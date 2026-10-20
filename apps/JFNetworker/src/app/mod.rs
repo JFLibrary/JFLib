@@ -6,11 +6,13 @@
 //
 // The state (Net, state.rs) sits behind an Rc<RefCell>: the canvas paints at render time and
 // borrows it through a Weak.  commands.rs has the command table, the menus and what the
-// commands do; constants.rs the ids.
+// commands do; constants.rs the ids; prefs.rs the user's settings; tr.rs the languages.
 
 pub(crate) mod commands;
 pub(crate) mod constants;
+pub(crate) mod prefs;
 pub(crate) mod state;
+pub(crate) mod tr;
 
 use alloc::rc::Rc;
 use core::cell::RefCell;

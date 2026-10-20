@@ -25,6 +25,7 @@ use jfn_sim::PortMode;
 use netpkt::{Ipv4, Prefix4};
 use ui::*;
 
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::{config, console};
 use crate::workspace::inspector::device::{if_rows, IfRow};
@@ -117,15 +118,15 @@ fn interfaces(n: &Net, dev: u32) -> Vec<IfInfo> {
 }
 
 // a section's heading
-fn heading(ui: &mut Ui, s: &str) {
-    ui.text(TS_BODY_STRONG, s);
+fn heading(ui: &mut Ui, s: &'static str) {
+    ui.text(TS_BODY_STRONG, t(s));
 }
 
 // a "label  field" row (the field follows, then box_end)
-fn field(ui: &mut Ui, label: &str) {
+fn field(ui: &mut Ui, label: &'static str) {
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.next_size(170, 0);
-    ui.text(TS_BODY | TX_SECONDARY, label);
+    ui.text(TS_BODY | TX_SECONDARY, if label.is_empty() { label } else { t(label) });
 }
 
 /// the Konfiguration tab of device window k (ids id .. id + 0x3F)
@@ -174,19 +175,19 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     heading(ui, "Allgemein");
     field(ui, "Gerätename");
     ui.next_size(220, 0);
-    let ev = ui.textbox(id + 1, Some("Name"), &mut f.host, 64);
+    let ev = ui.textbox(id + 1, Some(t("Name")), &mut f.host, 64);
     let mut set = ev & EV_COMMIT != 0 && ui.focused() == id + 1 && f.host != d.name;
     ui.next_flags(if f.host.trim() == d.name { ST_DISABLED } else { 0 });
-    if ui.button(id + 2, "Übernehmen") & EV_ACT != 0 {
+    if ui.button(id + 2, t("Übernehmen")) & EV_ACT != 0 {
         set = true;
     }
     ui.box_end();
     if set {
         let name = String::from(f.host.trim());
         if !jfn_model::project::valid_name(&name) {
-            f.err = format!("„{}“ ist kein gültiger Gerätename: Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe.", name);
+            f.err = tf("„{}“ ist kein gültiger Gerätename: Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe.", &[&name]);
         } else if n_name_taken(&n.doc.proj, dev, &name) {
-            f.err = format!("Der Name „{}“ ist schon vergeben.", name);
+            f.err = tf("Der Name „{}“ ist schon vergeben.", &[&name]);
         } else {
             run = Some((format!("{} umbenennen", d.name), alloc::vec![format!("hostname {}", name)]));
         }
@@ -209,9 +210,9 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             field(ui, "IPv4-Adresse mit Präfix");
             ui.next_size(220, 0);
             ui.next_flags(if x.dhcp { ST_DISABLED } else { 0 });
-            ui.textbox(id + 4, Some("z. B. 192.168.1.1/24"), &mut f.addr, 40);
+            ui.textbox(id + 4, Some(t("z. B. 192.168.1.1/24")), &mut f.addr, 40);
             let mut on = x.dhcp as i32;
-            if ui.checkbox(id + 8, "per DHCP", &mut on) & EV_ACT != 0 {
+            if ui.checkbox(id + 8, t("per DHCP"), &mut on) & EV_ACT != 0 {
                 dhcp = Some((x.name.clone(), on != 0));
             }
             ui.box_end();
@@ -223,17 +224,17 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             ui.box_end();
         } else if x.trunk {
             field(ui, "VLAN");
-            ui.text(TS_BODY, "Trunk (in der Konsole einstellen)");
+            ui.text(TS_BODY, t("Trunk (in der Konsole einstellen)"));
             ui.box_end();
         }
         if ios {
             field(ui, "Beschreibung");
             ui.next_size(-1, 0);
-            ui.textbox(id + 5, Some("z. B. zum Kern-Switch"), &mut f.descr, 240);
+            ui.textbox(id + 5, Some(t("z. B. zum Kern-Switch")), &mut f.descr, 240);
             ui.box_end();
         }
         field(ui, "");
-        ui.switch(id + 6, "Aktiv (nicht abgeschaltet)", &mut f.up);
+        ui.switch(id + 6, t("Aktiv (nicht abgeschaltet)"), &mut f.up);
         ui.box_end();
         // the lines the changed fields make
         let addr_changed = x.ip && !x.dhcp && f.addr.trim() != x.addr;
@@ -242,7 +243,7 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             match config::parse_addr(&f.addr) {
                 Some(p) => Some(p),
                 None => {
-                    bad = format!("„{}“ ist keine Adresse mit Präfix (10.0.0.1/24 oder 10.0.0.1 255.255.255.0).", f.addr.trim());
+                    bad = tf("„{}“ ist keine Adresse mit Präfix (10.0.0.1/24 oder 10.0.0.1 255.255.255.0).", &[f.addr.trim()]);
                     None
                 }
             }
@@ -254,7 +255,7 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             match f.vlan.trim().parse::<u16>() {
                 Ok(v) if (1..=4094).contains(&v) => Some(v),
                 _ => {
-                    bad = format!("„{}“ ist keine VLAN-Nummer (1 bis 4094).", f.vlan.trim());
+                    bad = tf("„{}“ ist keine VLAN-Nummer (1 bis 4094).", &[f.vlan.trim()]);
                     None
                 }
             }
@@ -294,7 +295,7 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         }
         ui.box_begin(0, BOX_H | BOX_END, 8);
         ui.next_flags(if lines.is_empty() && bad.is_empty() { ST_DISABLED } else { 0 });
-        if ui.accent_button(id + 9, "Übernehmen") & EV_ACT != 0 {
+        if ui.accent_button(id + 9, t("Übernehmen")) & EV_ACT != 0 {
             if !bad.is_empty() {
                 f.err = bad;
             } else {
@@ -308,17 +309,17 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         heading(ui, "Routing");
         field(ui, if ios { "Standardroute über" } else { "Standard-Gateway" });
         ui.next_size(220, 0);
-        let ev = ui.textbox(id + 0xA, Some("z. B. 192.168.1.254"), &mut f.gw, 40);
+        let ev = ui.textbox(id + 0xA, Some(t("z. B. 192.168.1.254")), &mut f.gw, 40);
         let mut set = ev & EV_COMMIT != 0 && ui.focused() == id + 0xA && f.gw.trim() != gw_now;
         ui.next_flags(if f.gw.trim() == gw_now { ST_DISABLED } else { 0 });
-        if ui.button(id + 0xB, "Setzen") & EV_ACT != 0 {
+        if ui.button(id + 0xB, t("Setzen")) & EV_ACT != 0 {
             set = true;
         }
         ui.box_end();
         if set {
-            let t = String::from(f.gw.trim());
-            match if t.is_empty() { Some(None) } else { Ipv4::parse(&t).map(Some) } {
-                None => f.err = format!("„{}“ ist keine IPv4-Adresse.", t),
+            let gw_text = String::from(f.gw.trim());
+            match if gw_text.is_empty() { Some(None) } else { Ipv4::parse(&gw_text).map(Some) } {
+                None => f.err = tf("„{}“ ist keine IPv4-Adresse.", &[&gw_text]),
                 Some(new) => {
                     let mut lines = Vec::new();
                     if ios {
@@ -344,13 +345,13 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         for (i, (p, via)) in statics.iter().enumerate().take(16) {
             ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
             ui.next_size(170, 0);
-            ui.text(TS_BODY | TX_SECONDARY, if i == 0 { "Statische Routen" } else { "" });
-            let via_s = via.map_or_else(|| String::from("direkt"), |v| format!("über {}", v));
+            ui.text(TS_BODY | TX_SECONDARY, if i == 0 { t("Statische Routen") } else { "" });
+            let via_s = via.map_or_else(|| String::from(t("direkt")), |v| tf("über {}", &[&v.to_string()]));
             ui.next_size(-1, 0);
             ui.text(TS_BODY, &format!("{} {}", p.trunc(), via_s));
             ui.next_flags(ST_SUBTLE | ST_COMPACT | ST_ICON_ONLY);
             ui.next_icon(IC_DELETE);
-            if ui.button(id + 0x10 + i as u32, &format!("Route {} entfernen", p.trunc())) & EV_ACT != 0 {
+            if ui.button(id + 0x10 + i as u32, &tf("Route {} entfernen", &[&p.trunc().to_string()])) & EV_ACT != 0 {
                 let line = if ios {
                     let v = via.map_or_else(String::new, |v| format!(" {}", v));
                     format!("no ip route {} {}{}", p.network(), p.mask(), v)
@@ -364,19 +365,19 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         }
         field(ui, "Neue Route");
         ui.next_size(150, 0);
-        ui.textbox(id + 0xC, Some("Netz, z. B. 10.2.0.0/16"), &mut f.net, 40);
-        ui.text(TS_BODY | TX_SECONDARY, "über");
+        ui.textbox(id + 0xC, Some(t("Netz, z. B. 10.2.0.0/16")), &mut f.net, 40);
+        ui.text(TS_BODY | TX_SECONDARY, t("über"));
         ui.next_size(140, 0);
-        ui.textbox(id + 0xD, Some("Next Hop"), &mut f.via, 40);
+        ui.textbox(id + 0xD, Some(t("Next Hop")), &mut f.via, 40);
         ui.next_flags(if f.net.trim().is_empty() || f.via.trim().is_empty() { ST_DISABLED } else { 0 });
-        if ui.button(id + 0xE, "Hinzufügen") & EV_ACT != 0 {
+        if ui.button(id + 0xE, t("Hinzufügen")) & EV_ACT != 0 {
             match (Prefix4::parse(f.net.trim()).filter(|p| p.len > 0), Ipv4::parse(f.via.trim())) {
                 (Some(p), Some(v)) => {
                     let line = if ios { format!("ip route {} {} {}", p.network(), p.mask(), v) } else { format!("ip route add {} via {}", p.trunc(), v) };
                     run = Some((format!("Route von {} hinzufügen", d.name), alloc::vec![line]));
                 }
-                (None, _) => f.err = format!("„{}“ ist kein Netz mit Präfix (z. B. 10.2.0.0/16).", f.net.trim()),
-                (_, None) => f.err = format!("„{}“ ist keine IPv4-Adresse.", f.via.trim()),
+                (None, _) => f.err = tf("„{}“ ist kein Netz mit Präfix (z. B. 10.2.0.0/16).", &[f.net.trim()]),
+                (_, None) => f.err = tf("„{}“ ist keine IPv4-Adresse.", &[f.via.trim()]),
             }
         }
         ui.box_end();
@@ -385,13 +386,13 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     heading(ui, "Startkonfiguration");
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.next_icon(IC_SAVE);
-    if ui.button(id + 0xF, "Laufende Konfiguration sichern") & EV_ACT != 0 {
+    if ui.button(id + 0xF, t("Laufende Konfiguration sichern")) & EV_ACT != 0 {
         save = true;
     }
     ui.next_size(-1, 0);
     ui.text(
         TS_CAPTION | TX_SECONDARY | TX_WRAP,
-        if ios { "Wie „copy running-config startup-config“ in der Konsole: was dort von Hand eingestellt wurde, bleibt beim nächsten Start." } else { "Die laufende Konfiguration (Adressen, Routen, Name) wird zur Startkonfiguration; eine Shell hat dafür keinen Befehl." },
+        t(if ios { "Wie „copy running-config startup-config“ in der Konsole: was dort von Hand eingestellt wurde, bleibt beim nächsten Start." } else { "Die laufende Konfiguration (Adressen, Routen, Name) wird zur Startkonfiguration; eine Shell hat dafür keinen Befehl." }),
     );
     ui.box_end();
     if !f.err.is_empty() {
@@ -399,11 +400,11 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         crate::workspace::error_text(ui, &err, 0);
     } else {
         ui.next_size(-1, 0);
-        ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, "Die Formulare tippen ihre Befehle in die Konsole des Geräts; sie gelten sofort und werden Teil der Startkonfiguration.");
+        ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Die Formulare tippen ihre Befehle in die Konsole des Geräts; sie gelten sofort und werden Teil der Startkonfiguration."));
     }
     if !f.ran.is_empty() {
         ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 2);
-        ui.text(TS_CAPTION | TX_SECONDARY, "Zuletzt in der Konsole:");
+        ui.text(TS_CAPTION | TX_SECONDARY, t("Zuletzt in der Konsole:"));
         for l in &f.ran {
             ui.text(TS_CAPTION, l);
         }

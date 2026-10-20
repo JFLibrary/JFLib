@@ -14,13 +14,13 @@
 // desktop's prompt) its tab and its window say so, with a button that brings that window to
 // the front.
 
-use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use ui::*;
 
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::console::{self, Rename};
 use crate::workspace::icons::JN_TERMINAL;
@@ -34,9 +34,9 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER | pad(12), 0);
         if floating {
-            ui.empty_state(JN_TERMINAL, "Die Konsolen sind in eigenen Fenstern", "„Andocken“ in einem Konsolenfenster bringt es als Tab hierher zurück.");
+            ui.empty_state(JN_TERMINAL, t("Die Konsolen sind in eigenen Fenstern"), t("„Andocken“ in einem Konsolenfenster bringt es als Tab hierher zurück."));
         } else {
-            ui.empty_state(JN_TERMINAL, "Keine Konsole geöffnet", "Hier erscheinen die Befehlszeilen der Geräte: IOS-artig bei Routern und Switches, eine Linux-Shell bei Hosts. Ein Doppelklick auf ein Gerät öffnet seine Konsole.");
+            ui.empty_state(JN_TERMINAL, t("Keine Konsole geöffnet"), t("Hier erscheinen die Befehlszeilen der Geräte: IOS-artig bei Routern und Switches, eine Linux-Shell bei Hosts. Ein Doppelklick auf ein Gerät öffnet seine Konsole."));
         }
         ui.box_end();
         return;
@@ -78,8 +78,8 @@ fn here(n: &mut Net, ui: &mut Ui, dev: u32) {
             let name = n.doc.proj.device(dev).map_or_else(String::new, |d| d.name.clone());
             ui.next_size(-1, -1);
             ui.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER | pad(12), 8);
-            ui.empty_state(JN_TERMINAL, &format!("Die Konsole von {} ist im Gerätefenster offen", name), "Eine Konsole erscheint an einer Stelle: solange das Gerätefenster sie zeigt, tippt man dort.");
-            if ui.button(ID_TERM_SHOW, "Gerätefenster zeigen") & EV_ACT != 0 {
+            ui.empty_state(JN_TERMINAL, &tf("Die Konsole von {} ist im Gerätefenster offen", &[&name]), t("Eine Konsole erscheint an einer Stelle: solange das Gerätefenster sie zeigt, tippt man dort."));
+            if ui.button(ID_TERM_SHOW, t("Gerätefenster zeigen")) & EV_ACT != 0 {
                 ui.window_activate(win);
             }
             ui.box_end();
@@ -109,20 +109,20 @@ fn rename_flyout(n: &mut Net, ui: &mut Ui) {
     if ui.flyout_begin(ID_TERM_RENAME, FL_BELOW) {
         if let Some(r) = &mut n.cons.rename {
             ui.box_begin(0, BOX_V | pad(8), 6);
-            ui.text(TS_BODY_STRONG, "Name des Tabs");
+            ui.text(TS_BODY_STRONG, t("Name des Tabs"));
             if ui.focused() == ID_TERM_RENAME_BOX && ui.capture_shortcut(VK_ESCAPE, 0) {
                 act = 2;
             }
             ui.next_size(240, 0);
-            let ev = ui.textbox(ID_TERM_RENAME_BOX, Some("leer: der Name des Geräts"), &mut r.text, 64);
+            let ev = ui.textbox(ID_TERM_RENAME_BOX, Some(t("leer: der Name des Geräts")), &mut r.text, 64);
             if ev & EV_COMMIT != 0 && ui.focused() == ID_TERM_RENAME_BOX {
                 act = 1;
             }
             ui.box_begin(0, BOX_H | BOX_END, 8);
-            if ui.accent_button(ID_TERM_RENAME_OK, "Umbenennen") & EV_ACT != 0 {
+            if ui.accent_button(ID_TERM_RENAME_OK, t("Umbenennen")) & EV_ACT != 0 {
                 act = 1;
             }
-            if ui.button(ID_TERM_RENAME_CANCEL, "Abbrechen") & EV_ACT != 0 {
+            if ui.button(ID_TERM_RENAME_CANCEL, t("Abbrechen")) & EV_ACT != 0 {
                 act = 2;
             }
             ui.box_end();
@@ -159,7 +159,7 @@ pub(crate) fn windows(n: &mut Net, ui: &mut Ui) {
         if dev.is_none() {
             open.set(0);
         }
-        let title = dev.map_or_else(String::new, |d| format!("Konsole – {}", n.cons.title(&n.doc.proj, d)));
+        let title = dev.map_or_else(String::new, |d| tf("Konsole – {}", &[&n.cons.title(&n.doc.proj, d)]));
         let id = ID_TERM_WIN0 + 0x10 * k as u32;
         if ui.window_begin(id, &title, Some(&open), WF_TOOL | WF_RESIZABLE, Some(&rect)) {
             if let Some(dev) = dev {
@@ -170,11 +170,11 @@ pub(crate) fn windows(n: &mut Net, ui: &mut Ui) {
                 ui.next_size(-1, 0);
                 ui.text(
                     TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS,
-                    if ios { "Strg+F sucht, Strg+Umschalt+6 bricht ab; Schließen dockt die Konsole wieder an." } else { "Strg+F sucht, Strg+C bricht ab; Schließen dockt die Konsole wieder an." },
+                    t(if ios { "Strg+F sucht, Strg+Umschalt+6 bricht ab; Schließen dockt die Konsole wieder an." } else { "Strg+F sucht, Strg+C bricht ab; Schließen dockt die Konsole wieder an." }),
                 );
                 ui.next_icon(IC_BACK_TO_WINDOW);
                 ui.next_flags(ST_SUBTLE | ST_COMPACT);
-                if ui.button(id + 1, "Andocken") & EV_ACT != 0 {
+                if ui.button(id + 1, t("Andocken")) & EV_ACT != 0 {
                     console::dock(n, dev);
                     ui.repass();
                 }
@@ -248,7 +248,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32) -> bool {
             if let Some(d) = cur
                 && !console::float(n, ui, d)
             {
-                n.file.msg = Some((IB_INFO, String::from("Kein Fenster frei"), format!("Höchstens {} Konsolen laufen in eigenen Fenstern; „Andocken“ gibt eines frei.", TERM_WINS)));
+                n.file.msg = Some((IB_INFO, String::from(t("Kein Fenster frei")), tf("Höchstens {} Konsolen laufen in eigenen Fenstern; „Andocken“ gibt eines frei.", &[&TERM_WINS.to_string()])));
             }
         }
         CMD_TERM_TILE => console::tile(n, ui),
@@ -267,7 +267,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32) -> bool {
 // the console of a device, or why it has none (the info bar above the canvas)
 fn open_console(n: &mut Net, ui: &mut Ui, dev: u32) {
     if let Err(e) = console::open(n, ui, dev) {
-        n.file.msg = Some((IB_INFO, String::from("Keine Konsole"), e));
+        n.file.msg = Some((IB_INFO, String::from(t("Keine Konsole")), e));
     }
 }
 

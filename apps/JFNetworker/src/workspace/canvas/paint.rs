@@ -45,6 +45,7 @@ use jfn_model::{catalog, ifname, CableKind, Project};
 use jfn_sim::Led;
 use ui::*;
 
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::workspace::icons::{tint_of, Symbols, TINTS};
 
@@ -342,18 +343,19 @@ impl Scene {
         let Some(&i) = self.at.get(&key) else { return String::from("–") };
         if let Some(n) = self.notes.get(i) {
             let first = n.text.lines().next().unwrap_or("").trim();
-            return if first.is_empty() { String::from("Notiz") } else { alloc::format!("Notiz: {}", first) };
+            return if first.is_empty() { String::from(t("Notiz")) } else { tf("Notiz: {}", &[first]) };
         }
         self.devs.get(i - self.notes.len()).map_or_else(|| String::from("–"), |d| d.name.clone())
     }
 }
 
-/// the colour (light theme), width (world units) and dash pattern of a cable
-fn cable_style(k: CableKind) -> (u32, f32, u32) {
+/// the colour (light theme; at least 3:1 against the canvas in both themes, selftest group
+/// ui), width (world units) and dash pattern of a cable
+pub(crate) fn cable_style(k: CableKind) -> (u32, f32, u32) {
     match k {
         CableKind::CopperStraight => (0xFF5A_6169, 2.0, DASH_SOLID),
         CableKind::CopperCross => (0xFF5A_6169, 2.0, DASH_DASH),
-        CableKind::FiberMm | CableKind::FiberSm => (0xFFC9_792B, 2.0, DASH_SOLID),
+        CableKind::FiberMm | CableKind::FiberSm => (0xFFB5_681F, 2.0, DASH_SOLID),
         CableKind::Serial => (0xFFB0_453F, 2.0, DASH_SOLID),
         CableKind::Console => (0xFF4F_86C6, 1.5, DASH_DOT),
         CableKind::Wireless => (0xFF3D_8C84, 1.0, DASH_DOT),
@@ -566,7 +568,7 @@ fn paint_notes(g: &mut Gfx, f: &DgFrame, sc: &Scene, nodes: &[u32], lod: bool) {
         }
         g.text.set_font(font, size);
         let line_h = (g.text.ascent() + g.text.descent()) * 6 / 5;
-        let (text, color) = if n.text.trim().is_empty() { ("Notiz", f.color(T_TEXT3)) } else { (n.text.as_str(), f.color(T_TEXT)) };
+        let (text, color) = if n.text.trim().is_empty() { (t("Notiz"), f.color(T_TEXT3)) } else { (n.text.as_str(), f.color(T_TEXT)) };
         g.dc.clip_push(q[0] + pad, q[1] + pad, iw, ih);
         g.dc.set_color(color);
         let mut y = q[1] + pad + g.text.ascent();

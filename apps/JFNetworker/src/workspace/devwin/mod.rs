@@ -25,7 +25,7 @@ pub(crate) mod desktop;
 pub(crate) mod services;
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use jfn_model::catalog::{self, CliStyle, F_HOST};
@@ -33,6 +33,7 @@ use jfn_model::ifname;
 use ui::*;
 
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::console;
 use crate::workspace::canvas::cables;
@@ -51,15 +52,16 @@ pub(crate) enum Tab {
 }
 
 impl Tab {
+    // its title in the current language
     fn title(self) -> &'static str {
-        match self {
+        t(match self {
             Tab::Overview => "Übersicht",
             Tab::Ifaces => "Schnittstellen",
             Tab::Config => "Konfiguration",
             Tab::Services => "Dienste",
             Tab::Cli => "CLI",
             Tab::Desktop => "Desktop",
-        }
+        })
     }
 }
 
@@ -169,7 +171,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
             n.devwin.wins[k] = None;
             continue;
         };
-        let title = format!("{} – {}", d.name, catalog::model(&d.model).map_or("Gerät", |m| m.name));
+        let title = format!("{} – {}", d.name, catalog::model(&d.model).map_or(t("Gerät"), |m| t(m.name)));
         let id = base(k);
         if ui.window_begin(id, &title, Some(&open), WF_TOOL | WF_RESIZABLE, Some(&rect)) {
             window(n, ui, k, dev);
@@ -190,7 +192,7 @@ fn window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
         w.tab = Tab::Overview;
     }
     let mut sel = tabs.iter().position(|&t| t == w.tab).unwrap_or(0) as i32;
-    let names: Vec<&str> = tabs.iter().map(|t| t.title()).collect();
+    let names: Vec<&str> = tabs.iter().map(|x| x.title()).collect();
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V | pad(10), 8);
     if ui.tabs(id + 1, &mut sel, &names) & EV_ACT != 0 {
@@ -243,42 +245,42 @@ fn overview(n: &mut Net, ui: &mut Ui, id: u32, dev: u32) {
     }
     ui.box_begin(0, BOX_V, 2);
     ui.text(TS_SUBTITLE, &d.name);
-    ui.text(TS_BODY | TX_SECONDARY, m.map_or("Unbekanntes Modell", |m| m.name));
+    ui.text(TS_BODY | TX_SECONDARY, m.map_or(t("Unbekanntes Modell"), |m| t(m.name)));
     ui.box_end();
     ui.box_end();
     let mut on = (!d.off) as i32;
-    if ui.switch(id + 0x11, "Eingeschaltet", &mut on) & EV_ACT != 0 {
+    if ui.switch(id + 0x11, t("Eingeschaltet"), &mut on) & EV_ACT != 0 {
         cables::set_power(n, &[dev], on != 0);
         ui.repass();
     }
     let rows = if_rows(n, dev);
     let ports = rows.iter().filter(|r| r.key < 0x1_0000).count();
-    let up = rows.iter().filter(|r| r.status == "aktiv").count();
+    let up = rows.iter().filter(|r| r.badge == BADGE_OK).count();
     let used = n.doc.proj.ports(dev).iter().filter(|(_, l)| l.is_some()).count();
     let svcs = n.doc.sim.engine().services(dev);
     let running = svcs.iter().filter(|s| s.running).count();
     ui.box_begin(0, BOX_V | BOX_CARD | pad(12), 6);
     if let Some(m) = m {
-        row(ui, "Modell", m.name);
-        row(ui, "Beschreibung", m.title);
-        row(ui, "Ports", &if m.groups.is_empty() { String::from("keine") } else { m.summary() });
+        row(ui, t("Modell"), t(m.name));
+        row(ui, t("Beschreibung"), t(m.title));
+        row(ui, t("Ports"), &if m.groups.is_empty() { String::from(t("keine")) } else { crate::app::tr::msg(&m.summary_msg()) });
     }
-    row(ui, "Belegt", &format!("{} von {} Ports", used, ports));
-    row(ui, "Status", &if d.off { String::from("ausgeschaltet") } else { format!("eingeschaltet, {} von {} Schnittstellen aktiv", up, rows.len()) });
-    row(ui, "Befehlszeile", match m.map(|m| m.cli) {
+    row(ui, t("Belegt"), &tf("{} von {} Ports", &[&used.to_string(), &ports.to_string()]));
+    row(ui, t("Status"), &if d.off { String::from(t("ausgeschaltet")) } else { tf("eingeschaltet, {} von {} Schnittstellen aktiv", &[&up.to_string(), &rows.len().to_string()]) });
+    row(ui, t("Befehlszeile"), t(match m.map(|m| m.cli) {
         Some(CliStyle::Ios) => "IOS-artig (Router, Switches)",
         Some(CliStyle::Linux) => "Linux-Shell",
         _ => "keine",
-    });
-    row(ui, "Dienste", &if svcs.is_empty() { String::from("keine") } else { format!("{} von {} laufen", running, svcs.len()) });
+    }));
+    row(ui, t("Dienste"), &if svcs.is_empty() { String::from(t("keine")) } else { tf("{} von {} laufen", &[&running.to_string(), &svcs.len().to_string()]) });
     if let Some(e) = n.doc.sim.errors.get(&dev) {
-        row(ui, "Simulator", &format!("läuft nicht: {}", e));
+        row(ui, t("Simulator"), &tf("läuft nicht: {}", &[&crate::app::tr::msg(e)]));
     }
     ui.box_end();
     // the first addresses at a glance
     let addrs: Vec<String> = rows.iter().filter(|r| r.ip != "–").map(|r| format!("{} {}", ifname::short(&r.name), r.ip)).take(6).collect();
     if !addrs.is_empty() {
-        ui.text(TS_BODY_STRONG, "Adressen");
+        ui.text(TS_BODY_STRONG, t("Adressen"));
         for a in &addrs {
             ui.text(TS_BODY, a);
         }
@@ -286,7 +288,7 @@ fn overview(n: &mut Net, ui: &mut Ui, id: u32, dev: u32) {
     if console::has_cli(&n.doc.proj, dev) {
         ui.box_begin(0, BOX_H, 8);
         ui.next_icon(JN_TERMINAL);
-        if ui.button(id + 0x12, "Konsole im Terminal öffnen") & EV_ACT != 0 {
+        if ui.button(id + 0x12, t("Konsole im Terminal öffnen")) & EV_ACT != 0 {
             let _ = console::open(n, ui, dev);
         }
         ui.box_end();
@@ -297,17 +299,19 @@ fn overview(n: &mut Net, ui: &mut Ui, id: u32, dev: u32) {
 
 // Schnittstellen: every interface with its state, addresses, far end, speed, VLAN, MAC and
 // frame counters
-const IF_COLS: [GridCol<'static>; 9] = [
-    GridCol::new("Port", 76).flags(GC_NOSORT),
-    GridCol::new("Status", 98).flags(GC_NOSORT),
-    GridCol::new("IP", 108).flags(GC_NOSORT),
-    GridCol::new("Gegenstelle", 108).flags(GC_NOSORT | GC_FILL),
-    GridCol::new("Speed", 72).flags(GC_NOSORT),
-    GridCol::new("VLAN", 50).flags(GC_NOSORT),
-    GridCol::new("MAC", 116).flags(GC_NOSORT),
-    GridCol::new("Empfangen", 86).flags(GC_NOSORT | GC_RIGHT),
-    GridCol::new("Gesendet", 86).flags(GC_NOSORT | GC_RIGHT),
-];
+fn if_cols() -> [GridCol<'static>; 9] {
+    [
+        GridCol::new(t("Port"), 76).flags(GC_NOSORT),
+        GridCol::new(t("Status"), 112).flags(GC_NOSORT),
+        GridCol::new(t("IP"), 108).flags(GC_NOSORT),
+        GridCol::new(t("Gegenstelle"), 108).flags(GC_NOSORT | GC_FILL),
+        GridCol::new(t("Speed"), 72).flags(GC_NOSORT),
+        GridCol::new(t("VLAN"), 50).flags(GC_NOSORT),
+        GridCol::new(t("MAC"), 116).flags(GC_NOSORT),
+        GridCol::new(t("Empfangen"), 86).flags(GC_NOSORT | GC_RIGHT),
+        GridCol::new(t("Gesendet"), 86).flags(GC_NOSORT | GC_RIGHT),
+    ]
+}
 
 fn ifaces(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
     let rows = if_rows(n, dev);
@@ -326,14 +330,15 @@ fn ifaces(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
     if rows.is_empty() {
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER, 0);
-        ui.empty_state(IC_INFO, "Keine Schnittstellen", "Dieses Gerät hat keine Ports oder läuft nicht im Simulator.");
+        ui.empty_state(IC_INFO, t("Keine Schnittstellen"), t("Dieses Gerät hat keine Ports oder läuft nicht im Simulator."));
         ui.box_end();
         return;
     }
     let keys: Vec<u64> = rows.iter().map(|r| r.key).collect();
     w.ifs.retain(&keys);
     ui.next_size(-1, -1);
-    let (first, end) = ui.grid_begin(id, &mut w.ifs, &IF_COLS, &keys);
+    let cols = if_cols();
+    let (first, end) = ui.grid_begin(id, &mut w.ifs, &cols, &keys);
     let num = |v: u64| if v == u64::MAX { String::from("–") } else { format!("{}", v) };
     for i in first..end {
         let r = &rows[i as usize];

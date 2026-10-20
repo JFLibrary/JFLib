@@ -10,6 +10,8 @@
 //   Engine::traceroute(dev, dst, TraceOpts) -> JobId   UDP probes to port 33434 + n with
 //                                                      TTL 1, 2, ...: Time Exceeded names the
 //                                                      hops, Port Unreachable the target
+//   Engine::traceroute_host(dev, host, TraceOpts)      the same for a name (looked up first, as
+//                                                      ping_host does)
 //   Engine::job(id) / jobs() / cancel_job(id)          the results grow while it runs
 //   Engine::ping_many(k) -> started                    one probe each from k hosts at once
 //                                                      (load for performance tests)
@@ -164,6 +166,10 @@ pub struct TraceJob {
     /// the destination port of the probe on its way and when it left
     waiting: Option<(u16, Ns)>,
     next_port: u16,
+    /// the name it was started with (traceroute_host)
+    pub host: Option<String>,
+    /// the lookup of the device's resolver for the name
+    pub lookup: Option<u32>,
 }
 
 #[derive(Clone, Debug)]
@@ -334,6 +340,8 @@ impl Engine {
                 j.done = true;
                 j.epoch = j.epoch.wrapping_add(1);
             }
+            // a console waits for it ("ping: NAME: Name or service not known")
+            self.cli_job(id);
             return;
         };
         let src = match &j.kind {
@@ -356,10 +364,13 @@ impl Engine {
             p.errors = 1;
             p.events.push(PingEv::Error { seq: 1, from: Ipv4::UNSPECIFIED, kind: IcmpKind::NoRoute });
             j.done = true;
+            self.cli_job(id);
             return;
         }
         self.ping_send(id);
         self.ping_schedule(id);
+        // the console prints its first line now ("PING NAME (ADDR) ...")
+        self.cli_job(id);
     }
 
     fn ping_send(&mut self, id: JobId) {
@@ -562,7 +573,7 @@ impl Engine {
         };
         let src = self.source_for(ni, dst).unwrap_or(Ipv4::UNSPECIFIED);
         let port = o.port;
-        let job = TraceJob { dst, src, opts: o, ident, ttl: 1, hops: Vec::new(), reached: false, waiting: None, next_port: port };
+        let job = TraceJob { dst, src, opts: o, ident, ttl: 1, hops: Vec::new(), reached: false, waiting: None, next_port: port, host: None, lookup: None };
         let id = self.new_job(ni, JobKind::Trace(job));
         if src.is_unspecified() {
             if let Some(j) = self.jobs.get_mut(&id)
@@ -576,6 +587,71 @@ impl Engine {
         }
         self.trace_send(id);
         Ok(id)
+    }
+
+    /// traces the route to a name or an address; a name is looked up by the device's resolver
+    /// first (a failed lookup ends the job without probes)
+    pub fn traceroute_host(&mut self, dev: u32, host: &str, o: TraceOpts) -> Result<JobId, ActErr> {
+        if let Some(ip) = Ipv4::parse(host.trim()) {
+            return self.traceroute(dev, ip, o);
+        }
+        self.trace.new_batch();
+        let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+        if self.stack(ni).is_none() || self.os(ni).is_none() {
+            return Err(ActErr::NoIp(dev));
+        }
+        let ident = match self.nodes.get_mut(ni) {
+            Some(Some(n)) => 32768 + (n.rng.next_u32() % 28000) as u16,
+            _ => 40000,
+        };
+        let port = o.port;
+        let job = TraceJob { dst: Ipv4::UNSPECIFIED, src: Ipv4::UNSPECIFIED, opts: o, ident, ttl: 1, hops: Vec::new(), reached: false, waiting: None, next_port: port, host: Some(String::from(host.trim())), lookup: None };
+        let id = self.new_job(ni, JobKind::Trace(job));
+        let lookup = self.lookup_start(ni, host, netpkt::dns::TYPE_A, crate::resolver::Owner::Trace(id));
+        if let Some(j) = self.jobs.get_mut(&id)
+            && let JobKind::Trace(t) = &mut j.kind
+        {
+            t.lookup = Some(lookup);
+        }
+        Ok(id)
+    }
+
+    /// the lookup of a traceroute_host job is done: trace the address, or end without probes
+    pub(crate) fn trace_resolved(&mut self, id: JobId, addr: Option<Ipv4>) {
+        let Some(j) = self.jobs.get(&id) else {
+            return;
+        };
+        if j.done {
+            return;
+        }
+        let ni = j.node;
+        let src = addr.and_then(|dst| self.source_for(ni, dst));
+        let Some(j) = self.jobs.get_mut(&id) else {
+            return;
+        };
+        let JobKind::Trace(t) = &mut j.kind else {
+            return;
+        };
+        match (addr, src) {
+            (Some(dst), Some(src)) => {
+                t.dst = dst;
+                t.src = src;
+                self.trace_send(id);
+            }
+            (Some(dst), None) => {
+                // no route: the first hop fails at once, as traceroute() does it
+                t.dst = dst;
+                push_probe(t, 1, TraceProbe { from: None, rtt: 0, kind: Some(IcmpKind::NoRoute) });
+                t.reached = true;
+                j.done = true;
+                j.epoch = j.epoch.wrapping_add(1);
+            }
+            (None, _) => {
+                j.done = true;
+                j.epoch = j.epoch.wrapping_add(1);
+            }
+        }
+        self.cli_job(id);
     }
 
     fn trace_send(&mut self, id: JobId) {

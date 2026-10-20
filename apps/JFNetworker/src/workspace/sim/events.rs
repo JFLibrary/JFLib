@@ -20,7 +20,7 @@
 // says so.
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use jfn_sim::Ns;
@@ -28,6 +28,7 @@ use ui::*;
 
 use super::{cat_color, cat_of, hidden, CATS, CAT_OTHER};
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 
 /// a recorded decision as the list needs it
@@ -42,14 +43,17 @@ struct Row {
     own: u32,
 }
 
-const COLS: [GridCol; 6] = [
-    GridCol::new("#", 56).flags(GC_RIGHT | GC_NOSORT),
-    GridCol::new("Zeit (s)", 128).flags(GC_RIGHT | GC_NOSORT),
-    GridCol::new("Von", 84).flags(GC_NOSORT),
-    GridCol::new("Bei", 84).flags(GC_NOSORT),
-    GridCol::new("Typ", 92).flags(GC_NOSORT),
-    GridCol::new("Info", 240).flags(GC_FILL | GC_NOSORT),
-];
+// the columns in the current language
+fn cols() -> [GridCol<'static>; 6] {
+    [
+        GridCol::new("#", 56).flags(GC_RIGHT | GC_NOSORT),
+        GridCol::new(t("Zeit (s)"), 128).flags(GC_RIGHT | GC_NOSORT),
+        GridCol::new(t("Von"), 84).flags(GC_NOSORT),
+        GridCol::new(t("Bei"), 84).flags(GC_NOSORT),
+        GridCol::new(t("Typ"), 92).flags(GC_NOSORT),
+        GridCol::new(t("Info"), 240).flags(GC_FILL | GC_NOSORT),
+    ]
+}
 
 pub(crate) struct Events {
     pub grid: GridState,
@@ -243,11 +247,11 @@ fn chips(n: &mut Net, ui: &mut Ui) {
     let h = hidden(n);
     let dark = ui.theme_dark();
     ui.box_begin(0, BOX_H | BOX_XCENTER | pad(4), 4);
-    ui.text(TS_CAPTION | TX_SECONDARY, "Protokolle");
+    ui.text(TS_CAPTION | TX_SECONDARY, t("Protokolle"));
     for (k, c) in CATS.iter().enumerate() {
         let mut on = (h & 1 << k == 0) as i32;
         ui.next_flags(ST_COMPACT);
-        if ui.toggle_button(ID_EV_CHIP0 + k as u32, c.name, &mut on) & EV_ACT != 0 {
+        if ui.toggle_button(ID_EV_CHIP0 + k as u32, t(c.name), &mut on) & EV_ACT != 0 {
             ui.cmd_run(CMD_SIM_CAT0 + k as u32, 0);
         }
         // the category's colour as a bar along the chip's bottom edge
@@ -255,22 +259,22 @@ fn chips(n: &mut Net, ui: &mut Ui) {
         let col = if on != 0 { cat_color(k, dark) } else { color_mix(cat_color(k, dark), ui.color(T_BG) | 0xFF00_0000, 170) };
         let bh = ui.dp(3);
         ui.cmd_rrect(r[0] + ui.dp(6), r[1] + r[3] - bh - ui.dp(3), r[2] - ui.dp(12), bh, bh / 2, 0, col, 0, 0);
-        ui.tooltip(if k == CAT_OTHER { "Ethernet ohne bekanntes Protokoll, LLDP, IPv6, IGMP" } else { "Ein- oder ausblenden: Schritte, Liste, Zeitleiste und Leinwand" });
+        ui.tooltip(t(if k == CAT_OTHER { "Ethernet ohne bekanntes Protokoll, LLDP, IPv6, IGMP" } else { "Ein- oder ausblenden: Schritte, Liste, Zeitleiste und Leinwand" }));
     }
     ui.next_size(1, 20);
     ui.separator();
     let mut only = n.sim.only_sel as i32;
     ui.next_flags(ST_COMPACT);
-    if ui.toggle_button(ID_EV_ONLY_SEL, "Nur Auswahl", &mut only) & EV_ACT != 0 {
+    if ui.toggle_button(ID_EV_ONLY_SEL, t("Nur Auswahl"), &mut only) & EV_ACT != 0 {
         ui.cmd_run(CMD_SIM_ONLY_SEL, 0);
     }
     let names: Vec<String> = n.sim.sel_devs.iter().filter_map(|&d| n.doc.proj.device(d).map(|x| x.name.clone())).collect();
-    ui.tooltip(&if n.sim.only_sel && !names.is_empty() { format!("Nur: {}", names.join(", ")) } else { String::from("Nur die auf der Leinwand gewählten Geräte") });
+    ui.tooltip(&if n.sim.only_sel && !names.is_empty() { tf("Nur: {}", &[&names.join(", ")]) } else { String::from(t("Nur die auf der Leinwand gewählten Geräte")) });
     ui.spacer(-1);
     let all = n.sim.ev.rows.len();
     let k = n.sim.ev.keys.len();
-    ui.text(TS_CAPTION | TX_SECONDARY, &format!("{} von {}", k, all));
-    ui.tooltip("Gezeigte Ereignisse von allen aufgezeichneten");
+    ui.text(TS_CAPTION | TX_SECONDARY, &tf("{} von {}", &[&k.to_string(), &all.to_string()]));
+    ui.tooltip(t("Gezeigte Ereignisse von allen aufgezeichneten"));
     ui.spacer(4);
     ui.box_end();
 }
@@ -303,11 +307,11 @@ fn timeline(n: &mut Net, ui: &mut Ui) {
     let mut tracks: Vec<TlTrack> = Vec::new();
     for (k, c) in CATS.iter().enumerate() {
         if !ev.ticks[k].is_empty() {
-            tracks.push(TlTrack { label: c.name, ticks: &ev.ticks[k] });
+            tracks.push(TlTrack { label: t(c.name), ticks: &ev.ticks[k] });
         }
     }
     if tracks.is_empty() {
-        tracks.push(TlTrack { label: "Ereignisse", ticks: &[] });
+        tracks.push(TlTrack { label: t("Ereignisse"), ticks: &[] });
     }
     ui.next_size(-1, -1);
     let e = ui.timeline(ID_EV_TIMELINE, &mut ev.tl, (0.0, secs_f(now).max(1e-6)), &tracks);
@@ -355,14 +359,14 @@ fn grid(n: &mut Net, ui: &mut Ui) {
         }
     }
     if n.sim.ev.keys.is_empty() {
-        let text = if n.sim.ev.rows.is_empty() {
+        let text = t(if n.sim.ev.rows.is_empty() {
             "Hier stehen die Entscheidungen der Geräte Schritt für Schritt: wer einen Rahmen bekam, was er damit tat. Eine PDU (Werkzeug P) oder ein ping auf einer Konsole füllt die Liste."
         } else {
             "Die gewählten Protokolle und Geräte haben keine Ereignisse."
-        };
+        });
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER | pad(12), 0);
-        ui.empty_state(IC_BULLETED_LIST, "Noch keine Ereignisse", text);
+        ui.empty_state(IC_BULLETED_LIST, t("Noch keine Ereignisse"), text);
         ui.box_end();
         return;
     }
@@ -370,10 +374,11 @@ fn grid(n: &mut Net, ui: &mut Ui) {
     let keys = n.sim.ev.keys.clone();
     let mut st = core::mem::take(&mut n.sim.ev.grid);
     ui.next_size(-1, -1);
-    let (first, end) = ui.grid_begin(ID_EV_GRID, &mut st, &COLS, &keys);
+    let cols = cols();
+    let (first, end) = ui.grid_begin(ID_EV_GRID, &mut st, &cols, &keys);
     let eng = n.doc.sim.engine();
     let p = &n.doc.proj;
-    let name = |d: u32| p.device(d).map_or_else(|| eng.node(d).map_or_else(|| format!("Gerät {}", d), |x| x.name.clone()), |x| x.name.clone());
+    let name = |d: u32| p.device(d).map_or_else(|| eng.node(d).map_or_else(|| tf("Gerät {}", &[&d.to_string()]), |x| x.name.clone()), |x| x.name.clone());
     let (_, scroll) = ui.scroll_pos(ID_EV_GRID);
     let mut row_h = 0;
     // the top of the lines' view (px): a line's top less its place in the list
@@ -399,12 +404,12 @@ fn grid(n: &mut Net, ui: &mut Ui) {
         let q = ui.place(d, d);
         ui.cmd_rrect(q[0], q[1], d, d, ui.dp(2), 0, cat_color(cat_of(r.own), dark), 0, 0);
         let proto = er.as_ref().map_or("", |x| x.proto);
-        ui.text(TS_BODY | TX_ELLIPSIS, if proto.is_empty() { "Leitung" } else { proto });
+        ui.text(TS_BODY | TX_ELLIPSIS, if proto.is_empty() { t("Leitung") } else { proto });
         ui.box_end();
         let text = match er {
-            Some(x) if x.drop => format!("× verworfen: {}", x.text),
-            Some(x) => x.text,
-            None => String::from("(nicht mehr aufgezeichnet)"),
+            Some(x) if x.drop => tf("× verworfen: {}", &[&crate::app::tr::msg(&x.msg)]),
+            Some(x) => crate::app::tr::msg(&x.msg),
+            None => String::from(t("(nicht mehr aufgezeichnet)")),
         };
         ui.grid_text(&st, 5, &text);
     }

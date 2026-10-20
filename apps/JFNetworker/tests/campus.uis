@@ -1,0 +1,196 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/campus.jfnet
+# the acceptance of phase 1 in the window: the campus (tests/fixtures/campus.jfnet).  The four PCs
+# get their leases from R1 over MLS1's relay ("ip helper-address" on both VLAN interfaces);
+# PC1's shell renews its lease straight from R1 (dhclient -v), shows /etc/resolv.conf from DHCP,
+# pings server.lab and traces the way there over MLS1 and R1; MLS1 shows its routes and the MAC
+# addresses of the four PCs, R1 its DHCP bindings and routes.  In the simulation mode PC2, which
+# has not talked yet, pings SRV1 with a simple PDU (tool P): step by step (F7) first the ARP
+# request for its gateway, MLS1's answer (and the flooded copy PC1 drops), then the echo, which
+# MLS1 routes on to R1; the Paket tab shows MLS1's step with the echo and its correct IPv4 and
+# ICMP checksums.  Shots of every part for the acceptance (build/jfnetworker/campus_*.png),
+# some dark and at 150 %.
+# Ids: the consoles in the order they open, R1 25088 (input 25089), MLS1 25096 (input 25097),
+# PC1 25104 (input 25105); the PDU tool 172; frame k on the canvas #37888+k (the PDU's ARP
+# request is frame 162,
+# MLS1's answer 164, the echo 165, routed on to R1 166).  The bottom dock is dragged up for the
+# consoles, so they show 26 rows (lines scrolled out of view have no text records), and for the
+# Paket tab, beside the folded device palette.
+size 1280 900
+theme light
+# the leases come within a few seconds of virtual time
+wait 6000
+expect listitem:"Notiz: VLAN 10 Staff: 10.10.10.0/24, Gateway 10.10.10.1 (MLS1)" exists
+expect listitem:"R1" exists
+expect listitem:"SRV1" exists
+shot build/jfnetworker/campus_topology.png
+theme dark
+shot build/jfnetworker/campus_topology_dark.png
+theme light
+# ---- the consoles: R1, MLS1 and PC1 (opened while all three are on the canvas)
+dblclick listitem:"R1"
+wait 600
+dblclick listitem:"MLS1"
+wait 600
+dblclick listitem:"PC1"
+expect tab:"PC1" selected
+expect #25105 focused
+drag 630,671 630,380 8
+# the lease again, straight from R1 over MLS1 (the client's unicast renewal; the window's
+# clock moves in steps of up to 250 ms)
+type "dhclient -v eth0\n"
+wait 400
+expect text:"DHCPREQUEST for 10.10.10.100 on eth0 to 10.10.0.1 port 67 (xid=0x941ca6e2)" exists
+expect text:"DHCPACK of 10.10.10.100 from 10.10.0.1 (xid=0x941ca6e2)" exists
+expect text:"bound to 10.10.10.100 -- renewal in 41830 seconds." exists
+type "cat /etc/resolv.conf\n"
+expect text:"search lab" exists
+expect text:"nameserver 10.10.100.10" exists
+# by name: R1 knows SRV1 already (NTP at the start), the first answer comes at once
+type "ping -c 2 server.lab\n"
+expect #25105 missing
+wait 2500
+expect text:"PING server.lab (10.10.100.10) 56(84) bytes of data." exists
+expect text:"64 bytes from 10.10.100.10: icmp_seq=2 ttl=62 time=0.005 ms" exists
+expect text:"--- server.lab ping statistics ---" exists
+expect text:"2 packets transmitted, 2 received, 0% packet loss, time 1000ms" exists
+expect #25105 focused
+type "traceroute server.lab\n"
+wait 500
+expect text:"traceroute to server.lab (10.10.100.10), 30 hops max, 60 byte packets" exists
+expect text:" 1  10.10.10.1 (10.10.10.1)  0.002 ms  0.002 ms  0.002 ms" exists
+expect text:" 2  10.10.0.1 (10.10.0.1)  0.003 ms  0.003 ms  0.003 ms" exists
+expect text:" 3  10.10.100.10 (10.10.100.10)  0.005 ms  0.005 ms  0.005 ms" exists
+shot build/jfnetworker/campus_console.png
+theme dark
+shot build/jfnetworker/campus_console_dark.png
+scale 150
+shot build/jfnetworker/campus_console_150.png
+scale 100
+theme light
+# MLS1: routes (its VLAN interfaces, the default route to R1) and the PCs' MAC addresses
+click tab:"MLS1"
+expect #25097 focused
+type "enable\n"
+type "show ip route\n"
+expect text:"S*    0.0.0.0/0 [1/0] via 10.10.0.1" exists
+expect text:"C        10.10.10.0/24 is directly connected, Vlan10" exists
+expect text:"C        10.10.20.0/24 is directly connected, Vlan20" exists
+type "show mac address-table\n"
+expect text:"  10    024a.0000.0401    DYNAMIC     Gi1/0/1" exists
+expect text:"  10    024a.0000.0501    DYNAMIC     Gi1/0/2" exists
+expect text:"  20    024a.0000.0601    DYNAMIC     Gi1/0/3" exists
+expect text:"  20    024a.0000.0701    DYNAMIC     Gi1/0/4" exists
+expect text:"Total Mac Addresses for this criterion: 4" exists
+# MLS1 in the inspector beside its console
+click listitem:"MLS1"
+move 640,890
+expect listitem:"MLS1" selected
+shot build/jfnetworker/campus_show_mls1.png
+# R1: who got which address, the routes back to the VLANs
+click tab:"R1"
+expect #25089 focused
+type "enable\n"
+type "show ip dhcp binding\n"
+expect text:"10.10.10.100        0102.4a00.0004.01       Mar 02 1993 12:00 AM    Automatic" exists
+expect text:"10.10.10.101        0102.4a00.0005.01       Mar 02 1993 12:00 AM    Automatic" exists
+expect text:"10.10.20.100        0102.4a00.0006.01       Mar 02 1993 12:00 AM    Automatic" exists
+expect text:"10.10.20.101        0102.4a00.0007.01       Mar 02 1993 12:00 AM    Automatic" exists
+type "show ip route\n"
+expect text:"S        10.10.10.0/24 [1/0] via 10.10.0.2" exists
+expect text:"S        10.10.20.0/24 [1/0] via 10.10.0.2" exists
+expect text:"C        10.10.100.0/24 is directly connected, GigabitEthernet0/0/1" exists
+shot build/jfnetworker/campus_show_r1.png
+# ---- the simulation mode: the dock back to its height, PC2 pings SRV1 (a simple PDU)
+drag 630,380 630,573 8
+click tab:"Simulation"
+wait 200
+expect tab:"Simulation" selected
+key p
+expect #172 checked
+click listitem:"PC2"
+wait 600
+click listitem:"SRV1"
+key esc
+expect #172 unchecked
+expect text:"#1 ICMP · PC2 → SRV1" exists
+expect text:"läuft: 1 von 1 gesendet, 0 Antworten" exists
+# PC2 asks for its gateway first (the times of the steps depend on when the PDU starts: they
+# are not checked)
+expect button:"Rahmen 162: PC2 → MLS1 · Who has 10.10.10.1? Tell 10.10.10.101" exists
+# a step: MLS1 answers (and floods the broadcast to PC1)
+key f7
+wait 1200
+expect button:"Rahmen 162: PC2 → MLS1 · Who has 10.10.10.1? Tell 10.10.10.101" missing
+expect button:"Rahmen 164: MLS1 → PC2 · 10.10.10.1 is at 02:4a:00:00:02:00" exists
+expect button:"Rahmen 163: MLS1 → PC1 · Who has 10.10.10.1? Tell 10.10.10.101" exists
+expect text:"ARP-Antwort an Vlan10: 10.10.10.1 ist 02:4a:00:00:02:00." exists
+move 640,890
+shot build/jfnetworker/campus_sim_arp.png
+# the next step: PC2 knows the gateway and sends the echo; PC1 dropped its copy
+key f7
+wait 1200
+expect text:"ARP-Eintrag 10.10.10.1 → 02:4a:00:00:02:00." exists
+expect #38052 missing
+expect #38053 exists
+expect button:"Rahmen 165: PC2 → MLS1 · Echo (ping) request id=0xc266, seq=1, ttl=64" exists
+# and on: MLS1 routes the echo over the fiber to R1 (one hop less to live)
+key f7
+wait 1200
+expect #38053 missing
+expect button:"Rahmen 166: MLS1 → R1 · Echo (ping) request id=0xc266, seq=1, ttl=63" exists
+move 640,890
+shot build/jfnetworker/campus_sim_icmp.png
+# back a step: the hint above the canvas says the view is in the past, the echo leaves PC2
+key shift+f7
+wait 1200
+expect button:"Zurück zu live" exists
+expect #38053 exists
+expect #38054 missing
+# the echo in the Paket tab: it has reached MLS1 by now, so MLS1's step (the echo in, the
+# routing decision, the echo out to R1) and the echo's checksums
+click #38053
+wait 100
+expect tab:"Paket" selected
+expect link:"#165 ICMP von PC2 (an MLS1 Gi1/0/2)" exists
+expect link:"#166 ICMP an R1 (über MLS1 Te1/1/1)" exists
+click button:"Einklappen: Geräte"
+wait 100
+drag 630,573 630,190 8
+wait 100
+expect listitem:"Internet Protocol Version 4, Src: 10.10.10.101, Dst: 10.10.100.10" exists
+expect listitem:"Time to Live: 64" exists
+expect listitem:"Header Checksum: 0xf823 [correct]" exists
+expect listitem:"Internet Control Message Protocol" exists
+expect listitem:"Checksum: 0x3e85 [correct]" exists
+click listitem:"Header Checksum: 0xf823 [correct]"
+wait 100
+move 640,890
+expect listitem:"Header Checksum: 0xf823 [correct]" selected
+expect text:"Bytes 24–25 · Header Checksum: 0xf823 [correct]" exists
+shot build/jfnetworker/campus_packet.png
+# (a second click on the tree only after the double-click time)
+wait 600
+click listitem:"Checksum: 0x3e85 [correct]"
+wait 100
+move 640,890
+expect listitem:"Checksum: 0x3e85 [correct]" selected
+expect text:"Bytes 36–37 · Checksum: 0x3e85 [correct]" exists
+# the dark colours keep the field chosen
+theme dark
+wait 100
+move 640,890
+expect listitem:"Checksum: 0x3e85 [correct]" selected
+expect text:"Bytes 36–37 · Checksum: 0x3e85 [correct]" exists
+shot build/jfnetworker/campus_packet_dark.png
+scale 150
+wait 100
+move 960,1335
+shot build/jfnetworker/campus_packet_150.png
+scale 100
+theme light
+# Echtzeit again (back to live first): the echo comes back, the PDU is done
+click tab:"Echtzeit"
+wait 1000
+expect tab:"Echtzeit" selected
+expect text:"fertig: 1 gesendet, alle beantwortet" exists
+expect_nowarn

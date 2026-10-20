@@ -16,13 +16,14 @@ mod cable;
 pub(crate) mod device;
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use jfn_model::Project;
 use ui::*;
 
 use crate::app::constants::*;
+use crate::app::tr::{t, tc, tf};
 use crate::app::Net;
 use crate::doc::edits::{self, Item};
 use crate::workspace::canvas::{self, cables};
@@ -112,7 +113,7 @@ pub(crate) fn field_begin(ui: &mut Ui, key: &str) {
 
 fn note(n: &mut Net, ui: &mut Ui, id: u32) {
     let Some(o) = n.doc.proj.note(id).cloned() else { return };
-    ui.text(TS_SUBTITLE, "Notiz");
+    ui.text(TS_SUBTITLE, t("Notiz"));
     let ins = &mut n.inspector;
     if ins.note_for != id || ins.note_src != o.text {
         ins.note = o.text.clone();
@@ -120,10 +121,10 @@ fn note(n: &mut Net, ui: &mut Ui, id: u32) {
         ins.note_for = id;
     }
     ui.next_size(-1, 120);
-    ui.textbox(ID_INS_NOTE, Some("Text der Notiz"), &mut ins.note, 2000 | TB_MULTI | TB_WRAP);
+    ui.textbox(ID_INS_NOTE, Some(t("Text der Notiz")), &mut ins.note, 2000 | TB_MULTI | TB_WRAP);
     ui.box_begin(0, BOX_H | BOX_END, 8);
     ui.next_flags(if ins.note == o.text { ST_DISABLED } else { 0 });
-    if ui.button(ID_INS_NOTE_APPLY, "Übernehmen") & EV_ACT != 0 {
+    if ui.button(ID_INS_NOTE_APPLY, t("Übernehmen")) & EV_ACT != 0 {
         let text = String::from(ins.note.trim_end());
         if let Some(e) = edits::note_text(&n.doc.proj, id, &text) {
             n.doc.apply(e);
@@ -132,8 +133,8 @@ fn note(n: &mut Net, ui: &mut Ui, id: u32) {
     }
     ui.box_end();
     rows_begin(ui);
-    row(ui, "Position", &format!("{}, {}", o.x, o.y));
-    row(ui, "Größe", &format!("{} × {}", o.w, o.h));
+    row(ui, t("Position"), &format!("{}, {}", o.x, o.y));
+    row(ui, t("Größe"), &format!("{} × {}", o.w, o.h));
     ui.box_end();
 }
 
@@ -144,55 +145,55 @@ fn several(n: &mut Net, ui: &mut Ui, sel: &[u32]) {
     let links = sel.iter().filter(|&&id| p.link(id).is_some()).count();
     let notes = sel.iter().filter(|&&id| p.note(id).is_some()).count();
     let off = devs.iter().filter(|&&d| p.device(d).is_some_and(|d| d.off)).count();
-    ui.text(TS_SUBTITLE, &format!("{} Objekte", sel.len()));
+    ui.text(TS_SUBTITLE, &tf("{} Objekte", &[&sel.len().to_string()]));
     rows_begin(ui);
-    row(ui, "Geräte", &if names.is_empty() { String::from("keine") } else { names.join(", ") });
+    row(ui, t("Geräte"), &if names.is_empty() { String::from(t("keine")) } else { names.join(", ") });
     if !devs.is_empty() {
-        row(ui, "Strom", &match off {
-            0 => String::from("alle eingeschaltet"),
-            k if k == devs.len() => String::from("alle ausgeschaltet"),
-            k => format!("{} von {} ausgeschaltet", k, devs.len()),
+        row(ui, t("Strom"), &match off {
+            0 => String::from(t("alle eingeschaltet")),
+            k if k == devs.len() => String::from(t("alle ausgeschaltet")),
+            k => tf("{} von {} ausgeschaltet", &[&k.to_string(), &devs.len().to_string()]),
         });
     }
     if links > 0 {
-        row(ui, "Kabel", &format!("{}", links));
+        row(ui, tc("Kabel|Anzahl"), &format!("{}", links));
     }
     if notes > 0 {
-        row(ui, "Notizen", &format!("{}", notes));
+        row(ui, t("Notizen"), &format!("{}", notes));
     }
     ui.box_end();
     if !devs.is_empty() {
         ui.box_begin(0, BOX_H, 8);
         ui.next_flags(if off == 0 { ST_DISABLED } else { 0 });
-        if ui.button(ID_INS_ALL_ON, "Alle einschalten") & EV_ACT != 0 {
+        if ui.button(ID_INS_ALL_ON, t("Alle einschalten")) & EV_ACT != 0 {
             cables::set_power(n, &devs, true);
             ui.repass();
         }
         ui.next_flags(if off == devs.len() { ST_DISABLED } else { 0 });
-        if ui.button(ID_INS_ALL_OFF, "Alle ausschalten") & EV_ACT != 0 {
+        if ui.button(ID_INS_ALL_OFF, t("Alle ausschalten")) & EV_ACT != 0 {
             cables::set_power(n, &devs, false);
             ui.repass();
         }
         ui.box_end();
     }
     ui.next_size(-1, 0);
-    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, "Ziehen verschiebt alle; Entf löscht sie, Geräte mit ihren Kabeln.");
+    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Ziehen verschiebt alle; Entf löscht sie, Geräte mit ihren Kabeln."));
 }
 
 fn project(n: &mut Net, ui: &mut Ui) {
-    ui.text(TS_SUBTITLE, "Projekt");
+    ui.text(TS_SUBTITLE, t("Projekt"));
     let title = n.doc.proj.title.clone();
     let ins = &mut n.inspector;
     if ins.title_src != title {
         ins.title = title.clone();
         ins.title_src = title.clone();
     }
-    ui.text(TS_BODY_STRONG, "Titel");
+    ui.text(TS_BODY_STRONG, t("Titel"));
     if ui.focused() == ID_INS_TITLE && ui.capture_shortcut(VK_ESCAPE, 0) {
         ins.title = title.clone();
     }
     ui.next_size(-1, 0);
-    let ev = ui.textbox(ID_INS_TITLE, Some("Ohne Titel"), &mut ins.title, 120);
+    let ev = ui.textbox(ID_INS_TITLE, Some(t("Ohne Titel")), &mut ins.title, 120);
     if ev & EV_COMMIT != 0 && ui.focused() == ID_INS_TITLE {
         if let Some(e) = edits::title(&n.doc.proj, &n.inspector.title) {
             n.doc.apply(e);
@@ -203,25 +204,31 @@ fn project(n: &mut Net, ui: &mut Ui) {
     rows_begin(ui);
     match &n.doc.path {
         Some(path) => {
-            row(ui, "Datei", &n.doc.file_name());
+            row(ui, t("Datei"), &n.doc.file_name());
             // the folder, shortened to its last two parts
             let dir = path.rsplit_once('/').map_or("", |d| d.0);
             let parts: Vec<&str> = dir.split('/').filter(|s| !s.is_empty()).collect();
             let short = if parts.len() > 2 { format!("…/{}", parts[parts.len() - 2..].join("/")) } else { String::from(dir) };
-            row(ui, "Ordner", &short);
+            row(ui, t("Ordner"), &short);
         }
-        None => row(ui, "Datei", "noch nicht gespeichert"),
+        None => row(ui, t("Datei"), t("noch nicht gespeichert")),
     }
-    row(ui, "Zustand", if n.doc.dirty() { "geändert" } else { "gespeichert" });
-    row(ui, "Geräte", &format!("{}", p.devices.len()));
+    // unsaved changes with a copy of them (doc/autosave.rs) say so
+    let state = match (n.doc.dirty(), n.autosave.has_copy(n.doc.rev)) {
+        (false, _) => "gespeichert",
+        (true, false) => "geändert",
+        (true, true) => "geändert, automatisch gesichert",
+    };
+    row(ui, t("Zustand"), t(state));
+    row(ui, t("Geräte"), &format!("{}", p.devices.len()));
     let up = n.doc.sim.leds.values().filter(|l| l[0] == jfn_sim::Led::Up && l[1] == jfn_sim::Led::Up).count();
-    row(ui, "Kabel", &format!("{} ({} aktiv)", p.links.len(), up));
-    row(ui, "Notizen", &format!("{}", p.notes.len()));
-    row(ui, "Simulation", crate::workspace::sim::mode_text(n));
+    row(ui, tc("Kabel|Anzahl"), &tf("{} ({} aktiv)", &[&p.links.len().to_string(), &up.to_string()]));
+    row(ui, t("Notizen"), &format!("{}", p.notes.len()));
+    row(ui, t("Simulation"), crate::workspace::sim::mode_text(n));
     ui.box_end();
     ui.next_size(-1, 0);
     ui.text(
         TS_CAPTION | TX_SECONDARY | TX_WRAP,
-        "Ziehen Sie ein Gerät aus der Palette auf die Zeichenfläche, oder klicken Sie eine Kachel und dann auf die Fläche (Umschalt: mehrere). Verbinden (C): von einem Gerät auf ein anderes ziehen.",
+        t("Ziehen Sie ein Gerät aus der Palette auf die Zeichenfläche, oder klicken Sie eine Kachel und dann auf die Fläche (Umschalt: mehrere). Verbinden (C): von einem Gerät auf ein anderes ziehen."),
     );
 }

@@ -42,6 +42,7 @@ use jfn_sim::{Action, Cmd, Engine, Report};
 use ui::*;
 
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::edits;
 use crate::workspace::canvas::cables;
@@ -183,7 +184,7 @@ impl Consoles {
     pub(crate) fn title(&self, p: &Project, dev: u32) -> String {
         match self.tab(dev).and_then(|i| self.tabs[i].title.clone()) {
             Some(t) => t,
-            None => p.device(dev).map_or_else(|| format!("Gerät {}", dev), |d| d.name.clone()),
+            None => p.device(dev).map_or_else(|| tf("Gerät {}", &[&dev.to_string()]), |d| d.name.clone()),
         }
     }
 
@@ -283,7 +284,7 @@ fn renamed(n: &mut Net, dev: u32, name: &str) {
         Err(why) => {
             let _ = n.doc.sim.send(Cmd::Apply(Action::Hostname { dev, name: old.clone() }));
             let c = n.cons.get(&n.doc.proj, dev);
-            c.term.write_str(&format!("% {} Das Gerät heißt weiter {}.\n", why, old));
+            c.term.write_str(&format!("% {}\n", tf("{} Das Gerät heißt weiter {}.", &[&why.to_string(), &old])));
         }
     }
 }
@@ -293,9 +294,9 @@ fn renamed(n: &mut Net, dev: u32, name: &str) {
 /// the console of device `dev` as the shown tab of the Terminal panel (its own window comes
 /// to the front), with the keyboard -> Err: why there is none
 pub(crate) fn open(n: &mut Net, ui: &mut Ui, dev: u32) -> Result<(), String> {
-    let Some(d) = n.doc.proj.device(dev) else { return Err(format!("Das Gerät {} gibt es nicht.", dev)) };
+    let Some(d) = n.doc.proj.device(dev) else { return Err(tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()])) };
     if !has_cli(&n.doc.proj, dev) {
-        return Err(format!("{} hat keine Befehlszeile.", d.name));
+        return Err(tf("{} hat keine Befehlszeile.", &[&d.name]));
     }
     let cons = &mut n.cons;
     if cons.tab(dev).is_none() {
@@ -400,8 +401,8 @@ pub(crate) fn view(n: &mut Net, ui: &mut Ui, dev: u32) {
         ui.box_begin(0, BOX_H | BOX_XCENTER | pad(4), 8);
         ui.icon(IC_POWER, 16);
         ui.next_size(-1, 0);
-        ui.text(TS_BODY | TX_SECONDARY | TX_ELLIPSIS, &format!("{} ist ausgeschaltet: die Konsole antwortet wieder, sobald es Strom hat.", name));
-        if ui.button(ID_TERM_POWER, "Einschalten") & EV_ACT != 0 {
+        ui.text(TS_BODY | TX_SECONDARY | TX_ELLIPSIS, &tf("{} ist ausgeschaltet: die Konsole antwortet wieder, sobald es Strom hat.", &[&name]));
+        if ui.button(ID_TERM_POWER, t("Einschalten")) & EV_ACT != 0 {
             cables::set_power(n, &[dev], true);
             ui.repass();
         }
@@ -594,7 +595,7 @@ fn with_lines(seed: u64, d: &Device, ios: bool, lines: &[String]) -> Result<Stri
         e.cli_line(dev, l).map_err(|x| x.to_string())?;
         let out = scratch_out(&mut e, dev);
         if let Some(why) = refused(ios, &out) {
-            return Err(format!("{} lehnt „{}“ ab: {}", d.name, l, why.trim()));
+            return Err(tf("{} lehnt „{}“ ab: {}", &[&d.name, l, why.trim()]));
         }
     }
     if ios {
@@ -610,9 +611,9 @@ fn with_lines(seed: u64, d: &Device, ios: bool, lines: &[String]) -> Result<Stri
 /// new startup configuration.  Err: why nothing changed (a line the device refuses, a command
 /// still running on the console)
 pub(crate) fn run_lines(n: &mut Net, dev: u32, label: &str, lines: &[String]) -> Result<(), String> {
-    let d = n.doc.proj.device(dev).cloned().ok_or_else(|| format!("Das Gerät {} gibt es nicht.", dev))?;
+    let d = n.doc.proj.device(dev).cloned().ok_or_else(|| tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()]))?;
     if !has_cli(&n.doc.proj, dev) {
-        return Err(format!("{} hat keine Befehlszeile.", d.name));
+        return Err(tf("{} hat keine Befehlszeile.", &[&d.name]));
     }
     let ios = ios_of(&n.doc.proj, dev);
     let text = with_lines(n.doc.proj.seed, &d, ios, lines)?;
@@ -627,7 +628,7 @@ pub(crate) fn run_lines(n: &mut Net, dev: u32, label: &str, lines: &[String]) ->
         (e.cli_busy(dev), e.node(dev).is_some_and(|x| x.cli.ask.is_some()), e.node(dev).map(|x| x.cli.mode))
     };
     if busy {
-        return Err(format!("Auf {} läuft noch ein Befehl; Strg+C in der Konsole bricht ihn ab.", d.name));
+        return Err(tf("Auf {} läuft noch ein Befehl; Strg+C in der Konsole bricht ihn ab.", &[&d.name]));
     }
     if asked {
         interrupt(n, dev);
@@ -664,12 +665,12 @@ pub(crate) fn run_lines(n: &mut Net, dev: u32, label: &str, lines: &[String]) ->
 /// the running configuration of device `dev` becomes its startup configuration (IOS: "copy
 /// running-config startup-config" on its console; a shell has no such command)
 pub(crate) fn save_running(n: &mut Net, dev: u32) -> Result<(), String> {
-    let d = n.doc.proj.device(dev).cloned().ok_or_else(|| format!("Das Gerät {} gibt es nicht.", dev))?;
+    let d = n.doc.proj.device(dev).cloned().ok_or_else(|| tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()]))?;
     if d.off {
-        return Err(format!("{} ist ausgeschaltet.", d.name));
+        return Err(tf("{} ist ausgeschaltet.", &[&d.name]));
     }
     if n.doc.sim.engine().cli_busy(dev) {
-        return Err(format!("Auf {} läuft noch ein Befehl; Strg+C in der Konsole bricht ihn ab.", d.name));
+        return Err(tf("Auf {} läuft noch ein Befehl; Strg+C in der Konsole bricht ihn ab.", &[&d.name]));
     }
     if ios_of(&n.doc.proj, dev) {
         if n.doc.sim.engine().node(dev).is_some_and(|x| x.cli.ask.is_some()) {

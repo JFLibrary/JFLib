@@ -9,8 +9,10 @@
 // pcapng), Beenden; Bearbeiten: Rückgängig, Wiederholen, Löschen, Alles auswählen, Umbenennen
 // (F2); Ansicht: Zoom, 100 %, Alles zeigen, Raster, Einrasten, Minimap, Bereiche (Ctrl+1 .. 8);
 // Simulation: Echtzeit / Simulationsmodus, Abspielen (F6), Schritt vor (F7) und zurück
-// (Shift+F7), Zurück zu live, Tempo, PDUs, Nur Auswahl, Zurücksetzen (workspace/sim); Hilfe:
-// Info.  Tools have single-key accelerators (V, H, C, N, P).  The context menus of the canvas:
+// (Shift+F7), Zurück zu live, Tempo, PDUs, Nur Auswahl, Zurücksetzen (workspace/sim);
+// Werkzeuge: the tools with their single keys (V, H, C, N, P) and Einstellungen (Ctrl+,);
+// Hilfe: Tastenkürzel (F1), Info.  Simulation (F5) and Echtzeit (Shift+F5) switch the mode,
+// Ctrl+9 gives the topology the keyboard as Ctrl+1 .. 8 do for the panels.  The context menus of the canvas:
 // a cable (route, kind, Trennen), a device (Konsole öffnen, Gerätefenster, Umbenennen,
 // Eingeschaltet, Löschen), the background.  TIMER_SIM moves the simulator's clock, TIMER_ANIM
 // the simulation mode's animation.  The consoles' commands (CMD_CONSOLE .. CMD_LOG_CLEAR: tabs,
@@ -26,7 +28,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 70] = [
+pub(crate) static CMDS: [Command; 73] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -56,8 +58,8 @@ pub(crate) static CMDS: [Command; 70] = [
     Command::new(CMD_TOOL_HAND, "Hand", JN_HAND, 0, b'H' as u32, 0),
     Command::new(CMD_TOOL_CONNECT, "Verbinden", JN_CONNECT, 0, b'C' as u32, 0),
     Command::new(CMD_TOOL_NOTE, "Notiz einfügen", JN_NOTE, 0, b'N' as u32, 0),
-    Command::new(CMD_SIM_REALTIME, "&Echtzeit", 0, 0, 0, CF_DISABLED | CF_CHECKED),
-    Command::new(CMD_SIM_MODE, "&Simulationsmodus", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_SIM_REALTIME, "&Echtzeit", 0, MOD_SHIFT, VK_F5, CF_DISABLED | CF_CHECKED),
+    Command::new(CMD_SIM_MODE, "&Simulationsmodus", 0, 0, VK_F5, CF_DISABLED),
     Command::new(CMD_SIM_PLAY, "&Abspielen / Anhalten", IC_PLAY, 0, VK_F6, CF_DISABLED),
     Command::new(CMD_SIM_STEP, "&Schritt vor", IC_NEXT, 0, VK_F7, CF_DISABLED),
     Command::new(CMD_SIM_BACK, "Schritt &zurück", IC_PREVIOUS, MOD_SHIFT, VK_F7, CF_DISABLED),
@@ -97,13 +99,17 @@ pub(crate) static CMDS: [Command; 70] = [
     Command::new(CMD_PDU_COMPLEX, "&Komplexe PDU …", IC_ADD, 0, 0, 0),
     Command::new(CMD_EXPORT_PCAP, "Aufzeichnung als &pcapng …", 0, 0, 0, CF_DISABLED),
     Command::new(CMD_PANEL0 + 7, "P&DUs", IC_MAIL, MOD_CTRL, b'8' as u32, 0),
+    Command::new(CMD_FOCUS_CANVAS, "Topo&logie", JN_CONNECT, MOD_CTRL, b'9' as u32, 0),
+    Command::new(CMD_SETTINGS, "&Einstellungen …", IC_SETTINGS, MOD_CTRL, VK_OEM_COMMA, 0),
+    Command::new(CMD_SHORTCUTS, "&Tastenkürzel …", IC_HELP, 0, VK_F1, 0),
 ];
 
-pub(crate) static MENUBAR: [Mi; 5] = [
+pub(crate) static MENUBAR: [Mi; 6] = [
     Mi::Menu("&Datei", &M_FILE),
     Mi::Menu("&Bearbeiten", &M_EDIT),
     Mi::Menu("&Ansicht", &M_VIEW),
     Mi::Menu("&Simulation", &M_SIM),
+    Mi::Menu("&Werkzeuge", &M_TOOLS),
     Mi::Menu("&Hilfe", &M_HELP),
 ];
 static M_FILE: [Mi; 10] = [
@@ -141,7 +147,8 @@ static M_VIEW: [Mi; 10] = [
     Mi::Sep,
     Mi::Sub("&Bereiche", &M_PANELS),
 ];
-static M_PANELS: [Mi; 10] = [
+static M_PANELS: [Mi; 11] = [
+    Mi::Cmd(CMD_FOCUS_CANVAS),
     Mi::Cmd(CMD_PANEL0),
     Mi::Cmd(CMD_PANEL0 + 1),
     Mi::Cmd(CMD_PANEL0 + 2),
@@ -178,7 +185,17 @@ static M_TEMPO: [Mi; 6] = [
     Mi::Cmd(CMD_SIM_TEMPO0 + 4),
     Mi::Cmd(CMD_SIM_TEMPO0 + 5),
 ];
-static M_HELP: [Mi; 1] = [Mi::Cmd(CMD_ABOUT)];
+/// the tools (their single keys) and the settings
+static M_TOOLS: [Mi; 7] = [
+    Mi::Cmd(CMD_TOOL_SELECT),
+    Mi::Cmd(CMD_TOOL_HAND),
+    Mi::Cmd(CMD_TOOL_CONNECT),
+    Mi::Cmd(CMD_TOOL_NOTE),
+    Mi::Cmd(CMD_TOOL_PDU),
+    Mi::Sep,
+    Mi::Cmd(CMD_SETTINGS),
+];
+static M_HELP: [Mi; 3] = [Mi::Cmd(CMD_SHORTCUTS), Mi::Sep, Mi::Cmd(CMD_ABOUT)];
 /// the canvas' context menu (the background, notes)
 pub(crate) static M_CANVAS: [Mi; 5] = [Mi::Cmd(CMD_RENAME), Mi::Cmd(CMD_DELETE), Mi::Sep, Mi::Cmd(CMD_SELECT_ALL), Mi::Cmd(CMD_FIT)];
 /// the context menu of a device
@@ -247,6 +264,25 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     terminal::states(n, ui);
 }
 
+// Ctrl+1 .. 8: the panel shows; the keyboard goes into it -- the device search, the shown
+// console -- or to its tab strip (Tab goes on into it)
+fn focus_panel(n: &mut Net, ui: &mut Ui, p: u32) {
+    let console = n.cons.cur.filter(|d| n.cons.docked().contains(d));
+    match p {
+        P_DEVICES => {
+            n.shell.dock.show(p);
+            n.shell.dock.activate(p);
+            ui.focus(ID_SEARCH);
+        }
+        P_TERMINAL if console.is_some() => {
+            n.shell.dock.show(p);
+            n.shell.dock.activate(p);
+            n.cons.focus = console;
+        }
+        _ => n.shell.dock.focus(p),
+    }
+}
+
 /// App::command
 pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
     match id {
@@ -261,6 +297,19 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             crate::workspace::sim::tick(n, ui);
             return true;
         }
+        UIC_TIMER if arg == TIMER_AUTOSAVE => {
+            crate::doc::autosave::tick(n, ui);
+            return true;
+        }
+        // the system goes to sleep, the session ends: a copy of unsaved work now
+        UIC_SUSPEND if arg != 0 => {
+            crate::doc::autosave::flush(n);
+            return false;
+        }
+        UIC_SESSION_END => {
+            crate::doc::autosave::flush(n);
+            return false;
+        }
         UIC_CLOSE => {
             if !n.doc.dirty() {
                 return false; // the window closes
@@ -268,6 +317,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             file::request(n, ui, After::Quit);
         }
         UIC_EXIT => {
+            crate::doc::autosave::exit(n);
             n.save_prefs(ui);
             return false;
         }
@@ -276,6 +326,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
                 return false;
             }
             n.canvas.tool = Tool::Select;
+            n.canvas.kb_from = None;
             n.sim.pdu.src = None;
         }
         CMD_NEW => file::request(n, ui, After::New),
@@ -308,18 +359,30 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_ZOOM_OUT => canvas::zoom(n, ui, -1),
         CMD_ZOOM_100 => canvas::zoom(n, ui, 0),
         CMD_FIT => canvas::zoom(n, ui, 2),
-        CMD_GRID => n.prefs.grid = !n.prefs.grid,
-        CMD_SNAP => n.prefs.snap = !n.prefs.snap,
-        CMD_MINIMAP => n.prefs.minimap = !n.prefs.minimap,
-        CMD_LAYOUT_RESET => n.shell.dock.reset(),
-        _ if (CMD_PANEL0..CMD_PANEL0 + PANELS.len() as u32).contains(&id) => {
-            n.shell.dock.focus(PANELS[(id - CMD_PANEL0) as usize]);
+        CMD_GRID => {
+            n.prefs.grid = !n.prefs.grid;
+            n.prefs.push();
         }
+        CMD_SNAP => {
+            n.prefs.snap = !n.prefs.snap;
+            n.prefs.push();
+        }
+        CMD_MINIMAP => {
+            n.prefs.minimap = !n.prefs.minimap;
+            n.prefs.push();
+        }
+        CMD_LAYOUT_RESET => n.shell.dock.reset(),
+        _ if (CMD_PANEL0..CMD_PANEL0 + PANELS.len() as u32).contains(&id) => focus_panel(n, ui, PANELS[(id - CMD_PANEL0) as usize]),
         CMD_TOOL_SELECT => tools::set(n, Tool::Select),
         CMD_TOOL_HAND => tools::set(n, Tool::Hand),
         CMD_TOOL_CONNECT => tools::set(n, Tool::Connect),
         CMD_TOOL_NOTE => tools::set(n, Tool::Note),
         CMD_ABOUT => n.shell.about.set(1),
+        CMD_FOCUS_CANVAS => ui.focus(ID_CANVAS),
+        CMD_SETTINGS => n.settings_open.set(1),
+        CMD_SHORTCUTS => n.keys_open.set(1),
+        CMD_RECOVER => crate::doc::autosave::recover(n, ui),
+        CMD_RECOVER_DROP => crate::doc::autosave::drop_offer(n, ui),
         CMD_ROUTE_STRAIGHT => cables::set_route(n, jfn_model::project::Route::Straight),
         CMD_ROUTE_ORTHO => cables::set_route(n, jfn_model::project::Route::Ortho),
         CMD_ROUTE_CURVE => cables::set_route(n, jfn_model::project::Route::Curve),

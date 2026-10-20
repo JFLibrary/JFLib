@@ -1,0 +1,5 @@
+#!args apps/JFNetworker/tests/fixtures/campus.jfnet --scenario apps/JFNetworker/tests/scen/campus.scn --golden apps/JFNetworker/tests/scen/campus.report
+# golden scenario of the acceptance: the campus (an L3 switch with two VLANs relays DHCP to the
+# router's pools, a name server behind the router).  The GUI program runs tests/scen/campus.scn
+# on tests/fixtures/campus.jfnet without a window and ends with the report, which must equal
+# tests/scen/campus.report byte for byte on every target (the script itself is not run)

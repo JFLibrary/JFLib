@@ -46,6 +46,8 @@ use alloc::vec::Vec;
 use core::any::Any;
 
 use agent_core::jmap::Value;
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 use base::hashring::{hash64, Ring};
 use base::metrics::Window;
 use netpkt::http::{Headers, Version};
@@ -921,13 +923,13 @@ impl Lb {
     }
 
     /// changes the backends while it runs (Action::LbBackend)
-    pub fn change(&mut self, os: &mut OsApi, op: LbOp) -> Result<(), String> {
+    pub fn change(&mut self, os: &mut OsApi, op: LbOp) -> Result<(), Msg> {
         let now = os.now();
         let find = |s: &Lb, n: &str| s.backends.iter().position(|b| b.name.eq_ignore_ascii_case(n));
         match op {
             LbOp::Add { name, addr, port, weight } => {
                 match find(self, &name) {
-                    Some(i) if !self.backends[i].gone() => return Err(format!("Das Backend {} gibt es schon.", name)),
+                    Some(i) if !self.backends[i].gone() => return Err(msg!("Das Backend {} gibt es schon.", name)),
                     Some(i) => {
                         // its old chain of checks ends here
                         if let Some(t) = self.backends[i].check_t {
@@ -947,7 +949,7 @@ impl Lb {
                 os.log(5, "lb", &format!("Backend {} ({}:{}) hinzugefügt", name, addr, port));
             }
             LbOp::Remove { name } | LbOp::Drain { name } if find(self, &name).is_none_or(|i| self.backends[i].gone()) => {
-                return Err(format!("Das Backend {} gibt es nicht.", name));
+                return Err(msg!("Das Backend {} gibt es nicht.", name));
             }
             LbOp::Remove { ref name } | LbOp::Drain { ref name } => {
                 let remove = matches!(op, LbOp::Remove { .. });
@@ -966,12 +968,12 @@ impl Lb {
                 }
             }
             LbOp::Enable { name } => {
-                let i = find(self, &name).filter(|&i| !self.backends[i].gone()).ok_or_else(|| format!("Das Backend {} gibt es nicht.", name))?;
+                let i = find(self, &name).filter(|&i| !self.backends[i].gone()).ok_or_else(|| msg!("Das Backend {} gibt es nicht.", name))?;
                 self.backends[i].admin = Admin::Active;
                 self.backends[i].since = now;
             }
             LbOp::Weight { name, weight } => {
-                let i = find(self, &name).filter(|&i| !self.backends[i].gone()).ok_or_else(|| format!("Das Backend {} gibt es nicht.", name))?;
+                let i = find(self, &name).filter(|&i| !self.backends[i].gone()).ok_or_else(|| msg!("Das Backend {} gibt es nicht.", name))?;
                 self.backends[i].weight = weight.max(1);
             }
         }
@@ -980,12 +982,12 @@ impl Lb {
     }
 
     /// changes the backends of a load balancer that does not run (they count from its start)
-    pub fn change_stopped(&mut self, op: LbOp) -> Result<(), String> {
+    pub fn change_stopped(&mut self, op: LbOp) -> Result<(), Msg> {
         let find = |s: &Lb, n: &str| s.backends.iter().position(|b| b.name.eq_ignore_ascii_case(n) && !b.gone());
         match op {
             LbOp::Add { name, addr, port, weight } => {
                 if find(self, &name).is_some() {
-                    return Err(format!("Das Backend {} gibt es schon.", name));
+                    return Err(msg!("Das Backend {} gibt es schon.", name));
                 }
                 match self.backends.iter().position(|b| b.name.eq_ignore_ascii_case(&name)) {
                     Some(i) => self.backends[i] = Backend::new(&name, addr, port, weight, 0),
@@ -993,19 +995,19 @@ impl Lb {
                 }
             }
             LbOp::Remove { name } => {
-                let i = find(self, &name).ok_or_else(|| format!("Das Backend {} gibt es nicht.", name))?;
+                let i = find(self, &name).ok_or_else(|| msg!("Das Backend {} gibt es nicht.", name))?;
                 self.backends[i].admin = Admin::Removed;
             }
             LbOp::Drain { name } => {
-                let i = find(self, &name).ok_or_else(|| format!("Das Backend {} gibt es nicht.", name))?;
+                let i = find(self, &name).ok_or_else(|| msg!("Das Backend {} gibt es nicht.", name))?;
                 self.backends[i].admin = Admin::Disabled;
             }
             LbOp::Enable { name } => {
-                let i = find(self, &name).ok_or_else(|| format!("Das Backend {} gibt es nicht.", name))?;
+                let i = find(self, &name).ok_or_else(|| msg!("Das Backend {} gibt es nicht.", name))?;
                 self.backends[i].admin = Admin::Active;
             }
             LbOp::Weight { name, weight } => {
-                let i = find(self, &name).ok_or_else(|| format!("Das Backend {} gibt es nicht.", name))?;
+                let i = find(self, &name).ok_or_else(|| msg!("Das Backend {} gibt es nicht.", name))?;
                 self.backends[i].weight = weight.max(1);
             }
         }
@@ -1385,30 +1387,36 @@ impl Service for Lb {
 
 // ---------------------------------------------------------------- project definitions
 
-/// a load balancer from its definition in a project file (svcact.rs)
+/// a load balancer from its definition in a project file (svcact.rs); the German reason when
+/// the configuration does not fit
 pub fn from_def(c: &Value) -> Result<Box<dyn Service>, String> {
+    from_def_msg(c).map_err(|m| m.text())
+}
+
+/// from_def, the reason as a message for the app's catalogue
+pub fn from_def_msg(c: &Value) -> Result<Box<dyn Service>, Msg> {
     let num = |k: &str, d: u64| c.get(k).and_then(|v| v.as_u64()).unwrap_or(d);
     let ms = |k: &str, d: u64| c.get(k).and_then(|v| decimal(v, MS)).unwrap_or(d * MS);
     let text = |k: &str| c.get(k).and_then(|v| v.as_str()).map(String::from);
     let mode = match text("mode").as_deref().unwrap_or("http") {
         "http" => LbMode::Http,
         "tcp" => LbMode::Tcp,
-        m => return Err(format!("\u{201e}mode\u{201c} kennt {} nicht (http, tcp).", m)),
+        m => return Err(msg!("\u{201e}mode\u{201c} kennt {} nicht (http, tcp).", m)),
     };
     let port = match num("port", 80) {
         p @ 1..=65535 => p as u16,
-        p => return Err(format!("Port {} gibt es nicht.", p)),
+        p => return Err(msg!("Port {} gibt es nicht.", p)),
     };
     let mut lb = Lb::new(mode, port);
     if let Some(a) = text("algorithm") {
-        lb.algo = Algo::parse(&a).ok_or_else(|| format!("\u{201e}algorithm\u{201c} kennt {} nicht (round-robin, least-conn, weighted, hash).", a))?;
+        lb.algo = Algo::parse(&a).ok_or_else(|| msg!("\u{201e}algorithm\u{201c} kennt {} nicht (round-robin, least-conn, weighted, hash).", a))?;
     }
     if let Some(h) = text("hash") {
         lb.hash_key = match h.as_str() {
             "path" => HashKey::Path,
             "client" => HashKey::Client,
             x if x.starts_with("header:") => HashKey::Header(String::from(x[7..].trim())),
-            x => return Err(format!("\u{201e}hash\u{201c} kennt {} nicht (path, client, header:NAME).", x)),
+            x => return Err(msg!("\u{201e}hash\u{201c} kennt {} nicht (path, client, header:NAME).", x)),
         };
     }
     lb.vnodes = num("vnodes", 64).clamp(1, 1000) as u32;
@@ -1427,7 +1435,7 @@ pub fn from_def(c: &Value) -> Result<Box<dyn Service>, String> {
                 "none" | "off" => CheckKind::None,
                 "tcp" => CheckKind::Tcp,
                 "http" => CheckKind::Http,
-                x => return Err(format!("\u{201e}health.type\u{201c} kennt {} nicht (tcp, http, none).", x)),
+                x => return Err(msg!("\u{201e}health.type\u{201c} kennt {} nicht (tcp, http, none).", x)),
             };
         }
         if let Some(p) = hs("path") {
@@ -1439,20 +1447,20 @@ pub fn from_def(c: &Value) -> Result<Box<dyn Service>, String> {
         lb.health.fall = h.get("fall").and_then(|v| v.as_u64()).unwrap_or(3).clamp(1, 100) as u32;
     }
     for (k, b) in c.get("backends").and_then(|b| b.as_array()).unwrap_or(&[]).iter().enumerate() {
-        let addr = b.get("addr").and_then(|v| v.as_str()).and_then(|s| Ipv4::parse(s.trim())).ok_or_else(|| format!("Backend {} braucht \u{201e}addr\u{201c} mit einer IPv4-Adresse.", k + 1))?;
+        let addr = b.get("addr").and_then(|v| v.as_str()).and_then(|s| Ipv4::parse(s.trim())).ok_or_else(|| msg!("Backend {} braucht \u{201e}addr\u{201c} mit einer IPv4-Adresse.", k + 1))?;
         let bport = b.get("port").and_then(|v| v.as_u64()).unwrap_or(if mode == LbMode::Http { 80 } else { port as u64 });
         if !(1..=65535).contains(&bport) {
-            return Err(format!("Port {} gibt es nicht.", bport));
+            return Err(msg!("Port {} gibt es nicht.", bport));
         }
         let name = b.get("name").and_then(|v| v.as_str()).map(String::from).unwrap_or_else(|| format!("{}:{}", addr, bport));
         if lb.backends.iter().any(|x| x.name.eq_ignore_ascii_case(&name)) {
-            return Err(format!("Das Backend {} steht zweimal da.", name));
+            return Err(msg!("Das Backend {} steht zweimal da.", name));
         }
         let weight = b.get("weight").and_then(|v| v.as_u64()).unwrap_or(1).clamp(1, 1000) as u32;
         lb.add_backend(&name, addr, bport as u16, weight);
     }
     if lb.backends.is_empty() {
-        return Err(String::from("\u{201e}backends\u{201c} fehlt."));
+        return Err(msg!("\u{201e}backends\u{201c} fehlt."));
     }
     Ok(Box::new(lb))
 }

@@ -42,6 +42,7 @@ use alloc::vec::Vec;
 use core::any::Any;
 
 use agent_core::jmap::Value;
+use jfn_model::msg;
 use base::metrics::Window;
 use base::rng::Pcg32;
 use netpkt::http::{Headers, Version};
@@ -860,8 +861,14 @@ impl Service for Worker {
 
 // ---------------------------------------------------------------- project definitions
 
-/// a queue or a worker from its definition in a project file (svcact.rs)
+/// a queue or a worker from its definition in a project file (svcact.rs); the German reason when
+/// the configuration does not fit
 pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
+    from_def_msg(kind, c).map_err(|m| m.text())
+}
+
+/// from_def, the reason as a message for the app's catalogue
+pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, jfn_model::msg::Msg> {
     let num = |k: &str, d: u64| c.get(k).and_then(|v| v.as_u64()).unwrap_or(d);
     let ms = |k: &str, d: u64| c.get(k).and_then(|v| decimal(v, MS)).unwrap_or(d * MS);
     match kind {
@@ -869,7 +876,7 @@ pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
             let mut q = Queue::new();
             q.port = match num("port", 9000) {
                 p @ 1..=65535 => p as u16,
-                p => return Err(format!("Port {} gibt es nicht.", p)),
+                p => return Err(msg!("Port {} gibt es nicht.", p)),
             };
             q.visibility = ms("visibility_ms", 5000).max(MS);
             q.max_deliveries = num("max_deliveries", 5).min(1_000_000) as u32;
@@ -883,8 +890,8 @@ pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
             Ok(Box::new(q))
         }
         "worker" => {
-            let u = c.get("queue").and_then(|v| v.as_str()).ok_or_else(|| String::from("\u{201e}queue\u{201c} fehlt."))?;
-            let url = Url::parse(u).map_err(|_| format!("\u{201e}{}\u{201c} ist keine http-URL.", u))?;
+            let u = c.get("queue").and_then(|v| v.as_str()).ok_or_else(|| msg!("\u{201e}queue\u{201c} fehlt."))?;
+            let url = Url::parse(u).map_err(|_| msg!("\u{201e}{}\u{201c} ist keine http-URL.", u))?;
             let mut w = Worker::new(url, c.get("topic").and_then(|v| v.as_str()).unwrap_or("jobs"));
             w.concurrency = num("concurrency", 1).clamp(1, 10_000) as u32;
             w.time = ms("time_ms", 50);
@@ -895,7 +902,7 @@ pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
             w.timeout = ms("timeout_ms", 5000).max(MS);
             Ok(Box::new(w))
         }
-        k => Err(format!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k)),
+        k => Err(msg!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k)),
     }
 }
 

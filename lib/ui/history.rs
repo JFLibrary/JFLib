@@ -7,6 +7,7 @@
 //                                        undo_value() / redo_value() -> the step as data
 //   h.group_begin(label) / group_end()   the edits between them are one step
 //   h.mark_saved() / dirty()             whether the state differs from the saved one
+//   h.mark_unsaved()                     the state counts as unsaved (a recovered copy)
 //   h.clear()
 //   Snapshot::new(label, before, after)  an Edit for small states: the whole value (Clone)
 //   ui.undo_keys() -> Option<bool>       Ctrl+Z (Some(true)) / Ctrl+Y or Ctrl+Shift+Z
@@ -217,6 +218,11 @@ impl<S: 'static> History<S> {
     /// the state is saved now (dirty() false until the next change)
     pub fn mark_saved(&mut self) {
         self.saved = Some(self.done.len());
+    }
+
+    /// the state counts as unsaved until the next mark_saved (a copy recovered after a crash)
+    pub fn mark_unsaved(&mut self) {
+        self.saved = None;
     }
 
     /// the state differs from the saved one

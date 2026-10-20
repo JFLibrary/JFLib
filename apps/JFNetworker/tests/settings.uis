@@ -1,0 +1,107 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# the settings (Werkzeuge › Einstellungen, Ctrl+,; app/prefs.rs, workspace/settings.rs): the page
+# built from the schema, every change at once -- the grid and its step, snapping, the minimap,
+# the speed, the language (the window in English and back), the motion, the autosave
+# interval; headless runs keep the settings in memory, the user's file stays untouched.  The
+# page's fields have hashed ids (the scope "page", the key, "value"): 224233805 the grid step,
+# 140509809 the speed, 162609353 the motion, 209344286 the language, 189150286 the autosave
+# interval; 32769 is the speed box of the toolbar, 12289 the minimap.  Shots light, English,
+# dark and at 150 %.
+theme light
+click menu:"Werkzeuge"
+expect menuitem:"Auswahl" exists
+expect menuitem:"Verbinden" exists
+expect menuitem:"Einfache PDU" exists
+click menuitem:"Einstellungen …"
+expect dialog:"Einstellungen" exists
+expect text:"Ansicht" exists
+expect text:"Allgemein" exists
+expect text:"Dateien" exists
+expect "Raster zeigen" checked
+expect "Am Raster einrasten" checked
+expect "Minimap zeigen" unchecked
+expect #224233805 value 20
+expect #140509809 value 2
+expect #162609353 value 0
+expect #209344286 value 0
+expect #189150286 value 120
+shot build/jfnetworker/settings_light.png
+# the grid: off at once (the toolbar and the status bar follow), then its step
+click "Raster zeigen"
+expect "Raster zeigen" unchecked
+expect button:"Raster" unchecked
+expect text:"Einrasten 20" exists
+focus #224233805
+key ctrl+a
+type "40\n"
+expect #224233805 value 40
+expect text:"Einrasten 40" exists
+click "Raster zeigen"
+expect text:"Raster 40 · Einrasten" exists
+click "Zurücksetzen: Rasterweite"
+expect #224233805 value 20
+expect text:"Raster 20 · Einrasten" exists
+# snapping and the minimap
+click "Am Raster einrasten"
+expect text:"Raster 20" exists
+expect button:"Einrasten" unchecked
+click "Am Raster einrasten"
+click "Minimap zeigen"
+expect #12289 exists
+click "Minimap zeigen"
+expect #12289 missing
+# the speed: the toolbar's box follows
+focus #140509809
+click #140509809
+click "4×"
+expect #140509809 value 4
+expect #32769 value 4
+click "Zurücksetzen: Tempo beim Start"
+expect #32769 value 2
+# the language (below: focusing it scrolls it into view): the dialog, the menus and the
+# panels in English, then German again
+focus #209344286
+click #209344286
+click "English"
+expect dialog:"Settings" exists
+expect "Show grid" checked
+expect text:"View" exists
+expect menu:"File" exists
+expect menu:"Tools" exists
+expect tab:"Devices" exists
+expect tab:"Properties" exists
+expect button:"Close" exists
+shot build/jfnetworker/settings_english.png
+focus #209344286
+click #209344286
+click "Deutsch"
+expect dialog:"Einstellungen" exists
+expect menu:"Datei" exists
+expect tab:"Geräte" exists
+# the motion: reduced (a stated choice, the system's no longer counts)
+focus #162609353
+click #162609353
+click "Reduziert"
+expect #162609353 value 1
+click "Zurücksetzen: Bewegung"
+expect #162609353 value 0
+# autosave off (the last field of the page)
+focus #189150286
+key ctrl+a
+type "0\n"
+expect #189150286 value 0
+click "Zurücksetzen: Automatisch sichern alle (Sekunden)"
+expect #189150286 value 120
+# Schließen, then Ctrl+, opens it again; Esc closes it
+click button:"Schließen"
+expect dialog:"Einstellungen" missing
+key ctrl+,
+expect dialog:"Einstellungen" exists
+theme dark
+shot build/jfnetworker/settings_dark.png
+scale 150
+shot build/jfnetworker/settings_150.png
+scale 100
+key esc
+expect dialog:"Einstellungen" missing
+expect_nowarn

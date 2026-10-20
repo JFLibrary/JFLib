@@ -16,7 +16,7 @@
 // checksum, a cut header) are lines of their own.
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use jfn_sim::{DevStep, HopId};
@@ -25,6 +25,7 @@ use ui::*;
 
 use super::{cat_color, cat_of, secs};
 use crate::app::constants::*;
+use crate::app::tr::{en, t, tf};
 use crate::app::Net;
 
 /// the height of a tree row (DIP)
@@ -74,6 +75,8 @@ pub(crate) struct Packet {
     step_w: i32,
     tree_w: i32,
     dark: bool,
+    /// the language the rows were made in
+    en: bool,
     /// a tree row to scroll to (and passes left to try), the tree's height (DIP)
     reveal: Option<(u64, u8)>,
     tree_h: i32,
@@ -92,6 +95,7 @@ impl Packet {
             step_w: 280,
             tree_w: 380,
             dark: false,
+            en: false,
             reveal: None,
             tree_h: 0,
         }
@@ -163,7 +167,7 @@ fn choose(n: &mut Net, hop: Option<HopId>) {
 }
 
 fn dev_name(n: &Net, d: u32) -> String {
-    n.doc.proj.device(d).map_or_else(|| format!("Gerät {}", d), |x| x.name.clone())
+    n.doc.proj.device(d).map_or_else(|| tf("Gerät {}", &[&d.to_string()]), |x| x.name.clone())
 }
 
 // the frame's layers as tree rows and hex marks
@@ -177,24 +181,24 @@ fn decode(n: &Net, hop: HopId, dark: bool) -> Option<Shown> {
     let mut fields = Vec::new();
     // layer 0: the ports and the times
     let ends = format!("{} → {}", eng.end_name(h.from), eng.end_name(h.to));
-    rows.push(TRow { key: key(0, 0), depth: 0, label: format!("L1 Ports: {}", ends), range: None, problem: false, parent: true });
+    rows.push(TRow { key: key(0, 0), depth: 0, label: tf("L1 Ports: {}", &[&ends]), range: None, problem: false, parent: true });
     let arrival = match h.drop {
-        Some(jfn_sim::HopDrop::Loss) => String::from("auf der Leitung verloren"),
-        Some(jfn_sim::HopDrop::LinkDown) => String::from("verloren: die Leitung fiel aus"),
-        None if h.t_rx > eng.now() => format!("{} s (noch unterwegs)", secs(h.t_rx)),
+        Some(jfn_sim::HopDrop::Loss) => String::from(t("auf der Leitung verloren")),
+        Some(jfn_sim::HopDrop::LinkDown) => String::from(t("verloren: die Leitung fiel aus")),
+        None if h.t_rx > eng.now() => tf("{} s (noch unterwegs)", &[&secs(h.t_rx)]),
         None => format!("{} s", secs(h.t_rx)),
     };
     let link = n.doc.sim.view.links.iter().find(|l| l.id == h.link);
     let mut l1: Vec<String> = alloc::vec![
-        format!("Gesendet: {} s", secs(h.t_tx)),
-        format!("Angekommen: {}", arrival),
-        format!("Länge: {} Bytes ({} Bit)", h.bytes.len(), h.bytes.len() * 8),
+        tf("Gesendet: {} s", &[&secs(h.t_tx)]),
+        tf("Angekommen: {}", &[&arrival]),
+        tf("Länge: {} Bytes ({} Bit)", &[&h.bytes.len().to_string(), &(h.bytes.len() * 8).to_string()]),
     ];
     if h.t_queued < h.t_tx {
-        l1.insert(0, format!("Wartete in der Warteschlange: {} s", secs(h.t_tx - h.t_queued)));
+        l1.insert(0, tf("Wartete in der Warteschlange: {} s", &[&secs(h.t_tx - h.t_queued)]));
     }
     if let Some(l) = link {
-        l1.push(format!("Kabel: {}, {}", l.cable.title(), jfn_model::catalog::speed_str(l.kbps)));
+        l1.push(tf("Kabel: {}, {}", &[t(l.cable.title()), &crate::app::tr::speed(l.kbps)]));
     }
     for (j, s) in l1.into_iter().enumerate() {
         rows.push(TRow { key: key(0, j + 1), depth: 1, label: s, range: None, problem: false, parent: false });
@@ -221,28 +225,32 @@ fn decode(n: &Net, hop: HopId, dark: bool) -> Option<Shown> {
             marks.push(HexMark { start: l.off, len: l.len, color: c, key: key(li, 0) });
         }
         for (j, p) in l.problems.iter().enumerate() {
-            rows.push(TRow { key: key(li, l.fields.len() + 1 + j), depth: 1, label: format!("Problem: {}", p), range: None, problem: true, parent: false });
+            rows.push(TRow { key: key(li, l.fields.len() + 1 + j), depth: 1, label: tf("Problem: {}", &[p]), range: None, problem: true, parent: false });
         }
     }
     fields.sort_by_key(|f| (f.1, f.0));
-    let title = format!("Rahmen {} · {} · {}", hop, ends, info);
+    let title = tf("Rahmen {} · {} · {}", &[&hop.to_string(), &ends, &info]);
     Some(Shown { bytes: h.bytes.to_vec(), rows, marks, fields, title })
 }
 
 /// the Paket panel
 pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     let dark = ui.theme_dark();
-    if n.sim.pk.dark != dark {
-        // the marks take the theme's colours
+    if n.sim.pk.dark != dark || n.sim.pk.en != en() {
+        // the same frame anew: the marks in the theme's colours, the rows in the language; the
+        // tree and the bytes keep their selection (the rows keep their keys)
         n.sim.pk.dark = dark;
-        n.sim.pk.made_for = None;
-        n.sim.pk.cur = None;
+        n.sim.pk.en = en();
+        if let Some(h) = n.sim.pk.cur {
+            let shown = decode(n, h, dark);
+            n.sim.pk.shown = shown;
+        }
     }
     follow(n);
     if n.sim.pk.step.is_none() && n.sim.pk.shown.is_none() {
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER | pad(12), 0);
-        ui.empty_state(JN_PACKET_ICON, "Kein Paket ausgewählt", "Ein Ereignis der Liste oder ein Rahmen auf der Leinwand zeigt hier, was das Gerät damit tat, und die Felder des Pakets Schicht für Schicht samt Bytes.");
+        ui.empty_state(JN_PACKET_ICON, t("Kein Paket ausgewählt"), t("Ein Ereignis der Liste oder ein Rahmen auf der Leinwand zeigt hier, was das Gerät damit tat, und die Felder des Pakets Schicht für Schicht samt Bytes."));
         ui.box_end();
         return;
     }
@@ -275,7 +283,7 @@ fn step_pane(n: &mut Net, ui: &mut Ui) {
     ui.scroll_begin(ID_PK_STEP, SC_V | pad(8));
     ui.box_begin(0, BOX_V, 6);
     let Some(s) = n.sim.pk.step.clone() else {
-        ui.text(TS_BODY | TX_SECONDARY, "Kein Schritt eines Geräts");
+        ui.text(TS_BODY | TX_SECONDARY, t("Kein Schritt eines Geräts"));
         ui.box_end();
         ui.scroll_end();
         return;
@@ -290,7 +298,11 @@ fn step_pane(n: &mut Net, ui: &mut Ui) {
         let Some(h) = eng.trace.hop(hop) else { return };
         let proto = jfn_sim::view::proto_name(h.mask);
         let (who, port) = if inbound { (dev_name(n, h.from.0), eng.end_name(h.to)) } else { (dev_name(n, h.to.0), eng.end_name(h.from)) };
-        let label = if inbound { format!("#{} {} von {} (an {})", hop, proto, who, port) } else { format!("#{} {} an {} (über {})", hop, proto, who, port) };
+        let label = if inbound {
+            format!("#{} {}", hop, tf("{} von {} (an {})", &[proto, &who, &port]))
+        } else {
+            format!("#{} {}", hop, tf("{} an {} (über {})", &[proto, &who, &port]))
+        };
         ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
         let d = ui.dp(8);
         let q = ui.place(d, d);
@@ -302,17 +314,17 @@ fn step_pane(n: &mut Net, ui: &mut Ui) {
         ui.box_end();
         k += 1;
     };
-    ui.text(TS_BODY_STRONG, "Eingang");
+    ui.text(TS_BODY_STRONG, t("Eingang"));
     match s.inbound {
         Some(h) => pdu_line(ui, n, h, true),
         None => {
             ui.next_size(-1, 0);
-            ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, "Kein Rahmen: das Gerät handelte von sich aus (ein Befehl, eine PDU, ein Zeitgeber).");
+            ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Kein Rahmen: das Gerät handelte von sich aus (ein Befehl, eine PDU, ein Zeitgeber)."));
         }
     }
-    ui.text(TS_BODY_STRONG, "Entscheidungen");
+    ui.text(TS_BODY_STRONG, t("Entscheidungen"));
     if s.decisions.is_empty() {
-        ui.text(TS_BODY | TX_SECONDARY, "keine");
+        ui.text(TS_BODY | TX_SECONDARY, t("keine"));
     }
     for e in &s.decisions {
         let layer = match e.note.layer() {
@@ -322,7 +334,7 @@ fn step_pane(n: &mut Net, ui: &mut Ui) {
             4 => "L4",
             _ => "L7",
         };
-        let text = eng.describe(e);
+        let text = crate::app::tr::msg(&eng.message(e));
         ui.box_begin(0, BOX_H, 6);
         ui.next_size(24, 0);
         ui.text(TS_CAPTION | TX_SECONDARY, layer);
@@ -331,9 +343,9 @@ fn step_pane(n: &mut Net, ui: &mut Ui) {
         ui.text(TS_BODY | TX_WRAP, &format!("{}{}", mark, text));
         ui.box_end();
     }
-    ui.text(TS_BODY_STRONG, "Ausgang");
+    ui.text(TS_BODY_STRONG, t("Ausgang"));
     if s.outbound.is_empty() {
-        ui.text(TS_BODY | TX_SECONDARY, "keine Rahmen");
+        ui.text(TS_BODY | TX_SECONDARY, t("keine Rahmen"));
     }
     for &h in &s.outbound {
         pdu_line(ui, n, h, false);
@@ -352,7 +364,7 @@ fn tree_pane(n: &mut Net, ui: &mut Ui) {
     let Some(s) = pk.shown.as_ref() else {
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER | pad(8), 0);
-        ui.text(TS_BODY | TX_SECONDARY, "Kein Rahmen gewählt");
+        ui.text(TS_BODY | TX_SECONDARY, t("Kein Rahmen gewählt"));
         ui.box_end();
         return;
     };
@@ -413,7 +425,7 @@ fn hex_pane(n: &mut Net, ui: &mut Ui) {
         (Some((o, l)), Some(f)) => format!("Bytes {}–{} · {}", o, o + l - 1, f),
         (Some((o, 1)), None) => format!("Byte {}", o),
         (Some((o, l)), None) => format!("Bytes {}–{}", o, o + l - 1),
-        (None, _) => format!("{} Bytes · ein Klick auf ein Byte wählt sein Feld", s.bytes.len()),
+        (None, _) => tf("{} Bytes · ein Klick auf ein Byte wählt sein Feld", &[&s.bytes.len().to_string()]),
     };
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS, &text);

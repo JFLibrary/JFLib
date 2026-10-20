@@ -36,6 +36,7 @@ use ui::*;
 
 use crate::app::commands::{M_CABLE, M_CANVAS, M_DEVICE};
 use crate::app::constants::*;
+use crate::app::tr::t;
 use crate::app::Net;
 use crate::doc::edits;
 use crate::workspace::icons::{tint_of, Symbols};
@@ -76,6 +77,8 @@ pub(crate) struct Canvas {
     pub wp_drag: Option<Link>,
     /// the cable with the × (cables.rs)
     pub x_link: Option<u32>,
+    /// end A of a cable chosen with Enter in the Verbinden tool (connect.rs)
+    pub kb_from: Option<u32>,
 }
 
 impl Canvas {
@@ -92,6 +95,7 @@ impl Canvas {
             choice: None,
             wp_drag: None,
             x_link: None,
+            kb_from: None,
         }
     }
 
@@ -105,6 +109,7 @@ impl Canvas {
         self.choice = None;
         self.wp_drag = None;
         self.x_link = None;
+        self.kb_from = None;
         let l = &p.layout;
         self.view = Some(if l.zoom_pm > 0 { View::At(l.zoom_pm as f32 / 1000.0, l.cx as f64, l.cy as f64) } else { View::Fit });
     }
@@ -153,16 +158,24 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     }
     n.canvas.scene.grid = n.prefs.grid;
     let g = n.doc.proj.layout.grid;
-    n.canvas.st.grid = if g == 0 { 20.0 } else { g.clamp(4, 200) as f32 };
+    // the project's grid step, else the one of the settings
+    n.canvas.st.grid = if g == 0 { n.prefs.grid_step.clamp(4, 200) as f32 } else { g.clamp(4, 200) as f32 };
     n.canvas.st.snap = n.prefs.snap;
+    // Tab walks the devices and notes, then the cables; screen readers call the canvas this
+    n.canvas.st.tab_edges = true;
+    if n.canvas.st.name != t("Topologie") {
+        n.canvas.st.name = String::from(t("Topologie"));
+    }
     // Esc gives up an armed tile before the canvas takes it for its selection
     if matches!(n.canvas.tool, Tool::Place(_) | Tool::Note | Tool::Pdu) && ui.popup_count() == 0 && ui.modal_active() == 0 && ui.key(VK_ESCAPE) {
         n.canvas.tool = Tool::Select;
     }
+    crate::doc::autosave::bar(n, ui);
     infobar(n, ui);
     let minimap = n.prefs.minimap;
-    // the painting depends on the symbols' palettes, the grid and the simulator's LEDs
-    let ver = n.syms.key() ^ if n.prefs.grid { 0 } else { 0x8000_0000 } ^ n.doc.sim.led_key.rotate_left(7);
+    // the painting depends on the symbols' palettes, the grid, the simulator's LEDs and the
+    // language (the placeholder of an empty note)
+    let ver = n.syms.key() ^ if n.prefs.grid { 0 } else { 0x8000_0000 } ^ if crate::app::tr::en() { 0x4000_0000 } else { 0 } ^ n.doc.sim.led_key.rotate_left(7);
     let tool = n.canvas.tool.dg();
     let dragging = n.palette.dragging;
     ui.next_size(-1, -1);
@@ -203,6 +216,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
         }
         let sc = &c.scene;
         ui.diagram_sems(ID_CANVAS, &mut c.st, &m, &|k| sc.label(k));
+        // the cables as well (screen readers, scripts: listitem:"Kabel PC1 eth0 – SW1 …")
+        ui.diagram_edge_sems(ID_CANVAS, &mut c.st, &m, &|k| cables::sem_label(doc, k));
         (evs, dropped, preview)
     };
     if let Some((model, x, y, click)) = preview {
@@ -315,8 +330,19 @@ fn event(n: &mut Net, ui: &mut Ui, ev: DEv) {
                 _ => {}
             }
         }
-        // a device: its console (Shift: its device window), a note: its text
-        DEv::Activate(DHit::Node(k)) => crate::workspace::terminal::activate(n, ui, k as u32),
+        // Enter (or a double click) on a device: with Verbinden it is an end of the cable, with
+        // the PDU tool the source or destination; else its console (Shift: its device window),
+        // a note: its text
+        DEv::Activate(DHit::Node(k)) => match n.canvas.tool {
+            Tool::Connect if n.doc.proj.device(k as u32).is_some() => connect::key_pick(n, ui, k as u32),
+            Tool::Pdu if n.doc.proj.device(k as u32).is_some() => crate::workspace::sim::pdu::pick_dev(n, ui, k as u32),
+            _ => crate::workspace::terminal::activate(n, ui, k as u32),
+        },
+        // Enter on a cable: its properties get the keyboard
+        DEv::Activate(DHit::Edge { .. }) => {
+            n.shell.dock.focus(P_PROPS);
+            ui.repass();
+        }
         DEv::Context(hit, _) => {
             let menu: &'static [Mi] = match hit {
                 DHit::Edge { .. } | DHit::Waypoint(..) | DHit::Mid(..) => &M_CABLE,
@@ -330,7 +356,7 @@ fn event(n: &mut Net, ui: &mut Ui, ev: DEv) {
                 }
                 _ => &M_CANVAS,
             };
-            ui.menu_popup(menu);
+            ui.menu_popup(crate::app::tr::menu(menu));
         }
         DEv::ConnectDrag { from, over, .. } => connect::drag(n, from, over),
         DEv::Connect { from, to, quick } => connect::finish(n, ui, from, to, quick),
@@ -476,17 +502,17 @@ fn rename_flyout(n: &mut Net, ui: &mut Ui) {
     if ui.flyout_begin(ID_RENAME, FL_BELOW) {
         if let Some(r) = &mut n.canvas.rename {
             ui.box_begin(0, BOX_V | pad(8), 6);
-            ui.text(TS_BODY_STRONG, if r.note { "Notiz" } else { "Gerätename" });
+            ui.text(TS_BODY_STRONG, t(if r.note { "Notiz" } else { "Gerätename" }));
             // Esc gives up (the text box would only drop the focus)
             if ui.focused() == ID_RENAME_BOX && ui.capture_shortcut(VK_ESCAPE, 0) {
                 act = 2;
             }
             let ev = if r.note {
                 ui.next_size(280, 110);
-                ui.textbox(ID_RENAME_BOX, Some("Text der Notiz"), &mut r.text, 2000 | TB_MULTI | TB_WRAP)
+                ui.textbox(ID_RENAME_BOX, Some(t("Text der Notiz")), &mut r.text, 2000 | TB_MULTI | TB_WRAP)
             } else {
                 ui.next_size(240, 0);
-                ui.textbox(ID_RENAME_BOX, Some("Name"), &mut r.text, 64)
+                ui.textbox(ID_RENAME_BOX, Some(t("Name")), &mut r.text, 64)
             };
             if r.select && ui.textbox_select(ID_RENAME_BOX, &r.text, 0, r.text.len()) {
                 r.select = false;
@@ -501,13 +527,13 @@ fn rename_flyout(n: &mut Net, ui: &mut Ui) {
                 crate::workspace::error_text(ui, &r.err, 240);
             } else if !r.note {
                 ui.next_size(240, 0);
-                ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, "Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe");
+                ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe"));
             }
             ui.box_begin(0, BOX_H | BOX_END, 8);
-            if ui.accent_button(ID_RENAME_OK, if r.note { "Übernehmen" } else { "Umbenennen" }) & EV_ACT != 0 {
+            if ui.accent_button(ID_RENAME_OK, t(if r.note { "Übernehmen" } else { "Umbenennen" })) & EV_ACT != 0 {
                 act = 1;
             }
-            if ui.button(ID_RENAME_CANCEL, "Abbrechen") & EV_ACT != 0 {
+            if ui.button(ID_RENAME_CANCEL, t("Abbrechen")) & EV_ACT != 0 {
                 act = 2;
             }
             ui.box_end();
@@ -538,7 +564,7 @@ fn commit_rename(n: &mut Net, ui: &mut Ui) {
             Ok(Some(e)) => n.doc.record(e),
             Ok(None) => {}
             Err(e) => {
-                r.err = alloc::format!("{}", e);
+                r.err = crate::app::tr::msg(&e.msg());
                 ui.repass();
                 return;
             }

@@ -1,0 +1,23 @@
+#!args --verify-dirty --autosave-dir build/jfn_autosave
+# the recovery bar (doc/autosave.rs) after a session that did not end well: autosave.uis (run
+# just before) left a copy of two_pcs.jfnet with PC2 deleted and PC1 moved.  Wiederherstellen
+# opens it with its file, unsaved; this session holds the copy until it keeps one of its own.
+# The script ends before that, as a crash would: autosave_reopen.uis (next) gets the copy
+# offered again.  The shot keeps the folder of the copies (see autosave.uis).
+shot build/jfn_autosave/recover.png
+theme light
+expect "Ungespeicherte Änderungen an „two_pcs.jfnet“ gefunden" exists
+expect button:"Wiederherstellen" exists
+expect button:"Verwerfen" exists
+expect button:"Später" exists
+shot build/jfnetworker/autosave_recover.png
+click button:"Wiederherstellen"
+expect "Ungespeicherte Änderungen an „two_pcs.jfnet“ gefunden" missing
+expect "„two_pcs.jfnet“ wiederhergestellt" exists
+expect text:"2 Geräte · 1 Kabel" exists
+expect text:"geändert" exists
+expect listitem:"PC2" missing
+expect listitem:"PC1" exists
+theme dark
+shot build/jfnetworker/autosave_recover_dark.png
+expect_nowarn

@@ -1,0 +1,35 @@
+#!args --verify-dirty --autosave-dir build/jfn_autosave --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# autosave (doc/autosave.rs): a saved project needs no copy; after a change the timer keeps
+# one (every 120 s of the virtual clock; the Eigenschaften of the project say "geändert,
+# automatisch gesichert"); the session ends with the change unsaved, so the copy stays for
+# autosave_recover.uis, which runs next and offers it.  The first shot puts the folder of the
+# copies in place before the program starts (build_rs.py makes the folders of shots), so the
+# command line hands it over (PERMISSIONS: fs.user).
+shot build/jfn_autosave/start.png
+theme light
+expect text:"gespeichert" exists
+# no copy while nothing changed
+wait 121000
+expect text:"gespeichert" exists
+# a change: PC2 goes with its cable
+click listitem:"PC2"
+key delete
+key esc
+expect text:"2 Geräte · 1 Kabel" exists
+expect text:"geändert" exists
+# the next round of the timer keeps it
+wait 120000
+expect text:"geändert, automatisch gesichert" exists
+shot build/jfnetworker/autosave.png
+# a later change is not in the copy yet
+click listitem:"PC1"
+key right
+key esc
+expect text:"geändert" exists
+# the system goes to sleep: a copy now
+system suspend
+expect text:"geändert, automatisch gesichert" exists
+system resume
+expect_nowarn
+# the session ends: the copy stays for the next start (autosave_recover.uis)
+system session-end

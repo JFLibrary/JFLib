@@ -9,7 +9,8 @@
 //                                   IPv4 interfaces with their state, the routing table as
 //                                   it is used now, the ARP cache without aged entries
 //   Engine::describe(&DevEvent)     the German sentence of a decision, with the device's
-//                                   port and interface names
+//                                   port and interface names; Engine::message(&DevEvent): the
+//                                   same as a Msg for the app's catalogue (EventRow::msg too)
 //
 // Simulation mode (below): frames_at(t) for the animation (which frame is how far along which
 // cable), drops_between (the red crosses), event_row(s) for the event list, step_of /
@@ -23,6 +24,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use jfn_model::cable::CableKind;
+use jfn_model::msg::Msg;
 use netpkt::{Ipv4, Mac, Prefix4};
 
 use crate::ip::{IfKind, Route};
@@ -249,6 +251,10 @@ impl Engine {
     }
     /// what a device decided, as a German sentence with its port and interface names
     pub fn describe(&self, ev: &DevEvent) -> String {
+        self.message(ev).text()
+    }
+    /// describe() as a message for the app's catalogue
+    pub fn message(&self, ev: &DevEvent) -> Msg {
         let n = self.node(ev.dev);
         let port = |p: u16| match n {
             Some(n) => String::from(n.port_name(p)),
@@ -258,7 +264,7 @@ impl Engine {
             Some(f) => f.name.clone(),
             None => alloc::format!("Interface {}", i),
         };
-        ev.note.describe(&port, &iface)
+        ev.note.message(&port, &iface)
     }
 }
 
@@ -331,6 +337,8 @@ pub struct EventRow {
     /// the decision as a German sentence (Engine::describe)
     pub text: String,
     pub drop: bool,
+    /// the decision as a message for the app's catalogue (text is its German text)
+    pub msg: Msg,
 }
 
 /// what one device did in one batch: the frame it handled, its decisions, the frames it sent
@@ -467,6 +475,7 @@ impl Engine {
         let hop = e.hop.and_then(|h| self.trace.hop(h));
         let hm = hop.map_or(0, |h| h.mask);
         let own = e.note.mask() & !hm;
+        let msg = self.message(e);
         EventRow {
             seq: e.seq,
             t: e.t,
@@ -476,8 +485,9 @@ impl Engine {
             layer: e.note.layer(),
             proto: proto_name(if own != 0 { own } else { hm | e.note.mask() }),
             mask: hm | e.note.mask(),
-            text: self.describe(e),
+            text: msg.text(),
             drop: e.note.is_drop(),
+            msg,
         }
     }
 

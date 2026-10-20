@@ -717,7 +717,7 @@ ui.dialog_end(); // always
   state, Box::new(edit))`, `h.undo(&mut state)`, `h.redo(..)`, `undo_label()` for the menu
   ("Rückgängig: …"), `undo_value()` / `redo_value()` (the step as data, `Edit::value`: an app
   can see what kind of edit it is before it runs), `group_begin` / `group_end` for compound
-  steps, `mark_saved()` / `dirty()` for "save changes?". `ui.undo_keys()` gives `Some(true)` for Ctrl+Z and `Some(false)` for
+  steps, `mark_saved()` / `dirty()` for "save changes?" (`mark_unsaved()`: a recovered copy counts as unsaved). `ui.undo_keys()` gives `Some(true)` for Ctrl+Z and `Some(false)` for
   Ctrl+Y / Ctrl+Shift+Z unless a text field (which has its own undo) has the keyboard.
 * **Unsaved changes**: in `App::command(UIC_CLOSE)` return `true` to keep the window, open your
   "save?" dialog, and call `ui.quit()` when done:
@@ -1309,6 +1309,11 @@ if (desc.render)(&args, &mut dst) == 0 {
   colour. Draw your own widgets with the tokens (`T_TEXT`, `T_CTRL_STROKE`, `T_ACCENT`, ...),
   not fixed colours, and they follow. `ui.set_text_scale(percent)` / `--text-scale` scale text
   and line heights; controls keep their sizes.
+* Reduced motion as an app setting: `ui.set_reduced_motion(Some(on) | None)` forces it on or
+  off (like `--anim`) or follows the system again (None). Colours of your own (charts,
+  canvases): `ui::contrast_ratio(a, b)` gives the WCAG 2 contrast of two colours (`luminance`
+  the relative luminance) -- 4.5 for text, 3 for graphical objects; a selftest can check a
+  palette against `style::STYLE.tokens(dark)` (JFNetworker's `uitest.rs`).
 * Missing characters (emoji, CJK, Arabic, symbols) are drawn with another font: first the
   app's chain `ui.text.set_fallback_fonts(&[id, ...])`, then system fonts
   (`ui.text.set_system_fallback(on)`, on in window mode; off in headless runs so shots match
@@ -1623,6 +1628,9 @@ Polish, Arabic and Hebrew (`i18n::library_languages()`), every other language ge
 An app without a catalogue stays German; one whose texts are language-neutral can install a
 catalogue that only names languages (`Catalog::from_tsv("de\ten\tfr\tar\n")`, as
 `datagallery` does) to let the library follow the user.
+`python tools/i18n_check.py apps/NAME` lists the texts of an app (`t("…")`, `tf("…")`,
+message templates, tables marked `// i18n`) that no `src/locales/*.tsv` has, and rows whose
+translation uses other placeholders (`--unused`: rows no source uses any more).
 
 **Sorting and case** follow the user's format locale, as Windows' `CompareStringEx` does:
 `i18n::collate(a, b)` orders base letters, then accents, then case ("a" < "A" < "ä" < "b"),
@@ -2170,6 +2178,11 @@ for ev in evs {
   moving things with `dg_point_at(&route.pts, f)`. Selection, hover, ports, handles, marquee
   and rubber band are drawn by the widget as ordinary commands on top. Pass a `ver` that
   changes with anything else the paint shows (states, labels).
+* Screen readers and keyboard: `ui.diagram_edge_sems(id, &mut st, &m, &label)` adds one
+  `listitem` per visible edge (a small box around the middle of its route; a screen reader's
+  click selects it), `st.tab_edges = true` lets Tab walk the edges after the nodes (a focused
+  edge gets the focus ring along its route, Enter activates it, the menu key opens its context
+  menu), `st.name` names the canvas.
 * Scripts: every visible node is a `listitem` with the label the app gives (`click
   listitem:"R1"`, `expect listitem:"R1" selected`). `down` / `up` take a point
   (`down 470,164`): a `listitem:` selector there reads as the button letter. A second press

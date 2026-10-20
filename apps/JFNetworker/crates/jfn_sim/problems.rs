@@ -16,6 +16,9 @@
 //   Loop                switches and hubs in a circle (there is no spanning tree yet)
 //   ShutWithAddress     an interface with an address that is shut down
 //
+// Problem::text is German; Problem::msg is the same as a template with arguments for the app's
+// catalogue (jfn_model::msg).
+//
 // Segments are the broadcast domains of the topology as cabled: cables, the VLANs inside
 // bridges (access ports, trunks with their native VLAN and allowed list), 802.1Q tags, hubs.
 // They count cables whether they are up or not -- a fault in the set-up stays one while a
@@ -30,6 +33,8 @@ use alloc::vec::Vec;
 use jfn_model::cable;
 use jfn_model::catalog::{CliStyle, PortSpec, F_HOST, F_HUB};
 use jfn_model::ifname;
+use jfn_model::msg;
+use jfn_model::msg::{phrase, Msg};
 use netpkt::{Ipv4, Prefix4};
 
 use crate::bridge::{BridgePort, PortMode};
@@ -46,8 +51,9 @@ pub enum Severity {
 }
 
 impl Severity {
-    /// the German name
+    /// the German name (the app translates it)
     pub fn title(self) -> &'static str {
+        // i18n
         match self {
             Severity::Error => "Fehler",
             Severity::Warning => "Warnung",
@@ -87,6 +93,8 @@ pub struct Problem {
     pub others: Vec<u32>,
     /// what is wrong, in German
     pub text: String,
+    /// what is wrong, as a message for the app's catalogue (text is its German text)
+    pub msg: Msg,
 }
 
 /// the loops reported at most
@@ -194,8 +202,8 @@ fn label(f: &Iface) -> String {
     }
 }
 
-fn problem(kind: ProblemKind, severity: Severity, dev: u32, port: Option<u16>, link: Option<u32>, others: Vec<u32>, text: String) -> Problem {
-    Problem { kind, severity, dev, port, link, others, text }
+fn problem(kind: ProblemKind, severity: Severity, dev: u32, port: Option<u16>, link: Option<u32>, others: Vec<u32>, msg: Msg) -> Problem {
+    Problem { kind, severity, dev, port, link, others, text: msg.text(), msg }
 }
 
 impl Engine {
@@ -347,7 +355,7 @@ impl Engine {
                 let mut others: Vec<u32> = rest.iter().map(|o| o.dev).filter(|&d| d != a.dev).collect();
                 others.sort_unstable();
                 others.dedup();
-                let text = format!("{} an {} ist im selben Netz doppelt vergeben: auch {}.", a.prefix.addr, a.name, names.join(", "));
+                let text = msg!("{} an {} ist im selben Netz doppelt vergeben: auch {}.", a.prefix.addr, a.name, names.join(", "));
                 out.push(problem(ProblemKind::DuplicateIp, Severity::Error, a.dev, a.port, None, others, text));
             }
         }
@@ -377,7 +385,7 @@ impl Engine {
             others.sort_unstable();
             others.dedup();
             let o = odd[0];
-            let text = format!("Netzmaske passt nicht: {} hat {}, {} ({}) im selben Netz /{}.", a.name, a.prefix, self.dev_name(o.dev), o.name, o.prefix.len);
+            let text = msg!("Netzmaske passt nicht: {} hat {}, {} ({}) im selben Netz /{}.", a.name, a.prefix, self.dev_name(o.dev), o.name, o.prefix.len);
             out.push(problem(ProblemKind::MaskMismatch, Severity::Warning, a.dev, a.port, None, others, text));
         }
     }
@@ -403,7 +411,7 @@ impl Engine {
                 // a router in one of its networks could be the gateway
                 let router = mine.iter().find_map(|a| addrs.iter().find(|r| r.seg.is_some() && r.seg == a.seg && r.dev != dev && forwards(r.ni) && r.prefix.contains(a.prefix.addr)).map(|r| (*a, r)));
                 if let Some((a, r)) = router {
-                    let text = format!("Kein Standard-Gateway: {} erreicht nur das eigene Netz ({} mit {} könnte es sein).", n.name, self.dev_name(r.dev), r.prefix.addr);
+                    let text = msg!("Kein Standard-Gateway: {} erreicht nur das eigene Netz ({} mit {} könnte es sein).", n.name, self.dev_name(r.dev), r.prefix.addr);
                     out.push(problem(ProblemKind::NoGateway, Severity::Warning, dev, a.port, None, alloc::vec![r.dev], text));
                 }
                 continue;
@@ -412,13 +420,13 @@ impl Engine {
                 match mine.iter().find(|a| a.prefix.contains(gw)) {
                     None => {
                         let nets: Vec<String> = mine.iter().map(|a| format!("{}", a.prefix.trunc())).collect();
-                        let text = format!("Das Standard-Gateway {} liegt außerhalb der eigenen Netze ({}).", gw, nets.join(", "));
+                        let text = msg!("Das Standard-Gateway {} liegt außerhalb der eigenen Netze ({}).", gw, nets.join(", "));
                         out.push(problem(ProblemKind::GatewayOffNet, Severity::Error, dev, mine[0].port, None, Vec::new(), text));
                     }
                     Some(a) => {
                         let holder = addrs.iter().find(|x| x.seg.is_some() && x.seg == a.seg && x.prefix.addr == gw);
                         if holder.is_none() {
-                            let text = format!("Das Standard-Gateway {} ist im Netz von {} nicht zu finden: kein Gerät dort hat diese Adresse.", gw, a.name);
+                            let text = msg!("Das Standard-Gateway {} ist im Netz von {} nicht zu finden: kein Gerät dort hat diese Adresse.", gw, a.name);
                             out.push(problem(ProblemKind::GatewayUnknown, Severity::Warning, dev, a.port, None, Vec::new(), text));
                         }
                     }
@@ -445,8 +453,11 @@ impl Engine {
                 if up {
                     continue;
                 }
-                let hint = if n.model.cli == CliStyle::Ios { " (\u{201e}no shutdown\u{201c} fehlt)" } else { "" };
-                let text = format!("{} hat die Adresse {}, ist aber abgeschaltet{}.", label(f), f.addrs[0], hint);
+                let text = if n.model.cli == CliStyle::Ios {
+                    msg!("{} hat die Adresse {}, ist aber abgeschaltet (\u{201e}no shutdown\u{201c} fehlt).", label(f), f.addrs[0])
+                } else {
+                    msg!("{} hat die Adresse {}, ist aber abgeschaltet.", label(f), f.addrs[0])
+                };
                 out.push(problem(ProblemKind::ShutWithAddress, Severity::Warning, dev, port, None, Vec::new(), text));
             }
         }
@@ -467,8 +478,10 @@ impl Engine {
                     (Some(a), Some(b)) => cable::cable_kind(&a, &b).ok(),
                     _ => None,
                 };
-                let what = right.map_or("ein anderes Kabel", |k| k.title());
-                let text = format!("Falsches Kabel zwischen {} und {}: hierher gehört {}; ohne Auto-MDI-X bleibt die Leitung aus.", name(0), name(1), what);
+                let text = match right {
+                    Some(k) => msg!("Falsches Kabel zwischen {} und {}: hierher gehört {}; ohne Auto-MDI-X bleibt die Leitung aus.", name(0), name(1), phrase(k.title())),
+                    None => msg!("Falsches Kabel zwischen {} und {}: hierher gehört ein anderes Kabel; ohne Auto-MDI-X bleibt die Leitung aus.", name(0), name(1)),
+                };
                 let (d, p, k, o) = at(0);
                 out.push(problem(ProblemKind::WrongCable, Severity::Error, d, p, k, o, text));
             }
@@ -481,37 +494,37 @@ impl Engine {
             };
             // a routed port with 802.1Q subinterfaces sends tagged frames
             let tagging = |k: usize| self.stack(ends[k].0).is_some_and(|st| st.ifaces.iter().any(|f| !f.hidden && matches!(f.kind, IfKind::Sub { port, .. } if port == ends[k].1)));
-            let mut push = |kind: ProblemKind, sev: Severity, k: usize, text: String| {
+            let mut push = |kind: ProblemKind, sev: Severity, k: usize, text: Msg| {
                 let (d, p, l, o) = at(k);
                 out.push(problem(kind, sev, d, p, l, o, text));
             };
             match (mode(0), mode(1)) {
                 (Some(PortMode::Trunk { native: na, allowed: aa }), Some(PortMode::Trunk { native: nb, allowed: ab })) => {
                     if na != nb {
-                        let text = format!("Native VLAN passt nicht: {} hat VLAN {}, {} VLAN {}; ungetaggte Frames wechseln auf dem Kabel das VLAN.", name(0), na, name(1), nb);
+                        let text = msg!("Native VLAN passt nicht: {} hat VLAN {}, {} VLAN {}; ungetaggte Frames wechseln auf dem Kabel das VLAN.", name(0), na, name(1), nb);
                         push(ProblemKind::NativeVlanMismatch, Severity::Warning, 0, text);
                     }
                     if aa.intersect(&ab).is_empty() {
-                        let text = format!("Der Trunk zwischen {} und {} lässt kein VLAN auf beiden Seiten zu.", name(0), name(1));
+                        let text = msg!("Der Trunk zwischen {} und {} lässt kein VLAN auf beiden Seiten zu.", name(0), name(1));
                         push(ProblemKind::NoCommonVlan, Severity::Error, 0, text);
                     }
                 }
                 (Some(PortMode::Access(a)), Some(PortMode::Access(b))) if a != b => {
-                    let text = format!("VLAN passt nicht: {} ist Access-Port in VLAN {}, {} in VLAN {}; die Frames wechseln auf dem Kabel das VLAN.", name(0), a, name(1), b);
+                    let text = msg!("VLAN passt nicht: {} ist Access-Port in VLAN {}, {} in VLAN {}; die Frames wechseln auf dem Kabel das VLAN.", name(0), a, name(1), b);
                     push(ProblemKind::NativeVlanMismatch, Severity::Warning, 0, text);
                 }
                 (Some(PortMode::Access(v)), Some(PortMode::Trunk { .. })) => {
-                    push(ProblemKind::AccessTrunk, Severity::Warning, 0, format!("{} ist Access-Port (VLAN {}), {} ist Trunk.", name(0), v, name(1)));
+                    push(ProblemKind::AccessTrunk, Severity::Warning, 0, msg!("{} ist Access-Port (VLAN {}), {} ist Trunk.", name(0), v, name(1)));
                 }
                 (Some(PortMode::Trunk { .. }), Some(PortMode::Access(v))) => {
-                    push(ProblemKind::AccessTrunk, Severity::Warning, 1, format!("{} ist Access-Port (VLAN {}), {} ist Trunk.", name(1), v, name(0)));
+                    push(ProblemKind::AccessTrunk, Severity::Warning, 1, msg!("{} ist Access-Port (VLAN {}), {} ist Trunk.", name(1), v, name(0)));
                 }
                 (Some(PortMode::Access(v)), None) if tagging(1) => {
-                    let text = format!("{} hat 802.1Q-Subinterfaces, {} ist aber Access-Port (VLAN {}): getaggte Frames verwirft der Switch.", name(1), name(0), v);
+                    let text = msg!("{} hat 802.1Q-Subinterfaces, {} ist aber Access-Port (VLAN {}): getaggte Frames verwirft der Switch.", name(1), name(0), v);
                     push(ProblemKind::AccessTrunk, Severity::Warning, 0, text);
                 }
                 (None, Some(PortMode::Access(v))) if tagging(0) => {
-                    let text = format!("{} hat 802.1Q-Subinterfaces, {} ist aber Access-Port (VLAN {}): getaggte Frames verwirft der Switch.", name(0), name(1), v);
+                    let text = msg!("{} hat 802.1Q-Subinterfaces, {} ist aber Access-Port (VLAN {}): getaggte Frames verwirft der Switch.", name(0), name(1), v);
                     push(ProblemKind::AccessTrunk, Severity::Warning, 1, text);
                 }
                 _ => {}
@@ -556,10 +569,13 @@ impl Engine {
             let dev = self.dev_of(e.node);
             let names: Vec<String> = devs.iter().map(|&d| self.dev_name(d)).collect();
             let vl: Vec<String> = vlans.iter().map(|v| format!("{}", v)).collect();
-            let vl = if vl.is_empty() { String::new() } else { format!(" (VLAN {})", vl.join(", ")) };
             let link = self.links.get(e.link).and_then(|l| l.as_ref()).map(|l| l.id);
             let others: Vec<u32> = devs.iter().copied().filter(|&d| d != dev).collect();
-            let text = format!("Schleife ohne Spanning Tree über {}{}: Broadcasts kreisen endlos.", names.join(", "), vl);
+            let text = if vl.is_empty() {
+                msg!("Schleife ohne Spanning Tree über {}: Broadcasts kreisen endlos.", names.join(", "))
+            } else {
+                msg!("Schleife ohne Spanning Tree über {} (VLAN {}): Broadcasts kreisen endlos.", names.join(", "), vl.join(", "))
+            };
             out.push(problem(ProblemKind::Loop, Severity::Error, dev, Some(e.port), link, others, text));
         }
     }

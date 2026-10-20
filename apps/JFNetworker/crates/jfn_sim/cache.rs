@@ -29,6 +29,8 @@ use alloc::vec::Vec;
 use core::any::Any;
 
 use agent_core::jmap::Value;
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 use base::lru::Lru;
 use base::metrics::Window;
 use netpkt::http::{Headers, Version};
@@ -464,16 +466,22 @@ impl Service for Cache {
     }
 }
 
-/// a cache from its definition in a project file (svcact.rs)
+/// a cache from its definition in a project file (svcact.rs); the German reason when
+/// the configuration does not fit
 pub fn from_def(c: &Value) -> Result<Box<dyn Service>, String> {
+    from_def_msg(c).map_err(|m| m.text())
+}
+
+/// from_def, the reason as a message for the app's catalogue
+pub fn from_def_msg(c: &Value) -> Result<Box<dyn Service>, Msg> {
     let num = |k: &str, d: u64| c.get(k).and_then(|v| v.as_u64()).unwrap_or(d);
     let ms = |k: &str, d: u64| c.get(k).and_then(|v| decimal(v, MS)).unwrap_or(d * MS);
-    let b = c.get("backend").and_then(|v| v.as_str()).ok_or_else(|| String::from("\u{201e}backend\u{201c} fehlt."))?;
-    let url = Url::parse(b).map_err(|_| format!("\u{201e}{}\u{201c} ist keine http-URL.", b))?;
+    let b = c.get("backend").and_then(|v| v.as_str()).ok_or_else(|| msg!("\u{201e}backend\u{201c} fehlt."))?;
+    let url = Url::parse(b).map_err(|_| msg!("\u{201e}{}\u{201c} ist keine http-URL.", b))?;
     let mut k = Cache::new(url);
     k.port = match num("port", 80) {
         p @ 1..=65535 => p as u16,
-        p => return Err(format!("Port {} gibt es nicht.", p)),
+        p => return Err(msg!("Port {} gibt es nicht.", p)),
     };
     k.store.max_len = num("entries", 1000).min(10_000_000) as usize;
     k.store.max_weight = num("max_kb", 65_536).min(1 << 30) * 1024;

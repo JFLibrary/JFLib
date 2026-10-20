@@ -1,51 +1,83 @@
 # JFNetworker
 
 Ein Netzwerksimulator und Labor für verteilte Systeme, gebaut als Alternative zu Cisco Packet
-Tracer: Geräte und Kabel auf einer Zeichenfläche, echte Protokolle Byte für Byte (Ethernet,
-ARP, IPv4/IPv6, ICMP, UDP, TCP, DHCP, DNS, später Routing-Protokolle), eine IOS-artige
-Befehlszeile für Router und Switches, eine Linux-artige Shell für Hosts, ein Simulationsmodus mit
-Paketanimation und PDU-Inspektor und Dienste, mit denen sich horizontal skalierte Systeme
-aufbauen lassen (Loadbalancer, geshardete Datenbanken, Caches, Queues, Lastgeneratoren, eigene
-Skripte).
+Tracer: Geräte und Kabel auf einer Zeichenfläche, echte Protokolle Byte für Byte, eine
+IOS-artige Befehlszeile für Router und Switches, eine Linux-artige Shell für Hosts, ein
+Simulationsmodus Schritt für Schritt mit Paketansicht, und später Dienste, mit denen sich
+horizontal skalierte Systeme aufbauen lassen (Loadbalancer, geshardete Datenbanken, Caches,
+Queues, Lastgeneratoren, eigene Skripte).
 
-**Stand (2026-10-20):** Das Datenmodell, die Paket-Bausteine und der Simulationskern sind
-fertig: Switching mit VLANs und IPv4 mit ARP, Routing, ICMP, Ping und Traceroute, dazu UDP
-und TCP (RFC 9293 mit Reno, siehe [TCP](#tcp)) mit Sockets und ein virtuelles Betriebssystem
-pro Gerät mit Diensten: DHCP (Client, Server, Relay), DNS (autoritativer Server, Resolver mit
-Cache), Syslog, NTP, TCP-Testdienste (Echo, Discard, Client) und HTTP (Webserver, Client,
-Lastgenerator mit Latenzfenstern, siehe [HTTP](#http)) und das Labor für verteilte Systeme
-(Loadbalancer, geshardeter KV-Speicher mit Replikaten und Quoren, Cache, Message Queue, Worker
-und Fehlerinjektion, siehe [Labor für verteilte Systeme](#labor-für-verteilte-systeme)); die
-Befehlszeilen (IOS-artig für
-Netzwerkgeräte, eine Linux-Shell für Hosts mit `curl`, `nc`, `ss` und `top`) mit running- und
-startup-config;
-der Szenario-Runner `jfn-sim`; außerdem die Engine-Seite des Simulationsmodus (Schritte vor
-und zurück, Ereignisliste, Paket-Tab), pcapng-Mitschnitte und die Probleme-Liste. Das Fenster
-ist der Topologie-Editor: Geräte aus der Palette platzieren, verschieben, löschen und
-umbenennen, Notizen, Projekte öffnen und speichern. Der Simulator läuft im Editor in Echtzeit
-mit und folgt jeder Änderung (auch Rückgängig): Geräte verbinden mit Port-Auswahl, Kabel aller
-Arten mit LEDs aus dem Simulator, Wegpunkten und Verlauf, der Inspektor für Geräte (Strom,
-Schnittstellen mit Status und Adressen, schnelle IP-, DHCP- und Gateway-Einstellungen) und
-Kabel (Typ, Bandbreite, Verzögerung, Verlust, Stecker), die Probleme-Liste mit den Befunden
-des Simulators. Jedes Gerät hat seine Konsole im Terminal-Bereich (IOS-artig oder Linux-Shell,
-als Tab oder eigenes Fenster), dazu ein Gerätefenster mit Übersicht, Schnittstellen,
-Formularen für die Konfiguration, Diensten, CLI und bei Hosts einem Desktop; das Protokoll
-sammelt die Meldungen aller Geräte, und `copy running-config startup-config` landet mit
-Rückgängig im Projekt (siehe [Konsolen, Gerätefenster, Protokoll](#konsolen-gerätefenster-protokoll)).
-Dazu kommt der Simulationsmodus im Fenster: Echtzeit oder Schritt für Schritt (vor, zurück
-entlang der Aufzeichnung, Abspielen mit Tempo 0,25× bis 8×), Pakete als Umschläge auf den
-Kabeln, Ereignisliste mit Zeitleiste, Paket-Tab mit Schichten und Bytes, eigene PDUs (einfach
-per Werkzeug P, komplex mit Protokoll, Ports, Größe, TTL und Anzahl) und der Export der
-Aufzeichnung als pcapng (siehe [Simulationsmodus](#simulationsmodus)). Als Nächstes folgt die
-Politur der Oberfläche (siehe [Fahrplan](#fahrplan)).
+**Stand (2026-10-20): Phase 1 ist fertig** (siehe [Fahrplan](#fahrplan)).
+
+- **Topologie-Editor:** 26 herstellerneutrale Gerätemodelle aus der Palette ziehen, klicken oder
+  per Tastatur platzieren; verbinden mit Port-Auswahl und automatischem Kabeltyp (Kupfer,
+  gekreuzt, Glasfaser, seriell, Konsole, Funk, WAN), Kabel mit LEDs, Wegpunkten und Verlauf,
+  Notizen, Rückgängig für alles, Projekte als `.jfnet`.
+- **Simulator im Editor:** läuft in Echtzeit mit und folgt jeder Änderung. Switching mit VLANs,
+  IPv4 mit ARP, Routing (auch L3-Switches), ICMP, Ping und Traceroute, UDP und TCP (RFC 9293),
+  DHCP mit Relay, DNS, Syslog, NTP, HTTP mit Lastgenerator; die Probleme-Liste zeigt doppelte
+  Adressen, fehlende Gateways, Schleifen und anderes.
+- **Konsolen:** IOS-artig auf Routern und Switches (Modi, `?`, Tab, `show`-Befehle, `ip dhcp
+  pool`, `copy run start` als Rückgängig-Schritt), eine Linux-Shell auf Hosts (`ip`, `ping`,
+  `traceroute`, `dhclient`, `curl`, `nc`, `ss`, `top`), als Tab, eigenes Fenster oder im
+  Gerätefenster mit Formularen und Desktop.
+- **Simulationsmodus:** Pakete als Umschläge auf den Kabeln, Schritt vor und zurück entlang der
+  Aufzeichnung, Ereignisliste mit Zeitleiste, Paket-Tab mit Schichten, Feldern, Bytes und
+  Prüfsummen, eigene PDUs, Export als pcapng.
+- **Labor für verteilte Systeme:** Loadbalancer, geshardeter KV-Speicher mit Replikaten und
+  Quoren, Cache, Message Queue mit Workern und Fehlerinjektion mit Marken auf der Zeitleiste,
+  bisher über die Shell (`lbctl`, `kvctl` …) und Szenarien (siehe
+  [Labor für verteilte Systeme](#labor-für-verteilte-systeme)).
+- **Politur (U5):** Deutsch und Englisch, Einstellungen, automatische Sicherung mit
+  Wiederherstellung, vollständige Tastaturbedienung, Geräte und Kabel für Screenreader,
+  geprüfter Kontrast, Tastenkürzel-Übersicht, App-Symbol und Paketierung (Dateityp `.jfnet`);
+  flüssig auch mit 500 Geräten, 800 Kabeln und 300 Paketen in Bewegung (unter 33 ms pro Bild in
+  1080p, siehe [Performance](#performance)).
+
+## Bedienung
+
+- **Geräte platzieren:** eine Kachel der Palette auf die Zeichenfläche ziehen, oder anklicken und
+  dann auf die Fläche klicken (Umschalt: mehrere), oder per Tastatur: Strg+1 springt in die
+  Gerätesuche, Tab zu den Kacheln einer Kategorie, die Pfeiltasten wählen, Eingabe setzt das
+  Gerät in die Mitte der Ansicht.
+- **Verbinden (C):** von Gerät zu Gerät ziehen oder beide anklicken; per Tastatur Strg+9 (die
+  Topologie), Tab zum ersten Gerät, Eingabe, Tab zum zweiten, Eingabe – die Port-Auswahl öffnet
+  sich unter dem zweiten Gerät, Eingabe verbindet das beste Paar. Umschalt verbindet sofort.
+- **Konsole:** Doppelklick oder Eingabe auf einem Gerät öffnet seine Konsole im Terminal-Bereich
+  (Strg+3), mit Umschalt das Gerätefenster.
+- **Simulation:** F5 Simulationsmodus, Umschalt+F5 Echtzeit, F6 Abspielen/Anhalten, F7 Schritt
+  vor, Umschalt+F7 zurück; das Werkzeug P sendet eine einfache PDU (Quelle, dann Ziel – auch mit
+  Tab und Eingabe).
+- **Tastatur:** Strg+1 … 8 zeigen die Bereiche und geben ihnen die Tastatur, Strg+9 die
+  Topologie; dort wählt Tab die Geräte und Notizen, dann die Kabel (Eingabe auf einem Kabel: seine
+  Eigenschaften). Werkzeugleiste und Palette sind Fokusgruppen (ein Tab-Halt, Pfeiltasten
+  innen). F1 zeigt alle Tastenkürzel.
+- **Einstellungen** (Werkzeuge › Einstellungen, Strg+,): Raster und Rasterweite, Einrasten,
+  Minimap, Tempo beim Start, Bewegung (wie das System, reduziert, voll), Sprache (wie das
+  System, Deutsch, English), automatisches Sichern (Sekunden, 0 aus). Sie liegen in
+  `config://settings.ini`.
+- **Automatische Sicherung:** ungespeicherte Änderungen landen alle 120 s (einstellbar) und
+  sofort beim Ruhezustand oder Abmelden in `data://autosave/`; nach einem Absturz bietet die
+  nächste Sitzung sie in einer Leiste über der Zeichenfläche an (Wiederherstellen, Verwerfen,
+  Später). Jede laufende Sitzung hält eine Sperre, ein zweites Fenster bietet ihre Kopie nicht an;
+  eine wiederhergestellte Kopie bleibt, bis die neue Sitzung ihre eigene geschrieben hat. Wer
+  beim Beenden „Verwerfen“ wählt, verwirft auch die Kopie.
+- **Barrierefreiheit:** Geräte und Kabel sind für Screenreader Listeneinträge („Kabel PC1 eth0 –
+  SW1 Gi1/0/1, Kupfer, gerade, aktiv“), die Leinwand heißt „Topologie“; die Farben der
+  Pakete und Kabel halten in beiden Themes und im Hochkontrast mindestens 3:1 gegen die Fläche
+  (Selbsttest). Die meisten Kabelarten unterscheiden sich auch in der Linie (gekreuzt
+  gestrichelt, Konsole und Funk gepunktet, seriell mit Blitz, WAN doppelt), Pakete nennen
+  Inhalt und Weg für Screenreader und in der Ereignisliste; „reduzierte Bewegung“ lässt Pakete
+  springen statt gleiten.
 
 ## Bauen und testen
 
 ```
 python build_rs.py app JFNetworker
 build/win/JFNetworker.exe                                   # der Editor
-build/win/JFNetworker.exe --open apps/JFNetworker/tests/fixtures/office.jfnet
-build/win/JFNetworker.exe --selftest                        # Prüfungen von Modell und Simulator
+build/win/JFNetworker.exe --open apps/JFNetworker/tests/fixtures/campus.jfnet
+build/win/JFNetworker.exe --lang en                         # auf Englisch
+build/win/JFNetworker.exe --selftest                        # Prüfungen von Modell, Simulator, Oberfläche
 build/win/JFNetworker.exe --selftest --pcap-out DIR         # dazu die Mitschnitte der Prüfungen
 build/win/JFNetworker.exe --script apps/JFNetworker/tests/place.uis --verify-dirty
 build/win/JFNetworker.exe --gen-topology 500 --traffic 300  # synthetischer Campus, 300 Pings (Leistung)
@@ -55,43 +87,53 @@ build/win/jfn-sim.exe check apps/JFNetworker/tests/fixtures/lan_router.jfnet
 build/win/jfn-sim.exe decode "ff ff ff ff ff ff 02 4a 00 00 01 01 08 06 ..."
 build/win/jfn-sim.exe gen 500 --out build/campus.jfnet
 build/win/JFNetworker.exe apps/JFNetworker/tests/fixtures/two_pcs.jfnet --scenario apps/JFNetworker/tests/scen/two_pcs.scn
+python tools/i18n_check.py apps/JFNetworker crates            # jeder Text der Crates hat sein Englisch
 ```
 
-`python build_rs.py test --quick` führt alle Skripte in `tests/` aus: `model.uis` (Selbsttest
-mit den Gruppen `sim`, `l3`, `simmode`, `svc`, `cli`, `tcp`, `http`, `console`, `pdu`, `lab` und `synth`), die Golden-Szenarien `scen_*.uis` und
-die Fensterskripte, alle mit `--verify-dirty`: `catalog.uis` (Palette und Suche), `shell.uis`
-(Bereiche, Menüs, Ansicht, Bilder hell, dunkel und 150 %), `place.uis` (Ziehen und
-Klicken-zum-Platzieren, Rückgängig), `edit.uis` (Verschieben, Rahmenauswahl, Löschen,
-Umbenennen mit abgelehnten Namen, Notizen, Hand), `links.uis` (Kabel beim Löschen und
-Wiederherstellen), `file.uis` und `file_reopen.uis` (Speichern unter `build/jfn_test.jfnet`,
-die Rückfrage bei Änderungen, Öffnen, zuletzt geöffnete Dateien; `file_reopen.uis` öffnet die
-Datei per `--open` wieder und läuft deshalb nach `file.uis`), `connect.uis` (Werkzeug C,
-Port-Auswahl, Umschalt und Port-Punkte, rot markierte Ziele ohne passenden Port),
-`cable_types.uis` (jede Kabelart, Typ aus dem Kontextmenü; Bilder hell, dunkel und 150 %),
-`waypoints.uis` (Wegpunkte einfügen, ziehen, löschen; gerade, rechtwinklig, Kurve),
-`inspector.uis` (Schnittstellen, schnelle Einstellungen, Kabelqualität, Mehrfachauswahl),
-`engine.uis` (LEDs und Zustände folgen Strom und Stecker, Befunde des Simulators),
-`undo.uis` (Verbinden und Trennen auf allen Wegen, ein gelöschter Switch kommt mit seiner
-laufenden Konfiguration zurück), `terminal_ios.uis` (R1s Konsole: Modi, `?`, Tab, Fehler mit
-`^`, `ping` mit `.!!!!`, Strg+Umschalt+6, `show ip route`, `--More--`, `terminal length 0`,
-`hostname`, `copy run start` mit Rückgängig und Wiederholen; Bilder hell, dunkel und 150 %),
-`terminal_linux.uis` (PC1s Shell: `ip addr`, `ping` bis Strg+C, Tab, Strg+L; Tabs umbenennen,
-eigenes Fenster, nebeneinander, schließen; ein ausgeschaltetes Gerät), `device_window.uis`
-(Formulare, die Befehle in die Konsole tippen und die Startkonfiguration ändern, Dienste,
-CLI, Desktop mit IP-Konfiguration, Texteditor und Browser), `log.uis` (Protokoll mit
-Filtern nach Gerät, Schwere und Text) und für den Simulationsmodus `simulation.uis` (Schritte
-vor und zurück, „Zurück zu live“, Pakete zu festen Zeitpunkten, Punkte unter 50 %, Filter,
-„Nur Auswahl“, Tempo, Abspielen, Zurücksetzen), `events.uis` (Liste und Zeitleiste in beide
-Richtungen, Chips, Echtzeit), `packet.uis` (Schritt am Gerät, Baum und Hex gekoppelt) und
-`pdu.uis` (einfache und komplexe PDUs, Stoppen, erneut senden, pcapng-Export), jeweils mit
-Bildern hell, dunkel und 150 %. Der Selbsttest hat dafür die Gruppen `console` (Log-Meldungen
-als `Report::Log`, gesicherte Konfiguration und Dienste durch Rückgängig) und `pdu`.
-`tests/fixtures/office.jfnet` ist ein kleines Büronetz mit jeder Kabelart, `cables.jfnet` eine
-Gerätereihe ohne Kabel, `pdu_lab.jfnet` ein Labor mit DHCP, DNS (Zone `lab`) und TCP-Echo für
-die PDUs. Die Bausteine aus `lib/` prüft `coretest`
-(Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`, `rng`, `metrics`, `jmap`, `cmdtree`,
-`hashring`, `lru`), die
-Skriptsprache die Gruppe `script`.
+`python build_rs.py test --quick` führt alle Skripte in `tests/` aus, die Fensterskripte mit
+`--verify-dirty` (Teil- und Vollbild pixelgleich); die meisten nehmen Bilder hell, dunkel und
+mit 150 % nach `build/jfnetworker/` auf.
+
+| Skript | prüft |
+|---|---|
+| `model.uis` | den Selbsttest: Katalog, Interface-Namen, Kabelregeln, Projekt, Datei, Szenarien und die Gruppen `sim`, `l3`, `simmode`, `svc`, `cli`, `tcp`, `http`, `console`, `pdu`, `lab` (das Labor für verteilte Systeme), `ui` (Kontrast, Einstellungen, Sicherungen, englischer Katalog), `msg` (Texte von Modell und Simulator), `campus` und `synth` (die synthetischen Projekte der Leistungstests) |
+| `scen_*.uis` | die Golden-Szenarien (siehe [Szenarien](#szenarien-scn)), byte-gleich auf Windows und Linux |
+| `shell.uis` | Bereiche, Menüs, Ansicht, Info |
+| `catalog.uis`, `place.uis`, `edit.uis`, `links.uis`, `undo.uis` | Palette und Suche, Platzieren, Verschieben, Rahmenauswahl, Löschen, Umbenennen, Notizen, Kabel beim Löschen und Wiederherstellen, Rückgängig auf allen Wegen |
+| `file.uis`, `file_reopen.uis` | Speichern unter `build/jfn_test.jfnet`, die Rückfrage, Öffnen, zuletzt geöffnete Dateien (`file_reopen.uis` läuft nach `file.uis`) |
+| `connect.uis`, `cable_types.uis`, `waypoints.uis`, `inspector.uis`, `engine.uis` | Verbinden und Port-Auswahl, jede Kabelart, Wegpunkte, die Eigenschaften, LEDs und Befunde des Simulators |
+| `terminal_ios.uis`, `terminal_linux.uis`, `device_window.uis`, `log.uis` | die Konsolen, Gerätefenster mit Formularen und Desktop, das Protokoll |
+| `simulation.uis`, `events.uis`, `packet.uis`, `pdu.uis` | Schritte, Ereignisse und Zeitleiste, Paket-Tab, PDUs und pcapng-Export |
+| `a11y.uis` | alles ohne Maus: Kabel und Geräte als Einträge, Tab über Geräte und Kabel, Platzieren aus der Palette, Verbinden per Eingabe, Konsole, Simulation mit F5/F7 und der PDU per Eingabe, die Tastenkürzel |
+| `settings.uis` | den Einstellungsdialog: Raster, Einrasten, Minimap, Tempo, Sprache (das Fenster auf Englisch und zurück), Bewegung, Sicherungsintervall |
+| `autosave.uis`, `autosave_recover.uis`, `autosave_reopen.uis` | eine Kopie nach dem Intervall und beim Ruhezustand, die Kopie überlebt das Sitzungsende; die nächste Sitzung stellt sie wieder her und hält sie, bis sie eine eigene hat (ein zweiter Absturz verliert nichts); Beenden mit „Verwerfen“ nimmt die Kopien mit (die drei laufen in dieser Reihenfolge) |
+| `english.uis` | das Fenster mit `--lang en`: Menüs, Bereiche, Eigenschaften, Simulationsmodus, Dialoge |
+| `rtl.uis` | ein gespiegeltes Fenster: Bereiche gespiegelt, die Topologie wie gezeichnet bedienbar |
+| `shots.uis` | die Bild-Matrix der Hauptansichten (Topologie, Konsole, Simulation, Paket-Tab, Gerätefenster) hell und dunkel mit 100 und 150 % |
+| `campus.uis`, `scen_campus.uis` | die Abnahme von Phase 1 (unten) |
+| `perf.uis` | die Leistung: 500 Geräte, 800 Kabel und 300 Rahmen in 1920 × 1080 mit höchstens 33 ms pro Bild in Echtzeit, beim Abspielen, Verschieben, Zoomen und Ziehen (siehe [Performance](#performance)) |
+
+Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
+`cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
+`campus.jfnet` (die Abnahme) und die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
+`coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`, `rng`, `metrics`, `jmap`,
+`cmdtree`, `hashring`, `lru`), die Skriptsprache die Gruppe `script`.
+
+**Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
+VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
+reicht DHCP mit `ip helper-address` an R1 weiter. R1 hängt über 10G-Glasfaser an MLS1, vergibt
+die Adressen aus zwei Pools (`ip dhcp pool` mit Gateway, DNS-Server und Domäne `lab`,
+ausgeschlossene Bereiche) und führt ins Servernetz zu SRV1 (DNS-Zone `lab` mit `server.lab`,
+Zeitquelle für R1 und MLS1). Drei Tests gehören dazu: das Golden-Szenario `scen_campus.uis`
+(siehe [Szenarien](#szenarien-scn)), die Selbsttest-Gruppe `campus` (das Fixture selbst: Leases
+über das Relay, Namen, `dhclient`, die DHCP-Befehle, NTP, ARP vor ICMP mit korrekten
+Prüfsummen auf jedem Kabel) und `campus.uis` im Fenster: die Leases, PC1s Shell mit `dhclient -v`,
+`/etc/resolv.conf`, `ping` und `traceroute` per Name, `show ip route` und `show mac
+address-table` auf MLS1, `show ip dhcp binding` auf R1, im Simulationsmodus eine einfache PDU
+von PC2 zu SRV1 Schritt für Schritt (ARP-Anfrage, Antwort von MLS1, dann das Echo, das MLS1 an
+R1 weiterroutet) und der Paket-Tab mit den Prüfsummen von IPv4 und ICMP. Die Bilder für die
+Abnahme landen als `build/jfnetworker/campus_*.png` (Topologie, Konsolen, `show`-Ausgaben,
+Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 
 ## Aufbau
 
@@ -106,11 +148,12 @@ Skriptsprache die Gruppe `script`.
 | Datenmodell | [`crates/jfn_model`](crates/jfn_model/lib.rs) | Gerätekatalog, Interface-Namen, Kabelregeln, Projekt, Szenarien, synthetische Testprojekte ([`synth.rs`](crates/jfn_model/synth.rs)) |
 | Simulator | [`crates/jfn_sim`](crates/jfn_sim/lib.rs) | Ereignis-Kern, Kabel mit Laufzeit/Verlust/Warteschlangen, Bridge mit VLANs, Hub, IPv4 mit ARP, Routing und ICMP, Ping- und Traceroute-Jobs, virtuelles OS mit UDP- und TCP-Sockets ([`tcp.rs`](crates/jfn_sim/tcp.rs)) und Diensten (DHCP, DNS, Resolver, Syslog, NTP, TCP-Testdienste in [`tcpsvc.rs`](crates/jfn_sim/tcpsvc.rs), HTTP in [`http.rs`](crates/jfn_sim/http.rs) und [`httpsvc.rs`](crates/jfn_sim/httpsvc.rs)), Trace, Zustand für die Leinwand, Treiber; Simulationsmodus, pcapng-Export, Probleme-Liste; Befehlszeilen in [`cli/`](crates/jfn_sim/cli/mod.rs) (`curl`, `nc`, `ss`, `top` in [`tools.rs`](crates/jfn_sim/cli/tools.rs), `lbctl`, `kvctl` … in [`lab.rs`](crates/jfn_sim/cli/lab.rs)), Szenarien in [`runner.rs`](crates/jfn_sim/runner.rs); das Labor: Loadbalancer, KV-Speicher, Cache, Queue und Worker ([`lb.rs`](crates/jfn_sim/lb.rs), [`kv.rs`](crates/jfn_sim/kv.rs), [`cache.rs`](crates/jfn_sim/cache.rs), [`mq.rs`](crates/jfn_sim/mq.rs)), Disk ([`disk.rs`](crates/jfn_sim/disk.rs)), Fehlerinjektion ([`fault.rs`](crates/jfn_sim/fault.rs)) |
 | Runner | [`crates/jfn_run`](crates/jfn_run/lib.rs), [`sim/main.rs`](sim/main.rs) | `jfn-sim` und `--scenario` der GUI-Exe: Dateien lesen, Bericht, pcapng, Vergleich mit Golden-Dateien |
-| App | [`src/app`](src/app/mod.rs) | Start (auch `--selftest` und `--scenario`), Zustand (`Net`), Befehle und Menüs, Kennungen |
-| | [`src/workspace`](src/workspace/mod.rs) | Fensterrahmen, Palette, Eigenschaften (`inspector/`: Gerät, Kabel, Projekt), Zeichenfläche (`canvas/`: Szene und Zeichnen, Werkzeuge, Verbinden, Kabel), Simulationsmodus ([`sim/`](src/workspace/sim/mod.rs): Steuerung, Animation, Ereignisse, Paket, PDUs und Export), Symbole und UI-Icons (`icons/`, erzeugt von `tools/vsym.py` und [`mkicons.py`](mkicons.py)), Terminal-Bereich und Konsolenfenster ([`terminal.rs`](src/workspace/terminal.rs)), Protokoll ([`logview.rs`](src/workspace/logview.rs)), Gerätefenster ([`devwin/`](src/workspace/devwin/mod.rs): Übersicht, Schnittstellen, Konfiguration, Dienste, CLI, Desktop) |
-| | [`src/doc`](src/doc/mod.rs) | das offene Projekt mit Rückgängig (`edits.rs`), Dateien und Dialoge (`file.rs`), der Simulator dahinter (`sim.rs`), Einstellungen, die die Konfiguration eines Geräts ändern (`config.rs`), die Konsolen der Geräte und die Meldungen des Simulators an sie ([`console.rs`](src/doc/console.rs)) |
+| App | [`src/app`](src/app/mod.rs) | Start (auch `--selftest` und `--scenario`), Zustand (`Net`), Befehle und Menüs, Kennungen, Einstellungen ([`prefs.rs`](src/app/prefs.rs): Schema über `base::settings`), Sprachen ([`tr.rs`](src/app/tr.rs): Katalog, übersetzte Befehle und Menüs) |
+| | [`src/workspace`](src/workspace/mod.rs) | Fensterrahmen, Palette, Eigenschaften (`inspector/`: Gerät, Kabel, Projekt), Zeichenfläche (`canvas/`: Szene und Zeichnen, Werkzeuge, Verbinden, Kabel), Simulationsmodus ([`sim/`](src/workspace/sim/mod.rs): Steuerung, Animation, Ereignisse, Paket, PDUs und Export), Symbole und UI-Icons (`icons/`, erzeugt von `tools/vsym.py` und [`mkicons.py`](mkicons.py)), Terminal-Bereich und Konsolenfenster ([`terminal.rs`](src/workspace/terminal.rs)), Protokoll ([`logview.rs`](src/workspace/logview.rs)), Gerätefenster ([`devwin/`](src/workspace/devwin/mod.rs): Übersicht, Schnittstellen, Konfiguration, Dienste, CLI, Desktop), die Dialoge der Einstellungen und der Tastenkürzel ([`settings.rs`](src/workspace/settings.rs)) |
+| | [`src/doc`](src/doc/mod.rs) | das offene Projekt mit Rückgängig (`edits.rs`), Dateien und Dialoge (`file.rs`), der Simulator dahinter (`sim.rs`), Einstellungen, die die Konfiguration eines Geräts ändern (`config.rs`), die Konsolen der Geräte und die Meldungen des Simulators an sie ([`console.rs`](src/doc/console.rs)), Sicherungen und ihre Wiederherstellung ([`autosave.rs`](src/doc/autosave.rs)) |
 | | [`src/sim_thread.rs`](src/sim_thread.rs) | Treiber mit eigenem Thread für Echtzeit und lange Läufe (nur nativ) |
-| | [`src/selftest.rs`](src/selftest.rs), [`src/simtest.rs`](src/simtest.rs), [`src/l3test.rs`](src/l3test.rs), [`src/simmodetest.rs`](src/simmodetest.rs), [`src/svctest.rs`](src/svctest.rs), [`src/clitest.rs`](src/clitest.rs), [`src/tcptest.rs`](src/tcptest.rs), [`src/httptest.rs`](src/httptest.rs), [`src/consoletest.rs`](src/consoletest.rs), [`src/pdutest.rs`](src/pdutest.rs), [`src/labtest.rs`](src/labtest.rs), [`src/synthtest.rs`](src/synthtest.rs) | Selbsttests von Modell, Simulator, Befehlszeilen, TCP, HTTP, PDUs, dem Labor, den synthetischen Projekten und dem, worauf die Konsolen bauen (`--selftest`) |
+| | [`src/selftest.rs`](src/selftest.rs), [`src/simtest.rs`](src/simtest.rs), [`src/l3test.rs`](src/l3test.rs), [`src/simmodetest.rs`](src/simmodetest.rs), [`src/svctest.rs`](src/svctest.rs), [`src/clitest.rs`](src/clitest.rs), [`src/tcptest.rs`](src/tcptest.rs), [`src/httptest.rs`](src/httptest.rs), [`src/consoletest.rs`](src/consoletest.rs), [`src/pdutest.rs`](src/pdutest.rs), [`src/labtest.rs`](src/labtest.rs), [`src/uitest.rs`](src/uitest.rs), [`src/campustest.rs`](src/campustest.rs), [`src/synthtest.rs`](src/synthtest.rs) | Selbsttests von Modell, Simulator, Befehlszeilen, TCP, HTTP, PDUs, des Labors, dem, worauf die Konsolen bauen, der Oberfläche ohne Fenster (Kontrast, Einstellungen, Sicherungen, Katalog), des Campus und der synthetischen Projekte (`--selftest`) |
+| Texte | [`crates/jfn_model/msg.rs`](crates/jfn_model/msg.rs), [`src/locales/engine.tsv`](src/locales/engine.tsv), [`src/locales/ui.tsv`](src/locales/ui.tsv), [`src/msgtest.rs`](src/msgtest.rs) | die deutschen Texte von Modell und Simulator als Vorlagen mit Argumenten (`Msg`, `msg!`; `text_with` übersetzt), die des Fensters (`t()`, `tf()`, die Befehle und Menüs), ihre englische Fassung und deren Selbsttest; Vollständigkeit: `python tools/i18n_check.py apps/JFNetworker crates` |
 | Tests | [`tests/`](tests) | Skripte, Fixtures (`fixtures/*.jfnet`), Szenarien mit Golden-Berichten (`scen/*.scn`, `scen/*.report`) |
 
 ### Gerätekatalog
@@ -401,7 +444,9 @@ Dienste eines Geräts in der Projektdatei (`"services": [{"kind": "dns-server", 
   500 ms und sendet T1/T2 mit; ISC dhcpd vergibt die höchste Adresse des Bereichs, pingt einmal
   1 s lang und antwortet mit NAK nur, wenn er `authoritative` ist. Antwortet jemand auf den
   Ping, wird die Adresse als Konflikt gesperrt. Ausgeschlossene Adressen, Leases (IOS 1 Tag,
-  dhcpd 600 s), Bindings, Konflikte, DECLINE, RELEASE, INFORM.
+  dhcpd 600 s), Bindings, Konflikte, DECLINE, RELEASE, INFORM. Was ohne Relay ankommt, aber
+  eine Adresse des Clients trägt (Erneuerung, Rückgabe, INFORM, auch über Router hinweg),
+  ordnet der Server über diese Adresse (ciaddr) seinem Pool zu.
 - **DHCP-Relay** (`ip helper-address`): setzt giaddr auf die Adresse des Eingangs-Interfaces,
   zählt die Hops und schickt per Unicast zum Server; die Antwort geht als Broadcast oder an die
   MAC des Clients zurück. IOS hält Server und Relay in einem Dienst und bedient ein Netz mit
@@ -619,6 +664,12 @@ IOS-artige Befehlszeile:
   `traceroute` im IOS-artigen Format, Abbruch mit Strg+Umschalt+6; `debug ip icmp` und
   `debug arp` aus den Entscheidungen der Geräte; Meldungen wie `%LINK-3-UPDOWN`,
   `%LINEPROTO-5-UPDOWN` und `%SYS-5-CONFIG_I` mit Zeitstempel.
+- DHCP und NTP ([`netsvc.rs`](crates/jfn_sim/cli/netsvc.rs)): `ip dhcp pool NAME` mit eigenem
+  Modus `(dhcp-config)#` (`network` mit Maske oder `/nn`, `default-router`, `dns-server`,
+  `domain-name`, `lease TAGE [STUNDEN [MINUTEN]]|infinite`; ein Pool ohne `network` wartet
+  auf der Befehlszeile), `ip dhcp excluded-address`, `ip helper-address` an Interfaces,
+  `show ip dhcp binding|pool|conflict`, `clear ip dhcp binding|conflict *|ADRESSE`,
+  `ntp server`, `ntp master [STRATUM]`; alles steht in der Running-Config.
 
 Hosts und Server haben eine Linux-Shell (`root@PC1:~#`): `ip addr|link|route|neigh` mit den
 Ausgaben und Fehlermeldungen von iproute2, `ping` wie iputils (bis Strg+C oder `-c`; `-i`,
@@ -637,6 +688,17 @@ Zustand und Zahlen), `kvctl` (Mitglieder, `ring`, `where SCHLÜSSEL` mit den Rep
 ihren Versionen, `get`, `keys`), `cachectl`, `mqctl` und `workerctl`, mit `-s NAME` für einen
 bestimmten Dienst; ihre Texte sind eigene Worte.
 
+Namen löst die Shell über den Resolver des Geräts auf (`ping server.lab`, `traceroute
+server.lab`, auch kurz mit der Suchdomäne): die erste Zeile nennt wie getaddrinfo das Ende der
+CNAME-Kette, eine gescheiterte Suche meldet sich wie glibc („Name or service not known“,
+„Temporary failure in name resolution“); Traceroute fragt nicht rückwärts nach Namen und
+zeigt einen Hop deshalb als „ADRESSE (ADRESSE)“. `dhclient [-v] [-r] [IF]` holt oder erneuert
+die Adresse (eine Erneuerung geht direkt an den Server, auch über Router) und hält die Konsole,
+bis der Client gebunden ist oder aufgibt; mit `-v` zeigt er die Zeilen des Clients, `-r` gibt
+die Adresse zurück. `cat /etc/resolv.conf` schreibt die Einstellungen des Resolvers so, wie
+Debians dhclient-script die Datei schreibt (`domain`, `search`, `nameserver`), dazu
+`/etc/hosts` und `/etc/hostname`.
+
 Hilfetexte (`?`, `ip … help`), Modus-Titel, Statuszeilen wie die ersten Zeilen von `ping` und
 `traceroute`, die Texte hinter Meldungen wie `%LINK-3-UPDOWN`, die Debug-Zeilen und
 `show version` sind eigene Worte (siehe die Regel unter [Fahrplan](#fahrplan)). Dem Vorbild folgen
@@ -647,7 +709,9 @@ die Befehlswörter und ihre Syntax, Interface-Namen, Konfigurationszeilen, kurze
 Die Konfiguration steckt in den Teilen des Geräts (Ports, Bridge, IPv4). `show running-config`
 schreibt sie als IOS-artige Konfiguration, `Engine::running_config` bei Linux-Geräten als
 Shell-Befehle. Beim Laden läuft die startup-config jedes Geräts durch dieselbe Befehlszeile;
-es gibt also nur eine Quelle der Wahrheit. Was dabei scheitert, zeigen die Konsole und
+es gibt also nur eine Quelle der Wahrheit (ein Port, den die Startkonfiguration nennt, ist an,
+solange dort kein `shutdown` steht; nur ungenannte Router-Ports bleiben wie ab Werk aus). Was
+dabei scheitert, zeigen die Konsole und
 `jfn-sim check`. `copy running-config startup-config` meldet die neue Fassung als
 `Report::Startup` an die Oberfläche, die sie als Rückgängig-Schritt ins Projekt übernimmt;
 Meldungen der Konsole, Debug-Zeilen und die Logs der Dienste kommen zusätzlich als
@@ -704,28 +768,14 @@ Read Repair holt den Shard nach; `lbctl`, `kvctl`). Ihre Berichte (`*.report`) s
 byte-gleich. `expect … svc NAME metric WERT` prüft die Zahlen eines Dienstes und schreibt den
 gemessenen Wert in Klammern dazu.
 
-## Fahrplan
-
-| Phase | Meilensteine |
-|---|---|
-| 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur |
-| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓) · NAT/ACL, RIP, OSPF, STP, IPv6 · Liniendiagramm und Code-Editor |
-| 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · Metrik-Fenster · Labor-Oberfläche · Skript-Editor |
-| 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
-
-**Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
-Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir
-immer in eigenen Worten. Nichts davon wird aus Herstellerdokumentation, echten Geräteausgaben
-oder Büchern übernommen. Dem Vorbild folgen dürfen nur die Befehlswörter, ihre Syntax,
-Interface-Namen, Konfigurationszeilen und kurze Fehlermeldungen wie `% Incomplete command.`,
-weil Lernende sie wiedererkennen sollen. `apps/termtest` zeigt das Muster.
-
-## Marken
-
-Cisco, IOS und Packet Tracer sind Marken von Cisco Systems, Inc. JFNetworker ist ein
-eigenständiges Projekt und steht in keiner Verbindung zu Cisco; es wird von Cisco weder
-unterstützt noch empfohlen. Die Namen stehen hier nur, um Befehlszeilen-Konventionen und
-vergleichbare Programme zu beschreiben.
+Dazu kommt der Campus der Abnahme (`campus.scn` auf `fixtures/campus.jfnet`, siehe
+[Bauen und testen](#bauen-und-testen)): die Leases der vier PCs über das Relay von MLS1,
+`dhclient -v` (PC1 erneuert direkt bei R1, über MLS1 hinweg), `ip addr`, `ip route` und
+`/etc/resolv.conf`, `ping -c 3 server.lab` aus beiden VLANs ohne Verlust, `traceroute
+server.lab` mit drei Hops (VLAN-Interface von MLS1, R1, SRV1), ein unbekannter Name, ein Ping
+zwischen den VLANs, `show ip dhcp binding` und `show ip route` auf R1, `show ip route`,
+`show mac address-table` und `show vlan brief` auf MLS1 und die Pools in R1s Running-Config;
+42 Erwartungen, dazu die Zähler von DHCP-Server und Relay.
 
 ## Performance
 
@@ -786,3 +836,26 @@ Ein ganzes Fenster neu zeichnen dauert statt 17–21 ms noch 3–4 ms; 300 Pings
 (9 460 Ereignisse) rechnet die Engine in 6–7 statt 14 ms. Was ein Bild jetzt noch kostet, sind
 vor allem die Durchläufe der übrigen Oberfläche (Panels, zwei Durchläufe pro Bild während einer
 Geste).
+
+## Fahrplan
+
+| Phase | Meilensteine |
+|---|---|
+| 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
+| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · NAT/ACL, RIP, OSPF, STP, IPv6 · Liniendiagramm und Code-Editor |
+| 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · Metrik-Fenster · Labor-Oberfläche · Skript-Editor |
+| 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
+
+**Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
+Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir
+immer in eigenen Worten. Nichts davon wird aus Herstellerdokumentation, echten Geräteausgaben
+oder Büchern übernommen. Dem Vorbild folgen dürfen nur die Befehlswörter, ihre Syntax,
+Interface-Namen, Konfigurationszeilen und kurze Fehlermeldungen wie `% Incomplete command.`,
+weil Lernende sie wiedererkennen sollen. `apps/termtest` zeigt das Muster.
+
+## Marken
+
+Cisco, IOS und Packet Tracer sind Marken von Cisco Systems, Inc. JFNetworker ist ein
+eigenständiges Projekt und steht in keiner Verbindung zu Cisco; es wird von Cisco weder
+unterstützt noch empfohlen. Die Namen stehen hier nur, um Befehlszeilen-Konventionen und
+vergleichbare Programme zu beschreiben.

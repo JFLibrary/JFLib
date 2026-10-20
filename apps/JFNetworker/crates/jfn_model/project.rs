@@ -10,13 +10,15 @@
 //   ports / free_ports / link_at / find / model_of / bounds
 //   check() -> Vec<Issue>                         consistency (names, ports, cables, ids)
 //   to_text() / from_text(text)                   the .jfnet file: indented JSON
+//   ProjErr::msg(), Issue::msg, LoadErr::msg      the German texts as a Msg (msg.rs) for the
+//                                                 app's catalogue
 //
 // A device's configuration is its startup-config text (the simulator replays it through the
 // command line); services carry their settings as JSON.  Ids come from `next_id` and are never
 // reused while the project is open, so undo, the canvas and the simulator agree on them.
 
 use alloc::format;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 use core::fmt;
 
@@ -27,6 +29,8 @@ use agent_core::{record, wire_enum};
 use crate::cable::{self, CableKind, Why};
 use crate::catalog::{self, Model, PortSpec, F_AP, F_ANNOTATION};
 use crate::ifname;
+use crate::msg::Msg;
+use crate::msg;
 
 /// the format name in every project file
 pub const FORMAT: &str = "jfn";
@@ -170,19 +174,26 @@ pub enum ProjErr {
     Cable(Why),
 }
 
+impl ProjErr {
+    /// the reason as a message (Display: its German text)
+    pub fn msg(&self) -> Msg {
+        match self {
+            ProjErr::UnknownModel(m) => msg!("Unbekanntes Gerätemodell \u{201e}{}\u{201c}.", m),
+            ProjErr::NotADevice(m) => msg!("\u{201e}{}\u{201c} ist kein Gerät.", m),
+            ProjErr::UnknownDevice(id) => msg!("Das Gerät {} gibt es nicht.", id),
+            ProjErr::UnknownPort { dev, port } => msg!("{} hat keinen Port \u{201e}{}\u{201c}.", dev, port),
+            ProjErr::UnknownLink(id) => msg!("Die Verbindung {} gibt es nicht.", id),
+            ProjErr::BadName(n) => msg!("\u{201e}{}\u{201c} ist kein gültiger Gerätename: Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe, höchstens 63 Zeichen.", n),
+            ProjErr::NameTaken(n) => msg!("Der Name \u{201e}{}\u{201c} ist schon vergeben.", n),
+            ProjErr::IdTaken(id) => msg!("Die Nummer {} ist schon vergeben.", id),
+            ProjErr::Cable(w) => w.msg(),
+        }
+    }
+}
+
 impl fmt::Display for ProjErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ProjErr::UnknownModel(m) => write!(f, "Unbekanntes Gerätemodell \u{201e}{}\u{201c}.", m),
-            ProjErr::NotADevice(m) => write!(f, "\u{201e}{}\u{201c} ist kein Gerät.", m),
-            ProjErr::UnknownDevice(id) => write!(f, "Das Gerät {} gibt es nicht.", id),
-            ProjErr::UnknownPort { dev, port } => write!(f, "{} hat keinen Port \u{201e}{}\u{201c}.", dev, port),
-            ProjErr::UnknownLink(id) => write!(f, "Die Verbindung {} gibt es nicht.", id),
-            ProjErr::BadName(n) => write!(f, "\u{201e}{}\u{201c} ist kein gültiger Gerätename: Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe, höchstens 63 Zeichen.", n),
-            ProjErr::NameTaken(n) => write!(f, "Der Name \u{201e}{}\u{201c} ist schon vergeben.", n),
-            ProjErr::IdTaken(id) => write!(f, "Die Nummer {} ist schon vergeben.", id),
-            ProjErr::Cable(w) => w.fmt(f),
-        }
+        f.write_str(&self.msg().text())
     }
 }
 
@@ -193,7 +204,16 @@ pub struct Issue {
     pub error: bool,
     pub dev: Option<u32>,
     pub link: Option<u32>,
+    /// German (msg.text())
     pub text: String,
+    /// what is wrong, for the app's catalogue
+    pub msg: Msg,
+}
+
+impl Issue {
+    fn new(error: bool, dev: Option<u32>, link: Option<u32>, msg: Msg) -> Issue {
+        Issue { error, dev, link, text: msg.text(), msg }
+    }
 }
 
 /// why a file could not be read
@@ -201,7 +221,16 @@ pub struct Issue {
 pub struct LoadErr {
     /// byte offset of a syntax error, else 0
     pub offset: usize,
+    /// German (msg.text())
     pub text: String,
+    /// the reason, for the app's catalogue
+    pub msg: Msg,
+}
+
+impl LoadErr {
+    fn new(offset: usize, msg: Msg) -> LoadErr {
+        LoadErr { offset, text: msg.text(), msg }
+    }
 }
 
 impl fmt::Display for LoadErr {
@@ -515,59 +544,59 @@ impl Project {
     /// everything that does not fit together
     pub fn check(&self) -> Vec<Issue> {
         let mut v = Vec::new();
-        let err = |v: &mut Vec<Issue>, dev: Option<u32>, link: Option<u32>, text: String| v.push(Issue { error: true, dev, link, text });
+        let err = |v: &mut Vec<Issue>, dev: Option<u32>, link: Option<u32>, m: Msg| v.push(Issue::new(true, dev, link, m));
         let mut ids = Vec::new();
         for d in &self.devices {
             if ids.contains(&d.id) {
-                err(&mut v, Some(d.id), None, format!("Die Gerätenummer {} kommt doppelt vor.", d.id));
+                err(&mut v, Some(d.id), None, msg!("Die Gerätenummer {} kommt doppelt vor.", d.id));
             }
             ids.push(d.id);
             match catalog::model(&d.model) {
-                None => err(&mut v, Some(d.id), None, ProjErr::UnknownModel(d.model.clone()).to_string()),
-                Some(m) if m.has(F_ANNOTATION) => err(&mut v, Some(d.id), None, ProjErr::NotADevice(d.model.clone()).to_string()),
+                None => err(&mut v, Some(d.id), None, ProjErr::UnknownModel(d.model.clone()).msg()),
+                Some(m) if m.has(F_ANNOTATION) => err(&mut v, Some(d.id), None, ProjErr::NotADevice(d.model.clone()).msg()),
                 Some(_) => {}
             }
             if !valid_name(&d.name) {
-                v.push(Issue { error: false, dev: Some(d.id), link: None, text: ProjErr::BadName(d.name.clone()).to_string() });
+                v.push(Issue::new(false, Some(d.id), None, ProjErr::BadName(d.name.clone()).msg()));
             }
             if self.devices.iter().any(|o| o.id != d.id && o.name.eq_ignore_ascii_case(&d.name)) {
-                err(&mut v, Some(d.id), None, ProjErr::NameTaken(d.name.clone()).to_string());
+                err(&mut v, Some(d.id), None, ProjErr::NameTaken(d.name.clone()).msg());
             }
         }
         let mut lids = Vec::new();
         let mut used: Vec<(u32, String)> = Vec::new();
         for l in &self.links {
             if lids.contains(&l.id) {
-                err(&mut v, None, Some(l.id), format!("Die Verbindungsnummer {} kommt doppelt vor.", l.id));
+                err(&mut v, None, Some(l.id), msg!("Die Verbindungsnummer {} kommt doppelt vor.", l.id));
             }
             lids.push(l.id);
             if l.a.dev == l.b.dev {
-                err(&mut v, Some(l.a.dev), Some(l.id), Why::SameDevice.to_string());
+                err(&mut v, Some(l.a.dev), Some(l.id), Why::SameDevice.msg());
                 continue;
             }
             let (pa, pb) = match (self.resolve_port(&l.a), self.resolve_port(&l.b)) {
                 (Ok(a), Ok(b)) => (a, b),
                 (Err(e), _) | (_, Err(e)) => {
-                    err(&mut v, None, Some(l.id), e.to_string());
+                    err(&mut v, None, Some(l.id), e.msg());
                     continue;
                 }
             };
             for (r, p) in [(&l.a, &pa), (&l.b, &pb)] {
                 let key = (r.dev, p.name.clone());
                 if used.contains(&key) {
-                    err(&mut v, Some(r.dev), Some(l.id), Why::PortInUse(p.name.clone()).to_string());
+                    err(&mut v, Some(r.dev), Some(l.id), Why::PortInUse(p.name.clone()).msg());
                 }
                 used.push(key);
             }
             if let Err(w) = cable::cable_fits(l.cable, &pa, &pb) {
-                err(&mut v, None, Some(l.id), w.to_string());
+                err(&mut v, None, Some(l.id), w.msg());
             }
             if l.kbps == 0 {
-                v.push(Issue { error: false, dev: None, link: Some(l.id), text: String::from("Die Verbindung hat keine Geschwindigkeit.") });
+                v.push(Issue::new(false, None, Some(l.id), msg!("Die Verbindung hat keine Geschwindigkeit.")));
             }
         }
         if self.next_id <= self.max_id() {
-            v.push(Issue { error: false, dev: None, link: None, text: String::from("Die nächste freie Nummer ist zu klein.") });
+            v.push(Issue::new(false, None, None, msg!("Die nächste freie Nummer ist zu klein.")));
         }
         v
     }
@@ -582,13 +611,13 @@ impl Project {
     }
     /// reads a .jfnet file; missing members take their defaults, unknown ones are ignored
     pub fn from_text(text: &str) -> Result<Project, LoadErr> {
-        let v = json::parse_with_limits(text.as_bytes(), file_limits()).map_err(|e| LoadErr { offset: e.offset, text: format!("Die Datei ist kein gültiges JSON ({} an Byte {}).", e.kind, e.offset) })?;
-        let mut p = Project::from_json(&v).ok_or_else(|| LoadErr { offset: 0, text: String::from("Die Datei enthält kein Projekt.") })?;
+        let v = json::parse_with_limits(text.as_bytes(), file_limits()).map_err(|e| LoadErr::new(e.offset, msg!("Die Datei ist kein gültiges JSON ({} an Byte {}).", e.kind, e.offset)))?;
+        let mut p = Project::from_json(&v).ok_or_else(|| LoadErr::new(0, msg!("Die Datei enthält kein Projekt.")))?;
         if p.format != FORMAT {
-            return Err(LoadErr { offset: 0, text: String::from("Das ist keine JFNetworker-Datei.") });
+            return Err(LoadErr::new(0, msg!("Das ist keine JFNetworker-Datei.")));
         }
         if p.version == 0 || p.version > VERSION {
-            return Err(LoadErr { offset: 0, text: format!("Die Datei hat die Version {}; dieses Programm liest Version 1 bis {}.", p.version, VERSION) });
+            return Err(LoadErr::new(0, msg!("Die Datei hat die Version {}; dieses Programm liest Version 1 bis {}.", p.version, VERSION)));
         }
         p.next_id = p.next_id.max(p.max_id() + 1);
         Ok(p)

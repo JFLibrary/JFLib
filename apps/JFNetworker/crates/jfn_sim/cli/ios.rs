@@ -10,7 +10,8 @@
 //   Engine::ios_help / ios_complete / ios_answer
 //
 // Modes: User ">", Priv "#", Config "(config)#", If "(config-if)#", SubIf "(config-subif)#",
-// Vlan "(config-vlan)#", Line "(config-line)#".  Interfaces are taken by any IOS spelling
+// Vlan "(config-vlan)#", Line "(config-line)#", DhcpPool "(dhcp-config)#" (the DHCP commands
+// are in netsvc.rs).  Interfaces are taken by any IOS spelling
 // ("g0/0/0", "Gi 0/0/0", "lo0", "vlan 10"); "interface Loopback5", "interface Vlan20" and
 // "interface Gi0/0/0.10" make them.  A subinterface gets its VLAN with "encapsulation dot1Q";
 // until then it takes no address (as IOS).  Addresses: "ip address" replaces the primary
@@ -90,6 +91,22 @@ pub enum K {
     ShowTcpBrief,
     ShowTcpStats,
     ShowOpenPorts,
+    // DHCP (cli/netsvc.rs)
+    DhcpPool,
+    DhcpExcluded,
+    PoolNetwork,
+    PoolRouter,
+    PoolDns,
+    PoolDomain,
+    PoolLease,
+    Helper,
+    ShowDhcpBinding,
+    ShowDhcpPool,
+    ShowDhcpConflict,
+    ClearDhcp,
+    // NTP (cli/netsvc.rs)
+    NtpServer,
+    NtpMaster,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -100,6 +117,7 @@ const IFM: ModeId = 3;
 const SUBIF: ModeId = 4;
 const VLAN: ModeId = 5;
 const LINE: ModeId = 6;
+const POOL: ModeId = 7;
 
 const CAP_BRIDGE: u32 = 1;
 const CAP_ROUTER: u32 = 2;
@@ -114,6 +132,7 @@ fn mode_id(m: Mode) -> ModeId {
         Mode::SubIf => SUBIF,
         Mode::Vlan => VLAN,
         Mode::Line => LINE,
+        Mode::DhcpPool => POOL,
     }
 }
 
@@ -128,6 +147,7 @@ pub fn prompt_suffix(m: Mode) -> &'static str {
         Mode::Vlan => "(config-vlan)#",
         Mode::Line => "(config-line)#",
         Mode::Out => "",
+        Mode::DhcpPool => "(dhcp-config)#",
     }
 }
 
@@ -146,7 +166,8 @@ fn build(caps: u32) -> Tree<K> {
     let sub = t.mode("(config-subif)#", "Commands for this subinterface:", Some(conf), Some(NEGATE));
     let vlan = t.mode("(config-vlan)#", "Commands for this VLAN:", Some(conf), Some(NEGATE));
     let line = t.mode("(config-line)#", "Commands for this line:", Some(conf), Some(NEGATE));
-    debug_assert!(user == USER && prv == PRIV && conf == CONF && ifm == IFM && sub == SUBIF && vlan == VLAN && line == LINE);
+    let pool = t.mode("(dhcp-config)#", "Commands for this address pool:", Some(conf), Some(NEGATE));
+    debug_assert!(user == USER && prv == PRIV && conf == CONF && ifm == IFM && sub == SUBIF && vlan == VLAN && line == LINE && pool == POOL);
 
     // ---- EXEC (user and privileged)
     for m in [user, prv] {
@@ -390,6 +411,9 @@ fn build(caps: u32) -> Tree<K> {
     t.add(line, "exec-timeout <0-35791>=min", "Minutes", Some(K::LineTimeout), 0);
     t.add(line, "exec-timeout <0-35791>=min <0-2147483>=sec", "Seconds", Some(K::LineTimeout), 0);
     t.add_no(line, "exec-timeout", K::LineTimeout);
+
+    // ---- DHCP server and relay, NTP (cli/netsvc.rs)
+    super::netsvc::build_netsvc(&mut t, [user, prv, conf, ifm, sub, pool]);
     t
 }
 
@@ -508,13 +532,16 @@ impl Engine {
             if m != Mode::Vlan {
                 c.vlans.clear();
             }
+            if m != Mode::DhcpPool {
+                c.pool.clear();
+            }
         }
     }
     fn booting(&self, ni: usize) -> bool {
         self.cdev(ni).is_some_and(|c| c.booting)
     }
     /// an error message on the console; Err with its first line
-    fn ios_err(&mut self, ni: usize, text: &str) -> Result<(), String> {
+    pub(crate) fn ios_err(&mut self, ni: usize, text: &str) -> Result<(), String> {
         self.out(ni, text);
         Err(first_line(text))
     }
@@ -561,7 +588,7 @@ impl Engine {
             Ok(p) => self.ios_do(ni, mode, &p, line),
             Err(err) => {
                 // a configuration submode falls back to the global configuration
-                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
+                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
                 match up {
                     Some(p) => {
                         self.set_mode(ni, Mode::Config);
@@ -823,6 +850,18 @@ impl Engine {
                 self.out(ni, &text);
                 Ok(())
             }
+            K::Helper => {
+                let ifs = self.cdev(ni).map(|c| c.ifs.clone()).unwrap_or_default();
+                let mut r = Ok(());
+                for f in ifs {
+                    if let Err(e) = self.ios_helper(ni, &f, p) {
+                        r = Err(e);
+                    }
+                }
+                r
+            }
+            K::DhcpPool | K::DhcpExcluded | K::PoolNetwork | K::PoolRouter | K::PoolDns | K::PoolDomain | K::PoolLease | K::ShowDhcpBinding | K::ShowDhcpPool | K::ShowDhcpConflict | K::ClearDhcp => self.ios_dhcp(ni, p),
+            K::NtpServer | K::NtpMaster => self.ios_ntp(ni, p),
         }
     }
 
@@ -890,6 +929,13 @@ impl Engine {
             };
         }
         if is_port {
+            // a port named in a configuration that boots is up unless the block says
+            // "shutdown" (the running configuration writes only "shutdown"; a port the
+            // configuration does not name keeps the model's default, down on a router)
+            if self.booting(ni) {
+                let ip = self.stack(ni).is_some_and(|s| s.iface_by_name(&name).is_some());
+                let _ = if ip { self.apply(Action::IfUp { dev, iface: name.clone(), up: true }) } else { self.apply(Action::PortAdmin { dev, port: name.clone(), up: true }) };
+            }
             if let Some(c) = self.cdev_mut(ni) {
                 if c.booting {
                     c.cfg.methods.entry(name.clone()).or_insert(Method::Nvram);

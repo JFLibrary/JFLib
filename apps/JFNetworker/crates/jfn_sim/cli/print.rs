@@ -11,8 +11,13 @@
 //   Linux ping       "PING ... 56(84) bytes of data.", a line per reply or error, statistics
 //                    with loss, time, rtt min/avg/max/mdev (iputils' arithmetic in µs); runs
 //                    until Ctrl+C unless -c; without a route "ping: connect: Network is
-//                    unreachable"
-//   Linux traceroute "traceroute to ... 30 hops max, 60 byte packets", a line per hop
+//                    unreachable"; a name is looked up first (the first line names the end of
+//                    its CNAME chain, as getaddrinfo's canonical name), a failed lookup prints
+//                    glibc's message ("ping: NAME: Name or service not known")
+//   Linux traceroute "traceroute to ... 30 hops max, 60 byte packets", a line per hop; names
+//                    as with ping (no reverse lookups: a hop shows "ADDR (ADDR)", as
+//                    traceroute does when an address has no name)
+//   dhclient         (cli/netsvc.rs) the DHCP client's lines while it acquires or releases
 //   Proc, Top        console programs (curl, nc) and top keep the console busy the same way
 //                    (cli/tools.rs): a program ends through OsApi::exit, top draws a screen
 //                    whenever the console wakes
@@ -30,6 +35,7 @@ use super::fmt::{iputils_time, isqrt, ms3, pct_g};
 use super::CliJob;
 use crate::jobs::{IcmpKind, JobKind, PingEv, PingOpts, TraceOpts};
 use crate::kernel::{Engine, Ns, MS, SEC};
+use crate::resolver::LookupErr;
 
 /// how a console job prints and how far it got
 #[derive(Clone, Debug)]
@@ -47,6 +53,12 @@ pub enum JobOut {
         seen: usize,
         sent: u32,
         last_send: Ns,
+        /// the name as typed (looked up first); None for an address
+        name: Option<String>,
+        /// the first line ("PING ...") is out
+        head: bool,
+        /// when pinging began (after the lookup)
+        t0: Ns,
     },
     IosTrace {
         /// hops and probes printed
@@ -59,6 +71,10 @@ pub enum JobOut {
     LinuxTrace {
         hop: usize,
         numeric: bool,
+        /// the name as typed (looked up first); None for an address
+        name: Option<String>,
+        /// the first line ("traceroute to ...") is out
+        head: bool,
     },
     /// a console program (curl, nc: cli/tools.rs), the service it runs as; `stdin`: typed
     /// lines go to it
@@ -71,6 +87,15 @@ pub enum JobOut {
         left: u32,
         delay: Ns,
         batch: bool,
+    },
+    /// dhclient (cli/netsvc.rs): the client's log lines after `mark` (printed with -v) until
+    /// it is bound, gives up or (`release`) sent its RELEASE; the console stops waiting at
+    /// `until`
+    Dhclient {
+        mark: u32,
+        verbose: bool,
+        release: bool,
+        until: Ns,
     },
 }
 
@@ -123,8 +148,8 @@ fn ios_summary(events: &[PingEv], sent: u32) -> String {
     s
 }
 
-/// the statistics iputils prints at the end
-fn linux_summary(dst: Ipv4, events: &[PingEv], sent: u32, errors: u32, time: Ns) -> String {
+/// the statistics iputils prints at the end (`dst`: the address or the name it pinged)
+fn linux_summary(dst: &str, events: &[PingEv], sent: u32, errors: u32, time: Ns) -> String {
     let us: Vec<u64> = events
         .iter()
         .filter_map(|e| match e {
@@ -192,31 +217,45 @@ impl Engine {
         self.cli_start_job(ni, id, JobOut::IosTrace { hop: 0, probe: 0, last: None, wrote: false });
     }
 
-    /// iputils "ping" (`opts.count` 0: until Ctrl+C)
-    pub(crate) fn linux_ping_start(&mut self, ni: usize, dst: Ipv4, o: PingOpts) {
+    /// iputils "ping" of an address or a name (`opts.count` 0: until Ctrl+C)
+    pub(crate) fn linux_ping_start(&mut self, ni: usize, host: &str, o: PingOpts) {
         let dev = self.dev_of(ni);
-        let size = o.size;
-        let Ok(id) = self.ping(dev, dst, o) else {
+        let Ok(id) = self.ping_host(dev, host, o) else {
             return;
         };
-        let no_route = self.job(id).is_some_and(|j| j.done && matches!(&j.kind, JobKind::Ping(p) if matches!(p.events.first(), Some(PingEv::Error { kind: IcmpKind::NoRoute, .. }))));
-        if no_route {
-            self.out(ni, "ping: connect: Network is unreachable\n");
-            return;
-        }
-        self.out(ni, &format!("PING {} ({}) {}({}) bytes of data.\n", dst, dst, size, size as u32 + 28));
         let now = self.now;
-        self.cli_start_job(ni, id, JobOut::LinuxPing { seen: 0, sent: 0, last_send: now });
+        let name = if Ipv4::parse(host).is_some() { None } else { Some(String::from(host)) };
+        self.cli_start_job(ni, id, JobOut::LinuxPing { seen: 0, sent: 0, last_send: now, name, head: false, t0: now });
     }
 
-    /// Linux "traceroute"
-    pub(crate) fn linux_trace_start(&mut self, ni: usize, dst: Ipv4, o: TraceOpts, numeric: bool) {
+    /// Linux "traceroute" to an address or a name
+    pub(crate) fn linux_trace_start(&mut self, ni: usize, host: &str, o: TraceOpts, numeric: bool) {
         let dev = self.dev_of(ni);
-        self.out(ni, &format!("traceroute to {} ({}), {} hops max, {} byte packets\n", dst, dst, o.max_hops, o.size as u32 + 28));
-        let Ok(id) = self.traceroute(dev, dst, o) else {
+        let Ok(id) = self.traceroute_host(dev, host, o) else {
             return;
         };
-        self.cli_start_job(ni, id, JobOut::LinuxTrace { hop: 0, numeric });
+        let name = if Ipv4::parse(host).is_some() { None } else { Some(String::from(host)) };
+        self.cli_start_job(ni, id, JobOut::LinuxTrace { hop: 0, numeric, name, head: false });
+    }
+
+    /// glibc's words for a failed lookup of a ping or traceroute job (gai_strerror)
+    fn lookup_failure(&self, ni: usize, lookup: Option<u32>) -> &'static str {
+        let dev = self.dev_of(ni);
+        let err = lookup.and_then(|l| self.lookup_state(dev, l)).and_then(|l| l.result.clone()).and_then(|r| r.err());
+        match err {
+            Some(LookupErr::NotFound | LookupErr::BadName) => "Name or service not known",
+            Some(LookupErr::NoData) => "No address associated with hostname",
+            _ => "Temporary failure in name resolution",
+        }
+    }
+
+    /// the name getaddrinfo calls canonical: the end of the CNAME chain of the lookup
+    fn canonical(&self, ni: usize, lookup: Option<u32>, typed: &str) -> String {
+        let dev = self.dev_of(ni);
+        match lookup.and_then(|l| self.lookup_state(dev, l)).and_then(|l| l.result.clone()) {
+            Some(Ok(a)) if !a.canonical.is_empty() => String::from(a.canonical.trim_end_matches('.')),
+            _ => String::from(typed),
+        }
     }
 
     /// prints what the job of node `ni` has to say now
@@ -224,6 +263,10 @@ impl Engine {
         let Some(cj) = self.cdev(ni).and_then(|c| c.job.clone()) else {
             return;
         };
+        if let JobOut::Dhclient { .. } = cj.out {
+            self.dhclient_progress(ni);
+            return;
+        }
         let Some(job) = self.job(cj.id).cloned() else {
             return;
         };
@@ -250,17 +293,41 @@ impl Engine {
                     text.push_str(&ios_summary(&p.events, p.sent));
                 }
             }
-            (JobOut::LinuxPing { seen, sent, last_send }, JobKind::Ping(p)) => {
-                if p.sent > *sent {
-                    *sent = p.sent;
-                    *last_send = now;
+            (JobOut::LinuxPing { seen, sent, last_send, name, head, t0 }, JobKind::Ping(p)) => {
+                if !*head {
+                    let no_route = matches!(p.events.first(), Some(PingEv::Error { kind: IcmpKind::NoRoute, .. }));
+                    if p.dst.is_unspecified() {
+                        // the lookup runs, or it failed
+                        if done {
+                            text.push_str(&format!("ping: {}: {}\n", name.as_deref().unwrap_or(""), self.lookup_failure(ni, p.lookup)));
+                        }
+                    } else if no_route && done {
+                        text.push_str("ping: connect: Network is unreachable\n");
+                    } else {
+                        let shown = match name {
+                            Some(n) => self.canonical(ni, p.lookup, n),
+                            None => format!("{}", p.dst),
+                        };
+                        text.push_str(&format!("PING {} ({}) {}({}) bytes of data.\n", shown, p.dst, p.opts.size, p.opts.size as u32 + 28));
+                        *name = Some(shown);
+                        *head = true;
+                        *t0 = now;
+                        *last_send = now;
+                    }
                 }
-                for e in &p.events[(*seen).min(p.events.len())..] {
-                    text.push_str(&self.linux_ping_line(ni, e));
-                }
-                *seen = p.events.len();
-                if done {
-                    text.push_str(&linux_summary(p.dst, &p.events, p.sent, p.errors, *last_send - cj.start));
+                if *head {
+                    if p.sent > *sent {
+                        *sent = p.sent;
+                        *last_send = now;
+                    }
+                    for e in &p.events[(*seen).min(p.events.len())..] {
+                        text.push_str(&self.linux_ping_line(ni, e));
+                    }
+                    *seen = p.events.len();
+                    if done {
+                        let shown = name.clone().unwrap_or_else(|| format!("{}", p.dst));
+                        text.push_str(&linux_summary(&shown, &p.events, p.sent, p.errors, *last_send - *t0));
+                    }
                 }
             }
             (JobOut::IosTrace { hop, probe, last, wrote }, JobKind::Trace(t)) => {
@@ -303,8 +370,21 @@ impl Engine {
                     text.push('\n');
                 }
             }
-            (JobOut::LinuxTrace { hop, numeric }, JobKind::Trace(t)) => {
-                while *hop < t.hops.len() {
+            (JobOut::LinuxTrace { hop, numeric, name, head }, JobKind::Trace(t)) => {
+                if !*head {
+                    let shown = name.clone().unwrap_or_else(|| format!("{}", t.dst));
+                    if t.dst.is_unspecified() {
+                        // the lookup runs, or it failed
+                        if done {
+                            let why = self.lookup_failure(ni, t.lookup);
+                            text.push_str(&format!("{}: {}\nCannot handle \"host\" cmdline arg `{}' on position 1 (argc 1)\n", shown, why, shown));
+                        }
+                    } else {
+                        text.push_str(&format!("traceroute to {} ({}), {} hops max, {} byte packets\n", shown, t.dst, t.opts.max_hops, t.opts.size as u32 + 28));
+                        *head = true;
+                    }
+                }
+                while *head && *hop < t.hops.len() {
                     let h = &t.hops[*hop];
                     let complete = h.probes.len() >= t.opts.probes as usize || done;
                     if !complete {
@@ -385,6 +465,10 @@ impl Engine {
                 self.top_tick(ni);
                 return;
             }
+            JobOut::Dhclient { .. } => {
+                self.dhclient_timer(ni);
+                return;
+            }
             _ => {}
         }
         let JobOut::IosPing { col, fake, count, timeout, .. } = &mut cj.out else {
@@ -430,9 +514,10 @@ impl Engine {
                     format!("\n{}", ios_summary(&p.events, p.events.len() as u32))
                 }
             }
-            (JobOut::LinuxPing { last_send, sent, .. }, Some(JobKind::Ping(p))) => {
+            (JobOut::LinuxPing { last_send, sent, name, head: true, t0, .. }, Some(JobKind::Ping(p))) => {
                 let sent = (*sent).max(p.sent);
-                linux_summary(p.dst, &p.events, sent, p.errors, *last_send - cj.start)
+                let shown = name.clone().unwrap_or_else(|| format!("{}", p.dst));
+                linux_summary(&shown, &p.events, sent, p.errors, *last_send - *t0)
             }
             (JobOut::Proc { svc, .. }, _) => {
                 // the program ends as a process does on SIGINT: its sockets close

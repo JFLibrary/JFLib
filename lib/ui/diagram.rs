@@ -14,6 +14,9 @@
 //                                   the canvas; pressing / dragging there moves the view
 //   ui.diagram_sems(id, &mut st, &m, &label)   one K_LISTITEM record per visible node
 //                                   (scripts: click listitem:"R1"; screen readers), no hit box
+//   ui.diagram_edge_sems(id, &mut st, &m, &label)   the same for the visible edges (a box
+//                                   around the middle of the route); st.tab_edges lets Tab
+//                                   walk them after the nodes, st.name names the canvas
 //   Viewport::{scale, to_screen, to_world, world_rect, rect_to_screen, zoom_at, step, fit}
 //   dg_paint_grid(g, vp, step, minor, major)   grid lines inside the clip (render time)
 //   dg_edge_points(m, i, &mut out)  the route of edge i (world polyline) without a state
@@ -40,8 +43,9 @@
 // (Shift adds, Ctrl toggles); middle drag, Space + drag and DG_PAN pan; the wheel scrolls
 // (Shift: sideways), Ctrl + wheel zooms at the pointer.  Keys while the canvas has the focus:
 // arrows nudge the selection (grid steps, Shift x10, Alt 1) or pan, Del, Ctrl+A, Esc cancels
-// a gesture (else clears the selection), Tab / Shift+Tab walk the nodes (and leave after the
-// last), Enter activates, Ctrl + plus / minus zoom, Ctrl+0 fits, Shift+F10 / the menu key
+// a gesture (else clears the selection), Tab / Shift+Tab walk the nodes (with tab_edges then
+// the edges, a focused edge drawn with the focus ring along its route; the focus leaves after
+// the last), Enter activates, Ctrl + plus / minus zoom, Ctrl+0 fits, Shift+F10 / the menu key
 // ask for the context menu.  DiagramState::test_keys stands in for held keys in scripts.
 // Drawing: the paint runs as one custom command whose version covers ver, the model version,
 // the view, the theme and the gesture flag; selection, hover, ports, handles, marquee and rubber
@@ -453,6 +457,11 @@ pub struct DiagramState {
     pub edge_width: f32,
     /// scripts cannot hold keys: 1 = as if Space were held, 2 = Ctrl
     pub test_keys: u32,
+    /// Tab / Shift+Tab also walk the edges (after the nodes, in model order): the focused
+    /// edge is selected, Enter activates it, the menu key asks for its context menu
+    pub tab_edges: bool,
+    /// the canvas' name for screen readers (its K_CANVAS record; empty: none)
+    pub name: String,
     fit_req: bool,
     pending_sel: bool,
     g: Gesture,
@@ -488,6 +497,8 @@ impl DiagramState {
             hover: DHit::None,
             edge_width: 2.0,
             test_keys: 0,
+            tab_edges: false,
+            name: String::new(),
             fit_req: true,
             pending_sel: false,
             g: Gesture::Idle,
@@ -558,7 +569,7 @@ impl DiagramState {
         let ix = &self.ix;
         let n = self.sel.len();
         self.sel.retain(|k| ix.nodes.contains_key(k) || ix.edges.contains_key(k));
-        if self.focus != 0 && !ix.nodes.contains_key(&self.focus) {
+        if self.focus != 0 && !ix.nodes.contains_key(&self.focus) && !ix.edges.contains_key(&self.focus) {
             self.focus = 0;
         }
         n != self.sel.len()
@@ -1059,10 +1070,27 @@ impl DiagramState {
         m.nodes.iter().filter(|n| n.flags & DN_NOSELECT == 0).map(|n| n.key).collect()
     }
 
-    // centre the view on a node that is not fully shown
+    // what Tab walks: the nodes, then (tab_edges) the edges that have a route
+    fn tab_keys(&self, m: &DModel) -> Vec<u64> {
+        let mut keys = self.walk_keys(m);
+        if self.tab_edges {
+            keys.extend(self.ix.geo.routes.iter().filter(|rt| rt.pts.len() >= 2).map(|rt| rt.key));
+        }
+        keys
+    }
+
+    // centre the view on a node (or the middle of an edge) that is not fully shown
     fn reveal(&mut self, m: &DModel, key: u64) {
-        let Some(n) = self.node(m, key) else { return };
-        let r = xyxy(n.rect);
+        let r = match self.node(m, key) {
+            Some(n) => xyxy(n.rect),
+            None => match self.route(key) {
+                Some(rt) if rt.pts.len() >= 2 => {
+                    let c = dg_point_at(&rt.pts, 0.5);
+                    [c[0] - 8.0, c[1] - 8.0, c[0] + 8.0, c[1] + 8.0]
+                }
+                _ => return,
+            },
+        };
         if !inside(r, self.vp.world_rect()) {
             self.vp.cx = (r[0] as f64 + r[2] as f64) * 0.5;
             self.vp.cy = (r[1] as f64 + r[3] as f64) * 0.5;
@@ -1978,7 +2006,8 @@ impl Ui {
         self.ltr_end();
         self.wp.ctx.last_rect = r;
         self.wp.ctx.last_state = state;
-        self.sem(K_CANVAS, id, None, st.sel.len() as i32);
+        let name = if st.name.is_empty() { None } else { Some(st.name.clone()) };
+        self.sem(K_CANVAS, id, name.as_deref(), st.sel.len() as i32);
         out
     }
 
@@ -2069,9 +2098,10 @@ impl Ui {
             let d = [dx * k, dy * k];
             out.push(DEv::Move { keys, d, total: d, done: true });
         }
-        // Tab / Shift+Tab: the next node (after the last one the focus leaves the canvas)
+        // Tab / Shift+Tab: the next node, then the edges with tab_edges (after the last one the
+        // focus leaves the canvas)
         if let Some((i, km)) = self.dg_key_find(VK_TAB, 0, MOD_CTRL | MOD_ALT) {
-            let keys = st.walk_keys(m);
+            let keys = st.tab_keys(m);
             let pos = keys.iter().position(|&k| k == st.focus);
             let next = match (pos, km & MOD_SHIFT != 0) {
                 (None, false) => keys.first().copied(),
@@ -2094,6 +2124,8 @@ impl Ui {
         // the thing Enter and the context key act on: the focused node, else a single selection
         let subject = if st.focus != 0 && st.ix.nodes.contains_key(&st.focus) {
             DHit::Node(st.focus)
+        } else if st.focus != 0 && st.ix.edges.contains_key(&st.focus) && st.sel.contains(&st.focus) {
+            DHit::Edge { key: st.focus, seg: 0, t: 0.5 }
         } else if st.sel.len() == 1 {
             let k = *st.sel.iter().next().unwrap_or(&0);
             if st.ix.nodes.contains_key(&k) { DHit::Node(k) } else { DHit::Edge { key: k, seg: 0, t: 0.5 } }
@@ -2238,6 +2270,19 @@ impl Ui {
             }
         }
         let geo = st.ix.geo.clone();
+        // the focus ring of a focused edge (tab_edges): the focus colours along its route,
+        // under its selection highlight
+        let mut edge_ring = false;
+        if ring && st.focus != 0 {
+            if let Some(rt) = st.ix.edges.get(&st.focus).and_then(|&i| geo.routes.get(i as usize)) {
+                if overlaps(rt.bb, wr) {
+                    let (fo, fi) = (self.color(T_FOCUS_OUT), self.color(T_FOCUS_IN));
+                    self.dg_poly(&vp, &rt.pts, ew + self.dp(8) as f32, fo);
+                    self.dg_poly(&vp, &rt.pts, ew + self.dp(5) as f32, fi);
+                    edge_ring = true;
+                }
+            }
+        }
         for &i in &sel_edges {
             if let Some(rt) = geo.routes.get(i) {
                 if overlaps(rt.bb, wr) {
@@ -2275,8 +2320,8 @@ impl Ui {
                 self.cmd_rrect(q[0] - g + t2, q[1] - g + t2, q[2] + (g - t2) * 2, q[3] + (g - t2) * 2, rad, hair, 0, fi, fi);
             }
         }
-        // the canvas' own focus ring while no node has the focus
-        if ring && !vis.iter().any(|&i| m.nodes[i as usize].key == st.focus) {
+        // the canvas' own focus ring while no node (or edge) has the focus
+        if ring && !edge_ring && !vis.iter().any(|&i| m.nodes[i as usize].key == st.focus) {
             let r = vp.rect;
             self.cmd_rrect(r[0], r[1], r[2], r[3], 0, t2, 0, fo, fo);
         }
@@ -2500,5 +2545,63 @@ impl Ui {
             self.sem(K_LISTITEM, sid, Some(&l), i as i32);
         }
         st.visible = vis;
+    }
+
+    /// ui_diagram_edge_sems(id, st, m, label): one K_LISTITEM record per edge the last diagram
+    /// call showed (label(key); value = the edge's index; selected / focused / hover states),
+    /// a small box around the middle of its route cut to the canvas, after the nodes' records;
+    /// a screen reader's click on one selects the edge (and focuses it with tab_edges)
+    pub fn diagram_edge_sems(&mut self, id: u32, st: &mut DiagramState, m: &DModel, label: &dyn Fn(u64) -> String) {
+        let r = st.vp.rect;
+        if r[2] <= 0 || r[3] <= 0 {
+            return;
+        }
+        let focused = self.wp.ctx.focus == id;
+        let hov = match st.hover {
+            DHit::Edge { key, .. } | DHit::Mid(key, _) | DHit::Waypoint(key, _) => key,
+            _ => 0,
+        };
+        let wr = st.vp.world_rect();
+        let half = self.dp(6);
+        let geo = st.ix.geo.clone();
+        for (i, rt) in geo.routes.iter().enumerate() {
+            if rt.pts.len() < 2 || !overlaps(rt.bb, wr) || m.edges.get(i).is_none_or(|e| e.key != rt.key) {
+                continue;
+            }
+            let c = st.vp.to_screen(dg_point_at(&rt.pts, 0.5));
+            let (cx, cy) = (fl(c[0] + 0.5), fl(c[1] + 0.5));
+            let (x0, y0) = ((cx - half).max(r[0]), (cy - half).max(r[1]));
+            let (x1, y1) = ((cx + half).min(r[0] + r[2]), (cy + half).min(r[1] + r[3]));
+            if x1 <= x0 || y1 <= y0 {
+                continue;
+            }
+            let mut rect = [x0, y0, x1 - x0, y1 - y0];
+            if self.rtl {
+                rect[0] = self.rtl_map(rect[0] + rect[2] - 1, r[0], r[2]);
+            }
+            let mut state = 0;
+            if st.sel.contains(&rt.key) {
+                state |= SS_SELECTED;
+            }
+            if focused && st.focus == rt.key {
+                state |= SS_FOCUSED;
+            }
+            if hov == rt.key {
+                state |= SS_HOVER;
+            }
+            let sid = node_sem_id(id, rt.key);
+            if self.m.a11y.pending() && self.a11y_click(sid) {
+                st.sel.clear();
+                st.sel.insert(rt.key);
+                if st.tab_edges {
+                    st.focus = rt.key;
+                }
+                st.pending_sel = true;
+                self.repass();
+            }
+            self.last_set(rect, state as u32);
+            let l = label(rt.key);
+            self.sem(K_LISTITEM, sid, Some(&l), i as i32);
+        }
     }
 }

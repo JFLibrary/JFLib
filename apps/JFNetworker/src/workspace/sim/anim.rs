@@ -33,6 +33,7 @@ use ui::*;
 
 use super::{cat_color, cat_of, shows, tween_us, FRAMES_MAX};
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::workspace::canvas::paint::{DEV_H, DEV_W};
 use crate::workspace::canvas::tools::Tool;
@@ -220,26 +221,30 @@ const LABELS_MAX: usize = 4096;
 #[derive(Default)]
 pub(crate) struct Labels {
     rev: Cell<u32>,
+    /// the labels are English (they are made again after a change of the language)
+    en: Cell<bool>,
     map: RefCell<BTreeMap<HopId, (Ns, u32, Rc<str>)>>,
 }
 
 impl Labels {
     fn get(&self, n: &Net, id: HopId) -> Rc<str> {
-        if self.rev.get() != n.doc.rev {
+        let en = crate::app::tr::en();
+        if self.rev.get() != n.doc.rev || self.en.get() != en {
             self.map.borrow_mut().clear();
             self.rev.set(n.doc.rev);
+            self.en.set(en);
         }
         let Some(hop) = n.doc.sim.engine().trace.hop(id) else {
-            return Rc::from(format!("Rahmen {}", id).as_str());
+            return Rc::from(tf("Rahmen {}", &[&format!("{}", id)]).as_str());
         };
         if let Some((t, l, s)) = self.map.borrow().get(&id) {
             if (*t, *l) == (hop.t_tx, hop.link) {
                 return s.clone();
             }
         }
-        let name = |d: u32| n.doc.proj.device(d).map_or_else(|| format!("Gerät {}", d), |x| x.name.clone());
+        let name = |d: u32| n.doc.proj.device(d).map_or_else(|| tf("Gerät {}", &[&format!("{}", d)]), |x| x.name.clone());
         let (_, info) = jfn_sim::view::hop_info(hop);
-        let s: Rc<str> = Rc::from(format!("Rahmen {}: {} → {} · {}", id, name(hop.from.0), name(hop.to.0), info).as_str());
+        let s: Rc<str> = Rc::from(tf("Rahmen {}: {} → {} · {}", &[&format!("{}", id), &name(hop.from.0), &name(hop.to.0), &info]).as_str());
         let mut m = self.map.borrow_mut();
         if m.len() >= LABELS_MAX {
             m.clear();
@@ -263,7 +268,7 @@ pub(crate) fn overlay(n: &mut Net, ui: &mut Ui) {
         // how many frames are on the cables at the moment shown (screen readers;
         // tests/perf.uis)
         ui.last_set(r, 0);
-        ui.sem(K_CANVAS, ID_SIM_FRAMES, Some("Rahmen auf den Kabeln"), shown as i32);
+        ui.sem(K_CANVAS, ID_SIM_FRAMES, Some(t("Rahmen auf den Kabeln")), shown as i32);
         crosses(n, ui);
         let mut held = None;
         // the ids given out in this pass (ID_PKT0 + number % 1024)

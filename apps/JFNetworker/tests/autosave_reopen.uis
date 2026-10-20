@@ -1,0 +1,21 @@
+#!args --verify-dirty --autosave-dir build/jfn_autosave
+# a second crash after Wiederherstellen loses nothing (doc/autosave.rs): autosave_recover.uis
+# (run just before) recovered the copy and ended before it kept one of its own; its session
+# held the recovered copy until then, so it is offered again.  Wiederherstellen, then Beenden
+# with Verwerfen: the changes go and the copies with them, so the next start offers nothing
+# (the selftest's group ui checks the files).  The shot keeps the folder of the copies (see
+# autosave.uis).
+shot build/jfn_autosave/reopen.png
+theme light
+expect "Ungespeicherte Änderungen an „two_pcs.jfnet“ gefunden" exists
+click button:"Wiederherstellen"
+expect "Ungespeicherte Änderungen an „two_pcs.jfnet“ gefunden" missing
+expect "„two_pcs.jfnet“ wiederhergestellt" exists
+expect text:"2 Geräte · 1 Kabel" exists
+expect listitem:"PC2" missing
+# Beenden with the changes unsaved: the question; Verwerfen drops them and the copies
+key ctrl+q
+expect dialog:"Änderungen speichern?" exists
+click button:"Verwerfen"
+expect dialog:"Änderungen speichern?" missing
+expect_nowarn

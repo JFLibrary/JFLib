@@ -23,10 +23,11 @@ use jfn_model::Project;
 use ui::*;
 
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 
-/// the file types of the dialogs
-pub(crate) static EXTS: [&str; 1] = ["jfnet=JFNetworker-Projekt"];
+/// the file type of the dialogs (German; shown through t())
+const EXT: &str = "jfnet=JFNetworker-Projekt";
 
 /// what follows the question about unsaved changes (or the save it asked for)
 #[derive(Clone, Debug, PartialEq)]
@@ -87,10 +88,10 @@ pub(crate) fn base_name(path: &str) -> &str {
 
 /// a .jfnet file -> the project, or why not (German)
 pub(crate) fn read(path: &str) -> Result<Project, String> {
-    let bytes = plat::read_file(path).ok_or_else(|| String::from("Die Datei ließ sich nicht lesen."))?;
+    let bytes = plat::read_file(path).ok_or_else(|| String::from(t("Die Datei ließ sich nicht lesen.")))?;
     let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(&bytes);
-    let text = core::str::from_utf8(bytes).map_err(|_| String::from("Die Datei ist kein UTF-8-Text."))?;
-    Project::from_text(text).map_err(|e| e.text)
+    let text = core::str::from_utf8(bytes).map_err(|_| String::from(t("Die Datei ist kein UTF-8-Text.")))?;
+    Project::from_text(text).map_err(|e| crate::app::tr::msg(&e.msg))
 }
 
 /// write the project as a .jfnet file (atomically)
@@ -145,7 +146,10 @@ pub(crate) fn request(n: &mut Net, ui: &mut Ui, after: After) {
 fn run(n: &mut Net, ui: &mut Ui, after: After) {
     match after {
         After::New => {
-            n.doc.replace(Project::new("", 1), None);
+            // a new project: the grid step of the settings
+            let mut p = Project::new("", 1);
+            p.layout.grid = n.prefs.grid_step;
+            n.doc.replace(p, None);
             n.after_load();
             n.file.msg = None;
         }
@@ -167,7 +171,13 @@ fn run(n: &mut Net, ui: &mut Ui, after: After) {
                 n.file.fd_open.set(1);
             }
         }
-        After::Quit => ui.quit(),
+        After::Quit => {
+            // still unsaved here: the question was answered with Verwerfen, the copies go too
+            if n.doc.dirty() {
+                crate::doc::autosave::discard(n);
+            }
+            ui.quit();
+        }
     }
     ui.repass();
 }
@@ -186,7 +196,8 @@ pub(crate) fn save(n: &mut Net, ui: &mut Ui) -> bool {
 /// Speichern unter: the save dialog
 pub(crate) fn save_as(n: &mut Net, ui: &mut Ui) {
     n.file.fd_save = true;
-    n.file.fd_path = start_path(n, ui, Some("Unbenannt.jfnet"));
+    let name = format!("{}.jfnet", t("Unbenannt"));
+    n.file.fd_path = start_path(n, ui, Some(&name));
     n.file.fd_active = true;
     n.file.fd_open.set(1);
     ui.repass();
@@ -199,10 +210,11 @@ pub(crate) fn save_to(n: &mut Net, ui: &mut Ui, path: &str) -> bool {
         n.doc.saved(path);
         n.file.add_recent(path);
         n.file.msg = None;
+        crate::doc::autosave::clean(n);
         ui.repass();
         true
     } else {
-        n.file.msg = Some((IB_ERROR, format!("„{}“ wurde nicht gespeichert", base_name(path)), String::from("Die Datei ließ sich nicht schreiben.")));
+        n.file.msg = Some((IB_ERROR, tf("„{}“ wurde nicht gespeichert", &[base_name(path)]), String::from(t("Die Datei ließ sich nicht schreiben."))));
         n.file.after = None;
         ui.repass();
         false
@@ -241,7 +253,7 @@ pub(crate) fn open_path(n: &mut Net, ui: &mut Ui, path: &str) -> bool {
             true
         }
         Err(e) => {
-            n.file.msg = Some((IB_ERROR, format!("„{}“ ließ sich nicht öffnen", base_name(&path)), e));
+            n.file.msg = Some((IB_ERROR, tf("„{}“ ließ sich nicht öffnen", &[base_name(&path)]), e));
             ui.repass();
             false
         }
@@ -279,7 +291,7 @@ pub(crate) fn answer(n: &mut Net, ui: &mut Ui, keep: bool) {
 pub(crate) fn dialogs(n: &mut Net, ui: &mut Ui) {
     let open = n.file.fd_open.clone();
     let flags = if n.file.fd_save { FD_SAVE } else { FD_OPEN };
-    let ev = ui.filedlg(ID_FILEDLG, flags, &open, &mut n.file.fd_path, 1040, &EXTS);
+    let ev = ui.filedlg(ID_FILEDLG, flags, &open, &mut n.file.fd_path, 1040, &[t(EXT)]);
     if ev & EV_ACT != 0 {
         n.file.fd_active = false;
         ui.cmd_run(CMD_FILE_DONE, n.file.fd_save as u32);
@@ -289,11 +301,11 @@ pub(crate) fn dialogs(n: &mut Net, ui: &mut Ui) {
         n.file.after = None;
     }
     let ask = n.file.ask_open.clone();
-    if ui.dialog_begin(ID_ASK, "Änderungen speichern?", &ask) {
-        let text = format!("„{}“ hat ungespeicherte Änderungen. Sollen sie gespeichert werden?", n.doc.file_name());
+    if ui.dialog_begin(ID_ASK, t("Änderungen speichern?"), &ask) {
+        let text = tf("„{}“ hat ungespeicherte Änderungen. Sollen sie gespeichert werden?", &[&n.doc.file_name()]);
         ui.next_size(380, 0);
         ui.text(TS_BODY | TX_WRAP, &text);
-        match ui.dialog_buttons(Some("Speichern"), Some("Verwerfen"), Some("Abbrechen")) {
+        match ui.dialog_buttons(Some(t("Speichern")), Some(t("Verwerfen")), Some(t("Abbrechen"))) {
             DLG_PRIMARY => ui.cmd_run(CMD_ASK_ANSWER, 1),
             DLG_SECONDARY => ui.cmd_run(CMD_ASK_ANSWER, 0),
             DLG_CLOSE => n.file.after = None,

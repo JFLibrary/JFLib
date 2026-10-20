@@ -357,6 +357,7 @@ impl Ui {
             hc_sys: None,
             accent_sys: false,
             anim_forced: false,
+            anim_sys: false,
             text_scale_forced: false,
             text_scale: 100,
             dbl_ms: 500,

@@ -3,7 +3,8 @@
 //   Pdus                        the user's PDUs, the simple tool's source, the dialog's
 //                               fields, the export dialog
 //   pick(n, ui)                 a click with the tool P: the source, then the destination ->
-//                               an ICMP echo (one probe) to the destination's address
+//                               an ICMP echo (one probe) to the destination's address;
+//                               pick_dev(n, ui, dev) the same for Enter on a focused device
 //   open_dialog(n) / dialog(n, ui)   the complex PDU: source, destination (a device, an
 //                               address or a name), protocol (ICMP echo, UDP, TCP, DNS query),
 //                               ports, size, TTL, count, interval, again and again until
@@ -33,13 +34,15 @@ use ui::*;
 
 use super::cat_color;
 use crate::app::constants::*;
+use crate::app::tr::{t, tc, tf};
 use crate::app::Net;
 use crate::workspace::canvas::paint::{DEV_H, DEV_W};
 
-/// the protocols of the dialog
+/// the protocols of the dialog (German; shown through t())
+// i18n
 pub(crate) const PROTOS: [&str; 4] = ["ICMP-Echo (ping)", "UDP", "TCP", "DNS-Abfrage"];
-/// the file types of the export dialog
-static EXTS: [&str; 1] = ["pcapng=Mitschnitt (pcapng)"];
+/// the file type of the export dialog (German; shown through t())
+const EXT: &str = "pcapng=Mitschnitt (pcapng)";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Proto {
@@ -218,25 +221,25 @@ fn address_of(n: &Net, src: u32, dst: u32) -> Option<Ipv4> {
 }
 
 fn dev_name(n: &Net, d: u32) -> String {
-    n.doc.proj.device(d).map_or_else(|| format!("Gerät {}", d), |x| x.name.clone())
+    n.doc.proj.device(d).map_or_else(|| tf("Gerät {}", &[&d.to_string()]), |x| x.name.clone())
 }
 
 /// where a PDU goes: an address, or a name for the source's resolver (Err: why not)
 fn target(n: &Net, s: &Spec) -> Result<String, String> {
-    let t = s.dst.trim();
-    if t.is_empty() {
-        return Err(String::from("Das Ziel fehlt."));
+    let dst = s.dst.trim();
+    if dst.is_empty() {
+        return Err(String::from(t("Das Ziel fehlt.")));
     }
     if s.proto == Proto::Dns {
-        return Ok(String::from(t));
+        return Ok(String::from(dst));
     }
-    if let Some(d) = n.doc.proj.devices.iter().find(|d| d.name.eq_ignore_ascii_case(t)) {
+    if let Some(d) = n.doc.proj.devices.iter().find(|d| d.name.eq_ignore_ascii_case(dst)) {
         return match address_of(n, s.src, d.id) {
             Some(a) => Ok(a.to_string()),
-            None => Err(format!("{} hat keine IP-Adresse.", d.name)),
+            None => Err(tf("{} hat keine IP-Adresse.", &[&d.name])),
         };
     }
-    Ok(String::from(t))
+    Ok(String::from(dst))
 }
 
 // ---------------------------------------------------------------- sending
@@ -244,10 +247,10 @@ fn target(n: &Net, s: &Spec) -> Result<String, String> {
 // the PDU starts in the engine
 fn start(n: &mut Net, id: u32, s: &Spec) -> Run {
     if n.doc.proj.device(s.src).is_none() {
-        return Run::Refused(String::from("Die Quelle gibt es nicht mehr."));
+        return Run::Refused(String::from(t("Die Quelle gibt es nicht mehr.")));
     }
     if !has_ip(n, s.src) {
-        return Run::Refused(format!("{} hat keine IP-Adresse.", dev_name(n, s.src)));
+        return Run::Refused(tf("{} hat keine IP-Adresse.", &[&dev_name(n, s.src)]));
     }
     let to = match target(n, s) {
         Ok(t) => t,
@@ -342,6 +345,12 @@ pub(crate) fn pick(n: &mut Net, ui: &mut Ui) {
     let (mx, my) = ui.mouse();
     let at = n.canvas.st.vp.to_world(mx as f32 + 0.5, my as f32 + 0.5);
     let Some(d) = device_at(n, at) else { return };
+    pick_dev(n, ui, d);
+}
+
+/// the tool chose device d (a click, or Enter on the focused device): the source, then the
+/// destination (the source again: choose anew)
+pub(crate) fn pick_dev(n: &mut Net, ui: &mut Ui, d: u32) {
     match n.sim.pdu.src {
         None => {
             if has_ip(n, d) {
@@ -349,7 +358,7 @@ pub(crate) fn pick(n: &mut Net, ui: &mut Ui) {
                 n.file.msg = None;
             } else {
                 let name = dev_name(n, d);
-                n.file.msg = Some((IB_WARNING, format!("{} kann keine PDU senden", name), String::from("Das Gerät hat keine IP-Adresse; eine Quelle braucht eine.")));
+                n.file.msg = Some((IB_WARNING, tf("{} kann keine PDU senden", &[&name]), String::from(t("Das Gerät hat keine IP-Adresse; eine Quelle braucht eine."))));
             }
         }
         // the source again: choose anew
@@ -358,7 +367,7 @@ pub(crate) fn pick(n: &mut Net, ui: &mut Ui) {
             n.sim.pdu.src = None;
             let dst = dev_name(n, d);
             if address_of(n, s, d).is_none() {
-                n.file.msg = Some((IB_WARNING, format!("{} hat keine IP-Adresse", dst), String::from("Ein Ziel braucht eine IPv4-Adresse für das ICMP-Echo.")));
+                n.file.msg = Some((IB_WARNING, tf("{} hat keine IP-Adresse", &[&dst]), String::from(t("Ein Ziel braucht eine IPv4-Adresse für das ICMP-Echo."))));
                 return;
             }
             n.file.msg = None;
@@ -372,21 +381,21 @@ pub(crate) fn pick(n: &mut Net, ui: &mut Ui) {
 
 fn icmp_text(k: IcmpKind) -> String {
     match k {
-        IcmpKind::NetUnreachable => String::from("Netz nicht erreichbar"),
-        IcmpKind::HostUnreachable => String::from("Host nicht erreichbar"),
-        IcmpKind::ProtoUnreachable => String::from("Protokoll nicht erreichbar"),
-        IcmpKind::PortUnreachable => String::from("Port nicht erreichbar"),
-        IcmpKind::FragNeeded(m) => format!("Fragmentierung nötig (MTU {})", m),
-        IcmpKind::Prohibited => String::from("verboten"),
-        IcmpKind::TtlExceeded => String::from("TTL abgelaufen"),
-        IcmpKind::ReasmExceeded => String::from("Zusammensetzen abgelaufen"),
-        IcmpKind::NoRoute => String::from("keine Route"),
+        IcmpKind::NetUnreachable => String::from(t("Netz nicht erreichbar")),
+        IcmpKind::HostUnreachable => String::from(t("Host nicht erreichbar")),
+        IcmpKind::ProtoUnreachable => String::from(t("Protokoll nicht erreichbar")),
+        IcmpKind::PortUnreachable => String::from(t("Port nicht erreichbar")),
+        IcmpKind::FragNeeded(m) => tf("Fragmentierung nötig (MTU {})", &[&m.to_string()]),
+        IcmpKind::Prohibited => String::from(t("verboten")),
+        IcmpKind::TtlExceeded => String::from(t("TTL abgelaufen")),
+        IcmpKind::ReasmExceeded => String::from(t("Zusammensetzen abgelaufen")),
+        IcmpKind::NoRoute => String::from(t("keine Route")),
         IcmpKind::Other(t, c) => format!("ICMP {}/{}", t, c),
     }
 }
 
 fn of_count(sent: u32, count: u32) -> String {
-    if count == 0 { format!("{}", sent) } else { format!("{} von {}", sent, count) }
+    if count == 0 { format!("{}", sent) } else { tf("{} von {}", &[&sent.to_string(), &count.to_string()]) }
 }
 
 // how PDU p stands, from the engine
@@ -396,71 +405,71 @@ fn state(n: &Net, p: &UserPdu) -> State {
     let s = |text: String, running: bool, badge: u32| State { text, running, badge };
     match &p.run {
         Run::Refused(why) => s(why.clone(), false, BADGE_CRIT),
-        Run::Gone => s(String::from("zurückgesetzt"), false, BADGE_NEUTRAL),
+        Run::Gone => s(String::from(t("zurückgesetzt")), false, BADGE_NEUTRAL),
         Run::Ping(job) => {
-            let Some(j) = eng.job(*job) else { return s(String::from("beendet"), false, BADGE_NEUTRAL) };
+            let Some(j) = eng.job(*job) else { return s(String::from(t("beendet")), false, BADGE_NEUTRAL) };
             let JobKind::Ping(pj) = &j.kind else { return s(String::from("–"), false, BADGE_NEUTRAL) };
             if pj.sent == 0 {
                 if !j.done {
-                    return s(String::from("fragt nach dem Namen …"), true, BADGE_INFO);
+                    return s(String::from(t("fragt nach dem Namen …")), true, BADGE_INFO);
                 }
-                let why = pj.lookup.and_then(|l| eng.lookup_state(src, l)).and_then(|l| l.result.clone()).and_then(|r| r.err()).map_or("Name unbekannt", |e| e.text());
+                let why = pj.lookup.and_then(|l| eng.lookup_state(src, l)).and_then(|l| l.result.clone()).and_then(|r| r.err()).map_or(t("Name unbekannt"), |e| t(e.text()));
                 return s(format!("„{}“: {}", p.spec.dst.trim(), why), false, BADGE_CRIT);
             }
             let last_err = pj.events.iter().rev().find_map(|e| match e {
                 PingEv::Error { kind, .. } => Some(icmp_text(*kind)),
-                PingEv::Timeout { .. } => Some(String::from("keine Antwort")),
+                PingEv::Timeout { .. } => Some(String::from(t("keine Antwort"))),
                 _ => None,
             });
             let sent = of_count(pj.sent, pj.opts.count);
             if !j.done {
-                return s(format!("läuft: {} gesendet, {} Antworten", sent, pj.received), true, BADGE_INFO);
+                return s(tf("läuft: {} gesendet, {} Antworten", &[&sent, &pj.received.to_string()]), true, BADGE_INFO);
             }
             if pj.opts.count == 0 {
                 // again and again: only a stop ends it
-                return s(format!("gestoppt: {} gesendet, {} Antworten", pj.sent, pj.received), false, if pj.received > 0 { BADGE_OK } else { BADGE_WARN });
+                return s(tf("gestoppt: {} gesendet, {} Antworten", &[&pj.sent.to_string(), &pj.received.to_string()]), false, if pj.received > 0 { BADGE_OK } else { BADGE_WARN });
             }
             match last_err {
-                None => s(format!("fertig: {} gesendet, alle beantwortet", pj.sent), false, BADGE_OK),
-                Some(e) if pj.received > 0 => s(format!("fertig: {} von {} beantwortet; {}", pj.received, pj.sent, e), false, BADGE_WARN),
-                Some(e) => s(format!("gescheitert: {}", e), false, BADGE_CRIT),
+                None => s(tf("fertig: {} gesendet, alle beantwortet", &[&pj.sent.to_string()]), false, BADGE_OK),
+                Some(e) if pj.received > 0 => s(tf("fertig: {} von {} beantwortet; {}", &[&pj.received.to_string(), &pj.sent.to_string(), &e]), false, BADGE_WARN),
+                Some(e) => s(tf("gescheitert: {}", &[&e]), false, BADGE_CRIT),
             }
         }
         Run::Svc(name) => {
-            let Some(x) = eng.service::<PduSender>(src, name) else { return s(String::from("beendet"), false, BADGE_NEUTRAL) };
+            let Some(x) = eng.service::<PduSender>(src, name) else { return s(String::from(t("beendet")), false, BADGE_NEUTRAL) };
             let sent = of_count(x.sent, x.spec.count);
-            let what = if x.spec.proto == PduProto::Tcp { "Verbindungen" } else { "gesendet" };
+            let what = t(if x.spec.proto == PduProto::Tcp { "Verbindungen" } else { "gesendet" });
             if x.dst.is_none() {
-                return match &x.error {
-                    Some(e) => s(e.clone(), false, BADGE_CRIT),
-                    None => s(String::from("fragt nach dem Namen …"), true, BADGE_INFO),
+                return match &x.error_msg {
+                    Some(e) => s(crate::app::tr::msg(e), false, BADGE_CRIT),
+                    None => s(String::from(t("fragt nach dem Namen …")), true, BADGE_INFO),
                 };
             }
-            if x.sent == 0 && x.error.is_some() {
-                return s(x.error.clone().unwrap_or_default(), false, BADGE_CRIT);
+            if x.sent == 0 && x.error_msg.is_some() {
+                return s(x.error_msg.as_ref().map(crate::app::tr::msg).unwrap_or_default(), false, BADGE_CRIT);
             }
-            let tail = match (&x.error, x.spec.proto) {
-                (Some(e), _) if x.failed > 0 => format!(", {} gescheitert ({})", x.failed, e),
+            let tail = match (&x.error_msg, x.spec.proto) {
+                (Some(e), _) if x.failed > 0 => tf(", {} gescheitert ({})", &[&x.failed.to_string(), &crate::app::tr::msg(e)]),
                 _ => String::new(),
             };
-            let answers = if x.spec.proto == PduProto::Tcp { format!("{} beendet", x.replies) } else { format!("{} Antworten", x.replies) };
+            let answers = if x.spec.proto == PduProto::Tcp { tf("{} beendet", &[&x.replies.to_string()]) } else { tf("{} Antworten", &[&x.replies.to_string()]) };
             if !x.done() {
-                return s(format!("läuft: {} {}, {}{}", sent, what, answers, tail), true, BADGE_INFO);
+                return s(tf("läuft: {} {}, {}{}", &[&sent, what, &answers, &tail]), true, BADGE_INFO);
             }
-            let stopped = if x.stopped { "gestoppt" } else { "fertig" };
+            let stopped = t(if x.stopped { "gestoppt" } else { "fertig" });
             let badge = if x.failed > 0 { if x.replies > 0 { BADGE_WARN } else { BADGE_CRIT } } else { BADGE_OK };
             s(format!("{}: {} {}, {}{}", stopped, sent, what, answers, tail), false, badge)
         }
         Run::Lookup(id) => match eng.lookup_state(src, *id) {
-            None => s(String::from("beendet"), false, BADGE_NEUTRAL),
+            None => s(String::from(t("beendet")), false, BADGE_NEUTRAL),
             Some(l) => match &l.result {
-                None => s(String::from("fragt …"), true, BADGE_INFO),
+                None => s(String::from(t("fragt …")), true, BADGE_INFO),
                 Some(Ok(a)) => {
                     let addrs: Vec<String> = a.addrs.iter().map(|x| x.to_string()).collect();
-                    let text = if addrs.is_empty() { String::from("Antwort ohne Adresse") } else { addrs.join(", ") };
-                    s(format!("fertig: {}", text), false, BADGE_OK)
+                    let text = if addrs.is_empty() { String::from(t("Antwort ohne Adresse")) } else { addrs.join(", ") };
+                    s(tf("fertig: {}", &[&text]), false, BADGE_OK)
                 }
-                Some(Err(e)) => s(format!("gescheitert: {}", e.text()), false, BADGE_CRIT),
+                Some(Err(e)) => s(tf("gescheitert: {}", &[t(e.text())]), false, BADGE_CRIT),
             },
         },
     }
@@ -477,20 +486,20 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
     let mut tool = (n.canvas.tool == crate::workspace::canvas::tools::Tool::Pdu) as i32;
     ui.next_flags(ST_COMPACT);
     ui.next_icon(IC_MAIL);
-    if ui.toggle_button(ID_PDU_SIMPLE, "Einfache PDU", &mut tool) & EV_ACT != 0 {
+    if ui.toggle_button(ID_PDU_SIMPLE, t("Einfache PDU"), &mut tool) & EV_ACT != 0 {
         ui.cmd_run(CMD_TOOL_PDU, 0);
     }
-    ui.tooltip("Werkzeug P: die Quelle anklicken, dann das Ziel (ein ICMP-Echo)");
+    ui.tooltip(t("Werkzeug P: die Quelle anklicken, dann das Ziel (ein ICMP-Echo)"));
     ui.next_flags(ST_COMPACT);
     ui.next_icon(IC_ADD);
-    if ui.button(ID_PDU_NEW, "Komplexe PDU …") & EV_ACT != 0 {
+    if ui.button(ID_PDU_NEW, t("Komplexe PDU …")) & EV_ACT != 0 {
         ui.cmd_run(CMD_PDU_COMPLEX, 0);
     }
     ui.box_end();
     if n.sim.pdu.list.is_empty() {
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER | pad(12), 0);
-        ui.empty_state(IC_MAIL, "Noch keine PDUs", "Mit dem Werkzeug P erst die Quelle, dann das Ziel anklicken: ein ICMP-Echo. „Komplexe PDU …“ wählt Protokoll, Ports, Größe, TTL und Anzahl.");
+        ui.empty_state(IC_MAIL, t("Noch keine PDUs"), t("Mit dem Werkzeug P erst die Quelle, dann das Ziel anklicken: ein ICMP-Echo. „Komplexe PDU …“ wählt Protokoll, Ports, Größe, TTL und Anzahl."));
         ui.box_end();
         ui.box_end();
         return;
@@ -526,15 +535,15 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
         ui.box_end();
         let base = ID_PDU_ACT0 + 4 * (i as u32 & 0xFF);
         ui.next_flags(ST_ICON_ONLY | ST_SUBTLE | ST_COMPACT);
-        if ui.icon_button(base, IC_REFRESH, "Erneut senden") & EV_ACT != 0 {
+        if ui.icon_button(base, IC_REFRESH, t("Erneut senden")) & EV_ACT != 0 {
             act = Some((i as usize, 0));
         }
         ui.next_flags(ST_ICON_ONLY | ST_SUBTLE | ST_COMPACT | if s.running { 0 } else { ST_DISABLED });
-        if ui.icon_button(base + 1, IC_STOP, "Stoppen") & EV_ACT != 0 {
+        if ui.icon_button(base + 1, IC_STOP, t("Stoppen")) & EV_ACT != 0 {
             act = Some((i as usize, 1));
         }
         ui.next_flags(ST_ICON_ONLY | ST_SUBTLE | ST_COMPACT);
-        if ui.icon_button(base + 2, IC_DELETE, "Entfernen") & EV_ACT != 0 {
+        if ui.icon_button(base + 2, IC_DELETE, t("Entfernen")) & EV_ACT != 0 {
             act = Some((i as usize, 2));
         }
         ui.list_item_end();
@@ -573,40 +582,41 @@ pub(crate) fn open_dialog(n: &mut Net) {
 }
 
 // a labelled field of the dialog: the label column, then the control
-fn field(ui: &mut Ui, label: &str) {
+fn field(ui: &mut Ui, label: &'static str) {
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.next_size(110, 0);
-    ui.text(TS_BODY | TX_SECONDARY, label);
+    ui.text(TS_BODY | TX_SECONDARY, if label.is_empty() { label } else { tc(label) });
 }
 
 /// the dialog of a complex PDU (once per frame)
 pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
     let open = n.sim.pdu.dlg.clone();
     let srcs = sources(n);
-    if ui.dialog_begin(ID_PDU_DLG, "Komplexe PDU", &open) {
+    if ui.dialog_begin(ID_PDU_DLG, t("Komplexe PDU"), &open) {
         let f = &mut n.sim.pdu;
         ui.box_begin(0, BOX_V, 8);
         ui.next_size(420, 0);
-        ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, "Die PDU läuft im Simulator wie ein Befehl auf der Quelle: ARP, Routen und Antworten wie echt.");
+        ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Die PDU läuft im Simulator wie ein Befehl auf der Quelle: ARP, Routen und Antworten wie echt."));
         let names: Vec<&str> = srcs.iter().map(|s| s.1.as_str()).collect();
         field(ui, "Quelle");
         ui.next_size(240, 0);
         if names.is_empty() {
-            ui.text(TS_BODY | TX_SECONDARY, "kein Gerät mit IP-Adresse");
+            ui.text(TS_BODY | TX_SECONDARY, t("kein Gerät mit IP-Adresse"));
         } else {
             ui.combobox(ID_PD_SRC, &mut f.f_src, &names);
         }
         ui.box_end();
         field(ui, "Ziel");
         ui.next_size(240, 0);
-        if ui.textbox(ID_PD_DST, Some("Gerät, IP-Adresse oder Name"), &mut f.f_dst, 128) & EV_ACT != 0 {
+        if ui.textbox(ID_PD_DST, Some(t("Gerät, IP-Adresse oder Name")), &mut f.f_dst, 128) & EV_ACT != 0 {
             f.f_err.clear();
         }
         ui.box_end();
-        field(ui, "Protokoll");
+        field(ui, "Protokoll|PDU");
         ui.next_size(240, 0);
         let before = f.f_proto;
-        if ui.combobox(ID_PD_PROTO, &mut f.f_proto, &PROTOS) & EV_ACT != 0 && f.f_proto != before {
+        let protos: Vec<&str> = PROTOS.iter().map(|&p| t(p)).collect();
+        if ui.combobox(ID_PD_PROTO, &mut f.f_proto, &protos) & EV_ACT != 0 && f.f_proto != before {
             // sizes and ports that fit the protocol
             match Proto::of(f.f_proto) {
                 Proto::Icmp => f.f_size = 56,
@@ -634,7 +644,7 @@ pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
         };
         field(ui, "Quellport");
         num(ui, ID_PD_SPORT, &mut f.f_sport, 0, 65535, ports);
-        ui.text(TS_CAPTION | TX_TERTIARY, "0: frei gewählt");
+        ui.text(TS_CAPTION | TX_TERTIARY, t("0: frei gewählt"));
         ui.box_end();
         field(ui, "Zielport");
         num(ui, ID_PD_DPORT, &mut f.f_dport, 1, 65535, ports);
@@ -644,7 +654,7 @@ pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
         ui.box_end();
         field(ui, "TTL");
         num(ui, ID_PD_TTL, &mut f.f_ttl, 0, 255, matches!(proto, Proto::Icmp | Proto::Udp));
-        ui.text(TS_CAPTION | TX_TERTIARY, "0: die des Geräts");
+        ui.text(TS_CAPTION | TX_TERTIARY, t("0: die des Geräts"));
         ui.box_end();
         field(ui, "Anzahl");
         num(ui, ID_PD_COUNT, &mut f.f_count, 1, 10000, !dns && f.f_periodic == 0);
@@ -656,14 +666,14 @@ pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
         if dns {
             ui.next_flags(ST_DISABLED);
         }
-        ui.checkbox(ID_PD_PERIODIC, "Periodisch, bis „Stoppen“", &mut f.f_periodic);
+        ui.checkbox(ID_PD_PERIODIC, t("Periodisch, bis „Stoppen“"), &mut f.f_periodic);
         ui.box_end();
         if !f.f_err.is_empty() {
             let e = f.f_err.clone();
             crate::workspace::error_text(ui, &e, 420);
         }
         ui.box_end();
-        if ui.dialog_buttons(Some("Senden"), None, Some("Abbrechen")) == DLG_PRIMARY {
+        if ui.dialog_buttons(Some(t("Senden")), None, Some(t("Abbrechen"))) == DLG_PRIMARY {
             submit(n, &srcs, &open);
         }
     }
@@ -674,7 +684,7 @@ pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
 fn submit(n: &mut Net, srcs: &[(u32, String)], open: &Shared<i32>) {
     let f = &n.sim.pdu;
     let Some(&(src, _)) = srcs.get(f.f_src.max(0) as usize) else {
-        n.sim.pdu.f_err = String::from("Kein Gerät mit IP-Adresse kann senden.");
+        n.sim.pdu.f_err = String::from(t("Kein Gerät mit IP-Adresse kann senden."));
         open.set(1);
         return;
     };
@@ -721,9 +731,9 @@ pub(crate) fn export_done(n: &mut Net, ui: &mut Ui) {
     let pcap = n.doc.sim.engine().pcapng(&jfn_sim::PcapOpts::default());
     let file = crate::doc::file::base_name(&path).to_string();
     n.file.msg = Some(if plat::write_file(&path, &pcap.bytes) {
-        (IB_SUCCESS, format!("Aufzeichnung als „{}“ exportiert", file), format!("{} Rahmen im pcapng-Format, zum Beispiel für Wireshark.", pcap.packets))
+        (IB_SUCCESS, tf("Aufzeichnung als „{}“ exportiert", &[&file]), tf("{} Rahmen im pcapng-Format, zum Beispiel für Wireshark.", &[&pcap.packets.to_string()]))
     } else {
-        (IB_ERROR, format!("„{}“ wurde nicht geschrieben", file), String::from("Die Datei ließ sich nicht schreiben."))
+        (IB_ERROR, tf("„{}“ wurde nicht geschrieben", &[&file]), String::from(t("Die Datei ließ sich nicht schreiben.")))
     });
     ui.repass();
 }
@@ -731,7 +741,7 @@ pub(crate) fn export_done(n: &mut Net, ui: &mut Ui) {
 /// the export's save dialog (once per frame)
 pub(crate) fn file_dialog(n: &mut Net, ui: &mut Ui) {
     let open = n.sim.pdu.fd.clone();
-    let ev = ui.filedlg(ID_PCAP_DLG, FD_SAVE, &open, &mut n.sim.pdu.fd_path, 1040, &EXTS);
+    let ev = ui.filedlg(ID_PCAP_DLG, FD_SAVE, &open, &mut n.sim.pdu.fd_path, 1040, &[t(EXT)]);
     if ev & EV_ACT != 0 {
         n.sim.pdu.fd_active = false;
         ui.cmd_run(CMD_PCAP_DONE, 0);

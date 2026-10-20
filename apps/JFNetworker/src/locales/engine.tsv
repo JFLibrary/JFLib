@@ -1,0 +1,435 @@
+de	en
+# JFNetworker: the texts of the model and the simulator (crates/jfn_model, crates/jfn_sim)
+# German templates as the code writes them (msg!, the tables marked "i18n"), tab, English.
+# Placeholders: "{}" in order, "{0}".."{9}" by number (a translation may reorder them).
+# Check: python tools/i18n_check.py apps/JFNetworker crates
+
+# jfn_model: device categories, port kinds, cables (catalog.rs, cable.rs)
+Endgeräte	End devices
+Netzwerk	Network
+Sicherheit	Security
+WLAN und WAN	Wireless and WAN
+Server	Servers
+Verteilte Systeme	Distributed systems
+Notizen	Notes
+RJ45	RJ45
+SFP	SFP
+SFP+	SFP+
+SFP28	SFP28
+QSFP28	QSFP28
+Seriell	Serial
+Konsole	Console
+USB	USB
+Funk (AP)	Radio (AP)
+Funk	Radio
+WAN	WAN
+Kupfer, gerade	Copper, straight-through
+Kupfer, gekreuzt	Copper, crossover
+Glasfaser, Multimode	Fiber, multimode
+Glasfaser, Singlemode	Fiber, single-mode
+Seriell (WAN)	Serial (WAN)
+Konsolenkabel	Console cable
+Funk (WLAN)	Wireless (WLAN)
+WAN-Leitung	WAN line
+
+# jfn_model: port summaries and speeds (Model::summary_msg, speed_msg)
+{}× Funk {}	{}× radio {}
+{}× Seriell	{}× serial
+{}× WAN	{}× WAN
+{} PoE+	{} PoE+
+{} (PoE-gespeist)	{} (PoE-powered)
+{} Mbit/s	{} Mbit/s
+{},{} Mbit/s	{}.{} Mbit/s
+{} kbit/s	{} kbit/s
+
+# jfn_model: spans of time (msg::dur; the German ones as fmt_ns writes them)
+{},{} s	{}.{} s
+{},{} ms	{}.{} ms
+{} µs	{} µs
+{} ns	{} ns
+
+# jfn_model: the device models (name, title)
+PC	PC
+Desktop-PC (2.5G Ethernet, USB-Konsole)	Desktop PC (2.5G Ethernet, USB console)
+Laptop	Laptop
+Laptop (WLAN 802.11ax, 6 GHz, USB-C-Ethernet 2.5G)	Laptop (WLAN 802.11ax, 6 GHz, USB-C Ethernet 2.5G)
+Smartphone	Smartphone
+Smartphone (WLAN 802.11ax, 6 GHz)	Smartphone (WLAN 802.11ax, 6 GHz)
+Tablet	Tablet
+Tablet (WLAN 802.11ax, 6 GHz)	Tablet (WLAN 802.11ax, 6 GHz)
+Drucker	Printer
+Netzwerkdrucker (1G, WLAN)	Network printer (1G, WLAN)
+IP-Telefon	IP phone
+IP-Telefon (PoE, Port für einen PC)	IP phone (PoE, port for a PC)
+IoT-Sensor	IoT sensor
+IoT-Sensor (WLAN 2,4 GHz)	IoT sensor (WLAN 2.4 GHz)
+IP-Kamera	IP camera
+IP-Kamera (1G, PoE)	IP camera (1G, PoE)
+Smart-TV	Smart TV
+Smart-TV (1G, WLAN)	Smart TV (1G, WLAN)
+JF-S24P	JF-S24P
+Access-Switch 24× 1G PoE+, 4× 10G SFP+	Access switch 24× 1G PoE+, 4× 10G SFP+
+JF-S24L3	JF-S24L3
+L3-Switch 24× 1G, 4× 10G SFP+	L3 switch 24× 1G, 4× 10G SFP+
+JF-S48X	JF-S48X
+Rechenzentrums-L3-Switch 48× 10G (10GBASE-T), 6× 100G QSFP28	Data center L3 switch 48× 10G (10GBASE-T), 6× 100G QSFP28
+JF-R4	JF-R4
+Edge-Router 4× 1G, 2× 10G SFP+, 2× Seriell	Edge router 4× 1G, 2× 10G SFP+, 2× serial
+JF-R8	JF-R8
+Core-Router 8× 10G SFP+, 2× 100G QSFP28	Core router 8× 10G SFP+, 2× 100G QSFP28
+Heimrouter	Home router
+Heimrouter mit WLAN 802.11ax (1G WAN, 4× 1G LAN)	Home router with WLAN 802.11ax (1G WAN, 4× 1G LAN)
+Hub	Hub
+Hub 8× 100M (Lehrgerät: jedes Paket an alle)	Hub 8× 100M (for teaching: every frame to every port)
+JF-FW	JF-FW
+Next-Generation-Firewall 8× 1G, 2× 10G SFP+	Next-generation firewall 8× 1G, 2× 10G SFP+
+JF-AP6E	JF-AP6E
+WLAN-Access-Point 802.11ax (6 GHz, 2.5G, PoE-gespeist)	WLAN access point 802.11ax (6 GHz, 2.5G, PoE-powered)
+Modem/ONT	Modem/ONT
+Glasfaser-ONT / Kabelmodem (WAN, 1G LAN)	Fiber ONT / cable modem (WAN, 1G LAN)
+Internet	Internet
+Internet / Netz des Providers	Internet / provider network
+Rack-Server 1U	Rack server 1U
+Rack-Server 1U (2× 10GBASE-T, 1G Management)	Rack server 1U (2× 10GBASE-T, 1G management)
+Rack-Server 1U SFP28	Rack server 1U SFP28
+Rack-Server 1U (2× 25G SFP28, 1G Management)	Rack server 1U (2× 25G SFP28, 1G management)
+Tower-Server	Tower server
+Tower-Server (2× 1G)	Tower server (2× 1G)
+Load Balancer	Load balancer
+Load Balancer L4/L7 (4× 10GBASE-T)	Load balancer L4/L7 (4× 10GBASE-T)
+DB-Shard	DB shard
+Datenbank-Knoten / Shard (2× 10GBASE-T)	Database node / shard (2× 10GBASE-T)
+Cache	Cache
+Cache-Knoten LRU/TTL (2× 10GBASE-T)	Cache node LRU/TTL (2× 10GBASE-T)
+Message Queue	Message queue
+Message-Queue-Knoten (2× 10GBASE-T)	Message queue node (2× 10GBASE-T)
+Traffic-Generator	Traffic generator
+Lastgenerator für offene und geschlossene Last (4× 10GBASE-T)	Load generator for open and closed load (4× 10GBASE-T)
+Container-Host	Container host
+Container-Host für mehrere Dienste und Skripte (2× 10GBASE-T)	Container host for several services and scripts (2× 10GBASE-T)
+Notiz	Note
+Notiz auf der Zeichenfläche	Note on the canvas
+
+# jfn_model: why ports do not join (Why), refused edits (ProjErr), project check (Issue), files (LoadErr)
+Ein Kabel braucht zwei verschiedene Geräte.	A cable needs two different devices.
+Der Port {} ist schon belegt.	Port {} is already in use.
+{} und {} passen nicht zusammen.	{} and {} do not fit together.
+Funk verbindet ein WLAN-Gerät mit einem Access Point.	A wireless link joins a WLAN client to an access point.
+{} passt nicht in einen {}-Port.	{} does not fit the {} port.
+Unbekanntes Gerätemodell „{}“.	Unknown device model “{}”.
+„{}“ ist kein Gerät.	“{}” is not a device.
+Das Gerät {} gibt es nicht.	Device {} does not exist.
+{} hat keinen Port „{}“.	{} has no port “{}”.
+Die Verbindung {} gibt es nicht.	Link {} does not exist.
+„{}“ ist kein gültiger Gerätename: Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe, höchstens 63 Zeichen.	“{}” is not a valid device name: letters, digits and hyphens, a letter first, at most 63 characters.
+Der Name „{}“ ist schon vergeben.	The name “{}” is already taken.
+Die Nummer {} ist schon vergeben.	Number {} is already taken.
+Die Gerätenummer {} kommt doppelt vor.	Device number {} occurs twice.
+Die Verbindungsnummer {} kommt doppelt vor.	Link number {} occurs twice.
+Die Verbindung hat keine Geschwindigkeit.	The link has no speed.
+Die nächste freie Nummer ist zu klein.	The next free number is too small.
+Die Datei ist kein gültiges JSON ({} an Byte {}).	The file is not valid JSON ({} at byte {}).
+Die Datei enthält kein Projekt.	The file contains no project.
+Das ist keine JFNetworker-Datei.	This is not a JFNetworker file.
+Die Datei hat die Version {}; dieses Programm liest Version 1 bis {}.	The file has version {}; this program reads versions 1 to {}.
+
+# jfn_sim: refused actions (ActErr, action.rs, svcact.rs, os.rs, cli)
+Gerät {} hat keinen Port „{}“.	Device {} has no port “{}”.
+Das Gerät {} läuft schon.	Device {} is running already.
+Die Verbindung {} besteht schon.	Link {} exists already.
+Der Port {} von Gerät {} ist schon verbunden.	Port {} of device {} is already connected.
+Gerät {} ist kein Switch.	Device {} is not a switch.
+VLAN {} gibt es nicht (1 bis 4094).	VLAN {} does not exist (1 to 4094).
+Gerät {} kann kein IP.	Device {} has no IP.
+Gerät {} hat kein Interface „{}“.	Device {} has no interface “{}”.
+Die MTU {} geht nicht (68 bis 65535).	An MTU of {} is not possible (68 to 65535).
+{} ist keine gültige Interface-Adresse.	{} is not a valid interface address.
+{} überschneidet sich mit {}.	{} overlaps with {}.
+Unbekanntes Interface.	Unknown interface.
+{} ist an {} nicht eingerichtet.	{} is not set up on {}.
+Keine passende Route zu {}.	No matching route to {}.
+Eine Route braucht einen nächsten Hop oder ein Interface.	A route needs a next hop or an interface.
+{} taugt nicht als nächster Hop.	{} cannot be a next hop.
+{} ist kein Switch-Port.	{} is not a switch port.
+„{}“ ist kein gültiger Gerätename.	“{}” is not a valid device name.
+{} ist ein reiner Layer-2-Switch: {} bleibt ein Switch-Port.	{} is a layer 2 switch only: {} stays a switch port.
+{} ist kein Ethernet-Port.	{} is not an Ethernet port.
+„{}“ ist kein Subinterface (Port.Nummer).	“{}” is not a subinterface (port.number).
+{} kann kein 802.1Q.	{} cannot do 802.1Q.
+{} ist ein Switch-Port: erst „no switchport“.	{} is a switch port: “no switchport” first.
+VLAN {} hat schon ein anderes Subinterface von {}.	VLAN {} already has another subinterface of {}.
+{} liegt in keinem Netz dieses Geräts.	{} is in none of this device's networks.
+Für {} gibt es keinen statischen ARP-Eintrag.	There is no static ARP entry for {}.
+{} taugt nicht als ARP-Eintrag.	{} cannot be an ARP entry.
+{} hat keine Befehlszeile.	{} has no command line.
+{} ist ausgeschaltet.	{} is powered off.
+Dienst {}: {}	Service {}: {}
+„iface“ fehlt.	“iface” is missing.
+ein Pool braucht „name“ und „network“.	a pool needs “name” and “network”.
+„{}“ ist kein Eintrag.	“{}” is not a record.
+Den Dienst „{}“ gibt es nicht.	The service “{}” does not exist.
+Der Dienst „{}“ ist von anderer Art.	The service “{}” is of another kind.
+Der Dienst „{}“ läuft nicht.	The service “{}” is not running.
+Auf diesem Gerät läuft schon ein DHCP-Relay: Port 67 ist belegt.	A DHCP relay runs on this device already: port 67 is in use.
+{} holt seine Adresse nicht per DHCP.	{} does not get its address by DHCP.
+{} ist zu klein für einen Pool.	{} is too small for a pool.
+Den Pool „{}“ gibt es nicht.	The pool “{}” does not exist.
+Auf diesem Gerät läuft schon ein DHCP-Server: Port 67 ist belegt.	A DHCP server runs on this device already: port 67 is in use.
+{} ist an {} nicht eingetragen.	{} is not set on {}.
+Hier läuft kein DHCP-Server.	No DHCP server runs here.
+Die Zone „{}“ gibt es nicht.	The zone “{}” does not exist.
+Für {} gibt es keine passende Zone oder keinen solchen Eintrag.	There is no matching zone or no such record for {}.
+Diese Aktion kennt der Simulator nicht.	The simulator does not know this action.
+Unbekannte Dienstart „{}“.	Unknown kind of service “{}”.
+Port {} gibt es nicht.	Port {} does not exist.
+„server“ fehlt oder ist keine IPv4-Adresse.	“server” is missing or not an IPv4 address.
+„close“ kennt {} nicht (shutdown, close, abort, keep).	“close” does not know {} (shutdown, close, abort, keep).
+„{}“: nur http geht.	“{}”: only http works.
+Die URL nennt keinen Host.	The URL names no host.
+Der Port der URL ist keine Zahl bis 65535.	The port of the URL is not a number up to 65535.
+Der Host der URL hat ungültige Zeichen.	The host of the URL has invalid characters.
+Der Pfad „{}“ beginnt nicht mit /.	The path “{}” does not start with /.
+„url“ fehlt.	“url” is missing.
+„targets“ fehlt.	“targets” is missing.
+„mode“ kennt {} nicht (closed, open).	“mode” does not know {} (closed, open).
+
+# jfn_sim: sockets that cannot be opened (os.rs, tcp.rs)
+kein IP	no IP
+Port {} ist schon belegt.	Port {} is already in use.
+Keine freien Ports.	No free ports.
+{}:{} ist kein Ziel für TCP.	{}:{} is no destination for TCP.
+Das Netz ist nicht erreichbar.	The network is unreachable.
+
+# jfn_sim: reasons inside other texts (TcpEnd, RstWhy, LookupErr, http Fail)
+ordentlich geschlossen	closed normally
+abgelehnt (RST auf den SYN)	refused (RST to the SYN)
+von der Gegenseite zurückgesetzt	reset by the peer
+keine Antwort mehr (Zeitüberschreitung)	no more answers (timeout)
+Ziel nicht erreichbar (ICMP)	destination unreachable (ICMP)
+von dieser Seite abgebrochen (RST)	aborted by this side (RST)
+keine solche Verbindung	no such connection
+Bestätigung für nie Gesendetes	acknowledgment of data never sent
+der Dienst bricht die Verbindung ab	the service aborts the connection
+geschlossen, obwohl noch ungelesene Bytes da waren	closed with unread bytes left
+Daten nach dem Schließen	data after the close
+keine Antwort auf die Keepalive-Proben	no answer to the keepalive probes
+der lauschende Socket wurde geschlossen	the listening socket was closed
+unbekannter Name	unknown name
+kein passender Eintrag	no matching record
+kein DNS-Server antwortet	no DNS server answers
+Fehler beim DNS-Server	error at the DNS server
+der DNS-Server lehnt ab	the DNS server refuses
+kein DNS-Server eingetragen	no DNS server set
+ungültiger Name	invalid name
+Name nicht aufgelöst: {}	Name not resolved: {}
+keine Verbindung: {}	no connection: {}
+Verbindungsaufbau dauerte zu lange	connecting took too long
+Zeitüberschreitung nach {} Bytes	timeout after {} bytes
+Verbindung abgebrochen: {}	connection ended: {}
+Verbindung ohne Antwort geschlossen	connection closed without a response
+Antwort unvollständig ({} Bytes)	response incomplete ({} bytes)
+Antwort nicht lesbar: {}	response not readable: {}
+abgebrochen	aborted
+
+# jfn_sim: status lines of services (Service::status_msg)
+{}: {} von {} ({})	{}: {} from {} ({})
+Relay: {} Helper-Adressen	Relay: {} helper addresses
+{} Pools, {} Leases	{} pools, {} leases
+keine	none
+Zonen: {}; leitet weiter	Zones: {}; forwarding
+Zonen: {}	Zones: {}
+synchronisiert mit {}	synchronized with {}
+eigene Uhr, Stratum {}	own clock, stratum {}
+nicht synchronisiert	not synchronized
+{} Meldungen	{} messages
+Port {}: {} Verbindungen, {} Bytes zurückgeschickt	Port {}: {} connections, {} bytes sent back
+Port {}: {} Verbindungen, {} Bytes verworfen	Port {}: {} connections, {} bytes discarded
+{}:{}: {} von {} Bytes gesendet, {} empfangen; {}	{}:{}: {} of {} bytes sent, {} received; {}
+verbunden mit {}:{}: {} von {} Bytes gesendet, {} empfangen	connected to {}:{}: {} of {} bytes sent, {} received
+verbindet mit {}:{} ...	connecting to {}:{} ...
+Port {} ist nicht offen	Port {} is not open
+Port {}: {} Anfragen, {} Antworten, {} in Arbeit, {} wartend	Port {}: {} requests, {} responses, {} in progress, {} waiting
+{}: {} von {} gesendet	{}: {} of {} sent
+{}: {} Antworten, zuletzt {}	{}: {} responses, last {}
+{} Nutzer	{} users
+{}.{} Anfragen/s	{}.{} requests/s
+läuft	running
+wartet	waiting
+beendet	finished
+{} ({}): {} gesendet, {} Antworten, {} Fehler	{} ({}): {} sent, {} responses, {} errors
+keine Route zum Ziel	no route to the destination
+„{}“ hat keine IPv4-Adresse	“{}” has no IPv4 address
+„{}“: keine Antwort	“{}”: no answer
+{} an {}:{}	{} to {}:{}
+{}: fragt nach dem Namen …	{}: looking up the name …
+{}: {} gesendet, {} Antworten, {} gescheitert	{}: {} sent, {} replies, {} failed
+
+# jfn_sim: problems of the set-up (problems.rs)
+Fehler	Error
+Warnung	Warning
+{} an {} ist im selben Netz doppelt vergeben: auch {}.	{} on {} is used twice in the same network: also {}.
+Netzmaske passt nicht: {} hat {}, {} ({}) im selben Netz /{}.	Subnet mask mismatch: {} has {}, {} ({}) in the same network /{}.
+Kein Standard-Gateway: {} erreicht nur das eigene Netz ({} mit {} könnte es sein).	No default gateway: {} reaches its own network only ({} with {} could be it).
+Das Standard-Gateway {} liegt außerhalb der eigenen Netze ({}).	The default gateway {} is outside the host's own networks ({}).
+Das Standard-Gateway {} ist im Netz von {} nicht zu finden: kein Gerät dort hat diese Adresse.	The default gateway {} is not in the network of {}: no device there has this address.
+{} hat die Adresse {}, ist aber abgeschaltet („no shutdown“ fehlt).	{} has the address {} but is shut down (“no shutdown” is missing).
+{} hat die Adresse {}, ist aber abgeschaltet.	{} has the address {} but is shut down.
+Falsches Kabel zwischen {} und {}: hierher gehört {}; ohne Auto-MDI-X bleibt die Leitung aus.	Wrong cable between {} and {}: the right one is “{}”; without auto-MDI-X the link stays down.
+Falsches Kabel zwischen {} und {}: hierher gehört ein anderes Kabel; ohne Auto-MDI-X bleibt die Leitung aus.	Wrong cable between {} and {}: another cable belongs here; without auto-MDI-X the link stays down.
+Native VLAN passt nicht: {} hat VLAN {}, {} VLAN {}; ungetaggte Frames wechseln auf dem Kabel das VLAN.	Native VLAN mismatch: {} has VLAN {}, {} VLAN {}; untagged frames change their VLAN on the cable.
+Der Trunk zwischen {} und {} lässt kein VLAN auf beiden Seiten zu.	The trunk between {} and {} allows no VLAN on both sides.
+VLAN passt nicht: {} ist Access-Port in VLAN {}, {} in VLAN {}; die Frames wechseln auf dem Kabel das VLAN.	VLAN mismatch: {} is an access port in VLAN {}, {} in VLAN {}; frames change their VLAN on the cable.
+{} ist Access-Port (VLAN {}), {} ist Trunk.	{} is an access port (VLAN {}), {} is a trunk.
+{} hat 802.1Q-Subinterfaces, {} ist aber Access-Port (VLAN {}): getaggte Frames verwirft der Switch.	{} has 802.1Q subinterfaces, but {} is an access port (VLAN {}): the switch drops tagged frames.
+Schleife ohne Spanning Tree über {}: Broadcasts kreisen endlos.	Loop without spanning tree through {}: broadcasts circle endlessly.
+Schleife ohne Spanning Tree über {} (VLAN {}): Broadcasts kreisen endlos.	Loop without spanning tree through {} (VLAN {}): broadcasts circle endlessly.
+
+# jfn_sim: decisions of the devices (Note::message, the event list and the packet tab)
+Leitung an {} ist aktiv.	Link on {} is up.
+Leitung an {} ist unterbrochen.	Link on {} is down.
+Verworfen: an {} ist keine aktive Leitung.	Dropped: no active link on {}.
+Verworfen: die Warteschlange von {} ist voll.	Dropped: the queue of {} is full.
+Verloren: die Leitung an {} fiel aus, während der Frame unterwegs war.	Lost: the link on {} went down while the frame was on its way.
+MAC {} an {} gelernt (VLAN {}).	MAC {} learned on {} (VLAN {}).
+MAC {} ist von {} nach {} umgezogen (VLAN {}).	MAC {} moved from {} to {} (VLAN {}).
+MAC-Tabelle voll: nichts gelernt (VLAN {}).	MAC table full: nothing learned (VLAN {}).
+Ziel bekannt: weitergeleitet an {} (VLAN {}).	Known destination: forwarded to {} (VLAN {}).
+Ziel unbekannt oder Gruppe: an {} Ports geflutet (VLAN {}).	Unknown or group destination: flooded to {} ports (VLAN {}).
+Ziel unbekannt oder Gruppe: an einen Port geflutet (VLAN {}).	Unknown or group destination: flooded to one port (VLAN {}).
+Gefiltert: das Ziel liegt hinter dem Eingangsport (VLAN {}).	Filtered: the destination is behind the ingress port (VLAN {}).
+Verworfen: Access-Port {} nimmt keine Frames mit Tag {} an.	Dropped: access port {} takes no frames tagged {}.
+Verworfen: VLAN {} ist an {} nicht erlaubt.	Dropped: VLAN {} is not allowed on {}.
+Verworfen: unlesbarer Frame an {}.	Dropped: unreadable frame on {}.
+Steuer-Frame an {} für die Bridge selbst.	Control frame on {} for the bridge itself.
+Hub: an {} Ports wiederholt.	Hub: repeated to {} ports.
+Hub: an einen Port wiederholt.	Hub: repeated to one port.
+Empfangen an {}.	Received on {}.
+Verworfen an {}: nicht für dieses Gerät.	Dropped on {}: not for this device.
+ARP-Anfrage an {}: Wer hat {}?	ARP request on {}: who has {}?
+ARP-Antwort an {}: {} ist {}.	ARP reply on {}: {} is {}.
+ARP-Eintrag {} → {}.	ARP entry {} → {}.
+Wartet auf die ARP-Antwort von {}.	Waiting for the ARP reply from {}.
+Verworfen: die MAC von {} ist noch unbekannt (ARP fragt).	Dropped: the MAC of {} is not known yet (ARP is asking).
+Proxy-ARP an {}: antwortet für {}, das hinter einem anderen Interface liegt.	Proxy ARP on {}: answers for {}, which is behind another interface.
+{} antwortet nicht auf ARP: wartende Pakete verworfen.	{} does not answer ARP: waiting packets dropped.
+ARP-Anfrage nach {} ist nicht für dieses Gerät: verworfen.	ARP request for {} is not for this device: dropped.
+IPv4-Paket für dieses Gerät ({}).	IPv4 packet for this device ({}).
+Route zu {}: direkt angeschlossen an {}.	Route to {}: directly connected on {}.
+Route zu {}: über {} an {}.	Route to {}: via {} on {}.
+Keine Route zu {}.	No route to {}.
+TTL abgelaufen: Paket von {} verworfen.	TTL expired: packet from {} dropped.
+Paket an {} verworfen: nicht für dieses Gerät, es leitet nicht weiter.	Packet to {} dropped: not for this device, which does not forward.
+Verworfen: {} an {} darf nicht über ein Kabel kommen.	Dropped: {} to {} must never come over a cable.
+Broadcast an {} nicht weitergeleitet (gerichtete Broadcasts bleiben draußen).	Broadcast to {} not forwarded (directed broadcasts stay out).
+Verworfen: Prüfsumme falsch.	Dropped: wrong checksum.
+Verworfen: unlesbares IPv4-Paket.	Dropped: unreadable IPv4 packet.
+Fragmentiert in {} Teile (MTU {}).	Fragmented into {} parts (MTU {}).
+Zu groß für die MTU {} und „nicht fragmentieren“ gesetzt.	Too big for the MTU {} and “don't fragment” is set.
+Fragmente zu {} Bytes zusammengesetzt.	Fragments reassembled into {} bytes.
+Fragmente nach 30 s verworfen: nicht vollständig.	Fragments dropped after 30 s: incomplete.
+Echo-Anfrage beantwortet an {}.	Echo request of {} answered.
+ICMP an {}: {}.	ICMP to {}: {}.
+ICMP-Meldung unterdrückt (Ratenbegrenzung).	ICMP message suppressed (rate limit).
+UDP an Port {}: niemand lauscht.	UDP to port {}: nobody listens.
+TCP an Port {}: niemand lauscht, Antwort RST.	TCP to port {}: nobody listens, answer RST.
+UDP an Port {}: an {}.	UDP to port {}: handed to {}.
+Port {} ist schon belegt: {} startet nicht.	Port {} is already in use: {} does not start.
+DHCPDISCOVER über {} (xid {}, seit {} s).	DHCPDISCOVER on {} (xid {}, {} s elapsed).
+DHCPOFFER: {} von {}.	DHCPOFFER: {} from {}.
+DHCPREQUEST über {}: nimmt das Angebot {} an.	DHCPREQUEST on {}: accepts the offer {}.
+DHCPREQUEST über {}: möchte {} nach dem Neustart weiter nutzen.	DHCPREQUEST on {}: wants to keep {} after the restart.
+DHCPREQUEST über {}: verlängert {} beim eigenen Server.	DHCPREQUEST on {}: renews {} at its own server.
+DHCPREQUEST über {}: verlängert {} bei jedem Server (Rebind).	DHCPREQUEST on {}: renews {} at any server (rebind).
+DHCPACK: {} für {} s von {}.	DHCPACK: {} for {} s from {}.
+DHCPNAK von {}: alles von vorn.	DHCPNAK from {}: starting over.
+ARP-Probe: benutzt schon jemand {}?	ARP probe: is anyone using {} already?
+{} wird schon von {} benutzt: DHCPDECLINE.	{} is already used by {}: DHCPDECLINE.
+{} hat {} (Router {}); Verlängerung in {} s.	{} has {} (router {}); renewal in {} s.
+{} hat {}; Verlängerung in {} s.	{} has {}; renewal in {} s.
+Lease für {} abgelaufen: Adresse entfernt.	Lease for {} expired: address removed.
+DHCPRELEASE: {} an {} zurückgegeben.	DHCPRELEASE: {} given back to {}.
+Kein DHCPOFFER über {}: neuer Versuch in {} s.	No DHCPOFFER on {}: trying again in {} s.
+DHCPOFFER: {} für {}.	DHCPOFFER: {} for {}.
+Ping-Prüfung: ist {} frei?	Ping check: is {} free?
+{} antwortet auf den Ping: als Konflikt gesperrt.	{} answers the ping: blocked as a conflict.
+DHCPACK: {} für {}, {} s.	DHCPACK: {} for {}, {} s.
+DHCPNAK: {} passt nicht für {}.	DHCPNAK: {} is not valid for {}.
+Kein Pool für das Netz von {}: keine Antwort.	No pool for the network of {}: no answer.
+Pool {} hat keine freie Adresse mehr.	Pool {} has no free address left.
+DHCPDECLINE von {}: {} als Konflikt gesperrt.	DHCPDECLINE from {}: {} blocked as a conflict.
+DHCPRELEASE: {} ist wieder frei.	DHCPRELEASE: {} is free again.
+{} nimmt das Angebot von {}: eigenes Angebot zurückgezogen.	{} accepts the offer from {}: own offer withdrawn.
+Nichts über {} für {} bekannt: keine Antwort.	Nothing known about {} for {}: no answer.
+DHCPINFORM von {}: Einstellungen geschickt.	DHCPINFORM from {}: settings sent.
+DHCP-Anfrage an {} weitergeleitet (giaddr {}).	DHCP request relayed to {} (giaddr {}).
+DHCP-Antwort an {} über {} weitergegeben.	DHCP reply passed on to {} on {}.
+DHCP verworfen: zu viele Relay-Hops.	DHCP dropped: too many relay hops.
+DHCP verworfen: an diesem Interface ist kein DHCP-Server eingetragen (helper-address).	DHCP dropped: no DHCP server is set on this interface (helper-address).
+DHCP verworfen: das Interface hat keine IPv4-Adresse für giaddr.	DHCP dropped: the interface has no IPv4 address for giaddr.
+DHCP verworfen: giaddr gehört nicht zu diesem Gerät.	DHCP dropped: giaddr does not belong to this device.
+DNS: {} {} beantwortet ({} Eintrag).	DNS: {} {} answered ({} record).
+DNS: {} {} beantwortet ({} Einträge).	DNS: {} {} answered ({} records).
+DNS: {} gibt es nicht (NXDOMAIN).	DNS: {} does not exist (NXDOMAIN).
+DNS: {} hat keinen {}-Eintrag.	DNS: {} has no {} record.
+DNS: {} liegt in der delegierten Zone {}: Verweis.	DNS: {} is in the delegated zone {}: referral.
+DNS: für {} nicht zuständig (REFUSED).	DNS: not responsible for {} (REFUSED).
+DNS: {} an den nächsten Server weitergereicht.	DNS: {} passed on to the next server.
+Frage {} nach {} ({}).	Asking {} for {} ({}).
+{} ist {} (aus dem Cache).	{} is {} (from the cache).
+{} ist {}.	{} is {}.
+{} aufgelöst (aus dem Cache).	{} resolved (from the cache).
+{} aufgelöst.	{} resolved.
+{} gibt es nicht (NXDOMAIN).	{} does not exist (NXDOMAIN).
+{} hat keinen passenden Eintrag.	{} has no matching record.
+{} antwortet nicht auf die Frage nach {}.	{} does not answer the query for {}.
+{} nicht aufgelöst: {}.	{} not resolved: {}.
+Syslog-Meldung ({}) an {}.	Syslog message ({}) to {}.
+Syslog-Meldung ({}) von {} gespeichert.	Syslog message ({}) from {} stored.
+NTP-Anfrage an {}.	NTP request to {}.
+NTP-Antwort von {}: Abweichung {}, Laufzeit {}.	NTP reply from {}: offset {}, delay {}.
+Uhr um {} gestellt.	Clock stepped by {}.
+Uhr wird um {} nachgeführt.	Clock slewed by {}.
+NTP-Zeit an {} (Stratum {}).	NTP time to {} (stratum {}).
+NTP-Anfrage von {} unbeantwortet: die eigene Uhr ist nicht synchronisiert.	NTP request from {} unanswered: this device's clock is not synchronized.
+TCP Port {}: {} → {}.	TCP port {}: {} → {}.
+TCP {} ↔ {}:{}: {} → {}.	TCP {} ↔ {}:{}: {} → {}.
+TCP an Port {}: keine solche Verbindung, Antwort RST.	TCP to port {}: no such connection, answer RST.
+Warteschlange von Port {} voll: SYN verworfen.	Queue of port {} full: SYN dropped.
+Warteschlange von Port {} voll: das letzte ACK des Handshakes wird ignoriert.	Queue of port {} full: the last ACK of the handshake is ignored.
+Der SYN kam noch einmal: SYN-ACK wiederholt.	The SYN came again: SYN-ACK repeated.
+Segment außerhalb des Empfangsfensters (Seq {}, Länge {}): ACK zurück, verworfen.	Segment outside the receive window (seq {}, length {}): ACK back, dropped.
+{} im Fenster, aber nicht an der erwarteten Stelle: Challenge-ACK (RFC 5961).	{} in the window but not where expected: challenge ACK (RFC 5961).
+RST empfangen: Verbindung abgelehnt.	RST received: connection refused.
+RST empfangen: Verbindung zurückgesetzt.	RST received: connection reset.
+RST gesendet: {}.	RST sent: {}.
+{} Bytes in Reihenfolge angenommen.	{} bytes received in order.
+Außer der Reihe (Seq {}, {} Bytes): zurückgehalten, sofortige Bestätigung.	Out of order (seq {}, {} bytes): held back, immediate ACK.
+Lücke geschlossen: {} Bytes aus der Warteschlange nachgereicht.	Gap filled: {} bytes delivered from the queue.
+{} Bytes kamen doppelt: sofortige Bestätigung.	{} bytes came twice: immediate ACK.
+Bestätigung verzögert um {}.	ACK delayed by {}.
+Verzögerte Bestätigung gesendet.	Delayed ACK sent.
+Empfangspuffer voll: Fenster 0.	Receive buffer full: window 0.
+Fenster wieder offen: {} Bytes.	Window open again: {} bytes.
+{} Bytes bestätigt, RTT {}, cwnd {} Bytes.	{} bytes acknowledged, RTT {}, cwnd {} bytes.
+{} Bytes bestätigt, cwnd {} Bytes.	{} bytes acknowledged, cwnd {} bytes.
+Doppelte Bestätigung Nr. {}.	Duplicate ACK no. {}.
+Drei doppelte Bestätigungen: Fast Retransmit ab Seq {}, ssthresh {}, cwnd {} Bytes.	Three duplicate ACKs: fast retransmit from seq {}, ssthresh {}, cwnd {} bytes.
+Fast Recovery beendet: cwnd {} Bytes.	Fast recovery ended: cwnd {} bytes.
+Zeitüberschreitung: Neuübertragung ab Seq {} (Versuch {}), nächstes RTO {}.	Timeout: retransmission from seq {} (attempt {}), next RTO {}.
+Nagle: {} Bytes warten auf die Bestätigung der offenen Daten.	Nagle: {} bytes wait for the ACK of the data in flight.
+Fenster zu klein, nichts unterwegs: Fenstersonde in {}.	Window too small, nothing in flight: window probe in {}.
+Fenstersonde Nr. {}.	Window probe no. {}.
+Keepalive-Probe Nr. {}.	Keepalive probe no. {}.
+Verbindung aufgegeben: {}.	Connection given up: {}.
+Fragmentierung nötig: kleinere Segmente, MSS {}.	Fragmentation needed: smaller segments, MSS {}.
+HTTP-Anfrage {} {}.	HTTP request {} {}.
+HTTP-Antwort {} {} ({} Bytes).	HTTP response {} {} ({} bytes).
+Alle Worker beschäftigt: die Anfrage wartet ({} vor ihr).	All workers busy: the request waits ({} ahead of it).
+Warteschlange voll: sofort 503.	Queue full: 503 at once.
+Fehlerquote: Antwort {} statt der Route.	Error rate: response {} instead of the route's.
+Anfrage nicht lesbar: {}, die Verbindung wird geschlossen.	Request not readable: {}, the connection is closed.
+Kein vollständiger Anfragekopf in der Zeit: Verbindung geschlossen.	No complete request head in time: connection closed.
+Keep-Alive-Verbindung zu lange ungenutzt: geschlossen.	Keep-alive connection idle too long: closed.
+HTTP-Antwort {} nach {} ms.	HTTP response {} after {} ms.
+HTTP-Anfrage: Zeitüberschreitung.	HTTP request: timeout.
+HTTP-Anfrage gescheitert.	HTTP request failed.

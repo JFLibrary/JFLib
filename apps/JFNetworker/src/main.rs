@@ -30,6 +30,7 @@ mod selftest;
 #[cfg(any(windows, target_os = "linux"))]
 mod sim_thread;
 mod simtest;
+mod uitest;
 mod workspace;
 
 ui::main!(app::run());

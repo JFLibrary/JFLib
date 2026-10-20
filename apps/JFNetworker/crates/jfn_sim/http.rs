@@ -19,13 +19,16 @@
 //
 // Both live inside a service: the service hands them its SvcEvents (on() says whether an event
 // was theirs) and the firing of their timer key.  Times are the engine's virtual time; a Date
-// header comes from the device clock.
+// header comes from the device clock.  Fail::msg() words a failure as a Msg for the app's
+// catalogue (Fail::text() is its German text).
 
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use jfn_model::msg;
+use jfn_model::msg::{phrase, Msg};
 use netpkt::http::{self, Event, Framing, Head, Headers, HttpErr, Parser, Version};
 use netpkt::Ipv4;
 
@@ -726,8 +729,8 @@ pub enum Fail {
     Resolve(LookupErr),
     /// the connection could not be set up: refused, unreachable, or TCP gave up
     Connect(TcpEnd),
-    /// the device has no route (the connect was refused at once)
-    NoRoute(String),
+    /// the device has no route (the connect was refused at once: why)
+    NoRoute(Msg),
     /// the connect timeout passed
     ConnectTimeout,
     /// the total timeout passed: bytes of the body so far and the length announced
@@ -747,17 +750,21 @@ pub enum Fail {
 impl Fail {
     /// German, for status lines and notes
     pub fn text(&self) -> String {
+        self.msg().text()
+    }
+    /// text() as a message for the app's catalogue
+    pub fn msg(&self) -> Msg {
         match self {
-            Fail::Resolve(e) => format!("Name nicht aufgelöst: {}", e.text()),
-            Fail::Connect(e) => format!("keine Verbindung: {}", e.text()),
-            Fail::NoRoute(w) => format!("keine Verbindung: {}", w),
-            Fail::ConnectTimeout => String::from("Verbindungsaufbau dauerte zu lange"),
-            Fail::Timeout { got, .. } => format!("Zeitüberschreitung nach {} Bytes", got),
-            Fail::Reset(e) => format!("Verbindung abgebrochen: {}", e.text()),
-            Fail::Empty => String::from("Verbindung ohne Antwort geschlossen"),
-            Fail::Truncated { got, .. } => format!("Antwort unvollständig ({} Bytes)", got),
-            Fail::Bad(e) => format!("Antwort nicht lesbar: {}", e.text()),
-            Fail::Aborted => String::from("abgebrochen"),
+            Fail::Resolve(e) => msg!("Name nicht aufgelöst: {}", phrase(e.text())),
+            Fail::Connect(e) => msg!("keine Verbindung: {}", phrase(e.text())),
+            Fail::NoRoute(w) => msg!("keine Verbindung: {}", w),
+            Fail::ConnectTimeout => msg!("Verbindungsaufbau dauerte zu lange"),
+            Fail::Timeout { got, .. } => msg!("Zeitüberschreitung nach {} Bytes", got),
+            Fail::Reset(e) => msg!("Verbindung abgebrochen: {}", phrase(e.text())),
+            Fail::Empty => msg!("Verbindung ohne Antwort geschlossen"),
+            Fail::Truncated { got, .. } => msg!("Antwort unvollständig ({} Bytes)", got),
+            Fail::Bad(e) => msg!("Antwort nicht lesbar: {}", e.text()),
+            Fail::Aborted => msg!("abgebrochen"),
         }
     }
     /// a timeout (total or connect)
@@ -1134,7 +1141,7 @@ impl Agent {
         self.waiting.retain(|w| *w != id);
         self.ev(AgentEv::Trying { id, addr, port: key.1 });
         let ct = self.reqs.get(&id).map(|r| r.req.connect_timeout).unwrap_or(0);
-        match os.tcp_connect(addr, key.1, self.opts) {
+        match os.tcp_connect_msg(addr, key.1, self.opts) {
             Ok(s) => {
                 let no = self.next_conn;
                 self.next_conn += 1;

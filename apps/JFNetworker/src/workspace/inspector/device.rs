@@ -16,29 +16,32 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use jfn_model::catalog::{self, speed_str, CliStyle, F_HOST};
+use jfn_model::catalog::{self, CliStyle, F_HOST};
 use jfn_model::ifname;
 use jfn_sim::{IfKind, IfView, Led, PortMode, PortView};
 use ui::*;
 
 use super::{row, rows_begin, Inspector};
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::{config, edits};
 use crate::workspace::canvas::cables;
 use crate::workspace::icons::port_icon;
 
-/// the columns of the interface grid (DIP); its width
+/// the columns of the interface grid (DIP), in the current language; its width
 /// (the most important first: the panel shows the start, the rest scrolls in)
-const COLS: [GridCol<'static>; 7] = [
-    GridCol::new("Port", 80).flags(GC_NOSORT),
-    GridCol::new("Status", 92).flags(GC_NOSORT),
-    GridCol::new("IP", 116).flags(GC_NOSORT),
-    GridCol::new("Gegenstelle", 128).flags(GC_NOSORT),
-    GridCol::new("Speed", 56).flags(GC_NOSORT),
-    GridCol::new("VLAN", 72).flags(GC_NOSORT),
-    GridCol::new("MAC", 124).flags(GC_NOSORT),
-];
+fn cols() -> [GridCol<'static>; 7] {
+    [
+        GridCol::new(t("Port"), 80).flags(GC_NOSORT),
+        GridCol::new(t("Status"), 92).flags(GC_NOSORT),
+        GridCol::new(t("IP"), 116).flags(GC_NOSORT),
+        GridCol::new(t("Gegenstelle"), 128).flags(GC_NOSORT),
+        GridCol::new(t("Speed"), 56).flags(GC_NOSORT),
+        GridCol::new(t("VLAN"), 72).flags(GC_NOSORT),
+        GridCol::new(t("MAC"), 124).flags(GC_NOSORT),
+    ]
+}
 const GRID_W: i32 = 668;
 /// interface rows shown at most (the grid scrolls beyond)
 const GRID_ROWS: i32 = 10;
@@ -70,21 +73,22 @@ fn iface_key(i: u16) -> u64 {
     0x1_0000 + i as u64
 }
 
-// the status of a port in words and as a badge kind
+// the status of a port in words (the current language) and as a badge kind
 fn port_status(power: bool, p: &PortView) -> (&'static str, u32) {
-    if !power {
-        return ("ohne Strom", BADGE_NEUTRAL);
-    }
-    if !p.admin_up {
-        return ("abgeschaltet", BADGE_NEUTRAL);
-    }
-    match (p.link, p.led) {
-        (None, _) => ("frei", BADGE_NEUTRAL),
-        (Some(_), Led::Up) => ("aktiv", BADGE_OK),
-        (Some(_), Led::Blocking | Led::Learning) => ("blockiert", BADGE_WARN),
-        (Some(_), Led::NoPower) => ("ohne Strom", BADGE_NEUTRAL),
-        (Some(_), Led::Down) => ("unten", BADGE_CRIT),
-    }
+    let (s, b) = if !power {
+        ("ohne Strom", BADGE_NEUTRAL)
+    } else if !p.admin_up {
+        ("abgeschaltet", BADGE_NEUTRAL)
+    } else {
+        match (p.link, p.led) {
+            (None, _) => ("frei", BADGE_NEUTRAL),
+            (Some(_), Led::Up) => ("aktiv", BADGE_OK),
+            (Some(_), Led::Blocking | Led::Learning) => ("blockiert", BADGE_WARN),
+            (Some(_), Led::NoPower) => ("ohne Strom", BADGE_NEUTRAL),
+            (Some(_), Led::Down) => ("unten", BADGE_CRIT),
+        }
+    };
+    (t(s), b)
 }
 
 fn addrs(f: &IfView) -> String {
@@ -128,7 +132,7 @@ pub(crate) fn if_rows(n: &Net, id: u32) -> Vec<IfRow> {
             media,
             status,
             badge,
-            speed: if console { String::from("–") } else { speed_str(pv.kbps) },
+            speed: if console { String::from("–") } else { crate::app::tr::speed(pv.kbps) },
             ip: iface.as_ref().map_or_else(|| String::from("–"), addrs),
             mac: if console { String::from("–") } else { pv.mac.to_string() },
             vlan,
@@ -140,13 +144,13 @@ pub(crate) fn if_rows(n: &Net, id: u32) -> Vec<IfRow> {
     // VLAN interfaces, subinterfaces and loopbacks
     for f in dv.ifaces.iter().filter(|f| !matches!(f.kind, IfKind::Port(_))) {
         let (status, badge) = if !dv.power {
-            ("ohne Strom", BADGE_NEUTRAL)
+            (t("ohne Strom"), BADGE_NEUTRAL)
         } else if !f.admin_up {
-            ("abgeschaltet", BADGE_NEUTRAL)
+            (t("abgeschaltet"), BADGE_NEUTRAL)
         } else if f.up {
-            ("aktiv", BADGE_OK)
+            (t("aktiv"), BADGE_OK)
         } else {
-            ("unten", BADGE_CRIT)
+            (t("unten"), BADGE_CRIT)
         };
         let vlan = match f.kind {
             IfKind::Sub { vlan, .. } | IfKind::Svi(vlan) => format!("{}", vlan),
@@ -183,7 +187,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
     }
     ui.box_begin(0, BOX_V, 2);
     ui.text(TS_SUBTITLE, &d.name);
-    ui.text(TS_CAPTION | TX_SECONDARY, m.map_or("Unbekanntes Modell", |m| m.name));
+    ui.text(TS_CAPTION | TX_SECONDARY, m.map_or(t("Unbekanntes Modell"), |m| t(m.name)));
     ui.box_end();
     // its console (Terminal panel) and its device window
     ui.spacer(-1);
@@ -193,7 +197,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
     name(n, ui, id, &d.name);
     // power: one undo step, the simulator switches it
     let mut on = (!d.off) as i32;
-    if ui.switch(ID_INS_POWER, "Eingeschaltet", &mut on) & EV_ACT != 0 {
+    if ui.switch(ID_INS_POWER, t("Eingeschaltet"), &mut on) & EV_ACT != 0 {
         cables::set_power(n, &[id], on != 0);
         ui.repass();
     }
@@ -204,21 +208,21 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
     rows_begin(ui);
     match m {
         Some(m) => {
-            row(ui, "Modell", m.name);
-            row(ui, "Beschreibung", m.title);
-            row(ui, "Ports", &if m.groups.is_empty() { String::from("keine") } else { m.summary() });
-            row(ui, "Belegt", &format!("{} von {}", used, ports.len()));
-            row(ui, "Befehlszeile", match m.cli {
+            row(ui, t("Modell"), t(m.name));
+            row(ui, t("Beschreibung"), t(m.title));
+            row(ui, t("Ports"), &if m.groups.is_empty() { String::from(t("keine")) } else { crate::app::tr::msg(&m.summary_msg()) });
+            row(ui, t("Belegt"), &tf("{} von {}", &[&used.to_string(), &ports.len().to_string()]));
+            row(ui, t("Befehlszeile"), t(match m.cli {
                 CliStyle::Ios => "IOS-artig (Router, Switches)",
                 CliStyle::Linux => "Linux-Shell",
                 CliStyle::None => "keine",
-            });
+            }));
         }
-        None => row(ui, "Modell", &format!("„{}“ (unbekannt)", d.model)),
+        None => row(ui, t("Modell"), &tf("„{}“ (unbekannt)", &[&d.model])),
     }
-    row(ui, "Position", &format!("{}, {}", d.x, d.y));
+    row(ui, t("Position"), &format!("{}, {}", d.x, d.y));
     if let Some(e) = n.doc.sim.errors.get(&id) {
-        row(ui, "Simulator", &format!("läuft nicht: {}", e));
+        row(ui, t("Simulator"), &tf("läuft nicht: {}", &[&crate::app::tr::msg(e)]));
     }
     ui.box_end();
     interfaces(n, ui, id);
@@ -226,15 +230,15 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
     let p = &n.doc.proj;
     let nb = p.neighbors(id);
     if !nb.is_empty() {
-        ui.text(TS_BODY_STRONG, &format!("Kabel ({})", nb.len()));
+        ui.text(TS_BODY_STRONG, &tf("Kabel ({})", &[&nb.len().to_string()]));
         for (own, other, port, lid) in nb.iter().take(24) {
             let peer = p.device(*other).map_or("?", |d| d.name.as_str());
-            let kind = p.link(*lid).map_or("", |l| l.cable.title());
+            let kind = p.link(*lid).map_or("", |l| t(l.cable.title()));
             ui.next_size(-1, 0);
             ui.text(TS_CAPTION | TX_ELLIPSIS, &format!("{} → {} {} · {}", ifname::short(own), peer, ifname::short(port), kind));
         }
         if nb.len() > 24 {
-            ui.text(TS_CAPTION | TX_SECONDARY, &format!("… und {} weitere", nb.len() - 24));
+            ui.text(TS_CAPTION | TX_SECONDARY, &tf("… und {} weitere", &[&(nb.len() - 24).to_string()]));
         }
     }
 }
@@ -250,19 +254,19 @@ fn name(n: &mut Net, ui: &mut Ui, id: u32, now: &str) {
         ins.name_src = String::from(now);
         ins.name_for = id;
     }
-    ui.text(TS_BODY_STRONG, "Name");
+    ui.text(TS_BODY_STRONG, t("Name"));
     ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
     if ui.focused() == ID_INS_NAME && ui.capture_shortcut(VK_ESCAPE, 0) {
         ins.name = String::from(now);
         ins.name_err.clear();
     }
     ui.next_size(-1, 0);
-    let ev = ui.textbox(ID_INS_NAME, Some("Gerätename"), &mut ins.name, 64);
+    let ev = ui.textbox(ID_INS_NAME, Some(t("Gerätename")), &mut ins.name, 64);
     let mut commit = ev & EV_COMMIT != 0 && ui.focused() == ID_INS_NAME && ins.name != now;
-    if ui.button(ID_INS_RENAME, "Umbenennen") & EV_ACT != 0 {
+    if ui.button(ID_INS_RENAME, t("Umbenennen")) & EV_ACT != 0 {
         commit = true;
     }
-    ui.tooltip("Den Namen übernehmen (Eingabetaste); F2 benennt auf der Zeichenfläche um");
+    ui.tooltip(t("Den Namen übernehmen (Eingabetaste); F2 benennt auf der Zeichenfläche um"));
     ui.box_end();
     if ev & EV_ACT != 0 {
         ins.name_err.clear();
@@ -275,7 +279,7 @@ fn name(n: &mut Net, ui: &mut Ui, id: u32, now: &str) {
                 n.inspector.name_err.clear();
             }
             Ok(None) => n.inspector.name_err.clear(),
-            Err(e) => n.inspector.name_err = format!("{}", e),
+            Err(e) => n.inspector.name_err = crate::app::tr::msg(&e.msg()),
         }
         ui.repass();
     }
@@ -291,7 +295,7 @@ fn interfaces(n: &mut Net, ui: &mut Ui, id: u32) {
     if rows.is_empty() {
         return;
     }
-    ui.text(TS_BODY_STRONG, &format!("Schnittstellen ({})", rows.len()));
+    ui.text(TS_BODY_STRONG, &tf("Schnittstellen ({})", &[&rows.len().to_string()]));
     let ins: &mut Inspector = &mut n.inspector;
     if ins.ifs_for != id {
         ins.ifs_for = id;
@@ -308,7 +312,8 @@ fn interfaces(n: &mut Net, ui: &mut Ui, id: u32) {
     ui.next_size(-1, h + 8);
     ui.scroll_begin(ID_INS_IF_SCROLL, SC_H);
     ui.next_size(GRID_W, h);
-    let (first, end) = ui.grid_begin(ID_INS_IFACES, &mut ins.ifs, &COLS, &keys);
+    let cols = cols();
+    let (first, end) = ui.grid_begin(ID_INS_IFACES, &mut ins.ifs, &cols, &keys);
     for i in first..end {
         let r = &rows[i as usize];
         ui.grid_row(&mut ins.ifs, i);
@@ -351,7 +356,7 @@ fn quick(n: &mut Net, ui: &mut Ui, id: u32, r: &IfRow) {
     let mut result: Option<Result<(), String>> = None;
     // up / shut down
     let mut up = r.admin as i32;
-    if ui.switch(ID_INS_IF_UP, "Aktiv (nicht abgeschaltet)", &mut up) & EV_ACT != 0 {
+    if ui.switch(ID_INS_IF_UP, t("Aktiv (nicht abgeschaltet)"), &mut up) & EV_ACT != 0 {
         result = Some(config::iface_up(&mut n.doc, id, &r.name, r.iface.is_some(), up != 0));
     }
     if let Some(f) = &r.iface {
@@ -363,17 +368,17 @@ fn quick(n: &mut Net, ui: &mut Ui, id: u32, r: &IfRow) {
             ins.ip = now.clone();
             ins.ip_src = (id, f.name.clone(), now.clone());
         }
-        ui.text(TS_BODY | TX_SECONDARY, "IPv4-Adresse mit Präfix");
+        ui.text(TS_BODY | TX_SECONDARY, t("IPv4-Adresse mit Präfix"));
         ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
         if ui.focused() == ID_INS_IP && ui.capture_shortcut(VK_ESCAPE, 0) {
             ins.ip = now.clone();
         }
         ui.next_size(-1, 0);
         ui.next_flags(if dhcp { ST_DISABLED } else { 0 });
-        let ev = ui.textbox(ID_INS_IP, Some("z. B. 192.168.1.10/24"), &mut ins.ip, 40);
+        let ev = ui.textbox(ID_INS_IP, Some(t("z. B. 192.168.1.10/24")), &mut ins.ip, 40);
         let mut set = ev & EV_COMMIT != 0 && ui.focused() == ID_INS_IP && ins.ip != now;
         ui.next_flags(if dhcp || ins.ip == now { ST_DISABLED } else { 0 });
-        if ui.button(ID_INS_IP_APPLY, "Setzen") & EV_ACT != 0 {
+        if ui.button(ID_INS_IP_APPLY, t("Setzen")) & EV_ACT != 0 {
             set = true;
         }
         ui.box_end();
@@ -382,7 +387,7 @@ fn quick(n: &mut Net, ui: &mut Ui, id: u32, r: &IfRow) {
             result = Some(config::address(&mut n.doc, id, &f.name, &text));
         }
         let mut on = dhcp as i32;
-        if ui.checkbox(ID_INS_DHCP, "Adresse per DHCP beziehen", &mut on) & EV_ACT != 0 {
+        if ui.checkbox(ID_INS_DHCP, t("Adresse per DHCP beziehen"), &mut on) & EV_ACT != 0 {
             result = Some(config::dhcp(&mut n.doc, id, &f.name, on != 0));
         }
     }
@@ -394,16 +399,16 @@ fn quick(n: &mut Net, ui: &mut Ui, id: u32, r: &IfRow) {
             ins.gw = now.clone();
             ins.gw_src = (id, now.clone());
         }
-        ui.text(TS_BODY | TX_SECONDARY, "Standard-Gateway");
+        ui.text(TS_BODY | TX_SECONDARY, t("Standard-Gateway"));
         ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
         if ui.focused() == ID_INS_GW && ui.capture_shortcut(VK_ESCAPE, 0) {
             ins.gw = now.clone();
         }
         ui.next_size(-1, 0);
-        let ev = ui.textbox(ID_INS_GW, Some("z. B. 192.168.1.1"), &mut ins.gw, 40);
+        let ev = ui.textbox(ID_INS_GW, Some(t("z. B. 192.168.1.1")), &mut ins.gw, 40);
         let mut set = ev & EV_COMMIT != 0 && ui.focused() == ID_INS_GW && ins.gw != now;
         ui.next_flags(if ins.gw == now { ST_DISABLED } else { 0 });
-        if ui.button(ID_INS_GW_APPLY, "Setzen") & EV_ACT != 0 {
+        if ui.button(ID_INS_GW_APPLY, t("Setzen")) & EV_ACT != 0 {
             set = true;
         }
         ui.box_end();
@@ -428,7 +433,7 @@ fn quick(n: &mut Net, ui: &mut Ui, id: u32, r: &IfRow) {
         crate::workspace::error_text(ui, &err, 0);
     } else {
         ui.next_size(-1, 0);
-        ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, "Gilt sofort und wird Teil der Startkonfiguration des Geräts.");
+        ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Gilt sofort und wird Teil der Startkonfiguration des Geräts."));
     }
     ui.box_end();
 }
