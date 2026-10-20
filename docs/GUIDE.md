@@ -1386,6 +1386,7 @@ in DIP):
 | `expect S exists\|missing\|hover\|focused\|checked\|unchecked\|disabled\|enabled\|selected\|open\|pressed` | widget states |
 | `expect S value N`, `expect S max N`, `expect S text "s"`, `expect S rect X Y W H` | values, texts, rectangles (DIP) |
 | `shot FILE.png [window ID\|desktop] [X Y W H]`, `dump [FILE]`, `print TEXT`, `bench N`, `quit` | output |
+| `bench N anim [MAX_US]`, `bench N drag S1 S2 [middle\|right\|shift\|ctrl\|alt]... [MAX_US]`, `bench N wheel S DY [shift\|ctrl\|alt]... [MAX_US]` | frame times while things move: N frames 16 ms apart on the virtual clock, the N moves of a drag (every other run drags back), N wheel events (DY and -DY by turns); each frame's passes and the render of its dirty cells are timed; prints mean, render, median and max; with `MAX_US` a run passes when its median is at most `MAX_US`, up to three runs, else FAIL |
 | `window ID\|main\|any` | selectors only look into that window |
 | `expect window ID open\|closed\|visible\|active\|modal\|keys`, `expect window ID rect X Y W H` | secondary windows (`keys`: the window the keys go to now -- a tool window borrows them after F6 / Ctrl+F6, §27) |
 | `close window ID`, `movewin ID X Y`, `resizewin ID W H`, `activate ID` | the user moves / closes windows |
@@ -1444,6 +1445,11 @@ python build_rs.py api-diff         # the public API since the last release (VER
 
 * Run new scripts with `--verify-dirty` too (`build_rs.py test` does not add it): it reports
   missed pixels with their bounding box.
+* **Frame times**: the moving forms of `bench` measure with the real clock; `--verify-dirty`
+  compares each frame after the timed part, untimed. The median and up to three runs ride out
+  a machine that builds other things meanwhile; give a frame budget as the limit (33000 for 30
+  fps) rather than today's times. Example: `apps/JFNetworker/tests/perf.uis` (500 devices, 800
+  cables, 300 frames moving, pan, zoom and a drag at 1920 x 1080).
 * **Parity** (apps that also exist in `legacy/`): `python tools/parity.py app NAME` runs the
   shot matrix (light / dark × 100 / 150 %, with dumps) and every script on the assembly
   reference and the Rust build and compares pixels, dumps, stdout and exit codes;
@@ -2157,9 +2163,9 @@ for ev in evs {
   (`DEv::Click` at a snapped point). Middle drag, Space + drag and the wheel pan, Ctrl + wheel
   zooms at the pointer; arrows nudge, Del, Ctrl+A, Esc, Tab, Enter, Ctrl + plus / minus / 0
   work while the canvas has the focus.
-* Painting: the `DgPaint` runs at render time once per dirty rectangle with a `DgFrame`
-  (`vp`: world <-> px, `clip`: the world part to paint, `geo.routes`: the polyline of every
-  edge, the theme's colours and fonts). Cull with `f.visible(rect)` / `f.route_visible(route,
+* Painting: the `DgPaint` runs at render time with a `DgFrame` (`vp`: world <-> px, `clip`: the
+  world part to paint, `geo.routes`: the polyline of every edge, the theme's colours and fonts,
+  `moving`). Cull with `f.visible(rect)` / `f.route_visible(route,
   width)`, stroke with `dg_stroke_edge` (gfx::dash caps for arrows, dash patterns), place
   moving things with `dg_point_at(&route.pts, f)`. Selection, hover, ports, handles, marquee
   and rubber band are drawn by the widget as ordinary commands on top. Pass a `ver` that
@@ -2171,6 +2177,18 @@ for ev in evs {
   and a drag of the same node. Ctrl + wheel: `wheel S DY ctrl`. Scripts cannot hold Space:
   the app sets `DiagramState::test_keys` (1 Space, 2 Ctrl) from a command (`cmd 900 1` in
   diagramtest).
+* **Large diagrams**: the widget paints the whole canvas into a backing store (an XRGB surface
+  of the `DiagramState`, from the window's corner to the canvas' far corner) whenever the
+  paint's version changes (the model, `ver`, the view, the theme, `DgFrame::moving`); dirty
+  rectangles then only copy their part, so hover, selection and what is drawn on top (moving
+  packets) never repaint the scene. In the paint, iterate `f.find(margin_px, edges)` (the
+  spatial buckets near the clip, ascending indices) instead of every node and edge, and cull
+  with `visible` / `route_visible` before computing anything per item. While a gesture moves
+  the view or nodes (a pan, wheel turns until 160 ms after the last one, a drag of nodes or a
+  waypoint) `f.moving` is set: with many things in view, leave out small labels and LEDs and
+  stroke edges with `dg_hairline` (1 px anti-aliased lines, a fraction of `dg_stroke_edge`'s
+  cost); the canvas is painted in full detail once the gesture ends. JFNetworker's
+  `tests/perf.uis` holds 500 devices and 800 cables this way.
 
 ## 23. Consoles: `ui.terminal`
 

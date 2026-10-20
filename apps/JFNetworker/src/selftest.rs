@@ -3,9 +3,9 @@
 // the file format, scenario scripts and (simtest.rs, l3test.rs, simmodetest.rs, svctest.rs,
 // clitest.rs, tcptest.rs, httptest.rs, pdutest.rs, labtest.rs) the simulator, its command
 // lines, TCP, HTTP, the PDUs of the simulation mode and the distributed-systems lab;
-// consoletest.rs what the consoles build on (log reports, saved configurations through undo
-// and redo).  Prints "FAIL group: name" lines and a
-// summary; exit code 1 on a failure.
+// synthtest.rs the synthetic projects of performance tests; consoletest.rs what the consoles
+// build on (log reports, saved configurations through undo and redo).  Prints "FAIL group:
+// name" lines and a summary; exit code 1 on a failure.
 
 use alloc::format;
 use alloc::string::String;
@@ -46,7 +46,7 @@ impl T {
 }
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 16] = [
+    let groups: [(&'static str, fn(&mut T)); 17] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -63,6 +63,7 @@ pub fn run() -> i32 {
         ("console", crate::consoletest::run),
         ("pdu", crate::simtest::pdutest::run),
         ("lab", crate::simtest::labtest::run),
+        ("synth", crate::simtest::synthtest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

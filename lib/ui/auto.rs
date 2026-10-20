@@ -27,6 +27,16 @@
 //            enabled | selected | open | pressed | value N | max N | text "s" | rect X Y W H
 //   print TEXT      echo
 //   bench N         time N frames (build, full render, unchanged frame) with the real clock
+//   bench N anim [MAX_US]   N frames 16 ms apart on the virtual clock (timers, animations):
+//                   each frame's passes and the render of its dirty cells, timed with the real
+//                   clock (--verify-dirty compares afterwards, untimed); prints mean, median, max
+//   bench N drag S1 S2 [middle|right|shift|ctrl|alt]... [MAX_US]   the same for the N moves of
+//                   a drag (press and release untimed; every other run drags back)
+//   bench N wheel S DY [shift|ctrl|alt]... [MAX_US]   ... for N wheel events at S, DY and -DY
+//                   by turns (with ctrl: zoom in and out)
+//                   With MAX_US a run passes when its median is at most MAX_US; up to three
+//                   runs (the median and the retries ride out a busy machine), FAIL when none
+//                   does
 //   quit
 //   system focus in|out | suspend | resume | session-end | settings theme|locale|contrast|fonts|N
 //                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...)
@@ -1733,9 +1743,15 @@ impl Ui {
         self.run_passes(app);
     }
 
-    // bench N: time N frames: build (passes), full render, partial render (no change)
+    // bench N: time N frames: build (passes), full render, partial render (no change);
+    // bench N anim | drag S1 S2 [opts] | wheel S DY [mods], each [MAX_US]: frames that move
     fn sc_bench(&mut self, app: &mut dyn App, a: &[u8]) {
-        let (n, _) = parse_int(a);
+        let (n, r) = parse_int(a);
+        let w = skip_ws(r);
+        if !w.is_empty() {
+            self.sc_bench_moving(app, n.max(1) as usize, w);
+            return;
+        }
         let n = if n > 0 { n as u64 } else { 100 };
         let t0 = plat::time_us();
         for _ in 0..n {
@@ -1763,6 +1779,179 @@ impl Ui {
             self.wp.rt.fb.h
         );
         plat::write_stdout(s.as_bytes());
+    }
+
+    // bench N anim | drag S1 S2 [middle|right|shift|ctrl|alt]... | wheel S DY [shift|ctrl|alt]...,
+    // each with an optional MAX_US: n frames that move per run, up to three runs with a limit
+    // (the first whose median is at most MAX_US passes)
+    fn sc_bench_moving(&mut self, app: &mut dyn App, n: usize, a: &[u8]) {
+        enum Kind {
+            Anim,
+            Drag { from: (i32, i32), to: (i32, i32), btn: u32, mods: u32, win: u32 },
+            Wheel { at: (i32, i32), dy: i32, mods: u32, win: u32 },
+        }
+        // the words of a drag / wheel up to the limit (a number)
+        let opts = |r: &[u8], drag: bool| -> Result<(u32, u32, usize), Vec<u8>> {
+            let (mut btn, mut mods, mut q) = (BTN_LEFT, 0, r);
+            loop {
+                q = skip_ws(q);
+                if q.is_empty() || q[0].is_ascii_digit() {
+                    return Ok((btn, mods, r.len() - q.len()));
+                }
+                let m = mod_word(q);
+                if m != 0 {
+                    mods |= m;
+                } else if drag && word_eq(q, "right").is_some() {
+                    btn = BTN_RIGHT;
+                } else if drag && word_eq(q, "middle").is_some() {
+                    btn = BTN_MIDDLE;
+                } else {
+                    let mut d = b"unknown bench option ".to_vec();
+                    d.extend_from_slice(q);
+                    return Err(d);
+                }
+                let i = q.iter().position(|&c| c == b' ' || c == b'\t').unwrap_or(q.len());
+                q = &q[i..];
+            }
+        };
+        let (kind, rest): (Kind, &[u8]) = if let Some(r) = word_eq(a, "anim") {
+            (Kind::Anim, r)
+        } else if let Some(r) = word_eq(a, "drag") {
+            let (s, r) = self.resolve(skip_ws(r));
+            if s.is_none() {
+                self.sel_fail();
+                return;
+            }
+            let (from, win) = ((self.sc.sel_x, self.sc.sel_y), self.sc.sel_win);
+            let (s, r) = self.resolve(skip_ws(r));
+            if s.is_none() {
+                self.sel_fail();
+                return;
+            }
+            self.point_to_window(self.sc.sel_win, win);
+            let to = (self.sc.sel_x, self.sc.sel_y);
+            match opts(r, true) {
+                Ok((btn, mods, k)) => (Kind::Drag { from, to, btn, mods, win }, &r[k..]),
+                Err(d) => {
+                    self.fail(&d);
+                    return;
+                }
+            }
+        } else if let Some(r) = word_eq(a, "wheel") {
+            let (s, r) = self.resolve(skip_ws(r));
+            if s.is_none() {
+                self.sel_fail();
+                return;
+            }
+            let (at, win) = ((self.sc.sel_x, self.sc.sel_y), self.sc.sel_win);
+            let (dy, r) = parse_int(skip_ws(r));
+            match opts(r, false) {
+                Ok((_, mods, k)) => (Kind::Wheel { at, dy, mods, win }, &r[k..]),
+                Err(d) => {
+                    self.fail(&d);
+                    return;
+                }
+            }
+        } else {
+            self.fail(b"expected: bench N [anim | drag S1 S2 [options] | wheel S DY [options]] [MAX_US]");
+            return;
+        };
+        let (max, _) = parse_int(skip_ws(rest));
+        let name = match kind {
+            Kind::Anim => "anim",
+            Kind::Drag { .. } => "drag",
+            Kind::Wheel { .. } => "wheel",
+        };
+        let runs = if max > 0 { 3 } else { 1 };
+        let mut best = u64::MAX;
+        for run in 0..runs {
+            // (the frame, its render) in us
+            let mut t: Vec<(u64, u64)> = Vec::with_capacity(n);
+            match kind {
+                Kind::Anim => {
+                    for _ in 0..n {
+                        t.push(self.bench_frame(app, |ui, app| ui.run_passes(app)));
+                    }
+                }
+                Kind::Drag { from, to, btn, mods, win } => {
+                    // back and forth: every other run from the end to the start
+                    let (a, b) = if run % 2 == 0 { (from, to) } else { (to, from) };
+                    let saved = self.sc.script_mods;
+                    self.sc.sel_win = win;
+                    self.mouse_to(app, a.0, a.1);
+                    self.sc.script_mods = mods;
+                    let d = self.sc.sc_pdata;
+                    self.inject(app, plat::E_DOWN, btn, a.0, a.1, d);
+                    for i in 1..=n as i32 {
+                        let (x, y) = (a.0 + (b.0 - a.0) * i / n as i32, a.1 + (b.1 - a.1) * i / n as i32);
+                        t.push(self.bench_frame(app, |ui, app| ui.mouse_to(app, x, y)));
+                    }
+                    let d = self.sc.sc_pdata;
+                    self.inject(app, plat::E_UP, btn, b.0, b.1, d);
+                    self.sc.script_mods = saved;
+                }
+                Kind::Wheel { at, dy, mods, win } => {
+                    self.sc.sel_win = win;
+                    self.mouse_to(app, at.0, at.1);
+                    let saved = self.sc.script_mods;
+                    self.sc.script_mods = mods;
+                    for i in 0..n {
+                        let v = if i % 2 == 0 { dy } else { -dy };
+                        let (x, y) = (self.sc.sc_x, self.sc.sc_y);
+                        t.push(self.bench_frame(app, |ui, app| ui.inject(app, plat::E_WHEEL, 0, x, y, v as u16 as u32)));
+                    }
+                    self.sc.script_mods = saved;
+                }
+            }
+            let mut s: Vec<u64> = t.iter().map(|x| x.0).collect();
+            s.sort_unstable();
+            let (mean, median, top) = (s.iter().sum::<u64>() / s.len() as u64, s[s.len() / 2], s[s.len() - 1]);
+            let render = t.iter().map(|x| x.1).sum::<u64>() / t.len() as u64;
+            best = best.min(median);
+            let o = alloc::format!(
+                "bench {}: {} frames, mean {} us (render {} us), median {} us, max {} us ({}x{} px)\n",
+                name,
+                s.len(),
+                mean,
+                render,
+                median,
+                top,
+                self.wp.rt.fb.w,
+                self.wp.rt.fb.h
+            );
+            plat::write_stdout(o.as_bytes());
+            if max <= 0 || median <= max as u64 {
+                return;
+            }
+        }
+        self.fail(alloc::format!("the median stayed above {} us in {} runs (best {} us)", max, runs, best).as_bytes());
+    }
+
+    // one timed frame of bench: the clock 16 ms on (due timers queued), f (the input, the
+    // passes), the render of the dirty cells -> (us, the render's us); --verify-dirty's
+    // comparison follows untimed
+    fn bench_frame(&mut self, app: &mut dyn App, f: impl FnOnce(&mut Ui, &mut dyn App)) -> (u64, u64) {
+        let verify = self.verify_dirty;
+        self.verify_dirty = false;
+        let t0 = plat::time_us();
+        let t = self.now_ms.wrapping_add(16);
+        self.set_time(t);
+        loop {
+            let (id, _) = self.timer_due();
+            if id == u32::MAX {
+                break;
+            }
+            self.cmd_run(UIC_TIMER, id);
+        }
+        f(self, app);
+        let t1 = plat::time_us();
+        self.render();
+        let t2 = plat::time_us();
+        self.verify_dirty = verify;
+        if verify {
+            self.verify_dirty();
+        }
+        (t2.saturating_sub(t0), t2.saturating_sub(t1))
     }
 
     // ------------------------------------------------------------------ (K1) drop / clip

@@ -48,15 +48,17 @@ build/win/JFNetworker.exe --open apps/JFNetworker/tests/fixtures/office.jfnet
 build/win/JFNetworker.exe --selftest                        # Prüfungen von Modell und Simulator
 build/win/JFNetworker.exe --selftest --pcap-out DIR         # dazu die Mitschnitte der Prüfungen
 build/win/JFNetworker.exe --script apps/JFNetworker/tests/place.uis --verify-dirty
+build/win/JFNetworker.exe --gen-topology 500 --traffic 300  # synthetischer Campus, 300 Pings (Leistung)
 
 build/win/jfn-sim.exe run apps/JFNetworker/tests/fixtures/lan_router.jfnet --scenario apps/JFNetworker/tests/scen/lan_router.scn
 build/win/jfn-sim.exe check apps/JFNetworker/tests/fixtures/lan_router.jfnet
 build/win/jfn-sim.exe decode "ff ff ff ff ff ff 02 4a 00 00 01 01 08 06 ..."
+build/win/jfn-sim.exe gen 500 --out build/campus.jfnet
 build/win/JFNetworker.exe apps/JFNetworker/tests/fixtures/two_pcs.jfnet --scenario apps/JFNetworker/tests/scen/two_pcs.scn
 ```
 
 `python build_rs.py test --quick` führt alle Skripte in `tests/` aus: `model.uis` (Selbsttest
-mit den Gruppen `sim`, `l3`, `simmode`, `svc`, `cli`, `tcp`, `http`, `console`, `pdu` und `lab`), die Golden-Szenarien `scen_*.uis` und
+mit den Gruppen `sim`, `l3`, `simmode`, `svc`, `cli`, `tcp`, `http`, `console`, `pdu`, `lab` und `synth`), die Golden-Szenarien `scen_*.uis` und
 die Fensterskripte, alle mit `--verify-dirty`: `catalog.uis` (Palette und Suche), `shell.uis`
 (Bereiche, Menüs, Ansicht, Bilder hell, dunkel und 150 %), `place.uis` (Ziehen und
 Klicken-zum-Platzieren, Rückgängig), `edit.uis` (Verschieben, Rahmenauswahl, Löschen,
@@ -101,14 +103,14 @@ Skriptsprache die Gruppe `script`.
 | Befehlsbaum | [`lib/base/cmdtree.rs`](../../lib/base/cmdtree.rs) | IOS-artige Befehlszeilen: Abkürzungen, `?`, Tab, Modi, `no`, typisierte Parameter, Fehlerposition |
 | Hash-Ring, LRU | [`lib/base/hashring.rs`](../../lib/base/hashring.rs), [`lib/base/lru.rs`](../../lib/base/lru.rs) | Consistent Hashing mit vnodes und Präferenzlisten; LRU-Tabelle nach Anzahl und Gewicht |
 | JSON | [`lib/agent_core/src/jmap.rs`](../../lib/agent_core/src/jmap.rs) | `record!` / `wire_enum!` für das Projektformat |
-| Datenmodell | [`crates/jfn_model`](crates/jfn_model/lib.rs) | Gerätekatalog, Interface-Namen, Kabelregeln, Projekt, Szenarien |
+| Datenmodell | [`crates/jfn_model`](crates/jfn_model/lib.rs) | Gerätekatalog, Interface-Namen, Kabelregeln, Projekt, Szenarien, synthetische Testprojekte ([`synth.rs`](crates/jfn_model/synth.rs)) |
 | Simulator | [`crates/jfn_sim`](crates/jfn_sim/lib.rs) | Ereignis-Kern, Kabel mit Laufzeit/Verlust/Warteschlangen, Bridge mit VLANs, Hub, IPv4 mit ARP, Routing und ICMP, Ping- und Traceroute-Jobs, virtuelles OS mit UDP- und TCP-Sockets ([`tcp.rs`](crates/jfn_sim/tcp.rs)) und Diensten (DHCP, DNS, Resolver, Syslog, NTP, TCP-Testdienste in [`tcpsvc.rs`](crates/jfn_sim/tcpsvc.rs), HTTP in [`http.rs`](crates/jfn_sim/http.rs) und [`httpsvc.rs`](crates/jfn_sim/httpsvc.rs)), Trace, Zustand für die Leinwand, Treiber; Simulationsmodus, pcapng-Export, Probleme-Liste; Befehlszeilen in [`cli/`](crates/jfn_sim/cli/mod.rs) (`curl`, `nc`, `ss`, `top` in [`tools.rs`](crates/jfn_sim/cli/tools.rs), `lbctl`, `kvctl` … in [`lab.rs`](crates/jfn_sim/cli/lab.rs)), Szenarien in [`runner.rs`](crates/jfn_sim/runner.rs); das Labor: Loadbalancer, KV-Speicher, Cache, Queue und Worker ([`lb.rs`](crates/jfn_sim/lb.rs), [`kv.rs`](crates/jfn_sim/kv.rs), [`cache.rs`](crates/jfn_sim/cache.rs), [`mq.rs`](crates/jfn_sim/mq.rs)), Disk ([`disk.rs`](crates/jfn_sim/disk.rs)), Fehlerinjektion ([`fault.rs`](crates/jfn_sim/fault.rs)) |
 | Runner | [`crates/jfn_run`](crates/jfn_run/lib.rs), [`sim/main.rs`](sim/main.rs) | `jfn-sim` und `--scenario` der GUI-Exe: Dateien lesen, Bericht, pcapng, Vergleich mit Golden-Dateien |
 | App | [`src/app`](src/app/mod.rs) | Start (auch `--selftest` und `--scenario`), Zustand (`Net`), Befehle und Menüs, Kennungen |
 | | [`src/workspace`](src/workspace/mod.rs) | Fensterrahmen, Palette, Eigenschaften (`inspector/`: Gerät, Kabel, Projekt), Zeichenfläche (`canvas/`: Szene und Zeichnen, Werkzeuge, Verbinden, Kabel), Simulationsmodus ([`sim/`](src/workspace/sim/mod.rs): Steuerung, Animation, Ereignisse, Paket, PDUs und Export), Symbole und UI-Icons (`icons/`, erzeugt von `tools/vsym.py` und [`mkicons.py`](mkicons.py)), Terminal-Bereich und Konsolenfenster ([`terminal.rs`](src/workspace/terminal.rs)), Protokoll ([`logview.rs`](src/workspace/logview.rs)), Gerätefenster ([`devwin/`](src/workspace/devwin/mod.rs): Übersicht, Schnittstellen, Konfiguration, Dienste, CLI, Desktop) |
 | | [`src/doc`](src/doc/mod.rs) | das offene Projekt mit Rückgängig (`edits.rs`), Dateien und Dialoge (`file.rs`), der Simulator dahinter (`sim.rs`), Einstellungen, die die Konfiguration eines Geräts ändern (`config.rs`), die Konsolen der Geräte und die Meldungen des Simulators an sie ([`console.rs`](src/doc/console.rs)) |
 | | [`src/sim_thread.rs`](src/sim_thread.rs) | Treiber mit eigenem Thread für Echtzeit und lange Läufe (nur nativ) |
-| | [`src/selftest.rs`](src/selftest.rs), [`src/simtest.rs`](src/simtest.rs), [`src/l3test.rs`](src/l3test.rs), [`src/simmodetest.rs`](src/simmodetest.rs), [`src/svctest.rs`](src/svctest.rs), [`src/clitest.rs`](src/clitest.rs), [`src/tcptest.rs`](src/tcptest.rs), [`src/httptest.rs`](src/httptest.rs), [`src/consoletest.rs`](src/consoletest.rs), [`src/pdutest.rs`](src/pdutest.rs), [`src/labtest.rs`](src/labtest.rs) | Selbsttests von Modell, Simulator, Befehlszeilen, TCP, HTTP, PDUs, dem Labor und dem, worauf die Konsolen bauen (`--selftest`) |
+| | [`src/selftest.rs`](src/selftest.rs), [`src/simtest.rs`](src/simtest.rs), [`src/l3test.rs`](src/l3test.rs), [`src/simmodetest.rs`](src/simmodetest.rs), [`src/svctest.rs`](src/svctest.rs), [`src/clitest.rs`](src/clitest.rs), [`src/tcptest.rs`](src/tcptest.rs), [`src/httptest.rs`](src/httptest.rs), [`src/consoletest.rs`](src/consoletest.rs), [`src/pdutest.rs`](src/pdutest.rs), [`src/labtest.rs`](src/labtest.rs), [`src/synthtest.rs`](src/synthtest.rs) | Selbsttests von Modell, Simulator, Befehlszeilen, TCP, HTTP, PDUs, dem Labor, den synthetischen Projekten und dem, worauf die Konsolen bauen (`--selftest`) |
 | Tests | [`tests/`](tests) | Skripte, Fixtures (`fixtures/*.jfnet`), Szenarien mit Golden-Berichten (`scen/*.scn`, `scen/*.report`) |
 
 ### Gerätekatalog
@@ -724,3 +726,63 @@ Cisco, IOS und Packet Tracer sind Marken von Cisco Systems, Inc. JFNetworker ist
 eigenständiges Projekt und steht in keiner Verbindung zu Cisco; es wird von Cisco weder
 unterstützt noch empfohlen. Die Namen stehen hier nur, um Befehlszeilen-Konventionen und
 vergleichbare Programme zu beschreiben.
+
+## Performance
+
+Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
+Rahmen gleichzeitig auf den Kabeln in 1920 × 1080 höchstens 33 ms pro Bild (30 fps).
+
+- **Testprojekt:** `JFNetworker --gen-topology 500` öffnet ohne Datei einen synthetischen
+  Campus aus Katalogmodellen (`jfn_model::synth`): 7 Kern-Router im 100G-Ring, 19 Pods aus einem
+  Router mit zwei Uplinks, zwei Access-Switches, PCs, Drucker, Kamera und Servern mit je einem
+  Port an beiden Switches; statische Routen, Adressen aus 10.P.1.0/24 und 10.P.2.0/24. Kabel über
+  einen Baum hinaus verbinden nur geroutete Interfaces oder die zwei Netze eines Servers, es gibt
+  also keine Schleife auf Schicht 2 (noch kein STP). `jfn-sim gen 500 --out campus.jfnet`
+  schreibt dasselbe Projekt als Datei; gleiche Größe, gleiches Projekt.
+- **Verkehr:** `--traffic 300` startet 300 Pings auf einmal (`Engine::ping_many`), deren
+  ARP-Anfragen zur Zeit 0 alle auf den Kabeln liegen; der Simulationsmodus zeigt sie als 300
+  bewegte Rahmen (die Zahl steht im Semantik-Eintrag „Rahmen auf den Kabeln“).
+- **Messung:** `bench N anim|drag|wheel … 33000` (ui/auto.rs) misst mit der echten Uhr die
+  Durchläufe und das Neuzeichnen der schmutzigen Zellen pro Bild; der Vergleich von
+  `--verify-dirty` läuft danach, ungezählt. Bestanden ist ein Lauf, dessen Median höchstens 33 ms
+  beträgt, mit bis zu drei Läufen gegen Last auf dem Rechner.
+
+Was es schnell macht:
+
+- **Backing-Store der Leinwand** (`ui::diagram`): Raster, Kabel und Geräte werden einmal pro
+  Version (Projekt, Ansicht, LEDs, Theme) in eine eigene Fläche gemalt; jedes schmutzige Rechteck
+  kopiert nur noch seinen Teil heraus. Bewegte Rahmen, Hover und Auswahl malen die Szene nicht
+  mehr neu.
+- **Culling über den räumlichen Index:** der Painter fragt die Buckets des Widgets
+  (`DgFrame::find`) und rechnet nur für sichtbare Kabel LEDs und Portnamen.
+- **Detailstufe während Gesten:** solange Verschieben, Zoomen mit dem Rad oder das Ziehen von
+  Geräten läuft (`DgFrame::moving`) und mehr als 150 Geräte und Kabel zu sehen sind, entfallen
+  Namen, LEDs und Portnamen, Kabel sind schlichte 1-px-Linien (`dg_hairline`); danach zeichnet die
+  Leinwand wieder in voller Qualität.
+- **Rahmen:** ihre Beschriftungen („Rahmen N: A → B · Info“) werden einmal dekodiert und
+  gemerkt, Rahmen außerhalb der Ansicht nicht gezeichnet, doppelte Kennungen (Nummer % 1024)
+  nicht vergeben.
+- **Szene:** `Scene::build` sucht Geräte, Modelle und Ports über Tabellen statt linear.
+- **Engine:** jede Weiterleitung schlug die Routingtabelle neu zusammen; jetzt hält `IpStack`
+  die Tabelle der letzten Suche mit dem, woraus sie entstand (Zustand und Adressen der Interfaces,
+  statische Routen), und baut sie nur bei einer Änderung neu. Determinismus und Golden-Berichte
+  bleiben unverändert.
+
+Messwerte auf dem Entwicklungsrechner (Windows, Median von drei Läufen in ms, 1920 × 1080):
+
+| Szene | vorher | nachher |
+|---|---|---|
+| Echtzeit, die 300 Pings laufen | 1,3–1,4 | 1,3–1,5 |
+| Simulation, ganzer Campus (17 %), Rahmen bewegen sich | 7,7–8,4 | 3,7–4,6 |
+| … Verschieben mit der mittleren Taste | 9,1–10,6 | 7,1–8,3 |
+| … Zoom mit Strg + Rad | 9,2–10,7 | 7,2–8,1 |
+| 100 % über zwei Pods, Rahmen bewegen sich | 2,3–2,6 | 2,2–2,3 |
+| … Verschieben | 8,9–10,4 | 6,9–8,0 |
+| … Zoom | 9,6–12,2 | 7,2–9,0 |
+| … einen Server ziehen | 10,9–12,8 | 8,4–10,1 |
+| Abspielen mit 8× | 28,6–35,0 | 3,3–3,4 |
+
+Ein ganzes Fenster neu zeichnen dauert statt 17–21 ms noch 3–4 ms; 300 Pings mit gelerntem ARP
+(9 460 Ereignisse) rechnet die Engine in 6–7 statt 14 ms. Was ein Bild jetzt noch kostet, sind
+vor allem die Durchläufe der übrigen Oberfläche (Panels, zwei Durchläufe pro Bild während einer
+Geste).

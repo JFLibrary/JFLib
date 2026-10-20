@@ -18,11 +18,15 @@
 // sender's end (dir 0: from the link's end a, where the route starts).  Everything is drawn
 // after ui.diagram with plain commands inside the canvas' clip: the canvas' own painting
 // (grid, cables, devices) stays cached, the dirty cells are only those the frames touch.
-// Reduced motion draws no tweens and lets the crosses stand.
+// Reduced motion draws no tweens and lets the crosses stand.  A frame's label (hit area,
+// tooltip) is made once (Labels: decoding costs, hundreds of frames move at once); frames whose
+// numbers meet in ID_PKT0 + number % 1024 share no id: the first one shown keeps it.
 
+use alloc::collections::BTreeMap;
 use alloc::format;
-use alloc::string::String;
+use alloc::rc::Rc;
 use alloc::vec::Vec;
+use core::cell::{Cell, RefCell};
 
 use jfn_sim::{DropMark, Filter, HopId, Ns};
 use ui::*;
@@ -204,7 +208,45 @@ fn fx(v: f32) -> i32 {
 struct Hit {
     hop: HopId,
     rect: [i32; 4],
-    label: String,
+    label: Rc<str>,
+}
+
+/// labels kept at most (then they are made again)
+const LABELS_MAX: usize = 4096;
+
+/// the frames' labels "Rahmen N: A → B · Info", made once per frame (decoding it for the info
+/// costs) and again when the project changes (device names); a frame is known by its number,
+/// moment and cable (a fresh engine numbers from 1 again)
+#[derive(Default)]
+pub(crate) struct Labels {
+    rev: Cell<u32>,
+    map: RefCell<BTreeMap<HopId, (Ns, u32, Rc<str>)>>,
+}
+
+impl Labels {
+    fn get(&self, n: &Net, id: HopId) -> Rc<str> {
+        if self.rev.get() != n.doc.rev {
+            self.map.borrow_mut().clear();
+            self.rev.set(n.doc.rev);
+        }
+        let Some(hop) = n.doc.sim.engine().trace.hop(id) else {
+            return Rc::from(format!("Rahmen {}", id).as_str());
+        };
+        if let Some((t, l, s)) = self.map.borrow().get(&id) {
+            if (*t, *l) == (hop.t_tx, hop.link) {
+                return s.clone();
+            }
+        }
+        let name = |d: u32| n.doc.proj.device(d).map_or_else(|| format!("Gerät {}", d), |x| x.name.clone());
+        let (_, info) = jfn_sim::view::hop_info(hop);
+        let s: Rc<str> = Rc::from(format!("Rahmen {}: {} → {} · {}", id, name(hop.from.0), name(hop.to.0), info).as_str());
+        let mut m = self.map.borrow_mut();
+        if m.len() >= LABELS_MAX {
+            m.clear();
+        }
+        m.insert(id, (hop.t_tx, hop.link, s.clone()));
+        s
+    }
 }
 
 /// the frames, crosses and rings over the canvas (after ui.diagram)
@@ -217,12 +259,23 @@ pub(crate) fn overlay(n: &mut Net, ui: &mut Ui) {
     ui.clip_push(r[0], r[1], r[2], r[3]);
     pdu_source(n, ui);
     if n.sim.sim_mode {
-        let hits = frames(n, ui);
+        let (hits, shown) = frames(n, ui);
+        // how many frames are on the cables at the moment shown (screen readers;
+        // tests/perf.uis)
+        ui.last_set(r, 0);
+        ui.sem(K_CANVAS, ID_SIM_FRAMES, Some("Rahmen auf den Kabeln"), shown as i32);
         crosses(n, ui);
         let mut held = None;
+        // the ids given out in this pass (ID_PKT0 + number % 1024)
+        let mut used = [0u64; 16];
         for h in &hits {
+            let k = (h.hop % 1024) as usize;
+            if used[k / 64] & 1 << (k % 64) != 0 {
+                continue;
+            }
+            used[k / 64] |= 1 << (k % 64);
             let ev = ui.hit_rect(ID_PKT0 + (h.hop % 1024) as u32, h.rect[0], h.rect[1], h.rect[2], h.rect[3], 0);
-            ui.sem(K_BUTTON, ID_PKT0 + (h.hop % 1024) as u32, Some(&h.label), 0);
+            ui.sem(K_BUTTON, ID_PKT0 + (h.hop % 1024) as u32, Some(&*h.label), 0);
             if ev & EV_HOVER != 0 {
                 ui.tooltip(&h.label);
             }
@@ -241,8 +294,8 @@ pub(crate) fn overlay(n: &mut Net, ui: &mut Ui) {
     ui.clip_pop();
 }
 
-// the envelopes (dots below 50 %) -> their hit areas
-fn frames(n: &Net, ui: &mut Ui) -> Vec<Hit> {
+// the envelopes (dots below 50 %) -> their hit areas, the frames shown (also outside the view)
+fn frames(n: &Net, ui: &mut Ui) -> (Vec<Hit>, usize) {
     let now = plat::task::now_us();
     let items = match &n.sim.tween {
         Some(t) if !t.done(now) => t.items(now),
@@ -253,12 +306,16 @@ fn frames(n: &Net, ui: &mut Ui) -> Vec<Hit> {
     let dark = ui.theme_dark();
     let hair = ui.hair();
     let accent = ui.color(T_ACCENT) | 0xFF00_0000;
-    let eng = n.doc.sim.engine();
     let small = vp.zoom < 0.5;
     let z = vp.zoom.clamp(1.0, 1.5);
     let (w, h) = ((ui.dp(12) as f32 * z) as i32, (ui.dp(8) as f32 * z) as i32);
     let dot = ui.dp(3);
     let mut hits = Vec::new();
+    let shown = items.iter().filter(|it| it.alpha >= 128).count();
+    // the canvas with room for an envelope and its ring
+    let r = vp.rect;
+    let g = (w + ui.dp(8)) as f32;
+    let (x0, y0, x1, y1) = (r[0] as f32 - g, r[1] as f32 - g, (r[0] + r[2]) as f32 + g, (r[1] + r[3]) as f32 + g);
     for it in items {
         let Some(rt) = st.route(it.link as u64) else { continue };
         if rt.pts.len() < 2 {
@@ -266,6 +323,9 @@ fn frames(n: &Net, ui: &mut Ui) -> Vec<Hit> {
         }
         let f = if it.dir == 0 { it.pos } else { 1.0 - it.pos };
         let p = vp.to_screen(dg_point_at(&rt.pts, f));
+        if p[0] < x0 || p[0] > x1 || p[1] < y0 || p[1] > y1 {
+            continue;
+        }
         let c = cat_color(cat_of(it.mask), dark);
         let fill = with_alpha(c, it.alpha);
         let edge = with_alpha(color_mix(c, 0xFF00_0000, 70), it.alpha);
@@ -292,18 +352,10 @@ fn frames(n: &Net, ui: &mut Ui) -> Vec<Hit> {
             ui.cmd_rrect(rect[0] - g + 2, rect[1] - g + 2, rect[2] + 2 * g - 4, rect[3] + 2 * g - 4, ui.dp(3), hair * 2, 0, accent, accent);
         }
         if it.alpha >= 128 {
-            let label = match eng.trace.hop(it.hop) {
-                Some(hop) => {
-                    let name = |d: u32| n.doc.proj.device(d).map_or_else(|| format!("Gerät {}", d), |x| x.name.clone());
-                    let (_, info) = jfn_sim::view::hop_info(hop);
-                    format!("Rahmen {}: {} → {} · {}", it.hop, name(hop.from.0), name(hop.to.0), info)
-                }
-                None => format!("Rahmen {}", it.hop),
-            };
-            hits.push(Hit { hop: it.hop, rect, label });
+            hits.push(Hit { hop: it.hop, rect, label: n.sim.labels.get(n, it.hop) });
         }
     }
-    hits
+    (hits, shown)
 }
 
 // the red crosses: at the device's top right corner, or near the receiver on the cable that

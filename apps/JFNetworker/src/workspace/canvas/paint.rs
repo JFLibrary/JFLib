@@ -25,8 +25,12 @@
 // double line; an unplugged cable is faded.  12 units before each end sits the port's LED from
 // the simulator (green up, red down, grey without power, amber blocking or learning); from
 // 100 % on the short port names stand next to it.  Levels of detail: below 50 % no names and no
-// LEDs, below 30 % a tinted square instead of the symbol.  Everything is culled against the
-// clip the widget paints (once per dirty rectangle), with labels and line widths included.
+// LEDs, below 30 % a tinted square instead of the symbol; while a gesture moves the view or
+// devices (a pan, wheel turns, a drag) and more than LOD_MIN devices and cables are in view, no
+// names, LEDs and port names either, and the cables are plain 1 px lines.  The widget keeps the
+// painting in a backing store and repaints it only when the scene, the view, the LEDs or the
+// theme change; the painter asks the widget's buckets for what lies near the clip and culls
+// that against it, with labels and line widths included.
 
 use alloc::collections::BTreeMap;
 use alloc::rc::Weak;
@@ -59,6 +63,10 @@ const LED_R: f32 = 3.0;
 /// a port name: this far from the end along the cable, this far beside it
 const NAME_AT: f32 = 26.0;
 const NAME_SIDE: f32 = 9.0;
+/// how far names and port names reach beyond a box or a cable (world units)
+const REACH: f32 = 96.0;
+/// devices and cables in view above which a moving view leaves out names, LEDs and port names
+const LOD_MIN: usize = 150;
 
 /// the diagram key of a port: devices, links and notes have project ids below 2^32
 pub(crate) fn port_key(dev: u32, index: u16) -> u64 {
@@ -120,16 +128,30 @@ pub(crate) struct Scene {
     pub grid: bool,
 }
 
-// the ports of a model, expanded once per build
-fn ports_of<'a>(cache: &'a mut BTreeMap<&'static str, Vec<PortSpec>>, model: &str) -> &'a [PortSpec] {
-    match catalog::model(model) {
-        Some(m) => cache.entry(m.id).or_insert_with(|| m.ports()),
-        None => &[],
-    }
+/// a model's ports, expanded once per build, and the index of each exact name
+#[derive(Default)]
+struct ModelPorts {
+    ports: Vec<PortSpec>,
+    exact: BTreeMap<String, u16>,
 }
 
-// the index of a port by any spelling
-fn port_index(ports: &[PortSpec], name: &str) -> Option<u16> {
+// the ports of a model, expanded once per build
+fn ports_of<'a>(cache: &'a mut BTreeMap<&'static str, ModelPorts>, m: Option<&'static catalog::Model>) -> Option<&'a ModelPorts> {
+    let m = m?;
+    Some(cache.entry(m.id).or_insert_with(|| {
+        let ports = m.ports();
+        let exact = ports.iter().map(|p| (p.name.clone(), p.index)).collect();
+        ModelPorts { ports, exact }
+    }))
+}
+
+// the index of a port by any spelling (projects keep the full names: those are looked up)
+fn port_index(mp: Option<&ModelPorts>, name: &str) -> Option<u16> {
+    let mp = mp?;
+    if let Some(&i) = mp.exact.get(name) {
+        return Some(i);
+    }
+    let ports = &mp.ports;
     ports.iter().find(|p| p.name.eq_ignore_ascii_case(name.trim())).or_else(|| ports.iter().find(|p| ifname::same(&p.name, name))).map(|p| p.index)
 }
 
@@ -196,10 +218,13 @@ impl Scene {
             self.nodes.push(DNode { key: n.id as u64, rect, ports: 0..0, flags: 0 });
             self.notes.push(SNote { rect, text: n.text.clone() });
         }
-        let rect_of = |id: u32| p.device(id).map(|d| [d.x as f32, d.y as f32, DEV_W, DEV_H]);
+        // the devices by id with their models (looked up once, not per cable end)
+        let by_id: BTreeMap<u32, (&jfn_model::Device, Option<&'static catalog::Model>)> = p.devices.iter().map(|d| (d.id, (d, catalog::model(&d.model)))).collect();
+        let rect_of = |id: u32| by_id.get(&id).map(|(d, _)| [d.x as f32, d.y as f32, DEV_W, DEV_H]);
+        let model_of = |id: u32| by_id.get(&id).and_then(|x| x.1);
         let centre = |r: [f32; 4]| [r[0] + r[2] * 0.5, r[1] + r[3] * 0.5];
         // the cables: their ports where they leave the boxes (parallel ones side by side)
-        let mut cache: BTreeMap<&'static str, Vec<PortSpec>> = BTreeMap::new();
+        let mut cache: BTreeMap<&'static str, ModelPorts> = BTreeMap::new();
         // the ports with a cable: where it leaves the box (x, y in the box)
         let mut used: BTreeMap<(u32, u16), [f32; 2]> = BTreeMap::new();
         let mut taken: alloc::collections::BTreeSet<(u32, u16)> = alloc::collections::BTreeSet::new();
@@ -209,9 +234,8 @@ impl Scene {
             count.entry(pair(l.a.dev, l.b.dev)).or_default().0 += 1;
         }
         for l in &p.links {
-            let model = |d: u32| p.device(d).map_or("", |d| d.model.as_str());
-            let ia = port_index(ports_of(&mut cache, model(l.a.dev)), &l.a.port);
-            let ib = port_index(ports_of(&mut cache, model(l.b.dev)), &l.b.port);
+            let ia = port_index(ports_of(&mut cache, model_of(l.a.dev)), &l.a.port);
+            let ib = port_index(ports_of(&mut cache, model_of(l.b.dev)), &l.b.port);
             for (d, i) in [(l.a.dev, ia), (l.b.dev, ib)] {
                 if let Some(i) = i {
                     taken.insert((d, i));
@@ -268,15 +292,16 @@ impl Scene {
             });
         }
         // the devices with their ports: the cables' ends (hidden), one free port per group
+        let mut sym_of: BTreeMap<&'static str, Option<usize>> = BTreeMap::new();
         for d in &p.devices {
-            let m = catalog::model(&d.model);
+            let m = by_id.get(&d.id).and_then(|x| x.1);
             let rect = [d.x as f32, d.y as f32, DEV_W, DEV_H];
             let first = self.ports.len() as u32;
             for (&(dev, i), &at) in used.range((d.id, 0)..=(d.id, u16::MAX)) {
                 self.ports.push(DPort { key: port_key(dev, i), at, flags: DPT_USED | DPT_HIDDEN });
             }
             if let Some(m) = m {
-                let all = ports_of(&mut cache, m.id);
+                let all = ports_of(&mut cache, Some(m)).map_or(&[][..], |x| &x.ports);
                 let mut free = Vec::new();
                 let mut k = 0usize;
                 for g in m.groups {
@@ -297,7 +322,7 @@ impl Scene {
             self.nodes.push(DNode { key: d.id as u64, rect, ports: first..self.ports.len() as u32, flags: 0 });
             self.devs.push(SDev {
                 rect,
-                sym: m.and_then(|m| syms.index(m.symbol)),
+                sym: m.and_then(|m| *sym_of.entry(m.symbol).or_insert_with(|| syms.index(m.symbol))),
                 tint: m.map_or(0, |m| tint_of(m.category)),
                 name: d.name.clone(),
                 off: d.off,
@@ -372,6 +397,28 @@ pub(crate) fn at_len(pts: &[[f32; 2]], s: f32) -> ([f32; 2], [f32; 2]) {
     if n >= 2 {
         let l = dist(pts[n - 2], pts[n - 1]).max(1e-6);
         return (pts[n - 1], [(pts[n - 1][0] - pts[n - 2][0]) / l, (pts[n - 1][1] - pts[n - 2][1]) / l]);
+    }
+    (pts.first().copied().unwrap_or([0.0; 2]), [1.0, 0.0])
+}
+
+/// at_len along the polyline walked from its last point (without reversing it)
+pub(crate) fn at_len_back(pts: &[[f32; 2]], s: f32) -> ([f32; 2], [f32; 2]) {
+    let mut left = s.max(0.0);
+    for i in (1..pts.len()).rev() {
+        let (a, b) = (pts[i], pts[i - 1]);
+        let l = dist(a, b);
+        if l <= 0.0 {
+            continue;
+        }
+        let u = [(b[0] - a[0]) / l, (b[1] - a[1]) / l];
+        if left <= l {
+            return ([a[0] + u[0] * left, a[1] + u[1] * left], u);
+        }
+        left -= l;
+    }
+    if pts.len() >= 2 {
+        let l = dist(pts[1], pts[0]).max(1e-6);
+        return (pts[0], [(pts[0][0] - pts[1][0]) / l, (pts[0][1] - pts[1][1]) / l]);
     }
     (pts.first().copied().unwrap_or([0.0; 2]), [1.0, 0.0])
 }
@@ -456,10 +503,20 @@ impl DgPaint for Painter {
             g.dc.set_color(f.bg);
             g.dc.fill(g.sf, c[0], c[1], c[2] - c[0], c[3] - c[1]);
         }
-        paint_notes(g, f, sc);
-        paint_links(g, f, sc);
-        paint_devices(g, f, sc, &n.syms);
-        paint_ends(g, f, sc, &n.doc.sim.leds);
+        // what may show: the nodes and cables in the buckets around the clip
+        let margin = REACH * f.vp.scale() as f32;
+        let nodes = f.find(margin, false);
+        let edges = f.find(margin, true);
+        let lod = f.moving && {
+            let shown = nodes.iter().filter(|&&i| sc.nodes.get(i as usize).is_some_and(|x| f.visible(x.rect))).count();
+            shown + edges.iter().filter(|&&i| f.geo.routes.get(i as usize).is_some_and(|rt| f.route_visible(rt, 2.0))).count() > LOD_MIN
+        };
+        paint_notes(g, f, sc, &nodes, lod);
+        paint_links(g, f, sc, &edges, lod);
+        paint_devices(g, f, sc, &n.syms, &nodes, lod);
+        if !lod {
+            paint_ends(g, f, sc, &n.doc.sim.leds, &edges);
+        }
     }
 }
 
@@ -477,7 +534,7 @@ fn px_rect(f: &DgFrame, r: [f32; 4]) -> [i32; 4] {
     [x0, y0, (x1 - x0).max(1), (y1 - y0).max(1)]
 }
 
-fn paint_notes(g: &mut Gfx, f: &DgFrame, sc: &Scene) {
+fn paint_notes(g: &mut Gfx, f: &DgFrame, sc: &Scene, nodes: &[u32], lod: bool) {
     let s = f.vp.scale() as f32;
     let hair = ((f.vp.dpi + 24) / 96).max(1);
     let card = f.color(T_CARD);
@@ -485,7 +542,8 @@ fn paint_notes(g: &mut Gfx, f: &DgFrame, sc: &Scene) {
     let fill = color_mix(fill, 0xFFF2_D46B, if f.dark { 18 } else { 40 });
     let stroke = f.color(T_CTRL_STROKE);
     let (font, size) = f.font(TS_BODY);
-    for n in &sc.notes {
+    // the notes are the first nodes
+    for n in nodes.iter().filter_map(|&i| sc.notes.get(i as usize)) {
         let q = px_rect(f, n.rect);
         if !touches(g, [q[0], q[1], q[0] + q[2], q[1] + q[3]]) {
             continue;
@@ -498,7 +556,7 @@ fn paint_notes(g: &mut Gfx, f: &DgFrame, sc: &Scene) {
             sh.dc.set_color(stroke);
             sh.stroke_rrect(q[0], q[1], q[2], q[3], rad, hair);
         }
-        if size < 5 << 8 {
+        if size < 5 << 8 || lod {
             continue;
         }
         let pad = (NOTE_PAD * s) as i32;
@@ -542,9 +600,9 @@ fn wrap(g: &mut Gfx, text: &str, w: i32) -> Vec<String> {
     out
 }
 
-fn paint_links(g: &mut Gfx, f: &DgFrame, sc: &Scene) {
-    for (i, l) in sc.links.iter().enumerate() {
-        let Some(rt) = f.geo.routes.get(i) else { continue };
+fn paint_links(g: &mut Gfx, f: &DgFrame, sc: &Scene, edges: &[u32], lod: bool) {
+    for &i in edges {
+        let (Some(l), Some(rt)) = (sc.links.get(i as usize), f.geo.routes.get(i as usize)) else { continue };
         let (_, w, dash) = cable_style(l.cable);
         if !f.route_visible(rt, w + 6.0) {
             continue;
@@ -553,6 +611,10 @@ fn paint_links(g: &mut Gfx, f: &DgFrame, sc: &Scene) {
         let argb = cable_color(l.cable, f.dark, l.down, f.bg);
         let len = dg_length(pts);
         if !(len > 0.5) {
+            continue;
+        }
+        if lod {
+            dg_hairline(g, &f.vp, pts, argb);
             continue;
         }
         match l.cable {
@@ -576,17 +638,19 @@ fn paint_links(g: &mut Gfx, f: &DgFrame, sc: &Scene) {
     }
 }
 
-fn paint_devices(g: &mut Gfx, f: &DgFrame, sc: &Scene, syms: &Symbols) {
+fn paint_devices(g: &mut Gfx, f: &DgFrame, sc: &Scene, syms: &Symbols, nodes: &[u32], lod: bool) {
     let zoom = f.vp.zoom;
     let s = f.vp.scale() as f32;
     let (font, size) = f.font(TS_BODY);
-    let named = zoom >= 0.5;
+    let named = zoom >= 0.5 && !lod;
     g.text.set_font(font, size);
     let (asc, desc) = (g.text.ascent(), g.text.descent());
     let text_c = f.color(T_TEXT);
     let plate = (f.bg & 0x00FF_FFFF) | 0xD800_0000;
     let hair = ((f.vp.dpi + 24) / 96).max(1);
-    for d in &sc.devs {
+    // the devices follow the notes among the nodes
+    let first = sc.notes.len() as u32;
+    for d in nodes.iter().filter(|&&i| i >= first).filter_map(|&i| sc.devs.get((i - first) as usize)) {
         let q = px_rect(f, d.rect);
         // the name below the box, centred
         let gap = (LABEL_GAP * s) as i32;
@@ -633,7 +697,7 @@ fn paint_devices(g: &mut Gfx, f: &DgFrame, sc: &Scene, syms: &Symbols) {
 }
 
 // the ends of the cables: the LEDs (from 50 %), the port names (from 100 %)
-fn paint_ends(g: &mut Gfx, f: &DgFrame, sc: &Scene, leds: &BTreeMap<u32, [Led; 2]>) {
+fn paint_ends(g: &mut Gfx, f: &DgFrame, sc: &Scene, leds: &BTreeMap<u32, [Led; 2]>, edges: &[u32]) {
     let zoom = f.vp.zoom;
     if zoom < 0.5 {
         return;
@@ -647,17 +711,19 @@ fn paint_ends(g: &mut Gfx, f: &DgFrame, sc: &Scene, leds: &BTreeMap<u32, [Led; 2
     let plate = (f.bg & 0x00FF_FFFF) | 0xC800_0000;
     let text_c = f.color(T_TEXT2);
     let ring = led_ring(f.color(T_TEXT), f.bg, f.dark);
-    for (i, l) in sc.links.iter().enumerate() {
-        let Some(rt) = f.geo.routes.get(i) else { continue };
-        if rt.pts.len() < 2 {
+    for &i in edges {
+        let (Some(l), Some(rt)) = (sc.links.get(i as usize), f.geo.routes.get(i as usize)) else { continue };
+        // LEDs and names stay within REACH of the cable
+        if rt.pts.len() < 2 || !f.route_visible(rt, REACH / 4.0) {
             continue;
         }
-        let len = dg_length(&rt.pts);
+        let pts = rt.pts.as_slice();
+        let len = dg_length(pts);
         let state = leds.get(&l.id).copied().unwrap_or([Led::NoPower; 2]);
-        // the end at the route's start is end a
-        let rev: Vec<[f32; 2]> = rt.pts.iter().rev().copied().collect();
-        for (k, pts) in [rt.pts.as_slice(), rev.as_slice()].into_iter().enumerate() {
-            let (c, u) = led_at(pts, len);
+        // the end at the route's start is end a; end b walks the route backwards
+        for k in 0..2 {
+            let along = |d: f32| if k == 0 { at_len(pts, d) } else { at_len_back(pts, d) };
+            let (c, u) = along(LED_AT.min(len / 3.0));
             let ri = led_radius(s);
             let p = f.vp.to_screen(c);
             let bb = [fl(p[0]) - ri - 1, fl(p[1]) - ri - 1, fl(p[0]) + ri + 2, fl(p[1]) + ri + 2];
@@ -674,7 +740,7 @@ fn paint_ends(g: &mut Gfx, f: &DgFrame, sc: &Scene, leds: &BTreeMap<u32, [Led; 2
                 continue;
             }
             // the port name beside the cable (further out below a device: its name is there)
-            let (a, _) = at_len(pts, NAME_AT + if u[1] > 0.6 { 14.0 } else { 0.0 });
+            let (a, _) = along(NAME_AT + if u[1] > 0.6 { 14.0 } else { 0.0 });
             let side = [-u[1] * l.sides[k], u[0] * l.sides[k]];
             let name = &l.names[k];
             let tw = g.text.width(name);

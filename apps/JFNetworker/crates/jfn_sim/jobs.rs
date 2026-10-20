@@ -11,6 +11,8 @@
 //                                                      TTL 1, 2, ...: Time Exceeded names the
 //                                                      hops, Port Unreachable the target
 //   Engine::job(id) / jobs() / cancel_job(id)          the results grow while it runs
+//   Engine::ping_many(k) -> started                    one probe each from k hosts at once
+//                                                      (load for performance tests)
 //
 // The command lines (cli/print.rs) print the events in the IOS or Linux way; this module only
 // measures.  It tells them when a job moved on (Engine::cli_job).  Round trip times are virtual: from handing the probe to IP (ARP included)
@@ -654,5 +656,45 @@ fn push_probe(t: &mut TraceJob, ttl: u8, p: TraceProbe) {
     match t.hops.last_mut() {
         Some(h) if h.ttl == ttl => h.probes.push(p),
         _ => t.hops.push(TraceHop { ttl, probes: alloc::vec![p] }),
+    }
+}
+
+// ---------------------------------------------------------------- load for tests
+
+impl Engine {
+    /// pings from k hosts at once, one probe each (load for performance tests, --traffic): the
+    /// Linux hosts with an address on an interface that is up, spread evenly in id order, each
+    /// to the host half way round that list -> the pings started (their first frames leave now)
+    pub fn ping_many(&mut self, k: usize) -> usize {
+        let mut hosts: Vec<(u32, Ipv4)> = Vec::new();
+        for (&dev, &ni) in &self.dev_idx {
+            let Some(Some(n)) = self.nodes.get(ni) else {
+                continue;
+            };
+            if !n.power || !n.model.has(jfn_model::catalog::F_HOST) || n.model.cli != jfn_model::catalog::CliStyle::Linux {
+                continue;
+            }
+            let Some(st) = n.ip.as_ref() else {
+                continue;
+            };
+            let up = st.ifaces.iter().enumerate().filter(|(i, f)| !f.hidden && !f.is_loopback() && self.iface_up(ni, *i as u16));
+            if let Some(a) = up.into_iter().find_map(|(_, f)| f.primary()) {
+                hosts.push((dev, a));
+            }
+        }
+        let m = hosts.len();
+        if m < 2 {
+            return 0;
+        }
+        let k = k.min(m);
+        let mut started = 0;
+        for j in 0..k {
+            let s = j * m / k;
+            let (dev, dst) = (hosts[s].0, hosts[(s + m / 2) % m].1);
+            if self.ping(dev, dst, PingOpts { count: 1, ..PingOpts::default() }).is_ok() {
+                started += 1;
+            }
+        }
+        started
     }
 }

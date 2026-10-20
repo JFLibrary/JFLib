@@ -10,6 +10,8 @@
 //   build/win/JFNetworker.exe                     the editor
 //   build/win/JFNetworker.exe --open FILE.jfnet   ... with a project
 //   build/win/JFNetworker.exe --selftest          self-checks of model and simulator (tests/model.uis)
+//   build/win/JFNetworker.exe --gen-topology 500 --traffic 300   a synthetic campus without a
+//                                                 file and 300 pings at once (tests/perf.uis)
 //
 // Modules: app/ (start, state, commands, ids), workspace/ (shell, palette, inspector, canvas,
 // icons, the Terminal and Protokoll panels, device windows), doc/ (files, undoable edits, the

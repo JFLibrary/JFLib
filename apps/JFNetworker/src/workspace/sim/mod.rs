@@ -133,6 +133,8 @@ pub(crate) struct SimUi {
     pub ev: events::Events,
     pub pk: packet::Packet,
     pub pdu: pdu::Pdus,
+    /// the labels of the frames on the canvas (anim.rs)
+    pub labels: anim::Labels,
 }
 
 impl SimUi {
@@ -155,6 +157,7 @@ impl SimUi {
             ev: events::Events::new(),
             pk: packet::Packet::new(),
             pdu: pdu::Pdus::new(),
+            labels: anim::Labels::default(),
         }
     }
 }

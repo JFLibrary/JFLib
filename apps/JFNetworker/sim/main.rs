@@ -4,6 +4,7 @@
 //   jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F]
 //   jfn-sim check PROJEKT
 //   jfn-sim decode HEX
+//   jfn-sim gen N [--out F]   a synthetic campus of N devices (jfn_model::synth)
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]

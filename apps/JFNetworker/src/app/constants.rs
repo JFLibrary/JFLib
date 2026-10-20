@@ -249,3 +249,6 @@ pub(crate) const ID_PKT0: u32 = 0x9400;
 /// the pcapng save dialog: ID_PCAP_DLG .. + 0x3FFF (a file dialog takes a block like
 /// ID_FILEDLG)
 pub(crate) const ID_PCAP_DLG: u32 = 0x0011_0000;
+// ---- performance (U5: commands 200 .. 209, widgets 0xA000 .. 0xA0FF, timers 0x120 .. 0x12F)
+/// the frames on the canvas in the simulation mode: a record whose value is their number
+pub(crate) const ID_SIM_FRAMES: u32 = 0xA000;

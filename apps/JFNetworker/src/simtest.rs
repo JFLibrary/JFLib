@@ -32,6 +32,8 @@ pub mod httptest;
 pub mod pdutest;
 #[path = "labtest.rs"]
 pub mod labtest;
+#[path = "synthtest.rs"]
+pub mod synthtest;
 
 const BUDGET: usize = 1_000_000;
 

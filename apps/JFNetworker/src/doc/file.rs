@@ -5,6 +5,7 @@
 //                                           the project has unsaved changes
 //   save(n, ui) / save_as(n)                Speichern (Speichern unter without a file)
 //   open_path(n, ui, path)                  load a project (--open, recent files, the dialog)
+//   open_generated(n, ui, count)            jfn_model::synth's synthetic project, without a file
 //   dialogs(n, ui)                          the file dialog and the question, once per frame
 //   chosen(n, ui, save) / answer(n, ui, save)   the commands those dialogs queue
 //
@@ -217,6 +218,14 @@ fn absolute(path: &str) -> String {
     }
     let cwd = plat::cwd().replace('\\', "/");
     format!("{}/{}", cwd.trim_end_matches('/'), p.trim_start_matches("./"))
+}
+
+/// a synthetic project of `count` devices without a file (--gen-topology: performance tests)
+pub(crate) fn open_generated(n: &mut Net, ui: &mut Ui, count: usize) {
+    n.doc.replace(jfn_model::synth::topology(count), None);
+    n.after_load();
+    n.file.msg = None;
+    ui.repass();
 }
 
 /// load a project -> it worked (else the info bar says why)

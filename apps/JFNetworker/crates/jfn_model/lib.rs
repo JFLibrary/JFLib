@@ -10,6 +10,8 @@
 //   project   Project / Device / Link / Note / Layout / ServiceDef records: add, rename, connect,
 //             disconnect, remove and restore (undo), suggest_ports, check, to_text / from_text
 //   scenario  .scn scripts for headless runs and tests: actions at virtual times and expectations
+//   synth     topology(n): a synthetic campus of n devices with working configurations (tests
+//             of large projects: --gen-topology, jfn-sim gen)
 //
 // Device identity is the project's numeric id; ports are referenced by their full interface
 // name ("GigabitEthernet1/0/1", "eth0"), so files stay readable.
@@ -23,6 +25,7 @@ pub mod catalog;
 pub mod ifname;
 pub mod project;
 pub mod scenario;
+pub mod synth;
 
 pub use cable::{cable_fits, cable_kind, CableKind, Why};
 pub use catalog::{catalog, model, Category, CliStyle, DeviceKind, Media, Model, PortSpec};

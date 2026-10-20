@@ -3,7 +3,8 @@
 //
 //   Net::new()              everything empty; run() puts it into an Rc<RefCell> and sets `me`
 //   init(ui)                icons, the consoles' font, the canvas' painter, the user's
-//                           settings, --open FILE
+//                           settings, --open FILE; --gen-topology N (a synthetic project
+//                           without a file) and --traffic K (K pings at once) for tests
 //   after_load()            a new or loaded project: canvas, inspector, consoles, log and
 //                           device windows start over, the simulator runs in real time
 //   save_prefs(ui)          settings, recent files and the dock layout (UIC_EXIT)
@@ -109,6 +110,14 @@ impl Net {
         let open = plat::arg_value("--open").or_else(|| args.iter().skip(1).find(|a| !a.starts_with('-') && a.to_lowercase().ends_with(".jfnet")).cloned());
         if let Some(path) = open {
             file::open_path(self, ui, &path);
+        }
+        // performance tests: a synthetic project (--gen-topology N), K pings at once (--traffic K)
+        let num = |a: &str| plat::arg_value(a).and_then(|v| v.trim().parse::<usize>().ok());
+        if let Some(k) = num("--gen-topology") {
+            file::open_generated(self, ui, k);
+        }
+        if let Some(k) = num("--traffic") {
+            self.doc.sim.with_engine(|e| e.ping_many(k));
         }
         true
     }

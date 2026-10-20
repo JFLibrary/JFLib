@@ -912,8 +912,9 @@ impl Ui {
     }
 
     // verify_dirty: render the whole frame into a shadow surface and compare
-    // (--verify-dirty): any difference means a command's box was too small
-    fn verify_dirty(&mut self) {
+    // (--verify-dirty): any difference means a command's box was too small (auto.rs' bench
+    // calls it after the timed render)
+    pub(crate) fn verify_dirty(&mut self) {
         let (w, h) = (self.wp.rt.fb.w, self.wp.rt.fb.h);
         if self.wp.rt.shadow.w != w || self.wp.rt.shadow.h != h {
             self.wp.rt.shadow = Surface::new(w, h, FMT_XRGB);

@@ -65,7 +65,7 @@ mod data;
 mod datepick;
 mod diagram; // node / edge canvas (diagram.rs)
 pub use diagram::{
-    dg_edge_points, dg_length, dg_paint_grid, dg_point_at, dg_stroke_edge, DEdge, DEv, DHit, DModel, DNode, DPort, DgFrame, DgGeo,
+    dg_edge_points, dg_hairline, dg_length, dg_paint_grid, dg_point_at, dg_stroke_edge, DEdge, DEv, DHit, DModel, DNode, DPort, DgFrame, DgGeo,
     DgPaint, DgRoute, DiagramState, Viewport, DG_CONNECT, DG_PAN, DG_PLACE, DG_SELECT, DN_LOCKED, DN_NOSELECT, DPT_HIDDEN,
     DPT_USED, DR_BEZIER, DR_ORTHO, DR_STRAIGHT,
 };

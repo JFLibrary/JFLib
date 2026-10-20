@@ -20,6 +20,9 @@
 //   dg_stroke_edge(g, vp, pts, width, argb, cap0, cap1, dash)   stroke a route (gfx::dash
 //                                   caps LCAP_* and patterns DASH_*), culled by the clip
 //   dg_point_at(pts, f) -> point    the point at fraction f of a route's length (packets)
+//   dg_hairline(g, vp, pts, argb)   a route as 1 px anti-aliased lines: far cheaper than
+//                                   dg_stroke_edge for many thin edges (DgFrame::moving)
+//   DgFrame::find(margin, edges)    the nodes or edges near the clip (the spatial buckets)
 //
 // Model (DModel, borrowed every frame): nodes with a world rectangle and a range of ports,
 // ports at a position relative to their node's top left corner, edges from key a to key b
@@ -41,15 +44,21 @@
 // last), Enter activates, Ctrl + plus / minus zoom, Ctrl+0 fits, Shift+F10 / the menu key
 // ask for the context menu.  DiagramState::test_keys stands in for held keys in scripts.
 // Drawing: the paint runs as one custom command whose version covers ver, the model version,
-// the view and the theme; selection, hover, ports, handles, marquee and rubber band are
-// recorded commands on top, so hovering redraws only their cells.  The paint runs once per
-// dirty rectangle: skip everything outside DgFrame::clip.  Content that moves every frame
-// (packets) is best drawn after diagram() with ui.draw_* inside ui.clip_push(st.vp.rect).
+// the view, the theme and the gesture flag; selection, hover, ports, handles, marquee and rubber
+// band are recorded commands on top, so hovering redraws only their cells.  The paint draws the
+// whole canvas into a backing store (an XRGB surface of the DiagramState) once per version;
+// every dirty rectangle copies its part out of it.  Skip what lies outside DgFrame::clip
+// (DgFrame::find asks the spatial buckets).  While a gesture moves the view or nodes (a pan,
+// wheel turns until MOVING_MS after the last one, a drag of nodes or a waypoint)
+// DgFrame::moving asks for less detail; a full paint follows the gesture.  Content that moves
+// every frame (packets) is best drawn after diagram() with ui.draw_* inside
+// ui.clip_push(st.vp.rect).
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::cell::RefCell;
 use core::ops::Range;
 
 use crate::cmd::{Draw, DrawRef, Gfx};
@@ -59,6 +68,7 @@ use crate::layout::dp_at;
 use crate::theme::{color_mix, THEME_N};
 use crate::Ui;
 use gfx::dash::{dash_pattern, dash_stroke, DStyle, LCAP_FLAT};
+use gfx::{Surface, FMT_XRGB};
 use rt::fx::{floor_i, sqrt};
 
 /// tools of ui.diagram
@@ -83,6 +93,8 @@ const SPAN_MAX: i64 = 64; // an item over more buckets goes to the always-checke
 const DRAG_DIP: i32 = 4;
 const STUB: f32 = 16.0; // orthogonal routes leave a port straight for this many units
 const EPS: f32 = 0.01;
+/// a view gesture of wheel turns (or the minimap) lasts this long after the last one (ms)
+const MOVING_MS: u32 = 160;
 const ZOOMS: [f32; 16] = [0.1, 0.125, 0.167, 0.25, 0.333, 0.5, 0.667, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0, 6.0, 8.0];
 // sides of a port / anchor
 const S_NONE: u8 = 0;
@@ -318,10 +330,16 @@ pub struct DgRoute {
     pub bb: [f32; 4],
 }
 
-/// the routes of every edge in model order, built once per model version
+/// the routes of every edge in model order and the spatial buckets of nodes and edges, built
+/// once per model version (DgFrame::find asks the buckets)
 #[derive(Default)]
 pub struct DgGeo {
     pub routes: Vec<DgRoute>,
+    // (row, column) -> (nodes, edges); what spans too many buckets; the numbers of nodes and
+    // edges
+    cells: BTreeMap<(i32, i32), (Vec<u32>, Vec<u32>)>,
+    big: (Vec<u32>, Vec<u32>),
+    counts: (usize, usize),
 }
 
 /// what a DgPaint gets at render time
@@ -336,6 +354,10 @@ pub struct DgFrame<'a> {
     /// font and size (24.8 px at zoom 1) of every TS_* text style
     pub fonts: [(u32, i32); 7],
     pub dark: bool,
+    /// a gesture moves the view or nodes (a pan, wheel turns, a drag of nodes or a waypoint):
+    /// leave out what costs and nobody reads in passing (small labels; plain shapes,
+    /// dg_hairline); the canvas is painted in full after it
+    pub moving: bool,
 }
 
 impl DgFrame<'_> {
@@ -356,6 +378,17 @@ impl DgFrame<'_> {
         let s = self.vp.scale() as f32;
         let g = ((width * s).max(1.0) * 4.0 + 6.0) / s;
         rt.pts.len() >= 2 && overlaps([rt.bb[0] - g, rt.bb[1] - g, rt.bb[2] + g, rt.bb[3] + g], self.clip)
+    }
+
+    /// the nodes (edges = false: DModel::nodes) or the edges whose spatial buckets touch the
+    /// clip grown by `margin` px: ascending indices, a superset of what can need paint (cheaper
+    /// than looking at all of them)
+    pub fn find(&self, margin: f32, edges: bool) -> Vec<u32> {
+        let g = margin / (self.vp.scale() as f32).max(1e-6);
+        let c = self.clip;
+        let mut v = Vec::new();
+        self.geo.find([c[0] - g, c[1] - g, c[2] + g, c[3] + g], edges, &mut v);
+        v
     }
 
     /// font and size (24.8 px) of text style ts at the current zoom
@@ -399,9 +432,6 @@ struct Index {
     nodes: BTreeMap<u64, u32>,
     ports: BTreeMap<u64, (u32, u32)>,
     edges: BTreeMap<u64, u32>,
-    // (row, column) -> (nodes, edges)
-    cells: BTreeMap<(i32, i32), (Vec<u32>, Vec<u32>)>,
-    big: (Vec<u32>, Vec<u32>),
     geo: Rc<DgGeo>,
     bounds: Option<[f32; 4]>,
 }
@@ -434,6 +464,10 @@ pub struct DiagramState {
     paint_obj: Option<(u64, DrawRef)>,
     mini_obj: Option<(u64, DrawRef)>,
     mini_ext: Option<[f32; 4]>,
+    /// the canvas as painted last (Wrap)
+    store: Rc<RefCell<Backing>>,
+    /// the view moves until this ms (wheel turns, the minimap)
+    moving_until: u32,
 }
 
 impl Default for DiagramState {
@@ -465,6 +499,8 @@ impl DiagramState {
             paint_obj: None,
             mini_obj: None,
             mini_ext: None,
+            store: Rc::new(RefCell::new(Backing::default())),
+            moving_until: 0,
         }
     }
 
@@ -1073,8 +1109,6 @@ impl Index {
         self.nodes.clear();
         self.ports.clear();
         self.edges.clear();
-        self.cells.clear();
-        self.big = (Vec::new(), Vec::new());
         for (i, n) in m.nodes.iter().enumerate() {
             self.nodes.insert(n.key, i as u32);
             for p in range_of(&n.ports, m.ports.len()) {
@@ -1084,7 +1118,7 @@ impl Index {
         for (i, e) in m.edges.iter().enumerate() {
             self.edges.insert(e.key, i as u32);
         }
-        let mut geo = DgGeo { routes: Vec::with_capacity(m.edges.len()) };
+        let mut geo = DgGeo { routes: Vec::with_capacity(m.edges.len()), counts: (m.nodes.len(), m.edges.len()), ..DgGeo::default() };
         for e in m.edges {
             let mut r = DgRoute::default();
             route(m, Some(self), e, &mut r);
@@ -1093,13 +1127,15 @@ impl Index {
         let mut b = None;
         for (i, n) in m.nodes.iter().enumerate() {
             let r = xyxy(n.rect);
-            self.put(r, i as u32, false);
+            geo.put(r, i as u32, false);
             b = union(b, r);
         }
-        for (i, rt) in geo.routes.iter().enumerate() {
+        for i in 0..geo.routes.len() {
+            let rt = &geo.routes[i];
             if rt.pts.len() >= 2 {
-                self.put(rt.bb, i as u32, true);
-                b = union(b, rt.bb);
+                let bb = rt.bb;
+                geo.put(bb, i as u32, true);
+                b = union(b, bb);
             }
         }
         self.bounds = b;
@@ -1107,6 +1143,14 @@ impl Index {
         true
     }
 
+    // the node (or edge) indices in the buckets touching r (x0, y0, x1, y1), ascending; all
+    // of them when r spans too many buckets
+    fn query(&self, r: [f32; 4], edge: bool, all: usize, out: &mut Vec<u32>) {
+        self.geo.find_in(r, edge, all, out);
+    }
+}
+
+impl DgGeo {
     fn put(&mut self, r: [f32; 4], i: u32, edge: bool) {
         let (c0, r0, c1, r1) = cells_of(r);
         let n = (c1 as i64 - c0 as i64 + 1) * (r1 as i64 - r0 as i64 + 1);
@@ -1122,9 +1166,14 @@ impl Index {
         }
     }
 
-    // the node (or edge) indices in the buckets touching r (x0, y0, x1, y1), ascending; all
-    // of them when r spans too many buckets
-    fn query(&self, r: [f32; 4], edge: bool, all: usize, out: &mut Vec<u32>) {
+    /// the indices of the nodes (edges = false) or edges whose buckets touch r (world x0, y0,
+    /// x1, y1), ascending: a superset of what overlaps it (all when r spans too many buckets)
+    pub fn find(&self, r: [f32; 4], edges: bool, out: &mut Vec<u32>) {
+        let all = if edges { self.counts.1 } else { self.counts.0 };
+        self.find_in(r, edges, all, out);
+    }
+
+    fn find_in(&self, r: [f32; 4], edge: bool, all: usize, out: &mut Vec<u32>) {
         out.clear();
         let (c0, r0, c1, r1) = cells_of(r);
         let n = (c1 as i64 - c0 as i64 + 1) * (r1 as i64 - r0 as i64 + 1);
@@ -1577,6 +1626,87 @@ pub fn dg_stroke_edge(g: &mut Gfx, vp: &Viewport, pts: &[[f32; 2]], width: f32, 
     path.fill(&mut g.text.ras, g.dc, g.sf, gfx::RULE_NONZERO);
 }
 
+// the canvas as painted last: Wrap paints the whole canvas into it once per paint hash and
+// copies every dirty rectangle out of it (absolute px: the surface reaches from the window's
+// corner to the canvas' far corner)
+#[derive(Default)]
+struct Backing {
+    hash: u64,
+    sf: Surface,
+}
+
+/// a route (world points) as 1 px anti-aliased lines in argb (Xiaolin Wu): a fraction of
+/// dg_stroke_edge's cost for many thin edges (the level of detail of DgFrame::moving); nothing
+/// outside the clip
+pub fn dg_hairline(g: &mut Gfx, vp: &Viewport, pts: &[[f32; 2]], argb: u32) {
+    if pts.len() < 2 || g.sf.fmt == gfx::FMT_A8 {
+        return;
+    }
+    g.dc.set_color(argb);
+    let mut a = vp.to_screen(pts[0]);
+    for &q in &pts[1..] {
+        let b = vp.to_screen(q);
+        wu_line(g, a, b);
+        a = b;
+    }
+}
+
+// one anti-aliased line between two px points in the Dc's colour, inside its clip: per column
+// (row when steep) the two pixels next to the line share its coverage (16.16 fixed point)
+fn wu_line(g: &mut Gfx, a: [f32; 2], b: [f32; 2]) {
+    let c = g.dc.clip;
+    let (ox, oy) = (g.dc.ox as f32, g.dc.oy as f32);
+    let (mut x0, mut y0, mut x1, mut y1) = (a[0] + ox, a[1] + oy, b[0] + ox, b[1] + oy);
+    let lim = 1.0e6;
+    if !(fabs(x0) < lim && fabs(y0) < lim && fabs(x1) < lim && fabs(y1) < lim) {
+        return;
+    }
+    let steep = fabs(y1 - y0) > fabs(x1 - x0);
+    if steep {
+        core::mem::swap(&mut x0, &mut y0);
+        core::mem::swap(&mut x1, &mut y1);
+    }
+    if x0 > x1 {
+        core::mem::swap(&mut x0, &mut x1);
+        core::mem::swap(&mut y0, &mut y1);
+    }
+    // the clip along the line's main axis and across it
+    let (lo, hi, mlo, mhi) = if steep { (c[1], c[3], c[0], c[2]) } else { (c[0], c[2], c[1], c[3]) };
+    let dx = x1 - x0;
+    let grad = if dx > 1e-6 { (y1 - y0) / dx } else { 0.0 };
+    // the columns whose centres lie on the line
+    let i0 = fl(x0 + 0.499).max(lo);
+    let i1 = fl(x1 - 0.5).min(hi - 1);
+    if i1 < i0 {
+        return;
+    }
+    // the line at column i0's centre, measured from the pixel centres across it
+    let mut y = ((y0 + grad * (i0 as f32 + 0.5 - x0) - 0.5) * 65536.0) as i64;
+    let step = (grad * 65536.0) as i64;
+    let (pcol, stride, w) = (g.dc.pcol, g.sf.stride as i64, g.sf.w);
+    let px = &mut g.sf.px;
+    for i in i0..=i1 {
+        let j = (y >> 16) as i32;
+        let f = ((y >> 8) & 0xFF) as u32;
+        for (jj, cov) in [(j, 255 - f), (j + 1, f)] {
+            if jj < mlo || jj >= mhi || cov == 0 {
+                continue;
+            }
+            let (x, yy) = if steep { (jj, i) } else { (i, jj) };
+            if x < 0 || x >= w || yy < 0 {
+                continue;
+            }
+            let k = (yy as i64 * stride + x as i64 * 4) as usize;
+            let Some(p) = px.get_mut(k..k + 4) else { continue };
+            let ia = 255 - gfx::div255(pcol[3] * cov);
+            for ch in 0..4 {
+                p[ch] = (gfx::div255(pcol[ch] * cov) + gfx::div255(p[ch] as u32 * ia)).min(255) as u8;
+            }
+        }
+        y += step;
+    }
+}
+
 // the render-time object of the canvas: background, grid, the app's paint
 struct Wrap {
     paint: Option<Rc<dyn DgPaint>>,
@@ -1586,6 +1716,9 @@ struct Wrap {
     fonts: [(u32, i32); 7],
     grid: f32,
     dark: bool,
+    moving: bool,
+    hash: u64,
+    store: Rc<RefCell<Backing>>,
 }
 
 impl Draw for Wrap {
@@ -1594,6 +1727,39 @@ impl Draw for Wrap {
         if k[2] <= k[0] || k[3] <= k[1] {
             return;
         }
+        let v = self.vp.rect;
+        let (w, h) = (v[0].max(0) + v[2], v[1].max(0) + v[3]);
+        let Ok(mut b) = self.store.try_borrow_mut() else {
+            self.paint_all(g, r);
+            return;
+        };
+        if b.hash != self.hash || b.sf.w != w || b.sf.h != h || b.sf.px.is_empty() {
+            if b.sf.w != w || b.sf.h != h || b.sf.px.is_empty() {
+                b.sf = Surface::new(w, h, FMT_XRGB);
+            }
+            if b.sf.px.is_empty() {
+                // no memory for it: paint the dirty rectangle straight away
+                b.hash = 0;
+                drop(b);
+                self.paint_all(g, r);
+                return;
+            }
+            let Backing { hash, sf } = &mut *b;
+            g.dc.begin(sf);
+            g.dc.clip_push(v[0], v[1], v[2], v[3]);
+            self.paint_all(&mut Gfx { dc: &mut *g.dc, sf, text: &mut *g.text }, v);
+            g.dc.end();
+            *hash = self.hash;
+        }
+        // a canvas the window moved (a mirrored window's island) shows the same pixels there
+        g.dc.blit(g.sf, &b.sf, r[0] - v[0], r[1] - v[1]);
+    }
+}
+
+impl Wrap {
+    // background, grid and the app's paint in r (the clip says what needs pixels)
+    fn paint_all(&self, g: &mut Gfx, r: [i32; 4]) {
+        let k = g.dc.clip;
         let bg = canvas_bg(&self.theme);
         g.dc.set_color(bg);
         g.dc.fill(g.sf, r[0], r[1], r[2], r[3]);
@@ -1605,7 +1771,7 @@ impl Draw for Wrap {
         if let Some(p) = &self.paint {
             let a = self.vp.to_world(k[0] as f32, k[1] as f32);
             let b = self.vp.to_world(k[2] as f32, k[3] as f32);
-            let f = DgFrame { vp: self.vp, clip: [a[0], a[1], b[0], b[1]], geo: &self.geo, theme: &self.theme, bg, fonts: self.fonts, dark: self.dark };
+            let f = DgFrame { vp: self.vp, clip: [a[0], a[1], b[0], b[1]], geo: &self.geo, theme: &self.theme, bg, fonts: self.fonts, dark: self.dark, moving: self.moving };
             p.paint(g, &f);
         }
     }
@@ -1774,6 +1940,7 @@ impl Ui {
         if ev & EV_HOVER != 0 && (c.wheel_x != 0 || c.wheel_y != 0) {
             let wx = if self.rtl { -c.wheel_x } else { c.wheel_x };
             st.wheel(wx, c.wheel_y, mods, [mx, my], notch);
+            st.moving_until = now.wrapping_add(MOVING_MS);
         }
         st.step(m, &inp, &mut out);
         if ev & EV_RCLICK != 0 {
@@ -1795,7 +1962,15 @@ impl Ui {
         // drawing: the paint, then the overlays
         self.ltr_begin(r[0], r[2]);
         self.clip_push(r[0], r[1], r[2], r[3]);
-        let (h, obj) = self.dg_paint_obj(st, m, paint, ver);
+        // a gesture that moves the view or nodes (a pan, a drag of nodes or a waypoint, wheel
+        // turns until MOVING_MS after the last one) paints with less detail; a frame after it
+        // paints everything again
+        let wheel = (st.moving_until.wrapping_sub(self.now_ms) as i32) > 0;
+        if wheel {
+            self.animating = true;
+        }
+        let moving = wheel || matches!(st.g, Gesture::Pan { .. } | Gesture::Move { .. } | Gesture::Waypoint { .. });
+        let (h, obj) = self.dg_paint_obj(st, m, paint, ver, moving);
         self.cmd_custom(r[0], r[1], r[2], r[3], Some(obj), 0, h as u32);
         let ring = self.wp.ctx.focus == id && self.wp.ctx.focus_visible;
         self.dg_overlay(st, m, tool, ring);
@@ -1959,7 +2134,7 @@ impl Ui {
     }
 
     // the cached render-time object of the canvas (a new one when anything it shows changed)
-    fn dg_paint_obj(&mut self, st: &mut DiagramState, m: &DModel, paint: Option<Rc<dyn DgPaint>>, ver: u32) -> (u64, DrawRef) {
+    fn dg_paint_obj(&mut self, st: &mut DiagramState, m: &DModel, paint: Option<Rc<dyn DgPaint>>, ver: u32, moving: bool) -> (u64, DrawRef) {
         let mut fonts = [(0u32, 0i32); 7];
         for (ts, f) in fonts.iter_mut().enumerate() {
             self.ts_font(ts as u32);
@@ -1975,7 +2150,7 @@ impl Ui {
         h.u64(vp.cy.to_bits());
         h.u64(vp.rect[0] as u32 as u64 | (vp.rect[1] as u32 as u64) << 32);
         h.u64(vp.rect[2] as u32 as u64 | (vp.rect[3] as u32 as u64) << 32);
-        h.u64(st.grid.to_bits() as u64 | (self.theme_dark as u64) << 32);
+        h.u64(st.grid.to_bits() as u64 | (self.theme_dark as u64) << 32 | (moving as u64) << 33);
         for &c in self.theme.iter() {
             h.u64(c as u64);
         }
@@ -1988,7 +2163,7 @@ impl Ui {
                 return (hash, d.clone());
             }
         }
-        let d: DrawRef = Rc::new(Wrap { paint, vp, geo: st.ix.geo.clone(), theme: self.theme, fonts, grid: st.grid, dark: self.theme_dark });
+        let d: DrawRef = Rc::new(Wrap { paint, vp, geo: st.ix.geo.clone(), theme: self.theme, fonts, grid: st.grid, dark: self.theme_dark, moving, hash, store: st.store.clone() });
         st.paint_obj = Some((hash, d.clone()));
         (hash, d)
     }
@@ -2229,6 +2404,7 @@ impl Ui {
                 st.vp.cx = wx;
                 st.vp.cy = wy;
                 moved = true;
+                st.moving_until = self.now_ms.wrapping_add(MOVING_MS);
                 self.repass();
             }
         }
