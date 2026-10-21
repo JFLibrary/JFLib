@@ -1,0 +1,17 @@
+#!args --fixture --text-scale 150 --verify-dirty
+# the overview at 150 % text against the demo server: in the card "Nächste Läufe"
+# (views/dashboard.rs) every time keeps the width it needs and ends at the card's content
+# edge (1398), the job's name takes the rest and is cut with "…" where it is too long (the
+# longest names were 234 and 196 DIP wide); no layout warnings
+size 1440 1400
+wait 50
+expect "Übersicht" selected
+expect link:"Entwicklung VM-Images" rect 1082 716 205 30
+expect text:"Heute 22:15" rect 1297 719 101 24
+# a short name: the time at the same edge
+expect link:"Mailserver" rect 1082 756 200 30
+expect text:"Heute 23:00" rect 1292 759 106 24
+expect link:"Dateiserver – täglich" rect 1082 876 185 30
+expect text:"Morgen 02:00" rect 1277 879 121 24
+shot build/shots/bc/dashboard_textscale_150.png 1030 652 410 282
+expect_nowarn
