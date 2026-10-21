@@ -2,7 +2,8 @@
 //
 //   time_box(id, &mut hour, &mut minute) -> EV    two number boxes "HH : MM" (EV_ACT changed)
 //   weekday_toggles(id, &mut mask) -> EV          seven toggle buttons, bit 0 = Monday ..
-//                                                 bit 6 = Sunday (EV_ACT changed)
+//                                                 bit 6 = Sunday (EV_ACT changed); they wrap
+//                                                 where the row is narrower (BOX_WRAP)
 //   date_picker(id, &mut y, &mut m, &mut d) -> EV a button with the date (the user's format,
 //                                                 i18n::fmt_date) that opens a month calendar
 //                                                 starting on the locale's first weekday
@@ -69,10 +70,11 @@ impl Ui {
         if *hour != h0 || *minute != m0 { ev | EV_ACT } else { ev }
     }
 
-    /// ui_weekday_toggles(id, &mut mask) -> EV_* (EV_ACT changed); bit 0 = Monday
+    /// ui_weekday_toggles(id, &mut mask) -> EV_* (EV_ACT changed); bit 0 = Monday.  The
+    /// buttons wrap where the row has less room than the seven of them (a narrow card)
     pub fn weekday_toggles(&mut self, id: u32, mask: &mut u32) -> u32 {
         let old = *mask;
-        self.box_begin(0, BOX_H | BOX_XCENTER, 4);
+        self.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP, 4);
         for d in 0..7u32 {
             let on = *mask & (1 << d) != 0;
             self.next_size(40, 0);

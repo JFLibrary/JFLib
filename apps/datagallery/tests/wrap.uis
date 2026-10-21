@@ -1,7 +1,9 @@
 #!args --verify-dirty
 # rows that wrap (BOX_WRAP, lib/ui/layout.rs) and wrapped text in a grid box (lib/ui/grid.rs):
 # the side panel's buttons and toggles start a new row where the next one does not fit (the
-# rows apart by the box's gap, each one centred across: BOX_XCENTER), the chart legend wraps
+# rows apart by the box's gap, each one centred across: BOX_XCENTER), so do the rows of the
+# spinner, the time and the weekdays (the seven toggles wrap as well), the date and the
+# badges: nothing runs past the card's edge (content 1112 .. 1402); the chart legend wraps
 # where the header leaves it too little room; the details grid's note wraps at its cell's
 # width and its row grows with the lines, the next row follows below it
 size 1440 2400
@@ -16,24 +18,40 @@ expect "Export" rect 1246 1236 86 32
 expect "Verschlüsseln" rect 1112 1280 112 32
 expect "Aktiviert" rect 1240 1280 104 32
 expect "Inkrementell" rect 1112 1328 105 32
+# the spinner and its label, the running bar below them (#30833, gap 12)
+expect text:"Verbindung wird hergestellt …" rect 1144 1528 187 20
+expect #30833 rect 1112 1560 160 4
+# the time, below it the weekdays (gap 16): Monday to Saturday, Sunday in a second row
+# (gap 4)
+expect "Mo" rect 1112 1668 40 24
+expect "Sa" rect 1332 1668 40 24
+expect "So" rect 1112 1696 40 24
+# the date and the first badge, the other four in a second row (gap 12): the card ends below
+# them, the details card follows 116 DIP lower than with rows that do not wrap
+expect "12.10.2026" rect 1112 1732 133 32
+expect text:"Details" rect 1112 1840 290 20
 # the legend fits next to the chart's title
 expect text:"Fehler" rect 757 312 33 16
 # the selected job's note: five lines in the value column (labels 92 DIP, values the rest)
 expect text:"Zwei Protokolldateien waren während der Sicherung gesperrt und wurden übersprungen; der nächste Lauf versucht sie erneut." value 5
-expect text:"Zwei Protokolldateien waren während der Sicherung gesperrt und wurden übersprungen; der nächste Lauf versucht sie erneut." rect 1210 1834 192 100
-expect text:"Hinweis" rect 1112 1874 92 20
-expect text:"Größe" rect 1112 1940 92 20
+expect text:"Zwei Protokolldateien waren während der Sicherung gesperrt und wurden übersprungen; der nächste Lauf versucht sie erneut." rect 1210 1950 192 100
+expect text:"Hinweis" rect 1112 1990 92 20
+expect text:"Größe" rect 1112 2056 92 20
 # another job: a note of two lines, the row below moves up
 click "Mailserver"
 expect text:"Alle Dateien wurden gesichert und geprüft." value 2
-expect text:"Alle Dateien wurden gesichert und geprüft." rect 1210 1834 192 40
-expect text:"Größe" rect 1112 1880 92 20
-shot build/shots/datagallery_wrap.png 1090 1140 350 800
-# a wider side panel: every button and every toggle in one row, the note in one line
+expect text:"Alle Dateien wurden gesichert und geprüft." rect 1210 1950 192 40
+expect text:"Größe" rect 1112 1996 92 20
+shot build/shots/datagallery_wrap.png 1090 1140 350 900
+# a wider side panel: every button, toggle, weekday and badge in one row, the bar beside the
+# label, the note in one line
 size 1700 2400
 expect #30823 rect 1405 1196 126 32
 expect "Export" rect 1539 1196 86 32
 expect "Inkrementell" rect 1360 1240 105 32
+expect #30833 rect 1343 1448 160 4
+expect "So" rect 1532 1520 40 24
+expect "12.10.2026" rect 1112 1560 133 32
 expect text:"Alle Dateien wurden gesichert und geprüft." value 1
 expect text:"Größe" rect 1112 1772 92 20
 # narrow: the legend's last entry goes to a second row, the title stays centred beside it
@@ -43,4 +61,5 @@ expect text:"Sitzungen der letzten 14 Tage" rect 284 322 193 20
 # back: the same rows as at the start
 size 1440 2400
 expect #30823 rect 1112 1236 126 32
+expect "So" rect 1112 1696 40 24
 expect text:"Fehler" rect 757 312 33 16

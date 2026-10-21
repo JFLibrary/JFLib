@@ -505,19 +505,20 @@ impl Gal {
         ui.box_end();
         ui.next_size(-1, 0);
         ui.progress(ID_SLIDER + 1, 62, 100);
-        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        // the spinner's, the time's and the date's rows: what does not fit in the card starts a
+        // new row (the label wraps at large text)
+        ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP, 12);
         ui.spinner(ID_SLIDER + 2, 20);
-        ui.text(TS_BODY | TX_SECONDARY, "Verbindung wird hergestellt …");
-        ui.spacer(-1);
+        ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, "Verbindung wird hergestellt …");
         ui.next_size(160, 0);
         ui.progress_indeterminate(ID_SLIDER + 3);
         ui.box_end();
         ui.segmented(ID_SEG, &mut self.seg, &["Manuell", "Stündlich", "Täglich", "Wöchentlich", "Monatlich"]);
-        ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
+        ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP, 16);
         ui.time_box(ID_TIME, &mut self.hour, &mut self.minute);
         ui.weekday_toggles(ID_DAYS, &mut self.days);
         ui.box_end();
-        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP, 12);
         let (mut y, mut m, mut d) = self.date;
         if ui.date_picker(ID_DATE, &mut y, &mut m, &mut d) & EV_ACT != 0 {
             self.date = (y, m, d);
