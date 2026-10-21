@@ -66,6 +66,9 @@ pub(crate) struct Net {
     /// the settings dialog and the overview of the shortcuts are open
     pub settings_open: Shared<i32>,
     pub keys_open: Shared<i32>,
+    /// the lab of the project: its goals over the run, the hints shown, the list of labs
+    /// (workspace/task.rs)
+    pub task: crate::workspace::task::Task,
 }
 
 impl Net {
@@ -89,6 +92,7 @@ impl Net {
             autosave: Autosave::new(),
             settings_open: Shared::new(0),
             keys_open: Shared::new(0),
+            task: crate::workspace::task::Task::new(),
         }
     }
 
@@ -141,6 +145,8 @@ impl Net {
         self.log = Log::new();
         self.devwin = DevWins::new();
         crate::workspace::sim::loaded(self, false);
+        // the lab's goals start over (its panel shows)
+        crate::workspace::task::loaded(self);
         // the copy of the project that went is no longer needed
         crate::doc::autosave::clean(self);
     }

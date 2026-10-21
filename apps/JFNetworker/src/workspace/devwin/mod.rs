@@ -11,6 +11,7 @@
 //
 //   config.rs    Konfiguration: forms that type command lines (doc/console.rs run_lines)
 //   services.rs  Dienste: what runs on the device, switched on and off
+//   svcedit.rs   the settings of a project's service as JSON (Dienste › Einstellungen …)
 //   desktop.rs   Desktop of hosts: IP-Konfiguration, Eingabeaufforderung, Texteditor, Browser
 //
 // Übersicht shows model, ports, power and state; Schnittstellen every interface as the
@@ -23,6 +24,7 @@
 pub(crate) mod config;
 pub(crate) mod desktop;
 pub(crate) mod services;
+pub(crate) mod svcedit;
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -99,11 +101,13 @@ pub(crate) struct DevWin {
 pub(crate) struct DevWins {
     wins: Vec<Option<DevWin>>,
     clock: u32,
+    /// the settings editor of a service (svcedit.rs)
+    pub svc: svcedit::SvcEdit,
 }
 
 impl DevWins {
     pub(crate) fn new() -> DevWins {
-        DevWins { wins: (0..DEVWINS).map(|_| None).collect(), clock: 0 }
+        DevWins { wins: (0..DEVWINS).map(|_| None).collect(), clock: 0, svc: svcedit::SvcEdit::new() }
     }
 
     /// device window k (for the tabs' modules)
@@ -207,7 +211,7 @@ fn window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
         Tab::Overview => overview(n, ui, id, dev),
         Tab::Ifaces => ifaces(n, ui, k, dev),
         Tab::Config => config::tab(n, ui, k, id + 0x20, dev),
-        Tab::Services => services::tab(n, ui, id + 0x60, dev),
+        Tab::Services => services::tab(n, ui, k, id + 0x60, dev),
         Tab::Cli => {
             ui.next_size(-1, -1);
             ui.box_begin(0, BOX_V, 0);

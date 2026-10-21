@@ -11,7 +11,8 @@
 //                                   rebuilds its scene when it differs)
 //   replace(project, path)          a loaded or new project: a fresh history and engine, saved
 //   dirty() / saved(path)           unsaved changes; the file was written
-//   file_name()                     "Büro.jfnet", "Unbenannt" for a project without a file
+//   file_name()                     "Büro.jfnet", "Unbenannt" for a project without a file (a
+//                                   lab of the app: its file's name, `origin`)
 //
 // After every change through the history (edits, undo, redo) the simulator follows the project
 // (sim.sync): the difference becomes jfn_sim Actions, so undo and redo send the opposite ones.
@@ -76,6 +77,8 @@ pub(crate) struct Doc {
     pub hist: History<Project>,
     /// the file (None: never saved)
     pub path: Option<String>,
+    /// a lab of the app opened without a file: the name of its file (title, save dialog)
+    pub origin: Option<String>,
     /// counts every change of proj (edits, undo, redo, replace)
     pub rev: u32,
     /// the simulator running proj
@@ -86,7 +89,7 @@ impl Doc {
     pub(crate) fn new() -> Doc {
         let proj = Project::new("", 1);
         let sim = Sim::new(&proj);
-        Doc { proj, hist: History::new(UNDO_LIMIT), path: None, rev: 1, sim }
+        Doc { proj, hist: History::new(UNDO_LIMIT), path: None, origin: None, rev: 1, sim }
     }
 
     /// a project from a file (or a new one): a fresh history and engine, saved; the engine
@@ -96,6 +99,7 @@ impl Doc {
         self.proj = proj;
         self.hist = History::new(UNDO_LIMIT);
         self.path = path;
+        self.origin = None;
         self.touch();
     }
 
@@ -182,11 +186,12 @@ impl Doc {
         self.hist.mark_saved();
     }
 
-    /// the name of the file ("Büro.jfnet"), "Unbenannt" without one
+    /// the name of the file ("Büro.jfnet"), a lab's file name, "Unbenannt" without one
     pub(crate) fn file_name(&self) -> String {
-        match &self.path {
-            Some(p) => String::from(p.rsplit(['/', '\\']).find(|s| !s.is_empty()).unwrap_or(p)),
-            None => String::from(crate::app::tr::t("Unbenannt")),
+        match (&self.path, &self.origin) {
+            (Some(p), _) => String::from(p.rsplit(['/', '\\']).find(|s| !s.is_empty()).unwrap_or(p)),
+            (None, Some(o)) => o.clone(),
+            (None, None) => String::from(crate::app::tr::t("Unbenannt")),
         }
     }
 }

@@ -625,3 +625,40 @@ Rahmen {}	Frame {}
 Rahmen {}: {} → {} · {}	Frame {}: {} → {} · {}
 Rahmen auf den Kabeln	Frames on the cables
 Skript	Script
+# the labs and the Aufgabe panel (U6b: workspace/task.rs, devwin/svcedit.rs)
+&Labor öffnen …	Open &lab …
+&Aufgabe	&Task
+Ziele &prüfen	&Check goals
+Nächster &Hinweis	Next &hint
+Aufgabe	Task
+1 Ziel	1 goal
+{} Ziele	{} goals
+Keine Aufgabe	No task
+Dieses Projekt hat keine Aufgabe. Ein Labor bringt eine mit: ein Netz, Ziele, die der Simulator prüft, und Hinweise.	This project has no task. A lab brings one: a network, goals the simulator checks, and hints.
+Labor öffnen …	Open lab …
+{} von {} Zielen erreicht	{} of {} goals reached
+Prüfen	Check
+Die Ziele jetzt prüfen und bei den offenen zeigen, was fehlt (F9)	Check the goals now and show what the open ones still lack (F9)
+Geschafft: alle Ziele erreicht.	Done: every goal reached.
+das letzte bei t = {}	the last one at t = {}
+geprüft bei t = {}	checked at t = {}
+Ziele	Goals
+erreicht bei t = {}	reached at t = {}
+wartet auf Ziel {}	waits for goal {}
+Prüfung {} ist fehlerhaft: {}	Check {} is broken: {}
+Hinweis|Aufgabe	Hint
+Noch ein Hinweis	Another hint
+Hinweise	Hints
+Hinweis zeigen ({} von {})	Show hint ({} of {})
+Labor öffnen	Open lab
+Ein Labor ist ein Projekt mit einer Aufgabe: das Netz zum Start, Ziele, die der Simulator prüft, und Hinweise. Es öffnet sich ohne Datei; Speichern legt eine Kopie an.	A lab is a project with a task: the network to start from, goals the simulator checks, and hints. It opens without a file; Save makes a copy.
+Keine Labore gefunden.	No labs found.
+Einstellungen …	Settings …
+Einstellungen schließen	Close settings
+Die Einstellungen von {} als JSON. Übernehmen prüft sie und startet {} mit ihnen neu.	The settings of {} as JSON. Apply checks them and restarts {} with them.
+Zeile {}, Spalte {}: kein gültiges JSON ({}).	Line {}, column {}: not valid JSON ({}).
+Die Einstellungen sind ein JSON-Objekt: { … }.	The settings are a JSON object: { … }.
+Loadbalancer	Load balancer
+KV-Knoten	KV node
+Worker	Worker
+Worum es geht	What it is about
