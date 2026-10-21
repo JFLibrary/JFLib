@@ -33,7 +33,8 @@
 // (publish to acknowledgement).  Of a worker: taken, done, failed, busy, polls, empty, errors,
 // p50_us, p95_us, p99_us (taken to acknowledged).  Engine::mq_view / worker_view; mqctl and
 // workerctl on the console.  The time series (series.rs) of both take p50_us, p95_us, p99_us
-// of each interval from the windows.
+// of each interval from the windows.  The status lines of both are messages for the app's
+// catalogue (status_msg; status() is their German text).
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, VecDeque};
@@ -519,7 +520,10 @@ impl Service for Queue {
         alloc::vec![LatWindow::new(&self.lat, LAT)]
     }
     fn status(&self) -> String {
-        format!("Port {}: {} Topics, {} wartend, {} unterwegs, {} bestätigt", self.port, self.topics.len(), self.depth(), self.inflight(), self.sum(|t| t.acked))
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> jfn_model::msg::Msg {
+        msg!("Port {}: {} Topics, {} wartend, {} unterwegs, {} bestätigt", self.port, self.topics.len(), self.depth(), self.inflight(), self.sum(|t| t.acked))
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())
@@ -854,7 +858,10 @@ impl Service for Worker {
         alloc::vec![LatWindow::new(&self.lat, LAT)]
     }
     fn status(&self) -> String {
-        format!("{} {}: {} von {} beschäftigt, {} erledigt, {} gescheitert", self.queue.text(), self.topic, self.busy(), self.concurrency, self.done, self.failed)
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> jfn_model::msg::Msg {
+        msg!("{} {}: {} von {} beschäftigt, {} erledigt, {} gescheitert", self.queue.text(), self.topic, self.busy(), self.concurrency, self.done, self.failed)
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())

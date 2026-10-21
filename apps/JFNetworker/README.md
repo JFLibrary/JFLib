@@ -26,7 +26,9 @@ Queues, Lastgeneratoren, eigene Skripte).
   Prüfsummen, eigene PDUs, Export als pcapng.
 - **Labor für verteilte Systeme:** Loadbalancer, geshardeter KV-Speicher mit Replikaten und
   Quoren, Cache, Message Queue mit Workern und Fehlerinjektion mit Marken auf der Zeitleiste,
-  bisher über die Shell (`lbctl`, `kvctl` …) und Szenarien (siehe
+  im Fenster mit dem Bereich Metriken, Dienst-Pillen und Sparklines auf der Zeichenfläche und
+  Fehlern aus dem Inspektor (siehe [Das Labor im Fenster](#das-labor-im-fenster)), dazu über
+  die Shell (`lbctl`, `kvctl` …) und Szenarien (siehe
   [Labor für verteilte Systeme](#labor-für-verteilte-systeme)).
 - **Politur (U5):** Deutsch und Englisch, Einstellungen, automatische Sicherung mit
   Wiederherstellung, vollständige Tastaturbedienung, Geräte und Kabel für Screenreader,
@@ -118,10 +120,16 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `shots.uis` | die Bild-Matrix der Hauptansichten (Topologie, Konsole, Simulation, Paket-Tab, Gerätefenster) hell und dunkel mit 100 und 150 % |
 | `campus.uis`, `scen_campus.uis` | die Abnahme von Phase 1 (unten) |
 | `perf.uis` | die Leistung: 500 Geräte, 800 Kabel und 300 Rahmen in 1920 × 1080 mit höchstens 33 ms pro Bild in Echtzeit, beim Abspielen, Verschieben, Zoomen und Ziehen (siehe [Performance](#performance)) |
+| `metrics.uis` | der Bereich Metriken auf `lab_window.jfnet`: ohne Messwerte, nach 8 s Statuszeile, Kacheln und Diagramme (die Zusammenfassungen ihrer Einträge), die Tastatur im Baum und in den Diagrammen, die Werte beim Überfahren, ein auf der Zeichenfläche gewähltes Gerät, der Simulationsmodus auch in der Vergangenheit, die Sparklines ab 75 % (siehe [Das Labor im Fenster](#das-labor-im-fenster)) |
+| `faults.uis` | Fehler aus dem Inspektor auf `lab_window.jfnet`: Strom aus, Rückgängig und Wiederholen, Wiederherstellen und Alle wiederherstellen samt Rückgängig, ein Dienst für 2 s, die Disk, ein Kabel gezogen und verschlechtert, eine Partition, Ablehnungen, das Projekt bleibt gespeichert, die Spur „Fehler“ der Zeitleiste und der Fehler als Bereich im Diagramm von LB1 |
+| `lab_shots.uis` | die Bild-Matrix des Labors (Zeichenfläche mit Pillen und Sparklines, Fehlerkarte, Metriken) hell und dunkel mit 100 und 150 % |
+| `model.uis`, Gruppe `labui` | was das Labor im Fenster braucht: die Texte des Labors als Meldungen mit Englisch (Statuszeilen, Disk, jede Art von Fehler, ihre Ereignisse), KPIs vergangener Zeiträume, die Tabellen des Bereichs Metriken, Pillen und Sparklines, Fehler als Rückgängig-Schritte samt gespeichertem Zustand |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
-`campus.jfnet` (die Abnahme) und die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
+`campus.jfnet` (die Abnahme), `lab_window.jfnet` (das Labor der Fenstertests: Cache,
+Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein Skript) und die
+Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`, `rng`, `metrics`, `jmap`,
 `cmdtree`, `hashring`, `lru`), die Skriptsprache die Gruppe `script`.
 
@@ -161,6 +169,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | | [`src/sim_thread.rs`](src/sim_thread.rs) | Treiber mit eigenem Thread für Echtzeit und lange Läufe (nur nativ) |
 | | [`src/selftest.rs`](src/selftest.rs), [`src/simtest.rs`](src/simtest.rs), [`src/l3test.rs`](src/l3test.rs), [`src/simmodetest.rs`](src/simmodetest.rs), [`src/svctest.rs`](src/svctest.rs), [`src/clitest.rs`](src/clitest.rs), [`src/tcptest.rs`](src/tcptest.rs), [`src/httptest.rs`](src/httptest.rs), [`src/consoletest.rs`](src/consoletest.rs), [`src/pdutest.rs`](src/pdutest.rs), [`src/labtest.rs`](src/labtest.rs), [`src/uitest.rs`](src/uitest.rs), [`src/campustest.rs`](src/campustest.rs), [`src/synthtest.rs`](src/synthtest.rs) | Selbsttests von Modell, Simulator, Befehlszeilen, TCP, HTTP, PDUs, des Labors, dem, worauf die Konsolen bauen, der Oberfläche ohne Fenster (Kontrast, Einstellungen, Sicherungen, Katalog), des Campus und der synthetischen Projekte (`--selftest`) |
 | | [`src/seriestest.rs`](src/seriestest.rs) | Selbsttest der Zeitreihen und der Erwartungen über Zeiträume (Gruppe `series`) |
+| | [`src/workspace/metrics.rs`](src/workspace/metrics.rs), [`canvas/lab.rs`](src/workspace/canvas/lab.rs), [`inspector/faults.rs`](src/workspace/inspector/faults.rs), [`src/doc/faults.rs`](src/doc/faults.rs), [`src/labuitest.rs`](src/labuitest.rs) | das Labor im Fenster (U6a): der Bereich Metriken, Dienst-Pillen und Sparklines, Fehler aus dem Inspektor als Rückgängig-Schritte, ihr Selbsttest (Gruppe `labui`; siehe [Das Labor im Fenster](#das-labor-im-fenster)) |
 | Texte | [`crates/jfn_model/msg.rs`](crates/jfn_model/msg.rs), [`src/locales/engine.tsv`](src/locales/engine.tsv), [`src/locales/ui.tsv`](src/locales/ui.tsv), [`src/msgtest.rs`](src/msgtest.rs) | die deutschen Texte von Modell und Simulator als Vorlagen mit Argumenten (`Msg`, `msg!`; `text_with` übersetzt), die des Fensters (`t()`, `tf()`, die Befehle und Menüs), ihre englische Fassung und deren Selbsttest; Vollständigkeit: `python tools/i18n_check.py apps/JFNetworker crates` |
 | Tests | [`tests/`](tests) | Skripte, Fixtures (`fixtures/*.jfnet`), Szenarien mit Golden-Berichten (`scen/*.scn`, `scen/*.report`) |
 | Skripte | [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs), [`cli/scripts.rs`](crates/jfn_sim/cli/scripts.rs), [`src/scripttest.rs`](src/scripttest.rs) | Skripte als Dienste in den Hosts: Host-API, Anweisungen als Rechenzeit, der Befehl `script`, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
@@ -683,6 +692,59 @@ prüfen Zeiträume (siehe [Szenarien](#szenarien-scn)).
   Markierungen), `series_value` (ein Wert über einen Zeitraum), `series_gen` (ändert sich nur
   mit neuen Punkten: dann neu zeichnen) und `series_csv`.
 
+### Das Labor im Fenster
+
+- **Metriken** (Bereich unten, Strg+Umschalt+M oder Ansicht › Bereiche;
+  [`src/workspace/metrics.rs`](src/workspace/metrics.rs)): links ein Baum der Dienste aller
+  Geräte (je Gerät seine Dienste mit Art, Name und Zustand: läuft, gestoppt, aus, ohne Strom),
+  rechts der gewählte Dienst mit seiner Statuszeile, KPI-Kacheln über die letzten 5 s (Anfragen
+  pro Sekunde, p50, p95, p99, Fehlerquote, Wartende, in Arbeit, die Trefferquote eines Caches,
+  Last, Lastanteil, Schlüssel und Daten eines KV-Knotens: `Engine::kpi`, `shard_load`) und die
+  Disk der Dienste, die speichern; darunter je Gruppe von Zeitreihen ein Liniendiagramm
+  (Durchsatz, die Latenzen p50/p95/p99 zusammen, Fehler, Warteschlange …) über 30 s, 1 min oder
+  5 min. Die Reihen heißen deutsch („Anfragen/s“ für requests, „p99“ für p99_us), die Werte
+  lesen sich wie im Diagramm (ms, µs, kB). Fehler sind rot unterlegte Bereiche mit ihrem Text;
+  ein aktiver reicht bis zum Ende der Ansicht, die Karte beim Überfahren nennt ihn mit seiner
+  Zeit. In Echtzeit folgen die Diagramme den neuesten Punkten, im Simulationsmodus enden sie
+  beim gezeigten Zeitpunkt, auch in der Vergangenheit, und die Kacheln gelten für die 5 s davor
+  (`Engine::kpi_between`). Ein auf der Zeichenfläche gewähltes Gerät zeigt seinen ersten
+  Dienst. Gelesen wird nur, wenn sich `series_gen`, der gezeigte Zeitpunkt, der Zeitraum, die
+  Fehler oder die Wahl ändern; dazwischen zeichnen die Diagramme nicht neu. Tastatur: Baum
+  (Pfeile, links und rechts klappen zu und auf), Zeitraum und jedes Diagramm sind Tab-Stopps;
+  im Diagramm wandern die Pfeiltasten über die Punkte, und Screenreader hören Punkt und
+  Zusammenfassung.
+- **Auf der Zeichenfläche** ([`canvas/lab.rs`](src/workspace/canvas/lab.rs)): Dienst-Pillen
+  oben an den Geräten (LB, KV, Cache, Q, Worker, HTTP, DNS, DHCP, Skript; eine je Art, ein
+  gestoppter Dienst blass, höchstens drei, dann „+n“), ab 50 % wie die Namen; ab 75 %
+  Mini-Sparklines unter Loadbalancern, KV-Knoten, Caches und Queues (die letzten 20 Punkte der
+  Anfragen pro Sekunde, bei einer Queue der Wartenden; höchstens 24 in der Ansicht, jede mit
+  einem Texteintrag wie „KV2: Anfragen/s 13“). Ein Gerät, das ein Fehler ausgeschaltet hat,
+  erscheint wie ohne Strom. Die Pillen gehören zum Backing-Store der Leinwand, der nur neu malt,
+  wenn sich Dienste oder Strom ändern; die Sparklines liegen als eigene Zeichenbefehle darüber
+  und werden nur mit neuen Punkten neu gelesen, Geräte außerhalb der Ansicht kosten nichts.
+- **Fehler einspielen** (Eigenschaften; [`inspector/faults.rs`](src/workspace/inspector/faults.rs),
+  [`src/doc/faults.rs`](src/doc/faults.rs)): ein Gerät ausschalten, einen seiner Dienste
+  stoppen, seine Disk verlangsamen (mehr ms je Zugriff, ein Faktor der Übertragung); ein Kabel
+  ziehen oder verschlechtern (mehr Laufzeit, Verlust, höchstens eine Rate); die gewählten
+  Geräte vom Rest des Netzes abtrennen (Partition) – jeweils für eine Dauer in Sekunden oder
+  ohne Ende. Darunter die aktiven Fehler mit „Wiederherstellen“ und „Alle wiederherstellen“
+  (auch Simulation › Alle Fehler beheben); die Seite des Projekts zeigt alle. Jeder Fehler geht
+  über die Fehler-Actions von `jfn_sim` (`Action::Fault`, `Heal`, `HealAll`), wird eine
+  Markierung (in den Diagrammen; eine eigene Spur „Fehler“ auf der Zeitleiste der Ereignisse)
+  und ist ein Schritt der Rückgängig-Liste: Rückgängig heilt einen eingespielten Fehler,
+  Wiederholen spielt ihn erneut ein (mit neuer Nummer und ganzer Dauer), ein rückgängig
+  gemachtes Wiederherstellen bringt die Fehler mit der Zeit zurück, die sie noch hatten. So
+  gilt weiter „Rückgängig arbeitet auf dem Projektmodell, die Engine folgt über Actions“: Fehler
+  gehören nicht zum Projekt, ihr Schritt ändert es nicht, und `Doc` schickt beim Rückgängig und
+  Wiederholen die Actions selbst (wie bei übernommenen Konfigurationen); das Dokument bleibt
+  dabei so gespeichert oder geändert, wie es war. Ein Schritt findet seinen Fehler an Nummer,
+  Beginn und Art wieder, ein frischer Simulator (Simulation zurücksetzen) verwechselt nichts.
+- **Englisch:** die Statuszeilen von Loadbalancer, KV-Knoten, Cache, Queue und Worker
+  (`status_msg`), die Zeile der Disk (`Disk::msg`) und die Texte der Fehler in Markierungen und
+  Ereignissen (`FaultMark::msg`, `Note::FaultStart` / `FaultEnd`) sind Meldungen mit englischer
+  Zeile in `engine.tsv`; die Berichte der Szenarien behalten ihren deutschen Text, die
+  Golden-Berichte sind unverändert.
+
 ### Befehlszeilen
 
 Jedes Gerät mit Befehlszeile hat eine Konsole (`Engine::cli_line`; die Oberfläche schickt
@@ -991,7 +1053,7 @@ Geste).
 |---|---|
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · NAT/ACL, RIP, OSPF, STP, IPv6 · Liniendiagramm und Code-Editor |
-| 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · Labor-Oberfläche · Skript-Editor |
+| 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor ✓; U6b Aufgaben und Labore) · Skript-Editor |
 | 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

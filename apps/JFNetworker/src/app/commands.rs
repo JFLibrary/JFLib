@@ -28,7 +28,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 73] = [
+pub(crate) static CMDS: [Command; 75] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -102,6 +102,8 @@ pub(crate) static CMDS: [Command; 73] = [
     Command::new(CMD_FOCUS_CANVAS, "Topo&logie", JN_CONNECT, MOD_CTRL, b'9' as u32, 0),
     Command::new(CMD_SETTINGS, "&Einstellungen …", IC_SETTINGS, MOD_CTRL, VK_OEM_COMMA, 0),
     Command::new(CMD_SHORTCUTS, "&Tastenkürzel …", IC_HELP, 0, VK_F1, 0),
+    Command::new(CMD_METRICS, "Me&triken", JN_METRICS, MOD_CTRL | MOD_SHIFT, b'M' as u32, 0),
+    Command::new(CMD_HEAL_ALL, "Alle &Fehler beheben", IC_REPAIR, 0, 0, CF_DISABLED),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -147,7 +149,7 @@ static M_VIEW: [Mi; 10] = [
     Mi::Sep,
     Mi::Sub("&Bereiche", &M_PANELS),
 ];
-static M_PANELS: [Mi; 11] = [
+static M_PANELS: [Mi; 12] = [
     Mi::Cmd(CMD_FOCUS_CANVAS),
     Mi::Cmd(CMD_PANEL0),
     Mi::Cmd(CMD_PANEL0 + 1),
@@ -157,10 +159,11 @@ static M_PANELS: [Mi; 11] = [
     Mi::Cmd(CMD_PANEL0 + 5),
     Mi::Cmd(CMD_PANEL0 + 6),
     Mi::Cmd(CMD_PANEL0 + 7),
+    Mi::Cmd(CMD_METRICS),
     Mi::Sep,
     Mi::Cmd(CMD_LAYOUT_RESET),
 ];
-static M_SIM: [Mi; 15] = [
+static M_SIM: [Mi; 17] = [
     Mi::Cmd(CMD_SIM_REALTIME),
     Mi::Cmd(CMD_SIM_MODE),
     Mi::Sep,
@@ -176,6 +179,8 @@ static M_SIM: [Mi; 15] = [
     Mi::Cmd(CMD_SIM_ONLY_SEL),
     Mi::Sep,
     Mi::Cmd(CMD_SIM_RESET),
+    Mi::Sep,
+    Mi::Cmd(CMD_HEAL_ALL),
 ];
 static M_TEMPO: [Mi; 6] = [
     Mi::Cmd(CMD_SIM_TEMPO0),
@@ -262,6 +267,7 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     crate::workspace::sim::states(n, ui);
     cables::states(n, ui);
     terminal::states(n, ui);
+    crate::workspace::metrics::states(n, ui);
 }
 
 // Ctrl+1 .. 8: the panel shows; the keyboard goes into it -- the device search, the shown
@@ -396,6 +402,8 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         // the simulation mode (workspace/sim)
         CMD_SIM_REALTIME | CMD_SIM_MODE | CMD_SIM_PLAY | CMD_SIM_STEP | CMD_SIM_BACK | CMD_SIM_RESET => return crate::workspace::sim::command(n, ui, id, arg),
         _ if (CMD_SIM_TEMPO0..200).contains(&id) => return crate::workspace::sim::command(n, ui, id, arg),
+        // the lab (U6a: the Metriken panel, faults)
+        CMD_METRICS | CMD_HEAL_ALL => return crate::workspace::metrics::command(n, ui, id, arg),
         _ => return false,
     }
     ui.repass();

@@ -9,6 +9,8 @@
 //                                   undo and redo: a saved configuration, a service switched
 //   undo() / redo()                 rev counts every change of the project (the canvas
 //                                   rebuilds its scene when it differs)
+//   inject(fault, dur) / heal(ids) / heal_all()   the lab's faults, each an undo step that
+//                                   changes nothing in the project (faults.rs)
 //   replace(project, path)          a loaded or new project: a fresh history and engine, saved
 //   dirty() / saved(path)           unsaved changes; the file was written
 //   file_name()                     "Büro.jfnet", "Unbenannt" for a project without a file
@@ -23,11 +25,16 @@
 // a device's configuration (the inspector's quick fields), console.rs the consoles of the
 // devices and what the engine reports to them, autosave.rs the copies of unsaved work and
 // their recovery.
+//
+// faults.rs: the lab's faults (inject, heal, heal_all) as steps of the history that change
+// nothing in the project; undo and redo hand such a step to Doc::fault_step, which runs the
+// engine's fault actions (and the document stays as clean as it was).
 
 pub(crate) mod autosave;
 pub(crate) mod config;
 pub(crate) mod console;
 pub(crate) mod edits;
+pub(crate) mod faults;
 pub(crate) mod file;
 pub(crate) mod sim;
 
@@ -80,13 +87,15 @@ pub(crate) struct Doc {
     pub rev: u32,
     /// the simulator running proj
     pub sim: Sim,
+    /// the faults of the lab the window injected or healed (faults.rs)
+    pub runs: faults::Runs,
 }
 
 impl Doc {
     pub(crate) fn new() -> Doc {
         let proj = Project::new("", 1);
         let sim = Sim::new(&proj);
-        Doc { proj, hist: History::new(UNDO_LIMIT), path: None, rev: 1, sim }
+        Doc { proj, hist: History::new(UNDO_LIMIT), path: None, rev: 1, sim, runs: faults::Runs::default() }
     }
 
     /// a project from a file (or a new one): a fresh history and engine, saved; the engine
@@ -95,6 +104,7 @@ impl Doc {
         self.sim = Sim::new(&proj);
         self.proj = proj;
         self.hist = History::new(UNDO_LIMIT);
+        self.runs = faults::Runs::default();
         self.path = path;
         self.touch();
     }
@@ -149,6 +159,9 @@ impl Doc {
     }
 
     pub(crate) fn undo(&mut self) -> bool {
+        if let Some(s) = faults::Step::of(self.hist.undo_value()) {
+            return self.fault_step(s, true);
+        }
         let kept = Kept::dev_of(self.hist.undo_value());
         let done = self.hist.undo(&mut self.proj);
         if done {
@@ -161,6 +174,9 @@ impl Doc {
     }
 
     pub(crate) fn redo(&mut self) -> bool {
+        if let Some(s) = faults::Step::of(self.hist.redo_value()) {
+            return self.fault_step(s, false);
+        }
         let kept = Kept::dev_of(self.hist.redo_value());
         let done = self.hist.redo(&mut self.proj);
         if done {

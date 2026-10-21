@@ -6,7 +6,9 @@
 //
 // device.rs shows a device (name, power, model, interfaces from the simulator with the quick
 // settings of the chosen one, cables), cable.rs a cable (ends, kind, speed, delay, loss, plug,
-// route).  Here: notes edit their text, several things show what is selected and switch all
+// route), faults.rs the lab's fault injection on each of them (a device, a cable, the
+// partition of several devices) and the active faults (also on the project's page).  Here:
+// notes edit their text, several things show what is selected and switch all
 // their devices on or off, the project edits its title and shows file, state and counts (with
 // the cables that are up).  Every change is one undo step; the simulator follows each.  Edit buffers
 // keep what the user typed until Enter, a button or Esc; they start over when the value
@@ -14,6 +16,7 @@
 
 mod cable;
 pub(crate) mod device;
+pub(crate) mod faults;
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -59,6 +62,8 @@ pub(crate) struct Inspector {
     loss: String,
     link_src: (u32, u32, u64, u32),
     link_err: String,
+    /// the fields of the fault cards (faults.rs)
+    flt: faults::Bufs,
 }
 
 impl Inspector {
@@ -178,6 +183,10 @@ fn several(n: &mut Net, ui: &mut Ui, sel: &[u32]) {
     }
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Ziehen verschiebt alle; Entf löscht sie, Geräte mit ihren Kabeln."));
+    // the lab: a partition of the devices, the faults of what is selected (faults.rs)
+    let p = &n.doc.proj;
+    let links: Vec<u32> = sel.iter().copied().filter(|&id| p.link(id).is_some()).collect();
+    faults::several(n, ui, &devs, &links);
 }
 
 fn project(n: &mut Net, ui: &mut Ui) {
@@ -231,4 +240,6 @@ fn project(n: &mut Net, ui: &mut Ui) {
         TS_CAPTION | TX_SECONDARY | TX_WRAP,
         t("Ziehen Sie ein Gerät aus der Palette auf die Zeichenfläche, oder klicken Sie eine Kachel und dann auf die Fläche (Umschalt: mehrere). Verbinden (C): von einem Gerät auf ein anderes ziehen."),
     );
+    // the lab's active faults (faults.rs)
+    faults::project(n, ui);
 }

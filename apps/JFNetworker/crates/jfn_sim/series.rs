@@ -21,8 +21,11 @@
 //   Engine::kpi(dev, svc, span) / kpis(span)   the KPI tiles of a service over the last span
 //                                      (Kpi): requests per second, p50 / p95 / p99, errors per
 //                                      mille, queue and work in flight, cache hits, a KV node's
-//                                      load, keys and bytes
+//                                      load, keys and bytes; kpi_between(dev, svc, from, to) /
+//                                      kpis_between the same over the samples taken in
+//                                      (from, to] (a view of the past)
 //   Engine::shard_load(span)           the load of every KV node and its share of all of them
+//                                      (shard_load_between(from, to))
 //   Engine::chart_marks(from, to)      the faults (fault.rs FaultMark) that overlap a span: the
 //                                      marks of the charts
 //   Engine::series_csv() / series_size()   every kept point as CSV, a column per series and a
@@ -758,9 +761,14 @@ impl Engine {
 
     /// the KPI tiles of a service over the samples of the last `span`
     pub fn kpi(&self, dev: u32, svc: &str, span: Ns) -> Option<Kpi> {
+        self.kpi_between(dev, svc, self.now.saturating_sub(span), self.now)
+    }
+
+    /// the KPI tiles of a service over the samples taken in (from, to]: a span that ends in
+    /// the past (the moment a view of the simulation mode shows)
+    pub fn kpi_between(&self, dev: u32, svc: &str, from: Ns, to: Ns) -> Option<Kpi> {
         let s = &self.series;
         let rec = s.rec(dev, svc)?;
-        let (from, to) = (self.now.saturating_sub(span), self.now);
         let r = roles(rec.kind);
         let rates = |names: &[&str]| -> Option<i64> {
             let mut out = None;
@@ -798,12 +806,22 @@ impl Engine {
 
     /// the KPI tiles of every service with series
     pub fn kpis(&self, span: Ns) -> Vec<Kpi> {
-        self.series_services().iter().filter_map(|x| self.kpi(x.dev, &x.svc, span)).collect()
+        self.kpis_between(self.now.saturating_sub(span), self.now)
+    }
+
+    /// the KPI tiles of every service with series over the samples taken in (from, to]
+    pub fn kpis_between(&self, from: Ns, to: Ns) -> Vec<Kpi> {
+        self.series_services().iter().filter_map(|x| self.kpi_between(x.dev, &x.svc, from, to)).collect()
     }
 
     /// the load of every KV node over the last `span` and its share of all of them
     pub fn shard_load(&self, span: Ns) -> Vec<ShardLoad> {
-        let kv: Vec<Kpi> = self.kpis(span).into_iter().filter(|k| k.kind == "kv").collect();
+        self.shard_load_between(self.now.saturating_sub(span), self.now)
+    }
+
+    /// the load of every KV node over the samples taken in (from, to] and its share
+    pub fn shard_load_between(&self, from: Ns, to: Ns) -> Vec<ShardLoad> {
+        let kv: Vec<Kpi> = self.kpis_between(from, to).into_iter().filter(|k| k.kind == "kv").collect();
         let total: i64 = kv.iter().filter_map(|k| k.load_milli).sum();
         kv.into_iter()
             .map(|k| {

@@ -37,7 +37,8 @@
 // (HTTP: arrival to answer; TCP: connect time), and per backend in the order of the
 // configuration b1_requests, b1_active, b1_up, b1_errors .. b8_*.  Engine::lb_view gives every
 // backend with its state, checks and latencies (the lab); lbctl shows it on the console.  The
-// time series (series.rs) take p50_us, p95_us, p99_us of each interval from the window.
+// time series (series.rs) take p50_us, p95_us, p99_us of each interval from the window.  The
+// status line is a message for the app's catalogue (status_msg; status() is its German text).
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -1374,10 +1375,16 @@ impl Service for Lb {
         alloc::vec![LatWindow::new(&self.lat, LAT)]
     }
     fn status(&self) -> String {
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
         let live: Vec<&Backend> = self.backends.iter().filter(|b| !b.gone()).collect();
         let up = live.iter().filter(|b| b.up && b.admin == Admin::Active).count();
-        let what = if self.mode == LbMode::Http { "Anfragen" } else { "Verbindungen" };
-        format!("{} Port {}, {}: {} von {} Backends verfügbar, {} {}, {} Fehler", if self.mode == LbMode::Http { "HTTP" } else { "TCP" }, self.port, self.algo.name(), up, live.len(), self.requests, what, self.errors)
+        if self.mode == LbMode::Http {
+            msg!("HTTP Port {}, {}: {} von {} Backends verfügbar, {} Anfragen, {} Fehler", self.port, self.algo.name(), up, live.len(), self.requests, self.errors)
+        } else {
+            msg!("TCP Port {}, {}: {} von {} Backends verfügbar, {} Verbindungen, {} Fehler", self.port, self.algo.name(), up, live.len(), self.requests, self.errors)
+        }
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())

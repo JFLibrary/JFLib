@@ -10,7 +10,8 @@
 // IPv4 address (more: "+1"), the far end, speed, VLAN (access VLAN, "Trunk (1)" with the native
 // one), MAC.  The chosen interface gets quick fields: address with prefix, DHCP, up; a host
 // also its default gateway.  They apply at once and land in the startup configuration
-// (doc/config.rs), one undo step each; a refusal shows below them.
+// (doc/config.rs), one undo step each; a refusal shows below them.  Last the lab's faults of
+// the device (faults.rs: power off, a service stopped, a slower disk, for a while).
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -241,6 +242,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
             ui.text(TS_CAPTION | TX_SECONDARY, &tf("… und {} weitere", &[&(nb.len() - 24).to_string()]));
         }
     }
+    // faults of the lab: power, a service, the disk (faults.rs)
+    super::faults::device(n, ui, id);
 }
 
 // the name: Enter or the button applies, Esc puts it back

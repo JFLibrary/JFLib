@@ -3,9 +3,16 @@
 //   Engine::lab_apply(Action)      Fault, Heal, HealAll (fault.rs); LbBackend, LbAlgorithm
 //                                  (lb.rs); KvSet (kv.rs); CacheClear (cache.rs); WorkerSet
 //                                  (mq.rs)
+//   Engine::service_list()         every configured service of every device in brief (SvcBrief:
+//                                  device, name, kind, enabled, running), without numbers or
+//                                  status -- cheap enough for the badges of 500 devices
+//   Engine::disk_of(dev)           the disk of a device (its state: Disk::msg)
 //
 // The services of the lab live in their own files (lb.rs, kv.rs, cache.rs, mq.rs); this one
 // routes the actions to the service of the right kind (a stopped one is changed as well).
+
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use jfn_model::msg;
 use jfn_model::msg::Msg;
@@ -87,4 +94,35 @@ impl Engine {
             _ => Err(ActErr::Refused(msg!("Diese Aktion kennt der Simulator nicht."))),
         }
     }
+
+    /// every configured service of every device (not the console's programs), by device id
+    /// and in the order of the device; no numbers or status (Engine::services has them)
+    pub fn service_list(&self) -> Vec<SvcBrief> {
+        let mut out = Vec::new();
+        for (&dev, &ni) in &self.dev_idx {
+            let Some(os) = self.os(ni) else {
+                continue;
+            };
+            for s in os.svcs.iter().filter(|s| !s.console) {
+                out.push(SvcBrief { dev, name: s.name.clone(), kind: s.kind, enabled: s.enabled, running: s.running });
+            }
+        }
+        out
+    }
+
+    /// the disk of a device (None: it has no IPv4 stack)
+    pub fn disk_of(&self, dev: u32) -> Option<&crate::disk::Disk> {
+        self.os(self.node_index(dev)?).map(|o| &o.disk)
+    }
+}
+
+/// a service in brief (Engine::service_list)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SvcBrief {
+    pub dev: u32,
+    pub name: String,
+    pub kind: &'static str,
+    /// it should run (not disabled)
+    pub enabled: bool,
+    pub running: bool,
 }

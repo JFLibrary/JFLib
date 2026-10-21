@@ -17,7 +17,8 @@
 // engine's numbers; times are seconds with six decimals; "Von" is the device the frame came
 // from, "Bei" the one that decided; "Typ" the protocol the decision is about (the question a
 // router asks before it forwards a ping is ARP), with its category's colour; what was dropped
-// says so.
+// says so.  The lab's faults (Engine::faults) have a lane of their own on the timeline: a tick
+// in the error colour where each one started and where it was healed.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -229,7 +230,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.box_begin(0, BOX_V, 0);
     chips(n, ui);
     // the timeline as high as its lanes (14 DIP each below the axis), unless dragged
-    let lanes = n.sim.ev.ticks.iter().filter(|t| !t.is_empty()).count().max(1) as i32;
+    let lanes = (n.sim.ev.ticks.iter().filter(|t| !t.is_empty()).count() + !n.doc.sim.engine().faults().is_empty() as usize).max(1) as i32;
     let mut tl_h = if n.sim.ev.tl_h > 0 { n.sim.ev.tl_h } else { (28 + 16 * lanes).clamp(70, 160) };
     ui.next_size(-1, -1);
     ui.split_begin(ID_EV_TL_SPLIT, tl_h, true);
@@ -304,11 +305,18 @@ fn timeline(n: &mut Net, ui: &mut Ui) {
         }
         false
     };
+    // the lab's faults (U6a): a lane with their starts and ends in the error colour
+    let crit = ui.color(T_CRIT);
+    let mut faults: Vec<(f64, u32)> = n.doc.sim.engine().faults().iter().flat_map(|m| core::iter::once(m.at).chain(m.healed)).map(|x| (secs_f(x), crit)).collect();
+    faults.sort_by(|a, b| a.0.total_cmp(&b.0));
     let mut tracks: Vec<TlTrack> = Vec::new();
     for (k, c) in CATS.iter().enumerate() {
         if !ev.ticks[k].is_empty() {
             tracks.push(TlTrack { label: t(c.name), ticks: &ev.ticks[k] });
         }
+    }
+    if !faults.is_empty() {
+        tracks.push(TlTrack { label: crate::app::tr::tc("Fehler|Zeitleiste"), ticks: &faults });
     }
     if tracks.is_empty() {
         tracks.push(TlTrack { label: t("Ereignisse"), ticks: &[] });
