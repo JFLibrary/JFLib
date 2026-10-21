@@ -155,7 +155,7 @@ python build_rs.py app Kritzel --target win --style classic --out build/kritzel-
 - **Localization and accessibility:** the current UI uses German labels;
   accessibility remains a shared [JFLib TODO](../../Todo.md).
 - **Plugins:** Kritzel has no plugin host. Work on original paint.net plugin
-  compatibility belongs to [PaintCraft](../PaintCraft/README.md#original-paintnet-plugins--work-in-progress).
+  compatibility belongs to [PaintCraft](../PaintCraft/README.md#original-paintnet-plugins).
 
 ## License
 

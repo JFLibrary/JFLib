@@ -1088,7 +1088,31 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   Nicht-Rust-Verträge (`PERMISSIONS`-Syntax, `PACKAGE`-Schlüssel, Skriptsprache) bei einer
   Version, Git-Tags und Veröffentlichung (bewusst Handarbeit), eine Versionsprüfung beim
   Bauen fremder Apps gegen eine Mindestversion der Library.
-- **P2** · *fehlt* · Website und Dokumentation für die Library.
+- **P2** · *teilweise* · Website und Dokumentation für die Library. Generator erledigt
+  (2026-10-21, [`tools/site.py`](../tools/site.py), nur Python-Standardbibliothek):
+  `python build_rs.py site [--out DIR]` schreibt eine statische Website nach `build/site/`, die
+  auch ohne Server aus dem Dateisystem läuft. Startseite aus den Abschnitten der README
+  (Einführung, Funktionen als Karten, Feature-Tour mit den Screenshots, Plattformen,
+  Schnellstart, Dokumentation, Lizenz); als Seiten README, die Dokumente aus `docs/`, die
+  App-READMEs, Changelog, Roadmap (als deutsch markiert, wie alle deutschen Seiten) und
+  Drittanbieter-Hinweise; GUIDE.md mit einer Seite pro Abschnitt (Vor/Zurück), API.md mit einer
+  Seite pro Crate (große Crates pro Abschnitt bzw. Modul) und einem Anker für jedes Item
+  (`#fn.run`, `#Ui.text`). Die GitHub-Anker der Überschriften gelten weiter, Links auf `.md`
+  werden zu Seite und Anker, andere Dateien und Ordner des Repositorys zu GitHub-Links.
+  Navigation an der Seite (am Telefon als Schublade), Kopfleiste mit Suche über Titel,
+  Überschriften und API-Items, helles und dunkles Design (System oder Schalter, gemerkt in
+  localStorage), Rust-Code farbig, keine fremden Schriften oder CDNs. Der Markdown-Konverter
+  kann genau das, was die Dokumente nutzen (Tabellen, Code-Blöcke auch in Listen, verschachtelte
+  Listen, `<img>`, `<br>`, `<a id>`); anderes HTML erscheint als Text.
+  `python build_rs.py site --check` (läuft in jeder Suite, einige Sekunden) baut in einen
+  temporären Ordner und prüft interne Links und Anker, Bilder, Links auf Repository-Dateien
+  (auch deren Anker), die HTML-Verschachtelung, Titel, Beschreibung und Sprache jeder Seite,
+  dass kein lokaler Pfad in der Ausgabe steht und dass zwei Läufe byteweise gleich sind.
+  Es fehlt die Veröffentlichung, bewusst offen (Entscheidung des Maintainers): etwa GitHub
+  Pages über einen Workflow (bei jedem Push auf `main`: `python build_rs.py site`, dann
+  `actions/upload-pages-artifact` mit `build/site` und `actions/deploy-pages`; in den
+  Repository-Einstellungen Pages mit der Quelle „GitHub Actions“), ein `gh-pages`-Zweig oder ein
+  beliebiger statischer Host; dazu wahlweise eine eigene Domain und eine Fassung pro Release.
 - **P3** · *teilweise* · Hot-Reload, Live-Inspector bzw. Debug-Overlay (`--dump` als Basis).
   Live-Inspector erledigt (2026-10-20, [GUIDE.md §30](GUIDE.md), `lib/ui/inspect.rs`): aus
   ohne Kosten und ohne Einfluss auf die Bilder (byteweise gleich), an mit `--inspect`,
