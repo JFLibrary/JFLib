@@ -58,7 +58,7 @@ impl Files {
     // the note and the start counter, once (not in headless script runs: no files of the user)
     fn load(&mut self, ui: &mut Ui) {
         self.loaded = true;
-        if let Some(t) = plat::env("jfgui_SELFTEST") {
+        if let Some(t) = plat::env("jfgui_SELFTEST").filter(|t| t.starts_with("phase")) {
             self.test = Some(SelfTest::new(&t));
         }
         if ui.headless() {

@@ -21,13 +21,19 @@
 // file is accepted.  Linux (linux_secret.rs): items of the Secret Service on the session bus
 // (gnome-keyring, KWallet, KeePassXC) in the default collection, attributes app / service /
 // account; the values travel encrypted (dh-ietf1024-sha256-aes128-cbc-pkcs7; plain only when
-// the service lacks it); a locked collection is unlocked through the service's prompt.  Web
-// and Android: no store yet (Unavailable).
+// the service lacks it); a locked collection is unlocked through the service's prompt.
+// Android (android_secret.rs): an AES-256-GCM key of the Android Keystore (one per app, made on
+// the first set, not exportable, no user authentication) encrypts each value into a file of
+// the app's no_backup folder.  Browser (web_secret.rs, web/secrets.js): a non-extractable
+// WebCrypto AES-GCM key per app in IndexedDB encrypts the values kept there; the host decrypts
+// the app's entries before it starts, plat answers from that copy and the host commits each
+// change asynchronously.
 //
 // The OS does not separate the programs of one user: other native programs of the same user
-// can read these entries (the Credential Manager, an unlocked keyring).  The calls block --
-// on Linux until the user answers a prompt (at most PROMPT_SECONDS): call them from a worker
-// thread when the UI must stay responsive.
+// can read these entries (the Credential Manager, an unlocked keyring); in the browser every
+// script of the page's origin can use the key.  The calls block -- on Linux until the user
+// answers a prompt (at most PROMPT_SECONDS): call them from a worker thread when the UI must
+// stay responsive.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -42,7 +48,8 @@ pub const PROMPT_SECONDS: u32 = 300;
 /// why a secret call failed
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SecretError {
-    /// no secret store here (Linux: no Secret Service on the session bus; web, Android)
+    /// no secret store here (Linux: no Secret Service on the session bus; browser: no
+    /// IndexedDB or WebCrypto, e.g. a page served over plain http)
     Unavailable,
     /// the app's permissions lack `secrets`
     Denied,
@@ -67,7 +74,7 @@ impl core::fmt::Display for SecretError {
 }
 
 /// an entry: the app and the caller's names
-#[cfg_attr(not(any(windows, target_os = "linux")), allow(dead_code))]
+#[cfg_attr(not(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32")), allow(dead_code))]
 pub(crate) struct Name<'a> {
     pub(crate) app: String,
     pub(crate) service: &'a str,
@@ -122,7 +129,19 @@ mod native;
 #[path = "linux_secret.rs"]
 mod native;
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(target_os = "android")]
+#[path = "android_secret.rs"]
+mod native;
+
+#[cfg(target_arch = "wasm32")]
+#[path = "web_secret.rs"]
+mod native;
+
+// (web.rs: jfgui_complete) the host committed a change, or failed to
+#[cfg(target_arch = "wasm32")]
+pub(crate) use native::committed;
+
+#[cfg(not(any(windows, target_os = "linux", target_os = "android", target_arch = "wasm32")))]
 mod native {
     use super::{Name, SecretError};
     use alloc::vec::Vec;

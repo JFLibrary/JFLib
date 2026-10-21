@@ -1,6 +1,7 @@
 /* The system services plat asks for (lib/plat/android_host.rs, web.rs; bridge.c):
  * call(kind, bytes) answers at once on the UI thread -- the ContentResolver behind content://
- * names, the ClipboardManager, the persisted grants; request(kind, id, bytes) starts the
+ * names, the ClipboardManager, the persisted grants, the secret store (GallerySecrets: the
+ * Android Keystore); request(kind, id, bytes) starts the
  * system's picker (Storage Access Framework) and answers later through nativeResult.
  * Wire: little endian; strings and byte blocks as u32 length + bytes (android_host.rs). */
 package org.jflib.gallery;
@@ -51,11 +52,13 @@ final class GalleryHost {
     private static final int REQUEST_BASE = 0x4A00;
 
     private static Activity activity;
+    // the application (the secret store needs no window)
+    private static Context app;
     // request code -> {id, kind, payload}
     private static final SparseArray<Object[]> pending = new SparseArray<>();
     private static int nextCode;
 
-    static void attach(Activity a) { activity = a; }
+    static void attach(Activity a) { activity = a; app = a.getApplicationContext(); }
     static void detach(Activity a) { if (activity == a) activity = null; }
 
     // ------------------------------------------------------------ wire
@@ -79,6 +82,8 @@ final class GalleryHost {
     // ------------------------------------------------------------ synchronous calls
 
     static byte[] call(int kind, byte[] in) {
+        if (kind >= GallerySecrets.CALL_SECRET_AVAILABLE && kind <= GallerySecrets.CALL_SECRET_DELETE)
+            return app == null ? null : GallerySecrets.call(app, kind, in);
         Context context = activity;
         if (context == null) return null;
         try {

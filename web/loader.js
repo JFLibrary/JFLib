@@ -1,5 +1,6 @@
 // One browser adapter for every jfguiLib app. All application UI is rendered in Rust.
 import {openFilesStorage} from "./storage.js";
+import {openSecrets, encodeSecrets} from "./secrets.js";
 import {Shadow, decode as decodeA11y} from "./a11y.js";
 const canvas=document.querySelector("#screen"), input=document.querySelector("#input"), status=document.querySelector("#status");
 const fileInput=document.querySelector("#files"), controlButton=document.querySelector("#control");
@@ -7,7 +8,7 @@ const viewport=document.querySelector("#viewport"), a11yRoot=document.querySelec
 const app=document.body.dataset.app, params=new URLSearchParams(location.search), worker=new Worker("worker.js",{type:"module"});
 const ctx=canvas.getContext("2d",{alpha:false}), text=new TextDecoder();
 let started=false, enabled=params.get("agent")==="1", nextId=1, composing=false, openRequest=0, database=null, pasteModifiers=2;
-let bridgeDisconnect=null, bridgeAttempt=0;
+let bridgeDisconnect=null, bridgeAttempt=0, secretStore=null;
 const pending=new Map(), ports=new Set();
 // One acknowledged batch at a time: a busy worker must not accumulate old frames
 // or hover positions. Input edges and every pressed-pointer sample stay ordered.
@@ -203,6 +204,11 @@ async function service(m) {
     else if(m.kind===8) document.title=value();
     else if(m.kind===9) {const url=new URL(value());if(!["https:","http:","mailto:"].includes(url.protocol))throw new Error("URL nicht unterstützt");if(!window.open(url.href,"_blank","noopener,noreferrer"))complete(m.id,-1);else complete(m.id,2);}
     else if(m.kind===10) {const on=data[0]===1;if(on!==enabled)activate(on);}
+    // a change of the secret store (secrets.js): encrypted and committed in order
+    else if(m.kind===13) {
+      if(!secretStore) {data.fill(0);complete(m.id,-3);return;}
+      secretStore.change(data).then(()=>complete(m.id,2),error=>{complete(m.id,errorCode(error));report("Geheimnis nicht gespeichert: "+error.message);});
+    }
     else if(m.kind===11) {
       // the differences of the accessibility tree; a mirror that went wrong asks for all anew
       if(shadow) try {shadow.apply(decodeA11y(m.data));} catch(error) {console.error(error);send({type:"a11y",on:true});}
@@ -236,5 +242,12 @@ try {
   const restored=await storage();database=restored.database;initialFiles=restored.entries.filter(f=>f.app===app);
   if(restored.error)report("Gespeicherte Dateien sind lesbar; dauerhafte Datenübernahme derzeit nicht verfügbar.");
 }catch(error){report("Browserspeicher nicht verfügbar; Dateien bleiben temporär.");}
+// the secret store: the app's values decrypted for the worker (none: plat::secret is Unavailable)
+let initialSecrets=null;
+try {
+  const store=await openSecrets(app);
+  if(store) {secretStore=store;initialSecrets=encodeSecrets(store.entries);for(const e of store.entries)e.value?.fill(0);store.entries=null;}
+}catch(error){console.warn("Geheimnisspeicher nicht verfügbar:",error);}
 const args=[];if(enabled)args.push("--agent");if(params.get("theme"))args.push("--theme",params.get("theme"));
-send({type:"start",url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,capabilities:(database?4:0)|(navigator.clipboard?8:0)});
+send({type:"start",url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)});
+initialSecrets?.fill(0); // postMessage copied them

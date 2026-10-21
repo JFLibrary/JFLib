@@ -50,7 +50,7 @@ process  gmic  $EXE/helpers/*.exe     # programs Command::spawn / run_elevated m
 url      https mailto                 # schemes for open_url ("*" = all)
 plugins  $EXE/plugins/*.dll $EXE/plugins/*.so
 print                                 # plat::print
-secrets                               # plat::secret (Credential Manager, Secret Service)
+secrets                               # plat::secret (Credential Manager, Secret Service, Keystore)
 autostart                             # plat::autostart_set (start at login)
 net.connect api.example.com:443 *.cdn.example.com:443
 net.connect 192.168.0.0/16:631 localhost:8000-8099
@@ -400,9 +400,10 @@ In addition:
   own folders lie below `/config`, `/data` and `/cache`; `$EXE` has no value (the pattern is
   dropped), and the other user folders do not exist. `plat` has no processes, sockets or
   native plugins on Android, so `process`, `net.*` and `plugins` have nothing to allow;
-  `secrets` finds no store (`Unavailable`). The rules do not reach Android's own storage
-  (the app's private folders, `content://` documents): the Java side of the bridge
-  (`android/*.java`) does not go through `plat`. The Android build is checked by building it;
+  `secrets` allows the store of the Android Keystore (checked in `plat` before the Java side
+  is asked). The rules do not reach Android's own storage (the app's private folders,
+  `content://` documents): the Java side of the bridge (`android/*.java`) does not go through
+  `plat`. The Android build is checked by building it;
   the manifest has not been run on a device in the test suite.
 - **Packages.** `tools/package.py` derives the Flatpak sandbox (finish-args) and the MSIX
   capabilities and StartupTask from the manifest ([PACKAGING.md](PACKAGING.md) "Flatpak",

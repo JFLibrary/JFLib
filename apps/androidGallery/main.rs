@@ -9,6 +9,7 @@ use alloc::{format, string::String};
 use ui::*;
 
 mod files;
+mod secrets;
 
 const DESC: AppDesc = AppDesc {
     title: "jfgui Pocket Gallery", w: 390, h: 780, min_w: 280, min_h: 240,
@@ -19,12 +20,12 @@ const COLORS: [u32; 5] = [0xFF0078D4, 0xFF8764B8, 0xFF008575, 0xFFD83B01, 0xFFC2
 
 struct Gallery {
     clicks: u32, enabled: i32, checked: i32, value: i32, color: usize, name: String,
-    viewport_height: i32, files: files::Files,
+    viewport_height: i32, files: files::Files, secrets: secrets::Secrets,
 }
 impl Default for Gallery {
     fn default() -> Self {
         Self { clicks: 0, enabled: 1, checked: 0, value: 40, color: 0, name: String::new(), viewport_height: 0,
-            files: files::Files::default() }
+            files: files::Files::default(), secrets: secrets::Secrets::default() }
     }
 }
 impl App for Gallery {
@@ -98,6 +99,7 @@ impl App for Gallery {
         ui.box_end();
 
         self.files.card(ui);
+        self.secrets.card(ui);
         let platform = if cfg!(target_arch = "aarch64") { "ARM64 / arm64-v8a" }
             else if cfg!(target_os = "android") { "x86_64 / Emulator" } else { "Desktop-Vorschau" };
         ui.text(TS_CAPTION | TX_SECONDARY, platform);

@@ -1185,7 +1185,7 @@ def web_assets(name, directory):
 def _web_assets(name, directory):
     """Shared browser host, emitted beside each app; the GUI stays entirely in WASM."""
     source = ROOT / "web"
-    for filename in ("loader.js", "worker.js", "bridge.js", "storage.js", "a11y.js", "host.css"):
+    for filename in ("loader.js", "worker.js", "bridge.js", "storage.js", "secrets.js", "a11y.js", "host.css"):
         shutil.copyfile(source / filename, directory / filename)
     html = (source / "index.html").read_text(encoding="utf-8").replace("{{APP}}", name)
     (directory / "index.html").write_bytes(html.encode("utf-8"))

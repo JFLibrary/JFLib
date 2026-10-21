@@ -212,6 +212,8 @@ self.onmessage = async ({data:m}) => {
       if(!selected) throw lastError || new Error("Kein passendes WASM-Bundle vorhanden.");
       memory = wasm.memory;
       wasm.jfgui_capabilities(m.capabilities);
+      // the app's secrets (loader.js, secrets.js) before it starts; the inbox is wiped by Rust
+      if (m.secrets && wasm.jfgui_secrets) { inbox(m.secrets); wasm.jfgui_secrets(m.secrets.length); m.secrets.fill(0); }
       for (const file of m.files) importFile(file.path, file.bytes, false, true);
       const now = new Date();
       wasm.jfgui_date(now.getFullYear(), now.getMonth()+1, now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds(), now.getDay());
