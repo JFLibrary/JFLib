@@ -320,7 +320,7 @@ impl RView<'_> {
 impl Ui {
     // the font of a run: the family's face of that weight / slant, else one of its faces with
     // synthetic styles, else the UI font
-    fn rt_face(&mut self, family: &str, bold: bool, italic: bool) -> u32 {
+    pub(crate) fn rt_face(&mut self, family: &str, bold: bool, italic: bool) -> u32 {
         let syn = |ui: &mut Ui, f: u32, flags: u32| -> u32 {
             if flags == 0 {
                 return f;

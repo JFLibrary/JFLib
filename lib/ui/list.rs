@@ -165,7 +165,7 @@ fn clamp_mem(v: i32, max: i32) -> (i32, bool) {
 
 // anim_decay(cur, target, steps) -> cur moved towards target (the remaining distance shrinks
 // to 150/256 per step; the last pixel snaps)
-fn anim_decay(cur: i32, target: i32, steps: u32) -> i32 {
+pub(crate) fn anim_decay(cur: i32, target: i32, steps: u32) -> i32 {
     if steps == 0 {
         return cur;
     }
@@ -215,7 +215,7 @@ fn scr_axes(flags: u32) -> u32 {
 }
 
 // anim_steps(&t0) -> number of 16 ms steps since t0 (0..24); t0 = now if > 0
-fn anim_steps(now: u32, t0: &mut i32) -> u32 {
+pub(crate) fn anim_steps(now: u32, t0: &mut i32) -> u32 {
     let d = (now as i32).wrapping_sub(*t0);
     if d <= 0 {
         return 0;

@@ -595,6 +595,8 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Schreiben", "Typing", "Saisie", "Escritura", "Digitazione", "Typen", "Pisanie", "كتابة", "הקלדה"],
     ["Fließtext", "Normal text", "Texte normal", "Texto normal", "Testo normale", "Normale tekst", "Zwykły tekst", "نص عادي", "טקסט רגיל"],
     ["Standardschrift", "Default font", "Police par défaut", "Fuente predeterminada", "Carattere predefinito", "Standaardlettertype", "Domyślna czcionka", "الخط الافتراضي", "גופן ברירת מחדל"],
+    // (ROADMAP §6) the Markdown / HTML viewer's name for screen readers (md_view.rs)
+    ["Dokument", "Document", "Document", "Documento", "Documento", "Document", "Dokument", "مستند", "מסמך"],
     // (ROADMAP §12) the live inspector's tool window (inspect.rs)
     ["Inspektor", "Inspector", "Inspecteur", "Inspector", "Ispettore", "Inspector", "Inspektor", "أداة الفحص", "כלי בדיקה"],
     ["Auswählen", "Pick", "Choisir", "Elegir", "Scegli", "Kiezen", "Wskaż", "انتقاء", "בחירה"],

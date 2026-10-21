@@ -62,7 +62,9 @@ pub const K_DIALOG: u16 = 18;
 pub const K_TITLEBAR: u16 = 19;
 pub const K_SWATCH: u16 = 20;
 pub const K_LINK: u16 = 21;
-pub const K_KIND_COUNT: u16 = 22;
+/// a heading of a document (value: its level 1 ..= 6; md_view.rs)
+pub const K_HEADING: u16 = 22;
+pub const K_KIND_COUNT: u16 = 23;
 pub const SS_HOVER: u16 = 1;
 pub const SS_PRESSED: u16 = 2;
 pub const SS_FOCUSED: u16 = 4;
@@ -72,10 +74,10 @@ pub const SS_SELECTED: u16 = 32;
 pub const SS_OPEN: u16 = 64;
 
 /// names of the K_* kinds (dump, selectors kind:"Label")
-pub const KIND_NAMES: [&str; 22] = [
+pub const KIND_NAMES: [&str; 23] = [
     "box", "text", "button", "checkbox", "radio", "switch", "slider", "progress", "textbox",
     "menu", "menuitem", "list", "listitem", "tab", "canvas", "icon", "image", "combo", "dialog",
-    "titlebar", "swatch", "link",
+    "titlebar", "swatch", "link", "heading",
 ];
 /// names of the SS_* state bits (dump)
 pub const STATE_NAMES: [&str; 7] = ["hover", "pressed", "focused", "checked", "disabled", "selected", "open"];

@@ -151,6 +151,15 @@ impl Ui {
         }
     }
 
+    /// a rectangle drawn inside the open ltr_begin region as a logical one (for records and
+    /// hit boxes, which are logical)
+    pub(crate) fn ltr_rect(&self, r: [i32; 4]) -> [i32; 4] {
+        match self.ltr_outer() {
+            Some((ix, iw)) if self.rtl => [ix.wrapping_add(ix).wrapping_add(iw).wrapping_sub(r[0]).wrapping_sub(r[2]), r[1], r[2], r[3]],
+            _ => r,
+        }
+    }
+
     /// rtl_map(x, ix, iw): a logical x as a region ix .. ix + iw that keeps its LTR content
     /// sees it (the same before its ltr_begin)
     pub fn rtl_map(&self, x: i32, ix: i32, iw: i32) -> i32 {

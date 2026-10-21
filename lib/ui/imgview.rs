@@ -200,9 +200,9 @@ pub(crate) struct S {
 
 /// an SVG drawn at render time into its rectangle (the rectangle is the viewport)
 pub(crate) struct SvgDraw {
-    doc: Rc<Svg>,
-    color: u32,
-    fonts: Rc<SvgFonts>,
+    pub(crate) doc: Rc<Svg>,
+    pub(crate) color: u32,
+    pub(crate) fonts: Rc<SvgFonts>,
 }
 
 impl Draw for SvgDraw {

@@ -85,6 +85,17 @@ pub use rich_edit::{
     RT_READONLY, RT_TAB,
 };
 mod rich_html;
+// (ROADMAP §6) the Markdown / HTML viewer: its document (md_doc.rs) and the view (md_view.rs)
+mod md_doc;
+pub use md_doc::{
+    MdBlock, MdDoc, MdImage, MdLinkSpot, MdSpan, MdTable, MA_CENTER, MA_LEFT, MA_NONE, MA_RIGHT, MB_CODE, MB_HEADING, MB_PARA, MB_ROW,
+    MB_RULE, MK_BULLET, MK_NONE, MK_NUMBER, MS_BOLD, MS_CODE, MS_ITALIC, MS_STRIKE, MS_UNDER,
+};
+mod md_view;
+pub use md_view::{MdEv, MdViewState, MV_LTR, MV_NO_FRAME, MV_OPEN_LINKS, MV_RTL};
+// (ROADMAP §6) lists whose rows have different heights (ui.vlist_begin)
+mod vlist;
+pub use vlist::VListState;
 mod code_doc;
 pub use code_doc::{CodeDoc, LineChange, FIND_CASE, FIND_MAX, FIND_WORD};
 mod highlight;
@@ -353,6 +364,8 @@ pub(crate) struct Mods {
     pub(crate) svg: imgview::S,
     /// (ROADMAP §4) hyphenation: languages, dictionaries (hyph.rs)
     pub(crate) hyph: hyph::S,
+    /// (ROADMAP §6) the open lists of ui.vlist_begin (vlist.rs)
+    pub(crate) vlist: vlist::S,
 }
 
 /// the UI context: everything ASMLIB keeps in g_* variables

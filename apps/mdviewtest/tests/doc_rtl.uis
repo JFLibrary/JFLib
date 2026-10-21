@@ -1,0 +1,29 @@
+#!args --verify-dirty
+# a mirrored window ("Rechts nach links"): the view's frame and scroll bar are mirrored, a
+# document keeps the direction of its text -- the German sample runs left to right inside,
+# the Hebrew one right to left; records are physical rectangles (mirrored), clicks on links
+# and keys work as in a left-to-right window
+size 1000 720
+theme light
+click "Rechts nach links"
+expect heading:"Markdown-Betrachter" rect 41 61 930 49
+expect link:"Link" rect 539 122 25 20
+shot build/mdviewtest/md_rtl.png
+click link:"Link"
+expect text:"Link: https://example.org/jflib" exists
+click 960,360
+key pgdn
+expect "Hilfe" value 518
+shot build/mdviewtest/md_rtl_middle.png
+click "Hebräisch"
+expect heading:"מדריך קצר" exists
+shot build/mdviewtest/he_rtl.png
+theme dark
+shot build/mdviewtest/he_rtl_dark.png
+theme light
+click "Liste"
+expect #16777217 rect 24 100 964 52
+shot build/mdviewtest/list_rtl.png
+click "Rechts nach links"
+expect #16777217 rect 12 100 964 52
+expect_nowarn

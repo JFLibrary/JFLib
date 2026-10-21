@@ -15,9 +15,16 @@
 //   (crate) clip_html(paras, font, size) the clipboard's HTML: to_html plus the fragment as
 //                                    JSON in a comment (<!--jfrich ...-->), so a paste into a
 //                                    richtext keeps every attribute exactly
+//   (crate) html_read(s) -> (paras, HExt)   the same reader for the Markdown / HTML viewer
+//                                    (md_doc.rs): the paragraphs and, by paragraph, what a
+//                                    viewer shows besides them -- rules, images (U+FFFC in the
+//                                    text), preformatted blocks and their language, the heading
+//                                    level, the quotation depth, table rows and their cells, the
+//                                    numbers of list items
 //
 // Whitespace outside <pre> / white-space:pre* collapses as in browsers; a paragraph is a
-// block or the text between two <br>.
+// block or the text between two <br>.  Nesting is capped (NEST_MAX open blocks, formats and
+// lists: deeper tags count as text-level), so no input costs more than linear time.
 
 use alloc::format;
 use alloc::string::String;
@@ -246,9 +253,64 @@ fn embedded(s: &str) -> Option<RichDoc> {
     RichDoc::from_json(&rest[..j])
 }
 
+/// (md_doc.rs) the paragraphs of HTML and what a viewer shows besides them (see the module
+/// header)
+pub(crate) fn html_read(s: &str) -> (Vec<Para>, Vec<(usize, HExt)>) {
+    let mut r = Reader::new();
+    r.ext = Some(Ext::default());
+    r.run(s);
+    let ext = r.ext.take().map(|e| e.items).unwrap_or_default();
+    let mut paras = r.finish();
+    if paras.len() == 1 && paras[0].is_empty() && ext.is_empty() {
+        paras.clear();
+    }
+    (paras, ext)
+}
+
+/// what html_read reports about paragraph `at` (the index the item is filed under)
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum HExt {
+    /// a horizontal rule before the paragraph
+    Rule,
+    /// an image: U+FFFC at `byte` of the paragraph (width / height: attributes, 0 none)
+    Image { byte: usize, src: String, alt: String, w: u32, h: u32 },
+    /// the paragraph is a line of preformatted block `block` (language from a class
+    /// "language-x" of its <code>)
+    Pre { block: u32, lang: String },
+    /// the paragraph is a heading of this level (1 ..= 6)
+    Heading(u8),
+    /// the paragraph is inside this many block quotes
+    Quote(u8),
+    /// the paragraph is a row of table `table` (header row); its cells start at these bytes
+    /// ('\t' between them) with their alignment (0 none, 1 left, 2 centre, 3 right)
+    Row { table: u32, head: bool, cells: Vec<(usize, u8)> },
+    /// the paragraph begins a list item (its number in an ordered list, else 0)
+    Item(u32),
+}
+
+// the reader's extra state for html_read
+#[derive(Default)]
+struct Ext {
+    items: Vec<(usize, HExt)>,
+    pre: u32,
+    lang: String,
+    table: u32,
+    cells: Vec<(usize, u8)>,
+    head: bool,
+    thead: bool,
+    item: Option<u32>,
+    // per open list: the next number (0: bullets)
+    nums: Vec<u32>,
+    // inside a table cell
+    cell: bool,
+}
+
+// open blocks, formats and lists at most (deeper ones are not opened)
+const NEST_MAX: usize = 64;
+
 // ------------------------------------------------------------------ the reader
 
-fn entity(name: &str) -> Option<char> {
+pub(crate) fn entity(name: &str) -> Option<char> {
     if let Some(num) = name.strip_prefix('#') {
         let v = if let Some(h) = num.strip_prefix(['x', 'X']) { u32::from_str_radix(h, 16).ok()? } else { num.parse().ok()? };
         return char::from_u32(v).map(|c| if c == '\0' { '\u{FFFD}' } else { c });
@@ -332,7 +394,7 @@ fn decode(s: &str) -> String {
 }
 
 // the attributes of a tag: (name lower-case, value decoded)
-fn attrs(s: &str) -> Vec<(String, String)> {
+pub(crate) fn attrs(s: &str) -> Vec<(String, String)> {
     let b = s.as_bytes();
     let mut v = Vec::new();
     let mut i = 0;
@@ -486,6 +548,8 @@ struct Reader {
     // the paragraph is a list item
     item: Option<(u8, u8)>,
     skip: Option<String>,
+    // html_read: what a viewer shows besides the paragraphs
+    ext: Option<Ext>,
 }
 
 const BLOCKS: [&str; 22] = [
@@ -505,6 +569,7 @@ impl Reader {
             lists: Vec::new(),
             item: None,
             skip: None,
+            ext: None,
         }
     }
 
@@ -543,10 +608,130 @@ impl Reader {
             p.level = level;
         }
         p.mark = self.fmt();
+        if self.ext.is_some() {
+            self.ext_para();
+        }
         self.out.push(p);
         self.cur = Para::new();
         self.started = false;
         self.space = false;
+    }
+
+    // html_read: what the paragraph about to be filed is besides its text
+    fn ext_para(&mut self) {
+        let at = self.out.len();
+        let pre = self.pre();
+        let level = self.blocks.iter().rev().find_map(|b| {
+            let t = b.tag.as_bytes();
+            (t.len() == 2 && t[0] == b'h' && (b'1'..=b'6').contains(&t[1])).then(|| t[1] - b'0')
+        });
+        let quote = self.blocks.iter().filter(|b| b.tag == "blockquote").count().min(255) as u8;
+        let row = self.blocks.last().is_some_and(|b| b.tag == "tr");
+        let Some(e) = self.ext.as_mut() else { return };
+        if pre {
+            e.items.push((at, HExt::Pre { block: e.pre, lang: e.lang.clone() }));
+        }
+        if let Some(l) = level {
+            e.items.push((at, HExt::Heading(l)));
+        }
+        if quote > 0 {
+            e.items.push((at, HExt::Quote(quote)));
+        }
+        if let Some(n) = e.item.take() {
+            e.items.push((at, HExt::Item(n)));
+        }
+        if row && !e.cells.is_empty() {
+            let cells = core::mem::take(&mut e.cells);
+            e.items.push((at, HExt::Row { table: e.table, head: e.head || e.thead, cells }));
+        }
+        e.cells.clear();
+        e.head = false;
+    }
+
+    // html_read: an element of a viewer (img, hr, cells, pre, code, lists, tables)
+    fn ext_open(&mut self, tag: &str, at: &[(String, String)]) {
+        let attr = |k: &str| at.iter().find(|a| a.0 == k).map(|a| a.1.as_str());
+        let num = |k: &str| attr(k).and_then(|v| v.trim().trim_end_matches("px").parse::<u32>().ok()).unwrap_or(0).min(100_000);
+        match tag {
+            "img" => {
+                let f = self.fmt();
+                let byte = self.cur.len();
+                self.cur.push("\u{FFFC}", &f);
+                self.started = true;
+                self.space = false;
+                let (src, alt) = (String::from(attr("src").unwrap_or("")), String::from(attr("alt").unwrap_or("")));
+                let (w, h) = (num("width"), num("height"));
+                let n = self.out.len();
+                if let Some(e) = self.ext.as_mut() {
+                    e.items.push((n, HExt::Image { byte, src, alt, w, h }));
+                }
+            }
+            "td" | "th" => {
+                let f = self.fmt();
+                let first = self.ext.as_ref().is_none_or(|e| e.cells.is_empty());
+                if !first {
+                    self.cur.push("\t", &f);
+                }
+                self.started = true;
+                self.space = false;
+                let byte = self.cur.len();
+                let a = attr("align").or_else(|| {
+                    attr("style").and_then(|v| v.split(';').filter_map(|d| d.split_once(':')).find(|(p, _)| p.trim() == "text-align").map(|(_, x)| x.trim()))
+                });
+                let align = match a.map(|s| s.to_ascii_lowercase()).as_deref() {
+                    Some("left") | Some("start") => 1,
+                    Some("center") => 2,
+                    Some("right") | Some("end") => 3,
+                    _ => 0,
+                };
+                if let Some(e) = self.ext.as_mut() {
+                    e.cells.push((byte, align));
+                    e.head |= tag == "th";
+                    e.cell = true;
+                }
+            }
+            _ => {
+                let Some(e) = self.ext.as_mut() else { return };
+                match tag {
+                    "table" => {
+                        e.table += 1;
+                        e.thead = false;
+                    }
+                    "thead" => e.thead = true,
+                    "tbody" | "tfoot" => e.thead = false,
+                    "pre" => {
+                        e.pre += 1;
+                        e.lang.clear();
+                    }
+                    "code" => {
+                        if let Some(c) = attr("class") {
+                            for w in c.split_whitespace() {
+                                if let Some(l) = w.strip_prefix("language-").or_else(|| w.strip_prefix("lang-")) {
+                                    e.lang = String::from(l);
+                                }
+                            }
+                        }
+                    }
+                    "ol" => {
+                        let start = attr("start").and_then(|v| v.trim().parse::<u32>().ok()).unwrap_or(1);
+                        e.nums.push(start.min(999_999_999));
+                    }
+                    "ul" => e.nums.push(0),
+                    "li" => {
+                        let n = match e.nums.last_mut() {
+                            Some(n) if *n > 0 => {
+                                let v = *n;
+                                *n = n.saturating_add(1);
+                                v
+                            }
+                            _ => 0,
+                        };
+                        e.item = Some(n);
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 
     fn text(&mut self, raw: &str) {
@@ -664,7 +849,18 @@ impl Reader {
         f
     }
 
+    // html_read inside a table cell: blocks, lists and breaks are part of the cell's text
+    fn in_cell(&self, tag: &str) -> bool {
+        self.ext.as_ref().is_some_and(|e| e.cell) && !matches!(tag, "tr" | "td" | "th" | "table" | "thead" | "tbody" | "tfoot")
+    }
+
     fn open(&mut self, tag: &str, at: &[(String, String)], selfclose: bool) {
+        if self.in_cell(tag) && (BLOCKS.contains(&tag) || matches!(tag, "br" | "hr" | "ul" | "ol")) {
+            if !self.space && self.started {
+                self.text(" ");
+            }
+            return;
+        }
         match tag {
             "script" | "style" | "head" | "title" | "template" | "noscript" | "svg" => {
                 if !selfclose {
@@ -679,17 +875,34 @@ impl Reader {
             "img" | "hr" | "meta" | "link" | "input" => {
                 if tag == "hr" {
                     self.flush(false);
+                    if let Some(e) = self.ext.as_mut() {
+                        e.items.push((self.out.len(), HExt::Rule));
+                    }
+                } else if tag == "img" && self.ext.is_some() {
+                    self.ext_open(tag, at);
                 }
                 return;
             }
             "ul" | "ol" => {
                 self.flush(false);
-                self.lists.push(if tag == "ol" { LS_NUMBER } else { LS_BULLET });
+                if self.lists.len() < NEST_MAX {
+                    self.lists.push(if tag == "ol" { LS_NUMBER } else { LS_BULLET });
+                    if self.ext.is_some() {
+                        self.ext_open(tag, at);
+                    }
+                }
                 return;
             }
             _ => {}
         }
+        // deeper than NEST_MAX: the tag counts as nothing (its text stays)
+        if self.blocks.len() >= NEST_MAX || self.fmts.len() >= NEST_MAX {
+            return;
+        }
         let block = BLOCKS.contains(&tag);
+        if self.ext.is_some() && matches!(tag, "table" | "thead" | "tbody" | "tfoot" | "code") {
+            self.ext_open(tag, at);
+        }
         if block {
             self.flush(false);
             let mut align = RA_LEFT;
@@ -726,6 +939,12 @@ impl Reader {
                 let kind = self.lists.last().copied().unwrap_or(LS_BULLET);
                 self.item = Some((kind, (self.lists.len().max(1) - 1).min(LEVEL_MAX as usize) as u8));
             }
+            if self.ext.is_some() && matches!(tag, "pre" | "li") {
+                self.ext_open(tag, at);
+            }
+        }
+        if self.ext.is_some() && matches!(tag, "td" | "th") {
+            self.ext_open(tag, at);
         }
         if selfclose {
             if block {
@@ -741,6 +960,14 @@ impl Reader {
         if let Some(i) = self.fmts.iter().rposition(|f| f.0 == tag) {
             self.fmts.truncate(i);
         }
+        if self.in_cell(tag) && (BLOCKS.contains(&tag) || matches!(tag, "ul" | "ol")) {
+            return;
+        }
+        if let Some(e) = self.ext.as_mut() {
+            if matches!(tag, "td" | "th" | "tr" | "table") {
+                e.cell = false;
+            }
+        }
         match tag {
             "ul" | "ol" => {
                 self.flush(false);
@@ -748,7 +975,15 @@ impl Reader {
                 if self.lists.is_empty() {
                     self.item = None;
                 }
+                if let Some(e) = self.ext.as_mut() {
+                    e.nums.pop();
+                }
                 return;
+            }
+            "thead" => {
+                if let Some(e) = self.ext.as_mut() {
+                    e.thead = false;
+                }
             }
             _ => {}
         }

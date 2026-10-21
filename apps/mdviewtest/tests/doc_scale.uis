@@ -1,0 +1,18 @@
+#!args --text-scale 150 --verify-dirty
+# text at 150 %: headings, lists, code, tables and the list rows grow with the text (the
+# layouts are cached per text scale); nothing overlaps
+size 1000 720
+theme light
+expect heading:"Markdown-Betrachter" value 1
+expect heading:"Listen" exists
+shot build/mdviewtest/md_150.png
+click 900,360
+key pgdn
+key pgdn
+shot build/mdviewtest/md_150_middle.png
+click "HTML"
+shot build/mdviewtest/html_150.png
+click "Liste"
+expect #16777217 exists
+shot build/mdviewtest/list_150.png
+expect_nowarn

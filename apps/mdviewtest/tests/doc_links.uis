@@ -1,0 +1,67 @@
+#!args --verify-dirty
+# links: a click activates one (MdEv::link, "Link: ..."), the link under the pointer is
+# MdEv::hover ("Zeiger: ..."); Tab / Shift+Tab move through the links in reading order (the
+# focused one framed, its record focused, scrolled into view), Enter activates it, Esc drops
+# it; past the last link Tab moves the focus on.  With "Links öffnen" (MV_OPEN_LINKS) the view
+# also hands the address to open_url (headless runs print it), never without a click or Enter
+size 1000 720
+theme light
+move 537,132
+expect text:"Zeiger: https://example.org/jflib" exists
+move 600,400
+expect text:"Zeiger: -" exists
+click link:"Link"
+expect text:"Link: https://example.org/jflib" exists
+expect "Hilfe" focused
+click link:"www.example.com"
+expect text:"Link: http://www.example.com" exists
+# the keyboard: Tab from the view to its first link
+click 900,360
+key tab
+expect link:"Link" focused
+shot build/mdviewtest/links_focus.png
+key tab
+expect link:"https://example.org/docs" focused
+key enter
+expect text:"Link: https://example.org/docs" exists
+key shift+tab
+expect link:"Link" focused
+# further links are scrolled into view: the table's, the references at the end
+key tab
+key tab
+key tab
+expect link:"Preisliste" focused
+expect heading:"Tabelle" exists
+key enter
+expect text:"Link: https://example.org/preis" exists
+key tab
+expect link:"Verweis" focused
+expect heading:"Überschrift 6" exists
+key tab
+expect link:"ref" focused
+key enter
+expect text:"Link: https://example.org/ref" exists
+shot build/mdviewtest/links_end.png
+# past the last link the focus moves on
+key tab
+expect "Langes Dokument" focused
+key shift+tab
+expect "Hilfe" focused
+# Esc drops the focused link (Enter then activates nothing)
+key tab
+key esc
+click "Zwischenablage"
+click 900,360
+key enter
+expect text:"Link: https://example.org/ref" exists
+# MV_OPEN_LINKS: the view opens the link too
+click "Links öffnen"
+key home
+click link:"Link"
+expect text:"Link: https://example.org/jflib" exists
+click "Links öffnen"
+# html_view's links
+click "HTML"
+click link:"Link"
+expect text:"Link: https://example.org/html" exists
+expect_nowarn
