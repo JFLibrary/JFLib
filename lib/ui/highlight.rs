@@ -1,9 +1,10 @@
 // highlight -- syntax highlighting for ui.code_editor: a small engine of token rules, the
-// built-in grammars (Rust, JSON, INI, TOML, a Markdown subset) and the colours of the tokens
+// built-in grammars (Rust, JSON, INI, TOML, a Markdown subset, JFS: the scripts of
+// lib/script) and the colours of the tokens
 //
-//   Highlighter::rust() / json() / ini() / toml() / markdown() / plain()
+//   Highlighter::rust() / json() / ini() / toml() / markdown() / jfs() / plain()
 //   Highlighter::for_name(s)            by name or file extension ("rs", "json", "ini", "cfg",
-//                                       "toml", "md", a path); plain() for anything else
+//                                       "toml", "md", "jfs", a path); plain() for anything else
 //   Highlighter::new(&GRAMMAR)          an app's own grammar (a static Grammar of Rules)
 //   h.line(text, state, &mut tokens) -> state   the tokens of one line (SY_* kinds, byte
 //                                       ranges; the plain text between them is SY_TEXT) from
@@ -11,11 +12,12 @@
 //   h.tokens(text) -> Vec<Vec<Token>>   every line of a text (tests)
 //   CodeTheme::light() / dark() / high_contrast(&HcColors), ui.code_theme()   the colours of
 //                                       the tokens and the editor (gutter, current line,
-//                                       selection, bracket match, find matches)
+//                                       selection, bracket match, find matches, diagnostics)
 //
 // A grammar is a list of rules tried in order at every position: line comments, blocks (from
 // open to close, nested or not, optionally only at a line start: Markdown fences), strings
-// (escapes, multi-line or not), Rust raw strings, word lists, numbers, punctuation and
+// (escapes, multi-line or not), strings with code inside (Interp: the ${..} of JFS, whose
+// code the same rules highlight), Rust raw strings, word lists, numbers, punctuation and
 // functions of its own (Custom: JSON keys, Rust char literals / lifetimes / attributes, INI
 // sections and keys, Markdown headings, lists, emphasis and links).  Where no rule matches,
 // an identifier is read whole: before '(' a function (calls), before '!' a macro (macros),
@@ -82,6 +84,11 @@ pub enum Rule {
     Str { open: &'static str, close: &'static str, escape: bool, multi: bool, kind: u8 },
     /// Rust raw strings: r"..", r#".."#, br".." (may span lines)
     RawStr,
+    /// a string with code inside (interpolation), on one line: from open to close, a backslash
+    /// takes the next character (\u{..} its hex digits and brace; SY_ESCAPE); from `start`
+    /// (ending with '{') to the '}' that closes it (braces inside count) the grammar's rules
+    /// highlight code, the two delimiters SY_META
+    Interp { open: &'static str, close: &'static str, start: &'static str },
     /// identifiers of a list
     Words(&'static [&'static str], u8),
     /// number literals: 12, 0x1F, 0b101, 0o17, 1_000, 1.5e-3, suffixes (u8, f32)
@@ -178,13 +185,17 @@ impl Highlighter {
     pub const fn markdown() -> Highlighter {
         Highlighter { g: &MARKDOWN }
     }
+    /// the scripting language of lib/script (.jfs, JFNetworker's scripts)
+    pub const fn jfs() -> Highlighter {
+        Highlighter { g: &JFS }
+    }
 
     /// by name or extension, also of a path ("rs", "Rust", "x/y.toml"); plain() for others
     pub fn for_name(s: &str) -> Highlighter {
         let s = s.trim();
         let ext = s.rsplit(['/', '\\']).next().unwrap_or(s);
         let ext = ext.rsplit('.').next().unwrap_or(ext).to_ascii_lowercase();
-        for g in [&RUST, &JSON, &INI, &TOML, &MARKDOWN] {
+        for g in [&RUST, &JSON, &INI, &TOML, &MARKDOWN, &JFS] {
             if g.name.eq_ignore_ascii_case(s) || g.exts.contains(&ext.as_str()) {
                 return Highlighter { g };
             }
@@ -229,11 +240,8 @@ impl Highlighter {
     /// the tokens of one line from the state of the line before -> the state at its end
     pub fn line(&self, t: &str, state: u32, out: &mut Vec<Token>) -> u32 {
         out.clear();
-        let b = t.as_bytes();
-        let n = b.len();
-        let rules = self.g.rules;
         let mut i = 0;
-        let bol = n - t.trim_start_matches([' ', '\t']).len();
+        let bol = t.len() - t.trim_start_matches([' ', '\t']).len();
         if state != 0 {
             let (e, st) = self.resume(t, state, bol, out);
             if st != 0 {
@@ -241,7 +249,25 @@ impl Highlighter {
             }
             i = e;
         }
+        self.scan(t, i, bol, false, out).1
+    }
+
+    // the tokens from i on (code: inside an interpolation, up to the '}' that closes it) ->
+    // (where it stopped, the state at the line end: 0 = nothing open)
+    fn scan(&self, t: &str, mut i: usize, bol: usize, code: bool, out: &mut Vec<Token>) -> (usize, u32) {
+        let b = t.as_bytes();
+        let n = b.len();
+        let rules = self.g.rules;
+        let mut braces = 0u32;
         'outer: while i < n {
+            if code && b[i] == b'{' {
+                braces += 1;
+            } else if code && b[i] == b'}' {
+                if braces == 0 {
+                    return (i, 0);
+                }
+                braces -= 1;
+            }
             let at_bol = i == bol;
             let prev = self.prev_ident(t, i);
             for (ri, rule) in rules.iter().enumerate() {
@@ -249,19 +275,19 @@ impl Highlighter {
                     Rule::LineComment(p) => {
                         if t[i..].starts_with(p) {
                             push(out, i, n, SY_COMMENT);
-                            return 0;
+                            return (n, 0);
                         }
                     }
                     Rule::Block { open, close, kind, nested, bol: only } => {
                         if (!*only || at_bol) && t[i..].starts_with(open) && !(prev && open.starts_with(|c: char| c.is_alphanumeric())) {
                             if *only {
                                 push(out, i, n, *kind);
-                                return enc(ri, 1, 0);
+                                return (n, enc(ri, 1, 0));
                             }
                             let (e, depth) = scan_block(t, i + open.len(), open, close, *nested, 1);
                             push(out, i, e, *kind);
                             if depth > 0 {
-                                return enc(ri, depth, 0);
+                                return (n, enc(ri, depth, 0));
                             }
                             i = e;
                             continue 'outer;
@@ -271,7 +297,7 @@ impl Highlighter {
                         if t[i..].starts_with(open) && !(prev && open.starts_with(|c: char| c.is_alphanumeric())) {
                             let (e, done) = scan_str(t, i, i + open.len(), close, *escape, *kind, out);
                             if !done && *multi {
-                                return enc(ri, 0, 0);
+                                return (n, enc(ri, 0, 0));
                             }
                             i = e;
                             continue 'outer;
@@ -287,9 +313,19 @@ impl Highlighter {
                                 }
                                 None => {
                                     push(out, i, n, SY_STRING);
-                                    return enc(ri, 0, hashes as u32);
+                                    return (n, enc(ri, 0, hashes as u32));
                                 }
                             }
+                        }
+                    }
+                    Rule::Interp { open, close, start } => {
+                        if t[i..].starts_with(open) && !(prev && open.starts_with(|c: char| c.is_alphanumeric())) {
+                            let (e, st) = self.interp(t, i, open.len(), close, start, bol, out);
+                            if st != 0 {
+                                return (n, st);
+                            }
+                            i = e;
+                            continue 'outer;
                         }
                     }
                     Rule::Words(list, kind) => {
@@ -363,7 +399,54 @@ impl Highlighter {
             }
             i += utf8_len(b[i]);
         }
-        0
+        (n, 0)
+    }
+
+    // a string with interpolations from its open quote at i (open: its length) -> (its end,
+    // the state at the line end: a construct inside an interpolation stays open)
+    #[allow(clippy::too_many_arguments)]
+    fn interp(&self, t: &str, i: usize, open: usize, close: &str, start: &str, bol: usize, out: &mut Vec<Token>) -> (usize, u32) {
+        let b = t.as_bytes();
+        let mut s = i;
+        let mut j = i + open;
+        while j < b.len() {
+            if b[j] == b'\\' {
+                push(out, s, j, SY_STRING);
+                let mut e = (j + 1 + b.get(j + 1).map_or(0, |&c| utf8_len(c))).min(b.len());
+                if b.get(j + 1) == Some(&b'u') && b.get(j + 2) == Some(&b'{') {
+                    e = j + 3 + b[j + 3..].iter().take_while(|c| c.is_ascii_hexdigit()).count();
+                    if b.get(e) == Some(&b'}') {
+                        e += 1;
+                    }
+                }
+                while e < b.len() && !t.is_char_boundary(e) {
+                    e += 1;
+                }
+                push(out, j, e, SY_ESCAPE);
+                j = e;
+                s = e;
+                continue;
+            }
+            if t[j..].starts_with(close) {
+                push(out, s, j + close.len(), SY_STRING);
+                return (j + close.len(), 0);
+            }
+            if t[j..].starts_with(start) {
+                push(out, s, j, SY_STRING);
+                push(out, j, j + start.len(), SY_META);
+                let (e, st) = self.scan(t, j + start.len(), bol, true, out);
+                if st != 0 || e >= b.len() {
+                    return (b.len(), st);
+                }
+                push(out, e, e + 1, SY_META);
+                j = e + 1;
+                s = j;
+                continue;
+            }
+            j += utf8_len(b[j]);
+        }
+        push(out, s, b.len(), SY_STRING);
+        (b.len(), 0)
     }
 
     // continue a construct open at the line start -> (where it ends, the state: 0 closed)
@@ -926,6 +1009,37 @@ pub static MARKDOWN: Grammar = Grammar {
     pairs: "()[]",
 };
 
+// the lexical rules of lib/script/lex.rs: keywords, true / false / nil, one-line strings
+// with escapes and ${..} (code inside, nested strings too), numbers with _, 0x, 0b, a
+// fraction and an exponent, // and /* */ comments (not nested)
+const JFS_KEYWORDS: &[&str] = &["let", "fn", "if", "else", "while", "for", "in", "break", "continue", "return", "try", "catch", "throw"];
+
+static JFS_RULES: [Rule; 7] = [
+    Rule::LineComment("//"),
+    Rule::Block { open: "/*", close: "*/", kind: SY_COMMENT, nested: false, bol: false },
+    Rule::Interp { open: "\"", close: "\"", start: "${" },
+    Rule::Words(JFS_KEYWORDS, SY_KEYWORD),
+    Rule::Words(&["true", "false", "nil"], SY_CONST),
+    Rule::Number,
+    Rule::Punct("+-*/%=<>!&|?:;,.()[]{}"),
+];
+
+/// the scripting language of lib/script (.jfs): calls before '(' are functions, the
+/// delimiters of ${..} in strings SY_META
+pub static JFS: Grammar = Grammar {
+    name: "JFS",
+    exts: &["jfs"],
+    rules: &JFS_RULES,
+    ident: "",
+    calls: true,
+    macros: false,
+    caps_types: false,
+    comment: "//",
+    openers: "{[(",
+    closers: "}])",
+    pairs: "()[]{}",
+};
+
 static PLAIN_RULES: [Rule; 0] = [];
 
 /// plain text: no tokens
@@ -972,6 +1086,8 @@ pub struct CodeTheme {
     pub tokens: [u32; SY_COUNT],
     pub bold: u32,
     pub italic: u32,
+    /// the wavy underlines and gutter markers of errors, warnings and infos (DIAG_* order)
+    pub diag: [u32; 3],
 }
 
 const fn argb(rgb: u32) -> u32 {
@@ -1018,6 +1134,7 @@ impl CodeTheme {
             ],
             bold: 1 << SY_HEADING | 1 << SY_STRONG,
             italic: 1 << SY_COMMENT | 1 << SY_EMPH,
+            diag: [argb(0xCF222E), argb(0x9A6700), argb(0x0969DA)],
         }
     }
 
@@ -1060,10 +1177,13 @@ impl CodeTheme {
             ],
             bold: 1 << SY_HEADING | 1 << SY_STRONG,
             italic: 1 << SY_COMMENT | 1 << SY_EMPH,
+            diag: [argb(0xF85149), argb(0xD29922), argb(0x58A6FF)],
         }
     }
 
-    /// the colours of a high-contrast scheme: few colours, keywords and headings bold
+    /// the colours of a high-contrast scheme: few colours, keywords and headings bold;
+    /// diagnostics in the text, link and highlight colours (the gutter markers' shapes tell
+    /// them apart too)
     pub fn high_contrast(c: &plat::HcColors) -> CodeTheme {
         let (bg, fg, hi, link, dis) = (argb(c.bg), argb(c.text), argb(c.highlight), argb(c.link), argb(c.disabled));
         CodeTheme {
@@ -1084,13 +1204,15 @@ impl CodeTheme {
             tokens: [fg, link, link, fg, hi, hi, dis, hi, fg, link, link, link, fg, fg, link, hi, link],
             bold: 1 << SY_KEYWORD | 1 << SY_HEADING | 1 << SY_STRONG | 1 << SY_FUNC,
             italic: 1 << SY_COMMENT | 1 << SY_EMPH,
+            diag: [fg, link, hi],
         }
     }
 }
 
 impl crate::Ui {
     /// the code editors' colours for the UI's theme: dark / light syntax colours on the UI's
-    /// text box colours (accent selection), or the high-contrast scheme's colours
+    /// text box colours (accent selection, diagnostics in its critical / warning / info
+    /// colours), or the high-contrast scheme's colours
     pub fn code_theme(&self) -> CodeTheme {
         use crate::consts::*;
         use crate::theme::color_mix;
@@ -1117,6 +1239,7 @@ impl crate::Ui {
         t.line_hl = color_mix(bg, fg, if self.theme_dark { 16 } else { 10 });
         t.sel = color_mix(bg, self.color(T_ACCENT) | 0xFF00_0000, if self.theme_dark { 110 } else { 80 });
         t.sel_inactive = color_mix(bg, fg, if self.theme_dark { 40 } else { 30 });
+        t.diag = [over(bg, self.color(T_CRIT)), over(bg, self.color(T_WARN)), over(bg, self.color(T_INFO))];
         t
     }
 }

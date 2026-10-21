@@ -10,13 +10,28 @@
 //        short one.  EV_ACT: the text changed; EV_FOCUS while focused; EV_COMMIT: the focus
 //        left.  Ids id .. id + 15 (id + 1 / + 2 the scroll bars, + 3 .. 13 the find bar).
 //        CE_READONLY: select, copy and find only; CE_NO_GUTTER: no line numbers;
-//        CE_NO_FRAME: no box; CE_NO_FIND: no find bar; CE_NO_LINE: no current-line highlight
+//        CE_NO_FRAME: no box; CE_NO_FIND: no find bar; CE_NO_LINE: no current-line highlight;
+//        CE_MARKS: the gutter keeps its column of diagnostic markers while there are none
 //   ui.code_find(id, query, replace)   open the find bar (replace: with the replace row) with
 //        a query; the editor selects the first match from the caret on
 //   ui.code_status(id) -> CodeStatus   line and column of the caret (from 1), the matches
-//        and the current one, the lines tokenized in the last frame
+//        and the current one, the lines tokenized in the last frame, the document's
+//        diagnostics per severity and the severity of the one at the caret
+//   ui.code_diag(id) -> Option<Diag>   the (most severe) diagnostic at the caret, its message
 //   ui.code_theme_set(Some(theme))     the colours of every code editor (None: code_theme())
 //   ui.code_font_size(pt)              the size of the code editors' font (default 10 pt)
+//
+// Diagnostics (CodeDoc::set_diagnostics; they follow the edits, code_doc.rs) are wavy
+// underlines below their text in the colour of their severity (infos below warnings below
+// errors; a point or the end of a line: one cell) and a marker in the gutter's first column on
+// the line where one starts (the most severe: a filled circle with a cross, a triangle, an
+// "i" -- shapes, not only colours, also in high contrast).  The column is there while the
+// document has diagnostics (CE_MARKS: always, so the text does not move).  The pointer over an
+// underline or a marker shows the messages as a tooltip ("Fehler: ...", most severe first);
+// the ones at the caret are in code_status / code_diag and a K_TEXT record at the caret's line
+// for screen readers (after the editor's record: the app's post-modifiers stay the editor's).
+// Only the diagnostics of the visible lines are looked at (binary search by position), an
+// underline is one command however long it is.
 //
 // Keys (besides those of ed_core.rs): Tab / Shift+Tab indent / unindent (several lines: the
 // block), Enter a line break with the indentation (one level more after an opener), a closer
@@ -24,7 +39,9 @@
 // tab stop, Home toggles between the first non-blank and column 0, Ctrl+C / Ctrl+X without a
 // selection the whole line, Ctrl+/ line comments, Alt+Up / Alt+Down move the lines, Ctrl+Up /
 // Ctrl+Down scroll, Ctrl+F find, Ctrl+H replace, F3 / Shift+F3 (Enter / Shift+Enter in the
-// find box) the next / previous match, Esc closes the find bar (else drops the focus),
+// find box) the next / previous match, F8 / Shift+F8 the caret to the start of the next /
+// previous diagnostic (round the end; without diagnostics F8 stays the window's key for the
+// splitters), Esc closes the find bar (else drops the focus),
 // Ctrl+Tab (read-only: Tab) moves the focus on.  Mouse: click, drag, Shift+click, double
 // click a word, a click or drag in the gutter selects lines, the wheel (Shift: sideways).
 // Accessibility: a K_TEXTBOX record with the text (beyond 64 KB: the visible lines) and the
@@ -33,12 +50,15 @@
 
 use alloc::collections::BTreeMap;
 use alloc::format;
+use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use gfx::{CAP_ROUND, JOIN_ROUND};
 use text::segment;
 use text::FS_SYN_ITALIC;
 
+use crate::cmd::{Draw, DrawRef, Gfx};
 use crate::code_doc::*;
 use crate::consts::*;
 use crate::ed_core::*;
@@ -57,6 +77,8 @@ pub const CE_NO_FRAME: u32 = 4;
 pub const CE_NO_FIND: u32 = 8;
 /// no highlight of the current line
 pub const CE_NO_LINE: u32 = 16;
+/// the gutter keeps its column of diagnostic markers while the document has none
+pub const CE_MARKS: u32 = 32;
 
 const NAT_W: i32 = 560;
 const NAT_H: i32 = 320;
@@ -78,6 +100,11 @@ pub struct CodeStatus {
     pub hl_lines: usize,
     /// the number of lines
     pub lines: usize,
+    /// the document's diagnostics: errors, warnings, infos (DIAG_* order)
+    pub diags: [usize; 3],
+    /// the severity (DIAG_*) of the most severe diagnostic at the caret (ui.code_diag: the
+    /// diagnostic with its message)
+    pub diag: Option<u8>,
 }
 
 // the highlighting states: states[i] = the state line i starts in
@@ -141,6 +168,8 @@ struct View {
     status: CodeStatus,
     // the lines tokenized for states by the last pass that had something to do
     hl_last: usize,
+    // the most severe diagnostic at the caret
+    caret_diag: Option<Diag>,
 }
 
 /// shared state (Ui::m.code)
@@ -151,6 +180,40 @@ pub(crate) struct S {
     size_pt: f32,
     // a find request: id, query, replace row
     find_req: Option<(u32, String, bool)>,
+    // the drawings of wavy underlines: colour, size key (the same object every frame)
+    waves: Vec<(u32, u32, DrawRef)>,
+}
+
+// a wavy underline across its rectangle, drawn at render time (one command however long)
+struct Wave {
+    color: u32,
+    // half a wave and its height (px), the line's width (24.8)
+    hp: i32,
+    amp: i32,
+    width: i32,
+}
+
+impl Draw for Wave {
+    fn draw(&self, g: &mut Gfx, r: [i32; 4]) {
+        let pad = (self.width >> 9) + 1;
+        let (x0, x1, top) = (r[0] + pad, r[0] + r[2] - pad, r[1] + pad);
+        // only the waves near the clip (a dirty part), in the phase of the whole line
+        let (c0, c1) = (g.dc.clip[0] - g.dc.ox, g.dc.clip[2] - g.dc.ox);
+        let k0 = ((c0 - x0) / self.hp - 2).max(0);
+        let y = |k: i32| ((top + (k & 1) * self.amp) << 8) + 128;
+        let sh = g.shapes();
+        sh.path.begin(sh.dc);
+        let mut k = k0;
+        let mut x = x0 + k * self.hp;
+        sh.path.move_fx(x << 8, y(k));
+        while x < x1 && x <= c1 + self.hp * 2 {
+            x = (x + self.hp).min(x1);
+            k += 1;
+            sh.path.line_fx(x << 8, y(k));
+        }
+        sh.dc.set_color(self.color);
+        sh.path.stroke(sh.ras, sh.dc, sh.sf, self.width, CAP_ROUND << 4 | JOIN_ROUND);
+    }
 }
 
 // the font and cells of the editors
@@ -235,9 +298,16 @@ impl Ui {
         self.repass();
     }
 
-    /// the caret, the find matches and the lines tokenized in code editor id's last frame
+    /// the caret, the find matches, the lines tokenized and the diagnostics in code editor
+    /// id's last frame
     pub fn code_status(&self, id: u32) -> CodeStatus {
         self.m.code.views.get(&id).map_or(CodeStatus::default(), |v| v.status)
+    }
+
+    /// the most severe diagnostic at the caret of code editor id in its last frame (its
+    /// message for a status bar)
+    pub fn code_diag(&self, id: u32) -> Option<Diag> {
+        self.m.code.views.get(&id).and_then(|v| v.caret_diag.clone())
     }
 
     // the monospace font: the cell a whole number of pixels wide (as the consoles)
@@ -479,7 +549,10 @@ impl Ui {
         let sbw = st.scrollbar_thickness(self);
         let n = doc.line_count();
         let digits = format!("{}", n).len().max(2) as i32;
-        let gw = if flags & CE_NO_GUTTER != 0 { 0 } else { digits * m.cw + self.dp(18) };
+        // the gutter: the markers' column (while there are diagnostics), the line numbers
+        let mk = if flags & CE_MARKS != 0 || doc.diagnostic_count() > 0 { m.lh } else { 0 };
+        let nums = flags & CE_NO_GUTTER == 0;
+        let gw = mk + if nums { digits * m.cw + self.dp(18) } else { 0 };
         let bar_h = if v.find.open { self.dp(if v.find.replace { 76 } else { 40 }) } else { 0 };
         let inner = [r[0] + hair, r[1] + hair, (r[2] - hair * 2).max(1), (r[3] - hair * 2).max(1)];
         let ty = inner[1] + bar_h;
@@ -498,6 +571,9 @@ impl Ui {
         let mut hb = HB_FOCUS | HB_TEXT | CUR_IBEAM << HB_CURSOR_SHIFT;
         if stflags & ST_DISABLED != 0 {
             hb |= HB_DISABLED;
+        }
+        if doc.diagnostic_count() > 0 {
+            hb |= HB_MOVES; // (the tooltip follows the pointer from one diagnostic to the next)
         }
         self.wp.ctx.last_rect = [inner[0], ty, inner[2], inner[1] + inner[3] - ty];
         let ev = self.behave(id, hb);
@@ -756,7 +832,7 @@ impl Ui {
         let cols = (tw_px / m.cw.max(1)) as usize + 2;
         let tx0 = tx - v.sx;
         // the line numbers
-        if gw > 0 {
+        if nums {
             for l in first..last {
                 let y = ty + l as i32 * m.lh - v.sy;
                 let num = format!("{}", l + 1);
@@ -764,6 +840,59 @@ impl Ui {
                 let c = if l == caret.line { theme.gutter_cur } else { theme.gutter_fg };
                 self.ce_cells(&m, inner[0] + gw - self.dp(10) - nw, y + m.base, num.as_bytes(), c, false, false);
             }
+        }
+        // the diagnostics of the visible lines: per line the most severe one starting there
+        // marks the gutter; underlines (severity, x0, x1, line top) are drawn after the text
+        let dvis: Vec<usize> = doc.mark_range(first, last).filter(|&i| last_line(&doc.marks()[i]) >= first).collect();
+        if mk > 0 {
+            let mut best: Vec<(usize, u8)> = Vec::new();
+            for &i in &dvis {
+                let d = &doc.marks()[i];
+                match best.last_mut() {
+                    Some(b) if b.0 == d.a.line => b.1 = b.1.min(d.sev),
+                    _ if d.a.line >= first => best.push((d.a.line, d.sev)),
+                    _ => {}
+                }
+            }
+            for (l, sev) in best {
+                let y = ty + l as i32 * m.lh - v.sy;
+                self.ce_marker(sev, inner[0], y, mk, m.lh, theme.diag[sev as usize]);
+            }
+        }
+        let mut waves: Vec<(u8, i32, i32, i32)> = Vec::new();
+        for &i in &dvis {
+            let d = &doc.marks()[i];
+            for l in d.a.line.max(first)..=d.b.line.min(last - 1) {
+                if !touches(d, l) {
+                    continue;
+                }
+                let (c0, c1) = mark_cols(d, l, doc.line(l), tw);
+                waves.push((d.sev, tx0 + c0 as i32 * m.cw, tx0 + c1 as i32 * m.cw, ty + l as i32 * m.lh - v.sy));
+            }
+        }
+        // the diagnostics under the pointer (an underline, a marker)
+        let mut hov: Vec<usize> = Vec::new();
+        if ev & EV_HOVER != 0 && v.drag == 0 && !dvis.is_empty() && my >= ty && my < ty + th {
+            let l = ((my - ty + v.sy) / m.lh.max(1)) as usize;
+            let col = ((mx - tx0).max(0) / m.cw.max(1)) as usize;
+            let on_mark = mk > 0 && mx >= inner[0] && mx < inner[0] + mk;
+            let on_text = mx >= tx && mx < tx + tw_px;
+            hov = dvis
+                .iter()
+                .copied()
+                .filter(|&i| {
+                    let d = &doc.marks()[i];
+                    if on_mark {
+                        d.a.line == l
+                    } else {
+                        on_text && touches(d, l) && {
+                            let (c0, c1) = mark_cols(d, l, doc.line(l), tw);
+                            col >= c0 && col < c1
+                        }
+                    }
+                })
+                .collect();
+            hov.sort_by_key(|&i| doc.marks()[i].sev);
         }
         let area = [tx - self.dp(6), ty, inner[0] + inner[2] - tx + self.dp(6), th];
         self.clip_push(area[0], area[1], area[2], area[3]);
@@ -862,6 +991,17 @@ impl Ui {
                 }
             }
         }
+        // the underlines: infos first, errors on top; only their visible part (whole waves)
+        waves.sort_by_key(|w| core::cmp::Reverse(w.0));
+        let (lim0, lim1) = (tx - m.cw * 2, tx + tw_px + m.cw * 2);
+        let period = self.dp(2).max(2) * 2;
+        for (sev, x0, x1, y) in waves {
+            let x0 = if x0 < lim0 { x0 + (lim0 - x0) / period * period } else { x0 };
+            let x1 = x1.min(lim1);
+            if x1 > x0 {
+                self.ce_wave(x0, x1, y, &m, theme.diag[sev as usize]);
+            }
+        }
         self.clip_pop();
         // the caret
         let cx_px = tx0 + ccol * m.cw;
@@ -931,6 +1071,30 @@ impl Ui {
             s.min = kind as i32;
         }
         v.label.4 = label;
+        // the messages under the pointer: the tooltip of the record above (part: the first
+        // diagnostic, in the gutter or the text; only while the pointer is here, so the part
+        // tooltips of other widgets keep theirs)
+        if ev & EV_HOVER != 0 && !dvis.is_empty() {
+            if hov.is_empty() {
+                self.tooltip_part("", 0);
+            } else {
+                let part = 1 + hov[0] as u64 + if mx < tx { 1 << 40 } else { 0 };
+                self.tooltip_part(&diag_text(doc, &hov), part);
+            }
+        }
+        // the diagnostics at the caret: the status, a record at the caret's line (after the
+        // editor's own, so an app's tooltip or context menu stays the editor's)
+        let at = doc.marks_at(caret);
+        v.caret_diag = at.first().map(|&i| doc.diag_of(&doc.marks()[i]));
+        if !at.is_empty() {
+            let state = self.wp.ctx.last_state;
+            let cy = (ty + caret.line as i32 * m.lh - v.sy).clamp(ty, (ty + th - m.lh).max(ty));
+            self.wp.ctx.last_rect = [inner[0], cy, inner[2], m.lh];
+            self.wp.ctx.last_state = 0;
+            self.sem(K_TEXT, 0, Some(&diag_text(doc, &at)), doc.marks()[at[0]].sev as i32);
+            self.wp.ctx.last_rect = r;
+            self.wp.ctx.last_state = state;
+        }
         if focused {
             self.ed_hold(id, fa, fc);
             v.held = Some((fa, fc));
@@ -947,6 +1111,8 @@ impl Ui {
             current: if v.find.open { v.find.current.map_or(0, |c| c + 1) } else { 0 },
             hl_lines: v.hl_last,
             lines: n,
+            diags: doc.diagnostic_counts(),
+            diag: at.first().map(|&i| doc.marks()[i].sev),
         };
         self.m.code.views.insert(id, v);
         let now = self.frame;
@@ -985,6 +1151,43 @@ impl Ui {
                 self.cmd_text(x + dx, y, s, font, m.size, c, 0);
             }
         }
+    }
+
+    // a wavy underline from x0 to x1 at the foot of the line whose top is y (one command: a
+    // Wave of this colour and size, the same object every frame)
+    fn ce_wave(&mut self, x0: i32, x1: i32, y: i32, m: &Metrics, color: u32) {
+        let hp = self.dp(2).max(2);
+        let amp = self.dp(2).max(2);
+        let width = self.dp(1).max(1) << 8;
+        let top = (y + m.base + self.dp(1)).min(y + m.lh - amp - 1);
+        let key = (hp as u32) << 16 | (amp as u32) << 8 | (width >> 8) as u32;
+        let w = &mut self.m.code.waves;
+        let d = match w.iter().find(|e| e.0 == color && e.1 == key) {
+            Some(e) => e.2.clone(),
+            None => {
+                if w.len() >= 24 {
+                    w.clear();
+                }
+                let d: DrawRef = Rc::new(Wave { color, hp, amp, width });
+                w.push((color, key, d.clone()));
+                d
+            }
+        };
+        let pad = (width >> 9) + 1;
+        self.cmd_custom(x0 - pad, top - pad, x1 - x0 + pad * 2, amp + pad * 2, Some(d), key as usize, color);
+    }
+
+    // the gutter's marker of a diagnostic, centred in the cell (x, y, w: cell, h: lh): a filled
+    // circle with a cross (error), a triangle (warning), an "i" (info)
+    fn ce_marker(&mut self, sev: u8, x: i32, y: i32, cell: i32, lh: i32, color: u32) {
+        let cp = match sev {
+            DIAG_ERROR => IC_ERROR_FILL,
+            DIAG_WARNING => IC_WARNING,
+            _ => IC_INFO,
+        };
+        let px = (lh * 2 / 3).max(8);
+        self.draw_color(color);
+        self.draw_icon(cp, x + (cell - px) / 2, y + (lh - px) / 2, px << 8);
     }
 
     // a key of the editor itself -> consumed
@@ -1048,6 +1251,14 @@ impl Ui {
             }
             VK_F3 => {
                 self.ce_find_step(doc, v, shift);
+                true
+            }
+            // (without diagnostics F8 is the window's: the splitters)
+            VK_F8 if doc.diagnostic_count() > 0 => {
+                if let Some(p) = doc.next_diagnostic(sel.caret, shift) {
+                    doc.set_selection(TextSel::at(p));
+                }
+                v.prefx = -1;
                 true
             }
             VK_HOME => {
@@ -1270,6 +1481,40 @@ fn soft_back(doc: &CodeDoc, a: TextPos, b: TextPos) -> (TextPos, TextPos) {
     let col = b.byte;
     let target = (col - 1) / tw * tw;
     (TextPos::new(b.line, target), b)
+}
+
+// the last line a diagnostic marks something on (a part over lines ending at a line's start
+// ends on the line before)
+fn last_line(d: &Mark) -> usize {
+    if d.b.byte == 0 && d.b.line > d.a.line { d.b.line - 1 } else { d.b.line }
+}
+
+// a diagnostic marks something on line l
+fn touches(d: &Mark, l: usize) -> bool {
+    d.a.line <= l && l <= last_line(d)
+}
+
+// the columns a diagnostic underlines on line l (its text t): over lines to the line's end and
+// one cell for its break; at least one cell
+fn mark_cols(d: &Mark, l: usize, t: &str, tw: usize) -> (usize, usize) {
+    let c0 = if d.a.line == l { col_in(t, d.a.byte, tw) } else { 0 };
+    let c1 = if d.b.line == l { col_in(t, d.b.byte, tw) } else { col_in(t, t.len(), tw) + 1 };
+    (c0, c1.max(c0 + 1))
+}
+
+// the messages of diagnostics (indexes of doc.marks()): "Fehler: ...", joined by " · "
+fn diag_text(doc: &CodeDoc, ix: &[usize]) -> String {
+    let mut s = String::new();
+    for (k, &i) in ix.iter().enumerate() {
+        let d = &doc.marks()[i];
+        if k > 0 {
+            s.push_str(" · ");
+        }
+        s.push_str(tr(["Fehler", "Warnung", "Hinweis"][d.sev.min(DIAG_INFO) as usize]));
+        s.push_str(": ");
+        s.push_str(&d.msg);
+    }
+    s
 }
 
 // the matches of lines first .. first + n

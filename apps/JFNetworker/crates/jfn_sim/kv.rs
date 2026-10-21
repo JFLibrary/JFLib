@@ -36,7 +36,8 @@
 // Metrics: requests, reads, writes, ok, not_found, unavailable, full, forwards, led,
 // replica_writes, replica_reads, stale_reads (a read answered an older version than another
 // replica had), read_repairs (sent), repaired (received), keys, bytes, members_up,
-// member_downs, p50_us, p95_us, p99_us (client requests at this node).
+// member_downs, p50_us, p95_us, p99_us (client requests at this node; the time series take them
+// per interval from the window).
 // Views: Engine::kv_view, kv_ring, kv_where (the replicas of a key and what each holds).
 
 use alloc::boxed::Box;
@@ -58,6 +59,7 @@ use crate::http::{Agent, Done, Fail, Reply, Req, ReqIn, Serve, ServeCfg, Url, Wh
 use crate::httpsvc::decimal;
 use crate::kernel::{Engine, Ns, MS, SEC};
 use crate::os::{Metric, OsApi, Service, SvcEvent};
+use crate::series::{LatWindow, LAT};
 use crate::trace::Note;
 
 /// timer keys: its own deadlines (heartbeats, disk, timeouts), the server side, the agent
@@ -1147,6 +1149,9 @@ impl Service for KvNode {
             Metric::new("p99_us", us(self.lat.p99(now))),
         ]
     }
+    fn windows(&self) -> Vec<LatWindow<'_>> {
+        alloc::vec![LatWindow::new(&self.lat, LAT)]
+    }
     fn status(&self) -> String {
         let up = self.nodes.iter().filter(|a| self.is_up(**a)).count();
         let (w, r) = self.quorums(None, None, None);
@@ -1342,6 +1347,10 @@ impl KvClient {
     /// latencies of the answered requests (p50 / p95 / p99 at `now`)
     pub fn latency(&self, now: Ns) -> (Option<Ns>, Option<Ns>, Option<Ns>) {
         (self.lat.p50(now), self.lat.p95(now), self.lat.p99(now))
+    }
+    /// the latencies of its requests (300 slots of one second; the time series of its service)
+    pub fn window(&self) -> &Window {
+        &self.lat
     }
     /// the nodes this client counts as down now
     pub fn down_now(&self, now: Ns) -> Vec<Ipv4> {

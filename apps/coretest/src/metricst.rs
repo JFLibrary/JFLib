@@ -1,7 +1,8 @@
 // metricst -- checks of base::metrics: counters and gauges, the bucket layout of the
 // log-linear histogram (exact below 32, then 32 steps per power of two, the last bucket at
 // u64::MAX), quantiles by nearest rank with their error bound, equal values reported exactly,
-// merging, and the window of 300 one-second slots (expiry, gaps, values per slot)
+// merging, and the window of 300 one-second slots (expiry, gaps, values per slot, the slots
+// of a time span)
 
 use alloc::vec::Vec;
 
@@ -102,6 +103,14 @@ fn window(t: &mut T) {
     t.eq("p99", w.p99(now), Some(599));
     t.check("too old", !w.record(10 * SEC, 1));
     t.eq("hist of the window", w.hist(now).count(), 300);
+    // the slots of a time span as one histogram (JFNetworker's time series)
+    let mut want = Hist::new();
+    for s in 400..410u64 {
+        want.record(s);
+    }
+    t.eq("hist between", w.hist_between(400 * SEC, 410 * SEC), want);
+    t.eq("between: slots that start in the span", (w.hist_between(400 * SEC + 1, 410 * SEC).count(), w.hist_between(400 * SEC, 410 * SEC + 1).count()), (9, 11));
+    t.eq("between: what the ring still holds", (w.hist_between(0, 600 * SEC).count(), w.hist_between(0, 300 * SEC).count(), w.hist_between(5 * SEC, 5 * SEC).count()), (300, 0, 0));
     // a quiet minute: the old seconds leave the window as time goes on
     let later = now + 60 * SEC;
     t.eq("quiet minute", (w.count(later), w.min(later)), (240, Some(360)));

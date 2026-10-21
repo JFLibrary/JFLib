@@ -28,7 +28,7 @@ use crate::os::Service;
 use crate::trace::fmt_ns;
 
 /// columns: every one as wide as its widest cell (+ 2), the last one not padded
-fn table(rows: &[Vec<String>]) -> String {
+pub(crate) fn table(rows: &[Vec<String>]) -> String {
     let n = rows.iter().map(|r| r.len()).max().unwrap_or(0);
     let mut w = alloc::vec![0usize; n];
     for r in rows {
@@ -53,7 +53,7 @@ fn table(rows: &[Vec<String>]) -> String {
     s
 }
 
-fn row(cells: &[&str]) -> Vec<String> {
+pub(crate) fn row(cells: &[&str]) -> Vec<String> {
     cells.iter().map(|c| String::from(*c)).collect()
 }
 

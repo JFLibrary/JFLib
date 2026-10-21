@@ -1,0 +1,168 @@
+#!args --verify-dirty
+# diagnostics in the code editor (CodeDoc::set_diagnostics, ui.code_diag): "Prüfen" checks the
+# JFS sample with lib/script (two errors, a warning) plus an info at the TODO -- wavy
+# underlines and markers in a gutter column of their own; the pointer over an underline or a
+# marker shows the messages, F8 / Shift+F8 go round them (the record at the caret and
+# code_diag tell the one there); edits move them until the next check (typing before one on
+# its line, at its edges, inside it, Enter above, undo, Alt+Down / Up, deleting its text drops
+# it); "Beim Tippen" checks after every change; diagnostics over lines, at a point and stacked
+# (cmd 900); CE_MARKS (cmd 903); 100 000 lines with diagnostics (cmd 902, bench); shots light /
+# dark at 100 and 150 %, high contrast.  Lines of 20 px from y 109; with the markers' column
+# the text starts at x 73, else at x 53 (cells of 8 px)
+size 1000 680
+theme light
+click tab:"Code"
+click tab:"JFS"
+wait 300
+expect text:"lang: JFS" exists
+# no diagnostics: no markers' column; CE_MARKS keeps it
+click 77,119
+expect text:"pos: 1:4" exists
+cmd 903
+wait 1000
+click 77,119
+expect text:"pos: 1:2" exists
+cmd 903
+click "Prüfen"
+expect text:"dg: 2/1/1" exists
+expect text:"ds: 22:4-22:8 I, 23:5-23:9 E, 24:1-24:6 W, 25:1-25:6 E" exists
+shot build/editortest/code_diag_light.png
+# F8 / Shift+F8: the caret to the start of the next / previous one, round the end
+focus #3000
+key ctrl+home
+expect text:"at: -" exists
+key f8
+expect text:"pos: 22:4" exists
+expect text:"at: I 22:4 Offene Aufgabe" exists
+expect text:"Hinweis: Offene Aufgabe" exists
+key f8
+expect text:"pos: 23:5" exists
+expect text:"at: E 23:5 hits ist schon deklariert (Zeile 2)" exists
+key f8
+key f8
+expect text:"pos: 25:1" exists
+expect text:"Fehler: break steht außerhalb einer Schleife" exists
+key f8
+expect text:"pos: 22:4" exists
+key shift+f8
+expect text:"pos: 25:1" exists
+key shift+f8
+expect text:"pos: 24:1" exists
+expect text:"at: W 24:1 Unbekannter Name pirnt – meinst du print?" exists
+shot build/editortest/code_diag_caret.png
+# the pointer over an underline, over a marker; away from them nothing
+key ctrl+home
+move 93,579
+wait 600
+expect text:"Warnung: Unbekannter Name pirnt – meinst du print?" exists
+shot build/editortest/code_diag_hover.png
+move 23,599
+wait 600
+expect text:"Fehler: break steht außerhalb einer Schleife" exists
+expect text:"Warnung: Unbekannter Name pirnt – meinst du print?" missing
+move 400,300
+wait 600
+expect text:"Fehler: break steht außerhalb einer Schleife" missing
+# typing before one on its line moves it, at its start it stays outside, inside it grows it
+focus #3000
+key ctrl+home
+key f8
+key f8
+key f8
+expect text:"pos: 24:1" exists
+type "x"
+expect text:"ds: 22:4-22:8 I, 23:5-23:9 E, 24:2-24:7 W, 25:1-25:6 E" exists
+key backspace
+key right
+key right
+type "r"
+expect text:"ds: 22:4-22:8 I, 23:5-23:9 E, 24:1-24:7 W, 25:1-25:6 E" exists
+key ctrl+z
+expect text:"ds: 22:4-22:8 I, 23:5-23:9 E, 24:1-24:6 W, 25:1-25:6 E" exists
+# Enter above: a line down; undo: back
+key ctrl+home
+key enter
+expect text:"ds: 23:4-23:8 I, 24:5-24:9 E, 25:1-25:6 W, 26:1-26:6 E" exists
+key ctrl+z
+expect text:"ds: 22:4-22:8 I, 23:5-23:9 E, 24:1-24:6 W, 25:1-25:6 E" exists
+# Alt+Down / Up: with their line
+key ctrl+home
+key f8
+key f8
+key alt+down
+expect text:"ds: 22:4-22:8 I, 23:1-23:6 W, 24:5-24:9 E, 25:1-25:6 E" exists
+key alt+up
+expect text:"ds: 22:4-22:8 I, 23:5-23:9 E, 24:1-24:6 W, 25:1-25:6 E" exists
+# its text deleted: gone (undo brings the text back, the next check the diagnostic)
+key ctrl+end
+key shift+f8
+key shift+end
+key delete
+expect text:"dg: 1/1/1" exists
+expect text:"ds: 22:4-22:8 I, 23:5-23:9 E, 24:1-24:6 W" exists
+key ctrl+z
+expect text:"dg: 1/1/1" exists
+click "Prüfen"
+expect text:"dg: 2/1/1" exists
+# checked while typing
+click "Beim Tippen"
+focus #3000
+key ctrl+end
+type "pirnt(1)"
+expect text:"dg: 2/2/1" exists
+expect text:"ds: 22:4-22:8 I, 23:5-23:9 E, 24:1-24:6 W, 25:1-25:6 E, 26:1-26:6 W" exists
+key ctrl+z
+expect text:"dg: 2/1/1" exists
+click "Beim Tippen"
+# the shots: dark, 150 %, high contrast
+focus #3000
+key ctrl+home
+key shift+f8
+theme dark
+wait 300
+shot build/editortest/code_diag_dark.png
+scale 150
+wait 300
+shot build/editortest/code_diag_dark_150.png
+theme light
+wait 300
+shot build/editortest/code_diag_light_150.png
+scale 100
+click "Hoher Kontrast"
+wait 300
+shot build/editortest/code_diag_hc.png
+click "Hoher Kontrast"
+# over lines, at the end of a line (a point), an info and a warning on top of each other;
+# both messages in the tooltip
+click tab:"Rust"
+wait 300
+cmd 900
+expect text:"ds: 1:74-1:74 W, 2:18-5:4 E, 6:1-6:4 I, 6:3-6:7 W" exists
+expect text:"dg: 1/2/1" exists
+move 93,219
+wait 600
+expect text:"Warnung: Eine Warnung darüber · Hinweis: Ein Hinweis" exists
+shot build/editortest/code_diag_lines.png
+move 400,300
+cmd 901
+expect text:"dg: 0/0/0" exists
+# 100 000 lines, one on every 7th line that calls compute(): only the visible ones are looked
+# at; Shift+F8 from the end, Enter in one and its undo (all of them follow); frame times
+click "100 000 Zeilen"
+cmd 902
+expect text:"dg: 4396/4394/4396" exists
+focus #3000
+bench 20
+key ctrl+end
+key shift+f8
+expect text:"pos: 99989:24" exists
+expect text:"at: W 99989:24 compute: eine Meldung" exists
+key ctrl+home
+key f8
+key enter
+expect text:"ds: 9:5-9:12 W, 16:24-16:31 I, 23:24-23:31 E, 30:24-30:31 W, 37:24-37:31 I, 44:24-44:31 E" exists
+key ctrl+z
+expect text:"ds: 8:24-8:31 W, 15:24-15:31 I, 22:24-22:31 E, 29:24-29:31 W, 36:24-36:31 I, 43:24-43:31 E" exists
+wheel #3000 -480
+bench 20
+expect_nowarn

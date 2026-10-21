@@ -1614,6 +1614,60 @@ self.dock.focus(P_PROPS);
 `donut(id, &[DonutSlice], center, sub)` and `legend(items)`; colours 0 take the style's chart
 palette.
 
+**Line charts** of time series (metrics, measurements): the app keeps each series in a
+`SeriesBuf` (a ring of `(t, value)` points with a capacity; a full one drops its oldest point)
+and describes the chart every frame:
+
+```rust
+// state: p50, p95: SeriesBuf (SeriesBuf::new(1200)), faults: Vec<(f64, &'static str)>
+self.p50.push(t, 0.012); // t in s, never decreasing; the value in s; f64::NAN is a gap
+let series = [
+    LcSeries::new("p50", &self.p50).unit(LcUnit::Secs),
+    LcSeries::new("p95", &self.p95).pal(3).unit(LcUnit::Secs),
+];
+let crit = ui.color(T_CRIT);
+let marks: Vec<LcMarker> = self.faults.iter().map(|f| LcMarker::line(f.0, f.1).color(crit)).collect();
+let slo = [LcThreshold::new(0.25, "SLO 250 ms")];
+let chart = LineChart::new(&series).name("Latenz").follow(60.0).y_range(0.0, f64::NAN).markers(&marks).thresholds(&slo);
+ui.next_size(-1, 240); // the plot with its axes and the legend below it
+if let Some((i, t)) = ui.line_chart(ID_LATENCY, &chart) {
+    // the pointer is over series i at its point t
+}
+```
+
+* The x axis: `LX_SECS` (the default) and `LX_NANOS` (a simulation clock) label time as `0:05`,
+  `1:00`, `1:30` (`1:00:00` from an hour on, decimals of the second below one), `LX_NUM` plain
+  numbers. `follow(span)` shows the newest `span` (from the first point on while the data are
+  shorter), `x_range(a, b)` a fixed view: to pause, keep `chart.view()` and pass it.
+* The y axis has nice ticks (1 / 2 / 2.5 / 5 × 10^k) in the first series' unit:
+  `LcUnit::Secs` (ns / µs / ms / s), `LcUnit::Si("B")` (kB, MB, GB; `"bit/s"`),
+  `LcUnit::Num("req/s")` (1,5k req/s; `"%"`; `""` plain numbers). A NaN end of `y_range` is
+  automatic (the visible values and the thresholds, out to the next tick).
+  `unit.text(v, ui.decimal_sep())` writes a value as the chart does (KPI tiles beside it).
+* Series are lines, `.area()` adds a translucent fill; colour 0 takes the palette colour
+  `.pal(k)`, else the series' index. Markers are lines (`LcMarker::line`) or shaded ranges
+  (`LcMarker::range`) with a tag at the top, thresholds dashed lines with a tag at their right
+  end. Tags never overlap: a marker's tag takes the first of up to three rows with room, else it
+  is left out (the hover card lists the markers under the pointer with their time).
+* Hovering shows a crosshair at the nearest point, a dot on every series and a card with every
+  series' value there. The chart returns the series nearest to the pointer and that x, and
+  passes once more when they change, so a readout above the chart is current. The keyboard:
+  the plot is a Tab stop; Left / Right step a cursor over the points of its series, Up / Down
+  change the series, Home / End, Esc ends it (a click puts it on the point under the pointer);
+  crosshair and card follow the cursor, and the chart's record starts with its point
+  ("p95, 1:45: 88,1 ms. Latenz – ..."), so a screen reader reads the values one by one.
+* Many points: up to two per pixel column the points themselves are drawn, more as one band per
+  column (`SeriesBuf::columns`: min / max per pixel column), so 100 000 points draw as fast as
+  500. The statistics and the drawing object are kept per id until a series' `ver()` or the
+  view changes; a change reads the visible points once (about a millisecond for 100 000).
+* No points at all: the `empty` text (default "Keine Daten" in the UI language). High contrast:
+  the scheme's colours with a dash pattern per series (also in the legend), no fills. The plot
+  keeps its left-to-right order in mirrored windows; the legend is mirrored. Screen readers get
+  a `K_CANVAS` record whose label sums the chart up ("Latenz – p50: aktuell 12 ms, min. 9,8 ms,
+  max. 41 ms; ..."); axis labels, tags and the card's rows are `K_TEXT` records.
+* Testing: the page "Metriken" of `apps/datagallery` (`tests/linechart.uis`,
+  `linechart_hc.uis`); `uitest --only chart` checks the ring and the axis maths.
+
 **Languages**: `ui::i18n::Catalog::from_tsv(include_str!("locales/ui.tsv"))` and
 `i18n::set_catalog` give an app a German-source catalogue of its own (BackupCraft:
 `src/tr.rs`); `i18n::t(s)` reads it. The column follows the user's languages: at start
@@ -1797,6 +1851,9 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   slots of a time span, e.g. `Window::new(300, 1_000_000_000)` for five minutes of seconds in
   nanoseconds: `record(t, v)`, quantiles over what is still in the window, `per_slot` for
   charts). Integer arithmetic only, so every target computes the same numbers.
+  `Window::hist_between(from, to)` merges the slots of a time span into one `Hist`: a time
+  series takes a point per interval from it and the quantiles of any span (JFNetworker's
+  `jfn_sim::series`, which samples every service on virtual time).
 * `base::hashring` -- consistent hashing: `Ring::add(member, key, vnodes)` puts a member's
   tokens on the ring (made from its key, so every device that knows the members builds the same
   ring), `owner(hash64(key))` is the member of the first token at or after the hash,
@@ -2602,6 +2659,54 @@ let text = self.code.text();
   beyond 64 KB it holds the visible lines. Mouse tests need `wait 1000` between clicks on the
   same editor, else they count as a double click.
 
+**Diagnostics** (a checker's or compiler's messages) belong to the document:
+
+```rust
+// after a change (or a pause in typing): lines and columns from 1 as compilers print them
+if ui.code_editor(ID_CODE, &mut self.code, &self.hl, CE_MARKS) & EV_ACT != 0 {
+    let d: Vec<Diag> = script::check(&self.code.text()).iter()
+        .map(|x| Diag::new(x.line as usize, x.col as usize, x.end_col as usize,
+                           if x.error { DIAG_ERROR } else { DIAG_WARNING }, &x.msg))
+        .collect();
+    self.code.set_diagnostics(&d);
+    ui.repass();                       // the editor drew the old ones in this pass
+}
+let st = ui.code_status(ID_CODE);      // st.diags: errors / warnings / infos, st.diag: at the caret
+if let Some(d) = ui.code_diag(ID_CODE) { self.status = format!("{}:{}: {}", d.line, d.col, d.msg); }
+```
+
+* `Diag::new(line, col, end_col, severity, msg)` marks a part of a line (`Diag::span` one over
+  lines); columns count characters (a tab is one), the end is exclusive, an end at or before
+  the start marks one character, a column past the line's end its end. Severities
+  `DIAG_ERROR`, `DIAG_WARNING`, `DIAG_INFO`. The positions are those of the text as it is
+  when they are set (a check on another thread: drop its result when `doc.revision()` changed
+  meanwhile).
+* The editor draws wavy underlines in the severity's colour (`CodeTheme::diag`; `code_theme()`
+  takes the UI's critical / warning / info colours) and, on the line where one starts, a
+  marker in a gutter column of their own: a filled circle with a cross, a triangle, an "i" --
+  shapes, so high contrast and colour-blind readers tell them apart. The column is there while
+  the document has diagnostics; `CE_MARKS` keeps it, so the text does not move when they come
+  and go. The pointer over an underline or a marker shows the messages as a tooltip
+  ("Fehler: …", most severe first); F8 / Shift+F8 move the caret to the next / previous one
+  (round the end; without diagnostics F8 stays the window's key for the splitters); the ones at
+  the caret are also a `K_TEXT` record at its line for screen readers.
+* They follow the edits (typing, Enter, deleting, block indent, comments, moved lines, undo /
+  redo) until the app sets new ones: text before a change keeps its place, text after it
+  shifts, a diagnostic whose text was replaced shrinks to what is left of it and is dropped
+  when nothing is, typed text at its edges stays outside. So a check may come later (after a
+  pause in typing) without squiggles sliding off their words. Where they are now:
+  `diagnostics()` / `diagnostic(i)` (a problems list), `diagnostics_at(pos)`,
+  `next_diagnostic(pos, back)`, `diagnostic_counts()`.
+* Only the visible lines' diagnostics are drawn, an underline is one command however long it
+  is: 100 000 lines with 13 000 diagnostics scroll and edit at the speed of a short file
+  (`apps/editortest/tests/code_diag.uis`: hover, F8, edits, checking while typing, shots).
+* `Highlighter::jfs()` (`for_name("x.jfs")`) highlights lib/script's language: keywords,
+  `true` / `false` / `nil`, numbers (`1_000`, `0xFF`, `0b101`, `1.5e-3`), `//` and `/* */`,
+  strings with escapes and `${…}` whose code is highlighted too (the delimiters are `SY_META`,
+  so their braces match as a bracket pair). A grammar of one's own gets such strings with
+  `Rule::Interp { open, close, start }`. `editortest --test model` compares it token by token
+  with `script::tokens`.
+
 ## 29. Scripts: `script` (compiler and VM)
 
 [`lib/script`](../lib/script/lib.rs) runs JFNetworker's `.jfs` scripts: `compile` turns the
@@ -2684,6 +2789,9 @@ impl Host for MyHost {
   allocates stay alive until it returns; values it only holds while calling back need
   `cx.keep(v)`. `cx.json_encode(v, indent)` / `cx.json_decode(text)` (and
   `vm.json_encode` / `vm.json_decode` between runs) work like `json.encode` / `json.decode`.
+  `cx.fuel()` is the fuel of the invocation so far, over all its runs and this call included:
+  a host that turns fuel into time knows the moment a native is called at (JFNetworker's
+  scripts send a packet then: `apps/JFNetworker/crates/jfn_sim/scriptsvc.rs`).
 * Values (`Value`, 16 bytes) refer to the VM's heap. A value the host keeps beyond the next
   `run` must be pinned (`pin` / `pinned` / `unpin`), e.g. a request handler; `valid(v)` tells
   a stale one, and the API returns `None` or an error instead of crashing on it.

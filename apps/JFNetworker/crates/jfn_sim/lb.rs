@@ -36,7 +36,8 @@
 // errors, no_backend, retries, status_2xx..5xx, backends, backends_up, p50_us, p95_us, p99_us
 // (HTTP: arrival to answer; TCP: connect time), and per backend in the order of the
 // configuration b1_requests, b1_active, b1_up, b1_errors .. b8_*.  Engine::lb_view gives every
-// backend with its state, checks and latencies (the lab); lbctl shows it on the console.
+// backend with its state, checks and latencies (the lab); lbctl shows it on the console.  The
+// time series (series.rs) take p50_us, p95_us, p99_us of each interval from the window.
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -57,6 +58,7 @@ use crate::http::{Agent, Done, Fail, Reply, Req, ReqIn, Serve, ServeCfg, Url, Wh
 use crate::httpsvc::decimal;
 use crate::kernel::{Engine, Ns, MS, SEC};
 use crate::os::{Metric, OsApi, Service, SvcEvent};
+use crate::series::{LatWindow, LAT};
 use crate::tcp::{SockOpts, TcpEnd};
 use crate::trace::Note;
 
@@ -1367,6 +1369,9 @@ impl Service for Lb {
             m.push(Metric::new(M_ERR[k], v(b.errors)));
         }
         m
+    }
+    fn windows(&self) -> Vec<LatWindow<'_>> {
+        alloc::vec![LatWindow::new(&self.lat, LAT)]
     }
     fn status(&self) -> String {
         let live: Vec<&Backend> = self.backends.iter().filter(|b| !b.gone()).collect();

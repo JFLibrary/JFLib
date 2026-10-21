@@ -65,6 +65,12 @@
 //   cache    HTTP cache in front of a backend: LRU with a time to live, hits and misses
 //   mq       message queue (topics, at-least-once, acknowledgements, redelivery, dead
 //            letters) and the workers that take from it
+//   scriptsvc scripts as services: a .jfs program (lib/script) driven by events, its fuel the
+//            CPU time of a single-threaded program; the host API (log, timers, net, dns, http,
+//            disk, metrics)
+//   series   time series on virtual time: every service's metrics (rates of counters, gauges,
+//            latency quantiles per interval) and the cables' traffic, KPIs, fault marks for
+//            charts, values over a span for scenarios, CSV
 //
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
@@ -115,6 +121,8 @@ pub mod lb;
 pub mod kv;
 pub mod cache;
 pub mod mq;
+pub mod scriptsvc;
+pub mod series;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -152,3 +160,5 @@ pub use lb::{Algo, BackendView, Lb, LbMode, LbOp, LbView};
 pub use kv::{Consistency, Entry, KvClient, KvDone, KvNode, KvView, ReplicaView, Ver};
 pub use cache::{Cache, CacheView};
 pub use mq::{Queue, QueueView, SlotState, TopicView, Worker, WorkerView};
+pub use scriptsvc::{ScriptCfg, ScriptErr, ScriptService, ScriptState, ScriptView};
+pub use series::{AggOut, Kpi, LatStat, LatWindow, MetricKind, SeriesCfg, SeriesErr, SeriesKind, SeriesView, ShardLoad, SvcSeries, Unit};

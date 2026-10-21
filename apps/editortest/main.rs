@@ -9,8 +9,15 @@
 // Tab "Rich-Text": the toolbar over a richtext with a sample document; status lines below
 // it show the document as a compact markup (`doc: ...`, see markup()), the selection, the
 // revision and the last activated link.  Tab "Code": the language (Rust, JSON, INI, TOML,
-// Markdown, Text), a sample per language, "100 000 Zeilen" (a generated file); the status
+// Markdown, Text, JFS), a sample per language, "100 000 Zeilen" (a generated file); the status
 // line shows the caret, the find matches and the lines tokenized in the last frame.
+// Diagnostics: "Prüfen" checks the text (JFS: lib/script's check(); every language: an info
+// at each "TODO"), "Beim Tippen" checks after every change; a second status line (once the
+// text was checked) shows the counts (`dg: E/W/I`), the diagnostic at the caret (`at: ...`,
+// ui.code_diag) and where the first six are now (`ds: line:col-line:col E|W|I`, they follow
+// the edits until the next check).  Commands for scripts: `cmd 900` diagnostics over lines,
+// at a point and stacked on the Rust sample, `cmd 901` none, `cmd 902` one on every 7th line
+// of "100 000 Zeilen" that calls compute(), `cmd 903` CE_MARKS on / off.
 // Fonts: DejaVu Sans Mono (the code editor, mono_font_set; also registered as a family) and
 // DejaVu Serif (registered for the rich text) from lib/doc_view/assets (licence:
 // DejaVu-LICENSE.txt there).
@@ -50,8 +57,17 @@ const ID_TABS_W: u32 = wid("tabs4");
 const ID_USE_TABS: u32 = wid("use_tabs");
 const ID_HC: u32 = wid("contrast");
 const ID_IME: u32 = wid("ime");
+const ID_CHECK: u32 = wid("check");
+const ID_LIVE: u32 = wid("live");
 
-const LANGS: [&str; 6] = ["Rust", "JSON", "INI", "TOML", "Markdown", "Text"];
+// commands of the scripts (App::command)
+const CMD_DIAGS: u32 = 900;
+const CMD_NO_DIAGS: u32 = 901;
+const CMD_BIG_DIAGS: u32 = 902;
+const CMD_MARKS: u32 = 903;
+
+const LANGS: [&str; 7] = ["Rust", "JSON", "INI", "TOML", "Markdown", "Text", "JFS"];
+const JFS: i32 = 6;
 
 struct EdTest {
     tab: i32,
@@ -65,6 +81,12 @@ struct EdTest {
     hc: i32,
     ime: bool,
     focus_pending: bool,
+    live: i32,
+    // CE_MARKS (cmd 903)
+    marks: bool,
+    // the diagnostics' status line: shown once the document was checked (the editor keeps
+    // its height in the other tests)
+    diag_row: bool,
 }
 
 /// the sample document of the rich text tab
@@ -216,8 +238,37 @@ fn main() { println!("fenced code"); }
 
 const TEXT_SAMPLE: &str = "Plain text without highlighting.\n\tA tab, wide characters 漢字 and an emoji 😀.\n";
 
+/// a script of lib/script with interpolations, escapes, numbers, comments and (at the end)
+/// an error, a warning and another error for "Prüfen"
+pub const JFS_SAMPLE: &str = r#"// JFS: a request counter for a virtual host (lib/script)
+let hits = 0
+let names = ["web", "db"]
+
+fn greet(name) {
+    let n = len(name)
+    return "Hallo ${name}, ${n} Zeichen: ${ {k: n}.k }\n"
+}
+
+/* the handler counts the requests
+   and answers in JSON */
+fn handle(req) {
+    hits += 1
+    if req.path == "/count" && hits > 0x10 {
+        return {status: 200, body: "${hits} Aufrufe \u{2713}"}
+    }
+    for i in 0..3 { log("i=${i}") }
+    let big = 1_000_000 + 0b1010 + 1.5e-3
+    return nil ?? greet("du")
+}
+
+// TODO: limits per client
+let hits = 1
+pirnt(greet("Welt"))
+break
+"#;
+
 fn sample_code(lang: i32) -> &'static str {
-    [RUST_SAMPLE, JSON_SAMPLE, INI_SAMPLE, TOML_SAMPLE, MD_SAMPLE, TEXT_SAMPLE][lang.clamp(0, 5) as usize]
+    [RUST_SAMPLE, JSON_SAMPLE, INI_SAMPLE, TOML_SAMPLE, MD_SAMPLE, TEXT_SAMPLE, JFS_SAMPLE][lang.clamp(0, 6) as usize]
 }
 
 fn highlighter(lang: i32) -> Highlighter {
@@ -227,8 +278,37 @@ fn highlighter(lang: i32) -> Highlighter {
         2 => Highlighter::ini(),
         3 => Highlighter::toml(),
         4 => Highlighter::markdown(),
+        JFS => Highlighter::jfs(),
         _ => Highlighter::plain(),
     }
+}
+
+/// the checks of the code tab: lib/script's for JFS (errors, warnings), an info at every
+/// "TODO" in any language
+pub fn check_code(doc: &CodeDoc, jfs: bool) -> Vec<Diag> {
+    let mut d = Vec::new();
+    if jfs {
+        for x in script::check(&doc.text()) {
+            let sev = if x.error { DIAG_ERROR } else { DIAG_WARNING };
+            d.push(Diag::new(x.line as usize, x.col as usize, x.end_col as usize, sev, &x.msg));
+        }
+    }
+    for (l, t) in doc.lines().iter().enumerate() {
+        if let Some(b) = t.find("TODO") {
+            let c = t[..b].chars().count() + 1;
+            d.push(Diag::new(l + 1, c, c + 4, DIAG_INFO, "Offene Aufgabe"));
+        }
+    }
+    d
+}
+
+/// where the diagnostics are: "line:col-line:col E|W|I", the first n
+pub fn diag_list(doc: &CodeDoc, n: usize) -> String {
+    let v: Vec<String> = (0..n)
+        .map_while(|i| doc.diagnostic(i))
+        .map(|x| format!("{}:{}-{}:{} {}", x.line, x.col, x.end_line, x.end_col, ["E", "W", "I"][x.severity.min(2) as usize]))
+        .collect();
+    v.join(", ")
 }
 
 /// a generated Rust file of n lines
@@ -330,7 +410,22 @@ impl EdTest {
     fn new() -> EdTest {
         let mut code = CodeDoc::from_text(RUST_SAMPLE);
         code.tab_width = 4;
-        EdTest { tab: 0, rich: sample_rich(), ro: 0, link: String::new(), code, lang: 0, tabs8: 0, use_tabs: 0, hc: 0, ime: false, focus_pending: false }
+        EdTest {
+            tab: 0,
+            rich: sample_rich(),
+            ro: 0,
+            link: String::new(),
+            code,
+            lang: 0,
+            tabs8: 0,
+            use_tabs: 0,
+            hc: 0,
+            ime: false,
+            focus_pending: false,
+            live: 0,
+            marks: false,
+            diag_row: false,
+        }
     }
 
     fn rich_tab(&mut self, ui: &mut Ui) {
@@ -390,12 +485,14 @@ impl EdTest {
             self.code = CodeDoc::from_text(sample_code(self.lang));
             self.code.tab_width = if self.tabs8 != 0 { 8 } else { 4 };
             self.code.use_tabs = self.use_tabs != 0;
+            self.diag_row = self.live != 0;
         }
         ui.spacer(-1);
         ui.next_flags(ST_NOFOCUS);
         if ui.button(ID_BIG, "100 000 Zeilen") & EV_ACT != 0 {
             self.lang = 0;
             self.code = big_code(100_000);
+            self.diag_row = self.live != 0;
         }
         if ui.checkbox(ID_TABS_W, "Tabweite 8", &mut self.tabs8) & EV_ACT != 0 {
             self.code.tab_width = if self.tabs8 != 0 { 8 } else { 4 };
@@ -403,10 +500,25 @@ impl EdTest {
         if ui.checkbox(ID_USE_TABS, "Tabs", &mut self.use_tabs) & EV_ACT != 0 {
             self.code.use_tabs = self.use_tabs != 0;
         }
+        ui.next_flags(ST_NOFOCUS);
+        if ui.button(ID_CHECK, "Prüfen") & EV_ACT != 0 {
+            let d = check_code(&self.code, self.lang == JFS);
+            self.code.set_diagnostics(&d);
+            self.diag_row = true;
+        }
+        if ui.checkbox(ID_LIVE, "Beim Tippen", &mut self.live) & EV_ACT != 0 && self.live != 0 {
+            self.diag_row = true;
+        }
         ui.box_end();
         ui.next_size(-1, -1);
         let hl = highlighter(self.lang);
-        ui.code_editor(ID_CODE, &mut self.code, &hl, 0);
+        let flags = if self.marks { CE_MARKS } else { 0 };
+        if ui.code_editor(ID_CODE, &mut self.code, &hl, flags) & EV_ACT != 0 && self.live != 0 {
+            // (the editor drew the old ones in this pass)
+            let d = check_code(&self.code, self.lang == JFS);
+            self.code.set_diagnostics(&d);
+            ui.repass();
+        }
         let st = ui.code_status(ID_CODE);
         let cs = self.code.selection();
         let lines = [
@@ -423,6 +535,48 @@ impl EdTest {
             ui.text(TS_CAPTION | TX_SECONDARY, l);
         }
         ui.box_end();
+        // the diagnostics: counts, the one at the caret, where the first ones are now
+        if !self.diag_row {
+            return;
+        }
+        let sev = |d: &Diag| ["E", "W", "I"][d.severity.min(2) as usize];
+        let at = ui.code_diag(ID_CODE).map_or(String::from("-"), |d| format!("{} {}:{} {}", sev(&d), d.line, d.col, d.msg));
+        let lines = [
+            format!("dg: {}/{}/{}", st.diags[0], st.diags[1], st.diags[2]),
+            format!("at: {}", at),
+            format!("ds: {}", diag_list(&self.code, 6)),
+        ];
+        ui.box_begin(0, BOX_H, 16);
+        for l in &lines {
+            ui.text(TS_CAPTION | TX_SECONDARY, l);
+        }
+        ui.box_end();
+    }
+
+    // the diagnostics of the script commands (CMD_DIAGS: on the Rust sample, CMD_BIG_DIAGS:
+    // on "100 000 Zeilen")
+    fn test_diags(&mut self, cmd: u32) {
+        let d = match cmd {
+            CMD_DIAGS => alloc::vec![
+                Diag::span(2, 18, 5, 4, DIAG_ERROR, "Ein Teil über vier Zeilen"),
+                Diag::new(1, 200, 0, DIAG_WARNING, "Ein Punkt am Zeilenende"),
+                Diag::new(6, 1, 4, DIAG_INFO, "Ein Hinweis"),
+                Diag::new(6, 3, 7, DIAG_WARNING, "Eine Warnung darüber"),
+            ],
+            CMD_BIG_DIAGS => {
+                let mut v = Vec::new();
+                for (l, t) in self.code.lines().iter().enumerate().step_by(7) {
+                    if let Some(b) = t.find("compute") {
+                        let c = t[..b].chars().count() + 1;
+                        v.push(Diag::new(l + 1, c, c + 7, (l / 7 % 3) as u8, "compute: eine Meldung"));
+                    }
+                }
+                v
+            }
+            _ => Vec::new(),
+        };
+        self.code.set_diagnostics(&d);
+        self.diag_row = true;
     }
 }
 
@@ -481,6 +635,22 @@ impl App for EdTest {
             self.code_tab(ui);
         }
         ui.box_end();
+    }
+
+    fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+        match id {
+            CMD_DIAGS | CMD_NO_DIAGS | CMD_BIG_DIAGS => {
+                self.test_diags(id);
+                ui.repass();
+                true
+            }
+            CMD_MARKS => {
+                self.marks = !self.marks;
+                ui.repass();
+                true
+            }
+            _ => false,
+        }
     }
 }
 

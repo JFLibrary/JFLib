@@ -2,9 +2,12 @@
 // RichDoc (editing, formats, typing formats, paragraphs, lists, undo / redo and merging, JSON,
 // HTML out and in, the clipboard fragment, plain text, links), CodeDoc (lines, auto-indent,
 // block indent, closers, comments, moving lines, find / replace, columns, the change journal,
-// undo merging) and the grammars (Rust, JSON, INI, TOML, Markdown: tokens and the states
-// across lines) plus a timing of 100 000 lines.  Prints FAIL lines and a summary; the exit
-// code is the number of failures.
+// undo merging), its diagnostics (positions in characters, clamping, counts, at / next, how
+// they follow typing, Enter, deletes, points, block indent, comments, moved lines, undo,
+// replace_all; 100 000 lines) and the grammars (Rust, JSON, INI, TOML, Markdown, JFS: tokens
+// and the states across lines; JFS also token by token against lib/script's tokens() on two
+// samples) plus a timing of 100 000 lines.  Prints FAIL lines and a summary; the exit code is
+// the number of failures.
 
 use alloc::format;
 use alloc::string::String;
@@ -446,12 +449,276 @@ fn grammars(t: &mut T) {
     t.eq(found, 9, "find in the big file");
 }
 
+// ------------------------------------------------------------------ diagnostics
+
+fn diags(t: &mut T) {
+    t.group = "diag";
+    let ds = |d: &CodeDoc| crate::diag_list(d, 100);
+    // columns in characters (a tab one), clamped to the line and the text, sorted, points
+    let mut d = CodeDoc::from_text("let größe = x\n\tfoo(1)\nend");
+    d.set_diagnostics(&[
+        Diag::new(2, 2, 5, DIAG_WARNING, "w"),
+        Diag::new(1, 5, 10, DIAG_ERROR, "e"),
+        Diag::new(3, 9, 9, DIAG_INFO, "past the end of the line"),
+        Diag::span(9, 1, 9, 2, DIAG_ERROR, "past the last line"),
+    ]);
+    t.eq(ds(&d), String::from("1:5-1:10 E, 2:2-2:5 W, 3:4-3:4 I, 3:4-3:4 E"), "set: sorted, clamped, points");
+    t.eq(d.diagnostic_counts(), [2, 1, 1], "counts");
+    // (bytes: größe is 4 .. 11)
+    t.eq(d.diagnostics_at(p(0, 11)).len(), 1, "at: the end belongs to it");
+    t.eq(d.diagnostics_at(p(0, 12)).len(), 0, "at: after it");
+    t.eq(d.diagnostics_at(p(0, 3)).len(), 0, "at: before it");
+    let at: Vec<u8> = d.diagnostics_at(p(2, 3)).iter().map(|x| x.severity).collect();
+    t.eq(at, alloc::vec![DIAG_ERROR, DIAG_INFO], "at: most severe first");
+    t.eq(d.next_diagnostic(p(0, 0), false), Some(p(0, 4)), "next");
+    t.eq(d.next_diagnostic(p(0, 4), false), Some(p(1, 1)), "next after one");
+    t.eq(d.next_diagnostic(p(2, 3), false), Some(p(0, 4)), "next round the end");
+    t.eq(d.next_diagnostic(p(0, 4), true), Some(p(2, 3)), "previous round the start");
+    t.eq(d.next_diagnostic(p(1, 2), true), Some(p(1, 1)), "previous");
+    t.eq(CodeDoc::new().next_diagnostic(p(0, 0), false), None, "next without any");
+    // typing: before it moves it, at its edges stays outside, inside grows it
+    let mut d = CodeDoc::from_text("abc foo bar\nnext line");
+    d.set_diagnostics(&[Diag::new(1, 5, 8, DIAG_ERROR, "foo"), Diag::new(2, 1, 5, DIAG_WARNING, "next")]);
+    for (at, s, want, name) in [
+        (0, "X", "1:6-1:9 E, 2:1-2:5 W", "typed before: moves"),
+        (5, "Y", "1:7-1:10 E, 2:1-2:5 W", "typed at its start: outside"),
+        (9, "Z", "1:7-1:10 E, 2:1-2:5 W", "typed at its end: outside"),
+        (7, "Q", "1:7-1:11 E, 2:1-2:5 W", "typed inside: grows"),
+    ] {
+        d.set_selection(TextSel::at(p(0, at)));
+        d.type_text(s, "");
+        t.eq(ds(&d), String::from(want), name);
+    }
+    // Enter above and its undo; deleting a part shrinks it, deleting all of it drops it
+    d.set_selection(TextSel::at(p(0, 0)));
+    d.newline("");
+    t.eq(ds(&d), String::from("2:7-2:11 E, 3:1-3:5 W"), "Enter above: a line down");
+    d.undo();
+    t.eq(ds(&d), String::from("1:7-1:11 E, 2:1-2:5 W"), "undo: back");
+    d.delete(p(0, 6), p(0, 8));
+    t.eq(ds(&d), String::from("1:7-1:9 E, 2:1-2:5 W"), "a part deleted: shrinks");
+    d.delete(p(0, 6), p(0, 8));
+    t.eq(ds(&d), String::from("2:1-2:5 W"), "its text deleted: gone");
+    t.eq(d.diagnostic_counts(), [0, 1, 0], "the counts follow");
+    d.set_selection(TextSel::new(p(0, 4), p(1, 2)));
+    d.insert("");
+    t.eq(ds(&d), String::from("1:5-1:7 W"), "a selection over lines deleted: what is left of it");
+    // points: at the end of the line typed text pushes it on, inside a change it goes to its start
+    let mut d = CodeDoc::from_text("call(x");
+    d.set_diagnostics(&[Diag::new(1, 99, 0, DIAG_ERROR, "missing )")]);
+    t.eq(ds(&d), String::from("1:7-1:7 E"), "a point at the line end");
+    d.set_selection(TextSel::at(p(0, 6)));
+    d.type_text(")", "");
+    t.eq(ds(&d), String::from("1:8-1:8 E"), "typed at a point: it moves on");
+    d.set_diagnostics(&[Diag::new(1, 3, 3, DIAG_ERROR, "at l")]);
+    d.replace(p(0, 1), p(0, 3), "XYZ");
+    t.eq(ds(&d), String::from("1:2-1:2 E"), "a point in a change: at its start");
+    // line by line: block indent, comments; Alt+Up / Down: with the line; undo
+    let mut d = CodeDoc::from_text("a = 1\nb = x\nc = 3");
+    d.set_diagnostics(&[Diag::new(1, 1, 2, DIAG_INFO, "a"), Diag::new(2, 5, 6, DIAG_WARNING, "x")]);
+    d.set_selection(TextSel::new(p(0, 0), p(2, 5)));
+    d.tab();
+    t.eq(ds(&d), String::from("1:5-1:6 I, 2:9-2:10 W"), "block indent: line by line");
+    d.toggle_comment("//");
+    t.eq(ds(&d), String::from("1:8-1:9 I, 2:12-2:13 W"), "comments: line by line");
+    d.undo();
+    d.undo();
+    t.eq(ds(&d), String::from("1:1-1:2 I, 2:5-2:6 W"), "undo comments and indent");
+    d.set_selection(TextSel::at(p(1, 0)));
+    d.move_lines(1);
+    t.eq(ds(&d), String::from("1:1-1:2 I, 3:5-3:6 W"), "Alt+Down: with its line");
+    d.set_selection(TextSel::at(p(0, 0)));
+    d.move_lines(1);
+    t.eq(ds(&d), String::from("2:1-2:2 I, 3:5-3:6 W"), "Alt+Down of the other line");
+    d.undo();
+    d.undo();
+    t.eq(ds(&d), String::from("1:1-1:2 I, 2:5-2:6 W"), "undo the moves");
+    d.redo();
+    t.eq(ds(&d), String::from("1:1-1:2 I, 3:5-3:6 W"), "redo a move");
+    // a part over lines: Enter inside it, replace_all on its lines
+    let mut d = CodeDoc::from_text("fn x() {\n  body\n}");
+    d.set_diagnostics(&[Diag::span(1, 8, 3, 2, DIAG_ERROR, "block")]);
+    t.eq(ds(&d), String::from("1:8-3:2 E"), "a part over lines");
+    d.set_selection(TextSel::at(p(1, 6)));
+    d.newline("{");
+    t.eq(ds(&d), String::from("1:8-4:2 E"), "Enter inside: the end follows");
+    let mut d = CodeDoc::from_text("x x\ny x");
+    d.set_diagnostics(&[Diag::new(2, 1, 2, DIAG_WARNING, "y"), Diag::new(2, 3, 4, DIAG_ERROR, "x")]);
+    d.replace_all("x", "long", 0);
+    t.eq(ds(&d), String::from("2:1-2:2 W"), "replace_all: before a replaced word it stays, the replaced one goes");
+    d.clear_diagnostics();
+    t.eq((d.diagnostic_count(), d.diagnostics().len()), (0, 0), "clear");
+    // 100 000 lines with one on every 7th: an Enter at the top and 100 characters typed
+    let mut big = crate::big_code(100_000);
+    let v: Vec<Diag> = (0..100_000).step_by(7).map(|l| Diag::new(l + 1, 5, 8, DIAG_WARNING, "w")).collect();
+    big.set_diagnostics(&v);
+    let t0 = plat::time_us();
+    big.set_selection(TextSel::at(p(0, 0)));
+    big.newline("");
+    for _ in 0..100 {
+        big.type_text("x", "");
+    }
+    let us = plat::time_us() - t0;
+    t.eq(big.diagnostic_count(), v.len(), "big: all kept");
+    t.eq(big.diagnostics().last().map(|x| x.line), Some(99_997), "big: the last one a line down");
+    t.eq(big.diagnostics().first().map(|x| (x.line, x.col)), Some((2, 105)), "big: the first one moved by the typed text");
+    out(&format!("model: 101 edits with {} diagnostics over 100 000 lines in {} ms\n", v.len(), us / 1000));
+}
+
+// ------------------------------------------------------------------ JFS against lib/script
+
+// the tokens of each line as (start, end, class) with neighbours of a class merged: what the
+// grammar and lib/script's lexer have to agree on
+type Classes = Vec<Vec<(usize, usize, &'static str)>>;
+
+fn merged(v: &mut Vec<(usize, usize, &'static str)>, s: usize, e: usize, class: &'static str) {
+    match v.last_mut() {
+        Some(l) if l.1 == s && l.2 == class => l.1 = e,
+        _ if e > s => v.push((s, e, class)),
+        _ => {}
+    }
+}
+
+fn jfs_by_grammar(src: &str) -> Classes {
+    let h = Highlighter::jfs();
+    let mut st = 0;
+    let mut out = Vec::new();
+    let mut toks = Vec::new();
+    for l in src.split('\n') {
+        st = h.line(l, st, &mut toks);
+        let mut v = Vec::new();
+        for tk in &toks {
+            let class = match tk.kind {
+                SY_COMMENT => "com",
+                SY_KEYWORD => "kw",
+                SY_CONST => "const",
+                SY_NUMBER => "num",
+                SY_STRING | SY_ESCAPE => "str",
+                SY_META => "interp",
+                SY_PUNCT => "punct",
+                SY_FUNC => "fn",
+                _ => "?",
+            };
+            merged(&mut v, tk.start, tk.end, class);
+        }
+        out.push(v);
+    }
+    out
+}
+
+fn jfs_by_script(src: &str) -> Classes {
+    let b = src.as_bytes();
+    let mut starts = alloc::vec![0];
+    starts.extend(src.match_indices('\n').map(|(i, _)| i + 1));
+    let mut out: Classes = starts.iter().map(|_| Vec::new()).collect();
+    for (s, len, kind) in script::tokens(src) {
+        let (s, e) = (s as usize, (s + len) as usize);
+        let class = match kind.class() {
+            script::TokClass::Comment => "com",
+            script::TokClass::Keyword => "kw",
+            script::TokClass::Constant => "const",
+            script::TokClass::Number => "num",
+            script::TokClass::Str => "str",
+            script::TokClass::Op | script::TokClass::Punct if kind == script::TokKind::Interp => "interp",
+            script::TokClass::Op | script::TokClass::Punct => "punct",
+            script::TokClass::Ident => {
+                // a call: '(' after blanks on the line (the grammar's `calls`)
+                let mut k = e;
+                while b.get(k) == Some(&b' ') {
+                    k += 1;
+                }
+                if b.get(k) != Some(&b'(') {
+                    continue;
+                }
+                "fn"
+            }
+            _ => continue,
+        };
+        // a part per line it covers (a comment over lines), without the line breaks
+        let first = starts.partition_point(|&x| x <= s) - 1;
+        for (l, &ls) in starts.iter().enumerate().skip(first) {
+            if ls >= e && l > first {
+                break;
+            }
+            let le = starts.get(l + 1).map_or(src.len(), |&n| n - 1);
+            let (a, z) = (s.max(ls), e.min(le));
+            if z > a {
+                merged(&mut out[l], a - ls, z - ls, class);
+            }
+        }
+    }
+    out
+}
+
+// more of the language than the editor's sample: every keyword, operator, escape, number form
+const JFS_MORE: &str = r#"// every kind of token once more
+let größe = 3
+let m = {name: "n", "quoted key": 1, 7: true, [größe]: nil}
+fn f(a, b) {
+    while a < b && !(a >= 10) || b <= 0 {
+        a += 2; b -= 1
+        a *= 1; a /= 1; a %= 7
+        if a != b { continue } else if a == b { break } else { a = a - 1 }
+    }
+    try { throw "boom ${a}" } catch e { log("caught: ${e} \t \" \\ \$ \0 \r \u{1F600}") }
+    return "${a}${b}" + "" + "${"inner ${b} ${ {x: "}"}.x }"}" + "\${not} $ {}"
+}
+let r = f(1, 2) ?? 0.5 * 3 % 2 / 1 - -1
+/* a comment */ let after = [1.0e+3, 2_5, 0XAB, 0B11, 1e5, 7] // the end
+/* over
+   three
+   lines */ for k, v in m { print(k, v) }
+for i in 0 .. 10 { m.list.push(i) }
+"#;
+
+fn jfs(t: &mut T) {
+    t.group = "jfs";
+    // token by token against lib/script's lexer
+    for (name, src) in [("editor sample", crate::JFS_SAMPLE), ("more", JFS_MORE)] {
+        let (g, s) = (jfs_by_grammar(src), jfs_by_script(src));
+        t.eq(g.len(), s.len(), &format!("{}: lines", name));
+        for (l, (a, b)) in g.iter().zip(&s).enumerate() {
+            let text = src.split('\n').nth(l).unwrap_or("");
+            t.check(a == b, &format!("{} line {} {:?}: grammar {:?}, lib/script {:?}", name, l + 1, text, a, b));
+        }
+    }
+    let h = Highlighter::jfs();
+    // expected tokens (punctuation left out): interpolation with braces and strings inside
+    let (v, st) = toks(&h, "let s = \"a${x + {k: \"}\"}.k}b\\n\"", 0);
+    t.eq(v, ["kw:let", "str:\"a", "meta:${", "str:\"}\"", "meta:}", "str:b", "esc:\\n", "str:\""].map(String::from).to_vec(), "interpolation");
+    t.eq(st, 0, "a string ends with its line");
+    let (v, _) = toks(&h, "\"${\"in ${x}\"}\" \"\\${no}\" \"\\u{2713}\"", 0);
+    let want = [
+        "str:\"", "meta:${", "str:\"in ", "meta:${", "meta:}", "str:\"", "meta:}", "str:\"", "str:\"", "esc:\\$", "str:{no}\"", "str:\"", "esc:\\u{2713}",
+        "str:\"",
+    ];
+    t.eq(v, want.map(String::from).to_vec(), "nested strings, \\$, \\u{..}");
+    let (v, _) = toks(&h, "1_000 0xFF 0b101 1.5e-3 2E10 1..5 x1", 0);
+    t.eq(v, ["num:1_000", "num:0xFF", "num:0b101", "num:1.5e-3", "num:2E10", "num:1", "num:5"].map(String::from).to_vec(), "numbers");
+    let (v, _) = toks(&h, "fn f(a) { return nil ?? true } print(s.split(\",\")) false", 0);
+    let want = ["kw:fn", "fn:f", "kw:return", "const:nil", "const:true", "fn:print", "fn:split", "str:\",\"", "const:false"];
+    t.eq(v, want.map(String::from).to_vec(), "keywords, constants, calls");
+    let (v, st) = toks(&h, "let a /* open", 0);
+    t.check(has(&v, "com:/* open") && st != 0, &format!("a block comment stays open: {:?}", v));
+    let (v, st2) = toks(&h, "still /* not nested */ let b", st);
+    t.check(has(&v, "com:still /* not nested */") && has(&v, "kw:let") && st2 == 0, &format!("it ends at the first */: {:?}", v));
+    let (v, st) = toks(&h, "let s = \"open ${a + 1", 0);
+    t.check(has(&v, "str:\"open ") && has(&v, "num:1") && st == 0, &format!("an open interpolation ends with the line: {:?}", v));
+    let (_, st) = toks(&h, "\"${ /* in a string", 0);
+    t.check(st != 0, "a comment open in an interpolation goes on in the next line");
+    t.eq(Highlighter::for_name("jfs").name(), "JFS", "for_name jfs");
+    t.eq(Highlighter::for_name("scripts/server.jfs").name(), "JFS", "for_name by path");
+    t.eq((h.grammar().comment, h.grammar().pairs), ("//", "()[]{}"), "comment, pairs");
+}
+
 /// --test model -> failures
 pub fn run() -> i32 {
     let mut t = T { group: "", ok: 0, failed: 0 };
     rich(&mut t);
     code(&mut t);
+    diags(&mut t);
     grammars(&mut t);
+    jfs(&mut t);
     out(&format!("model: {} checks, {} failed\n", t.ok + t.failed, t.failed));
     t.failed as i32
 }

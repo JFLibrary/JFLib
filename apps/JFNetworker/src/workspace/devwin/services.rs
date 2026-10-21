@@ -32,6 +32,7 @@ fn kind_name(kind: &str) -> &str {
         "http-server" => "Webserver (HTTP)",
         "http-client" => "HTTP-Client",
         "http-load" => "Lastgenerator (HTTP)",
+        "script" => "Skript",
         _ => return kind,
     })
 }

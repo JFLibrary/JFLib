@@ -87,13 +87,16 @@ pub use rich_edit::{
 mod rich_html;
 mod code_doc;
 pub use code_doc::{CodeDoc, LineChange, FIND_CASE, FIND_MAX, FIND_WORD};
+pub use code_doc::{Diag, DIAG_ERROR, DIAG_INFO, DIAG_WARNING}; // (L6) a code editor's diagnostics
 mod highlight;
 pub use highlight::{
     CodeTheme, Grammar, Highlighter, Rule, Token, INI, JSON, MARKDOWN, PLAIN, RUST, SY_CODE, SY_COMMENT, SY_CONST, SY_COUNT, SY_EMPH, SY_ESCAPE,
     SY_FUNC, SY_HEADING, SY_KEY, SY_KEYWORD, SY_LINK, SY_META, SY_NUMBER, SY_PUNCT, SY_STRING, SY_STRONG, SY_TEXT, SY_TYPE, TOML,
 };
+pub use highlight::JFS; // (L6) the grammar of lib/script's .jfs
 mod code_edit;
 pub use code_edit::{CodeStatus, CE_NO_FIND, CE_NO_FRAME, CE_NO_GUTTER, CE_NO_LINE, CE_READONLY};
+pub use code_edit::CE_MARKS; // (L6) the gutter's column of diagnostic markers
 mod dock;
 mod drop;
 mod edit;
@@ -177,6 +180,11 @@ pub use runtime::{Runtime, launch, run};
 pub use style::{Sp, Style, StyleBasic, StyleChrome, StyleData, StyleEdit, StyleList, StyleMisc, StylePopup, StyleShell, StyleValue};
 pub use data::{GridCol, GridEv, GridState, TreeEv, TreeRow, TreeState};
 pub use chart::{BarSeries, DonutSlice};
+// (L5) line charts of time series (chart.rs): the ring of points, what a chart shows, the axis maths
+pub use chart::{
+    lc_nice, lc_time_step, lc_time_text, LcMarker, LcSeries, LcThreshold, LcUnit, LineChart, SeriesBuf, SeriesCol, LC_NO_GRID, LC_NO_HOVER,
+    LC_NO_LEGEND, LX_NANOS, LX_NUM, LX_SECS,
+};
 pub use shell::{CmdItem, NavState};
 // docking (dock.rs): the panels, the layout, the sides and flags
 pub use dock::{

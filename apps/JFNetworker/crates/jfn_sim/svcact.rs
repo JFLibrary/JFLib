@@ -37,6 +37,8 @@
 //     mq              {"port": 9000, "visibility_ms": 5000, "max_deliveries": 5, ...} (mq.rs)
 //     worker          {"queue": "http://10.0.3.10:9000", "topic": "jobs", "concurrency": 4,
 //                     "time_ms": 50, ...} (mq.rs)
+//     script          {"source": "net.udp(7, fn(s, m) { s.send(m.from, m.port, m.data) })",
+//                     "ns_per_op": 5, "limits": {"fuel": 10000000, ...}, ...} (scriptsvc.rs)
 //
 //   HttpLoadSet / HttpServerSet    change a running load generator or web server in place
 //
@@ -199,6 +201,7 @@ impl Engine {
             "kv" => crate::kv::from_def_msg(c).map_err(|w| bad(kind, w))?,
             "cache" => crate::cache::from_def_msg(c).map_err(|w| bad(kind, w))?,
             "mq" | "worker" => crate::mq::from_def_msg(kind, c).map_err(|w| bad(kind, w))?,
+            "script" => crate::scriptsvc::from_def_msg(c).map_err(|w| bad(kind, w))?,
             k => return Err(ActErr::Refused(msg!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k))),
         };
         let name = if def.name.is_empty() { def.kind.clone() } else { def.name.clone() };

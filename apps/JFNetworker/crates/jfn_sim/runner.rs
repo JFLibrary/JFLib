@@ -2,7 +2,8 @@
 // output of the devices, the expectations, and a report with virtual times only, so that it
 // is the same on every machine and every run
 //
-//   run_scenario(&Project, &Scenario, name) -> Outcome { report, ok, expects, failed, pcap }
+//   run_scenario(&Project, &Scenario, name) -> Outcome { report, ok, expects, failed, pcap,
+//   series }
 //
 // The steps go through the Inline driver like the user interface's commands (Cmd::Cli,
 // Cmd::Interrupt for "^C", RunFor, Apply).  A report line is "    12.000004104  WHO  text":
@@ -15,6 +16,10 @@
 // "fault ..." starts a fault of the lab (fault.rs; the line names its number and what it
 // does), "heal ..." heals faults by number, by target or all of them; a fault that heals by
 // itself after its duration gets a line "Fehler N behoben" with the time it healed.
+// "expect DEV svc NAME metric [min|max|mean] M OP V over D" (or "between A and B") checks the
+// time series M of the service (series.rs, Engine::series_value) and writes the value it found
+// as a decimal; "series FILE" makes the time series a CSV at the end, like the capture, and its
+// line names how many series and values it has and the CRC-32 of the file.
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -23,7 +28,7 @@ use alloc::vec::Vec;
 
 use jfn_model::ifname;
 use jfn_model::project::Project;
-use jfn_model::scenario::{Expect, FaultSpec, HealSpec, Scenario, StepKind, Via};
+use jfn_model::scenario::{Agg, Expect, FaultSpec, HealSpec, Scenario, Span, StepKind, Via};
 use netpkt::decode;
 use netpkt::pcapng::{Writer, LINKTYPE_ETHERNET};
 
@@ -32,6 +37,7 @@ use crate::driver::{Cmd, Inline, Report};
 use crate::fault::Fault;
 use crate::ip::RouteSrc;
 use crate::kernel::{Engine, Ns, MS, SEC, US};
+use crate::series::SeriesErr;
 
 /// how far "run until idle" goes at most
 pub const IDLE_CAP: Ns = 3600 * SEC;
@@ -47,6 +53,8 @@ pub struct Outcome {
     pub failed: u32,
     /// the capture the scenario asked for: (file name as written in the scenario, pcapng)
     pub pcap: Option<(String, Vec<u8>)>,
+    /// the time series the scenario asked for: (file name as written in the scenario, CSV)
+    pub series: Option<(String, String)>,
 }
 
 /// "1.5s", "250ms" for a step line
@@ -62,6 +70,17 @@ fn dur(d: Ns) -> String {
     } else {
         format!("{}ns", d)
     }
+}
+
+/// a value in thousandths as a decimal ("99.5", "100", "-0.25")
+fn milli_text(v: i64) -> String {
+    let sign = if v < 0 { "-" } else { "" };
+    let a = v.unsigned_abs();
+    if a % 1000 == 0 {
+        return format!("{}{}", sign, a / 1000);
+    }
+    let frac = format!("{:03}", a % 1000);
+    format!("{}{}.{}", sign, a / 1000, frac.trim_end_matches('0'))
 }
 
 fn quote(s: &str) -> String {
@@ -271,13 +290,14 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
         Ok(e) => e,
         Err(e) => {
             r.s.push_str(&format!("# Das Projekt läuft nicht: {}\n", e));
-            return Outcome { report: r.s, ok: false, expects: 0, failed: 0, pcap: None };
+            return Outcome { report: r.s, ok: false, expects: 0, failed: 0, pcap: None, series: None };
         }
     };
     let mut d = Inline::new(eng);
     drain(&mut d, &mut r);
     let (mut expects, mut failed, mut ok) = (0u32, 0u32, true);
     let mut pcap: Option<String> = None;
+    let mut series: Option<String> = None;
     let mut healed: BTreeSet<u32> = BTreeSet::new();
     for step in &sc.steps {
         if let Some(t) = step.at {
@@ -391,6 +411,7 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
                 }
             }
             StepKind::Pcap(f) => pcap = Some(f.clone()),
+            StepKind::Series(f) => series = Some(f.clone()),
             StepKind::Print(t) => r.line(now, "--", t),
             StepKind::Fault { fault, dur } => match fault_of(&proj, &d.eng, fault) {
                 Ok(f) => {
@@ -454,8 +475,14 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
         }
         (f, bytes)
     });
+    let csv = series.map(|f| {
+        let text = d.eng.series_csv();
+        let (n, v) = d.eng.series_size();
+        r.line(end, "--", &format!("series {}: {} Reihen, {} Werte, CRC-32 {:08x}", f, n, v, netpkt::checksum::crc32(text.as_bytes())));
+        (f, text)
+    });
     r.s.push_str(&format!("# {} von {} Erwartungen erfüllt{}\n", expects - failed, expects, if ok { "" } else { ", Szenario fehlgeschlagen" }));
-    Outcome { report: r.s, ok, expects, failed, pcap: cap }
+    Outcome { report: r.s, ok, expects, failed, pcap: cap, series: csv }
 }
 
 /// whether an expectation holds, and its line
@@ -529,6 +556,29 @@ fn expect(p: &Project, e: &Engine, r: &Rep, x: &Expect) -> (bool, String) {
                 Some(v) if cmp.holds(v, *value) => (true, format!("{} ({})", text, v)),
                 Some(v) => (false, format!("{} (gemessen: {})", text, v)),
                 None => (false, format!("{} (keinen solchen Dienst oder Wert)", text)),
+            }
+        }
+        Expect::Series { dev, svc, name, agg, cmp, milli, span } => {
+            let now = e.now();
+            let ((from, to), what) = match span {
+                Span::Last(x) => ((now.saturating_sub(*x), now), format!("over {}", dur(*x))),
+                Span::Between(a, b) => ((*a, *b), format!("between {} and {}", dur(*a), dur(*b))),
+            };
+            let how = if *agg == Agg::Natural { String::new() } else { format!("{} ", agg.as_str()) };
+            let text = format!("expect {} svc {} metric {}{} {} {} {}", dev, svc, how, name, cmp.as_str(), milli_text(*milli), what);
+            let Some(id) = resolve(p, e, dev) else {
+                return (false, format!("{} (das Gerät gibt es nicht)", text));
+            };
+            if to > now {
+                return (false, format!("{} (der Zeitraum endet erst nach jetzt)", text));
+            }
+            match e.series_value(id, svc, name, *agg, from, to) {
+                Ok(v) if cmp.holds(v.milli, *milli) => (true, format!("{} ({})", text, milli_text(v.milli))),
+                Ok(v) => (false, format!("{} (gemessen: {})", text, milli_text(v.milli))),
+                Err(SeriesErr::NoService) => (false, format!("{} (keinen solchen Dienst)", text)),
+                Err(SeriesErr::NoSeries) => (false, format!("{} (keine solche Reihe)", text)),
+                Err(SeriesErr::NoValues) => (false, format!("{} (keine Werte im Zeitraum)", text)),
+                Err(SeriesErr::Gone) => (false, format!("{} (das Fenster der Latenzen hält den Zeitraum nicht mehr)", text)),
             }
         }
     }
