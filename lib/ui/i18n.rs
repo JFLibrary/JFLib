@@ -635,6 +635,11 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Hauptfenster", "Main window", "Fenêtre principale", "Ventana principal", "Finestra principale", "Hoofdvenster", "Okno główne", "النافذة الرئيسية", "חלון ראשי"],
     // (ROADMAP §6) the image viewer (imgview.rs): the accessible name of ui.image_view
     ["Bild", "Image", "Image", "Imagen", "Immagine", "Afbeelding", "Obraz", "صورة", "תמונה"],
+    // (L5) the line chart (chart.rs): its empty state and the words of its summary
+    ["Keine Daten", "No data", "Aucune donnée", "Sin datos", "Nessun dato", "Geen gegevens", "Brak danych", "لا توجد بيانات", "אין נתונים"],
+    ["aktuell", "current", "actuel", "actual", "attuale", "huidig", "bieżąca", "الحالية", "נוכחי"],
+    ["min.", "min", "min", "mín.", "min", "min.", "min.", "الأدنى", "מינימום"],
+    ["max.", "max", "max", "máx.", "max", "max.", "maks.", "الأقصى", "מקסימום"],
 ];
 
 /// a library text in the current language: the UI language when the library has it
