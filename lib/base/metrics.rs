@@ -11,6 +11,8 @@
 //                  minutes in 1 s slots of nanoseconds); record(t, v) / quantile(t, pm) /
 //                  p50 / p95 / p99 / count / sum / mean / min / max over the slots still in
 //                  the window at t / per_slot(t, pm) for charts / hist(t)
+//                  hist_between(from, to): the slots that start in [from, to) as one
+//                  histogram (a time series: one point per interval, quantiles of any span)
 //
 // Quantiles use the nearest rank (rank = ceil(pm * n / 1000)) and give the midpoint of that
 // rank's bucket, clamped to the smallest and largest value seen (the first and the last rank
@@ -264,6 +266,21 @@ impl Slot {
     }
 }
 
+/// adds the values of a slot to a histogram of the same resolution
+fn add_slot(h: &mut Hist, s: &Slot) {
+    for &(b, c) in &s.cells {
+        let i = b as usize;
+        if h.counts.len() <= i {
+            h.counts.resize(i + 1, 0);
+        }
+        h.counts[i] += c as u64;
+    }
+    h.n += s.n;
+    h.sum += s.sum;
+    h.min = h.min.min(s.min);
+    h.max = h.max.max(s.max);
+}
+
 /// a histogram over the last `slots` spans of time
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Window {
@@ -320,17 +337,22 @@ impl Window {
     pub fn hist(&self, t: u64) -> Hist {
         let mut h = Hist::with_bits(self.bits);
         for s in self.live(t) {
-            for &(b, c) in &s.cells {
-                let i = b as usize;
-                if h.counts.len() <= i {
-                    h.counts.resize(i + 1, 0);
-                }
-                h.counts[i] += c as u64;
+            add_slot(&mut h, s);
+        }
+        h
+    }
+    /// the slots that start in [from, to) as one histogram: what was recorded between two
+    /// times, to the resolution of the slots; slots the ring no longer holds are left out
+    pub fn hist_between(&self, from: u64, to: u64) -> Hist {
+        let mut h = Hist::with_bits(self.bits);
+        let len = self.ring.len() as u64;
+        let (a, b) = (from.div_ceil(self.span), to.div_ceil(self.span));
+        // only the newest `len` slot numbers can still be in the ring
+        for i in a.max(b.saturating_sub(len))..b {
+            let s = &self.ring[(i % len) as usize];
+            if s.idx == i {
+                add_slot(&mut h, s);
             }
-            h.n += s.n;
-            h.sum += s.sum;
-            h.min = h.min.min(s.min);
-            h.max = h.max.max(s.max);
         }
         h
     }

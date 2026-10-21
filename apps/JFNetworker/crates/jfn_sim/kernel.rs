@@ -11,7 +11,9 @@
 //                                          services)
 //
 // Events are plain data in a slab and run in (time, sequence) order: two events at the same
-// time run in the order they were scheduled.  Nothing here reads a clock.
+// time run in the order they were scheduled.  Nothing here reads a clock.  Before an event,
+// and where run_until leaves the clock, the time series take the samples that are due
+// (series.rs); they only read.
 
 use alloc::collections::{BTreeMap, BinaryHeap};
 use alloc::sync::Arc;
@@ -83,6 +85,8 @@ pub struct Engine {
     pub(crate) cli: crate::cli::EngineCli,
     /// injected faults: their marks and what they do to cables, devices and disks (fault.rs)
     pub(crate) faults: crate::fault::Faults,
+    /// the time series of the services and cables (series.rs)
+    pub(crate) series: crate::series::Sampler,
 }
 
 impl Engine {
@@ -105,6 +109,7 @@ impl Engine {
             next_job: 0,
             cli: crate::cli::EngineCli::default(),
             faults: crate::fault::Faults::default(),
+            series: crate::series::Sampler::default(),
         }
     }
     /// the virtual time
@@ -146,6 +151,10 @@ impl Engine {
     /// runs the next event; its time, or None when nothing is scheduled
     pub fn step(&mut self) -> Option<Ns> {
         let Reverse((t, _, slot)) = self.heap.pop()?;
+        if t >= self.series.next {
+            // the samples of the time series that are due first; they only read (series.rs)
+            self.sample_until(t);
+        }
         let ev = self.slab[slot as usize].take();
         self.free.push(slot);
         self.now = t;
@@ -173,6 +182,9 @@ impl Engine {
         }
         if t > self.now {
             self.now = t;
+        }
+        if self.now >= self.series.next {
+            self.sample_until(self.now);
         }
         RunOut::Reached
     }

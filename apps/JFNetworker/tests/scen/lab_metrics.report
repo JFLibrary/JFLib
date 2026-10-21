@@ -1,0 +1,50 @@
+# JFNetworker-Szenario lab_metrics.scn: „Geshardeter KV-Speicher hinter einem Loadbalancer“, 10 Geräte, 9 Verbindungen, Seed 11
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/4 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/4 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/5 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/5 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/6 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/6 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/7 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/7 is up
+   6.000000000  --      fault 1: KV2 ausgeschaltet (für 6s)
+   6.000000000  SW2     *Mar  1 00:00:06.000: %LINK-3-UPDOWN: GigabitEthernet1/0/6 is down
+   6.000000000  SW2     *Mar  1 00:00:06.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/6 is down
+   6.000000000  ok      expect LB1 svc lb metric requests >= 90 between 2s and 6s (101.75)
+   6.000000000  ok      expect LB1 svc lb metric p99_us < 2000 between 2s and 6s (1133.904)
+   6.000000000  ok      expect KV2 svc kv metric requests > 30 between 2s and 6s (44.5)
+   6.000000000  ok      expect KV1 svc kv metric min members_up == 3 over 4s (3)
+  12.000000000  SW2     *Mar  1 00:00:12.000: %LINK-3-UPDOWN: GigabitEthernet1/0/6 is up
+  12.000000000  SW2     *Mar  1 00:00:12.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/6 is up
+  12.000000000  --      Fehler 1 behoben: KV2 ausgeschaltet
+  12.000000000  ok      expect KV2 svc kv metric requests == 0 between 7s and 12s (0)
+  12.000000000  ok      expect KV1 svc kv metric requests > 50 between 7s and 12s (60.4)
+  12.000000000  ok      expect KV1 svc kv metric max members_up == 2 between 7s and 12s (2)
+  12.000000000  ok      expect LB1 svc lb metric max p99_us > 900000 between 6s and 12s (998244)
+  12.000000000  ok      expect LB1 svc lb metric p99_us > 150000 between 6s and 12s (249561.087)
+  12.000000000  ok      expect LB1 svc lb metric p50_us < 2000 between 6s and 12s (1133.904)
+  12.000000000  ok      expect WEB1 svc web metric failovers > 0 between 6s and 12s (2.166)
+  12.000000000  ok      expect GEN svc load metric failed == 0 between 6s and 12s (0)
+  19.000000000  ok      expect KV2 svc kv metric requests > 30 between 14s and 18s (47.75)
+  19.000000000  ok      expect KV2 svc kv metric repaired > 0 between 12s and 19s (4)
+  19.000000000  ok      expect KV1 svc kv metric min members_up == 3 between 13s and 19s (3)
+  19.000000000  ok      expect LB1 svc lb metric p99_us < 2000 between 14s and 18s (1133.904)
+  19.000000000  ok      expect LB1 svc lb metric max p99_us < 2000 between 14s and 18s (1135)
+  19.000000000  ok      expect GEN svc load metric responses >= 95 between 2s and 18s (102.25)
+  19.000000000  ok      expect GEN svc load metric errors == 0 over 17s (0)
+  19.000000000  ok      expect GEN svc load metric max max_us > 900000 over 17s (1001142)
+  19.000000000  ok      expect LB1 svc lb metric min backends_up == 3 over 17s (3)
+  19.000000000  ok      expect LB1 svc lb metric mean active < 5 over 17s (0.352)
+  19.000000000  --      Die Zeitreihen zeigen den Ausfall und die Erholung
+  19.000000000  --      series build/lab_metrics.csv: 251 Reihen, 4618 Werte, CRC-32 e4dd5156
+# 22 von 22 Erwartungen erfüllt

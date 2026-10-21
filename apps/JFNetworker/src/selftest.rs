@@ -11,6 +11,8 @@
 //
 // msgtest.rs: the texts of model and simulator as messages (jfn_model::msg) and their English.
 // scripttest.rs: scripts as services in the hosts (group script, jfn_sim::scriptsvc).
+// seriestest.rs: the time series of the lab (jfn_sim::series), the windowed expectations of
+// scenarios.
 
 use alloc::format;
 use alloc::string::String;
@@ -54,7 +56,7 @@ impl T {
 mod msgtest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 21] = [
+    let groups: [(&'static str, fn(&mut T)); 22] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -76,6 +78,7 @@ pub fn run() -> i32 {
         ("campus", crate::simtest::campustest::run),
         ("synth", crate::simtest::synthtest::run),
         ("script", crate::simtest::scripttest::run),
+        ("series", crate::simtest::seriestest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

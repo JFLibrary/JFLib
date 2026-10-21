@@ -19,7 +19,8 @@
 // Metrics: requests, hits, misses, hit_pm (hits per mille of GET and HEAD), collapsed,
 // expired, evictions, invalidations, entries, bytes, backend_requests, backend_errors, p50_us,
 // p95_us, p99_us (arrival to answer), hit_p50_us, miss_p50_us.  Engine::cache_view for the
-// lab, cachectl on the console.
+// lab, cachectl on the console.  The time series (series.rs) take p50_us .. p99_us,
+// hit_p50_us .. hit_p99_us and miss_p50_us .. miss_p99_us of each interval from the windows.
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -39,11 +40,16 @@ use crate::http::{Agent, Done, Reply, Req, ReqIn, Serve, ServeCfg, Url, Wheel};
 use crate::httpsvc::decimal;
 use crate::kernel::{Engine, Ns, MS, SEC, US};
 use crate::os::{Metric, OsApi, Service, SvcEvent};
+use crate::series::{LatStat, LatWindow, LAT};
 use crate::trace::Note;
 
 const K_OWN: u32 = 0;
 const K_SERVE: u32 = 1;
 const K_AGENT: u32 = 2;
+
+/// the time series of the hits' and the misses' latencies (series.rs)
+const HIT_LAT: &[(&str, LatStat)] = &[("hit_p50_us", LatStat::Quantile(500)), ("hit_p95_us", LatStat::Quantile(950)), ("hit_p99_us", LatStat::Quantile(990))];
+const MISS_LAT: &[(&str, LatStat)] = &[("miss_p50_us", LatStat::Quantile(500)), ("miss_p95_us", LatStat::Quantile(950)), ("miss_p99_us", LatStat::Quantile(990))];
 
 /// a kept answer
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -451,6 +457,9 @@ impl Service for Cache {
             Metric::new("hit_p50_us", us(self.hit_lat.p50(now))),
             Metric::new("miss_p50_us", us(self.miss_lat.p50(now))),
         ]
+    }
+    fn windows(&self) -> Vec<LatWindow<'_>> {
+        alloc::vec![LatWindow::new(&self.lat, LAT), LatWindow::new(&self.hit_lat, HIT_LAT), LatWindow::new(&self.miss_lat, MISS_LAT)]
     }
     fn status(&self) -> String {
         format!("Port {} vor {}: {} Einträge, {} Treffer, {} Fehlschläge ({},{} % Treffer)", self.port, self.backend.text(), self.store.len(), self.hits, self.misses, self.hit_pm() / 10, self.hit_pm() % 10)
