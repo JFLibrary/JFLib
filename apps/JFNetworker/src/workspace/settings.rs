@@ -129,7 +129,7 @@ const SCRIPT_KEYS: [(&str, &str); 7] = [
 pub(crate) fn shortcuts(n: &mut Net, ui: &mut Ui) {
     let open = n.keys_open.clone();
     if ui.dialog_begin(ID_KEYS_DLG, t("Tastenkürzel"), &open) {
-        let sections: [(&'static str, Vec<Row>); 9] = [
+        let sections: [(&'static str, Vec<Row>); 10] = [
             (t("Datei und Bearbeiten"), cmd_rows(ui, &[CMD_NEW, CMD_OPEN, CMD_SAVE, CMD_SAVE_AS, CMD_QUIT, CMD_UNDO, CMD_REDO, CMD_DELETE, CMD_SELECT_ALL, CMD_RENAME])),
             (t("Werkzeuge"), cmd_rows(ui, &[CMD_TOOL_SELECT, CMD_TOOL_HAND, CMD_TOOL_CONNECT, CMD_TOOL_NOTE, CMD_TOOL_PDU, CMD_SETTINGS])),
             (t("Ansicht"), cmd_rows(ui, &[CMD_ZOOM_IN, CMD_ZOOM_OUT, CMD_FIT])),
