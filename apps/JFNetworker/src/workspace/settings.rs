@@ -7,7 +7,7 @@
 //                       file is written when the dialog closes
 //   shortcuts(n, ui)    every key of the app by area: the commands with their accelerators
 //                       (from the command table, in the current language) and the keys of the
-//                       canvas, the consoles, the simulation and the window
+//                       canvas, the consoles, the simulation, the window and the script editor
 //
 // Both are dialogs of the main window; Esc and Schließen end them.
 
@@ -114,6 +114,16 @@ const WINDOW_KEYS: [(&str, &str); 4] = [
     ("Strg+F6", "zwischen den Fenstern wechseln (Konsolen, Gerätefenster)"),
     ("Alt", "die Menüleiste"),
 ];
+// i18n
+const SCRIPT_KEYS: [(&str, &str); 7] = [
+    ("Strg+S", "das Skript übernehmen: ins Projekt und in das laufende Skript"),
+    ("F8 / Umschalt+F8", "zur nächsten / vorigen Meldung (Fehler, Warnung, Fehler im Lauf)"),
+    ("Strg+Z / Strg+Y", "im Editor rückgängig / wiederholen (außerhalb des Editors: das Projekt)"),
+    ("Strg+F / Strg+H", "suchen / ersetzen"),
+    ("Strg+/", "Zeilen aus- und wieder einkommentieren"),
+    ("Tab / Umschalt+Tab", "die gewählten Zeilen ein- und ausrücken"),
+    ("Alt+Pfeil auf / ab", "die Zeilen verschieben"),
+];
 
 /// the overview of the shortcuts
 pub(crate) fn shortcuts(n: &mut Net, ui: &mut Ui) {
@@ -133,6 +143,7 @@ pub(crate) fn shortcuts(n: &mut Net, ui: &mut Ui) {
                 v
             }),
             (t("Aufgabe"), cmd_rows(ui, &[CMD_TASK_PANEL, CMD_TASK_CHECK])),
+            (t("Skript-Editor"), key_rows(&SCRIPT_KEYS)),
         ];
         ui.next_size(500, 460);
         ui.scroll_begin(ID_KEYS_SCROLL, SC_V | pad(2));

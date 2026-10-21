@@ -526,3 +526,7 @@ keine solche Reihe	no such series
 keine Werte im Zeitraum	no values in the span
 das Fenster der Latenzen hält den Zeitraum nicht mehr	the latency window no longer holds the span
 der Zeitraum endet erst nach jetzt	the span ends after now
+# the script editor (U7): a script's new definition, a service's new name (scriptsvc.rs, os.rs)
+Der Dienst „{}“ ist kein Skript.	The service “{}” is not a script.
+„{}“ taugt nicht als Name eines Dienstes.	“{}” cannot be the name of a service.
+Den Dienst „{}“ gibt es schon.	The service “{}” exists already.

@@ -15,6 +15,8 @@
 // scenarios.
 // tasktest.rs: the labs and their tasks (group task: jfn_model::lab, jfn_sim::goal, the labs of
 // assets/labs unsolved and solved).
+// scriptedtest.rs: what the script editor builds on (group scripted: doc/scripts.rs, the steps
+// that keep a running script's disk through undo and redo, keep_steps, the marks).
 
 use alloc::format;
 use alloc::string::String;
@@ -56,9 +58,11 @@ impl T {
 
 #[path = "msgtest.rs"]
 mod msgtest;
+#[path = "scriptedtest.rs"]
+mod scriptedtest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 23] = [
+    let groups: [(&'static str, fn(&mut T)); 24] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -82,6 +86,7 @@ pub fn run() -> i32 {
         ("script", crate::simtest::scripttest::run),
         ("series", crate::simtest::seriestest::run),
         ("task", crate::simtest::tasktest::run),
+        ("scripted", scriptedtest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

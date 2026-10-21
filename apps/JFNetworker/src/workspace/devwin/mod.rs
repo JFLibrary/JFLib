@@ -8,11 +8,14 @@
 //   frame(n, ui)            the windows (after the main window's content)
 //   shows(n, dev)           the window that draws this device's console now (its CLI tab, the
 //                           desktop's prompt): the Terminal panel shows a note instead
+//   open_on(n, ui, dev, tab)   the device's window on one of its tabs (CMD_SCRIPTS: Skripte)
 //
 //   config.rs    Konfiguration: forms that type command lines (doc/console.rs run_lines)
 //   services.rs  Dienste: what runs on the device, switched on and off
 //   svcedit.rs   the settings of a project's service as JSON (Dienste › Einstellungen …)
 //   desktop.rs   Desktop of hosts: IP-Konfiguration, Eingabeaufforderung, Texteditor, Browser
+//   scripts.rs   Skripte of hosts: the device's scripts, a code editor with diagnostics, run,
+//                stop, apply, their output and errors (ids ID_SCRIPTS0 + 0x400 k ..)
 //
 // Übersicht shows model, ports, power and state; Schnittstellen every interface as the
 // simulator runs it (the inspector's rows, with frame counters); CLI the device's console --
@@ -25,6 +28,7 @@ pub(crate) mod config;
 pub(crate) mod desktop;
 pub(crate) mod services;
 pub(crate) mod svcedit;
+pub(crate) mod scripts;
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -51,6 +55,7 @@ pub(crate) enum Tab {
     Services,
     Cli,
     Desktop,
+    Scripts,
 }
 
 impl Tab {
@@ -63,6 +68,7 @@ impl Tab {
             Tab::Services => "Dienste",
             Tab::Cli => "CLI",
             Tab::Desktop => "Desktop",
+            Tab::Scripts => "Skripte",
         })
     }
 }
@@ -82,6 +88,9 @@ fn tabs_of(n: &Net, dev: u32) -> Vec<Tab> {
     if m.is_some_and(|m| m.has(F_HOST) && m.cli == CliStyle::Linux) {
         v.push(Tab::Desktop);
     }
+    if scripts::has_tab(&n.doc.proj, dev) {
+        v.push(Tab::Scripts);
+    }
     v
 }
 
@@ -96,6 +105,8 @@ pub(crate) struct DevWin {
     pub desk: desktop::Desk,
     /// opened at (the oldest gives its place up)
     age: u32,
+    /// the Skripte tab
+    pub scr: scripts::Pane,
 }
 
 pub(crate) struct DevWins {
@@ -103,11 +114,13 @@ pub(crate) struct DevWins {
     clock: u32,
     /// the settings editor of a service (svcedit.rs)
     pub svc: svcedit::SvcEdit,
+    /// the scripts being edited, of every window (they outlive a closed window)
+    pub drafts: scripts::Drafts,
 }
 
 impl DevWins {
     pub(crate) fn new() -> DevWins {
-        DevWins { wins: (0..DEVWINS).map(|_| None).collect(), clock: 0, svc: svcedit::SvcEdit::new() }
+        DevWins { wins: (0..DEVWINS).map(|_| None).collect(), clock: 0, svc: svcedit::SvcEdit::new(), drafts: scripts::Drafts::new() }
     }
 
     /// device window k (for the tabs' modules)
@@ -150,9 +163,21 @@ pub(crate) fn open(n: &mut Net, ui: &mut Ui, dev: u32) {
         cfg: config::Form::new(),
         desk: desktop::Desk::new(),
         age: w.clock,
+        scr: scripts::Pane::new(dev),
     });
     ui.window_activate(base(k));
     ui.repass();
+}
+
+/// the device's window (open() as it is) on one of its tabs
+pub(crate) fn open_on(n: &mut Net, ui: &mut Ui, dev: u32, tab: Tab) {
+    open(n, ui, dev);
+    let tabs = tabs_of(n, dev);
+    if let Some(w) = n.devwin.wins.iter_mut().flatten().find(|w| w.dev == dev && w.open.get() != 0)
+        && tabs.contains(&tab)
+    {
+        w.tab = tab;
+    }
 }
 
 /// the window that draws device `dev`'s console now
@@ -219,6 +244,7 @@ fn window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
             ui.box_end();
         }
         Tab::Desktop => desktop::tab(n, ui, k, id + 0x80, dev),
+        Tab::Scripts => scripts::tab(n, ui, k, ID_SCRIPTS0 + 0x400 * k as u32, dev),
     }
     ui.box_end();
 }

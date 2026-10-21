@@ -23,7 +23,8 @@
 // changes?" question, sim.rs the engine behind the editor, config.rs the settings that change
 // a device's configuration (the inspector's quick fields), console.rs the consoles of the
 // devices and what the engine reports to them, autosave.rs the copies of unsaved work and
-// their recovery.
+// their recovery, scripts.rs the scripts of a device (new source, new script, rename, delete
+// as steps that keep the running device; the templates).
 
 pub(crate) mod autosave;
 pub(crate) mod config;
@@ -31,6 +32,7 @@ pub(crate) mod console;
 pub(crate) mod edits;
 pub(crate) mod file;
 pub(crate) mod sim;
+pub(crate) mod scripts;
 
 use alloc::boxed::Box;
 use alloc::string::String;

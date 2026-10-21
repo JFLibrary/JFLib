@@ -41,6 +41,8 @@
 //                     "ns_per_op": 5, "limits": {"fuel": 10000000, ...}, ...} (scriptsvc.rs)
 //
 //   HttpLoadSet / HttpServerSet    change a running load generator or web server in place
+//   ScriptSource / RenameService   a script's new definition, keeping its disk and numbers
+//                                  (scriptsvc.rs); a service's new name (os.rs)
 //
 // The actions find the services they change by their type (whatever a project named them)
 // and make missing ones on the fly, named after their kind ("dhcp-server", "dns-server",
@@ -459,6 +461,9 @@ impl Engine {
                 });
                 Ok(())
             }
+            // a script's new definition, a service's new name
+            Action::ScriptSource { dev, svc, config } => self.script_source(dev, &svc, &config),
+            Action::RenameService { dev, name, to } => self.rename_service(dev, &name, &to),
             // the lab: faults and its services (lab.rs)
             other => self.lab_apply(other),
         }

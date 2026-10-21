@@ -1,0 +1,67 @@
+#!args --verify-dirty --lang en --open apps/JFNetworker/tests/fixtures/scripts.jfnet
+# the script editor in English (U7): the context menu, the Scripts tab, the list, the status
+# line, the messages of a run, Output and Errors, the templates (their comments and texts in
+# English) on PC1, which has no script yet, and the keys in the overview of the shortcuts.
+# The messages of lib/script and of the running program stay German.  Ids as in
+# script_editor.uis: 26624 the device window, 53249 New, 53280 the editor, 53505 the first
+# script of the list.
+size 1280 900
+theme light
+wait 3500
+rclick listitem:"SRV1"
+move 700,300
+click menuitem:"Scripts …"
+expect window 26624 open
+expect tab:"Scripts" selected
+expect #53505 selected
+expect text:"running · 0 % · 1 error" exists
+expect text:"running · 0 %" exists
+expect text:"1 error, 0 warnings" exists
+expect text:"as in the project" exists
+expect tab:"Output" selected
+expect tab:"Errors (1)" exists
+expect button:"Run" disabled
+expect button:"Stop" enabled
+expect button:"Restart" enabled
+expect button:"Apply" disabled
+wait 600
+click tab:"Errors (1)"
+expect listitem:"3.000 s · line 13, column 15 (timer): Division durch 0" exists
+wait 600
+click #53280
+key f8
+expect text:"Line 13, column 15" exists
+expect text:"13:15: Error while running (timer, at 3.000 s): Division durch 0" exists
+key ctrl+end
+type "\nlet = 5"
+wait 300
+expect text:"2 errors, 0 warnings" exists
+expect text:"running · 0 % · 1 error · changed" exists
+key ctrl+s
+expect text:"The script does not compile: line 17, column 5: Nach let fehlt ein Name" exists
+shot build/jfnetworker/script_editor_en.png window 26624
+key ctrl+z ctrl+z
+close window 26624
+expect window 26624 closed
+# PC1 has no script yet; New makes one from a template, in English
+rclick listitem:"PC1"
+move 700,300
+click menuitem:"Scripts …"
+expect window 26624 open
+expect text:"No scripts yet" exists
+wait 600
+click #53249
+click menuitem:"UDP echo"
+move 700,300
+wait 100
+expect #53505 selected
+expect text:"running · 0 %" exists
+expect #53280 text "// UDP echo: sends every datagram back to its sender.\nlet port = config.port ?? 7\nnet.udp(port, fn(sock, msg) {\n  metrics.inc(\"echos\")\n  sock.send(msg.from, msg.port, msg.data)\n})\nlog(\"Echo ready on UDP port ${port}\")"
+shot build/jfnetworker/script_editor_en_template.png window 26624
+close window 26624
+# the keys of the script editor in the overview of the shortcuts
+key f1
+expect text:"Script editor" exists
+expect text:"apply the script: to the project and to the running script" exists
+key esc
+expect_nowarn

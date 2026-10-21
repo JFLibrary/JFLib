@@ -874,7 +874,11 @@ Fensterrand hinaus.
   Metriken), Fuel als Rechenzeit einer CPU mit einem Thread (`Cx::fuel()` nennt den Augenblick
   eines Aufrufs), Grenzen und Fehler mit Zeile und Spalte, der Befehl `script` in der
   Linux-Shell; getestet mit der Selbsttest-Gruppe `script` und dem Golden-Szenario
-  `scen_script_kv.uis`.
+  `scen_script_kv.uis`. Seit 2026-10-22 (U7) bearbeitet der Reiter Skripte im Gerätefenster
+  eines Hosts sie mit `ui.code_editor` (Prüfung mit `check()` beim Tippen, die Fehler des
+  laufenden Programms mit Zeile und Spalte als Marken, F8), Übernehmen ist ein
+  Rückgängig-Schritt, nach dem das laufende Skript Disk und Zahlen behält
+  (`Action::ScriptSource`; App-README „Skript-Editor“).
 - **P3** · *erledigt* · Befehlsbäume für Konsolen (seit 2026-10-19, für JFNetworker):
   [`base/cmdtree.rs`](../lib/base/cmdtree.rs) mit IOS-Abkürzungen (`sh ip int br`), `?`-Hilfe
   im IOS-Layout, Tab, Modi mit Prompt, `no`-Form, typisierten Parametern (Zahl mit Bereich,
