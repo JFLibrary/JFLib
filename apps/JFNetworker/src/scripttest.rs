@@ -831,7 +831,9 @@ fn texts(t: &mut T) {
     t.eq("texts: layer and drop", (notes[2].layer(), notes[1].is_drop(), notes[0].is_drop()), (7, true, false));
     let r = jfn_sim::scriptsvc::from_def_msg(&Json::Object(Vec::new())).err().map(|m| m.text_with(&en)).unwrap_or_default();
     t.eq("texts: refusal", r, String::from("\u{201c}source\u{201d} is missing: the text of the script."));
-    let _ = ScriptState::Stopped;
+    let _ = e.apply(Action::ServiceRun { dev: h[0], name: String::from("div"), on: false });
+    let stopped = e.services(h[0]).first().map(|s| (s.status_msg.text(), s.status_msg.text_with(&en)));
+    t.eq("texts: stopped", (sv(&e, h[0], "div").map(|s| s.state()), stopped), (Some(ScriptState::Stopped), Some((String::from("gestoppt"), String::from("stopped")))));
 }
 
 const RANDOM: &str = r#"let total = 0
