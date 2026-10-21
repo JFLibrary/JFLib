@@ -1,0 +1,18 @@
+# tools/package.py: setup.exe (Windows) and .deb (Linux) of JFNetworker
+display=JFNetworker
+version=0.1.0
+publisher=JFLib
+license=MIT
+summary=Netzwerksimulator und Labor für verteilte Systeme
+description=Netzwerke entwerfen und simulieren: Geräte und Kabel auf einer Zeichenfläche, echte Protokolle Byte für Byte, IOS-artige Befehlszeilen und Linux-Shells, ein Simulationsmodus Schritt für Schritt; eine Alternative zu Packet Tracer, geschrieben in Rust mit JFLib.
+generic=Netzwerksimulator
+categories=Education;ComputerScience;
+deb_name=jfnetworker
+# Flatpak, AppStream and the MSIX identity: the author's apps use jfreund.org (docs/PACKAGING.md)
+app_id=org.jfreund.JFNetworker
+homepage=https://github.com/JFLibrary/JFLib
+default_win=netlab
+default_linux=netlab
+styles=netlab
+# its own project files: "Open with" and the default for .jfnet
+filetypes=jfnet|application/x-jfnetworker|JFNetworker-Projekt|own

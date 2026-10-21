@@ -249,3 +249,40 @@ pub(crate) const ID_PKT0: u32 = 0x9400;
 /// the pcapng save dialog: ID_PCAP_DLG .. + 0x3FFF (a file dialog takes a block like
 /// ID_FILEDLG)
 pub(crate) const ID_PCAP_DLG: u32 = 0x0011_0000;
+// ---- U5: keyboard and screen readers, settings, autosave, shortcuts (commands 215 .. 259,
+// widgets 0xA200 .. 0xAFFF, timers 0x130 .. 0x13F)
+/// the topology canvas gets the keyboard (Ctrl+9)
+pub(crate) const CMD_FOCUS_CANVAS: u32 = 215;
+/// the settings dialog, the overview of the shortcuts
+pub(crate) const CMD_SETTINGS: u32 = 216;
+pub(crate) const CMD_SHORTCUTS: u32 = 217;
+/// the recovery bar: open the autosaved project, throw it away
+pub(crate) const CMD_RECOVER: u32 = 218;
+pub(crate) const CMD_RECOVER_DROP: u32 = 219;
+/// the autosave timer (doc::autosave)
+pub(crate) const TIMER_AUTOSAVE: u32 = 0x130;
+/// the toolbar as a pane (F6 order) and its parts as focus groups (one Tab stop each)
+pub(crate) const ID_TB_PANE: u32 = 0xA200;
+pub(crate) const ID_TB_GRP_TOOLS: u32 = 0xA201;
+pub(crate) const ID_TB_GRP_EDIT: u32 = 0xA202;
+pub(crate) const ID_TB_GRP_ZOOM: u32 = 0xA203;
+pub(crate) const ID_TB_GRP_VIEW: u32 = 0xA204;
+pub(crate) const ID_TB_GRP_PLAY: u32 = 0xA205;
+pub(crate) const ID_TB_GRP_PDU: u32 = 0xA206;
+/// the palette: the tiles of category k are one focus group (+ k)
+pub(crate) const ID_TILE_GROUP: u32 = 0xA210;
+/// the recovery bar (a card) and its buttons
+pub(crate) const ID_RECOVER_BAR: u32 = 0xA220;
+pub(crate) const ID_RECOVER_OK: u32 = 0xA224;
+pub(crate) const ID_RECOVER_DROP: u32 = 0xA225;
+pub(crate) const ID_RECOVER_LATER: u32 = 0xA226;
+/// the settings dialog, its scroll view and page (a scope of hashed ids)
+pub(crate) const ID_SETTINGS_DLG: u32 = 0xA230;
+pub(crate) const ID_SETTINGS_SCROLL: u32 = 0xA231;
+pub(crate) const ID_SETTINGS_PAGE: u32 = 0xA232;
+/// the overview of the shortcuts and its scroll view
+pub(crate) const ID_KEYS_DLG: u32 = 0xA240;
+pub(crate) const ID_KEYS_SCROLL: u32 = 0xA241;
+// ---- performance (U5: commands 200 .. 209, widgets 0xA000 .. 0xA0FF, timers 0x120 .. 0x12F)
+/// the frames on the canvas in the simulation mode: a record whose value is their number
+pub(crate) const ID_SIM_FRAMES: u32 = 0xA000;

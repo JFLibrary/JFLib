@@ -5,6 +5,8 @@
 //   needs_crossover(a, b)                          copper between two MDI or two MDI-X ports
 //   link_kbps(a, b) / default_delay_ns(kind)       the speed both ends agree on, the delay
 //   CableKind::title / max_len_m                   German name, the medium's length limit
+//   Why::msg() / describe_msg(kind, kbps)           the reason and the tooltip text as a Msg
+//                                                  (Display and describe(): their German text)
 //
 // Copper: a straight cable joins MDI (host, router) and MDI-X (switch) ports, a crossover cable
 // two of the same kind.  With auto-MDI-X (the default of every multi-gigabit port, and of the
@@ -13,13 +15,14 @@
 // optics at the lower speed; QSFP28 only joins QSFP28.  Radios: a client associates with an
 // access point (no ad-hoc mode).
 
-use alloc::format;
 use alloc::string::String;
 use core::fmt;
 
 use agent_core::wire_enum;
 
 use crate::catalog::{Media, PortSpec};
+use crate::msg::{phrase, Msg};
+use crate::msg;
 
 wire_enum! {
     /// the kind of a link
@@ -38,6 +41,7 @@ wire_enum! {
 impl CableKind {
     /// the German name (the app translates it)
     pub fn title(self) -> &'static str {
+        // i18n
         match self {
             CableKind::CopperStraight => "Kupfer, gerade",
             CableKind::CopperCross => "Kupfer, gekreuzt",
@@ -87,15 +91,22 @@ pub enum Why {
     CableDoesNotFit(CableKind, Media),
 }
 
+impl Why {
+    /// the reason as a message (Display: its German text)
+    pub fn msg(&self) -> Msg {
+        match self {
+            Why::SameDevice => msg!("Ein Kabel braucht zwei verschiedene Geräte."),
+            Why::PortInUse(p) => msg!("Der Port {} ist schon belegt.", p),
+            Why::MediaMismatch(a, b) => msg!("{} und {} passen nicht zusammen.", phrase(a.name()), phrase(b.name())),
+            Why::NoAccessPoint => msg!("Funk verbindet ein WLAN-Gerät mit einem Access Point."),
+            Why::CableDoesNotFit(c, m) => msg!("{} passt nicht in einen {}-Port.", phrase(c.title()), phrase(m.name())),
+        }
+    }
+}
+
 impl fmt::Display for Why {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Why::SameDevice => f.write_str("Ein Kabel braucht zwei verschiedene Geräte."),
-            Why::PortInUse(p) => write!(f, "Der Port {} ist schon belegt.", p),
-            Why::MediaMismatch(a, b) => write!(f, "{} und {} passen nicht zusammen.", a.name(), b.name()),
-            Why::NoAccessPoint => f.write_str("Funk verbindet ein WLAN-Gerät mit einem Access Point."),
-            Why::CableDoesNotFit(c, m) => write!(f, "{} passt nicht in einen {}-Port.", c.title(), m.name()),
-        }
+        f.write_str(&self.msg().text())
     }
 }
 
@@ -177,5 +188,10 @@ pub fn default_delay_ns(kind: CableKind) -> u64 {
 
 /// "Kupfer, gerade · 1G" for tooltips
 pub fn describe(kind: CableKind, kbps: u32) -> String {
-    format!("{} · {}", kind.title(), crate::catalog::speed_str(kbps))
+    describe_msg(kind, kbps).text()
+}
+
+/// describe() as a message
+pub fn describe_msg(kind: CableKind, kbps: u32) -> Msg {
+    msg!("{} · {}", phrase(kind.title()), crate::catalog::speed_msg(kbps))
 }

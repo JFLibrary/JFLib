@@ -27,6 +27,8 @@ use alloc::vec::Vec;
 use core::any::Any;
 
 use base::metrics::Counter;
+use jfn_model::msg;
+use jfn_model::msg::{phrase, Msg};
 use netpkt::dns::{self, Message, RData, Rr, Soa, CLASS_IN, TYPE_ANY, TYPE_CNAME, TYPE_NS, TYPE_OPT, TYPE_SOA};
 use netpkt::udp::PORT_DNS;
 use netpkt::{Ipv4, Ipv6};
@@ -458,8 +460,12 @@ impl Service for DnsServer {
         ]
     }
     fn status(&self) -> String {
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
         let names: Vec<&str> = self.zones.iter().map(|z| if z.origin.is_empty() { "." } else { z.origin.as_str() }).collect();
-        format!("Zonen: {}{}", if names.is_empty() { String::from("keine") } else { names.join(", ") }, if self.forward { "; leitet weiter" } else { "" })
+        let zones = if names.is_empty() { phrase("keine") } else { Msg::plain(names.join(", ")) };
+        if self.forward { msg!("Zonen: {}; leitet weiter", zones) } else { msg!("Zonen: {}", zones) }
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())

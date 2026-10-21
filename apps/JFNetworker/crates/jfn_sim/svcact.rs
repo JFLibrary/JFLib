@@ -46,7 +46,7 @@
 // lease and leaves the client idle).  IOS
 // keeps helper addresses in its "dhcp-server" (one DHCP subsystem); a Linux device gets a
 // separate "dhcp-relay", and as on a real Linux box a relay and a server cannot share port
-// 67 there.
+// 67 there.  Refusals carry their reason as a message (jfn_model::msg) for the app's catalogue.
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -54,6 +54,8 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use agent_core::jmap::Value;
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 use jfn_model::project::ServiceDef;
 use netpkt::{Ipv4, Prefix4};
 
@@ -78,8 +80,8 @@ fn ips_of(v: Option<&Value>) -> Vec<Ipv4> {
     v.and_then(|x| x.as_array()).map(|a| a.iter().filter_map(ip_of).collect()).unwrap_or_default()
 }
 
-fn bad(kind: &str, what: &str) -> ActErr {
-    ActErr::Refused(format!("Dienst {}: {}", kind, what))
+fn bad(kind: &str, what: Msg) -> ActErr {
+    ActErr::Refused(msg!("Dienst {}: {}", kind, what))
 }
 
 /// (interface, address) pairs: [["eth0", "10.0.2.10"], ...]
@@ -120,7 +122,7 @@ impl Engine {
         let kind = def.kind.as_str();
         let svc: Box<dyn Service> = match kind {
             "dhcp-client" => {
-                let iface = text_of(c.get("iface")).ok_or_else(|| bad(kind, "\u{201e}iface\u{201c} fehlt."))?;
+                let iface = text_of(c.get("iface")).ok_or_else(|| bad(kind, msg!("\u{201e}iface\u{201c} fehlt.")))?;
                 let mut d = DhcpClient::new(&iface, ios);
                 if let Some(b) = c.get("arp_check").and_then(|b| b.as_bool()) {
                     d.arp_check = b;
@@ -130,7 +132,7 @@ impl Engine {
             "dhcp-server" | "dhcp-relay" => {
                 let mut d = if kind == "dhcp-relay" { Dhcpd::relay(ios) } else { Dhcpd::server(ios) };
                 for p in c.get("pools").and_then(|p| p.as_array()).unwrap_or(&[]) {
-                    let (name, cfg) = pool_of(p).ok_or_else(|| bad(kind, "ein Pool braucht \u{201e}name\u{201c} und \u{201e}network\u{201c}."))?;
+                    let (name, cfg) = pool_of(p).ok_or_else(|| bad(kind, msg!("ein Pool braucht \u{201e}name\u{201c} und \u{201e}network\u{201c}.")))?;
                     d.set_pool(&name, Some(cfg));
                 }
                 for (a, b) in pairs_of(c.get("excluded")).into_iter().map(|(a, b)| (Ipv4::parse(&a), b)) {
@@ -163,7 +165,7 @@ impl Engine {
                     }
                     for line in z.get("records").and_then(|r| r.as_array()).unwrap_or(&[]) {
                         let l = line.as_str().unwrap_or("");
-                        let rr = parse_record(l, &zone.origin, zone.ttl).ok_or_else(|| bad(kind, &format!("\u{201e}{}\u{201c} ist kein Eintrag.", l)))?;
+                        let rr = parse_record(l, &zone.origin, zone.ttl).ok_or_else(|| bad(kind, msg!("\u{201e}{}\u{201c} ist kein Eintrag.", l)))?;
                         zone.add(rr);
                     }
                     s.zones.push(zone);
@@ -191,13 +193,13 @@ impl Engine {
                 }
                 Box::new(n)
             }
-            "tcp-echo" | "tcp-discard" | "tcp-client" => crate::tcpsvc::from_def(kind, c).map_err(|w| bad(kind, &w))?,
-            "http-server" | "http-client" | "http-load" => crate::httpsvc::from_def(kind, c).map_err(|w| bad(kind, &w))?,
-            "lb" => crate::lb::from_def(c).map_err(|w| bad(kind, &w))?,
-            "kv" => crate::kv::from_def(c).map_err(|w| bad(kind, &w))?,
-            "cache" => crate::cache::from_def(c).map_err(|w| bad(kind, &w))?,
-            "mq" | "worker" => crate::mq::from_def(kind, c).map_err(|w| bad(kind, &w))?,
-            k => return Err(ActErr::Refused(format!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k))),
+            "tcp-echo" | "tcp-discard" | "tcp-client" => crate::tcpsvc::from_def_msg(kind, c).map_err(|w| bad(kind, w))?,
+            "http-server" | "http-client" | "http-load" => crate::httpsvc::from_def_msg(kind, c).map_err(|w| bad(kind, w))?,
+            "lb" => crate::lb::from_def_msg(c).map_err(|w| bad(kind, w))?,
+            "kv" => crate::kv::from_def_msg(c).map_err(|w| bad(kind, w))?,
+            "cache" => crate::cache::from_def_msg(c).map_err(|w| bad(kind, w))?,
+            "mq" | "worker" => crate::mq::from_def_msg(kind, c).map_err(|w| bad(kind, w))?,
+            k => return Err(ActErr::Refused(msg!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k))),
         };
         let name = if def.name.is_empty() { def.kind.clone() } else { def.name.clone() };
         self.add_service(dev, &name, svc, !def.disabled)
@@ -207,12 +209,12 @@ impl Engine {
     fn http_svc<T: Service + 'static>(&self, dev: u32, name: &str) -> Result<(usize, u32), ActErr> {
         let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
         let os = self.os(ni).ok_or(ActErr::NoIp(dev))?;
-        let s = os.svc(name).ok_or_else(|| ActErr::Refused(format!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
+        let s = os.svc(name).ok_or_else(|| ActErr::Refused(msg!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
         if !s.svc.as_ref().is_some_and(|x| x.as_any().downcast_ref::<T>().is_some()) {
-            return Err(ActErr::Refused(format!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", name)));
+            return Err(ActErr::Refused(msg!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", name)));
         }
         if !s.running {
-            return Err(ActErr::Refused(format!("Der Dienst \u{201e}{}\u{201c} läuft nicht.", name)));
+            return Err(ActErr::Refused(msg!("Der Dienst \u{201e}{}\u{201c} läuft nicht.", name)));
         }
         Ok((ni, s.id))
     }
@@ -235,7 +237,7 @@ impl Engine {
             }
         };
         let os = self.os_mut(ni).ok_or(ActErr::NoIp(dev))?;
-        os.svcs.iter_mut().find(|s| s.id == id).and_then(|s| s.svc.as_mut()).and_then(|x| x.as_any_mut().downcast_mut::<T>()).ok_or_else(|| ActErr::Refused(format!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", name)))
+        os.svcs.iter_mut().find(|s| s.id == id).and_then(|s| s.svc.as_mut()).and_then(|x| x.as_any_mut().downcast_mut::<T>()).ok_or_else(|| ActErr::Refused(msg!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", name)))
     }
 
     /// the DHCP server of a device (IOS: also its relay agent)
@@ -243,7 +245,7 @@ impl Engine {
         let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
         let ios = self.os(ni).ok_or(ActErr::NoIp(dev))?.ios;
         if !ios && self.find::<Dhcpd>(ni, &|d| d.relay_only).is_some() {
-            return Err(ActErr::Refused(String::from("Auf diesem Gerät läuft schon ein DHCP-Relay: Port 67 ist belegt.")));
+            return Err(ActErr::Refused(msg!("Auf diesem Gerät läuft schon ein DHCP-Relay: Port 67 ist belegt.")));
         }
         self.ensure(dev, "dhcp-server", &|d: &Dhcpd| !d.relay_only, Dhcpd::server)
     }
@@ -284,7 +286,7 @@ impl Engine {
             Action::DhcpRenew { dev, iface } => {
                 let (ni, canon) = self.iface_name(dev, &iface)?;
                 let name = format!("dhcp-client@{}", canon);
-                let id = self.os(ni).and_then(|o| o.svc_id(&name)).ok_or_else(|| ActErr::Refused(format!("{} holt seine Adresse nicht per DHCP.", canon)))?;
+                let id = self.os(ni).and_then(|o| o.svc_id(&name)).ok_or_else(|| ActErr::Refused(msg!("{} holt seine Adresse nicht per DHCP.", canon)))?;
                 self.svc_ctl(ni, id, Ctl::Renew);
                 Ok(())
             }
@@ -292,13 +294,13 @@ impl Engine {
                 if let Some(p) = &pool
                     && p.network.len > 30
                 {
-                    return Err(ActErr::Refused(format!("{} ist zu klein für einen Pool.", p.network)));
+                    return Err(ActErr::Refused(msg!("{} ist zu klein für einen Pool.", p.network)));
                 }
                 let removing = pool.is_none();
                 if self.dhcp_server(dev)?.set_pool(&name, pool) || !removing {
                     Ok(())
                 } else {
-                    Err(ActErr::Refused(format!("Den Pool \u{201e}{}\u{201c} gibt es nicht.", name)))
+                    Err(ActErr::Refused(msg!("Den Pool \u{201e}{}\u{201c} gibt es nicht.", name)))
                 }
             }
             Action::DhcpExclude { dev, from, to, add } => {
@@ -312,20 +314,20 @@ impl Engine {
                     self.ensure(dev, "dhcp-server", &|d: &Dhcpd| !d.relay_only, Dhcpd::server)?
                 } else {
                     if self.find::<Dhcpd>(ni, &|d| !d.relay_only).is_some() {
-                        return Err(ActErr::Refused(String::from("Auf diesem Gerät läuft schon ein DHCP-Server: Port 67 ist belegt.")));
+                        return Err(ActErr::Refused(msg!("Auf diesem Gerät läuft schon ein DHCP-Server: Port 67 ist belegt.")));
                     }
                     self.ensure(dev, "dhcp-relay", &|d: &Dhcpd| d.relay_only, Dhcpd::relay)?
                 };
                 if d.set_helper(&canon, server, add) || add {
                     Ok(())
                 } else {
-                    Err(ActErr::Refused(format!("{} ist an {} nicht eingetragen.", server, canon)))
+                    Err(ActErr::Refused(msg!("{} ist an {} nicht eingetragen.", server, canon)))
                 }
             }
             Action::DhcpClear { dev, ip, conflicts } => {
                 let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
                 if self.find::<Dhcpd>(ni, &|d| !d.relay_only).is_none() {
-                    return Err(ActErr::Refused(String::from("Hier läuft kein DHCP-Server.")));
+                    return Err(ActErr::Refused(msg!("Hier läuft kein DHCP-Server.")));
                 }
                 self.dhcp_server(dev)?.clear(ip, conflicts);
                 Ok(())
@@ -336,7 +338,7 @@ impl Engine {
                 match (add, have) {
                     (true, false) => s.zones.push(Zone::new(&origin)),
                     (false, true) => s.zones.retain(|z| !netpkt::dns::name_eq(&z.origin, &origin)),
-                    (false, false) => return Err(ActErr::Refused(format!("Die Zone \u{201e}{}\u{201c} gibt es nicht.", origin))),
+                    (false, false) => return Err(ActErr::Refused(msg!("Die Zone \u{201e}{}\u{201c} gibt es nicht.", origin))),
                     (true, true) => {}
                 }
                 Ok(())
@@ -351,7 +353,7 @@ impl Engine {
                 } else {
                     false
                 };
-                if ok { Ok(()) } else { Err(ActErr::Refused(format!("Für {} gibt es keine passende Zone oder keinen solchen Eintrag.", rr.name))) }
+                if ok { Ok(()) } else { Err(ActErr::Refused(msg!("Für {} gibt es keine passende Zone oder keinen solchen Eintrag.", rr.name))) }
             }
             Action::DnsForward { dev, on } => {
                 self.ensure(dev, "dns-server", &|_: &DnsServer| true, DnsServer::new)?.forward = on;

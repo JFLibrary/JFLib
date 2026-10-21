@@ -7,8 +7,8 @@
 // The services of the lab live in their own files (lb.rs, kv.rs, cache.rs, mq.rs); this one
 // routes the actions to the service of the right kind (a stopped one is changed as well).
 
-use alloc::format;
-use alloc::string::String;
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 
 use crate::action::{ActErr, Action};
 use crate::kernel::Engine;
@@ -19,19 +19,19 @@ impl Engine {
     fn lab_svc<T: Service + 'static>(&self, dev: u32, name: &str) -> Result<(usize, u32), ActErr> {
         let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
         let os = self.os(ni).ok_or(ActErr::NoIp(dev))?;
-        let s = os.svc(name).ok_or_else(|| ActErr::Refused(format!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
+        let s = os.svc(name).ok_or_else(|| ActErr::Refused(msg!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
         if !s.svc.as_ref().is_some_and(|x| x.as_any().downcast_ref::<T>().is_some()) {
-            return Err(ActErr::Refused(format!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", name)));
+            return Err(ActErr::Refused(msg!("Der Dienst \u{201e}{}\u{201c} ist von anderer Art.", name)));
         }
         Ok((ni, s.id))
     }
 
     /// changes a service of type T; a running one gets its OsApi, a stopped one is changed
     /// as it is
-    fn lab_change<T: Service + 'static>(&mut self, dev: u32, name: &str, f: impl FnOnce(&mut T, Option<&mut crate::os::OsApi>) -> Result<(), String>) -> Result<(), ActErr> {
+    fn lab_change<T: Service + 'static>(&mut self, dev: u32, name: &str, f: impl FnOnce(&mut T, Option<&mut crate::os::OsApi>) -> Result<(), Msg>) -> Result<(), ActErr> {
         let (ni, id) = self.lab_svc::<T>(dev, name)?;
         let running = self.os(ni).is_some_and(|o| o.running(id));
-        let mut out: Result<(), String> = Ok(());
+        let mut out: Result<(), Msg> = Ok(());
         if running {
             let mut f = Some(f);
             self.svc_call(ni, id, None, |s, api| {
@@ -84,7 +84,7 @@ impl Engine {
                 }
                 Ok(())
             }),
-            _ => Err(ActErr::Refused(String::from("Diese Aktion kennt der Simulator nicht."))),
+            _ => Err(ActErr::Refused(msg!("Diese Aktion kennt der Simulator nicht."))),
         }
     }
 }

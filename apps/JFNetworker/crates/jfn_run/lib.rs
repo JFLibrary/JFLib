@@ -4,7 +4,8 @@
 //   gui_args(&args) -> Option<i32>   the GUI program's early exit: "--scenario S [PROJECT]
 //                                    [--pcap F] [--report F] [--golden F]" runs and ends
 //   main(&args) -> i32               jfn-sim: run PROJECT [--scenario S] [--pcap F] [--report F]
-//                                    [--golden F] | check PROJECT | decode HEX
+//                                    [--golden F] | check PROJECT | decode HEX | gen N [--out F]
+//   generate(&args) -> i32           jfn-sim gen: a synthetic project (jfn_model::synth)
 //
 // Exit codes: 0 everything held, 1 an expectation failed, the project has errors or the report
 // differs from the golden file, 2 a file could not be read or the command line is wrong.  The
@@ -246,7 +247,28 @@ pub fn decode(hex: &str) -> i32 {
     0
 }
 
-const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F]\n  jfn-sim check PROJEKT\n  jfn-sim decode HEX\n";
+/// a synthetic project of n devices (jfn_model::synth) as a .jfnet file, else on stdout
+pub fn generate(args: &[String]) -> i32 {
+    let Some(n) = args.first().and_then(|a| a.trim().parse::<usize>().ok()) else {
+        complain(USAGE);
+        return 2;
+    };
+    let p = jfn_model::synth::topology(n);
+    let text = p.to_text();
+    match args.iter().position(|a| a == "--out").and_then(|i| args.get(i + 1)) {
+        Some(f) => {
+            if !plat::write_file(f, text.as_bytes()) {
+                complain(&format!("{} lässt sich nicht schreiben.\n", f));
+                return 2;
+            }
+            say(&format!("{}: {} Geräte, {} Verbindungen\n", base_name(f), p.devices.len(), p.links.len()));
+        }
+        None => say(&text),
+    }
+    0
+}
+
+const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F]\n  jfn-sim check PROJEKT\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n";
 
 /// jfn-sim's command line (args[0] is the program)
 pub fn main(args: &[String]) -> i32 {
@@ -266,6 +288,7 @@ pub fn main(args: &[String]) -> i32 {
             }
         },
         Some("decode") if args.len() > 2 => decode(&args[2..].join(" ")),
+        Some("gen") => generate(&args[2..]),
         Some("help" | "--help" | "-h") => {
             say(USAGE);
             0

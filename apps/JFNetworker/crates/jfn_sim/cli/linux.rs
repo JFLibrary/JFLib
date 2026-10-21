@@ -6,10 +6,11 @@
 //   ip route [show] | add|del PREFIX|default [via ADDR] [dev IF] [metric N] | get ADDR
 //   ip neigh [show] | add ADDR lladdr MAC dev IF | del ADDR dev IF | flush all|dev IF
 //   ping [-c N] [-i S] [-s N] [-t TTL] [-W S] [-M do|dont|want] DEST
-//   traceroute [-n] [-m MAX] [-q N] [-w S] DEST
+//   traceroute [-n] [-m MAX] [-q N] [-w S] DEST       (DEST: an address or a name)
 //   hostname [NAME], sysctl [-w] net.ipv4.ip_forward[=0|1], echo, clear, true, false
 //   curl, nc, ss, top, printf and "echo|printf ... | nc|cat ..." (tools.rs)
 //   lbctl, kvctl, cachectl, mqctl, workerctl (lab.rs: the services of the lab)
+//   dhclient [-v] [-r] [IF], cat /etc/resolv.conf|/etc/hosts|/etc/hostname (netsvc.rs)
 //
 // Objects and commands of ip take any prefix, the first one of iproute2's order winning ("ip
 // a" is address, "ip r" route, "ip n" neighbour); output and error messages are those of
@@ -122,6 +123,8 @@ impl Engine {
             "cachectl" => self.sh_cachectl(ni, &args),
             "mqctl" => self.sh_mqctl(ni, &args),
             "workerctl" => self.sh_workerctl(ni, &args),
+            "dhclient" => self.sh_dhclient(ni, &args),
+            "cat" => self.sh_cat(ni, &args),
             "echo" => {
                 let t = format!("{}\n", args.join(" "));
                 self.out(ni, &t);
@@ -142,7 +145,7 @@ impl Engine {
         let w = words(line);
         let partial = !line.is_empty() && !line.ends_with(char::is_whitespace);
         let (list, done): (&[&str], usize) = match w.len() {
-            1 if partial => (&["cachectl", "clear", "curl", "echo", "hostname", "ip", "kvctl", "lbctl", "mqctl", "nc", "ping", "printf", "ss", "sysctl", "top", "traceroute", "workerctl"], 0),
+            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "echo", "hostname", "ip", "kvctl", "lbctl", "mqctl", "nc", "ping", "printf", "ss", "sysctl", "top", "traceroute", "workerctl"], 0),
             2 if partial && w[0] == "ip" => (&["address", "link", "neighbour", "route"], 1),
             3 if partial && w[0] == "ip" => (&["add", "del", "flush", "get", "set", "show"], 2),
             _ => return (None, Vec::new()),
@@ -721,10 +724,8 @@ impl Engine {
         let Some(d) = dst else {
             return self.sh_err(ni, "ping: usage error: Destination address required\n");
         };
-        let Some(ip) = Ipv4::parse(d) else {
-            return self.sh_err(ni, &format!("ping: {}: Temporary failure in name resolution\n", d));
-        };
-        self.linux_ping_start(ni, ip, o);
+        // a name goes to the device's resolver first (print.rs)
+        self.linux_ping_start(ni, d, o);
         Ok(())
     }
 
@@ -763,10 +764,8 @@ impl Engine {
         let Some(d) = dst else {
             return self.sh_err(ni, "Specify \"host\" missing argument.\n");
         };
-        let Some(ip) = Ipv4::parse(d) else {
-            return self.sh_err(ni, &format!("{}: Temporary failure in name resolution\nCannot handle \"host\" cmdline arg `{}' on position 1 (argc 1)\n", d, d));
-        };
-        self.linux_trace_start(ni, ip, o, numeric);
+        // a name goes to the device's resolver first (print.rs)
+        self.linux_trace_start(ni, d, o, numeric);
         Ok(())
     }
 

@@ -688,7 +688,8 @@ Fensterrand hinaus.
   Verschieben, Verbinden (aus Ports ziehen, Verbinden-Werkzeug, zwei Klicks), Kanten gerade /
   Kurve / rechtwinklig mit Wegpunkten, Tastatur, Minimap, ein `listitem` pro sichtbarem
   Knoten; die App malt über `DgPaint`. Getestet mit `apps/diagramtest` (8 Skripte mit
-  `--verify-dirty`, auch gespiegelt).
+  `--verify-dirty`, auch gespiegelt). Seit 2026-10-20 auch die Kanten für Screenreader
+  (`diagram_edge_sems`), Tab über die Kanten (`tab_edges`) und ein Name der Leinwand.
 - **P2** · *erledigt* · Konsolen-Widget ([`ui/term.rs`](../lib/ui/term.rs), `ui.terminal` /
   `TermState`, 2026-10-19): Scrollback-Ring mit ANSI-Teilmenge (SGR, `\r`, `ESC[K`, `ESC[2J`,
   BEL), 16 Farben aus den Theme-Tokens, Eingabezeile auf `textbox_surface` (IME, Zwischenablage),

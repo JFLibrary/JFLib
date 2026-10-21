@@ -20,7 +20,7 @@ click 930,420
 expect text:"4 Geräte · 0 Kabel" exists
 key c
 expect button:"Verbinden" checked
-expect text:"Von Gerät zu Gerät ziehen oder beide anklicken; Umschalt verbindet sofort, Esc beendet" exists
+expect text:"Von Gerät zu Gerät ziehen, beide anklicken oder mit Tab und Eingabe wählen; Umschalt verbindet sofort, Esc beendet" exists
 # a drag from PC1 to SW1: the port choice with the best pair, eth0 - Gi1/0/1
 drag listitem:"PC1" listitem:"SW1"
 expect text:"Ports wählen" exists

@@ -8,28 +8,28 @@
 // (SetCable, Impair, Unplug); a kind that does not plug into both ports is not offered.
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use jfn_model::catalog::speed_str;
 use jfn_model::project::Route;
 use jfn_model::{cable, ifname, CableKind};
 use ui::*;
 
 use super::{field_begin, row, rows_begin};
 use crate::app::constants::*;
+use crate::app::tr::{en, t, tf};
 use crate::app::Net;
 use crate::doc::edits;
 use crate::workspace::canvas::cables;
 
-/// v / unit with up to three decimals and a decimal comma ("2,5")
+/// v / unit with up to three decimals and the decimal mark of the language ("2,5", "2.5")
 fn decimal(v: u64, unit: u64) -> String {
     let (whole, frac) = (v / unit, v % unit * 1000 / unit);
     if frac == 0 {
         return format!("{}", whole);
     }
     let f = format!("{:03}", frac);
-    format!("{},{}", whole, f.trim_end_matches('0'))
+    format!("{}{}{}", whole, if en() { '.' } else { ',' }, f.trim_end_matches('0'))
 }
 
 /// "2,5" / "2.5" -> 2500 for unit 1000 (None: no number, negative, too big)
@@ -57,7 +57,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
     let p = &n.doc.proj;
     let Some(l) = p.link(id).cloned() else { return };
     let (pa, pb) = (p.resolve_port(&l.a).ok(), p.resolve_port(&l.b).ok());
-    ui.text(TS_SUBTITLE, "Kabel");
+    ui.text(TS_SUBTITLE, t("Kabel"));
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, &cables::ends_text(p, &l));
     let leds = n.doc.sim.led(id);
@@ -66,16 +66,16 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
     let end = |dev: u32, port: &str, spec: &Option<jfn_model::PortSpec>| {
         let name = p.device(dev).map_or("?", |d| d.name.as_str());
         match spec {
-            Some(s) if matches!(s.media, jfn_model::Media::Console | jfn_model::Media::Usb) => format!("{} {} ({})", name, ifname::short(port), s.media.name()),
-            Some(s) => format!("{} {} ({} {})", name, ifname::short(port), speed_str(s.kbps), s.media.name()),
+            Some(s) if matches!(s.media, jfn_model::Media::Console | jfn_model::Media::Usb) => format!("{} {} ({})", name, ifname::short(port), t(s.media.name())),
+            Some(s) => format!("{} {} ({} {})", name, ifname::short(port), crate::app::tr::speed(s.kbps), t(s.media.name())),
             None => format!("{} {}", name, ifname::short(port)),
         }
     };
-    row(ui, "Ende A", &end(l.a.dev, &l.a.port, &pa));
-    row(ui, "Ende B", &end(l.b.dev, &l.b.port, &pb));
-    row(ui, "Zustand", &format!("{} · {} Pakete/s", state, n.doc.sim.rate(id)));
+    row(ui, t("Ende A"), &end(l.a.dev, &l.a.port, &pa));
+    row(ui, t("Ende B"), &end(l.b.dev, &l.b.port, &pb));
+    row(ui, t("Zustand"), &tf("{} · {} Pakete/s", &[state, &n.doc.sim.rate(id).to_string()]));
     if let Some(e) = n.doc.sim.errors.get(&id) {
-        row(ui, "Simulator", &format!("läuft nicht: {}", e));
+        row(ui, t("Simulator"), &tf("läuft nicht: {}", &[&crate::app::tr::msg(e)]));
     }
     ui.box_end();
     // the kind: "Automatisch" (the right one for the ports) or one that plugs in
@@ -88,14 +88,14 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
         _ => None,
     };
     let mut items: Vec<String> = alloc::vec![match right {
-        Some(k) => format!("Automatisch: {}", k.title()),
-        None => String::from("Automatisch"),
+        Some(k) => tf("Automatisch: {}", &[t(k.title())]),
+        None => String::from(t("Automatisch")),
     }];
-    items.extend(kinds.iter().map(|k| String::from(k.title())));
+    items.extend(kinds.iter().map(|k| String::from(t(k.title()))));
     let refs: Vec<&str> = items.iter().map(|s| s.as_str()).collect();
     let mut sel = if l.cable_fixed { kinds.iter().position(|&k| k == l.cable).map_or(0, |i| i as i32 + 1) } else { 0 };
     ui.box_begin(0, BOX_V, 4);
-    ui.text(TS_BODY | TX_SECONDARY, "Kabeltyp");
+    ui.text(TS_BODY | TX_SECONDARY, t("Kabeltyp"));
     ui.next_size(-1, 0);
     if ui.combobox(ID_INS_CABLE, &mut sel, &refs) & EV_ACT != 0 {
         let kind = if sel <= 0 { None } else { kinds.get(sel as usize - 1).copied() };
@@ -125,9 +125,9 @@ fn quality(n: &mut Net, ui: &mut Ui, l: &jfn_model::Link) {
     }
     let mut set = false;
     let fields = [
-        (ID_INS_KBPS, "Bandbreite", "Mbit/s", "1000", decimal(l.kbps as u64, 1000)),
-        (ID_INS_DELAY, "Verzögerung", "µs", "0,05", decimal(l.delay_ns, 1000)),
-        (ID_INS_LOSS, "Verlust", "%", "0", decimal(l.loss_ppm as u64, 10_000)),
+        (ID_INS_KBPS, t("Bandbreite"), "Mbit/s", "1000", decimal(l.kbps as u64, 1000)),
+        (ID_INS_DELAY, t("Verzögerung"), "µs", if en() { "0.05" } else { "0,05" }, decimal(l.delay_ns, 1000)),
+        (ID_INS_LOSS, t("Verlust"), "%", "0", decimal(l.loss_ppm as u64, 10_000)),
     ];
     for (fid, key, unit, hint, now) in fields {
         let ins = &mut n.inspector;
@@ -151,7 +151,7 @@ fn quality(n: &mut Net, ui: &mut Ui, l: &jfn_model::Link) {
         ui.box_end();
     }
     ui.box_begin(0, BOX_H | BOX_END, 8);
-    if ui.button(ID_INS_LINK_APPLY, "Setzen") & EV_ACT != 0 {
+    if ui.button(ID_INS_LINK_APPLY, t("Setzen")) & EV_ACT != 0 {
         set = true;
     }
     ui.box_end();
@@ -172,7 +172,7 @@ fn quality(n: &mut Net, ui: &mut Ui, l: &jfn_model::Link) {
                 }
             }
             _ => {
-                n.inspector.link_err = String::from("Bandbreite (mehr als 0 Mbit/s), Verzögerung (µs) und Verlust (0 bis 100 %) als Zahlen, z. B. 2,5.");
+                n.inspector.link_err = String::from(t("Bandbreite (mehr als 0 Mbit/s), Verzögerung (µs) und Verlust (0 bis 100 %) als Zahlen, z. B. 2,5."));
             }
         }
         ui.repass();
@@ -187,7 +187,7 @@ fn quality(n: &mut Net, ui: &mut Ui, l: &jfn_model::Link) {
 fn cable_tail(n: &mut Net, ui: &mut Ui, l: &jfn_model::Link) {
     let id = l.id;
     let mut plugged = (!l.down) as i32;
-    if ui.switch(ID_INS_PLUG, "Eingesteckt", &mut plugged) & EV_ACT != 0 {
+    if ui.switch(ID_INS_PLUG, t("Eingesteckt"), &mut plugged) & EV_ACT != 0 {
         let label = if plugged != 0 { "Kabel einstecken" } else { "Kabel ausstecken" };
         if let Some(e) = edits::link_edit(&n.doc.proj, id, label, |l| l.down = plugged == 0) {
             n.doc.apply(e);
@@ -200,20 +200,20 @@ fn cable_tail(n: &mut Net, ui: &mut Ui, l: &jfn_model::Link) {
         Route::Curve => 2,
     };
     ui.box_begin(0, BOX_V, 4);
-    ui.text(TS_BODY | TX_SECONDARY, "Verlauf");
+    ui.text(TS_BODY | TX_SECONDARY, t("Verlauf"));
     ui.next_size(-1, 0);
     ui.next_flags(ST_COMPACT);
-    if ui.segmented(ID_INS_ROUTE, &mut route, &["Gerade", "Rechtwinklig", "Kurve"]) & EV_ACT != 0 {
+    if ui.segmented(ID_INS_ROUTE, &mut route, &[t("Gerade"), t("Rechtwinklig"), t("Kurve")]) & EV_ACT != 0 {
         cables::set_route(n, [Route::Straight, Route::Ortho, Route::Curve][route.clamp(0, 2) as usize]);
         ui.repass();
     }
     ui.box_end();
     if !l.waypoints.is_empty() {
         let at: Vec<String> = l.waypoints.iter().map(|w| format!("{}, {}", w.x, w.y)).collect();
-        row(ui, "Wegpunkte", &at.join("; "));
+        row(ui, t("Wegpunkte"), &at.join("; "));
     }
     ui.box_begin(0, BOX_H | BOX_END, 8);
-    if ui.button(ID_INS_DISCONNECT, "Trennen") & EV_ACT != 0 {
+    if ui.button(ID_INS_DISCONNECT, t("Trennen")) & EV_ACT != 0 {
         cables::disconnect_selection(n);
         ui.repass();
     }
@@ -221,6 +221,6 @@ fn cable_tail(n: &mut Net, ui: &mut Ui, l: &jfn_model::Link) {
     ui.next_size(-1, 0);
     ui.text(
         TS_CAPTION | TX_SECONDARY | TX_WRAP,
-        "Wegpunkte: an den „+“-Griffen des gewählten Kabels ziehen, Doppelklick entfernt einen. Rechtsklick: Verlauf, Kabeltyp, Trennen.",
+        t("Wegpunkte: an den „+“-Griffen des gewählten Kabels ziehen, Doppelklick entfernt einen. Rechtsklick: Verlauf, Kabeltyp, Trennen."),
     );
 }

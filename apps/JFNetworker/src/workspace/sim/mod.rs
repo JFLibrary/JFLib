@@ -23,7 +23,8 @@
 //
 // A frame belongs to the category of its top protocol: ICMP green, ARP amber, DNS violet,
 // TCP/HTTP blue, UDP cyan, DHCP teal, STP grey, OSPF/RIP brown, the rest slate -- muted,
-// lighter in the dark theme.  Hiding a category hides its frames everywhere: the canvas, the
+// lighter in the dark theme, each at least 3:1 against the canvas in both themes (WCAG for
+// graphical objects; checked by the selftest's group ui).  Hiding a category hides its frames everywhere: the canvas, the
 // list and the timeline leave them out, and steps go past them (the engine's filter passes
 // frames carrying one of the shown categories' bits; a step that lands on a frame of a hidden
 // category goes on).  The hidden categories are the project's layout.filters, saved with it.
@@ -45,7 +46,7 @@ pub(crate) mod packet;
 pub(crate) mod pdu;
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use jfn_sim::{Cmd, Filter, HopId, Mode, Ns};
@@ -53,10 +54,12 @@ use netpkt::decode::*;
 use ui::*;
 
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::workspace::canvas::tools::{self, Tool};
 
-/// the speeds (per mille of real time) and their labels
+/// the speeds (per mille of real time) and their labels (German; shown through t())
+// i18n
 pub(crate) const SPEEDS: [(u32, &str); 6] = [(250, "0,25×"), (500, "0,5×"), (1000, "1×"), (2000, "2×"), (4000, "4×"), (8000, "8×")];
 /// the speed after the start (1×)
 const TEMPO_START: usize = 2;
@@ -76,12 +79,12 @@ pub(crate) struct Cat {
 
 pub(crate) const CATS: [Cat; 9] = [
     Cat { name: "ICMP", bits: P_ICMP | P_ICMPV6, argb: 0xFF3F_8A52 },
-    Cat { name: "ARP", bits: P_ARP, argb: 0xFFC0_8A1E },
+    Cat { name: "ARP", bits: P_ARP, argb: 0xFFAA_7414 },
     Cat { name: "DNS", bits: P_DNS, argb: 0xFF7A_5C99 },
     Cat { name: "TCP/HTTP", bits: P_TCP | P_HTTP | P_TLS | P_SSH, argb: 0xFF35_68A8 },
-    Cat { name: "UDP", bits: P_UDP | P_NTP | P_SYSLOG | P_TFTP | P_SNMP, argb: 0xFF2C_93B0 },
+    Cat { name: "UDP", bits: P_UDP | P_NTP | P_SYSLOG | P_TFTP | P_SNMP, argb: 0xFF2A_8AA6 },
     Cat { name: "DHCP", bits: P_DHCP | P_DHCPV6, argb: 0xFF2F_7D72 },
-    Cat { name: "STP", bits: P_STP, argb: 0xFF80_878F },
+    Cat { name: "STP", bits: P_STP, argb: 0xFF7A_818A },
     Cat { name: "OSPF/RIP", bits: P_OSPF | P_RIP, argb: 0xFF8C_6A4F },
     Cat { name: "Andere", bits: P_ETH | P_VLAN | P_LLC | P_IPV4 | P_IPV6 | P_IGMP | P_LLDP | P_DATA, argb: 0xFF6A_737D },
 ];
@@ -133,6 +136,8 @@ pub(crate) struct SimUi {
     pub ev: events::Events,
     pub pk: packet::Packet,
     pub pdu: pdu::Pdus,
+    /// the labels of the frames on the canvas (anim.rs)
+    pub labels: anim::Labels,
 }
 
 impl SimUi {
@@ -155,6 +160,7 @@ impl SimUi {
             ev: events::Events::new(),
             pk: packet::Packet::new(),
             pdu: pdu::Pdus::new(),
+            labels: anim::Labels::default(),
         }
     }
 }
@@ -531,12 +537,14 @@ pub(crate) fn toolbar(n: &mut Net, ui: &mut Ui) {
     events::refresh(n, ui.theme_dark());
     let mut m = n.sim.sim_mode as i32;
     ui.next_flags(ST_COMPACT);
-    if ui.segmented(ID_TB_MODE, &mut m, &["Echtzeit", "Simulation"]) & EV_ACT != 0 {
+    if ui.segmented(ID_TB_MODE, &mut m, &[t("Echtzeit"), t("Simulation")]) & EV_ACT != 0 {
         ui.cmd_run(if m == 1 { CMD_SIM_MODE } else { CMD_SIM_REALTIME }, 0);
     }
-    ui.tooltip("Echtzeit: die Uhr läuft mit · Simulation: Schritt für Schritt (F7)");
+    ui.tooltip(t("Echtzeit: die Uhr läuft mit · Simulation: Schritt für Schritt (F7)"));
     ui.spacer(4);
-    let (icon, label) = if n.sim.playing { (IC_PAUSE, "Anhalten (F6)") } else { (IC_PLAY, "Abspielen (F6)") };
+    let (icon, label) = if n.sim.playing { (IC_PAUSE, t("Anhalten (F6)")) } else { (IC_PLAY, t("Abspielen (F6)")) };
+    // play, back, step: one Tab stop (the arrows move inside)
+    ui.focus_group_begin(ID_TB_GRP_PLAY);
     ui.next_flags(ST_ICON_ONLY | ST_SUBTLE);
     if ui.icon_button(ID_TB_PLAY, icon, label) & EV_ACT != 0 {
         ui.cmd_run(CMD_SIM_PLAY, 0);
@@ -544,17 +552,20 @@ pub(crate) fn toolbar(n: &mut Net, ui: &mut Ui) {
     for c in [CMD_SIM_BACK, CMD_SIM_STEP] {
         ui.cmd_button(c, ST_ICON_ONLY | ST_SUBTLE);
     }
-    let labels: Vec<&str> = SPEEDS.iter().map(|s| s.1).collect();
-    let mut t = n.sim.tempo as i32;
+    ui.focus_group_end();
+    let labels: Vec<&str> = SPEEDS.iter().map(|s| t(s.1)).collect();
+    let mut tempo = n.sim.tempo as i32;
     ui.next_flags(ST_COMPACT);
-    if ui.combobox(ID_TB_TEMPO, &mut t, &labels) & EV_ACT != 0 {
-        ui.cmd_run(CMD_SIM_TEMPO0 + t.max(0) as u32, 0);
+    if ui.combobox(ID_TB_TEMPO, &mut tempo, &labels) & EV_ACT != 0 {
+        ui.cmd_run(CMD_SIM_TEMPO0 + tempo.max(0) as u32, 0);
     }
-    ui.tooltip("Tempo");
+    ui.tooltip(t("Tempo"));
     sep(ui);
+    ui.focus_group_begin(ID_TB_GRP_PDU);
     for c in [CMD_TOOL_PDU, CMD_PDU_COMPLEX] {
         ui.cmd_button(c, ST_ICON_ONLY | ST_SUBTLE);
     }
+    ui.focus_group_end();
 }
 
 fn sep(ui: &mut Ui) {
@@ -566,7 +577,8 @@ fn sep(ui: &mut Ui) {
 /// takes microseconds
 pub(crate) fn secs(t: Ns) -> String {
     let f = t % 1_000_000_000;
-    format!("{},{:03} {:03} {:03}", t / 1_000_000_000, f / 1_000_000, f / 1000 % 1000, f % 1000)
+    let dot = if crate::app::tr::en() { '.' } else { ',' };
+    format!("{}{}{:03} {:03} {:03}", t / 1_000_000_000, dot, f / 1_000_000, f / 1000 % 1000, f % 1000)
 }
 
 /// above the canvas while the view stands in the past: the moment and "Zurück zu live"
@@ -574,52 +586,52 @@ pub(crate) fn hint(n: &mut Net, ui: &mut Ui) {
     if !n.sim.sim_mode {
         return;
     }
-    let Some(t) = n.doc.sim.view_at() else { return };
+    let Some(at) = n.doc.sim.view_at() else { return };
     ui.box_begin(0, BOX_V | pad(8), 0);
     ui.next_size(-1, 0);
     ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_CARD | pad(6), 10);
     ui.icon(IC_HISTORY, 16);
-    ui.text(TS_BODY_STRONG, &format!("Ansicht bei t = {} s", secs(t)));
+    ui.text(TS_BODY_STRONG, &tf("Ansicht bei t = {} s", &[&secs(at)]));
     ui.next_size(-1, 0);
-    ui.text(TS_BODY | TX_SECONDARY | TX_ELLIPSIS, "Die Aufzeichnung zu diesem Zeitpunkt; die Geräte zeigen ihren jetzigen Zustand.");
-    if ui.button(ID_SIM_LIVE, "Zurück zu live") & EV_ACT != 0 {
+    ui.text(TS_BODY | TX_SECONDARY | TX_ELLIPSIS, t("Die Aufzeichnung zu diesem Zeitpunkt; die Geräte zeigen ihren jetzigen Zustand."));
+    if ui.button(ID_SIM_LIVE, t("Zurück zu live")) & EV_ACT != 0 {
         ui.cmd_run(CMD_SIM_LIVE, 0);
     }
     ui.box_end();
     ui.box_end();
 }
 
-/// the mode in words (the status bar, the inspector's project)
+/// the mode in words (the status bar, the inspector's project), in the current language
 pub(crate) fn mode_text(n: &Net) -> &'static str {
-    match (n.sim.sim_mode, n.doc.sim.mode()) {
+    t(match (n.sim.sim_mode, n.doc.sim.mode()) {
         (true, _) if n.sim.playing && !n.sim.stalled => "Simulationsmodus, spielt ab",
         (true, _) => "Simulationsmodus",
         (false, Mode::Realtime { .. }) => "läuft in Echtzeit",
         (false, _) => "Echtzeit, angehalten",
-    }
+    })
 }
 
 /// the status bar: mode, clock, events
 pub(crate) fn status(n: &Net, ui: &mut Ui) {
     let sim = &n.doc.sim;
-    let mode = match (n.sim.sim_mode, sim.mode()) {
+    let mode = t(match (n.sim.sim_mode, sim.mode()) {
         (true, _) if n.sim.playing && !n.sim.stalled => "Simulation läuft",
         (true, _) => "Simulation",
         (false, Mode::Realtime { .. }) => "Echtzeit",
         (false, _) => "Echtzeit angehalten",
-    };
+    });
     ui.status_dot(if n.sim.sim_mode { BADGE_ACCENT } else if n.sim.playing { BADGE_OK } else { BADGE_NEUTRAL });
     ui.text(TS_CAPTION, mode);
     if !n.sim.sim_mode {
         return;
     }
     sep(ui);
-    let t = sim.view_time();
-    let clock = if sim.view_at().is_some() { format!("t = {} s (Aufzeichnung)", secs(t)) } else { format!("t = {} s", secs(t)) };
+    let at = sim.view_time();
+    let clock = if sim.view_at().is_some() { tf("t = {} s (Aufzeichnung)", &[&secs(at)]) } else { format!("t = {} s", secs(at)) };
     ui.text(TS_CAPTION | TX_SECONDARY, &clock);
     sep(ui);
     let k = n.sim.ev.shown();
-    ui.text(TS_CAPTION | TX_SECONDARY, &format!("{} {}", k, if k == 1 { "Ereignis" } else { "Ereignisse" }));
+    ui.text(TS_CAPTION | TX_SECONDARY, &if k == 1 { String::from(t("1 Ereignis")) } else { tf("{} Ereignisse", &[&k.to_string()]) });
 }
 
 /// the hint of the PDU tool in the status bar
@@ -628,8 +640,8 @@ pub(crate) fn pdu_hint(n: &Net, ui: &mut Ui) {
         return;
     }
     let text = match n.sim.pdu.src.and_then(|d| n.doc.proj.device(d)) {
-        Some(d) => format!("Von {}: jetzt das Ziel anklicken, Esc beendet", d.name),
-        None => String::from("Erst die Quelle, dann das Ziel anklicken, Esc beendet"),
+        Some(d) => tf("Von {}: jetzt das Ziel anklicken, Esc beendet", &[&d.name]),
+        None => String::from(t("Erst die Quelle, dann das Ziel anklicken (oder mit Tab und Eingabe wählen), Esc beendet")),
     };
     ui.text(TS_CAPTION | TX_TERTIARY, &text);
 }

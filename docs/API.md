@@ -169,7 +169,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [File dialog](#file-dialog): `filedlg`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
-- [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `dp_text`, `ts_base`
+- [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `dp_text`, `ts_base`
 - [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
 
 ### App, AppDesc, Ui, run, async tasks
@@ -2340,7 +2340,8 @@ Ids: parts (id << 3 | k) | 0x80000000; items of segmented / wizard / breadcrumb 
   ui_key_value(key, value, key_width): a "label: value" row (TS_BODY, the key in the
   secondary colour, key_width DIP)
 - **`fn empty_state(&mut self, icon: u32, title: &str, text: &str)`**
-  ui_empty_state(icon, title, text): a centred hint for an empty view (icon 0 = none)
+  ui_empty_state(icon, title, text): a centred hint for an empty view (icon 0 = none);
+  the text wraps at 360 DIP, or at the enclosing box's width when that is narrower
 
 ### Docking: panels at the sides, tab groups, floating tool windows
 
@@ -3285,6 +3286,16 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
            enabled | selected | open | pressed | value N | max N | text "s" | rect X Y W H
   print TEXT      echo
   bench N         time N frames (build, full render, unchanged frame) with the real clock
+  bench N anim [MAX_US]   N frames 16 ms apart on the virtual clock (timers, animations):
+                  each frame's passes and the render of its dirty cells, timed with the real
+                  clock (--verify-dirty compares afterwards, untimed); prints mean, median, max
+  bench N drag S1 S2 [middle|right|shift|ctrl|alt]... [MAX_US]   the same for the N moves of
+                  a drag (press and release untimed; every other run drags back)
+  bench N wheel S DY [shift|ctrl|alt]... [MAX_US]   ... for N wheel events at S, DY and -DY
+                  by turns (with ctrl: zoom in and out)
+                  With MAX_US a run passes when its median is at most MAX_US; up to three
+                  runs (the median and the retries ride out a busy machine), FAIL when none
+                  does
   quit
   system focus in|out | suspend | resume | session-end | settings theme|locale|contrast|fonts|N
                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...)
@@ -3361,6 +3372,8 @@ theme -- colour tokens, accent colour and type ramp of the linked style  [src/ui
                              from the scheme's colours (Windows: the system's; else white on
                              black or black on white), no translucent fills; None follows
                              the system; --contrast high|normal
+  set_reduced_motion(Some(on) | None)   reduced motion (anim_off) forced on or off, or as
+                             the system says (None); --anim off|on
   text_scale() / set_text_scale(percent)   text sizes and line heights (not the controls)
   sys_apply(settings)        (runtime) plat::sys_settings: theme, accent, contrast, reduced
                              motion (anim_off), text scale, double-click and caret times,
@@ -3372,6 +3385,8 @@ theme -- colour tokens, accent colour and type ramp of the linked style  [src/ui
   ts_base(ts) -> px          baseline offset from the line top
   dp_text(dip) -> px         dp(dip) grown with a text scale above 100 % (pills around text)
   color_mix(a, b, t)         per-channel a + (b - a) * t / 256 (t 0..256)
+  luminance(rgb) / contrast_ratio(a, b)   WCAG 2 relative luminance (0..1) of 0xRRGGBB and
+                             the contrast of two colours (1..21; text wants 4.5, graphics 3)
 
 The values come from the style (Style::tokens, accent, ts_size / ts_line / ts_font).
 ```
@@ -3379,6 +3394,13 @@ The values come from the style (Style::tokens, accent, ts_size / ts_line / ts_fo
 - **`fn color_mix(a: u32, b: u32, t: i32) -> u32`**
   color_mix(a, b, t): per-channel a + (b - a) \* t / 256 (t 0..256), every channel
   including alpha
+
+- **`fn luminance(rgb: u32) -> f32`**
+  the WCAG 2 relative luminance of 0xRRGGBB (alpha ignored): 0 black .. 1 white
+
+- **`fn contrast_ratio(a: u32, b: u32) -> f32`**
+  the WCAG 2 contrast ratio of two colours (alpha ignored): 1 (equal) .. 21 (black on
+  white); text needs 4.5 (large text 3), graphical objects and controls 3
 
 - **`fn contrast_tokens(c: &plat::HcColors) -> [u32; T_COUNT]`**
   the tokens of a high-contrast scheme: opaque fills from its colours, borders and strokes
@@ -3396,6 +3418,9 @@ The values come from the style (Style::tokens, accent, ts_size / ts_line / ts_fo
   the high-contrast theme is active
 - **`fn set_contrast(&mut self, on: Option<bool>)`**
   high contrast on (Some(true)), off (Some(false)) or as the system says (None)
+- **`fn set_reduced_motion(&mut self, on: Option<bool>)`**
+  reduced motion on (Some(true): no tweens, no fades), off (Some(false)) or as the
+  system says (None); like --anim, a forced value outlasts the system's changes
 - **`fn text_scale(&self) -> u32`**
   the text scale in percent (100 = the style's sizes)
 - **`fn font_prefs(&self) -> (Option<bool>, Option<u8>, Option<u8>)`**
@@ -5541,12 +5566,18 @@ did as DEv events.
                                   the canvas; pressing / dragging there moves the view
   ui.diagram_sems(id, &mut st, &m, &label)   one K_LISTITEM record per visible node
                                   (scripts: click listitem:"R1"; screen readers), no hit box
+  ui.diagram_edge_sems(id, &mut st, &m, &label)   the same for the visible edges (a box
+                                  around the middle of the route); st.tab_edges lets Tab
+                                  walk them after the nodes, st.name names the canvas
   Viewport::{scale, to_screen, to_world, world_rect, rect_to_screen, zoom_at, step, fit}
   dg_paint_grid(g, vp, step, minor, major)   grid lines inside the clip (render time)
   dg_edge_points(m, i, &mut out)  the route of edge i (world polyline) without a state
   dg_stroke_edge(g, vp, pts, width, argb, cap0, cap1, dash)   stroke a route (gfx::dash
                                   caps LCAP_* and patterns DASH_*), culled by the clip
   dg_point_at(pts, f) -> point    the point at fraction f of a route's length (packets)
+  dg_hairline(g, vp, pts, argb)   a route as 1 px anti-aliased lines: far cheaper than
+                                  dg_stroke_edge for many thin edges (DgFrame::moving)
+  DgFrame::find(margin, edges)    the nodes or edges near the clip (the spatial buckets)
 
 Model (DModel, borrowed every frame): nodes with a world rectangle and a range of ports,
 ports at a position relative to their node's top left corner, edges from key a to key b
@@ -5564,14 +5595,20 @@ port connects, on a handle moves or inserts a waypoint, on the background draws 
 (Shift adds, Ctrl toggles); middle drag, Space + drag and DG_PAN pan; the wheel scrolls
 (Shift: sideways), Ctrl + wheel zooms at the pointer.  Keys while the canvas has the focus:
 arrows nudge the selection (grid steps, Shift x10, Alt 1) or pan, Del, Ctrl+A, Esc cancels
-a gesture (else clears the selection), Tab / Shift+Tab walk the nodes (and leave after the
-last), Enter activates, Ctrl + plus / minus zoom, Ctrl+0 fits, Shift+F10 / the menu key
+a gesture (else clears the selection), Tab / Shift+Tab walk the nodes (with tab_edges then
+the edges, a focused edge drawn with the focus ring along its route; the focus leaves after
+the last), Enter activates, Ctrl + plus / minus zoom, Ctrl+0 fits, Shift+F10 / the menu key
 ask for the context menu.  DiagramState::test_keys stands in for held keys in scripts.
 Drawing: the paint runs as one custom command whose version covers ver, the model version,
-the view and the theme; selection, hover, ports, handles, marquee and rubber band are
-recorded commands on top, so hovering redraws only their cells.  The paint runs once per
-dirty rectangle: skip everything outside DgFrame::clip.  Content that moves every frame
-(packets) is best drawn after diagram() with ui.draw_* inside ui.clip_push(st.vp.rect).
+the view, the theme and the gesture flag; selection, hover, ports, handles, marquee and rubber
+band are recorded commands on top, so hovering redraws only their cells.  The paint draws the
+whole canvas into a backing store (an XRGB surface of the DiagramState) once per version;
+every dirty rectangle copies its part out of it.  Skip what lies outside DgFrame::clip
+(DgFrame::find asks the spatial buckets).  While a gesture moves the view or nodes (a pan,
+wheel turns until MOVING_MS after the last one, a drag of nodes or a waypoint)
+DgFrame::moving asks for less detail; a full paint follows the gesture.  Content that moves
+every frame (packets) is best drawn after diagram() with ui.draw_* inside
+ui.clip_push(st.vp.rect).
 ```
 
 ```rust
@@ -5693,7 +5730,8 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `bb: [f32; 4]`
 
 - **`struct DgGeo`**
-  the routes of every edge in model order, built once per model version
+  the routes of every edge in model order and the spatial buckets of nodes and edges, built
+  once per model version (DgFrame::find asks the buckets)
   - `routes: Vec<DgRoute>`
 
 - **`struct DgFrame<'a>`**
@@ -5705,6 +5743,9 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `bg: u32`
   - `fonts: [(u32, i32); 7]` -- font and size (24.8 px at zoom 1) of every TS_\* text style
   - `dark: bool`
+  - `moving: bool` -- a gesture moves the view or nodes (a pan, wheel turns, a drag of nodes or a waypoint):
+    leave out what costs and nobody reads in passing (small labels; plain shapes,
+    dg_hairline); the canvas is painted in full after it
 
 **`impl DgFrame<'_>`**
 
@@ -5715,6 +5756,10 @@ DPT_USED: u32 = 2  // shown filled (connected)
 - **`fn route_visible(&self, rt: &DgRoute, width: f32) -> bool`**
   a route stroked `width` world units wide (dg_stroke_edge, arrow heads included)
   touches the clip
+- **`fn find(&self, margin: f32, edges: bool) -> Vec<u32>`**
+  the nodes (edges = false: DModel::nodes) or the edges whose spatial buckets touch the
+  clip grown by `margin` px: ascending indices, a superset of what can need paint (cheaper
+  than looking at all of them)
 - **`fn font(&self, ts: u32) -> (u32, i32)`**
   font and size (24.8 px) of text style ts at the current zoom
 
@@ -5734,6 +5779,9 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `hover: DHit` -- what the pointer is over (after the last diagram call)
   - `edge_width: f32` -- the stroke width of the edges in world units (hit testing, the highlight)
   - `test_keys: u32` -- scripts cannot hold keys: 1 = as if Space were held, 2 = Ctrl
+  - `tab_edges: bool` -- Tab / Shift+Tab also walk the edges (after the nodes, in model order): the focused
+    edge is selected, Enter activates it, the menu key asks for its context menu
+  - `name: String` -- the canvas' name for screen readers (its K_CANVAS record; empty: none)
 
 **`impl DiagramState`**
 
@@ -5751,6 +5799,12 @@ DPT_USED: u32 = 2  // shown filled (connected)
   the bounding box x0, y0, x1, y1 of nodes and routes (None: empty)
 - **`fn visible(&self) -> &[u32]`**
   the indices of the nodes the canvas showed in the last diagram call
+
+**`impl DgGeo`**
+
+- **`fn find(&self, r: [f32; 4], edges: bool, out: &mut Vec<u32>)`**
+  the indices of the nodes (edges = false) or edges whose buckets touch r (world x0, y0,
+  x1, y1), ascending: a superset of what overlaps it (all when r spans too many buckets)
 
 - **`fn dg_length(pts: &[[f32; 2]]) -> f32`**
   the length of a polyline
@@ -5771,6 +5825,11 @@ DPT_USED: u32 = 2  // shown filled (connected)
   gfx::dash caps (LCAP_\*: arrows at an end) and pattern DASH_\*; nothing when it misses the
   clip
 
+- **`fn dg_hairline(g: &mut Gfx, vp: &Viewport, pts: &[[f32; 2]], argb: u32)`**
+  a route (world points) as 1 px anti-aliased lines in argb (Xiaolin Wu): a fraction of
+  dg_stroke_edge's cost for many thin edges (the level of detail of DgFrame::moving); nothing
+  outside the clip
+
 **`impl Ui`**
 
 - **`fn diagram(&mut self, id: u32, st: &mut DiagramState, m: &DModel, tool: u32, paint: Option<Rc<dyn DgPaint>>, ver: u32) -> Vec<DEv>`**
@@ -5784,6 +5843,11 @@ DPT_USED: u32 = 2  // shown filled (connected)
   ui_diagram_sems(id, st, m, label): one K_LISTITEM record per node the last diagram
   call showed (label(key), value = the node's index, selected / focused / hover states),
   cut to the canvas; a screen reader's click on one selects it
+- **`fn diagram_edge_sems(&mut self, id: u32, st: &mut DiagramState, m: &DModel, label: &dyn Fn(u64) -> String)`**
+  ui_diagram_edge_sems(id, st, m, label): one K_LISTITEM record per edge the last diagram
+  call showed (label(key); value = the edge's index; selected / focused / hover states),
+  a small box around the middle of its route cut to the canvas, after the nodes' records;
+  a screen reader's click on one selects the edge (and focuses it with tab_edges)
 
 #### `ui/text_surface.rs`
 
@@ -6122,6 +6186,7 @@ history -- undo / redo for an app's own state
                                        undo_value() / redo_value() -> the step as data
   h.group_begin(label) / group_end()   the edits between them are one step
   h.mark_saved() / dirty()             whether the state differs from the saved one
+  h.mark_unsaved()                     the state counts as unsaved (a recovered copy)
   h.clear()
   Snapshot::new(label, before, after)  an Edit for small states: the whole value (Clone)
   ui.undo_keys() -> Option<bool>       Ctrl+Z (Some(true)) / Ctrl+Y or Ctrl+Shift+Z
@@ -6186,6 +6251,8 @@ all back.  Text fields keep their own undo; the edits here are the app's.
   close the group of group_begin (an empty group records nothing)
 - **`fn mark_saved(&mut self)`**
   the state is saved now (dirty() false until the next change)
+- **`fn mark_unsaved(&mut self)`**
+  the state counts as unsaved until the next mark_saved (a copy recovered after a crash)
 - **`fn dirty(&self) -> bool`**
   the state differs from the saved one
 - **`fn clear(&mut self)`**

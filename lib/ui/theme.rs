@@ -8,6 +8,8 @@
 //                              from the scheme's colours (Windows: the system's; else white on
 //                              black or black on white), no translucent fills; None follows
 //                              the system; --contrast high|normal
+//   set_reduced_motion(Some(on) | None)   reduced motion (anim_off) forced on or off, or as
+//                              the system says (None); --anim off|on
 //   text_scale() / set_text_scale(percent)   text sizes and line heights (not the controls)
 //   sys_apply(settings)        (runtime) plat::sys_settings: theme, accent, contrast, reduced
 //                              motion (anim_off), text scale, double-click and caret times,
@@ -19,6 +21,8 @@
 //   ts_base(ts) -> px          baseline offset from the line top
 //   dp_text(dip) -> px         dp(dip) grown with a text scale above 100 % (pills around text)
 //   color_mix(a, b, t)         per-channel a + (b - a) * t / 256 (t 0..256)
+//   luminance(rgb) / contrast_ratio(a, b)   WCAG 2 relative luminance (0..1) of 0xRRGGBB and
+//                              the contrast of two colours (1..21; text wants 4.5, graphics 3)
 //
 // The values come from the style (Style::tokens, accent, ts_size / ts_line / ts_font).
 
@@ -39,6 +43,40 @@ pub fn color_mix(a: u32, b: u32, t: i32) -> u32 {
         r |= (v as u32) << sh;
     }
     r
+}
+
+// sRGB byte -> linear light * 65535 (IEC 61966-2-1)
+static SRGB_LIN: [u16; 256] = [
+    0, 20, 40, 60, 80, 99, 119, 139, 159, 179, 199, 219, 241, 264, 288, 313,
+    340, 367, 396, 427, 458, 491, 526, 562, 599, 637, 677, 718, 761, 805, 851, 898,
+    947, 997, 1048, 1101, 1156, 1212, 1270, 1330, 1391, 1453, 1517, 1583, 1651, 1720, 1790, 1863,
+    1937, 2013, 2090, 2170, 2250, 2333, 2418, 2504, 2592, 2681, 2773, 2866, 2961, 3058, 3157, 3258,
+    3360, 3464, 3570, 3678, 3788, 3900, 4014, 4129, 4247, 4366, 4488, 4611, 4736, 4864, 4993, 5124,
+    5257, 5392, 5530, 5669, 5810, 5953, 6099, 6246, 6395, 6547, 6700, 6856, 7014, 7174, 7335, 7500,
+    7666, 7834, 8004, 8177, 8352, 8528, 8708, 8889, 9072, 9258, 9445, 9635, 9828, 10022, 10219, 10417,
+    10619, 10822, 11028, 11235, 11446, 11658, 11873, 12090, 12309, 12530, 12754, 12980, 13209, 13440, 13673, 13909,
+    14146, 14387, 14629, 14874, 15122, 15371, 15623, 15878, 16135, 16394, 16656, 16920, 17187, 17456, 17727, 18001,
+    18277, 18556, 18837, 19121, 19407, 19696, 19987, 20281, 20577, 20876, 21177, 21481, 21787, 22096, 22407, 22721,
+    23038, 23357, 23678, 24002, 24329, 24658, 24990, 25325, 25662, 26001, 26344, 26688, 27036, 27386, 27739, 28094,
+    28452, 28813, 29176, 29542, 29911, 30282, 30656, 31033, 31412, 31794, 32179, 32567, 32957, 33350, 33745, 34143,
+    34544, 34948, 35355, 35764, 36176, 36591, 37008, 37429, 37852, 38278, 38706, 39138, 39572, 40009, 40449, 40891,
+    41337, 41785, 42236, 42690, 43147, 43606, 44069, 44534, 45002, 45473, 45947, 46423, 46903, 47385, 47871, 48359,
+    48850, 49344, 49841, 50341, 50844, 51349, 51858, 52369, 52884, 53401, 53921, 54445, 54971, 55500, 56032, 56567,
+    57105, 57646, 58190, 58737, 59287, 59840, 60396, 60955, 61517, 62082, 62650, 63221, 63795, 64372, 64952, 65535,
+];
+
+/// the WCAG 2 relative luminance of 0xRRGGBB (alpha ignored): 0 black .. 1 white
+pub fn luminance(rgb: u32) -> f32 {
+    let ch = |sh: u32| SRGB_LIN[((rgb >> sh) & 255) as usize] as f32 / 65535.0;
+    0.2126 * ch(16) + 0.7152 * ch(8) + 0.0722 * ch(0)
+}
+
+/// the WCAG 2 contrast ratio of two colours (alpha ignored): 1 (equal) .. 21 (black on
+/// white); text needs 4.5 (large text 3), graphical objects and controls 3
+pub fn contrast_ratio(a: u32, b: u32) -> f32 {
+    let (la, lb) = (luminance(a), luminance(b));
+    let (hi, lo) = if la >= lb { (la, lb) } else { (lb, la) };
+    (hi + 0.05) / (lo + 0.05)
 }
 
 // the brightness of 0xRRGGBB (0..255)
@@ -137,6 +175,25 @@ impl Ui {
         self.theme_build();
     }
 
+    /// reduced motion on (Some(true): no tweens, no fades), off (Some(false)) or as the
+    /// system says (None); like --anim, a forced value outlasts the system's changes
+    pub fn set_reduced_motion(&mut self, on: Option<bool>) {
+        let before = self.anim_off;
+        match on {
+            Some(v) => {
+                self.anim_forced = true;
+                self.anim_off = v;
+            }
+            None => {
+                self.anim_forced = false;
+                self.anim_off = self.anim_sys;
+            }
+        }
+        if before != self.anim_off {
+            self.repass = true;
+        }
+    }
+
     /// the text scale in percent (100 = the style's sizes)
     pub fn text_scale(&self) -> u32 {
         self.text_scale
@@ -181,6 +238,7 @@ impl Ui {
             _ => s.high_contrast,
         };
         self.hc_sys = s.contrast_colors;
+        self.anim_sys = s.reduce_motion;
         if !self.anim_forced {
             self.anim_off = s.reduce_motion;
         }

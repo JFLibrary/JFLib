@@ -16,13 +16,13 @@
 // until Esc or another tool.  A placing click with Shift keeps the tile armed for the next
 // device; without it the canvas returns to Auswahl.
 
-use alloc::format;
 use alloc::string::String;
 
 use jfn_model::catalog;
 use ui::*;
 
 use super::paint::{DEV_H, DEV_W};
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::edits;
 
@@ -52,12 +52,12 @@ impl Tool {
     /// the mode in the status bar
     pub(crate) fn status(self) -> String {
         match self {
-            Tool::Select => String::from("Auswahl"),
-            Tool::Hand => String::from("Hand"),
-            Tool::Connect => String::from("Verbinden"),
-            Tool::Note => String::from("Notiz"),
-            Tool::Place(i) => format!("Platzieren: {}", catalog::catalog().get(i).map_or("?", |m| m.name)),
-            Tool::Pdu => String::from("Einfache PDU"),
+            Tool::Select => String::from(t("Auswahl")),
+            Tool::Hand => String::from(t("Hand")),
+            Tool::Connect => String::from(t("Verbinden")),
+            Tool::Note => String::from(t("Notiz")),
+            Tool::Place(i) => tf("Platzieren: {}", &[catalog::catalog().get(i).map_or("?", |m| t(m.name))]),
+            Tool::Pdu => String::from(t("Einfache PDU")),
         }
     }
 }
@@ -66,6 +66,7 @@ impl Tool {
 pub(crate) fn set(n: &mut Net, tool: Tool) {
     n.canvas.tool = tool;
     n.canvas.conn = None;
+    n.canvas.kb_from = None;
 }
 
 /// a palette tile was clicked: arm it (a second click disarms); the note tile is the Notiz tool
@@ -124,7 +125,7 @@ pub(crate) fn place(n: &mut Net, ui: &mut Ui, model: usize, at: [f32; 2]) -> Opt
             Some(id)
         }
         Err(e) => {
-            n.file.msg = Some((IB_ERROR, String::from("Das Gerät wurde nicht eingefügt"), format!("{}", e)));
+            n.file.msg = Some((IB_ERROR, String::from(t("Das Gerät wurde nicht eingefügt")), crate::app::tr::msg(&e.msg())));
             None
         }
     }

@@ -8,7 +8,10 @@
 //                                   to a port dot, connects at once (the best pair); else the
 //                                   port choice opens at the pointer
 //   overlay(n, ui)                  the target's outline while drawing: accent when a pair
-//                                   fits, else red with the tooltip "Kein passender Port"
+//                                   fits, else red with the tooltip "Kein passender Port"; the
+//                                   ring of end A chosen with the keyboard
+//   key_pick(n, ui, dev)            Enter on a device with the tool: end A, then end B opens
+//                                   the port choice below B (Enter on A again gives it up)
 //   popover(n, ui)                  the port choice: device A | device B with every port (kind,
 //                                   name, speed, state), the best pair chosen, the cable
 //                                   ("Automatisch: Kupfer, gerade" or a kind that fits), Enter
@@ -25,12 +28,13 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use jfn_model::catalog::{speed_str, PortSpec};
+use jfn_model::catalog::PortSpec;
 use jfn_model::{cable, ifname, CableKind, PortRef, Project};
 use ui::*;
 
 use super::paint::{key_port, DEV_H, DEV_W};
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::edits;
 use crate::workspace::icons::port_icon;
@@ -74,6 +78,8 @@ pub(crate) struct Choice {
     /// 0: Automatisch, k: the kinds that fit the pair, k - 1
     pub cable: i32,
     opened: bool,
+    /// opened from the keyboard: below this box (px) instead of at the pointer
+    anchor: Option<[i32; 4]>,
 }
 
 /// the device of a node or port key
@@ -152,7 +158,7 @@ pub(crate) fn finish(n: &mut Net, ui: &mut Ui, from: u64, to: u64, quick: bool) 
             }
             None => {
                 let name = |d: u32| n.doc.proj.device(d).map_or_else(String::new, |d| d.name.clone());
-                n.file.msg = Some((IB_WARNING, String::from("Kein passender Port"), format!("{} und {} haben keine freien Ports, die zusammenpassen.", name(a), name(b))));
+                n.file.msg = Some((IB_WARNING, String::from(t("Kein passender Port")), tf("{} und {} haben keine freien Ports, die zusammenpassen.", &[&name(a), &name(b)])));
             }
         }
         ui.repass();
@@ -171,7 +177,34 @@ pub(crate) fn open(n: &mut Net, ui: &mut Ui, a: u32, pa: Option<u16>, b: u32, pb
     let pair = best(p, a, pa, b, pb).or_else(|| best(p, a, None, b, None));
     let pos = |side: usize, i: Option<u16>| i.and_then(|i| rows[side].iter().position(|r| r.spec.index == i)).map_or(-1, |k| k as i32);
     let sel = [pos(0, pair.map(|x| x.0)), pos(1, pair.map(|x| x.1))];
-    n.canvas.choice = Some(Choice { dev: [a, b], rows, sel, cable: 0, opened: false });
+    n.canvas.choice = Some(Choice { dev: [a, b], rows, sel, cable: 0, opened: false, anchor: None });
+    ui.repass();
+}
+
+/// Enter on a device with the Verbinden tool: the first one is end A (a ring marks it), the
+/// second opens the port choice of the two below it; Enter on A again gives A up
+pub(crate) fn key_pick(n: &mut Net, ui: &mut Ui, d: u32) {
+    match n.canvas.kb_from {
+        None => n.canvas.kb_from = Some(d),
+        Some(a) if a == d => n.canvas.kb_from = None,
+        Some(a) => {
+            n.canvas.kb_from = None;
+            open(n, ui, a, None, d, None);
+            let anchor = n.canvas.scene.rect(d as u64).map(|r| {
+                let vp = &n.canvas.st.vp;
+                let q = vp.rect_to_screen(r);
+                let c = vp.rect;
+                let x0 = (q[0] as i32).clamp(c[0], c[0] + c[2] - 1);
+                let x1 = ((q[0] + q[2]) as i32).clamp(x0 + 1, c[0] + c[2]);
+                let y0 = (q[1] as i32).clamp(c[1], c[1] + c[3] - 1);
+                let y1 = ((q[1] + q[3]) as i32).clamp(y0 + 1, c[1] + c[3]);
+                [x0, y0, x1 - x0, y1 - y0]
+            });
+            if let Some(c) = &mut n.canvas.choice {
+                c.anchor = anchor;
+            }
+        }
+    }
     ui.repass();
 }
 
@@ -195,9 +228,9 @@ fn rows(p: &Project, d: u32, other: u32) -> Vec<Row> {
             let why = if peer.is_some() || free.iter().any(|f| cable::cable_kind(&spec, f).is_ok()) {
                 None
             } else if free.is_empty() {
-                Some(format!("{} hat keinen freien Port", other_name))
+                Some(tf("{} hat keinen freien Port", &[&other_name]))
             } else {
-                Some(format!("passt nicht zu {}", medias.join(", ")))
+                Some(tf("passt nicht zu {}", &[&medias.iter().map(|&m| t(m)).collect::<Vec<_>>().join(", ")]))
             };
             Row { spec, peer, why }
         })
@@ -261,7 +294,7 @@ pub(crate) fn connect(n: &mut Net, ui: &mut Ui, a: u32, x: u16, b: u32, y: u16, 
             Some(id)
         }
         Err(e) => {
-            n.file.msg = Some((IB_ERROR, String::from("Die Geräte wurden nicht verbunden"), format!("{}", e)));
+            n.file.msg = Some((IB_ERROR, String::from(t("Die Geräte wurden nicht verbunden")), crate::app::tr::msg(&e.msg())));
             ui.repass();
             None
         }
@@ -270,6 +303,17 @@ pub(crate) fn connect(n: &mut Net, ui: &mut Ui, a: u32, x: u16, b: u32, y: u16, 
 
 /// the target's outline while a cable is drawn (after ui.diagram, inside its clip)
 pub(crate) fn overlay(n: &Net, ui: &mut Ui) {
+    // end A chosen with Enter: an accent ring until end B
+    if let Some(rect) = n.canvas.kb_from.filter(|_| n.canvas.tool == super::tools::Tool::Connect).and_then(|d| n.canvas.scene.rect(d as u64)) {
+        let vp = n.canvas.st.vp;
+        let q = vp.rect_to_screen(rect);
+        let (pad, t, rad) = (ui.dp(5), ui.dp(2), ui.dp(5));
+        let col = ui.color(T_ACCENT);
+        let r = vp.rect;
+        ui.clip_push(r[0], r[1], r[2], r[3]);
+        ui.cmd_rrect(q[0] as i32 - pad, q[1] as i32 - pad, q[2] as i32 + pad * 2, q[3] as i32 + pad * 2, rad, t, 0, col, col);
+        ui.clip_pop();
+    }
     let Some(c) = n.canvas.conn else { return };
     if c.over == 0 {
         return;
@@ -292,7 +336,7 @@ pub(crate) fn overlay(n: &Net, ui: &mut Ui) {
 pub(crate) fn tooltip(c: &super::Canvas, ui: &mut Ui) -> bool {
     match c.conn {
         Some(c) if c.over != 0 && !c.fits => {
-            ui.tooltip_part("Kein passender Port", c.over);
+            ui.tooltip_part(t("Kein passender Port"), c.over);
             true
         }
         _ => false,
@@ -307,15 +351,15 @@ fn row(ui: &mut Ui, r: &Row, i: i32) {
     ui.next_size(96, 0);
     ui.text(TS_BODY | TX_ELLIPSIS | dim, &ifname::short(&r.spec.name));
     let speed = match r.spec.media {
-        jfn_model::Media::Console | jfn_model::Media::Usb => String::from(r.spec.media.name()),
-        _ => speed_str(r.spec.kbps),
+        jfn_model::Media::Console | jfn_model::Media::Usb => String::from(t(r.spec.media.name())),
+        _ => crate::app::tr::speed(r.spec.kbps),
     };
     ui.next_size(56, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS | dim, &speed);
     let state = match (&r.peer, &r.why) {
         (Some(p), _) => format!("→ {}", p),
         (None, Some(w)) => w.clone(),
-        (None, None) => String::from("frei"),
+        (None, None) => String::from(t("frei")),
     };
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_ELLIPSIS | if r.usable() { TX_SECONDARY } else { TX_DISABLED }, &state);
@@ -386,14 +430,19 @@ pub(crate) fn popover(n: &mut Net, ui: &mut Ui) {
         return;
     }
     let mut act = 0; // 1 connect, 2 cancel
-    if ui.flyout_begin(ID_CONNECT, FL_POINT) {
+    // opened from the keyboard: below device B, else at the pointer
+    let anchor = n.canvas.choice.as_ref().and_then(|c| c.anchor);
+    if let Some(a) = anchor {
+        ui.last_set(a, 0);
+    }
+    if ui.flyout_begin(ID_CONNECT, if anchor.is_some() { FL_BELOW } else { FL_POINT }) {
         if n.canvas.choice.is_some() {
             // Enter connects (taken before the lists; not while the cable's list is open)
             let enter = ui.popup_count() == 1 && ui.key(VK_RETURN);
             // a fixed width: the flyout knows its size in the first pass
             ui.next_size(2 * LIST_W + 12 + 16, 0);
             ui.box_begin(0, BOX_V | pad(8), 8);
-            ui.text(TS_BODY_STRONG, "Ports wählen");
+            ui.text(TS_BODY_STRONG, t("Ports wählen"));
             ui.box_begin(0, BOX_H, 12);
             for s in 0..2 {
                 if let Some(i) = side(n, ui, s) {
@@ -417,28 +466,28 @@ pub(crate) fn popover(n: &mut Net, ui: &mut Ui) {
             }
             let mut items: Vec<String> = Vec::new();
             match kinds.first() {
-                Some(k) => items.push(format!("Automatisch: {}", k.title())),
-                None => items.push(String::from("Automatisch")),
+                Some(k) => items.push(tf("Automatisch: {}", &[t(k.title())])),
+                None => items.push(String::from(t("Automatisch"))),
             }
-            items.extend(kinds.iter().map(|k| String::from(k.title())));
+            items.extend(kinds.iter().map(|k| String::from(t(k.title()))));
             let refs: Vec<&str> = items.iter().map(|s| s.as_str()).collect();
             ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-            ui.text(TS_BODY | TX_SECONDARY, "Kabel");
+            ui.text(TS_BODY | TX_SECONDARY, t("Kabel"));
             ui.next_size(260, 0);
             ui.next_flags(if kinds.is_empty() { ST_DISABLED } else { 0 });
             ui.combobox(ID_CONN_CABLE, &mut c.cable, &refs);
             ui.spacer(-1);
             let ok = c.pair().is_some();
-            if ui.button(ID_CONN_CANCEL, "Abbrechen") & EV_ACT != 0 {
+            if ui.button(ID_CONN_CANCEL, t("Abbrechen")) & EV_ACT != 0 {
                 act = 2;
             }
             ui.next_flags(if ok { 0 } else { ST_DISABLED });
-            if ui.accent_button(ID_CONN_OK, "Verbinden") & EV_ACT != 0 {
+            if ui.accent_button(ID_CONN_OK, t("Verbinden")) & EV_ACT != 0 {
                 act = 1;
             }
             ui.box_end();
             if !ok {
-                ui.text(TS_CAPTION | TX_SECONDARY, "Diese beiden Geräte haben keine freien Ports, die zusammenpassen.");
+                ui.text(TS_CAPTION | TX_SECONDARY, t("Diese beiden Geräte haben keine freien Ports, die zusammenpassen."));
             }
             ui.box_end();
             if act == 0 && ok && enter {

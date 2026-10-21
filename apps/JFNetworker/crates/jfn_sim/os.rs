@@ -5,7 +5,9 @@
 //                             resolver (resolver.rs), host names, the log, the clock
 //   trait Service             start / on(SvcEvent, &mut OsApi) / stop / metrics / status; the
 //                             built-in ones: dhcpc.rs (DHCP client), dhcpd.rs (DHCP server
-//                             and relay), dnsd.rs (DNS server), syslogd.rs, ntpd.rs
+//                             and relay), dnsd.rs (DNS server), syslogd.rs, ntpd.rs;
+//                             status_msg: the status line as a Msg for the app's catalogue
+//                             (SvcView::status_msg; the built-in services word it so)
 //   SvcEvent                  Udp(Dgram) | Timer(key) | EchoReply | ArpConflict |
 //                             Resolved(lookup) | Link | Ctl
 //   OsApi                     what a running service may do: bind / bind_raw / close, send /
@@ -28,7 +30,9 @@
 //   TCP sockets (tcp.rs)      OsApi::tcp_listen / tcp_accept / tcp_connect / tcp_send / tcp_recv /
 //                             tcp_shutdown / tcp_close / tcp_abort / tcp_setopts / tcp_info; their
 //                             events: SvcEvent::TcpAccept, TcpConnected, TcpData, TcpWritable,
-//                             TcpEof, TcpClosed
+//                             TcpEof, TcpClosed; bind_msg, tcp_listen_msg, tcp_connect_msg and
+//                             tcp_connect_from_msg give the refusal as a Msg (the others as
+//                             German text)
 //   console programs          a program the shell starts (curl, nc: cli/tools.rs) is a service
 //                             on the console: OsApi::print writes to it, OsApi::exit ends the
 //                             program, typed lines come as SvcEvent::Console; such services are
@@ -53,6 +57,8 @@ use core::fmt;
 
 use base::rng::Pcg32;
 use jfn_model::catalog::{CliStyle, Model};
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 use netpkt::arp::{Arp, OP_REQUEST};
 use netpkt::eth::{ET_ARP, ET_IPV4};
 use netpkt::icmp::Icmp;
@@ -195,6 +201,11 @@ pub trait Service: Send {
     fn metrics(&self) -> Vec<Metric>;
     /// one German line for the inspector ("gebunden: 10.0.1.10/24 bis ...")
     fn status(&self) -> String;
+    /// the status line as a message for the app's catalogue (the built-in services word it so,
+    /// and their status() is its German text); the default does not translate status()
+    fn status_msg(&self) -> Msg {
+        Msg::plain(self.status())
+    }
     fn clone_box(&self) -> Box<dyn Service>;
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
@@ -246,6 +257,8 @@ pub struct SvcView {
     pub since: Ns,
     pub status: String,
     pub metrics: Vec<Metric>,
+    /// the status as a message for the app's catalogue (status is its German text)
+    pub status_msg: Msg,
 }
 
 /// work for the inbox
@@ -464,12 +477,16 @@ impl OsApi<'_> {
     }
     /// a socket on `port` (0: a free ephemeral port), on one interface or all
     pub fn bind(&mut self, port: u16, iface: Option<u16>) -> Result<u16, String> {
+        self.bind_msg(port, iface).map_err(|m| m.text())
+    }
+    /// bind(), the refusal as a message
+    pub fn bind_msg(&mut self, port: u16, iface: Option<u16>) -> Result<u16, Msg> {
         self.eng.sock_bind(self.ni, port, iface, false, Owner::Svc(self.id))
     }
     /// a packet socket on one interface: datagrams to `port` arrive even before the device has
     /// an address there
     pub fn bind_raw(&mut self, port: u16, iface: u16) -> Result<u16, String> {
-        self.eng.sock_bind(self.ni, port, Some(iface), true, Owner::Svc(self.id))
+        self.eng.sock_bind(self.ni, port, Some(iface), true, Owner::Svc(self.id)).map_err(|m| m.text())
     }
     pub fn close(&mut self, port: u16) {
         let id = self.id;
@@ -668,11 +685,11 @@ impl Engine {
         (lo..=hi).find(|&p| self.os(ni).is_some_and(|o| o.port_free(p, None))).unwrap_or(0)
     }
 
-    pub(crate) fn sock_bind(&mut self, ni: usize, port: u16, iface: Option<u16>, raw: bool, owner: Owner) -> Result<u16, String> {
+    pub(crate) fn sock_bind(&mut self, ni: usize, port: u16, iface: Option<u16>, raw: bool, owner: Owner) -> Result<u16, Msg> {
         let port = if port == 0 { self.ephemeral_port(ni) } else { port };
-        let os = self.os_mut(ni).ok_or_else(|| String::from("kein IP"))?;
+        let os = self.os_mut(ni).ok_or_else(|| msg!("kein IP"))?;
         if port == 0 || !os.port_free(port, iface) {
-            return Err(format!("Port {} ist schon belegt.", port));
+            return Err(msg!("Port {} ist schon belegt.", port));
         }
         os.socks.push(Sock { port, iface, raw, owner, rx: 0, tx: 0 });
         Ok(port)
@@ -987,9 +1004,15 @@ impl Engine {
             os.log.lines.pop_front();
         }
         os.log.lines.push_back(LogLine { t: now, clock, seq, fac, sev, tag: String::from(tag), text: String::from(text) });
-        if sev > os.log.trap || os.log.hosts.is_empty() {
+        let quiet = sev > os.log.trap || os.log.hosts.is_empty();
+        // a console that follows the log (dhclient -v: cli/netsvc.rs)
+        self.cli_log_seen(ni);
+        if quiet {
             return;
         }
+        let Some(os) = self.os_mut(ni) else {
+            return;
+        };
         let pri = syslog::pri(fac, sev);
         let msg = if os.ios {
             syslog::ios(pri, seq, &ios_stamp(clock, os.clock.synced), &format!("{}: {}", tag, text))
@@ -1042,7 +1065,7 @@ impl Engine {
     /// removes a service (stopping it first)
     pub fn remove_service(&mut self, dev: u32, name: &str) -> Result<(), ActErr> {
         let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
-        let id = self.os(ni).ok_or(ActErr::NoIp(dev))?.svc_id(name).ok_or_else(|| ActErr::Refused(format!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
+        let id = self.os(ni).ok_or(ActErr::NoIp(dev))?.svc_id(name).ok_or_else(|| ActErr::Refused(msg!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
         self.svc_stop(ni, id);
         if let Some(os) = self.os_mut(ni) {
             os.svcs.retain(|s| s.id != id);
@@ -1055,7 +1078,7 @@ impl Engine {
     /// starts or stops a service ("systemctl start|stop", IOS "[no] service dhcp")
     pub fn set_service_running(&mut self, dev: u32, name: &str, on: bool) -> Result<(), ActErr> {
         let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
-        let id = self.os(ni).ok_or(ActErr::NoIp(dev))?.svc_id(name).ok_or_else(|| ActErr::Refused(format!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
+        let id = self.os(ni).ok_or(ActErr::NoIp(dev))?.svc_id(name).ok_or_else(|| ActErr::Refused(msg!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
         if let Some(s) = self.os_mut(ni).and_then(|os| os.svcs.iter_mut().find(|s| s.id == id)) {
             s.enabled = on;
         }
@@ -1081,14 +1104,18 @@ impl Engine {
         os.svcs
             .iter()
             .filter(|s| !s.console)
-            .map(|s| SvcView {
-                name: s.name.clone(),
-                kind: s.kind,
-                enabled: s.enabled,
-                running: s.running,
-                since: s.since,
-                status: s.svc.as_ref().map(|x| x.status()).unwrap_or_default(),
-                metrics: s.svc.as_ref().map(|x| x.metrics_at(now)).unwrap_or_default(),
+            .map(|s| {
+                let status_msg = s.svc.as_ref().map(|x| x.status_msg()).unwrap_or_default();
+                SvcView {
+                    name: s.name.clone(),
+                    kind: s.kind,
+                    enabled: s.enabled,
+                    running: s.running,
+                    since: s.since,
+                    status: status_msg.text(),
+                    metrics: s.svc.as_ref().map(|x| x.metrics_at(now)).unwrap_or_default(),
+                    status_msg,
+                }
             })
             .collect()
     }
@@ -1144,6 +1171,10 @@ impl OsApi<'_> {
     /// a listening socket on `port` of every address (0: an ephemeral port); `backlog` 0: the
     /// system's
     pub fn tcp_listen(&mut self, port: u16, backlog: u32, opts: crate::tcp::SockOpts) -> Result<u32, String> {
+        self.tcp_listen_msg(port, backlog, opts).map_err(|m| m.text())
+    }
+    /// tcp_listen(), the refusal as a message
+    pub fn tcp_listen_msg(&mut self, port: u16, backlog: u32, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
         self.eng.tcp_listen(self.ni, self.id, Ipv4::UNSPECIFIED, port, backlog, opts)
     }
     /// takes the next connection from the queue of a listening socket
@@ -1152,10 +1183,18 @@ impl OsApi<'_> {
     }
     /// opens a connection from an ephemeral port; TcpConnected or TcpClosed follows
     pub fn tcp_connect(&mut self, dst: Ipv4, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, String> {
+        self.tcp_connect_msg(dst, dport, opts).map_err(|m| m.text())
+    }
+    /// tcp_connect(), the refusal as a message
+    pub fn tcp_connect_msg(&mut self, dst: Ipv4, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
         self.eng.tcp_connect(self.ni, self.id, 0, dst, dport, opts, self.cause)
     }
     /// the same from a given local port (bind, then connect)
     pub fn tcp_connect_from(&mut self, sport: u16, dst: Ipv4, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, String> {
+        self.tcp_connect_from_msg(sport, dst, dport, opts).map_err(|m| m.text())
+    }
+    /// tcp_connect_from(), the refusal as a message
+    pub fn tcp_connect_from_msg(&mut self, sport: u16, dst: Ipv4, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
         self.eng.tcp_connect(self.ni, self.id, sport, dst, dport, opts, self.cause)
     }
     /// queues bytes for sending: how many the send buffer took (TcpWritable follows when it

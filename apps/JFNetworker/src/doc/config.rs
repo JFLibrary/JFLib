@@ -25,6 +25,7 @@ use jfn_sim::{Action, Cmd, Engine};
 use netpkt::{Ipv4, Prefix4};
 
 use super::{edits, Doc};
+use crate::app::tr::tf;
 
 /// the kind and name of a device's DHCP client on an interface (svcact.rs)
 pub(crate) const DHCP_CLIENT: &str = "dhcp-client";
@@ -37,7 +38,7 @@ pub(crate) fn dhcp_service(d: &Device, iface: &str) -> Option<usize> {
 /// run Actions on device `dev` and keep its configuration (and services) as the new startup
 /// configuration: one undo step
 pub(crate) fn apply(doc: &mut Doc, dev: u32, label: &str, acts: &[Action], services: Option<Vec<ServiceDef>>) -> Result<(), String> {
-    let d = doc.proj.device(dev).cloned().ok_or_else(|| format!("Das Gerät {} gibt es nicht.", dev))?;
+    let d = doc.proj.device(dev).cloned().ok_or_else(|| tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()]))?;
     // the configuration with the change: a scratch copy boots from the project's one
     let mut e = Engine::new(doc.proj.seed);
     e.apply(Action::AddDevice(Device { services: Vec::new(), ..d.clone() })).map_err(|x| x.to_string())?;
@@ -78,9 +79,9 @@ pub(crate) fn address(doc: &mut Doc, dev: u32, iface: &str, text: &str) -> Resul
     let new = if text.trim().is_empty() {
         None
     } else {
-        Some(parse_addr(text).ok_or_else(|| format!("„{}“ ist keine Adresse mit Präfix (10.0.0.1/24 oder 10.0.0.1 255.255.255.0).", text.trim()))?)
+        Some(parse_addr(text).ok_or_else(|| tf("„{}“ ist keine Adresse mit Präfix (10.0.0.1/24 oder 10.0.0.1 255.255.255.0).", &[text.trim()]))?)
     };
-    let d = doc.proj.device(dev).cloned().ok_or_else(|| format!("Das Gerät {} gibt es nicht.", dev))?;
+    let d = doc.proj.device(dev).cloned().ok_or_else(|| tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()]))?;
     let mut acts = Vec::new();
     let mut services = d.services.clone();
     match dhcp_service(&d, iface) {
@@ -105,7 +106,7 @@ pub(crate) fn address(doc: &mut Doc, dev: u32, iface: &str, text: &str) -> Resul
 
 /// the interface's DHCP client on (its static addresses go) or off
 pub(crate) fn dhcp(doc: &mut Doc, dev: u32, iface: &str, on: bool) -> Result<(), String> {
-    let d = doc.proj.device(dev).cloned().ok_or_else(|| format!("Das Gerät {} gibt es nicht.", dev))?;
+    let d = doc.proj.device(dev).cloned().ok_or_else(|| tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()]))?;
     let mut services = d.services.clone();
     let have = dhcp_service(&d, iface);
     let mut acts = Vec::new();
@@ -131,7 +132,7 @@ pub(crate) fn dhcp(doc: &mut Doc, dev: u32, iface: &str, on: bool) -> Result<(),
 
 /// an interface (with IPv4) or a port (a switch port) up or shut down
 pub(crate) fn iface_up(doc: &mut Doc, dev: u32, name: &str, ip: bool, up: bool) -> Result<(), String> {
-    let d = doc.proj.device(dev).cloned().ok_or_else(|| format!("Das Gerät {} gibt es nicht.", dev))?;
+    let d = doc.proj.device(dev).cloned().ok_or_else(|| tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()]))?;
     let a = if ip { Action::IfUp { dev, iface: String::from(name), up } } else { Action::PortAdmin { dev, port: String::from(name), up } };
     let label = format!("{} {} {}", d.name, jfn_model::ifname::short(name), if up { "einschalten" } else { "abschalten" });
     apply(doc, dev, &label, &[a], None)
@@ -139,8 +140,8 @@ pub(crate) fn iface_up(doc: &mut Doc, dev: u32, name: &str, ip: bool, up: bool) 
 
 /// the default gateway of a host (empty: none)
 pub(crate) fn gateway(doc: &mut Doc, dev: u32, text: &str) -> Result<(), String> {
-    let new = if text.trim().is_empty() { None } else { Some(Ipv4::parse(text.trim()).ok_or_else(|| format!("„{}“ ist keine IPv4-Adresse.", text.trim()))?) };
-    let d = doc.proj.device(dev).cloned().ok_or_else(|| format!("Das Gerät {} gibt es nicht.", dev))?;
+    let new = if text.trim().is_empty() { None } else { Some(Ipv4::parse(text.trim()).ok_or_else(|| tf("„{}“ ist keine IPv4-Adresse.", &[text.trim()]))?) };
+    let d = doc.proj.device(dev).cloned().ok_or_else(|| tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()]))?;
     let any = Prefix4::new(Ipv4::from_u32(0), 0).ok_or_else(|| String::from("0.0.0.0/0"))?;
     let mut acts = Vec::new();
     for gw in default_gateways(doc.sim.engine(), dev) {

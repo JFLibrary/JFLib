@@ -21,8 +21,10 @@
 // configuration), file.rs reading and writing .jfnet files, the file dialogs and the "save
 // changes?" question, sim.rs the engine behind the editor, config.rs the settings that change
 // a device's configuration (the inspector's quick fields), console.rs the consoles of the
-// devices and what the engine reports to them.
+// devices and what the engine reports to them, autosave.rs the copies of unsaved work and
+// their recovery.
 
+pub(crate) mod autosave;
 pub(crate) mod config;
 pub(crate) mod console;
 pub(crate) mod edits;
@@ -184,7 +186,7 @@ impl Doc {
     pub(crate) fn file_name(&self) -> String {
         match &self.path {
             Some(p) => String::from(p.rsplit(['/', '\\']).find(|s| !s.is_empty()).unwrap_or(p)),
-            None => String::from("Unbenannt"),
+            None => String::from(crate::app::tr::t("Unbenannt")),
         }
     }
 }

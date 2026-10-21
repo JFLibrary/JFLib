@@ -1,0 +1,58 @@
+#!args --verify-dirty --gen-topology 500 --traffic 300
+# performance: 500 devices, 800 cables and 300 frames on the cables at 1920 x 1080 hold 30 fps.
+# --gen-topology 500 opens jfn_model::synth's campus without a file (7 core routers in a ring,
+# 19 pods of a router, two access switches, PCs, a printer, a camera and servers on both
+# switches), --traffic 300 starts 300 pings whose ARP requests leave at t = 0 (jfn_sim
+# ping_many).  bench (ui/auto.rs) times frames with the real clock: the passes and the render of
+# the dirty cells (--verify-dirty compares afterwards, untimed); a run passes when its median
+# stays at or below 33 ms, three runs at most.  Measured: real time while the pings run; the
+# simulation mode at t = 0 with the whole campus in view (17 %: squares and dots) while the
+# frames move (a step's animation at 0,25×), a pan with the middle button and Ctrl + wheel zoom;
+# 100 % over two pods (symbols, names, LEDs, port names, envelopes) while the frames move back,
+# pan, zoom and a server dragged; playing at 8×.  #40960 counts the frames on the cables.
+size 1920 1080
+theme light
+expect text:"500 Geräte · 800 Kabel" exists
+# everything in view (the window was smaller when the project came)
+cmd 23
+wait 100
+# real time: the engine runs the pings with their ARP, echo and reply frames
+bench 30 anim 33000
+click tab:"Simulation"
+wait 200
+cmd 23
+wait 100
+# 0,25×: a step's animation takes 1,2 s; the view at t = 0 shows the 300 ARP requests
+cmd 160
+cmd 176 0
+wait 100
+expect text:"Ansicht bei t = 0,000 000 000 s" exists
+expect #40960 value 300
+shot build/jfnetworker/perf_fit.png
+# a step: the requests run into their switches
+key f7
+bench 20 anim 33000
+bench 20 drag 900,420 1100,520 middle 33000
+bench 10 wheel 900,420 120 ctrl 33000
+# 100 % over two pods
+cmd 23
+wait 100
+wheel 616,512 720 ctrl
+wait 300
+expect text:"100 %" exists
+shot build/jfnetworker/perf_100.png
+# a step back: the frames run back to their senders
+key shift+f7
+bench 20 anim 33000
+bench 20 drag 900,420 1100,520 middle 33000
+bench 10 wheel 900,420 120 ctrl 33000
+click listitem:"SRV213"
+wait 600
+bench 20 drag listitem:"SRV213" 1100,400 33000
+# playing at 8× (a step every 125 ms)
+cmd 165
+key f6
+bench 40 anim 33000
+key f6
+shot build/jfnetworker/perf_played.png
+expect_nowarn

@@ -21,14 +21,17 @@ use jfn_sim::Ns;
 use ui::*;
 
 use crate::app::constants::*;
+use crate::app::tr::t;
 use crate::app::Net;
 
 /// lines kept (the table's row ids end below U4's range)
 pub(crate) const LOG_MAX: usize = 3000;
 
 /// the names of the severities 0 .. 7
+// i18n
 const SEV_NAMES: [&str; 8] = ["Notfall", "Alarm", "Kritisch", "Fehler", "Warnung", "Hinweis", "Info", "Debug"];
 /// the severity filter: label, the least severe severity shown
+// i18n
 const SEV_FILTER: [(&str, u8); 5] = [
     ("Alle Schweregrade", 7),
     ("Info und wichtiger", 6),
@@ -37,13 +40,16 @@ const SEV_FILTER: [(&str, u8); 5] = [
     ("Fehler und wichtiger", 3),
 ];
 
-const COLS: [GridCol<'static>; 5] = [
-    GridCol::new("Zeit", 96).flags(GC_NOSORT),
-    GridCol::new("Gerät", 84).flags(GC_NOSORT),
-    GridCol::new("Schwere", 92).flags(GC_NOSORT),
-    GridCol::new("Quelle", 196).flags(GC_NOSORT),
-    GridCol::new("Meldung", 360).flags(GC_NOSORT | GC_FILL),
-];
+// the columns in the current language
+fn cols() -> [GridCol<'static>; 5] {
+    [
+        GridCol::new(t("Zeit"), 96).flags(GC_NOSORT),
+        GridCol::new(t("Gerät"), 84).flags(GC_NOSORT),
+        GridCol::new(t("Schwere"), 92).flags(GC_NOSORT),
+        GridCol::new(t("Quelle"), 196).flags(GC_NOSORT),
+        GridCol::new(t("Meldung"), 360).flags(GC_NOSORT | GC_FILL),
+    ]
+}
 
 /// a line of the log
 struct Row {
@@ -113,7 +119,7 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
     if n.log.dev.is_some_and(|d| !devs.iter().any(|x| x.0 == d)) {
         n.log.dev = None;
     }
-    let mut names: Vec<&str> = alloc::vec!["Alle Geräte"];
+    let mut names: Vec<&str> = alloc::vec![t("Alle Geräte")];
     names.extend(devs.iter().map(|d| d.1.as_str()));
     let mut dsel = n.log.dev.and_then(|d| devs.iter().position(|x| x.0 == d)).map_or(0, |i| i as i32 + 1);
     ui.box_begin(0, BOX_H | BOX_XCENTER | pad(6), 8);
@@ -122,20 +128,20 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
         n.log.dev = if dsel <= 0 { None } else { devs.get(dsel as usize - 1).map(|d| d.0) };
         ui.repass();
     }
-    ui.tooltip("Nur die Meldungen dieses Geräts");
-    let labels: Vec<&str> = SEV_FILTER.iter().map(|f| f.0).collect();
+    ui.tooltip(t("Nur die Meldungen dieses Geräts"));
+    let labels: Vec<&str> = SEV_FILTER.iter().map(|f| t(f.0)).collect();
     ui.next_size(190, 0);
     if ui.combobox(ID_LOG_SEV, &mut n.log.sev_sel, &labels) & EV_ACT != 0 {
         ui.repass();
     }
-    ui.tooltip("Schwere: 0 Notfall bis 7 Debug");
+    ui.tooltip(t("Schwere: 0 Notfall bis 7 Debug"));
     ui.next_size(200, 0);
-    if ui.textbox(ID_LOG_FIND, Some("Meldungen durchsuchen"), &mut n.log.find, 80) & EV_ACT != 0 {
+    if ui.textbox(ID_LOG_FIND, Some(t("Meldungen durchsuchen")), &mut n.log.find, 80) & EV_ACT != 0 {
         ui.repass();
     }
     ui.spacer(-1);
     ui.next_flags(ST_COMPACT);
-    ui.checkbox(ID_LOG_FOLLOW, "Neueste zeigen", &mut n.log.follow);
+    ui.checkbox(ID_LOG_FOLLOW, t("Neueste zeigen"), &mut n.log.follow);
     ui.cmd_button(CMD_LOG_CLEAR, ST_ICON_ONLY | ST_SUBTLE);
     ui.box_end();
     // the lines that pass the filters
@@ -154,9 +160,9 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER | pad(12), 0);
         if rows.is_empty() {
-            ui.empty_state(IC_HISTORY, "Noch keine Meldungen", "Die Geräte protokollieren hier, was sie tun: Zustände der Ports (%LINK), Konfigurationen, DHCP, Zeit, und mit „debug“ jede Entscheidung.");
+            ui.empty_state(IC_HISTORY, t("Noch keine Meldungen"), t("Die Geräte protokollieren hier, was sie tun: Zustände der Ports (%LINK), Konfigurationen, DHCP, Zeit, und mit „debug“ jede Entscheidung."));
         } else {
-            ui.empty_state(IC_FILTER, "Keine passenden Meldungen", "Die Filter verbergen alle Meldungen; „Alle Geräte“ und „Alle Schweregrade“ zeigen sie wieder.");
+            ui.empty_state(IC_FILTER, t("Keine passenden Meldungen"), t("Die Filter verbergen alle Meldungen; „Alle Geräte“ und „Alle Schweregrade“ zeigen sie wieder."));
         }
         ui.box_end();
         return;
@@ -165,7 +171,8 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
     let newest = keys.last().copied().unwrap_or(0);
     grid.retain(&keys);
     ui.next_size(-1, -1);
-    let (first, end) = ui.grid_begin(ID_LOG_GRID, grid, &COLS, &keys);
+    let cols = cols();
+    let (first, end) = ui.grid_begin(ID_LOG_GRID, grid, &cols, &keys);
     for i in first..end {
         let r = &rows[shown[i as usize]];
         ui.grid_row(grid, i);
@@ -174,7 +181,7 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
         ui.grid_cell(grid, 2);
         ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
         ui.status_dot(badge_of(r.sev));
-        ui.text(TS_BODY | TX_ELLIPSIS, &format!("{} {}", r.sev, SEV_NAMES[r.sev as usize]));
+        ui.text(TS_BODY | TX_ELLIPSIS, &format!("{} {}", r.sev, t(SEV_NAMES[r.sev as usize])));
         ui.box_end();
         ui.grid_text(grid, 3, &r.tag);
         ui.grid_text(grid, 4, &r.text);

@@ -16,13 +16,14 @@
 // simulation mode over it.
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use ui::*;
 
 use crate::app::commands;
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::file;
 use crate::workspace::icons::*;
@@ -64,14 +65,14 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.menubar(None);
     toolbar(n, ui);
     let panels = [
-        DockPanel::new(P_DEVICES, "Geräte", JN_DEVICES).at(DOCK_LEFT, 0),
-        DockPanel::new(P_PROPS, "Eigenschaften", IC_SETTINGS).at(DOCK_RIGHT, 0),
-        DockPanel::new(P_TERMINAL, "Terminal", JN_TERMINAL).at(DOCK_BOTTOM, 0),
-        DockPanel::new(P_EVENTS, "Ereignisse", IC_BULLETED_LIST).at(DOCK_BOTTOM, 0),
-        DockPanel::new(P_PACKET, "Paket", JN_PACKET).at(DOCK_BOTTOM, 0),
-        DockPanel::new(P_LOG, "Protokoll", IC_HISTORY).at(DOCK_BOTTOM, 0),
-        DockPanel::new(P_PROBLEMS, "Probleme", IC_WARNING).at(DOCK_BOTTOM, 0),
-        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_PDUS, "PDUs", IC_MAIL).at(DOCK_RIGHT, 1) },
+        DockPanel::new(P_DEVICES, t("Geräte"), JN_DEVICES).at(DOCK_LEFT, 0),
+        DockPanel::new(P_PROPS, t("Eigenschaften"), IC_SETTINGS).at(DOCK_RIGHT, 0),
+        DockPanel::new(P_TERMINAL, t("Terminal"), JN_TERMINAL).at(DOCK_BOTTOM, 0),
+        DockPanel::new(P_EVENTS, t("Ereignisse"), IC_BULLETED_LIST).at(DOCK_BOTTOM, 0),
+        DockPanel::new(P_PACKET, t("Paket"), JN_PACKET).at(DOCK_BOTTOM, 0),
+        DockPanel::new(P_LOG, t("Protokoll"), IC_HISTORY).at(DOCK_BOTTOM, 0),
+        DockPanel::new(P_PROBLEMS, t("Probleme"), IC_WARNING).at(DOCK_BOTTOM, 0),
+        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_PDUS, t("PDUs"), IC_MAIL).at(DOCK_RIGHT, 1) },
     ];
     ui.next_size(-1, -1);
     ui.dock_begin(ID_DOCK, &mut n.shell.dock, &panels);
@@ -98,6 +99,9 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.box_end();
     file::dialogs(n, ui);
     about(n, ui);
+    crate::workspace::settings::dialog(n, ui);
+    crate::workspace::settings::shortcuts(n, ui);
+    crate::doc::autosave::frame(n, ui);
     sim::pdu::dialog(n, ui);
     sim::pdu::file_dialog(n, ui);
     n.sim_timer(ui);
@@ -106,10 +110,10 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
 
 // "JFNetworker – Büro.jfnet" with a dot while there are unsaved changes
 fn title(n: &mut Net, ui: &mut Ui) {
-    let t = format!("JFNetworker – {}{}", n.doc.file_name(), if n.doc.dirty() { " •" } else { "" });
-    if t != n.shell.title {
-        ui.set_title(&t);
-        n.shell.title = t;
+    let s = format!("JFNetworker – {}{}", n.doc.file_name(), if n.doc.dirty() { " •" } else { "" });
+    if s != n.shell.title {
+        ui.set_title(&s);
+        n.shell.title = s;
     }
 }
 
@@ -118,35 +122,47 @@ fn sep(ui: &mut Ui) {
     ui.separator();
 }
 
+// the toolbar: a pane of its own (Shift+F6), its parts one Tab stop each (the arrows move
+// inside a part)
 fn toolbar(n: &mut Net, ui: &mut Ui) {
+    ui.focus_pane_begin(ID_TB_PANE);
     ui.box_begin(ID_TOOLBAR, BOX_H | BOX_XCENTER | BOX_LAYER | pad(4), 2);
+    ui.focus_group_begin(ID_TB_GRP_TOOLS);
     for c in [CMD_TOOL_SELECT, CMD_TOOL_HAND, CMD_TOOL_CONNECT, CMD_TOOL_NOTE] {
         ui.cmd_button(c, ST_ICON_ONLY | ST_SUBTLE);
     }
+    ui.focus_group_end();
     sep(ui);
+    ui.focus_group_begin(ID_TB_GRP_EDIT);
     for c in [CMD_DELETE, CMD_UNDO, CMD_REDO] {
         ui.cmd_button(c, ST_ICON_ONLY | ST_SUBTLE);
     }
+    ui.focus_group_end();
     sep(ui);
+    ui.focus_group_begin(ID_TB_GRP_ZOOM);
     ui.cmd_button(CMD_ZOOM_OUT, ST_ICON_ONLY | ST_SUBTLE);
     let z = (n.canvas.st.vp.zoom * 100.0 + 0.5) as i32;
     ui.next_size(52, 0);
     ui.next_flags(ST_SUBTLE);
-    if ui.label_button(ID_TB_ZOOM, &format!("{} %", z), TS_BODY, 4) & EV_ACT != 0 {
+    if ui.label_button(ID_TB_ZOOM, &tf("{} %", &[&z.to_string()]), TS_BODY, 4) & EV_ACT != 0 {
         canvas::zoom(n, ui, 0);
     }
-    ui.tooltip("Zoom: auf 100 % setzen");
+    ui.tooltip(t("Zoom: auf 100 % setzen"));
     for c in [CMD_ZOOM_IN, CMD_FIT] {
         ui.cmd_button(c, ST_ICON_ONLY | ST_SUBTLE);
     }
+    ui.focus_group_end();
     sep(ui);
+    ui.focus_group_begin(ID_TB_GRP_VIEW);
     for c in [CMD_GRID, CMD_SNAP, CMD_MINIMAP] {
         ui.cmd_button(c, ST_ICON_ONLY | ST_SUBTLE);
     }
+    ui.focus_group_end();
     ui.spacer(-1);
     sim::toolbar(n, ui);
     ui.spacer(4);
     ui.box_end();
+    ui.focus_pane_end();
 }
 
 fn statusbar(n: &mut Net, ui: &mut Ui) {
@@ -154,29 +170,33 @@ fn statusbar(n: &mut Net, ui: &mut Ui) {
     ui.statusbar_begin();
     ui.text(TS_CAPTION, &n.canvas.tool.status());
     if matches!(n.canvas.tool, Tool::Place(_) | Tool::Note) {
-        ui.text(TS_CAPTION | TX_TERTIARY, "Klicken setzt, Umschalt+Klicken setzt mehrere, Esc beendet");
+        ui.text(TS_CAPTION | TX_TERTIARY, t("Klicken setzt, Umschalt+Klicken setzt mehrere, Esc beendet"));
     }
     if n.canvas.tool == Tool::Connect {
-        ui.text(TS_CAPTION | TX_TERTIARY, "Von Gerät zu Gerät ziehen oder beide anklicken; Umschalt verbindet sofort, Esc beendet");
+        match n.canvas.kb_from.and_then(|d| n.doc.proj.device(d)) {
+            Some(a) => ui.text(TS_CAPTION | TX_TERTIARY, &tf("Ende A: {} – Tab zum zweiten Gerät, Eingabe öffnet die Port-Auswahl, Esc bricht ab", &[&a.name])),
+            None => ui.text(TS_CAPTION | TX_TERTIARY, t("Von Gerät zu Gerät ziehen, beide anklicken oder mit Tab und Eingabe wählen; Umschalt verbindet sofort, Esc beendet")),
+        };
     }
     sim::pdu_hint(n, ui);
     sep(ui);
     sim::status(n, ui);
     sep(ui);
-    ui.text(TS_CAPTION | TX_SECONDARY, &format!("{} %", (n.canvas.st.vp.zoom * 100.0 + 0.5) as i32));
+    ui.text(TS_CAPTION | TX_SECONDARY, &tf("{} %", &[&((n.canvas.st.vp.zoom * 100.0 + 0.5) as i32).to_string()]));
     sep(ui);
     let k = n.canvas.st.sel.len();
-    ui.text(TS_CAPTION | TX_SECONDARY, &if k == 0 { String::from("Nichts ausgewählt") } else { format!("{} ausgewählt", k) });
+    ui.text(TS_CAPTION | TX_SECONDARY, &if k == 0 { String::from(t("Nichts ausgewählt")) } else { tf("{} ausgewählt", &[&k.to_string()]) });
     sep(ui);
-    let (d, l) = (p.devices.len(), p.links.len());
-    ui.text(TS_CAPTION | TX_SECONDARY, &format!("{} {} · {} Kabel", d, if d == 1 { "Gerät" } else { "Geräte" }, l));
+    let devs = if p.devices.len() == 1 { String::from(t("1 Gerät")) } else { tf("{} Geräte", &[&p.devices.len().to_string()]) };
+    let links = if p.links.len() == 1 { String::from(t("1 Kabel")) } else { tf("{} Kabel", &[&p.links.len().to_string()]) };
+    ui.text(TS_CAPTION | TX_SECONDARY, &format!("{} · {}", devs, links));
     ui.spacer(-1);
-    let grid = n.canvas.st.grid as i32;
+    let grid = (n.canvas.st.grid as i32).to_string();
     let g = match (n.prefs.grid, n.prefs.snap) {
-        (true, true) => format!("Raster {} · Einrasten", grid),
-        (true, false) => format!("Raster {}", grid),
-        (false, true) => format!("Einrasten {}", grid),
-        (false, false) => String::from("Frei"),
+        (true, true) => tf("Raster {} · Einrasten", &[&grid]),
+        (true, false) => tf("Raster {}", &[&grid]),
+        (false, true) => tf("Einrasten {}", &[&grid]),
+        (false, false) => String::from(t("Frei")),
     };
     ui.text(TS_CAPTION | TX_TERTIARY, &g);
     ui.statusbar_end();
@@ -209,13 +229,14 @@ pub(crate) fn findings(n: &mut Net) -> Vec<Finding> {
     };
     let mut v: Vec<Finding> = Vec::new();
     for i in p.check() {
-        v.push(Finding { error: i.error, text: named(i.dev, &i.text), dev: i.dev, link: i.link, others: Vec::new() });
+        v.push(Finding { error: i.error, text: named(i.dev, &crate::app::tr::msg(&i.msg)), dev: i.dev, link: i.link, others: Vec::new() });
     }
     for (&id, why) in &n.doc.sim.errors {
+        let why = crate::app::tr::msg(why);
         let (dev, link) = if p.link(id).is_some() { (p.link(id).map(|l| l.a.dev), Some(id)) } else { (Some(id), None) };
         let what = match link.and_then(|l| p.link(l)) {
-            Some(l) => format!("Das Kabel {} läuft nicht im Simulator: {}", crate::workspace::canvas::cables::ends_text(p, l), why),
-            None => named(dev, &format!("Läuft nicht im Simulator: {}", why)),
+            Some(l) => tf("Das Kabel {} läuft nicht im Simulator: {}", &[&crate::workspace::canvas::cables::ends_text(p, l), &why]),
+            None => named(dev, &tf("Läuft nicht im Simulator: {}", &[&why])),
         };
         v.push(Finding { error: true, text: what, dev, link, others: Vec::new() });
     }
@@ -226,7 +247,7 @@ pub(crate) fn findings(n: &mut Net) -> Vec<Finding> {
         _ => String::from(text),
     };
     for x in probs.iter() {
-        v.push(Finding { error: x.severity == jfn_sim::Severity::Error, text: named(x.dev, &x.text), dev: Some(x.dev), link: x.link, others: x.others.clone() });
+        v.push(Finding { error: x.severity == jfn_sim::Severity::Error, text: named(x.dev, &crate::app::tr::msg(&x.msg)), dev: Some(x.dev), link: x.link, others: x.others.clone() });
     }
     v.sort_by_key(|f| !f.error);
     v
@@ -237,7 +258,7 @@ pub(crate) fn findings(n: &mut Net) -> Vec<Finding> {
 fn problems(n: &mut Net, ui: &mut Ui) {
     let rows = findings(n);
     if rows.is_empty() {
-        empty(ui, IC_ACCEPT, "Keine Probleme", "Das Projekt ist in sich stimmig: eindeutige Namen, passende Kabel, belegte Ports nur einmal; der Simulator findet nichts.");
+        empty(ui, IC_ACCEPT, t("Keine Probleme"), t("Das Projekt ist in sich stimmig: eindeutige Namen, passende Kabel, belegte Ports nur einmal; der Simulator findet nichts."));
         return;
     }
     let mut sel = n.shell.prob_sel.min(rows.len() as i32 - 1);
@@ -281,18 +302,18 @@ fn show(n: &mut Net, r: &Finding, centre: bool) {
 
 fn about(n: &mut Net, ui: &mut Ui) {
     let open = n.shell.about.clone();
-    if ui.dialog_begin(ID_ABOUT, "Über JFNetworker", &open) {
+    if ui.dialog_begin(ID_ABOUT, t("Über JFNetworker"), &open) {
         ui.next_size(420, 0);
         ui.text(
             TS_BODY | TX_WRAP,
-            "JFNetworker – ein Netzwerksimulator und Labor für verteilte Systeme: Geräte und Kabel auf einer Zeichenfläche, echte Protokolle Byte für Byte, Befehlszeilen für Router, Switches und Hosts.",
+            t("JFNetworker – ein Netzwerksimulator und Labor für verteilte Systeme: Geräte und Kabel auf einer Zeichenfläche, echte Protokolle Byte für Byte, Befehlszeilen für Router, Switches und Hosts."),
         );
         ui.next_size(420, 0);
         ui.text(
             TS_CAPTION | TX_SECONDARY | TX_WRAP,
-            "Dieser Stand: der Topologie-Editor mit Kabeln, Inspektor und dem Simulator in Echtzeit, die Konsolen der Geräte, Gerätefenster und das Protokoll, dazu der Simulationsmodus mit Ereignisliste, Zeitleiste, Paketansicht und eigenen PDUs.",
+            t("Phase 1: der Topologie-Editor mit Kabeln und Inspektor, der Simulator in Echtzeit, die Konsolen der Geräte, Gerätefenster und das Protokoll, der Simulationsmodus mit Ereignisliste, Zeitleiste, Paketansicht und eigenen PDUs, Einstellungen, automatische Sicherung, Deutsch und Englisch."),
         );
-        ui.dialog_buttons(Some("Schließen"), None, None);
+        ui.dialog_buttons(Some(t("Schließen")), None, None);
     }
     ui.dialog_end();
 }

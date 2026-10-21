@@ -68,6 +68,12 @@
 //
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
+//
+// Texts for the app are German; each also comes as a jfn_model::msg::Msg (a template the app's
+// catalogue src/locales/engine.tsv translates): Note::message / Engine::message (describe),
+// EventRow::msg, Problem::msg, ActErr::msg (Refused carries a Msg), SvcView::status_msg
+// (Service::status_msg), Fail::msg, PduSender::error_msg, TcpClient::error_msg, the *_msg
+// variants of the socket calls and of from_def.  The runner's reports stay German only.
 #![no_std]
 #![forbid(unsafe_code)]
 

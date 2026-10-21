@@ -31,6 +31,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use jfn_model::ifname;
+use jfn_model::msg;
 use netpkt::Ipv4;
 
 use crate::action::{ActErr, Action};
@@ -293,25 +294,25 @@ impl Engine {
                 let ni = self.node_index(*dev).ok_or(ActErr::UnknownDevice(*dev))?;
                 let os = self.os(ni).ok_or(ActErr::NoIp(*dev))?;
                 if os.svc(svc).is_none_or(|s| s.console) {
-                    return Err(ActErr::Refused(format!("Den Dienst \u{201e}{}\u{201c} gibt es auf {} nicht.", svc, self.fault_dev_name(*dev))));
+                    return Err(ActErr::Refused(msg!("Den Dienst \u{201e}{}\u{201c} gibt es auf {} nicht.", svc, self.fault_dev_name(*dev))));
                 }
             }
             Fault::SlowDisk { dev, factor_pm, .. } => {
                 let ni = self.node_index(*dev).ok_or(ActErr::UnknownDevice(*dev))?;
                 self.os(ni).ok_or(ActErr::NoIp(*dev))?;
                 if *factor_pm == 0 {
-                    return Err(ActErr::Refused(String::from("Der Faktor einer langsamen Disk muss größer als 0 sein.")));
+                    return Err(ActErr::Refused(msg!("Der Faktor einer langsamen Disk muss größer als 0 sein.")));
                 }
             }
             Fault::Partition { a, b } => {
                 if a.is_empty() {
-                    return Err(ActErr::Refused(String::from("Eine Partition braucht auf einer Seite mindestens ein Gerät.")));
+                    return Err(ActErr::Refused(msg!("Eine Partition braucht auf einer Seite mindestens ein Gerät.")));
                 }
                 for &d in a.iter().chain(b.iter()) {
                     dev_ok(d)?;
                 }
                 if let Some(d) = a.iter().find(|d| b.contains(d)) {
-                    return Err(ActErr::Refused(format!("{} steht auf beiden Seiten der Partition.", self.fault_dev_name(*d))));
+                    return Err(ActErr::Refused(msg!("{} steht auf beiden Seiten der Partition.", self.fault_dev_name(*d))));
                 }
             }
         }
@@ -378,10 +379,10 @@ impl Engine {
     pub(crate) fn fault_heal(&mut self, id: u32) -> Result<(), ActErr> {
         let now = self.now;
         let Some(m) = self.faults.marks.iter_mut().find(|m| m.id == id) else {
-            return Err(ActErr::Refused(format!("Einen Fehler {} gibt es nicht.", id)));
+            return Err(ActErr::Refused(msg!("Einen Fehler {} gibt es nicht.", id)));
         };
         if !m.active() {
-            return Err(ActErr::Refused(format!("Fehler {} ist schon behoben.", id)));
+            return Err(ActErr::Refused(msg!("Fehler {} ist schon behoben.", id)));
         }
         m.healed = Some(now);
         let (f, dev, text) = (m.fault.clone(), m.dev, m.text.clone());

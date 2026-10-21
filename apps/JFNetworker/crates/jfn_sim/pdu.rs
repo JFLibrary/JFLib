@@ -7,7 +7,8 @@
 //                               one), destination port, data bytes, TTL (UDP; None: the
 //                               device's), how many (0: until it stops) and how often
 //   sender.sent / replies / failed / error, done(), status()
-//                               what came of it (the app's PDU list)
+//                               what came of it (the app's PDU list); error_msg and
+//                               status_msg(): the same as a Msg for the app's catalogue
 //   OsApi::send_ttl(..)         a UDP datagram with a TTL of its own
 //   payload(n)                  the data bytes of a PDU ("abcdefghijklmnopqrstuvw" repeated)
 //
@@ -19,11 +20,12 @@
 // follows their jobs and lookups.
 
 use alloc::boxed::Box;
-use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::any::Any;
 
+use jfn_model::msg;
+use jfn_model::msg::{phrase, Msg};
 use netpkt::ipv4::{Ipv4Hdr, PROTO_UDP};
 use netpkt::pkt::{Pkt, HEADROOM};
 use netpkt::udp::UdpHdr;
@@ -102,11 +104,19 @@ pub struct PduSender {
     /// stopped by the user, the power or a removal
     pub stopped: bool,
     rounds: u32,
+    /// error as a message for the app's catalogue
+    pub error_msg: Option<Msg>,
 }
 
 impl PduSender {
     pub fn new(spec: PduSpec) -> PduSender {
-        PduSender { spec, dst: None, lookup: None, port: None, conns: Vec::new(), sent: 0, replies: 0, failed: 0, error: None, stopped: false, rounds: 0 }
+        PduSender { spec, dst: None, lookup: None, port: None, conns: Vec::new(), sent: 0, replies: 0, failed: 0, error: None, stopped: false, rounds: 0, error_msg: None }
+    }
+
+    // something went wrong (error and error_msg)
+    fn fail(&mut self, m: Msg) {
+        self.error = Some(m.text());
+        self.error_msg = Some(m);
     }
 
     /// nothing more will happen: every round ran and every connection ended, it was stopped,
@@ -120,10 +130,10 @@ impl PduSender {
     // the address is known: bind the UDP port, the first round
     fn begin(&mut self, os: &mut OsApi) {
         if self.spec.proto == PduProto::Udp {
-            match os.bind(self.spec.sport, None) {
+            match os.bind_msg(self.spec.sport, None) {
                 Ok(p) => self.port = Some(p),
                 Err(e) => {
-                    self.error = Some(e);
+                    self.fail(e);
                     return;
                 }
             }
@@ -146,17 +156,17 @@ impl PduSender {
                     self.sent += 1;
                 } else {
                     self.failed += 1;
-                    self.error = Some(String::from("keine Route zum Ziel"));
+                    self.fail(msg!("keine Route zum Ziel"));
                 }
             }
-            PduProto::Tcp => match os.tcp_connect_from(self.spec.sport, dst, self.spec.dport, SockOpts::default()) {
+            PduProto::Tcp => match os.tcp_connect_from_msg(self.spec.sport, dst, self.spec.dport, SockOpts::default()) {
                 Ok(sock) => {
                     self.conns.push(Conn { sock, left: self.spec.size, shut: false });
                     self.sent += 1;
                 }
                 Err(e) => {
                     self.failed += 1;
-                    self.error = Some(e);
+                    self.fail(e);
                 }
             },
         }
@@ -195,7 +205,7 @@ impl PduSender {
             self.replies += 1;
         } else {
             self.failed += 1;
-            self.error = Some(String::from(end.text()));
+            self.fail(phrase(end.text()));
         }
     }
 }
@@ -229,10 +239,10 @@ impl Service for PduSender {
                             self.dst = Some(ip);
                             self.begin(os);
                         }
-                        None => self.error = Some(format!("„{}“ hat keine IPv4-Adresse", self.spec.dst.trim())),
+                        None => self.fail(msg!("„{}“ hat keine IPv4-Adresse", self.spec.dst.trim())),
                     },
-                    Some(Err(e)) => self.error = Some(format!("„{}“: {}", self.spec.dst.trim(), e.text())),
-                    None => self.error = Some(format!("„{}“: keine Antwort", self.spec.dst.trim())),
+                    Some(Err(e)) => self.fail(msg!("„{}“: {}", self.spec.dst.trim(), phrase(e.text()))),
+                    None => self.fail(msg!("„{}“: keine Antwort", self.spec.dst.trim())),
                 }
             }
             SvcEvent::Timer(K_NEXT) => self.round(os),
@@ -260,15 +270,19 @@ impl Service for PduSender {
         ]
     }
     fn status(&self) -> String {
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
         let what = match self.spec.proto {
             PduProto::Udp => "UDP",
             PduProto::Tcp => "TCP",
         };
-        let to = format!("{} an {}:{}", what, self.spec.dst.trim(), self.spec.dport);
-        match (&self.error, self.dst) {
-            (Some(e), _) if self.sent == 0 => format!("{}: {}", to, e),
-            (_, None) => format!("{}: fragt nach dem Namen …", to),
-            _ => format!("{}: {} gesendet, {} Antworten, {} gescheitert", to, self.sent, self.replies, self.failed),
+        let to = msg!("{} an {}:{}", what, self.spec.dst.trim(), self.spec.dport);
+        let error = self.error_msg.clone().or_else(|| self.error.clone().map(Msg::plain));
+        match (error, self.dst) {
+            (Some(e), _) if self.sent == 0 => msg!("{}: {}", to, e),
+            (_, None) => msg!("{}: fragt nach dem Namen …", to),
+            _ => msg!("{}: {} gesendet, {} Antworten, {} gescheitert", to, self.sent, self.replies, self.failed),
         }
     }
     fn clone_box(&self) -> Box<dyn Service> {

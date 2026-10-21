@@ -23,6 +23,10 @@
 //            statistics, show control-plane host open-ports on IOS (curl and nc are console
 //            programs: services that print to the console and read typed lines)
 //   lab      lbctl, kvctl, cachectl, mqctl, workerctl: the lab's services on the shell
+//   netsvc   DHCP, NTP and the resolver at the command lines: IOS "ip dhcp pool" (its own
+//            mode), "ip dhcp excluded-address", "ip helper-address", show ip dhcp binding|
+//            pool|conflict, clear ip dhcp, "ntp server", "ntp master"; dhclient and cat
+//            /etc/resolv.conf on the shell
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -51,6 +55,7 @@ pub mod ios;
 pub mod iosshow;
 pub mod linux;
 pub mod log;
+pub mod netsvc;
 pub mod print;
 pub mod tools;
 pub mod lab;
@@ -71,6 +76,8 @@ pub enum Mode {
     Line,
     /// logged out: "Console ready, press Enter to log in."
     Out,
+    /// "ip dhcp pool NAME": "(dhcp-config)#"
+    DhcpPool,
 }
 
 /// how an interface's address was set ("show ip interface brief", column Method)
@@ -113,6 +120,8 @@ pub struct DevCfg {
     /// "ip domain-lookup" (IOS looks unknown EXEC words up as host names)
     pub domain_lookup: bool,
     pub boot_errors: Vec<BootErr>,
+    /// DHCP pools without a network yet (the DHCP server takes them with "network")
+    pub pools: Vec<(String, crate::dhcpd::PoolCfg)>,
 }
 
 impl Default for DevCfg {
@@ -125,6 +134,7 @@ impl Default for DevCfg {
             lines: alloc::vec![LineCfg { name: String::from("con 0"), opts: Vec::new() }, LineCfg { name: String::from("vty 0 4"), opts: alloc::vec![String::from("login")] }],
             domain_lookup: true,
             boot_errors: Vec::new(),
+            pools: Vec::new(),
         }
     }
 }
@@ -169,6 +179,8 @@ pub struct CliDev {
     pub vlans: Vec<u16>,
     /// the line block of line mode
     pub line: usize,
+    /// the pool of DHCP pool mode
+    pub pool: String,
     pub job: Option<CliJob>,
     /// lines typed while a command runs
     pub queue: VecDeque<String>,
@@ -193,6 +205,7 @@ impl CliDev {
             ifs: Vec::new(),
             vlans: Vec::new(),
             line: 0,
+            pool: String::new(),
             job: None,
             queue: VecDeque::new(),
             ask: None,
@@ -299,10 +312,10 @@ impl Engine {
             return Err(ActErr::UnknownDevice(dev));
         };
         if n.cli.style == CliStyle::None {
-            return Err(ActErr::Refused(format!("{} hat keine Befehlszeile.", n.name)));
+            return Err(ActErr::Refused(jfn_model::msg!("{} hat keine Befehlszeile.", n.name)));
         }
         if !n.power {
-            return Err(ActErr::Refused(format!("{} ist ausgeschaltet.", n.name)));
+            return Err(ActErr::Refused(jfn_model::msg!("{} ist ausgeschaltet.", n.name)));
         }
         Ok(ni)
     }

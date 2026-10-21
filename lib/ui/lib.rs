@@ -65,7 +65,7 @@ mod data;
 mod datepick;
 mod diagram; // node / edge canvas (diagram.rs)
 pub use diagram::{
-    dg_edge_points, dg_length, dg_paint_grid, dg_point_at, dg_stroke_edge, DEdge, DEv, DHit, DModel, DNode, DPort, DgFrame, DgGeo,
+    dg_edge_points, dg_hairline, dg_length, dg_paint_grid, dg_point_at, dg_stroke_edge, DEdge, DEv, DHit, DModel, DNode, DPort, DgFrame, DgGeo,
     DgPaint, DgRoute, DiagramState, Viewport, DG_CONNECT, DG_PAN, DG_PLACE, DG_SELECT, DN_LOCKED, DN_NOSELECT, DPT_HIDDEN,
     DPT_USED, DR_BEZIER, DR_ORTHO, DR_STRAIGHT,
 };
@@ -190,6 +190,7 @@ pub use vicon::{paint_svg_icon, paint_svg_icon2};
 pub use symbol::{SymPalette, Symbol, SymbolCache, SYM_BODY, SYM_CACHE_MAX_W, SYM_CRIT, SYM_HI, SYM_INK, SYM_OK, SYM_PORT, SYM_ROLES,
     SYM_SCREEN, SYM_SHADE, SYM_TINT, SYM_WARN}; // multi-colour vector symbols (tools/vsym.py)
 pub use theme::color_mix;
+pub use theme::{contrast_ratio, luminance};
 pub use win::Shared; // ui-win: the app's open flags / WINRECTs the library keeps
 // ui-list: the value / colour / list API beside the Ui methods
 pub use color::{hsv_to_rgb, rgb_to_hsv};
@@ -406,6 +407,8 @@ pub struct Ui {
     pub(crate) hc_sys: Option<plat::HcColors>,
     pub(crate) accent_sys: bool,
     pub(crate) anim_forced: bool,
+    /// the system's reduced motion as last applied (set_reduced_motion(None) returns to it)
+    pub(crate) anim_sys: bool,
     pub(crate) text_scale_forced: bool,
     pub(crate) text_scale: u32,
     pub(crate) dbl_ms: u32,

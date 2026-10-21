@@ -27,6 +27,8 @@ use alloc::vec::Vec;
 use core::any::Any;
 
 use base::metrics::Counter;
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 use netpkt::ntp::{self, Ntp as Packet, NtpView, Ts};
 use netpkt::syslog::SEV_NOTICE;
 use netpkt::udp::PORT_NTP;
@@ -286,10 +288,13 @@ impl Service for Ntp {
         ]
     }
     fn status(&self) -> String {
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
         match (self.selected, self.master) {
-            (Some(s), _) => format!("synchronisiert mit {}", s),
-            (None, Some(m)) => format!("eigene Uhr, Stratum {}", m),
-            (None, None) => String::from("nicht synchronisiert"),
+            (Some(s), _) => msg!("synchronisiert mit {}", s),
+            (None, Some(m)) => msg!("eigene Uhr, Stratum {}", m),
+            (None, None) => msg!("nicht synchronisiert"),
         }
     }
     fn clone_box(&self) -> Box<dyn Service> {

@@ -3,6 +3,7 @@
 //   Palette::new(&symbols)      the expanders' states and one drawing per catalog model
 //   frame(n, ui)                the panel's content (a dock panel on the left)
 //
+// The tiles of a category are one Tab stop: the arrows move between them, Enter places.
 // A tile shows the device's symbol and its model name (tooltip: title and ports).  Clicking it
 // arms the canvas for placing (the next click there puts the device; Shift keeps it armed),
 // Enter puts the device into the middle of the view, dragging the tile onto the canvas places
@@ -19,6 +20,7 @@ use jfn_model::catalog::{self, Category, Model};
 use ui::*;
 
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::workspace::canvas::tools::{self, Tool};
 use crate::workspace::icons::{tint_of, Symbols};
@@ -68,17 +70,18 @@ impl Palette {
     }
 }
 
-// the model matches the search (case-insensitive, name or title)
+// the model matches the search (case-insensitive, name or title, German or translated)
 fn matches(m: &Model, q: &str) -> bool {
     let q = q.trim().to_lowercase();
-    q.is_empty() || m.name.to_lowercase().contains(&q) || m.title.to_lowercase().contains(&q) || m.id.contains(&q)
+    let hit = |s: &str| s.to_lowercase().contains(&q);
+    q.is_empty() || hit(m.name) || hit(m.title) || hit(t(m.name)) || hit(t(m.title)) || m.id.contains(&q)
 }
 
 /// the Geräte panel
 pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.box_begin(0, BOX_V | pad(8), 8);
     ui.next_size(-1, 0);
-    ui.textbox_icon(ID_SEARCH, IC_SEARCH, Some("Geräte suchen"), &mut n.palette.search, 64);
+    ui.textbox_icon(ID_SEARCH, IC_SEARCH, Some(t("Geräte suchen")), &mut n.palette.search, 64);
     ui.box_end();
     ui.next_size(-1, -1);
     ui.scroll_begin(ID_PALETTE, SC_V | pad(6));
@@ -92,16 +95,18 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
             continue;
         }
         any = true;
-        let title = format!("{} ({})", cat.title(), models.len());
+        let title = format!("{} ({})", t(cat.title()), models.len());
         let mut open = if searching { 1 } else { n.palette.open[k] };
         let shown = ui.expander_begin(ID_CATEGORY + k as u32, &title, &mut open) != 0;
         if !searching {
             n.palette.open[k] = open;
         }
         if shown {
-            // rows of as many tiles as fit
+            // rows of as many tiles as fit; the tiles of a category are one Tab stop (the
+            // arrows move between them)
             let gap = ui.dp(TILE_GAP);
             let cols = ((ui.box_rect()[2] + gap) / (ui.dp(TILE_W) + gap)).max(1) as usize;
+            ui.focus_group_begin(ID_TILE_GROUP + k as u32);
             ui.box_begin(0, BOX_V, TILE_GAP);
             for row in models.chunks(cols) {
                 ui.box_begin(0, BOX_H, TILE_GAP);
@@ -111,11 +116,12 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
                 ui.box_end();
             }
             ui.box_end();
+            ui.focus_group_end();
         }
         ui.expander_end();
     }
     if !any {
-        ui.empty_state(IC_SEARCH, "Kein Gerät gefunden", "Die Suche prüft Modellnamen und Beschreibungen.");
+        ui.empty_state(IC_SEARCH, t("Kein Gerät gefunden"), t("Die Suche prüft Modellnamen und Beschreibungen."));
     }
     ui.scroll_end();
 }
@@ -152,7 +158,7 @@ fn tile(n: &mut Net, ui: &mut Ui, i: usize) {
     // the name: one line, or two at a space, hyphen or slash
     ui.ts_font(TS_CAPTION);
     let room = r[2] - ui.dp(2);
-    let lines = two_lines(ui, m.name, room);
+    let lines = two_lines(ui, t(m.name), room);
     let line_h = ui.text.ascent() + ui.text.descent();
     let mut y = top + sh + ui.dp(5) + ui.text.ascent();
     let c = ui.color(T_TEXT);
@@ -166,8 +172,8 @@ fn tile(n: &mut Net, ui: &mut Ui, i: usize) {
     }
     let s = ui.last_state();
     ui.last_set(r, s | if armed { SS_CHECKED as u32 } else { 0 });
-    ui.sem(K_BUTTON, id, Some(m.name), 0);
-    ui.tooltip(&if m.groups.is_empty() { String::from(m.title) } else { format!("{} · Ports: {}", m.title, m.summary()) });
+    ui.sem(K_BUTTON, id, Some(t(m.name)), 0);
+    ui.tooltip(&if m.groups.is_empty() { String::from(t(m.title)) } else { tf("{} · Ports: {}", &[t(m.title), &crate::app::tr::msg(&m.summary_msg())]) });
     if ev & EV_ACT != 0 {
         if ui.released() & (1 << BTN_LEFT) == 0 {
             tools::place_centre(n, ui, i); // Enter / Space
@@ -179,7 +185,7 @@ fn tile(n: &mut Net, ui: &mut Ui, i: usize) {
     match ui.drag_source(id, ev) {
         DS_START => {
             let mut d = DragData::of_app(DT_DEVICE, m.id.as_bytes());
-            d.label = String::from(m.name);
+            d.label = String::from(t(m.name));
             d.effects = DE_COPY;
             ui.drag_set(d);
             n.palette.dragging = Some(i);

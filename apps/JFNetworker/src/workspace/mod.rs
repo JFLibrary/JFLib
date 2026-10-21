@@ -8,7 +8,8 @@
 // inspector.rs the Eigenschaften panel, canvas/ the topology, sim/ the simulation mode (the
 // controls, the frames on the canvas, the Ereignisse, Paket and PDUs panels, the pcapng
 // export), icons/ the device symbols and the UI icons; terminal.rs the Terminal panel and the
-// windows of consoles, logview.rs the Protokoll panel, devwin/ the device windows.
+// windows of consoles, logview.rs the Protokoll panel, devwin/ the device windows, settings.rs
+// the dialogs of the settings and the shortcuts.
 
 pub(crate) mod canvas;
 pub(crate) mod devwin;
@@ -16,6 +17,7 @@ pub(crate) mod icons;
 pub(crate) mod inspector;
 pub(crate) mod logview;
 pub(crate) mod palette;
+pub(crate) mod settings;
 pub(crate) mod shell;
 pub(crate) mod terminal;
 pub(crate) mod sim;

@@ -68,6 +68,8 @@ pub enum Owner {
     Svc(u32),
     /// a ping job waiting for its address
     Ping(u32),
+    /// a traceroute job waiting for its address
+    Trace(u32),
 }
 
 /// why a lookup failed
@@ -87,8 +89,9 @@ pub enum LookupErr {
 }
 
 impl LookupErr {
-    /// German words for notes
+    /// German words for notes (the app translates them)
     pub fn text(self) -> &'static str {
+        // i18n
         match self {
             LookupErr::NotFound => "unbekannter Name",
             LookupErr::NoData => "kein passender Eintrag",
@@ -699,6 +702,7 @@ impl Engine {
             Owner::Cli => {}
             Owner::Svc(s) => self.os_push(ni, Job::Ev(s, SvcEvent::Resolved(id))),
             Owner::Ping(job) => self.ping_resolved(job, addr),
+            Owner::Trace(job) => self.trace_resolved(job, addr),
         }
     }
 }
