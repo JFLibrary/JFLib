@@ -33,6 +33,9 @@
 //   LatWindow::new(&window, LAT)       what it says of a latency window (Service::windows): LAT
 //                                      names p50_us, p95_us, p99_us; LatStat a quantile, the
 //                                      mean or the maximum of each interval
+//   LatWindow::raw(&window, stats)     a window of a service's own numbers, not times in ns (a
+//                                      script's metrics.observe): its series keep them as they
+//                                      are, without a unit
 //
 // What a metric becomes: Service::metric_kind (by default metric_kind_of, which goes by the
 // names the built-in services use) makes it a counter, whose series is its rate per second
@@ -115,6 +118,9 @@ pub enum LatStat {
 pub struct LatWindow<'a> {
     pub win: &'a Window,
     pub stats: &'static [(&'static str, LatStat)],
+    /// the window holds the service's own numbers, not nanoseconds: its series keep them as
+    /// they are, without a unit (a script's metrics.observe)
+    pub raw: bool,
 }
 
 /// the series most latency windows make
@@ -122,7 +128,11 @@ pub const LAT: &[(&str, LatStat)] = &[("p50_us", LatStat::Quantile(500)), ("p95_
 
 impl<'a> LatWindow<'a> {
     pub fn new(win: &'a Window, stats: &'static [(&'static str, LatStat)]) -> LatWindow<'a> {
-        LatWindow { win, stats }
+        LatWindow { win, stats, raw: false }
+    }
+    /// a window of numbers that are not times in ns (they become series as they are)
+    pub fn raw(win: &'a Window, stats: &'static [(&'static str, LatStat)]) -> LatWindow<'a> {
+        LatWindow { win, stats, raw: true }
     }
 }
 
@@ -190,7 +200,8 @@ impl Unit {
 fn unit_of(name: &str, kind: SeriesKind) -> Unit {
     let bytes = name == "bytes" || name.starts_with("bytes_") || name.ends_with("_bytes");
     match kind {
-        SeriesKind::Lat(_) => Unit::Us,
+        SeriesKind::Lat(_) if name.ends_with("_us") => Unit::Us,
+        SeriesKind::Lat(_) => Unit::Count,
         SeriesKind::Rate if bytes => Unit::BytesPerSec,
         SeriesKind::Rate if name.ends_with("_ms") => Unit::MsPerSec,
         SeriesKind::Rate => Unit::PerSec,
@@ -619,7 +630,7 @@ fn sample_service(rec: &mut Rec, svc: &dyn Service, from: Ns, to: Ns, stamp: u64
     for w in &wins {
         let h = w.win.hist_between(from, to);
         for &(name, stat) in w.stats {
-            let v = lat_of(&h, stat).map(|ns| (ns / 1000) as i64);
+            let v = lat_of(&h, stat).map(|x| if w.raw { x.min(i64::MAX as u64) as i64 } else { (x / 1000) as i64 });
             rec.slot(&mut hint, name, SeriesKind::Lat(stat), base).put(v, stamp, base, keep);
         }
     }
@@ -734,8 +745,9 @@ impl Engine {
                 if lo < oldest {
                     return Err(SeriesErr::Gone);
                 }
-                // ns are thousandths of µs
-                lat_of(&w.win.hist_between(lo, hi), stat).ok_or(SeriesErr::NoValues)? as i128
+                // ns are thousandths of µs; a raw window's numbers are the unit itself
+                let q = lat_of(&w.win.hist_between(lo, hi), stat).ok_or(SeriesErr::NoValues)? as i128;
+                if w.raw { q * 1000 } else { q }
             }
             (Agg::Natural | Agg::Mean, _) => milli(vals.iter().sum::<i128>()) / n,
             (Agg::Min, _) => milli(vals.iter().copied().min().unwrap_or(0)),

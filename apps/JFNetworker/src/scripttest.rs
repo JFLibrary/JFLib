@@ -4,7 +4,7 @@
 // UDP, TCP servers and clients (also a character split between segments), HTTP servers (the
 // answer of a returned value, 500 after an error, 503 when the queue is full, the plan's
 // example with its disk and cache) and http.request, dns.resolve, the disk with its access
-// times and capacity, metrics, an endless loop as 100 % CPU while the simulation goes on, the
+// times and capacity, metrics and their time series, an endless loop as 100 % CPU while the simulation goes on, the
 // limits (fuel, heap, depth), errors with line and column in status, log and trace,
 // stop_on_error, a failed start and a restart, the shell's script command and top,
 // definitions and their refusals, the English of the texts, determinism (twice, and a clone in
@@ -25,7 +25,7 @@ use core::any::Any;
 use agent_core::jmap::Value as Json;
 use jfn_model::project::{PortRef, Project, ServiceDef};
 use jfn_sim::node::port_mac;
-use jfn_sim::{Action, Engine, Metric, Note, OsApi, Report, ScriptService, ScriptState, Service, SvcEvent, MS, SEC, US};
+use jfn_sim::{Action, Engine, LatStat, Metric, Note, OsApi, Report, ScriptService, ScriptState, SeriesKind, Service, SvcEvent, MS, SEC, US};
 use netpkt::{Ipv4, Mac, Prefix4};
 use script::{Cx, ErrorKind, Fail, Host, Limits, Pin, Status, Value, Vm};
 
@@ -327,6 +327,7 @@ pub fn run(t: &mut T) {
     dns(t);
     disk(t);
     metrics(t);
+    series(t);
     endless(t);
     limits(t);
     errors(t);
@@ -660,6 +661,21 @@ fn metrics(t: &mut T) {
     // after five minutes the window is empty
     run_to(&mut e, 302 * SEC);
     t.eq("metrics: the window moves on", metric(&e, h[0], "m", "lat_count"), 0);
+}
+
+const SERIES: &str = "let n = 0\ntimer.every(100, fn() { n += 1; metrics.inc(\"ticks\"); metrics.gauge(\"level\", n); metrics.observe(\"lat\", 2000) })";
+
+// the time series (series.rs) know what the script's numbers are: inc a rate, gauge a level,
+// observe the quantiles of each second and its count of five minutes; of the service's own
+// the CPU time is a rate, the timers a level
+fn series(t: &mut T) {
+    let (mut e, h) = net(1);
+    t.check("series: service", script(&mut e, h[0], "s", SERIES, ""));
+    run_to(&mut e, 5 * SEC + 500 * MS);
+    let at5 = |n: &str| e.series_one(h[0], "s", n).and_then(|v| v.points.iter().find(|p| p.0 == 5 * SEC).map(|p| p.1));
+    t.eq("series: rate, level, quantile, maximum", (at5("ticks"), at5("level"), at5("lat_p50"), at5("lat_max"), at5("lat_count")), (Some(10), Some(49), Some(2000), Some(2000), Some(49)));
+    let kind = |n: &str| e.series_one(h[0], "s", n).map(|v| v.kind);
+    t.eq("series: kinds", (kind("ticks"), kind("level"), kind("lat_p99"), kind("busy_us"), kind("timers")), (Some(SeriesKind::Rate), Some(SeriesKind::Gauge), Some(SeriesKind::Lat(LatStat::Quantile(990))), Some(SeriesKind::Rate), Some(SeriesKind::Gauge)));
 }
 
 const LOOP: &str = "timer.after(1, fn() { while true { } })\nnet.udp(7, fn(s, m) { s.send(m.from, m.port, m.data) })";

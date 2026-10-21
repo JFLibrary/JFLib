@@ -44,7 +44,10 @@
 //                        access times and capacity); they outlive restarts and power cycles
 //   metrics.inc(name, n), metrics.gauge(name, v), metrics.observe(name, v)   numbers of
 //                        Service::metrics (expect DEV svc NAME metric X); observe gives
-//                        NAME_count, NAME_p50, NAME_p95, NAME_p99, NAME_max over five minutes
+//                        NAME_count, NAME_p50, NAME_p95, NAME_p99, NAME_max over five minutes;
+//                        in the time series (series.rs) inc is a rate, gauge a level, and
+//                        observe's quantiles and maximum those of each interval (the first
+//                        call of a name decides its kind)
 //   json.encode / json.decode   the standard library, as everything else not listed here
 // Data arrives as str (UTF-8; a character split between segments waits for its rest), with
 // binary: true as bytes; send takes str or bytes.  Errors reach callbacks as German text.
@@ -89,6 +92,7 @@ use script::{num, Cx, ErrorKind, Fail, Limits, Pin, Program, Ref, Status, TraceL
 use crate::http::{Agent, Done, Reply, Req, ReqIn, Resp, Serve, ServeCfg, Url, Wheel};
 use crate::kernel::{Engine, Ns, MS, SEC, US};
 use crate::os::{Dgram, Metric, OsApi, Service, SvcEvent};
+use crate::series::{metric_kind_of, LatStat, LatWindow, MetricKind};
 use crate::tcp::{SockOpts, TcpEnd};
 use crate::trace::{HopId, Note};
 
@@ -220,6 +224,8 @@ enum UVal {
 #[derive(Clone)]
 struct UMetric {
     name: &'static str,
+    /// what the time series make of a number: a rate (inc) or a level (gauge)
+    kind: MetricKind,
     v: UVal,
 }
 
@@ -581,6 +587,20 @@ fn intern(name: &str) -> Option<&'static str> {
     let s: &'static str = Box::leak(String::from(name).into_boxed_str());
     set.insert(s);
     Some(s)
+}
+
+static STATS: rt::sync::SpinLock<BTreeMap<&'static str, &'static [(&'static str, LatStat)]>> = rt::sync::SpinLock::new(BTreeMap::new());
+
+/// what the time series take of an observed histogram (Service::windows): its p50, p95, p99
+/// and maximum of each interval, kept once per name like the names (at most NAMES_MAX / 5)
+fn lat_stats(n: &[&'static str; 5]) -> &'static [(&'static str, LatStat)] {
+    let mut map = STATS.lock();
+    if let Some(s) = map.get(n[1]) {
+        return s;
+    }
+    let s: &'static [(&'static str, LatStat)] = Box::leak(Box::new([(n[1], LatStat::Quantile(500)), (n[2], LatStat::Quantile(950)), (n[3], LatStat::Quantile(990)), (n[4], LatStat::Max)]));
+    map.insert(n[1], s);
+    s
 }
 
 /// fuel as CPU time
@@ -1093,7 +1113,8 @@ impl Api<'_, '_> {
                 } else {
                     UVal::Num(0)
                 };
-                self.book.metrics.push(UMetric { name: nm, v });
+                let kind = if name == "metrics.gauge" { MetricKind::Gauge } else { MetricKind::Counter };
+                self.book.metrics.push(UMetric { name: nm, kind, v });
                 self.book.metrics.len() - 1
             }
         };
@@ -2269,6 +2290,29 @@ impl Service for ScriptService {
     }
     fn metrics(&self) -> Vec<Metric> {
         self.metrics_at(self.seen)
+    }
+    fn metric_kind(&self, name: &str) -> MetricKind {
+        // the script's own: inc counts, gauge is a level, an observed histogram's count is the
+        // level of its last five minutes (its quantiles come from windows()); of the service's
+        // numbers the CPU time only grows, timers, connections and the heap are levels
+        for u in &self.book.metrics {
+            match &u.v {
+                UVal::Num(_) if u.name == name => return u.kind,
+                UVal::Hist(_, n) if n[0] == name => return MetricKind::Gauge,
+                _ => {}
+            }
+        }
+        match name {
+            "busy_us" | "fuel" => MetricKind::Counter,
+            "timers" | "conns" | "heap_kb" => MetricKind::Gauge,
+            n => metric_kind_of(n),
+        }
+    }
+    fn windows(&self) -> Vec<LatWindow<'_>> {
+        self.book.metrics.iter().filter_map(|u| match &u.v {
+            UVal::Hist(w, n) => Some(LatWindow::raw(w, lat_stats(n))),
+            UVal::Num(_) => None,
+        }).collect()
     }
     fn metrics_at(&self, now: Ns) -> Vec<Metric> {
         let mut m = self.own_metrics(now);
