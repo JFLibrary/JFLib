@@ -1603,6 +1603,60 @@ self.dock.focus(P_PROPS);
 `donut(id, &[DonutSlice], center, sub)` and `legend(items)`; colours 0 take the style's chart
 palette.
 
+**Line charts** of time series (metrics, measurements): the app keeps each series in a
+`SeriesBuf` (a ring of `(t, value)` points with a capacity; a full one drops its oldest point)
+and describes the chart every frame:
+
+```rust
+// state: p50, p95: SeriesBuf (SeriesBuf::new(1200)), faults: Vec<(f64, &'static str)>
+self.p50.push(t, 0.012); // t in s, never decreasing; the value in s; f64::NAN is a gap
+let series = [
+    LcSeries::new("p50", &self.p50).unit(LcUnit::Secs),
+    LcSeries::new("p95", &self.p95).pal(3).unit(LcUnit::Secs),
+];
+let crit = ui.color(T_CRIT);
+let marks: Vec<LcMarker> = self.faults.iter().map(|f| LcMarker::line(f.0, f.1).color(crit)).collect();
+let slo = [LcThreshold::new(0.25, "SLO 250 ms")];
+let chart = LineChart::new(&series).name("Latenz").follow(60.0).y_range(0.0, f64::NAN).markers(&marks).thresholds(&slo);
+ui.next_size(-1, 240); // the plot with its axes and the legend below it
+if let Some((i, t)) = ui.line_chart(ID_LATENCY, &chart) {
+    // the pointer is over series i at its point t
+}
+```
+
+* The x axis: `LX_SECS` (the default) and `LX_NANOS` (a simulation clock) label time as `0:05`,
+  `1:00`, `1:30` (`1:00:00` from an hour on, decimals of the second below one), `LX_NUM` plain
+  numbers. `follow(span)` shows the newest `span` (from the first point on while the data are
+  shorter), `x_range(a, b)` a fixed view: to pause, keep `chart.view()` and pass it.
+* The y axis has nice ticks (1 / 2 / 2.5 / 5 × 10^k) in the first series' unit:
+  `LcUnit::Secs` (ns / µs / ms / s), `LcUnit::Si("B")` (kB, MB, GB; `"bit/s"`),
+  `LcUnit::Num("req/s")` (1,5k req/s; `"%"`; `""` plain numbers). A NaN end of `y_range` is
+  automatic (the visible values and the thresholds, out to the next tick).
+  `unit.text(v, ui.decimal_sep())` writes a value as the chart does (KPI tiles beside it).
+* Series are lines, `.area()` adds a translucent fill; colour 0 takes the palette colour
+  `.pal(k)`, else the series' index. Markers are lines (`LcMarker::line`) or shaded ranges
+  (`LcMarker::range`) with a tag at the top, thresholds dashed lines with a tag at their right
+  end. Tags never overlap: a marker's tag takes the first of up to three rows with room, else it
+  is left out (the hover card lists the markers under the pointer with their time).
+* Hovering shows a crosshair at the nearest point, a dot on every series and a card with every
+  series' value there. The chart returns the series nearest to the pointer and that x, and
+  passes once more when they change, so a readout above the chart is current. The keyboard:
+  the plot is a Tab stop; Left / Right step a cursor over the points of its series, Up / Down
+  change the series, Home / End, Esc ends it (a click puts it on the point under the pointer);
+  crosshair and card follow the cursor, and the chart's record starts with its point
+  ("p95, 1:45: 88,1 ms. Latenz – ..."), so a screen reader reads the values one by one.
+* Many points: up to two per pixel column the points themselves are drawn, more as one band per
+  column (`SeriesBuf::columns`: min / max per pixel column), so 100 000 points cost little
+  more than 500. The statistics and the drawing object are kept per id until a series' `ver()`
+  or the view changes.
+* No points at all: the `empty` text (default "Keine Daten" in the UI language). High contrast:
+  the scheme's colours with a dash pattern per series (also in the legend), no fills. The plot
+  keeps its left-to-right order in mirrored windows; the legend is mirrored. Screen readers get
+  a `K_CANVAS` record whose label sums the chart up ("Latenz – p50: aktuell 12 ms, min. 9,8 ms,
+  max. 41 ms; ..."); axis labels, tags and the card's rows are `K_TEXT` records.
+* Testing: the page "Metriken" of `apps/datagallery` (`tests/linechart.uis`,
+  `linechart_hc.uis`); `uitest --only chart` checks the ring and the axis maths.
+
 **Languages**: `ui::i18n::Catalog::from_tsv(include_str!("locales/ui.tsv"))` and
 `i18n::set_catalog` give an app a German-source catalogue of its own (BackupCraft:
 `src/tr.rs`); `i18n::t(s)` reads it. The column follows the user's languages: at start

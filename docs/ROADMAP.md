@@ -709,6 +709,17 @@ Fensterrand hinaus.
   Schlüssel der Markierung unter dem Klick, Strg+C als Hex, Tooltip mit Offset; beide bleiben
   in RTL-Fenstern links → rechts. Getestet mit `datagallery/tests/timeline.uis`,
   `hexview.uis`, `simulation.uis` (hell, dunkel, 150 %).
+- **P2** · *erledigt* · Liniendiagramm für Zeitreihen ([`ui/chart.rs`](../lib/ui/chart.rs)
+  `line_chart` / `SeriesBuf`, L5 für das Verteilte-Systeme-Labor von JFNetworker): Ringpuffer
+  mit Kapazität (Lücken als NaN, Binärsuche, Spalten mit Min/Max je Pixel, sodass 100 000
+  Punkte so schnell gezeichnet werden wie 500), mehrere Serien als Linie oder Fläche, x als
+  Zeit (Sekunden oder Nanosekunden, Beschriftung 0:05 / 1:00 / 1:30) oder Zahl, y mit
+  „schönen“ Schritten und Einheiten (ms / µs, req/s, %, Bytes mit k / M / G), Bereich fest
+  oder automatisch, Raster, Legende, Fadenkreuz mit Karte aller Werte, Markierungen (Linien
+  und Bereiche: Fehlerinjektionen) und Schwellwerte mit Etiketten, die sich nie überdecken,
+  „Live folgen“, Leerzustand, Zusammenfassung für Screenreader; hoher Kontrast mit Strichmustern,
+  in RTL-Fenstern links → rechts. Getestet mit `datagallery/tests/linechart.uis`,
+  `linechart_hc.uis` und `uitest --only chart`.
 
 ## 7. App-Framework und Architektur
 
