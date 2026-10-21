@@ -2602,6 +2602,54 @@ let text = self.code.text();
   beyond 64 KB it holds the visible lines. Mouse tests need `wait 1000` between clicks on the
   same editor, else they count as a double click.
 
+**Diagnostics** (a checker's or compiler's messages) belong to the document:
+
+```rust
+// after a change (or a pause in typing): lines and columns from 1 as compilers print them
+if ui.code_editor(ID_CODE, &mut self.code, &self.hl, CE_MARKS) & EV_ACT != 0 {
+    let d: Vec<Diag> = script::check(&self.code.text()).iter()
+        .map(|x| Diag::new(x.line as usize, x.col as usize, x.end_col as usize,
+                           if x.error { DIAG_ERROR } else { DIAG_WARNING }, &x.msg))
+        .collect();
+    self.code.set_diagnostics(&d);
+    ui.repass();                       // the editor drew the old ones in this pass
+}
+let st = ui.code_status(ID_CODE);      // st.diags: errors / warnings / infos, st.diag: at the caret
+if let Some(d) = ui.code_diag(ID_CODE) { self.status = format!("{}:{}: {}", d.line, d.col, d.msg); }
+```
+
+* `Diag::new(line, col, end_col, severity, msg)` marks a part of a line (`Diag::span` one over
+  lines); columns count characters (a tab is one), the end is exclusive, an end at or before
+  the start marks one character, a column past the line's end its end. Severities
+  `DIAG_ERROR`, `DIAG_WARNING`, `DIAG_INFO`. The positions are those of the text as it is
+  when they are set (a check on another thread: drop its result when `doc.revision()` changed
+  meanwhile).
+* The editor draws wavy underlines in the severity's colour (`CodeTheme::diag`; `code_theme()`
+  takes the UI's critical / warning / info colours) and, on the line where one starts, a
+  marker in a gutter column of their own: a filled circle with a cross, a triangle, an "i" --
+  shapes, so high contrast and colour-blind readers tell them apart. The column is there while
+  the document has diagnostics; `CE_MARKS` keeps it, so the text does not move when they come
+  and go. The pointer over an underline or a marker shows the messages as a tooltip
+  ("Fehler: …", most severe first); F8 / Shift+F8 move the caret to the next / previous one
+  (round the end; without diagnostics F8 stays the window's key for the splitters); the ones at
+  the caret are also a `K_TEXT` record at its line for screen readers.
+* They follow the edits (typing, Enter, deleting, block indent, comments, moved lines, undo /
+  redo) until the app sets new ones: text before a change keeps its place, text after it
+  shifts, a diagnostic whose text was replaced shrinks to what is left of it and is dropped
+  when nothing is, typed text at its edges stays outside. So a check may come later (after a
+  pause in typing) without squiggles sliding off their words. Where they are now:
+  `diagnostics()` / `diagnostic(i)` (a problems list), `diagnostics_at(pos)`,
+  `next_diagnostic(pos, back)`, `diagnostic_counts()`.
+* Only the visible lines' diagnostics are drawn, an underline is one command however long it
+  is: 100 000 lines with 13 000 diagnostics scroll and edit at the speed of a short file
+  (`apps/editortest/tests/code_diag.uis`: hover, F8, edits, checking while typing, shots).
+* `Highlighter::jfs()` (`for_name("x.jfs")`) highlights lib/script's language: keywords,
+  `true` / `false` / `nil`, numbers (`1_000`, `0xFF`, `0b101`, `1.5e-3`), `//` and `/* */`,
+  strings with escapes and `${…}` whose code is highlighted too (the delimiters are `SY_META`,
+  so their braces match as a bracket pair). A grammar of one's own gets such strings with
+  `Rule::Interp { open, close, start }`. `editortest --test model` compares it token by token
+  with `script::tokens`.
+
 ## 29. Scripts: `script` (compiler and VM)
 
 [`lib/script`](../lib/script/lib.rs) runs JFNetworker's `.jfs` scripts: `compile` turns the

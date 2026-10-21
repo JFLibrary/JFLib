@@ -16,14 +16,28 @@
 //   tab_width (1..16, default 4), use_tabs (indent with tabs instead of blanks)
 //   col_of(line, byte) / byte_at_col(line, col)   visual columns (tabs to the next stop,
 //   wide East Asian characters two)
+//   diagnostics (a checker's or compiler's messages, drawn by the editor):
+//     set_diagnostics(&[Diag]) / clear_diagnostics() / diagnostics() -> Vec<Diag> /
+//     diagnostic(i) / diagnostic_count() / diagnostic_counts() -> [errors, warnings, infos] /
+//     diagnostics_at(pos) (most severe first) / next_diagnostic(pos, back) (wrapping)
 //
 // An edit replaces a range of whole lines (LineEdit: old and new lines, the selection before
 // and after); each change is also kept in a short journal (changes_since) that the editor's
 // highlighting states and the find results follow without starting again from the top.
+//
+// Diagnostics follow every change of the text (edits, undo, redo) until the app sets new
+// ones: when lines change, the old and new lines are compared -- the same number of lines
+// line by line (one line moved by Alt+Up / Down: as a move), else as one replaced part from
+// the first to the last difference.  Text before a change keeps its positions, text after it
+// shifts; a diagnostic whose text was replaced shrinks to what is left of it and is dropped
+// when nothing is (one that marks a point stays at the change).  Typed text at a diagnostic's
+// edge stays outside it.  So squiggles stay under their words while the user types, until
+// the next check replaces them.
 
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::ops::Range;
 
 use text::segment;
 
@@ -56,16 +70,69 @@ pub struct LineChange {
 
 const JOURNAL_MAX: usize = 256;
 
-/// the content an edit changes: the lines, the selection and the change journal
+/// Diag::severity: an error
+pub const DIAG_ERROR: u8 = 0;
+/// a warning
+pub const DIAG_WARNING: u8 = 1;
+/// a note, a hint (higher values count as this too)
+pub const DIAG_INFO: u8 = 2;
+
+/// a diagnostic of a code editor: a part of the text in lines and columns from 1 as compilers
+/// report them (columns count characters, a tab is one; the end is exclusive, an end at or
+/// before the start marks the one character at the start, past a line's end the end of the
+/// line), a severity DIAG_* and the message (see the module header)
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Diag {
+    /// where it starts (from 1)
+    pub line: usize,
+    pub col: usize,
+    /// where it ends (exclusive)
+    pub end_line: usize,
+    pub end_col: usize,
+    /// DIAG_ERROR, DIAG_WARNING, DIAG_INFO
+    pub severity: u8,
+    pub msg: String,
+}
+
+impl Diag {
+    /// a part of one line: line:col .. line:end_col
+    pub fn new(line: usize, col: usize, end_col: usize, severity: u8, msg: &str) -> Diag {
+        Diag { line, col, end_line: line, end_col, severity, msg: String::from(msg) }
+    }
+
+    /// line:col .. end_line:end_col
+    pub fn span(line: usize, col: usize, end_line: usize, end_col: usize, severity: u8, msg: &str) -> Diag {
+        Diag { line, col, end_line, end_col, severity, msg: String::from(msg) }
+    }
+}
+
+// a diagnostic in the document: a .. b (a == b: the character at a), severity, message
+#[derive(Clone, Debug)]
+pub(crate) struct Mark {
+    pub(crate) a: TextPos,
+    pub(crate) b: TextPos,
+    pub(crate) sev: u8,
+    pub(crate) msg: String,
+}
+
+/// the content an edit changes: the lines, the selection, the change journal and the
+/// diagnostics that follow the changes
 pub(crate) struct CodeBody {
     lines: Vec<String>,
     sel: TextSel,
     rev: u64,
     journal: Vec<LineChange>,
+    // sorted by position; the most lines one of them spans; how many per severity
+    marks: Vec<Mark>,
+    span: usize,
+    counts: [usize; 3],
 }
 
 impl CodeBody {
     fn splice(&mut self, first: usize, old: usize, new: &[String]) {
+        if !self.marks.is_empty() {
+            self.follow(first, old, new);
+        }
         self.lines.splice(first..first + old, new.iter().cloned());
         if self.lines.is_empty() {
             self.lines.push(String::new());
@@ -76,6 +143,189 @@ impl CodeBody {
         }
         self.journal.push(LineChange { rev: self.rev, first, old, new: new.len() });
     }
+
+    // the diagnostics follow lines first .. first + old becoming `new` (the lines still hold
+    // the old text; see the module header)
+    fn follow(&mut self, first: usize, old: usize, new: &[String]) {
+        let o = &self.lines[first..first + old];
+        let c = o.len();
+        let f = if o.is_empty() || new.is_empty() {
+            None
+        } else if c == new.len() && c > 1 && new[..c - 1] == o[1..] && new[c - 1] == o[0] {
+            Some(Follow::Turn(false))
+        } else if c == new.len() && c > 1 && new[1..] == o[..c - 1] && new[0] == o[c - 1] {
+            Some(Follow::Turn(true))
+        } else if c == new.len() {
+            let each = o.iter().zip(new).map(|(a, b)| (a != b).then(|| moved(core::slice::from_ref(a), core::slice::from_ref(b))));
+            Some(Follow::Lines(each.collect()))
+        } else {
+            Some(Follow::One(moved(o, new)))
+        };
+        let d = new.len() as isize - c as isize;
+        let marks = core::mem::take(&mut self.marks);
+        self.marks = marks
+            .into_iter()
+            .filter_map(|mut m| {
+                let point = m.a == m.b;
+                match &f {
+                    Some(f) => {
+                        m.a = f.pos(first, c, m.a, if point { AT_POINT } else { AT_START });
+                        m.b = if point { m.a } else { f.pos(first, c, m.b, AT_END) };
+                    }
+                    None => {
+                        // (no lines on one side) the block's diagnostics go, later ones move
+                        if [m.a, m.b].iter().any(|p| p.line >= first && p.line < first + c) {
+                            return None;
+                        }
+                        for p in [&mut m.a, &mut m.b] {
+                            if p.line >= first + c {
+                                p.line = (p.line as isize + d) as usize;
+                            }
+                        }
+                    }
+                }
+                (point || m.a < m.b).then_some(m)
+            })
+            .collect();
+        self.marks.sort_by(|x, y| (x.a, x.b).cmp(&(y.a, y.b)));
+        self.recount();
+    }
+
+    // the counts and the longest span after the diagnostics changed
+    fn recount(&mut self) {
+        self.counts = [0; 3];
+        self.span = 0;
+        for m in &self.marks {
+            self.counts[m.sev.min(DIAG_INFO) as usize] += 1;
+            self.span = self.span.max(m.b.line - m.a.line);
+        }
+    }
+
+    // the marks that may touch lines first .. last: those starting from first - span on
+    fn mark_range(&self, first: usize, last: usize) -> Range<usize> {
+        let lo = self.marks.partition_point(|m| m.a.line + self.span < first);
+        let hi = self.marks.partition_point(|m| m.a.line < last);
+        lo..hi.max(lo)
+    }
+}
+
+// what a position of a diagnostic is when it follows a change: its start, its end, a point
+const AT_START: u8 = 0;
+const AT_END: u8 = 1;
+const AT_POINT: u8 = 2;
+
+// a change of a block of lines as the positions see it (block-relative: line 0 is the first
+// changed line)
+enum Follow {
+    // one replaced part
+    One(Moved),
+    // as many lines as before, each changed by itself (None: unchanged)
+    Lines(Vec<Option<Moved>>),
+    // the lines turned by one (Alt+Up / Down): the last to the front (true), the first to the end
+    Turn(bool),
+}
+
+impl Follow {
+    // where position q (absolute) goes; c: the lines of the block before
+    fn pos(&self, first: usize, c: usize, q: TextPos, at: u8) -> TextPos {
+        if q.line < first {
+            return q;
+        }
+        let k = q.line - first;
+        match self {
+            Follow::One(m) => {
+                let r = m.at(TextPos::new(k, q.byte), at);
+                TextPos::new(r.line + first, r.byte)
+            }
+            Follow::Lines(v) => match v.get(k) {
+                Some(Some(m)) => TextPos::new(q.line, m.at(TextPos::new(0, q.byte), at).byte),
+                _ => q,
+            },
+            Follow::Turn(down) if k < c => TextPos::new(first + if *down { (k + 1) % c } else { (k + c - 1) % c }, q.byte),
+            Follow::Turn(_) => q,
+        }
+    }
+}
+
+// one replaced part: old [p, os) became new [p, ns) (block-relative)
+#[derive(Clone, Copy)]
+struct Moved {
+    p: TextPos,
+    os: TextPos,
+    ns: TextPos,
+}
+
+impl Moved {
+    // before the part a position stays, after it it shifts; inside it a start goes behind the
+    // new text, an end and a point to its front
+    fn at(&self, q: TextPos, at: u8) -> TextPos {
+        match at {
+            AT_END if q <= self.p => q,
+            AT_END if q <= self.os => self.p,
+            _ if q < self.p => q,
+            AT_START if q < self.os => self.ns,
+            AT_POINT if q < self.os => self.p,
+            _ => self.shift(q),
+        }
+    }
+
+    // q at or after the old part's end
+    fn shift(&self, q: TextPos) -> TextPos {
+        if q.line == self.os.line {
+            TextPos::new(self.ns.line, self.ns.byte + (q.byte - self.os.byte))
+        } else {
+            TextPos::new(q.line - self.os.line + self.ns.line, q.byte)
+        }
+    }
+}
+
+// lines o became lines n: one replaced part from the first difference to the last (the common
+// end does not reach into the common start)
+fn moved(o: &[String], n: &[String]) -> Moved {
+    let m = o.len().min(n.len());
+    let mut k = 0;
+    while k < m && o[k] == n[k] {
+        k += 1;
+    }
+    let p = if k < m {
+        TextPos::new(k, common_prefix(&o[k], &n[k]))
+    } else if k > 0 {
+        TextPos::new(k - 1, o[k - 1].len())
+    } else {
+        TextPos::new(0, 0)
+    };
+    let (mut ol, mut nl) = (o.len() - 1, n.len() - 1);
+    while ol > p.line && nl > p.line && o[ol] == n[nl] {
+        ol -= 1;
+        nl -= 1;
+    }
+    let lo = if ol == p.line { p.byte } else { 0 };
+    let ln = if nl == p.line { p.byte } else { 0 };
+    let s = common_suffix(&o[ol], &n[nl], (o[ol].len() - lo).min(n[nl].len() - ln));
+    Moved { p, os: TextPos::new(ol, o[ol].len() - s), ns: TextPos::new(nl, n[nl].len() - s) }
+}
+
+// the bytes a and b start with alike (up to a character boundary)
+fn common_prefix(a: &str, b: &str) -> usize {
+    let mut k = a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count();
+    while !(a.is_char_boundary(k) && b.is_char_boundary(k)) {
+        k -= 1;
+    }
+    k
+}
+
+// the bytes a and b end with alike, at most max (from a character boundary)
+fn common_suffix(a: &str, b: &str, max: usize) -> usize {
+    let mut k = a.bytes().rev().zip(b.bytes().rev()).take(max).take_while(|(x, y)| x == y).count();
+    while !(a.is_char_boundary(a.len() - k) && b.is_char_boundary(b.len() - k)) {
+        k -= 1;
+    }
+    k
+}
+
+// the byte of character column c (from 0) of t; past its end the end
+fn byte_of_char(t: &str, c: usize) -> usize {
+    t.char_indices().nth(c).map_or(t.len(), |(i, _)| i)
 }
 
 struct LineEdit {
@@ -180,7 +430,8 @@ impl CodeDoc {
         }
         static NEXT: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(1);
         let uid = NEXT.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-        CodeDoc { body: CodeBody { lines, sel: TextSel::default(), rev: 0, journal: Vec::new() }, hist: History::new(1000), uid, tab_width: 4, use_tabs: false }
+        let body = CodeBody { lines, sel: TextSel::default(), rev: 0, journal: Vec::new(), marks: Vec::new(), span: 0, counts: [0; 3] };
+        CodeDoc { body, hist: History::new(1000), uid, tab_width: 4, use_tabs: false }
     }
 
     /// the text: the lines joined by '\n'
@@ -776,6 +1027,102 @@ impl CodeDoc {
         let c = self.clamp(self.body.sel.caret);
         self.body.sel = TextSel::at(c);
         count
+    }
+
+    // ------------------------------------------------------------------ diagnostics
+
+    /// replace the diagnostics (Diag positions, clamped to the text); from now on they follow
+    /// the edits until the next call (see the module header)
+    pub fn set_diagnostics(&mut self, d: &[Diag]) {
+        let lines = &self.body.lines;
+        let pos = |line: usize, col: usize| -> TextPos {
+            match lines.get(line.max(1) - 1) {
+                Some(t) => TextPos::new(line.max(1) - 1, byte_of_char(t, col.max(1) - 1)),
+                None => TextPos::new(lines.len() - 1, lines[lines.len() - 1].len()),
+            }
+        };
+        let mut v: Vec<Mark> = d
+            .iter()
+            .map(|x| {
+                let a = pos(x.line, x.col);
+                Mark { a, b: pos(x.end_line, x.end_col).max(a), sev: x.severity.min(DIAG_INFO), msg: x.msg.clone() }
+            })
+            .collect();
+        v.sort_by(|x, y| (x.a, x.b).cmp(&(y.a, y.b)));
+        self.body.marks = v;
+        self.body.recount();
+    }
+
+    /// no diagnostics
+    pub fn clear_diagnostics(&mut self) {
+        self.body.marks.clear();
+        self.body.recount();
+    }
+
+    /// the diagnostics where they are now, by position
+    pub fn diagnostics(&self) -> Vec<Diag> {
+        self.body.marks.iter().map(|m| self.diag_of(m)).collect()
+    }
+
+    /// the number of diagnostics
+    pub fn diagnostic_count(&self) -> usize {
+        self.body.marks.len()
+    }
+
+    /// diagnostic i (0 .. diagnostic_count(), by position) where it is now
+    pub fn diagnostic(&self, i: usize) -> Option<Diag> {
+        self.body.marks.get(i).map(|m| self.diag_of(m))
+    }
+
+    /// the number of errors, warnings and infos (DIAG_* order)
+    pub fn diagnostic_counts(&self) -> [usize; 3] {
+        self.body.counts
+    }
+
+    /// the diagnostics at p (their part holds p, its end included; a point: its character),
+    /// most severe first
+    pub fn diagnostics_at(&self, p: TextPos) -> Vec<Diag> {
+        self.marks_at(p).into_iter().map(|i| self.diag_of(&self.body.marks[i])).collect()
+    }
+
+    /// the start of the first diagnostic after p (back: the last one before p), round the end
+    /// of the text; None without diagnostics
+    pub fn next_diagnostic(&self, p: TextPos, back: bool) -> Option<TextPos> {
+        let m = &self.body.marks;
+        let last = m.last()?;
+        Some(if back {
+            let k = m.partition_point(|x| x.a < p);
+            if k == 0 { last.a } else { m[k - 1].a }
+        } else {
+            m.get(m.partition_point(|x| x.a <= p)).map_or(m[0].a, |x| x.a)
+        })
+    }
+
+    // (code_edit.rs) the diagnostics by position
+    pub(crate) fn marks(&self) -> &[Mark] {
+        &self.body.marks
+    }
+
+    // (code_edit.rs) the indexes of the diagnostics that may touch lines first .. last
+    pub(crate) fn mark_range(&self, first: usize, last: usize) -> Range<usize> {
+        self.body.mark_range(first, last)
+    }
+
+    // (code_edit.rs) the indexes of the diagnostics at p, most severe first
+    pub(crate) fn marks_at(&self, p: TextPos) -> Vec<usize> {
+        let m = &self.body.marks;
+        let mut v: Vec<usize> = self.body.mark_range(p.line, p.line + 1).filter(|&i| m[i].a <= p && p <= m[i].b).collect();
+        v.sort_by_key(|&i| m[i].sev);
+        v
+    }
+
+    // a mark as the app sees it
+    pub(crate) fn diag_of(&self, m: &Mark) -> Diag {
+        let col = |p: TextPos| {
+            let p = self.clamp(p);
+            self.body.lines[p.line][..p.byte].chars().count() + 1
+        };
+        Diag { line: m.a.line + 1, col: col(m.a), end_line: m.b.line + 1, end_col: col(m.b), severity: m.sev, msg: m.msg.clone() }
     }
 }
 
