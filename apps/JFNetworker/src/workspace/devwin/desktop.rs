@@ -21,6 +21,7 @@ use alloc::vec::Vec;
 use netpkt::{Ipv4, Prefix4};
 use ui::*;
 
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::{config, console, edits};
 use crate::workspace::icons::JN_TERMINAL;
@@ -35,6 +36,7 @@ pub(crate) enum App {
     Browser,
 }
 
+// i18n
 const APPS: [(App, &str, &str); 4] = [
     (App::IpConfig, "IP-Konfiguration", "Adresse, Maske und Gateway oder DHCP"),
     (App::Prompt, "Eingabeaufforderung", "Die Shell des Geräts"),
@@ -97,11 +99,11 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         return;
     }
     // the program's head: back to the desktop, its name
-    let title = APPS.iter().find(|a| a.0 == app).map_or("", |a| a.1);
+    let title = APPS.iter().find(|a| a.0 == app).map_or("", |a| t(a.1));
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.next_icon(IC_BACK);
     ui.next_flags(ST_SUBTLE | ST_COMPACT);
-    if ui.button(id + 5, "Desktop") & EV_ACT != 0 {
+    if ui.button(id + 5, t("Desktop")) & EV_ACT != 0 {
         if let Some(w) = n.devwin.get(k) {
             w.desk.app = App::Home;
         }
@@ -138,10 +140,10 @@ fn home(n: &mut Net, ui: &mut Ui, k: usize, id: u32) {
         ui.next_size(150, 96);
         ui.next_icon(icon);
         ui.next_flags(ST_LARGE);
-        if ui.button(id + 1 + i as u32, label) & EV_ACT != 0 {
+        if ui.button(id + 1 + i as u32, t(label)) & EV_ACT != 0 {
             chosen = Some(*app);
         }
-        ui.tooltip(tip);
+        ui.tooltip(t(tip));
     }
     ui.box_end();
     if let Some(a) = chosen
@@ -156,10 +158,10 @@ fn home(n: &mut Net, ui: &mut Ui, k: usize, id: u32) {
 }
 
 // a "label  field" row (the field follows, then box_end)
-fn field(ui: &mut Ui, label: &str) {
+fn field(ui: &mut Ui, label: &'static str) {
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.next_size(150, 0);
-    ui.text(TS_BODY | TX_SECONDARY, label);
+    ui.text(TS_BODY | TX_SECONDARY, t(label));
 }
 
 // IP-Konfiguration
@@ -170,7 +172,7 @@ fn ipconfig(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     let Some(w) = n.devwin.get(k) else { return };
     let s = &mut w.desk;
     if ifs.is_empty() {
-        ui.text(TS_BODY | TX_SECONDARY, "Dieses Gerät hat keine IPv4-Schnittstelle.");
+        ui.text(TS_BODY | TX_SECONDARY, t("Dieses Gerät hat keine IPv4-Schnittstelle."));
         return;
     }
     s.iface = s.iface.clamp(0, ifs.len() as i32 - 1);
@@ -203,27 +205,27 @@ fn ipconfig(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         ui.box_end();
     }
     field(ui, "Adresse");
-    ui.radio(id + 2, "Statisch", &mut s.mode, 0);
-    ui.radio(id + 3, "DHCP", &mut s.mode, 1);
+    ui.radio(id + 2, t("Statisch"), &mut s.mode, 0);
+    ui.radio(id + 3, t("DHCP"), &mut s.mode, 1);
     ui.box_end();
     let st = if s.mode == 1 { ST_DISABLED } else { 0 };
     field(ui, "IPv4-Adresse");
     ui.next_size(200, 0);
     ui.next_flags(st);
-    ui.textbox(id + 4, Some("z. B. 192.168.1.10"), &mut s.addr, 20);
+    ui.textbox(id + 4, Some(t("z. B. 192.168.1.10")), &mut s.addr, 20);
     ui.box_end();
     field(ui, "Subnetzmaske");
     ui.next_size(200, 0);
     ui.next_flags(st);
-    ui.textbox(id + 5, Some("z. B. 255.255.255.0"), &mut s.mask, 20);
+    ui.textbox(id + 5, Some(t("z. B. 255.255.255.0")), &mut s.mask, 20);
     ui.box_end();
     field(ui, "Standard-Gateway");
     ui.next_size(200, 0);
     ui.next_flags(st);
-    ui.textbox(id + 6, Some("z. B. 192.168.1.1"), &mut s.gw, 20);
+    ui.textbox(id + 6, Some(t("z. B. 192.168.1.1")), &mut s.gw, 20);
     ui.box_end();
     if dhcp {
-        let lease = now.map_or_else(|| String::from("noch keine Adresse"), |p| format!("{}{}", p, if gw_now.is_empty() { String::new() } else { format!(", Gateway {}", gw_now) }));
+        let lease = now.map_or_else(|| String::from(t("noch keine Adresse")), |p| format!("{}{}", p, if gw_now.is_empty() { String::new() } else { tf(", Gateway {}", &[&gw_now]) }));
         field(ui, "Per DHCP");
         ui.text(TS_BODY, &lease);
         ui.box_end();
@@ -231,7 +233,7 @@ fn ipconfig(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     ui.box_begin(0, BOX_H | BOX_END, 8);
     let changed = s.mode != s.src.4 || (s.mode == 0 && (s.addr.trim() != s.src.1 || s.mask.trim() != s.src.2 || s.gw.trim() != s.src.3));
     ui.next_flags(if changed { 0 } else { ST_DISABLED });
-    if ui.accent_button(id + 7, "Übernehmen") & EV_ACT != 0 {
+    if ui.accent_button(id + 7, t("Übernehmen")) & EV_ACT != 0 {
         apply = true;
     }
     ui.box_end();
@@ -240,7 +242,7 @@ fn ipconfig(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         crate::workspace::error_text(ui, &e, 0);
     } else {
         ui.next_size(-1, 0);
-        ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, "Statische Einstellungen laufen als Befehle in der Eingabeaufforderung und werden Teil der Startkonfiguration; DHCP holt Adresse und Gateway vom Server.");
+        ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Statische Einstellungen laufen als Befehle in der Eingabeaufforderung und werden Teil der Startkonfiguration; DHCP holt Adresse und Gateway vom Server."));
     }
     ui.box_end();
     ui.scroll_end();
@@ -264,11 +266,11 @@ fn set_ip(n: &mut Net, dev: u32, iface: &str, to_dhcp: bool, dhcp: bool, addr: &
     }
     let prefix = match (addr.is_empty(), Ipv4::parse(addr), Ipv4::parse(mask)) {
         (true, ..) => None,
-        (false, Some(a), Some(m)) => Some(Prefix4::from_mask(a, m).ok_or_else(|| format!("„{}“ ist keine Subnetzmaske.", mask))?),
-        (false, None, _) => return Err(format!("„{}“ ist keine IPv4-Adresse.", addr)),
-        (false, _, None) => return Err(format!("„{}“ ist keine Subnetzmaske.", mask)),
+        (false, Some(a), Some(m)) => Some(Prefix4::from_mask(a, m).ok_or_else(|| tf("„{}“ ist keine Subnetzmaske.", &[mask]))?),
+        (false, None, _) => return Err(tf("„{}“ ist keine IPv4-Adresse.", &[addr])),
+        (false, _, None) => return Err(tf("„{}“ ist keine Subnetzmaske.", &[mask])),
     };
-    let gw_new = if gw.is_empty() { None } else { Some(Ipv4::parse(gw).ok_or_else(|| format!("„{}“ ist keine IPv4-Adresse.", gw))?) };
+    let gw_new = if gw.is_empty() { None } else { Some(Ipv4::parse(gw).ok_or_else(|| tf("„{}“ ist keine IPv4-Adresse.", &[gw]))?) };
     let mut lines = alloc::vec![format!("ip addr flush dev {}", iface)];
     if let Some(p) = prefix {
         lines.push(format!("ip addr add {} dev {}", p, iface));
@@ -308,21 +310,21 @@ fn editor(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
     ui.icon(IC_DOCUMENT, 16);
     ui.text(TS_BODY, "notizen.txt");
-    ui.text(TS_CAPTION | TX_SECONDARY, if s.text != now { "geändert" } else { "gesichert" });
+    ui.text(TS_CAPTION | TX_SECONDARY, t(if s.text != now { "geändert" } else { "gesichert" }));
     ui.spacer(-1);
     ui.next_flags(if s.text == now { ST_DISABLED } else { 0 });
-    if ui.button(id + 2, "Verwerfen") & EV_ACT != 0 {
+    if ui.button(id + 2, t("Verwerfen")) & EV_ACT != 0 {
         s.text = now.clone();
         ui.repass();
     }
     ui.next_flags(if s.text == now { ST_DISABLED } else { ST_ACCENT });
     ui.next_icon(IC_SAVE);
-    if ui.button(id + 1, "Speichern") & EV_ACT != 0 {
+    if ui.button(id + 1, t("Speichern")) & EV_ACT != 0 {
         save = true;
     }
     ui.box_end();
     ui.next_size(-1, -1);
-    ui.textbox(id, Some("Notizen zu diesem Gerät: Aufgaben, Zugangsdaten des Labors, was noch fehlt …"), &mut s.text, 64_000 | TB_MULTI | TB_WRAP);
+    ui.textbox(id, Some(t("Notizen zu diesem Gerät: Aufgaben, Zugangsdaten des Labors, was noch fehlt …")), &mut s.text, 64_000 | TB_MULTI | TB_WRAP);
     if save {
         let text = s.text.clone();
         let name = n.doc.proj.device(dev).map(|d| d.name.clone()).unwrap_or_default();
@@ -333,8 +335,8 @@ fn editor(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     }
 }
 
-// Webbrowser: an address, the page as text (HTTP follows: until then it says what it would
-// load)
+// Webbrowser: an address and where it leads (the page itself: curl in the Eingabeaufforderung,
+// the simulator speaks HTTP there)
 fn browser(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     let hosts = n.doc.sim.engine().hosts(dev);
     let Some(w) = n.devwin.get(k) else { return };
@@ -347,7 +349,7 @@ fn browser(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         go = true;
     }
     ui.next_icon(IC_REFRESH);
-    if ui.button(id + 1, "Öffnen") & EV_ACT != 0 {
+    if ui.button(id + 1, t("Öffnen")) & EV_ACT != 0 {
         go = true;
     }
     ui.box_end();
@@ -358,7 +360,7 @@ fn browser(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     ui.next_size(-1, -1);
     ui.box_begin(id + 2, BOX_V | BOX_CARD | pad(12), 4);
     if s.page.is_empty() {
-        ui.text(TS_BODY | TX_SECONDARY, "Eine Adresse eingeben und „Öffnen“.");
+        ui.text(TS_BODY | TX_SECONDARY, t("Eine Adresse eingeben und „Öffnen“."));
     }
     for l in &s.page {
         ui.next_size(-1, 0);
@@ -367,12 +369,12 @@ fn browser(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     ui.box_end();
 }
 
-// the page for an address: where it would go, and that HTTP is still to come
+// the page for an address: where it would go, and how to fetch it (curl)
 fn page(url: &str, hosts: &[(String, Ipv4)]) -> Vec<String> {
     let u = url.trim();
     let rest = u.strip_prefix("http://").unwrap_or(u);
     if u.starts_with("https://") {
-        return alloc::vec![String::from("Verschlüsselte Seiten (https) kann dieser Browser nicht öffnen.")];
+        return alloc::vec![String::from(t("Verschlüsselte Seiten (https) kann dieser Browser nicht öffnen."))];
     }
     let (hostport, path) = match rest.find('/') {
         Some(i) => (&rest[..i], &rest[i..]),
@@ -381,22 +383,22 @@ fn page(url: &str, hosts: &[(String, Ipv4)]) -> Vec<String> {
     let (host, port) = match hostport.rsplit_once(':') {
         Some((h, p)) => match p.parse::<u16>() {
             Ok(p) => (h, p),
-            Err(_) => return alloc::vec![format!("„{}“ ist keine Portnummer.", p)],
+            Err(_) => return alloc::vec![tf("„{}“ ist keine Portnummer.", &[p])],
         },
         None => (hostport, 80),
     };
     if host.is_empty() {
-        return alloc::vec![String::from("Die Adresse nennt keinen Rechner.")];
+        return alloc::vec![String::from(t("Die Adresse nennt keinen Rechner."))];
     }
     let ip = Ipv4::parse(host).or_else(|| hosts.iter().find(|h| h.0.eq_ignore_ascii_case(host)).map(|h| h.1));
     let target = match ip {
-        Some(a) if a.to_string() == host => format!("{}, Port {}, Pfad {}", a, port, path),
-        Some(a) => format!("{} ({}), Port {}, Pfad {}", host, a, port, path),
-        None => format!("{} (der Name ist auf diesem Gerät nicht eingetragen), Port {}, Pfad {}", host, port, path),
+        Some(a) if a.to_string() == host => tf("{}, Port {}, Pfad {}", &[&a.to_string(), &port.to_string(), path]),
+        Some(a) => tf("{} ({}), Port {}, Pfad {}", &[host, &a.to_string(), &port.to_string(), path]),
+        None => tf("{} (der Name ist auf diesem Gerät nicht eingetragen), Port {}, Pfad {}", &[host, &port.to_string(), path]),
     };
     alloc::vec![
-        String::from("Diese Seite kann noch nicht geladen werden."),
-        format!("Ziel: {}", target),
-        String::from("Der Simulator überträgt noch kein HTTP; sobald Webserver laufen, zeigt der Browser hier ihre Seiten als Text."),
+        String::from(t("Dieser Browser zeigt nur, wohin die Adresse führt.")),
+        tf("Ziel: {}", &[&target]),
+        tf("Die Seite selbst holt „curl {}“ in der Eingabeaufforderung über den Simulator.", &[u]),
     ]
 }

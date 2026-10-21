@@ -4,11 +4,14 @@
 //   Trace::hops() / hop(id) / hops_after(id)      frames in send order; ids are consecutive
 //   Trace::events() / events_of(hop)              decisions in time order
 //   Note::describe(port, iface) -> German text     "MAC 02:4a:.. an Gi1/0/1 gelernt (VLAN 1)"
+//   Note::message(port, iface) -> Msg             the same as a template with arguments, for
+//                                                 the app's catalogue (jfn_model::msg)
 //   Note::layer()                                 1 cable, 2 bridge and ARP, 3 IPv4, 4 UDP/TCP,
 //                                                 7 services (DHCP, DNS, syslog, NTP); TCP's
 //                                                 states and decisions are layer 4 (tcp.rs),
 //                                                 HTTP's layer 7 (http.rs, httpsvc.rs)
-//   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs"
+//   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
+//                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
 //   Trace::on_wire(t) / prev_send / next_send     frames on a cable at a moment; the moments
 //                                                 frames were sent (simulation mode steps)
@@ -16,7 +19,8 @@
 //   Filter                                        protocols and devices (steps, lists, files)
 //
 // The inspector decodes the bytes of a hop (netpkt::decode); there is no second model of the
-// packet.  Notes are data, so the app can word them in any language.
+// packet.  Notes are data, so the app can word them in any language: message() gives the German
+// template and its arguments, src/locales/engine.tsv the English one.
 //
 // Batches: every kernel event is one batch, and so is every change from outside between them
 // (an action, a ping: Trace::new_batch).  The decisions and frames of one device in one batch
@@ -28,6 +32,8 @@ use alloc::collections::VecDeque;
 use alloc::format;
 use alloc::string::String;
 
+use jfn_model::msg;
+use jfn_model::msg::{dur, phrase, Msg};
 use netpkt::{Ipv4, Mac, Prefix4};
 
 use crate::kernel::{Frame, Ns};
@@ -543,222 +549,251 @@ impl Note {
     /// a German sentence; `port` names a port index, `iface` an IPv4 interface of the
     /// deciding device
     pub fn describe(&self, port: &dyn Fn(u16) -> String, iface: &dyn Fn(u16) -> String) -> String {
+        self.message(port, iface).text()
+    }
+    /// the sentence as a message for the app's catalogue (describe() is its German text)
+    pub fn message(&self, port: &dyn Fn(u16) -> String, iface: &dyn Fn(u16) -> String) -> Msg {
         match self {
-            Note::LinkUp { port: p } => format!("Leitung an {} ist aktiv.", port(*p)),
-            Note::LinkDown { port: p } => format!("Leitung an {} ist unterbrochen.", port(*p)),
-            Note::DropNoLink { port: p } => format!("Verworfen: an {} ist keine aktive Leitung.", port(*p)),
-            Note::DropQueueFull { port: p } => format!("Verworfen: die Warteschlange von {} ist voll.", port(*p)),
-            Note::LostInFlight { port: p } => format!("Verloren: die Leitung an {} fiel aus, während der Frame unterwegs war.", port(*p)),
-            Note::Learned { mac, port: p, vlan } => format!("MAC {} an {} gelernt (VLAN {}).", mac, port(*p), vlan),
-            Note::Moved { mac, from, to, vlan } => format!("MAC {} ist von {} nach {} umgezogen (VLAN {}).", mac, port(*from), port(*to), vlan),
-            Note::TableFull { vlan } => format!("MAC-Tabelle voll: nichts gelernt (VLAN {}).", vlan),
-            Note::Forwarded { vlan, port: p } => format!("Ziel bekannt: weitergeleitet an {} (VLAN {}).", port(*p), vlan),
-            Note::Flooded { vlan, ports } => format!("Ziel unbekannt oder Gruppe: an {} Ports geflutet (VLAN {}).", ports, vlan),
-            Note::Filtered { vlan } => format!("Gefiltert: das Ziel liegt hinter dem Eingangsport (VLAN {}).", vlan),
-            Note::DropTagged { port: p, vid } => format!("Verworfen: Access-Port {} nimmt keine Frames mit Tag {} an.", port(*p), vid),
-            Note::DropVlan { port: p, vid } => format!("Verworfen: VLAN {} ist an {} nicht erlaubt.", vid, port(*p)),
-            Note::DropMalformed { port: p } => format!("Verworfen: unlesbarer Frame an {}.", port(*p)),
-            Note::Consumed { port: p } => format!("Steuer-Frame an {} für die Bridge selbst.", port(*p)),
-            Note::Repeated { ports } => format!("Hub: an {} Ports wiederholt.", ports),
-            Note::Delivered { port: p } => format!("Empfangen an {}.", port(*p)),
-            Note::NotForMe { port: p } => format!("Verworfen an {}: nicht für dieses Gerät.", port(*p)),
-            Note::ArpRequest { iface: i, ip } => format!("ARP-Anfrage an {}: Wer hat {}?", iface(*i), ip),
-            Note::ArpReply { iface: i, ip, mac } => format!("ARP-Antwort an {}: {} ist {}.", iface(*i), ip, mac),
-            Note::ArpLearned { ip, mac } => format!("ARP-Eintrag {} \u{2192} {}.", ip, mac),
-            Note::ArpWaiting { ip } => format!("Wartet auf die ARP-Antwort von {}.", ip),
-            Note::ArpIncomplete { ip } => format!("Verworfen: die MAC von {} ist noch unbekannt (ARP fragt).", ip),
-            Note::ArpProxied { iface: i, ip } => format!("Proxy-ARP an {}: antwortet für {}, das hinter einem anderen Interface liegt.", iface(*i), ip),
-            Note::ArpFailed { ip } => format!("{} antwortet nicht auf ARP: wartende Pakete verworfen.", ip),
-            Note::ArpIgnored { ip } => format!("ARP-Anfrage nach {} ist nicht für dieses Gerät: verworfen.", ip),
-            Note::IpLocal { proto } => format!("IPv4-Paket für dieses Gerät ({}).", netpkt::ipv4::proto_name(*proto).unwrap_or("?")),
+            Note::LinkUp { port: p } => msg!("Leitung an {} ist aktiv.", port(*p)),
+            Note::LinkDown { port: p } => msg!("Leitung an {} ist unterbrochen.", port(*p)),
+            Note::DropNoLink { port: p } => msg!("Verworfen: an {} ist keine aktive Leitung.", port(*p)),
+            Note::DropQueueFull { port: p } => msg!("Verworfen: die Warteschlange von {} ist voll.", port(*p)),
+            Note::LostInFlight { port: p } => msg!("Verloren: die Leitung an {} fiel aus, während der Frame unterwegs war.", port(*p)),
+            Note::Learned { mac, port: p, vlan } => msg!("MAC {} an {} gelernt (VLAN {}).", mac, port(*p), vlan),
+            Note::Moved { mac, from, to, vlan } => msg!("MAC {} ist von {} nach {} umgezogen (VLAN {}).", mac, port(*from), port(*to), vlan),
+            Note::TableFull { vlan } => msg!("MAC-Tabelle voll: nichts gelernt (VLAN {}).", vlan),
+            Note::Forwarded { vlan, port: p } => msg!("Ziel bekannt: weitergeleitet an {} (VLAN {}).", port(*p), vlan),
+            Note::Flooded { vlan, ports: 1 } => msg!("Ziel unbekannt oder Gruppe: an einen Port geflutet (VLAN {}).", vlan),
+            Note::Flooded { vlan, ports } => msg!("Ziel unbekannt oder Gruppe: an {} Ports geflutet (VLAN {}).", ports, vlan),
+            Note::Filtered { vlan } => msg!("Gefiltert: das Ziel liegt hinter dem Eingangsport (VLAN {}).", vlan),
+            Note::DropTagged { port: p, vid } => msg!("Verworfen: Access-Port {} nimmt keine Frames mit Tag {} an.", port(*p), vid),
+            Note::DropVlan { port: p, vid } => msg!("Verworfen: VLAN {} ist an {} nicht erlaubt.", vid, port(*p)),
+            Note::DropMalformed { port: p } => msg!("Verworfen: unlesbarer Frame an {}.", port(*p)),
+            Note::Consumed { port: p } => msg!("Steuer-Frame an {} für die Bridge selbst.", port(*p)),
+            Note::Repeated { ports: 1 } => msg!("Hub: an einen Port wiederholt."),
+            Note::Repeated { ports } => msg!("Hub: an {} Ports wiederholt.", ports),
+            Note::Delivered { port: p } => msg!("Empfangen an {}.", port(*p)),
+            Note::NotForMe { port: p } => msg!("Verworfen an {}: nicht für dieses Gerät.", port(*p)),
+            Note::ArpRequest { iface: i, ip } => msg!("ARP-Anfrage an {}: Wer hat {}?", iface(*i), ip),
+            Note::ArpReply { iface: i, ip, mac } => msg!("ARP-Antwort an {}: {} ist {}.", iface(*i), ip, mac),
+            Note::ArpLearned { ip, mac } => msg!("ARP-Eintrag {} \u{2192} {}.", ip, mac),
+            Note::ArpWaiting { ip } => msg!("Wartet auf die ARP-Antwort von {}.", ip),
+            Note::ArpIncomplete { ip } => msg!("Verworfen: die MAC von {} ist noch unbekannt (ARP fragt).", ip),
+            Note::ArpProxied { iface: i, ip } => msg!("Proxy-ARP an {}: antwortet für {}, das hinter einem anderen Interface liegt.", iface(*i), ip),
+            Note::ArpFailed { ip } => msg!("{} antwortet nicht auf ARP: wartende Pakete verworfen.", ip),
+            Note::ArpIgnored { ip } => msg!("ARP-Anfrage nach {} ist nicht für dieses Gerät: verworfen.", ip),
+            Note::IpLocal { proto } => msg!("IPv4-Paket für dieses Gerät ({}).", netpkt::ipv4::proto_name(*proto).unwrap_or("?")),
             Note::IpRouted { dst, gw, iface: i } => {
                 if dst == gw {
-                    format!("Route zu {}: direkt angeschlossen an {}.", dst, iface(*i))
+                    msg!("Route zu {}: direkt angeschlossen an {}.", dst, iface(*i))
                 } else {
-                    format!("Route zu {}: über {} an {}.", dst, gw, iface(*i))
+                    msg!("Route zu {}: über {} an {}.", dst, gw, iface(*i))
                 }
             }
-            Note::IpNoRoute { dst } => format!("Keine Route zu {}.", dst),
-            Note::IpTtlExpired { src } => format!("TTL abgelaufen: Paket von {} verworfen.", src),
-            Note::IpNotForMe { dst } => format!("Paket an {} verworfen: nicht für dieses Gerät, es leitet nicht weiter.", dst),
-            Note::IpMartian { src, dst } => format!("Verworfen: {} an {} darf nicht über ein Kabel kommen.", src, dst),
-            Note::IpDirectedBroadcast { dst } => format!("Broadcast an {} nicht weitergeleitet (gerichtete Broadcasts bleiben draußen).", dst),
-            Note::IpBadChecksum => String::from("Verworfen: Prüfsumme falsch."),
-            Note::IpMalformed => String::from("Verworfen: unlesbares IPv4-Paket."),
-            Note::IpFragmented { parts, mtu } => format!("Fragmentiert in {} Teile (MTU {}).", parts, mtu),
-            Note::IpFragNeeded { mtu } => format!("Zu groß für die MTU {} und \u{201e}nicht fragmentieren\u{201c} gesetzt.", mtu),
-            Note::IpReassembled { bytes } => format!("Fragmente zu {} Bytes zusammengesetzt.", bytes),
-            Note::IpReasmTimeout => String::from("Fragmente nach 30 s verworfen: nicht vollständig."),
-            Note::EchoAnswered { to } => format!("Echo-Anfrage beantwortet an {}.", to),
-            Note::IcmpSent { typ, code, to } => format!("ICMP an {}: {}.", to, netpkt::icmp::name(*typ, *code)),
-            Note::IcmpLimited => String::from("ICMP-Meldung unterdrückt (Ratenbegrenzung)."),
-            Note::UdpNoPort { port: p } => format!("UDP an Port {}: niemand lauscht.", p),
-            Note::TcpNoListener { port: p } => format!("TCP an Port {}: niemand lauscht, Antwort RST.", p),
-            Note::UdpToSocket { port: p, to } => format!("UDP an Port {}: an {}.", p, to),
-            Note::PortInUse { port: p, svc } => format!("Port {} ist schon belegt: {} startet nicht.", p, svc),
-            Note::DhcpDiscover { iface: i, xid, secs } => format!("DHCPDISCOVER über {} (xid 0x{:08x}, seit {} s).", iface(*i), xid, secs),
-            Note::DhcpOffered { ip, server } => format!("DHCPOFFER: {} von {}.", ip, server),
+            Note::IpNoRoute { dst } => msg!("Keine Route zu {}.", dst),
+            Note::IpTtlExpired { src } => msg!("TTL abgelaufen: Paket von {} verworfen.", src),
+            Note::IpNotForMe { dst } => msg!("Paket an {} verworfen: nicht für dieses Gerät, es leitet nicht weiter.", dst),
+            Note::IpMartian { src, dst } => msg!("Verworfen: {} an {} darf nicht über ein Kabel kommen.", src, dst),
+            Note::IpDirectedBroadcast { dst } => msg!("Broadcast an {} nicht weitergeleitet (gerichtete Broadcasts bleiben draußen).", dst),
+            Note::IpBadChecksum => msg!("Verworfen: Prüfsumme falsch."),
+            Note::IpMalformed => msg!("Verworfen: unlesbares IPv4-Paket."),
+            Note::IpFragmented { parts, mtu } => msg!("Fragmentiert in {} Teile (MTU {}).", parts, mtu),
+            Note::IpFragNeeded { mtu } => msg!("Zu groß für die MTU {} und \u{201e}nicht fragmentieren\u{201c} gesetzt.", mtu),
+            Note::IpReassembled { bytes } => msg!("Fragmente zu {} Bytes zusammengesetzt.", bytes),
+            Note::IpReasmTimeout => msg!("Fragmente nach 30 s verworfen: nicht vollständig."),
+            Note::EchoAnswered { to } => msg!("Echo-Anfrage beantwortet an {}.", to),
+            Note::IcmpSent { typ, code, to } => msg!("ICMP an {}: {}.", to, netpkt::icmp::name(*typ, *code)),
+            Note::IcmpLimited => msg!("ICMP-Meldung unterdrückt (Ratenbegrenzung)."),
+            Note::UdpNoPort { port: p } => msg!("UDP an Port {}: niemand lauscht.", p),
+            Note::TcpNoListener { port: p } => msg!("TCP an Port {}: niemand lauscht, Antwort RST.", p),
+            Note::UdpToSocket { port: p, to } => msg!("UDP an Port {}: an {}.", p, to),
+            Note::PortInUse { port: p, svc } => msg!("Port {} ist schon belegt: {} startet nicht.", p, svc),
+            Note::DhcpDiscover { iface: i, xid, secs } => msg!("DHCPDISCOVER über {} (xid {}, seit {} s).", iface(*i), format!("0x{:08x}", xid), secs),
+            Note::DhcpOffered { ip, server } => msg!("DHCPOFFER: {} von {}.", ip, server),
             Note::DhcpRequest { iface: i, ip, kind } => match kind {
-                DhcpReq::Select => format!("DHCPREQUEST über {}: nimmt das Angebot {} an.", iface(*i), ip),
-                DhcpReq::Reboot => format!("DHCPREQUEST über {}: möchte {} nach dem Neustart weiter nutzen.", iface(*i), ip),
-                DhcpReq::Renew => format!("DHCPREQUEST über {}: verlängert {} beim eigenen Server.", iface(*i), ip),
-                DhcpReq::Rebind => format!("DHCPREQUEST über {}: verlängert {} bei jedem Server (Rebind).", iface(*i), ip),
+                DhcpReq::Select => msg!("DHCPREQUEST über {}: nimmt das Angebot {} an.", iface(*i), ip),
+                DhcpReq::Reboot => msg!("DHCPREQUEST über {}: möchte {} nach dem Neustart weiter nutzen.", iface(*i), ip),
+                DhcpReq::Renew => msg!("DHCPREQUEST über {}: verlängert {} beim eigenen Server.", iface(*i), ip),
+                DhcpReq::Rebind => msg!("DHCPREQUEST über {}: verlängert {} bei jedem Server (Rebind).", iface(*i), ip),
             },
-            Note::DhcpAcked { ip, server, lease } => format!("DHCPACK: {} für {} s von {}.", ip, lease, server),
-            Note::DhcpNaked { server } => format!("DHCPNAK von {}: alles von vorn.", server),
-            Note::DhcpProbe { ip } => format!("ARP-Probe: benutzt schon jemand {}?", ip),
-            Note::DhcpConflict { ip, mac } => format!("{} wird schon von {} benutzt: DHCPDECLINE.", ip, mac),
+            Note::DhcpAcked { ip, server, lease } => msg!("DHCPACK: {} für {} s von {}.", ip, lease, server),
+            Note::DhcpNaked { server } => msg!("DHCPNAK von {}: alles von vorn.", server),
+            Note::DhcpProbe { ip } => msg!("ARP-Probe: benutzt schon jemand {}?", ip),
+            Note::DhcpConflict { ip, mac } => msg!("{} wird schon von {} benutzt: DHCPDECLINE.", ip, mac),
             Note::DhcpBound { iface: i, addr, router, renew } => match router {
-                Some(r) => format!("{} hat {} (Router {}); Verlängerung in {} s.", iface(*i), addr, r, renew),
-                None => format!("{} hat {}; Verlängerung in {} s.", iface(*i), addr, renew),
+                Some(r) => msg!("{} hat {} (Router {}); Verlängerung in {} s.", iface(*i), addr, r, renew),
+                None => msg!("{} hat {}; Verlängerung in {} s.", iface(*i), addr, renew),
             },
-            Note::DhcpExpired { ip } => format!("Lease für {} abgelaufen: Adresse entfernt.", ip),
-            Note::DhcpReleased { ip, server } => format!("DHCPRELEASE: {} an {} zurückgegeben.", ip, server),
-            Note::DhcpNoOffers { iface: i, retry } => format!("Kein DHCPOFFER über {}: neuer Versuch in {} s.", iface(*i), retry),
-            Note::DhcpdOffer { ip, mac } => format!("DHCPOFFER: {} für {}.", ip, mac),
-            Note::DhcpdPing { ip } => format!("Ping-Prüfung: ist {} frei?", ip),
-            Note::DhcpdPingConflict { ip } => format!("{} antwortet auf den Ping: als Konflikt gesperrt.", ip),
-            Note::DhcpdAck { ip, mac, lease } => format!("DHCPACK: {} für {}, {} s.", ip, mac, lease),
-            Note::DhcpdNak { ip, mac } => format!("DHCPNAK: {} passt nicht für {}.", ip, mac),
-            Note::DhcpdNoPool { net } => format!("Kein Pool für das Netz von {}: keine Antwort.", net),
-            Note::DhcpdExhausted { pool } => format!("Pool {} hat keine freie Adresse mehr.", pool),
-            Note::DhcpdDecline { ip, mac } => format!("DHCPDECLINE von {}: {} als Konflikt gesperrt.", mac, ip),
-            Note::DhcpdRelease { ip } => format!("DHCPRELEASE: {} ist wieder frei.", ip),
-            Note::DhcpdOtherServer { mac, server } => format!("{} nimmt das Angebot von {}: eigenes Angebot zurückgezogen.", mac, server),
-            Note::DhcpdSilent { ip, mac } => format!("Nichts über {} für {} bekannt: keine Antwort.", ip, mac),
-            Note::DhcpdInform { to } => format!("DHCPINFORM von {}: Einstellungen geschickt.", to),
-            Note::DhcpRelayed { to, giaddr } => format!("DHCP-Anfrage an {} weitergeleitet (giaddr {}).", to, giaddr),
-            Note::DhcpRelayedBack { to, iface: i } => format!("DHCP-Antwort an {} über {} weitergegeben.", to, iface(*i)),
-            Note::DhcpRelayDrop { why } => String::from(match why {
-                RelayDrop::Hops => "DHCP verworfen: zu viele Relay-Hops.",
-                RelayDrop::NoHelper => "DHCP verworfen: an diesem Interface ist kein DHCP-Server eingetragen (helper-address).",
-                RelayDrop::NoAddress => "DHCP verworfen: das Interface hat keine IPv4-Adresse für giaddr.",
-                RelayDrop::NotMine => "DHCP verworfen: giaddr gehört nicht zu diesem Gerät.",
-            }),
-            Note::DnsAnswer { name, qtype, n } => format!("DNS: {} {} beantwortet ({} {}).", name, netpkt::dns::type_name(*qtype), n, if *n == 1 { "Eintrag" } else { "Einträge" }),
-            Note::DnsNxDomain { name } => format!("DNS: {} gibt es nicht (NXDOMAIN).", name),
-            Note::DnsNoData { name, qtype } => format!("DNS: {} hat keinen {}-Eintrag.", name, netpkt::dns::type_name(*qtype)),
-            Note::DnsReferral { name, zone } => format!("DNS: {} liegt in der delegierten Zone {}: Verweis.", name, zone),
-            Note::DnsRefused { name } => format!("DNS: für {} nicht zuständig (REFUSED).", name),
-            Note::DnsForward { name } => format!("DNS: {} an den nächsten Server weitergereicht.", name),
-            Note::ResolveQuery { name, qtype, server } => format!("Frage {} nach {} ({}).", server, name, netpkt::dns::type_name(*qtype)),
-            Note::ResolveAnswer { name, addr, cached } => {
-                let from = if *cached { " (aus dem Cache)" } else { "" };
-                match addr {
-                    Some(a) => format!("{} ist {}{}.", name, a, from),
-                    None => format!("{} aufgelöst{}.", name, from),
+            Note::DhcpExpired { ip } => msg!("Lease für {} abgelaufen: Adresse entfernt.", ip),
+            Note::DhcpReleased { ip, server } => msg!("DHCPRELEASE: {} an {} zurückgegeben.", ip, server),
+            Note::DhcpNoOffers { iface: i, retry } => msg!("Kein DHCPOFFER über {}: neuer Versuch in {} s.", iface(*i), retry),
+            Note::DhcpdOffer { ip, mac } => msg!("DHCPOFFER: {} für {}.", ip, mac),
+            Note::DhcpdPing { ip } => msg!("Ping-Prüfung: ist {} frei?", ip),
+            Note::DhcpdPingConflict { ip } => msg!("{} antwortet auf den Ping: als Konflikt gesperrt.", ip),
+            Note::DhcpdAck { ip, mac, lease } => msg!("DHCPACK: {} für {}, {} s.", ip, mac, lease),
+            Note::DhcpdNak { ip, mac } => msg!("DHCPNAK: {} passt nicht für {}.", ip, mac),
+            Note::DhcpdNoPool { net } => msg!("Kein Pool für das Netz von {}: keine Antwort.", net),
+            Note::DhcpdExhausted { pool } => msg!("Pool {} hat keine freie Adresse mehr.", pool),
+            Note::DhcpdDecline { ip, mac } => msg!("DHCPDECLINE von {}: {} als Konflikt gesperrt.", mac, ip),
+            Note::DhcpdRelease { ip } => msg!("DHCPRELEASE: {} ist wieder frei.", ip),
+            Note::DhcpdOtherServer { mac, server } => msg!("{} nimmt das Angebot von {}: eigenes Angebot zurückgezogen.", mac, server),
+            Note::DhcpdSilent { ip, mac } => msg!("Nichts über {} für {} bekannt: keine Antwort.", ip, mac),
+            Note::DhcpdInform { to } => msg!("DHCPINFORM von {}: Einstellungen geschickt.", to),
+            Note::DhcpRelayed { to, giaddr } => msg!("DHCP-Anfrage an {} weitergeleitet (giaddr {}).", to, giaddr),
+            Note::DhcpRelayedBack { to, iface: i } => msg!("DHCP-Antwort an {} über {} weitergegeben.", to, iface(*i)),
+            Note::DhcpRelayDrop { why } => match why {
+                RelayDrop::Hops => msg!("DHCP verworfen: zu viele Relay-Hops."),
+                RelayDrop::NoHelper => msg!("DHCP verworfen: an diesem Interface ist kein DHCP-Server eingetragen (helper-address)."),
+                RelayDrop::NoAddress => msg!("DHCP verworfen: das Interface hat keine IPv4-Adresse für giaddr."),
+                RelayDrop::NotMine => msg!("DHCP verworfen: giaddr gehört nicht zu diesem Gerät."),
+            },
+            Note::DnsAnswer { name, qtype, n } => {
+                if *n == 1 {
+                    msg!("DNS: {} {} beantwortet ({} Eintrag).", name, netpkt::dns::type_name(*qtype), n)
+                } else {
+                    msg!("DNS: {} {} beantwortet ({} Einträge).", name, netpkt::dns::type_name(*qtype), n)
                 }
             }
+            Note::DnsNxDomain { name } => msg!("DNS: {} gibt es nicht (NXDOMAIN).", name),
+            Note::DnsNoData { name, qtype } => msg!("DNS: {} hat keinen {}-Eintrag.", name, netpkt::dns::type_name(*qtype)),
+            Note::DnsReferral { name, zone } => msg!("DNS: {} liegt in der delegierten Zone {}: Verweis.", name, zone),
+            Note::DnsRefused { name } => msg!("DNS: für {} nicht zuständig (REFUSED).", name),
+            Note::DnsForward { name } => msg!("DNS: {} an den nächsten Server weitergereicht.", name),
+            Note::ResolveQuery { name, qtype, server } => msg!("Frage {} nach {} ({}).", server, name, netpkt::dns::type_name(*qtype)),
+            Note::ResolveAnswer { name, addr, cached } => match (addr, *cached) {
+                (Some(a), true) => msg!("{} ist {} (aus dem Cache).", name, a),
+                (Some(a), false) => msg!("{} ist {}.", name, a),
+                (None, true) => msg!("{} aufgelöst (aus dem Cache).", name),
+                (None, false) => msg!("{} aufgelöst.", name),
+            },
             Note::ResolveNegative { name, nx } => {
                 if *nx {
-                    format!("{} gibt es nicht (NXDOMAIN).", name)
+                    msg!("{} gibt es nicht (NXDOMAIN).", name)
                 } else {
-                    format!("{} hat keinen passenden Eintrag.", name)
+                    msg!("{} hat keinen passenden Eintrag.", name)
                 }
             }
-            Note::ResolveTimeout { name, server } => format!("{} antwortet nicht auf die Frage nach {}.", server, name),
-            Note::ResolveFailed { name, why } => format!("{} nicht aufgelöst: {}.", name, why.text()),
-            Note::SyslogSent { to, sev } => format!("Syslog-Meldung ({}) an {}.", netpkt::syslog::severity_name(*sev), to),
-            Note::SyslogStored { from, sev } => format!("Syslog-Meldung ({}) von {} gespeichert.", netpkt::syslog::severity_name(*sev), from),
-            Note::NtpRequest { server } => format!("NTP-Anfrage an {}.", server),
-            Note::NtpSample { server, offset, delay } => format!("NTP-Antwort von {}: Abweichung {}, Laufzeit {}.", server, fmt_ns(*offset), fmt_ns(*delay)),
-            Note::NtpStep { offset } => format!("Uhr um {} gestellt.", fmt_ns(*offset)),
-            Note::NtpSlew { offset } => format!("Uhr wird um {} nachgeführt.", fmt_ns(*offset)),
-            Note::NtpServed { to, stratum } => format!("NTP-Zeit an {} (Stratum {}).", to, stratum),
-            Note::NtpNoTime { to } => format!("NTP-Anfrage von {} unbeantwortet: die eigene Uhr ist nicht synchronisiert.", to),
+            Note::ResolveTimeout { name, server } => msg!("{} antwortet nicht auf die Frage nach {}.", server, name),
+            Note::ResolveFailed { name, why } => msg!("{} nicht aufgelöst: {}.", name, phrase(why.text())),
+            Note::SyslogSent { to, sev } => msg!("Syslog-Meldung ({}) an {}.", netpkt::syslog::severity_name(*sev), to),
+            Note::SyslogStored { from, sev } => msg!("Syslog-Meldung ({}) von {} gespeichert.", netpkt::syslog::severity_name(*sev), from),
+            Note::NtpRequest { server } => msg!("NTP-Anfrage an {}.", server),
+            Note::NtpSample { server, offset, delay } => msg!("NTP-Antwort von {}: Abweichung {}, Laufzeit {}.", server, dur(*offset), dur(*delay)),
+            Note::NtpStep { offset } => msg!("Uhr um {} gestellt.", dur(*offset)),
+            Note::NtpSlew { offset } => msg!("Uhr wird um {} nachgeführt.", dur(*offset)),
+            Note::NtpServed { to, stratum } => msg!("NTP-Zeit an {} (Stratum {}).", to, stratum),
+            Note::NtpNoTime { to } => msg!("NTP-Anfrage von {} unbeantwortet: die eigene Uhr ist nicht synchronisiert.", to),
             Note::TcpStateChange { port: p, peer, pport, from, to } => {
                 if *pport == 0 {
-                    format!("TCP Port {}: {} \u{2192} {}.", p, from.name(), to.name())
+                    msg!("TCP Port {}: {} \u{2192} {}.", p, from.name(), to.name())
                 } else {
-                    format!("TCP {} \u{2194} {}:{}: {} \u{2192} {}.", p, peer, pport, from.name(), to.name())
+                    msg!("TCP {} \u{2194} {}:{}: {} \u{2192} {}.", p, peer, pport, from.name(), to.name())
                 }
             }
-            Note::TcpNoConn { port: p } => format!("TCP an Port {}: keine solche Verbindung, Antwort RST.", p),
-            Note::TcpSynDropped { port: p } => format!("Warteschlange von Port {} voll: SYN verworfen.", p),
-            Note::TcpAckDropped { port: p } => format!("Warteschlange von Port {} voll: das letzte ACK des Handshakes wird ignoriert.", p),
-            Note::TcpSynAgain => String::from("Der SYN kam noch einmal: SYN-ACK wiederholt."),
-            Note::TcpUnacceptable { seq, len } => format!("Segment außerhalb des Empfangsfensters (Seq {}, Länge {}): ACK zurück, verworfen.", seq, len),
-            Note::TcpChallenge { syn } => format!("{} im Fenster, aber nicht an der erwarteten Stelle: Challenge-ACK (RFC 5961).", if *syn { "SYN" } else { "RST" }),
-            Note::TcpReset { refused } => String::from(if *refused { "RST empfangen: Verbindung abgelehnt." } else { "RST empfangen: Verbindung zurückgesetzt." }),
-            Note::TcpRstSent { why } => format!("RST gesendet: {}.", why.text()),
-            Note::TcpReceived { bytes } => format!("{} Bytes in Reihenfolge angenommen.", bytes),
-            Note::TcpOutOfOrder { seq, bytes } => format!("Außer der Reihe (Seq {}, {} Bytes): zurückgehalten, sofortige Bestätigung.", seq, bytes),
-            Note::TcpGapFilled { bytes } => format!("Lücke geschlossen: {} Bytes aus der Warteschlange nachgereicht.", bytes),
-            Note::TcpDuplicate { bytes } => format!("{} Bytes kamen doppelt: sofortige Bestätigung.", bytes),
-            Note::TcpAckDelayed { delay } => format!("Bestätigung verzögert um {}.", fmt_ns(*delay as i64)),
-            Note::TcpDelayedAck => String::from("Verzögerte Bestätigung gesendet."),
-            Note::TcpZeroWindow => String::from("Empfangspuffer voll: Fenster 0."),
-            Note::TcpWindowUpdate { wnd } => format!("Fenster wieder offen: {} Bytes.", wnd),
+            Note::TcpNoConn { port: p } => msg!("TCP an Port {}: keine solche Verbindung, Antwort RST.", p),
+            Note::TcpSynDropped { port: p } => msg!("Warteschlange von Port {} voll: SYN verworfen.", p),
+            Note::TcpAckDropped { port: p } => msg!("Warteschlange von Port {} voll: das letzte ACK des Handshakes wird ignoriert.", p),
+            Note::TcpSynAgain => msg!("Der SYN kam noch einmal: SYN-ACK wiederholt."),
+            Note::TcpUnacceptable { seq, len } => msg!("Segment außerhalb des Empfangsfensters (Seq {}, Länge {}): ACK zurück, verworfen.", seq, len),
+            Note::TcpChallenge { syn } => msg!("{} im Fenster, aber nicht an der erwarteten Stelle: Challenge-ACK (RFC 5961).", if *syn { "SYN" } else { "RST" }),
+            Note::TcpReset { refused } => {
+                if *refused {
+                    msg!("RST empfangen: Verbindung abgelehnt.")
+                } else {
+                    msg!("RST empfangen: Verbindung zurückgesetzt.")
+                }
+            }
+            Note::TcpRstSent { why } => msg!("RST gesendet: {}.", phrase(why.text())),
+            Note::TcpReceived { bytes } => msg!("{} Bytes in Reihenfolge angenommen.", bytes),
+            Note::TcpOutOfOrder { seq, bytes } => msg!("Außer der Reihe (Seq {}, {} Bytes): zurückgehalten, sofortige Bestätigung.", seq, bytes),
+            Note::TcpGapFilled { bytes } => msg!("Lücke geschlossen: {} Bytes aus der Warteschlange nachgereicht.", bytes),
+            Note::TcpDuplicate { bytes } => msg!("{} Bytes kamen doppelt: sofortige Bestätigung.", bytes),
+            Note::TcpAckDelayed { delay } => msg!("Bestätigung verzögert um {}.", dur(*delay as i64)),
+            Note::TcpDelayedAck => msg!("Verzögerte Bestätigung gesendet."),
+            Note::TcpZeroWindow => msg!("Empfangspuffer voll: Fenster 0."),
+            Note::TcpWindowUpdate { wnd } => msg!("Fenster wieder offen: {} Bytes.", wnd),
             Note::TcpAcked { bytes, cwnd, rtt } => match rtt {
-                Some(r) => format!("{} Bytes bestätigt, RTT {}, cwnd {} Bytes.", bytes, fmt_ns(*r as i64), cwnd),
-                None => format!("{} Bytes bestätigt, cwnd {} Bytes.", bytes, cwnd),
+                Some(r) => msg!("{} Bytes bestätigt, RTT {}, cwnd {} Bytes.", bytes, dur(*r as i64), cwnd),
+                None => msg!("{} Bytes bestätigt, cwnd {} Bytes.", bytes, cwnd),
             },
-            Note::TcpDupAck { n } => format!("Doppelte Bestätigung Nr. {}.", n),
-            Note::TcpFastRetransmit { seq, ssthresh, cwnd } => format!("Drei doppelte Bestätigungen: Fast Retransmit ab Seq {}, ssthresh {}, cwnd {} Bytes.", seq, ssthresh, cwnd),
-            Note::TcpRecoveryEnd { cwnd } => format!("Fast Recovery beendet: cwnd {} Bytes.", cwnd),
-            Note::TcpRto { seq, rto, n } => format!("Zeitüberschreitung: Neuübertragung ab Seq {} (Versuch {}), nächstes RTO {}.", seq, n, fmt_ns(*rto as i64)),
-            Note::TcpNagle { bytes } => format!("Nagle: {} Bytes warten auf die Bestätigung der offenen Daten.", bytes),
-            Note::TcpPersist { after } => format!("Fenster zu klein, nichts unterwegs: Fenstersonde in {}.", fmt_ns(*after as i64)),
-            Note::TcpProbe { n } => format!("Fenstersonde Nr. {}.", n),
-            Note::TcpKeepalive { n } => format!("Keepalive-Probe Nr. {}.", n),
-            Note::TcpGiveUp { why } => format!("Verbindung aufgegeben: {}.", why.text()),
-            Note::TcpPmtu { mss } => format!("Fragmentierung nötig: kleinere Segmente, MSS {}.", mss),
-            Note::HttpRequest { method, path } => format!("HTTP-Anfrage {} {}.", method, path),
-            Note::HttpAnswered { status, bytes } => format!("HTTP-Antwort {} {} ({} Bytes).", status, netpkt::http::reason(*status), bytes),
-            Note::HttpQueued { waiting } => format!("Alle Worker beschäftigt: die Anfrage wartet ({} vor ihr).", waiting),
-            Note::HttpOverload => String::from("Warteschlange voll: sofort 503."),
-            Note::HttpInjected { status } => format!("Fehlerquote: Antwort {} statt der Route.", status),
-            Note::HttpBadRequest { status } => format!("Anfrage nicht lesbar: {}, die Verbindung wird geschlossen.", status),
-            Note::HttpIdleClose { header } => String::from(if *header { "Kein vollständiger Anfragekopf in der Zeit: Verbindung geschlossen." } else { "Keep-Alive-Verbindung zu lange ungenutzt: geschlossen." }),
-            Note::HttpReply { status, ms } => format!("HTTP-Antwort {} nach {} ms.", status, ms),
-            Note::HttpFailed { timeout } => String::from(if *timeout { "HTTP-Anfrage: Zeitüberschreitung." } else { "HTTP-Anfrage gescheitert." }),
-            Note::FaultStart { id, what } => format!("Fehler {} beginnt: {}.", id, what),
-            Note::FaultEnd { id, what } => format!("Fehler {} behoben: {}.", id, what),
-            Note::PartitionDrop { src } => format!("Partition: Paket von {} verworfen.", src),
-            Note::LbPick { backend, algo } => format!("Loadbalancer: Backend {} gewählt ({}).", backend, algo),
-            Note::LbNoBackend => String::from("Loadbalancer: kein Backend verfügbar."),
-            Note::LbRetry { backend } => format!("Loadbalancer: {} nicht erreichbar, nächster Versuch.", backend),
+            Note::TcpDupAck { n } => msg!("Doppelte Bestätigung Nr. {}.", n),
+            Note::TcpFastRetransmit { seq, ssthresh, cwnd } => msg!("Drei doppelte Bestätigungen: Fast Retransmit ab Seq {}, ssthresh {}, cwnd {} Bytes.", seq, ssthresh, cwnd),
+            Note::TcpRecoveryEnd { cwnd } => msg!("Fast Recovery beendet: cwnd {} Bytes.", cwnd),
+            Note::TcpRto { seq, rto, n } => msg!("Zeitüberschreitung: Neuübertragung ab Seq {} (Versuch {}), nächstes RTO {}.", seq, n, dur(*rto as i64)),
+            Note::TcpNagle { bytes } => msg!("Nagle: {} Bytes warten auf die Bestätigung der offenen Daten.", bytes),
+            Note::TcpPersist { after } => msg!("Fenster zu klein, nichts unterwegs: Fenstersonde in {}.", dur(*after as i64)),
+            Note::TcpProbe { n } => msg!("Fenstersonde Nr. {}.", n),
+            Note::TcpKeepalive { n } => msg!("Keepalive-Probe Nr. {}.", n),
+            Note::TcpGiveUp { why } => msg!("Verbindung aufgegeben: {}.", phrase(why.text())),
+            Note::TcpPmtu { mss } => msg!("Fragmentierung nötig: kleinere Segmente, MSS {}.", mss),
+            Note::HttpRequest { method, path } => msg!("HTTP-Anfrage {} {}.", method, path),
+            Note::HttpAnswered { status, bytes } => msg!("HTTP-Antwort {} {} ({} Bytes).", status, netpkt::http::reason(*status), bytes),
+            Note::HttpQueued { waiting } => msg!("Alle Worker beschäftigt: die Anfrage wartet ({} vor ihr).", waiting),
+            Note::HttpOverload => msg!("Warteschlange voll: sofort 503."),
+            Note::HttpInjected { status } => msg!("Fehlerquote: Antwort {} statt der Route.", status),
+            Note::HttpBadRequest { status } => msg!("Anfrage nicht lesbar: {}, die Verbindung wird geschlossen.", status),
+            Note::HttpIdleClose { header } => {
+                if *header {
+                    msg!("Kein vollständiger Anfragekopf in der Zeit: Verbindung geschlossen.")
+                } else {
+                    msg!("Keep-Alive-Verbindung zu lange ungenutzt: geschlossen.")
+                }
+            }
+            Note::HttpReply { status, ms } => msg!("HTTP-Antwort {} nach {} ms.", status, ms),
+            Note::HttpFailed { timeout } => {
+                if *timeout {
+                    msg!("HTTP-Anfrage: Zeitüberschreitung.")
+                } else {
+                    msg!("HTTP-Anfrage gescheitert.")
+                }
+            }
+            Note::FaultStart { id, what } => msg!("Fehler {} beginnt: {}.", id, what),
+            Note::FaultEnd { id, what } => msg!("Fehler {} behoben: {}.", id, what),
+            Note::PartitionDrop { src } => msg!("Partition: Paket von {} verworfen.", src),
+            Note::LbPick { backend, algo } => msg!("Loadbalancer: Backend {} gewählt ({}).", backend, algo),
+            Note::LbNoBackend => msg!("Loadbalancer: kein Backend verfügbar."),
+            Note::LbRetry { backend } => msg!("Loadbalancer: {} nicht erreichbar, nächster Versuch.", backend),
             Note::LbHealth { backend, up } => {
                 if *up {
-                    format!("Health Check: {} ist wieder verfügbar.", backend)
+                    msg!("Health Check: {} ist wieder verfügbar.", backend)
                 } else {
-                    format!("Health Check: {} fällt aus.", backend)
+                    msg!("Health Check: {} fällt aus.", backend)
                 }
             }
-            Note::LbDrained { backend } => format!("{} ist leer gelaufen und entfernt.", backend),
-            Note::KvCoordinate { key, op, replicas } => format!("KV: {} {} koordiniert ({} Replikate).", op, key, replicas),
-            Note::KvForward { key, to } => format!("KV: Schreiben von {} an den Leader {} weitergereicht.", key, to),
-            Note::KvWrite { key, version, need } => format!("KV: {} als Version {} gespeichert, wartet auf {} Bestätigungen.", key, version, need),
+            Note::LbDrained { backend } => msg!("{} ist leer gelaufen und entfernt.", backend),
+            Note::KvCoordinate { key, op, replicas } => msg!("KV: {} {} koordiniert ({} Replikate).", op, key, replicas),
+            Note::KvForward { key, to } => msg!("KV: Schreiben von {} an den Leader {} weitergereicht.", key, to),
+            Note::KvWrite { key, version, need } => msg!("KV: {} als Version {} gespeichert, wartet auf {} Bestätigungen.", key, version, need),
             Note::KvQuorum { key, got, need, ok } => {
                 if *ok {
-                    format!("KV: Quorum für {} erreicht ({} von {}).", key, got, need)
+                    msg!("KV: Quorum für {} erreicht ({} von {}).", key, got, need)
                 } else {
-                    format!("KV: Quorum für {} verfehlt ({} von {}).", key, got, need)
+                    msg!("KV: Quorum für {} verfehlt ({} von {}).", key, got, need)
                 }
             }
             Note::KvReplica { key, version, stored } => {
                 if *stored {
-                    format!("KV: Replikat von {} auf Version {} gebracht.", key, version)
+                    msg!("KV: Replikat von {} auf Version {} gebracht.", key, version)
                 } else {
-                    format!("KV: Replikat von {} hat schon Version {} oder neuer.", key, version)
+                    msg!("KV: Replikat von {} hat schon Version {} oder neuer.", key, version)
                 }
             }
-            Note::KvReadRepair { key, to } => format!("KV: Read Repair von {} an {}.", key, to),
+            Note::KvReadRepair { key, to } => msg!("KV: Read Repair von {} an {}.", key, to),
             Note::KvMember { member, up } => {
                 if *up {
-                    format!("KV: {} antwortet wieder.", member)
+                    msg!("KV: {} antwortet wieder.", member)
                 } else {
-                    format!("KV: {} antwortet nicht mehr und gilt als ausgefallen.", member)
+                    msg!("KV: {} antwortet nicht mehr und gilt als ausgefallen.", member)
                 }
             }
-            Note::DiskFull => String::from("Disk voll: Schreiben abgelehnt."),
-            Note::CacheHit { key } => format!("Cache: Treffer für {}.", key),
-            Note::CacheMiss { key } => format!("Cache: kein Treffer für {}, frage das Backend.", key),
-            Note::MqPublish { topic, id } => format!("Queue {}: Nachricht {} angenommen.", topic, id),
-            Note::MqDeliver { topic, id, n } => format!("Queue {}: Nachricht {} ausgeliefert ({}. Zustellung).", topic, id, n),
-            Note::MqAck { topic, id } => format!("Queue {}: Nachricht {} bestätigt.", topic, id),
-            Note::MqRedeliver { topic, id } => format!("Queue {}: Nachricht {} nicht bestätigt, wieder in der Warteschlange.", topic, id),
-            Note::MqDead { topic, id } => format!("Queue {}: Nachricht {} zu oft zugestellt, aussortiert.", topic, id),
+            Note::DiskFull => msg!("Disk voll: Schreiben abgelehnt."),
+            Note::CacheHit { key } => msg!("Cache: Treffer für {}.", key),
+            Note::CacheMiss { key } => msg!("Cache: kein Treffer für {}, frage das Backend.", key),
+            Note::MqPublish { topic, id } => msg!("Queue {}: Nachricht {} angenommen.", topic, id),
+            Note::MqDeliver { topic, id, n } => msg!("Queue {}: Nachricht {} ausgeliefert ({}. Zustellung).", topic, id, n),
+            Note::MqAck { topic, id } => msg!("Queue {}: Nachricht {} bestätigt.", topic, id),
+            Note::MqRedeliver { topic, id } => msg!("Queue {}: Nachricht {} nicht bestätigt, wieder in der Warteschlange.", topic, id),
+            Note::MqDead { topic, id } => msg!("Queue {}: Nachricht {} zu oft zugestellt, aussortiert.", topic, id),
         }
     }
 }

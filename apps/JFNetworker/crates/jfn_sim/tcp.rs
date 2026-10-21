@@ -20,6 +20,8 @@
 //                                 an established one remembers the error, "fragmentation
 //                                 needed" lowers the MSS
 //   Engine::tcp_conns / tcp_conn / tcp_stats   what ss and "show tcp brief" show
+//   TcpEnd::text / RstWhy::text   German reasons (the app translates them: engine.tsv);
+//                                 refusals of listen and connect are a Msg (jfn_model::msg)
 //
 // The system decides the numbers (TcpCfg).  Linux: ISNs and ports come from the device's
 // random numbers, connect takes ports from 32768-60999 (even ones first), the MSS is the MTU
@@ -47,6 +49,9 @@
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::String;
 use alloc::vec::Vec;
+
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 
 use netpkt::icmp::{T_TIME_EXCEEDED, T_UNREACH, UNREACH_FRAG_NEEDED, UNREACH_PORT, UNREACH_PROTO};
 use netpkt::ipv4::{Ipv4Hdr, Ipv4View, PROTO_TCP};
@@ -158,8 +163,9 @@ pub enum TcpEnd {
 }
 
 impl TcpEnd {
-    /// German, for notes and status lines
+    /// German, for notes and status lines (the app translates it)
     pub fn text(self) -> &'static str {
+        // i18n
         match self {
             TcpEnd::Closed => "ordentlich geschlossen",
             TcpEnd::Refused => "abgelehnt (RST auf den SYN)",
@@ -203,7 +209,9 @@ pub enum RstWhy {
 }
 
 impl RstWhy {
+    /// German, for notes (the app translates it)
     pub fn text(self) -> &'static str {
+        // i18n
         match self {
             RstWhy::NoConn => "keine solche Verbindung",
             RstWhy::BadAck => "Bestätigung für nie Gesendetes",
@@ -2528,12 +2536,12 @@ impl Engine {
     // ------------------------------------------------------------ the socket calls
 
     /// a listening socket (on every address when `addr` is 0.0.0.0)
-    pub(crate) fn tcp_listen(&mut self, ni: usize, owner: u32, addr: Ipv4, port: u16, backlog: u32, opts: SockOpts) -> Result<u32, String> {
-        let port = if port == 0 { self.tcp_port(ni, addr, Ipv4::UNSPECIFIED, 0).ok_or_else(|| String::from("Keine freien Ports."))? } else { port };
+    pub(crate) fn tcp_listen(&mut self, ni: usize, owner: u32, addr: Ipv4, port: u16, backlog: u32, opts: SockOpts) -> Result<u32, Msg> {
+        let port = if port == 0 { self.tcp_port(ni, addr, Ipv4::UNSPECIFIED, 0).ok_or_else(|| msg!("Keine freien Ports."))? } else { port };
         let dev = self.dev_of(ni);
-        let tcp = self.tcp_mut(ni).ok_or_else(|| String::from("kein IP"))?;
+        let tcp = self.tcp_mut(ni).ok_or_else(|| msg!("kein IP"))?;
         if tcp.listeners.values().any(|l| l.port == port && (l.addr == addr || l.addr.is_unspecified() || addr.is_unspecified())) {
-            return Err(alloc::format!("Port {} ist schon belegt.", port));
+            return Err(msg!("Port {} ist schon belegt.", port));
         }
         let id = tcp.next_id;
         tcp.next_id += 1;
@@ -2544,17 +2552,17 @@ impl Engine {
     }
 
     /// an active open from `sport` (0: an ephemeral port)
-    pub(crate) fn tcp_connect(&mut self, ni: usize, owner: u32, sport: u16, dst: Ipv4, dport: u16, opts: SockOpts, cause: Option<HopId>) -> Result<u32, String> {
+    pub(crate) fn tcp_connect(&mut self, ni: usize, owner: u32, sport: u16, dst: Ipv4, dport: u16, opts: SockOpts, cause: Option<HopId>) -> Result<u32, Msg> {
         if dport == 0 || dst.is_unspecified() || dst.is_broadcast() || dst.is_multicast() {
-            return Err(alloc::format!("{}:{} ist kein Ziel für TCP.", dst, dport));
+            return Err(msg!("{}:{} ist kein Ziel für TCP.", dst, dport));
         }
-        let src = self.source_for(ni, dst).ok_or_else(|| String::from("Das Netz ist nicht erreichbar."))?;
+        let src = self.source_for(ni, dst).ok_or_else(|| msg!("Das Netz ist nicht erreichbar."))?;
         let sport = if sport == 0 {
-            self.tcp_port(ni, src, dst, dport).ok_or_else(|| String::from("Keine freien Ports."))?
+            self.tcp_port(ni, src, dst, dport).ok_or_else(|| msg!("Keine freien Ports."))?
         } else {
-            let tcp = self.tcp(ni).ok_or_else(|| String::from("kein IP"))?;
+            let tcp = self.tcp(ni).ok_or_else(|| msg!("kein IP"))?;
             if tcp.tuples.contains_key(&(src, sport, dst, dport)) || tcp.listeners.values().any(|l| l.port == sport) {
-                return Err(alloc::format!("Port {} ist schon belegt.", sport));
+                return Err(msg!("Port {} ist schon belegt.", sport));
             }
             sport
         };
@@ -2562,7 +2570,7 @@ impl Engine {
         let ip_id = self.rand32(ni) as u16;
         let adv_mss = self.tcp_adv_mss(ni, dst);
         let now = self.now;
-        let tcp = self.tcp_mut(ni).ok_or_else(|| String::from("kein IP"))?;
+        let tcp = self.tcp_mut(ni).ok_or_else(|| msg!("kein IP"))?;
         let cfg = tcp.cfg;
         let id = tcp.next_id;
         tcp.next_id += 1;

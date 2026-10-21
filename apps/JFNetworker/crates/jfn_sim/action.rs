@@ -32,6 +32,9 @@
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
 // are lost.
+//
+// ActErr::msg() is the refusal as a message for the app's catalogue (Display: its German
+// text); Refused carries its reason as one (jfn_model::msg).
 
 use alloc::format;
 use alloc::string::String;
@@ -42,6 +45,8 @@ use core::fmt;
 use base::rng::Pcg32;
 use jfn_model::cable::{self, CableKind, Why};
 use jfn_model::catalog::{self, CliStyle, F_ROUTER};
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 use jfn_model::project::{Device, Link, ServiceDef};
 use netpkt::dns::Rr;
 use netpkt::eth::ET_IPV4;
@@ -191,29 +196,51 @@ pub enum ActErr {
     NoIp(u32),
     UnknownIface { dev: u32, iface: String },
     BadMtu(u16),
-    /// the device refuses the setting (the German reason)
-    Refused(String),
+    /// the device refuses the setting (the reason)
+    Refused(Msg),
+}
+
+impl ActErr {
+    /// the refusal as a message for the app's catalogue (Display: its German text)
+    pub fn msg(&self) -> Msg {
+        match self {
+            ActErr::UnknownDevice(d) => msg!("Das Gerät {} gibt es nicht.", d),
+            ActErr::UnknownPort { dev, port } => msg!("Gerät {} hat keinen Port \u{201e}{}\u{201c}.", dev, port),
+            ActErr::UnknownLink(l) => msg!("Die Verbindung {} gibt es nicht.", l),
+            ActErr::UnknownModel(m) => msg!("Unbekanntes Gerätemodell \u{201e}{}\u{201c}.", m),
+            ActErr::DeviceExists(d) => msg!("Das Gerät {} läuft schon.", d),
+            ActErr::LinkExists(l) => msg!("Die Verbindung {} besteht schon.", l),
+            ActErr::PortBusy { dev, port } => msg!("Der Port {} von Gerät {} ist schon verbunden.", port, dev),
+            ActErr::NoBridge(d) => msg!("Gerät {} ist kein Switch.", d),
+            ActErr::BadVlan(v) => msg!("VLAN {} gibt es nicht (1 bis 4094).", v),
+            ActErr::Cable(w) => w.msg(),
+            ActErr::NoIp(d) => msg!("Gerät {} kann kein IP.", d),
+            ActErr::UnknownIface { dev, iface } => msg!("Gerät {} hat kein Interface \u{201e}{}\u{201c}.", dev, iface),
+            ActErr::BadMtu(m) => msg!("Die MTU {} geht nicht (68 bis 65535).", m),
+            ActErr::Refused(why) => why.clone(),
+        }
+    }
 }
 
 impl fmt::Display for ActErr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            ActErr::UnknownDevice(d) => write!(f, "Das Gerät {} gibt es nicht.", d),
-            ActErr::UnknownPort { dev, port } => write!(f, "Gerät {} hat keinen Port \u{201e}{}\u{201c}.", dev, port),
-            ActErr::UnknownLink(l) => write!(f, "Die Verbindung {} gibt es nicht.", l),
-            ActErr::UnknownModel(m) => write!(f, "Unbekanntes Gerätemodell \u{201e}{}\u{201c}.", m),
-            ActErr::DeviceExists(d) => write!(f, "Das Gerät {} läuft schon.", d),
-            ActErr::LinkExists(l) => write!(f, "Die Verbindung {} besteht schon.", l),
-            ActErr::PortBusy { dev, port } => write!(f, "Der Port {} von Gerät {} ist schon verbunden.", port, dev),
-            ActErr::NoBridge(d) => write!(f, "Gerät {} ist kein Switch.", d),
-            ActErr::BadVlan(v) => write!(f, "VLAN {} gibt es nicht (1 bis 4094).", v),
-            ActErr::Cable(w) => w.fmt(f),
-            ActErr::NoIp(d) => write!(f, "Gerät {} kann kein IP.", d),
-            ActErr::UnknownIface { dev, iface } => write!(f, "Gerät {} hat kein Interface \u{201e}{}\u{201c}.", dev, iface),
-            ActErr::BadMtu(m) => write!(f, "Die MTU {} geht nicht (68 bis 65535).", m),
-            ActErr::Refused(why) => f.write_str(why),
-        }
+        f.write_str(&self.msg().text())
     }
+}
+
+/// a refusal of IpStack::add_addr as the message it was made from: ip.rs words its three
+/// refusals as German text (until add_addr gives a Msg itself); anything else stays as it is
+fn addr_refused(s: String) -> ActErr {
+    let m = if let Some(p) = s.strip_suffix(" ist keine gültige Interface-Adresse.") {
+        msg!("{} ist keine gültige Interface-Adresse.", p)
+    } else if let Some((p, other)) = s.strip_suffix('.').and_then(|x| x.split_once(" überschneidet sich mit ")) {
+        msg!("{} überschneidet sich mit {}.", p, other)
+    } else if s == "Unbekanntes Interface." {
+        msg!("Unbekanntes Interface.")
+    } else {
+        Msg::plain(s)
+    };
+    ActErr::Refused(m)
 }
 
 impl Engine {
@@ -337,11 +364,11 @@ impl Engine {
                 let (ni, i) = self.ip_iface(dev, &iface)?;
                 let st = self.ip_mut(ni, dev)?;
                 if add {
-                    st.add_addr(i, prefix).map_err(ActErr::Refused)
+                    st.add_addr(i, prefix).map_err(addr_refused)
                 } else if st.remove_addr(i, prefix) {
                     Ok(())
                 } else {
-                    Err(ActErr::Refused(format!("{} ist an {} nicht eingerichtet.", prefix, iface)))
+                    Err(ActErr::Refused(msg!("{} ist an {} nicht eingerichtet.", prefix, iface)))
                 }
             }
             Action::IfUp { dev, iface, up } => {
@@ -388,19 +415,19 @@ impl Engine {
                 let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
                 let st = self.ip_mut(ni, dev)?;
                 if !add {
-                    return if st.remove_route(prefix, via) { Ok(()) } else { Err(ActErr::Refused(format!("Keine passende Route zu {}.", prefix.trunc()))) };
+                    return if st.remove_route(prefix, via) { Ok(()) } else { Err(ActErr::Refused(msg!("Keine passende Route zu {}.", prefix.trunc()))) };
                 }
                 let out = match &iface {
                     Some(name) => Some(st.iface_by_name(name).ok_or_else(|| ActErr::UnknownIface { dev, iface: name.clone() })?),
                     None => None,
                 };
                 if via.is_none() && out.is_none() {
-                    return Err(ActErr::Refused(String::from("Eine Route braucht einen nächsten Hop oder ein Interface.")));
+                    return Err(ActErr::Refused(msg!("Eine Route braucht einen nächsten Hop oder ein Interface.")));
                 }
                 if let Some(gw) = via
                     && (st.is_mine(gw) || gw.is_unspecified() || gw.is_multicast() || gw.is_broadcast() || gw.is_loopback())
                 {
-                    return Err(ActErr::Refused(format!("{} taugt nicht als nächster Hop.", gw)));
+                    return Err(ActErr::Refused(msg!("{} taugt nicht als nächster Hop.", gw)));
                 }
                 st.add_route(Route { prefix, via, iface: out, src: RouteSrc::Static, ad, metric: 0 });
                 Ok(())
@@ -424,14 +451,14 @@ impl Engine {
                 };
                 let b = self.bridge_mut(ni, dev)?;
                 if !b.ports.get(pi as usize).is_some_and(|p| p.member) {
-                    return Err(ActErr::Refused(format!("{} ist kein Switch-Port.", port)));
+                    return Err(ActErr::Refused(msg!("{} ist kein Switch-Port.", port)));
                 }
                 if b.switchport(pi, set) { Ok(()) } else { Err(ActErr::BadVlan(bad.unwrap_or(0))) }
             }
             Action::Hostname { dev, name } => {
                 let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
                 if !jfn_model::project::valid_name(&name) {
-                    return Err(ActErr::Refused(format!("\u{201e}{}\u{201c} ist kein gültiger Gerätename.", name)));
+                    return Err(ActErr::Refused(msg!("\u{201e}{}\u{201c} ist kein gültiger Gerätename.", name)));
                 }
                 if let Some(Some(n)) = self.nodes.get_mut(ni) {
                     n.name = name;
@@ -548,11 +575,11 @@ impl Engine {
         };
         let ios = n.model.cli == CliStyle::Ios;
         if !n.model.has(F_ROUTER) {
-            return Err(ActErr::Refused(format!("{} ist ein reiner Layer-2-Switch: {} bleibt ein Switch-Port.", n.name, pname)));
+            return Err(ActErr::Refused(msg!("{} ist ein reiner Layer-2-Switch: {} bleibt ein Switch-Port.", n.name, pname)));
         }
         let b = n.bridge.as_mut().ok_or(ActErr::NoBridge(dev))?;
         if !media.is_ethernet() {
-            return Err(ActErr::Refused(format!("{} ist kein Ethernet-Port.", pname)));
+            return Err(ActErr::Refused(msg!("{} ist kein Ethernet-Port.", pname)));
         }
         b.ports[pi as usize].member = !routed;
         b.flush_port(pi);
@@ -581,7 +608,7 @@ impl Engine {
     }
 
     fn sub_if(&mut self, dev: u32, name: &str, vlan: u16, add: bool) -> Result<(), ActErr> {
-        let not_sub = || ActErr::Refused(format!("\u{201e}{}\u{201c} ist kein Subinterface (Port.Nummer).", name));
+        let not_sub = || ActErr::Refused(msg!("\u{201e}{}\u{201c} ist kein Subinterface (Port.Nummer).", name));
         let (base, num) = name.trim().rsplit_once('.').ok_or_else(not_sub)?;
         let num: u32 = num.parse().map_err(|_| not_sub())?;
         let (ni, pi) = self.resolve(dev, base)?;
@@ -594,12 +621,12 @@ impl Engine {
             (p.spec.name.clone(), p.mac, p.spec.media)
         };
         if !media.is_ethernet() {
-            return Err(ActErr::Refused(format!("{} kann kein 802.1Q.", pname)));
+            return Err(ActErr::Refused(msg!("{} kann kein 802.1Q.", pname)));
         }
         let full = format!("{}.{}", pname, num);
         let st = n.ip.as_mut().ok_or(ActErr::NoIp(dev))?;
         if !st.iface_of_port(pi).is_some_and(|i| !st.ifaces[i as usize].hidden) {
-            return Err(ActErr::Refused(format!("{} ist ein Switch-Port: erst \u{201e}no switchport\u{201c}.", pname)));
+            return Err(ActErr::Refused(msg!("{} ist ein Switch-Port: erst \u{201e}no switchport\u{201c}.", pname)));
         }
         let have = st.find_name(&full);
         if !add {
@@ -615,7 +642,7 @@ impl Engine {
             return Err(ActErr::BadVlan(vlan));
         }
         if st.ifaces.iter().any(|f| !f.hidden && f.kind == IfKind::Sub { port: pi, vlan } && !f.name.eq_ignore_ascii_case(&full)) {
-            return Err(ActErr::Refused(format!("VLAN {} hat schon ein anderes Subinterface von {}.", vlan, pname)));
+            return Err(ActErr::Refused(msg!("VLAN {} hat schon ein anderes Subinterface von {}.", vlan, pname)));
         }
         let kind = IfKind::Sub { port: pi, vlan };
         match have {
@@ -642,7 +669,7 @@ impl Engine {
         let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
         let st = self.ip_mut(ni, dev)?;
         let Some(i) = st.ifaces.iter().position(|f| !f.hidden && !f.is_loopback() && f.on_link(ip)).map(|i| i as u16) else {
-            return Err(ActErr::Refused(format!("{} liegt in keinem Netz dieses Geräts.", ip)));
+            return Err(ActErr::Refused(msg!("{} liegt in keinem Netz dieses Geräts.", ip)));
         };
         let Some(m) = mac else {
             return match st.arp.get(&(i, ip)) {
@@ -650,11 +677,11 @@ impl Engine {
                     st.arp.remove(&(i, ip));
                     Ok(())
                 }
-                _ => Err(ActErr::Refused(format!("Für {} gibt es keinen statischen ARP-Eintrag.", ip))),
+                _ => Err(ActErr::Refused(msg!("Für {} gibt es keinen statischen ARP-Eintrag.", ip))),
             };
         };
         if !m.is_unicast() || m.is_zero() {
-            return Err(ActErr::Refused(format!("{} taugt nicht als ARP-Eintrag.", m)));
+            return Err(ActErr::Refused(msg!("{} taugt nicht als ARP-Eintrag.", m)));
         }
         let old = st.arp.insert((i, ip), ArpEntry { mac: Some(m), at: now, tries: 0, queue: Vec::new(), fixed: true });
         // packets that waited for an answer go now

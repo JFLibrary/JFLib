@@ -1,0 +1,94 @@
+#!args --verify-dirty --lang en --open apps/JFNetworker/tests/fixtures/campus.jfnet
+# the window in English (app/tr.rs, src/locales/ui.tsv and engine.tsv): the menus, the panels,
+# the properties of a device, a cable for screen readers, the status bar, the simulation mode
+# with its events and the Paket tab, the problems, the settings and the shortcuts; shots light
+# and dark (build/jfnetworker/english_*.png).  --lang en picks the column, as the system's
+# language does in a window.
+size 1280 800
+theme light
+wait 6000
+expect menu:"File" exists
+expect menu:"Edit" exists
+expect menu:"View" exists
+expect menu:"Simulation" exists
+expect menu:"Tools" exists
+expect menu:"Help" exists
+expect tab:"Devices" exists
+expect tab:"Properties" exists
+expect tab:"Terminal" exists
+expect tab:"Events" exists
+expect tab:"Packet" exists
+expect tab:"Log" exists
+expect tab:"Problems" exists
+expect tab:"Real time" selected
+expect text:"7 devices · 6 cables" exists
+expect "End devices (9)" exists
+expect button:"Printer" exists
+expect listitem:"Cable MLS1 Te1/1/1 – R1 Te0/1/0, Fiber, multimode, up" exists
+click menu:"File"
+expect menuitem:"New" exists
+expect menuitem:"Open …" exists
+expect menuitem:"Save as …" exists
+expect menuitem:"Recent files" exists
+key esc
+click menu:"Simulation"
+expect menuitem:"Simulation mode" exists
+expect menuitem:"Step forward" exists
+key esc
+# a device in the properties
+move 640,790
+click listitem:"MLS1"
+move 640,790
+expect text:"Description" exists
+expect text:"L3 switch 24× 1G, 4× 10G SFP+" exists
+expect text:"24× 1G, 4× 10G SFP+, Console" exists
+expect "Powered on" checked
+expect text:"Command line" exists
+expect text:"IOS-like (routers, switches)" exists
+expect text:"Interfaces (32)" exists
+shot build/jfnetworker/english_light.png
+# the simulation mode: PC2 pings SRV1 (a simple PDU), a step
+click tab:"Simulation"
+wait 200
+key p
+expect text:"Click the source, then the destination (or choose them with Tab and Enter), Esc ends" exists
+click listitem:"PC2"
+wait 600
+click listitem:"SRV1"
+key esc
+expect text:"#1 ICMP · PC2 → SRV1" exists
+key f7
+wait 1200
+# the frames on the cables for screen readers: MLS1's answer, the flooded request
+expect button:"Frame 103: MLS1 → PC2 · 10.10.10.1 is at 02:4a:00:00:02:00" exists
+expect button:"Frame 102: MLS1 → PC1 · Who has 10.10.10.1? Tell 10.10.10.101" exists
+expect "Frames on the cables" exists
+click tab:"Events"
+expect "Protocols" exists
+expect button:"Only selection" exists
+expect text:"ARP reply on Vlan10: 10.10.10.1 is 02:4a:00:00:02:00." exists
+focus #38912
+key end
+wait 100
+click tab:"Packet"
+wait 100
+expect text:"Decisions" exists
+move 640,790
+theme dark
+shot build/jfnetworker/english_dark.png
+theme light
+# the problems: none
+click tab:"Problems"
+expect "No problems" exists
+# the settings and the shortcuts
+key ctrl+,
+expect dialog:"Settings" exists
+expect "Show grid" checked
+expect "Snap to grid" checked
+key esc
+key f1
+expect dialog:"Keyboard shortcuts" exists
+expect text:"Ctrl+9" exists
+expect text:"Shift+F5" exists
+key esc
+expect_nowarn

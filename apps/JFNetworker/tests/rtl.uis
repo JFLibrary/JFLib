@@ -1,0 +1,37 @@
+#!args --rtl --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# a mirrored window (ui/rtl.rs, as for Arabic or Hebrew): the menus, the toolbar, the docks and
+# the status bar flip -- Geräte on the right, Eigenschaften on the left --, the topology keeps
+# its drawing (a network is no text); its device and cable records, clicks, drags, the arrow
+# keys and Tab act as drawn.  Shots light and dark.
+theme light
+expect tab:"Geräte" rect 1192 70 84 26
+expect tab:"Eigenschaften" rect 146 70 130 26
+expect button:"Auswahl" rect 1248 38 28 28
+expect canvas:"Topologie" rect 286 70 728 500
+expect listitem:"PC1" rect 650 320 64 48
+expect listitem:"Kabel PC1 eth0 – SW1 Gi1/0/1, Kupfer, gerade, aktiv" exists
+# the canvas as drawn: a click selects, Right moves to the right on the screen
+click listitem:"PC1"
+expect listitem:"PC1" selected
+expect text:"0, 0" exists
+key right
+expect text:"20, 0" exists
+expect listitem:"PC1" rect 670 320 64 48
+wait 600
+drag listitem:"PC1" 742,404
+expect text:"60, 60" exists
+key ctrl+z
+key ctrl+z
+expect text:"0, 0" exists
+# Tab walks the devices (on from PC1, which has the focus), then the cables
+key ctrl+9
+key tab
+expect listitem:"PC2" focused
+key tab
+expect listitem:"SW1" focused
+key tab
+expect listitem:"Kabel PC1 eth0 – SW1 Gi1/0/1, Kupfer, gerade, aktiv" selected
+shot build/jfnetworker/rtl_light.png
+theme dark
+shot build/jfnetworker/rtl_dark.png
+expect_nowarn

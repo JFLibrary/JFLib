@@ -24,10 +24,9 @@
 // Several cables or devices change in one undo step.  The simulator follows every step.
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use jfn_model::catalog::speed_str;
 use jfn_model::project::{Point, Route};
 use jfn_model::{cable, CableKind, Project};
 use jfn_sim::Led;
@@ -35,6 +34,7 @@ use ui::*;
 
 use super::paint::key_port;
 use crate::app::constants::*;
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::edits;
 
@@ -246,7 +246,7 @@ pub(crate) fn hover_x(n: &mut Net, ui: &mut Ui) {
     let Some(r) = x_rect(n, ui, id) else { return };
     ui.next_rect_px(r[0], r[1], r[2], r[3]);
     ui.next_flags(ST_ICON_ONLY | ST_NOFOCUS);
-    if ui.icon_button(ID_CABLE_X, IC_CANCEL, "Kabel trennen") & EV_ACT != 0 {
+    if ui.icon_button(ID_CABLE_X, IC_CANCEL, t("Kabel trennen")) & EV_ACT != 0 {
         if let Some(e) = edits::delete(&n.doc.proj, &[id]) {
             n.doc.apply(e);
         }
@@ -365,14 +365,23 @@ pub(crate) fn plus_handles(n: &Net, ui: &mut Ui) {
     ui.clip_pop();
 }
 
-/// the state of a cable in words: "aktiv", "ausgesteckt", "ohne Strom", "unten"
+/// the state of a cable in words: "aktiv", "ausgesteckt", "ohne Strom", "unten" (in the
+/// current language)
 pub(crate) fn state_text(down: bool, leds: Option<[Led; 2]>) -> &'static str {
-    match leds {
+    t(match leds {
         _ if down => "ausgesteckt",
         Some([Led::Up, Led::Up]) => "aktiv",
         Some(l) if l.contains(&Led::NoPower) => "ohne Strom",
         Some(l) if l.iter().any(|x| matches!(x, Led::Blocking | Led::Learning)) => "blockiert",
         _ => "unten",
+    })
+}
+
+/// a cable for screen readers and scripts: "Kabel PC1 eth0 – SW1 Gi1/0/1, Kupfer, gerade, aktiv"
+pub(crate) fn sem_label(doc: &crate::doc::Doc, key: u64) -> String {
+    match doc.proj.link(key as u32) {
+        Some(l) => tf("Kabel {}, {}, {}", &[&ends_text(&doc.proj, l), t(l.cable.title()), state_text(l.down, doc.sim.led(l.id))]),
+        None => String::from("–"),
     }
 }
 
@@ -391,14 +400,14 @@ pub(crate) fn tooltip(c: &super::Canvas, doc: &crate::doc::Doc, ui: &mut Ui) {
             let sim = &doc.sim;
             let state = state_text(l.down, sim.led(l.id));
             let pps = sim.rate(l.id);
-            let text = format!("{} · {} · {} · {} · {} Pakete/s", ends_text(p, l), l.cable.title(), speed_str(l.kbps), state, pps);
+            let text = tf("{} · {} · {} · {} · {} Pakete/s", &[&ends_text(p, l), t(l.cable.title()), &crate::app::tr::speed(l.kbps), state, &pps.to_string()]);
             ui.tooltip_part(&text, key);
         }
         DHit::Port(key) => {
             let Some((d, i)) = key_port(key) else { return ui.tooltip_part("", 0) };
             let spec = p.model_of(d).and_then(|m| m.ports().into_iter().find(|s| s.index == i));
             let Some(s) = spec else { return ui.tooltip_part("", 0) };
-            let text = format!("{} · {} {} · frei", s.name, speed_str(s.kbps), s.media.name());
+            let text = tf("{} · {} {} · frei", &[&s.name, &crate::app::tr::speed(s.kbps), t(s.media.name())]);
             ui.tooltip_part(&text, key);
         }
         _ => ui.tooltip_part("", 0),

@@ -1,0 +1,75 @@
+# Campus (Abnahme Phase 1): MLS1 routet VLAN 10 (Staff) und VLAN 20 (Students) und reicht DHCP
+# über "ip helper-address" an R1 weiter; R1 vergibt die Adressen aus zwei Pools und führt ins
+# Servernetz zu SRV1 (DNS-Zone lab, Zeitquelle von R1 und MLS1). Die PCs holen ihre Adressen
+# beim Start; dhclient -v erneuert die von PC1 direkt bei R1, über MLS1 hinweg.
+run 10s
+PC1: dhclient -v eth0
+run 1s
+expect PC1 output contains "DHCPREQUEST for 10.10.10.100 on eth0 to 10.10.0.1 port 67"
+expect PC1 output contains "DHCPACK of 10.10.10.100 from 10.10.0.1"
+expect PC1 output contains "bound to 10.10.10.100 -- renewal in"
+PC1: ip addr show eth0
+expect PC1 output contains "inet 10.10.10.100/24 brd 10.10.10.255 scope global eth0"
+PC2: ip -br addr show eth0
+expect PC2 output contains "10.10.10.101/24"
+PC3: ip -br addr show eth0
+expect PC3 output contains "10.10.20.100/24"
+PC4: ip -br addr show eth0
+expect PC4 output contains "10.10.20.101/24"
+PC1: ip route
+expect PC1 route 0.0.0.0/0 via 10.10.10.1
+PC1: cat /etc/resolv.conf
+expect PC1 output contains "domain lab\nsearch lab\nnameserver 10.10.100.10\n"
+# Namen über den DNS-Server im Servernetz, aus beiden VLANs
+PC1: ping -c 3 server.lab
+run 3s
+expect PC1 output contains "PING server.lab (10.10.100.10) 56(84) bytes of data."
+expect PC1 output contains "3 packets transmitted, 3 received, 0% packet loss"
+PC3: ping -c 3 server.lab
+run 3s
+expect PC3 output contains "3 packets transmitted, 3 received, 0% packet loss"
+PC3: traceroute server.lab
+run 1s
+expect PC3 output contains "traceroute to server.lab (10.10.100.10), 30 hops max, 60 byte packets"
+expect PC3 output contains " 1  10.10.20.1 (10.10.20.1)"
+expect PC3 output contains " 2  10.10.0.1 (10.10.0.1)"
+expect PC3 output contains " 3  10.10.100.10 (10.10.100.10)"
+PC1: ping -c 1 nosuch.lab
+run 1s
+expect PC1 output contains "ping: nosuch.lab: Name or service not known"
+# von VLAN 10 nach VLAN 20 über die VLAN-Interfaces von MLS1
+PC2: ping -c 2 10.10.20.100
+run 2s
+expect PC2 output contains "2 packets transmitted, 2 received, 0% packet loss"
+R1: enable
+R1: show ip dhcp binding
+expect R1 output contains "10.10.10.100        0102.4a00.0004.01       Mar 02 1993 12:00 AM    Automatic"
+expect R1 output contains "10.10.10.101        0102.4a00.0005.01"
+expect R1 output contains "10.10.20.100        0102.4a00.0006.01"
+expect R1 output contains "10.10.20.101        0102.4a00.0007.01"
+expect R1 svc dhcp-server metric leases == 4
+R1: show ip route
+expect R1 route 10.10.10.0/24 via 10.10.0.2
+expect R1 route 10.10.20.0/24 via 10.10.0.2
+expect R1 route 10.10.100.0/24 via connected
+MLS1: enable
+MLS1: show ip route
+expect MLS1 route 0.0.0.0/0 via 10.10.0.1
+expect MLS1 route 10.10.10.0/24 dev Vlan10
+expect MLS1 route 10.10.20.0/24 dev Vlan20
+MLS1: show mac address-table
+expect MLS1 output contains "  10    024a.0000.0401    DYNAMIC     Gi1/0/1"
+expect MLS1 output contains "  10    024a.0000.0501    DYNAMIC     Gi1/0/2"
+expect MLS1 output contains "  20    024a.0000.0601    DYNAMIC     Gi1/0/3"
+expect MLS1 output contains "  20    024a.0000.0701    DYNAMIC     Gi1/0/4"
+expect MLS1 output contains "Total Mac Addresses for this criterion: 4"
+MLS1: show vlan brief
+expect MLS1 output contains "10   Staff                            active    Gi1/0/1, Gi1/0/2"
+expect MLS1 output contains "20   Students                         active    Gi1/0/3, Gi1/0/4"
+expect MLS1 svc dhcp-server metric relayed >= 4
+R1: show running-config
+expect R1 output contains "ip dhcp pool STAFF\n network 10.10.10.0 255.255.255.0\n default-router 10.10.10.1\n dns-server 10.10.100.10\n domain-name lab\n!"
+expect R1 output contains "ntp server 10.10.100.10"
+expect hops dhcp >= 32
+expect hops dns >= 8
+expect hops icmp >= 24

@@ -1,0 +1,626 @@
+de	en
+# JFNetworker: the window's texts (German source, English).  Rows: the German text exactly as in
+# the code (t("…"), tf("…"), the command table and the menus, tables marked "// i18n"), a tab,
+# the English text with the same "{}" placeholders in the same order.  The texts of the model and
+# the simulator are in engine.tsv.  US English; menus keep one mnemonic letter per menu.
+#
+# ---- menus and commands (app/commands.rs)
+&Datei	&File
+&Bearbeiten	&Edit
+&Ansicht	&View
+&Simulation	&Simulation
+&Werkzeuge	&Tools
+&Hilfe	&Help
+&Neu	&New
+Ö&ffnen …	&Open …
+&Zuletzt geöffnet	&Recent files
+Keine Dateien	No files
+&Speichern	&Save
+Speichern &unter …	Save &as …
+E&xportieren	E&xport
+Aufzeichnung als &pcapng …	Recording as &pcapng …
+&Beenden	&Quit
+&Rückgängig	&Undo
+&Wiederholen	&Redo
+&Löschen	&Delete
+&Alles auswählen	Select &all
+&Umbenennen …	Re&name …
+Ver&größern	Zoom &in
+Ver&kleinern	Zoom &out
+&100 %	&100%
+Alles &zeigen	Zoom to &fit
+&Raster	&Grid
+&Einrasten	&Snap to grid
+&Minimap	&Minimap
+&Bereiche	&Panels
+Anordnung &zurücksetzen	Re&set layout
+Topo&logie	Top&ology
+&Geräte	&Devices
+&Eigenschaften	P&roperties
+&Terminal	&Terminal
+E&reignisse	&Events
+&Paket	Pac&ket
+Pr&otokoll	&Log
+Pro&bleme	Pro&blems
+P&DUs	PD&Us
+Auswahl	Select
+Hand	Hand
+Verbinden	Connect
+Notiz einfügen	Insert note
+&Echtzeit	&Real time
+&Simulationsmodus	&Simulation mode
+&Abspielen / Anhalten	&Play / pause
+&Schritt vor	Step &forward
+Schritt &zurück	Step &back
+Zurück zu &live	Back to &live
+&Tempo	Spee&d
+0,25×	0.25×
+0,5×	0.5×
+1×	1×
+2×	2×
+4×	4×
+8×	8×
+Einfache &PDU	Si&mple PDU
+&Komplexe PDU …	&Complex PDU …
+&Nur Auswahl	&Only selection
+Simulation zu&rücksetzen	R&eset simulation
+&Einstellungen …	&Settings …
+&Tastenkürzel …	&Keyboard shortcuts …
+&Info …	&About JFNetworker …
+&Gerade	&Straight
+&Rechtwinklig	&Right-angled
+&Kurve	&Curve
+Kabel&typ	Cable &type
+&Trennen	&Disconnect
+&Eingeschaltet	&Powered on
+&Automatisch	&Automatic
+Kupfer, &gerade	Copper, &straight-through
+Kupfer, ge&kreuzt	Copper, &crossover
+Glasfaser, &Multimode	Fiber, &multimode
+Glasfaser, &Singlemode	Fiber, s&ingle-mode
+Se&riell (WAN)	Se&rial (WAN)
+K&onsolenkabel	C&onsole cable
+&Funk (WLAN)	&Wireless (WLAN)
+&WAN-Leitung	WAN &line
+&Konsole öffnen	&Open console
+&Gerätefenster …	Device &window …
+Konsole &schließen	&Close console
+Tab &umbenennen …	&Rename tab …
+In eigenem &Fenster	In its own &window
+Konsolen &nebeneinander	Consoles side by &side
+Konsole &leeren	C&lear console
+Protokoll &leeren	C&lear log
+#
+# ---- the window: panels, toolbar, status bar, problems, about (workspace/shell.rs)
+Geräte	Devices
+Eigenschaften	Properties
+Terminal	Terminal
+Ereignisse	Events
+Paket	Packet
+Protokoll	Log
+Probleme	Problems
+PDUs	PDUs
+{} %	{}%
+Zoom: auf 100 % setzen	Zoom: set to 100%
+Klicken setzt, Umschalt+Klicken setzt mehrere, Esc beendet	Click places one, Shift+click places several, Esc ends
+Ende A: {} – Tab zum zweiten Gerät, Eingabe öffnet die Port-Auswahl, Esc bricht ab	End A: {} – Tab to the second device, Enter opens the port choice, Esc cancels
+Von Gerät zu Gerät ziehen, beide anklicken oder mit Tab und Eingabe wählen; Umschalt verbindet sofort, Esc beendet	Drag from device to device, click both, or choose them with Tab and Enter; Shift connects at once, Esc ends
+Nichts ausgewählt	Nothing selected
+{} ausgewählt	{} selected
+1 Gerät	1 device
+{} Geräte	{} devices
+1 Kabel	1 cable
+{} Kabel	{} cables
+Raster {} · Einrasten	Grid {} · Snap
+Raster {}	Grid {}
+Einrasten {}	Snap {}
+Frei	Free
+Das Kabel {} läuft nicht im Simulator: {}	The cable {} does not run in the simulator: {}
+Läuft nicht im Simulator: {}	Does not run in the simulator: {}
+Keine Probleme	No problems
+Das Projekt ist in sich stimmig: eindeutige Namen, passende Kabel, belegte Ports nur einmal; der Simulator findet nichts.	The project is consistent: unique names, matching cables, each port used once; the simulator finds nothing.
+Über JFNetworker	About JFNetworker
+JFNetworker – ein Netzwerksimulator und Labor für verteilte Systeme: Geräte und Kabel auf einer Zeichenfläche, echte Protokolle Byte für Byte, Befehlszeilen für Router, Switches und Hosts.	JFNetworker – a network simulator and lab for distributed systems: devices and cables on a canvas, real protocols byte for byte, command lines for routers, switches and hosts.
+Phase 1: der Topologie-Editor mit Kabeln und Inspektor, der Simulator in Echtzeit, die Konsolen der Geräte, Gerätefenster und das Protokoll, der Simulationsmodus mit Ereignisliste, Zeitleiste, Paketansicht und eigenen PDUs, Einstellungen, automatische Sicherung, Deutsch und Englisch.	Phase 1: the topology editor with cables and properties, the simulator in real time, the devices' consoles, device windows and the log, the simulation mode with event list, timeline, packet view and PDUs of your own, settings, autosave, German and English.
+Schließen	Close
+#
+# ---- the canvas, connecting, cables (workspace/canvas)
+Topologie	Topology
+Notiz	Note
+Gerätename	Device name
+Text der Notiz	Text of the note
+Name	Name
+Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe	Letters, digits and hyphens, starting with a letter
+Übernehmen	Apply
+Umbenennen	Rename
+Abbrechen	Cancel
+Platzieren: {}	Place: {}
+Einfache PDU	Simple PDU
+Das Gerät wurde nicht eingefügt	The device was not added
+Kabel trennen	Disconnect cable
+Kabel {}, {}, {}	Cable {}, {}, {}
+{} · {} · {} · {} · {} Pakete/s	{} · {} · {} · {} · {} packets/s
+{} · {} {} · frei	{} · {} {} · free
+ausgesteckt	unplugged
+aktiv	up
+ohne Strom	no power
+blockiert	blocking
+unten	down
+Kein passender Port	No matching port
+{} und {} haben keine freien Ports, die zusammenpassen.	{} and {} have no free ports that fit together.
+{} hat keinen freien Port	{} has no free port
+passt nicht zu {}	does not fit {}
+Die Geräte wurden nicht verbunden	The devices were not connected
+frei	free
+Ports wählen	Choose ports
+Automatisch: {}	Automatic: {}
+Automatisch	Automatic
+Kabel	Cable
+Diese beiden Geräte haben keine freien Ports, die zusammenpassen.	These two devices have no free ports that fit together.
+#
+# ---- the device palette (workspace/palette.rs)
+Geräte suchen	Search devices
+Kein Gerät gefunden	No device found
+Die Suche prüft Modellnamen und Beschreibungen.	The search looks at model names and descriptions.
+{} · Ports: {}	{} · Ports: {}
+#
+# ---- the properties (workspace/inspector)
+Port	Port
+Status	Status
+IP	IP
+Gegenstelle	Far end
+Speed	Speed
+VLAN	VLAN
+MAC	MAC
+abgeschaltet	shut down
+Unbekanntes Modell	Unknown model
+Eingeschaltet	Powered on
+Modell	Model
+Beschreibung	Description
+Ports	Ports
+keine	none
+Belegt	In use
+{} von {}	{} of {}
+Befehlszeile	Command line
+IOS-artig (Router, Switches)	IOS-like (routers, switches)
+Linux-Shell	Linux shell
+„{}“ (unbekannt)	“{}” (unknown)
+Position	Position
+Simulator	Simulator
+läuft nicht: {}	not running: {}
+Kabel ({})	Cables ({})
+… und {} weitere	… and {} more
+Den Namen übernehmen (Eingabetaste); F2 benennt auf der Zeichenfläche um	Apply the name (Enter); F2 renames on the canvas
+Schnittstellen ({})	Interfaces ({})
+Aktiv (nicht abgeschaltet)	Up (not shut down)
+IPv4-Adresse mit Präfix	IPv4 address with prefix
+z. B. 192.168.1.10/24	e.g. 192.168.1.10/24
+Setzen	Set
+Adresse per DHCP beziehen	Get the address by DHCP
+Standard-Gateway	Default gateway
+z. B. 192.168.1.1	e.g. 192.168.1.1
+Gilt sofort und wird Teil der Startkonfiguration des Geräts.	Takes effect at once and becomes part of the device's startup configuration.
+Größe	Size
+{} Objekte	{} objects
+Strom	Power
+alle eingeschaltet	all powered on
+alle ausgeschaltet	all powered off
+{} von {} ausgeschaltet	{} of {} powered off
+Kabel|Anzahl	Cables
+Notizen	Notes
+Alle einschalten	Power all on
+Alle ausschalten	Power all off
+Ziehen verschiebt alle; Entf löscht sie, Geräte mit ihren Kabeln.	Dragging moves them all; Del deletes them, devices with their cables.
+Projekt	Project
+Titel	Title
+Ohne Titel	Untitled
+Datei	File
+Ordner	Folder
+noch nicht gespeichert	not saved yet
+Zustand	State
+gespeichert	saved
+geändert	changed
+geändert, automatisch gesichert	changed, autosaved
+{} ({} aktiv)	{} ({} up)
+Simulation	Simulation
+Ziehen Sie ein Gerät aus der Palette auf die Zeichenfläche, oder klicken Sie eine Kachel und dann auf die Fläche (Umschalt: mehrere). Verbinden (C): von einem Gerät auf ein anderes ziehen.	Drag a device from the palette onto the canvas, or click a tile and then the canvas (Shift: several). Connect (C): drag from one device to another.
+Ende A	End A
+Ende B	End B
+{} · {} Pakete/s	{} · {} packets/s
+Kabeltyp	Cable type
+Bandbreite	Bandwidth
+Verzögerung	Delay
+Verlust	Loss
+Bandbreite (mehr als 0 Mbit/s), Verzögerung (µs) und Verlust (0 bis 100 %) als Zahlen, z. B. 2,5.	Bandwidth (more than 0 Mbit/s), delay (µs) and loss (0 to 100%) as numbers, e.g. 2.5.
+Eingesteckt	Plugged in
+Verlauf	Route
+Gerade	Straight
+Rechtwinklig	Right-angled
+Kurve	Curve
+Wegpunkte	Waypoints
+Trennen	Disconnect
+Wegpunkte: an den „+“-Griffen des gewählten Kabels ziehen, Doppelklick entfernt einen. Rechtsklick: Verlauf, Kabeltyp, Trennen.	Waypoints: drag the “+” handles of the selected cable, a double click removes one. Right click: route, cable type, disconnect.
+#
+# ---- consoles and the Terminal panel (workspace/terminal.rs, doc/console.rs)
+Die Konsolen sind in eigenen Fenstern	The consoles are in windows of their own
+„Andocken“ in einem Konsolenfenster bringt es als Tab hierher zurück.	“Dock” in a console window brings it back here as a tab.
+Keine Konsole geöffnet	No console open
+Hier erscheinen die Befehlszeilen der Geräte: IOS-artig bei Routern und Switches, eine Linux-Shell bei Hosts. Ein Doppelklick auf ein Gerät öffnet seine Konsole.	The devices' command lines appear here: IOS-like on routers and switches, a Linux shell on hosts. A double click on a device opens its console.
+Die Konsole von {} ist im Gerätefenster offen	The console of {} is open in its device window
+Eine Konsole erscheint an einer Stelle: solange das Gerätefenster sie zeigt, tippt man dort.	A console appears in one place: while the device window shows it, you type there.
+Gerätefenster zeigen	Show device window
+Name des Tabs	Name of the tab
+leer: der Name des Geräts	empty: the device's name
+Konsole – {}	Console – {}
+Strg+F sucht, Strg+Umschalt+6 bricht ab; Schließen dockt die Konsole wieder an.	Ctrl+F searches, Ctrl+Shift+6 interrupts; closing docks the console again.
+Strg+F sucht, Strg+C bricht ab; Schließen dockt die Konsole wieder an.	Ctrl+F searches, Ctrl+C interrupts; closing docks the console again.
+Andocken	Dock
+Kein Fenster frei	No window free
+Höchstens {} Konsolen laufen in eigenen Fenstern; „Andocken“ gibt eines frei.	At most {} consoles run in windows of their own; “Dock” frees one.
+Keine Konsole	No console
+Gerät {}	Device {}
+{} Das Gerät heißt weiter {}.	{} The device keeps the name {}.
+{} hat keine Befehlszeile.	{} has no command line.
+{} ist ausgeschaltet: die Konsole antwortet wieder, sobald es Strom hat.	{} is powered off: the console answers again as soon as it has power.
+Einschalten	Power on
+{} lehnt „{}“ ab: {}	{} refuses “{}”: {}
+Auf {} läuft noch ein Befehl; Strg+C in der Konsole bricht ihn ab.	A command is still running on {}; Ctrl+C in the console interrupts it.
+#
+# ---- the log (workspace/logview.rs)
+Notfall	Emergency
+Alarm	Alert
+Kritisch	Critical
+Fehler	Error
+Warnung	Warning
+Hinweis	Notice
+Info	Info
+Debug	Debug
+Alle Schweregrade	All severities
+Info und wichtiger	Info and more severe
+Hinweise und wichtiger	Notices and more severe
+Warnungen und wichtiger	Warnings and more severe
+Fehler und wichtiger	Errors and more severe
+Zeit	Time
+Gerät	Device
+Schwere	Severity
+Quelle	Source
+Meldung	Message
+Alle Geräte	All devices
+Nur die Meldungen dieses Geräts	Only the messages of this device
+Schwere: 0 Notfall bis 7 Debug	Severity: 0 emergency to 7 debug
+Meldungen durchsuchen	Search messages
+Neueste zeigen	Show newest
+Noch keine Meldungen	No messages yet
+Die Geräte protokollieren hier, was sie tun: Zustände der Ports (%LINK), Konfigurationen, DHCP, Zeit, und mit „debug“ jede Entscheidung.	The devices log here what they do: port states (%LINK), configurations, DHCP, time, and with “debug” every decision.
+Keine passenden Meldungen	No matching messages
+Die Filter verbergen alle Meldungen; „Alle Geräte“ und „Alle Schweregrade“ zeigen sie wieder.	The filters hide every message; “All devices” and “All severities” show them again.
+#
+# ---- the device windows (workspace/devwin)
+Übersicht	Overview
+Schnittstellen	Interfaces
+Konfiguration	Configuration
+Dienste	Services
+CLI	CLI
+Desktop	Desktop
+ausgeschaltet	powered off
+{} von {} Ports	{} of {} ports
+eingeschaltet, {} von {} Schnittstellen aktiv	powered on, {} of {} interfaces up
+{} von {} laufen	{} of {} running
+Adressen	Addresses
+Konsole im Terminal öffnen	Open console in the terminal
+Empfangen	Received
+Gesendet	Sent
+Keine Schnittstellen	No interfaces
+Dieses Gerät hat keine Ports oder läuft nicht im Simulator.	This device has no ports or does not run in the simulator.
+DHCP-Client	DHCP client
+DHCP-Server	DHCP server
+DHCP-Relay	DHCP relay
+DNS-Server	DNS server
+Syslog-Server	Syslog server
+Zeit (NTP)	Time (NTP)
+TCP-Echo	TCP echo
+TCP-Discard	TCP discard
+TCP-Testclient	TCP test client
+Webserver (HTTP)	Web server (HTTP)
+HTTP-Client	HTTP client
+Lastgenerator (HTTP)	Load generator (HTTP)
+Auf {} läuft kein Dienst. Dienste (DHCP, DNS, Syslog, NTP) kommen aus der Projektdatei oder aus Einstellungen wie „Adresse per DHCP beziehen“.	No service runs on {}. Services (DHCP, DNS, syslog, NTP) come from the project file or from settings such as “Get the address by DHCP”.
+läuft	running
+gestoppt	stopped
+aus	off
+aus der Konfiguration	from the configuration
+Allgemein	General
+Schnittstelle	Interface
+„{}“ ist kein gültiger Gerätename: Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe.	“{}” is not a valid device name: letters, digits and hyphens, starting with a letter.
+z. B. 192.168.1.1/24	e.g. 192.168.1.1/24
+per DHCP	by DHCP
+VLAN (Access-Port)	VLAN (access port)
+Trunk (in der Konsole einstellen)	Trunk (set it in the console)
+z. B. zum Kern-Switch	e.g. to the core switch
+„{}“ ist keine Adresse mit Präfix (10.0.0.1/24 oder 10.0.0.1 255.255.255.0).	“{}” is no address with a prefix (10.0.0.1/24 or 10.0.0.1 255.255.255.0).
+„{}“ ist keine VLAN-Nummer (1 bis 4094).	“{}” is no VLAN number (1 to 4094).
+Routing	Routing
+Standardroute über	Default route via
+z. B. 192.168.1.254	e.g. 192.168.1.254
+„{}“ ist keine IPv4-Adresse.	“{}” is no IPv4 address.
+Statische Routen	Static routes
+direkt	directly
+über {}	via {}
+Route {} entfernen	Remove route {}
+Neue Route	New route
+Netz, z. B. 10.2.0.0/16	Network, e.g. 10.2.0.0/16
+über	via
+Next Hop	Next hop
+Hinzufügen	Add
+„{}“ ist kein Netz mit Präfix (z. B. 10.2.0.0/16).	“{}” is no network with a prefix (e.g. 10.2.0.0/16).
+Startkonfiguration	Startup configuration
+Laufende Konfiguration sichern	Save the running configuration
+Wie „copy running-config startup-config“ in der Konsole: was dort von Hand eingestellt wurde, bleibt beim nächsten Start.	Like “copy running-config startup-config” in the console: what was set by hand stays for the next start.
+Die laufende Konfiguration (Adressen, Routen, Name) wird zur Startkonfiguration; eine Shell hat dafür keinen Befehl.	The running configuration (addresses, routes, name) becomes the startup configuration; a shell has no command for it.
+Die Formulare tippen ihre Befehle in die Konsole des Geräts; sie gelten sofort und werden Teil der Startkonfiguration.	The forms type their commands into the device's console; they take effect at once and become part of the startup configuration.
+Zuletzt in der Konsole:	Last in the console:
+IP-Konfiguration	IP configuration
+Adresse, Maske und Gateway oder DHCP	Address, mask and gateway, or DHCP
+Eingabeaufforderung	Command prompt
+Die Shell des Geräts	The device's shell
+Texteditor	Text editor
+Notizen zum Gerät	Notes on the device
+Webbrowser	Web browser
+Seiten als Text	Pages as text
+Dieses Gerät hat keine IPv4-Schnittstelle.	This device has no IPv4 interface.
+Adresse	Address
+Statisch	Static
+DHCP	DHCP
+IPv4-Adresse	IPv4 address
+z. B. 192.168.1.10	e.g. 192.168.1.10
+Subnetzmaske	Subnet mask
+z. B. 255.255.255.0	e.g. 255.255.255.0
+Per DHCP	By DHCP
+noch keine Adresse	no address yet
+, Gateway {}	, gateway {}
+Statische Einstellungen laufen als Befehle in der Eingabeaufforderung und werden Teil der Startkonfiguration; DHCP holt Adresse und Gateway vom Server.	Static settings run as commands in the command prompt and become part of the startup configuration; DHCP gets address and gateway from the server.
+„{}“ ist keine Subnetzmaske.	“{}” is no subnet mask.
+gesichert	saved
+Verwerfen	Discard
+Speichern	Save
+Notizen zu diesem Gerät: Aufgaben, Zugangsdaten des Labors, was noch fehlt …	Notes on this device: tasks, the lab's credentials, what is still missing …
+Öffnen	Open
+Eine Adresse eingeben und „Öffnen“.	Enter an address and “Open”.
+Verschlüsselte Seiten (https) kann dieser Browser nicht öffnen.	This browser cannot open encrypted pages (https).
+„{}“ ist keine Portnummer.	“{}” is no port number.
+Die Adresse nennt keinen Rechner.	The address names no host.
+{}, Port {}, Pfad {}	{}, port {}, path {}
+{} ({}), Port {}, Pfad {}	{} ({}), port {}, path {}
+{} (der Name ist auf diesem Gerät nicht eingetragen), Port {}, Pfad {}	{} (the name is not known on this device), port {}, path {}
+Dieser Browser zeigt nur, wohin die Adresse führt.	This browser only shows where the address leads.
+Ziel: {}	Destination: {}
+Die Seite selbst holt „curl {}“ in der Eingabeaufforderung über den Simulator.	The page itself: “curl {}” in the command prompt fetches it through the simulator.
+#
+# ---- the simulation mode (workspace/sim)
+Echtzeit	Real time
+Echtzeit: die Uhr läuft mit · Simulation: Schritt für Schritt (F7)	Real time: the clock runs along · Simulation: step by step (F7)
+Anhalten (F6)	Pause (F6)
+Abspielen (F6)	Play (F6)
+Tempo	Speed
+Ansicht bei t = {} s	View at t = {} s
+Die Aufzeichnung zu diesem Zeitpunkt; die Geräte zeigen ihren jetzigen Zustand.	The recording at this moment; the devices show their present state.
+Zurück zu live	Back to live
+Simulationsmodus, spielt ab	Simulation mode, playing
+Simulationsmodus	Simulation mode
+läuft in Echtzeit	running in real time
+Echtzeit, angehalten	Real time, paused
+Simulation läuft	Simulation playing
+Echtzeit angehalten	Real time paused
+t = {} s (Aufzeichnung)	t = {} s (recording)
+1 Ereignis	1 event
+{} Ereignisse	{} events
+Von {}: jetzt das Ziel anklicken, Esc beendet	From {}: now click the destination, Esc ends
+Erst die Quelle, dann das Ziel anklicken (oder mit Tab und Eingabe wählen), Esc beendet	Click the source, then the destination (or choose them with Tab and Enter), Esc ends
+ICMP	ICMP
+ARP	ARP
+DNS	DNS
+TCP/HTTP	TCP/HTTP
+UDP	UDP
+STP	STP
+OSPF/RIP	OSPF/RIP
+Andere	Other
+Zeit (s)	Time (s)
+Von	From
+Bei	At
+Typ	Type
+Protokolle	Protocols
+Ethernet ohne bekanntes Protokoll, LLDP, IPv6, IGMP	Ethernet without a known protocol, LLDP, IPv6, IGMP
+Ein- oder ausblenden: Schritte, Liste, Zeitleiste und Leinwand	Show or hide: steps, list, timeline and canvas
+Nur Auswahl	Only selection
+Nur: {}	Only: {}
+Nur die auf der Leinwand gewählten Geräte	Only the devices selected on the canvas
+Gezeigte Ereignisse von allen aufgezeichneten	Events shown of all recorded
+Noch keine Ereignisse	No events yet
+Hier stehen die Entscheidungen der Geräte Schritt für Schritt: wer einen Rahmen bekam, was er damit tat. Eine PDU (Werkzeug P) oder ein ping auf einer Konsole füllt die Liste.	Here are the devices' decisions step by step: who got a frame and what it did with it. A PDU (tool P) or a ping in a console fills the list.
+Die gewählten Protokolle und Geräte haben keine Ereignisse.	The chosen protocols and devices have no events.
+Leitung	Link
+× verworfen: {}	× dropped: {}
+(nicht mehr aufgezeichnet)	(no longer recorded)
+L1 Ports: {}	L1 ports: {}
+auf der Leitung verloren	lost on the link
+verloren: die Leitung fiel aus	lost: the link went down
+{} s (noch unterwegs)	{} s (still on its way)
+Gesendet: {} s	Sent: {} s
+Angekommen: {}	Arrived: {}
+Länge: {} Bytes ({} Bit)	Length: {} bytes ({} bits)
+Wartete in der Warteschlange: {} s	Waited in the queue: {} s
+Kabel: {}, {}	Cable: {}, {}
+Problem: {}	Problem: {}
+Rahmen {} · {} · {}	Frame {} · {} · {}
+Kein Paket ausgewählt	No packet selected
+Ein Ereignis der Liste oder ein Rahmen auf der Leinwand zeigt hier, was das Gerät damit tat, und die Felder des Pakets Schicht für Schicht samt Bytes.	An event of the list or a frame on the canvas shows here what the device did with it, and the packet's fields layer by layer with their bytes.
+Kein Schritt eines Geräts	No step of a device
+{} von {} (an {})	{} from {} (at {})
+{} an {} (über {})	{} to {} (via {})
+Eingang	In
+Kein Rahmen: das Gerät handelte von sich aus (ein Befehl, eine PDU, ein Zeitgeber).	No frame: the device acted on its own (a command, a PDU, a timer).
+Entscheidungen	Decisions
+Ausgang	Out
+keine Rahmen	no frames
+Kein Rahmen gewählt	No frame chosen
+{} Bytes · ein Klick auf ein Byte wählt sein Feld	{} bytes · a click on a byte selects its field
+Byte {} · {}	Byte {} · {}
+Bytes {}–{} · {}	Bytes {}–{} · {}
+#
+# ---- PDUs (workspace/sim/pdu.rs)
+ICMP-Echo (ping)	ICMP echo (ping)
+TCP	TCP
+DNS-Abfrage	DNS query
+pcapng=Mitschnitt (pcapng)	pcapng=Capture (pcapng)
+Das Ziel fehlt.	The destination is missing.
+{} hat keine IP-Adresse.	{} has no IP address.
+Die Quelle gibt es nicht mehr.	The source no longer exists.
+{} kann keine PDU senden	{} cannot send a PDU
+Das Gerät hat keine IP-Adresse; eine Quelle braucht eine.	The device has no IP address; a source needs one.
+{} hat keine IP-Adresse	{} has no IP address
+Ein Ziel braucht eine IPv4-Adresse für das ICMP-Echo.	A destination needs an IPv4 address for the ICMP echo.
+Netz nicht erreichbar	network unreachable
+Host nicht erreichbar	host unreachable
+Protokoll nicht erreichbar	protocol unreachable
+Port nicht erreichbar	port unreachable
+Fragmentierung nötig (MTU {})	fragmentation needed (MTU {})
+verboten	prohibited
+TTL abgelaufen	TTL expired
+Zusammensetzen abgelaufen	reassembly timed out
+keine Route	no route
+zurückgesetzt	reset
+fragt nach dem Namen …	looking up the name …
+Name unbekannt	unknown name
+keine Antwort	no answer
+läuft: {} gesendet, {} Antworten	running: {} sent, {} answers
+gestoppt: {} gesendet, {} Antworten	stopped: {} sent, {} answers
+fertig: {} gesendet, alle beantwortet	done: {} sent, all answered
+fertig: {} von {} beantwortet; {}	done: {} of {} answered; {}
+gescheitert: {}	failed: {}
+Verbindungen	connections
+gesendet	sent
+, {} gescheitert ({})	, {} failed ({})
+{} beendet	{} closed
+{} Antworten	{} answers
+läuft: {} {}, {}{}	running: {} {}, {}{}
+fertig	done
+fragt …	asking …
+Antwort ohne Adresse	answer without an address
+fertig: {}	done: {}
+Werkzeug P: die Quelle anklicken, dann das Ziel (ein ICMP-Echo)	Tool P: click the source, then the destination (an ICMP echo)
+Komplexe PDU …	Complex PDU …
+Noch keine PDUs	No PDUs yet
+Mit dem Werkzeug P erst die Quelle, dann das Ziel anklicken: ein ICMP-Echo. „Komplexe PDU …“ wählt Protokoll, Ports, Größe, TTL und Anzahl.	With tool P click the source, then the destination: an ICMP echo. “Complex PDU …” chooses protocol, ports, size, TTL and count.
+Erneut senden	Send again
+Stoppen	Stop
+Entfernen	Remove
+Komplexe PDU	Complex PDU
+Die PDU läuft im Simulator wie ein Befehl auf der Quelle: ARP, Routen und Antworten wie echt.	The PDU runs in the simulator like a command on the source: ARP, routes and answers as in real life.
+kein Gerät mit IP-Adresse	no device with an IP address
+Ziel	Destination
+Gerät, IP-Adresse oder Name	Device, IP address or name
+Protokoll|PDU	Protocol
+Quellport	Source port
+0: frei gewählt	0: chosen freely
+Zielport	Destination port
+Größe (Bytes)	Size (bytes)
+TTL	TTL
+0: die des Geräts	0: the device's
+Anzahl	Count
+Abstand (s)	Interval (s)
+Periodisch, bis „Stoppen“	Periodic, until “Stop”
+Senden	Send
+Kein Gerät mit IP-Adresse kann senden.	No device with an IP address can send.
+Aufzeichnung als „{}“ exportiert	Recording exported as “{}”
+{} Rahmen im pcapng-Format, zum Beispiel für Wireshark.	{} frames in pcapng format, for Wireshark for example.
+„{}“ wurde nicht geschrieben	“{}” was not written
+#
+# ---- files, autosave (doc/file.rs, doc/autosave.rs)
+jfnet=JFNetworker-Projekt	jfnet=JFNetworker project
+Unbenannt	Untitled
+Die Datei ließ sich nicht lesen.	The file could not be read.
+Die Datei ist kein UTF-8-Text.	The file is no UTF-8 text.
+„{}“ wurde nicht gespeichert	“{}” was not saved
+Die Datei ließ sich nicht schreiben.	The file could not be written.
+„{}“ ließ sich nicht öffnen	“{}” could not be opened
+Änderungen speichern?	Save changes?
+„{}“ hat ungespeicherte Änderungen. Sollen sie gespeichert werden?	“{}” has unsaved changes. Save them?
+„{}“ wiederhergestellt	“{}” recovered
+Die automatisch gesicherten Änderungen sind wieder da; speichern übernimmt sie in die Datei.	The autosaved changes are back; saving puts them into the file.
+Die Sicherung ließ sich nicht lesen	The autosave could not be read
+Sie wurde verworfen.	It was discarded.
+Ungespeicherte Änderungen an „{}“ gefunden	Unsaved changes to “{}” found
+JFNetworker wurde nicht ordentlich beendet; eine automatische Sicherung ist da.	JFNetworker did not end properly; an autosave is available.
+Wiederherstellen	Recover
+Später	Later
+#
+# ---- settings and shortcuts (app/prefs.rs, workspace/settings.rs)
+Einstellungen	Settings
+Ansicht	View
+Dateien	Files
+Raster zeigen	Show grid
+Rasterweite	Grid step
+In Weltpunkten (bei 100 % je ein DIP); für das offene und neue Projekte.	In world units (one DIP each at 100%); for the open project and new ones.
+Am Raster einrasten	Snap to grid
+Minimap zeigen	Show minimap
+Tempo beim Start	Speed at the start
+Wie schnell die Zeit läuft; im Simulationsmodus der Takt der Schritte.	How fast time runs; in the simulation mode the pace of the steps.
+Bewegung	Motion
+Reduziert: Pakete springen von Schritt zu Schritt, nichts blendet.	Reduced: packets jump from step to step, nothing fades.
+Wie das System	As the system
+Reduziert	Reduced
+Volle Bewegung	Full motion
+Sprache	Language
+Deutsch	Deutsch
+English	English
+Automatisch sichern alle (Sekunden)	Autosave every (seconds)
+Eine Kopie ungespeicherter Änderungen für einen Absturz; 0 schaltet es aus.	A copy of unsaved changes in case of a crash; 0 turns it off.
+Tastenkürzel	Keyboard shortcuts
+Datei und Bearbeiten	File and edit
+Werkzeuge	Tools
+Bereiche	Panels
+Konsolen	Consoles
+Fenster	Window
+Tab / Umschalt+Tab	Tab / Shift+Tab
+Geräte und Notizen, dann die Kabel nacheinander wählen	select the devices and notes, then the cables, one after the other
+Pfeiltasten	Arrow keys
+die Auswahl um einen Rasterschritt verschieben (Umschalt: zehn, Alt: einen Punkt); ohne Auswahl die Ansicht	move the selection by a grid step (Shift: ten, Alt: one unit); without a selection the view
+Eingabe	Enter
+Konsole des Geräts öffnen; Kabel: seine Eigenschaften; mit Verbinden: Ende A, dann B	open the device's console; a cable: its properties; with Connect: end A, then B
+Umschalt+Doppelklick	Shift+double click
+Gerätefenster öffnen	open the device window
+Strg+Plus / Strg+Minus	Ctrl+Plus / Ctrl+Minus
+vergrößern / verkleinern	zoom in / out
+Leertaste + Ziehen	Space + drag
+die Ansicht verschieben	move the view
+Umschalt+F10 / Menütaste	Shift+F10 / menu key
+Kontextmenü des gewählten Geräts oder Kabels	context menu of the selected device or cable
+Esc	Esc
+Geste abbrechen, Auswahl aufheben, Werkzeug beenden	cancel a gesture, clear the selection, leave a tool
+Entf	Del
+Auswahl löschen	delete the selection
+Tab	Tab
+Befehl oder Argument ergänzen	complete a command or argument
+?	?
+Hilfe zum Befehl (IOS-artige Konsolen)	help on the command (IOS-like consoles)
+Pfeil auf / ab	Up / Down arrow
+frühere Befehle	earlier commands
+Strg+C	Ctrl+C
+laufenden Befehl abbrechen	interrupt the running command
+Strg+Umschalt+6	Ctrl+Shift+6
+ping oder traceroute abbrechen (IOS-artig)	interrupt ping or traceroute (IOS-like)
+Bild auf / Bild ab	Page Up / Page Down
+in der Ausgabe blättern	page through the output
+Umschalt+F6	Shift+F6
+zum vorigen Bereich (F6 spielt die Simulation ab)	to the previous panel (F6 plays the simulation)
+F8	F8
+Teiler zwischen den Bereichen mit den Pfeiltasten verschieben	move the splitters between the panels with the arrow keys
+Strg+F6	Ctrl+F6
+zwischen den Fenstern wechseln (Konsolen, Gerätefenster)	switch between the windows (consoles, device windows)
+Alt	Alt
+die Menüleiste	the menu bar
+# the canvas and the frames of the simulation mode (canvas/paint.rs, sim/anim.rs)
+Notiz: {}	Note: {}
+Rahmen {}	Frame {}
+Rahmen {}: {} → {} · {}	Frame {}: {} → {} · {}
+Rahmen auf den Kabeln	Frames on the cables

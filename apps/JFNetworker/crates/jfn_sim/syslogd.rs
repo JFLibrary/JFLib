@@ -8,11 +8,12 @@
 
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
-use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::any::Any;
 
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 use netpkt::syslog;
 use netpkt::udp::PORT_SYSLOG;
 use netpkt::Ipv4;
@@ -87,7 +88,10 @@ impl Service for SyslogServer {
         ]
     }
     fn status(&self) -> String {
-        format!("{} Meldungen", self.by_sev.iter().sum::<u64>())
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
+        msg!("{} Meldungen", self.by_sev.iter().sum::<u64>())
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())

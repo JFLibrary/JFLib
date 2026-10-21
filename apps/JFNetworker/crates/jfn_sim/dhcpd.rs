@@ -35,6 +35,8 @@ use alloc::vec::Vec;
 use core::any::Any;
 
 use base::metrics::Counter;
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 use netpkt::dhcp::{self, Dhcp, MsgType, Opt};
 use netpkt::syslog::{SEV_INFO, SEV_WARNING};
 use netpkt::udp::{PORT_DHCP_CLIENT, PORT_DHCP_SERVER};
@@ -575,7 +577,16 @@ impl Dhcpd {
     fn on_request(&mut self, os: &mut OsApi, d: &Dgram, req: Dhcp) {
         let now = os.now();
         self.expire(now);
-        let link = if req.giaddr.is_unspecified() { os.iface(d.iface).and_then(|f| f.primary()).unwrap_or(Ipv4::UNSPECIFIED) } else { req.giaddr };
+        // the client's network: the relay's address, else the client's own address (a renewal
+        // or release sent straight to the server, maybe over routers: RFC 2131 4.3.2), else
+        // the network of the interface the broadcast came in on
+        let link = if !req.giaddr.is_unspecified() {
+            req.giaddr
+        } else if !req.ciaddr.is_unspecified() {
+            req.ciaddr
+        } else {
+            os.iface(d.iface).and_then(|f| f.primary()).unwrap_or(Ipv4::UNSPECIFIED)
+        };
         let pool = if self.relay_only { None } else { self.pool_for(link).cloned() };
         let Some(pool) = pool else {
             if self.helpers_of(os, d.iface).is_empty() && !self.relay_only {
@@ -796,11 +807,14 @@ impl Service for Dhcpd {
         ]
     }
     fn status(&self) -> String {
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
         if self.relay_only || self.pools.is_empty() {
-            return format!("Relay: {} Helper-Adressen", self.helpers.len());
+            return msg!("Relay: {} Helper-Adressen", self.helpers.len());
         }
         let leases = self.bindings.values().filter(|b| b.state == BindState::Bound).count();
-        format!("{} Pools, {} Leases", self.pools.len(), leases)
+        msg!("{} Pools, {} Leases", self.pools.len(), leases)
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())

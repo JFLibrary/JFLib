@@ -37,7 +37,7 @@
 
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::rc::Rc;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use jfn_model::{CableKind, Device, Link, PortRef, Project, ServiceDef};
@@ -103,7 +103,7 @@ pub(crate) struct Sim {
     /// the running configurations of removed devices (an undo brings them back as they ran)
     stash: BTreeMap<u32, String>,
     /// devices and links of the project the engine refused: id -> why (German)
-    pub errors: BTreeMap<u32, String>,
+    pub errors: BTreeMap<u32, jfn_model::Msg>,
     /// the engine's state after the last change
     pub view: Rc<View>,
     /// link id -> the LEDs at end a and end b
@@ -269,7 +269,7 @@ impl Sim {
                         self.errors.remove(&l.id);
                     }
                     Err(e) => {
-                        self.errors.insert(l.id, e.to_string());
+                        self.errors.insert(l.id, e.msg());
                     }
                 }
                 continue;
@@ -282,7 +282,7 @@ impl Sim {
                         self.errors.remove(&l.id);
                     }
                     Err(e) => {
-                        self.errors.insert(l.id, e.to_string());
+                        self.errors.insert(l.id, e.msg());
                     }
                 }
             }
@@ -322,7 +322,7 @@ impl Sim {
                 self.errors.remove(&d.id);
             }
             Err(e) => {
-                self.errors.insert(d.id, e.to_string());
+                self.errors.insert(d.id, e.msg());
             }
         }
     }

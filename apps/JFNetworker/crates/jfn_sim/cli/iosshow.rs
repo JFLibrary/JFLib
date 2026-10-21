@@ -4,7 +4,8 @@
 //                                ip route | arp | mac address-table | vlan [brief] |
 //                                interfaces [NAME] | interfaces trunk | debugging | version
 //   Engine::ios_config(ni)       the configuration from "!" to "end" (what copy run start
-//                                stores and the startup replay reads back)
+//                                stores and the startup replay reads back; the DHCP lines
+//                                come from netsvc.rs)
 //
 // The layouts follow IOS 15 / IOS-XE: column widths of "show ip interface brief" (22, 15, 3,
 // 6, 21), "show arp" (address 15, age right-aligned in 9), "show mac address-table" and "show
@@ -115,6 +116,8 @@ impl Engine {
                 s.push_str(if st.forwarding { "ip routing\n!\n" } else { "no ip routing\n!\n" });
             }
         }
+        // excluded addresses and pools of the DHCP server (netsvc.rs)
+        s.push_str(&self.ios_dhcp_config(ni));
         if let Some(b) = &n.bridge {
             for (vid, name) in &b.vlans {
                 if *vid == 1 {
@@ -196,6 +199,8 @@ impl Engine {
                 s.push_str(&format!(" {}\n", o));
             }
         }
+        // "ntp master", "ntp server" (netsvc.rs)
+        s.push_str(&self.ios_ntp_config(ni));
         s.push_str("!\nend\n");
         s
     }
@@ -240,6 +245,7 @@ impl Engine {
             for (k, a) in x.addrs.iter().enumerate() {
                 s.push_str(&format!(" ip address {} {}{}\n", a.addr, mask_str(a.len), if k > 0 { " secondary" } else { "" }));
             }
+            s.push_str(&self.ios_helper_config(ni, name));
             if x.mtu != 1500 && !x.is_loopback() {
                 s.push_str(&format!(" ip mtu {}\n", x.mtu));
             }

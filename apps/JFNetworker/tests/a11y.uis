@@ -1,0 +1,120 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# keyboard and screen readers (U5): every area without a mouse -- the canvas' devices and
+# cables as list items for screen readers (Tab walks the devices, then the cables), placing a
+# device from the palette, connecting two devices (Verbinden: Enter on end A, Tab, Enter on end
+# B, the port choice), a console, the simulation (F5 mode, the PDU tool with Enter, F7 steps,
+# Shift+F5 back to real time), the overview of the shortcuts (F1); shots light, dark, 150 %.
+theme light
+# the canvas (Ctrl+9): its records name the devices and the cables
+key ctrl+9
+expect canvas:"Topologie" focused
+expect listitem:"PC1" exists
+expect listitem:"Kabel PC1 eth0 – SW1 Gi1/0/1, Kupfer, gerade, aktiv" exists
+expect listitem:"Kabel PC2 eth0 – SW1 Gi1/0/2, Kupfer, gerade, aktiv" exists
+key tab
+expect listitem:"PC1" selected
+expect listitem:"PC1" focused
+key tab
+key tab
+key tab
+expect listitem:"Kabel PC1 eth0 – SW1 Gi1/0/1, Kupfer, gerade, aktiv" selected
+expect listitem:"Kabel PC1 eth0 – SW1 Gi1/0/1, Kupfer, gerade, aktiv" focused
+shot build/jfnetworker/a11y_cable.png
+# Enter on a cable: its properties get the keyboard
+key enter
+expect tab:"Eigenschaften" focused
+expect text:"PC1 eth0 – SW1 Gi1/0/1" exists
+# placing: Ctrl+1 puts the keyboard into the device search, Tab to the first category's tiles
+# (one stop, the arrows move), Enter places the device in the middle of the view
+key ctrl+1
+expect #16385 focused
+key tab
+key tab
+expect button:"PC" focused
+key right
+expect button:"Laptop" focused
+key left
+key enter
+expect text:"4 Geräte · 2 Kabel" exists
+expect listitem:"PC3" selected
+# connecting: the tool (C), Enter on the new PC (end A), Shift+Tab to SW1, Enter (end B): the
+# port choice opens below SW1, Enter connects the best pair
+key c
+expect button:"Verbinden" checked
+key ctrl+9
+key enter
+expect text:"Ende A: PC3 – Tab zum zweiten Gerät, Eingabe öffnet die Port-Auswahl, Esc bricht ab" exists
+key shift+tab
+expect listitem:"SW1" focused
+key enter
+expect text:"Ports wählen" exists
+shot build/jfnetworker/a11y_connect.png
+key enter
+expect text:"Ports wählen" missing
+expect text:"4 Geräte · 3 Kabel" exists
+expect listitem:"Kabel PC3 eth0 – SW1 Gi1/0/3, Kupfer, gerade, aktiv" exists
+# a console: the selection tool (V); the new cable has the focus, Shift+Tab goes back over
+# the cables to PC3, Enter opens its console in the Terminal panel
+key v
+key ctrl+9
+key shift+tab
+key shift+tab
+key shift+tab
+expect listitem:"PC3" focused
+key enter
+expect tab:"PC3" selected
+type "echo erste Zeile\n"
+wait 100
+expect text:"erste Zeile" exists
+# Ctrl+3: back into the shown console from elsewhere
+key ctrl+9
+key ctrl+3
+type "echo zweite Zeile\n"
+wait 100
+expect text:"zweite Zeile" exists
+# the simulation by keys: F5 simulation mode, the PDU tool (P) with Enter on PC1 and PC2 (the
+# canvas kept its focus on PC3), F7 steps, Shift+F7 back, Shift+F5 real time again
+key f5
+wait 200
+expect tab:"Simulation" selected
+key p
+key ctrl+9
+expect listitem:"PC3" focused
+key shift+tab
+key shift+tab
+key shift+tab
+expect listitem:"PC1" focused
+key enter
+key tab
+expect listitem:"PC2" focused
+key enter
+key esc
+key esc
+expect text:"#1 ICMP · PC1 → PC2" exists
+key f7
+wait 1200
+expect text:"t = 0,200 000 722 s" exists
+key f7
+wait 1200
+expect text:"t = 0,200 001 444 s" exists
+shot build/jfnetworker/a11y_sim.png
+key shift+f7
+wait 1200
+expect text:"Ansicht bei t = 0,200 000 722 s" exists
+key shift+f5
+wait 200
+expect tab:"Echtzeit" selected
+# the overview of the shortcuts (F1)
+key f1
+expect dialog:"Tastenkürzel" exists
+expect text:"Strg+9" exists
+expect text:"Umschalt+F5" exists
+shot build/jfnetworker/a11y_keys.png
+key esc
+expect dialog:"Tastenkürzel" missing
+# dark and 150 %
+theme dark
+shot build/jfnetworker/a11y_dark.png
+scale 150
+shot build/jfnetworker/a11y_150.png
+expect_nowarn

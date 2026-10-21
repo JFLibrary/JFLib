@@ -61,7 +61,9 @@
 //                mean_us, max_us
 // Views for the lab: HttpServer::view, HttpLoad::view (per-second slots with p50/p95/p99);
 // Engine::http_server_view / http_load_view.  Actions HttpLoadSet and HttpServerSet change a
-// running service without losing its numbers.
+// running service without losing its numbers.  from_def (svcact.rs) refuses a definition with
+// German text, from_def_msg with a Msg for the app's catalogue; status_msg() words the status
+// lines so too.
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, VecDeque};
@@ -73,6 +75,8 @@ use core::any::Any;
 use agent_core::jmap::Value;
 use base::metrics::{Hist, Window};
 use base::rng::Pcg32;
+use jfn_model::msg;
+use jfn_model::msg::{phrase, Msg};
 use netpkt::http::{Headers, Version};
 
 use crate::http::{Agent, Done, Fail, Reply, ReqIn, Req, Serve, ServeCfg, Url, Wheel};
@@ -846,11 +850,14 @@ impl Service for HttpServer {
         m
     }
     fn status(&self) -> String {
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
         let s = self.serve.stats;
         if !self.serve.listening() {
-            return format!("Port {} ist nicht offen", self.serve.cfg.port);
+            return msg!("Port {} ist nicht offen", self.serve.cfg.port);
         }
-        format!("Port {}: {} Anfragen, {} Antworten, {} in Arbeit, {} wartend", self.serve.cfg.port, s.requests, s.responses, self.busy(), self.queued())
+        msg!("Port {}: {} Anfragen, {} Antworten, {} in Arbeit, {} wartend", self.serve.cfg.port, s.requests, s.responses, self.busy(), self.queued())
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())
@@ -1007,10 +1014,13 @@ impl Service for HttpClient {
         ]
     }
     fn status(&self) -> String {
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
         match (&self.last_error, self.last_status) {
-            (Some(f), _) => format!("{}: {}", self.url.text(), f.text()),
-            (None, 0) => format!("{}: {} von {} gesendet", self.url.text(), self.sent, self.count),
-            (None, s) => format!("{}: {} Antworten, zuletzt {}", self.url.text(), self.responses, s),
+            (Some(f), _) => msg!("{}: {}", self.url.text(), f.msg()),
+            (None, 0) => msg!("{}: {} von {} gesendet", self.url.text(), self.sent, self.count),
+            (None, s) => msg!("{}: {} Antworten, zuletzt {}", self.url.text(), self.responses, s),
         }
     }
     fn clone_box(&self) -> Box<dyn Service> {
@@ -1577,12 +1587,15 @@ impl Service for HttpLoad {
         ]
     }
     fn status(&self) -> String {
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
         let what = match self.mode {
-            LoadMode::Closed => format!("{} Nutzer", self.users),
-            LoadMode::Open => format!("{}.{:03} Anfragen/s", self.rate_m / 1000, self.rate_m % 1000),
+            LoadMode::Closed => msg!("{} Nutzer", self.users),
+            LoadMode::Open => msg!("{}.{} Anfragen/s", self.rate_m / 1000, format!("{:03}", self.rate_m % 1000)),
         };
-        let state = if self.running() { "läuft" } else if self.t0.is_none() { "wartet" } else { "beendet" };
-        format!("{} ({}): {} gesendet, {} Antworten, {} Fehler", what, state, self.sent, self.responses, self.http_errors + self.failed)
+        let state = if self.running() { phrase("läuft") } else if self.t0.is_none() { phrase("wartet") } else { phrase("beendet") };
+        msg!("{} ({}): {} gesendet, {} Antworten, {} Fehler", what, state, self.sent, self.responses, self.http_errors + self.failed)
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())
@@ -1597,26 +1610,31 @@ impl Service for HttpLoad {
 
 // ---------------------------------------------------------------- project definitions
 
-fn url_of(s: &str) -> Result<Url, String> {
+fn url_of(s: &str) -> Result<Url, Msg> {
     Url::parse(s).map_err(|e| match e {
-        crate::http::UrlErr::Scheme(s) => format!("\u{201e}{}\u{201c}: nur http geht.", s),
-        crate::http::UrlErr::NoHost => String::from("Die URL nennt keinen Host."),
-        crate::http::UrlErr::Port => String::from("Der Port der URL ist keine Zahl bis 65535."),
-        crate::http::UrlErr::BadHost => String::from("Der Host der URL hat ungültige Zeichen."),
+        crate::http::UrlErr::Scheme(s) => msg!("\u{201e}{}\u{201c}: nur http geht.", s),
+        crate::http::UrlErr::NoHost => msg!("Die URL nennt keinen Host."),
+        crate::http::UrlErr::Port => msg!("Der Port der URL ist keine Zahl bis 65535."),
+        crate::http::UrlErr::BadHost => msg!("Der Host der URL hat ungültige Zeichen."),
     })
 }
 
 /// an HTTP service from its definition in a project file (svcact.rs); the German reason when
 /// the configuration does not fit
 pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
+    from_def_msg(kind, c).map_err(|m| m.text())
+}
+
+/// from_def, the reason as a message for the app's catalogue
+pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
     let num = |k: &str, d: u64| c.get(k).and_then(|v| v.as_u64()).unwrap_or(d);
     let ms = |k: &str, d: u64| c.get(k).and_then(|v| decimal(v, MS)).unwrap_or(d * MS);
     let flag = |k: &str, d: bool| c.get(k).and_then(|v| v.as_bool()).unwrap_or(d);
     let text = |k: &str| c.get(k).and_then(|v| v.as_str()).map(String::from);
-    let port = |d: u16| -> Result<u16, String> {
+    let port = |d: u16| -> Result<u16, Msg> {
         match num("port", d as u64) {
             p @ 1..=65535 => Ok(p as u16),
-            p => Err(format!("Port {} gibt es nicht.", p)),
+            p => Err(msg!("Port {} gibt es nicht.", p)),
         }
     };
     Ok(match kind {
@@ -1661,7 +1679,7 @@ pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
                     Some(u) => RouteBackend::Url(url_of(u)?),
                 };
                 if !rt.path.starts_with('/') && rt.path != "*" {
-                    return Err(format!("Der Pfad \u{201e}{}\u{201c} beginnt nicht mit /.", rt.path));
+                    return Err(msg!("Der Pfad \u{201e}{}\u{201c} beginnt nicht mit /.", rt.path));
                 }
                 s.routes.push(rt);
             }
@@ -1673,7 +1691,7 @@ pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
             if let Some(k) = c.get("kv") {
                 s.upstream = Some(crate::kv::client_of(k, K_UP)?);
             } else if s.routes.iter().any(|r| r.backend == RouteBackend::Kv) {
-                return Err(String::from("Eine Route fragt den KV-Speicher, aber \u{201e}kv\u{201c} fehlt."));
+                return Err(msg!("Eine Route fragt den KV-Speicher, aber \u{201e}kv\u{201c} fehlt."));
             }
             if s.upstream.is_none() && s.routes.iter().any(|r| matches!(r.backend, RouteBackend::Url(_))) {
                 s.upstream = Some(crate::kv::KvClient::new(K_UP));
@@ -1681,7 +1699,7 @@ pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
             Box::new(s)
         }
         "http-client" => {
-            let url = url_of(&text("url").ok_or_else(|| String::from("\u{201e}url\u{201c} fehlt."))?)?;
+            let url = url_of(&text("url").ok_or_else(|| msg!("\u{201e}url\u{201c} fehlt."))?)?;
             let mut s = HttpClient::new(url);
             s.method = text("method").unwrap_or_else(|| String::from("GET")).to_ascii_uppercase();
             s.count = num("count", 1).min(u32::MAX as u64) as u32;
@@ -1704,13 +1722,13 @@ pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
                 }
             }
             if targets.is_empty() {
-                return Err(String::from("\u{201e}targets\u{201c} fehlt."));
+                return Err(msg!("\u{201e}targets\u{201c} fehlt."));
             }
             let mut s = HttpLoad::new(targets);
             s.mode = match text("mode").as_deref().unwrap_or("closed") {
                 "closed" => LoadMode::Closed,
                 "open" => LoadMode::Open,
-                m => return Err(format!("\u{201e}mode\u{201c} kennt {} nicht (closed, open).", m)),
+                m => return Err(msg!("\u{201e}mode\u{201c} kennt {} nicht (closed, open).", m)),
             };
             s.random_target = text("balance").as_deref() == Some("random");
             s.users = num("users", 1).clamp(1, 100_000) as u32;
@@ -1748,7 +1766,7 @@ pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
             }
             Box::new(s)
         }
-        k => return Err(format!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k)),
+        k => return Err(msg!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k)),
     })
 }
 

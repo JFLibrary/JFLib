@@ -8,7 +8,8 @@
 //                  "interval_ms": 0, "delay_ms": 0, "close": "shutdown", "sport": 0,
 //                  "nodelay": false, "keepalive": false, "rcvbuf": 0, "sndbuf": 0}
 //
-//   from_def(kind, &config)   the service of a project's definition (svcact.rs)
+//   from_def(kind, &config)   the service of a project's definition (svcact.rs); from_def_msg:
+//                             the refusal as a Msg for the app's catalogue
 //   pattern(i)                the byte the client sends at position i (i mod 256)
 //
 // The client connects when it starts (after delay_ms), from `sport` (0: an ephemeral port),
@@ -26,12 +27,13 @@
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
-use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::any::Any;
 
 use agent_core::jmap::Value;
+use jfn_model::msg;
+use jfn_model::msg::{phrase, Msg};
 use netpkt::Ipv4;
 
 use crate::kernel::{Ns, MS};
@@ -152,7 +154,10 @@ impl Service for TcpEcho {
         ]
     }
     fn status(&self) -> String {
-        format!("Port {}: {} Verbindungen, {} Bytes zurückgeschickt", self.port, self.connections, self.bytes_out)
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
+        msg!("Port {}: {} Verbindungen, {} Bytes zurückgeschickt", self.port, self.connections, self.bytes_out)
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())
@@ -259,7 +264,10 @@ impl Service for TcpDiscard {
         ]
     }
     fn status(&self) -> String {
-        format!("Port {}: {} Verbindungen, {} Bytes verworfen", self.port, self.connections, self.bytes)
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
+        msg!("Port {}: {} Verbindungen, {} Bytes verworfen", self.port, self.connections, self.bytes)
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())
@@ -314,6 +322,8 @@ pub struct TcpClient {
     pub failures: u64,
     /// why connect refused (no route, port in use)
     pub error: Option<String>,
+    /// error as a message for the app's catalogue
+    pub error_msg: Option<Msg>,
 }
 
 impl TcpClient {
@@ -338,6 +348,7 @@ impl TcpClient {
             end: None,
             failures: 0,
             error: None,
+            error_msg: None,
         }
     }
     /// the socket while the connection is open
@@ -346,11 +357,12 @@ impl TcpClient {
     }
     fn connect(&mut self, os: &mut OsApi) {
         self.started = Some(os.now());
-        match os.tcp_connect_from(self.sport, self.server, self.port, self.opts) {
+        match os.tcp_connect_from_msg(self.sport, self.server, self.port, self.opts) {
             Ok(s) => self.sock = Some(s),
             Err(e) => {
                 self.failures += 1;
-                self.error = Some(e);
+                self.error = Some(e.text());
+                self.error_msg = Some(e);
             }
         }
     }
@@ -471,11 +483,15 @@ impl Service for TcpClient {
         ]
     }
     fn status(&self) -> String {
-        match (&self.error, self.end, self.connected) {
-            (Some(e), _, _) => format!("{}:{}: {}", self.server, self.port, e),
-            (None, Some(end), _) => format!("{}:{}: {} von {} Bytes gesendet, {} empfangen; {}", self.server, self.port, self.sent, self.bytes, self.received, end.text()),
-            (None, None, Some(_)) => format!("verbunden mit {}:{}: {} von {} Bytes gesendet, {} empfangen", self.server, self.port, self.sent, self.bytes, self.received),
-            (None, None, None) => format!("verbindet mit {}:{} ...", self.server, self.port),
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
+        let error = self.error_msg.clone().or_else(|| self.error.clone().map(Msg::plain));
+        match (error, self.end, self.connected) {
+            (Some(e), _, _) => msg!("{}:{}: {}", self.server, self.port, e),
+            (None, Some(end), _) => msg!("{}:{}: {} von {} Bytes gesendet, {} empfangen; {}", self.server, self.port, self.sent, self.bytes, self.received, phrase(end.text())),
+            (None, None, Some(_)) => msg!("verbunden mit {}:{}: {} von {} Bytes gesendet, {} empfangen", self.server, self.port, self.sent, self.bytes, self.received),
+            (None, None, None) => msg!("verbindet mit {}:{} ...", self.server, self.port),
         }
     }
     fn clone_box(&self) -> Box<dyn Service> {
@@ -494,13 +510,18 @@ impl Service for TcpClient {
 /// a TCP service from its definition in a project file (svcact.rs); the German reason when
 /// the configuration does not fit
 pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
+    from_def_msg(kind, c).map_err(|m| m.text())
+}
+
+/// from_def, the reason as a message for the app's catalogue
+pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
     let num = |k: &str, d: u64| c.get(k).and_then(|v| v.as_u64()).unwrap_or(d);
     let flag = |k: &str, d: bool| c.get(k).and_then(|v| v.as_bool()).unwrap_or(d);
     let size = |k: &str| num(k, 0).min(u32::MAX as u64) as u32;
-    let port = |d: u16| -> Result<u16, String> {
+    let port = |d: u16| -> Result<u16, Msg> {
         match num("port", d as u64) {
             p @ 1..=65535 => Ok(p as u16),
-            p => Err(format!("Port {} gibt es nicht.", p)),
+            p => Err(msg!("Port {} gibt es nicht.", p)),
         }
     };
     let opts = SockOpts { nodelay: flag("nodelay", false), keepalive: flag("keepalive", false), rcvbuf: size("rcvbuf"), sndbuf: size("sndbuf") };
@@ -520,7 +541,7 @@ pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
             Box::new(s)
         }
         "tcp-client" => {
-            let server = c.get("server").and_then(|v| v.as_str()).and_then(|s| Ipv4::parse(s.trim())).ok_or_else(|| String::from("\u{201e}server\u{201c} fehlt oder ist keine IPv4-Adresse."))?;
+            let server = c.get("server").and_then(|v| v.as_str()).and_then(|s| Ipv4::parse(s.trim())).ok_or_else(|| msg!("\u{201e}server\u{201c} fehlt oder ist keine IPv4-Adresse."))?;
             let mut s = TcpClient::new(server, port(7)?, num("bytes", 10_000));
             s.chunk = size("chunk");
             s.interval = num("interval_ms", 0).saturating_mul(MS);
@@ -532,10 +553,10 @@ pub fn from_def(kind: &str, c: &Value) -> Result<Box<dyn Service>, String> {
                 "close" => CloseMode::Close,
                 "abort" => CloseMode::Abort,
                 "keep" => CloseMode::Keep,
-                other => return Err(format!("\u{201e}close\u{201c} kennt {} nicht (shutdown, close, abort, keep).", other)),
+                other => return Err(msg!("\u{201e}close\u{201c} kennt {} nicht (shutdown, close, abort, keep).", other)),
             };
             Box::new(s)
         }
-        k => return Err(format!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k)),
+        k => return Err(msg!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k)),
     })
 }

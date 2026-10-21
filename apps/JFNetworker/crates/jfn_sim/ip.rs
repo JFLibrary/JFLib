@@ -13,7 +13,10 @@
 //   rib(up) -> Vec<Route>         connected and local routes of the interfaces that are up,
 //                                 static routes whose interface is up or whose next hop is
 //                                 reachable (one level of recursion)
-//   lookup(up, dst) -> NextHop    longest prefix, then administrative distance, then metric
+//   lookup(up, dst) -> NextHop    longest prefix, then administrative distance, then metric;
+//                                 the table of the last lookup is kept with what it was made of
+//                                 (the interfaces' states and addresses, the static routes) and
+//                                 made again only when that changed
 //
 // The engine decides which interfaces are up (iface_up in l3.rs); this module only keeps the
 // data and answers questions about it.
@@ -22,6 +25,7 @@ use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::cell::RefCell;
 
 use jfn_model::catalog::{CliStyle, Media, Model, F_AP, F_BRIDGE, F_HOST, F_ROUTER};
 use jfn_model::ifname;
@@ -195,6 +199,18 @@ pub struct IpStack {
     pub long_quote: bool,
     /// packets that may wait for one ARP answer (Linux ARP_QUEUE, IOS 0)
     pub arp_queue: usize,
+    /// the routing table of the last lookup (every forwarded packet looks one up)
+    pub(crate) rib_cache: RefCell<RibCache>,
+}
+
+/// a routing table with what it was made of: per interface its state and addresses, the static
+/// routes (equal inputs give the same table)
+#[derive(Clone, Debug, Default)]
+pub(crate) struct RibCache {
+    up: Vec<bool>,
+    addrs: Vec<Vec<Prefix4>>,
+    statics: Vec<Route>,
+    rib: Vec<Route>,
 }
 
 /// how a device limits the ICMP errors it sends
@@ -274,6 +290,7 @@ impl IpStack {
             overlap_check: ios,
             long_quote: !ios,
             arp_queue: if ios { 0 } else { ARP_QUEUE },
+            rib_cache: RefCell::new(RibCache::default()),
         })
     }
 
@@ -460,8 +477,18 @@ impl IpStack {
 
     /// where a packet to `dst` goes
     pub fn lookup(&self, up: &dyn Fn(u16) -> bool, dst: Ipv4) -> Option<NextHop> {
-        let rib = self.rib(up);
-        let r = best(&rib, dst)?;
+        let mut c = self.rib_cache.borrow_mut();
+        let same = c.up.len() == self.ifaces.len()
+            && c.statics == self.statics
+            && self.ifaces.iter().enumerate().all(|(i, f)| c.up[i] == up(i as u16) && c.addrs[i] == f.addrs);
+        if !same {
+            c.up = (0..self.ifaces.len()).map(|i| up(i as u16)).collect();
+            c.addrs = self.ifaces.iter().map(|f| f.addrs.clone()).collect();
+            c.statics = self.statics.clone();
+            c.rib = self.rib(up);
+        }
+        let rib = &c.rib;
+        let r = best(rib, dst)?;
         let iface = r.iface?;
         let gw = match r.via {
             None => dst,
@@ -469,7 +496,7 @@ impl IpStack {
                 // a recursive static route: the next hop of the next hop
                 match self.ifaces.get(iface as usize) {
                     Some(f) if f.on_link(via) => via,
-                    _ => match best(&rib, via) {
+                    _ => match best(rib, via) {
                         Some(rr) if rr.src != RouteSrc::Local => rr.via.unwrap_or(via),
                         _ => via,
                     },

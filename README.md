@@ -172,7 +172,7 @@ Pass the app names in the first column exactly as written to `build_rs.py app NA
 | [`jfWord`](apps/jfWord/README.md) | A word processor with a ribbon, page view, text styles, tables, references, and DOCX support | Windows, Linux, Web |
 | [`buildManager`](apps/buildManager/README.md) | A graphical build app for applications, styles, profiles, tests, and release packages | Windows, Linux |
 | [`BackupCraft`](apps/BackupCraft/README.md) | A backup suite: console, server (`bc-server`), agents (`bc-agent`), and `bcctl`; deduplicated, encrypted, signed backups with schedules, roles, and audit; copy jobs, replication with failover, continuous protection, tape, QEMU/KVM VMs with instant start and boot checks, volume images, a central view of several servers | Windows, Linux |
-| [`JFNetworker`](apps/JFNetworker/README.md) | A network simulator and lab for distributed systems, an alternative to Cisco Packet Tracer (early stage: device catalog, project model, packet codecs) | Windows, Linux |
+| [`JFNetworker`](apps/JFNetworker/README.md) | A network simulator and lab for distributed systems, an alternative to Cisco Packet Tracer: a topology editor with cables and port choice, IOS-like and Linux consoles, ARP, IPv4, VLANs, DHCP, DNS, TCP and HTTP byte for byte, a step-by-step simulation mode with event list and packet view, pcapng export; German and English | Windows, Linux |
 | [`androidGallery`](apps/androidGallery/README.md) | A touch gallery with widgets, text input, and theme switching | Android; also Windows, Linux, and Web |
 
 jfWord is under active development; full Word feature coverage and file compatibility

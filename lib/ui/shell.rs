@@ -538,8 +538,11 @@ impl Ui {
         self.box_end();
     }
 
-    /// ui_empty_state(icon, title, text): a centred hint for an empty view (icon 0 = none)
+    /// ui_empty_state(icon, title, text): a centred hint for an empty view (icon 0 = none);
+    /// the text wraps at 360 DIP, or at the enclosing box's width when that is narrower
     pub fn empty_state(&mut self, icon: u32, title: &str, text: &str) {
+        // the text wraps at 360 DIP, narrower in a narrow panel (the enclosing box's width)
+        let avail = self.px2dip(self.box_rect()[2]);
         self.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER, 8);
         if icon != 0 {
             let s = self.dp(40);
@@ -549,7 +552,7 @@ impl Ui {
         }
         self.text(TS_SUBTITLE | TX_CENTER, title);
         if !text.is_empty() {
-            self.next_size(360, 0);
+            self.next_size(if avail > 80 { avail.min(360) } else { 360 }, 0);
             self.text(TS_BODY | TX_SECONDARY | TX_WRAP | TX_CENTER, text);
         }
         self.box_end();

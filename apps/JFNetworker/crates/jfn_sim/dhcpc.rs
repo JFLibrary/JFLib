@@ -38,6 +38,8 @@ use alloc::vec::Vec;
 use core::any::Any;
 
 use base::metrics::Counter;
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 use netpkt::dhcp::{self, Dhcp, MsgType, Opt};
 use netpkt::syslog::SEV_INFO;
 use netpkt::udp::{PORT_DHCP_CLIENT, PORT_DHCP_SERVER};
@@ -745,9 +747,12 @@ impl Service for DhcpClient {
         ]
     }
     fn status(&self) -> String {
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
         match (&self.state, &self.lease) {
-            (ClientState::Bound | ClientState::Renewing | ClientState::Rebinding, Some(l)) => format!("{}: {} von {} ({})", self.iface_name, l.addr, l.server, self.state.name()),
-            _ => format!("{}: {}", self.iface_name, self.state.name()),
+            (ClientState::Bound | ClientState::Renewing | ClientState::Rebinding, Some(l)) => msg!("{}: {} von {} ({})", self.iface_name, l.addr, l.server, self.state.name()),
+            _ => msg!("{}: {}", self.iface_name, self.state.name()),
         }
     }
     fn clone_box(&self) -> Box<dyn Service> {

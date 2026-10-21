@@ -13,12 +13,13 @@ use alloc::vec::Vec;
 
 use ui::*;
 
+use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::edits;
 
-/// the German name of a kind of service
+/// the name of a kind of service (in the current language)
 fn kind_name(kind: &str) -> &str {
-    match kind {
+    t(match kind {
         "dhcp-client" => "DHCP-Client",
         "dhcp-server" => "DHCP-Server",
         "dhcp-relay" => "DHCP-Relay",
@@ -28,8 +29,11 @@ fn kind_name(kind: &str) -> &str {
         "tcp-echo" => "TCP-Echo",
         "tcp-discard" => "TCP-Discard",
         "tcp-client" => "TCP-Testclient",
-        k => k,
-    }
+        "http-server" => "Webserver (HTTP)",
+        "http-client" => "HTTP-Client",
+        "http-load" => "Lastgenerator (HTTP)",
+        _ => return kind,
+    })
 }
 
 /// the Dienste tab of a device window (ids id .. id + 0x1F)
@@ -44,7 +48,7 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, id: u32, dev: u32) {
         ui.next_size(-1, 0);
         ui.text(
             TS_BODY | TX_SECONDARY | TX_WRAP,
-            &format!("Auf {} läuft kein Dienst. Dienste (DHCP, DNS, Syslog, NTP) kommen aus der Projektdatei oder aus Einstellungen wie „Adresse per DHCP beziehen“.", d.name),
+            &tf("Auf {} läuft kein Dienst. Dienste (DHCP, DNS, Syslog, NTP) kommen aus der Projektdatei oder aus Einstellungen wie „Adresse per DHCP beziehen“.", &[&d.name]),
         );
     }
     for (i, s) in svcs.iter().enumerate().take(30) {
@@ -52,9 +56,9 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, id: u32, dev: u32) {
         ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 4);
         ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
         let (badge, state) = match (s.enabled, s.running) {
-            (_, true) => (BADGE_OK, "läuft"),
-            (true, false) => (BADGE_WARN, "gestoppt"),
-            (false, false) => (BADGE_NEUTRAL, "aus"),
+            (_, true) => (BADGE_OK, t("läuft")),
+            (true, false) => (BADGE_WARN, t("gestoppt")),
+            (false, false) => (BADGE_NEUTRAL, t("aus")),
         };
         ui.status_dot(badge);
         ui.text(TS_BODY_STRONG, &format!("{} · {}", kind_name(s.kind), s.name));
@@ -63,16 +67,16 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, id: u32, dev: u32) {
         match def {
             Some(j) => {
                 let mut on = (!d.services[j].disabled) as i32;
-                if ui.switch(id + 1 + i as u32, "Eingeschaltet", &mut on) & EV_ACT != 0 {
+                if ui.switch(id + 1 + i as u32, t("Eingeschaltet"), &mut on) & EV_ACT != 0 {
                     switch = Some((j, on != 0));
                 }
             }
-            None => ui.text(TS_CAPTION | TX_TERTIARY, "aus der Konfiguration"),
+            None => ui.text(TS_CAPTION | TX_TERTIARY, t("aus der Konfiguration")),
         }
         ui.box_end();
-        if !s.status.is_empty() {
+        if !s.status_msg.is_empty() {
             ui.next_size(-1, 0);
-            ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, &s.status);
+            ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, &crate::app::tr::msg(&s.status_msg));
         }
         let nums: Vec<String> = s.metrics.iter().map(|m| format!("{} {}", m.name, m.value)).collect();
         if !nums.is_empty() {

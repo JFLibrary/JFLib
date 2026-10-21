@@ -5,8 +5,11 @@
 //   default_model(kind)           the first model of a kind
 //   Model::ports() / port(name)   the expanded ports ("GigabitEthernet1/0/1" ...); port() also
 //                                 takes IOS abbreviations ("gi1/0/1")
-//   Model::summary()              "24× 1G PoE+, 4× 10G SFP+, Konsole"
-//   speed_str(kbps)               "1G", "2.5G", "100M", "2 Mbit/s"
+//   Model::summary()              "24× 1G PoE+, 4× 10G SFP+, Konsole" (summary_msg: as a Msg)
+//   speed_str(kbps)               "1G", "2.5G", "100M", "2 Mbit/s" (speed_msg: as a Msg)
+//
+// The German names the app translates (its catalogue src/locales/engine.tsv): Category::title,
+// Media::name, a model's name and title (the tables marked "i18n" for tools/i18n_check.py).
 //
 // The models are vendor neutral but modern: multi-gigabit copper, SFP+/SFP28/QSFP28 optics,
 // PoE, WLAN 802.11ax with 6 GHz.  Network devices speak the IOS-like command line and use IOS interface names;
@@ -20,6 +23,8 @@ use alloc::vec::Vec;
 use agent_core::wire_enum;
 
 use crate::ifname;
+use crate::msg::{list, phrase, Msg};
+use crate::msg;
 
 wire_enum! {
     /// what a device is (its model's kind)
@@ -77,6 +82,7 @@ impl Category {
     ];
     /// the German title (the app translates it)
     pub fn title(self) -> &'static str {
+        // i18n
         match self {
             Category::EndDevices => "Endgeräte",
             Category::Network => "Netzwerk",
@@ -128,7 +134,9 @@ pub enum Media {
 }
 
 impl Media {
+    /// the name of the port kind (German where it is a word: the app translates it)
     pub fn name(self) -> &'static str {
+        // i18n
         match self {
             Media::Rj45 => "RJ45",
             Media::Sfp => "SFP",
@@ -282,31 +290,26 @@ impl Model {
     }
     /// "24× 1G PoE+, 4× 10G SFP+, Konsole"
     pub fn summary(&self) -> String {
-        let mut parts: Vec<String> = Vec::new();
-        for g in self.groups {
-            let s = match g.media {
-                Media::Console => String::from("Konsole"),
-                Media::Usb => String::from("USB"),
-                Media::RadioAp | Media::RadioClient => format!("{}× Funk {}", g.count, speed_str(g.kbps)),
-                Media::Serial => format!("{}× Seriell", g.count),
-                Media::Wan => format!("{}× WAN", g.count),
-                m => {
-                    let mut s = format!("{}× {}", g.count, speed_str(g.kbps));
-                    if m.is_optical() {
-                        s.push(' ');
-                        s.push_str(m.name());
-                    }
-                    match g.poe {
-                        Poe::Pse => s.push_str(" PoE+"),
-                        Poe::Pd => s.push_str(" (PoE-gespeist)"),
-                        Poe::None => {}
-                    }
-                    s
+        self.summary_msg().text()
+    }
+    /// the ports as a message (summary() is its German text)
+    pub fn summary_msg(&self) -> Msg {
+        let parts = self.groups.iter().map(|g| match g.media {
+            Media::Console => phrase("Konsole"),
+            Media::Usb => phrase("USB"),
+            Media::RadioAp | Media::RadioClient => msg!("{}× Funk {}", g.count, speed_str(g.kbps)),
+            Media::Serial => msg!("{}× Seriell", g.count),
+            Media::Wan => msg!("{}× WAN", g.count),
+            m => {
+                let base = if m.is_optical() { msg!("{}× {} {}", g.count, speed_str(g.kbps), m.name()) } else { msg!("{}× {}", g.count, speed_str(g.kbps)) };
+                match g.poe {
+                    Poe::Pse => msg!("{} PoE+", base),
+                    Poe::Pd => msg!("{} (PoE-gespeist)", base),
+                    Poe::None => base,
                 }
-            };
-            parts.push(s);
-        }
-        parts.join(", ")
+            }
+        });
+        list(parts.collect())
     }
 }
 
@@ -325,9 +328,26 @@ pub fn speed_str(kbps: u32) -> String {
     }
 }
 
+/// speed_str as a message (its German text is speed_str): "2,5 Mbit/s" takes the language's
+/// decimal mark
+pub fn speed_msg(kbps: u32) -> Msg {
+    if kbps >= K1G {
+        let g = kbps / 100_000; // tenths of a gigabit
+        Msg::plain(if g % 10 == 0 { format!("{}G", g / 10) } else { format!("{}.{}G", g / 10, g % 10) })
+    } else if kbps >= 100_000 {
+        Msg::plain(format!("{}M", kbps / 1000))
+    } else if kbps >= 1000 {
+        let m = kbps / 100;
+        if m % 10 == 0 { msg!("{} Mbit/s", m / 10) } else { msg!("{},{} Mbit/s", m / 10, m % 10) }
+    } else {
+        msg!("{} kbit/s", kbps)
+    }
+}
+
 use Media::*;
 use Poe::{None as NoPoe, Pd, Pse};
 
+// i18n: name title
 static CATALOG: &[Model] = &[
     // ---- end devices
     Model {

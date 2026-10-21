@@ -1,0 +1,94 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/campus.jfnet
+# the shot matrix of the main views (U5): the topology, a console, the simulation mode with its
+# events, the Paket tab and a device window, each light and dark at 100 and 150 %
+# (build/jfnetworker/shots_<view>_<theme>_<scale>.png) on the campus of the acceptance;
+# english.uis takes the same views in English.  Ids: 38912 the event list, 26624 the first
+# device window.
+size 1280 800
+theme light
+# the leases come within a few seconds of virtual time
+wait 6000
+# ---- the topology, MLS1 in the Eigenschaften
+click listitem:"MLS1"
+move 640,790
+expect listitem:"MLS1" selected
+shot build/jfnetworker/shots_topology_light_100.png
+theme dark
+shot build/jfnetworker/shots_topology_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/shots_topology_dark_150.png
+theme light
+shot build/jfnetworker/shots_topology_light_150.png
+scale 100
+# ---- a console: PC1 pings server.lab
+wait 600
+dblclick listitem:"PC1"
+expect tab:"PC1" selected
+type "ping -c 2 server.lab\n"
+wait 2500
+expect text:"2 packets transmitted, 2 received, 0% packet loss, time 1000ms" exists
+move 640,790
+shot build/jfnetworker/shots_console_light_100.png
+theme dark
+shot build/jfnetworker/shots_console_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/shots_console_dark_150.png
+theme light
+shot build/jfnetworker/shots_console_light_150.png
+scale 100
+# ---- the simulation mode: PC2 pings SRV1 (a simple PDU), two steps
+click tab:"Simulation"
+wait 200
+key p
+click listitem:"PC2"
+wait 600
+click listitem:"SRV1"
+key esc
+key f7
+wait 1200
+key f7
+wait 1200
+click tab:"Ereignisse"
+move 640,790
+shot build/jfnetworker/shots_simulation_light_100.png
+theme dark
+shot build/jfnetworker/shots_simulation_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/shots_simulation_dark_150.png
+theme light
+shot build/jfnetworker/shots_simulation_light_150.png
+scale 100
+# ---- the Paket tab: the last event of the list
+focus #38912
+key end
+wait 100
+click tab:"Paket"
+wait 100
+move 640,790
+shot build/jfnetworker/shots_packet_light_100.png
+theme dark
+shot build/jfnetworker/shots_packet_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/shots_packet_dark_150.png
+theme light
+shot build/jfnetworker/shots_packet_light_150.png
+scale 100
+# ---- a device window: R1 (Shift + double click), its interfaces
+click tab:"Echtzeit"
+wait 600
+dblclick listitem:"R1" shift
+expect window 26624 open
+click tab:"Schnittstellen"
+shot build/jfnetworker/shots_devwin_light_100.png window 26624
+theme dark
+shot build/jfnetworker/shots_devwin_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/shots_devwin_dark_150.png window 26624
+theme light
+shot build/jfnetworker/shots_devwin_light_150.png window 26624
+scale 100 window 26624
+expect_nowarn

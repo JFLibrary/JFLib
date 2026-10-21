@@ -47,6 +47,8 @@ use alloc::vec::Vec;
 use core::any::Any;
 
 use agent_core::jmap::Value;
+use jfn_model::msg;
+use jfn_model::msg::Msg;
 use base::hashring::{hash64, Ring};
 use base::metrics::Window;
 use netpkt::http::{Headers, Version};
@@ -1166,38 +1168,44 @@ impl Service for KvNode {
 }
 
 /// addresses from a JSON list
-fn addrs_of(v: Option<&Value>) -> Result<Vec<Ipv4>, String> {
+fn addrs_of(v: Option<&Value>) -> Result<Vec<Ipv4>, Msg> {
     let mut out = Vec::new();
     for x in v.and_then(|x| x.as_array()).unwrap_or(&[]) {
         let s = x.as_str().unwrap_or("");
-        out.push(Ipv4::parse(s.trim()).ok_or_else(|| format!("\u{201e}{}\u{201c} ist keine IPv4-Adresse.", s))?);
+        out.push(Ipv4::parse(s.trim()).ok_or_else(|| msg!("\u{201e}{}\u{201c} ist keine IPv4-Adresse.", s))?);
     }
     Ok(out)
 }
 
-/// a KV node from its definition in a project file (svcact.rs)
+/// a KV node from its definition in a project file (svcact.rs); the German reason when
+/// the configuration does not fit
 pub fn from_def(c: &Value) -> Result<Box<dyn Service>, String> {
+    from_def_msg(c).map_err(|m| m.text())
+}
+
+/// from_def, the reason as a message for the app's catalogue
+pub fn from_def_msg(c: &Value) -> Result<Box<dyn Service>, Msg> {
     let num = |k: &str, d: u64| c.get(k).and_then(|v| v.as_u64()).unwrap_or(d);
     let ms = |k: &str, d: u64| c.get(k).and_then(|v| decimal(v, MS)).unwrap_or(d * MS);
     let nodes = addrs_of(c.get("nodes"))?;
     if nodes.is_empty() {
-        return Err(String::from("\u{201e}nodes\u{201c} fehlt."));
+        return Err(msg!("\u{201e}nodes\u{201c} fehlt."));
     }
     let mut k = KvNode::new(nodes);
     k.port = match num("port", KV_PORT as u64) {
         p @ 1..=65535 => p as u16,
-        p => return Err(format!("Port {} gibt es nicht.", p)),
+        p => return Err(msg!("Port {} gibt es nicht.", p)),
     };
     k.hb_port = match num("hb_port", HB_PORT as u64) {
         p @ 1..=65535 => p as u16,
-        p => return Err(format!("Port {} gibt es nicht.", p)),
+        p => return Err(msg!("Port {} gibt es nicht.", p)),
     };
     k.vnodes = num("vnodes", 16).clamp(1, 1000) as u32;
     k.rf = (num("rf", 2) as usize).clamp(1, k.nodes.len());
     k.w = num("w", 0).min(k.rf as u64) as u8;
     k.r = num("r", 0).min(k.rf as u64) as u8;
     if let Some(s) = c.get("consistency").and_then(|v| v.as_str()) {
-        k.consistency = Consistency::parse(s).ok_or_else(|| format!("\u{201e}consistency\u{201c} kennt {} nicht (strong, eventual).", s))?;
+        k.consistency = Consistency::parse(s).ok_or_else(|| msg!("\u{201e}consistency\u{201c} kennt {} nicht (strong, eventual).", s))?;
     }
     k.read_repair = c.get("read_repair").and_then(|v| v.as_bool()).unwrap_or(true);
     k.timeout = ms("timeout_ms", 500).max(MS);
@@ -1447,24 +1455,24 @@ impl KvClient {
 /// a client's settings from a service configuration: {"nodes": [...], "port": 7000,
 /// "vnodes": 16, "rf": 2, "timeout_ms": 1000, "connect_timeout_ms": 200, "down_ms": 2000,
 /// "consistency": "eventual"}
-pub fn client_of(c: &Value, key: u32) -> Result<KvClient, String> {
+pub fn client_of(c: &Value, key: u32) -> Result<KvClient, Msg> {
     let num = |k: &str, d: u64| c.get(k).and_then(|v| v.as_u64()).unwrap_or(d);
     let ms = |k: &str, d: u64| c.get(k).and_then(|v| decimal(v, MS)).unwrap_or(d * MS);
     let nodes = addrs_of(c.get("nodes"))?;
     if nodes.is_empty() {
-        return Err(String::from("\u{201e}kv.nodes\u{201c} fehlt."));
+        return Err(msg!("\u{201e}kv.nodes\u{201c} fehlt."));
     }
     let mut k = KvClient::new(key);
     let port = match num("port", KV_PORT as u64) {
         p @ 1..=65535 => p as u16,
-        p => return Err(format!("Port {} gibt es nicht.", p)),
+        p => return Err(msg!("Port {} gibt es nicht.", p)),
     };
     k.setup(nodes, port, num("vnodes", 16).clamp(1, 1000) as u32, num("rf", 2) as usize);
     k.timeout = ms("timeout_ms", 1000).max(MS);
     k.connect_timeout = ms("connect_timeout_ms", 200).max(MS);
     k.down_for = ms("down_ms", 2000);
     if let Some(s) = c.get("consistency").and_then(|v| v.as_str()) {
-        k.consistency = Some(Consistency::parse(s).ok_or_else(|| format!("\u{201e}consistency\u{201c} kennt {} nicht (strong, eventual).", s))?);
+        k.consistency = Some(Consistency::parse(s).ok_or_else(|| msg!("\u{201e}consistency\u{201c} kennt {} nicht (strong, eventual).", s))?);
     }
     Ok(k)
 }
