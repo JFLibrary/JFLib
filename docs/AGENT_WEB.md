@@ -21,6 +21,7 @@ noch offenen Office-Funktionen und Browserdiensten.
 | `tools/jfgui-agent.py`, `tools/agent_bridge.py` | Gemeinsame CLI, Instanzsuche, native Verbindung, stdio-Gateway und explizite Browser-Bridge |
 | `web/loader.js`, `worker.js`, `bridge.js` | Gemeinsamer Browserhost, DOM-Eingabe, Worker, Canvas und aktivierbarer Agentenzugang |
 | `web/a11y.js` | ARIA-Schattenbaum über dem Canvas: Spiegel des Barrierefreiheitsbaums, Aktionen von Screenreadern (GUIDE.md, Abschnitt 19) |
+| `web/secrets.js` | Geheimnisspeicher des Hosts für `plat::secret`: nicht exportierbarer WebCrypto-Schlüssel pro App und verschlüsselte Werte in IndexedDB (SECRETS.md) |
 
 Neue Bibliotheksprojekte nutzen `src/lib.rs`. jfWord nutzt `src/main.rs` mit `app`, `ui`,
 `workflows` und `checks`. Andere bestehende Projekte dürfen ihre flachen Einstiegspunkte

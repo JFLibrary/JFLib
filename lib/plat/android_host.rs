@@ -23,6 +23,7 @@
 //   CALL_CLIP_OURS -> u32 (the clip's first item is a file of the app's GalleryFiles)
 //   CALL_GRANTS    -> u32 count, (uri, u32 read, u32 write)..
 //   CALL_RELEASE   uri -> u32 ok
+//   CALL_SECRET_*  the secret store (android_secret.rs, android/GallerySecrets.java)
 //   DocInfo: uri, display name, u32 dir, u64 size (u64::MAX unknown), i64 mtime ms, u32 DOC_*
 //
 // The clipboard: text (and HTML) go to the system; the library's richer forms (RTF, DOCX)
@@ -52,6 +53,10 @@ const CALL_CLIP_STAMP: u32 = 13;
 const CALL_CLIP_OURS: u32 = 14;
 const CALL_GRANTS: u32 = 20;
 const CALL_RELEASE: u32 = 21;
+pub(crate) const CALL_SECRET_AVAILABLE: u32 = 30;
+pub(crate) const CALL_SECRET_GET: u32 = 31;
+pub(crate) const CALL_SECRET_SET: u32 = 32;
+pub(crate) const CALL_SECRET_DELETE: u32 = 33;
 
 unsafe extern "C" {
     fn jfgui_host_call(kind: u32, ptr: *const u8, len: usize) -> i32;
@@ -83,7 +88,7 @@ pub extern "C" fn jfgui_reply(len: u32) -> usize {
 }
 
 // one synchronous question to the Java host (the documents: only with fs.user, policy.rs)
-fn call(kind: u32, payload: &[u8]) -> Option<Vec<u8>> {
+pub(crate) fn call(kind: u32, payload: &[u8]) -> Option<Vec<u8>> {
     if (CALL_QUERY..=CALL_OPEN).contains(&kind) {
         let uri = core::str::from_utf8(payload).ok().filter(|u| u.starts_with("content:")).unwrap_or("content://");
         if !crate::policy::user_doc_allowed(uri) {
@@ -103,36 +108,36 @@ fn call(kind: u32, payload: &[u8]) -> Option<Vec<u8>> {
 // ---------------------------------------------------------------- wire
 
 #[derive(Default)]
-struct W(Vec<u8>);
+pub(crate) struct W(pub(crate) Vec<u8>);
 impl W {
     fn u32(mut self, v: u32) -> W {
         self.0.extend_from_slice(&v.to_le_bytes());
         self
     }
-    fn bytes(mut self, b: &[u8]) -> W {
+    pub(crate) fn bytes(mut self, b: &[u8]) -> W {
         self.0.extend_from_slice(&(b.len() as u32).to_le_bytes());
         self.0.extend_from_slice(b);
         self
     }
-    fn str(self, s: &str) -> W {
+    pub(crate) fn str(self, s: &str) -> W {
         self.bytes(s.as_bytes())
     }
 }
 
-struct R<'a>(&'a [u8]);
+pub(crate) struct R<'a>(pub(crate) &'a [u8]);
 impl<'a> R<'a> {
     fn take(&mut self, n: usize) -> Option<&'a [u8]> {
         let (a, b) = (self.0.get(..n)?, self.0.get(n..)?);
         self.0 = b;
         Some(a)
     }
-    fn u32(&mut self) -> Option<u32> {
+    pub(crate) fn u32(&mut self) -> Option<u32> {
         Some(u32::from_le_bytes(self.take(4)?.try_into().ok()?))
     }
     fn u64(&mut self) -> Option<u64> {
         Some(u64::from_le_bytes(self.take(8)?.try_into().ok()?))
     }
-    fn bytes(&mut self) -> Option<&'a [u8]> {
+    pub(crate) fn bytes(&mut self) -> Option<&'a [u8]> {
         let n = self.u32()? as usize;
         self.take(n)
     }

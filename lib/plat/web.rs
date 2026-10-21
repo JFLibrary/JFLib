@@ -23,7 +23,7 @@ mod files;
 pub use files::*;
 #[cfg(target_os = "android")]
 #[path = "android_host.rs"]
-mod android_host;
+pub(crate) mod android_host;
 #[cfg(target_os = "android")]
 pub use android_host::{content_fs, content_grants, content_release, jfgui_reply, AndroidDocs};
 #[path = "web_windows.rs"]
@@ -84,6 +84,10 @@ pub const REQUEST_A11Y: u32 = 11;
 /// content:// URI it starts at (may be empty), u32 count, the extensions (one string each,
 /// "png"); answered by jfgui_file_result with the chosen content:// URI
 pub const REQUEST_FILE_DIALOG: u32 = 12;
+/// (browser) commit a change of the secret store (secret.rs, web_secret.rs): u32 op (1 set,
+/// 2 delete), app, service, account and for set the value, each as u32 length + bytes; the
+/// host encrypts and stores it in order and completes with 2, or an error
+pub const REQUEST_SECRET: u32 = 13;
 
 /// Completion state of one browser operation; durable and exported are distinct outcomes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -192,7 +196,7 @@ pub(super) fn present_bytes(data: &[u8], width: i32, height: i32, stride: i32, r
         host_present(data.as_ptr(), data.len(), width, height, stride, rects.as_ptr(), rects.len());
     }
 }
-fn request(kind: u32, bytes: &[u8], file: Option<(String, u64)>) -> Option<u32> {
+pub(crate) fn request(kind: u32, bytes: &[u8], file: Option<(String, u64)>) -> Option<u32> {
     let id = {
         let mut pending = REQUESTS.lock();
         if pending.len() >= 256 {
@@ -211,7 +215,7 @@ fn request(kind: u32, bytes: &[u8], file: Option<(String, u64)>) -> Option<u32> 
             kind,
             status: RequestStatus::Pending,
             file,
-            detached: matches!(kind, REQUEST_URL | REQUEST_CLIP_WRITE),
+            detached: matches!(kind, REQUEST_URL | REQUEST_CLIP_WRITE | REQUEST_SECRET),
             result: None,
         });
         id
@@ -674,8 +678,13 @@ pub(crate) fn os_drag_start(_data: crate::DragData) -> bool {
     false
 }
 
-fn input(len: u32) -> Option<Vec<u8>> {
+pub(crate) fn input(len: u32) -> Option<Vec<u8>> {
     INBOX.lock().get(..len as usize).map(|b| b.to_vec())
+}
+/// clear the host input buffer (it held secrets)
+#[cfg(target_arch = "wasm32")]
+pub(crate) fn wipe_input() {
+    crypto::zeroize(&mut INBOX.lock());
 }
 
 /// Reserve the reusable host input buffer (at most 256 MiB); zero means allocation failure.
@@ -1004,10 +1013,17 @@ pub extern "C" fn jfgui_complete(id: u32, status: i32) -> u32 {
             files::persisted(path, *revision);
         }
     }
+    let kind = request.kind;
     if request.detached {
         requests.retain(|request| request.id != id);
     }
     drop(requests);
+    #[cfg(target_arch = "wasm32")]
+    if kind == REQUEST_SECRET {
+        crate::secret::committed(id, status);
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    let _ = kind;
     wake();
     1
 }

@@ -16476,13 +16476,19 @@ data://secrets/; the credential keeps the file's SHA-256, so neither a stale nor
 file is accepted.  Linux (linux_secret.rs): items of the Secret Service on the session bus
 (gnome-keyring, KWallet, KeePassXC) in the default collection, attributes app / service /
 account; the values travel encrypted (dh-ietf1024-sha256-aes128-cbc-pkcs7; plain only when
-the service lacks it); a locked collection is unlocked through the service's prompt.  Web
-and Android: no store yet (Unavailable).
+the service lacks it); a locked collection is unlocked through the service's prompt.
+Android (android_secret.rs): an AES-256-GCM key of the Android Keystore (one per app, made on
+the first set, not exportable, no user authentication) encrypts each value into a file of
+the app's no_backup folder.  Browser (web_secret.rs, web/secrets.js): a non-extractable
+WebCrypto AES-GCM key per app in IndexedDB encrypts the values kept there; the host decrypts
+the app's entries before it starts, plat answers from that copy and the host commits each
+change asynchronously.
 
 The OS does not separate the programs of one user: other native programs of the same user
-can read these entries (the Credential Manager, an unlocked keyring).  The calls block --
-on Linux until the user answers a prompt (at most PROMPT_SECONDS): call them from a worker
-thread when the UI must stay responsive.
+can read these entries (the Credential Manager, an unlocked keyring); in the browser every
+script of the page's origin can use the key.  The calls block -- on Linux until the user
+answers a prompt (at most PROMPT_SECONDS): call them from a worker thread when the UI must
+stay responsive.
 ```
 
 ```rust
@@ -16496,7 +16502,8 @@ PROMPT_SECONDS: u32 = 300
 
 - **`enum SecretError`**
   why a secret call failed
-  - `Unavailable` -- no secret store here (Linux: no Secret Service on the session bus; web, Android)
+  - `Unavailable` -- no secret store here (Linux: no Secret Service on the session bus; browser: no
+    IndexedDB or WebCrypto, e.g. a page served over plain http)
   - `Denied` -- the app's permissions lack `secrets`
   - `Dismissed` -- the user dismissed the store's prompt (unlock, confirmation), or it timed out
   - `Invalid` -- an empty or too long service, a name with NUL, or a value above SECRET_MAX
@@ -19889,6 +19896,10 @@ REQUEST_A11Y: u32 = 11
 /// content:// URI it starts at (may be empty), u32 count, the extensions (one string each,
 /// "png"); answered by jfgui_file_result with the chosen content:// URI
 REQUEST_FILE_DIALOG: u32 = 12
+/// (browser) commit a change of the secret store (secret.rs, web_secret.rs): u32 op (1 set,
+/// 2 delete), app, service, account and for set the value, each as u32 length + bytes; the
+/// host encrypts and stores it in order and completes with 2, or an error
+REQUEST_SECRET: u32 = 13
 ```
 
 - **`enum RequestStatus`**
@@ -20188,6 +20199,7 @@ Wire (little endian): u32 numbers, i64 times, strings and byte blocks as u32 len
   CALL_CLIP_OURS -> u32 (the clip's first item is a file of the app's GalleryFiles)
   CALL_GRANTS    -> u32 count, (uri, u32 read, u32 write)..
   CALL_RELEASE   uri -> u32 ok
+  CALL_SECRET_*  the secret store (android_secret.rs, android/GallerySecrets.java)
   DocInfo: uri, display name, u32 dir, u64 size (u64::MAX unknown), i64 mtime ms, u32 DOC_*
 
 The clipboard: text (and HTML) go to the system; the library's richer forms (RTF, DOCX)

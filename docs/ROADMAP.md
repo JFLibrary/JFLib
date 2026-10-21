@@ -62,7 +62,7 @@ Host bietet (13 `CAP_*`-Bits). Seit Paket 1 und 2 (2026-10-16) gibt es das Manif
   UI-Thread (die App muss auf `UIC_PERMISSION` erneut zugreifen), Schutz der Antwortdatei
   gegen nativen Code (nur `plat` verweigert sie), Browser/Android nur gebaut, nicht im Gerät
   getestet.
-- **P2** · *teilweise* · Sicherer Speicher für Geheimnisse (2026-10-17, [SECRETS.md](SECRETS.md)):
+- **P2** · *erledigt* (2026-10-21) · Sicherer Speicher für Geheimnisse (seit 2026-10-17, [SECRETS.md](SECRETS.md)):
   `plat::secret` (`secret_set` / `secret_get` / `secret_delete` / `secret_available`), Namen mit
   dem App-Präfix (`vfs::app_id()`), Manifest-Recht `secrets`. Windows: Credential Manager
   (generische Einträge, `CRED_PERSIST_LOCAL_MACHINE`), Werte über 2560 Bytes per DPAPI als
@@ -71,8 +71,23 @@ Host bietet (13 `CAP_*`-Bits). Seit Paket 1 und 2 (2026-10-16) gibt es das Manif
   dafür AES-Entschlüsselung und `pow_ct` in `lib/crypto`), Entsperr-Prompts, fehlende
   Standardsammlung; ohne Dienst `Unavailable`, kein Klartext-Fallback. Getestet mit dem echten
   Credential Manager (`plattest --test secret`) und einem Fake-Secret-Service
-  (`tools/platshared/secret_bus.py`). Es fehlen: Android Keystore und ein Speicher im Browser
-  (beide melden `Unavailable`), Trennung der Programme eines Nutzers durch das OS.
+  (`tools/platshared/secret_bus.py`). Android (2026-10-21): ein AES-256-GCM-Schlüssel pro App
+  im Android Keystore (Alias `jfgui-secrets`, beim ersten `secret_set` erzeugt, nicht
+  exportierbar, ohne Nutzerauthentifizierung, auch bei gesperrtem Gerät nutzbar), die Werte
+  damit verschlüsselt (Name als zusätzliche Daten) in `noBackupFilesDir/jfgui-secrets/<SHA-256
+  des Namens>.bin`, geschrieben über `AtomicFile` (`android/GallerySecrets.java`, synchron über
+  `GalleryHost.call`). Browser (2026-10-21): Speicher des Web-Hosts (`web/secrets.js`), ein
+  nicht extrahierbarer WebCrypto-AES-GCM-Schlüssel pro App und die verschlüsselten Werte in
+  IndexedDB (`jfgui-secrets-v1`); der Host entschlüsselt die Einträge vor dem Start, `set` und
+  `delete` ändern die Kopie sofort und werden der Reihe nach asynchron festgeschrieben
+  (scheitert das, meldet der Eintrag `Failed`); ohne sicheren Kontext `Unavailable`. Getestet
+  auf einem x86_64-Emulator mit Android 15 / API 35 (`apps/androidGallery/tests/android_secrets.py`:
+  Selbsttest 33 + 9 Prüfungen, Schlüssel und Dateien von außen, eine beschädigte Datei,
+  Neustart, Shell-Nutzer ohne Zugriff) und in Chromium und Firefox
+  (`apps/androidGallery/tests/secrets_web.mjs`, auch die Threads-Variante). Es fehlt (bewusst):
+  Trennung der Programme eines Nutzers durch das OS auf dem Desktop, Schutz vor Skripten
+  desselben Origins im Browser, an Nutzerauthentifizierung gebundene Schlüssel. Nicht geprüft:
+  ein echtes Android-Gerät mit TEE oder StrongBox.
 - **P2** · *erledigt* (2026-10-19) · Rechte für native Plugins und Module und Rechte pro
   Aktion für die Agent-/MCP-Steuerung ([PERMISSIONS.md](PERMISSIONS.md) „Plugins“, „Agent
   control“). Plugins: `<name>.permissions` neben der Bibliothek (Manifest-Syntax ohne `ask` /

@@ -4,7 +4,9 @@ Kleine native Test-App mit den vorhandenen jfguiLib-Widgets: Buttons mit Klickz�
 Checkbox, Schalter, Slider, Fortschrittsanzeige, Akzentfarben, hellem/dunklem Design,
 Unicode-Textfeld und einer Karte „Dateien & Zwischenablage“ (Öffnen, Speichern unter, Ordner
 über den System-Picker, eine Notiz, die einen Neustart überlebt, ein Startzähler, Kopieren und
-Einfügen über die System-Zwischenablage; [`files.rs`](files.rs)). Vertikal wischen scrollt die
+Einfügen über die System-Zwischenablage; [`files.rs`](files.rs)) sowie „Sicherer Speicher“
+(ein Wert im Android Keystore bzw. im Browser-Speicher von `plat::secret`; [`secrets.rs`](secrets.rs)).
+Vertikal wischen scrollt die
 Seite; horizontal ziehen bewegt den Slider. Die App benötigt keine Berechtigungen und keinen
 Netzwerkzugang: Dokumente anderer Apps erreicht sie nur über die Freigabe im Picker.
 
@@ -195,6 +197,38 @@ Instrumentation-Prüfungen, Phase 2 15 + 6, alle bestanden; `GalleryInstrumentat
 `build/win/plattest.exe --test content` (55 Prüfungen) dieselbe Namenslogik gegen einen
 SAF-Anbieter im Speicher, `tests/folder.uis` den Ordnermodus des eigenen Dialogs. Ein echtes
 Gerät und Cloud-Anbieter wurden nicht geprüft.
+
+## Sicherer Speicher prüfen (seit 21.10.2026)
+
+Die Karte „05 Sicherer Speicher“ sichert den Inhalt ihres Feldes mit `plat::secret`
+(Dienst `galerie`, Konto `demo`), leert das Feld und lädt oder löscht den Wert wieder. Auf
+Android liegt er verschlüsselt mit einem Schlüssel des Android Keystore unter `no_backup`, im
+Browser verschlüsselt mit einem nicht exportierbaren WebCrypto-Schlüssel in IndexedDB
+(`docs/SECRETS.md`).
+
+```powershell
+python apps/androidGallery/tests/android_secrets.py --serial emulator-5554 --apk build/android/androidGallery-x86_64-debug.apk
+python build_rs.py app androidGallery --target web
+node apps/androidGallery/tests/secrets_web.mjs build
+```
+
+Das Android-Skript löscht die App-Daten und startet `GallerySecretsInstrumentation` zweimal
+mit einem `force-stop` dazwischen. Phase 1 startet den Selbsttest der App
+(`jfgui_SELFTEST=secrets1`: Setzen, Lesen, Überschreiben, Löschen, Namen, eine andere App-ID,
+5000 / 40000 / 65536 Bytes) und prüft danach von außen den Schlüssel (AES, 256 Bit, GCM, nicht
+exportierbar, ohne Nutzerauthentifizierung) und die drei verschlüsselten Dateien (kein Wert im
+Klartext in irgendeiner Datei der App); eine Datei wird beschädigt. Der Shell-Nutzer darf den
+Ordner nicht einmal auflisten. Phase 2 (neuer Prozess) prüft die Werte nach dem Neustart, die
+abgewiesene beschädigte Datei und löscht alles. Der Browsertest bedient die Karte über den
+ARIA-Schattenbaum in Chromium und Firefox (Sichern, Laden, Überschreiben, Neu laden, 5200
+Bytes, Löschen), liest IndexedDB wie ein anderes Skript des Origins (nur Chiffretext, Schlüssel
+nicht exportierbar) und prüft eine Seite ohne sicheren Kontext (kein Speicher, Knöpfe aus).
+
+Am 21.10.2026 auf einem x86_64-Emulator mit Android 15 / API 35: Phase 1 33 Selbsttest- und
+22 Instrumentation-Prüfungen, Phase 2 9 + 3, alle bestanden (Schlüssel dort nur in Software,
+Sicherheitsstufe 0); `android_files.py`, `GalleryInstrumentation` (78) und
+`GalleryA11yInstrumentation` (30) weiter grün. Browser: 56 Prüfungen in Chromium und Firefox,
+28 in Chromium mit `--threads`; `a11y_web.mjs` (33) weiter grün.
 
 ## Regressionstest für Android-Eingabe und Leerlauf
 

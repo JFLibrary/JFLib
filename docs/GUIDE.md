@@ -1970,7 +1970,9 @@ side TalkBack uses (`adb shell am instrument -w -r org.jflib.gallery/.GalleryA11
 
 `plat::secret` ([SECRETS.md](SECRETS.md)) stores small secrets in the operating system's store
 instead of a file: the Credential Manager on Windows, the Secret Service (gnome-keyring,
-KWallet, KeePassXC) on Linux. The app needs `secrets` in its `PERMISSIONS`.
+KWallet, KeePassXC) on Linux, the Android Keystore on Android; in the browser the web host
+encrypts them with a WebCrypto key that cannot be exported (IndexedDB). The app needs
+`secrets` in its `PERMISSIONS`.
 
 ```rust
 use plat::secret::{secret_available, secret_delete, secret_get, secret_set};
@@ -1987,9 +1989,11 @@ let _ = secret_delete("imap.example.org", &self.user); // when the user signs ou
 * An entry is the app's (`vfs::app_id()`) plus a service and an account (`""` for one value per
   service); values are bytes up to 64 KiB. `secret_set` replaces, `secret_get` gives `None` for
   a missing entry and on errors, `secret_get_checked` tells them apart.
-* Without a store (WSL, a minimal Linux, the web, Android) every call fails with
-  `SecretError::Unavailable` -- nothing is ever written to a plain file. Offer "remember" only
-  when `secret_available()` says so.
+* Without a store (WSL, a minimal Linux, a page without a secure context) every call fails
+  with `SecretError::Unavailable` -- nothing is ever written to a plain file. Offer "remember"
+  only when `secret_available()` says so.
+* In the browser every script of the page's origin can use the key: the store keeps values
+  from other origins and from readers of the profile's storage, not from the page itself.
 * A locked keyring asks the user to unlock it, and the call waits for the answer (at most five
   minutes): call it from a `plat::Job` when the window must keep drawing. A dismissed dialog is
   `SecretError::Dismissed`.

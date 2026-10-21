@@ -1,7 +1,7 @@
 /* Native Android host boundary. All callbacks run on the Java UI thread.
  * Rust owns widgets, layout, fonts, state and pixels; Java owns the Android View/IME.
  * Rust asks Java synchronously through jfgui_host_call (GalleryHost.call: the ContentResolver,
- * the clipboard; lib/plat/android_host.rs) and starts the system's picker through
+ * the clipboard, the secret store; lib/plat/android_host.rs) and starts the system's picker through
  * jfgui_host_request (GalleryHost.request), whose answer comes back in GalleryHost.nativeResult.
  */
 #include <jni.h>
