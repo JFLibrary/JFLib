@@ -433,3 +433,56 @@ Keep-Alive-Verbindung zu lange ungenutzt: geschlossen.	Keep-alive connection idl
 HTTP-Antwort {} nach {} ms.	HTTP response {} after {} ms.
 HTTP-Anfrage: Zeitüberschreitung.	HTTP request: timeout.
 HTTP-Anfrage gescheitert.	HTTP request failed.
+
+# jfn_sim: the lab's refusals and definitions (fault.rs, lab.rs, lb.rs, kv.rs, cache.rs, mq.rs, httpsvc.rs)
+Den Dienst „{}“ gibt es auf {} nicht.	The service “{}” does not exist on {}.
+Der Faktor einer langsamen Disk muss größer als 0 sein.	The factor of a slow disk must be greater than 0.
+Eine Partition braucht auf einer Seite mindestens ein Gerät.	A partition needs at least one device on one side.
+{} steht auf beiden Seiten der Partition.	{} is on both sides of the partition.
+Einen Fehler {} gibt es nicht.	Fault {} does not exist.
+Fehler {} ist schon behoben.	Fault {} is healed already.
+Das Backend {} gibt es schon.	Backend {} exists already.
+Das Backend {} gibt es nicht.	Backend {} does not exist.
+Das Backend {} steht zweimal da.	Backend {} is listed twice.
+Backend {} braucht „addr“ mit einer IPv4-Adresse.	Backend {} needs “addr” with an IPv4 address.
+„backends“ fehlt.	“backends” is missing.
+„mode“ kennt {} nicht (http, tcp).	“mode” does not know {} (http, tcp).
+„algorithm“ kennt {} nicht (round-robin, least-conn, weighted, hash).	“algorithm” does not know {} (round-robin, least-conn, weighted, hash).
+„hash“ kennt {} nicht (path, client, header:NAME).	“hash” does not know {} (path, client, header:NAME).
+„health.type“ kennt {} nicht (tcp, http, none).	“health.type” does not know {} (tcp, http, none).
+„nodes“ fehlt.	“nodes” is missing.
+„kv.nodes“ fehlt.	“kv.nodes” is missing.
+„backend“ fehlt.	“backend” is missing.
+„queue“ fehlt.	“queue” is missing.
+„consistency“ kennt {} nicht (strong, eventual).	“consistency” does not know {} (strong, eventual).
+„{}“ ist keine http-URL.	“{}” is not an http URL.
+Eine Route fragt den KV-Speicher, aber „kv“ fehlt.	A route asks the KV store, but “kv” is missing.
+
+# jfn_sim: decisions in the lab (Note::message: faults, load balancer, KV store, disk, cache, queue)
+Fehler {} beginnt: {}.	Fault {} starts: {}.
+Fehler {} behoben: {}.	Fault {} healed: {}.
+Partition: Paket von {} verworfen.	Partition: packet from {} dropped.
+Loadbalancer: Backend {} gewählt ({}).	Load balancer: backend {} picked ({}).
+Loadbalancer: kein Backend verfügbar.	Load balancer: no backend available.
+Loadbalancer: {} nicht erreichbar, nächster Versuch.	Load balancer: {} not reachable, next attempt.
+Health Check: {} ist wieder verfügbar.	Health check: {} is available again.
+Health Check: {} fällt aus.	Health check: {} is down.
+{} ist leer gelaufen und entfernt.	{} has drained and is removed.
+KV: {} {} koordiniert ({} Replikate).	KV: {} {} coordinated ({} replicas).
+KV: Schreiben von {} an den Leader {} weitergereicht.	KV: write of {} passed on to the leader {}.
+KV: {} als Version {} gespeichert, wartet auf {} Bestätigungen.	KV: {} stored as version {}, waiting for {} acknowledgements.
+KV: Quorum für {} erreicht ({} von {}).	KV: quorum for {} reached ({} of {}).
+KV: Quorum für {} verfehlt ({} von {}).	KV: quorum for {} missed ({} of {}).
+KV: Replikat von {} auf Version {} gebracht.	KV: replica of {} brought to version {}.
+KV: Replikat von {} hat schon Version {} oder neuer.	KV: replica of {} has version {} or newer already.
+KV: Read Repair von {} an {}.	KV: read repair of {} to {}.
+KV: {} antwortet wieder.	KV: {} answers again.
+KV: {} antwortet nicht mehr und gilt als ausgefallen.	KV: {} no longer answers and counts as down.
+Disk voll: Schreiben abgelehnt.	Disk full: write refused.
+Cache: Treffer für {}.	Cache: hit for {}.
+Cache: kein Treffer für {}, frage das Backend.	Cache: no hit for {}, asking the backend.
+Queue {}: Nachricht {} angenommen.	Queue {}: message {} accepted.
+Queue {}: Nachricht {} ausgeliefert ({}. Zustellung).	Queue {}: message {} delivered (delivery {}).
+Queue {}: Nachricht {} bestätigt.	Queue {}: message {} acknowledged.
+Queue {}: Nachricht {} nicht bestätigt, wieder in der Warteschlange.	Queue {}: message {} not acknowledged, back in the queue.
+Queue {}: Nachricht {} zu oft zugestellt, aussortiert.	Queue {}: message {} delivered too often, set aside.
