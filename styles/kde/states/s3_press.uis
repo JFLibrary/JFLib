@@ -1,0 +1,98 @@
+# s3_press -- pressed states (button held), light, then a few in dark
+size 1000 3500
+theme light
+down #100
+shot build/kdes/s3_btn_std.png 0 150 600 100
+up
+down #101
+shot build/kdes/s3_btn_acc.png 0 150 600 100
+up
+down #103
+shot build/kdes/s3_btn_icon.png 0 150 600 100
+up
+down #162
+shot build/kdes/s3_tool.png 0 150 600 100
+up
+down #110
+shot build/kdes/s3_check.png 0 270 600 40
+up
+down #122
+shot build/kdes/s3_radio.png 0 270 600 40
+up
+down #130
+shot build/kdes/s3_switch.png 0 270 600 40
+up
+wait 400
+shot build/kdes/s3_switch_off.png 0 270 600 40
+down #140
+shot build/kdes/s3_slider.png 0 340 720 120
+up
+down #141
+shot build/kdes/s3_vslider.png 0 340 720 120
+up
+down #8002
+shot build/kdes/s3_dropdown.png 0 720 600 90
+up
+key esc
+down #8010
+shot build/kdes/s3_split_main.png 0 720 600 90
+up
+down #9003
+shot build/kdes/s3_subtle.png 0 720 600 90
+up
+down #7012
+shot build/kdes/s3_tab.png 0 840 400 50
+up
+down #7011
+up
+down #7104
+shot build/kdes/s3_row.png 0 890 1000 250
+up
+down #7700
+shot build/kdes/s3_vs_plain.png 0 1300 500 180
+up
+down #7702
+shot build/kdes/s3_vs_label.png 0 1300 500 180
+up
+down #7704
+shot build/kdes/s3_angle.png 0 1480 400 140
+up
+down #7705
+shot build/kdes/s3_pan.png 0 1480 400 140
+up
+down #7711
+shot build/kdes/s3_grad.png 0 1610 500 200
+up
+down #7717
+shot build/kdes/s3_vgrad.png 0 1610 500 200
+up
+down #7718
+shot build/kdes/s3_swatch.png 0 1610 500 200
+up
+key esc
+down #7720
+shot build/kdes/s3_field.png 0 1830 560 440
+up
+down #7721
+shot build/kdes/s3_hue.png 0 1830 560 440
+up
+down #7803
+shot build/kdes/s3_lrow.png 0 2330 600 220
+up
+down "Datei"
+shot build/kdes/s3_menubar.png 0 0 400 260
+up
+key esc
+theme dark
+down #100
+shot build/kdes/s3_d_btn_std.png 0 150 600 100
+up
+down #101
+shot build/kdes/s3_d_btn_acc.png 0 150 600 100
+up
+down #140
+shot build/kdes/s3_d_slider.png 0 340 720 120
+up
+down #7702
+shot build/kdes/s3_d_vs_label.png 0 1300 500 180
+up

@@ -1,0 +1,20 @@
+# Fenster > Fensteranordnung zurücksetzen (CMD_WND_RESET 704, chrome.s): every tool window
+# goes back to its default place.  Window ids: Werkzeuge 0x6001, Verlauf 0x6002, Ebenen 0x6003,
+# Farben 0x6004.
+sync
+expect window 24577 rect 8 137 74 346
+expect window 24580 rect 92 410 272 320
+movewin 24577 300 200
+movewin 24578 40 40
+movewin 24579 500 300
+movewin 24580 20 20
+sync
+expect window 24577 rect 300 200 74 346
+expect window 24580 rect 20 20 272 320
+cmd 704
+sync
+sync
+expect window 24577 rect 8 137 74 346
+expect window 24578 rect 1062 137 208 260
+expect window 24579 rect 1062 490 208 240
+expect window 24580 rect 92 410 272 320

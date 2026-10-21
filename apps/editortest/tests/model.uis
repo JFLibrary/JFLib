@@ -1,0 +1,7 @@
+#!args --test model
+# editortest --test model: the self-checks of RichDoc, CodeDoc and the highlighter (model.rs):
+# editing, formats, paragraphs, lists, undo merging, JSON / HTML / clipboard fragments, plain
+# text, links; lines, auto-indent, block indent, comments, moving lines, find / replace,
+# columns, the change journal; the tokens of Rust, JSON, INI, TOML and Markdown with their states
+# across lines; 100 000 lines tokenized and searched.  The whole test runs before the UI
+# starts; the exit code is the number of failures.

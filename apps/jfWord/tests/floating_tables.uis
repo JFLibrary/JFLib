@@ -1,0 +1,52 @@
+#!args --editor
+size 1480 1040
+theme light
+type "Eine schwebende Tabelle bleibt am Absatz verankert. Der Text nutzt den freien Bereich neben der Tabelle und setzt sich darunter wieder über die volle Seitenbreite fort. Quellen und Fußnoten gehören weiterhin zum Dokument. Dies ist ein längerer Absatz zum Prüfen des Textumflusses neben einer Tabelle. Die Tabellenzellen bleiben direkt auf der Seite bearbeitbar."
+key ctrl+home
+click tab:"Einfügen"
+click #1514
+click #3901
+key ctrl+a
+type "2"
+key tab
+click #3902
+key ctrl+a
+type "2"
+key tab
+click "Übernehmen"
+type "Messung"
+click #3918
+click #3905
+key ctrl+a
+type "80"
+key tab
+click "Übernehmen"
+click #3990
+expect dialog:"Tabellenposition" exists
+click #4000
+click "Schwebend · Text umfließt die Tabelle"
+click #4002
+key ctrl+a
+type "0"
+key tab
+click #4004
+key ctrl+a
+type "0"
+key tab
+click "Übernehmen"
+expect dialog:"Tabellenposition" missing
+key tab
+type "Wert"
+key shift+tab
+click #3966
+click #3968
+key ctrl+v
+key ctrl+z
+key ctrl+y
+key ctrl+z
+shot build/jfword-floating-tables-light.png
+theme dark
+scale 150
+shot build/jfword-floating-tables-dark-150.png
+size 680 800
+expect_nowarn

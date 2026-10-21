@@ -1,0 +1,35 @@
+#!args --editor --structure --sources --navigation
+# Undoing insertion while editing its body must return to the actual anchor paragraph.
+size 1240 840
+click #10000
+type "Erster Hauptabsatz."
+cmd 7
+type "Zweiter Hauptabsatz."
+cmd 7
+type "Dritter Hauptabsatz."
+cmd 23
+expect "Fußnote 1 bearbeiten" exists
+cmd 5
+expect textbox:"Dritter Hauptabsatz." exists
+expect textbox:"Dritter Hauptabsatz." focused
+expect button:"Fußnote 1" missing
+cmd 6
+click button:"Fußnote 1"
+type "Anker im dritten Absatz."
+cmd 25
+expect textbox:"Dritter Hauptabsatz." exists
+expect button:"Fußnote 1 öffnen" focused
+cmd 8
+expect button:"Fußnote 1" missing
+cmd 5
+click button:"Fußnote 1"
+expect textbox:"Anker im dritten Absatz." exists
+cmd 25
+click "Referenzen"
+expect #320 enabled
+expect #321 enabled
+click button:"Fußnote 1"
+expect #320 disabled
+expect #321 disabled
+expect #322 enabled
+expect_nowarn

@@ -1,0 +1,55 @@
+#!args --fixture --page monitoring
+# the server fleet against the demo server: the watched servers and their details, a server
+# added after its CA is confirmed, checked now; a fleet token made in the settings
+size 1440 900
+wait 50
+click "Serverflotte"
+wait 20
+expect "Berlin (Außenstelle)" exists
+expect "Nicht erreichbar" exists
+click "München"
+wait 20
+expect "Hinweise des Servers" exists
+shot build/shots/bc/test_fleet.png
+click "Server hinzufügen …"
+wait 20
+focus #0xD00E01
+type "Köln"
+focus #0xD00E02
+type "backup-koe04.corp.local"
+focus #0xD00E03
+type "bcf_demo"
+click "Weiter"
+wait 50
+expect "Zertifizierungsstelle: BackupCraft CA backup-koe04.corp.local" exists
+expect "Überwachen" missing
+click checkbox:"Der Fingerabdruck stimmt"
+wait 10
+shot build/shots/bc/test_fleet_add.png
+click "Überwachen"
+wait 50
+expect "Server überwachen" missing
+expect "Köln" exists
+click "Köln"
+wait 20
+click "Jetzt abfragen"
+wait 50
+expect "6 Jobs, 120 Restore-Points" exists
+# this server's fleet tokens
+click "Einstellungen"
+wait 20
+click "Netzwerk"
+wait 20
+expect "Zentrale Frankfurt" exists
+click "Token erzeugen …"
+wait 20
+focus #0xD00F01
+type "Zentrale Test"
+click "Erzeugen"
+wait 50
+expect "Nur jetzt sichtbar" exists
+shot build/shots/bc/test_fleet_token.png
+click "Fertig"
+wait 20
+expect "Zentrale Test" exists
+expect_nowarn

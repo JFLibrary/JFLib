@@ -1,0 +1,83 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# the simulator behind the editor (doc/sim.rs): every change of the project is an Action for
+# the engine and undo sends the opposite one, so the LEDs at the cables' ends and the states in
+# the inspector follow power and plug; the problems list shows the engine's findings.  The
+# cable PC1 - SW1 runs through 722,414, PC2 - SW1 through 842,414.
+# Ids: the name 20481, power 20486, the address field 20488, the cable's plug 20500.
+theme light
+click 722,414
+expect text:"aktiv · 0 Pakete/s" exists
+shot build/jfnetworker/engine_on.png
+# SW1 off (its context menu): both cables lose their far end
+rclick listitem:"SW1"
+expect menuitem:"Eingeschaltet" checked
+click menuitem:"Eingeschaltet"
+expect #20486 unchecked
+# (the pointer first leaves the closed menu, whose catcher would take the press; a second click
+# on the same cable within the double-click time would be a double click)
+move 700,380
+wait 600
+click 722,414
+expect text:"ohne Strom · 0 Pakete/s" exists
+click listitem:"PC1"
+expect text:"unten" exists
+click 900,540
+expect text:"2 (0 aktiv)" exists
+shot build/jfnetworker/engine_off.png
+key ctrl+z
+expect text:"2 (2 aktiv)" exists
+# unplugged
+click 842,414
+click #20500
+expect text:"ausgesteckt · 0 Pakete/s" exists
+click listitem:"PC2"
+expect text:"unten" exists
+click 900,540
+expect text:"2 (1 aktiv)" exists
+shot build/jfnetworker/engine_unplugged.png
+key ctrl+z
+expect text:"2 (2 aktiv)" exists
+key ctrl+y
+expect text:"2 (1 aktiv)" exists
+key ctrl+z
+# PC1 off from the inspector, on again
+click listitem:"PC1"
+click #20486
+expect #20486 unchecked
+click 722,414
+expect text:"ohne Strom · 0 Pakete/s" exists
+key ctrl+z
+expect text:"aktiv · 0 Pakete/s" exists
+# a duplicate address: the engine's finding in the problems list
+click listitem:"PC2"
+click #20488
+key ctrl+a
+type "10.0.0.1/24"
+key enter
+click tab:"Probleme"
+expect text:"PC1: 10.0.0.1 an eth0 ist im selben Netz doppelt vergeben: auch PC2 (eth0)." exists
+shot build/jfnetworker/engine_problems.png
+# a click on the finding selects the device
+click text:"PC1: 10.0.0.1 an eth0 ist im selben Netz doppelt vergeben: auch PC2 (eth0)."
+expect listitem:"PC1" selected
+key ctrl+z
+expect text:"Keine Probleme" exists
+# a new name reaches the simulator and stays when the device restarts from a configuration
+# that names it otherwise (undo and redo of an address restart it)
+wait 600
+click listitem:"PC2"
+click #20481
+key ctrl+a
+type "Laptop-A"
+key enter
+click #20488
+key ctrl+a
+type "10.0.0.1/24"
+key enter
+expect text:"PC1: 10.0.0.1 an eth0 ist im selben Netz doppelt vergeben: auch Laptop-A (eth0)." exists
+click 900,540
+key ctrl+z
+expect text:"Keine Probleme" exists
+key ctrl+y
+expect text:"PC1: 10.0.0.1 an eth0 ist im selben Netz doppelt vergeben: auch Laptop-A (eth0)." exists
+expect_nowarn

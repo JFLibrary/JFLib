@@ -1,0 +1,53 @@
+# clipboard_dib.uis -- clipboard DIBs and BMPs of other programs (agent K1): `clip dib F` takes
+# the CF_DIB / CF_DIBV5 path of Windows (clip_dib_to_bmp), `clip file F.bmp` the image/bmp path
+# of Wayland / X11 (clip_bmp_fix); paint.net's alpha rule: a 32-bit DIB whose alpha is 0
+# everywhere is opaque.  Then Einfügen of such an image.  Fixtures (7 x 5) made by
+# tools/clip_check.py (source()); that tool checks many more variants on both targets.
+# Hook: K1 172 X|Y<<16 -> #0x82200 "W,H,AARRGGBB" of the decoded clipboard image.
+size 1280 800
+theme light
+
+# ------------------------------------------------------------ V5, BI_BITFIELDS, top-down, alpha
+clip dib apps/PaintCraft/tests/fixtures/clip/v5_alpha_td.dib
+clip expect image
+cmd 172 0
+expect #0x82200 text "7,5,FF050911"
+cmd 172 2
+expect #0x82200 text "7,5,004F13C7"
+cmd 172 65541
+expect #0x82200 text "7,5,C8C969DB"
+cmd 172 262150
+expect #0x82200 text "7,5,400F433F"
+
+# ------------------------------------------------------------ 32 bit BI_RGB, alpha 0 -> opaque
+clip dib apps/PaintCraft/tests/fixtures/clip/rgb32_alpha0.dib
+cmd 172 0
+expect #0x82200 text "7,5,FF050911"
+cmd 172 2
+expect #0x82200 text "7,5,FF4F13C7"
+cmd 172 65541
+expect #0x82200 text "7,5,FFC969DB"
+cmd 172 262150
+expect #0x82200 text "7,5,FF0F433F"
+
+# ------------------------------------------------------------ 24 bit, bottom-up, padded rows
+clip dib apps/PaintCraft/tests/fixtures/clip/rgb24.dib
+cmd 172 2
+expect #0x82200 text "7,5,FF4F13C7"
+cmd 172 262150
+expect #0x82200 text "7,5,FF0F433F"
+
+# ------------------------------------------------------------ image/bmp: V5 file, alpha 0 -> opaque
+clip file apps/PaintCraft/tests/fixtures/clip/v5_alpha0.bmp
+cmd 172 2
+expect #0x82200 text "7,5,FF4F13C7"
+
+# ------------------------------------------------------------ Einfügen of it
+key ctrl+v
+key enter
+cmd 900 2               # image (2, 0)
+expect #9900 text "FF4F13C7"
+cmd 900 262150          # image (6, 4)
+expect #9900 text "FF0F433F"
+cmd 900 7               # image (7, 0): white
+expect #9900 text "FFFFFFFF"

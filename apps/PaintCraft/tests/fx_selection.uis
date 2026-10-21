@@ -1,0 +1,81 @@
+#!args --open apps/PaintCraft/tests/fixtures/a6_photo.png
+# fx_selection.uis -- effects clipped by an antialiased selection (agent A6): an ellipse
+# (60,40)-(260,200) made with T2's hooks (982 / 983 corners, 984 mode|quality, 981 1), then
+# Gaußscher Weichzeichner radius 5: pixels outside unchanged, inside = efftest's result,
+# edge pixels = k_lerp_mask_row(layer, result, coverage) (coverage from T2's probe 980),
+# preview hash == committed hash, one history entry, undo restores the layer.
+# Expected edge values: round((a (255 - m) + b m) / 255) of the original / efftest pixels
+# (a6_photo.png, gaussian_blur radius 5): (230,63) m 183: FFB23EB1 / FFB641B5 -> FFB540B4;
+# (220,183) m 173: FFB7CB97 / FFB0C38D -> FFB2C690; Farben umkehren at (230,63): FF6A9C6A.
+size 1280 800
+theme light
+cmd 982 2621500
+cmd 983 13107460
+cmd 984 0
+cmd 981 1
+expect #9936 value 2
+cmd 980 4128998
+expect #9980 value 183
+cmd 980 11993308
+expect #9980 value 173
+cmd 980 655370
+expect #9980 value 0
+
+# ------------------------------------------------------------ preview through the selection
+cmd 472
+click #0x6001B681
+key ctrl+a
+type "5\n"
+sync
+cmd 900 655370
+expect #9900 text "FF00006A"
+cmd 900 3276850
+expect #9900 text "FF354393"
+cmd 900 7864480
+expect #9900 text "FF7D7E8B"
+cmd 900 4128998
+expect #9900 text "FFB540B4"
+cmd 900 11993308
+expect #9900 text "FFB2C690"
+cmd 995 2
+expect #9990 text "7254afdbf92becf3"
+
+# ------------------------------------------------------------ commit == preview
+click "OK"
+expect window 24688 closed
+cmd 995 0
+expect #9990 text "7254afdbf92becf3"
+expect #9936 value 3
+cmd 901 655370
+expect #9900 text "FF00006A"
+cmd 901 7864480
+expect #9900 text "FF7D7E8B"
+cmd 901 4128998
+expect #9900 text "FFB540B4"
+cmd 901 11993308
+expect #9900 text "FFB2C690"
+key ctrl+z
+cmd 995 0
+expect #9990 text "2cc39813e097b672"
+
+# ------------------------------------------------------------ an immediate adjustment too
+key ctrl+shift+i
+cmd 901 655370
+expect #9900 text "FF00006A"
+cmd 901 7864480
+expect #9900 text "FF747361"
+cmd 901 4128998
+expect #9900 text "FF6A9C6A"
+key ctrl+z
+cmd 995 0
+expect #9990 text "2cc39813e097b672"
+
+# ------------------------------------------------------------ Esc keeps everything
+cmd 590
+sync
+cmd 900 655370
+expect #9900 text "FF00006A"
+key esc
+cmd 995 0
+expect #9990 text "2cc39813e097b672"
+expect #9936 value 2

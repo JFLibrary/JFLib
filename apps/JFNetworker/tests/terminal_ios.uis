@@ -1,0 +1,133 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/lan_router.jfnet
+# R1's IOS-like console in the Terminal panel (doc/console.rs, workspace/terminal.rs): a double
+# click opens it with the boot messages; modes and prompts come from the device, `?` and Tab
+# from the engine's command tree, errors point with ^, ping prints .!!!! (the first echo waits
+# for ARP), show ip route, the --More-- pager (24 lines; "terminal length 0" turns it off),
+# Ctrl+Z leaves the configuration, Ctrl+Shift+6 stops a ping, and the undo keys stay in the
+# console; "hostname" renames the device in the project, and "copy running-config
+# startup-config" lands in the project as an undo step that keeps the running configuration
+# (undo and redo change only what the device boots with).  Shots light, dark and 150 %.
+# Ids: R1's console 25088 (its input line 25089).  The bottom dock is dragged up first, so the
+# console shows 26 rows (lines scrolled out of view have no text records).
+size 1280 900
+theme light
+drag 630,671 630,380 8
+expect text:"Keine Konsole geöffnet" exists
+dblclick listitem:"R1"
+expect tab:"R1" selected
+expect #25089 focused
+expect text:"*Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up" exists
+expect text:"*Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up" exists
+expect text:"R1>" exists
+# the modes; Ctrl+Z leaves the configuration (and does not undo anything in the project)
+type "enable\n"
+expect text:"R1>enable" exists
+type "conf t\n"
+expect text:"R1#conf t" exists
+expect text:"Configuration mode: one command per line; end or Ctrl+Z leaves it." exists
+type "int gi0/0/0\n"
+expect text:"R1(config-if)#" exists
+key ctrl+z
+expect text:"R1(config-if)#^Z" exists
+expect text:"R1#" exists
+# `?`: what may follow, the line stays
+type "show ?"
+expect text:"R1#show ?" exists
+expect text:"  ip              IPv4 state" exists
+expect text:"  running-config  Configuration in effect now" exists
+expect #25089 text "show "
+# Tab completes the last word
+key ctrl+a
+key backspace
+type "sh ip ro"
+key tab
+expect #25089 text "sh ip route "
+key enter
+expect text:"C        10.0.1.0/24 is directly connected, GigabitEthernet0/0/0" exists
+expect text:"L        10.0.2.1/32 is directly connected, GigabitEthernet0/0/1" exists
+# an error points at the word with ^
+type "show ipp route\n"
+expect text:"R1#show ipp route" exists
+expect text:"          ^" exists
+expect text:"% Invalid input detected at '^' marker." exists
+# ping: busy until it is done (no input line), the first echo waits for ARP
+type "ping 10.0.2.10\n"
+expect text:"Ctrl+Shift+6 stops the ping." exists
+expect text:"Pinging 10.0.2.10 with 5 echo requests of 100 bytes, 2 s timeout each:" exists
+expect #25089 missing
+wait 2500
+expect text:".!!!!" exists
+expect text:"Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms" exists
+expect #25089 focused
+# Ctrl+Shift+6 stops a ping that gets no answers; keys of tools and undo stay in the console
+type "ping 10.0.2.99 repeat 100\n"
+wait 4100
+expect text:".." exists
+key h
+key ctrl+z
+expect button:"Hand" unchecked
+key ctrl+shift+6
+expect text:"Success rate is 0 percent (0/2)" exists
+expect #25089 focused
+shot build/jfnetworker/terminal_ios.png
+# --More--: the running configuration pages (Space a page; keys do nothing else meanwhile)
+type "show running-config\n"
+expect text:" --More-- " exists
+expect #25089 missing
+key space
+expect text:"end" exists
+expect text:" --More-- " missing
+expect #25089 focused
+# "terminal length 0": no pager any more
+type "terminal length 0\n"
+type "show running-config\n"
+expect text:" --More-- " missing
+# a description, a new name: the project renames R1 (and its tab)
+type "conf t\n"
+type "interface gi0/0/1\n"
+type "description to PC2\n"
+type "hostname Edge\n"
+expect text:"Edge(config)#" exists
+type "end\n"
+expect text:"Edge(config)#end" exists
+expect listitem:"Edge" exists
+expect tab:"Edge" selected
+# copy run start: the question, the answer, an undo step in the project
+type "copy run start\n"
+expect text:"Edge#copy run start" exists
+expect text:"Save to which file [startup-config]? " exists
+key enter
+expect text:"Saving the configuration ..." exists
+expect text:"[OK]" exists
+expect text:"Edge#" exists
+# undone: the device boots with the old configuration again, but runs what it ran
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+click button:"Konsole leeren"
+click #25089
+type "show startup-config\n"
+expect text:"hostname R1" exists
+expect text:" description to PC2" missing
+click button:"Konsole leeren"
+click #25089
+type "show running-config\n"
+key ctrl+home
+expect text:" description to PC2" exists
+expect text:"hostname Edge" exists
+# redone: saved again
+click menu:"Bearbeiten"
+click menuitem:"Wiederholen"
+move 640,300
+click button:"Konsole leeren"
+click #25089
+type "show startup-config\n"
+key ctrl+home
+expect text:" description to PC2" exists
+expect text:"hostname Edge" exists
+# dark and 150 %
+theme dark
+shot build/jfnetworker/terminal_ios_dark.png
+scale 150
+shot build/jfnetworker/terminal_ios_150.png
+expect_nowarn

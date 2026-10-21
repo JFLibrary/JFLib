@@ -1,0 +1,213 @@
+# JFNetworker-Szenario l3_switch.scn: „L3-Switch mit SVIs“, 3 Geräte, 2 Verbindungen, Seed 4
+   0.000000000  MLS1    *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  MLS1    *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  MLS1    *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  MLS1    *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  MLS1    *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Vlan10 is up
+   0.000000000  MLS1    *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Vlan10 is up
+   0.000000000  MLS1    *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Vlan20 is up
+   0.000000000  MLS1    *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Vlan20 is up
+   0.000000000  PC1     root@PC1:~# ping -c 2 10.0.20.10
+   0.000000000  PC1     PING 10.0.20.10 (10.0.20.10) 56(84) bytes of data.
+   0.000000000  --      run until idle
+   1.000004104  PC1     64 bytes from 10.0.20.10: icmp_seq=2 ttl=63 time=0.004 ms
+  10.000000000  PC1     
+  10.000000000  PC1     --- 10.0.20.10 ping statistics ---
+  10.000000000  PC1     2 packets transmitted, 1 received, 50% packet loss, time 1000ms
+  10.000000000  PC1     rtt min/avg/max/mdev = 0.004/0.004/0.004/0.000 ms
+  10.000000000  ok      expect PC1 output contains "2 packets transmitted, 1 received, 50% packet loss"
+  10.000000000  PC1     root@PC1:~# ping -c 2 10.0.20.10
+  10.000000000  PC1     PING 10.0.20.10 (10.0.20.10) 56(84) bytes of data.
+  10.000000000  --      run until idle
+  10.000004104  PC1     64 bytes from 10.0.20.10: icmp_seq=1 ttl=63 time=0.004 ms
+  11.000004104  PC1     64 bytes from 10.0.20.10: icmp_seq=2 ttl=63 time=0.004 ms
+  11.000004104  PC1     
+  11.000004104  PC1     --- 10.0.20.10 ping statistics ---
+  11.000004104  PC1     2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+  11.000004104  PC1     rtt min/avg/max/mdev = 0.004/0.004/0.004/0.000 ms
+  21.000000000  ok      expect PC1 output contains "2 packets transmitted, 2 received, 0% packet loss"
+  21.000000000  MLS1    MLS1>enable
+  21.000000000  MLS1    MLS1#show ip route
+  21.000000000  MLS1    Codes: C - connected network, L - address of this device, S - static route,
+  21.000000000  MLS1           * - default route
+  21.000000000  MLS1    
+  21.000000000  MLS1    Gateway of last resort is not set
+  21.000000000  MLS1    
+  21.000000000  MLS1          10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+  21.000000000  MLS1    C        10.0.10.0/24 is directly connected, Vlan10
+  21.000000000  MLS1    L        10.0.10.1/32 is directly connected, Vlan10
+  21.000000000  MLS1    C        10.0.20.0/24 is directly connected, Vlan20
+  21.000000000  MLS1    L        10.0.20.1/32 is directly connected, Vlan20
+  21.000000000  ok      expect MLS1 route 10.0.20.0/24 dev Vlan20
+  21.000000000  MLS1    MLS1#show ip interface brief
+  21.000000000  MLS1    Interface              IP-Address      OK? Method Status                Protocol
+  21.000000000  MLS1    Vlan1                  unassigned      YES unset  administratively down down
+  21.000000000  MLS1    Vlan10                 10.0.10.1       YES NVRAM  up                    up
+  21.000000000  MLS1    Vlan20                 10.0.20.1       YES NVRAM  up                    up
+  21.000000000  MLS1    GigabitEthernet1/0/1   unassigned      YES NVRAM  up                    up
+  21.000000000  MLS1    GigabitEthernet1/0/2   unassigned      YES NVRAM  up                    up
+  21.000000000  MLS1    GigabitEthernet1/0/3   unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/4   unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/5   unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/6   unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/7   unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/8   unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/9   unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/10  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/11  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/12  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/13  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/14  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/15  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/16  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/17  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/18  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/19  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/20  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/21  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/22  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/23  unassigned      YES unset  down                  down
+  21.000000000  MLS1    GigabitEthernet1/0/24  unassigned      YES unset  down                  down
+  21.000000000  MLS1    TenGigabitEthernet1/1/1 unassigned      YES unset  down                  down
+  21.000000000  MLS1    TenGigabitEthernet1/1/2 unassigned      YES unset  down                  down
+  21.000000000  MLS1    TenGigabitEthernet1/1/3 unassigned      YES unset  down                  down
+  21.000000000  MLS1    TenGigabitEthernet1/1/4 unassigned      YES unset  down                  down
+  21.000000000  ok      expect MLS1 output contains "Vlan10                 10.0.10.1       YES NVRAM  up                    up"
+  21.000000000  MLS1    MLS1#show vlan brief
+  21.000000000  MLS1    
+  21.000000000  MLS1    VLAN Name                             Status    Ports
+  21.000000000  MLS1    ---- -------------------------------- --------- -------------------------------
+  21.000000000  MLS1    1    default                          active    Gi1/0/3, Gi1/0/4, Gi1/0/5
+  21.000000000  MLS1                                                    Gi1/0/6, Gi1/0/7, Gi1/0/8
+  21.000000000  MLS1                                                    Gi1/0/9, Gi1/0/10, Gi1/0/11
+  21.000000000  MLS1                                                    Gi1/0/12, Gi1/0/13, Gi1/0/14
+  21.000000000  MLS1                                                    Gi1/0/15, Gi1/0/16, Gi1/0/17
+  21.000000000  MLS1                                                    Gi1/0/18, Gi1/0/19, Gi1/0/20
+  21.000000000  MLS1                                                    Gi1/0/21, Gi1/0/22, Gi1/0/23
+  21.000000000  MLS1                                                    Gi1/0/24, Te1/1/1, Te1/1/2
+  21.000000000  MLS1                                                    Te1/1/3, Te1/1/4
+  21.000000000  MLS1    10   Office                           active    Gi1/0/1
+  21.000000000  MLS1    20   Lab                              active    Gi1/0/2
+  21.000000000  MLS1    1002 fddi-default                     act/unsup 
+  21.000000000  MLS1    1003 token-ring-default               act/unsup 
+  21.000000000  MLS1    1004 fddinet-default                  act/unsup 
+  21.000000000  MLS1    1005 trnet-default                    act/unsup 
+  21.000000000  MLS1    MLS1#show mac address-table
+  21.000000000  MLS1              Mac Address Table
+  21.000000000  MLS1    -------------------------------------------
+  21.000000000  MLS1    
+  21.000000000  MLS1    Vlan    Mac Address       Type        Ports
+  21.000000000  MLS1    ----    -----------       --------    -----
+  21.000000000  MLS1      10    024a.0000.0101    DYNAMIC     Gi1/0/1
+  21.000000000  MLS1      20    024a.0000.0201    DYNAMIC     Gi1/0/2
+  21.000000000  MLS1    Total Mac Addresses for this criterion: 2
+  21.000000000  MLS1    MLS1#configure terminal
+  21.000000000  MLS1    Configuration mode: one command per line; end or Ctrl+Z leaves it.
+  21.000000000  MLS1    MLS1(config)#no ip routing
+  21.000000000  MLS1    MLS1(config)#end
+  21.000000000  MLS1    *Mar  1 00:00:21.000: %SYS-5-CONFIG_I: configuration changed at the console
+  21.000000000  PC1     root@PC1:~# ping -c 1 10.0.20.10
+  21.000000000  PC1     PING 10.0.20.10 (10.0.20.10) 56(84) bytes of data.
+  21.000000000  --      run until idle
+  31.000000000  PC1     
+  31.000000000  PC1     --- 10.0.20.10 ping statistics ---
+  31.000000000  PC1     1 packets transmitted, 0 received, 100% packet loss, time 0ms
+  31.000000000  ok      expect PC1 output contains "1 packets transmitted, 0 received, 100% packet loss"
+  31.000000000  MLS1    MLS1#show ip route
+  31.000000000  MLS1    Default gateway is not set
+  31.000000000  MLS1    
+  31.000000000  MLS1    Host               Gateway           Last Use    Total Uses  Interface
+  31.000000000  MLS1    ICMP redirect cache is empty
+  31.000000000  ok      expect MLS1 output contains "Default gateway is not set"
+  31.000000000  MLS1    MLS1#show running-config
+  31.000000000  MLS1    Collecting the configuration ...
+  31.000000000  MLS1    
+  31.000000000  MLS1    ! configuration in effect, 1318 bytes
+  31.000000000  MLS1    !
+  31.000000000  MLS1    version 1.0
+  31.000000000  MLS1    !
+  31.000000000  MLS1    hostname MLS1
+  31.000000000  MLS1    !
+  31.000000000  MLS1    vlan 10
+  31.000000000  MLS1     name Office
+  31.000000000  MLS1    !
+  31.000000000  MLS1    vlan 20
+  31.000000000  MLS1     name Lab
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/1
+  31.000000000  MLS1     switchport access vlan 10
+  31.000000000  MLS1     switchport mode access
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/2
+  31.000000000  MLS1     switchport access vlan 20
+  31.000000000  MLS1     switchport mode access
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/3
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/4
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/5
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/6
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/7
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/8
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/9
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/10
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/11
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/12
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/13
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/14
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/15
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/16
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/17
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/18
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/19
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/20
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/21
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/22
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/23
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface GigabitEthernet1/0/24
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface TenGigabitEthernet1/1/1
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface TenGigabitEthernet1/1/2
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface TenGigabitEthernet1/1/3
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface TenGigabitEthernet1/1/4
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface Vlan1
+  31.000000000  MLS1     no ip address
+  31.000000000  MLS1     shutdown
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface Vlan10
+  31.000000000  MLS1     ip address 10.0.10.1 255.255.255.0
+  31.000000000  MLS1    !
+  31.000000000  MLS1    interface Vlan20
+  31.000000000  MLS1     ip address 10.0.20.1 255.255.255.0
+  31.000000000  MLS1    !
+  31.000000000  MLS1    line con 0
+  31.000000000  MLS1    line vty 0 4
+  31.000000000  MLS1     login
+  31.000000000  MLS1    !
+  31.000000000  MLS1    end
+  31.000000000  ok      expect MLS1 output contains "interface Vlan20\n ip address 10.0.20.1 255.255.255.0\n!"
+# 7 von 7 Erwartungen erfüllt

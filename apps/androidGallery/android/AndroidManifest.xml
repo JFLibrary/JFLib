@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.jflib.gallery" android:versionCode="1" android:versionName="0.1">
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <application android:label="jfgui Gallery" android:icon="@drawable/ic_launcher"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar"
+        android:allowBackup="false" android:debuggable="true" android:extractNativeLibs="false"
+        android:supportsRtl="true">
+        <activity android:name=".GalleryActivity" android:exported="true"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|density|uiMode"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+        <!-- images the app puts on the clipboard (android/GalleryFiles.java) -->
+        <provider android:name="org.jflib.gallery.GalleryFiles"
+            android:authorities="org.jflib.gallery.jfgui.files"
+            android:exported="false" android:grantUriPermissions="true" />
+    </application>
+    <instrumentation android:name="org.jflib.gallery.GalleryInstrumentation"
+        android:targetPackage="org.jflib.gallery" android:functionalTest="true" />
+    <instrumentation android:name="org.jflib.gallery.GalleryA11yInstrumentation"
+        android:targetPackage="org.jflib.gallery" android:functionalTest="true" />
+    <instrumentation android:name="org.jflib.gallery.GalleryFilesInstrumentation"
+        android:targetPackage="org.jflib.gallery" android:functionalTest="true" />
+</manifest>

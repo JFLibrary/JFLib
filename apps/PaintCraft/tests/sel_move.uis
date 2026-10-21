@@ -1,0 +1,277 @@
+# sel_move.uis -- Pixel verschieben / Auswahl verschieben (agent T2): move (whole
+# pixels), copy (Strg), scale by the handles (Alt: about the centre), rotate outside the frame
+# (Umschalt: 15 degree steps), the pivot, arrow keys (1 px, Strg 10 px), mirror buttons,
+# Probenahme; a session is ONE history step at Fertigstellen / Enter / Auswahl aufheben /
+# another tool, Esc drops it (no step, HIST-019/020); the selection moves with the pixels;
+# Auswahl verschieben moves only the selection (lossless geometry).
+# Canvas 1280 x 800, zoom 100 %: image pixel (x, y) is at (240 + x, 148 + y).
+# Records: #9984 text M "tx,ty,sx%,sy%,deg", value live | frame << 1; #9981 selection bounds;
+# #9935 history entries (T1); 900 / 901 composite / layer pixel -> #9900.
+size 1280 800
+theme light
+# red square (20,20)-(60,60) on white
+cmd 902 1
+cmd 903 1310740         # (20, 20)
+cmd 904 3932220         # (60, 60)
+
+# ------------------------------------------------------------ move, Enter, undo / redo
+cmd 750
+drag 250,158 350,258
+expect #9981 text "10,10,110,110"
+cmd 751
+expect #9931 value 1
+expect #9984 value 2
+drag 270,178 370,178
+expect #9984 value 3
+expect #9984 text "100,0,100,100,0"
+expect #9935 value 2
+expect #9941 value 1
+cmd 900 1966210         # image (130, 30)
+expect #9900 text "FFFF0000"
+cmd 900 1966110         # image (30, 30)
+expect #9900 text "00000000"
+cmd 900 327685          # image (5, 5)
+expect #9900 text "FFFFFFFF"
+cmd 901 1966110         # layer (30, 30)
+expect #9900 text "FFFF0000"
+expect #9981 text "110,10,210,110"
+shot build/t2/sel_move_live.png
+key enter
+expect #9984 value 2
+expect #9935 value 3
+expect text:"Pixel verschieben" exists
+cmd 901 1966210         # layer (130, 30)
+expect #9900 text "FFFF0000"
+cmd 901 1966110         # layer (30, 30)
+expect #9900 text "00FF0000"
+cmd 901 327685          # layer (5, 5)
+expect #9900 text "FFFFFFFF"
+cmd 901 1966245         # layer (165, 30)
+expect #9900 text "FFFFFFFF"
+expect #9981 text "110,10,210,110"
+key ctrl+z
+cmd 901 1966110         # layer (30, 30)
+expect #9900 text "FFFF0000"
+cmd 901 1966210         # layer (130, 30)
+expect #9900 text "FFFFFFFF"
+expect #9981 text "10,10,110,110"
+key ctrl+y
+cmd 901 1966210         # layer (130, 30)
+expect #9900 text "FFFF0000"
+expect #9981 text "110,10,210,110"
+key ctrl+z
+
+# ------------------------------------------------------------ Esc: no step
+drag 270,178 270,278
+expect #9984 text "0,100,100,100,0"
+cmd 900 8519710         # image (30, 130)
+expect #9900 text "FFFF0000"
+key esc
+expect #9984 value 2
+expect #9936 value 2
+cmd 901 1966110         # layer (30, 30)
+expect #9900 text "FFFF0000"
+cmd 900 8519710         # image (30, 130)
+expect #9900 text "FFFFFFFF"
+expect #9981 text "10,10,110,110"
+# Strg+Z while live drops it too
+drag 270,178 270,278
+key ctrl+z
+expect #9936 value 2
+expect #9981 text "10,10,110,110"
+cmd 901 8519710         # layer (30, 130)
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ copy (Strg at the first drag)
+drag 270,178 370,178 ctrl
+key enter
+cmd 901 1966110         # layer (30, 30)
+expect #9900 text "FFFF0000"
+cmd 901 1966210         # layer (130, 30)
+expect #9900 text "FFFF0000"
+expect #9935 value 3
+key ctrl+z
+cmd 901 1966210         # layer (130, 30)
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ arrow keys
+key right
+expect #9984 text "1,0,100,100,0"
+key ctrl+right
+key down
+expect #9984 text "11,1,100,100,0"
+key enter
+cmd 901 1376287         # layer (31, 21)
+expect #9900 text "FFFF0000"
+cmd 901 1376286         # layer (30, 21)
+expect #9900 text "FFFFFFFF"
+cmd 901 1310751         # layer (31, 20)
+expect #9900 text "FFFFFFFF"
+cmd 901 3932230         # layer (70, 60)
+expect #9900 text "FFFF0000"
+expect #9981 text "21,11,121,111"
+key ctrl+z
+
+# ------------------------------------------------------------ scale by a handle (Probenahme: nearest)
+click #2250
+click #2251
+drag 350,258 450,358
+expect #9984 text "-10,-10,200,200,0"
+key enter
+cmd 901 2621480         # layer (40, 40)
+expect #9900 text "FFFF0000"
+cmd 901 7143533         # layer (109, 109)
+expect #9900 text "FFFF0000"
+cmd 901 7340144         # layer (112, 112)
+expect #9900 text "FFFFFFFF"
+cmd 901 1835036         # layer (28, 28)
+expect #9900 text "FFFFFFFF"
+expect #9981 text "10,10,210,210"
+key ctrl+z
+# Alt: about the centre
+drag 350,258 400,308 alt
+expect #9984 text "-60,-60,200,200,0"
+key esc
+# Umschalt at a corner keeps the aspect ratio
+drag 350,258 450,308 shift
+expect #9984 text "-10,-10,200,200,0"
+key esc
+
+# ------------------------------------------------------------ rotate outside the frame (Umschalt: 15 degrees)
+drag 400,208 300,308 shift
+expect #9984 text "120,0,100,100,90"
+key enter
+cmd 901 1966160         # layer (80, 30)
+expect #9900 text "FFFF0000"
+cmd 901 1310780         # layer (60, 20)
+expect #9900 text "FFFF0000"
+cmd 901 1966181         # layer (101, 30)
+expect #9900 text "FFFFFFFF"
+expect #9981 text "10,10,110,110"
+key ctrl+z
+drag 400,208 395,228 shift
+expect #9984 text "18,-13,100,100,15"
+key esc
+# the pivot moved to the top left corner first
+drag 300,208 250,158
+expect #9984 value 3
+drag 400,158 250,308 shift
+expect #9984 text "21,0,100,100,90"
+key esc
+
+# ------------------------------------------------------------ mirror buttons
+click #2260
+expect #9984 text "120,0,100,100,0"
+cmd 790
+cmd 901 1310810         # layer (90, 20)
+expect #9900 text "FFFF0000"
+cmd 901 1310750         # layer (30, 20)
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+
+# ------------------------------------------------------------ Auswahl aufheben / another tool commit
+drag 270,178 370,178
+key ctrl+d
+expect #9981 value 0
+cmd 901 1966210         # layer (130, 30)
+expect #9900 text "FFFF0000"
+key ctrl+z
+expect #9981 text "110,10,210,110"
+key ctrl+z
+expect #9981 text "10,10,110,110"
+drag 270,178 370,178
+cmd 750
+expect #9935 value 3
+cmd 901 1966210         # layer (130, 30)
+expect #9900 text "FFFF0000"
+key ctrl+z
+cmd 901 1966110         # layer (30, 30)
+expect #9900 text "FFFF0000"
+
+# ------------------------------------------------------------ no selection: the whole layer
+key ctrl+d
+cmd 751
+expect #9984 value 2
+drag 600,500 610,500
+key enter
+cmd 901 1966105         # layer (25, 30)
+expect #9900 text "FFFFFFFF"
+cmd 901 1966145         # layer (65, 30)
+expect #9900 text "FFFF0000"
+cmd 901 327685          # layer (5, 5)
+expect #9900 text "00FFFFFF"
+expect #9981 text "10,0,800,600"
+key ctrl+z
+cmd 901 1966105         # layer (25, 30)
+expect #9900 text "FFFF0000"
+expect #9981 value 0
+
+# ------------------------------------------------------------ Auswahl verschieben
+cmd 750
+drag 250,158 350,258
+cmd 753
+expect #9931 value 3
+drag 270,178 370,278
+expect #9984 text "100,100,100,100,0"
+expect #9981 text "110,110,210,210"
+key enter
+expect text:"Auswahl verschieben" exists
+cmd 901 1966110         # layer (30, 30)
+expect #9900 text "FFFF0000"
+cmd 901 8519810         # layer (130, 130)
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+expect #9981 text "10,10,110,110"
+key ctrl+y
+expect #9981 text "110,110,210,210"
+key ctrl+z
+drag 350,258 450,358
+key enter
+expect #9981 text "10,10,210,210"
+expect text:"Auswahlgröße ändern" exists
+key ctrl+z
+drag 400,208 300,308 shift
+key enter
+expect text:"Auswahl drehen" exists
+expect #9981 text "10,10,110,110"
+key ctrl+z
+# lossless: moved out of the image and back
+drag 270,178 1270,178
+expect #9981 text "0,0,0,0"
+drag 1270,178 270,178
+expect #9981 text "10,10,110,110"
+key enter
+expect #9984 value 2
+# mirror the selection only (an L shape)
+key ctrl+d
+cmd 750
+drag 250,158 350,178
+drag 270,258 250,158 ctrl
+expect #9981 text "10,10,110,110"
+cmd 980 983140          # (100, 15)
+expect #9980 value 255
+cmd 980 3276900         # (100, 50)
+expect #9980 value 0
+cmd 753
+click #2360
+cmd 790
+expect #9981 text "10,10,110,110"
+cmd 980 983140          # (100, 15)
+expect #9980 value 255
+cmd 980 3276900         # (100, 50)
+expect #9980 value 255
+cmd 980 3276820         # (20, 50)
+expect #9980 value 0
+expect text:"Auswahlgröße ändern" exists
+key ctrl+z
+cmd 980 3276820         # (20, 50)
+expect #9980 value 255
+click #2361
+cmd 790
+cmd 980 3276820         # (20, 50)
+expect #9980 value 255
+cmd 980 983140          # (100, 15)
+expect #9980 value 0
+cmd 980 6881380         # (100, 105)
+expect #9980 value 255
+key ctrl+z

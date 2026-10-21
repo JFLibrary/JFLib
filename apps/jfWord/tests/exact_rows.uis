@@ -1,0 +1,41 @@
+#!args --editor
+size 1440 1040
+theme light
+scale 100
+click tab:"Einfügen"
+click #1514
+click "Übernehmen"
+type "Zeile mit genauer Höhe"
+click #3918
+expect dialog:"Tabelleneigenschaften" exists
+click #3906
+key ctrl+a
+type "18"
+key tab
+click #69441
+click "Genau"
+expect "Überstehender Inhalt bleibt erhalten und wird an der Zellgrenze abgeschnitten." exists
+shot build/jfword-exact-rows-dialog-light.png
+click "Übernehmen"
+click #3918
+expect #69441 text "Genau"
+click "Abbrechen"
+cmd 5
+click #3918
+expect #69441 text "Mindestens"
+click "Abbrechen"
+cmd 6
+click #3918
+expect #69441 text "Genau"
+theme dark
+scale 150
+shot build/jfword-exact-rows-dialog-dark-150.png
+click "Abbrechen"
+size 800 700
+scale 100
+click #3918
+expect #69441 text "Genau"
+click #69441
+click "Mindestens"
+click "Übernehmen"
+expect_nowarn

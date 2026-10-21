@@ -1,0 +1,135 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/pdu_lab.jfnet
+# PDUs (workspace/sim/pdu.rs): a simple one (tool P: source, then destination: an ICMP echo)
+# and complex ones (destination as a device, an address or a name; ICMP, UDP, TCP, a DNS
+# query; ports, size, TTL, count, again and again until stopped), the PDUs panel with their
+# state, sending again, stopping, removing; the recording as a pcapng file; shots light, dark
+# and at 150 %.  PC1 gets 10.0.0.100 and its DNS server (SRV1, zone lab) by DHCP; SRV1 runs a
+# TCP echo on port 7; nobody listens on PC2's port 9.  The dialog's fields: 33060 the
+# destination, 33064 the protocol, 33072 the destination port, 33080 the TTL, 33084 the count,
+# 33092 "periodisch"; per line i of the panel 36864+4i sends again, +1 stops, +2 removes.
+theme light
+# PC1's lease comes in real time
+wait 12000
+click tab:"Simulation"
+wait 200
+expect tab:"PDUs" exists
+expect text:"Noch keine PDUs" exists
+click tab:"Echtzeit"
+wait 100
+# a simple PDU: PC1 -> SRV1 (10.0.0.10)
+click #33024
+expect #172 checked
+click listitem:"PC1"
+wait 600
+click listitem:"SRV1"
+key esc
+wait 2000
+expect text:"#1 ICMP · PC1 → SRV1" exists
+expect text:"fertig: 1 gesendet, alle beantwortet" exists
+# the dialog: without a destination it stays open and says why
+cmd 173
+expect dialog:"Komplexe PDU" exists
+click button:"Senden"
+expect dialog:"Komplexe PDU" exists
+expect text:"Das Ziel fehlt." exists
+shot build/jfnetworker/pdu_dialog.png
+# UDP to PC2's port 9 with TTL 5, twice: PC2 answers with ICMP, the datagrams count as sent
+click #33060
+type "PC2"
+focus #33064
+key down
+click #33072
+key ctrl+a
+type "9"
+click #33080
+key ctrl+a
+type "5"
+click #33084
+key ctrl+a
+type "2"
+click button:"Senden"
+expect dialog:"Komplexe PDU" missing
+wait 3000
+expect text:"#2 UDP · PC1 → PC2:9" exists
+expect text:"fertig: 2 von 2 gesendet, 0 Antworten" exists
+# TCP: 1000 bytes to SRV1's echo, one connection that ends in order
+cmd 173
+click #33060
+key ctrl+a
+type "SRV1"
+focus #33064
+key down
+click #33084
+key ctrl+a
+type "1"
+click button:"Senden"
+wait 2000
+expect text:"#3 TCP · PC1 → SRV1:7" exists
+expect text:"fertig: 1 von 1 Verbindungen, 1 beendet" exists
+# a DNS query of PC1's resolver
+cmd 173
+click #33060
+key ctrl+a
+type "pc2.lab"
+focus #33064
+key down
+click button:"Senden"
+wait 2000
+expect text:"#4 DNS · PC1 → pc2.lab" exists
+expect text:"fertig: 10.0.0.2" exists
+# ICMP to a name: PC1 looks it up first, then two echoes
+cmd 173
+click #33060
+key ctrl+a
+type "srv1.lab"
+focus #33064
+key up up up
+click #33084
+key ctrl+a
+type "2"
+click button:"Senden"
+wait 3000
+expect text:"#5 ICMP · PC1 → srv1.lab" exists
+expect text:"fertig: 2 gesendet, alle beantwortet" exists
+shot build/jfnetworker/pdu_list.png
+# remove the first one
+click #36866
+expect text:"#1 ICMP · PC1 → SRV1" missing
+expect text:"#2 UDP · PC1 → PC2:9" exists
+# again and again: UDP every second until stopped (the protocol switch put the port back to 7)
+cmd 173
+click #33060
+key ctrl+a
+type "PC2"
+focus #33064
+key down
+click #33092
+click button:"Senden"
+wait 3500
+expect text:"#6 UDP · PC1 → PC2:7" exists
+expect text:"läuft: 4 gesendet, 0 Antworten" exists
+click #36881
+expect text:"gestoppt: 4 gesendet, 0 Antworten" exists
+# send #2 again
+click #36864
+wait 3000
+expect text:"fertig: 2 von 2 gesendet, 0 Antworten" exists
+# the recording as pcapng
+cmd 174
+expect dialog:"Speichern unter" exists
+click #1114124
+key ctrl+a
+type "build/jfnetworker/pdu_lab.pcapng"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect "Aufzeichnung als „pdu_lab.pcapng“ exportiert" exists
+shot build/jfnetworker/pdu_light.png
+theme dark
+wait 100
+shot build/jfnetworker/pdu_dark.png
+scale 150
+wait 100
+shot build/jfnetworker/pdu_150.png
+scale 100
+theme light
+expect_nowarn

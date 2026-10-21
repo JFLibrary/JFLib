@@ -1,0 +1,110 @@
+#!args --verify-dirty
+# keyboard.uis -- keyboard navigation of the library (lib/ui/kbnav.rs) in the gallery: radios
+# are one Tab stop (the checked one, arrows select), Enter is no click of a check box, the
+# reorderable list (Ctrl+arrows move the selected row, Space its check box, Tab enters the
+# selected row only, Enter = double click), the colour picker's parts take the arrows, a
+# swatch's menu key opens its menu (menu_popup at the swatch), F6 / Ctrl+F6 between the main
+# window and a tool window, a dialog window starts on its first control and Esc closes it.
+size 1000 3000
+theme light
+# ------------------------------------------------------------ radios: one stop, arrows select
+focus "Option A"
+key tab tab
+expect "Grün" focused
+key right
+expect "Blau" checked
+expect "Blau" focused
+expect "Grün" unchecked
+key right
+expect "Rot" checked
+key left
+expect "Blau" checked
+key tab
+expect "WLAN" focused
+key shift+tab
+expect "Blau" focused
+key shift+tab
+expect "Unbestimmt" focused
+# ------------------------------------------------------------ check box: Space toggles, Enter does not
+focus "Option A"
+expect "Option A" checked
+key enter
+expect "Option A" checked
+key space
+expect "Option A" unchecked
+key space
+expect "Option A" checked
+# ------------------------------------------------------------ the reorderable list
+focus #7800
+expect #7800 value 0
+key ctrl+down
+expect text:"Reihenfolge: 2 1 3 4 5 6 7 8 9 10 11 12" exists
+expect #7800 value 1
+key ctrl+end
+expect text:"Reihenfolge: 2 3 4 5 6 7 8 9 10 11 12 1" exists
+expect #7800 value 11
+key ctrl+home
+expect text:"Reihenfolge: 1 2 3 4 5 6 7 8 9 10 11 12" exists
+expect #7800 value 0
+key down
+expect #7800 value 1
+key ctrl+up
+expect text:"Reihenfolge: 2 1 3 4 5 6 7 8 9 10 11 12" exists
+key ctrl+down
+expect text:"Reihenfolge: 1 2 3 4 5 6 7 8 9 10 11 12" exists
+key up
+# Space: the selected row's check box
+expect #7850 checked
+key space
+expect #7850 unchecked
+key space
+expect #7850 checked
+# Tab: the selected row's widgets only (its swatch is a picture: ST_NOFOCUS), then on
+key tab
+expect #7850 focused
+key tab
+expect #7960 focused
+key shift+tab shift+tab
+expect #7800 focused
+# ------------------------------------------------------------ colour picker parts and the swatch menu
+focus #536878642
+expect #536878642 value 714
+key right
+expect #536878642 value 724
+key shift+left
+expect #536878642 value 624
+key tab
+expect #268443186 focused
+key end
+expect #268443186 value 3599
+focus #7718
+key apps
+expect menuitem:"Ausschneiden" exists
+key esc
+expect menuitem:"Ausschneiden" missing
+expect #7718 focused
+# ------------------------------------------------------------ windows: F6 / Ctrl+F6, dialogs
+click "Werkzeugfenster"
+expect window 7600 open
+expect window main keys
+key ctrl+f6
+expect window 7600 keys
+key tab
+key ctrl+f6
+expect window main keys
+expect "Werkzeugfenster" focused
+# F6: no panes in the main window -- the next window
+key f6
+expect window 7600 keys
+key esc
+expect window main keys
+click "Werkzeugfenster"
+expect window 7600 closed
+click "Dialogfenster…"
+expect window 7620 active
+expect window 7620 keys
+expect #7621 focused
+key esc
+expect window 7620 closed
+expect "Dialogfenster…" focused
+expect_nowarn

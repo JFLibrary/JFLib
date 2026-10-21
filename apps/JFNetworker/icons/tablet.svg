@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Tablet (landscape)</title>
+  <rect class="body" x="4" y="7" width="56" height="35" rx="4" fill="#F7F8FA"/>
+  <rect class="screen" x="9.5" y="10.5" width="45" height="27" rx="1" fill="#CAD4DF" stroke="none"/>
+  <circle class="port" cx="6.9" cy="24" r="0.8" fill="#4F555D" stroke="none"/>
+  <rect class="tint" x="27" y="38.9" width="10" height="1.6" rx="0.8" fill="#7A828C" stroke="none"/>
+</svg>

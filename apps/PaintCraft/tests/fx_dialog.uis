@@ -1,0 +1,151 @@
+#!args --open apps/PaintCraft/tests/fixtures/a6_photo.png
+# fx_dialog.uis -- generic effect dialog and runner (agent A6): Gaußscher Weichzeichner as a
+# modal dialog window next to the image, live preview (tiles on the worker pool), parameter
+# change -> restart after the 50 ms debounce, preview == commit == efftest (bit-identical
+# FNV-1a hashes, see docs/EFFECTS.md), Abbrechen = no history entry and the layer unchanged
+# (HIST-019), OK = one entry named after the effect, reset arrow, remembered parameters,
+# Strg+F repeat, the asynchronous path (progress window) with `sync`, Helligkeit / Kontrast.
+# Hooks (diag.s A6): 995 0 layer hash / 995 2 preview hash (layer rows through the compose
+# hook) -> #9990; 996 slot|v<<8 integer parameter; 998 1 always asynchronous; records #9991
+# mode | phase << 4 (1 dialog, 2 applying; phase 3 = complete), #9993 render starts, #9994
+# repeat label.  T1 records #9935 history entries, #9936 position.  A1: 900 composite pixel.
+# References: efftest --in a6_photo.png --fx NAME --p ... (tools: docs/EFFECTS.md §6):
+#   original 2cc39813e097b672, gaussian_blur radius 2 1d521b55d5e7c0d4, radius 5
+#   de98e56b29676da6 (pixel (50,50) FF293682), brightness_contrast 30 / 20 545c6fe631158b8b
+size 1280 800
+theme light
+cmd 995 0
+expect #9990 text "2cc39813e097b672"
+expect #9936 value 1
+
+# ------------------------------------------------------------ open: modal window, preview
+cmd 472
+expect window 24688 open
+expect window 24688 modal
+expect "Radius" value 2
+expect #0x6001B682 disabled
+sync
+expect #9991 value 49
+cmd 995 2
+expect #9990 text "1d521b55d5e7c0d4"
+cmd 995 0
+expect #9990 text "2cc39813e097b672"
+
+# ------------------------------------------------------------ typing restarts after 50 ms
+expect #9993 value 1
+click #0x6001B681
+key ctrl+a
+type "5\n"
+expect "Radius" value 5
+expect #0x6001B682 enabled
+expect #9993 value 1
+wait 32
+expect #9993 value 1
+wait 48
+expect #9993 value 2
+sync
+cmd 995 2
+expect #9990 text "de98e56b29676da6"
+cmd 900 3276850
+expect #9900 text "FF293682"
+
+# ------------------------------------------------------------ Abbrechen: nothing changes
+click "Abbrechen"
+expect window 24688 closed
+expect #9991 value 0
+cmd 995 0
+expect #9990 text "2cc39813e097b672"
+cmd 995 2
+expect #9990 text "2cc39813e097b672"
+cmd 900 3276850
+expect #9900 text "FF354393"
+expect #9935 value 1
+expect #9936 value 1
+expect #9994 value 0
+
+# ------------------------------------------------------------ reset arrow, Esc
+cmd 472
+expect "Radius" value 2
+click #0x6001B681
+key ctrl+a
+type "9\n"
+expect "Radius" value 9
+click #0x6001B682
+expect "Radius" value 2
+expect #0x6001B682 disabled
+key esc
+expect window 24688 closed
+expect #9935 value 1
+
+# ------------------------------------------------------------ OK: one entry, preview == commit
+cmd 472
+click #0x6001B681
+key ctrl+a
+type "5\n"
+sync
+cmd 995 2
+expect #9990 text "de98e56b29676da6"
+click "OK"
+sync
+expect window 24688 closed
+expect #9991 value 0
+cmd 995 0
+expect #9990 text "de98e56b29676da6"
+cmd 901 3276850
+expect #9900 text "FF293682"
+expect #9935 value 2
+expect #9936 value 2
+expect text:"Gaußscher Weichzeichner" exists
+
+# ------------------------------------------------------------ Strg+F, remembered values
+expect #9994 text "Gaußscher Weichzeichner wiederholen"
+expect #9994 value 1
+key ctrl+z
+cmd 995 0
+expect #9990 text "2cc39813e097b672"
+key ctrl+f
+cmd 995 0
+expect #9990 text "de98e56b29676da6"
+expect #9936 value 2
+key ctrl+z
+cmd 472
+expect "Radius" value 5
+key esc
+# settings round trip (hook 998 2: save into an INI, forget, load)
+cmd 998 2
+expect #9994 text "Gaußscher Weichzeichner wiederholen"
+cmd 472
+expect "Radius" value 5
+key esc
+
+# ------------------------------------------------------------ asynchronous commit + sync
+cmd 998 1
+cmd 472
+sync
+click "OK"
+sync
+expect window 24691 closed
+expect #9991 value 0
+cmd 995 0
+expect #9990 text "de98e56b29676da6"
+expect #9936 value 2
+key ctrl+z
+cmd 998 0
+
+# ------------------------------------------------------------ two properties (hooks 996)
+cmd 382
+expect window 24688 open
+expect "Helligkeit" value 0
+expect "Kontrast" value 0
+cmd 996 7680
+cmd 996 5121
+expect "Helligkeit" value 30
+expect "Kontrast" value 20
+sync
+cmd 995 2
+expect #9990 text "545c6fe631158b8b"
+click "OK"
+cmd 995 0
+expect #9990 text "545c6fe631158b8b"
+expect text:"Helligkeit / Kontrast" exists
+expect #9994 text "Helligkeit / Kontrast wiederholen"

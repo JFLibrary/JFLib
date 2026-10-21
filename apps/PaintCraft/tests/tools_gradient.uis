@@ -1,0 +1,195 @@
+# tools_gradient.uis -- Farbverlauf (agent T3): a click draws nothing, a drag shows a live
+# preview (layer unchanged), Esc / Strg+Z drop it (no step), Enter / Fertigstellen / tool
+# switch / a press away from the nubs = one step "Farbverlauf"; end / start / middle nub
+# drags, Shift = 15° angle steps, right button = colours reversed, right click on a nub
+# swaps them, type / colour changes re-render the live gradient, Transparenzverlauf,
+# Überschreiben with a half transparent colour, test clip rectangle and a real selection.
+# Mapping (1280 x 800, zoom 100 %): image pixel (x, y) at (240 + x, 148 + y).
+# Records: #524288 "sx,sy,ex,ey" (value 0 none / 1 live, not shown / 2 shown), #524289
+# "type,repeat,transparency,swapped,aa-samples"; probes 900 composite / 901 layer -> #9900.
+size 1280 800
+theme light
+key g
+expect #9931 value 9
+expect #790 disabled
+expect #9935 value 1
+expect #524289 text "0,0,0,0,0"
+expect button:"Linear" exists
+expect button:"Farbverlauf" exists
+expect button:"Keine Wiederholung" exists
+
+# ------------------------------------------------------------ a click without a drag: nothing
+click 340,248
+expect #9930 value 0
+expect #524288 value 0
+expect #9935 value 1
+
+# ------------------------------------------------------------ live preview, Esc drops it
+drag 340,248 740,248
+expect #9930 value 1
+expect #790 enabled
+expect #524288 value 2
+expect #524288 text "100,100,500,100"
+cmd 900 19661100
+expect #9900 text "FF808080"
+cmd 901 19661100
+expect #9900 text "FFFFFFFF"
+key esc
+expect #9930 value 0
+expect #524288 value 0
+expect #790 disabled
+cmd 900 19661100
+expect #9900 text "FFFFFFFF"
+expect #9935 value 1
+
+# ------------------------------------------------------------ Enter = one step "Farbverlauf"
+drag 340,248 740,248
+key enter
+expect #9930 value 0
+expect #9935 value 2
+cmd 901 19661000
+expect #9900 text "FF404040"
+cmd 901 19660850
+expect #9900 text "FF000000"
+cmd 901 19661400
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+cmd 901 19661000
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ nubs: end, start, middle
+drag 340,248 740,248
+drag 740,248 740,448
+expect #524288 text "100,100,500,300"
+cmd 900 19661100
+expect #9900 text "FF999999"
+drag 340,248 340,268
+expect #524288 text "100,120,500,300"
+drag 540,358 560,378
+expect #524288 text "120,140,520,320"
+expect #9930 value 1
+# Strg+Z drops the live gradient (no step)
+key ctrl+z
+expect #9930 value 0
+expect #524288 value 0
+cmd 900 19661100
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ Shift: 15° steps
+drag 340,548 540,560 shift
+expect #524288 text "100,400,300,400"
+key esc
+drag 340,548 440,640 shift
+expect #524288 text "100,400,196,496"
+key esc
+drag 340,548 400,448 shift
+expect #524288 text "100,400,158,299"
+key esc
+
+# ------------------------------------------------------------ right button, swapping, re-render
+drag 340,248 740,248 right
+expect #524289 text "0,0,0,1,0"
+cmd 900 19660850
+expect #9900 text "FFFFFFFF"
+cmd 900 19661400
+expect #9900 text "FF000000"
+drag 740,248 740,248 right
+expect #524289 text "0,0,0,0,0"
+expect #524288 text "100,100,500,100"
+cmd 900 19660850
+expect #9900 text "FF000000"
+cmd 792 3
+expect #524289 text "3,0,0,0,0"
+cmd 900 19660900
+expect #9900 text "FF808080"
+cmd 900 6553900
+expect #9900 text "FF808080"
+cmd 792 0
+cmd 900 19660900
+expect #9900 text "FF000000"
+key x
+cmd 900 19660850
+expect #9900 text "FFFFFFFF"
+key x
+cmd 900 19660850
+expect #9900 text "FF000000"
+cmd 792 256
+expect #524289 text "0,1,0,0,1"
+cmd 932 0
+expect #524289 text "0,1,0,0,0"
+cmd 932 1
+cmd 792 0
+# Fertigstellen
+click #790
+expect #9930 value 0
+expect #9935 value 2
+expect #790 disabled
+
+# ------------------------------------------------------------ press away from the nubs / tool switch commit
+# (an unchanged layer makes no step: the gradients differ from the committed one)
+drag 340,248 640,248
+drag 340,648 740,648
+expect #9935 value 3
+expect #524288 text "100,500,500,500"
+key b
+expect #9930 value 0
+expect #9935 value 4
+key g
+
+# ------------------------------------------------------------ Transparenzverlauf (alpha only)
+cmd 902 5
+cmd 903 0
+cmd 904 39322400
+cmd 792 65536
+expect button:"Transparenzverlauf" exists
+drag 340,248 740,248
+key enter
+expect #9935 value 5
+cmd 901 19661100
+expect #9900 text "80FFFFFF"
+cmd 901 19660850
+expect #9900 text "FFFFFFFF"
+cmd 901 19661400
+expect #9900 text "00FFFFFF"
+cmd 792 0
+
+# ------------------------------------------------------------ Überschreiben, half transparent primary
+cmd 904 39322400
+cmd 943 4
+cmd 933 14
+drag 340,248 740,248
+key enter
+cmd 901 19660850
+expect #9900 text "80FF0000"
+cmd 901 19661100
+expect #9900 text "C0FF8080"
+cmd 901 19661400
+expect #9900 text "FFFFFFFF"
+cmd 933 0
+cmd 785
+
+# ------------------------------------------------------------ test clip rectangle
+cmd 904 39322400
+cmd 941 6553700
+cmd 942 13107400
+drag 340,248 740,248
+key enter
+cmd 901 9830550
+expect #9900 text "FF202020"
+cmd 901 9830650
+expect #9900 text "FFFFFFFF"
+cmd 942 0
+
+# ------------------------------------------------------------ a real selection clips
+cmd 904 39322400
+key s
+drag 340,448 440,548
+key g
+drag 240,448 640,448
+click #790
+cmd 901 22937750
+expect #9900 text "FF606060"
+cmd 901 22937850
+expect #9900 text "FFFFFFFF"
+cmd 901 27525270
+expect #9900 text "FFFFFFFF"

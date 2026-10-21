@@ -1,0 +1,71 @@
+#!args --editor
+# The direct numeric size and existing presets format the same retained UTF-8 selection.
+size 1240 840
+theme light
+type "Alpha β bleibt."
+key ctrl+home shift+right shift+right shift+right shift+right shift+right shift+right shift+right
+expect textbox:"Alpha β bleibt." value 8
+expect textbox:"Alpha β bleibt." max 0
+expect #2880 value 110
+click #2880
+key ctrl+a
+type "13,5"
+key enter
+expect #2880 value 135
+expect #33 text "13,5 pt"
+expect textbox:"Alpha β bleibt." focused
+expect textbox:"Alpha β bleibt." value 8
+expect textbox:"Alpha β bleibt." max 0
+key ctrl+z
+expect #2880 value 110
+expect #33 text "11 pt"
+key ctrl+y
+expect #2880 value 135
+# Invalid numeric input must not alter text, selection or document history.
+click #2880
+key ctrl+a
+type "."
+key enter
+expect #2880 value 135
+click textbox:"Alpha β bleibt."
+key ctrl+z
+expect #2880 value 110
+key ctrl+y
+expect #2880 value 135
+# The numeric contract clamps endpoints and snaps ordinary decimal input to half points.
+click #2880
+key ctrl+a
+type "999"
+key enter
+expect #2880 value 1440
+expect #33 text "144 pt"
+click #2880
+key ctrl+a
+type "0"
+key enter
+expect #2880 value 40
+expect #33 text "4 pt"
+click #2880
+key ctrl+a
+type "12.6"
+key enter
+expect #2880 value 125
+expect #33 text "12,5 pt"
+click #2880
+key up
+expect #2880 value 130
+expect #33 text "13 pt"
+# Selecting an existing preset updates the direct input, preserving the original range.
+click #33
+click "18 pt"
+expect #2880 value 180
+expect textbox:"Alpha β bleibt." focused
+expect textbox:"Alpha β bleibt." value 8
+expect textbox:"Alpha β bleibt." max 0
+shot build/jfword-font-size-light.png
+size 1000 700
+scale 150
+theme dark
+expect #2880 value 180
+shot build/jfword-font-size-dark-150.png
+expect_nowarn

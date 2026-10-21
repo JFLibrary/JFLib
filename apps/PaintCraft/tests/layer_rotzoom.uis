@@ -1,0 +1,199 @@
+# layer_rotzoom.uis -- Ebenen > Rotationszoom… (agent A4): the modal dialog window (24609),
+# angle (dial #5301, number box #5302), pan (#5303, keys), zoom (log slider #5304, number
+# box #5308), Kachelmodus (#5305: Keine / Wiederholen / Spiegeln), Original als Hintergrund
+# (#5306), Probenahme (#5307); the live preview goes through the compose tool hook (the
+# layer itself only changes on OK), Abbrechen / Esc = no change, OK = one history step
+# "Rotationszoom", a selection limits the change.
+# Image 64 x 48 (white background), layer 1 red in [0, 16) x [0, 16).  Transform: the layer
+# turns / scales about the canvas centre (32, 24) and its centre moves to centre + pan *
+# (32, 24).  Hook 373 op << 16 | v sets a parameter directly (0 angle, 1 zoom %, 2 pan x %,
+# 3 pan y %, 4 Kachelmodus, 5 Original als Hintergrund, 6 Probenahme).
+# Probes: #9900 (cmd 900 composite / 901 current layer pixel, x | y << 16), #4391 history
+# entry, #4392 entries, #4394 previews computed (text "angle|zoom|panx|pany" x 100),
+# #4395 open dialogs (2 = Rotationszoom).
+size 1280 800
+theme light
+key ctrl+n
+click #5002
+key ctrl+a
+type "64"
+key tab
+click button:"OK"
+expect #9913 value 64
+cmd 320
+cmd 902 1
+cmd 903 0
+cmd 904 1048592
+expect #4392 value 2
+cmd 900 327685
+expect #9900 text "FFFF0000"
+
+# ------------------------------------------------------------ the dialog, defaults
+click menu:"Ebenen"
+click menuitem:"Rotationszoom…"
+expect window 24609 open
+expect window 24609 modal
+expect #4395 value 2
+expect #4394 value 1
+expect #4394 text "0|100|0|0"
+expect #5301 value 0
+expect #5302 value 0
+expect #5304 value 0
+expect #5308 value 100
+expect #5305 value 0
+expect #5306 unchecked
+expect #5307 value 2
+expect text:"Kippen / Rotieren" exists
+expect text:"Verschieben" exists
+cmd 900 327685
+expect #9900 text "FFFF0000"
+
+# ------------------------------------------------------------ 180 degrees (number box): live preview only
+click #5302
+key ctrl+a
+type "180"
+key enter
+expect #5301 value 18000
+expect #4394 value 2
+expect #4394 text "18000|100|0|0"
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+cmd 900 2621500
+expect #9900 text "FFFF0000"
+cmd 901 327685
+expect #9900 text "FFFF0000"
+expect #4392 value 2
+# Abbrechen: the layer shows as before, no history
+click button:"Abbrechen"
+expect window 24609 closed
+expect #4395 value 0
+cmd 900 327685
+expect #9900 text "FFFF0000"
+cmd 900 2621500
+expect #9900 text "FFFFFFFF"
+expect #4392 value 2
+
+# ------------------------------------------------------------ pan and the tiling modes
+cmd 328
+expect window 24609 open
+expect #5302 value 0
+cmd 373 131122
+expect #4394 text "0|100|50|0"
+expect #5303 value 500
+cmd 900 327700
+expect #9900 text "FFFF0000"
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+click #5305
+click listitem:"Wiederholen"
+expect #5305 value 1
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+cmd 900 327700
+expect #9900 text "FFFF0000"
+click #5305
+click listitem:"Spiegeln"
+expect #5305 value 2
+cmd 900 327685
+expect #9900 text "FFFF0000"
+click #5305
+click listitem:"Keine"
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+# Original als Hintergrund: the untransformed layer under the result
+click #5306
+expect #5306 checked
+cmd 900 327685
+expect #9900 text "FFFF0000"
+cmd 900 327700
+expect #9900 text "FFFF0000"
+click #5306
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+# the pan control with keys (1 % per arrow, Home centres)
+focus #5303
+key home
+expect #5303 value 0
+key right
+expect #5303 value 20
+key home
+cmd 900 327685
+expect #9900 text "FFFF0000"
+
+# ------------------------------------------------------------ zoom 0,5 (number box) and the log slider
+click #5308
+key ctrl+a
+type "0,5"
+key enter
+expect #5308 value 50
+expect #5304 value -1000
+expect #4394 text "0|50|0|0"
+cmd 900 983060
+expect #9900 text "FFFF0000"
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+cmd 373 65736
+expect #5304 value 1000
+expect #5308 value 200
+cmd 373 65586
+expect #5304 value -1000
+# Probenahme: Nächster Nachbar
+expect #4394 value 15
+click #5307
+click listitem:"Nächster Nachbar"
+expect #5307 value 0
+expect #4394 value 16
+cmd 900 983060
+expect #9900 text "FFFF0000"
+
+# ------------------------------------------------------------ OK: one history step, undo / redo
+click button:"OK"
+expect window 24609 closed
+expect #4391 text "Rotationszoom"
+expect #4392 value 3
+cmd 901 983060
+expect #9900 text "FFFF0000"
+cmd 901 327685
+expect #9900 text "00000000"
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+expect #4391 text "Neue Ebene"
+cmd 901 327685
+expect #9900 text "FFFF0000"
+cmd 901 983060
+expect #9900 text "00000000"
+key ctrl+y
+cmd 901 327685
+expect #9900 text "00000000"
+key ctrl+z
+# Esc cancels, OK without a change records nothing
+cmd 328
+key esc
+expect window 24609 closed
+expect #4392 value 3
+cmd 328
+click button:"OK"
+expect #4392 value 3
+expect #4391 text "Neue Ebene"
+
+# ------------------------------------------------------------ with a selection only the selected part changes
+cmd 982 0
+cmd 983 3145760
+cmd 984 256
+cmd 981 0
+cmd 328
+cmd 373 180
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+cmd 900 2621500
+expect #9900 text "FFFFFFFF"
+click button:"OK"
+expect #4391 text "Rotationszoom"
+cmd 901 327685
+expect #9900 text "00000000"
+cmd 901 2621500
+expect #9900 text "00000000"
+key ctrl+z
+cmd 901 327685
+expect #9900 text "FFFF0000"

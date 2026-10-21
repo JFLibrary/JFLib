@@ -1,0 +1,44 @@
+PaintCraft ist abgestürzt.
+
+PaintCraft hat diesen Bericht nach einem unerwarteten Fehler geschrieben. Er enthält Angaben, mit denen sich die Ursache finden und beheben lässt.
+
+Programm: PaintCraft 0.7
+Zeitpunkt: 2026-10-06 16:28:09
+Ausnahme: 0xC0000005 Zugriffsverletzung (beim Schreiben an Adresse 0x10)
+Adresse: 0x7ff7237e902c (PaintCraft.exe + 0x902c; die Funktionen stehen in der .map-Datei des Builds)
+
+Register:
+  RAX 0000000000000010  RBX 000000000000038f  RCX 0000000000000000
+  RDX 00007ff7238d7d20  RSI 0000000000000000  RDI 000001a7a2e00040
+  RBP 00000035240ff9d0  RSP 00000035240ff910  R8  00007ff7237fd508
+  R9  0000000000001000  R10 0000000000000005  R11 000000000000000a
+  R12 0000000000000000  R13 0000000000000000  R14 0000000000000000
+  R15 0000000000000000  RIP 00007ff7237e902c
+
+Aufrufkette (Rücksprungadressen im Programm, vom Stapel; die erste Zeile ist der Absturzort):
+  PaintCraft.exe + 0x902c
+  PaintCraft.exe + 0x9de5
+  PaintCraft.exe + 0x1d580
+  PaintCraft.exe + 0x75290
+  PaintCraft.exe + 0xaa214
+  PaintCraft.exe + 0xa971b
+  PaintCraft.exe + 0xa8f38
+  PaintCraft.exe + 0x74745
+  PaintCraft.exe + 0x6253f
+
+---- Diagnose ----
+PaintCraft 0.7 (Klon von paint.net 5.1; jfguiLib, x86-64-Assembler)
+Betriebssystem: Windows (x64)
+Prozessor: AMD Ryzen 5 3600 6-Core Processor
+Befehlssätze: SSE2, SSE4.1, AVX2, FMA, POPCNT, BMI2
+Logische Prozessoren: 12, Worker-Threads: 12
+Arbeitsspeicher: 32717 MB
+Verlauf: Budget 4096 MB, im Arbeitsspeicher 0 MB, ausgelagert 0 MB
+Anzeige: 96 dpi (100 %), Farbschema Dunkel
+Geöffnete Bilder: 1
+Einstellungsdatei: (keine: Testlauf ohne --config / PaintCraft_CONFIG_DIR)
+Temp-Ordner: C:/Users/jakob/AppData/Local/Temp
+Palettenordner: C:/Users/jakob/AppData/Roaming/PaintCraft/Palettes
+Geladene Module: kernel32.dll, user32.dll, gdi32.dll (keine weiteren Bibliotheken)
+Effekte und Anpassungen: 54
+Plugins: 0 geladen

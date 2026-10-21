@@ -1,0 +1,49 @@
+#!args --verify-dirty
+# selecting in the scrollback with the mouse, copying (Ctrl+C with a selection, Ctrl+Shift+C),
+# Ctrl+C without one interrupts; pasting several lines submits each of them
+size 760 520
+click tab:"Shell"
+type "echo Hallo schöne Welt\n"
+expect text:"Hallo schöne Welt" exists
+# cells are 8 x 16 DIP from (18, 66): "Hallo schöne Welt" is the third line
+drag 18,106 58,106
+key ctrl+c
+expect text:"nutzer@pc:~$ ^C" missing
+expect #1101 focused
+key ctrl+v
+expect #1101 text "Hallo"
+# Esc drops the selection: now Ctrl+C interrupts (the line is echoed with ^C)
+key esc
+key ctrl+c
+expect text:"nutzer@pc:~$ Hallo^C" exists
+expect #1101 text ""
+# a double click selects a word, Ctrl+Shift+C copies it (the clicks of the drag are long ago)
+wait 600
+dblclick 82,106
+key ctrl+shift+c
+key ctrl+v
+expect #1101 text "schöne"
+key ctrl+a
+key backspace
+# a selection over three lines keeps the line breaks: pasted, every line but the last runs
+type "echo zweite Zeile\n"
+expect text:"zweite Zeile" exists
+wait 600
+drag 66,106 66,154
+key ctrl+shift+c
+key esc
+key ctrl+v
+wait 100
+expect text:"bash: schöne: Befehl nicht gefunden" exists
+expect #1101 text "zweite"
+key ctrl+a
+key backspace
+# pasting several lines: one Submit each (a line every 16 ms), the rest stays on the line
+clip text "echo eins\necho zwei\nech"
+key ctrl+v
+expect text:"eins" exists
+expect text:"zwei" missing
+wait 100
+expect text:"zwei" exists
+expect #1101 text "ech"
+expect_nowarn

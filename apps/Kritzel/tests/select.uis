@@ -1,0 +1,162 @@
+# selection tool ("Auswahl"): rectangle, move, undo, select all + delete, copy / paste
+# (headless clipboard), keyed-out background colour, crop, free-form, invert, resize,
+# rotate, commit on tool change
+expect text:"1152 × 648px" exists
+# something to select: a red brush stroke and a blue pencil line
+click #1213
+drag 200,332 600,412 12
+click #1100
+click #1217
+drag 150,232 700,252 10
+# select tool; the flyout under the big button chooses the rectangle
+click #1107
+expect #1107 checked
+click #1400
+expect #1401 checked
+expect #1402 unchecked
+expect #1404 disabled
+click #1401
+# a rectangle around the red stroke, moved by dragging inside
+drag 180,312 620,432 8
+expect text:"440 × 120px" exists
+shot build/kritzel_sel_rect.png
+drag 400,372 700,572 10
+shot build/kritzel_sel_move.png
+# a click outside commits; the whole move is one undo step
+click 1150,752
+shot build/kritzel_sel_commit.png
+key ctrl+z
+shot build/kritzel_sel_undo.png
+# select all + delete, undone
+key ctrl+a
+key delete
+shot build/kritzel_sel_delall.png
+key ctrl+z
+# copy the red stroke; paste floats at the top-left of the image; move it
+drag 180,312 620,432 8
+key ctrl+c
+key ctrl+v
+shot build/kritzel_sel_paste.png
+# background colour keyed out: the white of the pasted pixels disappears
+cmd 18
+shot build/kritzel_sel_transp.png
+drag 200,232 700,592 10
+key enter
+cmd 18
+shot build/kritzel_sel_paste_moved.png
+# crop to a selection (and back)
+drag 200,212 520,452 8
+cmd 35
+expect text:"320 × 240px" exists
+shot build/kritzel_sel_crop.png
+key ctrl+z
+expect text:"1152 × 648px" exists
+# free-form selection around the left half of the red stroke, moved, Esc puts it back
+click #1400
+click #1402
+down 180,302
+move 420,292
+move 430,392
+move 300,452
+move 170,412
+up 175,332
+shot build/kritzel_sel_free.png
+drag 300,362 300,512 10
+shot build/kritzel_sel_free_move.png
+key esc
+shot build/kritzel_sel_free_esc.png
+# invert a rectangle and delete: only the rectangle survives
+click #1400
+click #1401
+drag 180,312 620,432 8
+click #1400
+expect #1404 enabled
+click #1404
+key delete
+shot build/kritzel_sel_invert.png
+key ctrl+z
+# resize with the bottom-right handle, Enter commits
+drag 180,312 620,432 8
+drag 620,432 840,552 8
+expect text:"660 × 240px" exists
+shot build/kritzel_sel_resize.png
+key enter
+shot build/kritzel_sel_resize_done.png
+key ctrl+z
+# rotate acts on the selection; Esc restores
+drag 180,312 620,432 8
+cmd 30
+expect text:"1152 × 648px" exists
+shot build/kritzel_sel_rot.png
+key esc
+shot build/kritzel_sel_rot_esc.png
+# another tool commits the moved pixels
+drag 180,312 620,432 8
+drag 400,372 400,532 8
+click #1100
+shot build/kritzel_sel_toolchange.png
+key ctrl+z
+# cut: the hole gets colour 2; paste brings the pixels back at the top-left
+click #1107
+drag 180,312 620,432 8
+key ctrl+x
+shot build/kritzel_sel_cut.png
+key ctrl+v
+key enter
+shot build/kritzel_sel_cut_paste.png
+key ctrl+z
+key ctrl+z
+# a pasted image larger than the canvas enlarges it
+key ctrl+a
+key ctrl+c
+key esc
+drag 200,212 520,452 8
+cmd 35
+expect text:"320 × 240px" exists
+key ctrl+v
+key enter
+expect text:"1152 × 648px" exists
+shot build/kritzel_sel_paste_big.png
+key ctrl+z
+key ctrl+z
+expect text:"320 × 240px" exists
+key ctrl+z
+expect text:"1152 × 648px" exists
+# free-form selection inverted and deleted: only the free-form part survives
+click #1400
+click #1402
+down 180,302
+move 420,292
+move 430,392
+move 300,452
+move 170,412
+up 175,332
+cmd 17
+key delete
+shot build/kritzel_sel_free_invert.png
+key ctrl+z
+# on an upper layer the hole is transparent
+cmd 19 0
+cmd 40
+click #1100
+click #1216
+drag 300,482 800,502 10
+click #1107
+drag 280,462 820,522 8
+drag 500,492 500,632 8
+shot build/kritzel_sel_layer.png
+key enter
+key ctrl+z
+shot build/kritzel_sel_layer_undo.png
+# Ctrl+Z while the pixels float puts them back
+drag 280,462 820,522 8
+drag 500,492 500,632 8
+key ctrl+z
+shot build/kritzel_sel_float_undo.png
+# inverting twice gives the rectangle back
+drag 180,312 620,432 8
+cmd 17
+cmd 17
+expect text:"440 × 120px" exists
+key esc
+expect text:"440 × 120px" missing

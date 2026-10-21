@@ -1,0 +1,4 @@
+#!args apps/JFNetworker/tests/fixtures/l3_switch.jfnet --scenario apps/JFNetworker/tests/scen/l3_switch.scn --golden apps/JFNetworker/tests/scen/l3_switch.report
+# golden scenario: an L3 switch routes between its VLAN interfaces, then no ip routing.  The GUI program runs tests/scen/l3_switch.scn on
+# tests/fixtures/l3_switch.jfnet without a window and ends with the report, which must equal
+# tests/scen/l3_switch.report byte for byte on every target (the script itself is not run)

@@ -1,0 +1,25 @@
+#!args --file build/jfword-empty-note-ui.docx --editor --structure --sources --navigation
+# Imported marker-only notes expose text input without silently mutating the file on open.
+size 1240 840
+expect "Nicht gespeichert" missing
+click button:"Endnote 1"
+expect "Endnote 1 bearbeiten" exists
+expect "Nicht gespeichert" missing
+type "Erste Eingabe."
+expect textbox:"Erste Eingabe." exists
+cmd 5
+type "Zweite Eingabe."
+expect textbox:"Zweite Eingabe." exists
+cmd 5
+cmd 6
+expect textbox:"Zweite Eingabe." exists
+cmd 25
+expect button:"Endnote 1 öffnen" focused
+click button:"Endnote 1"
+cmd 27
+click button:"Anmerkung entfernen"
+expect button:"Endnote 1" missing
+# Sole-anchor removal leaves an editable empty main paragraph.
+type "Wieder Haupttext."
+expect textbox:"Wieder Haupttext." exists
+expect_nowarn

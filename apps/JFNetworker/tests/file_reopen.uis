@@ -1,0 +1,18 @@
+#!args --verify-dirty --open build/jfn_test.jfnet
+# runs after file.uis (the scripts run in name order): the project it saved opens from the
+# command line with its devices, links, note and view
+theme light
+expect text:"13 Geräte · 14 Kabel" exists
+expect text:"gespeichert" exists
+expect #20482 text "Büro"
+expect listitem:"Client1" exists
+expect listitem:"PC1" missing
+expect listitem:"SW1" exists
+click listitem:"Client1"
+expect text:"220, 320" exists
+expect text:"Kabel (1)" exists
+expect text:"eth0 → SW1 Gi1/0/1 · Kupfer, gerade" exists
+click tab:"Probleme"
+# the model's check is clean; the simulator finds the loop SW1 - MLS1 (two cables, no spanning tree)
+expect text:"Schleife ohne Spanning Tree über MLS1, SW1 (VLAN 1): Broadcasts kreisen endlos." exists
+expect_nowarn

@@ -1,0 +1,316 @@
+# layer_props.uis -- Ebeneneigenschaften (agent A4): the modal dialog window (F4, menu,
+# layers window button), every blend mode through the combo box with a live preview checked
+# by composite pixels (expected values: tools/blend_check.py ref_blend, paint.net
+# UserBlendOps), opacity (slider number box), visibility, a name with umlauts, Abbrechen /
+# Esc restore everything (and the modified flag), OK = ONE history step with the old values.
+# Fixtures (tests/fixtures/layers/make_fixtures.py): l4_lo.png / l4_hi.png, 4 x 2 px:
+#   lower (200,100,50,255) (30,180,220,255) (128,64,192,255) (90,90,90,200)
+#   upper (60,150,240,200) (220,40,100,255) (100,200,30,128) (250,10,130,255)
+# over the white background; composite pixels (0..3, 0) = cmd 900 0..3 -> #9900.
+# Probes: diag.s A1 (#9903 layers, #9904 current, #9905 modified, #9906 name / visible,
+# #9907 opacity, #9908 blend), layer.s A4 (#4391 history entry, #4392 entries, #4395
+# open dialogs).  Dialog window 24608, name #5401, Sichtbar #5402, Mischmodus #5403,
+# Deckfähigkeit #5404 (number box #1610699201).
+size 1280 800
+theme light
+expect #9905 value 0
+# ------------------------------------------------------------ an unchanged image: Abbrechen keeps it unmodified
+key f4
+expect window 24608 open
+expect window 24608 modal
+expect #4395 value 1
+expect #5401 text "Hintergrund"
+expect #5402 checked
+expect #5404 value 255
+click #1610699201
+key ctrl+a
+type "100"
+key enter
+expect #9907 value 100
+expect #9905 value 1
+click button:"Abbrechen"
+expect window 24608 closed
+expect #4395 value 0
+expect #9907 value 255
+expect #9905 value 0
+expect #4392 value 1
+
+# ------------------------------------------------------------ the two blend layers (import)
+cmd 371 192
+expect #9903 value 3
+expect #9904 value 2
+expect #9906 text "l4_hi.png"
+expect #4391 text "Als Ebene importieren"
+expect #4392 value 2
+cmd 900 0
+expect #9900 text "FF5A8BC7"
+cmd 900 1
+expect #9900 text "FFDC2864"
+cmd 900 2
+expect #9900 text "FF71846E"
+cmd 900 3
+expect #9900 text "FFFA0A82"
+
+# ------------------------------------------------------------ every blend mode (live preview)
+cmd 338
+expect window 24608 open
+expect #5401 text "l4_hi.png"
+expect #5403 value 0
+click #5403
+click listitem:"Multiplizieren"
+expect #5403 value 1
+expect #9908 value 1
+cmd 900 0
+expect #9900 text "FF50432F"
+cmd 900 1
+expect #9900 text "FF1A1C56"
+cmd 900 2
+expect #9900 text "FF58386B"
+cmd 900 3
+expect #9900 text "FF7B0540"
+click #5403
+click listitem:"Additiv"
+expect #9908 value 2
+cmd 900 0
+expect #9900 text "FFF3D9D2"
+cmd 900 1
+expect #9900 text "FFFADCFF"
+cmd 900 2
+expect #9900 text "FFB29FCF"
+cmd 900 3
+expect #9900 text "FFFF87FF"
+click #5403
+click listitem:"Farbig nachbelichten"
+expect #9908 value 3
+cmd 900 0
+expect #9900 text "FF3C1528"
+cmd 900 1
+expect #9900 text "FF0000A6"
+cmd 900 2
+expect #9900 text "FF3F255F"
+cmd 900 3
+expect #9900 text "FF7B0000"
+click #5403
+click listitem:"Farbig abwedeln"
+expect #9908 value 4
+cmd 900 0
+expect #9900 text "FFF3D3D2"
+cmd 900 1
+expect #9900 text "FFDAD5FF"
+cmd 900 2
+expect #9900 text "FFA99FCC"
+cmd 900 3
+expect #9900 text "FFFF82FF"
+click #5403
+click listitem:"Reflektieren"
+expect #9908 value 5
+cmd 900 0
+expect #9900 text "FFCB608C"
+cmd 900 1
+expect #9900 text "FF1996FF"
+cmd 900 2
+expect #9900 text "FF7445B1"
+cmd 900 3
+expect #9900 text "FFFF3F7D"
+click #5403
+click listitem:"Leuchten"
+expect #9908 value 6
+cmd 900 0
+expect #9900 text "FF5E87D2"
+cmd 900 1
+expect #9900 text "FFD715FF"
+cmd 900 2
+expect #9900 text "FF668866"
+cmd 900 3
+expect #9900 text "FFFF0082"
+click #5403
+click listitem:"Überlagern"
+expect #9908 value 7
+cmd 900 0
+expect #9900 text "FFB17254"
+cmd 900 1
+expect #9900 text "FF3481D4"
+cmd 900 2
+expect #9900 text "FF7252A7"
+cmd 900 3
+expect #9900 text "FFF50A7F"
+click #5403
+click listitem:"Differenz"
+expect #9908 value 8
+cmd 900 0
+expect #9900 text "FF983C9F"
+cmd 900 1
+expect #9900 text "FFBE8C78"
+cmd 900 2
+expect #9900 text "FF4D64B0"
+cmd 900 3
+expect #9900 text "FF7D7305"
+click #5403
+click listitem:"Negierung"
+expect #9908 value 9
+cmd 900 0
+expect #9900 text "FFEFD9B7"
+cmd 900 1
+expect #9900 text "FFFADCBE"
+cmd 900 2
+expect #9900 text "FFB29BCF"
+cmd 900 3
+expect #9900 text "FF8787FF"
+click #5403
+click listitem:"Aufhellen"
+expect #9908 value 10
+cmd 900 0
+expect #9900 text "FFC88BC7"
+cmd 900 1
+expect #9900 text "FFDCB4DC"
+cmd 900 2
+expect #9900 text "FF8084C0"
+cmd 900 3
+expect #9900 text "FFFA7D82"
+click #5403
+click listitem:"Abdunkeln"
+expect #9908 value 11
+cmd 900 0
+expect #9900 text "FF5A6432"
+cmd 900 1
+expect #9900 text "FF1E2864"
+cmd 900 2
+expect #9900 text "FF71406E"
+cmd 900 3
+expect #9900 text "FF7D0A7D"
+click #5403
+click listitem:"Raster"
+expect #9908 value 12
+cmd 900 0
+expect #9900 text "FFD2ABC9"
+cmd 900 1
+expect #9900 text "FFE0C0EA"
+cmd 900 2
+expect #9900 text "FF998BC3"
+cmd 900 3
+expect #9900 text "FFFC82BF"
+click #5403
+click listitem:"Xor"
+expect #9908 value 13
+cmd 900 0
+expect #9900 text "FFEAD3A2"
+cmd 900 1
+expect #9900 text "FFC29CB8"
+cmd 900 2
+expect #9900 text "FFB264CF"
+cmd 900 3
+expect #9900 text "FF8777FF"
+# no history while the dialog is open
+expect #4392 value 2
+# ------------------------------------------------------------ opacity (typed and with keys)
+click #5403
+click listitem:"Multiplizieren"
+click #1610699201
+key ctrl+a
+type "128"
+key enter
+expect #5404 value 128
+expect #9907 value 128
+cmd 900 0
+expect #9900 text "FF8C5330"
+cmd 900 1
+expect #9900 text "FF1B6798"
+cmd 900 2
+expect #9900 text "FF6C3C95"
+cmd 900 3
+expect #9900 text "FF7B405E"
+# ------------------------------------------------------------ name with umlauts, visibility
+click #5401
+key ctrl+a
+type "Größe Übersicht"
+expect #5401 text "Größe Übersicht"
+expect #9906 text "Größe Übersicht"
+click #5402
+expect #5402 unchecked
+expect #9906 value 0
+cmd 900 0
+expect #9900 text "FFC86432"
+click #5402
+expect #9906 value 1
+# ------------------------------------------------------------ OK = one history step
+click button:"OK"
+expect window 24608 closed
+expect #4392 value 3
+expect #4391 text "Ebeneneigenschaften"
+expect #9906 text "Größe Übersicht"
+expect #9908 value 1
+expect #9907 value 128
+cmd 900 0
+expect #9900 text "FF8C5330"
+window 24579
+expect text:"Größe Übersicht" exists
+window any
+# one Strg+Z restores name, mode and opacity together
+key ctrl+z
+expect #4391 text "Als Ebene importieren"
+expect #9906 text "l4_hi.png"
+expect #9908 value 0
+expect #9907 value 255
+cmd 900 0
+expect #9900 text "FF5A8BC7"
+key ctrl+y
+expect #9906 text "Größe Übersicht"
+expect #9908 value 1
+expect #9907 value 128
+
+# ------------------------------------------------------------ Abbrechen / Esc restore everything
+key f4
+expect #5403 value 1
+expect #5404 value 128
+click #5403
+click listitem:"Differenz"
+click #1610699201
+key ctrl+a
+type "51"
+key enter
+click #5402
+click #5401
+key ctrl+a
+type "weg"
+expect #9906 text "weg"
+expect #9908 value 8
+click button:"Abbrechen"
+expect window 24608 closed
+expect #9906 text "Größe Übersicht"
+expect #9906 value 1
+expect #9908 value 1
+expect #9907 value 128
+expect #4392 value 3
+cmd 900 0
+expect #9900 text "FF8C5330"
+key f4
+click #5403
+click listitem:"Normal"
+expect #9908 value 0
+key esc
+expect window 24608 closed
+expect #9908 value 1
+expect #4392 value 3
+# unchanged OK: no step
+key f4
+click button:"OK"
+expect #4392 value 3
+# the menu item and the layers window button open it too
+click menu:"Ebenen"
+click menuitem:"Ebeneneigenschaften…"
+expect window 24608 open
+key esc
+click #4207
+expect window 24608 open
+# opacity with the keyboard (slider focused), then OK
+click #1610699201
+key ctrl+a
+type "51"
+key enter
+click button:"OK"
+expect #9907 value 51
+cmd 900 0
+expect #9900 text "FFB05D31"
+cmd 900 3
+expect #9900 text "FF7C6570"
+expect #4392 value 4

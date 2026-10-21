@@ -1,0 +1,109 @@
+#!args --open apps/PaintCraft/tests/fixtures/a6_photo.png
+# fx_levels.uis -- Korrekturen > Manuelle Anpassung (Levels, agent A6): number boxes (input
+# white #8201 / black #8202, output white #8203 / black #8204, gamma #8205), the input slider
+# #8206 at (153,121) and the output slider #8207 at (257,121) of the dialog window (88 x 256
+# DIP: value v at y = 121 + 255 - v), the grey triangle sets gamma = -log2((v - lo) / (hi -
+# lo)) with 2 decimals, the R / G / B check boxes (#8210..#8212) choose the channels an edit
+# changes, Automatisch == Korrekturen > Automatisch, Zurücksetzen; preview == commit ==
+# efftest levels (bit-identical hashes via 995 2 / 995 0 -> #9990).
+# efftest references: identity 2cc39813e097b672; input_white FFC8C8C8 e1a08eafe97a273f;
+# gamma 0.41 (all three) a9892c7d52fd67c5; gamma 2 e598f9407bb764ef; output_white FFFFFF80
+# (blue only) 4649a1b3326e5aed; auto_level cc42e279e7993d68.
+size 1280 800
+theme light
+cmd 389
+expect window 24690 open
+window 24690
+expect #8201 value 255
+expect #8202 value 0
+expect #8203 value 255
+expect #8204 value 0
+expect #8205 value 100
+expect #8206 rect 153 121 88 256
+expect #8207 rect 257 121 88 256
+sync
+window any
+cmd 995 2
+expect #9990 text "2cc39813e097b672"
+window 24690
+
+# ------------------------------------------------------------ number box, input triangle
+click #8201
+key ctrl+a
+type "200\n"
+expect #8201 value 200
+sync
+window any
+cmd 995 2
+expect #9990 text "e1a08eafe97a273f"
+window 24690
+drag 170,176 170,121
+expect #8201 value 255
+sync
+window any
+cmd 995 2
+expect #9990 text "2cc39813e097b672"
+window 24690
+
+# ------------------------------------------------------------ grey triangle = gamma
+drag 280,248 280,184
+expect #8205 value 41
+sync
+window any
+cmd 995 2
+expect #9990 text "a9892c7d52fd67c5"
+window 24690
+click #8205
+key ctrl+a
+type "2\n"
+expect #8205 value 200
+sync
+window any
+cmd 995 2
+expect #9990 text "e598f9407bb764ef"
+window 24690
+click "Zurücksetzen"
+expect #8205 value 100
+
+# ------------------------------------------------------------ channels: blue only
+click #8210
+click #8211
+expect #8210 unchecked
+expect #8212 checked
+click #8203
+key ctrl+a
+type "128\n"
+sync
+window any
+cmd 995 2
+expect #9990 text "4649a1b3326e5aed"
+window 24690
+expect #8203 value 128
+click #8210
+expect #8203 value 255
+click "Zurücksetzen"
+expect #8210 checked
+expect #8211 checked
+sync
+window any
+cmd 995 2
+expect #9990 text "2cc39813e097b672"
+window 24690
+
+# ------------------------------------------------------------ Automatisch, OK
+click "Automatisch"
+sync
+window any
+cmd 995 2
+expect #9990 text "cc42e279e7993d68"
+window 24690
+click "OK"
+window any
+expect window 24690 closed
+cmd 995 0
+expect #9990 text "cc42e279e7993d68"
+expect #9936 value 2
+expect text:"Manuelle Anpassung" exists
+key ctrl+z
+cmd 995 0
+expect #9990 text "2cc39813e097b672"

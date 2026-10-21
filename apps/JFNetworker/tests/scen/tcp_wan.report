@@ -1,0 +1,24 @@
+# JFNetworker-Szenario tcp_wan.scn: „TCP über eine langsame Leitung“, 3 Geräte, 2 Verbindungen, Seed 5
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  --      impair R1 Gi0/0/1 loss 10000ppm
+   0.000000000  --      run 1500ms
+   1.500000000  ok      expect PC1 svc bulk metric connected == 0 (0)
+   1.500000000  --      run 1500ms
+   3.000000000  ok      expect PC1 svc bulk metric connected == 1 (1)
+   3.000000000  ok      expect PC1 svc bulk metric connect_ns > 1000000000 (1010203044)
+   3.000000000  ok      expect PC1 svc echo metric connected == 1 (1)
+   3.000000000  --      run 60s
+  63.000000000  ok      expect SRV1 svc discard metric bytes == 1000000 (1000000)
+  63.000000000  ok      expect PC1 svc bulk metric done == 1 (1)
+  63.000000000  ok      expect PC1 svc bulk metric done_ns > 0 (2111320688)
+  63.000000000  ok      expect SRV1 svc echo metric bytes_out == 20000 (20000)
+  63.000000000  ok      expect PC1 svc echo metric received == 20000 (20000)
+  63.000000000  ok      expect PC1 svc echo metric done == 1 (1)
+  63.000000000  ok      expect PC1 svc echo metric done_ns > 0 (42142200)
+  63.000000000  ok      expect hops tcp >= 1000 (2280)
+  63.000000000  ok      expect hops arp == 4 (4)
+  63.000000000  --      beide Übertragungen vollständig
+# 13 von 13 Erwartungen erfüllt

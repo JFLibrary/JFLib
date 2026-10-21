@@ -1,0 +1,37 @@
+#!args --font-dirs "lib/doc_view/assets;apps/fonttest/tests/fixtures" --fontconf apps/fontpicktest/tests/fonts.conf
+# the fonts of the repository (DejaVu of lib/doc_view, the jfgui test fonts of fonttest) and the
+# rules of tests/fonts.conf: generic families, a substitute, a language rule, a name nothing
+# installed matches
+expect text:"Geladen: jfgui Mini" exists
+expect text:"sans-serif → jfgui Mini" exists
+expect text:"serif → DejaVu Serif" exists
+expect text:"monospace → DejaVu Sans Mono" exists
+expect text:"Helvetica → jfgui Mac" exists
+expect text:"Unbekannt → jfgui Mini" exists
+expect text:"ja: jfgui CID, jfgui Mini" exists
+# the picker (ui.id scope wid("picker") = 242158678): the drop-down shows the family
+click "sans-serif"
+expect #258540448 open
+# typing filters the families and takes the first match at once
+expect #201308612 focused
+type "jfgui"
+expect text:"Auswahl: jfgui CID 400 normal 11" exists
+# a click on a row takes it and closes the list
+click "jfgui Mini CFF"
+expect #258540448 enabled
+expect text:"Auswahl: jfgui Mini CFF 400 normal 11" exists
+expect text:"Geladen: jfgui Mini CFF" exists
+# the size box
+focus #223033062
+key ctrl+a
+type "20\n"
+expect text:"Auswahl: jfgui Mini CFF 400 normal 20" exists
+shot build/fontpick_picker.png
+# keyboard in the list: Up takes the family above
+click "jfgui Mini CFF"
+focus #169874962
+key up
+expect text:"Auswahl: jfgui Mini 400 normal 20" exists
+key esc
+expect #258540448 enabled
+expect_nowarn

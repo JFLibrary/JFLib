@@ -1,0 +1,9 @@
+# parity of the Rust gallery with the assembly version (tools/parity.py, build_rs.py test).
+# The page is identical only when every widget family is in (rewrite/AGENTS.md "R5 wave"); each
+# family removes its scripts' pending lines and, when all are in, the matrix line.
+# With every family in (R5 done), all 17 scripts and the shot / dump matrix are identical on
+# both targets (parity.py masks the address-derived menu ids 0xB... / 0xC... in dumps).
+rsonly clip_rich.uis # Rich clipboard alternative representations have no assembly counterpart.
+rsonly listfly.uis # Test hook 9061 (a list flyout focused at once) has no assembly counterpart.
+rsonly inspect.uis # The live inspector (ROADMAP §12) has no assembly counterpart.
+rsonly inspect_rtl.uis # The live inspector (ROADMAP §12) has no assembly counterpart.

@@ -1,0 +1,18 @@
+#!args --lang ar
+# Arabic (--lang ar): the window is mirrored because the UI language reads right to left,
+# the library's texts and calendar names are Arabic, dates in the Egyptian format
+size 1440 1800
+wait 50
+expect "ن" exists
+expect "Aufklappen" missing
+# the side panel's wrapping button row (BOX_WRAP) is mirrored too: its second row starts at
+# the right edge (#30823: "Aktualisieren")
+expect "Abbrechen" rect 238 1196 90 32
+expect #30823 rect 202 1236 126 32
+click "12/10/2026"
+wait 20
+expect text:"أكتوبر 2026" exists
+expect "اليوم" exists
+expect "الشهر التالي" exists
+shot build/shots/datagallery_ar.png
+expect_nowarn

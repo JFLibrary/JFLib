@@ -1,0 +1,269 @@
+&Datei	&File	&Fichier
+&Bearbeiten	&Edit	&Édition
+&Ansicht	&View	&Affichage
+&Bild	&Image	&Image
+&Ebenen	&Layers	&Calques
+&Korrekturen	&Adjustments	&Réglages
+E&ffekte	E&ffects	E&ffets
+&Neu…	&New…	&Nouveau…
+Ö&ffnen…	&Open…	&Ouvrir…
+&Speichern	&Save	&Enregistrer
+Speichern &unter…	Save &as…	Enregistrer &sous…
+A&lles speichern	Save a&ll	Tout enre&gistrer
+S&chließen	&Close	&Fermer
+&Drucken…	&Print…	&Imprimer…
+&Beenden	E&xit	&Quitter
+&Von Scanner/Kamera…	From &scanner or camera…	Depuis un &scanner ou appareil photo…
+(Keine)	(None)	(Aucun)
+&Liste leeren	&Clear list	&Vider la liste
+&Rückgängig	&Undo	&Annuler
+&Wiederholen	&Redo	&Rétablir
+&Verlauf löschen	&Clear history	&Effacer l’historique
+Zurück zum Anfang	Undo all	Tout annuler
+Vor bis zum Ende	Redo all	Tout rétablir
+Aus&schneiden	Cu&t	Cou&per
+&Kopieren	&Copy	&Copier
+S&ichtbares kopieren	Copy &merged	Copier avec &fusion
+&Einfügen	&Paste	Co&ller
+Einfügen als &neue Ebene	Paste as &new layer	Coller comme &nouveau calque
+Einfügen als neues &Bild	Paste as new &image	Coller comme nouvelle &image
+Auswahl kopieren	Copy selection	Copier la sélection
+&Ersetzen	&Replace	&Remplacer
+&Hinzufügen (Union)	&Add (union)	&Ajonction (union)
+&Ausschließen	&Subtract	&Soustraire
+&Schneiden	&Intersect	&Intersection
+Umkehren ("&xor")	Invert ("&xor")	Inverser (« &xor »)
+&Alles auswählen	Select &all	&Tout sélectionner
+Auswahl auf&heben	&Deselect	&Désélectionner
+Auswahl &löschen	&Erase selection	&Effacer la sélection
+Auswahl &füllen	&Fill selection	&Remplir la sélection
+Auswahl &umkehren	&Invert selection	&Inverser la sélection
+Weiche Auswahlkante…	Feather selection…	Adoucir la sélection…
+&Ordner mit Paletten öffnen…	&Open palette folder…	&Palettes : ouvrir le dossier…
+&Palette öffnen…	Open &palette…	Ouvrir une &palette…
+Palette speichern &als…	Save palette &as…	&Sauvegarder la palette…
+&Standardpalette laden	Load &default palette	Palette par &défaut
+Ver&größern	Zoom &in	Zoom &avant
+Ver&kleinern	Zoom &out	Zoom a&rrière
+Ganzes &Bild	Fit &image	Ajuster l’&image
+Auf &Auswahl zoomen	Zoom to &selection	&Zoomer sur la sélection
+&Originalgröße	&Actual size	&Taille réelle
+Pixel-&Raster	Pixel &grid	&Grille de pixels
+&Lineale	&Rulers	&Règles
+&Pixel	&Pixels	&Pixels
+Zoll	Inches	Pouces
+&Zentimeter	&Centimeters	&Centimètres
+Auf &Auswahl zuschneiden	&Crop to selection	&Recadrer sur la sélection
+&Größe ändern…	&Resize…	&Redimensionner…
+&Leinwandgröße…	&Canvas size…	&Taille du canevas…
+&Horizontal spiegeln	Flip &horizontal	Miroir &horizontal
+&Vertikal spiegeln	Flip &vertical	Miroir &vertical
+90° nach &rechts drehen	Rotate 90° &clockwise	Rotation de 90° à &droite
+90° nach l&inks drehen	Rotate 90° &counterclockwise	Rotation de 90° à &gauche
+Um 180° &drehen	Rotate &180°	Rotation de &180°
+&Farbprofil…	&Color profile…	&Profil colorimétrique…
+&Zusammenfassen	&Flatten	&Aplatir
+&Neue Ebene	&New layer	&Nouveau calque
+Ebene &löschen	&Delete layer	&Supprimer le calque
+Ebene ver&doppeln	&Duplicate layer	&Dupliquer le calque
+Nach &unten vereinen	&Merge layer down	&Fusionner vers le bas
+Als Ebene &importieren…	&Import from file…	&Importer un fichier…
+Um &180° rotieren	Rotate &180°	Rotation de &180°
+&Rotationszoom…	&Rotate / zoom…	&Rotation / zoom…
+Oberste Ebene wählen	Go to top layer	Aller au premier calque
+Gehe zu Ebene oben	Go to layer above	Aller au calque supérieur
+Gehe zu Ebene unten	Go to layer below	Aller au calque inférieur
+Unterste Ebene wählen	Go to bottom layer	Aller au dernier calque
+Ebene ganz nach oben	Move layer to top	Placer le calque au premier plan
+Ebene eine Stufe höher	Move layer up	Monter le calque
+Ebene eine Stufe tiefer	Move layer down	Descendre le calque
+Ebene ganz nach unten	Move layer to bottom	Placer le calque à l’arrière-plan
+Ebene ein-/aus&blenden	Show / hide &layer	Montrer ou cacher le &calque
+&Ebeneneigenschaften…	Layer &properties…	&Attributs du calque…
+Automatisch	Auto level	Niveaux automatiques
+Schwarzweiß	Black and white	Noir et blanc
+Helligkeit / Kontrast…	Brightness / contrast…	Luminosité / contraste…
+Kurven…	Curves…	Courbes…
+Belichtung…	Exposure…	Exposition…
+Tiefen / Lichter…	Shadows / highlights…	Ombres / hautes lumières…
+Farbton / Sättigung…	Hue / saturation…	Teinte / saturation…
+Alpha umkehren	Invert alpha	Inverser l’alpha
+Farben umkehren	Invert colors	Inverser les couleurs
+Manuelle Anpassung…	Levels…	Niveaux…
+Tontrennung…	Posterize…	Postériser…
+Sepia…	Sepia…	Sépia…
+Farbtemperatur / Tönung…	Color temperature / tint…	Température et teinte…
+Farbbalance…	Color balance…	Balance des couleurs…
+Schwarzweiß erweitert…	Advanced black and white…	Noir et blanc avancé…
+Letzten Effekt wiederholen	Repeat last effect	Répéter le dernier effet
+Plugin-Fehler…	Plugin errors…	Erreurs des plugins…
+Skizze nachzeichnen…	Ink sketch…	Dessin à l’encre…
+Ölgemälde…	Oil painting…	Peinture à l’huile…
+Bleistiftskizze…	Pencil sketch…	Dessin au crayon…
+Verwackelung…	Fragment…	Fragmenter…
+Gaußscher Weichzeichner…	Gaussian blur…	Flou gaussien…
+Medianunschärfe…	Median blur…	Flou médian…
+Bewegungsunschärfe…	Motion blur…	Flou de mouvement…
+Radialer Weichzeichner…	Radial blur…	Flou radial…
+Skizzenunschärfe…	Sketch blur…	Flou esquisse…
+Box-Weichzeichner…	Square blur…	Flou carré…
+Kantenerhaltende Unschärfe…	Surface blur…	Flou de surface…
+Unschärfe…	Unfocus…	Défocaliser…
+Zoom-Weichzeichner…	Zoom blur…	Flou de zoom…
+Wölbung…	Bulge…	Bombement…
+Kristallisieren…	Crystallize…	Cristalliser…
+Dellen…	Dents…	Bosselages…
+Milchglas…	Frosted glass…	Verre dépoli…
+Morphologie…	Morphology…	Morphologie…
+In Pixel auflösen…	Pixelate…	Pixelliser…
+Polarinvertierung…	Polar inversion…	Inversion polaire…
+Kachelspiegelung…	Tile reflection…	Réflexion en mosaïque…
+Spirale…	Twist…	Tourbillon…
+Rauschen hinzufügen…	Add noise…	Ajouter du bruit…
+Rauschen reduzieren…	Reduce noise…	Réduire le bruit…
+Schlagschatten…	Drop shadow…	Ombre portée…
+Leuchten…	Glow…	Lueur…
+Rote Augen entfernen…	Red eye removal…	Correction des yeux rouges…
+Verschärfen…	Sharpen…	Renforcer la netteté…
+Porträt weichzeichnen…	Soften portrait…	Adoucir le portrait…
+Begradigen…	Straighten…	Redresser…
+Wolken…	Clouds…	Nuages…
+Julia-Fraktal…	Julia fractal…	Fractale de Julia…
+Mandelbrot-Fraktal…	Mandelbrot fractal…	Fractale de Mandelbrot…
+Turbulenz…	Turbulence…	Turbulence…
+Kantenerkennung…	Edge detection…	Détection des contours…
+Einprägen…	Emboss…	Embossage…
+Umriss…	Outline…	Contour…
+Gravur…	Relief…	Relief…
+Traum…	Dream…	Rêve…
+Ölgemälde erweitert…	Advanced oil painting…	Peinture à l’huile avancée…
+Pastell…	Pastel…	Pastel…
+Weiche Objektkante…	Feather object…	Adoucir les bords de l’objet…
+Innerer Schatten…	Inner shadow…	Ombre intérieure…
+Abgeflachte Kante…	Bevel…	Biseau…
+Abwedeln / Nachbelichten…	Dodge / burn…	Densité − / +…
+Inhaltsbasiert füllen…	Content-aware fill…	Remplissage d’après le contenu…
+Porträt retuschieren…	Retouch portrait…	Retoucher le portrait…
+Paint.NET-Effekt öffnen…	Open Paint.NET effect…	Ouvrir un effet Paint.NET…
+Werkzeuge	Tools	Outils
+Verlauf	History	Historique
+Ebenen	Layers	Calques
+Farben	Colors	Couleurs
+Fenster&anordnung zurücksetzen	&Reset window positions	&Rétablir la position des fenêtres
+Durchscheinend	Translucent	Translucide
+&Nächstes Bild	&Next image	Image &suivante
+&Vorheriges Bild	&Previous image	Image &précédente
+Offene &Bilder auflisten	List open &images	Liste des &images ouvertes
+Einstellungen	Settings	Paramètres
+Hilfe	Help	Aide
+Do&kumentation	&Documentation	&Documentation
+&Lernprogramme	&Tutorials	&Tutoriels
+&Plug-Ins	&Plugins	&Plugins
+PaintCraft-&Webseite	PaintCraft &website	Site &web de PaintCraft
+&Spenden	&Donate	Faire un &don
+Fehler melden oder Feedback geben…	Send feedback or report a bug…	Envoyer un avis ou signaler un problème…
+&Info	&About	À &propos
+Rechteckige Auswahl	Rectangle select	Sélection rectangulaire
+Pixel verschieben	Move pixels	Déplacer les pixels
+Lasso-Auswahl	Lasso select	Sélection au lasso
+Auswahl verschieben	Move selection	Déplacer la sélection
+Elliptische Auswahl	Ellipse select	Sélection elliptique
+Zoomen	Zoom	Zoom
+Zauberstab	Magic wand	Baguette magique
+Ansicht verschieben	Pan	Déplacer la vue
+Farbeimer	Paint bucket	Pot de peinture
+Farbverlauf	Gradient	Dégradé
+Farbpinsel	Paintbrush	Pinceau
+Radierer	Eraser	Gomme
+Zeichenstift	Pencil	Crayon
+Farbauswahl	Color picker	Pipette
+Klonen (Stempel)	Clone stamp	Tampon de clonage
+Neu färben	Recolor	Recolorier
+Linie / Kurve	Line / curve	Ligne / courbe
+Formen	Shapes	Formes
+Auswahlwerkzeug	Selection tool	Outil de sélection
+Verschieben-Werkzeug	Move tool	Outil de déplacement
+Linie / Kurve, Formen	Line / curve, shapes	Ligne / courbe, formes
+Farben vertauschen	Swap colors	Intervertir les couleurs
+Standardfarben	Default colors	Couleurs par défaut
+Pinsel verkleinern	Smaller brush	Pinceau plus petit
+Pinsel vergrößern	Larger brush	Pinceau plus grand
+Pinselgröße um 5 verringern	Decrease brush size by 5	Pinceau plus petit (pas de 5)
+Pinselgröße um 5 erhöhen	Increase brush size by 5	Pinceau plus grand (pas de 5)
+Abbrechen	Cancel	Annuler
+Schließen	Close	Fermer
+Öffnen	Open	Ouvrir
+Speichern	Save	Enregistrer
+Ja	Yes	Oui
+Nein	No	Non
+Übernehmen	Apply	Appliquer
+Zurücksetzen	Reset	Réinitialiser
+Standard	Default	Par défaut
+Hell	Light	Clair
+Dunkel	Dark	Sombre
+Benutzeroberfläche	User interface	Interface utilisateur
+Grafik	Graphics	Graphiques
+Farbmanagement	Color management	Gestion des couleurs
+Aktualisierung	Updates	Mises à jour
+Diagnose	Diagnostics	Diagnostic
+Plugin-Fehler	Plugin errors	Erreurs des plugins
+Stift & Tablett	Pen & tablet	Stylet et tablette
+Sprache:	Language:	Langue :
+Farbschema:	Color theme:	Thème :
+Akzentfarbe:	Accent color:	Couleur d’accentuation :
+Animationen	Animations	Animations
+Arbeitsfläche	Workspace	Espace de travail
+Hintergrundfarbe	Background color	Couleur d’arrière-plan
+Schachbrett hell	Light checkerboard	Damier clair
+Schachbrett dunkel	Dark checkerboard	Damier sombre
+Schatten um das Bild	Image shadow	Ombre de l’image
+Arbeitsfläche zurücksetzen	Reset workspace	Réinitialiser l’espace de travail
+Breite:	Width:	Largeur :
+Höhe:	Height:	Hauteur :
+Auflösung:	Resolution:	Résolution :
+Name:	Name:	Nom :
+Sichtbar	Visible	Visible
+Deckkraft:	Opacity:	Opacité :
+Mischmodus:	Blend mode:	Mode de fusion :
+Neues Bild	New image	Nouvelle image
+Bildgröße ändern	Resize image	Redimensionner l’image
+Leinwandgröße	Canvas size	Taille du canevas
+Ebeneneigenschaften	Layer properties	Attributs du calque
+Pinselspitze…	Brush tip…	Pointe du pinceau…
+Pinselspitze und Dynamik	Brush tip and dynamics	Pointe et dynamique du pinceau
+Bildspitze laden…	Load image tip…	Charger une pointe d’image…
+Runde Spitze / Zurücksetzen	Round tip / reset	Pointe ronde / réinitialiser
+Drehwinkel (°)	Rotation (°)	Rotation (°)
+Streuung (%)	Scatter (%)	Dispersion (%)
+Größenvariation (%)	Size jitter (%)	Variation de taille (%)
+Winkelvariation (°)	Angle jitter (°)	Variation d’angle (°)
+Deckkraft pro Abdruck (%)	Dab opacity (%)	Opacité de l’empreinte (%)
+Spitze an Bewegungsrichtung ausrichten	Align tip to stroke direction	Orienter la pointe selon le tracé
+Weitere Übersetzungen folgen; nicht übersetzte Texte erscheinen auf Deutsch.	Some labels are still in German while translation is being completed.	Certains textes restent en allemand pendant la traduction.
+Bild	Image	Image
+Werkzeug:	Tool:	Outil :
+Pinselgröße:	Brush size:	Taille du pinceau :
+Härte:	Hardness:	Dureté :
+Abstand:	Spacing:	Espacement :
+Fülleffekt:	Fill:	Remplissage :
+Schriftart:	Font:	Police :
+Toleranz:	Tolerance:	Tolérance :
+Runde Standardspitze	Standard round tip	Pointe ronde standard
+Volltonfarbe	Solid color	Couleur unie
+Überschreiben	Overwrite	Remplacer
+Kantenglättung an	Antialiasing on	Lissage : oui
+Kantenglättung aus	Antialiasing off	Lissage : non
+Geglätteter Weg	Smoothed path	Tracé lissé
+Ungeglätteter Weg	Unsmoothed path	Tracé non lissé
+Stiftdruck auswerten	Use pen pressure	Utiliser la pression du stylet
+Stiftdruck ignorieren	Ignore pen pressure	Ignorer la pression du stylet
+Zusammenhängend	Contiguous	Contigu
+Global	Global	Global
+Auswahl mit Kantenglättung	Smooth selection edges	Lisser les bords de la sélection
+Auswahl ohne Kantenglättung	Hard selection edges	Bords de sélection nets
+Bildspitzen verwenden den Alphakanal oder bei deckenden Bildern die umgekehrte Helligkeit. Breite, Abstand, Farbe, Auswahl und Stiftdruck gelten wie beim runden Pinsel.	Image tips use alpha, or inverted brightness for opaque images. Size, spacing, color, selection and pen pressure work as with the round brush.	Les pointes utilisent le canal alpha ou la luminosité inversée des images opaques. Taille, espacement, couleur, sélection et pression fonctionnent comme avec le pinceau rond.
+Brush-Factory-Presets importieren…	Import Brush Factory presets…	Importer des préréglages Brush Factory…
+Preset anwenden	Apply preset	Appliquer le préréglage
+Lizenz der Brush-Factory-Spitzen	Brush Factory tip license	Licence des pointes Brush Factory
+Farbfluss bei überlappenden Abdrücken aufbauen	Accumulate flow for overlapping dabs	Accumuler le flux des empreintes superposées
+Maximale Strichdeckung (0–255)	Maximum stroke coverage (0–255)	Couverture maximale du trait (0–255)

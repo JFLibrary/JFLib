@@ -1,0 +1,453 @@
+# skeleton.uis -- PaintCraft skeleton (agent A0): window chrome, all seven menus with their
+# items and states, accelerators, tool keys, tool bar tooltips, status bar combo boxes,
+# theme switch.  Run: build/win/PaintCraft.exe --script apps/PaintCraft/tests/skeleton.uis
+theme light
+size 1280 800
+
+# ------------------------------------------------------------ chrome
+expect menu:"Datei" exists
+expect menu:"Bearbeiten" exists
+expect menu:"Ansicht" exists
+expect menu:"Bild" exists
+expect menu:"Ebenen" exists
+expect menu:"Korrekturen" exists
+expect menu:"Effekte" exists
+expect tab:"Unbenannt" selected
+expect #1300 exists
+# window toggles (all four tool windows start visible), settings, help
+expect #700 checked
+expect #701 checked
+expect #702 checked
+expect #703 checked
+expect #710 enabled
+expect #711 enabled
+# tool bar row 1: file commands (A1) and the view toggles work
+expect #100 enabled
+expect #101 enabled
+expect #102 enabled
+expect #106 enabled               # PR1: Drucken… with an image
+expect #160 enabled               # K1: Ausschneiden / Kopieren with an image
+expect #161 enabled
+expect #163 disabled              # Einfügen: the (headless) clipboard is empty
+expect #270 disabled
+expect #181 disabled
+expect #150 disabled
+expect #151 disabled
+expect #225 unchecked
+expect #226 unchecked
+# tool row and status bar
+expect text:"Werkzeug:" exists
+expect #1010 exists
+expect text:"Pinselgröße:" exists
+expect #2000 value 2
+expect text:"Farbpinsel: Mit der linken Maustaste malt der Pinsel in der Primärfarbe, mit der rechten in der Sekundärfarbe." exists
+expect text:"800 × 600" exists
+expect #1024 value 0
+expect combo:"Pixel" exists
+expect combo:"100%" exists
+expect #1400 exists
+
+# ------------------------------------------------------------ Datei
+click menu:"Datei"
+expect menu:"Datei" open
+expect menuitem:"Neu…" enabled
+expect menuitem:"Öffnen…" enabled
+expect menuitem:"Zuletzt geöffnet" enabled
+expect menuitem:"Übernehmen" enabled
+expect menuitem:"Speichern" enabled
+expect menuitem:"Speichern unter…" enabled
+expect menuitem:"Alles speichern" enabled
+expect menuitem:"Schließen" enabled
+expect menuitem:"Drucken…" enabled
+expect menuitem:"Beenden" enabled
+move menuitem:"Zuletzt geöffnet"
+expect menuitem:"Zuletzt geöffnet" open
+expect menuitem:"(Keine)" disabled
+expect menuitem:"Liste leeren" disabled
+expect menuitem:"1" missing
+move menuitem:"Übernehmen"
+expect menuitem:"Übernehmen" open
+expect menuitem:"Von Scanner/Kamera…" enabled
+key esc esc
+expect menuitem:"Neu…" missing
+
+# ------------------------------------------------------------ Bearbeiten
+click menu:"Bearbeiten"
+expect menuitem:"Rückgängig" disabled
+expect menuitem:"Wiederholen" disabled
+expect menuitem:"Ausschneiden" enabled
+expect menuitem:"Kopieren" enabled
+expect menuitem:"Sichtbares kopieren" enabled
+expect menuitem:"Einfügen" disabled
+expect menuitem:"Einfügen als neue Ebene" disabled
+expect menuitem:"Einfügen als neues Bild" disabled
+expect menuitem:"Auswahl kopieren" disabled
+expect menuitem:"Alles auswählen" enabled
+expect menuitem:"Auswahl aufheben" disabled
+expect menuitem:"Auswahl löschen" disabled
+expect menuitem:"Auswahl füllen" disabled
+expect menuitem:"Auswahl umkehren" disabled
+expect menuitem:"Verlauf löschen" disabled
+move menuitem:"Auswahl einfügen"
+expect menuitem:"Auswahl einfügen" open
+expect menuitem:"Ersetzen" disabled
+expect menuitem:"Hinzufügen (Union)" disabled
+expect menuitem:"Ausschließen" disabled
+expect menuitem:"Schneiden" disabled
+expect menuitem:"Umkehren (\"xor\")" disabled
+move menuitem:"Palette"
+expect menuitem:"Palette" open
+expect menuitem:"Ordner mit Paletten öffnen…" enabled
+expect menuitem:"Palette öffnen…" enabled
+expect menuitem:"Palette speichern als…" enabled
+expect menuitem:"Standardpalette laden" enabled
+key esc esc
+
+# ------------------------------------------------------------ Ansicht
+click menu:"Ansicht"
+expect menuitem:"Vergrößern" enabled
+expect menuitem:"Verkleinern" enabled
+expect menuitem:"Ganzes Bild" enabled
+expect menuitem:"Auf Auswahl zoomen" disabled
+expect menuitem:"Originalgröße" enabled
+expect menuitem:"Pixel-Raster" unchecked
+expect menuitem:"Lineale" unchecked
+expect menuitem:"Pixel" checked
+expect menuitem:"Zoll" unchecked
+expect menuitem:"Zentimeter" unchecked
+click menuitem:"Pixel-Raster"
+expect menuitem:"Pixel-Raster" missing
+expect #225 checked
+click menu:"Ansicht"
+expect menuitem:"Pixel-Raster" checked
+click menuitem:"Zentimeter"
+expect #1024 value 2
+expect text:"21,17 × 15,88" exists
+click menu:"Ansicht"
+expect menuitem:"Zentimeter" checked
+expect menuitem:"Pixel" unchecked
+click menuitem:"Pixel"
+expect text:"800 × 600" exists
+
+# ------------------------------------------------------------ Bild
+click menu:"Bild"
+expect menuitem:"Auf Auswahl zuschneiden" disabled
+expect menuitem:"Größe ändern…" enabled
+expect menuitem:"Leinwandgröße…" enabled
+expect menuitem:"Horizontal spiegeln" enabled
+expect menuitem:"Vertikal spiegeln" enabled
+expect menuitem:"90° nach rechts drehen" enabled
+expect menuitem:"90° nach links drehen" enabled
+expect menuitem:"Um 180° drehen" enabled
+expect menuitem:"Farbprofil…" enabled
+expect menuitem:"Zusammenfassen" disabled
+key esc
+
+# ------------------------------------------------------------ Ebenen
+click menu:"Ebenen"
+expect menu:"Ebenen" open
+expect menuitem:"Neue Ebene" enabled
+expect menuitem:"Ebene löschen" disabled
+expect menuitem:"Ebene verdoppeln" enabled
+expect menuitem:"Nach unten vereinen" disabled
+expect menuitem:"Als Ebene importieren…" enabled
+expect menuitem:"Horizontal spiegeln" enabled
+expect menuitem:"Vertikal spiegeln" enabled
+expect menuitem:"Um 180° rotieren" enabled
+expect menuitem:"Rotationszoom…" enabled
+expect menuitem:"Oberste Ebene wählen" disabled
+expect menuitem:"Gehe zu Ebene oben" disabled
+expect menuitem:"Gehe zu Ebene unten" disabled
+expect menuitem:"Unterste Ebene wählen" disabled
+expect menuitem:"Ebene ganz nach oben" disabled
+expect menuitem:"Ebene eine Stufe höher" disabled
+expect menuitem:"Ebene eine Stufe tiefer" disabled
+expect menuitem:"Ebene ganz nach unten" disabled
+expect menuitem:"Ebene ein-/ausblenden" enabled
+expect menuitem:"Ebeneneigenschaften…" enabled
+key esc
+
+# ------------------------------------------------------------ Korrekturen
+# (A6: every adjustment / effect with a registered kernel is enabled while an image is open)
+click menu:"Korrekturen"
+expect menuitem:"Alpha umkehren" enabled
+expect menuitem:"Automatisch" enabled
+expect menuitem:"Belichtung…" enabled
+expect menuitem:"Farben umkehren" enabled
+expect menuitem:"Farbton / Sättigung…" enabled
+expect menuitem:"Helligkeit / Kontrast…" enabled
+expect menuitem:"Tiefen / Lichter…" enabled
+expect menuitem:"Kurven…" enabled
+expect menuitem:"Manuelle Anpassung…" enabled
+expect menuitem:"Schwarzweiß" enabled
+expect menuitem:"Sepia…" enabled
+expect menuitem:"Farbtemperatur / Tönung…" enabled
+expect menuitem:"Tontrennung…" enabled
+key esc
+
+# ------------------------------------------------------------ Effekte (every submenu)
+click menu:"Effekte"
+expect menuitem:"Letzten Effekt wiederholen" disabled
+expect menuitem:"Plugin-Fehler…" missing
+move menuitem:"Farbe"
+expect menuitem:"Quantize…" enabled
+move menuitem:"Foto"
+expect menuitem:"Begradigen…" enabled
+expect menuitem:"Leuchten…" enabled
+expect menuitem:"Porträt weichzeichnen…" enabled
+expect menuitem:"Rote Augen entfernen…" enabled
+expect menuitem:"Verschärfen…" enabled
+expect menuitem:"Vignette…" enabled
+move menuitem:"Künstlerisch"
+expect menuitem:"Bleistiftskizze…" enabled
+expect menuitem:"Ölgemälde…" enabled
+expect menuitem:"Skizze nachzeichnen…" enabled
+move menuitem:"Objekt"
+expect menuitem:"Schlagschatten…" enabled
+move menuitem:"Rauschen"
+expect menuitem:"Rauschen hinzufügen…" enabled
+expect menuitem:"Median…" enabled
+expect menuitem:"Rauschen reduzieren…" enabled
+move menuitem:"Rendern"
+expect menuitem:"Julia-Fraktal…" enabled
+expect menuitem:"Mandelbrot-Fraktal…" enabled
+expect menuitem:"Turbulenz…" enabled
+expect menuitem:"Wolken…" enabled
+move menuitem:"Stilisieren"
+expect menuitem:"Einprägen…" enabled
+expect menuitem:"Gravur…" enabled
+expect menuitem:"Kantenerkennung…" enabled
+expect menuitem:"Umriss…" enabled
+move menuitem:"Weichzeichnen"
+expect menuitem:"Bewegungsunschärfe…" enabled
+expect menuitem:"Bokeh…" enabled
+expect menuitem:"Gaußscher Weichzeichner…" enabled
+expect menuitem:"Medianunschärfe…" disabled
+expect menuitem:"Kantenerhaltende Unschärfe…" enabled
+expect menuitem:"Box-Weichzeichner…" enabled
+expect menuitem:"Radialer Weichzeichner…" enabled
+expect menuitem:"Skizzenunschärfe…" enabled
+expect menuitem:"Unschärfe…" enabled
+expect menuitem:"Zoom-Weichzeichner…" enabled
+expect menuitem:"Verwackelung…" enabled
+move menuitem:"Verzerren"
+expect menuitem:"Dellen…" enabled
+expect menuitem:"In Pixel auflösen…" enabled
+expect menuitem:"Kachelspiegelung…" enabled
+expect menuitem:"Kristallisieren…" enabled
+expect menuitem:"Milchglas…" enabled
+expect menuitem:"Morphologie…" enabled
+expect menuitem:"Polarinvertierung…" enabled
+expect menuitem:"Spirale…" enabled
+expect menuitem:"Wölbung…" enabled
+key esc esc
+expect menuitem:"Farbe" missing
+
+# ------------------------------------------------------------ keyboard: Alt, mnemonics
+key alt+k
+expect menu:"Korrekturen" open
+key esc esc
+key alt+i
+expect menu:"Bild" open
+key esc esc
+
+# ------------------------------------------------------------ Hilfe flyout (button and Alt+H)
+click #711
+expect menuitem:"Dokumentation" enabled
+expect menuitem:"Suchen…" disabled
+expect menuitem:"Forum" disabled
+expect menuitem:"Lernprogramme" enabled
+expect menuitem:"Plug-Ins" enabled
+expect menuitem:"PaintCraft-Webseite" enabled
+expect menuitem:"Spenden" disabled
+expect menuitem:"Fehler melden oder Feedback geben…" enabled
+expect menuitem:"Info" enabled
+key esc
+expect menuitem:"Info" missing
+key alt+h
+expect menuitem:"Info" exists
+key esc
+
+# ------------------------------------------------------------ window toggles: click and F5..F8
+click #700
+expect #700 unchecked
+key f5
+expect #700 checked
+key f6
+expect #701 unchecked
+key f7
+expect #702 unchecked
+key f8
+expect #703 unchecked
+key f6 f7 f8
+expect #701 checked
+expect #702 checked
+expect #703 checked
+
+# ------------------------------------------------------------ view accelerators and the zoom combo box
+key ctrl+plus
+expect combo:"125%" exists
+key ctrl+plus
+expect combo:"150%" exists
+key ctrl+minus ctrl+minus ctrl+minus
+expect combo:"66%" exists
+key ctrl+0
+expect combo:"100%" exists
+key ctrl+minus
+key ctrl+shift+a
+expect combo:"100%" exists
+key ctrl+b
+expect combo:"100%" exists
+click #1025
+click listitem:"200%"
+expect combo:"200%" exists
+click #222
+expect combo:"100%" exists
+# zoom slider: all the way to the left = the smallest preset
+drag #1026 1100,784
+expect combo:"1%" exists
+key ctrl+0
+expect combo:"100%" exists
+
+# ------------------------------------------------------------ units combo box
+click #1024
+click listitem:"Zoll"
+expect #1024 value 1
+expect text:"8,33 × 6,25" exists
+click menu:"Ansicht"
+expect menuitem:"Zoll" checked
+key esc
+click #1024
+click listitem:"Pixel"
+expect text:"800 × 600" exists
+
+# ------------------------------------------------------------ tool menu and tool keys
+click #1010
+expect menuitem:"Farbpinsel" checked
+expect menuitem:"Rechteckige Auswahl" unchecked
+click menuitem:"Radierer"
+expect text:"Radierer: Entfernt die Pixel unter der Werkzeugspitze" exists
+key s
+expect text:"Rechteckige Auswahl: Rechteckige Auswahl mit gedrückter Maustaste aufziehen. Mit Umschalt wird sie quadratisch." exists
+expect text:"Pinselgröße:" missing
+key s
+expect text:"Lasso-Auswahl: Mit gedrückter Maustaste eine freie Auswahlform umfahren." exists
+key s s
+click #1010
+expect menuitem:"Zauberstab" checked
+key esc
+key s
+click #1010
+expect menuitem:"Rechteckige Auswahl" checked
+key esc
+key m
+click #1010
+expect menuitem:"Pixel verschieben" checked
+key esc
+key m
+click #1010
+expect menuitem:"Auswahl verschieben" checked
+key esc
+key z
+expect text:"Zoomen: Links: hineinzoomen, rechts: herauszoomen, Mitte: Ansicht schieben" exists
+key h
+click #1010
+expect menuitem:"Ansicht verschieben" checked
+key esc
+key f
+click #1010
+expect menuitem:"Farbeimer" checked
+key esc
+key g
+click #1010
+expect menuitem:"Farbverlauf" checked
+key esc
+key p
+click #1010
+expect menuitem:"Zeichenstift" checked
+key esc
+key k
+click #1010
+expect menuitem:"Farbauswahl" checked
+key esc
+key l
+click #1010
+expect menuitem:"Klonen (Stempel)" checked
+key esc
+key r
+click #1010
+expect menuitem:"Neu färben" checked
+key esc
+key t
+click #1010
+expect menuitem:"Text" checked
+key esc
+key o
+click #1010
+expect menuitem:"Linie / Kurve" checked
+key esc
+key o
+click #1010
+expect menuitem:"Formen" checked
+key esc
+key e
+click #1010
+expect menuitem:"Radierer" checked
+key esc
+key b
+expect text:"Farbpinsel: Mit der linken Maustaste malt der Pinsel in der Primärfarbe, mit der rechten in der Sekundärfarbe." exists
+# brush width commands ([ ] and Strg+[ ]; the script has no key names for [ and ])
+cmd 787
+expect #2000 value 3
+cmd 789
+expect #2000 value 8
+cmd 786
+expect #2000 value 7
+cmd 788
+cmd 788
+expect #2000 value 1
+# tool keys go to a focused text box instead
+click #2000
+key e
+expect #1010 exists
+click #1010
+expect menuitem:"Farbpinsel" checked
+key esc
+
+# ------------------------------------------------------------ disabled accelerators do nothing
+# (focus on the canvas: a focused drop-down would take F4 itself)
+click 100,700
+key ctrl+z ctrl+y ctrl+a ctrl+d delete ctrl+f
+expect tab:"Unbenannt" selected
+expect #700 checked
+
+# ------------------------------------------------------------ tooltips
+move #225
+wait 600
+expect text:"Pixel-Raster" exists
+move #700
+wait 50
+expect text:"Werkzeuge (F5)" exists
+move #1400
+wait 50
+expect text:"Werkzeuge (F5)" missing
+
+# ------------------------------------------------------------ cursor position over the image
+move 640,448
+expect text:"400, 300" exists
+
+# ------------------------------------------------------------ rulers toggle
+# (the canvas shrinks by the ruler bands: the same point is another image pixel)
+click #226
+expect #226 checked
+move 640,448
+expect text:"390, 290" exists
+click #226
+expect #226 unchecked
+
+# ------------------------------------------------------------ theme switch
+theme dark
+expect menu:"Datei" exists
+expect tab:"Unbenannt" selected
+theme light
+expect #225 checked

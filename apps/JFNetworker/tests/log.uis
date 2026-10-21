@@ -1,0 +1,58 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/lan_router.jfnet
+# the Protokoll panel (workspace/logview.rs): the devices' log lines as the simulator reports
+# them (Report::Log) -- R1's console messages from its boot (%LINK-3, %LINEPROTO-5) and
+# debugging output (severity 7, the subsystem as its source); filters by device, severity and
+# text with their empty state, "Leeren"; a double click selects the device.
+# Ids: device filter 28672, severity filter 28673, search 28674, the inspector's name 20481.
+size 1280 900
+theme light
+drag 630,671 630,380 8
+click tab:"Protokoll"
+expect text:"GigabitEthernet0/0/0 is up" exists
+expect text:"line protocol on GigabitEthernet0/0/1 is up" exists
+# debugging on R1, a ping from PC1: R1's decisions as lines of severity 7
+dblclick listitem:"R1"
+type "enable\n"
+type "debug ip icmp\n"
+wait 600
+dblclick listitem:"PC1"
+type "ping -c 1 10.0.1.1\n"
+wait 1100
+click tab:"Protokoll"
+expect text:"sent echo reply 10.0.1.1 -> 10.0.1.10" exists
+expect text:"7 Debug" exists
+shot build/jfnetworker/log.png
+# the severity: warnings and worse
+click #28673
+click listitem:"Warnungen und wichtiger"
+expect text:"GigabitEthernet0/0/0 is up" exists
+expect text:"line protocol on GigabitEthernet0/0/0 is up" missing
+expect text:"sent echo reply 10.0.1.1 -> 10.0.1.10" missing
+click #28673
+click listitem:"Alle Schweregrade"
+# a device without lines: the filters' empty state
+click #28672
+click listitem:"PC2"
+expect text:"Keine passenden Meldungen" exists
+click #28672
+click listitem:"Alle Geräte"
+# the search goes through source and text
+click #28674
+type "lineproto"
+expect text:"line protocol on GigabitEthernet0/0/0 is up" exists
+expect text:"GigabitEthernet0/0/0 is up" missing
+key ctrl+a
+key backspace
+# a double click selects the device on the canvas
+click listitem:"PC2"
+dblclick text:"GigabitEthernet0/0/1 is up"
+expect #20481 text "R1"
+# dark, 150 %, then empty
+theme dark
+shot build/jfnetworker/log_dark.png
+scale 150
+shot build/jfnetworker/log_150.png
+scale 100
+click button:"Protokoll leeren"
+expect text:"Noch keine Meldungen" exists
+expect_nowarn

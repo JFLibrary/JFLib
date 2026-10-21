@@ -1,0 +1,44 @@
+#!args --verify-dirty
+# the keyboard: panels focused by the app's commands, tabs switched with keys (ui/dock.rs)
+theme light
+# Ctrl+2 (the app's command calls DockState::focus): the Gliederung in front, its strip focused
+key ctrl+2
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect tab:"Gliederung" focused
+# Left / Right / Home / End on the focused strip
+key left
+expect tab:"Dateien" selected
+expect tab:"Dateien" focused
+key end
+expect tab:"Gliederung" selected
+key home
+expect tab:"Dateien" selected
+key right
+expect tab:"Gliederung" selected
+key left
+# Ctrl+PgDn / Ctrl+PgUp while the focus is anywhere in the group
+focus button:"Datei 2"
+key ctrl+pgdn
+expect tab:"Gliederung" selected
+expect tab:"Gliederung" focused
+key ctrl+pgup
+expect tab:"Dateien" selected
+# Shift+F10 on the strip opens the group's menu: docking without the mouse
+key ctrl+3
+expect tab:"Eigenschaften" focused
+key shift+f10
+expect menuitem:"Lösen" exists
+expect menuitem:"Rechts andocken" missing
+click menuitem:"Unten andocken"
+expect text:"L: [Dateien]+Gliederung | R: - | U: [Ausgabe], [Suche], [Eigenschaften] | F: - | V: Verlauf" exists
+# a hidden panel: the command shows it at its place and focuses it
+key ctrl+6
+expect text:"L: [Dateien]+Gliederung | R: [Verlauf] | U: [Ausgabe], [Suche], [Eigenschaften] | F: - | V: -" exists
+expect tab:"Verlauf" focused
+# a collapsed side opens for the command
+click button:"Einklappen: Dateien"
+expect text:"L(zu): [Dateien]+Gliederung | R: [Verlauf] | U: [Ausgabe], [Suche], [Eigenschaften] | F: - | V: -" exists
+key ctrl+2
+expect text:"L: Dateien+[Gliederung] | R: [Verlauf] | U: [Ausgabe], [Suche], [Eigenschaften] | F: - | V: -" exists
+expect tab:"Gliederung" focused
+expect_nowarn

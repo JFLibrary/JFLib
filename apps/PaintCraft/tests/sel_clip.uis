@@ -1,0 +1,114 @@
+# sel_clip.uis -- the tools paint through the selection (agent T2 sel_clip_row, used by T1's
+# tool layer): Farbpinsel and Farbeimer inside an antialiased and a pixelated elliptical
+# selection, a rectangle (exact edges), Auswahl umkehren, no selection = everywhere.
+# Canvas 1280 x 800, zoom 100 %: image pixel (x, y) is at (240 + x, 148 + y).
+# Ellipse (200,100)-(300,200): pixel (214,114) is covered by 63 / 255 (antialiased) -> red over
+# white = FF FF (255 - c) (255 - c); pixelated: (214,114) untouched, (215,114) red.
+# Hooks: T2 980 coverage probe; T1 930 width * 100, 943 primary colour, 947 selection quality.
+size 1280 800
+theme light
+cmd 943 1
+
+# ------------------------------------------------------------ Farbpinsel in an antialiased ellipse
+cmd 754
+drag 440,248 540,348
+cmd 980 7471318         # (214, 114)
+expect #9980 value 63
+cmd 760
+cmd 930 20000
+drag 390,298 590,298
+cmd 901 9830650         # layer (250, 150)
+expect #9900 text "FFFF0000"
+cmd 901 9830550         # layer (150, 150)
+expect #9900 text "FFFFFFFF"
+cmd 901 9830599         # layer (199, 150)
+expect #9900 text "FFFFFFFF"
+cmd 901 7471318         # layer (214, 114)
+expect #9900 text "FFFFC0C0"
+cmd 901 7471319         # layer (215, 114)
+expect #9900 text "FFFF0D0D"
+cmd 901 7405784         # layer (216, 113)
+expect #9900 text "FFFF1212"
+key ctrl+z
+cmd 901 9830650         # layer (250, 150)
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ pixelated
+cmd 754
+cmd 947 1
+key ctrl+d
+drag 440,248 540,348
+cmd 980 7471318         # (214, 114)
+expect #9980 value 0
+cmd 980 7471319         # (215, 114)
+expect #9980 value 255
+cmd 760
+drag 390,298 590,298
+cmd 901 7471318         # layer (214, 114)
+expect #9900 text "FFFFFFFF"
+cmd 901 7471319         # layer (215, 114)
+expect #9900 text "FFFF0000"
+cmd 901 9830600         # layer (200, 150)
+expect #9900 text "FFFF0000"
+cmd 901 9830599         # layer (199, 150)
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+cmd 947 0
+
+# ------------------------------------------------------------ Farbeimer in a rectangle, inverted
+cmd 750
+key ctrl+d
+drag 340,248 440,348
+cmd 758
+click 390,298
+cmd 790
+cmd 901 6553700         # layer (100, 100)
+expect #9900 text "FFFF0000"
+cmd 901 13041863        # layer (199, 199)
+expect #9900 text "FFFF0000"
+cmd 901 6553699         # layer (99, 100)
+expect #9900 text "FFFFFFFF"
+cmd 901 9830600         # layer (200, 150)
+expect #9900 text "FFFFFFFF"
+cmd 901 3276850         # layer (50, 50)
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+key ctrl+i
+click 390,298
+cmd 790
+cmd 901 9830550         # layer (150, 150)
+expect #9900 text "FFFFFFFF"
+cmd 901 3276850         # layer (50, 50)
+expect #9900 text "FFFF0000"
+cmd 901 6553699         # layer (99, 100)
+expect #9900 text "FFFF0000"
+cmd 901 6553700         # layer (100, 100)
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+
+# ------------------------------------------------------------ no selection: everywhere
+key ctrl+d
+click 390,298
+cmd 790
+cmd 901 9830550         # layer (150, 150)
+expect #9900 text "FFFF0000"
+cmd 901 327685          # layer (5, 5)
+expect #9900 text "FFFF0000"
+key ctrl+z
+
+# ------------------------------------------------------------ a selection off the image clips all
+cmd 750
+drag 340,248 440,348
+cmd 753
+drag 360,268 1270,268
+cmd 790
+expect #9981 text "0,0,0,0"
+expect #9981 value 1
+cmd 758
+click 390,298
+cmd 790
+cmd 901 9830550         # layer (150, 150)
+expect #9900 text "FFFFFFFF"
+cmd 901 327685          # layer (5, 5)
+expect #9900 text "FFFFFFFF"
+shot build/t2/sel_clip.png

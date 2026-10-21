@@ -1,0 +1,27 @@
+# drawing smoke test: brush, pencil, fill, picker, undo/redo, eraser
+expect #1106 checked
+# red brush stroke
+click #1213
+drag 200,300 600,380 12
+# pencil in blue
+click #1100
+click #1217
+drag 150,200 700,220 10
+# fill a closed area? fill the background with light yellow
+click #1101
+click #1225
+click 900,500
+expect text:"1152 × 648px" exists
+shot build/kritzel_draw1.png
+# undo the fill, then redo it
+key ctrl+z
+shot build/kritzel_undo.png
+key ctrl+y
+# picker: pick the red of the stroke into colour 1
+click #1104
+click 400,340
+expect #1100 unchecked
+# eraser across
+click #1103
+drag 300,250 500,450 6
+shot build/kritzel_draw2.png

@@ -1,0 +1,53 @@
+# the README screenshots: the JFLIB sample drawing, drawn with the text and shape tools
+# (light theme, 1280 x 800).  With the winui build and with a classic one
+# (--style classic --out build/kritzel-classic) copy build/kritzel_readme.png to
+# docs/images/readme/kritzel-winui.png and kritzel-classic.png
+# title: bold text in indigo
+theme light
+click #1102
+click #1218
+click 252,256
+click #1602
+click #1601
+key ctrl+a
+type "48"
+key enter
+type "JFLIB"
+key esc
+# subtitle in gray
+click #1211
+click #1602
+click #1601
+key ctrl+a
+type "20"
+key enter
+click 226,352
+type "Rust. Widgets. Apps."
+key esc
+# shapes without outline: fill = colour 2
+click #1304
+click #1330
+click #1332
+click #1340
+click #1343
+click #1201
+click #1217
+click #1200
+drag 220,470 430,650 6
+key enter
+click #1302
+click #1201
+click #1216
+click #1200
+drag 490,455 680,645 6
+key enter
+click #1316
+click #1201
+click #1214
+click #1200
+drag 755,445 990,660 6
+key enter
+click #1106
+move 1058,600
+expect #1106 checked
+shot build/kritzel_readme.png

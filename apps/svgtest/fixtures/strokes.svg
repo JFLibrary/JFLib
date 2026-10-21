@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <title>Linien</title>
+  <g stroke="#1f2937" stroke-width="12" fill="none">
+    <!-- caps -->
+    <line x1="20" y1="20" x2="70" y2="20" stroke-linecap="butt"/>
+    <line x1="20" y1="45" x2="70" y2="45" stroke-linecap="round"/>
+    <line x1="20" y1="70" x2="70" y2="70" stroke-linecap="square"/>
+    <!-- joins -->
+    <polyline points="100,40 125,15 150,40" stroke-linejoin="miter"/>
+    <polyline points="100,70 125,45 150,70" stroke-linejoin="round"/>
+    <polyline points="100,100 125,75 150,100" stroke-linejoin="bevel"/>
+    <!-- a sharp angle: beyond the miter limit -> bevel -->
+    <polyline points="165,100 180,20 195,100" stroke-width="6" stroke-miterlimit="2"/>
+  </g>
+  <!-- dashes -->
+  <g fill="none" stroke-width="4">
+    <line x1="20" y1="120" x2="180" y2="120" stroke="#2563eb" stroke-dasharray="10 5"/>
+    <line x1="20" y1="135" x2="180" y2="135" stroke="#dc2626" stroke-dasharray="1 6" stroke-linecap="round"/>
+    <line x1="20" y1="150" x2="180" y2="150" stroke="#16a34a" stroke-dasharray="15,5,5" stroke-dashoffset="5"/>
+    <circle cx="60" cy="178" r="15" stroke="#7c3aed" stroke-dasharray="6 3"/>
+    <rect x="100" y="165" width="80" height="26" rx="6" stroke="#ea580c" stroke-opacity="0.5" stroke-width="8"/>
+  </g>
+</svg>

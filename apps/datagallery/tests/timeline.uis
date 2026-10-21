@@ -1,0 +1,87 @@
+#!args --verify-dirty
+# the timeline (ui::timeline, page "Simulation"): a click seeks, Left / Right step from tick
+# to tick, Home / End (the live end follows), Ctrl+wheel zooms around the pointer (`cmd 9100
+# 2`: the gallery's test hook holds Ctrl, 1 Shift), Shift+wheel and a drag on the axis pan,
+# Shift+drag selects a range, the playhead's time drags it, + / - zoom, PgUp / PgDn page, a
+# double click on the axis shows the whole span
+size 1440 960
+wait 50
+click "Simulation"
+wait 50
+expect text:"TCP" exists
+expect text:"ARP" exists
+expect #31010 value 0
+expect #31010 max 12000
+expect text:"0,000 s" exists
+expect text:"Ansicht 0,000 – 12,000 s" exists
+
+# a click in the lanes seeks (to the pixel's time, rounded) and takes the keyboard
+click 866,245
+expect text:"t = 6,000 s" exists
+expect text:"6,000 s" exists
+expect #31010 value 6000
+expect #31010 focused
+
+# Left / Right: the previous / next tick of any track; Home, End (follows the live end)
+key right
+expect text:"t = 6,001 s" exists
+key right
+expect text:"t = 6,002 s" exists
+key left
+expect text:"t = 6,001 s" exists
+key home
+expect text:"t = 0,000 s" exists
+key end
+expect text:"t = 12,000 s" exists
+expect checkbox:"Live folgen" checked
+click 866,245
+expect text:"t = 6,000 s" exists
+expect checkbox:"Live folgen" unchecked
+
+# Ctrl+wheel zooms around the pointer; the plain wheel does not
+cmd 9100 2
+wheel 866,245 120
+expect text:"Ansicht 1,200 – 10,800 s" exists
+wheel 866,245 120
+expect text:"Ansicht 2,160 – 9,840 s" exists
+cmd 9100 0
+wheel 866,245 -120
+expect text:"Ansicht 2,160 – 9,840 s" exists
+
+# Shift+wheel pans by a tenth of the view, so does a drag on the axis
+cmd 9100 1
+wheel 866,245 -120
+expect text:"Ansicht 2,928 – 10,608 s" exists
+cmd 9100 0
+drag 600,199 500,199
+expect text:"Ansicht 3,662 – 11,342 s" exists
+expect text:"t = 6,000 s" exists
+
+# Shift+drag in the lanes selects a range, Esc clears it
+drag 500,245 700,245 shift
+expect text:"Bereich 4,817 – 6,284 s" exists
+key esc
+expect text:"Bereich –" exists
+
+# the playhead's time on the axis drags the playhead
+drag text:"6,000 s" 700,199
+expect text:"t = 6,284 s" exists
+expect text:"6,284 s" exists
+
+# + / - zoom at the playhead, PgDn / PgUp move it by a view
+key plus
+expect text:"Ansicht 4,186 – 10,330 s" exists
+key minus
+key minus
+expect text:"Ansicht 2,400 – 12,000 s" exists
+key pgdn
+expect text:"t = 12,000 s" exists
+key pgup
+expect text:"t = 2,400 s" exists
+
+# a double click on the axis: the whole span (its first click seeks)
+wait 600
+dblclick 1000,199
+expect text:"Ansicht 0,000 – 12,000 s" exists
+expect text:"t = 8,429 s" exists
+shot build/shots/datagallery_timeline.png

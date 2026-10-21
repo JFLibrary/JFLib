@@ -1,0 +1,65 @@
+#!args --verify-dirty
+# screenshots of the code editor: every grammar (Rust, JSON, INI, TOML, Markdown, Text) light,
+# Rust dark, in high contrast and at 150 %; the bracket pair at the caret; a selection; the
+# find / replace bar with matches; a scrolled view (wheel, sideways)
+size 1000 680
+theme light
+click tab:"Code"
+shot build/editortest/code_rust_light.png
+click tab:"JSON"
+shot build/editortest/code_json_light.png
+click tab:"INI"
+shot build/editortest/code_ini_light.png
+click tab:"TOML"
+shot build/editortest/code_toml_light.png
+click tab:"Markdown"
+shot build/editortest/code_md_light.png
+theme dark
+shot build/editortest/code_md_dark.png
+click tab:"Text"
+shot build/editortest/code_text_dark.png
+click tab:"Rust"
+# the bracket pair: the caret after "{" of line 7
+focus #3000
+key ctrl+home
+key down
+key down
+key down
+key down
+key down
+key down
+key end
+expect text:"pos: 7:23" exists
+shot build/editortest/code_rust_dark.png
+key shift+down
+key shift+down
+key shift+end
+shot build/editortest/code_select_dark.png
+click "Hoher Kontrast"
+focus #3000
+shot build/editortest/code_rust_hc.png
+click "Hoher Kontrast"
+theme light
+scale 150
+shot build/editortest/code_rust_150.png
+scale 100
+# the find bar with matches
+focus #3000
+key ctrl+h
+type "let"
+shot build/editortest/code_find_light.png
+theme dark
+shot build/editortest/code_find_dark.png
+theme light
+key esc
+expect #3003 missing
+# an IME composition at the caret
+key ctrl+home
+key end
+click "IME-Vorschau"
+shot build/editortest/code_ime.png
+click "IME-Vorschau"
+# scrolled: the wheel down, sideways
+wheel #3000 -240
+shot build/editortest/code_scrolled.png
+expect_nowarn

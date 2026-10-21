@@ -1,0 +1,50 @@
+#!args --verify-dirty
+# waypoints (ui/diagram.rs): a click selects an edge and shows its handles; dragging the middle
+# handle of a stretch inserts a waypoint (snapped), dragging a waypoint moves it (Alt: free),
+# a double click removes it, Esc takes a drag back (an inserted waypoint goes again), Del
+# deletes the edge.  N1 -> N2 runs from 198,164 to 262,164 (world 144,72 -> 208,72).
+theme light
+click 230,164
+expect text:"Auswahl: 1" exists
+expect text:"Wegpunkte: 0" exists
+# the middle handle: a new waypoint
+drag 230,164 230,108
+expect text:"Wegpunkte: 1" exists
+expect text:"Ereignis: Wegpunkt 1: 176,16" exists
+# the waypoint's handle
+drag 230,108 246,76
+expect text:"Ereignis: Wegpunkt 1: 192,-16" exists
+# another one in the middle of the first stretch (world 168,28)
+drag 222,120 182,76
+expect text:"Wegpunkte: 2" exists
+expect text:"Ereignis: Wegpunkt 1: 128,-16" exists
+shot build/diagramtest/waypoints.png
+# a double click removes it
+wait 600
+dblclick 182,76
+expect text:"Wegpunkte: 1" exists
+expect text:"Ereignis: Wegpunkt 1 entfernt" exists
+# Alt: free (the pointer's pixel centre, world 197.5,-10.5)
+wait 600
+drag 246,76 251,81 alt
+expect text:"Ereignis: Wegpunkt 1: 197,-10" exists
+# Esc during a drag
+down 251,81
+move 300,60
+key esc
+expect text:"Ereignis: Wegpunkt 1: 197,-10" exists
+up
+expect text:"Wegpunkte: 1" exists
+# Esc after an insert (the middle of the second stretch, world 202.5,30.5)
+down 256,122
+move 300,150
+expect text:"Wegpunkte: 2" exists
+key esc
+expect text:"Wegpunkte: 1" exists
+up
+expect text:"Auswahl: 1" exists
+# Del deletes the selected edge
+key delete
+expect text:"Kanten: 20" exists
+expect text:"Auswahl: 0" exists
+expect_nowarn

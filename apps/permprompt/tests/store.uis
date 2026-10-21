@@ -1,0 +1,26 @@
+# Always / Never are stored in config://permission-decisions.txt (scripts keep them in memory
+# unless `perm store` names a file): read back by a later run, revoked from the settings
+# section, and the app itself cannot write that file
+perm store config://permission-decisions.txt
+perm reset
+perm answer always
+click "Drucken prüfen"
+expect text:"Drucken: erlaubt" exists
+perm answer never
+click "Mail prüfen"
+expect text:"Mail: abgelehnt" exists
+perm answer none
+perm reload
+perm expect print always
+perm expect url mailto never
+expect text:"Immer erlaubt" exists
+click "Antworten überschreiben"
+expect text:"Antworten: abgelehnt" exists
+click "Zurücksetzen: print"
+perm reload
+perm expect print unanswered
+perm expect url mailto never
+perm reset
+perm reload
+perm expect url mailto unanswered
+expect_nowarn

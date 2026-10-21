@@ -1,0 +1,59 @@
+#!args --file build/jfword-stories.docx
+# Related story filtering, modal editing, mixed-story undo, save and reload.
+size 1240 840
+theme light
+expect "10 Bereiche · Seite 1 von 1" exists
+click #2405
+click "Kopfzeilen"
+expect "1 Bereiche · Seite 1 von 1" exists
+expect "Kopfzeile · Absatz 1" exists
+click #2420
+expect dialog:"Textbereich bearbeiten" exists
+click #2461
+key ctrl+a
+type "Neue Kopfzeile Ω"
+click "Text übernehmen"
+expect button:"Neue Kopfzeile Ω" exists
+expect "Originaler Text α bleibt erhalten." exists
+click #2405
+click "Fußnoten"
+expect "2 Bereiche · Seite 1 von 1" exists
+expect button:"Anmerkung 中" exists
+expect button:"Separator" missing
+click #2405
+click "Endnoten"
+expect "1 Bereiche · Seite 1 von 1" exists
+click #2420
+click #2461
+key ctrl+a
+type "Endnote bearbeitet α"
+click "Text übernehmen"
+expect button:"Endnote bearbeitet α" exists
+cmd 5
+expect button:"Endnote 😀" exists
+cmd 5
+click #2405
+click "Kopfzeilen"
+expect button:"Kopf α" exists
+cmd 6
+expect button:"Neue Kopfzeile Ω" exists
+cmd 6
+click #2405
+click "Endnoten"
+expect button:"Endnote bearbeitet α" exists
+cmd 3
+cmd 2
+click button:"Öffnen"
+expect "10 Bereiche · Seite 1 von 1" exists
+click #2405
+click "Kopfzeilen"
+expect button:"Neue Kopfzeile Ω" exists
+shot build/jfword-stories-light.png
+size 1000 700
+theme dark
+scale 150
+click #2420
+expect dialog:"Textbereich bearbeiten" exists
+shot build/jfword-stories-dark-dialog.png
+click "Abbrechen"
+expect_nowarn

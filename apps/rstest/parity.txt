@@ -1,0 +1,4 @@
+# parity of the Rust rstest with the assembly version (tools/parity.py, build_rs.py test);
+# the kernels: tools/diffcheck.py gradient_check | pathdata_check | dash_check | resample_check |
+# xform_check (byte-identical to asm)
+matrix off                      # no UI: the shot / dump matrix does not apply

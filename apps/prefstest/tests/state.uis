@@ -1,0 +1,33 @@
+# the placement of the windows: state_save / state_load through mem://prefstest/windows.ini
+# (a window run does the same with config://windows.ini, AF_SAVE_STATE); the palette is
+# the tool window wid("palette") = 195617225
+expect window 195617225 closed
+click "Palette"
+expect window 195617225 open
+movewin 195617225 100 80
+resizewin 195617225 300 260
+size 800 700
+click "Zustand speichern"
+# headless: the main window's size only (no position, never maximized)
+expect text:"Datei: [window] | w=800 | h=700 | max=0 | [window 195617225] | open=1 | x=100 | y=80 | w=300 | h=260" exists
+# everything changed ...
+close window 195617225
+expect window 195617225 closed
+size 640 480
+expect text:"Fenster: 640 × 480" exists
+# ... and back as it was saved: the palette open again at its place
+click "Zustand laden"
+expect window 195617225 open
+expect window 195617225 rect 100 80 300 260
+expect text:"Fenster: 800 × 700" exists
+expect "Palette" checked
+shot build/prefs_state.png desktop
+# a closed palette stays closed
+close window 195617225
+click "Zustand speichern"
+expect text:"Datei: [window] | w=800 | h=700 | max=0 | [window 195617225] | open=0 | x=100 | y=80 | w=300 | h=260" exists
+click "Palette"
+expect window 195617225 open
+click "Zustand laden"
+expect window 195617225 closed
+expect_nowarn

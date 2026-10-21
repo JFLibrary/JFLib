@@ -1,0 +1,64 @@
+#!args --verify-dirty
+# reorderable list (U1): LF_REORDER rows (layers-window style with a thumbnail, a name and
+# a visibility check box), insertion line, drop event, Esc cancels, autoscroll, and
+# ui_canvas_damage (marching ants redrawn without a new canvas version)
+size 1000 3000
+theme light
+expect text:"Reihenfolge: 1 2 3 4 5 6 7 8 9 10 11 12" exists
+expect #7800 value 0
+expect #7800 max 12
+# a click selects
+click #7803
+expect #7800 value 2
+expect #7803 selected
+# the check box inside a row keeps its click: no selection, no drag
+click #7850
+expect #7850 unchecked
+expect #7800 value 2
+click #7850
+expect #7850 checked
+# drag row 0 below row 2: the item ends at index 2 and stays selected
+drag #7801 164,2641
+expect text:"Reihenfolge: 2 3 1 4 5 6 7 8 9 10 11 12" exists
+expect #7800 value 2
+expect text:"Auswahl: 2   Verschoben: 1   Zuletzt: -" exists
+expect "Ebene 1" exists
+# ... and back to the top
+drag #7803 164,2525
+expect text:"Reihenfolge: 1 2 3 4 5 6 7 8 9 10 11 12" exists
+expect #7800 value 0
+# a drop on its own place is no move
+drag #7802 164,2575
+expect text:"Auswahl: 0   Verschoben: 2   Zuletzt: -" exists
+# while dragging: the row looks pressed, an insertion line follows the pointer; Esc cancels
+down #7802
+move 164,2600
+move 164,2641
+shot build/gal_reorder.png 0 2500 560 240
+key esc
+up
+expect text:"Reihenfolge: 1 2 3 4 5 6 7 8 9 10 11 12" exists
+expect text:"Auswahl: 0   Verschoben: 2   Zuletzt: -" exists
+# a small move (< 4 DIP) is a click
+drag #7804 164,2663
+expect #7800 value 3
+expect text:"Auswahl: 3   Verschoben: 2   Zuletzt: -" exists
+# autoscroll: hold the pointer near the bottom edge, the view scrolls, then drop
+down #7801
+move 164,2600
+move 164,2712
+wait 1000
+expect "Ebene 1" missing
+expect "Ebene 12" exists
+up
+expect #7800 value 11
+expect text:"Reihenfolge: 2 3 4 5 6 7 8 9 10 11 12 1" exists
+# keys still move the selection
+key home
+expect #7800 value 0
+expect #7801 selected
+# ---- explicit canvas damage: only the dashed edges are redrawn (version unchanged)
+cmd 9053
+cmd 9053
+shot build/gal_ants.png 320 2560 220 90
+expect_nowarn

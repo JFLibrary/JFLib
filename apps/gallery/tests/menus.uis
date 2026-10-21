@@ -1,0 +1,140 @@
+# menus, commands / accelerators, drop-downs and tooltips (popup agent)
+size 1000 1500
+# ---- menu bar by mouse
+click "Datei"
+expect "Datei" open
+expect menuitem:"Speichern unter…" exists
+expect menuitem:"Neu" enabled
+click menuitem:"Speichern"
+expect menuitem:"Neu" missing
+expect text:"Letzter Befehl: Speichern   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+click "Bearbeiten"
+expect menuitem:"Rückgängig" disabled
+expect menuitem:"Ausschneiden" enabled
+key esc
+expect menuitem:"Rückgängig" missing
+# ---- light dismiss: the press closes the menu and does not reach the button below
+click "Ansicht"
+expect menuitem:"Raster" checked
+click "Standard"
+expect menuitem:"Raster" missing
+expect text:"Wert: 40 %   Klicks: 0" exists
+# ---- submenu by mouse
+click "Ansicht"
+move menuitem:"Zoom"
+expect menuitem:"Zoom" open
+click menuitem:"Vergrößern"
+expect menuitem:"Vergrößern" missing
+expect text:"Letzter Befehl: Vergrößern   Form: Quadrat   Stärke: Mittel   Zoom: 110 %" exists
+# ---- checked items toggle
+click "Ansicht"
+click menuitem:"Raster"
+click "Ansicht"
+expect menuitem:"Raster" unchecked
+key esc
+expect #9020 unchecked
+# ---- keyboard: Alt enters menu bar mode, arrows, Enter, Esc
+click "Standard"
+expect "Standard" focused
+key alt
+expect "Datei" focused
+key alt
+expect "Standard" focused
+key f10
+expect "Datei" focused
+key right
+expect "Bearbeiten" focused
+key down
+expect "Bearbeiten" open
+expect menuitem:"Ausschneiden" focused
+key up
+expect menuitem:"Alles auswählen" focused
+key left
+expect "Datei" open
+expect menuitem:"Neu" focused
+key down down
+expect menuitem:"Speichern" focused
+key enter
+expect menuitem:"Speichern" missing
+expect "Standard" focused
+# ---- keyboard submenu, mnemonics
+key alt+a
+expect "Ansicht" open
+expect menuitem:"Raster" focused
+key down down
+expect menuitem:"Zoom" focused
+key right
+expect menuitem:"Zoom" open
+expect menuitem:"Vergrößern" focused
+key left
+expect menuitem:"Vergrößern" missing
+expect menuitem:"Zoom" focused
+key esc
+expect menuitem:"Zoom" missing
+expect "Ansicht" focused
+key esc
+expect "Standard" focused
+key alt+d
+key n
+expect text:"Letzter Befehl: Neu   Form: Quadrat   Stärke: Mittel   Zoom: 110 %" exists
+# ---- accelerators (Strg+Z is disabled)
+key ctrl+s
+expect text:"Letzter Befehl: Speichern   Form: Quadrat   Stärke: Mittel   Zoom: 110 %" exists
+key ctrl+z
+expect text:"Letzter Befehl: Speichern   Form: Quadrat   Stärke: Mittel   Zoom: 110 %" exists
+key ctrl+0
+expect text:"Letzter Befehl: 100 %   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+key ctrl+g
+expect #9020 checked
+# ---- combo box
+click #8001
+expect #8001 open
+expect listitem:"Quadrat" selected
+expect listitem:"Quadrat" focused
+click listitem:"Stern"
+expect listitem:"Stern" missing
+expect #8001 value 3
+key down
+expect #8001 value 4
+key up up
+expect #8001 value 2
+key enter
+expect #8001 open
+key down
+expect listitem:"Stern" focused
+key enter
+expect #8001 value 3
+expect #8001 focused
+# ---- drop-down button with a flyout
+click #8002
+expect #8002 open
+expect menuitem:"Mittel" checked
+click menuitem:"Breit"
+expect menuitem:"Breit" missing
+expect text:"Letzter Befehl: Raster   Form: Stern   Stärke: Breit   Zoom: 100 %" exists
+click #8002
+click "Schließen"
+expect "Schließen" missing
+# ---- split button
+click #8010
+expect text:"Letzter Befehl: Einfügen   Form: Stern   Stärke: Breit   Zoom: 100 %" exists
+click #0x80001F4A
+expect #8010 open
+click menuitem:"Als Bild einfügen"
+expect text:"Letzter Befehl: Als Bild einfügen   Form: Stern   Stärke: Breit   Zoom: 100 %" exists
+# ---- context menu
+rclick "Rechtsklick hier"
+expect menuitem:"Kopieren" exists
+click menuitem:"Eigenschaften"
+expect menuitem:"Kopieren" missing
+expect text:"Letzter Befehl: Eigenschaften   Form: Stern   Stärke: Breit   Zoom: 100 %" exists
+# ---- tooltips: after 500 ms, then at once for the next button
+move #9003
+wait 300
+expect text:"Speichern (Strg+S)" missing
+wait 300
+expect text:"Speichern (Strg+S)" exists
+move #103
+wait 16
+expect text:"Speichern" exists
+shot build/menus_script.png

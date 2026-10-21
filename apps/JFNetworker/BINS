@@ -1,0 +1,2 @@
+# JFNetworker's further executables (build_rs.py, section "app-bins"): NAME ENTRY cli|gui
+jfn-sim   sim/main.rs   cli    # headless runner: scenarios, project checks, frame decoder

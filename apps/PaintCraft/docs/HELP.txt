@@ -1,0 +1,43 @@
+PAINTCRAFT – KURZANLEITUNG
+
+Dateien und Ebenen
+Strg+N legt ein Bild an. Wähle Größe, Auflösung und einen weißen, transparenten oder farbigen Hintergrund. Strg+O öffnet eine Datei. Speichere in PDN, um Ebenen zu erhalten; PNG erhält Transparenz. JPEG reduziert das Ergebnis auf eine Ebene ohne Transparenz.
+Auf dem Desktop werden Dateien aus Öffnen, Zuletzt geöffnet und Drag-and-drop im Hintergrund geladen. Abbrechen verwirft den laufenden Import und die restliche Dateiliste. Das neue Dokument erscheint erst nach vollständigem Laden; bestehende Bilder bleiben erhalten.
+F7 zeigt die Ebenen. Neue Ebene, Duplizieren, Zusammenführen und Eigenschaften stehen im Ebenenmenü. Änderungen lassen sich mit Strg+Z zurücknehmen und mit Strg+Y wiederholen.
+
+Zeichnen und Auswählen
+Pinsel und Stift zeichnen mit der Primärfarbe. Die rechte Maustaste verwendet bei den entsprechenden Werkzeugen die Sekundärfarbe. F8 zeigt die Farben; X vertauscht beide Farben. Auswahlwerkzeuge begrenzen nachfolgende Bearbeitungen. Strg+D hebt die Auswahl auf. Bearbeiten > Weiche Auswahlkante federt die Auswahlmaske mit einem einstellbaren Radius. Rückgängig und Wiederholen erhalten die weichen Deckungswerte.
+Formen bleiben bis Enter bearbeitbar. Esc verwirft die aktuelle Form. Die Galerie enthält auch Herz, Blitz und Smartphone. Eigene Formen können als XAML ergänzt werden.
+
+Text
+T aktiviert Text. Klicke ins Bild und schreibe. Der Ziehpunkt verschiebt den Text. Enter fügt eine Zeile ein; Strg+Links/Rechts springt zwischen Wörtern. Schriftgrößen wie 12,5 sind möglich. Umschalt+Pfeiltasten oder Ziehen im Text markieren Zeichen; Strg+A/C/X/V wählen, kopieren, schneiden und fügen Text ein. Tippen ersetzt die Markierung. Fertigstellen schreibt den Text als einen Verlaufsschritt in die Ebene. Esc verwirft die Eingabe.
+Glatt erhält die Schriftkonturen; Scharf (Modern) richtet Konturen am Pixelraster aus und erhält gebrochene Zeichenabstände. Scharf (Klassisch) verwendet zusätzlich ganzzahlige Zeichenabstände.
+
+Drehen und räumlich Kippen
+Ebenen > Rotationszoom bietet Drehwinkel, Kippen X/Y, Verschieben und Zoom. Kachelmodus bestimmt das Verhalten außerhalb der Ebene. OK übernimmt die Vorschau als einen Verlaufsschritt; Abbrechen erhält das Original. Eine aktive Auswahl begrenzt die Änderung.
+
+Fotos bearbeiten
+Korrekturen > Farbbalance korrigiert Farbstiche über Cyan/Rot, Magenta/Grün und Gelb/Blau; Helligkeit und Kontrast passen die Tonwerte an.
+Schwarzweiß erweitert bietet mehrere Kanal- und Filtervorgaben sowie Helligkeit und Kontrast.
+Effekte > Künstlerisch enthält Traum (Fokus und Stärke), Ölgemälde erweitert (Pinsel, Grobheit und Schattendetail) und Pastell (Größe und Rauheit).
+Effekte > Foto > Inhaltsbasiert füllen ersetzt eine markierte Fläche mit passenden Pixeln aus ihrer nicht markierten Umgebung. Es benötigt eine Auswahl und nicht ausgewählte Quellpixel. Porträt retuschieren glättet feine Farbunterschiede mit einstellbarem Kantenschutz; eine Auswahl begrenzt die Retusche.
+Die nativen Ergänzungen sind eigene PaintCraft-Implementierungen. Ihre Ergebnisse müssen nicht pixelgleich mit gleichartigen Plugins anderer Programme sein.
+
+Kurzübung: Foto als Pastell
+Öffne ein Foto, dupliziere die Ebene und wähle Effekte > Künstlerisch > Pastell. Beginne mit Größe 8 und Rauheit 50. Vergleiche die Vorschau, bestätige und passe bei Bedarf die Ebenendeckkraft an. Speichere die Ebenen als PDN.
+
+Plugins
+Native PaintCraft-Plugins verwenden PNAPI. Originale Paint.NET-DLLs verwenden eine andere API. Unter Windows öffnet Effekte > Paint.NET-Effekt öffnen eine DLL im gesonderten .NET-Host. Bei mehreren Effekten folgt eine Auswahl. PropertyBased-Effekte erhalten einen eigenen Parametereditor; bei anderen klassischen Effekten wird deren Konfigurationsdialog aufgerufen. Das Ergebnis wird erst nach erfolgreicher Ausführung übernommen; Abbrechen oder ein Prozessfehler erhält das Bild.
+Der Host benötigt .NET 9 und eine lokale Paint.NET-5.1-Installation. Entpackte DLLs mit ihren Abhängigkeiten gehören nach Effects bzw. FileTypes, Formen nach Shapes. Beim nächsten Start werden kompatible Effekte unter Effekte > Paint.NET-Plugins und Dateiformate in den Datei-Dialogen angeboten. Zusätzlich werden die entsprechenden Ordner in Dokumente/PaintCraft App Files, Dokumente/Paint.NET App Files und der Paint.NET-Installation durchsucht. Ladefehler stehen in Einstellungen > Plugin-Fehler. Moderne Bitmap-/GPU-Effekte werden noch nicht ausgeführt. Paint.NET-Dateien werden nicht mit PaintCraft ausgeliefert.
+Dateiformat-Plugins importieren das zusammengefasste Bild samt Auflösung als neues, ungespeichertes Dokument. Der Export verwendet ihre Standardeinstellungen; fremde Ebenen und weitere Metadaten werden über diesen Host noch nicht übertragen.
+
+Arbeitsfläche
+Einstellungen > Benutzeroberfläche bietet Farben für die Arbeitsfläche und das Transparenz-Schachbrett sowie den Bildschatten. Arbeitsfläche zurücksetzen stellt die Standarddarstellung wieder her.
+
+PSD, Scanner und Updates
+PSD wird als zusammengefasstes 8-Bit-RGB- oder Graustufenbild geöffnet. Unterstützt sind unkomprimierte Daten, RLE und ZIP. Der Export schreibt 8-Bit-RGBA ohne Ebenenstruktur. Auflösung sowie vorhandene ICC-, EXIF- und XMP-Daten werden gelesen und wieder eingebettet. Eine PSD mit Ebenen wird als neues, ungespeichertes Bild importiert; die Originaldatei bleibt erhalten. Für bearbeitbare PaintCraft-Ebenen weiter PDN verwenden.
+Datei > Übernehmen > Von Scanner/Kamera verwendet WIA unter Windows beziehungsweise SANE scanimage unter Linux. Voraussetzung ist ein eingerichteter, kompatibler Gerätetreiber. Unter Linux wird das Standardgerät verwendet.
+Einstellungen > Aktualisierung kann GitHub-Veröffentlichungen über HTTPS prüfen. Dafür muss Python 3 verfügbar sein. Automatische Prüfung ist standardmäßig aus; Betaversionen lassen sich gesondert einschließen. Neue Versionen werden von Hand installiert.
+
+Projekt und Fehlerberichte
+Hilfe > Webseite öffnet das JFLib-Projekt. Hilfe > Feedback öffnet dessen Fehlerliste. Hilfe > Info zeigt Versions- und Diagnoseangaben, die in die Zwischenablage kopiert werden können.

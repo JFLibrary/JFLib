@@ -1,0 +1,38 @@
+#!args --fixture
+# a volume job through the wizard against the demo server: the server's volumes to choose,
+# saved and listed
+size 1440 900
+wait 50
+click "Neuer Job"
+wait 20
+focus #11534848
+type "Volumes"
+click "Ganzes Volume"
+wait 20
+click "Weiter"
+wait 30
+expect "Welche Volumes des Backup-Servers?" exists
+expect "Weiter" disabled
+click checkbox:"/dev/vg0/srv (daten) · xfs · 2,00 TB · /srv"
+wait 20
+expect "Weiter" enabled
+shot build/shots/bc/test_volume_job.png
+click "Weiter"
+wait 20
+click "Weiter"
+wait 20
+click "Weiter"
+wait 20
+click "Restore-Points verschlüsseln (XChaCha20-Poly1305)"
+wait 20
+click "Weiter"
+wait 20
+click "Weiter"
+wait 20
+expect "1 Volumes: /dev/vg0/srv" exists
+click "Job anlegen"
+wait 100
+click "Sicherungsjobs"
+wait 30
+expect "Volumes" exists
+expect_nowarn

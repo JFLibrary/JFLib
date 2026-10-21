@@ -1,0 +1,64 @@
+#!args --verify-dirty
+# zoom and pan (ui/diagram.rs): Ctrl + wheel zooms at the pointer (wheel S DY ctrl; scripts
+# hold Space with cmd 900 1), the wheel scrolls 48 DIP per notch, middle drag, the
+# Hand tool and Space + drag pan, Ctrl+plus / minus / 0 from the keyboard, Einpassen fits,
+# the zoom stays within 10 % .. 800 %, a click into the minimap centres the view there
+theme light
+expect text:"Zoom: 100 %" exists
+expect text:"Mitte: 496,296" exists
+wheel 550,388 120 ctrl
+expect text:"Zoom: 125 %" exists
+expect listitem:"N15" rect 390 358 120 60
+wheel 550,388 120 ctrl
+expect text:"Zoom: 150 %" exists
+wheel 550,388 -240 ctrl
+expect text:"Zoom: 100 %" exists
+expect listitem:"N15" rect 422 364 96 48
+# the wheel scrolls: down shows the lower part
+wheel 550,388 -120
+expect text:"Mitte: 496,344" exists
+expect listitem:"N15" rect 422 316 96 48
+# middle drag
+drag 550,388 450,338 middle
+expect text:"Mitte: 596,394" exists
+expect listitem:"N15" rect 322 266 96 48
+# the Hand tool
+click "Hand"
+drag 550,388 600,438
+expect text:"Mitte: 546,344" exists
+click "Auswahl"
+# Space held
+cmd 900 1
+drag 550,388 500,388
+expect text:"Mitte: 596,344" exists
+cmd 900 0
+expect text:"Auswahl: 0" exists
+# the keyboard (the canvas takes the focus with a click)
+click 60,700
+key ctrl+plus
+expect text:"Zoom: 125 %" exists
+key ctrl+minus ctrl+minus
+expect text:"Zoom: 75 %" exists
+key ctrl+0
+expect text:"Zoom: 100 %" exists
+expect text:"Mitte: 496,296" exists
+# Einpassen
+wheel 550,388 -120
+expect text:"Mitte: 496,344" exists
+click "Einpassen"
+expect text:"Mitte: 496,296" exists
+# the limits
+wheel 550,388 2400 ctrl
+expect text:"Zoom: 800 %" exists
+wheel 550,388 -2400 ctrl
+expect text:"Zoom: 10 %" exists
+shot build/diagramtest/zoom10.png
+click "Einpassen"
+expect text:"Zoom: 100 %" exists
+# the minimap (912,608 176x112) shows the view and the content
+expect #101 rect 912 608 176 112
+click 930,630
+expect text:"Zoom: 100 %" exists
+expect text:"Mitte: -22,46" exists
+expect_nowarn
+shot build/diagramtest/zoom_mini.png

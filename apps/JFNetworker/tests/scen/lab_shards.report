@@ -1,0 +1,117 @@
+# JFNetworker-Szenario lab_shards.scn: „Geshardeter KV-Speicher hinter einem Loadbalancer“, 10 Geräte, 9 Verbindungen, Seed 11
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/4 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/4 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/5 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/5 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/6 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/6 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/7 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/7 is up
+   0.000000000  --      run 1500ms
+   1.500000000  ok      expect GEN svc fill metric ok == 200 (200)
+   1.500000000  ok      expect LB1 svc lb metric backends_up == 3 (3)
+   1.500000000  LB1     root@LB1:~# lbctl
+   1.500000000  LB1     Loadbalancer lb: HTTP auf Port 80, Verfahren round-robin, Health Checks http GET /health alle 1,000 s (Timeout 500,000 ms, verfügbar nach 2, ausgefallen nach 3 Prüfungen)
+   1.500000000  LB1     Anfragen 200, beendet 200, offen 0, Fehler 0 (ohne Backend 0), Wiederholungen 0
+   1.500000000  LB1     Antwortzeit p50 1,134 ms, p95 1,134 ms, p99 1,134 ms
+   1.500000000  LB1     
+   1.500000000  LB1     Backend  Adresse       Gewicht  Zustand    seit  offen  gesamt  Fehler  p99
+   1.500000000  LB1     web1     10.0.2.11:80  1        verfügbar  0 ns  0      67      0       1,149 ms
+   1.500000000  LB1     web2     10.0.2.12:80  1        verfügbar  0 ns  0      67      0       1,145 ms
+   1.500000000  LB1     web3     10.0.2.13:80  1        verfügbar  0 ns  0      66      0       1,145 ms
+   1.500000000  KV1     root@KV1:~# kvctl
+   1.500000000  KV1     KV-Knoten kv: 10.0.2.21, Port 7000, Heartbeats UDP 7946 alle 500,000 ms (ausgefallen nach 1,500 s)
+   1.500000000  KV1     Ring: 3 Knoten mit je 16 vnodes, RF 2, Konsistenz eventual (W 1, R 1, W + R ≤ RF), Read Repair an
+   1.500000000  KV1     
+   1.500000000  KV1     Knoten     Zustand        seit  Ring-Anteil
+   1.500000000  KV1     10.0.2.21  dieser Knoten  -     20,0 %
+   1.500000000  KV1     10.0.2.22  erreichbar     0 ns  47,3 %
+   1.500000000  KV1     10.0.2.23  erreichbar     0 ns  32,5 %
+   1.500000000  KV1     
+   1.500000000  KV1     Schlüssel 138 (3 KiB), Disk 3 KiB von 1 GiB, 100 µs
+   1.500000000  KV1     Anfragen 33: gelesen 0, geschrieben 33, nicht gefunden 0, nicht verfügbar 0, Disk voll 0
+   1.500000000  KV1     Weitergereicht 0, selbst geführt 33; Replikate geschrieben 105, gelesen 0
+   1.500000000  KV1     Veraltete Antworten 0, Read Repair gesendet 0, erhalten 0; Ausfälle erkannt 0
+   1.500000000  KV1     Antwortzeit p50 120 µs, p95 120 µs, p99 120 µs
+   6.000000000  --      fault 1: KV2 ausgeschaltet
+   6.000000000  SW2     *Mar  1 00:00:06.000: %LINK-3-UPDOWN: GigabitEthernet1/0/6 is down
+   6.000000000  SW2     *Mar  1 00:00:06.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/6 is down
+   6.000000000  --      run 3s
+   9.000000000  KV1     root@KV1:~# kvctl
+   9.000000000  KV1     KV-Knoten kv: 10.0.2.21, Port 7000, Heartbeats UDP 7946 alle 500,000 ms (ausgefallen nach 1,500 s)
+   9.000000000  KV1     Ring: 3 Knoten mit je 16 vnodes, RF 2, Konsistenz eventual (W 1, R 1, W + R ≤ RF), Read Repair an
+   9.000000000  KV1     
+   9.000000000  KV1     Knoten     Zustand        seit     Ring-Anteil
+   9.000000000  KV1     10.0.2.21  dieser Knoten  -        20,0 %
+   9.000000000  KV1     10.0.2.22  ausgefallen    6,551 s  47,3 %
+   9.000000000  KV1     10.0.2.23  erreichbar     0 ns     32,5 %
+   9.000000000  KV1     
+   9.000000000  KV1     Schlüssel 138 (3 KiB), Disk 3 KiB von 1 GiB, 100 µs
+   9.000000000  KV1     Anfragen 310: gelesen 230, geschrieben 80, nicht gefunden 0, nicht verfügbar 0, Disk voll 0
+   9.000000000  KV1     Weitergereicht 5, selbst geführt 80; Replikate geschrieben 154, gelesen 191
+   9.000000000  KV1     Veraltete Antworten 0, Read Repair gesendet 0, erhalten 0; Ausfälle erkannt 1
+   9.000000000  KV1     Antwortzeit p50 120 µs, p95 120 µs, p99 249,561 ms
+   9.000000000  ok      expect KV1 svc kv metric members_up == 2 (2)
+  12.000000000  --      heal 1: KV2 ausgeschaltet
+  12.000000000  SW2     *Mar  1 00:00:12.000: %LINK-3-UPDOWN: GigabitEthernet1/0/6 is up
+  12.000000000  SW2     *Mar  1 00:00:12.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/6 is up
+  12.000000000  --      run 7s
+  19.000000000  ok      expect GEN svc load metric sent > 1400 (1637)
+  19.000000000  ok      expect GEN svc load metric failed == 0 (0)
+  19.000000000  ok      expect GEN svc load metric http_errors == 0 (0)
+  19.000000000  ok      expect GEN svc load metric p50_us < 5000 (1141)
+  19.000000000  ok      expect GEN svc load metric p99_us > 150000 (199229)
+  19.000000000  ok      expect GEN svc load metric max_us > 1000000 (1001142)
+  19.000000000  ok      expect LB1 svc lb metric errors == 0 (0)
+  19.000000000  ok      expect LB1 svc lb metric b1_requests > 500 (613)
+  19.000000000  ok      expect LB1 svc lb metric b2_requests > 500 (612)
+  19.000000000  ok      expect LB1 svc lb metric b3_requests > 500 (612)
+  19.000000000  ok      expect WEB1 svc web metric failovers > 0 (13)
+  19.000000000  ok      expect WEB2 svc web metric failovers > 0 (15)
+  19.000000000  ok      expect WEB3 svc web metric failovers > 0 (16)
+  19.000000000  ok      expect WEB1 svc web metric backend_errors == 0 (0)
+  19.000000000  ok      expect KV1 svc kv metric member_downs == 1 (1)
+  19.000000000  ok      expect KV3 svc kv metric member_downs == 1 (1)
+  19.000000000  ok      expect KV1 svc kv metric members_up == 3 (3)
+  19.000000000  ok      expect KV2 svc kv metric repaired > 0 (28)
+  19.000000000  ok      expect KV2 svc kv metric stale_reads > 0 (6)
+  19.000000000  ok      expect hops http > 10000 (28302)
+  19.000000000  LB1     root@LB1:~# lbctl
+  19.000000000  LB1     Loadbalancer lb: HTTP auf Port 80, Verfahren round-robin, Health Checks http GET /health alle 1,000 s (Timeout 500,000 ms, verfügbar nach 2, ausgefallen nach 3 Prüfungen)
+  19.000000000  LB1     Anfragen 1837, beendet 1837, offen 0, Fehler 0 (ohne Backend 0), Wiederholungen 0
+  19.000000000  LB1     Antwortzeit p50 1,133 ms, p95 1,133 ms, p99 199,229 ms
+  19.000000000  LB1     
+  19.000000000  LB1     Backend  Adresse       Gewicht  Zustand    seit  offen  gesamt  Fehler  p99
+  19.000000000  LB1     web1     10.0.2.11:80  1        verfügbar  0 ns  0      613     0       199,229 ms
+  19.000000000  LB1     web2     10.0.2.12:80  1        verfügbar  0 ns  0      612     0       199,229 ms
+  19.000000000  LB1     web3     10.0.2.13:80  1        verfügbar  0 ns  0      612     0       199,229 ms
+  19.000000000  KV2     root@KV2:~# kvctl
+  19.000000000  KV2     KV-Knoten kv: 10.0.2.22, Port 7000, Heartbeats UDP 7946 alle 500,000 ms (ausgefallen nach 1,500 s)
+  19.000000000  KV2     Ring: 3 Knoten mit je 16 vnodes, RF 2, Konsistenz eventual (W 1, R 1, W + R ≤ RF), Read Repair an
+  19.000000000  KV2     
+  19.000000000  KV2     Knoten     Zustand        seit      Ring-Anteil
+  19.000000000  KV2     10.0.2.21  erreichbar     12,000 s  20,0 %
+  19.000000000  KV2     10.0.2.22  dieser Knoten  -         47,3 %
+  19.000000000  KV2     10.0.2.23  erreichbar     12,000 s  32,5 %
+  19.000000000  KV2     
+  19.000000000  KV2     Schlüssel 148 (3 KiB), Disk 3 KiB von 1 GiB, 100 µs
+  19.000000000  KV2     Anfragen 487: gelesen 297, geschrieben 190, nicht gefunden 0, nicht verfügbar 0, Disk voll 0
+  19.000000000  KV2     Weitergereicht 0, selbst geführt 190; Replikate geschrieben 147, gelesen 252
+  19.000000000  KV2     Veraltete Antworten 6, Read Repair gesendet 6, erhalten 28; Ausfälle erkannt 0
+  19.000000000  KV2     Antwortzeit p50 120 µs, p95 120 µs, p99 120 µs
+  19.000000000  KV2     root@KV2:~# kvctl where k7
+  19.000000000  KV2     Schlüssel k7: Hash 0x83a57e6fcb6b0c94, Replikate (RF 2):
+  19.000000000  KV2       10.0.2.22  Leader    erreichbar  Version 277.1, 6 Bytes
+  19.000000000  KV2       10.0.2.21  Follower  erreichbar  Version 277.1, 6 Bytes
+  19.000000000  --      Ein Shard fiel aus, keine Anfrage ging verloren
+# 23 von 23 Erwartungen erfüllt

@@ -1,0 +1,52 @@
+#!args --plugins=@rsplug --open plugins/tests/rsdemo.png
+# rsdemo.uis -- the Rust-only example plugin plugins/rsdemo in PaintCraft (build_rs.py test
+# puts every Rust plugin that is not a port of an asm plugin into <exe folder>/rsplug/Effects:
+# prepcheck (record 0), rsdemo (record 1)).
+# Expected hashes: python plugins/tests/rsdemo_model.py (the plugin's math on the fixture).
+# Hooks: see apps/PaintCraft/tests/plugins.uis (cmd 145 / #0x82400 / #0x82401, 995 layer hash ->
+# #9990, 996 slot|v<<8 parameter, effect dialog window 24688).
+size 1280 800
+theme light
+expect #0x82400 text "2,0,3,0,0"
+cmd 145 1
+expect #0x82401 text "1|0|0|2|0|0|Rust-Beispiele"
+cmd 995 0
+expect #9990 text "7d498f73655da974"
+
+# ------------------------------------------------------------ Kontrast strecken (prepare + aux)
+click menu:"Korrekturen"
+expect menuitem:"Kontrast strecken" enabled
+click menuitem:"Kontrast strecken"
+expect window 24688 open
+cmd 996 0
+cmd 996 25601
+click button:"OK"
+expect window 24688 closed
+cmd 995 0
+expect #9990 text "95c9c0d143da0d6f"
+key ctrl+z
+cmd 995 0
+expect #9990 text "7d498f73655da974"
+# per channel, 40 %
+click menu:"Korrekturen"
+click menuitem:"Kontrast strecken"
+expect window 24688 open
+cmd 996 256
+cmd 996 10241
+click button:"OK"
+cmd 995 0
+expect #9990 text "f08e8a2bbb96c406"
+key ctrl+z
+
+# ------------------------------------------------------------ Körnung (hash32, seed)
+click menu:"Effekte"
+click menuitem:"Körnung"
+expect window 24688 open
+cmd 996 7680
+cmd 996 1206017
+click button:"OK"
+cmd 995 0
+expect #9990 text "fb6a1ac222eae053"
+key ctrl+z
+cmd 995 0
+expect #9990 text "7d498f73655da974"

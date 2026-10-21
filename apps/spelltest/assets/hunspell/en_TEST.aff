@@ -1,0 +1,16 @@
+# en_TEST -- a tiny English test dictionary of JFLib's spelltest, written for its tests (not a
+# real dictionary): plurals with a condition, REP, KEY, TRY
+SET UTF-8
+LANG en_US
+TRY esianrtolcdugmphbyfvkwzxjqESIANRTOLCDUGMPHBYFVKWZXJQ'
+WORDCHARS '
+KEY qwertyuiop|asdfghjkl|zxcvbnm
+
+REP 2
+REP f ph
+REP ph f
+
+SFX S Y 3
+SFX S y ies [^aeiou]y
+SFX S 0 s [aeiou]y
+SFX S 0 s [^y]

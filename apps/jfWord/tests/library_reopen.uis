@@ -1,0 +1,17 @@
+#!args --file build/jfword-library-copy.docx --library-dir build/jfword-library-ui --editor --structure --sources --navigation
+# A fresh process retains all saved sources, with no inherited in-memory history.
+cmd 18
+expect "2 von 2 Bibliotheksquellen" exists
+expect #1102 text "Bibliotheksmethoden · Institut · 2030 · ID 1"
+expect #1110 disabled
+expect #1111 disabled
+click #1108
+click #1108
+click "Schließen"
+cmd 1
+expect dialog:"Ungespeicherte Änderungen" missing
+expect "Neues Dokument" exists
+cmd 18
+expect "2 von 2 Bibliotheksquellen" exists
+click "Schließen"
+expect_nowarn

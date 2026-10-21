@@ -1,0 +1,50 @@
+#!args --verify-dirty
+# undo / redo of the rich text (the document's History): typing merges into one step, a
+# moved caret starts a new one; formats, paragraphs, paste and the toolbar's buttons
+size 1000 680
+click "Leeren"
+expect text:"rev: 0 undo: 0" exists
+type "eins"
+type " zwei"
+expect #2000 text "eins zwei"
+key left
+type "X"
+expect #2000 text "eins zweXi"
+key ctrl+z
+expect #2000 text "eins zwei"
+key ctrl+z
+expect #2000 text ""
+expect "Rückgängig" disabled
+key ctrl+y
+expect #2000 text "eins zwei"
+key ctrl+shift+z
+expect #2000 text "eins zweXi"
+# a format and a paragraph are steps of their own
+key ctrl+a
+key ctrl+b
+key end
+key enter
+type "drei"
+expect text:"doc: [b]eins zweXi[/] | [b]drei[/]" exists
+key ctrl+z
+expect text:"doc: [b]eins zweXi[/] | " exists
+key ctrl+z
+expect text:"doc: [b]eins zweXi[/]" exists
+key ctrl+z
+expect text:"doc: eins zweXi" exists
+expect text:"sel: 0:0-0:10" exists
+# the toolbar's undo / redo
+click "Wiederholen"
+expect text:"doc: [b]eins zweXi[/]" exists
+click "Rückgängig"
+expect text:"doc: eins zweXi" exists
+expect #2000 focused
+# Backspace merges, Delete too
+key end
+key backspace
+key backspace
+key backspace
+expect #2000 text "eins zw"
+key ctrl+z
+expect #2000 text "eins zweXi"
+expect_nowarn

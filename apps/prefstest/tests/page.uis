@@ -1,0 +1,49 @@
+# the settings page built from the schema; the app opened a file of version 1, which was
+# migrated (view.size -> view.zoom) and is not saved yet
+expect text:"Version der Datei: 1  Ungespeichert: ja" exists
+# the number boxes, text box and combo box are found by their hashed ids (the scope "page",
+# the key's name, "value": prefstest --shot x.png --dump lists them); they never change
+expect #209365651 value 150
+# a switch by the label of its row
+expect "Dunkles Design" unchecked
+expect "Zurücksetzen: Dunkles Design" disabled
+click "Dunkles Design"
+expect "Dunkles Design" checked
+expect "Zurücksetzen: Dunkles Design" enabled
+# a number box: typed values, the maximum, the reset button
+focus #209365651
+key ctrl+a
+type "250\n"
+expect #209365651 value 250
+key ctrl+a
+type "5000\n"
+expect #209365651 value 800
+click "Zurücksetzen: Zoom (%)"
+expect #209365651 value 100
+expect "Zurücksetzen: Zoom (%)" disabled
+# the combo box keeps the word of the choice in the file
+click #201617698
+click "Zoll"
+expect #201617698 value 2
+# the text box
+focus #188645314
+key ctrl+a
+type "Ada Lovelace"
+key tab
+expect #188645314 text "Ada Lovelace"
+# the colour button opens its picker
+click "Akzentfarbe"
+expect "Akzentfarbe" open
+shot build/prefs_color.png
+key esc
+expect "Akzentfarbe" enabled
+expect text:"Zoom: 100  Dunkel: ja  Einheit: Zoll  Farbe: #0078D4  Name: Ada Lovelace  Linie: 1.50  Kerne: 4" exists
+shot build/prefs_page.png
+# the file keeps only what differs from the defaults, with the new version
+click "Speichern"
+expect text:"Version der Datei: 1  Ungespeichert: nein" exists
+expect text:"Datei: version=2 | [view] | dark=true | unit=in | [system] | last=geändert | [user] | name=Ada Lovelace" exists
+click "Neu laden"
+expect text:"Version der Datei: 2  Ungespeichert: nein" exists
+expect text:"Zoom: 100  Dunkel: ja  Einheit: Zoll  Farbe: #0078D4  Name: Ada Lovelace  Linie: 1.50  Kerne: 4" exists
+expect_nowarn

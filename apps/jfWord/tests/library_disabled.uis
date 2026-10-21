@@ -1,0 +1,10 @@
+#!args --editor --structure --sources --navigation
+# Headless runs without an explicit test directory never load a profile library.
+click #411
+expect dialog:"Quellenbibliothek" exists
+expect #1104 disabled
+expect #1107 disabled
+expect #1112 disabled
+expect "Bibliothek deaktiviert" exists
+click "Schließen"
+expect_nowarn

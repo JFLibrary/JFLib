@@ -1,0 +1,3 @@
+#!args --test dnd
+# drag and drop between programs without a user (t_dnd.rs): effects, the target hook,
+# URL lists, the pending drop; Windows: our OLE data object, drop target and drop source

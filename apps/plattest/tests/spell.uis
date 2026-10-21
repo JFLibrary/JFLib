@@ -1,0 +1,4 @@
+#!args --test spell
+# (Rust only) plattest --test spell: the system's spell checker (lib/plat/spell.rs): Windows the
+# real ISpellChecker (the installed languages, sample words when one of de / en / fr / es / it /
+# nl is there), Linux without one. The whole test runs before the UI starts.

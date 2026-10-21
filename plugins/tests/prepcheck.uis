@@ -1,0 +1,44 @@
+#!args --plugins=@rsplug --open plugins/tests/rsdemo.png
+# prepcheck.uis -- the two-register return of FXD_PREPARE (rax = aux | 0, edx = error) through
+# the test plugin plugins/prepcheck: an aux, no aux, an error (ERR_LIMIT).
+# Expected hashes: python plugins/tests/rsdemo_model.py.  Hooks: see rsdemo.uis.
+size 1280 800
+theme light
+cmd 145 0
+expect #0x82401 text "1|0|0|1|0|0|prepare-Test"
+cmd 995 0
+expect #9990 text "7d498f73655da974"
+
+# ------------------------------------------------------------ aux: render inverts
+click menu:"Korrekturen"
+click menuitem:"prepare-Test"
+expect window 24688 open
+cmd 996 0
+click button:"OK"
+expect window 24688 closed
+cmd 995 0
+expect #9990 text "b08e4eedc6547374"
+key ctrl+z
+
+# ------------------------------------------------------------ no aux: render copies
+click menu:"Korrekturen"
+click menuitem:"prepare-Test"
+expect window 24688 open
+cmd 996 256
+click button:"OK"
+cmd 995 0
+expect #9990 text "7d498f73655da974"
+expect #9918 text ""
+
+# ------------------------------------------------------------ prepare fails: the layer stays
+click menu:"Korrekturen"
+click menuitem:"prepare-Test"
+expect window 24688 open
+cmd 996 512
+click button:"OK"
+expect #9918 text "Der Effekt ist fehlgeschlagen (zu wenig Arbeitsspeicher)."
+expect window 24688 closed
+cmd 995 0
+expect #9990 text "7d498f73655da974"
+cmd 145 0
+expect #0x82401 text "1|0|0|1|0|0|prepare-Test"

@@ -1,0 +1,3 @@
+#!args --test cpu
+# The whole test runs in on_init (headless: plat_wait without a display) and ends the
+# process with the number of failures; nothing below is executed.

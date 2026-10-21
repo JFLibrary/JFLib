@@ -1,0 +1,113 @@
+# JFNetworker-Szenario serial_wan.scn: „Serielle Strecke“, 4 Geräte, 3 Verbindungen, Seed 5
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Serial0/2/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Serial0/2/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Serial0/2/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Serial0/2/0 is up
+   0.000000000  R1      R1>enable
+   0.000000000  R1      R1#ping 10.0.12.2
+   0.000000000  R1      Ctrl+Shift+6 stops the ping.
+   0.000000000  R1      Pinging 10.0.12.2 with 5 echo requests of 100 bytes, 2 s timeout each:
+   0.000000000  --      run until idle
+   0.024062500  R1      !!!!!
+   0.024062500  R1      Success rate is 100 percent (5/5), round-trip min/avg/max = 4/4/4 ms
+   2.019250000  ok      expect R1 output contains "!!!!!"
+   2.019250000  ok      expect R1 output contains "Success rate is 100 percent (5/5), round-trip min/avg/max = 4/4/4 ms"
+   2.019250000  R1      R1#show interfaces Serial0/2/0
+   2.019250000  R1      Serial0/2/0 is up, line protocol is up
+   2.019250000  R1        Hardware is Serial
+   2.019250000  R1        Internet address is 10.0.12.1/30
+   2.019250000  R1        MTU 1500 bytes, BW 2048 Kbit/sec, DLY 20000 usec,
+   2.019250000  R1           reliability 255/255, txload 1/255, rxload 1/255
+   2.019250000  R1        Encapsulation HDLC, crc 16, loopback not set
+   2.019250000  R1        Keepalive set (10 sec)
+   2.019250000  R1        Last input 00:00:00, output 00:00:00, output hang never
+   2.019250000  R1        Last clearing of "show interface" counters never
+   2.019250000  R1        Input queue: 0/375/0/0 (size/max/drops/flushes); Total output drops: 0
+   2.019250000  R1        Queueing strategy: fifo
+   2.019250000  R1        Output queue: 0/40 (size/max)
+   2.019250000  R1        5 minute input rate 0 bits/sec, 0 packets/sec
+   2.019250000  R1        5 minute output rate 0 bits/sec, 0 packets/sec
+   2.019250000  R1           5 packets input, 520 bytes, 0 no buffer
+   2.019250000  R1           Received 0 broadcasts (0 IP multicasts)
+   2.019250000  R1           0 runts, 0 giants, 0 throttles
+   2.019250000  R1           0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+   2.019250000  R1           5 packets output, 520 bytes, 0 underruns
+   2.019250000  R1           0 output errors, 0 collisions, 0 interface resets
+   2.019250000  R1           0 unknown protocol drops
+   2.019250000  R1           0 output buffer failures, 0 output buffers swapped out
+   2.019250000  ok      expect R1 output contains "Encapsulation HDLC, crc 16, loopback not set"
+   2.019250000  R2      R2>enable
+   2.019250000  R2      R2#show ip route
+   2.019250000  R2      Codes: C - connected network, L - address of this device, S - static route,
+   2.019250000  R2             * - default route
+   2.019250000  R2      
+   2.019250000  R2      Gateway of last resort is not set
+   2.019250000  R2      
+   2.019250000  R2            10.0.0.0/8 is variably subnetted, 2 subnets, 2 masks
+   2.019250000  R2      C        10.0.12.0/30 is directly connected, Serial0/2/0
+   2.019250000  R2      L        10.0.12.2/32 is directly connected, Serial0/2/0
+   2.019250000  R2      S     192.168.1.0/24 is directly connected, Serial0/2/0
+   2.019250000  R2            192.168.2.0/24 is variably subnetted, 2 subnets, 2 masks
+   2.019250000  R2      C        192.168.2.0/24 is directly connected, GigabitEthernet0/0/0
+   2.019250000  R2      L        192.168.2.1/32 is directly connected, GigabitEthernet0/0/0
+   2.019250000  ok      expect R2 route 192.168.1.0/24 dev Serial0/2/0
+   2.019250000  ok      expect R1 route 192.168.2.0/24 via 10.0.12.2
+   2.019250000  PC1     root@PC1:~# traceroute 192.168.2.10
+   2.019250000  PC1     traceroute to 192.168.2.10 (192.168.2.10), 30 hops max, 60 byte packets
+   2.019250000  --      run until idle
+   2.019256352  PC1      1  192.168.1.1 (192.168.1.1)  0.003 ms  0.002 ms  0.002 ms
+   2.032714385  PC1      2  10.0.12.2 (10.0.12.2)  4.486 ms  4.486 ms  4.486 ms
+   7.041940703  PC1      3  * 192.168.2.10 (192.168.2.10)  4.613 ms  4.613 ms
+  12.037327544  ok      expect PC1 output contains " 2  10.0.12.2 (10.0.12.2)  4.486 ms"
+  12.037327544  ok      expect PC1 output contains " 3  * 192.168.2.10 (192.168.2.10)"
+  12.037327544  PC1     root@PC1:~# ping -c 2 192.168.2.10
+  12.037327544  PC1     PING 192.168.2.10 (192.168.2.10) 56(84) bytes of data.
+  12.037327544  --      run until idle
+  12.042019148  PC1     64 bytes from 192.168.2.10: icmp_seq=1 ttl=62 time=4.69 ms
+  13.042019148  PC1     64 bytes from 192.168.2.10: icmp_seq=2 ttl=62 time=4.69 ms
+  13.042019148  PC1     
+  13.042019148  PC1     --- 192.168.2.10 ping statistics ---
+  13.042019148  PC1     2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+  13.042019148  PC1     rtt min/avg/max/mdev = 4.691/4.691/4.691/0.000 ms
+  23.037327544  R1      R1#traceroute 192.168.2.10
+  23.037327544  R1      Ctrl+Shift+6 stops the traceroute.
+  23.037327544  R1      Route to 192.168.2.10, up to 30 hops:
+  23.037327544  --      run until idle
+  23.054766568  R1        1 10.0.12.2 4 msec 4 msec 4 msec
+  23.063488366  R1        2 192.168.2.10 4 msec 4 msec 4 msec
+  26.059127467  ok      expect R1 output contains "  2 192.168.2.10"
+  26.059127467  R1      R1#configure terminal
+  26.059127467  R1      Configuration mode: one command per line; end or Ctrl+Z leaves it.
+  26.059127467  R1      R1(config)#ip route 0.0.0.0 0.0.0.0 10.0.12.2
+  26.059127467  R1      R1(config)#end
+  26.059127467  R1      *Mar  1 00:00:26.059: %SYS-5-CONFIG_I: configuration changed at the console
+  26.059127467  R1      R1#ping 172.16.9.9
+  26.059127467  R1      Ctrl+Shift+6 stops the ping.
+  26.059127467  R1      Pinging 172.16.9.9 with 5 echo requests of 100 bytes, 2 s timeout each:
+  26.059127467  --      run until idle
+  30.073049342  R1      U.U.U
+  30.073049342  R1      Success rate is 0 percent (0/5)
+  32.068408717  ok      expect R1 output contains "U.U.U"
+  32.068408717  ok      expect R1 output contains "Success rate is 0 percent (0/5)"
+  32.068408717  --      link down R1 Serial0/2/0
+  32.068408717  R1      *Mar  1 00:00:32.068: %LINK-3-UPDOWN: Serial0/2/0 is down
+  32.068408717  R1      *Mar  1 00:00:32.068: %LINEPROTO-5-UPDOWN: line protocol on Serial0/2/0 is down
+  32.068408717  R2      *Mar  1 00:00:32.068: %LINK-3-UPDOWN: Serial0/2/0 is down
+  32.068408717  R2      *Mar  1 00:00:32.068: %LINEPROTO-5-UPDOWN: line protocol on Serial0/2/0 is down
+  32.068408717  --      run 1s
+  33.068408717  R1      R1#show ip route
+  33.068408717  R1      Codes: C - connected network, L - address of this device, S - static route,
+  33.068408717  R1             * - default route
+  33.068408717  R1      
+  33.068408717  R1      Gateway of last resort is not set
+  33.068408717  R1      
+  33.068408717  R1            192.168.1.0/24 is variably subnetted, 2 subnets, 2 masks
+  33.068408717  R1      C        192.168.1.0/24 is directly connected, GigabitEthernet0/0/0
+  33.068408717  R1      L        192.168.1.1/32 is directly connected, GigabitEthernet0/0/0
+  33.068408717  ok      expect R1 no route 192.168.2.0/24
+  33.068408717  ok      expect hops icmp >= 10 (54)
+# 12 von 12 Erwartungen erfüllt

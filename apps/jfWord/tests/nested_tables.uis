@@ -1,0 +1,28 @@
+#!args --editor
+size 1480 1040
+theme light
+click tab:"Einfügen"
+click #1514
+click #3902
+key ctrl+a
+type "1"
+key tab
+click "Übernehmen"
+type "Äußere Zelle"
+key enter
+click #1514
+click "Übernehmen"
+type "Innere Zelle"
+key tab
+type "Innerer Wert"
+key shift+tab
+click #3966
+click #3968
+key ctrl+v
+key ctrl+z
+key ctrl+y
+shot build/jfword-nested-tables-light.png
+theme dark
+scale 150
+shot build/jfword-nested-tables-dark-150.png
+expect_nowarn

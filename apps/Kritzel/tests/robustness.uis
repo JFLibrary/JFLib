@@ -1,0 +1,54 @@
+# regressions from the memory-safety review: undo of a resize while a stroke is held
+# (brush and pencil), skew beyond the canvas limit is refused
+# -- brush stroke on a 3000x2000 canvas, Ctrl+Z (back to 1152x648) while the button is held
+cmd 37
+click #1741
+key ctrl+a
+type "3000"
+key tab
+click #1742
+key ctrl+a
+type "2000"
+key tab
+click button:"OK"
+expect text:"3000 × 2000px" exists
+cmd 23
+down 400,400
+move 450,420
+key ctrl+z
+expect text:"1152 × 648px" exists
+move 1200,700
+move 1250,750
+up 1250,750
+# -- pencil stroke on a 300x200 canvas, Ctrl+Z (back to 1152x648) during the stroke
+cmd 37
+click #1741
+key ctrl+a
+type "300"
+key tab
+click #1742
+key ctrl+a
+type "200"
+key tab
+click button:"OK"
+expect text:"300 × 200px" exists
+click #1100
+down 640,460
+move 650,470
+key ctrl+z
+expect text:"1152 × 648px" exists
+move 1100,700
+up 1100,700
+# -- skew by 89 degrees would exceed 16384 px: refused with a message, canvas unchanged
+click #1106
+cmd 36
+click #1726
+key ctrl+a
+type "89"
+key tab
+click button:"OK"
+expect #1710 exists
+expect text:"1152 × 648px" exists
+down 80,465
+move 1200,466
+up 1200,466

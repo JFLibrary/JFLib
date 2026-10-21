@@ -1,0 +1,4 @@
+#!args --test engine
+# spelltest --test engine: the self-checks of the spell crate (engine.rs) on the test
+# dictionaries of app://hunspell and on small dictionaries written in the test.  The whole test
+# runs before the UI starts; the exit code is the number of failures.

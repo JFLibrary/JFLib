@@ -1,0 +1,125 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# the inspector (workspace/inspector): a device with power, its interfaces as the simulator
+# runs them (status, speed, IPv4, MAC, VLAN, far end) and the quick settings of the chosen one
+# (address, DHCP, up, gateway: they apply at once and land in the startup configuration, so an
+# undo restarts the device with the old one); a cable with kind, speed, delay, loss, plug;
+# several things; the project.  World (0, 0) shows at 630,320 (100 %).
+# Ids: power 20486, address 20488, DHCP 20490, up 20491, gateway 20492; the cable's speed 20497,
+# delay 20498, loss 20499, plug 20500; "Alle ausschalten" 20505; the project's title 20482.
+theme light
+# the project
+expect #20482 text "Zwei PCs am Switch"
+expect text:"2 (2 aktiv)" exists
+expect text:"läuft in Echtzeit" exists
+# PC1: its interfaces from the simulator
+click listitem:"PC1"
+expect text:"Schnittstellen (3)" exists
+expect text:"10.0.0.1/24" exists
+expect text:"02:4a:00:00:01:01" exists
+expect text:"SW1 Gi1/0/1" exists
+expect text:"2.5G" missing
+expect #20486 checked
+# the cable's port runs at 1G; eth0 is chosen and has the quick fields
+expect #20488 text "10.0.0.1/24"
+shot build/jfnetworker/inspector_device.png
+# a new address applies at once
+click #20488
+key ctrl+a
+type "10.0.0.11/24"
+key enter
+expect text:"10.0.0.11/24" exists
+expect #20488 text "10.0.0.11/24"
+# a refused one says why
+click #20488
+key ctrl+a
+type "10.0.0.300/24"
+key enter
+expect text:"„10.0.0.300/24“ ist keine Adresse mit Präfix (10.0.0.1/24 oder 10.0.0.1 255.255.255.0)." exists
+key esc
+expect #20488 text "10.0.0.11/24"
+# undo restarts PC1 with the configuration it had; redo with the new one
+click 900,540
+key ctrl+z
+click listitem:"PC1"
+expect text:"10.0.0.1/24" exists
+key ctrl+y
+expect text:"10.0.0.11/24" exists
+# the gateway of a host
+click #20492
+type "10.0.0.254"
+key enter
+expect #20492 text "10.0.0.254"
+# DHCP replaces the static address (no server here: none comes), off again: no address
+click #20490
+expect #20490 checked
+expect #20488 disabled
+expect text:"10.0.0.11/24" missing
+click #20490
+expect #20490 unchecked
+expect #20488 text ""
+key ctrl+z
+key ctrl+z
+expect text:"10.0.0.11/24" exists
+# shut down: the port and its cable go down
+click #20491
+expect text:"abgeschaltet" exists
+click #20491
+expect text:"abgeschaltet" missing
+# the cable PC1 - SW1: its quality
+click 722,414
+expect text:"PC1 eth0 – SW1 Gi1/0/1" exists
+expect text:"aktiv · 0 Pakete/s" exists
+expect #20497 text "1000"
+expect #20498 text "0,05"
+click #20497
+key ctrl+a
+type "100"
+click #20498
+key ctrl+a
+type "1000"
+click #20499
+key ctrl+a
+type "2,5"
+key enter
+expect #20497 text "100"
+expect #20498 text "1000"
+expect #20499 text "2,5"
+shot build/jfnetworker/inspector_cable.png
+# PC1's port now runs at the cable's speed
+click listitem:"PC1"
+expect text:"100M" exists
+click 722,414
+# a refused value
+click #20497
+key ctrl+a
+type "schnell"
+key enter
+expect text:"Bandbreite (mehr als 0 Mbit/s), Verzögerung (µs) und Verlust (0 bis 100 %) als Zahlen, z. B. 2,5." exists
+key esc
+expect #20497 text "100"
+# unplugged: the simulator takes it down
+click #20500
+expect text:"ausgesteckt · 0 Pakete/s" exists
+click 900,540
+expect text:"2 (1 aktiv)" exists
+key ctrl+z
+expect text:"2 (2 aktiv)" exists
+# several things: their devices on and off at once
+click listitem:"PC1"
+drag listitem:"PC2" listitem:"PC2" 1 shift
+expect text:"2 Objekte" exists
+expect text:"alle eingeschaltet" exists
+click #20505
+expect text:"alle ausgeschaltet" exists
+shot build/jfnetworker/inspector_several.png
+click 900,540
+expect text:"2 (0 aktiv)" exists
+key ctrl+z
+expect text:"2 (2 aktiv)" exists
+# dark and at 150 %
+click listitem:"PC1"
+theme dark
+shot build/jfnetworker/inspector_dark.png
+scale 150
+shot build/jfnetworker/inspector_150.png
+expect_nowarn

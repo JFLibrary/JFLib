@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <title>Text</title>
+  <defs>
+    <linearGradient id="tg" x2="1" y2="0">
+      <stop offset="0" stop-color="#dc2626"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+  </defs>
+  <line x1="100" y1="5" x2="100" y2="95" stroke="#cbd5e1"/>
+  <text x="100" y="25" font-size="16" text-anchor="start" fill="#111827">Anfang</text>
+  <text x="100" y="50" font-size="16" text-anchor="middle" fill="#111827">Mitte</text>
+  <text x="100" y="75" font-size="16" text-anchor="end" fill="#111827">Ende</text>
+  <text x="10" y="120" font-size="20" fill="#374151">Hallo, <tspan font-weight="bold" fill="#dc2626">SVG</tspan>   Welt!</text>
+  <text x="10" y="150" font-size="24" font-weight="bold" fill="url(#tg)" stroke="#111827" stroke-width="0.5">Verlauf</text>
+  <text x="10" y="180" font-size="14" font-style="italic" fill="#0f766e">kursiv <tspan dy="-6" font-size="9">hoch</tspan><tspan dy="6"> und zurück</tspan></text>
+  <text transform="translate(185 190) rotate(-90)" font-size="12" fill="#6b7280">gedreht</text>
+</svg>

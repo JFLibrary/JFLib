@@ -1,0 +1,51 @@
+#!args --editor
+size 1440 1000
+theme light
+click tab:"Einfügen"
+click #1514
+expect dialog:"Tabelle einfügen" exists
+click #3901
+key ctrl+a
+type "2"
+key tab
+click #3902
+key ctrl+a
+type "2"
+key tab
+click "Übernehmen"
+expect dialog:"Tabelle einfügen" missing
+type "Links"
+key tab
+type "Rechts"
+key shift+tab
+key end enter
+type "Absatz zwei"
+expect textbox:"Links\nAbsatz zwei" exists
+click #3918
+expect dialog:"Tabelleneigenschaften" exists
+click #3905
+key ctrl+a
+type "120.05"
+key tab
+click #3906
+key ctrl+a
+type "54"
+key tab
+click #3907
+click "Hellblau"
+click #3908
+click "Zentriert"
+click "Übernehmen"
+expect dialog:"Tabelleneigenschaften" missing
+click #3912
+click #3914
+click #3915
+click #3916
+cmd 5
+cmd 6
+shot build/jfword-tables-light.png
+theme dark
+scale 150
+shot build/jfword-tables-dark-150.png
+size 1000 800
+expect_nowarn

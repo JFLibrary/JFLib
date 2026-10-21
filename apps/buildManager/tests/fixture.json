@@ -1,0 +1,19 @@
+{
+  "workspace": "jfguiLib / RustLib",
+  "profile_revision": "fixture",
+  "profiles": {
+    "version": 1,
+    "builds": [{"name":"Kritzel Release","apps":["Kritzel","PaintCraft"],"targets":["win","linux"],"styles":["winui","classic"],"mode":"release","optimization":"size","jobs":8,"tests":true,"output":"build/manager"}],
+    "starts": [{"name":"Dunkel · 150 %","app":"Kritzel","argv":["--theme","dark","--scale","150"]}]
+  },
+  "capabilities": {"host":"win","rust":"rustc 1.98.1","targets":{"win":{"build":true,"run":true,"package":true,"reason":""},"linux":{"build":true,"run":true,"package":true,"reason":""},"web":{"build":true,"run":false,"package":true,"reason":""}}},
+  "apps": [
+    {"id":"Kritzel","name":"Kritzel","targets":["win","linux","web"],"style":"winui","package":{"revision":"fixture","values":{"display":"Kritzel","version":"0.1.0","publisher":"JFLib","summary":"Malprogramm","description":"Bildbearbeitung mit jfguiLib","generic":"Malprogramm","categories":"Graphics;","deb_name":"kritzel","default_win":"winui","default_linux":"kde","styles":"winui classic macos kde"}}},
+    {"id":"PaintCraft","name":"PaintCraft","targets":["win","linux","web"],"style":"winui","package":{"revision":"fixture","values":{"display":"PaintCraft","version":"0.1.0"}}},
+    {"id":"jfWord","name":"jfWord","targets":["win","linux","web"],"style":"jfoffice","package":{"revision":"fixture","values":{}}},
+    {"id":"gallery","name":"Galerie","targets":["win","linux","web"],"style":"winui","package":{"revision":"fixture","values":{}}},
+    {"id":"buildManager","name":"Build Manager","targets":["win","linux"],"style":"winui","package":{"revision":"fixture","values":{}}}
+  ],
+  "styles": [{"id":"classic","name":"Classic"},{"id":"jfoffice","name":"jfOffice"},{"id":"kde","name":"KDE"},{"id":"macos","name":"macOS"},{"id":"winui","name":"WinUI"}],
+  "jobs": [{"id":"vorschau-01","app":"Kritzel","mode":"development","created":1,"status":"succeeded","phase":"Build abgeschlossen","duration":12,"message":"","artifacts":[{"kind":"app","app":"Kritzel","style":"winui","target":"win","path":"build/manager/artifacts/vorschau-01/Kritzel.exe"}],"tests":[{"target":"win","style":"winui","script":"smoke.uis","status":"passed"}]}]
+}

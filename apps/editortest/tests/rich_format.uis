@@ -1,0 +1,76 @@
+#!args --verify-dirty
+# character and paragraph formats: Ctrl+B / I / U, Ctrl+Shift+X, a format without a selection
+# applies to what is typed next, the toolbar (bold, colours, size, font, alignment, style),
+# Ctrl+E / R / J / L, Ctrl+1 / 0, Ctrl+] / [, Ctrl+Space clears
+size 1000 680
+click "Leeren"
+type "eins zwei drei"
+key ctrl+left
+key ctrl+shift+left
+expect text:"sel: 0:10-0:5" exists
+key ctrl+b
+expect text:"doc: eins [b]zwei [/]drei" exists
+expect text:"fmt: b---" exists
+key ctrl+i
+key ctrl+u
+key ctrl+shift+x
+expect text:"doc: eins [b i u s]zwei [/]drei" exists
+key ctrl+b
+expect text:"doc: eins [i u s]zwei [/]drei" exists
+key ctrl+space
+expect text:"doc: eins zwei drei" exists
+# without a selection: the format of the text typed next
+key end
+key ctrl+b
+expect text:"fmt: b---" exists
+type " vier"
+expect text:"doc: eins zwei drei[b] vier[/]" exists
+key ctrl+b
+type "!"
+expect text:"doc: eins zwei drei[b] vier[/]!" exists
+# the toolbar: bold, size, font, colour
+key home
+key shift+ctrl+right
+click "Fett"
+expect text:"doc: [b]eins [/]zwei drei[b] vier[/]!" exists
+expect #2000 focused
+click #2106
+click menuitem:"14"
+expect text:"doc: [b sz=140]eins [/]zwei drei[b] vier[/]!" exists
+click #2104
+click menuitem:"DejaVu Serif"
+expect text:"doc: [b sz=140 f=DejaVu Serif]eins [/]zwei drei[b] vier[/]!" exists
+click "Textfarbe"
+click #2205
+expect text:"doc: [b c=#c00000 sz=140 f=DejaVu Serif]eins [/]zwei drei[b] vier[/]!" exists
+key ctrl+space
+expect text:"doc: eins zwei drei[b] vier[/]!" exists
+# size up / down
+key ctrl+]
+expect text:"doc: [sz=120]eins [/]zwei drei[b] vier[/]!" exists
+key ctrl+[
+key ctrl+[
+expect text:"doc: [sz=100]eins [/]zwei drei[b] vier[/]!" exists
+# paragraph formats
+key ctrl+e
+expect text:"doc: (center) [sz=100]eins [/]zwei drei[b] vier[/]!" exists
+key ctrl+r
+expect text:"doc: (right) [sz=100]eins [/]zwei drei[b] vier[/]!" exists
+key ctrl+j
+expect text:"doc: (justify) [sz=100]eins [/]zwei drei[b] vier[/]!" exists
+click "Linksbündig"
+expect text:"doc: [sz=100]eins [/]zwei drei[b] vier[/]!" exists
+key ctrl+2
+expect text:"doc: (h2) [sz=100]eins [/]zwei drei[b] vier[/]!" exists
+click #2102
+click menuitem:"Zitat"
+expect text:"doc: (quote) [sz=100]eins [/]zwei drei[b] vier[/]!" exists
+key ctrl+0
+expect text:"doc: [sz=100]eins [/]zwei drei[b] vier[/]!" exists
+# Enter after a heading: body text
+key ctrl+1
+key ctrl+end
+key enter
+type "Text"
+expect text:"doc: (h1) [sz=100]eins [/]zwei drei[b] vier[/]! | Text" exists
+expect_nowarn

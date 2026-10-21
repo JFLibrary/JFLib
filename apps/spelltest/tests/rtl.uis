@@ -1,0 +1,10 @@
+#!args --verify-dirty --rtl
+# right-to-left windows: the text of a box keeps its order, so do its marks; a right click
+# finds the word under the pointer the same way
+theme light
+rclick 70,136
+expect menuitem:"Haus" exists
+shot build/spell/rtl_menu.png
+click menuitem:"Haus"
+expect text:"Fehler Betreff: -" exists
+expect_nowarn

@@ -1,0 +1,70 @@
+#!args --editor --navigation
+# Keyboard paragraph transactions, UTF-8 carets, selection replacement and history.
+size 1240 840
+theme light
+type "AαβZ"
+key ctrl+home right right
+key enter
+expect "2 · Text" exists
+expect textbox:"Aα\nβZ" focused
+expect textbox:"Aα\nβZ" value 4
+type "X"
+expect textbox:"Aα\nXβZ" exists
+key home backspace
+expect textbox:"AαXβZ" focused
+expect textbox:"AαXβZ" value 3
+key ctrl+z
+expect textbox:"Aα\nXβZ" focused
+expect textbox:"Aα\nXβZ" value 4
+key ctrl+y
+expect textbox:"AαXβZ" focused
+expect textbox:"AαXβZ" value 3
+type "!"
+expect textbox:"Aα!XβZ" exists
+# Split a backwards selection; undo restores original text and original caret.
+key ctrl+end left shift+left shift+left
+key enter
+expect "2 · Text" exists
+expect textbox:"Aα!\nZ" focused
+key ctrl+z
+expect textbox:"Aα!XβZ" focused
+expect textbox:"Aα!XβZ" value 4
+expect textbox:"Aα!XβZ" max 7
+key ctrl+y
+expect textbox:"Aα!\nZ" focused
+expect textbox:"Aα!\nZ" value 5
+# Delete at the previous paragraph end joins in the other direction.
+click "1 · Text"
+click textbox:"Aα!\nZ"
+key ctrl+home end delete
+expect textbox:"Aα!Z" focused
+expect textbox:"Aα!Z" value 4
+key ctrl+z
+expect textbox:"Aα!\nZ" focused
+expect textbox:"Aα!\nZ" value 4
+key ctrl+y
+expect textbox:"Aα!Z" focused
+key ctrl+end shift+enter
+type "Ω"
+expect textbox:"Aα!Z\nΩ" exists
+# End-of-document Delete and first-paragraph Backspace are harmless.
+key delete
+expect textbox:"Aα!Z\nΩ" exists
+key ctrl+home backspace
+expect textbox:"Aα!Z\nΩ" exists
+key ctrl+end enter
+type "Finaler Absatz."
+expect textbox:"Aα!Z\nΩ\nFinaler Absatz." focused
+shot build/jfword-paragraph-editing.png
+cmd 4
+click #1048588
+key ctrl+a
+type "build/jfword-paragraphs.docx"
+click button:"Speichern"
+click "Ersetzen"
+expect "Gespeichert · Text, Quellen und Zitatverweise" exists
+cmd 2
+click button:"Öffnen"
+expect textbox:"Aα!Z\nΩ\nFinaler Absatz." exists
+expect "2 · Text" exists
+expect_nowarn

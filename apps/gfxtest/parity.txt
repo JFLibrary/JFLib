@@ -1,0 +1,2 @@
+# parity of the Rust gfxtest with the assembly version (tools/parity.py, build_rs.py test)
+matrix off                      # the test pages need the UI canvas (R5) and the text features (R3)

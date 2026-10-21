@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>IP phone: handset, display, keypad</title>
+  <rect class="body" x="4" y="11" width="56" height="31" rx="3" fill="#F7F8FA"/>
+  <rect class="shade" x="7" y="7" width="13" height="33" rx="5" fill="#DCDFE3"/>
+  <g class="port" fill="#4F555D" stroke="none">
+    <circle cx="11" cy="12.5" r="0.75"/><circle cx="13.5" cy="12.5" r="0.75"/><circle cx="16" cy="12.5" r="0.75"/>
+    <circle cx="11" cy="34.5" r="0.75"/><circle cx="13.5" cy="34.5" r="0.75"/><circle cx="16" cy="34.5" r="0.75"/>
+  </g>
+  <rect class="screen" x="24" y="14.5" width="32" height="9.5" rx="1" fill="#CAD4DF" stroke-width="1"/>
+  <g class="shade" fill="#DCDFE3" stroke="none">
+    <rect x="25" y="27" width="5.5" height="2.75" rx="0.75"/><rect x="32" y="27" width="5.5" height="2.75" rx="0.75"/><rect x="39" y="27" width="5.5" height="2.75" rx="0.75"/>
+    <rect x="25" y="31.5" width="5.5" height="2.75" rx="0.75"/><rect x="32" y="31.5" width="5.5" height="2.75" rx="0.75"/><rect x="39" y="31.5" width="5.5" height="2.75" rx="0.75"/>
+    <rect x="25" y="36" width="5.5" height="2.75" rx="0.75"/><rect x="32" y="36" width="5.5" height="2.75" rx="0.75"/><rect x="39" y="36" width="5.5" height="2.75" rx="0.75"/>
+  </g>
+  <g class="tint" fill="#7A828C" stroke="none">
+    <rect x="48" y="27" width="7" height="2.75" rx="0.75"/><rect x="48" y="31.5" width="7" height="2.75" rx="0.75"/><rect x="48" y="36" width="7" height="2.75" rx="0.75"/>
+  </g>
+</svg>

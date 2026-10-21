@@ -1,0 +1,27 @@
+#!args --verify-dirty
+# the page "Simulation" light, dark and at 150 %: a zoomed timeline with a selected range and
+# the playhead in it, the hex view with the IPv4 header selected and a byte under the pointer
+size 1440 960
+theme light
+wait 50
+click "Simulation"
+wait 50
+cmd 9100 2
+wheel 700,245 240
+cmd 9100 0
+drag 520,245 640,245 shift
+click 760,245
+dblclick text:"00 54 1C 46 40 00 40 01 9B 07 C0 A8 01 0A C0 A8"
+expect text:"Auswahl: 0x000E–0x0021 (20 Bytes)" exists
+expect text:"Feld: IPv4" exists
+move text:"01 01 08 00 51 A1 00 01 00 07 5F 2C 9B 66 00 00"
+wait 50
+shot build/shots/datagallery_sim_light.png
+theme dark
+wait 50
+expect text:"Auswahl: 0x000E–0x0021 (20 Bytes)" exists
+shot build/shots/datagallery_sim_dark.png
+scale 150
+wait 50
+expect text:"Feld: IPv4" exists
+shot build/shots/datagallery_sim_dark150.png

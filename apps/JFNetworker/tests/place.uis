@@ -1,0 +1,82 @@
+#!args --verify-dirty
+# placing devices (workspace/palette.rs, canvas/tools.rs): a tile dragged onto the canvas, a
+# tile clicked and then the canvas, Shift keeps the tile armed, Esc gives it up, undo and
+# redo.  A new project shows world (0, 0) at 630,320 (the canvas is 266,70 728x500, 100 %);
+# a device is centred on the point and its 64 x 48 box snapped to the 20 grid.
+theme light
+expect text:"0 Geräte · 0 Kabel" exists
+expect button:"Rückgängig" disabled
+# drag the PC tile onto the canvas: world (-100, -100) -> box at (-140, -120)
+drag button:"PC" 530,220
+expect listitem:"PC1" exists
+expect listitem:"PC1" rect 490 200 64 48
+expect listitem:"PC1" selected
+expect text:"1 Gerät · 0 Kabel" exists
+expect text:"1 ausgewählt" exists
+expect text:"Desktop-PC (2.5G Ethernet, USB-Konsole)" exists
+# a drag onto the inspector places nothing
+drag button:"PC" 1100,500
+expect text:"1 Gerät · 0 Kabel" exists
+# click a tile, then the canvas: world (100, 100) -> box at (60, 80); back to Auswahl
+click button:"JF-S24P"
+expect button:"JF-S24P" checked
+expect text:"Platzieren: JF-S24P" exists
+# a preview shows where it lands
+move 735,430
+shot build/jfnetworker/place_preview.png
+click 730,420
+expect listitem:"SW1" rect 690 400 64 48
+expect button:"JF-S24P" unchecked
+expect text:"2 Geräte · 0 Kabel" exists
+expect button:"Auswahl" checked
+# Shift keeps the tile armed for the next device
+click button:"Laptop"
+drag 830,220 830,220 1 shift
+expect listitem:"Laptop1" exists
+expect text:"Platzieren: Laptop" exists
+click 830,320
+expect listitem:"Laptop2" exists
+expect text:"Platzieren: Laptop" missing
+expect text:"4 Geräte · 0 Kabel" exists
+# Esc gives an armed tile up; a second click on the tile does too
+click button:"Tablet"
+expect text:"Platzieren: Tablet" exists
+key esc
+expect button:"Tablet" unchecked
+click button:"Tablet"
+click button:"Tablet"
+expect button:"Tablet" unchecked
+expect text:"4 Geräte · 0 Kabel" exists
+shot build/jfnetworker/place.png
+# undo removes, redo restores (keys and the toolbar)
+key ctrl+z
+expect listitem:"Laptop2" missing
+expect text:"3 Geräte · 0 Kabel" exists
+click button:"Rückgängig"
+expect listitem:"Laptop1" missing
+key ctrl+z
+expect listitem:"SW1" missing
+key ctrl+y
+expect listitem:"SW1" exists
+expect listitem:"SW1" rect 690 400 64 48
+click button:"Wiederholen"
+expect listitem:"Laptop1" exists
+expect text:"3 Geräte · 0 Kabel" exists
+# a new device after undo takes the free name again
+key ctrl+z
+click button:"Smartphone"
+click 430,420
+expect listitem:"Phone1" exists
+expect button:"Wiederholen" disabled
+# Enter on a tile puts the device into the middle of the view, the next one beside it
+focus button:"Drucker"
+key enter
+expect listitem:"Printer1" rect 590 300 64 48
+key enter
+expect listitem:"Printer2" rect 670 300 64 48
+# Ctrl+Shift+Z redoes like Ctrl+Y
+key ctrl+z
+expect listitem:"Printer2" missing
+key ctrl+shift+z
+expect listitem:"Printer2" exists
+expect_nowarn

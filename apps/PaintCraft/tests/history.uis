@@ -1,0 +1,386 @@
+# history.uis -- Verlauf (agent A2): pixel steps, undo / redo / jump, redo branch, layer
+# structure, layer properties, document size, compound, cancel, unchanged edits, saved state,
+# Verlauf löschen, one history per document, the Verlauf window (list, greyed redo rows,
+# buttons), memory budget (deflate, spill file, dropping), out of memory.
+# Test hooks: cmd 950..974 (hist_diag.s); probes "t.*" in the "Verlauf-Test" window.
+# ids: list rows 196609 + i (ID_HIST_LIST 0x30000 + 1 + i), buttons 4101 Alles rückgängig,
+# 4102 Rückgängig, 4103 Wiederholen, 4104 Vor bis zum Ende.
+
+cmd 950 1
+expect window 24578 open
+expect text:"t.n=1" exists
+expect text:"t.pos=1" exists
+expect text:"Neues Bild" exists
+expect #196609 selected
+expect #4101 disabled
+expect #4102 disabled
+expect #4103 disabled
+expect #4104 disabled
+expect text:"t.undo=0 redo=0" exists
+
+# ------------------------------------------------------------ pixel steps
+# red rectangle (10,10)-(100,80) on the current layer
+cmd 951 655370
+cmd 952 5242980
+cmd 953 4294901760
+cmd 961 0
+cmd 954 -1
+expect text:"t.n=2" exists
+expect text:"t.pos=2" exists
+expect text:"Farbeimer" exists
+expect #196610 selected
+expect text:"t.undo=1 redo=0" exists
+cmd 961 1
+# pattern (50,50)-(300,200)
+cmd 951 3276850
+cmd 952 13107500
+cmd 955 3
+expect text:"t.n=3" exists
+expect text:"Farbverlauf" exists
+cmd 961 2
+cmd 962 1
+expect text:"t.cmp=diff" exists
+
+# ------------------------------------------------------------ undo / redo (keys)
+key ctrl+z
+expect text:"t.pos=2" exists
+cmd 962 1
+expect text:"t.cmp=ok" exists
+expect #196610 selected
+key ctrl+z
+expect text:"t.pos=1" exists
+cmd 962 0
+expect text:"t.cmp=ok" exists
+key ctrl+z
+expect text:"t.pos=1" exists
+key ctrl+y
+expect text:"t.pos=2" exists
+cmd 962 1
+expect text:"t.cmp=ok" exists
+key ctrl+y
+expect text:"t.pos=3" exists
+cmd 962 2
+expect text:"t.cmp=ok" exists
+key ctrl+y
+expect text:"t.pos=3" exists
+
+# ------------------------------------------------------------ jumps: list and buttons
+click #196609
+expect text:"t.pos=1" exists
+expect #196609 selected
+cmd 962 0
+expect text:"t.cmp=ok" exists
+click #196611
+expect text:"t.pos=3" exists
+cmd 962 2
+expect text:"t.cmp=ok" exists
+click #4101
+expect text:"t.pos=1" exists
+expect #4101 disabled
+expect #4102 disabled
+expect #4103 enabled
+click #4104
+expect text:"t.pos=3" exists
+cmd 962 2
+expect text:"t.cmp=ok" exists
+click #4102
+expect text:"t.pos=2" exists
+click #4103
+expect text:"t.pos=3" exists
+cmd 155 1
+expect text:"t.pos=2" exists
+cmd 962 1
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ a new step discards the redo branch
+cmd 951 1310740
+cmd 952 3932220
+cmd 953 4278190335
+cmd 954 -1
+expect text:"t.n=3" exists
+expect text:"t.pos=3" exists
+expect text:"Farbverlauf" missing
+expect #4103 disabled
+expect #4104 disabled
+cmd 961 2
+
+# ------------------------------------------------------------ an unchanged edit makes no step
+cmd 954 -1
+expect text:"t.n=3" exists
+# cancel restores the pixels and makes no step
+cmd 953 4278255360
+cmd 956 -1
+expect text:"t.n=3" exists
+cmd 962 2
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ layers, properties, document size
+cmd 963 0
+cmd 957 1
+expect text:"t.layers=2" exists
+expect text:"t.cur=1" exists
+expect text:"Neue Ebene" exists
+cmd 955 11
+expect text:"t.n=5" exists
+cmd 961 3
+cmd 959 128
+expect text:"t.opac=128" exists
+expect text:"Ebeneneigenschaften" exists
+cmd 972 5
+expect text:"t.name=Ebene 5" exists
+cmd 961 4
+cmd 958 0
+expect text:"t.layers=1" exists
+expect text:"Ebene löschen" exists
+cmd 960 19661200
+expect text:"t.size=400x300" exists
+expect text:"Leinwandgröße" exists
+expect text:"t.n=9" exists
+cmd 961 5
+# back step by step
+key ctrl+z
+expect text:"t.size=800x600" exists
+expect text:"t.layers=1" exists
+key ctrl+z
+expect text:"t.layers=2" exists
+cmd 962 4
+expect text:"t.cmp=ok" exists
+key ctrl+z
+expect text:"t.opac=128" exists
+key ctrl+z
+expect text:"t.opac=255" exists
+cmd 962 3
+expect text:"t.cmp=ok" exists
+key ctrl+z ctrl+z
+expect text:"t.layers=1" exists
+cmd 962 2
+expect text:"t.cmp=ok" exists
+# and forward again in one jump
+click #4104
+expect text:"t.size=400x300" exists
+expect text:"t.layers=1" exists
+cmd 962 5
+expect text:"t.cmp=ok" exists
+# jump into the middle across the size change
+click #196613
+expect text:"t.layers=2" exists
+expect text:"t.size=800x600" exists
+cmd 962 3
+expect text:"t.cmp=ok" exists
+click #4104
+cmd 962 5
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ compound = one step
+cmd 951 655370
+cmd 952 5242980
+cmd 966
+expect text:"t.n=10" exists
+expect text:"Verbund" exists
+key ctrl+z
+cmd 962 5
+expect text:"t.cmp=ok" exists
+key ctrl+y
+expect text:"t.pos=10" exists
+
+# ------------------------------------------------------------ selection step (sel.s hooks absent)
+cmd 967
+expect text:"t.n=11" exists
+expect text:"Alles auswählen" exists
+key ctrl+z
+expect text:"t.pos=10" exists
+key ctrl+y
+
+# ------------------------------------------------------------ saved state
+cmd 971
+expect text:"t.mod=0" exists
+key ctrl+z
+expect text:"t.mod=1" exists
+key ctrl+y
+expect text:"t.mod=0" exists
+cmd 955 21
+expect text:"t.mod=1" exists
+key ctrl+z
+expect text:"t.mod=0" exists
+key ctrl+y
+
+# ------------------------------------------------------------ Verlauf löschen
+cmd 961 6
+cmd 152
+expect text:"t.n=1" exists
+expect text:"t.pos=1" exists
+expect text:"Neues Bild" exists
+expect #4102 disabled
+cmd 962 6
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ one history per document
+cmd 955 4
+expect text:"t.n=2" exists
+cmd 961 7
+cmd 968 13107400
+expect text:"t.docs=2" exists
+expect text:"t.n=1" exists
+expect text:"t.size=200x200" exists
+cmd 951 0
+cmd 952 6553700
+cmd 955 5
+expect text:"t.n=2" exists
+cmd 969 0
+expect text:"t.n=2" exists
+expect text:"t.size=400x300" exists
+key ctrl+z
+expect text:"t.pos=1" exists
+cmd 969 1
+expect text:"t.pos=2" exists
+expect text:"t.size=200x200" exists
+cmd 969 0
+key ctrl+y
+cmd 962 7
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ many steps: list scrolls
+cmd 951 0
+cmd 952 1048592
+cmd 973 40
+expect text:"t.n=42" exists
+expect #196650 selected
+cmd 961 0
+click #4101
+expect text:"t.pos=1" exists
+expect #196609 selected
+click #4104
+cmd 962 0
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ memory: deflate, spill file
+# 43 raw tiles (688 KB): a 512 KB budget deflates the oldest ones, no spill file yet
+expect text:"t.raw=43" exists
+cmd 963 512
+expect text:"t.z=0" missing
+expect text:"t.disk=0" exists
+expect text:"t.file=0" exists
+cmd 962 0
+expect text:"t.cmp=ok" exists
+click #4101
+click #4104
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# 12 KB: everything goes to the spill file
+cmd 963 12
+expect text:"t.file=1" exists
+expect text:"t.raw=0" exists
+expect text:"t.z=0" exists
+expect text:"t.disk=43" exists
+expect text:"t.msg=0" exists
+click #4101
+expect text:"t.pos=1" exists
+click #4104
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# no spill file: the oldest steps are dropped, with a message
+cmd 965 0
+cmd 963 1
+expect text:"t.msg=1" exists
+expect text:"t.n=42" missing
+cmd 962 0
+expect text:"t.cmp=ok" exists
+key ctrl+z
+key ctrl+y
+cmd 962 0
+expect text:"t.cmp=ok" exists
+cmd 974
+expect text:"t.msg=0" exists
+cmd 965 1
+cmd 963 0
+
+# ------------------------------------------------------------ out of memory: no crash
+cmd 961 1
+cmd 964 1
+cmd 951 131080
+cmd 952 2621480
+cmd 955 6
+expect text:"t.msg=1" exists
+expect text:"t.n=1" exists
+cmd 959 50
+expect text:"t.opac=50" missing
+cmd 964 0
+cmd 974
+cmd 961 1
+cmd 955 8
+expect text:"t.n=2" exists
+key ctrl+z
+cmd 962 1
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ the layer commands of layer.s
+# (hist_push_layers / hist_push_layer_props + hist_release in layer.s): every step undoes
+# and redoes exactly
+cmd 152
+cmd 961 2
+cmd 320
+expect text:"t.layers=2" exists
+cmd 951 655370
+cmd 952 5242980
+cmd 955 12
+cmd 322
+expect text:"t.layers=3" exists
+cmd 959 100
+cmd 323
+expect text:"t.layers=2" exists
+cmd 337
+cmd 336
+cmd 321
+expect text:"t.layers=1" exists
+expect text:"t.n=9" exists
+cmd 961 3
+click #4101
+expect text:"t.pos=1" exists
+cmd 962 2
+expect text:"t.cmp=ok" exists
+click #4104
+expect text:"t.pos=9" exists
+cmd 962 3
+expect text:"t.cmp=ok" exists
+key ctrl+z ctrl+z ctrl+z ctrl+z ctrl+z ctrl+z ctrl+z ctrl+z
+expect text:"t.pos=1" exists
+cmd 962 2
+expect text:"t.cmp=ok" exists
+key ctrl+y ctrl+y ctrl+y ctrl+y ctrl+y ctrl+y ctrl+y ctrl+y
+cmd 962 3
+expect text:"t.cmp=ok" exists
+# a new step after undoing a delete frees the deleted layer's pixels only once
+key ctrl+z
+expect text:"t.layers=2" exists
+cmd 955 13
+expect text:"t.n=9" exists
+cmd 152
+
+# ------------------------------------------------------------ a compound of structure steps
+# undone, then discarded by a new step: layers shared by both parts are freed once
+cmd 961 4
+cmd 979
+expect text:"Zwei Ebenen" exists
+expect text:"t.n=2" exists
+cmd 961 5
+key ctrl+z
+cmd 962 4
+expect text:"t.cmp=ok" exists
+key ctrl+y
+cmd 962 5
+expect text:"t.cmp=ok" exists
+key ctrl+z
+cmd 955 14
+expect text:"t.n=2" exists
+expect text:"Zwei Ebenen" missing
+cmd 979
+key ctrl+z ctrl+z
+cmd 979
+cmd 152
+
+# ------------------------------------------------------------ the window closes and opens (F6)
+key f6
+expect window 24578 closed
+key f6
+expect window 24578 open
+cmd 950 0

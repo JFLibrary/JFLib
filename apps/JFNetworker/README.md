@@ -1,0 +1,726 @@
+# JFNetworker
+
+Ein Netzwerksimulator und Labor für verteilte Systeme, gebaut als Alternative zu Cisco Packet
+Tracer: Geräte und Kabel auf einer Zeichenfläche, echte Protokolle Byte für Byte (Ethernet,
+ARP, IPv4/IPv6, ICMP, UDP, TCP, DHCP, DNS, später Routing-Protokolle), eine IOS-artige
+Befehlszeile für Router und Switches, eine Linux-artige Shell für Hosts, ein Simulationsmodus mit
+Paketanimation und PDU-Inspektor und Dienste, mit denen sich horizontal skalierte Systeme
+aufbauen lassen (Loadbalancer, geshardete Datenbanken, Caches, Queues, Lastgeneratoren, eigene
+Skripte).
+
+**Stand (2026-10-20):** Das Datenmodell, die Paket-Bausteine und der Simulationskern sind
+fertig: Switching mit VLANs und IPv4 mit ARP, Routing, ICMP, Ping und Traceroute, dazu UDP
+und TCP (RFC 9293 mit Reno, siehe [TCP](#tcp)) mit Sockets und ein virtuelles Betriebssystem
+pro Gerät mit Diensten: DHCP (Client, Server, Relay), DNS (autoritativer Server, Resolver mit
+Cache), Syslog, NTP, TCP-Testdienste (Echo, Discard, Client) und HTTP (Webserver, Client,
+Lastgenerator mit Latenzfenstern, siehe [HTTP](#http)) und das Labor für verteilte Systeme
+(Loadbalancer, geshardeter KV-Speicher mit Replikaten und Quoren, Cache, Message Queue, Worker
+und Fehlerinjektion, siehe [Labor für verteilte Systeme](#labor-für-verteilte-systeme)); die
+Befehlszeilen (IOS-artig für
+Netzwerkgeräte, eine Linux-Shell für Hosts mit `curl`, `nc`, `ss` und `top`) mit running- und
+startup-config;
+der Szenario-Runner `jfn-sim`; außerdem die Engine-Seite des Simulationsmodus (Schritte vor
+und zurück, Ereignisliste, Paket-Tab), pcapng-Mitschnitte und die Probleme-Liste. Das Fenster
+ist der Topologie-Editor: Geräte aus der Palette platzieren, verschieben, löschen und
+umbenennen, Notizen, Projekte öffnen und speichern. Der Simulator läuft im Editor in Echtzeit
+mit und folgt jeder Änderung (auch Rückgängig): Geräte verbinden mit Port-Auswahl, Kabel aller
+Arten mit LEDs aus dem Simulator, Wegpunkten und Verlauf, der Inspektor für Geräte (Strom,
+Schnittstellen mit Status und Adressen, schnelle IP-, DHCP- und Gateway-Einstellungen) und
+Kabel (Typ, Bandbreite, Verzögerung, Verlust, Stecker), die Probleme-Liste mit den Befunden
+des Simulators. Jedes Gerät hat seine Konsole im Terminal-Bereich (IOS-artig oder Linux-Shell,
+als Tab oder eigenes Fenster), dazu ein Gerätefenster mit Übersicht, Schnittstellen,
+Formularen für die Konfiguration, Diensten, CLI und bei Hosts einem Desktop; das Protokoll
+sammelt die Meldungen aller Geräte, und `copy running-config startup-config` landet mit
+Rückgängig im Projekt (siehe [Konsolen, Gerätefenster, Protokoll](#konsolen-gerätefenster-protokoll)).
+Dazu kommt der Simulationsmodus im Fenster: Echtzeit oder Schritt für Schritt (vor, zurück
+entlang der Aufzeichnung, Abspielen mit Tempo 0,25× bis 8×), Pakete als Umschläge auf den
+Kabeln, Ereignisliste mit Zeitleiste, Paket-Tab mit Schichten und Bytes, eigene PDUs (einfach
+per Werkzeug P, komplex mit Protokoll, Ports, Größe, TTL und Anzahl) und der Export der
+Aufzeichnung als pcapng (siehe [Simulationsmodus](#simulationsmodus)). Als Nächstes folgt die
+Politur der Oberfläche (siehe [Fahrplan](#fahrplan)).
+
+## Bauen und testen
+
+```
+python build_rs.py app JFNetworker
+build/win/JFNetworker.exe                                   # der Editor
+build/win/JFNetworker.exe --open apps/JFNetworker/tests/fixtures/office.jfnet
+build/win/JFNetworker.exe --selftest                        # Prüfungen von Modell und Simulator
+build/win/JFNetworker.exe --selftest --pcap-out DIR         # dazu die Mitschnitte der Prüfungen
+build/win/JFNetworker.exe --script apps/JFNetworker/tests/place.uis --verify-dirty
+
+build/win/jfn-sim.exe run apps/JFNetworker/tests/fixtures/lan_router.jfnet --scenario apps/JFNetworker/tests/scen/lan_router.scn
+build/win/jfn-sim.exe check apps/JFNetworker/tests/fixtures/lan_router.jfnet
+build/win/jfn-sim.exe decode "ff ff ff ff ff ff 02 4a 00 00 01 01 08 06 ..."
+build/win/JFNetworker.exe apps/JFNetworker/tests/fixtures/two_pcs.jfnet --scenario apps/JFNetworker/tests/scen/two_pcs.scn
+```
+
+`python build_rs.py test --quick` führt alle Skripte in `tests/` aus: `model.uis` (Selbsttest
+mit den Gruppen `sim`, `l3`, `simmode`, `svc`, `cli`, `tcp`, `http`, `console`, `pdu` und `lab`), die Golden-Szenarien `scen_*.uis` und
+die Fensterskripte, alle mit `--verify-dirty`: `catalog.uis` (Palette und Suche), `shell.uis`
+(Bereiche, Menüs, Ansicht, Bilder hell, dunkel und 150 %), `place.uis` (Ziehen und
+Klicken-zum-Platzieren, Rückgängig), `edit.uis` (Verschieben, Rahmenauswahl, Löschen,
+Umbenennen mit abgelehnten Namen, Notizen, Hand), `links.uis` (Kabel beim Löschen und
+Wiederherstellen), `file.uis` und `file_reopen.uis` (Speichern unter `build/jfn_test.jfnet`,
+die Rückfrage bei Änderungen, Öffnen, zuletzt geöffnete Dateien; `file_reopen.uis` öffnet die
+Datei per `--open` wieder und läuft deshalb nach `file.uis`), `connect.uis` (Werkzeug C,
+Port-Auswahl, Umschalt und Port-Punkte, rot markierte Ziele ohne passenden Port),
+`cable_types.uis` (jede Kabelart, Typ aus dem Kontextmenü; Bilder hell, dunkel und 150 %),
+`waypoints.uis` (Wegpunkte einfügen, ziehen, löschen; gerade, rechtwinklig, Kurve),
+`inspector.uis` (Schnittstellen, schnelle Einstellungen, Kabelqualität, Mehrfachauswahl),
+`engine.uis` (LEDs und Zustände folgen Strom und Stecker, Befunde des Simulators),
+`undo.uis` (Verbinden und Trennen auf allen Wegen, ein gelöschter Switch kommt mit seiner
+laufenden Konfiguration zurück), `terminal_ios.uis` (R1s Konsole: Modi, `?`, Tab, Fehler mit
+`^`, `ping` mit `.!!!!`, Strg+Umschalt+6, `show ip route`, `--More--`, `terminal length 0`,
+`hostname`, `copy run start` mit Rückgängig und Wiederholen; Bilder hell, dunkel und 150 %),
+`terminal_linux.uis` (PC1s Shell: `ip addr`, `ping` bis Strg+C, Tab, Strg+L; Tabs umbenennen,
+eigenes Fenster, nebeneinander, schließen; ein ausgeschaltetes Gerät), `device_window.uis`
+(Formulare, die Befehle in die Konsole tippen und die Startkonfiguration ändern, Dienste,
+CLI, Desktop mit IP-Konfiguration, Texteditor und Browser), `log.uis` (Protokoll mit
+Filtern nach Gerät, Schwere und Text) und für den Simulationsmodus `simulation.uis` (Schritte
+vor und zurück, „Zurück zu live“, Pakete zu festen Zeitpunkten, Punkte unter 50 %, Filter,
+„Nur Auswahl“, Tempo, Abspielen, Zurücksetzen), `events.uis` (Liste und Zeitleiste in beide
+Richtungen, Chips, Echtzeit), `packet.uis` (Schritt am Gerät, Baum und Hex gekoppelt) und
+`pdu.uis` (einfache und komplexe PDUs, Stoppen, erneut senden, pcapng-Export), jeweils mit
+Bildern hell, dunkel und 150 %. Der Selbsttest hat dafür die Gruppen `console` (Log-Meldungen
+als `Report::Log`, gesicherte Konfiguration und Dienste durch Rückgängig) und `pdu`.
+`tests/fixtures/office.jfnet` ist ein kleines Büronetz mit jeder Kabelart, `cables.jfnet` eine
+Gerätereihe ohne Kabel, `pdu_lab.jfnet` ein Labor mit DHCP, DNS (Zone `lab`) und TCP-Echo für
+die PDUs. Die Bausteine aus `lib/` prüft `coretest`
+(Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`, `rng`, `metrics`, `jmap`, `cmdtree`,
+`hashring`, `lru`), die
+Skriptsprache die Gruppe `script`.
+
+## Aufbau
+
+| Teil | Ort | Inhalt |
+|---|---|---|
+| Pakete | [`lib/netpkt`](../../lib/netpkt/lib.rs) | Adressen, Prüfsummen, Codecs von Ethernet bis TCP, DHCP, DNS, NTP, Syslog, HTTP/1.1 (inkrementell, [`http.rs`](../../lib/netpkt/http.rs)), Dissektor, pcapng (Library, ohne I/O) |
+| Metriken | [`lib/base/metrics.rs`](../../lib/base/metrics.rs) | Counter, Gauge, log-lineares Histogramm, Fenster 300 × 1 s für p50/p95/p99 |
+| Zufall | [`lib/base/rng.rs`](../../lib/base/rng.rs) | deterministische Zufallszahlen (PCG32) für reproduzierbare Läufe |
+| Befehlsbaum | [`lib/base/cmdtree.rs`](../../lib/base/cmdtree.rs) | IOS-artige Befehlszeilen: Abkürzungen, `?`, Tab, Modi, `no`, typisierte Parameter, Fehlerposition |
+| Hash-Ring, LRU | [`lib/base/hashring.rs`](../../lib/base/hashring.rs), [`lib/base/lru.rs`](../../lib/base/lru.rs) | Consistent Hashing mit vnodes und Präferenzlisten; LRU-Tabelle nach Anzahl und Gewicht |
+| JSON | [`lib/agent_core/src/jmap.rs`](../../lib/agent_core/src/jmap.rs) | `record!` / `wire_enum!` für das Projektformat |
+| Datenmodell | [`crates/jfn_model`](crates/jfn_model/lib.rs) | Gerätekatalog, Interface-Namen, Kabelregeln, Projekt, Szenarien |
+| Simulator | [`crates/jfn_sim`](crates/jfn_sim/lib.rs) | Ereignis-Kern, Kabel mit Laufzeit/Verlust/Warteschlangen, Bridge mit VLANs, Hub, IPv4 mit ARP, Routing und ICMP, Ping- und Traceroute-Jobs, virtuelles OS mit UDP- und TCP-Sockets ([`tcp.rs`](crates/jfn_sim/tcp.rs)) und Diensten (DHCP, DNS, Resolver, Syslog, NTP, TCP-Testdienste in [`tcpsvc.rs`](crates/jfn_sim/tcpsvc.rs), HTTP in [`http.rs`](crates/jfn_sim/http.rs) und [`httpsvc.rs`](crates/jfn_sim/httpsvc.rs)), Trace, Zustand für die Leinwand, Treiber; Simulationsmodus, pcapng-Export, Probleme-Liste; Befehlszeilen in [`cli/`](crates/jfn_sim/cli/mod.rs) (`curl`, `nc`, `ss`, `top` in [`tools.rs`](crates/jfn_sim/cli/tools.rs), `lbctl`, `kvctl` … in [`lab.rs`](crates/jfn_sim/cli/lab.rs)), Szenarien in [`runner.rs`](crates/jfn_sim/runner.rs); das Labor: Loadbalancer, KV-Speicher, Cache, Queue und Worker ([`lb.rs`](crates/jfn_sim/lb.rs), [`kv.rs`](crates/jfn_sim/kv.rs), [`cache.rs`](crates/jfn_sim/cache.rs), [`mq.rs`](crates/jfn_sim/mq.rs)), Disk ([`disk.rs`](crates/jfn_sim/disk.rs)), Fehlerinjektion ([`fault.rs`](crates/jfn_sim/fault.rs)) |
+| Runner | [`crates/jfn_run`](crates/jfn_run/lib.rs), [`sim/main.rs`](sim/main.rs) | `jfn-sim` und `--scenario` der GUI-Exe: Dateien lesen, Bericht, pcapng, Vergleich mit Golden-Dateien |
+| App | [`src/app`](src/app/mod.rs) | Start (auch `--selftest` und `--scenario`), Zustand (`Net`), Befehle und Menüs, Kennungen |
+| | [`src/workspace`](src/workspace/mod.rs) | Fensterrahmen, Palette, Eigenschaften (`inspector/`: Gerät, Kabel, Projekt), Zeichenfläche (`canvas/`: Szene und Zeichnen, Werkzeuge, Verbinden, Kabel), Simulationsmodus ([`sim/`](src/workspace/sim/mod.rs): Steuerung, Animation, Ereignisse, Paket, PDUs und Export), Symbole und UI-Icons (`icons/`, erzeugt von `tools/vsym.py` und [`mkicons.py`](mkicons.py)), Terminal-Bereich und Konsolenfenster ([`terminal.rs`](src/workspace/terminal.rs)), Protokoll ([`logview.rs`](src/workspace/logview.rs)), Gerätefenster ([`devwin/`](src/workspace/devwin/mod.rs): Übersicht, Schnittstellen, Konfiguration, Dienste, CLI, Desktop) |
+| | [`src/doc`](src/doc/mod.rs) | das offene Projekt mit Rückgängig (`edits.rs`), Dateien und Dialoge (`file.rs`), der Simulator dahinter (`sim.rs`), Einstellungen, die die Konfiguration eines Geräts ändern (`config.rs`), die Konsolen der Geräte und die Meldungen des Simulators an sie ([`console.rs`](src/doc/console.rs)) |
+| | [`src/sim_thread.rs`](src/sim_thread.rs) | Treiber mit eigenem Thread für Echtzeit und lange Läufe (nur nativ) |
+| | [`src/selftest.rs`](src/selftest.rs), [`src/simtest.rs`](src/simtest.rs), [`src/l3test.rs`](src/l3test.rs), [`src/simmodetest.rs`](src/simmodetest.rs), [`src/svctest.rs`](src/svctest.rs), [`src/clitest.rs`](src/clitest.rs), [`src/tcptest.rs`](src/tcptest.rs), [`src/httptest.rs`](src/httptest.rs), [`src/consoletest.rs`](src/consoletest.rs), [`src/pdutest.rs`](src/pdutest.rs), [`src/labtest.rs`](src/labtest.rs) | Selbsttests von Modell, Simulator, Befehlszeilen, TCP, HTTP, PDUs, dem Labor und dem, worauf die Konsolen bauen (`--selftest`) |
+| Tests | [`tests/`](tests) | Skripte, Fixtures (`fixtures/*.jfnet`), Szenarien mit Golden-Berichten (`scen/*.scn`, `scen/*.report`) |
+
+### Gerätekatalog
+
+Herstellerneutrale, moderne Modelle: PC (2.5G), Laptop, Smartphone und Tablet (WLAN 802.11ax mit 6 GHz),
+Drucker, IP-Telefon und IP-Kamera (PoE), IoT-Sensor, Smart-TV; Access-Switch 24× 1G PoE+ mit
+4× 10G SFP+, L3-Switches (1G und 10GBASE-T mit 100G QSFP28), Edge- und Core-Router (bis 100G,
+serielle WAN-Ports), Heimrouter mit WLAN, Hub; Next-Generation-Firewall; WLAN-Access-Point (802.11ax, 6 GHz),
+Modem/ONT, Internet-Wolke; Rack- und Tower-Server; Loadbalancer, DB-Shard, Cache, Message Queue,
+Lastgenerator, Container-Host. Netzwerkgeräte tragen IOS-Interface-Namen
+(`GigabitEthernet1/0/1`, Abkürzungen wie `gi1/0/1` gehen überall), Hosts Linux-Namen (`eth0`,
+`wlan0`).
+
+### Kabel
+
+`cable_kind` nennt das richtige Kabel für zwei Ports: Kupfer gerade oder gekreuzt (nach MDI /
+MDI-X; mit Auto-MDI-X funktionieren beide), Glasfaser für SFP/SFP+/SFP28 untereinander und
+QSFP28 mit QSFP28, seriell, Konsolenkabel (Konsole an USB), Funk (WLAN-Gerät an Access Point)
+und WAN-Leitungen. Beim schnellen Verbinden wählt `suggest_ports` das Portpaar: Funk, wenn ein
+Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinsten Portnummern.
+
+### Im Editor: Verbinden, Kabel, Inspektor
+
+- **Verbinden** (Werkzeug C): von einem Gerät auf ein anderes ziehen oder beide nacheinander
+  anklicken. Das Ziel ist in Akzentfarbe umrandet, wenn ein freier Port dazu passt, sonst rot
+  mit dem Tooltip „Kein passender Port“. Beim Loslassen öffnet sich am Zeiger die Port-Auswahl:
+  beide Geräte mit allen Ports (Typ-Symbol, Name, Speed, Zustand), belegte mit ihrer
+  Gegenstelle, Ports ohne Partner mit dem Grund; das beste Paar ist gewählt, darunter das Kabel
+  („Automatisch: Kupfer, gerade“ oder ein anderes, das passt); Enter verbindet. Umschalt beim
+  Loslassen oder ein Zug von Port-Punkt zu Port-Punkt (beim Überfahren erscheint je
+  Portgruppe der nächste freie Port als Punkt am Rand) verbindet sofort.
+- **Kabel** laufen vom Rand des einen Geräts zum Rand des anderen, gerade, rechtwinklig oder
+  als Kurve durch ihre Wegpunkte, und zeigen ihre Art nicht nur über die Farbe: Kupfer
+  durchgezogen, gekreuzt gestrichelt, Glasfaser orange, seriell mit Zickzack, Konsole
+  gepunktet, Funk dünn gepunktet, WAN doppelt. 12 Einheiten vor jedem Ende sitzt die LED des
+  Ports aus dem Simulator (grün aktiv, rot unten, grau ohne Strom, bernstein für blockierend
+  und lernend); ab 100 % stehen die Portnamen daneben. Der Tooltip nennt Ports, Art, Speed,
+  Zustand und Pakete pro Sekunde. Ein gewähltes Kabel hat „+“-Griffe in der Mitte seiner
+  Abschnitte (ziehen fügt einen Wegpunkt ein, Doppelklick auf einen Wegpunkt entfernt ihn),
+  das Kontextmenü wechselt Verlauf und Kabeltyp und trennt; Entf oder das × neben einem
+  überfahrenen Kabel trennt es. Alles ist rückgängig zu machen.
+- **Inspektor:** ein Gerät mit Name, Modell, Strom und seinen Schnittstellen, wie der Simulator
+  sie führt (Status in der Farbe der LED, IPv4-Adresse, Gegenstelle, Speed, VLAN, MAC); die
+  gewählte Schnittstelle bekommt schnelle Einstellungen (Adresse mit Präfix, DHCP, aktiv, bei
+  Hosts das Standard-Gateway). Sie gelten sofort und landen in der Startkonfiguration des
+  Geräts, die der Simulator dafür schreibt; Rückgängig startet das Gerät mit der vorigen neu.
+  Ein Kabel zeigt seine Enden, Zustand, Typ („Automatisch“ oder gewählt), Bandbreite,
+  Verzögerung, Verlust, Stecker und Verlauf; mehrere Objekte lassen sich gemeinsam ein- und
+  ausschalten.
+- **Simulator im Editor** ([`src/doc/sim.rs`](src/doc/sim.rs)): `Engine::from_project` beim
+  Öffnen und bei Neu, danach wird jede Änderung über die Rückgängig-Liste als `Action`
+  nachgeführt (Geräte, Namen, Strom, Kabel, Kabeltyp, Stecker, Bandbreite, Verzögerung,
+  Verlust); Rückgängig und Wiederholen schicken die Gegen-Actions, ein gelöschtes Gerät kommt
+  mit seiner laufenden Konfiguration zurück. `jfn_sim::Inline` läuft über einen UI-Timer in
+  Echtzeit, in Skriptläufen auf der virtuellen Uhr (`wait`), daher sind die Tests
+  wiederholbar. Alle Befehle an den Simulator gehen über `Sim::send`, seine Meldungen holt
+  `Sim::take_reports` ab (für die Konsolen und den Simulationsmodus).
+
+### Konsolen, Gerätefenster, Protokoll
+
+- **Konsolen** (Terminal-Bereich; [`src/workspace/terminal.rs`](src/workspace/terminal.rs),
+  [`src/doc/console.rs`](src/doc/console.rs)): Ein Doppelklick auf ein Gerät (auch Enter auf
+  der Zeichenfläche, „Konsole öffnen“ im Kontextmenü oder im Inspektor) öffnet seine
+  Befehlszeile als Tab. Jedes Gerät hat genau eine Konsole mit 5000 Zeilen Rückblick, Verlauf
+  (↑/↓), Suche (Strg+F) und den Meldungen seit dem Start. Eine Zeile geht als `Cmd::Cli` an das
+  Gerät, seine Ausgabe kommt als `Report::CliOut`; Prompt und Modus liefert das Gerät, ein
+  laufender Befehl hält die Eingabe zurück (vorab Getipptes läuft danach). IOS-artig: `?` zeigt
+  die Hilfe aus dem Befehlsbaum der Engine, Tab vervollständigt, Fehler zeigen mit `^` auf die
+  Stelle, Strg+Umschalt+6 bricht `ping` und `traceroute` ab, Strg+Z verlässt die
+  Konfiguration, und was ein Befehl ausgibt, blättert mit `--More--` (24 Zeilen pro Seite;
+  `terminal length N` ändert das, `0` schaltet es ab). Linux-Shell: Tab listet mehrere
+  Möglichkeiten, Strg+C bricht ab, Strg+L leert. Tastenkürzel des Editors und Rückgängig
+  bleiben dabei außen vor. Tabs lassen sich umbenennen, schließen und in eigene Fenster lösen
+  („Konsolen nebeneinander“ verteilt alle über die untere Fensterhälfte; Schließen eines
+  Konsolenfensters dockt die Konsole wieder an). Ein ausgeschaltetes Gerät sagt es in seiner
+  Konsole und lässt sich dort einschalten.
+- **Startkonfiguration:** `copy running-config startup-config` (und `write memory`) landet als
+  Rückgängig-Schritt im Projekt; der Titel zeigt die ungespeicherte Änderung, und beim
+  Speichern geht die Konfiguration in die Datei. Rückgängig und Wiederholen ändern nur, womit
+  das Gerät startet: Seine laufende Konfiguration bleibt (`Doc::apply_kept`, `Sim::keep`).
+  `hostname` benennt das Gerät im Projekt um; einen Namen, den das Projekt ablehnt, nimmt das
+  Gerät zurück.
+- **Gerätefenster** (Umschalt+Doppelklick, „Gerätefenster …“ im Kontextmenü oder Inspektor;
+  [`src/workspace/devwin/`](src/workspace/devwin/mod.rs)): Übersicht (Modell, Ports, Strom,
+  Zustand, Adressen), Schnittstellen (Zustand, IPv4, Gegenstelle, Speed, VLAN, MAC,
+  Paketzähler), Konfiguration (Formulare für Name, Adresse, Beschreibung, aktiv, Access-VLAN,
+  DHCP, Standardroute und statische Routen; sie tippen die passenden Befehle in die Konsole –
+  `interface …`, `ip address …`, `ip route …` bzw. `ip addr add …`, `ip route add default via
+  …` – und werden ein Rückgängig-Schritt in der Startkonfiguration; „Laufende Konfiguration
+  sichern“), Dienste (DHCP, DNS, Syslog, NTP, TCP-Testdienste mit Zustand und Zahlen; die des
+  Projekts schalten sich sofort ein und aus, auch rückgängig ohne Neustart), CLI (dieselbe
+  Konsole wie im Terminal-Tab) und bei Hosts ein Desktop: IP-Konfiguration (statisch oder
+  DHCP), Eingabeaufforderung, Texteditor (`notizen.txt`: die Notizen des Geräts, gespeichert
+  im Projekt, bis der Simulator ein Dateisystem hat) und ein Text-Browser, der schon Adressen
+  und Ports auflöst und Seiten zeigt, sobald der Simulator HTTP spricht. Eine Konsole erscheint
+  an einer Stelle: Zeigt das Gerätefenster sie, verweist der Tab dorthin. Offen sind höchstens
+  zwei Gerätefenster und drei Konsolenfenster.
+- **Protokoll** ([`src/workspace/logview.rs`](src/workspace/logview.rs)): die Log-Zeilen aller
+  Geräte als `Report::Log` – Syslog-Meldungen ihrer Dienste (dhclient, dhcpd, NTP …), die
+  IOS-artigen Meldungen `%LINK`, `%LINEPROTO` und `%SYS` mit der Schwere aus ihrem Code und mit
+  `debug` jede Entscheidung (Schwere 7, das Teilsystem als Quelle) – mit Zeit, Gerät, Schwere,
+  Quelle und Meldung; Filter nach Gerät, Schwere („… und wichtiger“) und Text, „Neueste zeigen“
+  folgt neuen Zeilen, ein Doppelklick zeigt das Gerät auf der Zeichenfläche. Die Schrift der
+  Konsolen ist DejaVu Sans Mono (Lizenz: `lib/doc_view/assets/DejaVu-LICENSE.txt`).
+
+### Projektdatei `.jfnet`
+
+Eingerücktes JSON; fehlende Felder gelten als Vorgabe, unbekannte werden übersprungen. Die
+Konfiguration eines Geräts ist sein startup-config-Text, den der Simulator durch die
+Befehlszeile einspielt. Positionen sind Weltkoordinaten (DIP bei 100 %): bei Geräten die linke
+obere Ecke ihres 64 × 48 großen Symbols, bei Notizen die der Karte. `layout` hält die Ansicht
+beim Speichern (`zoom_pm` in Promille, Mitte `cx`, `cy`, Raster `grid`); fehlt sie, zeigt das
+Programm beim Öffnen alles.
+
+```json
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Büro",
+  "seed": 42,
+  "next_id": 5,
+  "devices": [
+    { "id": 1, "name": "PC1", "model": "pc", "x": 0, "y": 0, "startup_config": "" },
+    { "id": 3, "name": "SW1", "model": "jf-s24p", "x": 50, "y": 100 }
+  ],
+  "links": [
+    { "id": 4, "a": { "dev": 1, "port": "eth0" }, "b": { "dev": 3, "port": "GigabitEthernet1/0/1" },
+      "cable": "copper", "kbps": 1000000, "delay_ns": 50 }
+  ]
+}
+```
+
+### Simulator
+
+Ein Ereignis-Kern über virtueller Zeit in Nanosekunden; gleiche Projekte und gleicher Seed
+ergeben byte-gleiche Läufe. Ein Kabel braucht für einen Frame die echte Sendezeit (Frame,
+mindestens 60 Byte, plus FCS, Präambel und Pause: 1 Gbit/s und 100 Byte ergeben 992 ns) plus
+Laufzeit; Switches speichern und leiten weiter, lernen MAC-Adressen (Aging 300 s), fluten
+unbekannte Ziele nur an aktive Ports und trennen VLANs (Access, Trunk mit Native-VLAN und
+erlaubter Liste, Tags auf dem Trunk). Router-Ports starten wie unter IOS abgeschaltet. Jeder
+Frame auf jedem Kabel und jede Entscheidung eines Geräts landet in der Aufzeichnung, aus der
+später der Simulationsmodus, der PDU-Inspektor und der pcapng-Export lesen.
+
+IPv4 läuft auf Ports, 802.1Q-Subinterfaces (Router-on-a-stick), den Switch-eigenen
+Interfaces (`Vlan10`, unter Linux `br0`), gerouteten Switch-Ports und Loopbacks:
+
+- **ARP:** drei Anfragen im Sekundenabstand. Linux hält bis zu 101 Pakete zurück und meldet
+  danach „Host unreachable“. IOS verwirft das Paket, das die Anfrage auslöst; daher kommt das
+  bekannte `.!!!!` beim ersten Ping.
+- **Routing:** der längste Präfix gewinnt, dann die Distanz, dann die Metrik. Statische Routen
+  gehen über einen nächsten Hop, auch rekursiv, oder über ein Interface. Ein L3-Switch routet
+  erst nach `ip routing`.
+- **Weiterleiten:** TTL, Fragmentieren und Zusammensetzen, „Fragmentation needed“ mit der MTU
+  des nächsten Abschnitts. Gerichtete Broadcasts bleiben draußen. IOS-Interfaces beantworten
+  ARP für Hosts hinter einem anderen Interface (Proxy-ARP). Serielle Leitungen tragen
+  Cisco-HDLC.
+- **ICMP-Fehler:** nach RFC 1812, also nie über Fehler, Broadcasts oder Folgefragmente.
+  Absender ist das Eingangs-Interface. Linux zitiert bis zu 576 Byte des Pakets, IOS den Kopf
+  und 8 Byte. Die Rate ist begrenzt wie im Original: IOS schickt höchstens alle 500 ms ein
+  Unreachable, daher `U.U` und Sternchen im Traceroute. Linux schickt 50 auf einmal und dann
+  1000 pro Sekunde, an ein Ziel 6 auf einmal und dann eins pro Sekunde.
+- **Ping und Traceroute:** Jobs über virtuelle Zeit mit exakten Laufzeiten. Ein Ping über einen
+  Switch mit 1 Gbit/s braucht 4104 ns.
+- **Loopback:** auf Linux-Geräten ist ganz 127.0.0.0/8 das Gerät selbst. Kommt so eine Adresse
+  über ein Kabel, wird das Paket verworfen.
+
+### Simulationsmodus
+
+Im Simulationsmodus läuft die Uhr nur auf Knopfdruck. Ein Schritt geht bis zum nächsten
+Frame, der auf ein Kabel geht, auf Wunsch nur für bestimmte Protokolle (ARP, ICMP, …) oder
+Geräte. „Schritt zurück“ wandert die Aufzeichnung entlang und zeigt Kabel, Ereignisse und
+Pakete zu diesem Zeitpunkt; die Geräte behalten dabei ihren heutigen Zustand (den Zustand von
+damals bringen Keyframes in Phase 4). Der nächste Schritt geht durch die Aufzeichnung wieder
+vor, „Zurück zu live“ springt sofort in die Gegenwart. Für die Oberfläche liefert der
+Simulator:
+
+- **Paketanimation:** welche Frames zu einem Zeitpunkt auf welchem Kabel sind und wie weit sie
+  zwischen Senden und Empfang gekommen sind (`frames_at`), dazu, wo etwas verworfen wurde
+  (`drops_between`, das rote ×).
+- **Ereignisliste:** jede Entscheidung eines Geräts als Zeile mit Zeit, „Von“, „Bei“,
+  Protokoll, Schicht und deutschem Text (`event_rows`), filterbar nach Protokollen und Geräten.
+  Hosts melden auch, dass sie eine ARP-Anfrage nach einer fremden Adresse verwerfen.
+- **Paket-Tab:** was ein Gerät mit einem Frame gemacht hat, also eingehende PDU, Entscheidungen
+  und ausgehende PDUs (`step_of`, `hop_steps`). Jeder Frame kennt den Frame, der ihn ausgelöst
+  hat. `hop_layers` zerlegt die Bytes, bei seriellen Leitungen samt Cisco-HDLC-Kopf.
+- **Eigene PDUs** ([`pdu.rs`](crates/jfn_sim/pdu.rs)): ein Dienst schickt UDP-Datagramme mit
+  eigener TTL und Größe oder öffnet TCP-Verbindungen, einmal, n-mal oder bis er gestoppt wird,
+  auch an Namen, die der Resolver des Geräts erst auflöst. ICMP-Echos sind Ping-Jobs,
+  DNS-Abfragen Lookups des Resolvers. `Cmd::Seek(t)` stellt die Ansicht auf jeden Zeitpunkt der
+  Aufzeichnung.
+
+**Im Fenster** ([`src/workspace/sim`](src/workspace/sim/mod.rs)):
+
+- **Steuerung:** in der Werkzeugleiste Echtzeit | Simulation, Abspielen/Anhalten (F6), Schritt
+  zurück (Umschalt+F7) und vor (F7), Tempo 0,25× bis 8×; dasselbe im Menü Simulation, dazu
+  „Zurück zu live“, „Nur Auswahl“ und „Simulation zurücksetzen“ (ein frischer Simulator aus dem
+  Projekt). In Echtzeit läuft die Uhr mit dem Tempo, im Simulationsmodus geht jeder Schritt zum
+  nächsten Zeitpunkt, an dem ein gezeigter Frame ein Gerät verlässt; Abspielen macht einen
+  Schritt pro Sekunde bei 1×. Steht die Ansicht in der Vergangenheit, sagt ein Hinweis über der
+  Zeichenfläche „Ansicht bei t = …“ mit dem Knopf „Zurück zu live“. Die Statusleiste nennt
+  Modus, Uhr und Ereignisse.
+- **Pakete auf der Leinwand:** kleine Umschläge in gedämpften Farben je Protokoll (ICMP grün,
+  ARP bernstein, DNS violett, TCP/HTTP blau, UDP cyan, DHCP petrol, STP grau, OSPF/RIP braun,
+  Rest schiefergrau), unter 50 % Zoom Punkte, dort auf dem Kabel, wo der Frame zum gezeigten
+  Zeitpunkt ist. Ein Schritt bewegt sie vom alten zum neuen Zeitpunkt (Ankommende laufen in ihr
+  Ziel und verblassen, neue erscheinen am Absender); Verworfenes zeigt ein rotes ×, das danach
+  ausblendet. Reduzierte Bewegung springt ohne Übergang. Ein Klick wählt den Frame und öffnet den
+  Paket-Tab. Gezeichnet wird über der Leinwand; ihr eigenes Bild bleibt im Cache, ein
+  Animations-Timer läuft nur, solange sich etwas bewegt oder abgespielt wird.
+- **Ereignisse:** Chips je Protokoll und „Nur Auswahl“ blenden Frames überall aus (Liste,
+  Zeitleiste, Leinwand, Schritte); die Auswahl der Protokolle speichert das Projekt. Darunter
+  die Zeitleiste mit einer Spur je Protokoll und dem Abspielkopf, darunter die Liste (#, Zeit
+  in Sekunden auf die Nanosekunde, Von, Bei, Typ, Info). Beide folgen einander: eine gewählte
+  Zeile zeigt ihren Zeitpunkt, ein bewegter Abspielkopf wählt die letzte Zeile davor. Im
+  Simulationsmodus passt sich die Zeitleiste den Ereignissen an, bis man selbst zoomt.
+- **Paket:** links der Schritt des Geräts (eingehender Frame, Entscheidungen mit Schicht,
+  ausgehende Frames; ein Klick zeigt den jeweiligen Frame), in der Mitte der Schichtenbaum (L1
+  mit Ports, Zeiten, Länge und Kabel, dann Ethernet II, 802.1Q, IPv4, TCP/UDP/ICMP und die
+  Anwendung mit allen Feldern und Problemen wie falschen Prüfsummen), rechts die Hex-Ansicht in
+  den Farben der Schichten. Ein Feld im Baum wählt seine Bytes, ein Klick auf ein Byte sein
+  Feld; die Zeile über den Bytes nennt beides.
+- **PDUs:** das Bedienfeld „PDUs“ (rechts, erscheint mit dem Simulationsmodus) listet die
+  eigenen PDUs mit Zustand („läuft: 1 von 2 gesendet …“, „fertig: …“, „gescheitert: …“) und
+  Knöpfen zum erneuten Senden, Stoppen und Entfernen. Einfache PDU: Werkzeug P, Quelle und Ziel
+  anklicken, ein ICMP-Echo an die Adresse des Ziels. Komplexe PDU: Quelle, Ziel als Gerät,
+  Adresse oder Name, ICMP-Echo, UDP, TCP oder DNS-Abfrage, Ports, Größe, TTL, Anzahl, Abstand,
+  periodisch.
+- **Export:** Datei › Exportieren › „Aufzeichnung als pcapng …“ schreibt alle aufgezeichneten
+  Frames für Wireshark.
+
+### Mitschnitt (pcapng)
+
+`Engine::pcapng` schreibt die Aufzeichnung als pcapng-Datei für Wireshark: alles (eine
+Schnittstelle pro Kabel, „PC1 eth0 – SW1 Gi1/0/1“), einen gefilterten Teil (Protokolle,
+Geräte, Zeitfenster), ein Kabel oder ein Gerät (eine Schnittstelle pro Port; Gesendetes mit
+der Sende-, Empfangenes mit der Empfangszeit). Zeitstempel sind die virtuelle Zeit in
+Nanosekunden. Ethernet-Kabel bekommen den Linktyp Ethernet, serielle Leitungen Cisco HDLC. Ein
+Kommentar pro Frame nennt beide Enden und Verluste auf der Leitung. Die Mitschnitte der
+Selbsttests (`--selftest --pcap-out DIR`) zerlegt tshark 4.6 vollständig und ohne
+Prüfsummenfehler.
+
+### Probleme
+
+`Engine::problems()` prüft den Aufbau und nennt Gerät, Port, Schweregrad und einen deutschen
+Text. Netze sind dabei die Broadcast-Domänen der verkabelten Topologie (Kabel, VLANs, Trunks,
+Tags, Hubs); für Schleifen zählen nur Kabel, die gerade aktiv sind.
+
+| Problem | Schweregrad |
+|---|---|
+| doppelte IP-Adresse im selben Netz | Fehler |
+| kein Standard-Gateway, obwohl ein Router im Netz ist | Warnung |
+| Gateway außerhalb der eigenen Netze / im Netz nicht zu finden | Fehler / Warnung |
+| Netzmasken passen im selben Netz nicht zusammen | Warnung |
+| Native VLAN verschieden, Access-Ports in verschiedenen VLANs | Warnung |
+| Trunk ohne gemeinsames erlaubtes VLAN | Fehler |
+| Access-Port gegen Trunk oder gegen Router-Subinterfaces | Warnung |
+| falsches Kupferkabel bei strengem MDI-X | Fehler |
+| Schleife aus Switches oder Hubs (Spanning Tree fehlt noch) | Fehler |
+| Interface mit Adresse, aber abgeschaltet | Warnung |
+
+### Treiber
+
+`jfn_sim::Inline` treibt den Simulator auf dem UI-Thread, deterministisch auch in Skripten.
+`src/sim_thread.rs` ist die Variante mit eigenem Thread (nur Windows und Linux): dieselben
+Befehle, Echtzeit und lange Läufe (`RunFor`, `RunIdle`) laufen im Hintergrund, `plat::wake()`
+weckt die Oberfläche (`UIC_WAKE`), `pending()` dient Testskripten als Sync-Hook.
+### Dienste und virtuelles Betriebssystem
+
+Jedes Gerät mit IP hat ein kleines Betriebssystem: UDP-Sockets (ein an ein Interface
+gebundener Socket geht vor einem allgemeinen), Dienste, die nur auf Ereignisse reagieren
+(Datagramm, Timer, Ping-Antwort, ARP-Konflikt, fertige Namensauflösung, Link), ein Log mit
+Syslog-Zielen, eine Hosts-Tabelle, einen Resolver und eine eigene Uhr, die anfangs bis zu 2 s
+falsch geht und um bis zu 30 ppm driftet. UDP an einen Port ohne Socket bekommt weiter „Port
+unreachable“. Konfiguriert wird über `Action`s (`DhcpClient`, `DhcpPool`, `DhcpHelper`,
+`DnsZone`, `DnsRecord`, `Resolver`, `LogHost`, `NtpServer`, `NtpMaster` …) oder über die
+Dienste eines Geräts in der Projektdatei (`"services": [{"kind": "dns-server", "config":
+{"zones": [{"origin": "lab", "records": ["www CNAME web", "web A 10.0.2.20"]}]}}]`).
+
+- **DHCP-Client:** unter Linux wie `dhclient`: DISCOVER sofort, Wiederholung nach 3 s mit
+  zufällig wachsendem Abstand (höchstens rund 15 s), nach 60 s ohne Angebot 300 s Pause; das
+  erste Angebot wird genommen; nach dem ACK zwei ARP-Proben im Sekundenabstand, eine Antwort
+  führt zu DHCPDECLINE und 10 s später zu einem neuen Versuch; Verlängerung zufällig zwischen
+  ¾ und 1 × T1 (unicast), nach T2 Rebind (broadcast), bei Ablauf ist die Adresse weg; nach
+  einem Neustart fragt er per INIT-REBOOT nach der alten Adresse. IOS (`ip address dhcp`)
+  setzt das Broadcast-Flag, nennt sich `cisco-<MAC>-<Interface>`, prüft nicht per ARP und
+  trägt die Default-Route mit Distanz 254 ein.
+- **DHCP-Server:** IOS vergibt die kleinste freie Adresse, pingt sie vorher zweimal mit je
+  500 ms und sendet T1/T2 mit; ISC dhcpd vergibt die höchste Adresse des Bereichs, pingt einmal
+  1 s lang und antwortet mit NAK nur, wenn er `authoritative` ist. Antwortet jemand auf den
+  Ping, wird die Adresse als Konflikt gesperrt. Ausgeschlossene Adressen, Leases (IOS 1 Tag,
+  dhcpd 600 s), Bindings, Konflikte, DECLINE, RELEASE, INFORM.
+- **DHCP-Relay** (`ip helper-address`): setzt giaddr auf die Adresse des Eingangs-Interfaces,
+  zählt die Hops und schickt per Unicast zum Server; die Antwort geht als Broadcast oder an die
+  MAC des Clients zurück. IOS hält Server und Relay in einem Dienst und bedient ein Netz mit
+  eigenem Pool selbst.
+- **DNS:** autoritativer Server mit Zonen (SOA, NS, A, AAAA, CNAME, PTR, MX, TXT), CNAME-Ketten,
+  Delegation mit Glue, NXDOMAIN und NODATA mit SOA, REFUSED außerhalb der Zonen oder
+  Weiterleitung über den eigenen Resolver. Der Resolver jedes Geräts arbeitet wie glibc mit
+  Suchdomänen (`ndots`), Timeout 5 s (IOS 3 s) und zwei Durchgängen über alle Server und hält
+  Antworten für ihre TTL im Cache, negative für das SOA-Minimum. `ping www` geht damit per Name.
+- **Syslog:** IOS schickt `<189>12: *Oct 19 12:00:05.123: %LINK-3-UPDOWN: …`, Linux das
+  BSD-Format mit Hostname und Programm; ein Syslog-Server sammelt die Meldungen.
+- **NTP:** Client und Server mit der virtuellen Uhr: die erste Antwort stellt die Uhr, später
+  wird nachgeführt und die Drift korrigiert; ein Gerät mit `ntp master` liefert seine eigene
+  Zeit. Eine asymmetrische Strecke verfälscht die Messung wie im echten Netz.
+
+Abfragen für die Befehlszeilen: `dhcp_leases`, `dhcp_bindings`, `dhcp_pools`, `dhcp_helpers`,
+`dns_zones`, `lookup` / `lookup_state`, `resolver_cache`, `resolv_conf`, `syslog_messages`,
+`log_lines`, `ntp_peers`, `clock_state`, `sockets`, `services`, `metric`, für TCP `tcp_conns`,
+`tcp_conn`, `tcp_stats` und `tcp_cfg`.
+
+Das Szenario im Selbsttest: PC1 und PC2 holen sich über R1 (Relay) Adressen vom Server SRV1 im
+Netz dahinter, lösen `www` über die Suchdomäne `lab` und den CNAME auf `web.lab` auf und pingen
+per Name, alles mit exakten virtuellen Zeiten. Den ersten weitergeleiteten DISCOVER verwirft R1,
+weil er erst nach der MAC von SRV1 fragt (IOS hält nichts zurück); PC1 bekommt seine Adresse
+deshalb erst nach der Wiederholung.
+### TCP
+
+TCP folgt RFC 9293 und läuft als Sockets im virtuellen Betriebssystem jedes Geräts
+([`tcp.rs`](crates/jfn_sim/tcp.rs)). Die Zahlen kommen vom System des Geräts: Hosts verhalten
+sich wie Linux, Router und Switches IOS-artig.
+
+- **Zustände:** alle elf, mit Simultaneous Open (die SYNs kreuzen sich, beide antworten mit
+  SYN-ACK) und Simultaneous Close (CLOSING). Ein SYN an einen Port ohne Listener bekommt RST,
+  ACK. TIME-WAIT dauert 60 s; ein wiederholter FIN startet sie neu, ein neuer SYN mit höherer
+  Folgenummer öffnet die Verbindung sofort wieder. ISNs und flüchtige Ports kommen aus den
+  Zufallszahlen des Geräts (Linux: 32768 bis 60999, gerade Ports zuerst).
+- **Segmente und Fenster:** die MSS-Option aus der MTU der Route (IOS-artig 536 zu Zielen
+  außerhalb der eigenen Netze); „Fragmentation needed“ senkt die MSS. Linux setzt DF, bietet
+  ohne Window Scaling 64240 Byte an (65535, abgerundet auf die MSS) und rundet Fenster auf
+  ganze Segmente; IOS-artig sind es 4128 Byte mit der SWS-Regel des Empfängers aus dem RFC.
+- **Neuübertragung:** RTO nach RFC 6298 mit den Grenzen des Systems (Linux 200 ms bis 120 s,
+  IOS-artig ab 300 ms), Karns Regel, doppelter Abstand nach jedem Timeout. Linux gibt Daten
+  nach 15 Wiederholungen auf (924,6 s), einen SYN nach sechs (127 s); IOS-artig endet ein
+  Verbindungsversuch nach 30 s. Segmente außer der Reihe werden gehalten und sofort mit einem
+  doppelten ACK beantwortet.
+- **Staukontrolle:** Reno nach RFC 5681, in Bytes gerechnet: Slow Start (Linux mit 10
+  Segmenten Anfangsfenster), Congestion Avoidance, Fast Retransmit nach drei doppelten ACKs
+  und Fast Recovery, Limited Transmit, Neustart nach einer Pause. Nach einem verlorenen SYN
+  beginnt die Verbindung mit einem Segment.
+- **ACKs:** verzögert (Linux 40 ms, mit Quick-ACKs am Anfang und im Ping-Pong-Modus auf der
+  Antwort; IOS-artig 200 ms), sofort bei mehr als einem vollen Segment, bei Lücken und
+  Duplikaten. Nagle (Linux nach Minshall), Fenster-Updates nach dem Lesen, Zero-Window-Probes
+  über den Persist-Timer (Linux ohne Daten knapp unter SND.UNA, IOS-artig mit einem Byte),
+  Challenge-ACKs nach RFC 5961, Keepalive nur auf Wunsch (Linux nach 7200 s, dann alle 75 s,
+  neunmal, dann RST).
+- **Sockets für Dienste:** `tcp_listen` (mit Backlog; wie bei Linux warten bis zu Backlog + 1
+  Verbindungen, weitere SYNs werden verworfen), `tcp_accept`, `tcp_connect`, `tcp_send`,
+  `tcp_recv`, `tcp_shutdown`, `tcp_close`, `tcp_abort`, `tcp_setopts` (TCP_NODELAY,
+  SO_KEEPALIVE, Puffergrößen) mit Ereignissen wie bei UDP: `TcpAccept`, `TcpConnected`,
+  `TcpData`, `TcpWritable`, `TcpEof`, `TcpClosed`; nach `TcpClosed` bleibt der Socket lesbar,
+  bis der Dienst ihn schließt. Schließt ein Dienst mit ungelesenen Bytes oder kommen nach dem
+  Schließen noch Daten, setzt das Gerät die Verbindung zurück (wie Linux, RFC 2525); ein
+  beendeter Dienst schließt seine Sockets wie ein Prozess, ein ausgeschaltetes Gerät vergisst
+  alles.
+- **Testdienste** ([`tcpsvc.rs`](crates/jfn_sim/tcpsvc.rs)): `tcp-echo` (Port 7),
+  `tcp-discard` (Port 9, auf Wunsch liest er nicht oder erst später) und `tcp-client` (schickt
+  N Bytes, in Stücken und Abständen, liest das Echo und endet mit FIN, RST oder gar nicht),
+  über `Action::Service` oder die Dienste in der Projektdatei, z. B. `{"kind": "tcp-client",
+  "config": {"server": "10.0.2.10", "port": 9, "bytes": 1000000}}`.
+- **Abfragen:** `tcp_conns` / `tcp_conn` (Zustand, Adressen, Warteschlangen, Fenster, cwnd,
+  ssthresh, SRTT, RTO, der nächste Timer und Zähler wie bei `ss -tin`; Zustandsnamen auch für
+  „show tcp brief“), `tcp_stats` (Zähler nach RFC 4022). Jeder Zustandswechsel und jede
+  Entscheidung (verzögertes ACK, doppelte Bestätigung, Fast Retransmit, Zeitüberschreitung,
+  Fenstersonde, Nagle, RST) steht mit deutschem Text in der Ereignisliste und im Paket-Tab.
+
+Nicht in v1: SACK, Window Scaling, Timestamps, Urgent-Daten (URG zählt als normale Daten),
+TCP Fast Open, ECN und SYN-Cookies. Linux rechnet eigentlich mit CUBIC; hier nutzen alle
+Systeme Reno. `ss`, `nc` und `curl` zeigen und nutzen die Sockets in der Linux-Shell (siehe
+[Befehlszeilen](#befehlszeilen)).
+
+### HTTP
+
+HTTP/1.1 läuft als Dienst auf den TCP-Sockets ([`http.rs`](crates/jfn_sim/http.rs),
+[`httpsvc.rs`](crates/jfn_sim/httpsvc.rs)). Die Bytes baut und zerlegt der Codec
+[`netpkt::http`](../../lib/netpkt/http.rs) ohne I/O: `Parser::push` nimmt Bytes in beliebigen
+Stücken und meldet Kopf, Daten und Ende oder dass er mehr Bytes braucht; Content-Length,
+chunked, Keep-Alive, Pipelining und die Grenzen (Kopf 16 KiB, 100 Kopfzeilen) folgen den Regeln
+von [`lib/netio/http.rs`](../../lib/netio/http.rs). Der Dissektor zeigt Anfragen und Antworten
+(auch mehrere in einem Segment) mit ihren Kopfzeilen und Chunks; der Filter heißt `http`.
+
+- **Webserver** (`http-server`): Routen nach Pfad (genau, `/api/*` als Präfix, `*`) und
+  Methode mit Status, Inhalt (`{host}`, `{path}`, `{client}` …), Typ, Größe, eigenen
+  Kopfzeilen und Chunks; Rechenzeit mit Streuung, Worker mit Warteschlange (voll: sofort 503
+  mit `Retry-After`), Fehlerrate pro Server oder Route; Keep-Alive mit Leerlauf-Timeout (75 s)
+  und höchstens 1000 Anfragen pro Verbindung, Timeout für den Kopf, 100-continue, 400, 404,
+  405 mit `Allow`, 413, 414, 431 und 505.
+- **Client** (`http-client`): N Anfragen an eine URL in Abständen. Der Agent dahinter
+  (auch für `curl` und den Lastgenerator) löst Namen auf, hält Verbindungen pro Host offen,
+  pipelinet auf Wunsch, kennt Timeouts für Verbindung und Anfrage und wiederholt eine Anfrage
+  einmal, wenn eine wiederverwendete Verbindung schon zu war.
+- **Lastgenerator** (`http-load`): geschlossene Schleife (Nutzer mit fester oder exponentieller
+  Denkzeit) oder offene (Zielrate gleichmäßig oder als Poisson-Prozess, Rampe von `start_rps`
+  auf `rps`; die Latenz zählt ab dem geplanten Zeitpunkt, also ohne Coordinated Omission), ein
+  Mix aus Methoden und Pfaden mit Gewichten, mehrere Ziele reihum oder zufällig, Dauer oder
+  Anzahl. Latenzen und Fehler gehen in Fenster aus `base::metrics`: p50/p95/p99, Mittel und
+  Maximum über fünf Minuten und je Sekunde (`Engine::http_load_view` und `http_server_view`
+  für die Labor-Oberfläche). `Action::HttpLoadSet` (Rate, Nutzer) und `Action::HttpServerSet`
+  (Fehlerrate, Rechenzeit, Worker) ändern laufende Dienste, ohne ihre Zahlen zu verlieren.
+- **Metriken** für `expect … svc NAME metric WERT`: Server `requests`, `responses`,
+  `status_2xx` … `status_5xx`, `errors`, `rejected`, `connections`, `active`, `inflight`,
+  `queued`, `p50_us`, `p95_us`, `p99_us`, `busy_ms` …; Lastgenerator `sent`, `responses`, `ok`,
+  `http_errors`, `failed`, `timeouts`, `inflight`, `connections`, `rate_mrps`, `rps`, `err_pm`,
+  `p50_us`, `p95_us`, `p99_us`, `mean_us`, `max_us`.
+
+Gerechnet wird nur mit ganzen Zahlen (Poisson-Abstände über einen Festkomma-Logarithmus, die
+Rampe über das Integral der Rate mit ganzzahliger Wurzel), deshalb sind die Läufe auf jedem
+Ziel gleich. Ein Lastgenerator in der Projektdatei:
+
+```json
+{"kind": "http-load", "name": "load", "config": {"targets": ["http://10.0.2.11/", "http://10.0.2.12/"],
+ "mode": "open", "rps": 200, "arrival": "poisson", "duration_ms": 10000,
+ "mix": [{"path": "/", "weight": 4}, {"path": "/api", "weight": 1}]}}
+```
+
+### Labor für verteilte Systeme
+
+Die Dienste des Labors laufen wie die anderen auf den TCP-Sockets der Geräte und sprechen
+HTTP, damit Lastgenerator, `curl` und Paket-Tab sie verstehen. Mit ihnen entstehen horizontal
+skalierte Systeme: ein Lastgenerator vor einem Loadbalancer, mehrere Webserver, ein
+geshardeter KV-Speicher, Caches, Queues und Worker. Konfiguriert werden sie wie die anderen
+Dienste in der Projektdatei oder mit `Action::Service`; laufende Dienste ändern
+`Action::LbBackend`, `LbAlgorithm`, `KvSet`, `CacheClear` und `WorkerSet`
+([`lab.rs`](crates/jfn_sim/lab.rs)).
+
+- **Loadbalancer** (`lb`, [`lb.rs`](crates/jfn_sim/lb.rs)): HTTP (L7: jede Anfrage über
+  gehaltene Verbindungen an ein Backend, mit `X-Forwarded-For` und in der Antwort
+  `X-Served-By`) oder TCP (L4: jede Verbindung Byte für Byte an ein Backend); `round-robin`,
+  `least-conn`, `weighted` (gewichtet und gleichmäßig verteilt) und `hash` (Consistent Hashing
+  mit vnodes über Pfad, Client-Adresse oder eine Kopfzeile). Health Checks (`tcp` oder
+  `http`) mit Intervall, Timeout und den Schwellen `rise` und `fall`; eine Anfrage, die ihr
+  Backend nicht erreicht, geht an das nächste (GET und HEAD auch nach einem Timeout).
+  Entfernen leert ein Backend erst (Drain, mit Frist). Zahlen gesamt und je Backend
+  (`b1_requests`, `b1_active`, `b1_up`, `b1_errors` …).
+- **KV-Speicher** (`kv`, [`kv.rs`](crates/jfn_sim/kv.rs)): Knoten auf einem Hash-Ring mit
+  vnodes ([`base::hashring`](../../lib/base/hashring.rs)), Replikationsfaktor, ein Leader je
+  Schlüssel (der erste erreichbare Knoten seiner Präferenzliste; er vergibt
+  Lamport-Versionen, die neuere gewinnt), Schreib- und Lesequoren `W` und `R` mit `strong`
+  (je eine Mehrheit, W + R > RF) und `eventual` (1 und 1), pro Anfrage überschreibbar
+  (`?consistency=`, `?w=`, `?r=`), Read Repair, Heartbeats über UDP. Wer eine Anfrage nicht
+  beantwortet oder zu lange schweigt, gilt als ausgefallen, bis er wieder zu hören ist;
+  antwortet der Leader nicht, führt ein Replikat den Schreibvorgang selbst. Die Daten liegen
+  im Dienst und überleben Strom aus; jedes Gerät hat eine Disk
+  ([`disk.rs`](crates/jfn_sim/disk.rs)) mit Latenz, Durchsatz, IOPS und Kapazität (voll: 507).
+  HTTP: `GET`, `PUT` und `DELETE` auf `/kv/SCHLÜSSEL`, zwischen den Knoten `/_kv/SCHLÜSSEL`.
+- **Webserver mit Backend:** eine Route mit `"backend": "kv"` liest und schreibt den Schlüssel,
+  der in ihrem Pfad folgt; der Client im Webserver kennt den Ring, fragt das erste nicht
+  ausgefallene Replikat und wechselt nach einem Timeout zum nächsten (`failovers`). Eine URL
+  als Backend reicht die Anfrage an einen anderen Server weiter. Der Worker bleibt so lange
+  belegt.
+- **Cache** (`cache`, [`cache.rs`](crates/jfn_sim/cache.rs)): HTTP-Cache vor einem Backend, LRU
+  nach Anzahl und Größe ([`base::lru`](../../lib/base/lru.rs)), Lebensdauer (oder `max-age` des
+  Backends), `X-Cache: HIT` oder `MISS`, zusammengelegte Fehlschläge, Invalidierung durch
+  Schreiben.
+- **Message Queue** (`mq`) und **Worker** (`worker`, beide in [`mq.rs`](crates/jfn_sim/mq.rs)):
+  Topics, at-least-once mit Bestätigung, Rückgabe, Sichtbarkeits-Timeout und erneuter
+  Zustellung, Dead Letters nach `max_deliveries`, Long-Polling; eine dauerhafte Queue legt ihre
+  Nachrichten auf die Disk. Worker arbeiten mit mehreren Plätzen, Bearbeitungszeit und
+  Fehlerquote.
+- **Lastgenerator:** Pfade und Inhalte dürfen `{seq}` (die Nummer der Anfrage ab 0),
+  `{rand:N}` und `{hot:N}` (vier von fünf Anfragen auf dem ersten Fünftel) enthalten.
+
+**Fehlerinjektion** ([`fault.rs`](crates/jfn_sim/fault.rs)): `Action::Fault { fault, dur }` mit
+`Unplug` (Kabel ziehen), `Impair` (mehr Laufzeit und Jitter, Verlust, weniger Bandbreite),
+`Power`, `Stop` (ein Dienst), `SlowDisk` und `Partition` (die Geräte zweier Seiten verwerfen
+gegenseitig ihre IPv4-Pakete, eine Seite allein steht gegen alle anderen). Jeder Fehler bekommt
+eine Nummer und eine Markierung mit Start, geplantem Ende und Text (`Engine::faults()` für
+Zeitleisten und Diagramme); `Action::Heal { id }` und `HealAll` machen genau das rückgängig,
+was er getan hat, auch wenn sich Fehler überlagern, und mit `dur` heilt er von selbst. Fehler
+legen sich über die Werte von Kabeln und Disks, statt sie zu überschreiben.
+
+**Abfragen für die Labor-Oberfläche:** `lb_view` (Backends mit Zustand, Prüfungen, Latenzen,
+Ring-Anteil), `kv_view` (Mitglieder, wie ein Knoten sie sieht, Quoren, Zähler), `kv_ring`,
+`kv_where` (die Replikate eines Schlüssels und was jedes hält), `cache_view`, `mq_view`,
+`worker_view`, `faults` und `active_faults`, dazu `services` und `metric`.
+
+```json
+{"kind": "lb", "name": "lb", "config": {"backends": [{"name": "web1", "addr": "10.0.2.11"},
+ {"name": "web2", "addr": "10.0.2.12"}], "health": {"type": "http", "path": "/health"}}}
+{"kind": "http-server", "name": "web", "config": {"routes": [{"path": "/item/*", "method": "*",
+ "backend": "kv"}], "kv": {"nodes": ["10.0.2.21", "10.0.2.22", "10.0.2.23"], "rf": 2}}}
+{"kind": "kv", "name": "kv", "config": {"nodes": ["10.0.2.21", "10.0.2.22", "10.0.2.23"],
+ "rf": 2, "consistency": "eventual"}}
+```
+
+### Befehlszeilen
+
+Jedes Gerät mit Befehlszeile hat eine Konsole (`Engine::cli_line`; die Oberfläche schickt
+`Cmd::Cli` und bekommt `Report::CliOut`). Router, Switches, Firewall und Access Point haben eine
+IOS-artige Befehlszeile:
+
+- Modi `R1>`, `R1#`, `R1(config)#`, `(config-if)#`, `(config-subif)#`, `(config-vlan)#` und
+  `(config-line)#` mit `enable`, `configure terminal`, `end`, `exit` und `do`; Abkürzungen wie
+  `sh ip int br`, `?` und Tab, Fehler mit `^`, `% Incomplete command.` und
+  `% Ambiguous command:`; wie beim Vorbild fällt eine Zeile aus einem Untermodus auf die globale
+  Konfiguration zurück, und unbekannte Wörter im EXEC gelten als Hostname.
+- Konfiguration: `hostname`, `interface` (Ports, `Gi0/0/0.10`, `Vlan10`, `Loopback0`),
+  `ip address … [secondary]`, `[no] shutdown`, `description`, `encapsulation dot1Q`,
+  `switchport mode|access vlan|trunk native vlan|trunk allowed vlan`, `[no] switchport`,
+  `vlan` mit `name`, `ip route`, `[no] ip routing`, `[no] ip proxy-arp`, `ip mtu`, `arp`,
+  `[no] ip domain-lookup`, `line con 0` / `line vty 0 4`.
+- `show running-config|startup-config|ip interface brief|ip route|arp|mac address-table|vlan
+  [brief]|interfaces [NAME|trunk]|debugging|version`, `copy running-config startup-config`,
+  `write memory`, `clear arp-cache`.
+- `ping` (5 × 100 Byte, Timeout 2 s, `!` `.` `U` `M` `&`, Erfolgsquote mit min/avg/max) und
+  `traceroute` im IOS-artigen Format, Abbruch mit Strg+Umschalt+6; `debug ip icmp` und
+  `debug arp` aus den Entscheidungen der Geräte; Meldungen wie `%LINK-3-UPDOWN`,
+  `%LINEPROTO-5-UPDOWN` und `%SYS-5-CONFIG_I` mit Zeitstempel.
+
+Hosts und Server haben eine Linux-Shell (`root@PC1:~#`): `ip addr|link|route|neigh` mit den
+Ausgaben und Fehlermeldungen von iproute2, `ping` wie iputils (bis Strg+C oder `-c`; `-i`,
+`-s`, `-t`, `-W`, `-M do`), `traceroute`, `hostname` und `sysctl net.ipv4.ip_forward`.
+Dazu Programme auf den Sockets, die die Konsole belegen, bis sie enden (Strg+C bricht ab):
+`curl` (`-v`, `-i`, `-I`, `-s`/`-S`, `-o`, `-w`, `-L`, `-f`, `-d`, `-X`, `-H`, `-m`,
+`--connect-timeout`, `-0`; mehrere URLs über eine Verbindung, Fortschrittsanzeige und
+Fehlermeldungen mit den Exit-Codes wie curl 8.5), `nc` (Client, `-l` mit `-k`, `-u`, `-z`
+mit Port-Bereichen, `-v`, `-C`, `-q`, `-w`, `-N`), `ss` (TCP und UDP mit Zuständen, `-t`,
+`-u`, `-l`, `-a`, `-n`, `-p`, `-o`, `-i`, `-s`, `-H`, Filter wie `state established` und
+`( sport = :80 or dst 10.0.0.1 )`, Spalten wie iproute2 ohne Terminal), `top` (die Dienste
+des Geräts mit CPU-Anteil, `-b`, `-n`, `-d`) und `printf` mit `|` in ein Programm.
+Router und Switches zeigen `show tcp brief [all]`, `show tcp statistics` und
+`show control-plane host open-ports`. Die Dienste des Labors zeigen `lbctl` (Backends mit
+Zustand und Zahlen), `kvctl` (Mitglieder, `ring`, `where SCHLÜSSEL` mit den Replikaten und
+ihren Versionen, `get`, `keys`), `cachectl`, `mqctl` und `workerctl`, mit `-s NAME` für einen
+bestimmten Dienst; ihre Texte sind eigene Worte.
+
+Hilfetexte (`?`, `ip … help`), Modus-Titel, Statuszeilen wie die ersten Zeilen von `ping` und
+`traceroute`, die Texte hinter Meldungen wie `%LINK-3-UPDOWN`, die Debug-Zeilen und
+`show version` sind eigene Worte (siehe die Regel unter [Fahrplan](#fahrplan)). Dem Vorbild folgen
+die Befehlswörter und ihre Syntax, Interface-Namen, Konfigurationszeilen, kurze
+`%`-Fehlermeldungen, die Tabellen der `show`-Befehle und die Ergebniszeilen von `ping`
+(`!!!!!`, `Success rate is …`), iproute2 und iputils.
+
+Die Konfiguration steckt in den Teilen des Geräts (Ports, Bridge, IPv4). `show running-config`
+schreibt sie als IOS-artige Konfiguration, `Engine::running_config` bei Linux-Geräten als
+Shell-Befehle. Beim Laden läuft die startup-config jedes Geräts durch dieselbe Befehlszeile;
+es gibt also nur eine Quelle der Wahrheit. Was dabei scheitert, zeigen die Konsole und
+`jfn-sim check`. `copy running-config startup-config` meldet die neue Fassung als
+`Report::Startup` an die Oberfläche, die sie als Rückgängig-Schritt ins Projekt übernimmt;
+Meldungen der Konsole, Debug-Zeilen und die Logs der Dienste kommen zusätzlich als
+`Report::Log` (Gerät, Zeit, Schwere, Quelle, Text) für das Protokoll.
+
+### Szenarien `.scn`
+
+Für Tests und Läufe ohne Fenster: Befehle zu virtuellen Zeitpunkten und Erwartungen.
+
+```
+seed 7
+at 1s PC1: ping -c 4 10.0.0.2
+run until idle
+R1: enable
+R1: show ip route
+PC1: ^C
+impair R1 Gi0/1 loss 5% delay 20ms
+at 6s fault power KV2 for 5s
+fault partition KV1 KV2 | KV3
+heal all
+expect PC1 output contains "4 received"
+expect R1 route 10.0.2.0/24 via 10.0.1.2
+expect hops icmp >= 8
+pcap build/run.pcapng
+```
+
+`jfn-sim run PROJEKT --scenario S` spielt ein Szenario ab und schreibt einen Bericht, der nur
+virtuelle Zeiten enthält und deshalb auf jedem Rechner gleich ist; der Exit-Code ist 0 oder 1.
+Jede Zeile trägt die Zeit, das Gerät (mit seiner Konsolenausgabe und den getippten Zeilen samt
+Prompt) oder `--` für einen Schritt und `ok` / `FEHLER` für eine Erwartung. `expect … output
+contains` prüft, was das Gerät seit seinem letzten Befehl ausgegeben hat. `--report F` schreibt
+den Bericht in eine Datei, `--golden F` vergleicht ihn mit einer gespeicherten Fassung,
+`--pcap F` schreibt die Aufzeichnung als pcapng. Die GUI-Exe nimmt dieselben Argumente
+(`JFNetworker.exe PROJEKT --scenario S`). Weil die App nur Dateien öffnen darf, die auf der
+Befehlszeile stehen (`fs.user`), gehören Projekt, Vergleichsdatei und pcap-Datei dorthin.
+
+`fault` spielt einen Fehler des Labors ein: `link GERÄT PORT`, `impair GERÄT PORT delay …
+jitter … loss … rate …`, `power GERÄT`, `stop GERÄT DIENST`, `disk GERÄT delay … factor …`,
+`partition A B | C` (ohne `|` gegen alle anderen), jeweils mit `for DAUER`, wenn er von selbst
+heilen soll. `heal NUMMER`, `heal all` oder `heal` mit Art und Ziel (`heal power KV2`,
+`heal partition`) heilt. Der Bericht nennt Nummer und Text jedes Fehlers; heilt einer von
+selbst, steht „Fehler N behoben“ mit der Zeit dabei.
+
+Die Golden-Szenarien in `tests/scen/` laufen über `tests/scen_*.uis` in `build_rs.py test`:
+zwei PCs am Switch, ein Router zwischen zwei Netzen (mit `.!!!!`), Router-on-a-stick, ein
+L3-Switch mit SVIs, eine serielle Strecke und TCP über eine langsame Leitung mit 1 % Verlust
+(der erste SYN geht verloren, während der Router nach ARP fragt; 1 MB an den Discard-Dienst und
+20 kB Echo mit Fast Retransmits) und HTTP-Last auf zwei Webserver hinter einem Router mit 2 %
+Verlust auf einer Leitung (200 Anfragen pro Sekunde, die Neuübertragungen nur im 99.
+Perzentil; `top`, `ss -s`, `curl`) und das Labor: ein Lastgenerator vor einem Loadbalancer,
+drei Webservern und drei KV-Shards mit Replikationsfaktor 2, von denen einer für 6 s ausfällt
+(keine Anfrage geht verloren, die Clients der Webserver weichen auf das zweite Replikat aus,
+Read Repair holt den Shard nach; `lbctl`, `kvctl`). Ihre Berichte (`*.report`) sind unter Windows und Linux
+byte-gleich. `expect … svc NAME metric WERT` prüft die Zahlen eines Dienstes und schreibt den
+gemessenen Wert in Klammern dazu.
+
+## Fahrplan
+
+| Phase | Meilensteine |
+|---|---|
+| 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur |
+| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓) · NAT/ACL, RIP, OSPF, STP, IPv6 · Liniendiagramm und Code-Editor |
+| 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · Metrik-Fenster · Labor-Oberfläche · Skript-Editor |
+| 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
+
+**Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
+Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir
+immer in eigenen Worten. Nichts davon wird aus Herstellerdokumentation, echten Geräteausgaben
+oder Büchern übernommen. Dem Vorbild folgen dürfen nur die Befehlswörter, ihre Syntax,
+Interface-Namen, Konfigurationszeilen und kurze Fehlermeldungen wie `% Incomplete command.`,
+weil Lernende sie wiedererkennen sollen. `apps/termtest` zeigt das Muster.
+
+## Marken
+
+Cisco, IOS und Packet Tracer sind Marken von Cisco Systems, Inc. JFNetworker ist ein
+eigenständiges Projekt und steht in keiner Verbindung zu Cisco; es wird von Cisco weder
+unterstützt noch empfohlen. Die Namen stehen hier nur, um Befehlszeilen-Konventionen und
+vergleichbare Programme zu beschreiben.

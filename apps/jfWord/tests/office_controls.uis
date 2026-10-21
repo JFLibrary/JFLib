@@ -1,0 +1,42 @@
+# Search icon inputs retain UTF-8 selection/clipboard behavior when horizontally scrolled.
+size 1424 884
+theme light
+focus button:"Vorlage: Leeres Dokument"
+key enter
+expect #10000 exists
+click #2104
+type "Eine lange Suchanfrage mit Unicode Äpfel Ω und genügend Zeichen für horizontales Scrollen"
+expect #2104 text "Eine lange Suchanfrage mit Unicode Äpfel Ω und genügend Zeichen für horizontales Scrollen"
+key ctrl+a ctrl+c
+type "kurz"
+key ctrl+a ctrl+v
+expect #2104 text "Eine lange Suchanfrage mit Unicode Äpfel Ω und genügend Zeichen für horizontales Scrollen"
+key ctrl+a
+type "Navigation"
+click button:"Navigation"
+expect #2104 text ""
+expect text:"Navigation" exists
+# Text-only gallery labels preserve keyboard activation and full semantic names.
+cmd 28
+focus button:"Wissenschaftliche Arbeit"
+key enter
+expect button:"2 Methode" exists
+focus button:"2 Methode"
+key enter
+expect text:"Seite 1 von 1" exists
+# Logarithmic drag mapping; the exposed and keyboard-editable value remains a percentage.
+click #2801
+expect #2801 value 71
+key home
+expect #2801 value 10
+key right
+expect #2801 value 11
+key end
+expect #2801 value 500
+key left
+expect #2801 value 499
+click #126
+click "100 %"
+expect #2801 value 100
+expect #126 text "100 %"
+expect_nowarn

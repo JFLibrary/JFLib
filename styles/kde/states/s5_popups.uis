@@ -1,0 +1,75 @@
+# s5_popups -- menus (hover, keyboard, submenus, check items, disabled rows, accelerators),
+# drop-down / split / context menus, combo list, tooltips; light, then dark 150 %
+size 1000 1500
+theme light
+click "Datei"
+shot build/kdes/s5_datei.png 0 0 500 300
+move menuitem:"Speichern"
+shot build/kdes/s5_datei_hover.png 0 0 500 300
+move menuitem:"Zuletzt geöffnet"
+wait 600
+shot build/kdes/s5_datei_sub.png 0 0 700 400
+key esc
+key esc
+click "Bearbeiten"
+key down down
+shot build/kdes/s5_bearb_key.png 0 0 500 300
+move menuitem:"Rückgängig"
+shot build/kdes/s5_bearb_dis.png 0 0 500 300
+key esc
+click "Ansicht"
+shot build/kdes/s5_ansicht.png 0 0 600 300
+move menuitem:"Zoom"
+wait 600
+shot build/kdes/s5_ansicht_zoom.png 0 0 700 400
+move menuitem:"Design"
+wait 600
+shot build/kdes/s5_ansicht_design.png 0 0 700 400
+key esc
+key esc
+move 600,600
+click #8002
+shot build/kdes/s5_staerke.png 0 700 500 250
+move menuitem:"Breit"
+shot build/kdes/s5_staerke_hover.png 0 700 500 250
+key esc
+click #2147491658
+shot build/kdes/s5_split.png 0 700 500 250
+move menuitem:"Als Bild einfügen"
+shot build/kdes/s5_split_hover.png 0 700 500 250
+key esc
+rclick #8020
+shot build/kdes/s5_ctx.png 0 700 500 250
+key down
+shot build/kdes/s5_ctx_key.png 0 700 500 250
+key esc
+click #8001
+shot build/kdes/s5_combo.png 0 650 500 250
+move listitem:"Stern"
+shot build/kdes/s5_combo_hover.png 0 650 500 250
+key esc
+move #103
+wait 800
+shot build/kdes/s5_tip.png 0 130 600 140
+move #9010
+wait 800
+shot build/kdes/s5_tip2.png 0 700 700 140
+move 600,600
+theme dark
+scale 150
+click "Datei"
+move menuitem:"Öffnen…"
+shot build/kdes/s5_d_datei.png 0 0 500 300
+key esc
+click "Ansicht"
+move menuitem:"Zoom"
+wait 600
+shot build/kdes/s5_d_ansicht_zoom.png 0 0 700 400
+key esc
+key esc
+click #8001
+shot build/kdes/s5_d_combo.png 0 650 500 250
+key esc
+move #103
+wait 800
+shot build/kdes/s5_d_tip.png 0 130 600 140

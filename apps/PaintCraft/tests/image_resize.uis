@@ -1,0 +1,512 @@
+# image_resize.uis -- Bild > Größe ändern… (Strg+R) (agent A5): the dialog (Prozentual /
+# Absolut, Seitenverhältnis beibehalten, Pixelgröße, Pixeldichte in Pixel/in and Pixel/cm,
+# Druckgröße in Zoll and Zentimeter, "Neue Größe"), every Interpolation method through the
+# dialog and through the hook (expected size + one probe value = tools/resample_check.py
+# ref_resize of the same 8 x 6 image, with and without gamma correction), resolution-only
+# changes, all layers resized, undo restores the old surfaces bit-exactly (state hash).
+# Window "Größe ändern" = 24616 (WINID_DLG0 + 24); widgets 5101 Prozentual, 5102 percent,
+# 5103 Absolut, 5104 Seitenverhältnis, 5105 / 5106 Breite / Höhe, 5107 Pixeldichte, 5108
+# Pixel/in | Pixel/cm, 5109 / 5111 print Breite / Höhe, 5110 Zoll | Zentimeter, 5112
+# Interpolation, 5113 Gammakorrektur.  Hooks: see image_ops.uis; 310 / 311 resize.
+size 1280 800
+theme light
+cmd 950 1
+
+# ------------------------------------------------------------ the dialog on 800 x 600
+key ctrl+r
+expect window 24616 open
+expect window 24616 modal
+expect #5101 checked
+expect #5103 unchecked
+expect #5102 value 100
+expect #5105 value 800
+expect #5106 value 600
+expect #5105 disabled
+expect #5104 checked
+expect #5107 value 9600
+expect #5107 text "96,00"
+expect #5108 value 0
+expect #5109 text "8,33"
+expect #5111 text "6,25"
+expect #5110 value 0
+expect #5112 value 0
+expect #5113 checked
+expect text:"Aktuelle Bildgröße: 1,8 MB" exists
+expect text:"Neue Größe: 1,8 MB" exists
+# percentage
+click #5102
+key ctrl+a
+type "50"
+key tab
+expect #5105 value 400
+expect #5106 value 300
+expect #5109 text "4,17"
+expect text:"Neue Größe: 468,8 KB" exists
+click #5102
+key ctrl+a
+type "1"
+key tab
+expect #5105 value 8
+expect #5106 value 6
+expect text:"Neue Größe: 192 Bytes" exists
+click #5102
+key ctrl+a
+type "250"
+key tab
+expect #5105 value 2000
+expect #5106 value 1500
+expect text:"Neue Größe: 11,4 MB" exists
+# absolute size with the aspect ratio
+click #5103
+expect #5103 checked
+expect #5105 enabled
+expect #5102 disabled
+click #5105
+key ctrl+a
+type "1000"
+key tab
+expect #5106 value 750
+expect text:"Neue Größe: 2,9 MB" exists
+expect #5109 text "10,42"
+expect #5111 text "7,81"
+# without the ratio only one side changes
+click #5104
+expect #5104 unchecked
+click #5106
+key ctrl+a
+type "500"
+key tab
+expect #5105 value 1000
+expect #5106 value 500
+# resolution: the pixel size stays, the print size follows
+click #5107
+key ctrl+a
+type "300"
+key tab
+expect #5107 value 30000
+expect #5105 value 1000
+expect #5109 text "3,33"
+expect #5111 text "1,67"
+# Pixel/cm: the print unit follows (linked like paint.net)
+click #5108
+click listitem:"Pixel/cm"
+expect #5108 value 1
+expect #5110 value 1
+expect #5107 text "118,11"
+expect #5109 text "8,47"
+expect #5111 text "4,23"
+expect #5105 value 1000
+expect text:"Zentimeter" exists
+# a print width in centimetres gives the pixel width (5 cm * 118,11 = 591)
+click #5109
+key ctrl+a
+type "5"
+key tab
+expect #5105 value 591
+expect #5106 value 500
+# back to inches through the print unit
+click #5110
+click listitem:"Zoll"
+expect #5108 value 0
+expect #5107 text "300,00"
+expect #5109 text "1,97"
+# the ratio again: the height follows the width (591 * 600 / 800 = 443,25)
+click #5104
+expect #5104 checked
+expect #5106 value 443
+# a print height in inches (2 in * 300 = 600 px) with the ratio
+click #5111
+key ctrl+a
+type "2"
+key tab
+expect #5106 value 600
+expect #5105 value 800
+# Abbrechen changes nothing, Esc neither
+click button:"Abbrechen"
+expect window 24616 closed
+expect #9913 value 800
+expect #9914 value 600
+expect text:"t.n=1" exists
+key ctrl+r
+expect #5101 checked
+expect #5102 value 100
+key esc
+expect window 24616 closed
+expect text:"t.n=1" exists
+
+# ------------------------------------------------------------ OK: 400 x 300, then undo / redo
+cmd 961 0
+key ctrl+r
+click #5102
+key ctrl+a
+type "50"
+key tab
+click button:"OK"
+expect window 24616 closed
+expect #9913 value 400
+expect #9914 value 300
+expect #5191 value 1
+expect text:"t.n=2" exists
+expect text:"Größe ändern" exists
+expect text:"400 × 300" exists
+key ctrl+z
+expect #9913 value 800
+cmd 962 0
+expect text:"t.cmp=ok" exists
+key ctrl+y
+expect #9913 value 400
+key ctrl+z
+# the dialog remembers the settings of the last OK (Prozentual 50 %)
+key ctrl+r
+expect #5101 checked
+expect #5102 value 50
+expect #5105 value 400
+key esc
+
+# ------------------------------------------------------------ Enter in a number box = OK
+key ctrl+r
+click #5102
+key ctrl+a
+type "25"
+key enter
+expect window 24616 closed
+expect #9913 value 200
+expect #9914 value 150
+key ctrl+z
+expect #9913 value 800
+key ctrl+r
+click #5102
+key ctrl+a
+type "50"
+key tab
+key esc
+expect window 24616 closed
+expect #9913 value 800
+
+# ------------------------------------------------------------ resolution only (Pixel/cm)
+key ctrl+r
+click #5103
+expect #5105 value 200
+click #5105
+key ctrl+a
+type "800"
+key tab
+expect #5106 value 600
+click #5108
+click listitem:"Pixel/cm"
+click button:"OK"
+expect #9913 value 800
+expect #9914 value 600
+expect #9916 value 2
+expect #9915 value 3780
+expect text:"t.n=2" exists
+key ctrl+z
+expect #9916 value 1
+expect #9915 value 9600
+# a resolution image: the dialog starts in Pixel/cm
+key ctrl+y
+key ctrl+r
+expect #5108 value 1
+expect #5110 value 1
+expect #5107 text "37,80"
+expect #5109 text "21,17"
+key esc
+key ctrl+z
+
+# ------------------------------------------------------------ an 8 x 6 image with two layers
+# red [0,3) x [0,6), green column 3, transparent (4, 0..2), blue [5,8), red 50 % (4, 3..5),
+# black [6,8) x [2,4), yellow [0,2) x [4,6); layer 1 transparent with one white pixel
+cmd 968 393224
+expect #9913 value 8
+cmd 902 1
+cmd 903 0
+cmd 904 393219
+cmd 902 2
+cmd 903 3
+cmd 904 393220
+cmd 902 0
+cmd 903 4
+cmd 904 196613
+cmd 902 3
+cmd 903 5
+cmd 904 393224
+cmd 902 4
+cmd 903 196612
+cmd 904 393221
+cmd 902 6
+cmd 903 131078
+cmd 904 262152
+cmd 902 9
+cmd 903 262144
+cmd 904 393218
+key ctrl+shift+n
+cmd 902 5
+cmd 903 0
+cmd 904 65537
+cmd 961 1
+cmd 314 0
+
+# ------------------------------------------------------------ every method through the hook
+# 8 x 6 -> 5 x 3, probe (3, 1); expected = resample_check.ref_resize (gamma / no gamma)
+cmd 310 196613
+cmd 311 0
+expect #9913 value 5
+expect #9914 value 3
+expect #5191 value 1
+cmd 313 65539
+expect #5190 text "FF0000FF"
+key ctrl+z
+cmd 311 1
+cmd 313 65539
+expect #5190 text "DC0E00B8"
+key ctrl+z
+cmd 311 257
+cmd 313 65539
+expect #5190 text "DC4200DD"
+key ctrl+z
+cmd 311 2
+cmd 313 65539
+expect #5190 text "FF0000E6"
+key ctrl+z
+cmd 311 258
+cmd 313 65539
+expect #5190 text "FF0000F3"
+key ctrl+z
+cmd 311 3
+cmd 313 65539
+expect #5190 text "DB0E00BF"
+key ctrl+z
+cmd 311 259
+cmd 313 65539
+expect #5190 text "DB4200E1"
+key ctrl+z
+cmd 311 4
+cmd 313 65539
+expect #5190 text "D90F00B6"
+key ctrl+z
+cmd 311 260
+cmd 313 65539
+expect #5190 text "D94400DC"
+key ctrl+z
+cmd 311 5
+cmd 313 65539
+expect #5190 text "D51200C6"
+key ctrl+z
+cmd 311 261
+cmd 313 65539
+expect #5190 text "D54B00E4"
+key ctrl+z
+cmd 311 6
+cmd 313 65539
+expect #5190 text "E70900B0"
+key ctrl+z
+cmd 311 262
+cmd 313 65539
+expect #5190 text "E73400D8"
+key ctrl+z
+cmd 311 7
+cmd 313 65539
+expect #5190 text "D51200C6"
+key ctrl+z
+cmd 311 263
+cmd 313 65539
+expect #5190 text "D54B00E4"
+# the second layer was resized too
+cmd 314 1
+cmd 313 0
+expect #5190 text "51FFFFFF"
+cmd 313 65539
+expect #5190 text "00000000"
+cmd 314 0
+key ctrl+z
+cmd 962 1
+expect text:"t.cmp=ok" exists
+# 8 x 6 -> 11 x 9, probe (4, 0)
+cmd 310 589835
+cmd 311 0
+expect #9913 value 11
+expect #9914 value 9
+cmd 313 4
+expect #5190 text "FF00FF00"
+key ctrl+z
+cmd 311 1
+cmd 313 4
+expect #5190 text "FF3AC500"
+key ctrl+z
+cmd 311 257
+cmd 313 4
+expect #5190 text "FF83E400"
+key ctrl+z
+cmd 311 2
+cmd 313 4
+expect #5190 text "FF3AC500"
+key ctrl+z
+cmd 311 3
+cmd 313 4
+expect #5190 text "FF2BD400"
+key ctrl+z
+cmd 311 4
+cmd 313 4
+expect #5190 text "FF37C800"
+key ctrl+z
+cmd 311 5
+cmd 313 4
+expect #5190 text "FF2ACE07"
+key ctrl+z
+cmd 311 261
+cmd 313 4
+expect #5190 text "FF71E82D"
+key ctrl+z
+cmd 311 6
+cmd 313 4
+expect #5190 text "FF20DF00"
+key ctrl+z
+cmd 311 7
+cmd 313 4
+expect #5190 text "FF2FD000"
+key ctrl+z
+cmd 311 263
+cmd 313 4
+expect #5190 text "FF77E900"
+key ctrl+z
+cmd 962 1
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ every method through the dialog
+# (Absolut 5 x 3 without the ratio; the Interpolation list order of paint.net 5.1)
+key ctrl+r
+click #5103
+click #5104
+expect #5104 unchecked
+click #5105
+key ctrl+a
+type "5"
+key tab
+click #5106
+key ctrl+a
+type "3"
+key tab
+expect text:"Neue Größe: 120 Bytes" exists
+click #5112
+click listitem:"Nächster Nachbar"
+click button:"OK"
+expect #9913 value 5
+cmd 313 65539
+expect #5190 text "FF0000FF"
+key ctrl+z
+key ctrl+r
+expect #5103 checked
+expect #5104 unchecked
+expect #5112 value 7
+click #5105
+key ctrl+a
+type "5"
+key tab
+click #5106
+key ctrl+a
+type "3"
+key tab
+click #5112
+click listitem:"Bilineare"
+click button:"OK"
+cmd 313 65539
+expect #5190 text "DC4200DD"
+key ctrl+z
+key ctrl+r
+click #5105
+key ctrl+a
+type "5"
+key tab
+click #5106
+key ctrl+a
+type "3"
+key tab
+click #5112
+click listitem:"Bilinear (schnell)"
+click #5113
+expect #5113 unchecked
+click button:"OK"
+cmd 313 65539
+expect #5190 text "FF0000E6"
+key ctrl+z
+key ctrl+r
+expect #5113 unchecked
+click #5105
+key ctrl+a
+type "5"
+key tab
+click #5106
+key ctrl+a
+type "3"
+key tab
+click #5112
+click listitem:"Bikubisch"
+click button:"OK"
+cmd 313 65539
+expect #5190 text "DB0E00BF"
+key ctrl+z
+key ctrl+r
+click #5105
+key ctrl+a
+type "5"
+key tab
+click #5106
+key ctrl+a
+type "3"
+key tab
+click #5112
+click listitem:"Bikubisch (glatt)"
+click button:"OK"
+cmd 313 65539
+expect #5190 text "D90F00B6"
+key ctrl+z
+key ctrl+r
+click #5105
+key ctrl+a
+type "5"
+key tab
+click #5106
+key ctrl+a
+type "3"
+key tab
+click #5112
+click listitem:"Lanczos"
+click button:"OK"
+cmd 313 65539
+expect #5190 text "D51200C6"
+key ctrl+z
+key ctrl+r
+click #5105
+key ctrl+a
+type "5"
+key tab
+click #5106
+key ctrl+a
+type "3"
+key tab
+click #5112
+click listitem:"Fant"
+click #5113
+expect #5113 checked
+click button:"OK"
+cmd 313 65539
+expect #5190 text "E73400D8"
+key ctrl+z
+key ctrl+r
+click #5105
+key ctrl+a
+type "5"
+key tab
+click #5106
+key ctrl+a
+type "3"
+key tab
+click #5112
+click listitem:"Adaptiv (scharf)"
+click button:"OK"
+cmd 313 65539
+expect #5190 text "D54B00E4"
+expect text:"t.n=3" exists
+key ctrl+z
+cmd 962 1
+expect text:"t.cmp=ok" exists

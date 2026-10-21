@@ -1,0 +1,114 @@
+#!args --open apps/PaintCraft/tests/fixtures/a6_photo.png
+# fx_menu.uis -- Korrekturen / Effekte menus (agent A6): rows of registered effects are enabled
+# while an image is open (Medianunschärfe has no kernel yet), the adjustments without a dialog
+# (Farben umkehren, Schwarzweiß, Sepia, Alpha umkehren, Automatisch) apply at once with one
+# history entry named after them (results == efftest, bit-identical), Strg+Z restores the
+# layer, "<Effekt> wiederholen" (Strg+F), no image = everything disabled.
+# Hooks: 995 0 layer hash -> #9990; #9994 repeat label (value 1 = enabled); T1 #9935 / #9936
+# history entries / position.  efftest references (a6_photo.png): original 2cc39813e097b672,
+# invert_colors 1342031e2af02d7a, black_white bc7e96595d491e0e, sepia 48f945d7feabe189,
+# invert_alpha 20e2bf4f23e84af2, auto_level cc42e279e7993d68.
+size 1280 800
+theme light
+
+# ------------------------------------------------------------ menu states
+click menu:"Korrekturen"
+expect menuitem:"Alpha umkehren" enabled
+expect menuitem:"Automatisch" enabled
+expect menuitem:"Belichtung…" enabled
+expect menuitem:"Farben umkehren" enabled
+expect menuitem:"Farbton / Sättigung…" enabled
+expect menuitem:"Helligkeit / Kontrast…" enabled
+expect menuitem:"Tiefen / Lichter…" enabled
+expect menuitem:"Kurven…" enabled
+expect menuitem:"Manuelle Anpassung…" enabled
+expect menuitem:"Schwarzweiß" enabled
+expect menuitem:"Sepia…" enabled
+expect menuitem:"Farbtemperatur / Tönung…" enabled
+expect menuitem:"Tontrennung…" enabled
+key esc
+click menu:"Effekte"
+expect menuitem:"Letzten Effekt wiederholen" disabled
+move menuitem:"Weichzeichnen"
+expect menuitem:"Gaußscher Weichzeichner…" enabled
+expect menuitem:"Bokeh…" enabled
+expect menuitem:"Medianunschärfe…" disabled
+move menuitem:"Rendern"
+expect menuitem:"Wolken…" enabled
+expect menuitem:"Mandelbrot-Fraktal…" enabled
+move menuitem:"Verzerren"
+expect menuitem:"Polarinvertierung…" enabled
+move menuitem:"Farbe"
+expect menuitem:"Quantize…" enabled
+key esc esc
+
+# ------------------------------------------------------------ immediate adjustments
+cmd 995 0
+expect #9990 text "2cc39813e097b672"
+expect #9935 value 1
+expect #9994 value 0
+key ctrl+shift+i
+cmd 995 0
+expect #9990 text "1342031e2af02d7a"
+expect #9936 value 2
+expect text:"Farben umkehren" exists
+expect #9994 text "Farben umkehren wiederholen"
+expect #9994 value 1
+cmd 901 3276850
+expect #9900 text "FFCABC6C"
+key ctrl+z
+cmd 995 0
+expect #9990 text "2cc39813e097b672"
+expect #9936 value 1
+key ctrl+shift+g
+cmd 995 0
+expect #9990 text "bc7e96595d491e0e"
+expect text:"Schwarzweiß" exists
+key ctrl+z
+key ctrl+shift+e
+cmd 995 0
+expect #9990 text "48f945d7feabe189"
+key ctrl+z
+cmd 387
+cmd 995 0
+expect #9990 text "20e2bf4f23e84af2"
+expect #9994 text "Alpha umkehren wiederholen"
+key ctrl+z
+key ctrl+shift+l
+cmd 995 0
+expect #9990 text "cc42e279e7993d68"
+expect #9994 text "Automatisch wiederholen"
+key ctrl+z
+cmd 995 0
+expect #9990 text "2cc39813e097b672"
+
+# ------------------------------------------------------------ Strg+F: the last effect again
+click menu:"Effekte"
+expect menuitem:"Automatisch wiederholen" enabled
+key esc
+key ctrl+f
+cmd 995 0
+expect #9990 text "cc42e279e7993d68"
+expect #9936 value 2
+key ctrl+f
+expect #9936 value 3
+key ctrl+z
+key ctrl+z
+cmd 995 0
+expect #9990 text "2cc39813e097b672"
+expect #9936 value 1
+
+# ------------------------------------------------------------ no image: everything disabled
+cmd 105
+expect #9901 value 0
+click menu:"Korrekturen"
+expect menuitem:"Farben umkehren" disabled
+expect menuitem:"Kurven…" disabled
+key esc
+click menu:"Effekte"
+expect menuitem:"Automatisch wiederholen" disabled
+move menuitem:"Weichzeichnen"
+expect menuitem:"Gaußscher Weichzeichner…" disabled
+key esc esc
+key ctrl+shift+i
+expect #9901 value 0

@@ -1,0 +1,252 @@
+# docs.uis -- several images (agent A1): Neu dialog, names "Unbenannt n", tabs (select,
+# Strg+Tab, drag to reorder, middle click, Bilderliste), Schließen with "Nicht gespeicherte
+# Änderungen" (Abbrechen / Nicht speichern / Speichern), window title, Beenden walking all
+# modified images.  Hidden probes: diag.s block A1 (#9901 documents, #9911 name ...).
+size 1280 800
+theme light
+expect #9901 value 1
+expect tab:"Unbenannt" selected
+expect #9905 value 0
+expect #9917 value 1
+expect #9919 text "Unbenannt – PaintCraft"
+
+# ------------------------------------------------------------ Neu: dialog values
+key ctrl+n
+expect window 24592 open
+expect window 24592 modal
+expect #5001 checked
+expect #5002 value 800
+expect #5003 value 600
+expect #5004 text "96,00"
+expect #5006 text "8,33"
+expect #5008 text "6,25"
+expect text:"Neue Größe: 1,8 MB" exists
+# width 400 keeps the aspect ratio
+click #5002
+key ctrl+a
+type "400"
+key tab
+expect #5003 value 300
+expect #5006 text "4,17"
+expect #5008 text "3,13"
+# without the ratio: only the width changes
+click #5001
+expect #5001 unchecked
+click #5002
+key ctrl+a
+type "640"
+key tab
+expect #5003 value 300
+# print size in centimetres
+click #5007
+click listitem:"Zentimeter"
+expect #5006 text "16,93"
+expect #5008 text "7,94"
+# a print width gives the pixel width (8,00 cm at 96 dpi = 302 px)
+click #5006
+key ctrl+a
+type "8"
+key tab
+expect #5002 value 302
+# resolution in Pixel/cm
+click #5005
+click listitem:"Pixel/cm"
+expect #5004 text "37,80"
+expect #5002 value 302
+click button:"OK"
+expect window 24592 closed
+expect #9901 value 2
+expect #9902 value 1
+expect tab:"Unbenannt 2" selected
+expect #9911 text "Unbenannt 2"
+expect #9913 value 302
+expect #9914 value 300
+expect #9916 value 2
+expect #9915 value 3780
+expect #9905 value 0
+expect text:"302 × 300" exists
+# the dialog remembers the last size; Abbrechen creates nothing
+key ctrl+n
+expect #5002 value 302
+click button:"Abbrechen"
+expect window 24592 closed
+expect #9901 value 2
+key ctrl+n
+key esc
+expect window 24592 closed
+expect #9901 value 2
+# a third image (800 x 600 again)
+key ctrl+n
+click #5002
+key ctrl+a
+type "800"
+key tab
+click #5003
+key ctrl+a
+type "600"
+key tab
+click button:"OK"
+expect #9901 value 3
+expect tab:"Unbenannt 3" selected
+expect text:"800 × 600" exists
+
+# ------------------------------------------------------------ switching
+click #1200
+expect tab:"Unbenannt" selected
+expect #9902 value 0
+key ctrl+tab
+expect tab:"Unbenannt 2" selected
+key ctrl+tab ctrl+tab
+expect tab:"Unbenannt" selected
+key ctrl+shift+tab
+expect tab:"Unbenannt 3" selected
+# Bilderliste (Ansicht menu command 708): every image, the active one checked
+cmd 708
+expect menuitem:"Unbenannt 3" checked
+expect menuitem:"Unbenannt" unchecked
+click menuitem:"Unbenannt 2"
+expect tab:"Unbenannt 2" selected
+# tooltip = the name for unsaved images
+move #1202
+wait 600
+expect text:"Unbenannt 3" exists
+move 640,448
+
+# ------------------------------------------------------------ drag a tab to another place
+drag #1200 #1202
+expect #1200 exists
+expect tab:"Unbenannt 2" exists
+expect #9911 text "Unbenannt"
+expect #9902 value 2
+# dropped on the left half of the first tab: it goes to the front
+drag #1202 590,24
+expect #9902 value 0
+expect #9911 text "Unbenannt"
+
+# ------------------------------------------------------------ Schließen: unchanged -> closes at once
+click #1202
+expect tab:"Unbenannt 3" selected
+key ctrl+w
+expect #9901 value 2
+expect window 24593 closed
+
+# ------------------------------------------------------------ Schließen with changes
+click #1201
+expect tab:"Unbenannt 2" selected
+cmd 902 1
+cmd 903 0
+cmd 904 655370
+expect #9905 value 1
+expect #9919 text "*Unbenannt 2 – PaintCraft"
+cmd 900 327685
+expect #9900 text "FFFF0000"
+expect #9917 value 0
+wait 300
+expect #9917 value 1
+key ctrl+w
+expect window 24593 open
+expect window 24593 modal
+expect text:"„Unbenannt 2“ wurde geändert und noch nicht gespeichert. Wie möchten Sie fortfahren?" exists
+click button:"Abbrechen"
+expect window 24593 closed
+expect #9901 value 2
+expect #9905 value 1
+# the close button of the tab asks too; Esc = Abbrechen
+click #1301
+expect window 24593 open
+key esc
+expect window 24593 closed
+expect #9901 value 2
+click #1301
+click button:"Nicht speichern"
+expect window 24593 closed
+expect #9901 value 1
+expect tab:"Unbenannt" selected
+
+# ------------------------------------------------------------ middle click closes a tab
+key ctrl+n
+click button:"OK"
+expect #9901 value 2
+down #1201 m
+up #1201 m
+expect #9901 value 1
+
+# ------------------------------------------------------------ Speichern from the question: save dialog
+cmd 902 3
+cmd 903 0
+cmd 904 655370
+key ctrl+w
+click button:"Speichern"
+expect window 24593 closed
+expect dialog:"Speichern unter" exists
+click button:"Abbrechen"
+expect dialog:"Speichern unter" missing
+expect #9901 value 1
+key ctrl+w
+click button:"Speichern"
+click #81932
+key ctrl+a
+type "build/a1_docs_save.png"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+# Speicheroptionen (dlg_saveopt.s)
+expect window 24595 open
+click button:"OK"
+expect window 24595 closed
+expect #9901 value 0
+expect text:"0 × 0" exists
+
+# ------------------------------------------------------------ Beenden asks for every modified image
+cmd 101
+click #65548
+key ctrl+a
+type "a1_docs_save.png"
+click button:"Öffnen"
+sync
+expect #9901 value 1
+expect #9911 text "a1_docs_save.png"
+cmd 900 327685
+expect #9900 text "FF0000FF"
+expect #9905 value 0
+key ctrl+n
+click button:"OK"
+cmd 902 2
+cmd 903 0
+cmd 904 655370
+click #1200
+cmd 904 655370
+expect #9905 value 1
+cmd 107
+expect window 24593 open
+expect text:"„a1_docs_save.png“ wurde geändert und noch nicht gespeichert. Wie möchten Sie fortfahren?" exists
+click button:"Nicht speichern"
+expect window 24593 open
+expect text:"„Unbenannt“ wurde geändert und noch nicht gespeichert. Wie möchten Sie fortfahren?" exists
+click button:"Abbrechen"
+expect window 24593 closed
+expect #9901 value 1
+expect tab:"Unbenannt" selected
+
+# ------------------------------------------------------------ many images: "Bilderliste" button
+key ctrl+n
+click button:"OK"
+key ctrl+n
+click button:"OK"
+key ctrl+n
+click button:"OK"
+key ctrl+n
+click button:"OK"
+key ctrl+n
+click button:"OK"
+key ctrl+n
+click button:"OK"
+expect #9901 value 7
+expect #1392 exists
+expect tab:"Unbenannt 7" selected
+click #1392
+expect menuitem:"Unbenannt 7" checked
+click menuitem:"Unbenannt"
+expect tab:"Unbenannt" selected
+expect #1200 exists
+key ctrl+shift+tab
+expect tab:"Unbenannt 7" selected

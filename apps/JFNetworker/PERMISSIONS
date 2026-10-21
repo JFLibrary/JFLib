@@ -1,0 +1,5 @@
+# JFNetworker: what the app may do (docs/PERMISSIONS.md)
+fs.user                      # the projects the user opens and saves
+fs.write $APPCONFIG/**       # settings, recent files, the dock layout, the window's place
+fs.write $APPDATA/**         # autosave and recovery (later)
+fs.write $DOCUMENTS/JFNetworker/**

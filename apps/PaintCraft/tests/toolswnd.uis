@@ -1,0 +1,73 @@
+# toolswnd.uis -- the "Werkzeuge" tool window (agent A2): 19 tool buttons in two columns in
+# the paint.net order, the active tool checked, tooltips "Name (Taste)", a click selects the
+# tool through tool.s (status bar hint, tool menu), tool keys update the window, F5 / close.
+# ids: window 24577 (WINID_TOOLS), buttons 4000 + TOOL_*.
+
+expect window 24577 open
+expect window 24577 rect 8 137 74 346
+expect #4000 exists
+expect #4018 exists
+expect #4019 missing
+# two columns of square buttons: tool 2i left, tool 2i + 1 right, rows 34 DIP apart
+expect #4000 rect 5 33 32 32
+expect #4001 rect 39 33 32 32
+expect #4002 rect 5 67 32 32
+expect #4018 rect 5 339 32 32
+# default tool Farbpinsel
+expect #4010 checked
+expect #4000 unchecked
+
+# ------------------------------------------------------------ a click selects the tool
+click #4000
+expect #4000 checked
+expect #4010 unchecked
+expect text:"Rechteckige Auswahl: Rechteckige Auswahl mit gedrückter Maustaste aufziehen. Mit Umschalt wird sie quadratisch." exists
+click "Zauberstab (S)"
+expect #4006 checked
+expect #4000 unchecked
+click #4012
+expect #4012 checked
+expect text:"Zeichenstift: Zeichnet pixelgenaue Freihandlinien: links in der Primärfarbe, rechts in der Sekundärfarbe" exists
+# the tool menu of the tool row shows the same tool
+click #1010
+expect #762 checked
+key esc
+
+# ------------------------------------------------------------ tool keys (keys of a tool window go to the owner)
+key e
+expect #4011 checked
+key s
+expect #4000 checked
+key s
+expect #4002 checked
+key o
+expect #4017 checked
+key o
+expect #4018 checked
+key b
+expect #4010 checked
+
+# ------------------------------------------------------------ tooltips
+move #4016
+wait 700
+expect text:"Text (T)" exists
+move #4008
+wait 700
+expect text:"Farbeimer (F)" exists
+expect text:"Text (T)" missing
+move 640,450
+wait 100
+
+# ------------------------------------------------------------ F5 and the close button
+key f5
+expect window 24577 closed
+expect #700 unchecked
+key f5
+expect window 24577 open
+expect #700 checked
+close window 24577
+expect window 24577 closed
+expect #700 unchecked
+click #700
+expect window 24577 open
+expect #4010 checked

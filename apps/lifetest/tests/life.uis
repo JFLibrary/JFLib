@@ -1,0 +1,29 @@
+# the app lifecycle (runtime.rs): the platform's events become UIC_ACTIVE, UIC_SUSPEND,
+# UIC_SESSION_END and UIC_SETTINGS; the runtime logs them (plat::log)
+theme light
+expect text:"Aktiv: nein  Schlaf: nein  Ende: 0" exists
+# the app gets the keyboard; focus moving between its windows in one batch does not count
+system focus in
+expect text:"Aktiv: ja  Schlaf: nein  Ende: 0" exists
+system focus out
+expect text:"Aktiv: nein  Schlaf: nein  Ende: 0" exists
+# sleep and wake up, logged
+system suspend
+expect text:"Aktiv: nein  Schlaf: ja  Ende: 0" exists
+expect text:"Log: INFO  app: the system goes to sleep" exists
+system resume
+expect text:"Aktiv: nein  Schlaf: nein  Ende: 0" exists
+expect text:"Log: INFO  app: the system woke up" exists
+# settings: the bits reach the app; a fixed theme (theme light: one UIC_THEME) does not follow
+# the system
+system settings locale
+expect text:"Einstellungen: 2  Theme: 1" exists
+system settings theme
+expect text:"Einstellungen: 1  Theme: 1" exists
+system settings 12
+expect text:"Einstellungen: 12  Theme: 1" exists
+# the session ends: the app saves (its log line), the runtime ends after it
+system session-end
+expect text:"Aktiv: nein  Schlaf: nein  Ende: 1" exists
+expect text:"Log: INFO  lifetest: saved before the end" exists
+expect_nowarn

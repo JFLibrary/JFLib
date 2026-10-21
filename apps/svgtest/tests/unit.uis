@@ -1,0 +1,7 @@
+#!args --test unit
+# svgtest --test unit: the self-checks of img_svg (unit.rs): sizes and units, colours, path data,
+# transforms, viewBox / preserveAspectRatio, strokes and dashes, gradients, opacity and layers,
+# clip paths, CSS, use / symbol, display / visibility, embedded images, the codec IMGF_SVG,
+# malformed input (prefixes, mutations of every fixture, nesting, entity and use explosions,
+# absurd numbers).  The whole test runs before the UI starts; the exit code is the number of
+# failures.

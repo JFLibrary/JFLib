@@ -1,0 +1,64 @@
+#!args --verify-dirty
+# typing into the rich-text editor: characters, Enter (paragraphs), Backspace / Delete across
+# paragraphs, words (Ctrl+Left / Right, Ctrl+Backspace / Delete), Home / End, Up / Down at the
+# preferred x, typing over a selection, Esc drops the focus
+size 1000 680
+click "Leeren"
+expect #2000 focused
+expect #2000 text ""
+type "Hallo Welt"
+expect #2000 text "Hallo Welt"
+expect text:"sel: 0:10-0:10" exists
+key enter
+type "Zweite Zeile"
+expect #2000 text "Hallo Welt\nZweite Zeile"
+expect text:"sel: 1:12-1:12" exists
+# Backspace at a paragraph start joins, Enter splits again
+key home
+expect text:"sel: 1:0-1:0" exists
+key backspace
+expect #2000 text "Hallo WeltZweite Zeile"
+expect text:"sel: 0:10-0:10" exists
+key enter
+expect #2000 text "Hallo Welt\nZweite Zeile"
+# Delete at a paragraph end joins
+key up
+key end
+expect text:"sel: 0:10-0:10" exists
+key delete
+expect #2000 text "Hallo WeltZweite Zeile"
+key enter
+# words
+key ctrl+right
+expect text:"sel: 1:7-1:7" exists
+key ctrl+backspace
+expect #2000 text "Hallo Welt\nZeile"
+key ctrl+delete
+expect #2000 text "Hallo Welt\n"
+type "Wende"
+key ctrl+home
+key ctrl+delete
+expect #2000 text "Welt\nWende"
+key ctrl+end
+expect text:"sel: 1:5-1:5" exists
+# Up / Down keep the x (the end of a longer line: the end of the shorter)
+key up
+expect text:"sel: 0:4-0:4" exists
+key left
+key left
+key down
+expect text:"sel: 1:2-1:2" exists
+# typing over a selection
+key shift+home
+expect text:"sel: 1:2-1:0" exists
+type "Sch"
+expect #2000 text "Welt\nSchnde"
+# umlauts and emoji; Backspace takes an emoji whole
+type "ön 😀"
+expect #2000 text "Welt\nSchön 😀nde"
+key backspace
+expect #2000 text "Welt\nSchön nde"
+# Esc drops the focus
+key esc
+expect #2000 enabled
+expect_nowarn

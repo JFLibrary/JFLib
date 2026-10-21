@@ -1,0 +1,24 @@
+#!args --verify-dirty
+# misspelled words get a red wavy line (TB_SPELL, ui/edit_spell.rs): of "Hasu-Tür" only "Hasu";
+# the box without TB_SPELL and the password box are not checked; headless runs use the test
+# dictionary of app://hunspell (de_TEST for the language de-DE)
+expect text:"Sprache: de-TEST (hunspell), bereit" exists
+expect text:"Fehler Betreff: Hasu" exists
+expect text:"Fehler Nachricht: Arbit, Strasse" exists
+expect text:"Fehler Kennwort: -" exists
+expect text:"Wörterbuch: -" exists
+theme light
+shot build/spell/light.png
+theme dark
+shot build/spell/dark.png
+scale 150
+shot build/spell/dark_150.png
+scale 100
+# the box keeps its marks when it scrolls (single line: a long text)
+focus #110
+key end
+type " und ein Satz mit der Arbit, Arbit Arbit Arbit"
+key home
+shot build/spell/subject_home.png
+expect text:"Fehler Betreff: Hasu, Arbit, Arbit, Arbit, Arbit" exists
+expect_nowarn

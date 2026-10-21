@@ -1,0 +1,77 @@
+#!args --editor
+# Complete ribbon groups scroll horizontally; all actions keep semantic focus and menus.
+size 1000 700
+theme light
+cmd 1
+expect button:"Fett" exists
+expect button:"Unterstrichen" exists
+expect #1331 missing
+expect #1341 missing
+expect #7 missing
+expect #2147484461 exists
+# Keyboard focus scrolls a trailing group into view before opening its popup.
+focus #2891
+key enter
+expect #2891 open
+expect #7 exists
+expect #8 disabled
+shot build/jfword-ribbon-overflow-document.png
+click #7
+expect #7 missing
+expect textbox:"\n" exists
+focus #35
+key enter
+expect #820 exists
+click "Schließen"
+focus #2891
+key enter
+expect #8 enabled
+click #8
+expect textbox:"\n" missing
+focus #2891
+key enter
+expect #8 disabled
+key esc
+expect #7 missing
+expect #2891 focused
+shot build/jfword-ribbon-start-1000.png
+# Resizing leaves no stale group flyouts. All Home controls retain their identities.
+size 1240 800
+expect #35 exists
+expect #1331 missing
+click "Layout"
+expect #36 exists
+expect #40 missing
+expect #3030 exists
+expect #44 missing
+click #3023
+expect #44 exists
+key esc
+shot build/jfword-ribbon-layout-1240.png
+click "Referenzen"
+expect #312 disabled
+expect #320 exists
+click #323
+expect #309 exists
+expect #316 disabled
+expect #318 exists
+expect #327 exists
+expect #328 disabled
+expect #1411 exists
+expect #1410 disabled
+click #3015
+expect #401 exists
+size 1000 700
+focus #323
+key enter
+expect #309 exists
+key esc
+shot build/jfword-ribbon-references-1000.png
+click "Ansicht"
+click #49
+expect button:"1 · Text" exists
+theme dark
+scale 150
+click "Start"
+shot build/jfword-ribbon-start-dark-150.png
+expect_nowarn

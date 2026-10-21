@@ -1,0 +1,22 @@
+# tools/package.py: setup.exe (Windows) and .deb (Linux) of BackupCraft
+display=BackupCraft
+version=0.1.0
+publisher=JFLib
+summary=Datensicherung mit Server, Agenten und Console
+description=Sicherung und Wiederherstellung für Server, Agenten und Dateien: dedupliziert, komprimiert, verschlüsselt, mit Zeitplänen, Aufbewahrung, unveränderlichen Restore-Points, Rollen und Audit; geschrieben in Rust mit JFLib.
+generic=Datensicherung
+categories=System;Utility;Archiving;
+section=admin
+deb_name=backupcraft
+# Flatpak, AppStream and the MSIX identity: the author's apps use jfreund.org (docs/PACKAGING.md)
+app_id=org.jfreund.BackupCraft
+homepage=https://github.com/JFLibrary/JFLib
+license=MIT
+default_win=backupcraft
+default_linux=backupcraft
+styles=backupcraft
+# the Windows server installs the Linux agent over SSH: its Linux build goes along
+cross_bins=bc-agent
+# systemd units in the .deb (not enabled: systemctl enable --now backupcraft-server)
+unit_backupcraft-server=BackupCraft Server (REST-API, Zeitpläne, Repositories)|bc-server run --data /var/lib/backupcraft
+unit_backupcraft-agent=BackupCraft Agent (vorher koppeln: bc-agent pair --data /var/lib/backupcraft-agent ...)|bc-agent run --data /var/lib/backupcraft-agent

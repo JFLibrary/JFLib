@@ -1,0 +1,22 @@
+# parity of the Rust plattest with the assembly version (tools/parity.py, build_rs.py test)
+matrix off                      # no UI: the shot / dump matrix does not apply
+stdout checks                   # compare PASS / FAIL lines and the summary; lines starting with
+                                # two blanks are details (times, paths, counts) and differ by run
+rsonly guard.uis   # Rust build only (was apps/plattest/tests)
+rsonly guardlimit.uis   # Rust build only (was apps/plattest/tests)
+rsonly print.uis   # Rust build only (was apps/plattest/tests)
+rsonly policy.uis  # The permission manifest has no assembly counterpart.
+rsonly vfs.uis     # The vfs layer has no assembly counterpart.
+rsonly instance.uis # The single-instance channel has no assembly counterpart.
+rsonly tray.uis    # The tray and notification API has no assembly counterpart.
+rsonly cliprich.uis # Rich clipboard API and CF_HTML framing have no assembly counterpart.
+rsonly a11y.uis    # The accessibility bridge has no assembly counterpart.
+rsonly dirs.uis    # The user folders and the log folder have no assembly counterpart.
+rsonly trash.uis   # plat::trash has no assembly counterpart.
+rsonly power.uis   # plat::inhibit has no assembly counterpart.
+rsonly autostart.uis # plat::autostart has no assembly counterpart.
+rsonly taskbar.uis # plat::taskbar has no assembly counterpart.
+rsonly dnd.uis     # Drag and drop between programs has no assembly counterpart.
+rsonly assoc.uis   # plat::assoc has no assembly counterpart.
+rsonly recent.uis  # plat::recent has no assembly counterpart.
+rsonly content.uis # Android's content:// names (plat::content) have no assembly counterpart.

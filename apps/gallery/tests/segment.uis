@@ -1,0 +1,67 @@
+# Unicode segmentation in the text box (text::segment, UAX #29 / #14): the caret moves over
+# grapheme clusters, Backspace deletes an emoji sequence whole but only the last code point of
+# other clusters, Ctrl+arrows jump over words (apostrophes and numbers inside a word), a
+# double click selects a word or a run of punctuation, wrapped boxes break lines after hyphens
+# and between ideographs (UAX #14).  The first text has "e" + U+0301, a ZWJ family and two flags.
+size 900 1200
+theme light
+click #700
+type "Café 👨‍👩‍👧 🇩🇪🇫🇷"
+expect #700 value 42
+# Café: C a f e+U+0301 (6 bytes); the space; the family (18); the space; two flags (8 each)
+key home right right right right
+expect #700 value 6
+key right right
+expect #700 value 25
+key right right
+expect #700 value 34
+key right
+expect #700 value 42
+key left left
+expect #700 value 26
+# Backspace after the family deletes it whole
+key left
+expect #700 value 25
+key backspace
+expect #700 text "Café  🇩🇪🇫🇷"
+expect #700 value 7
+# Backspace after e + U+0301 takes the accent only; typing it again restores the cluster
+key left
+key backspace
+expect #700 text "Cafe  🇩🇪🇫🇷"
+type "́"
+expect #700 text "Café  🇩🇪🇫🇷"
+expect #700 value 6
+# Delete removes the next cluster whole: a flag
+key end left left delete
+expect #700 text "Café  🇫🇷"
+# words: an apostrophe and a decimal number stay inside a word
+key ctrl+a
+type "can't stop 3.14 now"
+key home ctrl+right
+expect #700 value 6
+key ctrl+right
+expect #700 value 11
+key ctrl+right
+expect #700 value 16
+key ctrl+left ctrl+left
+expect #700 value 6
+key ctrl+shift+right
+key ctrl+c
+key end
+key ctrl+v
+expect #700 text "can't stop 3.14 nowstop "
+# a double click on punctuation selects the whole run (the dots of "abc...def": x 60)
+key ctrl+a
+type "abc...def"
+wait 600
+dblclick 60,564
+key ctrl+x
+expect #700 text "abcdef"
+# wrapping (the box with TB_WRAP): after the hyphen of a long compound, between ideographs
+size 900 3200
+click #7961
+key ctrl+a
+type "Donaudampfschifffahrts-Gesellschaftskapitän 日本語の文章は空白なしで折り返されます"
+shot build/segment_wrap.png 330 2820 260 150
+expect_nowarn

@@ -1,0 +1,8 @@
+# One rich-text surface with two separate line regions is one widget.
+expect_nowarn
+cmd 1
+# Two different surface calls using the same ID are still invalid.
+expect_warn
+cmd 2
+# Ordinary duplicate widgets are still diagnosed.
+expect_warn

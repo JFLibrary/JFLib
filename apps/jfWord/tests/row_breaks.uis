@@ -1,0 +1,35 @@
+#!args --editor
+size 1440 1040
+theme light
+scale 100
+click tab:"Einfügen"
+click #1514
+click "Übernehmen"
+type "Zeile zusammenhalten"
+click #3918
+expect dialog:"Tabelleneigenschaften" exists
+expect #3909 checked
+click #3909
+expect #3909 unchecked
+shot build/jfword-row-breaks-dialog-light.png
+click "Übernehmen"
+click #3918
+expect #3909 unchecked
+click "Abbrechen"
+cmd 5
+click #3918
+expect #3909 checked
+click "Abbrechen"
+cmd 6
+click #3918
+expect #3909 unchecked
+theme dark
+scale 150
+shot build/jfword-row-breaks-dialog-dark-150.png
+click "Abbrechen"
+size 800 700
+scale 100
+click #3918
+expect #3909 unchecked
+click "Abbrechen"
+expect_nowarn

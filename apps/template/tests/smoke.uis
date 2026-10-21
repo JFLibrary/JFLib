@@ -1,0 +1,7 @@
+# template smoke test
+click "Klick mich"
+click "Klick mich"
+expect text:"Klicks: 2" exists
+click "Zurücksetzen"
+expect text:"Klicks: 0" exists
+shot build/template.png

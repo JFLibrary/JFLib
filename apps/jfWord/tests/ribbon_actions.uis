@@ -1,0 +1,141 @@
+#!args --editor
+# Shared large action, independently focusable split dropdown and dialog starter.
+size 1240 840
+theme light
+expect button:"Einfügen" exists
+expect button:"Einfügeoptionen" exists
+expect button:"Absatzdialog öffnen" exists
+clip text "Alpha β"
+focus #72
+key enter
+expect textbox:"Alpha β" exists
+expect #10000 focused
+key ctrl+a ctrl+b
+click #70
+clip expect docx
+clip expect rtf
+key ctrl+end
+# Tab reaches the dropdown separately. Its keyboard activation focuses the menu.
+focus #72
+key tab
+expect #2870 focused
+key enter
+expect #2870 open
+expect menuitem:"Mit Formatierung einfügen" focused
+key down
+expect menuitem:"Nur Text einfügen" focused
+shot build/jfword-ribbon-actions-light.png
+key enter
+expect textbox:"Alpha βAlpha β" exists
+expect #10000 focused
+expect #2871 missing
+key ctrl+z
+expect textbox:"Alpha β" exists
+# Alt+Down and unbound F4 on the main action open only its dropdown.
+focus #72
+key alt+down
+expect #2870 open
+expect #2871 focused
+expect textbox:"Alpha β" exists
+key esc
+expect #2870 focused
+focus #72
+key f4
+expect #2871 focused
+key enter
+expect textbox:"Alpha βAlpha β" exists
+key ctrl+z
+# The dialog starter has its own semantic name, focus target and keyboard action.
+focus #2874
+key enter
+expect #850 exists
+click "Abbrechen"
+expect textbox:"Alpha β" exists
+# Format transfer uses the existing rich selection and does not replace clipboard data.
+click textbox:"Alpha β"
+key ctrl+a
+click #2870
+expect #2876 disabled
+click #2875
+expect textbox:"Alpha β" focused
+clip expect docx
+key ctrl+i
+expect button:"Kursiv" checked
+click #2870
+expect #2876 enabled
+click #2876
+expect button:"Fett" checked
+expect button:"Kursiv" unchecked
+expect textbox:"Alpha β" focused
+click #2870
+click #2877
+expect button:"Fett" unchecked
+expect button:"Kursiv" unchecked
+key ctrl+z
+expect button:"Fett" checked
+expect textbox:"Alpha β" exists
+# Format shortcuts must run before the focused text widget consumes Ctrl+C/V.
+key ctrl+shift+c
+key ctrl+i
+expect button:"Kursiv" checked
+key ctrl+shift+alt+v
+expect button:"Fett" checked
+expect button:"Kursiv" unchecked
+clip expect docx
+key ctrl+space
+expect button:"Fett" unchecked
+key ctrl+z
+expect button:"Fett" checked
+size 1000 700
+scale 150
+theme dark
+focus #2870
+key space
+expect #2871 focused
+shot build/jfword-ribbon-actions-dark-150.png
+key esc
+expect #2870 focused
+# A narrow ribbon scrolls whole groups; its leading split action remains usable.
+size 600 700
+scale 200
+theme light
+expect #1351 missing
+expect #72 exists
+focus #2870
+key enter
+expect #2871 focused
+shot build/jfword-ribbon-actions-overflow-200.png
+key esc
+expect #2870 focused
+expect #72 exists
+key esc
+expect #72 exists
+# Overflow tabs remain reachable by keyboard and mouse at 600 DIP.
+expect button:"Weitere Register" enabled
+focus #2000
+key end
+expect tab:"Hilfe" selected
+expect button:"Vorherige Register" enabled
+click tab:"Ansicht"
+expect tab:"Ansicht" selected
+click button:"Vorherige Register"
+click button:"Vorherige Register"
+click tab:"Start"
+expect tab:"Start" selected
+expect #72 exists
+size 1000 700
+scale 150
+theme dark
+# Structural editing does not advertise native rich-paste actions as available.
+click "Ansicht"
+click #54
+click "Start"
+expect #72 disabled
+expect #2870 disabled
+click #2870
+focus #2870
+key enter
+expect #2871 missing
+expect #2874 enabled
+shot build/jfword-ribbon-actions-disabled.png
+expect_nowarn

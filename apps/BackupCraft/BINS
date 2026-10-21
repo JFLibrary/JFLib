@@ -1,0 +1,4 @@
+# BackupCraft's further executables (build_rs.py, section "app-bins"): NAME ENTRY cli|gui
+bc-server   server/main.rs   cli    # backup server: REST API, scheduler, engine (service / daemon)
+bc-agent    agent/main.rs    cli    # agent on protected hosts (mTLS, pairing)
+bcctl       ctl/main.rs      cli    # command line client

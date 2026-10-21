@@ -1,0 +1,16 @@
+[package]
+name = "text_shape"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+harfrust = { version = "=0.14.0", default-features = false, features = ["libm"] }
+unicode-bidi = { version = "=0.3.18", default-features = false, features = ["hardcoded-data"] }
+unicode-script = { version = "=0.5.8", default-features = false }
+
+[profile.release]
+panic = "abort"
+opt-level = 2
+codegen-units = 1
+debug = false

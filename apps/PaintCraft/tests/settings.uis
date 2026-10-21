@@ -1,0 +1,204 @@
+#!args --config build/tests/pn_settings
+# settings.uis -- Einstellungen + settings file (agent S1, M7; docs/SETTINGS.md).
+# The dialog (Alt+X, pages, immediate changes, Schließen / Esc save the file), the tool
+# defaults (Standardtool, Aktuelle Werkzeugleiste übernehmen, Zurücksetzen), Diagnose (text,
+# clipboard), then an in-process round trip: every persisted value is changed, the file is
+# written (cmd 850), everything goes back to the factory state (cmd 852) and the file is
+# read again (cmd 851 = factory + load).  The real two-process round trip, malformed
+# files and the main window: tools/pn_settings_check.py.
+# Probes #5900.. (docs/SETTINGS.md §6); dialog window 24624, page list rows #5501..#5508.
+size 1280 800
+cmd 852
+theme light
+expect #5900 value 1
+expect #9918 text ""
+expect #710 enabled
+expect #5906 text "Paintbrush"
+expect #5907 value 10
+expect #5908 text "w=2 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
+expect #5910 text "FF000000 FFFFFFFF"
+expect #5910 value 64
+expect #5912 value 0
+expect #5912 text "grid=0 rulers=0"
+expect #5913 value 0
+expect #5914 value 0
+expect #5915 value 0
+
+# ------------------------------------------------------------ dialog: Alt+X, Benutzeroberfläche
+key alt+x
+expect window 24624 open
+expect window 24624 modal
+expect window 24624 rect 230 104 820 560
+resizewin 24624 900 620
+expect window 24624 rect 230 104 900 620
+expect #5917 value 0
+expect #5917 text "Benutzeroberfläche"
+expect #5530 value 0
+expect #5530 text "Standard"
+expect #5532 enabled
+expect #5533 checked
+click #5530
+click listitem:"Dunkel"
+expect #5530 value 2
+expect #5903 value 1
+expect #5903 text "Dunkel"
+click #5530
+click listitem:"Hell"
+expect #5903 value 0
+expect #5903 text "Hell"
+click #5530
+click listitem:"Dunkel"
+expect #5903 text "Dunkel"
+click #5531
+type "C42B1C"
+key enter
+expect #5904 text "C42B1C"
+click #5531
+key ctrl+a
+type "xyz"
+key tab
+expect #5904 text "C42B1C"
+expect #5531 text "C42B1C"
+click #5533
+expect #5905 value 0
+expect #5905 text "anim_off=1"
+click #5533
+expect #5905 value 1
+expect #5905 text "anim_off=0"
+
+# ------------------------------------------------------------ Werkzeuge
+click #5502
+expect #5917 value 1
+expect #5540 value 10
+expect #5540 text "Farbpinsel"
+click #5540
+click listitem:"Zoomen"
+expect #5540 value 5
+expect #5906 text "Zoom"
+expect #5907 value 10
+expect text:"Probennahme: Ebene" exists
+click #5542
+expect #5906 text "Paintbrush"
+expect #5540 value 10
+
+# ------------------------------------------------------------ Verlauf, Grafik
+click #5503
+expect #5917 value 2
+expect #5550 value 0
+click #5550
+key ctrl+a
+type "512"
+key enter
+expect #5913 value 512
+expect #5914 text "budget=512"
+click #5551
+type "build/tests/pn_tmp"
+key enter
+expect #5913 text "build/tests/pn_tmp"
+click #5504
+expect #5917 value 3
+click #5560
+key ctrl+a
+type "3"
+key enter
+expect #5914 value 3
+click #5505
+expect text:"Die Farbdarstellung von PaintCraft erfolgt in sRGB." exists
+click #5506
+expect #5570 enabled
+expect #5571 enabled
+expect #5572 enabled
+click #5508
+expect text:"Alle Plugins wurden fehlerfrei geladen." exists
+
+# ------------------------------------------------------------ Diagnose (text + clipboard)
+click #5507
+expect #5917 value 6
+clip clear
+click #5581
+clip expect text
+click "Schließen"
+expect window 24624 closed
+expect #5901 value 1
+expect #5901 text "ok"
+
+# ------------------------------------------------------------ tool bar -> defaults
+cmd 787
+cmd 787
+cmd 784
+expect #5910 text "FFFFFFFF FF000000"
+key alt+x
+expect window 24624 open
+expect #5917 value 6
+click #5502
+click #5541
+expect #5908 text "w=4 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
+click #5540
+click listitem:"Zoomen"
+key esc
+expect window 24624 closed
+expect #5901 value 2
+
+# ------------------------------------------------------------ everything else that is persisted
+cmd 225
+cmd 226
+cmd 231 2
+expect #5912 value 2
+expect #5912 text "grid=1 rulers=1"
+cmd 205
+expect #5910 value 65
+expect #5911 text "FF000000 FFFFFFFF"
+movewin 24577 300 200
+close window 24580
+expect window 24580 closed
+resizewin 24578 250 200
+sync
+# (the automatic layout keeps it at the top right of the canvas area, wnd_dock.s)
+expect window 24578 rect 1020 157 250 200
+cmd 850
+expect #5901 value 3
+
+# ------------------------------------------------------------ factory state
+cmd 852
+expect #5906 text "Paintbrush"
+expect #5908 text "w=2 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
+expect #5909 text "w=2 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
+expect #5910 text "FF000000 FFFFFFFF"
+expect #5910 value 64
+expect #5912 value 0
+expect #5912 text "grid=0 rulers=0"
+expect #5913 value 0
+expect #5913 text ""
+expect #5914 value 0
+expect #5903 value 2
+expect #5904 value 0
+expect window 24580 open
+expect window 24577 rect 8 137 74 346
+
+# ------------------------------------------------------------ read the file again
+cmd 851
+expect #5902 value 1
+expect #5903 value 1
+expect #5903 text "Dunkel"
+expect #5904 text "C42B1C"
+expect #5905 value 1
+expect #5906 text "Zoom"
+expect #5907 value 5
+expect #5908 text "w=4 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
+expect #5909 text "w=4 h=75 s=15 aa=1 b=0 f=0 t=50 fl=0 smp=0 sel=0 q=0 p=1 sm=0"
+expect #5910 text "FFFFFFFF FF000000"
+expect #5910 value 65
+expect #5911 text "FF000000 FFFFFFFF"
+expect #5912 value 2
+expect #5912 text "grid=1 rulers=1"
+expect #5913 value 512
+expect #5913 text "build/tests/pn_tmp"
+expect #5914 value 3
+expect #5914 text "budget=512"
+expect window 24580 closed
+expect window 24577 rect 300 200 74 346
+expect window 24578 rect 1020 157 250 200
+expect #225 checked
+theme light
+cmd 852
+cmd 850

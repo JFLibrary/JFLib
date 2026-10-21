@@ -1,0 +1,85 @@
+#!args --editor --sources --navigation --file build/jfword-complex-fields.docx
+# A Word complex citation is edited directly on paper, then copied across documents.
+size 1240 840
+theme light
+click #10000
+key ctrl+home f11
+expect button:"Zitat bearbeiten" exists
+click #1401
+expect dialog:"Zitat bearbeiten" exists
+click #957
+key ctrl+a
+type "99"
+click "Zitat übernehmen"
+expect button:"Zitat bearbeiten" exists
+key ctrl+c
+clip expect docx
+clip expect rtf
+clip expect text "(Lovelace, 1843, S. 99)"
+key ctrl+n
+click "Verwerfen"
+key ctrl+v
+expect textbox:"(Lovelace, 1843, S. 99)" focused
+type " danach"
+expect textbox:"(Lovelace, 1843, S. 99) danach" focused
+key ctrl+v
+expect textbox:"(Lovelace, 1843, S. 99) danach(Lovelace, 1843, S. 99)" focused
+key ctrl+z ctrl+home f11 ctrl+x
+expect textbox:" danach" focused
+key ctrl+z
+expect textbox:"(Lovelace, 1843, S. 99) danach" focused
+key ctrl+end
+cmd 23
+clip text "Notiz α\nBeleg β"
+key ctrl+v ctrl+a ctrl+i
+cmd 25
+key ctrl+a ctrl+c
+key ctrl+n
+click "Verwerfen"
+key ctrl+v
+expect textbox:"(Lovelace, 1843, S. 99) danach[1]" focused
+expect button:"Fußnote 1" exists
+key ctrl+home f11 f11
+expect button:"Anmerkung bearbeiten" exists
+key ctrl+c ctrl+end ctrl+v
+expect textbox:"(Lovelace, 1843, S. 99) danach[1][2]" focused
+expect button:"Fußnote 2" exists
+key shift+f11
+click #1401
+expect textbox:"Notiz α\nBeleg β" focused
+# An anchored note cannot be pasted into another note.
+key ctrl+end ctrl+v
+expect textbox:"Notiz α\nBeleg β" focused
+expect button:"Fußnote 3" missing
+cmd 25
+click #1403
+expect dialog:"Anmerkung entfernen" exists
+click "Abbrechen"
+key ctrl+home f11
+click #1401
+click #957
+key ctrl+a
+type "100"
+click "Zitat übernehmen"
+key ctrl+c
+clip expect text "(Lovelace, 1843, S. 100)"
+# Partial field copy is explicitly plain text; partial cut cannot destroy a field.
+key ctrl+home shift+right ctrl+c
+clip expect text "("
+clip expect text-only
+key ctrl+x
+expect textbox:"(Lovelace, 1843, S. 100) danach[1][2]" focused
+key ctrl+home f11 f11 f11
+click #1403
+click button:"Anmerkung entfernen"
+expect button:"Fußnote 2" missing
+key ctrl+z
+expect button:"Fußnote 2" exists
+shot build/jfword-field-editor.png
+cmd 4
+click #1048588
+key ctrl+a
+type "build/jfword-rich-fields.docx"
+click button:"Speichern"
+click "Ersetzen"
+expect_nowarn

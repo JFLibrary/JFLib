@@ -1,0 +1,32 @@
+#!args --open apps/Kritzel/tests/fixtures/small.png
+# open / save as / reopen through the file dialog, unsaved-changes prompt
+expect text:"64 × 48px" exists
+# open dialog in the folder of the document: the only PNG there, double-clicked
+cmd 2
+expect dialog:"Öffnen" exists
+expect #1048592 value -1
+wait 600
+dblclick #1048593
+expect dialog:"Öffnen" missing
+expect text:"64 × 48px" exists
+# save as: a relative name is taken relative to the shown folder, ".png" is appended
+cmd 4
+expect dialog:"Speichern unter" exists
+click #1048588
+key ctrl+a
+type "../../../../build/fd_out"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+# reopen: the dialog starts with the saved file
+cmd 2
+expect #1048588 text "fd_out.png"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect text:"64 × 48px" exists
+# changes -> "Neu" asks first
+drag #1000 -20,-10 4
+cmd 1
+expect button:"Nicht speichern" exists
+shot build/kritzel_ask.png
+click "Nicht speichern"
+expect text:"1152 × 648px" exists

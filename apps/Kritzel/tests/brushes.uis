@@ -1,0 +1,113 @@
+# brush variants (Pinsel): one zigzag stroke per variant, sizes, opacity, undo
+# canvas: doc (0,0) is at 64,188 (DIP) at 100 % (below the title bar and the ribbon)
+click #1106
+expect #1106 checked
+# the picker opens a flyout with all nine variants
+click #1260
+expect "Kalligrafiestift" exists
+expect "Aquarellpinsel" exists
+shot build/kritzel_brush_menu.png
+click "Pinsel"
+expect #1260 value 0
+# 0 Pinsel (soft round), black, size 20
+cmd 16977 20
+down 100,222
+move 220,262
+move 340,212
+move 460,262
+up
+# 1 Kalligrafiepinsel via the flyout, size 24, dark blue
+click #1260
+click "Kalligrafiepinsel"
+expect #1260 value 1
+click #1218
+cmd 16977 24
+down 520,212
+move 640,272
+move 760,212
+move 880,272
+move 1000,212
+up
+# 2 Kalligrafiestift, size 24, red
+cmd 16976 2
+click #1213
+down 100,302
+move 220,362
+move 340,302
+move 460,362
+up
+# 3 Airbrush, size 36, green; rest a while in the middle (timer spraying)
+cmd 16976 3
+click #1216
+cmd 16977 36
+down 520,332
+move 600,332
+move 680,332
+wait 200
+move 760,332
+move 840,332
+move 1000,332
+up
+# 4 Ölpinsel, size 32, orange
+cmd 16976 4
+click #1214
+cmd 16977 32
+down 100,432
+move 240,472
+move 380,422
+move 470,462
+up
+# 5 Buntstift, size 30, purple
+cmd 16976 5
+click #1219
+cmd 16977 30
+down 520,432
+move 660,472
+move 800,422
+move 1000,462
+up
+# 6 Marker, size 28, yellow, crossing itself (no build-up inside one stroke)
+cmd 16976 6
+click #1215
+cmd 16977 28
+down 100,532
+move 460,572
+move 460,522
+move 100,572
+up
+# 7 Natürlicher Bleistift, size 10, black
+cmd 16976 7
+click #1210
+cmd 16977 10
+down 520,532
+move 660,572
+move 800,522
+move 1000,562
+up
+# 8 Aquarellpinsel, size 40, light blue, two overlapping strokes
+cmd 16976 8
+click #1217
+cmd 16977 40
+down 100,642
+move 300,672
+move 460,632
+up
+down 250,622
+move 350,682
+up
+# opacity 40 %: soft brush over the watercolour
+cmd 16976 0
+click #1213
+cmd 16978 40
+cmd 16977 30
+down 520,652
+move 1000,652
+up
+shot build/kritzel_brushes.png
+# undo the last two strokes, redo one
+key ctrl+z
+key ctrl+z
+shot build/kritzel_brushes_undo.png
+key ctrl+y
+cmd 16978 100
+expect text:"1152 × 648px" exists

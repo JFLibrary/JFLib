@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [
+  <!ENTITY ns_svg "http://www.w3.org/2000/svg">
+  <!ENTITY accent "#0d9488">
+  <!ENTITY wave "M10 150 C40 120 70 180 100 150 S160 120 190 150">
+]>
+<!-- what editors write: a DOCTYPE with entities, foreign namespaces, metadata, units, the svg: prefix -->
+<svg:svg xmlns:svg="&ns_svg;" xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="52.917mm" height="52.917mm" viewBox="0 0 200 200" version="1.1">
+  <svg:title>Editor-Datei</svg:title>
+  <sodipodi:namedview pagecolor="#ffffff" inkscape:zoom="1.2"><svg:rect width="200" height="200" fill="red"/></sodipodi:namedview>
+  <svg:metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/></svg:metadata>
+  <svg:g inkscape:label="Ebene 1" inkscape:groupmode="layer" id="layer1">
+    <svg:rect style="fill:&accent;;fill-opacity:1;stroke:#134e4a;stroke-width:0.26458332mm" x="20" y="20" width="160" height="90" ry="8.5"/>
+    <svg:path d="&wave;" style="fill:none;stroke:#f97316;stroke-width:6;stroke-linecap:round"/>
+    <svg:circle cx="100" cy="65" r="30" fill="white" fill-opacity="0.85" stroke="none"/>
+    <svg:path d="M85 65 L97 77 L118 52" fill="none" stroke="&accent;" stroke-width="8" stroke-linejoin="round" stroke-linecap="round"/>
+    <svg:rect x="20" y="175" width="1in" height="12pt" fill="#64748b"/>
+    <svg:rect x="120" y="175" width="2em" height="0.75em" fill="#a855f7" font-size="20"/>
+  </svg:g>
+  <script type="text/javascript">alert(1)</script>
+  <foreignObject x="0" y="0" width="200" height="200"><div xmlns="http://www.w3.org/1999/xhtml">HTML</div></foreignObject>
+</svg:svg>

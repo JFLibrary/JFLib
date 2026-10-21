@@ -1,0 +1,159 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/tcp_wan.jfnet
+# the device window (workspace/devwin): Shift + double click or the context menu; Übersicht,
+# Schnittstellen, Konfiguration (forms that type their commands on the device's console and
+# land in its startup configuration: one undo step, which restarts the device with the old
+# one), Dienste (switched at once and through undo without a restart), CLI (the console of the
+# Terminal tab: the tab points there meanwhile), and a host's desktop (IP-Konfiguration,
+# Eingabeaufforderung, Texteditor, Webbrowser).  Shots light, dark and 150 %.
+# Ids: the window 26624, its tabs 26625; Konfiguration: name 26657 (+1 Übernehmen), interface
+# 26659, address 26660, description 26661, up 26662, Übernehmen 26665, gateway 26666, new route
+# 26668 / 26669 (+1 Hinzufügen), the first route's remove button 26672; Dienste: the switches
+# 26721 + i; Desktop: IP-Konfiguration gateway 26774 (+1 Übernehmen), the editor 26784 (+1
+# Speichern), the browser's address 26800 (+1 Öffnen).
+size 1280 900
+theme light
+dblclick listitem:"R1" shift
+expect window 26624 open
+expect titlebar:"R1 – JF-R4" exists
+expect tab:"Übersicht" selected
+expect text:"eingeschaltet, 2 von 9 Schnittstellen aktiv" exists
+expect text:"Gi0/0/0 10.0.1.1/24" exists
+shot build/jfnetworker/device_window.png window 26624
+# Schnittstellen: every interface with its far end and counters
+click tab:"Schnittstellen"
+expect text:"PC1 eth0" exists
+expect text:"SRV1 eth0" exists
+expect text:"10.0.2.1/24" exists
+# Konfiguration: the name, typed on the console
+click tab:"Konfiguration"
+expect #26657 text "R1"
+click #26657
+key ctrl+a
+type "Core"
+click #26658
+expect listitem:"Core" exists
+expect titlebar:"Core – JF-R4" exists
+expect text:"Zuletzt in der Konsole:" exists
+expect text:"hostname Core" exists
+# an interface: address, description, up
+click #26659
+click listitem:"Gi0/0/2"
+expect #26660 text ""
+click #26660
+type "10.0.3.1/24"
+click #26661
+type "Labor"
+click #26662
+click #26665
+expect text:"interface GigabitEthernet0/0/2" exists
+expect text:"ip address 10.0.3.1 255.255.255.0" exists
+expect text:"description Labor" exists
+expect text:"no shutdown" exists
+expect #26660 text "10.0.3.1/24"
+# a refused address says why and changes nothing
+click #26660
+key ctrl+a
+type "10.0.3.300/24"
+click #26665
+expect text:"„10.0.3.300/24“ ist keine Adresse mit Präfix (10.0.0.1/24 oder 10.0.0.1 255.255.255.0)." exists
+# a static route, then away again
+click #26668
+type "10.9.0.0/16"
+click #26669
+type "10.0.2.10"
+click #26670
+expect text:"10.9.0.0/16 über 10.0.2.10" exists
+click #26672
+expect text:"10.9.0.0/16 über 10.0.2.10" missing
+# the console shows what the forms typed (CLI: the same console as the Terminal tab)
+click tab:"CLI"
+expect text:"Core(config)#interface GigabitEthernet0/0/2" exists
+expect text:"Core(config-if)#ip address 10.0.3.1 255.255.255.0" exists
+expect text:"Core(config)#no ip route 10.9.0.0 255.255.0.0 10.0.2.10" exists
+type "show ip interface brief\n"
+expect text:"GigabitEthernet0/0/2   10.0.3.1        YES manual down                  down" exists
+shot build/jfnetworker/device_window_cli.png window 26624
+# undo restarts the device with the configuration before (the route, the address)
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+click tab:"Schnittstellen"
+expect text:"10.0.3.1/24" missing
+close window 26624
+expect window 26624 closed
+# SRV1's window from the context menu: its services switch without a restart
+rclick listitem:"SRV1"
+move 700,300
+click menuitem:"Gerätefenster …"
+expect window 26624 open
+click tab:"Dienste"
+expect text:"TCP-Discard · discard" exists
+expect text:"TCP-Echo · echo" exists
+expect text:"Port 7: 0 Verbindungen, 0 Bytes zurückgeschickt" exists
+click #26722
+expect #26722 unchecked
+expect text:"aus" exists
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+expect #26722 checked
+shot build/jfnetworker/device_window_services.png window 26624
+# its CLI tab: the Terminal tab of SRV1 points there meanwhile
+dblclick listitem:"SRV1"
+expect tab:"SRV1" selected
+click tab:"CLI"
+expect text:"Die Konsole von SRV1 ist im Gerätefenster offen" exists
+click tab:"Dienste"
+expect text:"Die Konsole von SRV1 ist im Gerätefenster offen" missing
+close window 26624
+# PC1's desktop: the IP configuration types shell commands
+dblclick listitem:"PC1" shift
+expect window 26624 open
+click tab:"Desktop"
+expect button:"IP-Konfiguration" exists
+shot build/jfnetworker/device_window_desktop.png window 26624
+click button:"IP-Konfiguration"
+expect #26772 text "10.0.1.10"
+expect #26773 text "255.255.255.0"
+expect #26774 text "10.0.1.1"
+click #26774
+key ctrl+a
+type "10.0.1.254"
+click #26775
+expect #26774 text "10.0.1.254"
+click button:"Desktop"
+click button:"Eingabeaufforderung"
+expect text:"root@PC1:~# ip addr flush dev eth0" exists
+expect text:"root@PC1:~# ip addr add 10.0.1.10/24 dev eth0" exists
+expect text:"root@PC1:~# ip route del default" exists
+expect text:"root@PC1:~# ip route add default via 10.0.1.254" exists
+# the editor keeps notes with the project
+click button:"Desktop"
+click button:"Texteditor"
+expect text:"gesichert" exists
+click #26784
+type "Labor-PC am Rand des Netzes"
+expect text:"geändert" exists
+click #26785
+expect text:"gesichert" exists
+# the browser says where it would go
+click button:"Desktop"
+click button:"Webbrowser"
+click #26800
+key ctrl+a
+type "http://10.0.2.10/index.html\n"
+expect text:"Ziel: 10.0.2.10, Port 80, Pfad /index.html" exists
+# dark and 150 %
+click button:"Desktop"
+click button:"IP-Konfiguration"
+theme dark
+shot build/jfnetworker/device_window_dark.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/device_window_150.png window 26624
+expect_nowarn

@@ -1,0 +1,5 @@
+#!args --test content
+# (Rust only) plattest --test content: Android's content:// names (lib/plat/content.rs) through the
+# ordinary file functions, against a storage provider in memory (path-like IDs, "name (1)" when a
+# name is taken). The whole test runs before the UI starts and ends the process with the number of
+# failures.

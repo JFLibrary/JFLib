@@ -1,0 +1,7 @@
+#!args --font-dirs "lib/doc_view/assets;apps/fonttest/tests/fixtures" --fontconf apps/fontpicktest/tests/fonts.conf --font-rgba bgr
+# jfgui_FONT_RGBA=bgr: subpixel smoothing with blue on the left of each pixel (the red and
+# blue channels of build/fontpick_subpixel_rgb.png swapped)
+expect text:"Subpixel: BGR" exists
+expect text:"Glättung: an  Dialog: 0" exists
+shot build/fontpick_subpixel_bgr.png 16 16 400 120
+expect_nowarn

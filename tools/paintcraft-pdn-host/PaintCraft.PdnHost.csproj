@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType><TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable><AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PaintDotNetDir Condition="'$(PaintDotNetDir)' == ''">C:\Program Files\paint.net</PaintDotNetDir>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="PluginCatalog.cs" />
+    <Compile Include="FileTypeBridge.cs" />
+    <Compile Include="HostWatchdog.cs" />
+    <Reference Include="PaintDotNet.Data;PaintDotNet.Core;PaintDotNet.Effects.Core;PaintDotNet.Base;PaintDotNet.Primitives;PaintDotNet.PropertySystem;PaintDotNet.Framework;PaintDotNet.Windows.Framework;PaintDotNet.ObjectModel;PaintDotNet.ComponentModel;System.Resources.Extensions;System.Runtime.Serialization.Formatters">
+      <HintPath>$(PaintDotNetDir)\%(Identity).dll</HintPath><Private>false</Private>
+    </Reference>
+  </ItemGroup>
+  <Target Name="CheckPaintDotNet" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(PaintDotNetDir)\PaintDotNet.Effects.Core.dll')" Text="Set PaintDotNetDir to an installed Paint.NET 5.1 directory." />
+  </Target>
+</Project>

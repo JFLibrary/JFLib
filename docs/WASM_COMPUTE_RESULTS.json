@@ -1,0 +1,583 @@
+{
+  "cpu": "AMD Ryzen 5 3600 6-Core Processor              ",
+  "logicalCpus": 12,
+  "repeats": 3,
+  "method": "Effect command to complete preview, one warm-up; PNG equality after commit; milliseconds",
+  "results": [
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "scalar",
+      "compute": {
+        "mode": "scalar",
+        "simd": false,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        2570.0443999999843,
+        2369.796399999992,
+        2530.785999999993
+      ],
+      "medianMs": 2530.785999999993,
+      "sha256": "c5596057aea7f3d81a964369b097b0e7884aaa85a008ae7b24543c518c15f1a7",
+      "ok": true
+    },
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "scalar",
+      "compute": {
+        "mode": "scalar",
+        "simd": false,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        2434.445699999982,
+        2457.3012000000163,
+        2482.7173000000184
+      ],
+      "medianMs": 2457.3012000000163,
+      "sha256": "24c0aac5cb138b79530d9ad1fb2e7ffa3031844b771a7eed95a4496bf30bf1af",
+      "ok": true
+    },
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "simd",
+      "compute": {
+        "mode": "simd",
+        "simd": true,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        735.1839000000036,
+        655.2629000000015,
+        841.565499999997
+      ],
+      "medianMs": 735.1839000000036,
+      "sha256": "c5596057aea7f3d81a964369b097b0e7884aaa85a008ae7b24543c518c15f1a7",
+      "ok": true
+    },
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "simd",
+      "compute": {
+        "mode": "simd",
+        "simd": true,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        580.2705000000133,
+        786.8923000000068,
+        873.2981999999902
+      ],
+      "medianMs": 786.8923000000068,
+      "sha256": "24c0aac5cb138b79530d9ad1fb2e7ffa3031844b771a7eed95a4496bf30bf1af",
+      "ok": true
+    },
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "threads",
+      "compute": {
+        "mode": "threads",
+        "simd": true,
+        "shared": true,
+        "workers": 4
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        365.67190000001574,
+        315.18540000001667,
+        295.3524000000325
+      ],
+      "medianMs": 315.18540000001667,
+      "sha256": "c5596057aea7f3d81a964369b097b0e7884aaa85a008ae7b24543c518c15f1a7",
+      "ok": true
+    },
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "threads",
+      "compute": {
+        "mode": "threads",
+        "simd": true,
+        "shared": true,
+        "workers": 4
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        292.08869999996386,
+        338.81609999999637,
+        230.89470000000438
+      ],
+      "medianMs": 292.08869999996386,
+      "sha256": "24c0aac5cb138b79530d9ad1fb2e7ffa3031844b771a7eed95a4496bf30bf1af",
+      "ok": true
+    },
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "scalar",
+      "compute": {
+        "mode": "scalar",
+        "simd": false,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        6831.806600000011,
+        7445.2639999999665,
+        7173.555500000017
+      ],
+      "medianMs": 7173.555500000017,
+      "sha256": "d8c76f4555196ef5956bed67cf4f95aeb578414ec536457d5658b40c859e1abf",
+      "ok": true
+    },
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "scalar",
+      "compute": {
+        "mode": "scalar",
+        "simd": false,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        7591.862800000003,
+        7988.071799999976,
+        13480.123300000036
+      ],
+      "medianMs": 7988.071799999976,
+      "sha256": "5ab458eaa23971afc504faa1c5a5f4f8c19802cc7cc190f1628885a70f7e4bf8",
+      "ok": true
+    },
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "simd",
+      "compute": {
+        "mode": "simd",
+        "simd": true,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        1403.1827000000048,
+        1420.9740999999922,
+        1432.3206000000355
+      ],
+      "medianMs": 1420.9740999999922,
+      "sha256": "d8c76f4555196ef5956bed67cf4f95aeb578414ec536457d5658b40c859e1abf",
+      "ok": true
+    },
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "simd",
+      "compute": {
+        "mode": "simd",
+        "simd": true,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        1007.0746999999974,
+        1081.568499999994,
+        1036.2290999999968
+      ],
+      "medianMs": 1036.2290999999968,
+      "sha256": "5ab458eaa23971afc504faa1c5a5f4f8c19802cc7cc190f1628885a70f7e4bf8",
+      "ok": true
+    },
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "threads",
+      "compute": {
+        "mode": "threads",
+        "simd": true,
+        "shared": true,
+        "workers": 4
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        517.8058999999776,
+        572.5506000000169,
+        562.1367999999784
+      ],
+      "medianMs": 562.1367999999784,
+      "sha256": "d8c76f4555196ef5956bed67cf4f95aeb578414ec536457d5658b40c859e1abf",
+      "ok": true
+    },
+    {
+      "engine": "chromium",
+      "browser": "155.0.8059.39",
+      "mode": "threads",
+      "compute": {
+        "mode": "threads",
+        "simd": true,
+        "shared": true,
+        "workers": 4
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        481.55019999999786,
+        465.4796000000206,
+        399.0109999999986
+      ],
+      "medianMs": 465.4796000000206,
+      "sha256": "5ab458eaa23971afc504faa1c5a5f4f8c19802cc7cc190f1628885a70f7e4bf8",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "scalar",
+      "compute": {
+        "mode": "scalar",
+        "simd": false,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        21103.883599999943,
+        21285.114500000025,
+        21254.145600000047
+      ],
+      "medianMs": 21254.145600000047,
+      "sha256": "c5596057aea7f3d81a964369b097b0e7884aaa85a008ae7b24543c518c15f1a7",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "scalar",
+      "compute": {
+        "mode": "scalar",
+        "simd": false,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        19430.237800000003,
+        19889.662700000103,
+        19948.573199999984
+      ],
+      "medianMs": 19889.662700000103,
+      "sha256": "24c0aac5cb138b79530d9ad1fb2e7ffa3031844b771a7eed95a4496bf30bf1af",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "simd",
+      "compute": {
+        "mode": "simd",
+        "simd": true,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        4107.392400000012,
+        3863.2446000000928,
+        3688.3907999999356
+      ],
+      "medianMs": 3863.2446000000928,
+      "sha256": "c5596057aea7f3d81a964369b097b0e7884aaa85a008ae7b24543c518c15f1a7",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "simd",
+      "compute": {
+        "mode": "simd",
+        "simd": true,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        3073.664299999946,
+        3298.932299999986,
+        3238.146999999997
+      ],
+      "medianMs": 3238.146999999997,
+      "sha256": "24c0aac5cb138b79530d9ad1fb2e7ffa3031844b771a7eed95a4496bf30bf1af",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "threads",
+      "compute": {
+        "mode": "threads",
+        "simd": true,
+        "shared": true,
+        "workers": 4
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        1312.3795999999857,
+        1059.5010000000475,
+        1089.7443999999668
+      ],
+      "medianMs": 1089.7443999999668,
+      "sha256": "c5596057aea7f3d81a964369b097b0e7884aaa85a008ae7b24543c518c15f1a7",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "threads",
+      "compute": {
+        "mode": "threads",
+        "simd": true,
+        "shared": true,
+        "workers": 4
+      },
+      "width": 2048,
+      "height": 2048,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        973.9782000000123,
+        920.6119999999646,
+        910.9338999999454
+      ],
+      "medianMs": 920.6119999999646,
+      "sha256": "24c0aac5cb138b79530d9ad1fb2e7ffa3031844b771a7eed95a4496bf30bf1af",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "scalar",
+      "compute": {
+        "mode": "scalar",
+        "simd": false,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        74176.99869999988,
+        66441.23539999989,
+        102197.32780000009
+      ],
+      "medianMs": 74176.99869999988,
+      "sha256": "d8c76f4555196ef5956bed67cf4f95aeb578414ec536457d5658b40c859e1abf",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "scalar",
+      "compute": {
+        "mode": "scalar",
+        "simd": false,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        93951.2182,
+        74100.62300000014,
+        123139.61229999969
+      ],
+      "medianMs": 93951.2182,
+      "sha256": "5ab458eaa23971afc504faa1c5a5f4f8c19802cc7cc190f1628885a70f7e4bf8",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "simd",
+      "compute": {
+        "mode": "simd",
+        "simd": true,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        24544.465000000317,
+        14376.358700000215,
+        13008.093899999745
+      ],
+      "medianMs": 14376.358700000215,
+      "sha256": "d8c76f4555196ef5956bed67cf4f95aeb578414ec536457d5658b40c859e1abf",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "simd",
+      "compute": {
+        "mode": "simd",
+        "simd": true,
+        "shared": false,
+        "workers": 0
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        21532.024999999994,
+        27445.45419999998,
+        19165.183100000024
+      ],
+      "medianMs": 21532.024999999994,
+      "sha256": "5ab458eaa23971afc504faa1c5a5f4f8c19802cc7cc190f1628885a70f7e4bf8",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "threads",
+      "compute": {
+        "mode": "threads",
+        "simd": true,
+        "shared": true,
+        "workers": 4
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Gaussian blur",
+      "parameter": 12,
+      "times": [
+        4405.01939999999,
+        3292.7033999999985,
+        3911.9164000000455
+      ],
+      "medianMs": 3911.9164000000455,
+      "sha256": "d8c76f4555196ef5956bed67cf4f95aeb578414ec536457d5658b40c859e1abf",
+      "ok": true
+    },
+    {
+      "engine": "firefox",
+      "browser": "153.0",
+      "mode": "threads",
+      "compute": {
+        "mode": "threads",
+        "simd": true,
+        "shared": true,
+        "workers": 4
+      },
+      "width": 4096,
+      "height": 3072,
+      "effect": "Motion blur",
+      "parameter": 32,
+      "times": [
+        2559.1819999999716,
+        2893.5218999999342,
+        2619.2323000000324
+      ],
+      "medianMs": 2619.2323000000324,
+      "sha256": "5ab458eaa23971afc504faa1c5a5f4f8c19802cc7cc190f1628885a70f7e4bf8",
+      "ok": true
+    }
+  ],
+  "build": {
+    "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+    "profile": "development; compute opt-level=2; UI opt-level=1; no LTO",
+    "date": "2026-10-12",
+    "workers": 4,
+    "bundles": {
+      "scalar": {
+        "file": "PaintCraft.wasm",
+        "bytes": 4728887,
+        "sha256": "66b763e1ef352e4edfa4e33785d7f58bb45de9f89f959b793c5ad69e71da3792"
+      },
+      "simd": {
+        "file": "PaintCraft.simd.wasm",
+        "bytes": 4313150,
+        "sha256": "59d99fb09110675e824e981529cabac326ccf3c2b0e7b9d8f3700f7568380977"
+      },
+      "threads": {
+        "file": "PaintCraft.threads.wasm",
+        "bytes": 4216785,
+        "sha256": "9a6eab36510f01bac14011b891a5d9643d50f3395ab180c1e017c9e933e79873"
+      }
+    }
+  }
+}

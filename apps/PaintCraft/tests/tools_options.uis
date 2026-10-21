@@ -1,0 +1,156 @@
+# tools_options.uis -- the option rows of the T1 tools (agent T1): widgets per tool, the
+# shared options (width, hardness, spacing, fill style, antialiasing, blend mode, flood mode,
+# tolerance, sampling), per-tool options of the picker, Fertigstellen only for the bucket,
+# [ ] steps.  #9937 = "hardness,spacing,aa,blend,fill,tolerance,flood,sampling,selmode,
+# selqual"; #9942 = picker "size,after,sampling".
+size 1280 800
+theme light
+
+# ------------------------------------------------------------ Farbpinsel
+expect #9931 value 10
+expect text:"Pinselgröße:" exists
+expect #2000 value 2
+click #2002
+expect #2000 value 3
+expect #9932 value 300
+click #2001
+expect #2000 value 2
+cmd 789
+expect #2000 value 7
+cmd 786
+expect #2000 value 6
+cmd 788
+cmd 788
+expect #2000 value 1
+cmd 787
+expect #2000 value 2
+expect text:"Härte:" exists
+expect #2010 value 75
+expect text:"75%" exists
+expect text:"Abstand:" exists
+expect #2012 value 15
+expect text:"Fülleffekt:" exists
+expect #2050 exists
+expect #2020 exists
+expect #2030 exists
+expect #790 missing
+# blend mode
+click #2030
+expect menuitem:"Normal" checked
+expect menuitem:"Überschreiben" unchecked
+click menuitem:"Multiplizieren"
+expect #9937 text "75,15,1,1,0,50,0,0,0,0"
+click #2030
+expect menuitem:"Multiplizieren" checked
+click menuitem:"Überschreiben"
+expect #9937 text "75,15,1,14,0,50,0,0,0,0"
+click #2030
+click menuitem:"Normal"
+expect #9937 text "75,15,1,0,0,50,0,0,0,0"
+# path smoothing (Pfadglättung)
+click #2150
+expect menuitem:"Ungeglätteter Weg" checked
+click menuitem:"Geglätteter Weg"
+click #2150
+expect menuitem:"Geglätteter Weg" checked
+click menuitem:"Ungeglätteter Weg"
+click #2150
+expect menuitem:"Ungeglätteter Weg" checked
+key esc
+# antialiasing
+click #2020
+expect menuitem:"Kantenglättung an" checked
+click menuitem:"Kantenglättung aus"
+expect #9937 text "75,15,0,0,0,50,0,0,0,0"
+click #2020
+click menuitem:"Kantenglättung an"
+expect #9937 text "75,15,1,0,0,50,0,0,0,0"
+# fill style: Volltonfarbe + 53 hatch swatches
+click #2050
+expect menuitem:"Volltonfarbe" checked
+expect #2053 exists
+expect #2106 missing
+click #2053
+expect #9937 text "75,15,1,0,2,50,0,0,0,0"
+expect button:"Vertikal" exists
+click #2050
+click #2104
+expect #9937 text "75,15,1,0,53,50,0,0,0,0"
+click #2050
+click menuitem:"Volltonfarbe"
+expect #9937 text "75,15,1,0,0,50,0,0,0,0"
+expect button:"Volltonfarbe" exists
+
+# ------------------------------------------------------------ Radierer: no fill, no blend mode
+key e
+expect text:"Pinselgröße:" exists
+expect text:"Härte:" exists
+expect text:"Fülleffekt:" missing
+expect #2030 missing
+expect #2020 exists
+
+# ------------------------------------------------------------ Zeichenstift: blend mode only
+key p
+expect text:"Pinselgröße:" missing
+expect text:"Härte:" missing
+expect #2030 exists
+expect #2020 missing
+
+# ------------------------------------------------------------ Farbeimer
+key f
+expect text:"Füllungsmodus:" exists
+expect text:"Toleranz:" exists
+expect #2110 value 50
+expect text:"50%" exists
+expect text:"Fülleffekt:" exists
+expect #790 exists
+expect #790 disabled
+click #2115
+expect menuitem:"Zusammenhängend" checked
+click menuitem:"Global"
+expect #9937 text "75,15,1,0,0,50,1,0,0,0"
+click #2115
+click menuitem:"Zusammenhängend"
+click #2120
+expect menuitem:"Ebene" checked
+click menuitem:"Bild"
+expect #9937 text "75,15,1,0,0,50,0,1,0,0"
+click #2120
+click menuitem:"Ebene"
+expect #9937 text "75,15,1,0,0,50,0,0,0,0"
+
+# ------------------------------------------------------------ Farbauswahl
+key k
+expect text:"Probennahme:" exists
+expect text:"Nach dem Klick:" exists
+expect #9942 text "0,0,0"
+click #2850
+expect menuitem:"Einzelne Pixel" checked
+click menuitem:"5 × 5 Pixel"
+expect #9942 text "2,0,0"
+click #2860
+click menuitem:"Bild"
+expect #9942 text "2,0,1"
+click #2870
+expect menuitem:"Werkzeug beibehalten" checked
+click menuitem:"Zum Zeichenstift wechseln"
+expect #9942 text "2,2,1"
+cmd 939 0
+cmd 940 0
+click #2860
+click menuitem:"Ebene"
+expect #9942 text "0,0,0"
+
+# ------------------------------------------------------------ Zoomen / Ansicht verschieben: no options
+key z
+expect text:"Pinselgröße:" missing
+expect #2030 missing
+key h
+expect #2030 missing
+
+# ------------------------------------------------------------ tools without a module yet keep the width
+key l
+expect text:"Pinselgröße:" exists
+key b
+theme dark
+expect text:"Pinselgröße:" exists

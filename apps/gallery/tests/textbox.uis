@@ -1,0 +1,107 @@
+# text input: typing (umlauts), selection, delete, clipboard, undo, number box (edit agent)
+size 900 1200
+theme light
+# typing into the name box
+click #700
+expect #700 focused
+type "Grüße aus Köln"
+expect #700 text "Grüße aus Köln"
+expect #700 value 17
+expect "Eingabe: Grüße aus Köln   (übernommen: 0, Zahl: 5)" exists
+# Shift+Left selects characters (UTF-8 aware), Backspace deletes the selection
+key shift+left shift+left shift+left shift+left
+expect #700 value 12
+key backspace
+expect #700 text "Grüße aus "
+type "Bonn"
+expect #700 text "Grüße aus Bonn"
+# Backspace / Delete remove whole characters
+key home right right right
+key backspace
+expect #700 text "Grße aus Bonn"
+key delete
+expect #700 text "Gre aus Bonn"
+key ctrl+z
+expect #700 text "Grße aus Bonn"
+key ctrl+z
+expect #700 text "Grüße aus Bonn"
+# select all, copy, paste at the end, undo / redo
+key ctrl+a
+key ctrl+c
+key end
+key ctrl+v
+expect #700 text "Grüße aus BonnGrüße aus Bonn"
+key ctrl+z
+expect #700 text "Grüße aus Bonn"
+key ctrl+y
+expect #700 text "Grüße aus BonnGrüße aus Bonn"
+key ctrl+z
+# word jumps and word deletion
+key home ctrl+right
+expect #700 value 8
+key ctrl+shift+right
+expect #700 value 12
+key ctrl+x
+expect #700 text "Grüße Bonn"
+key home ctrl+v
+expect #700 text "aus Grüße Bonn"
+key end ctrl+backspace
+expect #700 text "aus Grüße "
+key home ctrl+delete
+expect #700 text "Grüße "
+key end
+type "Bonn"
+expect #700 text "Grüße Bonn"
+# Enter commits (the gallery counts commits) and keeps the focus
+key enter
+expect #700 focused
+expect "Eingabe: Grüße Bonn   (übernommen: 1, Zahl: 5)" exists
+# Esc drops the focus
+key esc
+expect #702 exists
+expect "Eingabe: Grüße Bonn   (übernommen: 2, Zahl: 5)" exists
+# double click selects a word, drag selects with the pointer
+wait 600
+click #700
+key ctrl+a
+type "abc def"
+wait 600
+dblclick #700
+expect #700 value 7
+key ctrl+c
+key end
+key ctrl+v
+expect #700 text "abc defdef"
+wait 600
+drag #700 0,0
+expect #700 value 0
+key delete
+expect #700 text ""
+# the password box shows dots and does not copy
+click #701
+type "geheim"
+expect #701 text "●●●●●●"
+key ctrl+a ctrl+c
+click #700
+key ctrl+v
+expect #700 text "def"
+# Tab moves the focus on (and selects the number box text)
+click #701
+key tab
+expect #702 focused
+key end
+type "x2"
+expect #702 text "52"
+expect #702 value 5
+key enter
+expect #702 value 10
+expect #702 text "10"
+key down down down
+expect #702 value 7
+key up
+expect #702 value 8
+key ctrl+a
+type "3"
+key tab
+expect #702 value 3
+expect "Eingabe: def   (übernommen: 4, Zahl: 3)" exists

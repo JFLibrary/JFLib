@@ -1,0 +1,97 @@
+#!args --file build/jfword-notes-ui.docx --editor --structure --sources --navigation
+# Scientific notes: UTF-8 caret, rich text, citations, navigation, conversion and undo.
+size 1240 840
+theme light
+click #10000
+key ctrl+home right right right right right right right right right right right right
+cmd 23
+expect "Fußnote 1 bearbeiten" exists
+click #2874
+expect dialog:"Absatz formatieren" exists
+key ctrl+z ctrl+n ctrl+s ctrl+o
+expect dialog:"Absatz formatieren" exists
+click "Abbrechen"
+expect "Fußnote 1 bearbeiten" exists
+click button:"Fußnote 1"
+type "Anmerkung α zur Quelle."
+expect textbox:"Anmerkung α zur Quelle." exists
+key ctrl+a
+key ctrl+i
+expect "Textsegment · 11 pt · Kursiv" exists
+cmd 12
+expect "(Forschungsinstitut, 2026)" exists
+cmd 11
+expect "Quelle wird zitiert. Zitate zuerst entfernen." exists
+cmd 7
+type "Zweiter Notenabsatz."
+expect textbox:"Zweiter Notenabsatz." exists
+cmd 25
+expect "Textstelle der Anmerkung ausgewählt" exists
+expect button:"Fußnote 1 öffnen" focused
+expect textbox:"Haupttext α " exists
+expect textbox:"mit Beleg." exists
+cmd 13
+click #408
+expect dialog:"Verwendungen der Quelle" exists
+expect "Fußnote 1 · Absatz 1 · Zitat an Position 2" exists
+click #1900
+expect "Fußnote 1 bearbeiten" exists
+expect "Verwendung in Fußnote 1 · Absatz 1 ausgewählt" exists
+expect button:"Zitat bearbeiten" focused
+cmd 26
+expect "Endnote 1 bearbeiten" exists
+cmd 5
+expect "Fußnote 1 bearbeiten" exists
+cmd 6
+expect "Endnote 1 bearbeiten" exists
+size 1000 700
+shot build/jfword-note-editor-small.png
+size 1240 840
+cmd 27
+expect dialog:"Anmerkung entfernen" exists
+key ctrl+n ctrl+o ctrl+s ctrl+z
+expect dialog:"Anmerkung entfernen" exists
+click "Abbrechen"
+expect "Endnote 1 bearbeiten" exists
+cmd 27
+click button:"Anmerkung entfernen"
+expect "Anmerkung und Textverweis entfernt" exists
+expect button:"Endnote 1" missing
+cmd 5
+click button:"Endnote 1"
+expect "Endnote 1 bearbeiten" exists
+expect "(Forschungsinstitut, 2026)" exists
+cmd 25
+cmd 24
+expect "Endnote 2 bearbeiten" exists
+type "Weitere Erklärung Ω."
+cmd 26
+expect "Fußnote 1 bearbeiten" exists
+cmd 25
+focus #35
+key enter
+click #820
+type "Notenabsatz"
+click "Nächster Treffer"
+expect "Treffer 1 von 1" exists
+click "Schließen"
+expect "Endnote 1 bearbeiten" exists
+expect textbox:"Zweiter Notenabsatz." exists
+cmd 25
+cmd 3
+expect "Gespeichert · Text, Quellen und Zitatverweise" exists
+cmd 2
+click button:"Öffnen"
+expect "Dokument geöffnet · Quellen und Zitatverweise geladen" exists
+expect button:"Endnote 1 öffnen" exists
+expect button:"Fußnote 1 öffnen" exists
+size 1240 1000
+click #48
+expect "Seite 1 von 1" exists
+click #126
+click "50 %"
+shot build/jfword-notes-preview-light.png
+theme dark
+scale 150
+shot build/jfword-notes-preview-dark-150.png
+expect_nowarn

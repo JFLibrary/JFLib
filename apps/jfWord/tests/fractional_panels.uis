@@ -1,0 +1,35 @@
+# Half-DIP panel bounds must repaint fully when hover/focus changes at every DPI.
+size 1424 884
+theme light
+scale 100
+move button:"Vorlage: Leeres Dokument"
+move 1100,700
+focus button:"Vorlage: Leeres Dokument"
+key tab
+theme dark
+move button:"Vorlage: Leeres Dokument"
+move 1100,700
+focus button:"Vorlage: Leeres Dokument"
+key tab
+scale 150
+move button:"Vorlage: Leeres Dokument"
+move 1100,700
+focus button:"Vorlage: Leeres Dokument"
+key tab
+theme light
+move button:"Vorlage: Leeres Dokument"
+move 1100,700
+focus button:"Vorlage: Leeres Dokument"
+key tab
+scale 200
+move button:"Vorlage: Leeres Dokument"
+move 1100,700
+focus button:"Vorlage: Leeres Dokument"
+key tab
+theme dark
+move button:"Vorlage: Leeres Dokument"
+move 1100,700
+focus button:"Vorlage: Leeres Dokument"
+key enter
+expect #10000 exists
+expect_nowarn

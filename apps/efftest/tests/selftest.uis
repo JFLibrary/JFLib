@@ -1,0 +1,5 @@
+#!args --selftest
+# Built-in checks of the FXA effect kernels (apps/efftest/src/selftest.s): known answers,
+# serial / pool tile determinism with default properties, JOB_CANCEL honoured, guard bytes.
+# The whole test runs in on_init and ends the process with exit code 0 (passed) or 1;
+# nothing below is executed.  The full numpy-referenced suites are in tools/fx_check.py.

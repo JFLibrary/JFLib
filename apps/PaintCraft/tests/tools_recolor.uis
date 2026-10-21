@@ -1,0 +1,198 @@
+# tools_recolor.uis -- Neu färben (agent T6): left = pixels similar to the secondary colour take
+# the primary colour (shifted by primary - secondary, shading kept), right = roles swapped,
+# "Quelle: erster Klick" (colour under the press point), Toleranz (0 = exact), Toleranz-
+# Alpha-Modus Vormultipliziert / Gerade, one step per stroke, undo / redo, Esc, test clip.
+# Mapping (1280 x 800, zoom 100 %): image pixel (x, y) at (240 + x, 148 + y).  Probes: 901
+# layer / 900 composite pixel (x | y << 16) -> #9900; 902 / 903 / 904 test fills (no step).
+# Records (t_clone.s): #532739 "sampling,alpha" (value stroke running), #532740 "OLD,NEW".
+# Hooks: 847 sampling (0 einmalig / 1 Sekundärfarbe), 848 alpha mode (0 Vormultipliziert /
+# 1 Gerade), 930 width * 100, 932 antialiasing, 935 tolerance, 941 / 942 test clip, 943 / 944
+# primary / secondary test colour (3 blue, 5 white, 8 black 50 %).
+# Expected pixels (Python reference build/t6/ref_recolor.py = rc_px): match = flood.s
+# CheckColor(cmp, px) with cmp / px premultiplied in "Vormultipliziert": sum over R, G, B of
+# floor((1 + d^2) * cmp.A / 256) + (cmp.A - px.A)^2 <= tol^2 * 4, tol = round(pct * 2.55);
+# a match becomes clamp(px.c + new.c - old.c) per channel, alpha kept.  Aliased width 9 dabs
+# cover rows y - 4 .. y + 4 at the pointer column (full coverage: result = recoloured pixel).
+size 1280 800
+theme light
+key r
+expect #9931 value 15
+expect text:"Pinselgröße:" exists
+expect text:"Toleranz:" exists
+expect #532739 text "1,0"
+expect #532739 value 0
+expect #9935 value 1
+
+# ------------------------------------------------------------ row 1 (y 20..39): red, grey, yellow,
+# black squares of 20 px from x = 20 on white
+cmd 902 1
+cmd 903 1310740
+cmd 904 2621480
+cmd 902 7
+cmd 903 1310760
+cmd 904 2621500
+cmd 902 9
+cmd 903 1310780
+cmd 904 2621520
+cmd 902 6
+cmd 903 1310800
+cmd 904 2621540
+
+# ------------------------------------------------------------ left, Sekundärfarbe (white) -> blue, 50 %
+cmd 943 3
+cmd 932 0
+cmd 930 900
+drag 250,178 350,178 20
+expect #9930 value 0
+expect #9935 value 2
+expect #532740 text "FFFFFFFF,FF0000FF"
+cmd 901 1966095
+expect #9900 text "FF0000FF"
+cmd 901 1966110
+expect #9900 text "FFFF0000"
+cmd 901 1966130
+expect #9900 text "FF000080"
+cmd 901 1966150
+expect #9900 text "FF000000"
+cmd 901 1966170
+expect #9900 text "FF000000"
+cmd 901 2228329
+expect #9900 text "FF0000FF"
+cmd 901 2293865
+expect #9900 text "FFFFFFFF"
+cmd 901 2293810
+expect #9900 text "FF808080"
+
+# ------------------------------------------------------------ undo / redo
+key ctrl+z
+cmd 901 1966095
+expect #9900 text "FFFFFFFF"
+cmd 901 1966130
+expect #9900 text "FF808080"
+key ctrl+y
+cmd 901 1966095
+expect #9900 text "FF0000FF"
+
+# ------------------------------------------------------------ right button: blue -> white
+drag 250,178 350,178 20 right
+expect #9935 value 3
+expect #532740 text "FF0000FF,FFFFFFFF"
+cmd 901 1966095
+expect #9900 text "FFFFFFFF"
+cmd 901 1966110
+expect #9900 text "FFFF0000"
+cmd 901 1966130
+expect #9900 text "FFFFFF80"
+cmd 901 1966150
+expect #9900 text "FFFFFF00"
+cmd 901 1966185
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ Quelle: erster Klick -- the stroke
+# starts on red: red (and what is close to it) -> blue; row 2 (y 60..79) like row 1
+cmd 902 1
+cmd 903 3932180
+cmd 904 5242920
+cmd 902 7
+cmd 903 3932200
+cmd 904 5242940
+cmd 902 9
+cmd 903 3932220
+cmd 904 5242960
+cmd 902 6
+cmd 903 3932240
+cmd 904 5242980
+cmd 847 0
+expect #532739 text "0,0"
+drag 270,218 350,218 20
+expect #9935 value 4
+expect #532740 text "FFFF0000,FF0000FF"
+cmd 901 4587552
+expect #9900 text "FF0000FF"
+cmd 901 4587570
+expect #9900 text "FF0080FF"
+cmd 901 4587590
+expect #9900 text "FF00FFFF"
+cmd 901 4587610
+expect #9900 text "FF0000FF"
+cmd 901 4587625
+expect #9900 text "FFFFFFFF"
+cmd 901 4587542
+expect #9900 text "FFFF0000"
+
+# ------------------------------------------------------------ Toleranz 0: only the exact colour
+cmd 847 1
+cmd 935 0
+cmd 902 7
+cmd 903 6553640
+cmd 904 7864380
+drag 250,258 310,258 12
+expect #9935 value 5
+cmd 901 7208975
+expect #9900 text "FF0000FF"
+cmd 901 7209010
+expect #9900 text "FF808080"
+cmd 901 7209025
+expect #9900 text "FF0000FF"
+
+# ------------------------------------------------------------ Alpha-Modus der Toleranz: red 50 % vs the
+# secondary colour black 50 % at 30 %: premultiplied they match, straight they do not
+cmd 935 30
+cmd 944 8
+cmd 902 4
+cmd 903 9175060
+cmd 904 10485820
+drag 265,298 275,298 4
+expect #9935 value 6
+expect #532740 text "80000000,FF0000FF"
+cmd 901 9830430
+expect #9900 text "80FF00FF"
+cmd 848 1
+expect #532739 text "1,1"
+drag 285,298 295,298 4
+cmd 901 9830450
+expect #9900 text "80FF0000"
+expect #9935 value 6
+cmd 848 0
+
+# ------------------------------------------------------------ the test clip rectangle [200,210) x [195,205)
+cmd 944 5
+cmd 935 50
+cmd 941 12779720
+cmd 942 13435090
+drag 430,348 460,348 10
+expect #9935 value 7
+cmd 901 13107405
+expect #9900 text "FF0000FF"
+cmd 901 13107395
+expect #9900 text "FFFFFFFF"
+cmd 901 13107415
+expect #9900 text "FFFFFFFF"
+cmd 942 0
+
+# ------------------------------------------------------------ Esc during a stroke: no step
+down 540,448
+move 560,448
+expect #9930 value 1
+expect #532739 value 1
+cmd 900 19661110
+expect #9900 text "FF0000FF"
+cmd 901 19661110
+expect #9900 text "FFFFFFFF"
+key esc
+up 560,448
+expect #9930 value 0
+cmd 900 19661110
+expect #9900 text "FFFFFFFF"
+expect #9935 value 7
+
+# ------------------------------------------------------------ antialiased width 9: full coverage in the
+# centre, nothing beyond the radius
+cmd 932 1
+cmd 931 100
+click 640,448
+expect #9935 value 8
+cmd 901 19661200
+expect #9900 text "FF0000FF"
+cmd 901 19661206
+expect #9900 text "FFFFFFFF"

@@ -1,0 +1,22 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Kabelarten",
+  "description": "Geräte ohne Kabel für cable_types.uis: Kupfer gerade und gekreuzt, Glasfaser, seriell, Konsole, Funk, WAN",
+  "seed": 7,
+  "next_id": 10,
+  "devices": [
+    { "id": 1, "name": "PC1", "model": "pc", "x": -280, "y": -180 },
+    { "id": 2, "name": "SW1", "model": "jf-s24p", "x": -140, "y": -60 },
+    { "id": 3, "name": "SW2", "model": "jf-s24p", "x": 0, "y": -60 },
+    { "id": 4, "name": "R1", "model": "jf-r4", "x": 140, "y": -60 },
+    { "id": 5, "name": "R2", "model": "jf-r4", "x": 280, "y": -60 },
+    { "id": 6, "name": "Laptop1", "model": "laptop", "x": -280, "y": 100 },
+    { "id": 7, "name": "AP1", "model": "jf-ap6e", "x": -140, "y": 100 },
+    { "id": 8, "name": "Modem1", "model": "modem-ont", "x": 140, "y": 100 },
+    { "id": 9, "name": "Internet1", "model": "cloud", "x": 280, "y": 100 }
+  ],
+  "links": [],
+  "notes": [],
+  "layout": { "zoom_pm": 1000, "cx": 0, "cy": 0, "grid": 20 }
+}

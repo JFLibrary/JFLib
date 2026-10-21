@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Laptop: open lid and base</title>
+  <rect class="body" x="10" y="5" width="44" height="31" rx="2" fill="#F7F8FA" stroke="none"/>
+  <rect class="tint" x="10" y="30.5" width="44" height="5" fill="#7A828C" stroke="none"/>
+  <rect class="screen" x="13" y="8" width="38" height="20.5" fill="#CAD4DF" stroke="none"/>
+  <rect class="ink" x="10" y="5" width="44" height="31" rx="2"/>
+  <path class="body" d="M2 35H62V38.5A2.5 2.5 0 0 1 59.5 41H4.5A2.5 2.5 0 0 1 2 38.5Z" fill="#F7F8FA"/>
+  <rect class="shade" x="26" y="35.75" width="12" height="1.75" rx="0.875" fill="#DCDFE3" stroke="none"/>
+  <circle class="ok" cx="57" cy="38" r="0.9" fill="#3C9A5F" stroke="none"/>
+</svg>

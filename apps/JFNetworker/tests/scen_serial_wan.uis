@@ -1,0 +1,4 @@
+#!args apps/JFNetworker/tests/fixtures/serial_wan.jfnet --scenario apps/JFNetworker/tests/scen/serial_wan.scn --golden apps/JFNetworker/tests/scen/serial_wan.report
+# golden scenario: a serial line with HDLC, static routes, the line unplugged.  The GUI program runs tests/scen/serial_wan.scn on
+# tests/fixtures/serial_wan.jfnet without a window and ends with the report, which must equal
+# tests/scen/serial_wan.report byte for byte on every target (the script itself is not run)

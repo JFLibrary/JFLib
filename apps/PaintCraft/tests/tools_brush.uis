@@ -1,0 +1,281 @@
+# tools_brush.uis -- Farbpinsel, Radierer, Zeichenstift (agent T1): strokes through the tool
+# layer (preview = result), antialiasing / hardness, blend modes incl. Überschreiben, right
+# button = secondary colour, overlapping dabs of one stroke do not darken, one history step
+# per stroke (undo / redo), Esc cancels a stroke, the brush outline, selection clipping (test
+# clip rectangle, hooks 941 / 942).
+# Mapping (1280 x 800, zoom 100 %): image pixel (x, y) is at the point (240 + x, 148 + y)
+# (canvas at y 129, image origin 240,19 in the canvas).  Probes (diag.s): 901 layer pixel,
+# 900 composite pixel (arg x | y << 16) -> #9900 "AARRGGBB"; T1 records: #9930 edit pending,
+# #9931 tool, #9933 / #9934 primary / secondary, #9935 history entries, #9937 options,
+# #9938 outline.  Hooks: 930 width * 100, 932 antialiasing, 933 blend mode, 943 / 944
+# primary / secondary test colour (4 = red 50 %, 6 = black, 8 = black 50 %, 0 = transparent).
+size 1280 800
+theme light
+expect #9909 text "240,19"
+expect #9931 value 10
+expect #9933 text "FF000000"
+expect #9934 text "FFFFFFFF"
+expect #9935 value 1
+expect #9937 text "75,15,1,0,0,50,0,0,0,0"
+
+# ------------------------------------------------------------ Farbpinsel, width 2 (default)
+drag 340,248 440,248 10
+expect #9930 value 0
+expect #9935 value 2
+expect #9905 value 1
+# (150, 100) on the line opaque, the next row half covered (antialiased), two rows away
+# untouched; nothing before the start / after the end
+cmd 901 6553750
+expect #9900 text "FF000000"
+cmd 901 6619286
+expect #9900 text "FF818181"
+cmd 901 6750358
+expect #9900 text "FFFFFFFF"
+cmd 901 6553697
+expect #9900 text "FFFFFFFF"
+cmd 901 6553803
+expect #9900 text "FFFFFFFF"
+# undo / redo
+key ctrl+z
+cmd 901 6553750
+expect #9900 text "FFFFFFFF"
+key ctrl+y
+cmd 901 6553750
+expect #9900 text "FF000000"
+
+# ------------------------------------------------------------ aliased brush, width 5: a 5 x 5 disc
+cmd 932 0
+cmd 930 500
+click 340,300
+expect #9935 value 3
+# centre (100, 152); (100, 150) and (101, 150) inside, the corners (98, 150) / (102, 150) not
+cmd 901 9961572
+expect #9900 text "FF000000"
+cmd 901 9830500
+expect #9900 text "FF000000"
+cmd 901 9830501
+expect #9900 text "FF000000"
+cmd 901 9830498
+expect #9900 text "FFFFFFFF"
+cmd 901 9830502
+expect #9900 text "FFFFFFFF"
+cmd 901 9764966
+expect #9900 text "FFFFFFFF"
+cmd 901 9830503
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ right button: secondary colour
+cmd 944 1
+expect #9934 text "FFFF0000"
+drag 340,350 400,350 6 right
+cmd 901 13238402
+expect #9900 text "FFFF0000"
+expect #9935 value 4
+
+# ------------------------------------------------------------ colour alpha = stroke opacity
+cmd 943 4
+cmd 930 300
+drag 340,380 400,380 6
+cmd 901 15204482
+expect #9900 text "FFFF7F7F"
+expect #9935 value 5
+# a second stroke across it blends again
+drag 360,370 360,390 6
+cmd 901 15204472
+expect #9900 text "FFFF3F3F"
+expect #9935 value 6
+key ctrl+z
+# one stroke over itself (right, back left): coverage max, blended once
+down 340,420
+move 370,420
+move 400,420
+move 370,420
+move 340,420
+up 340,420
+cmd 901 17825922
+expect #9900 text "FFFF7F7F"
+key ctrl+z
+cmd 901 17825922
+expect #9900 text "FFFFFFFF"
+# Überschreiben: the pixels become the colour, alpha included
+cmd 933 14
+drag 340,410 400,410 6
+cmd 901 17170562
+expect #9900 text "80FF0000"
+cmd 933 0
+expect #9935 value 6
+
+# ------------------------------------------------------------ Esc cancels a stroke (no step)
+cmd 943 6
+down 500,200
+move 520,200
+move 540,200
+expect #9930 value 1
+expect #9941 value 1
+cmd 900 3408132
+expect #9900 text "FF000000"
+cmd 901 3408132
+expect #9900 text "FFFFFFFF"
+key esc
+up 540,200
+expect #9930 value 0
+expect #9941 value 0
+cmd 900 3408132
+expect #9900 text "FFFFFFFF"
+expect #9935 value 6
+
+# ------------------------------------------------------------ Radierer (E): alpha to 0
+key e
+expect #9931 value 11
+drag 340,248 440,248 10
+cmd 901 6553750
+expect #9900 text "00000000"
+expect #9935 value 7
+key ctrl+z
+cmd 901 6553750
+expect #9900 text "FF000000"
+# half strength (primary alpha 128)
+cmd 943 8
+drag 340,248 440,248 10
+cmd 901 6553750
+expect #9900 text "7F000000"
+key ctrl+z
+cmd 943 6
+
+# ------------------------------------------------------------ Zeichenstift (P): 1 px lines
+key p
+expect #9931 value 12
+drag 600,400 700,450 12
+cmd 901 16515432
+expect #9900 text "FF000000"
+cmd 901 19792332
+expect #9900 text "FF000000"
+cmd 901 18153882
+expect #9900 text "FF000000"
+cmd 901 18284954
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+cmd 901 18153882
+expect #9900 text "FFFFFFFF"
+# Überschreiben with a transparent colour clears the pixel
+cmd 943 0
+cmd 933 14
+click 640,500
+cmd 901 23069072
+expect #9900 text "00000000"
+cmd 933 0
+cmd 943 6
+key ctrl+z
+
+# ------------------------------------------------------------ selection clipping (test clip)
+key b
+cmd 941 13107300
+cmd 942 19661000
+cmd 930 400
+drag 300,398 500,398 10
+cmd 901 16384100
+expect #9900 text "FF000000"
+cmd 901 16384099
+expect #9900 text "FFFFFFFF"
+cmd 901 16384199
+expect #9900 text "FF000000"
+cmd 901 16384200
+expect #9900 text "FFFFFFFF"
+cmd 942 0
+key ctrl+z
+
+# ------------------------------------------------------------ a real selection (sel.s, Rechteckige Auswahl)
+# image (100, 300) .. (200, 400) selected; a stroke along y = 352 stays inside
+key s
+drag 340,448 440,548 5
+key b
+drag 300,500 500,500 10
+cmd 901 23068771
+expect #9900 text "FFFFFFFF"
+cmd 901 23068772
+expect #9900 text "FF000000"
+cmd 901 23068871
+expect #9900 text "FF000000"
+cmd 901 23068872
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+key ctrl+d
+
+# ------------------------------------------------------------ brush outline follows the pointer
+cmd 930 4000
+move 640,400
+expect #9938 value 1
+expect #9938 text "640,400,20"
+move 700,450
+expect #9938 text "700,450,20"
+move 640,786
+expect #9938 value 0
+key p
+move 640,400
+expect #9938 value 0
+key b
+cmd 930 200
+
+# ------------------------------------------------------------ TLK_SOURCE (moved pixels / clone path)
+# hook 949: layer pixels [0,10)^2 -> [100,110)^2 through a source tool layer + tl_commit
+cmd 902 1
+cmd 903 0
+cmd 904 655370
+cmd 949
+cmd 901 6881385
+expect #9900 text "FFFF0000"
+cmd 901 7143533
+expect #9900 text "FFFF0000"
+cmd 901 7209070
+expect #9900 text "FFFFFFFF"
+expect #9936 value 9
+key ctrl+z
+cmd 901 6881385
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ Pfadglättung (hook 948): a corner
+# (60, 452) -> (160, 452) -> (160, 552): smoothed, the path bulges up near x = 110 (rows
+# 443..447 instead of 449..455)
+cmd 932 1
+cmd 930 600
+cmd 948 1
+down 300,600
+move 400,600
+move 400,700
+move 500,700
+up 500,700
+cmd 901 29163630
+expect #9900 text "FF000000"
+cmd 901 29622382
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+cmd 948 0
+down 300,600
+move 400,600
+move 400,700
+move 500,700
+up 500,700
+cmd 901 29163630
+expect #9900 text "FFFFFFFF"
+cmd 901 29622382
+expect #9900 text "FF000000"
+key ctrl+z
+
+# ------------------------------------------------------------ blend mode Multiplizieren
+# grey [600,700) x [500,550); a red stroke along y = 520 multiplies: 80 * FF / FF = 80, 80 * 0 = 0
+cmd 902 7
+cmd 903 32768600
+cmd 904 36045500
+cmd 943 1
+cmd 932 0
+cmd 930 400
+cmd 933 1
+drag 850,668 930,668 8
+cmd 901 34079370
+expect #9900 text "FF800000"
+cmd 901 35390090
+expect #9900 text "FF808080"
+key ctrl+z
+cmd 933 0
+cmd 932 1
+cmd 943 6

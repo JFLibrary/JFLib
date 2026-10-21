@@ -1,0 +1,120 @@
+#!args --editor --structure --sources --navigation
+# Complete bibliography-list workflow, including import undo, duplicates and file failures.
+size 1240 840
+theme light
+cmd 14
+click #1048588
+key ctrl+a
+type "build/jfword-ui-sources.xml"
+click button:"Öffnen"
+expect dialog:"Quellenimport prüfen" exists
+click "Auswahl importieren"
+expect "3 Quellen importiert · 0 nicht übernommen" exists
+cmd 12
+expect "(Institut für offene Forschung, 2024)" exists
+cmd 5
+cmd 5
+expect "Im Absatz zitieren" missing
+cmd 6
+cmd 14
+click #1048588
+key ctrl+a
+type "build/jfword-ui-sources.xml"
+click button:"Öffnen"
+expect "3 Einträge · 3 identisch · 0 zu prüfen" exists
+click "Auswahl importieren"
+expect "0 Quellen importiert · 3 nicht übernommen" exists
+cmd 14
+click #1048588
+key ctrl+a
+type "build/jfword-invalid-sources.xml"
+click button:"Öffnen"
+expect "Im Absatz zitieren" exists
+cmd 12
+expect "(Institut für offene Forschung, 2024)" exists
+# Export confirms overwrite and does not mark the document as saved.
+cmd 15
+click #1048588
+key ctrl+a
+type "build/jfword-ui-sources.xml"
+click button:"Speichern"
+expect dialog:"Datei ersetzen" exists
+click "Ersetzen"
+expect "3 Quellen exportiert. Das Dokument wurde dadurch nicht gespeichert." exists
+expect text:"5 Wörter" exists
+expect text:"3 Quellen" exists
+expect text:"Deutsch" exists
+cmd 4
+click #1048588
+key ctrl+a
+type "build/jfword-science.docx"
+click button:"Speichern"
+click "Ersetzen"
+cmd 2
+click button:"Öffnen"
+expect "(Institut für offene Forschung, 2024)" exists
+shot build/jfword-science-workflow.png
+# New article with ordered authors, followed by live reorder and undo.
+cmd 9
+click #709
+click "Zeitschriftenartikel"
+click #712
+type "Messmethoden"
+click #713
+type "2026"
+click #716
+type "Journal of Methods"
+click "Autoren"
+click #2097152
+type "Ada"
+click #2097154
+type "Lovelace"
+click "+ Person"
+click #2097156
+type "Grace"
+click #2097158
+type "Hopper"
+click "Nach oben"
+expect #2097152 text "Grace"
+click "+ Person"
+click "Entfernen"
+shot build/jfword-authors-light.png
+click "Quelle übernehmen"
+cmd 12
+expect "(Hopper & Lovelace, 2026)" exists
+expect "Hopper, Grace; Lovelace, Ada (2026). Messmethoden. Journal of Methods." exists
+cmd 10
+click "Autoren"
+click "Nach unten"
+click "Quelle übernehmen"
+expect "(Lovelace & Hopper, 2026)" exists
+cmd 5
+expect "(Hopper & Lovelace, 2026)" exists
+cmd 6
+expect "(Lovelace & Hopper, 2026)" exists
+# Switching author modes and cancelling keeps the original people.
+cmd 10
+click "Autoren"
+click "Körperschaft"
+click #738
+type "Institut"
+click "Abbrechen"
+expect "(Lovelace & Hopper, 2026)" exists
+cmd 10
+click "Details"
+click #760
+type "https://doi.org/10.0000/test"
+click #761
+type "8"
+click #762
+type "2"
+click "Quelle übernehmen"
+cmd 10
+click "Details"
+expect #760 text "https://doi.org/10.0000/test"
+expect #761 text "8"
+theme dark
+scale 150
+shot build/jfword-source-details-dark-150.png
+click "Abbrechen"
+expect_nowarn

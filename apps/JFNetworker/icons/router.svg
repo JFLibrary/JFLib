@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Edge router: 4 RJ45, 2 SFP+, console, WAN module slot</title>
+  <rect class="body" x="6" y="15" width="52" height="18" rx="1.5" fill="#F7F8FA" stroke="none"/>
+  <path class="shade" d="M7.5 15H9.5V33H7.5A1.5 1.5 0 0 1 6 31.5V16.5A1.5 1.5 0 0 1 7.5 15ZM54.5 15H56.5A1.5 1.5 0 0 1 58 16.5V31.5A1.5 1.5 0 0 1 56.5 33H54.5Z" fill="#DCDFE3" stroke="none"/>
+  <path class="ink" d="M9.5 15V33M54.5 15V33" stroke-width="1"/>
+  <rect class="ink" x="6" y="15" width="52" height="18" rx="1.5"/>
+  <g class="port" fill="#4F555D" stroke="none"><circle cx="7.75" cy="18.5" r="0.8"/><circle cx="7.75" cy="29.5" r="0.8"/><circle cx="56.25" cy="18.5" r="0.8"/><circle cx="56.25" cy="29.5" r="0.8"/></g>
+  <circle class="tint" cx="17" cy="24" r="6.25" fill="#4F7396" stroke="none"/>
+  <path class="body" d="M14.1 21.1L19.9 26.9M19.9 21.1L14.1 26.9M14.1 23.2V21.1H16.2M17.8 26.9H19.9V24.8M17.8 21.1H19.9V23.2M14.1 24.8V26.9H16.2" stroke="#F7F8FA" stroke-width="1.25"/>
+  <g class="port" fill="#4F555D" stroke="none">
+    <rect x="26" y="18.5" width="2.2" height="2.75" rx="0.3"/><rect x="28.65" y="18.5" width="2.2" height="2.75" rx="0.3"/><rect x="31.3" y="18.5" width="2.2" height="2.75" rx="0.3"/><rect x="33.95" y="18.5" width="2.2" height="2.75" rx="0.3"/>
+  </g>
+  <g class="shade" fill="#DCDFE3" stroke-width="0.6">
+    <rect x="37.5" y="18.5" width="2.4" height="2.75" rx="0.3"/><rect x="40.4" y="18.5" width="2.4" height="2.75" rx="0.3"/>
+  </g>
+  <rect class="screen" x="44.5" y="18.5" width="2.6" height="2.75" rx="0.3" fill="#CAD4DF" stroke-width="0.6"/>
+  <rect class="shade" x="26" y="24.5" width="21" height="5" rx="0.6" fill="#DCDFE3" stroke-width="0.75"/>
+  <g class="port" fill="#4F555D" stroke="none"><circle cx="27.75" cy="27" r="0.6"/><circle cx="45.25" cy="27" r="0.6"/></g>
+  <circle class="ok" cx="50.5" cy="20" r="0.8" fill="#3C9A5F" stroke="none"/>
+  <circle class="ok" cx="50.5" cy="23.5" r="0.8" fill="#3C9A5F" stroke="none"/>
+</svg>

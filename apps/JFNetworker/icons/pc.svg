@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>PC: monitor and tower</title>
+  <!-- monitor -->
+  <rect class="shade" x="21" y="33" width="6" height="6" fill="#DCDFE3"/>
+  <rect class="body" x="14" y="39" width="20" height="3.5" rx="1.5" fill="#F7F8FA"/>
+  <rect class="body" x="4" y="5" width="40" height="29" rx="2" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M4 29H44V32A2 2 0 0 1 42 34H6A2 2 0 0 1 4 32Z" fill="#7A828C" stroke="none"/>
+  <rect class="screen" x="7" y="8" width="34" height="18.5" fill="#CAD4DF" stroke="none"/>
+  <rect class="ink" x="4" y="5" width="40" height="29" rx="2"/>
+  <!-- tower -->
+  <rect class="body" x="48" y="8" width="12" height="34.5" rx="1.5" fill="#F7F8FA"/>
+  <rect class="shade" x="50.5" y="11.5" width="7" height="3" rx="0.5" fill="#DCDFE3" stroke-width="1"/>
+  <path class="port" d="M51 19H57M51 21.5H57M51 24H57" stroke="#4F555D" stroke-width="1"/>
+  <circle class="ok" cx="54" cy="37" r="1.5" fill="#3C9A5F" stroke="none"/>
+</svg>

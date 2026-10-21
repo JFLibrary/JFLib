@@ -1,0 +1,87 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/office.jfnet
+# files (doc/file.rs): a project from the command line, Speichern unter
+# build/jfn_test.jfnet, "Änderungen speichern?" (Abbrechen, Speichern, Verwerfen), opening
+# through the dialog and the recent files; file_reopen.uis opens the file this one writes.
+# Commands: 1 Neu, 2 Öffnen, 4 Speichern unter, 5 Beenden, 70 the most recent file.
+theme light
+expect text:"13 Geräte · 14 Kabel" exists
+expect #20482 text "Büro"
+expect text:"gespeichert" exists
+# a change: PC1 one grid step right (200, 300 -> 220, 300), renamed
+click listitem:"PC1"
+key right
+expect text:"220, 300" exists
+key f2
+key ctrl+a
+type "Client1"
+key enter
+expect listitem:"Client1" exists
+# save as: the dialog starts in the fixture's folder
+cmd 4
+expect dialog:"Speichern unter" exists
+click #1048588
+key ctrl+a
+type "../../../../build/jfn_test.jfnet"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+click 300,540
+expect text:"gespeichert" exists
+# another change, then Neu asks first
+click listitem:"Client1"
+key down
+expect text:"220, 320" exists
+cmd 1
+expect dialog:"Änderungen speichern?" exists
+expect text:"„jfn_test.jfnet“ hat ungespeicherte Änderungen. Sollen sie gespeichert werden?" exists
+shot build/jfnetworker/file_ask.png
+click button:"Abbrechen"
+expect dialog:"Änderungen speichern?" missing
+expect text:"13 Geräte · 14 Kabel" exists
+# Speichern writes the file, then the new project comes
+cmd 1
+click button:"Speichern"
+expect text:"0 Geräte · 0 Kabel" exists
+expect text:"noch nicht gespeichert" exists
+# Verwerfen drops a change
+click button:"PC"
+click 530,220
+expect text:"1 Gerät · 0 Kabel" exists
+cmd 1
+expect dialog:"Änderungen speichern?" exists
+click button:"Verwerfen"
+expect text:"0 Geräte · 0 Kabel" exists
+# open through the dialog (a new project's dialog starts in the working folder)
+cmd 2
+expect dialog:"Öffnen" exists
+click #1048588
+key ctrl+a
+type "build/jfn_test.jfnet"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect text:"13 Geräte · 14 Kabel" exists
+expect listitem:"Client1" exists
+expect listitem:"Notiz: Büro: ONT und Firewall zum Internet, L3-Switch im Kern, PoE-Switch für AP und PCs. Außenstelle über R1 und R2 (seriell)." exists
+click listitem:"Client1"
+expect text:"220, 320" exists
+# the recent files: the newest first
+cmd 1
+expect text:"0 Geräte · 0 Kabel" exists
+cmd 70
+expect text:"13 Geräte · 14 Kabel" exists
+# a file that is no project (the dialog starts in build/ now): the info bar says why, the
+# project stays
+cmd 2
+click #1048588
+key ctrl+a
+type "../apps/JFNetworker/tests/place.uis"
+click button:"Öffnen"
+expect "„place.uis“ ließ sich nicht öffnen" exists
+expect text:"13 Geräte · 14 Kabel" exists
+# Beenden with changes asks as well
+click listitem:"Client1"
+key left
+cmd 5
+expect dialog:"Änderungen speichern?" exists
+click button:"Abbrechen"
+expect text:"13 Geräte · 14 Kabel" exists
+expect_nowarn

@@ -1,0 +1,66 @@
+#!args --verify-dirty
+# tab groups, splitters, collapsing and hiding (ui/dock.rs)
+theme light
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect text:"Größen: 260/280/200" exists
+expect tab:"Dateien" rect 4 48 75 32
+expect tab:"Dateien" selected
+expect tab:"Eigenschaften" rect 684 48 128 32
+expect tab:"Ausgabe" rect 270 376 96 32
+expect tab:"Suche" rect 477 376 80 32
+# a click on a tab shows its panel
+click tab:"Gliederung"
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect text:"1 Einleitung" exists
+expect button:"Datei 1" missing
+expect tab:"Gliederung" selected
+click tab:"Dateien"
+expect button:"Datei 1" exists
+click button:"Datei 2"
+expect text:"Klick: Datei 2" exists
+# the splitters between the sides and the document area
+drag 263,300 323,300
+expect text:"Größen: 320/280/200" exists
+expect tab:"Eigenschaften" rect 684 48 128 32
+drag 677,300 617,300
+expect text:"Größen: 320/340/200" exists
+expect tab:"Eigenschaften" rect 624 48 128 32
+drag 470,373 470,323
+expect text:"Größen: 320/340/250" exists
+expect tab:"Ausgabe" rect 330 326 96 32
+# the splitter between the two groups at the bottom (they share 288 - 6 DIP)
+expect tab:"Suche" rect 477 326 80 32
+drag 470,450 420,450
+expect tab:"Suche" rect 427 326 80 32
+expect text:"Änderungen: 0" missing
+# collapse the left side to a rail, open it with a panel of the rail
+click button:"Einklappen: Dateien"
+expect text:"L(zu): [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect tab:"Dateien" missing
+expect button:"Gliederung" exists
+expect tab:"Ausgabe" rect 40 326 92 32
+shot build/dock/rail.png
+click button:"Gliederung"
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect tab:"Ausgabe" rect 330 326 55 32
+# hide a panel; the Ausgabe cannot be hidden (DP_NOCLOSE)
+click button:"Ausblenden: Suche"
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe] | F: - | V: Verlauf+Suche" exists
+expect tab:"Suche" missing
+expect button:"Ausblenden: Ausgabe" disabled
+# the app shows the hidden Verlauf (DP_HIDDEN at first) in its group below the Eigenschaften
+click button:"Verlauf"
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften], [Verlauf] | U: [Ausgabe] | F: - | V: Suche" exists
+expect tab:"Verlauf" exists
+expect text:"Geöffnet" exists
+click button:"Verlauf"
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe] | F: - | V: Suche+Verlauf" exists
+# the menu of a group (the "…" button): hide from there
+click button:"Weitere Optionen: Eigenschaften"
+expect menuitem:"Lösen" exists
+expect menuitem:"Ausblenden" exists
+expect menuitem:"Rechts andocken" missing
+click menuitem:"Ausblenden"
+expect text:"L: Dateien+[Gliederung] | R: - | U: [Ausgabe] | F: - | V: Suche+Verlauf+Eigenschaften" exists
+expect text:"Änderungen: 0" missing
+expect_nowarn

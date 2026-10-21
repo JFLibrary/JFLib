@@ -1,0 +1,78 @@
+# text tool: create a box, type (umlauts, a new line), bold, commit, undo;
+# a second box: size, italic, underline, strike-through, background, move, resize
+# canvas: doc (0,0) is at 64,188 (DIP) at 100 %
+click #1102
+expect #1102 checked
+expect #1600 exists
+expect #1602 unchecked
+click 300,300
+type "Hallo Welt äöü\n2. Zeile"
+shot build/kritzel_text1.png
+click #1602
+expect #1602 checked
+shot build/kritzel_text2.png
+key esc
+shot build/kritzel_text3.png
+key ctrl+z
+shot build/kritzel_text4.png
+key ctrl+y
+# second box: 28 pt italic, underlined, struck through, on colour 2 (yellow)
+click #1602
+expect #1602 unchecked
+click #1603
+click #1604
+click #1605
+click #1606
+click #1201
+click #1215
+click #1200
+click #1213
+click 600,300
+type "Kursiv 28"
+click #1601
+key ctrl+a
+type "28"
+key enter
+expect #1601 value 28
+type " pt"
+key left
+key left
+key left
+key backspace
+type "!"
+key home
+type ">"
+key end
+type "<"
+shot build/kritzel_text5.png
+# drag the frame (left edge band) to move the box, then resize it with the bottom-right handle
+drag 598,320 598,420 6
+drag 876,478 960,540 6
+shot build/kritzel_text6.png
+# the preview follows the zoom
+cmd 20
+shot build/kritzel_text6z.png
+cmd 21
+# a click outside commits; undo removes only the second box
+click 1000,700
+expect #1102 checked
+shot build/kritzel_text7.png
+key ctrl+z
+shot build/kritzel_text8.png
+# an empty box (without background) leaves nothing behind: Esc, then undo
+# removes the first box again
+click #1606
+expect #1606 unchecked
+click 200,600
+key esc
+key ctrl+z
+shot build/kritzel_text9.png
+# choosing another tool commits the open box
+click 300,450
+type "Werkzeugwechsel"
+click #1106
+expect #1106 checked
+expect #1600 missing
+shot build/kritzel_text10.png
+key ctrl+z
+shot build/kritzel_text11.png

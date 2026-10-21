@@ -1,0 +1,31 @@
+#!args --editor --sources --navigation --file build/jfword-rich-citations.docx
+# Scientific fields remain editable as fields while surrounding text uses the page surface.
+size 1240 840
+theme light
+click #10000
+key ctrl+home
+type "Einleitung "
+expect textbox:"Einleitung Grüße & Forschung <2026>\nα β\t𝄞(Lovelace, 1843, S. 42–44) Danach.\nLovelace, Ada (1843). Notizen & Methoden. London." exists
+key ctrl+a delete
+expect textbox:"Einleitung Grüße & Forschung <2026>\nα β\t𝄞(Lovelace, 1843, S. 42–44) Danach.\nLovelace, Ada (1843). Notizen & Methoden. London." exists
+click #5000
+click "Ansicht"
+click #54
+expect button:"Zitat bearbeiten" exists
+click button:"Zitat bearbeiten"
+click #957
+key ctrl+a
+type "99"
+click "Zitat übernehmen"
+expect "(Lovelace, 1843, S. 99)" exists
+click #54
+expect button:"Zitat bearbeiten" missing
+expect textbox:"Einleitung Grüße & Forschung <2026>\nα β\t𝄞(Lovelace, 1843, S. 99) Danach.\nLovelace, Ada (1843). Notizen & Methoden. London." focused
+key ctrl+home
+click #403
+type "Dazwischen "
+expect textbox:"(Lovelace, 1843)Dazwischen Einleitung Grüße & Forschung <2026>\nα β\t𝄞(Lovelace, 1843, S. 99) Danach.\nLovelace, Ada (1843). Notizen & Methoden. London." exists
+key ctrl+z
+expect textbox:"(Lovelace, 1843)DazwischenEinleitung Grüße & Forschung <2026>\nα β\t𝄞(Lovelace, 1843, S. 99) Danach.\nLovelace, Ada (1843). Notizen & Methoden. London." exists
+shot build/jfword-rich-citations.png
+expect_nowarn

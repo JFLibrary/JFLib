@@ -1,0 +1,33 @@
+#!args --editor --structure --sources --navigation
+size 1240 840
+theme light
+expect button:"jf" exists
+click #10000
+type "Wissenschaft beginnt mit Quellen."
+expect #10000 text "Wissenschaft beginnt mit Quellen."
+click "Überschrift 1"
+expect button:"Wissenschaft beginnt mit Quellen." exists
+click "Quelle anlegen"
+click #712
+type "Notizen zur Forschung"
+click #713
+type "1843"
+click #714
+type "London"
+click "Autoren"
+click #2097152
+type "Ada"
+click #2097154
+type "Lovelace"
+click "Quelle übernehmen"
+expect "Lovelace, Ada · 1843" exists
+click #402
+type "42"
+click "Im Absatz zitieren"
+expect "(Lovelace, 1843, S. 42)" exists
+expect "Lovelace, Ada (1843). Notizen zur Forschung. London." exists
+click "Rückgängig"
+expect "Noch keine Zitate." exists
+click "Wiederholen"
+expect "(Lovelace, 1843, S. 42)" exists
+shot build/jfword-smoke.png

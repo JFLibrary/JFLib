@@ -1,0 +1,44 @@
+#!args --verify-dirty
+# output parsing: \r overwrites, ESC[nD + ESC[K erase, tabs, backspace, OSC skipped, ESC[nG,
+# UTF-8 split over two writes, SGR colours; ESC[2J scrolls the screen clear (the scrollback
+# keeps it), BEL flashes
+size 760 520
+click tab:"Shell"
+type "ansi\n"
+expect text:"Xbc" exists
+expect text:"12" exists
+expect text:"a       b" exists
+expect text:"y" exists
+expect text:"sichtbar" exists
+expect text:"vornmitte" exists
+expect text:"Grüße ✓" exists
+expect text:"rot grün invers blau" exists
+type "colors\n"
+expect text:" F00  F01  F02  F03  F04  F05  F06  F07 " exists
+expect text:" B10  B11  B12  B13  B14  B15  B16  B17 " exists
+expect text:"fett blass unterstrichen invers 256-rot" exists
+shot build/termtest/ansi_dark.png
+theme light
+shot build/termtest/ansi_light.png
+theme dark
+# the button writes the same table
+click "Farben"
+expect text:" F10  F11  F12  F13  F14  F15  F16  F17 " missing
+# clear: the old lines leave the screen, PgUp brings them back
+type "clear\n"
+expect text:"Xbc" missing
+expect text:"nutzer@pc:~$ " exists
+key pgup
+expect text:"Xbc" exists
+key ctrl+end
+expect text:"Xbc" missing
+# the bell flashes for a moment
+type "bell\n"
+wait 200
+expect text:"nutzer@pc:~$ bell" exists
+# "Leeren" drops the scrollback
+click "Leeren"
+expect text:"Zeilen: 0" exists
+key pgup
+expect text:"nutzer@pc:~$ bell" missing
+expect_nowarn

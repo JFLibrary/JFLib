@@ -1,0 +1,62 @@
+#!args --editor --navigation
+# Native clipboard survives new documents, preserves hard/soft breaks and direct formats.
+size 1240 840
+theme light
+clip text "Alpha β\nGamma"
+key ctrl+v ctrl+home
+key right right right right right right shift+right ctrl+b
+key ctrl+end shift+home ctrl+i
+key ctrl+home
+click "Überschrift 1"
+key ctrl+end shift+enter
+type "weich"
+key ctrl+a ctrl+c
+clip expect docx
+clip expect rtf
+clip expect html
+clip expect text "Alpha β\nGamma\nweich"
+clip save build/jfword-clipboard-native.bin docx
+clip save build/jfword-clipboard-export.rtf rtf
+key ctrl+n
+click "Verwerfen"
+key ctrl+v
+expect textbox:"Alpha β\nGamma\nweich" focused
+# The outline shows actual headings; temporarily return to the paragraph fallback
+# to retain the hard/soft-break count assertions, then undo only that style change.
+expect button:"Alpha β" exists
+key ctrl+home
+click "Standard"
+expect "2 · Text" exists
+expect "3 · Text" missing
+key ctrl+z
+expect button:"Alpha β" exists
+key ctrl+z
+expect textbox:"Alpha β\nGamma\nweich" missing
+key ctrl+y
+expect textbox:"Alpha β\nGamma\nweich" focused
+key ctrl+a ctrl+x
+expect textbox:"Alpha β\nGamma\nweich" missing
+key ctrl+z
+expect textbox:"Alpha β\nGamma\nweich" focused
+key ctrl+end
+key ctrl+shift+v
+expect textbox:"Alpha β\nGamma\nweichAlpha β\nGamma\nweich" focused
+key ctrl+home
+click "Standard"
+expect "4 · Text" exists
+key ctrl+z
+key ctrl+z
+# Replacing the native clipboard by plain text must invalidate its rich formats.
+clip text "Neu"
+key ctrl+home ctrl+a ctrl+v
+expect textbox:"Neu" focused
+key ctrl+z
+expect textbox:"Alpha β\nGamma\nweich" focused
+cmd 4
+click #1048588
+key ctrl+a
+type "build/jfword-rich-clipboard.docx"
+click button:"Speichern"
+click "Ersetzen"
+shot build/jfword-rich-clipboard.png
+expect_nowarn

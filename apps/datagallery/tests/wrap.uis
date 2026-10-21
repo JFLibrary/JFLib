@@ -1,0 +1,46 @@
+#!args --verify-dirty
+# rows that wrap (BOX_WRAP, lib/ui/layout.rs) and wrapped text in a grid box (lib/ui/grid.rs):
+# the side panel's buttons and toggles start a new row where the next one does not fit (the
+# rows apart by the box's gap, each one centred across: BOX_XCENTER), the chart legend wraps
+# where the header leaves it too little room; the details grid's note wraps at its cell's
+# width and its row grows with the lines, the next row follows below it
+size 1440 2400
+wait 50
+# three buttons in the first row, two in the second (gap 8; #30823: "Aktualisieren", the
+# command bar has one as well)
+expect "Abbrechen" rect 1112 1196 90 32
+expect "Deaktiviert" rect 1308 1196 89 32
+expect #30823 rect 1112 1236 126 32
+expect "Export" rect 1246 1236 86 32
+# checkbox and switch, then the radios (gap 16)
+expect "Verschlüsseln" rect 1112 1280 112 32
+expect "Aktiviert" rect 1240 1280 104 32
+expect "Inkrementell" rect 1112 1328 105 32
+# the legend fits next to the chart's title
+expect text:"Fehler" rect 757 312 33 16
+# the selected job's note: five lines in the value column (labels 92 DIP, values the rest)
+expect text:"Zwei Protokolldateien waren während der Sicherung gesperrt und wurden übersprungen; der nächste Lauf versucht sie erneut." value 5
+expect text:"Zwei Protokolldateien waren während der Sicherung gesperrt und wurden übersprungen; der nächste Lauf versucht sie erneut." rect 1210 1834 192 100
+expect text:"Hinweis" rect 1112 1874 92 20
+expect text:"Größe" rect 1112 1940 92 20
+# another job: a note of two lines, the row below moves up
+click "Mailserver"
+expect text:"Alle Dateien wurden gesichert und geprüft." value 2
+expect text:"Alle Dateien wurden gesichert und geprüft." rect 1210 1834 192 40
+expect text:"Größe" rect 1112 1880 92 20
+shot build/shots/datagallery_wrap.png 1090 1140 350 800
+# a wider side panel: every button and every toggle in one row, the note in one line
+size 1700 2400
+expect #30823 rect 1405 1196 126 32
+expect "Export" rect 1539 1196 86 32
+expect "Inkrementell" rect 1360 1240 105 32
+expect text:"Alle Dateien wurden gesichert und geprüft." value 1
+expect text:"Größe" rect 1112 1772 92 20
+# narrow: the legend's last entry goes to a second row, the title stays centred beside it
+size 1000 2400
+expect text:"Fehler" rect 509 338 33 16
+expect text:"Sitzungen der letzten 14 Tage" rect 284 322 193 20
+# back: the same rows as at the start
+size 1440 2400
+expect #30823 rect 1112 1236 126 32
+expect text:"Fehler" rect 757 312 33 16

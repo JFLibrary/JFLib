@@ -1,0 +1,74 @@
+// netpkt -- network packets byte for byte: addresses, checksums, header codecs, a dissector
+// and capture files.  No I/O, no clock, no randomness: everything is deterministic and works
+// on every target (simulators, packet tools, tests).
+//
+//   addr      Mac, Ipv4, Ipv6, IpAddr, Prefix4, Prefix6, wildcard_match
+//   checksum  Internet checksum (sum / finish / verify / pseudo_v4 / pseudo_v6 / update16),
+//             crc32 (Ethernet FCS)
+//   pkt       Pkt: a buffer with headroom, headers are prepended in place
+//   eth       Ethernet II (EthView, EthHdr), 802.1Q tags (VlanTag, tag_of, tagged, untagged,
+//             L2), 802.2 LLC
+//   arp       ArpView, Arp (request / reply / probe / announce)          (RFC 826, 5227)
+//   ipv4      Ipv4View, Ipv4Hdr, dec_ttl, fragment, Reassembly           (RFC 791, 1624)
+//   ipv6      Ipv6View, Ipv6Hdr, upper_layer (extension header walk)     (RFC 8200)
+//   icmp      IcmpView, Icmp, error_quote, name                          (RFC 792, 1191)
+//   udp       UdpView, UdpHdr (push_v4 / push_v6 with checksum)          (RFC 768)
+//   tcp       TcpView, TcpHdr, TcpOpts (MSS, WS, SACK, TS), seq_lt ...   (RFC 9293, 7323, 2018)
+//   dhcp      DhcpView, Dhcp with typed options (Opt), MsgType           (RFC 2131, 2132, 3046)
+//   dns       Message, Header, Question, Rr, RData, names with compression   (RFC 1035, 3596)
+//   ntp       NtpView, Ntp, Ts (32.32 timestamps), offset_delay           (RFC 5905)
+//   syslog    pri / bsd / ios formatting, parse                           (RFC 3164, IOS)
+//   decode    stack / proto_mask / layers / info: layers with fields and byte ranges for
+//             packet inspectors, P_* bits for filters, one-line summaries
+//   pcapng    Writer (section, interfaces, enhanced packets), read
+//   http      HTTP/1.1 without I/O: Parser (fed as bytes arrive, says when it needs more),
+//             Head, Headers, framing, encode_request / encode_response / chunks (RFC 9112)
+//
+// Views (XxxView::parse) check lengths once and then read fields without copying; records
+// (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
+// fields are big endian (network order); be16 / be32 / put16 / put32 below read and write them.
+#![no_std]
+#![forbid(unsafe_code)]
+
+extern crate alloc;
+
+pub mod addr;
+pub mod arp;
+pub mod checksum;
+pub mod decode;
+pub mod dhcp;
+pub mod dns;
+pub mod eth;
+pub mod icmp;
+pub mod ipv4;
+pub mod ipv6;
+pub mod ntp;
+pub mod pcapng;
+pub mod pkt;
+pub mod syslog;
+pub mod tcp;
+pub mod udp;
+pub mod http;
+
+pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
+pub use pkt::Pkt;
+
+/// the big-endian u16 at `off` (the caller has checked the length)
+pub fn be16(b: &[u8], off: usize) -> u16 {
+    u16::from_be_bytes([b[off], b[off + 1]])
+}
+
+/// the big-endian u32 at `off`
+pub fn be32(b: &[u8], off: usize) -> u32 {
+    u32::from_be_bytes([b[off], b[off + 1], b[off + 2], b[off + 3]])
+}
+
+/// writes a big-endian u16 at `off`
+pub fn put16(b: &mut [u8], off: usize, v: u16) {
+    b[off..off + 2].copy_from_slice(&v.to_be_bytes());
+}
+
+/// writes a big-endian u32 at `off`
+pub fn put32(b: &mut [u8], off: usize, v: u32) {
+    b[off..off + 4].copy_from_slice(&v.to_be_bytes());
+}

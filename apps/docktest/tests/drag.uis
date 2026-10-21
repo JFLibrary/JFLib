@@ -1,0 +1,59 @@
+#!args --verify-dirty
+# dragging tabs and groups onto the drop markers (ui/dock.rs)
+theme light
+# over the left group: its markers (as a tab, above, below) and the three edges
+down tab:"Eigenschaften"
+move 700,200
+move 140,200
+expect button:"Als Register" exists
+expect button:"Darüber" exists
+expect button:"Darunter" exists
+expect button:"Links andocken" rect 12 294 36 36
+expect button:"Rechts andocken" rect 912 294 36 36
+expect button:"Unten andocken" rect 452 528 36 36
+expect button:"Als Register" rect 112 310 36 36
+move 130,328
+expect button:"Als Register" hover
+shot build/dock/drag_tab.png
+up
+expect button:"Als Register" missing
+expect text:"L: Dateien+Gliederung+[Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect tab:"Eigenschaften" selected
+# below its own group: a group of its own under it
+drag tab:"Eigenschaften" 130,368
+expect text:"L: Dateien+[Gliederung], [Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# the right edge: a new group on the (empty) right side
+drag tab:"Ausgabe" 930,312
+expect text:"L: Dateien+[Gliederung], [Eigenschaften] | R: [Ausgabe] | U: [Suche] | F: - | V: Verlauf" exists
+# onto a tab strip: inserted at that place (here: before Dateien)
+drag tab:"Ausgabe" 8,64
+expect text:"L: [Ausgabe]+Dateien+Gliederung, [Eigenschaften] | R: - | U: [Suche] | F: - | V: Verlauf" exists
+# tabs reorder inside their strip
+drag tab:"Ausgabe" 180,64
+expect text:"L: Dateien+Gliederung+[Ausgabe], [Eigenschaften] | R: - | U: [Suche] | F: - | V: Verlauf" exists
+# the empty part of a strip drags the whole group (here the Eigenschaften): to the bottom
+down 150,331
+move 300,331
+move 613,546
+expect button:"Unten andocken" hover
+up
+expect text:"L: Dateien+Gliederung+[Ausgabe] | R: - | U: [Suche], [Eigenschaften] | F: - | V: Verlauf" exists
+# before the Suche group (the marker left of its middle)
+down tab:"Eigenschaften"
+move 500,200
+move tab:"Suche"
+move button:"Davor"
+expect button:"Davor" hover
+shot build/dock/drag_before.png
+up
+expect text:"L: Dateien+Gliederung+[Ausgabe] | R: - | U: [Eigenschaften], [Suche] | F: - | V: Verlauf" exists
+# Esc cancels a drag
+down tab:"Suche"
+move 500,200
+move 30,312
+expect button:"Links andocken" hover
+key esc
+expect button:"Links andocken" missing
+up
+expect text:"L: Dateien+Gliederung+[Ausgabe] | R: - | U: [Eigenschaften], [Suche] | F: - | V: Verlauf" exists
+expect_nowarn

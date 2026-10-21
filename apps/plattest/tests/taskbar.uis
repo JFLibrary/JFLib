@@ -1,0 +1,3 @@
+#!args --test taskbar
+# (Rust only) plattest --test taskbar: the taskbar button (lib/plat/taskbar.rs) in the dry run,
+# then without a window (Windows keeps the state) / without a session bus (Linux).

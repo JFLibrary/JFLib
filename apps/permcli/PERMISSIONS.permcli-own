@@ -1,0 +1,4 @@
+# permcli-own: the rules of this BINS program alone (build_rs.py takes PERMISSIONS.<bin> before
+# the app's PERMISSIONS)
+fs.read $TEMP/permcli-*/own.txt
+fs.user                        # the file named on its command line

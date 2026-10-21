@@ -1,0 +1,38 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/office.jfnet
+# cables of a project (canvas/paint.rs, doc/edits.rs): drawn from centre to centre in their
+# styles, parallel ones side by side; deleting a device takes its cables along, undo puts
+# them back where they were (the check stays clean), moving a device takes its cables along
+theme light
+expect text:"13 Geräte · 14 Kabel" exists
+shot build/jfnetworker/links.png
+click listitem:"SW1"
+expect text:"Kabel (7)" exists
+expect text:"Te1/1/1 → MLS1 Te1/1/2 · Glasfaser, Multimode" exists
+expect text:"Gi1/0/24 → MLS1 Gi1/0/2 · Kupfer, gekreuzt" exists
+expect text:"Con → PC2 usb0 · Konsolenkabel" exists
+key delete
+expect text:"12 Geräte · 7 Kabel" exists
+expect listitem:"SW1" missing
+key ctrl+z
+expect text:"13 Geräte · 14 Kabel" exists
+expect listitem:"SW1" selected
+click tab:"Probleme"
+# the model's check is clean; the simulator finds the loop SW1 - MLS1 (two cables, no spanning tree)
+expect text:"Schleife ohne Spanning Tree über MLS1, SW1 (VLAN 1): Broadcasts kreisen endlos." exists
+# several devices: the cables between them and to the rest go
+click listitem:"PC1"
+drag listitem:"PC2" listitem:"PC2" 1 shift
+expect text:"2 ausgewählt" exists
+expect text:"2 Objekte" exists
+key delete
+expect text:"11 Geräte · 11 Kabel" exists
+key ctrl+z
+expect text:"13 Geräte · 14 Kabel" exists
+# a moved device takes its cables along (one undo step)
+click listitem:"R2"
+key shift+down
+expect text:"860, 140" exists
+shot build/jfnetworker/links_moved.png
+key ctrl+z
+expect text:"860, -60" exists
+expect_nowarn

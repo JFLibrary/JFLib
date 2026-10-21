@@ -1,0 +1,7 @@
+#!args --font-dirs "lib/doc_view/assets;apps/fonttest/tests/fixtures" --fontconf apps/fontpicktest/tests/fonts.conf
+# headless without jfgui_FONT_RGBA: greyscale smoothing whatever the system's order, so shots
+# are the same on every machine (compare build/fontpick_subpixel_none.png with _rgb / _bgr)
+expect text:"Subpixel: keine" exists
+expect text:"Glättung: an  Dialog: 0" exists
+shot build/fontpick_subpixel_none.png 16 16 400 120
+expect_nowarn

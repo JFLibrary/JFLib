@@ -1,0 +1,36 @@
+#!args --open apps/PaintCraft/tests/fixtures/a6_photo.png --jxlenc=off
+# jxlmod_off.uis (jxl-module) -- without the JPEG XL writer module (--jxlenc=off: as if
+# jxlenc.dll / jxlenc.so were missing next to the exe) JPEG XL is saved with the
+# assembly-compatible writer: the save dialog says so, Bemühung and Filmkörnung are off,
+# Qualität and Verlustfrei work; the files are the compatible writer's (their sizes: lossy
+# quality 90, lossless).  Window 24595 = the save dialog (saveopt.uis).
+size 1280 800
+theme light
+shot build/tests/jxlmod/off_start.png
+cmd 103
+click #81932
+key ctrl+a
+type "../../../../build/tests/jxlmod/off.jxl"
+click button:"Speichern"
+expect window 24595 open
+window 24595
+expect text:"Hinweis: Das JPEG-XL-Modul (jxlenc) fehlt. Gespeichert wird mit dem einfachen Schreiber: nur Qualität und Verlustfrei wirken." exists
+expect #6026 disabled
+expect #6039 disabled
+expect #6022 enabled
+expect #6023 enabled
+expect #6022 value 90
+sync
+expect #6100 text "ok"
+expect #6100 value 20746
+click #6023
+expect #6022 disabled
+sync
+expect #6100 text "ok"
+expect #6100 value 128546
+shot build/tests/jxlmod/off_dialog.png window 24595
+window any
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "off.jxl"
+expect #9905 value 0

@@ -1,0 +1,60 @@
+#!args --verify-dirty
+# kbnav.uis -- the keyboard between the parts of the dock area (lib/ui/kbnav.rs): F6 / Shift+F6
+# visit the tool bar and every group (its tab strip first, later where the focus was last;
+# the document area has no focusable widget and is skipped), Tab keeps a group's strip,
+# buttons and panel together, F8 the splitters (arrows move
+# the focused one by 8 DIP, Shift+arrows by 1; Esc or F8 past the last go back to the widget
+# focused before)
+theme light
+expect text:"Größen: 260/280/200" exists
+# ------------------------------------------------------------ F6: the panes
+key f6
+expect button:"Speichern" focused
+key f6
+expect tab:"Dateien" focused
+# Tab: the group's strip, its buttons, then its panel (a pane's stops stay together)
+key tab
+expect button:"Weitere Optionen: Dateien" focused
+key tab tab tab
+expect button:"Datei 1" focused
+key tab
+expect button:"Datei 2" focused
+key f6
+expect tab:"Eigenschaften" focused
+key shift+f6
+expect button:"Datei 2" focused
+key f6 f6
+expect tab:"Ausgabe" focused
+key f6
+expect tab:"Suche" focused
+key f6
+expect button:"Speichern" focused
+key shift+f6
+expect tab:"Suche" focused
+key f6
+# ------------------------------------------------------------ F8: the splitters
+key f8
+expect #3166013428 focused
+expect #3166013428 value 260
+key right right
+expect text:"Größen: 276/280/200" exists
+key shift+left
+expect text:"Größen: 275/280/200" exists
+key f8
+expect #4115943472 focused
+key left
+expect text:"Größen: 275/288/200" exists
+key f8
+expect #3806917853 focused
+key up
+expect text:"Größen: 275/288/208" exists
+key f8
+expect #4218216879 focused
+expect tab:"Suche" rect 480 368 80 32
+key right
+expect tab:"Suche" rect 488 368 80 32
+key esc
+expect button:"Speichern" focused
+key f8 f8 f8 f8 f8
+expect button:"Speichern" focused
+expect_nowarn

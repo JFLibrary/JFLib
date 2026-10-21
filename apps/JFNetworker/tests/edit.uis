@@ -1,0 +1,181 @@
+#!args --verify-dirty
+# editing the topology (workspace/canvas): moving with the mouse and the arrows, the marquee,
+# deleting, renaming with F2, the context menu and the inspector (jfn_model's name rules: a
+# refused name keeps the flyout open with the reason; a double click on a device opens its
+# console, terminal_ios.uis), notes; every step undoes.  World
+# (0, 0) shows at 630,320 (100 %); boxes are 64 x 48 on the 20 grid.
+theme light
+# PC1 at (-140, -120), PC2 at (60, -120), SW1 at (-40, 80)
+click button:"PC"
+click 530,220
+click button:"PC"
+click 730,220
+click button:"JF-S24P"
+click 630,420
+expect text:"3 Geräte · 0 Kabel" exists
+expect listitem:"PC2" rect 690 200 64 48
+expect listitem:"SW1" rect 590 400 64 48
+# move: a drag by (100, 60), snapped
+click listitem:"PC1"
+expect text:"-140, -120" exists
+wait 600
+drag listitem:"PC1" 622,284
+expect listitem:"PC1" rect 590 260 64 48
+expect text:"-40, -60" exists
+key ctrl+z
+expect listitem:"PC1" rect 490 200 64 48
+key ctrl+y
+expect listitem:"PC1" rect 590 260 64 48
+# the arrows move a grid step (one undo step each)
+key right
+expect text:"-20, -60" exists
+key shift+down
+expect text:"-20, 140" exists
+key ctrl+z
+key ctrl+z
+expect text:"-40, -60" exists
+# Esc during a drag puts it back
+wait 600
+down 622,284
+move 700,330
+key esc
+up
+expect listitem:"PC1" rect 590 260 64 48
+# the marquee takes what lies fully inside
+drag 460,180 800,470
+expect text:"3 ausgewählt" exists
+key delete
+expect text:"0 Geräte · 0 Kabel" exists
+key ctrl+z
+expect text:"3 Geräte · 0 Kabel" exists
+drag 560,250 680,470
+expect text:"2 ausgewählt" exists
+expect listitem:"PC1" selected
+expect listitem:"SW1" selected
+click button:"Löschen"
+expect text:"1 Gerät · 0 Kabel" exists
+expect listitem:"PC2" exists
+click button:"Rückgängig"
+expect text:"3 Geräte · 0 Kabel" exists
+expect listitem:"SW1" rect 590 400 64 48
+# Ctrl+A, then a click on the background clears
+click 900,520
+key ctrl+a
+expect text:"3 ausgewählt" exists
+click 900,520
+expect text:"Nichts ausgewählt" exists
+# rename with F2: a refused name, a taken one, then a good one
+click listitem:"PC2"
+key f2
+expect #12305 text "PC2"
+key ctrl+a
+type "1PC"
+key enter
+expect text:"„1PC“ ist kein gültiger Gerätename: Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe, höchstens 63 Zeichen." exists
+expect #12305 exists
+shot build/jfnetworker/rename.png
+expect listitem:"PC2" exists
+key ctrl+a
+type "pc1"
+key enter
+expect text:"Der Name „pc1“ ist schon vergeben." exists
+key ctrl+a
+type "Client-A"
+key enter
+expect #12305 missing
+expect listitem:"Client-A" exists
+expect listitem:"PC2" missing
+key ctrl+z
+expect listitem:"PC2" exists
+key ctrl+y
+expect listitem:"Client-A" exists
+# Esc gives the flyout up
+key f2
+type "Egal"
+key esc
+expect #12305 missing
+expect listitem:"Client-A" exists
+# F2 on another device (the name starts selected)
+wait 600
+click listitem:"SW1"
+key f2
+expect #12305 text "SW1"
+type "Core-1"
+key enter
+expect listitem:"Core-1" exists
+# the keyboard is back on the canvas
+key down
+expect text:"-40, 100" exists
+key ctrl+z
+expect text:"-40, 80" exists
+shot build/jfnetworker/edit.png
+# the context menu
+rclick listitem:"Core-1"
+expect menuitem:"Löschen" enabled
+click menuitem:"Umbenennen …"
+expect #12305 text "Core-1"
+key esc
+expect #12305 missing
+# the inspector's name field: Enter applies, a bad name shows why
+click listitem:"PC1"
+click #20481
+key ctrl+a
+type "Platz 1"
+key enter
+expect text:"„Platz 1“ ist kein gültiger Gerätename: Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe, höchstens 63 Zeichen." exists
+key ctrl+a
+type "Platz-1"
+key enter
+expect listitem:"Platz-1" exists
+# the button applies what was typed, Esc puts the name back
+click #20481
+key ctrl+a
+type "Platz-2"
+click #20485
+expect listitem:"Platz-2" exists
+click #20481
+type "xyz"
+key esc
+expect #20481 text "Platz-2"
+expect listitem:"Platz-2" exists
+# notes: the Notiz tool, its text in the flyout, undo of both
+click #43
+expect #43 checked
+click 400,480
+expect #12305 exists
+type "Erster Stock"
+click button:"Übernehmen"
+expect listitem:"Notiz: Erster Stock" exists
+expect listitem:"Notiz: Erster Stock" rect 410 480 200 80
+expect #43 unchecked
+key ctrl+z
+expect listitem:"Notiz" exists
+key ctrl+z
+expect listitem:"Notiz" missing
+key ctrl+y
+key ctrl+y
+expect listitem:"Notiz: Erster Stock" exists
+# a note moves and deletes like a device
+wait 600
+drag listitem:"Notiz: Erster Stock" 530,500
+expect listitem:"Notiz: Erster Stock" rect 430 460 200 80
+key delete
+expect listitem:"Notiz: Erster Stock" missing
+key ctrl+z
+expect listitem:"Notiz: Erster Stock" rect 430 460 200 80
+# the inspector edits the text as well
+click #20483
+key ctrl+a
+type "Zweiter Stock"
+click #20484
+expect listitem:"Notiz: Zweiter Stock" exists
+key ctrl+z
+expect listitem:"Notiz: Erster Stock" exists
+# the Hand tool pans the view; V returns to Auswahl
+click #41
+expect #41 checked
+drag 900,500 800,450
+expect listitem:"Core-1" rect 490 350 64 48
+key v
+expect #40 checked
+expect_nowarn

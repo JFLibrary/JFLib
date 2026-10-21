@@ -1,0 +1,76 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# undo and redo over connecting and disconnecting (doc/edits.rs, doc/sim.rs): a cable goes with
+# Entf, the × beside it, the context menu or the inspector, comes back with undo and is up again
+# in the simulator; a new connection goes with undo; a deleted device comes back with its cables
+# and runs as it ran (SW1's VLAN interface).  The cable PC1 - SW1 runs through 722,414, PC2 -
+# SW1 through 842,414; the inspector's Trennen is 20502.
+theme light
+# Entf on the selected cable
+click 722,414
+expect text:"PC1 eth0 – SW1 Gi1/0/1" exists
+key delete
+expect text:"3 Geräte · 1 Kabel" exists
+click 900,540
+expect text:"1 (1 aktiv)" exists
+key ctrl+z
+expect text:"3 Geräte · 2 Kabel" exists
+expect text:"PC1 eth0 – SW1 Gi1/0/1" exists
+expect text:"aktiv · 0 Pakete/s" exists
+key ctrl+y
+expect text:"3 Geräte · 1 Kabel" exists
+key ctrl+z
+expect text:"3 Geräte · 2 Kabel" exists
+# the × beside the cable under the pointer
+click 900,540
+move 842,414
+wait 100
+click button:"Kabel trennen"
+expect text:"3 Geräte · 1 Kabel" exists
+expect button:"Kabel trennen" missing
+key ctrl+z
+expect text:"3 Geräte · 2 Kabel" exists
+expect text:"PC2 eth0 – SW1 Gi1/0/2" exists
+# Trennen from the context menu
+rclick 842,414
+click menuitem:"Trennen"
+expect text:"3 Geräte · 1 Kabel" exists
+key ctrl+z
+expect text:"3 Geräte · 2 Kabel" exists
+# Trennen in the inspector
+click 842,414
+click #20502
+expect text:"3 Geräte · 1 Kabel" exists
+key ctrl+z
+expect text:"aktiv · 0 Pakete/s" exists
+# a new connection: PC3 joins the switch; undo takes it out of the simulator again
+click button:"PC"
+click 530,420
+key c
+drag listitem:"PC3" listitem:"SW1" 8 shift
+expect text:"PC3 eth0 – SW1 Gi1/0/3" exists
+expect text:"aktiv · 0 Pakete/s" exists
+key ctrl+z
+expect text:"4 Geräte · 2 Kabel" exists
+key ctrl+y
+expect text:"4 Geräte · 3 Kabel" exists
+expect text:"aktiv · 0 Pakete/s" exists
+key v
+# a device goes with its cables; undo brings it back as it ran: its VLAN interface (the last
+# row of its interfaces, 20992 the grid) keeps its address
+click listitem:"SW1"
+focus #20992
+key end
+expect text:"10.0.0.254/24" exists
+key delete
+expect text:"3 Geräte · 0 Kabel" exists
+key ctrl+z
+expect text:"4 Geräte · 3 Kabel" exists
+wait 600
+click listitem:"SW1"
+focus #20992
+key end
+expect text:"10.0.0.254/24" exists
+click 900,540
+expect text:"3 (3 aktiv)" exists
+shot build/jfnetworker/undo.png
+expect_nowarn

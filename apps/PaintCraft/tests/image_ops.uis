@@ -1,0 +1,296 @@
+# image_ops.uis -- Bild: Horizontal / Vertikal spiegeln, 90° nach rechts / links drehen
+# (Strg+H / Strg+G), Um 180° drehen (Strg+J) (agent A5).
+# A non-square 6 x 4 image with two layers and coloured corners; every operation: image
+# size, pixel probes of both layers, the selection follows, ONE history step, undo restores
+# the state bit-exactly (history state hash), redo.
+# Hooks: 968 new image (hist_diag), 902/903/904 fill a rectangle of the current layer
+# (diag A1), 313/314 layer pixel -> #5190 (imgops A5), 980..983 selection (sel T2),
+# 950 1 history probes "t.*", 961/962 save / compare the state hash (hist_diag A2).
+# Pixels (layer 0, white): red (0,0), green (5,0), blue (0,3), black (5,3);
+# layer 1 (transparent): yellow (1,0), grey (3,2) (4,2).
+size 1280 800
+theme light
+cmd 950 1
+cmd 968 262150
+expect #9913 value 6
+expect #9914 value 4
+cmd 902 1
+cmd 903 0
+cmd 904 65537
+cmd 902 2
+cmd 903 5
+cmd 904 65542
+cmd 902 3
+cmd 903 196608
+cmd 904 262145
+cmd 902 6
+cmd 903 196613
+cmd 904 262150
+key ctrl+shift+n
+expect #9903 value 2
+cmd 902 9
+cmd 903 1
+cmd 904 65538
+cmd 902 7
+cmd 903 131075
+cmd 904 196613
+expect text:"t.n=2" exists
+cmd 961 0
+
+# ------------------------------------------------------------ menu states
+click menu:"Bild"
+expect menuitem:"Horizontal spiegeln" enabled
+expect menuitem:"Vertikal spiegeln" enabled
+expect menuitem:"90° nach rechts drehen" enabled
+expect menuitem:"90° nach links drehen" enabled
+expect menuitem:"Um 180° drehen" enabled
+expect menuitem:"Auf Auswahl zuschneiden" disabled
+
+# ------------------------------------------------------------ Horizontal spiegeln (menu)
+click menuitem:"Horizontal spiegeln"
+expect text:"t.n=3" exists
+expect text:"Bild horizontal spiegeln" exists
+expect #9913 value 6
+expect #9914 value 4
+expect #5191 value 1
+cmd 314 0
+cmd 313 5
+expect #5190 text "FFFF0000"
+cmd 313 0
+expect #5190 text "FF00FF00"
+cmd 313 196613
+expect #5190 text "FF0000FF"
+cmd 313 196608
+expect #5190 text "FF000000"
+cmd 313 65538
+expect #5190 text "FFFFFFFF"
+cmd 314 1
+cmd 313 4
+expect #5190 text "FFFFFF00"
+cmd 313 1
+expect #5190 text "00000000"
+cmd 313 131073
+expect #5190 text "FF808080"
+cmd 313 131074
+expect #5190 text "FF808080"
+cmd 313 131075
+expect #5190 text "00000000"
+# composite pixel (layer 1 over layer 0)
+cmd 900 4
+expect #9900 text "FFFFFF00"
+key ctrl+z
+expect text:"t.pos=2" exists
+cmd 962 0
+expect text:"t.cmp=ok" exists
+key ctrl+y
+expect text:"t.pos=3" exists
+cmd 314 0
+cmd 313 5
+expect #5190 text "FFFF0000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ Vertikal spiegeln (menu)
+click menu:"Bild"
+click menuitem:"Vertikal spiegeln"
+expect text:"Bild vertikal spiegeln" exists
+expect #9913 value 6
+expect #9914 value 4
+cmd 314 0
+cmd 313 196608
+expect #5190 text "FFFF0000"
+cmd 313 196613
+expect #5190 text "FF00FF00"
+cmd 313 0
+expect #5190 text "FF0000FF"
+cmd 313 5
+expect #5190 text "FF000000"
+cmd 314 1
+cmd 313 196609
+expect #5190 text "FFFFFF00"
+cmd 313 65539
+expect #5190 text "FF808080"
+cmd 313 65540
+expect #5190 text "FF808080"
+cmd 313 131075
+expect #5190 text "00000000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ 90° nach rechts drehen (Strg+H)
+# (x, y) -> (3 - y, x); the image becomes 4 x 6
+key ctrl+h
+expect text:"90° nach rechts drehen" exists
+expect #9913 value 4
+expect #9914 value 6
+expect #5191 value 1
+expect #5192 text "4,6"
+cmd 314 0
+cmd 313 3
+expect #5190 text "FFFF0000"
+cmd 313 327683
+expect #5190 text "FF00FF00"
+cmd 313 0
+expect #5190 text "FF0000FF"
+cmd 313 327680
+expect #5190 text "FF000000"
+cmd 314 1
+cmd 313 65539
+expect #5190 text "FFFFFF00"
+cmd 313 196609
+expect #5190 text "FF808080"
+cmd 313 262145
+expect #5190 text "FF808080"
+cmd 313 196610
+expect #5190 text "00000000"
+key ctrl+z
+expect #9913 value 6
+expect #9914 value 4
+cmd 962 0
+expect text:"t.cmp=ok" exists
+key ctrl+y
+expect #9913 value 4
+cmd 314 0
+cmd 313 327680
+expect #5190 text "FF000000"
+key ctrl+z
+
+# ------------------------------------------------------------ 90° nach links drehen (Strg+G)
+# (x, y) -> (y, 5 - x)
+key ctrl+g
+expect text:"90° nach links drehen" exists
+expect #9913 value 4
+expect #9914 value 6
+cmd 314 0
+cmd 313 327680
+expect #5190 text "FFFF0000"
+cmd 313 0
+expect #5190 text "FF00FF00"
+cmd 313 327683
+expect #5190 text "FF0000FF"
+cmd 313 3
+expect #5190 text "FF000000"
+cmd 314 1
+cmd 313 262144
+expect #5190 text "FFFFFF00"
+cmd 313 131074
+expect #5190 text "FF808080"
+cmd 313 65538
+expect #5190 text "FF808080"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ Um 180° drehen (Strg+J)
+# (x, y) -> (5 - x, 3 - y)
+key ctrl+j
+expect text:"180° (alle) Drehen" exists
+expect #9913 value 6
+expect #9914 value 4
+cmd 314 0
+cmd 313 196613
+expect #5190 text "FFFF0000"
+cmd 313 196608
+expect #5190 text "FF00FF00"
+cmd 313 5
+expect #5190 text "FF0000FF"
+cmd 313 0
+expect #5190 text "FF000000"
+cmd 314 1
+cmd 313 196612
+expect #5190 text "FFFFFF00"
+cmd 313 65537
+expect #5190 text "FF808080"
+cmd 313 65538
+expect #5190 text "FF808080"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ compositions
+# 180° = horizontal + vertical; four quarter turns and cw + ccw are the identity
+key ctrl+j
+cmd 961 1
+key ctrl+z
+cmd 273
+cmd 274
+cmd 962 1
+expect text:"t.cmp=ok" exists
+key ctrl+z
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+key ctrl+h
+key ctrl+g
+cmd 962 0
+expect text:"t.cmp=ok" exists
+key ctrl+h
+key ctrl+h
+key ctrl+h
+expect #9913 value 4
+key ctrl+h
+expect #9913 value 6
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# every operation was one step: 2 + ctrl+h ctrl+g + four ctrl+h
+expect text:"t.n=8" exists
+key ctrl+z ctrl+z ctrl+z ctrl+z ctrl+z ctrl+z
+expect text:"t.pos=2" exists
+cmd 962 0
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ the selection follows
+# rectangle (0,0)-(2,1) (T2 hook: one "Test" step)
+cmd 982 0
+cmd 983 65538
+cmd 981 0
+expect #9981 text "0,0,2,1"
+cmd 980 1
+expect #9980 value 255
+cmd 980 2
+expect #9980 value 0
+cmd 961 2
+cmd 273
+expect #9981 text "4,0,6,1"
+cmd 980 5
+expect #9980 value 255
+cmd 980 3
+expect #9980 value 0
+key ctrl+z
+expect #9981 text "0,0,2,1"
+cmd 962 2
+expect text:"t.cmp=ok" exists
+cmd 274
+expect #9981 text "0,3,2,4"
+key ctrl+z
+key ctrl+h
+expect #9981 text "3,0,4,2"
+cmd 980 65539
+expect #9980 value 255
+cmd 980 131075
+expect #9980 value 0
+key ctrl+z
+expect #9981 text "0,0,2,1"
+key ctrl+g
+expect #9981 text "0,4,1,6"
+key ctrl+z
+key ctrl+j
+expect #9981 text "4,3,6,4"
+key ctrl+z
+expect #9981 text "0,0,2,1"
+key ctrl+y
+expect #9981 text "4,3,6,4"
+key ctrl+z
+cmd 962 2
+expect text:"t.cmp=ok" exists
+# an ellipse keeps its shape (a quarter turn of an antialiased selection)
+cmd 982 0
+cmd 983 196612
+cmd 981 1
+expect #9981 text "0,0,4,3"
+key ctrl+h
+expect #9981 text "1,0,4,4"
+key ctrl+z
+expect #9981 text "0,0,4,3"

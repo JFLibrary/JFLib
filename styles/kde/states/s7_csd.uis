@@ -1,0 +1,23 @@
+#!env jfgui_CSD=1
+# s7_csd -- the library title bar of the main window (caption buttons hover / press, active /
+# inactive)
+size 1000 700
+theme light
+dump
+shot build/kdes/s7_l.png 0 0 1000 120
+move 900,15
+shot build/kdes/s7_l_hover1.png 0 0 1000 120
+move 930,15
+shot build/kdes/s7_l_hover2.png 0 0 1000 120
+move 970,15
+shot build/kdes/s7_l_hover3.png 0 0 1000 120
+down 970,15
+shot build/kdes/s7_l_press3.png 0 0 1000 120
+move 500,400
+up
+theme dark
+shot build/kdes/s7_d.png 0 0 1000 120
+move 945,15
+shot build/kdes/s7_d_hover.png 0 0 1000 120
+scale 150
+shot build/kdes/s7_d150.png 0 0 1000 120

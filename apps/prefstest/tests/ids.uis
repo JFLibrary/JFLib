@@ -1,0 +1,27 @@
+# widget ids from names: wid / wid_path equal ui.id in their scopes; one "del" per row scope
+expect text:"IDs: gleich" exists
+click "Löschen 2"
+click "Löschen 2"
+click "Löschen 3"
+expect text:"Gelöscht: 0 2 1" exists
+expect "Löschen 1" enabled
+expect_nowarn
+# mistakes the library reports (UIWARN; the messages are in the output):
+# a scope left open at the end of App::frame
+click "Offener Bereich"
+expect_warn
+click "Offener Bereich"
+wait 100
+expect_nowarn
+# one name twice in one scope: "widget id ... ("twin") used twice"
+click "Gleiche Namen"
+expect_warn
+click "Gleiche Namen"
+wait 100
+expect_nowarn
+# two names with one hash: "ids of "k11513" and "k27407" collide"
+click "Kollision"
+expect_warn
+click "Kollision"
+wait 100
+expect_nowarn

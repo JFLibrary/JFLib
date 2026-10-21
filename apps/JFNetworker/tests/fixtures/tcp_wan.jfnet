@@ -1,0 +1,136 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "TCP über eine langsame Leitung",
+  "description": "PC1 schickt SRV1 hinter R1 Daten über TCP: 1 MB an den Discard-Dienst und 20 kB an den Echo-Dienst. Die Leitung von R1 zu SRV1 hat 10 Mbit/s und 5 ms Laufzeit.",
+  "seed": 5,
+  "next_id": 6,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+      "services": [
+        {
+          "kind": "tcp-client",
+          "name": "bulk",
+          "disabled": false,
+          "config": {
+            "server": "10.0.2.10",
+            "port": 9,
+            "bytes": 1000000,
+            "delay_ms": 1000
+          }
+        },
+        {
+          "kind": "tcp-client",
+          "name": "echo",
+          "disabled": false,
+          "config": {
+            "server": "10.0.2.10",
+            "port": 7,
+            "bytes": 20000,
+            "delay_ms": 2000
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 160,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\n",
+      "services": [
+        {
+          "kind": "tcp-discard",
+          "name": "discard",
+          "disabled": false,
+          "config": {
+            "port": 9
+          }
+        },
+        {
+          "kind": "tcp-echo",
+          "name": "echo",
+          "disabled": false,
+          "config": {
+            "port": 7
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 4,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 5,
+      "a": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 10000,
+      "delay_ns": 5000000,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

@@ -1,0 +1,55 @@
+# tools_view.uis -- Zoomen and Ansicht verschieben (agent T1).  #9909 = image origin in
+# the canvas "x,y", value = zoom (1/100 %).  Canvas 1280 x 639 px at (0, 129) (1280 x 800).
+size 1280 800
+theme light
+expect #9909 value 10000
+expect #9909 text "240,19"
+
+# ------------------------------------------------------------ Zoomen: click in, right click out
+key z
+expect #9931 value 5
+expect text:"Zoomen: Links: hineinzoomen, rechts: herauszoomen, Mitte: Ansicht schieben" exists
+move 640,448
+expect text:"400, 300" exists
+click 640,448
+expect #9909 value 12500
+# the point under the pointer stays in place
+expect text:"400, 300" exists
+rclick 640,448
+expect #9909 value 10000
+rclick 640,448
+expect #9909 value 6600
+click 640,448
+expect #9909 value 10000
+expect #9935 value 1
+
+# ------------------------------------------------------------ Zoomen: a rectangle
+# image (100, 100) .. (300, 250): 200 x 150 px -> min(1280 / 200, 639 / 150) = 426 %
+drag 340,248 540,398 10
+expect #9909 value 42600
+# its centre (200, 175) is in the canvas centre now
+move 640,448
+expect text:"200, 175" exists
+key ctrl+0
+expect #9909 value 10000
+# a tiny drag is a click
+drag 640,448 642,449 2
+expect #9909 value 12500
+key ctrl+0
+
+# ------------------------------------------------------------ Ansicht verschieben
+cmd 230 40000
+expect #9909 value 40000
+move 640,448
+expect text:"400, 300" exists
+key h
+expect #9931 value 7
+drag 640,448 540,398 5
+move 640,448
+expect text:"425, 312" exists
+drag 640,448 740,498 5
+move 640,448
+expect text:"400, 300" exists
+expect #9935 value 1
+key ctrl+0
+key b

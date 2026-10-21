@@ -1,0 +1,17 @@
+#!args --verify-dirty
+# shots for a look by eye: light, dark, the markers, 150 %
+theme light
+shot build/dock/light.png
+theme dark
+shot build/dock/dark.png
+down tab:"Eigenschaften"
+move 600,300
+move 130,328
+shot build/dock/dark_markers.png
+up
+expect text:"L: Dateien+Gliederung+[Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+scale 150
+shot build/dock/dark_150.png
+click button:"Einklappen: Ausgabe"
+shot build/dock/dark_150_rail.png
+expect_nowarn

@@ -1,0 +1,47 @@
+#!args --verify-dirty
+# the code editor and the mouse: a click places the caret at the nearest cell boundary, a drag
+# selects, Shift+click extends, a double click selects an identifier, the gutter selects whole
+# lines (a drag there several), the wheel scrolls; keyboard selections and the clipboard
+size 1000 680
+click tab:"Code"
+key ctrl+a
+key delete
+type "alpha beta gamma\ndelta_x epsilon\nzeta"
+# cells of 8 px from x 53, lines of 19 px from y 109
+click 103,118
+expect text:"pos: 1:7" exists
+expect text:"sel: 0:6-0:6" exists
+wait 1000
+drag 55,118 95,137
+expect text:"sel: 0:0-1:5" exists
+wait 1000
+drag 151,156 151,156 shift
+expect text:"sel: 0:0-2:4" exists
+wait 1000
+dblclick 77,137
+expect text:"sel: 1:0-1:7" exists
+key ctrl+c
+# the gutter
+wait 1000
+click 30,156
+expect text:"sel: 2:0-2:4" exists
+wait 1000
+drag 30,118 30,137
+expect text:"sel: 0:0-2:0" exists
+key ctrl+v
+expect #3000 text "delta_xzeta"
+key ctrl+z
+expect #3000 text "alpha beta gamma\ndelta_x epsilon\nzeta"
+# keyboard selections
+key ctrl+home
+key shift+ctrl+right
+key shift+ctrl+right
+expect text:"sel: 0:0-0:11" exists
+key shift+down
+expect text:"sel: 0:0-1:11" exists
+key shift+end
+key ctrl+x
+expect #3000 text "\nzeta"
+key ctrl+v
+expect #3000 text "alpha beta gamma\ndelta_x epsilon\nzeta"
+expect_nowarn

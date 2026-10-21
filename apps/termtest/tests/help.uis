@@ -1,0 +1,40 @@
+#!args --verify-dirty
+# IOS help (TF_QHELP): a typed `?` is not inserted, the app answers TermEv::Help and the line
+# stays; Tab completes a unique word (TermEv::Complete / complete_reply)
+size 760 520
+type "?"
+expect text:"Router>?" exists
+expect text:"  enable         Switch to the privileged level" exists
+expect #1001 text ""
+type "en\n"
+# a partial word: the commands it starts
+type "sh?"
+expect text:"Router#sh?" exists
+expect text:"show" exists
+expect #1001 text "sh"
+# after a blank: the words that may follow
+type "ow ?"
+expect text:"Router#show ?" exists
+expect text:"  running-config Configuration in effect now" exists
+expect text:"  version        Software, uptime and image file" exists
+expect #1001 text "show "
+expect text:"Router#show " exists
+# Tab: a unique word is completed, an ambiguous / empty one is not
+key tab
+expect #1001 text "show "
+type "ve"
+key tab
+expect #1001 text "show version "
+key ctrl+a
+key backspace
+type "conf"
+key tab
+expect #1001 text "configure "
+# typing goes on after the help
+key ctrl+a
+key backspace
+type "di?sa"
+expect text:"Router#di?" exists
+expect text:"disable" exists
+expect #1001 text "disa"
+expect_nowarn

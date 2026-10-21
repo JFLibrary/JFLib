@@ -1,0 +1,96 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/cables.jfnet
+# the kinds of cables (jfn_model::cable_kind through connect.rs, paint.rs): copper straight and
+# crossover, fibre, serial, console, radio and WAN, each in its own drawing; the kind follows the
+# ports ("Automatisch") until the user picks one (context menu "Kabeltyp", the inspector), only
+# kinds that plug in are offered; shots light, dark and at 150 %.  World (0, 0) shows at 630,320.
+# Ids: port lists 12545 + i / 12801 + i, the choice's cable 12337, the inspector's kind 20496.
+theme light
+expect text:"9 Geräte · 0 Kabel" exists
+key c
+# copper, straight: PC1 eth0 - SW1 Gi1/0/1 (Shift: at once)
+drag listitem:"PC1" listitem:"SW1" 8 shift
+expect text:"PC1 eth0 – SW1 Gi1/0/1" exists
+expect #20496 text "Automatisch: Kupfer, gerade"
+# fibre: the switches' fastest pair is their SFP+ cages
+drag listitem:"SW1" listitem:"SW2" 8 shift
+expect text:"SW1 Te1/1/1 – SW2 Te1/1/1" exists
+expect #20496 text "Automatisch: Glasfaser, Multimode"
+# copper, crossover: two switch ports (MDI-X both); a copper port on one side takes the best
+# copper partner on the other
+drag listitem:"SW2" listitem:"SW1"
+expect text:"Ports wählen" exists
+click #12545
+expect #12802 selected
+expect #12337 text "Automatisch: Kupfer, gekreuzt"
+key enter
+expect text:"SW2 Gi1/0/1 – SW1 Gi1/0/2" exists
+# serial: the routers' first serial ports
+drag listitem:"R1" listitem:"R2"
+click #12551
+expect #12807 selected
+expect #12337 text "Automatisch: Seriell (WAN)"
+key enter
+expect text:"R1 Se0/2/0 – R2 Se0/2/0" exists
+# console: PC1's USB port is left, the switch's console port fits it
+drag listitem:"PC1" listitem:"SW1" 8 shift
+expect text:"PC1 usb0 – SW1 Con" exists
+expect #20496 text "Automatisch: Konsolenkabel"
+# radio: a WLAN client to the access point
+drag listitem:"Laptop1" listitem:"AP1" 8 shift
+expect text:"Laptop1 wlan0 – AP1 Dot11Radio1" exists
+expect #20496 text "Automatisch: Funk (WLAN)"
+# WAN: the modem's line to the provider (the quick pair would be copper)
+drag listitem:"Modem1" listitem:"Internet1"
+click #12545
+expect #12809 selected
+expect #12337 text "Automatisch: WAN-Leitung"
+key enter
+expect text:"Modem1 wan0 – Internet1 wan0" exists
+expect text:"9 Geräte · 7 Kabel" exists
+key v
+# the devices list their cables with the kinds
+click listitem:"SW1"
+expect text:"Kabel (4)" exists
+expect text:"Gi1/0/1 → PC1 eth0 · Kupfer, gerade" exists
+expect text:"Te1/1/1 → SW2 Te1/1/1 · Glasfaser, Multimode" exists
+expect text:"Gi1/0/2 → SW2 Gi1/0/1 · Kupfer, gekreuzt" exists
+expect text:"Con → PC1 usb0 · Konsolenkabel" exists
+click listitem:"R1"
+expect text:"Se0/2/0 → R2 Se0/2/0 · Seriell (WAN)" exists
+click listitem:"AP1"
+expect text:"Dot11Radio1 → Laptop1 wlan0 · Funk (WLAN)" exists
+click listitem:"Modem1"
+expect text:"wan0 → Internet1 wan0 · WAN-Leitung" exists
+click 700,180
+shot build/jfnetworker/cable_types_light.png
+# another kind from the context menu: only kinds that plug in are offered
+rclick 572,280
+expect text:"SW1 Te1/1/1 – SW2 Te1/1/1" exists
+click menuitem:"Kabeltyp"
+expect menuitem:"Automatisch" checked
+expect menuitem:"Kupfer, gerade" disabled
+expect menuitem:"Glasfaser, Singlemode" enabled
+click menuitem:"Glasfaser, Singlemode"
+expect #20496 text "Glasfaser, Singlemode"
+key ctrl+z
+expect #20496 text "Automatisch: Glasfaser, Multimode"
+key ctrl+y
+expect #20496 text "Glasfaser, Singlemode"
+# the copper crossover as a straight cable: auto-MDI-X keeps it up
+rclick 572,288
+expect text:"SW2 Gi1/0/1 – SW1 Gi1/0/2" exists
+click menuitem:"Kabeltyp"
+click menuitem:"Kupfer, gerade"
+expect #20496 text "Kupfer, gerade"
+expect text:"aktiv · 0 Pakete/s" exists
+rclick 572,288
+click menuitem:"Kabeltyp"
+expect menuitem:"Kupfer, gerade" checked
+click menuitem:"Automatisch"
+expect #20496 text "Automatisch: Kupfer, gekreuzt"
+click 700,180
+theme dark
+shot build/jfnetworker/cable_types_dark.png
+scale 150
+shot build/jfnetworker/cable_types_150.png
+expect_nowarn

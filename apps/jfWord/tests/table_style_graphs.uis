@@ -1,0 +1,79 @@
+#!args --editor
+size 1480 1000
+theme light
+click tab:"Einfügen"
+click #1514
+click "Übernehmen"
+type "Forschungsdaten"
+click #3926
+click "Blau · Zeilenbänder"
+click #3928
+click #3940
+key ctrl+a
+type "Vererbte Tabelle"
+key tab
+click tab:"Vererbung"
+expect #3949 text "Blau · Zeilenbänder"
+click #3951
+key ctrl+a
+type "2"
+key tab
+click #3952
+key ctrl+a
+type "2"
+key tab
+click tab:"Bereiche"
+click #3954
+click "Spaltenband 1"
+click #3955
+key ctrl+a
+type "D5E9F3"
+key tab
+click #3954
+click "Oben links"
+click #3955
+key ctrl+a
+type "285942"
+key tab
+click "Übernehmen"
+expect dialog:"Tabellenformatvorlage" missing
+click #3935
+click #3938
+shot build/jfword-table-graph-light.png
+cmd 5
+cmd 6
+click #3929
+click tab:"Vererbung"
+expect #3949 text "Blau · Zeilenbänder"
+click #3949
+click "Schlicht · Raster"
+click tab:"Grundlagen"
+expect #3945 text "808080"
+click tab:"Vererbung"
+click #3949
+click "Blau · Zeilenbänder"
+click tab:"Grundlagen"
+expect #3945 text "DCEEF5"
+click tab:"Vererbung"
+click tab:"Bereiche"
+click #3954
+click "Oben links"
+expect #3955 text "285942"
+click #3958
+expect #3955 text ""
+click tab:"Vererbung"
+click #3953
+expect #3951 value 0
+expect #3952 value 0
+click "Abbrechen"
+theme dark
+scale 150
+shot build/jfword-table-graph-dark-150.png
+size 680 800
+click #3929
+click tab:"Vererbung"
+shot build/jfword-table-graph-inheritance-compact.png
+click tab:"Bereiche"
+shot build/jfword-table-graph-regions-compact.png
+click "Abbrechen"
+expect_nowarn

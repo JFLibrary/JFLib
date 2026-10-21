@@ -1,0 +1,8 @@
+# canvas resize handles (bottom-right corner), undo
+expect text:"1152 × 648px" exists
+cmd 23
+drag #1507 700,450 6
+expect text:"1152 × 648px" missing
+shot build/kritzel_canvas_resized.png
+key ctrl+z
+expect text:"1152 × 648px" exists

@@ -1,0 +1,21 @@
+# traydemo: headless, so plat::tray prints instead of showing (dry run)
+click "Symbol anzeigen"
+expect text:"Symbol: sichtbar" exists
+expect text:"Zuletzt: Symbol gesetzt" exists
+click "Benachrichtigung senden"
+expect text:"Zuletzt: Benachrichtigung 1 gesendet" exists
+click "Symbol entfernen"
+expect text:"Symbol: aus" exists
+click "Fortschritt"
+expect text:"Fortschritt: normal 40 %, Zähler: 0, wach: nein" exists
+click "Fortschritt"
+expect text:"Fortschritt: pausiert 40 %, Zähler: 0, wach: nein" exists
+click "Zähler +1"
+click "Zähler +1"
+expect text:"Fortschritt: pausiert 40 %, Zähler: 2, wach: nein" exists
+click "Zähler löschen"
+expect text:"Fortschritt: pausiert 40 %, Zähler: 0, wach: nein" exists
+click "Sprungliste"
+expect text:"Zuletzt: Sprungliste gesetzt" exists
+click "Sprungliste"
+expect text:"Zuletzt: Sprungliste entfernt" exists

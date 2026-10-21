@@ -1,0 +1,28 @@
+# listfly.uis -- a list without a selection (-1) that gets the keyboard focus in the first frame
+# of a new flyout (test hook 9061: a flyout at the pointer, popup_open + ui.focus on its list,
+# like JFNetworker's port choice).  The focus alone selects nothing: the list keeps -1 and the
+# layout settles; Down selects the first row.  With arg 1 the app takes no row and puts -1 back
+# (no port fits): when focusing still selected row 0, that repeated in every pass and the layout
+# did not settle within 4 passes (UIWARN).
+move 300,300
+cmd 9061
+expect text:"Liste im Flyout" exists
+expect #7910 focused
+expect #7910 value -1
+expect_nowarn
+key down
+expect #7911 selected
+expect #7910 value 0
+key esc
+expect text:"Liste im Flyout" missing
+# no row can be chosen
+cmd 9061 1
+expect text:"Liste im Flyout" exists
+expect #7910 focused
+expect #7910 value -1
+expect_nowarn
+key down
+expect #7910 value -1
+expect_nowarn
+key esc
+expect text:"Liste im Flyout" missing

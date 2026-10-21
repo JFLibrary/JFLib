@@ -1,0 +1,3 @@
+#!args --test tray
+# (Rust only) plattest --test tray: the notification-area symbol and notifications in the dry
+# run (lib/plat/tray.rs). The whole test runs before the UI starts.

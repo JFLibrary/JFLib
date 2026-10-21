@@ -1,0 +1,3 @@
+#!args --test plugperm
+# (Rust only) plattest --test plugperm: the rights of native plugins (lib/plat/policy.rs). The
+# whole test runs before the UI starts and ends the process with the number of failures.

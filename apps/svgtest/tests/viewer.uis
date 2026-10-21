@@ -1,0 +1,111 @@
+#!args --verify-dirty
+# ui.image_view on the 32 x 24 pixel image (the view: 1016 x 612 px, centre 520, 442): fit at
+# first (25.5 px per pixel), keys + / - step, Ctrl+1 is 100 %, Ctrl+0 fits, the wheel zooms at
+# the pointer (the image point under it stays), a drag pans (the centre stays inside the
+# image), arrows / Home / End pan, Ctrl + drag zooms into a rectangle, a double click switches
+# 100 % / fit; the K_IMAGE record's value is the zoom in percent; shots of the pixel grid
+# (light, dark, high contrast), of smooth sampling and with scroll bars
+size 1040 760
+theme light
+click "Betrachter"
+expect image:"Bild" exists
+expect text:"zoom: 2550 %  cx: 16.0  cy: 12.0  fit: 1" exists
+expect #500 value 2550
+shot build/svgtest/viewer_fit.png
+# 100 %, then + / - through the steps
+focus #500
+key ctrl+1
+expect #500 value 100
+expect text:"zoom: 100 %  cx: 16.0  cy: 12.0  fit: 0" exists
+key +
+expect #500 value 125
+key -
+key -
+expect #500 value 75
+key ctrl+0
+expect #500 value 2550
+expect text:"zoom: 2550 %  cx: 16.0  cy: 12.0  fit: 1" exists
+# the wheel: one notch is x 1.25
+wheel 300,300 -120
+expect #500 value 2040
+wheel 300,300 120
+expect #500 value 2550
+key ctrl+1
+wheel 520,445 480
+expect #500 value 244
+# a double click: 100 %, again: fit
+dblclick 520,445
+expect #500 value 100
+wait 600
+dblclick 520,445
+expect #500 value 2550
+# 6400 %: larger than the view, scroll bars
+key ctrl+1
+click "Größer"
+click "Größer"
+click "Größer"
+click "Größer"
+click "Größer"
+click "Größer"
+expect text:"zoom: 6400 %  cx: 16.0  cy: 12.0  fit: 0" exists
+shot build/svgtest/viewer_6400.png
+# 6400 % is the largest zoom
+wheel 300,300 120
+expect #500 value 6400
+# at 3200 % the wheel keeps the image point under the pointer: (300, 300) -> the centre
+# (14.6, 11.1) at 4000 %
+click "Kleiner"
+expect text:"zoom: 3200 %  cx: 16.0  cy: 12.0  fit: 0" exists
+wheel 300,300 120
+expect text:"zoom: 4000 %  cx: 14.6  cy: 11.1  fit: 0" exists
+wheel 300,300 -120
+expect #500 value 3200
+click "Einpassen"
+expect #500 value 2550
+click "100 %"
+click "Größer"
+click "Größer"
+click "Größer"
+click "Größer"
+click "Größer"
+click "Größer"
+# a drag pans by the pointer's way / zoom: (-160, -96) px = (2.5, 1.5) pixels
+drag 520,445 360,349
+expect text:"zoom: 6400 %  cx: 18.5  cy: 13.5  fit: 0" exists
+# the centre stays inside the image: x stops at 508 / 64 = 7.94 (a press right after the
+# last one would be a double click)
+wait 600
+drag 200,200 900,700
+expect text:"zoom: 6400 %  cx: 7.9  cy: 5.7  fit: 0" exists
+focus #500
+key right
+key down
+expect text:"zoom: 6400 %  cx: 9.9  cy: 6.9  fit: 0" exists
+key end
+expect text:"zoom: 6400 %  cx: 9.9  cy: 19.2  fit: 0" exists
+key home
+expect text:"zoom: 6400 %  cx: 9.9  cy: 4.8  fit: 0" exists
+# Ctrl + drag: the rectangle of image pixels 0..16 x 0..12 -> 5100 % (centre clamped)
+key ctrl+0
+wait 600
+drag 112,136 520,442 ctrl
+expect text:"zoom: 5100 %  cx: 10.0  cy: 6.0  fit: 0" exists
+key ctrl+0
+expect #500 value 2550
+# 800 %: the pixel grid
+key ctrl+1
+click "Größer"
+click "Größer"
+click "Größer"
+expect #500 value 800
+shot build/svgtest/viewer_800.png
+theme dark
+shot build/svgtest/viewer_800_dark.png
+click "Hoher Kontrast"
+shot build/svgtest/viewer_800_hc.png
+click "Hoher Kontrast"
+theme light
+click "Glatt"
+shot build/svgtest/viewer_800_smooth.png
+click "Glatt"
+expect_nowarn

@@ -1,0 +1,248 @@
+# tools_fill.uis -- Farbeimer (agent T1): live fill (preview only, the layer unchanged until
+# Fertigstellen), Esc = no history step (HIST-019), Enter / Fertigstellen / tool switch /
+# document command = one step (HIST-020), Strg+Z drops the live fill, tolerance changes re-run
+# it, the origin nub can be dragged, global mode (option and Shift), sampling Ebene / Bild,
+# hatch pattern, antialiased edge, colour change while live, selection clip (test rectangle),
+# the background job (hook 945) with `sync`, X / Standardfarben.
+# Mapping (1280 x 800, zoom 100 %): image pixel (x, y) at (240 + x, 148 + y).
+# Regions (A1 hooks 902 colour, 903 corner, 904 fill, no history): A = [0,100) x [0,100) red,
+# B = [100,200) x [0,100) red 50 %, C = [300,400) x [0,100) red, the rest white.
+# Probes: 900 composite / 901 layer pixel (x | y << 16) -> #9900; #9930 edit pending,
+# #9935 history entries, #9939 live origin "x,y".
+size 1280 800
+theme light
+cmd 902 1
+cmd 903 0
+cmd 904 6553700
+cmd 902 4
+cmd 903 100
+cmd 904 6553800
+cmd 902 1
+cmd 903 300
+cmd 904 6554000
+cmd 900 3276850
+expect #9900 text "FFFF0000"
+cmd 900 3276950
+expect #9900 text "80FF0000"
+expect #9935 value 1
+
+# ------------------------------------------------------------ colours: X swaps, Standardfarben
+expect #9933 text "FF000000"
+expect #9934 text "FFFFFFFF"
+key x
+expect #9933 text "FFFFFFFF"
+expect #9934 text "FF000000"
+cmd 785
+expect #9933 text "FF000000"
+expect #9934 text "FFFFFFFF"
+cmd 943 3
+expect #9933 text "FF0000FF"
+
+# ------------------------------------------------------------ a live fill, Esc drops it
+key f
+expect #9931 value 8
+expect #790 disabled
+cmd 935 0
+click 290,198
+expect #9930 value 1
+expect #9939 text "50,50"
+expect #790 enabled
+cmd 900 3276850
+expect #9900 text "FF0000FF"
+cmd 901 3276850
+expect #9900 text "FFFF0000"
+cmd 900 3276950
+expect #9900 text "80FF0000"
+expect #9935 value 1
+# tolerance 50 %: region B (same colour, other alpha) joins while live
+cmd 935 50
+cmd 900 3276950
+expect #9900 text "FF0000FF"
+cmd 935 0
+cmd 900 3276950
+expect #9900 text "80FF0000"
+key esc
+expect #9930 value 0
+expect #790 disabled
+cmd 900 3276850
+expect #9900 text "FFFF0000"
+expect #9935 value 1
+
+# ------------------------------------------------------------ Enter commits: one step
+click 290,198
+key enter
+expect #9930 value 0
+expect #9935 value 2
+cmd 901 3276850
+expect #9900 text "FF0000FF"
+cmd 901 3276950
+expect #9900 text "80FF0000"
+key ctrl+z
+cmd 901 3276850
+expect #9900 text "FFFF0000"
+
+# ------------------------------------------------------------ Fertigstellen button
+click 290,198
+expect #9930 value 1
+click #790
+expect #9930 value 0
+expect #9935 value 2
+cmd 901 3276850
+expect #9900 text "FF0000FF"
+key ctrl+z
+
+# ------------------------------------------------------------ Strg+Z drops the live fill
+click 290,198
+expect #9930 value 1
+key ctrl+z
+expect #9930 value 0
+expect #9935 value 2
+cmd 900 3276850
+expect #9900 text "FFFF0000"
+# (the redo step of the last fill is still there)
+key ctrl+y
+cmd 901 3276850
+expect #9900 text "FF0000FF"
+key ctrl+z
+
+# ------------------------------------------------------------ drag the origin nub from A into B
+click 290,198
+drag 290,198 390,198 5
+expect #9939 text "150,50"
+cmd 900 3276950
+expect #9900 text "FF0000FF"
+cmd 900 3276850
+expect #9900 text "FFFF0000"
+key esc
+
+# ------------------------------------------------------------ a second click commits the first fill
+click 290,198
+click 390,198
+expect #9935 value 2
+expect #9939 text "150,50"
+key esc
+cmd 901 3276850
+expect #9900 text "FF0000FF"
+key ctrl+z
+
+# ------------------------------------------------------------ global: option and Shift
+cmd 936 1
+click 290,198
+cmd 900 3277150
+expect #9900 text "FF0000FF"
+key esc
+cmd 936 0
+click 290,198
+cmd 900 3277150
+expect #9900 text "FFFF0000"
+key esc
+drag 290,198 290,198 1 shift
+cmd 900 3277150
+expect #9900 text "FF0000FF"
+key esc
+
+# ------------------------------------------------------------ switching the tool commits
+click 290,198
+key b
+expect #9930 value 0
+expect #9935 value 2
+key ctrl+z
+key f
+
+# ------------------------------------------------------------ a document command commits first
+click 290,198
+key ctrl+shift+n
+expect #9930 value 0
+expect #9903 value 2
+expect #9936 value 3
+cmd 901 3276850
+expect #9900 text "00000000"
+key ctrl+z
+key ctrl+z
+expect #9903 value 1
+cmd 901 3276850
+expect #9900 text "FFFF0000"
+
+# ------------------------------------------------------------ colour change while live
+click 290,198
+cmd 943 2
+cmd 900 3276850
+expect #9900 text "FF00FF00"
+key esc
+cmd 943 3
+
+# ------------------------------------------------------------ hatch pattern (Vertikal: column x % 8 == 0)
+cmd 934 2
+click 290,198
+cmd 900 655368
+expect #9900 text "FF0000FF"
+cmd 900 655369
+expect #9900 text "FFFFFFFF"
+key esc
+cmd 934 0
+
+# ------------------------------------------------------------ antialiased edge (tent filter)
+click 290,198
+cmd 900 3276899
+expect #9900 text "FF4000BF"
+cmd 932 0
+cmd 900 3276899
+expect #9900 text "FF0000FF"
+cmd 932 1
+key esc
+
+# ------------------------------------------------------------ selection clip (test rectangle)
+cmd 941 0
+cmd 942 6553650
+click 290,198
+cmd 900 3276825
+expect #9900 text "FF0000FF"
+cmd 900 3276875
+expect #9900 text "FFFF0000"
+key enter
+cmd 901 3276875
+expect #9900 text "FFFF0000"
+cmd 901 3276825
+expect #9900 text "FF0000FF"
+cmd 942 0
+key ctrl+z
+
+# ------------------------------------------------------------ sampling Ebene / Bild on a new empty layer
+key ctrl+shift+n
+expect #9903 value 2
+click 290,198
+cmd 900 19661300
+expect #9900 text "FF0000FF"
+key esc
+cmd 937 1
+click 290,198
+cmd 900 19661300
+expect #9900 text "FFFFFFFF"
+cmd 900 3276850
+expect #9900 text "FF0000FF"
+key enter
+cmd 901 3276850
+expect #9900 text "FF0000FF"
+cmd 901 3276950
+expect #9900 text "00000000"
+cmd 937 0
+key ctrl+z
+key ctrl+z
+expect #9903 value 1
+
+# ------------------------------------------------------------ the fill on the worker pool
+cmd 945 1
+click 290,198
+sync
+cmd 900 3276850
+expect #9900 text "FF0000FF"
+cmd 935 50
+sync
+cmd 900 3276950
+expect #9900 text "FF0000FF"
+key enter
+expect #9935 value 2
+cmd 901 3276950
+expect #9900 text "FF0000FF"
+cmd 945 0
+cmd 935 50

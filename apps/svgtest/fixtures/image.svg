@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="200" viewBox="0 0 200 200">
+  <title>Eingebettetes Bild</title>
+  <!-- a 16 x 12 PNG as a data: URI: stretched, meet, slice, rotated, half transparent -->
+  <rect x="5" y="5" width="90" height="90" fill="none" stroke="#94a3b8"/>
+  <rect x="105" y="5" width="90" height="90" fill="none" stroke="#94a3b8"/>
+  <rect x="5" y="105" width="90" height="90" fill="none" stroke="#94a3b8"/>
+  <image x="5" y="5" width="90" height="90" preserveAspectRatio="none" xlink:href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAMCAYAAABr5z2BAAAANklEQVR42mNggIKKVc/+k4MZiDXg1wkNOEYxgBhbkDWjGzJEDKA4DPDGAsUG2PTY/KcEDwMDAMbd9b7zSfxwAAAAAElFTkSuQmCC"/>
+  <image x="105" y="5" width="90" height="90" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAMCAYAAABr5z2BAAAANklEQVR42mNggIKKVc/+k4MZiDXg1wkNOEYxgBhbkDWjGzJEDKA4DPDGAsUG2PTY/KcEDwMDAMbd9b7zSfxwAAAAAElFTkSuQmCC"/>
+  <image x="5" y="105" width="90" height="90" preserveAspectRatio="xMidYMid slice" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAMCAYAAABr5z2BAAAANklEQVR42mNggIKKVc/+k4MZiDXg1wkNOEYxgBhbkDWjGzJEDKA4DPDGAsUG2PTY/KcEDwMDAMbd9b7zSfxwAAAAAElFTkSuQmCC"/>
+  <image x="120" y="120" width="64" height="48" transform="rotate(15 152 144)" opacity="0.6" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAMCAYAAABr5z2BAAAANklEQVR42mNggIKKVc/+k4MZiDXg1wkNOEYxgBhbkDWjGzJEDKA4DPDGAsUG2PTY/KcEDwMDAMbd9b7zSfxwAAAAAElFTkSuQmCC"/>
+  <image x="0" y="0" width="10" height="10" href="missing.png"/>
+</svg>

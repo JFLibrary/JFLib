@@ -1,0 +1,52 @@
+# New default start page, original templates, command search and backstage draft safety.
+theme light
+expect text:"Willkommen bei jfWord" exists
+expect #10000 missing
+expect button:"Leeres Dokument" exists
+expect button:"Wissenschaftliche Arbeit" exists
+shot build/jfword-home-light.png
+click button:"Leeres Dokument"
+expect #10000 exists
+expect text:"Navigation" missing
+expect text:"Quellen" missing
+expect #10000 focused
+expect #3145728 rect 227 200 793 1121
+type "Ein neuer Gedanke."
+click #2101
+expect text:"Willkommen bei jfWord" exists
+click button:"Wissenschaftliche Arbeit"
+expect dialog:"Ungespeicherte Änderungen" exists
+click "Abbrechen"
+click "Zum Dokument"
+expect #10000 text "Ein neuer Gedanke."
+click #2104
+type "Quellenbereich"
+expect button:"Quellenbereich" exists
+click button:"Quellenbereich"
+expect text:"Quellen" exists
+expect #2104 text ""
+cmd 29
+expect text:"Quellen" missing
+click #2104
+type "Navigation"
+click button:"Navigation"
+expect text:"Navigation" exists
+cmd 49
+expect text:"Navigation" missing
+cmd 53
+expect dialog:"Dateiinformationen" exists
+cmd 1
+expect dialog:"Dateiinformationen" exists
+click "Schließen"
+expect #10000 text "Ein neuer Gedanke."
+cmd 28
+click button:"Wissenschaftliche Arbeit"
+click "Verwerfen"
+expect #10008 text "Titel der wissenschaftlichen Arbeit\nVerfasser · Hochschule · Datum\nZusammenfassung\n\n1 Einleitung\n\n2 Methode\n\n3 Ergebnisse\n"
+shot build/jfword-research-light.png
+cmd 28
+size 1000 700
+theme dark
+scale 150
+shot build/jfword-home-dark-150.png
+expect_nowarn

@@ -1,0 +1,31 @@
+#!args --crash-report apps/PaintCraft/tests/fixtures/crash_sample.txt
+# crash_report.uis -- the window "PaintCraft Absturz" (crash.s, report mode: PaintCraft started by
+# its crash handler with --crash-report FILE): message, protocol path, Details anzeigen /
+# ausblenden (the protocol in a read-only text box), In die Zwischenablage kopieren,
+# Ordner der Absturzberichte öffnen, PaintCraft neu starten, Beenden (headless runs only record the
+# last three: probe #6720 value CRF_* = 1 restart, 2 quit, 4 copied, 8 folder).  No other module
+# runs (no image, no menus).  The crash itself: tools/pn_crash_check.py.
+size 680 520
+theme light
+expect text:"PaintCraft wurde unerwartet beendet" exists
+expect #6720 text "apps/PaintCraft/tests/fixtures/crash_sample.txt"
+expect #6720 value 0
+expect #9901 missing
+expect #6706 missing
+click #6701
+expect #6706 exists
+expect button:"Details ausblenden" exists
+shot build/tests/crash_report.png
+click #6702
+clip expect text
+expect #6720 value 4
+click #6703
+expect #6720 value 12
+click #6704
+expect #6720 value 13
+click #6705
+expect #6720 value 15
+click #6701
+expect #6706 missing
+theme dark
+shot build/tests/crash_report_dark.png

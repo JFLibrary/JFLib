@@ -1,0 +1,33 @@
+#!args --editor --file build/jfword-fields-before.docx
+# Removing a citation updates an earlier bibliography; caret follows native text, not old display offsets.
+size 1240 840
+theme light
+click #10000
+key ctrl+home f11 f11
+expect button:"Zitat bearbeiten" exists
+click #1403
+expect textbox:"\nGrüße & Forschung <2026>\nα β\t𝄞 Danach." focused
+type "X"
+expect textbox:"\nGrüße & Forschung <2026>\nα β\t𝄞X Danach." focused
+key ctrl+z
+expect textbox:"\nGrüße & Forschung <2026>\nα β\t𝄞 Danach." focused
+key ctrl+home f11
+expect button:"Quellen bearbeiten" exists
+# An empty, zero-width bibliography is still an explicitly removable field.
+click #1403
+expect button:"Quellen bearbeiten" missing
+key ctrl+z
+expect button:"Quellen bearbeiten" exists
+key ctrl+z
+expect button:"Zitat bearbeiten" exists
+key ctrl+c
+clip expect docx
+clip expect text "(Lovelace, 1843, S. 42–44)"
+shot build/jfword-field-removal.png
+size 1000 700
+scale 150
+theme dark
+expect button:"Zitat bearbeiten" exists
+expect button:"Feld entfernen" exists
+shot build/jfword-field-dark-150.png
+expect_nowarn

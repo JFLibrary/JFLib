@@ -1,0 +1,7 @@
+# permprompt: questions at run time (docs/PERMISSIONS.md "Asking the user", "Agent control")
+ask fs.write $TEMP/permprompt-ask/**   "Briefe speichern"         # the UI thread writes here
+ask fs.write $TEMP/permprompt-bg/**    "Im Hintergrund sichern"   # a worker thread writes here
+ask url mailto                         "Eine Mail an den Support schreiben"
+ask print
+agent.confirm doc.save                 # the user confirms it for an agent
+agent.deny doc.wipe                    # never for an agent

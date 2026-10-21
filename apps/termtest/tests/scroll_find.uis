@@ -1,0 +1,53 @@
+#!args --verify-dirty
+# 10 000 lines at once, PgUp / the wheel scroll, new output while scrolled up shows "Neue
+# Ausgabe", the scrollback ring drops the oldest lines, Ctrl+F searches (Enter / F3 older,
+# Shift+F3 newer, Esc closes), a smaller window re-wraps
+size 760 520
+click tab:"Shell"
+click "Flut (10 000 Zeilen)"
+expect text:"Zeilen: 10001" exists
+expect text:"Flutzeile 10000 " exists
+expect #1101 focused
+key pgup
+expect text:"Flutzeile 10000 " missing
+expect text:"Flutzeile 09977 #################" exists
+wheel #1100 120
+expect text:"Flutzeile 09974 ##############" exists
+# new output while scrolled up: the view stays, a button leads down
+click "Flut (10 000 Zeilen)"
+expect text:"Zeilen: 20000" exists
+expect text:"Flutzeile 09974 ##############" exists
+expect button:"Neue Ausgabe" exists
+click button:"Neue Ausgabe"
+expect button:"Neue Ausgabe" missing
+expect text:"Flutzeile 10000 " exists
+# typing jumps down too
+key ctrl+home
+expect text:"Flutzeile 10000 " missing
+type "x"
+expect text:"Flutzeile 10000 " exists
+key backspace
+# the search bar
+key ctrl+f
+expect #1103 focused
+type "flutzeile 09999"
+expect text:"2/2" exists
+expect text:"Flutzeile 09999 #######################################" exists
+key enter
+expect text:"1/2" exists
+expect text:"Flutzeile 09999 #######################################" exists
+key shift+f3
+expect text:"2/2" exists
+key f3
+expect text:"1/2" exists
+type "x"
+expect text:"0/0" exists
+key esc
+expect #1103 missing
+expect #1101 focused
+# a narrower window wraps the lines again (the bottom stays in view)
+key ctrl+end
+size 400 400
+expect text:"Raster: 44x18" exists
+expect text:"Flutzeile 10000 " exists
+expect_nowarn

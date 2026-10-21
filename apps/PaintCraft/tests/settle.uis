@@ -1,0 +1,38 @@
+# settle.uis -- (U3) no "layout did not settle within 4 passes" while the history list fills
+# up and scrolls to the newest step: rectangle selections, Strg+D, Neue Ebene, Einfügen in
+# neue Ebene + Enter, a live bucket / gradient committed with Enter (T3, K1, S1 reports)
+size 1280 800
+theme light
+expect_nowarn
+cmd 750
+drag 260,168 300,208
+key ctrl+d
+drag 340,248 380,288
+expect_nowarn
+drag 300,200 400,300
+drag 420,220 500,320
+drag 320,330 380,400
+key ctrl+d
+expect_nowarn
+key ctrl+shift+n
+expect_nowarn
+clip file apps/PaintCraft/tests/fixtures/a1_rgba.png
+key ctrl+shift+v
+key enter
+expect_nowarn
+cmd 758
+click 400,300
+key enter
+expect_nowarn
+cmd 759
+drag 300,200 500,300
+key enter
+expect_nowarn
+cmd 750
+drag 300,200 400,300
+cmd 751
+drag 350,250 420,300
+key enter
+expect_nowarn
+key ctrl+z ctrl+z ctrl+y
+expect_nowarn

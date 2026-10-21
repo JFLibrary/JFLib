@@ -1,0 +1,36 @@
+#!args --rtl --verify-dirty
+# a mirrored window (RTL): the left side is at the right with its splitter and markers; the
+# script points at physical places, the layout stays logical
+theme light
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect tab:"Dateien" rect 881 48 75 32
+expect tab:"Eigenschaften" rect 148 48 128 32
+expect tab:"Ausgabe" rect 594 376 96 32
+# the splitter of the left side (at the right) widens it towards the left
+drag 696,300 636,300
+expect text:"Größen: 320/280/200" exists
+expect tab:"Dateien" rect 866 48 90 32
+# the Eigenschaften (at the left) onto the marker of the left side, which shows at the right
+down tab:"Eigenschaften"
+move 400,200
+move 930,312
+expect button:"Rechts andocken" hover
+expect button:"Rechts andocken" rect 912 294 36 36
+shot build/dock/rtl_drag.png
+up
+expect text:"L: [Dateien]+Gliederung, [Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# the menu names the sides as they show
+click button:"Weitere Optionen: Ausgabe"
+expect menuitem:"Links andocken" exists
+expect menuitem:"Rechts andocken" exists
+key esc
+# floated in the mirror
+drag tab:"Ausgabe" 300,200
+expect window 501 open
+expect text:"L: [Dateien]+Gliederung, [Eigenschaften] | R: - | U: [Suche] | F: [Ausgabe] | V: Verlauf" exists
+expect window 501 rect 37 156 314 200
+window 501
+expect tab:"Ausgabe" rect 215 29 96 32
+window main
+shot build/dock/rtl_float.png desktop
+expect_nowarn

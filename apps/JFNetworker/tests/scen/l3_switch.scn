@@ -1,0 +1,24 @@
+# L3-Switch mit SVIs: MLS1 routet zwischen VLAN 10 und VLAN 20; ohne "ip routing" nicht mehr
+PC1: ping -c 2 10.0.20.10
+run until idle
+expect PC1 output contains "2 packets transmitted, 1 received, 50% packet loss"
+PC1: ping -c 2 10.0.20.10
+run until idle
+expect PC1 output contains "2 packets transmitted, 2 received, 0% packet loss"
+MLS1: enable
+MLS1: show ip route
+expect MLS1 route 10.0.20.0/24 dev Vlan20
+MLS1: show ip interface brief
+expect MLS1 output contains "Vlan10                 10.0.10.1       YES NVRAM  up                    up"
+MLS1: show vlan brief
+MLS1: show mac address-table
+MLS1: configure terminal
+MLS1: no ip routing
+MLS1: end
+PC1: ping -c 1 10.0.20.10
+run until idle
+expect PC1 output contains "1 packets transmitted, 0 received, 100% packet loss"
+MLS1: show ip route
+expect MLS1 output contains "Default gateway is not set"
+MLS1: show running-config
+expect MLS1 output contains "interface Vlan20\n ip address 10.0.20.1 255.255.255.0\n!"

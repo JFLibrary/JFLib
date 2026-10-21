@@ -1,0 +1,159 @@
+# s4_focus -- keyboard focus visuals: Tab through the page (light 100, then dark 150)
+size 1000 3500
+theme light
+key tab
+shot build/kdes/s4_l00.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l01.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l02.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l03.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l04.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l05.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l06.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l07.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l08.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l09.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l10.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l11.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l12.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l13.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l14.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l15.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l16.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l17.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l18.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l19.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l20.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l21.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l22.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l23.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l24.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l25.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l26.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l27.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l28.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l29.png 0 130 1000 1250
+key tab
+shot build/kdes/s4_l30.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l31.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l32.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l33.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l34.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l35.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l36.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l37.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l38.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l39.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l40.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l41.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l42.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l43.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l44.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l45.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l46.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l47.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l48.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l49.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l50.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l51.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l52.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l53.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l54.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l55.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l56.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l57.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l58.png 0 1200 1000 2200
+key tab
+shot build/kdes/s4_l59.png 0 1200 1000 2200
+theme dark
+size 1000 1300
+scale 150
+focus #100
+key tab
+shot build/kdes/s4_d00.png
+key tab
+shot build/kdes/s4_d01.png
+key tab
+shot build/kdes/s4_d02.png
+key tab
+shot build/kdes/s4_d03.png
+key tab
+shot build/kdes/s4_d04.png
+key tab
+shot build/kdes/s4_d05.png
+key tab
+shot build/kdes/s4_d06.png
+key tab
+shot build/kdes/s4_d07.png
+key tab
+shot build/kdes/s4_d08.png
+key tab
+shot build/kdes/s4_d09.png
+key tab
+shot build/kdes/s4_d10.png
+key tab
+shot build/kdes/s4_d11.png
+key tab
+shot build/kdes/s4_d12.png
+key tab
+shot build/kdes/s4_d13.png
+key tab
+shot build/kdes/s4_d14.png
+key tab
+shot build/kdes/s4_d15.png

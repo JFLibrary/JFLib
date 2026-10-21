@@ -1,0 +1,41 @@
+#!args --editor
+size 1480 1040
+theme light
+click tab:"Einfügen"
+click #1514
+click "Übernehmen"
+type "Rahmentabelle"
+click #3965
+click #3971
+click "Doppelt"
+click #3972
+key ctrl+a
+type "1.5"
+key tab
+click #3973
+key ctrl+a
+type "264B78"
+key tab
+click #3975
+click "Ausblenden"
+click #3979
+click "Gestrichelt"
+click #3983
+click "Gepunktet"
+click "Übernehmen"
+expect dialog:"Zellrahmen" missing
+click #3965
+expect #3971 text "Doppelt"
+expect #3973 text "264B78"
+expect #3975 text "Ausblenden"
+click "Abbrechen"
+click #3966
+click #3968
+key ctrl+v
+key ctrl+z
+key ctrl+y
+shot build/jfword-cell-borders-light.png
+theme dark
+scale 150
+shot build/jfword-cell-borders-dark-150.png
+expect_nowarn

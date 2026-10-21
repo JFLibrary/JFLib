@@ -1,0 +1,312 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Büro",
+  "description": "Ein kleines Büro mit Außenstelle",
+  "seed": 42,
+  "next_id": 41,
+  "devices": [
+    {
+      "id": 1,
+      "name": "Internet1",
+      "model": "cloud",
+      "x": 420,
+      "y": -260
+    },
+    {
+      "id": 2,
+      "name": "Modem1",
+      "model": "modem-ont",
+      "x": 420,
+      "y": -160
+    },
+    {
+      "id": 3,
+      "name": "FW1",
+      "model": "jf-fw",
+      "x": 420,
+      "y": -60
+    },
+    {
+      "id": 4,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 640,
+      "y": -60
+    },
+    {
+      "id": 5,
+      "name": "R2",
+      "model": "jf-r4",
+      "x": 860,
+      "y": -60
+    },
+    {
+      "id": 6,
+      "name": "MLS1",
+      "model": "jf-s24l3",
+      "x": 420,
+      "y": 60
+    },
+    {
+      "id": 7,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 200,
+      "y": 60
+    },
+    {
+      "id": 8,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 420,
+      "y": 180
+    },
+    {
+      "id": 9,
+      "name": "PC1",
+      "model": "pc",
+      "x": 200,
+      "y": 300
+    },
+    {
+      "id": 10,
+      "name": "PC2",
+      "model": "pc",
+      "x": 340,
+      "y": 300
+    },
+    {
+      "id": 11,
+      "name": "Printer1",
+      "model": "printer",
+      "x": 480,
+      "y": 300
+    },
+    {
+      "id": 12,
+      "name": "AP1",
+      "model": "jf-ap6e",
+      "x": 640,
+      "y": 300
+    },
+    {
+      "id": 13,
+      "name": "Laptop1",
+      "model": "laptop",
+      "x": 780,
+      "y": 400
+    }
+  ],
+  "links": [
+    {
+      "id": 20,
+      "a": {
+        "dev": 1,
+        "port": "wan0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "wan0"
+      },
+      "cable": "wan",
+      "kbps": 1000000,
+      "delay_ns": 5000000
+    },
+    {
+      "id": 21,
+      "a": {
+        "dev": 2,
+        "port": "lan0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0"
+      },
+      "cable": "copper",
+      "kbps": 1000000,
+      "delay_ns": 50
+    },
+    {
+      "id": 22,
+      "a": {
+        "dev": 3,
+        "port": "TenGigabitEthernet0/8"
+      },
+      "b": {
+        "dev": 6,
+        "port": "TenGigabitEthernet1/1/1"
+      },
+      "cable": "fiber-mm",
+      "kbps": 10000000,
+      "delay_ns": 500
+    },
+    {
+      "id": 23,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet0/1"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "kbps": 1000000,
+      "delay_ns": 50
+    },
+    {
+      "id": 24,
+      "a": {
+        "dev": 4,
+        "port": "Serial0/2/0"
+      },
+      "b": {
+        "dev": 5,
+        "port": "Serial0/2/0"
+      },
+      "cable": "serial",
+      "kbps": 2048,
+      "delay_ns": 2000000
+    },
+    {
+      "id": 25,
+      "a": {
+        "dev": 6,
+        "port": "TenGigabitEthernet1/1/2"
+      },
+      "b": {
+        "dev": 8,
+        "port": "TenGigabitEthernet1/1/1"
+      },
+      "cable": "fiber-mm",
+      "kbps": 10000000,
+      "delay_ns": 500
+    },
+    {
+      "id": 26,
+      "a": {
+        "dev": 6,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "b": {
+        "dev": 7,
+        "port": "eth0"
+      },
+      "cable": "copper",
+      "kbps": 1000000,
+      "delay_ns": 50
+    },
+    {
+      "id": 27,
+      "a": {
+        "dev": 6,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "b": {
+        "dev": 8,
+        "port": "GigabitEthernet1/0/24"
+      },
+      "cable": "copper-cross",
+      "kbps": 1000000,
+      "delay_ns": 50
+    },
+    {
+      "id": 28,
+      "a": {
+        "dev": 8,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "b": {
+        "dev": 9,
+        "port": "eth0"
+      },
+      "cable": "copper",
+      "kbps": 1000000,
+      "delay_ns": 50
+    },
+    {
+      "id": 29,
+      "a": {
+        "dev": 8,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "b": {
+        "dev": 10,
+        "port": "eth0"
+      },
+      "cable": "copper",
+      "kbps": 1000000,
+      "delay_ns": 50
+    },
+    {
+      "id": 30,
+      "a": {
+        "dev": 8,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "b": {
+        "dev": 11,
+        "port": "eth0"
+      },
+      "cable": "copper",
+      "kbps": 1000000,
+      "delay_ns": 50
+    },
+    {
+      "id": 31,
+      "a": {
+        "dev": 8,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "b": {
+        "dev": 12,
+        "port": "TwoGigabitEthernet0"
+      },
+      "cable": "copper",
+      "kbps": 1000000,
+      "delay_ns": 50
+    },
+    {
+      "id": 32,
+      "a": {
+        "dev": 12,
+        "port": "Dot11Radio1"
+      },
+      "b": {
+        "dev": 13,
+        "port": "wlan0"
+      },
+      "cable": "wireless",
+      "kbps": 2400000,
+      "delay_ns": 0
+    },
+    {
+      "id": 33,
+      "a": {
+        "dev": 10,
+        "port": "usb0"
+      },
+      "b": {
+        "dev": 8,
+        "port": "Console"
+      },
+      "cable": "console",
+      "kbps": 115,
+      "delay_ns": 0
+    }
+  ],
+  "notes": [
+    {
+      "id": 40,
+      "x": -60,
+      "y": -260,
+      "w": 240,
+      "h": 110,
+      "text": "Büro: ONT und Firewall zum Internet, L3-Switch im Kern, PoE-Switch für AP und PCs. Außenstelle über R1 und R2 (seriell)."
+    }
+  ],
+  "layout": {
+    "grid": 20
+  }
+}

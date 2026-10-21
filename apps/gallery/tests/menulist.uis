@@ -1,0 +1,110 @@
+# MI_LIST menus, command states beyond 128, checked rows with icons, F4 next to an F4
+# accelerator, accelerator texts, script key names and `focus` (U1)
+size 1000 1600
+theme light
+# ---- a dynamic list in a submenu: rows run CMD_RECENT0 + k
+click "Datei"
+click "Zuletzt geöffnet"
+expect "Zuletzt geöffnet" open
+expect menuitem:"urlaub.png" exists
+expect menuitem:"katze.jpg" exists
+expect #9041 exists
+expect menuitem:"Liste leeren" exists
+shot build/gal_menulist.png 0 0 600 330
+click "katze.jpg"
+expect menuitem:"katze.jpg" missing
+expect text:"Auswahl: 0   Verschoben: 0   Zuletzt: katze.jpg" exists
+# the app changes the list at run time
+cmd 9052
+cmd 9052
+click "Datei"
+click "Zuletzt geöffnet"
+expect menuitem:"bild3.png" exists
+expect menuitem:"bild4.png" exists
+expect #9043 exists
+key esc esc
+# keyboard: Alt+D, Up (the last row), Right opens the list, the arrows reach its rows
+move 900,1500
+key alt+d
+key up
+expect "Zuletzt geöffnet" focused
+key right
+expect #9040 focused
+key down down down
+expect #9043 focused
+key enter
+expect text:"Auswahl: 0   Verschoben: 0   Zuletzt: bild4.png" exists
+# an empty list shows its placeholder, disabled
+cmd 9050
+click "Datei"
+click "Zuletzt geöffnet"
+expect menuitem:"Keine Dateien" disabled
+expect menuitem:"urlaub.png" missing
+key esc esc
+# ---- the accelerator text order is Strg+Umschalt+Alt
+cmd 9052
+key ctrl+shift+alt+l
+click "Datei"
+click "Zuletzt geöffnet"
+expect menuitem:"Keine Dateien" exists
+key esc esc
+# ---- checked rows with an icon keep it: check column + icon column (WinUI)
+click "Ansicht"
+click "Design"
+expect menuitem:"Hell" exists
+expect menuitem:"Dunkel" exists
+shot build/gal_menucheck.png 0 0 700 330
+key esc esc
+# ---- F4: an F4 accelerator exists, so a focused combo box leaves F4 alone
+click #8001
+key esc
+expect #8001 focused
+key f4
+expect listitem:"Kreis" missing
+expect text:"Letzter Befehl: Eigenschaften (F4)   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+key alt+down
+expect #8001 open
+key esc
+# ---- key names: + - [ ] numpad, and focus S
+focus #8001
+expect #8001 focused
+key ctrl++
+expect text:"Letzter Befehl: Vergrößern   Form: Quadrat   Stärke: Mittel   Zoom: 110 %" exists
+key ctrl+-
+expect text:"Letzter Befehl: Verkleinern   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+key [
+expect text:"Letzter Befehl: Kleiner   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+key ]
+expect text:"Letzter Befehl: Größer   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+key ctrl+numadd
+expect text:"Letzter Befehl: Plus (Ziffernblock)   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+key shift+num5
+expect text:"Letzter Befehl: Fünf (Ziffernblock)   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+focus "Standard"
+expect "Standard" focused
+expect_nowarn
+# ---- a flat (tool bar) drop-down with the current tool's icon only; its flyout has
+# checked rows with icons (check column + icon column)
+size 1000 3100
+expect #7980 text "Pinsel"
+click #7980
+expect #7980 open
+expect menuitem:"Pinsel" checked
+shot build/gal_tooldrop.png 0 2780 400 320
+click menuitem:"Radierer"
+expect #7980 text "Radierer"
+key alt+down
+expect #7980 open
+key esc
+# ---- command states: 1000 set and read back, over the limit one UIWARN
+cmd 9058
+expect text:"Befehlszustände: 1000" exists
+expect_nowarn
+cmd 9059
+expect_warn
+# ---- the decimal separator is configurable (ui_decimal_sep)
+expect #7701 text "12,5"
+cmd 9060
+expect #7701 text "12.5"
+cmd 9060
+expect #7701 text "12,5"

@@ -1,0 +1,76 @@
+#!args --verify-dirty
+# the device palette (workspace/palette.rs): every catalog model as a tile in its category,
+# the expanders, the search over names and descriptions, the tooltip with title and ports
+theme light
+expect button:"Endgeräte (9)" open
+expect button:"Netzwerk (7)" open
+expect button:"Notizen (1)" open
+expect button:"PC" exists
+expect button:"Laptop" exists
+expect button:"Smartphone" exists
+expect button:"Tablet" exists
+expect button:"Drucker" exists
+expect button:"IP-Telefon" exists
+expect button:"IoT-Sensor" exists
+expect button:"IP-Kamera" exists
+expect button:"Smart-TV" exists
+expect button:"JF-S24P" exists
+expect button:"JF-S24L3" exists
+expect button:"JF-S48X" exists
+expect button:"JF-R4" exists
+expect button:"JF-R8" exists
+expect button:"Heimrouter" exists
+expect button:"Hub" exists
+# the closed categories open on a click
+expect button:"JF-FW" missing
+click button:"Endgeräte (9)"
+click button:"Netzwerk (7)"
+click button:"Sicherheit (1)"
+expect button:"JF-FW" exists
+click button:"WLAN und WAN (3)"
+expect button:"JF-AP6E" exists
+expect button:"Modem/ONT" exists
+expect button:"Internet" exists
+click button:"Server (3)"
+expect button:"Rack-Server 1U" exists
+expect button:"Rack-Server 1U SFP28" exists
+expect button:"Tower-Server" exists
+click button:"Verteilte Systeme (6)"
+expect button:"Load Balancer" exists
+expect button:"DB-Shard" exists
+expect button:"Cache" exists
+expect button:"Message Queue" exists
+expect button:"Traffic-Generator" exists
+expect button:"Container-Host" exists
+expect button:"Notiz" exists
+shot build/jfnetworker/catalog_open.png
+# the tooltip: description and ports
+move button:"JF-FW"
+wait 900
+expect text:"Next-Generation-Firewall 8× 1G, 2× 10G SFP+ · Ports: 8× 1G, 2× 10G SFP+, Konsole" exists
+# the search: names and descriptions, every category with a hit open
+click #16385
+type "router"
+expect button:"Netzwerk (3)" open
+expect button:"JF-R4" exists
+expect button:"JF-R8" exists
+expect button:"Heimrouter" exists
+expect button:"PC" missing
+expect button:"Endgeräte (9)" missing
+type "x"
+expect text:"Kein Gerät gefunden" exists
+key ctrl+a
+type "server"
+expect button:"Server (3)" open
+expect button:"Container-Host" missing
+key ctrl+a
+type "kamera"
+expect button:"IP-Kamera" exists
+expect button:"Endgeräte (1)" open
+key ctrl+a
+key backspace
+expect button:"Endgeräte (9)" exists
+expect button:"PC" missing
+expect button:"JF-S24P" missing
+expect button:"Sicherheit (1)" open
+expect_nowarn

@@ -1,0 +1,2 @@
+#!args --simd sse2 --test cpu
+# cpu_features with the --simd sse2 override must report no feature bits.

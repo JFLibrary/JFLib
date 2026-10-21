@@ -1,0 +1,187 @@
+# icons.txt -- icon set of styles/winui/assets/icons.bin.  Format: "Name codepoint(hex)" per line,
+# '#' starts a comment.  Names become IC_NAME constants (lib/ui/keys.rs, CamelCase -> UPPER_SNAKE:
+# ChevDown -> IC_CHEV_DOWN).  The codepoints are those of Segoe Fluent Icons, where the set came
+# from, and stay fixed; the comments below describe those former Segoe glyphs.  The glyphs now come
+# from Fluent UI System Icons: tools/icons_fluent.txt names one per icon (regenerate: see there).
+
+# --- DESIGN.md §3.3 base set ---------------------------------------------------------------
+Menu                E700
+Add                 E710
+Cancel              E711
+More                E712
+Settings            E713
+ChevDown            E70D
+ChevUp              E70E
+ChevLeft            E76B
+ChevRight           E76C
+Forward             E72A
+Back                E72B
+Up                  E74A
+Down                E74B
+Edit                E70F
+Search              E721
+Refresh             E72C
+Share               E72D
+Lock                E72E
+Unlock              E785
+Remove              E738
+Star                E734
+StarFill            E735
+Checkbox            E739
+CheckboxComposite   E73A
+CheckboxFill        E73B
+CheckboxIndet       E73C
+CheckMark           E73E
+FullScreen          E740
+BackToWindow        E73F
+Delete              E74D
+Save                E74E
+Play                E768
+Pause               E769
+Stop                E71A
+Undo                E7A7
+Redo                E7A6
+Warning             E7BA
+Error               E783
+Info                E946
+Help                E897
+ChromeClose         E8BB
+ChromeMin           E921
+ChromeMax           E922
+ChromeRestore       E923
+Copy                E8C8
+Cut                 E8C6
+Paste               E77F
+OpenFile            E8E5
+Document            E8A5
+Folder              E8B7
+FolderOpen          E838
+NewFolder           E8F4
+Download            E896
+Upload              E898
+Font                E8D2
+Bold                E8DD
+Italic              E8DB
+Underline           E8DC
+AlignLeft           E8E4
+AlignCenter         E8E3
+AlignRight          E8E2
+FontSize            E8E9
+FontIncrease        E8E8
+FontDecrease        E8E7
+Color               E790
+Brush               E771
+ZoomIn              E8A3
+ZoomOut             E71F
+SelectAll           E8B3
+Sort                E8CB
+Crop                E7A8
+Rotate              E7AD
+Eraser              E75C
+InkingTool          E76D
+Highlight           E7E6
+Photo               E91B
+Pointer             E8B0
+Home                E80F
+History             E81C
+Recent              E823
+Calendar            E787
+Calculator          E8EF
+Clear               E894
+Accept              E8FB
+Unknown             E9CE
+Filter              E71C
+BulletedList        E8FD
+Repair              E90F
+View                E890
+Power               E7E8
+Globe               E774
+OpenInNewWindow     E8A7
+Heart               EB51
+HeartFill           EB52
+Record              E7C8
+Switch              E8AB
+ViewAll             E8A9
+CircleRing          EA3A
+CircleFill          EA3B
+Shuffle             E8B1
+Eyedropper          EF3C    # verified: pipette
+CalligraphyPen      EDFB    # verified: fountain-pen nib
+
+# --- additions: Kritzel (all shapes verified on candidate sheets rendered from the .bin;
+#     "purpose guess" = the shape is verified, its intended meaning in the font is not) ---------
+Zoom                E71E    # magnifier without +/- (zoom tool)
+Pencil              EB7E    # plain pencil
+Crayon              ED63    # pencil/crayon tip (purpose guess: crayon/pencil brush variant)
+Drop                EB42    # filled drop (purpose guess: fill / paint bucket stand-in; the font has no bucket)
+TextBox             F683    # "A" in a dashed box (text tool)
+FontColor           E8D3    # "A" over a colour bar
+Strikethrough       EDE0
+SelectRect          E65C    # dashed rounded square (rectangular selection)
+Lasso               F1BE    # dashed free-form loop (free-form selection)
+Shapes              EB91    # two overlapping squares (purpose guess: shapes gallery)
+Diamond             E18A    # diamond outline
+Curve               F128    # S-shaped stroke (purpose guess: curve shape)
+Line                F462    # slanted stroke (purpose guess: line shape)
+RotateCw            E149    # clockwise circular arrow (rotate right)
+RotateCcw           ED21    # counter-clockwise circular arrow (rotate left)
+Resize              E93A    # small square + arrow out to a big square (resize and skew)
+SizeGrip            E788    # small triangle, bottom right (window/panel size grip)
+Layers              E81E    # three stacked layers
+FitPage             E9A6    # zoom to fit
+Grid                F232    # 3x3 grid (gridlines)
+Image               EB9F    # picture frame with mountain and sun
+Pictures            E8B9    # stacked pictures
+Page                E7C3    # blank page with folded corner
+SaveAs              E792    # floppy with pen
+Move                E7C2    # four-way arrows
+Contrast            E7A1    # half-filled circle
+Brightness          E706    # sun
+Sliders             E9E9    # two slider tracks (adjustments)
+Hide                ED1A    # crossed-out eye
+Print               E749
+
+# --- additions: general widgets ---------------------------------------------------------------
+RadioOff            ECCA    # radio button ring
+RadioOn             ECCB    # ring + dot
+RadioDot            ECCC    # radio dot only
+CheckboxCheckedFill E73D    # filled box with knocked-out check
+CaretLeft           EDD9    # solid rounded triangles (scroll bar arrows)
+CaretRight          EDDA
+CaretUp             EDDB
+CaretDown           EDDC
+ChevUpSmall         E96D    # bold small chevrons (spin buttons, number boxes)
+ChevDownSmall       E96E
+ChevLeftSmall       E96F
+ChevRightSmall      E970
+ChevUpDown          EC8F    # up + down chevron pair
+ToggleOff           F19E    # toggle switch pill, knob left
+ToggleOn            F19F    # knob right
+CancelCircle        EA39    # circled X (clear text box)
+ErrorFill           EB90    # filled circle with X
+CheckCircleFill     EC61    # filled circle with check
+AddCircle           ECC8    # circled plus
+RemoveCircle        ECC9    # circled minus
+Link                E71B
+Mail                E715
+Pin                 E718
+Volume              E767
+Person              E77B
+Lightbulb           E82F
+Flag                E7C1
+Bell                EA8F
+Backspace           E750
+Return              E751
+
+# --- PaintCraft (agent A0): chrome and tool placeholders -------------------------------------
+ClearSelection      E8E6    # dashed rectangle with arrow (Auswahl aufheben)
+Scan                E8FE    # scanner (Übernehmen > Von Scanner oder Kamera)
+Ruler               ED5E    # ruler (Lineale)
+DevTools            EC7A    # wrench + screwdriver (Werkzeuge window toggle)
+SaveCopy            EA35    # two disks (Alles speichern)
+MagicSelect         EB1D    # dashed square with sparkle (Zauberstab placeholder)
+TouchPointer        F271    # pointing hand (Ausschnitt verschieben placeholder)
+
+# --- PaintCraft (agent A2): history window -------------------------------------------------------
+Previous            E892    # bar + left triangle (Verlauf: Zum Anfang / Alles rückgängig machen)
+Next                E893    # right triangle + bar (Verlauf: Zum Ende / Alles wiederherstellen)

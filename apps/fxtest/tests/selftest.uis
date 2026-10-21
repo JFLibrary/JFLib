@@ -1,0 +1,3 @@
+#!args --selftest
+# Known-answer checks of the straight / blend-mode / tmask / flood kernels.  The whole test runs
+# in on_init and ends the process with exit code 0 (passed) or 1; nothing below is executed.

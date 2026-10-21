@@ -1,0 +1,16 @@
+#!args --verify-dirty
+# screenshots (ui/diagram.rs): light and dark with two selected nodes and a selected curve
+# (its waypoint and middle handles), a hovered node with its ports, the minimap; 150 %
+theme light
+click listitem:"N8"
+drag listitem:"N9" listitem:"N9" 1 shift
+drag 710,236 710,236 1 shift
+expect text:"Auswahl: 3" exists
+move listitem:"N15"
+expect listitem:"N15" hover
+shot build/diagramtest/light.png
+theme dark
+shot build/diagramtest/dark.png
+scale 150
+shot build/diagramtest/dark150.png
+expect_nowarn

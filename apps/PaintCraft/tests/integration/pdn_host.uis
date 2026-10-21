@@ -1,0 +1,41 @@
+#!args --pdn-plugin "C:/Program Files/paint.net/PaintDotNet.Effects.Legacy.dll" --pdn-type PaintDotNet.Effects.InvertColorsEffect --pdn-defaults
+# Runner supplies the plugin path explicitly as one argv element (spaces preserved).
+size 1280 800
+theme light
+cmd 901 65537
+expect #9900 text "FFFFFFFF"
+cmd 444
+sync
+expect window 24800 closed
+cmd 901 65537
+expect #9900 text "FF000000"
+expect #4391 text "Paint.NET-Plugin"
+key ctrl+z
+cmd 901 65537
+expect #9900 text "FFFFFFFF"
+key ctrl+y
+cmd 901 65537
+expect #9900 text "FF000000"
+key ctrl+z
+# The original effect receives a selection; PaintCraft retains fractional coverage.
+cmd 982 2621500
+cmd 983 13107460
+cmd 984 0
+cmd 981 1
+cmd 444
+sync
+cmd 901 655370
+expect #9900 text "FFFFFFFF"
+cmd 901 7864480
+expect #9900 text "FF000000"
+cmd 901 4128998
+expect #9900 text "FF484848"
+key ctrl+z
+cmd 901 7864480
+expect #9900 text "FFFFFFFF"
+# Cancelling the separate process leaves the document intact.
+cmd 444
+click #0x90020
+sync
+cmd 901 7864480
+expect #9900 text "FFFFFFFF"

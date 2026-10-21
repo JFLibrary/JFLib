@@ -1,0 +1,54 @@
+#!args --verify-dirty
+# links: Ctrl+K opens the link flyout (the url of the link at the caret, else https://), Enter
+# or OK sets it on the selection, "Link entfernen" removes it, without a selection the url is
+# inserted as linked text; read-only a click opens a link (richtext_link), else Ctrl+click
+size 1000 680
+click "Leeren"
+type "Siehe Website hier"
+key ctrl+left
+key shift+end
+key ctrl+k
+expect #2003 focused
+expect #2003 text "https://"
+type "example.org"
+key enter
+expect text:"doc: Siehe Website [l=https://example.org]hier[/]" exists
+expect #2000 focused
+# the flyout shows the link at the caret; remove it
+key left
+key ctrl+k
+expect #2003 text "https://example.org"
+click "Link entfernen"
+expect text:"doc: Siehe Website hier" exists
+expect #2000 focused
+# Esc closes the flyout without a change
+key ctrl+k
+key esc
+expect #2003 missing
+expect text:"doc: Siehe Website hier" exists
+# a url inserted as linked text at the caret
+click #2000
+key end
+key ctrl+k
+type "jflib.test"
+click "OK"
+expect text:"doc: Siehe Website hier[l=https://jflib.test]https://jflib.test[/]" exists
+# typing after a link does not extend it
+type " ok"
+expect text:"doc: Siehe Website hier[l=https://jflib.test]https://jflib.test[/] ok" exists
+# Ctrl+click opens it
+drag link:"https://jflib.test" link:"https://jflib.test" ctrl
+expect text:"link: https://jflib.test" exists
+# the toolbar's link button shows the state at the caret
+key home
+expect "Link" unchecked
+# read-only: a plain click opens a link
+click "Leeren"
+type "Ein "
+key ctrl+k
+type "a.example"
+key enter
+click "Nur lesen"
+click link:"https://a.example"
+expect text:"link: https://a.example" exists
+expect_nowarn

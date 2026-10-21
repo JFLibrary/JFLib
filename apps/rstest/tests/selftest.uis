@@ -1,0 +1,5 @@
+#!args --selftest
+# rstest --selftest runs from on_init and exits (0 = every invariant held); see
+# apps/rstest/src/ops_self.s.  The numpy comparisons live in tools/resample_check.py,
+# tools/xform_check.py and tools/gradient_check.py.
+expect #none visible

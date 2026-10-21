@@ -1,0 +1,7 @@
+#!args --hyphen --hyph-lang en
+# hyph_language("en"): no English dictionary in app://hyphen, so TX_HYPHENATE / TB_HYPHENATE
+# change nothing (4 lines, like the text without the flag); soft hyphens still break
+expect text:"Muster: keine" exists
+expect text:"Mit: Die Donaudampfschifffahrtsgesellschaftskapitäne lesen Wörterbücher zur Rechtschreibung." value 4
+expect text:"Weich: Die Do­nau­dampf­schiff­fahrts­ge­sell­schafts­ka­pi­tä­ne lesen." value 2
+expect_nowarn

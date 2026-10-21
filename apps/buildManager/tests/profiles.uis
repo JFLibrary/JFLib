@@ -1,0 +1,21 @@
+#!args --fixture apps/buildManager/tests/fixture.json
+click #2101
+click "Kritzel Release"
+expect "Geprüftes Release" exists
+expect "2 von 5 ausgewählt" exists
+expect #2111 value 1
+expect #2112 value 1
+expect #2141 value 8
+click #2003
+click #2200
+click "Dunkel · 150 %"
+expect #2212 value 150
+click "Startprofil speichern"
+expect #120 exists
+click #2412
+click "App starten"
+expect "Aufgelöster Programmaufruf:" exists
+expect #2501 text "Kritzel · win · winui\n\n[\"build/manager/artifacts/vorschau-01/Kritzel.exe\",\"--theme\",\"dark\",\"--scale\",\"150\"]"
+click "Zurück"
+click "Erneut ausführen"
+expect #120 exists

@@ -1,0 +1,4 @@
+# permcli's further executables (build_rs.py, section "app-bins"): NAME ENTRY cli|gui
+permcli-own      own/main.rs      cli    # rt::main!, its own PERMISSIONS.permcli-own
+permcli-shared   shared/main.rs   cli    # rt::main!, the app's PERMISSIONS
+permcli-gui      gui/main.rs      gui    # ui::main!, the app's PERMISSIONS

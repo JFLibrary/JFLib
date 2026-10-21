@@ -1,0 +1,39 @@
+#!args --editor
+# First-line and hanging indentation remain editable, undoable and visible on paper.
+size 1240 840
+theme light
+type "Wissenschaftliche Texte brauchen klare Absatzformate. Quellen und lange Literaturangaben verwenden oft einen hängenden Einzug. Die erste Zeile beginnt dabei weiter links als die folgenden Zeilen."
+click #2874
+click #856
+click "Erste Zeile"
+expect #857 exists
+click "Übernehmen"
+expect dialog:"Absatz formatieren" missing
+shot build/jfword-indent-firstline.png
+click #2874
+expect "Erste Zeile" exists
+click #853
+key ctrl+a
+type "36"
+key tab
+click #856
+click "Hängend"
+click #857
+key ctrl+a
+type "36"
+key tab
+click "Übernehmen"
+expect dialog:"Absatz formatieren" missing
+shot build/jfword-indent-hanging.png
+cmd 5
+click #2874
+expect "Erste Zeile" exists
+click "Abbrechen"
+cmd 6
+click #2874
+expect "Hängend" exists
+click "Abbrechen"
+theme dark
+scale 150
+shot build/jfword-indent-hanging-dark-150.png
+expect_nowarn

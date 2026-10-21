@@ -1,0 +1,23 @@
+#!args --library-dir build/jfword-library-recovery-ui --editor --structure --sources --navigation
+# Existing corruption must remain an error until the reviewed recovery is confirmed.
+cmd 18
+expect dialog:"Quellenbibliothek" exists
+expect #1104 disabled
+expect #1108 disabled
+expect #1113 enabled
+click #1113
+expect "2 Quellen in der letzten Sicherung" exists
+expect #1160 text "Notizen & Methoden · Lovelace · 1843 · ID 17"
+click "Zurück"
+expect #1104 disabled
+click #1113
+click "Sicherung wiederherstellen"
+expect "2 von 2 Bibliotheksquellen" exists
+expect #1104 enabled
+expect #1102 text "Notizen & Methoden · Lovelace · 1843 · ID 17"
+expect #1110 disabled
+click "Schließen"
+cmd 1
+expect dialog:"Ungespeicherte Änderungen" missing
+expect "Neues Dokument" exists
+expect_nowarn

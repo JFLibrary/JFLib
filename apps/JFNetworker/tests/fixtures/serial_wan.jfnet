@@ -1,0 +1,127 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Serielle Strecke",
+  "description": "R1 und R2 über eine serielle Leitung (2 Mbit/s, HDLC); statische Routen zu den LANs.",
+  "seed": 5,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 192.168.1.10/24 dev eth0\nip route add default via 192.168.1.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 160,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 192.168.1.1 255.255.255.0\n no shutdown\n!\ninterface Serial0/2/0\n ip address 10.0.12.1 255.255.255.252\n no shutdown\n!\nip route 192.168.2.0 255.255.255.0 10.0.12.2\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "R2",
+      "model": "jf-r4",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 192.168.2.1 255.255.255.0\n no shutdown\n!\ninterface Serial0/2/0\n ip address 10.0.12.2 255.255.255.252\n no shutdown\n!\nip route 192.168.1.0 255.255.255.0 Serial0/2/0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "PC2",
+      "model": "pc",
+      "x": 480,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 192.168.2.10/24 dev eth0\nip route add default via 192.168.2.1\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 2,
+        "port": "Serial0/2/0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "Serial0/2/0"
+      },
+      "cable": "serial",
+      "cable_fixed": false,
+      "kbps": 2048,
+      "delay_ns": 2000000,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

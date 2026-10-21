@@ -1,0 +1,171 @@
+# multi-window runtime (window agent): tool window, modal dialog window, nested dialog,
+# key routing, popups inside a window, screenshots of windows and of the desktop
+size 1000 1450
+theme light
+expect window 7600 closed
+expect window 0 active
+# ---- open / close: the tool window keeps the main window active
+click "Werkzeugfenster"
+expect window 7600 open
+expect window 7600 visible
+expect window 0 active
+expect window 7600 rect 24 48 240 228
+expect "Werkzeugfenster" checked
+expect titlebar:"Werkzeuge" exists
+close window 7600
+expect window 7600 closed
+expect "Werkzeugfenster" unchecked
+click "Werkzeugfenster"
+expect window 7600 open
+# the close button of the title bar
+click #0xFFFF7811
+expect window 7600 closed
+click "Werkzeugfenster"
+# ---- values cross windows: the slider lives in the tool window, the main window shows it
+click #7601
+expect #7601 value 51
+expect text:"Pinselgröße: 51   Name:    Form: Rund   Dialog: 0" exists
+# ---- typing: a text box makes the tool window the keyboard window
+click #7602
+expect window 7600 active
+expect #7602 focused
+type "Borste"
+expect #7602 text "Borste"
+expect text:"Pinselgröße: 51   Name: Borste   Form: Rund   Dialog: 0" exists
+# ---- keys of a tool window without a focused text box go to the main window, except
+# those its focused widget uses (U3): the slider takes Right, Ctrl+S goes on
+click #7601
+expect window 7600 active
+key ctrl+s
+expect text:"Letzter Befehl: Speichern   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+key right
+expect #7601 value 52
+key left
+expect #7601 value 51
+# ... but a focused text box keeps them (Ctrl+A selects its text: no accelerator)
+click #7602
+key ctrl+a backspace
+expect #7602 text ""
+expect text:"Letzter Befehl: Speichern   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+type "Borste"
+# ---- the combo box list opens over the box; it may leave the tool window (U3: OS popup
+# windows / the virtual desktop), so it is no longer pushed up into it
+click #7603
+expect #7603 open
+expect listitem:"Rund" rect 14 173 216 32
+expect listitem:"Hart" rect 14 269 216 32
+shot build/w/windows_combo.png window 7600
+click listitem:"Hart"
+expect #7603 value 3
+expect text:"Pinselgröße: 51   Name: Borste   Form: Hart   Dialog: 0" exists
+# ---- tooltip in the tool window
+move #7604
+wait 600
+expect text:"Setzt Größe und Form zurück" exists
+click #7604
+expect #7601 value 20
+expect #7603 value 0
+# ---- modal dialog window: centred on the main window, the other windows are inert
+click "Dialogfenster…"
+expect window 7620 open
+expect window 7620 modal
+expect window 7620 active
+expect window 7620 rect 310 591 380 236
+expect dialog:"Bild bearbeiten" missing
+expect titlebar:"Bild bearbeiten" exists
+shot build/w/windows_desktop.png desktop
+shot build/w/windows_dialog.png window 7620
+click "Standard"
+expect text:"Wert: 40 %   Klicks: 0" exists
+click #7604
+click #7601
+expect #7601 value 20
+click "Kanten glätten"
+expect #7621 checked
+# keys of the main window's shortcuts do not fire (they go to the dialog, no accelerators)
+key ctrl+0
+expect text:"Letzter Befehl: Speichern   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+# ---- a dialog opened by the dialog: nested, modal over it
+click "Weitere Optionen…"
+expect window 7630 open
+expect window 7630 modal
+expect window 7630 active
+expect window 7620 visible
+click "Kanten glätten"
+expect #7621 checked
+click "Farbprofil einbetten"
+expect #7631 checked
+shot build/w/windows_nested.png desktop
+key esc
+expect window 7630 closed
+expect window 7620 active
+expect window 7620 modal
+# OK closes the dialog with result 1
+click "OK"
+expect window 7620 closed
+expect window 0 active
+expect text:"Pinselgröße: 20   Name: Borste   Form: Rund   Dialog: 1" exists
+# shown again: no focus inside, so Enter is the primary button
+click "Dialogfenster…"
+expect #7621 checked
+key enter
+expect window 7620 closed
+expect text:"Pinselgröße: 20   Name: Borste   Form: Rund   Dialog: 1" exists
+click "Dialogfenster…"
+key esc
+expect window 7620 closed
+expect text:"Pinselgröße: 20   Name: Borste   Form: Rund   Dialog: 3" exists
+# the main window works again
+click "Standard"
+expect text:"Wert: 40 %   Klicks: 1" exists
+# ---- placement: moving / resizing like the user does
+movewin 7600 300 200
+expect window 7600 rect 300 200 240 228
+resizewin 7600 320 100
+expect window 7600 rect 300 200 320 228
+expect #7601 rect 13 69 296 32
+activate 7600
+expect window 7600 active
+activate main
+expect window 0 active
+# ---- freed and created again: the app's WINRECT keeps the placement
+cmd 9102
+expect window 7600 closed
+click "Werkzeugfenster"
+expect window 7600 open
+expect window 7600 rect 300 200 320 228
+expect #7602 text "Borste"
+# ---- a window at another scale keeps its DIP geometry
+scale 150 window 7600
+expect window 7600 rect 300 200 320 228
+expect #7601 rect 13 69 296 32
+shot build/w/windows_tool150.png window 7600
+scale 100 window 7600
+# ---- ui_focus finds the widget in its window and activates that window
+click "Standard"
+expect window 0 active
+expect "Standard" focused
+cmd 9103
+expect window 7600 active
+expect #7602 focused
+expect "Standard" focused
+# (keyboard focus selects the whole text: typing replaces it)
+type "Haar"
+expect #7602 text "Haar"
+expect text:"Pinselgröße: 20   Name: Haar   Form: Rund   Dialog: 3" exists
+activate main
+# ---- selector scope
+window 7600
+expect button:"Zurücksetzen" exists
+expect "Standard" missing
+window main
+expect "Zurücksetzen" missing
+window any
+expect_nowarn
+# ---- #id selectors must be unique across windows
+cmd 9101
+expect #100 exists
+expect_warn
+cmd 9101
+expect #100 exists
+expect_nowarn

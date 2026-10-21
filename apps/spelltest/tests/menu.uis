@@ -1,0 +1,40 @@
+#!args --verify-dirty
+# the suggestion menu: a right click on a marked word, a suggestion replaces it (one undo step
+# when the box has the focus), Esc closes the menu, a right click on a correct word opens none
+theme light
+# "Hasu" in the box "Betreff" (not focused)
+rclick 70,136
+expect menuitem:"Haus" exists
+expect menuitem:"Zum Wörterbuch hinzufügen" exists
+expect menuitem:"Ignorieren" exists
+shot build/spell/menu.png
+key esc
+expect menuitem:"Haus" missing
+expect text:"Fehler Betreff: Hasu" exists
+rclick 70,136
+click menuitem:"Haus"
+expect menuitem:"Haus" missing
+expect #110 text "Die Haus-Tür"
+expect text:"Fehler Betreff: -" exists
+# a correct word: no menu
+rclick 110,136
+expect menuitem:"Ignorieren" missing
+# "Arbit" in the focused multi-line box: replaced, then undone
+click 400,260
+expect #111 focused
+rclick 120,205
+expect menuitem:"Arbeit" exists
+click menuitem:"Arbeit"
+expect text:"Fehler Nachricht: Strasse" exists
+expect #111 focused
+key ctrl+z
+expect text:"Fehler Nachricht: Arbit, Strasse" exists
+key ctrl+y
+expect text:"Fehler Nachricht: Strasse" exists
+# "Strasse": the REP rule ss -> ß comes first
+rclick 200,205
+expect menuitem:"Straße" exists
+shot build/spell/menu_multi.png
+click menuitem:"Straße"
+expect text:"Fehler Nachricht: -" exists
+expect_nowarn

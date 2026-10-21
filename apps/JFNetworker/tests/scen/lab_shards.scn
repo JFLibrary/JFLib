@@ -1,0 +1,47 @@
+# Lastgenerator, Loadbalancer, drei Webserver und drei KV-Shards mit Replikationsfaktor 2.
+# Zuerst schreibt "fill" 200 Schlüssel (k0 bis k199) über LB1 und die Webserver in den
+# KV-Speicher; jeder Schlüssel liegt auf zwei der drei Knoten. Ab 2 s schickt "load" 16 s lang
+# 100 Anfragen pro Sekunde (Poisson-Ankünfte): vier von fünf lesen einen Schlüssel (die
+# ersten 40 am häufigsten), eine schreibt einen neuen Wert. Bei 6 s fällt KV2 aus. Die Clients
+# in den Webservern warten auf ihn höchstens eine Sekunde und fragen dann das nächste
+# Replikat (nach 200 ms ohne Verbindungsaufbau, nach 1 s auf einer offenen Verbindung); KV1
+# und KV3 merken den Ausfall an der ersten unbeantworteten Anfrage oder den fehlenden
+# Heartbeats und führen die Schreibvorgänge, deren Leader KV2 war, selbst. Bei 12 s ist KV2
+# wieder da, mit dem Stand von 6 s auf seiner Disk; was er verpasst hat, bringt Read Repair
+# beim Lesen nach. Keine Anfrage geht verloren, nur das 99. Perzentil steigt. Die Werte in
+# Klammern sind gemessen.
+run 1500ms
+expect GEN svc fill metric ok == 200
+expect LB1 svc lb metric backends_up == 3
+LB1: lbctl
+KV1: kvctl
+at 6s fault power KV2
+run 3s
+KV1: kvctl
+expect KV1 svc kv metric members_up == 2
+at 12s heal power KV2
+run 7s
+expect GEN svc load metric sent > 1400
+expect GEN svc load metric failed == 0
+expect GEN svc load metric http_errors == 0
+expect GEN svc load metric p50_us < 5000
+expect GEN svc load metric p99_us > 150000
+expect GEN svc load metric max_us > 1000000
+expect LB1 svc lb metric errors == 0
+expect LB1 svc lb metric b1_requests > 500
+expect LB1 svc lb metric b2_requests > 500
+expect LB1 svc lb metric b3_requests > 500
+expect WEB1 svc web metric failovers > 0
+expect WEB2 svc web metric failovers > 0
+expect WEB3 svc web metric failovers > 0
+expect WEB1 svc web metric backend_errors == 0
+expect KV1 svc kv metric member_downs == 1
+expect KV3 svc kv metric member_downs == 1
+expect KV1 svc kv metric members_up == 3
+expect KV2 svc kv metric repaired > 0
+expect KV2 svc kv metric stale_reads > 0
+expect hops http > 10000
+LB1: lbctl
+KV2: kvctl
+KV2: kvctl where k7
+print "Ein Shard fiel aus, keine Anfrage ging verloren"

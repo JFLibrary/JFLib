@@ -1,0 +1,2 @@
+#!args --self-test --fixture build/jfword-ui-roundtrip.docx
+# Tests the real library codecs and document graph; exit status is the test result.

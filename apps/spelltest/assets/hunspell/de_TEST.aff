@@ -1,0 +1,127 @@
+# de_TEST -- a small German test dictionary of JFLib's spelltest, written for its tests (not a
+# real dictionary, only about 60 words): affixes with strip, conditions and cross products, two
+# suffixes, NEEDAFFIX (on roots and on a prefix), CIRCUMFIX, FORBIDDENWORD, KEEPCASE, NOSUGGEST,
+# compounds with COMPOUNDBEGIN / MIDDLE / END, a Fugen-s (ONLYINCOMPOUND), nouns in lower case
+# inside compounds (a prefix with COMPOUNDPERMITFLAG; as in de_DE_frami a lower case entry for a
+# plural last part), FORCEUCASE, CHECKSHARPS, WORDCHARS, REP, MAP, KEY, TRY.  Every expectation
+# of engine.rs on it agrees with Hunspell 1.7.
+SET UTF-8
+LANG de_DE
+TRY esianrtolcdugmphbfwkzvüäößjyxqESIANRTOLCDUGMPHBFWKZVÜÄÖ
+WORDCHARS ß-.
+KEY qwertzuiopü|asdfghjklöä|yxcvbnm
+CHECKSHARPS
+FORBIDDENWORD !
+NEEDAFFIX n
+CIRCUMFIX u
+ONLYINCOMPOUND o
+KEEPCASE k
+NOSUGGEST s
+COMPOUNDBEGIN x
+COMPOUNDMIDDLE y
+COMPOUNDEND z
+COMPOUNDPERMITFLAG c
+FORCEUCASE W
+COMPOUNDMIN 3
+CHECKCOMPOUNDDUP
+
+REP 4
+REP ss ß
+REP ß ss
+REP ph f
+REP ie i
+
+MAP 3
+MAP aä
+MAP oö
+MAP uü
+
+# a noun as the middle or last part of a compound: its first letter in lower case (the compound
+# flags of a prefix count when it stands alone; with a suffix only the suffix's and the root's
+# do).  A compound ending with a noun must not be all lower case: FORCEUCASE on the nouns.
+PFX - Y 29
+PFX - A a/yzoc A
+PFX - B b/yzoc B
+PFX - C c/yzoc C
+PFX - D d/yzoc D
+PFX - E e/yzoc E
+PFX - F f/yzoc F
+PFX - G g/yzoc G
+PFX - H h/yzoc H
+PFX - I i/yzoc I
+PFX - J j/yzoc J
+PFX - K k/yzoc K
+PFX - L l/yzoc L
+PFX - M m/yzoc M
+PFX - N n/yzoc N
+PFX - O o/yzoc O
+PFX - P p/yzoc P
+PFX - Q q/yzoc Q
+PFX - R r/yzoc R
+PFX - S s/yzoc S
+PFX - T t/yzoc T
+PFX - U u/yzoc U
+PFX - V v/yzoc V
+PFX - W w/yzoc W
+PFX - X x/yzoc X
+PFX - Y y/yzoc Y
+PFX - Z z/yzoc Z
+PFX - Ä ä/yzoc Ä
+PFX - Ö ö/yzoc Ö
+PFX - Ü ü/yzoc Ü
+
+# un- before adjectives
+PFX U Y 1
+PFX U 0 un .
+
+# ge- of the past participle: only with -en / -t (CIRCUMFIX; a prefix alone may have it, so
+# NEEDAFFIX too: never without a suffix)
+PFX G Y 1
+PFX G 0 ge/un .
+
+# plural of nouns
+SFX N Y 2
+SFX N 0 n e
+SFX N 0 en [^e]
+
+SFX E Y 1
+SFX E 0 e .
+
+SFX R Y 1
+SFX R 0 er .
+
+# the Fugen-s: only inside compounds, at the beginning or in the middle
+SFX F Y 1
+SFX F 0 s/xyoc .
+
+# endings of adjectives
+SFX A Y 5
+SFX A 0 e .
+SFX A 0 en .
+SFX A 0 er .
+SFX A 0 es .
+SFX A 0 em .
+
+# the comparative; the endings of A may follow it (two suffixes)
+SFX C Y 1
+SFX C 0 er/A .
+
+# dunkel -> dunkle, dunklen, dunkler (strip and condition)
+SFX D Y 3
+SFX D el le el
+SFX D el len el
+SFX D el ler el
+
+# verb endings (the stems have NEEDAFFIX)
+SFX V Y 4
+SFX V 0 e .
+SFX V 0 st .
+SFX V 0 t .
+SFX V 0 en .
+
+# the participle endings with ge- (CIRCUMFIX)
+SFX P Y 1
+SFX P 0 en/u .
+
+SFX Q Y 1
+SFX Q 0 t/u .

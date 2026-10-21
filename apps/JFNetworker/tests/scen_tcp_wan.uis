@@ -1,0 +1,6 @@
+#!args apps/JFNetworker/tests/fixtures/tcp_wan.jfnet --scenario apps/JFNetworker/tests/scen/tcp_wan.scn --golden apps/JFNetworker/tests/scen/tcp_wan.report
+# golden scenario: TCP over a slow, lossy line behind a router: the SYN IOS drops while it asks
+# ARP, 1 MB to a discard server and 20 kB of echo with retransmissions.  The GUI program runs
+# tests/scen/tcp_wan.scn on tests/fixtures/tcp_wan.jfnet without a window and ends with the
+# report, which must equal tests/scen/tcp_wan.report byte for byte on every target (the script
+# itself is not run)

@@ -1,0 +1,54 @@
+#!args --verify-dirty
+# connecting (ui/diagram.rs): with Auswahl a drag out of a port of the hovered node connects
+# (quick) onto a node or a port; with Verbinden a drag from node to node or two clicks; no
+# edge onto the own node, onto the background or after Esc
+theme light
+expect text:"Kanten: 21" exists
+# N26 (262,588 96x48) has no edges: right port 358,612, bottom port 310,636
+drag 358,612 listitem:"N27"
+expect text:"Kanten: 22" exists
+expect text:"Ereignis: Verbunden: N26-N27 (schnell)" exists
+# port to port
+drag 310,636 470,636
+expect text:"Kanten: 23" exists
+# onto the own node, onto the background: nothing
+drag 262,612 listitem:"N26"
+expect text:"Ereignis: Verbinden abgebrochen" exists
+drag 310,588 310,680
+expect text:"Ereignis: Verbinden abgebrochen" exists
+expect text:"Kanten: 23" exists
+# the rubber band while dragging out of N27's right port
+down 518,612
+move 560,580
+move 600,560
+expect text:"Ereignis: Verbinden …" exists
+shot build/diagramtest/connect_drag.png
+move listitem:"N28"
+expect text:"Ereignis: Verbinden mit N28" exists
+up
+expect text:"Kanten: 24" exists
+# the connect tool: node to node, a curve
+click "Verbinden"
+expect button:"Verbinden" checked
+click "Kurve"
+drag listitem:"N13" listitem:"N14"
+expect text:"Kanten: 25" exists
+expect text:"Ereignis: Verbunden: N13-N14" exists
+# two clicks
+click listitem:"N20"
+click listitem:"N21"
+expect text:"Kanten: 26" exists
+expect text:"Ereignis: Verbunden: N20-N21" exists
+# Esc after the first click
+click listitem:"N22"
+move listitem:"N23"
+expect text:"Ereignis: Verbinden mit N23" exists
+key esc
+expect text:"Ereignis: Verbinden abgebrochen" exists
+click listitem:"N23"
+# a press outside the canvas ends a started connection
+click "Auswahl"
+expect text:"Ereignis: Verbinden abgebrochen" exists
+expect text:"Kanten: 26" exists
+expect_nowarn
+shot build/diagramtest/connect.png

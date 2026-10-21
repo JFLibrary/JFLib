@@ -1,0 +1,80 @@
+#!args --verify-dirty
+# typing in the code editor: Enter keeps the indentation (one level more after an opener, the
+# closer on a line of its own), a closer on a blank line goes out a level, Backspace in leading
+# blanks back to the tab stop, Home toggles first non-blank / column 0, Tab / Shift+Tab (the
+# block), Ctrl+/ comments, Alt+Up / Down moves lines, Ctrl+C / X without a selection take the
+# line, tabs instead of blanks, tab width 8
+size 1000 680
+click tab:"Code"
+expect #3000 focused
+key ctrl+a
+key delete
+expect #3000 text ""
+type "fn main() {"
+key enter
+expect #3000 text "fn main() {\n    "
+expect text:"pos: 2:5" exists
+type "if x {}"
+key left
+key enter
+expect #3000 text "fn main() {\n    if x {\n        \n    }"
+expect text:"pos: 3:9" exists
+type "a();"
+key enter
+type "}"
+expect #3000 text "fn main() {\n    if x {\n        a();\n    }\n    }"
+key ctrl+z
+expect #3000 text "fn main() {\n    if x {\n        a();\n        \n    }"
+expect text:"pos: 4:9" exists
+# Backspace in blanks: to the previous tab stop, then joins the line
+key backspace
+expect #3000 text "fn main() {\n    if x {\n        a();\n    \n    }"
+key backspace
+key backspace
+expect #3000 text "fn main() {\n    if x {\n        a();\n    }"
+# Home: the first non-blank, then column 0
+key home
+expect text:"pos: 3:9" exists
+key home
+expect text:"pos: 3:1" exists
+# block indent / unindent
+key ctrl+a
+key shift+tab
+expect #3000 text "fn main() {\nif x {\n    a();\n}"
+key tab
+expect #3000 text "    fn main() {\n    if x {\n        a();\n    }"
+key shift+tab
+# comments on and off
+key ctrl+/
+expect #3000 text "// fn main() {\n// if x {\n//     a();\n// }"
+key ctrl+/
+expect #3000 text "fn main() {\nif x {\n    a();\n}"
+# moving lines
+key ctrl+home
+key alt+down
+expect #3000 text "if x {\nfn main() {\n    a();\n}"
+expect text:"pos: 2:1" exists
+key alt+up
+expect #3000 text "fn main() {\nif x {\n    a();\n}"
+# Ctrl+C / Ctrl+X without a selection: the whole line
+key ctrl+c
+key ctrl+end
+key enter
+key ctrl+v
+expect #3000 text "fn main() {\nif x {\n    a();\n}\nfn main() {\n"
+key ctrl+x
+expect #3000 text "fn main() {\nif x {\n    a();\n}\nfn main() {"
+# Tab at the caret, then tabs instead of blanks and the tab width
+key home
+key tab
+expect #3000 text "fn main() {\nif x {\n    a();\n}\n    fn main() {"
+click "Tabs"
+focus #3000
+key shift+tab
+key tab
+expect #3000 text "fn main() {\nif x {\n    a();\n}\n\tfn main() {"
+expect text:"pos: 5:5" exists
+click "Tabweite 8"
+focus #3000
+expect text:"pos: 5:9" exists
+expect_nowarn

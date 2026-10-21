@@ -1,0 +1,36 @@
+#!args --editor
+# Direct cell -> footnote -> anchor, conversion/removal, undo and DPI/theme rendering.
+size 1440 1040
+theme light
+scale 100
+click tab:"Einfügen"
+click #1514
+click "Übernehmen"
+type "Messwert α"
+cmd 23
+type "Zellnote β mit wissenschaftlicher Erklärung."
+expect textbox:"Zellnote β mit wissenschaftlicher Erklärung." exists
+cmd 25
+expect "Textstelle der Anmerkung ausgewählt" exists
+cmd 24
+type "Ergänzender Nachweis Ω."
+expect textbox:"Ergänzender Nachweis Ω." exists
+cmd 26
+expect "In Fußnote umgewandelt · Nummerierung aktualisiert" exists
+cmd 5
+expect textbox:"Ergänzender Nachweis Ω." exists
+cmd 27
+expect dialog:"Anmerkung entfernen" exists
+click button:"Anmerkung entfernen"
+expect "Anmerkung und Textverweis entfernt" exists
+cmd 5
+cmd 49
+click button:"Endnote 1"
+expect textbox:"Ergänzender Nachweis Ω." exists
+shot build/jfword-table-notes-light.png
+theme dark
+scale 150
+shot build/jfword-table-notes-dark-150.png
+size 1000 800
+scale 200
+expect_nowarn

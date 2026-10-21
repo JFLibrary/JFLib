@@ -1,0 +1,5 @@
+#!args --test recent
+# (Rust only) plattest --test recent: the system's recent files (lib/plat/recent.rs) through a
+# scratch .xbel (jfgui_RECENT) on every OS, Linux's default file in a scratch XDG_DATA_HOME; the
+# real Windows shell only by hand (--test recent-win). The whole test runs before the UI starts
+# and ends the process with the number of failures.

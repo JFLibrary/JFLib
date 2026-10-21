@@ -1,0 +1,277 @@
+# tools_text.uis -- Text (agent T5): live text (preview only until Fertigstellen), typing,
+# Enter = line break (not commit), Rücktaste / Entf / Pfeile / Pos1 / Ende, character keys
+# are text (no tool shortcuts while live), Esc / Strg+Z drop it, Fertigstellen / a click
+# outside / tool switch = one history step "Text", empty text = no step, click inside moves
+# the caret, handle drag and hook 843 move the text, size / style / alignment / AA / colour /
+# hatch fill / Überschreiben / test clip, the option widgets, the font list (system fonts).
+# Pixel tests use the embedded JFLib Sans (Selawik; hook 840 0), so they do not depend on installed fonts.
+# Mapping (1280 x 800, zoom 100 %): image pixel (x, y) at (240 + x, 148 + y).
+# Text at anchor (50, 50), 72 pt (96 px): "I" stem x 59..65 (58 / 66 partly), y 87..153; underline y 158..159;
+# second line top 178.  Probes (x | y << 16): 900 composite / 901 layer -> #9900.
+#   stem (63,120) 7864383   right of it (150,120) 7864470   underline (60,158) 10354748
+#   line 2 stem (63,250) 16384063   stem edges (66,120) 7864386 (58,120) 7864378   far (400,400) 26214800
+# Records: #532480 text (value live), #532481 "caret,line,ax,ay", #532482 family (value pt),
+# #532483 "style,align,render,metric", #532484 box (value font scan), #532485 list
+# #9930 edit pending, #9931 tool, #9935 history entries.
+size 1280 800
+theme light
+expect #9935 value 1
+key t
+expect #9931 value 16
+expect #790 disabled
+cmd 840 0
+cmd 841 72
+expect #532482 value 72
+
+# ------------------------------------------------------------ live preview, Esc drops it
+click 290,198
+expect #532480 value 1
+expect #9930 value 1
+expect #790 enabled
+expect #532481 text "0,0,50,50"
+type "I"
+expect #532480 text "I"
+cmd 900 7864383
+expect #9900 text "FF000000"
+cmd 901 7864383
+expect #9900 text "FFFFFFFF"
+cmd 900 7864470
+expect #9900 text "FFFFFFFF"
+key esc
+expect #532480 value 0
+expect #9930 value 0
+cmd 900 7864383
+expect #9900 text "FFFFFFFF"
+expect #9935 value 1
+
+# ------------------------------------------------------------ editing keys, Enter = line break
+click 290,198
+type "I"
+key enter
+expect #9930 value 1
+expect #532481 text "2,1,50,50"
+type "Hx"
+expect #532480 text "I\nHx"
+cmd 900 16384063
+expect #9900 text "FF000000"
+key backspace
+expect #532480 text "I\nH"
+key left
+expect #532481 text "2,1,50,50"
+key left
+expect #532481 text "1,0,50,50"
+key delete
+expect #532480 text "IH"
+cmd 900 16384063
+expect #9900 text "FFFFFFFF"
+key home
+expect #532481 text "0,0,50,50"
+key end
+expect #532481 text "2,0,50,50"
+key enter
+key up
+expect #532481 text "0,0,50,50"
+key down
+expect #532481 text "3,1,50,50"
+key ctrl+end
+expect #532481 text "3,1,50,50"
+key ctrl+home
+expect #532481 text "0,0,50,50"
+# character keys belong to the text (no tool shortcut), Delete / Backspace no selection command
+key b
+key delete
+expect #9931 value 16
+expect #532480 text "H\n"
+# Strg+Z drops the live text (no history step)
+key ctrl+z
+expect #532480 value 0
+expect #9935 value 1
+
+# ------------------------------------------------------------ Fertigstellen = one step "Text"
+click 290,198
+type "I"
+cmd 790
+expect #9930 value 0
+expect #9935 value 2
+cmd 901 7864383
+expect #9900 text "FF000000"
+cmd 901 7864470
+expect #9900 text "FFFFFFFF"
+# empty text: no step
+click 290,198
+expect #9930 value 1
+cmd 790
+expect #9935 value 2
+key ctrl+z
+expect #9935 value 2
+cmd 901 7864383
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ click outside commits + a new text
+click 290,198
+type "I"
+click 640,548
+expect #9935 value 2
+expect #9936 value 2
+expect #9930 value 1
+expect #532481 text "0,0,400,400"
+cmd 901 7864383
+expect #9900 text "FF000000"
+key esc
+key ctrl+z
+expect #9935 value 2
+cmd 901 7864383
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ click inside moves the caret
+click 290,198
+type "IHI"
+click 292,250
+expect #532481 text "0,0,50,50"
+expect #9930 value 1
+expect #532480 text "IHI"
+# a tool switch commits
+cmd 757
+expect #9931 value 7
+expect #9935 value 2
+key t
+expect #9931 value 16
+key ctrl+z
+expect #9935 value 2
+
+# ------------------------------------------------------------ move: hook 843 and the handle
+click 290,198
+type "I"
+cmd 843 13107300
+expect #532481 text "1,0,100,200"
+cmd 900 7864383
+expect #9900 text "FFFFFFFF"
+cmd 900 17694833
+expect #9900 text "FF000000"
+key esc
+# drag the handle (lower right corner of the text rectangle)
+click 290,198
+type "I"
+expect #532487 text "50,50,76,178"
+drag 316,326 416,426
+expect #532481 text "1,0,150,150"
+expect #9930 value 1
+key esc
+
+# ------------------------------------------------------------ options while live
+click 290,198
+type "I"
+# underline (842: bit 2)
+cmd 842 4
+expect #532483 text "4,0,0,0"
+cmd 900 10354748
+expect #9900 text "FF000000"
+cmd 842 0
+cmd 900 10354748
+expect #9900 text "FFFFFFFF"
+# primary colour (A1 test colour 3 = blue)
+cmd 943 3
+cmd 900 7864383
+expect #9900 text "FF0000FF"
+# Fülleffekt "Horizontal" hatch: every 8th row the primary colour, else the secondary one
+cmd 934 1
+cmd 900 7864383
+expect #9900 text "FF0000FF"
+cmd 900 7929919
+expect #9900 text "FFFFFFFF"
+cmd 934 0
+cmd 900 7929919
+expect #9900 text "FF0000FF"
+# antialiasing off: the stem edge (partly covered) is all or nothing
+cmd 900 7864386
+expect #9900 text "FF5050FF"
+cmd 900 7864378
+expect #9900 text "FFCFCFFF"
+cmd 932 0
+cmd 900 7864386
+expect #9900 text "FF0000FF"
+cmd 900 7864378
+expect #9900 text "FFFFFFFF"
+cmd 932 1
+# Überschreiben with 50 % red (A1 colour 4): the layer pixel becomes that colour
+cmd 943 4
+cmd 933 14
+cmd 790
+cmd 901 7864383
+expect #9900 text "80FF0000"
+cmd 933 0
+key ctrl+z
+cmd 943 1
+
+# ------------------------------------------------------------ right alignment, size, test clip
+click 290,198
+cmd 842 32
+type "I"
+expect #532483 text "0,2,0,0"
+cmd 900 7864383
+expect #9900 text "FFFFFFFF"
+cmd 842 0
+cmd 941 3276800
+cmd 942 7864420
+cmd 900 7864383
+expect #9900 text "FFFFFFFF"
+cmd 941 0
+cmd 942 0
+cmd 900 7864383
+expect #9900 text "FFFF0000"
+cmd 841 12
+expect #532482 value 12
+key esc
+
+# ------------------------------------------------------------ option widgets
+click #3008
+expect #532483 text "1,0,0,0"
+click #3008
+expect #532483 text "0,0,0,0"
+click #3011
+expect #532483 text "8,0,0,0"
+click #3011
+click #3016
+click #3019
+expect #532483 text "0,2,0,0"
+click #3016
+click #3017
+click #3012
+click #3014
+expect #532483 text "0,0,1,0"
+click #3012
+click #3013
+expect #532483 text "0,0,0,0"
+click #3003
+click #3007
+expect #532483 text "0,0,0,1"
+click #3003
+click #3006
+expect #532483 text "0,0,0,0"
+cmd 841 72
+
+# ------------------------------------------------------------ Strg+V: the text clipboard
+# (filled with Strg+C from the font search box; no family contains "Zq1")
+click #327680
+type "Zq1"
+key ctrl+a
+key ctrl+c
+key esc
+key esc
+click 290,198
+type "["
+key ctrl+v
+type "]"
+expect #532480 text "[Zq1]"
+key esc
+
+# ------------------------------------------------------------ the system font list
+cmd 844 1
+expect #532484 value 2
+expect #532485 value 1
+click #327680
+type "zzqqxxnomatch"
+expect #532485 value 0
+key esc
+key esc
+expect #532485 value 0

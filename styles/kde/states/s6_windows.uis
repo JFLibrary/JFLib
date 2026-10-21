@@ -1,0 +1,35 @@
+# s6_windows -- secondary windows (tool, dialog, values), their title bars active / inactive,
+# caption button hover / press, the content dialog with its smoke and frame
+size 1000 1450
+theme light
+click "Werkzeugfenster"
+shot build/kdes/s6_tool.png window 7600
+move #0xFFFF7811
+shot build/kdes/s6_tool_closehover.png window 7600
+down #0xFFFF7811
+shot build/kdes/s6_tool_closepress.png window 7600
+move 600,600
+up
+activate main
+shot build/kdes/s6_tool_inactive.png window 7600
+shot build/kdes/s6_desktop.png desktop
+click "Dialogfenster…"
+dump
+shot build/kdes/s6_dialog.png desktop
+key esc
+click #7012
+click #7013
+click #7420
+shot build/kdes/s6_cdialog.png
+move button:"Speichern"
+shot build/kdes/s6_cdialog_hover.png
+key esc
+theme dark
+click #7420
+shot build/kdes/s6_d_cdialog.png
+key esc
+click #7740
+dump
+shot build/kdes/s6_d_values.png desktop
+scale 150
+shot build/kdes/s6_d150_desktop.png desktop

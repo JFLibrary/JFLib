@@ -1,0 +1,28 @@
+# Router-on-a-stick: SW1 trennt VLAN 10 und VLAN 20, R1 routet über 802.1Q-Subinterfaces
+# eines Trunks; R1 verwirft das erste Echo, während er nach PC2 fragt
+PC1: ping -c 3 10.0.20.10
+run until idle
+expect PC1 output contains "3 packets transmitted, 2 received, 33.3333% packet loss"
+SW1: enable
+SW1: show vlan brief
+expect SW1 output contains "10   Office                           active    Gi1/0/1"
+SW1: show interfaces trunk
+expect SW1 output contains "Gi1/0/24    on               802.1q         trunking      1"
+R1: enable
+R1: show ip interface brief
+expect R1 output contains "GigabitEthernet0/0/0.10 10.0.10.1       YES NVRAM  up                    up"
+R1: show ip route
+expect R1 route 10.0.20.0/24 dev Gi0/0/0.20
+R1: configure terminal
+R1: interface gi0/0/0.30
+R1: ip address 10.0.30.1 255.255.255.0
+expect R1 output contains "% Give the subinterface its VLAN first"
+R1: encapsulation dot1Q 20
+expect R1 output contains "% VLAN 20 is already in use on GigabitEthernet0/0/0.20."
+R1: encapsulation dot1Q 30
+R1: ip address 10.0.30.1 255.255.255.0
+R1: end
+R1: show ip interface brief
+expect R1 output contains "GigabitEthernet0/0/0.30 10.0.30.1       YES manual up                    up"
+R1: show running-config
+expect R1 output contains "interface GigabitEthernet0/0/0.30\n encapsulation dot1Q 30\n ip address 10.0.30.1 255.255.255.0\n!"

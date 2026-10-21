@@ -1,0 +1,115 @@
+#!args --file build/jfword-merge-input.docx --editor --structure --sources --navigation
+# Compare selected fields, cancel without side effects, remap references and reload.
+size 1240 840
+theme light
+cmd 16
+expect dialog:"Quellen zusammenführen" exists
+expect #1002 checked
+expect #1003 text "Neue Methoden · Lovelace · 2026 · ID 3"
+key ctrl+z ctrl+n ctrl+s ctrl+o
+expect dialog:"Quellen zusammenführen" exists
+click #1010
+click "Verlag"
+expect #1013 checked
+expect "Forschungsverlag" exists
+click #1013
+expect #1013 unchecked
+click "Abbrechen"
+expect dialog:"Quellen zusammenführen" missing
+expect "Quellenvergleich abgebrochen · Dokument unverändert" exists
+expect #400 text "Methoden"
+cmd 16
+click #1010
+click "Verlag"
+expect #1013 checked
+click #1010
+click "Quellentyp"
+click #1013
+click #1010
+click "Autoren / Körperschaft"
+expect "Körperschaft:\nInstitut" exists
+expect "Person 1\nVorname: Ada\nWeitere Vornamen: Augusta\nNachname: Lovelace" exists
+click #1013
+click #1010
+click "Titel"
+click #1013
+click #1010
+click "Jahr"
+click #1013
+click #1010
+click "Notizen"
+expect #1013 unchecked
+click #1013
+size 1000 700
+shot build/jfword-merge-dialog-small.png
+size 1240 840
+click "Ergebnis"
+expect text:"Eigene Anmerkung" missing
+click "Feldvergleich"
+click #1013
+click "Ergebnis"
+expect text:"Eigene Anmerkung" exists
+click "Feldvergleich"
+click #1013
+click "Ergebnis"
+expect text:"Eigene Anmerkung" missing
+shot build/jfword-merge-result-light.png
+click "Zusammenführen"
+expect dialog:"Quellen zusammenführen" missing
+expect "Quellen zusammengeführt · 3 Zitatfelder umgehängt · ein Rückgängig-Schritt" exists
+expect #400 text "Neue Methoden"
+cmd 5
+expect #400 text "Methoden"
+cmd 6
+expect #400 text "Neue Methoden"
+cmd 3
+expect "Gespeichert · Text, Quellen und Zitatverweise" exists
+cmd 2
+click button:"Öffnen"
+expect "Dokument geöffnet · Quellen und Zitatverweise geladen" exists
+expect #400 text "Neue Methoden"
+# Report includes uncited sources by default, then opens the chosen source editor.
+cmd 17
+expect dialog:"Quellen prüfen" exists
+expect "2 Quellen mit Hinweisen in dieser Auswahl" exists
+expect "• Verlag fehlt beim Buch." exists
+key ctrl+z ctrl+n ctrl+s ctrl+o
+expect dialog:"Quellen prüfen" exists
+click #1051
+expect "1 Quelle mit Hinweisen in dieser Auswahl" exists
+theme dark
+scale 150
+shot build/jfword-source-audit-dark-150.png
+click button:"Quelle bearbeiten"
+expect dialog:"Quellen prüfen" missing
+expect dialog:"Quelle bearbeiten" exists
+key ctrl+n ctrl+o ctrl+s
+expect dialog:"Quelle bearbeiten" exists
+click #714
+type "Nachgetragen"
+click "Quelle übernehmen"
+cmd 17
+click #1051
+expect "0 Quellen mit Hinweisen in dieser Auswahl" exists
+expect "Keine Hinweise für diese Auswahl. Die Quellenangaben wurden nicht verändert." exists
+click "Schließen"
+cmd 5
+cmd 17
+click #1051
+expect "1 Quelle mit Hinweisen in dieser Auswahl" exists
+click "Schließen"
+cmd 9
+click #712
+type "Ohne Dublette"
+click "Quelle übernehmen"
+cmd 16
+expect #1002 unchecked
+click #1002
+expect #1003 disabled
+expect #1003 text "Keine möglichen Dubletten gefunden"
+click #1002
+expect #1003 enabled
+expect #1003 text "Neue Methoden · Lovelace · 2026 · ID 2"
+click "Abbrechen"
+cmd 5
+expect_nowarn

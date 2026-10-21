@@ -1,0 +1,20 @@
+# parity of the Rust PaintCraft with the assembly version (tools/parity.py, build_rs.py test).
+# Areas (rewrite/AGENTS.md "R10 / R11 wave"): pn-core main / doc / layer / compose / view / cmds /
+# tabs / chrome / rulers / nubs / cursors / icons_gen / pn_icons / settings; pn-hist, pn-tools1,
+# pn-tools2, pn-ui, pn-sys the rest.  A script leaves this list when it is identical on win and
+# linux (also with --verify-dirty).  The reason names the area(s) the script still waits for.
+# settle.uis: identical (win, linux, --verify-dirty) since pn-core.
+# pn-tools1: tools_brush / clone / fill / gradient / options / picker / pressure / recolor / view,
+# settings, toolkeys, toolrow_overflow identical (win, linux, --verify-dirty).
+# pn-tools2: tools_line, tools_shapes, tools_text, clipboard, clipboard_dib identical (win, linux,
+# --verify-dirty).
+# pn-sys: print, colorprofile, crash_report, fx_all / curves / dialog / levels / menu / selection,
+# plugins, plugins_crash, skeleton identical (win, linux, --verify-dirty); the shot / dump matrix too
+# (8 of 8).  plugins*.uis need <exe folder>/ptest (Effects = swapchan, sepiastr, crash, crashpf,
+# crashq, toonew, badinfo; FileTypes = qoi; Shapes = pshapes) next to both the asm and the Rust build.
+mask saveopt.uis jxl.png 470 58 64 20   # intended (jxl-plus): the JXL preview's file size (better encoder: 87,6 KB, asm 125,5 KB)
+mask saveopt.uis jxl.png 20 264 300 62  # intended (jxl-tools): the JXL options' new last row "Filmkörnung (ISO)" (photon noise, 0 = off: the file is unchanged)
+rsonly jxlmod.uis   # Rust build only (was apps/PaintCraft/tests)
+rsonly jxlmod_off.uis   # Rust build only (was apps/PaintCraft/tests)
+rsonly layer_import_pdn.uis   # c_layers.pdn moved to apps/PaintCraft/tests/fixtures/pdn; the frozen asm hard-codes apps/PaintCraft/tests/fixtures/pdn/c_layers.pdn (test hook 371 bit 3)
+rsonly view.uis   # wheel S DY ctrl / shift (modifiers on wheel) is newer than the frozen asm, whose wheel ignores the words

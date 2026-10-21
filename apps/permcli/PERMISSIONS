@@ -1,0 +1,4 @@
+# permcli: the app's permissions; its main program (rt::main!) and the BINS programs without a
+# PERMISSIONS.<bin> of their own get them (docs/PERMISSIONS.md)
+fs.write $TEMP/permcli-*/**    # a scratch folder per run
+process  $EXE/permcli-*        # its BINS programs

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <title>viewBox und Seitenverhältnis</title>
+  <defs>
+    <symbol id="face" viewBox="0 0 40 20">
+      <rect width="40" height="20" fill="#bfdbfe"/>
+      <circle cx="20" cy="10" r="9" fill="#1d4ed8"/>
+      <circle cx="2" cy="2" r="4" fill="#dc2626"/>
+    </symbol>
+  </defs>
+  <!-- one wide symbol in square boxes: meet (min / mid / max), slice, none -->
+  <g fill="none" stroke="#94a3b8">
+    <rect x="5" y="5" width="60" height="60"/>
+    <rect x="70" y="5" width="60" height="60"/>
+    <rect x="135" y="5" width="60" height="60"/>
+    <rect x="5" y="75" width="60" height="60"/>
+    <rect x="70" y="75" width="60" height="60"/>
+    <rect x="135" y="75" width="60" height="60"/>
+  </g>
+  <svg x="5" y="5" width="60" height="60" viewBox="0 0 40 20" preserveAspectRatio="xMinYMin meet"><use href="#face" width="40" height="20"/></svg>
+  <svg x="70" y="5" width="60" height="60" viewBox="0 0 40 20"><use href="#face" width="40" height="20"/></svg>
+  <svg x="135" y="5" width="60" height="60" viewBox="0 0 40 20" preserveAspectRatio="xMaxYMax meet"><use href="#face" width="40" height="20"/></svg>
+  <svg x="5" y="75" width="60" height="60" viewBox="0 0 40 20" preserveAspectRatio="xMinYMid slice"><use href="#face" width="40" height="20"/></svg>
+  <svg x="70" y="75" width="60" height="60" viewBox="0 0 40 20" preserveAspectRatio="xMidYMid slice"><use href="#face" width="40" height="20"/></svg>
+  <svg x="135" y="75" width="60" height="60" viewBox="0 0 40 20" preserveAspectRatio="none"><use href="#face" width="40" height="20"/></svg>
+  <!-- use of a symbol with its own size; overflow visible -->
+  <use href="#face" x="10" y="145" width="80" height="40"/>
+  <svg x="110" y="150" width="40" height="30" overflow="visible">
+    <circle cx="40" cy="15" r="20" fill="#f97316" opacity="0.7"/>
+  </svg>
+</svg>

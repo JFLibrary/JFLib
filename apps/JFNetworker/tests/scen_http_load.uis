@@ -1,0 +1,7 @@
+#!args apps/JFNetworker/tests/fixtures/http_load.jfnet --scenario apps/JFNetworker/tests/scen/http_load.scn --golden apps/JFNetworker/tests/scen/http_load.report
+# golden scenario: HTTP load on two web servers behind a router, 2 % loss on the line to one of
+# them: the SYNs IOS drops while it asks ARP, 200 requests per second for 10 s, the latency
+# quantiles with the retransmissions in the 99th percentile, top, ss -s and curl.  The GUI
+# program runs tests/scen/http_load.scn on tests/fixtures/http_load.jfnet without a window and
+# ends with the report, which must equal tests/scen/http_load.report byte for byte on every
+# target (the script itself is not run)

@@ -1,0 +1,88 @@
+#!args --verify-dirty
+# widgets as drag sources and drop targets (ui/dnd.rs): fruits into baskets, a target that
+# does not take the kind, Esc cancels, a short move is a click, the highlight and the label
+# next to the pointer, dragging out of the window and back (headless: dragout)
+theme light
+expect text:"Ziehen: -  Über: -" exists
+# hover: while held over basket A the basket is highlighted, the label follows the pointer
+down #101
+move 200,110
+move 330,120
+expect text:"Ziehen: Text+Frucht bei 330,120  Über: Korb A" exists
+shot build/dnd/widgets_hover.png 0 40 520 160
+up
+expect text:"Abgelegt: Apfel -> Korb A (verschieben)" exists
+expect text:"Ende: Apfel verschieben (1)" exists
+expect text:"Ziehen: -  Über: -" exists
+# the apple is in basket A now; from there into basket B
+expect #101 rect 254 88 55 32
+drag #101 586,114
+expect text:"Abgelegt: Apfel -> Korb B (verschieben)" exists
+expect #101 rect 484 88 55 32
+# Ctrl copies, Shift moves (the source allows both)
+drag #102 356,114 ctrl
+expect text:"Abgelegt: Birne -> Korb A (kopieren)" exists
+expect text:"Ende: Birne kopieren (3)" exists
+# a fruit onto the text target: its text
+drag #103 82,229
+expect text:"Text: Kirsche" exists
+expect text:"Abgelegt: Text+Frucht -> Text-Ziel (verschieben)" exists
+# basket B takes no text: nothing is dropped, the drag ends without an effect
+drag #401 586,114
+expect text:"Ende: Text ziehen keine (5)" exists
+expect text:"Abgelegt: Text+Frucht -> Text-Ziel (verschieben)" exists
+# ... basket A does
+drag #401 356,114
+expect text:"Abgelegt: Text \"Hallo aus jfgui\" -> Korb A" exists
+expect text:"Ende: Text ziehen verschieben (6)" exists
+# Esc cancels a drag: the cherry stays on the shelf
+down #103
+move 200,110
+move 586,114
+expect text:"Ziehen: Text+Frucht bei 586,114  Über: Korb B" exists
+key esc
+expect text:"Ende: Kirsche keine (7)" exists
+expect text:"Ziehen: -  Über: -" exists
+up
+expect #103 rect 24 88 67 32
+expect text:"Abgelegt: Text \"Hallo aus jfgui\" -> Korb A" exists
+# a short move (< 4 DIP) is a click, no drag
+drag #103 59,105
+expect text:"Ende: Kirsche keine (7)" exists
+# out of the window: the platform takes what other programs know (text); the app's own kind
+# comes back when it is dropped onto the app again
+down #103
+move 300,110
+move 780,110
+dragout expect text "Kirsche"
+dragout expect kinds 258
+expect text:"Ziehen: -  Über: -" exists
+drop 356 114 self move
+expect text:"Abgelegt: Kirsche -> Korb A (verschieben)" exists
+dragout end move
+expect text:"Ende: Kirsche verschieben (8)" exists
+dragout expect none
+up
+expect #103 rect 314 88 67 32
+# dragged out and dropped somewhere else: copied there, nothing changes here
+down #401
+move 780,300
+dragout expect text "Hallo aus jfgui"
+dragout end copy
+expect text:"Ende: Text ziehen kopieren (9)" exists
+up
+# the image and the temporary file leave the app as they are
+down #402
+move 780,300
+dragout expect image
+dragout expect kinds 16
+dragout end none
+expect text:"Ende: Bild ziehen keine (10)" exists
+up
+down #403
+move 780,300
+dragout expect files 1
+dragout end copy
+up
+expect text:"Ende: Datei ziehen kopieren (11)" exists
+expect_nowarn

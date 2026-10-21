@@ -1,0 +1,19 @@
+#!args --rtl --verify-dirty
+# a mirrored window (ui/rtl.rs): tool bar and status line flip, the diagram keeps its
+# drawing; node records, clicks, drags and arrow keys still act as drawn
+theme light
+expect listitem:"N1" rect 102 140 96 48
+click listitem:"N1"
+expect listitem:"N1" selected
+expect text:"Position: 48,48" exists
+wait 600
+drag listitem:"N1" 248,214
+expect text:"Position: 144,96" exists
+expect listitem:"N1" rect 198 188 96 48
+key right
+expect text:"Position: 160,96" exists
+# a marquee from the bottom right: N1, N2, N7, N8 and the edges between them
+drag 380,320 80,120
+expect text:"Auswahl: 7" exists
+expect_nowarn
+shot build/diagramtest/rtl.png

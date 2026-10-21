@@ -1,0 +1,90 @@
+# TB_MULTI / TB_WRAP text boxes (U1): line breaks with Enter, Ctrl+Enter commits, Up / Down
+# with the preferred x, Home / End per line, selection over lines, copy / paste of lines,
+# vertical scrolling (caret and wheel), word wrap
+size 1000 3000
+theme light
+# "Zeile 1\nZeile 2\nZeile 3": lines start at 0, 8, 16 (length 23)
+expect #7960 text "Zeile 1\nZeile 2\nZeile 3"
+click 300,2885
+expect #7960 focused
+expect #7960 value 23
+key up
+expect #7960 value 15
+key home
+expect #7960 value 8
+key up
+expect #7960 value 0
+key end
+expect #7960 value 7
+type "!"
+key enter
+type "neu"
+expect #7960 text "Zeile 1!\nneu\nZeile 2\nZeile 3"
+expect #7960 value 12
+expect text:"Übernommen: 0" exists
+# Ctrl+Enter commits (the box keeps the focus)
+key ctrl+enter
+expect text:"Übernommen: 1" exists
+expect #7960 focused
+# the preferred x survives a short line: from "Zeile 1!" end over "neu" to "Zeile 2"
+key ctrl+home end
+expect #7960 value 8
+key down
+expect #7960 value 12
+key down
+expect #7960 value 20
+# a click places the caret on the line under the pointer (waits: no double clicks)
+wait 600
+click 36,2849
+expect #7960 value 0
+wait 600
+click 300,2869
+expect #7960 value 12
+# selection over two lines, copy, paste at the end (the lines are kept)
+key ctrl+home shift+down shift+down
+expect #7960 value 13
+expect #7960 max 0
+key ctrl+c ctrl+end ctrl+v
+expect #7960 text "Zeile 1!\nneu\nZeile 2\nZeile 3Zeile 1!\nneu\n"
+expect #7960 value 41
+# six lines in a 5-line view: the caret scrolled the view; the wheel scrolls it back
+wheel #7960 240
+wait 600
+click 36,2849
+expect #7960 value 0
+wheel #7960 -240
+wait 600
+click 36,2849
+expect #7960 value 9
+# Esc drops the focus and commits
+key esc
+expect text:"Übernommen: 2" exists
+# PgUp / PgDn move a view
+click #7960
+key ctrl+end pgup
+expect #7960 value 0
+key pgdn
+expect #7960 value 41
+# ---- word wrap: "Ein langer Absatz, der am Rand des " / "Textfelds umgebrochen wird, damit " /
+# "alles sichtbar bleibt." / "Zweiter Absatz."  (lines start at 0, 35, 69, 92)
+click #7961
+key ctrl+home down
+expect #7961 value 35
+key down
+expect #7961 value 69
+key end
+expect #7961 value 91
+key down
+expect #7961 value 107
+key up
+expect #7961 value 91
+key ctrl+home end
+expect #7961 value 35
+# typing reflows
+key ctrl+home
+type "Sehr "
+expect #7961 text "Sehr Ein langer Absatz, der am Rand des Textfelds umgebrochen wird, damit alles sichtbar bleibt.\nZweiter Absatz."
+key ctrl+home down
+expect #7961 value 31
+shot build/gal_multiline.png 0 2820 600 150
+expect_nowarn

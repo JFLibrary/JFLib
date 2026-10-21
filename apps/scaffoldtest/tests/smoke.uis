@@ -1,0 +1,19 @@
+# scaffoldtest: the smoke test of `build_rs.py new` (build_rs.py test runs every tests/*.uis; the
+# script language: docs/GUIDE.md section 12)
+expect text:"0 Zeilen, 0 Wörter, 0 Zeichen" exists
+expect "Leeren" missing
+click #100
+type "eins zwei\ndrei"
+expect text:"2 Zeilen, 3 Wörter, 14 Zeichen" exists
+key ctrl+a
+type "Wort"
+expect text:"1 Zeile, 1 Wort, 4 Zeichen" exists
+click "Datei"
+click "Leeren"
+expect text:"0 Zeilen, 0 Wörter, 0 Zeichen" exists
+click "Hilfe"
+click "Info …"
+expect dialog:"Über Scaffold-Test" exists
+key esc
+expect dialog:"Über Scaffold-Test" missing
+shot build/scaffoldtest.png

@@ -1,0 +1,101 @@
+#!args --editor --navigation
+# A whole story is one surface, with genuine paragraph structure and mixed run formatting.
+size 1240 840
+theme light
+clip text "Aα\nBβ\nCΩ"
+key ctrl+v
+expect textbox:"Aα\nBβ\nCΩ" focused
+expect "3 · Text" exists
+key ctrl+end shift+home ctrl+i
+# Select from inside the first paragraph into the third, leaving its Unicode suffix.
+key ctrl+home right ctrl+shift+end shift+left
+expect textbox:"Aα\nBβ\nCΩ" value 9
+expect textbox:"Aα\nBβ\nCΩ" max 1
+key ctrl+b
+shot build/jfword-story-selection.png
+wait 600
+drag 465,305 465,364
+expect textbox:"Aα\nBβ\nCΩ" value 9
+expect textbox:"Aα\nBβ\nCΩ" max 1
+type "X"
+expect textbox:"AXΩ" focused
+expect "2 · Text" missing
+key ctrl+z
+expect textbox:"Aα\nBβ\nCΩ" value 9
+expect textbox:"Aα\nBβ\nCΩ" max 1
+key ctrl+y
+expect textbox:"AXΩ" exists
+key ctrl+z shift+enter
+expect textbox:"A\nΩ" exists
+expect "2 · Text" missing
+key ctrl+z enter
+expect textbox:"A\nΩ" exists
+expect "2 · Text" exists
+key ctrl+z ctrl+x
+expect textbox:"AΩ" exists
+key ctrl+z ctrl+end ctrl+v
+expect textbox:"Aα\nBβ\nCΩα\nBβ\nC" exists
+expect "5 · Text" exists
+key ctrl+z
+expect textbox:"Aα\nBβ\nCΩ" exists
+# Reverse selection uses the same transaction and restores anchor/caret through undo.
+key ctrl+end left ctrl+shift+home shift+right
+expect textbox:"Aα\nBβ\nCΩ" value 1
+expect textbox:"Aα\nBβ\nCΩ" max 9
+key delete
+expect textbox:"AΩ" exists
+key ctrl+z
+expect textbox:"Aα\nBβ\nCΩ" value 1
+expect textbox:"Aα\nBβ\nCΩ" max 9
+# Paragraph styles and alignment affect every touched paragraph in one undo step.
+key ctrl+a
+click "Überschrift 1"
+expect button:"Aα" exists
+expect button:"Bβ" exists
+expect button:"CΩ" exists
+key ctrl+z
+expect "1 · Text" exists
+expect "2 · Text" exists
+expect "3 · Text" exists
+key ctrl+home shift+down shift+down
+click "Zentriert"
+expect textbox:"Aα\nBβ\nCΩ" value 8
+expect textbox:"Aα\nBβ\nCΩ" max 0
+click #2874
+click #856
+click "Erste Zeile"
+click "Übernehmen"
+expect textbox:"Aα\nBβ\nCΩ" focused
+key ctrl+z ctrl+y
+expect textbox:"Aα\nBβ\nCΩ" value 8
+expect textbox:"Aα\nBβ\nCΩ" max 0
+# Main-body marks and native footnote stories remain isolated.
+key ctrl+end
+cmd 23
+clip text "Notiz α\nBeleg β"
+key ctrl+v
+expect textbox:"Notiz α\nBeleg β" focused
+key ctrl+a ctrl+u
+shot build/jfword-story-footnote.png
+cmd 25
+expect textbox:"Aα\nBβ\nCΩ[1]" exists
+key ctrl+end
+cmd 24
+clip text "Ende α\nQuelle β"
+key ctrl+v
+expect textbox:"Ende α\nQuelle β" focused
+key ctrl+a ctrl+b
+shot build/jfword-story-endnote.png
+cmd 25
+expect textbox:"Aα\nBβ\nCΩ[1][E1]" exists
+cmd 4
+click #1048588
+key ctrl+a
+type "build/jfword-rich-story.docx"
+click button:"Speichern"
+click "Ersetzen"
+cmd 2
+click button:"Öffnen"
+expect textbox:"Aα\nBβ\nCΩ[1][E1]" exists
+expect "3 · Text" exists
+expect_nowarn

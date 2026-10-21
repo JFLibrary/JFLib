@@ -1,0 +1,47 @@
+#!args --editor --structure --navigation
+# Enter splits formatted runs and note bodies; reference anchors remain outside note edits.
+size 1240 840
+type "Vor α Nach"
+key ctrl+home right right right right shift+right
+key ctrl+b
+expect textbox:"α" exists
+key right enter
+type "X"
+expect textbox:"X" focused
+expect textbox:" Nach" exists
+key ctrl+home backspace
+expect textbox:"αX" focused
+expect textbox:"αX" value 2
+expect "Textsegment · 11 pt · Fett" exists
+key ctrl+z
+expect textbox:"X" focused
+expect textbox:"X" value 0
+key ctrl+y
+expect textbox:"αX" focused
+expect textbox:"αX" value 2
+# Insert a footnote at this caret and edit only its own paragraph group.
+cmd 23
+expect "Fußnote 1 bearbeiten" exists
+type "Notiz α Ende"
+key ctrl+home right right right right right right right
+key enter
+expect textbox:" Ende" focused
+type "Neue"
+expect textbox:"Neue Ende" exists
+key ctrl+home backspace
+expect textbox:"Notiz αNeue Ende" focused
+expect textbox:"Notiz αNeue Ende" value 8
+key ctrl+z
+expect textbox:"Neue Ende" focused
+key ctrl+y
+expect textbox:"Notiz αNeue Ende" focused
+key ctrl+home backspace
+expect textbox:"Notiz αNeue Ende" exists
+expect "Fußnote 1 bearbeiten" exists
+cmd 25
+expect button:"Fußnote 1 öffnen" exists
+expect textbox:"Vor " exists
+expect textbox:"α" exists
+expect textbox:"X" exists
+expect textbox:" Nach" exists
+expect_nowarn

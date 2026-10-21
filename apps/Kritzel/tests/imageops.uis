@@ -1,0 +1,16 @@
+# rotate / flip / undo of whole-document operations
+click #1213
+drag 200,300 600,380 12
+expect text:"1152 × 648px" exists
+cmd 30
+expect text:"648 × 1152px" exists
+shot build/kritzel_rot.png
+key ctrl+z
+expect text:"1152 × 648px" exists
+cmd 33
+cmd 34
+shot build/kritzel_flip.png
+key ctrl+z
+key ctrl+z
+key ctrl+y
+shot build/kritzel_flip_redo.png

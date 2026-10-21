@@ -1,0 +1,108 @@
+# containers: scroll views, virtualized list, tabs, expander, info bars, dialog,
+# status bar (container agent)
+size 900 1300
+theme dark
+# ---- list: virtualized rows, selection by click and keys, wheel scrolling
+expect "Eintrag 3" selected
+expect #7100 value 2
+expect "Eintrag 150" missing
+expect "Auswahl: 2" exists
+wheel "Eintrag 3" -1200
+wait 400
+expect "Eintrag 1" missing
+expect "Eintrag 15" exists
+click "Eintrag 15"
+expect "Eintrag 15" selected
+expect #7100 focused
+expect #7100 value 14
+key down down
+expect "Eintrag 17" selected
+key end
+expect "Eintrag 200" selected
+expect #7100 value 199
+key pgup
+expect #7100 value 193
+key home
+expect "Eintrag 1" selected
+expect "Eintrag 200" missing
+dblclick "Eintrag 4"
+expect "Eintrag 4" selected
+expect text:"Auswahl: 3   Doppelklicks: 1" exists
+expect "Auswahl: 3" exists
+# ---- tabs by click and arrow keys
+click "Erweitert"
+expect "Erweitert" selected
+expect #7010 value 1
+expect "Eintrag 4" missing
+key left
+expect "Liste" selected
+key right right
+expect "Dialog" selected
+key right
+expect "Dialog" selected
+click "Erweitert"
+# ---- expander by click and Space
+expect "Automatisch speichern" missing
+click "Erweiterte Einstellungen"
+expect "Erweiterte Einstellungen" open
+expect "Automatisch speichern" exists
+key space
+expect "Automatisch speichern" missing
+# ---- info bars: the close button hides one
+expect "Hinweis" exists
+click #7411
+expect "Hinweis" missing
+expect "Gespeichert" exists
+# ---- horizontal scroll view and a standalone scroll bar
+click "Dialog"
+expect #7440 value 0
+wheel "Knopf 2" -240
+wait 400
+expect #7440 value 96
+expect #7441 value 0
+click #7441
+expect #7441 value 250
+# ---- dialog: Enter = primary, base inert, Esc = close, buttons, Tab stays inside
+click "Dialog öffnen"
+expect "Änderungen speichern?" open
+click "Standard"
+expect text:"Wert: 40 %   Klicks: 0" exists
+click "Liste"
+expect "Dialog" selected
+expect "Änderungen speichern?" exists
+key enter
+expect "Änderungen speichern?" missing
+expect "Ergebnis: 1" exists
+expect "Dialog öffnen" focused
+click "Dialog öffnen"
+key esc
+expect "Änderungen speichern?" missing
+expect "Ergebnis: 3" exists
+click "Dialog öffnen"
+key tab
+expect #0x8000E835 focused
+key tab
+expect #0x8000E837 focused
+key tab
+expect #0x8000E835 focused
+click #0x8000E835
+expect "Änderungen speichern?" missing
+expect "Ergebnis: 1" exists
+click "Dialog öffnen"
+click "Abbrechen"
+expect "Ergebnis: 3" exists
+# the base works again
+click "Standard"
+expect text:"Wert: 40 %   Klicks: 1" exists
+# ---- page scroll view: the wheel scrolls the page in a small window
+size 900 620
+expect #7000 value 0
+wheel "Bereiche" -360
+wait 400
+expect #7000 value 144
+wheel "Bereiche" 1200
+wait 400
+expect #7000 value 0
+# ---- status bar
+expect "Bereit" exists
+expect "Auswahl: 3" exists

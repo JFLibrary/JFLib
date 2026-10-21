@@ -1,0 +1,4 @@
+#!args apps/JFNetworker/tests/fixtures/two_pcs.jfnet --scenario apps/JFNetworker/tests/scen/two_pcs.scn --golden apps/JFNetworker/tests/scen/two_pcs.report
+# golden scenario: two PCs on a switch: ARP, ping, the MAC table, a shut port.  The GUI program runs tests/scen/two_pcs.scn on
+# tests/fixtures/two_pcs.jfnet without a window and ends with the report, which must equal
+# tests/scen/two_pcs.report byte for byte on every target (the script itself is not run)

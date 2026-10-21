@@ -1,0 +1,197 @@
+# layers_basic.uis -- Ebenen basics (agent A1): add, duplicate, delete, merge down (with the
+# upper layer's blend mode and opacity), move, go to, visibility, composite pixels, menu
+# states, undo of layer structure changes (history agent A2).
+# Probes (diag.s block A1): 900 composite pixel / 901 current layer pixel -> #9900,
+# #9903 layers, #9904 current, #9906 name (+ visible), #9907 opacity, #9908 blend mode.
+# Colours: 902 7 = grey 808080, 4 = red at alpha 128.  Pixel (5, 5) = arg 327685.
+size 1280 800
+theme light
+expect #9903 value 1
+expect #9904 value 0
+expect #9906 text "Hintergrund"
+expect #9906 value 1
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+# the live tool hook (comp_set_tool): preview without changing the layer
+cmd 909 1
+cmd 900 327685
+expect #9900 text "FFFFFF00"
+cmd 900 327695
+expect #9900 text "FFFFFFFF"
+cmd 901 327685
+expect #9900 text "FFFFFFFF"
+expect #9905 value 0
+cmd 909 0
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+# a grey background (the whole 800 x 600 layer)
+cmd 902 7
+cmd 903 0
+cmd 904 39322400
+cmd 900 327685
+expect #9900 text "FF808080"
+cmd 900 39256863
+expect #9900 text "FF808080"
+
+# ------------------------------------------------------------ menu states with one layer
+click menu:"Ebenen"
+expect menuitem:"Neue Ebene" enabled
+expect menuitem:"Ebene löschen" disabled
+expect menuitem:"Ebene verdoppeln" enabled
+expect menuitem:"Nach unten vereinen" disabled
+expect menuitem:"Oberste Ebene wählen" disabled
+expect menuitem:"Gehe zu Ebene unten" disabled
+expect menuitem:"Ebene eine Stufe höher" disabled
+expect menuitem:"Ebene eine Stufe tiefer" disabled
+expect menuitem:"Ebene ein-/ausblenden" enabled
+expect menuitem:"Ebeneneigenschaften…" enabled
+key esc
+
+# ------------------------------------------------------------ Neue Ebene
+key ctrl+shift+n
+expect #9903 value 2
+expect #9904 value 1
+expect #9906 text "Ebene 2"
+expect #9907 value 255
+expect #9908 value 0
+cmd 900 327685
+expect #9900 text "FF808080"
+# red at alpha 128 in [0, 10) x [0, 10) of the new layer
+cmd 902 4
+cmd 903 0
+cmd 904 655370
+cmd 901 327685
+expect #9900 text "80FF0000"
+cmd 900 327685
+expect #9900 text "FFBF3F3F"
+cmd 900 720907
+expect #9900 text "FF808080"
+click menu:"Ebenen"
+expect menuitem:"Ebene löschen" enabled
+expect menuitem:"Nach unten vereinen" enabled
+expect menuitem:"Gehe zu Ebene unten" enabled
+expect menuitem:"Gehe zu Ebene oben" disabled
+expect menuitem:"Ebene eine Stufe tiefer" enabled
+expect menuitem:"Ebene eine Stufe höher" disabled
+key esc
+
+# ------------------------------------------------------------ blend modes and opacity of the upper layer
+cmd 906 1
+expect #9908 value 1
+cmd 900 327685
+expect #9900 text "FF803F3F"
+cmd 906 12
+cmd 900 327685
+expect #9900 text "FFBF8080"
+cmd 906 0
+cmd 905 0
+expect #9907 value 0
+cmd 900 327685
+expect #9900 text "FF808080"
+cmd 905 255
+cmd 900 327685
+expect #9900 text "FFBF3F3F"
+
+# ------------------------------------------------------------ visibility (Strg+,)
+key ctrl+,
+expect #9906 value 0
+cmd 900 327685
+expect #9900 text "FF808080"
+key ctrl+,
+expect #9906 value 1
+cmd 900 327685
+expect #9900 text "FFBF3F3F"
+
+# ------------------------------------------------------------ Ebene verdoppeln
+key ctrl+shift+d
+expect #9903 value 3
+expect #9904 value 2
+expect #9906 text "Ebene 2 Kopie"
+cmd 901 327685
+expect #9900 text "80FF0000"
+cmd 900 327685
+expect #9900 text "FFDF1F1F"
+
+# ------------------------------------------------------------ go to / move
+cmd 331
+expect #9904 value 1
+expect #9906 text "Ebene 2"
+cmd 332
+expect #9904 value 0
+expect #9906 text "Hintergrund"
+cmd 330
+expect #9904 value 1
+cmd 329
+expect #9904 value 2
+expect #9906 text "Ebene 2 Kopie"
+# the copy goes down: it stays the current layer
+cmd 335
+expect #9904 value 1
+expect #9906 text "Ebene 2 Kopie"
+cmd 334
+expect #9904 value 2
+expect #9906 text "Ebene 2 Kopie"
+cmd 336
+expect #9904 value 0
+expect #9906 text "Ebene 2 Kopie"
+cmd 900 327685
+expect #9900 text "FFBF3F3F"
+cmd 333
+expect #9904 value 2
+expect #9906 text "Ebene 2 Kopie"
+cmd 900 327685
+expect #9900 text "FFDF1F1F"
+# reorder by index (layers window drag): 2 -> 0 and back
+cmd 341 2
+expect #9904 value 0
+cmd 341 131072
+expect #9904 value 2
+# select by index (layers window)
+cmd 339 1
+expect #9904 value 1
+expect #9906 text "Ebene 2"
+cmd 339 7
+expect #9904 value 2
+
+# ------------------------------------------------------------ merge down with the upper layer's mode
+cmd 906 1
+cmd 900 327685
+expect #9900 text "FFBF1F1F"
+key ctrl+m
+expect #9903 value 2
+expect #9904 value 1
+expect #9906 text "Ebene 2"
+cmd 901 327685
+expect #9900 text "C0FF0000"
+cmd 900 327685
+expect #9900 text "FFDF1F1F"
+cmd 901 720907
+expect #9900 text "00000000"
+
+# ------------------------------------------------------------ undo / redo of structure changes (A2)
+key ctrl+z
+expect #9903 value 3
+expect #9904 value 2
+cmd 900 327685
+expect #9900 text "FFBF1F1F"
+key ctrl+y
+expect #9903 value 2
+cmd 900 327685
+expect #9900 text "FFDF1F1F"
+
+# ------------------------------------------------------------ Ebene löschen
+key ctrl+shift+delete
+expect #9903 value 1
+expect #9904 value 0
+expect #9906 text "Hintergrund"
+cmd 900 327685
+expect #9900 text "FF808080"
+click menu:"Ebenen"
+expect menuitem:"Ebene löschen" disabled
+key esc
+key ctrl+z
+expect #9903 value 2
+expect #9904 value 1
+cmd 900 327685
+expect #9900 text "FFDF1F1F"
+expect #9905 value 1

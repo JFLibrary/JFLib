@@ -1,0 +1,19 @@
+#!args --fixture apps/buildManager/tests/fixture.json
+expect "Build Manager" exists
+expect "Entwicklungs-Build" exists
+click "Alle"
+expect "5 von 5 ausgewählt" exists
+click "Keine"
+expect "0 von 5 ausgewählt" exists
+click #2002
+expect "Geprüftes Release" exists
+click #2003
+expect "Startprofil · Kritzel" exists
+click #2004
+expect "Paketdaten · Kritzel" exists
+expect #2310 text "Kritzel"
+click #2001
+click "Hell / Dunkel"
+shot build/manager-check/dark.png
+click "Hell / Dunkel"
+shot build/manager-check/light.png

@@ -1,0 +1,4 @@
+# parity of the Rust setup stub with the assembly version (tools/parity.py app installer
+# --target win; Windows only, apps/installer/TARGETS).  The bare stub has no payload: the
+# shot / dump matrix and nopayload.uis show the error page.  Install / uninstall with a payload:
+# tools/package.py --impl rs and the test mode ASMINST_SHELL_DIR (ASMLIB/docs/PACKAGING.md).

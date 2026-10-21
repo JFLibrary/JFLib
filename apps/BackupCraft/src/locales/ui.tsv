@@ -1,0 +1,1041 @@
+de	en
+Aktualisiert	Refreshed
+Die Daten wurden neu geladen.	The data was reloaded.
+Keine Berechtigung	No permission
+Noch nicht verfügbar	Not available yet
+Unveränderlich	Immutable
+Aktion fehlgeschlagen	Action failed
+Abgeschlossen	Completed
+Abgebrochen	Canceled
+Fehlgeschlagen	Failed
+Die Anmeldung ist abgelaufen. Bitte erneut anmelden.	Your sign-in has expired. Please sign in again.
+Angemeldet	Signed in
+Verbunden mit {}	Connected to {}
+Der Job wurde gespeichert.	The job was saved.
+Der Job wurde gelöscht. Seine Restore-Points bleiben erhalten.	The job was deleted. Its restore points are kept.
+Der Job ist aktiviert.	The job is enabled.
+Der Job ist deaktiviert.	The job is disabled.
+Der Job wurde gestartet.	The job was started.
+Die Wiederherstellung wurde gestartet.	The restore was started.
+Die Prüfung des Restore-Points läuft.	Restore point verification is running.
+Das Repository wurde gespeichert.	The repository was saved.
+Die Freigaben wurden gespeichert.	The shared folders were saved.
+Der Agent wurde entfernt und sein Zertifikat gesperrt.	The agent was removed and its certificate revoked.
+Die Einstellungen wurden gespeichert.	The settings were saved.
+Der Benutzer wurde gespeichert.	The user was saved.
+Die Zugangsdaten wurden gespeichert.	The credentials were saved.
+Der Vorgang wird abgebrochen.	The operation is being canceled.
+Erledigt	Done
+Nie	Never
+Heute	Today
+Gestern	Yesterday
+Morgen	Tomorrow
+Nie gelaufen	Never run
+Läuft	Running
+Erfolgreich	Success
+Warnung	Warning
+Wartet	Waiting
+Wird abgebrochen	Canceling
+Unterbrochen	Interrupted
+Online	Online
+Offline	Offline
+Wird gekoppelt	Pairing
+Fehler	Error
+Unbekannt	Unknown
+Bereit	Ready
+Nicht erreichbar	Unreachable
+Gesperrt	Locked
+Keine Verbindung zum Server	No connection to the server
+Verbunden	Connected
+Verbinde …	Connecting…
+Verbindung unterbrochen	Connection lost
+Getrennt	Disconnected
+ · Demo	 · Demo
+Version {}	Version {}
+Verschlüsselt (TLS 1.3)	Encrypted (TLS 1.3)
+Lokale Verbindung (HTTP)	Local connection (HTTP)
+Demo-Daten: Änderungen bleiben nur bis zum Beenden erhalten.	Demo data: changes are kept only until you exit.
+Verbindung trennen	Disconnect
+Aktivität	Activity
+Keine laufenden Vorgänge.	No running operations.
+Alle Vorgänge anzeigen	Show all operations
+Helles Design	Light theme
+Dunkles Design	Dark theme
+Einstellungen	Settings
+Passwort ändern …	Change password…
+Abmelden	Sign out
+Jobs, Server, Repositories suchen (Strg+K)	Search jobs, servers, repositories (Ctrl+K)
+Sicherungsjob	Backup job
+Nichts gefunden.	Nothing found.
+Navigation umschalten	Toggle navigation
+bald	soon
+Start	Home
+Übersicht	Overview
+Schutz	Protection
+Sicherungsjobs	Backup jobs
+Wiederherstellung	Restore
+Infrastruktur	Infrastructure
+Server & Agenten	Servers & agents
+Repositories	Repositories
+Zugangsdaten	Credentials
+Erweitert	Advanced
+Replikation	Replication
+Tape	Tape
+Sofortstart	Instant start
+Betrieb	Operations
+Monitoring	Monitoring
+Demo-Server · Daten werden simuliert	Demo server · Data is simulated
+Verbindung wird hergestellt …	Connecting…
+Verbindung unterbrochen – neuer Versuch läuft	Connection lost – retrying
+Nicht verbunden	Not connected
+{} Vorgänge laufen	{} operations running
+Für die Installation von Agenten per SSH und für Netzwerkfreigaben. Die Geheimnisse verlassen den Server nie.	For installing agents via SSH and for network shares. The secrets never leave the server.
+Nur für Administratoren	Administrators only
+Zugangsdaten sehen und verwalten nur Administratoren.	Only administrators can see and manage credentials.
+Zugangsdaten hinzufügen …	Add credentials…
+Löschen	Delete
+Zugangsdaten löschen?	Delete credentials?
+{} wird gelöscht. Installationen, die sie verwenden, müssen neue Zugangsdaten bekommen.	{} will be deleted. Installations that use them must be given new credentials.
+Keine Zugangsdaten gespeichert	No credentials stored
+Agenten lassen sich auch ganz ohne gespeicherte Zugangsdaten koppeln (Pairing-Code).	Agents can also be paired without any stored credentials (pairing code).
+Bezeichnung	Label
+Benutzer	User
+Art	Type
+Angelegt	Created
+SSH-Schlüssel	SSH key
+Passwort	Password
+{} · {} Jobs · {} von {} Hosts online	{} · {} jobs · {} of {} hosts online
+Neuer Job	New job
+Geschützte Objekte	Protected objects
+{} Restore-Points	{} restore points
+Erfolgreich (24 h)	Successful (24 h)
+von {} Sitzungen	of {} sessions
+Fehler und Warnungen (24 h)	Errors and warnings (24 h)
+{} fehlgeschlagen · {} mit Warnung	{} failed · {} with warnings
+Speicherbelegung	Storage usage
+Sitzungen der letzten 14 Tage	Sessions in the last 14 days
+Sicherungen, Kopien und Prüfungen pro Tag	Backups, copies and verifications per day
+Speicher	Storage
+{} Repositories	{} repositories
+Frei	Free
+belegt	used
+Aufmerksamkeit erforderlich	Needs attention
+Alles in Ordnung. Keine Fehler, keine Warnungen.	All good. No errors, no warnings.
+Öffnen	Open
+Laufende Vorgänge	Running operations
+Gerade läuft nichts.	Nothing is running right now.
+Nächste Läufe	Upcoming runs
+Keine geplanten Läufe.	No scheduled runs.
+Abbrechen	Cancel
+Protokoll: {}	Log: {}
+Schließen	Close
+Passwort ändern	Change password
+Bisheriges Passwort	Current password
+Neues Passwort	New password
+Neues Passwort wiederholen	Confirm new password
+Mindestens 12 Zeichen.	At least 12 characters.
+Die Passwörter stimmen nicht überein.	The passwords don't match.
+Ändern	Change
+Freigaben bearbeiten	Edit shared folders
+Anzeigename	Display name
+Lesbare Ordner (Sicherungsquellen), einer pro Zeile	Readable folders (backup sources), one per line
+Beschreibbare Ordner (Wiederherstellungsziele)	Writable folders (restore targets)
+Der Agent lässt nur Zugriffe innerhalb dieser Ordner zu; Verknüpfungen nach außen werden nicht verfolgt.	The agent only allows access within these folders; links pointing outside are not followed.
+Speichern	Save
+Repository hinzufügen	Add repository
+Name	Name
+z. B. Primär (NAS)	e.g. Primary (NAS)
+Ordner auf dem Server	Folder on the server
+Neues Repository anlegen	Create new repository
+Vorhandenes Repository einbinden	Attach existing repository
+Unveränderlichkeit (Tage, 0 = aus)	Immutability (days, 0 = off)
+Unveränderliche Restore-Points kann niemand vor Ablauf löschen – auch kein Administrator.	Nobody can delete immutable restore points before they expire – not even an administrator.
+Hinzufügen	Add
+Unveränderlichkeit: {}	Immutability: {}
+Tage	Days
+Die Frist lässt sich nur verlängern. Sie gilt für neue Restore-Points; bestehende behalten ihre Frist.	The period can only be extended. It applies to new restore points; existing ones keep their period.
+Übernehmen	Apply
+Zugangsdaten hinzufügen	Add credentials
+z. B. Linux-Server	e.g. Linux servers
+SSH-Schlüssel (Ed25519)	SSH key (Ed25519)
+Privater Schlüssel (OpenSSH-Format)	Private key (OpenSSH format)
+Benutzer bearbeiten	Edit user
+Benutzer anlegen	Create user
+Benutzername	User name
+Rolle	Role
+Betrachter	Viewer
+Operator	Operator
+Administrator	Administrator
+Neues Passwort (leer: unverändert)	New password (leave empty to keep)
+Passwort (mindestens 12 Zeichen)	Password (at least 12 characters)
+Recovery-Kit	Recovery kit
+Nur jetzt sichtbar	Shown only now
+Notieren oder ausdrucken und offline verwahren.	Write it down or print it, and keep it offline.
+Mit diesem Schlüssel lässt sich jede verschlüsselte Sicherung öffnen, auch wenn dieser Server verloren ist.	This key opens every encrypted backup, even if this server is lost.
+Kopieren	Copy
+Kopiert	Copied
+Der Schlüssel liegt in der Zwischenablage.	The key is on the clipboard.
+Ich habe den Schlüssel sicher abgelegt.	I have stored the key safely.
+Fertig	Done
+Konfiguration sichern	Back up configuration
+Die Sicherung enthält die Datenbank und die Schlüssel des Servers. Sie wird mit dieser Passphrase verschlüsselt.	The backup contains the server's database and keys. It is encrypted with this passphrase.
+Passphrase	Passphrase
+Passphrase wiederholen	Confirm passphrase
+Die Eingaben stimmen nicht überein.	The entries don't match.
+Sichern	Back up
+Konfiguration wiederherstellen	Restore configuration
+Neustart nötig	Restart required
+Wird beim nächsten Start des Servers angewendet.	Applied the next time the server starts.
+Sicherung	Backup
+Vormerken	Schedule
+{} Hosts · {} online · {} Agenten	{} hosts · {} online · {} agents
+Agent koppeln …	Pair agent…
+Per SSH installieren …	Install via SSH…
+Verbindung prüfen	Test connection
+Freigaben bearbeiten …	Edit shared folders…
+Entfernen	Remove
+Aktualisieren	Refresh
+ {} Jobs sichern diesen Host; sie schlagen danach fehl.	 {} jobs back up this host; they will fail afterwards.
+Agent entfernen?	Remove agent?
+{} wird entfernt und sein Zertifikat gesperrt. Zum erneuten Koppeln braucht er einen neuen Pairing-Code.	{} will be removed and its certificate revoked. To pair it again, it needs a new pairing code.
+Hosts filtern	Filter hosts
+Betriebssystem	Operating system
+Status	Status
+Letzter Kontakt	Last contact
+Jobs	Jobs
+Backup-Server	Backup server
+Agent	Agent
+Version	Version
+Gekoppelt seit	Paired since
+Zertifikat (SHA-256)	Certificate (SHA-256)
+Freigegebene Ordner	Shared folders
+Nur aus diesen Ordnern darf der Server lesen. Der Agent verweigert alles andere.	The server may only read from these folders. The agent denies everything else.
+Wiederherstellungsziele	Restore targets
+Keine – Wiederherstellungen auf diesen Host sind gesperrt.	None – restores to this host are blocked.
+Jobs ({})	Jobs ({})
+Dateien	Files
+Volume	Volume
+Hyper-V-VM	Hyper-V VM
+KVM-VM	KVM VM
+Sicherungskopie	Backup copy
+Nur manuell	Manual only
+{} Punkte	{} points
+{} Tage	{} days
+{} Wochen	{} weeks
+{} Monate	{} months
+{} Jahre	{} years
+Alle behalten	Keep all
+{} Jobs · {} aktiv · {} fehlgeschlagen	{} jobs · {} enabled · {} failed
+Jetzt starten	Start now
+Aktive Vollsicherung	Active full backup
+Bearbeiten	Edit
+Deaktivieren	Disable
+Aktivieren	Enable
+Wiederherstellen …	Restore…
+Jobs löschen?	Delete jobs?
+{} wird gelöscht. Die Restore-Points bleiben im Repository und können weiter wiederhergestellt werden.	{} will be deleted. The restore points remain in the repository and can still be restored.
+Jobs filtern	Filter jobs
+Alle	All
+Warnungen	Warnings
+Laufend	Running
+Deaktiviert	Disabled
+{} angezeigt	{} shown
+Noch keine Sicherungsjobs	No backup jobs yet
+Ein Job legt fest, was gesichert wird, wohin, wie lange die Stände bleiben und wann er läuft.	A job defines what is backed up, where to, how long the restore points are kept and when it runs.
+Typ	Type
+Quelle	Source
+Ziel	Target
+Nächster Lauf	Next run
+Letzter Lauf	Last run
+Größe	Size
+{} · {} Quellen	{} · {} sources
+Manuell	Manual
+Verlauf	History
+Restore-Points	Restore points
+Ja	Yes
+Ja · Hinweis: {}	Yes · Hint: {}
+Nein	No
+Alle {} Tage	Every {} days
+Nie (nur geänderte Dateien)	Never (changed files only)
+Host	Host
+Repository	Repository
+Zeitplan	Schedule
+Zeitzone	Time zone
+Aufbewahrung	Retention
+Verschlüsselung	Encryption
+Vollsicherung	Full backup
+Quellen	Sources
+Ausgeschlossen: {}	Excluded: {}
+Skripte	Scripts
+Davor	Before
+Danach	After
+Noch keine Sitzungen.	No sessions yet.
+läuft	running
+gelesen	read
+ohne Meldungen	no messages
+Protokoll	Log
+Noch keine Restore-Points.	No restore points yet.
+Wird geladen …	Loading…
+unveränderlich bis {}	immutable until {}
+Wiederherstellen	Restore
+Sicherung und Wiederherstellung für Server, Agenten und Dateien – dedupliziert, verschlüsselt, nachvollziehbar.	Backup and restore for servers, agents and files – deduplicated, encrypted, traceable.
+Signierte, unveränderliche Restore-Points	Signed, immutable restore points
+Ende-zu-Ende verschlüsselt mit eigenem Recovery-Kit	End-to-end encrypted with your own recovery kit
+Agenten für Windows und Linux, gekoppelt per Code	Agents for Windows and Linux, paired by code
+Zeitpläne in jeder Zeitzone, sicher über die Zeitumstellung	Schedules in any time zone, safe across daylight saving changes
+Anmelden	Sign in
+Mit einem BackupCraft-Server verbinden.	Connect to a BackupCraft server.
+Server	Server
+Zuletzt verwendet	Recently used
+Anmeldung nicht möglich	Unable to sign in
+Noch kein Server?	No server yet?
+BackupCraft {} · Erstanmeldung mit dem Setup-Token des Servers	BackupCraft {} · First sign-in with the server's setup token
+Prüfung	Verification
+Kopie	Copy
+Wartung	Maintenance
+Was gelaufen ist, was gerade läuft und wer was geändert hat.	What has run, what is running now and who changed what.
+Sitzungen	Sessions
+Vorgänge	Operations
+Hinweise	Alerts
+Audit-Protokoll	Audit log
+Sitzungen filtern	Filter sessions
+Wiederherstellungen	Restores
+Job	Job
+Dauer	Duration
+Gelesen	Read
+Keine Sitzung gewählt	No session selected
+Neu gespeichert	Newly stored
+Deduplizierung	Deduplication
+Kompression	Compression
+Abbrechen wirkt an der nächsten sicheren Stelle; ein halber Restore-Point entsteht nie.	Canceling takes effect at the next safe point; a partial restore point is never created.
+Vorgang	Operation
+Fortschritt	Progress
+Gestartet	Started
+Ergebnis	Result
+Keine Hinweise	No alerts
+Alle Jobs, Hosts und Repositories sind in Ordnung.	All jobs, hosts and repositories are fine.
+Zeit	Time
+Aktion	Action
+Details	Details
+Abgelehnt	Denied
+Repository hinzufügen …	Add repository…
+Prüfen	Verify
+Aufräumen	Clean up
+Unveränderlichkeit …	Immutability…
+Austragen	Detach
+Repository aufräumen?	Clean up repository?
+Daten, die kein Restore-Point von „{}“ mehr braucht, werden freigegeben. Das kann bei großen Repositories dauern; Sicherungen warten so lange.	Data no longer needed by any restore point of “{}” is released. This can take a while for large repositories; backups wait until it is done.
+Repository austragen?	Detach repository?
+„{}“ wird aus BackupCraft entfernt. Die Daten im Ordner bleiben erhalten und lassen sich später wieder einbinden.	“{}” will be removed from BackupCraft. The data in the folder is kept and can be attached again later.
+Noch kein Repository	No repository yet
+Ein Repository ist ein Ordner auf dem Server (lokale Platte, NAS, eingebundene Freigabe), in dem BackupCraft dedupliziert und verschlüsselt speichert.	A repository is a folder on the server (local disk, NAS, mounted network share) where BackupCraft stores data deduplicated and encrypted.
+Aus	Off
+Gesicherte Daten	Backed-up data
+Ersparnis	Savings
+Verschlüsselt	Encrypted
+Dateien und Ordner aus einem Restore-Point zurückholen – an den Originalort oder woandershin.	Recover files and folders from a restore point – to the original location or somewhere else.
+Letzter Stand	Latest point
+Noch keine Restore-Points	No restore points yet
+Sobald ein Job gelaufen ist, erscheinen seine Restore-Points hier.	Once a job has run, its restore points appear here.
+Dateien wiederherstellen …	Restore files…
+Inhalt durchsuchen	Browse contents
+Restore-Point löschen?	Delete restore point?
+Der Stand vom {} wird gelöscht. Daten, die kein anderer Stand braucht, gibt die nächste Bereinigung frei.	The restore point from {} will be deleted. Data no other restore point needs is released by the next cleanup.
+{} Restore-Points · Aufbewahrung: {}	{} restore points · Retention: {}
+Zeitpunkt	Point in time
+Geprüft	Verified
+Vollständig	Full
+Inkrementell	Incremental
+bis {}	until {}
+Nicht geprüft	Not verified
+Server, Benutzer, Sicherheit und Darstellung.	Server, users, security and appearance.
+Allgemein	General
+Benutzer & Rollen	Users & roles
+Sicherheit	Security
+Netzwerk	Network
+Benachrichtigungen	Notifications
+Über BackupCraft	About BackupCraft
+Darstellung	Appearance
+Gilt für diese Konsole auf diesem Rechner.	Applies to this console on this computer.
+Sprache	Language
+Design	Theme
+Hell	Light
+Dunkel	Dark
+Wie das System	Use system setting
+Zeitzone der Anzeige	Display time zone
+{} – Zeitpläne verwenden ihre eigene Zeitzone.	{} – schedules use their own time zone.
+Name des Servers	Server name
+Erscheint in der Titelleiste, in Berichten und im Recovery-Kit.	Appears in the title bar, in reports and in the recovery kit.
+Konfiguration täglich automatisch sichern	Back up the configuration automatically every day
+An	On
+Betrachter sehen alles, Wiederherstellung darf zurückholen, Operatoren starten und ändern Jobs, Administratoren verwalten alles.	Viewers see everything, restore operators can restore, operators start and change jobs, administrators manage everything.
+Benutzer anlegen …	Create user…
+Bearbeiten …	Edit…
+Benutzer löschen?	Delete user?
+{} kann sich danach nicht mehr anmelden.	{} will no longer be able to sign in.
+Letzte Anmeldung	Last sign-in
+Aktiv	Active
+Der private Schlüssel öffnet jede verschlüsselte Sicherung – auch ohne diesen Server. Offline und getrennt aufbewahren.	The private key opens every encrypted backup – even without this server. Keep it offline and separate.
+Erzeugt	Created
+Fingerabdruck	Fingerprint
+Kein Recovery-Kit	No recovery kit
+Ohne Kit hängt die Wiederherstellung verschlüsselter Daten an diesem Server.	Without a kit, restoring encrypted data depends on this server.
+Neues Recovery-Kit erzeugen …	Generate new recovery kit…
+Neues Recovery-Kit erzeugen?	Generate new recovery kit?
+Der private Schlüssel wird genau einmal angezeigt. Neue Sicherungen verwenden das neue Kit; das alte bleibt für ältere Sicherungen nötig.	The private key is shown exactly once. New backups use the new kit; the old one is still needed for older backups.
+Erzeugen	Generate
+Konfigurationssicherung	Configuration backup
+Datenbank, Schlüssel und Zertifikate des Servers – verschlüsselt mit einer Passphrase.	The server's database, keys and certificates – encrypted with a passphrase.
+Jetzt sichern …	Back up now…
+Anmeldung	Sign-in
+Sitzungsdauer (Stunden)	Session length (hours)
+Fehlversuche bis zur Sperre (pro Minute)	Failed attempts before lockout (per minute)
+Passwörter brauchen mindestens 12 Zeichen und werden mit Argon2id gespeichert.	Passwords need at least 12 characters and are stored with Argon2id.
+Erlaubte Wiederherstellungsziele	Allowed restore targets
+Benutzer mit der Rolle „Wiederherstellung“ dürfen nur in diese Ordner auf dem Server zurückholen. Vorhandene Dateien werden nie stillschweigend überschrieben.	Users with the “Restore” role may only restore to these folders on the server. Existing files are never silently overwritten.
+Ordner (einer pro Zeile)	Folders (one per line)
+Bandbreite	Bandwidth
+Begrenzt die Übertragung von Agenten zum Server (0 = unbegrenzt).	Limits transfers from agents to the server (0 = unlimited).
+Verbindungen	Connections
+Konsole und bcctl	Console and bcctl
+Agenten	Agents
+gegenseitiges TLS mit eigener CA	mutual TLS with its own CA
+Außerhalb des Servers	Outside the server
+nur verschlüsselt	encrypted only
+In Vorbereitung	In preparation
+Jedem Lauf	Every run
+Version {} · gebaut mit JFLib	Version {} · built with JFLib
+Konsole	Console
+Speicherformat	Storage format
+Transport	Transport
+Lizenzen	Licenses
+Schrift: Inter (SIL Open Font License 1.1). Symbole: eigene Vektorgrafiken von BackupCraft und jfOffice; die jfOffice-Motive gehen auf WordCraft zurück (MIT-Lizenz). Das Programm enthält Code von Drittanbietern, darunter Rust-Bibliotheken wie HarfRust und Portierungen aus libjpeg-turbo, libwebp und libjxl. Diese Software beruht teilweise auf der Arbeit der Independent JPEG Group. Alle Hinweise und Lizenztexte liegen dem Programm bei (THIRD_PARTY_NOTICES.md und Ordner „licenses“).	Font: Inter (SIL Open Font License 1.1). Icons: original vector graphics by BackupCraft and jfOffice; the jfOffice motifs derive from WordCraft (MIT License). The program contains third-party code, including Rust libraries such as HarfRust and ports of libjpeg-turbo, libwebp and libjxl. This software is based in part on the work of the Independent JPEG Group. All notices and license texts ship with the program (THIRD_PARTY_NOTICES.md and the "licenses" folder).
+Replikate von Systemen auf einem Zielhost, Failover-Pläne und Failback.	Replicas of systems on a target host, failover plans and failback.
+Medienpools, Bänder und Auslagerung – auch als virtuelle Bandbibliothek auf Platte.	Media pools, tapes and vaulting – also as a virtual tape library on disk.
+Sofortstart und Startprüfung	Instant start and boot checks
+Systeme direkt aus einem Restore-Point starten und Sicherungen automatisch auf Startfähigkeit prüfen.	Start systems directly from a restore point and automatically verify that backups boot.
+Datenmodell, Schnittstelle und Oberfläche stehen bereit; die Ausführung folgt in einer der nächsten Versionen.	The data model, API and UI are ready; execution will follow in an upcoming version.
+Was hier entsteht	What's coming
+Status auf diesem Server	Status on this server
+Verfügbar	Available
+Noch keine Einträge	No entries yet
+Sobald die Funktion verfügbar ist, erscheinen die Einträge hier.	Once the feature is available, entries appear here.
+Replikation und Failover	Replication and failover
+Datei-CDP	File CDP
+Bandbibliothek	Tape library
+Startprüfungen	Boot checks
+Startprüfung	Boot check
+Hypervisor-Anbindung	Hypervisor integration
+Funktion	Feature
+Replikat vorbereiten: ein startbereiter Stand auf einem Zielhost, aus jedem neuen Restore-Point nachgeführt.	Prepare replica: a ready-to-start copy on a target host, updated from every new restore point.
+Failover-Plan: Reihenfolge, Wartezeiten und Prüfungen für den Ernstfall.	Failover plan: order, wait times and checks for an emergency.
+Failback: die Änderungen während des Failovers zurück auf das Original übertragen.	Failback: transfer the changes made during failover back to the original.
+Datei-CDP: Änderungen fortlaufend aufzeichnen, Rückkehr zu jedem Zeitpunkt.	File CDP: record changes continuously, return to any point in time.
+Replikat anlegen …	Create replica…
+Failover-Plan …	Failover plan…
+Medienpools mit eigener Aufbewahrung und Schreibschutz.	Media pools with their own retention and write protection.
+Restore-Points vollständig auf Band schreiben – lesbar auch ohne Repository.	Write restore points to tape in full – readable even without a repository.
+Katalog, Prüfung und Wiederherstellung direkt vom Band.	Catalog, verification and restore directly from tape.
+Medienpool anlegen …	Create media pool…
+Band hinzufügen …	Add tape…
+Auf Band schreiben	Write to tape
+Band prüfen	Verify tape
+Schutz bis	Protected until
+Sofortstart: eine VM aus dem Restore-Point starten, ohne vorher alles zurückzukopieren (QEMU/KVM, Hyper-V).	Instant start: start a VM from the restore point without copying everything back first (QEMU/KVM, Hyper-V).
+Zusammenführen oder verwerfen: Änderungen während des Betriebs übernehmen oder rückstandslos entfernen.	Merge or discard: keep the changes made while running, or remove them without a trace.
+Startprüfung: Start in einer isolierten Umgebung, Gastprüfungen, Bericht.	Boot check: boot in an isolated environment, guest checks, report.
+VM starten …	Start VM…
+Zusammenführen	Merge
+Startprüfung …	Boot check…
+Ordner nicht verfügbar	Folder not available
+Ungültiger Ausdruck	Invalid expression
+Unbekannte Zeitzone	Unknown time zone
+Stündlich	Hourly
+Täglich	Daily
+Wöchentlich	Weekly
+Monatlich	Monthly
+Cron	Cron
+Der Job läuft nur, wenn er von Hand oder über bcctl gestartet wird.	The job only runs when started manually or via bcctl.
+Jede Stunde zur Minute	Every hour at minute
+Uhrzeit	Time
+am Tag	on day
+An diesen Tagen	On these days
+Monate ohne diesen Tag werden übersprungen.	Months without this day are skipped.
+Ausdruck	Expression
+Minute Stunde Tag Monat Wochentag; Namen (mon, jan), Bereiche (1-5), Schritte (*/15) und Listen (1,15) sind erlaubt.	Minute hour day month weekday; names (mon, jan), ranges (1-5), steps (*/15) and lists (1,15) are allowed.
+Zur Zeitumstellung: Eine ausgefallene Uhrzeit läuft direkt danach, eine doppelte Uhrzeit nur einmal.	Daylight saving changes: a skipped time runs right afterwards, a repeated time runs only once.
+Zeitzone suchen	Search time zones
+Bitte einen Namen eingeben.	Enter a name.
+Bitte den Job wählen, dessen Stände kopiert werden.	Select the job whose restore points are copied.
+Bitte einen Host wählen.	Select a host.
+Bitte mindestens einen Ordner oder eine Datei auswählen.	Select at least one folder or file.
+Bitte ein Repository wählen.	Select a repository.
+Die Passphrase braucht mindestens 12 Zeichen.	The passphrase needs at least 12 characters.
+Die Passphrasen stimmen nicht überein.	The passphrases don't match.
+Der Zeitplan ist ungültig.	The schedule is invalid.
+Name und Art	Name and type
+Zusammenfassung	Summary
+Job bearbeiten: {}	Edit job: {}
+Neuer Sicherungsjob	New backup job
+Was wird gesichert, wohin, wie lange und wann.	What is backed up, where to, for how long and when.
+Job anlegen	Create job
+z. B. Dateiserver – täglich	e.g. File server – daily
+Beschreibung (optional)	Description (optional)
+Was soll gesichert werden?	What do you want to back up?
+Dateien und Ordner	Files and folders
+Ordner und Dateien auf dem Server selbst oder auf einem Agenten. Unveränderte Dateien werden nicht erneut gelesen.	Folders and files on the server itself or on an agent. Unchanged files are not read again.
+Die Restore-Points eines anderen Jobs in ein zweites Repository kopieren (3-2-1-Regel).	Copy another job's restore points to a second repository (3-2-1 rule).
+Ganzes Volume	Entire volume
+Welcher Job wird kopiert?	Which job is copied?
+{} Restore-Points in „{}“	{} restore points in “{}”
+Ordner und Dateien	Folders and files
+{} ausgewählt	{} selected
+Angeboten werden nur die Ordner, die der Host für Sicherungen freigegeben hat.	Only the folders the host has shared for backup are offered.
+Ausschließen (ein Muster pro Zeile)	Exclude (one pattern per line)
+Das Repository speichert dedupliziert: Daten, die schon ein anderer Job gesichert hat, belegen keinen zusätzlichen Platz.	The repository stores data deduplicated: data that another job has already backed up takes up no extra space.
+frei	free
+unveränderlich	immutable
+Kein Repository	No repository
+Bitte zuerst unter „Repositories“ eines hinzufügen.	Add one under “Repositories” first.
+Ein Stand bleibt, solange eine der Regeln ihn braucht. Jeder Restore-Point ist vollständig wiederherstellbar – es gibt keine Ketten, die man pflegen müsste.	A restore point is kept as long as any of the rules needs it. Every restore point can be fully restored – there are no chains to maintain.
+Mindestens die letzten Restore-Points	At least the latest restore points
+Alle Stände der letzten Tage	All restore points from the last days
+Je einen pro Woche, Wochen	One per week, weeks
+Je einen pro Monat, Monate	One per month, months
+Je einen pro Jahr, Jahre	One per year, years
+Verschlüsselung und Optionen	Encryption and options
+Restore-Points verschlüsseln (XChaCha20-Poly1305)	Encrypt restore points (XChaCha20-Poly1305)
+Neue Passphrase festlegen (ab dem nächsten Lauf)	Set a new passphrase (from the next run)
+Mindestens 12 Zeichen. Der Server bewahrt die Passphrase versiegelt auf; das Recovery-Kit öffnet die Daten auch ohne sie.	At least 12 characters. The server keeps the passphrase sealed; the recovery kit opens the data even without it.
+Hinweis zur Passphrase (optional, unverschlüsselt gespeichert)	Passphrase hint (optional, stored unencrypted)
+z. B. Tresor › BackupCraft	e.g. Vault › BackupCraft
+Alles neu lesen (aktive Vollsicherung) alle … Tage	Re-read everything (active full backup) every … days
+0 = nie. Sonst vergleicht BackupCraft Größe, Änderungszeit und Datei-ID und liest nur Geänderte.	0 = never. Otherwise BackupCraft compares size, modification time and file ID and reads only changed files.
+Skript davor (auf dem Host, optional)	Script before (on the host, optional)
+Skript danach	Script after
+Skripte müssen auf dem Host in einem freigegebenen Skriptordner liegen; beliebige Befehle führt der Agent nicht aus.	Scripts must be in a shared script folder on the host; the agent does not run arbitrary commands.
+{} Einträge auf {}	{} items on {}
+Einträge	Items
+Job aktiv (Zeitplan läuft)	Job enabled (schedule active)
+Nach dem Speichern sofort starten	Start immediately after saving
+Wird gespeichert …	Saving…
+Zurück	Back
+Weiter	Next
+Code erzeugen	Generate code
+Auf dem Rechner koppeln	Pair on the computer
+Agent koppeln	Pair agent
+Ohne gespeicherte Zugangsdaten: der Agent meldet sich mit einem Einmal-Code.	No stored credentials: the agent registers with a one-time code.
+So funktioniert es	How it works
+BackupCraft-Agent auf dem Rechner installieren (Setup für Windows, .deb für Linux).	Install the BackupCraft agent on the computer (setup for Windows, .deb for Linux).
+Hier einen Pairing-Code erzeugen – gültig 15 Minuten, nur einmal verwendbar.	Generate a pairing code here – valid for 15 minutes, single use.
+Auf dem Rechner koppeln; der Agent zeigt den Fingerabdruck dieses Servers zum Vergleich.	Pair on the computer; the agent shows this server's fingerprint for comparison.
+Der Server stellt dem Agenten ein eigenes Zertifikat aus; ab dann gilt gegenseitiges TLS.	The server issues the agent its own certificate; from then on, mutual TLS applies.
+Betriebssystem des Rechners	Computer's operating system
+Pairing-Code erzeugen	Generate pairing code
+Pairing-Code	Pairing code
+gültig bis {}	valid until {}
+noch {}	{} left
+Auf dem Rechner ausführen	Run on the computer
+Befehl kopieren	Copy command
+Der Befehl liegt in der Zwischenablage.	The command is on the clipboard.
+Fingerabdruck dieses Servers (zum Vergleich auf dem Rechner)	This server's fingerprint (to compare on the computer)
+{} ist gekoppelt.	{} is paired.
+Warte auf den Agenten …	Waiting for the agent…
+Bitte einen Restore-Point wählen.	Select a restore point.
+Bitte auswählen, was wiederhergestellt wird – oder „Alles“.	Select what to restore – or “Everything”.
+Bitte Host und Zielordner angeben.	Specify a host and target folder.
+Restore-Point	Restore point
+Inhalt	Contents
+Optionen	Options
+Wiederherstellen: {}	Restore: {}
+Vorhandene Dateien werden nie stillschweigend überschrieben.	Existing files are never silently overwritten.
+Welcher Stand?	Which restore point?
+Was wird wiederhergestellt?	What do you want to restore?
+Alles	Everything
+Den kompletten Stand dieses Restore-Points.	The complete contents of this restore point.
+Auswahl	Selection
+Einzelne Ordner und Dateien aus dem Restore-Point.	Individual folders and files from the restore point.
+Wohin?	Where to?
+Originalort	Original location
+Zurück an die ursprünglichen Pfade auf {}.	Back to the original paths on {}.
+Anderer Ordner	Different folder
+In einen neuen Ordner auf einem Host – sicher zum Vergleichen.	To a new folder on a host – safe for comparing.
+Zielordner	Target folder
+Kein Wiederherstellungsziel freigegeben	No restore target shared
+Der Host nimmt keine Wiederherstellungen an. Ziele lassen sich unter „Server & Agenten“ freigeben.	The host doesn't accept restores. Targets can be shared under “Servers & agents”.
+Erlaubt: {}	Allowed: {}
+Wenn eine Datei schon existiert	If a file already exists
+Überspringen (vorhandene Datei bleibt)	Skip (existing file is kept)
+Unter neuem Namen ablegen (Datei (wiederhergestellt).ext)	Save under a new name (file (restored).ext)
+Überschreiben	Overwrite
+Vorsicht	Caution
+Überschriebene Dateien lassen sich nur aus einem anderen Restore-Point zurückholen.	Overwritten files can only be recovered from another restore point.
+Berechtigungen, Zeitstempel und symbolische Verknüpfungen werden mit wiederhergestellt; Verknüpfungen, die aus dem Ziel hinauszeigen, nicht.	Permissions, timestamps and symbolic links are restored too; links that point outside the target are not.
+{} Einträge	{} items
+Originalort auf {}	Original location on {}
+Überspringen	Skip
+Neuer Name	New name
+Bei Konflikten	On conflicts
+Läuft im Hintergrund	Runs in the background
+Den Fortschritt zeigt die Aktivitätsleiste; das Protokoll steht unter Monitoring.	The activity bar shows the progress; the log is under Monitoring.
+Bitte die Adresse des Rechners angeben.	Enter the computer's address.
+Der Host-Schlüssel ist noch nicht abgefragt.	The host key hasn't been retrieved yet.
+Bitte bestätigen, dass der Fingerabdruck stimmt.	Confirm that the fingerprint matches.
+Bitte Benutzer und Passwort angeben oder gespeicherte Zugangsdaten wählen.	Enter a user and password, or select stored credentials.
+Bitte mindestens einen Ordner freigeben.	Share at least one folder.
+Rechner	Computer
+Host-Schlüssel	Host key
+Freigaben	Shared folders
+Agent per SSH installieren	Install agent via SSH
+Für Linux-Rechner mit OpenSSH (Ed25519-Host-Schlüssel).	For Linux computers with OpenSSH (Ed25519 host key).
+Adresse	Address
+SSH-Port	SSH port
+Anzeigename (optional)	Display name (optional)
+Host-Schlüssel prüfen	Verify host key
+Vergleichen Sie den Fingerabdruck mit dem des Rechners (z. B. „ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub“). Erst nach Ihrer Bestätigung sendet der Server Zugangsdaten.	Compare the fingerprint with the computer's (e.g. “ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub”). The server sends credentials only after you confirm.
+Der Fingerabdruck stimmt mit dem des Rechners überein.	The fingerprint matches the computer's.
+Benutzer und Passwort eingeben	Enter user and password
+Das Passwort wird nur für diese Installation verwendet und nicht gespeichert.	The password is used only for this installation and is not stored.
+Nur aus diesen Ordnern darf der Server später lesen (einer pro Zeile).	Later, the server may only read from these folders (one per line).
+{} Ordner	{} folders
+Ablauf	What happens
+Upload des Agenten, Einrichtung als Dienst (systemd), Kopplung mit eigenem Zertifikat.	The agent is uploaded, set up as a service (systemd) and paired with its own certificate.
+Installieren	Install
+Der Server weist sich mit einer unbekannten Zertifizierungsstelle aus	The server presents an unknown certificate authority
+Zertifizierungsstelle geändert	Certificate authority changed
+Dieser Server weist sich mit einer anderen Zertifizierungsstelle aus als bisher. Das ist nach einer Neuinstallation normal – oder jemand sitzt zwischen Console und Server. Nur vertrauen, wenn der Fingerabdruck stimmt.	This server presents a different certificate authority than before. That is normal after a reinstallation – or someone sits between the console and the server. Trust it only if the fingerprint matches.
+Unbekannter Server	Unknown server
+Der Server verwendet eine eigene Zertifizierungsstelle. Vergleichen Sie den Fingerabdruck mit der Ausgabe von „bc-server ca“ auf dem Server oder mit dem Dialog „Agent koppeln“.	The server uses its own certificate authority. Compare the fingerprint with the output of “bc-server ca” on the server or with the “Pair agent” dialog.
+Zertifizierungsstelle	Certificate authority
+Fingerabdruck (SHA-256)	Fingerprint (SHA-256)
+Vertrauen und anmelden	Trust and sign in
+Server einrichten	Set up server
+{} ist noch nicht eingerichtet. Legen Sie den ersten Administrator an. Das Setup-Token zeigt der Server beim ersten Start; es steht auch in der Datei setup.token in seinem Datenordner.	{} is not set up yet. Create the first administrator. The server shows the setup token when it starts for the first time; it is also in the file setup.token in its data folder.
+Setup-Token	Setup token
+Passwort wiederholen	Repeat password
+Name des Servers (optional)	Server name (optional)
+Das Passwort ist kürzer als 12 Zeichen.	The password is shorter than 12 characters.
+Einrichtung nicht möglich	Setup failed
+Richte ein …	Setting up …
+Einrichten und anmelden	Set up and sign in
+Server eingerichtet	Server set up
+{} ist Administrator.	{} is administrator.
+Schnell (LZ4)	Fast (LZ4)
+Ausgewogen (zstd)	Balanced (zstd)
+Hoch (zstd 6)	High (zstd 6)
+Schnell	Fast
+Ausgewogen	Balanced
+Hoch	High
+Daten werden unkomprimiert gespeichert (sinnvoll für bereits komprimierte Medien).	Data is stored uncompressed (useful for media that is compressed already).
+LZ4: sehr schnell, mäßige Ersparnis.	LZ4: very fast, moderate savings.
+zstd Stufe 3: deutlich kleiner, etwa halb so schnell wie LZ4.	zstd level 3: clearly smaller, about half as fast as LZ4.
+zstd Stufe 6: am kleinsten, rechenintensiv – für Jobs mit viel Zeit und wenig Speicher.	zstd level 6: smallest, CPU-intensive – for jobs with plenty of time and little storage.
+Gesendet	Sent
+Nicht verfügbar	Not available
+Dieser Server versendet keine Benachrichtigungen (ältere Version). Die Einstellungen werden trotzdem gespeichert.	This server does not send notifications (older version). The settings are saved anyway.
+Nach jeder Sitzung je nach Auswahl, dazu auf Wunsch eine tägliche Zusammenfassung.	After sessions as selected, plus a daily summary if you like.
+Benachrichtigen bei	Notify on
+Fehlern und Warnungen	Errors and warnings
+Tägliche Zusammenfassung um	Daily summary at
+Uhr (Serverzeit)	(server time)
+E-Mail (SMTP)	E-mail (SMTP)
+Der Server prüft das Zertifikat des Mailservers wie ein Browser; eine eigene Zertifizierungsstelle kann unten ergänzt werden.	The server checks the mail server's certificate like a browser; a certificate authority of your own can be added below.
+SMTP-Server (Name:Port)	SMTP server (name:port)
+STARTTLS (587)	STARTTLS (587)
+TLS (465)	TLS (465)
+Keine (25)	None (25)
+Ohne Verschlüsselung meldet sich BackupCraft nicht an – nur für Relays im eigenen Netz.	Without encryption BackupCraft does not log in – only for relays in your own network.
+Benutzer (optional)	User (optional)
+Absender	Sender
+Empfänger (mehrere mit Komma)	Recipients (separate with commas)
+Eigene Zertifizierungsstelle (PEM, optional)	Own certificate authority (PEM, optional)
+Web-Hook	Web hook
+POST mit JSON an diese Adresse (Teams, Slack und Mattermost nehmen das Feld „text“).	POST with JSON to this address (Teams, Slack and Mattermost use the "text" field).
+Versand	Delivery
+Noch nichts versendet.	Nothing sent yet.
+Testnachricht senden	Send test message
+Zusammenfassung jetzt senden	Send summary now
+Speichern Sie Änderungen vor dem Test: der Server sendet mit den gespeicherten Einstellungen.	Save your changes before testing: the server sends with the saved settings.
+Updates	Updates
+Neue Versionen kommen aus einem Update-Kanal; jedes Manifest ist vom Herausgeber signiert, jedes Paket per SHA-256 geprüft.	New versions come from an update channel; every manifest is signed by the publisher, every package checked with SHA-256.
+noch nicht gesucht	not checked yet
+{} – verfügbar	{} – available
+{} – aktuell	{} – up to date
+Diese Version	This version
+Neueste Version	Newest version
+Zuletzt gesucht	Last checked
+Update-Kanal	Update channel
+Neu in dieser Version	New in this version
+Zum Installieren das Setup als Administrator ausführen; es ersetzt die Programme und startet die Dienste neu.	To install, run the setup as administrator; it replaces the programs and restarts the services.
+Zum Installieren: sudo apt install ./<Paket> – der Dienst startet danach neu.	To install: sudo apt install ./<package> – the service restarts afterwards.
+Heruntergeladen und geprüft	Downloaded and checked
+Jetzt suchen	Check now
+Herunterladen ({})	Download ({})
+Update-Kanal (Adresse von manifest.json)	Update channel (address of manifest.json)
+Schlüssel des Herausgebers (Ed25519, hex)	Publisher key (Ed25519, hex)
+Täglich automatisch suchen	Check automatically every day
+Version {} ist verfügbar.	Version {} is available.
+BackupCraft ist aktuell.	BackupCraft is up to date.
+Das Replikat wurde gespeichert.	The replica was saved.
+Das Replikat wurde ausgetragen. Die Dateien im Zielordner bleiben.	The replica was removed. The files in the target folder stay.
+Failover aktiv: das Replikat ist in Gebrauch.	Failover active: the replica is in use.
+Der Failover-Plan wurde gespeichert.	The failover plan was saved.
+Der Failover-Plan wurde gelöscht.	The failover plan was deleted.
+Replikat bearbeiten	Edit replica
+Replikat anlegen	New replica
+z. B. Dateiserver – Standby	e.g. File server – standby
+Job (sein neuester Restore-Point wird repliziert)	Job (its newest restore point is replicated)
+Zielhost	Target host
+Replikat	Replica
+Ordner auf dem Zielhost	Folder on the target host
+Der Ordner muss in einem beschreibbaren Ordner (Wiederherstellungsziel) des Zielhosts liegen.	The folder must be inside a writable folder (restore target) of the target host.
+Muss innerhalb von {} liegen. Jede Quelle des Jobs bekommt darin einen eigenen Unterordner.	Must be inside {}. Each source of the job gets its own subfolder there.
+Nach jedem neuen Restore-Point abgleichen	Sync after every new restore point
+Failover-Plan bearbeiten	Edit failover plan
+Failover-Plan anlegen	New failover plan
+z. B. Standort ausgefallen	e.g. Site down
+Replikate (in der Reihenfolge des Anklickens)	Replicas (in the order you tick them)
+Pause zwischen zwei Replikaten (Sekunden)	Pause between two replicas (seconds)
+Failback	Failback
+Noch nicht abgeglichen	Not synced yet
+Wird abgeglichen	Syncing
+Failover aktiv	Failover active
+Failback läuft	Failback running
+Überwacht	Watching
+Sichert	Backing up
+Startet	Starting
+Angehalten	Stopped
+Startbereite Kopien auf einem Zielhost, Failover und Failback – und Jobs, die Änderungen laufend sichern.	Ready-to-use copies on a target host, failover and failback – and jobs that back up changes continuously.
+Replikate	Replicas
+Failover-Pläne	Failover plans
+Abgleichen	Sync
+Failover	Failover
+Failover verwerfen	Discard failover
+Failover auf „{}“?	Fail over to “{}”?
+Ab jetzt gilt {} auf {} als die Arbeitskopie. Das Replikat wird nicht mehr abgeglichen, bis Failback oder Verwerfen es zurückholt.	From now on {} on {} is the working copy. The replica is no longer synced until failback or discard brings it back.
+Failback von „{}“?	Fail back “{}”?
+Die Ordner des Replikats werden als Restore-Point des Jobs gesichert und dann an die ursprünglichen Orte zurückgeschrieben. Geänderte Dateien werden ersetzt; am Original wird nichts gelöscht.	The replica's folders are backed up as a restore point of the job and then written back to the original places. Changed files are replaced; nothing is deleted at the original.
+Failover von „{}“ verwerfen?	Discard the failover of “{}”?
+Änderungen, die während des Failovers am Replikat gemacht wurden, gehen verloren: das Replikat wird wieder auf seinen Restore-Point gebracht.	Changes made to the replica during the failover are lost: the replica goes back to its restore point.
+Verwerfen	Discard
+Replikat „{}“ austragen?	Remove replica “{}”?
+BackupCraft gleicht den Ordner nicht mehr ab. Die Dateien im Zielordner bleiben erhalten.	BackupCraft no longer syncs the folder. The files in the target folder stay.
+{} Replikate im Failover	{} replicas in failover
+Failover aktiv: {}	Failover active: {}
+Änderungen am Replikat bringt „Failback“ zurück auf das Original; „Failover verwerfen“ setzt das Replikat zurück.	“Failback” brings changes of the replica back to the original; “Discard failover” resets the replica.
+Noch keine Replikate	No replicas yet
+Ein Replikat hält den neuesten Restore-Point eines Jobs startbereit in einem Ordner eines anderen Hosts – für den Fall, dass das Original ausfällt.	A replica keeps a job's newest restore point ready in a folder of another host – in case the original fails.
+Ordner	Folder
+Stand	As of
+Zustand	State
+Abgeglichen	Synced
+folgt jedem neuen Restore-Point	follows every new restore point
+Failover-Plan anlegen …	New failover plan …
+Plan ausführen	Run plan
+Failover-Plan „{}“ ausführen?	Run failover plan “{}”?
+Nacheinander auf ihre Replikate umgeschaltet werden: {}. Pause dazwischen: {} s.	Switched to their replicas one after the other: {}. Pause in between: {} s.
+Ausführen	Run
+Failover-Plan „{}“ löschen?	Delete failover plan “{}”?
+Die Replikate bleiben unverändert.	The replicas stay unchanged.
+Noch keine Failover-Pläne	No failover plans yet
+Ein Plan schaltet mehrere Replikate in fester Reihenfolge um, mit einer Pause dazwischen – etwa erst die Datenbank, dann die Anwendung.	A plan switches several replicas over in a fixed order with a pause in between – say the database first, then the application.
+Plan	Plan
+Reihenfolge	Order
+Pause	Pause
+Zuletzt ausgeführt	Last run
+(fehlt)	(missing)
+Umgeschaltet	Switched over
+Job bearbeiten …	Edit job …
+Kein Job sichert laufend	No job backs up continuously
+Im Job-Assistenten unter „Zeitplan“ lässt sich „Laufend sichern (CDP)“ einschalten: Änderungen werden dann innerhalb des RPO zu einem Restore-Point.	Turn on “Back up continuously (CDP)” under “Schedule” in the job wizard: changes then become a restore point within the RPO.
+RPO	RPO
+Punkte	Points
+Offen	Pending
+Letzte Änderung	Last change
+Letzter Punkt	Last point
+{} in {} h	{} in {} h
+Server: Dateisystem-Ereignisse des Betriebssystems. Agenten: der Agent meldet Änderungen in seinen freigegebenen Ordnern. Unveränderte Ordner übernimmt ein CDP-Punkt aus dem vorigen.	Server: file system events of the operating system. Agents: the agent reports changes in its shared folders. A CDP point takes unchanged folders over from the previous one.
+Der Abstand der CDP-Punkte liegt zwischen 15 Sekunden und einem Tag.	The interval of CDP points is between 15 seconds and one day.
+Laufend sichern (CDP)	Back up continuously (CDP)
+Änderungen in den Quellen werden überwacht; kurz danach entsteht ein Restore-Point – höchstens einer pro RPO. Unveränderte Ordner werden dabei nicht gelesen.	Changes in the sources are watched; shortly after, a restore point is made – at most one per RPO. Unchanged folders are not read.
+RPO: höchstens ein Punkt alle … Sekunden	RPO: at most one point every … seconds
+Alle CDP-Punkte behalten für … Stunden	Keep all CDP points for … hours
+Danach gilt wieder die normale Aufbewahrung. Der Zeitplan oben kann zusätzlich laufen (etwa für eine nächtliche Vollprüfung) oder ausgeschaltet bleiben.	After that the normal retention applies. The schedule above can run as well (say for a nightly full check) or stay off.
+{} · laufend (RPO {})	{} · continuous (RPO {})
+Der Server wird überwacht.	The server is watched.
+Der Server wird nicht mehr überwacht.	The server is no longer watched.
+Das Überwachungs-Token wurde widerrufen.	The fleet token was revoked.
+Überwachten Server bearbeiten	Edit watched server
+Server überwachen	Watch a server
+Ein anderer BackupCraft-Server meldet diesem seinen Zustand. Das Überwachungs-Token erzeugt man dort unter Einstellungen › Netzwerk.	Another BackupCraft server reports its state to this one. Make the fleet token there under Settings › Network.
+z. B. Hamburg	e.g. Hamburg
+Überwachungs-Token (leer: unverändert)	Fleet token (empty: unchanged)
+Überwachungs-Token	Fleet token
+Zertifizierungsstelle: {}	Certificate authority: {}
+Mit dem Fingerabdruck vergleichen, den der Server beim Start protokolliert (oder Einstellungen › Netzwerk dort).	Compare with the fingerprint the server logs at start (or Settings › Network there).
+Der Fingerabdruck stimmt	The fingerprint matches
+Unverschlüsselt über http – nur auf diesem Rechner (localhost) zulässig.	Unencrypted http – allowed on this computer (localhost) only.
+Überwachen	Watch
+Überwachungs-Token erzeugen	Make a fleet token
+Mit dem Token liest eine Zentrale den Zustand dieses Servers – Jobs, Sitzungen, Speicher, Hinweise. Ändern oder wiederherstellen kann sie damit nichts.	With the token a central server reads this server's state – jobs, sessions, storage, alerts. It cannot change or restore anything with it.
+z. B. Zentrale Frankfurt	e.g. Frankfurt head office
+In der Zentrale unter Monitoring › Serverflotte eintragen.	Enter it at the central server under Monitoring › Server fleet.
+Das Token liegt in der Zwischenablage.	The token is on the clipboard.
+In Ordnung	OK
+Token abgelehnt	Token refused
+CA geändert	CA changed
+Server hinzufügen …	Add server …
+Jetzt abfragen	Check now
+Konsole verbinden	Connect console
+„{}“ nicht mehr überwachen?	Stop watching “{}”?
+Der Server selbst bleibt unverändert; sein Überwachungs-Token lässt sich dort widerrufen.	The server itself stays unchanged; its fleet token can be revoked there.
+Keine weiteren Server	No other servers
+Hier erscheinen andere BackupCraft-Server, die dieser überwacht – etwa die Server der Außenstellen. Dort unter Einstellungen › Netzwerk ein Überwachungs-Token erzeugen und hier mit „Server hinzufügen“ eintragen.	Other BackupCraft servers this one watches appear here – say the servers of branch offices. Make a fleet token there under Settings › Network and enter it here with “Add server”.
+{} Server	{} servers
+{} in Ordnung	{} OK
+{} mit Warnungen	{} with warnings
+{} mit Fehlern	{} with errors
+Letzte 24 h	Last 24 h
+Abgefragt	Checked
+keine (http auf diesem Rechner)	none (http on this computer)
+{} (älter als die letzte Abfrage)	{} (older than the last check)
+Servername	Server name
+Letzter Bericht	Last report
+Hosts online	Hosts online
+Läuft gerade	Running now
+Hinweise des Servers	The server's alerts
+Serverflotte	Server fleet
+Fingerabdruck der CA	CA fingerprint
+Zentrale Überwachung	Central monitoring
+Andere BackupCraft-Server (Zentralen) lesen mit einem Überwachungs-Token den Zustand dieses Servers. Mehr dürfen sie damit nicht.	Other BackupCraft servers (central servers) read this server's state with a fleet token. They may do nothing more with it.
+Von	By
+Token erzeugen …	Make token …
+Widerrufen	Revoke
+Token „{}“ widerrufen?	Revoke token “{}”?
+Die Zentrale, die es verwendet, erreicht diesen Server danach nicht mehr.	The central server that uses it can no longer reach this server afterwards.
+Die Bänder wurden angelegt.	The tapes were added.
+Das Band wurde zugeordnet.	The tape was assigned.
+Das Band wurde entfernt.	The tape was removed.
+Der Medienpool wurde gespeichert.	The media pool was saved.
+Der Medienpool wurde gelöscht.	The media pool was deleted.
+Bänder hinzufügen	Add tapes
+Frei (jeder Pool nimmt sie)	Free (any pool takes them)
+Die virtuelle Bibliothek legt jedes Band als Datei an; sie wächst erst beim Schreiben.	The virtual library makes each tape a file; it grows only while being written.
+Anzahl	Count
+Kapazität je Band (GB)	Capacity per tape (GB)
+Barcode-Präfix (2 bis 4 Buchstaben)	Barcode prefix (2 to 4 letters)
+Medienpool	Media pool
+Anlegen	Create
+Band {}: Pool	Tape {}: pool
+Zuordnen	Assign
+Medienpool bearbeiten	Edit media pool
+Medienpool anlegen	New media pool
+z. B. Wöchentlich	e.g. Weekly
+Schreibschutz nach dem Schreiben (Tage, 0 = keiner)	Write protection after writing (days, 0 = none)
+Verschlüsseln (XChaCha20-Poly1305, ein Schlüssel je Satz)	Encrypt (XChaCha20-Poly1305, one key per set)
+An beschriebene Bänder anhängen, bis sie voll sind	Append to written tapes until they are full
+Mit Recovery-Kit lassen sich verschlüsselte Bänder auch ohne diesen Server öffnen: der Schlüssel jedes Satzes liegt für das Kit versiegelt auf dem Band.	With a recovery kit, encrypted tapes open even without this server: each set's key is on the tape, sealed for the kit.
+Bitte wählen	Please choose
+Der Restore-Point wird vollständig auf Bänder des Pools geschrieben – lesbar auch ohne Repository.	The restore point is written completely to tapes of the pool – readable even without the repository.
+Schreiben	Write
+Vom Band wiederherstellen	Restore from tape
+Nur diese Pfade (einer pro Zeile; leer = alles)	Only these paths (one per line; empty = everything)
+Vorhandene Dateien	Existing files
+Umbenennen	Rename
+Ersetzen	Replace
+Band	Tape
+Band:	Tape:
+Schreibt auf Band	Writes to tape
+Auf Band …	To tape …
+Leer	Blank
+Beschrieben	Written
+Voll	Full
+Nicht in der Bibliothek	Not in the library
+Band fehlt	Tape missing
+Unvollständig	Incomplete
+Schlüssel fehlt	Key missing
+Restore-Points vollständig auf Band – lesbar ohne Repository, auch auf einem anderen Server.	Restore points completely on tape – readable without the repository, even on another server.
+{} Bänder	{} tapes
+{} leer · {} von {} belegt · {} Sätze	{} blank · {} of {} used · {} sets
+{} nicht in der Bibliothek	{} not in the library
+Virtuelle Bibliothek: {}	Virtual library: {}
+Bibliothek nicht erreichbar	Library not reachable
+Bänder	Tapes
+Medienpools	Media pools
+Auf Band	On tape
+Bänder hinzufügen …	Add tapes …
+Pool zuweisen …	Assign pool …
+Band löschen …	Erase tape …
+Bibliothek einlesen	Read library
+Band {} löschen?	Erase tape {}?
+Die {} Sätze darauf gehen verloren – auch Sätze, die auf anderen Bändern weitergehen. Das Band bleibt im Pool und wird wieder beschrieben.	The {} sets on it are lost – also sets that go on on other tapes. The tape stays in its pool and is written again.
+Band {} entfernen?	Remove tape {}?
+Die Datei des virtuellen Bandes wird gelöscht, seine Sätze fallen aus dem Katalog.	The file of the virtual tape is deleted, its sets leave the catalog.
+Noch keine Bänder	No tapes yet
+Die virtuelle Bandbibliothek legt jedes Band als Datei an. „Bänder hinzufügen“ erzeugt leere Bänder; mit „Bibliothek einlesen“ kommen Bänder von anderswo dazu.	The virtual tape library makes each tape a file. “Add tapes” makes blank tapes; “Read library” takes in tapes from elsewhere.
+Barcode	Barcode
+Pool	Pool
+Belegt	Used
+Sätze	Sets
+Geschrieben	Written
+Pool anlegen …	New pool …
+Medienpool „{}“ löschen?	Delete media pool “{}”?
+Leere Bänder des Pools werden frei. Ein Pool mit beschriebenen Bändern bleibt.	Blank tapes of the pool become free. A pool with written tapes stays.
+Noch keine Medienpools	No media pools yet
+Ein Medienpool fasst Bänder mit einem Zweck zusammen – etwa „Wöchentlich“ mit vier Wochen Schutz oder „Tresor“ verschlüsselt für die Auslagerung.	A media pool groups tapes with one purpose – say “Weekly” with four weeks of protection or “Vault”, encrypted, for off-site storage.
+keiner	none
+anhängen, bis voll	append until full
+je Lauf ein leeres Band	a blank tape per run
+Vom Band wiederherstellen …	Restore from tape …
+Noch nichts auf Band	Nothing on tape yet
+Einen Restore-Point schreibt „Auf Band …“ unter Sicherungsjobs › Restore-Points auf Band; ein Bandjob macht das regelmäßig.	“To tape …” under Backup jobs › Restore points writes a point to tape; a tape job does it regularly.
+Bitte einen Medienpool wählen.	Please choose a media pool.
+Ohne Zeitplan läuft der Job nach jedem erfolgreichen Lauf seines Quelljobs.	Without a schedule the job runs after each good run of its source job.
+Den neuesten Restore-Point eines anderen Jobs vollständig auf Band schreiben – lesbar ohne Repository.	Write the newest restore point of another job completely to tape – readable without the repository.
+Welcher Job kommt auf Band?	Which job goes to tape?
+Der Medienpool bestimmt Bänder, Schreibschutz und Verschlüsselung.	The media pool decides tapes, write protection and encryption.
+ohne Schreibschutz	without write protection
+{} Tage geschützt	protected {} days
+verschlüsselt	encrypted
+Kein Medienpool	No media pool
+Bitte zuerst unter „Tape“ einen Pool anlegen und Bänder hinzufügen.	Please create a pool under “Tape” first and add tapes.
+Wie lange ein Band unangetastet bleibt, bestimmt der Schreibschutz seines Medienpools. Gelöscht wird ein Band nur von Hand, nach Ablauf des Schutzes.	How long a tape stays untouched is up to its media pool's write protection. A tape is erased only by hand, after the protection ends.
+Ob die Bänder verschlüsselt werden, bestimmt der Medienpool (ein eigener Schlüssel je Satz).	Whether the tapes are encrypted is up to the media pool (its own key per set).
+VM	VM
+VM aus einem Restore-Point starten	Start a VM from a restore point
+Die VM startet auf diesem Server direkt aus dem Repository. Was sie schreibt, landet in einer eigenen Datei; der Restore-Point bleibt unverändert.	The VM starts on this server straight from the repository. What it writes goes to a file of its own; the restore point stays unchanged.
+Arbeitsspeicher (MB, 0 = wie gesichert)	Memory (MB, 0 = as backed up)
+Kein Netzwerk	No network
+Isoliert	Isolated
+Isoliert: ein eigenes Netz ohne Verbindung nach außen.	Isolated: a network of its own without a connection outside.
+Starten	Start
+Die VM startet ohne Netzwerkzugang aus dem Restore-Point und wird geprüft; danach wird alles verworfen.	The VM starts from the restore point without network access and is checked; afterwards everything is discarded.
+Läuft mindestens (Sekunden)	Runs at least (seconds)
+Text auf der seriellen Konsole (optional)	Text on the serial console (optional)
+z. B. login:	e.g. login:
+Antwortet auf Port (optional)	Answers on port (optional)
+Höchstens warten (Sekunden)	Wait at most (seconds)
+Konsole: {}	Console: {}
+{} zusammenführen	Merge {}
+Die Platten werden im laufenden Betrieb in den Ordner übertragen; danach läuft die VM von dort und braucht den Restore-Point nicht mehr.	The disks are moved into the folder while the VM runs; afterwards it runs from there and no longer needs the restore point.
+Zielordner (ein Wiederherstellungsordner des Servers)	Target folder (a restore folder of the server)
+Starten …	Start …
+Läuft aus dem Restore-Point	Running from the restore point
+Wird zusammengeführt	Merging
+Zusammengeführt	Merged
+Beendet	Stopped
+Virtuelle Maschinen sichern, direkt aus einem Restore-Point starten und Sicherungen automatisch auf Startfähigkeit prüfen.	Back up virtual machines, start them straight from a restore point and check backups for bootability automatically.
+Virtuelle Maschinen	Virtual machines
+Aus Sicherungen gestartet	Started from backups
+KVM	KVM
+ohne KVM	without KVM
+{} VMs, {} laufen	{} VMs, {} running
+QMP-Ordner: {}	QMP folders: {}
+Hypervisor nicht eingerichtet	Hypervisor not set up
+Keine virtuellen Maschinen	No virtual machines
+BackupCraft findet QEMU/KVM-VMs über ihre QMP-Sockets (qemu … -qmp unix:/run/vms/NAME.qmp,server=on,wait=off). Den Ordner trägt man in der Einstellung hypervisor.qmp ein; VM-Jobs legt der Job-Assistent an.	BackupCraft finds QEMU/KVM VMs through their QMP sockets (qemu … -qmp unix:/run/vms/NAME.qmp,server=on,wait=off). Enter the folder in the setting hypervisor.qmp; the job wizard creates VM jobs.
+CPUs	CPUs
+Platten	Disks
+Gesehen	Seen
+Zusammenführen …	Merge …
+Beenden	Stop
+Die VM wird beendet. Ihre zusammengeführten Platten bleiben im Zielordner.	The VM is stopped. Its merged disks stay in the target folder.
+Die VM wird beendet; was sie seit dem Start geschrieben hat, wird verworfen. Der Restore-Point bleibt unverändert.	The VM is stopped; what it wrote since its start is discarded. The restore point stays unchanged.
+{} beenden?	Stop {}?
+Keine VM läuft aus einer Sicherung	No VM runs from a backup
+Der Sofortstart startet eine VM direkt aus einem Restore-Point – ohne alles zurückzukopieren. Ihre Änderungen landen in einer eigenen Datei; „Zusammenführen“ überträgt die Platten im Betrieb auf lokalen Speicher.	Instant start runs a VM straight from a restore point – without copying everything back. Its changes go to a file of its own; “Merge” moves the disks to local storage while it runs.
+Meldung	Message
+isoliert	isolated
+keins	none
+Prüfen …	Check …
+Noch keine Prüfung	No check yet
+Die Startprüfung startet eine VM aus einem Restore-Point ohne Netzwerkzugang und prüft, ob sie läuft, ob ihre Konsole einen Text zeigt und ob sie auf einem Port antwortet. Danach wird alles verworfen.	A boot check starts a VM from a restore point without network access and checks whether it runs, whether its console shows a text and whether it answers on a port. Afterwards everything is discarded.
+Prüfungen	Checks
+Bestanden	Passed
+Nicht bestanden	Failed
+Bitte mindestens eine VM wählen.	Please choose at least one VM.
+Virtuelle Maschinen (KVM)	Virtual machines (KVM)
+QEMU/KVM-VMs, im Betrieb konsistent durch QEMU gesichert; danach nur geänderte Blöcke.	QEMU/KVM VMs, backed up consistently by QEMU while they run; after that only changed blocks.
+Hyper-V	Hyper-V
+Hyper-V-VMs mit Prüfpunkten und Änderungsverfolgung.	Hyper-V VMs with checkpoints and change tracking.
+Welche VMs werden gesichert?	Which VMs are backed up?
+Keine VMs gefunden	No VMs found
+Unter „Sofortstart und Startprüfung“ steht, wie BackupCraft VMs findet.	“Instant start and boot checks” tells how BackupCraft finds VMs.
+Laufende VMs sichert QEMU selbst – konsistent über alle Platten, ab dem zweiten Lauf nur geänderte Blöcke. Ausgeschaltete VMs werden aus ihren Plattendateien gelesen.	QEMU itself backs up running VMs – consistent across all disks, from the second run only changed blocks. VMs that are off are read from their disk files.
+{} VMs: {}	{} VMs: {}
+Die VM wurde beendet.	The VM was stopped.
+Bitte mindestens ein Volume wählen.	Please choose at least one volume.
+Blockweise Sicherung eines Laufwerks des Backup-Servers mit Snapshot (VSS / LVM).	Block-level backup of a drive of the backup server with a snapshot (VSS / LVM).
+Welche Volumes des Backup-Servers?	Which volumes of the backup server?
+Ein Snapshot (Windows: VSS, Linux: LVM) hält das Volume während des Lesens fest; dafür braucht der Dienst Administrator- bzw. Root-Rechte. Unveränderte Blöcke speichert das Repository nur einmal. Volumes von Agenten folgen.	A snapshot (Windows: VSS, Linux: LVM) holds the volume still while it is read; the service needs administrator or root rights for it. The repository stores unchanged blocks only once. Volumes of agents follow.
+{} Volumes: {}	{} volumes: {}
+Einrichtungsassistent	Setup assistant
+Demo mit Beispieldaten	Demo with sample data
+Das Programm endete mit {} ohne Bericht.	The program ended with {} without a report.
+Der Dienst läuft, antwortet aber nicht auf Port {}.	The service runs but does not answer on port {}.
+Bitte einen Datenordner angeben.	Please enter a data folder.
+Bitte einen Benutzernamen angeben.	Please enter a user name.
+Das Passwort braucht mindestens 12 Zeichen.	The password needs at least 12 characters.
+Bitte Name und Ordner des Repositorys angeben.	Please enter the name and folder of the repository.
+Bitte Serveradresse und Pairing-Code angeben.	Please enter the server address and the pairing code.
+Bitte den Fingerabdruck der Zertifizierungsstelle angeben (64 Hex-Zeichen).	Please enter the fingerprint of the certificate authority (64 hex characters).
+Bitte mindestens einen Ordner angeben.	Please enter at least one folder.
+Später	Later
+Willkommen bei BackupCraft	Welcome to BackupCraft
+Wie soll BackupCraft auf diesem Computer arbeiten?	How should BackupCraft work on this computer?
+Backup-Server auf diesem Computer	Backup server on this computer
+Dieser Computer speichert die Sicherungen, führt die Zeitpläne aus und wird mit dieser Konsole verwaltet.	This computer stores the backups, runs the schedules and is managed with this console.
+Mit einem vorhandenen Server verbinden	Connect to an existing server
+Der Backup-Server läuft schon auf einem anderen Computer; diese Konsole verwaltet ihn.	The backup server already runs on another computer; this console manages it.
+Diesen Computer sichern lassen (Agent)	Have this computer backed up (agent)
+Ein vorhandener Backup-Server sichert Ordner dieses Computers.	An existing backup server backs up folders of this computer.
+Speicherort und Netzwerk	Location and network
+Datenordner des Servers	The server's data folder
+Hier liegen Datenbank, Schlüssel und Zertifikate des Servers – die Sicherungen selbst kommen in ein Repository.	The server's database, keys and certificates live here – the backups themselves go into a repository.
+Erreichbar	Reachable
+Nur von diesem Computer	Only from this computer
+Im Netzwerk (für Agenten und andere Konsolen, verschlüsselt)	In the network (for agents and other consoles, encrypted)
+Namen und Adressen für das Zertifikat (durch Komma getrennt)	Names and addresses for the certificate (separated by commas)
+Unter diesen Namen erreichen Agenten und Konsolen den Server; die Firewall muss Port 7642 durchlassen.	Agents and consoles reach the server under these names; the firewall must let port 7642 through.
+Erster Administrator	First administrator
+Mit diesem Konto melden Sie sich an. Weitere Benutzer legen Sie später unter Einstellungen an.	You sign in with this account. Further users are added later under Settings.
+Wohin sollen die Sicherungen?	Where should the backups go?
+Gleich ein Repository anlegen	Create a repository right away
+Am besten auf einer anderen Festplatte oder einem NAS als die Daten, die gesichert werden. Das Repository speichert dedupliziert, komprimiert und verschlüsselt.	Best on another disk or a NAS than the data that is backed up. The repository stores deduplicated, compressed and encrypted.
+Ein Repository lässt sich später unter „Repositories“ hinzufügen.	A repository can be added later under “Repositories”.
+Einrichten	Set up
+im Netzwerk (https)	in the network (https)
+nur dieser Computer (http)	only this computer (http)
+später	later
+Datenordner	Data folder
+Dienst einrichten und starten (fragt nach Administratorrechten)	Set up and start the service (asks for administrator rights)
+Administrator anlegen und anmelden	Create the administrator and sign in
+Repository anlegen	Create the repository
+Für den Dienst fragt das System gleich nach Administratorrechten.	The system will ask for administrator rights for the service in a moment.
+Erneut versuchen	Try again
+bc-server wurde neben der Konsole nicht gefunden (Installation unvollständig?).	bc-server was not found next to the console (incomplete installation?).
+Der Dienst läuft, aber der Server ist bereits eingerichtet. Bitte mit „Später“ zur Anmeldung wechseln und mit dem vorhandenen Konto anmelden.	The service runs, but the server is already set up. Please switch to the sign-in with “Later” and sign in with the existing account.
+Einrichtung abgeschlossen	Setup complete
+Der Server läuft als Dienst. Jetzt den ersten Sicherungsjob anlegen.	The server runs as a service. Now create the first backup job.
+Mit welchem Server koppeln?	Which server to pair with?
+In der Konsole des Servers unter „Server & Agenten“ › „Agent koppeln“ stehen Adresse, Pairing-Code und Fingerabdruck.	The server's console shows the address, pairing code and fingerprint under “Servers & agents” › “Pair agent”.
+Serveradresse	Server address
+Fingerabdruck der Zertifizierungsstelle	Fingerprint of the certificate authority
+Welche Ordner darf der Server sichern?	Which folders may the server back up?
+Zu sichernde Ordner (einer pro Zeile)	Folders to back up (one per line)
+Ordner für Wiederherstellungen	Folder for restores
+Der Agent liest nur in diesen Ordnern und schreibt nur in sie und den Wiederherstellungsordner; Befehle führt er nicht aus.	The agent reads only in these folders and writes only to them and the restore folder; it runs no commands.
+Koppeln	Pair
+Koppeln und Dienst einrichten (fragt nach Administratorrechten) …	Pair and set up the service (asks for administrator rights) …
+Gekoppelt	Paired
+Der Agent läuft als Dienst. Sicherungen dieses Computers richten Sie in der Konsole des Servers ein.	The agent runs as a service. Backups of this computer are set up in the server's console.
+Konsole mit dem Server verbinden	Connect the console to the server
+bc-agent wurde neben der Konsole nicht gefunden (Installation unvollständig?).	bc-agent was not found next to the console (incomplete installation?).
+{} frei von {} · Ersparnis {}	{} free of {} · savings {}
+Andere Daten	Other data
+{} frei	{} free
+{} frei von {}	{} free of {}
+{} Repositories · {} belegt · {} frei	{} repositories · {} used · {} free
+frei von {} · Platte {} belegt	free of {} · disk {} used
+freier Platz unbekannt	free space unknown
+Im Repository	In the repository

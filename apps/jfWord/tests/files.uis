@@ -1,0 +1,32 @@
+#!args --editor --structure --sources --navigation
+# Save-as, reload and unsaved-change decisions through the real library dialogs.
+theme light
+click #10000
+type "Sicher gespeichert."
+cmd 1
+expect dialog:"Ungespeicherte Änderungen" exists
+click "Abbrechen"
+expect #10000 text "Sicher gespeichert."
+cmd 4
+expect dialog:"Speichern unter" exists
+click #1048588
+key ctrl+a
+type "build/jfword-ui-roundtrip.docx"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect dialog:"Datei ersetzen" exists
+click "Ersetzen"
+expect text:"Gespeichert · Text, Quellen und Zitatverweise" exists
+cmd 2
+expect dialog:"Öffnen" exists
+click button:"Öffnen"
+expect text:"Dokument geöffnet · Quellen und Zitatverweise geladen" exists
+expect textbox:"Sicher gespeichert." exists
+cmd 7
+cmd 1
+expect dialog:"Ungespeicherte Änderungen" exists
+click "Verwerfen"
+expect text:"Neues Dokument" exists
+expect "1 · Text" exists
+expect "2 · Text" missing
+expect_nowarn

@@ -1,0 +1,33 @@
+#!args --editor --structure --sources --navigation
+theme light
+cmd 9
+click "Quelle übernehmen"
+expect dialog:"Quelle bearbeiten" exists
+click #712
+type "Methoden"
+click #713
+type "2020"
+click "Autoren"
+click #2097154
+type "Müller"
+click "Quelle übernehmen"
+cmd 12
+expect "(Müller, 2020)" exists
+cmd 11
+expect "Quelle wird zitiert. Zitate zuerst entfernen." exists
+cmd 10
+click #713
+key ctrl+a
+type "2026"
+click "Quelle übernehmen"
+expect "(Müller, 2026)" exists
+expect "Müller (2026). Methoden." exists
+cmd 5
+expect "(Müller, 2020)" exists
+cmd 6
+expect "(Müller, 2026)" exists
+click "Zitat entfernen"
+cmd 11
+expect "Noch keine Zitate." exists
+expect "Im Absatz zitieren" missing
+expect_nowarn

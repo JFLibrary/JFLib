@@ -1,0 +1,45 @@
+#!args --editor
+size 1480 1000
+theme light
+click tab:"Einfügen"
+click #1514
+click #3901
+key ctrl+a
+type "3"
+key tab
+click #3902
+key ctrl+a
+type "3"
+key tab
+click "Übernehmen"
+type "Links oben"
+key tab
+type "Rechts oben"
+key shift+tab
+click #3921
+expect dialog:"Zellen verbinden" exists
+click "Übernehmen"
+expect dialog:"Zellen verbinden" missing
+expect textbox:"Links oben\nRechts oben\n\n" exists
+key ctrl+end
+type "Verbunden"
+key tab
+type "Nächste freie Zelle"
+key shift+tab
+click #3923
+click "An Inhalt"
+click #3923
+click "An Seitenbreite"
+click #3923
+click "Gleich verteilen"
+click #3922
+cmd 5
+cmd 6
+shot build/jfword-table-merges-light.png
+theme dark
+scale 150
+shot build/jfword-table-merges-dark-150.png
+size 1000 800
+size 680 800
+shot build/jfword-table-merges-compact.png
+expect_nowarn

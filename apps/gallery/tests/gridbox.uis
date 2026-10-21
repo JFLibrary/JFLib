@@ -1,0 +1,22 @@
+# grid box (lib/ui/grid.rs): a natural column (the labels), a fill column (the fields), a
+# fixed one (120 DIP), a column span (Beschreibung), a row span (Optionen: Archivieren moves
+# to column 1), alignment (Optionen at the start of its cells, OK at the end of its cell)
+size 900 4400
+theme light
+expect text:"Name" rect 40 3631 84 20
+expect #8701 rect 132 3625 228 32
+expect #8702 rect 368 3625 120 32
+expect text:"Beschreibung" rect 40 3671 84 20
+expect #8703 rect 132 3665 356 32
+expect text:"Optionen" rect 40 3705 59 20
+expect #8704 rect 132 3705 228 32
+expect #8705 rect 368 3705 120 32
+expect #8706 rect 132 3745 228 32
+expect #8707 rect 447 3745 41 32
+# the widgets in the cells work as anywhere
+click #8701
+type "Ada Lovelace"
+expect #8701 text "Ada Lovelace"
+click "Teilen"
+expect "Teilen" checked
+expect_nowarn

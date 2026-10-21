@@ -1,0 +1,47 @@
+#!args --editor
+size 1480 1000
+theme light
+click tab:"Einfügen"
+click #1514
+click "Übernehmen"
+type "Messreihe"
+key tab
+type "Wert"
+key shift+tab
+click #3926
+click "Blau · Zeilenbänder"
+click #3927
+key ctrl+a
+type "1"
+key tab
+click #3928
+expect dialog:"Tabellenformatvorlage" exists
+click #3940
+key ctrl+a
+type "Forschungstabelle"
+key tab
+click #3942
+key ctrl+a
+type "345A68"
+key tab
+click "Übernehmen"
+expect dialog:"Tabellenformatvorlage" missing
+click #3937
+click #3934
+click #3929
+expect dialog:"Tabellenformatvorlage" exists
+click "Abbrechen"
+cmd 5
+cmd 6
+shot build/jfword-table-styles-light.png
+theme dark
+scale 150
+shot build/jfword-table-styles-dark-150.png
+size 1000 800
+size 680 800
+shot build/jfword-table-styles-compact.png
+click #3929
+expect dialog:"Tabellenformatvorlage" exists
+shot build/jfword-table-styles-dialog-compact.png
+click "Abbrechen"
+expect_nowarn

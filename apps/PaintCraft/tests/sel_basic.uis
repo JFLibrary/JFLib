@@ -1,0 +1,415 @@
+# sel_basic.uis -- Auswahl (agent T2): Rechteckige / Elliptische / Lasso-Auswahl with every
+# combine mode (Auswahlmodus and Strg / right / Strg+right / Alt), antialiased vs pixelated
+# coverage at the edges, the handles of the last rectangle / ellipse, Alles auswählen,
+# Auswahl aufheben, Auswahl umkehren, Auswahl löschen (Entf), Auswahl füllen (Rücktaste),
+# Auf Auswahl zuschneiden (Strg+Umschalt+X), undo / redo of every step, marching ants.
+# Canvas 1280 x 800, zoom 100 %: image pixel (x, y) is at (240 + x, 148 + y).
+# Hooks (diag.s block T2): cmd 980 x|y<<16 coverage probe -> #9980 value / text none part
+# all; 981 op; #9981 text bounds "x0,y0,x1,y1", value ops; #9982 text outline "c,p";
+# #9983 text handles "x0,y0,x1,y1"; T1: #9931 tool, #9935 history entries, #9936 position,
+# 943 k primary colour, 946 m selection mode, 947 q quality.  A1: 900/901 pixel probes,
+# 902 colour, 903/904 fill.  List rows of the Verlauf window: #196609 + i.
+size 1280 800
+theme light
+expect #9981 value 0
+expect menuitem:"Auswahl aufheben" missing
+
+# ------------------------------------------------------------ Rechteckige Auswahl (Ersetzen)
+cmd 750
+expect #9931 value 0
+drag 250,158 350,258
+expect #9981 text "10,10,110,110"
+expect #9981 value 1
+expect #9982 text "1,4"
+expect text:"Rechteckige Auswahl" exists
+expect #9935 value 2
+cmd 980 655370          # (10, 10)
+expect #9980 value 255
+cmd 980 7143533         # (109, 109)
+expect #9980 value 255
+cmd 980 655369          # (9, 10)
+expect #9980 value 0
+cmd 980 3276910         # (110, 50)
+expect #9980 value 0
+cmd 980 589874          # (50, 9)
+expect #9980 value 0
+cmd 980 3276850         # (50, 50)
+expect #9980 text "all"
+expect text:"100 × 100" exists
+expect #9983 text "10,10,110,110"
+# the bottom right handle: the same step becomes 120 x 120
+drag 350,258 370,278
+expect #9981 text "10,10,130,130"
+expect #9983 text "10,10,130,130"
+expect #9935 value 2
+cmd 980 8454273         # (129, 129)
+expect #9980 value 255
+cmd 980 8454274         # (130, 129)
+expect #9980 value 0
+# the left handle past the right edge: the rectangle flips
+drag 250,218 400,218
+expect #9981 text "130,10,160,130"
+drag 400,218 250,218
+expect #9981 text "10,10,130,130"
+# a click without dragging deselects (Ersetzen)
+click 600,500
+expect #9981 value 0
+expect text:"Auswahl aufheben" exists
+key ctrl+z
+expect #9981 text "10,10,130,130"
+key ctrl+z
+expect #9981 value 0
+key ctrl+y
+expect #9981 text "10,10,130,130"
+expect #9983 text ""
+
+# ------------------------------------------------------------ combine modes by keys / buttons
+# Strg: Hinzufügen
+drag 300,208 400,308 ctrl
+expect #9981 text "10,10,160,160"
+expect #9981 value 2
+cmd 980 9830550         # (150, 150)
+expect #9980 value 255
+cmd 980 1310860         # (140, 20)
+expect #9980 value 0
+cmd 980 9175060         # (20, 140)
+expect #9980 value 0
+# right button: Subtrahieren (a hole)
+drag 320,228 340,248 right
+expect #9981 value 3
+cmd 980 5898330         # (90, 90)
+expect #9980 value 0
+cmd 980 5177423         # (79, 79)
+expect #9980 value 255
+cmd 980 6553700         # (100, 100)
+expect #9980 value 255
+expect #9982 text "2,12"
+# Strg + right: Exklusiv (XOR)
+drag 300,158 380,198 ctrl right
+expect #9981 value 4
+cmd 980 1310790         # (70, 20)
+expect #9980 value 0
+cmd 980 1310855         # (135, 20)
+expect #9980 value 255
+cmd 980 3604550         # (70, 55)
+expect #9980 value 255
+# Alt: Schneiden with (0, 0)-(50, 50)
+drag 240,148 290,198 alt
+expect #9981 value 5
+expect #9981 text "10,10,50,50"
+cmd 980 1966110         # (30, 30)
+expect #9980 value 255
+cmd 980 3932220         # (60, 60)
+expect #9980 value 0
+# undo walks back through every step
+key ctrl+z
+expect #9981 value 4
+key ctrl+z
+expect #9981 value 3
+key ctrl+z
+expect #9981 value 2
+key ctrl+y ctrl+y ctrl+y
+expect #9981 text "10,10,50,50"
+# the Auswahlmodus option (Hinzufügen / Subtrahieren / Schneiden / Invertieren)
+cmd 946 1
+drag 440,348 460,368
+expect #9981 value 6
+cmd 980 13762770        # (210, 210)
+expect #9980 value 255
+cmd 980 1966110         # (30, 30)
+expect #9980 value 255
+cmd 946 2
+drag 450,358 440,348
+cmd 980 13435085        # (205, 205)
+expect #9980 value 0
+cmd 980 14090455        # (215, 215)
+expect #9980 value 255
+cmd 946 3
+drag 430,338 480,388
+expect #9981 text "200,200,220,220"
+cmd 946 4
+drag 250,158 270,178
+cmd 980 983055          # (15, 15)
+expect #9980 value 255
+cmd 980 14090455        # (215, 215)
+expect #9980 value 255
+cmd 946 0
+# Subtrahieren everything: no selection is left
+drag 230,140 1050,758 right
+expect #9981 value 0
+
+# ------------------------------------------------------------ Elliptische Auswahl: AA / pixelated
+cmd 754
+expect #9931 value 4
+drag 440,248 540,348
+expect #9981 text "200,100,300,200"
+expect text:"Elliptische Auswahl" exists
+cmd 980 9830650         # (250, 150)
+expect #9980 value 255
+cmd 980 6553800         # (200, 100)
+expect #9980 value 0
+cmd 980 13041963        # (299, 199)
+expect #9980 value 0
+cmd 980 9830600         # (200, 150)
+expect #9980 text "part"
+cmd 980 8519883         # (203, 130)
+expect #9980 text "part"
+cmd 980 8519882         # (202, 130)
+expect #9980 text "none"
+cmd 980 7471318         # (214, 114)
+expect #9980 text "part"
+cmd 980 7471319         # (215, 114)
+expect #9980 text "part"
+cmd 981 8
+expect #9980 text "count"
+shot build/t2/sel_ellipse_aa.png
+# the handles of the ellipse: wider
+drag 540,298 640,298
+expect #9981 text "200,100,400,200"
+expect #9983 text "200,100,400,200"
+# pixelated (Auswahl ohne Kantenglättung)
+key ctrl+d
+cmd 947 1
+drag 440,248 540,348
+cmd 980 9830600         # (200, 150)
+expect #9980 text "all"
+cmd 980 9830599         # (199, 150)
+expect #9980 text "none"
+cmd 980 7471318         # (214, 114)
+expect #9980 text "none"
+cmd 980 7471319         # (215, 114)
+expect #9980 text "all"
+cmd 980 9830650         # (250, 150)
+expect #9980 text "all"
+cmd 981 8
+expect #9980 value 0
+cmd 947 0
+# Umschalt: a circle
+key ctrl+d
+drag 440,248 540,298 shift
+expect #9981 text "200,100,300,200"
+
+# ------------------------------------------------------------ Zeichenmodus (SEL-019 / SEL-020)
+cmd 750
+key ctrl+d
+click #2200
+click #2202
+expect #2210 value 4
+expect #2211 value 3
+drag 250,158 350,178
+expect #9981 text "10,10,110,85"
+drag 350,258 250,238
+expect #9981 text "10,35,110,110"
+click #2200
+click #2203
+expect #2210 value 100
+drag 250,158 260,160
+expect #9981 text "10,10,110,110"
+key ctrl+d
+drag 350,258 340,250
+expect #9981 text "10,10,110,110"
+click 300,400
+expect #9981 text "60,252,160,352"
+click #2200
+click #2201
+key ctrl+d
+
+# ------------------------------------------------------------ clipboard text (Auswahl kopieren / einfügen)
+cmd 754
+drag 440,248 540,348
+cmd 981 9
+expect #9981 text "200,100,300,200"
+expect #9981 value 1
+cmd 980 7471318         # (214, 114)
+expect #9980 text "part"
+cmd 980 7471319         # (215, 114)
+expect #9980 text "part"
+cmd 750
+drag 250,158 350,258 ctrl
+cmd 981 9
+expect #9981 text "10,10,300,200"
+expect #9981 value 1
+cmd 980 7471319         # (215, 114)
+expect #9980 value 255
+cmd 980 7471318         # (214, 114)
+expect #9980 value 0
+cmd 980 3276850         # (50, 50)
+expect #9980 value 255
+key ctrl+d
+
+# ------------------------------------------------------------ Lasso-Auswahl
+cmd 752
+expect #9931 value 2
+down 250,450
+move 350,450
+move 350,550
+move 250,550
+up 250,550
+expect #9981 text "10,302,111,403"
+expect text:"Lasso-Auswahl" exists
+cmd 980 22937660        # (60, 350)
+expect #9980 value 255
+cmd 980 22937610        # (10, 350)
+expect #9980 text "part"
+cmd 980 22937609        # (9, 350)
+expect #9980 text "none"
+# a triangle added with Strg (a drag = straight line: nothing)
+drag 400,450 500,450 ctrl
+expect #9981 text "10,302,111,403"
+
+# ------------------------------------------------------------ Alles auswählen / aufheben / umkehren
+key ctrl+a
+expect #9981 text "0,0,800,600"
+expect #9981 value 1
+expect text:"Alles auswählen" exists
+cmd 980 0               # (0, 0)
+expect #9980 text "all"
+cmd 980 39256863        # (799, 599)
+expect #9980 text "all"
+key ctrl+i
+expect #9981 value 0
+key ctrl+z
+expect #9981 text "0,0,800,600"
+key ctrl+d
+expect #9981 value 0
+key ctrl+z
+expect #9981 text "0,0,800,600"
+# invert a rectangle
+cmd 750
+drag 250,158 350,258
+key ctrl+i
+expect #9981 text "0,0,800,600"
+expect text:"Auswahl umkehren" exists
+cmd 980 3276850         # (50, 50)
+expect #9980 value 0
+cmd 980 327685          # (5, 5)
+expect #9980 value 255
+cmd 980 13107400        # (200, 200)
+expect #9980 value 255
+key ctrl+i
+expect #9981 text "10,10,110,110"
+cmd 980 3276850         # (50, 50)
+expect #9980 value 255
+cmd 980 327685          # (5, 5)
+expect #9980 value 0
+key ctrl+d
+
+# ------------------------------------------------------------ Auswahl löschen / füllen
+# a blue layer
+cmd 902 3
+cmd 903 0
+cmd 904 39322400        # (800, 600)
+cmd 901 3276850         # layer (50, 50)
+expect #9900 text "FF0000FF"
+drag 250,158 350,258
+key delete
+cmd 901 3276850         # layer (50, 50)
+expect #9900 text "000000FF"
+cmd 901 327685          # layer (5, 5)
+expect #9900 text "FF0000FF"
+cmd 901 7143533         # layer (109, 109)
+expect #9900 text "000000FF"
+cmd 901 7209070         # layer (110, 110)
+expect #9900 text "FF0000FF"
+expect text:"Auswahlinhalt löschen" exists
+key ctrl+z
+cmd 901 3276850         # layer (50, 50)
+expect #9900 text "FF0000FF"
+# fill with the primary colour (red)
+cmd 943 1
+key backspace
+cmd 901 3276850         # layer (50, 50)
+expect #9900 text "FFFF0000"
+cmd 901 327685          # layer (5, 5)
+expect #9900 text "FF0000FF"
+expect text:"Auswahl füllen" exists
+key ctrl+z
+cmd 901 3276850         # layer (50, 50)
+expect #9900 text "FF0000FF"
+key ctrl+y
+cmd 901 3276850         # layer (50, 50)
+expect #9900 text "FFFF0000"
+# an antialiased ellipse: the edge pixels are mixed
+cmd 754
+key ctrl+d
+drag 440,248 540,348
+key backspace
+cmd 901 9830650         # layer (250, 150)
+expect #9900 text "FFFF0000"
+cmd 901 6553800         # layer (200, 100)
+expect #9900 text "FF0000FF"
+key ctrl+z
+key ctrl+z
+
+# ------------------------------------------------------------ Auf Auswahl zuschneiden
+cmd 950 1
+cmd 961 1
+cmd 750
+drag 250,158 350,208
+key ctrl+shift+x
+expect #9913 value 100
+expect #9914 value 50
+expect #9981 text "0,0,100,50"
+expect text:"Auf Auswahl zuschneiden" exists
+cmd 901 0               # layer (0, 0)
+expect #9900 text "FFFF0000"
+key ctrl+z
+expect #9913 value 800
+expect #9914 value 600
+expect #9981 text "10,10,110,60"
+cmd 962 1
+expect text:"t.cmp=ok" exists
+key ctrl+y
+expect #9913 value 100
+expect #9981 text "0,0,100,50"
+key ctrl+z
+# an ellipse: the corners become transparent
+cmd 754
+key ctrl+d
+drag 440,248 540,348
+key ctrl+shift+x
+expect #9913 value 100
+expect #9914 value 100
+cmd 901 0               # layer (0, 0)
+expect #9900 text "000000FF"
+cmd 901 3276850         # layer (50, 50)
+expect #9900 text "FF0000FF"
+expect #9981 text "0,0,100,100"
+key ctrl+z
+expect #9913 value 800
+cmd 962 1
+expect text:"t.cmp=ok" exists
+cmd 950 0
+
+# ------------------------------------------------------------ marching ants: animation
+key ctrl+a
+wait 250
+shot build/t2/sel_ants_light.png
+theme dark
+wait 120
+shot build/t2/sel_ants_dark.png
+theme light
+key ctrl+d
+expect #9981 value 0
+
+# ------------------------------------------------------------ one selection per image, closing
+cmd 750
+drag 250,158 350,258
+expect #9981 text "10,10,110,110"
+cmd 968 19661200        # (400, 300)
+expect #9901 value 2
+expect #9981 value 0
+key ctrl+a
+expect #9981 text "0,0,400,300"
+cmd 969 0
+expect #9981 text "10,10,110,110"
+cmd 969 1
+expect #9981 text "0,0,400,300"
+key ctrl+w
+expect #9901 value 1
+expect #9981 text "10,10,110,110"
+cmd 968 13107500        # (300, 200)
+expect #9981 value 0
+key ctrl+w
+expect #9901 value 1
+expect #9981 text "10,10,110,110"

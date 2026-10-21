@@ -1,0 +1,48 @@
+#!args --plugins=@ptest --open apps/PaintCraft/tests/fixtures/p1_plugin.png
+# plugins_crash.uis -- crash protection (agent P1): the test plugin "Absturz-Test" writes to
+# address 0 in render, "Absturz-Test (parallel)" divides by zero inside a PNAPI parallel_for
+# item on a worker thread.  Each fault is caught, the plugin disabled (PS_CRASHED, where / kind
+# recorded), the effect reports an error, the layer stays unchanged, the other plugins keep
+# working and the app keeps running.  Folder / hooks: see plugins.uis.
+size 1280 800
+theme light
+expect #0x82400 text "6,3,4,1,2"
+
+# ------------------------------------------------------------ access violation in render
+click menu:"Effekte"
+click menuitem:"Absturz-Test"
+cmd 145 1
+expect #0x82401 text "3|4|1|1|0|0|Absturz-Test"
+expect #0x82401 value 3
+expect #0x82400 text "5,4,4,1,2"
+expect #9918 text "Das Plugin ist abgestürzt und wurde deaktiviert (siehe Einstellungen ▸ Plugin-Fehler)."
+cmd 995 0
+expect #9990 text "223d3a3679b9ca1f"
+# the row of the disabled plugin only shows a message
+click menu:"Effekte"
+click menuitem:"Absturz-Test"
+expect #9918 text "Das Plugin wurde nach einem Fehler deaktiviert (siehe Einstellungen ▸ Plugin-Fehler)."
+cmd 995 0
+expect #9990 text "223d3a3679b9ca1f"
+
+# ------------------------------------------------------------ division by zero in parallel_for
+click menu:"Korrekturen"
+click menuitem:"Absturz-Test (parallel)"
+cmd 145 2
+expect #0x82401 text "3|9|3|1|0|0|Absturz-Test parallel_for"
+expect #0x82400 text "4,5,4,1,2"
+cmd 995 0
+expect #9990 text "223d3a3679b9ca1f"
+
+# ------------------------------------------------------------ the other plugins still work
+click menu:"Effekte"
+click menuitem:"Kanäle tauschen"
+expect window 24688 open
+click button:"OK"
+cmd 995 0
+expect #9990 text "524c1a34ce934e23"
+click menu:"Effekte"
+click menuitem:"Plugin-Fehler…"
+expect window 24624 open
+expect text:"Diese Plugins ließen sich nicht laden oder wurden nach einem Fehler abgeschaltet:" exists
+key esc

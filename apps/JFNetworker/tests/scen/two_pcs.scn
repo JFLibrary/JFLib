@@ -1,0 +1,45 @@
+# Zwei PCs am Switch: ARP und Ping im selben Netz, die MAC-Tabelle des Switches, seine
+# Management-Adresse in VLAN 1, ein abgeschalteter Port
+PC1: ip addr
+expect PC1 output contains "inet 10.0.0.1/24 brd 10.0.0.255 scope global eth0"
+PC1: ping -c 2 10.0.0.2
+run until idle
+expect PC1 output contains "2 packets transmitted, 2 received, 0% packet loss"
+PC1: ip neigh
+expect PC1 output contains "10.0.0.2 dev eth0 lladdr 02:4a:00:00:02:01 REACHABLE"
+SW1: enable
+SW1: show mac address-table
+expect SW1 output contains "   1    024a.0000.0101    DYNAMIC     Gi1/0/1"
+SW1: ping 10.0.0.2
+run until idle
+expect SW1 output contains "Success rate is 80 percent (4/5)"
+SW1: show ip interface brief
+expect SW1 output contains "Vlan1                  10.0.0.254      YES NVRAM  up                    up"
+SW1: show vlan brief
+SW1: show interfaces GigabitEthernet1/0/1
+expect SW1 output contains "GigabitEthernet1/0/1 is up, line protocol is up (connected)"
+SW1: configure terminal
+SW1: interface gi1/0/2
+SW1: shutdown
+SW1: end
+PC1: ping -c 1 10.0.0.2
+run until idle
+expect PC1 output contains "1 packets transmitted, 0 received, 100% packet loss"
+SW1: show ip interface brief
+expect SW1 output contains "GigabitEthernet1/0/2   unassigned      YES unset  administratively down down"
+SW1: configure terminal
+SW1: interface gi1/0/2
+SW1: no shutdown
+SW1: end
+# 1 ms mehr Laufzeit auf dem Kabel von PC1: 2 ms mehr für jedes Echo; PC2 hat mit dem
+# Carrier seinen ARP-Cache verloren und fragt vor der Antwort neu (noch einmal 2 ms)
+impair PC1 eth0 delay 1ms
+PC1: ping -c 1 10.0.0.2
+run until idle
+expect PC1 output contains "time=4.01 ms"
+power off PC2
+run 1s
+expect SW1 output contains "%LINK-3-UPDOWN: GigabitEthernet1/0/2 is down"
+power on PC2
+run 1s
+expect SW1 output contains "%LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up"

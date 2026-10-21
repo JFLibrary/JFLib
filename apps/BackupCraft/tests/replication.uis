@@ -1,0 +1,66 @@
+#!args --fixture --page replication
+# replicas against the demo server: one is created, synced, failed over and back; a failover
+# plan is created and run
+size 1440 900
+wait 50
+expect "Dateiserver – Standby" exists
+expect "Failover aktiv: Webserver – Standby" exists
+click "Replikat anlegen …"
+wait 20
+focus #0xD00C01
+type "DC Standby"
+click #0xD00C02
+wait 20
+click "Domänencontroller"
+wait 20
+click #0xD00C03
+wait 20
+click "dc01.corp.local"
+wait 20
+expect "Nach jedem neuen Restore-Point abgleichen" checked
+shot build/shots/bc/test_replica_dialog.png
+click "Speichern"
+wait 50
+expect "DC Standby" exists
+click "DC Standby"
+wait 20
+expect "Failover" disabled
+click "Abgleichen"
+wait 200
+expect "Failover" enabled
+click "Failover"
+wait 20
+expect "Failover auf „DC Standby“?" exists
+click "Failover"
+wait 50
+expect "2 Replikate im Failover" exists
+expect "Failback" enabled
+click "Failback"
+wait 20
+click "Failback"
+wait 200
+expect "Failover aktiv: Webserver – Standby" exists
+# a plan: the new replica first, then the file server
+click "Failover-Pläne"
+wait 20
+click "Failover-Plan anlegen …"
+wait 20
+focus #0xD00D01
+type "Nur Windows"
+click checkbox:"DC Standby · dc01.corp.local"
+wait 10
+click checkbox:"Dateiserver – Standby · backup-srv01"
+wait 10
+shot build/shots/bc/test_plan_dialog.png
+click "Speichern"
+wait 50
+expect "Nur Windows" exists
+expect "1. DC Standby  2. Dateiserver – Standby" exists
+click "Nur Windows"
+wait 20
+click "Plan ausführen"
+wait 20
+click "Ausführen"
+wait 200
+expect "2 Replikate umgeschaltet" exists
+expect_nowarn

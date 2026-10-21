@@ -1,0 +1,58 @@
+#!args --editor
+# Actual menu commands retain rich selection and share the document style model.
+size 1440 1000
+theme light
+type "Wissenschaft αβ"
+key ctrl+a
+click #2883
+click "DejaVu Serif"
+expect #2883 text "DejaVu Serif"
+expect textbox:"Wissenschaft αβ" focused
+key ctrl+z
+expect #2883 text "DejaVu Sans"
+key ctrl+y
+expect #2883 text "DejaVu Serif"
+key ctrl+space
+click #2881
+expect dialog:"Formatvorlagen" exists
+click #3502
+click #3503
+key ctrl+a
+type "Forschungsabsatz"
+click #3505
+key ctrl+a
+type "DejaVu"
+type " "
+type "Serif"
+expect #3505 text "DejaVu Serif"
+click #3508
+key ctrl+a
+type "14"
+key enter
+shot build/jfword-styles-dialog.png
+click "Anwenden"
+expect dialog:"Formatvorlagen" missing
+expect #2883 text "DejaVu Serif"
+expect #2880 value 140
+click #2918
+expect button:"Forschungsabsatz" exists
+shot build/jfword-styles-page.png
+click #2881
+expect #3503 text "Forschungsabsatz"
+click #3508
+key ctrl+a
+type "18"
+key enter
+click "Speichern"
+expect #2880 value 180
+click textbox:"Wissenschaft αβ"
+key ctrl+z
+expect #2880 value 140
+key ctrl+y
+expect #2880 value 180
+scale 150
+theme dark
+click #2881
+shot build/jfword-styles-dialog-dark-150.png
+click "Schließen"
+expect_nowarn

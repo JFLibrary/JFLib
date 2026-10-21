@@ -1,0 +1,29 @@
+# toolkeys.uis -- (U3) focus-dependent key routing of tool windows: the main window keeps
+# the keyboard, a press on a focusable widget of a tool window lets that widget use the keys
+# it wants (slider arrows, combo list), everything else goes on to the main window
+size 1000 1450
+theme light
+click "Werkzeugfenster"
+expect window 7600 open
+click "Standard"
+expect window 0 active
+# the slider in the tool window: arrows move it, the window stays inactive
+click #7601
+expect window 0 active
+expect #7601 value 51
+key right right
+expect #7601 value 53
+key home
+expect #7601 value 1
+# accelerators still reach the main window
+key ctrl+s
+expect text:"Letzter Befehl: Speichern   Form: Quadrat   Stärke: Mittel   Zoom: 100 %" exists
+# the combo box list: Down / Enter inside the tool window
+click #7603
+expect #7603 open
+key down enter
+expect #7603 value 1
+# a press in the main window gives the keys back to it
+click "Standard"
+key right
+expect #7601 value 1

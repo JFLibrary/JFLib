@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Note: a sheet with a folded corner and tape</title>
+  <path class="body" d="M12 8H52V34L44 42H12Z" fill="#F7F8FA"/>
+  <polygon class="shade" points="44,42 44,34 52,34" fill="#DCDFE3"/>
+  <path class="shade" d="M18 17H46M18 22.5H46M18 28H40M18 33.5H34" stroke="#DCDFE3" stroke-width="2"/>
+  <rect class="tint" x="25" y="4.5" width="14" height="6" rx="0.5" transform="rotate(-5 32 7.5)" fill="#7A828C" stroke="none"/>
+</svg>

@@ -1,0 +1,5 @@
+#!args --font-dirs "lib/doc_view/assets;apps/fonttest/tests/fixtures" --fontconf apps/fontpicktest/tests/fonts.conf --font-aa 0
+# the system's font smoothing off (jfgui_FONT_AA=0): black-and-white glyphs everywhere
+expect text:"Glättung: aus  Dialog: 0" exists
+shot build/fontpick_aa.png 16 16 400 120
+expect_nowarn

@@ -1,0 +1,3 @@
+matrix off
+rsonly palette.uis New multicolour Office style without assembly counterpart
+# New style test atlas, no corresponding assembly application.

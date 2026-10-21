@@ -1,0 +1,119 @@
+#!args --open apps/PaintCraft/tests/fixtures/a6_photo.png
+# fx_curves.uis -- Korrekturen > Kurven (agent A6): the curve editor (256 x 256 DIP graph at
+# (25, 101) of the dialog window, 1 value per DIP: value (x, y) at (25 + x, 356 - y)): a click
+# adds a control point, dragging moves it, right click removes it, dragging it out of the graph
+# removes it, "(x, y)" shows the position, Transferzuordnung RGB with R / G / B check boxes
+# (edits go to the checked channels), Zurücksetzen; preview == commit == efftest curves with
+# the blob of the points (bit-identical hashes, #9990 via hooks 995 2 / 995 0).
+# efftest references: identity 2cc39813e097b672; luminosity (0,0) (64,128) (255,255)
+# "0300004080ffff" da92faaaa80201ea; (64,160) "03000040a0ffff" fc39acf20a4b5fde; RGB with all
+# three at (64,128) a813ee0fc6b93e15; red (64,160), green / blue (64,128) 37b76ba4ac32c4dc.
+size 1280 800
+theme light
+cmd 383
+expect window 24689 open
+expect window 24689 modal
+window 24689
+expect #8002 rect 25 101 256 256
+sync
+cmd 995 2
+window any
+expect #9990 text "2cc39813e097b672"
+window 24689
+
+# ------------------------------------------------------------ Leuchtkraft: add, move, remove
+click 89,228
+expect text:"(64, 128)" exists
+sync
+cmd 995 2
+window any
+expect #9990 text "da92faaaa80201ea"
+window 24689
+drag 89,228 89,196
+sync
+cmd 995 2
+window any
+expect #9990 text "fc39acf20a4b5fde"
+window 24689
+move 89,196
+expect text:"(64, 160)" exists
+rclick 89,196
+sync
+cmd 995 2
+window any
+expect #9990 text "2cc39813e097b672"
+window 24689
+# a point dragged far out of the graph goes away
+click 89,228
+sync
+cmd 995 2
+window any
+expect #9990 text "da92faaaa80201ea"
+window 24689
+drag 89,228 89,420
+sync
+cmd 995 2
+window any
+expect #9990 text "2cc39813e097b672"
+window 24689
+
+# ------------------------------------------------------------ RGB: the checked channels
+click #8001
+click "RGB"
+expect #8003 checked
+expect #8004 checked
+expect #8005 checked
+click 89,228
+sync
+cmd 995 2
+window any
+expect #9990 text "a813ee0fc6b93e15"
+window 24689
+click "Grün"
+click "Blau"
+expect #8004 unchecked
+drag 89,228 89,196
+sync
+cmd 995 2
+window any
+expect #9990 text "37b76ba4ac32c4dc"
+window 24689
+
+# ------------------------------------------------------------ Zurücksetzen, OK
+click "Zurücksetzen"
+sync
+cmd 995 2
+window any
+expect #9990 text "2cc39813e097b672"
+window 24689
+click #8001
+click "Leuchtkraft"
+click 89,228
+drag 89,228 89,196
+sync
+cmd 995 2
+window any
+expect #9990 text "fc39acf20a4b5fde"
+window 24689
+click "OK"
+window any
+expect window 24689 closed
+cmd 995 0
+expect #9990 text "fc39acf20a4b5fde"
+expect #9936 value 2
+expect text:"Kurven" exists
+
+# ------------------------------------------------------------ remembered curve, Strg+F
+key ctrl+z
+cmd 383
+window 24689
+sync
+cmd 995 2
+window any
+expect #9990 text "fc39acf20a4b5fde"
+window 24689
+key esc
+window any
+key ctrl+f
+cmd 995 0
+expect #9990 text "fc39acf20a4b5fde"

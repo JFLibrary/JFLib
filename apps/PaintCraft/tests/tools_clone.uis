@@ -1,0 +1,250 @@
+# tools_clone.uis -- Klonen (Stempel) (agent T6): Strg+click sets the anchor (pixel + layer),
+# the first stroke fixes the offset, strokes copy the source through the tool layer (one step
+# each), the source is read before the stroke (no self-copy), another layer as the source
+# (DRAW-017), Füllmethode Unterschied / Überschreiben (DRAW-013 / 014), Esc, undo / redo, the
+# test clip rectangle, the crosshair, the error text without an anchor.
+# Mapping (1280 x 800, zoom 100 %): image pixel (x, y) at (240 + x, 148 + y).  Probes: 901
+# layer / 900 composite pixel (x | y << 16) -> #9900; 902 / 903 / 904 test fills (no step).
+# Records (t_clone.s): #532736 anchor "x,y,layer" (value set), #532737 offset "dx,dy" (value
+# fixed), #532738 crosshair "sx,sy" (window px, value shown).  Hooks 930 width * 100, 931
+# hardness, 932 antialiasing, 933 blend mode, 941 / 942 test clip, 846 0 = clear the anchor.
+# Expected pixels: aliased dabs of width w are w x w discs (d < w / 2 around the pixel under
+# the pointer); dest (x, y) = source (x + dx, y + dy); Unterschied |lhs - rhs|, Überschreiben
+# = the source pixel (all four channels) at full coverage.
+size 1280 800
+theme light
+key l
+expect #9931 value 14
+expect text:"Pinselgröße:" exists
+expect text:"Härte:" exists
+expect text:"Abstand:" exists
+expect #532736 value 0
+expect #532737 value 0
+expect #532738 value 0
+expect #9935 value 1
+
+# ------------------------------------------------------------ pattern: red [20,40)^2, blue
+# [40,60) x [20,40), green [20,40) x [40,60)
+cmd 902 1
+cmd 903 1310740
+cmd 904 2621480
+cmd 902 3
+cmd 903 1310760
+cmd 904 2621500
+cmd 902 2
+cmd 903 2621460
+cmd 904 3932200
+
+# ------------------------------------------------------------ Strg+click = anchor (no step)
+drag 270,178 270,178 1 ctrl
+expect #532736 text "30,30,0"
+expect #532736 value 1
+expect #532737 value 0
+expect #532738 text "270,178"
+expect #532738 value 1
+expect #9935 value 1
+expect #9930 value 0
+
+# ------------------------------------------------------------ aliased width 5: one click copies
+# the 5 x 5 disc around the anchor; the offset is fixed now
+cmd 932 0
+cmd 930 500
+click 370,278
+expect #9935 value 2
+expect #9930 value 0
+expect #532737 text "-100,-100"
+expect #532737 value 1
+cmd 901 8519810
+expect #9900 text "FFFF0000"
+cmd 901 8519812
+expect #9900 text "FFFF0000"
+cmd 901 8519813
+expect #9900 text "FFFFFFFF"
+cmd 901 8650884
+expect #9900 text "FFFFFFFF"
+cmd 900 8585347
+expect #9900 text "FFFF0000"
+
+# ------------------------------------------------------------ the offset stays: (150, 130) <- (50, 30)
+click 390,278
+expect #9935 value 3
+expect #532737 text "-100,-100"
+cmd 901 8519830
+expect #9900 text "FF0000FF"
+expect #532738 text "290,178"
+
+# ------------------------------------------------------------ a drag: one step, dest = source + offset
+drag 360,288 400,288 8
+expect #9935 value 4
+cmd 901 9175165
+expect #9900 text "FF00FF00"
+cmd 901 9044093
+expect #9900 text "FFFF0000"
+cmd 901 9044113
+expect #9900 text "FF0000FF"
+cmd 901 9175190
+expect #9900 text "FFFFFFFF"
+cmd 901 9371773
+expect #9900 text "FFFFFFFF"
+# the crosshair follows the pointer (+ offset)
+move 440,348
+expect #532738 text "340,248"
+expect #532738 value 1
+
+# ------------------------------------------------------------ the source is the layer before the
+# stroke: red [195,205) x [295,305), anchor (200, 300), a stroke from (210, 300) to the right
+# copies the red square once (a self-copying stroke would drag it along)
+cmd 902 1
+cmd 903 19333315
+cmd 904 19988685
+drag 440,448 440,448 1 ctrl
+expect #532736 text "200,300,0"
+expect #532737 value 0
+drag 450,448 500,448 10
+expect #9935 value 5
+expect #532737 text "-10,0"
+cmd 901 19661010
+expect #9900 text "FFFF0000"
+cmd 901 19661014
+expect #9900 text "FFFF0000"
+cmd 901 19661016
+expect #9900 text "FFFFFFFF"
+cmd 901 19661020
+expect #9900 text "FFFFFFFF"
+cmd 901 19661040
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ preview = composite only; Esc drops it
+drag 270,178 270,178 1 ctrl
+down 540,548
+move 550,548
+move 560,548
+expect #9930 value 1
+expect #9941 value 1
+cmd 900 26214705
+expect #9900 text "FFFF0000"
+cmd 900 26214715
+expect #9900 text "FF0000FF"
+cmd 901 26214705
+expect #9900 text "FFFFFFFF"
+expect #532738 text "290,178"
+key esc
+up 560,548
+expect #9930 value 0
+expect #9941 value 0
+cmd 900 26214705
+expect #9900 text "FFFFFFFF"
+expect #9935 value 5
+
+# ------------------------------------------------------------ another layer as the source (DRAW-017):
+# anchor on "Hintergrund", the stroke on the new transparent layer
+cmd 320
+expect #9903 value 2
+expect #9904 value 1
+expect #9935 value 6
+cmd 339 0
+expect #9904 value 0
+drag 270,178 270,178 1 ctrl
+expect #532736 text "30,30,0"
+cmd 339 1
+expect #9904 value 1
+expect #532736 text "30,30,0"
+click 540,248
+expect #9935 value 7
+cmd 901 6553900
+expect #9900 text "FFFF0000"
+cmd 901 6553903
+expect #9900 text "00000000"
+cmd 900 6553900
+expect #9900 text "FFFF0000"
+cmd 339 0
+cmd 901 6553900
+expect #9900 text "FFFFFFFF"
+# the anchor remembers its layer (index 1 now)
+cmd 339 1
+drag 740,648 740,648 1 ctrl
+expect #532736 text "500,500,1"
+
+# ------------------------------------------------------------ Überschreiben (DRAW-014): transparent
+# source pixels of layer 1 replace the white of "Hintergrund"; Normal leaves it white
+cmd 339 0
+cmd 933 14
+click 690,248
+expect #532737 text "50,400"
+cmd 901 6554050
+expect #9900 text "00000000"
+cmd 901 6554053
+expect #9900 text "FFFFFFFF"
+cmd 933 0
+click 710,248
+cmd 901 6554070
+expect #9900 text "FFFFFFFF"
+# nothing changed: no history step
+expect #9935 value 8
+
+# ------------------------------------------------------------ Füllmethode Unterschied (DRAW-013):
+# |white - blue| = yellow
+cmd 933 8
+drag 290,178 290,178 1 ctrl
+expect #532736 text "50,30,0"
+click 640,248
+cmd 901 6554000
+expect #9900 text "FFFFFF00"
+expect #9935 value 9
+cmd 933 0
+
+# ------------------------------------------------------------ undo / redo: one step per stroke
+key ctrl+z
+cmd 901 6554000
+expect #9900 text "FFFFFFFF"
+key ctrl+y
+cmd 901 6554000
+expect #9900 text "FFFFFF00"
+
+# ------------------------------------------------------------ the test clip rectangle [600,610) x [200,210)
+cmd 941 13107800
+cmd 942 13763170
+drag 270,178 270,178 1 ctrl
+drag 835,353 855,353 10
+expect #9935 value 10
+cmd 901 13435482
+expect #9900 text "FFFF0000"
+cmd 901 13435488
+expect #9900 text "FF0000FF"
+cmd 901 13435477
+expect #9900 text "FFFFFFFF"
+cmd 901 13435492
+expect #9900 text "FFFFFFFF"
+cmd 942 0
+
+# ------------------------------------------------------------ antialiased, width 9, hardness 100:
+# the centre is copied exactly, nothing beyond the radius
+cmd 932 1
+cmd 931 100
+cmd 930 900
+drag 270,178 270,178 1 ctrl
+click 940,448
+expect #9935 value 11
+cmd 901 19661500
+expect #9900 text "FFFF0000"
+cmd 901 19792574
+expect #9900 text "FFFF0000"
+cmd 901 19661506
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ another tool hides the crosshair
+key b
+expect #9931 value 10
+key l
+expect #532738 value 1
+
+# ------------------------------------------------------------ no anchor: error text, no stroke
+cmd 846 0
+expect #532736 value 0
+expect #532738 value 0
+click 540,648
+expect #9930 value 0
+expect #9935 value 11
+expect #9918 text "Zum Klonen fehlt noch die Quelle. Legen Sie sie zuerst mit Strg+Klick fest."
+cmd 901 32768300
+expect #9900 text "FFFFFFFF"

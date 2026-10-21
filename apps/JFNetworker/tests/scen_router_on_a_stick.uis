@@ -1,0 +1,4 @@
+#!args apps/JFNetworker/tests/fixtures/router_on_a_stick.jfnet --scenario apps/JFNetworker/tests/scen/router_on_a_stick.scn --golden apps/JFNetworker/tests/scen/router_on_a_stick.report
+# golden scenario: 802.1Q subinterfaces on a trunk, VLANs on the switch.  The GUI program runs tests/scen/router_on_a_stick.scn on
+# tests/fixtures/router_on_a_stick.jfnet without a window and ends with the report, which must equal
+# tests/scen/router_on_a_stick.report byte for byte on every target (the script itself is not run)

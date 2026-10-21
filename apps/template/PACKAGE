@@ -1,0 +1,18 @@
+# tools/package.py: the packages of template (docs/PACKAGING.md) -- a starting point for new apps
+#   python tools/package.py template --formats all
+display=jfgui Template
+version=0.1.0
+publisher=JFLib
+summary=Vorlage für neue JFLib-Apps
+description=Das kleinste vollständige JFLib-Programm: ein Fenster mit Text und zwei Schaltflächen, der Ausgangspunkt für neue Apps.
+generic=Beispielprogramm
+categories=Development;
+deb_name=jfgui-template
+# Flatpak, AppStream and the MSIX identity (reverse DNS of a domain you control)
+app_id=org.jflib.Template
+homepage=https://github.com/JFLibrary/JFLib
+# SPDX licence of the packages (default LicenseRef-proprietary): set your app's own
+license=MIT OR Apache-2.0
+default_win=winui
+default_linux=winui
+styles=winui

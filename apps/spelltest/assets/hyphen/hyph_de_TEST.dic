@@ -1,0 +1,37 @@
+ISO8859-1
+% hyph_de_TEST.dic -- a tiny hyphenation dictionary written for spelltest (not a real
+% language's patterns): two levels as libhyphen's de_DE, ISO8859-1 like it
+LEFTHYPHENMIN 2
+RIGHTHYPHENMIN 2
+COMPOUNDLEFTHYPHENMIN 2
+COMPOUNDRIGHTHYPHENMIN 2
+# first level: the parts of compound words (an odd digit after a part)
+donau1
+dampf1
+schiff1
+fahrts1
+silben1
+wörter1
+recht1
+NOHYPHEN -,'
+1-1
+1'1
+NEXTLEVEL
+# second level: the syllables of each part
+do1nau
+sil1ben
+tren1nung
+ge1sell
+sell1schaf
+schaf1ten
+schafts1ka
+ka1pi
+pi1tän
+wör1ter
+bü1cher
+schrei1bung
+les1bar
+ma1chen
+mor1gen
+1ver
+1zu

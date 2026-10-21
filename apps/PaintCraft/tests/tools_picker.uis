@@ -1,0 +1,90 @@
+# tools_picker.uis -- Farbauswahl (agent T1, COLOR-009..015): left = primary, right =
+# secondary, one pixel exactly (also its colour under alpha 0), averaged sample sizes 3 x 3 ..
+# 11 x 11 (premultiplied: weighted by alpha), clicks outside the image pick nothing, Ebene /
+# Bild (Strg = Bild), continuous picking while dragging, "Nach dem Klick" behaviours.
+# Mapping (1280 x 800, zoom 100 %): image pixel (x, y) at (240 + x, 148 + y).
+# Image: [0,10) x [0,10) red, [20,30) x [0,10) red 50 %, the rest white.  Hooks: 939 sample
+# size index (0 one pixel, 1 3 x 3, 2 5 x 5, 3 11 x 11), 940 after click (0 stay, 1 previous
+# tool, 2 pencil); #9933 / #9934 primary / secondary, #9931 tool.
+size 1280 800
+theme light
+cmd 902 1
+cmd 903 0
+cmd 904 655370
+cmd 902 4
+cmd 903 20
+cmd 904 655390
+key k
+expect #9931 value 13
+expect text:"Farbauswahl: Linksklick nimmt die Farbe unter dem Mauszeiger als Primärfarbe auf, Rechtsklick als Sekundärfarbe. Mit Strg zählt das Gesamtbild aller Ebenen." exists
+
+# ------------------------------------------------------------ one pixel, left / right
+click 245,153
+expect #9933 text "FFFF0000"
+expect #9934 text "FFFFFFFF"
+rclick 245,153
+expect #9934 text "FFFF0000"
+click 250,153
+expect #9933 text "FFFFFFFF"
+# a half transparent pixel exactly
+click 265,153
+expect #9933 text "80FF0000"
+# outside the image: nothing
+click 100,700
+expect #9933 text "80FF0000"
+
+# ------------------------------------------------------------ averaged sample sizes
+cmd 939 1
+click 250,153
+expect #9933 text "FFFFAAAA"
+cmd 939 2
+click 250,153
+expect #9933 text "FFFF9999"
+cmd 939 3
+click 250,153
+expect #9933 text "FFFF9696"
+# weighted by alpha: (29, y) red 50 %, (30, y) (31, y) white
+cmd 939 1
+click 270,153
+expect #9933 text "D5FFCCCC"
+cmd 939 0
+
+# ------------------------------------------------------------ dragging picks continuously
+down 245,153
+expect #9933 text "FFFF0000"
+move 250,153
+expect #9933 text "FFFFFFFF"
+move 246,154
+expect #9933 text "FFFF0000"
+up 246,154
+
+# ------------------------------------------------------------ Ebene / Bild on an empty layer
+key ctrl+shift+n
+expect #9903 value 2
+click 245,153
+expect #9933 text "00000000"
+drag 245,153 245,153 1 ctrl
+expect #9933 text "FFFF0000"
+click 250,153
+expect #9933 text "00000000"
+key ctrl+z
+expect #9903 value 1
+
+# ------------------------------------------------------------ Nach dem Klick
+cmd 940 2
+click 245,153
+expect #9931 value 12
+key k
+expect #9940 value 12
+cmd 940 1
+click 250,153
+expect #9931 value 12
+expect #9933 text "FFFFFFFF"
+key k
+cmd 940 0
+click 245,153
+expect #9931 value 13
+expect #9933 text "FFFF0000"
+# no history steps for picking (the undone "Neue Ebene" is the only other entry)
+expect #9935 value 2
+expect #9936 value 1

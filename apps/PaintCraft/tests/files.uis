@@ -1,0 +1,359 @@
+#!args --open apps/PaintCraft/tests/fixtures/a1_rgba.png
+# files.uis -- Datei (agent A1): command line file, Öffnen (PNG, JPEG, GIF, BMP, .pdn with
+# every layer), an open file is only activated, Speichern unter in PNG / JPEG / BMP / GIF /
+# .pdn and reopening, the flatten question ("Speichern": Zusammenfassen / Abbrechen), recent
+# files, error bar.  Headless runs use the library's own file dialog (name box #65548 for
+# Öffnen, #81932 for Speichern unter; relative names start in the folder of the active
+# image).  Fixtures: tests/fixtures/make_fixtures.py.  Output: build/a1_files_*.
+size 1280 800
+theme light
+expect #9901 value 1
+expect tab:"a1_rgba.png" selected
+expect #9911 text "a1_rgba.png"
+expect #9911 value 1
+expect #9913 value 64
+expect #9914 value 48
+expect #9905 value 0
+expect text:"64 × 48" exists
+# 300 dpi stored per metre in PNG: 118,11 Pixel/cm
+expect #9915 value 11811
+expect #9916 value 2
+# the status bar measures in the image's resolution
+cmd 229
+expect text:"0,54 × 0,41" exists
+cmd 228
+expect text:"0,21 × 0,16" exists
+cmd 227
+expect text:"64 × 48" exists
+cmd 900 0
+expect #9900 text "FFFF0000"
+cmd 900 40
+expect #9900 text "8000FF00"
+cmd 900 2621450
+expect #9900 text "FF0000FF"
+cmd 900 2293810
+expect #9900 text "00000000"
+cmd 900 2621480
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ an open file is only activated
+cmd 101
+expect dialog:"Öffnen" exists
+expect #65548 text "a1_rgba.png"
+click button:"Öffnen"
+sync
+expect dialog:"Öffnen" missing
+expect #9901 value 1
+
+# ------------------------------------------------------------ JPEG, GIF, BMP
+cmd 101
+click #65548
+key ctrl+a
+type "a1_rgb.jpg"
+click button:"Öffnen"
+sync
+expect #9901 value 2
+expect tab:"a1_rgb.jpg" selected
+expect #9911 value 2
+expect #9915 value 9600
+expect #9916 value 1
+cmd 900 0
+expect #9900 text "FFFE0000"
+cmd 900 40
+expect #9900 text "FF00FF00"
+cmd 101
+click #65548
+key ctrl+a
+type "a1_pal.gif"
+click button:"Öffnen"
+sync
+expect #9901 value 3
+expect #9911 value 4
+cmd 900 0
+expect #9900 text "FFFC0000"
+cmd 101
+click #65548
+key ctrl+a
+type "a1_rgb.bmp"
+click button:"Öffnen"
+sync
+expect #9901 value 4
+expect #9911 value 3
+cmd 900 0
+expect #9900 text "FFFF0000"
+cmd 900 2293810
+expect #9900 text "FFFFFFFF"
+expect #9905 value 0
+
+# ------------------------------------------------------------ recent files: newest first
+click menu:"Datei"
+move menuitem:"Zuletzt geöffnet"
+expect menuitem:"(Keine)" missing
+expect menuitem:"1 a1_rgb.bmp" exists
+expect menuitem:"2 a1_pal.gif" exists
+expect menuitem:"3 a1_rgb.jpg" exists
+expect menuitem:"4 a1_rgba.png" exists
+expect menuitem:"Liste leeren" enabled
+# the oldest entry (the command line file) is open already: only activated
+click menuitem:"4 a1_rgba.png"
+expect #9901 value 4
+expect tab:"a1_rgba.png" selected
+click menu:"Datei"
+move menuitem:"Zuletzt geöffnet"
+expect menuitem:"1 a1_rgb.bmp" exists
+key esc esc
+
+# ------------------------------------------------------------ Speichern unter: PNG, BMP, GIF, JPEG and back
+cmd 103
+expect dialog:"Speichern unter" exists
+expect #81932 text "a1_rgba"
+click #81932
+key ctrl+a
+type "../../../../build/a1_files_out.png"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+# Speicheroptionen (dlg_saveopt.s, own test saveopt.uis)
+expect window 24595 open
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "a1_files_out.png"
+expect #9911 value 1
+expect #9905 value 0
+expect tab:"a1_files_out.png" selected
+cmd 103
+click #81932
+key ctrl+a
+type "a1_files_out.bmp"
+click button:"Speichern"
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "a1_files_out.bmp"
+expect #9911 value 3
+cmd 103
+click #81932
+key ctrl+a
+type "a1_files_out.gif"
+click button:"Speichern"
+click button:"OK"
+expect window 24595 closed
+expect #9911 value 4
+cmd 103
+click #81932
+key ctrl+a
+type "a1_files_out.jpg"
+click button:"Speichern"
+click button:"OK"
+expect window 24595 closed
+expect #9911 value 2
+expect #9901 value 4
+# reopen every file (the image itself keeps its last name: a1_files_out.jpg)
+key ctrl+w
+expect #9901 value 3
+cmd 101
+click #65548
+key ctrl+a
+type "../../../../build/a1_files_out.png"
+click button:"Öffnen"
+sync
+expect #9901 value 4
+expect #9911 text "a1_files_out.png"
+cmd 900 40
+expect #9900 text "8000FF00"
+cmd 900 2293810
+expect #9900 text "00000000"
+cmd 900 2621450
+expect #9900 text "FF0000FF"
+cmd 101
+click #65548
+key ctrl+a
+type "a1_files_out.bmp"
+click button:"Öffnen"
+sync
+expect #9901 value 5
+cmd 900 40
+expect #9900 text "8000FF00"
+cmd 900 2293810
+expect #9900 text "00000000"
+cmd 101
+click #65548
+key ctrl+a
+type "a1_files_out.gif"
+click button:"Öffnen"
+sync
+expect #9901 value 6
+cmd 900 0
+expect #9900 text "FFFF0000"
+cmd 900 2293810
+expect #9900 text "00000000"
+cmd 101
+click #65548
+key ctrl+a
+type "a1_files_out.jpg"
+click button:"Öffnen"
+sync
+expect #9901 value 7
+cmd 900 2621450
+expect #9900 text "FF0000FE"
+
+# ------------------------------------------------------------ layered image: flatten question, .pdn
+key ctrl+n
+click button:"OK"
+expect #9901 value 8
+key ctrl+shift+n
+cmd 902 3
+cmd 903 0
+cmd 904 655370
+cmd 900 327685
+expect #9900 text "FF0000FF"
+# untitled: the dialog starts in the folder used last (build/)
+cmd 103
+expect #81932 text "Unbenannt"
+click #81932
+key ctrl+a
+type "a1_files_flat.png"
+click button:"Speichern"
+expect window 24594 open
+expect window 24594 modal
+expect text:"Dieses Dateiformat kennt keine Ebenen. Für die Datei werden deshalb alle Ebenen zu einer einzigen vereint." exists
+click button:"Abbrechen"
+expect window 24594 closed
+expect #9911 text "Unbenannt"
+expect #9905 value 1
+cmd 103
+click #81932
+key ctrl+a
+type "a1_files_flat.png"
+click button:"Speichern"
+click button:"Zusammenfassen"
+expect window 24594 closed
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "a1_files_flat.png"
+expect #9903 value 2
+expect #9905 value 0
+# .pdn keeps the layers
+cmd 103
+click #81932
+key ctrl+a
+type "a1_files_layers.pdn"
+click button:"Speichern"
+expect window 24594 closed
+expect #9911 text "a1_files_layers.pdn"
+expect #9911 value 13
+key ctrl+w
+cmd 101
+click #65548
+key ctrl+a
+type "a1_files_layers.pdn"
+click button:"Öffnen"
+sync
+expect #9911 text "a1_files_layers.pdn"
+expect #9903 value 2
+expect #9904 value 1
+expect #9906 text "Ebene 2"
+cmd 900 327685
+expect #9900 text "FF0000FF"
+cmd 900 720907
+expect #9900 text "FFFFFFFF"
+cmd 339 0
+expect #9906 text "Hintergrund"
+cmd 101
+click #65548
+key ctrl+a
+type "a1_files_flat.png"
+click button:"Öffnen"
+sync
+expect #9903 value 1
+cmd 900 327685
+expect #9900 text "FF0000FF"
+
+# ------------------------------------------------------------ a paint.net 5.1 file with five layers
+cmd 101
+click #65548
+key ctrl+a
+type "../apps/PaintCraft/tests/fixtures/pdn/c_layers.pdn"
+click button:"Öffnen"
+sync
+expect #9911 text "c_layers.pdn"
+expect #9911 value 13
+expect #9903 value 5
+expect #9904 value 4
+expect #9913 value 800
+expect #9914 value 600
+cmd 339 0
+expect #9906 text "Hintergrund"
+expect #9906 value 1
+cmd 339 2
+expect #9906 text "ö"
+expect #9906 value 0
+cmd 339 4
+expect #9906 text "ß"
+expect #9907 value 128
+expect #9905 value 0
+
+# ------------------------------------------------------------ errors
+cmd 101
+click #65548
+key ctrl+a
+type "../make_fixtures.py"
+click button:"Öffnen"
+sync
+expect #1640 text "make_fixtures.py"
+expect #9918 text "Dieses Bildformat wird nicht erkannt; die Datei lässt sich nicht öffnen."
+expect #9901 value 10
+click #1641
+expect #1640 missing
+expect #9918 text ""
+# a missing file
+cmd 101
+click #65548
+key ctrl+a
+type "a1_no_such_file.png"
+click button:"Öffnen"
+sync
+expect dialog:"Öffnen" exists
+expect text:"Die Datei wurde nicht gefunden." exists
+click button:"Abbrechen"
+expect #9901 value 10
+
+# ------------------------------------------------------------ Alles speichern (Strg+Alt+S)
+cmd 101
+click #65548
+key ctrl+a
+type "../../../../../build/a1_files_out.png"
+click button:"Öffnen"
+sync
+expect #9911 text "a1_files_out.png"
+expect #9901 value 10
+cmd 902 9
+cmd 903 0
+cmd 904 131074
+expect #9905 value 1
+key ctrl+n
+click button:"OK"
+cmd 904 131074
+expect #9905 value 1
+expect #9901 value 11
+key ctrl+alt+s
+# a1_files_out.png was opened, not saved yet: its options first
+expect window 24595 open
+click button:"OK"
+expect window 24595 closed
+expect dialog:"Speichern unter" exists
+click #81932
+key ctrl+a
+type "a1_files_all.png"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "a1_files_all.png"
+expect #9905 value 0
+expect #9919 text "a1_files_all.png – PaintCraft"
+# (eleven images: the tab is behind the "Bilderliste" button)
+click #1392
+click menuitem:"a1_files_out.png"
+expect #9911 text "a1_files_out.png"
+expect #9905 value 0
+cmd 900 65537
+expect #9900 text "FFFFFF00"

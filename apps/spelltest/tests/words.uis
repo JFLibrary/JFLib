@@ -1,0 +1,23 @@
+#!args --verify-dirty
+# "Zum Wörterbuch hinzufügen" (the personal word list; headless: in memory only) and
+# "Ignorieren" (this session): every box checks again, the word is no longer marked anywhere
+rclick 70,136
+click menuitem:"Zum Wörterbuch hinzufügen"
+expect text:"Wörterbuch: Hasu" exists
+expect text:"Fehler Betreff: -" exists
+# the same word typed into the other box: not marked either
+focus #111
+key ctrl+end
+type " Hasu"
+expect text:"Fehler Nachricht: Arbit, Strasse" exists
+# ignore "Arbit": not in the personal list
+rclick 120,205
+click menuitem:"Ignorieren"
+expect text:"Fehler Nachricht: Strasse" exists
+expect text:"Wörterbuch: Hasu" exists
+# a word added in its case: "HASU" too, "hasu" not
+focus #110
+key ctrl+a
+type "HASU hasu"
+expect text:"Fehler Betreff: hasu" exists
+expect_nowarn

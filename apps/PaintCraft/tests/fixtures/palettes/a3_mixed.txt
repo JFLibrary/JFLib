@@ -1,0 +1,18 @@
+﻿; a3_mixed.txt -- test palette (agent A3): comments, blanks, 6 and 8 digits,
+; a leading '#', a trailing comment, tabs, CRLF and malformed lines
+FFFF0000
+  ff00ff00  
+; a comment line
+#0000FF
+80FFFF00 ; trailing comment
+	00FF00FF	
+123456
+XYZXYZ
+FF00FF0
+12345
+FF 00 FF 00
+0x80FF0000
+#
+;;;
+
+abcdef

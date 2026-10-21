@@ -1,0 +1,84 @@
+# colour wheel (U1) on an HSV record with a value track, and ui_color_picker_ex with the
+# alpha bar and the R G B A / H S V / hex fields
+size 1000 3000
+theme light
+# ---- wheel: value = hue (tenths of a degree), max = saturation (0..1000)
+expect #7720 value 1200
+expect #7720 max 700
+expect #7721 value 850
+# the centre: no saturation, the hue stays
+click #7720
+expect #7720 value 1200
+expect #7720 max 0
+# right edge: red, full saturation; beyond the rim it stays at the rim
+drag #7720 183,2089
+expect #7720 value 0
+expect #7720 max 1000
+drag #7720 104,1990
+expect #7720 value 900
+expect #7720 max 1000
+drag #7720 64,2089
+expect #7720 value 1800
+expect #7720 max 506
+# keys: Left / Right hue (1 degree, Shift 10), Up / Down saturation (1 %, Shift 10 %)
+key right
+expect #7720 value 1810
+key shift+left
+expect #7720 value 1710
+key down down
+expect #7720 max 486
+key shift+up
+expect #7720 max 586
+expect #7720 focused
+# the value track does not change hue or saturation
+drag #7721 224,2169
+expect #7721 value 0
+expect #7720 value 1710
+expect #7720 max 586
+drag #7721 224,2009
+expect #7721 value 1000
+shot build/gal_wheel.png 0 2000 260 180
+# ---- colour picker with alpha and fields (0xC0E04040)
+expect #0x6001E323 text "224"
+expect #0x6001E326 text "192"
+expect #0x6001E327 text "0"
+expect #0x6001E32A text "C0E04040"
+# R field -> hex, H stays
+click #0x6001E323
+key ctrl+a
+type "255\n"
+expect #0x6001E32A text "C0FF4040"
+expect #0x6001E328 text "75"
+# hex with 6 digits keeps the alpha; H follows
+click #0x6001E32A
+key ctrl+a
+type "#00FF00\n"
+expect #0x6001E32A text "C000FF00"
+expect #0x6001E323 text "0"
+expect #0x6001E324 text "255"
+expect #0x6001E327 text "120"
+# 8 digits set the alpha too
+key ctrl+a
+type "800000FF\n"
+expect #0x6001E326 text "128"
+expect #0x6001E327 text "240"
+# H field: blue -> red at the same saturation and value
+click #0x6001E327
+key ctrl+a
+type "0\n"
+expect #0x6001E323 text "255"
+expect #0x6001E325 text "0"
+# V field up / down
+click #0x6001E329
+key down
+expect #0x6001E329 text "99"
+expect #0x6001E323 text "252"
+# the alpha bar: left end = transparent, right end = opaque
+drag 390,2237 264,2237
+expect #0x6001E326 text "0"
+drag 264,2237 520,2237
+expect #0x6001E326 text "255"
+# the hue bar still works with the fields
+drag 264,2209 392,2209
+expect #0x6001E327 text "180"
+shot build/gal_picker.png 250 2000 290 440

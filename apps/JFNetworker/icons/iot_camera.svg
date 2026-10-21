@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>IoT camera: a dome camera under its ceiling plate</title>
+  <path class="body" d="M14 13H50V20A18 18 0 0 1 14 20Z" fill="#F7F8FA"/>
+  <path class="screen" d="M18.5 20H45.5A13.5 13.5 0 0 1 18.5 20Z" fill="#CAD4DF" stroke-width="1"/>
+  <circle class="port" cx="32" cy="25.5" r="5.25" fill="#4F555D" stroke="none"/>
+  <circle class="screen" cx="32" cy="25.5" r="2" fill="#CAD4DF" stroke="none"/>
+  <circle class="hi" cx="33.4" cy="24.1" r="0.75" fill="#FFFFFF" stroke="none"/>
+  <rect class="tint" x="9" y="8" width="46" height="5.5" rx="2" fill="#8A929C" stroke="none"/>
+  <rect class="ink" x="9" y="8" width="46" height="5.5" rx="2"/>
+  <circle class="ok" cx="46.5" cy="17" r="1" fill="#3C9A5F" stroke="none"/>
+</svg>

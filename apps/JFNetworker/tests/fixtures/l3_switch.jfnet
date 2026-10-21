@@ -1,0 +1,96 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "L3-Switch mit SVIs",
+  "description": "MLS1 routet zwischen VLAN 10 (PC1) und VLAN 20 (PC2) über seine VLAN-Interfaces.",
+  "seed": 4,
+  "next_id": 6,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.10.10/24 dev eth0\nip route add default via 10.0.10.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 240,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.20.10/24 dev eth0\nip route add default via 10.0.20.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "MLS1",
+      "model": "jf-s24l3",
+      "x": 120,
+      "y": 140,
+      "off": false,
+      "startup_config": "hostname MLS1\n!\nip routing\n!\nvlan 10\n name Office\n!\nvlan 20\n name Lab\n!\ninterface GigabitEthernet1/0/1\n switchport access vlan 10\n switchport mode access\n!\ninterface GigabitEthernet1/0/2\n switchport access vlan 20\n switchport mode access\n!\ninterface Vlan10\n ip address 10.0.10.1 255.255.255.0\n no shutdown\n!\ninterface Vlan20\n ip address 10.0.20.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 4,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 5,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

@@ -1,0 +1,182 @@
+# clipboard.uis -- Zwischenablage (agent K1): Kopieren, Ausschneiden, Sichtbares kopieren,
+# Einfügen (floating pixels of Pixel verschieben, Enter / Esc / move, one step
+# "Einfügen"), In neue Ebene / Einfügen als neues Bild, the question for images larger than the
+# canvas, Auswahl kopieren / Auswahl einfügen (5 modes, also from an image), command states.
+# The headless clipboard is used (script command `clip`); never the real one.
+# Canvas 1280 x 800, zoom 100 %: image pixel (x, y) is at (240 + x, 148 + y).
+# Hooks: K1 172 clipboard image probe, 173 state (value = enabled commands) -> #0x82200,
+# #0x82201 open questions; A1 900 / 901 composite / layer pixel -> #9900, #9901 documents,
+# #9903 layers, #9913 / #9914 size, #9918 error bar; A4 #4391 current history entry;
+# T2 #9981 selection bounds, #9984 value live | frame << 1.
+size 1280 800
+theme light
+# red square (20,20)-(60,60) on white
+cmd 902 1
+cmd 903 1310740         # (20, 20)
+cmd 904 3932220         # (60, 60)
+clip clear
+
+# ------------------------------------------------------------ states without clipboard data
+cmd 173
+expect #0x82200 text "1,1,0,800,600"
+expect #0x82200 value 32
+
+# ------------------------------------------------------------ Kopieren, Einfügen, Enter, undo
+cmd 750
+drag 260,168 300,208
+expect #9981 text "20,20,60,60"
+key ctrl+c
+clip expect image
+cmd 172 0
+expect #0x82200 text "40,40,FFFF0000"
+expect #0x82200 value 1
+cmd 173
+expect #0x82200 value 63
+key ctrl+v
+expect #9984 value 3
+expect #9981 text "0,0,40,40"
+key enter
+expect #9984 value 2
+cmd 900 327685          # image (5, 5)
+expect #9900 text "FFFF0000"
+expect #4391 text "Einfügen"
+key ctrl+z
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+expect #9981 text "20,20,60,60"
+
+# ------------------------------------------------------------ Esc drops the paste
+key ctrl+v
+expect #9984 value 3
+key esc
+expect #9984 value 2
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+expect #9981 text "20,20,60,60"
+expect #4391 text "Rechteckige Auswahl"
+
+# ------------------------------------------------------------ move the pasted pixels
+key ctrl+v
+drag 250,158 350,208
+key enter
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+cmd 900 3604585         # image (105, 55)
+expect #9900 text "FFFF0000"
+expect #9981 text "100,50,140,90"
+expect #4391 text "Einfügen"
+key ctrl+z
+
+# ------------------------------------------------------------ Ausschneiden
+key ctrl+x
+expect #4391 text "Ausschneiden"
+cmd 901 1966110         # layer (30, 30)
+expect #9900 text "00FF0000"
+cmd 172 0
+expect #0x82200 text "40,40,FFFF0000"
+key ctrl+z
+cmd 901 1966110
+expect #9900 text "FFFF0000"
+
+# ------------------------------------------------------------ Sichtbares kopieren, no selection
+cmd 162
+cmd 172 1310740         # (20, 20)
+expect #0x82200 text "40,40,FFFF0000"
+key ctrl+d
+key ctrl+c
+cmd 172 0
+expect #0x82200 text "800,600,FFFFFFFF"
+cmd 172 1966110         # (30, 30)
+expect #0x82200 text "800,600,FFFF0000"
+
+# ------------------------------------------------------------ Auswahl kopieren / einfügen
+cmd 750
+drag 260,168 300,208
+cmd 166
+clip expect text
+cmd 173
+expect #0x82200 value 56
+key ctrl+d
+cmd 167
+expect #9981 text "20,20,60,60"
+expect #4391 text "Auswahl einfügen"
+drag 340,248 380,288
+expect #9981 text "100,100,140,140"
+cmd 168
+expect #9981 text "20,20,140,140"
+expect #4391 text "Auswahl einfügen (vereinigen)"
+cmd 170
+expect #9981 text "20,20,60,60"
+expect #4391 text "Auswahl einfügen (Schnittmenge)"
+cmd 169
+expect #4391 text "Auswahl einfügen (abziehen)"
+cmd 171
+expect #9981 text "20,20,60,60"
+expect #4391 text "Auswahl einfügen (XOR)"
+# from an image: its rectangle at (0, 0)
+clip file apps/PaintCraft/tests/fixtures/a1_rgba.png
+key ctrl+d
+cmd 167
+expect #9981 text "0,0,64,48"
+key ctrl+d
+
+# ------------------------------------------------------------ Einfügen als neue Ebene
+key ctrl+shift+v
+expect #9903 value 2
+key enter
+expect #4391 text "Einfügen"
+cmd 901 655370          # layer (10, 10)
+expect #9900 text "FFFF0000"
+cmd 901 3276900         # layer (100, 50)
+expect #9900 text "00000000"
+key ctrl+z
+expect #4391 text "Neue Ebene"
+key ctrl+z
+expect #9903 value 1
+
+# ------------------------------------------------------------ Einfügen als neues Bild
+key ctrl+alt+v
+expect #9901 value 2
+expect #9913 value 64
+expect #9914 value 48
+key enter
+cmd 900 0
+expect #9900 text "FFFF0000"
+cmd 900 1572896         # (32, 24)
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ larger than the canvas
+clip file apps/PaintCraft/tests/fixtures/a6_photo.png
+key ctrl+v
+expect #0x82201 value 1
+expect text:"Das Bild ragt über die Leinwand hinaus." exists
+click "Leinwand vergrößern"
+expect #0x82201 value 0
+expect #9913 value 320
+expect #9914 value 240
+key enter
+cmd 900 6553700         # (100, 100)
+expect #9900 text "FFFAFAF5"
+expect #4391 text "Einfügen"
+key ctrl+z
+key ctrl+z
+expect #9913 value 64
+key ctrl+v
+click "Leinwand nicht ändern"
+key enter
+expect #9913 value 64
+cmd 900 2555943         # (39, 39)
+expect #9900 text "FF1B257B"
+key ctrl+z
+key ctrl+v
+click "Abbrechen"
+expect #0x82201 value 0
+expect #9984 value 2
+expect #4391 text "Einfügen"
+
+# ------------------------------------------------------------ nothing to paste
+clip clear
+cmd 173
+expect #0x82200 value 40
+cmd 163
+expect #9918 text "In der Zwischenablage liegt kein Bild."

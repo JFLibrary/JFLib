@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Smartphone</title>
+  <rect class="body" x="20" y="3" width="24" height="42" rx="4" fill="#F7F8FA"/>
+  <rect class="screen" x="22.75" y="7.5" width="18.5" height="32.5" rx="1" fill="#CAD4DF" stroke="none"/>
+  <line class="port" x1="29" y1="5.25" x2="34" y2="5.25" stroke="#4F555D" stroke-width="1"/>
+  <circle class="port" cx="36.75" cy="5.25" r="0.75" fill="#4F555D" stroke="none"/>
+  <rect class="tint" x="28" y="41.7" width="8" height="1.6" rx="0.8" fill="#7A828C" stroke="none"/>
+</svg>

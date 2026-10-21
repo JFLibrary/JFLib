@@ -1,0 +1,525 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Geshardeter KV-Speicher hinter einem Loadbalancer",
+  "description": "GEN schickt HTTP-Last an LB1, der sie reihum auf WEB1 bis WEB3 verteilt. Die Webserver lesen und schreiben Schlüssel im KV-Speicher aus KV1 bis KV3 (Hash-Ring mit 16 vnodes je Knoten, Replikationsfaktor 2, eventual consistency mit Read Repair).",
+  "seed": 11,
+  "next_id": 20,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "GEN",
+      "model": "traffic-gen",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname GEN\nip addr add 10.0.1.10/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-load",
+          "name": "fill",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.1.1/"
+            ],
+            "mode": "closed",
+            "users": 1,
+            "requests": 200,
+            "timeout_ms": 5000,
+            "mix": [
+              {
+                "method": "PUT",
+                "path": "/item/k{seq}",
+                "body": "v{seq}"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "http-load",
+          "name": "load",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.1.1/"
+            ],
+            "mode": "open",
+            "rps": 100,
+            "arrival": "poisson",
+            "delay_ms": 2000,
+            "duration_ms": 16000,
+            "timeout_ms": 5000,
+            "mix": [
+              {
+                "path": "/item/k{hot:200}",
+                "weight": 4
+              },
+              {
+                "method": "PUT",
+                "path": "/item/k{rand:200}",
+                "body": "neu{seq}",
+                "weight": 1
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 160,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "LB1",
+      "model": "load-balancer",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname LB1\nip addr add 10.0.1.1/24 dev eth0\nip addr add 10.0.2.1/24 dev eth1\n",
+      "services": [
+        {
+          "kind": "lb",
+          "name": "lb",
+          "disabled": false,
+          "config": {
+            "mode": "http",
+            "port": 80,
+            "algorithm": "round-robin",
+            "backends": [
+              {
+                "name": "web1",
+                "addr": "10.0.2.11"
+              },
+              {
+                "name": "web2",
+                "addr": "10.0.2.12"
+              },
+              {
+                "name": "web3",
+                "addr": "10.0.2.13"
+              }
+            ],
+            "health": {
+              "type": "http",
+              "path": "/health",
+              "interval_ms": 1000,
+              "timeout_ms": 500,
+              "rise": 2,
+              "fall": 3
+            }
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "SW2",
+      "model": "jf-s24p",
+      "x": 480,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW2\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 640,
+      "y": -120,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.2.11/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "time_ms": 1,
+            "routes": [
+              {
+                "path": "/health",
+                "body": "ok\n"
+              },
+              {
+                "path": "/item/*",
+                "method": "*",
+                "backend": "kv"
+              }
+            ],
+            "kv": {
+              "nodes": [
+                "10.0.2.21",
+                "10.0.2.22",
+                "10.0.2.23"
+              ],
+              "rf": 2
+            }
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 6,
+      "name": "WEB2",
+      "model": "server-1u",
+      "x": 640,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname WEB2\nip addr add 10.0.2.12/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "time_ms": 1,
+            "routes": [
+              {
+                "path": "/health",
+                "body": "ok\n"
+              },
+              {
+                "path": "/item/*",
+                "method": "*",
+                "backend": "kv"
+              }
+            ],
+            "kv": {
+              "nodes": [
+                "10.0.2.21",
+                "10.0.2.22",
+                "10.0.2.23"
+              ],
+              "rf": 2
+            }
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 7,
+      "name": "WEB3",
+      "model": "server-1u",
+      "x": 640,
+      "y": 120,
+      "off": false,
+      "startup_config": "hostname WEB3\nip addr add 10.0.2.13/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "time_ms": 1,
+            "routes": [
+              {
+                "path": "/health",
+                "body": "ok\n"
+              },
+              {
+                "path": "/item/*",
+                "method": "*",
+                "backend": "kv"
+              }
+            ],
+            "kv": {
+              "nodes": [
+                "10.0.2.21",
+                "10.0.2.22",
+                "10.0.2.23"
+              ],
+              "rf": 2
+            }
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 8,
+      "name": "KV1",
+      "model": "database",
+      "x": 800,
+      "y": -120,
+      "off": false,
+      "startup_config": "hostname KV1\nip addr add 10.0.2.21/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "kv",
+          "name": "kv",
+          "disabled": false,
+          "config": {
+            "nodes": [
+              "10.0.2.21",
+              "10.0.2.22",
+              "10.0.2.23"
+            ],
+            "rf": 2,
+            "consistency": "eventual"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 9,
+      "name": "KV2",
+      "model": "database",
+      "x": 800,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname KV2\nip addr add 10.0.2.22/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "kv",
+          "name": "kv",
+          "disabled": false,
+          "config": {
+            "nodes": [
+              "10.0.2.21",
+              "10.0.2.22",
+              "10.0.2.23"
+            ],
+            "rf": 2,
+            "consistency": "eventual"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 10,
+      "name": "KV3",
+      "model": "database",
+      "x": 800,
+      "y": 120,
+      "off": false,
+      "startup_config": "hostname KV3\nip addr add 10.0.2.23/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "kv",
+          "name": "kv",
+          "disabled": false,
+          "config": {
+            "nodes": [
+              "10.0.2.21",
+              "10.0.2.22",
+              "10.0.2.23"
+            ],
+            "rf": 2,
+            "consistency": "eventual"
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 11,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 13,
+      "a": {
+        "dev": 3,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 14,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 15,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 16,
+      "a": {
+        "dev": 7,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 17,
+      "a": {
+        "dev": 8,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/5"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 18,
+      "a": {
+        "dev": 9,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/6"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 19,
+      "a": {
+        "dev": 10,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/7"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

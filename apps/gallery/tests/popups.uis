@@ -1,0 +1,53 @@
+# popups.uis -- (U3) popups of a secondary window that do not fit into it: the small tool
+# window "Popups" (test hook 9104).  Its menu, combo list and tooltip leave the window (OS
+# popup windows; headless: the virtual desktop = the main window's client area), rows
+# outside the window are clicked like any other; a list taller than the desktop scrolls;
+# a press in another window closes the popups (light dismiss across windows).
+size 1000 700
+theme light
+cmd 9104
+expect window 7760 open
+expect window 7760 rect 40 60 180 180
+expect text:"Zuletzt: –" exists
+# ---- the menu below the button, far beyond the window's bottom (window height 180 + 28)
+click #7761
+expect #7761 open
+expect menuitem:"Neu" rect 17 81 136 32
+expect menuitem:"Schließen" rect 17 433 136 32
+shot build/u3/popups_menu.png desktop 0 0 400 560
+click menuitem:"Schließen"
+expect menuitem:"Neu" missing
+expect text:"Zuletzt: Schließen" exists
+# ---- the keyboard: after the press in the tool window the menu takes Down / Enter
+click #7761
+key down down enter
+expect text:"Zuletzt: Öffnen" exists
+# ---- light dismiss: a press in the main window closes the tool window's menu
+click #7761
+expect menuitem:"Neu" exists
+click 900,650
+expect menuitem:"Neu" missing
+# ---- the combo list: 20 rows (648 DIP) in a 700 DIP desktop, then in a 400 DIP one
+click #7762
+expect #7762 open
+expect listitem:"Luminanz" exists
+key esc
+size 1000 400
+click #7762
+expect #7762 open
+shot build/u3/popups_combo.png desktop 0 0 400 400
+key up enter
+expect #7762 value 19
+# ---- the tooltip below the button at the window's bottom edge
+move #7763
+wait 700
+expect text:"Ein Tooltip, der über den unteren Rand des Fensters hinausragt" exists
+shot build/u3/popups_tip.png desktop 0 0 400 400
+# ---- dark theme, 150 %
+theme dark
+scale 150 window 7760
+click #7761
+expect #7761 open
+shot build/u3/popups_menu_dark150.png desktop
+key esc
+expect menuitem:"Neu" missing

@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="200" viewBox="0 0 200 200">
+  <title>Verläufe</title>
+  <defs>
+    <linearGradient id="lin">
+      <stop offset="0" stop-color="#ef4444"/>
+      <stop offset="0.5" stop-color="#facc15"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="vert" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" style="stop-color: #10b981"/>
+      <stop offset="1" style="stop-color: #10b981; stop-opacity: 0"/>
+    </linearGradient>
+    <linearGradient id="user" gradientUnits="userSpaceOnUse" x1="10" y1="0" x2="40" y2="0" spreadMethod="reflect">
+      <stop offset="0" stop-color="#1e3a8a"/>
+      <stop offset="1" stop-color="#93c5fd"/>
+    </linearGradient>
+    <linearGradient id="rep" xlink:href="#user" spreadMethod="repeat"/>
+    <linearGradient id="rot" href="#lin" gradientTransform="rotate(45 0.5 0.5)"/>
+    <radialGradient id="rad">
+      <stop offset="0" stop-color="white"/>
+      <stop offset="0.6" stop-color="#f97316"/>
+      <stop offset="1" stop-color="#7c2d12"/>
+    </radialGradient>
+    <radialGradient id="focal" cx="0.5" cy="0.5" r="0.5" fx="0.25" fy="0.3">
+      <stop offset="0" stop-color="#fef9c3"/>
+      <stop offset="1" stop-color="#a16207"/>
+    </radialGradient>
+    <radialGradient id="radrep" r="0.2" spreadMethod="reflect">
+      <stop offset="0" stop-color="#4c1d95"/>
+      <stop offset="1" stop-color="#ddd6fe"/>
+    </radialGradient>
+  </defs>
+  <rect x="10" y="10" width="180" height="30" fill="url(#lin)"/>
+  <rect x="10" y="50" width="55" height="60" fill="url(#vert)" stroke="#065f46"/>
+  <rect x="75" y="50" width="55" height="60" fill="url(#user)"/>
+  <rect x="140" y="50" width="50" height="60" fill="url(#rep)"/>
+  <circle cx="40" cy="150" r="35" fill="url(#rad)"/>
+  <circle cx="110" cy="150" r="35" fill="url(#focal)"/>
+  <rect x="155" y="120" width="40" height="70" fill="url(#radrep)"/>
+  <rect x="80" y="190" width="40" height="8" fill="url(#missing) #64748b"/>
+  <rect x="10" y="190" width="60" height="8" fill="url(#rot)"/>
+</svg>

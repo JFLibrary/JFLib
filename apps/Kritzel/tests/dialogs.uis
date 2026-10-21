@@ -1,0 +1,41 @@
+# resize / skew, properties, edit colours
+expect text:"1152 × 648px" exists
+cmd 36
+expect dialog:"Größe ändern und schräg stellen" exists
+expect #1723 value 100
+click #1723
+key ctrl+a
+type "50"
+key tab
+expect #1724 value 50
+shot build/kritzel_dlg_resize.png
+click button:"OK"
+expect text:"576 × 324px" exists
+# pixel mode keeps the aspect ratio too
+cmd 36
+click #1722
+expect #1723 value 576
+click #1724
+key ctrl+a
+type "162"
+key tab
+expect #1723 value 288
+click button:"OK"
+expect text:"288 × 162px" exists
+key ctrl+z
+expect text:"576 × 324px" exists
+# properties: a bigger canvas
+cmd 37
+click #1741
+key ctrl+a
+type "600"
+key tab
+shot build/kritzel_dlg_props.png
+click button:"OK"
+expect text:"600 × 324px" exists
+# edit colours
+cmd 50
+expect dialog:"Farben bearbeiten" exists
+shot build/kritzel_dlg_color.png
+click button:"OK"
+expect dialog:"Farben bearbeiten" missing

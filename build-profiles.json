@@ -1,0 +1,66 @@
+{
+  "version": 1,
+  "builds": [
+    {
+      "name": "Kritzel – Entwicklung",
+      "apps": [
+        "Kritzel"
+      ],
+      "targets": [
+        "win",
+        "linux"
+      ],
+      "styles": [],
+      "mode": "development",
+      "optimization": "size",
+      "jobs": 4,
+      "tests": false,
+      "output": "build/manager"
+    },
+    {
+      "name": "Kritzel – Release WinUI",
+      "apps": [
+        "Kritzel"
+      ],
+      "targets": [
+        "win",
+        "linux"
+      ],
+      "styles": [
+        "winui"
+      ],
+      "mode": "release",
+      "optimization": "size",
+      "jobs": 4,
+      "tests": true,
+      "output": "build/manager"
+    }
+  ],
+  "starts": [
+    {
+      "name": "Standard",
+      "app": "Kritzel",
+      "argv": []
+    },
+    {
+      "name": "Dunkel · 150 %",
+      "app": "Kritzel",
+      "argv": [
+        "--theme",
+        "dark",
+        "--scale",
+        "150"
+      ]
+    },
+    {
+      "name": "Dunkel · 150 %",
+      "app": "template",
+      "argv": [
+        "--theme",
+        "dark",
+        "--scale",
+        "150"
+      ]
+    }
+  ]
+}

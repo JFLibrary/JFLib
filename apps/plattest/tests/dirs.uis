@@ -1,0 +1,4 @@
+#!args --test dirs
+# (Rust only) plattest --test dirs: the user's folders and the log folder (lib/plat/dirs.rs),
+# their vfs schemes and manifest variables. The whole test runs before the UI starts and ends
+# the process with the number of failures.

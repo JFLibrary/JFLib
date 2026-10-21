@@ -1,0 +1,116 @@
+# Heading/page/result navigation uses existing UTF-8 selections and changes no text.
+size 1240 840
+theme light
+cmd 61
+cmd 49
+expect text:"Navigation" exists
+expect button:"Zusammenfassung" exists
+expect button:"2 Methode" exists
+click button:"2 Methode"
+expect #10000 focused
+expect #10000 value 100
+expect #10000 max 100
+click "Layout"
+click #3023
+click #44
+expect text:"Seite 2 von 2" exists
+click "Seiten"
+expect button:"Seite 1" exists
+expect button:"Seite 2" exists
+click button:"Seite 1"
+expect #10000 value 0
+expect text:"Seite 1 von 2" exists
+click button:"Seite 2"
+expect #10000 value 100
+expect text:"Seite 2 von 2" exists
+click #2501
+type "METHODE"
+expect text:"1 Treffer" exists
+click #2520
+expect text:"Keine Treffer" exists
+click #2520
+click #5439488
+expect #10000 focused
+expect #10000 value 109
+expect #10000 max 102
+click #2501
+key ctrl+a
+type "Method"
+expect text:"1 Treffer" exists
+click #2521
+expect text:"Keine Treffer" exists
+click #2521
+expect text:"1 Treffer" exists
+shot build/jfword-navigation-results.png
+click "Ansicht"
+click #2834
+key ctrl+a
+type "137"
+key enter
+expect #2801 value 137
+click #126
+click "500 %"
+expect #2801 value 500
+click #2802
+expect #2801 value 500
+click #126
+click "10 %"
+expect #2801 value 10
+click #2800
+expect #2801 value 10
+click #2834
+key ctrl+a
+type "999"
+key enter
+expect #2801 value 500
+cmd 65 100
+expect #2801 value 100
+cmd 64
+expect #126 text "Seitenbreite"
+cmd 29
+expect text:"Quellen" exists
+cmd 63
+expect #2000 missing
+expect #101 missing
+expect text:"Navigation" missing
+expect text:"Quellen" missing
+expect button:"Fokus beenden" exists
+expect #10000 focused
+shot build/jfword-focus-light.png
+key esc
+expect #2000 exists
+expect text:"Navigation" exists
+expect text:"Quellen" exists
+expect #10000 text "Titel der wissenschaftlichen Arbeit\nVerfasser · Hochschule · Datum\nZusammenfassung\n\n1 Einleitung\n\n2 Methode\n\n3 Ergebnisse\n"
+cmd 29
+size 1000 700
+scale 150
+theme dark
+click "Überschriften"
+click button:"3 Ergebnisse"
+shot build/jfword-navigation-dark-150.png
+cmd 63
+shot build/jfword-focus-dark-150.png
+click button:"Fokus beenden"
+expect #2000 exists
+# Search also reaches notes and marks a query spanning separate format runs.
+size 1240 840
+scale 100
+theme light
+cmd 23
+type "Anmerkung "
+key ctrl+b
+type "α in zwei Formaten."
+expect textbox:"Anmerkung α in zwei Formaten." focused
+cmd 25
+click #2501
+key ctrl+a
+type "Anmerkung α"
+expect text:"1 Treffer" exists
+click #5439488
+expect "Fußnote 1 bearbeiten" exists
+expect textbox:"Anmerkung α in zwei Formaten." focused
+expect textbox:"Anmerkung α in zwei Formaten." value 12
+expect textbox:"Anmerkung α in zwei Formaten." max 0
+shot build/jfword-navigation-note.png
+expect_nowarn

@@ -1,0 +1,86 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# the Ereignisse panel (workspace/sim/events.rs): the event list and the timeline in step both
+# ways -- a chosen line shows its moment and moves the playhead, a moved playhead chooses the
+# last line at or before it -- the protocol chips, "Nur Auswahl", real time (the playhead at
+# the live end, the list at its end); shots light, dark and at 150 %.
+# A ping PC1 -> PC2 records 17 decisions: 1-4 the links (at 0), 5-12 ARP (0 .. 2888), 13-17
+# ICMP (3914 .. 6992 ns).  Line i of the list is #38913+i, the list #38912, the timeline
+# #32808, the chip ARP #32785, "Nur Auswahl" #32794.
+theme light
+click tab:"Simulation"
+wait 200
+key p
+click listitem:"PC1"
+wait 600
+click listitem:"PC2"
+key esc
+cmd 165
+key f6
+wait 2500
+key f6
+expect text:"17 von 17" exists
+expect text:"17 Ereignisse" exists
+expect text:"fertig: 1 gesendet, alle beantwortet" exists
+# the last line is chosen, the playhead stands at the present
+expect #38929 selected
+shot build/jfnetworker/events_light.png
+# lines -> view and playhead: Home shows the first moment, Down the next lines
+focus #38912
+key home
+expect #38913 selected
+expect text:"Ansicht bei t = 0,000 000 000 s" exists
+key down down down down down
+expect #38918 selected
+expect text:"Ansicht bei t = 0,000 000 722 s" exists
+expect text:"t = 0,000 000 722 s (Aufzeichnung)" exists
+# playhead -> view and line: Right goes to the next tick (1444: the ARP reply leaves PC2), the
+# last line at that moment is chosen
+focus #32808
+key right
+expect text:"Ansicht bei t = 0,000 001 444 s" exists
+expect #38921 selected
+key right right
+expect text:"Ansicht bei t = 0,000 002 888 s" exists
+expect #38924 selected
+key left
+expect text:"Ansicht bei t = 0,000 002 166 s" exists
+expect #38923 selected
+shot build/jfnetworker/events_sync.png
+# the chips: without ARP 9 of the 17 lines, no ARP lane
+click #32785
+expect #32785 unchecked
+expect text:"9 von 17" exists
+expect text:"ARP" missing
+shot build/jfnetworker/events_no_arp.png
+click #32785
+expect text:"17 von 17" exists
+# "Nur Auswahl" with SW1: what SW1 decided and what others did with its frames
+click listitem:"SW1"
+cmd 171
+expect #32794 checked
+expect text:"14 von 17" exists
+cmd 171
+expect text:"17 von 17" exists
+# real time: the hint goes, the playhead follows the live end
+click tab:"Echtzeit"
+wait 200
+expect text:"Ansicht bei t = 0,000 002 166 s" missing
+# another ping in real time: its lines join the end of the list
+click #33024
+click listitem:"PC2"
+wait 600
+click listitem:"PC1"
+key esc
+wait 1000
+expect text:"#2 ICMP · PC2 → PC1" exists
+expect text:"22 von 22" exists
+shot build/jfnetworker/events_realtime.png
+theme dark
+wait 100
+shot build/jfnetworker/events_dark.png
+scale 150
+wait 100
+shot build/jfnetworker/events_150.png
+scale 100
+theme light
+expect_nowarn

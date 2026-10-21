@@ -1,0 +1,37 @@
+# Serielle Strecke: HDLC ohne ARP ("!!!!!"), statische Routen auf beiden Seiten, traceroute
+# über drei Hops; ohne die Leitung verschwindet die Route
+R1: enable
+R1: ping 10.0.12.2
+run until idle
+expect R1 output contains "!!!!!"
+expect R1 output contains "Success rate is 100 percent (5/5), round-trip min/avg/max = 4/4/4 ms"
+R1: show interfaces Serial0/2/0
+expect R1 output contains "Encapsulation HDLC, crc 16, loopback not set"
+R2: enable
+R2: show ip route
+expect R2 route 192.168.1.0/24 dev Serial0/2/0
+expect R1 route 192.168.2.0/24 via 10.0.12.2
+PC1: traceroute 192.168.2.10
+run until idle
+# R2 fragt erst per ARP nach PC2 und verwirft die erste Probe dabei: " 3  * 192.168.2.10 ..."
+expect PC1 output contains " 2  10.0.12.2 (10.0.12.2)  4.486 ms"
+expect PC1 output contains " 3  * 192.168.2.10 (192.168.2.10)"
+PC1: ping -c 2 192.168.2.10
+run until idle
+R1: traceroute 192.168.2.10
+run until idle
+expect R1 output contains "  2 192.168.2.10"
+# eine Standardroute zu R2, der das Ziel nicht kennt: R2 meldet "unreachable", höchstens alle
+# 500 ms (wie IOS-artige Router), dazwischen laufen Proben in den Timeout
+R1: configure terminal
+R1: ip route 0.0.0.0 0.0.0.0 10.0.12.2
+R1: end
+R1: ping 172.16.9.9
+run until idle
+expect R1 output contains "U.U.U"
+expect R1 output contains "Success rate is 0 percent (0/5)"
+link down R1 Serial0/2/0
+run 1s
+R1: show ip route
+expect R1 no route 192.168.2.0/24
+expect hops icmp >= 10

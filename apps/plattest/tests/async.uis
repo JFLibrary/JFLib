@@ -1,0 +1,6 @@
+#!args --test async
+# (Rust only) plattest --test async: plat::task (executors, wake-ups from other threads, the
+# blocking pool, cancellation, timers, the virtual clock, Progress) and plat::aio (chunked reads,
+# atomic writes and copies with progress, cancelled between chunks; AtomicFile); children for
+# panics in tasks / jobs and for aio under a manifest. The whole test runs before the UI starts
+# and ends the process with the number of failures.

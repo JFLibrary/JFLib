@@ -1,0 +1,4 @@
+#!args --test update
+# updatetest --test update: checks, downloads, staging, applying to stand-in programs, the
+# health marker and the rollback (lib/update) against tools/update_server.py.  The whole test
+# runs before the UI starts and ends the process with the number of failures.

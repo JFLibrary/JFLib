@@ -1,0 +1,4 @@
+#!args apps/JFNetworker/tests/fixtures/lan_router.jfnet --scenario apps/JFNetworker/tests/scen/lan_router.scn --golden apps/JFNetworker/tests/scen/lan_router.report
+# golden scenario: a router between two networks: ".!!!!", traceroute, debug ip icmp.  The GUI program runs tests/scen/lan_router.scn on
+# tests/fixtures/lan_router.jfnet without a window and ends with the report, which must equal
+# tests/scen/lan_router.report byte for byte on every target (the script itself is not run)

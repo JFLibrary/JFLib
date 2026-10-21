@@ -1,0 +1,38 @@
+#!args --verify-dirty
+# screenshots: IOS and shell, light and dark, 100 % and 150 %; the search bar and the
+# "Neue Ausgabe" button
+size 760 520
+theme light
+type "en\n"
+type "show ?"
+type "ver"
+shot build/termtest/ios_light.png
+theme dark
+shot build/termtest/ios_dark.png
+click tab:"Shell"
+wait 300
+type "ls\n"
+type "colors\n"
+type "ping -c 2 10.0.0.9\n"
+wait 2100
+type "echo Hallo Welt"
+shot build/termtest/shell_dark.png
+theme light
+shot build/termtest/shell_light.png
+scale 150
+expect text:"Raster: 89x26" exists
+shot build/termtest/shell_light_150.png
+theme dark
+shot build/termtest/shell_dark_150.png
+scale 100
+# scrolled up with new output, searching
+click "Flut (10 000 Zeilen)"
+key pgup
+click "Flut (10 000 Zeilen)"
+key ctrl+f
+type "zeile 09990"
+expect text:"2/2" exists
+shot build/termtest/find_dark.png
+theme light
+shot build/termtest/find_light.png
+expect_nowarn

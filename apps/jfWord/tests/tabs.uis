@@ -1,0 +1,44 @@
+#!args --editor
+size 1440 1000
+theme light
+type "Name"
+key tab
+type "Wert"
+click #2874
+click #858
+expect dialog:"Tabstopps" exists
+click #3802
+key ctrl+a
+type "144.05"
+key tab
+click #3803
+click "Rechts"
+click #3804
+click "Punkte"
+click #3805
+expect "144.05 pt · Rechts · Punkte" exists
+click "Übernehmen"
+expect dialog:"Tabstopps" missing
+click #2874
+click #858
+click #3801
+expect "144.05 pt · Rechts · Punkte" exists
+click "144.05 pt · Rechts · Punkte"
+click #3807
+click "Abbrechen"
+click #2874
+click #858
+click #3801
+expect "144.05 pt · Rechts · Punkte" exists
+click "144.05 pt · Rechts · Punkte"
+click "Abbrechen"
+cmd 5
+click #2874
+click #858
+expect "144.05 pt · Rechts · Punkte" missing
+click "Abbrechen"
+cmd 6
+theme dark
+scale 150
+shot build/jfword-tabs-dark-150.png
+expect_nowarn

@@ -1,0 +1,3 @@
+#!args --check
+# uitest is a console program: the self-checks of ui::History and ui::ease; it ignores the
+# script (build_rs.py test passes --script); a failing check exits with code 1

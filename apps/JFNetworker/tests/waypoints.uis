@@ -1,0 +1,66 @@
+#!args --verify-dirty
+# waypoints and routes of a cable (canvas/cables.rs): a selected cable shows "+" handles in
+# the middle of its stretches; dragging one inserts a waypoint (snapped to the grid), dragging
+# a waypoint moves it, a double click removes it, Esc during the drag takes it back; the
+# context menu and the inspector switch between straight, right-angled and curved.  Every
+# change is one undo step.  World (0, 0) shows at 630,320 (100 %).
+theme light
+# PC1 (-140, -120), SW1 (160, 80), joined at once; the new cable is selected
+click button:"PC"
+click 530,220
+click button:"JF-S24P"
+click 830,420
+key c
+drag listitem:"PC1" listitem:"SW1" 8 shift
+key v
+expect text:"PC1 eth0 – SW1 Gi1/0/1" exists
+expect text:"Wegpunkte" missing
+# the "+" in the middle: a drag inserts a waypoint at (40, 100)
+drag 672,324 672,424
+expect text:"40, 100" exists
+shot build/jfnetworker/waypoints_one.png
+# the waypoint moves to (40, 160); undo puts it back
+drag 670,420 670,480
+expect text:"40, 160" exists
+key ctrl+z
+expect text:"40, 100" exists
+key ctrl+y
+expect text:"40, 160" exists
+# a second one in the stretch to the switch (its "+" at 730,458) at (100, 220)
+drag 730,458 730,540
+expect text:"40, 160; 100, 220" exists
+# Esc during a drag from a "+" takes the new waypoint back (no undo step)
+down 605,364
+move 560,420
+move 540,450
+key esc
+up
+expect text:"40, 160; 100, 220" exists
+# right angles through the waypoints, from the context menu
+rclick 660,470
+expect menuitem:"Gerade" checked
+click menuitem:"Rechtwinklig"
+expect tab:"Rechtwinklig" selected
+shot build/jfnetworker/waypoints_ortho.png
+# a curve from the inspector
+click tab:"Kurve"
+expect tab:"Kurve" selected
+shot build/jfnetworker/waypoints_curve.png
+key ctrl+z
+expect tab:"Rechtwinklig" selected
+key ctrl+z
+expect tab:"Gerade" selected
+# a double click on a waypoint removes it
+wait 600
+dblclick 730,540
+expect text:"40, 160" exists
+expect text:"40, 160; 100, 220" missing
+key ctrl+z
+expect text:"40, 160; 100, 220" exists
+# moving a device keeps the waypoints, the cable leaves it towards the first one
+click listitem:"PC1"
+key shift+right
+expect text:"60, -120" exists
+key ctrl+z
+expect text:"-140, -120" exists
+expect_nowarn

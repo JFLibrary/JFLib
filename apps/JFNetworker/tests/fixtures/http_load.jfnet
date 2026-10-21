@@ -1,0 +1,248 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Last auf zwei Webserver",
+  "description": "GEN erzeugt HTTP-Last auf WEB1 und WEB2 hinter R1 und SW1. Zwischen R1 und SW1 liegen 100 Mbit/s mit 1 ms Laufzeit; die Leitung zu WEB2 verliert 2 % der Rahmen.",
+  "seed": 7,
+  "next_id": 10,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "GEN",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname GEN\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+      "services": [
+        {
+          "kind": "http-client",
+          "name": "warm1",
+          "disabled": false,
+          "config": {
+            "url": "http://10.0.2.11/"
+          }
+        },
+        {
+          "kind": "http-client",
+          "name": "warm2",
+          "disabled": false,
+          "config": {
+            "url": "http://10.0.2.12/"
+          }
+        },
+        {
+          "kind": "http-load",
+          "name": "load",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.2.11/",
+              "http://10.0.2.12/"
+            ],
+            "mode": "open",
+            "rps": 200,
+            "arrival": "poisson",
+            "delay_ms": 2000,
+            "duration_ms": 10000,
+            "timeout_ms": 3000,
+            "mix": [
+              {
+                "path": "/",
+                "weight": 4
+              },
+              {
+                "path": "/api",
+                "weight": 1
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 160,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 480,
+      "y": -60,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.2.11/24 dev eth0\nip route add default via 10.0.2.1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 8,
+            "time_ms": 4,
+            "jitter_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Hallo von {host}\n"
+              },
+              {
+                "path": "/api",
+                "type": "application/json",
+                "body": "{\"ok\": true}\n",
+                "time_ms": 10
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "WEB2",
+      "model": "server-1u",
+      "x": 480,
+      "y": 60,
+      "off": false,
+      "startup_config": "hostname WEB2\nip addr add 10.0.2.12/24 dev eth0\nip route add default via 10.0.2.1\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 8,
+            "time_ms": 4,
+            "jitter_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Hallo von {host}\n"
+              },
+              {
+                "path": "/api",
+                "type": "application/json",
+                "body": "{\"ok\": true}\n",
+                "time_ms": 10
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 6,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 100000,
+      "delay_ns": 1000000,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "b": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "b": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 20000,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

@@ -1,0 +1,74 @@
+# drop.uis -- files dropped on the window (agent K1; script command `drop X Y FILE...` injects
+# E_DROP -> UIC_DROP like the platforms do): without an image the files open at once; with an
+# image the question "Drag & Drop" (singular / plural texts): Öffnen, Ebene(n) hinzufügen (A4's
+# import: larger images ask about the canvas), Abbrechen, Esc.
+# Hooks: K1 #0x82201 open questions (2 = Drag & Drop); A1 #9901 documents, #9903 layers,
+# #9913 / #9914 size, #9918 error bar; A4 #4391 current history entry.
+size 1280 800
+theme light
+
+# ------------------------------------------------------------ no image: open directly
+key ctrl+w
+expect #9901 value 0
+drop 600 400 apps/PaintCraft/tests/fixtures/a1_rgba.png
+sync
+expect #0x82201 value 0
+expect #9901 value 1
+expect #9913 value 64
+expect #9914 value 48
+
+# ------------------------------------------------------------ Öffnen
+drop 600 400 apps/PaintCraft/tests/fixtures/a1_rgb.bmp
+expect #0x82201 value 2
+expect text:"Wie soll die Datei geöffnet werden?" exists
+expect text:"Öffnet das Bild." exists
+expect button:"Ebene hinzufügen" exists
+click "Öffnen"
+sync
+expect #0x82201 value 0
+expect #9901 value 2
+expect #9903 value 1
+
+# ------------------------------------------------------------ Ebene hinzufügen
+drop 300 300 apps/PaintCraft/tests/fixtures/a1_rgb.jpg
+click "Ebene hinzufügen"
+expect #0x82201 value 0
+expect #9901 value 2
+expect #9903 value 2
+expect #4391 text "Als Ebene importieren"
+key ctrl+z
+expect #9903 value 1
+
+# ------------------------------------------------------------ several files: plural, Abbrechen / Esc
+drop 600 400 apps/PaintCraft/tests/fixtures/a1_pal.gif "apps/PaintCraft/tests/fixtures/a6_photo.png"
+expect text:"Wie sollen die Dateien geöffnet werden?" exists
+expect button:"Ebenen hinzufügen" exists
+expect text:"Öffnet alle Bilder." exists
+click "Abbrechen"
+expect #0x82201 value 0
+expect #9901 value 2
+expect #9903 value 1
+drop 600 400 apps/PaintCraft/tests/fixtures/a1_pal.gif apps/PaintCraft/tests/fixtures/a6_photo.png
+key esc
+expect #0x82201 value 0
+expect #9901 value 2
+# both as layers: a6_photo (320 x 240) is larger than the 64 x 48 image -> A4's question
+drop 600 400 apps/PaintCraft/tests/fixtures/a1_pal.gif apps/PaintCraft/tests/fixtures/a6_photo.png
+click "Ebenen hinzufügen"
+click "Leinwand vergrößern"
+expect #9903 value 3
+expect #9913 value 320
+key ctrl+z
+# both opened
+drop 600 400 apps/PaintCraft/tests/fixtures/a1_pal.gif apps/PaintCraft/tests/fixtures/a6_photo.png
+click "Öffnen"
+sync
+expect #9901 value 4
+expect #9913 value 320
+
+# ------------------------------------------------------------ a file that is no image
+drop 600 400 apps/PaintCraft/tests/drop.uis
+click "Öffnen"
+sync
+expect #9901 value 4
+expect #9918 text "Dieses Bildformat wird nicht erkannt; die Datei lässt sich nicht öffnen."

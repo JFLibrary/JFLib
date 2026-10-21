@@ -1,0 +1,40 @@
+#!args --verify-dirty
+# ui.image_view on a 1600 x 1200 "photo" (fine rings: shrinking through the mip levels keeps
+# them smooth) and on an SVG, which is drawn again at every zoom (sharp at 1224 %); a new image
+# fits; the scroll bars move the view; 150 % display scale (an SVG's 100 % = its size in DIP)
+size 1040 760
+theme light
+click "Betrachter"
+click tab:"Foto"
+expect text:"zoom: 51 %  cx: 800.0  cy: 600.0  fit: 1" exists
+shot build/svgtest/photo_fit.png
+click "Kleiner"
+expect #500 value 26
+shot build/svgtest/photo_26.png
+click "100 %"
+expect text:"zoom: 100 %  cx: 800.0  cy: 600.0  fit: 0" exists
+shot build/svgtest/photo_100.png
+# a click on the horizontal scroll bar's track pages to the right
+click 1000,743
+expect text:"zoom: 100 %  cx: 1092.0  cy: 600.0  fit: 0" exists
+click tab:"SVG"
+expect image:"Pfade" exists
+expect text:"zoom: 306 %  cx: 100.0  cy: 100.0  fit: 1" exists
+shot build/svgtest/svg_fit.png
+click "Größer"
+click "Größer"
+expect #500 value 1224
+shot build/svgtest/svg_1224.png
+click "100 %"
+expect #500 value 100
+theme dark
+shot build/svgtest/svg_100_dark.png
+theme light
+scale 150
+size 1040 760
+click "Einpassen"
+expect #500 value 306
+shot build/svgtest/svg_fit_150.png
+click "100 %"
+shot build/svgtest/svg_100_150.png
+expect_nowarn

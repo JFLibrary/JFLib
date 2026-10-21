@@ -1,0 +1,25 @@
+#!args --text-scale 150 --verify-dirty
+# text at 150 % (lib/ui chart.rs, data.rs, stock.rs, list.rs, chrome.rs): no text runs into
+# other text or through an edge.  The bar chart's 14 column labels do not fit side by side:
+# every second one is shown, the first and the last kept (inside the chart), each a text
+# record.  The badges in the narrow status column, the labels beside the donut, the info
+# bar's message and the narrowed tabs are cut with "…" (see the shots)
+size 1440 960
+wait 50
+expect text:"29.9" rect 312 616 34 24
+expect text:"30.9" missing
+expect text:"1.10" exists
+expect text:"9.10" exists
+expect text:"10.10" missing
+expect text:"11.10" missing
+# the last label ends at the chart's right edge (790)
+expect text:"12.10" rect 747 616 43 24
+expect text:"Primär (NAS)" value 1
+expect text:"Offsite" value 0
+# the tabs of the narrow card: the widest one gives way, the last one ends at the card's
+# content edge (1410)
+expect tab:"Restore-Points" rect 1188 886 114 40
+expect tab:"Protokoll" rect 1302 886 108 40
+shot build/shots/datagallery_textscale_150.png
+shot build/shots/datagallery_textscale_150_grid.png 268 660 820 300
+expect_nowarn

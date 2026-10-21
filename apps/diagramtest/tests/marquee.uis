@@ -1,0 +1,33 @@
+#!args --verify-dirty
+# the marquee (ui/diagram.rs): a drag on the background selects the nodes and edges fully
+# inside it, Shift adds, Ctrl toggles, either direction works; Esc and a click on the
+# background clear, Ctrl+A takes everything (30 nodes, 21 edges)
+theme light
+# N1, N2, N7, N8 and the three edges between them
+drag 80,120 380,320
+expect text:"Auswahl: 7" exists
+expect listitem:"N1" selected
+expect listitem:"N8" selected
+expect text:"Ereignis: –" exists
+# Shift adds N3 (dragged from the bottom right to the top left)
+drag 540,200 400,120 shift
+expect text:"Auswahl: 8" exists
+expect listitem:"N3" selected
+# Ctrl toggles N7 off
+drag 80,230 220,320 ctrl
+expect text:"Auswahl: 7" exists
+# a plain marquee replaces the selection
+drag 560,330 700,430
+expect text:"Auswahl: 1" exists
+expect listitem:"N16" selected
+key esc
+expect text:"Auswahl: 0" exists
+key ctrl+a
+expect text:"Auswahl: 51" exists
+shot build/diagramtest/marquee_all.png
+click 60,700
+expect text:"Auswahl: 0" exists
+# a marquee over nothing selects nothing
+drag 40,690 90,720
+expect text:"Auswahl: 0" exists
+expect_nowarn

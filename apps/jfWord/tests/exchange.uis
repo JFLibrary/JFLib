@@ -1,0 +1,88 @@
+#!args --editor --structure --sources --navigation
+# Import review cancel/select, similar-source protection, filtering and format exchange.
+size 1240 840
+theme light
+click #10000
+type "Unverändert"
+cmd 14
+click #1048588
+key ctrl+a
+type "build/jfword-exchange.ris"
+click button:"Öffnen"
+expect dialog:"Quellenimport prüfen" exists
+expect "3 Einträge · 1 identisch · 1 zu prüfen" exists
+expect "2 von 3 ausgewählt · ein Rückgängig-Schritt" exists
+key ctrl+z ctrl+n ctrl+s ctrl+o
+expect dialog:"Quellenimport prüfen" exists
+shot build/jfword-import-review-light.png
+click "Abbrechen"
+expect "Quellenimport abgebrochen · Dokument unverändert" exists
+expect "Im Absatz zitieren" missing
+expect textbox:"Unverändert" exists
+cmd 14
+click #1048588
+key ctrl+a
+type "build/jfword-exchange.ris"
+click button:"Öffnen"
+click "Auswahl importieren"
+expect "2 Quellen importiert · 1 nicht übernommen" exists
+# Filter chooses the correct underlying document source, even with duplicate titles.
+click #407
+type "Beta"
+expect #400 text "Methoden"
+cmd 12
+expect "(Hopper, 2026)" exists
+expect "Hopper, Grace (2026). Methoden. Beta." exists
+click #407
+key ctrl+a
+type "missing"
+expect "Keine Quellen zum Suchtext gefunden." exists
+expect "Im Absatz zitieren" missing
+click #407
+key ctrl+a backspace
+# Undo citation and the entire import, then restore it.
+cmd 5
+cmd 5
+expect "Im Absatz zitieren" missing
+cmd 6
+expect "Im Absatz zitieren" exists
+# Per-entry selection imports only the website from BibTeX.
+cmd 14
+click #1048588
+key ctrl+a
+type "build/jfword-exchange.bib"
+click button:"Öffnen"
+expect "2 Einträge · 1 identisch · 0 zu prüfen" exists
+click "Keine auswählen"
+click #923
+click "– 2 · Offene Forschung"
+click #924
+expect "1 von 2 ausgewählt · ein Rückgängig-Schritt" exists
+theme dark
+scale 150
+shot build/jfword-import-review-dark-150.png
+click "Auswahl importieren"
+expect "1 Quellen importiert · 1 nicht übernommen" exists
+# Undo must preserve the selected source identity after indices shift.
+click #407
+type "Alpha"
+cmd 11
+click #407
+key ctrl+a backspace
+click #400
+click "Offene Forschung"
+cmd 5
+expect #400 text "Offene Forschung"
+cmd 12
+expect "(Institut)" exists
+# Bibliography export preserves the document's dirty state.
+click #406
+click "BibTeX"
+cmd 15
+click #1048588
+key ctrl+a
+type "build/jfword-exchange.bib"
+click button:"Speichern"
+click "Ersetzen"
+expect "3 Quellen exportiert. Das Dokument wurde dadurch nicht gespeichert." exists
+expect_nowarn

@@ -1,0 +1,25 @@
+rust-project.json
+/__pycache__
+/build
+/buildManager.exe
+/apps/jfWord/context
+/apps/jfWord/books
+/apps/JFNetworker/books
+/apps/BackupCraft/context
+/tools/paintcraft-pdn-host/obj
+*.pyc
+*.csproj
+*.props
+# except the project files of the Paint.NET plugin host (tools/paintcraft-pdn-host/README.md)
+!/tools/paintcraft-pdn-host/*.csproj
+!/tools/paintcraft-pdn-host/tests/*.csproj
+!/tools/paintcraft-pdn-host/Directory.Build.props
+*.log
+.env
+rust-project.json
+# signing keys never belong in the repository (docs/PACKAGING.md, "Signing")
+*.updkey
+*.pfx
+*.p12
+*.keystore
+*.jks

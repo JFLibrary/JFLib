@@ -1,0 +1,22 @@
+# info.uis -- Hilfe > Info (dlg_misc.s): the modal window "Info" (WINID_DLG0 + 0x58 = 24680)
+# with name, version, origin, trademark note, the diagnostics (read-only) and "In die
+# Zwischenablage kopieren"; the web items of the Hilfe menu stay disabled.
+size 1280 800
+theme light
+click #711
+expect menuitem:"Info" enabled
+expect menuitem:"Forum" disabled
+click menuitem:"Info"
+expect window 24680 open
+expect window 24680 modal
+expect text:"PaintCraft" exists
+expect #6403 exists
+shot build/tests/info.png window 24680
+click #6402
+clip expect text
+click button:"Schließen"
+expect window 24680 closed
+cmd 728
+expect window 24680 open
+key esc
+expect window 24680 closed

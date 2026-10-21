@@ -1,0 +1,44 @@
+# asynctest: the chunked copy with its progress bar and cancel button, step by step and
+# deterministic: `sync` waits for the pool's jobs (and takes their wake-ups), `wait` moves the
+# virtual clock over the 100 ms the copy sleeps between two chunks
+expect text:"Status: bereit" exists
+expect #300 value 0
+expect #300 max 4
+expect text:"Ziel vorhanden: nein" exists
+click "Kopieren"
+expect text:"Status: kopiert …" exists
+sync
+expect #300 value 1
+wait 50
+sync
+expect #300 value 1
+wait 50
+sync
+expect #300 value 2
+expect text:"Temporäre Dateien: 1" exists
+expect text:"Aufgaben aktiv: 1" exists
+click "Abbrechen"
+expect text:"Status: abgebrochen" exists
+expect text:"Ziel vorhanden: nein" exists
+expect text:"Temporäre Dateien: 0" exists
+expect text:"Aufgaben aktiv: 0" exists
+sync
+expect #300 value 2
+# again, to the end
+click "Kopieren"
+sync
+expect #300 value 1
+wait 100
+sync
+wait 100
+sync
+expect #300 value 3
+wait 100
+sync
+expect #300 value 4
+expect text:"Status: fertig (262144 Bytes)" exists
+expect text:"Ziel vorhanden: ja" exists
+expect text:"Inhalt gleich: ja" exists
+expect text:"Temporäre Dateien: 0" exists
+expect text:"Aufgaben aktiv: 0" exists
+shot build/asynctest-copy.png

@@ -1,0 +1,54 @@
+#!args --verify-dirty
+# moving nodes (ui/diagram.rs): a click selects, a drag moves the selection snapped to the
+# 16-unit grid, Alt moves freely, Shift+click adds, dragging one of several selected nodes
+# moves all of them, Esc during a drag takes it back, a click on the background clears.
+# At 100 % a world unit is a DIP: node N at world (x, y) shows at (x + 54, y + 92).
+theme light
+expect text:"Auswahl: 0" exists
+expect text:"Zoom: 100 %" exists
+expect listitem:"N1" rect 102 140 96 48
+click listitem:"N1"
+expect listitem:"N1" selected
+expect text:"Auswahl: 1" exists
+expect text:"Position: 48,48" exists
+expect text:"Fokus: N1" exists
+# (a second press within the double-click time would activate the node)
+wait 600
+# by (98, 50): snapped to (96, 48)
+drag listitem:"N1" 248,214
+expect text:"Position: 144,96" exists
+expect text:"Ereignis: Verschoben: 1" exists
+expect listitem:"N1" rect 198 188 96 48
+# Alt: no snapping
+drag listitem:"N1" 259,219 alt
+expect text:"Position: 157,103" exists
+expect listitem:"N1" rect 211 195 96 48
+# Shift+click adds N2; dragging N2 moves both
+drag listitem:"N2" listitem:"N2" 1 shift
+expect text:"Auswahl: 2" exists
+expect listitem:"N1" selected
+expect listitem:"N2" selected
+wait 600
+drag listitem:"N2" 310,214
+expect listitem:"N2" rect 262 188 96 48
+expect listitem:"N1" rect 211 243 96 48
+expect text:"Ereignis: Verschoben: 2" exists
+# a click on one of them selects it alone
+wait 600
+click listitem:"N2"
+expect text:"Auswahl: 1" exists
+# Esc during a drag: back where it was
+down 470,164
+move 520,250
+expect listitem:"N3" rect 470 220 96 48
+expect text:"Auswahl: 1" exists
+key esc
+expect listitem:"N3" rect 422 140 96 48
+up
+expect listitem:"N3" rect 422 140 96 48
+expect text:"Auswahl: 1" exists
+# the background clears the selection
+click 60,700
+expect text:"Auswahl: 0" exists
+expect_nowarn
+shot build/diagramtest/move.png

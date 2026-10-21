@@ -1,0 +1,60 @@
+#!args --verify-dirty
+# typing on the IOS console: Enter echoes after the prompt, the history (Up / Down), Home /
+# End, Ctrl+U, Ctrl+Z on an empty line, a long line wrapping
+size 760 520
+expect #1001 focused
+expect text:"Router>" exists
+# an ambiguous command (enable, exit)
+type "e\n"
+expect text:"% Ambiguous command:  \"e\"" exists
+type "en"
+expect #1001 text "en"
+expect text:"Router>en" exists
+key enter
+expect text:"Router>en" exists
+expect text:"Router#" exists
+expect #1001 text ""
+type "show clock\n"
+expect text:"Router#show clock" exists
+expect text:"*12:00:00.000 UTC Mon Oct 19 2026" exists
+# the history
+key up
+expect #1001 text "show clock"
+key up
+expect #1001 text "en"
+key up
+expect #1001 text "e"
+key up
+expect #1001 text "e"
+key down
+expect #1001 text "en"
+key down
+expect #1001 text "show clock"
+key down
+expect #1001 text ""
+# Home, typing in front, Ctrl+U removes what is before the caret
+type "conf t"
+key home
+type "xy"
+expect #1001 text "xyconf t"
+key ctrl+u
+expect #1001 text "conf t"
+key end
+key enter
+expect text:"Configuration mode: one command per line; end or Ctrl+Z leaves it." exists
+expect text:"Router(config)#" exists
+type "hostname R1\n"
+expect text:"R1(config)#" exists
+# Ctrl+Z on the empty line leaves the configuration
+key ctrl+z
+expect text:"R1(config)#^Z" exists
+expect text:"R1#" exists
+# an unknown command, an ambiguous one
+type "foo\n"
+expect text:"% Invalid input detected at '^' marker." exists
+# a line longer than the console wraps; the text box keeps it as one line
+type "show 0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+expect #1001 text "show 0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+key enter
+expect text:"R1#show 0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789" exists
+expect_nowarn

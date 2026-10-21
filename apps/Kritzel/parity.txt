@@ -1,0 +1,5 @@
+# parity of Kritzel with its assembly version legacy/apps/paint (tools/parity.py, build_rs.py test).
+# paint-core owns main / doc / view / history / tools / brushes / fileio / imageops / dialogs /
+# layers_ui; paint-tools select / shapes / shapes_geom / textool (rewrite/AGENTS.md "R7 wave").
+# Every script and the shot / dump matrix are identical on win and linux (also with
+# --verify-dirty).

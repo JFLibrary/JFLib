@@ -1,0 +1,40 @@
+#!args --editor
+# Fixed viewport and DPI: exercise the real native canvas capture, including release outside.
+size 1480 1040
+scale 100
+theme light
+type "Wert"
+click 537,172
+drag 537,172 561,172 8
+click #2874
+click #858
+click #3801
+expect "90.00 pt · Links · Keine" exists
+click "90.00 pt · Links · Keine"
+click "Abbrechen"
+down 561,172
+move 585,172
+key esc
+up 585,172
+click #2874
+click #858
+click #3801
+expect "90.00 pt · Links · Keine" exists
+click "90.00 pt · Links · Keine"
+click "Abbrechen"
+drag 561,172 561,227 8
+click #2874
+click #858
+click #3801
+expect "90.00 pt · Links · Keine" missing
+key esc
+click "Abbrechen"
+cmd 5
+click #2874
+click #858
+click #3801
+expect "90.00 pt · Links · Keine" exists
+click "90.00 pt · Links · Keine"
+click "Abbrechen"
+shot build/jfword-rulers-native.png
+expect_nowarn

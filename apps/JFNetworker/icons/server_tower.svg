@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Tower server: drive bays, grille, power button</title>
+  <rect class="port" x="20" y="43" width="5" height="1.75" rx="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="port" x="39" y="43" width="5" height="1.75" rx="0.6" fill="#4F555D" stroke="none"/>
+  <rect class="body" x="18" y="3" width="28" height="41" rx="2" fill="#F7F8FA" stroke="none"/>
+  <path class="tint" d="M20 3H22.5V44H20A2 2 0 0 1 18 42V5A2 2 0 0 1 20 3Z" fill="#6A6390" stroke="none"/>
+  <rect class="ink" x="18" y="3" width="28" height="41" rx="2"/>
+  <g class="shade" fill="#DCDFE3" stroke-width="0.75">
+    <rect x="25.5" y="6.5" width="17" height="3.75" rx="0.5"/><rect x="25.5" y="11.5" width="17" height="3.75" rx="0.5"/><rect x="25.5" y="16.5" width="17" height="3.75" rx="0.5"/>
+  </g>
+  <path class="port" d="M38 8.4H40.5M38 13.4H40.5M38 18.4H40.5" stroke="#4F555D" stroke-width="0.9"/>
+  <path class="port" d="M27 24.5H41M27 27H41M27 29.5H41M27 32H41" stroke="#4F555D" stroke-width="1"/>
+  <circle class="body" cx="34" cy="38.5" r="2" fill="#F7F8FA" stroke-width="1"/>
+  <path class="ink" d="M34 37.5V39" stroke-width="0.9"/>
+  <circle class="ok" cx="29" cy="38.5" r="0.9" fill="#3C9A5F" stroke="none"/>
+</svg>

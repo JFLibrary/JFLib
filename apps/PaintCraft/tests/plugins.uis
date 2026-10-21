@@ -1,0 +1,126 @@
+#!args --plugins=@ptest --open apps/PaintCraft/tests/fixtures/p1_plugin.png
+# plugins.uis -- plugin system (agent P1): the test plugin folder <exe folder>/ptest (build.py
+# test and tools/plugin_check.py prepare it: Effects = swapchan, sepiastr, crash, crashpf, crashq,
+# toonew, badinfo; FileTypes = qoi; Shapes = pshapes).  Loading + rejection reasons, menu rows,
+# effect / adjustment results (FNV-1a hashes computed by tools/plugin_check.py from the fixture
+# with the plugins' integer math), QOI save (checked there with a Python decoder) and open,
+# plugin shapes in the Formen gallery, the settings page.  Crashes: plugins_crash.uis.
+# Hooks: P1 cmd 145 i -> #0x82401 "state|where|kind|effects|filetypes|shapes|name";
+# #0x82400 "loaded,errors,effects,filetypes,shapes" (value = records); A6 995 0 layer hash ->
+# #9990, 996 slot|v<<8 parameter, effect dialog window 24688; A1 #9901 documents, #9911 name /
+# format; T4 #524545 shapes; S1 settings window 24624.
+size 1280 800
+theme light
+
+# ------------------------------------------------------------ loading
+expect #9918 text ""
+expect #9911 text "p1_plugin.png"
+expect #0x82400 text "6,3,4,1,2"
+expect #0x82400 value 9
+cmd 145 0
+expect #0x82401 text "2|0|0|0|0|0|Kaputte Info"
+cmd 145 1
+expect #0x82401 text "1|0|0|1|0|0|Absturz-Test"
+cmd 145 3
+expect #0x82401 text "3|1|2|0|0|0|"
+cmd 145 4
+expect #0x82401 text "1|0|0|1|0|0|Sepia-Stärke (Beispiel)"
+cmd 145 5
+expect #0x82401 text "1|0|0|1|0|0|Kanäle tauschen (Beispiel)"
+cmd 145 6
+expect #0x82401 text "2|0|0|0|0|0|Zu neu"
+expect #0x82401 value 2
+cmd 145 7
+expect #0x82401 text "1|0|0|0|1|0|QOI-Format (Beispiel)"
+cmd 145 8
+expect #0x82401 text "1|0|0|0|0|2|Beispielformen"
+cmd 145 9
+expect #0x82401 value 0
+
+# ------------------------------------------------------------ menus
+click menu:"Korrekturen"
+expect menuitem:"Sepia-Stärke" enabled
+expect menuitem:"Absturz-Test (parallel)" enabled
+expect menuitem:"Tontrennung…" enabled
+key esc
+click menu:"Effekte"
+expect menuitem:"Kanäle tauschen" enabled
+expect menuitem:"Absturz-Test" enabled
+expect menuitem:"Plugin-Fehler…" enabled
+key esc
+
+# ------------------------------------------------------------ effect: Kanäle tauschen
+cmd 995 0
+expect #9990 text "223d3a3679b9ca1f"
+click menu:"Effekte"
+click menuitem:"Kanäle tauschen"
+expect window 24688 open
+click button:"OK"
+expect window 24688 closed
+cmd 995 0
+expect #9990 text "524c1a34ce934e23"
+key ctrl+z
+cmd 995 0
+expect #9990 text "223d3a3679b9ca1f"
+# the third order (choice 2)
+click menu:"Effekte"
+click menuitem:"Kanäle tauschen"
+expect window 24688 open
+cmd 996 512
+click button:"OK"
+cmd 995 0
+expect #9990 text "fe71a108ae3ba2b3"
+key ctrl+z
+
+# ------------------------------------------------------------ adjustment: Sepia-Stärke (60 %)
+click menu:"Korrekturen"
+click menuitem:"Sepia-Stärke"
+expect window 24688 open
+click button:"OK"
+cmd 995 0
+expect #9990 text "12bdf00d145d34f5"
+key ctrl+z
+cmd 995 0
+expect #9990 text "223d3a3679b9ca1f"
+
+# ------------------------------------------------------------ file type: QOI save + open
+cmd 103
+expect dialog:"Speichern unter" exists
+click #81932
+key ctrl+a
+type "../../../../build/p1_plugins_out.qoi"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect #9911 text "p1_plugins_out.qoi"
+expect #9911 value 14
+expect #9905 value 0
+cmd 101
+click #65548
+key ctrl+a
+type "../apps/PaintCraft/tests/fixtures/p1_plugin.qoi"
+click button:"Öffnen"
+# Interactive opening uses a background decode; synchronize before inspecting its result.
+sync
+expect #9901 value 2
+expect tab:"p1_plugin.qoi" selected
+expect #9911 value 14
+cmd 995 0
+expect #9990 text "223d3a3679b9ca1f"
+
+# ------------------------------------------------------------ shapes of the plugin
+key o
+key o
+expect #524545 value 32
+cmd 795 262174
+expect #524546 text "Plugin-Stern"
+cmd 795 262175
+expect #524546 text "Plugin-Haus"
+
+# ------------------------------------------------------------ settings page Plugin-Fehler
+click menu:"Effekte"
+click menuitem:"Plugin-Fehler…"
+expect window 24624 open
+expect text:"Diese Plugins ließen sich nicht laden oder wurden nach einem Fehler abgeschaltet:" exists
+expect text:"Geladene Plugins" exists
+key esc
+expect window 24624 closed

@@ -1,0 +1,8 @@
+#!args apps/JFNetworker/tests/fixtures/lab_shards.jfnet --scenario apps/JFNetworker/tests/scen/lab_shards.scn --golden apps/JFNetworker/tests/scen/lab_shards.report
+# golden scenario of the distributed-systems lab: a load generator, a load balancer, three
+# web servers and three KV shards with a replication factor of 2; KV2 loses its power at 6 s
+# and comes back at 12 s: the web servers' clients fail over to the other replica, the other
+# nodes lead KV2's writes, read repair brings KV2 up to date, no request is lost (lbctl and
+# kvctl in the report).  The GUI program runs tests/scen/lab_shards.scn on
+# tests/fixtures/lab_shards.jfnet without a window and ends with the report, which must equal
+# tests/scen/lab_shards.report byte for byte on every target (the script itself is not run)

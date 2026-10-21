@@ -1,0 +1,37 @@
+# toolkeys.uis -- (U3) keys in tool windows: after a click into the layers list its arrows
+# move the selection there, other keys (Strg+Z, tool letters) still reach the main window;
+# a click on the canvas gives the arrows back; the wheel scrolls the history list
+size 1280 800
+theme light
+key ctrl+shift+n
+expect #9903 value 2
+expect #262145 selected
+click #262146
+expect #262146 selected
+expect window 0 active
+key up
+expect #262145 selected
+key down
+expect #262146 selected
+# a tool letter goes on to the main window
+key b
+expect #9931 value 10
+# Strg+Z too (undo "Neue Ebene")
+key ctrl+z
+expect #9903 value 1
+# the history list scrolls with the wheel
+cmd 750
+drag 260,168 300,208
+drag 300,200 400,300
+drag 420,220 500,320
+drag 320,330 380,400
+drag 260,168 300,208
+drag 300,200 400,300
+drag 420,220 500,320
+drag 320,330 380,400
+drag 260,168 300,208
+drag 300,200 400,300
+expect #196609 rect 1 16 208 28
+wheel #196608 240
+wait 400
+expect #196609 rect 1 29 208 28

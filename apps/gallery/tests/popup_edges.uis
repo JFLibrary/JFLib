@@ -1,0 +1,99 @@
+# popup_edges.uis -- (ROADMAP §6) popups at the edges of the MAIN window (test hook 9105: the
+# menu bar and controls in the window's corners).  Its menus, lists, the calendar, tooltips and
+# the context menu with a submenu leave the window (OS popup windows; headless: slots on the
+# virtual desktop) and stay on the virtual screen (`screen`): below / to the right of their
+# anchor when there is room, above / to the left when not; at the screen's left edge they
+# stop.  Rows outside the window take clicks like any other; Esc and presses elsewhere close
+# them.  Without a screen the main window keeps its popups inside (the old behaviour).
+size 600 400
+theme light
+cmd 9105
+expect #7810 rect 12 356 118 32
+expect #7811 rect 138 356 133 32
+expect #7812 rect 517 356 71 32
+# ---- no virtual screen: the calendar stays inside the window (flipped above its button)
+click #7811
+expect button:"Heute" exists
+expect text:"Oktober 2026" rect 178 75 180 20
+key esc
+expect button:"Heute" missing
+# ---- the window in the middle of a 1000 x 1000 screen: room on every side
+screen -200 -150 1000 1000
+# the calendar below its button, beyond the window's bottom edge (400)
+click #7811
+expect #7811 open
+expect button:"Heute" rect 142 652 252 24
+shot build/popup_edges/calendar_below.png desktop
+click button:"20"
+expect button:"Heute" missing
+expect text:"Zuletzt: 20.10.2026" exists
+# the combo box's list: the selected row over the box, the rest below the window
+click #7810
+expect listitem:"Januar" rect 13 357 118 32
+expect listitem:"Dezember" rect 13 709 118 32
+click listitem:"Dezember"
+expect #7810 value 11
+# opened again: the list goes up so that "Dezember" lies over the box
+click #7810
+expect listitem:"Dezember" rect 13 357 118 32
+expect listitem:"Januar" rect 13 5 118 32
+key esc
+# the tooltip of the bottom right button: below the pointer, beyond the bottom and right edges
+move #7812
+wait 700
+expect text:"Ein Tooltip am unteren rechten Rand des Hauptfensters" rect 396 392 312 30
+shot build/popup_edges/tooltip_out.png desktop
+# a wide tooltip at the left edge: centred on the pointer, beyond the window's left edge
+move #7813
+wait 700
+expect text:"Ein breiter Tooltip am linken Rand des Hauptfensters" rect -110 88 297 30
+# the context menu at the pointer, to the right of and below it (out of the window); its
+# submenu does not fit to the right of the screen's edge (800): it opens to the left
+rclick #7812
+expect menuitem:"Öffnen" rect 556 376 148 32
+click menuitem:"Anordnen"
+expect menuitem:"Nach vorne" rect 395 449 158 32
+shot build/popup_edges/context_out.png desktop
+click menuitem:"Nach hinten"
+expect menuitem:"Öffnen" missing
+expect text:"Zuletzt: Nach hinten" exists
+# light dismiss: a press in the window closes a menu that stands outside it
+rclick #7812
+expect menuitem:"Eigenschaften" exists
+click 300,200
+expect menuitem:"Eigenschaften" missing
+# the drop-down at the right edge: its menu ends at the button's right edge (inside)
+click #7800
+expect menuitem:"Ausschneiden" rect 448 92 136 32
+key down enter
+expect text:"Zuletzt: Ausschneiden" exists
+# ---- the window in the bottom right corner of the screen: no room below / to the right
+screen -400 -500 1000 900
+click #7811
+expect text:"Oktober 2026" rect 178 75 180 20
+key esc
+rclick #7812
+expect menuitem:"Öffnen" rect 400 231 148 32
+click menuitem:"Anordnen"
+expect menuitem:"Nach vorne" rect 239 300 158 32
+shot build/popup_edges/context_flipped.png desktop
+key esc esc
+expect menuitem:"Öffnen" missing
+move #7812
+wait 700
+expect text:"Ein Tooltip am unteren rechten Rand des Hauptfensters" rect 288 334 312 30
+# ---- the window in the top left corner: the left tooltip stops at the screen's edge
+screen 0 0 1200 900
+move #7813
+wait 700
+expect text:"Ein breiter Tooltip am linken Rand des Hauptfensters" rect 0 88 297 30
+# ---- dark, 150 %: the calendar below the window again (DIP the same, px scaled)
+screen -200 -150 1000 1000
+theme dark
+scale 150
+click #7811
+expect button:"Heute" exists
+shot build/popup_edges/calendar_dark150.png desktop
+key esc
+expect button:"Heute" missing
+screen off

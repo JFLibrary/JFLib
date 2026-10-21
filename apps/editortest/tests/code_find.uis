@@ -1,0 +1,65 @@
+#!args --verify-dirty
+# find and replace: Ctrl+F opens the bar, typing searches incrementally, Enter / F3 the next
+# match, Shift+Enter / Shift+F3 the previous one (wrapping), case and whole word, no matches,
+# Ctrl+H with the selected text, Ersetzen / Alle ersetzen (one undo step), Esc closes the bar
+size 1000 680
+click tab:"Code"
+key ctrl+a
+key delete
+type "foo Foo food\nbar foo_x FOO\nfoo end"
+key ctrl+home
+key ctrl+f
+expect #3003 focused
+type "foo"
+expect text:"find: 1/6" exists
+expect text:"pos: 1:4" exists
+key enter
+expect text:"find: 2/6" exists
+expect text:"pos: 1:8" exists
+key f3
+expect text:"find: 3/6" exists
+key shift+f3
+expect text:"find: 2/6" exists
+key shift+enter
+key shift+enter
+expect text:"find: 6/6" exists
+expect text:"pos: 3:4" exists
+# case, whole word
+click "Aa"
+expect text:"find: 4/4" exists
+click "W"
+expect text:"find: 2/2" exists
+# no matches, then a new query from where the search was
+focus #3003
+type "zzz"
+expect text:"Keine Treffer" exists
+expect text:"find: 0/0" exists
+key ctrl+a
+type "foo"
+expect text:"find: 2/2" exists
+expect text:"pos: 3:4" exists
+# replace
+focus #3000
+key ctrl+h
+expect #3003 text "foo"
+click #3004
+type "X"
+click "Ersetzen"
+expect #3000 text "foo Foo food\nbar foo_x FOO\nX end"
+expect text:"find: 1/1" exists
+click "Alle ersetzen"
+expect #3000 text "X Foo food\nbar foo_x FOO\nX end"
+focus #3000
+key ctrl+z
+expect #3000 text "foo Foo food\nbar foo_x FOO\nX end"
+# Esc closes the bar, a second Ctrl+F opens it again with the old query
+key esc
+expect #3003 missing
+expect #3000 focused
+key ctrl+f
+expect #3003 text "foo"
+key enter
+expect text:"find: 1/1" exists
+key esc
+expect #3003 missing
+expect_nowarn

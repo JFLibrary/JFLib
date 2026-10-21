@@ -1,0 +1,4 @@
+#!args --test trash
+# (Rust only) plattest --test trash: plat::trash (lib/plat/trash.rs). On Windows one throwaway
+# file from build/plattest goes into the real recycle bin. The whole test runs before the UI
+# starts and ends the process with the number of failures.

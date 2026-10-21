@@ -1,0 +1,32 @@
+#!args --editor --file apps/jfWord/fixtures/floating-pages.html
+# A floating table creates four pages even though its anchor is only one short paragraph.
+size 1480 1040
+theme light
+scale 100
+expect #3145728 exists
+expect #3145729 exists
+expect #3145730 exists
+expect #3145731 exists
+click 535,280
+expect #3990 exists
+key tab
+key tab
+key tab
+key tab
+key tab
+key tab
+key tab
+key tab
+expect text:"Tabelle · Zeile 5 · Spalte 1" exists
+key ctrl+end
+type " · Nativ"
+key ctrl+z
+key ctrl+y
+shot build/jfword-floating-pages-light.png
+theme dark
+scale 150
+shot build/jfword-floating-pages-dark-150.png
+click #3990
+expect dialog:"Tabellenposition" exists
+click "Abbrechen"
+expect_nowarn

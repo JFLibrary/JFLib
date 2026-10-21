@@ -1,0 +1,200 @@
+# JFNetworker-Szenario two_pcs.scn: „Zwei PCs am Switch“, 3 Geräte, 2 Verbindungen, Seed 1
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Vlan1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Vlan1 is up
+   0.000000000  PC1     root@PC1:~# ip addr
+   0.000000000  PC1     1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+   0.000000000  PC1         link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+   0.000000000  PC1         inet 127.0.0.1/8 scope host lo
+   0.000000000  PC1            valid_lft forever preferred_lft forever
+   0.000000000  PC1     2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+   0.000000000  PC1         link/ether 02:4a:00:00:01:01 brd ff:ff:ff:ff:ff:ff
+   0.000000000  PC1         inet 10.0.0.1/24 brd 10.0.0.255 scope global eth0
+   0.000000000  PC1            valid_lft forever preferred_lft forever
+   0.000000000  ok      expect PC1 output contains "inet 10.0.0.1/24 brd 10.0.0.255 scope global eth0"
+   0.000000000  PC1     root@PC1:~# ping -c 2 10.0.0.2
+   0.000000000  PC1     PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.
+   0.000000000  --      run until idle
+   0.000006992  PC1     64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=0.006 ms
+   1.000004104  PC1     64 bytes from 10.0.0.2: icmp_seq=2 ttl=64 time=0.004 ms
+   1.000004104  PC1     
+   1.000004104  PC1     --- 10.0.0.2 ping statistics ---
+   1.000004104  PC1     2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+   1.000004104  PC1     rtt min/avg/max/mdev = 0.004/0.005/0.006/0.001 ms
+  11.000000000  ok      expect PC1 output contains "2 packets transmitted, 2 received, 0% packet loss"
+  11.000000000  PC1     root@PC1:~# ip neigh
+  11.000000000  PC1     10.0.0.2 dev eth0 lladdr 02:4a:00:00:02:01 REACHABLE
+  11.000000000  ok      expect PC1 output contains "10.0.0.2 dev eth0 lladdr 02:4a:00:00:02:01 REACHABLE"
+  11.000000000  SW1     SW1>enable
+  11.000000000  SW1     SW1#show mac address-table
+  11.000000000  SW1               Mac Address Table
+  11.000000000  SW1     -------------------------------------------
+  11.000000000  SW1     
+  11.000000000  SW1     Vlan    Mac Address       Type        Ports
+  11.000000000  SW1     ----    -----------       --------    -----
+  11.000000000  SW1        1    024a.0000.0101    DYNAMIC     Gi1/0/1
+  11.000000000  SW1        1    024a.0000.0201    DYNAMIC     Gi1/0/2
+  11.000000000  SW1     Total Mac Addresses for this criterion: 2
+  11.000000000  ok      expect SW1 output contains "   1    024a.0000.0101    DYNAMIC     Gi1/0/1"
+  11.000000000  SW1     SW1#ping 10.0.0.2
+  11.000000000  SW1     Ctrl+Shift+6 stops the ping.
+  11.000000000  SW1     Pinging 10.0.0.2 with 5 echo requests of 100 bytes, 2 s timeout each:
+  11.000000000  --      run until idle
+  13.000009232  SW1     .!!!!
+  13.000009232  SW1     Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms
+  15.000006924  ok      expect SW1 output contains "Success rate is 80 percent (4/5)"
+  15.000006924  SW1     SW1#show ip interface brief
+  15.000006924  SW1     Interface              IP-Address      OK? Method Status                Protocol
+  15.000006924  SW1     Vlan1                  10.0.0.254      YES NVRAM  up                    up
+  15.000006924  SW1     GigabitEthernet1/0/1   unassigned      YES unset  up                    up
+  15.000006924  SW1     GigabitEthernet1/0/2   unassigned      YES unset  up                    up
+  15.000006924  SW1     GigabitEthernet1/0/3   unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/4   unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/5   unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/6   unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/7   unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/8   unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/9   unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/10  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/11  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/12  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/13  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/14  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/15  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/16  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/17  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/18  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/19  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/20  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/21  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/22  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/23  unassigned      YES unset  down                  down
+  15.000006924  SW1     GigabitEthernet1/0/24  unassigned      YES unset  down                  down
+  15.000006924  SW1     TenGigabitEthernet1/1/1 unassigned      YES unset  down                  down
+  15.000006924  SW1     TenGigabitEthernet1/1/2 unassigned      YES unset  down                  down
+  15.000006924  SW1     TenGigabitEthernet1/1/3 unassigned      YES unset  down                  down
+  15.000006924  SW1     TenGigabitEthernet1/1/4 unassigned      YES unset  down                  down
+  15.000006924  ok      expect SW1 output contains "Vlan1                  10.0.0.254      YES NVRAM  up                    up"
+  15.000006924  SW1     SW1#show vlan brief
+  15.000006924  SW1     
+  15.000006924  SW1     VLAN Name                             Status    Ports
+  15.000006924  SW1     ---- -------------------------------- --------- -------------------------------
+  15.000006924  SW1     1    default                          active    Gi1/0/1, Gi1/0/2, Gi1/0/3
+  15.000006924  SW1                                                     Gi1/0/4, Gi1/0/5, Gi1/0/6
+  15.000006924  SW1                                                     Gi1/0/7, Gi1/0/8, Gi1/0/9
+  15.000006924  SW1                                                     Gi1/0/10, Gi1/0/11, Gi1/0/12
+  15.000006924  SW1                                                     Gi1/0/13, Gi1/0/14, Gi1/0/15
+  15.000006924  SW1                                                     Gi1/0/16, Gi1/0/17, Gi1/0/18
+  15.000006924  SW1                                                     Gi1/0/19, Gi1/0/20, Gi1/0/21
+  15.000006924  SW1                                                     Gi1/0/22, Gi1/0/23, Gi1/0/24
+  15.000006924  SW1                                                     Te1/1/1, Te1/1/2, Te1/1/3
+  15.000006924  SW1                                                     Te1/1/4
+  15.000006924  SW1     1002 fddi-default                     act/unsup 
+  15.000006924  SW1     1003 token-ring-default               act/unsup 
+  15.000006924  SW1     1004 fddinet-default                  act/unsup 
+  15.000006924  SW1     1005 trnet-default                    act/unsup 
+  15.000006924  SW1     SW1#show interfaces GigabitEthernet1/0/1
+  15.000006924  SW1     GigabitEthernet1/0/1 is up, line protocol is up (connected)
+  15.000006924  SW1       Hardware is Gigabit Ethernet, address is 024a.0000.0301 (bia 024a.0000.0301)
+  15.000006924  SW1       MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+  15.000006924  SW1          reliability 255/255, txload 1/255, rxload 1/255
+  15.000006924  SW1       Encapsulation ARPA, loopback not set
+  15.000006924  SW1       Keepalive set (10 sec)
+  15.000006924  SW1       Full Duplex, 1000Mbps, link type is auto, media type is RJ45
+  15.000006924  SW1       Last input 00:00:00, output 00:00:00, output hang never
+  15.000006924  SW1       Last clearing of "show interface" counters never
+  15.000006924  SW1       Input queue: 0/375/0/0 (size/max/drops/flushes); Total output drops: 0
+  15.000006924  SW1       Queueing strategy: fifo
+  15.000006924  SW1       Output queue: 0/40 (size/max)
+  15.000006924  SW1       5 minute input rate 0 bits/sec, 0 packets/sec
+  15.000006924  SW1       5 minute output rate 0 bits/sec, 0 packets/sec
+  15.000006924  SW1          3 packets input, 256 bytes, 0 no buffer
+  15.000006924  SW1          Received 0 broadcasts (0 IP multicasts)
+  15.000006924  SW1          0 runts, 0 giants, 0 throttles
+  15.000006924  SW1          0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+  15.000006924  SW1          4 packets output, 316 bytes, 0 underruns
+  15.000006924  SW1          0 output errors, 0 collisions, 0 interface resets
+  15.000006924  SW1          0 unknown protocol drops
+  15.000006924  SW1          0 babbles, 0 late collision, 0 deferred
+  15.000006924  SW1          0 lost carrier, 0 no carrier
+  15.000006924  SW1          0 output buffer failures, 0 output buffers swapped out
+  15.000006924  ok      expect SW1 output contains "GigabitEthernet1/0/1 is up, line protocol is up (connected)"
+  15.000006924  SW1     SW1#configure terminal
+  15.000006924  SW1     Configuration mode: one command per line; end or Ctrl+Z leaves it.
+  15.000006924  SW1     SW1(config)#interface gi1/0/2
+  15.000006924  SW1     SW1(config-if)#shutdown
+  15.000006924  SW1     *Mar  1 00:00:15.000: %LINK-5-CHANGED: GigabitEthernet1/0/2 was shut down
+  15.000006924  SW1     *Mar  1 00:00:15.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is down
+  15.000006924  SW1     SW1(config-if)#end
+  15.000006924  SW1     *Mar  1 00:00:15.000: %SYS-5-CONFIG_I: configuration changed at the console
+  15.000006924  PC1     root@PC1:~# ping -c 1 10.0.0.2
+  15.000006924  PC1     PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.
+  15.000006924  --      run until idle
+  25.000006924  PC1     
+  25.000006924  PC1     --- 10.0.0.2 ping statistics ---
+  25.000006924  PC1     1 packets transmitted, 0 received, 100% packet loss, time 0ms
+  25.000006924  ok      expect PC1 output contains "1 packets transmitted, 0 received, 100% packet loss"
+  25.000006924  SW1     SW1#show ip interface brief
+  25.000006924  SW1     Interface              IP-Address      OK? Method Status                Protocol
+  25.000006924  SW1     Vlan1                  10.0.0.254      YES NVRAM  up                    up
+  25.000006924  SW1     GigabitEthernet1/0/1   unassigned      YES unset  up                    up
+  25.000006924  SW1     GigabitEthernet1/0/2   unassigned      YES unset  administratively down down
+  25.000006924  SW1     GigabitEthernet1/0/3   unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/4   unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/5   unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/6   unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/7   unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/8   unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/9   unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/10  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/11  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/12  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/13  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/14  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/15  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/16  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/17  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/18  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/19  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/20  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/21  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/22  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/23  unassigned      YES unset  down                  down
+  25.000006924  SW1     GigabitEthernet1/0/24  unassigned      YES unset  down                  down
+  25.000006924  SW1     TenGigabitEthernet1/1/1 unassigned      YES unset  down                  down
+  25.000006924  SW1     TenGigabitEthernet1/1/2 unassigned      YES unset  down                  down
+  25.000006924  SW1     TenGigabitEthernet1/1/3 unassigned      YES unset  down                  down
+  25.000006924  SW1     TenGigabitEthernet1/1/4 unassigned      YES unset  down                  down
+  25.000006924  ok      expect SW1 output contains "GigabitEthernet1/0/2   unassigned      YES unset  administratively down down"
+  25.000006924  SW1     SW1#configure terminal
+  25.000006924  SW1     Configuration mode: one command per line; end or Ctrl+Z leaves it.
+  25.000006924  SW1     SW1(config)#interface gi1/0/2
+  25.000006924  SW1     SW1(config-if)#no shutdown
+  25.000006924  SW1     *Mar  1 00:00:25.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+  25.000006924  SW1     *Mar  1 00:00:25.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+  25.000006924  SW1     SW1(config-if)#end
+  25.000006924  SW1     *Mar  1 00:00:25.000: %SYS-5-CONFIG_I: configuration changed at the console
+  25.000006924  --      impair PC1 eth0 delay 1ms
+  25.000006924  PC1     root@PC1:~# ping -c 1 10.0.0.2
+  25.000006924  PC1     PING 10.0.0.2 (10.0.0.2) 56(84) bytes of data.
+  25.000006924  --      run until idle
+  25.004013716  PC1     64 bytes from 10.0.0.2: icmp_seq=1 ttl=64 time=4.01 ms
+  25.004013716  PC1     
+  25.004013716  PC1     --- 10.0.0.2 ping statistics ---
+  25.004013716  PC1     1 packets transmitted, 1 received, 0% packet loss, time 0ms
+  25.004013716  PC1     rtt min/avg/max/mdev = 4.006/4.006/4.006/0.000 ms
+  35.000006924  ok      expect PC1 output contains "time=4.01 ms"
+  35.000006924  --      power off PC2
+  35.000006924  SW1     *Mar  1 00:00:35.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is down
+  35.000006924  SW1     *Mar  1 00:00:35.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is down
+  35.000006924  --      run 1s
+  36.000006924  ok      expect SW1 output contains "%LINK-3-UPDOWN: GigabitEthernet1/0/2 is down"
+  36.000006924  --      power on PC2
+  36.000006924  SW1     *Mar  1 00:00:36.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+  36.000006924  SW1     *Mar  1 00:00:36.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+  36.000006924  --      run 1s
+  37.000006924  ok      expect SW1 output contains "%LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up"
+# 12 von 12 Erwartungen erfüllt

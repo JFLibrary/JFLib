@@ -1,0 +1,141 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# the simulation mode (workspace/sim): Echtzeit | Simulation, a simple PDU (tool P), steps
+# forward and back along the recording with "Ansicht bei t = …" and "Zurück zu live", the
+# frames on the canvas at fixed moments (envelopes, the tween of a step, dots below 50 %),
+# the protocol filter, "Nur Auswahl", the speed, play / pause; shots light, dark and at 150 %.
+# The frames (1 Gbit/s, 50 ns of cable): 1 ARP PC1 -> SW1 at 0 (arrives at 722), 2 SW1 -> PC2
+# at 722, 3 the reply PC2 -> SW1 at 1444, 4 SW1 -> PC1 at 2166, 5 the echo request PC1 -> SW1
+# at 2888, 6 SW1 -> PC2 at 3914, 7 the echo reply at 4940, 8 SW1 -> PC1 at 5966.  The frame
+# with number k on the canvas is #37888+k; 172 the PDU tool, 176 shows a moment (ns), 181 the
+# chip ARP, 171 "Nur Auswahl", 165 the speed 8×.
+theme light
+expect tab:"Echtzeit" selected
+expect button:"Anhalten (F6)" exists
+expect tab:"PDUs" missing
+click tab:"Simulation"
+wait 200
+expect tab:"Simulation" selected
+expect button:"Abspielen (F6)" exists
+expect tab:"Ereignisse" selected
+expect tab:"PDUs" exists
+expect text:"t = 0,000 000 000 s" exists
+# a simple PDU: the tool, then PC1 and PC2; the ARP request waits at PC1
+key p
+expect #172 checked
+click listitem:"PC1"
+wait 600
+click listitem:"PC2"
+key esc
+expect #172 unchecked
+expect #37889 exists
+expect text:"#1 ICMP · PC1 → PC2" exists
+expect text:"läuft: 1 von 1 gesendet, 0 Antworten" exists
+shot build/jfnetworker/sim_pdu.png
+# a step: frame 1 runs into SW1, which floods frame 2 towards PC2 (half way through the tween)
+key f7
+wait 300
+shot build/jfnetworker/sim_tween.png
+wait 900
+expect #37889 missing
+expect #37890 exists
+expect text:"t = 0,000 000 722 s" exists
+key f7
+wait 1200
+key f7
+wait 1200
+expect #37892 exists
+expect text:"t = 0,000 002 166 s" exists
+# back along the recording: the view at 1444 (the reply leaves PC2), the devices stay live
+key shift+f7
+wait 1200
+expect text:"Ansicht bei t = 0,000 001 444 s" exists
+expect #37891 exists
+expect #37892 missing
+shot build/jfnetworker/sim_back.png
+click button:"Zurück zu live"
+wait 100
+expect text:"Ansicht bei t = 0,000 001 444 s" missing
+expect #37892 exists
+# fixed moments: frame 1 half way to SW1, frame 3 half way back
+cmd 176 361
+wait 100
+expect text:"Ansicht bei t = 0,000 000 361 s" exists
+expect #37889 exists
+shot build/jfnetworker/sim_at_361.png
+cmd 176 1805
+wait 100
+expect #37891 exists
+expect #37889 missing
+shot build/jfnetworker/sim_at_1805.png
+# below 50 % the frames are dots
+cmd 21
+cmd 21
+cmd 21
+cmd 21
+wait 100
+expect text:"33 %" exists
+expect #37891 exists
+shot build/jfnetworker/sim_dots.png
+cmd 22
+click button:"Zurück zu live"
+wait 100
+# ARP hidden: the next step goes to the echo request (frame 5 at 2888)
+click #32785
+expect #32785 unchecked
+key f7
+wait 1200
+expect text:"t = 0,000 002 888 s" exists
+expect #37893 exists
+click #32785
+expect #32785 checked
+# "Nur Auswahl" with PC1: from 3914 the next frame of PC1 is the reply SW1 -> PC1 at 5966 (the
+# reply leaving PC2 at 4940 is passed by)
+key f7
+wait 1200
+expect text:"t = 0,000 003 914 s" exists
+click listitem:"PC1"
+cmd 171
+expect #32794 checked
+key f7
+wait 1200
+expect text:"t = 0,000 005 966 s" exists
+expect #37896 exists
+cmd 171
+expect #32794 unchecked
+# reset: a fresh engine, the PDU stays in the list
+cmd 55
+wait 200
+expect text:"zurückgesetzt" exists
+expect tab:"Simulation" selected
+expect text:"t = 0,000 000 000 s" exists
+# the PDU again; play at 8× until the reply is back
+click #36864
+wait 100
+expect text:"läuft: 1 von 1 gesendet, 0 Antworten" exists
+cmd 165
+expect combo:"8×" exists
+key f6
+expect button:"Anhalten (F6)" exists
+wait 2500
+key f6
+expect button:"Abspielen (F6)" exists
+expect text:"fertig: 1 gesendet, alle beantwortet" exists
+shot build/jfnetworker/sim_played.png
+# dark and 150 %, in the past with frames on the cables
+cmd 176 3000
+wait 100
+theme dark
+wait 100
+shot build/jfnetworker/sim_dark.png
+scale 150
+wait 100
+shot build/jfnetworker/sim_150.png
+scale 100
+theme light
+# Echtzeit again: the clock runs, the hint is gone
+click tab:"Echtzeit"
+wait 100
+expect tab:"Echtzeit" selected
+expect button:"Anhalten (F6)" exists
+expect button:"Zurück zu live" missing
+expect_nowarn

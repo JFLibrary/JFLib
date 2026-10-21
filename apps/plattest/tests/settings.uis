@@ -1,0 +1,2 @@
+#!args --test settings
+# the system settings the UI follows (lib/plat/settings.rs): overrides, limits, defaults

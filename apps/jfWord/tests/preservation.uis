@@ -1,0 +1,64 @@
+#!args --file build/jfword-compat.docx
+# Foreign DOCX: distinct text-only mode, modal command isolation, undo and exact-part save.
+size 1240 840
+theme light
+expect "DOCX-Dokument · Originalinhalt erhalten" exists
+expect "Textauszug" exists
+expect "Originaler Text α bleibt erhalten." exists
+expect "5 Bereiche · Seite 1 von 1" exists
+click #2445
+expect dialog:"Dateiinformationen" exists
+expect "6 Paketteile" exists
+expect "Erhaltungsmodus mit begrenzter Textbearbeitung" exists
+key ctrl+n ctrl+s ctrl+z
+expect dialog:"Dateiinformationen" exists
+click "Schließen"
+cmd 23
+expect "Diese Bearbeitung ist für das erhaltene DOCX-Dokument noch nicht verfügbar." exists
+click #2420
+expect dialog:"Textbereich bearbeiten" exists
+click #2461
+key ctrl+a
+type "Entwurf"
+key enter
+type "zweite Zeile"
+click "Text übernehmen"
+expect dialog:"Textbereich bearbeiten" exists
+key ctrl+n ctrl+s ctrl+z
+expect dialog:"Textbereich bearbeiten" exists
+click #2461
+key ctrl+a
+type "Geänderter Fremdtext Ω"
+click "Text übernehmen"
+expect dialog:"Textbereich bearbeiten" missing
+expect "Geänderter Fremdtext Ω bleibt erhalten." exists
+cmd 5
+expect "Originaler Text α bleibt erhalten." exists
+cmd 6
+expect "Geänderter Fremdtext Ω bleibt erhalten." exists
+click #2404
+type "Zelle"
+expect "2 Bereiche · Seite 1 von 1" exists
+click #2420
+expect dialog:"Textbereich bearbeiten" exists
+click #2461
+key ctrl+a
+type "Geänderte Tabellenzelle"
+click "Text übernehmen"
+expect "Geänderte Tabellenzelle" exists
+cmd 1
+expect dialog:"Ungespeicherte Änderungen" exists
+click "Abbrechen"
+expect "DOCX-Dokument · Originalinhalt erhalten" exists
+cmd 3
+expect "Gespeichert · Dokumentpaket mit allen enthaltenen Teilen" exists
+cmd 2
+click button:"Öffnen"
+expect "DOCX geöffnet · Originalteile erhalten · eingeschränkte Textbearbeitung" exists
+expect "Geänderter Fremdtext Ω bleibt erhalten." exists
+expect "Geänderte Tabellenzelle" exists
+shot build/jfword-preserved-light.png
+theme dark
+scale 150
+shot build/jfword-preserved-dark-150.png
+expect_nowarn

@@ -1,0 +1,39 @@
+#!args --font-dirs "lib/doc_view/assets;apps/fonttest/tests/fixtures" --fontconf apps/fontpicktest/tests/fonts.conf
+# the font dialog (wid("dialog") = 184878562): it works on a copy, OK writes it back
+click "Schriftart…"
+expect window 184878562 open
+expect window 184878562 modal
+# sans-serif is no installed family: the four styles of its own
+expect "Fett Kursiv" exists
+# the search box has the focus and filters; the first match is taken
+expect #159954872 focused
+type "mono"
+expect #198978935 value 0
+# the family's own styles (DejaVu Sans Mono: Book and Bold)
+expect "Book" exists
+click "Bold"
+# a size from the list
+click "14"
+expect #157544224 text "14,0"
+shot build/fontpick_dialog.png window 184878562
+# nothing changed before OK
+expect text:"Auswahl: sans-serif 400 normal 11" exists
+click "OK"
+expect window 184878562 closed
+expect text:"Auswahl: DejaVu Sans Mono 700 normal 14" exists
+expect text:"Glättung: an  Dialog: 1" exists
+# Abbrechen keeps the choice; the dialog starts from it again
+click "Schriftart…"
+expect #157544224 text "14,0"
+type "serif"
+click "Abbrechen"
+expect window 184878562 closed
+expect text:"Auswahl: DejaVu Sans Mono 700 normal 14" exists
+# an installed family shows its faces' names (jfgui Mini: Standard, Bold)
+click "Schriftart…"
+type "jfgui mini"
+expect "Bold" exists
+click "Standard"
+click "OK"
+expect text:"Auswahl: jfgui Mini 400 normal 14" exists
+expect_nowarn

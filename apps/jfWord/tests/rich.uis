@@ -1,0 +1,77 @@
+#!args --editor --navigation
+# One paragraph surface across formats: selections, inserted format, fields and history.
+size 1240 840
+theme light
+type "Alpha βeta Gamma"
+key ctrl+home right right right right right right
+key shift+right shift+right shift+right shift+right
+key ctrl+b
+expect textbox:"Alpha βeta Gamma" focused
+expect textbox:"βeta" missing
+expect textbox:"Alpha βeta Gamma" value 11
+expect textbox:"Alpha βeta Gamma" max 6
+# Repeated toggles at a run boundary inspect the selected run, not the preceding one.
+key ctrl+b
+expect #30 unchecked
+key ctrl+b
+expect #30 checked
+key ctrl+home right right right
+key shift+right shift+right shift+right shift+right shift+right shift+right shift+right shift+right shift+right shift+right shift+right
+key ctrl+u
+expect textbox:"Alpha βeta Gamma" focused
+click "Durchgestrichen"
+click #56
+click "Blau"
+expect textbox:"Alpha βeta Gamma" focused
+shot build/jfword-rich-selection.png
+# Replacing across three runs retains the prefix/suffix and is one undo operation.
+type "Ω"
+expect textbox:"AlpΩma" exists
+key ctrl+z
+expect textbox:"Alpha βeta Gamma" focused
+key ctrl+y
+expect textbox:"AlpΩma" exists
+key ctrl+z
+# Collapsed formatting changes the insertion format, not the entire run.
+key ctrl+end
+key ctrl+i
+type " Ende"
+expect textbox:"Alpha βeta Gamma Ende" exists
+click "Zentriert"
+expect textbox:"Alpha βeta Gamma Ende" exists
+shot build/jfword-rich-centered.png
+key ctrl+home right right right right right right
+key enter
+expect textbox:"Alpha \nβeta Gamma Ende" focused
+key backspace
+expect textbox:"Alpha βeta Gamma Ende" focused
+expect textbox:"Alpha βeta Gamma Ende" value 6
+key ctrl+z
+expect textbox:"Alpha \nβeta Gamma Ende" focused
+key ctrl+y
+# Native footnote text is edited on the page with the same surface.
+key ctrl+end
+cmd 23
+type "Fußnote α bleibt wissenschaftlich."
+expect textbox:"Fußnote α bleibt wissenschaftlich." focused
+key ctrl+home right right right right right right right right
+key shift+right
+key ctrl+b
+expect textbox:"Fußnote α bleibt wissenschaftlich." exists
+shot build/jfword-rich-footnote.png
+cmd 25
+expect textbox:"Alpha βeta Gamma Ende[1]" exists
+click textbox:"Alpha βeta Gamma Ende[1]"
+key ctrl+a delete
+expect textbox:"Alpha βeta Gamma Ende[1]" exists
+# Field intersections are rejected without a destructive flattening step.
+cmd 4
+click #1048588
+key ctrl+a
+type "build/jfword-rich-ui.docx"
+click button:"Speichern"
+click "Ersetzen"
+cmd 2
+click button:"Öffnen"
+expect textbox:"Alpha βeta Gamma Ende[1]" exists
+expect_nowarn

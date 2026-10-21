@@ -1,0 +1,110 @@
+#!args --editor --structure --sources --navigation
+# Structured citations at a UTF-8 caret, multi-source drafts, navigation and DOCX reload.
+size 1240 840
+theme light
+cmd 9
+click #712
+type "Alpha"
+click #713
+type "2020"
+click "Autoren"
+click #2097154
+type "Müller"
+click "Quelle übernehmen"
+cmd 9
+click #712
+type "Beta"
+click #713
+type "2024"
+click "Autoren"
+click #2097154
+type "Meier"
+click "Quelle übernehmen"
+click #400
+click "Alpha"
+click #10000
+type "Äpfel Ende"
+key ctrl+home right right right right right right
+click #403
+expect textbox:"Äpfel " exists
+expect textbox:"Ende" exists
+expect "(Müller, 2020)" exists
+click button:"Zitat bearbeiten"
+expect dialog:"Zitat bearbeiten" exists
+key ctrl+n ctrl+s ctrl+o
+expect dialog:"Zitat bearbeiten" exists
+click #957
+type "5"
+click #958
+type "vgl. "
+click #959
+type " ff."
+click #952
+click #956
+click "Beta · Meier · 2024"
+click #961
+expect "(vgl. Müller, 2020, S. 5 ff.; Meier)" exists
+click #954
+expect "(Meier; vgl. Müller, 2020, S. 5 ff.)" exists
+shot build/jfword-citation-dialog-light.png
+click "Zitat übernehmen"
+expect dialog:"Zitat bearbeiten" missing
+expect "(Meier; vgl. Müller, 2020, S. 5 ff.)" exists
+cmd 5
+expect "(Müller, 2020)" exists
+cmd 6
+expect "(Meier; vgl. Müller, 2020, S. 5 ff.)" exists
+click button:"Zitat bearbeiten"
+click #959
+type " verworfen"
+click "Abbrechen"
+expect "(Meier; vgl. Müller, 2020, S. 5 ff.)" exists
+# Deletion protection covers the second item of a multi-source field too.
+cmd 11
+expect "Quelle wird zitiert. Zitate zuerst entfernen." exists
+cmd 7
+type "Zweiter Absatz"
+click #408
+expect dialog:"Verwendungen der Quelle" exists
+expect "1 Zitatfelder · Seite 1 von 1" exists
+key ctrl+z ctrl+n
+expect dialog:"Verwendungen der Quelle" exists
+click #1900
+expect "Verwendung in Absatz 1 ausgewählt" exists
+expect button:"Zitat bearbeiten" focused
+expect textbox:"Äpfel " exists
+expect textbox:"Ende" exists
+cmd 4
+click #1048588
+key ctrl+a
+type "build/jfword-ui-roundtrip.docx"
+click button:"Speichern"
+click "Ersetzen"
+cmd 2
+click button:"Öffnen"
+expect "Dokument geöffnet · Quellen und Zitatverweise geladen" exists
+expect "(Meier; vgl. Müller, 2020, S. 5 ff.)" exists
+click button:"Zitat bearbeiten"
+click #958
+type "bad\"value"
+click "Zitat übernehmen"
+expect dialog:"Zitat bearbeiten" exists
+click #958
+key ctrl+a
+key backspace
+click #953
+expect "(vgl. Müller, 2020, S. 5 ff.)" exists
+click "Abbrechen"
+expect "(Meier; vgl. Müller, 2020, S. 5 ff.)" exists
+click button:"Zitat bearbeiten"
+size 1000 700
+shot build/jfword-citation-dialog-small.png
+size 1240 840
+theme dark
+scale 150
+shot build/jfword-citation-dialog-dark-150.png
+click "Abbrechen"
+click #48
+expect "Seite 1 von 1" exists
+shot build/jfword-citation-preview.png
+expect_nowarn

@@ -1,0 +1,87 @@
+#!args --fixture
+# a new file job through every step of the wizard: it is saved, listed and started
+size 1440 900
+wait 50
+click "Neuer Job"
+wait 20
+expect "Neuer Sicherungsjob" exists
+expect "Weiter" disabled
+focus #11534848
+type "Projekte"
+wait 20
+expect "Weiter" enabled
+click "Weiter"
+wait 20
+# source: a folder of the backup server
+expect "Weiter" disabled
+click checkbox:"/srv"
+wait 20
+expect checkbox:"/srv" checked
+expect "Weiter" enabled
+click "Weiter"
+wait 20
+# target: the first repository is preselected
+expect "Ziel" exists
+click "Weiter"
+wait 20
+# retention defaults
+click "Weiter"
+wait 20
+# encryption: a short passphrase is refused, a matching long one accepted
+expect "Restore-Points verschlüsseln (XChaCha20-Poly1305)" checked
+focus #11536130
+type "zu kurz"
+wait 20
+expect "Weiter" disabled
+key ctrl+a
+type "korrekt Pferd Batterie"
+focus #11536131
+type "korrekt Pferd Batterie"
+wait 20
+expect "Weiter" enabled
+# compression: zstd instead of the LZ4 default
+click "Ausgewogen"
+wait 20
+expect "zstd Stufe 3: deutlich kleiner, etwa halb so schnell wie LZ4." exists
+# the fields below keep it (they once shared the segments' ids: a click switched the compression)
+click #0xB00718
+wait 10
+click #0xB00719
+type "/usr/local/bin/freeze.sh"
+click #0xB0071A
+wait 20
+expect "zstd Stufe 3: deutlich kleiner, etwa halb so schnell wie LZ4." exists
+expect_nowarn
+shot build/shots/bc/test_job_encryption.png
+click "Weiter"
+wait 20
+# schedule: weekly
+expect "Zeitplan" exists
+# hourly: the minute field keeps the kind (it once shared the id of the first segment)
+click "Stündlich"
+wait 20
+click #0xB01014
+wait 20
+expect "Jede Stunde zur Minute" exists
+click "Wöchentlich"
+wait 20
+# continuous protection on top of the schedule
+expect "Laufend sichern (CDP)" exists
+click "Laufend sichern (CDP)"
+wait 20
+expect "RPO: höchstens ein Punkt alle … Sekunden" exists
+shot build/shots/bc/test_job_schedule.png
+click "Weiter"
+wait 20
+# summary
+expect "Projekte" exists
+expect "Ausgewogen (zstd)" exists
+expect "Job anlegen" enabled
+shot build/shots/bc/test_job_summary.png
+click "Job anlegen"
+wait 100
+expect "Neuer Sicherungsjob" missing
+click "Sicherungsjobs"
+wait 30
+expect "Projekte" exists
+shot build/shots/bc/test_job_saved.png

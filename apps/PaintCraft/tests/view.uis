@@ -1,0 +1,152 @@
+# view.uis -- the canvas view (agent A1): zoom presets and accelerators, Ganzes Bild (Strg+B
+# toggles back), Originalgröße, Strg + wheel around the pointer, wheel / Shift + wheel
+# scrolling, Space + drag and middle drag panning, scroll bars, rulers and units, pixel grid,
+# status bar cursor position.  #9909 = image origin relative to the canvas "x,y", value =
+# zoom; #9912 = Ganzes Bild mode.  Canvas 1280 x 639 px at (0, 129).
+size 1280 800
+theme light
+expect #9909 value 10000
+expect #9909 text "240,19"
+expect #9912 value 0
+expect #1400 rect 0 129 1280 639
+move 640,448
+expect text:"400, 300" exists
+move 240,148
+expect text:"0, 0" exists
+move 239,147
+expect text:"-1, -1" exists
+
+# ------------------------------------------------------------ zoom around the centre
+key ctrl+plus
+expect #9909 value 12500
+expect #9909 text "140,-56"
+expect #1402 exists
+expect #1401 missing
+key ctrl+minus ctrl+minus
+expect #9909 value 6600
+expect #9909 text "376,121"
+expect #1402 missing
+key ctrl+0
+expect #9909 value 10000
+expect #9909 text "240,19"
+cmd 230 5000
+expect combo:"50%" exists
+expect #9909 text "440,169"
+cmd 230 123
+expect combo:"1%" exists
+cmd 230 999999
+expect #9909 value 640000
+click menu:"Ansicht"
+expect menuitem:"Vergrößern" disabled
+key esc
+key ctrl+0
+
+# ------------------------------------------------------------ Strg + wheel zooms around the pointer
+move 640,200
+expect text:"400, 52" exists
+wheel 640,200 120 ctrl
+expect #9909 value 12500
+expect #9909 text "140,6"
+expect text:"400, 52" exists
+wheel 640,200 -120 ctrl
+expect #9909 value 10000
+wheel 640,200 240 ctrl
+expect #9909 value 15000
+
+# ------------------------------------------------------------ wheel scrolling (48 px per notch)
+key ctrl+0
+key ctrl+plus
+expect #9909 text "140,-56"
+wheel 640,448 -120
+expect #9909 text "140,-104"
+wheel 640,448 120
+expect #9909 text "140,-56"
+# the image cannot leave the canvas: at most 32 px margin beyond an edge
+wheel 640,448 -1200
+expect #9909 text "140,-143"
+wheel 640,448 1200
+expect #9909 text "140,32"
+# Shift + wheel scrolls horizontally: nothing to scroll while the width fits
+wheel 640,448 -120 shift
+expect #9909 text "140,32"
+wheel 640,448 -120
+expect #9909 text "140,-16"
+
+# ------------------------------------------------------------ panning: Space + drag, middle drag
+key ctrl+0
+key ctrl+plus
+expect #9909 text "140,-56"
+cmd 907 1
+drag 640,400 640,350
+expect #9909 text "140,-106"
+cmd 907 0
+drag 640,300 640,340 middle
+expect #9909 text "140,-66"
+
+# ------------------------------------------------------------ scroll bar
+cmd 230 40000
+expect #9909 value 40000
+expect #1401 exists
+expect #1402 exists
+expect #1402 max 1825
+expect #9909 text "-960,-913"
+
+# ------------------------------------------------------------ Ganzes Bild: a large image fits, Strg+B toggles back
+key ctrl+n
+click #5001
+click #5002
+key ctrl+a
+type "2000"
+key tab
+click #5003
+key ctrl+a
+type "1500"
+key tab
+click button:"OK"
+expect #9913 value 2000
+expect #9912 value 1
+expect #9909 value 4046
+expect #9909 text "235,16"
+expect combo:"40%" exists
+key ctrl+b
+expect #9912 value 0
+expect #9909 value 10000
+key ctrl+b
+expect #9912 value 1
+expect #9909 value 4046
+# the window gets smaller: the image still fits
+size 1000 700
+expect #9909 value 3380
+size 1280 800
+expect #9909 value 4046
+key ctrl+0
+expect #9912 value 0
+# each image keeps its own view
+click #1200
+expect #9909 value 40000
+click #1201
+expect #9909 value 10000
+click #1200
+
+# ------------------------------------------------------------ rulers and units
+key ctrl+0
+cmd 226
+expect #226 checked
+expect #1400 rect 20 149 1260 619
+move 640,448
+expect text:"390, 290" exists
+cmd 228
+expect #1024 value 1
+expect text:"8,33 × 6,25" exists
+cmd 229
+expect text:"21,17 × 15,88" exists
+cmd 227
+cmd 226
+expect #1400 rect 0 129 1280 639
+
+# ------------------------------------------------------------ pixel grid from 400 %
+cmd 225
+expect #225 checked
+cmd 230 80000
+cmd 225
+expect #225 unchecked

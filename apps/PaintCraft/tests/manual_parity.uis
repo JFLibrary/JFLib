@@ -1,0 +1,52 @@
+#!args --open apps/PaintCraft/tests/fixtures/a6_photo.png
+size 1280 800
+theme light
+# Actual help is available offline and closes cleanly.
+key f1
+expect window 24680 open
+key esc
+# Background selection is applied to the document, not just displayed.
+key ctrl+n
+click #5009
+click listitem:"Transparent"
+click button:"OK"
+cmd 901 65537
+expect #9900 text "00000000"
+# New shape is available without downloading assets.
+key o
+key o
+cmd 795 262173
+expect #524546 text "Smartphone"
+key b
+# Word navigation handles UTF-8 byte boundaries.
+key t
+cmd 840 0
+click 290,198
+type "Hallo schöne Welt"
+key ctrl+left
+expect #532481 text "14,0,50,50"
+key ctrl+left
+expect #532481 text "6,0,50,50"
+key ctrl+right
+expect #532481 text "14,0,50,50"
+key esc
+# Tilt controls and real perspective output, cancel and a single undo step.
+cmd 902 1
+cmd 903 0
+cmd 904 1048592
+cmd 328
+expect #5309 exists
+expect #5310 exists
+cmd 373 458812
+click button:"Abbrechen"
+cmd 901 327685
+expect #9900 text "FFFF0000"
+cmd 328
+cmd 373 524348
+click button:"OK"
+expect #4391 text "Rotationszoom"
+cmd 901 327685
+expect #9900 text "00000000"
+key ctrl+z
+cmd 901 327685
+expect #9900 text "FFFF0000"

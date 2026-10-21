@@ -1,0 +1,5 @@
+# parity of the Rust efftest with the assembly version (tools/parity.py, build_rs.py test);
+# the effect kernels: tools/diffcheck.py fx_check | fx_check_b | fx_check_c (every result
+# line, --list and every output image byte-identical to asm)
+matrix off                      # no UI: the shot / dump matrix does not apply
+stdout checks                   # the selftest summary line

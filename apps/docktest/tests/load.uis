@@ -1,0 +1,14 @@
+#!args --layout apps/docktest/tests/layout.txt --verify-dirty
+# a layout loaded at the start from text written by hand (tests/layout.txt, DockState::load);
+# never click Speichern here: it would write the file
+theme light
+expect text:"L: Dateien+[Gliederung], [Eigenschaften] | R: - | U: [Ausgabe]+Suche | F: [Verlauf] | V: ?" exists
+expect text:"Größen: 300/280/180" exists
+expect window 501 open
+expect window 501 rect 500 120 260 300
+# the floating Verlauf docks where its layout line says: the right side
+window 501
+click button:"Andocken: Verlauf"
+window main
+expect text:"L: Dateien+[Gliederung], [Eigenschaften] | R: [Verlauf] | U: [Ausgabe]+Suche | F: - | V: ?" exists
+expect_nowarn

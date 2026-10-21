@@ -1,0 +1,69 @@
+#!args --fixture
+# every page of the navigation against the demo server, light and dark, no layout warnings
+size 1440 900
+wait 50
+expect "Übersicht" selected
+expect "Sitzungen der letzten 14 Tage" exists
+click "Sicherungsjobs"
+wait 20
+expect "Webserver Konfiguration" exists
+expect "Aktive Vollsicherung" disabled
+click "Webserver Konfiguration"
+wait 20
+expect "Aktive Vollsicherung" enabled
+click "Wiederherstellung"
+wait 20
+expect "Dateien wiederherstellen …" exists
+click "Server & Agenten"
+wait 20
+expect "dev-vm07" exists
+click "Repositories"
+wait 20
+expect "Archiv" exists
+click "Zugangsdaten"
+wait 20
+click "Replikation"
+wait 20
+expect "Dateiserver – Standby" exists
+expect "Failover aktiv: Webserver – Standby" exists
+expect "Abgleichen" disabled
+click "Dateiserver – Standby"
+wait 20
+expect "Abgleichen" enabled
+expect "Failover" enabled
+expect "Failback" disabled
+shot build/shots/bc/test_replicas.png
+click "Failover-Pläne"
+wait 20
+expect "Standort Frankfurt ausgefallen" exists
+shot build/shots/bc/test_failover_plans.png
+click "Datei-CDP"
+wait 20
+expect "SQL-Cluster Logs" exists
+expect "Überwacht" exists
+shot build/shots/bc/test_cdp.png
+click "Tape"
+wait 20
+click "Sofortstart"
+wait 20
+click "Monitoring"
+wait 20
+click "Vorgänge"
+wait 20
+click "Hinweise"
+wait 20
+click "Audit-Protokoll"
+wait 20
+click "Einstellungen"
+wait 20
+click "Benutzer & Rollen"
+wait 20
+click "Sicherheit"
+wait 20
+click "Über BackupCraft"
+wait 20
+theme dark
+click "Übersicht"
+wait 20
+shot build/shots/bc/test_pages_dark.png
+expect_nowarn

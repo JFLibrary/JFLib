@@ -1,0 +1,114 @@
+# sel_wand.uis -- Zauberstab (agent T2): tolerance (paint.net's colour distance, alpha counts),
+# zusammenhängend vs global (option and Umschalt), Ebene vs Bild sampling, the combine modes
+# (Strg / right button), the editable result (tolerance changes and the dragged origin re-run
+# it inside the same history step), undo / redo.
+# Canvas 1280 x 800, zoom 100 %: image pixel (x, y) is at (240 + x, 148 + y).
+# Image: white; A red (100,100)-(200,200); B red 50 % (200,100)-(300,200) touching A;
+# C red (400,100)-(500,200) apart.  Red vs red 50 %: alpha distance 127 -> matches from a
+# tolerance of 25 % (30 % yes, 20 % no); red vs white never below 70 %.
+# Hooks: T2 980 probe / #9981 bounds / #9983 origin "x,y"; T1 935 tolerance, 936 flood mode,
+# 937 sampling, #9935 history entries; A1 902 colour, 903 / 904 fill; 320 Neue Ebene.
+size 1280 800
+theme light
+cmd 902 1
+cmd 903 6553700         # (100, 100)
+cmd 904 13107400        # (200, 200)
+cmd 903 6554000         # (400, 100)
+cmd 904 13107700        # (500, 200)
+cmd 902 4
+cmd 903 6553800         # (200, 100)
+cmd 904 13107500        # (300, 200)
+cmd 900 9830550         # image (150, 150)
+expect #9900 text "FFFF0000"
+cmd 900 9830650         # image (250, 150)
+expect #9900 text "80FF0000"
+
+# ------------------------------------------------------------ tolerance, contiguous
+cmd 756
+expect #9931 value 6
+cmd 935 20
+click 390,298
+expect #9981 text "100,100,200,200"
+expect #9981 value 1
+expect #9983 text "150,150"
+expect text:"Zauberstab" exists
+expect #9935 value 2
+cmd 980 6553700         # (100, 100)
+expect #9980 value 255
+cmd 980 13041863        # (199, 199)
+expect #9980 value 255
+cmd 980 9830600         # (200, 150)
+expect #9980 value 0
+# more tolerance: the same step grows over B
+cmd 935 30
+expect #9981 text "100,100,300,200"
+expect #9935 value 2
+cmd 980 9830650         # (250, 150)
+expect #9980 value 255
+# global: C as well
+cmd 936 1
+expect #9981 text "100,100,500,200"
+cmd 980 9830850         # (450, 150)
+expect #9980 value 255
+cmd 980 9830750         # (350, 150)
+expect #9980 value 0
+cmd 936 0
+expect #9981 text "100,100,300,200"
+# drag the origin to C
+drag 390,298 690,298
+expect #9983 text "450,150"
+expect #9981 text "400,100,500,200"
+expect #9935 value 2
+key ctrl+z
+expect #9981 value 0
+key ctrl+y
+expect #9981 text "400,100,500,200"
+expect #9983 text ""
+
+# ------------------------------------------------------------ Umschalt = global, combine modes
+drag 390,298 390,298 shift
+expect #9981 text "100,100,500,200"
+expect #9935 value 3
+cmd 935 20
+expect #9981 text "100,100,500,200"
+cmd 980 9830650         # (250, 150)
+expect #9980 value 0
+# Strg: Hinzufügen of the white background (tolerance 20 %: only white)
+drag 290,198 290,198 ctrl
+expect #9981 text "0,0,800,600"
+expect #9981 value 2
+cmd 980 9830650         # (250, 150)
+expect #9980 value 0
+cmd 980 3276850         # (50, 50)
+expect #9980 value 255
+cmd 980 9830550         # (150, 150)
+expect #9980 value 255
+# right button: Subtrahieren of A (contiguous)
+drag 390,298 390,298 right
+cmd 980 9830550         # (150, 150)
+expect #9980 value 0
+cmd 980 9830850         # (450, 150)
+expect #9980 value 255
+# Strg + right: Invertieren of B
+drag 490,298 490,298 ctrl right
+cmd 980 9830650         # (250, 150)
+expect #9980 value 255
+cmd 980 9830550         # (150, 150)
+expect #9980 value 0
+expect #9981 value 4
+key ctrl+d
+
+# ------------------------------------------------------------ Ebene / Bild
+cmd 320
+expect #9903 value 2
+click 390,298
+expect #9981 text "0,0,800,600"
+cmd 937 1
+expect #9981 text "100,100,200,200"
+cmd 937 0
+expect #9981 text "0,0,800,600"
+key ctrl+z
+key ctrl+z
+expect #9903 value 1
+expect #9981 value 0
+shot build/t2/sel_wand.png

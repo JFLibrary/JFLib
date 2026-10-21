@@ -1,0 +1,154 @@
+"""Build self-contained Office vector scenes and the monochrome SGF1 fallback.
+
+Artwork is in icon_art.py; neither this generator nor the app reads context/.
+See LICENSE-icons.txt. Stable role IDs are assigned by the append-only NAMES list.
+"""
+from pathlib import Path
+import json
+import math
+import re
+import struct
+import icon_art as art
+import legacy_icons as fallback
+
+HERE = Path(__file__).resolve().parent
+ROOT = HERE.parent.parent
+BASE = 0xF800
+ALIASES = {
+    "MENU":"draft", "ADD":"plus", "CANCEL":"close", "CHROME_CLOSE":"close",
+    "MORE":"more", "SETTINGS":"settings", "CHEV_DOWN":"dropdown",
+    "CHEV_UP":"chevronUp", "CHEV_LEFT":"chevronLeft", "CHEV_RIGHT":"chevronRight",
+    "CHEV_DOWN_SMALL":"dropdown", "CHEV_UP_SMALL":"chevronUp",
+    "CHEV_LEFT_SMALL":"chevronLeft", "CHEV_RIGHT_SMALL":"chevronRight",
+    "CARET_DOWN":"dropdown", "CARET_UP":"chevronUp", "CARET_LEFT":"chevronLeft",
+    "CARET_RIGHT":"chevronRight", "FORWARD":"chevronRight", "BACK":"chevronLeft",
+    "UP":"chevronUp", "DOWN":"chevronDown", "EDIT":"pen", "SEARCH":"search",
+    "REFRESH":"update", "SHARE":"share", "LOCK":"protect", "REMOVE":"minus",
+    "CHECK_MARK":"check", "FULL_SCREEN":"focus", "BACK_TO_WINDOW":"newWindow",
+    "SAVE":"save", "SAVE_AS":"save", "SAVE_COPY":"save", "PLAY":"mediaPlay",
+    "PAUSE":"mediaPause", "STOP":"mediaStop", "UNDO":"undo", "REDO":"redo",
+    "INFO":"info", "HELP":"help", "COPY":"copy", "CUT":"cut", "PASTE":"paste",
+    "OPEN_FILE":"open", "FOLDER":"open", "FOLDER_OPEN":"open", "DOCUMENT":"document",
+    "DOWNLOAD":"export", "UPLOAD":"share", "FONT":"fonts", "BOLD":"bold",
+    "ITALIC":"italic", "UNDERLINE":"underline", "STRIKETHROUGH":"strike",
+    "ALIGN_LEFT":"alignLeft", "ALIGN_CENTER":"alignCenter", "ALIGN_RIGHT":"alignRight",
+    "FONT_SIZE":"fonts", "FONT_INCREASE":"grow", "FONT_DECREASE":"shrink",
+    "COLOR":"colors", "BRUSH":"painter", "ZOOM_IN":"zoomIn", "ZOOM_OUT":"zoomOut",
+    "SELECT_ALL":"select", "SORT":"sort", "ROTATE":"rotate", "ERASER":"eraser",
+    "INKING_TOOL":"pen", "HIGHLIGHT":"highlight", "PHOTO":"picture", "POINTER":"select",
+    "HOME":"home", "HISTORY":"history", "RECENT":"history", "CALENDAR":"dateTime",
+    "CLEAR":"clear", "ACCEPT":"check", "BULLETED_LIST":"bullets", "VIEW":"navPane",
+    "GLOBE":"webLayout", "OPEN_IN_NEW_WINDOW":"launcher", "VIEW_ALL":"sideBySide",
+    "ZOOM":"zoom", "PENCIL":"pencil", "TEXT_BOX":"textBox", "FONT_COLOR":"fontcolor",
+    "LASSO":"lasso", "SHAPES":"shapes", "LAYERS":"bringForward", "FIT_PAGE":"onePage",
+    "GRID":"table", "IMAGE":"picture", "PICTURES":"picture", "PAGE":"document",
+    "PRINT":"print", "LINK":"link", "MAIL":"envelope", "PIN":"pin", "PERSON":"user",
+    "RULER":"ruler", "DEV_TOOLS":"addins", "PREVIOUS":"previous", "NEXT":"next",
+}
+
+
+def const(name):
+    return "IC_OFFICE_" + re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name).upper()
+
+
+def f(value):
+    s = f"{value:.6f}".rstrip("0").rstrip(".")
+    return s if "." in s else s + ".0"
+
+
+def rust_op(op):
+    kind,c,*v = op
+    if kind == "Path":
+        closed,filled,pts = v
+        points = ",".join(f"({f(x)},{f(y)})" for x,y in pts)
+        return f"Mark::Path(&[{points}],{str(closed).lower()},{str(filled).lower()},{c})"
+    if kind == "Box":
+        filled,x,y,xx,yy = v
+        return f"Mark::Box([{','.join(f(n) for n in (x,y,xx,yy))}],{str(filled).lower()},{c})"
+    if kind == "Circle":
+        filled,x,y,r = v
+        return f"Mark::Circle([{','.join(f(n) for n in (x,y,r))}],{str(filled).lower()},{c})"
+    bold,x,y,size,value = v
+    return f"Mark::Text([{','.join(f(n) for n in (x,y,size))}],{json.dumps(value,ensure_ascii=False)},{str(bold).lower()},{c})"
+
+
+def fallback_contours(ops):
+    """The rich renderer uses UI glyphs for letters; fallback preserves the geometry."""
+    out = []
+    def point(p): return round(p[0]*50), round((20-p[1])*50)
+    for kind,c,*v in ops:
+        if kind == "Path":
+            closed,filled,pts = v
+            pts = [point(p) for p in pts]
+            if filled: out.append(pts)
+            else:
+                if closed: pts = pts + pts[:1]
+                out.extend(fallback.line(*a,*b,62.5) for a,b in zip(pts,pts[1:]) if a!=b)
+        elif kind == "Box":
+            filled,x,y,xx,yy=v
+            pts=[point(p) for p in [(x,y),(xx,y),(xx,yy),(x,yy)]]
+            if filled: out.append(pts)
+            else: out.extend(fallback.line(*a,*b,62.5) for a,b in zip(pts,pts[1:]+pts[:1]))
+        elif kind == "Circle":
+            filled,x,y,r=v
+            pts=[point((x+r*math.cos(i*math.pi/16),y+r*math.sin(i*math.pi/16))) for i in range(32)]
+            if filled: out.append(pts)
+            else: out.extend(fallback.line(*a,*b,62.5) for a,b in zip(pts,pts[1:]+pts[:1]))
+    return out or fallback.shapes["IC_FONT"]
+
+
+def generate():
+    keys_path = ROOT / "lib/ui/keys.rs"
+    keys_src = keys_path.read_text(encoding="utf-8")
+    marker = "// Office semantic icons (generated by styles/jfoffice/mkicons.py)."
+    end_marker = "// End generated Office semantic icons."
+    before, separator, after = keys_src.partition(marker)
+    suffix = ""
+    if separator:
+        if end_marker in after:
+            suffix = after.partition(end_marker)[2]
+        else:
+            # Upgrade the original generated tail without deleting unrelated additions.
+            suffix = re.sub(r"^(?:\s*/// Office[^\n]*\n\s*pub const IC_OFFICE_\w+: u32 = 0x[0-9A-Fa-f]+;\n)*", "", after)
+    keys_src = before.rstrip()+"\n\n"+marker+"\n"
+    for i,name in enumerate(art.NAMES):
+        keys_src += f"/// Office {name} symbol; style-independent semantic identifier.\npub const {const(name)}: u32 = 0x{BASE+i:X};\n"
+    keys_src += end_marker + "\n" + suffix.lstrip("\n")
+    keys_path.write_bytes(keys_src.encode("utf-8"))
+    keys=dict((n,int(v,16)) for n,v in re.findall(r"pub const (IC_\w+): u32 = (0x[0-9A-Fa-f]+);",keys_src))
+    data = ["// Generated scene geometry from icon_art.py; see LICENSE-icons.txt.\nuse super::Mark;\n"]
+    for i,name in enumerate(art.NAMES):
+        data.append(f"static G{i}: &[Mark] = &[\n"+",\n".join(rust_op(op) for op in art.ART[name])+"\n];\n")
+    data.append("pub(super) fn scene(cp:u32)->Option<&'static [Mark]> {\nSome(match cp {\n")
+    for i,name in enumerate(art.NAMES):
+        codes=[BASE+i]+[keys["IC_"+k] for k,v in ALIASES.items() if v==name and "IC_"+k in keys]
+        data.append(" | ".join(f"0x{cp:X}" for cp in sorted(set(codes)))+f" => G{i},\n")
+    data.append("_ => return None,\n})\n}\n")
+    (HERE/"icons_data.rs").write_bytes("".join(data).encode("utf-8"))
+    symbols = {}
+    for name,cp in keys.items():
+        if name.startswith("IC_OFFICE_"): ops=art.ART[art.NAMES[cp-BASE]]
+        elif name[3:] in ALIASES: ops=art.ART[ALIASES[name[3:]]]
+        else:
+            symbols[cp]=fallback.shapes.get(name,fallback.shapes["IC_DOCUMENT"])
+            continue
+        symbols[cp]=fallback_contours(ops)
+    symbols=sorted(symbols.items())
+    records,outlines=bytearray(),bytearray()
+    for cp,contours in symbols:
+        points=[p for c in contours for p in c]
+        ends=[]; n=0
+        for c in contours: n+=len(c); ends.append(n-1)
+        offset=len(outlines)
+        outlines+=struct.pack('<'+'H'*len(ends),*ends)
+        if len(ends)%2: outlines+=b'\0\0'
+        for x,y in points: outlines+=struct.pack('<hh',(x<<1)|1,y)
+        records+=struct.pack('<HhhhhHI',1000,min(p[0] for p in points),min(p[1] for p in points),max(p[0] for p in points),max(p[1] for p in points),len(ends),offset)
+    ranges=b''.join(struct.pack('<IHH',cp,1,i) for i,(cp,_) in enumerate(symbols))
+    header=struct.pack('<4sHHHhhhhhhhHHHHIIIIH14x',b'SGF1',1,1,1000,1000,0,0,800,600,-100,60,len(symbols),len(symbols),0,0,64,64+len(ranges),64+len(ranges)+len(records),0,0)
+    (HERE/'assets/icons.bin').write_bytes(header+ranges+records+outlines)
+    (HERE/'ICON_ROLES.md').write_bytes(('Office icon roles generated from self-contained scene data.\n\n| Role | Artwork | ID |\n|---|---|---|\n'+''.join(f'| `{const(n)}` | {n} | `0x{BASE+i:X}` |\n' for i,n in enumerate(art.NAMES))).encode('utf-8'))
+    print(f'jfOffice: {len(art.NAMES)} colour vector roles, {len(ALIASES)} generic aliases, {len(symbols)} fallback glyphs')
+
+
+if __name__ == '__main__': generate()

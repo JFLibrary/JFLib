@@ -1,0 +1,27 @@
+#!args --anim off --verify-dirty
+# Foregrounds stay unchanged during pure accent changes. Every icon must repaint.
+theme light
+cmd 2 1
+expect window 100 open
+cmd 1 13843259
+wait 20
+expect_nowarn
+cmd 1 3050327
+wait 20
+expect_nowarn
+cmd 1 0
+theme dark
+wait 20
+expect_nowarn
+scale 150
+cmd 1 13843259
+wait 20
+expect_nowarn
+scale 200
+cmd 1 0
+theme light
+wait 20
+expect_nowarn
+cmd 2 0
+expect window 100 closed
+print "OFFICE_PALETTE_OK"

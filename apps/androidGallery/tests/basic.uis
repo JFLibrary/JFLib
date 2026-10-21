@@ -1,0 +1,26 @@
+#!args --size 390x1100 --anim off --theme light
+expect text:"Klicks: 0" exists
+click #100
+click #100
+expect text:"Klicks: 2" exists
+click #110
+expect #110 checked
+click #120
+expect #130 disabled
+click #120
+click #130
+key right
+click #101
+expect text:"Klicks: 0" exists
+expect #130 value 40
+click #202
+expect #202 selected
+click #210
+expect "Helles Design" exists
+click #300
+type "ARM64"
+expect text:"Hallo ARM64!" exists
+# A smaller viewport (e.g. Android's soft keyboard) keeps the focused field visible.
+size 390 500
+expect #300 rect 36 440 318 44
+expect #300 focused

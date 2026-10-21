@@ -1,0 +1,27 @@
+# layers panel: show, add, draw on the new layer, hide, merge, delete
+click #1410
+expect text:"Ebene 1" exists
+expect #1600 selected
+click #1640
+expect text:"Ebene 2" exists
+expect #1601 selected
+drag #1000 -100,-50 6
+shot build/kritzel_layers.png
+click #1621
+expect #1601 selected
+click #1621
+click #1643
+expect text:"Ebene 2" missing
+click #1640
+click #1641
+expect text:"Ebene 2" missing
+click #1410
+expect text:"Ebene 1" missing
+# layer opacity
+click #1410
+click #1640
+expect #1646 value 100
+click #1646
+key home
+expect #1646 value 0
+expect text:"Deckkraft: 0 %" exists

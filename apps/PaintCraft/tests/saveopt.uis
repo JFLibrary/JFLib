@@ -1,0 +1,350 @@
+#!args --open apps/PaintCraft/tests/fixtures/a6_photo.png
+# saveopt.uis -- "Speicheroptionen" (dlg_saveopt.s, paint.net's Save
+# Configuration dialog): the controls of every format (IFI_IOM), the preview job (file size,
+# smaller / larger than before: probes #6100 / #6101), OK writes the previewed bytes,
+# Speichern asks only the first time, Abbrechen / Esc / × save nothing, Standardwerte,
+# Ganzes Bild / Originalgröße, no dialog for .pdn.  Window 24595 (WINID_DLG0 + 3).
+# File names are relative to the image's folder (apps/PaintCraft/tests/fixtures).
+size 1280 800
+theme light
+shot build/tests/saveopt/start.png
+
+# ------------------------------------------------------------ JPEG
+cmd 103
+click #81932
+key ctrl+a
+type "../../../../build/tests/saveopt/so.jpg"
+click button:"Speichern"
+expect window 24595 open
+expect window 24595 modal
+window 24595
+expect text:"Einstellungen" exists
+expect #6022 value 95
+expect #6024 exists
+expect #6024 text "4:2:0 (kleinste Datei)"
+expect #6023 missing
+expect #6010 missing
+expect #6002 exists
+sync
+expect #6100 text "ok"
+# a lower quality gives a smaller file, 4:4:4 a larger one
+focus #6022
+key home
+sync
+expect #6022 value 1
+expect #6101 text "kleiner"
+click #6024
+click listitem:"4:4:4 (höchste Qualität)"
+sync
+expect #6101 text "größer"
+shot build/tests/saveopt/jpeg.png window 24595
+window any
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "so.jpg"
+expect #9911 value 2
+expect #9905 value 0
+# Speichern after a change: no question any more
+cmd 902 3
+cmd 903 0
+cmd 904 655370
+expect #9905 value 1
+key ctrl+s
+expect window 24595 closed
+expect #9905 value 0
+# Speichern unter asks again with the remembered options; Standardwerte; Abbrechen
+cmd 904 655370
+cmd 103
+click #81932
+key ctrl+a
+type "so.jpg"
+click button:"Speichern"
+expect window 24595 open
+expect #6022 value 1
+expect #6024 text "4:4:4 (höchste Qualität)"
+click #6002
+expect #6022 value 95
+expect #6024 text "4:2:0 (kleinste Datei)"
+click button:"Abbrechen"
+expect window 24595 closed
+expect #9905 value 1
+expect #9911 text "so.jpg"
+# Esc and × cancel too
+cmd 103
+click #81932
+key ctrl+a
+type "so.jpg"
+click button:"Speichern"
+expect window 24595 open
+key esc
+expect window 24595 closed
+expect #9905 value 1
+cmd 103
+click #81932
+key ctrl+a
+type "so.jpg"
+click button:"Speichern"
+expect window 24595 open
+close window 24595
+expect window 24595 closed
+expect #9905 value 1
+
+# ------------------------------------------------------------ PNG: bit depth, 8-bit options
+cmd 103
+click #81932
+key ctrl+a
+type "so.png"
+click button:"Speichern"
+expect window 24595 open
+expect #6010 checked
+expect #6011 exists
+expect #6013 exists
+expect #6020 enabled
+expect #6021 enabled
+expect #6026 value 6
+expect text:"Komprimierungsstufe" exists
+click #6012
+expect #6020 disabled
+expect #6021 disabled
+sync
+expect #6100 text "ok"
+click #6013
+expect #6020 enabled
+sync
+expect #6101 text "kleiner"
+# the preview: Originalgröße (radio, then a click on the image toggles back)
+window 24595
+click #6005
+expect #6005 checked
+drag #6003 400,300
+click #6003
+expect #6004 checked
+click #6003
+expect #6005 checked
+shot build/tests/saveopt/png8.png window 24595
+window any
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "so.png"
+expect #9911 value 1
+
+# ------------------------------------------------------------ TGA, GIF, TIFF, WebP, DDS controls
+cmd 103
+click #81932
+key ctrl+a
+type "so.tga"
+click button:"Speichern"
+expect window 24595 open
+expect #6010 exists
+expect #6012 exists
+expect #6013 missing
+expect #6030 checked
+expect #6020 missing
+sync
+click #6030
+expect #6030 unchecked
+sync
+expect #6101 text "größer"
+click button:"Abbrechen"
+cmd 103
+click #81932
+key ctrl+a
+type "so.gif"
+click button:"Speichern"
+expect window 24595 open
+expect #6010 missing
+expect #6020 enabled
+expect #6020 value 7
+expect #6021 value 128
+sync
+expect #6100 text "ok"
+click button:"Abbrechen"
+cmd 103
+click #81932
+key ctrl+a
+type "so.tif"
+click button:"Speichern"
+expect window 24595 open
+expect #6031 text "LZW"
+sync
+click #6031
+click listitem:"Keine"
+sync
+expect #6101 text "größer"
+click button:"Abbrechen"
+cmd 103
+click #81932
+key ctrl+a
+type "so.webp"
+click button:"Speichern"
+expect window 24595 open
+expect #6022 enabled
+expect #6025 text "Standard"
+expect #6026 value 5
+click #6023
+expect #6023 checked
+expect #6022 disabled
+sync
+expect #6100 text "ok"
+click button:"Abbrechen"
+cmd 103
+click #81932
+key ctrl+a
+type "so.dds"
+click button:"Speichern"
+expect window 24595 open
+expect #6032 text "BC1 (Linear, DXT1)"
+expect #6027 text "Mittel"
+expect #6033 text "Perzeptiv"
+expect #6037 disabled
+sync
+click #6036
+expect #6037 enabled
+expect #6037 text "Fant"
+sync
+expect #6101 text "größer"
+shot build/tests/saveopt/dds.png window 24595
+click button:"Abbrechen"
+expect window 24595 closed
+# JPEG XR: Bit-Tiefe without 8 bit, Qualität 90, Verlustfrei, Chroma-Subsampling 4:4:4; OK writes
+cmd 103
+click #81932
+key ctrl+a
+type "so.jxr"
+click button:"Speichern"
+expect window 24595 open
+window 24595
+expect #6010 exists
+expect #6012 exists
+expect #6013 missing
+expect #6020 missing
+expect #6022 value 90
+expect #6023 unchecked
+expect #6024 text "4:4:4 (höchste Qualität)"
+sync
+expect #6100 text "ok"
+click #6024
+click listitem:"4:2:0 (kleinste Datei)"
+sync
+expect #6101 text "kleiner"
+click #6023
+expect #6023 checked
+expect #6022 disabled
+expect #6024 disabled
+sync
+expect #6101 text "größer"
+shot build/tests/saveopt/jxr.png window 24595
+window any
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "so.jxr"
+expect #9905 value 0
+
+# HEIC: Qualität 95, Verlustfrei, Chroma-Subsampling 4:2:0 (4:2:2 is written as 4:2:0); OK
+# writes the lossless file
+cmd 103
+click #81932
+key ctrl+a
+type "so.heic"
+click button:"Speichern"
+expect window 24595 open
+window 24595
+expect #6010 missing
+expect #6022 value 95
+expect #6023 unchecked
+expect #6024 text "4:2:0 (kleinste Datei)"
+sync
+expect #6100 text "ok"
+click #6024
+click listitem:"4:4:4 (höchste Qualität)"
+sync
+expect #6101 text "größer"
+click #6023
+expect #6023 checked
+expect #6022 disabled
+expect #6024 disabled
+sync
+expect #6101 text "größer"
+shot build/tests/saveopt/heic.png window 24595
+window any
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "so.heic"
+expect #9905 value 0
+
+# AVIF: Qualität 95, Verlustfrei, Chroma-Subsampling 4:2:0 (4:2:2 is written as 4:2:0); OK
+# writes the lossless file
+cmd 103
+click #81932
+key ctrl+a
+type "so.avif"
+click button:"Speichern"
+expect window 24595 open
+window 24595
+expect #6010 missing
+expect #6022 value 95
+expect #6023 unchecked
+expect #6024 text "4:2:0 (kleinste Datei)"
+sync
+expect #6100 text "ok"
+focus #6022
+key home
+sync
+expect #6022 value 1
+expect #6101 text "kleiner"
+click #6024
+click listitem:"4:4:4 (höchste Qualität)"
+sync
+expect #6101 text "größer"
+click #6023
+expect #6023 checked
+expect #6022 disabled
+expect #6024 disabled
+sync
+expect #6101 text "größer"
+shot build/tests/saveopt/avif.png window 24595
+window any
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "so.avif"
+expect #9905 value 0
+
+# JPEG XL: Qualität 90 (VarDCT, jxl_venc.s), Verlustfrei (modular, jxl_enc.s); quality 1 gives a
+# smaller file, lossless a larger one; OK writes the lossless file
+cmd 103
+click #81932
+key ctrl+a
+type "so.jxl"
+click button:"Speichern"
+expect window 24595 open
+window 24595
+expect #6022 value 90
+expect #6023 unchecked
+sync
+expect #6100 text "ok"
+focus #6022
+key home
+sync
+expect #6022 value 1
+expect #6101 text "kleiner"
+click #6023
+expect #6023 checked
+expect #6022 disabled
+sync
+expect #6101 text "größer"
+shot build/tests/saveopt/jxl.png window 24595
+window any
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "so.jxl"
+expect #9905 value 0
+
+# ------------------------------------------------------------ .pdn: no dialog
+cmd 103
+click #81932
+key ctrl+a
+type "so.pdn"
+click button:"Speichern"
+expect window 24595 closed
+expect #9911 text "so.pdn"
+expect #9905 value 0

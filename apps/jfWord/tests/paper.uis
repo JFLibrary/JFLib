@@ -1,0 +1,80 @@
+#!args --editor
+# On-page native editor: UTF-8 selection, document undo, formatted runs and a second paragraph.
+size 1240 840
+theme light
+expect #10000 focused
+expect #3145728 rect 227 200 793 1121
+type "Forschung α: zuverlässige Ergebnisse."
+expect textbox:"Forschung α: zuverlässige Ergebnisse." exists
+key ctrl+home
+key right right right right right right right right right right
+key shift+right
+type "β"
+expect textbox:"Forschung β: zuverlässige Ergebnisse." exists
+key ctrl+z
+expect textbox:"Forschung α: zuverlässige Ergebnisse." exists
+key ctrl+y
+expect textbox:"Forschung β: zuverlässige Ergebnisse." exists
+key ctrl+a
+key ctrl+b
+expect textbox:"Forschung β: zuverlässige Ergebnisse." exists
+key ctrl+i
+key ctrl+u
+expect textbox:"Forschung β: zuverlässige Ergebnisse." exists
+cmd 7
+type "Der zweite Absatz bleibt ein eigener Dokumentabsatz."
+expect textbox:"Forschung β: zuverlässige Ergebnisse.\nDer zweite Absatz bleibt ein eigener Dokumentabsatz." exists
+shot build/jfword-paper-editor-light.png
+size 1000 700
+shot build/jfword-paper-editor-small.png
+click #126
+click "150 %"
+click textbox:"Forschung β: zuverlässige Ergebnisse.\nDer zweite Absatz bleibt ein eigener Dokumentabsatz."
+key ctrl+end
+type " α"
+expect textbox:"Forschung β: zuverlässige Ergebnisse.\nDer zweite Absatz bleibt ein eigener Dokumentabsatz. α" exists
+click #126
+click "Seitenbreite"
+theme dark
+scale 150
+expect textbox:"Forschung β: zuverlässige Ergebnisse.\nDer zweite Absatz bleibt ein eigener Dokumentabsatz. α" exists
+shot build/jfword-paper-editor-dark-150.png
+# Shift+Enter inserts a paragraph-internal line break; Ctrl+Enter adds a document paragraph.
+click textbox:"Forschung β: zuverlässige Ergebnisse.\nDer zweite Absatz bleibt ein eigener Dokumentabsatz. α"
+key ctrl+end
+key shift+enter
+type "Ω"
+expect textbox:"Forschung β: zuverlässige Ergebnisse.\nDer zweite Absatz bleibt ein eigener Dokumentabsatz. α\nΩ" exists
+cmd 5
+expect textbox:"Forschung β: zuverlässige Ergebnisse.\nDer zweite Absatz bleibt ein eigener Dokumentabsatz. α\n" exists
+cmd 5
+expect textbox:"Forschung β: zuverlässige Ergebnisse.\nDer zweite Absatz bleibt ein eigener Dokumentabsatz. α" exists
+key ctrl+enter
+type "Neuer Absatz durch Strg+Enter."
+expect textbox:"Forschung β: zuverlässige Ergebnisse.\nDer zweite Absatz bleibt ein eigener Dokumentabsatz. α\nNeuer Absatz durch Strg+Enter." exists
+# Clicking a previously unselected paragraph uses layout hit testing; dragging then uses
+# the native editor. Selection boundaries remain UTF-8 byte boundaries over two lines.
+size 1240 840
+scale 100
+theme light
+cmd 1
+click "Verwerfen"
+click #3145728
+type "Äpfel αβ"
+key shift+enter
+type "Ωmega Zeile"
+cmd 7
+type "Zweites Ziel"
+wait 600
+# The scrollbar gutter moves the centered page seven DIP left; y/content are unchanged.
+click 332,323
+expect textbox:"Äpfel αβ\nΩmega Zeile\nZweites Ziel" focused
+expect textbox:"Äpfel αβ\nΩmega Zeile\nZweites Ziel" value 14
+expect textbox:"Äpfel αβ\nΩmega Zeile\nZweites Ziel" max 14
+wait 600
+drag 332,323 321,303
+expect textbox:"Äpfel αβ\nΩmega Zeile\nZweites Ziel" value 0
+expect textbox:"Äpfel αβ\nΩmega Zeile\nZweites Ziel" max 14
+key ctrl+c ctrl+end ctrl+v
+expect textbox:"Äpfel αβ\nΩmega Zeile\nZweites ZielÄpfel αβ\nΩ" exists
+expect_nowarn

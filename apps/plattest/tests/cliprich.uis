@@ -1,0 +1,2 @@
+#!args --test cliprich
+# Pure framing and validation checks; no system clipboard writes or display needed.

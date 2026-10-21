@@ -1,0 +1,44 @@
+# toolrow_overflow.uis -- the tool options row scrolls sideways when it is wider than the
+# window (U3): page buttons #1031 / #1032 appear, "Fertigstellen" (#790) becomes reachable
+# at 1024 px / 150 %, the wheel over the row scrolls, a wide window hides the buttons.
+size 1024 700
+scale 150
+theme light
+cmd 768
+expect #1032 exists
+expect #1031 disabled
+click #1032
+wait 600
+click #1032
+wait 600
+click #1032
+wait 600
+click #1032
+expect #1032 disabled
+expect #1031 enabled
+# a live shape: Fertigstellen is enabled and reachable
+drag 400,400 480,460
+expect #790 enabled
+click #790
+expect #1031 enabled
+# back to the start
+click #1031
+wait 600
+click #1031
+wait 600
+click #1031
+wait 600
+click #1031
+expect #1031 disabled
+# the wheel over the row scrolls it
+wheel #1030 -240
+wait 400
+expect #1031 enabled
+# text tool at 100 %: wide enough without the buttons at 1920 px
+scale 100
+size 1920 900
+cmd 766
+expect #1032 missing
+size 1280 800
+cmd 768
+expect #1031 disabled

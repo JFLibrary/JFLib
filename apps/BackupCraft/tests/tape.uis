@@ -1,0 +1,40 @@
+#!args --fixture --page tape
+# the tape library against the demo server: tapes (a missing one), new blank tapes, a new
+# media pool, the sets on tape: verify and a restore from tape
+size 1440 900
+wait 50
+expect "BC0001V1" exists
+expect "Nicht in der Bibliothek" exists
+shot build/shots/bc/test_tape.png
+click "Bänder hinzufügen …"
+wait 20
+click "Anlegen"
+wait 50
+expect "BC0011V1" exists
+click "Medienpools"
+wait 20
+expect "Tresor" exists
+click "Pool anlegen …"
+wait 20
+focus #0xD01201
+type "Jährlich"
+click "Speichern"
+wait 50
+expect "Jährlich" exists
+shot build/shots/bc/test_tape_pools.png
+click "Auf Band"
+wait 20
+click "BC0004V1"
+wait 20
+expect "Prüfen" enabled
+click "Prüfen"
+wait 100
+click "Vom Band wiederherstellen …"
+wait 20
+expect "Zielordner" exists
+shot build/shots/bc/test_tape_restore.png
+click "Wiederherstellen"
+wait 100
+expect "Vom Band wiederherstellen" missing
+shot build/shots/bc/test_tape_sets.png
+expect_nowarn

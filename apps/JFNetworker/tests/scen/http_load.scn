@@ -1,0 +1,35 @@
+# HTTP-Last auf zwei Webserver hinter einem Router. Zuerst holen warm1 und warm2 auf GEN je eine
+# Seite; R1 verwirft dabei den ersten SYN, während er nach der MAC des Servers fragt (IOS hält
+# nichts zurück), der SYN kommt nach 1 s wieder. Ab 2 s schickt der Lastgenerator zehn Sekunden
+# lang 200 Anfragen pro Sekunde (Poisson-Ankünfte, abwechselnd an WEB1 und WEB2, jede fünfte an
+# /api, das 10 ms rechnet, die übrigen 4 ms und bis zu 2 ms mehr). Die Leitung zu WEB2 verliert
+# 2 % der Rahmen: Neuübertragungen nach mindestens 200 ms treiben das 99. Perzentil hoch, der
+# Median bleibt bei wenigen Millisekunden. Die Werte in Klammern sind gemessen.
+run 1500ms
+expect GEN svc warm1 metric ok == 1
+expect GEN svc warm1 metric last_us > 1000000
+expect GEN svc warm2 metric ok == 1
+expect GEN svc load metric sent == 0
+run 5s
+expect GEN svc load metric rate_mrps == 200000
+expect GEN svc load metric sent > 800
+WEB1: top -b -n 1
+GEN: ss -s
+run 8s
+expect GEN svc load metric sent > 1800
+expect GEN svc load metric sent < 2200
+expect GEN svc load metric inflight == 0
+expect GEN svc load metric http_errors == 0
+expect GEN svc load metric failed == 0
+expect GEN svc load metric p50_us < 10000
+expect GEN svc load metric p95_us < 20000
+expect GEN svc load metric p99_us > 200000
+expect WEB1 svc web metric requests > 900
+expect WEB2 svc web metric requests > 900
+expect WEB1 svc web metric p99_us < 20000
+expect WEB2 svc web metric p99_us < 20000
+expect hops http > 7000
+GEN: curl -s -o /dev/null -w "%{http_code} %{size_download} %{num_connects}\n" http://10.0.2.12/api
+run 1s
+expect GEN output contains "200 13 1"
+print "Last vollständig beantwortet, Verluste nur im 99. Perzentil"

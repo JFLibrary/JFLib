@@ -1,0 +1,2 @@
+# scaffoldtest's further programs (build_rs.py, section "app-bins"): NAME ENTRY cli|gui
+scaffoldtest-cli   cli/main.rs   cli    # the counts for files on the command line

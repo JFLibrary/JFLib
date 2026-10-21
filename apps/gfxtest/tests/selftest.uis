@@ -1,0 +1,5 @@
+#!args --selftest
+# Rasterizer and kernel checks (selftest.s): random paths rendered unclipped and through many
+# clip rectangles must be bit-identical inside the clip (PARGB and A8 targets); k_a8_over
+# against the scalar formula for every (dst, coverage, alpha) and at every alignment.  The
+# whole test runs in on_init and ends the process with exit code 0 (passed) or 1.

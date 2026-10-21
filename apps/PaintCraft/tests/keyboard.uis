@@ -1,0 +1,156 @@
+# keyboard.uis -- PaintCraft with the keyboard only (ROADMAP §11, lib/ui/kbnav.rs): the Tab
+# ring of the main window (image tabs, title row buttons and tool bar are one stop each,
+# arrows inside), Ctrl+F6 through the tool windows (F6 itself toggles "Verlauf"), the
+# Werkzeuge grid, the Ebenen window (arrows select, Ctrl+Up / Ctrl+Down move the layer,
+# Space toggles its visibility, Enter opens the properties, the menu key the layer menu, Esc
+# back to the main window), the Farben window (the colour squares and the palette grid with
+# arrows, the menu key = right click = secondary colour), dialogs (the first control has the
+# focus, Esc closes at once, Enter on a check box is the default button, radios: one stop).
+size 1280 800
+theme light
+# ------------------------------------------------------------ main window: the Tab ring
+expect window main keys
+key tab
+expect #1200 focused
+key tab
+expect #700 focused
+key right right
+expect #702 focused
+key end
+expect #711 focused
+key home
+expect #700 focused
+key tab
+expect #100 focused
+key shift+tab shift+tab
+expect #1200 focused
+# ------------------------------------------------------------ Ctrl+F6: Werkzeuge (the checked tool first)
+key ctrl+f6
+expect window 24577 keys
+expect #4010 focused
+expect #4010 checked
+key down
+expect #4012 focused
+key space
+expect #4012 checked
+key up
+key enter
+expect #4010 checked
+# Tab stays in the tool window (one stop: the tool grid)
+key tab
+expect #4010 focused
+# ------------------------------------------------------------ Verlauf, then Ebenen
+key ctrl+f6
+expect window 24578 keys
+expect #196608 focused
+key ctrl+f6
+expect window 24579 keys
+expect #262144 focused
+# keys the window does not use go to the main window (the accelerators)
+key ctrl+shift+n ctrl+shift+n
+expect #9903 value 3
+expect #9904 value 2
+expect window 24579 keys
+expect #262145 selected
+# Down selects the layer below
+key down
+expect #262146 selected
+expect #9904 value 1
+expect #9906 text "Ebene 2"
+# Ctrl+Up moves it up (one history step), it stays the current layer
+key ctrl+up
+expect #262145 selected
+expect #9904 value 2
+expect #9906 text "Ebene 2"
+expect #4391 text "Ebene verschieben"
+key ctrl+end
+expect #262147 selected
+expect #9904 value 0
+expect #9906 text "Ebene 2"
+key ctrl+z ctrl+z
+cmd 370 2
+expect #4390 text "Ebene 3|1|255|0"
+key home
+expect #262145 selected
+expect #9904 value 2
+# Space: the visibility of the selected layer
+expect #9906 value 1
+key space
+expect #9906 value 0
+expect #4391 text "Ebene Sichtbarkeit"
+key space
+expect #9906 value 1
+# Enter: Ebenen-Eigenschaften, the name field focused; Esc closes at once and the keys come
+# back to the Ebenen window
+key enter
+expect window 24608 open
+expect #5401 focused
+key esc
+expect window 24608 closed
+expect window 24579 keys
+expect #262144 focused
+# the menu key: the layer menu at the selected row, its first row focused
+key apps
+expect menuitem:"Ebene löschen" exists
+key esc
+expect menuitem:"Ebene löschen" missing
+# Tab: the selected row's check box, the button bar (one stop), the list again
+key tab
+expect #1614807057 focused
+key tab
+expect #4201 focused
+key right
+expect #4202 focused
+key tab
+expect #262144 focused
+# Esc gives the keys back to the main window (its focus is kept)
+key esc
+expect window main keys
+key tab
+expect #700 focused
+# ------------------------------------------------------------ Farben: colour squares, palette grid
+key ctrl+f6 ctrl+f6 ctrl+f6 ctrl+f6
+expect window 24580 keys
+expect #4400 focused
+key tab tab
+expect #4402 focused
+key right
+expect #4403 focused
+key enter
+expect #4403 exists
+key tab tab tab tab tab
+expect #4700 focused
+key right right
+expect #4702 focused
+expect #4402 text "FF000000"
+key space
+expect #4402 text "FFFF0000"
+key down
+expect #4718 focused
+key apps
+expect #4403 text "FF7F0000"
+key ctrl+f6
+expect window main keys
+# ------------------------------------------------------------ dialogs
+# Größe ändern: the first stop is the checked radio, the arrows select the other one
+cmd 271
+expect window 24616 open
+expect #5101 focused
+expect #5101 checked
+key down
+expect #5103 checked
+expect #5103 focused
+key down
+expect #5101 checked
+key esc
+expect window 24616 closed
+# Ebenen-Eigenschaften: Enter on the check box is OK, the box keeps its state
+cmd 338
+expect #5401 focused
+key tab
+expect #5402 focused
+expect #5402 checked
+key enter
+expect window 24608 closed
+expect #9906 value 1
+expect_nowarn

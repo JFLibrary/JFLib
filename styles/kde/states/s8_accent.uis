@@ -1,0 +1,12 @@
+#!args --accent 8E44AD
+# s8_accent -- a custom accent colour (light: link colour 25 % darker), light / dark
+size 1000 1500
+theme light
+shot build/kdes/s8_l.png
+move #101
+shot build/kdes/s8_l_acc.png 0 150 600 100
+theme dark
+shot build/kdes/s8_d.png
+down #140
+shot build/kdes/s8_d_slider.png 0 340 720 120
+up

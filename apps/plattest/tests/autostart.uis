@@ -1,0 +1,3 @@
+#!args --test autostart
+# (Rust only) plattest --test autostart: start at login (lib/plat/autostart.rs): Windows the real
+# Run value of HKCU (removed again), Linux XDG autostart in a scratch XDG_CONFIG_HOME.

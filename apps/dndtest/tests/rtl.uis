@@ -1,0 +1,30 @@
+#!args --rtl --verify-dirty
+# drag and drop in a mirrored window (ui/rtl.rs): scripts point at physical places, the
+# targets are found in logical coordinates; drag_over / drop_pos report logical DIP
+theme light
+expect #101 rect 681 88 55 32
+# basket A is mirrored to the middle: the apple goes there
+down #101
+move 600,110
+move 404,114
+expect text:"Ziehen: Text+Frucht bei 355,114  Über: Korb A" exists
+shot build/dnd/rtl_hover.png 240 40 520 160
+up
+expect text:"Abgelegt: Apfel -> Korb A (verschieben)" exists
+expect #101 rect 451 88 55 32
+# another program's drag over the text target (right in the mirror)
+dragover 678 229 text
+expect text:"Ziehen: Text bei 81,229  Über: Text-Ziel" exists
+drop 678 229 text "von rechts"
+expect text:"Text: von rechts" exists
+drop 160 480 build/dnd/f.txt
+expect text:"UIC_DROP: 1 Datei(en) bei 599,480 (Fenster 0)" exists
+# out of the window on the left: the platform takes it
+down #103
+move 500,110
+move -20,110
+dragout expect text "Kirsche"
+dragout end copy
+expect text:"Ende: Kirsche kopieren (2)" exists
+up
+expect_nowarn

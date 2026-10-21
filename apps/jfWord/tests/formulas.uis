@@ -1,0 +1,51 @@
+#!args --editor
+size 1440 1040
+theme light
+scale 100
+click tab:"Einfügen"
+click #1514
+click "Übernehmen"
+type "12.5"
+key tab
+type "7.5"
+key tab
+cmd 130
+expect dialog:"Tabellenformel" exists
+expect "Ergebnis: 20" exists
+click #4110
+key ctrl+a
+type "=ROUND(SUM(LEFT)/2,1)"
+click #4111
+type "0.00"
+key tab
+expect "Ergebnis: 10.00" exists
+shot build/jfword-formula-dialog-light.png
+click "Übernehmen"
+expect "Formel übernommen · Ergebnisse aktualisiert" exists
+cmd 5
+cmd 6
+cmd 130
+expect dialog:"Tabellenformel" exists
+click #4110
+key ctrl+a
+type "=SUM("
+click "Übernehmen"
+expect dialog:"Tabellenformel" exists
+expect "Ergebnis: #SYNTAX!" exists
+click #4110
+key ctrl+a
+type "=1/0"
+key tab
+expect "Ergebnis: #DIV/0!" exists
+click "Übernehmen"
+cmd 5
+cmd 130
+theme dark
+scale 150
+shot build/jfword-formula-dialog-dark-150.png
+click "Abbrechen"
+key f9
+expect "Tabellenformeln aktualisiert" exists
+size 1000 800
+scale 200
+expect_nowarn

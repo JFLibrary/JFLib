@@ -1,0 +1,25 @@
+# TX_ELLIPSIS (U1): texts cut with "…" at their placed width; the semantic record keeps the
+# whole text (selectors still match it) with value 1 when the text is cut
+size 1000 3000
+theme light
+expect text:"Eine sehr lange Beschreibung, die nicht in die Breite passt" value 1
+expect text:"Eine sehr lange Beschreibung, die nicht in die Breite passt" rect 24 2773 120 20
+expect text:"Pinsel: Klicken und ziehen, um mit der Primärfarbe zu malen." value 1
+expect text:"Kurzer Text" value 0
+# a fill-width hint (status bar style): whole in a wide window, cut in a narrow one
+expect text:"Farbpinsel: Klicken und ziehen, um mit der Primärfarbe zu malen, Rechtsklick für die Sekundärfarbe." value 0
+expect text:"800 × 600" rect 922 2805 54 16
+shot build/gal_ellipsis_wide.png 0 2760 1000 70
+size 500 3000
+expect text:"Farbpinsel: Klicken und ziehen, um mit der Primärfarbe zu malen, Rechtsklick für die Sekundärfarbe." value 1
+expect text:"800 × 600" rect 422 2805 54 16
+shot build/gal_ellipsis_narrow.png 0 2760 500 70
+# list rows use it too (their names fit)
+expect text:"Ebene 1" value 0
+# dark theme, 150 %
+theme dark
+scale 150
+expect text:"Farbpinsel: Klicken und ziehen, um mit der Primärfarbe zu malen, Rechtsklick für die Sekundärfarbe." value 1
+expect text:"Eine sehr lange Beschreibung, die nicht in die Breite passt" value 1
+expect text:"Kurzer Text" value 0
+expect_nowarn

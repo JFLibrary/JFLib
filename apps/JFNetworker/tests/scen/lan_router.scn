@@ -1,0 +1,28 @@
+# Router zwischen zwei Netzen: R1 fragt beim ersten Echo nach PC2 und verwirft es (".!!!!"),
+# PC1 erreicht PC2 über das Gateway, traceroute zeigt beide Hops
+R1: enable
+R1: ping 10.0.2.10
+run until idle
+expect R1 output contains ".!!!!"
+expect R1 output contains "Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms"
+R1: show ip interface brief
+R1: show ip route
+expect R1 route 10.0.1.0/24 via connected
+expect R1 route 10.0.2.1/32 dev Gi0/0/1
+R1: show arp
+PC1: ping -c 3 10.0.2.10
+run until idle
+expect PC1 output contains "3 packets transmitted, 3 received, 0% packet loss"
+PC1: traceroute -n 10.0.2.10
+run until idle
+expect PC1 output contains " 2  10.0.2.10"
+PC1: ip route
+expect PC1 output contains "default via 10.0.1.1 dev eth0"
+R1: debug ip icmp
+PC1: ping -c 1 10.0.1.1
+run until idle
+expect R1 output contains "ICMP: sent echo reply 10.0.1.1 -> 10.0.1.10"
+R1: undebug all
+R1: show running-config
+expect R1 output contains "interface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n!"
+expect hops icmp >= 20

@@ -1,0 +1,139 @@
+# the live inspector (ui/inspect.rs, ROADMAP §12): closed it changes nothing; the hot keys, the
+# overlay (the widget under the pointer, boxes, Tab order, repainted rectangles), the tool window
+# (tree, properties, frame statistics, colours), the pick, the copied selector.  The inspector's
+# window is 2147422208 (0x7FFF1000).
+theme light
+move 700,300
+wait 300
+inspect snap
+# ---- not armed: F12 and Ctrl+Shift+I stay the app's keys, the inspector does no work
+key f12 ctrl+shift+i
+inspect expect closed
+expect window 2147422208 closed
+inspect expect idle
+inspect expect same
+# ---- armed (jfgui_INSPECT=1, ui.inspect_enable): F12 opens it as a tool window, the main
+# window keeps the keyboard
+inspect arm
+key f12
+inspect expect open
+expect window 2147422208 open
+expect window 0 active
+expect window 0 keys
+inspect expect excluded
+inspect expect selected none
+# the overlay: the widget under the pointer, its tag
+move "Standard"
+inspect expect hover button:"Standard"
+shot build/insp/hover.png
+shot build/insp/tool.png window 2147422208
+# a widget selected by script (as a row of the tree): highlighted in the app
+inspect select #702
+inspect expect selected #702
+inspect expect selector "textbox:\"5\""
+inspect select #700
+inspect expect selector "#700"
+# the options: layout boxes, Tab order
+inspect option outlines on
+inspect option order on
+shot build/insp/options.png
+inspect option outlines off
+inspect option order off
+inspect tab frame
+shot build/insp/frame.png window 2147422208
+inspect tab colors
+shot build/insp/colors.png window 2147422208
+inspect tab widgets
+inspect select none
+# ---- closed with F12: the app renders byte for byte as before
+key f12
+inspect expect closed
+expect window 2147422208 closed
+move 700,300
+wait 300
+inspect expect same
+inspect expect idle
+# ---- Ctrl+Shift+I opens it again; the focused text box keeps the focus and its keys
+click #700
+expect #700 focused
+key ctrl+shift+i
+inspect expect open
+expect #700 focused
+type "abc"
+expect #700 text "abc"
+# ---- the pick: a click into the app selects the widget and does not reach the app
+inspect pick
+inspect expect pick on
+click "Standard"
+inspect expect pick off
+expect text:"Wert: 40 %   Klicks: 0" exists
+inspect expect selected button:"Standard"
+inspect expect selector "button:\"Standard\""
+shot build/insp/picked.png window 2147422208
+shot build/insp/picked_main.png
+# Esc ends a pick without picking (the Esc does not reach the app either)
+inspect pick
+key esc
+inspect expect pick off
+inspect expect selected button:"Standard"
+expect #700 text "abc"
+# the pick button of the tool window, then a widget inside a scroll view
+click button:"Auswählen"
+inspect expect pick on
+click "Option A"
+inspect expect selected checkbox:"Option A"
+expect "Option A" checked
+# ---- the selector: "Kopieren" and Ctrl+C in the tool window (a click there lends it the keys)
+clip clear
+click button:"Kopieren"
+inspect expect copied "checkbox:\"Option A\""
+inspect pick
+click "Standard"
+clip clear
+click tab:"Widgets"
+expect window 2147422208 keys
+key ctrl+c
+inspect expect copied "button:\"Standard\""
+# the keys go back to the app with a click there
+click #700
+expect window 0 keys
+# ---- an open menu (a popup layer): its rows are in the tree and the pick takes them; the
+# menu stays open, the command does not run
+click "Datei"
+expect "Datei" open
+inspect pick
+click menuitem:"Speichern unter…"
+inspect expect selected menuitem:"Speichern unter…"
+inspect expect selector "menuitem:\"Speichern unter…\""
+expect "Datei" open
+click "Datei"
+expect menuitem:"Neu" missing
+# ---- repainted rectangles: a change of the app flashes, then fades out
+inspect option dirty on
+click "Akzent"
+expect text:"Wert: 40 %   Klicks: 1" exists
+shot build/insp/dirty.png
+inspect expect flash on
+wait 1000
+shot build/insp/dirty_faded.png
+inspect expect flash off
+inspect option dirty off
+# ---- a tool window of the app: its widgets in the tree, the overlay in that window
+size 1000 1450
+click "Werkzeugfenster"
+expect window 7600 open
+inspect select #7601
+inspect expect selected #7601
+inspect expect selector "#7601"
+window 7600
+move #7601
+inspect expect hover #7601
+shot build/insp/toolwin.png window 7600
+window any
+close window 7600
+# ---- the close button of the inspector's window: closed, nothing reaches the app
+close window 2147422208
+inspect expect closed
+expect window 2147422208 closed
+expect window 0 active
+expect_nowarn

@@ -1,0 +1,40 @@
+#!args --verify-dirty
+# TX_WRAP (U2): ui_text breaks at blanks inside the width the layout gives it, long words by
+# character, at "\n"; natural height = lines x line height; each line aligned (TX_CENTER /
+# TX_RIGHT); TX_ELLIPSIS cuts to the lines a fixed height holds.  Record value = lines.
+size 1000 3600
+theme light
+expect text:"„Unbenannt.png“ hat nicht gespeicherte Änderungen. Möchten Sie die Änderungen speichern, bevor Sie das Bild schließen?" value 4
+expect text:"„Unbenannt.png“ hat nicht gespeicherte Änderungen. Möchten Sie die Änderungen speichern, bevor Sie das Bild schließen?" rect 36 3093 236 80
+# a word longer than the card breaks inside the word
+expect text:"Donaudampfschifffahrtsgesellschaftskapitänsmützenabzeichen passen in keine Zeile." value 2
+expect text:"Donaudampfschifffahrtsgesellschaftskapitänsmützenabzeichen passen in keine Zeile." rect 36 3181 236 32
+# explicit line break + wrap
+expect text:"Erste Zeile\nZweite Zeile, länger als die Karte breit ist" value 3
+# fixed width in a row: the next widget follows at 200 DIP, centred on the three lines
+expect text:"Das Bild wird zusammengefasst gespeichert; die Ebenen im Dokument bleiben erhalten." rect 48 3305 200 60
+expect text:"danach" rect 256 3327 39 16
+# two lines of a four-line text, cut with "…"
+expect text:"Dieser Hinweis ist länger als zwei Zeilen und wird deshalb am Ende mit Auslassungspunkten gekürzt." rect 24 3377 180 40
+expect text:"Dieser Hinweis ist länger als zwei Zeilen und wird deshalb am Ende mit Auslassungspunkten gekürzt." value 4
+# stretched over the page: the line count follows the window width
+expect text:"Dieser Absatz ist so breit wie die Seite: in einem schmalen Fenster braucht er mehr Zeilen als in einem breiten, und die Höhe der Seite passt sich an, ohne dass die App etwas messen muss." value 2
+shot build/u2/gal_wrap.png 0 3030 520 540
+size 500 3600
+expect text:"Dieser Absatz ist so breit wie die Seite: in einem schmalen Fenster braucht er mehr Zeilen als in einem breiten, und die Höhe der Seite passt sich an, ohne dass die App etwas messen muss." value 3
+expect text:"Dieser Absatz ist so breit wie die Seite: in einem schmalen Fenster braucht er mehr Zeilen als in einem breiten, und die Höhe der Seite passt sich an, ohne dass die App etwas messen muss." rect 24 3517 452 60
+size 1000 3600
+# layout in DIP: the same lines at 150 % and in the dark theme
+theme dark
+scale 150
+expect text:"„Unbenannt.png“ hat nicht gespeicherte Änderungen. Möchten Sie die Änderungen speichern, bevor Sie das Bild schließen?" value 4
+expect text:"Das Bild wird zusammengefasst gespeichert; die Ebenen im Dokument bleiben erhalten." value 3
+shot build/u2/gal_wrap150.png 0 3030 520 540
+# the gallery's dialog window wraps its message as well
+scale 100
+theme light
+click #7641
+expect window 7620 open
+expect text:"Die Änderung wird auf das ganze Bild angewendet." exists
+key esc
+expect_nowarn

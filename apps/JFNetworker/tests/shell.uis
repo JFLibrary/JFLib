@@ -1,0 +1,103 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/office.jfnet
+# the main window (workspace/shell.rs): dock panels, toolbar, menus with their states, the
+# simulator's panels, Probleme, the info dialog, the view commands; shots light, dark and at
+# 150 %
+theme light
+# the panels
+expect tab:"Geräte" exists
+expect tab:"Eigenschaften" exists
+expect tab:"Terminal" selected
+expect tab:"Ereignisse" exists
+expect tab:"Paket" exists
+expect tab:"Protokoll" exists
+expect tab:"Probleme" exists
+expect text:"Keine Konsole geöffnet" exists
+click tab:"Probleme"
+# the model's check is clean; the simulator finds the loop SW1 - MLS1 (two cables, no spanning tree)
+expect text:"Schleife ohne Spanning Tree über MLS1, SW1 (VLAN 1): Broadcasts kreisen endlos." exists
+click tab:"Ereignisse"
+expect text:"Protokolle" exists
+expect button:"Nur Auswahl" exists
+click tab:"Terminal"
+# the toolbar
+expect button:"Auswahl" checked
+expect button:"Verbinden" enabled
+expect button:"Rückgängig" disabled
+expect button:"Löschen" disabled
+expect button:"Raster" checked
+expect button:"Einrasten" checked
+expect tab:"Echtzeit" selected
+expect tab:"Simulation" enabled
+expect text:"13 Geräte · 14 Kabel" exists
+expect text:"64 %" exists
+shot build/jfnetworker/shell_light.png
+# the menus
+click menu:"Datei"
+expect menuitem:"Neu" exists
+expect menuitem:"Öffnen …" exists
+expect menuitem:"Zuletzt geöffnet" exists
+expect menuitem:"Speichern" exists
+expect menuitem:"Speichern unter …" exists
+expect menuitem:"Beenden" exists
+key esc
+click menu:"Bearbeiten"
+expect menuitem:"Rückgängig" disabled
+expect menuitem:"Wiederholen" disabled
+expect menuitem:"Löschen" disabled
+expect menuitem:"Alles auswählen" enabled
+expect menuitem:"Umbenennen …" disabled
+key esc
+click menu:"Ansicht"
+expect menuitem:"Vergrößern" exists
+expect menuitem:"Verkleinern" exists
+expect menuitem:"100 %" exists
+expect menuitem:"Alles zeigen" exists
+expect menuitem:"Raster" checked
+expect menuitem:"Einrasten" checked
+expect menuitem:"Minimap" unchecked
+click menuitem:"Bereiche"
+expect menuitem:"Geräte" checked
+expect menuitem:"Probleme" checked
+key esc
+key esc
+click menu:"Simulation"
+expect menuitem:"Echtzeit" checked
+expect menuitem:"Simulationsmodus" unchecked
+expect menuitem:"Abspielen / Anhalten" checked
+expect menuitem:"Schritt vor" enabled
+key esc
+click menu:"Hilfe"
+click menuitem:"Info …"
+expect dialog:"Über JFNetworker" exists
+click button:"Schließen"
+expect dialog:"Über JFNetworker" missing
+# view: 100 %, zoom steps, everything, grid off, minimap on
+click menu:"Ansicht"
+click menuitem:"100 %"
+expect text:"100 %" exists
+click button:"Vergrößern"
+expect text:"125 %" exists
+click button:"Alles zeigen"
+expect text:"64 %" exists
+click button:"Raster"
+expect button:"Raster" unchecked
+expect text:"Einrasten 20" exists
+click button:"Minimap"
+expect #12289 exists
+shot build/jfnetworker/shell_nogrid.png
+click button:"Minimap"
+click button:"Raster"
+expect #12289 missing
+expect text:"Raster 20 · Einrasten" exists
+# a hidden panel comes back from the menu (Ctrl+2)
+click button:"Ausblenden: Eigenschaften"
+expect tab:"Eigenschaften" missing
+key ctrl+2
+expect tab:"Eigenschaften" exists
+# dark and 150 %
+click listitem:"SW1"
+theme dark
+shot build/jfnetworker/shell_dark.png
+scale 150
+shot build/jfnetworker/shell_150.png
+expect_nowarn

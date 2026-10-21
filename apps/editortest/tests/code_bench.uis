@@ -1,0 +1,46 @@
+#!args --verify-dirty
+# a file of 100 000 lines: only the visible lines are laid out and highlighted.  "hl:" counts
+# the lines tokenized for highlighting states by the last pass with something to do (the
+# visible lines are tokenized again to draw them).  Scrolling in, Ctrl+End once through the
+# file, PgUp / the wheel without new work, an edit at the end and at the top (the old states
+# agree again right after the edited line), a comment opened at the top (only the visible lines
+# are done again), find over the whole file; `bench` prints the frame times
+size 1000 680
+click tab:"Code"
+click "100 000 Zeilen"
+expect text:"lines: 100000" exists
+focus #3000
+bench 20
+key pgdn
+key pgdn
+expect text:"pos: 55:1" exists
+expect text:"hl: 27" exists
+key ctrl+end
+expect text:"pos: 100000:68" exists
+expect text:"hl: 99944" exists
+key pgup
+expect text:"hl: 0" exists
+wheel #3000 -480
+expect text:"hl: 0" exists
+bench 20
+type " "
+expect text:"hl: 1" exists
+key ctrl+home
+type "x"
+expect text:"hl: 1" exists
+key ctrl+end
+expect text:"hl: 0" exists
+key ctrl+home
+type "/*"
+expect text:"hl: 27" exists
+key ctrl+z
+expect text:"pos: 1:1" exists
+key ctrl+f
+type "value_0010"
+expect text:"find: 1/96" exists
+expect text:"pos: 1043:19" exists
+key f3
+expect text:"find: 2/96" exists
+key esc
+bench 20
+expect_nowarn

@@ -1,0 +1,5 @@
+# the bare setup stub has no payload: it must show the error page (and not crash)
+size 820 600
+theme light
+expect text:"Das hat nicht geklappt" exists
+expect "Schließen" exists

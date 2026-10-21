@@ -1,0 +1,5 @@
+#!args --selftest
+# Known-answer checks of the runtime font loader on the synthetic fixture fonts
+# (tools/font_fixtures.py): TrueType, CFF, TTC, COLR, CBDT, GPOS, kern, synthetic styles,
+# fontdb and truncated files.  The whole test runs in on_init and ends the process with
+# exit code 0 (passed) or 1; nothing below is executed.

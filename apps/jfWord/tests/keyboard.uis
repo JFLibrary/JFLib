@@ -1,0 +1,21 @@
+#!args --editor --structure --sources --navigation
+theme light
+click #10000
+type "X"
+key ctrl+z
+type "Y"
+expect textbox:"Y" focused
+key ctrl+a
+type "Text mit Struktur."
+key ctrl+enter
+expect "2 · Text" exists
+key ctrl+z
+expect "2 · Text" missing
+key ctrl+y
+expect "2 · Text" exists
+cmd 13
+expect text:"Literaturverzeichnis" exists
+expect "3 · Text" exists
+cmd 5
+expect "3 · Text" missing
+expect_nowarn

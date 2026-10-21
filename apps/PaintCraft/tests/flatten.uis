@@ -1,0 +1,111 @@
+# flatten.uis -- Bild > Zusammenfassen (Strg+Umschalt+F): imgops.s forwards CMD_FLATTEN to
+# layer.s (A4: lay_flatten_cmd / lay_flat_states).  The composite of the visible layers
+# becomes the bottom layer (its name stays, Normal, 100 %, visible), one history step,
+# undo restores every layer bit-exactly; hidden layers ask "Ausgeblendete Ebenen löschen?"
+# (window 24611 = WINID_DLG0 + 19, A4) and are dropped; one layer: disabled (agent A5).
+# Hooks: 968 new image, 902/903/904 fill, 905 opacity, 900 composite probe (#9900),
+# 313/314 layer probe (#5190), 950 / 961 / 962 history; 340 = CMD_LAYER_SET_VIS (index).
+size 1280 800
+theme light
+cmd 950 1
+cmd 968 262150
+# layer 0 (Hintergrund, white): red (0,0)
+cmd 902 1
+cmd 903 0
+cmd 904 65537
+# layer 1: black 50 % over [0,3) x [0,4), layer opacity 128
+key ctrl+shift+n
+cmd 902 8
+cmd 903 0
+cmd 904 262147
+cmd 905 128
+# layer 2: blue (5,0)
+key ctrl+shift+n
+cmd 902 3
+cmd 903 5
+cmd 904 65542
+expect #9903 value 3
+expect text:"t.n=4" exists
+cmd 900 0
+expect #9900 text "FFBF0000"
+cmd 900 1
+expect #9900 text "FFBFBFBF"
+cmd 900 5
+expect #9900 text "FF0000FF"
+cmd 900 196613
+expect #9900 text "FFFFFFFF"
+cmd 961 0
+
+# ------------------------------------------------------------ menu and shortcut
+click menu:"Bild"
+expect menuitem:"Zusammenfassen" enabled
+key esc
+key ctrl+shift+f
+expect #9903 value 1
+expect #9904 value 0
+expect #9906 text "Hintergrund"
+expect #9906 value 1
+expect #9907 value 255
+expect #9908 value 0
+expect text:"t.n=5" exists
+expect text:"Zusammenfassen" exists
+cmd 314 0
+cmd 313 0
+expect #5190 text "FFBF0000"
+cmd 313 1
+expect #5190 text "FFBFBFBF"
+cmd 313 5
+expect #5190 text "FF0000FF"
+cmd 313 196613
+expect #5190 text "FFFFFFFF"
+cmd 900 0
+expect #9900 text "FFBF0000"
+click menu:"Bild"
+expect menuitem:"Zusammenfassen" disabled
+key esc
+key ctrl+z
+expect #9903 value 3
+cmd 962 0
+expect text:"t.cmp=ok" exists
+key ctrl+y
+expect #9903 value 1
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ a hidden layer: the question
+cmd 340 2
+expect text:"t.n=5" exists
+cmd 900 5
+expect #9900 text "FFFFFFFF"
+key ctrl+shift+f
+expect window 24611 open
+expect text:"Ausgeblendete Ebenen löschen?" exists
+click button:"Abbrechen"
+expect window 24611 closed
+expect #9903 value 3
+key ctrl+shift+f
+expect window 24611 open
+click button:"OK"
+expect window 24611 closed
+expect #9903 value 1
+cmd 314 0
+cmd 313 5
+expect #5190 text "FFFFFFFF"
+cmd 313 0
+expect #5190 text "FFBF0000"
+key ctrl+z
+expect #9903 value 3
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ one layer: nothing to do
+cmd 968 262150
+expect #9903 value 1
+click menu:"Bild"
+expect menuitem:"Zusammenfassen" disabled
+key esc
+key ctrl+shift+f
+expect #9903 value 1
+expect text:"t.n=1" exists

@@ -1,0 +1,34 @@
+#!args --open apps/PaintCraft/tests/fixtures/a6_photo.png
+# jxlmod.uis (jxl-module) -- JPEG XL is saved by the writer module next to the exe (jxlenc.dll /
+# jxlenc.so, which `python build_rs.py app PaintCraft` builds into the app's folder; loaded on
+# the first JPEG XL save): no note in the save dialog, Bemühung and Filmkörnung on, the files
+# are the new writer's (their sizes: lossy quality 90 effort 7, lossless effort 7 -- the same
+# as saveopt.uis's; jxlmod_off.uis has the compatible writer's).  Window 24595 = the save dialog.
+size 1280 800
+theme light
+shot build/tests/jxlmod/mod_start.png
+cmd 103
+click #81932
+key ctrl+a
+type "../../../../build/tests/jxlmod/mod.jxl"
+click button:"Speichern"
+expect window 24595 open
+window 24595
+expect text:"Hinweis: Das JPEG-XL-Modul (jxlenc) fehlt. Gespeichert wird mit dem einfachen Schreiber: nur Qualität und Verlustfrei wirken." missing
+expect #6026 enabled
+expect #6026 value 7
+expect #6039 enabled
+expect #6022 value 90
+sync
+expect #6100 text "ok"
+expect #6100 value 20092
+click #6023
+expect #6039 disabled
+sync
+expect #6100 text "ok"
+expect #6100 value 89954
+window any
+click button:"OK"
+expect window 24595 closed
+expect #9911 text "mod.jxl"
+expect #9905 value 0

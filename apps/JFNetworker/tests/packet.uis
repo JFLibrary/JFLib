@@ -1,0 +1,79 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/two_pcs.jfnet
+# the Paket panel (workspace/sim/packet.rs): what a device did with a frame -- the frame that
+# came in, its decisions, the frames it sent -- the layers of the frame as a tree and its bytes
+# in the hex view, the two choices coupled; a frame clicked on the canvas and a line of the
+# event list choose what it shows; shots light, dark and at 150 %.
+# The echo request (frame 5, 98 bytes) leaves PC1 at 2888 ns after the ARP exchange (frames
+# 1 .. 4); #37893 is it on the canvas, #34816 the tree, #38912 the event list.
+theme light
+click tab:"Simulation"
+wait 200
+key p
+click listitem:"PC1"
+wait 600
+click listitem:"PC2"
+key esc
+key f7
+wait 1200
+key f7
+wait 1200
+key f7
+wait 1200
+key f7
+wait 1200
+expect text:"t = 0,000 002 888 s" exists
+# a click on the frame: PC1's step, sender side (it is still on its way)
+click #37893
+wait 100
+expect tab:"Paket" selected
+expect link:"#4 ARP von SW1 (an PC1 eth0)" exists
+expect link:"#5 ICMP an SW1 (über PC1 eth0)" exists
+expect text:"ARP-Eintrag 10.0.0.2 → 02:4a:00:00:02:01." exists
+expect listitem:"L1 Ports: PC1 eth0 → SW1 Gi1/0/1" exists
+expect listitem:"Angekommen: 0,000 003 914 s (noch unterwegs)" exists
+expect listitem:"Internet Protocol Version 4, Src: 10.0.0.1, Dst: 10.0.0.2" exists
+expect text:"98 Bytes · ein Klick auf ein Byte wählt sein Feld" exists
+shot build/jfnetworker/packet_light.png
+# hex -> tree: the middle of row 0018 (bytes 24 .. 31) lies in the source address (26 .. 29)
+click text:"66 A6 0A 00 00 01 0A 00"
+wait 100
+expect text:"Bytes 26–29 · Source Address: 10.0.0.1" exists
+expect listitem:"Source Address: 10.0.0.1" selected
+shot build/jfnetworker/packet_hex.png
+# tree -> hex: the field above, the header checksum (24 .. 25), selects its bytes
+focus #34816
+key up
+wait 100
+expect listitem:"Header Checksum: 0x66a6 [correct]" selected
+expect text:"Bytes 24–25 · Header Checksum: 0x66a6 [correct]" exists
+key up
+wait 100
+expect text:"Bytes 22–22 · Time to Live: 64" missing
+expect text:"Byte 23 · Protocol: ICMP (1)" exists
+# the frame that came in: the ARP reply of PC2 by way of SW1
+click link:"#4 ARP von SW1 (an PC1 eth0)"
+wait 100
+expect listitem:"L1 Ports: SW1 Gi1/0/1 → PC1 eth0" exists
+expect text:"60 Bytes · ein Klick auf ein Byte wählt sein Feld" exists
+# a line of the event list: PC2's answer to the ARP request (event 9 at 1444) shows PC2's step
+click tab:"Ereignisse"
+focus #38912
+key home
+key down down down down down down down down
+wait 100
+expect #38921 selected
+click tab:"Paket"
+wait 100
+expect link:"#2 ARP von SW1 (an PC2 eth0)" exists
+expect link:"#3 ARP an SW1 (über PC2 eth0)" exists
+expect text:"ARP-Antwort an eth0: 10.0.0.2 ist 02:4a:00:00:02:01." exists
+expect listitem:"L1 Ports: SW1 Gi1/0/2 → PC2 eth0" exists
+theme dark
+wait 100
+shot build/jfnetworker/packet_dark.png
+scale 150
+wait 100
+shot build/jfnetworker/packet_150.png
+scale 100
+theme light
+expect_nowarn

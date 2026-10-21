@@ -1,0 +1,122 @@
+# s2_hover -- the hover state of every kind of widget (light), a few in dark
+size 1000 3500
+theme light
+move #100
+shot build/kdes/s2_btn_std.png 0 150 600 100
+move #101
+shot build/kdes/s2_btn_acc.png 0 150 600 100
+move #103
+shot build/kdes/s2_btn_icon.png 0 150 600 100
+move #105
+shot build/kdes/s2_btn_withicon.png 0 150 600 100
+move #160
+shot build/kdes/s2_tool.png 0 150 600 100
+move #161
+shot build/kdes/s2_tool_checked.png 0 150 600 100
+move #110
+shot build/kdes/s2_check.png 0 270 600 40
+move #111
+shot build/kdes/s2_check_ind.png 0 270 600 40
+move #120
+shot build/kdes/s2_radio.png 0 270 600 40
+move #121
+shot build/kdes/s2_radio_sel.png 0 270 600 40
+move #130
+shot build/kdes/s2_switch.png 0 270 600 40
+move #140
+shot build/kdes/s2_slider.png 0 340 720 120
+move #141
+shot build/kdes/s2_vslider.png 0 340 720 120
+move #700
+shot build/kdes/s2_textbox.png 0 490 620 50
+move #150
+shot build/kdes/s2_cardbtn.png 0 560 1000 140
+move #8001
+shot build/kdes/s2_combo.png 0 720 600 90
+move #8002
+shot build/kdes/s2_dropdown.png 0 720 600 90
+move #8010
+shot build/kdes/s2_split_main.png 0 720 600 90
+move #2147491658
+shot build/kdes/s2_split_chev.png 0 720 600 90
+move #9003
+shot build/kdes/s2_subtle.png 0 720 600 90
+move #9020
+shot build/kdes/s2_subtle_checked.png 0 720 600 90
+move #8020
+shot build/kdes/s2_rclick.png 0 720 600 90
+move #7012
+shot build/kdes/s2_tab.png 0 840 400 50
+move #7102
+shot build/kdes/s2_row.png 0 890 1000 250
+move #7103
+shot build/kdes/s2_row_sel.png 0 890 1000 250
+move 968,950
+wait 400
+shot build/kdes/s2_list_sbar.png 0 890 1000 250
+move "Datei"
+shot build/kdes/s2_menubar.png 0 0 400 40
+move #7640
+shot build/kdes/s2_winbtn.png 0 1230 700 50
+move #7700
+shot build/kdes/s2_vs_plain.png 0 1300 500 180
+move #7702
+shot build/kdes/s2_vs_label.png 0 1300 500 180
+move #1610735969
+shot build/kdes/s2_vs_box.png 0 1300 500 180
+move #7704
+shot build/kdes/s2_angle.png 0 1480 400 140
+move #7705
+shot build/kdes/s2_pan.png 0 1480 400 140
+move #7710
+shot build/kdes/s2_grad.png 0 1610 500 200
+move #7717
+shot build/kdes/s2_vgrad.png 0 1610 500 200
+move #7718
+shot build/kdes/s2_swatch.png 0 1610 500 200
+move #7720
+shot build/kdes/s2_field.png 0 1830 560 440
+move #7721
+shot build/kdes/s2_hue.png 0 1830 560 440
+move #7802
+shot build/kdes/s2_lrow.png 0 2330 600 220
+move #7871
+shot build/kdes/s2_lswatch.png 0 2330 600 220
+move #7852
+shot build/kdes/s2_lcheck.png 0 2330 600 220
+move #7960
+shot build/kdes/s2_multi.png 0 2630 600 150
+move #8610
+shot build/kdes/s2_numbox.png 0 3230 500 50
+click #7012
+move #7400
+shot build/kdes/s2_expander.png 0 880 1000 280
+move #7411
+shot build/kdes/s2_ibclose.png 0 880 1000 280
+click #7400
+move #7413
+shot build/kdes/s2_expander_open.png 0 880 1000 400
+click #7013
+move #7441
+wait 400
+shot build/kdes/s2_hsbar.png 0 880 1000 160
+click #7011
+theme dark
+move #100
+shot build/kdes/s2_d_btn_std.png 0 150 600 100
+move #101
+shot build/kdes/s2_d_btn_acc.png 0 150 600 100
+move #110
+shot build/kdes/s2_d_check.png 0 270 600 40
+move #130
+shot build/kdes/s2_d_switch.png 0 270 600 40
+move #140
+shot build/kdes/s2_d_slider.png 0 340 720 120
+move #700
+shot build/kdes/s2_d_textbox.png 0 490 620 50
+move #7102
+shot build/kdes/s2_d_row.png 0 890 1000 250
+move #7702
+shot build/kdes/s2_d_vs_label.png 0 1300 500 180
+move #7710
+shot build/kdes/s2_d_grad.png 0 1610 500 200

@@ -1,0 +1,3 @@
+#!args --check
+# i18ntest is a console program: it runs the self-checks of ui::i18n and plat::locale and
+# ignores the script (build_rs.py test passes --script); a failing check exits with code 1

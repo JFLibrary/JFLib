@@ -1,0 +1,72 @@
+# print.uis -- Datei > Drucken… (agent PR1): the modal print dialog (window 24640 =
+# WINID_DLG0 + 48), its options and the print size they give (the preview's layout,
+# print_layout), Esc / Abbrechen, the menu state, and that a headless run never reaches a
+# print dialog: "Drucken…" without jfgui_PRINT_TO ends in the error bar.  PDF output:
+# tools/print_check.py.  Ids: 6201 Papierformat, 6202 / 6203 Hoch- / Querformat, 6204 / 6205 /
+# 6206 An Seite anpassen / Originalgröße / Prozentual, 6207 percent, 6208 Zentrieren,
+# 6209 Rand (mm), 6210 preview.
+size 1280 800
+theme light
+expect #106 enabled
+click menu:"Datei"
+expect menuitem:"Drucken…" enabled
+click menuitem:"Drucken…"
+expect window 24640 open
+expect window 24640 modal
+expect #6202 checked
+expect #6204 checked
+expect #6208 checked
+expect #6209 value 5
+expect #6210 exists
+expect text:"Bild: 800 × 600 Pixel, 96 dpi" exists
+expect text:"Druckgröße: 20,00 × 15,00 cm" exists
+# ------------------------------------------------------------ options
+click #6203
+expect #6203 checked
+expect text:"Druckgröße: 26,67 × 20,00 cm" exists
+click #6205
+expect text:"Druckgröße: 21,17 × 15,88 cm" exists
+expect #6207 disabled
+click #6206
+expect #6207 enabled
+click #6207
+key ctrl+a
+type "50"
+key enter
+expect #6207 value 50
+expect text:"Druckgröße: 10,58 × 7,94 cm" exists
+click #6201
+click listitem:"A5 (148 × 210 mm)"
+expect #6201 value 2
+expect text:"Druckgröße: 10,58 × 7,94 cm" exists
+click #6202
+click #6204
+expect text:"Druckgröße: 13,80 × 10,35 cm" exists
+click #6209
+key ctrl+a
+type "0"
+key enter
+expect text:"Druckgröße: 14,80 × 11,10 cm" exists
+click #6208
+expect #6208 unchecked
+# ------------------------------------------------------------ Esc cancels, the options stay
+key esc
+expect window 24640 closed
+key ctrl+p
+expect window 24640 open
+expect #6201 value 2
+expect #6209 value 0
+expect text:"Druckgröße: 14,80 × 11,10 cm" exists
+click button:"Abbrechen"
+expect window 24640 closed
+expect text:"Es ist kein Drucker bzw. Druckdienst verfügbar." missing
+# ------------------------------------------------------------ headless: never a dialog, an error
+key ctrl+p
+click button:"Drucken…"
+expect window 24640 closed
+expect text:"Es ist kein Drucker bzw. Druckdienst verfügbar." exists
+# ------------------------------------------------------------ without an image
+cmd 105
+expect #106 disabled
+key ctrl+p
+expect window 24640 closed

@@ -1,0 +1,10 @@
+#!args --contrast high --text-scale 125 --anim off
+# what the command line fixes wins over the system: high contrast, text scale, animations off;
+# the script's theme switches contrast off and on again
+expect text:"Kontrast: ja  Text: 125 %  Animationen: aus" exists
+theme light
+expect text:"Kontrast: nein  Text: 125 %  Animationen: aus" exists
+theme contrast
+expect text:"Kontrast: ja  Text: 125 %  Animationen: aus" exists
+shot build/life_contrast.png
+expect_nowarn

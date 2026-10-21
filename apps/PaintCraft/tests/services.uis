@@ -1,0 +1,25 @@
+#!args --acquire-file apps/PaintCraft/tests/fixtures/a1_rgba.png --update-feed apps/PaintCraft/tests/fixtures/releases.json
+size 1280 800
+cmd 852
+theme light
+cmd 108
+sync
+expect window 24804 closed
+expect #9901 value 2
+expect #9913 value 64
+expect #9914 value 48
+expect #9905 value 1
+cmd 901 40
+expect #9900 text "8000FF00"
+expect #4391 text "Bilderfassung"
+key alt+x
+cmd 853 5
+expect #5570 unchecked
+click #5572
+sync
+expect text:"Neue PaintCraft-Version verfuegbar: PaintCraft-v0.8" exists
+click #5571
+click #5572
+sync
+expect text:"Neue PaintCraft-Version verfuegbar: PaintCraft-v0.9-beta" exists
+key esc

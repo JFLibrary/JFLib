@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <title>Deckkraft</title>
+  <!-- a checkered background shows the transparency -->
+  <g fill="#e5e7eb">
+    <rect width="200" height="200" fill="white"/>
+    <rect x="0" y="0" width="50" height="50"/><rect x="100" y="0" width="50" height="50"/>
+    <rect x="50" y="50" width="50" height="50"/><rect x="150" y="50" width="50" height="50"/>
+    <rect x="0" y="100" width="50" height="50"/><rect x="100" y="100" width="50" height="50"/>
+    <rect x="50" y="150" width="50" height="50"/><rect x="150" y="150" width="50" height="50"/>
+  </g>
+  <!-- group opacity: the overlap is not darker -->
+  <g opacity="0.5">
+    <circle cx="45" cy="50" r="32" fill="#dc2626"/>
+    <circle cx="75" cy="50" r="32" fill="#dc2626"/>
+  </g>
+  <!-- element opacity: overlaps add up -->
+  <circle cx="125" cy="50" r="32" fill="#2563eb" opacity="0.5"/>
+  <circle cx="155" cy="50" r="32" fill="#2563eb" opacity="0.5"/>
+  <!-- fill and stroke with opacity on the element (a layer) / fill-opacity and stroke-opacity -->
+  <rect x="20" y="110" width="70" height="60" fill="#16a34a" stroke="#14532d" stroke-width="12" opacity="0.6"/>
+  <rect x="110" y="110" width="70" height="60" fill="#16a34a" stroke="#14532d" stroke-width="12" fill-opacity="0.6" stroke-opacity="0.6"/>
+  <!-- nested opacities multiply; rgba and #rrggbbaa colours -->
+  <g opacity="0.5"><g opacity="0.5"><rect x="20" y="180" width="40" height="15" fill="black"/></g></g>
+  <rect x="80" y="180" width="40" height="15" fill="rgba(0, 0, 0, 0.25)"/>
+  <rect x="140" y="180" width="40" height="15" fill="#00000040"/>
+</svg>

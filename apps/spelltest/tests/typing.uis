@@ -1,0 +1,34 @@
+#!args --verify-dirty
+# typing: the word being typed (the caret at its end) is not marked until the caret leaves
+# it; the menu key / Shift+F10 open the menu for the word at the caret, the keyboard picks
+theme light
+focus #110
+key ctrl+a
+type "Ein Fehlr"
+expect text:"Fehler Betreff: Fehlr" exists
+shot build/spell/typing.png
+type " "
+shot build/spell/typed.png
+# the caret into the word, the menu key: the first row has the focus
+key left left left
+key apps
+expect menuitem:"Fehler" exists
+expect menuitem:"Fehler" focused
+key enter
+expect #110 text "Ein Fehler "
+expect text:"Fehler Betreff: -" exists
+# Shift+F10 in the multi-line box
+focus #111
+key ctrl+home
+key ctrl+right ctrl+right ctrl+right
+key right
+key shift+f10
+expect menuitem:"Arbeit" exists
+key esc
+expect menuitem:"Arbeit" missing
+expect #111 focused
+# typed into the box without TB_SPELL: never checked
+focus #112
+type " Fehlr"
+expect text:"Fehler Betreff: -" exists
+expect_nowarn

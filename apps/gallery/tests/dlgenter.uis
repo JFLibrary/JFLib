@@ -1,0 +1,21 @@
+# dlgenter.uis -- (U3) Enter in a single-line text box of a WF_DIALOG window without a
+# primary button gives EV_COMMIT (the nested dialog "Weitere Optionen" has only "Schließen")
+size 1000 1450
+theme light
+click "Dialogfenster…"
+click "Weitere Optionen…"
+expect window 7630 active
+click #7632
+expect #7632 focused
+type "sRGB"
+expect text:"Übernommen: 0" exists
+key enter
+expect text:"Übernommen: 1" exists
+expect window 7630 open
+expect #7632 text "sRGB"
+# Esc first leaves the text box (it keeps the text), then closes the dialog
+key esc
+key esc
+expect window 7630 closed
+key esc
+expect window 7620 closed

@@ -1,0 +1,59 @@
+#!args --editor
+size 1440 1000
+theme light
+type "H2O + x2"
+key ctrl+home right
+key shift+right
+click #2888
+expect #2888 checked
+expect #2889 unchecked
+expect textbox:"H2O + x2" focused
+click #2894
+click "Gelb"
+expect textbox:"H2O + x2" focused
+key ctrl+end left
+key shift+right
+click #2889
+expect #2889 checked
+expect #2888 unchecked
+click #2894
+click "Türkis"
+shot build/jfword-characters-light.png
+key ctrl+a
+expect #2888 unchecked
+expect #2889 unchecked
+click #2889
+expect #2889 checked
+click #2889
+expect #2889 unchecked
+key ctrl+z
+expect #2889 checked
+key ctrl+z
+expect #2889 unchecked
+click #2894
+click "Keine Farbe"
+key ctrl+z
+key ctrl+end
+click #2888
+type "n"
+expect textbox:"H2O + x2n" focused
+expect #2888 checked
+key ctrl+z
+expect textbox:"H2O + x2" focused
+theme dark
+key ctrl+home
+key shift+right
+key ctrl+shift+plus
+expect #2889 checked
+key ctrl+plus
+expect #2888 checked
+expect #2889 unchecked
+key ctrl+plus
+expect #2888 unchecked
+click #2881
+key ctrl+plus
+click "Schließen"
+expect #2888 unchecked
+scale 150
+shot build/jfword-characters-dark-150.png
+expect_nowarn

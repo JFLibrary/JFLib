@@ -1,0 +1,18 @@
+# asynctest: a fast copy (one pool job with Progress), a timer on the virtual clock, a read
+# with a check sum computed on the pool; the app takes the results in App::frame
+expect text:"Schnell: bereit" exists
+click "Schnell kopieren"
+sync
+expect text:"Schnell: fertig (262144 Bytes)" exists
+expect #301 value 1000
+click "Warten"
+expect text:"Timer: läuft" exists
+wait 400
+expect text:"Timer: läuft" exists
+wait 100
+expect text:"Timer: abgelaufen" exists
+click "Laden"
+expect text:"Prüfsumme: lädt …" exists
+sync
+expect text:"Prüfsumme: 8fd61de3" exists
+expect text:"Aufgaben aktiv: 0" exists

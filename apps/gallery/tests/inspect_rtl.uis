@@ -1,0 +1,18 @@
+#!args --rtl --inspect
+# the live inspector (ui/inspect.rs) in a mirrored window at 150 %: the overlay, the pick, the
+# boxes and the Tab order at the mirrored places (--inspect: open from the start)
+theme light
+scale 150
+inspect expect open
+move "Standard"
+inspect expect hover button:"Standard"
+inspect pick
+click "Akzent"
+inspect expect selected button:"Akzent"
+expect text:"Wert: 40 %   Klicks: 0" exists
+inspect option outlines on
+inspect option order on
+shot build/insp/rtl.png
+shot build/insp/rtl_tool.png window 2147422208
+inspect expect excluded
+expect_nowarn

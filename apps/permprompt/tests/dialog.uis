@@ -1,0 +1,59 @@
+# the questions of ask lines as the library's dialog: a write of the UI thread is refused
+# while its question is open and done again after the answer (UIC_PERMISSION); each answer;
+# the settings section lists the answers and revokes them
+perm answer dialog
+perm expect none
+perm expect fs.write $TEMP/permprompt-ask/** unanswered
+click "Datei schreiben"
+expect text:"Datei: wartet auf Antwort" exists
+perm expect open
+expect text:"Grund: Briefe speichern" exists
+expect text:"Regel: fs.write $TEMP/permprompt-ask/**" exists
+shot build/permprompt_dialog.png
+click "Einmal erlauben"
+perm expect none
+expect "Einmal erlauben" missing
+expect text:"Datei: geschrieben" exists
+perm expect fs.write $TEMP/permprompt-ask/** once
+# allowed until the end: no second question
+click "Datei schreiben"
+expect text:"Datei: geschrieben" exists
+perm expect none
+# refused until the end: the access fails now and later, without a question
+click "Mail prüfen"
+expect text:"Mail: abgelehnt" exists
+perm expect open
+expect text:"mailto:support@example.org" exists
+click "Ablehnen"
+perm expect url mailto deny
+click "Mail prüfen"
+expect text:"Mail: abgelehnt" exists
+perm expect none
+# never (stored), a question without a target or reason
+click "Drucken prüfen"
+expect text:"Regel: print" exists
+click "Nie erlauben"
+perm expect print never
+click "Drucken prüfen"
+expect text:"Drucken: abgelehnt" exists
+perm expect none
+# the settings section: what each line allows and its answer
+expect text:"Bis zum Programmende erlaubt" exists
+expect text:"Bis zum Programmende abgelehnt" exists
+expect text:"Nie erlaubt" exists
+expect text:"Wird beim nächsten Zugriff gefragt" exists
+expect "Zurücksetzen: fs.write $TEMP/permprompt-bg/**" disabled
+shot build/permprompt_page.png
+# revoked: asked again; Esc refuses
+click "Zurücksetzen: url mailto"
+perm expect url mailto unanswered
+click "Mail prüfen"
+perm expect open
+key esc
+perm expect none
+perm expect url mailto deny
+click "Alle zurücksetzen"
+perm expect print unanswered
+perm expect fs.write $TEMP/permprompt-ask/** unanswered
+expect "Alle zurücksetzen" disabled
+expect_nowarn

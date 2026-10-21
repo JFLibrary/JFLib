@@ -1,0 +1,22 @@
+#!args --verify-dirty
+# the fixtures through ui.svg at 180 DIP (sharp: drawn at the device size), light, dark, high
+# contrast and at 200 %; the icon row follows the text colour; the K_IMAGE records carry the
+# documents' titles
+size 1040 820
+theme light
+expect "Galerie" exists
+expect image:"Grundformen" exists
+expect image:"Verläufe" exists
+expect #300 exists
+expect #304 exists
+shot build/svgtest/gallery_light.png
+theme dark
+shot build/svgtest/gallery_dark.png
+click "Hoher Kontrast"
+shot build/svgtest/gallery_hc.png
+click "Hoher Kontrast"
+theme light
+scale 200
+size 1040 820
+shot build/svgtest/gallery_200.png
+expect_nowarn

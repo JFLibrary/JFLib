@@ -1,0 +1,3 @@
+#!args --check
+# coretest is a console program: it runs every self-check of the foundation crates and ignores
+# the script (build_rs.py test passes --script); a failing check exits with code 1

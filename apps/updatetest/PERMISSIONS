@@ -1,0 +1,4 @@
+# updatetest: the updater's tests (lib/update, docs/UPDATES.md) against tools/update_server.py
+net.connect localhost:*                # the test server on 127.0.0.1 (other hosts: refused)
+fs.write $TEMP/updatetest-*/**         # a scratch folder per run: states, stand-in programs, the installed copy
+process python python3 $TEMP/updatetest-*/**   # the test server; the installed copy of this program

@@ -1,0 +1,14 @@
+# wintitle.uis -- (U3) the title of a narrow secondary window is cut with "…" and the close
+# button stays inside the window
+size 1000 1450
+theme light
+click "Werkzeugfenster"
+expect window 7600 open
+expect text:"Werkzeuge" value 0
+resizewin 7600 100 228
+expect window 7600 rect 24 48 100 228
+expect text:"Werkzeuge" value 1
+expect #0xFFFF7811 rect 61 1 40 28
+shot build/u3/wintitle.png window 7600
+click #0xFFFF7811
+expect window 7600 closed

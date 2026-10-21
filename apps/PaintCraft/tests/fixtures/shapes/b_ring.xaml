@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- paint.net ShapeKit style: geometry as child elements -->
+<ps:SimpleGeometryShape xmlns="clr-namespace:PaintDotNet.UI.Media;assembly=PaintDotNet.Framework"
+                        xmlns:ps="clr-namespace:PaintDotNet.Shapes;assembly=PaintDotNet.Framework"
+                        DisplayName='Ring'>
+    <ps:SimpleGeometryShape.Geometry>
+        <PathGeometry FillRule="EvenOdd"
+                      Figures="M 50,0 A 50,50 0 1 1 49.99,0 Z M 50,25 A 25,25 0 1 1 49.99,25 Z" />
+    </ps:SimpleGeometryShape.Geometry>
+</ps:SimpleGeometryShape>

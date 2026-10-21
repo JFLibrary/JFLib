@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="200" height="200" viewBox="0 0 200 200">
+  <title>use und symbol</title>
+  <defs>
+    <g id="pin">
+      <path d="M0 -20 C11 -20 14 -10 9 -2 L0 12 L-9 -2 C-14 -10 -11 -20 0 -20 Z"/>
+      <circle cy="-11" r="4" fill="white"/>
+    </g>
+    <symbol id="tile" viewBox="0 0 10 10" preserveAspectRatio="none">
+      <rect width="10" height="10" fill="#e0e7ff"/>
+      <path d="M0 10 L5 0 L10 10 Z" fill="#4338ca"/>
+    </symbol>
+    <g id="row">
+      <use href="#pin" x="20" fill="#dc2626"/>
+      <use xlink:href="#pin" x="50" fill="#16a34a"/>
+      <use href="#pin" x="80"/>
+    </g>
+    <!-- a reference cycle: drawn once, then cut -->
+    <g id="loop"><rect width="6" height="6" fill="#64748b"/><use href="#loop" x="8"/></g>
+  </defs>
+  <!-- the fill of a use is inherited by the referenced content -->
+  <use href="#row" y="40" fill="#2563eb"/>
+  <use href="#row" x="95" y="40" fill="#f59e0b" transform="scale(1 1)"/>
+  <use href="#tile" x="10" y="70" width="60" height="40"/>
+  <use href="#tile" x="80" y="70" width="40" height="40"/>
+  <use href="#tile" x="130" y="70" width="60" height="20"/>
+  <g transform="translate(100 150) rotate(20)">
+    <use href="#row" x="-50" fill="#9333ea" stroke="black" stroke-width="1"/>
+  </g>
+  <use href="#loop" x="10" y="185"/>
+  <use href="#nothing" x="100" y="185"/>
+</svg>

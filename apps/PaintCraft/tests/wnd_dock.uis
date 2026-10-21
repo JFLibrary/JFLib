@@ -1,0 +1,72 @@
+# wnd_dock.uis -- the tool window layout (wnd_dock.s): automatic places in the canvas area,
+# windows moved inside the main window keep their distance from the nearest edges on resizes,
+# windows dragged out stay put, very small / low main windows hide Verlauf / Ebenen and lay the
+# Werkzeuge out in two rows, a closed window comes back at its place.
+# Window ids: Werkzeuge 24577, Verlauf 24578, Ebenen 24579, Farben 24580.
+size 1280 800
+theme light
+sync
+expect window 24577 rect 8 137 74 346
+expect window 24578 rect 1062 137 208 260
+expect window 24579 rect 1062 490 208 240
+expect window 24580 rect 92 410 272 320
+# ---- bigger: the right / bottom windows follow their edges
+size 1600 1000
+sync
+sync
+expect window 24577 rect 8 137 74 346
+expect window 24578 rect 1382 137 208 260
+expect window 24579 rect 1382 690 208 240
+expect window 24580 rect 8 610 272 320
+# ---- moved inside: anchored to the nearest edges (Ebenen: right / top)
+movewin 24579 1200 300
+sync
+expect window 24579 rect 1200 300 208 240
+size 1400 900
+sync
+sync
+expect window 24579 rect 1000 300 208 240
+# ---- dragged out: it stays where it is
+movewin 24580 -400 100
+sync
+size 1280 800
+sync
+sync
+expect window 24580 rect -400 100 272 320
+expect window 24579 rect 880 300 208 240
+# ---- narrower: the Ebenen keep their distance from the right edge (190 DIP)
+size 900 800
+sync
+sync
+expect window 24579 rect 500 300 208 240
+# ---- moved to the lower half: anchored to the bottom (30 DIP above it), a lower main window
+# takes it along
+movewin 24579 500 500
+sync
+size 900 640
+sync
+sync
+expect window 24579 rect 500 340 208 240
+# ---- closed and opened again: the same place
+close window 24577
+expect window 24577 closed
+key f5
+sync
+expect window 24577 open
+expect window 24577 rect 8 137 74 346
+# ---- low window: Werkzeuge in two rows, no Verlauf
+cmd 704
+size 1280 480
+sync
+sync
+expect window 24577 rect 8 137 346 74
+expect window 24578 closed
+# ---- very small: only Werkzeuge (left) and Farben (right)
+size 700 460
+sync
+sync
+expect window 24578 closed
+expect window 24579 closed
+expect window 24577 open
+expect window 24580 open
+shot build/pn_dock_tiny.png desktop

@@ -1,0 +1,3 @@
+#!args --selftest
+# self-checks of the data model (crates/jfn_model); they run before a window opens and
+# ignore the script (build_rs.py test passes --script)

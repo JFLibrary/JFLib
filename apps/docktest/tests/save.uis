@@ -1,0 +1,40 @@
+#!args --verify-dirty
+# the layout as text: DockState::save / load (the app keeps the text in memory)
+theme light
+click button:"Speichern"
+expect text:"dock 1" exists
+expect text:"side 0 0 0" exists
+expect text:"side 2 0 0" exists
+expect text:"group 0 0 0 11 11 12" exists
+expect text:"group 1 0 0 13 13" exists
+expect text:"group 2 0 0 14 14" exists
+expect text:"group 2 1 0 15 15" exists
+expect text:"hidden 16 1 1 4294967295 40 80 280 320 1 1" exists
+# change everything, then load the saved layout
+drag 263,300 323,300
+drag tab:"Eigenschaften" 30,312
+click button:"Einklappen: Ausgabe"
+dblclick tab:"Gliederung"
+expect window 501 open
+expect text:"L: [Dateien], [Eigenschaften] | R: - | U(zu): [Ausgabe], [Suche] | F: [Gliederung] | V: Verlauf" exists
+click button:"Laden"
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect text:"Größen: 260/280/200" exists
+expect window 501 closed
+# sizes, a collapsed side and a floating window survive save and load
+drag 263,300 323,300
+dblclick tab:"Suche"
+click button:"Einklappen: Eigenschaften"
+click button:"Speichern"
+expect text:"side 0 320 0" exists
+expect text:"side 1 0 1" exists
+expect text:"group 1 0 0 13 13" exists
+click button:"Zurücksetzen"
+expect window 501 closed
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+expect text:"Größen: 260/280/200" exists
+click button:"Laden"
+expect window 501 open
+expect text:"L: [Dateien]+Gliederung | R(zu): [Eigenschaften] | U: [Ausgabe] | F: [Suche] | V: Verlauf" exists
+expect text:"Größen: 320/280/200" exists
+expect_nowarn

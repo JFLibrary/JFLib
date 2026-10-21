@@ -1,0 +1,33 @@
+# a worker thread's access waits for the answer of the dialog on the UI thread; refused by the
+# answer and after the timeout (the question stays open for later)
+perm answer dialog
+click "Im Hintergrund schreiben"
+perm wait
+perm expect open
+expect text:"Grund: Im Hintergrund sichern" exists
+click "Immer erlauben"
+sync
+expect text:"Hintergrund: geschrieben" exists
+perm expect fs.write $TEMP/permprompt-bg/** always
+expect text:"Immer erlaubt" exists
+# refused by the answer
+click "Zurücksetzen: fs.write $TEMP/permprompt-bg/**"
+click "Im Hintergrund schreiben"
+perm wait
+click "Nie erlauben"
+sync
+expect text:"Hintergrund: abgelehnt" exists
+perm expect fs.write $TEMP/permprompt-bg/** never
+# nobody answers within the time: refused, the question stays
+click "Zurücksetzen: fs.write $TEMP/permprompt-bg/**"
+perm timeout 300
+click "Im Hintergrund schreiben"
+perm wait
+sync
+expect text:"Hintergrund: abgelehnt" exists
+perm expect open
+perm expect fs.write $TEMP/permprompt-bg/** unanswered
+click "Ablehnen"
+perm expect none
+perm expect fs.write $TEMP/permprompt-bg/** deny
+expect_nowarn

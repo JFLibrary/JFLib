@@ -1,0 +1,30 @@
+#!args --open apps/Kritzel/tests/fixtures/small.png
+# "Speichern unter" > GIF-Bild / JPEG-Bild and back (own dialog in headless runs)
+expect text:"64 × 48px" exists
+cmd 83
+expect dialog:"Speichern unter" exists
+click #1048588
+key ctrl+a
+type "../../../../build/fmt_out"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect #1710 missing
+cmd 2
+expect #1048588 text "fmt_out.gif"
+click button:"Öffnen"
+expect text:"64 × 48px" exists
+expect #1710 missing
+# JPEG (the dialog now starts in build/, the folder of fmt_out.gif)
+cmd 81
+expect dialog:"Speichern unter" exists
+click #1048588
+key ctrl+a
+type "fmt_out"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect #1710 missing
+cmd 2
+expect #1048588 text "fmt_out.jpg"
+click button:"Öffnen"
+expect text:"64 × 48px" exists
+expect #1710 missing

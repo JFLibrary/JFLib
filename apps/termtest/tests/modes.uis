@@ -1,0 +1,49 @@
+#!args --verify-dirty
+# TM_RAW: every key goes to the app (TermEv::Raw); TM_SECRET: a password without echo or
+# history; Ctrl+D on an empty line (Eof), Ctrl+L (Chord), Tab with several candidates
+size 760 520
+click tab:"Shell"
+type "keys\n"
+expect text:"Modus: Roh" exists
+expect #1101 missing
+type "ab"
+key up
+key ctrl+x
+key enter
+key tab
+expect text:"a b <0x26> ^X ^M ^I " exists
+type "q"
+expect text:"Rohmodus beendet." exists
+expect text:"Modus: Zeile" exists
+expect #1101 focused
+# a password: not shown, not echoed, not in the history
+type "sudo ls\n"
+expect text:"Modus: Geheim" exists
+expect text:"[sudo] Passwort für nutzer: " exists
+expect #1101 missing
+type "geheim"
+expect text:"[sudo] Passwort für nutzer: " exists
+key enter
+expect text:"nutzer ist nicht in der sudoers-Datei." exists
+expect text:"Modus: Zeile" exists
+key up
+expect #1101 text "sudo ls"
+key ctrl+a
+key backspace
+# Tab: one candidate completes, several are listed under the line
+type "ec"
+key tab
+expect #1101 text "echo "
+key ctrl+a
+key backspace
+type "c"
+key tab
+expect text:"cat     clear   colors" exists
+expect #1101 text "c"
+key backspace
+# Ctrl+D on the empty line, Ctrl+L clears the screen
+key ctrl+d
+expect text:"logout" exists
+key ctrl+l
+expect text:"logout" missing
+expect_nowarn

@@ -1,0 +1,275 @@
+# layers_window.uis -- the Ebenen tool window (agent A4): default place, one row per layer
+# (top layer first, current one selected), click selects, visibility check box (history),
+# drag to reorder (one history step, undo), the bottom bar (tooltips with the shortcuts,
+# states), double click -> Ebeneneigenschaften, the row context menu, lazy thumbnails,
+# F7 / close button.
+# Ids: window 24579; list #262144, row r = #262145 + r (row 0 = top layer); visibility
+# check box of row r = ui_part_id(row id, 1): row 0 #1614807057, row 1 #1614807073,
+# row 2 #1614807089, row 3 #1614807105; bar #4201..#4207 (neu, löschen, duplizieren,
+# zusammenführen, aufwärts, abwärts, Eigenschaften).
+# Probes: diag.s A1 (#9903 layers, #9904 current, #9906 name / visible, #9900 pixel
+# probe of cmd 900 / 901), layer.s A4 (#4391 history entry, #4392 entries, #4393
+# thumbnails rendered by the window, #4395 open dialogs).
+size 1280 800
+theme light
+expect window 24579 open
+expect window 24579 rect 1062 490 208 240
+expect #262144 max 1
+expect #262145 selected
+window 24579
+expect text:"Hintergrund" exists
+window any
+expect #4393 value 1
+# ------------------------------------------------------------ bottom bar: states and tooltips
+expect #4201 enabled
+expect #4202 disabled
+expect #4203 enabled
+expect #4204 disabled
+expect #4205 disabled
+expect #4206 disabled
+expect #4207 enabled
+expect button:"Neue Ebene (Strg+Umschalt+N)" exists
+expect button:"Ebene löschen (Strg+Umschalt+Entf)" exists
+expect button:"Ebene duplizieren (Strg+Umschalt+D)" exists
+expect button:"Nach unten vereinen (Strg+M)" exists
+expect button:"Ebene eine Stufe höher" exists
+expect button:"Ebene eine Stufe tiefer" exists
+expect button:"Eigenschaften (F4)" exists
+move #4201
+wait 600
+expect text:"Neue Ebene (Strg+Umschalt+N)" exists
+move #1400
+wait 50
+# ------------------------------------------------------------ add two layers with the bar
+click #4201
+expect #9903 value 2
+expect #9904 value 1
+expect #262144 max 2
+expect #262145 selected
+expect #262146 exists
+expect #4391 text "Neue Ebene"
+click #4201
+expect #9903 value 3
+expect #9904 value 2
+expect #262145 selected
+window 24579
+expect text:"Ebene 2" exists
+expect text:"Ebene 3" exists
+window any
+expect #4202 enabled
+expect #4204 enabled
+expect #4206 enabled
+expect #4205 disabled
+# ------------------------------------------------------------ click selects (row 2 = Hintergrund)
+click #262147
+expect #9904 value 0
+expect #262147 selected
+expect #9906 text "Hintergrund"
+expect #4204 disabled
+expect #4206 disabled
+expect #4205 enabled
+click #262146
+expect #9904 value 1
+expect #9906 text "Ebene 2"
+# red in [0, 10) x [0, 10) of Ebene 2, blue in [10, 20) x [0, 10) of Ebene 3
+cmd 902 1
+cmd 903 0
+cmd 904 655370
+click #262145
+expect #9904 value 2
+cmd 902 3
+cmd 903 10
+cmd 904 655380
+cmd 900 327685
+expect #9900 text "FFFF0000"
+cmd 900 327695
+expect #9900 text "FF0000FF"
+# ------------------------------------------------------------ visibility check box (one step each)
+expect #1614807073 checked
+click #1614807073
+expect #1614807073 unchecked
+expect #9904 value 2
+expect #4391 text "Ebene Sichtbarkeit"
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+expect #1614807073 checked
+cmd 900 327685
+expect #9900 text "FFFF0000"
+click #1614807057
+expect #1614807057 unchecked
+cmd 900 327695
+expect #9900 text "FFFFFFFF"
+click #1614807057
+expect #1614807057 checked
+cmd 900 327695
+expect #9900 text "FF0000FF"
+# ------------------------------------------------------------ drag to reorder: Ebene 3 (top) to the bottom
+expect #4392 value 5
+drag #262145 #262147 8
+expect #9903 value 3
+expect #9904 value 0
+expect #9906 text "Ebene 3"
+expect #262147 selected
+expect #4391 text "Ebene verschieben"
+expect #4392 value 6
+cmd 370 0
+expect #4390 text "Ebene 3|1|255|0"
+cmd 370 2
+expect #4390 text "Ebene 2|1|255|0"
+cmd 370 1
+expect #4390 text "Hintergrund|1|255|0"
+# blue is under the white background now
+cmd 900 327695
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+expect #4392 value 6
+expect #4391 text "Ebene Sichtbarkeit"
+cmd 370 2
+expect #4390 text "Ebene 3|1|255|0"
+cmd 900 327695
+expect #9900 text "FF0000FF"
+key ctrl+y
+cmd 370 0
+expect #4390 text "Ebene 3|1|255|0"
+key ctrl+z
+# a drop on its own place changes nothing (the release selects the row like a click)
+drag #262146 #262146 8
+expect #4391 text "Ebene Sichtbarkeit"
+expect #9906 text "Ebene 2"
+# drag Hintergrund (bottom) to the top (above the middle of row 0)
+window 24579
+drag #262147 100,34 8
+window any
+expect #9904 value 2
+expect #9906 text "Hintergrund"
+cmd 900 327685
+expect #9900 text "FFFFFFFF"
+key ctrl+z
+expect #9906 text "Ebene 2"
+cmd 370 0
+expect #4390 text "Hintergrund|1|255|0"
+# ------------------------------------------------------------ bottom bar buttons
+click #262146
+expect #9906 text "Ebene 2"
+click #4203
+expect #9903 value 4
+expect #9906 text "Ebene 2 Kopie"
+expect #4391 text "Ebene verdoppeln"
+click #4206
+expect #9904 value 1
+expect #9906 text "Ebene 2 Kopie"
+expect #4391 text "Ebene eine Stufe tiefer"
+click #4205
+expect #9904 value 2
+expect #4391 text "Ebene eine Stufe höher"
+click #4204
+expect #9903 value 3
+expect #9904 value 1
+expect #4391 text "Nach unten vereinen"
+click #4202
+expect #9903 value 2
+expect #4391 text "Ebene löschen"
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+key ctrl+z
+expect #9903 value 3
+expect #4391 text "Ebene Sichtbarkeit"
+# ------------------------------------------------------------ double click: Ebeneneigenschaften of that layer
+dblclick #262147
+expect window 24608 open
+expect #9904 value 0
+expect #5401 text "Hintergrund"
+click button:"Abbrechen"
+expect window 24608 closed
+click #4207
+expect window 24608 open
+expect #5401 text "Hintergrund"
+key esc
+# ------------------------------------------------------------ context menu on a row (selects it)
+rclick #262146
+expect #9904 value 1
+expect menuitem:"Neue Ebene" exists
+expect menuitem:"Ebene löschen" exists
+expect menuitem:"Nach unten vereinen" exists
+expect menuitem:"Ebene eine Stufe höher" exists
+expect menuitem:"Ebeneneigenschaften…" exists
+click menuitem:"Ebene verdoppeln"
+expect #9903 value 4
+expect #9904 value 2
+expect #9906 text "Ebene 2 Kopie"
+expect #4391 text "Ebene verdoppeln"
+key ctrl+z
+expect #9903 value 3
+rclick #262146
+click menuitem:"Ebeneneigenschaften…"
+expect window 24608 open
+expect #5401 text "Ebene 2"
+key esc
+# Horizontal spiegeln of Ebene 2 (menu): the red block goes to the right edge
+cmd 325
+expect #4391 text "Horizontal kippen"
+cmd 901 327685
+expect #9900 text "00000000"
+cmd 901 328475
+expect #9900 text "FFFF0000"
+key ctrl+z
+cmd 901 327685
+expect #9900 text "FFFF0000"
+# Vertikal spiegeln, Um 180° rotieren
+cmd 326
+expect #4391 text "Vertikal kippen"
+cmd 901 38993925
+expect #9900 text "FFFF0000"
+cmd 901 327685
+expect #9900 text "00000000"
+key ctrl+z
+cmd 327
+expect #4391 text "Um 180° rotieren"
+cmd 901 38994715
+expect #9900 text "FFFF0000"
+cmd 900 38994715
+expect #9900 text "FFFF0000"
+key ctrl+z
+cmd 901 327685
+expect #9900 text "FFFF0000"
+# ------------------------------------------------------------ lazy thumbnails
+# (only rows in view; a changed layer 250 ms after the last change of the image)
+wait 300
+expect #4393 value 13
+cmd 902 2
+cmd 903 20
+cmd 904 655390
+expect #4393 value 13
+wait 100
+expect #4393 value 13
+wait 300
+expect #4393 value 14
+# ------------------------------------------------------------ many layers: the list scrolls to the current one
+click #4201
+click #4201
+click #4201
+click #4201
+click #4201
+click #4201
+expect #9903 value 9
+cmd 339 0
+expect #262153 selected
+expect #262153 exists
+cmd 339 8
+expect #262145 selected
+# ------------------------------------------------------------ F7 and the close button
+key f7
+expect window 24579 closed
+expect #702 unchecked
+key f7
+expect window 24579 open
+close window 24579
+expect window 24579 closed
+expect #702 unchecked
+click #702
+expect window 24579 open
+theme dark
+shot build/a4_layers_window_dark.png window 24579

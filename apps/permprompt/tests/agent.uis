@@ -1,0 +1,49 @@
+# agent actions: open, refused by the manifest (agent.deny), kept local (ActionSpec::
+# local_only), confirmed by the user (agent.confirm); the refusals reach the agent as errors
+agent on
+agent call doc.count
+agent expect ok
+agent call doc.wipe
+agent expect error forbidden
+agent call doc.peek
+agent expect error forbidden
+agent call doc.nothing
+agent expect error not_found
+# nobody can confirm in a headless run
+agent call doc.save
+agent expect error forbidden
+perm expect none
+expect text:"Agent: 0 gespeichert" exists
+# the dialog asks; the agent hears that a confirmation is pending
+perm answer dialog
+agent call doc.save
+agent expect error confirmation_required
+perm expect open
+expect text:"Eine Aktion für den Agenten ausführen" exists
+expect text:"Grund: Save the document" exists
+expect text:"Regel: agent doc.save" exists
+shot build/permprompt_agent.png
+# the agent cannot answer the question through the GUI (the button "Einmal erlauben", Tab, Space)
+agent call ui.click {"id":4294932225}
+agent expect error unavailable
+agent call ui.key {"key":32}
+agent expect error unavailable
+perm expect open
+click "Einmal erlauben"
+agent call doc.save
+agent expect ok
+agent call doc.save
+agent expect ok
+expect text:"Agent: 2 gespeichert" exists
+perm expect agent doc.save once
+# revoked, then refused by the user
+click "Zurücksetzen: agent doc.save"
+agent call doc.save
+agent expect error confirmation_required
+click "Ablehnen"
+agent call doc.save
+agent expect error forbidden
+perm expect agent doc.save deny
+expect text:"Agent: 2 gespeichert" exists
+agent off
+expect_nowarn

@@ -1,0 +1,23 @@
+# TCP über eine langsame Leitung: PC1 schickt 1 MB an den Discard-Dienst von SRV1 (ab 1 s) und
+# 20 kB an seinen Echo-Dienst (ab 2 s). R1 verwirft den ersten SYN, während er nach der MAC von
+# SRV1 fragt (IOS hält nichts zurück); der SYN kommt nach 1 s wieder. Hinter R1 liegen
+# 10 Mbit/s mit 5 ms Laufzeit und 1 % Verlust: Neuübertragungen, Fast Retransmit.
+# Die Werte in Klammern sind gemessen: die Zeiten in ns ab dem Start des Dienstes.
+impair R1 Gi0/0/1 loss 1%
+run 1500ms
+expect PC1 svc bulk metric connected == 0
+run 1500ms
+expect PC1 svc bulk metric connected == 1
+expect PC1 svc bulk metric connect_ns > 1000000000
+expect PC1 svc echo metric connected == 1
+run 60s
+expect SRV1 svc discard metric bytes == 1000000
+expect PC1 svc bulk metric done == 1
+expect PC1 svc bulk metric done_ns > 0
+expect SRV1 svc echo metric bytes_out == 20000
+expect PC1 svc echo metric received == 20000
+expect PC1 svc echo metric done == 1
+expect PC1 svc echo metric done_ns > 0
+expect hops tcp >= 1000
+expect hops arp == 4
+print "beide Übertragungen vollständig"

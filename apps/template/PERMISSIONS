@@ -1,0 +1,3 @@
+# template: what the app may do (docs/PERMISSIONS.md); without this file an app may do everything.
+# The packages follow it too: Flatpak's finish-args, the MSIX capabilities (docs/PACKAGING.md).
+fs.user                      # the files the user opens (file dialog, drops, "Open with")

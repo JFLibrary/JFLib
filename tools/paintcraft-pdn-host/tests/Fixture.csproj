@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework><UseWindowsForms>true</UseWindowsForms><UseWPF>true</UseWPF>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks><ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <PaintDotNetDir Condition="'$(PaintDotNetDir)' == ''">C:\Program Files\paint.net</PaintDotNetDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Fixture.cs" />
+    <Reference Include="PaintDotNet.Data;PaintDotNet.Core;PaintDotNet.Base;PaintDotNet.Primitives;PaintDotNet.Framework;PaintDotNet.ObjectModel;PaintDotNet.ComponentModel;System.Resources.Extensions;System.Runtime.Serialization.Formatters">
+      <HintPath>$(PaintDotNetDir)\%(Identity).dll</HintPath><Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

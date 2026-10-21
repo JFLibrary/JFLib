@@ -1,0 +1,27 @@
+# s1_full -- the whole gallery page (all three container tabs) light / dark, 100 / 125 / 150 %
+size 1000 3500
+theme light
+shot build/kdes/s1_l100.png
+click #7012
+shot build/kdes/s1_l100_tab2.png 0 800 1000 400
+click #7013
+shot build/kdes/s1_l100_tab3.png 0 800 1000 400
+click #7011
+theme dark
+shot build/kdes/s1_d100.png
+click #7012
+shot build/kdes/s1_d100_tab2.png 0 800 1000 400
+click #7013
+shot build/kdes/s1_d100_tab3.png 0 800 1000 400
+click #7011
+scale 150
+shot build/kdes/s1_d150.png
+theme light
+shot build/kdes/s1_l150.png
+click #7012
+shot build/kdes/s1_l150_tab2.png 0 800 1000 400
+click #7011
+scale 125
+shot build/kdes/s1_l125.png
+theme dark
+shot build/kdes/s1_d125.png

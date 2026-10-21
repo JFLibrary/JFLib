@@ -1,0 +1,4 @@
+<ps:SimpleGeometryShape xmlns="clr-namespace:PaintDotNet.UI.Media;assembly=PaintDotNet.Framework"
+                        xmlns:ps="clr-namespace:PaintDotNet.Shapes;assembly=PaintDotNet.Framework"
+                        DisplayName="Raute &amp; Punkt"
+                        Geometry="F1 M 10,0 L 20,10 10,20 0,10 Z M 9,9 h 2 v 2 h -2 z" />

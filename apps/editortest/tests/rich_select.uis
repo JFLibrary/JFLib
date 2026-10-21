@@ -1,0 +1,62 @@
+#!args --verify-dirty
+# selection and the clipboard: Shift+arrows, Shift+Ctrl+arrows, Ctrl+A, the mouse (click,
+# drag, Shift+click, double click a word), copy / cut / paste of text and of formatted
+# paragraphs (HTML with the exact fragment), Ctrl+Shift+V pastes the text only
+size 1000 680
+click "Leeren"
+type "Erste Zeile mit Wörtern"
+key enter
+type "Zweite Zeile"
+# keyboard selections
+key shift+left
+key shift+left
+expect text:"sel: 1:12-1:10" exists
+key shift+ctrl+left
+expect text:"sel: 1:12-1:7" exists
+key shift+up
+expect text:"sel: 1:12-0:7" exists
+key ctrl+a
+expect text:"sel: 0:0-1:12" exists
+# the mouse: a click places the caret, a drag selects, Shift+click extends
+click 23,160
+expect text:"sel: 0:0-0:0" exists
+drag 23,160 62,160
+expect text:"sel: 0:0-0:11" exists
+drag 23,188 23,188 shift
+expect text:"sel: 0:0-1:0" exists
+wait 1000
+dblclick 75,160
+expect text:"sel: 0:6-0:11" exists
+# copy and paste the text
+key ctrl+c
+key end
+type " "
+key ctrl+v
+expect #2000 text "Erste Zeile mit Wörtern Zeile\nZweite Zeile"
+# formatted paragraphs keep their formats through the clipboard
+key ctrl+home
+key shift+end
+key ctrl+b
+key shift+down
+key shift+end
+key ctrl+c
+key ctrl+end
+key enter
+key ctrl+v
+expect text:"doc: [b]Erste Zeile mit Wörtern Zeile[/] | Zweite Zeile | [b]Erste Zeile mit Wörtern Zeile[/] | Zweite Zeile" exists
+# Ctrl+Shift+V: the text only
+key enter
+key ctrl+shift+v
+expect text:"doc: [b]Erste Zeile mit Wörtern Zeile[/] | Zweite Zeile | [b]Erste Zeile mit Wörtern Zeile[/] | Zweite Zeile | Erste Zeile mit Wörtern Zeile | Zweite Zeile" exists
+# cut
+key ctrl+a
+key ctrl+x
+expect #2000 text ""
+key ctrl+v
+expect #2000 text "Erste Zeile mit Wörtern Zeile\nZweite Zeile\nErste Zeile mit Wörtern Zeile\nZweite Zeile\nErste Zeile mit Wörtern Zeile\nZweite Zeile"
+# text from another program: lines become paragraphs
+clip text "eins\nzwei"
+key ctrl+a
+key ctrl+v
+expect text:"doc: [b]eins[/] | [b]zwei[/]" exists
+expect_nowarn

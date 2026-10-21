@@ -1,0 +1,153 @@
+#!args --file build/jfword-library-input.docx --library-dir build/jfword-library-ui --editor --structure --sources --navigation
+# core.uis's fixture run supplies a clean, explicitly isolated library directory.
+size 1240 840
+theme light
+cmd 18
+expect dialog:"Quellenbibliothek" exists
+expect "0 von 0 Bibliotheksquellen" exists
+expect #1105 disabled
+key ctrl+n ctrl+o ctrl+s ctrl+z
+expect dialog:"Quellenbibliothek" exists
+click #1107
+expect "1 von 1 Bibliotheksquellen" exists
+expect #1102 text "Methoden · Institut · 2024 · ID 1"
+click #1107
+expect "1 von 1 Bibliotheksquellen" exists
+click #1105
+expect dialog:"Quellenbibliothek" missing
+expect dialog:"Bibliotheksquelle bearbeiten" exists
+click #712
+key ctrl+a
+type "Bibliotheksmethoden"
+click #713
+key ctrl+a
+type "2028"
+click #714
+type "Bibliotheksverlag"
+click "Quelle übernehmen"
+expect dialog:"Bibliotheksquelle bearbeiten" missing
+expect #400 text "Methoden"
+cmd 18
+expect #1102 text "Bibliotheksmethoden · Institut · 2028 · ID 1"
+click #1109
+expect "Quellen gezielt abgleichen" exists
+click #1125
+click "Verlag"
+expect #1128 checked
+click #1125
+click "Titel"
+expect #1128 unchecked
+click #1128
+click #1125
+click "Jahr"
+click #1128
+size 1000 700
+shot build/jfword-library-compare-small.png
+click #1122
+expect text:"Bibliotheksverlag" exists
+click "Dokumentquelle aktualisieren"
+expect "Dokumentquelle abgeglichen. Ihre Zitatverweise bleiben erhalten." exists
+click "Schließen"
+expect #400 text "Bibliotheksmethoden"
+cmd 5
+expect #400 text "Methoden"
+cmd 6
+expect #400 text "Bibliotheksmethoden"
+# Reverse reconciliation affects only the library and uses its own history.
+cmd 10
+click #713
+key ctrl+a
+type "2030"
+click "Quelle übernehmen"
+cmd 18
+click #1109
+click #1120
+click "Dokument → Bibliotheksquelle"
+click #1125
+click "Jahr"
+expect #1128 unchecked
+click #1128
+click "Bibliotheksquelle aktualisieren"
+expect #1102 text "Bibliotheksmethoden · Institut · 2030 · ID 1"
+click #1110
+expect #1102 text "Bibliotheksmethoden · Institut · 2028 · ID 1"
+click #1111
+expect #1102 text "Bibliotheksmethoden · Institut · 2030 · ID 1"
+click #1112
+expect #1110 disabled
+expect #1102 text "Bibliotheksmethoden · Institut · 2030 · ID 1"
+# Search, reviewed deletion and independent undo.
+click #1101
+type "does not match"
+expect "0 von 1 Bibliotheksquellen" exists
+expect #1105 disabled
+click #1101
+key ctrl+a backspace
+click #1106
+expect "Bibliotheksquelle entfernen" exists
+click "Zurück"
+expect "1 von 1 Bibliotheksquellen" exists
+click #1106
+click "Aus Bibliothek entfernen"
+expect "0 von 0 Bibliotheksquellen" exists
+click #1110
+expect #1102 text "Bibliotheksmethoden · Institut · 2030 · ID 1"
+# The reviewed backup restores a removed record and resets library history.
+click #1106
+click "Aus Bibliothek entfernen"
+click #1113
+expect "1 Quelle in der letzten Sicherung" exists
+click "Zurück"
+expect "0 von 0 Bibliotheksquellen" exists
+click #1113
+theme dark
+scale 150
+shot build/jfword-library-recovery-dark-150.png
+click "Sicherung wiederherstellen"
+expect #1102 text "Bibliotheksmethoden · Institut · 2030 · ID 1"
+expect #1110 disabled
+scale 100
+size 1240 840
+theme light
+click #1104
+expect dialog:"Bibliotheksquelle bearbeiten" exists
+click #712
+type "Globaler Zusatz"
+click "Quelle übernehmen"
+cmd 18
+expect "2 von 2 Bibliotheksquellen" exists
+expect #1102 text "Globaler Zusatz · Globaler Zusatz ·  · ID 2"
+shot build/jfword-library-light.png
+click "Schließen"
+cmd 3
+expect "Gespeichert · Text, Quellen und Zitatverweise" exists
+# A new document retains the global library and receives a new local source identity.
+cmd 1
+expect "Neues Dokument" exists
+cmd 18
+expect "2 von 2 Bibliotheksquellen" exists
+click #1102
+click "Bibliotheksmethoden · Institut · 2030 · ID 1"
+click #1108
+click #1108
+expect "Bibliotheksquelle im Dokument verfügbar. Identische Angaben werden nur einmal importiert." exists
+click "Schließen"
+expect #400 text "Bibliotheksmethoden"
+cmd 10
+click #712
+key ctrl+a
+type "Dokumentkopie"
+click "Quelle übernehmen"
+cmd 18
+expect #1102 text "Bibliotheksmethoden · Institut · 2030 · ID 1"
+expect "Ausgewählte Dokumentquelle: Dokumentkopie" exists
+click "Schließen"
+cmd 5
+expect #400 text "Bibliotheksmethoden"
+cmd 4
+click #1048588
+key ctrl+a
+type "build/jfword-library-copy.docx"
+click button:"Speichern"
+expect "Gespeichert · Text, Quellen und Zitatverweise" exists
+expect_nowarn

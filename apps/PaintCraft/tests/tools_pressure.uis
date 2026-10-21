@@ -1,0 +1,134 @@
+# tools_pressure.uis -- pen pressure (agent PN1, spec DRAW-020): the script's pen strokes
+# (`drag ... pen P0 P1`, `pointer pen|eraser|mouse`) scale the brush width with the
+# pressure (Farbpinsel, Radierer, Klonen, Neu färben), the tool row's Druckempfindlichkeit
+# switch (off = full width), the eraser end of the pen selects the Radierer and the tip
+# brings the tool back, Einstellungen > Stift & Tablett > Windows-Tinte off = plain mouse.
+# The switch is the last widget of the row and appears once a pen was used.
+# Aliased dabs (cmd 932 0), width 40 (cmd 930 4000): full pressure = 40 px, 50 % = 20 px.
+# Mapping (1280 x 800, zoom 100 %): image pixel (x, y) is at the point (240 + x, 148 + y).
+size 1280 800
+theme light
+expect #9931 value 10
+cmd 932 0
+cmd 930 4000
+# no pen yet (headless: the system is not asked): the switch is not in the tool row
+expect #2155 missing
+
+# ------------------------------------------------------------ pen 50 %: 20 px wide
+drag 340,248 540,248 10 pen 50 50
+expect #9930 value 0
+expect #2155 exists
+cmd 901 6029512
+expect #9900 text "FF000000"
+cmd 901 7078088
+expect #9900 text "FF000000"
+cmd 901 6553800
+expect #9900 text "FF000000"
+cmd 901 5767368
+expect #9900 text "FFFFFFFF"
+cmd 901 7340232
+expect #9900 text "FFFFFFFF"
+cmd 901 5570760
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ the mouse: 40 px
+drag 340,348 540,348 10
+cmd 901 11927752
+expect #9900 text "FF000000"
+cmd 901 14287048
+expect #9900 text "FF000000"
+cmd 901 11534536
+expect #9900 text "FFFFFFFF"
+cmd 901 14680264
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ rising pressure 10 -> 100 %
+drag 340,448 740,448 20 pen 10 100
+cmd 901 19660950
+expect #9900 text "FF000000"
+cmd 901 19267734
+expect #9900 text "FFFFFFFF"
+cmd 901 20054166
+expect #9900 text "FFFFFFFF"
+cmd 901 18612704
+expect #9900 text "FF000000"
+cmd 901 20709856
+expect #9900 text "FF000000"
+cmd 901 18219488
+expect #9900 text "FFFFFFFF"
+cmd 901 21103072
+expect #9900 text "FFFFFFFF"
+cmd 901 19136812
+expect #9900 text "FF000000"
+cmd 901 18743596
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ Druckempfindlichkeit off
+# the switch is the last widget: focus scrolls the overflowing row to it
+focus #2155
+click #2155
+expect menuitem:"Stiftdruck auswerten" checked
+click menuitem:"Stiftdruck ignorieren"
+click #2155
+expect menuitem:"Stiftdruck ignorieren" checked
+key esc
+drag 340,548 540,548 10 pen 50 50
+cmd 901 25034952
+expect #9900 text "FF000000"
+cmd 901 27394248
+expect #9900 text "FF000000"
+cmd 901 24641736
+expect #9900 text "FFFFFFFF"
+click #2155
+click menuitem:"Stiftdruck auswerten"
+
+# ------------------------------------------------------------ eraser end -> Radierer
+pointer eraser 50
+move 840,248
+expect #9931 value 11
+drag 840,208 840,288 8 eraser 50 50
+expect #9931 value 11
+# the tip brings the Farbpinsel back
+pointer pen 100
+move 860,248
+expect #9931 value 10
+pointer mouse
+
+# ------------------------------------------------------------ Radierer with the pen, 50 %
+key e
+expect #9931 value 11
+drag 440,308 440,388 8 pen 50 50
+cmd 901 13107400
+expect #9900 text "00000000"
+cmd 901 13107392
+expect #9900 text "00000000"
+cmd 901 13107408
+expect #9900 text "00000000"
+cmd 901 13107388
+expect #9900 text "FF000000"
+cmd 901 13107412
+expect #9900 text "FF000000"
+key b
+expect #9931 value 10
+
+# ------------------------------------------------------------ Windows-Tinte off: a mouse
+cmd 853 8
+click "Windows-Tinte"
+expect "Windows-Tinte" unchecked
+click "Schließen"
+drag 340,648 540,648 10 pen 50 50
+cmd 901 31588552
+expect #9900 text "FF000000"
+cmd 901 33947848
+expect #9900 text "FF000000"
+cmd 901 31195336
+expect #9900 text "FFFFFFFF"
+cmd 853 8
+click "Windows-Tinte"
+expect "Windows-Tinte" checked
+click "Schließen"
+drag 340,708 540,708 10 pen 50 50
+cmd 901 36176072
+expect #9900 text "FF000000"
+cmd 901 35913928
+expect #9900 text "FFFFFFFF"

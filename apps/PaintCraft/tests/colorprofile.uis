@@ -1,0 +1,159 @@
+# colorprofile.uis -- Bild > Farbprofil... (agent I1): Zuweisen / Konvertieren, undo / redo of
+# DOC_ICC, the display transform with simulated monitor profiles, colour management on / off,
+# the dialog and its error path.
+# Hooks: 968 new image (hist_diag), 902/903/904 fill (diag A1), 901 x|y<<16 layer pixel ->
+# #9900, 950 1 history probes "t.*"; colormgmt.s: 280 / 281 row = Zuweisen / Konvertieren,
+# 290 monitor profile (built-in id, 255 = none), 291 on / off, 293 x|y<<16 display probe ->
+# #533249, 294 id = imported profile; probes #533248 document profile (text description,
+# value length), #533250 value display transform kind (-1 none, 1 matrix), #533251 error.
+# Rows: 0 sRGB, 1 A98 RGB, 2 Display P3, 3 ROMM RGB, 4 Graustufen, 5.. monitor /
+# imported.  Expected colours: tools/icc_check.py reference (perceptual + BPC, the default).
+size 1280 800
+theme light
+cmd 950 1
+cmd 968 262150
+cmd 902 1
+cmd 903 0
+cmd 904 65537
+cmd 902 2
+cmd 903 1
+cmd 904 65538
+cmd 902 3
+cmd 903 2
+cmd 904 65539
+cmd 902 7
+cmd 903 3
+cmd 904 65540
+cmd 902 4
+cmd 903 4
+cmd 904 65541
+cmd 902 9
+cmd 903 5
+cmd 904 65542
+expect text:"t.n=1" exists
+
+# ------------------------------------------------------------ no profile = sRGB
+cmd 290 255
+expect #533248 value 0
+expect #533248 text ""
+expect #533250 value -1
+cmd 293 3
+expect #533249 text "FF808080"
+
+# ------------------------------------------------------------ Zuweisen: metadata only
+cmd 280 1
+expect #533248 text "A98 RGB compatible"
+expect text:"t.n=2" exists
+cmd 901 0
+expect #9900 text "FFFF0000"
+cmd 901 3
+expect #9900 text "FF808080"
+expect #533250 value 1
+cmd 293 3
+expect #533249 text "FF818181"
+key ctrl+z
+expect #533248 value 0
+expect #533250 value -1
+key ctrl+y
+expect #533248 text "A98 RGB compatible"
+key ctrl+z
+expect #533248 value 0
+
+# ------------------------------------------------------------ Konvertieren sRGB -> A98 RGB
+cmd 281 1
+expect #533248 text "A98 RGB compatible"
+expect text:"t.n=2" exists
+cmd 901 0
+expect #9900 text "FFDB0200"
+cmd 901 1
+expect #9900 text "FF90FF3C"
+cmd 901 2
+expect #9900 text "FF0200FA"
+cmd 901 3
+expect #9900 text "FF7F7F7F"
+cmd 901 4
+expect #9900 text "80DB0200"
+cmd 901 5
+expect #9900 text "FFFFFF3C"
+cmd 901 65536
+expect #9900 text "FFFFFFFF"
+# shown on an sRGB monitor: the original colours again
+cmd 293 0
+expect #533249 text "FFFF0000"
+cmd 293 5
+expect #533249 text "FFFFFF01"
+key ctrl+z
+expect #533248 value 0
+cmd 901 0
+expect #9900 text "FFFF0000"
+key ctrl+y
+expect #533248 text "A98 RGB compatible"
+cmd 901 0
+expect #9900 text "FFDB0200"
+
+# ------------------------------------------------------------ monitor profile, on / off
+cmd 290 2
+expect #533250 value 1
+cmd 293 0
+expect #533249 text "FFEA3323"
+cmd 291 0
+expect #533249 value 0
+expect #533250 value -1
+cmd 293 0
+expect #533249 text "FFDB0200"
+cmd 291 1
+expect #533250 value 1
+cmd 290 255
+key ctrl+z
+expect #533248 value 0
+
+# ------------------------------------------------------------ Konvertieren to Graustufen
+cmd 281 4
+expect #533248 text "Gray Gamma 2.2"
+cmd 901 0
+expect #9900 text "FF818181"
+cmd 901 1
+expect #9900 text "FFDBDBDB"
+cmd 901 2
+expect #9900 text "FF474747"
+cmd 901 4
+expect #9900 text "80818181"
+key ctrl+z
+cmd 901 0
+expect #9900 text "FFFF0000"
+
+# ------------------------------------------------------------ the dialog
+cmd 278
+expect window 24632 open
+window 24632
+expect text:"Aktuell:" exists
+expect text:"sRGB (kein Profil eingebettet)" exists
+expect text:"Neu:" exists
+click #6300
+click "Display P3"
+click "Zuweisen"
+window main
+expect window 24632 closed
+expect #533248 text "Display P3 compatible"
+cmd 901 0
+expect #9900 text "FFFF0000"
+cmd 278
+window 24632
+expect text:"Display P3 compatible" exists
+click "Abbrechen"
+window main
+expect window 24632 closed
+expect #533248 text "Display P3 compatible"
+
+# ------------------------------------------------------------ imported profile row, error
+cmd 294 3
+cmd 280 5
+expect #533248 text "ROMM RGB compatible"
+cmd 281 9
+expect window 24632 open
+expect #533251 text "In dieses Farbprofil lässt sich nicht umrechnen."
+window 24632
+click "Abbrechen"
+window main
+expect window 24632 closed
+expect #533248 text "ROMM RGB compatible"

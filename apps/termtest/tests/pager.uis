@@ -1,0 +1,48 @@
+#!args --verify-dirty
+# the --More-- pager: a screen minus one line, Space a page, Enter a line, q quits
+# (TermEv::PagerQuit); while it waits there is no input line
+size 760 520
+expect text:"Raster: 89x25" exists
+type "en\n"
+type "show run\n"
+expect text:" --More-- " exists
+expect #1001 missing
+expect text:"hostname Router" exists
+expect text:"interface GigabitEthernet0/3" exists
+expect text:"interface GigabitEthernet0/4" missing
+# typed characters do nothing while it waits
+type "x"
+expect text:"interface GigabitEthernet0/4" missing
+key space
+expect text:" --More-- " exists
+expect text:"interface GigabitEthernet0/8" exists
+expect text:"interface GigabitEthernet0/9" missing
+key enter
+expect text:" --More-- " exists
+expect text:"interface GigabitEthernet0/9" missing
+key enter
+key enter
+key enter
+key enter
+key enter
+expect text:"interface GigabitEthernet0/9" exists
+key q
+expect text:" --More-- " missing
+expect text:"interface GigabitEthernet0/10" missing
+expect #1001 focused
+expect #1001 text ""
+# the next command pages again; Space to the end brings the prompt back
+type "show run\n"
+expect text:" --More-- " exists
+key space
+key space
+expect text:" --More-- " missing
+expect text:"end" exists
+expect #1001 exists
+# Esc quits too
+type "show run\n"
+expect text:" --More-- " exists
+key esc
+expect text:" --More-- " missing
+expect #1001 focused
+expect_nowarn

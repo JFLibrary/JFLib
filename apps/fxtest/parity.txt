@@ -1,0 +1,4 @@
+# parity of the Rust fxtest with the assembly version (tools/parity.py, build_rs.py test);
+# the kernels themselves: tools/blend_check.py, tmask_check.py, flood_check.py --out build --no-build
+matrix off                      # no UI: the shot / dump matrix does not apply
+stdout checks                   # the selftest summary line

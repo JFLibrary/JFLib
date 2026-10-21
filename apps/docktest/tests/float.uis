@@ -1,0 +1,63 @@
+#!args --verify-dirty
+# floating panels in tool windows and back (ui/dock.rs; windows 501 ..)
+theme light
+# dragged out of its group onto the document: a floating window, the tab under the pointer
+drag tab:"Eigenschaften" 460,200
+expect window 501 open
+expect text:"L: [Dateien]+Gliederung | R: - | U: [Ausgabe], [Suche] | F: [Eigenschaften] | V: Verlauf" exists
+expect window 501 rect 392 156 280 480
+window 501
+expect tab:"Eigenschaften" rect 5 29 128 32
+click button:"Eigenschaft"
+window main
+expect text:"Klick: Eigenschaft" exists
+shot build/dock/float.png desktop
+# the user moves the window: the layout keeps the place
+movewin 501 300 100
+click button:"Speichern"
+expect text:"float 0 300 100 280 480 1 0 13 13" exists
+# its tab dragged back onto the main window's right edge marker
+window any
+drag tab:"Eigenschaften" 930,312
+window main
+expect window 501 closed
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# a double click on a tab floats it, the pin button docks it where it came from
+dblclick tab:"Gliederung"
+expect window 501 open
+expect text:"L: [Dateien] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: [Gliederung] | V: Verlauf" exists
+window 501
+click button:"Andocken: Gliederung"
+window main
+expect window 501 closed
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# the menu floats too; two floating windows at once
+click button:"Weitere Optionen: Eigenschaften"
+click menuitem:"Lösen"
+dblclick tab:"Suche"
+expect window 501 open
+expect window 502 open
+expect text:"L: Dateien+[Gliederung] | R: - | U: [Ausgabe] | F: [Eigenschaften], [Suche] | V: Verlauf" exists
+# a floating tab dragged onto a group's marker in the main window becomes a tab there
+window any
+drag tab:"Suche" 613,492
+window main
+expect window 502 closed
+expect text:"L: Dateien+[Gliederung] | R: - | U: Ausgabe+[Suche] | F: [Eigenschaften] | V: Verlauf" exists
+# the window's close button hides its panels; showing it again floats it again
+close window 501
+expect window 501 closed
+expect text:"L: Dateien+[Gliederung] | R: - | U: Ausgabe+[Suche] | F: - | V: Verlauf+Eigenschaften" exists
+key ctrl+3
+expect window 501 open
+expect text:"L: Dateien+[Gliederung] | R: - | U: Ausgabe+[Suche] | F: [Eigenschaften] | V: Verlauf" exists
+window 501
+expect tab:"Eigenschaften" focused
+# a drag of the floating window's only tab elsewhere moves the window
+window any
+drag tab:"Eigenschaften" 600,150
+expect window 501 open
+window main
+expect text:"F: [Eigenschaften]" missing
+expect text:"L: Dateien+[Gliederung] | R: - | U: Ausgabe+[Suche] | F: [Eigenschaften] | V: Verlauf" exists
+expect_nowarn

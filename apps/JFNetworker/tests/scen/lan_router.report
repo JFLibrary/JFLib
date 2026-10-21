@@ -1,0 +1,124 @@
+# JFNetworker-Szenario lan_router.scn: „Router zwischen zwei Netzen“, 3 Geräte, 2 Verbindungen, Seed 2
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  R1      R1>enable
+   0.000000000  R1      R1#ping 10.0.2.10
+   0.000000000  R1      Ctrl+Shift+6 stops the ping.
+   0.000000000  R1      Pinging 10.0.2.10 with 5 echo requests of 100 bytes, 2 s timeout each:
+   0.000000000  --      run until idle
+   2.000009232  R1      .!!!!
+   2.000009232  R1      Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms
+   4.000006924  ok      expect R1 output contains ".!!!!"
+   4.000006924  ok      expect R1 output contains "Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms"
+   4.000006924  R1      R1#show ip interface brief
+   4.000006924  R1      Interface              IP-Address      OK? Method Status                Protocol
+   4.000006924  R1      GigabitEthernet0/0/0   10.0.1.1        YES NVRAM  up                    up
+   4.000006924  R1      GigabitEthernet0/0/1   10.0.2.1        YES NVRAM  up                    up
+   4.000006924  R1      GigabitEthernet0/0/2   unassigned      YES unset  administratively down down
+   4.000006924  R1      GigabitEthernet0/0/3   unassigned      YES unset  administratively down down
+   4.000006924  R1      TenGigabitEthernet0/1/0 unassigned      YES unset  administratively down down
+   4.000006924  R1      TenGigabitEthernet0/1/1 unassigned      YES unset  administratively down down
+   4.000006924  R1      Serial0/2/0            unassigned      YES unset  administratively down down
+   4.000006924  R1      Serial0/2/1            unassigned      YES unset  administratively down down
+   4.000006924  R1      R1#show ip route
+   4.000006924  R1      Codes: C - connected network, L - address of this device, S - static route,
+   4.000006924  R1             * - default route
+   4.000006924  R1      
+   4.000006924  R1      Gateway of last resort is not set
+   4.000006924  R1      
+   4.000006924  R1            10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+   4.000006924  R1      C        10.0.1.0/24 is directly connected, GigabitEthernet0/0/0
+   4.000006924  R1      L        10.0.1.1/32 is directly connected, GigabitEthernet0/0/0
+   4.000006924  R1      C        10.0.2.0/24 is directly connected, GigabitEthernet0/0/1
+   4.000006924  R1      L        10.0.2.1/32 is directly connected, GigabitEthernet0/0/1
+   4.000006924  ok      expect R1 route 10.0.1.0/24 via connected
+   4.000006924  ok      expect R1 route 10.0.2.1/32 dev Gi0/0/1
+   4.000006924  R1      R1#show arp
+   4.000006924  R1      Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+   4.000006924  R1      Internet  10.0.1.1                -   024a.0000.0201  ARPA   GigabitEthernet0/0/0
+   4.000006924  R1      Internet  10.0.2.1                -   024a.0000.0202  ARPA   GigabitEthernet0/0/1
+   4.000006924  R1      Internet  10.0.2.10               0   024a.0000.0301  ARPA   GigabitEthernet0/0/1
+   4.000006924  PC1     root@PC1:~# ping -c 3 10.0.2.10
+   4.000006924  PC1     PING 10.0.2.10 (10.0.2.10) 56(84) bytes of data.
+   4.000006924  --      run until idle
+   4.000012472  PC1     64 bytes from 10.0.2.10: icmp_seq=1 ttl=63 time=0.005 ms
+   5.000011028  PC1     64 bytes from 10.0.2.10: icmp_seq=2 ttl=63 time=0.004 ms
+   6.000011028  PC1     64 bytes from 10.0.2.10: icmp_seq=3 ttl=63 time=0.004 ms
+   6.000011028  PC1     
+   6.000011028  PC1     --- 10.0.2.10 ping statistics ---
+   6.000011028  PC1     3 packets transmitted, 3 received, 0% packet loss, time 2000ms
+   6.000011028  PC1     rtt min/avg/max/mdev = 0.004/0.004/0.005/0.000 ms
+  16.000006924  ok      expect PC1 output contains "3 packets transmitted, 3 received, 0% packet loss"
+  16.000006924  PC1     root@PC1:~# traceroute -n 10.0.2.10
+  16.000006924  PC1     traceroute to 10.0.2.10 (10.0.2.10), 30 hops max, 60 byte packets
+  16.000006924  --      run until idle
+  16.000011832  PC1      1  10.0.1.1  0.002 ms  0.002 ms  0.002 ms
+  16.000023184  PC1      2  10.0.2.10  0.004 ms  0.004 ms  0.004 ms
+  21.000019400  ok      expect PC1 output contains " 2  10.0.2.10"
+  21.000019400  PC1     root@PC1:~# ip route
+  21.000019400  PC1     default via 10.0.1.1 dev eth0
+  21.000019400  PC1     10.0.1.0/24 dev eth0 proto kernel scope link src 10.0.1.10
+  21.000019400  ok      expect PC1 output contains "default via 10.0.1.1 dev eth0"
+  21.000019400  R1      R1#debug ip icmp
+  21.000019400  R1      Debug output for ICMP: on
+  21.000019400  PC1     root@PC1:~# ping -c 1 10.0.1.1
+  21.000019400  PC1     PING 10.0.1.1 (10.0.1.1) 56(84) bytes of data.
+  21.000019400  --      run until idle
+  21.000020426  R1      *Mar  1 00:00:21.000: ICMP: sent echo reply 10.0.1.1 -> 10.0.1.10
+  21.000021452  PC1     64 bytes from 10.0.1.1: icmp_seq=1 ttl=255 time=0.002 ms
+  21.000021452  PC1     
+  21.000021452  PC1     --- 10.0.1.1 ping statistics ---
+  21.000021452  PC1     1 packets transmitted, 1 received, 0% packet loss, time 0ms
+  21.000021452  PC1     rtt min/avg/max/mdev = 0.002/0.002/0.002/0.000 ms
+  31.000019400  ok      expect R1 output contains "ICMP: sent echo reply 10.0.1.1 -> 10.0.1.10"
+  31.000019400  R1      R1#undebug all
+  31.000019400  R1      Debug output: all off
+  31.000019400  R1      R1#show running-config
+  31.000019400  R1      Collecting the configuration ...
+  31.000019400  R1      
+  31.000019400  R1      ! configuration in effect, 539 bytes
+  31.000019400  R1      !
+  31.000019400  R1      version 1.0
+  31.000019400  R1      !
+  31.000019400  R1      hostname R1
+  31.000019400  R1      !
+  31.000019400  R1      interface GigabitEthernet0/0/0
+  31.000019400  R1       ip address 10.0.1.1 255.255.255.0
+  31.000019400  R1      !
+  31.000019400  R1      interface GigabitEthernet0/0/1
+  31.000019400  R1       ip address 10.0.2.1 255.255.255.0
+  31.000019400  R1      !
+  31.000019400  R1      interface GigabitEthernet0/0/2
+  31.000019400  R1       no ip address
+  31.000019400  R1       shutdown
+  31.000019400  R1      !
+  31.000019400  R1      interface GigabitEthernet0/0/3
+  31.000019400  R1       no ip address
+  31.000019400  R1       shutdown
+  31.000019400  R1      !
+  31.000019400  R1      interface TenGigabitEthernet0/1/0
+  31.000019400  R1       no ip address
+  31.000019400  R1       shutdown
+  31.000019400  R1      !
+  31.000019400  R1      interface TenGigabitEthernet0/1/1
+  31.000019400  R1       no ip address
+  31.000019400  R1       shutdown
+  31.000019400  R1      !
+  31.000019400  R1      interface Serial0/2/0
+  31.000019400  R1       no ip address
+  31.000019400  R1       shutdown
+  31.000019400  R1      !
+  31.000019400  R1      interface Serial0/2/1
+  31.000019400  R1       no ip address
+  31.000019400  R1       shutdown
+  31.000019400  R1      !
+  31.000019400  R1      line con 0
+  31.000019400  R1      line vty 0 4
+  31.000019400  R1       login
+  31.000019400  R1      !
+  31.000019400  R1      end
+  31.000019400  ok      expect R1 output contains "interface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n!"
+  31.000019400  ok      expect hops icmp >= 20 (31)
+# 10 von 10 Erwartungen erfüllt

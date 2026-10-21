@@ -1,0 +1,37 @@
+#!args --verify-dirty
+# undo / redo in the code editor: typing merges until the caret moves, Backspace runs merge,
+# Enter, block indent, moved lines and comments are steps of their own; Ctrl+Y and
+# Ctrl+Shift+Z redo
+size 1000 680
+click tab:"Code"
+key ctrl+a
+key delete
+type "let a = 1;"
+key enter
+type "let b"
+expect #3000 text "let a = 1;\nlet b"
+key ctrl+z
+expect #3000 text "let a = 1;\n"
+key ctrl+z
+expect #3000 text "let a = 1;"
+key ctrl+y
+key ctrl+shift+z
+expect #3000 text "let a = 1;\nlet b"
+key backspace
+key backspace
+expect #3000 text "let a = 1;\nlet"
+key ctrl+z
+expect #3000 text "let a = 1;\nlet b"
+key ctrl+a
+key tab
+key alt+up
+expect #3000 text "    let a = 1;\n    let b"
+key ctrl+/
+expect #3000 text "    // let a = 1;\n    // let b"
+key ctrl+z
+key ctrl+z
+expect #3000 text "let a = 1;\nlet b"
+key ctrl+y
+key ctrl+y
+expect #3000 text "    // let a = 1;\n    // let b"
+expect_nowarn

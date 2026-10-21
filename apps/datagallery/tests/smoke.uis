@@ -1,0 +1,16 @@
+# the data views and shell parts: sort, select, wizard, nav, segmented, toast
+size 1440 960
+wait 50
+expect "Sicherungsjobs" exists
+click "Größe"
+wait 20
+click #1001
+expect #1001 exists
+click "Monitoring"
+click "Wöchentlich"
+click "Toast zeigen"
+wait 20
+expect "Job gestartet" exists
+click "Weiter"
+shot build/shots/datagallery_smoke.png
+expect_nowarn

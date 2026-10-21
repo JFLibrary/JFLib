@@ -1,0 +1,95 @@
+# shapes test: gallery, outline / fill drop-downs, drawing, move / resize before
+# the commit, commit paths (Enter, click outside, tool switch), curve, polygon,
+# Esc, undo / redo, 200 % zoom
+# (canvas: doc pixel 0,0 is at DIP 64,156 at 100 %)
+expect #1303 unchecked
+expect #1330 exists
+expect #1340 exists
+# ---- rectangle: red outline, blue fill
+click #1303
+expect #1303 checked
+click #1340
+expect #1340 open
+expect #1342 checked
+click #1343
+expect #1340 exists
+click #1213
+click #1201
+click #1217
+click #1200
+drag 150,220 330,330 8
+shot build/shapes_edit1.png
+# move it (drag inside), then resize with the bottom-right handle
+drag 240,275 300,305 6
+drag 391,361 451,421 6
+shot build/shapes_edit2.png
+key enter
+expect #10 enabled
+# ---- changing the kind of an edited shape: rectangle -> oval
+click #1303
+drag 520,200 660,300 6
+click #1302
+expect #1302 checked
+expect #1303 unchecked
+# a click outside commits it
+click 1000,650
+# ---- star, committed and undone
+click #1316
+drag 700,200 820,320 6
+key enter
+key ctrl+z
+# ---- hexagon without outline (fill only)
+click #1330
+click #1332
+click #1310
+drag 860,200 1000,300 6
+key enter
+click #1330
+click #1333
+# ---- Esc discards a shape
+click #1321
+drag 1020,200 1150,300 6
+key esc
+# ---- line: move an end point before the commit
+click #1300
+drag 120,480 300,560 6
+drag 300,560 330,620 6
+key enter
+# ---- curve: line, then two bends
+click #1301
+drag 380,600 600,600 6
+drag 450,560 440,500 4
+drag 540,640 560,700 4
+shot build/shapes_curve.png
+key enter
+# ---- polygon: first side, corners, double click
+click #1305
+drag 700,480 800,470 6
+wait 600
+click 860,560
+wait 600
+click 780,640
+wait 600
+dblclick 700,600
+shot build/shapes_poly.png
+key enter
+# ---- tool switch commits (heart without fill), then the pencil is active
+click #1340
+click #1342
+click #1321
+drag 950,480 1100,600 6
+click #1100
+expect #1100 checked
+expect #1321 unchecked
+shot build/shapes_100.png
+# ---- 200 %: a lightning bolt with its handles
+cmd 20
+cmd 20
+expect text:"200 %" exists
+click #1322
+drag 500,300 700,500 6
+shot build/shapes_200.png
+key enter
+key ctrl+z
+key ctrl+y
+shot build/shapes_200b.png

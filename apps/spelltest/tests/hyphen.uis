@@ -1,0 +1,27 @@
+#!args --hyphen --verify-dirty
+# hyphenation (ui/hyph.rs, spell::Hyphenator, text::segment::wrap_end_hyph) with
+# app://hyphen/hyph_de_TEST.dic, chosen by the UI language (headless: de-DE).  TX_HYPHENATE
+# breaks a word that does not fit at its last hyphenation point that fits and draws a hyphen
+# ("Donaudampfschifffahrts-", "Wör-"): 3 lines instead of 4 (without the flag the long word
+# is cut between letters); next_hyph_language("en") has no dictionary: as without the flag;
+# soft hyphens break with a hyphen without any flag; TB_HYPHENATE in a wrapped text box: the
+# visual lines end at the hyphenation points, the text keeps no hyphen (End goes there)
+expect text:"Muster: 9 + 17" exists
+expect text:"Mit: Die Donaudampfschifffahrtsgesellschaftskapitäne lesen Wörterbücher zur Rechtschreibung." value 3
+expect text:"Ohne: Die Donaudampfschifffahrtsgesellschaftskapitäne lesen Wörterbücher zur Rechtschreibung." value 4
+expect text:"Englisch: Die Donaudampfschifffahrtsgesellschaftskapitäne lesen Wörterbücher zur Rechtschreibung." value 4
+expect text:"Weich: Die Do­nau­dampf­schiff­fahrts­ge­sell­schafts­ka­pi­tä­ne lesen." value 2
+shot build/spell/hyphen.png 0 0 260 520
+# the text box: line 1 ends after "Donaudampfschifffahrts" (byte 26), line 3 after "Rechtschrei" (85)
+click #201
+key ctrl+home end
+expect #201 value 26
+key down end
+expect #201 value 85
+expect #201 text "Die Donaudampfschifffahrtsgesellschaftskapitäne lesen Wörterbücher zur Rechtschreibung."
+# typing re-wraps: with a word in front line 1 ends after "Donaudampfschiff" (24)
+key ctrl+home
+type "Wir "
+key ctrl+home end
+expect #201 value 24
+expect_nowarn

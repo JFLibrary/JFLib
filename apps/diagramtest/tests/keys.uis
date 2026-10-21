@@ -1,0 +1,64 @@
+#!args --verify-dirty
+# the keyboard (ui/diagram.rs): Tab / Shift+Tab walk the nodes and select them (Shift+Tab on
+# the first node leaves the canvas), arrows nudge the selection (a grid step, Shift x10,
+# Alt 1), Enter activates, Shift+F10 and the menu key ask for the context menu, Ctrl+A takes
+# everything, Esc clears, Del deletes; without a selection the arrows pan an eighth
+theme light
+click 60,700
+expect #100 focused
+key tab
+expect text:"Fokus: N1" exists
+expect listitem:"N1" selected
+expect listitem:"N1" focused
+expect text:"Auswahl: 1" exists
+key tab tab
+expect text:"Fokus: N3" exists
+key shift+tab
+expect text:"Fokus: N2" exists
+expect listitem:"N2" selected
+expect text:"Auswahl: 1" exists
+shot build/diagramtest/keys_focus.png
+# nudging N2 (world 208,48)
+key right
+expect text:"Position: 224,48" exists
+key shift+down
+expect text:"Position: 224,208" exists
+key alt+left
+expect text:"Position: 223,208" exists
+expect text:"Ereignis: Verschoben: 1" exists
+key enter
+expect text:"Ereignis: Aktiviert: N2" exists
+key esc
+expect text:"Auswahl: 0" exists
+key shift+f10
+expect text:"Ereignis: Kontext: N2" exists
+expect text:"Auswahl: 1" exists
+key ctrl+a
+expect text:"Auswahl: 51" exists
+key esc
+expect text:"Auswahl: 0" exists
+key apps
+expect text:"Ereignis: Kontext: N2" exists
+key esc
+# the arrows pan without a selection
+key down
+expect text:"Mitte: 496,382" exists
+key up
+expect text:"Mitte: 496,296" exists
+# Del
+key tab
+expect text:"Fokus: N3" exists
+key delete
+expect text:"Knoten: 29" exists
+expect text:"Kanten: 19" exists
+expect text:"Auswahl: 0" exists
+expect text:"Fokus: –" exists
+# after the first node Shift+Tab leaves the canvas, Tab comes back
+key tab
+expect text:"Fokus: N1" exists
+key shift+tab
+expect "Am Raster ausrichten" focused
+key tab
+expect #100 focused
+expect text:"Fokus: N1" exists
+expect_nowarn

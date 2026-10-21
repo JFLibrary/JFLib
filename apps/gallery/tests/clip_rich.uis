@@ -1,0 +1,24 @@
+# Multiple representations refer to the same clipboard selection.
+clip data text apps/gallery/fixtures/clip-rich.txt html apps/gallery/fixtures/clip-rich.html rtf apps/gallery/fixtures/clip-rich.rtf docx apps/gallery/fixtures/clip-rich.rtf
+clip expect text
+clip expect html
+clip expect rtf
+clip expect docx
+clip save build/clip-rich-export.txt text
+clip save build/clip-rich-export.html html
+clip save build/clip-rich-export.rtf rtf
+clip save build/clip-rich-export.docx docx
+clip text "plain"
+clip expect text-only
+clip data html apps/gallery/fixtures/clip-rich.html
+clip expect html
+clip clear
+clip expect none
+clip data rtf apps/gallery/fixtures/clip-rich.rtf
+clip expect rtf
+clip utf8 apps/gallery/fixtures/clip-rich.txt
+clip expect text-only
+clip data docx apps/gallery/fixtures/clip-rich.rtf
+clip expect docx
+clip clear
+clip expect none

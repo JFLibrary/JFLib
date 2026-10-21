@@ -1,0 +1,59 @@
+#!args --rtl
+# right-to-left (--rtl, rtl.rs): the window is mirrored as a whole; rectangles are physical
+# (mirrored: 900 - x - w), clicks by label and at points, keys and text input follow what
+# is on the screen
+size 900 700
+expect "Standard" rect 798 184 78 32
+expect #140 rect 676 430 200 32
+expect #700 rect 636 548 240 32
+# clicks by label and at a physical point (Option A sits at the right edge)
+expect "Option A" checked
+click "Option A"
+expect "Option A" unchecked
+click 860,329
+expect "Option A" checked
+click "Standard"
+click "Akzent"
+expect text:"Wert: 40 %   Klicks: 2" exists
+# the slider runs from the right: its middle, then Right moves the thumb to the right, to
+# the start of the range
+click #140
+expect #140 value 49
+key right right right
+expect #140 value 46
+key left
+expect #140 value 47
+# a text field keeps the text's order: Left / Right as the text reads, a click at the
+# right end of the box (behind the text, after the double-click time) puts the caret at
+# the end
+click #700
+type "abc"
+key left left
+type "X"
+expect #700 text "aXbc"
+key shift+right
+expect #700 value 3
+wait 600
+click 870,565
+type "Z"
+expect #700 text "aXbcZ"
+# menus open towards the left, submenus on the left of their menu
+click "Ansicht"
+expect menuitem:"Raster" rect 556 44 180 32
+move menuitem:"Zoom"
+expect menuitem:"Zoom" open
+expect menuitem:"Vergrößern" rect 345 117 207 32
+click 450,650
+expect menuitem:"Raster" missing
+# the menu bar by keyboard: Left goes to the next menu on the screen
+click "Standard"
+key f10
+expect "Datei" focused
+key left
+expect "Bearbeiten" focused
+key down
+expect "Bearbeiten" open
+expect menuitem:"Ausschneiden" focused
+key esc esc
+shot build/gal_rtl.png
+expect_nowarn

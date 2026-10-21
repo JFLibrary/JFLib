@@ -1,0 +1,5 @@
+#!args --test apply
+# updatetest --test apply: an installed copy of this program puts a downloaded update in place,
+# restarts into it and reports healthy; a version that fails its first start is rolled back at
+# the next one.  The whole test runs before the UI starts and ends the process with the number
+# of failures.

@@ -1,0 +1,172 @@
+# JFNetworker-Szenario router_on_a_stick.scn: „Router-on-a-stick“, 4 Geräte, 3 Verbindungen, Seed 3
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/24 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/24 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0.10 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0.10 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0.20 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0.20 is up
+   0.000000000  PC1     root@PC1:~# ping -c 3 10.0.20.10
+   0.000000000  PC1     PING 10.0.20.10 (10.0.20.10) 56(84) bytes of data.
+   0.000000000  --      run until idle
+   1.000008336  PC1     64 bytes from 10.0.20.10: icmp_seq=2 ttl=63 time=0.008 ms
+   2.000008336  PC1     64 bytes from 10.0.20.10: icmp_seq=3 ttl=63 time=0.008 ms
+  10.000000000  PC1     
+  10.000000000  PC1     --- 10.0.20.10 ping statistics ---
+  10.000000000  PC1     3 packets transmitted, 2 received, 33.3333% packet loss, time 2000ms
+  10.000000000  PC1     rtt min/avg/max/mdev = 0.008/0.008/0.008/0.000 ms
+  10.000000000  ok      expect PC1 output contains "3 packets transmitted, 2 received, 33.3333% packet loss"
+  10.000000000  SW1     SW1>enable
+  10.000000000  SW1     SW1#show vlan brief
+  10.000000000  SW1     
+  10.000000000  SW1     VLAN Name                             Status    Ports
+  10.000000000  SW1     ---- -------------------------------- --------- -------------------------------
+  10.000000000  SW1     1    default                          active    Gi1/0/3, Gi1/0/4, Gi1/0/5
+  10.000000000  SW1                                                     Gi1/0/6, Gi1/0/7, Gi1/0/8
+  10.000000000  SW1                                                     Gi1/0/9, Gi1/0/10, Gi1/0/11
+  10.000000000  SW1                                                     Gi1/0/12, Gi1/0/13, Gi1/0/14
+  10.000000000  SW1                                                     Gi1/0/15, Gi1/0/16, Gi1/0/17
+  10.000000000  SW1                                                     Gi1/0/18, Gi1/0/19, Gi1/0/20
+  10.000000000  SW1                                                     Gi1/0/21, Gi1/0/22, Gi1/0/23
+  10.000000000  SW1                                                     Te1/1/1, Te1/1/2, Te1/1/3
+  10.000000000  SW1                                                     Te1/1/4
+  10.000000000  SW1     10   Office                           active    Gi1/0/1
+  10.000000000  SW1     20   Lab                              active    Gi1/0/2
+  10.000000000  SW1     1002 fddi-default                     act/unsup 
+  10.000000000  SW1     1003 token-ring-default               act/unsup 
+  10.000000000  SW1     1004 fddinet-default                  act/unsup 
+  10.000000000  SW1     1005 trnet-default                    act/unsup 
+  10.000000000  ok      expect SW1 output contains "10   Office                           active    Gi1/0/1"
+  10.000000000  SW1     SW1#show interfaces trunk
+  10.000000000  SW1     
+  10.000000000  SW1     Port        Mode             Encapsulation  Status        Native vlan
+  10.000000000  SW1     Gi1/0/24    on               802.1q         trunking      1
+  10.000000000  SW1     
+  10.000000000  SW1     Port        Vlans allowed on trunk
+  10.000000000  SW1     Gi1/0/24    1,10,20
+  10.000000000  SW1     
+  10.000000000  SW1     Port        Vlans allowed and active in management domain
+  10.000000000  SW1     Gi1/0/24    1,10,20
+  10.000000000  SW1     
+  10.000000000  SW1     Port        Vlans in spanning tree forwarding state and not pruned
+  10.000000000  SW1     Gi1/0/24    1,10,20
+  10.000000000  ok      expect SW1 output contains "Gi1/0/24    on               802.1q         trunking      1"
+  10.000000000  R1      R1>enable
+  10.000000000  R1      R1#show ip interface brief
+  10.000000000  R1      Interface              IP-Address      OK? Method Status                Protocol
+  10.000000000  R1      GigabitEthernet0/0/0   unassigned      YES NVRAM  up                    up
+  10.000000000  R1      GigabitEthernet0/0/0.10 10.0.10.1       YES NVRAM  up                    up
+  10.000000000  R1      GigabitEthernet0/0/0.20 10.0.20.1       YES NVRAM  up                    up
+  10.000000000  R1      GigabitEthernet0/0/1   unassigned      YES unset  administratively down down
+  10.000000000  R1      GigabitEthernet0/0/2   unassigned      YES unset  administratively down down
+  10.000000000  R1      GigabitEthernet0/0/3   unassigned      YES unset  administratively down down
+  10.000000000  R1      TenGigabitEthernet0/1/0 unassigned      YES unset  administratively down down
+  10.000000000  R1      TenGigabitEthernet0/1/1 unassigned      YES unset  administratively down down
+  10.000000000  R1      Serial0/2/0            unassigned      YES unset  administratively down down
+  10.000000000  R1      Serial0/2/1            unassigned      YES unset  administratively down down
+  10.000000000  ok      expect R1 output contains "GigabitEthernet0/0/0.10 10.0.10.1       YES NVRAM  up                    up"
+  10.000000000  R1      R1#show ip route
+  10.000000000  R1      Codes: C - connected network, L - address of this device, S - static route,
+  10.000000000  R1             * - default route
+  10.000000000  R1      
+  10.000000000  R1      Gateway of last resort is not set
+  10.000000000  R1      
+  10.000000000  R1            10.0.0.0/8 is variably subnetted, 4 subnets, 2 masks
+  10.000000000  R1      C        10.0.10.0/24 is directly connected, GigabitEthernet0/0/0.10
+  10.000000000  R1      L        10.0.10.1/32 is directly connected, GigabitEthernet0/0/0.10
+  10.000000000  R1      C        10.0.20.0/24 is directly connected, GigabitEthernet0/0/0.20
+  10.000000000  R1      L        10.0.20.1/32 is directly connected, GigabitEthernet0/0/0.20
+  10.000000000  ok      expect R1 route 10.0.20.0/24 dev Gi0/0/0.20
+  10.000000000  R1      R1#configure terminal
+  10.000000000  R1      Configuration mode: one command per line; end or Ctrl+Z leaves it.
+  10.000000000  R1      R1(config)#interface gi0/0/0.30
+  10.000000000  R1      R1(config-subif)#ip address 10.0.30.1 255.255.255.0
+  10.000000000  R1      % Give the subinterface its VLAN first (encapsulation dot1Q)
+  10.000000000  ok      expect R1 output contains "% Give the subinterface its VLAN first"
+  10.000000000  R1      R1(config-subif)#encapsulation dot1Q 20
+  10.000000000  R1      % VLAN 20 is already in use on GigabitEthernet0/0/0.20.
+  10.000000000  ok      expect R1 output contains "% VLAN 20 is already in use on GigabitEthernet0/0/0.20."
+  10.000000000  R1      R1(config-subif)#encapsulation dot1Q 30
+  10.000000000  R1      *Mar  1 00:00:10.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0.30 is up
+  10.000000000  R1      *Mar  1 00:00:10.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0.30 is up
+  10.000000000  R1      R1(config-subif)#ip address 10.0.30.1 255.255.255.0
+  10.000000000  R1      R1(config-subif)#end
+  10.000000000  R1      *Mar  1 00:00:10.000: %SYS-5-CONFIG_I: configuration changed at the console
+  10.000000000  R1      R1#show ip interface brief
+  10.000000000  R1      Interface              IP-Address      OK? Method Status                Protocol
+  10.000000000  R1      GigabitEthernet0/0/0   unassigned      YES NVRAM  up                    up
+  10.000000000  R1      GigabitEthernet0/0/0.10 10.0.10.1       YES NVRAM  up                    up
+  10.000000000  R1      GigabitEthernet0/0/0.20 10.0.20.1       YES NVRAM  up                    up
+  10.000000000  R1      GigabitEthernet0/0/0.30 10.0.30.1       YES manual up                    up
+  10.000000000  R1      GigabitEthernet0/0/1   unassigned      YES unset  administratively down down
+  10.000000000  R1      GigabitEthernet0/0/2   unassigned      YES unset  administratively down down
+  10.000000000  R1      GigabitEthernet0/0/3   unassigned      YES unset  administratively down down
+  10.000000000  R1      TenGigabitEthernet0/1/0 unassigned      YES unset  administratively down down
+  10.000000000  R1      TenGigabitEthernet0/1/1 unassigned      YES unset  administratively down down
+  10.000000000  R1      Serial0/2/0            unassigned      YES unset  administratively down down
+  10.000000000  R1      Serial0/2/1            unassigned      YES unset  administratively down down
+  10.000000000  ok      expect R1 output contains "GigabitEthernet0/0/0.30 10.0.30.1       YES manual up                    up"
+  10.000000000  R1      R1#show running-config
+  10.000000000  R1      Collecting the configuration ...
+  10.000000000  R1      
+  10.000000000  R1      ! configuration in effect, 797 bytes
+  10.000000000  R1      !
+  10.000000000  R1      version 1.0
+  10.000000000  R1      !
+  10.000000000  R1      hostname R1
+  10.000000000  R1      !
+  10.000000000  R1      interface GigabitEthernet0/0/0
+  10.000000000  R1       no ip address
+  10.000000000  R1      !
+  10.000000000  R1      interface GigabitEthernet0/0/0.10
+  10.000000000  R1       encapsulation dot1Q 10
+  10.000000000  R1       ip address 10.0.10.1 255.255.255.0
+  10.000000000  R1      !
+  10.000000000  R1      interface GigabitEthernet0/0/0.20
+  10.000000000  R1       encapsulation dot1Q 20
+  10.000000000  R1       ip address 10.0.20.1 255.255.255.0
+  10.000000000  R1      !
+  10.000000000  R1      interface GigabitEthernet0/0/0.30
+  10.000000000  R1       encapsulation dot1Q 30
+  10.000000000  R1       ip address 10.0.30.1 255.255.255.0
+  10.000000000  R1      !
+  10.000000000  R1      interface GigabitEthernet0/0/1
+  10.000000000  R1       no ip address
+  10.000000000  R1       shutdown
+  10.000000000  R1      !
+  10.000000000  R1      interface GigabitEthernet0/0/2
+  10.000000000  R1       no ip address
+  10.000000000  R1       shutdown
+  10.000000000  R1      !
+  10.000000000  R1      interface GigabitEthernet0/0/3
+  10.000000000  R1       no ip address
+  10.000000000  R1       shutdown
+  10.000000000  R1      !
+  10.000000000  R1      interface TenGigabitEthernet0/1/0
+  10.000000000  R1       no ip address
+  10.000000000  R1       shutdown
+  10.000000000  R1      !
+  10.000000000  R1      interface TenGigabitEthernet0/1/1
+  10.000000000  R1       no ip address
+  10.000000000  R1       shutdown
+  10.000000000  R1      !
+  10.000000000  R1      interface Serial0/2/0
+  10.000000000  R1       no ip address
+  10.000000000  R1       shutdown
+  10.000000000  R1      !
+  10.000000000  R1      interface Serial0/2/1
+  10.000000000  R1       no ip address
+  10.000000000  R1       shutdown
+  10.000000000  R1      !
+  10.000000000  R1      line con 0
+  10.000000000  R1      line vty 0 4
+  10.000000000  R1       login
+  10.000000000  R1      !
+  10.000000000  R1      end
+  10.000000000  ok      expect R1 output contains "interface GigabitEthernet0/0/0.30\n encapsulation dot1Q 30\n ip address 10.0.30.1 255.255.255.0\n!"
+# 9 von 9 Erwartungen erfüllt

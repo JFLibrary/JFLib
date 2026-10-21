@@ -1,0 +1,455 @@
+# colors.uis -- the "Farben" window and the colour model (agent A3): window toggles (chrome
+# button, F8, close button), Mehr >> / << Weniger (the height follows the content), primary
+# and secondary colour (click on a square = edit that one, combo box), the colour wheel and
+# the value track, R G B / H S V / alpha tracks and number boxes consistent with each other,
+# hex entry, swap / reset icons, palette click (left = primary, right = secondary), tooltips,
+# "Farbe hinzufügen" (append; replace mode on a full palette, Esc ends it), palette files:
+# save to build/ and load again, malformed lines, the 96 colour limit, an empty file (error
+# dialog), the palette menu with the files of the palette folder, Bearbeiten > Palette.
+# Ids: window 24580 (WINID_COLORS); 4400 combo box, 4401 Mehr, 4402 / 4403 primary /
+# secondary square, 4404 swap, 4405 reset, 4406 wheel, 4407 value track; expanded: tracks /
+# number boxes 4410 / 4411 R, 4412 / 4413 G, 4414 / 4415 B, 4416 / 4417 H, 4418 / 4419 S,
+# 4420 / 4421 V, 4422 / 4423 A, 4424 hex; palette swatches 4700 + i, 4796 add, 4797 menu;
+# file dialog name box 114700.  Probes (diag.s A3): 9985 primary, 9986 secondary (text
+# AARRGGBB), 9987 value colours / text file name, 9988 value ignored lines / text error,
+# 9989 replace mode.  Test hooks: cmd 985 k palette folder (1 build/, 2 the fixtures),
+# 986 / 987 set primary / secondary, 988 n palette of n generated colours.
+# Keys X / reset are routed by tool.s (agent T1) to pal_swap / pal_reset.
+size 1280 800
+theme light
+
+# ------------------------------------------------------------ defaults, compact window
+expect window 24580 open
+expect window 24580 rect 92 410 272 320
+expect #703 checked
+expect #4400 text "Primärfarbe"
+expect #4400 value 0
+expect #4401 text "Mehr >>"
+expect #4406 exists
+expect #4407 exists
+expect #4410 missing
+expect #4424 missing
+expect #9985 text "FF000000"
+expect #9986 text "FFFFFFFF"
+expect #4402 text "FF000000"
+expect #4402 selected
+expect #4403 text "FFFFFFFF"
+expect #4404 exists
+expect #4405 exists
+# the default palette: 64 colours (paint.net's), 32 free slots
+expect #9987 value 64
+expect #4700 text "FF000000"
+expect #4701 text "FF404040"
+expect #4702 text "FFFF0000"
+expect #4703 text "FFFF6A00"
+expect #4716 text "FFFFFFFF"
+expect #4763 text "FF7F3F5B"
+expect #4764 text ""
+expect #4795 text ""
+expect #4796 exists
+expect #4797 exists
+
+# ------------------------------------------------------------ show / hide: F8, close button, chrome toggle
+key f8
+expect window 24580 closed
+expect #703 unchecked
+key f8
+expect window 24580 open
+expect #703 checked
+close window 24580
+expect window 24580 closed
+expect #703 unchecked
+click #703
+expect window 24580 open
+expect window 24580 rect 92 410 272 320
+
+# ------------------------------------------------------------ Mehr >> / << Weniger: width and height
+click #4401
+expect #4401 text "<< Weniger"
+expect window 24580 rect 92 358 496 372
+expect #4410 exists
+expect #4411 value 0
+expect #4413 value 0
+expect #4415 value 0
+expect #4421 value 0
+expect #4423 value 255
+expect #4424 text "000000"
+click #4401
+expect #4401 text "Mehr >>"
+expect window 24580 rect 92 410 272 320
+expect #4410 missing
+click #4401
+expect window 24580 rect 92 358 496 372
+
+# ------------------------------------------------------------ palette: left click = primary, right click = secondary
+click #4702
+expect #9985 text "FFFF0000"
+expect #9986 text "FFFFFFFF"
+expect #4411 value 255
+expect #4413 value 0
+expect #4415 value 0
+expect #4424 text "FF0000"
+expect #4417 value 0
+expect #4419 value 100
+expect #4421 value 100
+expect #4406 value 0
+expect #4406 max 1000
+expect #4407 value 1000
+rclick #4703
+expect #9986 text "FFFF6A00"
+expect #9985 text "FFFF0000"
+# tooltip with the colour
+move #4704
+wait 700
+expect text:"#FFD800" exists
+move #4705
+wait 700
+expect text:"#B6FF00" exists
+expect text:"#FFD800" missing
+
+# ------------------------------------------------------------ RGB number boxes -> hex, HSV
+click #4413
+key ctrl+a
+type "128\n"
+expect #4424 text "FF8000"
+expect #9985 text "FFFF8000"
+expect #4412 value 128
+expect #4417 value 30
+expect #4419 value 100
+expect #4421 value 100
+
+# ------------------------------------------------------------ HSV number boxes -> RGB
+click #4417
+key ctrl+a
+type "120\n"
+expect #4424 text "00FF00"
+expect #4411 value 0
+expect #4413 value 255
+expect #4415 value 0
+expect #4406 value 1200
+click #4419
+key ctrl+a
+type "50\n"
+expect #4424 text "80FF80"
+expect #4406 max 500
+click #4421
+key ctrl+a
+type "50\n"
+expect #4424 text "408040"
+expect #4411 value 64
+expect #4413 value 128
+expect #4415 value 64
+expect #4407 value 500
+# S 0 (grey) and back: the hue stays
+click #4419
+key ctrl+a
+type "0\n"
+expect #4424 text "808080"
+expect #4417 value 120
+click #4419
+key ctrl+a
+type "100\n"
+expect #4424 text "008000"
+expect #4417 value 120
+
+# ------------------------------------------------------------ a focused number box does not bring back its old text
+# (R typed + Enter, the colour changes on the palette, the focus moves on)
+click #4411
+key ctrl+a
+type "7\n"
+expect #4424 text "078000"
+click #4702
+expect #4424 text "FF0000"
+click #4413
+expect #4411 value 255
+expect #9985 text "FFFF0000"
+key esc
+click #4417
+key ctrl+a
+type "120\n"
+click #4419
+key ctrl+a
+type "100\n"
+click #4421
+key ctrl+a
+type "50\n"
+expect #4424 text "008000"
+
+# ------------------------------------------------------------ alpha
+click #4423
+key ctrl+a
+type "128\n"
+expect #9985 text "80008000"
+expect #4422 value 128
+expect #4424 text "008000"
+
+# ------------------------------------------------------------ hex: 6 digits keep the alpha, 8 set it, junk is refused
+click #4424
+key ctrl+a
+type "#4080C0\n"
+expect #9985 text "804080C0"
+expect #4411 value 64
+expect #4413 value 128
+expect #4415 value 192
+expect #4417 value 210
+expect #4419 value 67
+expect #4421 value 75
+click #4424
+key ctrl+a
+type "FF102030\n"
+expect #9985 text "FF102030"
+expect #4423 value 255
+expect #4424 text "102030"
+click #4424
+key ctrl+a
+type "zz\n"
+expect #4424 text "102030"
+expect #9985 text "FF102030"
+
+# ------------------------------------------------------------ tracks: drag to the ends
+window 24580
+drag #4410 300,77
+expect #4411 value 0
+drag #4410 430,77
+expect #4411 value 255
+drag #4422 300,377
+expect #4423 value 0
+window any
+expect #9985 text "00FF2030"
+window 24580
+drag #4422 430,377
+expect #4423 value 255
+# H 360 = red at the same S (87 %) and V
+drag #4416 430,245
+expect #4417 value 360
+expect #4424 text "FF2121"
+
+# ------------------------------------------------------------ colour wheel and value track (compact controls)
+# right edge = red (hue 0), full saturation; top = hue 90; centre = grey (hue kept)
+drag #4406 237,157
+expect #4406 value 0
+expect #4406 max 1000
+expect #4417 value 0
+expect #4419 value 100
+drag #4406 157,77
+expect #4417 value 90
+expect #4419 value 100
+click #4406
+expect #4419 value 0
+expect #4417 value 90
+# value track: bottom = black, top = full value; hue and saturation stay
+drag #4406 157,77
+drag #4407 253,237
+expect #4421 value 0
+expect #4424 text "000000"
+expect #4417 value 90
+expect #4419 value 100
+drag #4407 253,77
+expect #4421 value 100
+expect #4424 text "80FF00"
+window any
+# picking on the wheel while the colour is black gives the colour at full value
+cmd 986 4278190080
+expect #4424 text "000000"
+window 24580
+drag #4406 237,157
+expect #4424 text "FF0000"
+window any
+
+# ------------------------------------------------------------ secondary colour
+click #4403
+expect #4400 value 1
+expect #4400 text "Sekundärfarbe"
+expect #4403 selected
+expect #4424 text "FF6A00"
+expect #4411 value 255
+expect #4413 value 106
+click #4411
+key ctrl+a
+type "0\n"
+expect #9986 text "FF006A00"
+expect #9985 text "FFFF0000"
+# the primary square switches back
+click #4402
+expect #4400 value 0
+expect #4402 selected
+expect #4424 text "FF0000"
+
+# ------------------------------------------------------------ swap and reset (icons of the window)
+click #4404
+expect #9985 text "FF006A00"
+expect #9986 text "FFFF0000"
+expect #4424 text "006A00"
+click #4404
+expect #9985 text "FFFF0000"
+click #4405
+expect #9985 text "FF000000"
+expect #9986 text "FFFFFFFF"
+expect #4424 text "000000"
+# colours set from outside (tools) show up in the window
+cmd 986 4282417407
+expect #4424 text "4080FF"
+expect #4402 text "FF4080FF"
+
+# ------------------------------------------------------------ Farbe hinzufügen: appends the primary colour
+click #4796
+expect #9987 value 65
+expect #4764 text "FF4080FF"
+expect #9989 value 0
+
+# ------------------------------------------------------------ save to build/ and load again
+cmd 985 1
+cmd 201
+expect dialog:"Speichern unter" exists
+expect #114700 text "Palette.txt"
+click #114700
+key ctrl+a
+type "a3_colors_test.txt"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+expect #9987 text "a3_colors_test.txt"
+expect #9988 text ""
+# default palette again: 64 colours
+cmd 202
+expect #9987 value 64
+expect #4764 text ""
+# Öffnen starts with the last palette file
+cmd 204
+expect dialog:"Öffnen" exists
+expect #114700 text "a3_colors_test.txt"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect #9987 value 65
+expect #9988 value 0
+expect #4764 text "FF4080FF"
+expect #4702 text "FFFF0000"
+
+# ------------------------------------------------------------ fixtures: comments, 6 / 8 digits, malformed lines
+cmd 985 2
+cmd 200
+expect dialog:"Öffnen" exists
+click #114700
+key ctrl+a
+type "a3_mixed.txt"
+click button:"Öffnen"
+expect #9987 value 7
+expect #9988 value 6
+expect #4700 text "FFFF0000"
+expect #4701 text "FF00FF00"
+expect #4702 text "FF0000FF"
+expect #4703 text "80FFFF00"
+expect #4704 text "00FF00FF"
+expect #4705 text "FF123456"
+expect #4706 text "FFABCDEF"
+expect #4707 text ""
+# a transparent palette colour keeps its alpha
+click #4703
+expect #9985 text "80FFFF00"
+expect #4423 value 128
+
+# ------------------------------------------------------------ 96 colour limit
+cmd 200
+click #114700
+key ctrl+a
+type "a3_big.txt"
+click button:"Öffnen"
+expect #9987 value 96
+expect #9988 value 4
+expect #4700 text "FF000000"
+expect #4795 text "FF00005F"
+# full: Farbe hinzufügen switches to the replace mode, a click replaces that swatch
+cmd 986 4294967040
+click #4796
+expect #9989 value 1
+expect #9987 value 96
+click #4710
+expect #4710 text "FFFFFF00"
+expect #9989 value 0
+expect #9985 text "FFFFFF00"
+# a right click in the replace mode takes the secondary colour; Esc and a second click end it
+click #4796
+rclick #4711
+expect #4711 text "FFFFFFFF"
+click #4796
+expect #9989 value 1
+key esc
+expect #9989 value 0
+click #4796
+click #4796
+expect #9989 value 0
+# a palette with free slots: the replace mode puts a colour into an empty slot at the end
+cmd 988 10
+expect #9987 value 10
+expect #4709 text "FF09121B"
+click #4796
+expect #9987 value 11
+expect #4710 text "FFFFFF00"
+
+# ------------------------------------------------------------ an empty palette file: error, palette unchanged
+cmd 200
+click #114700
+key ctrl+a
+type "a3_empty.txt"
+click button:"Öffnen"
+expect dialog:"Palette" exists
+expect text:"Die Datei ist nicht lesbar oder enthält keine Farbe." exists
+expect #9988 text "Die Palette ließ sich nicht laden."
+expect #9987 value 11
+click button:"OK"
+expect dialog:"Palette" missing
+
+# ------------------------------------------------------------ palette menu: commands and the files of the palette folder
+click #4797
+expect menuitem:"Ordner mit Paletten öffnen…" exists
+expect menuitem:"Palette öffnen…" exists
+expect menuitem:"Palette speichern als…" exists
+expect menuitem:"Standardpalette laden" exists
+expect menuitem:"a3_big" exists
+expect menuitem:"a3_empty" exists
+expect menuitem:"a3_mixed" exists
+# (U3) the menu may leave the Colors window: every palette file, no "Weitere Paletten…"
+expect menuitem:"a3_two" exists
+expect menuitem:"Weitere Paletten…" missing
+shot build/a3/colors_menu.png window 24580
+click menuitem:"a3_mixed"
+expect #9987 value 7
+click #4797
+click menuitem:"Standardpalette laden"
+expect #9987 value 64
+click #4797
+click menuitem:"Ordner mit Paletten öffnen…"
+expect dialog:"Öffnen" exists
+click #114700
+key ctrl+a
+type "a3_two.txt"
+click button:"Öffnen"
+expect #9987 value 2
+expect #4701 text "FF445566"
+
+# ------------------------------------------------------------ Bearbeiten > Palette
+click menu:"Bearbeiten"
+move menuitem:"Palette"
+expect menuitem:"Ordner mit Paletten öffnen…" enabled
+expect menuitem:"Palette öffnen…" enabled
+expect menuitem:"Palette speichern als…" enabled
+expect menuitem:"Standardpalette laden" enabled
+click menuitem:"Standardpalette laden"
+expect #9987 value 64
+cmd 985 0
+
+# ------------------------------------------------------------ screenshots: light / dark, 100 % / 150 %, both modes
+cmd 986 4282417407
+cmd 987 2164195328
+shot build/a3/colors_more_light_100.png window 24580
+click #4401
+shot build/a3/colors_less_light_100.png window 24580
+theme dark
+shot build/a3/colors_less_dark_100.png window 24580
+click #4401
+shot build/a3/colors_more_dark_100.png window 24580
+scale 150 window 24580
+shot build/a3/colors_more_dark_150.png window 24580
+theme light
+shot build/a3/colors_more_light_150.png window 24580
+scale 100 window 24580
+shot build/a3/colors_desktop.png desktop

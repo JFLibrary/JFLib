@@ -1,0 +1,79 @@
+#!args --setup
+# the setup assistant (no service is installed: the script stops before "Einrichten"): the
+# roles, the questions of a backup server here with their checks, the agent's questions, and
+# "existing server" leads to the sign-in page
+size 1440 900
+wait 50
+expect "Willkommen bei BackupCraft" exists
+shot build/shots/bc/test_setup_role.png
+click "Backup-Server auf diesem Computer"
+wait 10
+click "Weiter"
+wait 20
+expect "Speicherort und Netzwerk" exists
+click "Im Netzwerk (für Agenten und andere Konsolen, verschlüsselt)"
+wait 20
+expect "Namen und Adressen für das Zertifikat (durch Komma getrennt)" exists
+click "Weiter"
+wait 20
+expect "Erster Administrator" exists
+expect "Weiter" disabled
+focus #0xE0101F
+type "kurz"
+wait 10
+expect "Das Passwort braucht mindestens 12 Zeichen." exists
+key ctrl+a
+type "ein langes Passwort"
+focus #0xE01020
+type "ein langes Passwort"
+wait 20
+expect "Weiter" enabled
+shot build/shots/bc/test_setup_admin.png
+click "Weiter"
+wait 20
+expect "Wohin sollen die Sicherungen?" exists
+click "Weiter"
+wait 20
+expect "Einrichten" enabled
+shot build/shots/bc/test_setup_summary.png
+click "Zurück"
+wait 10
+click "Zurück"
+wait 10
+click "Zurück"
+wait 10
+click "Zurück"
+wait 10
+click "Diesen Computer sichern lassen (Agent)"
+wait 10
+click "Weiter"
+wait 20
+expect "Mit welchem Server koppeln?" exists
+expect "Weiter" disabled
+focus #0xE01046
+type "https://backup.corp.local:7642"
+focus #0xE01047
+type "ABCD-EFGH"
+focus #0xE01048
+type "AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89:AB:CD:EF:01:23:45:67:89"
+wait 20
+expect "Weiter" enabled
+click "Weiter"
+wait 20
+expect "Welche Ordner darf der Server sichern?" exists
+click "Weiter"
+wait 20
+expect "Koppeln" enabled
+shot build/shots/bc/test_setup_agent.png
+click "Zurück"
+wait 10
+click "Zurück"
+wait 10
+click "Zurück"
+wait 10
+click "Mit einem vorhandenen Server verbinden"
+wait 10
+click "Weiter"
+wait 20
+expect "Anmelden" exists
+expect_nowarn

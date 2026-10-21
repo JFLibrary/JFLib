@@ -1,0 +1,31 @@
+# headless runs never ask: without `perm answer dialog` an ask line refuses (UI thread and
+# workers alike, no question, no wait); a script answers deterministically instead
+click "Datei schreiben"
+expect text:"Datei: abgelehnt" exists
+perm expect none
+perm expect fs.write $TEMP/permprompt-ask/** unanswered
+click "Im Hintergrund schreiben"
+sync
+expect text:"Hintergrund: abgelehnt" exists
+perm expect none
+# fixed answers
+perm answer once
+click "Datei schreiben"
+expect text:"Datei: geschrieben" exists
+perm expect fs.write $TEMP/permprompt-ask/** once
+perm answer never
+click "Mail prüfen"
+expect text:"Mail: abgelehnt" exists
+perm expect url mailto never
+perm answer always
+click "Mail prüfen"
+expect text:"Mail: abgelehnt" exists
+click "Zurücksetzen: url mailto"
+click "Mail prüfen"
+expect text:"Mail: erlaubt" exists
+perm expect url mailto always
+perm answer none
+click "Drucken prüfen"
+expect text:"Drucken: abgelehnt" exists
+perm expect print unanswered
+expect_nowarn

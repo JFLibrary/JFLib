@@ -1,0 +1,45 @@
+#!args --verify-dirty
+# drops of other programs (ui/drop.rs, ui/dnd.rs): a drag hovering over the window (E_DRAG)
+# highlights the target that takes its kind; text, HTML, URLs, an image and files land on their
+# targets (DS_DROP); outside every target the window takes files and text as UIC_DROP (the
+# K1 behaviour: drop_list, drop_pos); the old `drop X Y FILE...` still works
+theme light
+# hover: the text target takes text, the HTML target does not
+dragover 82 229 text
+expect text:"Ziehen: Text bei 82,229  Über: Text-Ziel" exists
+shot build/dnd/drops_hover.png 0 170 300 120
+dragover 220 229 text
+expect text:"Ziehen: Text bei 220,229  Über: -" exists
+dragover 220 229 text html
+expect text:"Ziehen: Text+HTML bei 220,229  Über: HTML-Ziel" exists
+dragleave
+expect text:"Ziehen: -  Über: -" exists
+# the kinds onto their targets
+drop 82 229 text "Hallo Welt"
+expect text:"Text: Hallo Welt" exists
+expect text:"Abgelegt: Text -> Text-Ziel (kopieren)" exists
+expect text:"Ziehen: -  Über: -" exists
+drop 220 229 html "<b>fett</b>" text "fett"
+expect text:"HTML: <b>fett</b>" exists
+expect text:"Abgelegt: Text+HTML -> HTML-Ziel (kopieren)" exists
+drop 360 229 url https://example.org/a url https://example.org/b
+expect text:"URL: https://example.org/a https://example.org/b" exists
+drop 500 229 image apps/Kritzel/tests/fixtures/small.png
+expect text:"Bild: PNG 64x48" exists
+# (asked to move: files are copied, else their source would delete them)
+drop 640 229 files build/dnd/a.txt build/dnd/b.txt move
+expect text:"Dateien: 2 Datei(en): a.txt" exists
+expect text:"Abgelegt: Dateien -> Dateien-Ziel (kopieren)" exists
+# text onto basket A (fruits and text)
+drop 356 114 text "Pflaume"
+expect text:"Abgelegt: Text \"Pflaume\" -> Korb A" exists
+# outside the targets: UIC_DROP with the paths and the position (as before)
+drop 600 480 build/dnd/c.txt
+expect text:"UIC_DROP: 1 Datei(en) bei 600,480 (Fenster 0)" exists
+drop 600 470 text "lose"
+expect text:"UIC_DROP: Text \"lose\" bei 600,470 (Fenster 0)" exists
+# a target that does not take the kind: the window takes it
+drop 82 229 build/dnd/d.txt build/dnd/e.txt
+expect text:"UIC_DROP: 2 Datei(en) bei 82,229 (Fenster 0)" exists
+expect text:"Text: Hallo Welt" exists
+expect_nowarn

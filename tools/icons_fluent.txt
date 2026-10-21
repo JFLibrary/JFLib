@@ -1,0 +1,194 @@
+# icons_fluent.txt -- glyph source of every icon in tools/icons.txt: Fluent UI System Icons
+# (https://github.com/microsoft/fluentui-system-icons, MIT licence, see
+# styles/winui/assets/LICENSE-FluentSystemIcons.txt; fonts/FluentSystemIcons-{Regular,Filled}.ttf
+# and their .json name maps, commit 83b26348c811f072429427ff48362238656524fe).
+# Format: "Name glyph" per line, '#' starts a comment.  ttf2bin stores the glyph at the icon's
+# codepoint from icons.txt, so the IC_* constants (the former Segoe Fluent Icons codepoints) keep
+# their values.  Size: the 16 px design where Fluent has one (1 px strokes at 16 px, the size the
+# styles draw most icons at), else the 20 px design; regular unless the icon is a filled shape.
+# Comments note where the Fluent shape differs from the former Segoe glyph.
+# Regenerate styles/winui/assets/icons.bin (FLUENT = fonts/ directory of the repository above):
+#   python tools/ttf2bin.py --font FLUENT/FluentSystemIcons-Regular.ttf
+#       --font FLUENT/FluentSystemIcons-Filled.ttf --icons tools/icons.txt
+#       --remap tools/icons_fluent.txt --out styles/winui/assets/icons.bin
+
+# --- DESIGN.md §3.3 base set ----------------------------------------------------------------------
+Menu                ic_fluent_navigation_16_regular
+Add                 ic_fluent_add_16_regular
+Cancel              ic_fluent_dismiss_16_regular
+More                ic_fluent_more_horizontal_16_regular
+Settings            ic_fluent_settings_16_regular
+ChevDown            ic_fluent_chevron_down_16_regular
+ChevUp              ic_fluent_chevron_up_16_regular
+ChevLeft            ic_fluent_chevron_left_16_regular
+ChevRight           ic_fluent_chevron_right_16_regular
+Forward             ic_fluent_arrow_right_16_regular
+Back                ic_fluent_arrow_left_16_regular
+Up                  ic_fluent_arrow_up_16_regular
+Down                ic_fluent_arrow_down_16_regular
+Edit                ic_fluent_edit_16_regular
+Search              ic_fluent_search_16_regular
+Refresh             ic_fluent_arrow_clockwise_16_regular
+Share               ic_fluent_share_16_regular
+Lock                ic_fluent_lock_closed_16_regular
+Unlock              ic_fluent_lock_open_16_regular
+Remove              ic_fluent_subtract_16_regular
+Star                ic_fluent_star_16_regular
+StarFill            ic_fluent_star_16_filled
+Checkbox            ic_fluent_checkbox_unchecked_16_regular
+CheckboxComposite   ic_fluent_checkbox_checked_16_regular
+CheckboxFill        ic_fluent_square_16_filled                    # filled box
+CheckboxIndet       ic_fluent_checkbox_indeterminate_16_regular   # Segoe: dash only
+CheckMark           ic_fluent_checkmark_16_regular
+FullScreen          ic_fluent_arrow_maximize_16_regular
+BackToWindow        ic_fluent_arrow_minimize_16_regular
+Delete              ic_fluent_delete_16_regular
+Save                ic_fluent_save_16_regular
+Play                ic_fluent_play_16_regular
+Pause               ic_fluent_pause_16_regular
+Stop                ic_fluent_stop_16_regular
+Undo                ic_fluent_arrow_undo_16_regular
+Redo                ic_fluent_arrow_redo_16_regular
+Warning             ic_fluent_warning_16_regular
+Error               ic_fluent_error_circle_16_regular
+Info                ic_fluent_info_16_regular
+Help                ic_fluent_question_16_regular                 # plain question mark
+ChromeClose         ic_fluent_dismiss_16_regular                  # Fluent has no thin caption set
+ChromeMin           ic_fluent_subtract_16_regular
+ChromeMax           ic_fluent_maximize_16_regular
+ChromeRestore       ic_fluent_square_multiple_16_regular
+Copy                ic_fluent_copy_16_regular
+Cut                 ic_fluent_cut_16_regular
+Paste               ic_fluent_clipboard_paste_16_regular
+OpenFile            ic_fluent_document_arrow_up_16_regular        # page with circled arrow
+Document            ic_fluent_document_16_regular
+Folder              ic_fluent_folder_16_regular
+FolderOpen          ic_fluent_folder_open_16_regular
+NewFolder           ic_fluent_folder_add_16_regular
+Download            ic_fluent_arrow_download_16_regular
+Upload              ic_fluent_arrow_upload_16_regular
+Font                ic_fluent_text_font_16_regular
+Bold                ic_fluent_text_bold_16_regular
+Italic              ic_fluent_text_italic_16_regular
+Underline           ic_fluent_text_underline_16_regular
+AlignLeft           ic_fluent_text_align_left_16_regular
+AlignCenter         ic_fluent_text_align_center_16_regular
+AlignRight          ic_fluent_text_align_right_16_regular
+FontSize            ic_fluent_text_font_size_16_regular
+FontIncrease        ic_fluent_font_increase_20_regular
+FontDecrease        ic_fluent_font_decrease_20_regular
+Color               ic_fluent_color_16_regular
+Brush               ic_fluent_paint_brush_16_regular
+ZoomIn              ic_fluent_zoom_in_16_regular
+ZoomOut             ic_fluent_zoom_out_16_regular
+SelectAll           ic_fluent_select_all_on_16_regular            # Segoe: dashed grid
+Sort                ic_fluent_arrow_sort_16_regular
+Crop                ic_fluent_crop_16_regular
+Rotate              ic_fluent_arrow_rotate_clockwise_16_regular   # circular arrow around a dot
+Eraser              ic_fluent_eraser_20_regular
+InkingTool          ic_fluent_inking_tool_16_regular
+Highlight           ic_fluent_highlight_16_regular
+Photo               ic_fluent_image_16_regular
+Pointer             ic_fluent_cursor_16_regular
+Home                ic_fluent_home_16_regular
+History             ic_fluent_history_16_regular
+Recent              ic_fluent_clock_16_regular
+Calendar            ic_fluent_calendar_ltr_16_regular
+Calculator          ic_fluent_calculator_16_regular
+Clear               ic_fluent_dismiss_16_regular
+Accept              ic_fluent_checkmark_16_regular
+Unknown             ic_fluent_question_circle_16_regular
+Filter              ic_fluent_filter_16_regular
+BulletedList        ic_fluent_text_bullet_list_ltr_16_regular
+Repair              ic_fluent_wrench_16_regular
+View                ic_fluent_eye_16_regular
+Power               ic_fluent_power_20_regular
+Globe               ic_fluent_globe_16_regular
+OpenInNewWindow     ic_fluent_open_16_regular
+Heart               ic_fluent_heart_16_regular
+HeartFill           ic_fluent_heart_16_filled
+Record              ic_fluent_record_16_regular
+Switch              ic_fluent_arrow_swap_16_regular
+ViewAll             ic_fluent_grid_16_regular
+CircleRing          ic_fluent_circle_16_regular
+CircleFill          ic_fluent_circle_16_filled
+Shuffle             ic_fluent_arrow_shuffle_16_regular
+Eyedropper          ic_fluent_eyedropper_16_regular
+CalligraphyPen      ic_fluent_calligraphy_pen_20_regular
+
+# --- additions: Kritzel ----------------------------------------------------------------------------
+Zoom                ic_fluent_search_16_regular                   # = Search
+Pencil              ic_fluent_edit_16_regular                     # = Edit
+Crayon              ic_fluent_pen_16_regular                      # Segoe: crayon tip
+Drop                ic_fluent_drop_16_filled
+TextBox             ic_fluent_textbox_16_regular                  # Segoe: A in a dashed box
+FontColor           ic_fluent_text_color_16_regular
+Strikethrough       ic_fluent_text_strikethrough_16_regular
+SelectRect          ic_fluent_square_hint_16_regular
+Lasso               ic_fluent_lasso_20_regular
+Shapes              ic_fluent_shapes_16_regular
+Diamond             ic_fluent_diamond_16_regular
+Curve               ic_fluent_bezier_curve_square_20_regular      # Segoe: S-shaped stroke
+Line                ic_fluent_line_20_regular
+RotateCw            ic_fluent_arrow_clockwise_16_regular
+RotateCcw           ic_fluent_arrow_counterclockwise_16_regular
+Resize              ic_fluent_resize_large_16_regular
+SizeGrip            ic_fluent_caret_down_right_16_regular         # triangle, bottom right
+Layers              ic_fluent_layer_20_regular
+FitPage             ic_fluent_scale_fit_16_regular                # Segoe: frame with corners
+Grid                ic_fluent_table_16_regular                    # 3x3 table grid
+Image               ic_fluent_image_16_regular
+Pictures            ic_fluent_image_multiple_16_regular
+Page                ic_fluent_document_16_regular                 # = Document
+SaveAs              ic_fluent_save_edit_20_regular
+Move                ic_fluent_arrow_move_20_regular
+Contrast            ic_fluent_dark_theme_20_regular               # half-filled circle
+Brightness          ic_fluent_brightness_high_16_regular
+Sliders             ic_fluent_options_16_regular
+Hide                ic_fluent_eye_off_16_regular
+Print               ic_fluent_print_16_regular
+
+# --- additions: general widgets -------------------------------------------------------------------
+RadioOff            ic_fluent_radio_button_16_regular
+RadioOn             ic_fluent_radio_button_16_filled
+RadioDot            ic_fluent_circle_12_filled                    # larger than the Segoe dot
+CheckboxCheckedFill ic_fluent_checkbox_checked_16_filled
+CaretLeft           ic_fluent_caret_left_16_filled
+CaretRight          ic_fluent_caret_right_16_filled
+CaretUp             ic_fluent_caret_up_16_filled
+CaretDown           ic_fluent_caret_down_16_filled
+ChevUpSmall         ic_fluent_chevron_up_16_filled
+ChevDownSmall       ic_fluent_chevron_down_16_filled
+ChevLeftSmall       ic_fluent_chevron_left_16_filled
+ChevRightSmall      ic_fluent_chevron_right_16_filled
+ChevUpDown          ic_fluent_chevron_up_down_16_regular
+ToggleOff           ic_fluent_toggle_left_16_regular
+ToggleOn            ic_fluent_toggle_right_16_regular
+CancelCircle        ic_fluent_dismiss_circle_16_regular
+ErrorFill           ic_fluent_dismiss_circle_16_filled
+CheckCircleFill     ic_fluent_checkmark_circle_16_filled
+AddCircle           ic_fluent_add_circle_16_regular
+RemoveCircle        ic_fluent_subtract_circle_16_regular
+Link                ic_fluent_link_16_regular
+Mail                ic_fluent_mail_16_regular
+Pin                 ic_fluent_pin_16_regular
+Volume              ic_fluent_speaker_2_16_regular
+Person              ic_fluent_person_16_regular
+Lightbulb           ic_fluent_lightbulb_16_regular
+Flag                ic_fluent_flag_16_regular
+Bell                ic_fluent_alert_16_regular
+Backspace           ic_fluent_backspace_16_regular
+Return              ic_fluent_arrow_enter_left_20_regular
+
+# --- PaintCraft (agent A0): chrome and tool placeholders ------------------------------------------
+ClearSelection      ic_fluent_select_all_off_16_regular           # Segoe: dashed rect. with arrow
+Scan                ic_fluent_scan_camera_16_regular              # Segoe: flatbed scanner
+Ruler               ic_fluent_ruler_16_regular
+DevTools            ic_fluent_wrench_screwdriver_20_regular
+SaveCopy            ic_fluent_save_copy_20_regular
+MagicSelect         ic_fluent_wand_16_regular                     # Segoe: dashed square, sparkle
+TouchPointer        ic_fluent_hand_point_16_regular               # pointing hand
+
+# --- PaintCraft (agent A2): history window --------------------------------------------------------
+Previous            ic_fluent_previous_16_regular
+Next                ic_fluent_next_16_regular

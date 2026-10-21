@@ -1,0 +1,33 @@
+#!args --verify-dirty --spell-lang en
+# the language: --spell-lang en (spell_language) takes en_TEST from app://hunspell; the
+# buttons switch it, "Benutzersprachen" goes back to the user's languages (headless: de-DE);
+# the switch "Rechtschreibung prüfen" (spell_enable) removes every mark
+expect text:"Sprache: en-TEST (hunspell), bereit" exists
+expect text:"Fehler Betreff: Die, Hasu-Tür" exists
+focus #110
+key ctrl+a
+type "Some houses and flies with the phone"
+expect text:"Fehler Betreff: -" exists
+type " fone"
+type " "
+expect text:"Fehler Betreff: fone" exists
+rclick 290,136
+expect menuitem:"phone" exists
+key esc
+click button:"Deutsch"
+expect text:"Sprache: de-TEST (hunspell), bereit" exists
+expect text:"Fehler Betreff: Some, houses, and, flies, with, the, phone, fone" exists
+click button:"English"
+expect text:"Fehler Betreff: fone" exists
+click button:"Benutzersprachen"
+expect text:"Sprache: de-TEST (hunspell), bereit" exists
+# switched off: no marks, no menu
+click checkbox:"Rechtschreibung prüfen"
+expect text:"Sprache: de-TEST (hunspell), aus" exists
+expect text:"Fehler Nachricht: -" exists
+rclick 120,205
+expect menuitem:"Ignorieren" missing
+shot build/spell/off.png
+click checkbox:"Rechtschreibung prüfen"
+expect text:"Fehler Nachricht: Arbit, Strasse" exists
+expect_nowarn

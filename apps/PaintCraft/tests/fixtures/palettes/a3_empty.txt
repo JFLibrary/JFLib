@@ -1,0 +1,3 @@
+; a3_empty.txt -- no colour at all: loading it fails, the palette stays
+;FF000000
+

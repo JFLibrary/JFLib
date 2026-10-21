@@ -1,0 +1,49 @@
+#!args --verify-dirty
+# screenshots of the rich-text editor: the sample (headings, formats, lists, quotation,
+# alignments) light, dark, at 150 %, in high contrast; a selection; read-only; a narrow window
+# wraps; the link flyout
+size 1000 680
+theme light
+key ctrl+end
+shot build/editortest/rich_light.png
+theme dark
+shot build/editortest/rich_dark.png
+theme light
+scale 150
+shot build/editortest/rich_light_150.png
+scale 100
+click "Hoher Kontrast"
+shot build/editortest/rich_hc.png
+click "Hoher Kontrast"
+# a selection over several paragraphs (focused and not)
+click #2000
+key ctrl+home
+key down
+key shift+down
+key shift+down
+key shift+end
+shot build/editortest/rich_select.png
+click "Nur lesen"
+shot build/editortest/rich_readonly.png
+click "Nur lesen"
+# narrow: wrapping, the scroll bar
+size 520 600
+shot build/editortest/rich_narrow.png
+size 1000 680
+# the link flyout
+click #2000
+key ctrl+home
+key ctrl+right
+key shift+ctrl+right
+key ctrl+k
+shot build/editortest/rich_link.png
+key esc
+expect #2003 missing
+# an IME composition at the caret
+click #2000
+key ctrl+home
+key end
+click "IME-Vorschau"
+shot build/editortest/rich_ime.png
+click "IME-Vorschau"
+expect_nowarn

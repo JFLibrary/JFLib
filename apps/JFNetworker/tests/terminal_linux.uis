@@ -1,0 +1,114 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/lan_router.jfnet
+# PC1's Linux shell in the Terminal panel (doc/console.rs): ip addr, ping until Ctrl+C (^C and
+# the statistics), Tab with one and with several choices, Ctrl+L; the tabs of two consoles
+# (workspace/terminal.rs): switching, renaming with the flyout, into a window of its own and
+# back ("Andocken", closing the window), every console side by side, closing a tab; a device
+# without power says so and switches on from its console.
+# Ids: PC1's console 25088 (input 25089), R1's 25096 (input 25097); the rename box 24897;
+# "Einschalten" 24912; the console windows 26112 and 26128 ("Andocken" + 1).
+size 1280 900
+theme light
+drag 630,671 630,380 8
+dblclick listitem:"PC1"
+expect tab:"PC1" selected
+expect #25089 focused
+expect text:"root@PC1:~# " exists
+type "ip addr\n"
+expect text:"root@PC1:~# ip addr" exists
+expect text:"2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000" exists
+expect text:"    inet 10.0.1.10/24 brd 10.0.1.255 scope global eth0" exists
+# ping runs until Ctrl+C (the router drops the first echo while it asks ARP)
+type "ping 10.0.2.10\n"
+expect text:"PING 10.0.2.10 (10.0.2.10) 56(84) bytes of data." exists
+expect #25089 missing
+wait 3100
+expect text:"64 bytes from 10.0.2.10: icmp_seq=2 ttl=63 time=0.004 ms" exists
+expect text:"64 bytes from 10.0.2.10: icmp_seq=4 ttl=63 time=0.004 ms" exists
+key ctrl+c
+expect text:"^C" exists
+expect text:"--- 10.0.2.10 ping statistics ---" exists
+expect text:"4 packets transmitted, 3 received, 25% packet loss, time 3000ms" exists
+expect #25089 focused
+# Tab: one choice completes, several are listed below the line
+type "ip ro"
+key tab
+expect #25089 text "ip route "
+key ctrl+a
+key backspace
+type "ip addr s"
+key tab
+expect text:"set   show" exists
+expect #25089 text "ip addr s"
+# Ctrl+L clears the screen
+key ctrl+a
+key backspace
+key ctrl+l
+expect text:"set   show" missing
+expect text:"root@PC1:~# " exists
+shot build/jfnetworker/terminal_linux.png
+# a second console: R1 as its own tab; switching gives the keyboard to the shown one
+dblclick listitem:"R1"
+expect tab:"R1" selected
+expect #25097 focused
+click tab:"PC1"
+expect tab:"PC1" selected
+expect #25089 focused
+# rename the tab (empty: the device's name again)
+click button:"Tab umbenennen …"
+expect #24897 text "PC1"
+key ctrl+a
+type "Client"
+key enter
+expect tab:"Client" selected
+expect tab:"PC1" missing
+# into a window of its own: the panel shows R1; "Andocken" brings it back
+click button:"In eigenem Fenster"
+expect window 26112 open
+expect tab:"Client" missing
+expect tab:"R1" selected
+click #26113
+expect window 26112 closed
+expect tab:"Client" selected
+# every console side by side, each in its window; closing one docks it again
+click button:"Konsolen nebeneinander"
+expect window 26112 open
+expect window 26128 open
+expect text:"Die Konsolen sind in eigenen Fenstern" exists
+shot build/jfnetworker/terminal_tiled.png desktop
+close window 26128
+expect window 26128 closed
+expect tab:"R1" exists
+close window 26112
+expect tab:"Client" exists
+# the tab's name back to the device's
+click tab:"Client"
+click button:"Tab umbenennen …"
+key ctrl+a
+key backspace
+key enter
+expect tab:"PC1" selected
+# R1 off: its console says so; switched on from there
+click tab:"R1"
+rclick listitem:"R1"
+move 700,300
+click menuitem:"Eingeschaltet"
+move 700,300
+expect text:"R1 ist ausgeschaltet: die Konsole antwortet wieder, sobald es Strom hat." exists
+expect text:"--- R1 ausgeschaltet ---" exists
+expect #25097 missing
+click #24912
+expect text:"--- R1 eingeschaltet ---" exists
+expect #25097 exists
+# closing a tab: the neighbour is shown
+click button:"Konsole schließen"
+expect tab:"R1" missing
+expect tab:"PC1" selected
+click button:"Konsole schließen"
+expect text:"Keine Konsole geöffnet" exists
+# dark and 150 %
+dblclick listitem:"PC1"
+theme dark
+shot build/jfnetworker/terminal_linux_dark.png
+scale 150
+shot build/jfnetworker/terminal_linux_150.png
+expect_nowarn

@@ -1,0 +1,166 @@
+# decimal values (U1): ui_slider_f / ui_number_box_f on one f64, paint.net property rows
+# (int and f64, reset button), angle dial, pan control, colour track sliders, a value
+# widget inside a tool window
+size 1000 3000
+theme light
+# ---- slider_f + number_box_f (RANGE_F 0..100, step 0.5, 1 decimal)
+expect #7700 value 125
+expect #7700 max 1000
+expect #7701 text "12,5"
+expect #7701 value 125
+click #7700
+expect #7700 value 500
+expect #7701 text "50,0"
+key right
+expect #7700 value 505
+key pgup
+expect #7700 value 555
+key left pgdn
+expect #7700 value 500
+key end
+expect #7700 value 1000
+key home
+expect #7700 value 0
+drag #7700 264,1433
+expect #7700 value 1000
+# typing with ',' or '.', snapped to the step, shown with ','
+click #7701
+key ctrl+a
+type "33,25\n"
+expect #7700 value 335
+expect #7701 text "33,5"
+key ctrl+a
+type "7.24"
+key tab
+expect #7700 value 70
+expect #7701 text "7,0"
+click #7701
+key up
+expect #7701 text "7,5"
+key pgdn
+expect #7701 text "2,5"
+key ctrl+a
+type "-5\n"
+expect #7700 value 50
+key ctrl+a
+type "250\n"
+expect #7700 value 1000
+key ctrl+a
+type "abc\n"
+expect #7700 value 1000
+# ---- property rows: the label selects the slider, number box and reset button
+expect "Radius" value 25
+expect #0x6001E162 disabled
+click "Radius"
+expect "Radius" value 50
+expect #0x6001E161 text "50"
+expect #0x6001E162 enabled
+click #0x6001E162
+expect "Radius" value 25
+expect #0x6001E162 disabled
+click #0x6001E161
+key ctrl+a
+type "80\n"
+expect "Radius" value 80
+key pgdn
+expect "Radius" value 70
+# typing previews the value before Enter (property rows)
+key ctrl+a
+type "33"
+expect "Radius" value 33
+expect #0x6001E161 text "33"
+type "3"
+expect "Radius" value 100
+key tab
+expect #0x6001E161 text "100"
+expect "Härte" value 150
+click "Härte"
+expect "Härte" value 500
+expect #0x6001E171 text "5,00"
+click #0x6001E172
+expect "Härte" value 150
+expect #0x6001E171 text "1,50"
+# ---- angle dial: drag (Shift snaps to 15 degrees), keys wrap around -180 / 180
+expect #7704 value 4500
+expect #7704 max 18000
+drag #7704 56,1600
+expect #7704 value 9000
+drag #7704 90,1625
+expect #7704 value 4326
+drag #7704 90,1625 shift
+expect #7704 value 4500
+drag #7704 20,1657
+expect #7704 value 18000
+key right
+expect #7704 value -17900
+key left left
+expect #7704 value 17900
+key shift+right
+expect #7704 value -16600
+key pgdn
+expect #7704 value 17900
+key home
+expect #7704 value 0
+expect #7704 focused
+# ---- pan control: -1 .. 1, y down; keys 1 % (Shift 10 %), Home centres
+click #7705
+expect #7705 value 0
+expect #7705 max 0
+drag #7705 336,1717
+expect #7705 value 1000
+expect #7705 max 1000
+drag #7705 176,1597
+expect #7705 value -1000
+expect #7705 max -1000
+key home
+expect #7705 value 0
+key right right
+expect #7705 value 40
+key shift+down
+expect #7705 max 200
+# ---- colour track sliders (H S V R G B A) on one colour
+expect #7710 value 210
+expect #7716 value 200
+click #7710
+expect #7710 value 180
+expect #7713 value 46
+key end
+expect #7710 value 359
+key home
+expect #7710 value 0
+expect #7713 value 230
+expect #7714 value 46
+drag #7713 24,1841
+expect #7713 value 0
+expect #7711 value 100
+drag #7716 324,1937
+expect #7716 value 255
+click #7716
+key pgdn
+expect #7716 value 118
+# vertical track (value): the top is the maximum
+drag #7717 364,1729
+expect #7717 value 100
+expect #7712 value 100
+key down down
+expect #7717 value 98
+# ---- a property row and an angle dial inside a tool window
+click "Werte-Fenster"
+expect window 7750 open
+expect "Winkel" value 0
+expect #7751 value 0
+window 7750
+drag #7752 13,81
+expect #7752 value -18000
+expect #7751 value -18000
+expect_nowarn
+click #0x6001E482
+expect #7751 value 0
+drag #7751 151,105
+expect #7751 value 9000
+expect #0x6001E481 text "90,00"
+window any
+expect #7704 value 9000
+shot build/gal_values.png window 7750
+close window 7750
+expect window 7750 closed

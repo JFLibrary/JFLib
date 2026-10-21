@@ -1,0 +1,141 @@
+# tools_line.uis -- Linie / Kurve (agent T4): a drag draws a live line (preview only, the
+# layer unchanged until Fertigstellen), Esc = no history step, Enter = one step, the control
+# points bend it (spline through the points, right button = Bézier), the move handle moves
+# it, Linienart (dashes), Linienende (filled arrow), right button = secondary colour,
+# Überschreiben with a transparent colour, the selection clip (test rectangle), Strg+Z drops
+# a live line, a tool switch commits.  Antialiasing off (aliased = pixel centres, ties to
+# +x / +y) so the pixels are exact.
+# Mapping (1280 x 800, zoom 100 %): image pixel (x, y) at (240 + x, 148 + y); the pointer
+# is at the pixel centre (x + 0.5, y + 0.5).
+# Probes: 900 composite / 901 layer pixel (x | y << 16) -> #9900; #9930 edit pending,
+# #9935 history entries; #524544 line state "L S|B x0,y0 x1,y1 x2,y2 x3,y3" (rounded).
+size 1280 800
+theme light
+key o
+expect #9931 value 17
+cmd 930 400
+cmd 932 0
+expect #9935 value 1
+
+# ------------------------------------------------------------ a straight line, Esc drops it
+drag 290,248 490,248
+expect #9930 value 1
+expect #524544 text "L S 50,100 117,100 184,100 250,100"
+cmd 900 6553750
+expect #9900 text "FF000000"
+cmd 901 6553750
+expect #9900 text "FFFFFFFF"
+# 4 px: rows 99..102, columns 51..250
+cmd 900 6422678
+expect #9900 text "FFFFFFFF"
+cmd 900 6684822
+expect #9900 text "FF000000"
+cmd 900 6750358
+expect #9900 text "FFFFFFFF"
+cmd 900 6553650
+expect #9900 text "FFFFFFFF"
+cmd 900 6553651
+expect #9900 text "FF000000"
+cmd 900 6553850
+expect #9900 text "FF000000"
+cmd 900 6553851
+expect #9900 text "FFFFFFFF"
+key esc
+expect #9930 value 0
+cmd 900 6553750
+expect #9900 text "FFFFFFFF"
+expect #9935 value 1
+
+# ------------------------------------------------------------ curve: spline, Bézier, move
+drag 290,248 490,248
+drag 357,248 357,298
+expect #524544 text "L S 50,100 118,150 184,100 250,100"
+cmd 900 9830517
+expect #9900 text "FF000000"
+drag 424,248 424,198 right
+expect #524544 text "L B 50,100 118,150 184,50 250,100"
+# the move handle after the end (22 DIP along P0 -> P3)
+drag 512,248 522,268
+expect #524544 text "L B 60,120 128,170 194,70 260,120"
+expect #9935 value 1
+key enter
+expect #9930 value 0
+expect #9935 value 2
+expect #524544 text ""
+key ctrl+z
+expect #9935 value 2
+cmd 901 11141248
+expect #9900 text "FFFFFFFF"
+key ctrl+y
+
+# ------------------------------------------------------------ Striche (3 1 x width)
+cmd 795 65537
+expect #524547 text "1,0,0,0,20,0"
+drag 290,448 490,448
+cmd 900 19660860
+expect #9900 text "FF000000"
+cmd 900 19660864
+expect #9900 text "FFFFFFFF"
+cmd 900 19660870
+expect #9900 text "FF000000"
+key enter
+cmd 795 65536
+
+# ------------------------------------------------------------ filled arrow at the end
+cmd 795 196610
+drag 290,548 490,548
+cmd 900 26476784
+expect #9900 text "FF000000"
+cmd 900 26607856
+expect #9900 text "FFFFFFFF"
+key enter
+cmd 795 196608
+expect #9935 value 4
+
+# ------------------------------------------------------------ right button: secondary
+cmd 944 3
+drag 290,648 490,648 right
+cmd 900 32768150
+expect #9900 text "FF0000FF"
+key enter
+cmd 944 5
+
+# ------------------------------------------------------------ Überschreiben, 50 % red
+cmd 943 4
+cmd 933 14
+drag 290,698 490,698
+key enter
+cmd 901 36044950
+expect #9900 text "80FF0000"
+cmd 933 0
+cmd 943 6
+expect #9935 value 6
+
+# ------------------------------------------------------------ selection clip [0,150) x [570,590)
+cmd 941 37355520
+cmd 942 38666390
+drag 290,728 490,728
+cmd 900 38010980
+expect #9900 text "FF000000"
+cmd 900 38011080
+expect #9900 text "FFFFFFFF"
+key enter
+cmd 941 0
+cmd 942 0
+cmd 901 38010980
+expect #9900 text "FF000000"
+cmd 901 38011080
+expect #9900 text "FFFFFFFF"
+
+# ------------------------------------------------------------ Strg+Z drops, tool switch commits
+drag 290,348 490,348
+expect #9930 value 1
+key ctrl+z
+expect #9930 value 0
+expect #9935 value 7
+drag 290,348 490,348
+key b
+expect #9930 value 0
+expect #9935 value 8
+cmd 901 13107350
+expect #9900 text "FF000000"

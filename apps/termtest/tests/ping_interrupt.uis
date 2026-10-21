@@ -1,0 +1,58 @@
+#!args --verify-dirty
+# busy mode: a ping streams on a timer, Ctrl+C interrupts it (TermEv::Interrupt, ^C echoed);
+# lines typed while it runs wait (type-ahead) and run when it ends; IOS: Ctrl+Shift+6
+size 760 520
+click tab:"Shell"
+expect #1101 focused
+type "ping 10.0.0.1\n"
+expect text:"PING 10.0.0.1 (10.0.0.1) 56(84) bytes of data." exists
+expect text:"Modus: Beschäftigt" exists
+expect #1101 missing
+wait 1010
+expect text:"64 bytes from 10.0.0.1: icmp_seq=1 ttl=64 time=0.41 ms" exists
+wait 1010
+expect text:"64 bytes from 10.0.0.1: icmp_seq=2 ttl=64 time=0.42 ms" exists
+key ctrl+c
+expect text:"^C" exists
+expect text:"--- 10.0.0.1 ping statistics ---" exists
+expect text:"2 packets transmitted, 2 received, 0% packet loss, time 1000ms" exists
+expect text:"Modus: Zeile" exists
+expect #1101 focused
+# type-ahead: two lines and a half typed while busy
+type "ping -c 2 10.0.0.2\n"
+expect text:"Modus: Beschäftigt" exists
+type "echo eins\n"
+type "echo zwei\n"
+type "echx"
+key backspace
+type "o drei"
+expect text:"eins" missing
+wait 2100
+expect text:"2 packets transmitted, 2 received, 0% packet loss" exists
+expect text:"eins" exists
+expect text:"zwei" exists
+expect text:"Modus: Zeile" exists
+expect #1101 text "echo drei"
+key enter
+expect text:"drei" exists
+# Ctrl+C drops the type-ahead
+type "ping 10.0.0.3\n"
+type "echo vier\n"
+key ctrl+c
+wait 1010
+expect text:"vier" missing
+expect text:"Modus: Zeile" exists
+# IOS: Ctrl+Shift+6 aborts, without an echo
+click tab:"IOS-artig"
+type "en\n"
+type "ping 10.1.1.1\n"
+expect text:"Pinging 10.1.1.1 with 5 echo requests of 100 bytes, 2 s timeout each:" exists
+wait 450
+expect text:"!!" exists
+key ctrl+shift+6
+expect text:"Success rate is 40 percent (2/5)" exists
+expect text:"Modus: Zeile" exists
+type "ping 10.1.1.2\n"
+wait 1110
+expect text:"Success rate is 100 percent (5/5), round-trip min/avg/max = 1/2/4 ms" exists
+expect_nowarn

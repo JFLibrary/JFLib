@@ -1,0 +1,9 @@
+# drag options: Shift constrains the selection to a square; the right button paints
+# with colour 2 (white on white: the image stays unchanged but undo gets a step)
+click #1107
+drag 300,300 500,420 8 shift
+expect text:"120 × 120px" exists
+key esc
+click #1106
+drag 300,300 500,420 8 right
+expect #10 enabled

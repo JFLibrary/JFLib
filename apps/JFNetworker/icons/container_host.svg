@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 48" width="256" height="192"
+     fill="none" stroke="#2E343B" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <title>Container host: a host carrying containers</title>
+  <rect class="body" x="4" y="30" width="56" height="10" rx="1.5" fill="#F7F8FA"/>
+  <g class="ok" fill="#3C9A5F" stroke="none"><circle cx="8.5" cy="35" r="1"/><circle cx="12" cy="35" r="1"/></g>
+  <g class="port" fill="#4F555D" stroke="none"><rect x="40" y="33.75" width="2.6" height="2.5" rx="0.3"/><rect x="43.6" y="33.75" width="2.6" height="2.5" rx="0.3"/><rect x="47.2" y="33.75" width="2.6" height="2.5" rx="0.3"/><rect x="50.8" y="33.75" width="2.6" height="2.5" rx="0.3"/></g>
+  <rect class="tint" x="6" y="19" width="15" height="9" rx="1" fill="#8E8540"/>
+  <path class="body" d="M9.5 21V26M12 21V26M14.5 21V26M17 21V26" stroke="#F7F8FA" stroke-width="0.9"/>
+  <rect class="tint" x="24.5" y="19" width="15" height="9" rx="1" fill="#8E8540"/>
+  <path class="body" d="M28 21V26M30.5 21V26M33 21V26M35.5 21V26" stroke="#F7F8FA" stroke-width="0.9"/>
+  <rect class="tint" x="43" y="19" width="15" height="9" rx="1" fill="#8E8540"/>
+  <path class="body" d="M46.5 21V26M49 21V26M51.5 21V26M54 21V26" stroke="#F7F8FA" stroke-width="0.9"/>
+  <rect class="tint" x="15" y="8.5" width="15" height="9" rx="1" fill="#8E8540"/>
+  <path class="body" d="M18.5 10.5V15.5M21 10.5V15.5M23.5 10.5V15.5M26 10.5V15.5" stroke="#F7F8FA" stroke-width="0.9"/>
+  <rect class="tint" x="34" y="8.5" width="15" height="9" rx="1" fill="#8E8540"/>
+  <path class="body" d="M37.5 10.5V15.5M40 10.5V15.5M42.5 10.5V15.5M45 10.5V15.5" stroke="#F7F8FA" stroke-width="0.9"/>
+</svg>

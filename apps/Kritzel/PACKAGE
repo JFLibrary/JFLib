@@ -1,0 +1,16 @@
+# tools/package.py: setup.exe (Windows) and .deb (Linux) of Kritzel
+display=Kritzel
+version=0.1.0
+publisher=JFLib
+license=MIT
+summary=Zeichnen und Skizzieren mit Ebenen
+description=Zeichnen, Skizzieren und kleine Bildkorrekturen: Stift, Pinsel, Formen, Text, Auswahl und Ebenen in einer kompakten Oberfläche, geschrieben in Rust mit JFLib.
+generic=Zeichenprogramm
+categories=Graphics;2DGraphics;RasterGraphics;
+deb_name=kritzel
+# Flatpak, AppStream and the MSIX identity: the author's apps use jfreund.org (docs/PACKAGING.md)
+app_id=org.jfreund.Kritzel
+homepage=https://github.com/JFLibrary/JFLib
+default_win=winui
+default_linux=kde
+styles=winui classic macos kde

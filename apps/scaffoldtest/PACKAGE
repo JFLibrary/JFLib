@@ -1,0 +1,19 @@
+# apps/scaffoldtest/PACKAGE: the app's identity and packages (docs/PACKAGING.md)
+#   python tools/package.py scaffoldtest --formats all
+# version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
+# as rt::app_version!(), the packages and lib/update use it.  The library has its own (lib/VERSION).
+display=Scaffold-Test
+version=0.1.0
+publisher=JFLib
+summary=Ein Werkzeug mit Fenster und Kommandozeile, erstellt mit JFLib
+description=Scaffold-Test: Ein Werkzeug mit Fenster und Kommandozeile, erstellt mit JFLib. Diese Beschreibung durch eine eigene ersetzen.
+generic=Werkzeug
+categories=Utility;
+deb_name=scaffoldtest
+# Flatpak, AppStream and the MSIX identity: reverse DNS of a domain or project you control
+app_id=org.jflib.scaffoldtest
+homepage=https://github.com/JFLibrary/JFLib
+license=MIT OR Apache-2.0
+default_win=winui
+default_linux=winui
+styles=winui

@@ -1,0 +1,130 @@
+# tools_shapes.uis -- Formen (agent T4): a drag draws the shape into the rectangle (corners
+# = the pixel corners under the pointer), live until Enter (one step "Formen"), Esc drops
+# it; handles resize (Umschalt: equal sides while drawing), a drag inside moves, mirror /
+# rotate (hooks), Formfüllmodus Umriss / Füllung (primary) / beides (fill = secondary),
+# the gallery (Ellipse), custom shapes from XAML files (two good, two broken fixtures).
+# Antialiasing off: exact pixels (outline width 2 centred on the frame edges).
+# Mapping (1280 x 800, zoom 100 %): image pixel (x, y) at (240 + x, 148 + y).
+# Records: #524544 "F shape x0,y0 x1,y1 degrees" (image points of the frame corners),
+# #524545 custom shape status (value = shapes), #524546 current shape (value = index),
+# #524547 "dash,cap0,cap1,mode,radius,ctype".
+size 1280 800
+theme light
+key o
+key o
+expect #9931 value 18
+expect #524546 text "Rechteck"
+expect #524545 value 30
+cmd 930 200
+cmd 932 0
+
+# ------------------------------------------------------------ outline rectangle, Esc
+drag 290,198 390,268
+expect #9930 value 1
+expect #524544 text "F 0 50,50 150,120 0"
+cmd 900 3211364
+expect #9900 text "FF000000"
+cmd 900 3276900
+expect #9900 text "FF000000"
+cmd 900 3342436
+expect #9900 text "FFFFFFFF"
+cmd 900 3145828
+expect #9900 text "FFFFFFFF"
+cmd 900 5242929
+expect #9900 text "FF000000"
+cmd 900 5242931
+expect #9900 text "FFFFFFFF"
+cmd 900 5243030
+expect #9900 text "FF000000"
+cmd 900 5243031
+expect #9900 text "FFFFFFFF"
+cmd 901 3276900
+expect #9900 text "FFFFFFFF"
+key esc
+expect #9930 value 0
+cmd 900 3276900
+expect #9900 text "FFFFFFFF"
+expect #9935 value 1
+
+# ------------------------------------------------------------ handles, move, mirror, rotate
+drag 290,198 390,268
+drag 390,268 410,288
+expect #524544 text "F 0 50,50 170,140 0"
+drag 340,248 350,258
+expect #524544 text "F 0 60,60 180,150 0"
+cmd 795 458752
+expect #524544 text "F 0 180,60 60,150 0"
+cmd 795 458752
+expect #524544 text "F 0 60,60 180,150 0"
+cmd 795 589914
+expect #524544 text "F 0 165,45 75,165 90"
+cmd 795 589914
+cmd 795 589914
+cmd 795 589914
+expect #524544 text "F 0 60,60 180,150 360"
+expect #9935 value 1
+key enter
+expect #9930 value 0
+expect #9935 value 2
+cmd 901 3932260
+expect #9900 text "FF000000"
+
+# ------------------------------------------------------------ Umschalt: equal sides
+drag 290,448 390,478 shift
+expect #524544 text "F 0 50,300 150,400 0"
+# a drag just outside the frame rotates about the centre (Umschalt: 15 degree steps)
+drag 400,498 340,568 shift
+expect #524544 text "F 0 150,300 50,400 90"
+key esc
+
+# ------------------------------------------------------------ fill modes
+cmd 795 327681
+expect #524547 text "0,0,0,1,20,0"
+drag 290,448 390,548
+cmd 900 22282340
+expect #9900 text "FF000000"
+key enter
+cmd 944 3
+cmd 795 327682
+drag 490,448 590,548
+cmd 900 22282540
+expect #9900 text "FF0000FF"
+cmd 900 22282490
+expect #9900 text "FF000000"
+key enter
+expect #9935 value 4
+cmd 944 5
+cmd 795 327680
+
+# ------------------------------------------------------------ gallery: Ellipse
+click #393216
+click #393219
+expect #524546 text "Ellipse"
+expect #524546 value 2
+cmd 795 327681
+drag 640,448 740,548
+cmd 900 22282690
+expect #9900 text "FF000000"
+cmd 900 19726738
+expect #9900 text "FFFFFFFF"
+key enter
+cmd 795 327680
+
+# ------------------------------------------------------------ custom shapes (XAML)
+cmd 795 524288
+expect #524545 text "2 eigene Formen; nicht geladen: c_kaputt.xaml, d_leer.xaml"
+expect #524545 value 32
+cmd 795 262174
+expect #524546 text "Raute & Punkt"
+cmd 795 262175
+expect #524546 text "Ring"
+cmd 795 327681
+drag 290,598 390,698
+cmd 900 32768100
+expect #9900 text "FFFFFFFF"
+cmd 900 32768055
+expect #9900 text "FF000000"
+key enter
+expect #9935 value 6
+cmd 795 327680
+cmd 795 262144

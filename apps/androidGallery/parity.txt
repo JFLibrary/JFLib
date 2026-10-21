@@ -1,0 +1,3 @@
+matrix off
+rsonly tests/basic.uis New Android gallery without an assembly reference.
+rsonly tests/folder.uis The folder mode of the file dialog has no assembly counterpart.

@@ -1,0 +1,10 @@
+#!args --size 390x2000 --anim off --theme light
+# FD_FOLDER in the library's own dialog (headless runs; Android: the system's tree picker):
+# folders only, no name box, the folder shown is the answer.
+expect text:"Noch keine Datei gewählt." exists
+click #402
+expect dialog:"Ordner auswählen" exists
+expect #16396 missing
+click button:"Ordner auswählen"
+expect dialog:"Ordner auswählen" missing
+expect text:"Noch keine Datei gewählt." missing

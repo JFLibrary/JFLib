@@ -1,0 +1,62 @@
+# cursors.uis -- PaintCraft's own pointer cursors (cursors.s): every crosshair / arrow tool shows
+# its cursor (CUR_CUSTOM + ui_cursor_custom: crosshair + tool icon), Text the I-beam,
+# Ansicht verschieben the hand, the move tools the rotate cursor outside the selection;
+# cmd 910 renders all cursors at 100 / 150 / 200 % into build/tests/cursors.png.
+# #9920 value = the canvas cursor (15 CUR_CUSTOM, 1 I-beam, 2 hand, 4 move), text = which one.
+# Canvas 1280 x 800, zoom 100 %: image pixel (x, y) is at (240 + x, 148 + y).
+size 1280 800
+theme light
+shot build/tests/cursors_start.png
+expect #9920 value 15
+expect #9920 text "tool 10"
+cmd 750
+expect #9920 value 15
+expect #9920 text "tool 0"
+cmd 752
+expect #9920 text "tool 2"
+cmd 754
+expect #9920 text "tool 4"
+cmd 755
+expect #9920 text "tool 5"
+cmd 756
+expect #9920 text "tool 6"
+cmd 757
+expect #9920 value 2
+expect #9920 text ""
+cmd 758
+expect #9920 text "tool 8"
+cmd 759
+expect #9920 text "tool 9"
+cmd 761
+expect #9920 text "tool 11"
+cmd 762
+expect #9920 text "tool 12"
+cmd 763
+expect #9920 text "tool 13"
+cmd 764
+expect #9920 text "tool 14"
+cmd 765
+expect #9920 text "tool 15"
+cmd 766
+expect #9920 value 1
+expect #9920 text ""
+cmd 767
+expect #9920 text "tool 17"
+cmd 768
+expect #9920 text "tool 18"
+# move tools: without a selection the whole image is the frame (move inside); inside the
+# frame = move, outside = rotate
+cmd 751
+expect #9920 value 4
+cmd 750
+drag 250,158 350,258
+cmd 751
+move 300,200
+expect #9920 value 4
+move 600,500
+expect #9920 value 15
+expect #9920 text "rotate"
+key esc
+# the cursor sheet
+cmd 910
+expect #9900 text "ok"

@@ -1,0 +1,45 @@
+#!args --fixture --page recovery
+# virtual machines against the demo server: the hypervisor and its VMs, a VM started from a
+# restore point (console, merge), a boot check and its result
+size 1440 900
+wait 50
+expect "dc02" exists
+expect "test-vm" exists
+expect "QEMU 8.2.2" exists
+shot build/shots/bc/test_vms.png
+click "Aus Sicherungen gestartet"
+wait 30
+expect "erp-app" exists
+expect "Läuft aus dem Restore-Point" exists
+click "erp-app"
+wait 20
+click "Konsole"
+wait 50
+expect "Konsole: erp-app" exists
+shot build/shots/bc/test_instant_console.png
+click "Schließen"
+wait 20
+click "Zusammenführen …"
+wait 20
+expect "erp-app zusammenführen" exists
+click "Zusammenführen"
+wait 100
+expect "Zusammengeführt" exists
+click "VM starten …"
+wait 20
+expect "VM aus einem Restore-Point starten" exists
+shot build/shots/bc/test_instant_start.png
+click "Starten"
+wait 100
+click "Startprüfungen"
+wait 30
+expect "Nicht bestanden" exists
+shot build/shots/bc/test_bootcheck.png
+click "Prüfen …"
+wait 20
+focus #0xD01604
+type "login:"
+click "Prüfen"
+wait 100
+expect "Startprüfung" missing
+expect_nowarn

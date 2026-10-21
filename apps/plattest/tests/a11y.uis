@@ -1,0 +1,4 @@
+#!args --test a11y
+# (Rust only) plattest --test a11y: the accessibility tree of a headless demo window and the
+# actions of a screen reader (lib/ui/a11y.rs, lib/plat/a11y.rs). The whole test runs before
+# the UI starts.

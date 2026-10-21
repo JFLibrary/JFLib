@@ -1,0 +1,20 @@
+#!args --lang fr-FR
+# the library's texts in the user's language (--lang, i18n::tr): weekday toggles, the date
+# picker (French format and month names, its buttons), the tree's chevrons; the gallery's
+# own texts stay German (its catalogue only names the languages)
+size 1440 1800
+wait 50
+expect "Sicherungsjobs" exists
+expect "lu" exists
+expect "di" exists
+expect "Aufklappen" missing
+click "12/10/2026"
+wait 20
+expect text:"octobre 2026" exists
+expect "Aujourd’hui" exists
+expect "Mois précédent" exists
+click "Mois suivant"
+wait 20
+expect text:"novembre 2026" exists
+shot build/shots/datagallery_fr.png
+expect_nowarn

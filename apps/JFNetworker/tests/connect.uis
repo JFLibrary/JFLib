@@ -1,0 +1,101 @@
+#!args --verify-dirty
+# connecting (workspace/canvas/connect.rs): the Verbinden tool (C) draws a cable from device to
+# device or takes two clicks; the port choice opens at the pointer with both devices' ports
+# (the best pair chosen, occupied ports with their far end) and the cable ("Automatisch: ...");
+# Enter connects.  Shift at the release, or a drag from a port dot to a port dot, connects at
+# once.  A target without a fitting free port is outlined red with "Kein passender Port".
+# Every connection is one undo step.  World (0, 0) shows at 630,320 (100 %).
+# Ids: the port lists' rows 12545 + i (left) and 12801 + i (right), the cable 12337, Verbinden
+# 12338; the cable inspector's kind 20496.
+theme light
+# PC1 (-140, -120), SW1 (-40, 80), R1 (160, -120), Phone1 (260, 80)
+click button:"PC"
+click 530,220
+click button:"JF-S24P"
+click 630,420
+click button:"JF-R4"
+click 830,220
+click button:"Smartphone"
+click 930,420
+expect text:"4 Geräte · 0 Kabel" exists
+key c
+expect button:"Verbinden" checked
+expect text:"Von Gerät zu Gerät ziehen oder beide anklicken; Umschalt verbindet sofort, Esc beendet" exists
+# a drag from PC1 to SW1: the port choice with the best pair, eth0 - Gi1/0/1
+drag listitem:"PC1" listitem:"SW1"
+expect text:"Ports wählen" exists
+expect #12545 selected
+expect #12801 selected
+expect #12337 text "Automatisch: Kupfer, gerade"
+shot build/jfnetworker/connect_choice.png
+# another switch port, then Enter
+click #12803
+expect #12803 selected
+key enter
+expect text:"Ports wählen" missing
+expect text:"4 Geräte · 1 Kabel" exists
+# the new cable is selected: the inspector shows it, the simulator has it up
+expect text:"PC1 eth0 – SW1 Gi1/0/3" exists
+expect text:"aktiv · 0 Pakete/s" exists
+# Shift at the release: at once, over the fastest pair (10G optics)
+drag listitem:"R1" listitem:"SW1" 8 shift
+expect text:"4 Geräte · 2 Kabel" exists
+expect text:"R1 Te0/1/0 – SW1 Te1/1/1" exists
+expect #20496 text "Automatisch: Glasfaser, Multimode"
+# the router's port starts shut down (IOS-like): the cable is down
+expect text:"unten · 0 Pakete/s" exists
+# two clicks: PC1, then R1; their free ports are PC1 usb0 and R1 Console
+click listitem:"PC1"
+click listitem:"R1"
+expect text:"Ports wählen" exists
+expect #12546 selected
+expect #12337 text "Automatisch: Konsolenkabel"
+# PC1's eth0 is taken: it shows its far end
+expect text:"→ SW1 Gi1/0/3" exists
+key enter
+expect text:"4 Geräte · 3 Kabel" exists
+expect text:"PC1 usb0 – R1 Con" exists
+# a target without a fitting free port: Phone1 has a radio only, SW1 none
+down 922,424
+move 800,440
+move 640,430
+move 622,424
+wait 600
+expect text:"Kein passender Port" exists
+shot build/jfnetworker/connect_nofit.png
+up
+# the choice says why
+expect text:"Diese beiden Geräte haben keine freien Ports, die zusammenpassen." exists
+expect #12338 disabled
+key esc
+expect text:"Ports wählen" missing
+expect text:"4 Geräte · 3 Kabel" exists
+# back to the selection tool
+key v
+expect button:"Auswahl" checked
+# from port dot to port dot (selection tool): R1's next free Gi port to SW1's
+drag 822,200 622,400
+expect text:"4 Geräte · 4 Kabel" exists
+expect text:"R1 Gi0/0/0 – SW1 Gi1/0/1" exists
+# undo takes the connections back one by one, redo brings them back
+key ctrl+z
+expect text:"4 Geräte · 3 Kabel" exists
+key ctrl+z
+expect text:"4 Geräte · 2 Kabel" exists
+key ctrl+y
+expect text:"4 Geräte · 3 Kabel" exists
+expect text:"PC1 usb0 – R1 Con" exists
+key ctrl+y
+expect text:"4 Geräte · 4 Kabel" exists
+shot build/jfnetworker/connect_done.png
+# the port choice dark and at 150 %: PC1 has no free port left, each row says why
+key c
+drag listitem:"PC1" listitem:"R1"
+expect text:"→ SW1 Gi1/0/3" exists
+expect #12338 disabled
+theme dark
+shot build/jfnetworker/connect_choice_dark.png
+scale 150
+shot build/jfnetworker/connect_choice_150.png
+key esc
+expect_nowarn

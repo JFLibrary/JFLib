@@ -1,0 +1,48 @@
+#!args --verify-dirty
+# lists: Ctrl+Shift+8 / Ctrl+Shift+7 and the toolbar, Enter continues a list, Enter in an
+# empty item ends it (a nested one moves out first), Tab / Shift+Tab change the level,
+# Backspace at the start of an item makes it body text, numbering by level
+size 1000 680
+click "Leeren"
+type "Einkauf"
+key enter
+key ctrl+shift+8
+type "Brot"
+key enter
+type "Milch"
+expect text:"doc: Einkauf | (bullet) Brot | (bullet) Milch" exists
+key enter
+key tab
+type "frisch"
+expect text:"doc: Einkauf | (bullet) Brot | (bullet) Milch | (bullet,level1) frisch" exists
+key enter
+key enter
+expect text:"doc: Einkauf | (bullet) Brot | (bullet) Milch | (bullet,level1) frisch | (bullet) " exists
+key enter
+expect text:"doc: Einkauf | (bullet) Brot | (bullet) Milch | (bullet,level1) frisch | " exists
+type "Ende"
+# numbers; Shift+Tab out
+key ctrl+home
+key down
+key shift+down
+click "Nummerierung"
+expect text:"doc: Einkauf | (number) Brot | (number) Milch | (bullet,level1) frisch | Ende" exists
+click "Aufzählung"
+expect text:"doc: Einkauf | (bullet) Brot | (bullet) Milch | (bullet,level1) frisch | Ende" exists
+click "Aufzählung"
+expect text:"doc: Einkauf | Brot | Milch | (bullet,level1) frisch | Ende" exists
+key ctrl+shift+7
+key down
+key shift+tab
+expect text:"doc: Einkauf | (number) Brot | (number) Milch | (bullet) frisch | Ende" exists
+# Backspace at the start of an item: body text; at the start of an indented paragraph: out
+key home
+key backspace
+expect text:"doc: Einkauf | (number) Brot | (number) Milch | frisch | Ende" exists
+click "Einzug vergrößern"
+expect text:"doc: Einkauf | (number) Brot | (number) Milch | (level1) frisch | Ende" exists
+key backspace
+expect text:"doc: Einkauf | (number) Brot | (number) Milch | frisch | Ende" exists
+key backspace
+expect text:"doc: Einkauf | (number) Brot | (number) Milchfrisch | Ende" exists
+expect_nowarn

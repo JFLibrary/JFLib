@@ -1,0 +1,6 @@
+# permtest: the permissions of the manifest self-test (docs/PERMISSIONS.md)
+fs.write $TEMP/permtest-*/**   # a scratch folder per run
+fs.user                        # the file named on the command line
+url https mailto
+print
+secrets                        # plat::secret (only checked, the store is not touched)

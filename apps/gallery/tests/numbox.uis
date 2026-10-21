@@ -1,0 +1,55 @@
+#!args --verify-dirty
+# Number boxes follow a value changed elsewhere while they have the focus (U2): the new value
+# is shown as long as the text is unedited, and Enter / focus loss never store the stale text;
+# a text the user typed wins over the outside change.  cmd 9110 sets 42 / 12,5 from outside,
+# cmd 9111 adds 1 to both (gallery test hooks, u2demo.s).
+size 1000 3600
+theme light
+expect #8610 text "7"
+expect #8611 text "3,5"
+click #8610
+expect #8610 focused
+cmd 9110
+expect #8610 text "42"
+expect #8610 value 42
+# focus loss: the old "7" is not committed
+key tab
+expect #8610 value 42
+expect #8610 text "42"
+expect #8611 focused
+expect #8611 text "12,5"
+cmd 9111
+expect #8611 text "13,5"
+expect #8610 text "43"
+key enter
+expect #8611 value 135
+expect #8611 text "13,5"
+# a typed text wins
+click #8610
+key ctrl+a
+type "99"
+cmd 9110
+expect #8610 text "99"
+key enter
+expect #8610 value 99
+expect text:"Wert 99, Übernahmen 4" exists
+# steps still work, and the box keeps following afterwards
+key up
+expect #8610 value 100
+cmd 9111
+expect #8610 text "101"
+key tab
+expect #8610 value 101
+# the f64 box: typed text wins, then Esc commits it
+key ctrl+a
+type "7,5"
+cmd 9110
+expect #8611 text "7,5"
+key esc
+expect #8611 value 75
+expect #8610 value 42
+shot build/u2/gal_numbox.png 0 3410 520 60
+# open a folder: headless runs start nothing (ui_open_folder prints the path)
+click "Ordner öffnen"
+expect text:"Ordner build: Ergebnis 0" exists
+expect_nowarn

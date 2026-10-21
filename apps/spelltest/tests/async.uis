@@ -1,0 +1,59 @@
+#!args --verify-dirty --spell-async
+# suggestions made on a worker (as in window mode): the menu opens at once with a disabled row
+# "Vorschläge werden gesucht …" and fills when they are there (`sync` waits for the worker);
+# a menu opened with a key moves the focus to the first suggestion then
+theme light
+# "Hasu" in the box "Betreff" (not focused)
+rclick 70,136
+expect menuitem:"Vorschläge werden gesucht …" exists
+expect menuitem:"Vorschläge werden gesucht …" disabled
+expect menuitem:"Haus" missing
+expect menuitem:"Zum Wörterbuch hinzufügen" exists
+shot build/spell/async_wait.png
+sync
+expect menuitem:"Vorschläge werden gesucht …" missing
+expect menuitem:"Haus" exists
+shot build/spell/async_done.png
+click menuitem:"Haus"
+expect #110 text "Die Haus-Tür"
+expect text:"Fehler Betreff: -" exists
+# closed before the suggestions came: they are dropped, the next menu waits for its own
+rclick 120,205
+expect menuitem:"Vorschläge werden gesucht …" exists
+key esc
+sync
+expect menuitem:"Arbeit" missing
+rclick 200,205
+sync
+expect menuitem:"Straße" exists
+expect menuitem:"Arbeit" missing
+key esc
+# the menu key: the first row the keyboard can take while waiting, then the first suggestion
+focus #110
+key ctrl+a
+type "Ein Fehlr "
+key left left left
+key apps
+expect menuitem:"Vorschläge werden gesucht …" exists
+expect menuitem:"Zum Wörterbuch hinzufügen" focused
+sync
+expect menuitem:"Fehler" focused
+key enter
+expect #110 text "Ein Fehler "
+expect text:"Fehler Betreff: -" exists
+# the keyboard moved on while waiting: the focus stays where it is
+focus #111
+key ctrl+home
+key ctrl+right ctrl+right ctrl+right
+key right
+key shift+f10
+expect menuitem:"Zum Wörterbuch hinzufügen" focused
+key down
+expect menuitem:"Ignorieren" focused
+sync
+expect menuitem:"Arbeit" exists
+expect menuitem:"Ignorieren" focused
+key esc
+expect menuitem:"Arbeit" missing
+expect #111 focused
+expect_nowarn

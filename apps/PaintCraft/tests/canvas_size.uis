@@ -1,0 +1,488 @@
+# canvas_size.uis -- Bild > Leinwandgröße… (Strg+Umschalt+R) (agent A5): every anchor of the
+# 3 x 3 grid with pixel probes of both layers, the fill rule of the new area (paint.net: the
+# background layer gets the chosen colour -- Sekundärfarbe by default --, every other layer
+# transparent pixels), Fülleffekt choices, odd growth (centre = C# integer division),
+# shrinking, the selection moves with the image, undo restores the state bit-exactly; the
+# dialog (Absolut / Prozentual, anchor combo box <-> grid, fill combo box).
+# Window "Leinwandgröße" = 24617 (WINID_DLG0 + 25); widgets 5201 .. 5211 like the resize
+# dialog (+100), 5212 Anker, 5213 Fülleffekt, grid cells 5220 .. 5228 (Links oben .. Rechts
+# unten).  Hooks: 310 size, 312 anchor | fill << 8 (FILLC_*), 313 / 314 layer probes (#5190),
+# 986 / 987 primary / secondary colour (palette A3), 968 new image, 950 / 961 / 962 history.
+# The 6 x 4 image: layer 0 (Hintergrund, white) red (0,0), green (5,0), blue (0,3), black
+# (5,3); layer 1 yellow (1,0).
+size 1280 800
+theme light
+cmd 950 1
+cmd 986 4294902015
+cmd 987 4278255615
+expect #9986 text "FF00FFFF"
+cmd 968 262150
+cmd 902 1
+cmd 903 0
+cmd 904 65537
+cmd 902 2
+cmd 903 5
+cmd 904 65542
+cmd 902 3
+cmd 903 196608
+cmd 904 262145
+cmd 902 6
+cmd 903 196613
+cmd 904 262150
+key ctrl+shift+n
+cmd 902 9
+cmd 903 1
+cmd 904 65538
+cmd 961 0
+expect text:"t.n=2" exists
+
+# ------------------------------------------------------------ every anchor: 6 x 4 -> 8 x 6
+# (secondary colour cyan in the background layer's new area, transparent in layer 1)
+cmd 310 393224
+# Links oben: old image at (0, 0)
+cmd 312 0
+expect text:"Leinwandgröße" exists
+expect text:"t.n=3" exists
+expect #9913 value 8
+expect #9914 value 6
+expect #5191 value 1
+cmd 314 0
+cmd 313 0
+expect #5190 text "FFFF0000"
+cmd 313 5
+expect #5190 text "FF00FF00"
+cmd 313 196608
+expect #5190 text "FF0000FF"
+cmd 313 196613
+expect #5190 text "FF000000"
+cmd 313 65537
+expect #5190 text "FFFFFFFF"
+cmd 313 327687
+expect #5190 text "FF00FFFF"
+cmd 314 1
+cmd 313 1
+expect #5190 text "FFFFFF00"
+cmd 313 327687
+expect #5190 text "00000000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# Oben: old image at (1, 0)
+cmd 312 1
+expect #9913 value 8
+expect #9914 value 6
+expect #5191 value 1
+cmd 314 0
+cmd 313 1
+expect #5190 text "FFFF0000"
+cmd 313 6
+expect #5190 text "FF00FF00"
+cmd 313 196609
+expect #5190 text "FF0000FF"
+cmd 313 196614
+expect #5190 text "FF000000"
+cmd 313 65538
+expect #5190 text "FFFFFFFF"
+cmd 313 327680
+expect #5190 text "FF00FFFF"
+cmd 314 1
+cmd 313 2
+expect #5190 text "FFFFFF00"
+cmd 313 327680
+expect #5190 text "00000000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# Rechts oben: old image at (2, 0)
+cmd 312 2
+expect #9913 value 8
+expect #9914 value 6
+expect #5191 value 1
+cmd 314 0
+cmd 313 2
+expect #5190 text "FFFF0000"
+cmd 313 7
+expect #5190 text "FF00FF00"
+cmd 313 196610
+expect #5190 text "FF0000FF"
+cmd 313 196615
+expect #5190 text "FF000000"
+cmd 313 65539
+expect #5190 text "FFFFFFFF"
+cmd 313 327680
+expect #5190 text "FF00FFFF"
+cmd 314 1
+cmd 313 3
+expect #5190 text "FFFFFF00"
+cmd 313 327680
+expect #5190 text "00000000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# Links: old image at (0, 1)
+cmd 312 3
+expect #9913 value 8
+expect #9914 value 6
+expect #5191 value 1
+cmd 314 0
+cmd 313 65536
+expect #5190 text "FFFF0000"
+cmd 313 65541
+expect #5190 text "FF00FF00"
+cmd 313 262144
+expect #5190 text "FF0000FF"
+cmd 313 262149
+expect #5190 text "FF000000"
+cmd 313 131073
+expect #5190 text "FFFFFFFF"
+cmd 313 7
+expect #5190 text "FF00FFFF"
+cmd 314 1
+cmd 313 65537
+expect #5190 text "FFFFFF00"
+cmd 313 7
+expect #5190 text "00000000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# Mitte: old image at (1, 1)
+cmd 312 4
+expect #9913 value 8
+expect #9914 value 6
+expect #5191 value 1
+cmd 314 0
+cmd 313 65537
+expect #5190 text "FFFF0000"
+cmd 313 65542
+expect #5190 text "FF00FF00"
+cmd 313 262145
+expect #5190 text "FF0000FF"
+cmd 313 262150
+expect #5190 text "FF000000"
+cmd 313 131074
+expect #5190 text "FFFFFFFF"
+cmd 313 0
+expect #5190 text "FF00FFFF"
+cmd 314 1
+cmd 313 65538
+expect #5190 text "FFFFFF00"
+cmd 313 0
+expect #5190 text "00000000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# Rechts: old image at (2, 1)
+cmd 312 5
+expect #9913 value 8
+expect #9914 value 6
+expect #5191 value 1
+cmd 314 0
+cmd 313 65538
+expect #5190 text "FFFF0000"
+cmd 313 65543
+expect #5190 text "FF00FF00"
+cmd 313 262146
+expect #5190 text "FF0000FF"
+cmd 313 262151
+expect #5190 text "FF000000"
+cmd 313 131075
+expect #5190 text "FFFFFFFF"
+cmd 313 0
+expect #5190 text "FF00FFFF"
+cmd 314 1
+cmd 313 65539
+expect #5190 text "FFFFFF00"
+cmd 313 0
+expect #5190 text "00000000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# Links unten: old image at (0, 2)
+cmd 312 6
+expect #9913 value 8
+expect #9914 value 6
+expect #5191 value 1
+cmd 314 0
+cmd 313 131072
+expect #5190 text "FFFF0000"
+cmd 313 131077
+expect #5190 text "FF00FF00"
+cmd 313 327680
+expect #5190 text "FF0000FF"
+cmd 313 327685
+expect #5190 text "FF000000"
+cmd 313 196609
+expect #5190 text "FFFFFFFF"
+cmd 313 7
+expect #5190 text "FF00FFFF"
+cmd 314 1
+cmd 313 131073
+expect #5190 text "FFFFFF00"
+cmd 313 7
+expect #5190 text "00000000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# Unten: old image at (1, 2)
+cmd 312 7
+expect #9913 value 8
+expect #9914 value 6
+expect #5191 value 1
+cmd 314 0
+cmd 313 131073
+expect #5190 text "FFFF0000"
+cmd 313 131078
+expect #5190 text "FF00FF00"
+cmd 313 327681
+expect #5190 text "FF0000FF"
+cmd 313 327686
+expect #5190 text "FF000000"
+cmd 313 196610
+expect #5190 text "FFFFFFFF"
+cmd 313 0
+expect #5190 text "FF00FFFF"
+cmd 314 1
+cmd 313 131074
+expect #5190 text "FFFFFF00"
+cmd 313 0
+expect #5190 text "00000000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# Rechts unten: old image at (2, 2)
+cmd 312 8
+expect #9913 value 8
+expect #9914 value 6
+expect #5191 value 1
+cmd 314 0
+cmd 313 131074
+expect #5190 text "FFFF0000"
+cmd 313 131079
+expect #5190 text "FF00FF00"
+cmd 313 327682
+expect #5190 text "FF0000FF"
+cmd 313 327687
+expect #5190 text "FF000000"
+cmd 313 196611
+expect #5190 text "FFFFFFFF"
+cmd 313 0
+expect #5190 text "FF00FFFF"
+cmd 314 1
+cmd 313 131075
+expect #5190 text "FFFFFF00"
+cmd 313 0
+expect #5190 text "00000000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ fill choices (Mitte, 8 x 6)
+# Grundfarbe (magenta)
+cmd 312 260
+cmd 314 0
+cmd 313 0
+expect #5190 text "FFFF00FF"
+cmd 314 1
+cmd 313 0
+expect #5190 text "00000000"
+key ctrl+z
+# Transparent
+cmd 312 516
+cmd 314 0
+cmd 313 0
+expect #5190 text "00000000"
+cmd 313 65537
+expect #5190 text "FFFF0000"
+key ctrl+z
+# Schwarz
+cmd 312 772
+cmd 314 0
+cmd 313 327687
+expect #5190 text "FF000000"
+key ctrl+z
+# Weiß
+cmd 312 1028
+cmd 314 0
+cmd 313 7
+expect #5190 text "FFFFFFFF"
+cmd 314 1
+cmd 313 7
+expect #5190 text "00000000"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ odd growth and shrinking
+# 6 x 4 -> 9 x 7, Mitte: offset (3 / 2, 3 / 2) = (1, 1)
+cmd 310 458761
+cmd 312 4
+expect #9913 value 9
+expect #9914 value 7
+cmd 314 0
+cmd 313 65537
+expect #5190 text "FFFF0000"
+cmd 313 262150
+expect #5190 text "FF000000"
+cmd 313 393224
+expect #5190 text "FF00FFFF"
+key ctrl+z
+# 6 x 4 -> 3 x 2, Mitte: offset (-3 / 2, -2 / 2) = (-1, -1): new (0,0) = old (1,1)
+cmd 310 131075
+cmd 312 4
+expect #9913 value 3
+expect #9914 value 2
+expect #5191 value 1
+cmd 314 0
+cmd 313 0
+expect #5190 text "FFFFFFFF"
+cmd 314 1
+cmd 313 65538
+expect #5190 text "00000000"
+cmd 313 0
+expect #5190 text "00000000"
+key ctrl+z
+# Rechts unten: new (2,1) = old (5,3) (black), new (0,0) = old (3,2)
+cmd 312 8
+cmd 314 0
+cmd 313 65538
+expect #5190 text "FF000000"
+key ctrl+z
+# Links oben: new (0,0) = old (0,0) (red), layer 1 (1,0) yellow
+cmd 312 0
+cmd 314 0
+cmd 313 0
+expect #5190 text "FFFF0000"
+cmd 314 1
+cmd 313 1
+expect #5190 text "FFFFFF00"
+key ctrl+z
+# wider but lower: 10 x 2, Unten: offset (2, -2)
+cmd 310 131082
+cmd 312 7
+expect #9913 value 10
+expect #9914 value 2
+cmd 314 0
+cmd 313 65538
+expect #5190 text "FF0000FF"
+cmd 313 65543
+expect #5190 text "FF000000"
+cmd 313 65545
+expect #5190 text "FF00FFFF"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+
+# ------------------------------------------------------------ the selection moves along
+cmd 982 0
+cmd 983 65538
+cmd 981 0
+expect #9981 text "0,0,2,1"
+cmd 310 393224
+cmd 312 4
+expect #9981 text "1,1,3,2"
+key ctrl+z
+expect #9981 text "0,0,2,1"
+cmd 312 8
+expect #9981 text "2,2,4,3"
+key ctrl+z
+cmd 310 131075
+cmd 312 8
+expect #9981 text "0,0,0,0"
+key ctrl+z
+expect #9981 text "0,0,2,1"
+cmd 981 2
+expect #9981 text "0,0,0,0"
+
+# ------------------------------------------------------------ the dialog
+key ctrl+shift+r
+expect window 24617 open
+expect window 24617 modal
+expect #5203 checked
+expect #5201 unchecked
+expect #5204 unchecked
+expect #5205 value 6
+expect #5206 value 4
+expect #5212 value 4
+expect #5213 value 0
+expect #5224 checked
+expect #5220 unchecked
+expect text:"Neue Größe: 192 Bytes" exists
+expect text:"Aktuelle Bildgröße: 192 Bytes" exists
+# the grid sets the combo box and back
+click #5220
+expect #5220 checked
+expect #5224 unchecked
+expect #5212 value 0
+click #5212
+click listitem:"Rechts unten"
+expect #5228 checked
+expect #5212 value 8
+click #5205
+key ctrl+a
+type "8"
+key tab
+click #5206
+key ctrl+a
+type "6"
+key tab
+expect text:"Neue Größe: 384 Bytes" exists
+click #5213
+click listitem:"Transparent"
+expect #5213 value 2
+click button:"OK"
+expect window 24617 closed
+expect #9913 value 8
+expect #9914 value 6
+cmd 314 0
+cmd 313 131074
+expect #5190 text "FFFF0000"
+cmd 313 0
+expect #5190 text "00000000"
+key ctrl+z
+# remembered: Rechts unten, Transparent; Prozentual 200 % with Mitte and Sekundärfarbe
+key ctrl+shift+r
+expect #5228 checked
+expect #5213 value 2
+click #5201
+click #5202
+key ctrl+a
+type "200"
+key tab
+expect #5205 value 12
+expect #5206 value 8
+click #5224
+click #5213
+click listitem:"Sekundärfarbe"
+click button:"OK"
+expect #9913 value 12
+expect #9914 value 8
+cmd 314 0
+cmd 313 131075
+expect #5190 text "FFFF0000"
+cmd 313 0
+expect #5190 text "FF00FFFF"
+key ctrl+z
+cmd 962 0
+expect text:"t.cmp=ok" exists
+# Abbrechen / Esc change nothing
+key ctrl+shift+r
+click button:"Abbrechen"
+expect window 24617 closed
+key ctrl+shift+r
+key esc
+expect window 24617 closed
+expect #9913 value 6
+expect text:"t.pos=3" exists
+# Enter in a number box = OK (the dialog remembered Prozentual: back to Absolut)
+key ctrl+shift+r
+expect #5201 checked
+click #5203
+click #5205
+key ctrl+a
+type "7"
+key enter
+expect window 24617 closed
+expect #9913 value 7
+expect #9914 value 8
+key ctrl+z
+expect #9913 value 6

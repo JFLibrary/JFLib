@@ -1,0 +1,222 @@
+# layer_import.uis -- Ebenen > Als Ebene importieren… (agent A4): the open dialog (headless:
+# the library's own dialog, name box #98316, relative names start in the working directory),
+# PNG images as new layers above the current one named after the file, images larger than
+# the canvas ask (window 24610: Leinwand vergrößern #5450 / Leinwand nicht ändern #5451 /
+# Abbrechen / Esc), several files at once (test hook 371), .pdn documents with every layer
+# and its properties (paint.net's c_layers.pdn and a .pdn written by this app), errors in
+# the error bar, one history step each ("Als Ebene importieren", undo restores the size).
+# Fixtures: tests/fixtures/layers/make_fixtures.py (l4_small.png 32 x 24: red | green 50 %,
+# (31, 23) transparent; l4_wide.png 96 x 40 blue, (95, 0) yellow, (0, 39) white;
+# l4_tall.png 40 x 80 yellow, (0, 79) black).  Hook 371 mask: bit 0 l4_small, 1 l4_wide,
+# 2 l4_tall, 3 c_layers.pdn, 4 build/a4_layers.pdn, 5 a missing file.
+# Probes: #9903 layers, #9904 current, #9906 name, #9913 / #9914 image size, #9918 error
+# bar, #4390 (cmd 370 i: "name|visible|opacity|blend", cmd 372 x | y << 12 | i << 24:
+# layer pixel), #4391 history entry, #4392 entries, #4395 open dialogs.
+size 1280 800
+theme light
+# a 64 x 48 image (Neu keeps the aspect ratio of 800 x 600)
+key ctrl+n
+click #5002
+key ctrl+a
+type "64"
+key tab
+expect #5003 value 48
+click button:"OK"
+expect #9913 value 64
+expect #9914 value 48
+expect #9903 value 1
+expect #4392 value 1
+
+# ------------------------------------------------------------ a small PNG through the menu and the dialog
+click menu:"Ebenen"
+click menuitem:"Als Ebene importieren…"
+expect dialog:"Öffnen" exists
+expect #4395 value 16
+click #98316
+key ctrl+a
+type "apps/PaintCraft/tests/fixtures/layers/l4_small.png"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect #4395 value 0
+expect #9903 value 2
+expect #9904 value 1
+expect #9906 text "l4_small.png"
+expect #9913 value 64
+expect #4391 text "Als Ebene importieren"
+expect #4392 value 2
+cmd 370 1
+expect #4390 text "l4_small.png|1|255|0"
+cmd 372 16777216
+expect #4390 text "FFFF0000"
+cmd 372 16777236
+expect #4390 text "8000FF00"
+cmd 372 16871455
+expect #4390 text "00000000"
+# outside the image: transparent (the layer has the canvas size)
+cmd 372 16777256
+expect #4390 text "00000000"
+cmd 900 20
+expect #9900 text "FF7FFF7F"
+window 24579
+expect text:"l4_small.png" exists
+window any
+key ctrl+z
+expect #9903 value 1
+expect #4392 value 2
+key ctrl+y
+expect #9903 value 2
+# the next import starts in the folder of the last one (the name box keeps nothing)
+cmd 324
+expect dialog:"Öffnen" exists
+click #98316
+key ctrl+a
+type "l4_small.png"
+click button:"Öffnen"
+expect #9903 value 3
+expect #9904 value 2
+cmd 370 2
+expect #4390 text "l4_small.png|1|255|0"
+key ctrl+z
+
+# ------------------------------------------------------------ larger than the canvas: the question
+cmd 339 0
+cmd 324
+click #98316
+key ctrl+a
+type "l4_wide.png"
+click button:"Öffnen"
+expect window 24610 open
+expect window 24610 modal
+expect #4395 value 4
+expect text:"Das Bild ragt über die Leinwand hinaus." exists
+expect button:"Leinwand vergrößern" exists
+expect button:"Leinwand nicht ändern" exists
+# Abbrechen: nothing happens
+click button:"Abbrechen"
+expect window 24610 closed
+expect #9903 value 2
+expect #4392 value 3
+# Esc: nothing either
+cmd 371 2
+expect window 24610 open
+key esc
+expect window 24610 closed
+expect #9903 value 2
+# keep the size: the image is cut at the canvas (top left)
+cmd 371 2
+click button:"Leinwand nicht ändern"
+expect window 24610 closed
+expect #9903 value 3
+expect #9904 value 1
+expect #9906 text "l4_wide.png"
+expect #9913 value 64
+expect #9914 value 48
+cmd 372 16777216
+expect #4390 text "FF0000FF"
+cmd 372 16777279
+expect #4390 text "FF0000FF"
+cmd 372 16936960
+expect #4390 text "FFFFFFFF"
+cmd 372 16941056
+expect #4390 text "00000000"
+expect #4391 text "Als Ebene importieren"
+key ctrl+z
+expect #9903 value 2
+# enlarge: the canvas grows to 96 x 48 (top left anchor), the background's new area in the
+# secondary colour (white), other layers transparent there; one step, undo restores the size
+cmd 371 2
+click button:"Leinwand vergrößern"
+expect #9913 value 96
+expect #9914 value 48
+expect #9903 value 3
+expect #9904 value 1
+cmd 372 16777311
+expect #4390 text "FFFFFF00"
+cmd 372 90
+expect #4390 text "FFFFFFFF"
+cmd 372 33554522
+expect #4390 text "00000000"
+cmd 372 33554432
+expect #4390 text "FFFF0000"
+cmd 900 90
+expect #9900 text "FF0000FF"
+cmd 900 2883674
+expect #9900 text "FFFFFFFF"
+expect #4391 text "Als Ebene importieren"
+key ctrl+z
+expect #9913 value 64
+expect #9914 value 48
+expect #9903 value 2
+cmd 372 16777216
+expect #4390 text "FFFF0000"
+key ctrl+y
+expect #9913 value 96
+expect #9903 value 3
+key ctrl+z
+
+# ------------------------------------------------------------ several files at once: one step
+cmd 339 1
+cmd 371 5
+expect window 24610 open
+click button:"Abbrechen"
+expect #9903 value 2
+cmd 371 7
+expect window 24610 open
+click button:"Leinwand vergrößern"
+expect #9913 value 96
+expect #9914 value 80
+expect #9903 value 5
+expect #9904 value 4
+cmd 370 2
+expect #4390 text "l4_small.png|1|255|0"
+cmd 370 3
+expect #4390 text "l4_wide.png|1|255|0"
+cmd 370 4
+expect #4390 text "l4_tall.png|1|255|0"
+cmd 372 67108864
+expect #4390 text "FFFFFF00"
+cmd 372 67432448
+expect #4390 text "FF000000"
+key ctrl+z
+expect #9903 value 2
+expect #9913 value 64
+expect #9914 value 48
+expect #4391 text "Als Ebene importieren"
+
+# ------------------------------------------------------------ a .pdn written by this app
+cmd 339 1
+cmd 906 1
+cmd 905 200
+cmd 103
+click #81932
+key ctrl+a
+type "build/a4_layers.pdn"
+click button:"Speichern"
+expect #9911 text "a4_layers.pdn"
+key ctrl+n
+click button:"OK"
+expect #9903 value 1
+cmd 371 16
+expect #9903 value 3
+expect #9904 value 2
+cmd 370 1
+expect #4390 text "a4_layers.pdn: Hintergrund|1|255|0"
+cmd 370 2
+expect #4390 text "a4_layers.pdn: l4_small.png|1|200|1"
+cmd 372 33554432
+expect #4390 text "FFFF0000"
+
+# ------------------------------------------------------------ errors
+cmd 371 32
+expect #9918 text "Datei nicht gefunden."
+expect #9903 value 3
+click #1641
+cmd 324
+click #98316
+key ctrl+a
+type "make_fixtures.py"
+click button:"Öffnen"
+expect #9918 text "Dieses Bildformat wird nicht erkannt; die Datei lässt sich nicht öffnen."
+expect #9903 value 3
+click #1641
+expect #9918 text ""

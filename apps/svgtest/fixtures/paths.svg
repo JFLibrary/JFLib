@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <title>Pfade</title>
+  <!-- every path command, absolute and relative, implicit repetition -->
+  <path d="M10 10 H60 V40 L35 55 Z" fill="#2563eb"/>
+  <path d="m70 10 h50 v30 l-25 15 z" fill="#16a34a"/>
+  <path d="M130 50 C130 10 190 10 190 50 S150 60 130 50" fill="#f59e0b" stroke="#78350f"/>
+  <path d="M10 110 Q35 60 60 110 T110 110" fill="none" stroke="#db2777" stroke-width="4"/>
+  <path d="M120 110 q15-40 30 0 t30 0" fill="none" stroke="#7c3aed" stroke-width="4"/>
+  <!-- arcs: the four flag combinations -->
+  <path d="M20 160 a25 15 0 0 1 40 0" fill="none" stroke="#dc2626" stroke-width="3"/>
+  <path d="M20 160 a25 15 0 1 0 40 0" fill="none" stroke="#0284c7" stroke-width="2"/>
+  <path d="M80 150 A20 20 0 1 1 79.9 150.1 Z" fill="#14b8a6"/>
+  <!-- a star: even-odd leaves the centre open, non-zero fills it -->
+  <path d="M140 125 L152 185 L120 145 L162 145 L128 185 Z" fill="#111827" fill-rule="evenodd"/>
+  <path d="M175 125 L187 185 L155 145 L197 145 L163 185 Z" fill="#111827" fill-rule="nonzero"/>
+  <!-- compressed numbers and flags, an error after the first segment -->
+  <path d="M10,190l30-10.5.5,10a5,5,0,0,0,10,0zM70,190 L80 180 X 200 0" fill="#9ca3af" stroke="#374151"/>
+</svg>

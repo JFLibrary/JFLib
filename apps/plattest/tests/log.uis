@@ -1,0 +1,2 @@
+#!args --test log
+# the log (lib/plat/log.rs): levels, the ring, file rotation, the last lines of a crashing child
