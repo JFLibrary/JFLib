@@ -4,7 +4,10 @@
 // rows that wrap (BOX_WRAP), a details grid box whose note wraps (tests/wrap.uis), all of it
 // at a text scale of 150 % (tests/textscale.uis); the page "Simulation" (navigation, Labor):
 // a timeline over three tracks of events and a hex view of an Ethernet / IPv4 / ICMP frame
-// with its layers marked
+// with its layers marked; the page "Metriken" (navigation, Labor): line charts of a
+// simulated service, sampled every half second from a deterministic generator, with its
+// fault injections as markers and thresholds, a signal of 100 000 points (or the same span
+// in 500), one over plain numbers and an empty one (tests/linechart.uis, linechart_hc.uis)
 //
 //   python build_rs.py app datagallery --style backupcraft,winui,kde
 //   build/win/datagallery.exe --shot shot.png --size 1440x960 --theme dark
@@ -86,6 +89,36 @@ const ID_HEX_PASTE: u32 = 31110;
 const PAGE_SIM: u32 = 9;
 // scripts: the modifier keys the timeline treats as held (`cmd 9100 2` = Ctrl, 1 = Shift)
 const CMD_TL_MODS: u32 = 9100;
+// the page "Metriken" (line charts) takes the ids 32000 .. 32099: after the simulation
+// page's (31000 .. 31110) with room to spare; the span control takes 32003 .. 32005
+const PAGE_MET: u32 = 10;
+const ID_MET: u32 = 32000;
+const ID_MET_FOLLOW: u32 = 32001;
+const ID_MET_SPAN: u32 = 32002;
+const ID_MET_FAULT: u32 = 32010;
+const ID_LC_LAT: u32 = 32020;
+const ID_LC_RPS: u32 = 32021;
+const ID_LC_ERR: u32 = 32022;
+const ID_LC_NET: u32 = 32023;
+const ID_LC_RAW: u32 = 32024;
+const ID_LC_LOAD: u32 = 32025;
+const ID_LC_QUEUE: u32 = 32026;
+const ID_MET_POINTS: u32 = 32030; // the signal's points: 500 / 100 000 (32031 .. 32032)
+// the generator's tick (a timer, every 500 ms while the page shows); scripts: `cmd 9201 N`
+// takes N samples at once, `cmd 9202 0` stops the ticks (1 starts them again)
+const TIMER_MET: u32 = 9200;
+const CMD_MET_STEP: u32 = 9201;
+const CMD_MET_RUN: u32 = 9202;
+// `cmd 9203 1`: a sample in every pass (for `bench`: every frame draws new data), 0 ends it
+const CMD_MET_PUMP: u32 = 9203;
+const MET_SPANS: [f64; 3] = [30.0, 60.0, 120.0];
+// the faults of the 120 s cycle: start, end (s in the cycle; equal: a line), label,
+// critical (else a warning)
+const FAULTS: [(f64, f64, &str, bool); 3] = [
+    (70.0, 82.0, "Link getrennt", true),
+    (95.0, 95.0, "Latenz +40 ms", false),
+    (108.0, 114.0, "Paketverlust 5 %", false),
+];
 
 // the simulation page: 12 s of events; an echo request as one frame with its three layers
 const SPAN: f64 = 12.0;
@@ -156,6 +189,194 @@ fn echo_frame() -> Vec<u8> {
     let c = checksum(&f[34..]);
     f[36..38].copy_from_slice(&c.to_be_bytes());
     f
+}
+
+// a number in 0 .. 1 for sample k of channel c: a 32-bit hash, the same on every machine
+fn noise(k: u64, c: u32) -> f64 {
+    let mut x = (k as u32).wrapping_mul(0x9E37_79B9) ^ ((k >> 32) as u32) ^ c.wrapping_mul(0x85EB_CA6B);
+    x ^= x >> 16;
+    x = x.wrapping_mul(0x7FEB_352D);
+    x ^= x >> 15;
+    x = x.wrapping_mul(0x846C_A68B);
+    x ^= x >> 16;
+    (x >> 8) as f64 / 16_777_216.0
+}
+
+// the metrics page: a simulated service sampled every half second (latency percentiles in
+// s, requests and failed requests per second, the error rate, bytes per second) whose faults
+// come in a cycle of 120 s (FAULTS, and one injected by hand), a 1 kHz signal kept as its
+// newest 100 000 points (and every 200th of them: the same 100 s in 500 points), the latency
+// over the number of clients, a queue without data
+struct Lab {
+    k: u64,
+    p50: SeriesBuf,
+    p95: SeriesBuf,
+    p99: SeriesBuf,
+    rps: SeriesBuf,
+    errs: SeriesBuf,
+    err_pct: SeriesBuf,
+    net: SeriesBuf,
+    raw: SeriesBuf,
+    raw_lo: SeriesBuf,
+    raw_k: u64,
+    // the signal shown: 0 its 500 points, 1 its 100 000
+    points: i32,
+    // a sample in every pass (`cmd 9203 1`, benchmarks)
+    pump: bool,
+    load50: SeriesBuf,
+    load99: SeriesBuf,
+    queue: SeriesBuf,
+    // markers: start, end, label, critical
+    marks: Vec<(f64, f64, &'static str, bool)>,
+    // the fault injected by hand: from, until (s)
+    manual: Option<(f64, f64)>,
+    follow: i32,
+    span: i32,
+    view: (f64, f64),
+    run: bool,
+    armed: bool,
+    hover: Option<(usize, f64)>,
+}
+
+impl Lab {
+    fn new() -> Lab {
+        let mut l = Lab {
+            k: 0,
+            p50: SeriesBuf::new(1200),
+            p95: SeriesBuf::new(1200),
+            p99: SeriesBuf::new(1200),
+            rps: SeriesBuf::new(1200),
+            errs: SeriesBuf::new(1200),
+            err_pct: SeriesBuf::new(1200),
+            net: SeriesBuf::new(1200),
+            raw: SeriesBuf::new(100_000),
+            raw_lo: SeriesBuf::new(500),
+            raw_k: 0,
+            points: 1,
+            pump: false,
+            load50: SeriesBuf::new(64),
+            load99: SeriesBuf::new(64),
+            queue: SeriesBuf::new(64),
+            marks: Vec::new(),
+            manual: None,
+            follow: 1,
+            span: 1,
+            view: (0.0, 0.0),
+            run: true,
+            armed: false,
+            hover: None,
+        };
+        // two minutes of history (the signal: its newest 100 s)
+        for _ in 0..240 {
+            l.sample();
+        }
+        // the latency over 0 .. 200 clients: flat, then the queueing knee
+        for c in 0..=40 {
+            let x = c as f64 * 5.0;
+            let q = x / 160.0;
+            let knee = q * q * q * q;
+            l.load50.push(x, 0.011 + 0.002 * noise(c, 20) + 0.04 * knee);
+            l.load99.push(x, 0.06 + 0.01 * noise(c, 21) + 0.35 * knee);
+        }
+        l
+    }
+
+    // the time of the newest sample (s)
+    fn now(&self) -> f64 {
+        self.k.saturating_sub(1) as f64 * 0.5
+    }
+
+    // the next half second: a sample of every series, 500 of the signal; a fault of the
+    // cycle that starts now becomes a marker
+    fn sample(&mut self) {
+        let k = self.k;
+        self.k += 1;
+        let t = k as f64 * 0.5;
+        let cyc = (k / 240) as f64 * 120.0;
+        let ph = t - cyc;
+        for &(a, b, label, crit) in &FAULTS {
+            if ph == a {
+                self.marks.push((cyc + a, cyc + b, label, crit));
+            }
+        }
+        // markers older than every point kept go
+        if let Some((oldest, _)) = self.p50.first() {
+            self.marks.retain(|m| m.1 >= oldest);
+        }
+        let down = (70.0..82.0).contains(&ph);
+        let slow = (95.0..108.0).contains(&ph) || self.manual.is_some_and(|(a, b)| t >= a && t < b);
+        let loss = (108.0..114.0).contains(&ph);
+        let n = |c: u32| noise(k, c);
+        // a slow wave over four minutes
+        let (s, _) = deg_sincos(t * 1.5);
+        let mut rps = 1150.0 + 120.0 * s + 80.0 * (n(1) - 0.5);
+        let mut p50 = 0.012 + 0.004 * n(2) + 0.002 * s;
+        let mut p95 = p50 * 2.6 + 0.012 * n(3);
+        let mut p99 = p95 * 1.7 + 0.025 * n(4);
+        let mut err = 0.25 + 0.35 * n(5);
+        if slow {
+            p50 += 0.04;
+            p95 += 0.045;
+            p99 += 0.05;
+        }
+        if loss {
+            p95 += 0.06 * n(6);
+            p99 += 0.18 + 0.1 * n(7);
+            err += 5.0;
+        }
+        if down {
+            rps *= 0.55;
+            err = 30.0 + 8.0 * n(8);
+            p95 = 0.22 + 0.05 * n(9);
+            p99 = 0.55 + 0.2 * n(10);
+        }
+        self.p50.push(t, p50);
+        self.p95.push(t, p95);
+        self.p99.push(t, p99);
+        self.rps.push(t, rps);
+        self.errs.push(t, rps * err / 100.0);
+        self.err_pct.push(t, err);
+        // the bytes on a simulation clock: nanoseconds (the chart's LX_NANOS)
+        self.net.push(t * 1e9, rps * (24_000.0 + 3_000.0 * n(11)));
+        // the signal: a wave of 10 s, noise, a spike every 7.3 s
+        for _ in 0..500 {
+            let j = self.raw_k;
+            self.raw_k += 1;
+            let tt = j as f64 / 1000.0;
+            let (a, _) = deg_sincos(tt * 36.0);
+            let spike = if j % 7300 < 6 { 24.0 } else { 0.0 };
+            let v = 50.0 + 18.0 * a + 6.0 * (noise(j, 99) - 0.5) + spike;
+            self.raw.push(tt, v);
+            if j % 200 == 0 {
+                self.raw_lo.push(tt, v);
+            }
+        }
+    }
+
+    // a fault by hand: 10 s of +40 ms latency from now
+    fn inject(&mut self) {
+        let t = self.now();
+        self.manual = Some((t, t + 10.0));
+        self.marks.push((t, t + 10.0, "Manuell: Latenz", false));
+    }
+}
+
+// a chart following the newest `span`, or showing a fixed view
+fn timed(c: LineChart<'_>, follow: bool, span: f64, view: (f64, f64)) -> LineChart<'_> {
+    if follow { c.follow(span) } else { c.x_range(view.0, view.1) }
+}
+
+// a card with a title, a note and a line chart 220 DIP high -> the chart's hover
+fn chart_card(ui: &mut Ui, title: &str, note: &str, id: u32, chart: &LineChart) -> Option<(usize, f64)> {
+    ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 8);
+    ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+    ui.text(TS_BODY_STRONG, title);
+    ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS, note);
+    ui.box_end();
+    ui.next_size(-1, 220);
+    let hover = ui.line_chart(id, chart);
+    ui.box_end();
+    hover
 }
 
 struct Job {
@@ -237,6 +458,7 @@ struct Gal {
     frame: Vec<u8>,
     layer: Option<u64>,
     paste: String,
+    lab: Lab,
 }
 
 impl Default for Gal {
@@ -276,6 +498,7 @@ impl Default for Gal {
             frame: echo_frame(),
             layer: None,
             paste: String::new(),
+            lab: Lab::new(),
         }
     }
 }
@@ -307,7 +530,7 @@ impl Gal {
             ui.text(TS_BODY_STRONG, "BackupCraft");
         }
         ui.box_end();
-        let items: [(u32, &str, u32, Option<&str>); 10] = [
+        let items: [(u32, &str, u32, Option<&str>); 11] = [
             (0, "Übersicht", IC_HOME, None),
             (1, "Sicherungsjobs", IC_HISTORY, Some("2")),
             (2, "Wiederherstellung", IC_REFRESH, None),
@@ -317,6 +540,7 @@ impl Gal {
             (6, "Replikation", IC_SHUFFLE, Some("bald")),
             (7, "Monitoring", IC_SLIDERS, Some("1")),
             (PAGE_SIM, "Simulation", IC_DEV_TOOLS, None),
+            (PAGE_MET, "Metriken", IC_CURVE, None),
             (8, "Einstellungen", IC_SETTINGS, None),
         ];
         for (k, (i, label, icon, badge)) in items.iter().enumerate() {
@@ -646,6 +870,143 @@ impl Gal {
         ui.scroll_end();
     }
 
+    // the metrics page: the newest values, the controls (follow live, the span, a fault by
+    // hand), the line charts in two columns, the signal of 100 000 points across both
+    fn metrics(&mut self, ui: &mut Ui) {
+        // the generator ticks while the page shows (and runs)
+        if self.lab.run && !self.lab.armed {
+            ui.timer(TIMER_MET, 500);
+            self.lab.armed = true;
+        }
+        if self.lab.pump {
+            self.lab.sample();
+        }
+        ui.breadcrumb(ID_CRUMB, &["BackupCraft", "Labor", "Metriken"]);
+        ui.page_header("Metriken", "Ein simulierter Dienst, alle 0,5 s gemessen; alle 2 min werden Fehler injiziert");
+        ui.next_size(-1, -1);
+        ui.scroll_begin(ID_MET, SC_V | pad(2));
+        ui.box_begin(0, BOX_V, 14);
+        let sep = ui.decimal_sep();
+        let last = |s: &SeriesBuf| s.last().map_or(f64::NAN, |p| p.1);
+        let lab = &self.lab;
+        let kpis = [
+            ("Anfragen", LcUnit::Num("req/s").text(last(&lab.rps), sep), format!("davon fehlerhaft {}", LcUnit::Num("req/s").text(last(&lab.errs), sep))),
+            ("Latenz p95", LcUnit::Secs.text(last(&lab.p95), sep), format!("p99 {}", LcUnit::Secs.text(last(&lab.p99), sep))),
+            ("Fehlerquote", LcUnit::Num("%").text(last(&lab.err_pct), sep), String::from("Ziel: unter 2 %")),
+            ("Datenrate", LcUnit::Si("B/s").text(last(&lab.net), sep), String::from("gesendet")),
+        ];
+        ui.box_begin(0, BOX_H, 12);
+        for (title, value, sub) in kpis.iter() {
+            ui.next_size(-1, 0);
+            ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 4);
+            ui.text(TS_CAPTION | TX_SECONDARY, title);
+            ui.text(TS_TITLE, value);
+            ui.text(TS_CAPTION | TX_TERTIARY, sub);
+            ui.box_end();
+        }
+        ui.box_end();
+        // follow live (unchecked: the view stays where it is), the span, a fault by hand
+        let span = MET_SPANS[self.lab.span.clamp(0, 2) as usize];
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 16);
+        let mut follow = self.lab.follow;
+        if ui.checkbox(ID_MET_FOLLOW, "Live folgen", &mut follow) & EV_ACT != 0 {
+            self.lab.follow = follow;
+            let probe = [LcSeries::new("", &self.lab.p50)];
+            self.lab.view = LineChart::new(&probe).follow(span).view();
+        }
+        let mut sel = self.lab.span;
+        if ui.segmented(ID_MET_SPAN, &mut sel, &["30 s", "1 min", "2 min"]) & EV_ACT != 0 {
+            self.lab.span = sel;
+            let s = MET_SPANS[sel.clamp(0, 2) as usize];
+            self.lab.view = (self.lab.view.1 - s, self.lab.view.1);
+        }
+        if ui.button(ID_MET_FAULT, "Fehler injizieren") & EV_ACT != 0 {
+            self.lab.inject();
+        }
+        ui.spacer(-1);
+        let names = ["p50", "p95", "p99"];
+        let at = match self.lab.hover {
+            Some((i, t)) => format!("Zeiger: {} bei {}", names[i.min(2)], lc_time_text(t, 1, false, sep)),
+            None => String::from("Zeiger: –"),
+        };
+        ui.text(TS_BODY | TX_SECONDARY, &at);
+        ui.box_end();
+        let span = MET_SPANS[self.lab.span.clamp(0, 2) as usize];
+        let (follow, view) = (self.lab.follow != 0, self.lab.view);
+        let (crit, warn) = (ui.color(T_CRIT), ui.color(T_WARN));
+        let lab = &self.lab;
+        let marks: Vec<LcMarker> = lab
+            .marks
+            .iter()
+            .map(|&(a, b, label, c)| (if b > a { LcMarker::range(a, b, label) } else { LcMarker::line(a, label) }).color(if c { crit } else { warn }))
+            .collect();
+        let lat = [
+            LcSeries::new("p50", &lab.p50).unit(LcUnit::Secs),
+            LcSeries::new("p95", &lab.p95).pal(2).unit(LcUnit::Secs),
+            LcSeries::new("p99", &lab.p99).pal(4).unit(LcUnit::Secs),
+        ];
+        let slo = [LcThreshold::new(0.25, "SLO 250 ms")];
+        let rps = [
+            LcSeries::new("Anfragen", &lab.rps).area().unit(LcUnit::Num("req/s")),
+            LcSeries::new("Fehler", &lab.errs).pal(4).unit(LcUnit::Num("req/s")),
+        ];
+        let err = [LcSeries::new("Fehlerquote", &lab.err_pct).pal(4).area().unit(LcUnit::Num("%"))];
+        let budget = [LcThreshold::new(2.0, "Budget 2 %").color(warn)];
+        let net = [LcSeries::new("Gesendet", &lab.net).pal(1).area().unit(LcUnit::Si("B/s"))];
+        let raw = [LcSeries::new("Signal", if lab.points == 0 { &lab.raw_lo } else { &lab.raw }).pal(2)];
+        let load = [
+            LcSeries::new("p50", &lab.load50).unit(LcUnit::Secs),
+            LcSeries::new("p99", &lab.load99).pal(2).unit(LcUnit::Secs),
+        ];
+        let queue = [LcSeries::new("Tiefe", &lab.queue)];
+        ui.box_begin(0, BOX_H, 14);
+        ui.next_size(-1, 0);
+        ui.box_begin(0, BOX_V, 14);
+        let c = LineChart::new(&lat).name("Latenz").y_range(0.0, f64::NAN).markers(&marks).thresholds(&slo);
+        let hover = chart_card(ui, "Latenz", "p50, p95 und p99 je halbe Sekunde", ID_LC_LAT, &timed(c, follow, span, view));
+        let c = LineChart::new(&err).name("Fehlerquote").y_range(0.0, f64::NAN).markers(&marks).thresholds(&budget);
+        chart_card(ui, "Fehlerquote", "Anteil fehlerhafter Antworten", ID_LC_ERR, &timed(c, follow, span, view));
+        ui.box_end();
+        ui.next_size(-1, 0);
+        ui.box_begin(0, BOX_V, 14);
+        let c = LineChart::new(&rps).name("Durchsatz").y_range(0.0, f64::NAN).markers(&marks);
+        chart_card(ui, "Durchsatz", "Anfragen und Fehler pro Sekunde", ID_LC_RPS, &timed(c, follow, span, view));
+        // the bytes are on a clock in nanoseconds (LX_NANOS): so are its markers and its view
+        let marks_ns: Vec<LcMarker> = marks.iter().map(|m| LcMarker { t0: m.t0 * 1e9, t1: m.t1 * 1e9, ..*m }).collect();
+        let c = LineChart::new(&net).name("Datenrate").x_axis(LX_NANOS).y_range(0.0, f64::NAN).markers(&marks_ns);
+        let view_ns = (view.0 * 1e9, view.1 * 1e9);
+        chart_card(ui, "Datenrate", "gesendete Bytes pro Sekunde", ID_LC_NET, &timed(c, follow, span * 1e9, view_ns));
+        ui.box_end();
+        ui.box_end();
+        // the signal: the same 100 s in 500 or 100 000 points (as columns: as fast)
+        ui.box_begin(0, BOX_V | BOX_CARD | pad(16), 8);
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        ui.text(TS_BODY_STRONG, "Rohsignal");
+        let note = if lab.points == 0 { "jeder 200. Messpunkt, 5 Hz" } else { "1 kHz, je Pixelspalte Minimum und Maximum" };
+        ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS, note);
+        ui.spacer(-1);
+        let mut points = lab.points;
+        let changed = ui.segmented(ID_MET_POINTS, &mut points, &["500 Punkte", "100 000 Punkte"]) & EV_ACT != 0;
+        ui.box_end();
+        ui.next_size(-1, 220);
+        ui.line_chart(ID_LC_RAW, &LineChart::new(&raw).name("Rohsignal").follow(100.0));
+        ui.box_end();
+        ui.box_begin(0, BOX_H, 14);
+        ui.next_size(-1, 0);
+        let c = LineChart::new(&load).name("Antwortzeit nach Last").x_axis(LX_NUM).y_range(0.0, f64::NAN);
+        chart_card(ui, "Antwortzeit nach Last", "x: gleichzeitige Clients", ID_LC_LOAD, &c);
+        ui.next_size(-1, 0);
+        let c = LineChart::new(&queue).name("Warteschlange");
+        chart_card(ui, "Warteschlange", "noch nicht gemessen", ID_LC_QUEUE, &c);
+        ui.box_end();
+        self.lab.hover = hover;
+        if changed {
+            self.lab.points = points;
+        }
+        ui.box_end();
+        ui.scroll_end();
+    }
+
     // the jobs page (every other navigation item)
     fn jobs(&mut self, ui: &mut Ui) {
         // header: breadcrumb, title, command bar
@@ -715,6 +1076,8 @@ impl App for Gal {
         ui.box_begin(0, BOX_V | pad(20), 14);
         if self.page == PAGE_SIM {
             self.simulation(ui);
+        } else if self.page == PAGE_MET {
+            self.metrics(ui);
         } else {
             self.jobs(ui);
         }
@@ -723,11 +1086,29 @@ impl App for Gal {
         ui.toast_host();
     }
 
-    fn command(&mut self, _ui: &mut Ui, id: u32, arg: u32) -> bool {
-        if id != CMD_TL_MODS {
-            return false;
+    fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
+        match id {
+            CMD_TL_MODS => self.tl.test_mods = arg,
+            // the metrics page: N samples at once, the ticks stopped / started, a tick
+            CMD_MET_STEP => {
+                for _ in 0..arg.min(10_000) {
+                    self.lab.sample();
+                }
+            }
+            CMD_MET_RUN => self.lab.run = arg != 0,
+            CMD_MET_PUMP => self.lab.pump = arg != 0,
+            UIC_TIMER if arg == TIMER_MET => {
+                self.lab.armed = false;
+                if self.lab.run {
+                    self.lab.sample();
+                    if self.page == PAGE_MET {
+                        ui.timer(TIMER_MET, 500);
+                        self.lab.armed = true;
+                    }
+                }
+            }
+            _ => return false,
         }
-        self.tl.test_mods = arg;
         true
     }
 }

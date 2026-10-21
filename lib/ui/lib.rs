@@ -180,6 +180,11 @@ pub use runtime::{Runtime, launch, run};
 pub use style::{Sp, Style, StyleBasic, StyleChrome, StyleData, StyleEdit, StyleList, StyleMisc, StylePopup, StyleShell, StyleValue};
 pub use data::{GridCol, GridEv, GridState, TreeEv, TreeRow, TreeState};
 pub use chart::{BarSeries, DonutSlice};
+// (L5) line charts of time series (chart.rs): the ring of points, what a chart shows, the axis maths
+pub use chart::{
+    lc_nice, lc_time_step, lc_time_text, LcMarker, LcSeries, LcThreshold, LcUnit, LineChart, SeriesBuf, SeriesCol, LC_NO_GRID, LC_NO_HOVER,
+    LC_NO_LEGEND, LX_NANOS, LX_NUM, LX_SECS,
+};
 pub use shell::{CmdItem, NavState};
 // docking (dock.rs): the panels, the layout, the sides and flags
 pub use dock::{

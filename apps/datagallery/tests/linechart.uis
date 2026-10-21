@@ -1,0 +1,120 @@
+#!args --verify-dirty
+# the line chart (ui::line_chart over ui::SeriesBuf, page "Metriken"): the charts' summaries
+# (their K_CANVAS records), axis labels and the tags of thresholds; hovering puts the
+# crosshair on the nearest point and the card lists every series' value there and the
+# markers under the pointer with their time, the chart reports the series nearest to the
+# pointer (the gallery's readout "Zeiger: ..."); the keys move a cursor over the points
+# (its point starts the record's text); new samples move the view while "Live folgen" is on
+# and leave it while it is off; the span; the empty chart; the signal in 100 000 and in 500
+# points.  The generator is stopped (`cmd 9202 0`) and stepped (`cmd 9201 N`), so every
+# value is fixed.  Shots light / dark at 100 and 150 %
+size 1440 960
+theme light
+wait 50
+click "Metriken"
+cmd 9202 0
+wait 50
+
+# the summaries: per series its last value, min. and max. in the view (the last minute)
+expect #32020 value 3
+expect #32020 text "Latenz – p50: aktuell 11,9 ms, min. 10,2 ms, max. 54,1 ms; p95: aktuell 40 ms, min. 30 ms, max. 263 ms; p99: aktuell 76,6 ms, min. 52,6 ms, max. 749 ms"
+expect #32021 text "Durchsatz – Anfragen: aktuell 1,06k req/s, min. 582 req/s, max. 1,18k req/s; Fehler: aktuell 6,1 req/s, min. 2,75 req/s, max. 232 req/s"
+expect #32022 text "Fehlerquote – Fehlerquote: aktuell 0,574 %, min. 0,254 %, max. 37,8 %"
+expect #32023 text "Datenrate – Gesendet: aktuell 26,8 MB/s, min. 14,3 MB/s, max. 30,8 MB/s"
+expect #32026 text "Warteschlange – Keine Daten"
+expect #32026 value 1
+expect text:"Keine Daten" exists
+
+# the axes: the first series' unit on y, the clock on x; the thresholds' tags at the right
+# end of their line
+expect text:"800 ms" rect 288 340 39 16
+expect text:"0 ms" rect 301 509 26 16
+expect text:"1250 req/s" exists
+expect text:"SLO 250 ms" rect 740 457 73 16
+expect text:"Budget 2 %" rect 741 796 72 16
+
+# hovering: the crosshair at the nearest point, the card with every series' value there,
+# the series nearest to the pointer reported
+move 700,420
+expect #32020 hover
+expect text:"1:45" exists
+expect text:"p50: 53 ms" exists
+expect text:"p95: 88,1 ms" exists
+expect text:"p99: 131 ms" exists
+expect text:"Zeiger: p99 bei 1:45,0" exists
+# over the link failure the card names it with its time
+move 462,420
+expect text:"1:15,5" exists
+expect text:"p95: 232 ms" exists
+expect text:"Link getrennt: 1:10 – 1:22" exists
+expect text:"Zeiger: p95 bei 1:15,5" exists
+# the data rate is on a clock in nanoseconds (LX_NANOS): the same axis, the card's x in
+# minutes and seconds (and to the left of the crosshair: no room at the window's edge)
+move 1282,720
+expect text:"1:45" rect 1124 704 23 16
+expect text:"Gesendet: 25,5 MB/s" exists
+move 700,150
+expect text:"Zeiger: –" exists
+expect text:"1:15,5" missing
+
+# the keys: End the last point, Left the one before, Down the next series, Home the first
+# point in view, Esc ends the cursor; its point starts the record
+focus #32020
+key end
+expect #32020 focused
+expect #32020 text "p50, 1:59,5: 11,9 ms. Latenz – p50: aktuell 11,9 ms, min. 10,2 ms, max. 54,1 ms; p95: aktuell 40 ms, min. 30 ms, max. 263 ms; p99: aktuell 76,6 ms, min. 52,6 ms, max. 749 ms"
+expect text:"1:59,5" exists
+expect text:"p50: 11,9 ms" exists
+key left
+expect text:"1:59" exists
+expect text:"p50: 13,5 ms" exists
+key down
+expect text:"p95: 41 ms" exists
+expect #32020 text "p95, 1:59: 41 ms. Latenz – p50: aktuell 11,9 ms, min. 10,2 ms, max. 54,1 ms; p95: aktuell 40 ms, min. 30 ms, max. 263 ms; p99: aktuell 76,6 ms, min. 52,6 ms, max. 749 ms"
+key home
+expect text:"0:59,5" exists
+expect text:"p95: 42,3 ms" exists
+key esc
+expect text:"0:59,5" missing
+expect #32020 text "Latenz – p50: aktuell 11,9 ms, min. 10,2 ms, max. 54,1 ms; p95: aktuell 40 ms, min. 30 ms, max. 263 ms; p99: aktuell 76,6 ms, min. 52,6 ms, max. 749 ms"
+
+# live: two samples move the view (follow), "Live folgen" off keeps it, on again it moves
+# to the newest minute; 30 s narrow it
+cmd 9201 2
+wait 20
+expect #32020 text "Latenz – p50: aktuell 10,2 ms, min. 10,2 ms, max. 54,1 ms; p95: aktuell 27,7 ms, min. 27,7 ms, max. 263 ms; p99: aktuell 68,6 ms, min. 52,6 ms, max. 749 ms"
+click "Live folgen"
+expect checkbox:"Live folgen" unchecked
+cmd 9201 4
+wait 20
+expect #32020 text "Latenz – p50: aktuell 10,2 ms, min. 10,2 ms, max. 54,1 ms; p95: aktuell 27,7 ms, min. 27,7 ms, max. 263 ms; p99: aktuell 68,6 ms, min. 52,6 ms, max. 749 ms"
+click "Live folgen"
+wait 20
+expect #32020 text "Latenz – p50: aktuell 12,9 ms, min. 10,1 ms, max. 54,1 ms; p95: aktuell 43,8 ms, min. 27,7 ms, max. 263 ms; p99: aktuell 94,6 ms, min. 52,6 ms, max. 749 ms"
+click "30 s"
+wait 20
+expect #32020 text "Latenz – p50: aktuell 12,9 ms, min. 10,1 ms, max. 54,1 ms; p95: aktuell 43,8 ms, min. 27,7 ms, max. 96,6 ms; p99: aktuell 94,6 ms, min. 52,6 ms, max. 350 ms"
+
+# the signal: 100 000 points as columns, or every 200th of them (the same 100 s)
+expect #32024 text "Rohsignal – Signal: aktuell 41,9, min. 29, max. 94,1"
+click "500 Punkte"
+wait 20
+expect #32024 text "Rohsignal – Signal: aktuell 48, min. 29,2, max. 88,6"
+click "100 000 Punkte"
+wait 20
+expect #32024 text "Rohsignal – Signal: aktuell 41,9, min. 29, max. 94,1"
+move 700,420
+wait 50
+shot build/shots/datagallery_lines_light.png
+theme dark
+wait 50
+shot build/shots/datagallery_lines_dark.png
+scale 150
+move 700,420
+wait 50
+expect text:"Zeiger: p99 bei 1:55,5" exists
+shot build/shots/datagallery_lines_dark150.png
+theme light
+wait 50
+shot build/shots/datagallery_lines_light150.png
+expect_nowarn
