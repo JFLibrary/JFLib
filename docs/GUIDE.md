@@ -1646,9 +1646,9 @@ if let Some((i, t)) = ui.line_chart(ID_LATENCY, &chart) {
   crosshair and card follow the cursor, and the chart's record starts with its point
   ("p95, 1:45: 88,1 ms. Latenz – ..."), so a screen reader reads the values one by one.
 * Many points: up to two per pixel column the points themselves are drawn, more as one band per
-  column (`SeriesBuf::columns`: min / max per pixel column), so 100 000 points cost little
-  more than 500. The statistics and the drawing object are kept per id until a series' `ver()`
-  or the view changes.
+  column (`SeriesBuf::columns`: min / max per pixel column), so 100 000 points draw as fast as
+  500. The statistics and the drawing object are kept per id until a series' `ver()` or the
+  view changes; a change reads the visible points once (about a millisecond for 100 000).
 * No points at all: the `empty` text (default "Keine Daten" in the UI language). High contrast:
   the scheme's colours with a dash pattern per series (also in the legend), no fills. The plot
   keeps its left-to-right order in mirrored windows; the legend is mirrored. Screen readers get
