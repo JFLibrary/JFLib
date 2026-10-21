@@ -38,7 +38,8 @@
 // replica had), read_repairs (sent), repaired (received), keys, bytes, members_up,
 // member_downs, p50_us, p95_us, p99_us (client requests at this node; the time series take them
 // per interval from the window).
-// Views: Engine::kv_view, kv_ring, kv_where (the replicas of a key and what each holds).
+// Views: Engine::kv_view, kv_ring, kv_where (the replicas of a key and what each holds).  The
+// status line is a message for the app's catalogue (status_msg; status() is its German text).
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -1153,13 +1154,16 @@ impl Service for KvNode {
         alloc::vec![LatWindow::new(&self.lat, LAT)]
     }
     fn status(&self) -> String {
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
         let up = self.nodes.iter().filter(|a| self.is_up(**a)).count();
         let (w, r) = self.quorums(None, None, None);
         let me = match self.me {
-            Some(a) => format!("{}", a),
-            None => String::from("nur Koordinator"),
+            Some(a) => Msg::plain(format!("{}", a)),
+            None => jfn_model::msg::phrase("nur Koordinator"),
         };
-        format!("{}: {} Schlüssel, {} von {} Knoten erreichbar, RF {}, {} W{}/R{}", me, self.keys(), up, self.nodes.len(), self.rf, self.consistency.name(), w, r)
+        msg!("{}: {} Schlüssel, {} von {} Knoten erreichbar, RF {}, {} W{}/R{}", me, self.keys(), up, self.nodes.len(), self.rf, self.consistency.name(), w, r)
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())

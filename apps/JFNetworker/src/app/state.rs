@@ -34,6 +34,7 @@ use crate::workspace::devwin::DevWins;
 use crate::workspace::icons::{self, Symbols};
 use crate::workspace::inspector::Inspector;
 use crate::workspace::logview::Log;
+use crate::workspace::metrics::Metrics;
 use crate::workspace::palette::Palette;
 use crate::workspace::shell::Shell;
 use crate::workspace::sim::SimUi;
@@ -69,6 +70,8 @@ pub(crate) struct Net {
     /// the lab of the project: its goals over the run, the hints shown, the list of labs
     /// (workspace/task.rs)
     pub task: crate::workspace::task::Task,
+    /// the Metriken panel of the lab (workspace/metrics.rs)
+    pub metrics: Metrics,
 }
 
 impl Net {
@@ -93,6 +96,7 @@ impl Net {
             settings_open: Shared::new(0),
             keys_open: Shared::new(0),
             task: crate::workspace::task::Task::new(),
+            metrics: Metrics::new(),
         }
     }
 
@@ -144,6 +148,7 @@ impl Net {
         self.cons = Consoles::new();
         self.log = Log::new();
         self.devwin = DevWins::new();
+        self.metrics = Metrics::new();
         crate::workspace::sim::loaded(self, false);
         // the lab's goals start over (its panel shows)
         crate::workspace::task::loaded(self);

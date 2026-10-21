@@ -744,3 +744,129 @@ Alt+Pfeil auf / ab	Alt+Up / Down arrow
 die Zeilen verschieben	move the lines
 Fehler|Liste	Errors
 Löschen	Delete
+# the lab in the window (U6a): the Metriken panel (workspace/metrics.rs), the pills on the canvas (canvas/lab.rs), faults in the inspector (inspector/faults.rs)
+Metriken	Metrics
+Me&triken	Me&trics
+Alle &Fehler beheben	Heal all &faults
+30 s	30 s
+1 min	1 min
+5 min	5 min
+Durchsatz	Throughput
+Latenz	Latency
+Fehler|Diagramm	Errors
+Warteschlange	Queue
+In Arbeit	In progress
+Backends	Backends
+Replikate	Replicas
+Knoten	Nodes
+Inhalt	Contents
+Auslastung	Utilization
+Leases	Leases
+Rechenzeit	CPU time
+Anfragen/s	Requests/s
+Antworten/s	Responses/s
+Verbindungen/s	Connections/s
+Fehler/s	Errors/s
+5xx/s	5xx/s
+Abgewiesen/s	Rejected/s
+Backend-Fehler/s	Backend errors/s
+Wartend	Waiting
+p50	p50
+p95	p95
+p99	p99
+Mittel	Mean
+Maximum	Maximum
+Gesendet/s	Sent/s
+Erfolgreich/s	Successful/s
+HTTP-Fehler/s	HTTP errors/s
+Gescheitert/s	Failed/s
+Zeitüberschreitungen/s	Timeouts/s
+Ohne Backend/s	No backend/s
+Wiederholt/s	Retried/s
+Verfügbare Backends	Available backends
+Gelesen/s	Reads/s
+Geschrieben/s	Writes/s
+Nicht verfügbar/s	Unavailable/s
+Disk voll/s	Disk full/s
+Replikate gelesen/s	Replica reads/s
+Replikate geschrieben/s	Replica writes/s
+Read Repair/s	Read repairs/s
+Repariert/s	Repaired/s
+Erreichbare Knoten	Reachable nodes
+Schlüssel	Keys
+Daten	Data
+Treffer/s	Hits/s
+Fehlschläge/s	Misses/s
+Einträge	Entries
+Veröffentlicht/s	Published/s
+Zugestellt/s	Delivered/s
+Bestätigt/s	Acknowledged/s
+Zurückgegeben/s	Returned/s
+Aussortiert/s	Dead letters/s
+Angenommen/s	Taken/s
+Erledigt/s	Done/s
+Beschäftigt	Busy
+NXDOMAIN/s	NXDOMAIN/s
+SERVFAIL/s	SERVFAIL/s
+Abgelehnt/s	Refused/s
+DISCOVER/s	DISCOVER/s
+OFFER/s	OFFER/s
+ACK/s	ACK/s
+NAK/s	NAK/s
+DECLINE/s	DECLINE/s
+Konflikte/s	Conflicts/s
+Rückrufe/s	Callbacks/s
+Rechenzeit (µs/s)	CPU time (µs/s)
+Verworfen/s	Dropped/s
+Loadbalancer	Load balancer
+KV-Knoten	KV node
+Queue	Queue
+Worker	Worker
+Webserver	Web server
+Lastgenerator	Load generator
+Nachrichten/s	Messages/s
+Fehlerquote	Error rate
+Trefferquote	Hit rate
+Last/s	Load/s
+Lastanteil	Share of the load
+Keine Dienste	No services
+Hier stehen die Zahlen der Dienste: Loadbalancer, KV-Speicher, Caches, Queues, Webserver und Lastgeneratoren aus der Projektdatei, mit Kacheln und Verläufen über die Zeit.	Here are the numbers of the services: load balancers, KV stores, caches, queues, web servers and load generators from the project file, as tiles and over time.
+1 Dienst	1 service
+{} Dienste	{} services
+Zeitraum	Span
+Kacheln: die letzten {} s	Tiles: the last {} s
+Noch keine Messwerte: der Simulator nimmt jede Sekunde einen Punkt jeder Zahl.	No measurements yet: the simulator takes a point of every number each second.
+Disk: {}	Disk: {}
+Fehler {}: {}	Fault {}: {}
+LB	LB
+KV	KV
+Q	Q
+HTTP	HTTP
+Dauer	Duration
+bis zum Wiederherstellen	until restored
+ohne Ende	no end
+Disk +	Disk +
+Faktor ×	Factor ×
+Fehler einspielen	Inject a fault
+Ausschalten	Power off
+Das Gerät verliert den Strom und kommt beim Wiederherstellen wieder (das Projekt bleibt eingeschaltet).	The device loses its power and comes back when restored (the project keeps it switched on).
+Dienst	Service
+Disk	Disk
+Verlangsamen	Slow down
+Die Disk braucht mehr Zeit je Zugriff (ms) oder einen Faktor für die Übertragung (größer als 0, nicht 1), z. B. 10 und 3.	The disk needs more time per access (ms) or a factor for the transfer (greater than 0, not 1), e.g. 10 and 3.
+Kabel ziehen	Pull the cable
+Das Kabel ist getrennt, bis der Fehler behoben ist (im Projekt bleibt es eingesteckt).	The cable is disconnected until the fault is healed (the project keeps it plugged in).
+Laufzeit +	Delay +
+Verlust +	Loss +
+Höchstens	At most
+Verschlechtern	Degrade
+Laufzeit (ms), Verlust (0 bis 100 %) oder eine Rate (Mbit/s, größer als 0) angeben, z. B. 20, 5 oder 10.	Give a delay (ms), a loss (0 to 100 %) or a rate (Mbit/s, greater than 0), e.g. 20, 5 or 10.
+Partition	Partition
+Die gewählten Geräte und der Rest des Netzes hören einander nicht mehr: jedes verwirft die IPv4-Pakete der anderen Seite.	The selected devices and the rest of the network no longer hear each other: each drops the IPv4 packets of the other side.
+Abtrennen	Cut off
+Aktive Fehler ({})	Active faults ({})
+noch {}	{} left
+Wiederherstellen|Fehler	Restore
+Alle wiederherstellen ({})	Restore all ({})
+Die Dauer ist eine Zahl von Sekunden (größer als 0, höchstens ein Tag), z. B. 10 oder 2,5; leer: bis zum Wiederherstellen.	The duration is a number of seconds (greater than 0, at most a day), e.g. 10 or 2.5; empty: until restored.
+Fehler|Zeitleiste	Faults

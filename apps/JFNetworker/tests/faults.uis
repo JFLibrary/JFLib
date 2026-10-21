@@ -1,0 +1,160 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/lab_window.jfnet
+# fault injection in the inspector (workspace/inspector/faults.rs, doc/faults.rs) on
+# tests/fixtures/lab_window.jfnet: a device's power fault, its undo (it heals) and redo (it
+# starts again under a new number), "Wiederherstellen" and its undo, "Alle wiederherstellen"; a
+# service stopped for 2 s heals by itself; a slower disk; a refused duration; a cable pulled and
+# made worse (delay, loss), an empty one refused; a partition of two selected devices; every
+# fault on the project's page; the document stays saved throughout (faults are not part of
+# the file); the faults' lane on the Ereignisse timeline; the power fault as a shaded range in
+# the Metriken panel's chart of LB1 (its hover card names it), and the canvas draws KV2 off.
+# Ids: duration 45312, power 45313, service 45314, stop 45315, disk ms 45316, factor 45317,
+# slow down 45318, unplug 45319, delay 45320, loss 45321, rate 45322, impair 45323, partition
+# 45324, heal all 45325, heal 45376 + k
+size 1280 1400
+theme light
+wait 4000
+# ---- KV2: its card at the end of the inspector
+click listitem:"KV2"
+wait 100
+expect text:"Fehler einspielen" exists
+expect #45313 enabled
+expect text:"Aktive Fehler (0)" missing
+shot build/jfnetworker/faults_card.png
+# power off: one undo step; the project keeps KV2 switched on
+click #45313
+wait 100
+expect text:"Aktive Fehler (1)" exists
+expect text:"Fehler 1: KV2 ausgeschaltet" exists
+expect text:"bis zum Wiederherstellen" exists
+expect #45313 disabled
+expect #20486 checked
+expect text:"KV2: KV (gestoppt)" exists
+shot build/jfnetworker/faults_power.png
+# undo heals it, redo starts it again (a new number, a new mark)
+key ctrl+z
+wait 100
+expect text:"Aktive Fehler (1)" missing
+expect #45313 enabled
+expect text:"KV2: KV" exists
+key ctrl+y
+wait 100
+expect text:"Fehler 2: KV2 ausgeschaltet" exists
+# Wiederherstellen heals it; its undo brings it back
+click #45376
+wait 100
+expect text:"Fehler 2: KV2 ausgeschaltet" missing
+key ctrl+z
+wait 100
+expect text:"Fehler 3: KV2 ausgeschaltet" exists
+click #45325
+wait 100
+expect text:"Fehler 3: KV2 ausgeschaltet" missing
+# ---- a service stopped for 2 s heals by itself
+click #45312
+type "2"
+click #45315
+wait 100
+expect text:"Fehler 4: Dienst kv auf KV2 gestoppt" exists
+expect text:"noch 2,0 s" exists
+expect #45315 disabled
+wait 2500
+expect text:"Fehler 4: Dienst kv auf KV2 gestoppt" missing
+expect #45315 enabled
+# a refused duration
+click #45312
+key ctrl+a
+type "bald"
+click #45313
+wait 100
+expect text:"Die Dauer ist eine Zahl von Sekunden (größer als 0, höchstens ein Tag), z. B. 10 oder 2,5; leer: bis zum Wiederherstellen." exists
+expect text:"Aktive Fehler (1)" missing
+click #45312
+key ctrl+a
+key delete
+# the disk: 10 ms more per access, three times the transfer time
+click #45316
+type "10"
+click #45317
+type "3"
+click #45318
+wait 100
+expect text:"Fehler 5: Disk von KV2 langsam: +10,000 ms je Zugriff, Übertragung ×3" exists
+expect text:"Die Dauer ist eine Zahl von Sekunden (größer als 0, höchstens ein Tag), z. B. 10 oder 2,5; leer: bis zum Wiederherstellen." missing
+dump build/jfnetworker/faults_kv2.txt
+expect_nowarn
+# ---- the cable KV2 - SW2: pulled, healed; worse (20 ms more delay, 5 % loss); empty refused
+click listitem:"Kabel KV2 eth0 – SW2 Gi1/0/5, Kupfer, gerade, aktiv"
+wait 100
+expect text:"Fehler einspielen" exists
+click #45319
+wait 100
+expect text:"Fehler 6: Kabel KV2 eth0 – SW2 Gi1/0/5 getrennt" exists
+click #45376
+wait 100
+expect text:"Fehler 6: Kabel KV2 eth0 – SW2 Gi1/0/5 getrennt" missing
+click #45323
+wait 100
+expect text:"Laufzeit (ms), Verlust (0 bis 100 %) oder eine Rate (Mbit/s, größer als 0) angeben, z. B. 20, 5 oder 10." exists
+click #45320
+type "20"
+click #45321
+type "5"
+click #45323
+wait 100
+expect text:"Fehler 7: Kabel KV2 eth0 – SW2 Gi1/0/5: +20,000 ms Laufzeit, 5 % Verlust" exists
+shot build/jfnetworker/faults_cable.png
+expect_nowarn
+# ---- a partition: KV1 and KV2 against the rest of the network
+click listitem:"KV1"
+drag listitem:"KV2" listitem:"KV2" 1 shift
+wait 100
+expect text:"2 Objekte" exists
+click #45324
+wait 100
+expect text:"Fehler 8: Partition: KV1, KV2 | alle anderen" exists
+shot build/jfnetworker/faults_partition.png
+expect_nowarn
+# ---- the project's page: every fault; the document is still saved
+click 330,900
+wait 100
+expect text:"Aktive Fehler (3)" exists
+expect text:"gespeichert" exists
+click #45325
+wait 100
+expect text:"Aktive Fehler (3)" missing
+key ctrl+z
+wait 100
+expect text:"Aktive Fehler (3)" exists
+key ctrl+y
+wait 100
+expect text:"Aktive Fehler (3)" missing
+expect text:"gespeichert" exists
+expect_nowarn
+# ---- a power fault in the charts of LB1: a shaded range; undo ends it
+click listitem:"KV2"
+wait 100
+click #45313
+wait 3000
+cmd 260
+wait 100
+click #47111
+wait 100
+expect text:"LB1 · Loadbalancer lb" exists
+# the first chart's cursor on its newest point: the card names the fault there
+focus #45088
+key end
+wait 100
+expect text:"Fehler 12: KV2 ausgeschaltet: 0:08,716 – 0:12" exists
+shot build/jfnetworker/faults_chart.png
+key ctrl+z
+wait 1000
+expect text:"Fehler 12: KV2 ausgeschaltet: 0:08,716 – 0:12,016" exists
+expect text:"Aktive Fehler (1)" missing
+# ---- the faults' lane on the Ereignisse timeline (the simulation mode shows it)
+click tab:"Simulation"
+wait 300
+expect tab:"Ereignisse" selected
+expect text:"Fehler" value 24
+click tab:"Echtzeit"
+wait 100
+expect_nowarn

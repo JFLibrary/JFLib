@@ -6,6 +6,8 @@
 //                                           comes on top and overlaps with the next accesses
 //                                           (a queue of a flash disk)
 //   Disk::access(now, bytes) -> Ns          when an access that starts now is done
+//   Disk::text() / msg()                    "12 KiB von 1 GiB, 100 µs" (the console's German
+//                                           line; as a message for the app's catalogue)
 //   OsApi::disk_read(bytes) / disk_write(bytes, grow) / disk_free(bytes) / disk() /
 //   disk_setup(latency, bps, iops, capacity); setup_of(config) reads {"disk": {...}}
 //
@@ -16,6 +18,9 @@
 // services' business (they lose what they had not stored yet).
 
 use alloc::collections::BTreeMap;
+
+use jfn_model::msg;
+use jfn_model::msg::{dur, Msg};
 
 use crate::kernel::{Ns, SEC, US};
 use crate::os::OsApi;
@@ -130,6 +135,15 @@ impl Disk {
     pub fn text(&self) -> alloc::string::String {
         let slow = if self.slow_extra > 0 || self.slow_pm != 1000 { " (verlangsamt)" } else { "" };
         alloc::format!("{} von {}, {}{}", size_text(self.used()), size_text(self.capacity), crate::trace::fmt_ns((self.latency + self.slow_extra) as i64), slow)
+    }
+    /// text() as a message for the app's catalogue (its German text is text())
+    pub fn msg(&self) -> Msg {
+        let lat = dur((self.latency + self.slow_extra) as i64);
+        if self.slow_extra > 0 || self.slow_pm != 1000 {
+            msg!("{} von {}, {} (verlangsamt)", size_text(self.used()), size_text(self.capacity), lat)
+        } else {
+            msg!("{} von {}, {}", size_text(self.used()), size_text(self.capacity), lat)
+        }
     }
 }
 

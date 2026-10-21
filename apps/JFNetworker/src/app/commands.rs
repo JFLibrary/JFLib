@@ -30,7 +30,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 78] = [
+pub(crate) static CMDS: [Command; 80] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -109,6 +109,8 @@ pub(crate) static CMDS: [Command; 78] = [
     Command::new(CMD_TASK_CHECK, "Ziele &prüfen", IC_ACCEPT, 0, VK_F9, CF_DISABLED),
     Command::new(CMD_TASK_HINT, "Nächster &Hinweis", IC_LIGHTBULB, 0, 0, CF_DISABLED),
     Command::new(CMD_SCRIPTS, "&Skripte …", IC_DEV_TOOLS, 0, 0, CF_DISABLED | CF_HIDDEN),
+    Command::new(CMD_METRICS, "Me&triken", JN_METRICS, MOD_CTRL | MOD_SHIFT, b'M' as u32, 0),
+    Command::new(CMD_HEAL_ALL, "Alle &Fehler beheben", IC_REPAIR, 0, 0, CF_DISABLED),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -155,7 +157,7 @@ static M_VIEW: [Mi; 10] = [
     Mi::Sep,
     Mi::Sub("&Bereiche", &M_PANELS),
 ];
-static M_PANELS: [Mi; 12] = [
+static M_PANELS: [Mi; 13] = [
     Mi::Cmd(CMD_FOCUS_CANVAS),
     Mi::Cmd(CMD_PANEL0),
     Mi::Cmd(CMD_PANEL0 + 1),
@@ -165,11 +167,12 @@ static M_PANELS: [Mi; 12] = [
     Mi::Cmd(CMD_PANEL0 + 5),
     Mi::Cmd(CMD_PANEL0 + 6),
     Mi::Cmd(CMD_PANEL0 + 7),
+    Mi::Cmd(CMD_METRICS),
     Mi::Cmd(CMD_TASK_PANEL),
     Mi::Sep,
     Mi::Cmd(CMD_LAYOUT_RESET),
 ];
-static M_SIM: [Mi; 18] = [
+static M_SIM: [Mi; 20] = [
     Mi::Cmd(CMD_SIM_REALTIME),
     Mi::Cmd(CMD_SIM_MODE),
     Mi::Sep,
@@ -185,6 +188,8 @@ static M_SIM: [Mi; 18] = [
     Mi::Cmd(CMD_SIM_ONLY_SEL),
     Mi::Sep,
     Mi::Cmd(CMD_SIM_RESET),
+    Mi::Sep,
+    Mi::Cmd(CMD_HEAL_ALL),
     Mi::Sep,
     Mi::Cmd(CMD_TASK_CHECK),
     Mi::Cmd(CMD_TASK_HINT),
@@ -277,6 +282,7 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     terminal::states(n, ui);
     crate::workspace::task::states(n, ui);
     crate::workspace::devwin::scripts::states(n, ui);
+    crate::workspace::metrics::states(n, ui);
 }
 
 // Ctrl+1 .. 8: the panel shows; the keyboard goes into it -- the device search, the shown
@@ -419,6 +425,8 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             return true;
         }
         CMD_SCRIPTS => return crate::workspace::devwin::scripts::command(n, ui, id),
+        // the lab (U6a: the Metriken panel, faults)
+        CMD_METRICS | CMD_HEAL_ALL => return crate::workspace::metrics::command(n, ui, id, arg),
         _ => return false,
     }
     ui.repass();

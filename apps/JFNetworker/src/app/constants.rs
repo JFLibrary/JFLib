@@ -333,3 +333,41 @@ pub(crate) const TIMER_SCRIPT_CHECK: u32 = 0x160;
 /// + 0x20 the code editor, + 0x30 the output, + 0x40 the errors (rows + 1 + i), + 0x100 the
 /// list of scripts (rows + 1 + i))
 pub(crate) const ID_SCRIPTS0: u32 = 0xD000;
+// ---- U6a: the lab in the window -- the Metriken panel, the badges and sparklines of the
+// canvas, faults in the inspector (commands 260 .. 299, widgets 0xB000 .. 0xBFFF, timers
+// 0x140 .. 0x14F)
+/// the Metriken panel shows and its service tree gets the keyboard (Ctrl+Shift+M)
+pub(crate) const CMD_METRICS: u32 = 260;
+/// every active fault heals (one undo step; Simulation › Alle Fehler beheben)
+pub(crate) const CMD_HEAL_ALL: u32 = 261;
+/// the dock panel of the lab's metrics (bottom, a tab beside Terminal .. Probleme)
+pub(crate) const P_METRICS: u32 = 9;
+/// the Metriken panel: the split between tree and charts, the scroll view of the charts, the
+/// span of the charts (+ 1 + i: its segments), the charts (+ k)
+pub(crate) const ID_MET_SPLIT: u32 = 0xB000;
+pub(crate) const ID_MET_SCROLL: u32 = 0xB001;
+pub(crate) const ID_MET_SPAN: u32 = 0xB008;
+pub(crate) const ID_MET_CHART0: u32 = 0xB020;
+/// the mini sparklines under the lab's devices on the canvas (+ k, at most 24)
+pub(crate) const ID_SPARK0: u32 = 0xB040;
+/// faults in the inspector: the duration; a device's power, service (+ its stop button),
+/// slower disk (extra ms, factor, button); a cable's unplug, delay, loss, rate, impair; the
+/// partition of a selection; "Alle wiederherstellen"; the heal buttons of the active faults
+/// (+ k, at most 64)
+pub(crate) const ID_FLT_DUR: u32 = 0xB100;
+pub(crate) const ID_FLT_POWER: u32 = 0xB101;
+pub(crate) const ID_FLT_SVC: u32 = 0xB102;
+pub(crate) const ID_FLT_STOP: u32 = 0xB103;
+pub(crate) const ID_FLT_DISK_MS: u32 = 0xB104;
+pub(crate) const ID_FLT_DISK_X: u32 = 0xB105;
+pub(crate) const ID_FLT_DISK: u32 = 0xB106;
+pub(crate) const ID_FLT_UNPLUG: u32 = 0xB107;
+pub(crate) const ID_FLT_DELAY: u32 = 0xB108;
+pub(crate) const ID_FLT_LOSS: u32 = 0xB109;
+pub(crate) const ID_FLT_RATE: u32 = 0xB10A;
+pub(crate) const ID_FLT_IMPAIR: u32 = 0xB10B;
+pub(crate) const ID_FLT_PART: u32 = 0xB10C;
+pub(crate) const ID_FLT_HEAL_ALL: u32 = 0xB10D;
+pub(crate) const ID_FLT_HEAL0: u32 = 0xB140;
+/// the service tree (its rows + 1 + i, at most 2000: up to 0xBFD1)
+pub(crate) const ID_MET_TREE: u32 = 0xB800;

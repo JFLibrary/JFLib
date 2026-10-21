@@ -10,6 +10,8 @@
 // export), icons/ the device symbols and the UI icons; terminal.rs the Terminal panel and the
 // windows of consoles, logview.rs the Protokoll panel, devwin/ the device windows, settings.rs
 // the dialogs of the settings and the shortcuts, task.rs the Aufgabe panel and the list of labs.
+// metrics.rs: the Metriken panel of the lab (services, KPI tiles, charts of the time series
+// with the faults).
 
 pub(crate) mod canvas;
 pub(crate) mod devwin;
@@ -22,6 +24,7 @@ pub(crate) mod shell;
 pub(crate) mod terminal;
 pub(crate) mod sim;
 pub(crate) mod task;
+pub(crate) mod metrics;
 
 use alloc::string::String;
 use alloc::vec::Vec;

@@ -19,10 +19,12 @@
 // would land.  A double click (or Enter) opens a device's console, with Shift its device window
 // (workspace/terminal.rs, devwin/); a note's text opens in the flyout.  connect.rs joins
 // devices (tool C, port dots, the port choice), cables.rs edits cables (route, kind,
-// waypoints, the ×, tooltips); the LEDs come from the simulator.
+// waypoints, the ×, tooltips); the LEDs come from the simulator.  lab.rs puts the lab on it:
+// the pills of the devices' services, mini sparklines from 75 %, devices a fault switched off.
 
 pub(crate) mod cables;
 pub(crate) mod connect;
+pub(crate) mod lab;
 pub(crate) mod paint;
 pub(crate) mod tools;
 
@@ -79,6 +81,8 @@ pub(crate) struct Canvas {
     pub x_link: Option<u32>,
     /// end A of a cable chosen with Enter in the Verbinden tool (connect.rs)
     pub kb_from: Option<u32>,
+    /// the lab on the canvas: service pills, sparklines, devices a fault switched off (lab.rs)
+    pub lab: lab::Lab,
 }
 
 impl Canvas {
@@ -96,6 +100,7 @@ impl Canvas {
             wp_drag: None,
             x_link: None,
             kb_from: None,
+            lab: lab::Lab::default(),
         }
     }
 
@@ -110,6 +115,7 @@ impl Canvas {
         self.wp_drag = None;
         self.x_link = None;
         self.kb_from = None;
+        self.lab = lab::Lab::default();
         let l = &p.layout;
         self.view = Some(if l.zoom_pm > 0 { View::At(l.zoom_pm as f32 / 1000.0, l.cx as f64, l.cy as f64) } else { View::Fit });
     }
@@ -173,9 +179,11 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     crate::doc::autosave::bar(n, ui);
     infobar(n, ui);
     let minimap = n.prefs.minimap;
-    // the painting depends on the symbols' palettes, the grid, the simulator's LEDs and the
-    // language (the placeholder of an empty note)
-    let ver = n.syms.key() ^ if n.prefs.grid { 0 } else { 0x8000_0000 } ^ if crate::app::tr::en() { 0x4000_0000 } else { 0 } ^ n.doc.sim.led_key.rotate_left(7);
+    // the painting depends on the symbols' palettes, the grid, the simulator's LEDs, the
+    // language (the placeholder of an empty note) and the services and power the simulator
+    // has (the pills, devices a fault switched off: lab.rs)
+    lab::update(n);
+    let ver = n.syms.key() ^ if n.prefs.grid { 0 } else { 0x8000_0000 } ^ if crate::app::tr::en() { 0x4000_0000 } else { 0 } ^ n.doc.sim.led_key.rotate_left(7) ^ n.canvas.lab.key().rotate_left(13);
     let tool = n.canvas.tool.dg();
     let dragging = n.palette.dragging;
     ui.next_size(-1, -1);
@@ -223,6 +231,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     if let Some((model, x, y, click)) = preview {
         preview_device(n, ui, model, x, y, click);
     }
+    lab::pill_records(n, ui);
+    lab::sparklines(n, ui);
     cables::leds_on_top(n, ui);
     cables::plus_handles(n, ui);
     connect::overlay(n, ui);

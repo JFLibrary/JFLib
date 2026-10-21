@@ -15,6 +15,8 @@
 // sim::toolbar); the canvas has the hint of a view in the past above it and the frames of the
 // simulation mode over it.  Aufgabe (right, a tab beside Eigenschaften that comes forward with
 // a lab) is the lab's task (workspace/task.rs), its dialog the list of labs.
+// simulation mode over it.  Metriken (bottom, U6a: workspace/metrics.rs) shows the lab's
+// services with KPI tiles and charts of their time series.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -75,6 +77,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
         DockPanel::new(P_PROBLEMS, t("Probleme"), IC_WARNING).at(DOCK_BOTTOM, 0),
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_PDUS, t("PDUs"), IC_MAIL).at(DOCK_RIGHT, 1) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_TASK, t("Aufgabe"), IC_FLAG).at(DOCK_RIGHT, 0) },
+        DockPanel::new(P_METRICS, t("Metriken"), JN_METRICS).at(DOCK_BOTTOM, 0),
     ];
     ui.next_size(-1, -1);
     ui.dock_begin(ID_DOCK, &mut n.shell.dock, &panels);
@@ -94,6 +97,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
             P_PDUS => sim::pdu::panel(n, ui),
             P_LOG => crate::workspace::logview::panel(n, ui),
             P_TASK => crate::workspace::task::panel(n, ui),
+            P_METRICS => crate::workspace::metrics::panel(n, ui),
             _ => {}
         }
     }

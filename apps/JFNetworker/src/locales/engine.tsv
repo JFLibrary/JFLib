@@ -530,3 +530,32 @@ der Zeitraum endet erst nach jetzt	the span ends after now
 Der Dienst „{}“ ist kein Skript.	The service “{}” is not a script.
 „{}“ taugt nicht als Name eines Dienstes.	“{}” cannot be the name of a service.
 Den Dienst „{}“ gibt es schon.	The service “{}” exists already.
+
+# jfn_sim: the lab's status lines (lb.rs, kv.rs, cache.rs, mq.rs: status_msg), the disk (disk.rs: Disk::msg), the lines of faults (fault.rs: FaultMark::msg)
+HTTP Port {}, {}: {} von {} Backends verfügbar, {} Anfragen, {} Fehler	HTTP port {}, {}: {} of {} backends available, {} requests, {} errors
+TCP Port {}, {}: {} von {} Backends verfügbar, {} Verbindungen, {} Fehler	TCP port {}, {}: {} of {} backends available, {} connections, {} errors
+{}: {} Schlüssel, {} von {} Knoten erreichbar, RF {}, {} W{}/R{}	{}: {} keys, {} of {} nodes reachable, RF {}, {} W{}/R{}
+nur Koordinator	coordinator only
+Port {} vor {}: {} Einträge, {} Treffer, {} Fehlschläge ({},{} % Treffer)	Port {} in front of {}: {} entries, {} hits, {} misses ({}.{} % hits)
+Port {}: {} Topics, {} wartend, {} unterwegs, {} bestätigt	Port {}: {} topics, {} waiting, {} out, {} acknowledged
+{} {}: {} von {} beschäftigt, {} erledigt, {} gescheitert	{} {}: {} of {} busy, {} done, {} failed
+{} von {}, {}	{} of {}, {}
+{} von {}, {} (verlangsamt)	{} of {}, {} (slowed down)
+Kabel {}	Cable {}
+Kabel {} getrennt	Cable {} pulled
++{} Laufzeit	+{} delay
++{} Jitter	+{} jitter
+{} % Verlust	{} % loss
+{},{} % Verlust	{}.{} % loss
+{} ppm Verlust	{} ppm loss
+höchstens {}	at most {}
+unverändert	unchanged
+Kabel {}: {}	Cable {}: {}
+{} ausgeschaltet	{} switched off
+Dienst {} auf {} gestoppt	Service {} on {} stopped
++{} je Zugriff	+{} per access
+Übertragung ×{}	transfer ×{}
+Übertragung ×{},{}	transfer ×{}.{}
+Disk von {} langsam: {}	Disk of {} slow: {}
+Partition: {} | alle anderen	Partition: {} | all others
+Partition: {} | {}	Partition: {} | {}
