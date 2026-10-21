@@ -625,3 +625,85 @@ Rahmen {}	Frame {}
 Rahmen {}: {} → {} · {}	Frame {}: {} → {} · {}
 Rahmen auf den Kabeln	Frames on the cables
 Skript	Script
+# the script editor (U7): the Skripte tab of a host's device window (devwin/scripts.rs), the
+# scripts of a device in the project and the templates of "Neu" (doc/scripts.rs; the texts of
+# a template's code lines must stay free of quotes and backslashes), its keys in the overview
+&Skripte …	&Scripts …
+Skripte	Scripts
+Ein Skript braucht einen Namen.	A script needs a name.
+„{}“ geht nicht als Name: Buchstaben, Ziffern, - _ und . (am Anfang ein Buchstabe oder eine Ziffer, höchstens 32 Zeichen).	“{}” cannot be a name: letters, digits, - _ and . (a letter or digit first, at most 32 characters).
+Auf {} gibt es schon einen Dienst „{}“.	{} has a service “{}” already.
+Das Skript „{}“ gibt es auf {} nicht.	There is no script “{}” on {}.
+Das Skript übersetzt nicht: Zeile {}, Spalte {}: {}	The script does not compile: line {}, column {}: {}
+Diese Vorlage gibt es nicht.	There is no such template.
+Leeres Skript	Empty script
+UDP-Echo	UDP echo
+HTTP-Server	HTTP server
+Abfrage (fragt regelmäßig eine URL ab)	Poller (asks a URL again and again)
+Schlüssel-Wert-Speicher auf der Disk	Key-value store on the disk
+UDP-Echo: schickt jedes Datagramm an seinen Absender zurück.	UDP echo: sends every datagram back to its sender.
+Echo bereit auf UDP-Port ${port}	Echo ready on UDP port ${port}
+HTTP-Server: GET / grüßt, /status nennt die Zahlen als JSON, alles andere ist 404.	HTTP server: GET / says hello, /status gives the numbers as JSON, everything else is 404.
+Hallo ${req.peer}, das ist Anfrage ${hits}.	Hello ${req.peer}, this is request ${hits}.
+Webserver bereit auf Port ${port}	Web server ready on port ${port}
+Abfrage: fragt alle config.every_ms Millisekunden config.url ab und misst die Antwortzeit.	Poller: asks config.url every config.every_ms milliseconds and measures the response time.
+${resp.status} nach ${now() - t0} ms	${resp.status} after ${now() - t0} ms
+Schlüssel-Wert-Speicher: GET, PUT und DELETE auf /kv/SCHLÜSSEL, die Werte liegen auf der Disk	Key-value store: GET, PUT and DELETE on /kv/KEY, the values are on the disk
+des Geräts und überstehen Neustarts und Stromausfälle.	of the device and survive restarts and power cuts.
+kein Wert	no value
+Speicher bereit auf Port ${port}	Store ready on port ${port}
+Ein Skript reagiert auf Ereignisse: net.udp, net.listen, http.serve, timer.every …	A script reacts to events: net.udp, net.listen, http.serve, timer.every …
+Strg+S übernimmt es ins Projekt und in den laufenden Simulator.	Ctrl+S applies it to the project and the running simulator.
+Skript gestartet	Script started
+übersetzt nicht	does not compile
+nicht im Simulator	not in the simulator
+Gerät aus	device off
+rechnet	computing
+mit Fehler beendet	ended by an error
+Der Simulator führt dieses Skript nicht aus.	The simulator does not run this script.
+Der Simulator führt es nicht aus: {}	The simulator does not run it: {}
+CPU {} · Warteschlange {} (höchstens {}) · Rückrufe {} · Fehler {} · Speicher {}	CPU {} · queue {} (at most {}) · callbacks {} · errors {} · memory {}
+offen: {}	open: {}
+Fehler im Lauf ({}, bei {}): {}	Error while running ({}, at {}): {}
+Noch keine Skripte	No scripts yet
+Ein Skript ist ein eigenes Programm in der Sprache .jfs, das auf diesem Gerät als Dienst läuft: UDP, TCP, HTTP, Timer, die Disk. „Neu“ legt eines aus einer Vorlage an.	A script is a program of your own in the .jfs language that runs on this device as a service: UDP, TCP, HTTP, timers, the disk. “New” makes one from a template.
+Neu	New
+Ein neues Skript aus einer Vorlage	A new script from a template
+{} hat noch kein Skript.	{} has no script yet.
+1 Fehler	1 error
+{} Fehler	{} errors
+Löscht das Skript und was es auf der Disk abgelegt hat (Rückgängig bringt das Skript zurück, die Disk beginnt leer)	Deletes the script and what it stored on the disk (undo brings the script back, its disk starts empty)
+Neuer Name des Skripts	New name of the script
+Ausführen	Run
+Neu starten	Restart
+Neu starten: Speicher und Timer beginnen leer, die Disk und die Zahlen bleiben	Restart: memory and timers start empty, the disk and the numbers stay
+Holt die Fassung des Projekts zurück (Strg+Z im Editor nimmt das zurück)	Brings back the project's version (Ctrl+Z in the editor takes that back)
+Ins Projekt (ein Rückgängig-Schritt) und in das laufende Skript, das damit neu startet und seine Disk und Zahlen behält (Strg+S)	Into the project (one undo step) and into the running script, which restarts with it and keeps its disk and numbers (Ctrl+S)
+Zeile {}, Spalte {}	Line {}, column {}
+keine Meldungen	no messages
+1 Warnung	1 warning
+{} Warnungen	{} warnings
+geändert – Strg+S übernimmt, F8 springt zur nächsten Meldung	changed – Ctrl+S applies, F8 goes to the next message
+wie im Projekt	as in the project
+Fehler ({})	Errors ({})
+Ausgabe	Output
+Noch keine Ausgabe in diesem Lauf: print(…) schreibt hierher.	No output in this run yet: print(…) writes here.
+Keine Fehler in diesem Lauf (davor {}; die Konsole zeigt sie mit „script errors“).	No errors in this run ({} before; the console shows them with “script errors”).
+Keine Fehler in diesem Lauf.	No errors in this run.
+{} · Zeile {}, Spalte {} ({}): {}	{} · line {}, column {} ({}): {}
+Skript-Editor	Script editor
+Strg+S	Ctrl+S
+das Skript übernehmen: ins Projekt und in das laufende Skript	apply the script: to the project and to the running script
+F8 / Umschalt+F8	F8 / Shift+F8
+zur nächsten / vorigen Meldung (Fehler, Warnung, Fehler im Lauf)	to the next / previous message (error, warning, error while running)
+Strg+Z / Strg+Y	Ctrl+Z / Ctrl+Y
+im Editor rückgängig / wiederholen (außerhalb des Editors: das Projekt)	undo / redo in the editor (outside the editor: the project)
+Strg+F / Strg+H	Ctrl+F / Ctrl+H
+suchen / ersetzen	find / replace
+Strg+/	Ctrl+/
+Zeilen aus- und wieder einkommentieren	comment lines out and in again
+die gewählten Zeilen ein- und ausrücken	indent and outdent the chosen lines
+Alt+Pfeil auf / ab	Alt+Up / Down arrow
+die Zeilen verschieben	move the lines
+Fehler|Liste	Errors
+Löschen	Delete

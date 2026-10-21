@@ -37,6 +37,10 @@ Queues, Lastgeneratoren, eigene Skripte).
   UDP, TCP, HTTP-Server und -Client, DNS, Timer, Disk und Metriken, ihre Anweisungen kosten
   Rechenzeit wie auf einer CPU mit einem Thread; `script` in der Shell zeigt und steuert sie
   (siehe [Skripte in Hosts](#skripte-in-hosts)).
+- **Skript-Editor (U7):** der Reiter Skripte im Gerätefenster eines Hosts: Code-Editor mit
+  Prüfung beim Tippen und den Fehlern des laufenden Programms an ihrer Zeile, Ausführen,
+  Stoppen, Übernehmen als Rückgängig-Schritt (das Skript behält Disk und Zahlen), Ausgabe und
+  Fehler des Laufs, Vorlagen (siehe [Skript-Editor](#skript-editor)).
 
 ## Bedienung
 
@@ -118,10 +122,15 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `shots.uis` | die Bild-Matrix der Hauptansichten (Topologie, Konsole, Simulation, Paket-Tab, Gerätefenster) hell und dunkel mit 100 und 150 % |
 | `campus.uis`, `scen_campus.uis` | die Abnahme von Phase 1 (unten) |
 | `perf.uis` | die Leistung: 500 Geräte, 800 Kabel und 300 Rahmen in 1920 × 1080 mit höchstens 33 ms pro Bild in Echtzeit, beim Abspielen, Verschieben, Zoomen und Ziehen (siehe [Performance](#performance)) |
+| `script_editor.uis` | den Skript-Editor (siehe [Skript-Editor](#skript-editor)) auf `fixtures/scripts.jfnet`: der Reiter aus dem Kontextmenü, die Liste mit Zustand und Fehlern, der Laufzeitfehler in Zeile 13 als Marke und in der Fehlerliste (ein Klick setzt die Schreibmarke), die Ausgabe live, Tippen mit Prüfung nach einem Augenblick, F8 und Umschalt+F8, Strg+S lehnt einen Fehler ab und übernimmt, was sich übersetzen lässt (das Skript startet mit seiner Disk neu: „Start 2“), Rückgängig und Wiederholen („Start 3“, „Start 4“), Stoppen, Ausführen, Neu starten, Verwerfen, eine Vorlage (ihr Fehler: Port 7 ist belegt), Umbenennen, Löschen und Rückgängig, der Reiter Dienste |
+| `script_editor_en.uis` | den Skript-Editor auf Englisch: Kontextmenü, Reiter, Liste, Statuszeile, Meldungen, Ausgabe und Fehler, eine Vorlage auf PC1 mit englischen Kommentaren und Texten, die Tasten in der Übersicht (F1) |
+| `script_shots.uis` | die Bilder des Skript-Editors hell und dunkel mit 100 und 150 % (`build/jfnetworker/script_shots_*.png`) |
+| `model.uis`, Gruppe `scripted` | worauf der Skript-Editor baut: der Quelltext einer Definition als Zeilen oder Text und zurück, Namen, die Vorlagen (übersetzbar, Deutsch und Englisch), Übernehmen, Neu, Umbenennen und Löschen über die Rückgängig-Liste mit Disk und Zahlen des laufenden Skripts und ohne Neustart des Geräts, ein Skript, das der Simulator aus der Datei nicht nehmen konnte, `keep_steps`, die Marken auf bearbeitetem Text |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
-`campus.jfnet` (die Abnahme) und die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
+`campus.jfnet` (die Abnahme), `scripts.jfnet` (zwei Skripte auf SRV1 für den Skript-Editor) und
+die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`, `rng`, `metrics`, `jmap`,
 `cmdtree`, `hashring`, `lru`), die Skriptsprache die Gruppe `script`.
 
@@ -164,6 +173,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Texte | [`crates/jfn_model/msg.rs`](crates/jfn_model/msg.rs), [`src/locales/engine.tsv`](src/locales/engine.tsv), [`src/locales/ui.tsv`](src/locales/ui.tsv), [`src/msgtest.rs`](src/msgtest.rs) | die deutschen Texte von Modell und Simulator als Vorlagen mit Argumenten (`Msg`, `msg!`; `text_with` übersetzt), die des Fensters (`t()`, `tf()`, die Befehle und Menüs), ihre englische Fassung und deren Selbsttest; Vollständigkeit: `python tools/i18n_check.py apps/JFNetworker crates` |
 | Tests | [`tests/`](tests) | Skripte, Fixtures (`fixtures/*.jfnet`), Szenarien mit Golden-Berichten (`scen/*.scn`, `scen/*.report`) |
 | Skripte | [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs), [`cli/scripts.rs`](crates/jfn_sim/cli/scripts.rs), [`src/scripttest.rs`](src/scripttest.rs) | Skripte als Dienste in den Hosts: Host-API, Anweisungen als Rechenzeit, der Befehl `script`, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
+| Skript-Editor | [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | der Reiter Skripte des Gerätefensters, die Skripte eines Geräts im Projekt mit Rückgängig und Vorlagen, ihr Selbsttest (siehe [Skript-Editor](#skript-editor)) |
 
 ### Gerätekatalog
 
@@ -920,10 +930,62 @@ eines davon (Rechenzeit und Preis einer Anweisung, Warteschlange, Grenzen, Offen
 letzter Fehler), `script errors NAME` die letzten Fehler mit Zeit, Zeile, Spalte und Aufrufen,
 `script output NAME` die Ausgabe von `print`; `script start|stop|restart NAME` steuert es, und
 `top` zeigt seine Rechenzeit. Für die Oberfläche gibt es `Engine::scripts(dev)` und
-`ScriptService::view`, `errors`, `output`, `source`; den Skript-Editor im Fenster bringt U7.
+`ScriptService::view`, `errors`, `output`, `source`; im Fenster der Skript-Editor (unten).
 Geprüft wird das in der Selbsttest-Gruppe `script` ([`src/scripttest.rs`](src/scripttest.rs):
 Antwortzeiten auf die Nanosekunde aus dem Fuel, Timer, UDP, TCP, HTTP, DNS, Disk, Metriken,
-Endlosschleife, Grenzen, Fehler, `script`, `top`, Determinismus) und im Golden-Szenario oben.
+Endlosschleife, Grenzen, Fehler, `script`, `top`, Determinismus, ein neuer Quelltext, der Disk,
+Zahlen und Fehler behält, Umbenennen im Lauf) und im Golden-Szenario oben.
+
+### Skript-Editor
+
+Die Skripte eines Hosts bearbeitet der Reiter **Skripte** seines Gerätefensters (Kontextmenü
+eines Hosts › „Skripte …“; [`devwin/scripts.rs`](src/workspace/devwin/scripts.rs),
+[`doc/scripts.rs`](src/doc/scripts.rs)):
+
+- **Liste:** die Skripte des Geräts in der Reihenfolge des Projekts mit Zustand (läuft, rechnet,
+  gestoppt, mit Fehler beendet, „übersetzt nicht“, wenn der Simulator die Definition aus der
+  Datei nicht nehmen konnte), CPU-Anteil der letzten Sekunden und Fehlern; „geändert“ markiert
+  nicht übernommene Änderungen. „Neu“ legt ein Skript aus einer Vorlage an (leer, UDP-Echo,
+  HTTP-Server, eine Abfrage, die regelmäßig eine URL abfragt und die Antwortzeit misst, ein
+  Schlüssel-Wert-Speicher auf der Disk; Kommentare und Texte in der Sprache des Fensters),
+  „Umbenennen“ und „Löschen“ ändern das Projekt. Jeder dieser Schritte ist ein
+  Rückgängig-Schritt, der das laufende Gerät behält: ein umbenanntes Skript läuft weiter (mit
+  Disk, Zahlen und Zeitreihen), ein gelöschtes nimmt mit, was es auf der Disk abgelegt hatte
+  (Rückgängig bringt das Skript zurück, seine Disk beginnt leer).
+- **Editor:** der Code-Editor der Library mit Hervorhebung für `.jfs`. Beim Tippen prüft er
+  höchstens alle 250 ms (Syntaxfehler, unbekannte Namen, `break` außerhalb einer Schleife …), und
+  die Fehler des laufenden Programms stehen mit Zeile und Spalte als Marken im Text – nur die
+  des aktuellen Laufs, ein Neustart räumt sie ab; ihre Zeilen folgen dem bearbeiteten Text, eine
+  geänderte Zeile verliert ihre Marke. F8 und Umschalt+F8 springen von Meldung zu Meldung, die
+  Statuszeile nennt die Stelle, die Zahl der Fehler und Warnungen und die Meldung an der
+  Schreibmarke. Jedes Skript hat einen Entwurf mit eigenem Rückgängig (Strg+Z im Editor), der
+  den Wechsel zu einem anderen Skript und das Schließen des Fensters übersteht, bis er
+  übernommen oder verworfen wird oder ein anderes Projekt kommt; ein unveränderter Entwurf
+  folgt dem Projekt.
+- **Übernehmen** (Strg+S im Editor): ein Quelltext, der sich übersetzen lässt, geht als ein
+  Rückgängig-Schritt ins Projekt (die `source` der Dienstdefinition, als Liste von Zeilen oder
+  als Text, wie sie war) und in das laufende Skript: es startet mit dem neuen Programm, Disk,
+  Zahlen, Fehler, Ausgabe und Zeitreihen bleiben, das Gerät startet nicht neu. Rückgängig und
+  Wiederholen tauschen das Programm genauso. Einen Quelltext mit Fehlern lehnt es mit dem
+  ersten ab. Strg+S speichert hier also nicht die Projektdatei.
+- **Ausführen, Stoppen, Neu starten** wirken nur im Simulator, wie `script start|stop|restart`
+  in der Shell; ob ein Skript mit dem Gerät startet, bleibt Sache des Projekts (Reiter Dienste).
+- **Unten:** die Ausgabe des aktuellen Laufs (`print`, folgt live) und seine Fehler mit Zeit,
+  Zeile und Spalte (ein Klick setzt die Schreibmarke dorthin); darüber die Kennzahlen: Zustand,
+  CPU, Warteschlange, Rückrufe, Fehler, Speicher und was das Skript offen hat.
+
+Der Simulator ([`scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs)) bietet dafür
+`Action::ScriptSource { dev, svc, config }`: das Skript bekommt eine neue Definition und bleibt
+derselbe Dienst (Nummer, Disk, Zahlen, Fehler, Ausgabe, Zeitreihen); eines, das laufen soll
+(läuft, nach einem Fehler beendet oder wartet auf Strom), startet sofort mit dem neuen Programm,
+ein gestopptes bleibt gestoppt, eine Definition, die sich nicht übersetzen lässt, wird mit Zeile
+und Spalte abgelehnt und das alte Programm läuft weiter. `Action::RenameService` benennt einen
+Dienst um, ohne ihn anzuhalten (seine Zeitreihen gehen mit). `ScriptService::run_errors()` und
+`run_output(from)` geben Fehler und Ausgabe des aktuellen Laufs (`run_output` ab einer Stelle,
+damit eine Anzeige nur Neues liest), `ScriptView::runs` zählt die Starts. Ersetzt
+`Action::Service` einen Dienst gleichen Namens, gibt der alte seine Bytes auf der Disk frei. Die
+Oberfläche schickt diese Actions über `Sim::keep` ([`src/doc/sim.rs`](src/doc/sim.rs),
+`keep_steps`), so laufen Bearbeiten, Rückgängig und Wiederholen ohne Neustart des Geräts.
 
 ## Performance
 
@@ -991,7 +1053,7 @@ Geste).
 |---|---|
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · NAT/ACL, RIP, OSPF, STP, IPv6 · Liniendiagramm und Code-Editor |
-| 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · Labor-Oberfläche · Skript-Editor |
+| 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · Labor-Oberfläche · Skript-Editor ✓ |
 | 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

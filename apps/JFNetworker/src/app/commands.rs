@@ -13,8 +13,8 @@
 // Werkzeuge: the tools with their single keys (V, H, C, N, P) and Einstellungen (Ctrl+,);
 // Hilfe: Tastenkürzel (F1), Info.  Simulation (F5) and Echtzeit (Shift+F5) switch the mode,
 // Ctrl+9 gives the topology the keyboard as Ctrl+1 .. 8 do for the panels.  The context menus of the canvas:
-// a cable (route, kind, Trennen), a device (Konsole öffnen, Gerätefenster, Umbenennen,
-// Eingeschaltet, Löschen), the background.  TIMER_SIM moves the simulator's clock, TIMER_ANIM
+// a cable (route, kind, Trennen), a device (Konsole öffnen, Gerätefenster, Skripte of a host,
+// Umbenennen, Eingeschaltet, Löschen), the background.  TIMER_SIM moves the simulator's clock, TIMER_ANIM
 // the simulation mode's animation.  The consoles' commands (CMD_CONSOLE .. CMD_LOG_CLEAR: tabs,
 // windows, the log) are workspace/terminal.rs's.
 
@@ -28,7 +28,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 73] = [
+pub(crate) static CMDS: [Command; 74] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -102,6 +102,7 @@ pub(crate) static CMDS: [Command; 73] = [
     Command::new(CMD_FOCUS_CANVAS, "Topo&logie", JN_CONNECT, MOD_CTRL, b'9' as u32, 0),
     Command::new(CMD_SETTINGS, "&Einstellungen …", IC_SETTINGS, MOD_CTRL, VK_OEM_COMMA, 0),
     Command::new(CMD_SHORTCUTS, "&Tastenkürzel …", IC_HELP, 0, VK_F1, 0),
+    Command::new(CMD_SCRIPTS, "&Skripte …", IC_DEV_TOOLS, 0, 0, CF_DISABLED | CF_HIDDEN),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -199,9 +200,10 @@ static M_HELP: [Mi; 3] = [Mi::Cmd(CMD_SHORTCUTS), Mi::Sep, Mi::Cmd(CMD_ABOUT)];
 /// the canvas' context menu (the background, notes)
 pub(crate) static M_CANVAS: [Mi; 5] = [Mi::Cmd(CMD_RENAME), Mi::Cmd(CMD_DELETE), Mi::Sep, Mi::Cmd(CMD_SELECT_ALL), Mi::Cmd(CMD_FIT)];
 /// the context menu of a device
-pub(crate) static M_DEVICE: [Mi; 10] = [
+pub(crate) static M_DEVICE: [Mi; 11] = [
     Mi::Cmd(CMD_CONSOLE),
     Mi::Cmd(CMD_DEVWIN),
+    Mi::Cmd(CMD_SCRIPTS),
     Mi::Sep,
     Mi::Cmd(CMD_RENAME),
     Mi::Cmd(CMD_POWER),
@@ -262,6 +264,7 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     crate::workspace::sim::states(n, ui);
     cables::states(n, ui);
     terminal::states(n, ui);
+    crate::workspace::devwin::scripts::states(n, ui);
 }
 
 // Ctrl+1 .. 8: the panel shows; the keyboard goes into it -- the device search, the shown
@@ -396,6 +399,12 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         // the simulation mode (workspace/sim)
         CMD_SIM_REALTIME | CMD_SIM_MODE | CMD_SIM_PLAY | CMD_SIM_STEP | CMD_SIM_BACK | CMD_SIM_RESET => return crate::workspace::sim::command(n, ui, id, arg),
         _ if (CMD_SIM_TEMPO0..200).contains(&id) => return crate::workspace::sim::command(n, ui, id, arg),
+        // the script editor (workspace/devwin/scripts.rs): the check while typing, the tab
+        UIC_TIMER if arg == TIMER_SCRIPT_CHECK => {
+            crate::workspace::devwin::scripts::check_due(n, ui);
+            return true;
+        }
+        CMD_SCRIPTS => return crate::workspace::devwin::scripts::command(n, ui, id),
         _ => return false,
     }
     ui.repass();
