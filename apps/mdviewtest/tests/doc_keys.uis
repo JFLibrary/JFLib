@@ -1,0 +1,59 @@
+#!args --verify-dirty
+# scrolling: Up / Down by a line (40 DIP), PgUp / PgDn and Space / Shift+Space by a view less a
+# line, Home / End; the wheel (smooth: settled after a wait), the scroll bar; the view's
+# K_BOX value is the position in DIP.  The long document (50 000 blocks): only the blocks in
+# view are laid out and drawn -- the end at once, frame times while the wheel turns (at the
+# end and in the middle)
+size 1000 720
+theme light
+click 900,360
+key down
+expect "Hilfe" value 40
+key down
+expect "Hilfe" value 80
+key up
+expect "Hilfe" value 40
+key pgdn
+expect "Hilfe" value 558
+key pgup
+expect "Hilfe" value 40
+key space
+expect "Hilfe" value 558
+key shift+space
+expect "Hilfe" value 40
+key home
+expect "Hilfe" value 0
+key end
+expect heading:"Überschrift 6" exists
+expect heading:"Markdown-Betrachter" missing
+key home
+expect "Hilfe" value 0
+expect heading:"Markdown-Betrachter" exists
+# the wheel: three notches are 144 DIP
+wheel 500,300 -360
+wait 500
+expect "Hilfe" value 144
+wheel 500,300 360
+wait 500
+expect "Hilfe" value 0
+# the long document; at its end hard cases for the layout: a code line of 100 000 characters,
+# a word of 20 000, a paragraph of 1 000 links (each wraps in linear time)
+click "Langes Dokument"
+expect heading:"Abschnitt 0" value 2
+expect heading:"Abschnitt 5000" missing
+click 900,400
+key end
+expect link:"L999" exists
+expect heading:"Abschnitt 0" missing
+shot build/mdviewtest/long_end.png
+bench 60 wheel 500,300 -120 8000
+key home
+expect heading:"Abschnitt 0" exists
+# the scroll bar's thumb dragged to the middle: around section 5000
+drag 981,70 981,340
+expect heading:"Abschnitt 0" missing
+shot build/mdviewtest/long_middle.png
+key home
+click "Beispiel"
+expect heading:"Markdown-Betrachter" exists
+expect_nowarn

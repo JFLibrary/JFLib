@@ -1498,9 +1498,16 @@ rich_html -- RichDoc as HTML and back
   (crate) clip_html(paras, font, size) the clipboard's HTML: to_html plus the fragment as
                                    JSON in a comment (<!--jfrich ...-->), so a paste into a
                                    richtext keeps every attribute exactly
+  (crate) html_read(s) -> (paras, HExt)   the same reader for the Markdown / HTML viewer
+                                   (md_doc.rs): the paragraphs and, by paragraph, what a
+                                   viewer shows besides them -- rules, images (U+FFFC in the
+                                   text), preformatted blocks and their language, the heading
+                                   level, the quotation depth, table rows and their cells, the
+                                   numbers of list items
 
 Whitespace outside <pre> / white-space:pre* collapses as in browsers; a paragraph is a
-block or the text between two <br>.
+block or the text between two <br>.  Nesting is capped (NEST_MAX open blocks, formats and
+lists: deeper tags count as text-level), so no input costs more than linear time.
 ```
 
 **`impl RichDoc`**
@@ -4110,7 +4117,9 @@ K_DIALOG: u16 = 18
 K_TITLEBAR: u16 = 19
 K_SWATCH: u16 = 20
 K_LINK: u16 = 21
-K_KIND_COUNT: u16 = 22
+/// a heading of a document (value: its level 1 ..= 6; md_view.rs)
+K_HEADING: u16 = 22
+K_KIND_COUNT: u16 = 23
 SS_HOVER: u16 = 1
 SS_PRESSED: u16 = 2
 SS_FOCUSED: u16 = 4
@@ -4119,7 +4128,7 @@ SS_DISABLED: u16 = 16
 SS_SELECTED: u16 = 32
 SS_OPEN: u16 = 64
 /// names of the K_* kinds (dump, selectors kind:"Label")
-KIND_NAMES: [&str; 22] = [ "box", "text", "button", "checkbox", "radio", "switch", ...
+KIND_NAMES: [&str; 23] = [ "box", "text", "button", "checkbox", "radio", "switch", ...
 /// names of the SS_* state bits (dump)
 STATE_NAMES: [&str; 7] = ["hover", "pressed", "focused", "checked", "disabled", "s ...
 ```
@@ -5848,6 +5857,387 @@ DPT_USED: u32 = 2  // shown filled (connected)
   call showed (label(key); value = the edge's index; selected / focused / hover states),
   a small box around the middle of its route cut to the canvas, after the nodes' records;
   a screen reader's click on one selects the edge (and focuses it with tab_edges)
+
+#### `ui/md_doc.rs`
+
+Source: [`lib/ui/md_doc.rs`](../lib/ui/md_doc.rs)
+
+```text
+md_doc -- the document of the Markdown / HTML viewer (md_view.rs): blocks of formatted text,
+read from Markdown (CommonMark with GitHub's tables, task lists, strikethrough and bare
+links) or from HTML (the reader of the rich-text editor, rich_html.rs)
+
+  MdDoc::markdown(s) / MdDoc::html(s)  parse; never panics, takes linear time: nesting, input
+                                       size and the inline parser's work are capped
+  doc.blocks() -> &[MdBlock]           the blocks in reading order (see MdBlock)
+  doc.links() / images() / tables()    link targets (MdSpan::link - 1), images (MdSpan::image
+                                       - 1: src, alt, title, size), table column alignments
+  doc.plain() / doc.to_html()          everything as text (list markers, cells by tabs) / HTML
+  doc.plain_range(a, b) / html_range(a, b)   a part: TextPos { line: block, byte }
+  doc.link_spots()                     every link in reading order (block, bytes, link)
+  doc.truncated()                      a limit cut the input
+
+The model: a block is a paragraph, a heading (level 1..6), a code block (its text, the
+language of the fence), a rule or a table row (cells: byte ranges of the text, '\t' between
+them).  Its place: `quote` (block quotes around it), `list` (lists around it), `marker` /
+`number` / `task` (it starts a list item), `space` (the gap before it: 0 none, 1 a tight
+list's, 2 a paragraph's).  Its text holds the visible characters (an image is one U+FFFC,
+a hard break '\n'); spans give ranges their style (MS_*), link, image and colours.
+
+Markdown: ATX and setext headings, paragraphs with lazy continuation lines, block quotes,
+bullet (- + *) and ordered (1. 1)) lists with start numbers, tight / loose spacing and task
+items ([ ] / [x]), fenced (``` ~~~ with an info string) and indented code, thematic breaks,
+GFM tables (alignment row, escaped pipes), HTML blocks (through the HTML reader), link
+reference definitions; inline: backslash escapes, entities, code spans, emphasis and strong
+emphasis (the delimiter algorithm with the rule of three), ~~strikethrough~~, links and
+images (inline, full / collapsed / shortcut references, titles), autolinks (<...>, bare
+http:// https:// www.), hard breaks (two spaces, backslash) and soft breaks, a little inline
+HTML (br, b / strong, i / em, s / del, u / ins, code / kbd, a href, img).  Other tags are
+dropped, their text stays.  Tabs expand to 4 columns.
+```
+
+```rust
+/// MdBlock::kind: a paragraph
+MB_PARA: u8 = 0
+/// a heading (MdBlock::level 1 ..= 6)
+MB_HEADING: u8 = 1
+/// a code block (MdBlock::lang: the fence's language)
+MB_CODE: u8 = 2
+/// a thematic break (no text)
+MB_RULE: u8 = 3
+/// a table row (MdBlock::cells, table, head)
+MB_ROW: u8 = 4
+/// MdSpan::style: strong
+MS_BOLD: u16 = 1
+/// emphasis
+MS_ITALIC: u16 = 2
+/// struck through
+MS_STRIKE: u16 = 4
+/// code (monospace)
+MS_CODE: u16 = 8
+/// underlined (HTML)
+MS_UNDER: u16 = 16
+/// MdBlock::marker: no list item starts here
+MK_NONE: u8 = 0
+/// a bullet item
+MK_BULLET: u8 = 1
+/// a numbered item (MdBlock::number, delim)
+MK_NUMBER: u8 = 2
+/// MdTable::aligns: not given
+MA_NONE: u8 = 0
+/// left (start)
+MA_LEFT: u8 = 1
+/// centred
+MA_CENTER: u8 = 2
+/// right (end)
+MA_RIGHT: u8 = 3
+```
+
+- **`struct MdSpan`**
+  a range of a block's text with its style
+  - `a: u32` -- bytes a .. b of the block's text
+  - `b: u32`
+  - `style: u16` -- MS_\*
+  - `link: u32` -- a link: index + 1 into MdDoc::links (0: none)
+  - `image: u32` -- an image (the text is U+FFFC): index + 1 into MdDoc::images (0: none)
+  - `color: u32` -- HTML colours 0xAARRGGBB (0: the theme's)
+  - `bg: u32`
+
+- **`struct MdBlock`**
+  a block of the document (see the module header)
+  - `kind: u8` -- MB_\*
+  - `level: u8` -- headings: 1 ..= 6
+  - `text: String` -- the visible text (U+FFFC an image, '\\n' a hard break or a code line's end, '\\t' between
+    cells)
+  - `spans: Vec<MdSpan>` -- styled ranges, ascending, not overlapping (the text between them is plain)
+  - `quote: u8` -- block quotes around it
+  - `list: u8` -- lists around it (0: none)
+  - `path: u32` -- the containers from the outside in: bit i set = the i-th is a block quote, clear = a
+    list
+  - `marker: u8` -- MK_\*: a list item starts with this block
+  - `number: u32` -- MK_NUMBER: the item's number and its delimiter ('.' or ')')
+  - `delim: u8`
+  - `task: u8` -- a task item: 0 none, 1 open, 2 done
+  - `space: u8` -- the gap before it: 0 none, 1 a tight list's, 2 a paragraph's
+  - `lang: String` -- code blocks: the language of the fence ("" none)
+  - `cells: Vec<(u32, u32)>` -- table rows: the cells' byte ranges
+  - `table: u32` -- table rows: index into MdDoc::tables, a header row
+  - `head: bool`
+  - `align: u8` -- paragraphs: 0 start, 1 centre, 2 end (HTML)
+
+- **`struct MdImage`**
+  an image of the document
+  - `src: String`
+  - `alt: String`
+  - `title: String`
+  - `w: u32` -- size given by HTML attributes (px, 0: the picture's)
+  - `h: u32`
+
+- **`struct MdTable`**
+  a table: its columns' alignment (MA_\*)
+  - `aligns: Vec<u8>`
+
+- **`struct MdLinkSpot`**
+  a link in reading order: block, bytes a .. b of its text, the link (index + 1)
+  - `block: usize`
+  - `a: u32`
+  - `b: u32`
+  - `link: u32`
+
+- **`struct MdDoc`**
+  the document (see the module header)
+
+**`impl MdDoc`**
+
+- **`fn markdown(s: &str) -> MdDoc`**
+  a document from Markdown (see the module header)
+- **`fn html(s: &str) -> MdDoc`**
+  a document from HTML: what the rich-text editor reads (paragraphs, headings h1 .. h6,
+  lists, block quotes, formats, links, colours) and rules, images, preformatted blocks
+  (&lt;pre>&lt;code class="language-x">) and tables
+- **`fn blocks(&self) -> &[MdBlock]`**
+  the blocks in reading order
+- **`fn links(&self) -> &[String]`**
+  the link targets (MdSpan::link - 1)
+- **`fn link(&self, link: u32) -> &str`**
+  the target of MdSpan::link (index + 1); "" for 0
+- **`fn images(&self) -> &[MdImage]`**
+  the images (MdSpan::image - 1)
+- **`fn tables(&self) -> &[MdTable]`**
+  the tables (MdBlock::table)
+- **`fn link_spots(&self) -> &[MdLinkSpot]`**
+  every link in reading order (adjacent spans of one link joined)
+- **`fn truncated(&self) -> bool`**
+  a limit cut the input (size, blocks)
+- **`fn end(&self) -> TextPos`**
+  the place after the last character
+- **`fn plain(&self) -> String`**
+  the whole document as text
+- **`fn to_html(&self) -> String`**
+  the whole document as HTML
+- **`fn plain_range(&self, a: TextPos, b: TextPos) -> String`**
+  the text of a .. b: blocks on lines of their own (a blank line before paragraphs),
+  list markers ("- ", "1. ", "[x] "), cells by tabs, images as their alt texts
+- **`fn html_range(&self, a: TextPos, b: TextPos) -> String`**
+  the HTML of a .. b: h1 .. h6, p, ul / ol / li (task items with a disabled check box),
+  blockquote, pre / code (class language-x), hr, table / tr / th / td (align), strong,
+  em, del, u, code, a href, img src alt, colours as span styles
+
+#### `ui/md_view.rs`
+
+Source: [`lib/ui/md_view.rs`](../lib/ui/md_view.rs)
+
+```text
+md_view -- ui.markdown_view / ui.html_view: a read-only document view over an MdDoc
+(md_doc.rs) for help pages, README-like content, release notes and chat output
+
+  ui.markdown_view(id, &mut MdViewState, text, MV_*) -> MdEv   Markdown; parsed again only
+       when the text changes (the state keeps a hash of it)
+  ui.html_view(id, &mut MdViewState, html, MV_*) -> MdEv        HTML (the rich-text reader)
+  ui.doc_view(id, &mut MdViewState, MV_*) -> MdEv                the document set before
+       (st.set_markdown / set_html / set_doc)
+  MdEv { ev, link, hover }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was activated); link: the
+       activated link's target (a click on it, Enter on the focused one); hover: the target
+       of the link under the pointer.  The view fills the place it gets (natural 480 x 320
+       DIP; next_size(-1, -1) fills).
+  MdViewState::new() / base (where relative image paths start, e.g. "app://help/") / label
+       (the name for screen readers; "" = "Dokument") / doc() / selection() /
+       set_selection(sel) / select_all() / selected_text() / selected_html() /
+       scroll_to_block(i) / scroll_to_end() (the end, also while the document grows: chat
+       output; scrolling to the end of a long document does the same until the user scrolls
+       away) / first_visible() -> (block, px above the view) / focused_link()
+  Flags: MV_NO_FRAME (no card, a smaller padding), MV_OPEN_LINKS (an activated link is also
+       opened with open_url: its scheme rules and the app's policy apply; never without the
+       user's click or Enter), MV_RTL / MV_LTR (the document's direction; default: that of
+       its first strong character, else the window's)
+
+Layout: the blocks in a column; block quotes indent with a bar, lists with their markers in
+front (bullets by depth: disc, ring, square; numbers; task boxes), headings 2 / 1.5 / 1.25 /
+1 / 0.875 / 0.85 times the body text in bold (h1 and h2 underlined), code blocks in the
+monospace font on a tinted box with the code editor's highlighting (Highlighter::for_name of
+the fence's language, ui.code_theme colours), tables with column widths from their cells
+(wrapped to fit the column), images at their size (DIP; wider than the column: scaled down;
+SVGs through img_svg, sharp at every size), rules.  Text wraps at text::segment's line
+breaks (clusters inside a word too long).  A paragraph's direction comes from its first
+strong character: Hebrew and Arabic run right to left (their runs shaped and reordered by
+text_shape); indents and markers follow the document's direction.  Only the blocks in view
+are laid out (cached per width, dpi, text scale and fonts) and drawn; scrolling is anchored at
+the first visible block (vlist.rs Rows), so blocks laid out for the first time never move
+what is shown.
+Mouse: a drag selects (the view scrolls at its edges), Shift+click extends, a double click
+selects a word; a click on a link activates it.  Keys (focused): Up / Down scroll by a line,
+PgUp / PgDn and Space / Shift+Space by a view, Home / End to the ends, Tab / Shift+Tab
+through the links (the focused one is framed and scrolled into view; past the last one the
+focus moves on), Enter activates the focused link, Esc drops it, Ctrl+A selects all,
+Ctrl+C / Ctrl+Insert copy the selection as text (list markers, cells by tabs) and HTML.
+Images: names of the VFS ("app://", "data://" ...) and paths (relative ones after base) are
+read on first view and kept in the state; http(s) addresses are never fetched (the alt text
+shows in a frame instead).
+Records: K_BOX id (label: the label, value: the scroll position in DIP); per visible block
+K_HEADING (value: the level), K_TEXT (paragraphs, code, table cells), K_LISTITEM (the first
+block of a list item, value: its number), K_CHECKBOX (a task's box, checked), K_LINK per
+link, K_IMAGE (label: the alt text) per image.  Ids: id (focus, keys), part_id(id, 1) the
+scroll bar.
+```
+
+```rust
+/// markdown_view flags: no card around the document
+MV_NO_FRAME: u32 = 1
+/// an activated link is also opened (open_url)
+MV_OPEN_LINKS: u32 = 2
+/// the document runs right to left (indents and markers on the right)
+MV_RTL: u32 = 4
+/// the document runs left to right (also in a mirrored window)
+MV_LTR: u32 = 8
+```
+
+- **`struct MdEv`**
+  what a document view reports (see the module header)
+  - `ev: u32` -- EV_FOCUS, EV_HOVER, EV_ACT (a link was activated)
+  - `link: Option<String>` -- the target of the link activated this frame
+  - `hover: Option<String>` -- the target of the link under the pointer
+
+- **`struct MdViewState`**
+  the state of a document view (see the module header)
+  - `base: String` -- where relative image paths start ("app://help/"; "" = as given)
+  - `label: String` -- the name for screen readers ("" = "Dokument")
+
+**`impl MdViewState`**
+
+- **`fn new() -> MdViewState`**
+  an empty document
+- **`fn doc(&self) -> &MdDoc`**
+  the document shown
+- **`fn set_markdown(&mut self, s: &str)`**
+  show Markdown (parsed now unless it is the text shown already)
+- **`fn set_html(&mut self, s: &str)`**
+  show HTML (parsed now unless it is the text shown already)
+- **`fn set_doc(&mut self, doc: MdDoc)`**
+  show a document
+- **`fn selection(&self) -> TextSel`**
+  the selection (TextPos: block, byte of its text)
+- **`fn set_selection(&mut self, sel: TextSel)`**
+  select a range (clamped to the document)
+- **`fn select_all(&mut self)`**
+  select the whole document
+- **`fn selected_text(&self) -> String`**
+  the selection as text (list markers, cells by tabs, images as their alt texts)
+- **`fn selected_html(&self) -> String`**
+  the selection as HTML
+- **`fn scroll_to_block(&mut self, i: usize)`**
+  show block i at the top
+- **`fn scroll_to_end(&mut self)`**
+  show the end, also while the document grows (until the user scrolls away)
+- **`fn first_visible(&self) -> (usize, i32)`**
+  the first visible block and how many px of it are above the view
+- **`fn focused_link(&self) -> Option<usize>`**
+  the link focused with Tab (an index of doc().link_spots())
+
+**`impl Ui`**
+
+- **`fn markdown_view(&mut self, id: u32, st: &mut MdViewState, text: &str, flags: u32) -> MdEv`**
+  ui_markdown_view(id, &mut st, text, MV_\*) -> MdEv (see the module header of md_view.rs)
+- **`fn html_view(&mut self, id: u32, st: &mut MdViewState, html: &str, flags: u32) -> MdEv`**
+  ui_html_view(id, &mut st, html, MV_\*) -> MdEv: the HTML counterpart of markdown_view
+- **`fn doc_view(&mut self, id: u32, st: &mut MdViewState, flags: u32) -> MdEv`**
+  ui_doc_view(id, &mut st, MV_\*) -> MdEv: the document set in st (see the module header)
+
+#### `ui/vlist.rs`
+
+Source: [`lib/ui/vlist.rs`](../lib/ui/vlist.rs)
+
+```text
+vlist -- lists whose rows have different heights, virtualized: only the rows in view are
+built, laid out and drawn, for any number of rows
+
+  ui.vlist_begin(id, &mut VListState, count) -> (first, end)   the rows to emit, first ..
+       end - 1 (the view takes its place like a box: natural 320 x 240 DIP, next_size(-1, -1)
+       fills)
+  ui.vlist_item_begin(i) -> EV       row i: the style's list row (hover, selection, focus)
+       and a BOX_V of the list's width at the row's place; the box's natural height is the
+       row's height (measured every pass it is built, unless st.set_height gave one).
+       EV_ACT clicked, EV_DOUBLE, EV_RCLICK
+  ui.vlist_item_end()
+  ui.vlist_end(&mut VListState) -> EV   EV_ACT the selection changed (a click, the keys),
+       EV_DOUBLE Enter or a double click, EV_FOCUS, EV_HOVER
+  ui.vlist_sel() -> i32               the selection while the rows are emitted
+  VListState::new() / sel (-1: none) / estimate (DIP of a row not measured yet; 0: 40, then
+       the mean of the measured rows) / set_height(i, dip) (0: measure again) /
+       invalidate(i) / invalidate_all() / insert(at, n) / remove(at, n) (rows above the view:
+       it keeps showing the same rows) / reveal(i) / scroll_to(i) / first_visible() ->
+       (row, px of it above the view) / row_height(i) (px, measured or estimated) /
+       row_known(i) / set_count(n) (vlist_begin does it) / scroll_pos() / set_scroll_pos(px)
+       / total_height() (px; rows not measured count with the estimate)
+
+Scrolling is anchored at the first visible row (its index and how far it is scrolled out):
+rows above it may change their height, come or go without moving what is shown.  The
+heights sit in Fenwick trees (the heights known and how many are known; the others count
+with the estimate), so a position and the row at a position cost O(log n); the scroll bar
+shows the anchor's position in the total.  Keys (focused): Up / Down, PgUp / PgDn (a view of
+rows), Home / End move the selection and scroll it into view (exactly, once the rows on the
+way are measured), Enter: EV_DOUBLE.  The wheel scrolls (smoothly unless animations are
+off), the scroll bar drags.  A change of dpi, width or text scale measures every row again.
+Ids: id the view (focus; K_LIST: value sel, max count), id + 1 + i the rows (K_LISTITEM,
+value i), (id + 1 + i) | 0xC000_0000 their content boxes, part_id(id, 1) the scroll bar.
+
+Rows (crate): the height cache and anchor on their own -- the Markdown viewer (md_view.rs)
+scrolls its blocks with it.
+```
+
+- **`struct VListState`**
+  the state of a list with rows of different heights (see the module header)
+  - `sel: i32` -- the selected row, -1 none
+  - `estimate: i32` -- the height of a row that was not measured yet (DIP; 0: 40 at first, then the mean of
+    the measured rows)
+
+**`impl VListState`**
+
+- **`fn new() -> VListState`**
+  no rows yet, nothing selected
+- **`fn set_height(&mut self, i: usize, dip: i32)`**
+  row i is `dip` high (the app knows it: its box is not measured); 0 measures it again
+- **`fn invalidate(&mut self, i: usize)`**
+  row i is measured again the next time it is built
+- **`fn invalidate_all(&mut self)`**
+  every row is measured again
+- **`fn insert(&mut self, at: usize, n: usize)`**
+  n rows were inserted before row `at`: the view keeps showing the rows it showed (also
+  the selection stays on its row)
+- **`fn remove(&mut self, at: usize, n: usize)`**
+  rows at .. at + n were removed (the selection on one of them: none)
+- **`fn reveal(&mut self, i: usize)`**
+  scroll row i fully into view (the next pass)
+- **`fn scroll_to(&mut self, i: usize)`**
+  show row i at the top of the view
+- **`fn first_visible(&self) -> (usize, i32)`**
+  the first visible row and how many px of it are scrolled out above the view
+- **`fn row_height(&self, i: usize) -> i32`**
+  row i's height in px (measured or given; else the estimate)
+- **`fn row_known(&self, i: usize) -> bool`**
+  row i's height is measured or given
+- **`fn set_count(&mut self, n: usize)`**
+  the number of rows (vlist_begin sets it from its count; rows come and go at the end)
+- **`fn scroll_pos(&self) -> i64`**
+  the scroll position: px from the first row's top to the view's top (rows not measured
+  count with the estimate)
+- **`fn set_scroll_pos(&mut self, px: i64)`**
+  scroll to a position (px; the next pass keeps the view inside the rows)
+- **`fn total_height(&self) -> i64`**
+  the height of all rows (px; rows not measured count with the estimate)
+
+**`impl Ui`**
+
+- **`fn vlist_begin(&mut self, id: u32, st: &mut VListState, count: usize) -> (usize, usize)`**
+  ui_vlist_begin(id, &mut st, count) -> (first, end): the rows to emit (see the module
+  header)
+- **`fn vlist_item_begin(&mut self, i: usize) -> u32`**
+  ui_vlist_item_begin(i) -> EV_\*: row i (see the module header)
+- **`fn vlist_item_end(&mut self)`**
+  ui_vlist_item_end: the row's height is measured
+- **`fn vlist_sel(&self) -> i32`**
+  the selection of the innermost vlist while its rows are emitted (-1 outside one)
+- **`fn vlist_end(&mut self, st: &mut VListState) -> u32`**
+  ui_vlist_end(&mut st) -> EV_\* (see the module header)
 
 #### `ui/text_surface.rs`
 

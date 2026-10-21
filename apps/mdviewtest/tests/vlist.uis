@@ -1,0 +1,89 @@
+#!args --verify-dirty
+# ui.vlist_begin with 100 000 rows of different heights (tab Liste): rows are measured as they
+# are built (52 or 72 DIP here, from 1 .. 3 wrapped lines), the K_LIST record (#16777216)
+# has the selection and the count, row i is #16777217 + i.  A click selects; Up / Down, PgDn,
+# Home / End move the selection and scroll it into view; the scroll bar and the wheel go far
+# into the list and back; Enter opens a row (it grows: the rows below move down); rows
+# inserted above the view leave it where it is (anchored at the first visible row); frame
+# times while the wheel turns
+size 1000 720
+theme light
+click "Liste"
+expect #16777216 value -1
+expect #16777216 max 100000
+expect #16777217 rect 12 100 964 52
+expect #16777220 rect 12 256 964 72
+expect text:"Zeile 0" exists
+shot build/mdviewtest/list_light.png
+theme dark
+shot build/mdviewtest/list_dark.png
+click "Hoher Kontrast"
+shot build/mdviewtest/list_hc.png
+click "Hoher Kontrast"
+theme light
+# selection by click and keys
+click 400,230
+expect #16777216 value 2
+expect #16777219 selected
+key down
+expect #16777216 value 3
+key up
+expect #16777216 value 2
+# Enter opens row 2: it grows by 20, the rows below move down
+key enter
+expect text:"Aufgeklappt: diese Zeile zeigt mehr Text und wird dadurch höher; die Zeilen darunter rücken nach." exists
+expect #16777219 rect 12 204 964 72
+expect #16777220 rect 12 276 964 72
+expect #16777221 rect 12 348 964 52
+key enter
+expect #16777219 rect 12 204 964 52
+expect #16777220 rect 12 256 964 72
+# the end and back
+key end
+expect #16777216 value 99999
+expect #16877216 exists
+expect text:"Zeile 99999" exists
+expect #16777217 missing
+shot build/mdviewtest/list_end.png
+key home
+expect #16777216 value 0
+expect #16777217 rect 12 100 964 52
+key pgdn
+expect #16777216 value 10
+expect text:"Auswahl: Zeile 10 · oben: Zeile 0 +24" exists
+key home
+# the scroll bar's thumb to the bottom and back to the top
+drag 981,103 981,705
+expect #16777217 missing
+expect text:"Zeile 0" missing
+wait 600
+drag 981,700 981,90
+expect #16777217 rect 12 100 964 52
+# far into the list: a row in the middle, revealed at the bottom of the view
+click "Zu Zeile 50000"
+expect #16777216 value 50000
+expect text:"Zeile 50000" exists
+expect text:"Auswahl: Zeile 50000 · oben: Zeile 49990 +44" exists
+click 400,130
+key home
+# the wheel: down three notches (smooth, settled after a wait), back up
+wheel 500,400 -360
+wait 500
+expect text:"Auswahl: Zeile 0 · oben: Zeile 2 +38" exists
+wheel 500,400 360
+wait 500
+expect #16777217 rect 12 100 964 52
+# rows inserted above: Zeile 0 stays where it is, the new rows are above the view (the
+# selection stays on its row)
+click "Oben einfügen"
+expect text:"Zeile 0" rect 24 104 940 20
+expect text:"Neu 1" missing
+expect #16777216 max 100005
+expect #16777216 value 5
+click 400,130
+key home
+expect #16777216 value 0
+expect text:"Neu 1" exists
+expect text:"Zeile 0" rect 24 404 940 20
+bench 60 wheel 500,400 -120 6000
+expect_nowarn

@@ -686,7 +686,46 @@ Fensterrand hinaus.
     und `@media`, Animation. Ungleichmäßig skalierte Konturen werden mit der mittleren Breite
     gezeichnet. Eingebettete Bilder brauchen die Decoder der Bildformate (die Laufzeit
     registriert PNG, JPEG, BMP, GIF).
-- **P3** · *fehlt* · Markdown- / HTML-Viewer, Listen mit variabler Zeilenhöhe.
+- **P3** · *erledigt* · Markdown- / HTML-Viewer, Listen mit variabler Zeilenhöhe (2026-10-21,
+  [`ui/md_doc.rs`](../lib/ui/md_doc.rs), [`ui/md_view.rs`](../lib/ui/md_view.rs),
+  [`ui/vlist.rs`](../lib/ui/vlist.rs)): `ui.markdown_view(id, &mut MdViewState, text, MV_*)` /
+  `ui.html_view(...)` zeigen ein Dokument nur lesend (Hilfeseiten, README, Versionshinweise,
+  Chat-Ausgabe). Markdown nach CommonMark mit den GFM-Teilen: Überschriften (ATX, Setext),
+  Absätze mit faulen Fortsetzungszeilen, Zitate, Aufzählungen und nummerierte Listen
+  (Startnummern, enge / lockere Abstände, Aufgaben `[ ]` / `[x]`), Code-Blöcke mit Zaun und
+  eingerückt, Trennlinien, Tabellen mit Ausrichtung, HTML-Blöcke, Link-Referenzen; im Text
+  Hervorhebung nach den Begrenzer-Regeln, `~~durch~~`, Code, Links (inline, Referenz, `<…>`,
+  nackte `https://` / `www.`), Bilder, harte und weiche Umbrüche, Entities, Escapes, etwas
+  Inline-HTML. HTML über den Leser des Rich-Text-Editors (`rich_html.rs`, erweitert um Regeln,
+  Bilder, `pre` / `code class="language-x"`, Tabellen, Listennummern; kein zweiter
+  HTML-Parser). Layout: Einzüge, Zitatbalken, Listenmarken nach Tiefe, Aufgaben-Kästchen,
+  Überschriften 1–6, Code in Monospace mit der Hervorhebung des Code-Editors, Tabellen mit
+  Spaltenbreiten aus den Zellen, Bilder über das VFS (`app://`, Pfade nach `base`; SVG über
+  `lib/img_svg`, nie `http(s)`), Umbruch mit `text::segment`; Hebräisch / Arabisch von rechts
+  nach links (Richtung je Absatz und Dokument aus dem ersten starken Zeichen, geformt mit
+  `text_shape`). Nur sichtbare Blöcke werden gesetzt und gezeichnet, gescrollt wird am ersten
+  sichtbaren Block verankert (50 000 Blöcke: rund 1 ms pro Bild). Auswahl mit Maus
+  (Ziehen, Doppelklick, Umschalt), Strg+A / Strg+C als Text (Listenmarken, Zellen mit Tab) und
+  HTML; Tastatur (Pfeile, Bild auf / ab, Leertaste, Pos1 / Ende, Tab durch die Links, Enter
+  aktiviert, Esc); Links werden gemeldet (`MdEv::link`), geöffnet nur mit `MV_OPEN_LINKS` nach
+  Klick oder Enter über `open_url`. Barrierefreiheit: neue Art `K_HEADING` (Wert: Ebene),
+  `K_LINK`, `K_LISTITEM`, `K_CHECKBOX`, `K_IMAGE` (Alt-Text), `K_TEXT`. Robust gegen kaputte und
+  böswillige Eingaben (Verschachtelung begrenzt, Budget für Link- und Tag-Suche, Index für
+  Code-Spans: linear). `ui.vlist_begin(id, &mut VListState, count)` / `vlist_item_begin` /
+  `vlist_item_end` / `vlist_end`: virtualisierte Liste mit gemessenen oder vorgegebenen
+  Zeilenhöhen (Fenwick-Bäume: O(log n)), Verankerung an der ersten sichtbaren Zeile (Zeilen
+  darüber dürfen wachsen, eingefügt oder entfernt werden, ohne dass die Ansicht springt),
+  Tastatur, Auswahl, `reveal`, Bildlaufleiste und weiches Mausrad (100 000 Zeilen: rund 1 ms
+  pro Bild); der Viewer scrollt seine Blöcke mit demselben Höhen-Cache.
+  * Getestet mit `apps/mdviewtest` (`--test unit`: 148 Prüfungen, darunter böswillige Eingaben
+    mit Zeitgrenzen und die Höhen von 100 000 Zeilen; `doc_shots.uis` hell / dunkel / hoher
+    Kontrast / HTML / Hebräisch, `doc_rtl.uis`, `doc_scale.uis` (150 %), `doc_links.uis`,
+    `doc_select.uis`, `doc_keys.uis` (auch 50 000 Blöcke), `vlist.uis` (100 000 Zeilen); alle mit
+    `--verify-dirty`, Windows und Linux).
+  * Offen: Suche im Dokument, Fußnoten und Definitionslisten, HTML-Blöcke nur bis zur nächsten
+    Leerzeile, Bidi-Neuordnung über Formatwechsel hinweg (je Lauf), synthetischer Fettdruck für
+    Ersatzschriften in geformten Läufen, die Überschriftenebene erreicht die Plattform-Brücken
+    (UIA / AT-SPI) noch nicht (dort eine Beschriftung), Bilder aus dem Netz und `data:`-URIs.
 - **P3** · *teilweise* · Mehrfarbige Vektor-Symbole aus SVG (2026-10-19,
   [`ui/symbol.rs`](../lib/ui/symbol.rs), [`tools/vsym.py`](../tools/vsym.py)): handgezeichnete
   SVG-Dateien (Pfade, Grundformen, Gruppen, Transformationen) werden zu Pfad-Ebenen mit

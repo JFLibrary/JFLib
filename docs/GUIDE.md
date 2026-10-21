@@ -2957,3 +2957,116 @@ if ui.button(ID_ONE, "100 %") & EV_ACT != 0 { self.view.set_actual(); }
   gradients, text layout (with a font engine of boxes), clipping, CSS, the codec and malformed
   files; `gallery.uis`: every fixture of `apps/svgtest/fixtures` light / dark / high contrast /
   200 %; `viewer.uis`, `viewer_modes.uis`: zoom and pan by script, all with `--verify-dirty`).
+
+## 32. Markdown / HTML viewer and lists with rows of different heights
+
+**The document view** shows Markdown or HTML read-only: help pages, README-like content,
+release notes, chat output. [`MdDoc`](../lib/ui/md_doc.rs) is its model -- blocks of formatted
+text -- read from Markdown (CommonMark with GitHub's tables, task lists, strikethrough and bare
+links) or from HTML (the reader of the rich-text editor, extended by rules, images,
+preformatted code and tables). [`ui.markdown_view` / `ui.html_view`](../lib/ui/md_view.rs)
+draw it; the app keeps an `MdViewState` (layouts, images, scroll position, selection).
+
+```rust
+// state: self.help = MdViewState::new(); self.help.base = String::from("app://help/");
+// per frame: the text is parsed again only when it changes (the state keeps a hash of it)
+ui.next_size(-1, -1);
+let ev = ui.markdown_view(ID_HELP, &mut self.help, &self.page, 0);
+if let Some(url) = ev.link {                 // a click on a link, Enter on the focused one
+    if url.starts_with("#") { self.go_to(&url) } else { ui.open_url(&url); }
+}
+self.status = ev.hover.unwrap_or_default();   // the link under the pointer
+// HTML instead: ui.html_view(ID_NOTES, &mut self.notes, &html, MV_NO_FRAME)
+// a document built once: st.set_markdown(s) / set_html(s) / set_doc(MdDoc::markdown(s)),
+// then ui.doc_view(id, &mut st, flags)
+```
+
+* Markdown: ATX and setext headings, paragraphs (lazy continuation lines), block quotes,
+  bullet and ordered lists (start numbers, tight / loose spacing, `[ ]` / `[x]` task items),
+  fenced and indented code, thematic breaks, tables with alignment (`\|` in cells), HTML blocks
+  (through the HTML reader), link reference definitions; emphasis by CommonMark's delimiter
+  rules, `~~strike~~`, code spans, inline / reference / auto links and bare `https://` and
+  `www.` addresses, images, hard and soft breaks, entities, backslash escapes, a little inline
+  HTML (`br`, `b`, `i`, `s`, `u`, `code`, `kbd`, `a href`, `img`). HTML: what
+  `RichDoc::from_html` reads (headings h1 .. h6, paragraphs, lists, quotes, formats, colours,
+  links) and `hr`, `img` (width / height), `pre` / `code class="language-x"`, tables (`th`,
+  `thead`, alignment).
+* Layout: the blocks in a column; quotes indented with a bar, list markers in front (bullets by
+  depth, numbers, task boxes), headings 2 / 1.5 / 1.25 / 1 / 0.875 / 0.85 times the body text
+  (h1 / h2 underlined), code blocks in the monospace font with the code editor's highlighting
+  (`Highlighter::for_name` of the fence's language, `ui.code_theme()` colours), tables with
+  column widths from their cells (wrapped to fit), images at their size in DIP (scaled down to
+  the column; SVGs through `lib/img_svg`, sharp at every size). Text wraps at
+  `text::segment`'s line breaks. A paragraph's direction comes from its first strong
+  character: Hebrew and Arabic run right to left, shaped and reordered by `text_shape` (with
+  the fallback font that has the script); the document's direction (indents, markers) is that
+  of its first strong character unless `MV_RTL` / `MV_LTR` says otherwise -- a German page
+  stays left to right in a mirrored window, a Hebrew one runs right to left in any window.
+* Long documents: only the blocks in view are laid out (cached per width, dpi, text scale and
+  fonts) and drawn; scrolling is anchored at the first visible block, so blocks laid out for
+  the first time never move what is shown. 50 000 blocks scroll in about a millisecond per
+  frame. `scroll_to_end()` (and scrolling to the end of a long document) keeps the end in view
+  while the document grows -- chat output.
+* Mouse: drag selects (the view scrolls at its edges), Shift + press extends, a double click
+  selects a word, a click on a link activates it. Keys: Up / Down scroll by a line, PgUp / PgDn
+  and Space / Shift+Space by a view, Home / End, Tab / Shift+Tab through the links (the focused
+  one is framed and scrolled into view; past the last one the focus moves on), Enter activates
+  the focused link, Esc drops it, Ctrl+A, Ctrl+C / Ctrl+Insert copy text (list markers, cells by
+  tabs, images as their alt texts) and HTML. `MdViewState` also gives `selection()`,
+  `selected_text()`, `selected_html()`, `select_all()`, `scroll_to_block(i)`.
+* Links are reported, not opened: `MdEv::link` carries the target; with `MV_OPEN_LINKS` the view
+  also hands it to `open_url` (whose scheme rules and the app's `url` permission apply) -- only
+  after the user's click or Enter, never by itself.
+* Images: names of the VFS (`app://`, `data://` ...) and paths -- relative ones after `st.base`
+  -- are read when first shown and kept in the state; `http(s)` and `data:` addresses are never
+  fetched (the alt text shows in a frame instead).
+* Accessibility: the view is a `K_BOX` (label `st.label`, default "Dokument"; value: the scroll
+  position in DIP); per visible block a `K_HEADING` record (new kind; value: the level),
+  `K_TEXT` (paragraphs, code, table cells), `K_LISTITEM` (value: the item's number),
+  `K_CHECKBOX` (a task's box, checked), `K_LINK` per link, `K_IMAGE` (label: the alt text).
+  Scripts select them as `heading:"Title"`, `link:"Docs"` ...
+* Robustness: malformed input never panics and takes linear time -- container nesting is capped
+  at 32 (the HTML reader's at 64 open elements), the inline parser has a scan budget for link
+  destinations and tags, code spans find their closing run through an index, nested images
+  collapse as they form; 16 MB of input at most.
+
+**Lists with rows of different heights** (`ui.vlist_begin`, [`vlist.rs`](../lib/ui/vlist.rs))
+virtualize like `list_begin`, but every row has a height of its own: the app emits the rows the
+list asks for, each in a box whose natural height is measured.
+
+```rust
+// state: self.vl = VListState::new();
+ui.next_size(-1, -1);
+let (first, end) = ui.vlist_begin(ID_LOG, &mut self.vl, self.msgs.len());
+for i in first..end {
+    ui.vlist_item_begin(i);                      // the row's box (BOX_V, the list's width)
+    ui.text(TS_BODY_STRONG, &self.msgs[i].from);
+    ui.text(TS_BODY | TX_WRAP, &self.msgs[i].text);
+    ui.vlist_item_end();                         // measured: the rows below follow it
+}
+let ev = ui.vlist_end(&mut self.vl);            // EV_ACT: selection, EV_DOUBLE: Enter / double click
+// older messages arrived at the top: tell the list, the view stays where it is
+self.msgs.splice(0..0, older);
+self.vl.insert(0, n);
+```
+
+* Heights: measured as the rows are built (a changed row is measured again the next time it is
+  built; `invalidate(i)` / `invalidate_all()` force it), or given by the app with
+  `set_height(i, dip)`. Rows not measured yet count with `estimate` (DIP; by default the mean
+  of the measured rows). The heights sit in Fenwick trees: positions and the row at a position
+  cost O(log n), 100 000 rows scroll in about a millisecond per frame.
+* Scrolling is anchored at the first visible row: rows above it may change their height, be
+  inserted (`insert(at, n)`) or removed (`remove(at, n)`) without moving what is shown; the
+  selection stays on its row. `reveal(i)` scrolls a row fully into view (exactly, once the
+  rows on the way are measured), `scroll_to(i)` shows it at the top, `first_visible()`,
+  `scroll_pos()` / `set_scroll_pos(px)`, `total_height()`.
+* Keys: Up / Down, PgUp / PgDn (a view of rows), Home / End move the selection and reveal it;
+  Enter reports `EV_DOUBLE`. The wheel scrolls smoothly, the scroll bar drags. Records:
+  `K_LIST` (value: the selection, max: the count), `K_LISTITEM` per row (`id + 1 + i`).
+* The document view scrolls its blocks with the same height cache (`Rows`).
+
+Tests: `apps/mdviewtest` (`--test unit`: the parser -- blocks, inline parts, HTML, text and HTML
+of ranges -- adversarial input with time limits and the list's height cache;
+`doc_shots.uis` light / dark / high contrast / HTML / Hebrew, `doc_rtl.uis` (mirrored window),
+`doc_scale.uis` (150 % text), `doc_links.uis`, `doc_select.uis`, `doc_keys.uis` (also 50 000
+blocks), `vlist.uis` (100 000 rows); all with `--verify-dirty`).

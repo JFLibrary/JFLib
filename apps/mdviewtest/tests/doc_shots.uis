@@ -1,0 +1,82 @@
+#!args --verify-dirty
+# ui.markdown_view on the sample (tab Markdown): the records of headings (value: the level),
+# list items (value: the number), task boxes, links and images (label: the alt text), the
+# scroll position as the value of the view's K_BOX ("Hilfe"); only the blocks in view have
+# records.  Shots light, dark, high contrast, the middle (code, table, images) and the end;
+# html_view (tab HTML) and a Hebrew document (tab Hebräisch: right to left) light and dark
+size 1000 720
+theme light
+expect heading:"Markdown-Betrachter" value 1
+expect heading:"Markdown-Betrachter" rect 29 61 930 49
+expect heading:"Listen" value 2
+expect listitem:"Erster Punkt" rect 29 255 930 20
+expect listitem:"Noch tiefer" rect 85 327 874 20
+expect listitem:"Schritt drei" value 3
+expect listitem:"Schritt vier" value 4
+expect checkbox:"Erledigte Aufgabe" checked
+expect checkbox:"Offene Aufgabe" unchecked
+expect link:"Link" rect 527 122 25 20
+expect link:"https://example.org/docs" exists
+expect link:"www.example.com" exists
+expect text:"Ein Zitat mit Fettdruck und einer zweiten Zeile." exists
+expect "Hilfe" value 0
+expect heading:"Tabelle" missing
+expect image:"Logo" missing
+shot build/mdviewtest/md_light.png
+theme dark
+shot build/mdviewtest/md_dark.png
+click "Hoher Kontrast"
+shot build/mdviewtest/md_hc.png
+click "Hoher Kontrast"
+theme light
+# a page further: code, the table (a record per cell), the images (an SVG, a PNG, one that is
+# never fetched: its alt text in a frame)
+click 900,360
+key pgdn
+expect "Hilfe" value 518
+expect heading:"Tabelle" exists
+expect text:"Äpfel" exists
+expect text:"a|b" exists
+expect link:"Preisliste" exists
+expect image:"Logo" exists
+expect image:"Raster" exists
+expect image:"Nicht geladen" exists
+expect heading:"Markdown-Betrachter" missing
+shot build/mdviewtest/md_middle.png
+theme dark
+shot build/mdviewtest/md_middle_dark.png
+theme light
+# the end: headings 4 .. 6, entities, inline HTML, references, Hebrew and Arabic paragraphs
+key end
+expect heading:"Überschrift 4" value 4
+expect heading:"Überschrift 6" value 6
+expect link:"Verweis" exists
+expect link:"ref" exists
+expect heading:"Tabelle" missing
+shot build/mdviewtest/md_end.png
+key home
+expect "Hilfe" value 0
+# html_view
+click "HTML"
+expect heading:"HTML-Betrachter" value 1
+expect listitem:"Fünf" value 5
+expect listitem:"Sechs" value 6
+expect listitem:"Unterpunkt" exists
+expect text:"Spalte A" exists
+expect text:"22" exists
+expect link:"Link" exists
+shot build/mdviewtest/html_light.png
+theme dark
+shot build/mdviewtest/html_dark.png
+theme light
+# a Hebrew document runs right to left: markers, indents, quote bars on the right
+click "Hebräisch"
+expect "עברית" exists
+expect heading:"מדריך קצר" value 1
+expect listitem:"פריט ראשון" exists
+expect checkbox:"משימה שהושלמה" checked
+shot build/mdviewtest/he_light.png
+theme dark
+shot build/mdviewtest/he_dark.png
+theme light
+expect_nowarn

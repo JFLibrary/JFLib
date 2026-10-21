@@ -1,0 +1,49 @@
+#!args --verify-dirty
+# selection and the clipboard: a drag selects (the status shows the length), Ctrl+C copies
+# the text (list markers, cells by tabs, images as their alt texts) and HTML ("Zwischenablage"
+# shows the first 120 characters of both, line ends as ⏎, tabs as ⇥), a double click selects
+# a word, Shift + press extends, Ctrl+A selects everything
+size 1000 720
+theme light
+drag 30,135 300,135
+expect text:"Auswahl: 44 Zeichen" exists
+key ctrl+c
+click "Zwischenablage"
+expect text:"Text: Ein Absatz mit kursiv, fett, beidem, durchge" exists
+expect text:"HTML: <p>Ein Absatz mit <em>kursiv</em>, <strong>fett</strong>, <strong><em>beidem</em></strong>, <del>durchge</del></p>" exists
+shot build/mdviewtest/select.png
+# a word
+dblclick 172,132
+expect text:"Auswahl: 4 Zeichen" exists
+# from the heading into the list: blocks on lines of their own, list markers
+wait 600
+drag 30,220 140,290
+expect text:"Auswahl: 38 Zeichen" exists
+key ctrl+c
+click "Zwischenablage"
+expect text:"Text: Listen⏎⏎- Erster Punkt⏎- Zweiter Punkt" exists
+expect text:"HTML: <h2>Listen</h2><ul><li><p>Erster Punkt</p></li><li><p>Zweiter Punkt</p></li></ul>" exists
+shot build/mdviewtest/select_list.png
+# Shift + press extends the selection from its anchor
+wait 600
+drag 100,318 101,318 shift
+expect text:"Auswahl: 60 Zeichen" exists
+# Ctrl+A: everything
+click 900,360
+key ctrl+a
+expect text:"Auswahl: 993 Zeichen" exists
+key ctrl+c
+click "Zwischenablage"
+expect text:"Text: Markdown-Betrachter⏎⏎Ein Absatz mit kursiv, fett, beidem, durchgestrichen, Code im Text und einem Link. Bare Adressen we" exists
+shot build/mdviewtest/select_all.png
+# a table (html_view): cells by tabs, the HTML's table with its alignment
+click "HTML"
+wait 600
+drag 40,440 160,505
+expect text:"Auswahl: 31 Zeichen" exists
+key ctrl+c
+click "Zwischenablage"
+expect text:"Text: Spalte A⇥Spalte B⏎eins⇥1⏎zwei⇥2" exists
+expect text:"HTML: <table><tr><th>Spalte A</th><th align=\"right\">Spalte B</th></tr><tr><td>eins</td><td align=\"right\">1</td></tr><tr><td>zw" exists
+shot build/mdviewtest/select_table.png
+expect_nowarn

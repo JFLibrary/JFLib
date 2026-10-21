@@ -98,7 +98,7 @@ fn union(a: [i32; 4], b: &[i32; 4]) -> [i32; 4] {
 fn role_of(s: &Sem) -> Option<Role> {
     let label = s.label.as_deref().unwrap_or("");
     Some(match s.kind {
-        K_TEXT if !label.is_empty() => Role::Label,
+        K_TEXT | K_HEADING if !label.is_empty() => Role::Label,
         K_BUTTON | K_SWATCH => Role::Button,
         K_CHECKBOX => Role::CheckBox,
         K_RADIO => Role::Radio,
