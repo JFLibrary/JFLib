@@ -1,0 +1,38 @@
+# History guard: an alarm when the old history reaches GitHub.
+# The public history starts at one root commit, 93f47e5 "JFLib: first public version". The
+# history before it (root 2e0b359 "init") contains files that must not be published and
+# lives only in a local branch. GitHub cannot refuse such a push for a public repository,
+# so this job fails right after it, and the failure mail is the alarm; the local pre-push
+# hook and the ruleset on main (no force push, no deletion) are the actual barriers.
+name: History guard
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  history:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: One root commit, never the old history
+        run: |
+          expected=93f47e59c7bacede0e4b1165b00c8568300283aa
+          old=2e0b359504d9f0c3eea112d24720d2e45b61d678
+          git fetch --quiet --no-tags origin '+refs/heads/*:refs/remotes/origin/*'
+          roots=$(git rev-list --max-parents=0 --all | sort -u)
+          echo "root commits: $roots"
+          if git cat-file -e "$old^{commit}" 2>/dev/null; then
+            echo "::error::The old history (root 2e0b359) is on GitHub. Remove it at once."
+            exit 1
+          fi
+          if [ "$roots" != "$expected" ]; then
+            echo "::error::Unexpected root commits: $roots (expected only $expected)"
+            exit 1
+          fi
