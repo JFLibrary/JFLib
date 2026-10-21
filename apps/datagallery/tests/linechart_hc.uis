@@ -1,0 +1,45 @@
+#!args --lang ar --verify-dirty
+# the line chart in high contrast and mirrored (Arabic; page "Metriken"): the scheme's
+# colours with a dash pattern per series (line samples in the legend), no fills, framed
+# tags, a dotted grid; the plot keeps its left-to-right order in its mirrored place (time
+# runs to the right, the y labels at its left), the legend is mirrored; the summary's words
+# and the empty text in Arabic; hovering and the keys (Left: the earlier point, as drawn)
+size 1440 960
+theme dark
+theme contrast
+wait 50
+click "Metriken"
+cmd 9202 0
+wait 50
+expect #32026 text "Warteschlange – لا توجد بيانات"
+expect text:"لا توجد بيانات" exists
+expect #32022 text "Fehlerquote – Fehlerquote: الحالية 0.574 %, الأدنى 0.254 %, الأقصى 37.8 %"
+# the latency chart sits in the right half: 800 ms at the left of its plot, the SLO tag at
+# the right end of its line
+expect #32020 rect 619 340 535 198
+expect text:"800 ms" rect 621 340 39 16
+expect text:"SLO 250 ms" rect 1073 457 73 16
+# hovering 1:45 of it (the same place in the plot as left to right)
+move 1033,420
+expect text:"1:45" exists
+expect text:"p95: 88.1 ms" exists
+expect text:"Zeiger: p99 bei 1:45.0" exists
+# the keys act as drawn: Left the earlier point
+move 700,150
+focus #32020
+key end
+expect text:"1:59.5" exists
+key left
+expect text:"1:59" exists
+key right
+expect text:"1:59.5" exists
+key esc
+move 1033,420
+wait 50
+shot build/shots/datagallery_lines_hc_dark.png
+theme light
+theme contrast
+wait 50
+expect text:"1:45" exists
+shot build/shots/datagallery_lines_hc_light.png
+expect_nowarn

@@ -1,8 +1,9 @@
 // uitest -- self-checks of ui logic without a window: the undo history (ui::History, Snapshot,
 // groups, merging, the limit, the saved state), the easing curves (ui::ease), typed settings
 // (base::settings: types, limits, the file, versions and migrations), the hashed widget ids
-// (ui::wid, wid_path) and Unicode segmentation (text::segment: UAX #29, UAX #14).  Console
-// program; exit code 1 when a check fails.
+// (ui::wid, wid_path) and Unicode segmentation (text::segment: UAX #29, UAX #14), the line
+// chart's series ring and axis maths (ui::SeriesBuf, LcUnit, lc_nice, lc_time_step,
+// lc_time_text).  Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app uitest
 //   build/win/uitest.exe [--only NAME]        (build_rs.py test runs it through tests/all.uis;
@@ -20,6 +21,7 @@ use alloc::vec::Vec;
 
 use base::{Ini, Key, Schema, Settings};
 use ui::{EASE_IN, EASE_IN_OUT, EASE_LINEAR, EASE_OUT, EASE_OUT_BACK, EASE_OUT_CUBIC, Edit, History, Snapshot, ease};
+use ui::{lc_nice, lc_time_step, lc_time_text, LcUnit, SeriesBuf, SeriesCol};
 
 struct T {
     group: &'static str,
@@ -381,9 +383,98 @@ fn segment(t: &mut T) {
     t.check("version", unicode_version().starts_with("15."));
 }
 
+// line charts: the ring of points (order, capacity, refused times, gaps, lookups, pixel
+// columns), the labels of values and ticks, nice steps, clock steps and labels
+fn chart(t: &mut T) {
+    let sep = ',' as u32;
+    let strs = |v: &[&str]| v.iter().map(|s| String::from(*s)).collect::<Vec<String>>();
+    let mut b = SeriesBuf::new(4);
+    t.check("empty", b.is_empty() && b.first().is_none() && b.min_max().is_none() && b.nearest(1.0).is_none());
+    let v0 = b.ver();
+    t.check("push", b.push(0.0, 1.0) && b.push(1.0, 5.0) && b.push(1.0, 3.0));
+    t.check("a version per change", b.ver() != v0);
+    t.check("an earlier time is refused", !b.push(0.5, 9.0) && !b.push(f64::NAN, 1.0) && !b.push(f64::INFINITY, 1.0) && b.len() == 3);
+    b.push(2.0, f64::NAN);
+    b.push(3.0, 2.0);
+    t.eq("full: the oldest went", (b.len(), b.first(), b.last(), b.capacity()), (4, Some((1.0, 5.0)), Some((3.0, 2.0)), 4));
+    t.eq("iter", b.iter().map(|p| p.0).collect::<Vec<f64>>(), alloc::vec![1.0, 1.0, 2.0, 3.0]);
+    t.eq("iter backwards", (b.iter().rev().next(), b.iter().len(), b.get(1)), (Some((3.0, 2.0)), 4, Some((1.0, 3.0))));
+    t.eq("min_max skips gaps", b.min_max(), Some((2.0, 5.0)));
+    t.eq("min_max_in", (b.min_max_in(1.5, 3.0), b.min_max_in(1.5, 2.5), b.min_max_in(4.0, 9.0)), (Some((2.0, 2.0)), None, None));
+    t.eq("lower_bound", (b.lower_bound(0.0), b.lower_bound(1.0), b.lower_bound(1.5), b.lower_bound(9.0)), (0, 0, 2, 4));
+    t.eq("nearest skips gaps", (b.nearest(2.0), b.nearest(2.6), b.nearest(-5.0), b.nearest(99.0)), (Some(1), Some(3), Some(0), Some(3)));
+    let v1 = b.ver();
+    b.clear();
+    t.check("clear", b.is_empty() && b.capacity() == 4 && b.ver() != v1);
+    // pixel columns: the range, first and last value per column; a gap starts an entry
+    let mut c = SeriesBuf::new(100);
+    for (x, v) in [(0.0, 1.0), (0.4, 3.0), (0.9, 2.0), (1.0, f64::NAN), (1.5, 4.0), (3.9, 7.0), (4.0, 8.0)] {
+        c.push(x, v);
+    }
+    let col = |col, n, min, max, first, last, gap| SeriesCol { col, n, min, max, first, last, gap };
+    t.eq(
+        "columns",
+        c.columns(0.0, 4.0, 4),
+        alloc::vec![col(0, 3, 1.0, 3.0, 1.0, 2.0, false), col(1, 1, 4.0, 4.0, 4.0, 4.0, true), col(3, 2, 7.0, 8.0, 7.0, 8.0, false)],
+    );
+    let mut g = SeriesBuf::new(8);
+    for (x, v) in [(0.0, 1.0), (0.2, f64::NAN), (0.4, 2.0)] {
+        g.push(x, v);
+    }
+    let gc: Vec<(u32, u32, bool)> = g.columns(0.0, 1.0, 1).iter().map(|c| (c.col, c.n, c.gap)).collect();
+    t.eq("a gap inside a column: a second entry", gc, alloc::vec![(0, 1, false), (0, 1, true)]);
+    t.check("columns of nothing", c.columns(5.0, 9.0, 4).is_empty() && c.columns(1.0, 1.0, 4).is_empty() && c.columns(0.0, 4.0, 0).is_empty());
+    let mut big = SeriesBuf::new(100_000);
+    for i in 0..100_000u32 {
+        big.push(i as f64 / 1000.0, (i % 1000) as f64);
+    }
+    let cols = big.columns(0.0, 100.0, 500);
+    let n: usize = cols.iter().map(|c| c.n as usize).sum();
+    t.eq("100 000 points in 500 columns", (cols.len(), n), (500, 100_000));
+    t.check("their extremes kept", cols[0].min == 0.0 && cols.iter().all(|c| c.max <= 999.0) && cols.iter().any(|c| c.max == 999.0));
+    t.check("a full ring keeps its capacity", big.push(100.0, 1.0) && big.len() == 100_000 && big.first() == Some((0.001, 1.0)));
+    // values: three significant digits, the scale that fits
+    let secs = [0.0482, 0.00045, 1.5, 0.12, 0.0].map(|v| LcUnit::Secs.text(v, sep));
+    t.eq("seconds", secs.to_vec(), strs(&["48,2 ms", "450 µs", "1,5 s", "120 ms", "0 s"]));
+    let nums = [
+        LcUnit::Num("req/s").text(1234.0, sep),
+        LcUnit::Num("").text(999.6, sep),
+        LcUnit::Num("%").text(12.34, sep),
+        LcUnit::Num("").text(-0.0123, sep),
+        LcUnit::Num("").text(f64::NAN, sep),
+    ];
+    t.eq("numbers", nums.to_vec(), strs(&["1,23k req/s", "1k", "12,3 %", "-0,0123", "–"]));
+    let si = [LcUnit::Si("B").text(1500.0, sep), LcUnit::Si("B").text(950.0, sep), LcUnit::Si("bit/s").text(1.0e8, sep), LcUnit::Si("B/s").text(2.68e7, sep)];
+    t.eq("SI prefixes", si.to_vec(), strs(&["1,5 kB", "950 B", "100 Mbit/s", "26,8 MB/s"]));
+    t.eq("decimal point", LcUnit::Secs.text(0.0482, '.' as u32), String::from("48.2 ms"));
+    // ticks: one scale, the decimals of the step, zero with the unit
+    t.eq("ticks in ms", LcUnit::Secs.ticks(0.0, 0.05, 4, sep), strs(&["0 ms", "50 ms", "100 ms", "150 ms", "200 ms"]));
+    t.eq("ticks of requests", LcUnit::Num("req/s").ticks(0.0, 250.0, 4, sep), strs(&["0 req/s", "250 req/s", "500 req/s", "750 req/s", "1000 req/s"]));
+    t.eq("ticks with k", LcUnit::Num("").ticks(0.0, 5000.0, 3, sep), strs(&["0", "5k", "10k", "15k"]));
+    t.eq("ticks in MB", LcUnit::Si("B").ticks(0.0, 5e5, 3, sep), strs(&["0 MB", "0,5 MB", "1,0 MB", "1,5 MB"]));
+    t.eq("negative ticks", LcUnit::Num("").ticks(-2.0, 1.0, 4, sep), strs(&["-2", "-1", "0", "1", "2"]));
+    // nice steps: 1 / 2 / 2.5 / 5 x 10^k
+    let nice = [lc_nice(0.0, 0.73, 5), lc_nice(0.0, 230.0, 5), lc_nice(3.0, 97.0, 5), lc_nice(-1.3, 2.2, 4), lc_nice(5.0, 5.0, 5), lc_nice(0.0, 1.2e6, 6), lc_nice(0.0, 120.0, 5)];
+    t.eq("nice", nice.to_vec(), alloc::vec![(0.0, 0.2, 4), (0.0, 50.0, 5), (0.0, 20.0, 5), (-2.0, 2.0, 3), (5.0, 1.0, 1), (0.0, 2e5, 6), (0.0, 25.0, 5)]);
+    // clock steps and labels
+    let steps = [0.3, 0.8, 3.0, 7.0, 40.0, 100.0, 4000.0, 2e5, 2e-8].map(lc_time_step);
+    t.eq("time steps", steps.to_vec(), alloc::vec![0.5, 1.0, 5.0, 10.0, 60.0, 120.0, 7200.0, 432000.0, 2e-8]);
+    let labels = [
+        lc_time_text(5.0, 0, false, sep),
+        lc_time_text(60.0, 0, false, sep),
+        lc_time_text(90.0, 0, false, sep),
+        lc_time_text(3600.0, 0, true, sep),
+        lc_time_text(83.5, 1, false, sep),
+        lc_time_text(-30.0, 0, false, sep),
+        lc_time_text(1.000012, 6, false, sep),
+        lc_time_text(4000.0, 0, false, sep),
+    ];
+    t.eq("time labels", labels.to_vec(), strs(&["0:05", "1:00", "1:30", "1:00:00", "1:23,5", "-0:30", "0:01,000012", "66:40"]));
+}
+
 fn run() -> i32 {
     let only = plat::arg_value("--only").map(String::from);
-    let groups: &[(&str, fn(&mut T))] = &[("history", history), ("easing", easing), ("settings", settings), ("ids", ids), ("segment", segment)];
+    let groups: &[(&str, fn(&mut T))] = &[("history", history), ("easing", easing), ("settings", settings), ("ids", ids), ("segment", segment), ("chart", chart)];
     let (mut failed, mut total) = (0, 0);
     for (name, f) in groups {
         if only.as_deref().is_some_and(|o| o != *name) {
