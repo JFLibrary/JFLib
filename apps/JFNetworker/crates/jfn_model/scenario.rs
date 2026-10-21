@@ -2,6 +2,7 @@
 //
 //   parse(text) -> Result<Scenario, Vec<ScnErr>>   every error with its line number
 //   parse_duration("1.5s") -> ns   parse_rate("100M") -> bit/s   parse_ppm("0.5%") -> ppm
+//   parse_milli("99.5") -> 99500 (thousandths)
 //
 // One step per line, "#" starts a comment.  A step may start with "at TIME" (virtual time
 // since the start); without it, it happens when the previous steps are done.
@@ -27,6 +28,14 @@
 //   fault partition KV1 KV2 | KV3                partition (one side alone: against all others)
 //   heal 2 | heal all | heal power KV2 | heal link R1 Gi0/1 | heal impair R1 Gi0/1 |
 //   heal stop WEB2 web | heal disk KV1 | heal partition
+//   expect LB1 svc lb metric requests >= 99.5 over 5s       a metric's time series over a span
+//   expect LB1 svc lb metric max p99_us < 5000 between 14s and 19s   (jfn_sim series.rs): the
+//                                                samples of the last 5 s, or those taken after
+//                                                14 s up to 19 s; without min, max or mean the
+//                                                series' own (a counter's rate per second, a
+//                                                gauge's mean, a latency's quantile of the span);
+//                                                the value may have a fraction
+//   series build/run.csv                         write the time series as CSV at the end
 //
 // Device and port names are resolved when the scenario runs; this module only checks syntax.
 
@@ -66,6 +75,8 @@ pub enum StepKind {
     /// a fault of the lab; with a duration it heals by itself
     Fault { fault: FaultSpec, dur: Option<u64> },
     Heal(HealSpec),
+    /// the time series as CSV at the end ("series FILE")
+    Series(String),
 }
 
 /// a fault of a scenario (the names are resolved when it runs)
@@ -122,6 +133,50 @@ pub enum Expect {
     NoRoute { dev: String, prefix: Prefix4 },
     Hops { proto: String, cmp: Cmp, n: u64 },
     Metric { dev: String, svc: String, name: String, cmp: Cmp, value: i64 },
+    /// a metric's time series over a span; the value in thousandths
+    Series { dev: String, svc: String, name: String, agg: Agg, cmp: Cmp, milli: i64, span: Span },
+}
+
+/// how a windowed expectation sums up the samples of a series
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Agg {
+    /// the series' own: a counter's rate over the span, a gauge's mean, a latency's quantile
+    /// (or mean, maximum) of everything in the span
+    #[default]
+    Natural,
+    Min,
+    Max,
+    /// the mean of the samples' values
+    Mean,
+}
+
+impl Agg {
+    pub fn parse(s: &str) -> Option<Agg> {
+        Some(match s {
+            "min" => Agg::Min,
+            "max" => Agg::Max,
+            "mean" => Agg::Mean,
+            _ => return None,
+        })
+    }
+    /// the word of the scenario ("" for the series' own)
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Agg::Natural => "",
+            Agg::Min => "min",
+            Agg::Max => "max",
+            Agg::Mean => "mean",
+        }
+    }
+}
+
+/// the samples a windowed expectation looks at
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Span {
+    /// "over D": the samples taken in the last D (ns)
+    Last(u64),
+    /// "between A and B": the samples taken after A up to B (ns)
+    Between(u64, u64),
 }
 
 /// a comparison
@@ -291,7 +346,7 @@ fn words(s: &str) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-const KEYWORDS: &[&str] = &["seed", "run", "link", "impair", "power", "expect", "pcap", "print", "at", "fault", "heal"];
+const KEYWORDS: &[&str] = &["seed", "run", "link", "impair", "power", "expect", "pcap", "print", "at", "fault", "heal", "series"];
 
 /// parses a scenario; all syntax errors are collected
 pub fn parse(text: &str) -> Result<Scenario, Vec<ScnErr>> {
@@ -361,6 +416,7 @@ fn parse_line(t: &str, sc: &mut Scenario) -> Result<Option<(Option<u64>, StepKin
         ["power", st, dev] if *st == "on" || *st == "off" => StepKind::Power { dev: String::from(*dev), on: *st == "on" },
         ["expect", rest @ ..] => StepKind::Expect(parse_expect(rest)?),
         ["pcap", file] => StepKind::Pcap(String::from(*file)),
+        ["series", file] => StepKind::Series(String::from(*file)),
         ["print", text @ ..] => StepKind::Print(text.join(" ")),
         ["fault", rest @ ..] => {
             let (rest, dur) = match rest {
@@ -448,9 +504,55 @@ fn parse_heal(w: &[&str]) -> Result<HealSpec, String> {
     })
 }
 
+/// a decimal number in thousandths ("99.5": 99500, "-2": -2000; three decimals at most)
+pub fn parse_milli(s: &str) -> Option<i64> {
+    let (neg, num) = match s.strip_prefix('-') {
+        Some(r) => (true, r),
+        None => (false, s),
+    };
+    if num.split_once('.').is_some_and(|(_, f)| f.len() > 3) {
+        return None;
+    }
+    let v = i64::try_from(scaled(num, 1000)?).ok()?;
+    Some(if neg { -v } else { v })
+}
+
+/// the words after "expect DEV svc NAME metric" of an expectation over a span:
+/// "[min|max|mean] METRIC CMP VALUE over D" or "... between A and B"
+fn parse_series_expect(dev: &str, svc: &str, w: &[&str]) -> Result<Expect, String> {
+    let dur = |s: &str| parse_duration(s).ok_or_else(|| format!("\u{201e}{}\u{201c} ist keine Zeitangabe (z. B. 250ms, 1.5s).", s));
+    let (head, span) = match w {
+        [h @ .., "over", d] => match dur(d)? {
+            0 => return Err(String::from("\u{201e}over\u{201c} braucht eine Dauer größer als 0.")),
+            x => (h, Span::Last(x)),
+        },
+        [h @ .., "between", a, "and", b] => {
+            let (x, y) = (dur(a)?, dur(b)?);
+            if x >= y {
+                return Err(format!("Der Zeitraum von {} bis {} ist leer.", a, b));
+            }
+            (h, Span::Between(x, y))
+        }
+        _ => return Err(format!("Diese Erwartung kenne ich nicht: expect {} svc {} metric {}", dev, svc, w.join(" "))),
+    };
+    let (agg, name, c, v) = match head {
+        [name, c, v] => (Agg::Natural, name, c, v),
+        [a, name, c, v] => (Agg::parse(a).ok_or_else(|| format!("\u{201e}{}\u{201c} fasst keine Reihe zusammen (min, max, mean).", a))?, name, c, v),
+        _ => return Err(format!("Diese Erwartung kenne ich nicht: expect {} svc {} metric {}", dev, svc, w.join(" "))),
+    };
+    let cmp = Cmp::parse(c).ok_or_else(|| format!("\u{201e}{}\u{201c} ist kein Vergleich (==, !=, <, <=, >, >=).", c))?;
+    let milli = parse_milli(v).ok_or_else(|| format!("\u{201e}{}\u{201c} ist keine Zahl.", v))?;
+    Ok(Expect::Series { dev: String::from(dev), svc: String::from(svc), name: String::from(*name), agg, cmp, milli, span })
+}
+
 fn parse_expect(w: &[&str]) -> Result<Expect, String> {
     let prefix = |s: &str| Prefix4::parse(s).map(|p| p.trunc()).ok_or_else(|| format!("\u{201e}{}\u{201c} ist kein IPv4-Präfix (z. B. 10.0.2.0/24).", s));
     let cmp = |s: &str| Cmp::parse(s).ok_or_else(|| format!("\u{201e}{}\u{201c} ist kein Vergleich (==, !=, <, <=, >, >=).", s));
+    if let [dev, "svc", svc, "metric", rest @ ..] = w
+        && (rest.contains(&"over") || rest.contains(&"between"))
+    {
+        return parse_series_expect(dev, svc, rest);
+    }
     Ok(match w {
         [dev, "output", "contains", needle] => Expect::Output { dev: String::from(*dev), needle: String::from(*needle), negate: false },
         [dev, "output", "not", "contains", needle] => Expect::Output { dev: String::from(*dev), needle: String::from(*needle), negate: true },

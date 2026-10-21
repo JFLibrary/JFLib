@@ -59,6 +59,9 @@
 //                connections, status_2xx..5xx, users / rate_mrps, rps (answers per second
 //                over the last 10 s), err_pm (errors per mille), p50_us, p95_us, p99_us,
 //                mean_us, max_us
+// Time series (series.rs): busy_ms counts up (its rate is the workers' load in ms per
+// second); the latency windows give p50_us, p95_us, p99_us of each interval, a web server's
+// backend also backend_p50_us .. backend_p99_us, the load generator also mean_us and max_us.
 // Views for the lab: HttpServer::view, HttpLoad::view (per-second slots with p50/p95/p99);
 // Engine::http_server_view / http_load_view.  Actions HttpLoadSet and HttpServerSet change a
 // running service without losing its numbers.  from_def (svcact.rs) refuses a definition with
@@ -82,6 +85,7 @@ use netpkt::http::{Headers, Version};
 use crate::http::{Agent, Done, Fail, Reply, ReqIn, Req, Serve, ServeCfg, Url, Wheel};
 use crate::kernel::{Engine, Ns, MS, SEC};
 use crate::os::{Metric, OsApi, Service, SvcEvent};
+use crate::series::{metric_kind_of, LatStat, LatWindow, MetricKind, LAT};
 use crate::trace::Note;
 
 /// timer keys: the service's own deadlines, the HTTP part (Serve or Agent)
@@ -286,6 +290,13 @@ fn us(v: Option<u64>) -> i64 {
 fn lat_window() -> Window {
     Window::new(300, SEC)
 }
+
+/// the time series of a web server's backend latency (series.rs)
+const BACKEND_LAT: &[(&str, LatStat)] = &[("backend_p50_us", LatStat::Quantile(500)), ("backend_p95_us", LatStat::Quantile(950)), ("backend_p99_us", LatStat::Quantile(990))];
+
+/// the load generator's latency series: the quantiles, the mean and the maximum of each
+/// interval
+const LOAD_LAT: &[(&str, LatStat)] = &[("p50_us", LatStat::Quantile(500)), ("p95_us", LatStat::Quantile(950)), ("p99_us", LatStat::Quantile(990)), ("mean_us", LatStat::Mean), ("max_us", LatStat::Max)];
 
 /// one second of a latency window and its counters, for charts
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -848,6 +859,17 @@ impl Service for HttpServer {
             m.push(Metric::new("backend_p99_us", us(up.latency(now).2)));
         }
         m
+    }
+    fn metric_kind(&self, name: &str) -> MetricKind {
+        // the busy time only grows: its rate is the workers' load (1000 ms/s: one worker)
+        if name == "busy_ms" { MetricKind::Counter } else { metric_kind_of(name) }
+    }
+    fn windows(&self) -> Vec<LatWindow<'_>> {
+        let mut w = alloc::vec![LatWindow::new(&self.lat, LAT)];
+        if let Some(up) = &self.upstream {
+            w.push(LatWindow::new(up.window(), BACKEND_LAT));
+        }
+        w
     }
     fn status(&self) -> String {
         self.status_msg().text()
@@ -1585,6 +1607,9 @@ impl Service for HttpLoad {
             Metric::new("mean_us", us(self.lat.mean(now))),
             Metric::new("max_us", us(self.lat.max(now))),
         ]
+    }
+    fn windows(&self) -> Vec<LatWindow<'_>> {
+        alloc::vec![LatWindow::new(&self.lat, LOAD_LAT)]
     }
     fn status(&self) -> String {
         self.status_msg().text()

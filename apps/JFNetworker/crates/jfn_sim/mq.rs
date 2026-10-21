@@ -32,7 +32,8 @@
 // (waiting), inflight (out), topics, oldest_ms, max_depth, rejected, p50_us, p95_us, p99_us
 // (publish to acknowledgement).  Of a worker: taken, done, failed, busy, polls, empty, errors,
 // p50_us, p95_us, p99_us (taken to acknowledged).  Engine::mq_view / worker_view; mqctl and
-// workerctl on the console.
+// workerctl on the console.  The time series (series.rs) of both take p50_us, p95_us, p99_us
+// of each interval from the windows.
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, VecDeque};
@@ -51,6 +52,7 @@ use crate::http::{Agent, Done, Reply, Req, ReqIn, Serve, ServeCfg, Url, Wheel};
 use crate::httpsvc::{decimal, rate_ppm};
 use crate::kernel::{Engine, Ns, MS, SEC};
 use crate::os::{Metric, OsApi, Service, SvcEvent};
+use crate::series::{LatWindow, LAT};
 use crate::trace::Note;
 
 const K_OWN: u32 = 0;
@@ -513,6 +515,9 @@ impl Service for Queue {
             Metric::new("p99_us", us(self.lat.p99(now))),
         ]
     }
+    fn windows(&self) -> Vec<LatWindow<'_>> {
+        alloc::vec![LatWindow::new(&self.lat, LAT)]
+    }
     fn status(&self) -> String {
         format!("Port {}: {} Topics, {} wartend, {} unterwegs, {} bestätigt", self.port, self.topics.len(), self.depth(), self.inflight(), self.sum(|t| t.acked))
     }
@@ -844,6 +849,9 @@ impl Service for Worker {
             Metric::new("p95_us", us(self.lat.p95(now))),
             Metric::new("p99_us", us(self.lat.p99(now))),
         ]
+    }
+    fn windows(&self) -> Vec<LatWindow<'_>> {
+        alloc::vec![LatWindow::new(&self.lat, LAT)]
     }
     fn status(&self) -> String {
         format!("{} {}: {} von {} beschäftigt, {} erledigt, {} gescheitert", self.queue.text(), self.topic, self.busy(), self.concurrency, self.done, self.failed)

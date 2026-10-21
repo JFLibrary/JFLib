@@ -7,7 +7,9 @@
 //                             built-in ones: dhcpc.rs (DHCP client), dhcpd.rs (DHCP server
 //                             and relay), dnsd.rs (DNS server), syslogd.rs, ntpd.rs;
 //                             status_msg: the status line as a Msg for the app's catalogue
-//                             (SvcView::status_msg; the built-in services word it so)
+//                             (SvcView::status_msg; the built-in services word it so);
+//                             metric_kind and windows: how its numbers become time series
+//                             (series.rs)
 //   SvcEvent                  Udp(Dgram) | Timer(key) | EchoReply | ArpConflict |
 //                             Resolved(lookup) | Link | Ctl
 //   OsApi                     what a running service may do: bind / bind_raw / close, send /
@@ -214,6 +216,16 @@ pub trait Service: Send {
     fn metrics_at(&self, now: Ns) -> Vec<Metric> {
         let _ = now;
         self.metrics()
+    }
+    /// what a metric of metrics_at() is to the time series (series.rs): a counter (its rate
+    /// per second), a gauge or none; the default goes by the name (series::metric_kind_of)
+    fn metric_kind(&self, name: &str) -> crate::series::MetricKind {
+        crate::series::metric_kind_of(name)
+    }
+    /// the latency windows of the time series (series.rs): what each interval of them gives
+    /// becomes the series of the names they list, in place of the metrics of those names
+    fn windows(&self) -> Vec<crate::series::LatWindow<'_>> {
+        Vec::new()
     }
 }
 
