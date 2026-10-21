@@ -2,9 +2,9 @@
 // used most, its output and messages as curl 8 prints them on a terminal), nc (TCP and UDP
 // client, -l server, -z scan; OpenBSD netcat's messages), ss (TCP and UDP sockets with states,
 // timers and TCP internals in iproute2's layout), top (a slim overview of the services: state,
-// the CPU time of the web servers, load average), printf and pipes into nc ("printf 'GET /
-// HTTP/1.0\r\n\r\n' | nc web 80"); on the IOS-like console "show tcp brief [all]", "show tcp
-// statistics" and "show control-plane host open-ports"
+// the CPU time of the web servers and the scripts, load average), printf and pipes into nc
+// ("printf 'GET / HTTP/1.0\r\n\r\n' | nc web 80"); on the IOS-like console "show tcp brief
+// [all]", "show tcp statistics" and "show control-plane host open-ports"
 //
 // curl and nc are console programs: services the shell starts (OsApi::print, exit,
 // SvcEvent::Console); the console is busy while they run, typed lines go to nc, Ctrl+C ends
@@ -2239,11 +2239,13 @@ impl Engine {
         // the web servers' work: busy and waiting time per window
         let ids = self.service_ids(dev);
         let servers: Vec<(u32, &crate::httpsvc::HttpServer)> = ids.iter().filter_map(|s| self.service::<crate::httpsvc::HttpServer>(dev, &s.1).map(|h| (s.0, h))).collect();
+        // the scripts' CPU time (scriptsvc.rs)
+        let scripts: Vec<(u32, &crate::scriptsvc::ScriptService)> = ids.iter().filter_map(|s| self.service::<crate::scriptsvc::ScriptService>(dev, &s.1).map(|x| (s.0, x))).collect();
         let load = |w: u64| -> u64 {
             let sum: u64 = servers.iter().map(|(_, h)| {
                 let (b, q) = h.load(now, w);
                 b + q
-            }).sum();
+            }).sum::<u64>() + scripts.iter().map(|(_, x)| x.load(now, w)).sum::<u64>();
             (sum as u128 * 1000 / (w as u128 * SEC as u128)) as u64
         };
         let dsecs = (delay / SEC).max(1);
@@ -2260,7 +2262,14 @@ impl Engine {
                     busy_total += b;
                     ((b as u128 * 100_000 / (dsecs as u128 * SEC as u128)) as u64, h.busy_ns, if h.busy() > 0 { 'R' } else { 'S' })
                 }
-                None => (0, 0, 'S'),
+                None => match scripts.iter().find(|s| s.0 == *id) {
+                    Some((_, x)) => {
+                        let b = x.load(now, dsecs);
+                        busy_total += b;
+                        ((b as u128 * 100_000 / (dsecs as u128 * SEC as u128)) as u64, x.busy_ns(), if x.busy(now) { 'R' } else { 'S' })
+                    }
+                    None => (0, 0, 'S'),
+                },
             };
             if st == 'R' {
                 running += 1;

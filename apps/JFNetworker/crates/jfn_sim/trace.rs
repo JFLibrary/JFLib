@@ -310,6 +310,11 @@ pub enum Note {
     MqAck { topic: String, id: u64 },
     MqRedeliver { topic: String, id: u64 },
     MqDead { topic: String, id: u64 },
+    /// scripts (scriptsvc.rs): an event waits for the CPU, a datagram is dropped because too
+    /// many wait, an error ended a callback (line, column and the VM's German message)
+    ScriptBusy { svc: String, waiting: u32 },
+    ScriptDropped { svc: String },
+    ScriptError { svc: String, line: u32, col: u32, msg: String },
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -425,6 +430,7 @@ impl Note {
             Note::FaultStart { .. } | Note::FaultEnd { .. } => 1,
             Note::PartitionDrop { .. } => 3,
             n if n.is_lab() => 7,
+            Note::ScriptBusy { .. } | Note::ScriptDropped { .. } | Note::ScriptError { .. } => 7,
             _ => 2,
         }
     }
@@ -509,6 +515,7 @@ impl Note {
                 | Note::LbNoBackend
                 | Note::DiskFull
                 | Note::MqDead { .. }
+                | Note::ScriptDropped { .. }
         )
     }
     /// a TCP decision (tcp.rs)
@@ -794,6 +801,9 @@ impl Note {
             Note::MqAck { topic, id } => msg!("Queue {}: Nachricht {} bestätigt.", topic, id),
             Note::MqRedeliver { topic, id } => msg!("Queue {}: Nachricht {} nicht bestätigt, wieder in der Warteschlange.", topic, id),
             Note::MqDead { topic, id } => msg!("Queue {}: Nachricht {} zu oft zugestellt, aussortiert.", topic, id),
+            Note::ScriptBusy { svc, waiting } => msg!("Skript {} rechnet noch: das Ereignis wartet ({} vor ihm).", svc, waiting),
+            Note::ScriptDropped { svc } => msg!("Skript {} überlastet: Datagramm verworfen.", svc),
+            Note::ScriptError { svc, line, col, msg: text } => msg!("Skript {}: Fehler in Zeile {}, Spalte {}: {}", svc, line, col, text),
         }
     }
 }

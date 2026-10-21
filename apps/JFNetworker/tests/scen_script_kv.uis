@@ -1,0 +1,10 @@
+#!args apps/JFNetworker/tests/fixtures/script_kv.jfnet --scenario apps/JFNetworker/tests/scen/script_kv.scn --golden apps/JFNetworker/tests/scen/script_kv.report
+# golden scenario of scripts as services: a key-value store written as a script (kv.jfs in the
+# fixture) on SRV1 behind a load generator, its fuel the CPU time of one thread (100 ns per
+# instruction, about 1.1 ms per request): 200 requests per second take about a fifth of the
+# CPU, 1500 per second fill the queue to 100 and get 503 beyond it, the latency climbs to tens
+# of milliseconds; a second script on MON polls the numbers with http.request every second
+# (script, script status, script output, top, curl in the report).  The GUI program runs
+# tests/scen/script_kv.scn on tests/fixtures/script_kv.jfnet without a window and ends with
+# the report, which must equal tests/scen/script_kv.report byte for byte on every target (the
+# script itself is not run)

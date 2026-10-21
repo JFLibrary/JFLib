@@ -2085,6 +2085,12 @@ impl Cx<'_> {
         self.vm.used += fuel;
     }
 
+    /// the fuel of the current invocation so far, over all its runs and this call included:
+    /// the moment of its CPU time a host gives what the native does (JFNetworker's scripts)
+    pub fn fuel(&self) -> u64 {
+        self.vm.call_fuel + self.vm.used
+    }
+
     /// charge fuel for work and end the invocation with ErrorKind::Fuel once Limits::fuel is
     /// used up: a long operation calls this as it goes, so a huge job stops in the middle
     pub fn spend(&mut self, fuel: u64) -> Result<(), Fail> {

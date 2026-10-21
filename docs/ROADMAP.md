@@ -801,7 +801,7 @@ Fensterrand hinaus.
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene
   Vektor-Icons ([STYLES.md](STYLES.md)).
-- **P3** · *teilweise* · Skriptsprache für JFNetworker ([`script`](../lib/script/lib.rs), seit
+- **P3** · *erledigt* · Skriptsprache für JFNetworker ([`script`](../lib/script/lib.rs), seit
   2026-10-19, Meilenstein SK1): `.jfs`-Dateien, klein und dynamisch typisiert (JS/Lua-artig,
   Closures, `try`/`catch`, `??`, Interpolation `"${x}"`). Lexer mit `tokens()` für die
   Syntaxhervorhebung (deckt jedes Byte ab, scheitert nie), Pratt-Parser mit Fehlerkorrektur
@@ -836,8 +836,13 @@ Fensterrand hinaus.
   Position. `agent_core::json` prüft doppelte Schlüssel großer Objekte jetzt in O(n log n).
   Getestet mit `coretest --only scriptlib` (Windows und Linux mit gleichem Hash über die
   Mathe-Ergebnisse) und `tools/script_math_check.py --target both` (Genauigkeit gegen
-  Pythons `decimal`, Windows gegen Linux Bit für Bit). Es fehlt: Anbindung an den Simulator
-  (SK4).
+  Pythons `decimal`, Windows gegen Linux Bit für Bit). Seit 2026-10-21 (SK4) laufen Skripte als
+  Dienste in den Hosts von JFNetworker (`jfn_sim::scriptsvc`, App-README „Skripte in Hosts“):
+  ereignisgesteuert über Rückrufe (UDP, TCP, HTTP-Server und -Client, DNS, Timer, Disk,
+  Metriken), Fuel als Rechenzeit einer CPU mit einem Thread (`Cx::fuel()` nennt den Augenblick
+  eines Aufrufs), Grenzen und Fehler mit Zeile und Spalte, der Befehl `script` in der
+  Linux-Shell; getestet mit der Selbsttest-Gruppe `script` und dem Golden-Szenario
+  `scen_script_kv.uis`.
 - **P3** · *erledigt* · Befehlsbäume für Konsolen (seit 2026-10-19, für JFNetworker):
   [`base/cmdtree.rs`](../lib/base/cmdtree.rs) mit IOS-Abkürzungen (`sh ip int br`), `?`-Hilfe
   im IOS-Layout, Tab, Modi mit Prompt, `no`-Form, typisierten Parametern (Zahl mit Bereich,

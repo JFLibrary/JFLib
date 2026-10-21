@@ -38,6 +38,8 @@
 //                             program, typed lines come as SvcEvent::Console; such services are
 //                             not in services(); Service::metrics_at gives numbers that depend
 //                             on the time (windows of the HTTP services)
+//   OsApi::halt / svc_name    a service ends itself (a script after an error: scriptsvc.rs);
+//                             its name on the device
 //
 // Everything a service sees goes through its node's inbox, which a node timer (SLOT_OS)
 // empties at the same virtual time: a service never runs inside another one's call, and a
@@ -1247,6 +1249,18 @@ impl OsApi<'_> {
     /// the service's id (ss -p shows it as the process id)
     pub fn svc_id(&self) -> u32 {
         self.id
+    }
+    /// the service's name on the device
+    pub fn svc_name(&self) -> String {
+        let id = self.id;
+        self.eng.os(self.ni).and_then(|o| o.svcs.iter().find(|s| s.id == id)).map(|s| s.name.clone()).unwrap_or_default()
+    }
+    /// the service ends by itself (a script after an error): it stops as when stopped from
+    /// outside, its sockets, timers and queued events go (Service::stop is not called: it
+    /// cleaned up already); it stays enabled, so it starts again with the device or on request
+    pub fn halt(&mut self) {
+        let (ni, id) = (self.ni, self.id);
+        self.eng.svc_stop(ni, id);
     }
 }
 
