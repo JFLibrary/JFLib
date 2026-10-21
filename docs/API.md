@@ -2596,7 +2596,8 @@ datepick -- date and time input
 
   time_box(id, &mut hour, &mut minute) -> EV    two number boxes "HH : MM" (EV_ACT changed)
   weekday_toggles(id, &mut mask) -> EV          seven toggle buttons, bit 0 = Monday ..
-                                                bit 6 = Sunday (EV_ACT changed)
+                                                bit 6 = Sunday (EV_ACT changed); they wrap
+                                                where the row is narrower (BOX_WRAP)
   date_picker(id, &mut y, &mut m, &mut d) -> EV a button with the date (the user's format,
                                                 i18n::fmt_date) that opens a month calendar
                                                 starting on the locale's first weekday
@@ -2611,7 +2612,8 @@ Ids: parts (id << 3 | k) | 0x80000000; calendar days ((id ^ 0x3C3C) << 6 | cell)
 - **`fn time_box(&mut self, id: u32, hour: &mut i32, minute: &mut i32) -> u32`**
   ui_time_box(id, &mut hour, &mut minute) -> EV_\* (EV_ACT changed)
 - **`fn weekday_toggles(&mut self, id: u32, mask: &mut u32) -> u32`**
-  ui_weekday_toggles(id, &mut mask) -> EV_\* (EV_ACT changed); bit 0 = Monday
+  ui_weekday_toggles(id, &mut mask) -> EV_\* (EV_ACT changed); bit 0 = Monday.  The
+  buttons wrap where the row has less room than the seven of them (a narrow card)
 - **`fn date_picker(&mut self, id: u32, y: &mut i32, m: &mut u32, d: &mut u32) -> u32`**
   ui_date_picker(id, &mut y, &mut m, &mut d) -> EV_\* (EV_ACT when a day was picked)
 

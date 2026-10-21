@@ -192,14 +192,15 @@ pub fn frame(app: &mut Console, ui: &mut Ui) {
         ui.text(TS_BODY | TX_SECONDARY, t("Keine geplanten Läufe."));
     }
     for (i, n) in s.next_runs.iter().enumerate() {
+        // the time keeps the width it needs, the job's name takes the rest (cut with "…")
         ui.box_begin(0, BOX_H | BOX_XCENTER, 10);
         ui.icon(BC_CLOCK, 16);
+        ui.next_size(-1, 0);
         if ui.link(ID_NEXT + i as u32, &n.job_name, TS_BODY) & EV_ACT != 0 {
             let id = n.job_id.clone();
             app.go(ui, Page::Jobs);
             views::select(app, Page::Jobs, &id);
         }
-        ui.spacer(-1);
         ui.text(TS_CAPTION | TX_SECONDARY, &fmt::when_short(n.at, epoch, &app.zone));
         ui.box_end();
     }

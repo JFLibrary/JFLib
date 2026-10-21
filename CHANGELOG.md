@@ -31,6 +31,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 - **tests:** The cancellation, wake-up and download checks of plattest and coretest no longer race on a loaded machine
 - **ui:** Text scale 150 to 200 %: bar chart column labels no longer run into each other (every k-th one, the first and the last kept, inside the chart; value steps a line apart), badges, grid headers, navigation items, segmented items, tabs, info bars, legend entries and text box placeholders that do not fit end with an ellipsis instead of a cut through a glyph, badge and navigation pills grow with the text (Ui::dp_text), donut centre texts stay inside the hole
+- **ui:** The weekday toggles (ui.weekday_toggles) wrap their seven buttons (BOX_WRAP) where the row has less room than they need, instead of running past the edge of a narrow card
 
 ## [0.1.0] - 2026-10-20
 
