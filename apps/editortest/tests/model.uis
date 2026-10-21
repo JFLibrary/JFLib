@@ -5,3 +5,7 @@
 # columns, the change journal; the tokens of Rust, JSON, INI, TOML and Markdown with their states
 # across lines; 100 000 lines tokenized and searched.  The whole test runs before the UI
 # starts; the exit code is the number of failures.
+# Diagnostics: characters to bytes, clamping, counts, at / next, how they follow typing, Enter,
+# deletes, points, block indent, comments, moved lines, undo / redo, replace_all, 100 000 lines;
+# the JFS grammar token by token against lib/script's tokens() on two samples, interpolation,
+# numbers, comments over lines.

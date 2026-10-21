@@ -34,6 +34,7 @@ use netpkt::Ipv4;
 use crate::ip::Origin;
 use crate::kernel::{Ns, MS};
 use crate::os::{Metric, OsApi, Service, SvcEvent};
+use crate::series::{metric_kind_of, MetricKind};
 use crate::tcp::{SockOpts, TcpEnd};
 use crate::trace::Note;
 
@@ -268,6 +269,10 @@ impl Service for PduSender {
             Metric::new("failed", self.failed as i64),
             Metric::new("done", self.done() as i64),
         ]
+    }
+    fn metric_kind(&self, name: &str) -> MetricKind {
+        // "done" is a flag here (series.rs)
+        if name == "done" { MetricKind::Gauge } else { metric_kind_of(name) }
     }
     fn status(&self) -> String {
         self.status_msg().text()

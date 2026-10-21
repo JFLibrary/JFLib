@@ -614,6 +614,24 @@ Fensterrand hinaus.
     Blockkommentare, Strings mit Escapes / mehrzeilig, Rust-Raw-Strings, Wortlisten, Zahlen,
     eigene Funktionen) mit Grammatiken für Rust, JSON, INI, TOML und eine Markdown-Teilmenge;
     Farben `CodeTheme` hell / dunkel / hoher Kontrast (`ui.code_theme()`).
+  * Diagnosen (L6, 2026-10-21): `CodeDoc::set_diagnostics(&[Diag])` (Zeile / Spalte ab 1 in
+    Zeichen, Fehler / Warnung / Hinweis, Meldung) zeichnet Wellenlinien in der Farbe der
+    Schwere und Marken in einer eigenen Spalte der Leiste (Kreis mit Kreuz, Dreieck, „i“ –
+    Formen, auch im hohen Kontrast unterscheidbar; `CE_MARKS` hält die Spalte); Tooltip mit
+    den Meldungen, F8 / Umschalt+F8 zur nächsten / vorigen, die am Caret in `code_status` /
+    `code_diag` und als Eintrag für Screenreader. Sie folgen jeder Änderung (Tippen, Enter,
+    Löschen, Block-Einzug, Kommentare, verschobene Zeilen, Undo / Redo) bis zur nächsten
+    Prüfung: ersetzter Text lässt eine Diagnose schrumpfen, ganz gelöscht entfällt sie. Nur
+    sichtbare Zeilen werden angesehen, eine Wellenlinie ist ein Zeichenbefehl (100 000 Zeilen
+    mit 13 000 Diagnosen so schnell wie ohne). Grammatik `Highlighter::jfs()` für die
+    Skriptsprache (`${…}` mit hervorgehobenem Code: neue Regel `Rule::Interp`), Token für
+    Token gegen `script::tokens` geprüft. Getestet mit `tests/code_diag.uis` (Hover, F8,
+    Bearbeiten, Prüfen beim Tippen, 100 000 Zeilen, Shots hell / dunkel bei 100 / 150 %,
+    hoher Kontrast) und `--test model` (jetzt 266 Prüfungen). Offen: Quick-Fixes,
+    Markierungen in der Bildlaufleiste, mehrzeilige Tooltips (lange Meldungen werden bei
+    300 DIP abgeschnitten); das Folgen vergleicht alten und neuen Text der geänderten Zeilen –
+    mehrdeutige Änderungen (eine Zeile löschen, die wie die nächste beginnt) können eine
+    Diagnose bis zur nächsten Prüfung leicht verschieben.
   * Getestet mit `apps/editortest` (13 Skripte mit `--verify-dirty`, Windows und Linux, und
     `--test model`: 168 Prüfungen der Modelle und Grammatiken).
   * Offen: kein bidirektionaler Text innerhalb eines Absatzes (wie bei den Textfeldern bleibt
@@ -764,6 +782,17 @@ Fensterrand hinaus.
   Schlüssel der Markierung unter dem Klick, Strg+C als Hex, Tooltip mit Offset; beide bleiben
   in RTL-Fenstern links → rechts. Getestet mit `datagallery/tests/timeline.uis`,
   `hexview.uis`, `simulation.uis` (hell, dunkel, 150 %).
+- **P2** · *erledigt* · Liniendiagramm für Zeitreihen ([`ui/chart.rs`](../lib/ui/chart.rs)
+  `line_chart` / `SeriesBuf`, L5 für das Verteilte-Systeme-Labor von JFNetworker): Ringpuffer
+  mit Kapazität (Lücken als NaN, Binärsuche, Spalten mit Min/Max je Pixel, sodass 100 000
+  Punkte so schnell gezeichnet werden wie 500), mehrere Serien als Linie oder Fläche, x als
+  Zeit (Sekunden oder Nanosekunden, Beschriftung 0:05 / 1:00 / 1:30) oder Zahl, y mit
+  „schönen“ Schritten und Einheiten (ms / µs, req/s, %, Bytes mit k / M / G), Bereich fest
+  oder automatisch, Raster, Legende, Fadenkreuz mit Karte aller Werte, Markierungen (Linien
+  und Bereiche: Fehlerinjektionen) und Schwellwerte mit Etiketten, die sich nie überdecken,
+  „Live folgen“, Leerzustand, Zusammenfassung für Screenreader; hoher Kontrast mit Strichmustern,
+  in RTL-Fenstern links → rechts. Getestet mit `datagallery/tests/linechart.uis`,
+  `linechart_hc.uis` und `uitest --only chart`.
 
 ## 7. App-Framework und Architektur
 
@@ -851,11 +880,14 @@ Fensterrand hinaus.
   ([`agent_core/src/jmap.rs`](../lib/agent_core/src/jmap.rs): `record!`, `wire_enum!`, aus
   BackupCraft in die Library gezogen; `bc_proto` nutzt es mit) und eingerücktes JSON für
   Dateien (`json::stringify_pretty`), getestet mit der coretest-Gruppe `jmap`.
+  Seit D2 fasst `Window::hist_between` die Slots eines Zeitraums zu einem Histogramm zusammen
+  (die Zeitreihen des Labors von JFNetworker: ein Punkt pro Intervall, Perzentile beliebiger
+  Zeiträume; Gruppe `metrics`).
 - **P2** · *erledigt* · Style `netlab` ([`styles/netlab`](../styles/netlab)) für JFNetworker:
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene
   Vektor-Icons ([STYLES.md](STYLES.md)).
-- **P3** · *teilweise* · Skriptsprache für JFNetworker ([`script`](../lib/script/lib.rs), seit
+- **P3** · *erledigt* · Skriptsprache für JFNetworker ([`script`](../lib/script/lib.rs), seit
   2026-10-19, Meilenstein SK1): `.jfs`-Dateien, klein und dynamisch typisiert (JS/Lua-artig,
   Closures, `try`/`catch`, `??`, Interpolation `"${x}"`). Lexer mit `tokens()` für die
   Syntaxhervorhebung (deckt jedes Byte ab, scheitert nie), Pratt-Parser mit Fehlerkorrektur
@@ -890,8 +922,13 @@ Fensterrand hinaus.
   Position. `agent_core::json` prüft doppelte Schlüssel großer Objekte jetzt in O(n log n).
   Getestet mit `coretest --only scriptlib` (Windows und Linux mit gleichem Hash über die
   Mathe-Ergebnisse) und `tools/script_math_check.py --target both` (Genauigkeit gegen
-  Pythons `decimal`, Windows gegen Linux Bit für Bit). Es fehlt: Anbindung an den Simulator
-  (SK4).
+  Pythons `decimal`, Windows gegen Linux Bit für Bit). Seit 2026-10-21 (SK4) laufen Skripte als
+  Dienste in den Hosts von JFNetworker (`jfn_sim::scriptsvc`, App-README „Skripte in Hosts“):
+  ereignisgesteuert über Rückrufe (UDP, TCP, HTTP-Server und -Client, DNS, Timer, Disk,
+  Metriken), Fuel als Rechenzeit einer CPU mit einem Thread (`Cx::fuel()` nennt den Augenblick
+  eines Aufrufs), Grenzen und Fehler mit Zeile und Spalte, der Befehl `script` in der
+  Linux-Shell; getestet mit der Selbsttest-Gruppe `script` und dem Golden-Szenario
+  `scen_script_kv.uis`.
 - **P3** · *erledigt* · Befehlsbäume für Konsolen (seit 2026-10-19, für JFNetworker):
   [`base/cmdtree.rs`](../lib/base/cmdtree.rs) mit IOS-Abkürzungen (`sh ip int br`), `?`-Hilfe
   im IOS-Layout, Tab, Modi mit Prompt, `no`-Form, typisierten Parametern (Zahl mit Bereich,

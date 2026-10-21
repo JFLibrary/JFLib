@@ -2,9 +2,11 @@
 // the files, run, write the report and the capture
 //
 //   gui_args(&args) -> Option<i32>   the GUI program's early exit: "--scenario S [PROJECT]
-//                                    [--pcap F] [--report F] [--golden F]" runs and ends
+//                                    [--pcap F] [--report F] [--golden F] [--series F]" runs
+//                                    and ends
 //   main(&args) -> i32               jfn-sim: run PROJECT [--scenario S] [--pcap F] [--report F]
-//                                    [--golden F] | check PROJECT | decode HEX | gen N [--out F]
+//                                    [--golden F] [--series F] | check PROJECT | decode HEX |
+//                                    gen N [--out F]
 //   generate(&args) -> i32           jfn-sim gen: a synthetic project (jfn_model::synth)
 //
 // Exit codes: 0 everything held, 1 an expectation failed, the project has errors or the report
@@ -12,7 +14,9 @@
 // report goes to stdout and with --report to a file, byte for byte the same on every machine;
 // --golden compares it with a stored one (CR LF there counts as LF).  With the app's
 // PERMISSIONS (fs.user) the files must be named on the command line: a "pcap FILE" step of a
-// scenario writes only when FILE is granted that way, else use --pcap.
+// scenario writes only when FILE is granted that way, else use --pcap.  --series F writes the
+// time series as CSV to F, for the scenario's "series FILE" step or, without one, as if the
+// scenario ended with "series F".
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -23,7 +27,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use jfn_model::project::Project;
-use jfn_model::scenario::{self, Scenario};
+use jfn_model::scenario::{self, Scenario, Step, StepKind};
 
 /// what a run is given
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -33,6 +37,7 @@ pub struct Opts {
     pub pcap: Option<String>,
     pub report: Option<String>,
     pub golden: Option<String>,
+    pub series: Option<String>,
 }
 
 fn say(s: &str) {
@@ -65,6 +70,7 @@ pub fn parse_opts(args: &[String]) -> Result<Opts, String> {
             "--pcap" => o.pcap = Some(value()?),
             "--report" => o.report = Some(value()?),
             "--golden" => o.golden = Some(value()?),
+            "--series" => o.series = Some(value()?),
             "--script" | "--shot" | "--style" | "--lang" => {
                 value()?;
             }
@@ -127,7 +133,7 @@ pub fn run(o: &Opts) -> i32 {
             return 2;
         }
     };
-    let sc = match o.scenario.as_deref() {
+    let mut sc = match o.scenario.as_deref() {
         Some(s) => {
             let text = match read_text(s) {
                 Ok(t) => t,
@@ -148,6 +154,11 @@ pub fn run(o: &Opts) -> i32 {
         }
         None => Scenario::default(),
     };
+    if let Some(f) = o.series.as_deref()
+        && !sc.steps.iter().any(|s| matches!(s.kind, StepKind::Series(_)))
+    {
+        sc.steps.push(Step { line: 0, at: None, kind: StepKind::Series(String::from(f)) });
+    }
     let name = base_name(o.scenario.as_deref().unwrap_or(pp));
     let out = jfn_sim::run_scenario(&proj, &sc, name, o.pcap.is_some());
     say(&out.report);
@@ -162,6 +173,13 @@ pub fn run(o: &Opts) -> i32 {
         let target = o.pcap.as_deref().unwrap_or(file);
         if !plat::write_file(target, bytes) {
             complain(&format!("pcap: {} lässt sich nicht schreiben (mit --pcap auf der Befehlszeile nennen).\n", target));
+            code = code.max(1);
+        }
+    }
+    if let Some((file, csv)) = &out.series {
+        let target = o.series.as_deref().unwrap_or(file);
+        if !plat::write_file(target, csv.as_bytes()) {
+            complain(&format!("series: {} lässt sich nicht schreiben (mit --series auf der Befehlszeile nennen).\n", target));
             code = code.max(1);
         }
     }
@@ -268,7 +286,7 @@ pub fn generate(args: &[String]) -> i32 {
     0
 }
 
-const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F]\n  jfn-sim check PROJEKT\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n";
+const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F] [--series F]\n  jfn-sim check PROJEKT\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n";
 
 /// jfn-sim's command line (args[0] is the program)
 pub fn main(args: &[String]) -> i32 {

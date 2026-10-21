@@ -592,6 +592,10 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Vorheriger Treffer", "Previous match", "Résultat précédent", "Coincidencia anterior", "Risultato precedente", "Vorige overeenkomst", "Poprzednie wystąpienie", "التطابق السابق", "ההתאמה הקודמת"],
     ["Nächster Treffer", "Next match", "Résultat suivant", "Coincidencia siguiente", "Risultato successivo", "Volgende overeenkomst", "Następne wystąpienie", "التطابق التالي", "ההתאמה הבאה"],
     ["Keine Treffer", "No results", "Aucun résultat", "Sin resultados", "Nessun risultato", "Geen resultaten", "Brak wyników", "لا توجد نتائج", "אין תוצאות"],
+    // (L6) the severities of the code editor's diagnostics (tooltips, the record at the caret)
+    ["Fehler", "Error", "Erreur", "Error", "Errore", "Fout", "Błąd", "خطأ", "שגיאה"],
+    ["Warnung", "Warning", "Avertissement", "Advertencia", "Avviso", "Waarschuwing", "Ostrzeżenie", "تحذير", "אזהרה"],
+    ["Hinweis", "Info", "Info", "Información", "Informazione", "Info", "Informacja", "معلومة", "מידע"],
     ["Schreiben", "Typing", "Saisie", "Escritura", "Digitazione", "Typen", "Pisanie", "كتابة", "הקלדה"],
     ["Fließtext", "Normal text", "Texte normal", "Texto normal", "Testo normale", "Normale tekst", "Zwykły tekst", "نص عادي", "טקסט רגיל"],
     ["Standardschrift", "Default font", "Police par défaut", "Fuente predeterminada", "Carattere predefinito", "Standaardlettertype", "Domyślna czcionka", "الخط الافتراضي", "גופן ברירת מחדל"],
@@ -637,6 +641,11 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Hauptfenster", "Main window", "Fenêtre principale", "Ventana principal", "Finestra principale", "Hoofdvenster", "Okno główne", "النافذة الرئيسية", "חלון ראשי"],
     // (ROADMAP §6) the image viewer (imgview.rs): the accessible name of ui.image_view
     ["Bild", "Image", "Image", "Imagen", "Immagine", "Afbeelding", "Obraz", "صورة", "תמונה"],
+    // (L5) the line chart (chart.rs): its empty state and the words of its summary
+    ["Keine Daten", "No data", "Aucune donnée", "Sin datos", "Nessun dato", "Geen gegevens", "Brak danych", "لا توجد بيانات", "אין נתונים"],
+    ["aktuell", "current", "actuel", "actual", "attuale", "huidig", "bieżąca", "الحالية", "נוכחי"],
+    ["min.", "min", "min", "mín.", "min", "min.", "min.", "الأدنى", "מינימום"],
+    ["max.", "max", "max", "máx.", "max", "max.", "maks.", "الأقصى", "מקסימום"],
 ];
 
 /// a library text in the current language: the UI language when the library has it

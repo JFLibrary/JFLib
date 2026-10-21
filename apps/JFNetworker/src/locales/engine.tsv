@@ -486,3 +486,19 @@ Queue {}: Nachricht {} ausgeliefert ({}. Zustellung).	Queue {}: message {} deliv
 Queue {}: Nachricht {} bestätigt.	Queue {}: message {} acknowledged.
 Queue {}: Nachricht {} nicht bestätigt, wieder in der Warteschlange.	Queue {}: message {} not acknowledged, back in the queue.
 Queue {}: Nachricht {} zu oft zugestellt, aussortiert.	Queue {}: message {} delivered too often, set aside.
+
+# scripts as services (scriptsvc.rs): status lines and refusals; their notes (trace.rs)
+beendet nach einem Fehler in Zeile {}, Spalte {}: {}	ended after an error in line {}, column {}: {}
+beendet nach einem Fehler	ended after an error
+gestoppt	stopped
+läuft: Rückrufe {}, CPU-Zeit {}	running: callbacks {}, CPU time {}
+läuft: Rückrufe {}, CPU-Zeit {}, Fehler {}, zuletzt in Zeile {}, Spalte {}: {}	running: callbacks {}, CPU time {}, errors {}, the last in line {}, column {}: {}
+„source“ ist ein Text oder eine Liste von Zeilen.	“source” is a text or a list of lines.
+„source“ fehlt: der Text des Skripts.	“source” is missing: the text of the script.
+Das Skript lässt sich nicht übersetzen.	The script does not compile.
+Zeile {}, Spalte {}: {} (und {} weitere Fehler)	line {}, column {}: {} (and {} more errors)
+Zeile {}, Spalte {}: {}	line {}, column {}: {}
+„ns_per_op“ muss eine Zahl größer als 0 sein.	“ns_per_op” must be a number greater than 0.
+Skript {} rechnet noch: das Ereignis wartet ({} vor ihm).	Script {} is still computing: the event waits ({} before it).
+Skript {} überlastet: Datagramm verworfen.	Script {} overloaded: datagram dropped.
+Skript {}: Fehler in Zeile {}, Spalte {}: {}	Script {}: error in line {}, column {}: {}

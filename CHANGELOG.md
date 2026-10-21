@@ -29,6 +29,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 - **spell:** Spell checking agrees with Hunspell 1.7 on real dictionaries (COMPOUNDRULE, compound flags, forbidden words, CHECKCOMPOUNDPATTERN ...) and checks and suggests faster; suggestions come from a worker, so the menu opens at once
 - **img_core:** img_core::icc_xform: ICC_BI_ADOBE is now ICC_BI_A98 and ICC_BI_PROPHOTO is ICC_BI_ROMM (the same values; names of the standards instead of trademarks)
+- **ui:** ui::KIND_NAMES has 23 entries: the new record kind K_HEADING (level as the value, dump name heading) of the Markdown / HTML viewer; K_KIND_COUNT is 23
 
 ### Fixed
 

@@ -23,6 +23,7 @@
 //            statistics, show control-plane host open-ports on IOS (curl and nc are console
 //            programs: services that print to the console and read typed lines)
 //   lab      lbctl, kvctl, cachectl, mqctl, workerctl: the lab's services on the shell
+//   scripts  script: the device's scripts on the shell (scriptsvc.rs)
 //   netsvc   DHCP, NTP and the resolver at the command lines: IOS "ip dhcp pool" (its own
 //            mode), "ip dhcp excluded-address", "ip helper-address", show ip dhcp binding|
 //            pool|conflict, clear ip dhcp, "ntp server", "ntp master"; dhclient and cat
@@ -59,6 +60,7 @@ pub mod netsvc;
 pub mod print;
 pub mod tools;
 pub mod lab;
+pub mod scripts;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;

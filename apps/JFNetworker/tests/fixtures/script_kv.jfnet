@@ -1,0 +1,264 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Skript-Speicher unter Last",
+  "description": "SRV1 führt ein Skript aus, das Werte über HTTP annimmt und auf seiner Disk ablegt (kv). GEN schickt erst 200, dann 1500 Anfragen pro Sekunde; MON fragt jede Sekunde nach den Zahlen.",
+  "seed": 11,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "GEN",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname GEN\nip addr add 10.0.1.10/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-load",
+          "name": "load",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.1.20/"
+            ],
+            "mode": "open",
+            "rps": 200,
+            "arrival": "poisson",
+            "delay_ms": 1000,
+            "duration_ms": 4000,
+            "timeout_ms": 3000,
+            "mix": [
+              {
+                "method": "PUT",
+                "path": "/kv/k{rand:50}",
+                "body": "v{seq}",
+                "weight": 1
+              },
+              {
+                "method": "GET",
+                "path": "/kv/k{rand:50}",
+                "weight": 3
+              }
+            ]
+          }
+        },
+        {
+          "kind": "http-load",
+          "name": "burst",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.1.20/"
+            ],
+            "mode": "open",
+            "rps": 1500,
+            "arrival": "poisson",
+            "delay_ms": 6000,
+            "duration_ms": 1000,
+            "timeout_ms": 3000,
+            "mix": [
+              {
+                "method": "PUT",
+                "path": "/kv/k{rand:50}",
+                "body": "v{seq}",
+                "weight": 1
+              },
+              {
+                "method": "GET",
+                "path": "/kv/k{rand:50}",
+                "weight": 3
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.1.20/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "script",
+          "name": "kv",
+          "disabled": false,
+          "config": {
+            "source": [
+              "// kv.jfs: a small key-value store over HTTP, GET, PUT and DELETE on /kv/KEY, the values on",
+              "// the disk; every request costs some CPU time (config.work rounds of a hash)",
+              "let stored = 0",
+              "let hits = 0",
+              "let misses = 0",
+              "fn work(n) {",
+              "  let h = 7",
+              "  for i in 0..n { h = (h * 31 + i) % 1000003 }",
+              "  return h",
+              "}",
+              "http.serve(config.port ?? 80, fn(req, res) {",
+              "  let t0 = now()",
+              "  work(config.work ?? 100)",
+              "  if req.path == \"/stats\" {",
+              "    return {stored: stored, hits: hits, misses: misses}",
+              "  }",
+              "  if !req.path.starts_with(\"/kv/\") { return 404 }",
+              "  let key = req.path.slice(4)",
+              "  if req.method == \"PUT\" {",
+              "    disk.put(key, req.body, fn(err) {",
+              "      if err { return res.send(507, \"${err}\\n\") }",
+              "      stored += 1",
+              "      metrics.inc(\"puts\")",
+              "      metrics.observe(\"put_us\", int((now() - t0) * 1000))",
+              "      res.send(204, nil)",
+              "    })",
+              "  } else if req.method == \"GET\" {",
+              "    disk.get(key, fn(err, v) {",
+              "      if v == nil {",
+              "        misses += 1",
+              "        return res.send(404, \"kein Wert\\n\")",
+              "      }",
+              "      hits += 1",
+              "      res.send(200, v + \"\\n\")",
+              "    })",
+              "  } else if req.method == \"DELETE\" {",
+              "    disk.delete(key, fn(err, had) {",
+              "      if had { return res.send(204, nil) }",
+              "      res.send(404, \"kein Wert\\n\")",
+              "    })",
+              "  } else {",
+              "    return 405",
+              "  }",
+              "})",
+              "// config.keys values to begin with",
+              "for i in 0..(config.keys ?? 0) { disk.put(\"k${i}\", \"anfang\") }",
+              "log(\"Speicher bereit auf Port ${config.port ?? 80}\")"
+            ],
+            "port": 80,
+            "work": 1000,
+            "keys": 50,
+            "ns_per_op": 100,
+            "queue": 100
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "MON",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname MON\nip addr add 10.0.1.30/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "script",
+          "name": "mon",
+          "disabled": false,
+          "config": {
+            "source": [
+              "// mon.jfs: asks the store for its numbers every second and prints them",
+              "let n = 0",
+              "timer.every(1000, fn() {",
+              "  let t0 = now()",
+              "  http.request({url: config.url, timeout_ms: 2000}, fn(err, resp) {",
+              "    n += 1",
+              "    let ms = int(now() - t0)",
+              "    if err { return print(\"${n}: ${err}\") }",
+              "    if resp.status != 200 { return print(\"${n}: Status ${resp.status} nach ${ms} ms\") }",
+              "    let s = json.decode(resp.body)",
+              "    metrics.gauge(\"stored\", s.stored)",
+              "    print(\"${n}: ${s.stored} gespeichert, ${s.hits} gefunden, ${s.misses} nicht da, nach ${ms} ms\")",
+              "  })",
+              "})"
+            ],
+            "url": "http://10.0.1.20/stats"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 160,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": []
+}

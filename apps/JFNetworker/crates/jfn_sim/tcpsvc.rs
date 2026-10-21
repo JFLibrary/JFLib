@@ -23,7 +23,9 @@
 //
 // Metrics: the servers count connections (and "active" ones), bytes and resets; the client
 // "connected", "sent", "received", "done" (everything sent and an orderly end), "failed",
-// "connect_ns" (the handshake from its start) and "done_ns" (from its start to the end).
+// "connect_ns" (the handshake from its start) and "done_ns" (from its start to the end).  For
+// the time series (series.rs) the discard server's bytes count up and the client's done is a
+// flag.
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -38,6 +40,7 @@ use netpkt::Ipv4;
 
 use crate::kernel::{Ns, MS};
 use crate::os::{Metric, OsApi, Service, SvcEvent};
+use crate::series::{metric_kind_of, MetricKind};
 use crate::tcp::{SockOpts, TcpEnd};
 use crate::trace::Note;
 
@@ -263,6 +266,10 @@ impl Service for TcpDiscard {
             Metric::new("resets", self.resets as i64),
         ]
     }
+    fn metric_kind(&self, name: &str) -> MetricKind {
+        // the bytes it dropped so far, not what it holds
+        if name == "bytes" { MetricKind::Counter } else { metric_kind_of(name) }
+    }
     fn status(&self) -> String {
         self.status_msg().text()
     }
@@ -481,6 +488,10 @@ impl Service for TcpClient {
             Metric::new("connect_ns", since(self.connected)),
             Metric::new("done_ns", since(self.finished)),
         ]
+    }
+    fn metric_kind(&self, name: &str) -> MetricKind {
+        // "done" is a flag here
+        if name == "done" { MetricKind::Gauge } else { metric_kind_of(name) }
     }
     fn status(&self) -> String {
         self.status_msg().text()

@@ -10,6 +10,7 @@
 //   hostname [NAME], sysctl [-w] net.ipv4.ip_forward[=0|1], echo, clear, true, false
 //   curl, nc, ss, top, printf and "echo|printf ... | nc|cat ..." (tools.rs)
 //   lbctl, kvctl, cachectl, mqctl, workerctl (lab.rs: the services of the lab)
+//   script [list|status|start|stop|restart|errors|output] [NAME] (scripts.rs: the scripts)
 //   dhclient [-v] [-r] [IF], cat /etc/resolv.conf|/etc/hosts|/etc/hostname (netsvc.rs)
 //
 // Objects and commands of ip take any prefix, the first one of iproute2's order winning ("ip
@@ -123,6 +124,7 @@ impl Engine {
             "cachectl" => self.sh_cachectl(ni, &args),
             "mqctl" => self.sh_mqctl(ni, &args),
             "workerctl" => self.sh_workerctl(ni, &args),
+            "script" => self.sh_script(ni, &args),
             "dhclient" => self.sh_dhclient(ni, &args),
             "cat" => self.sh_cat(ni, &args),
             "echo" => {
@@ -145,7 +147,7 @@ impl Engine {
         let w = words(line);
         let partial = !line.is_empty() && !line.ends_with(char::is_whitespace);
         let (list, done): (&[&str], usize) = match w.len() {
-            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "echo", "hostname", "ip", "kvctl", "lbctl", "mqctl", "nc", "ping", "printf", "ss", "sysctl", "top", "traceroute", "workerctl"], 0),
+            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "echo", "hostname", "ip", "kvctl", "lbctl", "mqctl", "nc", "ping", "printf", "script", "ss", "sysctl", "top", "traceroute", "workerctl"], 0),
             2 if partial && w[0] == "ip" => (&["address", "link", "neighbour", "route"], 1),
             3 if partial && w[0] == "ip" => (&["add", "del", "flush", "get", "set", "show"], 2),
             _ => return (None, Vec::new()),

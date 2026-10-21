@@ -1,0 +1,39 @@
+# Die Zeitreihen des Labors auf dem Netz von lab_shards: ein Lastgenerator, ein Loadbalancer,
+# drei Webserver und drei KV-Shards mit Replikationsfaktor 2. Ab 2 s schickt "load" 16 s lang
+# 100 Anfragen pro Sekunde; bei 6 s fällt KV2 für 6 s aus. Jede Sekunde nimmt der Simulator
+# einen Punkt jeder Reihe: ein Zähler wird zur Rate pro Sekunde, ein Wert bleibt ein Wert, die
+# Latenz kommt als p50, p95 und p99 jeder Sekunde. Über einen Zeitraum ("over 4s", "between
+# 2s and 6s": die Punkte nach 2 s bis 6 s) ist ein Zähler seine Rate, ein Wert sein Mittel und
+# eine Latenz das Perzentil aller Anfragen des Zeitraums; min, max und mean gehen über die
+# Punkte. Die Werte in Klammern sind gemessen.
+at 6s fault power KV2 for 6s
+# vor dem Ausfall: rund 100 Anfragen pro Sekunde, kurze Antwortzeiten, alle Knoten da
+expect LB1 svc lb metric requests >= 90 between 2s and 6s
+expect LB1 svc lb metric p99_us < 2000 between 2s and 6s
+expect KV2 svc kv metric requests > 30 between 2s and 6s
+expect KV1 svc kv metric min members_up == 3 over 4s
+# während des Ausfalls: KV2 bekommt nichts mehr, KV1 und KV3 übernehmen, die Clients der
+# Webserver warten bis zu einer Sekunde auf KV2 (das 99. Perzentil steigt), keine Anfrage
+# geht verloren
+at 12s expect KV2 svc kv metric requests == 0 between 7s and 12s
+expect KV1 svc kv metric requests > 50 between 7s and 12s
+expect KV1 svc kv metric max members_up == 2 between 7s and 12s
+expect LB1 svc lb metric max p99_us > 900000 between 6s and 12s
+expect LB1 svc lb metric p99_us > 150000 between 6s and 12s
+expect LB1 svc lb metric p50_us < 2000 between 6s and 12s
+expect WEB1 svc web metric failovers > 0 between 6s and 12s
+expect GEN svc load metric failed == 0 between 6s and 12s
+# danach: KV2 ist wieder da, Read Repair holt ihn nach, die Antwortzeiten sind wie vorher
+at 19s expect KV2 svc kv metric requests > 30 between 14s and 18s
+expect KV2 svc kv metric repaired > 0 between 12s and 19s
+expect KV1 svc kv metric min members_up == 3 between 13s and 19s
+expect LB1 svc lb metric p99_us < 2000 between 14s and 18s
+expect LB1 svc lb metric max p99_us < 2000 between 14s and 18s
+# der ganze Lauf: die Last kam an, nichts ging schief, kein Backend fiel aus
+expect GEN svc load metric responses >= 95 between 2s and 18s
+expect GEN svc load metric errors == 0 over 17s
+expect GEN svc load metric max max_us > 900000 over 17s
+expect LB1 svc lb metric min backends_up == 3 over 17s
+expect LB1 svc lb metric mean active < 5 over 17s
+series build/lab_metrics.csv
+print "Die Zeitreihen zeigen den Ausfall und die Erholung"

@@ -1,0 +1,72 @@
+# JFNetworker-Szenario script_kv.scn: „Skript-Speicher unter Last“, 4 Geräte, 3 Verbindungen, Seed 11
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  --      run 900ms
+   0.900000000  SRV1    root@SRV1:~# script
+   0.900000000  SRV1    Skript  Zustand  Rückrufe  Fehler  CPU-Zeit  offen
+   0.900000000  SRV1    kv      läuft    1         0       47 µs     http 80
+   0.900000000  ok      expect SRV1 svc kv metric calls == 1 (1)
+   0.900000000  --      run 4100ms
+   5.000000000  ok      expect GEN svc load metric sent > 700 (862)
+   5.000000000  ok      expect GEN svc load metric ok > 700 (862)
+   5.000000000  ok      expect GEN svc load metric http_errors == 0 (0)
+   5.000000000  ok      expect GEN svc load metric failed == 0 (0)
+   5.000000000  ok      expect GEN svc load metric p50_us < 3000 (1232)
+   5.000000000  ok      expect GEN svc load metric p99_us < 10000 (4521)
+   5.000000000  ok      expect SRV1 svc kv metric errors == 0 (0)
+   5.000000000  ok      expect SRV1 svc kv metric puts > 150 (193)
+   5.000000000  ok      expect SRV1 svc kv metric put_us_p50 < 2000 (1231)
+   5.000000000  ok      expect SRV1 svc kv metric max_queued < 10 (4)
+   5.000000000  SRV1    root@SRV1:~# top -b -n 1
+   5.000000000  SRV1    top - 00:00:04 up 0 min,  1 user,  load average: 0.02, 0.00, 0.00
+   5.000000000  SRV1    Tasks:   3 total,   1 running,   2 sleeping,   0 stopped,   0 zombie
+   5.000000000  SRV1    %Cpu(s):  4.0 us,  0.0 sy,  0.0 ni, 96.0 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st 
+   5.000000000  SRV1    
+   5.000000000  SRV1        PID USER      PR  NI S  %CPU     TIME+ COMMAND
+   5.000000000  SRV1        101 root      20   0 S  16.0   0:00.95 kv
+   5.000000000  SRV1          1 root      20   0 S   0.0   0:00.00 init
+   5.000000000  SRV1        102 root      20   0 R   0.0   0:00.00 top
+   5.000000000  SRV1    root@SRV1:~# script status kv
+   5.000000000  SRV1    Skript kv: läuft seit 0 ns, 47 Zeilen
+   5.000000000  SRV1    Rückrufe 1729, Fehler 0, Anweisungen 9590505, CPU-Zeit 959,050 ms (100 ns je Anweisung)
+   5.000000000  SRV1    Warteschlange 0 (höchstens 4, Platz für 100), verworfen 0, abgewiesen 0
+   5.000000000  SRV1    Grenzen je Rückruf: 10000000 Anweisungen, Tiefe 500, Stapel 100000; Speicher 220 KiB von 16 MiB
+   5.000000000  SRV1    Offen: http 80; Verbindungen 0, Timer 0
+   5.000000000  SRV1    Metriken: puts 193, put_us_count 193, put_us_p50 1231, put_us_p95 3295, put_us_p99 4415, put_us_max 4425
+   5.000000000  --      run 3s
+   8.000000000  ok      expect SRV1 svc kv metric rejected > 0 (559)
+   8.000000000  ok      expect SRV1 svc kv metric max_queued > 99 (101)
+   8.000000000  ok      expect GEN svc burst metric status_5xx > 0 (559)
+   8.000000000  ok      expect GEN svc burst metric failed == 0 (0)
+   8.000000000  ok      expect GEN svc burst metric p99_us > 50000 (112197)
+   8.000000000  ok      expect SRV1 svc kv metric errors == 0 (0)
+   8.000000000  SRV1    root@SRV1:~# script status kv
+   8.000000000  SRV1    Skript kv: läuft seit 0 ns, 47 Zeilen
+   8.000000000  SRV1    Rückrufe 3626, Fehler 0, Anweisungen 20110863, CPU-Zeit 2,011 s (100 ns je Anweisung)
+   8.000000000  SRV1    Warteschlange 0 (höchstens 101, Platz für 100), verworfen 0, abgewiesen 559
+   8.000000000  SRV1    Grenzen je Rückruf: 10000000 Anweisungen, Tiefe 500, Stapel 100000; Speicher 167 KiB von 16 MiB
+   8.000000000  SRV1    Offen: http 80; Verbindungen 0, Timer 0
+   8.000000000  SRV1    Metriken: puts 418, put_us_count 418, put_us_p50 30975, put_us_p95 65023, put_us_p99 68607, put_us_max 71928
+   8.000000000  MON     root@MON:~# script output
+   8.000000000  MON     1: 0 gespeichert, 0 gefunden, 0 nicht da, nach 1 ms
+   8.000000000  MON     2: 54 gespeichert, 146 gefunden, 0 nicht da, nach 1 ms
+   8.000000000  MON     3: 102 gespeichert, 328 gefunden, 0 nicht da, nach 1 ms
+   8.000000000  MON     4: 151 gespeichert, 507 gefunden, 0 nicht da, nach 1 ms
+   8.000000000  MON     5: 193 gespeichert, 669 gefunden, 0 nicht da, nach 1 ms
+   8.000000000  MON     6: 193 gespeichert, 669 gefunden, 0 nicht da, nach 1 ms
+   8.000000000  MON     7: 407 gespeichert, 1356 gefunden, 0 nicht da, nach 50 ms
+   8.000000000  ok      expect MON svc mon metric stored > 400 (407)
+   8.000000000  GEN     root@GEN:~# curl -s -X PUT -d hallo http://10.0.1.20/kv/gruss
+   8.000000000  --      run 100ms
+   8.100000000  GEN     root@GEN:~# curl -s http://10.0.1.20/kv/gruss
+   8.100000000  --      run 100ms
+   8.101236516  GEN     hallo
+   8.200000000  ok      expect GEN output contains "hallo"
+   8.200000000  SRV1    root@SRV1:~# script errors
+   8.200000000  SRV1    kv: keine Fehler
+   8.200000000  --      Unter Last wartet jede Anfrage auf die eine CPU des Skripts; zu viele bekommen 503
+# 19 von 19 Erwartungen erfüllt

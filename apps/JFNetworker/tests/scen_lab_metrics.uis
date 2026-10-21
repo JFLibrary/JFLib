@@ -1,0 +1,9 @@
+#!args apps/JFNetworker/tests/fixtures/lab_shards.jfnet --scenario apps/JFNetworker/tests/scen/lab_metrics.scn --golden apps/JFNetworker/tests/scen/lab_metrics.report --series build/lab_metrics.csv
+# golden scenario of the lab's time series: on the network of lab_shards (a load generator, a
+# load balancer, three web servers, three KV shards) KV2 loses its power from 6 s to 12 s; the
+# expectations look at spans of the series before, during and after the fault (rates per
+# second, a gauge's minimum and maximum, the p99 of a span and of its seconds) and the CSV of
+# every series goes to build/lab_metrics.csv, its CRC-32 in the report.  The GUI program runs
+# tests/scen/lab_metrics.scn on tests/fixtures/lab_shards.jfnet without a window and ends with
+# the report, which must equal tests/scen/lab_metrics.report byte for byte on every target (the
+# script itself is not run)

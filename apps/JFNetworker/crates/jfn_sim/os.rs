@@ -7,7 +7,9 @@
 //                             built-in ones: dhcpc.rs (DHCP client), dhcpd.rs (DHCP server
 //                             and relay), dnsd.rs (DNS server), syslogd.rs, ntpd.rs;
 //                             status_msg: the status line as a Msg for the app's catalogue
-//                             (SvcView::status_msg; the built-in services word it so)
+//                             (SvcView::status_msg; the built-in services word it so);
+//                             metric_kind and windows: how its numbers become time series
+//                             (series.rs)
 //   SvcEvent                  Udp(Dgram) | Timer(key) | EchoReply | ArpConflict |
 //                             Resolved(lookup) | Link | Ctl
 //   OsApi                     what a running service may do: bind / bind_raw / close, send /
@@ -38,6 +40,8 @@
 //                             program, typed lines come as SvcEvent::Console; such services are
 //                             not in services(); Service::metrics_at gives numbers that depend
 //                             on the time (windows of the HTTP services)
+//   OsApi::halt / svc_name    a service ends itself (a script after an error: scriptsvc.rs);
+//                             its name on the device
 //
 // Everything a service sees goes through its node's inbox, which a node timer (SLOT_OS)
 // empties at the same virtual time: a service never runs inside another one's call, and a
@@ -214,6 +218,16 @@ pub trait Service: Send {
     fn metrics_at(&self, now: Ns) -> Vec<Metric> {
         let _ = now;
         self.metrics()
+    }
+    /// what a metric of metrics_at() is to the time series (series.rs): a counter (its rate
+    /// per second), a gauge or none; the default goes by the name (series::metric_kind_of)
+    fn metric_kind(&self, name: &str) -> crate::series::MetricKind {
+        crate::series::metric_kind_of(name)
+    }
+    /// the latency windows of the time series (series.rs): what each interval of them gives
+    /// becomes the series of the names they list, in place of the metrics of those names
+    fn windows(&self) -> Vec<crate::series::LatWindow<'_>> {
+        Vec::new()
     }
 }
 
@@ -1247,6 +1261,18 @@ impl OsApi<'_> {
     /// the service's id (ss -p shows it as the process id)
     pub fn svc_id(&self) -> u32 {
         self.id
+    }
+    /// the service's name on the device
+    pub fn svc_name(&self) -> String {
+        let id = self.id;
+        self.eng.os(self.ni).and_then(|o| o.svcs.iter().find(|s| s.id == id)).map(|s| s.name.clone()).unwrap_or_default()
+    }
+    /// the service ends by itself (a script after an error): it stops as when stopped from
+    /// outside, its sockets, timers and queued events go (Service::stop is not called: it
+    /// cleaned up already); it stays enabled, so it starts again with the device or on request
+    pub fn halt(&mut self) {
+        let (ni, id) = (self.ni, self.id);
+        self.eng.svc_stop(ni, id);
     }
 }
 

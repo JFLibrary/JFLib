@@ -155,12 +155,12 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_cmd`, `menu_sep`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
-- [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_editor`
+- [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_editor`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
 - [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters): `grid_begin`, `grid_row`, `grid_cell`, `grid_text`, `grid_text_ts`, `grid_end`, `tree`, `badge`, `status_dot`, `meter`
 - [Shell parts: navigation, command bar, splitter, breadcrumb, wizard steps](#shell-parts-navigation-command-bar-splitter-breadcrumb-wizard-steps): `nav_begin`, `nav_toggle`, `nav_section`, `nav_item`, `nav_footer`, `nav_end`, `command_bar`, `split_begin`, `split_next`, `split_end`, `breadcrumb`, `segmented`, `wizard_steps`, `page_header`, `key_value`, `empty_state`
 - [Docking: panels at the sides, tab groups, floating tool windows](#docking-panels-at-the-sides-tab-groups-floating-tool-windows): `dock_begin`, `dock_next`, `dock_end`
-- [Charts](#charts): `sparkline`, `bar_chart`, `donut`, `legend`
+- [Charts](#charts): `sparkline`, `bar_chart`, `donut`, `legend`, `line_chart`
 - [Toasts, spinners, progress](#toasts-spinners-progress): `toast`, `toast_dismiss`, `toast_clear`, `toasts`, `toast_host`, `spinner`, `progress_indeterminate`
 - [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`
 - [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`
@@ -1636,10 +1636,23 @@ the indentation settings and the edits of a code editor
   tab_width (1..16, default 4), use_tabs (indent with tabs instead of blanks)
   col_of(line, byte) / byte_at_col(line, col)   visual columns (tabs to the next stop,
   wide East Asian characters two)
+  diagnostics (a checker's or compiler's messages, drawn by the editor):
+    set_diagnostics(&[Diag]) / clear_diagnostics() / diagnostics() -> Vec<Diag> /
+    diagnostic(i) / diagnostic_count() / diagnostic_counts() -> [errors, warnings, infos] /
+    diagnostics_at(pos) (most severe first) / next_diagnostic(pos, back) (wrapping)
 
 An edit replaces a range of whole lines (LineEdit: old and new lines, the selection before
 and after); each change is also kept in a short journal (changes_since) that the editor's
 highlighting states and the find results follow without starting again from the top.
+
+Diagnostics follow every change of the text (edits, undo, redo) until the app sets new
+ones: when lines change, the old and new lines are compared -- the same number of lines
+line by line (one line moved by Alt+Up / Down: as a move), else as one replaced part from
+the first to the last difference.  Text before a change keeps its positions, text after it
+shifts; a diagnostic whose text was replaced shrinks to what is left of it and is dropped
+when nothing is (one that marks a point stays at the change).  Typed text at a diagnostic's
+edge stays outside it.  So squiggles stay under their words while the user types, until
+the next check replaces them.
 ```
 
 ```rust
@@ -1657,6 +1670,34 @@ FIND_MAX: usize = 100_000
   - `first: usize`
   - `old: usize`
   - `new: usize`
+
+```rust
+/// Diag::severity: an error
+DIAG_ERROR: u8 = 0
+/// a warning
+DIAG_WARNING: u8 = 1
+/// a note, a hint (higher values count as this too)
+DIAG_INFO: u8 = 2
+```
+
+- **`struct Diag`**
+  a diagnostic of a code editor: a part of the text in lines and columns from 1 as compilers
+  report them (columns count characters, a tab is one; the end is exclusive, an end at or
+  before the start marks the one character at the start, past a line's end the end of the
+  line), a severity DIAG_\* and the message (see the module header)
+  - `line: usize` -- where it starts (from 1)
+  - `col: usize`
+  - `end_line: usize` -- where it ends (exclusive)
+  - `end_col: usize`
+  - `severity: u8` -- DIAG_ERROR, DIAG_WARNING, DIAG_INFO
+  - `msg: String`
+
+**`impl Diag`**
+
+- **`fn new(line: usize, col: usize, end_col: usize, severity: u8, msg: &str) -> Diag`**
+  a part of one line: line:col .. line:end_col
+- **`fn span(line: usize, col: usize, end_line: usize, end_col: usize, severity: u8, msg: &str) -> Diag`**
+  line:col .. end_line:end_col
 
 - **`struct CodeDoc`**
   the document of ui.code_editor (see the module header)
@@ -1763,6 +1804,25 @@ FIND_MAX: usize = 100_000
   replace the selection when it is a match, then select the next match -> replaced
 - **`fn replace_all(&mut self, q: &str, rep: &str, opts: u8) -> usize`**
   replace every match (one undo step) -> how many
+- **`fn set_diagnostics(&mut self, d: &[Diag])`**
+  replace the diagnostics (Diag positions, clamped to the text); from now on they follow
+  the edits until the next call (see the module header)
+- **`fn clear_diagnostics(&mut self)`**
+  no diagnostics
+- **`fn diagnostics(&self) -> Vec<Diag>`**
+  the diagnostics where they are now, by position
+- **`fn diagnostic_count(&self) -> usize`**
+  the number of diagnostics
+- **`fn diagnostic(&self, i: usize) -> Option<Diag>`**
+  diagnostic i (0 .. diagnostic_count(), by position) where it is now
+- **`fn diagnostic_counts(&self) -> [usize; 3]`**
+  the number of errors, warnings and infos (DIAG_\* order)
+- **`fn diagnostics_at(&self, p: TextPos) -> Vec<Diag>`**
+  the diagnostics at p (their part holds p, its end included; a point: its character),
+  most severe first
+- **`fn next_diagnostic(&self, p: TextPos, back: bool) -> Option<TextPos>`**
+  the start of the first diagnostic after p (back: the last one before p), round the end
+  of the text; None without diagnostics
 
 #### `ui/highlight.rs`
 
@@ -1770,11 +1830,12 @@ Source: [`lib/ui/highlight.rs`](../lib/ui/highlight.rs)
 
 ```text
 highlight -- syntax highlighting for ui.code_editor: a small engine of token rules, the
-built-in grammars (Rust, JSON, INI, TOML, a Markdown subset) and the colours of the tokens
+built-in grammars (Rust, JSON, INI, TOML, a Markdown subset, JFS: the scripts of
+lib/script) and the colours of the tokens
 
-  Highlighter::rust() / json() / ini() / toml() / markdown() / plain()
+  Highlighter::rust() / json() / ini() / toml() / markdown() / jfs() / plain()
   Highlighter::for_name(s)            by name or file extension ("rs", "json", "ini", "cfg",
-                                      "toml", "md", a path); plain() for anything else
+                                      "toml", "md", "jfs", a path); plain() for anything else
   Highlighter::new(&GRAMMAR)          an app's own grammar (a static Grammar of Rules)
   h.line(text, state, &mut tokens) -> state   the tokens of one line (SY_* kinds, byte
                                       ranges; the plain text between them is SY_TEXT) from
@@ -1782,11 +1843,12 @@ built-in grammars (Rust, JSON, INI, TOML, a Markdown subset) and the colours of 
   h.tokens(text) -> Vec<Vec<Token>>   every line of a text (tests)
   CodeTheme::light() / dark() / high_contrast(&HcColors), ui.code_theme()   the colours of
                                       the tokens and the editor (gutter, current line,
-                                      selection, bracket match, find matches)
+                                      selection, bracket match, find matches, diagnostics)
 
 A grammar is a list of rules tried in order at every position: line comments, blocks (from
 open to close, nested or not, optionally only at a line start: Markdown fences), strings
-(escapes, multi-line or not), Rust raw strings, word lists, numbers, punctuation and
+(escapes, multi-line or not), strings with code inside (Interp: the ${..} of JFS, whose
+code the same rules highlight), Rust raw strings, word lists, numbers, punctuation and
 functions of its own (Custom: JSON keys, Rust char literals / lifetimes / attributes, INI
 sections and keys, Markdown headings, lists, emphasis and links).  Where no rule matches,
 an identifier is read whole: before '(' a function (calls), before '!' a macro (macros),
@@ -1848,6 +1910,10 @@ SY_COUNT: usize = 17
   - `Str { open: &'static str, close: &'static str, escape: bool, multi: bool, kind: u8 }` -- a string from open to close; escape: a backslash takes the next character (SY_ESCAPE);
     multi: may span lines
   - `RawStr` -- Rust raw strings: r"..", r#".."#, br".." (may span lines)
+  - `Interp { open: &'static str, close: &'static str, start: &'static str }` -- a string with code inside (interpolation), on one line: from open to close, a backslash
+    takes the next character (\\u{..} its hex digits and brace; SY_ESCAPE); from `start`
+    (ending with '{') to the '}' that closes it (braces inside count) the grammar's rules
+    highlight code, the two delimiters SY_META
   - `Words(&'static [&'static str], u8)` -- identifiers of a list
   - `Number` -- number literals: 12, 0x1F, 0b101, 0o17, 1_000, 1.5e-3, suffixes (u8, f32)
   - `Custom(fn(&str, usize, bool) -> Option<(usize, u8)>)` -- a function of its own: (line, position, at the line start after blanks) -> (bytes, kind)
@@ -1886,6 +1952,8 @@ SY_COUNT: usize = 17
   TOML
 - **`const fn markdown() -> Highlighter`**
   a Markdown subset
+- **`const fn jfs() -> Highlighter`**
+  the scripting language of lib/script (.jfs, JFNetworker's scripts)
 - **`fn for_name(s: &str) -> Highlighter`**
   by name or extension, also of a path ("rs", "Rust", "x/y.toml"); plain() for others
 - **`fn grammar(&self) -> &'static Grammar`**
@@ -1913,6 +1981,10 @@ SY_COUNT: usize = 17
   a Markdown subset: headings, quotations, rules, lists, fenced code, code spans, emphasis,
   strong, links, escapes, HTML comments
 
+- **`static JFS: Grammar`**
+  the scripting language of lib/script (.jfs): calls before '(' are functions, the
+  delimiters of ${..} in strings SY_META
+
 - **`static PLAIN: Grammar`**
   plain text: no tokens
 
@@ -1935,6 +2007,7 @@ SY_COUNT: usize = 17
   - `tokens: [u32; SY_COUNT]`
   - `bold: u32`
   - `italic: u32`
+  - `diag: [u32; 3]` -- the wavy underlines and gutter markers of errors, warnings and infos (DIAG_\* order)
 
 **`impl CodeTheme`**
 
@@ -1943,13 +2016,16 @@ SY_COUNT: usize = 17
 - **`fn dark() -> CodeTheme`**
   on a dark background (the colours of GitHub's dark theme)
 - **`fn high_contrast(c: &plat::HcColors) -> CodeTheme`**
-  the colours of a high-contrast scheme: few colours, keywords and headings bold
+  the colours of a high-contrast scheme: few colours, keywords and headings bold;
+  diagnostics in the text, link and highlight colours (the gutter markers' shapes tell
+  them apart too)
 
 **`impl crate::Ui`**
 
 - **`fn code_theme(&self) -> CodeTheme`**
   the code editors' colours for the UI's theme: dark / light syntax colours on the UI's
-  text box colours (accent selection), or the high-contrast scheme's colours
+  text box colours (accent selection, diagnostics in its critical / warning / info
+  colours), or the high-contrast scheme's colours
 
 #### `ui/code_edit.rs`
 
@@ -1968,13 +2044,28 @@ highlighting (highlight.rs)
        short one.  EV_ACT: the text changed; EV_FOCUS while focused; EV_COMMIT: the focus
        left.  Ids id .. id + 15 (id + 1 / + 2 the scroll bars, + 3 .. 13 the find bar).
        CE_READONLY: select, copy and find only; CE_NO_GUTTER: no line numbers;
-       CE_NO_FRAME: no box; CE_NO_FIND: no find bar; CE_NO_LINE: no current-line highlight
+       CE_NO_FRAME: no box; CE_NO_FIND: no find bar; CE_NO_LINE: no current-line highlight;
+       CE_MARKS: the gutter keeps its column of diagnostic markers while there are none
   ui.code_find(id, query, replace)   open the find bar (replace: with the replace row) with
        a query; the editor selects the first match from the caret on
   ui.code_status(id) -> CodeStatus   line and column of the caret (from 1), the matches
-       and the current one, the lines tokenized in the last frame
+       and the current one, the lines tokenized in the last frame, the document's
+       diagnostics per severity and the severity of the one at the caret
+  ui.code_diag(id) -> Option<Diag>   the (most severe) diagnostic at the caret, its message
   ui.code_theme_set(Some(theme))     the colours of every code editor (None: code_theme())
   ui.code_font_size(pt)              the size of the code editors' font (default 10 pt)
+
+Diagnostics (CodeDoc::set_diagnostics; they follow the edits, code_doc.rs) are wavy
+underlines below their text in the colour of their severity (infos below warnings below
+errors; a point or the end of a line: one cell) and a marker in the gutter's first column on
+the line where one starts (the most severe: a filled circle with a cross, a triangle, an
+"i" -- shapes, not only colours, also in high contrast).  The column is there while the
+document has diagnostics (CE_MARKS: always, so the text does not move).  The pointer over an
+underline or a marker shows the messages as a tooltip ("Fehler: ...", most severe first);
+the ones at the caret are in code_status / code_diag and a K_TEXT record at the caret's line
+for screen readers (after the editor's record: the app's post-modifiers stay the editor's).
+Only the diagnostics of the visible lines are looked at (binary search by position), an
+underline is one command however long it is.
 
 Keys (besides those of ed_core.rs): Tab / Shift+Tab indent / unindent (several lines: the
 block), Enter a line break with the indentation (one level more after an opener), a closer
@@ -1982,7 +2073,9 @@ typed on a blank line goes one level out, Backspace in leading blanks back to th
 tab stop, Home toggles between the first non-blank and column 0, Ctrl+C / Ctrl+X without a
 selection the whole line, Ctrl+/ line comments, Alt+Up / Alt+Down move the lines, Ctrl+Up /
 Ctrl+Down scroll, Ctrl+F find, Ctrl+H replace, F3 / Shift+F3 (Enter / Shift+Enter in the
-find box) the next / previous match, Esc closes the find bar (else drops the focus),
+find box) the next / previous match, F8 / Shift+F8 the caret to the start of the next /
+previous diagnostic (round the end; without diagnostics F8 stays the window's key for the
+splitters), Esc closes the find bar (else drops the focus),
 Ctrl+Tab (read-only: Tab) moves the focus on.  Mouse: click, drag, Shift+click, double
 click a word, a click or drag in the gutter selects lines, the wheel (Shift: sideways).
 Accessibility: a K_TEXTBOX record with the text (beyond 64 KB: the visible lines) and the
@@ -2001,6 +2094,8 @@ CE_NO_FRAME: u32 = 4
 CE_NO_FIND: u32 = 8
 /// no highlight of the current line
 CE_NO_LINE: u32 = 16
+/// the gutter keeps its column of diagnostic markers while the document has none
+CE_MARKS: u32 = 32
 ```
 
 - **`struct CodeStatus`**
@@ -2012,6 +2107,9 @@ CE_NO_LINE: u32 = 16
   - `hl_lines: usize` -- the lines tokenized for highlighting states in the editor's last frame (the visible
     lines are tokenized again to draw them, not counted)
   - `lines: usize` -- the number of lines
+  - `diags: [usize; 3]` -- the document's diagnostics: errors, warnings, infos (DIAG_\* order)
+  - `diag: Option<u8>` -- the severity (DIAG_\*) of the most severe diagnostic at the caret (ui.code_diag: the
+    diagnostic with its message)
 
 **`impl Ui`**
 
@@ -2023,7 +2121,11 @@ CE_NO_LINE: u32 = 16
   open the find bar of code editor id with a query (replace: with the replace row); the
   editor selects the first match from its caret on
 - **`fn code_status(&self, id: u32) -> CodeStatus`**
-  the caret, the find matches and the lines tokenized in code editor id's last frame
+  the caret, the find matches, the lines tokenized and the diagnostics in code editor
+  id's last frame
+- **`fn code_diag(&self, id: u32) -> Option<Diag>`**
+  the most severe diagnostic at the caret of code editor id in its last frame (its
+  message for a status bar)
 - **`fn code_editor(&mut self, id: u32, doc: &mut CodeDoc, h: &Highlighter, flags: u32) -> u32`**
   ui_code_editor(id, doc, hl, CE_\*) -> EV_\* (see the module header)
 
@@ -2512,7 +2614,8 @@ Source: [`lib/ui/chart.rs`](../lib/ui/chart.rs)
 
 ```text
 chart -- small charts for dashboards: sparkline, bar chart (grouped or stacked), donut,
-legend.  Colours: 0 = the style's chart palette (StyleData::chart_palette) by index.
+legend, and line charts of time series (line_chart over SeriesBuf rings).  Colours: 0 =
+the style's chart palette (StyleData::chart_palette) by index.
 
   sparkline(id, values, color)          area + line, natural 120 x 32 DIP (next_size)
   bar_chart(id, labels, series, stacked) -> hovered column or -1
@@ -2526,10 +2629,54 @@ legend.  Colours: 0 = the style's chart palette (StyleData::chart_palette) by in
                                         (texts kept inside the hole)
   legend(items)                         colour dot + label per item, wrapping row (an
                                         item wider than the row: its label cut with "…")
+  line_chart(id, &LineChart) -> Option<(series, x)>
+       series of (x, value) points (LcSeries over a SeriesBuf: label, colour or palette
+       index, line or area, LcUnit) over time -- LX_SECS seconds or LX_NANOS nanoseconds,
+       ticks 0:05 / 1:00 / 1:30 (h:mm:ss from an hour on, decimals of the second below
+       one) -- or plain numbers (LX_NUM).  Natural 480 x 200 DIP for the plot with its
+       axes, the legend (legend(), the series' labels) below it; next_size sizes both.
+       The y axis: "nice" ticks (1 / 2 / 2.5 / 5 x 10^k) labelled in the first series'
+       unit; y_range fixed or automatic per end (NaN: from the visible values and the
+       thresholds, out to the next tick).  The x range: x_range, else the data's --
+       follow live with x_span (the newest x_span; LineChart::view() is what it shows).
+       Grid lines at the ticks; markers (LcMarker: a line or a shaded range with a short
+       label in a tag at the top: fault injections) and thresholds (LcThreshold: a dashed
+       line with its label in a tag at its right end).  Tags never overlap: a marker's tag
+       takes the first of up to three rows with room, else it is left out (the hover card
+       still names the markers under the pointer).  Hovering the plot: a crosshair at the
+       nearest point, a dot on every series and a card beside it at once (the style's
+       tooltip surface) with the x and every series' value there; the return value is the
+       series nearest to the pointer and that x.  Keys (the plot takes the focus: Tab, a
+       click puts the cursor on the point under the pointer): Left / Right the previous /
+       next point of the cursor's series, Up / Down another series, Home / End, Esc ends
+       it; crosshair and card show the cursor, the record's label starts with its point.
+       Up to two points per pixel column the points themselves are drawn, more as one
+       band per series (per column the range of its values, SeriesBuf::columns), so
+       100 000 points draw like 500.  No points at all: LineChart::empty in the middle
+       ("Keine Daten" in the UI language).  High
+       contrast: the scheme's highlight, text and link colours with a dash pattern per
+       series (the legend shows line samples), no translucent fills.  The plot keeps its
+       left-to-right order in mirrored windows (ltr_begin); the legend is mirrored.
+       Records: K_CANVAS id, its label a summary (the name, then per series its last
+       value, min. and max. in the view; value: the number of series); K_TEXT per axis
+       label, tag and hover card row ("p95: 48 ms").  Flags LC_NO_LEGEND, LC_NO_GRID,
+       LC_NO_HOVER.
+  SeriesBuf::new(capacity)              the ring a series draws from: push(t, v) (times
+                                        never decrease; a value that is not finite is a
+                                        gap), clear, len / get / first / last / iter,
+                                        lower_bound(t), nearest(t), min_max /
+                                        min_max_in(t0, t1), columns(t0, t1, n) (per pixel
+                                        column min / max / first / last), ver()
+  LcUnit::Num(sfx) / Si(unit) / Secs    how values read: text(v, sep) ("48,2 ms", "1,25k
+                                        req/s", "1,5 MB"), ticks(first, step, n, sep)
+  lc_nice(lo, hi, steps), lc_time_step(min), lc_time_text(t, dec, hours, sep)
+                                        the axis maths: tick steps, clock labels
 
 Area, line and ring are vector paths filled at render time (cmd_custom); their drawing
 object is kept per id and replaced only when the data or the size change, so an unchanged
-chart does not redraw (dirty.rs hashes the object's identity and version).
+chart does not redraw (dirty.rs hashes the object's identity and version).  A line chart
+keeps its statistics, summary and plot per id, keyed by the series' versions and the
+view; its crosshair, dots and card are ordinary commands over the plot.
 ```
 
 - **`struct BarSeries<'a>`**
@@ -2544,6 +2691,202 @@ chart does not redraw (dirty.rs hashes the object's identity and version).
   - `value: f32`
   - `color: u32` -- 0xAARRGGBB, 0 = palette colour of the slice index
 
+- **`struct SeriesBuf`**
+  a time series for line_chart: (t, value) points in a ring that keeps the newest
+  `capacity` (a full buffer drops its oldest point on push).  Times never decrease (push
+  refuses an earlier one, so every lookup is a binary search); a value that is not finite
+  (NaN) is a gap where the line breaks.  ver() changes with every change: a chart redraws
+  only then.
+
+- **`struct SeriesCol`**
+  one pixel column of a downsampled series (SeriesBuf::columns): the points with a finite
+  value whose time falls into it
+  - `col: u32` -- the column (0 .. n)
+  - `n: u32` -- its points with a value
+  - `min: f64`
+  - `max: f64`
+  - `first: f64` -- the values of its first and its last point
+  - `last: f64`
+  - `gap: bool` -- a gap came before it (after the previous point with a value inside t0 .. t1): the
+    line breaks there; a gap inside a column starts a second entry for it
+
+**`impl SeriesBuf`**
+
+- **`fn new(capacity: usize) -> SeriesBuf`**
+  an empty series that keeps the newest `capacity` points (at least one)
+- **`fn push(&mut self, t: f64, v: f64) -> bool`**
+  append a point (t: the time, or any x that never decreases; v NaN: a gap); false
+  (nothing added) when t is not finite or earlier than the last point's
+- **`fn clear(&mut self)`**
+  remove every point
+- **`fn len(&self) -> usize`**
+  the number of points
+- **`fn is_empty(&self) -> bool`**
+  no points
+- **`fn capacity(&self) -> usize`**
+  the most points it keeps
+- **`fn ver(&self) -> u32`**
+  changes with every push and clear (equal versions: equal points)
+- **`fn get(&self, i: usize) -> Option<(f64, f64)>`**
+  the i-th point, the oldest first
+- **`fn first(&self) -> Option<(f64, f64)>`**
+  the oldest point
+- **`fn last(&self) -> Option<(f64, f64)>`**
+  the newest point
+- **`fn iter(&self) -> impl DoubleEndedIterator<Item = (f64, f64)> + ExactSizeIterator + '_`**
+  the points, the oldest first
+- **`fn lower_bound(&self, t: f64) -> usize`**
+  the index of the first point at t or later (len() when there is none)
+- **`fn nearest(&self, t: f64) -> Option<usize>`**
+  the index of the point with a finite value nearest to t (of two as near the earlier)
+- **`fn min_max(&self) -> Option<(f64, f64)>`**
+  the smallest and the largest finite value (None without one); looks at every point
+- **`fn min_max_in(&self, t0: f64, t1: f64) -> Option<(f64, f64)>`**
+  the smallest and the largest finite value of the points with t0 &lt;= t &lt;= t1
+- **`fn columns(&self, t0: f64, t1: f64, n: usize) -> Vec<SeriesCol>`**
+  the points with t0 &lt;= t &lt;= t1 in n columns of equal width (t1 belongs to the last):
+  per column the range of its values, its first and its last value.  Columns without
+  a point with a value are left out; the work is one pass over the points, the result
+  at most n entries (plus one per gap)
+
+- **`enum LcUnit<'a>`**
+  how a line chart labels values (axis ticks, the hover card, the summary)
+  - `Num(&'a str)` -- numbers, large ones with k / M / G / T (1,5k), then the suffix after a space
+    ("req/s", "%"; "" none)
+  - `Si(&'a str)` -- SI prefixes on a unit: Si("B") 950 B / 1,5 kB / 20 MB, Si("bit/s") 100 Mbit/s
+  - `Secs` -- seconds shown as ns / µs / ms / s (latencies)
+
+**`impl LcUnit<'_>`**
+
+- **`fn text(&self, v: f64, sep: u32) -> String`**
+  v as one value: three significant digits with the scale that fits ("48,2 ms",
+  "1,25k req/s", "12 %", "1,5 MB"); sep = the decimal separator (ui.decimal_sep());
+  "–" for a value that is not finite
+- **`fn ticks(&self, first: f64, step: f64, n: u32, sep: u32) -> Vec<String>`**
+  the labels of the axis ticks first + k \* step (k = 0 ..= n): one scale for all (the
+  largest tick's; plain numbers get k / M only from 10 000 on), the decimals the step
+  needs; a zero tick reads "0" with the unit ("0 ms", "0 req/s")
+
+- **`fn lc_nice(lo: f64, hi: f64, steps: u32) -> (f64, f64, u32)`**
+  "nice" ticks over lo ..= hi: (first, step, n) -- the step 1, 2, 2.5 or 5 x 10^k, first
+  and first + n \* step the multiples of it at or around lo and hi, n &lt;= max(steps, 1) (at
+  least 1; lo == hi spans |lo|, or 1)
+
+- **`fn lc_time_step(min: f64) -> f64`**
+  the step of a time axis (s): the smallest of 1 / 2 / 5 x 10^k below a second (down to a
+  nanosecond), 1 2 5 10 15 30 s, 1 2 5 10 15 30 min, 1 2 3 6 12 h, then days (1 / 2 / 5 x
+  10^k) that is at least `min`
+
+- **`fn lc_time_text(t: f64, dec: u32, hours: bool, sep: u32) -> String`**
+  a time t (s) as a clock: "0:05", "1:30", "12:00", with hours "1:00:00"; dec decimals of
+  the second (up to 9) after sep (the decimal separator): "0:01,5"; negative with a minus
+
+*line chart*
+
+```rust
+/// x axes of a line chart (LineChart::x)
+LX_SECS: u8 = 0  // time in seconds: 0:05, 1:00, 1:30
+LX_NANOS: u8 = 1  // time in nanoseconds (a simulation clock), labelled the same
+LX_NUM: u8 = 2  // plain numbers
+/// LineChart::flags
+LC_NO_LEGEND: u32 = 1  // no legend below the plot
+LC_NO_GRID: u32 = 2  // no grid lines
+LC_NO_HOVER: u32 = 4  // no crosshair, card and keyboard cursor (no focus stop)
+```
+
+- **`struct LcSeries<'a>`**
+  one series of a line chart: a label, its points, colour, line or area, unit
+  - `label: &'a str`
+  - `data: &'a SeriesBuf`
+  - `color: u32` -- 0xAARRGGBB; 0 = the chart palette's colour `pal`, without one the series' index
+  - `pal: Option<u8>`
+  - `area: bool` -- a translucent fill under the line, down to zero (or to the edge of the plot)
+  - `unit: LcUnit<'a>` -- how its values read (the y axis takes the first series')
+
+**`impl<'a> LcSeries<'a>`**
+
+- **`const fn new(label: &'a str, data: &'a SeriesBuf) -> LcSeries<'a>`**
+  a line in the palette colour of its index, plain numbers
+- **`const fn color(mut self, c: u32) -> LcSeries<'a>`**
+  the same series in a colour (0xAARRGGBB)
+- **`const fn pal(mut self, k: u8) -> LcSeries<'a>`**
+  the same series in the chart palette's colour k (0 ..= 7)
+- **`const fn area(mut self) -> LcSeries<'a>`**
+  the same series as an area
+- **`const fn unit(mut self, u: LcUnit<'a>) -> LcSeries<'a>`**
+  the same series with a unit
+
+- **`struct LcMarker<'a>`**
+  a marker on the x axis: a line at t0, or the range t0 .. t1 shaded (fault injections)
+  - `t0: f64`
+  - `t1: f64` -- &lt;= t0: a line
+  - `label: &'a str` -- a short label in a tag at the top of the plot ("" none)
+  - `color: u32` -- 0xAARRGGBB, 0 = T_TEXT2
+
+**`impl<'a> LcMarker<'a>`**
+
+- **`const fn line(t: f64, label: &'a str) -> LcMarker<'a>`**
+  a line at t
+- **`const fn range(t0: f64, t1: f64, label: &'a str) -> LcMarker<'a>`**
+  the range t0 .. t1
+- **`const fn color(mut self, c: u32) -> LcMarker<'a>`**
+  the same marker in a colour
+
+- **`struct LcThreshold<'a>`**
+  a threshold: a dashed horizontal line at a value with a label at its right end
+  - `value: f64`
+  - `label: &'a str`
+  - `color: u32` -- 0xAARRGGBB, 0 = T_TEXT2
+
+**`impl<'a> LcThreshold<'a>`**
+
+- **`const fn new(value: f64, label: &'a str) -> LcThreshold<'a>`**
+  a threshold at value with its label, in T_TEXT2
+- **`const fn color(mut self, c: u32) -> LcThreshold<'a>`**
+  the same threshold in a colour
+
+- **`struct LineChart<'a>`**
+  what ui.line_chart shows: the series and how (see the module header of chart.rs); build
+  it with LineChart::new(&series) and the setters, or change the fields
+  - `series: &'a [LcSeries<'a>]`
+  - `x: u8` -- the x axis: LX_SECS (default), LX_NANOS or LX_NUM
+  - `x_range: (f64, f64)` -- the visible x range (the points' units); empty (the default) = the data's
+  - `x_span: f64` -- follow live: without x_range the newest x_span of the data (0 = all of it)
+  - `y_range: (f64, f64)` -- the y range; a NaN end (the default) is automatic: the visible values and the
+    thresholds, out to the next tick.  (0.0, f64::NAN): from zero (metrics)
+  - `markers: &'a [LcMarker<'a>]`
+  - `thresholds: &'a [LcThreshold<'a>]`
+  - `flags: u32` -- LC_\*
+  - `name: &'a str` -- the chart's name: the start of its summary (screen readers)
+  - `empty: &'a str` -- the text without points ("" = "Keine Daten" in the UI language)
+
+**`impl<'a> LineChart<'a>`**
+
+- **`const fn new(series: &'a [LcSeries<'a>]) -> LineChart<'a>`**
+  the series over time in seconds, both ranges automatic
+- **`const fn x_axis(mut self, x: u8) -> LineChart<'a>`**
+  the x axis: LX_SECS, LX_NANOS or LX_NUM
+- **`const fn x_range(mut self, lo: f64, hi: f64) -> LineChart<'a>`**
+  a fixed x range (a paused view)
+- **`const fn follow(mut self, span: f64) -> LineChart<'a>`**
+  follow live: the newest `span` of the data
+- **`const fn y_range(mut self, lo: f64, hi: f64) -> LineChart<'a>`**
+  the y range (a NaN end: automatic)
+- **`const fn markers(mut self, m: &'a [LcMarker<'a>]) -> LineChart<'a>`**
+  markers on the x axis (lines and shaded ranges with tags)
+- **`const fn thresholds(mut self, t: &'a [LcThreshold<'a>]) -> LineChart<'a>`**
+  thresholds (dashed lines with tags)
+- **`const fn flags(mut self, f: u32) -> LineChart<'a>`**
+  LC_\* flags
+- **`const fn name(mut self, n: &'a str) -> LineChart<'a>`**
+  the name its summary starts with
+- **`const fn empty(mut self, s: &'a str) -> LineChart<'a>`**
+  the text of the empty chart
+- **`fn view(&self) -> (f64, f64)`**
+  the x range the chart shows (the points' units): x_range when it is set, else the
+  data's -- with x_span the newest x_span of it (from the first point on while the
+  data is shorter: it grows from the left); without points 0 .. x_span (or one second)
+
 **`impl Ui`**
 
 - **`fn sparkline(&mut self, id: u32, values: &[f32], color: u32)`**
@@ -2557,6 +2900,10 @@ chart does not redraw (dirty.rs hashes the object's identity and version).
 - **`fn legend(&mut self, items: &[(&str, u32)])`**
   ui_legend(items): a colour dot and a label per item (colour 0 = palette by index),
   laid out in a wrapping row; an item wider than the row has its label cut with "…"
+- **`fn line_chart(&mut self, id: u32, c: &LineChart) -> Option<(usize, f64)>`**
+  ui_line_chart(id, chart) -> the hovered series and the x it snapped to: series over
+  time (or plain numbers) with axes, grid, legend, markers, thresholds and a hover card
+  (see the module header of chart.rs)
 
 ### Toasts, spinners, progress
 
@@ -22306,6 +22653,8 @@ log-linear histograms and a sliding window of them (simulators, servers, benchma
                  minutes in 1 s slots of nanoseconds); record(t, v) / quantile(t, pm) /
                  p50 / p95 / p99 / count / sum / mean / min / max over the slots still in
                  the window at t / per_slot(t, pm) for charts / hist(t)
+                 hist_between(from, to): the slots that start in [from, to) as one
+                 histogram (a time series: one point per interval, quantiles of any span)
 
 Quantiles use the nearest rank (rank = ceil(pm * n / 1000)) and give the midpoint of that
 rank's bucket, clamped to the smallest and largest value seen (the first and the last rank
@@ -22388,6 +22737,9 @@ HIST_BITS: u8 = 5
 - **`fn record_n(&mut self, t: u64, v: u64, n: u32) -> bool`**
 - **`fn hist(&self, t: u64) -> Hist`**
   everything in the window at time t as one histogram
+- **`fn hist_between(&self, from: u64, to: u64) -> Hist`**
+  the slots that start in [from, to) as one histogram: what was recorded between two
+  times, to the resolution of the slots; slots the ring no longer holds are left out
 - **`fn count(&self, t: u64) -> u64`**
 - **`fn sum(&self, t: u64) -> u128`**
 - **`fn mean(&self, t: u64) -> Option<u64>`**
@@ -23862,6 +24214,9 @@ are checked (valid()): a stale value of a freed object gives an error or None, n
 - **`fn charge(&mut self, fuel: u64)`**
   add fuel for the work of this call (the call itself costs 1); spend() also stops at the
   fuel limit
+- **`fn fuel(&self) -> u64`**
+  the fuel of the current invocation so far, over all its runs and this call included:
+  the moment of its CPU time a host gives what the native does (JFNetworker's scripts)
 - **`fn spend(&mut self, fuel: u64) -> Result<(), Fail>`**
   charge fuel for work and end the invocation with ErrorKind::Fuel once Limits::fuel is
   used up: a long operation calls this as it goes, so a huge job stops in the middle
