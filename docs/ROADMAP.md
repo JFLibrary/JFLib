@@ -599,6 +599,24 @@ Fensterrand hinaus.
     Blockkommentare, Strings mit Escapes / mehrzeilig, Rust-Raw-Strings, Wortlisten, Zahlen,
     eigene Funktionen) mit Grammatiken für Rust, JSON, INI, TOML und eine Markdown-Teilmenge;
     Farben `CodeTheme` hell / dunkel / hoher Kontrast (`ui.code_theme()`).
+  * Diagnosen (L6, 2026-10-21): `CodeDoc::set_diagnostics(&[Diag])` (Zeile / Spalte ab 1 in
+    Zeichen, Fehler / Warnung / Hinweis, Meldung) zeichnet Wellenlinien in der Farbe der
+    Schwere und Marken in einer eigenen Spalte der Leiste (Kreis mit Kreuz, Dreieck, „i“ –
+    Formen, auch im hohen Kontrast unterscheidbar; `CE_MARKS` hält die Spalte); Tooltip mit
+    den Meldungen, F8 / Umschalt+F8 zur nächsten / vorigen, die am Caret in `code_status` /
+    `code_diag` und als Eintrag für Screenreader. Sie folgen jeder Änderung (Tippen, Enter,
+    Löschen, Block-Einzug, Kommentare, verschobene Zeilen, Undo / Redo) bis zur nächsten
+    Prüfung: ersetzter Text lässt eine Diagnose schrumpfen, ganz gelöscht entfällt sie. Nur
+    sichtbare Zeilen werden angesehen, eine Wellenlinie ist ein Zeichenbefehl (100 000 Zeilen
+    mit 13 000 Diagnosen so schnell wie ohne). Grammatik `Highlighter::jfs()` für die
+    Skriptsprache (`${…}` mit hervorgehobenem Code: neue Regel `Rule::Interp`), Token für
+    Token gegen `script::tokens` geprüft. Getestet mit `tests/code_diag.uis` (Hover, F8,
+    Bearbeiten, Prüfen beim Tippen, 100 000 Zeilen, Shots hell / dunkel bei 100 / 150 %,
+    hoher Kontrast) und `--test model` (jetzt 266 Prüfungen). Offen: Quick-Fixes,
+    Markierungen in der Bildlaufleiste, mehrzeilige Tooltips (lange Meldungen werden bei
+    300 DIP abgeschnitten); das Folgen vergleicht alten und neuen Text der geänderten Zeilen –
+    mehrdeutige Änderungen (eine Zeile löschen, die wie die nächste beginnt) können eine
+    Diagnose bis zur nächsten Prüfung leicht verschieben.
   * Getestet mit `apps/editortest` (13 Skripte mit `--verify-dirty`, Windows und Linux, und
     `--test model`: 168 Prüfungen der Modelle und Grammatiken).
   * Offen: kein bidirektionaler Text innerhalb eines Absatzes (wie bei den Textfeldern bleibt
