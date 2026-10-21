@@ -360,6 +360,16 @@ impl Sampler {
     fn rec(&self, dev: u32, svc: &str) -> Option<&Rec> {
         self.svcs.get(&dev)?.iter().find(|r| r.name.eq_ignore_ascii_case(svc))
     }
+    /// service `id` of a device got another name (Engine::rename_service): its series go on
+    /// under it (series of a gone service of that name go)
+    pub(crate) fn rename(&mut self, dev: u32, id: u32, to: &str) {
+        if let Some(recs) = self.svcs.get_mut(&dev) {
+            recs.retain(|r| r.id == id || r.name != to);
+            if let Some(r) = recs.iter_mut().find(|r| r.id == id) {
+                r.name = String::from(to);
+            }
+        }
+    }
     /// the kept samples of a series: (moment, value or NONE), oldest first
     fn samples<'a>(&'a self, x: &'a Ser) -> impl Iterator<Item = (Ns, i64)> + 'a {
         let n = x.vals.len().min(self.times.len());

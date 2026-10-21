@@ -67,7 +67,7 @@
 //            letters) and the workers that take from it
 //   scriptsvc scripts as services: a .jfs program (lib/script) driven by events, its fuel the
 //            CPU time of a single-threaded program; the host API (log, timers, net, dns, http,
-//            disk, metrics)
+//            disk, metrics); a new source that keeps the disk and numbers (ScriptSource)
 //   series   time series on virtual time: every service's metrics (rates of counters, gauges,
 //            latency quantiles per interval) and the cables' traffic, KPIs, fault marks for
 //            charts, values over a span for scenarios, CSV

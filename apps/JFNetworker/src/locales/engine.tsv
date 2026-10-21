@@ -502,3 +502,7 @@ Zeile {}, Spalte {}: {}	line {}, column {}: {}
 Skript {} rechnet noch: das Ereignis wartet ({} vor ihm).	Script {} is still computing: the event waits ({} before it).
 Skript {} überlastet: Datagramm verworfen.	Script {} overloaded: datagram dropped.
 Skript {}: Fehler in Zeile {}, Spalte {}: {}	Script {}: error in line {}, column {}: {}
+# the script editor (U7): a script's new definition, a service's new name (scriptsvc.rs, os.rs)
+Der Dienst „{}“ ist kein Skript.	The service “{}” is not a script.
+„{}“ taugt nicht als Name eines Dienstes.	“{}” cannot be the name of a service.
+Den Dienst „{}“ gibt es schon.	The service “{}” exists already.

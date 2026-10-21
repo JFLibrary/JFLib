@@ -42,6 +42,8 @@
 //                             on the time (windows of the HTTP services)
 //   OsApi::halt / svc_name    a service ends itself (a script after an error: scriptsvc.rs);
 //                             its name on the device
+//   Engine::rename_service    Action::RenameService: a service goes on under another name
+//                             (Service::renamed tells it; its time series follow)
 //
 // Everything a service sees goes through its node's inbox, which a node timer (SLOT_OS)
 // empties at the same virtual time: a service never runs inside another one's call, and a
@@ -228,6 +230,11 @@ pub trait Service: Send {
     /// becomes the series of the names they list, in place of the metrics of those names
     fn windows(&self) -> Vec<crate::series::LatWindow<'_>> {
         Vec::new()
+    }
+    /// it got another name (Engine::rename_service) and goes on; one that keeps a copy of its
+    /// name (a script tags its log lines with it) takes the new one
+    fn renamed(&mut self, name: &str) {
+        let _ = name;
     }
 }
 
@@ -1055,8 +1062,9 @@ impl Engine {
 
     // ---------------------------------------------------------------- services
 
-    /// adds a service to a device (one with the same name is stopped and replaced); it starts
-    /// when the engine runs next, if `enabled` and the device is on
+    /// adds a service to a device (one with the same name is stopped and replaced, and what it
+    /// stored on the disk goes with it); it starts when the engine runs next, if `enabled` and
+    /// the device is on
     pub fn add_service(&mut self, dev: u32, name: &str, svc: Box<dyn Service>, enabled: bool) -> Result<(), ActErr> {
         let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
         let old = self.os(ni).ok_or(ActErr::NoIp(dev))?.svc_id(name);
@@ -1066,6 +1074,10 @@ impl Engine {
         let now = self.now;
         let os = self.os_mut(ni).ok_or(ActErr::NoIp(dev))?;
         os.svcs.retain(|s| !s.name.eq_ignore_ascii_case(name));
+        // the replaced one's bytes on the disk go with it (the new service starts empty)
+        if let Some(id) = old {
+            os.disk.forget(id);
+        }
         let id = os.next_svc;
         os.next_svc += 1;
         let kind = svc.kind();
@@ -1086,6 +1098,31 @@ impl Engine {
             // what it stored on the disk goes with it
             os.disk.forget(id);
         }
+        Ok(())
+    }
+
+    /// gives a service another name (Action::RenameService): it goes on as it was, without a
+    /// restart -- its sockets, its disk and numbers, its time series (series.rs) -- and hears
+    /// of it (Service::renamed); the name must be free on the device (case-insensitive) and
+    /// one word
+    pub fn rename_service(&mut self, dev: u32, name: &str, to: &str) -> Result<(), ActErr> {
+        let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+        let os = self.os(ni).ok_or(ActErr::NoIp(dev))?;
+        let id = os.svc_id(name).ok_or_else(|| ActErr::Refused(msg!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
+        let to = to.trim();
+        if to.is_empty() || to.chars().any(|c| c.is_whitespace() || c.is_control()) {
+            return Err(ActErr::Refused(msg!("\u{201e}{}\u{201c} taugt nicht als Name eines Dienstes.", to)));
+        }
+        if os.svcs.iter().any(|s| s.id != id && s.name.eq_ignore_ascii_case(to)) {
+            return Err(ActErr::Refused(msg!("Den Dienst \u{201e}{}\u{201c} gibt es schon.", to)));
+        }
+        if let Some(s) = self.os_mut(ni).and_then(|os| os.svcs.iter_mut().find(|s| s.id == id)) {
+            s.name = String::from(to);
+            if let Some(x) = s.svc.as_mut() {
+                x.renamed(to);
+            }
+        }
+        self.series.rename(dev, id, to);
         Ok(())
     }
 
