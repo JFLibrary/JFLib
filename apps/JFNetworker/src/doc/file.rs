@@ -5,6 +5,9 @@
 //                                           the project has unsaved changes
 //   save(n, ui) / save_as(n)                Speichern (Speichern unter without a file)
 //   open_path(n, ui, path)                  load a project (--open, recent files, the dialog)
+//   open_lab(n, ui, path)                   a lab of the app (app://labs): a project without a
+//                                           file, named after the lab's file until it is saved,
+//                                           its title the lab's in the window's language
 //   open_generated(n, ui, count)            jfn_model::synth's synthetic project, without a file
 //   dialogs(n, ui)                          the file dialog and the question, once per frame
 //   chosen(n, ui, save) / answer(n, ui, save)   the commands those dialogs queue
@@ -36,6 +39,8 @@ pub(crate) enum After {
     Open,
     OpenPath(String),
     Quit,
+    /// a lab of the app (app://labs/…, workspace/task.rs): a project without a file
+    Lab(String),
 }
 
 /// the state of the file dialog, the question and the recent files
@@ -178,8 +183,35 @@ fn run(n: &mut Net, ui: &mut Ui, after: After) {
             }
             ui.quit();
         }
+        After::Lab(p) => {
+            open_lab(n, ui, &p);
+        }
     }
     ui.repass();
+}
+
+/// a lab of the app (app://labs/…) as a project without a file: Speichern asks where, the
+/// title names the lab's file until then -> it worked (else the info bar says why)
+pub(crate) fn open_lab(n: &mut Net, ui: &mut Ui, path: &str) -> bool {
+    match read(path) {
+        Ok(mut p) => {
+            // the project is called as its lab in the window's language
+            if let Some(l) = &p.lab {
+                p.title = String::from(l.title.get(crate::app::tr::en()));
+            }
+            n.doc.replace(p, None);
+            n.doc.origin = Some(String::from(base_name(path)));
+            n.after_load();
+            n.file.msg = None;
+            ui.repass();
+            true
+        }
+        Err(e) => {
+            n.file.msg = Some((IB_ERROR, tf("„{}“ ließ sich nicht öffnen", &[base_name(path)]), e));
+            ui.repass();
+            false
+        }
+    }
 }
 
 /// Speichern: into the file, or through the dialog when there is none -> written now
@@ -196,7 +228,8 @@ pub(crate) fn save(n: &mut Net, ui: &mut Ui) -> bool {
 /// Speichern unter: the save dialog
 pub(crate) fn save_as(n: &mut Net, ui: &mut Ui) {
     n.file.fd_save = true;
-    let name = format!("{}.jfnet", t("Unbenannt"));
+    // a lab without a file proposes its own name
+    let name = n.doc.origin.clone().unwrap_or_else(|| format!("{}.jfnet", t("Unbenannt")));
     n.file.fd_path = start_path(n, ui, Some(&name));
     n.file.fd_active = true;
     n.file.fd_open.set(1);

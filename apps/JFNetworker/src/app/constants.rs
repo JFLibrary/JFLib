@@ -286,3 +286,40 @@ pub(crate) const ID_KEYS_SCROLL: u32 = 0xA241;
 // ---- performance (U5: commands 200 .. 209, widgets 0xA000 .. 0xA0FF, timers 0x120 .. 0x12F)
 /// the frames on the canvas in the simulation mode: a record whose value is their number
 pub(crate) const ID_SIM_FRAMES: u32 = 0xA000;
+// ---- U6b: tasks and labs (commands 300 .. 339, widgets 0xC000 .. 0xCFFF, timers 0x150 ..
+// 0x15F, the dock panel P_TASK)
+/// Datei › Labor öffnen …: the list of the labs in app://labs
+pub(crate) const CMD_LAB_OPEN: u32 = 300;
+/// the Aufgabe panel shows and gets the keyboard
+pub(crate) const CMD_TASK_PANEL: u32 = 301;
+/// "Prüfen": the goals are judged now and the open ones say why they are not reached
+pub(crate) const CMD_TASK_CHECK: u32 = 302;
+/// the next hint: of the first open goal, else of the whole task
+pub(crate) const CMD_TASK_HINT: u32 = 303;
+/// the list of labs chose one (arg: its index in the list; queued by the dialog)
+pub(crate) const CMD_LAB_CHOSEN: u32 = 304;
+/// the dock panel of the lab's task (right, a tab beside Eigenschaften)
+pub(crate) const P_TASK: u32 = 10;
+/// the Aufgabe panel: its scroll view, "Prüfen", the progress, the task's hint button, the
+/// empty state's "Labor öffnen …", the introduction; per goal its record (+ i) and its hint
+/// button (+ i)
+pub(crate) const ID_TASK: u32 = 0xC000;
+pub(crate) const ID_TASK_CHECK: u32 = 0xC001;
+pub(crate) const ID_TASK_PROGRESS: u32 = 0xC002;
+pub(crate) const ID_TASK_HINT: u32 = 0xC003;
+pub(crate) const ID_TASK_OPEN: u32 = 0xC004;
+/// the expander of the introduction
+pub(crate) const ID_TASK_INTRO: u32 = 0xC005;
+pub(crate) const ID_TASK_GOAL0: u32 = 0xC010;
+pub(crate) const ID_TASK_GOAL_HINT0: u32 = 0xC100;
+/// goals a lab shows at most
+pub(crate) const TASK_GOALS: usize = 200;
+/// the list of labs (a dialog) and its list (rows + 1 + i)
+pub(crate) const ID_LABS_DLG: u32 = 0xC400;
+pub(crate) const ID_LABS_LIST: u32 = 0xC410;
+/// the Dienste tab of device window k: "Einstellungen …" of service i is + 0x40 k + i; the
+/// settings editor of a service (a code editor: + 0 .. 15), Übernehmen, Abbrechen
+pub(crate) const ID_SVC_EDIT_BTN0: u32 = 0xC800;
+pub(crate) const ID_SVC_EDIT: u32 = 0xC900;
+pub(crate) const ID_SVC_EDIT_APPLY: u32 = 0xC910;
+pub(crate) const ID_SVC_EDIT_CANCEL: u32 = 0xC911;

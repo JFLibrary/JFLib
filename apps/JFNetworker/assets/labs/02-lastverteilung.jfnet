@@ -1,0 +1,448 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Lastverteilung: der dritte Webserver",
+  "description": "Labor: ein Loadbalancer vor zwei Webservern am Limit, der dritte wartet.",
+  "seed": 6,
+  "next_id": 15,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "GEN",
+      "model": "traffic-gen",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname GEN\nip addr add 10.0.1.10/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-load",
+          "name": "load",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.1.1/"
+            ],
+            "mode": "open",
+            "rps": 360,
+            "arrival": "poisson",
+            "delay_ms": 1000,
+            "timeout_ms": 2000,
+            "mix": [
+              {
+                "path": "/"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 160,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "LB1",
+      "model": "load-balancer",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname LB1\nip addr add 10.0.1.1/24 dev eth0\nip addr add 10.0.2.1/24 dev eth1\n",
+      "services": [
+        {
+          "kind": "lb",
+          "name": "lb",
+          "disabled": false,
+          "config": {
+            "mode": "http",
+            "port": 80,
+            "algorithm": "round-robin",
+            "backends": [
+              {
+                "name": "web1",
+                "addr": "10.0.2.11"
+              },
+              {
+                "name": "web2",
+                "addr": "10.0.2.12"
+              }
+            ],
+            "health": {
+              "type": "http",
+              "path": "/health",
+              "interval_ms": 1000,
+              "timeout_ms": 500,
+              "rise": 2,
+              "fall": 3
+            }
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "SW2",
+      "model": "jf-s24p",
+      "x": 480,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW2\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 640,
+      "y": -120,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.2.11/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "queue": 50,
+            "time_ms": 20,
+            "jitter_ms": 10,
+            "routes": [
+              {
+                "path": "/health",
+                "body": "ok\n",
+                "time_ms": 0
+              },
+              {
+                "path": "/",
+                "body": "Hallo von {host}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 6,
+      "name": "WEB2",
+      "model": "server-1u",
+      "x": 640,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname WEB2\nip addr add 10.0.2.12/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "queue": 50,
+            "time_ms": 20,
+            "jitter_ms": 10,
+            "routes": [
+              {
+                "path": "/health",
+                "body": "ok\n",
+                "time_ms": 0
+              },
+              {
+                "path": "/",
+                "body": "Hallo von {host}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 7,
+      "name": "WEB3",
+      "model": "server-1u",
+      "x": 640,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname WEB3\nip addr add 10.0.2.13/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "queue": 50,
+            "time_ms": 20,
+            "jitter_ms": 10,
+            "routes": [
+              {
+                "path": "/health",
+                "body": "ok\n",
+                "time_ms": 0
+              },
+              {
+                "path": "/",
+                "body": "Hallo von {host}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 8,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 3,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [
+    {
+      "id": 13,
+      "x": -20,
+      "y": 90,
+      "w": 300,
+      "h": 50,
+      "text": "10.0.1.0/24 · GEN 10.0.1.10 · LB1 10.0.1.1"
+    },
+    {
+      "id": 14,
+      "x": 380,
+      "y": -200,
+      "w": 300,
+      "h": 50,
+      "text": "10.0.2.0/24 · LB1 10.0.2.1 · WEB1 .11 · WEB2 .12 · WEB3 .13"
+    }
+  ],
+  "layout": {
+    "zoom_pm": 0,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Lastverteilung: der dritte Webserver",
+      "Load balancing: the third web server"
+    ],
+    "summary": [
+      "Zwei Webserver schaffen die Last nicht: WEB3 anschließen und in den Loadbalancer aufnehmen.",
+      "Two web servers cannot carry the load: connect WEB3 and add it to the load balancer."
+    ],
+    "topic": "ds",
+    "intro": [
+      [
+        "GEN schickt 360 Anfragen pro Sekunde an den Loadbalancer LB1, der sie reihum an WEB1 und WEB2 weitergibt. Jeder Webserver hat vier Worker, und eine Anfrage braucht 20 bis 30 ms: zusammen schaffen die beiden kaum 320 pro Sekunde. Ihre Warteschlangen laufen voll, die Antwortzeiten steigen, und was nicht mehr hineinpasst, bekommt 503.",
+        "GEN sends 360 requests per second to the load balancer LB1, which passes them on to WEB1 and WEB2 in turn. Each web server has four workers, and a request takes 20 to 30 ms: together the two manage hardly 320 per second. Their queues fill up, response times rise, and whatever no longer fits gets a 503."
+      ],
+      [
+        "WEB3 steht mit Adresse und Webserver bereit, hängt aber an keinem Kabel, und LB1 kennt ihn nicht. Nimm ihn in Betrieb. Die Ziele prüft der Simulator laufend; „Prüfen“ zeigt bei jedem offenen Ziel, was noch fehlt.",
+        "WEB3 is ready with its address and web server, but no cable reaches it and LB1 does not know it. Put it into service. The simulator checks the goals all the time; “Check” shows what is still missing for every open goal."
+      ]
+    ],
+    "ordered": true,
+    "goals": [
+      {
+        "text": [
+          "WEB3 hängt am Servernetz",
+          "WEB3 is on the server network"
+        ],
+        "checks": [
+          "WEB3 route 10.0.2.0/24 via connected"
+        ],
+        "hints": [
+          [
+            "Werkzeug Verbinden (C): von WEB3 auf SW2 ziehen. Mit Umschalt beim Loslassen verbindet es sofort über die besten Ports.",
+            "The Connect tool (C): drag from WEB3 to SW2. With Shift at the release it connects at once over the best ports."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "LB1 verteilt auf alle drei Webserver",
+          "LB1 spreads the load over all three web servers"
+        ],
+        "checks": [
+          "LB1 svc lb metric backends_up == 3"
+        ],
+        "hints": [
+          [
+            "Die Backends stehen in den Einstellungen des Dienstes lb: Umschalt+Doppelklick auf LB1, Reiter Dienste, „Einstellungen …“.",
+            "The backends are in the settings of the service lb: Shift+double-click LB1, tab Services, “Settings …”."
+          ],
+          [
+            "Ein drittes Backend wie die beiden anderen in die Liste backends: {\"name\": \"web3\", \"addr\": \"10.0.2.13\"}. Übernehmen startet LB1 mit der neuen Liste.",
+            "A third backend like the other two in the list backends: {\"name\": \"web3\", \"addr\": \"10.0.2.13\"}. Apply restarts LB1 with the new list."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "WEB3 bekommt seinen Teil der Anfragen",
+          "WEB3 gets its share of the requests"
+        ],
+        "checks": [
+          "WEB3 svc web metric requests >= 100 over 5s"
+        ],
+        "hints": [
+          [
+            "Reihum bekommt jeder Webserver ein Drittel, hier rund 120 Anfragen pro Sekunde.",
+            "In turn, every web server gets a third, here about 120 requests per second."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "99 % der Antworten kommen in unter 100 ms",
+          "99 % of the answers come in under 100 ms"
+        ],
+        "checks": [
+          "GEN svc load metric p99_us < 100000 over 10s"
+        ],
+        "hints": [
+          [
+            "Geprüft wird das 99. Perzentil der letzten 10 s. Mit drei Webservern hat jeder Luft; mit zweien warten die Anfragen.",
+            "The check takes the 99th percentile of the last 10 s. With three web servers each has room to spare; with two the requests wait."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "Keine Fehler mehr",
+          "No more errors"
+        ],
+        "checks": [
+          "GEN svc load metric errors == 0 over 10s"
+        ],
+        "hints": [
+          [
+            "Als Fehler zählen Antworten mit 4xx oder 5xx und Anfragen, die keine Antwort bekommen. Nach einem Neustart von LB1 dauert es ein paar Sekunden.",
+            "Errors are answers with 4xx or 5xx and requests that get no answer. After LB1 restarts it takes a few seconds."
+          ]
+        ]
+      }
+    ],
+    "hints": [
+      [
+        "lbctl in der Konsole von LB1 zeigt jedes Backend mit Zustand, Anfragen und Fehlern.",
+        "lbctl in the console of LB1 shows every backend with its state, requests and errors."
+      ],
+      [
+        "Die Einstellungen eines Dienstes sind JSON. Übernehmen prüft sie, bevor das Gerät mit ihnen neu startet; Rückgängig nimmt sie zurück.",
+        "The settings of a service are JSON. Apply checks them before the device restarts with them; Undo takes them back."
+      ]
+    ]
+  }
+}

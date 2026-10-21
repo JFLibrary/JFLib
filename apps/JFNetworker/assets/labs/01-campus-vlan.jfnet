@@ -1,0 +1,424 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Campus: ein VLAN für die Studierenden",
+  "description": "Labor: VLAN 20 auf MLS1 einrichten, DHCP über das Relay, die Route zurück auf R1.",
+  "seed": 5,
+  "next_id": 17,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 440,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\nip dhcp excluded-address 10.10.10.1 10.10.10.99\nip dhcp excluded-address 10.10.20.1 10.10.20.99\n!\nip dhcp pool STAFF\n network 10.10.10.0 255.255.255.0\n default-router 10.10.10.1\n dns-server 10.10.100.10\n domain-name lab\n!\nip dhcp pool STUDENTS\n network 10.10.20.0 255.255.255.0\n default-router 10.10.20.1\n dns-server 10.10.100.10\n domain-name lab\n!\ninterface GigabitEthernet0/0/1\n description server network\n ip address 10.10.100.1 255.255.255.0\n no shutdown\n!\ninterface TenGigabitEthernet0/1/0\n description downlink to MLS1\n ip address 10.10.0.1 255.255.255.252\n no shutdown\n!\nip route 10.10.10.0 255.255.255.0 10.10.0.2\n!\nntp server 10.10.100.10\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "MLS1",
+      "model": "jf-s24l3",
+      "x": 260,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname MLS1\n!\nip routing\n!\nvlan 10\n name Staff\n!\ninterface GigabitEthernet1/0/1\n switchport access vlan 10\n switchport mode access\n!\ninterface GigabitEthernet1/0/2\n switchport access vlan 10\n switchport mode access\n!\ninterface GigabitEthernet1/0/3\n switchport mode access\n!\ninterface GigabitEthernet1/0/4\n switchport mode access\n!\ninterface TenGigabitEthernet1/1/1\n description uplink to R1\n no switchport\n ip address 10.10.0.2 255.255.255.252\n!\ninterface Vlan10\n description gateway of VLAN 10 Staff\n ip address 10.10.10.1 255.255.255.0\n ip helper-address 10.10.0.1\n!\nip route 0.0.0.0 0.0.0.0 10.10.0.1\n!\nntp server 10.10.100.10\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 620,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.10.100.10/24 dev eth0\nip route add default via 10.10.100.1\n",
+      "services": [
+        {
+          "kind": "dns-server",
+          "name": "named",
+          "disabled": false,
+          "config": {
+            "zones": [
+              {
+                "origin": "lab",
+                "ttl": 300,
+                "records": [
+                  "server A 10.10.100.10",
+                  "srv1 CNAME server",
+                  "r1 A 10.10.0.1",
+                  "mls1 A 10.10.0.2"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "kind": "ntp",
+          "name": "chronyd",
+          "disabled": false,
+          "config": {
+            "master": 8
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 180,
+      "off": false,
+      "startup_config": "hostname PC1\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "PC2",
+      "model": "pc",
+      "x": 120,
+      "y": 360,
+      "off": false,
+      "startup_config": "hostname PC2\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 6,
+      "name": "PC3",
+      "model": "pc",
+      "x": 400,
+      "y": 360,
+      "off": false,
+      "startup_config": "hostname PC3\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 7,
+      "name": "PC4",
+      "model": "pc",
+      "x": 520,
+      "y": 140,
+      "off": false,
+      "startup_config": "hostname PC4\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 8,
+      "a": {
+        "dev": 2,
+        "port": "TenGigabitEthernet1/1/1"
+      },
+      "b": {
+        "dev": 1,
+        "port": "TenGigabitEthernet0/1/0"
+      },
+      "cable": "fiber-mm",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 500,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 13,
+      "a": {
+        "dev": 7,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [
+    {
+      "id": 14,
+      "x": 0,
+      "y": 450,
+      "w": 260,
+      "h": 50,
+      "text": "VLAN 10 (Staff): 10.10.10.0/24 · GW 10.10.10.1 (MLS1)"
+    },
+    {
+      "id": 15,
+      "x": 380,
+      "y": 450,
+      "w": 260,
+      "h": 50,
+      "text": "VLAN 20 (Students): 10.10.20.0/24 · GW 10.10.20.1 (MLS1) · ?"
+    },
+    {
+      "id": 16,
+      "x": 440,
+      "y": -80,
+      "w": 260,
+      "h": 56,
+      "text": "10.10.100.0/24: SRV1 · DNS server.lab · NTP"
+    }
+  ],
+  "layout": {
+    "zoom_pm": 0,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Campus: ein VLAN für die Studierenden",
+      "Campus: a VLAN for the students"
+    ],
+    "summary": [
+      "VLAN 20 einrichten, DHCP über das Relay, Routen in beide Richtungen.",
+      "Set up VLAN 20, DHCP through the relay, routes in both directions."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "Im Campus routet der L3-Switch MLS1 das VLAN 10 der Beschäftigten (PC1 und PC2) und reicht ihre DHCP-Anfragen an R1 weiter, der die Adressen vergibt. PC3 und PC4 sollen ins VLAN 20 der Studierenden, doch dafür fehlt noch alles: das VLAN selbst, sein Interface auf MLS1 und auf R1 der Weg zurück.",
+        "In the campus, the layer-3 switch MLS1 routes VLAN 10 of the staff (PC1 and PC2) and passes their DHCP requests on to R1, which hands out the addresses. PC3 and PC4 belong in VLAN 20 of the students, but everything for it is missing: the VLAN itself, its interface on MLS1 and the way back on R1."
+      ],
+      [
+        "Der Pool STUDENTS für 10.10.20.0/24 mit dem Gateway 10.10.20.1 steht auf R1 schon bereit. Richte MLS1 und R1 in ihren Konsolen ein (Doppelklick auf das Gerät), bis PC3 und PC4 ihre Adressen haben und SRV1 erreichen.",
+        "The pool STUDENTS for 10.10.20.0/24 with the gateway 10.10.20.1 is ready on R1. Configure MLS1 and R1 in their consoles (double-click the device) until PC3 and PC4 have their addresses and reach SRV1."
+      ]
+    ],
+    "ordered": false,
+    "goals": [
+      {
+        "text": [
+          "MLS1 hat ein aktives VLAN-Interface 10.10.20.1/24 für VLAN 20",
+          "MLS1 has an active VLAN interface 10.10.20.1/24 for VLAN 20"
+        ],
+        "checks": [
+          "MLS1 route 10.10.20.0/24 dev Vlan20"
+        ],
+        "hints": [
+          [
+            "Auf MLS1: enable, configure terminal, dann vlan 20 und name Students.",
+            "On MLS1: enable, configure terminal, then vlan 20 and name Students."
+          ],
+          [
+            "Die Ports von PC3 und PC4 gehören ins neue VLAN: interface GigabitEthernet1/0/3, dort switchport access vlan 20, ebenso für Gi1/0/4.",
+            "The ports of PC3 and PC4 belong in the new VLAN: interface GigabitEthernet1/0/3, there switchport access vlan 20, the same for Gi1/0/4."
+          ],
+          [
+            "Das Interface: interface vlan 20 und ip address 10.10.20.1 255.255.255.0. Aktiv ist es, sobald ein Port im VLAN eine Verbindung hat.",
+            "The interface: interface vlan 20 and ip address 10.10.20.1 255.255.255.0. It is up as soon as a port in the VLAN has a link."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "PC3 und PC4 bekommen ihre Adressen über das Relay",
+          "PC3 and PC4 get their addresses through the relay"
+        ],
+        "checks": [
+          "PC3 route 10.10.20.0/24 via connected",
+          "PC4 route 10.10.20.0/24 via connected"
+        ],
+        "hints": [
+          [
+            "MLS1 muss die DHCP-Anfragen aus VLAN 20 an R1 weiterreichen: ip helper-address 10.10.0.1 am Interface Vlan20, wie bei Vlan10.",
+            "MLS1 has to pass the DHCP requests from VLAN 20 on to R1: ip helper-address 10.10.0.1 on the interface Vlan20, as on Vlan10."
+          ],
+          [
+            "R1 antwortet an 10.10.20.1. Ohne Route dorthin kommt die Antwort nie an (siehe Ziel 3).",
+            "R1 answers to 10.10.20.1. Without a route there the answer never arrives (see goal 3)."
+          ],
+          [
+            "Nach einer Minute ohne Antwort warten die PCs eine Weile. dhclient eth0 in ihrer Konsole fragt sofort neu.",
+            "After a minute without an answer the PCs wait for a while. dhclient eth0 in their console asks again at once."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "R1 kennt den Weg ins VLAN 20",
+          "R1 knows the way into VLAN 20"
+        ],
+        "checks": [
+          "R1 route 10.10.20.0/24 via 10.10.0.2"
+        ],
+        "hints": [
+          [
+            "Für VLAN 10 hat R1 eine statische Route über MLS1; show running-config auf R1 zeigt sie.",
+            "For VLAN 10, R1 has a static route via MLS1; show running-config on R1 shows it."
+          ],
+          [
+            "Im configure terminal von R1: ip route 10.10.20.0 255.255.255.0 10.10.0.2.",
+            "In configure terminal on R1: ip route 10.10.20.0 255.255.255.0 10.10.0.2."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "PC3 erreicht server.lab",
+          "PC3 reaches server.lab"
+        ],
+        "checks": [
+          "PC3 output contains \"PING server.lab (10.10.100.10)\"",
+          "PC3 output contains \", 0% packet loss\""
+        ],
+        "hints": [
+          [
+            "In der Konsole von PC3: ping -c 3 server.lab. Der Name kommt vom DNS-Server SRV1, den der Pool mitliefert.",
+            "In the console of PC3: ping -c 3 server.lab. The name comes from the DNS server SRV1, which the pool hands out."
+          ]
+        ]
+      }
+    ],
+    "hints": [
+      [
+        "VLAN 10 ist fertig eingerichtet und zeigt, wie es geht: show running-config auf MLS1.",
+        "VLAN 10 is set up already and shows how it is done: show running-config on MLS1."
+      ],
+      [
+        "copy running-config startup-config hält die Konfiguration im Projekt fest; sonst gilt sie nur bis zum nächsten Neustart des Geräts.",
+        "copy running-config startup-config keeps the configuration in the project; otherwise it lasts only until the device restarts."
+      ]
+    ]
+  }
+}

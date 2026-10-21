@@ -1,0 +1,56 @@
+#!args --verify-dirty
+# the shot matrix of the labs (U6b): the list of labs (Datei › Labor öffnen …), the Aufgabe
+# panel of the shards' lab (the introduction folded) after "Prüfen" with a hint open, the
+# service settings of a KV node in its device window, each light and dark at 100 and 150 %
+# (build/jfnetworker/task_<view>_<theme>_<scale>.png).  Ids: 49157 the introduction, 49408 the
+# first goal's hint button, 26624 the first device window, 51200 the settings button of its
+# first service.
+size 1280 800
+theme light
+# ---- the list of labs, the shards chosen
+cmd 300
+expect dialog:"Labor öffnen" exists
+click text:"Geshardeter Speicher: ein Knoten fällt aus"
+move 640,790
+shot build/jfnetworker/task_labs_light_100.png
+theme dark
+shot build/jfnetworker/task_labs_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/task_labs_dark_150.png
+theme light
+shot build/jfnetworker/task_labs_light_150.png
+scale 100
+click button:"Öffnen"
+expect dialog:"Labor öffnen" missing
+# ---- the panel: "Prüfen", a hint
+click #49157
+wait 3000
+click button:"Prüfen"
+click #49408
+expect text:"Der Replikationsfaktor ist die Einstellung rf des Dienstes kv: Umschalt+Doppelklick auf KV1, Reiter Dienste, „Einstellungen …“." exists
+move 640,790
+shot build/jfnetworker/task_panel_light_100.png
+theme dark
+shot build/jfnetworker/task_panel_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/task_panel_dark_150.png
+theme light
+shot build/jfnetworker/task_panel_light_150.png
+scale 100
+# ---- the settings of KV1's store in its device window
+dblclick listitem:"KV1" shift
+expect window 26624 open
+click tab:"Dienste"
+click #51200
+expect text:"Die Einstellungen von kv als JSON. Übernehmen prüft sie und startet KV1 mit ihnen neu." exists
+shot build/jfnetworker/task_settings_light_100.png window 26624
+theme dark
+shot build/jfnetworker/task_settings_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/task_settings_dark_150.png window 26624
+theme light
+shot build/jfnetworker/task_settings_light_150.png window 26624
+scale 100 window 26624
+expect_nowarn

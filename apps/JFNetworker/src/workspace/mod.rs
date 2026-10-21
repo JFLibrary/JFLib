@@ -9,7 +9,7 @@
 // controls, the frames on the canvas, the Ereignisse, Paket and PDUs panels, the pcapng
 // export), icons/ the device symbols and the UI icons; terminal.rs the Terminal panel and the
 // windows of consoles, logview.rs the Protokoll panel, devwin/ the device windows, settings.rs
-// the dialogs of the settings and the shortcuts.
+// the dialogs of the settings and the shortcuts, task.rs the Aufgabe panel and the list of labs.
 
 pub(crate) mod canvas;
 pub(crate) mod devwin;
@@ -21,6 +21,7 @@ pub(crate) mod settings;
 pub(crate) mod shell;
 pub(crate) mod terminal;
 pub(crate) mod sim;
+pub(crate) mod task;
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -33,6 +34,8 @@ use crate::app::Net;
 pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     // what the simulator reported: console output, saved configurations, names, the log
     crate::doc::console::pump(n);
+    // the lab's goals follow the simulation (workspace/task.rs)
+    task::tick(n);
     shell::frame(n, ui);
     terminal::windows(n, ui);
     devwin::frame(n, ui);

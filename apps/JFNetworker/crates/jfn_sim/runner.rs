@@ -19,7 +19,8 @@
 // "expect DEV svc NAME metric [min|max|mean] M OP V over D" (or "between A and B") checks the
 // time series M of the service (series.rs, Engine::series_value) and writes the value it found
 // as a decimal; "series FILE" makes the time series a CSV at the end, like the capture, and its
-// line names how many series and values it has and the CRC-32 of the file.
+// line names how many series and values it has and the CRC-32 of the file.  The expectations
+// are judged by goal.rs (judge, Verdict::report), which the lab's goals in the window share.
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -28,16 +29,14 @@ use alloc::vec::Vec;
 
 use jfn_model::ifname;
 use jfn_model::project::Project;
-use jfn_model::scenario::{Agg, Expect, FaultSpec, HealSpec, Scenario, Span, StepKind, Via};
-use netpkt::decode;
+use jfn_model::scenario::{Expect, FaultSpec, HealSpec, Scenario, StepKind};
 use netpkt::pcapng::{Writer, LINKTYPE_ETHERNET};
 
 use crate::action::Action;
 use crate::driver::{Cmd, Inline, Report};
 use crate::fault::Fault;
-use crate::ip::RouteSrc;
-use crate::kernel::{Engine, Ns, MS, SEC, US};
-use crate::series::SeriesErr;
+use crate::goal::{dur, judge, resolve};
+use crate::kernel::{Engine, Ns, SEC};
 
 /// how far "run until idle" goes at most
 pub const IDLE_CAP: Ns = 3600 * SEC;
@@ -55,70 +54,6 @@ pub struct Outcome {
     pub pcap: Option<(String, Vec<u8>)>,
     /// the time series the scenario asked for: (file name as written in the scenario, CSV)
     pub series: Option<(String, String)>,
-}
-
-/// "1.5s", "250ms" for a step line
-fn dur(d: Ns) -> String {
-    if d == 0 {
-        String::from("0s")
-    } else if d % SEC == 0 {
-        format!("{}s", d / SEC)
-    } else if d % MS == 0 {
-        format!("{}ms", d / MS)
-    } else if d % US == 0 {
-        format!("{}us", d / US)
-    } else {
-        format!("{}ns", d)
-    }
-}
-
-/// a value in thousandths as a decimal ("99.5", "100", "-0.25")
-fn milli_text(v: i64) -> String {
-    let sign = if v < 0 { "-" } else { "" };
-    let a = v.unsigned_abs();
-    if a % 1000 == 0 {
-        return format!("{}{}", sign, a / 1000);
-    }
-    let frac = format!("{:03}", a % 1000);
-    format!("{}{}.{}", sign, a / 1000, frac.trim_end_matches('0'))
-}
-
-fn quote(s: &str) -> String {
-    let mut q = String::from("\"");
-    for c in s.chars() {
-        match c {
-            '"' => q.push_str("\\\""),
-            '\\' => q.push_str("\\\\"),
-            '\n' => q.push_str("\\n"),
-            '\t' => q.push_str("\\t"),
-            c => q.push(c),
-        }
-    }
-    q.push('"');
-    q
-}
-
-/// the P_* bit of a protocol name of "expect hops"
-fn proto_bit(p: &str) -> Option<u32> {
-    Some(match p {
-        "any" | "all" | "frame" | "frames" => 0,
-        "eth" | "ethernet" => decode::P_ETH,
-        "vlan" | "802.1q" | "dot1q" => decode::P_VLAN,
-        "arp" => decode::P_ARP,
-        "ip" | "ipv4" => decode::P_IPV4,
-        "ipv6" => decode::P_IPV6,
-        "icmp" => decode::P_ICMP,
-        "icmpv6" => decode::P_ICMPV6,
-        "udp" => decode::P_UDP,
-        "tcp" => decode::P_TCP,
-        "dhcp" => decode::P_DHCP,
-        "dns" => decode::P_DNS,
-        "http" => decode::P_HTTP,
-        "stp" => decode::P_STP,
-        "rip" => decode::P_RIP,
-        "ospf" => decode::P_OSPF,
-        _ => return None,
-    })
 }
 
 /// every recorded frame as pcapng: one interface per cable, stamped when it was sent
@@ -189,14 +124,6 @@ impl Rep {
             }
         }
     }
-}
-
-/// the device a scenario names: by project name, else by its current host name
-fn resolve(p: &Project, e: &Engine, name: &str) -> Option<u32> {
-    if let Some(d) = p.find(name) {
-        return Some(d.id);
-    }
-    e.devices().find(|&id| e.node(id).is_some_and(|n| n.name.eq_ignore_ascii_case(name)))
 }
 
 /// what the reports of the engine add to the report
@@ -485,101 +412,9 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
     Outcome { report: r.s, ok, expects, failed, pcap: cap, series: csv }
 }
 
-/// whether an expectation holds, and its line
+/// whether an expectation holds, and its line (goal.rs judges it; "output contains" looks at
+/// what the device printed since its last command line)
 fn expect(p: &Project, e: &Engine, r: &Rep, x: &Expect) -> (bool, String) {
-    match x {
-        Expect::Output { dev, needle, negate } => {
-            let text = format!("expect {} output {}contains {}", dev, if *negate { "not " } else { "" }, quote(needle));
-            let Some(id) = resolve(p, e, dev) else {
-                return (false, format!("{} (das Gerät gibt es nicht)", text));
-            };
-            let out = r.since.get(&id).map(String::as_str).unwrap_or("");
-            let has = out.contains(needle.as_str());
-            (has != *negate, text)
-        }
-        Expect::Route { dev, prefix, via } => {
-            let what = match via {
-                Via::Addr(a) => format!(" via {}", a),
-                Via::Connected => String::from(" via connected"),
-                Via::Iface(i) => format!(" dev {}", i),
-                Via::Any => String::new(),
-            };
-            let text = format!("expect {} route {}{}", dev, prefix, what);
-            let Some(id) = resolve(p, e, dev) else {
-                return (false, format!("{} (das Gerät gibt es nicht)", text));
-            };
-            let rs: Vec<_> = e.routes(id).into_iter().filter(|r| r.prefix == *prefix).collect();
-            let best = rs.iter().map(|r| r.ad).min();
-            let rs: Vec<_> = rs.into_iter().filter(|r| Some(r.ad) == best).collect();
-            let st = e.node(id).and_then(|n| n.ip.as_ref());
-            let ifn = |i: Option<u16>| i.and_then(|i| st.and_then(|s| s.ifaces.get(i as usize))).map(|f| f.name.clone()).unwrap_or_default();
-            let held = match via {
-                Via::Any => !rs.is_empty(),
-                Via::Addr(a) => rs.iter().any(|r| r.via == Some(*a)),
-                Via::Connected => rs.iter().any(|r| r.src == RouteSrc::Connected),
-                Via::Iface(name) => rs.iter().any(|r| ifname::same(&ifn(r.iface), name)),
-            };
-            if held {
-                return (true, text);
-            }
-            let have = match rs.first() {
-                None => String::from("keine Route"),
-                Some(r) => match r.via {
-                    Some(v) => format!("{} via {} dev {}", r.src.code(), v, ifn(r.iface)),
-                    None => format!("{} dev {}", r.src.code(), ifn(r.iface)),
-                },
-            };
-            (false, format!("{} (gefunden: {})", text, have))
-        }
-        Expect::NoRoute { dev, prefix } => {
-            let text = format!("expect {} no route {}", dev, prefix);
-            let Some(id) = resolve(p, e, dev) else {
-                return (false, format!("{} (das Gerät gibt es nicht)", text));
-            };
-            let n = e.routes(id).iter().filter(|r| r.prefix == *prefix).count();
-            if n == 0 { (true, text) } else { (false, format!("{} (es gibt {})", text, n)) }
-        }
-        Expect::Hops { proto, cmp, n } => {
-            let text = format!("expect hops {} {} {}", proto, cmp.as_str(), n);
-            let Some(bit) = proto_bit(proto) else {
-                return (false, format!("{} (unbekanntes Protokoll)", text));
-            };
-            let count = e.trace.hops().filter(|h| bit == 0 || h.mask & bit != 0).count() as u64;
-            if cmp.holds(count, *n) { (true, format!("{} ({})", text, count)) } else { (false, format!("{} (gezählt: {})", text, count)) }
-        }
-        Expect::Metric { dev, svc, name, cmp, value } => {
-            let text = format!("expect {} svc {} metric {} {} {}", dev, svc, name, cmp.as_str(), value);
-            let Some(id) = resolve(p, e, dev) else {
-                return (false, format!("{} (das Gerät gibt es nicht)", text));
-            };
-            match e.metric(id, svc, name) {
-                Some(v) if cmp.holds(v, *value) => (true, format!("{} ({})", text, v)),
-                Some(v) => (false, format!("{} (gemessen: {})", text, v)),
-                None => (false, format!("{} (keinen solchen Dienst oder Wert)", text)),
-            }
-        }
-        Expect::Series { dev, svc, name, agg, cmp, milli, span } => {
-            let now = e.now();
-            let ((from, to), what) = match span {
-                Span::Last(x) => ((now.saturating_sub(*x), now), format!("over {}", dur(*x))),
-                Span::Between(a, b) => ((*a, *b), format!("between {} and {}", dur(*a), dur(*b))),
-            };
-            let how = if *agg == Agg::Natural { String::new() } else { format!("{} ", agg.as_str()) };
-            let text = format!("expect {} svc {} metric {}{} {} {} {}", dev, svc, how, name, cmp.as_str(), milli_text(*milli), what);
-            let Some(id) = resolve(p, e, dev) else {
-                return (false, format!("{} (das Gerät gibt es nicht)", text));
-            };
-            if to > now {
-                return (false, format!("{} (der Zeitraum endet erst nach jetzt)", text));
-            }
-            match e.series_value(id, svc, name, *agg, from, to) {
-                Ok(v) if cmp.holds(v.milli, *milli) => (true, format!("{} ({})", text, milli_text(v.milli))),
-                Ok(v) => (false, format!("{} (gemessen: {})", text, milli_text(v.milli))),
-                Err(SeriesErr::NoService) => (false, format!("{} (keinen solchen Dienst)", text)),
-                Err(SeriesErr::NoSeries) => (false, format!("{} (keine solche Reihe)", text)),
-                Err(SeriesErr::NoValues) => (false, format!("{} (keine Werte im Zeitraum)", text)),
-                Err(SeriesErr::Gone) => (false, format!("{} (das Fenster der Latenzen hält den Zeitraum nicht mehr)", text)),
-            }
-        }
-    }
+    let v = judge(p, e, x, &|id| r.since.get(&id).cloned().unwrap_or_default());
+    (v.held, v.report())
 }

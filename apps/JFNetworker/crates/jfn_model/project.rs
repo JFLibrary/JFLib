@@ -16,6 +16,26 @@
 // A device's configuration is its startup-config text (the simulator replays it through the
 // command line); services carry their settings as JSON.  Ids come from `next_id` and are never
 // reused while the project is open, so undo, the canvas and the simulator agree on them.
+//
+// A lab project (assets/labs of the app) has a "lab" member, a free one null (lab.rs):
+//
+//   "lab": {
+//     "title": ["Lastverteilung", "Load balancing"],      a text: "Deutsch" or ["Deutsch",
+//     "summary": ["Eine Zeile für die Liste", "..."],       "English"] (no English: the German)
+//     "topic": "ds",                                      "net" or "ds": the shelf of the list
+//     "intro": [["Absatz 1", "Paragraph 1"], ...],
+//     "ordered": false,                                   true: a goal counts after the ones
+//                                                         before it only
+//     "goals": [{"text": ["WEB3 trägt mit", "WEB3 does its share"],
+//                "checks": ["WEB3 svc web metric requests >= 50 over 5s"],
+//                "hints": [["Erster Hinweis", "First hint"], ...]}],
+//     "hints": [["Ein Hinweis zur ganzen Aufgabe", "..."]]
+//   }
+//
+// A check is an expectation of a scenario without its "expect" (scenario.rs: output, route,
+// no route, hops, metric, a metric over a span); a goal is reached when all its checks hold at
+// one moment.  Members that are missing take their defaults; a file without a lab stays as it
+// was ("lab": null).
 
 use alloc::format;
 use alloc::string::String;
@@ -29,6 +49,7 @@ use agent_core::{record, wire_enum};
 use crate::cable::{self, CableKind, Why};
 use crate::catalog::{self, Model, PortSpec, F_AP, F_ANNOTATION};
 use crate::ifname;
+use crate::lab::Lab;
 use crate::msg::Msg;
 use crate::msg;
 
@@ -155,8 +176,9 @@ record! {
         pub links: Vec<Link>,
         pub notes: Vec<Note>,
         pub layout: Layout,
-        /// the task of a lab (goals, hints, checks), Null for a free project
-        pub lab: Value,
+        /// the task of a lab (title, goals with their checks, hints), None (null) for a free
+        /// project
+        pub lab: Option<Lab>,
     }
 }
 

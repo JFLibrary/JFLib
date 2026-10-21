@@ -1,0 +1,111 @@
+#!args --verify-dirty
+# the Aufgabe panel (workspace/task.rs) with the lab of the load balancer
+# (assets/labs/02-lastverteilung.jfnet): the empty panel and the list of labs (Datei › Labor
+# öffnen …), the lab's title, introduction and goals in order, "Prüfen" with what the checks
+# found, hints one by one, the progress; the lab solved in the window: WEB3 cabled with the
+# Verbinden tool, LB1's backends in its device window (Dienste › Einstellungen …: text that is
+# no JSON, refused with its line and column, a setting the simulator refuses, then the third
+# backend), every goal reached; undo keeps them reached, "Simulation zurücksetzen" starts them
+# over.  Ids: 49153 "Prüfen", 49157 the introduction, 49168 + i the goals, 49408 + i their hint
+# buttons, 50193 + i the rows of the list of labs, 26624 the first device window, 51200 the
+# settings button of its first service, 51456 the settings editor, 51472 Übernehmen.
+size 1280 800
+theme light
+# ---- without a lab the panel leads to the list
+cmd 301
+expect text:"Keine Aufgabe" exists
+click button:"Labor öffnen …"
+expect dialog:"Labor öffnen" exists
+expect text:"Campus: ein VLAN für die Studierenden" exists
+expect text:"5 Ziele · Zwei Webserver schaffen die Last nicht: WEB3 anschließen und in den Loadbalancer aufnehmen." exists
+expect text:"Geshardeter Speicher: ein Knoten fällt aus" exists
+expect text:"Ein Cache vor dem langsamen Katalog" exists
+expect #50193 selected
+click text:"Lastverteilung: der dritte Webserver"
+expect #50194 selected
+click button:"Öffnen"
+expect dialog:"Labor öffnen" missing
+# ---- the lab: its title, the introduction, the goals in order
+expect text:"Verteilte Systeme · 5 Ziele" exists
+expect text:"0 von 5 Zielen erreicht" exists
+expect #49157 open
+expect #49168 unchecked
+expect #49172 unchecked
+expect text:"1. WEB3 hängt am Servernetz" exists
+expect text:"5. Keine Fehler mehr" exists
+shot build/jfnetworker/task_intro.png
+# the introduction folds away (the goals and their hints have the room then)
+click #49157
+expect #49168 exists
+shot build/jfnetworker/task_folded.png
+# ---- two web servers at their limit; "Prüfen" says what the first goal lacks
+wait 6000
+click button:"Prüfen"
+expect text:"WEB3 route 10.0.2.0/24 via connected: keine Route" exists
+# the first goal's hint, then the task's
+click #49408
+expect text:"Werkzeug Verbinden (C): von WEB3 auf SW2 ziehen. Mit Umschalt beim Loslassen verbindet es sofort über die besten Ports." exists
+expect #49408 missing
+click button:"Hinweis zeigen (1 von 2)"
+expect text:"lbctl in der Konsole von LB1 zeigt jedes Backend mit Zustand, Anfragen und Fehlern." exists
+expect button:"Hinweis zeigen (2 von 2)" exists
+shot build/jfnetworker/task_checked.png
+# ---- WEB3 cabled (Verbinden, Shift: at once): the first goal; the second says what it found
+key c
+drag listitem:"WEB3" listitem:"SW2" 8 shift
+key v
+wait 2000
+expect #49168 checked
+expect text:"1 von 5 Zielen erreicht" exists
+expect text:"LB1 svc lb metric backends_up == 3: gemessen: 2" exists
+# ---- LB1's backends: its device window, Dienste › Einstellungen …
+dblclick listitem:"LB1" shift
+expect window 26624 open
+click tab:"Dienste"
+click #51200
+expect text:"Die Einstellungen von lb als JSON. Übernehmen prüft sie und startet LB1 mit ihnen neu." exists
+# no JSON: refused with its line and column
+focus #51456
+key ctrl+a
+type "{\"mode\": \"http\", backends}"
+click #51472
+expect text:"Zeile 1, Spalte 18: kein gültiges JSON (expected_string)." exists
+# a setting the simulator refuses
+focus #51456
+key ctrl+a
+type "{\"mode\": \"udp\", \"backends\": []}"
+click #51472
+expect text:"Dienst lb: „mode“ kennt udp nicht (http, tcp)." exists
+shot build/jfnetworker/task_settings_refused.png window 26624
+# the third backend
+focus #51456
+key ctrl+a
+type "{\"mode\": \"http\", \"port\": 80, \"backends\": [{\"name\": \"web1\", \"addr\": \"10.0.2.11\"}, {\"name\": \"web2\", \"addr\": \"10.0.2.12\"}, "
+type "{\"name\": \"web3\", \"addr\": \"10.0.2.13\"}], \"health\": {\"type\": \"http\", \"path\": \"/health\", \"interval_ms\": 1000}}"
+click #51472
+expect #51456 missing
+expect button:"Einstellungen …" exists
+close window 26624
+# ---- the goals follow, in order
+wait 20000
+expect #49169 checked
+expect #49170 checked
+expect #49171 checked
+expect #49172 checked
+expect text:"5 von 5 Zielen erreicht" exists
+expect text:"Geschafft: alle Ziele erreicht." exists
+# "Prüfen" after the fix: nothing is missing any more
+click button:"Prüfen"
+expect text:"LB1 svc lb metric backends_up == 3: gemessen: 2" missing
+expect text:"5 von 5 Zielen erreicht" exists
+shot build/jfnetworker/task_done.png
+# ---- undo: LB1 has two backends again, the goals stay reached
+key ctrl+z
+wait 1000
+expect text:"5 von 5 Zielen erreicht" exists
+# ---- Simulation zurücksetzen: a fresh engine, the goals start over (the cable is still there)
+cmd 55
+wait 3000
+expect text:"1 von 5 Zielen erreicht" exists
+expect #49169 unchecked
+expect_nowarn
