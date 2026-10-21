@@ -22379,7 +22379,7 @@ No clock here: plat::unix_time_ns gives "now"; datetime only computes.
   the timestamp as local time with its UTC offset: "2026-10-12T21:58:00+02:00"
 
 - **`fn parse_rfc3339(s: &str) -> Option<Timestamp>`**
-  parse "YYYY-MM-DDTHH:MM:SS[.fff…](Z|±HH:MM)" (also with a space or lower-case t / z)
+  parse `YYYY-MM-DDTHH:MM:SS[.fff…](Z|±HH:MM)` (also with a space or lower-case t / z)
 
 - **`fn format_date_time(ts: Timestamp, zone: &Zone, en: bool) -> String`**
   "12.10.2026 19:58" (de) / "2026-10-12 19:58" (en) in a zone

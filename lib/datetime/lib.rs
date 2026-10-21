@@ -180,7 +180,7 @@ pub fn rfc3339_offset(ts: Timestamp, offset_secs: i32) -> String {
     format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}{}{}", c.year, c.month, c.day, c.hour, c.minute, c.second, frac, zone)
 }
 
-/// parse "YYYY-MM-DDTHH:MM:SS[.fff…](Z|±HH:MM)" (also with a space or lower-case t / z)
+/// parse `YYYY-MM-DDTHH:MM:SS[.fff…](Z|±HH:MM)` (also with a space or lower-case t / z)
 pub fn parse_rfc3339(s: &str) -> Option<Timestamp> {
     let b = s.trim().as_bytes();
     if b.len() < 20 {

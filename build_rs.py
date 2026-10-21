@@ -25,6 +25,10 @@ dependencies are built through Cargo and linked as static .rlib files.
   python build_rs.py changelog ["TEXT" --type T --area A]    show / add to [Unreleased] of CHANGELOG.md
   python build_rs.py release X.Y.Z [--date D] [--force]      CHANGELOG.md, lib/VERSION, docs/api/X.Y.Z.txt
                                                                 (tools/changelog.py)
+  python build_rs.py site [--out DIR] [--check]              the website: landing page, docs and API reference from
+                                                                the Markdown -> build/site/ (tools/site.py); --check
+                                                                builds into a temporary folder and checks links,
+                                                                anchors, images and the HTML (the suite runs it)
   python build_rs.py ide                                     write rust-project.json
   python build_rs.py plugin [NAME]                           plugins/NAME -> <out>/<t>/plugins/NAME.dll|.so
                                                                 (PaintCraft plugins: section "rust-plugin")
@@ -1346,6 +1350,13 @@ def run_tests(builders, out, quick):
     print(r.stdout.strip() + (("\n" + r.stderr.strip()) if r.returncode and r.stderr.strip() else ""))
     if r.returncode:
         fails.append("tools/pkg_check.py --quick")
+    # the website (tools/site.py --check): every page, internal link, anchor and image, the HTML, two
+    # builds byte-identical; a temporary folder below build/
+    r = subprocess.run([sys.executable, str(RS / "tools" / "site.py"), "--check", "--summary"], cwd=ROOT,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+    print(r.stdout.strip() + (("\n" + r.stderr.strip()) if r.returncode and r.stderr.strip() else ""))
+    if r.returncode:
+        fails.append("tools/site.py --check")
     if not quick:
         # parity with the assembly reference (apps that exist in both)
         tgt = "both" if len(builders) == 2 else builders[0].target
@@ -2004,7 +2015,7 @@ def main():
         argv, extra = argv[:i], argv[i + 1:]
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["lib", "app", "all", "run", "test", "check", "ide", "plugin",
-                                    "new", "api-diff", "changelog", "release"])
+                                    "new", "api-diff", "changelog", "release", "site"])
     ap.add_argument("name", nargs="?")
     ap.add_argument("--target", choices=["win", "linux", "both", "web", "all", "android"])
     ap.add_argument("--android-abi", choices=["arm64-v8a", "x86_64"], default="arm64-v8a",
@@ -2032,10 +2043,15 @@ def main():
     ap.add_argument("--area", help="changelog: the part the entry is about (ui, plat, build ...)")
     ap.add_argument("--date", help="release: the release date (default today)")
     ap.add_argument("--force", action="store_true", help="release: also when the API changes need a larger step")
+    ap.add_argument("--check", action="store_true", help="site: build into a temporary folder and check it")
     a = ap.parse_args(argv)
     if a.cmd == "ide":
         write_ide()
         return 0
+    if a.cmd == "site":                             # tools/site.py (its own process: `site` is a stdlib name)
+        return subprocess.run([sys.executable, str(ROOT / "tools" / "site.py")]
+                              + (["--out", str((ROOT / a.out).resolve())] if a.out else [])
+                              + (["--check"] if a.check else []), cwd=ROOT).returncode
     if a.cmd in ("new", "api-diff", "changelog", "release"):
         if a.cmd == "new" and not a.name:
             print("new: the name is missing (python build_rs.py new NAME [--kind window|console|tool|service])")

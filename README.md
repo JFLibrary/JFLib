@@ -643,6 +643,21 @@ repository, that corresponds to the repository root.
 | `docs/` | References, guides, and the screenshots used in this README |
 | `build/` | Generated programs, library components, and test output |
 
+### The documentation as a website
+
+```sh
+python build_rs.py site            # -> build/site/index.html, opens from the file system
+python build_rs.py site --check    # build into a temporary folder and check links, anchors, images
+```
+
+`site` ([`tools/site.py`](tools/site.py), Python standard library only) turns this README, the
+guides listed above, the changelog, the roadmap and the API reference into a static website: a
+landing page, one page per section of the developer guide and per crate of the API reference, a
+search over titles, headings and API items, and light and dark themes. The test suite runs the
+check. Nothing is published automatically. One way to publish it is GitHub Pages: a workflow
+that runs `python build_rs.py site` and hands `build/site/` to `actions/upload-pages-artifact`
+and `actions/deploy-pages`; any static web host can serve the folder as well.
+
 ## License
 
 JFLib is dual-licensed under the [MIT License](LICENSE-MIT) or the
