@@ -797,6 +797,9 @@ Fensterrand hinaus.
   ([`agent_core/src/jmap.rs`](../lib/agent_core/src/jmap.rs): `record!`, `wire_enum!`, aus
   BackupCraft in die Library gezogen; `bc_proto` nutzt es mit) und eingerücktes JSON für
   Dateien (`json::stringify_pretty`), getestet mit der coretest-Gruppe `jmap`.
+  Seit D2 fasst `Window::hist_between` die Slots eines Zeitraums zu einem Histogramm zusammen
+  (die Zeitreihen des Labors von JFNetworker: ein Punkt pro Intervall, Perzentile beliebiger
+  Zeiträume; Gruppe `metrics`).
 - **P2** · *erledigt* · Style `netlab` ([`styles/netlab`](../styles/netlab)) für JFNetworker:
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene
