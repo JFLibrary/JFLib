@@ -2732,6 +2732,9 @@ impl Host for MyHost {
   allocates stay alive until it returns; values it only holds while calling back need
   `cx.keep(v)`. `cx.json_encode(v, indent)` / `cx.json_decode(text)` (and
   `vm.json_encode` / `vm.json_decode` between runs) work like `json.encode` / `json.decode`.
+  `cx.fuel()` is the fuel of the invocation so far, over all its runs and this call included:
+  a host that turns fuel into time knows the moment a native is called at (JFNetworker's
+  scripts send a packet then: `apps/JFNetworker/crates/jfn_sim/scriptsvc.rs`).
 * Values (`Value`, 16 bytes) refer to the VM's heap. A value the host keeps beyond the next
   `run` must be pinned (`pin` / `pinned` / `unpin`), e.g. a request handler; `valid(v)` tells
   a stale one, and the API returns `None` or an error instead of crashing on it.

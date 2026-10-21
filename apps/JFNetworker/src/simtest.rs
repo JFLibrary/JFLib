@@ -36,6 +36,8 @@ pub mod labtest;
 pub mod campustest;
 #[path = "synthtest.rs"]
 pub mod synthtest;
+#[path = "scripttest.rs"]
+pub mod scripttest;
 
 const BUDGET: usize = 1_000_000;
 

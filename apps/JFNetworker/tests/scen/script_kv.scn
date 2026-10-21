@@ -1,0 +1,44 @@
+# Ein Skript als Schlüssel-Wert-Speicher hinter dem Lastgenerator. SRV1 führt kv.jfs aus (im
+# Fixture als Zeilen): GET, PUT und DELETE auf /kv/SCHLÜSSEL über HTTP, die Werte auf der Disk,
+# zu Beginn 50 Schlüssel. Jede Anfrage rechnet 1000 Runden eines Hashs; bei 100 ns je Anweisung
+# sind das rund 1,1 ms CPU-Zeit, und das Skript bearbeitet wie jedes Programm mit einem Thread
+# eine Anfrage nach der anderen. GEN schickt von 1 s bis 5 s 200 Anfragen pro Sekunde (ein
+# Viertel PUT, der Rest GET, Poisson-Ankünfte): rund 22 % CPU (top mittelt über drei Sekunden),
+# kaum Wartezeit. Von 6 s bis 7 s kommen 1500 pro Sekunde, mehr als die CPU schafft: die
+# Warteschlange füllt sich auf 100 Anfragen (dazu kommen die Rückrufe der Disk), was darüber
+# kommt, beantwortet der Dienst sofort mit 503, und die Latenz steigt auf Dutzende
+# Millisekunden. MON fragt jede Sekunde mit http.request nach den Zahlen (/stats). Die Werte in
+# Klammern sind gemessen.
+run 900ms
+SRV1: script
+expect SRV1 svc kv metric calls == 1
+run 4100ms
+expect GEN svc load metric sent > 700
+expect GEN svc load metric ok > 700
+expect GEN svc load metric http_errors == 0
+expect GEN svc load metric failed == 0
+expect GEN svc load metric p50_us < 3000
+expect GEN svc load metric p99_us < 10000
+expect SRV1 svc kv metric errors == 0
+expect SRV1 svc kv metric puts > 150
+expect SRV1 svc kv metric put_us_p50 < 2000
+expect SRV1 svc kv metric max_queued < 10
+SRV1: top -b -n 1
+SRV1: script status kv
+run 3s
+expect SRV1 svc kv metric rejected > 0
+expect SRV1 svc kv metric max_queued > 99
+expect GEN svc burst metric status_5xx > 0
+expect GEN svc burst metric failed == 0
+expect GEN svc burst metric p99_us > 50000
+expect SRV1 svc kv metric errors == 0
+SRV1: script status kv
+MON: script output
+expect MON svc mon metric stored > 400
+GEN: curl -s -X PUT -d hallo http://10.0.1.20/kv/gruss
+run 100ms
+GEN: curl -s http://10.0.1.20/kv/gruss
+run 100ms
+expect GEN output contains "hallo"
+SRV1: script errors
+print "Unter Last wartet jede Anfrage auf die eine CPU des Skripts; zu viele bekommen 503"

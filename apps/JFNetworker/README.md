@@ -33,6 +33,10 @@ Queues, Lastgeneratoren, eigene Skripte).
   geprüfter Kontrast, Tastenkürzel-Übersicht, App-Symbol und Paketierung (Dateityp `.jfnet`);
   flüssig auch mit 500 Geräten, 800 Kabeln und 300 Paketen in Bewegung (unter 33 ms pro Bild in
   1080p, siehe [Performance](#performance)).
+- **Skripte in Hosts (SK4):** eigene Programme in der Skriptsprache `.jfs` laufen als Dienste:
+  UDP, TCP, HTTP-Server und -Client, DNS, Timer, Disk und Metriken, ihre Anweisungen kosten
+  Rechenzeit wie auf einer CPU mit einem Thread; `script` in der Shell zeigt und steuert sie
+  (siehe [Skripte in Hosts](#skripte-in-hosts)).
 
 ## Bedienung
 
@@ -96,7 +100,7 @@ mit 150 % nach `build/jfnetworker/` auf.
 
 | Skript | prüft |
 |---|---|
-| `model.uis` | den Selbsttest: Katalog, Interface-Namen, Kabelregeln, Projekt, Datei, Szenarien und die Gruppen `sim`, `l3`, `simmode`, `svc`, `cli`, `tcp`, `http`, `console`, `pdu`, `lab` (das Labor für verteilte Systeme), `ui` (Kontrast, Einstellungen, Sicherungen, englischer Katalog), `msg` (Texte von Modell und Simulator), `campus` und `synth` (die synthetischen Projekte der Leistungstests) |
+| `model.uis` | den Selbsttest: Katalog, Interface-Namen, Kabelregeln, Projekt, Datei, Szenarien und die Gruppen `sim`, `l3`, `simmode`, `svc`, `cli`, `tcp`, `http`, `console`, `pdu`, `lab` (das Labor für verteilte Systeme), `ui` (Kontrast, Einstellungen, Sicherungen, englischer Katalog), `msg` (Texte von Modell und Simulator), `campus` und `synth` (die synthetischen Projekte der Leistungstests), `script` (Skripte in Hosts) |
 | `scen_*.uis` | die Golden-Szenarien (siehe [Szenarien](#szenarien-scn)), byte-gleich auf Windows und Linux |
 | `shell.uis` | Bereiche, Menüs, Ansicht, Info |
 | `catalog.uis`, `place.uis`, `edit.uis`, `links.uis`, `undo.uis` | Palette und Suche, Platzieren, Verschieben, Rahmenauswahl, Löschen, Umbenennen, Notizen, Kabel beim Löschen und Wiederherstellen, Rückgängig auf allen Wegen |
@@ -155,6 +159,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | | [`src/selftest.rs`](src/selftest.rs), [`src/simtest.rs`](src/simtest.rs), [`src/l3test.rs`](src/l3test.rs), [`src/simmodetest.rs`](src/simmodetest.rs), [`src/svctest.rs`](src/svctest.rs), [`src/clitest.rs`](src/clitest.rs), [`src/tcptest.rs`](src/tcptest.rs), [`src/httptest.rs`](src/httptest.rs), [`src/consoletest.rs`](src/consoletest.rs), [`src/pdutest.rs`](src/pdutest.rs), [`src/labtest.rs`](src/labtest.rs), [`src/uitest.rs`](src/uitest.rs), [`src/campustest.rs`](src/campustest.rs), [`src/synthtest.rs`](src/synthtest.rs) | Selbsttests von Modell, Simulator, Befehlszeilen, TCP, HTTP, PDUs, des Labors, dem, worauf die Konsolen bauen, der Oberfläche ohne Fenster (Kontrast, Einstellungen, Sicherungen, Katalog), des Campus und der synthetischen Projekte (`--selftest`) |
 | Texte | [`crates/jfn_model/msg.rs`](crates/jfn_model/msg.rs), [`src/locales/engine.tsv`](src/locales/engine.tsv), [`src/locales/ui.tsv`](src/locales/ui.tsv), [`src/msgtest.rs`](src/msgtest.rs) | die deutschen Texte von Modell und Simulator als Vorlagen mit Argumenten (`Msg`, `msg!`; `text_with` übersetzt), die des Fensters (`t()`, `tf()`, die Befehle und Menüs), ihre englische Fassung und deren Selbsttest; Vollständigkeit: `python tools/i18n_check.py apps/JFNetworker crates` |
 | Tests | [`tests/`](tests) | Skripte, Fixtures (`fixtures/*.jfnet`), Szenarien mit Golden-Berichten (`scen/*.scn`, `scen/*.report`) |
+| Skripte | [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs), [`cli/scripts.rs`](crates/jfn_sim/cli/scripts.rs), [`src/scripttest.rs`](src/scripttest.rs) | Skripte als Dienste in den Hosts: Host-API, Anweisungen als Rechenzeit, der Befehl `script`, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 
 ### Gerätekatalog
 
@@ -686,7 +691,8 @@ Router und Switches zeigen `show tcp brief [all]`, `show tcp statistics` und
 `show control-plane host open-ports`. Die Dienste des Labors zeigen `lbctl` (Backends mit
 Zustand und Zahlen), `kvctl` (Mitglieder, `ring`, `where SCHLÜSSEL` mit den Replikaten und
 ihren Versionen, `get`, `keys`), `cachectl`, `mqctl` und `workerctl`, mit `-s NAME` für einen
-bestimmten Dienst; ihre Texte sind eigene Worte.
+bestimmten Dienst; ihre Texte sind eigene Worte. Die Skripte eines Hosts zeigt und steuert
+`script` (siehe [Skripte in Hosts](#skripte-in-hosts)).
 
 Namen löst die Shell über den Resolver des Geräts auf (`ping server.lab`, `traceroute
 server.lab`, auch kurz mit der Suchdomäne): die erste Zeile nennt wie getaddrinfo das Ende der
@@ -777,6 +783,88 @@ zwischen den VLANs, `show ip dhcp binding` und `show ip route` auf R1, `show ip 
 `show mac address-table` und `show vlan brief` auf MLS1 und die Pools in R1s Running-Config;
 42 Erwartungen, dazu die Zähler von DHCP-Server und Relay.
 
+Ein Skript als Schlüssel-Wert-Speicher (`script_kv.scn` auf `fixtures/script_kv.jfnet`) zeigt
+die Rechenzeit von Skripten: SRV1 nimmt über HTTP Werte an und legt sie auf seine Disk, jede
+Anfrage rechnet rund 1,1 ms (100 ns je Anweisung). 200 Anfragen pro Sekunde kosten gut ein
+Fünftel der CPU und warten kaum; bei 1500 pro Sekunde füllt sich die Warteschlange auf 100,
+darüber antwortet der Dienst sofort mit 503, und das 99. Perzentil steigt über 100 ms. Ein
+zweites Skript auf MON fragt jede Sekunde mit `http.request` nach den Zahlen; im Bericht stehen
+`script`, `script status`, `script output`, `top` und `curl`.
+
+### Skripte in Hosts
+
+Eigene Programme laufen als Dienste in den Hosts ([`scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs)):
+ein Skript in der Sprache von [`lib/script`](../../lib/script/lib.rs) (`.jfs`, siehe
+[GUIDE §29](../../docs/GUIDE.md)), das nur auf die Ereignisse reagiert, um die es gebeten hat –
+Datagramme, Verbindungen, Daten, HTTP-Anfragen, Antworten, Timer, Namen, Zugriffe auf die Disk.
+Es steht wie die anderen Dienste in der Projektdatei (`"kind": "script"`) oder kommt mit
+`Action::Service`; der Quelltext ist ein Text oder eine Liste von Zeilen, die übrige
+Konfiguration sieht das Skript als `config` (`config.port`):
+
+```json
+{"kind": "script", "name": "echo", "config": {"source": [
+  "net.udp(config.port, fn(s, m) { s.send(m.from, m.port, m.data) })"], "port": 7,
+  "ns_per_op": 5, "limits": {"fuel": 10000000, "heap_kb": 16384, "depth": 500, "stack": 100000}}}
+```
+
+- **Rechenzeit:** Ein Skript hat eine CPU. Jede Anweisung kostet virtuelle Zeit (`ns_per_op`,
+  Standard 5 ns, auch mit Nachkommastellen); solange ein Rückruf rechnet, warten alle anderen
+  Ereignisse, wie bei einem Server mit einem Thread. Was ein Rückruf nach außen tut (senden,
+  verbinden, schließen, antworten, fragen, auf die Disk zugreifen, ins Log schreiben),
+  geschieht in dem Augenblick seiner Rechenzeit, an dem er es tut: eine Schleife vor dem
+  Senden verzögert die Antwort um ihre Anweisungen. Ein Rückruf läuft in Scheiben (`slice`,
+  Standard 100 000 Anweisungen), dazwischen geht die Simulation weiter; eine Endlosschleife ist
+  also 100 % CPU (in `top` zu sehen) statt ein Hänger, bis `limits.fuel` den Rückruf beendet (0:
+  nie). Solange die CPU rechnet, bleiben TCP-Daten im Socket (das Fenster füllt sich) und
+  Verbindungen im Backlog; ist die Warteschlange voll (`queue`, Standard 1000 Ereignisse),
+  verwirft der Dienst Datagramme und beantwortet Anfragen sofort mit 503. Rückrufe, um die das
+  Skript gebeten hat (Timer, Disk, Antworten), kommen trotzdem.
+- **Grenzen und Fehler:** Speicher (`heap_kb`), Aufruftiefe (`depth`), Stapel (`stack`) und
+  Anweisungen je Rückruf (`fuel`) sind hart; eine Ausnahme, die niemand fängt, oder eine Grenze
+  nennt Zeile und Spalte in der Statuszeile, in `script errors`, im Log des Geräts und in der
+  Ereignisliste. Ein Fehler im Hauptprogramm beendet den Dienst, mit `"stop_on_error": true`
+  jeder; sonst läuft das Skript weiter, und ein HTTP-Handler, der scheitert, antwortet 500.
+  Stoppen und Strom aus beenden das Programm samt Speicher; was es auf die Disk legte, bleibt.
+- **Determinismus:** keine Uhr außer der virtuellen, Zufall aus einem eigenen Strom je Dienst
+  (vom Gerät und Seed abgeleitet), Gleitkomma in Software: gleiche Projekte ergeben auf jedem
+  Ziel byte-gleiche Läufe, auch mitten in einem Rückruf geklont.
+
+| Name | Was es tut |
+|---|---|
+| `log(x, ..)`, `log.debug`, `log.info`, `log.warn`, `log.error` | eine Zeile im Log des Geräts mit dem Namen des Dienstes; `print` schreibt in die Ausgabe des Skripts (`script output`) |
+| `now()` | die virtuelle Zeit in ms, als Kommazahl auf die Nanosekunde, die Rechenzeit eingerechnet |
+| `rand()`, `rand(n)`, `rand(a, b)` | eine Zahl in [0, 1), eine ganze Zahl von 0 bis n − 1, eine von a bis b |
+| `config` | die Konfiguration des Dienstes ohne `source` |
+| `timer.after(ms, f)`, `timer.every(ms, f)`, `timer.cancel(id)` | Timer; `every` höchstens alle 10 µs |
+| `net.listen(port, {accept, data, close, binary})` | TCP-Server; eine Verbindung ist `{kind, id, peer, peer_port, port}` mit `send(daten)`, `close()` (nach dem, was noch wartet) und `abort()` (RST) |
+| `net.connect(adresse, port, {connect, data, close, binary})` | TCP-Client (Namen löst `dns.resolve` auf) |
+| `net.udp(port, fn(sock, msg), {binary})` | UDP-Socket mit `send(adresse, port, daten)` und `close()`; `msg` ist `{data, from, port}`, Port 0 ein flüchtiger |
+| `dns.resolve(name, fn(err, adressen))` | der Resolver des Geräts (Suchdomänen, Cache) |
+| `http.serve(port, fn(req, res))` | HTTP-Server, einmal je Skript: `req` ist `{method, path, target, query, headers, body, peer, peer_port}`, `res.send(status, body, headers)` und `res.json(status, wert, headers)` gehen auch später aus einem anderen Rückruf; gibt der Handler einen Text, Bytes, eine Liste, eine Map oder einen Status zurück, ohne `res` zu nutzen, ist das die Antwort |
+| `http.request(url, fn(err, resp))`, `http.request({url, method, headers, body, timeout_ms}, ..)` | HTTP-Client mit gehaltenen Verbindungen, Namen über den Resolver, ohne Angabe 30 s Timeout; `resp` ist `{status, headers, body}` |
+| `disk.get(key, fn(err, wert))`, `disk.put(key, wert, fn(err))`, `disk.delete(key, fn(err, war_da))`, `disk.scan(präfix, fn(err, einträge))` | JSON-Werte auf der Disk des Geräts mit ihren Zugriffszeiten und ihrer Kapazität (`"disk": {...}` wie beim KV-Knoten) |
+| `metrics.inc(name, n)`, `metrics.gauge(name, wert)`, `metrics.observe(name, wert)` | Zahlen des Dienstes für `expect … svc NAME metric X`; `observe` ergibt `NAME_count`, `NAME_p50`, `NAME_p95`, `NAME_p99` und `NAME_max` über fünf Minuten |
+| `json`, `str`, `list`, `map`, `math`, `bytes` | die Standardbibliothek |
+
+Daten kommen als Text (UTF-8; ein Zeichen, das zwei Segmente teilen, wartet auf seinen Rest),
+mit `binary: true` als `bytes`; Fehler bekommen Rückrufe als deutschen Text. `close(conn, why)`
+kommt genau einmal je Verbindung, wer sie auch beendet (`closed`, `reset`, `refused`,
+`timeout`, `unreachable`, `aborted`); nach dem FIN der Gegenseite schließt die Verbindung, sobald
+dieser Rückruf zurück ist. Die Zahlen eines Skripts sind seine eigenen Metriken, dann `calls`,
+`errors`, `fuel`, `busy_us`, `queued`, `max_queued`, `dropped`, `rejected`, `timers`, `conns` und
+`heap_kb`.
+
+In der Linux-Shell ([`cli/scripts.rs`](crates/jfn_sim/cli/scripts.rs)) zeigt `script` die
+Skripte des Geräts (Zustand, Rückrufe, Fehler, Rechenzeit, offene Ports), `script status NAME`
+eines davon (Rechenzeit und Preis einer Anweisung, Warteschlange, Grenzen, Offenes, Metriken,
+letzter Fehler), `script errors NAME` die letzten Fehler mit Zeit, Zeile, Spalte und Aufrufen,
+`script output NAME` die Ausgabe von `print`; `script start|stop|restart NAME` steuert es, und
+`top` zeigt seine Rechenzeit. Für die Oberfläche gibt es `Engine::scripts(dev)` und
+`ScriptService::view`, `errors`, `output`, `source`; den Skript-Editor im Fenster bringt U7.
+Geprüft wird das in der Selbsttest-Gruppe `script` ([`src/scripttest.rs`](src/scripttest.rs):
+Antwortzeiten auf die Nanosekunde aus dem Fuel, Timer, UDP, TCP, HTTP, DNS, Disk, Metriken,
+Endlosschleife, Grenzen, Fehler, `script`, `top`, Determinismus) und im Golden-Szenario oben.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -843,7 +931,7 @@ Geste).
 |---|---|
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · NAT/ACL, RIP, OSPF, STP, IPv6 · Liniendiagramm und Code-Editor |
-| 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · Metrik-Fenster · Labor-Oberfläche · Skript-Editor |
+| 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · Metrik-Fenster · Labor-Oberfläche · Skript-Editor |
 | 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

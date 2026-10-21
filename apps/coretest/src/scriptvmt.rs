@@ -967,6 +967,27 @@ fn fuel(t: &mut T) {
     let mut vm = Vm::new(&prog, Limits::default());
     t.eq("fuel 0 does nothing", (vm.run(&mut (), 0), vm.last_fuel()), (Status::Yielded, 0));
     t.eq("fuel 5", (vm.run(&mut (), 5), vm.last_fuel()), (Status::Yielded, 5));
+    // Cx::fuel: the invocation's fuel when a native runs, the same however the runs are cut
+    struct Stamp(Vec<u64>);
+    impl Host for Stamp {
+        fn call(&mut self, cx: &mut Cx, name: &str, _: &[Value]) -> Result<Value, Fail> {
+            if name != "stamp" {
+                return Err(Fail::Unknown);
+            }
+            self.0.push(cx.fuel());
+            Ok(Value::Nil)
+        }
+    }
+    let Ok(prog) = script::compile("stamp()\nlet i = 0\nwhile i < 100 { i += 1 }\nstamp()") else { return };
+    let mut whole = Stamp(Vec::new());
+    let mut vm = Vm::new(&prog, Limits::default());
+    let _ = vm.run(&mut whole, u64::MAX);
+    let total = vm.call_fuel();
+    let mut sliced = Stamp(Vec::new());
+    let mut vm = Vm::new(&prog, Limits::default());
+    while vm.run(&mut sliced, 7) == Status::Yielded {}
+    t.eq("Cx::fuel in slices", sliced.0.clone(), whole.0.clone());
+    t.check(&format!("Cx::fuel counts up ({:?} of {})", whole.0, total), whole.0.len() == 2 && whole.0[0] >= 1 && whole.0[1] > whole.0[0] + 100 && whole.0[1] < total);
 }
 
 fn limits(t: &mut T) {
