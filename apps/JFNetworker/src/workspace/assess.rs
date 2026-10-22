@@ -1,7 +1,7 @@
 // assess -- an assessment in the Aufgabe panel (A1): the grade of the open project (points, a
 // percentage, the items as the feedback mode allows), the time limit and handing in
 //
-//   Run::new(&assess, &project, clock)    the items prepared (jfn_sim::assess::Grader); graded at
+//   Run::new(&assess, clock)              the items prepared (jfn_sim::assess::Grader); graded at
 //                                         the next tick; a time limit runs from `clock` (µs of
 //                                         the task clock)
 //   run.due(rev, ver, clock)              a grade is due: "Prüfen", else while the score shows a
@@ -19,8 +19,10 @@
 //                                         time, the final score stays
 //   run.shows_score() / shows_items()     what the feedback mode shows now: Items both, Score the
 //                                         score, End nothing; once it ended, both
-//   loaded(n) / tick(n, ui) / check(n) / timer(n, ui)   the window's (task.rs calls them)
-//   section(n, ui)                        the score card and the items (in task.rs's panel)
+//   loaded(n) / tick(n, ui) / check(n) / timer(n, ui)   the window's (task.rs and the frame call
+//                                         them; TIMER_ASSESS brings the window back for them)
+//   card(n, ui, check_button) / items(n, ui)   the score card and the items (task.rs's panel)
+//   submit(n) / command(n, ui, id) / states(n, ui)   "Abgeben" (CMD_ASSESS_SUBMIT)
 //   dialog(n, ui)                         "Jetzt abgeben?" before handing in
 //   points_text(k) / clock_text(us)       "20 Punkte", "14:05"
 //
@@ -83,9 +85,9 @@ pub(crate) struct Run {
 }
 
 impl Run {
-    pub(crate) fn new(a: &Assess, p: &Project, clock: u64) -> Run {
+    pub(crate) fn new(a: &Assess, clock: u64) -> Run {
         Run {
-            grader: Grader::new(a, p),
+            grader: Grader::new(a),
             feedback: a.feedback,
             limit_us: a.time_limit_s as u64 * 1_000_000,
             started_us: clock,
@@ -205,7 +207,7 @@ pub(crate) fn clock_text(us: u64) -> String {
 pub(crate) fn loaded(n: &mut Net) {
     let clock = plat::task::now_us();
     n.task.assess = match n.doc.proj.lab.as_ref().and_then(|l| l.assess.as_ref()) {
-        Some(a) => Some(Run::new(a, &n.doc.proj, clock)),
+        Some(a) => Some(Run::new(a, clock)),
         None => None,
     };
 }
@@ -377,45 +379,43 @@ pub(crate) fn items(n: &mut Net, ui: &mut Ui) {
     let en = tr::en();
     let score = run.score.clone();
     let explain = run.explain || run.end.is_some();
-    {
-        let items = run.grader.items().to_vec();
-        ui.text(TS_BODY_STRONG, t("Kriterien"));
-        for (i, it) in items.iter().enumerate().take(ASSESS_ITEMS) {
-            let g = score.as_ref().and_then(|s| s.items.get(i));
-            let held = g.is_some_and(|g| g.held);
-            let text = if it.text.is_empty() { tr::msg(&item_text(it)) } else { String::from(it.text.get(en)) };
-            ui.next_size(-1, 0);
-            ui.box_begin(0, BOX_H, 8);
-            let r = ui.box_rect();
-            ui.last_set(r, if held { SS_CHECKED as u32 } else { 0 });
-            ui.sem(K_CHECKBOX, ID_AS_ITEM0 + i as u32, Some(&text), held as i32);
-            match g {
-                Some(g) if g.held => mark(ui, IC_CHECK_CIRCLE_FILL, T_OK, 18),
-                Some(_) => mark(ui, IC_CANCEL_CIRCLE, T_CRIT, 18),
-                None => mark(ui, IC_CIRCLE_RING, T_TEXT3, 18),
-            }
-            ui.next_size(-1, 0);
-            ui.box_begin(0, BOX_V, 2);
-            ui.next_size(-1, 0);
-            ui.box_begin(0, BOX_H, 8);
-            ui.next_size(-1, 0);
-            ui.text(TS_BODY | TX_WRAP, &text);
-            let pts = format!("{}/{}", g.map_or(0, |g| g.points), it.points);
-            ui.text(TS_CAPTION | TX_SECONDARY, &pts);
-            ui.box_end();
-            if let Some(g) = g
-                && !g.held
-                && explain
-            {
-                let why = tr::msg(&g.found);
-                if !why.is_empty() {
-                    ui.next_size(-1, 0);
-                    ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, &why);
-                }
-            }
-            ui.box_end();
-            ui.box_end();
+    let items = run.grader.items().to_vec();
+    ui.text(TS_BODY_STRONG, t("Kriterien"));
+    for (i, it) in items.iter().enumerate().take(ASSESS_ITEMS) {
+        let g = score.as_ref().and_then(|s| s.items.get(i));
+        let held = g.is_some_and(|g| g.held);
+        let text = if it.text.is_empty() { tr::msg(&item_text(it)) } else { String::from(it.text.get(en)) };
+        ui.next_size(-1, 0);
+        ui.box_begin(0, BOX_H, 8);
+        let r = ui.box_rect();
+        ui.last_set(r, if held { SS_CHECKED as u32 } else { 0 });
+        ui.sem(K_CHECKBOX, ID_AS_ITEM0 + i as u32, Some(&text), held as i32);
+        match g {
+            Some(g) if g.held => mark(ui, IC_CHECK_CIRCLE_FILL, T_OK, 18),
+            Some(_) => mark(ui, IC_CANCEL_CIRCLE, T_CRIT, 18),
+            None => mark(ui, IC_CIRCLE_RING, T_TEXT3, 18),
         }
+        ui.next_size(-1, 0);
+        ui.box_begin(0, BOX_V, 2);
+        ui.next_size(-1, 0);
+        ui.box_begin(0, BOX_H, 8);
+        ui.next_size(-1, 0);
+        ui.text(TS_BODY | TX_WRAP, &text);
+        let pts = format!("{}/{}", g.map_or(0, |g| g.points), it.points);
+        ui.text(TS_CAPTION | TX_SECONDARY, &pts);
+        ui.box_end();
+        if let Some(g) = g
+            && !g.held
+            && explain
+        {
+            let why = tr::msg(&g.found);
+            if !why.is_empty() {
+                ui.next_size(-1, 0);
+                ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, &why);
+            }
+        }
+        ui.box_end();
+        ui.box_end();
     }
 }
 

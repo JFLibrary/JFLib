@@ -43,6 +43,7 @@ use alloc::vec::Vec;
 use agent_core::jmap::Value;
 use jfn_model::lab::{canon, Assess, Compare, Feedback, Item, ItemKind, Lab, Target, Text};
 use jfn_model::scenario;
+use jfn_model::Project;
 use jfn_sim::assess::{candidates, capture, item_key, item_text, start_network, Cand, Grader};
 use jfn_sim::Engine;
 use ui::*;
@@ -96,9 +97,9 @@ pub(crate) struct Author {
     /// the feedback (Feedback::ALL index) and the time limit in minutes
     pub feedback: i32,
     pub minutes: i32,
-    /// the score of the project now: (project revision, draft revision, task clock, points,
-    /// total); the draft's revision
-    preview: Option<(u32, u32, u64, u32, u32)>,
+    /// the score of the project now: (project revision, simulator snapshot, draft revision,
+    /// task clock, points, total); the draft's revision
+    preview: Option<(u32, u32, u32, u64, u32, u32)>,
     rev: u32,
     /// what the last step said (an error, a confirmation)
     pub msg: String,
@@ -137,16 +138,24 @@ impl Author {
     }
 }
 
-/// an item's default texts in German and English
-fn default_text(it: &Item) -> Text {
-    let m = item_text(it);
+/// an item's default texts in German and English, its devices named as the project names them
+/// now (after "Ausgangsnetz erzeugen" a device may have a neutral name the learner sees)
+fn default_text(it: &Item, p: &Project) -> Text {
+    let mut shown = it.clone();
+    if let Some(d) = p.device(it.id) {
+        shown.dev = d.name.clone();
+    }
+    if let Some(d) = p.device(it.peer_id) {
+        shown.peer = d.name.clone();
+    }
+    let m = item_text(&shown);
     Text { de: m.text(), en: tr::msg_en(&m) }
 }
 
 /// a draft of a new item (its default text)
-fn draft_of(it: Item) -> Draft {
+fn draft_of(it: Item, p: &Project) -> Draft {
     let mut item = it;
-    item.text = default_text(&item);
+    item.text = default_text(&item, p);
     Draft { item, auto: true }
 }
 
@@ -185,7 +194,7 @@ pub(crate) fn open(n: &mut Net) {
         a.minutes = (asm.time_limit_s / 60) as i32;
         a.items = asm.items.iter().map(|it| Draft { item: it.clone(), auto: it.text.is_empty() }).collect();
         for d in a.items.iter_mut().filter(|d| d.auto) {
-            d.item.text = default_text(&d.item);
+            d.item.text = default_text(&d.item, &n.doc.proj);
         }
         if !asm.target.devices.is_empty() {
             let cands = tree_of(n, &asm.target);
@@ -218,7 +227,7 @@ fn take_target(n: &mut Net) {
                 d.item.value = c.value.clone();
             }
             if d.auto {
-                d.item.text = default_text(&d.item);
+                d.item.text = default_text(&d.item, &n.doc.proj);
             }
         }
     }
@@ -241,7 +250,17 @@ pub(crate) fn draft(n: &Net) -> Option<Assess> {
     let pos = |d: &Draft| a.cands.iter().position(|c| c.key == item_key(&d.item)).unwrap_or(usize::MAX);
     let mut items: Vec<&Draft> = a.items.iter().collect();
     items.sort_by_key(|d| (d.item.kind() == Some(ItemKind::Check), pos(d)));
-    let items = items.into_iter().map(|d| d.item.clone()).collect();
+    // a default text names the devices as the project (the start network) does now
+    let items = items
+        .into_iter()
+        .map(|d| {
+            let mut it = d.item.clone();
+            if d.auto {
+                it.text = default_text(&it, &n.doc.proj);
+            }
+            it
+        })
+        .collect();
     let feedback = Feedback::ALL.get(a.feedback.max(0) as usize).copied().unwrap_or_default();
     Some(Assess { feedback, time_limit_s: a.minutes.max(0) as u32 * 60, items, target })
 }
@@ -294,7 +313,7 @@ fn make_start(n: &mut Net) {
     }
     // the default texts name the devices as the start network does now
     for d in n.author.items.iter_mut().filter(|d| d.auto) {
-        d.item.text = default_text(&d.item);
+        d.item.text = default_text(&d.item, &n.doc.proj);
     }
     n.author.msg = String::from(t("Ausgangsnetz erzeugt (rückgängig mit Strg+Z)."));
     n.author.touch();
@@ -529,7 +548,7 @@ fn tree(n: &mut Net, ui: &mut Ui) {
             if let Some(it) = a.cands.iter().find(|c| c.key == key).and_then(|c| c.item.clone())
                 && !chosen.contains(&key)
             {
-                a.items.push(draft_of(it));
+                a.items.push(draft_of(it, &n.doc.proj));
                 a.cur = Some(a.items.len() - 1);
             }
         } else {
@@ -657,7 +676,7 @@ fn editor(n: &mut Net, ui: &mut Ui, en: bool, checks: bool) {
         a.items[i].auto = false;
         changed = true;
     } else if changed && a.items[i].auto {
-        a.items[i].item.text = default_text(&a.items[i].item);
+        a.items[i].item.text = default_text(&a.items[i].item, &n.doc.proj);
     }
     if remove {
         a.items.remove(i);
@@ -718,7 +737,7 @@ fn checks(n: &mut Net, ui: &mut Ui) {
             Some(e) => a.new_err = e,
             None => {
                 let it = Item { what: String::from(ItemKind::Check.as_str()), checks: list, points: a.new_points.max(0) as u32, ..Item::default() };
-                a.items.push(draft_of(it));
+                a.items.push(draft_of(it, &n.doc.proj));
                 a.cur = Some(a.items.len() - 1);
                 a.buf = None;
                 a.new_check.clear();
@@ -742,19 +761,20 @@ fn checks(n: &mut Net, ui: &mut Ui) {
     }
 }
 
-// the score of the project now against the draft (graded again after changes, at most every
-// PREVIEW_US)
+// the score of the project now against the draft (graded again after a change of the project,
+// the simulator or the draft, at most every PREVIEW_US)
 fn preview(n: &mut Net, ui: &mut Ui) {
     let clock = plat::task::now_us();
-    let stale = n.author.preview.is_none_or(|(rev, drev, at, _, _)| (rev != n.doc.rev || drev != n.author.rev) && clock >= at + PREVIEW_US);
+    let now = (n.doc.rev, n.doc.sim.ver, n.author.rev);
+    let stale = n.author.preview.is_none_or(|(rev, ver, drev, at, _, _)| (rev, ver, drev) != now && clock >= at + PREVIEW_US);
     if stale && let Some(asm) = draft(n) {
-        let g = Grader::new(&asm, &n.doc.proj);
+        let g = Grader::new(&asm);
         let cons = &n.cons;
         let out = |dev: u32| cons.by_dev.get(&dev).map(|c| c.term.text()).unwrap_or_default();
         let s = g.grade(&n.doc.proj, n.doc.sim.engine(), &out);
-        n.author.preview = Some((n.doc.rev, n.author.rev, clock, s.points, s.total));
+        n.author.preview = Some((now.0, now.1, now.2, clock, s.points, s.total));
     }
-    if let (Some((_, _, _, p, total)), true) = (n.author.preview, n.author.target.is_some()) {
+    if let (Some((_, _, _, _, p, total)), true) = (n.author.preview, n.author.target.is_some()) {
         ui.next_size(-1, 0);
         ui.text(TS_BODY | TX_WRAP, &tf("Das Projekt jetzt: {} von {} Punkten.", &[&p.to_string(), &total.to_string()]));
     }

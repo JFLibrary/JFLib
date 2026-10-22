@@ -77,7 +77,7 @@ fn running(text: &str, secs: u64) -> Option<(Project, Engine)> {
 /// the items graded against a project and its engine
 fn grade(items: Vec<Item>, p: &Project, e: &Engine) -> Score {
     let a = Assess { items, ..Assess::default() };
-    Grader::new(&a, p).grade(p, e, &|_| String::new())
+    Grader::new(&a).grade(p, e, &|_| String::new())
 }
 
 /// whether each item holds
@@ -515,7 +515,7 @@ fn points_t(t: &mut T) {
         target,
         ..Assess::default()
     };
-    let sc = Grader::new(&a, &q).grade(&q, &e2, &|_| String::new());
+    let sc = Grader::new(&a).grade(&q, &e2, &|_| String::new());
     t.eq("renamed: by id", sc.items.iter().map(|g| g.held).collect::<Vec<_>>(), vec![false, true, true]);
     t.eq("renamed: what it is called", sc.items[0].found.text(), s("heißt Core"));
 }
@@ -528,11 +528,11 @@ fn run_t(t: &mut T) {
     let items = vec![item("address", "R1", "Gi0/0/0", "10.0.1.1/24"), item("address", "R1", "Gi0/0/0", "10.0.1.9/24")];
     let a = |feedback: Feedback, limit: u32| Assess { feedback, time_limit_s: limit, items: items.clone(), ..Assess::default() };
     // feedback: what shows before and after the end
-    let r = Run::new(&a(Feedback::Items, 0), &p, 0);
+    let r = Run::new(&a(Feedback::Items, 0), 0);
     t.eq("items: score and items", (r.shows_score(), r.shows_items()), (true, true));
-    let r = Run::new(&a(Feedback::Score, 0), &p, 0);
+    let r = Run::new(&a(Feedback::Score, 0), 0);
     t.eq("score: the score only", (r.shows_score(), r.shows_items()), (true, false));
-    let mut r = Run::new(&a(Feedback::End, 0), &p, 0);
+    let mut r = Run::new(&a(Feedback::End, 0), 0);
     t.eq("end: nothing", (r.shows_score(), r.shows_items()), (false, false));
     t.check("end: graded at first only (forced)", r.due(1, 1, 0));
     r.grade(&p, &e, &none, 1, 1, 0);
@@ -543,7 +543,7 @@ fn run_t(t: &mut T) {
     t.eq("ended: the score", r.score.as_ref().map(|s| (s.points, s.total)), Some((1, 2)));
     // when a grade is due: forced first, then after a change: of the project after EDIT_US, of
     // the simulator after EVERY_US; the timer brings the window back for it
-    let mut r = Run::new(&a(Feedback::Items, 0), &p, 0);
+    let mut r = Run::new(&a(Feedback::Items, 0), 0);
     t.check("due first", r.due(1, 1, 0));
     r.grade(&p, &e, &none, 1, 1, 0);
     t.check("nothing changed: never due, no timer", !r.due(1, 1, 100 * EVERY_US) && r.wake(1, 1, 5).is_none());
@@ -553,10 +553,10 @@ fn run_t(t: &mut T) {
     t.eq("the simulator: the timer", (r.wake(1, 2, 0), r.wake(1, 2, 10 * EVERY_US)), (Some(2000), Some(16)));
     r.force = true;
     t.check("Prüfen: due at once", r.due(1, 1, 1));
-    let r = Run::new(&a(Feedback::Score, 600), &p, 0);
+    let r = Run::new(&a(Feedback::Score, 600), 0);
     t.eq("the countdown: a timer each second", r.wake(0, 0, 1), Some(1000));
     // the time limit: on the task clock, from the start, ends with the final score at the limit
-    let mut r = Run::new(&a(Feedback::Score, 600), &p, 1_000_000);
+    let mut r = Run::new(&a(Feedback::Score, 600), 1_000_000);
     t.eq("no time used", r.remaining(1_000_000), Some(600_000_000));
     t.eq("time left", r.remaining(61_000_000), Some(540_000_000));
     t.check("not up yet", !r.time_up(600_999_999));
@@ -566,10 +566,10 @@ fn run_t(t: &mut T) {
     t.eq("out of time: nothing left", r.remaining(700_000_000), Some(0));
     t.check("out of time: not up again", !r.time_up(700_000_000));
     t.check("out of time: items show", r.shows_items());
-    let mut r = Run::new(&a(Feedback::Items, 300), &p, 0);
+    let mut r = Run::new(&a(Feedback::Items, 300), 0);
     r.finish(&p, &e, &none, 1, 1, 100_000_000, false);
     t.eq("handed in early: the time stands", (r.remaining(200_000_000), r.time_up(400_000_000)), (Some(200_000_000), false));
-    t.eq("no limit", Run::new(&a(Feedback::Items, 0), &p, 0).remaining(5), None);
+    t.eq("no limit", Run::new(&a(Feedback::Items, 0), 0).remaining(5), None);
     t.eq("clock", (clock_text(0), clock_text(1), clock_text(65_000_000), clock_text(3_723_000_000)), (s("0:00"), s("0:01"), s("1:05"), s("1:02:03")));
 }
 
@@ -616,7 +616,7 @@ fn author_t(t: &mut T) {
         };
         se.run_until(SEC, BUDGET);
         let a = Assess { items: vec![it.clone()], target: target.clone(), ..Assess::default() };
-        let gone = Grader::new(&a, &start).grade(&start, &se, &|_| String::new());
+        let gone = Grader::new(&a).grade(&start, &se, &|_| String::new());
         t.check(&format!("start without {} {} {} ({})", it.what, it.dev, it.port, item_text(&it).text()), !gone.items[0].held);
         tested += 1;
     }
@@ -668,7 +668,7 @@ struct Solve {
 impl Solve {
     fn new(text: &str) -> Option<Solve> {
         let p = Project::from_text(text).ok()?;
-        let grader = Grader::new(p.lab.as_ref()?.assess.as_ref()?, &p);
+        let grader = Grader::new(p.lab.as_ref()?.assess.as_ref()?);
         let sim = Sim::new(&p);
         Some(Solve { p, sim, grader })
     }
@@ -752,7 +752,7 @@ fn samples_t(t: &mut T) {
             t.eq(&format!("{}: the target ({})", name, g.why()), (sc.points, sc.percent()), (20, 100));
         }
         // the window's run of it
-        let r = Run::new(&a, &p, 0);
+        let r = Run::new(&a, 0);
         t.eq(&format!("{}: what shows", name), (r.shows_score(), r.shows_items(), r.remaining(0)), (feedback != Feedback::End, feedback == Feedback::Items, if limit == 0 { None } else { Some(limit as u64 * 1_000_000) }));
     }
 }

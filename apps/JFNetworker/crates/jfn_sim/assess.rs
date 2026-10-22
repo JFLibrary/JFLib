@@ -3,7 +3,7 @@
 // what it found; for authors the network captured as a target, the target's settings as
 // candidate items, and a start network made from the target without what the items check
 //
-//   Grader::new(&assess, &project)        the items prepared once (their checks parsed)
+//   Grader::new(&assess)                  the items prepared once (their checks parsed)
 //   grader.grade(&project, &engine, out) -> Score   out(dev): what the device printed (the
 //                                         checks' "output contains"); a config item grades a
 //                                         running configuration once (kept until it changes)
@@ -303,6 +303,9 @@ pub struct Grader {
     seen: RefCell<BTreeMap<(usize, u64), (bool, Msg)>>,
 }
 
+/// config grades a Grader keeps at most (then it starts again)
+const SEEN_MAX: usize = 512;
+
 /// the project's device an item names: by id when the project has it, else by name
 fn find_dev(p: &Project, e: &Engine, id: u32, name: &str) -> Option<u32> {
     if id != 0 && p.device(id).is_some() {
@@ -315,7 +318,7 @@ fn find_dev(p: &Project, e: &Engine, id: u32, name: &str) -> Option<u32> {
 }
 
 impl Grader {
-    pub fn new(a: &Assess, _p: &Project) -> Grader {
+    pub fn new(a: &Assess) -> Grader {
         let names = a.target.devices.iter().map(|d| (d.name.to_ascii_lowercase(), d.id)).collect();
         let checks = a.items.iter().map(|it| if it.kind() == Some(ItemKind::Check) { it.check_list() } else { Ok(Vec::new()) }).collect();
         Grader { items: a.items.clone(), checks, names, seen: RefCell::new(BTreeMap::new()) }
@@ -448,7 +451,11 @@ impl Grader {
                     return held(*ok, found.clone());
                 }
                 let (ok, found) = config_holds(it, e.node(dev).map(|n| n.model), &run);
-                self.seen.borrow_mut().insert(key, (ok, found.clone()));
+                let mut seen = self.seen.borrow_mut();
+                if seen.len() >= SEEN_MAX {
+                    seen.clear();
+                }
+                seen.insert(key, (ok, found.clone()));
                 held(ok, found)
             }
             ItemKind::Check => held(false, Msg::default()),

@@ -32,6 +32,7 @@
 //                                                 run, to pick items from)
 //   assess.total() / assess.issues(&project)      the points there are; what is wrong with it
 //   item.kind() / item.values() / item.check_list() -> Result<Vec<Expect>, (index, why)>
+//   item.dev_name() / config_lines(&value)        the device for messages; a config item's lines
 //   canon(kind, text) -> Option<String>           a value in its canonical form ("10.0.1.1
 //                                                 255.255.255.0" -> "10.0.1.1/24", "no shut" ->
 //                                                 "up", "VLAN 20" -> "20"); None: no such value
