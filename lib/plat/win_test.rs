@@ -20,6 +20,9 @@
 //     WT_CLIP_ACCESS  0 when the clipboard can be opened, else the error (5: access denied,
 //                   e.g. in a sandbox that keeps processes off the clipboard)
 //     WT_POPUP_SEND popup slot w: SendMessageW(msg a[0], wParam a[1], lParam = point a[2], a[3])
+//     WT_POST_CHARS a burst: a[0] WM_CHAR messages posted to window w, the characters a[1],
+//                   a[1] + 1, ... a[1] + a[2] - 1 by turns (as an input method commits a long
+//                   text) -> the number posted
 //   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms by a timer of the
 //                   UI thread: name None = Cancel, Some(name) = the name typed + OK
 
@@ -72,6 +75,7 @@ pub const WT_CARET: u32 = 10;
 pub const WT_ACTIVE: u32 = 11;
 pub const WT_CLIP_ACCESS: u32 = 12;
 pub const WT_POPUP_SEND: u32 = 13;
+pub const WT_POST_CHARS: u32 = 14;
 
 const RDW_INVALIDATE: u32 = 1;
 const RDW_UPDATENOW: u32 = 0x100;
@@ -81,6 +85,7 @@ const SWP_NOACTIVATE: u32 = 0x0010;
 const WM_DPICHANGED: u32 = 0x02E0;
 const WM_SETTEXT: u32 = 0x000C;
 const WM_COMMAND: u32 = 0x0111;
+const WM_CHAR: u32 = 0x0102;
 const IDOK: usize = 1;
 const IDCANCEL: usize = 2;
 const AC_TRIES: u32 = 50; // timer ticks to find the dialog
@@ -172,6 +177,10 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
                     WT_VISIBLE => (IsWindowVisible(h) != 0) as i64,
                     WT_ENABLED => (IsWindowEnabled(h) != 0) as i64,
                     WT_ACTIVE => (GetActiveWindow() == h) as i64,
+                    WT_POST_CHARS => {
+                        let (n, c0, k) = (a[0].max(0), a[1].max(0) as usize, a[2].max(1));
+                        (0..n).take_while(|i| PostMessageW(h, WM_CHAR, c0 + (i % k) as usize, 1) != 0).count() as i64
+                    }
                     _ => -1,
                 }
             }

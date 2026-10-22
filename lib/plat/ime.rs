@@ -17,6 +17,19 @@ pub fn ime_commit_set(win:u8,text:&str) -> bool {
     if crate::evq_push(crate::Event {typ:crate::E_IME_COMMIT,win,data:token,..Default::default()}) { true }
     else { q.1.pop(); false }
 }
+/// Committed text of any length: commits of at most 4096 bytes, split between characters ->
+/// the bytes queued (fewer: the commit queue or the event ring is full, the rest can follow
+/// once the app took these).
+pub fn ime_commit_text(win:u8,text:&str) -> usize {
+    let mut at=0;
+    while at<text.len() {
+        let mut end=(at+4096).min(text.len());
+        while !text.is_char_boundary(end) { end-=1; }
+        if !ime_commit_set(win,&text[at..end]) { break; }
+        at=end;
+    }
+    at
+}
 pub fn ime_commit_take(token:u32) -> Option<String> {
     let mut q=COMMITS.lock(); let i=q.1.iter().position(|v|v.0==token)?; Some(q.1.remove(i).1)
 }

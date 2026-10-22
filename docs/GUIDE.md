@@ -1384,6 +1384,7 @@ in DIP):
 | `wheel S DY [shift] [ctrl] [alt]` | raw wheel units (120 = one notch); the modifiers are held during the wheel event (Ctrl + wheel zoom) |
 | `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... |
 | `type "text"` | typed text (`"\n"` presses Enter) |
+| `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it) |
 | `focus S` | keyboard focus to a widget (focus ring shown) |
 | `cmd ID [ARG]` | run a command as if a menu row was chosen |
 | `wait MS` | advance the virtual clock (16 ms frames) |

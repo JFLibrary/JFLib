@@ -1576,6 +1576,9 @@ pub fn wait_refresh(deadline_us: u64, refresh: &mut dyn FnMut()) -> u32 {
     n
 }
 
+// wait() dispatches messages while fewer events are queued (room for what one message adds)
+const PUMP_MAX: u32 = (crate::EVQ_CAP - 64) as u32;
+
 /// pump the OS until an event is queued or the deadline (plat::time_us; 0 = poll without
 /// blocking, u64::MAX = forever) passes -> events queued (wake() makes it return at once)
 pub fn wait(deadline_us: u64) -> u32 {
@@ -1583,8 +1586,10 @@ pub fn wait(deadline_us: u64) -> u32 {
     let mut m: Msg = unsafe { core::mem::zeroed() };
     loop {
         win_dnd::run_pending(); // the app drags something out: DoDragDrop (modal)
-        // SAFETY: the standard message loop on the UI thread.
-        while unsafe { PeekMessageW(&mut m, 0, 0, 0, PM_REMOVE) } != 0 {
+        // SAFETY: the standard message loop on the UI thread.  A burst (a WM_CHAR per typed
+        // or committed character) stops short of a full event ring: the rest waits in the
+        // thread's queue until the app took these events
+        while evq_count() < PUMP_MAX && unsafe { PeekMessageW(&mut m, 0, 0, 0, PM_REMOVE) } != 0 {
             if m.msg == WM_QUIT {
                 evq_push(Event { typ: E_CLOSE, ..Event::default() });
                 continue;

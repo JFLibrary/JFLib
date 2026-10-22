@@ -302,6 +302,27 @@ mod win {
         if got != want {
             t.info(&format!("  (got {got:?})\n"));
         }
+        // a burst of WM_CHAR (a long input method commit): wait() stops short of a full event
+        // ring, the rest waits in the thread's queue; every character comes, in order
+        let posted = win_test(WT_POST_CHARS, 0, [600, 'a' as i32, 26, 0]);
+        let (mut chars, mut most, mut order) = (0, 0, true);
+        for _ in 0..200 {
+            most = most.max(wait(0));
+            while let Some(e) = evq_pop() {
+                if e.typ == E_TEXT {
+                    order &= e.data == 'a' as u32 + chars % 26;
+                    chars += 1;
+                }
+            }
+            if chars >= 600 {
+                break;
+            }
+        }
+        t.check(posted == 600 && chars == 600 && order && (most as usize) < EVQ_CAP,
+                "input: a burst of 600 WM_CHAR -> 600 E_TEXT in order, the event ring never full");
+        if chars != 600 || !order || most as usize >= EVQ_CAP {
+            t.info(&format!("  (posted {posted}, got {chars}, in order {order}, at most {most} queued)\n"));
+        }
 
         // ---- cursors
         let mut cur = vec![0u8; 32 * 32 * 4];

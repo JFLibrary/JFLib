@@ -67,8 +67,10 @@ pub(super) fn viewport(width: i32, height: i32, dpi: i32) {
     display.height = height.clamp(1, 16384);
     display.dpi = dpi.clamp(48, 480);
 }
-pub(super) fn active() -> i32 {
-    DISPLAY.lock().active
+/// The window typed text goes to (as keys do): the active one while it is shown and enabled.
+pub(super) fn text_target() -> Option<u8> {
+    let d = DISPLAY.lock();
+    window(&d, d.active).is_some_and(|w| w.shown && w.enabled).then_some(d.active as u8)
 }
 
 /// Create a window within the app canvas; window zero uses the host viewport.

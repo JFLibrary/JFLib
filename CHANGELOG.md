@@ -24,6 +24,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **tools:** A static website from the docs: python build_rs.py site writes build/site/ (a landing page from README.md, every guide, the app READMEs, changelog and roadmap as pages, the developer guide split per section, the API reference per crate with an anchor per item, search, light and dark themes, phone layout); site --check checks every link, anchor and image, the HTML and that two builds are byte-identical, and runs in every test suite
 - **plat:** plat::secret on Android and in the browser: Android keeps the values encrypted with a non-exportable AES-256-GCM key of the Android Keystore (one per app, no user authentication) in the app's no_backup folder; the web host keeps them encrypted with a non-extractable WebCrypto AES-GCM key per app in IndexedDB (decrypted for the app at start, changes committed asynchronously); secret_available() is true where the store works, the API is unchanged
 - **ui:** A Markdown / HTML viewer (ui.markdown_view, ui.html_view, MdDoc: CommonMark with GFM tables, task lists, strikethrough and bare links, the HTML of the rich-text reader; headings, lists, quotes, highlighted code, tables, images through the VFS and img_svg, right-to-left paragraphs; selection and copy as text and HTML, links through the keyboard, only the visible blocks laid out) and lists whose rows have different heights (ui.vlist_begin / VListState: measured or given heights, anchored scrolling that keeps still when rows above change, 100 000 rows); a new record kind K_HEADING
+- **plat:** plat::ime_commit_text: committed text of any length as input method commits of at most 4 KB (the bytes queued); the test script command commit "text" [N]
 
 ### Changed
 
@@ -36,6 +37,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **tests:** The cancellation, wake-up and download checks of plattest and coretest no longer race on a loaded machine
 - **ui:** Text scale 150 to 200 %: bar chart column labels no longer run into each other (every k-th one, the first and the last kept, inside the chart; value steps a line apart), badges, grid headers, navigation items, segmented items, tabs, info bars, legend entries and text box placeholders that do not fit end with an ellipsis instead of a cut through a glyph, badge and navigation pills grow with the text (Ui::dp_text), donut centre texts stay inside the hole
 - **ui:** The weekday toggles (ui.weekday_toggles) wrap their seven buttons (BOX_WRAP) where the row has less room than they need, instead of running past the edge of a narrow card
+- **ui:** Typed text is never dropped: a long insert or input method commit (beyond 64 characters, a burst of WM_CHAR on Windows, an IBus commit over 4 KB) reaches text boxes and editors whole and in order; a pass takes up to 4096 characters, the rest comes in the next passes, also what a widget leaves with a smaller ui.text_take cap
+- **web:** Browser: long text (a 5000-character insert, emoji, combining sequences) reaches the app whole as commits instead of one event per character; in Firefox, typing, inserting and IME compositions in a field of the ARIA shadow tree reach the app (the input event Firefox sends after compositionend no longer undoes the committed text)
 
 ## [0.1.0] - 2026-10-20
 

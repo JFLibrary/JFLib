@@ -162,7 +162,7 @@ for(const target of [input,a11yRoot].filter(Boolean)) {
     else if(e.inputType==="insertLineBreak" || e.inputType==="insertParagraph") e.preventDefault();
   });
   // #input stays empty; a shadow field or range edited otherwise tells the app (a11y.js)
-  target.addEventListener("input",e=>{if(composing)return;if(e.target===input)input.value="";else shadow?.edited(e.target);});
+  target.addEventListener("input",e=>{if(composing)return;if(e.target===input)input.value="";else shadow?.edited(e.target,e.inputType);});
   target.addEventListener("paste",e=>{
     e.preventDefault(); const value=e.clipboardData?.getData("text/plain")||"";
     send({type:"clipboard",text:value,html:e.clipboardData?.getData("text/html")||"",rtf:e.clipboardData?.getData("text/rtf")||e.clipboardData?.getData("application/rtf")||""});

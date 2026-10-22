@@ -786,6 +786,9 @@ pub extern "C" fn jfgui_env(len: u32) -> u32 {
     setenv(name, Some(value)) as u32
 }
 /// Enqueue committed UTF-8 from the host composition element; uncommitted IME text stays in the DOM.
+/// The text goes as commits (whole strings, not one ring slot per character) -> the characters
+/// queued: fewer when the queue is full (the host calls again with the rest after jfgui_input),
+/// none without a window that takes text.
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_text(len: u32) -> u32 {
     let Some(bytes) = input(len) else {
@@ -794,19 +797,11 @@ pub extern "C" fn jfgui_text(len: u32) -> u32 {
     let Ok(text) = core::str::from_utf8(&bytes) else {
         return 0;
     };
-    let mut done = 0;
-    for ch in text.chars() {
-        if !windows::event(Event {
-            typ: crate::E_TEXT,
-            win: windows::active() as u8,
-            data: ch as u32,
-            ..Event::default()
-        }) {
-            break;
-        }
-        done += 1;
-    }
-    done
+    let Some(win) = windows::text_target() else {
+        return 0;
+    };
+    let n = crate::ime_commit_text(win, text);
+    text[..n].chars().count() as u32
 }
 /// Process one MessagePort/JavaScript agent request only after explicit activation.
 #[unsafe(no_mangle)]

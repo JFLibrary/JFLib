@@ -339,6 +339,7 @@ impl Ui {
             mptype: 0,
             mpts_win: 0,
             cmdq: Vec::new(),
+            text_more: Vec::new(),
             timers: [(0, 0); super::ctx::TIMERS_MAX],
             mods: 0,
             frame: 0,
@@ -495,6 +496,7 @@ impl Ui {
             if !self.headless {
                 let w = self.uiw_from_pw(ev.win as i32);
                 if w < 0 {
+                    ev_dropped(&ev);
                     continue; // a window the UI does not know (any more)
                 }
                 ev.win = w as u8;
@@ -607,6 +609,7 @@ impl Ui {
             }
             let t = self.uiw_input_target(&ev);
             if t < 0 {
+                ev_dropped(&ev);
                 continue; // a window that is gone
             }
             // a run of text ends before any other input (and before text for another window)
@@ -712,9 +715,28 @@ impl Ui {
     /// starts in the main window; window_begin / window_end inside App::frame build the
     /// other windows in the same pass.
     pub(crate) fn run_passes(&mut self, app: &mut dyn App) {
+        let (mut passes, mut build_us) = (0u32, 0u64); // (inspect.rs) statistics
+        let mut tasks_ran = self.settle(app, &mut passes, &mut build_us);
+        // typed text beyond a pass's queue (ctx.rs): part by part, each with passes of its own
+        while self.text_refill() {
+            tasks_ran = self.settle(app, &mut passes, &mut build_us);
+        }
+        self.dnd_after_passes(); // a DS_START without drag_set is no drag
+        self.focus_req_expire();
+        self.need = tasks_ran; // tasks ran in the last round: the frame did not see it yet
+        self.a11y_frame(); // the accessibility tree for screen readers (a11y.rs)
+        if self.m.ins.on {
+            self.ins_passes(passes, build_us);
+        } else if self.m.ins.gone {
+            self.ins_gone(); // the inspector closed: its window is freed (inspect.rs)
+        }
+    }
+
+    // settle -> async tasks ran in the last round: passes until the layout settles, the
+    // queued commands, at most three rounds
+    fn settle(&mut self, app: &mut dyn App, passes: &mut u32, build_us: &mut u64) -> bool {
         let mut rounds = 3;
         let mut tasks_ran;
-        let (mut passes, mut build_us) = (0u32, 0u64); // (inspect.rs) statistics
         loop {
             let mut pass = 0;
             let mut keys_fwd = false; // (U3) keys handed on for the next pass
@@ -727,7 +749,7 @@ impl Ui {
                 let t0 = if self.m.ins.on { plat::time_us() } else { 0 };
                 app.frame(self);
                 if t0 != 0 {
-                    build_us += plat::time_us().saturating_sub(t0);
+                    *build_us += plat::time_us().saturating_sub(t0);
                 }
                 self.uiw_unwind(); // windows the app did not end
                 self.ids_unwind(); // id scopes it did not close
@@ -758,7 +780,7 @@ impl Ui {
                     self.uiw_clear_edges(); // the handed-on keys were seen once
                 }
                 pass += 1;
-                passes += 1;
+                *passes += 1;
                 if !again {
                     break;
                 }
@@ -796,15 +818,7 @@ impl Ui {
                 break;
             }
         }
-        self.dnd_after_passes(); // a DS_START without drag_set is no drag
-        self.focus_req_expire();
-        self.need = tasks_ran; // tasks ran in the last round: the frame did not see it yet
-        self.a11y_frame(); // the accessibility tree for screen readers (a11y.rs)
-        if self.m.ins.on {
-            self.ins_passes(passes, build_us);
-        } else if self.m.ins.gone {
-            self.ins_gone(); // the inspector closed: its window is freed (inspect.rs)
-        }
+        tasks_ran
     }
 
     // csd_begin -> true when the library draws the title bar for the app: the window has no
@@ -978,6 +992,14 @@ impl Ui {
             return self.now_ms;
         }
         next
+    }
+}
+
+// ev_dropped: an event that goes to no window; a commit's text leaves the store with it (the
+// store keeps a few: plat::ime_commit_set)
+fn ev_dropped(ev: &Event) {
+    if ev.typ == plat::E_IME_COMMIT {
+        let _ = plat::ime_commit_take(ev.data);
     }
 }
 

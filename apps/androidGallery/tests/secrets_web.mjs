@@ -87,20 +87,12 @@ try {
         await f.focus();
         const key=await f.getAttribute('data-key');
         await until(async()=>(await page.evaluate(()=>window.jfguiA11y.mirror.active()?.focus))===key,'focus on the secret field');
-        // the keyboard through the host's #input (the app keeps its focus on the field)
-        await page.locator('#input').focus();
-        ok((await page.evaluate(()=>window.jfguiA11y.mirror.active()?.focus))===key,'the app keeps the focus');
+        // the keyboard in the shadow tree's field, the whole value in one insert
         await page.keyboard.press('Control+A');await page.keyboard.press('Backspace');
         await until(async()=>await f.inputValue()==='','field emptied');
-        // in pieces: the UI takes at most TEXTQ_MAX (64) characters of text per pass
-        for(let at=0;at<value.length;at+=60) {
-          // the DOM focus follows the app into the shadow tree after keys and updates; text
-          // inserted into the shadow field did not reach the app in Firefox: through #input
-          await page.locator('#input').focus();
-          await page.keyboard.insertText(value.slice(at,at+60));
-          const want=value.slice(0,at+60);
-          await until(async()=>await f.inputValue()===want,`typed ${want.length} of ${value.length} characters`).catch(async e=>{const v=await f.inputValue();const act=await page.evaluate(()=>{const a=document.activeElement;return a.id||a.tagName+':'+a.getAttribute('aria-label');});throw new Error(e.message+` (got ${v.length}: ${JSON.stringify(v.slice(0,100))}; DOM focus ${act})`);});
-        }
+        await page.keyboard.insertText(value);
+        await until(async()=>await f.inputValue()===value,`typed ${value.length} characters`).catch(async e=>{const v=await f.inputValue();const act=await page.evaluate(()=>{const a=document.activeElement;return a.id||a.tagName+':'+a.getAttribute('aria-label');});throw new Error(e.message+` (got ${v.length}: ${JSON.stringify(v.slice(0,100))}; DOM focus ${act})`);});
+        ok((await page.evaluate(()=>window.jfguiA11y.mirror.active()?.focus))===key,'the app keeps the focus');
       };
       // the stored record (app, service, account) once the host committed the change
       const record=()=>dump(page).then(d=>d['jfgui-secrets-v1/values'].find(r=>r.app==='androidGallery' && r.service==='galerie' && r.account==='demo'));

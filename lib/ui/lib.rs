@@ -403,6 +403,9 @@ pub struct Ui {
     pub(crate) mptype: u32,
     pub(crate) mpts_win: u32,
     pub(crate) cmdq: Vec<(u32, u32)>,
+    /// typed text that waits for the next passes (beyond a pass's TEXTQ_MAX, or left by a
+    /// text_take cap): (window, codepoints) in typing order (ctx.rs text_refill)
+    pub(crate) text_more: Vec<(u32, Vec<u32>)>,
     pub(crate) timers: [(u32, u32); ctx::TIMERS_MAX],
     pub(crate) mods: u32,
     pub(crate) frame: u32,

@@ -781,7 +781,7 @@ impl Ui {
                     _ => {}
                 }
             }
-            let cps = self.text_take(64);
+            let cps = self.text_take(super::ctx::TEXTQ_MAX);
             if !ro {
                 let s = typed_text(&cps, false);
                 if !s.is_empty() {

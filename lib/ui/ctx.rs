@@ -34,7 +34,9 @@ use super::Ui;
 use plat::Event;
 
 pub(crate) const KEYQ_MAX: usize = 16;
-pub(crate) const TEXTQ_MAX: usize = 64;
+/// typed codepoints a pass sees at most (one input method commit); more waits for the next
+/// passes (Ui::text_more), nothing typed is dropped
+pub(crate) const TEXTQ_MAX: usize = 4096;
 pub(crate) const PTS_MAX: usize = 2048;
 pub(crate) const CMDQ_MAX: usize = 32;
 pub(crate) const TIMERS_MAX: usize = 16;
@@ -337,13 +339,67 @@ impl Ui {
         self.wp.ctx.keyq.iter().copied().find(|&k| (k as i32) >= 0).unwrap_or(0)
     }
 
-    /// ui_text_take(cap): the typed codepoints (at most cap), consumed
+    /// ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
+    /// they come in the next pass (nothing typed is lost)
     pub fn text_take(&mut self, cap: usize) -> Vec<u32> {
         let c = &mut self.wp.ctx;
         let n = c.textq.len().min(cap);
-        let v = c.textq[..n].to_vec();
-        c.textq.clear();
+        let v: Vec<u32> = c.textq.drain(..n).collect();
+        if n > 0 && !c.textq.is_empty() {
+            let rest = core::mem::take(&mut c.textq);
+            self.text_defer(rest);
+        }
+        self.wp.ctx.textq.clear(); // (cap 0 takes nothing: the text goes)
         v
+    }
+
+    // text_defer(rest): typed text of the live window for the next pass, before the text
+    // that waits already (it came later)
+    fn text_defer(&mut self, rest: Vec<u32>) {
+        let w = self.uiw_cur;
+        match self.text_more.first_mut() {
+            Some((m, q)) if *m == w => drop(q.splice(0..0, rest)),
+            _ => self.text_more.insert(0, (w, rest)),
+        }
+    }
+
+    // text_push(cp): a typed codepoint for the live window; beyond TEXTQ_MAX (or behind text
+    // that waits already) it waits for the next pass (text_refill)
+    fn text_push(&mut self, cp: u32) {
+        if self.text_more.is_empty() && self.wp.ctx.textq.len() < TEXTQ_MAX {
+            self.wp.ctx.textq.push(cp);
+            return;
+        }
+        let w = self.uiw_cur;
+        match self.text_more.last_mut() {
+            Some((m, q)) if *m == w => q.push(cp),
+            _ => self.text_more.push((w, alloc::vec![cp])),
+        }
+    }
+
+    /// text_refill -> true: the next part of the text that waits (text_more) is in its
+    /// window's queue for the next passes (run_passes); text of a window that is gone goes
+    pub(crate) fn text_refill(&mut self) -> bool {
+        while let Some((w, q)) = self.text_more.first() {
+            let w = *w;
+            if q.is_empty() || (w != 0 && !self.uiw_drawable(w)) {
+                self.text_more.remove(0);
+                continue;
+            }
+            let cur = self.uiw_cur;
+            self.uiw_use(w);
+            let q = &mut self.text_more[0].1;
+            let n = q.len().min(TEXTQ_MAX.saturating_sub(self.wp.ctx.textq.len()));
+            self.wp.ctx.textq.extend(q.drain(..n));
+            if q.is_empty() {
+                self.text_more.remove(0);
+            }
+            self.m.win.edges |= 1 << (w & (WIN_MAX as u32 - 1)); // cleared after the first pass
+            self.uiw_fwd_arm(w);
+            self.uiw_use(cur);
+            return true;
+        }
+        false
     }
 
     /// ui_keys_take_rest(cap): (U3, key forwarding of tool windows) the unconsumed keys of
@@ -378,11 +434,11 @@ impl Ui {
     /// ui_text_inject(cps): (U3) append typed codepoints to the live window's text queue
     #[allow(dead_code)] // ui-win: key forwarding of tool windows (U3)
     pub(crate) fn text_inject(&mut self, cps: &[u32]) {
-        for &c in cps {
-            if self.wp.ctx.textq.len() >= TEXTQ_MAX {
-                break;
-            }
-            self.wp.ctx.textq.push(c);
+        // text of this pass: before any that waits; what does not fit, in the next pass
+        let n = TEXTQ_MAX.saturating_sub(self.wp.ctx.textq.len()).min(cps.len());
+        self.wp.ctx.textq.extend_from_slice(&cps[..n]);
+        if n < cps.len() {
+            self.text_defer(cps[n..].to_vec());
         }
     }
 
@@ -458,14 +514,16 @@ impl Ui {
                 (k == VK_MENU) as u32
             }
             plat::E_TEXT => {
-                if self.wp.ctx.textq.len() < TEXTQ_MAX {
-                    self.wp.ctx.textq.push(ev.data);
-                }
+                self.text_push(ev.data);
                 2 // text batches with following text
             }
             plat::E_PREEDIT => 1,
             plat::E_IME_COMMIT => {
-                if let Some(text)=plat::ime_commit_take(ev.data) { self.wp.ctx.textq.extend(text.chars().map(|c|c as u32)); }
+                if let Some(text) = plat::ime_commit_take(ev.data) {
+                    for c in text.chars() {
+                        self.text_push(c as u32);
+                    }
+                }
                 1 // atomic input, handled in its own pass
             }
             plat::E_LEAVE => {

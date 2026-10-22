@@ -84,7 +84,7 @@ const ML_MAX: usize = 4096; // visual lines of a multi-line box (more: the rest 
 const PW_MAX: usize = 1024; // characters a password box shows
 const UD_N: usize = 16; // undo states (power of two)
 const UD_SEG: usize = 2048; // bytes per undo state (longer texts are not recorded)
-const TXQ_MAX: usize = 64; // typed codepoints taken per frame
+const TXQ_MAX: usize = super::ctx::TEXTQ_MAX; // typed codepoints taken per pass (all of them)
 const NB_CAP: u32 = 32; // number box text buffer
 
 /// Opt-in presentation for a multiline editor embedded in document content. Geometry is in
