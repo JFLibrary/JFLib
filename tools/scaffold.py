@@ -790,6 +790,7 @@ fs.user                              # the files the user picks (file dialog, dr
 # secrets                            passwords and tokens in the system's store (plat::secret)
 # autostart                          start at login (plat::autostart_set)
 # ask fs.read $PICTURES/** "Bilder öffnen"   ask the user at the first access instead
+# sandbox                            let the OS enforce this manifest too (Landlock+seccomp / mitigations)
 """
 
 PERMS_CONSOLE = PERMS_HEAD + """\

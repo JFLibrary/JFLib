@@ -25,7 +25,7 @@ pub fn t_permask(t: &mut T) {
 }
 
 fn syntax(t: &mut T) {
-    let bad: [(&str, &str); 10] = [
+    let bad: [(&str, &str); 11] = [
         ("ask fs.user", "PERMISSIONS:1: fs.user cannot be asked for"),
         ("print\nask", "PERMISSIONS:2: ask needs a permission"),
         ("fs.read /x \"why\"", "a reason belongs to an ask line"),
@@ -36,6 +36,7 @@ fn syntax(t: &mut T) {
         ("agent.deny", "expected at least one action name"),
         ("fs.read $PLUGIN/x", "$PLUGIN only in a plugin's manifest"),
         ("ask print \"a\u{7}b\"", "no control characters"),
+        ("sandbox loose", "sandbox takes nothing or 'strict'"),
     ];
     for (text, want) in bad {
         match policy::check(text) {
@@ -54,6 +55,7 @@ fn syntax(t: &mut T) {
     let r = policy::check(good);
     t.check(r.is_err() && r.unwrap_err().contains("PERMISSIONS:7: a reason belongs"), "permask: a quote alone is a reason without a line");
     t.check(policy::check(&good[..good.len() - 3]).is_ok(), "permask: ask lines, reasons with '#', agent lines");
+    t.check(policy::check("sandbox\nsandbox strict\n").is_ok(), "permask: the sandbox line (with 'strict')");
 }
 
 fn installed(t: &mut T) {

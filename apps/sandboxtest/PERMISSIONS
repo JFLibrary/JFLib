@@ -1,0 +1,5 @@
+# sandboxtest: opt into the OS sandbox and check that the kernel enforces the manifest
+# (docs/PERMISSIONS.md "OS sandbox").  No process, plugins or net rule, so the sandbox blocks
+# execve / child processes, dynamic code and TCP; `strict` refuses to start without the OS.
+sandbox strict
+fs.write $TEMP/sandboxtest-*/**   # the only folder it may write

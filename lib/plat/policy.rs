@@ -78,6 +78,9 @@
 //                         plain rule that covers the access wins over an ask line
 //   agent.confirm NAME..  agent actions (glob: '*' any run) the user confirms first
 //   agent.deny NAME..     agent actions an agent may not run
+//   sandbox [strict]      ask the OS to enforce the manifest as well (Landlock + seccomp on
+//                         Linux, process mitigation policies on Windows; sandbox.rs); `strict`
+//                         refuses to start when the OS cannot enforce it
 // A PATTERN is an absolute path (X:/.. and //server/share/.. count on Windows only, /.. on
 // Linux only), or starts with $CONFIG $TEMP $HOME $EXE $FONTS, the app's own folders
 // $APPCONFIG $APPDATA $APPCACHE $APPLOG (vfs::app_dir) or the user's folders $DESKTOP
@@ -264,6 +267,8 @@ struct Policy {
     asks: Vec<(String, String)>,
     agent_confirm: Vec<String>,
     agent_deny: Vec<String>,
+    /// OS sandbox the manifest asks for: 0 none, 1 `sandbox`, 2 `sandbox strict` (sandbox.rs)
+    sandbox: u8,
 }
 
 static ACTIVE: AtomicBool = AtomicBool::new(false);
@@ -409,6 +414,157 @@ pub fn autostart_allowed() -> bool {
 /// the last refusals, oldest first
 pub fn denials() -> Vec<Denial> {
     DENIALS.lock().clone()
+}
+
+/// the OS sandbox the manifest asks for: 0 none, 1 `sandbox`, 2 `sandbox strict` (sandbox.rs)
+pub fn sandbox_level() -> u8 {
+    POLICY.lock().as_ref().map_or(0, |p| p.sandbox)
+}
+
+// the literal leading path of a rule's segments (up to the first glob) as a Linux path ("/"
+// when the rule starts with a glob), and whether the rule goes on below it (then it is a
+// folder); for the OS sandbox, which is coarser than the lexical policy -- the fine-grained
+// check stays in `plat`
+#[cfg(target_os = "linux")]
+fn literal_prefix(segs: &[String]) -> (String, bool) {
+    let mut out: Vec<&str> = Vec::new();
+    for s in segs {
+        if s == "**" || s.contains(['*', '?']) {
+            break;
+        }
+        out.push(s);
+    }
+    let below = out.len() < segs.len();
+    // segs[0] is "" (the root): [""] / ["", "usr"] -> "/" / "/usr"
+    let path = if out.len() <= 1 { String::from("/") } else { out.join("/") };
+    (path, below)
+}
+
+/// what the Linux OS sandbox grants, derived from the active policy ([`sandbox_plan_linux`])
+#[cfg(target_os = "linux")]
+pub struct LinuxPlan {
+    /// 0 none, 1 `sandbox`, 2 `sandbox strict`
+    pub level: u8,
+    /// literal folders / files the manifest reaches, with whether they may be written
+    pub fs: Vec<(String, bool)>,
+    /// writable folders to create when missing (the app's own folders, the folders of fs.write
+    /// rules): the kernel can only grant paths that exist
+    pub make_dirs: Vec<String>,
+    /// the manifest names at least one program (execve is denied otherwise)
+    pub exec_allowed: bool,
+    /// restrict TCP connect to `connect_ports` (false: leave it unrestricted -- a `*` rule)
+    pub connect_restrict: bool,
+    /// the ports of net.connect (and 53 with a name rule); empty: no TCP connection at all
+    pub connect_ports: Vec<u16>,
+    /// restrict TCP bind to `listen_ports`
+    pub listen_restrict: bool,
+    /// the ports of net.listen; empty: no TCP listener at all
+    pub listen_ports: Vec<u16>,
+}
+
+#[cfg(target_os = "linux")]
+fn add_fs(fs: &mut Vec<(String, bool)>, path: String, w: bool) {
+    if path.is_empty() {
+        return;
+    }
+    match fs.iter_mut().find(|(q, _)| *q == path) {
+        Some(e) => e.1 |= w,
+        None => fs.push((path, w)),
+    }
+}
+
+// the ports of net rules, bounded -> (restrict, ports): (false, _) for a wide range or a `*`
+// port (leave TCP to the in-process policy), else the explicit ports (empty: deny every port)
+#[cfg(target_os = "linux")]
+fn plan_ports(rules: &[NetRule], dns: bool) -> (bool, Vec<u16>) {
+    let mut ports: Vec<u16> = Vec::new();
+    for r in rules {
+        if r.hi as u32 - r.lo as u32 > 64 || ports.len() > 128 {
+            return (false, Vec::new()); // a wide range: leave it to the in-process policy
+        }
+        for p in r.lo..=r.hi {
+            if !ports.contains(&p) {
+                ports.push(p);
+            }
+        }
+    }
+    if dns && !ports.contains(&53) {
+        ports.push(53);
+    }
+    (true, ports)
+}
+
+/// what the Linux OS sandbox should enforce for the active policy (no policy: nothing)
+#[cfg(target_os = "linux")]
+pub fn sandbox_plan_linux() -> LinuxPlan {
+    let g = POLICY.lock();
+    let Some(p) = g.as_ref() else {
+        return LinuxPlan {
+            level: 0,
+            fs: Vec::new(),
+            make_dirs: Vec::new(),
+            exec_allowed: true,
+            connect_restrict: false,
+            connect_ports: Vec::new(),
+            listen_restrict: false,
+            listen_ports: Vec::new(),
+        };
+    };
+    let mut fs: Vec<(String, bool)> = Vec::new();
+    let mut make_dirs: Vec<String> = Vec::new();
+    for r in &p.fs {
+        let (path, below) = literal_prefix(&r.segs);
+        let w = r.mode & FS_WRITE != 0;
+        if w && below && !make_dirs.contains(&path) {
+            make_dirs.push(path.clone());
+        }
+        add_fs(&mut fs, path, w);
+    }
+    for r in &p.granted {
+        add_fs(&mut fs, literal_prefix(&r.segs).0, r.mode & FS_WRITE != 0); // the user's files
+    }
+    for (segs, _) in &p.plugins {
+        add_fs(&mut fs, literal_prefix(segs).0, false); // mapped executable: read + execute
+    }
+    let dns = p.connect.iter().any(|r| matches!(r.host, Host::Any | Host::Name(_)));
+    let (connect_restrict, connect_ports) = plan_ports(&p.connect, dns);
+    let (listen_restrict, listen_ports) = plan_ports(&p.listen, false);
+    LinuxPlan {
+        level: p.sandbox,
+        fs,
+        make_dirs,
+        exec_allowed: !p.process.is_empty() || !p.names.is_empty(),
+        connect_restrict,
+        connect_ports,
+        listen_restrict,
+        listen_ports,
+    }
+}
+
+/// what the Windows OS sandbox needs to know from the active policy ([`sandbox_plan_win`])
+#[cfg(windows)]
+pub struct WinPlan {
+    /// 0 none, 1 `sandbox`, 2 `sandbox strict`
+    pub level: u8,
+    /// the manifest allows native plugins (dynamic code must stay allowed for the loader)
+    pub plugins_allowed: bool,
+    /// child processes may be created: the manifest names a program, or has a `url` / `print`
+    /// rule (open_url's ShellExecute and the print dialog can start another program)
+    pub exec_allowed: bool,
+}
+
+/// what the Windows OS sandbox should enforce for the active policy (no policy: nothing)
+#[cfg(windows)]
+pub fn sandbox_plan_win() -> WinPlan {
+    let g = POLICY.lock();
+    match g.as_ref() {
+        Some(p) => WinPlan {
+            level: p.sandbox,
+            plugins_allowed: !p.plugins.is_empty(),
+            exec_allowed: !p.process.is_empty() || !p.names.is_empty() || !p.urls.is_empty() || p.print.is_some(),
+        },
+        None => WinPlan { level: 0, plugins_allowed: true, exec_allowed: true },
+    }
 }
 
 /// the CAP_* bits the policy leaves (all without a policy)
@@ -1357,6 +1513,17 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
                     p.urls.push((a.to_ascii_lowercase(), ask));
                 }
             }
+            "sandbox" => {
+                if plugin.is_some() {
+                    return Err(at("sandbox belongs to the app's manifest"));
+                }
+                let lvl = match args.as_slice() {
+                    [] => 1,
+                    ["strict"] => 2,
+                    _ => return Err(at("sandbox takes nothing or 'strict'")),
+                };
+                p.sandbox = p.sandbox.max(lvl);
+            }
             "agent.confirm" | "agent.deny" => {
                 if plugin.is_some() {
                     return Err(at("agent rules belong to the app's manifest"));
@@ -1377,7 +1544,7 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
             }
             _ => {
                 return Err(at(
-                    "unknown permission (fs.read, fs.write, fs.user, process, url, plugins, print, secrets, autostart, net.connect, net.listen, ask, agent.confirm, agent.deny)",
+                    "unknown permission (fs.read, fs.write, fs.user, process, url, plugins, print, secrets, autostart, net.connect, net.listen, sandbox, ask, agent.confirm, agent.deny)",
                 ))
             }
         }

@@ -37,6 +37,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** Address and port translation of IPv4 packets in place (netpkt::nat: Flow::of / Flow::quoted, rewrite and rewrite_quoted with incremental checksums of the header, TCP, UDP and ICMP, ICMP errors with the packet they quote per RFC 5508) and checksum::update for a changed run of bytes
 - **base:** Tree::find_mode(prompt): a mode by its prompt, so modes that parts of an app add need no fixed number
 - **plat:** plat::audio: sound output on every target -- streams (Stream::open + write / write_i16 into a ring the platform drains, or open_fill with a callback on the audio thread; start / pause / stop / finish, volume, latency, played frames, underruns, the default device followed), short sounds mixed by play / play_file (WAV PCM and float, Ogg Vorbis), the system's sounds by sound(SOUND_*); Windows WASAPI, Linux the PulseAudio protocol (pipewire-pulse, WSLg), the browser an AudioWorklet (web/audio.js), Android AAudio (android/audio.c). ui.beep, ui.dialog_sound and ui.set_sounds play them from the UI; scripts check them with expect sound
+- **plat:** OS sandbox from the permission manifest, opt-in per app with a sandbox / sandbox strict line: Linux Landlock (filesystem and TCP) plus seccomp syscall deny-list, Windows process mitigation policies (image load, extension points, dynamic code, child processes)
 
 ### Changed
 
