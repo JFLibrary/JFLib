@@ -86,6 +86,21 @@
 //   nat      address translation of IOS-like devices: inside and outside interfaces, pools,
 //            PAT, static addresses and ports; TCP, UDP, ICMP queries and errors (RFC 5508),
 //            fragments, timeouts; the order of lists, routing and translation
+//   ip6      the IPv6 part of a device (IpStack::v6): addresses with their states and lifetimes,
+//            the neighbor cache, default routers, static routes, the RIB; Ip6Set (Action::Ip6);
+//            off until configured, so projects without IPv6 send no IPv6 frame
+//   nd       Neighbor Discovery (RFC 4861), DAD and SLAAC (RFC 4862), router advertisements,
+//            the IPv6 timers; the views ip6 / ip6_routes / ip6_neighbors / addrs6
+//   l3v6     IPv6 input, local delivery, forwarding with the hop limit, output with source
+//            address selection and fragmentation by the sender, ICMPv6 errors with their limits
+//   jobs6    ping and traceroute over IPv6 (JobKind::Ping6 / Trace6)
+//   trace6   Note6: the decisions of IPv6 as notes (Note::V6) with their German sentences
+//   ospf     OSPF version 2 (RFC 2328) as the service "ospf" of IOS-like routers and L3
+//            switches: interfaces with DR / BDR election, neighbours from Down to Full with the
+//            database exchange, flooding with acknowledgements and retransmission, aging and
+//            refresh, SPF per area, inter-area routes over an ABR, AS-external routes
+//            (redistribution, default route); its routes in the RIB with distance 110;
+//            OspfCfg / OspfSet (Action::Ospf)
 //
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
@@ -146,6 +161,12 @@ pub mod rstp;
 pub mod rip;
 pub mod acl;
 pub mod nat;
+pub mod ip6;
+pub mod nd;
+pub mod l3v6;
+pub mod jobs6;
+pub mod trace6;
+pub mod ospf;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -190,3 +211,8 @@ pub use stp::{LinkType, ModeWord, PortRole, PortState, StpPortView, StpSet, Tree
 pub use rip::{Redist, Rip, RipCfg, RipDrop, RipHow, RipLoss, RipOut, RipSet, RipTimers};
 pub use acl::{Ace, Acl, AclKind, AclOp, AclView};
 pub use nat::{Nat, NatAct, NatStats, Tmo, XlateRow};
+pub use ip6::{Addr6, AddrCfg, AddrState, DefRouter, If6, Ip6, Ip6Set, Limit6, NState, Neigh, NextHop6, OnLink, Origin6, PrefixCfg, RaCfg, Route6, Src6};
+pub use nd::{Addr6View, Neigh6Row};
+pub use jobs6::{Icmp6Kind, Ping6Ev, Ping6Job, Ping6Opts, Trace6Hop, Trace6Job, Trace6Probe};
+pub use trace6::{Note6, RaWhy};
+pub use ospf::{IfState, LsaDrop, LsaRef, LsuWhy, NbrEvent, NbrState, NetType, OrigWhy, Ospf, OspfCfg, OspfDrop, OspfSet, RtChange, RtKind};

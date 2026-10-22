@@ -1956,6 +1956,55 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   UdpHdr::new(udp::PORT_RIP, udp::PORT_RIP).push_v4(&mut p, src, rip::GROUP);
   let heard = rip::RipView::parse(payload).map(|v| rip::Rip::read(&v));
   ```
+
+  IPv6: `ipv6` reads a packet with its extension headers (`Ipv6View`, `ext_headers`,
+  `upper_layer` for the header that carries the payload), writes the fixed header
+  (`Ipv6Hdr::packet` / `push_onto`), fragments as a sender does (`fragment(packet, mtu, id)`:
+  fragment headers of RFC 8200 4.5, pieces in multiples of 8 bytes; `frag` reads one back) and
+  reassembles (`Reassembly6::add`: offsets and lengths checked, overlapping fragments refused
+  as RFC 5722 says). `icmpv6` has the messages of RFC 4443 and RFC 4861: `Icmp6` (echo and the
+  errors; `error_quote` fills the 1280-byte minimum MTU) with the checksum over the pseudo
+  header, `Nd` for Neighbor Discovery (`ns`, `na`, `rs`, router advertisements with their flags
+  and lifetimes, redirects; the options source and target link-layer address, prefix
+  information, MTU and redirected header) with `Nd::parse` and `check_ip`, the validation of
+  RFC 4861 6.1 and 7.1 (hop limit 255, code 0, option lengths, link-local sources of router
+  advertisements, DAD only to a solicited-node group) as an `NdErr`. `Ipv6::solicited_node`,
+  `Ipv6::link_local_of(mac)` / `eui64_in(prefix, mac)` (the interface identifier of RFC 4291
+  appendix A) and `Mac::of_ipv6_multicast` give the addresses Neighbor Discovery needs;
+  `decode::layers` shows every field and option, `decode::info` sums a message up ("Neighbor
+  Advertisement 2001:db8::5 (sol, ovr) is at 02:4a:00:00:01:01").
+
+  ```rust
+  let group = target.solicited_node();
+  let msg = Nd::ns(target, Some(my_mac)).encode(src, group);      // with the checksum
+  let pkt = Ipv6Hdr::new(src, group, ipv6::NH_ICMPV6, 255).packet(&msg);
+  let nd = Nd::parse(&Icmp6View::parse(body)?).ok()?;            // then nd.check_ip(src, dst, hops)
+  let parts = ipv6::fragment(&big, 1280, id)?;                    // 1280 bytes, then the rest
+  ```
+
+  And `ospf` (OSPF version 2, RFC 2328 appendix A) -- `OspfView` reads a packet (the 24-byte
+  header: version, type, length, router ID, area, checksum, authentication type and field;
+  `checksum_ok()` is the IP checksum without the authentication field, `lsu_spans()` the LSAs of
+  an update), `Packet::read` / `Packet::to_bytes` turn it into a record and back (`Header` and
+  `Body::Hello`, `Dd`, `Lsr`, `Lsu` with the LSAs byte for byte, `Ack`; `to_bytes` fills in the
+  length and the checksum). `Lsa::parse` / `Lsa::new(..).to_bytes()` read and write an LSA
+  (`LsaHeader` and `LsaBody::Router`, `Network`, `Summary` for types 3 and 4, `External`,
+  `Other`) with the Fletcher checksum of 12.1.7 (`lsa_checksum`, `lsa_checksum_ok`; `set_age`
+  changes the age outside it), `compare` tells which of two instances is more recent (13.1) and
+  `LsaKey` names an LSA. The constants of appendix B (`MAX_AGE`, `LS_REFRESH_TIME`,
+  `MIN_LS_INTERVAL`, `MIN_LS_ARRIVAL` ...), the option bits, DD flags, LSA and link types come
+  with it. `decode::layers` shows every field and every LSA with its bytes and the problems (a
+  checksum of the packet or of an LSA that does not fit, another version, lengths that do not
+  add up); `decode::info` sums it up ("Hello Packet, DR 10.0.0.2, BDR 10.0.0.1, 3 neighbors",
+  "LS Update, 2 LSAs").
+
+  ```rust
+  let hdr = ospf::Header { kind: ospf::T_HELLO, router: rid, area: 0, autype: ospf::AU_NULL, auth: [0; 8] };
+  let bytes = ospf::Packet { hdr, body: ospf::Body::Hello(hello) }.to_bytes();
+  let back = ospf::OspfView::parse(&bytes).filter(|v| v.checksum_ok()).map(|v| ospf::Packet::read(&v));
+  let lsa = ospf::Lsa::new(ospf::LSA_ROUTER, rid, rid, ospf::INITIAL_SEQ, ospf::OPT_E, body).to_bytes();
+  assert!(ospf::lsa_checksum_ok(&lsa));
+  ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
   nonces use `plat::random_bytes`.
@@ -2712,6 +2761,9 @@ let c = t.complete(conf, "int gi", &names);   // c.line == Some("int GigabitEthe
 * Write the help texts, mode titles and status lines in your own words; only the command
   words, their syntax, configuration lines and short `%` errors should follow the original
   (JFNetworker's rule, see its README).
+* IPv6 parameters: `X:X:X:X::X` (an address in the text of RFC 4291 2.2; `Parsed::ip6` gives
+  its 16 bytes) and `X:X:X:X::X/<0-128>` (with a prefix length; `Parsed::prefix6`);
+  `cmdtree::parse_ipv6` reads such an address alone.
 
 ## 27. Keyboard operation
 

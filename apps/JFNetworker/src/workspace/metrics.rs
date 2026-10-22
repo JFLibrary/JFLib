@@ -296,6 +296,7 @@ pub(crate) fn kind_name(kind: &str) -> &str {
         "tcp-discard" => t("TCP-Discard"),
         "tcp-client" => t("TCP-Testclient"),
         "rip" => t("Routing (RIP)"),
+        "ospf" => t("Routing (OSPF)"),
         _ => kind,
     }
 }

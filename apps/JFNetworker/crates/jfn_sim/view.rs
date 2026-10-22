@@ -6,8 +6,9 @@
 //   Engine::in_flight(limit)        frames with t_tx <= now < t_rx (newest first, at most
 //                                   `limit` recent frames are looked at)
 //   Engine::ifaces(dev) / routes(dev) / arp_table(dev)
-//                                   IPv4 interfaces with their state, the routing table as
-//                                   it is used now, the ARP cache without aged entries
+//                                   IPv4 interfaces with their state (and their IPv6
+//                                   addresses: IfView::addrs6), the routing table as it is
+//                                   used now, the ARP cache without aged entries
 //   Engine::describe(&DevEvent)     the German sentence of a decision, with the device's
 //                                   port and interface names; Engine::message(&DevEvent): the
 //                                   same as a Msg for the app's catalogue (EventRow::msg too)
@@ -72,6 +73,8 @@ pub struct IfView {
     /// carries traffic
     pub up: bool,
     pub proxy_arp: bool,
+    /// its IPv6 addresses, the link-local one first (empty without IPv6: nd.rs)
+    pub addrs6: Vec<crate::nd::Addr6View>,
 }
 
 /// an entry of the ARP cache
@@ -222,6 +225,7 @@ impl Engine {
                 },
                 up: self.iface_up(ni, i as u16),
                 proxy_arp: f.proxy_arp,
+                addrs6: self.addrs6_of(ni, i as u16),
             })
             .collect()
     }

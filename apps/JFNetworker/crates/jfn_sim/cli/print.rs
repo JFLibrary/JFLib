@@ -17,6 +17,8 @@
 //   Linux traceroute "traceroute to ... 30 hops max, 60 byte packets", a line per hop; names
 //                    as with ping (no reverse lookups: a hop shows "ADDR (ADDR)", as
 //                    traceroute does when an address has no name)
+//   IPv6             ping and traceroute over IPv6 (JobOut::Ping6, JobOut::Trace6) print in
+//                    print6.rs
 //   dhclient         (cli/netsvc.rs) the DHCP client's lines while it acquires or releases
 //   Proc, Top        console programs (curl, nc) and top keep the console busy the same way
 //                    (cli/tools.rs): a program ends through OsApi::exit, top draws a screen
@@ -97,6 +99,30 @@ pub enum JobOut {
         release: bool,
         until: Ns,
     },
+    /// ping over IPv6 (print6.rs): IOS-like or iputils; `shown`: the destination as typed
+    /// (with its "%IF"), `from`: the interface of "-I" (the first line names it)
+    Ping6 {
+        ios: bool,
+        col: usize,
+        seen: usize,
+        sent: u32,
+        last_send: Ns,
+        head: bool,
+        t0: Ns,
+        shown: String,
+        from: Option<String>,
+    },
+    /// traceroute over IPv6 (print6.rs)
+    Trace6 {
+        ios: bool,
+        hop: usize,
+        probe: usize,
+        last: Option<netpkt::Ipv6>,
+        wrote: bool,
+        numeric: bool,
+        head: bool,
+        shown: String,
+    },
 }
 
 /// the mark of an IOS ping probe
@@ -135,6 +161,11 @@ fn ios_summary(events: &[PingEv], sent: u32) -> String {
             _ => None,
         })
         .collect();
+    ios_summary_ms(&rtts, sent)
+}
+
+/// "Success rate is ..." from the round trips of the replies in milliseconds (IPv6 too)
+pub(crate) fn ios_summary_ms(rtts: &[u64], sent: u32) -> String {
     let rx = rtts.len() as u32;
     let pct = if sent == 0 { 0 } else { rx * 100 / sent };
     let mut s = format!("Success rate is {} percent ({}/{})", pct, rx, sent);
@@ -157,6 +188,11 @@ fn linux_summary(dst: &str, events: &[PingEv], sent: u32, errors: u32, time: Ns)
             _ => None,
         })
         .collect();
+    linux_summary_us(dst, &us, sent, errors, time)
+}
+
+/// the statistics from the round trips of the replies in microseconds (IPv6 too)
+pub(crate) fn linux_summary_us(dst: &str, us: &[u64], sent: u32, errors: u32, time: Ns) -> String {
     let rx = us.len() as u64;
     let mut s = format!("\n--- {} ping statistics ---\n{} packets transmitted, {} received", dst, sent, rx);
     if errors > 0 {
@@ -265,6 +301,11 @@ impl Engine {
         };
         if let JobOut::Dhclient { .. } = cj.out {
             self.dhclient_progress(ni);
+            return;
+        }
+        // over IPv6 (print6.rs)
+        if matches!(cj.out, JobOut::Ping6 { .. } | JobOut::Trace6 { .. }) {
+            self.job6_progress(ni);
             return;
         }
         let Some(job) = self.job(cj.id).cloned() else {
@@ -526,6 +567,7 @@ impl Engine {
                 self.console_kill(ni, *svc);
                 String::from("\n")
             }
+            (JobOut::Ping6 { .. } | JobOut::Trace6 { .. }, _) => self.job6_interrupted(&cj),
             _ => String::from("\n"),
         };
         self.out(ni, &text);

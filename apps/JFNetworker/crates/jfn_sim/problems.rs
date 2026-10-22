@@ -16,6 +16,7 @@
 //   Loop                switches and hubs in a circle, unless every switch in it runs spanning
 //                       tree (stp.rs); the text names those that do not when some do
 //   ShutWithAddress     an interface with an address that is shut down
+//   DuplicateIpv6       duplicate address detection found another node with an IPv6 address
 //
 // Problem::text is German; Problem::msg is the same as a template with arguments for the app's
 // catalogue (jfn_model::msg).
@@ -76,6 +77,7 @@ pub enum ProblemKind {
     WrongCable,
     Loop,
     ShutWithAddress,
+    DuplicateIpv6,
 }
 
 /// a problem of the set-up
@@ -224,6 +226,7 @@ impl Engine {
         self.shut_addrs(&mut out);
         self.cables(&mut out);
         self.loops(&tags, &mut out);
+        self.dup_ip6s(&mut out);
         out.sort_by(|a, b| (a.severity, a.dev, a.port, a.kind, &a.text).cmp(&(b.severity, b.dev, b.port, b.kind, &b.text)));
         out
     }
@@ -592,6 +595,38 @@ impl Engine {
                 msg!("Schleife ohne Spanning Tree über {} (VLAN {}): Broadcasts kreisen endlos.", names.join(", "), vl.join(", "))
             };
             out.push(problem(ProblemKind::Loop, Severity::Error, dev, Some(e.port), link, others, text));
+        }
+    }
+}
+
+impl Engine {
+    /// the IPv6 addresses duplicate address detection found taken (RFC 4862 5.4.5): the address
+    /// stays unused until the interface starts again
+    fn dup_ip6s(&self, out: &mut Vec<Problem>) {
+        for (&dev, &ni) in &self.dev_idx {
+            let Some(Some(n)) = self.nodes.get(ni) else {
+                continue;
+            };
+            let Some(st) = n.ip.as_ref() else {
+                continue;
+            };
+            for (i, f) in st.v6.ifs.iter().enumerate() {
+                let Some(x) = st.ifaces.get(i) else {
+                    continue;
+                };
+                for a in f.addrs.iter().filter(|a| a.state == crate::ip6::AddrState::Duplicate) {
+                    let port = match x.kind {
+                        IfKind::Port(p) | IfKind::Sub { port: p, .. } => Some(p),
+                        _ => None,
+                    };
+                    let others: Vec<u32> = a.dup_mac.and_then(|m| self.nodes.iter().flatten().find(|o| o.ports.iter().any(|p| p.mac == m) || o.base_mac == m)).map(|o| alloc::vec![o.dev]).unwrap_or_default();
+                    let m = match a.dup_mac {
+                        Some(mac) => msg!("{} ist an {} doppelt: die Adressprüfung (DAD) fand {} damit.", a.addr, x.name, mac),
+                        None => msg!("{} ist an {} doppelt: ein anderes Gerät prüft oder benutzt dieselbe Adresse.", a.addr, x.name),
+                    };
+                    out.push(Problem { kind: ProblemKind::DuplicateIpv6, severity: Severity::Error, dev, port, link: None, others, text: m.text(), msg: m });
+                }
+            }
         }
     }
 }

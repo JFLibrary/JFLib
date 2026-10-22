@@ -1,0 +1,90 @@
+R1: enable
+R3: enable
+# R3 (Priorität 0) ist sofort DROTHER, die anderen warten 40 s auf ihre Wahl
+run 39s
+R1: show ip ospf interface brief
+expect R1 output contains "Gi0/0/0      1     0               10.0.0.1/24        1     WAIT"
+R3: show ip ospf interface brief
+expect R3 output contains "Gi0/0/0      1     0               10.0.0.3/24        1     DROTH"
+R1: debug ip ospf events
+run 2s
+expect R1 output contains "OSPF: election on GigabitEthernet0/0/0: DR 2.2.2.2, BDR 1.1.1.1"
+R1: undebug all
+run 29s
+R2: enable
+R2: show ip ospf neighbor
+expect R2 output contains "1.1.1.1          50   FULL/BDR"
+expect R2 output contains "3.3.3.3           0   FULL/DROTHER"
+R1: show ip ospf neighbor
+R1: show ip ospf interface brief
+R1: show ip ospf
+R1: show ip ospf database
+R1: show ip route
+expect R1 route 0.0.0.0/0 via 10.0.0.4
+expect R1 route 192.168.50.0/24 via 10.0.0.4
+expect R1 route 10.1.5.0/24 via 10.1.15.5
+expect R1 route 10.2.6.0/24 via 10.2.16.6
+R3: show ip ospf neighbor
+expect R3 output contains "4.4.4.4           1   2WAY/DROTHER"
+R3: show ip route ospf
+expect R3 route 10.1.5.0/24 via 10.0.0.1
+R4: enable
+R4: show ip ospf
+R4: show ip protocols
+R4: show running-config
+expect R4 output contains "router ospf 1\n router-id 4.4.4.4\n redistribute static subnets\n network 10.0.0.0 0.0.0.255 area 0\n network 4.4.4.4 0.0.0.0 area 0\n default-information originate\n!"
+R5: enable
+R5: show ip route
+expect R5 route 0.0.0.0/0 via 10.1.15.1
+expect R5 route 10.0.0.0/24 via 10.1.15.1
+expect R5 route 10.2.6.0/24 via 10.1.15.1
+expect R5 route 192.168.50.0/24 via 10.1.15.1
+R5: show ip ospf database
+R6: enable
+R6: show ip route
+expect R6 route 0.0.0.0/0 via 10.2.16.1
+expect R6 route 10.1.5.0/24 via 10.2.16.1
+expect R6 no route 192.168.50.0/24
+R6: show ip ospf database
+expect R6 output not contains "AS External"
+PC5: ping -c 2 192.168.50.1
+PC6: ping -c 2 203.0.113.1
+run 12s
+expect PC5 output contains "64 bytes from 192.168.50.1: icmp_seq=2"
+expect PC6 output contains "64 bytes from 203.0.113.1: icmp_seq=2"
+# ISP antwortet wie ein IOS-artiger Router von seinem Interface zu R4 und lässt eine der drei
+# Proben unbeantwortet (höchstens ein Unreachable alle 500 ms)
+PC5: traceroute -n 192.168.50.1
+run 10s
+expect PC5 output contains " 2  10.1.15.1"
+expect PC5 output contains " 3  10.0.0.4"
+expect PC5 output contains " 4  198.51.100.2"
+# der DR R2 fällt aus: der BDR R1 übernimmt nach dem Dead-Intervall, R4 wird BDR
+R1: debug ip ospf events
+power off R2
+run 45s
+expect R1 output contains "OSPF: neighbour 2.2.2.2 on GigabitEthernet0/0/0: FULL -> DOWN (InactivityTimer)"
+expect R1 output contains "OSPF: election on GigabitEthernet0/0/0: DR 1.1.1.1, BDR 4.4.4.4"
+R1: undebug all
+R1: show ip ospf neighbor
+R1: show ip ospf interface brief
+expect R1 output contains "Gi0/0/0      1     0               10.0.0.1/24        1     DR"
+R4: show ip ospf neighbor
+R3: show ip route ospf
+expect R3 route 10.1.5.0/24 via 10.0.0.1
+expect R3 no route 2.2.2.2/32
+# Bereich 2 wird total stubby (no-summary): R6 kennt nur noch die Standardroute
+R1: configure terminal
+R1: router ospf 1
+R1: area 2 stub no-summary
+R1: end
+run 10s
+R6: show ip route ospf
+expect R6 route 0.0.0.0/0 via 10.2.16.1
+expect R6 no route 10.1.5.0/24
+R6: show ip ospf database
+PC6: ping -c 2 192.168.50.1
+run 5s
+expect PC6 output contains "64 bytes from 192.168.50.1: icmp_seq=2"
+expect R1 svc ospf metric full == 4
+expect hops ospf >= 200

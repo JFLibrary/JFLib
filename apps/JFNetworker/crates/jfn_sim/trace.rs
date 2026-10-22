@@ -11,7 +11,10 @@
 //                                                 states and decisions are layer 4 (tcp.rs),
 //                                                 HTTP's layer 7 (http.rs, httpsvc.rs), and so
 //                                                 are RIP's (rip.rs: Note::is_rip); spanning
-//                                                 tree's layer 2 (stp.rs; is_stp, is_stp_event)
+//                                                 tree's layer 2 (stp.rs; is_stp, is_stp_event);
+//                                                 OSPF's layer 3, as IP carries it directly
+//                                                 (ospf.rs: Note::is_ospf), and IPv6's layer 3
+//                                                 (trace6.rs: Note::V6)
 //   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
 //                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
@@ -402,6 +405,49 @@ pub enum Note {
     /// of a datagram whose first part never came are dropped
     NatFragWait { id: u16 },
     NatFragDropped { id: u16, parts: u16 },
+    /// IPv6 (trace6.rs: neighbor discovery, addresses, forwarding, ICMPv6)
+    V6(crate::trace6::Note6),
+    /// OSPF (ospf.rs; `iface` is an IPv4 interface, a neighbour is named by its router ID): the
+    /// process took this router ID
+    OspfRouterId { id: Ipv4 },
+    /// a Hello went out (with the neighbours it names) / was taken
+    OspfHelloSent { iface: u16, nbrs: u16 },
+    OspfHelloRcvd { from: Ipv4, iface: u16 },
+    /// a packet was ignored (`from`: its source address)
+    OspfIgnored { from: Ipv4, iface: u16, why: crate::ospf::OspfDrop },
+    /// an interface changed its state (9.3)
+    OspfIfState { iface: u16, from: crate::ospf::IfState, to: crate::ospf::IfState },
+    /// the DR election of an interface: DR and BDR by router ID (0.0.0.0: none)
+    OspfDr { iface: u16, dr: Ipv4, bdr: Ipv4 },
+    /// a neighbour changed its state, and the event that did it (10.3)
+    OspfNbr { nbr: Ipv4, iface: u16, from: crate::ospf::NbrState, to: crate::ospf::NbrState, ev: crate::ospf::NbrEvent },
+    /// the negotiation of a database exchange: this router is the master (or the slave)
+    OspfMaster { nbr: Ipv4, iface: u16, master: bool },
+    /// a Database Description packet went out / came in (flags, sequence number, LSA headers)
+    OspfDd { nbr: Ipv4, iface: u16, out: bool, flags: u8, seq: u32, lsas: u16 },
+    /// a Link State Request
+    OspfLsr { nbr: Ipv4, iface: u16, out: bool, lsas: u16 },
+    /// a Link State Update (`nbr` None: flooded to a group)
+    OspfLsu { nbr: Option<Ipv4>, iface: u16, out: bool, lsas: u16, why: crate::ospf::LsuWhy },
+    /// a Link State Acknowledgment (delayed ones go to a group)
+    OspfAck { nbr: Option<Ipv4>, iface: u16, out: bool, lsas: u16, delayed: bool },
+    /// the database: a newer instance from a neighbour installed, an own one made, flooded out of
+    /// so many interfaces, acknowledged by a neighbour (explicitly or implied), an own one flushed
+    /// (premature aging), one at MaxAge, one removed, an older one answered with the database
+    /// copy, one dropped
+    OspfLsaNew { lsa: crate::ospf::LsaRef, from: Ipv4 },
+    OspfLsaOrig { lsa: crate::ospf::LsaRef, why: crate::ospf::OrigWhy },
+    OspfLsaFlooded { lsa: crate::ospf::LsaRef, ifaces: u16 },
+    OspfLsaAcked { lsa: crate::ospf::LsaRef, nbr: Ipv4 },
+    OspfLsaFlush { lsa: crate::ospf::LsaRef },
+    OspfLsaAged { lsa: crate::ospf::LsaRef },
+    OspfLsaGone { lsa: crate::ospf::LsaRef },
+    OspfLsaOlder { lsa: crate::ospf::LsaRef, nbr: Ipv4 },
+    OspfLsaDropped { lsa: crate::ospf::LsaRef, why: crate::ospf::LsaDrop },
+    /// SPF ran (its number, the routes now, how many came, changed and went), and a route that
+    /// came, changed (next hop or cost) or went (`via` 0.0.0.0: a network the router is on)
+    OspfSpf { run: u32, routes: u16, added: u16, changed: u16, removed: u16 },
+    OspfRoute { prefix: Prefix4, kind: crate::ospf::RtKind, cost: u32, via: Ipv4, what: crate::ospf::RtChange },
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -521,6 +567,8 @@ impl Note {
             n if n.is_rip() => 7,
             Note::IpGroupIgnored { .. } => 3,
             n if n.is_filter() => 3,
+            Note::V6(_) => 3,
+            n if n.is_ospf() => 3,
             _ => 2,
         }
     }
@@ -656,7 +704,9 @@ impl Note {
                 | Note::NatExhausted { .. }
                 | Note::NatErrorDropped
                 | Note::NatFragDropped { .. }
-        )
+                | Note::OspfIgnored { .. }
+                | Note::OspfLsaDropped { .. }
+        ) || matches!(self, Note::V6(n) if n.is_drop())
     }
     /// a TCP decision (tcp.rs)
     pub fn is_tcp(&self) -> bool {
@@ -1060,7 +1110,121 @@ impl Note {
             Note::NatErrorDropped => msg!("NAT: ICMP-Fehler ohne passende Übersetzung verworfen."),
             Note::NatFragWait { id } => msg!("NAT: Fragment (ID {}) wartet auf das erste Fragment.", id),
             Note::NatFragDropped { id, parts } => msg!("NAT: {} Fragmente (ID {}) ohne erstes Fragment verworfen.", parts, id),
+            Note::V6(n) => n.message(port, iface),
+            n @ (Note::OspfRouterId { .. }
+            | Note::OspfHelloSent { .. }
+            | Note::OspfHelloRcvd { .. }
+            | Note::OspfIgnored { .. }
+            | Note::OspfIfState { .. }
+            | Note::OspfDr { .. }
+            | Note::OspfNbr { .. }
+            | Note::OspfMaster { .. }
+            | Note::OspfDd { .. }
+            | Note::OspfLsr { .. }
+            | Note::OspfLsu { .. }
+            | Note::OspfAck { .. }
+            | Note::OspfLsaNew { .. }
+            | Note::OspfLsaOrig { .. }
+            | Note::OspfLsaFlooded { .. }
+            | Note::OspfLsaAcked { .. }
+            | Note::OspfLsaFlush { .. }
+            | Note::OspfLsaAged { .. }
+            | Note::OspfLsaGone { .. }
+            | Note::OspfLsaOlder { .. }
+            | Note::OspfLsaDropped { .. }
+            | Note::OspfSpf { .. }
+            | Note::OspfRoute { .. }) => ospf_message(n, iface),
         }
+    }
+}
+
+// ---------------------------------------------------------------- OSPF
+
+impl Note {
+    /// a decision of OSPF (ospf.rs)
+    pub fn is_ospf(&self) -> bool {
+        matches!(
+            self,
+            Note::OspfRouterId { .. }
+                | Note::OspfHelloSent { .. }
+                | Note::OspfHelloRcvd { .. }
+                | Note::OspfIgnored { .. }
+                | Note::OspfIfState { .. }
+                | Note::OspfDr { .. }
+                | Note::OspfNbr { .. }
+                | Note::OspfMaster { .. }
+                | Note::OspfDd { .. }
+                | Note::OspfLsr { .. }
+                | Note::OspfLsu { .. }
+                | Note::OspfAck { .. }
+                | Note::OspfLsaNew { .. }
+                | Note::OspfLsaOrig { .. }
+                | Note::OspfLsaFlooded { .. }
+                | Note::OspfLsaAcked { .. }
+                | Note::OspfLsaFlush { .. }
+                | Note::OspfLsaAged { .. }
+                | Note::OspfLsaGone { .. }
+                | Note::OspfLsaOlder { .. }
+                | Note::OspfLsaDropped { .. }
+                | Note::OspfSpf { .. }
+                | Note::OspfRoute { .. }
+        )
+    }
+}
+
+/// "DR 2.2.2.2" or "keiner"
+fn ospf_who(id: Ipv4) -> Msg {
+    if id.is_unspecified() { phrase("keiner") } else { Msg::plain(format!("{}", id)) }
+}
+
+/// the sentence of an OSPF decision
+fn ospf_message(n: &Note, iface: &dyn Fn(u16) -> String) -> Msg {
+    use crate::ospf::{LsuWhy, RtChange};
+    let flags = |f: u8| if f == 0 { phrase("keine") } else { Msg::plain(netpkt::ospf::dd_flags_text(f)) };
+    match n {
+        Note::OspfRouterId { id } => msg!("OSPF: der Prozess arbeitet mit der Router-ID {}.", id),
+        Note::OspfHelloSent { iface: i, nbrs: 0 } => msg!("OSPF: Hello über {} an 224.0.0.5, noch kein Nachbar gesehen.", iface(*i)),
+        Note::OspfHelloSent { iface: i, nbrs } => msg!("OSPF: Hello über {} an 224.0.0.5, gesehene Nachbarn: {}.", iface(*i), nbrs),
+        Note::OspfHelloRcvd { from, iface: i } => msg!("OSPF: Hello von {} über {}.", from, iface(*i)),
+        Note::OspfIgnored { from, iface: i, why } => msg!("OSPF: Paket von {} über {} ignoriert: {}.", from, iface(*i), phrase(why.text())),
+        Note::OspfIfState { iface: i, from, to } => msg!("OSPF: {} wechselt von {} nach {}.", iface(*i), from.name(), to.name()),
+        Note::OspfDr { iface: i, dr, bdr } => msg!("OSPF: Wahl an {}: DR ist {}, BDR ist {}.", iface(*i), ospf_who(*dr), ospf_who(*bdr)),
+        Note::OspfNbr { nbr, iface: i, from, to, ev } => msg!("OSPF: Nachbar {} an {}: {} \u{2192} {} ({}).", nbr, iface(*i), from.name(), to.name(), ev.name()),
+        Note::OspfMaster { nbr, iface: i, master: true } => msg!("OSPF: Austausch mit {} an {}: dieser Router ist Master.", nbr, iface(*i)),
+        Note::OspfMaster { nbr, iface: i, master: false } => msg!("OSPF: Austausch mit {} an {}: dieser Router ist Slave.", nbr, iface(*i)),
+        Note::OspfDd { nbr, iface: i, out: true, flags: f, seq, lsas } => msg!("OSPF: Database Description an {} über {} (Flags {}, Nummer 0x{}, LSA-Köpfe: {}).", nbr, iface(*i), flags(*f), format!("{:08x}", seq), lsas),
+        Note::OspfDd { nbr, iface: i, out: false, flags: f, seq, lsas } => msg!("OSPF: Database Description von {} über {} (Flags {}, Nummer 0x{}, LSA-Köpfe: {}).", nbr, iface(*i), flags(*f), format!("{:08x}", seq), lsas),
+        Note::OspfLsr { nbr, iface: i, out: true, lsas } => msg!("OSPF: Link State Request an {} über {}, LSAs: {}.", nbr, iface(*i), lsas),
+        Note::OspfLsr { nbr, iface: i, out: false, lsas } => msg!("OSPF: Link State Request von {} über {}, LSAs: {}.", nbr, iface(*i), lsas),
+        Note::OspfLsu { nbr, iface: i, out: true, lsas, why } => match (why, nbr) {
+            (LsuWhy::Flood, _) | (_, None) => msg!("OSPF: Link State Update über {} an die Gruppe, LSAs: {} (Flooding).", iface(*i), lsas),
+            (LsuWhy::Answer, Some(a)) => msg!("OSPF: Link State Update an {} über {}, LSAs: {} (Antwort auf den Request).", a, iface(*i), lsas),
+            (LsuWhy::Rxmt, Some(a)) => msg!("OSPF: Link State Update an {} über {}, LSAs: {} (Wiederholung, nicht bestätigt).", a, iface(*i), lsas),
+            (LsuWhy::Back, Some(a)) => msg!("OSPF: Link State Update an {} über {}, LSAs: {} (die neuere Kopie der Datenbank).", a, iface(*i), lsas),
+        },
+        Note::OspfLsu { nbr, iface: i, out: false, lsas, .. } => msg!("OSPF: Link State Update von {} über {}, LSAs: {}.", ospf_who(nbr.unwrap_or_default()), iface(*i), lsas),
+        Note::OspfAck { iface: i, out: true, lsas, delayed: true, .. } => msg!("OSPF: verzögerte Bestätigung über {} an die Gruppe, LSAs: {}.", iface(*i), lsas),
+        Note::OspfAck { nbr, iface: i, out: true, lsas, delayed: false } => msg!("OSPF: direkte Bestätigung an {} über {}, LSAs: {}.", ospf_who(nbr.unwrap_or_default()), iface(*i), lsas),
+        Note::OspfAck { nbr, iface: i, out: false, lsas, .. } => msg!("OSPF: Bestätigung von {} über {}, LSAs: {}.", ospf_who(nbr.unwrap_or_default()), iface(*i), lsas),
+        Note::OspfLsaNew { lsa, from } => msg!("OSPF: {} von {} übernommen.", lsa.msg(), from),
+        Note::OspfLsaOrig { lsa, why } => msg!("OSPF: eigenes {} ({}).", lsa.msg(), phrase(why.text())),
+        Note::OspfLsaFlooded { lsa, ifaces } => msg!("OSPF: {} geflutet, Interfaces: {}.", lsa.msg(), ifaces),
+        Note::OspfLsaAcked { lsa, nbr } => msg!("OSPF: {} hat {} bestätigt.", nbr, lsa.msg()),
+        Note::OspfLsaFlush { lsa } => msg!("OSPF: eigenes {} wird mit MaxAge zurückgezogen.", lsa.msg()),
+        Note::OspfLsaAged { lsa } => msg!("OSPF: {} hat MaxAge (3600 s) erreicht und wird noch einmal geflutet.", lsa.msg()),
+        Note::OspfLsaGone { lsa } => msg!("OSPF: {} aus der Datenbank entfernt.", lsa.msg()),
+        Note::OspfLsaOlder { lsa, nbr } => msg!("OSPF: {} schickte eine ältere Instanz von {}: es bekommt die neuere.", nbr, lsa.msg()),
+        Note::OspfLsaDropped { lsa, why } => msg!("OSPF: {} verworfen: {}.", lsa.msg(), phrase(why.text())),
+        Note::OspfSpf { run, routes, added, changed, removed } => msg!("OSPF: SPF-Lauf {}: Routen: {}, neu: {}, geändert: {}, entfallen: {}.", run, routes, added, changed, removed),
+        Note::OspfRoute { prefix, kind, via, cost, what } => {
+            let hop = if via.is_unspecified() { phrase("direkt angeschlossen") } else { Msg::plain(format!("{}", via)) };
+            match what {
+                RtChange::Added => msg!("OSPF: Route {} ({}) über {}, Kosten {}.", prefix, phrase(kind.text()), hop, cost),
+                RtChange::Changed => msg!("OSPF: Route {} ({}) jetzt über {}, Kosten {}.", prefix, phrase(kind.text()), hop, cost),
+                RtChange::Removed => msg!("OSPF: Route {} ({}) entfällt.", prefix, phrase(kind.text())),
+            }
+        }
+        _ => Msg::default(),
     }
 }
 
@@ -1418,6 +1582,8 @@ impl Note {
             }
             Note::NatQuote { .. } | Note::NatErrorDropped => P_IPV4 | P_ICMP,
             n if n.is_filter() => P_IPV4,
+            Note::V6(n) => n.mask(),
+            n if n.is_ospf() => P_IPV4 | netpkt::decode::P_OSPF,
             _ => 0,
         }
     }

@@ -1069,8 +1069,7 @@ Fensterrand hinaus.
   `httpmsg`). Seit D1 auch Consistent Hashing mit vnodes und Präferenzlisten
   ([`base/hashring.rs`](../lib/base/hashring.rs)) und eine LRU-Tabelle nach Anzahl und Gewicht
   ([`base/lru.rs`](../lib/base/lru.rs); Gruppen `hashring`, `lru`), im Einsatz im
-  Loadbalancer, KV-Speicher und Cache des Labors von JFNetworker. Es fehlen: ICMPv6/NDP und
-  OSPF – sie kommen mit den Meilensteinen des Simulators. Dazu typisiertes JSON
+  Loadbalancer, KV-Speicher und Cache des Labors von JFNetworker. Dazu typisiertes JSON
   ([`agent_core/src/jmap.rs`](../lib/agent_core/src/jmap.rs): `record!`, `wire_enum!`, aus
   BackupCraft in die Library gezogen; `bc_proto` nutzt es mit) und eingerücktes JSON für
   Dateien (`json::stringify_pretty`), getestet mit der coretest-Gruppe `jmap`.
@@ -1090,6 +1089,17 @@ Fensterrand hinaus.
   RFC 1058, Requests und Antworten mit ihren Einträgen, der Authentifizierungs-Eintrag erkannt,
   Dissektor mit den Problemen, die ein Empfänger ablehnt; Gruppe `rip`), im Einsatz in den
   Routern und L3-Switches von JFNetworker.
+  Seit R3 auch OSPF ([`netpkt/ospf.rs`](../lib/netpkt/ospf.rs): Version 2 nach RFC 2328, der
+  Kopf mit Prüfsumme und Authentifizierungsfeld, Hello, Database Description, Request, Update und
+  Acknowledgement, Router-, Network-, Summary- und AS-externe LSAs mit der Fletcher-Prüfsumme,
+  welche von zwei Instanzen neuer ist, Dissektor mit jedem LSA; Gruppe `ospf`), im Einsatz in
+  den Routern und L3-Switches von JFNetworker.
+  Seit R5 auch ICMPv6 und Neighbor Discovery ([`netpkt/icmpv6.rs`](../lib/netpkt/icmpv6.rs):
+  Echo und Fehler nach RFC 4443 mit Zitat und Prüfsumme über den Pseudo-Header, Router- und
+  Neighbor-Solicitations und -Advertisements und Redirects nach RFC 4861 mit ihren Optionen und
+  der Prüfung des Empfängers; [`netpkt/ipv6.rs`](../lib/netpkt/ipv6.rs): Erweiterungsköpfe,
+  Fragmente und Reassembly nach RFC 8200 und 5722; Solicited-Node-Gruppen und EUI-64,
+  Dissektor mit jedem Feld; Gruppe `icmpv6`), im Einsatz im IPv6 von JFNetworker.
 - **P2** · *erledigt* · Style `netlab` ([`styles/netlab`](../styles/netlab)) für JFNetworker:
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene

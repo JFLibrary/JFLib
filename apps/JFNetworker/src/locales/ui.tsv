@@ -870,3 +870,18 @@ Fehler|Zeitleiste	Faults
 
 # RIP (R2): the kind of the service in the Dienste tab and the Metriken panel
 Routing (RIP)	Routing (RIP)
+# IPv6 (R5): the IPv6 column of the interface grids, the addresses of the chosen interface (inspector/device.rs, devwin/mod.rs)
+IPv6	IPv6
+IPv6-Adressen	IPv6 addresses
+Link-Local	link-local
+Link-Local, manuell	link-local, manual
+manuell	manual
+EUI-64	EUI-64
+SLAAC	SLAAC
+Loopback	loopback
+wird geprüft (DAD)	being checked (DAD)
+doppelt (DAD)	duplicate (DAD)
+veraltet	deprecated
+
+# OSPF (R3): the kind of the service in the Dienste tab and the Metriken panel
+Routing (OSPF)	Routing (OSPF)
