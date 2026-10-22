@@ -28,6 +28,15 @@
 //            mode), "ip dhcp excluded-address", "ip helper-address", show ip dhcp binding|
 //            pool|conflict, clear ip dhcp, "ntp server", "ntp master"; dhclient and cat
 //            /etc/resolv.conf on the shell
+//   stp      spanning tree on IOS switches: "spanning-tree ...", show spanning-tree, debug
+//            spanning-tree events, clear spanning-tree detected-protocols
+//   rip      RIP at the IOS-like command line: "router rip" (its own mode), "ip rip send|receive
+//            version", show ip rip database, show ip protocols, the R routes of show ip route,
+//            debug ip rip, clear ip route *, the lines of the running configuration
+//   acl      IOS access lists: access-list, ip access-list standard|extended (their own
+//            modes), ip access-group, show access-lists, clear access-list counters
+//   nat      IOS NAT: ip nat inside|outside, ip nat pool, ip nat inside source, translation
+//            timeouts, show ip nat translations|statistics, clear ip nat, debug ip nat
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -61,10 +70,20 @@ pub mod print;
 pub mod tools;
 pub mod lab;
 pub mod scripts;
+pub mod stp;
+pub mod rip;
+pub mod acl;
+pub mod nat;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
 pub const D_ARP: u32 = 2;
+/// "debug spanning-tree events"
+pub const D_STP: u32 = 4;
+/// "debug ip rip" (a bit of its own, away from the low ones other protocols take)
+pub const D_RIP: u32 = 0x100;
+/// "debug ip nat" (a bit of its own, away from the others' next ones)
+pub const D_NAT: u32 = 0x200;
 
 /// where an IOS console is
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,6 +99,11 @@ pub enum Mode {
     Out,
     /// "ip dhcp pool NAME": "(dhcp-config)#"
     DhcpPool,
+    /// "router rip": "(config-router)#"
+    Router,
+    /// "ip access-list standard|extended NAME": "(config-std-nacl)#", "(config-ext-nacl)#"
+    AclStd,
+    AclExt,
 }
 
 /// how an interface's address was set ("show ip interface brief", column Method)
@@ -197,6 +221,8 @@ pub struct CliDev {
     /// debug arp: the received request already printed
     pub(crate) rcvd_hop: HopId,
     pub(crate) booting: bool,
+    /// the list of an access list's mode
+    pub acl: String,
 }
 
 impl CliDev {
@@ -218,6 +244,7 @@ impl CliDev {
             snap: Vec::new(),
             rcvd_hop: 0,
             booting: false,
+            acl: String::new(),
         }
     }
 }
@@ -240,6 +267,9 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
     match n {
         Note::LinkUp { .. } | Note::LinkDown { .. } => true,
         Note::ArpRequest { .. } | Note::ArpReply { .. } | Note::ArpLearned { .. } | Note::ArpProxied { .. } | Note::EchoAnswered { .. } | Note::IcmpSent { .. } | Note::IpLocal { .. } => c.debug > 0,
+        n if n.is_stp_event() => c.debug > 0,
+        n if n.is_rip() => c.debug > 0,
+        n if n.is_nat() => c.debug > 0,
         _ => false,
     }
 }
@@ -490,6 +520,8 @@ impl Engine {
             c.ifs.clear();
             c.vlans.clear();
         }
+        // spanning tree starts with the whole configuration read (stp.rs)
+        self.stp_booted(ni);
         if style == CliStyle::Ios {
             self.ios_snap(ni);
         }

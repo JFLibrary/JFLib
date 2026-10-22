@@ -11,7 +11,9 @@
 //
 // Modes: User ">", Priv "#", Config "(config)#", If "(config-if)#", SubIf "(config-subif)#",
 // Vlan "(config-vlan)#", Line "(config-line)#", DhcpPool "(dhcp-config)#" (the DHCP commands
-// are in netsvc.rs).  Interfaces are taken by any IOS spelling
+// are in netsvc.rs), Router "(config-router)#" ("router rip": rip.rs), AclStd
+// "(config-std-nacl)#" and AclExt "(config-ext-nacl)#" (acl.rs; found by their prompt,
+// tree_mode).  Interfaces are taken by any IOS spelling
 // ("g0/0/0", "Gi 0/0/0", "lo0", "vlan 10"); "interface Loopback5", "interface Vlan20" and
 // "interface Gi0/0/0.10" make them.  A subinterface gets its VLAN with "encapsulation dot1Q";
 // until then it takes no address (as IOS).  Addresses: "ip address" replaces the primary
@@ -27,7 +29,7 @@ use base::cmdtree::{Error, ModeId, Names, Parsed, Tree, F_HIDDEN, F_NO};
 use jfn_model::catalog::{Media, F_AP, F_BRIDGE, F_ROUTER};
 use netpkt::{Ipv4, Mac, Prefix4};
 
-use super::{Ask, AskKind, LineCfg, Method, Mode, D_ARP, D_ICMP};
+use super::{Ask, AskKind, LineCfg, Method, Mode, D_ARP, D_ICMP, D_RIP};
 use crate::action::{ActErr, Action};
 use crate::bridge::{SwMode, SwSet, VlanSet};
 use crate::driver::Report;
@@ -107,6 +109,48 @@ pub enum K {
     // NTP (cli/netsvc.rs)
     NtpServer,
     NtpMaster,
+    // spanning tree (cli/stp.rs)
+    ShowStp,
+    DebugStp,
+    ClearStp,
+    StpMode,
+    StpPriority,
+    StpTimer,
+    StpIf,
+    // RIP (cli/rip.rs)
+    RouterRip,
+    RipVersion,
+    RipNetwork,
+    RipPassive,
+    RipAutoSummary,
+    RipDefault,
+    RipRedist,
+    RipTimers,
+    RipDistance,
+    RipMaxPaths,
+    RipIfVersion,
+    ShowRipDb,
+    ShowProtocols,
+    ClearRoute,
+    // access lists (cli/acl.rs)
+    AclStd,
+    AclExt,
+    AclRemark,
+    AclNamed,
+    AclSeqNo,
+    AclReseq,
+    AccessGroup,
+    ShowAcl,
+    ClearAcl,
+    // NAT (cli/nat.rs)
+    NatSide,
+    NatPool,
+    NatList,
+    NatStatic,
+    NatTimeout,
+    ShowNatTrans,
+    ShowNatStats,
+    ClearNat,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -118,6 +162,7 @@ const SUBIF: ModeId = 4;
 const VLAN: ModeId = 5;
 const LINE: ModeId = 6;
 const POOL: ModeId = 7;
+const ROUTER: ModeId = 8;
 
 const CAP_BRIDGE: u32 = 1;
 const CAP_ROUTER: u32 = 2;
@@ -133,6 +178,18 @@ fn mode_id(m: Mode) -> ModeId {
         Mode::Vlan => VLAN,
         Mode::Line => LINE,
         Mode::DhcpPool => POOL,
+        Mode::Router => ROUTER,
+        // modes of later parts are found by their prompt (tree_mode)
+        Mode::AclStd | Mode::AclExt => CONF,
+    }
+}
+
+/// the mode of the tree for a console mode: the fixed ones by number, those that cli/acl.rs
+/// (and later parts) add by their prompt, so their numbers may differ from tree to tree
+fn tree_mode(t: &Tree<K>, m: Mode) -> ModeId {
+    match m {
+        Mode::AclStd | Mode::AclExt => t.find_mode(prompt_suffix(m)).unwrap_or(CONF),
+        _ => mode_id(m),
     }
 }
 
@@ -148,6 +205,9 @@ pub fn prompt_suffix(m: Mode) -> &'static str {
         Mode::Line => "(config-line)#",
         Mode::Out => "",
         Mode::DhcpPool => "(dhcp-config)#",
+        Mode::Router => "(config-router)#",
+        Mode::AclStd => "(config-std-nacl)#",
+        Mode::AclExt => "(config-ext-nacl)#",
     }
 }
 
@@ -167,7 +227,8 @@ fn build(caps: u32) -> Tree<K> {
     let vlan = t.mode("(config-vlan)#", "Commands for this VLAN:", Some(conf), Some(NEGATE));
     let line = t.mode("(config-line)#", "Commands for this line:", Some(conf), Some(NEGATE));
     let pool = t.mode("(dhcp-config)#", "Commands for this address pool:", Some(conf), Some(NEGATE));
-    debug_assert!(user == USER && prv == PRIV && conf == CONF && ifm == IFM && sub == SUBIF && vlan == VLAN && line == LINE && pool == POOL);
+    let rtr = t.mode("(config-router)#", "Commands for this routing process:", Some(conf), Some(NEGATE));
+    debug_assert!(user == USER && prv == PRIV && conf == CONF && ifm == IFM && sub == SUBIF && vlan == VLAN && line == LINE && pool == POOL && rtr == ROUTER);
 
     // ---- EXEC (user and privileged)
     for m in [user, prv] {
@@ -414,6 +475,17 @@ fn build(caps: u32) -> Tree<K> {
 
     // ---- DHCP server and relay, NTP (cli/netsvc.rs)
     super::netsvc::build_netsvc(&mut t, [user, prv, conf, ifm, sub, pool]);
+    // ---- spanning tree on switches (cli/stp.rs)
+    if bridge && caps & CAP_AP == 0 {
+        super::stp::build_stp(&mut t, [user, prv, conf, ifm]);
+    }
+    // ---- RIP (cli/rip.rs)
+    super::rip::build_rip(&mut t, [user, prv, conf, ifm, sub, rtr], router);
+    // ---- access lists with their two modes, NAT on routing devices (cli/acl.rs, cli/nat.rs)
+    super::acl::build_acl(&mut t, [user, prv, conf, ifm, sub]);
+    if router {
+        super::nat::build_nat(&mut t, [user, prv, conf, ifm, sub]);
+    }
     t
 }
 
@@ -560,14 +632,14 @@ impl Engine {
             let off = line.len() - rest.len();
             return tree.help(PRIV, rest, &names).render(col + off, rest);
         }
-        tree.help(mode_id(mode), line, &names).render(col, line)
+        tree.help(tree_mode(&tree, mode), line, &names).render(col, line)
     }
 
     /// Tab
     pub(crate) fn ios_complete(&self, ni: usize, line: &str) -> (Option<String>, Vec<String>) {
         let tree = self.ios_tree_ro(ni);
         let names = IosNames { e: self, ni };
-        let c = tree.complete(mode_id(self.ios_mode(ni)), line, &names);
+        let c = tree.complete(tree_mode(&tree, self.ios_mode(ni)), line, &names);
         (c.line, c.choices)
     }
 
@@ -583,12 +655,12 @@ impl Engine {
             return Ok(());
         }
         let tree = self.ios_tree(ni);
-        let parsed = tree.parse(mode_id(mode), line, &IosNames { e: self, ni });
+        let parsed = tree.parse(tree_mode(&tree, mode), line, &IosNames { e: self, ni });
         let r = match parsed {
             Ok(p) => self.ios_do(ni, mode, &p, line),
             Err(err) => {
                 // a configuration submode falls back to the global configuration
-                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
+                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool | Mode::Router | Mode::AclStd | Mode::AclExt) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
                 match up {
                     Some(p) => {
                         self.set_mode(ni, Mode::Config);
@@ -603,7 +675,7 @@ impl Engine {
     }
 
     /// "% Invalid input detected at '^' marker." under byte `at` of the line
-    fn ios_marker(&mut self, ni: usize, line: &str, at: usize) -> Result<(), String> {
+    pub(crate) fn ios_marker(&mut self, ni: usize, line: &str, at: usize) -> Result<(), String> {
         self.ios_error(ni, line, Error::Invalid(at.min(line.len())))
     }
 
@@ -619,7 +691,7 @@ impl Engine {
     }
 
     fn ios_parse_error(&mut self, ni: usize, mode: Mode, tree: &Tree<K>, err: Error, line: &str) -> Result<(), String> {
-        if matches!(mode, Mode::User | Mode::Priv) && !tree.knows_first(mode_id(mode), line) {
+        if matches!(mode, Mode::User | Mode::Priv) && !tree.knows_first(tree_mode(tree, mode), line) {
             // IOS takes an unknown word in EXEC for a host to connect to
             let word = line.split_whitespace().next().unwrap_or("");
             let lookup = self.cdev(ni).is_some_and(|c| c.cfg.domain_lookup);
@@ -706,9 +778,13 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP
+                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT
                 } else if p.has("icmp") {
                     D_ICMP
+                } else if p.has("rip") {
+                    D_RIP
+                } else if p.has("nat") {
+                    super::D_NAT
                 } else {
                     D_ARP
                 };
@@ -726,6 +802,8 @@ impl Engine {
                     (true, true, _) => String::from("Debug output: all off\n"),
                     (false, true, _) => String::from("Debug output: all on (a busy network prints a lot)\n"),
                     (o, _, D_ICMP) => format!("Debug output for ICMP: {}\n", if o { "off" } else { "on" }),
+                    (o, _, D_RIP) => format!("Debug output for RIP: {}\n", if o { "off" } else { "on" }),
+                    (o, _, super::D_NAT) => format!("Debug output for NAT: {}\n", if o { "off" } else { "on" }),
                     (o, _, _) => format!("Debug output for ARP: {}\n", if o { "off" } else { "on" }),
                 };
                 self.out(ni, &text);
@@ -757,6 +835,10 @@ impl Engine {
             K::IpRoute => self.ios_route(ni, p),
             K::IpRouting => {
                 let _ = self.apply(Action::Forwarding { dev, on: !p.no });
+                // without routing there is no routing process either
+                if p.no {
+                    let _ = self.apply(Action::Rip { dev, set: crate::rip::RipSet::Process(false) });
+                }
                 Ok(())
             }
             K::DomainLookup => {
@@ -862,6 +944,43 @@ impl Engine {
             }
             K::DhcpPool | K::DhcpExcluded | K::PoolNetwork | K::PoolRouter | K::PoolDns | K::PoolDomain | K::PoolLease | K::ShowDhcpBinding | K::ShowDhcpPool | K::ShowDhcpConflict | K::ClearDhcp => self.ios_dhcp(ni, p),
             K::NtpServer | K::NtpMaster => self.ios_ntp(ni, p),
+            K::ShowStp | K::DebugStp | K::ClearStp | K::StpMode | K::StpPriority | K::StpTimer => self.ios_stp(ni, p),
+            K::StpIf => {
+                let ifs = self.cdev(ni).map(|c| c.ifs.clone()).unwrap_or_default();
+                let mut r = Ok(());
+                for f in ifs {
+                    if let Err(e) = self.ios_stp_if(ni, &f, p, line) {
+                        r = Err(e);
+                    }
+                }
+                r
+            }
+            K::AclStd | K::AclExt | K::AclRemark | K::AclNamed | K::AclSeqNo | K::AclReseq | K::ShowAcl | K::ClearAcl => self.ios_acl(ni, mode, p, line),
+            K::AccessGroup | K::NatSide => {
+                let ifs = self.cdev(ni).map(|c| c.ifs.clone()).unwrap_or_default();
+                let mut r = Ok(());
+                for f in ifs {
+                    if let Err(e) = self.ios_if_filter(ni, &f, p) {
+                        r = Err(e);
+                    }
+                }
+                r
+            }
+            K::RouterRip
+            | K::RipVersion
+            | K::RipNetwork
+            | K::RipPassive
+            | K::RipAutoSummary
+            | K::RipDefault
+            | K::RipRedist
+            | K::RipTimers
+            | K::RipDistance
+            | K::RipMaxPaths
+            | K::RipIfVersion
+            | K::ShowRipDb
+            | K::ShowProtocols
+            | K::ClearRoute => self.ios_rip(ni, p),
+            K::NatPool | K::NatList | K::NatStatic | K::NatTimeout | K::ShowNatTrans | K::ShowNatStats | K::ClearNat => self.ios_nat(ni, p),
         }
     }
 

@@ -559,3 +559,141 @@ Dienst {} auf {} gestoppt	Service {} on {} stopped
 Disk von {} langsam: {}	Disk of {} slow: {}
 Partition: {} | alle anderen	Partition: {} | all others
 Partition: {} | {}	Partition: {} | {}
+
+# jfn_sim: spanning tree (stp.rs, stp98.rs, rstp.rs; its notes in trace.rs, its loops in problems.rs)
+deaktiviert	disabled
+Root-Port	root port
+Designated-Port	designated port
+Alternate-Port	alternate port
+Backup-Port	backup port
+Disabled	Disabled
+Blocking	Blocking
+Listening	Listening
+Learning	Learning
+Forwarding	Forwarding
+Discarding	Discarding
+Die Bridge-Priorität {} geht nicht: 0 bis 61440 in Schritten von 4096.	The bridge priority {} does not work: 0 to 61440 in steps of 4096.
+Ein Spanning-Tree-Timer braucht mindestens eine Sekunde.	A spanning tree timer needs at least one second.
+Die Timer passen nicht zusammen: 2 × (Forward Delay − 1) ≥ Max Age ≥ 2 × (Hello Time + 1) (jetzt Hello {}, Forward Delay {}, Max Age {}).	The timers do not fit together: 2 × (Forward Delay − 1) ≥ Max Age ≥ 2 × (Hello Time + 1) (now Hello {}, Forward Delay {}, Max Age {}).
+Die Pfadkosten gehen von 1 bis 200000000.	Path costs go from 1 to 200000000.
+Die Port-Priorität {} geht nicht: 0 bis 240 in Schritten von 16.	The port priority {} does not work: 0 to 240 in steps of 16.
+TCN-BPDU an {} empfangen.	TCN BPDU received on {}.
+BPDU an {}: {} von {}, Root {}, Kosten {}{}.	BPDU on {}: {} from {}, root {}, cost {}{}.
+TCN-BPDU über {} an die Root-Bridge gesendet.	TCN BPDU sent to the root bridge over {}.
+BPDU über {}: {}, Root {}, Kosten {}{}.	BPDU over {}: {}, root {}, cost {}{}.
+BPDU an {} verworfen: diese Bridge spricht 802.1D (STP) und kennt RST-BPDUs nicht.	BPDU on {} dropped: this bridge speaks 802.1D (STP) and does not know RST BPDUs.
+BPDU an {} verworfen: ihr Message Age hat Max Age erreicht.	BPDU on {} dropped: its message age has reached max age.
+BPDU an {} verworfen: die eigene BPDU kam über eine Schleife zurück.	BPDU on {} dropped: the bridge's own BPDU came back over a loop.
+Verworfen: {} ist im Zustand {} (Spanning Tree).	Dropped: {} is in the {} state (spanning tree).
+Spanning Tree: {} ist jetzt {} (vorher {}).	Spanning tree: {} is now {} (was {}).
+Spanning Tree: {} wechselt von {} nach {}.	Spanning tree: {} goes from {} to {}.
+Spanning Tree: diese Bridge ist die Root-Bridge ({}).	Spanning tree: this bridge is the root bridge ({}).
+Spanning Tree: die Root-Bridge ist {}, über {} mit Kosten {}.	Spanning tree: the root bridge is {}, over {} at cost {}.
+Topologieänderung an {} erkannt.	Topology change detected on {}.
+Topologieänderung erkannt.	Topology change detected.
+Topologieänderung: TCN-BPDU über {} zur Root-Bridge.	Topology change: TCN BPDU over {} to the root bridge.
+Topologieänderung: TCN-BPDU zur Root-Bridge.	Topology change: TCN BPDU to the root bridge.
+Topologieänderung: TCN-BPDU an {}, wird bestätigt und weitergegeben.	Topology change: TCN BPDU on {}, acknowledged and passed on.
+Topologieänderung: TCN-BPDU empfangen.	Topology change: TCN BPDU received.
+Topologieänderung: die TCN-BPDU über {} ist bestätigt.	Topology change: the TCN BPDU over {} is acknowledged.
+Topologieänderung: die TCN-BPDU ist bestätigt.	Topology change: the TCN BPDU is acknowledged.
+Topologieänderung gemeldet an {} (TC-Flag).	Topology change reported on {} (TC flag).
+Topologieänderung gemeldet (TC-Flag).	Topology change reported (TC flag).
+Root-Bridge: ihre BPDUs tragen das TC-Flag für Max Age + Forward Delay.	Root bridge: its BPDUs carry the TC flag for max age + forward delay.
+Root-Bridge: die Topologieänderung ist vorbei, ihre BPDUs tragen kein TC-Flag mehr.	Root bridge: the topology change is over, its BPDUs no longer carry the TC flag.
+Topologieänderung: ein MAC-Eintrag an {} gelöscht.	Topology change: one MAC entry on {} removed.
+Topologieänderung: {} MAC-Einträge an {} gelöscht.	Topology change: {} MAC entries on {} removed.
+Topologieänderung: MAC-Einträge altern jetzt nach {} s (Forward Delay).	Topology change: MAC entries now age out after {} s (forward delay).
+MAC-Einträge altern wieder nach {} s.	MAC entries age out after {} s again.
+Spanning Tree: die Information an {} ist abgelaufen, keine BPDU in der Zeit.	Spanning tree: the information on {} has aged out, no BPDU in time.
+Spanning Tree: {} ist ein Edge-Port.	Spanning tree: {} is an edge port.
+Spanning Tree: an {} kam eine BPDU, er ist kein Edge-Port mehr.	Spanning tree: a BPDU arrived on {}, it is no edge port any more.
+Spanning Tree: an {} spricht der Nachbar 802.1D, der Port sendet Configuration BPDUs.	Spanning tree: the neighbour on {} speaks 802.1D, the port sends configuration BPDUs.
+Spanning Tree: {} versucht wieder RSTP.	Spanning tree: {} tries RSTP again.
+BPDU Guard: BPDU an {}, der Port wird abgeschaltet (err-disabled).	BPDU guard: BPDU on {}, the port is shut off (err-disabled).
+Schleife über {}: {} ohne Spanning Tree, Broadcasts kreisen endlos; „spanning-tree mode rstp“ dort schaltet ihn ein.	Loop through {}: {} without spanning tree, broadcasts circle endlessly; "spanning-tree mode rstp" there turns it on.
+Schleife über {} (VLAN {}): {} ohne Spanning Tree, Broadcasts kreisen endlos; „spanning-tree mode rstp“ dort schaltet ihn ein.	Loop through {} (VLAN {}): {} without spanning tree, broadcasts circle endlessly; "spanning-tree mode rstp" there turns it on.
+# jfn_sim: RIP (rip.rs): its decisions (Note::message), the reasons in them, its status lines and refusals
+RIP: fragt über {} nach der ganzen Tabelle (Request, Version {}).	RIP: asks on {} for the whole table (request, version {}).
+RIP: {} fragt über {} nach der ganzen Tabelle: Antwort folgt.	RIP: {} asks on {} for the whole table: an answer follows.
+RIP: {} fragt über {} nach einzelnen Routen: Antwort folgt.	RIP: {} asks on {} for single routes: an answer follows.
+RIP: Update (Version {}) über {} an {}, Routen: {}.	RIP: update (version {}) on {} to {}, routes: {}.
+RIP: Update (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.	RIP: update (version {}) on {} to {}, routes: {}, poisoned by split horizon: {}.
+RIP: ausgelöstes Update (Version {}) über {} an {}, Routen: {}.	RIP: triggered update (version {}) on {} to {}, routes: {}.
+RIP: ausgelöstes Update (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.	RIP: triggered update (version {}) on {} to {}, routes: {}, poisoned by split horizon: {}.
+RIP: Antwort (Version {}) über {} an {}, Routen: {}.	RIP: answer (version {}) on {} to {}, routes: {}.
+RIP: Antwort (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.	RIP: answer (version {}) on {} to {}, routes: {}, poisoned by split horizon: {}.
+RIP: Update (Version {}) von {} über {}, Routen: {}.	RIP: update (version {}) from {} on {}, routes: {}.
+RIP: Nachricht von {} über {} ignoriert: {}.	RIP: message from {} on {} ignored: {}.
+RIP: Eintrag {} mit Metrik {} von {} ist ungültig: ignoriert.	RIP: entry {} with metric {} from {} is invalid: ignored.
+RIP: Route {} gelernt: über {}, Metrik {}.	RIP: route {} learned: via {}, metric {}.
+RIP: Route {} jetzt über {}, Metrik {} (vorher {}).	RIP: route {} now via {}, metric {} (was {}).
+RIP: ein weiterer gleich guter Weg zu {} über {} (Metrik {}).	RIP: one more equal-cost path to {} via {} (metric {}).
+RIP: {} über {} ist weg ({}): unerreichbar, wird mit Metrik 16 gemeldet.	RIP: {} via {} is lost ({}): unreachable, advertised with metric 16.
+RIP: der Weg zu {} über {} entfällt ({}); gleich gute Wege bleiben.	RIP: the path to {} via {} is dropped ({}); equal-cost paths remain.
+RIP: {} im Holddown: das Angebot von {} mit Metrik {} wird ignoriert.	RIP: {} is held down: the offer of {} with metric {} is ignored.
+RIP: {} aus der Tabelle gelöscht (Garbage Collection abgelaufen).	RIP: {} removed from the table (garbage collection over).
+RIP: meldet {} ({}).	RIP: advertises {} ({}).
+RIP: {} gibt es hier nicht mehr: wird mit Metrik 16 gemeldet.	RIP: {} is gone here: advertised with metric 16.
+Multicast an {} verworfen: kein Interface hört auf diese Gruppe.	Multicast to {} dropped: no interface listens to this group.
+diese Version nimmt das Interface nicht an	the interface does not take this version
+sie kommt nicht vom RIP-Port 520	it does not come from the RIP port 520
+der Absender liegt in keinem Netz des Interfaces	the sender is on none of the interface's subnets
+sie kommt von einer eigenen Adresse	it comes from an address of this device
+sie ist authentifiziert, hier ist keine Authentifizierung eingerichtet	it is authenticated, and no authentication is set up here
+RIP läuft auf diesem Interface nicht	RIP does not run on this interface
+Version 1 mit einem Feld, das null sein muss	version 1 with a must-be-zero field set
+unbekanntes Kommando	unknown command
+das Interface ist passiv	the interface is passive
+das Interface sendet diese Version nicht	the interface does not send this version
+unlesbare Nachricht	unreadable message
+der Nachbar meldet Metrik 16	the neighbour reports metric 16
+{} s ohne Update	no update for {} s
+das Interface ist ausgefallen	the interface went down
+der Nachbar meldet eine schlechtere Metrik	the neighbour reports a worse metric
+direkt angeschlossen	directly connected
+angeschlossen, über redistribute connected	connected, through redistribute connected
+statische Route, über redistribute static	static route, through redistribute static
+Standardroute, über default-information originate	default route, through default-information originate
+RIP ist nicht eingerichtet (kein router rip).	RIP is not set up (no router rip).
+RIP Version {}: Routen: {}, davon gelernt: {}, Nachbarn: {}; nächstes Update bei {}.	RIP version {}: routes: {}, learned: {}, neighbours: {}; next update at {}.
+RIP Version {}: wartet auf das Gerät.	RIP version {}: waiting for the device.
+{} routet nicht: hier gibt es kein RIP.	{} does not route: there is no RIP here.
+RIP kennt die Versionen 1 und 2.	RIP has the versions 1 and 2.
+{} ist kein Netz für RIP.	{} is no network for RIP.
+Die Zeiten passen nicht: Update und Invalid größer als 0, Flush nicht kürzer als Invalid.	The times do not fit: update and invalid above 0, flush not shorter than invalid.
+# jfn_sim: access lists and NAT (trace.rs notes, acl.rs, nat.rs)
+Zugriffsliste {} eingehend an {}: Zeile {} erlaubt das Paket.	Access list {} inbound on {}: line {} lets the packet through.
+Zugriffsliste {} ausgehend an {}: Zeile {} erlaubt das Paket.	Access list {} outbound on {}: line {} lets the packet through.
+Zugriffsliste {} eingehend an {}: Zeile {} verwirft das Paket.	Access list {} inbound on {}: line {} drops the packet.
+Zugriffsliste {} ausgehend an {}: Zeile {} verwirft das Paket.	Access list {} outbound on {}: line {} drops the packet.
+Zugriffsliste {} eingehend an {}: keine Zeile passt, verworfen (implizites deny).	Access list {} inbound on {}: no line matches, dropped (implicit deny).
+Zugriffsliste {} ausgehend an {}: keine Zeile passt, verworfen (implizites deny).	Access list {} outbound on {}: no line matches, dropped (implicit deny).
+NAT: neue Übersetzung {} {} = {} (Gegenstelle {}).	NAT: new translation {} {} = {} (peer {}).
+NAT: {} bekommt {} für alle Protokolle.	NAT: {} gets {} for every protocol.
+NAT: neue Zuordnung {} {} = {}.	NAT: new mapping {} {} = {}.
+NAT: Quelle {} → {} ({}).	NAT: source {} → {} ({}).
+NAT: Ziel {} → {} ({}).	NAT: destination {} → {} ({}).
+NAT: ICMP-Fehler zurückübersetzt, zitierte Quelle {} → {}.	NAT: ICMP error translated back, quoted source {} → {}.
+NAT: ICMP-Fehler übersetzt, zitiertes Ziel {} → {}.	NAT: ICMP error translated, quoted destination {} → {}.
+NAT: Übersetzung {} {} = {} (Gegenstelle {}) abgelaufen.	NAT: translation {} {} = {} (peer {}) expired.
+NAT: Zuordnung {} = {} abgelaufen.	NAT: mapping {} = {} expired.
+NAT: keine Übersetzung für {} ({}): unverändert weiter.	NAT: no translation for {} ({}): passed on unchanged.
+NAT: keine Regel übersetzt {}: unverändert weiter.	NAT: no rule translates {}: passed on unchanged.
+NAT: keine freie Adresse und kein freier Port ({}): verworfen.	NAT: no free address or port ({}): dropped.
+NAT: ICMP-Fehler ohne passende Übersetzung verworfen.	NAT: ICMP error without a matching translation dropped.
+NAT: Fragment (ID {}) wartet auf das erste Fragment.	NAT: fragment (ID {}) waits for the first fragment.
+NAT: {} Fragmente (ID {}) ohne erstes Fragment verworfen.	NAT: {} fragments (ID {}) dropped without their first fragment.
+{} (Kennung {})	{} (identifier {})
+Zugriffsliste {}: diese Zeilennummer gibt es schon.	Access list {}: this sequence number exists already.
+Zugriffsliste {}: keine Zeilennummer mehr frei.	Access list {}: no sequence number left.
+Zugriffsliste {} ist eine Standardliste.	Access list {} is a standard list.
+Zugriffsliste {} ist eine erweiterte Liste.	Access list {} is an extended list.
+Die Zugriffsliste {} gibt es nicht.	Access list {} does not exist.
+Zugriffsliste {}: keine solche Zeile.	Access list {}: no such line.
+Zugriffsliste {}: so lassen sich die Zeilen nicht nummerieren.	Access list {}: the lines cannot be numbered like that.
+Pool {}: Anfang und Ende liegen nicht im selben Netz.	Pool {}: start and end are not in the same network.
+Pool {} ist in Gebrauch.	Pool {} is in use.
+Pool {} gibt es nicht.	Pool {} does not exist.
+Diese Adresse hat schon eine statische Übersetzung.	This address has a static translation already.
+Keine solche NAT-Regel.	No such NAT rule.

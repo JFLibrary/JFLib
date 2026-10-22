@@ -32,6 +32,10 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **text:** text::segment::cluster_end: the end of the grapheme cluster that starts at a boundary (walks over a text without looking back)
 - **ui:** Test scripts: bench N key CHORD [MAX_US] and bench N type "s" [MAX_US] time frames of key presses and typing; ui::code_long_check (tests) checks what the code editor keeps of long lines against a fresh look
 - **plat:** plat::UiaTestElem::localized_type (tests): an element's LocalizedControlType
+- **netpkt:** BPDUs of the spanning tree protocols (netpkt::stp): Configuration and TCN BPDUs of IEEE 802.1D-1998 and RST BPDUs of 802.1D-2004 with their flags and port roles, BridgeId and PortId, the path costs of 802.1D-2004 Table 17-3, validation as 9.3.4 says, the 802.3 / LLC frames to 01:80:c2:00:00:00; decode::layers shows every field and flag of a BPDU, decode::info sums it up
+- **netpkt:** RIP messages (netpkt::rip: version 2 after RFC 2453 and version 1 after RFC 1058, requests and responses with their route entries, the authentication entry recognised, simple passwords read and written) and their dissection (decode::layers: a field per entry with its bytes and what a receiver refuses; decode::info: "RIPv2 Response, 3 routes")
+- **netpkt:** Address and port translation of IPv4 packets in place (netpkt::nat: Flow::of / Flow::quoted, rewrite and rewrite_quoted with incremental checksums of the header, TCP, UDP and ICMP, ICMP errors with the packet they quote per RFC 5508) and checksum::update for a changed run of bytes
+- **base:** Tree::find_mode(prompt): a mode by its prompt, so modes that parts of an app add need no fixed number
 
 ### Changed
 

@@ -1,0 +1,60 @@
+# RIP mit zwei Versionen: MLS1, ein L3-Switch, routet VLAN 10 und 20 und spricht RIPv2 nur auf
+# seinem gerouteten Uplink (passive-interface default); R1 meldet eine Standardroute und spricht
+# zu R2 Version 1 (ip rip send|receive version 1); R2, ein alter Router mit RIPv1, fasst seine
+# Subnetze von 172.16.0.0 an der Klassengrenze zusammen und lernt 10.0.0.0/8 ohne Maske. Eine
+# schwimmende statische Route auf R1 (Distanz 200) springt ein, als R1 die Version 1 nicht mehr
+# annimmt und die RIP-Route nach 180 s verfällt.
+R2: enable
+R2: debug ip rip
+run 5s
+expect R2 output contains "RIP: update v1 out of GigabitEthernet0/0/0 to 255.255.255.255, 1 route"
+expect R2 output contains "      172.16.0.0 metric 1"
+expect R2 output contains "RIP: new route 10.0.0.0/8 via 192.168.5.1, metric 2"
+R2: undebug all
+run 30s
+R2: show ip route
+expect R2 route 10.0.0.0/8 via 192.168.5.1
+expect R2 route 0.0.0.0/0 via 192.168.5.1
+R1: enable
+R1: show ip route
+expect R1 route 172.16.0.0/16 via 192.168.5.2
+expect R1 route 10.10.10.0/24 via 10.0.1.1
+R1: show ip protocols
+MLS1: enable
+MLS1: show ip route
+expect MLS1 route 0.0.0.0/0 via 10.0.1.2
+expect MLS1 route 172.16.0.0/16 via 10.0.1.2
+MLS1: show ip rip database
+MLS1: show running-config
+expect MLS1 output contains "router rip\n version 2\n passive-interface default\n no passive-interface GigabitEthernet1/0/24\n network 10.0.0.0\n no auto-summary\n!"
+expect hops rip >= 10
+PC1: ping -c 2 172.16.2.1
+run 12s
+expect PC1 output contains "64 bytes from 172.16.2.1: icmp_seq=2 ttl=253"
+# eine schwimmende statische Route: RIP (120) gewinnt
+R1: configure terminal
+R1: ip route 172.16.0.0 255.255.0.0 192.168.5.2 200
+R1: end
+R1: show ip route
+expect R1 output contains "R     172.16.0.0/16 [120/2] via 192.168.5.2"
+# R1 nimmt auf Gi0/0/1 nur noch Version 2: R2s Updates fallen weg, die Route verfällt
+R1: configure terminal
+R1: interface GigabitEthernet0/0/1
+R1: no ip rip receive version
+R1: end
+run 179s
+R1: show ip rip database
+expect R1 output contains "172.16.0.0/16    unreachable (metric 16): held down"
+R1: show ip route
+expect R1 route 172.16.0.0/16 via 192.168.5.2
+expect R1 output contains "S     172.16.0.0/16 [200/0] via 192.168.5.2"
+expect R1 svc rip metric timeouts == 1
+MLS1: show ip route
+expect MLS1 no route 172.16.0.0/16
+PC2: ping -c 2 172.16.1.1
+run 12s
+expect PC2 output contains "64 bytes from 172.16.1.1: icmp_seq=2 ttl=253"
+MLS1: clear ip route *
+run 1s
+MLS1: show ip route rip
+expect MLS1 route 0.0.0.0/0 via 10.0.1.2
