@@ -1,5 +1,7 @@
-// hmac -- HMAC (RFC 2104) over any Hash, HKDF (RFC 5869), PBKDF2 (RFC 8018)
+// hmac -- HMAC (RFC 2104) over any Hash, HKDF (RFC 5869), PBKDF2 (RFC 8018); HMAC-SHA1 and
+// PBKDF2-HMAC-SHA1 only for protocols defined with them (WPA2-Personal: its PMK, PRF and MIC)
 
+use crate::sha1::Sha1;
 use crate::sha2::{Sha256, Sha512};
 use crate::{zeroize, Hash};
 
@@ -132,4 +134,42 @@ pub fn pbkdf2_sha256(password: &[u8], salt: &[u8], iterations: u32, out: &mut [u
         zeroize(&mut u);
         zeroize(&mut acc);
     }
+}
+
+/// HMAC-SHA1 of a message (older protocols only: WPA2's PRF and MIC)
+pub fn hmac_sha1(key: &[u8], data: &[u8]) -> [u8; 20] {
+    let mut m = Hmac::<Sha1>::new(key);
+    m.update(data);
+    let mut out = [0u8; 20];
+    m.finish_into(&mut out);
+    out
+}
+
+/// PBKDF2 (RFC 8018 5.2) with HMAC over any Hash: fills `out` (any length)
+pub fn pbkdf2<H: Hash>(password: &[u8], salt: &[u8], iterations: u32, out: &mut [u8]) {
+    let base = Hmac::<H>::new(password);
+    for (i, chunk) in out.chunks_mut(H::OUT).enumerate() {
+        let mut m = base.clone();
+        m.update(salt);
+        m.update(&(i as u32 + 1).to_be_bytes());
+        let mut u = [0u8; 64];
+        m.finish_into(&mut u[..H::OUT]);
+        let mut acc = u;
+        for _ in 1..iterations.max(1) {
+            let mut m = base.clone();
+            m.update(&u[..H::OUT]);
+            m.finish_into(&mut u[..H::OUT]);
+            for (a, b) in acc.iter_mut().zip(&u[..H::OUT]) {
+                *a ^= b;
+            }
+        }
+        chunk.copy_from_slice(&acc[..chunk.len()]);
+        zeroize(&mut u);
+        zeroize(&mut acc);
+    }
+}
+
+/// PBKDF2-HMAC-SHA1 (the PMK of WPA2-Personal: passphrase, SSID, 4096 rounds, 32 bytes)
+pub fn pbkdf2_sha1(password: &[u8], salt: &[u8], iterations: u32, out: &mut [u8]) {
+    pbkdf2::<Sha1>(password, salt, iterations, out);
 }

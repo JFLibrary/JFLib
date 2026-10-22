@@ -956,3 +956,59 @@ Die Aufgabe braucht mindestens ein Kriterium.	The assessment needs at least one 
 Die Aufgabe braucht einen Titel (Deutsch).	The assessment needs a title (German).
 Die Aufgabe steht im Projekt; jetzt die Datei wählen.	The assessment is in the project; now choose the file.
 Mit Punkten	With points
+
+# WLAN (W1): View › WLAN ranges, the radio lines and ranges on the canvas (canvas/wlan.rs), the WLAN part of the inspector and the scale (inspector/wlan.rs)
+&WLAN-Reichweiten	&WLAN ranges
+außer Reichweite	out of range
+{} dBm, {} Mbit/s	{} dBm, {} Mbit/s
+Handshake läuft	handshake running
+Funk: {} – {} ({}, {}, {})	Radio: {} – {} ({}, {}, {})
+Reichweite: {}, {}	Range: {}, {}
+Funk: {} – nicht verbunden („{}“)	Radio: {} – not connected (“{}”)
+WLAN ({})	WLAN ({})
+Die Netze dieses Access Points. Eine Station nimmt in ihrer Reichweite das beste Netz ihrer SSID.	The networks of this access point. A station takes the best network of its SSID within its range.
+Netz ohne SSID	Network without SSID
+SSID	SSID
+Name des Netzes	Name of the network
+Band	Band
+Kanal	Channel
+Passphrase	Passphrase
+8 bis 63 Zeichen	8 to 63 characters
+Passphrase zeigen	Show passphrase
+keins	none
+Gastnetz	Guest network
+Client-Isolation	Client isolation
+Wird nicht angeboten: {}	Not offered: {}
+{} · {} dBm · {} Mbit/s	{} · {} dBm · {} Mbit/s
+Stationen	Stations
+Netz hinzufügen	Add network
+Reichweite	Range
+{}: {} m ({} Einheiten)	{}: {} m ({} units)
+kein Netz eingestellt	no network set
+aus (Gerät oder Port)	off (device or port)
+fest verbunden (Funkkabel des Projekts)	fixed (a radio cable of the project)
+sucht „{}“	looking for “{}”
+meldet sich bei „{}“ an	joining “{}”
+4-Wege-Handshake läuft	4-way handshake running
+verbunden	connected
+wechselt den Access Point	changing the access point
+{}. Fehlschlag, neuer Versuch in {} s	failure {}, next try in {} s
+„{}“ ist nicht in Reichweite	“{}” is not in range
+„{}“ braucht eine Passphrase	“{}” needs a passphrase
+aufgegeben nach {} Fehlschlägen: Passphrase prüfen	gave up after {} failures: check the passphrase
+WLAN	WLAN
+Access Point	Access point
+Netz	Network
+Signal	Signal
+{} dBm ({} von 4 Balken)	{} dBm ({} of 4 bars)
+Rate	Rate
+für WPA2 / WPA3	for WPA2 / WPA3
+In Reichweite	In range
+offen	open
+Die Station sucht ihr Netz, meldet sich beim besten Access Point an und wechselt, wenn ein anderer deutlich besser ist.	The station looks for its network, joins the best access point and moves on when another one is clearly better.
+Maßstab	Scale
+Je Meter	Per meter
+Eine ganze Zahl von 1 bis 1000.	A whole number from 1 to 1000.
+Ein Meter sind {} Einheiten der Zeichenfläche (bei 100 % Pixel); danach richten sich die Reichweiten im WLAN.	One meter is {} units of the canvas (pixels at 100%); the WLAN ranges follow it.
+Anmelden	Join
+Abmelden	Leave

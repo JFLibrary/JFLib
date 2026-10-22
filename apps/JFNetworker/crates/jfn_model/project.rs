@@ -38,6 +38,15 @@
 // was ("lab": null).  An assessment adds "assess" to the lab (lab.rs, A1): graded items with
 // points, the feedback, a time limit and the target network; the project is its start network,
 // a lab without one has "assess": null.
+//
+// WLAN (wlan.rs): a device's "wlan" holds the networks an access point offers and the network
+// a station joins ("wlan": null without), the project's "dip_per_m" the scale of the canvas
+// (world units per metre, 0: 10) the ranges of the radios are measured in:
+//
+//   "wlan": {"nets": [{"ssid": "Büro", "band": "5", "channel": 36, "security":
+//            "wpa2-personal", "passphrase": "geheim123", "vlan": 0, "guest": false,
+//            "isolate": false}], "join": null}
+//   "wlan": {"nets": [], "join": {"ssid": "Büro", "passphrase": "geheim123"}}
 
 use alloc::format;
 use alloc::string::String;
@@ -111,6 +120,9 @@ record! {
         pub startup_config: String,
         pub services: Vec<ServiceDef>,
         pub comment: String,
+        /// the WLAN settings: the networks of an access point, the one a station joins
+        /// (wlan.rs; None: none)
+        pub wlan: Option<crate::wlan::Wlan>,
     }
 }
 
@@ -181,6 +193,9 @@ record! {
         /// the task of a lab (title, goals with their checks, hints), None (null) for a free
         /// project
         pub lab: Option<Lab>,
+        /// the scale of the canvas: world units (DIP at 100 %) per metre, for the range of
+        /// radios (0: wlan::DIP_PER_M, 10)
+        pub dip_per_m: u32,
     }
 }
 
@@ -621,6 +636,18 @@ impl Project {
         }
         if self.next_id <= self.max_id() {
             v.push(Issue::new(false, None, None, msg!("Die nächste freie Nummer ist zu klein.")));
+        }
+        // WLAN settings (wlan.rs): what an access point cannot offer, what a station cannot join
+        for d in &self.devices {
+            let Some(w) = &d.wlan else { continue };
+            for n in &w.nets {
+                if let Some(m) = crate::wlan::check_net(n) {
+                    v.push(Issue::new(false, Some(d.id), None, m));
+                }
+            }
+            if let Some(m) = w.join.as_ref().and_then(crate::wlan::check_join) {
+                v.push(Issue::new(false, Some(d.id), None, m));
+            }
         }
         v
     }

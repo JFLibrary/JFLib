@@ -28,6 +28,8 @@
 // resolver, the services, cli/tools.rs, cli/names.rs).
 // assesstest.rs: assessments (group assess: jfn_model::lab's Assess and items, jfn_sim::assess,
 // the reach expectation, the Aufgabe panel's run, authoring, the samples of assets/assess).
+// wlantest.rs: WLAN (group wlan: jfn_model::wlan, jfn_sim::wlan, wlankey, wlantrace, cli/wlan.rs,
+// doc/wlan.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -83,9 +85,11 @@ mod ospftest;
 mod ipv6tcptest;
 #[path = "assesstest.rs"]
 mod assesstest;
+#[path = "wlantest.rs"]
+mod wlantest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 32] = [
+    let groups: [(&'static str, fn(&mut T)); 33] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -118,6 +122,7 @@ pub fn run() -> i32 {
         ("ospf", ospftest::run),
         ("ipv6tcp", ipv6tcptest::run),
         ("assess", assesstest::run),
+        ("wlan", wlantest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

@@ -15,6 +15,8 @@
 //   ip -6 addr|route|neigh, ping6 / ping -6, traceroute6 / traceroute -6, sysctl net.ipv6.*
 //   (linux6.rs; ip addr and ip neigh show both families, an IPv6 target picks IPv6 by itself)
 //   dig, host, nslookup (names.rs: their own questions to a name server)
+//   iw dev [IF info|link|scan|connect SSID [psk PASS]|disconnect|station dump] (cli/wlan.rs:
+//   WLAN; wlan0 shows in ip link as any port, NO-CARRIER until the handshake is done)
 //
 // Objects and commands of ip take any prefix, the first one of iproute2's order winning ("ip
 // a" is address, "ip r" route, "ip n" neighbour); output and error messages are those of
@@ -136,6 +138,7 @@ impl Engine {
             "script" => self.sh_script(ni, &args),
             "dhclient" => self.sh_dhclient(ni, &args),
             "cat" => self.sh_cat(ni, &args),
+            "iw" => self.sh_iw(ni, &args),
             "echo" => {
                 let t = format!("{}\n", args.join(" "));
                 self.out(ni, &t);
@@ -156,7 +159,7 @@ impl Engine {
         let w = words(line);
         let partial = !line.is_empty() && !line.ends_with(char::is_whitespace);
         let (list, done): (&[&str], usize) = match w.len() {
-            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "top", "traceroute", "workerctl"], 0),
+            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "top", "traceroute", "workerctl"], 0),
             2 if partial && w[0] == "ip" => (&["address", "link", "neighbour", "route"], 1),
             3 if partial && w[0] == "ip" => (&["add", "del", "flush", "get", "set", "show"], 2),
             _ => return (None, Vec::new()),

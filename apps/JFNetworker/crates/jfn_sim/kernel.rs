@@ -10,7 +10,8 @@
 //                                          and up: the inbox, the resolver, tcp::SLOT_TCP,
 //                                          services; stp::SLOT_STP the spanning tree's tick,
 //                                          nat::SLOT_NAT; ip6::SLOT_V6_KICK ..= SLOT_V6_LAST
-//                                          for IPv6, nd.rs)
+//                                          for IPv6, nd.rs; wlan::SLOT_WLAN_STA and
+//                                          SLOT_WLAN_AP for WLAN)
 //
 // Events are plain data in a slab and run in (time, sequence) order: two events at the same
 // time run in the order they were scheduled.  Nothing here reads a clock.  Before an event,
@@ -89,6 +90,8 @@ pub struct Engine {
     pub(crate) faults: crate::fault::Faults,
     /// the time series of the services and cables (series.rs)
     pub(crate) series: crate::series::Sampler,
+    /// WLAN: positions, settings, stations and associations (wlan.rs)
+    pub(crate) wlan: crate::wlan::WlanState,
 }
 
 impl Engine {
@@ -112,6 +115,7 @@ impl Engine {
             cli: crate::cli::EngineCli::default(),
             faults: crate::fault::Faults::default(),
             series: crate::series::Sampler::default(),
+            wlan: crate::wlan::WlanState::default(),
         }
     }
     /// the virtual time
@@ -251,6 +255,8 @@ impl Engine {
     fn on_timer(&mut self, node: usize, slot: u32) {
         if slot == crate::stp::SLOT_STP {
             self.stp_tick(node);
+        } else if slot == crate::wlan::SLOT_WLAN_STA || slot == crate::wlan::SLOT_WLAN_AP {
+            self.wlan_timer(node, slot);
         } else if slot >= crate::os::SLOT_OS {
             self.os_timer(node, slot);
         } else {

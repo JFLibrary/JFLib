@@ -213,6 +213,9 @@ pub enum Ctl {
     Release,
     /// ask again now ("dhclient", "renew dhcp")
     Renew,
+    /// the WLAN connection of the interface is up (wlan.rs, as wpa_supplicant's hook or a
+    /// network manager does it): a DHCP client without a lease starts at once
+    Carrier,
 }
 
 /// what happens to a service

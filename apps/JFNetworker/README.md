@@ -87,6 +87,13 @@ Queues, Lastgeneratoren, eigene Skripte).
   Rückmeldung je Kriterium, nur als Punktzahl oder erst nach dem Abgeben, wahlweise mit
   Zeitgrenze; Werkzeuge › Aufgabe erstellen … macht aus einem fertigen Netz eine Aufgabe mit
   Ausgangsnetz; drei Beispiele (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)).
+- **WLAN (W1):** Access Points und der Heimrouter bieten Netze an (SSID, 2,4, 5 oder 6 GHz mit
+  Kanal, offen, WPA2- oder WPA3-Personal, VLAN, Gastnetz, Client-Isolation), Laptops, Smartphones
+  und andere Stationen melden sich ohne Kabel an: Suche, Authentifizierung, Assoziation und der
+  4-Wege-Handshake mit echten EAPOL-Frames, Signal und Rate aus der Entfernung im Maßstab des
+  Projekts, Roaming beim Verschieben, Verbindungsverlust außer Reichweite; Funklinien,
+  Reichweiten und Signalbalken auf der Zeichenfläche, die Einstellungen im Inspektor, `iw` in der
+  Shell, `show dot11 associations` am Access Point (siehe [WLAN](#wlan)).
 
 ## Bedienung
 
@@ -198,15 +205,22 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `assess_solve.uis` | die Aufgaben im Panel: die Liste mit ihnen, „Ein Router für zwei Netze“ mit „Prüfen“ und den Befunden, in zwei Schritten in der Konsole gelöst (7, dann 20 von 20 Punkten), Rückgängig des Namens kostet seine Punkte; „Statische Routen über drei Router“ ohne Rückmeldung bis zum Abgeben (der Countdown, eine Route, die Rückfrage abgebrochen und beantwortet, dann alle Kriterien mit ihren Befunden); „VLANs und ein Trunk zum Router“ nur mit der Punktzahl, früh abgegeben |
 | `assess_en.uis` | dasselbe auf Englisch: die Liste, das Panel mit den Texten der Datei, F9 mit den Befunden, der Bereich „Author an assessment“ aus der Aufgabe gefüllt |
 | `assess_shots.uis` | die Bilder der Liste, des Panels (halb gelöst nach „Prüfen“) und des Bereichs „Aufgabe erstellen“ hell und dunkel mit 100 und 150 % (`build/jfnetworker/assess_*.png`) |
+| `model.uis`, Gruppe `wlan` | WLAN (siehe [WLAN](#wlan)): Signal, Rate, Verlust und Zugang zum Medium aus der Entfernung, Kanäle, Bänder, Reichweiten und Ports der Modelle, was ein Netz ungültig macht; PRF und KDF des 802.11-Standards, PMK und PTK gegen unabhängig gerechnete Werte, MICs mit HMAC-SHA1 und AES-CMAC, der GTK im Key Wrap, SAEs Ersatz-PMK; Suche, Authentifizierung und Assoziation auf die Nanosekunde (offen, WPA2, WPA3 mit SAE), die vier EAPOL-Frames mit ihren Zeiten und von außen nachgerechneten MICs, eine falsche Passphrase (Wiederholungen nach 100 ms und 1 s, Grund 15, Pausen von 10, 20 und 30 s, Aufgeben), ein falsches SAE-Passwort, WPA2 auf 6 GHz; die Wahl von Band und Access Point, DHCP und Ping über WLAN, Roaming während eines Pings ohne Verlust, der Rand der Reichweite, Verbindungsverlust nach sieben Beacons, Access Point aus, umkonfiguriert und mit abgeschaltetem Funk, Client-Isolation und Gastnetze (auch am Heimrouter), Funkkabel älterer Projekte (feste Zuordnungen wie bisher, ausgesteckt sucht die Station), `iw` und `show dot11 associations`, die Probleme-Liste, Datei, Szenario-Schritt `move`, Rückgängig über das Dokument, Texte auf Deutsch und Englisch, Determinismus |
+| `wlan_inspector.uis` | der WLAN-Teil des Inspektors auf `fixtures/wlan_office.jfnet`: die Netze von AP1 (Passphrase maskiert, bis sie gezeigt wird), eine neue SSID schickt Phone1 weg und rückgängig gemacht kommt es wieder, offen zu WPA2 erst mit Passphrase, ein Netz hinzugefügt und entfernt; eine Station mit Zustand, Access Point, Signal mit Balken, Rate und den Netzen in Reichweite, ihre Passphrase im Inspektor korrigiert und rückgängig gemacht, Abmelden |
+| `wlan_range.uis` | die Reichweiten: ein gewählter Access Point zeigt seine Kreise, Ansicht › WLAN-Reichweiten alle (auch mit Alt+A, W), die Kreise als Texteinträge, der Maßstab im Inspektor des Projekts mit Rückgängig und einer Ablehnung |
+| `wlan_drag.uis` | Laptop1 bei gehaltener Maustaste aus der Reichweite gezogen: „außer Reichweite“, nach sieben fehlenden Beacons getrennt, die Station sucht; Loslassen ist ein Rückgängig-Schritt, rückgängig gemacht meldet sie sich wieder bei AP1 an |
+| `wlan_shots.uis` | die Bilder von WLAN (Reichweiten, Funklinien, Signalbalken, Inspektor eines Access Points und einer Station) hell und dunkel mit 100 und 150 % (`build/jfnetworker/wlan_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
 `campus.jfnet` (die Abnahme), `lab_window.jfnet` (das Labor der Fenstertests: Cache,
 Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein Skript),
-`stp_triangle.jfnet` und `rstp_triangle.jfnet` (drei Switches im Dreieck mit STP bzw. RSTP) und
-die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
-`coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`, `rng`, `metrics`, `jmap`,
-`cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`), die Skriptsprache die Gruppe `script`.
+`stp_triangle.jfnet` und `rstp_triangle.jfnet` (drei Switches im Dreieck mit STP bzw. RSTP),
+`wlan_office.jfnet` (zwei Access Points, ein Gastnetz, zwei Laptops und ein Smartphone; das
+Szenario `wlan_office.scn` und die WLAN-Fensterskripte) und die Netze der Golden-Szenarien. Die
+Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`,
+`rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
+für WLAN `crypto` und `netpkt`), die Skriptsprache die Gruppe `script`.
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -256,6 +270,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | IPv6 | [`crates/jfn_sim/ip6.rs`](crates/jfn_sim/ip6.rs), [`nd.rs`](crates/jfn_sim/nd.rs), [`l3v6.rs`](crates/jfn_sim/l3v6.rs), [`jobs6.rs`](crates/jfn_sim/jobs6.rs), [`trace6.rs`](crates/jfn_sim/trace6.rs), [`cli/ip6.rs`](crates/jfn_sim/cli/ip6.rs), [`cli/linux6.rs`](crates/jfn_sim/cli/linux6.rs), [`cli/print6.rs`](crates/jfn_sim/cli/print6.rs), [`cli/names.rs`](crates/jfn_sim/cli/names.rs), [`lib/netpkt/icmpv6.rs`](../../lib/netpkt/icmpv6.rs), [`lib/netpkt/ipv6.rs`](../../lib/netpkt/ipv6.rs), [`lib/netpkt/addrsel.rs`](../../lib/netpkt/addrsel.rs), [`src/ipv6test.rs`](src/ipv6test.rs), [`src/ipv6tcptest.rs`](src/ipv6tcptest.rs) | der IPv6-Teil der Geräte (Adressen, Neighbor Cache, Router, Routen), Neighbor Discovery, DAD und SLAAC, Weiterleiten und ICMPv6, Ping und Traceroute, die Notizen, die Befehle beider Befehlszeilen, Namen an beiden Befehlszeilen (`dig`, `host`, `nslookup`, `ip host`, `ip name-server`), ICMPv6 und Neighbor Discovery Byte für Byte, die Fragmente und die Adressauswahl nach RFC 6724 (Library), die Selbsttests (siehe [IPv6](#ipv6)) |
 | OSPF | [`crates/jfn_sim/ospf.rs`](crates/jfn_sim/ospf.rs), [`cli/ospf.rs`](crates/jfn_sim/cli/ospf.rs), [`src/ospftest.rs`](src/ospftest.rs), [`lib/netpkt/ospf.rs`](../../lib/netpkt/ospf.rs) | OSPF als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Pakete und LSAs Byte für Byte (siehe [Routing mit OSPF](#routing-mit-ospf)) |
 | Aufgaben mit Bewertung | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/assess.rs`](crates/jfn_sim/assess.rs), [`src/workspace/assess.rs`](src/workspace/assess.rs), [`src/workspace/author.rs`](src/workspace/author.rs), [`src/doc/assess.rs`](src/doc/assess.rs), [`assets/assess`](assets/assess), [`src/assesstest.rs`](src/assesstest.rs) | das Format einer Aufgabe, das Bewerten ihrer Kriterien, die Prüfung `reaches`, das Panel mit Punkten, Zeit und Abgeben, der Bereich zum Erstellen mit seinen Rückgängig-Schritten, die drei Aufgaben, ihr Selbsttest (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)) |
+| WLAN | [`crates/jfn_model/wlan.rs`](crates/jfn_model/wlan.rs), [`crates/jfn_sim/wlan.rs`](crates/jfn_sim/wlan.rs), [`wlankey.rs`](crates/jfn_sim/wlankey.rs), [`wlantrace.rs`](crates/jfn_sim/wlantrace.rs), [`cli/wlan.rs`](crates/jfn_sim/cli/wlan.rs), [`src/doc/wlan.rs`](src/doc/wlan.rs), [`src/workspace/canvas/wlan.rs`](src/workspace/canvas/wlan.rs), [`src/workspace/inspector/wlan.rs`](src/workspace/inspector/wlan.rs), [`src/wlantest.rs`](src/wlantest.rs), [`lib/netpkt/eapol.rs`](../../lib/netpkt/eapol.rs), [`lib/crypto`](../../lib/crypto/lib.rs) (`sha1.rs`, `keywrap.rs`, `cmac.rs`) | die WLAN-Einstellungen im Projekt, Stationen und Access Points im Simulator mit Funk, Schlüsseln und Notizen, `iw` und `show dot11`, die Einstellungen als Rückgängig-Schritte, Funklinien, Reichweiten und Balken, der Inspektor, der Selbsttest, EAPOL Byte für Byte und die Kryptografie von WPA2 und WPA3 (siehe [WLAN](#wlan)) |
 
 ### Gerätekatalog
 
@@ -1055,6 +1070,10 @@ heilen soll. `heal NUMMER`, `heal all` oder `heal` mit Art und Ziel (`heal power
 `heal partition`) heilt. Der Bericht nennt Nummer und Text jedes Fehlers; heilt einer von
 selbst, steht „Fehler N behoben“ mit der Zeit dabei.
 
+`move GERÄT X Y` setzt ein Gerät an eine andere Stelle der Zeichenfläche (Weltkoordinaten der
+linken oberen Ecke), wie ein Verschieben im Fenster; für WLAN zählen Reichweite und Signal neu
+(siehe [WLAN](#wlan)).
+
 `expect … svc NAME metric WERT VERGLEICH ZAHL over 5s` (oder `… between 6s and 12s`) prüft
 statt des Werts von jetzt seine Zeitreihe
 (siehe [Metriken und Zeitreihen](#metriken-und-zeitreihen)): die Punkte der letzten 5 s oder
@@ -1166,6 +1185,18 @@ nach der Antwort oder nach einer Sekunde, bis eine Antwort kommt; `not reaches` 
 keine kommt. Der Lauf selbst bleibt unberührt. Der Bericht nennt, wie viele Pings beantwortet
 wurden, oder warum keiner („keine Antwort: 10.0.1.1 meldet: Netz nicht erreichbar“, „keine
 Route zum Ziel“, „der Name … ist unbekannt“, „das Gerät ist ausgeschaltet“).
+
+Ein Szenario zeigt WLAN (siehe [WLAN](#wlan)). `wlan_office.scn` auf `fixtures/wlan_office.jfnet`:
+zwei Access Points mit dem Netz „Buero“ (WPA2-Personal, 5 GHz, Kanal 36 und 44), an AP1 dazu das
+offene Gastnetz „Gaeste“ (2,4 GHz, VLAN 20), R1 vergibt die Adressen beider Netze. Laptop1 und
+Phone1 sind nach 761 ms angemeldet und bekommen ihre Adressen per DHCP (`iw dev wlan0 link`, `ip
+-br addr`, `show dot11 associations`, `iw dev wlan0 scan`), Laptop2 mit falscher Passphrase
+scheitert am Handshake (`%DOT11-4-MAXRETRIES` nach 3,861 s) und versucht es nach 10, 20 und 30 s
+wieder. Laptop1 pingt SRV1 und geht dabei zu AP2: in der Mitte bleibt er, nahe AP2 wechselt er
+(alle 12 Antworten kommen); zu weit weg ist er nach 716,8 ms getrennt (`NO-CARRIER`), zurück
+meldet er sich sofort wieder an. AP1 aus: Phone1 verliert das Gastnetz, wieder an: beide sind
+761 ms später zurück. Laptop2 gibt nach dem vierten Fehlschlag auf und kommt mit `iw dev wlan0
+connect Buero psk …` ins Netz; 22 Erwartungen.
 
 ### Skripte in Hosts
 
@@ -1856,6 +1887,106 @@ Für Programme: `Action::Ospf { dev, set: OspfSet }` (`Process`, `RouterId`, `Ne
 ([`src/ospftest.rs`](src/ospftest.rs)), die Pakete in der coretest-Gruppe `ospf`, dazu die
 Szenarien `ospf_triangle.scn` und `ospf_areas.scn` (siehe [Szenarien](#szenarien-scn)).
 
+### WLAN
+
+Access Points und der Heimrouter bieten WLAN-Netze an, Laptops, Smartphones, Tablets, Drucker,
+der IoT-Sensor und der Smart-TV melden sich an ([`jfn_model/wlan.rs`](crates/jfn_model/wlan.rs),
+[`jfn_sim/wlan.rs`](crates/jfn_sim/wlan.rs)). Statt eines Kabels verbindet eine Zuordnung
+(Assoziation) die Station mit ihrem Access Point; der Simulator legt sie an und löst sie wieder,
+die Zeichenfläche zeigt sie als dünne, gepunktete Funklinie (gestrichelt, solange der Handshake
+läuft, blass, wenn die Station außer Reichweite ist).
+
+- **Einstellungen** (Inspektor, in der Projektdatei `wlan` je Gerät): Ein Access Point hat ein
+  oder mehrere Netze mit SSID, Band und Kanal (2,4 GHz Kanal 1 bis 13, 5 GHz 36 bis 64 und 100
+  bis 140, 6 GHz 1 bis 93; der JF-AP6E sendet auf allen drei Bändern über je einen Funkport, der
+  Heimrouter 2,4 und 5 GHz über `wlan0`), Sicherheit (offen, WPA2-Personal oder WPA3-Personal
+  mit einer Passphrase von 8 bis 63 Zeichen; 6 GHz nur mit WPA3), VLAN (auf Access Points: ihre
+  Funkports und die Kabelports in der Grundeinstellung werden dafür Trunks mit VLAN 1 ungetaggt;
+  der Heimrouter behält seine Stationen in seinem LAN), Gastnetz und Client-Isolation. Eine Station hat das
+  Netz, das sie sucht (SSID und Passphrase), oder keins. Jede Änderung ist ein Rückgängig-Schritt,
+  der Simulator folgt ohne Neustart des Geräts.
+- **Maßstab und Reichweite:** Der Maßstab des Projekts (`dip_per_m`: Einheiten der Zeichenfläche
+  je Meter, ohne Angabe 10, also 10 Pixel je Meter bei 100 %) steht im Inspektor des Projekts.
+  Ein JF-AP6E reicht 50 m auf 2,4 GHz, 35 m auf 5 GHz und 25 m auf 6 GHz, der Heimrouter 40, 30
+  und 20 m, gemessen von Mitte zu Mitte der Geräte.
+- **Anmelden:** Eine Station hört alle Kanäle ihrer Bänder ab (20 ms je Kanal, auf 6 GHz die
+  sechs bevorzugten; ein Laptop braucht 760 ms), nimmt das Netz ihrer SSID mit der besten
+  geschätzten Rate (dann das stärkere Signal, das höhere Band, den Access Point mit der kleineren
+  Nummer), authentifiziert sich (Open System; bei WPA3 SAE mit 10 ms Rechenzeit) und assoziiert
+  sich (je zwei Management-Frames zu 250 µs; der Access Point vergibt eine AID und meldet die
+  Station mit einem Layer-2-Update den Switches). Bei WPA2 und WPA3 folgt der 4-Wege-Handshake
+  mit echten EAPOL-Key-Frames ([`wlankey.rs`](crates/jfn_sim/wlankey.rs): PMK mit PBKDF2, PTK,
+  MIC, der GTK und bei WPA3 der IGTK im AES Key Wrap); erst danach fließen Daten, und ein
+  DHCP-Client des Ports beginnt sofort. Mit falscher Passphrase verwirft der Access Point
+  Nachricht 2 (der MIC passt nicht), schickt Nachricht 1 nach 100 ms und dann jede Sekunde
+  wieder, viermal insgesamt, und beendet die Zuordnung (Grund 15); die Station versucht es nach
+  10, 20 und 30 s wieder und gibt nach dem vierten Fehlschlag auf, bis sich ihre Einstellung,
+  ein Netz eines Access Points oder `iw … connect` ändert. Bei WPA3 scheitert schon SAE: der
+  Access Point bestätigt nicht, die Station gibt nach 1 s auf.
+- **Funk:** Keine Funkphysik, aber ein festes Modell in ganzzahliger Rechnung, auf jedem Ziel
+  gleich: am Rand der Reichweite -82 dBm, je Zehntel der Entfernung 30 dB mehr (ein
+  Pfadverlust-Exponent von 3); aus dem Signal die Rate nach der Mindestempfindlichkeit von
+  802.11ax MCS 0 bis 11 (-82 bis -52 dBm) als Anteil der schnellsten Rate des Bands (2,4 GHz
+  573,5 Mbit/s, 5 und 6 GHz 2,4 Gbit/s), begrenzt durch die Funkports beider Seiten. Die
+  Funkstrecke trägt zwei Drittel davon, jeder Frame braucht 300 µs (2,4 GHz), 200 µs (5 GHz)
+  oder 150 µs (6 GHz) für den Zugang zum Medium plus die Laufzeit; unter -78 dBm gehen bis zu
+  2 % der Frames verloren.
+- **Bewegen:** Wird eine Station oder ein Access Point verschoben (im Fenster schon während des
+  Ziehens, im Szenario mit `move`), zählt der Simulator neu: Außer Reichweite verliert die
+  Station nach sieben fehlenden Beacons (716,8 ms) die Verbindung und sucht wieder; unter -70
+  dBm und mit einem Access Point ihres Netzes, der 8 dB besser ist, wechselt sie dorthin
+  (Roaming: Reassoziation und ein neuer Handshake; ihr Port bleibt dabei oben, so bleiben
+  Adressen, Nachbarn und Lease). Ein Access Point, der ausgeschaltet wird, verstummt (seine
+  Stationen merken es an den Beacons); einer, dessen Netz sich ändert oder dessen Funkport
+  abgeschaltet wird, meldet seine Stationen ab.
+- **Weiterleiten:** Der Access Point verbindet seine Stationen mit seiner Kabelseite und
+  untereinander, mit Client-Isolation nicht untereinander; ein Gastnetz erreicht keine andere
+  Station, am Heimrouter nur den Router selbst (seine Adresse, DHCP, DNS, den Weg nach draußen).
+  Daten fahren als Ethernet-II-Frames über die Funkstrecke, so wie der Treiber der Station sie
+  ihrem Stack gibt, der Handshake als EAPOL; Management-Frames (Beacons, Suche,
+  Authentifizierung, Assoziation) sind keine Frames, sondern Ereignisse mit ihren Zeiten. Die
+  Ereignisliste nennt jeden Schritt („WLAN: assoziiert mit AP1 (AID 1, 5 GHz, Kanal 36, -71
+  dBm, 576,0 Mbit/s).“), Paket-Tab und pcapng zeigen Daten und EAPOL.
+- **Ältere Projekte:** Ein Funkkabel des Projekts bleibt ein Kabel wie bisher, eine feste
+  Zuordnung ohne Suche, Reichweite und Schlüssel; WLAN-Einstellungen gelten für Funkports ohne
+  Kabel. Wird es ausgesteckt, sucht die Station ihr Netz.
+- **Fenster:** Ansicht › WLAN-Reichweiten zeigt die Reichweiten aller Access Points als Kreise
+  mit Band und Metern, sonst zeigt sie ein gewählter Access Point. Stationen tragen vier
+  Signalbalken (ab -60, -67 und -75 dBm und darunter einen; leer, solange sie nicht verbunden
+  sind). Funklinien, Kreise und suchende Stationen sind Texteinträge für Screenreader und
+  Skripte („Funk: Laptop1 – AP1 (Buero, 5 GHz, -71 dBm, 576,0 Mbit/s)“, „Reichweite: AP1, 2,4
+  GHz 50 m, 5 GHz 35 m“, „Funk: Laptop2 – nicht verbunden („Buero“)“). Der Inspektor eines
+  Access Points zeigt seine Netze (die Passphrase maskiert, bis „Passphrase zeigen“ sie
+  aufdeckt), warum eines nicht angeboten wird, die Stationen je Netz und die Reichweiten; der
+  einer Station ihren Zustand, den Access Point, Netz, Signal und Rate, ihr Netz zum Ändern
+  und die Netze in Reichweite.
+- **Befehlszeilen** ([`cli/wlan.rs`](crates/jfn_sim/cli/wlan.rs)): unter Linux `iw dev`, `iw dev
+  wlan0 info|link|scan|station dump`, `iw dev wlan0 connect SSID [psk PASSPHRASE]` (für den
+  Lauf; das Projekt behält seine Einstellung) und `iw dev wlan0 disconnect`; der Heimrouter
+  nennt ein zweites Netz auf seinem Funkport `wlan0-1`. `ip link` zeigt `wlan0` mit
+  `NO-CARRIER`, solange keine Zuordnung steht; `wpa_supplicant` und `hostapd` schreiben ins
+  Protokoll. Der IOS-artige JF-AP6E kennt `show dot11 associations` und meldet Anmeldungen und
+  Abschiede als `%DOT11-…`-Zeilen auf der Konsole. Andere IOS-artige Geräte haben laut Katalog
+  keine Funkports.
+- **Probleme:** Stationen, die kein Netz ihrer SSID finden (keines angeboten: Fehler, außer
+  Reichweite: Warnung), Stationen ohne oder mit falscher Passphrase, Netze, die nicht angeboten
+  werden können (etwa WPA2 auf 6 GHz), mit dem Grund.
+
+Entscheidungen: SAE (die Dragonfly-Rechnung von WPA3) wird nicht gerechnet; für sein PMK steht
+ein HKDF-SHA256 über Passwort, beide MAC-Adressen und je einen Zufallswert beider Seiten (gleich
+auf beiden Seiten bei gleichem Passwort, neu bei jeder Zuordnung), alles danach ist echt. Die
+Daten werden nicht mit CCMP verschlüsselt (die Schlüssel entstehen, die Frames bleiben lesbar).
+
+Noch offen: Kanäle, die sich gegenseitig stören, Ad-hoc-Netze, WPA-Enterprise (802.1X mit
+RADIUS), Band Steering und 802.11r, Netze über die IOS-artige Befehlszeile einrichten.
+
+Für Programme: `Action::Move { dev, x, y }`, `Action::Wlan { dev, wlan }`, `Action::Scale {
+dip_per_m }`, `Engine::wlan_assocs()`, `wlan_station(dev)`, `wlan_stations_of(ap)`,
+`wlan_survey(dev, ssid)`, `wlan_scale()`, die Notizen `Note::Wlan(WNote)`. Geprüft wird WLAN in
+der Selbsttest-Gruppe `wlan` ([`src/wlantest.rs`](src/wlantest.rs)), SHA-1, PBKDF2, Key Wrap und
+CMAC in der coretest-Gruppe `crypto`, EAPOL in `netpkt`, dazu das Szenario `wlan_office.scn` und
+die Fensterskripte `wlan_inspector.uis`, `wlan_range.uis`, `wlan_drag.uis` und `wlan_shots.uis`.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -1923,7 +2054,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | WLAN, physische Ansicht, A1 Aufgaben mit Bewertung ✓, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · physische Ansicht, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
 Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir

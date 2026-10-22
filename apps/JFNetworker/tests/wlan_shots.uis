@@ -1,0 +1,39 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/wlan_office.jfnet
+# the shot matrix of WLAN (W1): the office with the ranges of all access points (Ansicht ›
+# WLAN-Reichweiten), the radio lines and the signal bars, the inspector of AP1 scrolled to its
+# networks and of Laptop1 scrolled to its connection, each light and dark at 100 and 150 %
+# (build/jfnetworker/wlan_<view>_<theme>_<scale>.png)
+size 1280 900
+theme light
+wait 2000
+cmd 480
+# ---- AP1: its ranges on the canvas, its networks in the inspector
+click listitem:"AP1"
+move 1140,500
+wheel 1140,500 -1440
+wait 500
+move 640,860
+shot build/jfnetworker/wlan_ap_light_100.png
+theme dark
+shot build/jfnetworker/wlan_ap_dark_100.png
+scale 150
+move 960,1290
+shot build/jfnetworker/wlan_ap_dark_150.png
+theme light
+shot build/jfnetworker/wlan_ap_light_150.png
+scale 100
+# ---- Laptop1: its connection
+click listitem:"Laptop1"
+move 1140,500
+wheel 1140,500 -1440
+wait 500
+move 640,860
+shot build/jfnetworker/wlan_station_light_100.png
+theme dark
+shot build/jfnetworker/wlan_station_dark_100.png
+scale 150
+move 960,1290
+shot build/jfnetworker/wlan_station_dark_150.png
+theme light
+shot build/jfnetworker/wlan_station_light_150.png
+scale 100

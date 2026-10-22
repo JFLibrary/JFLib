@@ -21,6 +21,10 @@
 //   p256      Diffie-Hellman on P-256 in constant time (complete formulas)      (SEC 1)
 //   b64       Base64 (standard and URL alphabet, with or without padding)
 //   ct_eq / zeroize / hex
+//   sha1      Sha1, sha1(data); with hmac_sha1, pbkdf2 (any Hash) and pbkdf2_sha1 in hmac:
+//             only for protocols defined with SHA-1 (WPA2-Personal)          (FIPS 180-4)
+//   keywrap   aes_wrap / aes_unwrap: the AES key wrap                         (RFC 3394)
+//   cmac      cmac_aes: AES-CMAC                                              (RFC 4493)
 //
 // No randomness here: callers pass random bytes in (plat::fill_random), so everything is
 // deterministic and testable.  Secret-dependent work avoids branches and table lookups
@@ -50,6 +54,9 @@ mod scalar;
 pub mod sealbox;
 pub mod sha2;
 pub mod x25519;
+pub mod sha1;
+pub mod keywrap;
+pub mod cmac;
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -57,6 +64,10 @@ use alloc::vec::Vec;
 pub use blake3::Blake3;
 pub use hmac::{hkdf_sha256, hkdf_sha512, hmac_sha256, hmac_sha512, pbkdf2_sha256, Hmac};
 pub use sha2::{sha256, sha384, sha512, Sha256, Sha384, Sha512};
+pub use sha1::{sha1, Sha1};
+pub use hmac::{hmac_sha1, pbkdf2, pbkdf2_sha1};
+pub use keywrap::{aes_unwrap, aes_wrap};
+pub use cmac::cmac_aes;
 
 /// a hash function for Hmac / HKDF / PBKDF2
 pub trait Hash: Clone {

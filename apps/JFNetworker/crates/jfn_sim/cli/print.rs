@@ -131,6 +131,11 @@ pub enum JobOut {
         timeout: Ns,
         df: bool,
     },
+    /// "iw dev IF scan" (cli/wlan.rs): the scan of radio port `port` ends at `until`
+    IwScan {
+        until: Ns,
+        port: u16,
+    },
 }
 
 /// the mark of an IOS ping probe
@@ -601,6 +606,12 @@ impl Engine {
             }
             JobOut::Dhclient { .. } => {
                 self.dhclient_timer(ni);
+                return;
+            }
+            JobOut::IwScan { until, .. } => {
+                if self.now >= until {
+                    self.iw_scan_done(ni);
+                }
                 return;
             }
             _ => {}

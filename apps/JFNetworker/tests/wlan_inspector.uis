@@ -1,0 +1,114 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/wlan_office.jfnet
+# the WLAN part of the inspector (inspector/wlan.rs, doc/wlan.rs) on the office of the golden
+# scenario: an access point's networks (SSID, band, channel, security, the passphrase masked
+# until shown, VLAN, guest network, client isolation, the stations of each network, the ranges),
+# changes as undo steps the simulator follows at once (a renamed network sends its station
+# away, undone it joins again; open to WPA2 needs a passphrase first; a network added, one
+# removed and back); a station's state (connected: the AP, network, signal with bars, rate; the
+# networks in reach), its passphrase corrected in the inspector and undone, leaving the
+# network.  A tall window shows the whole inspector.  Ids: 62464 the first network's SSID (+1
+# band, +2 channel, +3 security, +4 passphrase, +5 show it, +6 VLAN, +7 guest, +8 isolation, +9
+# apply, +10 remove; the second network 16 further), 62720 add a network, 62736 the station's
+# SSID, 62737 its passphrase, 62738 show it, 62739 join, 62740 leave.
+size 1280 1900
+theme light
+wait 2000
+click listitem:"AP1"
+expect text:"WLAN (2)" exists
+expect #62464 text "Buero"
+expect #62465 text "5 GHz"
+expect #62466 text "36 (5180 MHz)"
+expect #62467 text "WPA2-Personal"
+expect #62468 text "●●●●●●●●●●●"
+click #62469
+expect #62468 text "Sommer2026!"
+click #62469
+expect #62468 text "●●●●●●●●●●●"
+expect #62480 text "Gaeste"
+expect #62481 text "2,4 GHz"
+expect #62483 text "Offen"
+expect #62484 missing
+expect #62486 text "20"
+expect #62487 checked
+expect #62488 unchecked
+expect text:"Phone1 · -71 dBm · 137,6 Mbit/s" exists
+expect text:"2,4 GHz: 50 m (500 Einheiten)\n5 GHz: 35 m (350 Einheiten)\n6 GHz: 25 m (250 Einheiten)" exists
+shot build/jfnetworker/wlan_inspector_ap.png
+# another SSID: Phone1 loses its network, undone it joins again
+click #62480
+key ctrl+a
+type "Gast\n"
+expect #62480 text "Gast"
+expect text:"Gast" exists
+wait 1000
+expect text:"Funk: Phone1 – nicht verbunden („Gaeste“)" exists
+click button:"Rückgängig"
+expect #62480 text "Gaeste"
+wait 1500
+expect text:"Funk: Phone1 – AP1 (Gaeste, 2,4 GHz, -71 dBm, 137,6 Mbit/s)" exists
+# open to WPA2: not offered until it has a passphrase
+click #62483
+click listitem:"WPA2-Personal"
+expect #62483 text "WPA2-Personal"
+expect text:"Wird nicht angeboten: Die Passphrase von „Gaeste“ braucht 8 bis 63 Zeichen (ASCII)." exists
+click #62484
+type "kurz\n"
+expect text:"Die Passphrase von „Gaeste“ braucht 8 bis 63 Zeichen (ASCII)." exists
+key ctrl+a
+type "Gaeste2026\n"
+expect text:"Wird nicht angeboten: Die Passphrase von „Gaeste“ braucht 8 bis 63 Zeichen (ASCII)." missing
+expect #62484 text "●●●●●●●●●●"
+click button:"Rückgängig"
+click button:"Rückgängig"
+expect #62483 text "Offen"
+# a network added; Buero removed (its stations leave) and back; the new one undone
+click #62720
+expect #62496 text "WLAN-1"
+expect text:"WLAN (3)" exists
+wait 600
+click #62474
+expect text:"WLAN (2)" exists
+expect #62464 text "Gaeste"
+expect #62480 text "WLAN-1"
+wait 200
+expect text:"Funk: Laptop1 – nicht verbunden („Buero“)" exists
+click button:"Rückgängig"
+expect #62464 text "Buero"
+expect text:"WLAN (3)" exists
+wait 600
+click button:"Rückgängig"
+expect text:"WLAN (2)" exists
+expect #62496 missing
+wait 1500
+expect text:"Funk: Laptop1 – AP1 (Buero, 5 GHz, -71 dBm, 576,0 Mbit/s)" exists
+# the station: its state, the access point, the networks in reach
+click listitem:"Laptop1"
+expect text:"verbunden" exists
+expect text:"AP1 Dot11Radio1" exists
+expect text:"Buero · 5 GHz · Kanal 36 · WPA2-Personal" exists
+expect text:"-71 dBm (2 von 4 Balken)" exists
+expect text:"576,0 Mbit/s" exists
+expect #62736 text "Buero"
+expect #62737 text "●●●●●●●●●●●"
+expect text:"Gaeste · AP1 · 2,4 GHz · -67 dBm · offen" exists
+shot build/jfnetworker/wlan_inspector_station.png
+# Laptop2 with the right passphrase from the inspector, then undone
+click listitem:"Laptop2"
+click #62737
+key ctrl+a
+type "Sommer2026!\n"
+wait 1500
+expect text:"verbunden" exists
+expect text:"Funk: Laptop2 – AP1 (Buero, 5 GHz, -73 dBm, 576,0 Mbit/s)" exists
+click button:"Rückgängig"
+wait 1000
+expect text:"4-Wege-Handshake läuft" exists
+# Laptop1 leaves the network and comes back
+click listitem:"Laptop1"
+click #62740
+expect text:"kein Netz eingestellt" exists
+expect #62740 disabled
+expect text:"Funk: Laptop1 – AP1 (Buero, 5 GHz, -71 dBm, 576,0 Mbit/s)" missing
+click button:"Rückgängig"
+wait 1500
+expect text:"verbunden" exists

@@ -188,6 +188,8 @@ pub enum K {
     IpHost,
     Ipv6Host,
     NameServer,
+    // WLAN on access points (cli/wlan.rs)
+    ShowDot11,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -531,6 +533,10 @@ fn build(caps: u32) -> Tree<K> {
     super::ospf::build_ospf(&mut t, [user, prv, conf, ifm, sub], router);
     // ---- static names and name servers of either family (cli/names.rs)
     super::names::build_names(&mut t, conf);
+    // ---- WLAN on access points (cli/wlan.rs)
+    if caps & CAP_AP != 0 {
+        super::wlan::build_wlan(&mut t, [user, prv]);
+    }
     t
 }
 
@@ -1049,6 +1055,7 @@ impl Engine {
             | K::DebugOspf
             | K::ClearOspf => self.ios_ospf(ni, p),
             K::IpHost | K::Ipv6Host | K::NameServer => self.ios_names(ni, p),
+            K::ShowDot11 => self.ios_dot11(ni, p),
         }
     }
 

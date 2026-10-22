@@ -105,6 +105,14 @@
 //            (points, a percentage, what each item found), config lines normalised on a
 //            scratch device; for authors the network captured as a target, the target's
 //            settings as candidate items, the start network without what the items check
+//   wlan     WLAN on layer 2: access points offer networks, stations scan, authenticate,
+//            associate and run the 4-way handshake; associations as radio links the simulator
+//            makes and drops, the AP's bridge to its stations (VLANs, client isolation, guest
+//            networks), signal and rate from the distance, roaming, beacon loss, back-off;
+//            Action::Move / Wlan / Scale; the views wlan_assocs / wlan_station / wlan_survey
+//   wlankey  the keys of WPA2-Personal and WPA3-Personal (PMK, PTK, MICs, the key wrap of the
+//            group key) and the EAPOL-Key messages of the 4-way handshake
+//   wlantrace WNote: the decisions of WLAN as notes (Note::Wlan) with their German sentences
 //
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
@@ -176,6 +184,9 @@ pub mod jobs6;
 pub mod trace6;
 pub mod ospf;
 pub mod assess;
+pub mod wlan;
+pub mod wlankey;
+pub mod wlantrace;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -228,3 +239,5 @@ pub use ospf::{IfState, LsaDrop, LsaRef, LsuWhy, NbrEvent, NbrState, NetType, Or
 pub use resolver::Family;
 pub use os::{ANY, ANY4};
 pub use assess::{Cand, Graded, Grader, Lines, Score};
+pub use wlan::{AssocView, Bss, StaState, StaView};
+pub use wlantrace::WNote;

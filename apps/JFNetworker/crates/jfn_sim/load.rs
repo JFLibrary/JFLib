@@ -7,6 +7,8 @@
 // same parser a user types into (IOS: in global configuration mode, Linux: as shell
 // commands); what it does not take is reported on the console and in boot_errors.  A device
 // without one starts with its defaults (switch ports in VLAN 1, router interfaces shut down).
+// Last, WLAN stations with a network to join start their scan (wlan.rs), on the project's
+// positions and scale.
 
 use jfn_model::Project;
 
@@ -17,6 +19,7 @@ impl Engine {
     pub fn from_project(p: &Project) -> Result<Engine, ActErr> {
         let mut e = Engine::new(p.seed);
         e.strict_mdix = p.strict_mdix;
+        e.wlan.dip_per_m = p.dip_per_m;
         for d in &p.devices {
             e.add_node(d)?;
         }
@@ -26,6 +29,7 @@ impl Engine {
         for d in &p.devices {
             e.cli_boot(d.id, &d.startup_config);
         }
+        e.wlan_boot();
         Ok(e)
     }
 }

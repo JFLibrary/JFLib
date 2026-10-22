@@ -14,7 +14,8 @@
 //                                                 tree's layer 2 (stp.rs; is_stp, is_stp_event);
 //                                                 OSPF's layer 3, as IP carries it directly
 //                                                 (ospf.rs: Note::is_ospf), and IPv6's layer 3
-//                                                 (trace6.rs: Note::V6)
+//                                                 (trace6.rs: Note::V6); WLAN's layer 2
+//                                                 (wlantrace.rs: Note::Wlan)
 //   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
 //                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
@@ -451,6 +452,9 @@ pub enum Note {
     /// TCP over IPv6 (tcp.rs): Packet Too Big about a segment in flight, smaller segments from
     /// now on
     TcpPtb { mss: u16 },
+    /// WLAN (wlan.rs, wlantrace.rs): scans, authentication, association, the 4-way handshake,
+    /// roaming, range, what an access point drops (layer 2)
+    Wlan(crate::wlantrace::WNote),
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -710,6 +714,7 @@ impl Note {
                 | Note::OspfIgnored { .. }
                 | Note::OspfLsaDropped { .. }
         ) || matches!(self, Note::V6(n) if n.is_drop())
+            || matches!(self, Note::Wlan(n) if n.is_drop())
     }
     /// a TCP decision (tcp.rs)
     pub fn is_tcp(&self) -> bool {
@@ -1141,6 +1146,7 @@ impl Note {
             | Note::OspfSpf { .. }
             | Note::OspfRoute { .. }) => ospf_message(n, iface),
             Note::TcpPtb { mss } => msg!("Packet Too Big: kleinere Segmente, MSS {}.", mss),
+            Note::Wlan(n) => n.message(port),
         }
     }
 }
@@ -1606,6 +1612,7 @@ impl Note {
             n if n.is_filter() => P_IPV4,
             Note::V6(n) => n.mask(),
             n if n.is_ospf() => P_IPV4 | netpkt::decode::P_OSPF,
+            Note::Wlan(n) => n.mask(),
             _ => 0,
         }
     }

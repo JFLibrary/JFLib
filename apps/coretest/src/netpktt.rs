@@ -2,6 +2,8 @@
 // round trips (view -> record -> bytes), fragmentation and reassembly, the dissector and
 // pcapng files.  Expected checksums of whole segments were computed independently (Python);
 // the ICMP one is also the well-known value of a Windows ping (id 1, seq 1).
+// eapol(): EAPOL-Key frames of the 4-way handshake (IEEE 802.1X-2004, 802.11-2020 12.7.2): their
+// fields, which message a frame is, the MIC field, RSN elements and KDEs, the dissector.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -40,6 +42,7 @@ pub fn run(t: &mut T) {
     pcap(t);
     pkt_growth(t);
     nat_rewrite(t);
+    eapol(t);
 }
 
 fn checksums(t: &mut T) {
@@ -502,4 +505,62 @@ fn nat_rewrite(t: &mut T) {
         *b ^= 0xA5;
     }
     t.eq("checksum update", checksum::update(ck, &old, &blk[10..19]), checksum::checksum(&blk));
+}
+
+fn eapol(t: &mut T) {
+    use netpkt::eapol::{self, EapolView, Key, Rsne};
+    let anonce = [0xA1u8; 32];
+    let m1 = Key { info: eapol::KDV_SHA1 | eapol::KI_PAIRWISE | eapol::KI_ACK, key_len: 16, replay: 1, nonce: anonce, ..Key::default() };
+    let pdu = m1.pdu(eapol::VERSION_2004);
+    t.eq("eapol m1 length", pdu.len(), 4 + eapol::KEY_FIXED);
+    t.eq("eapol m1 head", pdu[..13].to_vec(), vec![2, 3, 0, 95, 2, 0x00, 0x8A, 0, 16, 0, 0, 0, 0]);
+    t.eq("eapol m1 replay and nonce", (pdu[16], pdu[17], pdu[48]), (1, 0xA1, 0xA1));
+    let v = EapolView::parse(&pdu);
+    t.eq("eapol view", v.as_ref().map(|v| (v.version(), v.kind(), v.body_len())), Some((2, eapol::T_KEY, 95)));
+    let back = v.and_then(|v| Key::parse(v.body()));
+    t.eq("eapol key round trip", back.as_ref(), Some(&m1));
+    t.eq("eapol kind name", eapol::kind_name(eapol::T_KEY), "EAPOL-Key");
+    // the four messages by their bits (message 2 carries the RSN element, 4 has none)
+    let rsne = Rsne { akm: eapol::AKM_PSK, caps: 0 };
+    let k = |info: u16, data: Vec<u8>, nonce: [u8; 32]| Key { info: eapol::KDV_SHA1 | eapol::KI_PAIRWISE | info, nonce, data, ..Key::default() };
+    let m2 = k(eapol::KI_MIC, rsne.to_bytes(), [0xB2; 32]);
+    let m3 = k(eapol::KI_INSTALL | eapol::KI_ACK | eapol::KI_MIC | eapol::KI_SECURE | eapol::KI_ENCRYPTED, vec![0; 56], anonce);
+    let m4 = k(eapol::KI_MIC | eapol::KI_SECURE, Vec::new(), [0; 32]);
+    t.eq("eapol messages", [m1.message(), m2.message(), m3.message(), m4.message()], [Some(1), Some(2), Some(3), Some(4)]);
+    let group = Key { info: eapol::KDV_SHA1 | eapol::KI_ACK | eapol::KI_MIC | eapol::KI_SECURE, ..Key::default() };
+    t.eq("eapol group message", group.message(), None);
+    // the MIC: what it covers has the field zeroed, set_mic writes it
+    let mut p2 = m2.pdu(1);
+    let zero = eapol::mic_input(&p2);
+    eapol::set_mic(&mut p2, &[0x5C; 16]);
+    t.eq("eapol mic field", p2[4 + eapol::MIC_OFF..4 + eapol::MIC_OFF + eapol::MIC_LEN].to_vec(), vec![0x5C; 16]);
+    t.eq("eapol mic input", eapol::mic_input(&p2), zero);
+    t.eq("eapol short body", Key::parse(&p2[4..60]), None);
+    // the RSN element of WPA2-Personal and of WPA3-Personal (management frame protection)
+    let b = rsne.to_bytes();
+    t.eq("rsne bytes", b.clone(), vec![48, 20, 1, 0, 0x00, 0x0F, 0xAC, 4, 1, 0, 0x00, 0x0F, 0xAC, 4, 1, 0, 0x00, 0x0F, 0xAC, 2, 0, 0]);
+    let sae = Rsne { akm: eapol::AKM_SAE, caps: eapol::RSN_MFPR | eapol::RSN_MFPC };
+    t.eq("rsne parse", (Rsne::parse(&b), Rsne::parse(&sae.to_bytes())), (Some(rsne), Some(sae)));
+    // KDEs: the GTK and the IGTK, padding of the key data
+    let gtk = [0x47u8; 16];
+    let mut data = b.clone();
+    data.extend_from_slice(&eapol::kde_gtk(1, &gtk));
+    t.eq("gtk kde", eapol::kde_gtk(1, &gtk)[..8].to_vec(), vec![0xDD, 22, 0x00, 0x0F, 0xAC, eapol::KDE_GTK, 1, 0]);
+    let igtk = eapol::kde_igtk(4, 0, &[0x49; 16]);
+    t.eq("igtk kde", (igtk.len(), igtk[1], igtk[5], igtk[6]), (30, 28, eapol::KDE_IGTK, 4));
+    let padded = eapol::pad_key_data(&data);
+    t.eq("key data padding", (data.len(), padded.len(), padded[46], padded[47]), (46, 48, 0xDD, 0));
+    let kdes = eapol::kdes(&padded);
+    t.eq("kdes", kdes.iter().map(|k| (k.0, k.1.len())).collect::<Vec<_>>(), vec![(eapol::KDE_GTK, 18)]);
+    // a frame: ethertype 0x888E, the dissector names the message
+    let f = EthHdr { dst: MAC_A, src: MAC_B, ethertype: eth::ET_EAPOL }.frame(&pdu);
+    t.eq("ethertype name", eth::ethertype_name(eth::ET_EAPOL), Some("802.1X Authentication"));
+    t.eq("eapol info", decode::info(&f), (Proto::Eapol, String::from("Key (Message 1 of 4)")));
+    t.check("eapol mask", decode::proto_mask(&f) & decode::P_EAPOL != 0);
+    let layers = decode::layers(&f);
+    t.eq("eapol layer", layers.last().map(|l| l.title.clone()), Some(String::from("802.1X Authentication, EAPOL-Key (Message 1 of 4)")));
+    let fields: Vec<String> = layers.last().map(|l| l.fields.iter().map(|x| format!("{}: {}", x.name, x.value)).collect()).unwrap_or_default();
+    t.check("eapol fields", fields.iter().any(|x| x == "Key Information: 0x008a (AES Cipher, HMAC-SHA1 MIC (2); Pairwise, Ack)") && fields.iter().any(|x| x == "Replay Counter: 1"));
+    let f3 = EthHdr { dst: MAC_A, src: MAC_B, ethertype: eth::ET_EAPOL }.frame(&m3.pdu(2));
+    t.eq("eapol info 3", decode::info(&f3).1, String::from("Key (Message 3 of 4)"));
 }

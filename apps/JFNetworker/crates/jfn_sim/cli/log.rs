@@ -71,7 +71,8 @@ impl Engine {
         let Some(Some(n)) = self.nodes.get(ni) else {
             return (false, false, false);
         };
-        let port_link = |p: u16| n.ports.get(p as usize).is_some_and(|x| x.link.is_some_and(|li| self.link_up(li)));
+        // the radio of an access point without a cable is up while it sends a network (wlan.rs)
+        let port_link = |p: u16| n.ports.get(p as usize).is_some_and(|x| x.link.is_some_and(|li| self.link_up(li))) || self.wlan_radio_up(ni, p);
         let port_admin = |p: u16| n.ports.get(p as usize).is_some_and(|x| x.admin_up);
         let x = f.and_then(|i| n.ip.as_ref().and_then(|s| s.ifaces.get(i as usize)));
         match (x.map(|x| x.kind), port) {

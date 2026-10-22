@@ -25,6 +25,9 @@
 // OSPF (IP protocol 89) shows the common header, the fields of the five packet types, every LSA
 // header and the links, routers and metrics of the LSAs an update carries, with what a receiver
 // refuses: another version, a wrong packet or LSA checksum, bodies that do not fit (RFC 2328).
+// EAPOL (ethertype 0x888E) shows its header and an EAPOL-Key body field by field: the Key
+// Information bits, replay counter, nonce, MIC and the key data (the RSN element and, when it is
+// not encrypted, the KDEs); the summary names the message of the 4-way handshake (eapol.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -74,6 +77,7 @@ pub const P_TFTP: u32 = 1 << 21;
 pub const P_SNMP: u32 = 1 << 22;
 pub const P_LLDP: u32 = 1 << 23;
 pub const P_DHCPV6: u32 = 1 << 24;
+pub const P_EAPOL: u32 = 1 << 25;
 pub const P_DATA: u32 = 1 << 31;
 
 /// a protocol layer
@@ -105,6 +109,7 @@ pub enum Proto {
     Snmp,
     Lldp,
     Data,
+    Eapol,
 }
 
 impl Proto {
@@ -136,6 +141,7 @@ impl Proto {
             Proto::Snmp => "SNMP",
             Proto::Lldp => "LLDP",
             Proto::Data => "Data",
+            Proto::Eapol => "EAPOL",
         }
     }
     pub fn bit(self) -> u32 {
@@ -166,6 +172,7 @@ impl Proto {
             Proto::Snmp => P_SNMP,
             Proto::Lldp => P_LLDP,
             Proto::Data => P_DATA,
+            Proto::Eapol => P_EAPOL,
         }
     }
 }
@@ -296,6 +303,13 @@ pub fn stack(frame: &[u8]) -> Stack {
             ipv6_stack(&mut s, &v, off);
         }
         eth::ET_LLDP => s.push(Proto::Lldp, off, rest.len()),
+        eth::ET_EAPOL => match crate::eapol::EapolView::parse(rest) {
+            Some(v) => {
+                s.push(Proto::Eapol, off, v.pdu().len());
+                s.trailer = (rest.len() - v.pdu().len()) as u32;
+            }
+            None => s.push(Proto::Data, off, rest.len()),
+        },
         _ => {
             if !rest.is_empty() {
                 s.push(Proto::Data, off, rest.len());
@@ -513,6 +527,7 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Rip => Some(rip_layer(frame, off, len)),
             Proto::Icmpv6 => Some(icmpv6_layer(frame, off, len, net, hop6, frag6)),
             Proto::Ospf => Some(ospf_layer(frame, off, len)),
+            Proto::Eapol => Some(eapol_layer(frame, off, len)),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -966,6 +981,7 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Stp => crate::stp::Bpdu::parse(b).ok().map(|x| crate::stp::summary(&x)),
         Proto::Rip => rip_info(b),
         Proto::Ospf => ospf_info(b),
+        Proto::Eapol => Some(eapol_info(b)),
         _ => None,
     }
 }
@@ -2145,4 +2161,144 @@ fn ospf_info(b: &[u8]) -> Option<String> {
         ospf::Body::Lsu(l) => format!("LS Update, {}", n(l.len(), "LSA", "LSAs")),
         ospf::Body::Ack(h) => format!("LS Acknowledge, {}", n(h.len(), "LSA header", "LSA headers")),
     })
+}
+
+// ---------------------------------------------------------------- EAPOL
+
+/// a byte string as hex, the first `max` bytes ("…" after them)
+fn hex_head(b: &[u8], max: usize) -> String {
+    let mut s = String::new();
+    for x in b.iter().take(max) {
+        s.push_str(&format!("{:02x}", x));
+    }
+    if b.len() > max {
+        s.push('\u{2026}');
+    }
+    s
+}
+
+/// the names of the Key Information bits that are set ("Pairwise, Install, Ack, MIC")
+fn key_info_text(info: u16) -> String {
+    use crate::eapol::*;
+    let mut v: Vec<&str> = Vec::new();
+    for (bit, name) in [(KI_PAIRWISE, "Pairwise"), (KI_INSTALL, "Install"), (KI_ACK, "Ack"), (KI_MIC, "MIC"), (KI_SECURE, "Secure"), (KI_ERROR, "Error"), (KI_REQUEST, "Request"), (KI_ENCRYPTED, "Encrypted Key Data")] {
+        if info & bit != 0 {
+            v.push(name);
+        }
+    }
+    if info & KI_PAIRWISE == 0 {
+        v.insert(0, "Group");
+    }
+    v.join(", ")
+}
+
+/// the name of an AKM suite of 00-0F-AC
+fn akm_name(a: u8) -> String {
+    match a {
+        crate::eapol::AKM_PSK => String::from("PSK (2)"),
+        crate::eapol::AKM_PSK_SHA256 => String::from("PSK-SHA256 (6)"),
+        crate::eapol::AKM_SAE => String::from("SAE (8)"),
+        n => format!("{}", n),
+    }
+}
+
+fn eapol_layer(frame: &[u8], off: usize, len: usize) -> B {
+    use crate::eapol::{self, EapolView, Key};
+    let b = &frame[off..off + len];
+    let Some(v) = EapolView::parse(b) else {
+        return payload_layer(Proto::Eapol, off, len);
+    };
+    let key = if v.kind() == eapol::T_KEY { Key::parse(v.body()) } else { None };
+    let title = match key.as_ref().and_then(|k| k.message()) {
+        Some(m) => format!("802.1X Authentication, EAPOL-Key (Message {} of 4)", m),
+        None => format!("802.1X Authentication, {}", eapol::kind_name(v.kind())),
+    };
+    let mut l = B::new(Proto::Eapol, off, len, title);
+    let ver = match v.version() {
+        1 => String::from("802.1X-2001 (1)"),
+        2 => String::from("802.1X-2004 (2)"),
+        3 => String::from("802.1X-2010 (3)"),
+        n => format!("{}", n),
+    };
+    l.f("Version", off, 1, ver);
+    l.f("Type", off + 1, 1, format!("{} ({})", eapol::kind_name(v.kind()), v.kind()));
+    l.f("Length", off + 2, 2, format!("{}", v.body_len()));
+    let body = off + 4;
+    let Some(k) = key else {
+        if v.kind() == eapol::T_KEY {
+            l.bad(String::from("not a valid EAPOL-Key body (RSN descriptor, 95 bytes and its key data)"));
+        }
+        if v.body_len() > 0 {
+            l.f("Body", body, v.body_len(), format!("{} bytes", v.body_len()));
+        }
+        return l;
+    };
+    l.f("Key Descriptor Type", body, 1, String::from("EAPOL RSN Key (2)"));
+    let kdv = match k.version() {
+        eapol::KDV_AKM => String::from("AKM defined (0)"),
+        1 => String::from("RC4 Cipher, HMAC-MD5 MIC (1)"),
+        eapol::KDV_SHA1 => String::from("AES Cipher, HMAC-SHA1 MIC (2)"),
+        eapol::KDV_CMAC => String::from("AES Cipher, AES-128-CMAC MIC (3)"),
+        n => format!("{}", n),
+    };
+    l.f("Key Information", body + 1, 2, format!("0x{:04x} ({}; {})", k.info, kdv, key_info_text(k.info)));
+    l.f("Key Length", body + 3, 2, format!("{}", k.key_len));
+    l.f("Replay Counter", body + 5, 8, format!("{}", k.replay));
+    l.f("Key Nonce", body + 13, 32, if k.nonce == [0; 32] { String::from("0 (none)") } else { hex_head(&k.nonce, 32) });
+    l.f("Key IV", body + 45, 16, hex_head(&k.iv, 16));
+    l.f("Key RSC", body + 61, 8, hex_head(&k.rsc, 8));
+    l.f("Key ID", body + 69, 8, hex_head(&b[4 + 69..4 + 77], 8));
+    l.f("Key MIC", body + eapol::MIC_OFF, eapol::MIC_LEN, if k.has(eapol::KI_MIC) { hex_head(&k.mic, 16) } else { String::from("0 (none)") });
+    l.f("Key Data Length", body + 93, 2, format!("{}", k.data.len()));
+    let doff = body + eapol::KEY_FIXED;
+    if k.has(eapol::KI_ENCRYPTED) {
+        if !k.data.is_empty() {
+            l.f("WPA Key Data", doff, k.data.len(), format!("{} bytes, encrypted (AES key wrap)", k.data.len()));
+        }
+        return l;
+    }
+    // the elements of plain key data: the RSN element, KDEs
+    let mut at = doff;
+    for (id, e) in eapol::elements(&k.data) {
+        match id {
+            eapol::EID_RSN => {
+                let what = match eapol::Rsne::parse(&k.data[at - doff..]) {
+                    Some(r) => format!("RSN Information: CCMP, AKM {}, capabilities 0x{:04x}", akm_name(r.akm), r.caps),
+                    None => String::from("RSN Information (unreadable)"),
+                };
+                l.f("RSN IE", at, e.len() + 2, what);
+            }
+            eapol::EID_VENDOR if e.len() >= 4 && e[..3] == eapol::OUI => {
+                let what = match e[3] {
+                    eapol::KDE_GTK => String::from("GTK"),
+                    eapol::KDE_PMKID => format!("PMKID {}", hex_head(&e[4..], 16)),
+                    eapol::KDE_IGTK => String::from("IGTK"),
+                    t => format!("type {}", t),
+                };
+                l.f("Key Data Element", at, e.len() + 2, what);
+            }
+            _ => l.f("Element", at, e.len() + 2, format!("ID {}, {} bytes", id, e.len())),
+        }
+        at += e.len() + 2;
+    }
+    l
+}
+
+/// "Key (Message 1 of 4)", "EAPOL-Start"
+fn eapol_info(b: &[u8]) -> String {
+    use crate::eapol::{self, EapolView, Key};
+    let Some(v) = EapolView::parse(b) else {
+        return String::from("EAPOL");
+    };
+    if v.kind() != eapol::T_KEY {
+        return String::from(eapol::kind_name(v.kind()));
+    }
+    match Key::parse(v.body()) {
+        Some(k) => match k.message() {
+            Some(m) => format!("Key (Message {} of 4)", m),
+            None if k.has(eapol::KI_REQUEST) => String::from("Key (Request)"),
+            None => String::from("Key (Group Message)"),
+        },
+        None => String::from("Key"),
+    }
 }

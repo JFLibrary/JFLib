@@ -9,6 +9,15 @@
 //                          cable, flushes the bridges' MAC entries of that port, tells spanning
 //                          tree (stp.rs), the services and RIP (rip.rs) of both ends, and
 //                          IPv6 (nd.rs: ip6_kick)
+//   Engine::send_on        a frame on one direction of a link without asking whether it is up
+//                          (WLAN: the handshake before an association carries data; the AP's
+//                          frames to its stations)
+//
+// WLAN associations (wlan.rs) are links too, between a station's port and the radio port of
+// its access point, which has no link of its own: they are up while the station is (powered,
+// its port up, the handshake done); the AP's side sends through wlan_ap_send (a radio port
+// without a cable), receives through wlan_rx, and keeps the other stations' MAC entries and
+// its notes when one of them goes.
 //
 // Serialisation of Ethernet takes the frame (at least 60 bytes) + FCS + preamble + inter-frame
 // gap: (max(len, 60) + 24) * 8 bits at the link speed.  The receiver gets the frame when its
@@ -114,6 +123,9 @@ impl Engine {
         let Some(Some(l)) = self.links.get(li) else {
             return false;
         };
+        if crate::wlan::is_assoc_id(l.id) {
+            return self.wlan_link_up(li, l);
+        }
         if l.down || (l.wrong_cable && self.strict_mdix) || self.faults.link(li).is_some_and(|o| o.cut > 0) {
             return false;
         }
@@ -163,15 +175,21 @@ impl Engine {
                 d.busy_until = 0;
             }
         }
+        // a WLAN association: the AP's radio port keeps its other stations (wlan.rs)
+        let ap_end = self.wlan_ap_end(li);
         for (n, p) in ends {
             let Some(Some(node)) = self.nodes.get_mut(n) else {
                 continue;
             };
+            let at_ap = ap_end.is_some_and(|(a, _)| a == n);
             if !up && let Some(b) = node.bridge.as_mut() {
-                b.flush_port(p);
+                match ap_end {
+                    Some((_, mac)) if at_ap => b.fdb.retain(|k, e| e.fixed || e.port != p || k.1 != mac),
+                    _ => b.flush_port(p),
+                }
             }
             let dev = node.dev;
-            if node.power {
+            if node.power && !at_ap {
                 self.note(dev, None, if up { Note::LinkUp { port: p } } else { Note::LinkDown { port: p } });
             }
         }
@@ -221,6 +239,11 @@ impl Engine {
             return;
         };
         if matches!(port.spec.media, Media::Console | Media::Usb) {
+            return;
+        }
+        // the radio of an access point without a cable: its stations (wlan.rs)
+        if port.link.is_none() && port.spec.media == Media::RadioAp {
+            self.wlan_ap_send(ni, pi, frame, cause, crate::wlan::Src::Own);
             return;
         }
         let Some(li) = port.link else {
@@ -336,11 +359,13 @@ impl Engine {
     }
 
     pub(crate) fn arrive(&mut self, li: usize, epoch: u32, d: u8, frame: Frame, hop: HopId) {
-        let up = self.link_up(li);
+        // a WLAN association carries the handshake before it carries data (wlan.rs)
+        let up = self.link_up(li) || self.wlan_carrier(li);
         let Some(Some(l)) = self.links.get(li) else {
             self.trace.mark_lost(hop);
             return;
         };
+        let assoc = crate::wlan::is_assoc_id(l.id);
         let (ni, pi) = l.ends[1 - d as usize];
         if l.epoch != epoch || !up {
             self.trace.mark_lost(hop);
@@ -356,6 +381,9 @@ impl Engine {
         let c = &mut node.ports[pi as usize].counters;
         c.rx_frames += 1;
         c.rx_bytes += frame.len() as u64;
+        if assoc && self.wlan_rx(li, ni, pi, &frame, hop) {
+            return;
+        }
         self.receive(ni, pi, frame, hop);
     }
 
@@ -400,4 +428,33 @@ impl Engine {
 /// does a copper cable of this kind fit the ports' MDI / MDI-X roles?
 pub fn right_cable(kind: CableKind, a: &jfn_model::PortSpec, b: &jfn_model::PortSpec) -> bool {
     !kind.is_copper() || cable::cable_kind(a, b).is_ok_and(|k| k == kind)
+}
+
+impl Engine {
+    /// a frame from end `d` of link `li`, at once or after what waits; the caller decided it
+    /// may go (WLAN: EAPOL before the association carries data, the AP's frames to its
+    /// stations)
+    pub(crate) fn send_on(&mut self, li: usize, d: u8, frame: Frame, cause: Option<HopId>) {
+        let now = self.now;
+        let batch = self.trace.stamp(now);
+        let Some(Some(l)) = self.links.get_mut(li) else {
+            return;
+        };
+        let (ni, pi) = l.ends[d as usize];
+        let dir = &mut l.dir[d as usize];
+        if dir.busy_until > now || !dir.queue.is_empty() {
+            if dir.queued_bytes + frame.len() > QUEUE_BYTES {
+                if let Some(Some(n)) = self.nodes.get_mut(ni) {
+                    n.ports[pi as usize].counters.drops += 1;
+                    let dev = n.dev;
+                    self.note(dev, cause, Note::DropQueueFull { port: pi });
+                }
+                return;
+            }
+            dir.queued_bytes += frame.len();
+            dir.queue.push_back(Queued { frame, cause, batch, at: now });
+            return;
+        }
+        self.start_tx(li, d, Queued { frame, cause, batch, at: now });
+    }
 }

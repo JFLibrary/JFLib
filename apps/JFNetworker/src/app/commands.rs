@@ -21,6 +21,8 @@
 // and Nächster Hinweis.  Assessments (A1): Werkzeuge › Aufgabe erstellen … (the author's panel,
 // workspace/author.rs), Simulation › Aufgabe abgeben (workspace/assess.rs); TIMER_ASSESS moves
 // a time limit's countdown.
+// WLAN (W1): Ansicht › WLAN-Reichweiten shows the range of every access
+// point on the canvas (canvas/wlan.rs; without it the selected ones show theirs).
 
 use jfn_model::CableKind;
 use ui::*;
@@ -32,7 +34,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 85] = [
+pub(crate) static CMDS: [Command; 86] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -118,6 +120,7 @@ pub(crate) static CMDS: [Command; 85] = [
     Command::new(CMD_AUTHOR_TARGET, "Aktuelles Netz als Ziel", IC_FLAG, 0, 0, 0),
     Command::new(CMD_AUTHOR_START, "Ausgangsnetz erzeugen", IC_REFRESH, 0, 0, CF_DISABLED),
     Command::new(CMD_AUTHOR_SAVE, "Als Aufgabe speichern …", IC_SAVE_AS, 0, 0, CF_DISABLED),
+    Command::new(CMD_WLAN_RANGES, "&WLAN-Reichweiten", JN_PORT_RADIO, 0, 0, 0),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -152,7 +155,7 @@ static M_EDIT: [Mi; 7] = [
     Mi::Sep,
     Mi::Cmd(CMD_RENAME),
 ];
-static M_VIEW: [Mi; 10] = [
+static M_VIEW: [Mi; 11] = [
     Mi::Cmd(CMD_ZOOM_IN),
     Mi::Cmd(CMD_ZOOM_OUT),
     Mi::Cmd(CMD_ZOOM_100),
@@ -161,6 +164,7 @@ static M_VIEW: [Mi; 10] = [
     Mi::Cmd(CMD_GRID),
     Mi::Cmd(CMD_SNAP),
     Mi::Cmd(CMD_MINIMAP),
+    Mi::Cmd(CMD_WLAN_RANGES),
     Mi::Sep,
     Mi::Sub("&Bereiche", &M_PANELS),
 ];
@@ -279,6 +283,7 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     ui.cmd_state(CMD_GRID, flag(n.prefs.grid, CF_CHECKED));
     ui.cmd_state(CMD_SNAP, flag(n.prefs.snap, CF_CHECKED));
     ui.cmd_state(CMD_MINIMAP, flag(n.prefs.minimap, CF_CHECKED));
+    ui.cmd_state(CMD_WLAN_RANGES, flag(n.canvas.wl.ranges, CF_CHECKED));
     for (k, &p) in PANELS.iter().enumerate() {
         ui.cmd_state(CMD_PANEL0 + k as u32, flag(n.shell.dock.visible(p), CF_CHECKED));
     }
@@ -446,6 +451,8 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
             crate::workspace::assess::timer(n, ui);
             return true;
         }
+        // WLAN: the ranges of every access point on the canvas (canvas/wlan.rs)
+        CMD_WLAN_RANGES => n.canvas.wl.ranges = !n.canvas.wl.ranges,
         _ => return false,
     }
     ui.repass();

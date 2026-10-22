@@ -42,6 +42,9 @@
 //   expect PC1 reaches 10.0.2.10                 a ping would get an answer now (A1: judged on
 //   expect PC1 not reaches server.lab            a copy of the engine, goal.rs; a name is looked
 //                                                up by the device's resolver)
+//   move Laptop1 900 300                         put a device's box at x, y (world units, its
+//                                                top left corner, as in the project): WLAN
+//                                                stations and access points look again
 //
 // Device and port names are resolved when the scenario runs; this module only checks syntax.
 
@@ -83,6 +86,8 @@ pub enum StepKind {
     Heal(HealSpec),
     /// the time series as CSV at the end ("series FILE")
     Series(String),
+    /// a device moves on the canvas ("move DEV X Y"): its new top left corner
+    Move { dev: String, x: i32, y: i32 },
 }
 
 /// a fault of a scenario (the names are resolved when it runs)
@@ -365,7 +370,7 @@ fn words(s: &str) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-const KEYWORDS: &[&str] = &["seed", "run", "link", "impair", "power", "expect", "pcap", "print", "at", "fault", "heal", "series"];
+const KEYWORDS: &[&str] = &["seed", "run", "link", "impair", "power", "expect", "pcap", "print", "at", "fault", "heal", "series", "move"];
 
 /// parses a scenario; all syntax errors are collected
 pub fn parse(text: &str) -> Result<Scenario, Vec<ScnErr>> {
@@ -445,6 +450,10 @@ fn parse_line(t: &str, sc: &mut Scenario) -> Result<Option<(Option<u64>, StepKin
             StepKind::Fault { fault: parse_fault(rest)?, dur }
         }
         ["heal", rest @ ..] => StepKind::Heal(parse_heal(rest)?),
+        ["move", dev, x, y] => {
+            let num = |s: &str| s.parse::<i32>().map_err(|_| format!("\u{201e}{}\u{201c} ist keine Zahl.", s));
+            StepKind::Move { dev: String::from(*dev), x: num(x)?, y: num(y)? }
+        }
         [k, ..] => return Err(format!("Unbekannter Schritt \u{201e}{}\u{201c}.", k)),
         [] => return Ok(None),
     };
