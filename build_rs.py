@@ -412,6 +412,7 @@ def app_targets(name):
 PERM_KEYS_ARGS = ("fs.read", "fs.write", "process", "plugins", "url", "net.connect", "net.listen")
 PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart", "audio.output")
 PERM_KEYS_AGENT = ("agent.confirm", "agent.deny")                  # agent actions: confirmed / refused
+PERM_KEYS_SANDBOX = ("sandbox",)                                   # OS sandbox: "sandbox [strict]"
 PERM_ASKABLE = PERM_KEYS_ARGS + PERM_KEYS_FLAG[1:]                  # "ask KEY ARGS [\"reason\"]"
 PERM_VARS = ("CONFIG", "TEMP", "HOME", "EXE", "FONTS", "APPCONFIG", "APPDATA", "APPCACHE", "APPLOG",
              "DESKTOP", "DOCUMENTS", "DOWNLOADS", "PICTURES", "MUSIC", "VIDEOS")
@@ -522,6 +523,9 @@ def perm_check(text, where):
             for a in args:
                 if not re.fullmatch(r"[A-Za-z0-9._*?-]{1,128}", a):
                     raise BuildError(f"{where}:{i}: {a} is not an action name pattern (letters, digits, . _ - and * ?)")
+        elif key in PERM_KEYS_SANDBOX:
+            if args not in ([], ["strict"]):
+                raise BuildError(f"{where}:{i}: sandbox takes nothing or 'strict'")
         elif key in PERM_KEYS_FLAG:
             if args:
                 raise BuildError(f"{where}:{i}: {key} takes no arguments")
@@ -541,7 +545,7 @@ def perm_check(text, where):
                     raise BuildError(f"{where}:{i}: {err}")
         else:
             raise BuildError(f"{where}:{i}: unknown permission {key} "
-                             f"({', '.join(PERM_KEYS_ARGS[:2] + PERM_KEYS_FLAG[:1] + PERM_KEYS_ARGS[2:] + PERM_KEYS_FLAG[1:] + ('ask',) + PERM_KEYS_AGENT)})")
+                             f"({', '.join(PERM_KEYS_ARGS[:2] + PERM_KEYS_FLAG[:1] + PERM_KEYS_ARGS[2:] + PERM_KEYS_FLAG[1:] + PERM_KEYS_SANDBOX + ('ask',) + PERM_KEYS_AGENT)})")
 
 
 # manifests and the error perm_check must give (None: valid); `check` runs them, so the build's
@@ -557,6 +561,8 @@ PERM_CASES = [
     ("ask agent.deny doc.x", "agent.deny cannot be asked for"),
     ("agent.confirm doc/x", "is not an action name pattern"),
     ("agent.deny", "needs at least one action name"),
+    ("sandbox\nsandbox strict", None),
+    ("sandbox loose", "sandbox takes nothing or 'strict'"),
     ('ask print "a\x07b"', "no control characters"),
     ("fs.read $PLUGIN/x", "unknown variable $PLUGIN"),
     ('audio.output\nask audio.output "Klänge"', None),

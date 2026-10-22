@@ -119,6 +119,14 @@ mod capabilities;
 pub use capabilities::*;
 /// The app's permissions (apps/NAME/PERMISSIONS) and their checks.
 pub mod policy;
+/// OS sandbox derived from the manifest: Landlock + seccomp (Linux), mitigation policies (Windows).
+pub mod sandbox;
+#[cfg(target_os = "linux")]
+#[path = "linux_sandbox.rs"]
+mod linux_sandbox;
+#[cfg(windows)]
+#[path = "win_sandbox.rs"]
+mod win_sandbox;
 /// What build_rs.py builds into a program (name, assets, manifest), set up at start-up.
 pub mod boot;
 /// One file namespace: app://, config://, data://, cache://, mem:// and mounted providers.

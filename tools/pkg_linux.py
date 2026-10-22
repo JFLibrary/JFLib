@@ -456,6 +456,9 @@ def finish_args(perms, extra=()):
             notes.append("fs.user: Dateien über die Portale (Dateidialog, Dokument-Portal für „Öffnen mit“)")
         elif key in ("url", "print", "autostart"):
             notes.append(f"{key}: über das Portal, kein Loch nötig")
+        elif key == "sandbox":
+            notes.append("sandbox: zusätzlich zur Flatpak der In-Process-Sandkasten "
+                         "(Landlock + seccomp) im Prozess (docs/PERMISSIONS.md „OS sandbox“)")
     for loc in sorted(fs):
         args.append(f"--filesystem={loc}" + ("" if fs[loc] else ":ro"))
     return args + list(extra), notes

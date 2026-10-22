@@ -1,0 +1,2 @@
+# sandboxtest checks the OS sandbox in its own body (installed by ui::main! before the UI) and
+# ends the process with the number of failures; nothing below is executed.

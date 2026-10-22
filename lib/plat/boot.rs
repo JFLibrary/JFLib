@@ -8,7 +8,8 @@
 //                           paths on the command line are the user's (read + write, folders
 //                           with everything below; a local file:// URI as its path); without
 //                           a manifest the process's key (policy::take_key: it answers the
-//                           questions of agent actions)
+//                           questions of agent actions).  A `sandbox` line then hands the
+//                           manifest to the OS as well (sandbox::apply)
 //
 // ui::main! calls name_and_assets and permissions itself (ui::boot, with the user's languages
 // in between) and keeps the key; rt::main! programs drop it, so their code cannot widen the
@@ -70,6 +71,14 @@ pub fn permissions(manifest: Option<&str>) -> Result<Option<Key>, i32> {
                 None => grant_user(&key, v),
             }
         }
+    }
+    // the OS sandbox (a `sandbox` line in the manifest): after the command-line grants, so the
+    // kernel also allows the user's files; before the app's own code and any worker thread.
+    // Not for a one-shot that only registers the app's file types and exits (it writes the
+    // user's config folders, which the sandbox does not grant; no app code runs).
+    let registering = crate::args().iter().skip(1).any(|a| matches!(a.as_str(), "--register" | "--register-replace" | "--unregister"));
+    if !registering {
+        crate::sandbox::apply();
     }
     Ok(Some(key))
 }

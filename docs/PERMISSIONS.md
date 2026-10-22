@@ -28,12 +28,13 @@ From then on the rules can only grow by files the user hands over.
 | Checked autostart entry | [`lib/plat/autostart.rs`](../lib/plat/autostart.rs) |
 | Checked sound output (streams, `play`, the system's sounds; `ui.beep`, `ui.dialog_sound`) | [`lib/plat/audio.rs`](../lib/plat/audio.rs), [`lib/ui/sound.rs`](../lib/ui/sound.rs) |
 | Install at start-up, the command line's paths | [`lib/plat/boot.rs`](../lib/plat/boot.rs) (console programs reach it through [`rt::boot`](../lib/rt/boot.rs) and `rt::main!`) |
+| OS sandbox from the manifest (`sandbox` line) | [`lib/plat/sandbox.rs`](../lib/plat/sandbox.rs), [`lib/plat/linux_sandbox.rs`](../lib/plat/linux_sandbox.rs) (Landlock + seccomp), [`lib/plat/win_sandbox.rs`](../lib/plat/win_sandbox.rs) (mitigation policies) |
 | Grants for the user's files, trusted library code, the question dialog, `ui.permissions_page` | [`lib/ui/perm.rs`](../lib/ui/perm.rs) |
 | Questions, answers, plugin scopes, agent rules | [`lib/plat/policy.rs`](../lib/plat/policy.rs) (`questions`, `Key::answer`, `decisions`, `forget`, `plugin_rights`, `on_behalf`, `agent_rule`, `agent_ask`) |
 | Agent actions: `Access`, `forbidden`, `confirmation_required` | [`lib/agent_core/src/action.rs`](../lib/agent_core/src/action.rs), the UI's host [`lib/ui/agent.rs`](../lib/ui/agent.rs) |
 | Script commands `perm ...`, `agent ...` | [`lib/ui/auto_perm.rs`](../lib/ui/auto_perm.rs) |
 | Syntax check, hand-over to `rustc` | `app_permissions`, `perm_split`, `Builder.boot_inputs` / `boot_args` in [`build_rs.py`](../build_rs.py), `build_apk` in [`tools/android.py`](../tools/android.py) |
-| Tests | `plattest --test policy` ([`t_policy.rs`](../apps/plattest/t_policy.rs)), `--test permask` ([`t_permask.rs`](../apps/plattest/t_permask.rs): questions without the UI), `--test plugperm` ([`t_plugperm.rs`](../apps/plattest/t_plugperm.rs): plugins), `--test dirs` and `--test trash` (the user folders' variables, `trash` as a write), [`apps/permtest`](../apps/permtest/main.rs) (GUI program; sound refused without `audio.output`), [`apps/permcli`](../apps/permcli/src/main.rs) (`rt::main!` and the programs of `BINS`), [`apps/permprompt`](../apps/permprompt/main.rs) (the dialog, each answer, a worker thread, headless answers, the stored answers, the settings section, agent actions; `tests/sound.uis`: `ask audio.output`, `ui.beep` and the silent dialog sound), [`apps/audiotest`](../apps/audiotest/PERMISSIONS) (`audio.output`: plays) |
+| Tests | `plattest --test policy` ([`t_policy.rs`](../apps/plattest/t_policy.rs)), `--test permask` ([`t_permask.rs`](../apps/plattest/t_permask.rs): questions without the UI), `--test plugperm` ([`t_plugperm.rs`](../apps/plattest/t_plugperm.rs): plugins), `--test dirs` and `--test trash` (the user folders' variables, `trash` as a write), [`apps/permtest`](../apps/permtest/main.rs) (GUI program; sound refused without `audio.output`), [`apps/permcli`](../apps/permcli/src/main.rs) (`rt::main!` and the programs of `BINS`), [`apps/permprompt`](../apps/permprompt/main.rs) (the dialog, each answer, a worker thread, headless answers, the stored answers, the settings section, agent actions; `tests/sound.uis`: `ask audio.output`, `ui.beep` and the silent dialog sound), [`apps/audiotest`](../apps/audiotest/PERMISSIONS) (`audio.output`: plays), [`apps/sandboxtest`](../apps/sandboxtest/main.rs) (the OS sandbox: raw syscalls that the kernel blocks or allows) |
 
 ## The manifest
 
@@ -62,6 +63,7 @@ ask net.connect *:443                 # one question for the whole line
 ask url mailto
 agent.confirm document.save document.export.*   # an agent needs the user's OK
 agent.deny document.delete ui.render  # never for an agent
+sandbox                               # let the OS enforce the manifest too (OS sandbox)
 ```
 
 | Key | Arguments | Allows |
@@ -81,6 +83,7 @@ agent.deny document.delete ui.render  # never for an agent
 | `ask KEY ...` | a rule of any key but `fs.user`, then an optional `"reason"` | the same access after the user agreed ([Asking the user](#asking-the-user)) |
 | `agent.confirm` | action names (`*`, `?`) | external control runs these actions after the user's confirmation |
 | `agent.deny` | action names (`*`, `?`) | external control may not run these actions |
+| `sandbox` | nothing or `strict` | have the OS enforce the manifest as defence in depth ([OS sandbox](#os-sandbox)); `strict` refuses to start without it |
 
 ### Patterns
 
@@ -360,6 +363,103 @@ question is open, the `ui.*` input actions are refused (`unavailable`): the agen
 away from such buttons deny or confirm the `ui.*` actions themselves (`agent.confirm ui.click
 ui.type ui.key`). `actions/describe` and `actions/list` report each action's `access`.
 
+## OS sandbox
+
+The checks above run inside the process, so a bug in the library or native code that calls the
+operating system directly can bypass them ([Limits](#limits), [Plugins](#plugins)). An app can
+ask the operating system to enforce the same manifest as well, as defence in depth. It is
+opt-in, one line in the manifest, and apps without it are unchanged:
+
+```text
+sandbox          # best effort: enforce what this OS and kernel support, carry on otherwise
+sandbox strict   # refuse to start when the OS cannot enforce the manifest
+```
+
+`plat::boot` applies it right after it installs the manifest and grants the command line's
+files, before the app's own code and any worker thread. A one-shot that only registers the
+app's file types (`--register` ...) is not sandboxed (it writes the user's config folders and
+then exits; no app code runs). `plat::sandbox::status()` reports what was applied (for a
+diagnostics page or a test).
+
+### Linux: Landlock and seccomp
+
+- **Landlock** (`lib/plat/linux_sandbox.rs`, raw syscalls, no libc; the ABI is detected and
+  older kernels get what they support) restricts the filesystem to:
+  - the folders and files the manifest grants (`fs.read` read only, `fs.write` read and write,
+    the plugin folders read and execute), with the command line's `fs.user` files,
+  - the app's own folders (`config://`, `data://`, `cache://`, `logs://`) and the folders the
+    library always reads (the system fonts, the Hunspell dictionaries, the executable's folder,
+    `/etc/resolv.conf` and `/etc/hosts`),
+  - the system paths the library needs: `/usr`, `/etc`, `/bin`, `/lib`, `/lib64`, `/sbin`,
+    `/opt`, `/proc`, `/sys`, `/run`, `/var` (read only), and `/tmp`, `$TMPDIR`,
+    `$XDG_RUNTIME_DIR` and `/dev` (read and write), the X11 cookie (`$XAUTHORITY` or
+    `~/.Xauthority`).
+  - Landlock grants existing paths only, and is coarser than the lexical rules: a pattern
+    grants the folder above its first wildcard (`$TEMP/mytool-*/**` grants `$TEMP`; the
+    in-process check still narrows it). The app's own folders and the folder of every
+    `fs.write` rule are created at start-up when they are missing. A command-line file that
+    does not exist yet cannot be granted (name its folder in a rule).
+  - The X11 and Wayland display sockets, the D-Bus session bus and the PulseAudio socket are
+    Unix sockets; connecting to a Unix socket is not a filesystem action Landlock mediates, so
+    they keep working without a rule.
+  - Network: on Landlock ABI 4 and newer, TCP `bind` is restricted to the ports of
+    `net.listen` and TCP `connect` to the ports of `net.connect` (plus 53 for DNS when a name
+    rule exists). A rule with a port range wider than 64 or `*` leaves TCP unrestricted (the
+    in-process policy still checks it); with no `net.*` rule, all TCP is blocked. UDP is not
+    restricted by Landlock (DNS over UDP keeps working).
+- **seccomp-bpf** installs a deny list that returns `EPERM` for `ptrace`, `process_vm_readv`,
+  `process_vm_writev`, `kexec_load`, `kexec_file_load`, `init_module`, `finit_module`,
+  `delete_module`, `mount`, `umount2`, `pivot_root`, `chroot`, `bpf`, `perf_event_open`,
+  `userfaultfd`, `keyctl`, `add_key`, `request_key`, `open_by_handle_at`, `setns` and
+  `unshare`, and for `execve` / `execveat` when the manifest allows no program. It does not
+  touch the syscalls the library itself uses (threads, futexes, memory, sockets, the font, IME
+  and D-Bus code paths). `NO_NEW_PRIVS` is set first, so it needs no privilege. The filter is
+  inherited by the threads started afterwards.
+- **`fs.user` at run time.** Landlock grants are fixed when the sandbox is applied; it cannot
+  add a path the user picks later in a file dialog. Inside a Flatpak the file dialog and the
+  documents portal hand the file over below the portal mount (`$XDG_RUNTIME_DIR/doc/`), which
+  is granted, so picked files work. Outside a sandbox the native dialog returns an ordinary
+  path that Landlock did not grant: such an app should not opt in to the OS sandbox, or should
+  run inside a Flatpak, or should widen its Landlock grant by naming the folder with an
+  `fs.read` / `fs.write` rule. The in-process `fs.user` grant still holds either way.
+- **`execve` and `spawn_self`.** A sandbox with no `process` rule blocks every `execve`,
+  including `plat::spawn_self` (a crash relaunch, single-instance forwarding). An app that
+  needs those must list a `process` rule (which also keeps `execve` allowed).
+
+### Windows: process mitigation policies
+
+A full-trust Win32 process is not confined the way an AppContainer is, but the process
+mitigation policies (`lib/plat/win_sandbox.rs`, `SetProcessMitigationPolicy`) still harden it
+from the manifest, as defence in depth:
+
+- **Always** (`sandbox`): image load (no images from a remote/UNC path or with a low integrity
+  label), extension points disabled, and -- unless the manifest has a `plugins` rule --
+  dynamic code prohibited (no new executable memory; the plugin loader maps on-disk images,
+  which stays allowed). On the Windows build this was tested on (10.0.26200) the dynamic code
+  policy reads back as set, but `VirtualAlloc(PAGE_EXECUTE_READWRITE)` and `VirtualProtect` to
+  executable still succeed, in any process; `sandboxtest` reports that instead of failing.
+- **`sandbox strict`** also blocks child-process creation when the app may not start other
+  programs: no `process` rule and no `url` / `print` rule (`open_url`'s `ShellExecute` and the
+  print dialog can start one). This stops `plat::spawn_self` too. Strict handle checks are
+  deliberately not enabled: an invalid-handle reference anywhere would raise an exception and
+  turn a benign race in a GUI into a crash.
+- **AppContainer** (re-executing the app into an AppContainer profile with capabilities from
+  the manifest) is *not* done here: it needs ACL grants on the app's real `config` / `data` /
+  `cache` folders (a lasting change to the user's folders) and testing per app to be sure the
+  GUI still works. For a packaged app the MSIX capabilities in `tools/pkg_msix.py` already
+  follow the manifest (`internetClient` for `net.connect`, `internetClientServer` /
+  `privateNetworkClientServer` for `net.listen`); an MSIX full-trust app is not confined by
+  them, they are shown in the Store.
+
+### Flatpak
+
+`tools/pkg_linux.py` derives the Flatpak finish-args from the manifest and is already as narrow
+as it allows: Wayland with X11 as fallback and IPC, the network only with a `net.*` rule, the
+Secret Service only with `secrets`, `--filesystem` holes only for the folders of `fs.*` rules
+(`fs.read` as `:ro`), and portals (file dialog, `open_url`, printing, autostart, the documents
+portal for `fs.user`) instead of holes. Inside the Flatpak the kernel enforces those; the
+in-process OS sandbox above stacks on top when the manifest also has a `sandbox` line.
+
 ## Refusals
 
 A refused call fails the way a missing or unreadable target fails: `None`, `false`, `0`,
@@ -386,10 +486,11 @@ In addition:
 - **Lexical checks.** A symbolic link inside an allowed folder can lead outside it. On
   Linux a path with a `..` segment is refused, because the kernel applies `..` after
   symbolic links (`allowed/link/../x`). Windows resolves `..` in the text, as the policy does.
-- **Not a sandbox against native code.** Native plugins and app code that call the OS
-  directly bypass `plat` ([Plugins](#plugins): what an in-process plugin can still do).
-  Kernel enforcement (Landlock on Linux, AppContainer / MSIX capabilities on Windows) is a
-  later step ([roadmap](ROADMAP.md) §1).
+- **Not a sandbox against native code, by default.** Native plugins and app code that call the
+  OS directly bypass `plat` ([Plugins](#plugins): what an in-process plugin can still do). An
+  app that adds a `sandbox` line to its manifest has the operating system enforce the manifest
+  as well (Landlock + seccomp on Linux, process mitigation policies on Windows), so a bypass of
+  the in-process checks is still contained ([OS sandbox](#os-sandbox)).
 - **Questions.** The stored answers are a plain file in the app's config folder: `plat`
   refuses the app's writes to it, native code can still change it. Answers are per line, not
   per file or host. The UI thread's own access is refused while its question is open (the app

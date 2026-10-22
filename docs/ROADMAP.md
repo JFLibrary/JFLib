@@ -106,8 +106,33 @@ Host bietet (13 `CAP_*`-Bits). Seit Paket 1 und 2 (2026-10-16) gibt es das Manif
   echter Sandkasten für In-Process-Plugins (Plugin-Code kann `plat` umgehen, siehe
   PERMISSIONS.md; dafür ein eigener Prozess oder die OS-Sandbox, P3); `ui.click` auf einen
   Knopf einer gesperrten Aktion läuft als Nutzereingabe (Apps sperren dafür `ui.*`).
-- **P3** · *fehlt* · OS-Sandbox nutzen: Windows AppContainer / MSIX-Capabilities, Linux
-  Landlock / seccomp, Flatpak-Portale.
+- **P3** · *erledigt* (2026-10-22) · OS-Sandbox nutzen ([PERMISSIONS.md](PERMISSIONS.md)
+  „OS sandbox", [`plat/sandbox.rs`](../lib/plat/sandbox.rs)): opt-in pro App über eine Zeile
+  `sandbox` (bestmöglich) oder `sandbox strict` (startet nicht ohne OS-Durchsetzung) im
+  Manifest; `plat::boot` wendet sie nach dem Installieren des Manifests an, bevor App-Code oder
+  Threads laufen, Apps ohne die Zeile bleiben unverändert. **Linux** (`linux_sandbox.rs`, rohe
+  Syscalls, ABI-Erkennung): Landlock beschränkt das Dateisystem auf die Ordner des Manifests
+  plus die Systempfade, die die Bibliothek liest (`/usr`, `/etc`, Schriften, `/proc` … nur
+  lesen; `/tmp`, `$XDG_RUNTIME_DIR`, `/dev` schreibbar), und TCP-bind/connect auf die Ports von
+  `net.listen`/`net.connect` (Landlock-ABI 4+); seccomp-bpf verbietet eine Liste gefährlicher
+  Syscalls (ptrace, process_vm_\*, kexec, Modul-Laden, mount, bpf, perf_event_open,
+  userfaultfd, keyctl …) mit EPERM und `execve`, wenn das Manifest kein Programm erlaubt (auch
+  `spawn_self`). Die Anzeige-Sockets (X11/Wayland, auch D-Bus, PulseAudio) sind Unix-Sockets:
+  Verbinden wird von Landlock nicht gefiltert. Vom Nutzer zur Laufzeit gewählte Dateien
+  (`fs.user`) kann Landlock nicht nachträglich freigeben – in einer Flatpak laufen sie über das
+  Dokumente-Portal, nativ bleibt der Dialogpfad außerhalb der Freigaben (dokumentiert).
+  **Windows** (`win_sandbox.rs`): Prozess-Mitigation-Policies (`SetProcessMitigationPolicy`):
+  Image-Load (keine Remote-/Low-Label-Images), Extension-Points aus, dynamischer Code verboten
+  (außer das Manifest erlaubt Plugins; auf Windows 10.0.26200 meldet die Policy sich als
+  gesetzt, ausführbarer Speicher wird aber trotzdem vergeben – in jedem Prozess); `strict`
+  sperrt zusätzlich die Erzeugung von Kindprozessen, wenn weder `process` noch `url`/`print`
+  im Manifest stehen (geprüft: `CreateProcess` scheitert). AppContainer per Re-exec ist bewusst nicht
+  umgesetzt (bräuchte ACL-Änderungen an den echten Nutzerordnern und Tests pro App; die
+  MSIX-Capabilities in `tools/pkg_msix.py` folgen schon dem Manifest, docs). **Flatpak**: die
+  finish-args aus `tools/pkg_linux.py` sind bereits so eng wie das Manifest (Portale statt
+  Löcher), der In-Process-Sandkasten greift darin zusätzlich. Getestet mit `apps/sandboxtest`
+  (`sandbox strict`, versucht per rohen Syscalls Verbotenes und Erlaubtes) unter Windows und
+  Linux (WSL, Landlock-ABI 7) und `plattest --test permask`.
 - **P3** · *fehlt* · OS-Berechtigungen für Kamera, Mikrofon, Standort (Android-Laufzeitrechte,
   Portale).
 

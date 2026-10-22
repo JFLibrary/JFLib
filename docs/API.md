@@ -61,7 +61,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -16707,6 +16707,9 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
                         plain rule that covers the access wins over an ask line
   agent.confirm NAME..  agent actions (glob: '*' any run) the user confirms first
   agent.deny NAME..     agent actions an agent may not run
+  sandbox [strict]      ask the OS to enforce the manifest as well (Landlock + seccomp on
+                        Linux, process mitigation policies on Windows; sandbox.rs); `strict`
+                        refuses to start when the OS cannot enforce it
 A PATTERN is an absolute path (X:/.. and //server/share/.. count on Windows only, /.. on
 Linux only), or starts with $CONFIG $TEMP $HOME $EXE $FONTS, the app's own folders
 $APPCONFIG $APPDATA $APPCACHE $APPLOG (vfs::app_dir) or the user's folders $DESKTOP
@@ -16843,6 +16846,34 @@ STORE: &str = "config://permission-decisions.txt"
 - **`fn denials() -> Vec<Denial>`**
   the last refusals, oldest first
 
+- **`fn sandbox_level() -> u8`**
+  the OS sandbox the manifest asks for: 0 none, 1 `sandbox`, 2 `sandbox strict` (sandbox.rs)
+
+- **`struct LinuxPlan`** *(Linux)*
+  what the Linux OS sandbox grants, derived from the active policy ([`sandbox_plan_linux`])
+  - `level: u8` -- 0 none, 1 `sandbox`, 2 `sandbox strict`
+  - `fs: Vec<(String, bool)>` -- literal folders / files the manifest reaches, with whether they may be written
+  - `make_dirs: Vec<String>` -- writable folders to create when missing (the app's own folders, the folders of fs.write
+    rules): the kernel can only grant paths that exist
+  - `exec_allowed: bool` -- the manifest names at least one program (execve is denied otherwise)
+  - `connect_restrict: bool` -- restrict TCP connect to `connect_ports` (false: leave it unrestricted -- a `*` rule)
+  - `connect_ports: Vec<u16>` -- the ports of net.connect (and 53 with a name rule); empty: no TCP connection at all
+  - `listen_restrict: bool` -- restrict TCP bind to `listen_ports`
+  - `listen_ports: Vec<u16>` -- the ports of net.listen; empty: no TCP listener at all
+
+- **`fn sandbox_plan_linux() -> LinuxPlan`** *(Linux)*
+  what the Linux OS sandbox should enforce for the active policy (no policy: nothing)
+
+- **`struct WinPlan`** *(Windows)*
+  what the Windows OS sandbox needs to know from the active policy ([`sandbox_plan_win`])
+  - `level: u8` -- 0 none, 1 `sandbox`, 2 `sandbox strict`
+  - `plugins_allowed: bool` -- the manifest allows native plugins (dynamic code must stay allowed for the loader)
+  - `exec_allowed: bool` -- child processes may be created: the manifest names a program, or has a `url` / `print`
+    rule (open_url's ShellExecute and the print dialog can start another program)
+
+- **`fn sandbox_plan_win() -> WinPlan`** *(Windows)*
+  what the Windows OS sandbox should enforce for the active policy (no policy: nothing)
+
 - **`fn cap_mask() -> u64`**
   the CAP_\* bits the policy leaves (all without a policy)
 
@@ -16956,6 +16987,61 @@ STORE: &str = "config://permission-decisions.txt"
 - **`fn check(text: &str) -> Result<(), String>`**
   (build checks, tests) whether text is a valid manifest: Err names the first bad line
 
+### `plat/sandbox.rs`
+
+Source: [`lib/plat/sandbox.rs`](../lib/plat/sandbox.rs)
+
+```text
+sandbox -- OS-level confinement that mirrors the permission manifest (docs/PERMISSIONS.md
+"OS sandbox"), as defence in depth for the in-process policy (policy.rs): a bug or native
+code can bypass `plat`, the kernel cannot be bypassed.  Opt in with a `sandbox` (best effort)
+or `sandbox strict` (refuse to start when the OS cannot enforce it) line in the manifest.
+
+  apply()          install the sandbox for the active policy, once, at start-up (boot.rs,
+                   before the app's own code runs); nothing without a `sandbox` line
+  status() -> Status   what was applied (tests, a diagnostics page)
+
+Linux: Landlock restricts the filesystem to the folders the manifest grants plus the system
+paths the library reads (ABI detected, best effort on older kernels), and TCP bind / connect
+to the manifest's ports (ABI 4+); seccomp-bpf denies a list of dangerous syscalls (ptrace,
+process_vm_*, kexec, module loading, mount, bpf, perf_event_open, userfaultfd, keyctl ...)
+and execve when no program is allowed.  Windows: process mitigation policies (image load,
+extension points, dynamic code; strict adds strict handle checks and child-process
+creation).  The browser and Android have no such API; apply() does nothing there.
+```
+
+- **`struct Status`**
+  what [`apply`] installed (the fields not relevant to this OS stay false / -1)
+  - `level: u8` -- 0 none, 1 `sandbox`, 2 `sandbox strict`
+  - `landlock_abi: i32` -- Linux: the Landlock ABI the kernel reports (-1 = no Landlock)
+  - `landlock_fs: bool` -- Linux: the filesystem ruleset is enforced
+  - `landlock_net: bool` -- Linux: TCP bind / connect is restricted (Landlock ABI 4+)
+  - `seccomp: bool` -- Linux: the seccomp filter is installed
+  - `exec_denied: bool` -- execve is denied (no program allowed): Linux seccomp, Windows child-process policy
+  - `win_mitigations: bool` -- Windows: the process mitigation policies were set
+  - `win_dynamic_code: bool` -- Windows: dynamic code is prohibited (no native plugins)
+
+**`impl Status`**
+
+- **`const NONE: Status = Status { level: 0, landlock_abi: -1, landlock_fs: false, ...`**
+  nothing applied
+
+- **`fn apply()`** *(Linux)*
+  install the OS sandbox the active policy asks for (nothing without a `sandbox` line); call
+  once, before the app's own code and before any worker thread is started
+
+- **`fn apply()`** *(Windows)*
+  install the OS sandbox the active policy asks for (nothing without a `sandbox` line)
+
+- **`fn apply()`**
+  the browser and Android have no such API
+
+- **`fn status() -> Status`**
+  what [`apply`] installed
+
+- **`fn status() -> Status`**
+  the browser and Android install nothing
+
 ### `plat/boot.rs`
 
 Source: [`lib/plat/boot.rs`](../lib/plat/boot.rs)
@@ -16971,7 +17057,8 @@ own code runs (docs/PERMISSIONS.md, docs/VFS.md)
                           paths on the command line are the user's (read + write, folders
                           with everything below; a local file:// URI as its path); without
                           a manifest the process's key (policy::take_key: it answers the
-                          questions of agent actions)
+                          questions of agent actions).  A `sandbox` line then hands the
+                          manifest to the OS as well (sandbox::apply)
 
 ui::main! calls name_and_assets and permissions itself (ui::boot, with the user's languages
 in between) and keeps the key; rt::main! programs drop it, so their code cannot widen the

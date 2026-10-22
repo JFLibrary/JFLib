@@ -972,6 +972,14 @@ ui.dialog_end(); // always
   (or `ActionSpec::confirm()` / `local_only()`) gate agent actions; the agent gets
   `confirmation_required` or `forbidden` back.
 
+  A `sandbox` line (or `sandbox strict`) has the operating system enforce the manifest too, as
+  defence in depth against a bug or native code that bypasses `plat`: Landlock plus seccomp on
+  Linux, process mitigation policies on Windows, applied at start-up before the app's own code.
+  Apps without the line are unchanged. See [PERMISSIONS.md](PERMISSIONS.md) "OS sandbox" for
+  what each platform enforces and the limits (a `sandbox` app without a `process` rule cannot
+  `spawn_self`, and files the user picks at run time need a Flatpak's documents portal or an
+  `fs.*` rule on the folder).
+
   ```rust
   fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
       if id == UIC_PERMISSION && arg == 1 && self.pending_import {
