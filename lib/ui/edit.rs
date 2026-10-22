@@ -558,6 +558,7 @@ impl Ui {
         let st = self.style;
         let mut sp = Sp { value: self.m.edit.tb_natw, icon, flags: 0, ..Sp::default() };
         let (w, h) = st.textbox_metrics(self, &mut sp);
+        let (w, h) = self.ctrl_size(w, h, stflags, false); // (theme) control height
         if icon != 0 { sp.s[0] += self.dp(23); }
         self.place(w, h);
         let mut hb = HB_FOCUS | HB_TEXT | CUR_IBEAM << HB_CURSOR_SHIFT;

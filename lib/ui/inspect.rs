@@ -89,14 +89,7 @@ const FLASH_MS: u32 = 700; // a repainted rectangle fades out in this time
 const FLASH_MAX: usize = 96;
 
 /// the names of the theme tokens (T_* / 4)
-const TOKEN_NAMES: [&str; T_COUNT] = [
-    "BG", "BG_ALT", "LAYER", "LAYER_STROKE", "CARD", "CARD_STROKE", "CTRL", "CTRL_HOVER", "CTRL_PRESSED", "CTRL_DISABLED",
-    "CTRL_STROKE", "CTRL_STROKE2", "STRONG_STROKE", "SUBTLE", "SUBTLE_HOVER", "SUBTLE_PRESSED", "SUBTLE_DISABLED", "TEXT",
-    "TEXT2", "TEXT3", "TEXT_DISABLED", "ACCENT", "ACCENT_HOVER", "ACCENT_PRESSED", "ACCENT_DISABLED", "ON_ACCENT",
-    "ON_ACCENT_DIS", "ACCENT_TEXT", "FOCUS_OUT", "FOCUS_IN", "FLYOUT", "FLYOUT_STROKE", "SMOKE", "DIVIDER", "INPUT_ACTIVE",
-    "CRIT", "OK", "WARN", "INFO", "CRIT_BG", "OK_BG", "WARN_BG", "INFO_BG", "CLOSE_HOVER", "SHADOW", "SCROLL", "TRACK",
-    "KNOB", "ALT_FILL", "STRONG_FILL",
-];
+use super::theme::TOKEN_NAMES;
 const LAYER_NAMES: [&str; L_COUNT] = ["base", "dialog", "popup", "tip"];
 
 /// a layout box begun or ended in a pass (box_begin / box_end while the inspector is open):

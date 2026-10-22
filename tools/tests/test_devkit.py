@@ -1,5 +1,6 @@
 """The developer tools without a build: `build_rs.py new` (tools/scaffold.py), the API snapshot and
-diff (tools/apidiff.py) and the changelog helper (tools/changelog.py).
+diff (tools/apidiff.py), the changelog helper (tools/changelog.py) and the catalogue check
+(`build_rs.py i18n`, tools/i18n_check.py).
 
     python tools/tests/test_devkit.py        (build_rs.py test runs it; about a second)
 
@@ -7,6 +8,8 @@ That the generated apps build and pass their smoke tests is checked by building 
 apps/scaffoldtest is the generator's output (test_fixture_is_generator_output keeps it so), and
 the suite builds and runs it like every app.
 """
+import contextlib
+import io
 import re
 import shutil
 import sys
@@ -20,6 +23,7 @@ sys.path.insert(0, str(ROOT))
 import apidiff  # noqa: E402
 import changelog  # noqa: E402
 import gendoc  # noqa: E402
+import i18n_check  # noqa: E402
 import pkgmeta  # noqa: E402
 import scaffold  # noqa: E402
 import build_rs  # noqa: E402
@@ -336,6 +340,113 @@ class ChangelogTest(unittest.TestCase):
         text, _ = changelog.read()
         self.assertIn(apidiff.lib_version(), changelog.releases(text))
         self.assertTrue(changelog.UNRELEASED.search(text))
+
+
+# ---------------------------------------------------------------- build_rs.py i18n
+class I18nTest(Temp):
+    """tools/i18n_check.py on a small app: what counts as a text, the report, --update"""
+    MAIN = """use ui::i18n::{self, Catalog};
+static NAMES: [&str; 2] = ["Rot", "Grün"];
+static CMDS: [Command; 2] = [Command::new(CMD_OPEN, "Ö&ffnen", 0, 0, 0, 0), Command::new(CMD_X + 1, "&Neu", 0, 0, 0, 0)];
+static MENU: [Mi; 2] = [Mi::Menu("&Datei", &M_FILE), Mi::Item(ID_INFO, "&Info", 0)];
+fn install() {
+    i18n::set_catalog(Catalog::from_tsv(include_str!("locales/ui.tsv")));
+}
+fn commands() -> Vec<Command> {
+    CMDS.iter().map(|c| Command { label: t(c.label), ..*c }).collect()
+}
+fn menu(it: Mi) -> Mi {
+    match it {
+        Mi::Item(id, label, icon) => Mi::Item(id, t(label), icon),
+        other => other,
+    }
+}
+fn frame(ui: &mut Ui) {
+    ui.text(i18n::t("Hallo"));
+    ui.text(&tf("{} Dateien", &[&n]));
+    ui.combobox(&list(&NAMES));
+    ui.text(i18n::tr("Öffnen")); // the library's own text
+    ui.text(t("Abbrechen")); // a library text: t falls back to it
+    x.t("Methode");
+    let s = "Nur ein Wert";
+    // t("Kommentar")
+}
+// i18n
+static TIPS: [&str; 2] = [
+    "Erster Tipp",
+    "Zweiter Tipp",
+];
+"""
+    CORE = 'pub fn cable() -> Msg {\n    msg!("Kabel {} fehlt", 3)\n}\npub fn port() -> Msg {\n    msg!("Port {} belegt", 80)\n}\n'
+    UI = ("de\ten\nHallo\tHello\n{} Dateien\t{0} files\nRot\tRed\nÖ&ffnen\t&Open\n&Datei\t&File\nNur ein Wert\tOnly one value\n"
+          "Veraltet\tOld\nErster Tipp\t\n{n, plural, one {# Datei} other {# Dateien}}\t{n, plural, other {# files}}\n")
+    ENGINE = "de\ten\n# the model's templates\nKabel {} fehlt\tCable {} missing\n"
+
+    def app(self):
+        self.write("demo/src/main.rs", self.MAIN)
+        self.write("demo/crates/demo_core/lib.rs", self.CORE)
+        self.write("demo/src/locales/ui.tsv", self.UI.replace("\n", "\r\n"))
+        self.write("demo/src/locales/engine.tsv", self.ENGINE)
+        return self.dir / "demo"
+
+    def test_report(self):
+        rep, _ = i18n_check.check_app(self.app())
+        got = {c: sorted(w for k, _, w in rep.lines if k == c) for c in rep.count}
+        self.assertEqual(rep.texts, 13)
+        self.assertEqual(got["missing"], ["&Info", "&Neu", "Grün", "Port {} belegt", "Zweiter Tipp"])
+        self.assertEqual(got["untranslated"], ["en: Erster Tipp"])
+        self.assertEqual(got["unused"], ["Veraltet", "{n, plural, one {# Datei} other {# Dateien}}"])
+        self.assertEqual(len(got["error"]), 2, got["error"])
+        self.assertIn("i18n::fill takes 1", got["error"][0] + got["error"][1])
+        self.assertIn("en needs one", got["error"][0] + got["error"][1])
+
+    def test_update(self):
+        app = self.app()
+        ui, engine = app / "src/locales/ui.tsv", app / "src/locales/engine.tsv"
+        before = ui.read_bytes()
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(i18n_check.main([str(app), "--update"]), 1)
+        after = ui.read_bytes()
+        self.assertTrue(after.startswith(before))
+        added = after[len(before):].decode("utf-8")
+        self.assertEqual(added, "\r\n".join([i18n_check.MARK, "Grün\t", "&Neu\t", "&Info\t", "Zweiter Tipp\t", ""]))
+        self.assertTrue(engine.read_text(encoding="utf-8").endswith("Kabel {} fehlt\tCable {} missing\n" + i18n_check.MARK + "\nPort {} belegt\t\n"))
+        rep, _ = i18n_check.check_app(app)
+        self.assertEqual((rep.count["missing"], rep.count["untranslated"]), (0, 6))
+        with contextlib.redirect_stdout(io.StringIO()):
+            i18n_check.main([str(app), "--update"])
+        self.assertEqual(ui.read_bytes(), after)        # nothing more to add
+
+    def test_catalogue_headers(self):
+        f = self.write("x/locales/a.tsv", "# languages: de en fr (read by the app)\n&Datei\t&File\t&Fichier\nNeu\tNew\n")
+        c = i18n_check.Catalogue(f)
+        self.assertEqual((c.langs, sorted(c.rows)), (["de", "en", "fr"], ["&Datei", "Neu"]))
+        c = i18n_check.Catalogue(self.write("x/locales/b.tsv", "Ja\tYes\tOui\nJa\tYes\tOui\n"))
+        self.assertEqual(c.langs, ["de", "column 2", "column 3"])
+        self.assertIn("twice", c.problems[0][1])
+
+    def test_placeholders(self):
+        ok = [("{} von {}", "{1} of {0}", {"msg"}, "en"), ("Datei '{}' fehlt", "File '{}' is missing", {"fill"}, "en"),
+              ("{n, plural, =0 {Keine} one {# Datei} other {# Dateien}} in {dir}", "{n, plural, =0 {None} one {# file} other {# files}} in {dir}", {"t"}, "en"),
+              ("{n, plural, one {# Datei} other {# Dateien}}", "{n, plural, one {# plik} few {# pliki} many {# plików} other {# pliku}}", {"t"}, "pl"),
+              ("{n, number} B", "{n, number} bytes", {"t"}, "en"), ("'{'x'}' {}", "'{'x'}' {}", {"t"}, "en")]
+        for src, tr, kinds, lang in ok:
+            self.assertEqual(i18n_check.compare(src, tr, kinds, lang), [], (src, tr))
+        bad = [("{} Dateien", "{0} files", {"fill"}, "en", "i18n::fill"), ("{} von {}", "{0} of {0}", {"msg"}, "en", "differ"),
+               ("Hallo {name}", "Hello {nom}", {"t"}, "en", "differ"), ("{n, number} B", "{n} bytes", {"t"}, "en", "differ"),
+               ("{n, plural, one {# Datei} other {# Dateien}}", "{n, plural, one {# plik} other {# pliku}}", {"t"}, "pl", "pl needs few, many"),
+               ("{n, plural, one {# Datei} other {# Dateien}}", "{n, plural, one {# file} few {# files} other {# files}}", {"t"}, "en", "never uses few"),
+               ("{g, select, f {sie} other {es}}", "{g, select, f {she}}", {"t"}, "en", 'no "other"')]
+        for src, tr, kinds, lang, why in bad:
+            self.assertIn(why, " ".join(i18n_check.compare(src, tr, kinds, lang)), (src, tr))
+        self.assertTrue(i18n_check.template_problems("Kabel {name}") and i18n_check.template_problems("{:>4}"))
+        self.assertEqual(i18n_check.template_problems("Kabel {} an {0}"), [])
+
+    def test_library(self):
+        """LIB_TEXTS has every tr("…") of lib/ and the same placeholders in every language"""
+        rep = i18n_check.check_lib()
+        self.assertEqual([x for x in rep.lines if x[0] in ("missing", "untranslated", "error")], [])
+        self.assertGreater(rep.texts, 100)
 
 
 if __name__ == "__main__":

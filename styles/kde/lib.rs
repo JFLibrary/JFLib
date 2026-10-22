@@ -28,6 +28,9 @@ pub struct Kde;
 pub static STYLE: Kde = Kde;
 
 impl Style for Kde {
+    fn name(&self) -> &'static str {
+        "kde"
+    }
     fn tokens(&self, dark: bool) -> [u32; T_COUNT] {
         if dark { TOKENS_DARK } else { TOKENS_LIGHT }
     }

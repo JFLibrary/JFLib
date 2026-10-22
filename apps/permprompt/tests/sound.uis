@@ -1,0 +1,34 @@
+# sound (ask audio.output): ui.beep is refused like any other access until the line is allowed,
+# the dialog's sound (ui.dialog_sound) never asks and stays silent until then; headless runs
+# print "sound: NAME" instead of playing (docs/PERMISSIONS.md, docs/GUIDE.md section 33)
+click "Hinweis mit Klang"
+expect dialog:"Hinweis" exists
+expect sound none
+perm expect none
+perm expect audio.output unanswered
+click "OK"
+expect dialog:"Hinweis" missing
+# nobody asks in a headless run: refused, nothing requested
+click "Klang abspielen"
+expect text:"Klang: abgelehnt" exists
+expect sound none
+perm expect none
+perm expect audio.output unanswered
+# the question as the library's dialog, allowed once
+perm answer dialog
+click "Klang abspielen"
+perm expect open
+expect text:"Regel: audio.output" exists
+expect text:"Grund: Hinweistöne" exists
+click "Einmal erlauben"
+perm expect none
+perm expect audio.output once
+click "Klang abspielen"
+expect text:"Klang: erlaubt" exists
+expect sound information
+# now the dialog plays its sound where message dialogs do (Windows, Linux desktops)
+click "Hinweis mit Klang"
+expect dialog:"Hinweis" exists
+expect sound warning
+click "OK"
+expect_nowarn

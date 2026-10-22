@@ -972,6 +972,14 @@ ui.dialog_end(); // always
   (or `ActionSpec::confirm()` / `local_only()`) gate agent actions; the agent gets
   `confirmation_required` or `forbidden` back.
 
+  A `sandbox` line (or `sandbox strict`) has the operating system enforce the manifest too, as
+  defence in depth against a bug or native code that bypasses `plat`: Landlock plus seccomp on
+  Linux, process mitigation policies on Windows, applied at start-up before the app's own code.
+  Apps without the line are unchanged. See [PERMISSIONS.md](PERMISSIONS.md) "OS sandbox" for
+  what each platform enforces and the limits (a `sandbox` app without a `process` rule cannot
+  `spawn_self`, and files the user picks at run time need a Flatpak's documents portal or an
+  `fs.*` rule on the folder).
+
   ```rust
   fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
       if id == UIC_PERMISSION && arg == 1 && self.pending_import {
@@ -1267,7 +1275,8 @@ if (desc.render)(&args, &mut dst) == 0 {
 * The look comes from one style crate linked at build time: `winui` (default), `classic`,
   `macos`, `kde`. `apps/NAME/STYLE` sets an app's style, `build_rs.py ... --style S` overrides
   it. Only the linked style is in the executable. [STYLES.md](STYLES.md) has the model and how
-  to write one.
+  to write one. Your own colours, corners, spacing, control heights and type without a style
+  crate: an app theme; several styles in one app, switched at run time: §34.
 * Colours of your own drawing come from the theme tokens: `ui.color(T_TEXT)`, `T_ACCENT`,
   `T_CTRL`, `T_BG`, ... (`ui::consts`), so they work in every style, light and dark.
   `ui.theme_set(0 | 1 | 2)` (light, dark, system), `ui.theme_dark()`, `ui.accent_set(rgb)`;
@@ -1370,7 +1379,8 @@ if (desc.render)(&args, &mut dst) == 0 {
 * **Command line of every app**: `--shot FILE.png` (headless render, no window system needed),
   `--script FILE.uis` (headless UI test, exit code 0 = every `expect` met), `--dump` (widget tree
   as JSON lines), `--verify-dirty` (compare every incremental redraw with a full redraw),
-  `--size WxH` (DIP), `--scale PERCENT`, `--theme light|dark`, `--accent RRGGBB`, `--anim off`,
+  `--size WxH` (DIP), `--scale PERCENT`, `--theme light|dark`, `--theme-file PATH` (an app
+  theme, §34), `--accent RRGGBB`, `--anim off`,
   `--log-events`, `--auto-close MS`, `--threads N`, `--simd sse2` (no AVX2 paths), `--inspect`
   (the live inspector, §30). Environment: `jfgui_DEBUG=1` (layout / render trace), `jfgui_CSD=1`,
   `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`,
@@ -1408,9 +1418,12 @@ in DIP):
 | `focus S` | keyboard focus to a widget (focus ring shown) |
 | `cmd ID [ARG]` | run a command as if a menu row was chosen |
 | `wait MS` | advance the virtual clock (16 ms frames) |
-| `size W H`, `theme dark\|light`, `scale P [window ID]` | window size, theme, dpi |
+| `size W H`, `theme dark\|light\|contrast`, `scale P [window ID]` | window size, theme, dpi |
+| `theme file PATH`, `theme none`, `style NAME` | an app theme from a file (an error is printed and remembered, the theme stays), none, another linked style (§34) |
+| `expect theme "NAME"\|none`, `expect theme error "TEXT"\|none`, `expect style NAME` | the app theme, the error of the last `theme file` (contains TEXT), the style in use |
+| `expect token NAME #RRGGBB\|#AARRGGBB`, `expect pixel X Y #RRGGBB`, `expect same FILE.png` | a colour token now (`bg`, `accent_text`, ...), the rendered colour at a point of the main window (DIP), the main window rendered now has the pixels of an earlier `shot` |
 | `expect S exists\|missing\|hover\|focused\|checked\|unchecked\|disabled\|enabled\|selected\|open\|pressed` | widget states |
-| `expect S value N`, `expect S max N`, `expect S text "s"`, `expect S rect X Y W H` | values, texts, rectangles (DIP) |
+| `expect S value N`, `expect S max N`, `expect S text "s"`, `expect S rect X Y W H` | values, texts, rectangles (DIP; `*` takes any value: `rect * * * 36`) |
 | `shot FILE.png [window ID\|desktop] [X Y W H]`, `dump [FILE]`, `print TEXT`, `bench N`, `quit` | output |
 | `bench N anim [MAX_US]`, `bench N drag S1 S2 [middle\|right\|shift\|ctrl\|alt]... [MAX_US]`, `bench N wheel S DY [shift\|ctrl\|alt]... [MAX_US]` | frame times while things move: N frames 16 ms apart on the virtual clock, the N moves of a drag (every other run drags back), N wheel events (DY and -DY by turns); each frame's passes and the render of its dirty cells are timed; prints mean, render, median and max; with `MAX_US` a run passes when its median is at most `MAX_US`, up to three runs, else FAIL |
 | `window ID\|main\|any` | selectors only look into that window |
@@ -1472,6 +1485,7 @@ python build_rs.py test NAME        # one app: build it, run its tests/*.uis
 python build_rs.py check            # the rules lint alone
 python tools/gendoc.py --check      # docs/API.md matches the doc comments
 python build_rs.py api-diff         # the public API since the last release (VERSIONING.md)
+python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unused texts ("Languages")
 ```
 
 * Run new scripts with `--verify-dirty` too (`build_rs.py test` does not add it): it reports
@@ -1708,9 +1722,31 @@ Polish, Arabic and Hebrew (`i18n::library_languages()`), every other language ge
 An app without a catalogue stays German; one whose texts are language-neutral can install a
 catalogue that only names languages (`Catalog::from_tsv("de\ten\tfr\tar\n")`, as
 `datagallery` does) to let the library follow the user.
-`python tools/i18n_check.py apps/NAME` lists the texts of an app (`t("…")`, `tf("…")`,
-message templates, tables marked `// i18n`) that no `src/locales/*.tsv` has, and rows whose
-translation uses other placeholders (`--unused`: rows no source uses any more).
+
+**Checking the catalogues**: `python build_rs.py i18n` ([`tools/i18n_check.py`](../tools/i18n_check.py))
+extracts the translatable texts of every app with a catalogue (`apps/NAME/**/locales/*.tsv`)
+and of the library, and reports per app:
+
+| Report | Means |
+| --- | --- |
+| `missing` | a text of the sources without a row (the app shows German in every language) |
+| `untranslated` | a row with an empty or missing cell for a language |
+| `unused` | a row whose text is no string literal of the app's sources any more (counted; `--unused` or `i18n APP` lists them) |
+| `error` | a translation whose placeholders differ (`{}` / `{0}` / `{name}`, the kinds of `{n, number}` ...), a `plural` without `other` or without the categories of its language (`pl` needs `one few many`, `en` never uses `few`), a `tf` text whose translation uses more than `"{}"` (`i18n::fill` fills only those), a message template with formats or names, a text translated differently in two rows |
+
+The texts are the string literals of `t("…")`, `tc("…")`, `tr("…")` (not the library's
+`i18n::tr`), `tf("…")`, `msg!` / `Msg::new` / `phrase` templates, `list(&TABLE)`, tables
+marked `// i18n` (`// i18n: name title` for some fields of a table, `… // i18n` for one
+line), and the labels of `Command::new` and `Mi::*` when the app translates its command
+table and menus. A text the library translates (`LIB_TEXTS`) needs no row in an app that
+installs its catalogue with `i18n::set_catalog` (`t` falls back to the library). `python build_rs.py i18n APP` lists one app's gaps (`lib`: the library's `tr("…")`
+against `LIB_TEXTS`), `--update` adds the missing texts as rows with empty cells to the app's
+catalogue (the one whose texts come from the same folder, `src/` or `crates/`), at its end in
+source order; existing rows are never changed, and the app keeps showing German there until
+the cells are filled. A catalogue the app reads itself without `Catalog::from_tsv` names its
+languages in a comment (`# languages: de en fr`, PaintCraft's). The suite runs
+`i18n --check`: it fails on errors and on gaps in the catalogues that are complete
+(BackupCraft, JFNetworker, the library) and only counts the others (PaintCraft's).
 
 **Sorting and case** follow the user's format locale, as Windows' `CompareStringEx` does:
 `i18n::collate(a, b)` orders base letters, then accents, then case ("a" < "A" < "ä" < "b"),
@@ -3431,11 +3467,18 @@ if ui.dialog_begin(ID_ASK, "Datei überschreiben?", &open) {
   `sound: NAME` instead of playing.
 * **Scripts**: headless runs play nothing; `expect sound KIND|none` checks what `ui.beep` /
   `ui.dialog_sound` asked for since the last check (section 12).
+* **Permissions**: an app with a `PERMISSIONS` manifest needs the line `audio.output` for any
+  sound ([PERMISSIONS.md](PERMISSIONS.md)). Without it `Stream::open`, `open_fill`, `play` and
+  `play_file` give `AudioError::Denied`, `sound()` and `ui.beep` return `false` (a script sees
+  `expect sound none`), `available()` is `false`, and stderr shows `PERMDENY audio.output` once.
+  `ui.dialog_sound` stays silent without a question or a record, also under
+  `ask audio.output` until that line is allowed. Only apps that play sound list the right: a
+  Flatpak package (`tools/package.py`) reaches the sound server through
+  `--socket=pulseaudio`, which also allows recording, and gets it only with `audio.output`;
+  MSIX, the setup, .deb, .rpm, AppImage and Android need nothing for playing sound.
 * Not there yet: output without a sound server on Linux (raw ALSA), choosing an output device,
   the stream's name in Windows' volume mixer (it names the program), capture (microphone),
-  video. Sound needs no `PERMISSIONS` right (output reveals nothing), but a Flatpak package
-  only reaches the sound server with `--socket=pulseaudio`, which `tools/package.py` does not
-  add yet (that socket also allows recording): add it to the finish-args by hand for now.
+  video.
 
 Tests: `apps/audiotest` -- the demo (tone generator, the chime as WAV and Ogg Vorbis, the
 system sounds, a dialog with its sound) and `--test play` (push and fill streams, pause / stop,
@@ -3446,3 +3489,90 @@ AnalyserNode hears the tone through the ring and through posted buffers, `Blocke
 click), `tests/android_audio.py` (an emulator: audioserver plays the app's AAudio track, the
 self-test passes). `plattest --test audio`: WAV formats and damaged files, the ring, the
 resampler, Ogg Vorbis files against their sines, the PulseAudio wire format, the sound theme.
+
+## 34. App themes and the style at run time
+
+An app's own colours, corners, spacing, control heights and type do not need a style crate: an
+**app theme** ([`ui/theme_app.rs`](../lib/ui/theme_app.rs)) lays them over the active style,
+from a small INI file or built in code, and takes effect on the next frame. An app that links
+several styles switches between them at run time. [STYLES.md](STYLES.md) has the whole format
+and how the styles read it.
+
+```rust
+use ui::theme::{Radius, Theme, THEME_DARK, THEME_LIGHT};
+
+// a theme file of the app (apps/NAME/assets/themes/...) or of the user (config://)
+match ui.load_theme("app://themes/ocean.theme") {
+    Ok(()) => {}
+    Err(e) => self.error = e.to_string(),   // "Zeile 5: „#12345“ ist keine Farbe (#RRGGBB oder #AARRGGBB)"
+}
+// an editor: start from the active theme, change a token, apply it live, save it
+let mut th = ui.app_theme().cloned().unwrap_or_default();
+th.name = String::from("Eigenes");
+th.accent[THEME_LIGHT] = Some(0x6B4FBB);                 // the style derives its accent ramp
+th.colors[THEME_DARK][(T_BG / 4) as usize] = Some(0xFF17_2029);
+th.radius = Some(Radius::Dip(8));
+th.spacing = 110;                                        // percent: box padding and gaps
+th.control_height = 36;                                  // DIP: buttons, text / combo boxes
+th.text[TS_BODY as usize].size_fx = Some(15 << 8);
+ui.set_theme(&th)?;                                      // a font that cannot be loaded: Err, theme stays
+th.save("config://themes/eigenes.theme");                // the text of a theme file (to_ini)
+ui.clear_theme();                                        // the style's own look again
+
+// several styles: build_rs.py links every style_NAME the sources name
+ui.styles_add(&[&style_winui::STYLE, &style_classic::STYLE, &style_kde::STYLE]);
+let names = ui.style_names();                            // the app's own style first
+ui.set_style("kde");                                     // tokens, fonts, metrics, painters
+```
+
+```ini
+# app://themes/ocean.theme (apps/themedemo/assets/themes)
+[theme]
+name = Ozean
+[light]
+accent = #0F7B8A
+bg = #EAF3F5
+text = #0B2A33
+[dark]
+accent = #4FC3D1
+bg = #0E1E24
+[metrics]
+radius = 8
+spacing = 110%
+control_height = 36
+[text]
+body.size = 15
+subtitle.weight = bold
+```
+
+* **What a theme sets**: every `T_*` colour token for light, dark (`[colors]` both) and high
+  contrast, the accent (through the style's ramp; it wins over the app's and the system's),
+  rounded corners that are not pills (`radius = 8` DIP or `150%`), box padding and gaps
+  (`spacing`), the height of standard buttons, text boxes, combo boxes, drop-down and split
+  buttons (`control_height`; it grows with a text scale above 100 %), size, line height and
+  weight of each text style and a font family (a font file next to the theme, a VFS path, or an
+  installed family). Light / dark / system and high contrast stay the app's and the user's
+  choice: the theme has colours for each.
+* **Errors** name the line and come in the UI language (`ThemeError { line, msg }`); a broken
+  file or a missing font leaves the previous theme as it was. Without a theme the rendering is
+  the style's to the pixel.
+* **Limits**: a style's own fixed values stay (classic's grey 3D face and bevels come from its
+  palette, not from tokens; title bar fonts; paddings inside a widget). The style switch
+  replaces the embedded fonts (`FONT_REG` .. `FONT_ICON`) for the whole process; fonts the app
+  loaded itself keep their ids. `build_rs.py` passes the extra style crates on every target;
+  `apps/themedemo` is built and tested on Windows and Linux.
+* **Command line and scripts**: `--theme-file PATH` (after `App::init`); scripts `theme file
+  PATH`, `theme none`, `style NAME`, `expect theme "NAME"|none`, `expect theme error "TEXT"`,
+  `expect style NAME`, `expect token NAME #RRGGBB`, `expect pixel X Y #RRGGBB`, `expect same
+  FILE.png` (the same pixels as an earlier shot), `rect * * * 36` (§12).
+
+Tests: `apps/themedemo` -- the page "Darstellung" (style, light / dark / system, high contrast,
+the two sample themes, a live editor for accent, background, corners, spacing, control height,
+text size and a system font, saving to `config://themes/eigenes.theme` and loading a theme
+file by its path) with a preview of the common widgets; `tests/themes.uis` (tokens, pixels and
+rectangles of both themes in light, dark and high contrast, back to the same pixels, all four
+linked styles with and without a theme, broken files, the editor, save and load),
+`tests/text150.uis` (at 150 % text). `apps/gallery/tests/themes.uis` and `themes150.uis` (the
+sample themes and a font family from files over the gallery; they hold in the builds of every
+style), `uitest --only themes` (the format, the errors with their lines, the text form,
+`Ini::items`).

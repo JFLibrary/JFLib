@@ -595,7 +595,7 @@ impl Ui {
 
     // the layout of every paragraph (cached by version) -> (layouts, tops, height)
     fn rt_layout(&mut self, v: &mut View, doc: &RichDoc, w: i32) -> (Vec<Rc<PLay>>, Vec<i32>, i32) {
-        let key = LKey { w, dpi: self.wp.rt.dpi, scale: self.text_scale, font: doc.font.clone(), size: doc.size, ui: self.style.ts_font()[TS_BODY as usize] as u32 };
+        let key = LKey { w, dpi: self.wp.rt.dpi, scale: self.layout_scale(), font: doc.font.clone(), size: doc.size, ui: self.style.ts_font()[TS_BODY as usize] as u32 };
         if key != v.key {
             v.lays.clear();
             v.key = key;

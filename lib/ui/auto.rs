@@ -5,7 +5,10 @@
 //
 // Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
 //   size W H                      resize the headless window
-//   theme dark|light
+//   theme dark|light|contrast
+//   theme file PATH | none        an app theme from a file (an error is printed and kept for
+//                                 `expect theme error`; the theme stays) / no app theme
+//   style NAME                    another style linked into the app (Ui::set_style)
 //   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r]
 //   rclick S        dblclick S [shift|ctrl|alt]...
 //                   drag S1 S2 [steps] [shift|ctrl|alt|right|middle]...
@@ -29,6 +32,12 @@
 //   dump [FILE]     print / save the widget tree
 //   expect S exists | missing | hover | focused | checked | unchecked | disabled |
 //            enabled | selected | open | pressed | value N | max N | text "s" | rect X Y W H
+//            (rect: '*' takes any value)
+//   expect theme "NAME" | none    the app theme;  expect theme error "TEXT" | none  the error
+//                                 of the last `theme file` contains TEXT
+//   expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
+//   expect pixel X Y #RRGGBB      the main window's pixel at (X, Y), rendered now
+//   expect same FILE.png          the main window rendered now has the pixels of that shot
 //   print TEXT      echo
 //   bench N         time N frames (build, full render, unchanged frame) with the real clock
 //   bench N anim [MAX_US]   N frames 16 ms apart on the virtual clock (timers, animations):
@@ -137,6 +146,8 @@ pub(crate) struct S {
     sc_scope: i32,
     /// the agent session of `agent call` (auto_perm.rs)
     pub(crate) agent: super::auto_perm::S,
+    /// the error of the last `theme file` (None: it was applied)
+    theme_err: Option<String>,
 }
 
 impl Default for S {
@@ -161,6 +172,7 @@ impl Default for S {
             warn_mark: 0,
             sc_scope: -1, // `window` scope: window id, -1 = any
             agent: Default::default(),
+            theme_err: None,
         }
     }
 }
@@ -636,11 +648,12 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 43] = [
+        const CMDS: [&str; 44] = [
             "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
             "key", "keys", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
             "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
             "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
+            "style",
         ];
         let Some(&c) = CMDS.iter().find(|c| word_eq(l, c).is_some()) else {
             let mut o = alloc::format!("error: line {}: unknown command: ", self.sc.lineno).into_bytes();
@@ -666,7 +679,17 @@ impl Ui {
                 self.resize(app, w, h);
             }
             "theme" => {
-                if word_eq(a, "contrast").is_some() {
+                if let Some(r) = word_eq(a, "file") {
+                    // an app theme from a file; an error is remembered (expect theme error)
+                    let path = String::from(String::from_utf8_lossy(skip_ws(r)).trim());
+                    let res = super::perm::trusted(|| self.load_theme(&path));
+                    self.sc.theme_err = res.err().map(|e| {
+                        plat::write_stdout(alloc::format!("theme: {}\n", e).as_bytes());
+                        e.msg
+                    });
+                } else if word_eq(a, "none").is_some() {
+                    self.clear_theme();
+                } else if word_eq(a, "contrast").is_some() {
                     self.set_contrast(Some(true));
                 } else {
                     self.set_contrast(Some(false));
@@ -818,6 +841,15 @@ impl Ui {
                 self.run_passes(app);
             }
             "sync" => self.sc_sync(app, a),
+            "style" => {
+                // another linked style (Ui::set_style)
+                let name = String::from_utf8_lossy(skip_ws(a)).into_owned();
+                if self.set_style(name.trim()) {
+                    self.run_passes(app);
+                } else {
+                    self.fail(b"no such style");
+                }
+            }
             "perm" => self.sc_perm(app, a),   // auto_perm.rs
             "agent" => self.sc_agent(app, a), // auto_perm.rs
             "inspect" => self.sc_inspect(app, a), // inspect.rs
@@ -1626,6 +1658,31 @@ impl Ui {
             }
             return;
         }
+        // app themes and styles (theme.rs)
+        if let Some(r) = word_eq(a, "theme") {
+            self.expect_theme(skip_ws(r));
+            return;
+        }
+        if let Some(r) = word_eq(a, "style") {
+            let want = String::from_utf8_lossy(skip_ws(r));
+            let have = self.style_name();
+            if want.trim() != have {
+                self.fail(alloc::format!("style is {}", have).as_bytes());
+            }
+            return;
+        }
+        if let Some(r) = word_eq(a, "token") {
+            self.expect_token(skip_ws(r));
+            return;
+        }
+        if let Some(r) = word_eq(a, "pixel") {
+            self.expect_pixel(r);
+            return;
+        }
+        if let Some(r) = word_eq(a, "same") {
+            self.expect_same(skip_ws(r));
+            return;
+        }
         let (s, rest) = self.resolve(a);
         if s.is_none() && self.sc.sel_err == 3 {
             self.sel_fail(); // bad selector syntax: report and stop
@@ -1692,20 +1749,120 @@ impl Ui {
         }
     }
 
-    // expect_rect(p, rec): "X Y W H" -- the record's rectangle in DIP (its window's dpi)
+    // expect_rect(p, rec): "X Y W H" -- the record's rectangle in DIP (its window's dpi); a
+    // '*' takes any value (a theme's control height: "rect * * * 36")
     fn expect_rect(&mut self, p: &[u8], rec: &Sem) {
-        let mut want = [0i32; 4];
+        let mut want = [None; 4];
         let mut q = p;
         for v in want.iter_mut() {
+            q = skip_ws(q);
+            if q.first() == Some(&b'*') {
+                q = &q[1..];
+                continue;
+            }
             let (n, r) = parse_int(q);
-            *v = n;
+            *v = Some(n);
             q = r;
         }
         let dpi = self.win_dpi(rec.win as u32);
         let have = rec.rect.map(|v| px2dip_at(v, dpi));
-        if have != want {
+        if have.iter().zip(want).any(|(h, w)| w.is_some_and(|w| w != *h)) {
             self.fail_more(alloc::format!("rect is {} {}", have[0], have[1]).as_bytes());
             plat::write_stdout(alloc::format!(" {} {}\n", have[2], have[3]).as_bytes());
+        }
+    }
+
+    // expect theme "NAME" | none | error "TEXT" | error none: the app theme (theme.rs), the
+    // error of the last `theme file`
+    fn expect_theme(&mut self, p: &[u8]) {
+        if let Some(r) = word_eq(p, "error") {
+            let r = skip_ws(r);
+            let have = self.sc.theme_err.clone();
+            if word_eq(r, "none").is_some() {
+                if let Some(h) = have {
+                    self.fail(alloc::format!("error: {}", h).as_bytes());
+                }
+                return;
+            }
+            let Some((t, _)) = parse_qstring(r, 256) else {
+                self.fail(b"expected a quoted string");
+                return;
+            };
+            let t = String::from_utf8_lossy(&t).into_owned();
+            match have {
+                Some(h) if h.contains(&t) => {}
+                Some(h) => self.fail(alloc::format!("error: {}", h).as_bytes()),
+                None => self.fail(b"no error"),
+            }
+            return;
+        }
+        let have = self.app_theme().map(|t| t.name.clone());
+        if word_eq(p, "none").is_some() {
+            if let Some(h) = have {
+                self.fail(alloc::format!("theme is \"{}\"", h).as_bytes());
+            }
+            return;
+        }
+        let want = match parse_qstring(p, 256) {
+            Some((t, _)) => String::from_utf8_lossy(&t).into_owned(),
+            None => String::from(String::from_utf8_lossy(p).trim()),
+        };
+        match have {
+            Some(h) if h == want => {}
+            Some(h) => self.fail(alloc::format!("theme is \"{}\"", h).as_bytes()),
+            None => self.fail(b"no theme"),
+        }
+    }
+
+    // expect token NAME #RRGGBB | #AARRGGBB: a colour token of the theme now in use
+    fn expect_token(&mut self, p: &[u8]) {
+        let name = String::from_utf8_lossy(&p[..p.iter().position(|&c| c == b' ' || c == b'\t').unwrap_or(p.len())]).into_owned();
+        let want = super::theme::parse_color(String::from_utf8_lossy(next_word(p)).trim());
+        let (Some(i), Some(want)) = (super::theme::token_index(&name), want) else {
+            self.fail(b"expect token NAME #RRGGBB | #AARRGGBB");
+            return;
+        };
+        let have = self.color(i as u32 * 4);
+        if have != want {
+            self.fail(alloc::format!("token is #{:08X}", have).as_bytes());
+        }
+    }
+
+    // expect pixel X Y #RRGGBB: the colour of the main window's pixel at (X, Y) DIP, rendered now
+    fn expect_pixel(&mut self, p: &[u8]) {
+        let (x, r) = parse_int(p);
+        let (y, r) = parse_int(r);
+        let Some(want) = super::theme::parse_color(String::from_utf8_lossy(skip_ws(r)).trim()) else {
+            self.fail(b"expect pixel X Y #RRGGBB");
+            return;
+        };
+        self.render();
+        let dpi = self.win_dpi(0);
+        let sf = self.win_fb(0);
+        let (px, py) = (dp_at(x, dpi), dp_at(y, dpi));
+        if px < 0 || py < 0 || px >= sf.w || py >= sf.h {
+            self.fail(b"outside the window");
+            return;
+        }
+        let o = py as usize * sf.stride as usize + px as usize * 4;
+        let have = u32::from_le_bytes([sf.px[o], sf.px[o + 1], sf.px[o + 2], sf.px[o + 3]]) & 0xFF_FFFF;
+        if have != want & 0xFF_FFFF {
+            self.fail(alloc::format!("pixel is #{:06X}", have).as_bytes());
+        }
+    }
+
+    // expect same FILE.png: the main window rendered now is the shot saved in FILE (the same
+    // PNG bytes: the same pixels)
+    fn expect_same(&mut self, p: &[u8]) {
+        let path = String::from(String::from_utf8_lossy(p).trim());
+        self.render();
+        let sf = self.win_fb(0);
+        let png = img_png::encode(&sf.px, sf.w as usize, sf.h as usize, sf.stride as usize, false);
+        let file = super::perm::trusted(|| plat::read_file(&path));
+        match file {
+            None => self.fail(b"no such file"),
+            Some(f) if f != png => self.fail(b"the pixels differ"),
+            Some(_) => {}
         }
     }
 

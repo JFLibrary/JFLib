@@ -78,17 +78,20 @@ def publisher(meta):
 def capabilities(perms):
     """the capabilities of a PERMISSIONS manifest (None: no manifest) -> (names, notes).  A
     full-trust desktop app is not confined by them (they are shown in the Store); runFullTrust
-    is always declared, PERMISSIONS stays what plat enforces"""
+    is always declared, PERMISSIONS stays what plat enforces.  audio.output needs none: playing
+    sound is no capability in MSIX (only recording would be: microphone)"""
     if perms is None:
         return ["internetClient", "internetClientServer", "privateNetworkClientServer"], \
             ["kein PERMISSIONS: alle Netz-Fähigkeiten angegeben"]
     keys = {k for k, _ in perms}
-    caps = []
+    caps, notes = [], []
     if "net.connect" in keys:
         caps.append("internetClient")
     if "net.listen" in keys:
         caps += ["internetClientServer", "privateNetworkClientServer"]
-    return caps, []
+    if "audio.output" in keys:
+        notes.append("audio.output: keine Fähigkeit nötig (Wiedergabe)")
+    return caps, notes
 
 
 def startup_task(perms):

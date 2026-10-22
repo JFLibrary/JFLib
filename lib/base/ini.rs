@@ -10,6 +10,8 @@
 //   ini.remove(sec, key) -> bool
 //   ini.section(sec) -> Vec<(&str, &str)>   the keys of a section and their values, in order
 //   ini.sections() -> Vec<&str>   the section names in file order (each once; not "")
+//   ini.items() -> Vec<Item>      headers, keys and malformed lines with their line numbers
+//                                 (files that are checked: a theme names a mistake's line)
 //
 // Format: one entry per line; sec "" = the keys before the first [section].  Section and
 // key names compare ASCII case-insensitively; values are stored as written (blanks around
@@ -63,6 +65,17 @@ impl Line {
 #[derive(Default)]
 pub struct Ini {
     lines: Vec<Line>,
+}
+
+/// a line of the file as Ini::items lists it (line numbers from 1)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Item<'a> {
+    /// a "[name]" header
+    Section { line: usize, name: &'a str },
+    /// "key = value" of section sec ("" before the first header)
+    Key { line: usize, sec: &'a str, key: &'a str, value: &'a str },
+    /// neither blank, a comment, a header nor a key (or not UTF-8)
+    Bad { line: usize, text: &'a [u8] },
 }
 
 /// n bytes equal ignoring ASCII case (only letters may differ in case)  [ieq]
@@ -281,6 +294,35 @@ impl Ini {
             if let Ok(n) = core::str::from_utf8(&l.name) {
                 if !out.iter().any(|o| ieq(o.as_bytes(), n.as_bytes())) {
                     out.push(n);
+                }
+            }
+        }
+        out
+    }
+
+    /// every header, key and malformed line in file order with its line number; blank lines
+    /// and comments are left out
+    pub fn items(&self) -> Vec<Item<'_>> {
+        let mut out = Vec::new();
+        for (i, l) in self.lines.iter().enumerate() {
+            let line = i + 1;
+            match l.kind {
+                Kind::Sec => match core::str::from_utf8(&l.name) {
+                    Ok(name) => out.push(Item::Section { line, name }),
+                    Err(_) => out.push(Item::Bad { line, text: &l.raw }),
+                },
+                Kind::Kv => {
+                    let sec = if l.sec < 0 { Ok("") } else { core::str::from_utf8(&self.lines[l.sec as usize].name) };
+                    match (sec, core::str::from_utf8(&l.name), core::str::from_utf8(&l.value)) {
+                        (Ok(sec), Ok(key), Ok(value)) => out.push(Item::Key { line, sec, key, value }),
+                        _ => out.push(Item::Bad { line, text: &l.raw }),
+                    }
+                }
+                Kind::Raw => {
+                    let t = trim(&l.raw);
+                    if !t.is_empty() && t[0] != b';' && t[0] != b'#' {
+                        out.push(Item::Bad { line, text: &l.raw });
+                    }
                 }
             }
         }

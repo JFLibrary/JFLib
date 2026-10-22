@@ -353,9 +353,10 @@ own repositories and bundles.
 | `plugins P` | as `fs.read` |
 | `net.connect`, `net.listen` | `--share=network` |
 | `secrets` | `--talk-name=org.freedesktop.secrets` (the Secret Service; plat does not use the Secret portal) |
+| `audio.output` | `--socket=pulseaudio` (`plat::audio` speaks the PulseAudio protocol, also to pipewire-pulse; the socket allows recording too, so only apps that play sound list the right; noted) |
 | `fs.user`, `url`, `print`, `autostart` | none: the file dialog, OpenURI, Print and Background portals; files of "Open with" come through the document portal |
 | `process` | none: programs outside the sandbox are not reachable (`flatpak-spawn --host` would need `--talk-name=org.freedesktop.Flatpak`, a full escape: not granted; noted) |
-| no PERMISSIONS | `--share=network --filesystem=host --talk-name=org.freedesktop.secrets` (the app may do everything; noted) |
+| no PERMISSIONS | `--share=network --filesystem=host --talk-name=org.freedesktop.secrets --socket=pulseaudio` (the app may do everything; noted) |
 
 `flatpak_args=` adds more, for example `--talk-name=org.kde.StatusNotifierWatcher` for the tray
 (`plat::tray`), `--talk-name=org.freedesktop.Notifications` or
@@ -385,7 +386,8 @@ reserved schemes and an extension in two file types are refused; reserved types 
 or URL as its command-line argument; a `desktop:StartupTask` (`Enabled="false"`) when PERMISSIONS
 allows `autostart` (or there is no PERMISSIONS); capabilities: `internetClient` for `net.connect`,
 `internetClientServer` and `privateNetworkClientServer` for `net.listen` (a full-trust app is not
-confined by them; they are shown in the Store, PERMISSIONS stays what plat enforces).  The
+confined by them; they are shown in the Store, PERMISSIONS stays what plat enforces); `audio.output`
+needs none (playing sound is no MSIX capability, only recording is: `microphone`).  The
 package folder holds `<App>.exe` (signed like the setup's, when a certificate is set), modules,
 further programs and notices; `MakeAppx pack` checks the manifest against the schema.
 

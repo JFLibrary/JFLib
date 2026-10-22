@@ -8,7 +8,8 @@
 //
 // Modules (one per ASMLIB file): ctx (ui_ctx.s: input, hit testing, behaviour, slots,
 // timers, commands, semantics, clip, layers, passes), layout (ui_layout.s), cmd (ui_cmd.s:
-// draw command lists and their replay), dirty (ui_dirty.s), theme (ui_theme.s), basic
+// draw command lists and their replay), dirty (ui_dirty.s), theme (ui_theme.s; app themes
+// over the style and the run-time style switch, theme_app.rs: Theme and its file), basic
 // (ui_basic.s), auto (ui_auto.s: scripts and the widget dump), runtime (ui_main.s), cursor
 // (ui_cursor.s), drop (ui_drop.s), dnd (drag and drop between widgets and programs), dock
 // (docking: panels at the sides in tab groups, floating tool windows), kbnav (keyboard
@@ -214,6 +215,7 @@ pub use symbol::{SymPalette, Symbol, SymbolCache, SYM_BODY, SYM_CACHE_MAX_W, SYM
     SYM_SCREEN, SYM_SHADE, SYM_TINT, SYM_WARN}; // multi-colour vector symbols (tools/vsym.py)
 pub use theme::color_mix;
 pub use theme::{contrast_ratio, luminance};
+pub use theme::{Theme, ThemeError}; // app themes over the style (theme.rs, theme_app.rs)
 pub use win::Shared; // ui-win: the app's open flags / WINRECTs the library keeps
 // ui-list: the value / colour / list API beside the Ui methods
 pub use color::{hsv_to_rgb, rgb_to_hsv};
@@ -467,6 +469,8 @@ pub struct Ui {
     pub(crate) theme: [u32; theme::THEME_N],
     pub(crate) theme_dark: bool,
     pub(crate) accent: u32,
+    /// the app's theme over the style and the styles to switch to (theme.rs)
+    pub(crate) look: theme::Look,
 
     // ---- runtime (ui_main.s, shared part)
     pub(crate) title: String,

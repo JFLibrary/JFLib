@@ -19,6 +19,9 @@ pub struct Office;
 /// Linkable style instance.
 pub static STYLE: Office = Office;
 impl Style for Office {
+    fn name(&self) -> &'static str {
+        "jfoffice"
+    }
     fn paint_icon(
         &self,
         g: &mut ui::Gfx,

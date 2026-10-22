@@ -26,7 +26,8 @@ Host bietet (13 `CAP_*`-Bits). Seit Paket 1 und 2 (2026-10-16) gibt es das Manif
   `plat` setzt es durch. Ohne Datei bleibt alles erlaubt.
 - **P1** · *erledigt* · Scopes: Dateien unter Mustern mit `$CONFIG` / `$TEMP` / `$HOME` /
   `$EXE` / `$FONTS`, vom Nutzer gewählte Dateien (`fs.user`: Dialog, Drop, Kommandozeile),
-  Prozesse, `open_url`-Schemes, Plugins, Drucken und Netz (`net.connect` / `net.listen`:
+  Prozesse, `open_url`-Schemes, Plugins, Drucken, Klangausgabe (`audio.output`, seit
+  2026-10-22) und Netz (`net.connect` / `net.listen`:
   Namen, `*.domain`, IPs, Adressblöcke, `localhost`, Port-Bereiche; Namen werden beim
   Auflösen geprüft, ihre Adressen dann vorgemerkt).
 - **P1** · *erledigt* · Zentrale Durchsetzung in `plat` (Dateien, `fs.rs`, Prozesse, Shell,
@@ -105,8 +106,33 @@ Host bietet (13 `CAP_*`-Bits). Seit Paket 1 und 2 (2026-10-16) gibt es das Manif
   echter Sandkasten für In-Process-Plugins (Plugin-Code kann `plat` umgehen, siehe
   PERMISSIONS.md; dafür ein eigener Prozess oder die OS-Sandbox, P3); `ui.click` auf einen
   Knopf einer gesperrten Aktion läuft als Nutzereingabe (Apps sperren dafür `ui.*`).
-- **P3** · *fehlt* · OS-Sandbox nutzen: Windows AppContainer / MSIX-Capabilities, Linux
-  Landlock / seccomp, Flatpak-Portale.
+- **P3** · *erledigt* (2026-10-22) · OS-Sandbox nutzen ([PERMISSIONS.md](PERMISSIONS.md)
+  „OS sandbox", [`plat/sandbox.rs`](../lib/plat/sandbox.rs)): opt-in pro App über eine Zeile
+  `sandbox` (bestmöglich) oder `sandbox strict` (startet nicht ohne OS-Durchsetzung) im
+  Manifest; `plat::boot` wendet sie nach dem Installieren des Manifests an, bevor App-Code oder
+  Threads laufen, Apps ohne die Zeile bleiben unverändert. **Linux** (`linux_sandbox.rs`, rohe
+  Syscalls, ABI-Erkennung): Landlock beschränkt das Dateisystem auf die Ordner des Manifests
+  plus die Systempfade, die die Bibliothek liest (`/usr`, `/etc`, Schriften, `/proc` … nur
+  lesen; `/tmp`, `$XDG_RUNTIME_DIR`, `/dev` schreibbar), und TCP-bind/connect auf die Ports von
+  `net.listen`/`net.connect` (Landlock-ABI 4+); seccomp-bpf verbietet eine Liste gefährlicher
+  Syscalls (ptrace, process_vm_\*, kexec, Modul-Laden, mount, bpf, perf_event_open,
+  userfaultfd, keyctl …) mit EPERM und `execve`, wenn das Manifest kein Programm erlaubt (auch
+  `spawn_self`). Die Anzeige-Sockets (X11/Wayland, auch D-Bus, PulseAudio) sind Unix-Sockets:
+  Verbinden wird von Landlock nicht gefiltert. Vom Nutzer zur Laufzeit gewählte Dateien
+  (`fs.user`) kann Landlock nicht nachträglich freigeben – in einer Flatpak laufen sie über das
+  Dokumente-Portal, nativ bleibt der Dialogpfad außerhalb der Freigaben (dokumentiert).
+  **Windows** (`win_sandbox.rs`): Prozess-Mitigation-Policies (`SetProcessMitigationPolicy`):
+  Image-Load (keine Remote-/Low-Label-Images), Extension-Points aus, dynamischer Code verboten
+  (außer das Manifest erlaubt Plugins; auf Windows 10.0.26200 meldet die Policy sich als
+  gesetzt, ausführbarer Speicher wird aber trotzdem vergeben – in jedem Prozess); `strict`
+  sperrt zusätzlich die Erzeugung von Kindprozessen, wenn weder `process` noch `url`/`print`
+  im Manifest stehen (geprüft: `CreateProcess` scheitert). AppContainer per Re-exec ist bewusst nicht
+  umgesetzt (bräuchte ACL-Änderungen an den echten Nutzerordnern und Tests pro App; die
+  MSIX-Capabilities in `tools/pkg_msix.py` folgen schon dem Manifest, docs). **Flatpak**: die
+  finish-args aus `tools/pkg_linux.py` sind bereits so eng wie das Manifest (Portale statt
+  Löcher), der In-Process-Sandkasten greift darin zusätzlich. Getestet mit `apps/sandboxtest`
+  (`sandbox strict`, versucht per rohen Syscalls Verbotenes und Erlaubtes) unter Windows und
+  Linux (WSL, Landlock-ABI 7) und `plattest --test permask`.
 - **P3** · *fehlt* · OS-Berechtigungen für Kamera, Mikrofon, Standort (Android-Laufzeitrechte,
   Portale).
 
@@ -372,11 +398,18 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   Benachrichtigungston und `ToneGenerator`. Getestet: WASAPI-Loopback hört die Töne,
   WSLg-PulseServer listet den Stream samt Latenz, Playwright (Chromium, Firefox) misst den Ton
   mit einem AnalyserNode, im Emulator spielt audioserver die AAudio-Spur
-  (`apps/audiotest`, `plattest --test audio`). Es fehlen: Ausgabe ohne Soundserver unter
+  (`apps/audiotest`, `plattest --test audio`). Seit 2026-10-22 braucht Klang bei einem
+  Manifest das Recht `audio.output` (Entscheidung: nur Apps, die Klang brauchen, bekommen es;
+  [PERMISSIONS.md](PERMISSIONS.md)): ohne es verweigert `plat` Streams, `play`, `play_file`
+  und Systemklänge (`AudioError::Denied`, `ui.beep` liefert `false`, einmal
+  `PERMDENY audio.output`), Dialogklänge bleiben ohne Rückfrage still; `ask audio.output`
+  fragt beim ersten eigenen Klang. Das Flatpak-Paket bekommt `--socket=pulseaudio` (der auch
+  Aufnahmen erlaubt) nur mit dem Recht (`tools/package.py`, geprüft in `tools/pkg_check.py`),
+  MSIX und die übrigen Pakete brauchen nichts. Getestet: `permtest` (verweigert),
+  `permprompt/tests/sound.uis` (Rückfrage, stiller Dialog), `audiotest` (mit Recht),
+  `plattest --test policy` / `permask`. Es fehlen: Ausgabe ohne Soundserver unter
   Linux (ALSA direkt), Wahl des Ausgabegeräts, der Stream-Name im Windows-Lautstärkemixer,
-  Floor 0 von Vorbis, `--socket=pulseaudio` im Flatpak-Paket (fügt `tools/package.py` noch
-  nicht hinzu; der Socket erlaubt auch Aufnahmen, eine Manifest-Regel dafür ist zu
-  entscheiden); später Video, Kamera, Mikrofon.
+  Floor 0 von Vorbis; später Video, Kamera, Mikrofon.
 - **P3** · *fehlt* · WebView einbetten (WebView2, WebKitGTK); ohne libc schwierig, bewusst
   zu entscheiden.
 
@@ -599,8 +632,23 @@ Sortierung nach Sprache und Groß- / Kleinschreibung.
   `i18ntest --only collate`, `--only case`. Es fehlen noch: weitere Sprachregeln (hu, ro, lt,
   hr, Litauisch-Punkt, Griechisch-Großschreibung ohne Akzente), Persisch-Reihenfolge,
   `contains` ohne Groß / Klein für Filter.
-- **P3** · *fehlt* · Werkzeug, das Übersetzungsschlüssel extrahiert und fehlende Einträge
-  meldet.
+- **P3** · *erledigt* · Werkzeug, das Übersetzungsschlüssel extrahiert und fehlende Einträge
+  meldet (`python build_rs.py i18n [APP|lib] [--update]`, [`tools/i18n_check.py`](../tools/i18n_check.py),
+  seit 2026-10-22; GUIDE.md „Checking the catalogues“): liest die Texte aus den Quellen
+  (`t` / `tc` / `tr` / `tf`, `msg!`-Vorlagen, `list(&TABELLE)`, mit `// i18n` markierte
+  Tabellen, Befehls- und Menübeschriftungen, wenn die App sie übersetzt; bei der Bibliothek
+  `tr("…")` gegen `LIB_TEXTS`) und meldet je App fehlende Zeilen, unübersetzte Zellen je
+  Sprache, nicht mehr benutzte Zeilen, abweichende Platzhalter (`{}`, `{0}`, `{name}`, Arten
+  von `i18n::msg`; `tf`-Texte nur `{}`) und Pluralformen (`other`, die CLDR-Kategorien der
+  Sprache). `--update` hängt fehlende Texte mit leeren Zellen an den passenden Katalog an
+  (Quellreihenfolge, bestehende Zeilen bleiben unberührt). Die Suite prüft mit `--check`:
+  Fehler und Lücken in den heute vollständigen Katalogen (BackupCraft, JFNetworker,
+  Bibliothek) machen sie rot, die übrigen Lücken werden nur gezählt. Stand 2026-10-22:
+  BackupCraft und JFNetworker vollständig (JFNetworker: eine unbenutzte Zeile „Disk“),
+  Bibliothek vollständig („Neue Ausgabe“ des Terminals ergänzt; „Dateityp:“ und „Neuer
+  Ordner“ unbenutzt), PaintCraft: 147 Texte ohne Zeile (u. a. Effekt-Untermenüs,
+  Einstellungen, Druck-, Speicher- und Absturzdialog) und 7 unbenutzte Zeilen; „B&ild“ (das
+  Menü hieß im Katalog noch „&Bild“) korrigiert. Getestet in `tools/tests/test_devkit.py`.
 
 ## 6. Widgets und Layout
 
@@ -934,8 +982,30 @@ Fensterrand hinaus.
   Werte als Konstanten. Gehashte IDs liegen ab `ID_HASH_BASE` (0x0800_0000) und treffen nie
   handvergebene IDs; Skripte und `jfgui_DEBUG=1` warnen bei zwei Namen mit gleichem Hash, bei
   doppelt benutzten IDs (mit Namen) und bei offenen Bereichen am Ende des Frames.
-- **P3** · *fehlt* · Stil zur Laufzeit wechseln bzw. eigene Themes für Apps ohne neues
-  Style-Crate.
+- **P3** · *erledigt* (2026-10-22) · Stil zur Laufzeit wechseln bzw. eigene Themes für Apps ohne
+  neues Style-Crate: App-Themes ([`ui/theme_app.rs`](../lib/ui/theme_app.rs),
+  [STYLES.md](STYLES.md#app-themes), [GUIDE §34](GUIDE.md)) überschreiben die Tokens des aktiven
+  Stils – Farben je Rolle für Hell, Dunkel und hohen Kontrast, den Akzent (über die Akzent-Rampe
+  des Stils), Eckenradien (DIP oder Prozent; Pillen bleiben Pillen), Abstände (Polsterung und
+  Lücken der Boxen und Raster), die Höhe der Standard-Steuerelemente, Größe, Zeilenhöhe und
+  Stärke je Textstil und eine Schriftfamilie (Datei neben dem Theme, VFS-Pfad oder installierte
+  Familie). Format: INI (`base::ini`, neu `Ini::items` mit Zeilennummern); `Theme::from_ini` /
+  `load` / `to_ini` / `save`, `ui.set_theme` / `clear_theme` / `load_theme`, `--theme-file`.
+  Fehler nennen die Zeile in der UI-Sprache, ein kaputtes Theme lässt das alte stehen; wirksam
+  ab dem nächsten Frame. Kein Stil musste dafür umgebaut werden: die Theme-Schicht sitzt in
+  `theme_build`, `cmd_rrect` / `cmd_shadow`, `box_begin` / `gridbox_begin`, den Größenaufrufen
+  der Standard-Controls und `ts_font` / `ts_line`; ohne Theme rendert alles pixelgleich (Shots
+  von gallery in winui, classic und kde und von datagallery samt den Shots ihrer Skripte unter
+  Windows und Linux). Stilwechsel zur Laufzeit: `build_rs.py` linkt jedes `style_NAME`, das die
+  Quellen einer App nennen, dazu; `ui.styles_add` / `style_names` / `set_style` (`Style::name`;
+  `Text::set_embedded` tauscht die eingebetteten Schriften, abgeleitete Schriften folgen).
+  Getestet mit `apps/themedemo` (Seite „Darstellung“ mit Live-Editor, Speichern nach
+  `config://`, vier gelinkte Stile; Skripte für Token, Pixel und Rechtecke in Hell, Dunkel,
+  hohem Kontrast und bei 150 % Text, kaputte Dateien, gleiche Pixel nach dem Rückweg),
+  `apps/gallery/tests/themes*.uis` (mit jedem der sieben Stile gebaut) und `uitest --only
+  themes` (Format, Fehler mit Zeile, Textform). Grenzen: feste Werte eines Stils bleiben (die
+  graue 3D-Fläche von classic kommt aus seiner eigenen Palette, Titelleisten-Schriften,
+  Innenabstände der Widgets).
 - **P3** · *erledigt* · Bausteine für Simulationen (seit 2026-10-19, für JFNetworker):
   deterministische Zufallszahlen [`base/rng.rs`](../lib/base/rng.rs) (PCG32 nach der
   Referenzimplementierung, SplitMix64, Sprung nach vorn, abgeleitete Generatoren pro Objekt)

@@ -1,0 +1,5 @@
+# a theme whose font file does not exist: set_theme fails, the theme stays
+[theme]
+name = Ohne Schrift
+[text]
+family = fonts/fehlt.ttf

@@ -29,7 +29,12 @@ dependencies are built through Cargo and linked as static .rlib files.
                                                                 the Markdown -> build/site/ (tools/site.py); --check
                                                                 builds into a temporary folder and checks links,
                                                                 anchors, images and the HTML (the suite runs it)
-  python build_rs.py ide                                     write rust-project.json
+  python build_rs.py i18n [APP|lib] [--update] [--unused]    the translatable texts against the catalogues
+                                                                (tools/i18n_check.py): missing, untranslated, unused,
+                                                                placeholders and plural forms; --update adds the
+                                                                missing rows (untranslated); --check: the suite's
+                                                                check (errors only, the gaps are reported)
+  python build_rs.py ide                                    write rust-project.json
   python build_rs.py plugin [NAME]                           plugins/NAME -> <out>/<t>/plugins/NAME.dll|.so
                                                                 (PaintCraft plugins: section "rust-plugin")
   options: --target win|linux|both (default both; run: win), --release, --out DIR, -j N,
@@ -58,6 +63,11 @@ Rules checked before every build (`check`):
     crate has #![forbid(unsafe_code)], every app #![deny(unsafe_code)] (its one exception
     is the ui::main! entry point)
   * own crates use --extern; text_shape's pinned Cargo dependencies are the exception
+
+Styles: an app is linked with its style (apps/NAME/STYLE or --style) as the crate `style`, and
+with every further style crate its sources name (`style_kde::STYLE`, app_styles) under that
+name, for the run-time style switch (ui.styles_add / ui.set_style, docs/STYLES.md); their
+licence notices go next to the app as well.
 
 Apps with several executables (section "app-bins"): apps/NAME/BINS lists further binaries
 ("NAME ENTRY cli|gui", e.g. "bc-server server/main.rs cli"), each in a folder of its own; cli
@@ -369,6 +379,12 @@ def app_crates(name):
     return source_crates(entrypoint(RS / "apps" / name, "app"))
 
 
+def app_styles(name):
+    """the style crates an app's sources name besides its own style (style_kde::STYLE ...):
+    linked side by side for the run-time style switch (ui.styles_add / set_style, STYLES.md)"""
+    return sorted(named_crates(entrypoint(RS / "apps" / name, "app"), [f"style_{s}" for s in STYLES]))
+
+
 def style_crates():
     return {f"style_{s}": (entrypoint(RS / "styles" / s, "lib").relative_to(RS).as_posix(),
                            source_crates(entrypoint(RS / "styles" / s, "lib"))) for s in STYLES}
@@ -405,9 +421,10 @@ def app_targets(name):
 # do everything (as before).  "ask KEY ARGS [\"reason\"]" asks the user at the first access;
 # agent.confirm / agent.deny name agent actions (patterns) the user confirms / an agent may not run.
 PERM_KEYS_ARGS = ("fs.read", "fs.write", "process", "plugins", "url", "net.connect", "net.listen")
-PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart")
+PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart", "audio.output")
 PERM_KEYS_AGENT = ("agent.confirm", "agent.deny")                  # agent actions: confirmed / refused
-PERM_ASKABLE = PERM_KEYS_ARGS + ("print", "secrets", "autostart")   # "ask KEY ARGS [\"reason\"]"
+PERM_KEYS_SANDBOX = ("sandbox",)                                   # OS sandbox: "sandbox [strict]"
+PERM_ASKABLE = PERM_KEYS_ARGS + PERM_KEYS_FLAG[1:]                  # "ask KEY ARGS [\"reason\"]"
 PERM_VARS = ("CONFIG", "TEMP", "HOME", "EXE", "FONTS", "APPCONFIG", "APPDATA", "APPCACHE", "APPLOG",
              "DESKTOP", "DOCUMENTS", "DOWNLOADS", "PICTURES", "MUSIC", "VIDEOS")
 
@@ -517,6 +534,9 @@ def perm_check(text, where):
             for a in args:
                 if not re.fullmatch(r"[A-Za-z0-9._*?-]{1,128}", a):
                     raise BuildError(f"{where}:{i}: {a} is not an action name pattern (letters, digits, . _ - and * ?)")
+        elif key in PERM_KEYS_SANDBOX:
+            if args not in ([], ["strict"]):
+                raise BuildError(f"{where}:{i}: sandbox takes nothing or 'strict'")
         elif key in PERM_KEYS_FLAG:
             if args:
                 raise BuildError(f"{where}:{i}: {key} takes no arguments")
@@ -536,7 +556,7 @@ def perm_check(text, where):
                     raise BuildError(f"{where}:{i}: {err}")
         else:
             raise BuildError(f"{where}:{i}: unknown permission {key} "
-                             f"({', '.join(PERM_KEYS_ARGS[:2] + PERM_KEYS_FLAG[:1] + PERM_KEYS_ARGS[2:] + PERM_KEYS_FLAG[1:] + ('ask',) + PERM_KEYS_AGENT)})")
+                             f"({', '.join(PERM_KEYS_ARGS[:2] + PERM_KEYS_FLAG[:1] + PERM_KEYS_ARGS[2:] + PERM_KEYS_FLAG[1:] + PERM_KEYS_SANDBOX + ('ask',) + PERM_KEYS_AGENT)})")
 
 
 # manifests and the error perm_check must give (None: valid); `check` runs them, so the build's
@@ -552,8 +572,13 @@ PERM_CASES = [
     ("ask agent.deny doc.x", "agent.deny cannot be asked for"),
     ("agent.confirm doc/x", "is not an action name pattern"),
     ("agent.deny", "needs at least one action name"),
+    ("sandbox\nsandbox strict", None),
+    ("sandbox loose", "sandbox takes nothing or 'strict'"),
     ('ask print "a\x07b"', "no control characters"),
     ("fs.read $PLUGIN/x", "unknown variable $PLUGIN"),
+    ('audio.output\nask audio.output "Klänge"', None),
+    ("audio.output on", "audio.output takes no arguments"),
+    ("ask audio.input", "audio.input cannot be asked for"),
 ]
 
 
@@ -948,12 +973,14 @@ class Builder:
             return None
         scrate = f"style_{style}"
         crates = app_crates(name)
-        self.build_libs(crates + [scrate])
+        extra = app_styles(name)                       # further styles to switch to at run time
+        self.build_libs(crates + sorted({scrate, *extra}))
         root = entrypoint(RS / "apps" / name, "app")
-        deps = crates + [scrate]
+        deps = crates + sorted({scrate, *extra})
         if self.target == "android":
             from tools.android import build_apk
-            return build_apk(self, name, style, variant, root, crates, run_cmd, app_notices([style]))
+            return build_apk(self, name, style, variant, root, crates + extra, run_cmd,
+                             app_notices([style] + [c[len("style_"):] for c in extra]))
         lto = self.profile["lto"] if self.release and self.profile else "fat"      # r13-measure
         perms, assets, boot = self.boot_inputs(name)     # permissions, vfs: manifest and assets
         digest = self.src_hash(root, deps, extra=style + ("" if lto == "fat" else f" lto={lto}")
@@ -963,7 +990,8 @@ class Builder:
         if self.target == "web":
             vdir = (self.web_public / style if variant else self.web_public) / name
         vdir.mkdir(parents=True, exist_ok=True)
-        copy_style_notices(name, style, vdir)
+        for s in sorted({style, *(c[len("style_"):] for c in extra)}):
+            copy_style_notices(name, s, vdir)
         copy_library_notices(vdir)
         web_suffix = ("." + self.web_mode if self.web_mode != "scalar" else "") + ".wasm"
         exe = vdir / (name + (".exe" if self.target == "win" else web_suffix if self.target == "web" else ""))
@@ -990,6 +1018,8 @@ class Builder:
         for d in crates:
             cmd += ["--extern", f"{d}={self.rlib(d)}"]
         cmd += ["--extern", f"style={self.rlib(scrate)}"]
+        for c in extra:
+            cmd += ["--extern", f"{c}={self.rlib(c)}"]
         cmd += self.native_link_args(name, exe, "WINDOWS")
         boot_args, env = self.boot_args(name, perms, assets)
         cmd += boot_args
@@ -1209,7 +1239,7 @@ def build_apps(builders, names, styles=None):
 
     def libs(b):
         mine = [(n, s) for bb, n, s in jobs if bb is b and b.target in app_targets(n)]
-        crates = {c for n, _ in mine for c in app_crates(n)} | {f"style_{s}" for _, s in mine}
+        crates = {c for n, _ in mine for c in app_crates(n) + app_styles(n)} | {f"style_{s}" for _, s in mine}
         return b.build_libs(sorted(crates)) if mine else []
     with ThreadPoolExecutor(max(1, 2 * len(builders) * len(names))) as ex:
         mods = [ex.submit(build_app_modules, b, n) for b in builders for n in names
@@ -1350,6 +1380,13 @@ def run_tests(builders, out, quick):
     print(r.stdout.strip() + (("\n" + r.stderr.strip()) if r.returncode and r.stderr.strip() else ""))
     if r.returncode:
         fails.append("tools/pkg_check.py --quick")
+    # the catalogues (tools/i18n_check.py --check): errors only (placeholders, plural forms,
+    # broken rows; the apps whose catalogues are complete stay so); the other gaps are reported
+    r = subprocess.run([sys.executable, str(RS / "tools" / "i18n_check.py"), "--check"], cwd=ROOT, capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+    print((r.stdout.strip() + ("\n" + r.stderr.strip() if r.stderr.strip() else "")).strip())
+    if r.returncode:
+        fails.append("tools/i18n_check.py --check")
     # the website (tools/site.py --check): every page, internal link, anchor and image, the HTML, two
     # builds byte-identical; a temporary folder below build/
     r = subprocess.run([sys.executable, str(RS / "tools" / "site.py"), "--check", "--summary"], cwd=ROOT,
@@ -1460,7 +1497,7 @@ def write_ide():
                 deps.append({"crate": idx[f"style_{app_style(a)}"], "name": "style"})
         elif n.startswith("app:"):
             root = entrypoint(RS / "apps" / n[4:], "app")
-            deps = [{"crate": idx[d], "name": d} for d in app_crates(n[4:])] + [{"crate": idx[f"style_{app_style(n[4:])}"], "name": "style"}]
+            deps = [{"crate": idx[d], "name": d} for d in app_crates(n[4:]) + app_styles(n[4:])] + [{"crate": idx[f"style_{app_style(n[4:])}"], "name": "style"}]
         else:
             root = RS / libs[n][0]
             deps = [{"crate": idx[d], "name": d} for d in libs[n][1]]
@@ -2015,7 +2052,7 @@ def main():
         argv, extra = argv[:i], argv[i + 1:]
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["lib", "app", "all", "run", "test", "check", "ide", "plugin",
-                                    "new", "api-diff", "changelog", "release", "site"])
+                                    "new", "api-diff", "changelog", "release", "site", "i18n"])
     ap.add_argument("name", nargs="?")
     ap.add_argument("--target", choices=["win", "linux", "both", "web", "all", "android"])
     ap.add_argument("--android-abi", choices=["arm64-v8a", "x86_64"], default="arm64-v8a",
@@ -2043,7 +2080,9 @@ def main():
     ap.add_argument("--area", help="changelog: the part the entry is about (ui, plat, build ...)")
     ap.add_argument("--date", help="release: the release date (default today)")
     ap.add_argument("--force", action="store_true", help="release: also when the API changes need a larger step")
-    ap.add_argument("--check", action="store_true", help="site: build into a temporary folder and check it")
+    ap.add_argument("--check", action="store_true", help="site: build into a temporary folder and check it; i18n: errors only")
+    ap.add_argument("--update", action="store_true", help="i18n: add the missing texts to the app's catalogue (untranslated)")
+    ap.add_argument("--unused", action="store_true", help="i18n: list the unused rows of every app")
     a = ap.parse_args(argv)
     if a.cmd == "ide":
         write_ide()
@@ -2052,6 +2091,13 @@ def main():
         return subprocess.run([sys.executable, str(ROOT / "tools" / "site.py")]
                               + (["--out", str((ROOT / a.out).resolve())] if a.out else [])
                               + (["--check"] if a.check else []), cwd=ROOT).returncode
+    if a.cmd == "i18n":                             # tools/i18n_check.py
+        if a.update and not a.name:
+            print("i18n: --update needs the app (python build_rs.py i18n PaintCraft --update)")
+            return 1
+        return subprocess.run([sys.executable, str(ROOT / "tools" / "i18n_check.py")] + ([a.name] if a.name else [])
+                              + [f for f, on in (("--update", a.update), ("--check", a.check), ("--unused", a.unused)) if on],
+                              cwd=ROOT).returncode
     if a.cmd in ("new", "api-diff", "changelog", "release"):
         if a.cmd == "new" and not a.name:
             print("new: the name is missing (python build_rs.py new NAME [--kind window|console|tool|service])")

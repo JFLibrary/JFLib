@@ -1,0 +1,19 @@
+#!args --text-scale 150
+# app themes at a text scale of 150 %: the theme's control height grows with the text (like
+# the parts around one line of text); back to the style's look gives the same pixels
+theme light
+wait 500
+shot build/gal_themes/default_ts150.png
+theme file apps/themedemo/assets/themes/ocean.theme
+expect theme "Ozean"
+expect #100 rect * * * 54
+expect #8701 rect * * * 54
+shot build/gal_themes/ocean_ts150.png
+theme dark
+shot build/gal_themes/ocean_ts150_dark.png
+theme light
+theme file apps/themedemo/assets/themes/paper.theme
+expect #100 rect * * * 42
+shot build/gal_themes/paper_ts150.png
+theme none
+expect same build/gal_themes/default_ts150.png

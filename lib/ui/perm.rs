@@ -163,6 +163,7 @@ fn what(kind: &str) -> &'static str {
         "print" => tr("Drucken"),
         "secrets" => tr("Gespeicherte Kennwörter verwenden"),
         "autostart" => tr("Beim Anmelden starten"),
+        "audio.output" => tr("Klänge abspielen"),
         "net.connect" => tr("Eine Netzwerkverbindung aufbauen"),
         "net.listen" => tr("Netzwerkverbindungen annehmen"),
         "agent" => tr("Eine Aktion für den Agenten ausführen"),

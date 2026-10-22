@@ -6,7 +6,8 @@
 //      (Pending, Key::answer, the decision for the line), another thread waiting for the answer
 //      and refused after the timeout, Key::ask_here(false) withdrawing a question, the stored
 //      answers (a file: written, protected from the app, reloaded, forgotten), decisions(),
-//      agent rules and questions, the network's name check
+//      agent rules and questions, the network's name check, sound (the quiet audio_granted
+//      of ui's dialog sounds against audio_allowed, which asks)
 // A policy stays installed until the process ends: this test is not part of "all".
 
 use alloc::boxed::Box;
@@ -25,7 +26,7 @@ pub fn t_permask(t: &mut T) {
 }
 
 fn syntax(t: &mut T) {
-    let bad: [(&str, &str); 10] = [
+    let bad: [(&str, &str); 11] = [
         ("ask fs.user", "PERMISSIONS:1: fs.user cannot be asked for"),
         ("print\nask", "PERMISSIONS:2: ask needs a permission"),
         ("fs.read /x \"why\"", "a reason belongs to an ask line"),
@@ -36,6 +37,7 @@ fn syntax(t: &mut T) {
         ("agent.deny", "expected at least one action name"),
         ("fs.read $PLUGIN/x", "$PLUGIN only in a plugin's manifest"),
         ("ask print \"a\u{7}b\"", "no control characters"),
+        ("sandbox loose", "sandbox takes nothing or 'strict'"),
     ];
     for (text, want) in bad {
         match policy::check(text) {
@@ -54,6 +56,7 @@ fn syntax(t: &mut T) {
     let r = policy::check(good);
     t.check(r.is_err() && r.unwrap_err().contains("PERMISSIONS:7: a reason belongs"), "permask: a quote alone is a reason without a line");
     t.check(policy::check(&good[..good.len() - 3]).is_ok(), "permask: ask lines, reasons with '#', agent lines");
+    t.check(policy::check("sandbox\nsandbox strict\n").is_ok(), "permask: the sandbox line (with 'strict')");
 }
 
 fn installed(t: &mut T) {
@@ -68,7 +71,7 @@ fn installed(t: &mut T) {
          ask fs.read {base}/ask/**  \"Briefe lesen\"\n\
          ask fs.write {base}/bg/**\n\
          ask fs.read {base}/both/**\nfs.read {base}/both/**   # the plain line wins\n\
-         ask url mailto \"Mails schreiben\"\nask print\n\
+         ask url mailto \"Mails schreiben\"\nask print\nask audio.output \"Klänge\"\n\
          ask net.connect *.ask.test:443\n\
          agent.confirm doc.* ui.type\nagent.deny *.wipe\n"
     );
@@ -92,7 +95,7 @@ fn installed(t: &mut T) {
     t.check(plat::read_file(&p("both/x.txt")).is_some(), "permask: a plain line wins over an ask line");
     t.check(plat::write_file(&p("plain/y.txt"), b"y"), "permask: plain lines are not asked");
     let d = policy::decisions();
-    t.check(d.len() == 6 && d.iter().all(|x| x.answer.is_none()), "permask: decisions() lists every ask line");
+    t.check(d.len() == 7 && d.iter().all(|x| x.answer.is_none()), "permask: decisions() lists every ask line");
     t.check(d.iter().any(|x| x.rule == "url mailto" && x.kind == "url" && x.reason == "Mails schreiben"), "permask: ... with its kind and reason");
 
     // fixed answers (jfgui_PERM_ANSWER, the scripts' perm answer)
@@ -120,6 +123,17 @@ fn installed(t: &mut T) {
         t.check(!key.answer(q.id, Answer::Once), "permask: a question is answered once");
     }
     t.check(policy::url_allowed("mailto:e@f.example") && policy::questions().is_empty(), "permask: allowed after the answer");
+
+    // sound: the quiet check (ui's dialog sounds) neither asks nor records, audio_allowed asks
+    let sounds = || policy::denials().iter().filter(|d| d.kind == "audio.output").count();
+    let n = sounds();
+    t.check(!policy::audio_granted() && policy::questions().is_empty() && sounds() == n, "permask: audio_granted asks nobody and records nothing");
+    t.check(!policy::audio_allowed(), "permask: audio_allowed asks (pending on the asking thread)");
+    if let Some(q) = policy::questions().first() {
+        t.check(q.kind == "audio.output" && q.rule == "audio.output" && q.target.is_empty() && q.reason == "Klänge", "permask: the sound question");
+        key.answer(q.id, Answer::Once);
+    }
+    t.check(policy::audio_granted() && policy::audio_allowed() && policy::questions().is_empty(), "permask: sound allowed after the answer, also quietly");
 
     // another thread waits for the answer
     let result = Arc::new(AtomicU32::new(0));

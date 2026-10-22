@@ -27,6 +27,9 @@ pub struct MacOs;
 pub static STYLE: MacOs = MacOs;
 
 impl Style for MacOs {
+    fn name(&self) -> &'static str {
+        "macos"
+    }
     fn tokens(&self, dark: bool) -> [u32; T_COUNT] {
         if dark { TOKENS_DARK } else { TOKENS_LIGHT }
     }

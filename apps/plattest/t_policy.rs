@@ -5,7 +5,7 @@
 //      installed)
 //   3. a manifest for a scratch tree, installed in this process: reads, writes, traversal,
 //      fs.rs, locks, a grant of the user's file, Key::trusted, processes, URLs, plugins,
-//      print, secrets, autostart, capabilities(), the network (connect, listen, UDP, names, resolved addresses,
+//      print, secrets, autostart, audio.output, capabilities(), the network (connect, listen, UDP, names, resolved addresses,
 //      DNS, Unix sockets) and the denial records
 // A policy stays installed until the process ends: this test is not part of "all".
 
@@ -105,7 +105,7 @@ fn patterns(t: &mut T) {
 
 fn refused_manifests(t: &mut T) {
     for m in [
-        "fs.read relative/path", "bogus", "url ftp:x", "fs.read $NOPE/x", "print now", "secrets all", "autostart on", "fs.write",
+        "fs.read relative/path", "bogus", "url ftp:x", "fs.read $NOPE/x", "print now", "secrets all", "autostart on", "audio.output on", "fs.write",
         "net.connect example.org", "net.connect ::1:80", "net.listen example.org:80", "net.connect 10.0.0.0/33:1",
         "net.connect a..b:1", "net.connect host:70000", "net.connect host:9-3", "net.connect [10.0.0.1]:1", "net.connect",
     ] {
@@ -200,6 +200,18 @@ fn installed(t: &mut T) {
         "policy: secret_get / secret_available without secrets refused");
     t.check(plat::autostart_set(true, &[]) == Err(plat::AutostartError::Denied) && !policy::autostart_allowed(),
         "policy: autostart_set without autostart refused (nothing written)");
+    {
+        use plat::audio::{self, AudioError, Config, Sound, Stream};
+        audio::set_dry_run(true);
+        t.check(!audio::sound(audio::SOUND_INFO), "policy: sound() without audio.output plays nothing (also in a dry run)");
+        audio::set_dry_run(false);
+        t.check(Stream::open(&Config::new(48_000, 2)).err() == Some(AudioError::Denied)
+            && Stream::open_fill(&Config::new(48_000, 2), |_: &mut [f32]| false).err() == Some(AudioError::Denied),
+            "policy: Stream::open / open_fill without audio.output refused");
+        t.check(audio::play(&Sound::tone(440.0, 10)).err() == Some(AudioError::Denied) && audio::play_file("mem://none.wav").err() == Some(AudioError::Denied),
+            "policy: play / play_file without audio.output refused");
+        t.check(!audio::available() && !policy::audio_allowed() && !policy::audio_granted(), "policy: available() false without audio.output");
+    }
     let caps = plat::capabilities();
     t.check(caps.supports(plat::CAP_FILE_READ | plat::CAP_FILE_WRITE), "policy: capabilities keep the files");
     t.check(!caps.supports(plat::CAP_PRINT) && !caps.supports(plat::CAP_NATIVE_PLUGINS), "policy: capabilities drop print and plugins");
@@ -246,6 +258,7 @@ fn installed(t: &mut T) {
     let has = |kind: &str, end: &str| d.iter().any(|x| x.kind == kind && x.target.ends_with(end));
     t.check(has("fs.read", "secret.txt") && has("fs.write", "b.txt") && has("process", "plattest-other-program")
         && has("url", "ftp://example.org") && has("plugins", "plugin.dll") && has("print", "") && has("secrets", "plattest-policy") && has("autostart", "")
+        && has("audio.output", "")
         && has("net.connect", &format!(":{other}")) && has("net.listen", "0.0.0.0:0") && has("net.connect", "evil.org"),
         "policy: denials recorded");
     t.info(&format!("  {} denial(s) recorded\n", d.len()));

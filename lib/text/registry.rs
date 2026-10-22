@@ -104,21 +104,63 @@ impl Text {
         i as i32
     }
 
-    // register a runtime face; the fast table through its glyph op  [font_add_rt]
-    fn add_rt(&mut self, face: Face) -> i32 {
+    // the fast glyph table of a runtime face (code points below FAST_CP)
+    fn fast_map(&self, face: &Face) -> Vec<u16> {
         let mut fmap = Vec::with_capacity(FAST_CP as usize);
         for cp in 0..FAST_CP {
-            let g = match &face {
+            let g = match face {
                 Face::Tt(t) => t.glyph(cp),
                 Face::Syn(s) => self.glyph(s.base, cp),
                 _ => 0,
             };
             fmap.push(g as u16);
         }
+        fmap
+    }
+
+    // register a runtime face; the fast table through its glyph op  [font_add_rt]
+    fn add_rt(&mut self, face: Face) -> i32 {
+        let fmap = self.fast_map(&face);
         let Some(i) = self.slot_alloc() else { return ERR_LIMIT };
         let raster = match &face { Face::Syn(s) => self.font_raster(s.base), _ => crate::FontRaster::Legacy };
         self.slots[i] = Slot { face, raster, fmap };
         i as i32
+    }
+
+    /// replace the embedded fonts 0..3 (SGF1 or TrueType / OpenType; a style switched at run
+    /// time): the ids keep their meaning, fonts derived from them (style) take the new
+    /// metrics, cached glyphs are dropped; each face starts with the legacy raster policy
+    pub fn set_embedded(&mut self, fonts: [&'static [u8]; 4], names: [[&'static str; 5]; 4]) {
+        for (i, f) in fonts.iter().enumerate() {
+            let face = if f.starts_with(b"SGF1") {
+                Font::parse(f).map_or(Face::Free, Face::Sgf)
+            } else {
+                let serial = self.next_serial();
+                TtFont::open(Vec::from(*f), 0, &mut self.ol, serial).map_or(Face::Free, Face::Tt)
+            };
+            let fmap = if matches!(face, Face::Tt(_)) { self.fast_map(&face) } else { Vec::new() };
+            while self.slots.len() <= i {
+                self.slots.push(Slot::free());
+            }
+            self.slots[i] = Slot { face, raster: crate::FontRaster::Legacy, fmap };
+        }
+        self.names = names;
+        // the derived fonts of the embedded ones: header, metrics and glyph table of the new base
+        for i in FONT_EMBEDDED as usize..self.slots.len() {
+            let (base, syn) = match &self.slots[i].face {
+                Face::Syn(s) if s.base < FONT_EMBEDDED => (s.base, s.syn),
+                _ => continue,
+            };
+            let Some((hdr, fm, strength)) = self.syn_metrics(base, syn) else { continue };
+            let serial = self.next_serial();
+            if let Face::Syn(s) = &mut self.slots[i].face {
+                (s.hdr, s.fm, s.strength, s.serial) = (hdr, fm, strength, serial);
+            }
+            let fmap = self.fast_map(&self.slots[i].face);
+            self.slots[i].fmap = fmap;
+            self.slots[i].raster = self.font_raster(base);
+        }
+        self.gc_flush();
     }
 
     fn next_serial(&mut self) -> u64 {
@@ -450,8 +492,15 @@ impl Text {
                 return i as i32;
             }
         }
+        let Some((hdr, fm, strength)) = self.syn_metrics(base, flags) else { return ERR_FAIL };
+        let serial = self.next_serial();
+        self.add_rt(Face::Syn(Box::new(SynFont { hdr, fm, base, syn: flags, strength, serial })))
+    }
+
+    // header, metrics and embolden strength of the font derived from base with flags
+    fn syn_metrics(&self, base: u32, flags: u32) -> Option<(Hdr, Metrics, f32)> {
         let mut hdr = self.hdr(base);
-        let Some(mut fm) = self.metrics(base) else { return ERR_FAIL };
+        let mut fm = self.metrics(base)?;
         hdr.flags = (hdr.flags & (SGH_COLR | SGH_CBDT)) | SGH_RUNTIME;
         hdr.baseid = base + 1;
         // strength = upem / 30
@@ -465,8 +514,7 @@ impl Text {
         if flags & FS_SYN_ITALIC != 0 {
             fm.flags |= FMF_ITALIC;
         }
-        let serial = self.next_serial();
-        self.add_rt(Face::Syn(Box::new(SynFont { hdr, fm, base, syn: flags, strength, serial })))
+        Some((hdr, fm, strength))
     }
 
     // the transformed outline of glyph into the buffer: true = not empty  [syn_prep]

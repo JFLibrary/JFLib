@@ -1,0 +1,14 @@
+# a test theme with a font family from files (themes.uis; the paths are relative to this
+# file): Inter of styles/jfoffice, its semibold face for the semibold and bold text styles
+[theme]
+name = Inter
+[colors]
+accent = #6B4FBB
+[metrics]
+radius = 150%
+[text]
+family = ../../../styles/jfoffice/assets/Inter-Regular.ttf
+family.semibold = ../../../styles/jfoffice/assets/Inter-SemiBold.ttf
+body.size = 14
+body.line = 20
+title.size = 26

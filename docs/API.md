@@ -61,7 +61,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -112,7 +112,8 @@ ui -- the immediate-mode runtime: one Ui context instead of ASMLIB's g_* globals
 
 Modules (one per ASMLIB file): ctx (ui_ctx.s: input, hit testing, behaviour, slots,
 timers, commands, semantics, clip, layers, passes), layout (ui_layout.s), cmd (ui_cmd.s:
-draw command lists and their replay), dirty (ui_dirty.s), theme (ui_theme.s), basic
+draw command lists and their replay), dirty (ui_dirty.s), theme (ui_theme.s; app themes
+over the style and the run-time style switch, theme_app.rs: Theme and its file), basic
 (ui_basic.s), auto (ui_auto.s: scripts and the widget dump), runtime (ui_main.s), cursor
 (ui_cursor.s), drop (ui_drop.s), dnd (drag and drop between widgets and programs), dock
 (docking: panels at the sides in tab groups, floating tool windows), kbnav (keyboard
@@ -169,7 +170,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [File dialog](#file-dialog): `filedlg`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
-- [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `dp_text`, `ts_base`
+- [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
 - [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
 
 ### App, AppDesc, Ui, run, async tasks
@@ -3626,7 +3627,10 @@ auto -- UI automation for headless tests: scripts and the widget dump  [src/ui/u
 
 Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   size W H                      resize the headless window
-  theme dark|light
+  theme dark|light|contrast
+  theme file PATH | none        an app theme from a file (an error is printed and kept for
+                                `expect theme error`; the theme stays) / no app theme
+  style NAME                    another style linked into the app (Ui::set_style)
   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r]
   rclick S        dblclick S [shift|ctrl|alt]...
                   drag S1 S2 [steps] [shift|ctrl|alt|right|middle]...
@@ -3650,6 +3654,12 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   dump [FILE]     print / save the widget tree
   expect S exists | missing | hover | focused | checked | unchecked | disabled |
            enabled | selected | open | pressed | value N | max N | text "s" | rect X Y W H
+           (rect: '*' takes any value)
+  expect theme "NAME" | none    the app theme;  expect theme error "TEXT" | none  the error
+                                of the last `theme file` contains TEXT
+  expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
+  expect pixel X Y #RRGGBB      the main window's pixel at (X, Y), rendered now
+  expect same FILE.png          the main window rendered now has the pixels of that shot
   print TEXT      echo
   bench N         time N frames (build, full render, unchanged frame) with the real clock
   bench N anim [MAX_US]   N frames 16 ms apart on the virtual clock (timers, animations):
@@ -3758,6 +3768,22 @@ theme -- colour tokens, accent colour and type ramp of the linked style  [src/ui
   color_mix(a, b, t)         per-channel a + (b - a) * t / 256 (t 0..256)
   luminance(rgb) / contrast_ratio(a, b)   WCAG 2 relative luminance (0..1) of 0xRRGGBB and
                              the contrast of two colours (1..21; text wants 4.5, graphics 3)
+App themes (theme_app.rs: Theme, its file format and errors) on top of the style:
+  set_theme(&theme) -> Result   from the next frame on; a font that cannot be loaded is an
+                             error and the previous theme stays; clear_theme() the style's
+                             own look again; app_theme() -> Option<&Theme>;
+                             load_theme(path) = Theme::load + set_theme
+  The theme layer: theme_build (colours: the theme's tokens over the style's, its accent
+  through the style's ramp), cmd_rrect / cmd_shadow (look_radius: corners that are not pills),
+  box_begin / gridbox_begin (dp_space: padding and gaps), the size calls of buttons, text
+  boxes, combo boxes, drop-down and split buttons (ctrl_size), ts_font / ts_line (sizes,
+  line heights, weights, the family's faces).  Without a theme every value is the style's.
+The run-time style switch (styles linked side by side, build_rs.py: every style_NAME the
+app's sources name):
+  styles_add(&[&style_kde::STYLE, ..])   style_names() -> names   style_name() -> current
+  set_style(name) -> bool    the style's fonts replace ids 0..3 (Text::set_embedded), the
+                             tokens are built again, everything is redrawn and laid out
+look.serial counts the changes of theme and style: caches of laid-out text compare it.
 
 The values come from the style (Style::tokens, accent, ts_size / ts_line / ts_font).
 ```
@@ -3807,6 +3833,28 @@ The values come from the style (Style::tokens, accent, ts_size / ts_line / ts_fo
   ui_ts_font(ts): select the font and pixel size (size \* dpi / 96, 24.8) of a style
 - **`fn ts_line(&self, ts: u32) -> i32`**
   ui_ts_line(ts): line height of a text style in px
+- **`fn set_theme(&mut self, th: &Theme) -> Result<(), ThemeError>`**
+  the app's theme over the style (theme_app.rs) from the next frame on: colours of light,
+  dark and high contrast, the accent, corners, spacing, control heights, text styles and
+  a font family.  A font that cannot be loaded is an error; the previous theme stays.
+- **`fn clear_theme(&mut self)`**
+  no app theme: the style's own look again
+- **`fn app_theme(&self) -> Option<&Theme>`**
+  the active app theme (None: the style's look)
+- **`fn load_theme(&mut self, path: &str) -> Result<(), ThemeError>`**
+  read a theme file (app://, config://, a path) and make it the app's theme; on an error
+  the previous theme stays
+- **`fn styles_add(&mut self, styles: &[&'static dyn Style])`**
+  the styles set_style can switch to: the app names the style crates it links besides its
+  own (build_rs.py links every style_NAME its sources name):
+  `ui.styles_add(&[&style_classic::STYLE, &style_kde::STYLE])`
+- **`fn style_names(&self) -> Vec<&'static str>`**
+  the names of the styles set_style knows (the app's own first, then as added)
+- **`fn style_name(&self) -> &'static str`**
+  the name of the style in use (Style::name)
+- **`fn set_style(&mut self, name: &str) -> bool`**
+  switch to another linked style (styles_add) from the next frame on: its tokens, fonts,
+  metrics and painters; the app theme stays on top -> false: no such style
 - **`fn dp_text(&self, dip: i32) -> i32`**
   dp_text(dip): DIP -> px, grown with a text scale above 100 % (the height of parts
   around one line of text, such as badge pills)
@@ -4102,6 +4150,9 @@ the widget families are being ported; a finished style overrides every function.
 
 - **`trait Style: StyleBasic + StyleValue + StyleEdit + StyleList + StylePopup + StyleChrome + StyleMisc + Sync`**
   a style: tokens, type ramp, fonts and every widget family's paint functions
+  - `fn name(&self) -> &'static str`
+    the style's short name, as build_rs.py --style knows it ("winui", "kde"): the name
+    Ui::set_style switches to (several styles linked into one app)
   - `fn ribbon_height(&self) -> i32`
     Ribbon height in DIP. Existing styles retain the original 110-DIP layout.
   - `fn ribbon_padding(&self) -> u32`
@@ -7813,6 +7864,10 @@ sound -- the system's sounds from the UI (plat::audio::sound)
   set_sounds(on), sounds() the app's own switch (default on; an app setting "Klänge");
                            jfgui_SOUNDS=0 turns them off for the process
 
+An app whose PERMISSIONS lack `audio.output` plays nothing: beep is refused like any other
+access (an ask line asks, "PERMDENY audio.output" once, plat::policy::denials), dialog_sound
+stays silent without a question or a record (plat::policy::audio_granted).
+
 Headless runs (scripts, --shot) play nothing: plat::audio's dry run prints "sound: NAME", and
 the script command `expect sound KIND|none` checks the last sound requested (auto.rs).
 ```
@@ -7820,10 +7875,12 @@ the script command `expect sound KIND|none` checks the last sound requested (aut
 **`impl Ui`**
 
 - **`fn beep(&mut self, kind: u32) -> bool`**
-  the system's sound for kind (plat::audio::SOUND_\*) -> false: off, unknown or not played
+  the system's sound for kind (plat::audio::SOUND_\*) -> false: off, unknown, not
+  permitted (`audio.output`) or not played
 - **`fn dialog_sound(&mut self, kind: u32) -> bool`**
   inside an open content dialog: its sound, once when it has just opened, where message
-  dialogs play one on this platform -> whether a sound was asked for
+  dialogs play one on this platform and the app may play sound -> whether a sound was
+  asked for
 - **`fn set_sounds(&mut self, on: bool)`**
   the app's switch for its sounds (beep, dialog_sound); on by default
 - **`fn sounds(&self) -> bool`**
@@ -8164,6 +8221,100 @@ TK_KEY: u32 = 0x8000_0000  // TermEv::Raw: a key (VK | MOD_* << 16), not a chara
   mono_font_set, else the system's "monospace", else FONT_REG (drawn cell by cell)
 - **`fn terminal(&mut self, id: u32, st: &mut TermState, flags: u32) -> Vec<TermEv>`**
   ui_terminal(id, st, flags) -> events: the console (see the module header)
+
+#### `ui/theme_app.rs`
+
+Source: [`lib/ui/theme_app.rs`](../lib/ui/theme_app.rs)
+
+```text
+theme_app -- app themes: the active style's tokens overridden from a small text file
+
+  Theme::from_ini(text) -> Result<Theme, ThemeError>   parse a theme (the format below)
+  Theme::load(path) -> Result<Theme, ThemeError>       ... from a file (app://, config://, a
+                             path); relative font files are taken from the theme's folder
+  theme.to_ini() -> String / theme.save(path) -> bool  the text form of what the theme sets
+  token_index(name) -> Option<usize>   the T_* index (token / 4) of a token name ("bg")
+  TOKEN_NAMES, TS_NAMES      the names of the tokens and of the text styles
+
+The format is INI (base::ini):
+  [theme]     name = the theme's name
+  [colors]    TOKEN = #RRGGBB | #AARRGGBB for light and dark; [light], [dark] for one of
+              them, [contrast] for high contrast (on top of the scheme's colours).  TOKEN is
+              a T_* name in lower case (bg, card, ctrl_stroke, text2, accent_text, ...);
+              accent is the colour the style derives its accent ramp from (as accent_set;
+              high contrast: the accent fills)
+  [metrics]   radius = DIP | PERCENT%   rounded corners that are not pills (0: square)
+              spacing = PERCENT%        padding and gaps of boxes and grid boxes
+              control_height = DIP      buttons, text boxes, combo boxes, drop-down and split
+                                        buttons (not compact or large ones)
+  [text]      family = FILE | installed family   (family.semibold, family.bold: their faces;
+              else from the family: a file gets a synthetic bold); STYLE.size = DIP (24.8),
+              STYLE.line = DIP, STYLE.weight = regular | semibold | bold | 100..900 for STYLE
+              in caption, body, body_strong, subtitle, title, title_large, display
+Errors name the line (in the UI language): an unknown section or key, a line without '=',
+a key before the first section or twice in one section, a value out of range.  A theme is
+applied whole or not at all (Ui::set_theme).
+```
+
+```rust
+/// Theme::colors / accent index: the light theme
+THEME_LIGHT: usize = 0
+/// ... the dark theme
+THEME_DARK: usize = 1
+/// ... high contrast
+THEME_CONTRAST: usize = 2
+/// the T_* tokens by name, in token order (index = token / 4); theme files write them in
+/// lower case
+TOKEN_NAMES: [&str; T_COUNT] = [ "BG", "BG_ALT", "LAYER", "LAYER_STROKE", "CARD", "CARD_ ...
+/// the TS_* text styles by name (theme files: body.size, title.weight)
+TS_NAMES: [&str; TS_COUNT as usize] = ["caption", "body", "body_strong", "subtitle", "title", " ...
+```
+
+- **`fn token_index(name: &str) -> Option<usize>`**
+  the T_\* index of a token name (any case, "T_" in front allowed)
+
+- **`enum Radius`**
+  rounded corners of a theme: every corner radius that is not a pill becomes this many DIP,
+  or the style's radius scaled by this percentage
+  - `Dip(u16)`
+  - `Percent(u16)`
+
+- **`struct TextStyle`**
+  a text style of a theme: size in DIP (24.8), line height in DIP, weight 100..900; None =
+  the style's (a size alone scales the style's line height with it)
+  - `size_fx: Option<u16>`
+  - `line: Option<u16>`
+  - `weight: Option<u16>`
+
+- **`struct Theme`**
+  an app theme (see the module header); Default = nothing overridden
+  - `name: String`
+  - `colors: [[Option<u32>; T_COUNT]; 3]` -- colour tokens per THEME_LIGHT / \_DARK / \_CONTRAST (index token / 4), 0xAARRGGBB
+  - `accent: [Option<u32>; 3]` -- the accent per mode, 0xRRGGBB: the style derives its accent ramp from it
+  - `radius: Option<Radius>`
+  - `spacing: u16` -- box padding and gaps in percent (100: the app's values)
+  - `control_height: u16` -- DIP; 0 = the style's
+  - `text: [TextStyle; TS_COUNT as usize]`
+  - `family: String` -- "" = the style's faces; a font file (VFS path) or an installed family
+  - `family_semibold: String`
+  - `family_bold: String`
+
+- **`struct ThemeError`**
+  why a theme could not be read or applied: the line of the file (0: not a line) and the
+  message in the UI language ("Zeile 4: ...")
+  - `line: u32`
+  - `msg: String`
+
+**`impl Theme`**
+
+- **`fn from_ini(text: &str) -> Result<Theme, ThemeError>`**
+  parse a theme file's text (module header); every error names its line
+- **`fn load(path: &str) -> Result<Theme, ThemeError>`**
+  read and parse a theme file; relative font files then name files in its folder
+- **`fn to_ini(&self) -> String`**
+  the theme as the text of a theme file (only what it sets)
+- **`fn save(&self, path: &str) -> bool`**
+  write the theme file (missing folders are made) -> written
 
 #### `ui/timeline.rs`
 
@@ -10585,6 +10736,10 @@ FONT_MAX_IDS: u32 = 4096  // registry capacity
 
 - **`fn register(&mut self, data: &'static [u8]) -> i32`**
   font_register(data) -> id / -1
+- **`fn set_embedded(&mut self, fonts: [&'static [u8]; 4], names: [[&'static str; 5]; 4])`**
+  replace the embedded fonts 0..3 (SGF1 or TrueType / OpenType; a style switched at run
+  time): the ids keep their meaning, fonts derived from them (style) take the new
+  metrics, cached glyphs are dropped; each face starts with the legacy raster policy
 - **`fn face_count(data: &[u8]) -> i32`**
   font_face_count(data) -> faces (1 for a plain sfnt, n for a TTC / OTC) / ERR_\*
 - **`fn load_mem(&mut self, data: &[u8], face: u32) -> i32`**
@@ -16625,10 +16780,12 @@ start-up, then checked by the public file, process, shell, plugin and print func
                                          before that, and in apps without one, all is allowed
   active() -> bool
   fs_allowed(path, FS_READ | FS_WRITE) / process_allowed(program) / url_allowed(url) /
-  plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed()
-                                         -> bool
+  plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed() /
+  audio_allowed()                        -> bool
                                          a refusal is recorded (denials) and printed once
                                          per target to stderr: "PERMDENY kind target"
+  audio_granted() -> bool                sound is allowed now, without asking or recording a
+                                         refusal (ui's dialog sounds stay silent without it)
   net_connect_allowed(addr) / net_listen_allowed(addr) / net_name_allowed(host) -> bool
   net_resolved(host, addrs)              (resolvers) the addresses of a permitted name:
                                          connections to them follow that name's rules
@@ -16685,6 +16842,7 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
   print                 plat::print
   secrets               plat::secret (the system's store for passwords, tokens and keys)
   autostart             plat::autostart_set (start the app at login; reading is free)
+  audio.output          plat::audio: streams, play / play_file, the system's sounds (sound)
   net.connect HOST:PORT..   TCP connections and UDP datagrams to HOST (a name, *.name for
                         every name below it, an IPv4 / [IPv6] address, a block 10.0.0.0/8
                         or [fd00::]/8, localhost = the loopback addresses, * = any) on PORT
@@ -16698,6 +16856,9 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
                         plain rule that covers the access wins over an ask line
   agent.confirm NAME..  agent actions (glob: '*' any run) the user confirms first
   agent.deny NAME..     agent actions an agent may not run
+  sandbox [strict]      ask the OS to enforce the manifest as well (Landlock + seccomp on
+                        Linux, process mitigation policies on Windows; sandbox.rs); `strict`
+                        refuses to start when the OS cannot enforce it
 A PATTERN is an absolute path (X:/.. and //server/share/.. count on Windows only, /.. on
 Linux only), or starts with $CONFIG $TEMP $HOME $EXE $FONTS, the app's own folders
 $APPCONFIG $APPDATA $APPCACHE $APPLOG (vfs::app_dir) or the user's folders $DESKTOP
@@ -16730,9 +16891,9 @@ STORE: &str = "config://permission-decisions.txt"
 - **`struct Denial`**
   one refused access
   - `kind: &'static str` -- "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart",
-    "net.connect", "net.listen" or "agent"
+    "audio.output", "net.connect", "net.listen" or "agent"
   - `target: String` -- the path, program, URL, address, the service of a secret, the agent's action or ""
-    (print, autostart)
+    (print, autostart, audio.output)
   - `plugin: String` -- the plugin the call was made for ("" = the app itself)
 
 - **`enum Answer`**
@@ -16823,8 +16984,44 @@ STORE: &str = "config://permission-decisions.txt"
 - **`fn autostart_allowed() -> bool`**
   whether plat::autostart_set may change the app's autostart entry (`autostart`)
 
+- **`fn audio_allowed() -> bool`**
+  whether plat::audio may play sound (`audio.output`): streams, play, play_file, the
+  system's sounds
+
+- **`fn audio_granted() -> bool`**
+  whether sound is allowed now without a question or a recorded refusal: no manifest, a plain
+  `audio.output` line or an ask line already answered with yes (ui's dialog sounds)
+
 - **`fn denials() -> Vec<Denial>`**
   the last refusals, oldest first
+
+- **`fn sandbox_level() -> u8`**
+  the OS sandbox the manifest asks for: 0 none, 1 `sandbox`, 2 `sandbox strict` (sandbox.rs)
+
+- **`struct LinuxPlan`** *(Linux)*
+  what the Linux OS sandbox grants, derived from the active policy ([`sandbox_plan_linux`])
+  - `level: u8` -- 0 none, 1 `sandbox`, 2 `sandbox strict`
+  - `fs: Vec<(String, bool)>` -- literal folders / files the manifest reaches, with whether they may be written
+  - `make_dirs: Vec<String>` -- writable folders to create when missing (the app's own folders, the folders of fs.write
+    rules): the kernel can only grant paths that exist
+  - `exec_allowed: bool` -- the manifest names at least one program (execve is denied otherwise)
+  - `connect_restrict: bool` -- restrict TCP connect to `connect_ports` (false: leave it unrestricted -- a `*` rule)
+  - `connect_ports: Vec<u16>` -- the ports of net.connect (and 53 with a name rule); empty: no TCP connection at all
+  - `listen_restrict: bool` -- restrict TCP bind to `listen_ports`
+  - `listen_ports: Vec<u16>` -- the ports of net.listen; empty: no TCP listener at all
+
+- **`fn sandbox_plan_linux() -> LinuxPlan`** *(Linux)*
+  what the Linux OS sandbox should enforce for the active policy (no policy: nothing)
+
+- **`struct WinPlan`** *(Windows)*
+  what the Windows OS sandbox needs to know from the active policy ([`sandbox_plan_win`])
+  - `level: u8` -- 0 none, 1 `sandbox`, 2 `sandbox strict`
+  - `plugins_allowed: bool` -- the manifest allows native plugins (dynamic code must stay allowed for the loader)
+  - `exec_allowed: bool` -- child processes may be created: the manifest names a program, or has a `url` / `print`
+    rule (open_url's ShellExecute and the print dialog can start another program)
+
+- **`fn sandbox_plan_win() -> WinPlan`** *(Windows)*
+  what the Windows OS sandbox should enforce for the active policy (no policy: nothing)
 
 - **`fn cap_mask() -> u64`**
   the CAP_\* bits the policy leaves (all without a policy)
@@ -16939,6 +17136,61 @@ STORE: &str = "config://permission-decisions.txt"
 - **`fn check(text: &str) -> Result<(), String>`**
   (build checks, tests) whether text is a valid manifest: Err names the first bad line
 
+### `plat/sandbox.rs`
+
+Source: [`lib/plat/sandbox.rs`](../lib/plat/sandbox.rs)
+
+```text
+sandbox -- OS-level confinement that mirrors the permission manifest (docs/PERMISSIONS.md
+"OS sandbox"), as defence in depth for the in-process policy (policy.rs): a bug or native
+code can bypass `plat`, the kernel cannot be bypassed.  Opt in with a `sandbox` (best effort)
+or `sandbox strict` (refuse to start when the OS cannot enforce it) line in the manifest.
+
+  apply()          install the sandbox for the active policy, once, at start-up (boot.rs,
+                   before the app's own code runs); nothing without a `sandbox` line
+  status() -> Status   what was applied (tests, a diagnostics page)
+
+Linux: Landlock restricts the filesystem to the folders the manifest grants plus the system
+paths the library reads (ABI detected, best effort on older kernels), and TCP bind / connect
+to the manifest's ports (ABI 4+); seccomp-bpf denies a list of dangerous syscalls (ptrace,
+process_vm_*, kexec, module loading, mount, bpf, perf_event_open, userfaultfd, keyctl ...)
+and execve when no program is allowed.  Windows: process mitigation policies (image load,
+extension points, dynamic code; strict adds strict handle checks and child-process
+creation).  The browser and Android have no such API; apply() does nothing there.
+```
+
+- **`struct Status`**
+  what [`apply`] installed (the fields not relevant to this OS stay false / -1)
+  - `level: u8` -- 0 none, 1 `sandbox`, 2 `sandbox strict`
+  - `landlock_abi: i32` -- Linux: the Landlock ABI the kernel reports (-1 = no Landlock)
+  - `landlock_fs: bool` -- Linux: the filesystem ruleset is enforced
+  - `landlock_net: bool` -- Linux: TCP bind / connect is restricted (Landlock ABI 4+)
+  - `seccomp: bool` -- Linux: the seccomp filter is installed
+  - `exec_denied: bool` -- execve is denied (no program allowed): Linux seccomp, Windows child-process policy
+  - `win_mitigations: bool` -- Windows: the process mitigation policies were set
+  - `win_dynamic_code: bool` -- Windows: dynamic code is prohibited (no native plugins)
+
+**`impl Status`**
+
+- **`const NONE: Status = Status { level: 0, landlock_abi: -1, landlock_fs: false, ...`**
+  nothing applied
+
+- **`fn apply()`** *(Linux)*
+  install the OS sandbox the active policy asks for (nothing without a `sandbox` line); call
+  once, before the app's own code and before any worker thread is started
+
+- **`fn apply()`** *(Windows)*
+  install the OS sandbox the active policy asks for (nothing without a `sandbox` line)
+
+- **`fn apply()`**
+  the browser and Android have no such API
+
+- **`fn status() -> Status`**
+  what [`apply`] installed
+
+- **`fn status() -> Status`**
+  the browser and Android install nothing
+
 ### `plat/boot.rs`
 
 Source: [`lib/plat/boot.rs`](../lib/plat/boot.rs)
@@ -16954,7 +17206,8 @@ own code runs (docs/PERMISSIONS.md, docs/VFS.md)
                           paths on the command line are the user's (read + write, folders
                           with everything below; a local file:// URI as its path); without
                           a manifest the process's key (policy::take_key: it answers the
-                          questions of agent actions)
+                          questions of agent actions).  A `sandbox` line then hands the
+                          manifest to the OS as well (sandbox::apply)
 
 ui::main! calls name_and_assets and permissions itself (ui::boot, with the user's languages
 in between) and keeps the key; rt::main! programs drop it, so their code cannot widen the
@@ -18086,6 +18339,11 @@ as .oga / .ogg / .wav, the theme of org.gnome.desktop.sound, only while its even
 are on), Android the notification sound and ToneGenerator beeps, the browser short generated
 tones (as Linux without a theme).  jfgui_AUDIO_DRYRUN=1 / set_dry_run: sound() only prints
 "sound: NAME".
+
+Permissions: an app with a manifest needs `audio.output` (policy.rs, docs/PERMISSIONS.md) for
+every sound: open / open_fill / play / play_file give AudioError::Denied, sound() false
+(also in a dry run), available() false; the refusal is recorded once per run as
+"PERMDENY audio.output".
 ```
 
 ```rust
@@ -18110,6 +18368,7 @@ SOUND_NOTIFY: u32 = 5
   - `Format` -- not a sound file read here (WAV PCM / float, Ogg Vorbis) or a damaged one
   - `Io` -- the file could not be read
   - `Failed(i32)` -- the system refused (its code: an HRESULT, a PulseAudio error, an AAudio result)
+  - `Denied` -- the app's permissions lack `audio.output`
 
 - **`enum State`**
   what a stream does
@@ -18226,10 +18485,10 @@ SOUND_NOTIFY: u32 = 5
 
 - **`fn play(s: &Sound) -> Result<Voice, AudioError>`**
   play a sound once, mixed with the other sounds of play() (dropping the Voice lets it play
-  on) -> Err(Unavailable) without an output
+  on) -> Err(Unavailable) without an output, Err(Denied) without `audio.output`
 
 - **`fn play_file(path: &str) -> Result<Voice, AudioError>`**
-  play a WAV or Ogg Vorbis file once (see play)
+  play a WAV or Ogg Vorbis file once (see play; without `audio.output` the file is not read)
 
 - **`fn set_dry_run(on: bool)`**
   true: sound() only prints "sound: NAME" (headless runs; also jfgui_AUDIO_DRYRUN=1)
@@ -18240,14 +18499,15 @@ SOUND_NOTIFY: u32 = 5
 
 - **`fn sound(kind: u32) -> bool`**
   the system's sound for an event (SOUND_\*) -> false: nothing played (unknown kind, sounds
-  switched off by the system, no output)
+  switched off by the system, no output, no `audio.output`)
 
 - **`fn dialog_sounds() -> bool`**
   whether message dialogs play the system's sound when they open (Windows like MessageBox;
   Linux desktops while event sounds are on; not Android, not the browser)
 
 - **`fn available() -> bool`**
-  an output device / sound service exists here (a quick probe)
+  an output device / sound service exists here (a quick probe; false without `audio.output`,
+  nothing recorded)
 
 - **`fn level(samples: &[f32], channels: usize, ch: usize, rate: u32, freq: f32) -> f32`**
   (tests) the amplitude of the sine at freq in channel ch of interleaved frames (Goertzel,
@@ -22726,6 +22986,8 @@ ini -- settings files: UTF-8 "[section]" / "key=value" text              [src/co
   ini.remove(sec, key) -> bool
   ini.section(sec) -> Vec<(&str, &str)>   the keys of a section and their values, in order
   ini.sections() -> Vec<&str>   the section names in file order (each once; not "")
+  ini.items() -> Vec<Item>      headers, keys and malformed lines with their line numbers
+                                (files that are checked: a theme names a mistake's line)
 
 Format: one entry per line; sec "" = the keys before the first [section].  Section and
 key names compare ASCII case-insensitively; values are stored as written (blanks around
@@ -22744,6 +23006,12 @@ a blank (set -> false).  CR / LF inside a value are written as blanks.
 - **`struct Ini`**
   a settings object (one thread at a time)
 
+- **`enum Item<'a>`**
+  a line of the file as Ini::items lists it (line numbers from 1)
+  - `Section { line: usize, name: &'a str }` -- a "[name]" header
+  - `Key { line: usize, sec: &'a str, key: &'a str, value: &'a str }` -- "key = value" of section sec ("" before the first header)
+  - `Bad { line: usize, text: &'a [u8] }` -- neither blank, a comment, a header nor a key (or not UTF-8)
+
 **`impl Ini`**
 
 - **`fn new() -> Ini`**
@@ -22761,6 +23029,9 @@ a blank (set -> false).  CR / LF inside a value are written as blanks.
 - **`fn sections(&self) -> Vec<&str>`**
   the names of the sections in file order, each once (names that are not UTF-8 are left
   out; the keys before the first header are not a section here)
+- **`fn items(&self) -> Vec<Item<'_>>`**
+  every header, key and malformed line in file order with its line number; blank lines
+  and comments are left out
 - **`fn get(&self, sec: &str, key: &str) -> Option<&str>`**
   the value, or None when missing or not UTF-8  [ini_get]
 - **`fn get_bytes(&self, sec: &str, key: &str) -> Option<&[u8]>`**
