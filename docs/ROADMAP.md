@@ -879,13 +879,17 @@ Fensterrand hinaus.
   ([`base/hashring.rs`](../lib/base/hashring.rs)) und eine LRU-Tabelle nach Anzahl und Gewicht
   ([`base/lru.rs`](../lib/base/lru.rs); Gruppen `hashring`, `lru`), im Einsatz im
   Loadbalancer, KV-Speicher und Cache des Labors von JFNetworker. Es fehlen: ICMPv6/NDP, STP,
-  RIP, OSPF – sie kommen mit den Meilensteinen des Simulators. Dazu typisiertes JSON
+  OSPF – sie kommen mit den Meilensteinen des Simulators. Dazu typisiertes JSON
   ([`agent_core/src/jmap.rs`](../lib/agent_core/src/jmap.rs): `record!`, `wire_enum!`, aus
   BackupCraft in die Library gezogen; `bc_proto` nutzt es mit) und eingerücktes JSON für
   Dateien (`json::stringify_pretty`), getestet mit der coretest-Gruppe `jmap`.
   Seit D2 fasst `Window::hist_between` die Slots eines Zeitraums zu einem Histogramm zusammen
   (die Zeitreihen des Labors von JFNetworker: ein Punkt pro Intervall, Perzentile beliebiger
   Zeiträume; Gruppe `metrics`).
+  Seit R2 auch RIP ([`netpkt/rip.rs`](../lib/netpkt/rip.rs): Version 2 nach RFC 2453 und 1 nach
+  RFC 1058, Requests und Antworten mit ihren Einträgen, der Authentifizierungs-Eintrag erkannt,
+  Dissektor mit den Problemen, die ein Empfänger ablehnt; Gruppe `rip`), im Einsatz in den
+  Routern und L3-Switches von JFNetworker.
 - **P2** · *erledigt* · Style `netlab` ([`styles/netlab`](../styles/netlab)) für JFNetworker:
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene

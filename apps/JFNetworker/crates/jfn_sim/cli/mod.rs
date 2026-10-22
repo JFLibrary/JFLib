@@ -28,6 +28,9 @@
 //            mode), "ip dhcp excluded-address", "ip helper-address", show ip dhcp binding|
 //            pool|conflict, clear ip dhcp, "ntp server", "ntp master"; dhclient and cat
 //            /etc/resolv.conf on the shell
+//   rip      RIP at the IOS-like command line: "router rip" (its own mode), "ip rip send|receive
+//            version", show ip rip database, show ip protocols, the R routes of show ip route,
+//            debug ip rip, clear ip route *, the lines of the running configuration
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -61,10 +64,13 @@ pub mod print;
 pub mod tools;
 pub mod lab;
 pub mod scripts;
+pub mod rip;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
 pub const D_ARP: u32 = 2;
+/// "debug ip rip" (a bit of its own, away from the low ones other protocols take)
+pub const D_RIP: u32 = 0x100;
 
 /// where an IOS console is
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,6 +86,8 @@ pub enum Mode {
     Out,
     /// "ip dhcp pool NAME": "(dhcp-config)#"
     DhcpPool,
+    /// "router rip": "(config-router)#"
+    Router,
 }
 
 /// how an interface's address was set ("show ip interface brief", column Method)
@@ -240,6 +248,7 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
     match n {
         Note::LinkUp { .. } | Note::LinkDown { .. } => true,
         Note::ArpRequest { .. } | Note::ArpReply { .. } | Note::ArpLearned { .. } | Note::ArpProxied { .. } | Note::EchoAnswered { .. } | Note::IcmpSent { .. } | Note::IpLocal { .. } => c.debug > 0,
+        n if n.is_rip() => c.debug > 0,
         _ => false,
     }
 }

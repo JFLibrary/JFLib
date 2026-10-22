@@ -867,3 +867,6 @@ Wiederherstellen|Fehler	Restore
 Alle wiederherstellen ({})	Restore all ({})
 Die Dauer ist eine Zahl von Sekunden (größer als 0, höchstens ein Tag), z. B. 10 oder 2,5; leer: bis zum Wiederherstellen.	The duration is a number of seconds (greater than 0, at most a day), e.g. 10 or 2.5; empty: until restored.
 Fehler|Zeitleiste	Faults
+
+# RIP (R2): the kind of the service in the Dienste tab and the Metriken panel
+Routing (RIP)	Routing (RIP)

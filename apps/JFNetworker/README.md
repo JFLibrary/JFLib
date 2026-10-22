@@ -49,6 +49,12 @@ Queues, Lastgeneratoren, eigene Skripte).
   Prüfung beim Tippen und den Fehlern des laufenden Programms an ihrer Zeile, Ausführen,
   Stoppen, Übernehmen als Rückgängig-Schritt (das Skript behält Disk und Zahlen), Ausgabe und
   Fehler des Laufs, Vorlagen (siehe [Skript-Editor](#skript-editor)).
+- **Routing mit RIP (R2):** Router und L3-Switches sprechen RIPv2 nach RFC 2453 (Version 1 nach
+  RFC 1058, wo eingestellt): `router rip` mit `network`, `passive-interface`,
+  `default-information originate`, `redistribute`, `timers basic`, `distance` und
+  `maximum-paths`; periodische und ausgelöste Updates, Split Horizon mit Poisoned Reverse,
+  Timeout, Garbage Collection und Holddown, gleich gute Wege; `show ip rip database`, `show ip
+  protocols`, `debug ip rip` (siehe [Routing mit RIP](#routing-mit-rip)).
 
 ## Bedienung
 
@@ -147,6 +153,7 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `faults.uis` | Fehler aus dem Inspektor auf `lab_window.jfnet`: Strom aus, Rückgängig und Wiederholen, Wiederherstellen und Alle wiederherstellen samt Rückgängig, ein Dienst für 2 s, die Disk, ein Kabel gezogen und verschlechtert, eine Partition, Ablehnungen, das Projekt bleibt gespeichert, die Spur „Fehler“ der Zeitleiste und der Fehler als Bereich im Diagramm von LB1 |
 | `lab_shots.uis` | die Bild-Matrix des Labors (Zeichenfläche mit Pillen und Sparklines, Fehlerkarte, Metriken) hell und dunkel mit 100 und 150 % |
 | `model.uis`, Gruppe `labui` | was das Labor im Fenster braucht: die Texte des Labors als Meldungen mit Englisch (Statuszeilen, Disk, jede Art von Fehler, ihre Ereignisse), KPIs vergangener Zeiträume, die Tabellen des Bereichs Metriken, Pillen und Sparklines, Fehler als Rückgängig-Schritte samt gespeichertem Zustand |
+| `model.uis`, Gruppe `rip` | RIP (siehe [Routing mit RIP](#routing-mit-rip)): der erste Austausch auf die Nanosekunde (Request, Update ohne das Netz des Interfaces, die Antwort, die das IOS-artige ARP verliert), Konvergenz und Metriken über zwei Hops, periodische Updates mit Zufallsversatz und ausgelöste mit ihrer Pause, Split Horizon mit Poisoned Reverse auf dem Kabel, ein gezogenes Kabel (ausgelöstes Update mit Metrik 16, Holddown, Garbage Collection nach 120 s), ein schweigender Nachbar (Timeout nach 180 s, gelöscht nach 300 s), passive Interfaces, Distanzen gegen statische Routen, gleich gute Wege (ein Weg je Ziel, `maximum-paths`), Version 1 neben 2, `auto-summary`, Standardroute und Redistribution, RIP auf dem VLAN-Interface eines L3-Switches, die Befehlszeile (Modus, Hilfe, `show`, `debug`, `clear`, die Running-Config als Startkonfiguration), Strom, die Texte auf Deutsch und Englisch, Determinismus |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -176,7 +183,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 
 | Teil | Ort | Inhalt |
 |---|---|---|
-| Pakete | [`lib/netpkt`](../../lib/netpkt/lib.rs) | Adressen, Prüfsummen, Codecs von Ethernet bis TCP, DHCP, DNS, NTP, Syslog, HTTP/1.1 (inkrementell, [`http.rs`](../../lib/netpkt/http.rs)), Dissektor, pcapng (Library, ohne I/O) |
+| Pakete | [`lib/netpkt`](../../lib/netpkt/lib.rs) | Adressen, Prüfsummen, Codecs von Ethernet bis TCP, DHCP, DNS, NTP, Syslog, HTTP/1.1 (inkrementell, [`http.rs`](../../lib/netpkt/http.rs)), RIP ([`rip.rs`](../../lib/netpkt/rip.rs)), Dissektor, pcapng (Library, ohne I/O) |
 | Metriken | [`lib/base/metrics.rs`](../../lib/base/metrics.rs) | Counter, Gauge, log-lineares Histogramm, Fenster 300 × 1 s für p50/p95/p99 |
 | Zufall | [`lib/base/rng.rs`](../../lib/base/rng.rs) | deterministische Zufallszahlen (PCG32) für reproduzierbare Läufe |
 | Befehlsbaum | [`lib/base/cmdtree.rs`](../../lib/base/cmdtree.rs) | IOS-artige Befehlszeilen: Abkürzungen, `?`, Tab, Modi, `no`, typisierte Parameter, Fehlerposition |
@@ -198,6 +205,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Skripte | [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs), [`cli/scripts.rs`](crates/jfn_sim/cli/scripts.rs), [`src/scripttest.rs`](src/scripttest.rs) | Skripte als Dienste in den Hosts: Host-API, Anweisungen als Rechenzeit, der Befehl `script`, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Labore | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/goal.rs`](crates/jfn_sim/goal.rs), [`src/workspace/task.rs`](src/workspace/task.rs), [`src/workspace/devwin/svcedit.rs`](src/workspace/devwin/svcedit.rs), [`assets/labs`](assets/labs), [`src/tasktest.rs`](src/tasktest.rs) | die Aufgabe eines Labors in der Projektdatei, das Urteil über eine Erwartung (Runner und Labor) und die Ziele über einen Lauf, das Panel „Aufgabe“ mit der Liste der Labore, die Einstellungen der Dienste als JSON, die vier Labore, ihr Selbsttest (siehe [Labore und Aufgaben](#labore-und-aufgaben)) |
 | Skript-Editor | [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | der Reiter Skripte des Gerätefensters, die Skripte eines Geräts im Projekt mit Rückgängig und Vorlagen, ihr Selbsttest (siehe [Skript-Editor](#skript-editor)) |
+| Routing | [`crates/jfn_sim/rip.rs`](crates/jfn_sim/rip.rs), [`cli/rip.rs`](crates/jfn_sim/cli/rip.rs), [`src/riptest.rs`](src/riptest.rs), [`lib/netpkt/rip.rs`](../../lib/netpkt/rip.rs) | RIP als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit RIP](#routing-mit-rip)) |
 
 ### Gerätekatalog
 
@@ -801,6 +809,10 @@ IOS-artige Befehlszeile:
   auf der Befehlszeile), `ip dhcp excluded-address`, `ip helper-address` an Interfaces,
   `show ip dhcp binding|pool|conflict`, `clear ip dhcp binding|conflict *|ADRESSE`,
   `ntp server`, `ntp master [STRATUM]`; alles steht in der Running-Config.
+- RIP ([`cli/rip.rs`](crates/jfn_sim/cli/rip.rs)): `router rip` mit eigenem Modus
+  `(config-router)#`, `ip rip send|receive version` an Interfaces, `show ip rip database`, `show
+  ip protocols`, `show ip route rip|connected|static`, `debug ip rip`, `clear ip route *` (siehe
+  [Routing mit RIP](#routing-mit-rip)).
 
 Hosts und Server haben eine Linux-Shell (`root@PC1:~#`): `ip addr|link|route|neigh` mit den
 Ausgaben und Fehlermeldungen von iproute2, `ping` wie iputils (bis Strg+C oder `-c`; `-i`,
@@ -939,6 +951,18 @@ Fünftel der CPU und warten kaum; bei 1500 pro Sekunde füllt sich die Warteschl
 darüber antwortet der Dienst sofort mit 503, und das 99. Perzentil steigt über 100 ms. Ein
 zweites Skript auf MON fragt jede Sekunde mit `http.request` nach den Zahlen; im Bericht stehen
 `script`, `script status`, `script output`, `top` und `curl`.
+
+Zwei Szenarien zeigen RIP (siehe [Routing mit RIP](#routing-mit-rip)). `rip_ring.scn` auf
+`fixtures/rip_ring.jfnet`: vier Router im Ring mit RIPv2 und einem PC hinter jedem; `debug ip
+rip` zeigt den ersten Austausch (Requests, die eigenen Tabellen, ausgelöste Updates mit Split
+Horizon), `show ip route` die Metriken und die zwei gleich guten Wege zu R3s LAN, `traceroute`
+einen davon; dann wird das Kabel R1–R2 gezogen: R1 und R2 halten die verlorenen Netze im
+Holddown (`show ip rip database`), ein Ping endet mit „Destination Net Unreachable“, und nach der
+Garbage Collection führt der Weg über R4 und R3 (`traceroute` mit fünf Hops). `rip_versions.scn`
+auf `fixtures/rip_versions.jfnet`: ein L3-Switch mit zwei VLANs, der RIPv2 nur auf seinem
+gerouteten Uplink spricht (`passive-interface default`), ein Router mit Standardroute, der zu
+einem alten Router Version 1 spricht (Broadcasts, Klassennetze ohne Maske), eine schwimmende
+statische Route, die einspringt, als die RIP-Route nach 180 s verfällt, und `clear ip route *`.
 
 ### Skripte in Hosts
 
@@ -1141,6 +1165,88 @@ deterministisch. Geprüft wird das in der Selbsttest-Gruppe `task`
 gelöst wie im Fenster (das Projekt geändert, der Simulator folgt ihm wie in `doc/sim.rs`), und
 in den Fensterskripten `task.uis`, `labs.uis` und `task_shots.uis`.
 
+### Routing mit RIP
+
+Router, L3-Switches und die Firewall sprechen RIP ([`rip.rs`](crates/jfn_sim/rip.rs)): Version 2
+nach RFC 2453, Version 1 nach RFC 1058 auf Interfaces, die so eingestellt sind. RIP ist ein
+Dienst des Geräts („rip“; im Gerätefenster unter Dienste mit Statuszeile und Zahlen: Routen,
+gelernte, Nachbarn, Updates, ausgelöste, Timeouts …), den die Befehlszeile einrichtet. Er läuft
+auf virtueller Zeit mit den Zufallszahlen des Geräts, gleiche Projekte ergeben gleiche Läufe.
+
+- **Einrichten** ([`cli/rip.rs`](crates/jfn_sim/cli/rip.rs)): `router rip` öffnet den Modus
+  `(config-router)#` mit `version 1|2`, `network A.B.C.D` (gespeichert als Klasse-A/B/C-Netz;
+  RIP läuft auf jedem Interface, dessen primäre Adresse darin liegt), `passive-interface
+  IF|default` (das Interface hört zu, sendet aber nichts; mit `default` alle außer denen mit `no
+  passive-interface`), `[no] auto-summary`, `default-information originate`, `redistribute
+  connected|static [metric N]` (statische Routen erst, wenn sie im RIB gewinnen), `timers basic`,
+  `distance`, `maximum-paths`; an Interfaces `ip rip send|receive version 1|2|1 2`. Ein
+  L3-Switch braucht `ip routing` (sonst `% IP routing not enabled`), `no ip routing` und `no
+  router rip` nehmen den Prozess mit (die Einstellungen der Interfaces bleiben). Alles steht in
+  der Running-Config und kommt beim Start durch dieselbe Befehlszeile zurück.
+- **Versionen:** ohne `version` sendet RIP Version 2 und nimmt 1 und 2; `version 2` nimmt nur 2,
+  `version 1` sendet und nimmt nur 1. Version 2 geht an 224.0.0.9 (die Interfaces treten der
+  Gruppe bei, andere Geräte verwerfen die Pakete mit einer Notiz), Version 1 an
+  255.255.255.255, beide mit TTL 1 vom Port 520 und der primären Adresse des Interfaces. Version
+  1 trägt keine Masken: Subnetze des Hauptnetzes des Interfaces gehen nur mit dessen Maske
+  hinaus, andere Hauptnetze als Klassennetz; der Empfänger nimmt die Maske seines Interfaces im
+  selben Hauptnetz, sonst die der Klasse, und Host-Routen, wo Host-Bits gesetzt sind. Version 2
+  fasst nur mit `auto-summary` an Klassengrenzen zusammen (aus wie bei IOS 15). Eine
+  Version-1-Anfrage beantwortet ein Interface, das nur Version 2 sendet, nicht (RFC 2453 4.6).
+- **Metriken nach RFC 2453:** Ein angeschlossenes Netz kostet 1, jede empfangene Metrik bekommt
+  1 dazu, 16 ist unerreichbar. Ein Router sieht das LAN seines Nachbarn also als `[120/2]` (wie
+  FRR; IOS zählt die 1 beim Senden dazu und zeigt dort 1 – auf der Leitung stehen dieselben
+  Zahlen, nur eine mit 15 empfangene Route ist hier unerreichbar). Im RIB haben RIP-Routen die
+  Distanz 120 (`distance`): eine statische Route (1) gewinnt, eine schwimmende (z. B. 200)
+  springt ein, wenn RIP die Route verliert.
+- **Updates:** Beim Start und wenn ein Interface zu senden beginnt (es kommt hoch, ist nicht mehr
+  passiv, sendet andere Versionen), fragt RIP dort nach der ganzen Tabelle und schickt die
+  eigene. Danach alle 30 s, jedes Mal mit einem zufälligen Versatz von bis zu einem Sechstel
+  (RFC: ±5 s). Änderungen gehen sofort als ausgelöstes Update hinaus, nur die geänderten Routen;
+  danach wartet RIP zufällig 1 bis 5 s, was in der Zeit geändert wird, geht gesammelt, und ein
+  fälliges reguläres Update ersetzt es (RFC 2453 3.10.1). Höchstens 25 Einträge je Nachricht.
+  Split Horizon mit Poisoned Reverse: Was über ein Interface gelernt wurde, geht dort mit Metrik
+  16 zurück; die eigenen Netze eines Interfaces meldet RIP dort gar nicht. Antworten auf einen
+  Request gehen an den Fragenden (Unicast, das IOS-artige ARP verliert die erste).
+- **Timer** (`timers basic 30 180 180 300`): Eine Route, die 180 s lang niemand bestätigt,
+  verfällt; sie wird mit Metrik 16 gemeldet, bis 300 s nach ihrem letzten Update, dann gelöscht –
+  das sind die 120 s Garbage Collection des RFC. Meldet der nächste Hop 16 oder fällt das
+  Interface aus, beginnt das sofort. Der **Holddown** ist das, was IOS-artige Geräte dazu tun
+  (RFC 2453 kennt ihn nicht): 180 s lang nach dem Verlust nimmt RIP von anderen Routern nur
+  Angebote mit besserer Metrik als zuvor an, der Router, von dem die Route kam, darf sie
+  zurückbringen, und eine gelöschte Route ist wieder neu. In einem Ring kommt eine verlorene
+  Route deshalb erst nach der Garbage Collection über die andere Seite zurück; mit einer 0 an
+  der Stelle des Holddowns gilt nur das RFC. Ein Router, der so lange schweigt wie die
+  Flush-Zeit oder hinter einem ausgefallenen Interface liegt, ist keine Quelle mehr.
+- **Gleich gute Wege:** Bis zu `maximum-paths` (4) Router mit derselben besten Metrik geben je
+  eine Route ins RIB; weitergeleitet wird je Zieladresse über einen davon, immer denselben
+  ([`ip.rs`](crates/jfn_sim/ip.rs): `ecmp_pick`). Fällt einer weg, bleiben die anderen, ohne
+  Holddown.
+- **Eingang** (RFC 2453 3.9): Antworten vom Port 520, von einem Nachbarn in einem Netz des
+  Interfaces, nicht von einer eigenen Adresse; Version 1 mit gesetzten Null-Feldern,
+  authentifizierte Nachrichten (Authentifizierung ist nicht einstellbar, RFC 2453 5.2),
+  Nachrichten auf Interfaces ohne RIP und Einträge mit falscher Metrik oder Adresse werden mit
+  ihrem Grund ignoriert. Passive Interfaces beantworten keine Requests.
+- **Anzeigen:** `show ip route [rip|connected|static]` mit dem Code R, `[120/Metrik]`, dem Alter
+  des letzten Updates und dem Interface (die Legende nennt R nur auf Geräten mit RIP), `show ip
+  rip database` (eigene Netze, gelernte Wege, Unerreichbares mit Holddown und Löschzeit,
+  Zusammenfassungen), `show ip protocols` (Timer, Versionen je Interface, Netze, passive
+  Interfaces, Quellen mit dem Alter ihres letzten Updates, Distanz), `debug ip rip` (jedes
+  Update mit seinen Routen und jede Entscheidung, in eigenen Worten), `clear ip route *` (vergisst
+  die gelernten Routen und fragt die Nachbarn neu).
+- **Ereignisse:** Jede Entscheidung – Request, Update gesendet und empfangen samt der per Split
+  Horizon vergifteten Routen, Route gelernt, geändert, ein weiterer gleich guter Weg, verloren,
+  im Holddown abgewiesen, gelöscht, eigene Netze, ignorierte Nachrichten mit ihrem Grund – steht
+  mit deutschem Text in der Ereignisliste und im Paket-Tab. Der Simulationsmodus zeigt
+  RIP-Rahmen braun (Filter „OSPF/RIP“), der Paket-Tab zerlegt sie mit jedem Eintrag
+  ([`netpkt::rip`](../../lib/netpkt/rip.rs), [`decode.rs`](../../lib/netpkt/decode.rs)).
+
+Für Programme: `Action::Rip { dev, set: RipSet }` (`Process`, `Version`, `Network`, `Passive`,
+`AutoSummary`, `DefaultOriginate`, `Redistribute`, `Timers`, `Distance`, `MaxPaths`,
+`IfVersions`, `Clear`) und `Engine::rip(dev)` mit `cfg`, `table()`, `ifaces()`, `sources()`,
+`next_update()` und `age()`. Geprüft wird RIP in der Selbsttest-Gruppe `rip`
+([`src/riptest.rs`](src/riptest.rs)) und in den Szenarien `rip_ring.scn` und
+`rip_versions.scn` (siehe [Szenarien](#szenarien-scn)).
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -1206,7 +1312,7 @@ Geste).
 | Phase | Meilensteine |
 |---|---|
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
-| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · NAT/ACL, RIP, OSPF, STP, IPv6 · Liniendiagramm und Code-Editor |
+| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · NAT/ACL, R2 RIP ✓, OSPF, STP, IPv6 · Liniendiagramm und Code-Editor |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
 | 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 

@@ -9,7 +9,8 @@
 //   Note::layer()                                 1 cable, 2 bridge and ARP, 3 IPv4, 4 UDP/TCP,
 //                                                 7 services (DHCP, DNS, syslog, NTP); TCP's
 //                                                 states and decisions are layer 4 (tcp.rs),
-//                                                 HTTP's layer 7 (http.rs, httpsvc.rs)
+//                                                 HTTP's layer 7 (http.rs, httpsvc.rs), and so
+//                                                 are RIP's (rip.rs: Note::is_rip)
 //   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
 //                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
@@ -38,6 +39,7 @@ use netpkt::{Ipv4, Mac, Prefix4};
 
 use crate::kernel::{Frame, Ns};
 use crate::resolver::LookupErr;
+use crate::rip::{RipDrop, RipHow, RipLoss, RipOut};
 use crate::tcp::{RstWhy, TcpEnd, TcpState};
 
 pub type HopId = u64;
@@ -316,6 +318,34 @@ pub enum Note {
     ScriptBusy { svc: String, waiting: u32 },
     ScriptDropped { svc: String },
     ScriptError { svc: String, line: u32, col: u32, msg: String },
+    /// RIP (rip.rs; `iface` is an IPv4 interface): a request for the whole table went out
+    RipRequest { iface: u16, ver: u8 },
+    /// a request arrived and is answered (for the whole table, or for single routes)
+    RipAsked { from: Ipv4, iface: u16, whole: bool },
+    /// an update went out (its routes with the metrics sent, how many split horizon poisoned)
+    RipSent { iface: u16, ver: u8, to: Ipv4, kind: RipOut, routes: Vec<(Prefix4, u8)>, poisoned: u16 },
+    /// an update arrived and is taken (its routes with the metrics as sent)
+    RipHeard { from: Ipv4, iface: u16, ver: u8, routes: Vec<(Prefix4, u8)> },
+    /// a message was ignored, or an entry of an update
+    RipIgnored { from: Ipv4, iface: u16, why: RipDrop },
+    RipBadEntry { from: Ipv4, addr: Ipv4, metric: u32 },
+    /// the table: a route learned, changed, one more equal-cost path
+    RipLearned { prefix: Prefix4, via: Ipv4, metric: u8 },
+    RipChanged { prefix: Prefix4, via: Ipv4, metric: u8, old: u8 },
+    RipPathAdded { prefix: Prefix4, via: Ipv4, metric: u8 },
+    /// a route lost its last path: unreachable (metric 16) until the garbage collection; a path
+    /// of several lost
+    RipDown { prefix: Prefix4, via: Ipv4, why: RipLoss },
+    RipPathGone { prefix: Prefix4, via: Ipv4, why: RipLoss },
+    /// held down: an offer no better than the route was is ignored
+    RipHeld { prefix: Prefix4, from: Ipv4, metric: u8 },
+    /// the garbage collection removed a route
+    RipFlushed { prefix: Prefix4 },
+    /// a network of the device itself is advertised now / no longer
+    RipLocal { prefix: Prefix4, how: RipHow },
+    RipLocalGone { prefix: Prefix4 },
+    /// IPv4: a multicast packet for a group no interface here listens to
+    IpGroupIgnored { dst: Ipv4 },
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -432,8 +462,31 @@ impl Note {
             Note::PartitionDrop { .. } => 3,
             n if n.is_lab() => 7,
             Note::ScriptBusy { .. } | Note::ScriptDropped { .. } | Note::ScriptError { .. } => 7,
+            n if n.is_rip() => 7,
+            Note::IpGroupIgnored { .. } => 3,
             _ => 2,
         }
+    }
+    /// a decision of RIP (rip.rs)
+    pub fn is_rip(&self) -> bool {
+        matches!(
+            self,
+            Note::RipRequest { .. }
+                | Note::RipAsked { .. }
+                | Note::RipSent { .. }
+                | Note::RipHeard { .. }
+                | Note::RipIgnored { .. }
+                | Note::RipBadEntry { .. }
+                | Note::RipLearned { .. }
+                | Note::RipChanged { .. }
+                | Note::RipPathAdded { .. }
+                | Note::RipDown { .. }
+                | Note::RipPathGone { .. }
+                | Note::RipHeld { .. }
+                | Note::RipFlushed { .. }
+                | Note::RipLocal { .. }
+                | Note::RipLocalGone { .. }
+        )
     }
     /// a decision of the lab's services (lb.rs, kv.rs, cache.rs, mq.rs)
     pub fn is_lab(&self) -> bool {
@@ -517,6 +570,8 @@ impl Note {
                 | Note::DiskFull
                 | Note::MqDead { .. }
                 | Note::ScriptDropped { .. }
+                | Note::RipIgnored { .. }
+                | Note::IpGroupIgnored { .. }
         )
     }
     /// a TCP decision (tcp.rs)
@@ -805,6 +860,38 @@ impl Note {
             Note::ScriptBusy { svc, waiting } => msg!("Skript {} rechnet noch: das Ereignis wartet ({} vor ihm).", svc, waiting),
             Note::ScriptDropped { svc } => msg!("Skript {} überlastet: Datagramm verworfen.", svc),
             Note::ScriptError { svc, line, col, msg: text } => msg!("Skript {}: Fehler in Zeile {}, Spalte {}: {}", svc, line, col, text),
+            Note::RipRequest { iface: i, ver } => msg!("RIP: fragt über {} nach der ganzen Tabelle (Request, Version {}).", iface(*i), ver),
+            Note::RipAsked { from, iface: i, whole } => {
+                if *whole {
+                    msg!("RIP: {} fragt über {} nach der ganzen Tabelle: Antwort folgt.", from, iface(*i))
+                } else {
+                    msg!("RIP: {} fragt über {} nach einzelnen Routen: Antwort folgt.", from, iface(*i))
+                }
+            }
+            Note::RipSent { iface: i, ver, to, kind, routes, poisoned } => {
+                let n = routes.len();
+                match (kind, *poisoned) {
+                    (RipOut::Regular, 0) => msg!("RIP: Update (Version {}) über {} an {}, Routen: {}.", ver, iface(*i), to, n),
+                    (RipOut::Regular, p) => msg!("RIP: Update (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.", ver, iface(*i), to, n, p),
+                    (RipOut::Triggered, 0) => msg!("RIP: ausgelöstes Update (Version {}) über {} an {}, Routen: {}.", ver, iface(*i), to, n),
+                    (RipOut::Triggered, p) => msg!("RIP: ausgelöstes Update (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.", ver, iface(*i), to, n, p),
+                    (RipOut::Answer, 0) => msg!("RIP: Antwort (Version {}) über {} an {}, Routen: {}.", ver, iface(*i), to, n),
+                    (RipOut::Answer, p) => msg!("RIP: Antwort (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.", ver, iface(*i), to, n, p),
+                }
+            }
+            Note::RipHeard { from, iface: i, ver, routes } => msg!("RIP: Update (Version {}) von {} über {}, Routen: {}.", ver, from, iface(*i), routes.len()),
+            Note::RipIgnored { from, iface: i, why } => msg!("RIP: Nachricht von {} über {} ignoriert: {}.", from, iface(*i), phrase(why.text())),
+            Note::RipBadEntry { from, addr, metric } => msg!("RIP: Eintrag {} mit Metrik {} von {} ist ungültig: ignoriert.", addr, metric, from),
+            Note::RipLearned { prefix, via, metric } => msg!("RIP: Route {} gelernt: über {}, Metrik {}.", prefix, via, metric),
+            Note::RipChanged { prefix, via, metric, old } => msg!("RIP: Route {} jetzt über {}, Metrik {} (vorher {}).", prefix, via, metric, old),
+            Note::RipPathAdded { prefix, via, metric } => msg!("RIP: ein weiterer gleich guter Weg zu {} über {} (Metrik {}).", prefix, via, metric),
+            Note::RipDown { prefix, via, why } => msg!("RIP: {} über {} ist weg ({}): unerreichbar, wird mit Metrik 16 gemeldet.", prefix, via, why.msg()),
+            Note::RipPathGone { prefix, via, why } => msg!("RIP: der Weg zu {} über {} entfällt ({}); gleich gute Wege bleiben.", prefix, via, why.msg()),
+            Note::RipHeld { prefix, from, metric } => msg!("RIP: {} im Holddown: das Angebot von {} mit Metrik {} wird ignoriert.", prefix, from, metric),
+            Note::RipFlushed { prefix } => msg!("RIP: {} aus der Tabelle gelöscht (Garbage Collection abgelaufen).", prefix),
+            Note::RipLocal { prefix, how } => msg!("RIP: meldet {} ({}).", prefix, phrase(how.text())),
+            Note::RipLocalGone { prefix } => msg!("RIP: {} gibt es hier nicht mehr: wird mit Metrik 16 gemeldet.", prefix),
+            Note::IpGroupIgnored { dst } => msg!("Multicast an {} verworfen: kein Interface hört auf diese Gruppe.", dst),
         }
     }
 }
@@ -1128,6 +1215,8 @@ impl Note {
             Note::KvMember { .. } => P_IPV4 | P_UDP,
             Note::DiskFull => 0,
             n if n.is_lab() => P_IPV4 | P_TCP | netpkt::decode::P_HTTP,
+            n if n.is_rip() => P_IPV4 | P_UDP | netpkt::decode::P_RIP,
+            Note::IpGroupIgnored { .. } => P_IPV4,
             _ => 0,
         }
     }

@@ -73,6 +73,10 @@
 //            charts, values over a span for scenarios, CSV
 //   goal     an expectation against the engine now (judge: the runner's and the lab's, with a
 //            report line and a reason as a Msg); LabRun: a lab's goals over a run
+//   rip      RIP (RFC 2453, version 1 after RFC 1058) as the service "rip" of IOS-like routers
+//            and L3 switches: requests, periodic and triggered updates, split horizon with
+//            poisoned reverse, timeout, garbage collection, holddown, equal-cost paths; its
+//            routes in the RIB with distance 120; RipCfg / RipSet (Action::Rip)
 //
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
@@ -127,6 +131,7 @@ pub mod mq;
 pub mod scriptsvc;
 pub mod series;
 pub mod goal;
+pub mod rip;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -167,3 +172,4 @@ pub use mq::{Queue, QueueView, SlotState, TopicView, Worker, WorkerView};
 pub use scriptsvc::{ScriptCfg, ScriptErr, ScriptService, ScriptState, ScriptView};
 pub use series::{AggOut, Kpi, LatStat, LatWindow, MetricKind, SeriesCfg, SeriesErr, SeriesKind, SeriesView, ShardLoad, SvcSeries, Unit};
 pub use goal::{judge, Found, GoalRun, LabRun, Verdict};
+pub use rip::{Redist, Rip, RipCfg, RipDrop, RipHow, RipLoss, RipOut, RipSet, RipTimers};
