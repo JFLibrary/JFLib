@@ -101,6 +101,10 @@
 //            refresh, SPF per area, inter-area routes over an ABR, AS-external routes
 //            (redistribution, default route); its routes in the RIB with distance 110;
 //            OspfCfg / OspfSet (Action::Ospf)
+//   assess   the grading of an assessment (A1): its items against a project and its engine
+//            (points, a percentage, what each item found), config lines normalised on a
+//            scratch device; for authors the network captured as a target, the target's
+//            settings as candidate items, the start network without what the items check
 //
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
@@ -171,6 +175,7 @@ pub mod l3v6;
 pub mod jobs6;
 pub mod trace6;
 pub mod ospf;
+pub mod assess;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -222,3 +227,4 @@ pub use trace6::{Note6, RaWhy};
 pub use ospf::{IfState, LsaDrop, LsaRef, LsuWhy, NbrEvent, NbrState, NetType, OrigWhy, Ospf, OspfCfg, OspfDrop, OspfSet, RtChange, RtKind};
 pub use resolver::Family;
 pub use os::{ANY, ANY4};
+pub use assess::{Cand, Graded, Grader, Lines, Score};

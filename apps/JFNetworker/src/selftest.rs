@@ -26,6 +26,8 @@
 // ospftest.rs: OSPF version 2 on routers and L3 switches (group ospf: jfn_sim::ospf, cli/ospf.rs).
 // ipv6tcptest.rs: UDP and TCP over IPv6 and what uses them (group ipv6tcp: jfn_sim::os, tcp,
 // resolver, the services, cli/tools.rs, cli/names.rs).
+// assesstest.rs: assessments (group assess: jfn_model::lab's Assess and items, jfn_sim::assess,
+// the reach expectation, the Aufgabe panel's run, authoring, the samples of assets/assess).
 
 use alloc::format;
 use alloc::string::String;
@@ -79,9 +81,11 @@ mod ipv6test;
 mod ospftest;
 #[path = "ipv6tcptest.rs"]
 mod ipv6tcptest;
+#[path = "assesstest.rs"]
+mod assesstest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 31] = [
+    let groups: [(&'static str, fn(&mut T)); 32] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -113,6 +117,7 @@ pub fn run() -> i32 {
         ("ipv6", ipv6test::run),
         ("ospf", ospftest::run),
         ("ipv6tcp", ipv6tcptest::run),
+        ("assess", assesstest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

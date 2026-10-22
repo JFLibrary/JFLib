@@ -1,0 +1,145 @@
+#!args --verify-dirty
+# assessments in the Aufgabe panel (A1, workspace/assess.rs) with the samples of assets/assess:
+# the list of labs with them; "Ein Router für zwei Netze" (each item right or wrong): the score
+# card, "Prüfen" with what each item found, R1 named and set up in its console in two steps (7,
+# then 20 of 20 points), undo of the name costs its points, redo brings them back; "Statische
+# Routen über drei Router" (nothing until handed in, 15 minutes): no items, the countdown, one
+# route, "Jetzt abgeben?" cancelled and answered, then the final grade with every item;
+# "VLANs und ein Trunk zum Router" (the score only): the score while working, handed in early
+# with the small button.  Ids: 49153 "Prüfen" / "Abgeben" of the card, 63810 "Abgeben" beside
+# the time, 63824 + i the items.
+size 1280 800
+theme light
+# ---- the list has the assessments after the labs, with their points
+cmd 300
+expect dialog:"Labor öffnen" exists
+expect text:"Campus: ein VLAN für die Studierenden" exists
+expect text:"20 Punkte · Den neuen Router benennen und seine zwei Interfaces einrichten, bis die PCs zueinander finden." exists
+expect text:"Statische Routen über drei Router" exists
+click text:"Ein Router für zwei Netze"
+click button:"Öffnen"
+expect dialog:"Labor öffnen" missing
+# ---- the card and the items, nothing reached yet
+expect text:"Netzwerk · 20 Punkte" exists
+expect text:"0 von 20 Punkten · 0 %" exists
+expect #63824 unchecked
+expect #63830 unchecked
+expect text:"Der Router heißt R1" exists
+expect text:"PC2 erreicht das Gateway von PC1" exists
+expect text:"heißt Router1" missing
+# "Prüfen": what each item found
+click button:"Prüfen"
+expect text:"heißt Router1" exists
+expect text:"PC1 reaches 10.0.2.10: keine Antwort: keine Route zum Ziel" exists
+shot build/jfnetworker/assess_checked.png
+# ---- R1 named, Gi0/0/0 set up (abbreviated): 7 points
+dblclick listitem:"Router1"
+type "enable\n"
+type "configure terminal\n"
+type "hostname R1\n"
+type "int g0/0/0\n"
+type "ip add 10.0.1.1 255.255.255.0\n"
+type "no shut\n"
+type "end\n"
+wait 3000
+expect text:"7 von 20 Punkten · 35 %" exists
+expect #63824 checked
+expect #63825 checked
+expect #63826 checked
+expect #63827 unchecked
+expect #63829 unchecked
+expect listitem:"R1" exists
+# ---- Gi0/0/1 too: everything
+type "configure terminal\n"
+type "interface GigabitEthernet0/0/1\n"
+type "ip address 10.0.2.1 255.255.255.0\n"
+type "no shutdown\n"
+type "end\n"
+wait 3000
+expect text:"20 von 20 Punkten · 100 %" exists
+expect #63829 checked
+expect #63830 checked
+shot build/jfnetworker/assess_solved.png
+# undo the name: its points go; redo: back
+cmd 10
+wait 2500
+expect listitem:"Router1" exists
+expect text:"18 von 20 Punkten · 90 %" exists
+expect #63824 unchecked
+cmd 11
+wait 2500
+expect text:"20 von 20 Punkten · 100 %" exists
+# ---- the static routes (the last row of the list: one down from the row above it): nothing
+# shows until handed in
+cmd 300
+click text:"VLANs und ein Trunk zum Router"
+key down
+click button:"Öffnen"
+expect dialog:"Änderungen speichern?" exists
+click button:"Verwerfen"
+expect text:"Netzwerk · 20 Punkte" exists
+expect text:"Die Bewertung zeigt sich nach dem Abgeben." exists
+expect text:"Noch 15:00" exists
+expect text:"Kriterien" missing
+expect #63824 missing
+wait 60500
+expect text:"Noch 14:00" exists
+# one route, a default one: one of the values the item takes
+dblclick listitem:"R1"
+type "enable\n"
+type "configure terminal\n"
+type "ip route 0.0.0.0 0.0.0.0 10.0.12.2\n"
+type "end\n"
+wait 1000
+expect text:"Kriterien" missing
+# "Abgeben": the question first (cancelled), then handed in
+click button:"Abgeben"
+expect dialog:"Jetzt abgeben?" exists
+click button:"Abbrechen"
+expect dialog:"Jetzt abgeben?" missing
+expect text:"Die Bewertung zeigt sich nach dem Abgeben." exists
+click button:"Abgeben"
+expect dialog:"Jetzt abgeben?" exists
+click button:"Abgeben"
+expect dialog:"Jetzt abgeben?" missing
+expect text:"Abgegeben: die Bewertung ist endgültig." exists
+expect text:"3 von 20 Punkten · 15 %" exists
+expect text:"Kriterien" exists
+expect #63824 unchecked
+expect #63825 checked
+expect text:"nicht verbunden" exists
+expect text:"keine statische Route nach 10.0.3.0/24" exists
+expect button:"Abgeben" missing
+shot build/jfnetworker/assess_handed_in.png
+# ---- VLANs and a trunk: the score only, handed in early beside the time
+cmd 300
+click text:"VLANs und ein Trunk zum Router"
+click button:"Öffnen"
+expect text:"0 von 20 Punkten · 0 %" exists
+expect text:"Diese Aufgabe zeigt nur die Punktzahl, nicht die einzelnen Kriterien." exists
+expect text:"Noch 20:00" exists
+expect text:"Kriterien" missing
+dblclick listitem:"SW1"
+type "enable\n"
+type "configure terminal\n"
+type "interface Gi1/0/1\n"
+type "switchport mode access\n"
+type "switchport access vlan 10\n"
+type "interface Gi1/0/2\n"
+type "switchport mode access\n"
+type "switchport access vlan 20\n"
+type "interface Gi1/0/24\n"
+type "switchport mode trunk\n"
+type "end\n"
+wait 3000
+expect text:"8 von 20 Punkten · 40 %" exists
+expect text:"Kriterien" missing
+click #63810
+expect dialog:"Jetzt abgeben?" exists
+click button:"Abgeben"
+expect text:"Abgegeben: die Bewertung ist endgültig." exists
+expect text:"Kriterien" exists
+expect #63824 checked
+expect #63829 unchecked
+expect text:"Noch 20:00" missing
+expect_nowarn

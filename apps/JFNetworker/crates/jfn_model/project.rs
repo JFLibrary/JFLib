@@ -35,7 +35,9 @@
 // A check is an expectation of a scenario without its "expect" (scenario.rs: output, route,
 // no route, hops, metric, a metric over a span); a goal is reached when all its checks hold at
 // one moment.  Members that are missing take their defaults; a file without a lab stays as it
-// was ("lab": null).
+// was ("lab": null).  An assessment adds "assess" to the lab (lab.rs, A1): graded items with
+// points, the feedback, a time limit and the target network; the project is its start network,
+// a lab without one has "assess": null.
 
 use alloc::format;
 use alloc::string::String;

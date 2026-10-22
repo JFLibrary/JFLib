@@ -81,6 +81,12 @@ Queues, Lastgeneratoren, eigene Skripte).
   Bestätigungen und Wiederholungen, Altern der LSAs, SPF mit gleich guten Wegen, Bereiche über
   einen ABR, Stub-Bereiche und externe Routen (E1, E2); `show ip ospf
   [neighbor|interface|database]`, `debug ip ospf` (siehe [Routing mit OSPF](#routing-mit-ospf)).
+- **Aufgaben mit Bewertung (A1):** Labore mit Kriterien, die Punkte bringen: Namen, Adressen und
+  Zustände von Interfaces, VLANs und Modi von Switchports, statische Routen, Kabel, Einstellungen
+  von Diensten, Zeilen der Running-Config (Abkürzungen zählen) und Verbindungsprüfungen; die
+  Rückmeldung je Kriterium, nur als Punktzahl oder erst nach dem Abgeben, wahlweise mit
+  Zeitgrenze; Werkzeuge › Aufgabe erstellen … macht aus einem fertigen Netz eine Aufgabe mit
+  Ausgangsnetz; drei Beispiele (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)).
 
 ## Bedienung
 
@@ -187,6 +193,11 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `ipv6_inspector.uis` | IPv6 im Fenster (`fixtures/ipv6_slaac.jfnet`): die Spalte IPv6 im Inspektor und im Gerätefenster, die Adressen des gewählten Interfaces mit Herkunft und Zustand, ein Switch ohne IPv6 behält seine Spalten; ein Bild (`build/jfnetworker/inspector_ipv6.png`) |
 | `model.uis`, Gruppe `ospf` | OSPF (siehe [Routing mit OSPF](#routing-mit-ospf)): Hellos auf dem Kabel (an 224.0.0.5 mit TTL 1 und Präzedenz 6, alle 10 s) und das Dead-Intervall, die Wahl von DR und BDR mit Prioritäten (ohne Verdrängen; fällt der DR aus, übernimmt der BDR), eine Nachbarschaft durch jeden Zustand auf die Nanosekunde (Master und Slave, Database Description, Request, Update), am LAN die Wartezeit und die erste DD, die das IOS-artige ARP verliert, ein LSA, das vor MinLSArrival kommt, verworfen und wiederholt, Flooding mit verzögerten und direkten Bestätigungen, MinLSInterval, SPF 200 ms nach einer Änderung, Kosten aus der Referenzbandbreite und je Interface, gleich gute Wege, ein gezogenes Kabel und der neue Weg, passive Interfaces mit `traceroute`, Redistribution (E1, E2, `subnets`) und die Standardroute gegen statische Routen und Distanzen, zwei Bereiche über einen ABR mit Stub und `no-summary`, das Erneuern nach 1800 s und MaxAge nach 3600 s, Unstimmigkeiten (Hello-Intervall, Bereich, MTU), die Befehlszeile (Modus, Hilfe, `show`, `debug`, `clear ip ospf process`, die Running-Config als Startkonfiguration), die Texte auf Deutsch und Englisch, Determinismus |
 | `model.uis`, Gruppe `ipv6tcp` | UDP und TCP über IPv6 (siehe [IPv6](#ipv6)): der Handshake Byte für Byte auf die Nanosekunde (Port und ISN aus dem Zufallsstrom des Geräts, MSS 1440 aus der MTU des Pfads, Linux' Fenster 64800, die Prüfsumme über den IPv6-Pseudo-Header), Daten und Abbau bis TIME-WAIT, RST an einem geschlossenen Port, die sechs SYN-Wiederholungen bis 127 s, Packet Too Big von R1 senkt die MSS auf 1220, ICMPv6-Fehler beenden einen Verbindungsaufbau und erreichen verbundene UDP-Sockets (auch über IPv4), nie unverbundene; die Dual-Stack-Sockets (`::` nimmt beide Familien, `0.0.0.0` nur IPv4, eine Adresse nur sich, was sich einen Port teilen darf, `ss -4`/`-6`), der Resolver mit A und AAAA in der Reihenfolge von RFC 6724 (globale IPv6-Adresse: IPv6 zuerst, nur Link-Local: IPv4 zuerst, ohne IPv6 nur A), `curl`, `nc`, der TCP-Client am Echo, ein Skript mit `http.request` und `dns.resolve`, `ping` und `traceroute` per Name, `dig`, `host`, `nslookup` (auch ohne Antwort und abgewiesen), die IOS-artige Konsole (`ip name-server` über IPv6, `ip host`, `ipv6 host`, `ping` per Name, die Running-Config, `show tcp brief`), Masken, Sätze und Mitschnitt, Determinismus |
+| `model.uis`, Gruppe `assess` | Aufgaben mit Bewertung (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)): das Format (was auf seinem Vorgabewert steht, fehlt in der Datei; ohne `points` 1 Punkt), was `Assess::issues` findet, die kanonischen Werte (Masken, Präfixe, IOS-artige und Linux-Schreibweisen von Adressen und Routen), `reaches` auf einer Kopie des Simulators (beantwortet, keine Route, ein ausgeschalteter Router oder PC, ein unbekannter Name, der Lauf unberührt, die Zeile des Runners), jede Art von Kriterium mit ihren Schreibweisen, gleichwertig, genau und einer von mehreren Werten, Zeilen der Konfiguration abgekürzt, mit `no shutdown` und einer abgelehnten Zeile, Punkte und Prozent, ein umbenanntes Gerät über seine Nummer, die Rückmeldungen, wann bewertet wird und die Zeitgrenze, das Erstellen (das laufende Netz als Ziel, der Baum der Kandidaten, das Ausgangsnetz: was ein Kriterium prüft, fehlt dort und gilt im Ziel), die vier Labore wie bisher, die drei Aufgaben ohne Befund, ungelöst mit 0 Punkten, mit ihrem Zielnetz und gelöst wie im Fenster mit 20, dieselben Punkte zweimal |
+| `assess_author.uis` | eine Aufgabe erstellen aus dem Router zwischen zwei Netzen: das Ziel, Kriterien aus dem Baum mit Punkten, einem zweiten zulässigen Wert (ein ungültiger abgelehnt) und eigenem Text, eine abgelehnte und eine angenommene Prüfung, die Texte, eine Minute Zeit, das Ausgangsnetz (rückgängig und wieder), die Aufgabe ins Projekt (das Panel „Aufgabe“ folgt Rückgängig und Wiederholen), gespeichert als `build/jfn_assess.jfnet`, die Minute läuft ab, die Datei wieder geöffnet und der Bereich aus ihr gefüllt |
+| `assess_solve.uis` | die Aufgaben im Panel: die Liste mit ihnen, „Ein Router für zwei Netze“ mit „Prüfen“ und den Befunden, in zwei Schritten in der Konsole gelöst (7, dann 20 von 20 Punkten), Rückgängig des Namens kostet seine Punkte; „Statische Routen über drei Router“ ohne Rückmeldung bis zum Abgeben (der Countdown, eine Route, die Rückfrage abgebrochen und beantwortet, dann alle Kriterien mit ihren Befunden); „VLANs und ein Trunk zum Router“ nur mit der Punktzahl, früh abgegeben |
+| `assess_en.uis` | dasselbe auf Englisch: die Liste, das Panel mit den Texten der Datei, F9 mit den Befunden, der Bereich „Author an assessment“ aus der Aufgabe gefüllt |
+| `assess_shots.uis` | die Bilder der Liste, des Panels (halb gelöst nach „Prüfen“) und des Bereichs „Aufgabe erstellen“ hell und dunkel mit 100 und 150 % (`build/jfnetworker/assess_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -244,6 +255,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | NAT und Zugriffslisten | [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs), [`nat.rs`](crates/jfn_sim/nat.rs), [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs), [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs), [`lib/netpkt/nat.rs`](../../lib/netpkt/nat.rs), [`src/nattest.rs`](src/nattest.rs) | Zugriffslisten und Adressübersetzung der IOS-artigen Geräte, ihre Befehle, das Umschreiben der Pakete mit ihren Prüfsummen (Library), ihr Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
 | IPv6 | [`crates/jfn_sim/ip6.rs`](crates/jfn_sim/ip6.rs), [`nd.rs`](crates/jfn_sim/nd.rs), [`l3v6.rs`](crates/jfn_sim/l3v6.rs), [`jobs6.rs`](crates/jfn_sim/jobs6.rs), [`trace6.rs`](crates/jfn_sim/trace6.rs), [`cli/ip6.rs`](crates/jfn_sim/cli/ip6.rs), [`cli/linux6.rs`](crates/jfn_sim/cli/linux6.rs), [`cli/print6.rs`](crates/jfn_sim/cli/print6.rs), [`cli/names.rs`](crates/jfn_sim/cli/names.rs), [`lib/netpkt/icmpv6.rs`](../../lib/netpkt/icmpv6.rs), [`lib/netpkt/ipv6.rs`](../../lib/netpkt/ipv6.rs), [`lib/netpkt/addrsel.rs`](../../lib/netpkt/addrsel.rs), [`src/ipv6test.rs`](src/ipv6test.rs), [`src/ipv6tcptest.rs`](src/ipv6tcptest.rs) | der IPv6-Teil der Geräte (Adressen, Neighbor Cache, Router, Routen), Neighbor Discovery, DAD und SLAAC, Weiterleiten und ICMPv6, Ping und Traceroute, die Notizen, die Befehle beider Befehlszeilen, Namen an beiden Befehlszeilen (`dig`, `host`, `nslookup`, `ip host`, `ip name-server`), ICMPv6 und Neighbor Discovery Byte für Byte, die Fragmente und die Adressauswahl nach RFC 6724 (Library), die Selbsttests (siehe [IPv6](#ipv6)) |
 | OSPF | [`crates/jfn_sim/ospf.rs`](crates/jfn_sim/ospf.rs), [`cli/ospf.rs`](crates/jfn_sim/cli/ospf.rs), [`src/ospftest.rs`](src/ospftest.rs), [`lib/netpkt/ospf.rs`](../../lib/netpkt/ospf.rs) | OSPF als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Pakete und LSAs Byte für Byte (siehe [Routing mit OSPF](#routing-mit-ospf)) |
+| Aufgaben mit Bewertung | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/assess.rs`](crates/jfn_sim/assess.rs), [`src/workspace/assess.rs`](src/workspace/assess.rs), [`src/workspace/author.rs`](src/workspace/author.rs), [`src/doc/assess.rs`](src/doc/assess.rs), [`assets/assess`](assets/assess), [`src/assesstest.rs`](src/assesstest.rs) | das Format einer Aufgabe, das Bewerten ihrer Kriterien, die Prüfung `reaches`, das Panel mit Punkten, Zeit und Abgeben, der Bereich zum Erstellen mit seinen Rückgängig-Schritten, die drei Aufgaben, ihr Selbsttest (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)) |
 
 ### Gerätekatalog
 
@@ -1148,6 +1160,13 @@ Internet“; Summaries (O IA), externe Routen (O E2) über die ASBR-Summaries, d
 des Stub-Bereichs (O*IA), Pings und `traceroute` aus beiden Bereichen, der Ausfall des DR (nach
 dem Dead-Intervall übernimmt der BDR, R4 wird BDR) und `area 2 stub no-summary`.
 
+`expect PC1 reaches 10.0.2.10` prüft die Verbindung selbst (A1): Auf einer Kopie des Simulators
+pingt PC1 die Adresse (oder einen Namen über seinen Resolver) bis zu fünfmal, das nächste Echo
+nach der Antwort oder nach einer Sekunde, bis eine Antwort kommt; `not reaches` verlangt, dass
+keine kommt. Der Lauf selbst bleibt unberührt. Der Bericht nennt, wie viele Pings beantwortet
+wurden, oder warum keiner („keine Antwort: 10.0.1.1 meldet: Netz nicht erreichbar“, „keine
+Route zum Ziel“, „der Name … ist unbekannt“, „das Gerät ist ausgeschaltet“).
+
 ### Skripte in Hosts
 
 Eigene Programme laufen als Dienste in den Hosts ([`scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs)):
@@ -1348,6 +1367,113 @@ deterministisch. Geprüft wird das in der Selbsttest-Gruppe `task`
 ([`src/tasktest.rs`](src/tasktest.rs)): jedes Labor ungelöst (kein Ziel wird erreicht) und
 gelöst wie im Fenster (das Projekt geändert, der Simulator folgt ihm wie in `doc/sim.rs`), und
 in den Fensterskripten `task.uis`, `labs.uis` und `task_shots.uis`.
+
+### Aufgaben mit Bewertung
+
+Ein Labor kann die Arbeit auch bewerten (A1): mit Kriterien, die Punkte bringen, einem
+Zielnetz und wahlweise einer Zeitgrenze. Das Projekt selbst ist das Netz, mit dem Lernende
+beginnen; das Ziel, die fertige Lösung, steht mit in der Datei. **Wer die Datei öffnet, kann
+die Lösung lesen: Aufgaben mit Bewertung sind zum Üben und für Selbstkontrollen gedacht, nicht
+für Prüfungen, die manipulationssicher sein müssen.**
+
+- **Kriterien:** der Name eines Geräts, die Adresse eines Interfaces (IPv4 oder IPv6), sein
+  Zustand (eingeschaltet oder `shutdown`), das VLAN und der Modus eines Switchports (access,
+  trunk, dynamic, geroutet), eine statische Route, eine Einstellung eines Dienstes (ein Wert
+  seines JSON, auch tiefer: `pools.0.range`), ein Kabel zwischen zwei Ports (ein Port, der
+  fehlt: irgendeiner) und Zeilen der Running-Config; dazu Verbindungsprüfungen in der Sprache
+  der Szenarien (siehe [Szenarien](#szenarien-scn)), etwa `PC1 reaches 10.0.2.10`: ein Ping
+  auf einer Kopie des Simulators bekommt eine Antwort. Jedes Kriterium hat Punkte, einen Text
+  auf Deutsch und Englisch und einen Vergleich: gleichwertig (Groß- und Kleinschreibung,
+  Leerzeichen, Masken statt Präfixlängen, `Gi0/1` statt `GigabitEthernet0/1`, IOS-artige und
+  Linux-Schreibweisen von Routen, die Reihenfolge der Einstellungen eines Dienstes), genau
+  (derselbe Text) oder einer von mehreren Werten (eine Route oder die Standardroute).
+- **Zeilen der Konfiguration** gelten, wenn sie auf dem Gerät nichts ändern würden: Eine Kopie
+  des Geräts mit seiner Running-Config bekommt sie eingetippt, wie Lernende tippen (`int
+  g0/0/1`, `ip add …`, `no shut`), und ihre Running-Config muss bleiben, wie sie ist. Was
+  dazukäme, fehlt („es fehlt: interface GigabitEthernet0/0/0.10 › encapsulation dot1Q 10“), was
+  wegfiele, ist zu viel („zu viel: … › shutdown“ für `no shutdown` an einem ausgeschalteten
+  Port).
+- **Bewertung:** die Punkte der erfüllten Kriterien, ein Prozentsatz (abgerundet), je Kriterium
+  erfüllt oder nicht und was es fand. Bewertet wird der Stand jetzt: Ein Kriterium kann wieder
+  verloren gehen. Ein Kriterium findet sein Gerät über dessen Nummer, auch wenn es umbenannt
+  wurde; Prüfungen nennen Geräte wie das Zielnetz.
+- **Rückmeldung:** jedes Kriterium erfüllt oder nicht (nach „Prüfen“, F9, auch was fehlt), nur
+  die Punktzahl, oder nichts, bis abgegeben ist. Eine Zeitgrenze läuft ab dem Öffnen auf der
+  Uhr des Fensters (Anhalten und Tempo der Simulation ändern sie nicht) und wird nicht
+  mitgespeichert. Ist sie um oder wurde abgegeben („Abgeben“, Simulation › Aufgabe abgeben, nach
+  der Rückfrage „Jetzt abgeben?“), steht die Bewertung fest, und alle Kriterien zeigen, was sie
+  fanden.
+- **Das Panel „Aufgabe“** zeigt dann die Punkte („7 von 20 Punkten · 35 %“) mit
+  Fortschrittsbalken, die verbleibende Zeit und die Kriterien, so weit die Rückmeldung es
+  erlaubt. Es bewertet nach jeder Änderung des Projekts (höchstens alle 0,5 s) und, wenn sich
+  im Simulator etwas tat (eine Zeile in einer Konsole, Ereignisse), höchstens alle 2 s; steht
+  alles still, bewertet es nicht. Für Screenreader ist jedes Kriterium ein Kontrollkästchen
+  (angehakt: erfüllt), die Punkte ein Fortschrittsbalken.
+- **Aufgabe erstellen** (Werkzeuge › Aufgabe erstellen …, ein Bereich rechts) in sieben
+  Schritten: 1 „Aktuelles Netz als Ziel“: das Netz, wie es läuft, mit den Running-Configs,
+  wird die Lösung. 2 Ein Baum seiner Einstellungen (Geräte mit Namen, Interfaces mit Adresse,
+  Zustand, VLAN und Modus, statische Routen, Dienste und ihre Einstellungen, die Zeilen der
+  Konfiguration, die ein neues Gerät nicht hat, die Kabel): ein Häkchen bewertet eine
+  Einstellung, darunter stehen ihre Punkte, der Vergleich (mit den weiteren Werten) und der
+  Text in beiden Sprachen (bis zu einem eigenen der des Kriteriums). 3 Verbindungsprüfungen mit
+  Punkten (eine, die sich nicht lesen lässt, wird mit dem Grund abgelehnt). 4 Titel, Kurztext
+  für die Liste, Einleitung, Thema. 5 Rückmeldung und Zeit in Minuten. 6 „Ausgangsnetz
+  erzeugen“ nimmt dem Ziel, was die Kriterien prüfen (Adressen, Routen, VLANs, Modi und Zeilen
+  aus den Konfigurationen; ein Interface, das eingeschaltet sein soll, wird ausgeschaltet;
+  Einstellungen von Diensten entfallen, Kabel werden entfernt, ein Name wird neutral wie
+  `JF-R4-1`), als ein Rückgängig-Schritt; oder das Netz wird von Hand zurückgebaut. Darunter
+  steht, wie viele Punkte das Projekt jetzt hätte. 7 „Als Aufgabe speichern …“ legt das Labor
+  mit der Aufgabe ins Projekt (ein Rückgängig-Schritt) und fragt nach der Datei. Ein Projekt mit
+  Aufgabe füllt den Bereich aus seiner Datei.
+
+| Aufgabe | worum es geht |
+|---|---|
+| `01-router-zwei-netze.jfnet` | einen neuen Router benennen und seine zwei Interfaces einrichten, bis die PCs einander erreichen; jedes Kriterium zeigt sich sofort (20 Punkte) |
+| `02-vlans-trunk.jfnet` | zwei VLANs auf SW1, ein Trunk zu R1 und dort ein Subinterface je VLAN (Router-on-a-stick); nur die Punktzahl, 20 Minuten |
+| `03-statische-routen.jfnet` | das fehlende Kabel stecken und die statischen Routen dreier Router setzen (für R1 und R3 genügt eine Standardroute); die Bewertung erst nach dem Abgeben, 15 Minuten |
+
+Die Aufgaben liegen in `assets/assess` (im Programm `app://assess`) und stehen in Datei › Labor
+öffnen … nach den Laboren, mit ihren Punkten und dem Zeichen „Mit Punkten“. In der Datei ist
+die Aufgabe der Abschnitt `assess` des Labors (siehe [`lab.rs`](crates/jfn_model/lab.rs)):
+
+```json
+"assess": {
+  "feedback": "score",
+  "time_limit_s": 1200,
+  "items": [
+    {"what": "address", "dev": "R1", "id": 2, "port": "GigabitEthernet0/0/0", "value": "10.0.1.1/24", "points": 3,
+     "text": ["R1 Gi0/0/0 hat die Adresse 10.0.1.1/24", "R1 Gi0/0/0 has the address 10.0.1.1/24"]},
+    {"what": "route", "dev": "R1", "id": 2, "value": ["10.0.3.0/24 via 10.0.12.2", "default via 10.0.12.2"], "cmp": "any", "points": 3},
+    {"what": "config", "dev": "R1", "id": 4, "value": ["interface GigabitEthernet0/0/0.10", " encapsulation dot1Q 10"], "points": 3},
+    {"what": "cable", "dev": "R2", "port": "GigabitEthernet0/0/1", "peer": "R3", "peer_port": "GigabitEthernet0/0/0", "points": 2},
+    {"what": "check", "checks": ["PC1 reaches 10.0.3.10"], "points": 6}
+  ],
+  "target": {"devices": [...], "links": [...]}
+}
+```
+
+`feedback` ist `items`, `score` oder `end`, `time_limit_s` 0 ohne Grenze. `what` ist
+`hostname`, `address`, `state`, `vlan`, `mode`, `route`, `service` (mit `svc` und dem Pfad
+`key`), `cable` (mit `peer` und `peer_port`; ein `value` verlangt eine Kabelart), `config`
+(Zeilen, die eines Blocks eingerückt) oder `check` (`checks`: Erwartungen, die zugleich
+gelten); `cmp` ist `norm` (Vorgabe), `exact` oder `any` (dann ist `value` eine Liste). Was auf
+seinem Vorgabewert steht, fehlt in der Datei; ohne `points` zählt ein Kriterium 1. Ein Labor
+ohne Aufgabe hat `"assess": null` und verhält sich wie bisher; ein Labor mit Aufgabe braucht
+keine Ziele, kann aber welche haben.
+
+Für Programme: `jfn_model::lab` (`Assess`, `Item`, `ItemKind`, `Compare`, `Feedback`, `Target`,
+`canon`, `RouteVal`, `Assess::issues`), `jfn_sim::assess` (`Grader::new(&aufgabe)`,
+`grade(&projekt, &engine, ausgabe)` -> `Score` mit `points`, `total`, `percent()` und je
+Kriterium `Graded` mit `held` und `found`; `would_change`, `normalise`; zum Erstellen
+`capture`, `candidates`, `start_network`, `item_text`, `item_key`) und `jfn_sim::goal::probe`
+(die Erwartung `reaches`). Geprüft wird das in der Selbsttest-Gruppe `assess`
+([`src/assesstest.rs`](src/assesstest.rs)) und in den Fensterskripten `assess_author.uis`,
+`assess_solve.uis`, `assess_en.uis` und `assess_shots.uis` (siehe
+[Bauen und testen](#bauen-und-testen)).
+
+Noch offen: Kriterien für ACLs, NAT, OSPF und RIP über ihre Zeilen hinaus (heute über
+Zeilen der Konfiguration und Prüfungen), Teilpunkte, Zufallswerte je Lernendem und eine
+verschlüsselte Lösung.
 
 ### Routing mit RIP
 
@@ -1797,7 +1923,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
+| 4 Parität | WLAN, physische Ansicht, A1 Aufgaben mit Bewertung ✓, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
 Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir

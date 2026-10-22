@@ -39,6 +39,9 @@
 //                                                gauge's mean, a latency's quantile of the span);
 //                                                the value may have a fraction
 //   series build/run.csv                         write the time series as CSV at the end
+//   expect PC1 reaches 10.0.2.10                 a ping would get an answer now (A1: judged on
+//   expect PC1 not reaches server.lab            a copy of the engine, goal.rs; a name is looked
+//                                                up by the device's resolver)
 //
 // Device and port names are resolved when the scenario runs; this module only checks syntax.
 
@@ -138,6 +141,8 @@ pub enum Expect {
     Metric { dev: String, svc: String, name: String, cmp: Cmp, value: i64 },
     /// a metric's time series over a span; the value in thousandths
     Series { dev: String, svc: String, name: String, agg: Agg, cmp: Cmp, milli: i64, span: Span },
+    /// a ping from the device to an address or a name gets an answer (negate: none does)
+    Reach { dev: String, host: String, negate: bool },
 }
 
 impl Expect {
@@ -145,6 +150,7 @@ impl Expect {
     pub fn dev(&self) -> Option<&str> {
         match self {
             Expect::Output { dev, .. } | Expect::Route { dev, .. } | Expect::NoRoute { dev, .. } | Expect::Metric { dev, .. } | Expect::Series { dev, .. } => Some(dev),
+            Expect::Reach { dev, .. } => Some(dev),
             Expect::Hops { .. } => None,
         }
     }
@@ -589,6 +595,8 @@ fn parse_expect(w: &[&str]) -> Result<Expect, String> {
         }
         [dev, "route", p, "dev", iface] => Expect::Route { dev: String::from(*dev), prefix: prefix(p)?, via: Via::Iface(String::from(*iface)) },
         [dev, "no", "route", p] => Expect::NoRoute { dev: String::from(*dev), prefix: prefix(p)? },
+        [dev, "reaches", host] => Expect::Reach { dev: String::from(*dev), host: String::from(*host), negate: false },
+        [dev, "not", "reaches", host] => Expect::Reach { dev: String::from(*dev), host: String::from(*host), negate: true },
         ["hops", proto, c, n] => Expect::Hops {
             proto: proto.to_ascii_lowercase(),
             cmp: cmp(c)?,

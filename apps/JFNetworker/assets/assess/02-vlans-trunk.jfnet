@@ -1,0 +1,388 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "VLANs und ein Trunk zum Router",
+  "description": "Aufgabe mit Bewertung: VLAN 10 und 20 auf SW1, Router-on-a-stick auf R1.",
+  "seed": 12,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.10.10/24 dev eth0\nip route add default via 10.0.10.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 240,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.20.10/24 dev eth0\nip route add default via 10.0.20.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 120,
+      "y": 140,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 120,
+      "y": 280,
+      "off": false,
+      "startup_config": "hostname R1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/24"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "VLANs und ein Trunk zum Router",
+      "VLANs and a trunk to the router"
+    ],
+    "summary": [
+      "Zwei VLANs auf SW1, ein Trunk zu R1 und ein Subinterface je VLAN, in 20 Minuten; gezeigt wird nur die Punktzahl.",
+      "Two VLANs on SW1, a trunk to R1 and a subinterface per VLAN, in 20 minutes; only the score shows."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "PC1 gehört ins VLAN 10 (10.0.10.0/24), PC2 ins VLAN 20 (10.0.20.0/24). SW1 kennt noch keine VLANs, und R1 soll zwischen beiden routen, über ein einziges Kabel zum Switch (Router-on-a-stick).",
+        "PC1 belongs in VLAN 10 (10.0.10.0/24), PC2 in VLAN 20 (10.0.20.0/24). SW1 knows no VLANs yet, and R1 is to route between both over a single cable to the switch (router-on-a-stick)."
+      ],
+      [
+        "Diese Aufgabe zeigt nur die Punktzahl, nicht welches Kriterium fehlt, und hat 20 Minuten. Mit „Abgeben“ endet sie früher; danach zeigt sie jedes Kriterium.",
+        "This assessment shows the score only, not which item is missing, and has 20 minutes. “Hand in” ends it earlier; then it shows every item."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Auf SW1: interface GigabitEthernet1/0/1, switchport mode access, switchport access vlan 10; Gi1/0/2 ebenso mit VLAN 20; Gi1/0/24 mit switchport mode trunk.",
+        "On SW1: interface GigabitEthernet1/0/1, switchport mode access, switchport access vlan 10; Gi1/0/2 likewise with VLAN 20; Gi1/0/24 with switchport mode trunk."
+      ],
+      [
+        "Auf R1: interface GigabitEthernet0/0/0 mit no shutdown, dann interface GigabitEthernet0/0/0.10 mit encapsulation dot1Q 10 und ip address 10.0.10.1 255.255.255.0, für VLAN 20 genauso.",
+        "On R1: interface GigabitEthernet0/0/0 with no shutdown, then interface GigabitEthernet0/0/0.10 with encapsulation dot1Q 10 and ip address 10.0.10.1 255.255.255.0, the same for VLAN 20."
+      ]
+    ],
+    "assess": {
+      "feedback": "score",
+      "time_limit_s": 1200,
+      "items": [
+        {
+          "what": "vlan",
+          "dev": "SW1",
+          "id": 3,
+          "port": "GigabitEthernet1/0/1",
+          "value": "10",
+          "points": 2,
+          "text": [
+            "SW1 Gi1/0/1 gehört zu VLAN 10",
+            "SW1 Gi1/0/1 belongs to VLAN 10"
+          ]
+        },
+        {
+          "what": "mode",
+          "dev": "SW1",
+          "id": 3,
+          "port": "GigabitEthernet1/0/1",
+          "value": "access",
+          "points": 1,
+          "text": [
+            "SW1 Gi1/0/1 ist ein Access-Port",
+            "SW1 Gi1/0/1 is an access port"
+          ]
+        },
+        {
+          "what": "vlan",
+          "dev": "SW1",
+          "id": 3,
+          "port": "GigabitEthernet1/0/2",
+          "value": "20",
+          "points": 2,
+          "text": [
+            "SW1 Gi1/0/2 gehört zu VLAN 20",
+            "SW1 Gi1/0/2 belongs to VLAN 20"
+          ]
+        },
+        {
+          "what": "mode",
+          "dev": "SW1",
+          "id": 3,
+          "port": "GigabitEthernet1/0/2",
+          "value": "access",
+          "points": 1,
+          "text": [
+            "SW1 Gi1/0/2 ist ein Access-Port",
+            "SW1 Gi1/0/2 is an access port"
+          ]
+        },
+        {
+          "what": "mode",
+          "dev": "SW1",
+          "id": 3,
+          "port": "GigabitEthernet1/0/24",
+          "value": "trunk",
+          "points": 2,
+          "text": [
+            "SW1 Gi1/0/24 ist ein Trunk",
+            "SW1 Gi1/0/24 is a trunk"
+          ]
+        },
+        {
+          "what": "state",
+          "dev": "R1",
+          "id": 4,
+          "port": "GigabitEthernet0/0/0",
+          "value": "up",
+          "points": 1,
+          "text": [
+            "R1 Gi0/0/0 ist eingeschaltet",
+            "R1 Gi0/0/0 is up"
+          ]
+        },
+        {
+          "what": "config",
+          "dev": "R1",
+          "id": 4,
+          "value": [
+            "interface GigabitEthernet0/0/0.10",
+            " encapsulation dot1Q 10",
+            " ip address 10.0.10.1 255.255.255.0"
+          ],
+          "points": 3,
+          "text": [
+            "R1 hat das Subinterface Gi0/0/0.10 für VLAN 10 mit 10.0.10.1/24",
+            "R1 has the subinterface Gi0/0/0.10 for VLAN 10 with 10.0.10.1/24"
+          ]
+        },
+        {
+          "what": "config",
+          "dev": "R1",
+          "id": 4,
+          "value": [
+            "interface GigabitEthernet0/0/0.20",
+            " encapsulation dot1Q 20",
+            " ip address 10.0.20.1 255.255.255.0"
+          ],
+          "points": 3,
+          "text": [
+            "R1 hat das Subinterface Gi0/0/0.20 für VLAN 20 mit 10.0.20.1/24",
+            "R1 has the subinterface Gi0/0/0.20 for VLAN 20 with 10.0.20.1/24"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC1 reaches 10.0.20.10"
+          ],
+          "points": 5,
+          "text": [
+            "PC1 erreicht PC2 über R1",
+            "PC1 reaches PC2 through R1"
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.10.10/24 dev eth0\nip route add default via 10.0.10.1\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "PC2",
+            "model": "pc",
+            "x": 240,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC2\nip addr add 10.0.20.10/24 dev eth0\nip route add default via 10.0.20.1\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "SW1",
+            "model": "jf-s24p",
+            "x": 120,
+            "y": 140,
+            "off": false,
+            "startup_config": "hostname SW1\n!\nvlan 10\n name Office\n!\nvlan 20\n name Lab\n!\ninterface GigabitEthernet1/0/1\n switchport access vlan 10\n switchport mode access\n!\ninterface GigabitEthernet1/0/2\n switchport access vlan 20\n switchport mode access\n!\ninterface GigabitEthernet1/0/24\n switchport mode trunk\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "R1",
+            "model": "jf-r4",
+            "x": 120,
+            "y": 280,
+            "off": false,
+            "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n no ip address\n!\ninterface GigabitEthernet0/0/0.10\n encapsulation dot1Q 10\n ip address 10.0.10.1 255.255.255.0\n!\ninterface GigabitEthernet0/0/0.20\n encapsulation dot1Q 20\n ip address 10.0.20.1 255.255.255.0\n!\nend\n",
+            "services": [],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 5,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/1"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 6,
+            "a": {
+              "dev": 2,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/2"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 7,
+            "a": {
+              "dev": 3,
+              "port": "GigabitEthernet1/0/24"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,294 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Ein Router für zwei Netze",
+  "description": "Aufgabe mit Bewertung: R1 zwischen 10.0.1.0/24 und 10.0.2.0/24 einrichten.",
+  "seed": 11,
+  "next_id": 6,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "Router1",
+      "model": "jf-r4",
+      "x": 200,
+      "y": 0,
+      "off": false,
+      "startup_config": "",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "PC2",
+      "model": "pc",
+      "x": 400,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 4,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 5,
+      "a": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Ein Router für zwei Netze",
+      "One router for two networks"
+    ],
+    "summary": [
+      "Den neuen Router benennen und seine zwei Interfaces einrichten, bis die PCs zueinander finden.",
+      "Name the new router and set up its two interfaces until the PCs find each other."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "PC1 sitzt im Netz 10.0.1.0/24, PC2 im Netz 10.0.2.0/24. Beide kennen ihr Gateway schon: die Adresse .1 ihres Netzes. Dazwischen steht ein neuer Router, der noch nichts kann: Er hat keinen Namen, keine Adressen, und seine Interfaces sind ausgeschaltet.",
+        "PC1 sits in the network 10.0.1.0/24, PC2 in 10.0.2.0/24. Both already know their gateway: the address .1 of their network. Between them stands a new router that cannot do anything yet: it has no name, no addresses, and its interfaces are shut down."
+      ],
+      [
+        "Gib dem Router in seiner IOS-artigen Konsole (Doppelklick) den Namen R1 und richte GigabitEthernet0/0/0 (zu PC1) und GigabitEthernet0/0/1 (zu PC2) ein. Jedes Kriterium zeigt gleich, ob es stimmt; „Prüfen“ sagt bei den falschen, was fehlt.",
+        "Give the router the name R1 in its IOS-like console (double-click) and set up GigabitEthernet0/0/0 (towards PC1) and GigabitEthernet0/0/1 (towards PC2). Each item shows at once whether it is right; “Check” tells the wrong ones what they lack."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Im privilegierten Modus (enable) geht es mit configure terminal in die Konfiguration; hostname R1 gibt den Namen.",
+        "In privileged mode (enable), configure terminal leads into the configuration; hostname R1 sets the name."
+      ],
+      [
+        "An jedem Interface: interface GigabitEthernet0/0/0, ip address 10.0.1.1 255.255.255.0 und no shutdown. Abkürzungen wie int g0/0/0 oder ip add zählen genauso.",
+        "On each interface: interface GigabitEthernet0/0/0, ip address 10.0.1.1 255.255.255.0 and no shutdown. Abbreviations such as int g0/0/0 or ip add count the same."
+      ]
+    ],
+    "assess": {
+      "feedback": "items",
+      "time_limit_s": 0,
+      "items": [
+        {
+          "what": "hostname",
+          "dev": "R1",
+          "id": 2,
+          "value": "R1",
+          "points": 2,
+          "text": [
+            "Der Router heißt R1",
+            "The router is called R1"
+          ]
+        },
+        {
+          "what": "address",
+          "dev": "R1",
+          "id": 2,
+          "port": "GigabitEthernet0/0/0",
+          "value": "10.0.1.1/24",
+          "points": 3,
+          "text": [
+            "R1 Gi0/0/0 hat die Adresse 10.0.1.1/24",
+            "R1 Gi0/0/0 has the address 10.0.1.1/24"
+          ]
+        },
+        {
+          "what": "state",
+          "dev": "R1",
+          "id": 2,
+          "port": "GigabitEthernet0/0/0",
+          "value": "up",
+          "points": 2,
+          "text": [
+            "R1 Gi0/0/0 ist eingeschaltet",
+            "R1 Gi0/0/0 is up"
+          ]
+        },
+        {
+          "what": "address",
+          "dev": "R1",
+          "id": 2,
+          "port": "GigabitEthernet0/0/1",
+          "value": "10.0.2.1/24",
+          "points": 3,
+          "text": [
+            "R1 Gi0/0/1 hat die Adresse 10.0.2.1/24",
+            "R1 Gi0/0/1 has the address 10.0.2.1/24"
+          ]
+        },
+        {
+          "what": "state",
+          "dev": "R1",
+          "id": 2,
+          "port": "GigabitEthernet0/0/1",
+          "value": "up",
+          "points": 2,
+          "text": [
+            "R1 Gi0/0/1 ist eingeschaltet",
+            "R1 Gi0/0/1 is up"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC1 reaches 10.0.2.10"
+          ],
+          "points": 4,
+          "text": [
+            "PC1 erreicht PC2",
+            "PC1 reaches PC2"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC2 reaches 10.0.1.1"
+          ],
+          "points": 4,
+          "text": [
+            "PC2 erreicht das Gateway von PC1",
+            "PC2 reaches the gateway of PC1"
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "R1",
+            "model": "jf-r4",
+            "x": 200,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "PC2",
+            "model": "pc",
+            "x": 400,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC2\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\n",
+            "services": [],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 4,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 2,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 5,
+            "a": {
+              "dev": 2,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 3,
+              "port": "eth0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    }
+  }
+}
