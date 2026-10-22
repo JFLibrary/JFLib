@@ -16,6 +16,8 @@
 //             of large projects: --gen-topology, jfn-sim gen)
 //   lab       Lab, Goal, Text: the task of a lab project (title, introduction, goals with checks
 //             in the expectation syntax of scenarios, hints; German and English)
+//             Assess, Item, Target (A1): an assessment of a lab -- graded items with points,
+//             the target network, the feedback; canon / RouteVal: the canonical item values
 //
 // Device identity is the project's numeric id; ports are referenced by their full interface
 // name ("GigabitEthernet1/0/1", "eth0"), so files stay readable.
@@ -39,3 +41,4 @@ pub use project::{Device, Issue, Link, Note, PortRef, ProjErr, Project, ServiceD
 pub use scenario::Scenario;
 pub use msg::Msg;
 pub use lab::{Goal, Lab, Text};
+pub use lab::{Assess, Compare, Feedback, Item, ItemKind, Target};

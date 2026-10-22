@@ -101,6 +101,10 @@
 //            refresh, SPF per area, inter-area routes over an ABR, AS-external routes
 //            (redistribution, default route); its routes in the RIB with distance 110;
 //            OspfCfg / OspfSet (Action::Ospf)
+//   assess   the grading of an assessment (A1): its items against a project and its engine
+//            (points, a percentage, what each item found), config lines normalised on a
+//            scratch device; for authors the network captured as a target, the target's
+//            settings as candidate items, the start network without what the items check
 //
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
@@ -167,6 +171,7 @@ pub mod l3v6;
 pub mod jobs6;
 pub mod trace6;
 pub mod ospf;
+pub mod assess;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -216,3 +221,4 @@ pub use nd::{Addr6View, Neigh6Row};
 pub use jobs6::{Icmp6Kind, Ping6Ev, Ping6Job, Ping6Opts, Trace6Hop, Trace6Job, Trace6Probe};
 pub use trace6::{Note6, RaWhy};
 pub use ospf::{IfState, LsaDrop, LsaRef, LsuWhy, NbrEvent, NbrState, NetType, OrigWhy, Ospf, OspfCfg, OspfDrop, OspfSet, RtChange, RtKind};
+pub use assess::{Cand, Graded, Grader, Lines, Score};

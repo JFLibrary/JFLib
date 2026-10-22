@@ -24,6 +24,13 @@
 // Judging only reads the engine and is deterministic: the same run judges the same at the same
 // virtual time.  The texts of report() are the runner's, which golden reports compare byte for
 // byte; reason() words the same findings as messages (jfn_model::msg) for the app's languages.
+//
+//   probe(&engine, dev, host) -> Found::Ping     "expect PC1 reaches 10.0.2.10" (A1): a ping on
+//                                         a copy of the engine (Engine::clone) -- up to PROBES
+//                                         echoes, the next when the last is answered or a second
+//                                         passed, until the first answer; a name is looked up by
+//                                         the device's resolver first.  The engine itself stays
+//                                         as it was, so judging still only reads.
 
 use alloc::format;
 use alloc::string::String;
@@ -38,6 +45,7 @@ use jfn_model::scenario::{Agg, Expect, Span, Via};
 use netpkt::decode;
 
 use crate::ip::RouteSrc;
+use crate::jobs::{IcmpKind, JobKind, PingEv, PingOpts};
 use crate::kernel::{Engine, Ns, MS, SEC, US};
 use crate::series::SeriesErr;
 
@@ -65,6 +73,10 @@ pub enum Found {
     Series(SeriesErr),
     /// the span ends after now
     Later,
+    /// the pings of a probe (Expect::Reach): sent, answered, and why none was answered when
+    /// something said so (the device is off or has no address, the name is unknown, an ICMP
+    /// error came back)
+    Ping { sent: u32, received: u32, why: Option<Msg> },
 }
 
 /// whether an expectation holds and what it found
@@ -175,6 +187,7 @@ pub fn expect_text(x: &Expect) -> String {
             let how = if *agg == Agg::Natural { String::new() } else { format!("{} ", agg.as_str()) };
             format!("expect {} svc {} metric {}{} {} {} {}", dev, svc, how, name, cmp.as_str(), milli_text(*milli), what)
         }
+        Expect::Reach { dev, host, negate } => format!("expect {} {}reaches {}", dev, if *negate { "not " } else { "" }, host),
     }
 }
 
@@ -255,7 +268,78 @@ fn judge_found(p: &Project, e: &Engine, x: &Expect, out: &dyn Fn(u32) -> String)
                 Err(err) => (false, Found::Series(err)),
             }
         }
+        Expect::Reach { host, negate, .. } => {
+            let f = probe(e, id, host);
+            let answered = matches!(f, Found::Ping { received, .. } if received > 0);
+            (answered != *negate, f)
+        }
     }
+}
+
+/// echoes a probe sends at most (one at a time: the next when the last is answered or timed out)
+pub const PROBES: u32 = 5;
+/// how long a probe runs at most (virtual time of its copy: a lookup and the echoes) and the
+/// events it may take
+const PROBE_SPAN: Ns = 15 * SEC;
+const PROBE_EVENTS: usize = 2_000_000;
+
+/// what an ICMP error says, as a reason
+fn icmp_why(from: netpkt::Ipv4, k: IcmpKind) -> Msg {
+    match k {
+        IcmpKind::NoRoute => msg!("keine Route zum Ziel"),
+        IcmpKind::NetUnreachable => msg!("{} meldet: Netz nicht erreichbar", from),
+        IcmpKind::HostUnreachable => msg!("{} meldet: Host nicht erreichbar", from),
+        IcmpKind::PortUnreachable | IcmpKind::ProtoUnreachable => msg!("{} meldet: Ziel nicht erreichbar", from),
+        IcmpKind::Prohibited => msg!("{} meldet: durch eine Zugriffsliste verboten", from),
+        IcmpKind::TtlExceeded | IcmpKind::ReasmExceeded => msg!("{} meldet: TTL abgelaufen", from),
+        IcmpKind::FragNeeded(m) => msg!("{} meldet: Fragmentierung nötig (MTU {})", from, m),
+        IcmpKind::Other(t, c) => msg!("{} meldet: ICMP Typ {} Code {}", from, t, c),
+    }
+}
+
+/// a ping from `dev` to `host` (an address or a name) on a copy of the engine: up to PROBES
+/// echoes until the first answer (Found::Ping); the engine itself is left as it was
+pub fn probe(e: &Engine, dev: u32, host: &str) -> Found {
+    let none = |why: Msg| Found::Ping { sent: 0, received: 0, why: Some(why) };
+    match e.node(dev) {
+        None => return Found::NoDevice,
+        Some(n) if !n.power => return none(msg!("das Gerät ist ausgeschaltet")),
+        Some(_) => {}
+    }
+    let mut c = e.clone();
+    let opts = PingOpts { count: PROBES, interval: 0, timeout: SEC, ..PingOpts::default() };
+    let job = match c.ping_host(dev, host.trim(), opts) {
+        Ok(j) => j,
+        Err(x) => return none(x.msg()),
+    };
+    let end = c.now() + PROBE_SPAN;
+    let mut budget = PROBE_EVENTS;
+    loop {
+        let (done, received) = match c.job(job).map(|j| (j.done, &j.kind)) {
+            Some((done, JobKind::Ping(p))) => (done, p.received),
+            _ => (true, 0),
+        };
+        if received > 0 || done || c.now() >= end || budget == 0 {
+            break;
+        }
+        let before = c.events_done();
+        c.run_until((c.now() + 100 * MS).min(end), budget);
+        budget = budget.saturating_sub((c.events_done() - before) as usize);
+    }
+    let Some(JobKind::Ping(p)) = c.job(job).map(|j| &j.kind) else {
+        return none(msg!("keine Antwort"));
+    };
+    let why = if p.received > 0 {
+        None
+    } else if p.sent == 0 && p.host.is_some() {
+        Some(msg!("der Name {} ist unbekannt", host.trim()))
+    } else {
+        p.events.iter().find_map(|ev| match ev {
+            PingEv::Error { from, kind, .. } => Some(icmp_why(*from, *kind)),
+            _ => None,
+        })
+    };
+    Found::Ping { sent: p.sent, received: p.received, why }
 }
 
 /// the words of the report for a series without a value
@@ -285,6 +369,8 @@ impl Verdict {
             Found::NoMetric => format!("{} (keinen solchen Dienst oder Wert)", t),
             Found::Series(e) => format!("{} ({})", t, series_why(*e)),
             Found::Later => format!("{} (der Zeitraum endet erst nach jetzt)", t),
+            Found::Ping { why: Some(w), received: 0, .. } => format!("{} (keine Antwort: {})", t, w.text()),
+            Found::Ping { sent, received, .. } => format!("{} ({} von {} beantwortet)", t, received, sent),
         }
     }
 
@@ -311,6 +397,10 @@ impl Verdict {
             Found::Series(SeriesErr::NoValues) => msg!("keine Werte im Zeitraum"),
             Found::Series(SeriesErr::Gone) => msg!("das Fenster der Latenzen hält den Zeitraum nicht mehr"),
             Found::Later => msg!("der Zeitraum endet erst nach jetzt"),
+            Found::Ping { why: Some(w), received: 0, .. } => msg!("keine Antwort: {}", w.clone()),
+            Found::Ping { sent, received: 0, .. } => msg!("keine Antwort auf {} Pings", sent),
+            Found::Ping { .. } if self.held => Msg::default(),
+            Found::Ping { sent, received, .. } => msg!("{} von {} Pings beantwortet", received, sent),
         }
     }
 }

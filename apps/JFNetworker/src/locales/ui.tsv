@@ -885,3 +885,75 @@ veraltet	deprecated
 
 # OSPF (R3): the kind of the service in the Dienste tab and the Metriken panel
 Routing (OSPF)	Routing (OSPF)
+# A1: assessments -- the commands, the score card and items of the Aufgabe panel (workspace/assess.rs)
+&Aufgabe erstellen …	&Author an assessment …
+Aufgabe a&bgeben	Hand &in the assessment
+Aktuelles Netz als Ziel	Current network as the target
+Ausgangsnetz erzeugen	Make the start network
+Als Aufgabe speichern …	Save as an assessment …
+1 Punkt	1 point
+{} Punkte	{} points
+{} von {} Punkten · {} %	{} of {} points · {}%
+? von {} Punkten	? of {} points
+Die Bewertung zeigt sich nach dem Abgeben.	The grade shows once the work is handed in.
+Abgeben	Hand in
+Die Arbeit abgeben: danach zählt die Bewertung, wie sie jetzt ist	Hand the work in: from then on the grade counts as it is now
+Die Kriterien jetzt prüfen und bei den falschen zeigen, was fehlt (F9)	Check the items now and show what the wrong ones lack (F9)
+Abgegeben: die Bewertung ist endgültig.	Handed in: the grade is final.
+Die Zeit ist um: die Bewertung ist endgültig.	Time is up: the grade is final.
+bewertet bei t = {}	graded at t = {}
+Noch {}	{} left
+Diese Aufgabe zeigt nur die Punktzahl, nicht die einzelnen Kriterien.	This assessment shows the score only, not the single items.
+Kriterien	Items
+Jetzt abgeben?	Hand in now?
+Danach zählt die Bewertung, wie sie jetzt ist, und die Kriterien zeigen, was fehlt. Weiterarbeiten geht, die Punkte bleiben.	From then on the grade counts as it is now, and the items show what is missing. You may go on working; the points stay.
+# A1: the author's panel (workspace/author.rs)
+Aufgabe erstellen	Author an assessment
+Aus dem Projekt wird eine Aufgabe mit Punkten: das fertige Netz als Ziel, die Kriterien daraus, dann das Netz, mit dem Lernende beginnen. Das Ziel steht in der Datei: zum Üben, nicht für Prüfungen, die niemand einsehen darf.	The project becomes an assessment with points: the finished network as the target, the items taken from it, then the network learners start with. The target is stored in the file: for practice, not for exams nobody may look into.
+1  Zielnetz	1  Target network
+Ziel: {} Geräte, {} Kabel.	Target: {} devices, {} cables.
+Noch kein Ziel. Das Netz fertig einrichten, dann übernehmen.	No target yet. Finish setting up the network, then take it.
+Das Netz, wie es jetzt läuft (mit den Running-Configs), wird die Lösung	The network as it runs now (with the running configs) becomes the answer
+Ziel übernommen: {} Geräte, {} Kabel.	Target taken: {} devices, {} cables.
+2  Kriterien aus dem Zielnetz	2  Items from the target network
+Erst mit einem Ziel.	Only with a target.
+Ein Häkchen bewertet die Einstellung; ausgewählt lassen sich Punkte und Texte ändern.	A check mark grades the setting; select it to change its points and texts.
+Keine Einstellung gewählt.	No setting selected.
+Punkte	Points
+Vergleich	Comparison
+gleichwertig	equivalent
+genau	exact
+einer von mehreren Werten	one of several values
+Werte	Values
+Werte, durch | getrennt	values, separated by |
+„{}“ ist kein gültiger Wert.	“{}” is not a valid value.
+Prüfung	Check
+z. B. PC1 reaches 10.0.2.10	e.g. PC1 reaches 10.0.2.10
+Text	Text
+Nicht bewerten	Do not grade
+3  Verbindungsprüfungen	3  Connectivity checks
+Prüfungen in der Sprache der Szenarien, z. B. „PC1 reaches 10.0.2.10“ (ein Ping kommt an) oder „R1 route 10.0.3.0/24“; mehrere mit „;“ gelten zusammen.	Checks in the language of scenarios, e.g. “PC1 reaches 10.0.2.10” (a ping gets an answer) or “R1 route 10.0.3.0/24”; several joined by “;” hold together.
+Prüfung entfernen	Remove the check
+Neue Prüfung	New check
+Die Prüfung ist leer.	The check is empty.
+4  Texte	4  Texts
+Kurztext	Summary
+Einleitung	Introduction
+Thema	Topic
+5  Bewertung	5  Grading
+Jedes Kriterium richtig oder falsch zeigen	Show each item right or wrong
+Nur die Punktzahl zeigen	Show the score only
+Nichts zeigen, bis abgegeben ist	Show nothing until it is handed in
+Zeit (Minuten)	Time (minutes)
+0: ohne Grenze	0: no limit
+6  Ausgangsnetz	6  Start network
+Lernende beginnen mit dem Netz des Projekts. „Ausgangsnetz erzeugen“ nimmt dem Ziel, was die Kriterien prüfen; oder das Netz von Hand zurückbauen.	Learners start with the project's network. “Make the start network” takes from the target what the items check; or take the network apart by hand.
+Das Projekt jetzt: {} von {} Punkten.	The project now: {} of {} points.
+Ausgangsnetz erzeugt (rückgängig mit Strg+Z).	Start network made (undo with Ctrl+Z).
+7  Speichern	7  Save
+{} Kriterien, {}.	{} items, {}.
+Zuerst ein Ziel: „Aktuelles Netz als Ziel“.	First a target: “Current network as the target”.
+Die Aufgabe braucht mindestens ein Kriterium.	The assessment needs at least one item.
+Die Aufgabe braucht einen Titel (Deutsch).	The assessment needs a title (German).
+Die Aufgabe steht im Projekt; jetzt die Datei wählen.	The assessment is in the project; now choose the file.
+Mit Punkten	With points

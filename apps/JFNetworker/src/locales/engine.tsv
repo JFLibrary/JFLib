@@ -857,3 +857,72 @@ OSPF: SPF-Lauf {}: Routen: {}, neu: {}, geändert: {}, entfallen: {}.	OSPF: SPF 
 OSPF: Route {} ({}) über {}, Kosten {}.	OSPF: route {} ({}) via {}, cost {}.
 OSPF: Route {} ({}) jetzt über {}, Kosten {}.	OSPF: route {} ({}) now via {}, cost {}.
 OSPF: Route {} ({}) entfällt.	OSPF: route {} ({}) is gone.
+# A1: assessments -- what Assess::issues finds (jfn_model lab.rs)
+Die Aufgabe hat keine Kriterien.	The assessment has no items.
+Die Aufgabe hat kein Zielnetz.	The assessment has no target network.
+Kriterium {}: unbekannte Art „{}“.	Item {}: unknown kind “{}”.
+Kriterium {} hat keine Prüfung.	Item {} has no check.
+Kriterium {}: „{}“ ist keine Prüfung: {}	Item {}: “{}” is not a check: {}
+Kriterium {}: das Gerät {} gibt es im Projekt nicht.	Item {}: the project has no device {}.
+Kriterium {} nennt kein Gerät.	Item {} names no device.
+Kriterium {} nennt keine Schnittstelle.	Item {} names no interface.
+Kriterium {} nennt keinen Dienst.	Item {} names no service.
+Kriterium {} nennt kein zweites Gerät.	Item {} names no second device.
+Kriterium {}: „any“ braucht eine Liste von Werten.	Item {}: “any” needs a list of values.
+Kriterium {} erwartet keinen Wert.	Item {} expects no value.
+Kriterium {}: „{}“ ist kein gültiger Wert.	Item {}: “{}” is not a valid value.
+# A1: what a graded item found (jfn_sim assess.rs)
+unbekannte Art {}	unknown kind {}
+das Gerät {} gibt es nicht	there is no device {}
+heißt {}	is called {}
+kein Interface {}	no interface {}
+hat keine Adresse	has no address
+hat {}	has {}
+ist ausgeschaltet (shutdown)	is shut down
+ist eingeschaltet	is up (not shut down)
+{} ist kein Switchport	{} is no switch port
+im VLAN {}	in VLAN {}
+im Modus {}	in mode {}
+keine statische Route nach {}	no static route to {}
+statt dessen: {}	instead: {}
+kein Dienst {}	no service {}
+keine Einstellung {}	no setting {}
+ist {}	is {}
+{} {} hängt an {} {}	{} {} is connected to {} {}
+nicht verbunden	not connected
+falsches Kabel: {}	wrong cable: {}
+keine Prüfung	no check
+es fehlt: {}	missing: {}
+zu viel: {}	too much: {}
+# A1: the default texts of items and the rows of the author's tree (jfn_sim assess.rs)
+{} heißt {}	{} is called {}
+{} {}: Adresse {}	{} {}: address {}
+{} {} ist ausgeschaltet	{} {} is shut down
+{} {} ist eingeschaltet	{} {} is up
+{} {} im VLAN {}	{} {} in VLAN {}
+{} {} im Modus {}	{} {} in mode {}
+{}: statische Route {}	{}: static route {}
+Kabel zwischen {} und {}	Cable between {} and {}
+Kabel {} {} – {} {}	Cable {} {} – {} {}
+{} erreicht {}	{} reaches {}
+{} erreicht {} nicht	{} does not reach {}
+Hostname {}	Hostname {}
+Adresse {}	Address {}
+ausgeschaltet (shutdown)	shut down
+eingeschaltet	up (not shut down)
+VLAN {}	VLAN {}
+Modus {}	Mode {}
+Konfiguration (IOS-artig)	Configuration (IOS-like)
+# A1: a ping on a copy of the engine ("expect ... reaches", jfn_sim goal.rs)
+{} meldet: Netz nicht erreichbar	{} reports: network unreachable
+{} meldet: Host nicht erreichbar	{} reports: host unreachable
+{} meldet: Ziel nicht erreichbar	{} reports: destination unreachable
+{} meldet: durch eine Zugriffsliste verboten	{} reports: prohibited by an access list
+{} meldet: TTL abgelaufen	{} reports: TTL exceeded
+{} meldet: Fragmentierung nötig (MTU {})	{} reports: fragmentation needed (MTU {})
+{} meldet: ICMP Typ {} Code {}	{} reports: ICMP type {} code {}
+das Gerät ist ausgeschaltet	the device is switched off
+der Name {} ist unbekannt	the name {} is unknown
+keine Antwort: {}	no answer: {}
+keine Antwort auf {} Pings	no answer to {} pings
+{} von {} Pings beantwortet	{} of {} pings answered
