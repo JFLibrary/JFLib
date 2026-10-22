@@ -53,7 +53,7 @@ const WSE_ENTERED: u32 = 0x10000; // stack entry: prev | index << 8 | WSE_ENTERE
 const TITLE_MAX: usize = 256;
 const SIZE_MAX_DIP: i32 = 8192; // largest client width / height of a window (DIP)
 const FWDQ_MAX: usize = 16; // (U3) keys a borrowing tool window hands on per frame
-const FWDT_MAX: usize = 64; // (U3) typed codepoints handed on per frame
+const FWDT_MAX: usize = super::ctx::TEXTQ_MAX; // (U3) typed codepoints handed on per pass (all)
 const EXT_MAX: usize = 4; // (U3) popup slots (items outside their window)
 const POPUP_ITEMS: u32 = 7; // (U3) popup_ext items: 6 popups + the tooltip
 
@@ -1447,6 +1447,15 @@ impl Ui {
         self.m.win.fwdq.clear();
         self.m.win.fwdt.clear();
         r
+    }
+
+    /// uiw_fwd_arm(i): (U3) typed text for window i outside an input event (ctx.rs
+    /// text_refill): what the widgets of a borrowing tool window leave goes on to its owner,
+    /// as uiw_key_target arranges for typed text
+    pub(crate) fn uiw_fwd_arm(&mut self, i: u32) {
+        if self.uiw_borrows(i) && !self.uiw_focus_is_text(i) {
+            self.m.win.fwd |= 1 << (i & 31);
+        }
     }
 
     // uiw_focus_is_text(i): the focused widget of window i was a text input in the last pass

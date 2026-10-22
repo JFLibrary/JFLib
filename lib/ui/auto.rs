@@ -18,6 +18,7 @@
 //                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
 //   focus S         give the widget the keyboard focus (focus ring shown)
 //   type "text"     ("\n" presses Enter)
+//   commit "text" [N]   an input method commits the text (N times over: one long commit)
 //   cmd ID [ARG]    run a command as if a menu item was chosen
 //   wait MS         advance the virtual clock (16 ms frames; timers, animations and the
 //                   sleep()s of async tasks)
@@ -603,9 +604,9 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 41] = [
+        const CMDS: [&str; 42] = [
             "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
-            "key", "type", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close", "movewin",
+            "key", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close", "movewin",
             "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop", "clip",
             "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
         ];
@@ -705,6 +706,7 @@ impl Ui {
             "wheel" => self.sc_wheel(app, a),
             "key" => self.sc_key(app, a),
             "type" => self.sc_type(app, a),
+            "commit" => self.sc_commit(app, a),
             "cmd" => {
                 let (id, r) = parse_int(a);
                 let (arg, _) = parse_int(r);
@@ -1365,6 +1367,27 @@ impl Ui {
             self.inject(app, plat::E_KEY_UP, 0, 0, 0, vk);
             self.sc.script_mods = 0;
             p = next_word(p);
+        }
+    }
+
+    // commit "text" [N]: the commits of an input method (plat::ime_commit_text) to the window
+    // with the keyboard, as the platform queues them
+    fn sc_commit(&mut self, app: &mut dyn App, a: &[u8]) {
+        let Some((s, r)) = parse_qstring(a, 1024) else {
+            self.fail(b"expected a quoted string");
+            return;
+        };
+        let text = String::from_utf8_lossy(&s).repeat(parse_int(r).0.max(1) as usize);
+        let w = (self.m.win.active & (WIN_MAX as u32 - 1)) as u8;
+        let mut at = 0;
+        while at < text.len() {
+            let n = plat::ime_commit_text(w, &text[at..]);
+            if n == 0 {
+                self.fail(b"the commit was not queued");
+                return;
+            }
+            at += n;
+            self.process_events(app);
         }
     }
 

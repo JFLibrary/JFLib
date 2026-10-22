@@ -1,0 +1,17 @@
+#!args --verify-dirty
+# long input method commits into the code editor (plat::ime_commit_text, lib/ui/ctx.rs: the
+# text queue): 4340 bytes in two commits, then more than the 64 characters a pass took before;
+# every character arrives (columns: the CJK characters and the emoji count two)
+size 1000 680
+click tab:"Code"
+expect #3000 focused
+key ctrl+a
+key delete
+expect #3000 text ""
+commit "Grüße 東京 🙂 abcdefghij " 140
+expect text:"pos: 1:3501" exists
+key ctrl+a
+key delete
+commit "let x = 1; // 東京 🙂 é " 3
+expect #3000 text "let x = 1; // 東京 🙂 é let x = 1; // 東京 🙂 é let x = 1; // 東京 🙂 é "
+expect_nowarn

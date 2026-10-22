@@ -563,7 +563,8 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
 - **`fn key_first(&self) -> u32`**
   ui_key_first: the first unconsumed key this frame (VK | mods &lt;&lt; 16) or 0
 - **`fn text_take(&mut self, cap: usize) -> Vec<u32>`**
-  ui_text_take(cap): the typed codepoints (at most cap), consumed
+  ui_text_take(cap): the typed codepoints (at most cap), consumed; when cap leaves some,
+  they come in the next pass (nothing typed is lost)
 - **`fn hit_flags_at(&mut self, x: i32, y: i32) -> u32`**
   ui_hit_flags_at(x, y): HB_\* flags of the topmost hit box at a point of the main
   window (previous pass) -- non-client hit testing of the platform
@@ -3631,6 +3632,7 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
   focus S         give the widget the keyboard focus (focus ring shown)
   type "text"     ("\n" presses Enter)
+  commit "text" [N]   an input method commits the text (N times over: one long commit)
   cmd ID [ARG]    run a command as if a menu item was chosen
   wait MS         advance the virtual clock (16 ms frames; timers, animations and the
                   sleep()s of async tasks)
@@ -19444,6 +19446,9 @@ and poke our own windows only (no input is injected into the system)
     WT_CLIP_ACCESS  0 when the clipboard can be opened, else the error (5: access denied,
                   e.g. in a sandbox that keeps processes off the clipboard)
     WT_POPUP_SEND popup slot w: SendMessageW(msg a[0], wParam a[1], lParam = point a[2], a[3])
+    WT_POST_CHARS a burst: a[0] WM_CHAR messages posted to window w, the characters a[1],
+                  a[1] + 1, ... a[1] + a[2] - 1 by turns (as an input method commits a long
+                  text) -> the number posted
   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms by a timer of the
                   UI thread: name None = Cancel, Some(name) = the name typed + OK
 ```
@@ -19462,6 +19467,7 @@ WT_CARET: u32 = 10
 WT_ACTIVE: u32 = 11
 WT_CLIP_ACCESS: u32 = 12
 WT_POPUP_SEND: u32 = 13
+WT_POST_CHARS: u32 = 14
 ```
 
 - **`fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64`**
@@ -20402,7 +20408,7 @@ its own path (text-input-v3, linux_wl_ime.rs).
   ibus_available() -> bool        jfgui_IME=0 turns it off
   ibus_ready() -> bool            the input context exists (keys go to it only then)
 
-Signals of the context: CommitText -> ime_commit_set, UpdatePreeditText (cursor in
+Signals of the context: CommitText -> ime_commit_text, UpdatePreeditText (cursor in
 characters -> bytes) / HidePreeditText -> ime_preedit_set, ForwardKeyEvent -> E_TEXT or the
 key's E_KEY_DOWN / E_KEY_UP.  Capabilities: preedit text and focus (IBus draws its own
 candidate window).  Every result wakes the UI thread.
@@ -20840,6 +20846,9 @@ REQUEST_SECRET: u32 = 13
 
 - **`extern "C" fn jfgui_text(len: u32) -> u32`**
   Enqueue committed UTF-8 from the host composition element; uncommitted IME text stays in the DOM.
+  The text goes as commits (whole strings, not one ring slot per character) -> the characters
+  queued: fewer when the queue is full (the host calls again with the rest after jfgui_input),
+  none without a window that takes text.
 
 - **`extern "C" fn jfgui_control(len: u32) -> u32`**
   Process one MessagePort/JavaScript agent request only after explicit activation.
@@ -21560,6 +21569,11 @@ Source: [`lib/plat/ime.rs`](../lib/plat/ime.rs)
 
 - **`fn ime_commit_set(win:u8,text:&str) -> bool`**
   One composition commit is one event, avoiding truncation by the character ring.
+
+- **`fn ime_commit_text(win:u8,text:&str) -> usize`**
+  Committed text of any length: commits of at most 4096 bytes, split between characters ->
+  the bytes queued (fewer: the commit queue or the event ring is full, the rest can follow
+  once the app took these).
 
 - **`fn ime_commit_take(token:u32) -> Option<String>`**
 

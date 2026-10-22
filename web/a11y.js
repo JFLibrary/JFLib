@@ -365,8 +365,9 @@ export class Shadow {
     if(f.n.actions&A.FOCUS && !(t.active && t.focus===f.n.id) && this.claimed!==f.el) {this.claimed=f.el;this.act(f.n,ACT.FOCUS);}
   }
   /** (loader: input events that were not prevented) a text field edited in the DOM (a
-   * replacement, a virtual keyboard, assistive technology) or a range moved */
-  edited(el) {
+   * replacement, a virtual keyboard, assistive technology) or a range moved; type: the
+   * event's inputType */
+  edited(el,type="") {
     const f=this.nodeOf(el);
     if(!f) return;
     const n=f.n;
@@ -375,7 +376,9 @@ export class Shadow {
       this.act(n,ACT.VALUE,0,0,Number(f.el.value));
       return;
     }
-    if(!isField(f.el) || this.composing===f.el) return;
+    // a composition's text went to the app with compositionend; Firefox sends its last input
+    // after that (isComposing false), when the field shows the app's text again: no edit
+    if(!isField(f.el) || this.composing===f.el || type.endsWith("CompositionText")) return;
     if(n.state&(S.DISABLED|S.READONLY) || !(n.actions&A.TEXT)) {this.restore(f.el);return;}
     const text=f.el.value;
     this.act(n,ACT.TEXT,0,0,0,text);

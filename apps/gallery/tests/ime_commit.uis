@@ -1,0 +1,31 @@
+# long input method commits (lib/ui/ctx.rs: the text queue, plat::ime_commit_text): a commit
+# longer than a pass took before (64 characters) arrives whole and in order (emoji, a ZWJ
+# sequence, e + combining acute, CJK), 1000 characters in one commit, and as much through a
+# tool window that hands the text on to its owner (win.rs uiw_fwd_take)
+size 1000 3000
+theme light
+click #7961
+expect #7961 focused
+key ctrl+a
+key delete
+expect #7961 text ""
+commit "Grüße aus 東京 🙂 é 👩‍💻 abc " 5
+expect #7961 text "Grüße aus 東京 🙂 é 👩‍💻 abc Grüße aus 東京 🙂 é 👩‍💻 abc Grüße aus 東京 🙂 é 👩‍💻 abc Grüße aus 東京 🙂 é 👩‍💻 abc Grüße aus 東京 🙂 é 👩‍💻 abc "
+expect #7961 value 220
+key ctrl+a
+key delete
+commit "abcdefghi " 100
+expect #7961 value 1000
+# a tool window whose slider has the focus borrows the keys: the text goes on to the main
+# window's box
+click "Werkzeugfenster"
+expect window 7600 open
+click #7961
+key ctrl+a
+key delete
+click #7601
+expect window 7600 keys
+commit "Grüße aus 東京 🙂 é 👩‍💻 abc " 5
+expect #7961 text "Grüße aus 東京 🙂 é 👩‍💻 abc Grüße aus 東京 🙂 é 👩‍💻 abc Grüße aus 東京 🙂 é 👩‍💻 abc Grüße aus 東京 🙂 é 👩‍💻 abc Grüße aus 東京 🙂 é 👩‍💻 abc "
+expect #7601 value 51
+expect_nowarn

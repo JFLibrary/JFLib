@@ -113,9 +113,15 @@ function dispatch(m) {
     case "tick": break;
     case "event": wasm.jfgui_event(...m.event); input(); break;
     case "text": {
-      // Drain the bounded Rust input ring without rendering between text chunks.
+      // Whole code points (never half a surrogate pair); jfgui_text answers the characters it
+      // queued, the rest follows once input() handed them to the app (no rendering between).
+      // Nothing taken twice in a row: no window takes text, the rest goes.
       const chars=Array.from(m.text);
-      for(let i=0;i<chars.length;i+=96) {const data=encode.encode(chars.slice(i,i+96).join(""));inbox(data);wasm.jfgui_text(data.length);input();}
+      for(let i=0,idle=0;i<chars.length && idle<2;) {
+        const data=encode.encode(chars.slice(i,i+4096).join(""));inbox(data);
+        const n=wasm.jfgui_text(data.length);input();
+        i+=n;idle=n?0:idle+1;
+      }
       break;
     }
     case "import": importFile(m.path,m.bytes,m.dropped,m.durable);input();postMessage({type:"imported",id:m.id});break;

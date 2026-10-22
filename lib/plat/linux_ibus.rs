@@ -14,7 +14,7 @@
 //   ibus_available() -> bool        jfgui_IME=0 turns it off
 //   ibus_ready() -> bool            the input context exists (keys go to it only then)
 //
-// Signals of the context: CommitText -> ime_commit_set, UpdatePreeditText (cursor in
+// Signals of the context: CommitText -> ime_commit_text, UpdatePreeditText (cursor in
 // characters -> bytes) / HidePreeditText -> ime_preedit_set, ForwardKeyEvent -> E_TEXT or the
 // key's E_KEY_DOWN / E_KEY_UP.  Capabilities: preedit text and focus (IBus draws its own
 // candidate window).  Every result wakes the UI thread.
@@ -217,7 +217,7 @@ fn handle(ctx: &mut Ctx, m: &Msg) {
             "CommitText" => {
                 if let Some(t) = ibus_text(m.body.first()) {
                     crate::ime_preedit_set(ctx.win, "", 0);
-                    crate::ime_commit_set(ctx.win, &t);
+                    crate::ime_commit_text(ctx.win, &t); // longer than one commit: in parts
                     crate::wake();
                 }
             }
