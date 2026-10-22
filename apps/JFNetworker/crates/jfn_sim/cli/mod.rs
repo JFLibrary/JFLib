@@ -28,6 +28,8 @@
 //            mode), "ip dhcp excluded-address", "ip helper-address", show ip dhcp binding|
 //            pool|conflict, clear ip dhcp, "ntp server", "ntp master"; dhclient and cat
 //            /etc/resolv.conf on the shell
+//   stp      spanning tree on IOS switches: "spanning-tree ...", show spanning-tree, debug
+//            spanning-tree events, clear spanning-tree detected-protocols
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -61,10 +63,13 @@ pub mod print;
 pub mod tools;
 pub mod lab;
 pub mod scripts;
+pub mod stp;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
 pub const D_ARP: u32 = 2;
+/// "debug spanning-tree events"
+pub const D_STP: u32 = 4;
 
 /// where an IOS console is
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -240,6 +245,7 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
     match n {
         Note::LinkUp { .. } | Note::LinkDown { .. } => true,
         Note::ArpRequest { .. } | Note::ArpReply { .. } | Note::ArpLearned { .. } | Note::ArpProxied { .. } | Note::EchoAnswered { .. } | Note::IcmpSent { .. } | Note::IpLocal { .. } => c.debug > 0,
+        n if n.is_stp_event() => c.debug > 0,
         _ => false,
     }
 }
@@ -490,6 +496,8 @@ impl Engine {
             c.ifs.clear();
             c.vlans.clear();
         }
+        // spanning tree starts with the whole configuration read (stp.rs)
+        self.stp_booted(ni);
         if style == CliStyle::Ios {
             self.ios_snap(ni);
         }

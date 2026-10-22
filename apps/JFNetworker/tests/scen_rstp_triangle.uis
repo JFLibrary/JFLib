@@ -1,0 +1,6 @@
+#!args apps/JFNetworker/tests/fixtures/rstp_triangle.jfnet --scenario apps/JFNetworker/tests/scen/rstp_triangle.scn --golden apps/JFNetworker/tests/scen/rstp_triangle.report
+# golden scenario: rapid spanning tree (IEEE 802.1w, typed as "rapid-pvst") on three switches in a
+# triangle: proposal and agreement, a cable pulled and the new tree within microseconds.  The GUI
+# program runs tests/scen/rstp_triangle.scn on tests/fixtures/rstp_triangle.jfnet without a window and
+# ends with the report, which must equal tests/scen/rstp_triangle.report byte for byte on every
+# target (the script itself is not run)

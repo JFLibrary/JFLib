@@ -49,6 +49,10 @@ Queues, Lastgeneratoren, eigene Skripte).
   Prüfung beim Tippen und den Fehlern des laufenden Programms an ihrer Zeile, Ausführen,
   Stoppen, Übernehmen als Rückgängig-Schritt (das Skript behält Disk und Zahlen), Ausgabe und
   Fehler des Laufs, Vorlagen (siehe [Skript-Editor](#skript-editor)).
+- **Spanning Tree (R4):** STP (IEEE 802.1D) und RSTP (802.1w) auf den IOS-artigen Switches, je
+  Switch eingeschaltet: Wahl der Root-Bridge, Rollen und Zustände, Proposal und Agreement,
+  Edge-Ports, BPDU Guard, `show spanning-tree`, bernsteinfarbene LEDs an blockierten Ports
+  (siehe [Spanning Tree](#spanning-tree)).
 
 ## Bedienung
 
@@ -147,14 +151,17 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `faults.uis` | Fehler aus dem Inspektor auf `lab_window.jfnet`: Strom aus, Rückgängig und Wiederholen, Wiederherstellen und Alle wiederherstellen samt Rückgängig, ein Dienst für 2 s, die Disk, ein Kabel gezogen und verschlechtert, eine Partition, Ablehnungen, das Projekt bleibt gespeichert, die Spur „Fehler“ der Zeitleiste und der Fehler als Bereich im Diagramm von LB1 |
 | `lab_shots.uis` | die Bild-Matrix des Labors (Zeichenfläche mit Pillen und Sparklines, Fehlerkarte, Metriken) hell und dunkel mit 100 und 150 % |
 | `model.uis`, Gruppe `labui` | was das Labor im Fenster braucht: die Texte des Labors als Meldungen mit Englisch (Statuszeilen, Disk, jede Art von Fehler, ihre Ereignisse), KPIs vergangener Zeiträume, die Tabellen des Bereichs Metriken, Pillen und Sparklines, Fehler als Rückgängig-Schritte samt gespeichertem Zustand |
+| `model.uis`, Gruppe `stp` | Spanning Tree (siehe [Spanning Tree](#spanning-tree)): aus ohne Konfiguration (keine BPDUs, die Schleife mit dem alten Text), die ersten BPDUs Byte für Byte, Wahl und Rollen im Dreieck und im Quadrat mit STP und RSTP, die Timer von 802.1D (Learning nach 15 s, Forwarding nach 30 s, nach einem indirekten Ausfall 47 s: Max Age minus Message Age plus 2 × 15 s), Proposal und Agreement in Mikrosekunden, Edge-Ports (portfast sofort, AutoEdge nach 3 s, eine BPDU beendet sie), TCN, TC-Flag für 35 s und kurzes Altern, RSTP löscht MAC-Einträge, STP und RSTP gemischt, BPDU Guard (auch ohne Spanning Tree), Kosten, Prioritäten, 10G, ein Hub (Backup-Port, geteiltes LAN), Befehle, Ausgaben und Debug, LEDs, Simulationsmodus, die Probleme-Liste, Determinismus, Englisch |
+| `stp.uis` | Spanning Tree auf der Zeichenfläche (`fixtures/stp_triangle.jfnet`): LEDs bernstein beim Listening und Learning, Edge-Ports grün, nach 30 s nur noch der Alternate-Port von SW3 bernstein, die Kabel „blockiert“ für Screenreader, der Inspektor von SW3; Bilder hell und dunkel (`build/jfnetworker/stp_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
 `campus.jfnet` (die Abnahme), `lab_window.jfnet` (das Labor der Fenstertests: Cache,
-Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein Skript) und die
-Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
+Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein Skript),
+`stp_triangle.jfnet` und `rstp_triangle.jfnet` (drei Switches im Dreieck mit STP bzw. RSTP) und
+die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`, `rng`, `metrics`, `jmap`,
-`cmdtree`, `hashring`, `lru`), die Skriptsprache die Gruppe `script`.
+`cmdtree`, `hashring`, `lru`, `stp`), die Skriptsprache die Gruppe `script`.
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -198,6 +205,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Skripte | [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs), [`cli/scripts.rs`](crates/jfn_sim/cli/scripts.rs), [`src/scripttest.rs`](src/scripttest.rs) | Skripte als Dienste in den Hosts: Host-API, Anweisungen als Rechenzeit, der Befehl `script`, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Labore | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/goal.rs`](crates/jfn_sim/goal.rs), [`src/workspace/task.rs`](src/workspace/task.rs), [`src/workspace/devwin/svcedit.rs`](src/workspace/devwin/svcedit.rs), [`assets/labs`](assets/labs), [`src/tasktest.rs`](src/tasktest.rs) | die Aufgabe eines Labors in der Projektdatei, das Urteil über eine Erwartung (Runner und Labor) und die Ziele über einen Lauf, das Panel „Aufgabe“ mit der Liste der Labore, die Einstellungen der Dienste als JSON, die vier Labore, ihr Selbsttest (siehe [Labore und Aufgaben](#labore-und-aufgaben)) |
 | Skript-Editor | [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | der Reiter Skripte des Gerätefensters, die Skripte eines Geräts im Projekt mit Rückgängig und Vorlagen, ihr Selbsttest (siehe [Skript-Editor](#skript-editor)) |
+| Spanning Tree | [`crates/jfn_sim/stp.rs`](crates/jfn_sim/stp.rs), [`stp98.rs`](crates/jfn_sim/stp98.rs), [`rstp.rs`](crates/jfn_sim/rstp.rs), [`cli/stp.rs`](crates/jfn_sim/cli/stp.rs), [`lib/netpkt/stp.rs`](../../lib/netpkt/stp.rs), [`src/stptest.rs`](src/stptest.rs) | STP (802.1D-1998) und RSTP (802.1D-2004) auf den Switches, Einstellungen und Befehle, BPDUs, ihr Selbsttest (siehe [Spanning Tree](#spanning-tree)) |
 
 ### Gerätekatalog
 
@@ -365,6 +373,84 @@ Interfaces (`Vlan10`, unter Linux `br0`), gerouteten Switch-Ports und Loopbacks:
 - **Loopback:** auf Linux-Geräten ist ganz 127.0.0.0/8 das Gerät selbst. Kommt so eine Adresse
   über ein Kabel, wird das Paket verworfen.
 
+### Spanning Tree
+
+Die IOS-artigen Switches (JF-S24P, JF-S24L3, JF-S48X) sprechen Spanning Tree nach IEEE: STP
+nach 802.1D (der Algorithmus von 802.1D-1998, [`stp98.rs`](crates/jfn_sim/stp98.rs)) oder RSTP
+nach 802.1w, heute 802.1D-2004 Abschnitt 17 ([`rstp.rs`](crates/jfn_sim/rstp.rs)); wie die
+Bridge ihn nutzt, steht in [`stp.rs`](crates/jfn_sim/stp.rs). **Ohne Konfiguration ist er
+aus:** ein Switch ohne `spanning-tree mode …` ist die lernende Bridge von bisher, sendet keine
+BPDUs und behält empfangene für sich; jedes bestehende Projekt läuft deshalb wie vorher
+(Golden-Berichte und Selbsttests unverändert). Eingeschaltet wird er je Switch in der
+Startkonfiguration oder in der Konsole (`spanning-tree mode rstp` oder `stp`; er startet, wenn
+die ganze Startkonfiguration gelesen ist), `no spanning-tree mode` schaltet ihn wieder aus. Ob
+neue Projekte ihn von Anfang an bekommen, ist eine spätere Entscheidung.
+
+- **Ein Baum für alle VLANs:** BPDUs gehen ungetaggt über jeden Switch-Port (Access und Trunk)
+  an 01:80:c2:00:00:00, die Bridge-ID trägt die System-ID-Erweiterung 0. Herstellereigene
+  Protokolle mit einem Baum je VLAN gibt es nicht: `pvst` und `rapid-pvst` nimmt die Konsole
+  zum Wiedererkennen an und lässt IEEE-STP bzw. -RSTP mit einem Baum laufen, was `show
+  spanning-tree` dazuschreibt; ebenso stellen `spanning-tree vlan LISTE priority …` und die
+  Timer je VLAN den einen Baum ein (die laufende Konfiguration schreibt die globale Form).
+- **Wahl:** Root-Bridge ist die kleinste Bridge-ID (Priorität in Schritten von 4096, dann MAC),
+  Root-Port der Port mit den kleinsten Kosten zur Root (dann Bridge- und Port-ID des Nachbarn,
+  dann die eigene Port-ID), Designated-Port je LAN der mit dem besten Angebot; die übrigen
+  blockieren (Alternate-Port, oder Backup-Port, wenn der Designated-Port des LANs am selben
+  Switch liegt, etwa über einen Hub). Pfadkosten nach 802.1D-2004 Tabelle 17-3 aus der
+  Geschwindigkeit der Leitung (100M 200 000, 1G 20 000, 2.5G 8 000, 10G 2 000, 25G 800, 100G
+  200), außer `spanning-tree cost` setzt sie.
+- **STP:** ein Port geht über Listening und Learning (je Forward Delay, 15 s) nach Forwarding,
+  also 30 s; die Root sendet alle 2 s (Hello Time) Configuration BPDUs, die anderen reichen sie
+  über ihre Designated-Ports weiter, höchstens eine je Sekunde und Port (Hold Time). Fällt der
+  Root-Port selbst aus, wählt der Switch sofort neu (wieder 30 s); fällt eine Leitung anderswo
+  aus, wartet ein blockierter Port, bis seine gespeicherte Information abläuft (Max Age 20 s
+  minus Message Age), also bis zu 50 s. Topologieänderungen: TCN-BPDUs über die Root-Ports, bis
+  der Nachbar bestätigt (TCA), dann setzt die Root für Max Age + Forward Delay (35 s) das
+  TC-Flag, und alle Switches altern ihre MAC-Einträge so lange nach Forward Delay.
+- **RSTP:** Rollen und Zustände (Discarding, Learning, Forwarding) nach den Zustandsmaschinen
+  von 802.1D-2004. Auf Punkt-zu-Punkt-Leitungen schlägt ein Designated-Port vor (Proposal), der
+  Nachbar synchronisiert seine Ports und stimmt zu (Agreement), beide leiten nach Mikrosekunden
+  weiter; ein Alternate-Port wird beim Ausfall des Root-Ports sofort Root-Port. Eine
+  Topologieänderung (ein Port, der kein Edge-Port ist, beginnt weiterzuleiten) geht mit dem
+  TC-Flag weiter, und jeder Switch vergisst dabei die MAC-Einträge seiner anderen Ports.
+  Gemeinsame LANs (an einem Hub, `spanning-tree link-type shared`) bekommen keine Zustimmung und
+  warten auf die Timer (fdWhile, beim ersten Mal Max Age).
+- **STP und RSTP zusammen:** ein RSTP-Port, der Configuration BPDUs hört, spricht auf diesem
+  Port 802.1D (`Peer(STP)` in der Tabelle); ein STP-Switch verwirft RST-BPDUs, wie es
+  802.1D-1998 mit einem unbekannten Typ tut. `clear spanning-tree detected-protocols` versucht
+  es wieder mit RSTP.
+- **Edge-Ports:** `spanning-tree portfast` macht einen Port zum Edge-Port: er leitet sofort
+  weiter und löst keine Topologieänderung aus, bis an ihm eine BPDU ankommt. RSTP findet
+  Edge-Ports auch selbst (AutoEdge: ein Designated-Port, der 3 s lang keine BPDU hört).
+  `spanning-tree bpduguard enable` schaltet einen Port bei der ersten BPDU ab (err-disabled,
+  mit `%SPANTREE-2-BLOCK_BPDUGUARD` und `%PM-4-ERR_DISABLE` in der Konsole und
+  „(err-disabled)“ in `show interfaces`), `shutdown` und `no shutdown` holen ihn zurück; BPDU
+  Guard wirkt auch ohne Spanning Tree.
+- **Im Editor:** die LED eines Ports ist bernstein, solange er nicht weiterleitet (Blocking,
+  Listening, Discarding und Learning), der Inspektor nennt ihn „blockiert“; ein VLAN-Interface
+  ist erst oben, wenn ein Port seines VLANs weiterleitet. Die Probleme-Liste meldet eine
+  Schleife nur, solange nicht jede Bridge darin Spanning Tree spricht, und nennt dann die ohne.
+  BPDUs sind im Simulationsmodus Frames wie andere (grau, Filter STP), der Paket-Tab zeigt alle
+  Felder und Flags, und jede Entscheidung (BPDU empfangen oder gesendet, verworfen, neue Root,
+  Rolle, Zustand, Topologieänderung, gelöschte MAC-Einträge, Edge-Port, Migration, err-disabled)
+  steht in der Ereignisliste.
+- **Zeit:** beide Protokolle zählen in Sekunden-Ticks ab ihrem Start (die Auflösung von
+  802.1D-2004); BPDUs, Leitungen und Einstellungen wirken sofort. Nicht dabei: MSTP, Root
+  Guard, Loop Guard, BPDU-Filter und die herstellereigenen Beschleuniger.
+
+Befehle: global `spanning-tree mode stp|rstp|pvst|rapid-pvst`, `spanning-tree priority N`,
+`spanning-tree hello-time|forward-time|max-age N` (mit 2 × (Forward Delay − 1) ≥ Max Age ≥
+2 × (Hello Time + 1)), dieselben als `spanning-tree vlan LISTE …`; am Switch-Port `spanning-tree
+cost N`, `port-priority N`, `portfast`, `bpduguard enable`, `link-type point-to-point|shared`;
+`show spanning-tree [detail]`, `show spanning-tree interface IF [detail]`, `show spanning-tree
+root`, `show spanning-tree vlan LISTE`, `debug spanning-tree events`, `clear spanning-tree
+detected-protocols [interface IF]` ([`cli/stp.rs`](crates/jfn_sim/cli/stp.rs)). Die Tabellen und
+Konfigurationszeilen folgen dem Vorbild, die Texte darüber, die Hilfe und die Debug-Zeilen sind
+eigene Worte. Für Programme: `Engine::stp_view(dev)` (`TreeView` mit Root, Timern und je Port
+Rolle, Zustand, Kosten, Port-ID, Edge, Link-Typ, Designated-Werten, Zählern) und
+`Action::Stp { dev, set: StpSet }`; die BPDUs baut und zerlegt
+[`netpkt::stp`](../../lib/netpkt/stp.rs).
+
 ### Simulationsmodus
 
 Im Simulationsmodus läuft die Uhr nur auf Knopfdruck. Ein Schritt geht bis zum nächsten
@@ -456,7 +542,7 @@ Tags, Hubs); für Schleifen zählen nur Kabel, die gerade aktiv sind.
 | Trunk ohne gemeinsames erlaubtes VLAN | Fehler |
 | Access-Port gegen Trunk oder gegen Router-Subinterfaces | Warnung |
 | falsches Kupferkabel bei strengem MDI-X | Fehler |
-| Schleife aus Switches oder Hubs (Spanning Tree fehlt noch) | Fehler |
+| Schleife aus Switches oder Hubs, solange nicht jede Bridge darin Spanning Tree spricht | Fehler |
 | Interface mit Adresse, aber abgeschaltet | Warnung |
 
 ### Treiber
@@ -819,6 +905,9 @@ Zustand und Zahlen), `kvctl` (Mitglieder, `ring`, `where SCHLÜSSEL` mit den Rep
 ihren Versionen, `get`, `keys`), `cachectl`, `mqctl` und `workerctl`, mit `-s NAME` für einen
 bestimmten Dienst; ihre Texte sind eigene Worte. Die Skripte eines Hosts zeigt und steuert
 `script` (siehe [Skripte in Hosts](#skripte-in-hosts)).
+Spanning Tree stellen `spanning-tree …`, `show spanning-tree`, `debug spanning-tree events`
+und `clear spanning-tree detected-protocols` ein und zeigen ihn (siehe
+[Spanning Tree](#spanning-tree)).
 
 Namen löst die Shell über den Resolver des Geräts auf (`ping server.lab`, `traceroute
 server.lab`, auch kurz mit der Suchdomäne): die erste Zeile nennt wie getaddrinfo das Ende der
@@ -931,6 +1020,15 @@ server.lab` mit drei Hops (VLAN-Interface von MLS1, R1, SRV1), ein unbekannter N
 zwischen den VLANs, `show ip dhcp binding` und `show ip route` auf R1, `show ip route`,
 `show mac address-table` und `show vlan brief` auf MLS1 und die Pools in R1s Running-Config;
 42 Erwartungen, dazu die Zähler von DHCP-Server und Relay.
+
+Spanning Tree im Dreieck (`stp_triangle.scn` auf `fixtures/stp_triangle.jfnet`, 802.1D): SW1
+wird mit Priorität 4096 Root-Bridge, die Ports zwischen den Switches brauchen 30 s, ein Ping
+davor scheitert; nach dem Ausfall des Kabels SW1–SW2 hält sich SW2 für die Root-Bridge, SW3
+übernimmt erst, als seine Information von SW2 abläuft (17 s später), und leitet 47 s nach dem
+Ausfall weiter. Dasselbe mit RSTP (`rstp_triangle.scn` auf `fixtures/rstp_triangle.jfnet`,
+eingegeben als `rapid-pvst`): Proposal und Agreement nach Mikrosekunden, der neue Baum drei
+BPDUs nach dem Ausfall; beide mit `debug spanning-tree events` auf SW3 und `show
+spanning-tree` zu festen Zeiten.
 
 Ein Skript als Schlüssel-Wert-Speicher (`script_kv.scn` auf `fixtures/script_kv.jfnet`) zeigt
 die Rechenzeit von Skripten: SRV1 nimmt über HTTP Werte an und legt sie auf seine Disk, jede
@@ -1151,7 +1249,7 @@ Rahmen gleichzeitig auf den Kabeln in 1920 × 1080 höchstens 33 ms pro Bild (30
   Router mit zwei Uplinks, zwei Access-Switches, PCs, Drucker, Kamera und Servern mit je einem
   Port an beiden Switches; statische Routen, Adressen aus 10.P.1.0/24 und 10.P.2.0/24. Kabel über
   einen Baum hinaus verbinden nur geroutete Interfaces oder die zwei Netze eines Servers, es gibt
-  also keine Schleife auf Schicht 2 (noch kein STP). `jfn-sim gen 500 --out campus.jfnet`
+  also keine Schleife auf Schicht 2 (ohne Spanning Tree). `jfn-sim gen 500 --out campus.jfnet`
   schreibt dasselbe Projekt als Datei; gleiche Größe, gleiches Projekt.
 - **Verkehr:** `--traffic 300` startet 300 Pings auf einmal (`Engine::ping_many`), deren
   ARP-Anfragen zur Zeit 0 alle auf den Kabeln liegen; der Simulationsmodus zeigt sie als 300
@@ -1206,7 +1304,7 @@ Geste).
 | Phase | Meilensteine |
 |---|---|
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
-| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · NAT/ACL, RIP, OSPF, STP, IPv6 · Liniendiagramm und Code-Editor |
+| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · NAT/ACL, RIP, OSPF, R4 Spanning Tree (STP, RSTP) ✓, IPv6 · Liniendiagramm und Code-Editor |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
 | 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 

@@ -39,6 +39,8 @@ pub struct Port {
     pub mac: Mac,
     /// "no shutdown"
     pub admin_up: bool,
+    /// shut off by BPDU guard until "shutdown" (stp.rs); the link stays down meanwhile
+    pub err_disabled: bool,
     /// the engine slot of its cable
     pub link: Option<usize>,
     pub counters: PortCounters,
@@ -89,7 +91,7 @@ impl Node {
         let ports: Vec<Port> = model
             .ports()
             .into_iter()
-            .map(|spec| Port { mac: port_mac(dev, spec.index), admin_up: up, link: None, counters: PortCounters::default(), spec })
+            .map(|spec| Port { mac: port_mac(dev, spec.index), admin_up: up, err_disabled: false, link: None, counters: PortCounters::default(), spec })
             .collect();
         let mut bridge = if model.has(F_BRIDGE) { Some(Bridge::new(&ports.iter().map(|p| p.spec.clone()).collect::<Vec<_>>())) } else { None };
         // a home router routes its WAN port and bridges the rest
