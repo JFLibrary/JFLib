@@ -44,6 +44,10 @@
 //   linux6   IPv6 in the shell: ip -6 addr|route|neigh, ping6 / ping -6, traceroute6 /
 //            traceroute -6, sysctl net.ipv6.conf.*, the device's configuration
 //   print6   ping and traceroute over IPv6 as console commands
+//   ospf     OSPF at the IOS-like command line: "router ospf N" (its own tree mode behind
+//            "(config-router)#"), "ip ospf ...", show ip ospf [neighbor|interface|database],
+//            the O routes of show ip route, debug ip ospf adj|events|hello, clear ip ospf
+//            process, the lines of the running configuration
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -84,6 +88,7 @@ pub mod nat;
 pub mod ip6;
 pub mod linux6;
 pub mod print6;
+pub mod ospf;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -97,6 +102,17 @@ pub const D_NAT: u32 = 0x200;
 /// "debug ipv6 icmp", "debug ipv6 nd" (cli/ip6.rs)
 pub const D_ICMP6: u32 = 0x800;
 pub const D_ND: u32 = 0x1000;
+/// "debug ip ospf adj|events|hello" (which of them: CliDev::ospf_debug)
+pub const D_OSPF: u32 = 0x400;
+
+/// the routing process a "(config-router)#" console sets up
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Proc {
+    /// "router rip"
+    Rip,
+    /// "router ospf N"
+    Ospf(u16),
+}
 
 /// where an IOS console is
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -112,8 +128,8 @@ pub enum Mode {
     Out,
     /// "ip dhcp pool NAME": "(dhcp-config)#"
     DhcpPool,
-    /// "router rip": "(config-router)#"
-    Router,
+    /// "router rip", "router ospf N": "(config-router)#" for the process it names
+    Router(Proc),
     /// "ip access-list standard|extended NAME": "(config-std-nacl)#", "(config-ext-nacl)#"
     AclStd,
     AclExt,
@@ -190,6 +206,8 @@ pub enum AskKind {
     CopyRunStart,
     /// "Output Interface: " of a ping to a link-local IPv6 address (cli/ip6.rs)
     Ping6Out { dst: netpkt::Ipv6, count: u32, bytes: u16, timeout: Ns },
+    /// "clear ip ospf process"
+    ClearOspf,
 }
 
 /// a console command that runs over virtual time
@@ -238,6 +256,8 @@ pub struct CliDev {
     pub(crate) booting: bool,
     /// the list of an access list's mode
     pub acl: String,
+    /// what "debug ip ospf" shows (cli/ospf.rs DO_*; none: everything)
+    pub ospf_debug: u8,
 }
 
 impl CliDev {
@@ -260,6 +280,7 @@ impl CliDev {
             rcvd_hop: 0,
             booting: false,
             acl: String::new(),
+            ospf_debug: 0,
         }
     }
 }
@@ -286,6 +307,7 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
         n if n.is_rip() => c.debug > 0,
         n if n.is_nat() => c.debug > 0,
         Note::V6(_) => c.debug > 0,
+        n if n.is_ospf() => c.debug > 0,
         _ => false,
     }
 }

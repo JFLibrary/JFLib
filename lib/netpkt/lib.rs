@@ -33,6 +33,9 @@
 //   icmpv6    Icmp6View, Icmp6 (echo and the errors with their quote), Nd: router and neighbor
 //             solicitations and advertisements, redirects, their options (link-layer
 //             addresses, prefix information, MTU); error_quote, name   (RFC 4443, 4861, 4862)
+//   ospf      OspfView, Packet (Hello, Database Description, Link State Request, Update,
+//             Acknowledgment), LsaHeader, Lsa (router, network, summary, AS-external) with the
+//             Fletcher checksum, compare (which instance is newer)      (RFC 2328, RFC 905)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -63,6 +66,7 @@ pub mod stp;
 pub mod rip;
 pub mod nat;
 pub mod icmpv6;
+pub mod ospf;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

@@ -1,0 +1,60 @@
+R1: enable
+R1: debug ip ospf adj
+run 12s
+expect R1 output contains "OSPF: neighbour 3.3.3.3 on GigabitEthernet0/0/1: LOADING -> FULL (Loading Done)"
+expect R1 output contains "OSPF: neighbour 2.2.2.2 on GigabitEthernet0/0/0: INIT -> 2WAY (2-WayReceived)"
+expect R1 output not contains "neighbour 2.2.2.2 on GigabitEthernet0/0/0: 2WAY -> EXSTART"
+R1: undebug all
+# nach der Wartezeit von 40 s: R2 wird DR, R1 BDR
+run 48s
+R1: show ip ospf neighbor
+expect R1 output contains "2.2.2.2           1   FULL/DR"
+R1: show ip ospf interface brief
+R1: show ip ospf database
+R1: show ip route
+expect R1 route 10.0.2.0/24 via 10.0.12.2
+expect R1 route 10.0.3.0/24 via 10.0.13.3
+expect R1 route 10.0.23.0/30 via 10.0.12.2
+expect R1 route 10.0.23.0/30 via 10.0.13.3
+R1: show ip protocols
+R1: show running-config
+expect R1 output contains "router ospf 1\n router-id 1.1.1.1\n passive-interface GigabitEthernet0/0/2\n network 10.0.0.0 0.255.255.255 area 0\n network 1.1.1.1 0.0.0.0 area 0\n!"
+R2: enable
+R2: show ip ospf neighbor
+R2: show ip ospf interface Serial0/2/0
+R2: show ip route ospf
+expect R2 route 10.0.3.0/24 via 10.0.12.1
+R3: enable
+R3: show ip route ospf
+expect R3 route 10.0.2.0/24 via 10.0.13.1
+PC1: ping -c 2 10.0.2.10
+run 3s
+PC1: traceroute -n 10.0.2.10
+run 10s
+expect PC1 output contains " 2  10.0.12.2"
+expect PC1 output contains " 3  10.0.2.10"
+# das LAN-Kabel R1-R2 fehlt: der Weg führt über R3 und die serielle Leitung
+R1: debug ip ospf events
+link down R1 Gi0/0/0
+run 2s
+expect R1 output contains "OSPF: neighbour 2.2.2.2 on GigabitEthernet0/0/0: FULL -> DOWN (KillNbr)"
+R1: undebug all
+R1: show ip ospf neighbor
+R1: show ip route ospf
+expect R1 route 10.0.2.0/24 via 10.0.13.3
+expect R1 no route 10.0.12.0/24
+R2: show ip ospf database
+PC1: traceroute -n 10.0.2.10
+run 10s
+expect PC1 output contains " 2  * 10.0.13.3"
+expect PC1 output contains " 3  10.0.23.1"
+expect PC1 output contains " 4  10.0.2.10"
+# das Kabel kommt zurück: eine neue Wahl am LAN, dann wieder der kurze Weg
+link up R1 Gi0/0/0
+run 60s
+R1: show ip ospf neighbor
+R1: show ip route ospf
+expect R1 route 10.0.2.0/24 via 10.0.12.2
+expect R1 svc ospf metric full == 2
+R2: show ip ospf neighbor
+expect hops ospf >= 100

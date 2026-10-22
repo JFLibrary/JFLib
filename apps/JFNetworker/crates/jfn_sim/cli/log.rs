@@ -1,8 +1,9 @@
 // log -- what the IOS-like console prints by itself: interface changes (%LINK-3-UPDOWN,
 // %LINK-5-CHANGED, %LINEPROTO-5-UPDOWN), "%SYS-5-CONFIG_I", and debugging output made from
 // the device's decisions (debug ip icmp, debug arp, debug spanning-tree events, debug ip rip:
-// cli/rip.rs, debug ip nat: cli/nat.rs, debug ipv6 icmp|nd: cli/ip6.rs), each line with a time
-// stamp; the texts after the message codes are our own words
+// cli/rip.rs, debug ip nat: cli/nat.rs, debug ipv6 icmp|nd: cli/ip6.rs, debug ip ospf:
+// cli/ospf.rs), each line with a time stamp; the texts after the message codes are our own
+// words (%OSPF-5-ADJCHG comes from ospf.rs through ios_log)
 //
 //   Engine::if_state(ni, iface, port)   (not shut down, link, line protocol) of an interface
 //   Engine::ios_snap(ni)                compares every interface with the last look and logs
@@ -241,6 +242,8 @@ impl Engine {
             n if n.is_nat() && d & super::D_NAT != 0 => text = self.nat_debug(n),
             // debug ipv6 icmp|nd (cli/ip6.rs)
             Note::V6(n) if d & (super::D_ICMP6 | super::D_ND) != 0 => text = self.ip6_debug(ni, hop, n, d),
+            // debug ip ospf (cli/ospf.rs)
+            n if n.is_ospf() && d & super::D_OSPF != 0 => text = self.ospf_debug(ni, n),
             _ => {}
         }
         if text.is_empty() {

@@ -33,7 +33,9 @@
 // its header and 8 bytes.  Loopback addresses never come from a wire (martians); on Linux
 // devices all of 127.0.0.0/8 is the device itself.
 // Multicast packets are for the device when the receiving interface joined their group (RIPv2's
-// 224.0.0.9: ip.rs join, rip.rs); the others are dropped with a note.
+// 224.0.0.9: ip.rs join, rip.rs); the others are dropped with a note.  IP protocol 89 goes to
+// the device's OSPF (ospf.rs: 224.0.0.5 and 224.0.0.6 joined where it runs); without OSPF it
+// gets "protocol unreachable" like any protocol the device does not speak.
 // IPv6 frames (ethertype 86DD, Cisco HDLC 86DD on serial lines) go to l3v6.rs.
 
 use alloc::sync::Arc;
@@ -422,6 +424,10 @@ impl Engine {
             }
             PROTO_TCP => self.tcp_input(ni, &v, bcast, hop),
             _ => {
+                // OSPF takes its packets without a transport header (ospf.rs)
+                if v.proto() == ipv4::PROTO_OSPF && self.ospf_rx(ni, iface, &v, hop) {
+                    return;
+                }
                 if !bcast {
                     self.icmp_error(ni, iface, v.packet(), Icmp::Unreachable { code: icmp::UNREACH_PROTO, mtu: 0 }, Some(hop));
                 }

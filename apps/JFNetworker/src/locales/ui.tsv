@@ -882,3 +882,6 @@ Loopback	loopback
 wird geprüft (DAD)	being checked (DAD)
 doppelt (DAD)	duplicate (DAD)
 veraltet	deprecated
+
+# OSPF (R3): the kind of the service in the Dienste tab and the Metriken panel
+Routing (OSPF)	Routing (OSPF)

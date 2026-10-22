@@ -49,6 +49,10 @@
 //                                                      routes, neighbors (ip6.rs, nd.rs); IPv6
 //                                                      looks at a device again after the changes
 //                                                      RIP looks after, and after the power
+//   Ospf                                               OSPF's configuration: "router ospf", its
+//                                                      commands, "ip ospf ...", "clear ip ospf
+//                                                      process" (ospf.rs); OSPF looks again
+//                                                      after the same changes as RIP
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -221,6 +225,8 @@ pub enum Action {
     Nat { dev: u32, act: crate::nat::NatAct },
     /// a change of the IPv6 configuration (ip6.rs, nd.rs)
     Ip6 { dev: u32, set: crate::ip6::Ip6Set },
+    /// a change of OSPF's configuration, or "clear ip ospf process" (ospf.rs)
+    Ospf { dev: u32, set: crate::ospf::OspfSet },
 }
 
 /// why an action was refused (German text through Display)
@@ -296,6 +302,7 @@ impl Engine {
         if let Some(dev) = touched {
             self.rip_kick_dev(dev);
             self.ip6_kick_dev(dev);
+            self.ospf_kick_dev(dev);
         }
         r
     }
@@ -569,6 +576,7 @@ impl Engine {
                 self.nat_apply(ni, dev, act)
             }
             Action::Ip6 { dev, set } => self.ip6_apply(dev, set),
+            Action::Ospf { dev, set } => self.ospf_apply(dev, set),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }

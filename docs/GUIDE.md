@@ -1937,6 +1937,30 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   let nd = Nd::parse(&Icmp6View::parse(body)?).ok()?;            // then nd.check_ip(src, dst, hops)
   let parts = ipv6::fragment(&big, 1280, id)?;                    // 1280 bytes, then the rest
   ```
+
+  And `ospf` (OSPF version 2, RFC 2328 appendix A) -- `OspfView` reads a packet (the 24-byte
+  header: version, type, length, router ID, area, checksum, authentication type and field;
+  `checksum_ok()` is the IP checksum without the authentication field, `lsu_spans()` the LSAs of
+  an update), `Packet::read` / `Packet::to_bytes` turn it into a record and back (`Header` and
+  `Body::Hello`, `Dd`, `Lsr`, `Lsu` with the LSAs byte for byte, `Ack`; `to_bytes` fills in the
+  length and the checksum). `Lsa::parse` / `Lsa::new(..).to_bytes()` read and write an LSA
+  (`LsaHeader` and `LsaBody::Router`, `Network`, `Summary` for types 3 and 4, `External`,
+  `Other`) with the Fletcher checksum of 12.1.7 (`lsa_checksum`, `lsa_checksum_ok`; `set_age`
+  changes the age outside it), `compare` tells which of two instances is more recent (13.1) and
+  `LsaKey` names an LSA. The constants of appendix B (`MAX_AGE`, `LS_REFRESH_TIME`,
+  `MIN_LS_INTERVAL`, `MIN_LS_ARRIVAL` ...), the option bits, DD flags, LSA and link types come
+  with it. `decode::layers` shows every field and every LSA with its bytes and the problems (a
+  checksum of the packet or of an LSA that does not fit, another version, lengths that do not
+  add up); `decode::info` sums it up ("Hello Packet, DR 10.0.0.2, BDR 10.0.0.1, 3 neighbors",
+  "LS Update, 2 LSAs").
+
+  ```rust
+  let hdr = ospf::Header { kind: ospf::T_HELLO, router: rid, area: 0, autype: ospf::AU_NULL, auth: [0; 8] };
+  let bytes = ospf::Packet { hdr, body: ospf::Body::Hello(hello) }.to_bytes();
+  let back = ospf::OspfView::parse(&bytes).filter(|v| v.checksum_ok()).map(|v| ospf::Packet::read(&v));
+  let lsa = ospf::Lsa::new(ospf::LSA_ROUTER, rid, rid, ospf::INITIAL_SEQ, ospf::OPT_E, body).to_bytes();
+  assert!(ospf::lsa_checksum_ok(&lsa));
+  ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
   nonces use `plat::random_bytes`.

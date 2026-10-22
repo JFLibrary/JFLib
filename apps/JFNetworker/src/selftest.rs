@@ -23,6 +23,7 @@
 // riptest.rs: RIP on routers and L3 switches (group rip: jfn_sim::rip, cli/rip.rs).
 // nattest.rs: access lists and NAT (group nat: jfn_sim::acl, jfn_sim::nat, their console).
 // ipv6test.rs: IPv6 (group ipv6: jfn_sim::ip6, nd, l3v6, jobs6, their consoles).
+// ospftest.rs: OSPF version 2 on routers and L3 switches (group ospf: jfn_sim::ospf, cli/ospf.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -72,9 +73,11 @@ mod labuitest;
 mod nattest;
 #[path = "ipv6test.rs"]
 mod ipv6test;
+#[path = "ospftest.rs"]
+mod ospftest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 29] = [
+    let groups: [(&'static str, fn(&mut T)); 30] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -104,6 +107,7 @@ pub fn run() -> i32 {
         ("rip", crate::simtest::riptest::run),
         ("nat", nattest::run),
         ("ipv6", ipv6test::run),
+        ("ospf", ospftest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

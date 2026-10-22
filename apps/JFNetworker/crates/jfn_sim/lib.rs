@@ -95,6 +95,12 @@
 //            address selection and fragmentation by the sender, ICMPv6 errors with their limits
 //   jobs6    ping and traceroute over IPv6 (JobKind::Ping6 / Trace6)
 //   trace6   Note6: the decisions of IPv6 as notes (Note::V6) with their German sentences
+//   ospf     OSPF version 2 (RFC 2328) as the service "ospf" of IOS-like routers and L3
+//            switches: interfaces with DR / BDR election, neighbours from Down to Full with the
+//            database exchange, flooding with acknowledgements and retransmission, aging and
+//            refresh, SPF per area, inter-area routes over an ABR, AS-external routes
+//            (redistribution, default route); its routes in the RIB with distance 110;
+//            OspfCfg / OspfSet (Action::Ospf)
 //
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
@@ -160,6 +166,7 @@ pub mod nd;
 pub mod l3v6;
 pub mod jobs6;
 pub mod trace6;
+pub mod ospf;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -208,3 +215,4 @@ pub use ip6::{Addr6, AddrCfg, AddrState, DefRouter, If6, Ip6, Ip6Set, Limit6, NS
 pub use nd::{Addr6View, Neigh6Row};
 pub use jobs6::{Icmp6Kind, Ping6Ev, Ping6Job, Ping6Opts, Trace6Hop, Trace6Job, Trace6Probe};
 pub use trace6::{Note6, RaWhy};
+pub use ospf::{IfState, LsaDrop, LsaRef, LsuWhy, NbrEvent, NbrState, NetType, OrigWhy, Ospf, OspfCfg, OspfDrop, OspfSet, RtChange, RtKind};

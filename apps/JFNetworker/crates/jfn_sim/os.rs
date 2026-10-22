@@ -11,7 +11,8 @@
 //                             metric_kind and windows: how its numbers become time series
 //                             (series.rs)
 //   SvcEvent                  Udp(Dgram) | Timer(key) | EchoReply | ArpConflict |
-//                             Resolved(lookup) | Link | Ctl
+//                             Resolved(lookup) | Link | Ctl; Ip(IpPkt) for a protocol a service
+//                             takes without a transport header (OSPF: ospf.rs)
 //   OsApi                     what a running service may do: bind / bind_raw / close, send /
 //                             send_from / send_raw, timers (four keys per service), notes,
 //                             the log, interfaces, addresses and routes, resolver settings
@@ -129,6 +130,22 @@ pub struct Dgram {
     pub hop: HopId,
 }
 
+/// a received IP packet of a protocol a service takes without a transport header (OSPF,
+/// protocol 89: Engine::ospf_rx)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IpPkt {
+    pub src: Ipv4,
+    pub dst: Ipv4,
+    pub proto: u8,
+    /// the IPv4 interface it arrived on
+    pub iface: u16,
+    pub ttl: u8,
+    /// the IP payload
+    pub data: Vec<u8>,
+    /// the frame that brought it
+    pub hop: HopId,
+}
+
 /// a request from outside for a service
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Ctl {
@@ -168,6 +185,8 @@ pub enum SvcEvent {
     TcpClosed { sock: u32, end: crate::tcp::TcpEnd },
     /// a console program: what the console gives it
     Console(ConsoleEv),
+    /// an IP packet of a protocol the service takes directly (OSPF: ospf.rs)
+    Ip(IpPkt),
 }
 
 /// what the console gives a program the shell started
@@ -948,6 +967,7 @@ impl Engine {
                     if self.os(ni).is_some_and(|o| o.running(id)) {
                         let cause = match &ev {
                             SvcEvent::Udp(d) => Some(d.hop),
+                            SvcEvent::Ip(p) => Some(p.hop).filter(|&h| h != 0),
                             SvcEvent::TcpAccept { hop, .. } | SvcEvent::TcpConnected { hop, .. } | SvcEvent::TcpData { hop, .. } | SvcEvent::TcpEof { hop, .. } => Some(*hop).filter(|&h| h != 0),
                             _ => None,
                         };

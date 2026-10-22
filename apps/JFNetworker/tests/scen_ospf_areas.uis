@@ -1,0 +1,15 @@
+#!args apps/JFNetworker/tests/fixtures/ospf_areas.jfnet --scenario apps/JFNetworker/tests/scen/ospf_areas.scn --golden apps/JFNetworker/tests/scen/ospf_areas.report
+# golden scenario: OSPF with areas: four routers on a switch elect DR and BDR by priority (R3 with
+# priority 0 never takes part), R1 is ABR to area 1 and to the stub area 2, R4 is ASBR with a
+# static route and the default route towards ISP; inter-area routes from summaries, external
+# routes over ASBR summaries, the default route of the stub area, pings and traceroute from both
+# areas, the DR powered off (the BDR takes over after the dead interval, R4 becomes BDR) and
+# area 2 made totally stubby.  The GUI program runs tests/scen/ospf_areas.scn on
+# tests/fixtures/ospf_areas.jfnet without a window and ends with the report, which must equal
+# tests/scen/ospf_areas.report byte for byte on every target (the script itself is not run)
+# OSPF mit Bereichen: R1 bis R4 an SW1 (Prioritäten 50, 100, 0 und 1) wählen nach 40 s R2 zum DR
+# und R1 zum BDR; R3 bleibt mit R4 in 2-Way. R1 ist ABR zu Bereich 1 (R5) und zum Stub-Bereich 2
+# (R6), R4 ASBR mit einer statischen Route und der Standardroute zu ISP. R5 sieht die Netze der
+# anderen Bereiche als O IA und die externen als O E2, R6 statt der externen eine Standardroute
+# von R1. Dann fällt R2 aus: nach dem Dead-Intervall wird R1 DR und R4 BDR. Zuletzt nimmt
+# no-summary dem Stub-Bereich alle Summaries außer der Standardroute.

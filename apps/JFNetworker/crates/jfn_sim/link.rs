@@ -179,6 +179,10 @@ impl Engine {
         for (n, _) in ends {
             self.rip_kick(n);
         }
+        // and so does OSPF
+        for (n, _) in ends {
+            self.ospf_kick(n);
+        }
         // and IPv6 (nothing for devices without it)
         for (n, _) in ends {
             self.ip6_kick(n);

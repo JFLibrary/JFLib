@@ -1,5 +1,5 @@
 // coretest -- self-checks of the foundation crates (datetime, crypto, compress, datastore,
-// cas, netio incl. TLS and SSH, netpkt incl. DHCP, DNS, NTP, syslog and RIP, base::rng,
+// cas, netio incl. TLS and SSH, netpkt incl. DHCP, DNS, NTP, syslog, RIP and OSPF, base::rng,
 // base::metrics, base::cmdtree, base::hashring, base::lru, agent_core::jmap, script, its VM and
 // its standard library, the BPDUs of netpkt::stp, ICMPv6 and Neighbor Discovery of
 // netpkt::icmpv6): known-answer vectors, round trips, edge cases.  Console program; exit code 1
@@ -45,6 +45,7 @@ mod lrut;
 mod stpt;
 mod ript;
 mod icmpv6t;
+mod ospft;
 
 /// the result collector of a check group
 pub struct T {
@@ -118,7 +119,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 27] = [
+    let groups: [(&'static str, fn(&mut T)); 28] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -146,6 +147,7 @@ fn run() -> i32 {
         ("stp", stpt::run),
         ("rip", ript::run),
         ("icmpv6", icmpv6t::run),
+        ("ospf", ospft::run),
     ];
     let mut failed = 0;
     let mut total = 0;

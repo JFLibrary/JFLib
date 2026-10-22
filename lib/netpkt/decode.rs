@@ -22,6 +22,9 @@
 // ICMPv6 every field of echo, the errors (with the quoted packet) and Neighbor Discovery (RS, RA,
 // NS, NA, redirect and one field per option) with what a receiver refuses: a checksum over the
 // pseudo header that does not fit, an ND message whose hop limit is not 255 (RFC 4443, 4861).
+// OSPF (IP protocol 89) shows the common header, the fields of the five packet types, every LSA
+// header and the links, routers and metrics of the LSAs an update carries, with what a receiver
+// refuses: another version, a wrong packet or LSA checksum, bodies that do not fit (RFC 2328).
 
 use alloc::format;
 use alloc::string::String;
@@ -44,6 +47,7 @@ use crate::be16;
 use crate::http;
 use crate::rip::{self, RipView};
 use crate::icmpv6::{self, Icmp6View, NdMsg, NdOpt};
+use crate::ospf;
 
 pub const P_ETH: u32 = 1 << 0;
 pub const P_VLAN: u32 = 1 << 1;
@@ -508,6 +512,7 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Stp => Some(stp_layer(frame, off, len)),
             Proto::Rip => Some(rip_layer(frame, off, len)),
             Proto::Icmpv6 => Some(icmpv6_layer(frame, off, len, net, hop6, frag6)),
+            Proto::Ospf => Some(ospf_layer(frame, off, len)),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -960,6 +965,7 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Http => Some(http_info(b)),
         Proto::Stp => crate::stp::Bpdu::parse(b).ok().map(|x| crate::stp::summary(&x)),
         Proto::Rip => rip_info(b),
+        Proto::Ospf => ospf_info(b),
         _ => None,
     }
 }
@@ -1884,6 +1890,198 @@ fn icmpv6_layer(frame: &[u8], off: usize, len: usize, net: Net, hop: Option<u8>,
     l
 }
 
+// ---------------------------------------------------------------- OSPF
+
+/// "Router-LSA 1.1.1.1 from 1.1.1.1, seq 0x80000002, age 3"
+fn ospf_lsa_head(h: &ospf::LsaHeader) -> String {
+    format!("{} {} from {}, seq 0x{:08x}, age {}", ospf::lsa_name(h.kind), h.id, h.adv, h.seq, h.age)
+}
+
+fn ospf_link_kind(k: u8) -> &'static str {
+    match k {
+        ospf::LINK_P2P => "point-to-point",
+        ospf::LINK_TRANSIT => "transit network",
+        ospf::LINK_STUB => "stub network",
+        ospf::LINK_VIRTUAL => "virtual link",
+        _ => "unknown link type",
+    }
+}
+
+/// the fields of one LSA of an update at `o` (its length checked); its problems
+fn ospf_lsa_fields(l: &mut B, lsa: &[u8], o: usize) {
+    let Some(h) = ospf::LsaHeader::of(lsa) else {
+        return;
+    };
+    let ok = ospf::lsa_checksum_ok(lsa);
+    let ck = if ok { format!("0x{:04x} [correct]", h.checksum) } else { format!("0x{:04x} [incorrect, should be 0x{:04x}]", h.checksum, ospf::lsa_checksum(lsa)) };
+    l.f("LSA", o, ospf::LSA_HDR_LEN, format!("{}, options {}, checksum {}, len {}", ospf_lsa_head(&h), ospf::options_text(h.options), ck, h.len));
+    if !ok {
+        l.bad(format!("bad LSA checksum of {} {} from {}", ospf::lsa_name(h.kind), h.id, h.adv));
+    }
+    if h.age > ospf::MAX_AGE {
+        l.bad(format!("LS age {} is beyond MaxAge (3600)", h.age));
+    }
+    let x = match ospf::Lsa::parse(lsa) {
+        Ok(x) => x,
+        Err(e) => {
+            l.bad(format!("{} {}: {}", ospf::lsa_name(h.kind), h.id, e.text()));
+            return;
+        }
+    };
+    let b = o + ospf::LSA_HDR_LEN;
+    match &x.body {
+        ospf::LsaBody::Router(r) => {
+            let mut fl: Vec<&str> = Vec::new();
+            for (bit, n) in [(ospf::RTR_V, "V (virtual link endpoint)"), (ospf::RTR_E, "E (AS boundary router)"), (ospf::RTR_B, "B (area border router)")] {
+                if r.flags & bit != 0 {
+                    fl.push(n);
+                }
+            }
+            let flags = if fl.is_empty() { String::from("none") } else { fl.join(", ") };
+            l.f("Router flags", b, 1, format!("0x{:02x} ({})", r.flags, flags));
+            l.f("Number of links", b + 2, 2, format!("{}", r.links.len()));
+            let mut p = b + 4;
+            for k in &r.links {
+                let n = 12 + 4 * k.tos.len();
+                let what = match k.kind {
+                    ospf::LINK_STUB => format!("{} {}/{}, metric {}", ospf_link_kind(k.kind), k.id, k.data, k.metric),
+                    ospf::LINK_TRANSIT => format!("{} with DR {}, interface {}, metric {}", ospf_link_kind(k.kind), k.id, k.data, k.metric),
+                    _ => format!("{} to {}, interface {}, metric {}", ospf_link_kind(k.kind), k.id, k.data, k.metric),
+                };
+                l.f("Link", p, n, what);
+                p += n;
+            }
+        }
+        ospf::LsaBody::Network(n) => {
+            l.f("Netmask", b, 4, format!("{}", n.mask));
+            for (i, r) in n.routers.iter().enumerate() {
+                l.f("Attached Router", b + 4 + 4 * i, 4, format!("{}", r));
+            }
+        }
+        ospf::LsaBody::Summary(s) => {
+            l.f("Netmask", b, 4, format!("{}", s.mask));
+            let m = if s.metric == ospf::LS_INFINITY { String::from("16777215 (unreachable)") } else { format!("{}", s.metric) };
+            l.f("Metric", b + 5, 3, m);
+        }
+        ospf::LsaBody::External(e) => {
+            l.f("Netmask", b, 4, format!("{}", e.mask));
+            l.f("External Type", b + 4, 1, String::from(if e.e2 { "Type 2 (metric is larger than any path inside the AS)" } else { "Type 1 (metric counts like an OSPF cost)" }));
+            let m = if e.metric == ospf::LS_INFINITY { String::from("16777215 (unreachable)") } else { format!("{}", e.metric) };
+            l.f("Metric", b + 5, 3, m);
+            l.f("Forwarding Address", b + 8, 4, format!("{}", e.fwd));
+            l.f("External Route Tag", b + 12, 4, format!("{}", e.tag));
+        }
+        ospf::LsaBody::Other(d) => {
+            if !d.is_empty() {
+                l.f("Data", b, d.len(), format!("{} bytes", d.len()));
+            }
+        }
+    }
+}
+
+fn ospf_layer(frame: &[u8], off: usize, len: usize) -> B {
+    let raw = &frame[off..off + len];
+    let Some(v) = ospf::OspfView::parse(raw) else {
+        let mut l = payload_layer(Proto::Ospf, off, len);
+        l.bad(String::from("shorter than an OSPF header or than its length field"));
+        return l;
+    };
+    let kind = v.kind();
+    let mut l = B::new(Proto::Ospf, off, len, format!("Open Shortest Path First ({})", ospf::type_name(kind)));
+    l.f("Version", off, 1, format!("{}", v.version()));
+    l.f("Message Type", off + 1, 1, format!("{} ({})", ospf::type_name(kind), kind));
+    l.f("Packet Length", off + 2, 2, format!("{}", v.len()));
+    l.f("Source OSPF Router", off + 4, 4, format!("{}", v.router()));
+    l.f("Area ID", off + 8, 4, ospf::area_text(v.area()));
+    let au = v.autype();
+    if au == ospf::AU_CRYPTO {
+        l.f("Checksum", off + 12, 2, format!("0x{:04x} [none with cryptographic authentication]", v.checksum()));
+    } else {
+        let ok = v.checksum_ok();
+        let want = if ok { None } else { Some(v.computed_checksum()) };
+        l.f("Checksum", off + 12, 2, ck_str(v.checksum(), ok, want));
+        if !ok {
+            l.bad(format!("bad OSPF checksum (should be 0x{:04x})", v.computed_checksum()));
+        }
+    }
+    let a = v.auth();
+    let (auname, audata) = match au {
+        ospf::AU_NULL => ("Null (0)", if a == [0; 8] { String::from("none") } else { hex_short(&a) }),
+        ospf::AU_SIMPLE => ("Simple password (1)", String::from_utf8_lossy(&a[..a.iter().position(|&c| c == 0).unwrap_or(8)]).into_owned()),
+        ospf::AU_CRYPTO => ("Cryptographic (2)", format!("key ID {}, digest length {}, sequence {}", a[2], a[3], crate::be32(&a, 4))),
+        n => {
+            l.bad(format!("unknown authentication type {}", n));
+            ("Unknown", hex_short(&a))
+        }
+    };
+    l.f("Auth Type", off + 14, 2, String::from(auname));
+    l.f("Auth Data", off + 16, 8, audata);
+    if raw.len() > v.len() {
+        l.f("Trailing bytes", off + v.len(), raw.len() - v.len(), format!("{} bytes", raw.len() - v.len()));
+    }
+    if v.version() != ospf::VERSION {
+        l.bad(format!("version {}: an OSPFv2 router ignores the packet", v.version()));
+        return l;
+    }
+    let pkt = match ospf::Packet::read(&v) {
+        Ok(p) => p,
+        Err(e) => {
+            l.bad(e.text());
+            if v.len() > ospf::HDR_LEN {
+                l.f("Data", off + ospf::HDR_LEN, v.len() - ospf::HDR_LEN, format!("{} bytes", v.len() - ospf::HDR_LEN));
+            }
+            return l;
+        }
+    };
+    let b = off + ospf::HDR_LEN;
+    match &pkt.body {
+        ospf::Body::Hello(h) => {
+            l.f("Network Mask", b, 4, format!("{}", h.mask));
+            l.f("Hello Interval [sec]", b + 4, 2, format!("{}", h.interval));
+            l.f("Options", b + 6, 1, format!("0x{:02x} ({})", h.options, ospf::options_text(h.options)));
+            l.f("Router Priority", b + 7, 1, format!("{}", h.priority));
+            l.f("Router Dead Interval [sec]", b + 8, 4, format!("{}", h.dead));
+            l.f("Designated Router", b + 12, 4, format!("{}", h.dr));
+            l.f("Backup Designated Router", b + 16, 4, format!("{}", h.bdr));
+            for (i, n) in h.neighbors.iter().enumerate() {
+                l.f("Active Neighbor", b + ospf::HELLO_LEN + 4 * i, 4, format!("{}", n));
+            }
+        }
+        ospf::Body::Dd(d) => {
+            l.f("Interface MTU", b, 2, format!("{}", d.mtu));
+            l.f("Options", b + 2, 1, format!("0x{:02x} ({})", d.options, ospf::options_text(d.options)));
+            l.f("DB Description", b + 3, 1, format!("0x{:02x} ({})", d.flags, ospf::dd_flags_text(d.flags)));
+            l.f("DD Sequence", b + 4, 4, format!("0x{:08x} ({})", d.seq, d.seq));
+            for (i, h) in d.lsas.iter().enumerate() {
+                l.f("LSA Header", b + ospf::DD_LEN + ospf::LSA_HDR_LEN * i, ospf::LSA_HDR_LEN, format!("{}, checksum 0x{:04x}, len {}", ospf_lsa_head(h), h.checksum, h.len));
+            }
+        }
+        ospf::Body::Lsr(keys) => {
+            for (i, k) in keys.iter().enumerate() {
+                l.f("Link State Request", b + ospf::LSR_ENTRY_LEN * i, ospf::LSR_ENTRY_LEN, format!("{} {} from {}", ospf::lsa_name(k.kind), k.id, k.adv));
+            }
+        }
+        ospf::Body::Lsu(lsas) => {
+            l.f("Number of LSAs", b, 4, format!("{}", lsas.len()));
+            let spans = v.lsu_spans().unwrap_or_default();
+            for (&(o, n), lsa) in spans.iter().zip(lsas) {
+                ospf_lsa_fields(&mut l, &lsa[..n], off + o);
+            }
+            let end = spans.last().map(|&(o, n)| o + n).unwrap_or(ospf::HDR_LEN + 4);
+            if end < v.len() {
+                l.f("Data", off + end, v.len() - end, format!("{} bytes", v.len() - end));
+                l.bad(format!("{} bytes after the last LSA", v.len() - end));
+            }
+        }
+        ospf::Body::Ack(hs) => {
+            for (i, h) in hs.iter().enumerate() {
+                l.f("LSA Header", b + ospf::LSA_HDR_LEN * i, ospf::LSA_HDR_LEN, format!("{}, checksum 0x{:04x}, len {}", ospf_lsa_head(h), h.checksum, h.len));
+            }
+        }
+    }
+    l
+}
+
 /// "Echo (ping) request id=0x0001, seq=1, hop limit=64", "Neighbor Solicitation for 2001:db8::1
 /// from 02:4a:00:00:01:01", "Neighbor Advertisement 2001:db8::1 (sol, ovr) is at ...", "Router
 /// Advertisement from ..."
@@ -1916,4 +2114,35 @@ fn icmpv6_info(b: &[u8], hop: u8) -> String {
         }
         NdMsg::Redirect { .. } => String::from("Redirect"),
     }
+}
+
+/// "Hello Packet, DR 10.0.0.1, BDR 10.0.0.2, 2 neighbors", "DB Description (I, M, MS), seq
+/// 0x0000a1b2, 0 LSA headers", "LS Request, 2 LSAs", "LS Update, 3 LSAs", "LS Acknowledge, 1
+/// LSA header"
+fn ospf_info(b: &[u8]) -> Option<String> {
+    let v = ospf::OspfView::parse(b)?;
+    if v.version() != ospf::VERSION {
+        return Some(format!("OSPF version {}", v.version()));
+    }
+    let n = |k: usize, one: &str, many: &str| format!("{} {}", k, if k == 1 { one } else { many });
+    let Ok(p) = ospf::Packet::read(&v) else {
+        return Some(String::from(ospf::type_name(v.kind())));
+    };
+    Some(match &p.body {
+        ospf::Body::Hello(h) => {
+            let mut s = String::from("Hello Packet");
+            if !h.dr.is_unspecified() {
+                s.push_str(&format!(", DR {}", h.dr));
+            }
+            if !h.bdr.is_unspecified() {
+                s.push_str(&format!(", BDR {}", h.bdr));
+            }
+            s.push_str(&format!(", {}", n(h.neighbors.len(), "neighbor", "neighbors")));
+            s
+        }
+        ospf::Body::Dd(d) => format!("DB Description ({}), seq 0x{:08x}, {}", ospf::dd_flags_text(d.flags), d.seq, n(d.lsas.len(), "LSA header", "LSA headers")),
+        ospf::Body::Lsr(k) => format!("LS Request, {}", n(k.len(), "LSA", "LSAs")),
+        ospf::Body::Lsu(l) => format!("LS Update, {}", n(l.len(), "LSA", "LSAs")),
+        ospf::Body::Ack(h) => format!("LS Acknowledge, {}", n(h.len(), "LSA header", "LSA headers")),
+    })
 }

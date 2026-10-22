@@ -10,6 +10,9 @@
 //                                from nat.rs and acl.rs, the IPv6 lines from ip6.rs)
 //   show ip route [connected|static|rip]   RIP routes with the age of their last update and
 //                                their interface; the legend names R only where RIP runs
+//   show ip route ospf           OSPF routes as O, O IA, O E1 and O E2 (cli/ospf.rs) with the
+//                                time since they are as they are and their interface; the legend
+//                                names them only where OSPF runs
 //
 // The layouts follow IOS 15 / IOS-XE: column widths of "show ip interface brief" (22, 15, 3,
 // 6, 21), "show arp" (address 15, age right-aligned in 9), "show mac address-table" and "show
@@ -38,6 +41,9 @@ use crate::kernel::{Engine, SEC};
 const ROUTE_CODES: &str = "Codes: C - connected network, L - address of this device, S - static route,\n       * - default route\n\n";
 /// the codes on a device that runs RIP
 const ROUTE_CODES_RIP: &str = "Codes: C - connected network, L - address of this device, S - static route,\n       R - learned by RIP, * - default route\n\n";
+/// the codes on a device that runs OSPF, and on one that runs both
+const ROUTE_CODES_OSPF: &str = "Codes: C - connected network, L - address of this device, S - static route,\n       O - learned by OSPF, IA - from another area, E1 / E2 - external of type 1 / 2,\n       * - default route\n\n";
+const ROUTE_CODES_BOTH: &str = "Codes: C - connected network, L - address of this device, S - static route,\n       R - learned by RIP, O - learned by OSPF, IA - from another area,\n       E1 / E2 - external of type 1 / 2, * - default route\n\n";
 
 /// the length of the classful network of an address
 fn classful(a: Ipv4) -> u8 {
@@ -106,6 +112,17 @@ impl Engine {
                     s.push_str("Debug output for NAT: on\n");
                 }
                 s.push_str(&Self::ios_debug6_lines(d));
+                if d & super::D_OSPF != 0 {
+                    let k = match self.cdev(ni).map(|c| c.ospf_debug).unwrap_or(0) {
+                        0 => super::ospf::DO_ADJ | super::ospf::DO_EVENTS | super::ospf::DO_HELLO,
+                        k => k,
+                    };
+                    for (bit, what) in [(super::ospf::DO_ADJ, "adjacencies"), (super::ospf::DO_EVENTS, "events"), (super::ospf::DO_HELLO, "hellos")] {
+                        if k & bit != 0 {
+                            s.push_str(&format!("Debug output for OSPF {}: on\n", what));
+                        }
+                    }
+                }
                 s
             }
             K::ShowVersion => self.show_version(ni),
@@ -184,6 +201,8 @@ impl Engine {
         }
         // "router rip" (cli/rip.rs)
         s.push_str(&self.ios_rip_config(ni));
+        // "router ospf" (cli/ospf.rs)
+        s.push_str(&self.ios_ospf_config(ni));
         // the global lines of NAT come before the static routes (cli/nat.rs)
         s.push_str(&self.ios_nat_config(ni));
         if let Some(st) = &n.ip {
@@ -277,6 +296,7 @@ impl Engine {
             s.push_str(&self.ios_access_group_config(ni, i));
             s.push_str(&self.ios_helper_config(ni, name));
             s.push_str(&self.ios_rip_if_config(ni, name));
+            s.push_str(&self.ios_ospf_if_config(ni, name));
             if x.mtu != 1500 && !x.is_loopback() {
                 s.push_str(&format!(" ip mtu {}\n", x.mtu));
             }
@@ -507,7 +527,7 @@ impl Engine {
 
     // ---------------------------------------------------------------- routes, ARP, MAC, VLANs
 
-    /// "show ip route [connected|static|rip]"
+    /// "show ip route [connected|static|rip|ospf]"
     fn show_ip_route(&self, ni: usize, only: Option<&str>) -> String {
         let dev = self.dev_of(ni);
         let Some(st) = self.stack(ni) else {
@@ -519,6 +539,7 @@ impl Engine {
         let mut all = self.routes(dev);
         let rip = self.rip_on(ni);
         let rip_db = self.rip_of(ni);
+        let ospf = self.ospf_on(ni);
         // per prefix only the routes of the best distance are in the table
         let mut best: BTreeMap<(u32, u8), u8> = BTreeMap::new();
         for r in &all {
@@ -529,13 +550,19 @@ impl Engine {
         // "show ip route rip" and the like: only the routes of that source
         let keep = |r: &Route| match only {
             Some("rip") => r.src == RouteSrc::Rip,
+            Some("ospf") => r.src == RouteSrc::Ospf,
             Some("static") => r.src == RouteSrc::Static,
             Some("connected") => matches!(r.src, RouteSrc::Connected | RouteSrc::Local),
             _ => true,
         };
         all.retain(|r| best.get(&(r.prefix.addr.to_u32(), r.prefix.len)) == Some(&r.ad) && keep(r));
         let routes: Vec<&Route> = all.iter().collect();
-        let mut s = String::from(if rip { ROUTE_CODES_RIP } else { ROUTE_CODES });
+        let mut s = String::from(match (rip, ospf) {
+            (true, true) => ROUTE_CODES_BOTH,
+            (true, false) => ROUTE_CODES_RIP,
+            (false, true) => ROUTE_CODES_OSPF,
+            (false, false) => ROUTE_CODES,
+        });
         let default = routes.iter().find(|r| r.prefix.len == 0);
         match default {
             Some(r) => s.push_str(&format!("Gateway of last resort is {} to network 0.0.0.0\n\n", r.via.unwrap_or(Ipv4::UNSPECIFIED))),
@@ -562,10 +589,16 @@ impl Engine {
         let configured_if = |r: &Route| st.statics.iter().any(|x| x.prefix == r.prefix && x.via == r.via && x.iface.is_some());
         let entry = |s: &mut String, rs: &[&Route], width: usize, with_len: bool| {
             let r0 = rs[0];
-            let mut code = String::from(r0.src.code());
-            if r0.prefix.len == 0 {
-                code.push('*');
-            }
+            let code = if r0.src == RouteSrc::Ospf {
+                // "O", "O IA", "O E2", "O*E2" (cli/ospf.rs)
+                self.ospf_route_code(ni, r0)
+            } else {
+                let mut c = String::from(r0.src.code());
+                if r0.prefix.len == 0 {
+                    c.push('*');
+                }
+                c
+            };
             let net = if with_len { format!("{}", r0.prefix) } else { format!("{}", r0.prefix.addr) };
             let head = format!("{}{}", pad(&code, width), net);
             for (k, r) in rs.iter().enumerate() {
@@ -578,6 +611,9 @@ impl Engine {
                             // RIP: how long ago the route was heard, and the interface
                             let age = rip_db.and_then(|x| x.age(r.prefix, v, self.now)).unwrap_or(0);
                             l.push_str(&format!(", {}, {}", super::rip::hms(age), name(r.iface)));
+                        } else if r.src == RouteSrc::Ospf {
+                            // OSPF: how long the route is as it is, and the interface
+                            l.push_str(&format!(", {}, {}", super::rip::hms(self.ospf_route_age(ni, r.prefix)), name(r.iface)));
                         } else if configured_if(r) {
                             l.push_str(&format!(", {}", name(r.iface)));
                         }
