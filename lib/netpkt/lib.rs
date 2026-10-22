@@ -10,7 +10,8 @@
 //             L2), 802.2 LLC
 //   arp       ArpView, Arp (request / reply / probe / announce)          (RFC 826, 5227)
 //   ipv4      Ipv4View, Ipv4Hdr, dec_ttl, fragment, Reassembly           (RFC 791, 1624)
-//   ipv6      Ipv6View, Ipv6Hdr, upper_layer (extension header walk)     (RFC 8200)
+//   ipv6      Ipv6View, Ipv6Hdr, upper_layer / ext_headers (extension header walk),
+//             FragHdr, fragment, Reassembly6                             (RFC 8200, 5722)
 //   icmp      IcmpView, Icmp, error_quote, name                          (RFC 792, 1191)
 //   udp       UdpView, UdpHdr (push_v4 / push_v6 with checksum)          (RFC 768)
 //   tcp       TcpView, TcpHdr, TcpOpts (MSS, WS, SACK, TS), seq_lt ...   (RFC 9293, 7323, 2018)
@@ -29,6 +30,12 @@
 //             authentication entry recognised                       (RFC 2453, 1058)
 //   nat       address and port translation in place: Flow (what translation and filters look
 //             at), rewrite / rewrite_quoted with incremental checksums (RFC 3022, 1624, 5508)
+//   icmpv6    Icmp6View, Icmp6 (echo and the errors with their quote), Nd: router and neighbor
+//             solicitations and advertisements, redirects, their options (link-layer
+//             addresses, prefix information, MTU); error_quote, name   (RFC 4443, 4861, 4862)
+//   ospf      OspfView, Packet (Hello, Database Description, Link State Request, Update,
+//             Acknowledgment), LsaHeader, Lsa (router, network, summary, AS-external) with the
+//             Fletcher checksum, compare (which instance is newer)      (RFC 2328, RFC 905)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -58,6 +65,8 @@ pub mod http;
 pub mod stp;
 pub mod rip;
 pub mod nat;
+pub mod icmpv6;
+pub mod ospf;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

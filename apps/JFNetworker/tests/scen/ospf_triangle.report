@@ -1,0 +1,355 @@
+# JFNetworker-Szenario ospf_triangle.scn: „OSPF im Dreieck“, 6 Geräte, 6 Verbindungen, Seed 13
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Loopback0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Loopback0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/2 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/2 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Loopback0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Loopback0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/2 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/2 is up
+   0.000000000  R3      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Loopback0 is up
+   0.000000000  R3      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Loopback0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  R3      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  R3      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Serial0/2/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Serial0/2/0 is up
+   0.000000000  R3      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Serial0/2/0 is up
+   0.000000000  R3      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Serial0/2/0 is up
+   0.000000000  R3      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/2 is up
+   0.000000000  R3      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/2 is up
+   0.000000000  R1      R1>enable
+   0.000000000  R1      R1#debug ip ospf adj
+   0.000000000  R1      Debug output for OSPF adjacencies: on
+   0.000000000  --      run 12s
+   0.000000000  R1      *Mar  1 00:00:00.000: OSPF: GigabitEthernet0/0/0 goes from DOWN to WAIT
+   0.000000000  R1      *Mar  1 00:00:00.000: OSPF: GigabitEthernet0/0/1 goes from DOWN to P2P
+   0.000000000  R1      *Mar  1 00:00:00.000: OSPF: GigabitEthernet0/0/2 goes from DOWN to DR
+   0.000000000  R1      *Mar  1 00:00:00.000: OSPF: Loopback0 goes from DOWN to LOOP
+   0.000000866  R1      *Mar  1 00:00:00.000: OSPF: neighbour 2.2.2.2 on GigabitEthernet0/0/0: DOWN -> INIT (HelloReceived)
+   0.000000866  R1      *Mar  1 00:00:00.000: OSPF: neighbour 3.3.3.3 on GigabitEthernet0/0/1: DOWN -> INIT (HelloReceived)
+  10.000000898  R1      *Mar  1 00:00:10.000: OSPF: neighbour 2.2.2.2 on GigabitEthernet0/0/0: INIT -> 2WAY (2-WayReceived)
+  10.000000898  R1      *Mar  1 00:00:10.000: OSPF: neighbour 3.3.3.3 on GigabitEthernet0/0/1: INIT -> EXSTART (2-WayReceived)
+  10.000000898  R1      *Mar  1 00:00:10.000: OSPF: DD out of GigabitEthernet0/0/1 to 3.3.3.3: flags I, M, MS, seq 0x6234ad2d, 0 LSA headers
+  10.000001668  R1      *Mar  1 00:00:10.000: OSPF: DD from 3.3.3.3 on GigabitEthernet0/0/1: flags I, M, MS, seq 0xa1155259, 0 LSA headers
+  10.000001668  R1      *Mar  1 00:00:10.000: OSPF: exchange with 3.3.3.3 on GigabitEthernet0/0/1: this router is slave
+  10.000001668  R1      *Mar  1 00:00:10.000: OSPF: neighbour 3.3.3.3 on GigabitEthernet0/0/1: EXSTART -> EXCHANGE (NegotiationDone)
+  10.000001668  R1      *Mar  1 00:00:10.000: OSPF: DD out of GigabitEthernet0/0/1 to 3.3.3.3: flags none, seq 0xa1155259, 1 LSA header
+  10.000003528  R1      *Mar  1 00:00:10.000: OSPF: DD from 3.3.3.3 on GigabitEthernet0/0/1: flags MS, seq 0xa115525a, 1 LSA header
+  10.000003528  R1      *Mar  1 00:00:10.000: OSPF: DD out of GigabitEthernet0/0/1 to 3.3.3.3: flags none, seq 0xa115525a, 0 LSA headers
+  10.000003528  R1      *Mar  1 00:00:10.000: OSPF: neighbour 3.3.3.3 on GigabitEthernet0/0/1: EXCHANGE -> LOADING (ExchangeDone)
+  10.000003528  R1      *Mar  1 00:00:10.000: OSPF: asking 3.3.3.3 on GigabitEthernet0/0/1 for 1 LSA
+  10.000005100  R1      *Mar  1 00:00:10.000: OSPF: 3.3.3.3 on GigabitEthernet0/0/1 asks for 1 LSA
+  10.000006364  R1      *Mar  1 00:00:10.000: OSPF: neighbour 3.3.3.3 on GigabitEthernet0/0/1: LOADING -> FULL (Loading Done)
+  10.000006364  R1      *Mar  1 00:00:10.000: %OSPF-5-ADJCHG: process 1, neighbour 3.3.3.3 on GigabitEthernet0/0/1: LOADING -> FULL (Loading Done)
+  10.000006414  R3      *Mar  1 00:00:10.000: %OSPF-5-ADJCHG: process 1, neighbour 1.1.1.1 on GigabitEthernet0/0/1: LOADING -> FULL (Loading Done)
+  10.002156500  R3      *Mar  1 00:00:10.002: %OSPF-5-ADJCHG: process 1, neighbour 2.2.2.2 on Serial0/2/0: LOADING -> FULL (Loading Done)
+  10.002484675  R2      *Mar  1 00:00:10.002: %OSPF-5-ADJCHG: process 1, neighbour 3.3.3.3 on Serial0/2/0: LOADING -> FULL (Loading Done)
+  12.000000000  ok      expect R1 output contains "OSPF: neighbour 3.3.3.3 on GigabitEthernet0/0/1: LOADING -> FULL (Loading Done)"
+  12.000000000  ok      expect R1 output contains "OSPF: neighbour 2.2.2.2 on GigabitEthernet0/0/0: INIT -> 2WAY (2-WayReceived)"
+  12.000000000  ok      expect R1 output not contains "neighbour 2.2.2.2 on GigabitEthernet0/0/0: 2WAY -> EXSTART"
+  12.000000000  R1      R1#undebug all
+  12.000000000  R1      Debug output: all off
+  12.000000000  --      run 48s
+  45.000003270  R1      *Mar  1 00:00:45.000: %OSPF-5-ADJCHG: process 1, neighbour 2.2.2.2 on GigabitEthernet0/0/0: EXCHANGE -> FULL (ExchangeDone)
+  45.000004040  R2      *Mar  1 00:00:45.000: %OSPF-5-ADJCHG: process 1, neighbour 1.1.1.1 on GigabitEthernet0/0/0: EXCHANGE -> FULL (ExchangeDone)
+  60.000000000  R1      R1#show ip ospf neighbor
+  60.000000000  R1      
+  60.000000000  R1      Neighbor ID     Pri   State           Dead Time   Address         Interface
+  60.000000000  R1      2.2.2.2           1   FULL/DR         00:00:30    10.0.12.2       GigabitEthernet0/0/0
+  60.000000000  R1      3.3.3.3           1   FULL/  -        00:00:30    10.0.13.3       GigabitEthernet0/0/1
+  60.000000000  ok      expect R1 output contains "2.2.2.2           1   FULL/DR"
+  60.000000000  R1      R1#show ip ospf interface brief
+  60.000000000  R1      Interface    PID   Area            IP Address/Mask    Cost  State Nbrs F/C
+  60.000000000  R1      Gi0/0/0      1     0               10.0.12.1/24       1     BDR   1/1
+  60.000000000  R1      Gi0/0/1      1     0               10.0.13.1/24       1     P2P   1/1
+  60.000000000  R1      Gi0/0/2      1     0               10.0.1.1/24        1     DR    0/0
+  60.000000000  R1      Lo0          1     0               1.1.1.1/32         0     LOOP  0/0
+  60.000000000  R1      R1#show ip ospf database
+  60.000000000  R1      
+  60.000000000  R1                  OSPF router 1.1.1.1, process 1
+  60.000000000  R1      
+  60.000000000  R1                      Router Link States (Area 0)
+  60.000000000  R1      
+  60.000000000  R1      Link ID         ADV Router      Age         Seq#       Checksum Link count
+  60.000000000  R1      1.1.1.1         1.1.1.1         14          0x80000003 0x00206E 5
+  60.000000000  R1      2.2.2.2         2.2.2.2         15          0x80000003 0x00D13F 5
+  60.000000000  R1      3.3.3.3         3.3.3.3         45          0x80000003 0x008C65 6
+  60.000000000  R1      
+  60.000000000  R1                      Net Link States (Area 0)
+  60.000000000  R1      
+  60.000000000  R1      Link ID         ADV Router      Age         Seq#       Checksum
+  60.000000000  R1      10.0.12.2       2.2.2.2         15          0x80000001 0x00A08D
+  60.000000000  R1      R1#show ip route
+  60.000000000  R1      Codes: C - connected network, L - address of this device, S - static route,
+  60.000000000  R1             O - learned by OSPF, IA - from another area, E1 / E2 - external of type 1 / 2,
+  60.000000000  R1             * - default route
+  60.000000000  R1      
+  60.000000000  R1      Gateway of last resort is not set
+  60.000000000  R1      
+  60.000000000  R1            1.0.0.0/32 is subnetted, 1 subnets
+  60.000000000  R1      C        1.1.1.1 is directly connected, Loopback0
+  60.000000000  R1            2.0.0.0/32 is subnetted, 1 subnets
+  60.000000000  R1      O        2.2.2.2 [110/1] via 10.0.12.2, 00:00:14, GigabitEthernet0/0/0
+  60.000000000  R1            3.0.0.0/32 is subnetted, 1 subnets
+  60.000000000  R1      O        3.3.3.3 [110/1] via 10.0.13.3, 00:00:44, GigabitEthernet0/0/1
+  60.000000000  R1            10.0.0.0/8 is variably subnetted, 9 subnets, 3 masks
+  60.000000000  R1      C        10.0.1.0/24 is directly connected, GigabitEthernet0/0/2
+  60.000000000  R1      L        10.0.1.1/32 is directly connected, GigabitEthernet0/0/2
+  60.000000000  R1      O        10.0.2.0/24 [110/2] via 10.0.12.2, 00:00:14, GigabitEthernet0/0/0
+  60.000000000  R1      O        10.0.3.0/24 [110/2] via 10.0.13.3, 00:00:44, GigabitEthernet0/0/1
+  60.000000000  R1      C        10.0.12.0/24 is directly connected, GigabitEthernet0/0/0
+  60.000000000  R1      L        10.0.12.1/32 is directly connected, GigabitEthernet0/0/0
+  60.000000000  R1      C        10.0.13.0/24 is directly connected, GigabitEthernet0/0/1
+  60.000000000  R1      L        10.0.13.1/32 is directly connected, GigabitEthernet0/0/1
+  60.000000000  R1      O        10.0.23.0/30 [110/49] via 10.0.12.2, 00:00:14, GigabitEthernet0/0/0
+  60.000000000  R1                            [110/49] via 10.0.13.3, 00:00:14, GigabitEthernet0/0/1
+  60.000000000  ok      expect R1 route 10.0.2.0/24 via 10.0.12.2
+  60.000000000  ok      expect R1 route 10.0.3.0/24 via 10.0.13.3
+  60.000000000  ok      expect R1 route 10.0.23.0/30 via 10.0.12.2
+  60.000000000  ok      expect R1 route 10.0.23.0/30 via 10.0.13.3
+  60.000000000  R1      R1#show ip protocols
+  60.000000000  R1      Routing process "ospf 1" with router ID 1.1.1.1 (RFC 2328)
+  60.000000000  R1        Area border router: no; AS boundary router: no
+  60.000000000  R1        Redistributing: ospf 1
+  60.000000000  R1        Equal-cost paths: up to 4
+  60.000000000  R1        Areas: 1 normal, 0 stub
+  60.000000000  R1        Routing for networks:
+  60.000000000  R1          10.0.0.0 0.255.255.255 area 0
+  60.000000000  R1          1.1.1.1 0.0.0.0 area 0
+  60.000000000  R1        Passive interfaces:
+  60.000000000  R1          GigabitEthernet0/0/2
+  60.000000000  R1        Routing information sources:
+  60.000000000  R1          Gateway         Distance      Last Update
+  60.000000000  R1          2.2.2.2              110      00:00:14
+  60.000000000  R1          3.3.3.3              110      00:00:39
+  60.000000000  R1        Distance: 110 (default 110)
+  60.000000000  R1      R1#show running-config
+  60.000000000  R1      Collecting the configuration ...
+  60.000000000  R1      
+  60.000000000  R1      ! configuration in effect, 787 bytes
+  60.000000000  R1      !
+  60.000000000  R1      version 1.0
+  60.000000000  R1      !
+  60.000000000  R1      hostname R1
+  60.000000000  R1      !
+  60.000000000  R1      interface Loopback0
+  60.000000000  R1       ip address 1.1.1.1 255.255.255.255
+  60.000000000  R1      !
+  60.000000000  R1      interface GigabitEthernet0/0/0
+  60.000000000  R1       ip address 10.0.12.1 255.255.255.0
+  60.000000000  R1      !
+  60.000000000  R1      interface GigabitEthernet0/0/1
+  60.000000000  R1       ip address 10.0.13.1 255.255.255.0
+  60.000000000  R1       ip ospf network point-to-point
+  60.000000000  R1      !
+  60.000000000  R1      interface GigabitEthernet0/0/2
+  60.000000000  R1       ip address 10.0.1.1 255.255.255.0
+  60.000000000  R1      !
+  60.000000000  R1      interface GigabitEthernet0/0/3
+  60.000000000  R1       no ip address
+  60.000000000  R1       shutdown
+  60.000000000  R1      !
+  60.000000000  R1      interface TenGigabitEthernet0/1/0
+  60.000000000  R1       no ip address
+  60.000000000  R1       shutdown
+  60.000000000  R1      !
+  60.000000000  R1      interface TenGigabitEthernet0/1/1
+  60.000000000  R1       no ip address
+  60.000000000  R1       shutdown
+  60.000000000  R1      !
+  60.000000000  R1      interface Serial0/2/0
+  60.000000000  R1       no ip address
+  60.000000000  R1       shutdown
+  60.000000000  R1      !
+  60.000000000  R1      interface Serial0/2/1
+  60.000000000  R1       no ip address
+  60.000000000  R1       shutdown
+  60.000000000  R1      !
+  60.000000000  R1      router ospf 1
+  60.000000000  R1       router-id 1.1.1.1
+  60.000000000  R1       passive-interface GigabitEthernet0/0/2
+  60.000000000  R1       network 10.0.0.0 0.255.255.255 area 0
+  60.000000000  R1       network 1.1.1.1 0.0.0.0 area 0
+  60.000000000  R1      !
+  60.000000000  R1      line con 0
+  60.000000000  R1      line vty 0 4
+  60.000000000  R1       login
+  60.000000000  R1      !
+  60.000000000  R1      end
+  60.000000000  ok      expect R1 output contains "router ospf 1\n router-id 1.1.1.1\n passive-interface GigabitEthernet0/0/2\n network 10.0.0.0 0.255.255.255 area 0\n network 1.1.1.1 0.0.0.0 area 0\n!"
+  60.000000000  R2      R2>enable
+  60.000000000  R2      R2#show ip ospf neighbor
+  60.000000000  R2      
+  60.000000000  R2      Neighbor ID     Pri   State           Dead Time   Address         Interface
+  60.000000000  R2      1.1.1.1           1   FULL/BDR        00:00:30    10.0.12.1       GigabitEthernet0/0/0
+  60.000000000  R2      3.3.3.3           1   FULL/  -        00:00:30    10.0.23.2       Serial0/2/0
+  60.000000000  R2      R2#show ip ospf interface Serial0/2/0
+  60.000000000  R2      Serial0/2/0 is up, line protocol is up
+  60.000000000  R2        Internet address 10.0.23.1/30, area 0, process 1, router ID 2.2.2.2
+  60.000000000  R2        Network type POINT_TO_POINT, cost 48, transmit delay 1 s, state P2P, priority 1
+  60.000000000  R2        Timers: hello 10 s, dead 40 s, wait 40 s, retransmit 5 s; next hello in 00:00:10
+  60.000000000  R2        Neighbours: 1, adjacent: 1 (3.3.3.3)
+  60.000000000  R2      R2#show ip route ospf
+  60.000000000  R2      Codes: C - connected network, L - address of this device, S - static route,
+  60.000000000  R2             O - learned by OSPF, IA - from another area, E1 / E2 - external of type 1 / 2,
+  60.000000000  R2             * - default route
+  60.000000000  R2      
+  60.000000000  R2      Gateway of last resort is not set
+  60.000000000  R2      
+  60.000000000  R2            1.0.0.0/32 is subnetted, 1 subnets
+  60.000000000  R2      O        1.1.1.1 [110/1] via 10.0.12.1, 00:00:14, GigabitEthernet0/0/0
+  60.000000000  R2            3.0.0.0/32 is subnetted, 1 subnets
+  60.000000000  R2      O        3.3.3.3 [110/2] via 10.0.12.1, 00:00:14, GigabitEthernet0/0/0
+  60.000000000  R2            10.0.0.0/24 is subnetted, 3 subnets
+  60.000000000  R2      O        10.0.1.0 [110/2] via 10.0.12.1, 00:00:14, GigabitEthernet0/0/0
+  60.000000000  R2      O        10.0.3.0 [110/3] via 10.0.12.1, 00:00:14, GigabitEthernet0/0/0
+  60.000000000  R2      O        10.0.13.0 [110/2] via 10.0.12.1, 00:00:14, GigabitEthernet0/0/0
+  60.000000000  ok      expect R2 route 10.0.3.0/24 via 10.0.12.1
+  60.000000000  R3      R3>enable
+  60.000000000  R3      R3#show ip route ospf
+  60.000000000  R3      Codes: C - connected network, L - address of this device, S - static route,
+  60.000000000  R3             O - learned by OSPF, IA - from another area, E1 / E2 - external of type 1 / 2,
+  60.000000000  R3             * - default route
+  60.000000000  R3      
+  60.000000000  R3      Gateway of last resort is not set
+  60.000000000  R3      
+  60.000000000  R3            1.0.0.0/32 is subnetted, 1 subnets
+  60.000000000  R3      O        1.1.1.1 [110/1] via 10.0.13.1, 00:00:44, GigabitEthernet0/0/1
+  60.000000000  R3            2.0.0.0/32 is subnetted, 1 subnets
+  60.000000000  R3      O        2.2.2.2 [110/2] via 10.0.13.1, 00:00:14, GigabitEthernet0/0/1
+  60.000000000  R3            10.0.0.0/24 is subnetted, 3 subnets
+  60.000000000  R3      O        10.0.1.0 [110/2] via 10.0.13.1, 00:00:44, GigabitEthernet0/0/1
+  60.000000000  R3      O        10.0.2.0 [110/3] via 10.0.13.1, 00:00:14, GigabitEthernet0/0/1
+  60.000000000  R3      O        10.0.12.0 [110/2] via 10.0.13.1, 00:00:44, GigabitEthernet0/0/1
+  60.000000000  ok      expect R3 route 10.0.2.0/24 via 10.0.13.1
+  60.000000000  PC1     root@PC1:~# ping -c 2 10.0.2.10
+  60.000000000  PC1     PING 10.0.2.10 (10.0.2.10) 56(84) bytes of data.
+  60.000000000  --      run 3s
+  61.000006156  PC1     64 bytes from 10.0.2.10: icmp_seq=2 ttl=62 time=0.006 ms
+  63.000000000  --      run 10s
+  70.000000000  PC1     
+  70.000000000  PC1     --- 10.0.2.10 ping statistics ---
+  70.000000000  PC1     2 packets transmitted, 1 received, 50% packet loss, time 1000ms
+  70.000000000  PC1     rtt min/avg/max/mdev = 0.006/0.006/0.006/0.000 ms
+  70.000000000  PC1     root@PC1:~# traceroute -n 10.0.2.10
+  70.000000000  PC1     traceroute to 10.0.2.10 (10.0.2.10), 30 hops max, 60 byte packets
+  70.000004908  PC1      1  10.0.1.1  0.002 ms  0.002 ms  0.002 ms
+  70.000014724  PC1      2  10.0.12.2  0.003 ms  0.003 ms  0.003 ms
+  70.000031752  PC1      3  10.0.2.10  0.006 ms  0.006 ms  0.006 ms
+  73.000000000  ok      expect PC1 output contains " 2  10.0.12.2"
+  73.000000000  ok      expect PC1 output contains " 3  10.0.2.10"
+  73.000000000  R1      R1#debug ip ospf events
+  73.000000000  R1      Debug output for OSPF events: on
+  73.000000000  --      link down R1 Gi0/0/0
+  73.000000000  R1      *Mar  1 00:01:13.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is down
+  73.000000000  R1      *Mar  1 00:01:13.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is down
+  73.000000000  R2      *Mar  1 00:01:13.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is down
+  73.000000000  R2      *Mar  1 00:01:13.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is down
+  73.000000000  --      run 2s
+  73.000000000  R1      *Mar  1 00:01:13.000: OSPF: neighbour 2.2.2.2 on GigabitEthernet0/0/0: FULL -> DOWN (KillNbr)
+  73.000000000  R1      *Mar  1 00:01:13.000: %OSPF-5-ADJCHG: process 1, neighbour 2.2.2.2 on GigabitEthernet0/0/0: FULL -> DOWN (KillNbr)
+  73.000000000  R1      *Mar  1 00:01:13.000: OSPF: GigabitEthernet0/0/0 goes from BDR to DOWN
+  73.000000000  R1      *Mar  1 00:01:13.000: OSPF: own Router-LSA 1.1.1.1 from 1.1.1.1 (0x80000004, area 0) (changed)
+  73.000000000  R1      *Mar  1 00:01:13.000: OSPF: flooded Router-LSA 1.1.1.1 from 1.1.1.1 (0x80000004, area 0) out of 1 interface
+  73.000000000  R1      *Mar  1 00:01:13.000: OSPF: update out of GigabitEthernet0/0/1 to the group, 1 LSA (flooding)
+  73.000000000  R2      *Mar  1 00:01:13.000: %OSPF-5-ADJCHG: process 1, neighbour 1.1.1.1 on GigabitEthernet0/0/0: FULL -> DOWN (KillNbr)
+  73.000610995  R1      *Mar  1 00:01:13.000: OSPF: update from 3.3.3.3 on GigabitEthernet0/0/1, 2 LSAs
+  73.000610995  R1      *Mar  1 00:01:13.000: OSPF: took Router-LSA 2.2.2.2 from 2.2.2.2 (0x80000004, area 0) from 3.3.3.3
+  73.000610995  R1      *Mar  1 00:01:13.000: OSPF: took Network-LSA 10.0.12.2 from 2.2.2.2 (0x80000001, area 0) from 3.3.3.3
+  73.000610995  R1      *Mar  1 00:01:13.000: OSPF: removed Network-LSA 10.0.12.2 from 2.2.2.2 (0x80000001, area 0) from the database
+  73.200000000  R1      *Mar  1 00:01:13.200: OSPF: intra-area route 2.2.2.2/32 now via 10.0.13.3, cost 49
+  73.200000000  R1      *Mar  1 00:01:13.200: OSPF: intra-area route 10.0.2.0/24 now via 10.0.13.3, cost 50
+  73.200000000  R1      *Mar  1 00:01:13.200: OSPF: intra-area route 10.0.23.0/30 now via 10.0.13.3, cost 49
+  73.200000000  R1      *Mar  1 00:01:13.200: OSPF: intra-area route 10.0.12.0/24 gone
+  73.200000000  R1      *Mar  1 00:01:13.200: OSPF: SPF run 6: 8 routes, 0 new, 3 changed, 1 gone
+  74.000002180  R1      *Mar  1 00:01:14.000: OSPF: acknowledgement from 3.3.3.3 on GigabitEthernet0/0/1, 1 LSA
+  74.000002180  R1      *Mar  1 00:01:14.000: OSPF: 3.3.3.3 acknowledged Router-LSA 1.1.1.1 from 1.1.1.1 (0x80000004, area 0)
+  74.000610995  R1      *Mar  1 00:01:14.000: OSPF: acknowledgement out of GigabitEthernet0/0/1 to the group (delayed), 2 LSAs
+  75.000000000  ok      expect R1 output contains "OSPF: neighbour 2.2.2.2 on GigabitEthernet0/0/0: FULL -> DOWN (KillNbr)"
+  75.000000000  R1      R1#undebug all
+  75.000000000  R1      Debug output: all off
+  75.000000000  R1      R1#show ip ospf neighbor
+  75.000000000  R1      
+  75.000000000  R1      Neighbor ID     Pri   State           Dead Time   Address         Interface
+  75.000000000  R1      3.3.3.3           1   FULL/  -        00:00:35    10.0.13.3       GigabitEthernet0/0/1
+  75.000000000  R1      R1#show ip route ospf
+  75.000000000  R1      Codes: C - connected network, L - address of this device, S - static route,
+  75.000000000  R1             O - learned by OSPF, IA - from another area, E1 / E2 - external of type 1 / 2,
+  75.000000000  R1             * - default route
+  75.000000000  R1      
+  75.000000000  R1      Gateway of last resort is not set
+  75.000000000  R1      
+  75.000000000  R1            2.0.0.0/32 is subnetted, 1 subnets
+  75.000000000  R1      O        2.2.2.2 [110/49] via 10.0.13.3, 00:00:01, GigabitEthernet0/0/1
+  75.000000000  R1            3.0.0.0/32 is subnetted, 1 subnets
+  75.000000000  R1      O        3.3.3.3 [110/1] via 10.0.13.3, 00:00:59, GigabitEthernet0/0/1
+  75.000000000  R1            10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+  75.000000000  R1      O        10.0.2.0/24 [110/50] via 10.0.13.3, 00:00:01, GigabitEthernet0/0/1
+  75.000000000  R1      O        10.0.3.0/24 [110/2] via 10.0.13.3, 00:00:59, GigabitEthernet0/0/1
+  75.000000000  R1      O        10.0.23.0/30 [110/49] via 10.0.13.3, 00:00:01, GigabitEthernet0/0/1
+  75.000000000  ok      expect R1 route 10.0.2.0/24 via 10.0.13.3
+  75.000000000  ok      expect R1 no route 10.0.12.0/24
+  75.000000000  R2      R2#show ip ospf database
+  75.000000000  R2      
+  75.000000000  R2                  OSPF router 2.2.2.2, process 1
+  75.000000000  R2      
+  75.000000000  R2                      Router Link States (Area 0)
+  75.000000000  R2      
+  75.000000000  R2      Link ID         ADV Router      Age         Seq#       Checksum Link count
+  75.000000000  R2      1.1.1.1         1.1.1.1         3           0x80000004 0x00D7F4 4
+  75.000000000  R2      2.2.2.2         2.2.2.2         2           0x80000004 0x00064A 4
+  75.000000000  R2      3.3.3.3         3.3.3.3         60          0x80000003 0x008C65 6
+  75.000000000  PC1     root@PC1:~# traceroute -n 10.0.2.10
+  75.000000000  PC1     traceroute to 10.0.2.10 (10.0.2.10), 30 hops max, 60 byte packets
+  75.000000000  --      run 10s
+  75.000004908  PC1      1  10.0.1.1  0.002 ms  0.002 ms  0.002 ms
+  80.000011452  PC1      2  * 10.0.13.3  0.003 ms  0.003 ms
+  80.001742823  PC1      3  10.0.23.1  0.756 ms  0.488 ms  0.488 ms
+  80.003588276  PC1      4  10.0.2.10  0.615 ms  0.615 ms  0.615 ms
+  85.000000000  ok      expect PC1 output contains " 2  * 10.0.13.3"
+  85.000000000  ok      expect PC1 output contains " 3  10.0.23.1"
+  85.000000000  ok      expect PC1 output contains " 4  10.0.2.10"
+  85.000000000  --      link up R1 Gi0/0/0
+  85.000000000  R1      *Mar  1 00:01:25.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+  85.000000000  R1      *Mar  1 00:01:25.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+  85.000000000  R2      *Mar  1 00:01:25.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+  85.000000000  R2      *Mar  1 00:01:25.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+  85.000000000  --      run 60s
+ 130.000003270  R1      *Mar  1 00:02:10.000: %OSPF-5-ADJCHG: process 1, neighbour 2.2.2.2 on GigabitEthernet0/0/0: EXCHANGE -> FULL (ExchangeDone)
+ 130.000004040  R2      *Mar  1 00:02:10.000: %OSPF-5-ADJCHG: process 1, neighbour 1.1.1.1 on GigabitEthernet0/0/0: EXCHANGE -> FULL (ExchangeDone)
+ 145.000000000  R1      R1#show ip ospf neighbor
+ 145.000000000  R1      
+ 145.000000000  R1      Neighbor ID     Pri   State           Dead Time   Address         Interface
+ 145.000000000  R1      2.2.2.2           1   FULL/DR         00:00:30    10.0.12.2       GigabitEthernet0/0/0
+ 145.000000000  R1      3.3.3.3           1   FULL/  -        00:00:35    10.0.13.3       GigabitEthernet0/0/1
+ 145.000000000  R1      R1#show ip route ospf
+ 145.000000000  R1      Codes: C - connected network, L - address of this device, S - static route,
+ 145.000000000  R1             O - learned by OSPF, IA - from another area, E1 / E2 - external of type 1 / 2,
+ 145.000000000  R1             * - default route
+ 145.000000000  R1      
+ 145.000000000  R1      Gateway of last resort is not set
+ 145.000000000  R1      
+ 145.000000000  R1            2.0.0.0/32 is subnetted, 1 subnets
+ 145.000000000  R1      O        2.2.2.2 [110/1] via 10.0.12.2, 00:00:14, GigabitEthernet0/0/0
+ 145.000000000  R1            3.0.0.0/32 is subnetted, 1 subnets
+ 145.000000000  R1      O        3.3.3.3 [110/1] via 10.0.13.3, 00:02:09, GigabitEthernet0/0/1
+ 145.000000000  R1            10.0.0.0/8 is variably subnetted, 3 subnets, 2 masks
+ 145.000000000  R1      O        10.0.2.0/24 [110/2] via 10.0.12.2, 00:00:14, GigabitEthernet0/0/0
+ 145.000000000  R1      O        10.0.3.0/24 [110/2] via 10.0.13.3, 00:02:09, GigabitEthernet0/0/1
+ 145.000000000  R1      O        10.0.23.0/30 [110/49] via 10.0.12.2, 00:00:14, GigabitEthernet0/0/0
+ 145.000000000  R1                            [110/49] via 10.0.13.3, 00:00:14, GigabitEthernet0/0/1
+ 145.000000000  ok      expect R1 route 10.0.2.0/24 via 10.0.12.2
+ 145.000000000  ok      expect R1 svc ospf metric full == 2 (2)
+ 145.000000000  R2      R2#show ip ospf neighbor
+ 145.000000000  R2      
+ 145.000000000  R2      Neighbor ID     Pri   State           Dead Time   Address         Interface
+ 145.000000000  R2      1.1.1.1           1   FULL/BDR        00:00:30    10.0.12.1       GigabitEthernet0/0/0
+ 145.000000000  R2      3.3.3.3           1   FULL/  -        00:00:35    10.0.23.2       Serial0/2/0
+ 145.000000000  ok      expect hops ospf >= 100 (177)
+# 22 von 22 Erwartungen erfüllt

@@ -11,7 +11,8 @@
 //
 // Modes: User ">", Priv "#", Config "(config)#", If "(config-if)#", SubIf "(config-subif)#",
 // Vlan "(config-vlan)#", Line "(config-line)#", DhcpPool "(dhcp-config)#" (the DHCP commands
-// are in netsvc.rs), Router "(config-router)#" ("router rip": rip.rs), AclStd
+// are in netsvc.rs), Router "(config-router)#" ("router rip": rip.rs; "router ospf N": ospf.rs,
+// a tree mode of its own behind the same prompt, found by its key), AclStd
 // "(config-std-nacl)#" and AclExt "(config-ext-nacl)#" (acl.rs; found by their prompt,
 // tree_mode).  Interfaces are taken by any IOS spelling
 // ("g0/0/0", "Gi 0/0/0", "lo0", "vlan 10"); "interface Loopback5", "interface Vlan20" and
@@ -19,6 +20,8 @@
 // until then it takes no address (as IOS).  Addresses: "ip address" replaces the primary
 // address, "secondary" adds one; masks must fit (no network or broadcast address, no overlap
 // with another interface).
+// IPv6 (cli/ip6.rs): its commands in every mode, "ping X:X::X" and "traceroute X:X::X" go
+// there too, and "Output Interface: " of a link-local ping is one more question of the console.
 
 use alloc::format;
 use alloc::string::String;
@@ -151,6 +154,35 @@ pub enum K {
     ShowNatTrans,
     ShowNatStats,
     ClearNat,
+    // IPv6 (cli/ip6.rs)
+    Ipv6Global,
+    Ipv6Route,
+    Ipv6Neighbor,
+    Ipv6If,
+    ShowIpv6,
+    Ping6,
+    Trace6,
+    Debug6,
+    ClearIpv6,
+    // OSPF (cli/ospf.rs)
+    RouterOspf,
+    OspfRouterId,
+    OspfNetwork,
+    OspfPassive,
+    OspfAutoCost,
+    OspfDefault,
+    OspfRedist,
+    OspfStub,
+    OspfDistance,
+    OspfMaxPaths,
+    OspfLogAdj,
+    OspfIf,
+    ShowOspf,
+    ShowOspfNbr,
+    ShowOspfIf,
+    ShowOspfDb,
+    DebugOspf,
+    ClearOspf,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -178,7 +210,7 @@ fn mode_id(m: Mode) -> ModeId {
         Mode::Vlan => VLAN,
         Mode::Line => LINE,
         Mode::DhcpPool => POOL,
-        Mode::Router => ROUTER,
+        Mode::Router(_) => ROUTER,
         // modes of later parts are found by their prompt (tree_mode)
         Mode::AclStd | Mode::AclExt => CONF,
     }
@@ -189,6 +221,8 @@ fn mode_id(m: Mode) -> ModeId {
 fn tree_mode(t: &Tree<K>, m: Mode) -> ModeId {
     match m {
         Mode::AclStd | Mode::AclExt => t.find_mode(prompt_suffix(m)).unwrap_or(CONF),
+        // OSPF's router mode shares the prompt with RIP's: the tree knows it by its key
+        Mode::Router(super::Proc::Ospf(_)) => t.find_mode(super::ospf::MODE_KEY).unwrap_or(CONF),
         _ => mode_id(m),
     }
 }
@@ -205,7 +239,7 @@ pub fn prompt_suffix(m: Mode) -> &'static str {
         Mode::Line => "(config-line)#",
         Mode::Out => "",
         Mode::DhcpPool => "(dhcp-config)#",
-        Mode::Router => "(config-router)#",
+        Mode::Router(_) => "(config-router)#",
         Mode::AclStd => "(config-std-nacl)#",
         Mode::AclExt => "(config-ext-nacl)#",
     }
@@ -486,6 +520,10 @@ fn build(caps: u32) -> Tree<K> {
     if router {
         super::nat::build_nat(&mut t, [user, prv, conf, ifm, sub]);
     }
+    // ---- IPv6 (cli/ip6.rs)
+    super::ip6::build_ip6(&mut t, [user, prv, conf, ifm, sub], router);
+    // ---- OSPF with its own router mode (cli/ospf.rs)
+    super::ospf::build_ospf(&mut t, [user, prv, conf, ifm, sub], router);
     t
 }
 
@@ -660,7 +698,7 @@ impl Engine {
             Ok(p) => self.ios_do(ni, mode, &p, line),
             Err(err) => {
                 // a configuration submode falls back to the global configuration
-                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool | Mode::Router | Mode::AclStd | Mode::AclExt) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
+                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool | Mode::Router(_) | Mode::AclStd | Mode::AclExt) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
                 match up {
                     Some(p) => {
                         self.set_mode(ni, Mode::Config);
@@ -778,7 +816,7 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT
+                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF
                 } else if p.has("icmp") {
                     D_ICMP
                 } else if p.has("rip") {
@@ -838,6 +876,9 @@ impl Engine {
                 // without routing there is no routing process either
                 if p.no {
                     let _ = self.apply(Action::Rip { dev, set: crate::rip::RipSet::Process(false) });
+                    if let Some(pid) = self.ospf_of(ni).filter(|o| o.cfg.on).map(|o| o.cfg.pid) {
+                        let _ = self.apply(Action::Ospf { dev, set: crate::ospf::OspfSet::Process { pid, on: false } });
+                    }
                 }
                 Ok(())
             }
@@ -981,6 +1022,25 @@ impl Engine {
             | K::ShowProtocols
             | K::ClearRoute => self.ios_rip(ni, p),
             K::NatPool | K::NatList | K::NatStatic | K::NatTimeout | K::ShowNatTrans | K::ShowNatStats | K::ClearNat => self.ios_nat(ni, p),
+            K::Ipv6Global | K::Ipv6Route | K::Ipv6Neighbor | K::Ipv6If | K::ShowIpv6 | K::Ping6 | K::Trace6 | K::Debug6 | K::ClearIpv6 => self.ios_ip6(ni, p),
+            K::RouterOspf
+            | K::OspfRouterId
+            | K::OspfNetwork
+            | K::OspfPassive
+            | K::OspfAutoCost
+            | K::OspfDefault
+            | K::OspfRedist
+            | K::OspfStub
+            | K::OspfDistance
+            | K::OspfMaxPaths
+            | K::OspfLogAdj
+            | K::OspfIf
+            | K::ShowOspf
+            | K::ShowOspfNbr
+            | K::ShowOspfIf
+            | K::ShowOspfDb
+            | K::DebugOspf
+            | K::ClearOspf => self.ios_ospf(ni, p),
         }
     }
 
@@ -995,6 +1055,8 @@ impl Engine {
                     self.out(ni, &format!("%Error opening {} (Invalid argument)\n", t));
                 }
             }
+            AskKind::Ping6Out { dst, count, bytes, timeout } => self.ios_ping6_answer(ni, dst, count, bytes, timeout, line),
+            AskKind::ClearOspf => self.ios_ospf_clear(ni, line),
         }
     }
 
@@ -1425,6 +1487,9 @@ impl Engine {
     /// "ping ..." in EXEC
     fn ios_ping(&mut self, ni: usize, p: &Parsed<K>) -> Result<(), String> {
         let target = p.text("target").unwrap_or("");
+        if netpkt::Ipv6::parse(target).is_some() {
+            return self.ios_ping6(ni, p);
+        }
         let Some(dst) = Ipv4::parse(target) else {
             let lookup = self.cdev(ni).is_some_and(|c| c.cfg.domain_lookup);
             let text = if lookup {
@@ -1457,6 +1522,9 @@ impl Engine {
     /// "traceroute ..." in EXEC
     fn ios_traceroute(&mut self, ni: usize, p: &Parsed<K>) -> Result<(), String> {
         let target = p.text("target").unwrap_or("");
+        if netpkt::Ipv6::parse(target).is_some() {
+            return self.ios_trace6(ni, p);
+        }
         let Some(dst) = Ipv4::parse(target) else {
             let lookup = self.cdev(ni).is_some_and(|c| c.cfg.domain_lookup);
             let text = if lookup {

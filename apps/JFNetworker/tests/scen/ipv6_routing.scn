@@ -1,0 +1,54 @@
+# IPv6 über zwei Router: statische Routen, R2s Standardroute über die Link-Local-Adresse
+# FE80::1 von R1, Packet Too Big an der MTU 1280 vor SRV und die Fragmente des Absenders, das
+# Hop Limit und ein Ziel ohne Route; zum Schluss eine doppelte Adresse (DAD) und R1 ohne
+# IPv6-Routing (ein letztes Router Advertisement mit Lebensdauer 0)
+run 20s
+R1: enable
+R1: show ipv6 route
+expect R1 output contains "S   2001:DB8:2::/64 [1/0]\n     via 2001:DB8:12::2\n"
+R2: enable
+R2: show ipv6 route static
+expect R2 output contains "S   ::/0 [1/0]\n     via FE80::1, GigabitEthernet0/0/0\n"
+R2: show running-config
+expect R2 output contains " ipv6 address 2001:DB8:2::1/64\n ipv6 mtu 1280\n ipv6 nd ra mtu suppress\n"
+expect R2 output contains "ipv6 route ::/0 GigabitEthernet0/0/0 FE80::1\n"
+PC1: ping -c 2 2001:db8:2::10
+run 3s
+expect PC1 output contains "2 packets transmitted, 2 received, 0% packet loss"
+expect PC1 output contains "ttl=62"
+PC1: traceroute6 -n 2001:db8:2::10
+run 10s
+expect PC1 output contains " 2  2001:db8:12::2  "
+expect PC1 output contains " 3  2001:db8:2::10  "
+# zu groß für die MTU 1280: R2 verwirft (Router fragmentieren IPv6 nicht) und nennt die MTU;
+# PC1 merkt sie sich für SRV und teilt die nächsten Pakete selbst
+PC1: ping -c 3 -s 1400 2001:db8:2::10
+run 4s
+expect PC1 output contains "From 2001:db8:12::2 icmp_seq=1 Packet too big: mtu=1280"
+expect PC1 output contains "1408 bytes from 2001:db8:2::10: icmp_seq=2 ttl=62"
+PC1: ping -c 1 -M do -s 1400 2001:db8:2::10
+run 2s
+expect PC1 output contains "ping: local error: message too long, mtu=1280"
+# Hop Limit 1 und ein Ziel ohne Route: R1 antwortet
+PC2: ping -c 1 -t 1 2001:db8:2::10
+run 2s
+expect PC2 output contains "From 2001:db8:1::1 icmp_seq=1 Time exceeded: Hop limit"
+PC2: ping -c 1 2001:db8:99::1
+run 2s
+expect PC2 output contains "From 2001:db8:1::1 icmp_seq=1 Destination unreachable: No route"
+R1: traceroute ipv6 2001:DB8:2::10
+run 5s
+expect R1 output contains "  2 2001:DB8:2::10 "
+# PC2 nimmt die Adresse von PC1 dazu: PC1 verteidigt sie, PC2 benutzt sie nicht
+PC2: ip -6 addr add 2001:db8:1::4a:ff:fe00:101/64 dev eth0
+run 3s
+PC2: ip -6 addr show dev eth0
+expect PC2 output contains "inet6 2001:db8:1:0:4a:ff:fe00:101/64 scope global dadfailed tentative"
+# R1 ohne IPv6-Routing: die PCs streichen ihn als Standard-Router
+R1: configure terminal
+R1: no ipv6 unicast-routing
+R1: end
+run 2s
+PC1: ip -6 route
+expect PC1 output not contains "default"
+expect hops icmpv6 >= 60

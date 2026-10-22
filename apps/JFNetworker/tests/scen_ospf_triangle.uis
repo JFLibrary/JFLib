@@ -1,0 +1,15 @@
+#!args apps/JFNetworker/tests/fixtures/ospf_triangle.jfnet --scenario apps/JFNetworker/tests/scen/ospf_triangle.scn --golden apps/JFNetworker/tests/scen/ospf_triangle.report
+# golden scenario: OSPF in a triangle of three routers in area 0 (a LAN cable with DR and BDR, a
+# serial line of cost 48, Ethernet set to point-to-point) with a PC behind each: the adjacencies
+# up to Full (debug ip ospf adj), the neighbours, interfaces, database and routes after 60 s with
+# two equal-cost paths, a pulled LAN cable (KillNbr, SPF 200 ms later, the way over R3 and the
+# serial line with traceroute) and the way back after a new election.  The GUI program runs
+# tests/scen/ospf_triangle.scn on tests/fixtures/ospf_triangle.jfnet without a window and ends
+# with the report, which must equal tests/scen/ospf_triangle.report byte for byte on every target
+# (the script itself is not run)
+# OSPF im Dreieck: R1 bis R3 in Bereich 0, hinter jedem ein PC (die LANs passiv). Zwischen R1 und
+# R2 ein LAN-Kabel: beide warten 40 s, dann wird R2 DR und R1 BDR; R2-R3 ist eine serielle
+# Leitung (Kosten 48), R1-R3 Ethernet als Punkt-zu-Punkt-Netz. Zur seriellen Leitung führen zwei
+# gleich gute Wege. Dann wird das LAN-Kabel R1-R2 gezogen: R1 verliert R2 sofort, flutet ein
+# neues Router-LSA, und 200 ms später führt der Weg zu PC2 über R3 und die serielle Leitung; mit
+# dem Kabel kommt nach einer neuen Wahl der kurze Weg zurück.

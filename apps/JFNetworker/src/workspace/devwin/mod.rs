@@ -307,8 +307,9 @@ fn overview(n: &mut Net, ui: &mut Ui, id: u32, dev: u32) {
         row(ui, t("Simulator"), &tf("läuft nicht: {}", &[&crate::app::tr::msg(e)]));
     }
     ui.box_end();
-    // the first addresses at a glance
-    let addrs: Vec<String> = rows.iter().filter(|r| r.ip != "–").map(|r| format!("{} {}", ifname::short(&r.name), r.ip)).take(6).collect();
+    // the first addresses at a glance (IPv6 after IPv4)
+    let mut addrs: Vec<String> = rows.iter().filter(|r| r.ip != "–").map(|r| format!("{} {}", ifname::short(&r.name), r.ip)).take(6).collect();
+    addrs.extend(rows.iter().filter(|r| r.ip6 != "–").map(|r| format!("{} {}", ifname::short(&r.name), r.ip6)).take(6));
     if !addrs.is_empty() {
         ui.text(TS_BODY_STRONG, t("Adressen"));
         for a in &addrs {
@@ -329,8 +330,8 @@ fn overview(n: &mut Net, ui: &mut Ui, id: u32, dev: u32) {
 
 // Schnittstellen: every interface with its state, addresses, far end, speed, VLAN, MAC and
 // frame counters
-fn if_cols() -> [GridCol<'static>; 9] {
-    [
+fn if_cols(v6: bool) -> Vec<GridCol<'static>> {
+    let mut v = alloc::vec![
         GridCol::new(t("Port"), 76).flags(GC_NOSORT),
         GridCol::new(t("Status"), 112).flags(GC_NOSORT),
         GridCol::new(t("IP"), 108).flags(GC_NOSORT),
@@ -340,7 +341,12 @@ fn if_cols() -> [GridCol<'static>; 9] {
         GridCol::new(t("MAC"), 116).flags(GC_NOSORT),
         GridCol::new(t("Empfangen"), 86).flags(GC_NOSORT | GC_RIGHT),
         GridCol::new(t("Gesendet"), 86).flags(GC_NOSORT | GC_RIGHT),
-    ]
+    ];
+    // the IPv6 addresses after IP, only on a device with IPv6
+    if v6 {
+        v.insert(3, GridCol::new(t("IPv6"), 180).flags(GC_NOSORT));
+    }
+    v
 }
 
 fn ifaces(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
@@ -367,7 +373,9 @@ fn ifaces(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
     let keys: Vec<u64> = rows.iter().map(|r| r.key).collect();
     w.ifs.retain(&keys);
     ui.next_size(-1, -1);
-    let cols = if_cols();
+    let v6 = rows.iter().any(|r| r.ip6 != "–");
+    let k = v6 as usize;
+    let cols = if_cols(v6);
     let (first, end) = ui.grid_begin(id, &mut w.ifs, &cols, &keys);
     let num = |v: u64| if v == u64::MAX { String::from("–") } else { format!("{}", v) };
     for i in first..end {
@@ -386,12 +394,15 @@ fn ifaces(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
         ui.text(TS_BODY | TX_ELLIPSIS, r.status);
         ui.box_end();
         ui.grid_text(&w.ifs, 2, &r.ip);
-        ui.grid_text(&w.ifs, 3, &r.peer);
-        ui.grid_text(&w.ifs, 4, &r.speed);
-        ui.grid_text(&w.ifs, 5, &r.vlan);
-        ui.grid_text_ts(&w.ifs, 6, TS_CAPTION, &r.mac);
-        ui.grid_text(&w.ifs, 7, &num(counters[i as usize].0));
-        ui.grid_text(&w.ifs, 8, &num(counters[i as usize].1));
+        if v6 {
+            ui.grid_text(&w.ifs, 3, &r.ip6);
+        }
+        ui.grid_text(&w.ifs, 3 + k, &r.peer);
+        ui.grid_text(&w.ifs, 4 + k, &r.speed);
+        ui.grid_text(&w.ifs, 5 + k, &r.vlan);
+        ui.grid_text_ts(&w.ifs, 6 + k, TS_CAPTION, &r.mac);
+        ui.grid_text(&w.ifs, 7 + k, &num(counters[i as usize].0));
+        ui.grid_text(&w.ifs, 8 + k, &num(counters[i as usize].1));
     }
     ui.grid_end(&mut w.ifs);
 }

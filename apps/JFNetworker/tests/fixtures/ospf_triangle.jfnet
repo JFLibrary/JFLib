@@ -1,0 +1,209 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "OSPF im Dreieck",
+  "description": "Drei Router mit OSPF in Bereich 0: ein LAN mit DR und BDR, eine serielle Leitung und eine Punkt-zu-Punkt-Ethernet-Verbindung, hinter jedem Router ein PC.",
+  "seed": 13,
+  "next_id": 13,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 100,
+      "y": 100,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface Loopback0\n ip address 1.1.1.1 255.255.255.255\n no shutdown\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.13.1 255.255.255.0\n ip ospf network point-to-point\n no shutdown\n!\ninterface GigabitEthernet0/0/2\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\nrouter ospf 1\n router-id 1.1.1.1\n passive-interface GigabitEthernet0/0/2\n network 10.0.0.0 0.255.255.255 area 0\n network 1.1.1.1 0.0.0.0 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "R2",
+      "model": "jf-r4",
+      "x": 400,
+      "y": 100,
+      "off": false,
+      "startup_config": "hostname R2\n!\ninterface Loopback0\n ip address 2.2.2.2 255.255.255.255\n no shutdown\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.2 255.255.255.0\n no shutdown\n!\ninterface Serial0/2/0\n ip address 10.0.23.1 255.255.255.252\n no shutdown\n!\ninterface GigabitEthernet0/0/2\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nrouter ospf 1\n router-id 2.2.2.2\n passive-interface GigabitEthernet0/0/2\n network 10.0.0.0 0.255.255.255 area 0\n network 2.2.2.2 0.0.0.0 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "R3",
+      "model": "jf-r4",
+      "x": 250,
+      "y": 350,
+      "off": false,
+      "startup_config": "hostname R3\n!\ninterface Loopback0\n ip address 3.3.3.3 255.255.255.255\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.13.3 255.255.255.0\n ip ospf network point-to-point\n no shutdown\n!\ninterface Serial0/2/0\n ip address 10.0.23.2 255.255.255.252\n no shutdown\n!\ninterface GigabitEthernet0/0/2\n ip address 10.0.3.1 255.255.255.0\n no shutdown\n!\nrouter ospf 1\n router-id 3.3.3.3\n passive-interface GigabitEthernet0/0/2\n network 10.0.0.0 0.255.255.255 area 0\n network 3.3.3.3 0.0.0.0 area 0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "PC1",
+      "model": "pc",
+      "x": -100,
+      "y": 100,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "PC2",
+      "model": "pc",
+      "x": 600,
+      "y": 100,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 6,
+      "name": "PC3",
+      "model": "pc",
+      "x": 250,
+      "y": 550,
+      "off": false,
+      "startup_config": "hostname PC3\nip addr add 10.0.3.10/24 dev eth0\nip route add default via 10.0.3.1\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 7,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 2,
+        "port": "Serial0/2/0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "Serial0/2/0"
+      },
+      "cable": "serial",
+      "cable_fixed": false,
+      "kbps": 2048,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/2"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/2"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/2"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

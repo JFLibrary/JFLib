@@ -148,7 +148,7 @@ impl Engine {
                     return self.ios_err(ni, &format!("% {}\n", e));
                 }
                 if let Some(c) = self.cdev_mut(ni) {
-                    c.mode = Mode::Router;
+                    c.mode = Mode::Router(super::Proc::Rip);
                     c.ifs.clear();
                     c.vlans.clear();
                     c.pool.clear();
@@ -161,7 +161,8 @@ impl Engine {
                 return Ok(());
             }
             K::ShowProtocols => {
-                let text = self.show_protocols(ni);
+                // RIP's process, then OSPF's (cli/ospf.rs)
+                let text = format!("{}{}", self.show_protocols(ni), self.ospf_protocols(ni));
                 self.out(ni, &text);
                 return Ok(());
             }

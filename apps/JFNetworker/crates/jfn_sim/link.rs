@@ -7,7 +7,8 @@
 //                          cable works
 //   Engine::refresh_link   after any change: notes LinkUp / LinkDown, drops what was on the
 //                          cable, flushes the bridges' MAC entries of that port, tells spanning
-//                          tree (stp.rs), the services and RIP (rip.rs) of both ends
+//                          tree (stp.rs), the services and RIP (rip.rs) of both ends, and
+//                          IPv6 (nd.rs: ip6_kick)
 //
 // Serialisation of Ethernet takes the frame (at least 60 bytes) + FCS + preamble + inter-frame
 // gap: (max(len, 60) + 24) * 8 bits at the link speed.  The receiver gets the frame when its
@@ -177,6 +178,14 @@ impl Engine {
         // RIP looks at its interfaces again (an SVI may have gone with its last port)
         for (n, _) in ends {
             self.rip_kick(n);
+        }
+        // and so does OSPF
+        for (n, _) in ends {
+            self.ospf_kick(n);
+        }
+        // and IPv6 (nothing for devices without it)
+        for (n, _) in ends {
+            self.ip6_kick(n);
         }
     }
 
