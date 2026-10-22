@@ -885,7 +885,12 @@ Fensterrand hinaus.
   Dateien (`json::stringify_pretty`), getestet mit der coretest-Gruppe `jmap`.
   Seit D2 fasst `Window::hist_between` die Slots eines Zeitraums zu einem Histogramm zusammen
   (die Zeitreihen des Labors von JFNetworker: ein Punkt pro Intervall, Perzentile beliebiger
-  Zeiträume; Gruppe `metrics`).
+  Zeiträume; Gruppe `metrics`). Seit R1 (2026-10-22) übersetzt
+  [`netpkt/nat.rs`](../lib/netpkt/nat.rs) Adressen und Ports in Paketen an Ort und Stelle und
+  führt jede Prüfsumme inkrementell nach (RFC 1624; ICMP-Fehler samt Zitat nach RFC 5508,
+  Fragmente), `checksum::update` folgt einem geänderten Bytebereich (Gruppe `netpkt`: das
+  Ergebnis gleicht dem frisch gebauten Paket Byte für Byte); im Einsatz in NAT und den
+  Zugriffslisten von JFNetworker.
   Seit R4 auch die BPDUs von STP und RSTP ([`netpkt/stp.rs`](../lib/netpkt/stp.rs):
   Configuration-, TCN- und RST-BPDUs mit ihren Flags, Bridge- und Port-IDs, Pfadkosten nach
   802.1D-2004, Prüfung nach 9.3.4, Frames mit LLC, Dissektor; Gruppe `stp`), im Einsatz im
@@ -949,7 +954,8 @@ Fensterrand hinaus.
   im IOS-Layout, Tab, Modi mit Prompt, `no`-Form, typisierten Parametern (Zahl mit Bereich,
   IPv4, Maske, Präfix, MAC, Wort, Rest der Zeile, Namen wie Interfaces von der App) und der
   Fehlerposition für `% Invalid input detected at '^' marker.`; getestet mit der
-  coretest-Gruppe `cmdtree`, im Einsatz in der IOS-Konsole von JFNetworker.
+  coretest-Gruppe `cmdtree`, im Einsatz in der IOS-Konsole von JFNetworker. Seit R1 findet
+  `find_mode` einen Modus über seinen Prompt (die Modi der Zugriffslisten von JFNetworker).
 
 ## 8. Rendering
 

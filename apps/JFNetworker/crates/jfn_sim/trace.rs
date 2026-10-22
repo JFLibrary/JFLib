@@ -375,6 +375,33 @@ pub enum Note {
     RipLocalGone { prefix: Prefix4 },
     /// IPv4: a multicast packet for a group no interface here listens to
     IpGroupIgnored { dst: Ipv4 },
+    /// access lists (acl.rs): line `seq` of the list on interface `iface` (inbound or
+    /// outbound) let the packet through / dropped it; seq 0 is the implicit deny at the end
+    AclPermit { list: String, seq: u32, iface: u16, out: bool },
+    AclDeny { list: String, seq: u32, iface: u16, out: bool },
+    /// NAT (nat.rs; an endpoint is an address and a port or ICMP identifier, 0 when the
+    /// address alone counts): a new translation of a flow with its remote end, or a new
+    /// mapping (remote None; protocol 0: an address with every protocol)
+    NatCreate { proto: u8, local: (Ipv4, u16), global: (Ipv4, u16), remote: Option<(Ipv4, u16)> },
+    /// the source (inside to outside) or the destination (outside to inside) of a packet
+    NatTranslate { proto: u8, inbound: bool, from: (Ipv4, u16), to: (Ipv4, u16) },
+    /// an ICMP error about a translated packet: the packet it quotes translated back (RFC 5508)
+    NatQuote { inbound: bool, from: (Ipv4, u16), to: (Ipv4, u16) },
+    /// a translation ended after its time without traffic
+    NatExpire { proto: u8, local: (Ipv4, u16), global: (Ipv4, u16), remote: Option<(Ipv4, u16)> },
+    /// a packet to a global address with no translation for it: it goes on as it is
+    NatNoEntry { proto: u8, dst: (Ipv4, u16) },
+    /// a packet from inside that no rule translates: it leaves as it is
+    NatNoRule { src: Ipv4 },
+    /// no free address or port for a new translation ("pool NAME", "interface X"): dropped,
+    /// the sender gets "administratively prohibited"
+    NatExhausted { what: String },
+    /// an ICMP error about nothing NAT knows: dropped (RFC 5508)
+    NatErrorDropped,
+    /// a fragment waits for the first one of its datagram (its identification); the fragments
+    /// of a datagram whose first part never came are dropped
+    NatFragWait { id: u16 },
+    NatFragDropped { id: u16, parts: u16 },
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -493,6 +520,7 @@ impl Note {
             Note::ScriptBusy { .. } | Note::ScriptDropped { .. } | Note::ScriptError { .. } => 7,
             n if n.is_rip() => 7,
             Note::IpGroupIgnored { .. } => 3,
+            n if n.is_filter() => 3,
             _ => 2,
         }
     }
@@ -515,6 +543,26 @@ impl Note {
                 | Note::RipFlushed { .. }
                 | Note::RipLocal { .. }
                 | Note::RipLocalGone { .. }
+        )
+    }
+    /// a decision of an access list or of NAT (acl.rs, nat.rs)
+    pub fn is_filter(&self) -> bool {
+        matches!(self, Note::AclPermit { .. } | Note::AclDeny { .. }) || self.is_nat()
+    }
+    /// a decision of NAT (nat.rs)
+    pub fn is_nat(&self) -> bool {
+        matches!(
+            self,
+            Note::NatCreate { .. }
+                | Note::NatTranslate { .. }
+                | Note::NatQuote { .. }
+                | Note::NatExpire { .. }
+                | Note::NatNoEntry { .. }
+                | Note::NatNoRule { .. }
+                | Note::NatExhausted { .. }
+                | Note::NatErrorDropped
+                | Note::NatFragWait { .. }
+                | Note::NatFragDropped { .. }
         )
     }
     /// a decision of the lab's services (lb.rs, kv.rs, cache.rs, mq.rs)
@@ -604,6 +652,10 @@ impl Note {
                 | Note::StpErrDisable { .. }
                 | Note::RipIgnored { .. }
                 | Note::IpGroupIgnored { .. }
+                | Note::AclDeny { .. }
+                | Note::NatExhausted { .. }
+                | Note::NatErrorDropped
+                | Note::NatFragDropped { .. }
         )
     }
     /// a TCP decision (tcp.rs)
@@ -966,7 +1018,70 @@ impl Note {
             Note::RipLocal { prefix, how } => msg!("RIP: meldet {} ({}).", prefix, phrase(how.text())),
             Note::RipLocalGone { prefix } => msg!("RIP: {} gibt es hier nicht mehr: wird mit Metrik 16 gemeldet.", prefix),
             Note::IpGroupIgnored { dst } => msg!("Multicast an {} verworfen: kein Interface hört auf diese Gruppe.", dst),
+            Note::AclPermit { list, seq, iface: i, out } => {
+                if *out {
+                    msg!("Zugriffsliste {} ausgehend an {}: Zeile {} erlaubt das Paket.", list, iface(*i), seq)
+                } else {
+                    msg!("Zugriffsliste {} eingehend an {}: Zeile {} erlaubt das Paket.", list, iface(*i), seq)
+                }
+            }
+            Note::AclDeny { list, seq, iface: i, out } => match (*out, *seq) {
+                (true, 0) => msg!("Zugriffsliste {} ausgehend an {}: keine Zeile passt, verworfen (implizites deny).", list, iface(*i)),
+                (false, 0) => msg!("Zugriffsliste {} eingehend an {}: keine Zeile passt, verworfen (implizites deny).", list, iface(*i)),
+                (true, s) => msg!("Zugriffsliste {} ausgehend an {}: Zeile {} verwirft das Paket.", list, iface(*i), s),
+                (false, s) => msg!("Zugriffsliste {} eingehend an {}: Zeile {} verwirft das Paket.", list, iface(*i), s),
+            },
+            Note::NatCreate { proto, local, global, remote } => match remote {
+                Some(r) => msg!("NAT: neue Übersetzung {} {} = {} (Gegenstelle {}).", proto_word(*proto), ep(*proto, *local), ep(*proto, *global), ep(*proto, *r)),
+                None if *proto == 0 => msg!("NAT: {} bekommt {} für alle Protokolle.", local.0, global.0),
+                None => msg!("NAT: neue Zuordnung {} {} = {}.", proto_word(*proto), ep(*proto, *local), ep(*proto, *global)),
+            },
+            Note::NatTranslate { proto, inbound, from, to } => {
+                if *inbound {
+                    msg!("NAT: Ziel {} \u{2192} {} ({}).", ep(*proto, *from), ep(*proto, *to), proto_word(*proto))
+                } else {
+                    msg!("NAT: Quelle {} \u{2192} {} ({}).", ep(*proto, *from), ep(*proto, *to), proto_word(*proto))
+                }
+            }
+            Note::NatQuote { inbound, from, to } => {
+                if *inbound {
+                    msg!("NAT: ICMP-Fehler zurückübersetzt, zitierte Quelle {} \u{2192} {}.", ep(0, *from), ep(0, *to))
+                } else {
+                    msg!("NAT: ICMP-Fehler übersetzt, zitiertes Ziel {} \u{2192} {}.", ep(0, *from), ep(0, *to))
+                }
+            }
+            Note::NatExpire { proto, local, global, remote } => match remote {
+                Some(r) => msg!("NAT: Übersetzung {} {} = {} (Gegenstelle {}) abgelaufen.", proto_word(*proto), ep(*proto, *local), ep(*proto, *global), ep(*proto, *r)),
+                None => msg!("NAT: Zuordnung {} = {} abgelaufen.", local.0, global.0),
+            },
+            Note::NatNoEntry { proto, dst } => msg!("NAT: keine Übersetzung für {} ({}): unverändert weiter.", ep(*proto, *dst), proto_word(*proto)),
+            Note::NatNoRule { src } => msg!("NAT: keine Regel übersetzt {}: unverändert weiter.", src),
+            Note::NatExhausted { what } => msg!("NAT: keine freie Adresse und kein freier Port ({}): verworfen.", what),
+            Note::NatErrorDropped => msg!("NAT: ICMP-Fehler ohne passende Übersetzung verworfen."),
+            Note::NatFragWait { id } => msg!("NAT: Fragment (ID {}) wartet auf das erste Fragment.", id),
+            Note::NatFragDropped { id, parts } => msg!("NAT: {} Fragmente (ID {}) ohne erstes Fragment verworfen.", parts, id),
         }
+    }
+}
+
+/// a protocol as notes name it ("TCP", "ICMP"; "IP" for every protocol)
+fn proto_word(p: u8) -> String {
+    match p {
+        0 => String::from("IP"),
+        n => match netpkt::ipv4::proto_name(n) {
+            Some(s) => String::from(s),
+            None => format!("{}", n),
+        },
+    }
+}
+
+/// an endpoint in a note: "10.0.0.1:80", an ICMP query's identifier in words, the address
+/// alone without a port
+fn ep(proto: u8, e: (Ipv4, u16)) -> Msg {
+    match (proto, e.1) {
+        (_, 0) => Msg::plain(format!("{}", e.0)),
+        (netpkt::ipv4::PROTO_ICMP, id) => msg!("{} (Kennung {})", e.0, id),
+        (_, p) => Msg::plain(format!("{}:{}", e.0, p)),
     }
 }
 
@@ -1292,6 +1407,17 @@ impl Note {
             n if n.is_stp() => netpkt::decode::P_STP,
             n if n.is_rip() => P_IPV4 | P_UDP | netpkt::decode::P_RIP,
             Note::IpGroupIgnored { .. } => P_IPV4,
+            Note::NatCreate { proto, .. } | Note::NatTranslate { proto, .. } | Note::NatExpire { proto, .. } | Note::NatNoEntry { proto, .. } => {
+                P_IPV4
+                    | match *proto {
+                        netpkt::ipv4::PROTO_ICMP => P_ICMP,
+                        netpkt::ipv4::PROTO_UDP => P_UDP,
+                        netpkt::ipv4::PROTO_TCP => P_TCP,
+                        _ => 0,
+                    }
+            }
+            Note::NatQuote { .. } | Note::NatErrorDropped => P_IPV4 | P_ICMP,
+            n if n.is_filter() => P_IPV4,
             _ => 0,
         }
     }

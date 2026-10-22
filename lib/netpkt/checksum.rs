@@ -8,6 +8,8 @@
 //   pseudo_v4 / pseudo_v6          the pseudo-header sums of UDP, TCP and ICMPv6
 //   update16(ck, old, new) -> u16  incremental update after a 16-bit field changed (RFC 1624)
 //   crc32(data) -> u32             IEEE 802.3 FCS (reflected 0x04C11DB7, as zlib)
+//   update(ck, old, new) -> u16    incremental update after a run of bytes changed (an address,
+//                                  a whole quoted packet): update16 for every word that differs
 
 use crate::addr::{Ipv4, Ipv6};
 
@@ -96,4 +98,19 @@ pub fn crc32(data: &[u8]) -> u32 {
         c = CRC_TAB[((c ^ b as u32) & 0xFF) as usize] ^ (c >> 8);
     }
     !c
+}
+
+/// the new checksum after the bytes `old` became `new` (of the same length, starting at an even
+/// offset of the data the checksum covers; an odd last byte is the high byte of its word, as
+/// in sum): RFC 1624 eqn. 3 for every 16-bit word that changed
+pub fn update(ck: u16, old: &[u8], new: &[u8]) -> u16 {
+    let mut c = ck;
+    for (o, n) in old.chunks(2).zip(new.chunks(2)) {
+        let ow = u16::from_be_bytes([o[0], o.get(1).copied().unwrap_or(0)]);
+        let nw = u16::from_be_bytes([n[0], n.get(1).copied().unwrap_or(0)]);
+        if ow != nw {
+            c = update16(c, ow, nw);
+        }
+    }
+    c
 }

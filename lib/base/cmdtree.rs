@@ -15,6 +15,8 @@
 //   help(mode, line, &dyn Names)         -> Help: the answer to "?" typed after `line`
 //   complete(mode, line, &dyn Names)     -> Completion (Tab)
 //   Error::render / Help::render         the text an IOS-like console shows
+//   find_mode(prompt)                    a mode by its prompt (modes that parts of an app add
+//                                        need no fixed number)
 //
 // Paths are words separated by spaces.  A keyword stands for itself ("shutdown"; "access=mode"
 // stores it under the key "mode").  A parameter is TYPE or TYPE=key (a later value of a key
@@ -592,6 +594,10 @@ impl<C: Copy> Tree<C> {
     }
     pub fn mode_info(&self, m: ModeId) -> &Mode {
         &self.modes[m as usize]
+    }
+    /// the mode with this prompt suffix ("(config-ext-nacl)#"; the first one made)
+    pub fn find_mode(&self, prompt: &str) -> Option<ModeId> {
+        self.modes.iter().position(|m| m.prompt == prompt).map(|i| i as ModeId)
     }
     /// the prompt of a mode for a host name ("R1(config)#")
     pub fn prompt(&self, m: ModeId, host: &str) -> String {

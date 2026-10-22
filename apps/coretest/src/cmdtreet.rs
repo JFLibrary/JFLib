@@ -210,6 +210,7 @@ pub fn run(t: &mut T) {
     // the first word of EXEC (IOS looks unknown ones up as host names)
     t.check("knows first", tr.knows_first(ex, "sh ip") && !tr.knows_first(ex, "frob") && tr.knows_first(cf, "no hostname"));
     t.eq("prompt", tr.prompt(cf, "R1"), String::from("R1(config)#"));
+    t.eq("find mode by prompt", (tr.find_mode("(config-if)#"), tr.find_mode("#"), tr.find_mode("(config-x)#")), (Some(ifm), Some(ex), None));
     // the value parsers
     t.eq("ipv4", cmdtree::parse_ipv4("192.168.001.10"), Some([192, 168, 1, 10]));
     t.check("ipv4 bad", cmdtree::parse_ipv4("1.2.3").is_none() && cmdtree::parse_ipv4("1.2.3.4.5").is_none() && cmdtree::parse_ipv4("1.2..4").is_none() && cmdtree::parse_ipv4("+1.2.3.4").is_none());

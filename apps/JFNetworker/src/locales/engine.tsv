@@ -662,3 +662,38 @@ RIP Version {}: wartet auf das Gerät.	RIP version {}: waiting for the device.
 RIP kennt die Versionen 1 und 2.	RIP has the versions 1 and 2.
 {} ist kein Netz für RIP.	{} is no network for RIP.
 Die Zeiten passen nicht: Update und Invalid größer als 0, Flush nicht kürzer als Invalid.	The times do not fit: update and invalid above 0, flush not shorter than invalid.
+# jfn_sim: access lists and NAT (trace.rs notes, acl.rs, nat.rs)
+Zugriffsliste {} eingehend an {}: Zeile {} erlaubt das Paket.	Access list {} inbound on {}: line {} lets the packet through.
+Zugriffsliste {} ausgehend an {}: Zeile {} erlaubt das Paket.	Access list {} outbound on {}: line {} lets the packet through.
+Zugriffsliste {} eingehend an {}: Zeile {} verwirft das Paket.	Access list {} inbound on {}: line {} drops the packet.
+Zugriffsliste {} ausgehend an {}: Zeile {} verwirft das Paket.	Access list {} outbound on {}: line {} drops the packet.
+Zugriffsliste {} eingehend an {}: keine Zeile passt, verworfen (implizites deny).	Access list {} inbound on {}: no line matches, dropped (implicit deny).
+Zugriffsliste {} ausgehend an {}: keine Zeile passt, verworfen (implizites deny).	Access list {} outbound on {}: no line matches, dropped (implicit deny).
+NAT: neue Übersetzung {} {} = {} (Gegenstelle {}).	NAT: new translation {} {} = {} (peer {}).
+NAT: {} bekommt {} für alle Protokolle.	NAT: {} gets {} for every protocol.
+NAT: neue Zuordnung {} {} = {}.	NAT: new mapping {} {} = {}.
+NAT: Quelle {} → {} ({}).	NAT: source {} → {} ({}).
+NAT: Ziel {} → {} ({}).	NAT: destination {} → {} ({}).
+NAT: ICMP-Fehler zurückübersetzt, zitierte Quelle {} → {}.	NAT: ICMP error translated back, quoted source {} → {}.
+NAT: ICMP-Fehler übersetzt, zitiertes Ziel {} → {}.	NAT: ICMP error translated, quoted destination {} → {}.
+NAT: Übersetzung {} {} = {} (Gegenstelle {}) abgelaufen.	NAT: translation {} {} = {} (peer {}) expired.
+NAT: Zuordnung {} = {} abgelaufen.	NAT: mapping {} = {} expired.
+NAT: keine Übersetzung für {} ({}): unverändert weiter.	NAT: no translation for {} ({}): passed on unchanged.
+NAT: keine Regel übersetzt {}: unverändert weiter.	NAT: no rule translates {}: passed on unchanged.
+NAT: keine freie Adresse und kein freier Port ({}): verworfen.	NAT: no free address or port ({}): dropped.
+NAT: ICMP-Fehler ohne passende Übersetzung verworfen.	NAT: ICMP error without a matching translation dropped.
+NAT: Fragment (ID {}) wartet auf das erste Fragment.	NAT: fragment (ID {}) waits for the first fragment.
+NAT: {} Fragmente (ID {}) ohne erstes Fragment verworfen.	NAT: {} fragments (ID {}) dropped without their first fragment.
+{} (Kennung {})	{} (identifier {})
+Zugriffsliste {}: diese Zeilennummer gibt es schon.	Access list {}: this sequence number exists already.
+Zugriffsliste {}: keine Zeilennummer mehr frei.	Access list {}: no sequence number left.
+Zugriffsliste {} ist eine Standardliste.	Access list {} is a standard list.
+Zugriffsliste {} ist eine erweiterte Liste.	Access list {} is an extended list.
+Die Zugriffsliste {} gibt es nicht.	Access list {} does not exist.
+Zugriffsliste {}: keine solche Zeile.	Access list {}: no such line.
+Zugriffsliste {}: so lassen sich die Zeilen nicht nummerieren.	Access list {}: the lines cannot be numbered like that.
+Pool {}: Anfang und Ende liegen nicht im selben Netz.	Pool {}: start and end are not in the same network.
+Pool {} ist in Gebrauch.	Pool {} is in use.
+Pool {} gibt es nicht.	Pool {} does not exist.
+Diese Adresse hat schon eine statische Übersetzung.	This address has a static translation already.
+Keine solche NAT-Regel.	No such NAT rule.

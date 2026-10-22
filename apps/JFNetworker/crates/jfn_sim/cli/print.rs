@@ -359,7 +359,9 @@ impl Engine {
                                 text.push_str(&format!("{}", a));
                                 *last = Some(a);
                             }
-                            text.push_str(&format!(" {} msec{}", pr.rtt / MS, trace_flag(pr.kind)));
+                            // IOS marks "administratively prohibited" (an access list) with A
+                            let flag = if pr.kind == Some(IcmpKind::Prohibited) { " !A" } else { trace_flag(pr.kind) };
+                            text.push_str(&format!(" {} msec{}", pr.rtt / MS, flag));
                         }
                         _ => text.push_str(" * "),
                     }

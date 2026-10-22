@@ -81,6 +81,11 @@
 //            and L3 switches: requests, periodic and triggered updates, split horizon with
 //            poisoned reverse, timeout, garbage collection, holddown, equal-cost paths; its
 //            routes in the RIB with distance 120; RipCfg / RipSet (Action::Rip)
+//   acl      IPv4 access lists of IOS-like devices: standard and extended, numbered and named,
+//            sequence numbers, remarks, hit counters; inbound and outbound on interfaces
+//   nat      address translation of IOS-like devices: inside and outside interfaces, pools,
+//            PAT, static addresses and ports; TCP, UDP, ICMP queries and errors (RFC 5508),
+//            fragments, timeouts; the order of lists, routing and translation
 //
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
@@ -139,6 +144,8 @@ pub mod stp;
 pub mod stp98;
 pub mod rstp;
 pub mod rip;
+pub mod acl;
+pub mod nat;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -181,3 +188,5 @@ pub use series::{AggOut, Kpi, LatStat, LatWindow, MetricKind, SeriesCfg, SeriesE
 pub use goal::{judge, Found, GoalRun, LabRun, Verdict};
 pub use stp::{LinkType, ModeWord, PortRole, PortState, StpPortView, StpSet, TreeView};
 pub use rip::{Redist, Rip, RipCfg, RipDrop, RipHow, RipLoss, RipOut, RipSet, RipTimers};
+pub use acl::{Ace, Acl, AclKind, AclOp, AclView};
+pub use nat::{Nat, NatAct, NatStats, Tmo, XlateRow};

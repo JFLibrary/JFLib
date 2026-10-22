@@ -21,6 +21,7 @@
 // messages, KPIs of past spans, the Metriken panel's tables, faults as undo steps).
 // stptest.rs: spanning tree on the switches (group stp: STP and RSTP, jfn_sim::stp).
 // riptest.rs: RIP on routers and L3 switches (group rip: jfn_sim::rip, cli/rip.rs).
+// nattest.rs: access lists and NAT (group nat: jfn_sim::acl, jfn_sim::nat, their console).
 
 use alloc::format;
 use alloc::string::String;
@@ -66,9 +67,11 @@ mod msgtest;
 mod scriptedtest;
 #[path = "labuitest.rs"]
 mod labuitest;
+#[path = "nattest.rs"]
+mod nattest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 27] = [
+    let groups: [(&'static str, fn(&mut T)); 28] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -96,6 +99,7 @@ pub fn run() -> i32 {
         ("labui", labuitest::run),
         ("stp", crate::simtest::stptest::run),
         ("rip", crate::simtest::riptest::run),
+        ("nat", nattest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

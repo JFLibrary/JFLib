@@ -1817,7 +1817,14 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   (`push` adds bytes and gives the next event -- `More`, `Head`, `Data`, `End` --, `poll` the
   ones after it, pipelined messages one after the other, `finish` at the end of the stream)
   and `http::encode_request` / `encode_response` / `encode_chunked` by the wire rules of
-  `netio::http`.
+  `netio::http`. For address translation, `nat::rewrite(pkt, Side::Src | Side::Dst, addr,
+  Some(port))` changes a packet in place with every checksum it touches updated incrementally
+  (IPv4 header, TCP and UDP with their pseudo header -- a UDP checksum of 0 stays 0 --, the
+  identifier of an ICMP query; a later fragment changes its address only),
+  `nat::rewrite_quoted` does the same to the packet an ICMP error quotes together with the
+  error's own checksum (RFC 5508), `nat::Flow::of` / `Flow::quoted` give what translation and
+  filters look at (addresses, ports or the ICMP identifier, type and code, TCP flags, fragment
+  position), and `checksum::update(ck, old, new)` follows any changed run of bytes (RFC 1624).
 
   ```rust
   let mut p = Pkt::new(netpkt::pkt::HEADROOM, b"payload");
@@ -2537,7 +2544,9 @@ let c = t.complete(conf, "int gi", &names);   // c.line == Some("int GigabitEthe
   (`show  shutdown  `). `F_HIDDEN` keeps a command out of help and Tab.
 * Modes carry their prompt suffix and the mode they fall back to (`mode_info(m).parent`): an
   IOS-like console tries a line that fails in a configuration submode again in the global
-  configuration; the app decides when to do that.
+  configuration; the app decides when to do that. `find_mode(prompt)` finds a mode by its
+  prompt, so a part of an app that adds its own modes later (JFNetworker's access-list modes)
+  needs no fixed mode number.
 * Write the help texts, mode titles and status lines in your own words; only the command
   words, their syntax, configuration lines and short `%` errors should follow the original
   (JFNetworker's rule, see its README).

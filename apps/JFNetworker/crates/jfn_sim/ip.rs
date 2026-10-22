@@ -22,6 +22,8 @@
 //                                 protocol share the destinations: one per destination address
 //   join(iface, group, on) / joined   IPv4 multicast groups an interface listens to (224.0.0.9
 //                                 for RIPv2); packets to other groups are not for the device
+//   acls / nat                    the device's access lists (acl.rs) and address translation
+//                                 (nat.rs); an interface that goes away takes its part along
 //
 // The engine decides which interfaces are up (iface_up in l3.rs); this module only keeps the
 // data and answers questions about it.
@@ -212,6 +214,10 @@ pub struct IpStack {
     pub(crate) dyn_gen: u64,
     /// multicast groups the device listens to: (interface, group)
     pub groups: Vec<(u16, Ipv4)>,
+    /// access lists and where they are used (acl.rs)
+    pub acls: crate::acl::Acls,
+    /// address translation: interfaces, rules, translations (nat.rs)
+    pub nat: crate::nat::Nat,
 }
 
 /// a routing table with what it was made of: per interface its state and addresses, the static
@@ -306,6 +312,8 @@ impl IpStack {
             dynamic: Vec::new(),
             dyn_gen: 0,
             groups: Vec::new(),
+            acls: crate::acl::Acls::default(),
+            nat: crate::nat::Nat::default(),
         })
     }
 
@@ -387,12 +395,18 @@ impl IpStack {
             self.statics.retain(|r| r.iface != Some(iface));
         }
         self.arp.retain(|(i, _), _| *i != iface);
+        // its access lists and its side of NAT go with it
+        self.acls.unbind(iface);
+        self.nat.unbind(iface);
     }
     /// what is forgotten when the device is switched off: learned neighbours, fragments
+    /// (NAT's translations and the hit counters of access lists too)
     pub fn reset(&mut self) {
         self.arp.retain(|_, e| e.fixed);
         self.reasm.clear();
         self.icmp_rate = IcmpRate::new();
+        self.nat.reset();
+        self.acls.clear_counters(None);
     }
 
     /// may an ICMP error of `typ` / `code` go to `to` now?  (Takes what it costs.)

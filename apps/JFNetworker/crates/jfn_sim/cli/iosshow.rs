@@ -6,7 +6,8 @@
 //   Engine::ios_config(ni)       the configuration from "!" to "end" (what copy run start
 //                                stores and the startup replay reads back; the DHCP lines
 //                                come from netsvc.rs, the spanning tree's from stp.rs, "router
-//                                rip" and "ip rip" from rip.rs)
+//                                rip" and "ip rip" from rip.rs, those of NAT and access lists
+//                                from nat.rs and acl.rs)
 //   show ip route [connected|static|rip]   RIP routes with the age of their last update and
 //                                their interface; the legend names R only where RIP runs
 //
@@ -101,6 +102,9 @@ impl Engine {
                 if d & D_RIP != 0 {
                     s.push_str("Debug output for RIP: on\n");
                 }
+                if d & super::D_NAT != 0 {
+                    s.push_str("Debug output for NAT: on\n");
+                }
                 s
             }
             K::ShowVersion => self.show_version(ni),
@@ -177,6 +181,8 @@ impl Engine {
         }
         // "router rip" (cli/rip.rs)
         s.push_str(&self.ios_rip_config(ni));
+        // the global lines of NAT come before the static routes (cli/nat.rs)
+        s.push_str(&self.ios_nat_config(ni));
         if let Some(st) = &n.ip {
             let mut routes: Vec<&Route> = st.statics.iter().collect();
             routes.sort_by_key(|r| (r.prefix.addr.to_u32(), r.prefix.len, r.via.map(|v| v.to_u32()).unwrap_or(0)));
@@ -208,6 +214,8 @@ impl Engine {
                 s.push_str("!\n");
             }
         }
+        // the access lists: named ones, then the numbered lines (cli/acl.rs)
+        s.push_str(&self.ios_acl_config(ni));
         for l in &cfg.lines {
             s.push_str(&format!("line {}\n", l.name));
             for o in &l.opts {
@@ -260,6 +268,8 @@ impl Engine {
             for (k, a) in x.addrs.iter().enumerate() {
                 s.push_str(&format!(" ip address {} {}{}\n", a.addr, mask_str(a.len), if k > 0 { " secondary" } else { "" }));
             }
+            // access lists of the interface (cli/acl.rs)
+            s.push_str(&self.ios_access_group_config(ni, i));
             s.push_str(&self.ios_helper_config(ni, name));
             s.push_str(&self.ios_rip_if_config(ni, name));
             if x.mtu != 1500 && !x.is_loopback() {
@@ -268,6 +278,8 @@ impl Engine {
             if !x.proxy_arp && !x.is_loopback() {
                 s.push_str(" no ip proxy-arp\n");
             }
+            // its side of NAT (cli/nat.rs)
+            s.push_str(&self.ios_nat_if_config(ni, i));
         }
         let admin = match (port, f) {
             (Some(p), None) | (Some(p), Some(_)) if !name.contains('.') => n.ports.get(p as usize).is_some_and(|x| x.admin_up),

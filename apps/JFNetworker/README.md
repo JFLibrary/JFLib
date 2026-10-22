@@ -59,6 +59,10 @@ Queues, Lastgeneratoren, eigene Skripte).
   `maximum-paths`; periodische und ausgelöste Updates, Split Horizon mit Poisoned Reverse,
   Timeout, Garbage Collection und Holddown, gleich gute Wege; `show ip rip database`, `show ip
   protocols`, `debug ip rip` (siehe [Routing mit RIP](#routing-mit-rip)).
+- **NAT und Zugriffslisten (R1):** Router, L3-Switches und die Firewall übersetzen Adressen
+  (PAT, Pools, statische Adressen und Port-Weiterleitungen, ICMP-Fehler nach RFC 5508) und
+  filtern mit Standard- und erweiterten Zugriffslisten, nummeriert und benannt, mit Zählern und
+  den Befehlen des Vorbilds (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)).
 
 ## Bedienung
 
@@ -160,6 +164,7 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `model.uis`, Gruppe `stp` | Spanning Tree (siehe [Spanning Tree](#spanning-tree)): aus ohne Konfiguration (keine BPDUs, die Schleife mit dem alten Text), die ersten BPDUs Byte für Byte, Wahl und Rollen im Dreieck und im Quadrat mit STP und RSTP, die Timer von 802.1D (Learning nach 15 s, Forwarding nach 30 s, nach einem indirekten Ausfall 47 s: Max Age minus Message Age plus 2 × 15 s), Proposal und Agreement in Mikrosekunden, Edge-Ports (portfast sofort, AutoEdge nach 3 s, eine BPDU beendet sie), TCN, TC-Flag für 35 s und kurzes Altern, RSTP löscht MAC-Einträge, STP und RSTP gemischt, BPDU Guard (auch ohne Spanning Tree), Kosten, Prioritäten, 10G, ein Hub (Backup-Port, geteiltes LAN), Befehle, Ausgaben und Debug, LEDs, Simulationsmodus, die Probleme-Liste, Determinismus, Englisch |
 | `stp.uis` | Spanning Tree auf der Zeichenfläche (`fixtures/stp_triangle.jfnet`): LEDs bernstein beim Listening und Learning, Edge-Ports grün, nach 30 s nur noch der Alternate-Port von SW3 bernstein, die Kabel „blockiert“ für Screenreader, der Inspektor von SW3; Bilder hell und dunkel (`build/jfnetworker/stp_*.png`) |
 | `model.uis`, Gruppe `rip` | RIP (siehe [Routing mit RIP](#routing-mit-rip)): der erste Austausch auf die Nanosekunde (Request, Update ohne das Netz des Interfaces, die Antwort, die das IOS-artige ARP verliert), Konvergenz und Metriken über zwei Hops, periodische Updates mit Zufallsversatz und ausgelöste mit ihrer Pause, Split Horizon mit Poisoned Reverse auf dem Kabel, ein gezogenes Kabel (ausgelöstes Update mit Metrik 16, Holddown, Garbage Collection nach 120 s), ein schweigender Nachbar (Timeout nach 180 s, gelöscht nach 300 s), passive Interfaces, Distanzen gegen statische Routen, gleich gute Wege (ein Weg je Ziel, `maximum-paths`), Version 1 neben 2, `auto-summary`, Standardroute und Redistribution, RIP auf dem VLAN-Interface eines L3-Switches, die Befehlszeile (Modus, Hilfe, `show`, `debug`, `clear`, die Running-Config als Startkonfiguration), Strom, die Texte auf Deutsch und Englisch, Determinismus |
+| `model.uis`, Gruppe `nat` | Zugriffslisten und NAT (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)): jeder Port-Operator, Wildcards, Protokolle, ICMP-Typen, `established`, spätere Fragmente, die erste Zeile gewinnt, das implizite deny; Zeilennummern, Bemerkungen, `no`, `resequence`; die Konsole mit Modi, Hilfe, `show access-lists` und der Konfiguration, die gelesen wieder dieselbe ist; Listen an Interfaces mit Zählern, Notizen und „administratively prohibited“ unter der Grenze (auf die Nanosekunde), die ausgehende Liste nach NAT, eigene Pakete des Routers; PAT mit zwei Hosts am selben UDP- und TCP-Port (Parität), gleichen ICMP-Kennungen, ein erschöpfter Pool, statische Adressen und Ports mit ARP für die globale Adresse, Filter von außen, ICMP-Fehler in beide Richtungen, Fragmente auch außer der Reihe, die Zeiten der Übersetzungen, Löschen, Strom, `debug ip nat`, deutsche und englische Texte, VLAN-Interfaces, Subinterfaces, die Firewall; die Prüfsummen jedes Frames |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -214,6 +219,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Skript-Editor | [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | der Reiter Skripte des Gerätefensters, die Skripte eines Geräts im Projekt mit Rückgängig und Vorlagen, ihr Selbsttest (siehe [Skript-Editor](#skript-editor)) |
 | Spanning Tree | [`crates/jfn_sim/stp.rs`](crates/jfn_sim/stp.rs), [`stp98.rs`](crates/jfn_sim/stp98.rs), [`rstp.rs`](crates/jfn_sim/rstp.rs), [`cli/stp.rs`](crates/jfn_sim/cli/stp.rs), [`lib/netpkt/stp.rs`](../../lib/netpkt/stp.rs), [`src/stptest.rs`](src/stptest.rs) | STP (802.1D-1998) und RSTP (802.1D-2004) auf den Switches, Einstellungen und Befehle, BPDUs, ihr Selbsttest (siehe [Spanning Tree](#spanning-tree)) |
 | Routing | [`crates/jfn_sim/rip.rs`](crates/jfn_sim/rip.rs), [`cli/rip.rs`](crates/jfn_sim/cli/rip.rs), [`src/riptest.rs`](src/riptest.rs), [`lib/netpkt/rip.rs`](../../lib/netpkt/rip.rs) | RIP als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit RIP](#routing-mit-rip)) |
+| NAT und Zugriffslisten | [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs), [`nat.rs`](crates/jfn_sim/nat.rs), [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs), [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs), [`lib/netpkt/nat.rs`](../../lib/netpkt/nat.rs), [`src/nattest.rs`](src/nattest.rs) | Zugriffslisten und Adressübersetzung der IOS-artigen Geräte, ihre Befehle, das Umschreiben der Pakete mit ihren Prüfsummen (Library), ihr Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
 
 ### Gerätekatalog
 
@@ -899,6 +905,12 @@ IOS-artige Befehlszeile:
   `(config-router)#`, `ip rip send|receive version` an Interfaces, `show ip rip database`, `show
   ip protocols`, `show ip route rip|connected|static`, `debug ip rip`, `clear ip route *` (siehe
   [Routing mit RIP](#routing-mit-rip)).
+- Zugriffslisten und NAT ([`cli/acl.rs`](crates/jfn_sim/cli/acl.rs),
+  [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs)): `access-list`, `ip access-list
+  standard|extended` mit den Modi `(config-std-nacl)#` und `(config-ext-nacl)#`, `ip
+  access-group`, `show access-lists`, `ip nat …`, `show ip nat translations|statistics`,
+  `clear ip nat translation *`, `debug ip nat` (siehe
+  [NAT und Zugriffslisten](#nat-und-zugriffslisten)).
 
 Hosts und Server haben eine Linux-Shell (`root@PC1:~#`): `ip addr|link|route|neigh` mit den
 Ausgaben und Fehlermeldungen von iproute2, `ping` wie iputils (bis Strg+C oder `-c`; `-i`,
@@ -1061,6 +1073,10 @@ auf `fixtures/rip_versions.jfnet`: ein L3-Switch mit zwei VLANs, der RIPv2 nur a
 gerouteten Uplink spricht (`passive-interface default`), ein Router mit Standardroute, der zu
 einem alten Router Version 1 spricht (Broadcasts, Klassennetze ohne Maske), eine schwimmende
 statische Route, die einspringt, als die RIP-Route nach 180 s verfällt, und `clear ip route *`.
+Das Büro hinter NAT (`nat_pat.scn` auf `fixtures/nat_pat.jfnet`, siehe
+[NAT und Zugriffslisten](#nat-und-zugriffslisten)): 24 Erwartungen zu PAT, der
+Port-Weiterleitung von außen, einer Zugriffsliste, `traceroute` durch PAT, `debug ip nat` und
+den abgelaufenen Übersetzungen nach fünf Minuten.
 
 ### Skripte in Hosts
 
@@ -1345,6 +1361,88 @@ Für Programme: `Action::Rip { dev, set: RipSet }` (`Process`, `Version`, `Netwo
 ([`src/riptest.rs`](src/riptest.rs)) und in den Szenarien `rip_ring.scn` und
 `rip_versions.scn` (siehe [Szenarien](#szenarien-scn)).
 
+### NAT und Zugriffslisten
+
+IOS-artige Geräte, die routen (Router, L3-Switches, die Firewall JF-FW), übersetzen Adressen
+(NAT, RFC 3022) und filtern mit Zugriffslisten ([`acl.rs`](crates/jfn_sim/acl.rs),
+[`nat.rs`](crates/jfn_sim/nat.rs); die Befehle in [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs)
+und [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs)). Zugriffslisten kennt jedes IOS-artige Gerät,
+ein L2-Switch an seinem VLAN-Interface.
+
+- **Zugriffslisten:** nummeriert (`access-list` 1–99 und 1300–1999 Standard, 100–199 und
+  2000–2699 erweitert) oder benannt (`ip access-list standard|extended NAME` mit den Modi
+  `(config-std-nacl)#` und `(config-ext-nacl)#`, auch für Nummern), mit Zeilennummern (ohne
+  eine: 10 nach der letzten), `remark`, `no` einer Zeile über ihre Nummer oder ihren Wortlaut
+  und `ip access-list resequence`; `no access-list N …` löscht wie beim Vorbild die ganze Liste.
+  Eine Regel nennt Protokoll (`ip`, `tcp`, `udp`, `icmp` mit Typ und Code oder Namen wie
+  `echo-reply`, `gre`, `esp`, eine Nummer …), Quelle und Ziel (`any`, `host A`, Adresse mit
+  Wildcard, auch nicht zusammenhängend), Ports (`eq`, `neq`, `gt`, `lt`, `range`, mit den
+  Namen des Vorbilds wie `www` oder `domain`), `established` (TCP mit ACK oder RST) und `log`.
+  `ip access-group N|NAME in|out` gilt an Ports, Subinterfaces und VLAN-Interfaces.
+- **Wann eine Liste greift:** ein ankommendes Paket trifft zuerst die eingehende Liste seines
+  Interfaces, auch eines an das Gerät selbst; ein weitergeleitetes trifft nach Routing und NAT
+  die ausgehende Liste des Interfaces, über das es geht. Was das Gerät selbst sendet, filtert
+  keine ausgehende Liste. Die erste passende Zeile entscheidet, sonst das implizite deny am
+  Ende; eine Liste ohne Regel oder eine, die es nicht gibt, lässt alles durch. Ein verworfenes
+  Paket bekommt „administratively prohibited“ (ICMP 3/13) vom Interface, an dem es ankam, mit
+  der Grenze der anderen Unreachables (eines alle 500 ms): Linux-`ping` zeigt „Packet
+  filtered“, IOS-`ping` ein `U`, IOS-`traceroute` `!A`. Spätere Fragmente tragen keine Ports:
+  eine Regel mit Ports lässt sie durch, wenn sie erlaubt, und wird übersprungen, wenn sie
+  verbietet. Die Treffer zählen `show access-lists` und `show ip access-lists [N|NAME]`;
+  `clear access-list counters [N|NAME]` und das Ausschalten setzen sie zurück.
+- **NAT:** `ip nat inside|outside` an Interfaces; `ip nat pool NAME ANFANG ENDE netmask M` oder
+  `prefix-length P`; dynamisch `ip nat inside source list L pool P [overload]` oder `… interface
+  I overload` (PAT); statisch `ip nat inside source static [tcp|udp] LOKAL [PORT]
+  GLOBAL|interface I [PORT]` für Adressen und Port-Weiterleitungen; `ip nat translation
+  timeout`, `udp-timeout`, `dns-timeout`, `tcp-timeout`, `finrst-timeout`, `syn-timeout` und
+  `icmp-timeout` mit Sekunden oder `never`. Ein Outside-Interface beantwortet ARP für die
+  globalen Adressen von Pools und statischen Übersetzungen in seinem Netz.
+- **Die Reihenfolge** (wie beim Vorbild): die eingehende Liste; auf einem Outside-Interface dann
+  die Rückübersetzung des Ziels vor dem Routing, so bestimmt die innere Adresse den Weg (die TTL
+  zählt für das Paket, wie es ankam); das Routing; für Pakete von innen nach außen die
+  Übersetzung der Quelle; zuletzt die ausgehende Liste, die also die übersetzten Adressen sieht.
+  ICMP-Antworten des Routers zitieren das Paket, wie es ankam.
+- **Verhalten nach RFC 4787, 5382 und 5508:** eine Zuordnung gehört zum inneren Endpunkt
+  (Adresse und Port oder ICMP-Kennung) und gilt für jedes Ziel. Der globale Port behält die
+  Nummer des inneren, wenn sie frei ist, sonst den nächsten freien mit gleicher Parität im
+  selben Bereich (1–1023, 1024–65535); ICMP-Kennungen ebenso, eigene Ports des Routers sind
+  belegt. Ein Pool mit `overload` gibt einem Host seine Adresse wieder, einer ohne gibt jedem
+  Host eine eigene. Von außen nehmen statische Übersetzungen und Adressen ohne Ports Pakete von
+  jedem, PAT nur von Adressen, an die der Host gesendet hat; eine ICMP-Abfrage nimmt nur ihre
+  Antworten. Jeder Fluss hat seine eigene Zeit: UDP 300 s (DNS 60 s), ICMP 60 s, TCP 24 h nach
+  dem Handshake, vorher und nach RST oder FIN von beiden Seiten 240 s; eine Adresse ohne Ports
+  bleibt 24 h nach ihrem letzten Paket, eine Zuordnung mit Ports so lange wie ihre Flüsse.
+  Findet eine neue Übersetzung keine Adresse oder keinen Port, bekommt der Absender
+  „administratively prohibited“. ICMP-Fehler über übersetzte Pakete kommen mit
+  zurückübersetztem Zitat an, aus dem Inneren mit globaler Quelle; einer, zu dem NAT nichts
+  kennt, wird verworfen, und keiner frischt eine Übersetzung auf. Das erste Fragment
+  entscheidet für sein Datagramm, spätere, die vor ihm kommen, warten bis zu 30 s und folgen
+  ihm in ihrer Reihenfolge. Die Prüfsummen von IPv4, TCP, UDP und ICMP (auch die des Zitats)
+  werden nach RFC 1624 nachgeführt ([`netpkt::nat`](../../lib/netpkt/nat.rs)): Mitschnitte
+  öffnen ohne Prüfsummenfehler, und der Paket-Tab zeigt übersetzte Frames wie alle anderen.
+- **Anzeigen:** `show ip nat translations [verbose]` (Protokoll, Inside global, Inside local,
+  Outside local, Outside global; `verbose` mit Alter, Ablauf und Art), `show ip nat
+  statistics`, `clear ip nat translation *`, `clear ip nat statistics` und `debug ip nat`. Jede
+  Entscheidung ist eine Notiz mit deutschem Text (englisch in `engine.tsv`): Liste und Zeile,
+  die erlauben oder verwerfen, neue, übersetzte und abgelaufene Übersetzungen, Pakete ohne
+  Übersetzung oder Regel, ein erschöpfter Pool, wartende und verworfene Fragmente.
+- **Für Programme:** `Action::Acl`, `AccessGroup`, `AclCounters` und `Nat` (auch die Befehle
+  gehen über sie), `Engine::access_lists`, `access_groups`, `nat` und `nat_translations`.
+
+Noch offen: Hairpinning (ein innerer Host erreicht einen anderen über dessen globale Adresse;
+RFC 4787 verlangt es, das klassische Vorbild kann es nicht), `ip nat outside source`,
+Route-Maps, Helfer für Protokolle mit Adressen im Inhalt (FTP …), Zonen und
+zustandsbehaftete Prüfung der Firewall, NAT und Filter auf Linux-Geräten (iptables, der
+Heimrouter).
+
+Geprüft wird das in der Selbsttest-Gruppe `nat` ([`src/nattest.rs`](src/nattest.rs)) und im
+Golden-Szenario `nat_pat.scn` auf `fixtures/nat_pat.jfnet`: ein Büro hinter R1 mit PAT auf
+203.0.113.1, ein Server „im Internet“ hinter ISP, der das Büronetz nicht kennt, die
+Port-Weiterleitung von 203.0.113.1:80 auf den Webserver im Büro und eine Zugriffsliste, die PC2
+nicht ins Web lässt; Pings, `curl` von innen (SRV sieht 203.0.113.1) und von außen (WEB sieht
+EXT), `traceroute` durch PAT, `debug ip nat`, die Tabellen und nach fünf Minuten die
+abgelaufenen Übersetzungen.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -1410,7 +1508,7 @@ Geste).
 | Phase | Meilensteine |
 |---|---|
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
-| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · NAT/ACL, R2 RIP ✓, OSPF, R4 Spanning Tree (STP, RSTP) ✓, IPv6 · Liniendiagramm und Code-Editor |
+| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, OSPF, R4 Spanning Tree (STP, RSTP) ✓, IPv6 · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
 | 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 
