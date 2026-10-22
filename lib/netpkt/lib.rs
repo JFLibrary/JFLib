@@ -23,6 +23,8 @@
 //   pcapng    Writer (section, interfaces, enhanced packets), read
 //   http      HTTP/1.1 without I/O: Parser (fed as bytes arrive, says when it needs more),
 //             Head, Headers, framing, encode_request / encode_response / chunks (RFC 9112)
+//   nat       address and port translation in place: Flow (what translation and filters look
+//             at), rewrite / rewrite_quoted with incremental checksums (RFC 3022, 1624, 5508)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -49,6 +51,7 @@ pub mod syslog;
 pub mod tcp;
 pub mod udp;
 pub mod http;
+pub mod nat;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

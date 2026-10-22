@@ -39,6 +39,7 @@ pub fn run(t: &mut T) {
     ipv6_udp(t);
     pcap(t);
     pkt_growth(t);
+    nat_rewrite(t);
 }
 
 fn checksums(t: &mut T) {
@@ -399,4 +400,106 @@ fn pkt_growth(t: &mut T) {
     p.extend(b"z");
     p.truncate(2);
     t.eq("pkt tail", p.into_vec(), b"xy".to_vec());
+}
+
+// netpkt::nat: a translated packet equals the one made fresh with the new addresses and ports,
+// checksums included (RFC 1624 against a full computation); ICMP errors with their quote
+// (RFC 5508); fragments; checksum::update
+fn nat_rewrite(t: &mut T) {
+    use netpkt::nat::{self, Flow, Side};
+    let g = Ipv4([203, 0, 113, 1]);
+    let l = Ipv4([192, 168, 1, 20]);
+    let udp = |src: Ipv4, sp: u16, dst: Ipv4, dp: u16, zero: bool| {
+        let mut p = Pkt::new(netpkt::pkt::HEADROOM, b"translate me, please");
+        UdpHdr::new(sp, dp).push_v4(&mut p, src, dst);
+        if zero {
+            p.bytes_mut()[6] = 0;
+            p.bytes_mut()[7] = 0;
+        }
+        let mut h = Ipv4Hdr::new(src, dst, ipv4::PROTO_UDP, 63);
+        h.id = 0x1234;
+        h.push_onto(&mut p);
+        p.into_vec()
+    };
+    // UDP: source address and port
+    let mut a = udp(IP_A, 40000, IP_B, 9, false);
+    t.check("nat udp", nat::rewrite(&mut a, Side::Src, g, Some(5002)));
+    t.eq("nat udp = fresh", a, udp(g, 5002, IP_B, 9, false));
+    // a UDP checksum of 0 means none and stays so
+    let mut z = udp(IP_A, 40000, IP_B, 9, true);
+    nat::rewrite(&mut z, Side::Src, g, Some(5002));
+    t.eq("nat udp without checksum", z, udp(g, 5002, IP_B, 9, true));
+    // TCP: destination address and port (a SYN with options)
+    let tcp = |dst: Ipv4, dp: u16| {
+        let opts = TcpOpts { mss: Some(1460), ..TcpOpts::default() };
+        let h = TcpHdr { src_port: 51000, dst_port: dp, seq: 77, ack: 0, flags: tcp::SYN, window: 64240, urgent: 0, opts };
+        let mut p = Pkt::new(netpkt::pkt::HEADROOM, b"");
+        h.push_v4(&mut p, IP_A, dst);
+        Ipv4Hdr::new(IP_A, dst, ipv4::PROTO_TCP, 64).push_onto(&mut p);
+        p.into_vec()
+    };
+    let mut s = tcp(g, 80);
+    nat::rewrite(&mut s, Side::Dst, l, Some(8080));
+    t.eq("nat tcp = fresh", s, tcp(l, 8080));
+    // an ICMP echo: the identifier is its port, the ICMP checksum follows
+    let echo = |src: Ipv4, id: u16| {
+        let mut p = Pkt::new(netpkt::pkt::HEADROOM, PING_DATA);
+        Icmp::EchoRequest { id, seq: 3 }.push_onto(&mut p);
+        Ipv4Hdr::new(src, IP_B, ipv4::PROTO_ICMP, 64).push_onto(&mut p);
+        p.into_vec()
+    };
+    let mut e = echo(IP_A, 7);
+    nat::rewrite(&mut e, Side::Src, g, Some(9));
+    t.eq("nat echo = fresh", e.clone(), echo(g, 9));
+    let f = Flow::of(&e);
+    t.eq("flow of an echo", f.map(|f| (f.proto, f.src, f.sport, f.dport, f.icmp, f.ports)), Some((ipv4::PROTO_ICMP, g, 9, 9, Some((8, 0)), true)));
+    // an ICMP error quoting a whole UDP datagram (as Linux does): the quote's source goes back
+    // to the inside host, the error to it
+    let err = |quoted: &[u8], dst: Ipv4| {
+        let mut p = Pkt::new(netpkt::pkt::HEADROOM, quoted);
+        Icmp::Unreachable { code: icmp::UNREACH_PORT, mtu: 0 }.push_onto(&mut p);
+        Ipv4Hdr::new(IP_B, dst, ipv4::PROTO_ICMP, 64).push_onto(&mut p);
+        p.into_vec()
+    };
+    let out = udp(g, 5002, IP_B, 9, false);
+    let mut long = err(&out, g);
+    t.eq("quoted flow", Flow::quoted(&long).map(|q| (q.src, q.sport, q.dst, q.dport)), Some((g, 5002, IP_B, 9)));
+    t.check("nat quote", nat::rewrite_quoted(&mut long, Side::Src, l, Some(40000)) && nat::rewrite(&mut long, Side::Dst, l, None));
+    t.eq("nat long quote = fresh", long, err(&udp(l, 40000, IP_B, 9, false), l));
+    // the IOS quote (header and 8 bytes) of a TCP segment: no TCP checksum in it
+    let seg = tcp(g, 80);
+    let mut short = err(icmp::error_quote(&seg), IP_A);
+    nat::rewrite_quoted(&mut short, Side::Dst, l, Some(8080));
+    t.eq("nat short quote = fresh", short, err(icmp::error_quote(&tcp(l, 8080)), IP_A));
+    t.check("nat quote refused without one", !nat::rewrite_quoted(&mut udp(IP_A, 1, IP_B, 2, false), Side::Src, g, None));
+    // fragments: the first carries the port, the others only the address; the datagram adds up
+    let big: Vec<u8> = {
+        let data: Vec<u8> = (0..3000u32).map(|i| (i * 13 + 5) as u8).collect();
+        let mut p = Pkt::new(netpkt::pkt::HEADROOM, &data);
+        UdpHdr::new(40000, 9).push_v4(&mut p, IP_A, IP_B);
+        let mut h = Ipv4Hdr::new(IP_A, IP_B, ipv4::PROTO_UDP, 64);
+        h.id = 0x55;
+        h.push_onto(&mut p);
+        p.into_vec()
+    };
+    let parts = ipv4::fragment(&big, 1500).unwrap_or_default();
+    let mut r = Reassembly::new();
+    let mut whole = None;
+    for (i, mut part) in parts.into_iter().enumerate() {
+        let fl = Flow::of(&part);
+        t.check("fragment flow", fl.is_some_and(|f| f.later == (i > 0) && f.ports == (i == 0)));
+        nat::rewrite(&mut part, Side::Src, g, Some(5002));
+        t.check("fragment header", Ipv4View::parse(&part).is_some_and(|v| v.checksum_ok() && v.src() == g));
+        whole = Ipv4View::parse(&part).and_then(|v| r.add(&v)).or(whole);
+    }
+    let ok = whole.as_deref().and_then(Ipv4View::parse).is_some_and(|v| UdpView::parse(v.payload()).is_some_and(|u| u.src_port() == 5002 && u.checksum_ok_v4(g, IP_B)));
+    t.check("fragments translated add up", ok);
+    // checksum::update over a run of bytes equals a new computation
+    let mut blk: Vec<u8> = (0..64u8).map(|i| i.wrapping_mul(37)).collect();
+    let ck = checksum::checksum(&blk);
+    let old = blk[10..19].to_vec();
+    for b in blk[10..19].iter_mut() {
+        *b ^= 0xA5;
+    }
+    t.eq("checksum update", checksum::update(ck, &old, &blk[10..19]), checksum::checksum(&blk));
 }
