@@ -178,7 +178,29 @@ for(const target of [input,a11yRoot].filter(Boolean)) {
 viewport.addEventListener("focusin",e=>{if(!viewport.contains(e.relatedTarget))event(10);});
 viewport.addEventListener("focusout",e=>{if(!viewport.contains(e.relatedTarget))event(11);});
 let lastSize="";
-function resize() {if(started){const s=sizes(),key=`${s.width},${s.height},${s.dpi}`;if(key!==lastSize){lastSize=key;event(9,0,0,0,s.dpi);event(8,0,s.width,s.height);shadow?.resized();}}}
+function resize() {if(started){const s=sizes(),key=`${s.width},${s.height},${s.dpi}`;if(key!==lastSize){lastSize=key;event(9,0,0,0,s.dpi);event(8,0,s.width,s.height);shadow?.resized();screens();}}}
+// the monitors (lib/plat/web_screen.rs): window.screen in CSS pixels, or every screen where the
+// page may already ask (getScreenDetails with "window-management" granted; never a prompt);
+// one line each: x y w h, the work area x y w h, dpi, refresh (mHz, unknown: 0), primary, name
+let lastScreens="", screenDetails=null;
+function screenLine(s,primary) {
+  const n=v=>Math.round(Number(v)||0);
+  return [n(s.left),n(s.top),n(s.width),n(s.height),n(s.availLeft),n(s.availTop),n(s.availWidth||s.width),n(s.availHeight||s.height),
+    Math.round(96*(s.devicePixelRatio||devicePixelRatio)),0,primary?1:0,String(s.label||"").replace(/[\r\n]/g," ")].join(" ");
+}
+async function screens() {
+  if(!started) return;
+  let text=screenLine(screen,true);
+  try {
+    if(!screenDetails && window.getScreenDetails && (await navigator.permissions.query({name:"window-management"})).state==="granted") {
+      screenDetails=await getScreenDetails();
+      screenDetails.addEventListener("screenschange",screens);
+    }
+    if(screenDetails?.screens?.length) text=screenDetails.screens.map(s=>screenLine(s,s.isPrimary)).join("\n");
+  } catch {}
+  if(text!==lastScreens) {lastScreens=text;send({type:"screens",text});}
+}
+screen.addEventListener?.("change",screens);
 new ResizeObserver(resize).observe(canvas);
 window.addEventListener("resize",resize);
 async function importFiles(files) {
@@ -267,6 +289,12 @@ async function service(m) {
       if(shadow) try {shadow.apply(decodeA11y(m.data));} catch(error) {console.error(error);send({type:"a11y",on:true});}
     }
     else if(m.kind===14) audioHost().then(h=>h.request(m.data)).catch(error=>console.warn("Audio:",error));
+    // the colour pick (lib/plat/web_screen.rs): the EyeDropper, opened from the user's gesture
+    else if(m.kind===21) {
+      if(!window.EyeDropper) {send({type:"color",id:m.id,status:-3,rgb:0});return;}
+      try {const r=await new EyeDropper().open();send({type:"color",id:m.id,status:2,rgb:parseInt(String(r.sRGBHex).slice(1),16)&0xFFFFFF});}
+      catch(error) {send({type:"color",id:m.id,status:error?.name==="AbortError"?-4:errorCode(error),rgb:0});}
+    }
     else complete(m.id,-3);
   } catch(error) {complete(m.id,errorCode(error));report(error.message);}
 }
@@ -281,7 +309,7 @@ worker.onmessage=({data:m})=>{
     worker.postMessage({type:"recycle",buffers},buffers);
   }
   else if(m.type==="batch-complete") {inFlight=false;schedule();}
-  else if(m.type==="ready") {window.__jfguiCompute=m.compute;document.body.dataset.compute=m.compute?.mode || "scalar";document.body.dataset.computeWorkers=String(m.compute?.workers || 0);started=true;activate(enabled);if(shadow)send({type:"a11y",on:true});input.focus({preventScroll:true});window.dispatchEvent(new Event("jfgui-ready"));}
+  else if(m.type==="ready") {window.__jfguiCompute=m.compute;document.body.dataset.compute=m.compute?.mode || "scalar";document.body.dataset.computeWorkers=String(m.compute?.workers || 0);started=true;activate(enabled);screens();if(shadow)send({type:"a11y",on:true});input.focus({preventScroll:true});window.dispatchEvent(new Event("jfgui-ready"));}
   else if(m.type==="service") service(m);
   else if(m.type==="rpc" || (m.type==="error" && m.id)) {const p=pending.get(m.id);if(p){clearTimeout(p.timer);pending.delete(m.id);m.type==="error"?p.reject(new Error(m.message)):p.resolve(m.result);}}
   else if(m.type==="error") {report(m.message);console.error(m.message);}
@@ -318,5 +346,6 @@ try {
   if(store) {secretStore=store;initialSecrets=encodeSecrets(store.entries);for(const e of store.entries)e.value?.fill(0);store.entries=null;}
 }catch(error){console.warn("Geheimnisspeicher nicht verfügbar:",error);}
 const args=[];if(enabled)args.push("--agent");if(params.get("theme"))args.push("--theme",params.get("theme"));
-send({type:"start",url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)});
+lastScreens=screenLine(screen,true); // the first frame knows the monitor already
+send({type:"start",url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,screens:lastScreens,secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)|(window.EyeDropper?131072:0)});
 initialSecrets?.fill(0); // postMessage copied them

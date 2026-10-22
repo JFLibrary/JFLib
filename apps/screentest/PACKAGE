@@ -1,0 +1,18 @@
+# apps/screentest/PACKAGE: the app's identity and packages (docs/PACKAGING.md)
+#   python tools/package.py screentest --formats all
+# version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
+# as rt::app_version!(), the packages and lib/update use it.  The library has its own (lib/VERSION).
+display=Bildschirm-Test
+version=0.1.0
+publisher=Graphsto
+summary=Monitore, globale Tastenkürzel, Farbe vom Bildschirm, Bildschirmfotos
+description=Bildschirm-Test: die Monitore mit Arbeitsbereich, DPI und Bildwiederholrate, ein globales Tastenkürzel, eine Farbe von irgendwo auf dem Bildschirm und ein Bildschirmfoto; die Testanwendung von plat::screen und plat::hotkey.
+generic=Bildschirmtest
+categories=Utility;
+deb_name=screentest
+# Flatpak, AppStream and the MSIX identity: reverse DNS of a domain or project you control
+app_id=org.jflib.screentest
+homepage=https://github.com/JFLibrary/JFLib
+default_win=winui
+default_linux=winui
+styles=winui

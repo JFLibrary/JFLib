@@ -421,7 +421,7 @@ def app_targets(name):
 # do everything (as before).  "ask KEY ARGS [\"reason\"]" asks the user at the first access;
 # agent.confirm / agent.deny name agent actions (patterns) the user confirms / an agent may not run.
 PERM_KEYS_ARGS = ("fs.read", "fs.write", "process", "plugins", "url", "net.connect", "net.listen")
-PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart", "audio.output")
+PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart", "audio.output", "input.global", "screen.capture")
 PERM_KEYS_AGENT = ("agent.confirm", "agent.deny")                  # agent actions: confirmed / refused
 PERM_KEYS_SANDBOX = ("sandbox",)                                   # OS sandbox: "sandbox [strict]"
 PERM_ASKABLE = PERM_KEYS_ARGS + PERM_KEYS_FLAG[1:]                  # "ask KEY ARGS [\"reason\"]"

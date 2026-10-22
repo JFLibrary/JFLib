@@ -1,0 +1,23 @@
+# screentest: a colour from the screen headless (ui/screen.rs, color.rs CP_PIPETTE): the colour
+# picker's pipette and ui.pick_color wait for the user's answer, which `system pick RRGGBB|cancel`
+# gives; the picked colour reaches the picker (its alpha kept) and UIC_PICK
+size 720 1500
+expect text:"Gewählt: #206090" exists
+expect "Farbe vom Bildschirm aufnehmen" exists
+click "Farbe vom Bildschirm aufnehmen"
+system pick 336699
+expect text:"Gewählt: #336699" exists
+# the app's own pick: cancelled, then a colour
+click "Farbe aufnehmen"
+expect text:"Klicken Sie irgendwo auf den Bildschirm …" exists
+system pick cancel
+expect text:"Farbe aufnehmen: abgebrochen" exists
+click "Farbe aufnehmen"
+system pick 102030
+expect text:"Aufgenommen: #102030" exists
+expect text:"Gewählt: #336699" exists
+# the pipette again: the picker follows
+click "Farbe vom Bildschirm aufnehmen"
+system pick ff8000
+expect text:"Gewählt: #FF8000" exists
+shot build/screentest_pick.png

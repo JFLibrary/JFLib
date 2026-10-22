@@ -154,6 +154,10 @@ function dispatch(m) {
       wasm.jfgui_a11y_act(m.win>>>0,m.lo>>>0,m.hi>>>0,m.act>>>0,m.a|0,m.b|0,Number(m.value)||0,text.length);input();break;
     }
     case "agent": wasm.jfgui_agent(+m.enabled);input();break;
+    // the monitors the page sees (loader.js screens(): one line each; lib/plat/web_screen.rs)
+    case "screens": if(wasm.jfgui_screens) {const data=encode.encode(String(m.text||""));inbox(data);wasm.jfgui_screens(data.length);input();} break;
+    // the EyeDropper's answer to a colour pick (status 2: rgb picked)
+    case "color": if(wasm.jfgui_color) wasm.jfgui_color(m.id>>>0,m.status|0,m.rgb>>>0); else wasm.jfgui_complete(m.id,-3); input(); break;
     case "closeSession": {
       if(typeof m.session!=="string" || m.session.length>128) throw new Error("Ungültige Agentensitzung.");
       const data=encode.encode(JSON.stringify({session:m.session,close:true}));
@@ -239,6 +243,8 @@ self.onmessage = async ({data:m}) => {
       wasm.jfgui_date(now.getFullYear(), now.getMonth()+1, now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds(), now.getDay());
       const langs = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || ""]).filter(Boolean);
       if (wasm.jfgui_env && langs.length) { const env = encode.encode("LANGUAGE="+langs.join(":")); inbox(env); wasm.jfgui_env(env.length); }
+      // the monitors (lib/plat/web_screen.rs) before the app's first frame
+      if (m.screens && wasm.jfgui_screens) { const s = encode.encode(m.screens); inbox(s); wasm.jfgui_screens(s.length); }
       const args = encode.encode(m.args.join("\n")); inbox(args);
       const code = wasm.jfgui_start(m.width, m.height, m.dpi, args.length);
       if (code) throw new Error(`Anwendung konnte nicht starten (${code}).`);

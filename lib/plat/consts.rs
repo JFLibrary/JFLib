@@ -34,6 +34,7 @@ pub const SET_LOCALE: u32 = 2; // language, regional format
 pub const SET_CONTRAST: u32 = 4; // high contrast, system colours
 pub const SET_FONTS: u32 = 8; // fonts, text scaling
 pub const SET_OTHER: u32 = 16;
+pub const SET_MONITORS: u32 = 32; // monitors added, removed, moved, rescaled; work areas (screen::monitors)
 pub const EVQ_CAP: usize = 256; // event ring capacity (power of two)
 
 // ---- pointer types, buttons, modifiers

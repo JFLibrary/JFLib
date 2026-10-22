@@ -45,13 +45,46 @@ public final class GalleryActivity extends Activity {
     private GalleryView gallery;
 
     private static native void nativeEnv(byte[] entry);
+    // the displays (lib/plat/web_screen.rs jfgui_screens): one line each
+    private static native void nativeScreens(byte[] lines);
+    private android.hardware.display.DisplayManager.DisplayListener displayListener;
 
     private static void env(String name, String value) {
         nativeEnv((name + "=" + value).getBytes(StandardCharsets.UTF_8));
     }
+    // every display: "0 0 w h 0 0 w h dpi refresh_mHz primary name" (real pixels; 96 dpi = 100 %)
+    private void screens() {
+        android.hardware.display.DisplayManager dm =
+            (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
+        if (dm == null) return;
+        StringBuilder b = new StringBuilder();
+        for (android.view.Display d : dm.getDisplays()) {
+            android.util.DisplayMetrics m = new android.util.DisplayMetrics();
+            d.getRealMetrics(m);
+            int w = m.widthPixels, h = m.heightPixels;
+            b.append("0 0 ").append(w).append(' ').append(h).append(" 0 0 ").append(w).append(' ').append(h)
+                .append(' ').append(Math.max(48, Math.round(96 * m.density)))
+                .append(' ').append(Math.round(d.getRefreshRate() * 1000))
+                .append(' ').append(d.getDisplayId() == android.view.Display.DEFAULT_DISPLAY ? 1 : 0)
+                .append(' ').append(d.getName().replace('\n', ' ').replace('\r', ' ')).append('\n');
+        }
+        nativeScreens(b.toString().getBytes(StandardCharsets.UTF_8));
+    }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         GalleryHost.attach(this);
+        // the displays now and after every change (a projection, a folding phone)
+        screens();
+        android.hardware.display.DisplayManager dm =
+            (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
+        if (dm != null) {
+            displayListener = new android.hardware.display.DisplayManager.DisplayListener() {
+                @Override public void onDisplayAdded(int id) { screens(); }
+                @Override public void onDisplayRemoved(int id) { screens(); }
+                @Override public void onDisplayChanged(int id) { screens(); }
+            };
+            dm.registerDisplayListener(displayListener, null);
+        }
         // the system's languages for the app's texts and formats, before it starts
         String langs = android.os.LocaleList.getDefault().toLanguageTags();
         if (!langs.isEmpty()) env("LANGUAGE", langs);
@@ -99,7 +132,13 @@ public final class GalleryActivity extends Activity {
     }
     @Override public void onResume() { super.onResume(); gallery.resume(); }
     @Override public void onPause() { gallery.pause(); super.onPause(); }
-    @Override public void onDestroy() { GalleryHost.detach(this); super.onDestroy(); }
+    @Override public void onDestroy() {
+        android.hardware.display.DisplayManager dm =
+            (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
+        if (dm != null && displayListener != null) dm.unregisterDisplayListener(displayListener);
+        GalleryHost.detach(this);
+        super.onDestroy();
+    }
     // the system's picker answered (GalleryHost.request)
     @Override protected void onActivityResult(int code, int result, Intent data) {
         if (!GalleryHost.onResult(this, code, result, data)) super.onActivityResult(code, result, data);

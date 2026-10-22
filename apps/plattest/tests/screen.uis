@@ -1,0 +1,7 @@
+#!args --test screen
+# (Rust only) plattest --test screen: plat::screen and plat::hotkey (t_screen.rs): chords, the
+# dry run; Windows: the monitors against GetSystemMetrics, a small topmost window with a colour
+# pattern captured and picked (a test point, the overlay for a moment), RegisterHotKey of an
+# unused F13-F24 pressed through SendInput, a chord another plattest holds; Linux (X11 of WSLg):
+# RandR, GetImage, the pick, XGrabKey with XTEST keys, a chord another plattest grabbed.
+# Nothing stays registered or grabbed.

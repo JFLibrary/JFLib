@@ -151,6 +151,8 @@ mod slider;
 mod sound;
 mod rtl;
 mod runtime;
+// the monitors, global shortcuts, the colour pick, pictures of the screen (plat::screen, hotkey)
+mod screen;
 mod stock;
 mod style;
 mod symbol;
@@ -209,6 +211,8 @@ pub use dock::{
 };
 // the taskbar button's progress and jump list tasks (ui.taskbar_progress / taskbar_tasks)
 pub use plat::taskbar::{JumpTask, TaskbarProgress};
+pub use plat::hotkey::{Chord, HotkeyError};
+pub use plat::screen::{Monitor, ScreenError};
 pub use stock::{card_opaque, kind_colors, Stock};
 pub use vicon::{paint_svg_icon, paint_svg_icon2};
 pub use symbol::{SymPalette, Symbol, SymbolCache, SYM_BODY, SYM_CACHE_MAX_W, SYM_CRIT, SYM_HI, SYM_INK, SYM_OK, SYM_PORT, SYM_ROLES,
@@ -382,6 +386,8 @@ pub(crate) struct Mods {
     pub(crate) vlist: vlist::S,
     /// (ROADMAP §3) the app's sound switch, the last sound asked for (sound.rs)
     pub(crate) sound: sound::S,
+    /// (ROADMAP §3) the colour pick, the last picture, dropped shortcuts (screen.rs)
+    pub(crate) screen: screen::S,
 }
 
 /// the UI context: everything ASMLIB keeps in g_* variables

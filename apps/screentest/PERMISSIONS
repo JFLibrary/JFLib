@@ -1,0 +1,20 @@
+# screentest: what the program may do (docs/PERMISSIONS.md).  Without this file an app may do
+# everything; with it, everything that is not listed is refused (in the library, plugins,
+# scripts and agent actions too).  The app's own folders (config://, data://, cache://,
+# logs://) and app:// need no line.  The build checks the syntax; the packages follow the file
+# (Flatpak finish-args, MSIX capabilities: docs/PACKAGING.md).
+fs.user                              # the files the user picks (file dialog, drops, "Open with")
+input.global                         # global shortcuts (plat::hotkey_register)
+screen.capture                       # pictures of the screen (plat::screen::capture_start)
+#
+# Remove the # of a rule the app needs:
+# fs.read  $DOCUMENTS/**             read below the documents folder (documents://)
+# fs.write $DOCUMENTS/Reports/**     write (and read) below a folder
+# url      https mailto              open web pages and mail addresses (plat::open_url)
+# net.connect api.example.org:443    connections to a server (netio, lib/update)
+# print                              print (plat::print)
+# secrets                            passwords and tokens in the system's store (plat::secret)
+# autostart                          start at login (plat::autostart_set)
+# input.global                       global shortcuts: chords pressed in other programs
+# screen.capture                     pictures of the screen (picking one pixel needs nothing)
+# ask fs.read $PICTURES/** "Bilder öffnen"   ask the user at the first access instead

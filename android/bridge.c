@@ -19,6 +19,7 @@ extern uint32_t jfgui_event(uint32_t type, uint32_t button, uint32_t mods, uint3
                              int32_t x, int32_t y, uint32_t data);
 extern uint32_t jfgui_text(uint32_t length);
 extern uint32_t jfgui_env(uint32_t length);
+extern uint32_t jfgui_screens(uint32_t length);
 extern uint32_t jfgui_complete(uint32_t id, int32_t status);
 extern uint32_t jfgui_frame_delay(void);
 extern uint32_t jfgui_editor_snapshot(void);
@@ -244,6 +245,22 @@ JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryActivity_nativeEnv(
     (*env)->GetByteArrayRegion(env, entry, 0, length, (jbyte *)buffer);
     if ((*env)->ExceptionCheck(env)) return;
     jfgui_env((uint32_t)length);
+}
+
+/* The displays (GalleryActivity.screens, lib/plat/web_screen.rs): one line each; before the
+ * start and after every change (E_SETTINGS with SET_MONITORS then). */
+JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryActivity_nativeScreens(
+        JNIEnv *env, jclass cls, jbyteArray lines) {
+    (void)cls;
+    if (!lines) return;
+    jsize length = (*env)->GetArrayLength(env, lines);
+    if (length <= 0 || length > 65536) return;
+    uintptr_t buffer = jfgui_buffer((uint32_t)length);
+    if (!buffer) return;
+    (*env)->GetByteArrayRegion(env, lines, 0, length, (jbyte *)buffer);
+    if ((*env)->ExceptionCheck(env)) return;
+    jfgui_screens((uint32_t)length);
+    if (started) jfgui_input(time_ms());
 }
 
 JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryActivity_nativeText(

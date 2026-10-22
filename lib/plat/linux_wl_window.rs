@@ -54,6 +54,19 @@ pub(crate) struct Out {
     pub mw: i32, // current mode width / height
     pub mh: i32,
     pub ver: u32,
+    // (screen.rs monitors) geometry position and transform, the mode's refresh (mHz), the
+    // output's name, its zxdg_output_v1 and logical position / size (lw 0: none)
+    pub x: i32,
+    pub y: i32,
+    pub transform: i32,
+    pub refresh: i32,
+    pub label: [u8; 32],
+    pub label_len: u8,
+    pub xo: u32,
+    pub lx: i32,
+    pub ly: i32,
+    pub lw: i32,
+    pub lh: i32,
 }
 
 /// the bound globals and process-wide window state
@@ -74,6 +87,7 @@ pub(crate) struct Globals {
     pub decom: u32,
     pub dialogm: u32,
     pub tabm: u32,
+    pub xom: u32, // zxdg_output_manager_v1 (screen.rs monitors)
     pub scale_ovr: i32,
     pub refresh: Option<fn()>, // stored only: Wayland has no modal size loop
     pub titles: [Vec<u8>; PW_MAX],
@@ -822,8 +836,16 @@ pub(crate) fn wlh_global(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
         let Some(k) = wl.outs.iter().position(|o| o.id == 0) else { return };
         let v = ver.min(4);
         let id = wl.w.send(wl.g.reg, &REGISTRY_BIND, &[A::U(name), A::B(&IFACE_WL_OUTPUT, v)]);
-        wl.outs[k] = Out { id, name, scale: 1, mw: 0, mh: 0, ver: v };
+        wl.outs[k] = Out { id, name, scale: 1, ver: v, ..Out::default() };
         wl.w.set_udata(id, k as u64 + 1);
+        wl.xdg_output(k);
+        return;
+    }
+    if iface == b"zxdg_output_manager_v1" && wl.g.xom == 0 {
+        wl.g.xom = wl.w.send(wl.g.reg, &REGISTRY_BIND, &[A::U(name), A::B(&IFACE_ZXDG_OUTPUT_MANAGER, ver.min(3))]);
+        for k in 0..OUT_MAX {
+            wl.xdg_output(k);
+        }
         return;
     }
     let Some(gi) = GLOBALS.iter().position(|g| g.0.as_bytes() == iface) else { return };
@@ -842,6 +864,48 @@ pub(crate) fn wlh_global(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
 }
 
 impl Wl {
+    /// the zxdg_output_v1 of output slot k (once both the output and the manager are bound)
+    fn xdg_output(&mut self, k: usize) {
+        let o = self.outs[k];
+        if o.id == 0 || o.xo != 0 || self.g.xom == 0 {
+            return;
+        }
+        let xo = self.w.send(self.g.xom, &XOM_GET_XDG_OUTPUT, &[A::N(&IFACE_ZXDG_OUTPUT), A::O(o.id)]);
+        self.w.set_udata(xo, k as u64 + 1);
+        self.outs[k].xo = xo;
+    }
+
+    /// (screen.rs) every output as a monitor: the logical rectangle (xdg-output, else the
+    /// position and the mode / scale), dpi from physical / logical width, the refresh, the
+    /// name; no work area and no primary on Wayland (the first output counts)
+    pub(crate) fn monitors(&self) -> alloc::vec::Vec<crate::screen::Monitor> {
+        let mut v = alloc::vec::Vec::new();
+        for o in self.outs.iter().filter(|o| o.id != 0) {
+            let (mw, mh) = if o.transform & 1 != 0 { (o.mh, o.mw) } else { (o.mw, o.mh) };
+            let sc = o.scale.max(1);
+            let rect = if o.lw > 0 && o.lh > 0 { [o.lx, o.ly, o.lw, o.lh] } else { [o.x, o.y, mw / sc, mh / sc] };
+            let dpi = if mw > 0 && rect[2] > 0 { (mw as u32 * 96 + rect[2] as u32 / 2) / rect[2] as u32 } else { 96 * sc as u32 };
+            v.push(crate::screen::Monitor {
+                id: o.name as u64,
+                name: alloc::string::String::from_utf8_lossy(&o.label[..o.label_len as usize]).into_owned(),
+                rect,
+                work: rect,
+                dpi,
+                refresh_mhz: o.refresh.max(0) as u32,
+                primary: v.is_empty(),
+            });
+        }
+        v
+    }
+
+    /// an output changed after start-up: E_SETTINGS with SET_MONITORS
+    fn monitors_changed(&mut self) {
+        if self.win[0].configured {
+            self.inp.evwin = 0;
+            self.push(crate::E_SETTINGS, 0, 0, 0, crate::SET_MONITORS);
+        }
+    }
+
     fn global_id(&self, gi: usize) -> u32 {
         let g = &self.g;
         [g.comp, g.shm, g.seat, g.xdg_wm, g.ddm, g.vpr, g.fsm, g.csm, g.decom, g.dialogm, g.tabm][gi]
@@ -883,6 +947,10 @@ pub(crate) fn wlh_global_remove(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
             continue;
         }
         wl.w.set_udata(o.id, 0);
+        if o.xo != 0 {
+            wl.w.set_udata(o.xo, 0);
+            wl.w.send(o.xo, &XDG_OUTPUT_DESTROY, &[]);
+        }
         if o.ver >= 3 {
             wl.w.send(o.id, &OUTPUT_RELEASE, &[]);
         }
@@ -891,6 +959,7 @@ pub(crate) fn wlh_global_remove(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
             r.outs &= !(1 << k); // no window is on it any more
         }
         wl.update_scale_all();
+        wl.monitors_changed();
     }
 }
 
@@ -902,6 +971,60 @@ pub(crate) fn wlh_output_mode(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
     let o = &mut wl.outs[(u - 1) as usize & (OUT_MAX - 1)];
     o.mw = a.i(1);
     o.mh = a.i(2);
+    o.refresh = a.i(3);
+}
+
+/// position in the compositor's space and transform (screen.rs monitors)
+pub(crate) fn wlh_output_geometry(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
+    if u == 0 {
+        return;
+    }
+    let o = &mut wl.outs[(u - 1) as usize & (OUT_MAX - 1)];
+    o.x = a.i(0);
+    o.y = a.i(1);
+    o.transform = a.i(7);
+}
+
+// an output's name into its slot (cut to 31 bytes)
+fn out_label(wl: &mut Wl, u: u64, s: Option<&[u8]>) {
+    let Some(s) = s else { return };
+    if u == 0 {
+        return;
+    }
+    let o = &mut wl.outs[(u - 1) as usize & (OUT_MAX - 1)];
+    let n = s.len().min(31);
+    o.label[..n].copy_from_slice(&s[..n]);
+    o.label_len = n as u8;
+}
+
+/// wl_output.name (v4): "HDMI-A-1"
+pub(crate) fn wlh_output_name(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
+    out_label(wl, u, a.s(0));
+}
+
+/// zxdg_output_v1.logical_position
+pub(crate) fn wlh_xo_pos(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
+    if u != 0 {
+        let o = &mut wl.outs[(u - 1) as usize & (OUT_MAX - 1)];
+        o.lx = a.i(0);
+        o.ly = a.i(1);
+    }
+}
+
+/// zxdg_output_v1.logical_size
+pub(crate) fn wlh_xo_size(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
+    if u != 0 {
+        let o = &mut wl.outs[(u - 1) as usize & (OUT_MAX - 1)];
+        o.lw = a.i(0);
+        o.lh = a.i(1);
+    }
+}
+
+/// zxdg_output_v1.name (when wl_output has none: below version 4)
+pub(crate) fn wlh_xo_name(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
+    if u != 0 && wl.outs[(u - 1) as usize & (OUT_MAX - 1)].label_len == 0 {
+        out_label(wl, u, a.s(0));
+    }
 }
 
 /// [wlh_output_scale]
@@ -915,6 +1038,7 @@ pub(crate) fn wlh_output_scale(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
 /// output properties are complete  [wlh_output_done]
 pub(crate) fn wlh_output_done(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
     wl.update_scale_all();
+    wl.monitors_changed();
 }
 
 /// surface.enter / leave bookkeeping  [win_out_mark]

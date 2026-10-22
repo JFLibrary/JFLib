@@ -1,0 +1,21 @@
+# screentest: the monitors headless (ui/screen.rs; docs/GUIDE.md sections 12 and 21): the window
+# is the one monitor, a virtual screen (`screen X Y W H`) replaces it, `system settings monitors`
+# is the change the platform reports (UIC_SETTINGS with SET_MONITORS)
+expect "Monitore" exists
+expect text:"1: headless – 720 × 820 bei 0, 0 · Arbeitsbereich 720 × 820 bei 0, 0 · 96 dpi · 60.00 Hz · primär" exists
+expect text:"Änderungen: 0" exists
+screen 10 20 640 480
+system settings monitors
+expect text:"Änderungen: 1" exists
+expect text:"1: headless – 640 × 480 bei 10, 20 · Arbeitsbereich 640 × 480 bei 10, 20 · 96 dpi · 60.00 Hz · primär" exists
+screen off
+scale 150
+system settings monitors
+expect text:"Änderungen: 2" exists
+expect text:"1: headless – 1080 × 1230 bei 0, 0 · Arbeitsbereich 1080 × 1230 bei 0, 0 · 144 dpi · 60.00 Hz · primär" exists
+scale 100
+# no picture of the screen in a headless run (the page taller: the button in view)
+size 720 1500
+click "Bildschirm aufnehmen"
+expect text:"Bildschirmfoto: hier nicht verfügbar" exists
+shot build/screentest.png

@@ -77,6 +77,109 @@ pub(crate) fn drain(c: &mut Conn, f: impl Fn(&Msg) -> Option<Vec<Value>>) {
     }
 }
 
+pub(crate) const PORTAL: &str = "org.freedesktop.portal.Desktop";
+pub(crate) const PORTAL_PATH: &str = "/org/freedesktop/portal/desktop";
+static TOKEN: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(0);
+
+/// why a portal request has no answer
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum PortalError {
+    /// no portal, no such interface or method
+    Missing,
+    /// an error answer (its name), a broken connection ("")
+    Failed(String),
+    /// no Response in time
+    Timeout,
+}
+
+/// a fresh handle token "jfgui_<what><n>"
+pub(crate) fn token(what: &str) -> String {
+    alloc::format!("jfgui_{what}{}", TOKEN.fetch_add(1, core::sync::atomic::Ordering::Relaxed) + 1)
+}
+
+/// the a{sv} of a message body as (key, value) pairs, the variants unwrapped
+pub(crate) fn results(v: Option<&Value>) -> Vec<(String, Value)> {
+    match v {
+        Some(Value::A(_, kv)) => kv
+            .iter()
+            .filter_map(|e| match e {
+                Value::E(k, v) => {
+                    let v = match &**v {
+                        Value::V(inner) => (**inner).clone(),
+                        other => other.clone(),
+                    };
+                    Some((String::from(k.as_str()?), v))
+                }
+                _ => None,
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// the value of key in results
+pub(crate) fn result<'a>(r: &'a [(String, Value)], key: &str) -> Option<&'a Value> {
+    r.iter().find(|e| e.0 == key).map(|e| &e.1)
+}
+
+/// a portal request: iface.member(args.., options with handle_token = token(what)) on the
+/// portal, then its Request's Response, waited for up to ms -> (code: 0 granted, 1 cancelled,
+/// 2 other, results).  Other messages meanwhile go to other(msg).
+pub(crate) fn portal_request(
+    c: &mut Conn,
+    iface: &str,
+    member: &str,
+    mut args: Vec<Value>,
+    mut opts: Vec<(&str, Value)>,
+    what: &str,
+    ms: u64,
+    other: &mut dyn FnMut(&Msg),
+) -> Result<(u32, Vec<(String, Value)>), PortalError> {
+    let tok = token(what);
+    let sender = c.unique.trim_start_matches(':').replace('.', "_");
+    let mut handle = alloc::format!("{PORTAL_PATH}/request/{sender}/{tok}");
+    let rule = alloc::format!("type='signal',interface='org.freedesktop.portal.Request',member='Response',path='{handle}'");
+    c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "AddMatch", alloc::vec![Value::S(rule)]));
+    opts.insert(0, ("handle_token", Value::S(tok)));
+    args.push(Value::dict(opts));
+    let serial = c.send(&Msg::call(PORTAL, PORTAL_PATH, iface, member, args)).ok_or(PortalError::Failed(String::new()))?;
+    let end = crate::time_us() + ms * 1000;
+    loop {
+        let now = crate::time_us();
+        if now >= end {
+            return Err(PortalError::Timeout);
+        }
+        let Some(m) = c.read((((end - now) / 1000) as i32 + 1).min(250)) else {
+            if c.broken {
+                return Err(PortalError::Failed(String::new()));
+            }
+            continue;
+        };
+        match m.typ {
+            crate::linux_dbus::T_ERROR if m.reply_to == serial => {
+                let missing = m.error.ends_with(".ServiceUnknown") || m.error.ends_with(".UnknownMethod") || m.error.ends_with(".UnknownInterface");
+                return Err(if missing { PortalError::Missing } else { PortalError::Failed(m.error) });
+            }
+            crate::linux_dbus::T_RETURN if m.reply_to == serial => {
+                if let Some(p) = m.body.first().and_then(|v| v.as_str()) {
+                    handle = String::from(p); // older portals choose the path themselves
+                }
+            }
+            crate::linux_dbus::T_SIGNAL if m.member == "Response" && m.path == handle => {
+                let code = m.body.first().and_then(|v| v.as_u32()).unwrap_or(2);
+                return Ok((code, results(m.body.get(1))));
+            }
+            _ => other(&m),
+        }
+    }
+}
+
+/// the portal's version of iface (Properties.Get "version"; 0 = no such portal)
+pub(crate) fn portal_version(c: &mut Conn, iface: &str) -> u32 {
+    let m = Msg::call(PORTAL, PORTAL_PATH, "org.freedesktop.DBus.Properties", "Get", alloc::vec![Value::str(iface), Value::str("version")]);
+    call(c, &m, 3000).and_then(|r| r.body.first().and_then(|v| v.as_u32())).unwrap_or(0)
+}
+
 /// whether this process runs in a Flatpak sandbox
 pub(crate) fn in_flatpak() -> bool {
     crate::file_exists_raw("/.flatpak-info") == 1

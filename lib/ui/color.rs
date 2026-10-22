@@ -9,7 +9,10 @@
 //   color_picker_ex(id, &mut argb, flags) -> EV   (U1) the same with CP_ALPHA: an alpha bar
 //        (id + 0x30000000, checkerboard) under the hue bar; CP_FIELDS: number boxes R G B (A)
 //        and H S V (part_id(id, 3..9)) and a hex text box (part_id(id, 10); RRGGBB,
-//        AARRGGBB with CP_ALPHA, taken on Enter / focus loss) instead of the hex text.
+//        AARRGGBB with CP_ALPHA, taken on Enter / focus loss) instead of the hex text;
+//        CP_PIPETTE: a pipette button beside the preview (part_id(id, 11); only where the
+//        user can pick a colour anywhere on the screen, screen.rs): the picked colour (alpha
+//        kept) comes with EV_ACT | EV_COMMIT on the picker's next pass.
 //   color_wheel(id, &mut color, flags) -> EV  (U1) hue around the circle (0 = red at the
 //        right, counter-clockwise), saturation from the centre to the rim; the value is not
 //        part of the wheel (a separate track slider) but the wheel is drawn at that value.
@@ -331,10 +334,19 @@ impl Ui {
         st.color_marker(self, x, y);
     }
 
-    /// ui_color_picker_ex(id, &mut argb, flags) -> EV_* (CP_ALPHA, CP_FIELDS)
+    /// ui_color_picker_ex(id, &mut argb, flags) -> EV_* (CP_ALPHA, CP_FIELDS, CP_PIPETTE)
     pub fn color_picker_ex(&mut self, id: u32, argb: &mut u32, flags: u32) -> u32 {
         let mut ev = 0;
         let old = *argb;
+        // a colour the pipette picked for this picker (screen.rs)
+        if let Some((owner, c)) = self.m.screen.pending {
+            if owner == id {
+                self.m.screen.pending = None;
+                let a = if *argb >> 24 == 0 { 0xFF00_0000 } else { *argb & 0xFF00_0000 };
+                *argb = a | (c & 0xFF_FFFF);
+                ev |= EV_COMMIT;
+            }
+        }
         // resync the HSV state when the colour was changed from outside
         if *argb as i32 != self.slot(id).measw {
             let c = *argb;
@@ -470,6 +482,13 @@ impl Ui {
         let hex = format!("#{:06X}", *argb & 0xFF_FFFF);
         if flags & CP_FIELDS == 0 {
             self.text(TS_BODY, &hex);
+        }
+        // the pipette: a colour from anywhere on the screen (only where that is possible)
+        if flags & CP_PIPETTE != 0 && self.pick_available() {
+            let e = self.icon_button(part_id(id, 11), super::keys::IC_EYEDROPPER, super::i18n::tr("Farbe vom Bildschirm aufnehmen"));
+            if e & EV_ACT != 0 {
+                self.pick_start_for(id);
+            }
         }
         self.box_end();
         if flags & CP_FIELDS != 0 {

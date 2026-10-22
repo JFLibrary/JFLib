@@ -76,6 +76,8 @@ pub(crate) const POINTER_SET_CURSOR: Req = rq(0, "set_cursor:u?oii");
 pub(crate) const POINTER_RELEASE: Req = rd(1, "release:");
 pub(crate) const KEYBOARD_RELEASE: Req = rd(0, "release:");
 pub(crate) const OUTPUT_RELEASE: Req = rd(0, "release:");
+pub(crate) const XOM_GET_XDG_OUTPUT: Req = rq(1, "get_xdg_output:no"); // zxdg_output_manager_v1
+pub(crate) const XDG_OUTPUT_DESTROY: Req = rd(0, "destroy:");
 pub(crate) const WM_BASE_GET_XDG_SURFACE: Req = rq(2, "get_xdg_surface:no");
 pub(crate) const WM_BASE_PONG: Req = rq(3, "pong:u");
 pub(crate) const XDG_SURFACE_DESTROY: Req = rd(0, "destroy:");
@@ -187,8 +189,17 @@ pub(crate) static IFACE_WL_KEYBOARD: Iface = Iface {
 
 pub(crate) static IFACE_WL_OUTPUT: Iface = Iface {
     name: "wl_output",
-    evs: &[ig("geometry:iiiiissi"), ev("mode:uiii", wlh_output_mode), ev("done:", wlh_output_done),
-           ev("scale:i", wlh_output_scale), ig("name:s"), ig("description:s")],
+    evs: &[ev("geometry:iiiiissi", wlh_output_geometry), ev("mode:uiii", wlh_output_mode), ev("done:", wlh_output_done),
+           ev("scale:i", wlh_output_scale), ev("name:s", wlh_output_name), ig("description:s")],
+};
+
+pub(crate) static IFACE_ZXDG_OUTPUT_MANAGER: Iface = Iface { name: "zxdg_output_manager_v1", evs: &[] };
+
+/// an output's logical position and size in the compositor's space (screen.rs monitors)
+pub(crate) static IFACE_ZXDG_OUTPUT: Iface = Iface {
+    name: "zxdg_output_v1",
+    evs: &[ev("logical_position:ii", wlh_xo_pos), ev("logical_size:ii", wlh_xo_size), ig("done:"),
+           ev("name:s", wlh_xo_name), ig("description:s")],
 };
 
 pub(crate) static IFACE_XDG_WM_BASE: Iface = Iface { name: "xdg_wm_base", evs: &[ev("ping:u", wlh_ping)] };

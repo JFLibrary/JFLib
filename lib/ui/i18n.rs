@@ -547,6 +547,8 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Sättigung und Helligkeit", "Saturation and brightness", "Saturation et luminosité", "Saturación y brillo", "Saturazione e luminosità", "Verzadiging en helderheid", "Nasycenie i jasność", "التشبع والسطوع", "רוויה ובהירות"],
     ["Farbton", "Hue", "Teinte", "Matiz", "Tonalità", "Tint", "Odcień", "تدرج اللون", "גוון"],
     ["Deckkraft", "Opacity", "Opacité", "Opacidad", "Opacità", "Dekking", "Krycie", "العتامة", "אטימות"],
+    // the colour picker's pipette (CP_PIPETTE): a colour from anywhere on the screen (screen.rs)
+    ["Farbe vom Bildschirm aufnehmen", "Pick a color from the screen", "Prélever une couleur à l'écran", "Tomar un color de la pantalla", "Preleva un colore dallo schermo", "Kleur van het scherm kiezen", "Pobierz kolor z ekranu", "التقاط لون من الشاشة", "דגימת צבע מהמסך"],
     // a splitter grip (shell.rs split views, dock.rs): F8 focuses it, the arrows move it
     ["Teiler", "Splitter", "Séparateur", "Divisor", "Divisore", "Splitser", "Rozdzielacz", "فاصل", "מפריד"],
     // (ROADMAP §6) the rich-text and code editors (rich_edit.rs, rich_doc.rs, code_edit.rs, code_doc.rs)

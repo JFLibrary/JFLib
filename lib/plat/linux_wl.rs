@@ -35,6 +35,11 @@ use core::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{Display, Frame, PPW_MAX, PW_MAX};
 
+/// (screen.rs) the outputs as monitors (empty without a compositor connection)
+pub(crate) fn wl_monitors() -> Vec<crate::screen::Monitor> {
+    with(|wl| wl.monitors())
+}
+
 #[path = "linux_wl_clip.rs"]
 mod clip;
 #[path = "linux_wl_cursor.rs"]

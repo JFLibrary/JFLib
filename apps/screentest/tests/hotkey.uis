@@ -1,0 +1,30 @@
+# screentest: a global shortcut headless (ui/screen.rs): the registration is only recorded (the
+# manifest's input.global is checked), `system hotkey ID` presses it as the platform would
+# (UIC_HOTKEY), an unknown chord is refused
+expect "Registrieren" exists
+expect text:"Gedrückt: 0" exists
+click "Registrieren"
+expect text:"Registriert: Ctrl+Alt+K" exists
+expect "Entfernen" exists
+system hotkey 1
+system hotkey 1
+expect text:"Gedrückt: 2" exists
+click "Entfernen"
+expect text:"Entfernt." exists
+expect "Registrieren" exists
+# another chord, typed into the text box
+focus #101
+key ctrl+a
+type "Shift+Super+F9"
+click "Registrieren"
+expect text:"Registriert: Shift+Super+F9" exists
+expect text:"Gedrückt: 0" exists
+system hotkey 1
+expect text:"Gedrückt: 1" exists
+click "Entfernen"
+focus #101
+key ctrl+a
+type "Hyper+K"
+click "Registrieren"
+expect text:"Nicht registriert: ungültiges Kürzel" exists
+expect "Registrieren" exists

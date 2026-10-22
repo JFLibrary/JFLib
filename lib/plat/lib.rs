@@ -47,6 +47,10 @@
 //   audio:   Stream (open / open_fill, write, start / pause / stop, volume, latency, the default
 //            device followed), play / play_file (WAV, Ogg Vorbis), sound(SOUND_*): the system's
 //            sounds (WASAPI, PulseAudio protocol, WebAudio, AAudio)               (audio.rs)
+//   screen:  monitors() (rect, work area, dpi, refresh, primary; SET_MONITORS), pick_start (a
+//            pixel's colour anywhere), capture_start (pictures of the screen)  (screen.rs)
+//   hotkey:  hotkey_register / hotkey_unregister / hotkey_take: global shortcuts (RegisterHotKey,
+//            XGrabKey, the GlobalShortcuts portal)                             (hotkey.rs)
 //   threads: thread_spawn(stack, f) -> Thread (join), thread_yield(), Sem (post / wait),
 //            wake() (any thread: E_WAKE on the UI thread), wait_events(deadline, on_event)
 //            (headless), cpu_count(), mem_total()
@@ -158,6 +162,12 @@ pub mod recent;
 pub use recent::{recent_add, recent_clear, recent_list, recent_remove};
 /// Sound output: streams, short sounds from memory or files, the system's own sounds.
 pub mod audio;
+/// The monitors, a pixel's colour anywhere on the screen, pictures of the screen.
+pub mod screen;
+pub use screen::{Monitor, monitors};
+/// Global keyboard shortcuts: chords that reach the app while another program has the keyboard.
+pub mod hotkey;
+pub use hotkey::{Chord, HotkeyError, HotkeyEvent, hotkey_register, hotkey_take, hotkey_unregister};
 // what the desktop integration shares on Linux (the session-bus link, the .desktop id)
 #[cfg(target_os = "linux")]
 mod linux_desk;

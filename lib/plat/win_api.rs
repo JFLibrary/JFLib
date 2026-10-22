@@ -59,7 +59,7 @@ use core::cell::Cell;
 use crate::{
     CUR_ARROW, CUR_COUNT, CUR_MAX_PX, CUR_TABLE, CUR_USER0, CUR_USER_MAX, E_CLOSE, E_DOWN, E_DPI, E_DROP, E_FOCUS_IN,
     E_FOCUS_OUT, E_KEY_DOWN, E_KEY_UP, E_LEAVE, E_MOVE, E_PAINT, E_POWER, E_RESIZE, E_SESSION_END, E_SETTINGS, E_TEXT,
-    E_UP, E_WHEEL, E_WINPOS, SET_CONTRAST, SET_FONTS, SET_LOCALE, SET_THEME,
+    E_UP, E_WHEEL, E_WINPOS, SET_CONTRAST, SET_FONTS, SET_LOCALE, SET_MONITORS, SET_THEME,
     Event, Frame, HB_CLOSE, HB_DRAG, HB_MAX, HB_MIN, HB_TEXT, MOD_ALT, MOD_ALTGR, MOD_CAPS, MOD_CTRL, MOD_NUM, MOD_SHIFT,
     MOD_SUPER, PW_DEFAULT, PW_KEEP, PW_MAX, PW_NOOWNER, PWF_MASK, PWF_NOACTIVATE, PWF_RESIZABLE, PWF_SYSFRAME,
     PWF_TOOL, PWS_SHOWNA, WCMD_CLOSE, WCMD_MAXIMIZE, WCMD_MINIMIZE, WST_ACTIVE, WST_MAXIMIZED, WST_MINIMIZED, evq_count,
@@ -90,6 +90,14 @@ pub mod inst;
 // tray.rs: the symbol in the notification area and the notifications (Shell_NotifyIconW)
 #[path = "win_tray.rs"]
 pub(crate) mod win_tray;
+// screen.rs: the monitors, pictures of the screen, the colour pick (BitBlt, an overlay)
+#[path = "win_screen.rs"]
+pub(crate) mod win_screen;
+pub use win_screen::{pick_test_cancel, pick_test_click, pick_test_move, pick_test_window, screen_test_metrics, screen_test_topmost};
+// hotkey.rs: global shortcuts (RegisterHotKey on a message-only window)
+#[path = "win_hotkey.rs"]
+pub(crate) mod win_hotkey;
+pub use win_hotkey::{hotkey_test_input, hotkey_test_post};
 // a11y.rs: the accessibility tree as UI Automation providers (WM_GETOBJECT)
 #[path = "win_uia.rs"]
 pub(crate) mod win_uia;
@@ -327,6 +335,8 @@ const WM_QUERYENDSESSION: u32 = 0x0011;
 const WM_SYSCOLORCHANGE: u32 = 0x0015;
 const WM_ENDSESSION: u32 = 0x0016;
 const WM_SETTINGCHANGE: u32 = 0x001A;
+const WM_DISPLAYCHANGE: u32 = 0x007E;
+const SPI_SETWORKAREA: usize = 0x002F;
 const WM_POWERBROADCAST: u32 = 0x0218;
 const PBT_APMSUSPEND: usize = 4;
 const PBT_APMRESUMESUSPEND: usize = 7;
@@ -341,6 +351,9 @@ static ENDING: core::sync::atomic::AtomicBool = core::sync::atomic::AtomicBool::
 fn setting_bits(wp: usize, lp: isize) -> u32 {
     if wp == SPI_SETHIGHCONTRAST {
         return SET_CONTRAST;
+    }
+    if wp == SPI_SETWORKAREA {
+        return SET_MONITORS; // a taskbar moved or changed its size
     }
     // SPI_SETFONTSMOOTHING, _TYPE, _CONTRAST, _ORIENTATION
     if matches!(wp, 0x004B | 0x200B | 0x200D | 0x2013) {
@@ -1321,6 +1334,11 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             }
             if msg == WM_QUERYENDSESSION { 1 } else { 0 }
         }
+        WM_DISPLAYCHANGE if w == 0 => {
+            // a monitor came, went, moved or changed its mode (screen.rs: monitors())
+            win_push(E_SETTINGS, 0, 0, 0, SET_MONITORS);
+            def()
+        }
         WM_SETTINGCHANGE | WM_SYSCOLORCHANGE if w == 0 => {
             let bits = if msg == WM_SYSCOLORCHANGE { SET_CONTRAST } else { setting_bits(wp, lp) };
             if bits != 0 {
@@ -1919,7 +1937,7 @@ fn pointer_free(msg: u32) -> bool {
         WM_CLOSE | WM_ACTIVATEAPP | WM_SETCURSOR | WM_MOUSEACTIVATE | WM_NCHITTEST | WM_NCACTIVATE
         | WM_NCMOUSEMOVE..=WM_NCLBUTTONDBLCLK | WM_KEYDOWN..=WM_SYSCHAR | WM_MOUSEMOVE..=WM_MOUSEHWHEEL
         | WM_CAPTURECHANGED | WM_POINTERUPDATE..=WM_POINTERCAPTURECHANGED | WM_ENTERSIZEMOVE | WM_EXITSIZEMOVE
-        | WM_NCMOUSELEAVE | WM_MOUSELEAVE)
+        | WM_NCMOUSELEAVE | WM_MOUSELEAVE | WM_DISPLAYCHANGE)
 }
 
 /// (test aid) SendMessageW to window w -> its result (0 without the window or for a message
@@ -1927,7 +1945,7 @@ fn pointer_free(msg: u32) -> bool {
 pub fn win_test_send(w: i32, msg: u32, wp: usize, lp: isize) -> isize {
     match rec(w) {
         // SAFETY: our window; only messages whose parameters are plain values.
-        Some(r) if pointer_free(msg) => unsafe { SendMessageW(r.hwnd.get(), msg, wp, lp) },
+        Some(r) if pointer_free(msg) || (msg == WM_SETTINGCHANGE && lp == 0) => unsafe { SendMessageW(r.hwnd.get(), msg, wp, lp) },
         _ => 0,
     }
 }

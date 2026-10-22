@@ -61,7 +61,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -186,6 +186,10 @@ Re-exports: `rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PA
 Re-exports: `plat::{DE_ALL, DE_COPY, DE_LINK, DE_MOVE, DT_FILES, DT_HTML, DT_IMAGE, DT_STD, DT_TEXT, DT_URL, DT_USER0, DragData}`
 
 Re-exports: `plat::taskbar::{JumpTask, TaskbarProgress}`
+
+Re-exports: `plat::hotkey::{Chord, HotkeyError}`
+
+Re-exports: `plat::screen::{Monitor, ScreenError}`
 
 - **`main!(...)`**
   the app's entry point: `ui::main!(ui::run(&DESC, &mut MyApp::default(), &style::STYLE));`
@@ -3282,7 +3286,10 @@ color -- colour swatches, the colour picker and the HSV colour wheel
   color_picker_ex(id, &mut argb, flags) -> EV   (U1) the same with CP_ALPHA: an alpha bar
        (id + 0x30000000, checkerboard) under the hue bar; CP_FIELDS: number boxes R G B (A)
        and H S V (part_id(id, 3..9)) and a hex text box (part_id(id, 10); RRGGBB,
-       AARRGGBB with CP_ALPHA, taken on Enter / focus loss) instead of the hex text.
+       AARRGGBB with CP_ALPHA, taken on Enter / focus loss) instead of the hex text;
+       CP_PIPETTE: a pipette button beside the preview (part_id(id, 11); only where the
+       user can pick a colour anywhere on the screen, screen.rs): the picked colour (alpha
+       kept) comes with EV_ACT | EV_COMMIT on the picker's next pass.
   color_wheel(id, &mut color, flags) -> EV  (U1) hue around the circle (0 = red at the
        right, counter-clockwise), saturation from the centre to the rim; the value is not
        part of the wheel (a separate track slider) but the wheel is drawn at that value.
@@ -3314,7 +3321,7 @@ scaled to the current value; only a change of size or value re-renders it.
 - **`fn color_picker(&mut self, id: u32, argb: &mut u32) -> u32`**
   ui_color_picker(id, &mut argb) -> EV_\*
 - **`fn color_picker_ex(&mut self, id: u32, argb: &mut u32, flags: u32) -> u32`**
-  ui_color_picker_ex(id, &mut argb, flags) -> EV_\* (CP_ALPHA, CP_FIELDS)
+  ui_color_picker_ex(id, &mut argb, flags) -> EV_\* (CP_ALPHA, CP_FIELDS, CP_PIPETTE)
 - **`fn color_wheel(&mut self, id: u32, color: &mut [u32], flags: u32) -> u32`**
   ui_color_wheel(id, &mut color, flags) -> EV_\*: color = [argb], or [h, s, v] with
   CW_HSV
@@ -4685,6 +4692,11 @@ UIC_SETTINGS: u32 = 0x7FFF_0012  // arg = plat::SET_* bits: system settings chan
 UIC_DRAG_END: u32 = 0x7FFF_0013  // arg = DE_* effect (0 = cancelled / refused): a drag of the app ended
 // permissions (perm.rs)
 UIC_PERMISSION: u32 = 0x7FFF_0014  // arg 1 allowed, 0 refused: the user answered a permission question (try the access again)
+// the screen and global shortcuts (screen.rs)
+UIC_HOTKEY: u32 = 0x7FFF_0015  // arg = id: a global shortcut was pressed (hotkey_register)
+UIC_HOTKEY_LOST: u32 = 0x7FFF_0016  // arg = id: the desktop dropped the shortcut (hotkey_error tells why)
+UIC_PICK: u32 = 0x7FFF_0017  // arg 1: a colour was picked (picked_color), 0: cancelled / failed (pick_color)
+UIC_SCREENSHOT: u32 = 0x7FFF_0018  // arg 1: the picture is there (screenshot_take), 0: failed (screen_error)
 TRAY_ACTIVATE: u32 = 1  // UIC_TRAY: the symbol was clicked
 TRAY_SECONDARY: u32 = 2  // UIC_TRAY: double click (Windows) / middle click (Linux)
 ```
@@ -4798,6 +4810,7 @@ PAN_UNIT: u32 = 1  // pan: coordinates 0 .. 1 instead of -1 .. 1
 CW_HSV: u32 = 1  // color_wheel: an HSV record instead of 0xAARRGGBB
 CP_ALPHA: u32 = 1  // color_picker_ex: alpha (transparency) track
 CP_FIELDS: u32 = 2  // ... number boxes R G B (A) H S V and a hex text box
+CP_PIPETTE: u32 = 4  // ... a pipette button: a colour from anywhere on the screen (only where possible)
 PART_BASE: u32 = 0x6000_0000  // part_id(id, k): ids of the parts of composite widgets
 ```
 
@@ -7930,6 +7943,68 @@ popup windows, the platform's hit tests, resize edges and the IME caret.
 - **`fn rtl_map(&self, x: i32, ix: i32, iw: i32) -> i32`**
   rtl_map(x, ix, iw): a logical x as a region ix .. ix + iw that keeps its LTR content
   sees it (the same before its ltr_begin)
+
+#### `ui/screen.rs`
+
+Source: [`lib/ui/screen.rs`](../lib/ui/screen.rs)
+
+```text
+screen -- the monitors, global shortcuts, a colour from anywhere on the screen and pictures of
+the screen for the app (plat::screen, plat::hotkey)
+
+  monitors() -> Vec<Monitor>       every monitor, the primary one first (rect / work area in
+                                   desktop units, dpi, refresh, name); a change comes as
+                                   App::command(UIC_SETTINGS, plat::SET_MONITORS)
+  hotkey_register(id, chord, description) -> Result<(), HotkeyError>   a global shortcut
+                                   ("Ctrl+Alt+K"; plat::Chord::parse names the keys): when it
+                                   is pressed anywhere, App::command(UIC_HOTKEY, id); when the
+                                   desktop drops it later (the portal's dialog),
+                                   App::command(UIC_HOTKEY_LOST, id) and hotkey_error(id)
+                                   tells why.  Needs `input.global` in the manifest.
+  hotkey_unregister(id) -> bool    hotkeys_available() -> bool
+  pick_color() -> bool             the user clicks a pixel anywhere on the screen (Esc
+                                   cancels); then App::command(UIC_PICK, 1 picked / 0 not) and
+                                   picked_color() -> Some(0xRRGGBB); false: not possible here
+  pick_available() -> bool         a colour picker with CP_PIPETTE shows its pipette then
+  screenshot(rect) -> bool         a picture of the whole desktop (None) or a rectangle; then
+                                   App::command(UIC_SCREENSHOT, 1 / 0) and screenshot_take() ->
+                                   Option<Surface> (FMT_XRGB); needs `screen.capture`
+  screen_error() -> Option<ScreenError>   why the last pick / picture failed
+
+Headless runs (scripts, --shot) touch nothing real: shortcuts are only recorded (the script
+command `system hotkey ID` presses one), a pick waits for `system pick RRGGBB|cancel`, the
+monitors are the window (or the script's `screen` rectangle) at the run's dpi, pictures are
+Unavailable.
+```
+
+**`impl Ui`**
+
+- **`fn monitors(&mut self) -> Vec<Monitor>`**
+  every monitor, the primary one first
+- **`fn hotkeys_available(&mut self) -> bool`**
+  whether global shortcuts work here
+- **`fn hotkey_register(&mut self, id: u32, chord: &str, description: &str) -> Result<(), HotkeyError>`**
+  register chord ("Ctrl+Alt+K") as the global shortcut id; description tells the user
+  what it does (the desktop's dialog shows it)
+- **`fn hotkey_unregister(&mut self, id: u32) -> bool`**
+  remove the global shortcut id -> false when it was not registered
+- **`fn hotkey_error(&self, id: u32) -> Option<HotkeyError>`**
+  why the desktop dropped the shortcut id (after UIC_HOTKEY_LOST)
+- **`fn pick_available(&self) -> bool`**
+  whether the user can pick a colour anywhere on the screen here (headless: yes, the
+  script answers)
+- **`fn pick_color(&mut self) -> bool`**
+  the user picks a pixel anywhere on the screen; UIC_PICK reports the end -> false when
+  that is not possible here (or a pick runs)
+- **`fn picked_color(&mut self) -> Option<u32>`**
+  the colour of the last pick (0xRRGGBB), once
+- **`fn screenshot(&mut self, rect: Option<[i32; 4]>) -> bool`**
+  a picture of the whole desktop (None) or of a rectangle (desktop units); UIC_SCREENSHOT
+  reports it -> false when that is not possible here
+- **`fn screenshot_take(&mut self) -> Option<Surface>`**
+  the picture of the last screenshot, once
+- **`fn screen_error(&self) -> Option<ScreenError>`**
+  why the last pick or picture failed (None: it worked or was not asked for)
 
 #### `ui/symbol.rs`
 
@@ -15969,6 +16044,10 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
   audio:   Stream (open / open_fill, write, start / pause / stop, volume, latency, the default
            device followed), play / play_file (WAV, Ogg Vorbis), sound(SOUND_*): the system's
            sounds (WASAPI, PulseAudio protocol, WebAudio, AAudio)               (audio.rs)
+  screen:  monitors() (rect, work area, dpi, refresh, primary; SET_MONITORS), pick_start (a
+           pixel's colour anywhere), capture_start (pictures of the screen)  (screen.rs)
+  hotkey:  hotkey_register / hotkey_unregister / hotkey_take: global shortcuts (RegisterHotKey,
+           XGrabKey, the GlobalShortcuts portal)                             (hotkey.rs)
   threads: thread_spawn(stack, f) -> Thread (join), thread_yield(), Sem (post / wait),
            wake() (any thread: E_WAKE on the UI thread), wait_events(deadline, on_event)
            (headless), cpu_count(), mem_total()
@@ -16782,6 +16861,8 @@ start-up, then checked by the public file, process, shell, plugin and print func
   fs_allowed(path, FS_READ | FS_WRITE) / process_allowed(program) / url_allowed(url) /
   plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed() /
   audio_allowed()                        -> bool
+  input_global_allowed() / screen_capture_allowed()
+                                         -> bool
                                          a refusal is recorded (denials) and printed once
                                          per target to stderr: "PERMDENY kind target"
   audio_granted() -> bool                sound is allowed now, without asking or recording a
@@ -16843,6 +16924,10 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
   secrets               plat::secret (the system's store for passwords, tokens and keys)
   autostart             plat::autostart_set (start the app at login; reading is free)
   audio.output          plat::audio: streams, play / play_file, the system's sounds (sound)
+  input.global          plat::hotkey_register (global shortcuts: chords pressed while
+                        another program has the keyboard)
+  screen.capture        plat::screen::capture_start (pictures of the screen; picking one
+                        pixel's colour needs nothing: the user chooses it)
   net.connect HOST:PORT..   TCP connections and UDP datagrams to HOST (a name, *.name for
                         every name below it, an IPv4 / [IPv6] address, a block 10.0.0.0/8
                         or [fd00::]/8, localhost = the loopback addresses, * = any) on PORT
@@ -16891,9 +16976,9 @@ STORE: &str = "config://permission-decisions.txt"
 - **`struct Denial`**
   one refused access
   - `kind: &'static str` -- "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart",
-    "audio.output", "net.connect", "net.listen" or "agent"
-  - `target: String` -- the path, program, URL, address, the service of a secret, the agent's action or ""
-    (print, autostart, audio.output)
+    "audio.output", "net.connect", "net.listen", "agent", "input.global" or "screen.capture"
+  - `target: String` -- the path, program, URL, address, the service of a secret, the agent's action, the
+    chord of a shortcut or "" (print, autostart, audio.output, screen.capture)
   - `plugin: String` -- the plugin the call was made for ("" = the app itself)
 
 - **`enum Answer`**
@@ -16991,6 +17076,12 @@ STORE: &str = "config://permission-decisions.txt"
 - **`fn audio_granted() -> bool`**
   whether sound is allowed now without a question or a recorded refusal: no manifest, a plain
   `audio.output` line or an ask line already answered with yes (ui's dialog sounds)
+
+- **`fn input_global_allowed() -> bool`**
+  whether plat::hotkey_register may register global shortcuts (`input.global`)
+
+- **`fn screen_capture_allowed() -> bool`**
+  whether plat::screen::capture_start may take pictures of the screen (`screen.capture`)
 
 - **`fn denials() -> Vec<Denial>`**
   the last refusals, oldest first
@@ -18523,6 +18614,208 @@ SOUND_NOTIFY: u32 = 5
 
 - **`fn theme_path(kind: u32) -> Option<String>`** *(Linux)*
   (tests, Linux) the sound theme's file for a SOUND_\* kind (".disabled": switched off)
+
+### `plat/screen.rs`
+
+Source: [`lib/plat/screen.rs`](../lib/plat/screen.rs)
+
+```text
+screen -- the monitors, the colour of any pixel on the screen, pictures of the screen
+
+  monitors() -> Vec<Monitor>        every monitor: id, name, rectangle and work area (desktop
+                                    units), dpi, refresh rate, the primary one first; when the
+                                    set or one of them changes, E_SETTINGS with SET_MONITORS
+  monitor_at(x, y) -> Option<Monitor>   the monitor holding a desktop point, else the primary
+  pick_available() -> bool          the user can pick a colour outside the app's windows here
+  pick_start() -> Result<(), ScreenError>   the user clicks a pixel anywhere on the screen (Esc
+                                    or a right click cancels); the answer is ScreenEvent::Color
+  capture_available() -> bool       pictures of the screen can be taken here
+  capture_start(rect) -> Result<(), ScreenError>   a picture of the whole desktop (None) or
+                                    of a rectangle (desktop units); needs `screen.capture` in
+                                    the manifest (else Denied, "PERMDENY screen.capture"); the
+                                    answer is ScreenEvent::Shot
+  screen_take() -> Vec<ScreenEvent> the answers since the last call (each one calls wake())
+  pick_test_point(Some((x, y)))     (test aid) the next pick_start answers the pixel at the
+                                    desktop point x, y without asking the user (Windows,
+                                    X11; the portal and the browser ignore it)
+
+One pick and one capture at a time (else Busy).  Picking needs no right: the user chooses
+the one pixel the app gets, like a file in the file dialog.  Call pick_start and
+capture_start from the UI thread: their answers are made there (Windows, X11) or on a thread
+of their own (the portal), and arrive through the event loop.
+
+Windows (win_screen.rs): EnumDisplayMonitors + GetMonitorInfoW (device name, work area,
+primary), GetDpiForMonitor (shcore), EnumDisplaySettingsW (refresh), WM_DISPLAYCHANGE and a
+changed work area -> SET_MONITORS; capture: BitBlt (CAPTUREBLT) from the screen DC into a DIB
+section; pick: a topmost window over the virtual desktop showing a frozen picture of it with
+a magnifier at the pointer.  Linux (linux_screen.rs): X11 RandR 1.5 (GetMonitors, the CRTC's
+mode for the refresh rate, _NET_WORKAREA, RRScreenChangeNotify), GetImage of the root window,
+a pointer grab for the pick; Wayland wl_output (+ zxdg_output_v1 for logical position and
+size; no work area, no primary: the first output); in Wayland sessions and in Flatpak the
+screenshot portal (Screenshot, PickColor: the desktop asks the user).  Browser: the host's
+window.screen (getScreenDetails when the page may), the EyeDropper API (Chromium) for the
+pick, no capture.  Android: the host's DisplayManager displays, no pick, no capture.
+```
+
+- **`struct Monitor`**
+  one monitor
+  - `id: u64` -- stable while the monitor stays connected (Windows: a hash of its device name, X11 the
+    RandR monitor's name atom, Wayland the output's global name, browser / Android an index)
+  - `name: String` -- the system's name ("\\\\.\\DISPLAY1", "HDMI-1", "rdp-0"); "" when unknown
+  - `rect: [i32; 4]` -- x, y, w, h in desktop units: physical pixels on Windows, X11 and Android; the
+    compositor's logical units on Wayland; CSS pixels in the browser
+  - `work: [i32; 4]` -- the part windows should use (without taskbars, docks, panels); = rect where unknown
+  - `dpi: u32` -- 96 = 100 %
+  - `refresh_mhz: u32` -- refresh rate in mHz (60000 = 60 Hz), 0 = unknown
+  - `primary: bool` -- the primary monitor (exactly one in a non-empty list)
+
+- **`enum ScreenError`**
+  why a pick or a capture did not happen
+  - `Unavailable` -- not possible here (browser without EyeDropper, Android, no X server / portal)
+  - `Denied` -- the app's permissions lack `screen.capture`, or the system / the user refused
+  - `Cancelled` -- the user cancelled (Esc, a right click, the portal's dialog dismissed)
+  - `Busy` -- a pick (or capture) is still running
+  - `Failed(String)` -- the system failed: what it said
+
+- **`struct Shot`**
+  a picture of the screen
+  - `rect: [i32; 4]` -- where it was taken: x, y, w, h in desktop units ([0, 0, w, h] when the system did not
+    say: the portal)
+  - `w: i32` -- size in pixels
+  - `h: i32`
+  - `px: Vec<u8>` -- w x h pixels B, G, R, x (rows of w \* 4 bytes); empty when `file` holds the picture
+  - `file: Option<(String, Vec<u8>)>` -- the picture as the system wrote it (the screenshot portal's PNG): its name and bytes
+
+- **`enum ScreenEvent`**
+  an answer of pick_start / capture_start
+  - `Color(Result<u32, ScreenError>)` -- the picked colour 0xRRGGBB
+  - `Shot(Result<Shot, ScreenError>)` -- the picture
+
+- **`fn screen_take() -> Vec<ScreenEvent>`**
+  the answers since the last call, oldest first
+
+- **`fn monitors() -> Vec<Monitor>`**
+  every monitor, the primary one first (empty when nothing is known: Linux before the first
+  window, headless runs)
+
+- **`fn monitor_at(x: i32, y: i32) -> Option<Monitor>`**
+  the monitor holding the desktop point x, y, else the primary one
+
+- **`fn pick_available() -> bool`**
+  whether the user can pick a colour anywhere on the screen here
+
+- **`fn pick_start() -> Result<(), ScreenError>`**
+  the user picks a pixel anywhere on the screen; the answer comes as ScreenEvent::Color
+
+- **`fn pick_test_point(p: Option<(i32, i32)>)`**
+  (test aid) the next pick_start answers the pixel at the desktop point x, y at once,
+  without asking the user (Windows, X11; the portal and the browser ignore it); None: ask
+  again
+
+- **`fn capture_available() -> bool`**
+  whether pictures of the screen can be taken here (the permission is checked when taking)
+
+- **`fn capture_start(rect: Option<[i32; 4]>) -> Result<(), ScreenError>`**
+  a picture of the whole desktop (None) or of the rectangle x, y, w, h (desktop units); the
+  answer comes as ScreenEvent::Shot.  The screenshot portal takes the whole screen (or what
+  the user chooses in its dialog) whatever rect says.
+
+- **`fn shot_pixel(s: &Shot, x: i32, y: i32) -> Option<u32>`**
+  the pixel 0xRRGGBB at x, y of a shot's B, G, R, x rows (None outside)
+
+### `plat/hotkey.rs`
+
+Source: [`lib/plat/hotkey.rs`](../lib/plat/hotkey.rs)
+
+```text
+hotkey -- global keyboard shortcuts: chords that reach the app while another program has the
+keyboard
+
+  Chord::parse("Ctrl+Alt+K") -> Option<Chord>   modifiers ctrl, alt, shift, super (win, meta,
+                                    logo), one key: a-z 0-9 f1-f24, space enter tab esc
+                                    backspace delete insert home end pageup pagedown left up
+                                    right down print pause num0-num9 numadd numsub nummul
+                                    numdiv numdec minus plus comma period (case ignored)
+  chord.text() -> "Ctrl+Alt+K"      chord.trigger() -> "CTRL+ALT+k" (the XDG shortcuts
+                                    notation of the GlobalShortcuts portal)
+  hotkey_available() -> bool        global shortcuts work here
+  hotkey_register(id, chord, description) -> Result<(), HotkeyError>   id != 0; the same id
+                                    again replaces its chord; needs `input.global` in the
+                                    manifest (else Denied, "PERMDENY input.global")
+  hotkey_unregister(id) -> bool     hotkey_clear()   hotkey_list() -> [(id, chord)]
+  hotkey_take() -> Vec<HotkeyEvent> Pressed(id) when the chord was pressed anywhere (held keys
+                                    do not repeat), Refused(id, why) when the desktop refused
+                                    a registration later (the portal); each one calls wake()
+  set_dry_run(on)                   only record registrations (the UI's headless runs);
+                                    hotkey_test_press(id) delivers a press (test aid)
+
+Call register / unregister from the UI thread: the presses arrive through its event loop.
+Windows (win_hotkey.rs): RegisterHotKey (MOD_NOREPEAT) on a message-only window of the UI
+thread, WM_HOTKEY; a chord another program holds is Conflict.  X11 (linux_x11_screen.rs):
+XGrabKey on the root window for every keycode of the key and every combination of Caps Lock
+and Num Lock, KeyPress on the root window; BadAccess (another client grabbed it) is
+Conflict.  Wayland and Flatpak (linux_hotkey.rs): the GlobalShortcuts portal on a thread of
+its own: a session, BindShortcuts with the description and the preferred trigger -- the
+desktop asks the user, who may choose another chord or none; what is not bound comes as
+Refused(id, Dismissed); Activated -> Pressed.  Browser and Android: Unavailable.
+```
+
+- **`struct Chord`**
+  a key with modifiers: VK code (the platform's E_KEY_DOWN codes) and MOD_SHIFT | MOD_CTRL |
+  MOD_ALT | MOD_SUPER
+  - `vk: u32`
+  - `mods: u8`
+
+- **`enum HotkeyError`**
+  why a shortcut was not registered
+  - `Unavailable` -- no global shortcuts here (browser, Android, no X server / portal)
+  - `Denied` -- the app's permissions lack `input.global`
+  - `Invalid` -- id 0, a key without a name, a description with NUL
+  - `Conflict` -- another program (or another id of this app) holds the chord
+  - `Dismissed` -- the user or the desktop did not bind it (the portal's dialog)
+  - `Failed(String)` -- the system failed: what it said
+
+- **`enum HotkeyEvent`**
+  what happened to a registered shortcut
+  - `Pressed(u32)` -- its chord was pressed
+  - `Refused(u32, HotkeyError)` -- the desktop did not bind it after all (the portal answers later)
+
+**`impl Chord`**
+
+- **`fn parse(s: &str) -> Option<Chord>`**
+  "Ctrl+Alt+K", "super+f12", "Shift+NumAdd" -> the chord (None: no key, an unknown name,
+  two keys)
+- **`fn text(&self) -> String`**
+  "Ctrl+Alt+K" (the modifiers in the order Ctrl, Alt, Shift, Super)
+- **`fn trigger(&self) -> Option<String>`**
+  the XDG shortcuts notation ("CTRL+ALT+k", "LOGO+F12"): modifiers CTRL ALT SHIFT LOGO,
+  the key as its xkb keysym name; None for a key without one
+
+- **`fn hotkey_take() -> Vec<HotkeyEvent>`**
+  what happened since the last call, oldest first
+
+- **`fn set_dry_run(on: bool)`**
+  only record registrations from now on (the UI's headless runs: scripts, --shot)
+
+- **`fn hotkey_available() -> bool`**
+  whether global shortcuts work here
+
+- **`fn hotkey_register(id: u32, chord: Chord, description: &str) -> Result<(), HotkeyError>`**
+  register chord as the global shortcut id (the same id again replaces it); description says
+  what it does (the portal's dialog shows it)
+
+- **`fn hotkey_unregister(id: u32) -> bool`**
+  remove the shortcut id -> false when it was not registered
+
+- **`fn hotkey_clear()`**
+  remove every shortcut of the app
+
+- **`fn hotkey_list() -> Vec<(u32, Chord)>`**
+  the registered shortcuts: (id, chord)
+
+- **`fn hotkey_test_press(id: u32) -> bool`**
+  (test aid) a press of the registered shortcut id, as the system would report it -> false
+  when id is not registered
 
 ### `plat/log.rs`
 
@@ -20244,6 +20537,80 @@ PATH_CAP: usize = 520
   start a command line (UTF-8, PATH_CAP wide chars) in dir (None = the current folder);
   hidden = CREATE_NO_WINDOW  [sh_run]
 
+### `plat/win_screen.rs` (Windows)
+
+Source: [`lib/plat/win_screen.rs`](../lib/plat/win_screen.rs)
+
+```text
+win_screen -- (screen.rs) the monitors, pictures of the screen and the colour pick on Windows
+
+  monitors() -> Vec<Monitor>   EnumDisplayMonitors; per monitor GetMonitorInfoW (MONITORINFOEXW:
+                               rectangle, work area, MONITORINFOF_PRIMARY, the device name),
+                               GetDpiForMonitor (shcore, effective dpi; else the system's),
+                               EnumDisplaySettingsW (ENUM_CURRENT_SETTINGS: dmDisplayFrequency)
+  capture_start(rect)          BitBlt (SRCCOPY | CAPTUREBLT) from the screen DC into a top-down
+                               32-bit DIB section, answered at once (ScreenEvent::Shot)
+  pick_start(test)             a frozen picture of the virtual desktop in a topmost window over
+                               all monitors, a magnifier (9 x 9 pixels) beside the pointer with
+                               the colour and its hex value; a left click, Enter or Space takes
+                               the pixel under the pointer, the arrows move the pointer by one
+                               pixel (Shift: ten), Esc / a right click cancels.  test = Some(x,
+                               y): that pixel at once (1 x 1 BitBlt), no window
+  (test aid) screen_test_metrics() -> (SM_CMONITORS, virtual desktop rectangle), the
+                               independent figures of GetSystemMetrics
+
+The process is made per-monitor DPI aware first (win_api.rs), so every figure is in physical
+pixels of the virtual desktop.  WM_DISPLAYCHANGE and a changed work area (SPI_SETWORKAREA)
+reach the app as E_SETTINGS with SET_MONITORS (win_api.rs).  The overlay belongs to the UI
+thread: its messages are dispatched by wait().
+```
+
+- **`fn screen_test_metrics() -> (i32, [i32; 4])`**
+  (test aid) GetSystemMetrics: the number of monitors and the virtual desktop x, y, w, h
+
+- **`fn pick_test_window() -> isize`**
+  (test aid) the pick overlay's window, 0 = none (tests close it with Esc through it)
+
+- **`fn pick_test_click(x: i32, y: i32) -> bool`**
+  (test aid) pointer at the desktop point x, y of the open pick and a click there, as the
+  window would see it -> false without a pick
+
+- **`fn pick_test_move(x: i32, y: i32) -> bool`**
+  (test aid) the pointer at the desktop point x, y of the open pick (the magnifier follows on
+  the next WM_PAINT); the real pointer's moves are ignored from then on -> false without a pick
+
+- **`fn pick_test_cancel() -> bool`**
+  (test aid) Esc in the open pick -> false without a pick
+
+- **`fn screen_test_topmost(w: i32) -> bool`**
+  (test aid) window w above every other window (HWND_TOPMOST), shown without activation, so a
+  picture of the screen shows it -> false without the window
+
+### `plat/win_hotkey.rs` (Windows)
+
+Source: [`lib/plat/win_hotkey.rs`](../lib/plat/win_hotkey.rs)
+
+```text
+win_hotkey -- (hotkey.rs) global shortcuts on Windows: RegisterHotKey on a message-only window
+of the UI thread
+
+  available() -> true          register(id, chord, _) / unregister(id)
+  (test aids) hotkey_test_post(id) posts WM_HOTKEY of a registered id to the window (the path
+  of the window procedure without a key); hotkey_test_input(vk) presses and releases vk with
+  SendInput (the real way through the system: only for keys nobody uses, F13-F24)
+
+The app's ids map to the window's hotkey ids 1..0xBFFF (the range RegisterHotKey allows
+applications).  MOD_NOREPEAT: a held chord reports once.  ERROR_HOTKEY_ALREADY_REGISTERED
+(another program or thread holds the chord) is Conflict.  WM_HOTKEY -> hotkey::push(Pressed).
+```
+
+- **`fn hotkey_test_post(id: u32) -> bool`**
+  (test aid) WM_HOTKEY of the registered id posted to the window -> false when unknown
+
+- **`fn hotkey_test_input(vk: u32) -> u32`**
+  (test aid) press and release vk through SendInput (only F13-F24: keys no program uses) ->
+  the events the system took (2 = both)
+
 ### `plat/win_uia.rs` (Windows)
 
 Source: [`lib/plat/win_uia.rs`](../lib/plat/win_uia.rs)
@@ -20932,6 +21299,10 @@ KV_MODSHIFT: u32 = 24
 - **`fn xkb_key(evdev: u32) -> (u32, u32)`**
   evdev code -> (VK code, text codepoint (0 = none))  [xkb_key]
 
+- **`fn xkb_vk_keys(vk: u32) -> alloc::vec::Vec<u32>`**
+  the evdev codes of the keys that give vk without modifiers (keypad keys: with Num Lock on)
+  -- the keys a global shortcut grabs (linux_x11_screen.rs)
+
 - **`fn xkb_dump()`**
   print every defined key: evdev, VK, flags, modifier id, 4 levels  [xkb_dump]
 
@@ -20966,6 +21337,8 @@ bug and panics.  Files:
   linux_x11_clip.rs     CLIPBOARD (INCR both ways, images)
   linux_x11_dnd.rs      XDND 5: drops of every kind into the windows, the app's drags out
   linux_x11_misc.rs     popups (override-redirect), cursors (font / RENDER), monitors (RandR)
+  linux_x11_screen.rs   the monitor list, global shortcuts (GrabKey), GetImage of the root,
+                        the colour pick (pointer grab), RandR change events
 
 Deviation from the assembly (the Rust API hands the frame over only for the call):
 presented pixels are copied into a per-window shadow image (the damaged rectangles), and
@@ -21026,6 +21399,28 @@ plat::xkb_\*)
 
 - **`fn err_last() -> u32`**
   the sequence number of the last X error (g_x11_err_last)
+
+- **`fn fake_input(typ: u32, detail: u32, x: i32, y: i32) -> bool`**
+  XTEST FakeInput: 2 / 3 key press / release (detail: keycode), 4 / 5 button press /
+  release, 6 motion to the root point x, y -> false without XTEST or a connection
+
+- **`fn focus() -> (u32, u32)`**
+  the input focus: (window: 0 None, 1 PointerRoot; revert-to) (GetInputFocus)
+
+- **`fn set_focus(win: u32, revert: u32)`**
+  SetInputFocus(window, revert-to) at CurrentTime
+
+- **`fn root() -> u32`**
+  the root window (0 without a connection)
+
+- **`fn roles() -> (u32, u32, u32)`**
+  the modifier masks of Alt, Num Lock and Super (their roles in the modifier mapping)
+
+- **`fn vk_keycodes(vk: u32) -> alloc::vec::Vec<u32>`**
+  the keycodes (X, evdev + 8) that give vk without modifiers
+
+- **`fn image_of(w: i32, r: [i32; 4]) -> Result<crate::screen::Shot, crate::screen::ScreenError>`**
+  GetImage of window w's rectangle (window px): the capture's path on an own window
 
 **`mod x11s`**
 
@@ -21797,6 +22192,46 @@ by the existing software renderer; the browser host receives pixels, not another
 - **`fn popup(slot: u32, owner: i32, rect: Option<[i32; 4]>, frame: Option<&Frame<'_>>)`**
   Paint an existing library popup into the canvas overlay stack.
 
+### `plat/web_screen.rs`
+
+Source: [`lib/plat/web_screen.rs`](../lib/plat/web_screen.rs)
+
+```text
+web_screen -- (screen.rs) the monitors the browser / Android host reports, the browser's
+EyeDropper
+
+  jfgui_screens(len) -> count      the host's monitors from the inbox: one line per monitor,
+                                   "x y w h wx wy ww wh dpi refresh_mhz primary name" (name:
+                                   the rest of the line, may be empty); sent at start and on
+                                   every change (then E_SETTINGS with SET_MONITORS).  Browser
+                                   (web/loader.js): window.screen (CSS pixels, availLeft /
+                                   availTop / availWidth / availHeight, devicePixelRatio) or,
+                                   where the page may already (permission "window-management"
+                                   granted), getScreenDetails() with every screen; Android
+                                   (android/GalleryActivity.java): DisplayManager.getDisplays()
+                                   with their bounds, density and refresh rate
+  monitors()                       that list; before it arrives one monitor of the viewport
+  pick_start()                     REQUEST_PICK_COLOR: the browser's EyeDropper (Chromium,
+                                   from the user's gesture), answered by jfgui_color(id, status,
+                                   rgb); without EyeDropper (the host's capability bit
+                                   HOST_EYEDROPPER) and on Android Unavailable
+  capture_*                        Unavailable (no picture of the screen here)
+```
+
+```rust
+/// (browser) open the EyeDropper; no payload; answered by jfgui_color
+REQUEST_PICK_COLOR: u32 = 21
+```
+
+- **`extern "C" fn jfgui_screens(len: u32) -> u32`**
+  The host's monitors (inbox: one line per monitor, see the module header) -> how many were
+  taken; a different list once the app runs is a change (E_SETTINGS with SET_MONITORS; the
+  first one after the start too: the app saw the viewport until then).
+
+- **`extern "C" fn jfgui_color(id: u32, status: i32, rgb: u32) -> u32`**
+  The EyeDropper's answer to the pick request id: status 2 = picked (rgb 0xRRGGBB), -4
+  cancelled, -1 refused, -3 not supported, else failed.  1 = taken.
+
 ### `plat/android_ime.rs`
 
 Source: [`lib/plat/android_ime.rs`](../lib/plat/android_ime.rs)
@@ -22117,6 +22552,7 @@ SET_LOCALE: u32 = 2  // language, regional format
 SET_CONTRAST: u32 = 4  // high contrast, system colours
 SET_FONTS: u32 = 8  // fonts, text scaling
 SET_OTHER: u32 = 16
+SET_MONITORS: u32 = 32  // monitors added, removed, moved, rescaled; work areas (screen::monitors)
 EVQ_CAP: usize = 256  // event ring capacity (power of two)
 ```
 

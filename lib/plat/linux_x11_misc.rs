@@ -260,7 +260,7 @@ impl X11 {
     }
 
     /// cursor_get(shape) -> cursor id (made on first use; 0 = None; a custom cursor's id)
-    fn cursor_get(&mut self, shape: u32) -> u32 {
+    pub(super) fn cursor_get(&mut self, shape: u32) -> u32 {
         let k = shape.wrapping_sub(CUR_USER0);
         if k < CUR_USER_MAX {
             return self.xcust[k as usize];

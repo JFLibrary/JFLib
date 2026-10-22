@@ -20,3 +20,6 @@ rsonly dnd.uis     # Drag and drop between programs has no assembly counterpart.
 rsonly assoc.uis   # plat::assoc has no assembly counterpart.
 rsonly recent.uis  # plat::recent has no assembly counterpart.
 rsonly content.uis # Android's content:// names (plat::content) have no assembly counterpart.
+rsonly screen.uis  # plat::screen and plat::hotkey have no assembly counterpart.
+rsonly screen_policy.uis # The input.global / screen.capture rights have no assembly counterpart.
+rsonly screen_wl.uis # plat::screen (Wayland outputs) has no assembly counterpart.

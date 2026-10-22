@@ -24,6 +24,8 @@
 //   linux_x11_clip.rs     CLIPBOARD (INCR both ways, images)
 //   linux_x11_dnd.rs      XDND 5: drops of every kind into the windows, the app's drags out
 //   linux_x11_misc.rs     popups (override-redirect), cursors (font / RENDER), monitors (RandR)
+//   linux_x11_screen.rs   the monitor list, global shortcuts (GrabKey), GetImage of the root,
+//                         the colour pick (pointer grab), RandR change events
 //
 // Deviation from the assembly (the Rust API hands the frame over only for the call):
 // presented pixels are copied into a per-window shadow image (the damaged rectangles), and
@@ -46,6 +48,8 @@ mod input;
 mod misc;
 #[path = "linux_x11_present.rs"]
 mod present;
+#[path = "linux_x11_screen.rs"]
+mod screen;
 #[path = "linux_x11_window.rs"]
 mod window;
 #[path = "linux_x11_wire.rs"]
@@ -504,6 +508,16 @@ struct X11 {
     xm_op: u32,
     xm_primary: u32,
     xm_valid: bool,
+    // ---- screen (linux_x11_screen.rs): RandR, work area, shortcuts, the pick, XTEST
+    sc_rr_op: u32,
+    sc_rr_ev: u32,
+    sc_wa_atom: u32,
+    sc_desk_atom: u32,
+    sc_grabs: Vec<screen::Grab>,
+    sc_key_down: u32,
+    sc_pick: screen::Pick,
+    sc_changed: bool,
+    sc_xt_op: u32,
 }
 
 impl X11 {
@@ -659,6 +673,15 @@ impl X11 {
             xm_op: 0,
             xm_primary: 0,
             xm_valid: false,
+            sc_rr_op: 0,
+            sc_rr_ev: 0,
+            sc_wa_atom: 0,
+            sc_desk_atom: 0,
+            sc_grabs: Vec::new(),
+            sc_key_down: 0,
+            sc_pick: screen::Pick::default(),
+            sc_changed: false,
+            sc_xt_op: 0,
         }
     }
 }
@@ -952,6 +975,94 @@ pub mod x11t {
         with_x(|s| s.err_last)
     }
 
+    /// XTEST FakeInput: 2 / 3 key press / release (detail: keycode), 4 / 5 button press /
+    /// release, 6 motion to the root point x, y -> false without XTEST or a connection
+    pub fn fake_input(typ: u32, detail: u32, x: i32, y: i32) -> bool {
+        with_x(|s| s.fd >= 0 && s.fake_input(typ, detail, x, y))
+    }
+
+    /// the input focus: (window: 0 None, 1 PointerRoot; revert-to) (GetInputFocus)
+    pub fn focus() -> (u32, u32) {
+        with_x(|s| {
+            if s.fd < 0 {
+                return (0, 0);
+            }
+            let (_, seq) = s.req(super::XR_GET_INPUT_FOCUS, 4);
+            s.reply(seq).map_or((0, 0), |r| (super::rd32(&r, 8), r[1] as u32))
+        })
+    }
+
+    /// SetInputFocus(window, revert-to) at CurrentTime
+    pub fn set_focus(win: u32, revert: u32) {
+        with_x(|s| {
+            if s.fd >= 0 {
+                let (o, _) = s.req(42 | (revert & 0xFF) << 8, 12);
+                super::wr32(&mut s.out, o, win);
+                super::wr32(&mut s.out, o + 4, 0);
+                s.sync();
+            }
+        })
+    }
+
+    /// the root window (0 without a connection)
+    pub fn root() -> u32 {
+        with_x(|s| if s.fd >= 0 { s.root } else { 0 })
+    }
+
+    /// the modifier masks of Alt, Num Lock and Super (their roles in the modifier mapping)
+    pub fn roles() -> (u32, u32, u32) {
+        with_x(|s| (s.role_alt, s.role_num, s.role_super))
+    }
+
+    /// the keycodes (X, evdev + 8) that give vk without modifiers
+    pub fn vk_keycodes(vk: u32) -> alloc::vec::Vec<u32> {
+        crate::xkb_vk_keys(vk).into_iter().map(|e| e + 8).collect()
+    }
+
+    /// GetImage of window w's rectangle (window px): the capture's path on an own window
+    pub fn image_of(w: i32, r: [i32; 4]) -> Result<crate::screen::Shot, crate::screen::ScreenError> {
+        with_x(|s| s.image_of(w, r))
+    }
+
+}
+
+// ------------------------------------------------------------------ screen, shortcuts
+/// (screen.rs, hotkey.rs through linux_screen.rs / linux_hotkey.rs) the X11 parts; only while
+/// the main window exists (its connection)
+pub(crate) mod x11scr {
+    use super::with_x;
+    use crate::hotkey::{Chord, HotkeyError};
+    use crate::screen::{Monitor, ScreenError, Shot};
+    use alloc::vec::Vec;
+
+    /// connected, the main window made
+    pub(crate) fn ready() -> bool {
+        with_x(|s| s.fd >= 0 && s.xw[0].win != 0)
+    }
+
+    pub(crate) fn monitors() -> Vec<Monitor> {
+        with_x(|s| if s.fd >= 0 { s.monitors() } else { Vec::new() })
+    }
+
+    pub(crate) fn hotkey_grab(id: u32, chord: Chord) -> Result<(), HotkeyError> {
+        with_x(|s| s.hotkey_grab(id, chord))
+    }
+
+    pub(crate) fn hotkey_ungrab(id: u32) {
+        with_x(|s| {
+            if s.fd >= 0 {
+                s.hotkey_ungrab(id)
+            }
+        })
+    }
+
+    pub(crate) fn capture(rect: Option<[i32; 4]>) -> Result<Shot, ScreenError> {
+        with_x(|s| s.capture(rect))
+    }
+
+    pub(crate) fn pick_start(test: Option<(i32, i32)>) -> Result<(), ScreenError> {
+        with_x(|s| s.pick_start(test))
+    }
 }
 
 // ------------------------------------------------------------------ plat-shared
