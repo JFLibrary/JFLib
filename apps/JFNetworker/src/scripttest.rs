@@ -8,7 +8,10 @@
 // limits (fuel, heap, depth), errors with line and column in status, log and trace,
 // stop_on_error, a failed start and a restart, the shell's script command and top,
 // definitions and their refusals, the English of the texts, determinism (twice, and a clone in
-// the middle of a callback)
+// the middle of a callback); for the script editor (U7) a new definition that keeps the disk,
+// numbers and errors (Action::ScriptSource: the current run's errors and output, stopped,
+// failed and switched-off scripts, refusals, a replaced service's bytes on the disk) and a
+// rename while it runs (Action::RenameService: log lines, time series, refusals)
 //
 // Times: as labtest, 1 Gbit/s copper with 50 ns of cable and a switch between the hosts, every
 // ARP entry set by hand: a frame of up to 60 bytes takes 722 ns per cable, 1444 ns from host to
@@ -335,6 +338,8 @@ pub fn run(t: &mut T) {
     defs(t);
     texts(t);
     determinism(t);
+    redefine(t);
+    rename(t);
 }
 
 const ECHO: &str = "net.udp(7, fn(s, m) { s.send(m.from, m.port, m.data) })";
@@ -902,4 +907,144 @@ fn determinism(t: &mut T) {
     }
     t.check(&format!("determinism: a cut inside a callback ({} ns)", cut), cut < SEC);
     t.check("determinism: a clone in the middle goes on alike", run(Some(cut)) == a);
+}
+
+// ---------------------------------------------------------------- a new definition, a new name (U7)
+
+/// counts its starts on the disk and prints them, echoes on port 7; its timer fails in line 3
+const V1: &str = "disk.get(\"runs\", fn(err, v) { let n = (v ?? 0) + 1; disk.put(\"runs\", n); metrics.gauge(\"runs\", n); print(\"Lauf ${n}\") })\nnet.udp(7, fn(s, m) { s.send(m.from, m.port, m.data) })\ntimer.after(5, fn() { let x = 1 / 0 })";
+/// the same count, another text, the echo on port 8, no error
+const V2: &str = "disk.get(\"runs\", fn(err, v) { let n = (v ?? 0) + 1; disk.put(\"runs\", n); metrics.gauge(\"runs\", n); print(\"zwei ${n}\") })\nnet.udp(8, fn(s, m) { s.send(m.from, m.port, m.data) })";
+
+/// the config of a definition: its source and more members ("\"port\": 7")
+fn conf(src: &str, more: &str) -> Json {
+    script_def("", src, more).config
+}
+
+/// the service id of a device's service
+fn svc_id(e: &Engine, dev: u32, name: &str) -> Option<u32> {
+    e.service_ids(dev).into_iter().find(|s| s.1 == name).map(|s| s.0)
+}
+
+/// the bytes on a device's disk
+fn disk_used(e: &Engine, dev: u32) -> u64 {
+    e.node(dev).and_then(|n| n.os.as_ref()).map_or(0, |o| o.disk.used())
+}
+
+// Action::ScriptSource: the program is new, the service stays -- its disk, numbers, errors and
+// output, its id; the current run's errors and output start again; a stopped script stays
+// stopped, a failed one runs again; what is refused leaves the old program running
+fn redefine(t: &mut T) {
+    let (mut e, h) = net(2);
+    let ok = script(&mut e, h[0], "z", V1, "") && probe(&mut e, h[1], addr(0), 8, &[(30 * MS, "a")]);
+    t.check("redefine: services", ok);
+    run_to(&mut e, 20 * MS);
+    let s = sv(&e, h[0], "z");
+    t.eq("redefine: the first run", (s.map(|s| String::from(s.output())), s.map(|s| s.errors().len()), metric(&e, h[0], "z", "runs")), (Some(String::from("Lauf 1\n")), Some(1), 1));
+    t.eq("redefine: its error in line 3", s.map(|s| s.run_errors().iter().map(|x| (x.line, x.during)).collect::<Vec<_>>()), Some(vec![(3, "timer")]));
+    let (id, used, calls) = (svc_id(&e, h[0], "z"), disk_used(&e, h[0]), metric(&e, h[0], "z", "calls"));
+    t.check(&format!("redefine: the disk holds the count ({} bytes)", used), used > 0);
+    t.check("redefine: the new source", e.apply(Action::ScriptSource { dev: h[0], svc: String::from("z"), config: conf(V2, "") }).is_ok());
+    run_to(&mut e, 40 * MS);
+    let s = sv(&e, h[0], "z");
+    t.eq("redefine: the same service", svc_id(&e, h[0], "z"), id);
+    t.eq("redefine: the disk kept the count", metric(&e, h[0], "z", "runs"), 2);
+    t.eq("redefine: its bytes still counted once", disk_used(&e, h[0]), used);
+    t.eq("redefine: the output goes on", s.map(|s| String::from(s.output())), Some(String::from("Lauf 1\nzwei 2\n")));
+    t.eq("redefine: the run's output", s.map(|s| String::from(s.run_output(0).0)), Some(String::from("zwei 2\n")));
+    t.eq("redefine: the errors stay, the run has none", (s.map(|s| s.errors().len()), s.map(|s| s.run_errors().len()), metric(&e, h[0], "z", "errors")), (Some(1), Some(0), 1));
+    t.check(&format!("redefine: the calls go on ({} before)", calls), metric(&e, h[0], "z", "calls") > calls);
+    t.eq("redefine: two runs", s.map(|s| (s.view(e.now()).runs, s.state(), s.source() == V2)), Some((2, ScriptState::Running, true)));
+    let ports: Vec<u16> = e.sockets(h[0]).iter().map(|s| s.port).collect();
+    t.check(&format!("redefine: port 7 closed, 8 open ({:?})", ports), !ports.contains(&7) && ports.contains(&8));
+    t.eq("redefine: the new echo answers", got(&e, h[1]).iter().map(|x| x.1.clone()).collect::<Vec<_>>(), vec![String::from("a")]);
+    // what a pane that follows reads: only the new part, then nothing
+    let end = s.map_or(0, |s| s.run_output(0).1);
+    t.eq("redefine: nothing new", s.map(|s| (String::from(s.run_output(end).0), s.run_output(end).1)), Some((String::new(), end)));
+
+    // refused: nothing such, not a script, a source that does not compile (the old one goes on)
+    let r = e.apply(Action::ScriptSource { dev: h[0], svc: String::from("nix"), config: conf(V2, "") });
+    t.check("redefine: unknown", matches!(&r, Err(jfn_sim::ActErr::Refused(m)) if m.text() == "Den Dienst \u{201e}nix\u{201c} gibt es nicht."));
+    let r = e.apply(Action::ScriptSource { dev: h[1], svc: String::from("probe"), config: conf(V2, "") });
+    t.check("redefine: not a script", matches!(&r, Err(jfn_sim::ActErr::Refused(m)) if m.text() == "Der Dienst \u{201e}probe\u{201c} ist kein Skript."));
+    let r = e.apply(Action::ScriptSource { dev: h[0], svc: String::from("z"), config: conf("let = 1", "") });
+    t.check("redefine: does not compile", matches!(&r, Err(jfn_sim::ActErr::Refused(m)) if m.text().starts_with("Dienst script: Zeile 1, Spalte ")));
+    run_to(&mut e, 50 * MS);
+    t.eq("redefine: the old program goes on", sv(&e, h[0], "z").map(|s| (s.view(e.now()).runs, s.state(), s.source() == V2)), Some((2, ScriptState::Running, true)));
+
+    // stopped: the new definition waits for the start
+    let _ = e.apply(Action::ServiceRun { dev: h[0], name: String::from("z"), on: false });
+    t.check("redefine: while stopped", e.apply(Action::ScriptSource { dev: h[0], svc: String::from("z"), config: conf(V1, "") }).is_ok());
+    run_to(&mut e, 60 * MS);
+    t.eq("redefine: still stopped", sv(&e, h[0], "z").map(|s| (s.state(), s.view(e.now()).runs, s.source() == V1)), Some((ScriptState::Stopped, 2, true)));
+    let _ = e.apply(Action::ServiceRun { dev: h[0], name: String::from("z"), on: true });
+    run_to(&mut e, 70 * MS);
+    t.eq("redefine: started, the count on", (metric(&e, h[0], "z", "runs"), sv(&e, h[0], "z").map(|s| String::from(s.run_output(0).0))), (3, Some(String::from("Lauf 3\n"))));
+
+    // a failed one (an error in its top-level code) runs again with a definition that works
+    let (mut e, h) = net(1);
+    t.check("failed: service", script(&mut e, h[0], "bad", "let x = nil\nx.y()", ""));
+    run_to(&mut e, MS);
+    t.eq("failed: ended", sv(&e, h[0], "bad").map(|s| s.state()), Some(ScriptState::Failed));
+    t.check("failed: a new source", e.apply(Action::ScriptSource { dev: h[0], svc: String::from("bad"), config: conf("metrics.gauge(\"ok\", 1)", "") }).is_ok());
+    run_to(&mut e, 2 * MS);
+    t.eq("failed: running again", (sv(&e, h[0], "bad").map(|s| (s.state(), s.run_errors().len(), s.errors().len())), metric(&e, h[0], "bad", "ok")), (Some((ScriptState::Running, 0, 1)), 1));
+
+    // switched off: the new program starts with the power
+    let _ = e.apply(Action::Power { dev: h[0], on: false });
+    t.check("off: a new source", e.apply(Action::ScriptSource { dev: h[0], svc: String::from("bad"), config: conf("metrics.gauge(\"ok\", 2)", "") }).is_ok());
+    run_to(&mut e, 3 * MS);
+    t.eq("off: not started", sv(&e, h[0], "bad").map(|s| s.state()), Some(ScriptState::Stopped));
+    let _ = e.apply(Action::Power { dev: h[0], on: true });
+    run_to(&mut e, 4 * MS);
+    t.eq("off: started with the power", (sv(&e, h[0], "bad").map(|s| s.state()), metric(&e, h[0], "bad", "ok")), (Some(ScriptState::Running), 2));
+
+    // replaced by a new service of the same name (Action::Service): a fresh disk, its bytes no
+    // longer counted
+    let (mut e, h) = net(1);
+    let put = "disk.put(\"k\", \"0123456789\", fn(err) { metrics.gauge(\"put\", 1) })";
+    t.check("replace: service", script(&mut e, h[0], "p", put, ""));
+    run_to(&mut e, 10 * MS);
+    let used = disk_used(&e, h[0]);
+    t.check(&format!("replace: stored ({} bytes)", used), used > 0);
+    t.check("replace: a new one", script(&mut e, h[0], "p", "metrics.gauge(\"put\", 0)", ""));
+    run_to(&mut e, 20 * MS);
+    t.eq("replace: the old bytes went", disk_used(&e, h[0]), 0);
+}
+
+// Action::RenameService: a running script goes on as it was under the new name -- no restart,
+// its disk, log lines with the new name, its time series; refusals
+fn rename(t: &mut T) {
+    let (mut e, h) = net(2);
+    let src = "let n = 0\ntimer.every(500, fn() { n += 1; metrics.gauge(\"n\", n); log(\"Takt ${n}\") })";
+    let ok = script(&mut e, h[0], "takt", src, "") && script(&mut e, h[0], "echo", ECHO, "");
+    t.check("rename: services", ok);
+    run_to(&mut e, 2 * SEC + 200 * MS);
+    let id = svc_id(&e, h[0], "takt");
+    t.check("rename: to uhr", e.apply(Action::RenameService { dev: h[0], name: String::from("takt"), to: String::from("uhr") }).is_ok());
+    run_to(&mut e, 4 * SEC + 200 * MS);
+    t.eq("rename: the same service, no restart", (svc_id(&e, h[0], "uhr"), sv(&e, h[0], "uhr").map(|s| s.view(e.now()).runs), sv(&e, h[0], "takt").is_some()), (id, Some(1), false));
+    t.eq("rename: it went on counting", metric(&e, h[0], "uhr", "n"), 8);
+    let tags: Vec<(String, String)> = e.log_lines(h[0]).into_iter().filter(|l| l.text.starts_with("Takt ")).map(|l| (l.tag, l.text)).collect();
+    t.eq("rename: the log lines carry the new name", tags.iter().map(|x| x.0.as_str()).collect::<Vec<_>>(), vec!["takt", "takt", "takt", "takt", "uhr", "uhr", "uhr", "uhr"]);
+    let pts = e.series_one(h[0], "uhr", "n").map(|v| v.points.iter().map(|p| p.0).collect::<Vec<_>>()).unwrap_or_default();
+    t.eq("rename: the series go on under it", pts, vec![SEC, 2 * SEC, 3 * SEC, 4 * SEC]);
+    t.check("rename: the shell knows it", sh(&mut e, h[0], "script status uhr", MS).starts_with("Skript uhr: "));
+    // refusals
+    let refused = |e: &mut Engine, name: &str, to: &str| match e.apply(Action::RenameService { dev: h[0], name: String::from(name), to: String::from(to) }) {
+        Err(jfn_sim::ActErr::Refused(m)) => m.text(),
+        _ => String::new(),
+    };
+    t.eq("rename: taken", refused(&mut e, "uhr", "ECHO"), String::from("Den Dienst \u{201e}ECHO\u{201c} gibt es schon."));
+    t.eq("rename: no name", refused(&mut e, "uhr", " "), String::from("\u{201e}\u{201c} taugt nicht als Name eines Dienstes."));
+    t.eq("rename: two words", refused(&mut e, "uhr", "a b"), String::from("\u{201e}a b\u{201c} taugt nicht als Name eines Dienstes."));
+    t.eq("rename: unknown", refused(&mut e, "nix", "x"), String::from("Den Dienst \u{201e}nix\u{201c} gibt es nicht."));
+    t.check("rename: only the case", e.apply(Action::RenameService { dev: h[0], name: String::from("uhr"), to: String::from("Uhr") }).is_ok() && e.service_ids(h[0]).iter().any(|s| s.1 == "Uhr"));
+    // the English of the refusals
+    let en = english();
+    let m = match e.apply(Action::RenameService { dev: h[0], name: String::from("Uhr"), to: String::from("echo") }) {
+        Err(x) => x.msg().text_with(&en),
+        Ok(()) => String::new(),
+    };
+    t.eq("rename: in English", m, String::from("The service \u{201c}echo\u{201d} exists already."));
 }

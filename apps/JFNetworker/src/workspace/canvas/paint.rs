@@ -12,8 +12,11 @@
 //                                      through a Weak to Net
 //
 // Devices are their symbol's 64 x 48 box (world units = DIP at 100 %) with the host name
-// below; the widget draws selection, hover and focus around the box.  A cable leaves a device
-// where the line from its centre towards the other end (or the first waypoint) crosses the box:
+// below and the pills of their services along the top edge (canvas/lab.rs; from 50 %, as the
+// names); one the simulator has off while the project has it on (a power fault) is drawn as
+// one without power.  The widget draws selection, hover and focus around the box.  A cable
+// leaves a device where the line from its centre towards the other end (or the first
+// waypoint) crosses the box:
 // that point is its (hidden) port in the diagram, so the widget routes it straight, as a curve
 // or at right angles through its waypoints, and parallel cables run 7 units apart.  Each device
 // also shows one free port per port group as a dot on the border while hovered (the next free
@@ -81,6 +84,8 @@ pub(crate) fn key_port(key: u64) -> Option<(u32, u16)> {
 
 /// a device to paint
 pub(crate) struct SDev {
+    /// the project's id
+    pub id: u32,
     pub rect: [f32; 4],
     /// the symbol (None: an unknown model, drawn as a box)
     pub sym: Option<usize>,
@@ -322,6 +327,7 @@ impl Scene {
             self.at.insert(d.id as u64, self.nodes.len());
             self.nodes.push(DNode { key: d.id as u64, rect, ports: first..self.ports.len() as u32, flags: 0 });
             self.devs.push(SDev {
+                id: d.id,
                 rect,
                 sym: m.and_then(|m| *sym_of.entry(m.symbol).or_insert_with(|| syms.index(m.symbol))),
                 tint: m.map_or(0, |m| tint_of(m.category)),
@@ -515,7 +521,7 @@ impl DgPaint for Painter {
         };
         paint_notes(g, f, sc, &nodes, lod);
         paint_links(g, f, sc, &edges, lod);
-        paint_devices(g, f, sc, &n.syms, &nodes, lod);
+        paint_devices(g, f, sc, &n.syms, &n.canvas.lab, &nodes, lod);
         if !lod {
             paint_ends(g, f, sc, &n.doc.sim.leds, &edges);
         }
@@ -640,7 +646,7 @@ fn paint_links(g: &mut Gfx, f: &DgFrame, sc: &Scene, edges: &[u32], lod: bool) {
     }
 }
 
-fn paint_devices(g: &mut Gfx, f: &DgFrame, sc: &Scene, syms: &Symbols, nodes: &[u32], lod: bool) {
+fn paint_devices(g: &mut Gfx, f: &DgFrame, sc: &Scene, syms: &Symbols, lab: &super::lab::Lab, nodes: &[u32], lod: bool) {
     let zoom = f.vp.zoom;
     let s = f.vp.scale() as f32;
     let (font, size) = f.font(TS_BODY);
@@ -663,10 +669,16 @@ fn paint_devices(g: &mut Gfx, f: &DgFrame, sc: &Scene, syms: &Symbols, nodes: &[
         let mut ext = [q[0], q[1], q[0] + q[2], q[1] + q[3]];
         if named {
             ext = [ext[0].min(lx - pad), ext[1], ext[2].max(lx + tw + pad), ext[3].max(ly + asc + desc + 1)];
+            // the service pills along the top edge (canvas/lab.rs)
+            let pills = super::lab::paint_pills(g, f, lab, d.id, q, false, true);
+            ext = [ext[0].min(pills[0]), ext[1].min(pills[1]), ext[2].max(pills[2]), ext[3].max(pills[3])];
+            g.text.set_font(font, size);
         }
         if !touches(g, ext) {
             continue;
         }
+        // off in the project, or in the simulator only (a power fault)
+        let off = d.off || lab.dark.contains(&d.id);
         if zoom < 0.3 || d.sym.is_none() {
             // far away (or an unknown model): a square in the category colour
             let side = q[3].min(q[2]);
@@ -674,7 +686,7 @@ fn paint_devices(g: &mut Gfx, f: &DgFrame, sc: &Scene, syms: &Symbols, nodes: &[
             let tint = TINTS[d.tint] | 0xFF00_0000;
             let fill = if f.dark { color_mix(tint, 0xFFFF_FFFF, 56) } else { tint };
             let mut sh = g.shapes();
-            sh.dc.set_color(if d.off { color_mix(fill, f.bg, 140) } else { fill });
+            sh.dc.set_color(if off { color_mix(fill, f.bg, 140) } else { fill });
             sh.fill_rrect(x, y, side, side, (side / 6).max(1));
             if d.sym.is_none() {
                 sh.dc.set_color(f.color(T_TEXT2));
@@ -683,7 +695,10 @@ fn paint_devices(g: &mut Gfx, f: &DgFrame, sc: &Scene, syms: &Symbols, nodes: &[
         } else if let Some(i) = d.sym {
             let w = q[2];
             let h = syms.height(i, w);
-            syms.draw(g, i, q[0], q[1] + (q[3] - h) / 2, w, d.tint, d.off);
+            syms.draw(g, i, q[0], q[1] + (q[3] - h) / 2, w, d.tint, off);
+        }
+        if named {
+            super::lab::paint_pills(g, f, lab, d.id, q, off, false);
         }
         if named && size >= 4 << 8 {
             {

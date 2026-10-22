@@ -1,0 +1,171 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/scripts.jfnet
+# the script editor (U7: workspace/devwin/scripts.rs, doc/scripts.rs) on SRV1 of the fixture:
+# its device window from the context menu on the Skripte tab; the list with state, CPU and
+# errors; zaehler's runtime error in line 13 (a mark in the editor, the Fehler list, a click
+# puts the caret there) and its output, following live; typing with the check while typing
+# (at most every 250 ms) and F8 from one message to the next; Ctrl+S refuses a source that does
+# not compile and applies one that does -- one undo step, the script starts again with its disk
+# (Start 2), undo and redo go back and forth (Start 3, Start 4) without restarting the device;
+# stop, run, restart; Verwerfen; a new script from a template (its error: port 7 is taken),
+# rename and delete with undo; the Dienste tab knows the scripts too.  Shots:
+# build/jfnetworker/script_editor_*.png.
+# Ids: the device window 26624; its Skripte tab from 53248: + 1 Neu (the templates + 2 + k),
+# + 8 Umbenennen (the flyout: the name 53259, Umbenennen 53260), + 9 Löschen, Ausführen 53264,
+# Stoppen 53265, Neu starten 53266, Verwerfen 53267, Übernehmen 53268, the editor 53280, the
+# output 53296, the errors 53312 (rows + 1 + i), the list of scripts 53504 (rows + 1 + i).
+size 1280 900
+theme light
+# zaehler prints "Start 1" and then a beat a second; the third beat divides by 0 (line 13)
+wait 3500
+rclick listitem:"SRV1"
+move 700,300
+click menuitem:"Skripte …"
+expect window 26624 open
+expect tab:"Skripte" selected
+expect #53505 selected
+expect text:"läuft · 0 % · 1 Fehler" exists
+expect text:"läuft · 0 %" exists
+expect text:"1 Fehler, 0 Warnungen" exists
+expect text:"wie im Projekt" exists
+expect text:"Start 1" exists
+expect text:"Takt 2" exists
+expect text:"Takt 3" missing
+expect #53268 disabled
+expect #53264 disabled
+expect #53265 enabled
+shot build/jfnetworker/script_editor_open.png window 26624
+# the error of the run: in the list below, a click puts the caret on it
+click tab:"Fehler (1)"
+expect listitem:"3,000 s · Zeile 13, Spalte 15 (timer): Division durch 0" exists
+click #53313
+wait 100
+expect #53280 focused
+expect text:"Zeile 13, Spalte 15" exists
+expect text:"13:15: Fehler im Lauf (timer, bei 3,000 s): Division durch 0" exists
+# typing: a line that does not compile; the check comes after a moment
+key ctrl+end
+type "\nlet = 5"
+expect text:"1 Fehler, 0 Warnungen" exists
+wait 300
+expect text:"2 Fehler, 0 Warnungen" exists
+expect text:"läuft · 0 % · 1 Fehler · geändert" exists
+expect #53267 enabled
+expect #53268 disabled
+# F8: round the end to the first message, then the next
+key f8
+expect text:"Zeile 13, Spalte 15" exists
+key f8
+expect text:"Zeile 17, Spalte 5" exists
+shot build/jfnetworker/script_editor_errors.png window 26624
+key shift+f8
+expect text:"Zeile 13, Spalte 15" exists
+expect text:"13:15: Fehler im Lauf (timer, bei 3,000 s): Division durch 0" exists
+key f8
+expect text:"17:5: Nach let fehlt ein Name" exists
+# Ctrl+S refuses it: the project keeps the old source
+key ctrl+s
+expect text:"Das Skript übersetzt nicht: Zeile 17, Spalte 5: Nach let fehlt ein Name" exists
+# the editor's own undo takes the typing back; a line that compiles
+key ctrl+z ctrl+z
+wait 300
+expect text:"1 Fehler, 0 Warnungen" exists
+expect text:"wie im Projekt" exists
+key ctrl+end
+type "\nprint(\"neu\")"
+wait 300
+expect text:"1 Fehler, 0 Warnungen" exists
+expect #53268 enabled
+# Ctrl+S: into the project and the running script; it starts again and keeps its disk
+key ctrl+s
+wait 200
+expect text:"wie im Projekt" exists
+expect text:"keine Meldungen" exists
+click tab:"Ausgabe"
+expect text:"Start 2" exists
+expect text:"neu" exists
+expect text:"Start 1" missing
+expect tab:"Fehler" exists
+expect text:"läuft · 0 % · 1 Fehler" exists
+shot build/jfnetworker/script_editor_applied.png window 26624
+# undo: the source before, in the editor and the simulator (the disk counts on)
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+wait 200
+expect text:"Start 3" exists
+expect text:"neu" missing
+expect text:"wie im Projekt" exists
+expect #53268 disabled
+# redo: the new source again
+click menu:"Bearbeiten"
+click menuitem:"Wiederholen"
+move 640,300
+wait 200
+expect text:"Start 4" exists
+expect text:"neu" exists
+# stop, run, restart: the simulator only (the project is as it was); clicks 600 ms apart (no
+# double clicks)
+click #53265
+wait 100
+expect text:"gestoppt" exists
+expect text:"gestoppt · 0 % · 1 Fehler" exists
+expect #53264 enabled
+expect #53265 disabled
+expect text:"Start 4" exists
+wait 600
+click #53264
+wait 100
+expect text:"Start 5" exists
+expect text:"Start 4" missing
+expect #53265 enabled
+wait 600
+click #53266
+wait 100
+expect text:"Start 6" exists
+# Verwerfen: typed text goes, the project's version is back
+wait 600
+click #53280
+key ctrl+home
+type "// weg"
+expect text:"läuft · 0 % · 1 Fehler · geändert" exists
+wait 600
+click #53267
+expect text:"läuft · 0 % · 1 Fehler" exists
+expect #53267 disabled
+# a new script from a template: the echo on port 7 again fails (the port is taken), with its
+# mark in line 3
+wait 600
+click #53249
+click menuitem:"UDP-Echo"
+move 700,300
+wait 100
+expect #53507 selected
+expect text:"mit Fehler beendet · 0 % · 1 Fehler" exists
+expect tab:"Fehler (1)" exists
+expect text:"1 Fehler, 0 Warnungen" exists
+wait 600
+click tab:"Fehler (1)"
+shot build/jfnetworker/script_editor_template.png window 26624
+# rename it (it goes on, its draft with it), delete it, undo the deletion
+wait 600
+click #53256
+expect #53259 text "echo2"
+key ctrl+a
+type "spiegel\n"
+wait 100
+expect text:"echo2" missing
+expect #53507 selected
+wait 600
+click #53257
+expect text:"spiegel" missing
+expect #53505 selected
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+expect text:"spiegel" exists
+# the Dienste tab lists the scripts as services
+wait 600
+click tab:"Dienste"
+expect text:"Skript · zaehler" exists
+expect text:"Skript · spiegel" exists
+expect_nowarn

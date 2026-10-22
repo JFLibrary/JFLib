@@ -21,6 +21,8 @@
 // p95_us, p99_us (arrival to answer), hit_p50_us, miss_p50_us.  Engine::cache_view for the
 // lab, cachectl on the console.  The time series (series.rs) take p50_us .. p99_us,
 // hit_p50_us .. hit_p99_us and miss_p50_us .. miss_p99_us of each interval from the windows.
+// The status line is a message for the app's catalogue (status_msg; status() is its German
+// text).
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -462,7 +464,10 @@ impl Service for Cache {
         alloc::vec![LatWindow::new(&self.lat, LAT), LatWindow::new(&self.hit_lat, HIT_LAT), LatWindow::new(&self.miss_lat, MISS_LAT)]
     }
     fn status(&self) -> String {
-        format!("Port {} vor {}: {} Einträge, {} Treffer, {} Fehlschläge ({},{} % Treffer)", self.port, self.backend.text(), self.store.len(), self.hits, self.misses, self.hit_pm() / 10, self.hit_pm() % 10)
+        self.status_msg().text()
+    }
+    fn status_msg(&self) -> Msg {
+        msg!("Port {} vor {}: {} Einträge, {} Treffer, {} Fehlschläge ({},{} % Treffer)", self.port, self.backend.text(), self.store.len(), self.hits, self.misses, self.hit_pm() / 10, self.hit_pm() % 10)
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())

@@ -1,0 +1,103 @@
+#!args --verify-dirty --lang en
+# the labs in English (--lang en; assets/labs, workspace/task.rs): the list, the panel with its
+# texts from the lab file, F9 ("Check goals") and what the checks found, a hint, Ctrl+Shift+A;
+# the cache lab solved through its settings (CACHE1's device window, Services › Settings …);
+# then the campus lab (after "Save changes?" with Discard) solved in the consoles of MLS1, R1,
+# PC3 and PC4, its goals in any order.  Ids: 49153 "Check", 49168 + i the goals, 49408 + i
+# their hint buttons, 26624 the first device window, 51200 the settings button of its first
+# service, 51456 the settings editor, 51472 Apply.
+size 1280 800
+theme light
+# ---- the list in English
+cmd 300
+expect dialog:"Open lab" exists
+expect text:"Campus: a VLAN for the students" exists
+expect text:"4 goals · Set up VLAN 20, DHCP through the relay, routes in both directions." exists
+expect text:"Load balancing: the third web server" exists
+expect text:"Sharded storage: a node fails" exists
+click text:"A cache in front of the slow catalogue"
+click button:"Open"
+# ---- the cache lab: the panel, F9, a hint
+expect text:"Distributed systems · 4 goals" exists
+expect text:"0 of 4 goals reached" exists
+expect text:"1. Four of five requests come from the cache" exists
+expect button:"What it is about" exists
+click #49157
+wait 4000
+key f9
+expect text:"CACHE1 svc cache metric misses <= 30 over 10s: measured: 89.333/s" exists
+click #49408
+expect text:"Two settings of the service cache decide: entries (how many answers it keeps) and ttl_ms (for how long). Shift+double-click CACHE1, tab Services, “Settings …”." exists
+expect #49408 text "Another hint"
+# Simulation › Next hint: the goal's second and last one
+cmd 303
+expect text:"With only 100 entries the rarely asked articles push the popular ones out. A few hundred entries (or all 500 at once) and a lifetime of 30 s (30000) are enough for a catalogue." exists
+expect #49408 missing
+key ctrl+shift+a
+expect #49153 focused
+# ---- CACHE1 keeps 1000 answers for 30 s
+dblclick listitem:"CACHE1" shift
+expect window 26624 open
+click tab:"Services"
+expect text:"Cache · cache" exists
+click #51200
+expect text:"The settings of cache as JSON. Apply checks them and restarts CACHE1 with them." exists
+focus #51456
+key ctrl+a
+type "{\"port\": 80, \"backend\": \"http://10.0.2.30/\", \"entries\": 1000, \"ttl_ms\": 30000}"
+click #51472
+expect #51456 missing
+close window 26624
+wait 30000
+expect #49168 checked
+expect #49171 checked
+expect text:"4 of 4 goals reached" exists
+shot build/jfnetworker/labs_cache_done.png
+# ---- the campus: unsaved changes first
+cmd 300
+click text:"Campus: a VLAN for the students"
+click button:"Open"
+expect dialog:"Save changes?" exists
+click button:"Discard"
+expect text:"Network · 4 goals" exists
+expect text:"0 of 4 goals reached" exists
+wait 2000
+# MLS1: VLAN 20, its ports, its interface with the relay
+dblclick listitem:"MLS1"
+type "enable\n"
+type "configure terminal\n"
+type "vlan 20\n"
+type "name Students\n"
+type "exit\n"
+type "interface GigabitEthernet1/0/3\n"
+type "switchport access vlan 20\n"
+type "interface GigabitEthernet1/0/4\n"
+type "switchport access vlan 20\n"
+type "interface vlan 20\n"
+type "ip address 10.10.20.1 255.255.255.0\n"
+type "ip helper-address 10.10.0.1\n"
+type "end\n"
+wait 2000
+expect #49168 checked
+expect text:"1 of 4 goals reached" exists
+# R1: the way back
+dblclick listitem:"R1"
+type "enable\n"
+type "configure terminal\n"
+type "ip route 10.10.20.0 255.255.255.0 10.10.0.2\n"
+type "end\n"
+wait 2000
+expect #49170 checked
+# PC3 and PC4 ask at once, PC3 pings by name
+dblclick listitem:"PC4"
+type "dhclient eth0\n"
+dblclick listitem:"PC3"
+type "dhclient eth0\n"
+wait 6000
+expect #49169 checked
+type "ping -c 3 server.lab\n"
+wait 4000
+expect #49171 checked
+expect text:"4 of 4 goals reached" exists
+shot build/jfnetworker/labs_campus_done.png
+expect_nowarn

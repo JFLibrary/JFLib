@@ -3,6 +3,9 @@
 //   parse(text) -> Result<Scenario, Vec<ScnErr>>   every error with its line number
 //   parse_duration("1.5s") -> ns   parse_rate("100M") -> bit/s   parse_ppm("0.5%") -> ppm
 //   parse_milli("99.5") -> 99500 (thousandths)
+//   parse_expectation("LB1 svc lb metric requests >= 10 over 5s") -> Expect   one
+//                                                expectation alone (the checks of a lab's goals;
+//                                                a leading "expect" is allowed); Expect::dev
 //
 // One step per line, "#" starts a comment.  A step may start with "at TIME" (virtual time
 // since the start); without it, it happens when the previous steps are done.
@@ -135,6 +138,16 @@ pub enum Expect {
     Metric { dev: String, svc: String, name: String, cmp: Cmp, value: i64 },
     /// a metric's time series over a span; the value in thousandths
     Series { dev: String, svc: String, name: String, agg: Agg, cmp: Cmp, milli: i64, span: Span },
+}
+
+impl Expect {
+    /// the device it looks at (None: the frames of every cable)
+    pub fn dev(&self) -> Option<&str> {
+        match self {
+            Expect::Output { dev, .. } | Expect::Route { dev, .. } | Expect::NoRoute { dev, .. } | Expect::Metric { dev, .. } | Expect::Series { dev, .. } => Some(dev),
+            Expect::Hops { .. } => None,
+        }
+    }
 }
 
 /// how a windowed expectation sums up the samples of a series
@@ -502,6 +515,18 @@ fn parse_heal(w: &[&str]) -> Result<HealSpec, String> {
         ["partition"] => HealSpec::Like(FaultSpec::Partition { a: Vec::new(), b: Vec::new() }),
         _ => return Err(format!("Was soll geheilt werden? heal {} (all, NUMMER, link, impair, power, stop, disk, partition).", w.join(" "))),
     })
+}
+
+/// one expectation as a scenario writes it, with or without the "expect" in front (the checks
+/// of a lab's goals); the German reason when it does not parse
+pub fn parse_expectation(s: &str) -> Result<Expect, String> {
+    let w = words(s.trim())?;
+    let ws: Vec<&str> = w.iter().map(String::as_str).collect();
+    match ws.as_slice() {
+        [] | ["expect"] => Err(String::from("Die Prüfung ist leer.")),
+        ["expect", rest @ ..] => parse_expect(rest),
+        rest => parse_expect(rest),
+    }
 }
 
 /// a decimal number in thousandths ("99.5": 99500, "-2": -2000; three decimals at most)

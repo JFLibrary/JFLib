@@ -28,6 +28,9 @@
 //                                                      and quorums of a KV node (kv.rs)
 //   CacheClear / WorkerSet                             empties a cache (cache.rs); the slots,
 //                                                      time and error rate of a worker (mq.rs)
+//   ScriptSource / RenameService                       a script's new definition that keeps its
+//                                                      disk, numbers and errors (scriptsvc.rs);
+//                                                      a service's new name (os.rs)
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -177,6 +180,12 @@ pub enum Action {
     /// changes a running worker: its slots, its time per message (ns), its error rate (ppm)
     /// (mq.rs)
     WorkerSet { dev: u32, svc: String, concurrency: Option<u32>, time_ns: Option<u64>, error_ppm: Option<u32> },
+    /// a script takes a new definition -- the config of its ServiceDef, the source included --
+    /// and keeps its disk, numbers, errors and output; one that should run starts again with
+    /// it (scriptsvc.rs); a definition that does not compile is refused
+    ScriptSource { dev: u32, svc: String, config: agent_core::jmap::Value },
+    /// a service goes on under another name, without a restart (os.rs)
+    RenameService { dev: u32, name: String, to: String },
 }
 
 /// why an action was refused (German text through Display)

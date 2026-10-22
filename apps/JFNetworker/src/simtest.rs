@@ -40,6 +40,8 @@ pub mod synthtest;
 pub mod scripttest;
 #[path = "seriestest.rs"]
 pub mod seriestest;
+#[path = "tasktest.rs"]
+pub mod tasktest;
 
 const BUDGET: usize = 1_000_000;
 

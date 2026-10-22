@@ -1,0 +1,57 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/lab_window.jfnet
+# the shot matrix of the lab in the window (U6a): the topology with the pills of the services
+# and the sparklines under load balancer, cache, KV nodes and queue; KV2 switched off from the
+# inspector's fault card (KV2 drawn without power, the fault in the list); the Metriken panel
+# with LB1's tiles and charts, the fault as a shaded range -- each light and dark at 100 and
+# 150 % (build/jfnetworker/lab_shots_<view>_<theme>_<scale>.png) on
+# tests/fixtures/lab_window.jfnet.  Ids: power 45313, the tree's row of LB1's service 47111.
+size 1280 800
+theme light
+wait 8000
+# ---- the topology: pills and sparklines
+move 640,790
+expect #45121 exists
+shot build/jfnetworker/lab_shots_topology_light_100.png
+theme dark
+shot build/jfnetworker/lab_shots_topology_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/lab_shots_topology_dark_150.png
+theme light
+shot build/jfnetworker/lab_shots_topology_light_150.png
+scale 100
+# ---- KV2 switched off from its fault card
+click listitem:"KV2"
+wheel 1140,300 -2400
+wait 100
+click #45313
+wait 100
+expect text:"Fehler 1: KV2 ausgeschaltet" exists
+move 640,790
+shot build/jfnetworker/lab_shots_fault_light_100.png
+theme dark
+shot build/jfnetworker/lab_shots_fault_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/lab_shots_fault_dark_150.png
+theme light
+shot build/jfnetworker/lab_shots_fault_light_150.png
+scale 100
+# ---- the Metriken panel: LB1 while KV2 is off
+wait 3000
+cmd 260
+wait 100
+click #47111
+wait 100
+expect text:"LB1 · Loadbalancer lb" exists
+move 640,790
+shot build/jfnetworker/lab_shots_metrics_light_100.png
+theme dark
+shot build/jfnetworker/lab_shots_metrics_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/lab_shots_metrics_dark_150.png
+theme light
+shot build/jfnetworker/lab_shots_metrics_light_150.png
+scale 100
+expect_nowarn

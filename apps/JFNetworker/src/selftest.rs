@@ -13,6 +13,12 @@
 // scripttest.rs: scripts as services in the hosts (group script, jfn_sim::scriptsvc).
 // seriestest.rs: the time series of the lab (jfn_sim::series), the windowed expectations of
 // scenarios.
+// tasktest.rs: the labs and their tasks (group task: jfn_model::lab, jfn_sim::goal, the labs of
+// assets/labs unsolved and solved).
+// scriptedtest.rs: what the script editor builds on (group scripted: doc/scripts.rs, the steps
+// that keep a running script's disk through undo and redo, keep_steps, the marks).
+// labuitest.rs: what the lab in the window builds on (group labui: the lab's texts as
+// messages, KPIs of past spans, the Metriken panel's tables, faults as undo steps).
 
 use alloc::format;
 use alloc::string::String;
@@ -54,9 +60,13 @@ impl T {
 
 #[path = "msgtest.rs"]
 mod msgtest;
+#[path = "scriptedtest.rs"]
+mod scriptedtest;
+#[path = "labuitest.rs"]
+mod labuitest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 22] = [
+    let groups: [(&'static str, fn(&mut T)); 25] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -79,6 +89,9 @@ pub fn run() -> i32 {
         ("synth", crate::simtest::synthtest::run),
         ("script", crate::simtest::scripttest::run),
         ("series", crate::simtest::seriestest::run),
+        ("task", crate::simtest::tasktest::run),
+        ("scripted", scriptedtest::run),
+        ("labui", labuitest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {
@@ -290,7 +303,11 @@ fn project_t(t: &mut T) {
 fn file_t(t: &mut T) {
     let mut p = sample();
     p.description = String::from("Zeile 1\n\"Zitat\"");
-    p.lab = Value::object([("goal", Value::string("ping PC2"))]);
+    p.lab = Some(jfn_model::Lab {
+        title: jfn_model::Text::new("Ping", "Ping"),
+        goals: alloc::vec![jfn_model::Goal { text: jfn_model::Text::new("PC1 erreicht PC2", ""), checks: alloc::vec![String::from("PC1 output contains \"0% packet loss\"")], ..jfn_model::Goal::default() }],
+        ..jfn_model::Lab::default()
+    });
     if let Some(d) = p.devices.get_mut(0) {
         d.startup_config = String::from("hostname PC1\nip addr add 10.0.0.1/24 dev eth0\n");
         d.services.push(ServiceDef { kind: String::from("http"), name: String::from("web"), disabled: false, config: Value::object([("port", Value::u64(80))]) });

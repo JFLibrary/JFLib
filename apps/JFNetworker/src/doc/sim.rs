@@ -24,9 +24,11 @@
 //                                 inspector; ver changes with it, led_key with the LEDs
 //   problems()                    Engine::problems(), kept until the engine changes
 //   engine()                      the engine for questions (interfaces, routes, configuration)
-//   keep(&device)                 the engine takes the device's startup configuration and
-//                                 which of its services run without a restart (a saved
-//                                 configuration, a switched service; also their undo)
+//   keep(&device)                 the engine takes the device's startup configuration, which
+//                                 of its services run and its scripts without a restart (a
+//                                 saved configuration, a switched service, the script editor's
+//                                 steps; also their undo): keep_steps(dev, old, new, has)
+//                                 makes the Actions, a script's new source keeps its disk
 //   mode() / view_at() / view_time() / with_engine(f)   the simulation mode: the driver's
 //                                 mode, the moment the view shows, a change of the engine
 //                                 that is no command (PDUs: a ping job, a service, a lookup)
@@ -94,6 +96,71 @@ impl MLink {
 /// the new value when it differs from the old one
 fn diff<T: PartialEq + Copy>(old: T, new: T) -> Option<T> {
     if old != new { Some(new) } else { None }
+}
+
+/// the actions that take a running device's services from `old` (what the engine was told)
+/// to `new` (the project) without a restart, None when that cannot be done (the next sync
+/// restarts the device): switched services (ServiceRun); a script's new definition
+/// (ScriptSource, which keeps its disk and numbers; one the engine does not run yet comes as
+/// Service, one that does not compile goes, as when a project loads); new and removed scripts;
+/// a renamed script (one gone, one new, the same definition, or the same name in another case:
+/// RenameService).  `has` tells whether the engine runs a script of that name.  Other services
+/// that come, go or change: None.
+pub(crate) fn keep_steps(dev: u32, old: &[ServiceDef], new: &[ServiceDef], has: &dyn Fn(&str) -> bool) -> Option<Vec<Action>> {
+    fn script(s: &ServiceDef) -> bool {
+        s.kind == crate::doc::scripts::KIND
+    }
+    fn same(a: &ServiceDef, b: &ServiceDef) -> bool {
+        a.name.eq_ignore_ascii_case(&b.name)
+    }
+    fn compiles(s: &ServiceDef) -> bool {
+        jfn_sim::scriptsvc::from_def(&s.config).is_ok()
+    }
+    let gone: Vec<&ServiceDef> = old.iter().filter(|&a| !new.iter().any(|b| same(a, b))).collect();
+    let added: Vec<&ServiceDef> = new.iter().filter(|&b| !old.iter().any(|a| same(a, b))).collect();
+    if gone.iter().chain(added.iter()).any(|&s| !script(s)) {
+        return None;
+    }
+    let mut acts = Vec::new();
+    match (&gone[..], &added[..]) {
+        (&[a], &[b]) if a.config == b.config => {
+            acts.push(Action::RenameService { dev, name: a.name.clone(), to: b.name.clone() });
+            if a.disabled != b.disabled {
+                acts.push(Action::ServiceRun { dev, name: b.name.clone(), on: !b.disabled });
+            }
+        }
+        _ => {
+            for &a in &gone {
+                acts.push(Action::RemoveService { dev, name: a.name.clone() });
+            }
+            for &b in &added {
+                if compiles(b) {
+                    acts.push(Action::Service { dev, def: b.clone() });
+                }
+            }
+        }
+    }
+    for b in new {
+        let Some(a) = old.iter().find(|&a| same(a, b)) else { continue };
+        if a.kind != b.kind || (a.config != b.config && !script(b)) {
+            return None;
+        }
+        if a.name != b.name {
+            acts.push(Action::RenameService { dev, name: a.name.clone(), to: b.name.clone() });
+        }
+        if a.config != b.config {
+            match (compiles(b), has(&a.name)) {
+                (true, true) => acts.push(Action::ScriptSource { dev, svc: b.name.clone(), config: b.config.clone() }),
+                (true, false) => acts.push(Action::Service { dev, def: b.clone() }),
+                (false, true) => acts.push(Action::RemoveService { dev, name: b.name.clone() }),
+                (false, false) => {}
+            }
+        }
+        if a.disabled != b.disabled {
+            acts.push(Action::ServiceRun { dev, name: b.name.clone(), on: !b.disabled });
+        }
+    }
+    Some(acts)
 }
 
 pub(crate) struct Sim {
@@ -476,24 +543,22 @@ impl Sim {
     }
 
     /// the engine runs device `d` as the project has it, without a restart: the configuration
-    /// it boots with (Action::Startup) and which of its services run (Action::ServiceRun) --
-    /// "copy running-config startup-config", a service switched in the device window, and
-    /// the undo and redo of both (Doc::apply_kept); other changes of its services still
-    /// restart it at the next sync
+    /// it boots with (Action::Startup), which of its services run (Action::ServiceRun) and
+    /// its scripts (keep_steps: a new source keeps the script's disk and numbers, new,
+    /// renamed and removed scripts) -- "copy running-config startup-config", a service
+    /// switched in the device window, the script editor, and the undo and redo of them
+    /// (Doc::apply_kept); other changes of its services still restart it at the next sync
     pub(crate) fn keep(&mut self, d: &Device) {
         let Some(m) = self.devs.get(&d.id).cloned() else { return };
-        let same = m.services.len() == d.services.len() && m.services.iter().zip(&d.services).all(|(a, b)| a.kind == b.kind && a.name == b.name && a.config == b.config);
-        if same {
-            for (a, b) in m.services.iter().zip(&d.services) {
-                if a.disabled != b.disabled {
-                    let _ = self.act(Action::ServiceRun { dev: d.id, name: b.name.clone(), on: !b.disabled });
-                }
-            }
+        let eng = &self.drv.eng;
+        let steps = keep_steps(d.id, &m.services, &d.services, &|name: &str| eng.service::<jfn_sim::ScriptService>(d.id, name).is_some());
+        for a in steps.iter().flatten() {
+            let _ = self.act(a.clone());
         }
         if m.startup != d.startup_config {
             let _ = self.act(Action::Startup { dev: d.id, text: d.startup_config.clone() });
         }
-        let services = if same { d.services.clone() } else { m.services.clone() };
+        let services = if steps.is_some() { d.services.clone() } else { m.services.clone() };
         self.devs.insert(d.id, MDev { startup: d.startup_config.clone(), services, ..m });
     }
 }

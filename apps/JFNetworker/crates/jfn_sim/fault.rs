@@ -24,6 +24,10 @@
 // count: the device comes back on when the last power fault of it heals.  Each start and end
 // is a note (FaultStart, FaultEnd) of the device it belongs to; the timer of a fault with a
 // duration is a kernel event (Ev::Heal).
+//
+// Texts: a mark keeps its German line (FaultMark::text, what the runner's reports print) and
+// the same as a message for the app's catalogue (FaultMark::msg; its German text is text);
+// the notes carry the message.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -32,6 +36,7 @@ use alloc::vec::Vec;
 
 use jfn_model::ifname;
 use jfn_model::msg;
+use jfn_model::msg::{dur, list, phrase, Msg};
 use netpkt::Ipv4;
 
 use crate::action::{ActErr, Action};
@@ -89,6 +94,8 @@ pub struct FaultMark {
     pub text: String,
     /// the device whose notes tell its start and end
     pub dev: u32,
+    /// text as a message for the app's catalogue (its German text is text)
+    pub msg: Msg,
 }
 
 impl FaultMark {
@@ -220,6 +227,58 @@ impl Engine {
         }
     }
 
+    /// the line of a fault as a message (its German text is fault_text's)
+    fn fault_msg(&self, f: &Fault) -> Msg {
+        let link = |id: u32| match self.link_idx.get(&id) {
+            Some(&li) => Msg::plain(self.link_text(li)),
+            None => msg!("Kabel {}", id),
+        };
+        match f {
+            Fault::Unplug { link: l } => msg!("Kabel {} getrennt", link(*l)),
+            Fault::Impair { link: l, delay, jitter, loss_ppm, kbps } => {
+                let mut what = Vec::new();
+                if *delay > 0 {
+                    what.push(msg!("+{} Laufzeit", dur(*delay as i64)));
+                }
+                if *jitter > 0 {
+                    what.push(msg!("+{} Jitter", dur(*jitter as i64)));
+                }
+                if *loss_ppm > 0 {
+                    what.push(loss_msg(*loss_ppm));
+                }
+                if let Some(k) = kbps {
+                    what.push(msg!("höchstens {}", jfn_model::catalog::speed_msg(*k)));
+                }
+                if what.is_empty() {
+                    what.push(phrase("unverändert"));
+                }
+                let what = list(what);
+                msg!("Kabel {}: {}", link(*l), what)
+            }
+            Fault::Power { dev } => msg!("{} ausgeschaltet", self.fault_dev_name(*dev)),
+            Fault::Stop { dev, svc } => msg!("Dienst {} auf {} gestoppt", svc, self.fault_dev_name(*dev)),
+            Fault::SlowDisk { dev, extra, factor_pm } => {
+                let mut what = Vec::new();
+                if *extra > 0 {
+                    what.push(msg!("+{} je Zugriff", dur(*extra as i64)));
+                }
+                if *factor_pm != 1000 {
+                    let pm = *factor_pm;
+                    what.push(if pm % 1000 == 0 { msg!("Übertragung \u{d7}{}", pm / 1000) } else { msg!("Übertragung \u{d7}{},{}", pm / 1000, (pm % 1000) / 100) });
+                }
+                let what = list(what);
+                msg!("Disk von {} langsam: {}", self.fault_dev_name(*dev), what)
+            }
+            Fault::Partition { a, b } => {
+                if b.is_empty() {
+                    msg!("Partition: {} | alle anderen", self.names(a))
+                } else {
+                    msg!("Partition: {} | {}", self.names(a), self.names(b))
+                }
+            }
+        }
+    }
+
     /// the device a fault's notes go to
     fn fault_dev(&self, f: &Fault) -> u32 {
         match f {
@@ -337,16 +396,17 @@ impl Engine {
         self.faults.last += 1;
         let id = self.faults.last;
         let text = self.fault_text(&f);
+        let what = self.fault_msg(&f);
         let dev = self.fault_dev(&f);
         let until = dur.map(|d| now + d.clamp(1, MAX_DUR));
         // the mark first: the overlays are computed from the active marks
-        self.faults.marks.push(FaultMark { id, fault: f.clone(), at: now, until, healed: None, text: text.clone(), dev });
+        self.faults.marks.push(FaultMark { id, fault: f.clone(), at: now, until, healed: None, text, dev, msg: what.clone() });
         if self.faults.marks.len() > MARKS_KEEP
             && let Some(i) = self.faults.marks.iter().position(|m| !m.active())
         {
             self.faults.marks.remove(i);
         }
-        self.note(dev, None, Note::FaultStart { id, what: text });
+        self.note(dev, None, Note::FaultStart { id, what });
         match &f {
             Fault::Unplug { link } | Fault::Impair { link, .. } => self.relink(*link),
             Fault::Power { dev } => {
@@ -385,8 +445,8 @@ impl Engine {
             return Err(ActErr::Refused(msg!("Fehler {} ist schon behoben.", id)));
         }
         m.healed = Some(now);
-        let (f, dev, text) = (m.fault.clone(), m.dev, m.text.clone());
-        self.note(dev, None, Note::FaultEnd { id, what: text });
+        let (f, dev, what) = (m.fault.clone(), m.dev, m.msg.clone());
+        self.note(dev, None, Note::FaultEnd { id, what });
         match f {
             Fault::Unplug { link } | Fault::Impair { link, .. } => self.relink(link),
             Fault::Power { dev } => {
@@ -469,6 +529,17 @@ pub fn ppm_text(ppm: u32) -> String {
         format!("{},{} %", ppm / 10_000, ppm % 10_000 / 1000)
     } else {
         format!("{} ppm", ppm)
+    }
+}
+
+/// "5 % Verlust", "0,5 % Verlust", "250 ppm Verlust" (ppm_text with "Verlust" as a message)
+fn loss_msg(ppm: u32) -> Msg {
+    if ppm % 10_000 == 0 {
+        msg!("{} % Verlust", ppm / 10_000)
+    } else if ppm % 1000 == 0 {
+        msg!("{},{} % Verlust", ppm / 10_000, ppm % 10_000 / 1000)
+    } else {
+        msg!("{} ppm Verlust", ppm)
     }
 }
 

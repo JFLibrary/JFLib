@@ -269,9 +269,10 @@ pub enum Note {
     HttpReply { status: u16, ms: u32 },
     /// a client's request failed (a timeout or another error)
     HttpFailed { timeout: bool },
-    /// lab (fault.rs): a fault started / was healed (its number and what it does)
-    FaultStart { id: u32, what: String },
-    FaultEnd { id: u32, what: String },
+    /// lab (fault.rs): a fault started / was healed (its number and what it does, as the
+    /// fault's message: FaultMark::msg)
+    FaultStart { id: u32, what: Msg },
+    FaultEnd { id: u32, what: Msg },
     /// a partition: the packet comes from a device on the other side and is dropped
     PartitionDrop { src: Ipv4 },
     /// load balancer (lb.rs): a backend was picked by the algorithm

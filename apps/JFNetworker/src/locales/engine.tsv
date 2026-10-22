@@ -502,3 +502,60 @@ Zeile {}, Spalte {}: {}	line {}, column {}: {}
 Skript {} rechnet noch: das Ereignis wartet ({} vor ihm).	Script {} is still computing: the event waits ({} before it).
 Skript {} überlastet: Datagramm verworfen.	Script {} overloaded: datagram dropped.
 Skript {}: Fehler in Zeile {}, Spalte {}: {}	Script {}: error in line {}, column {}: {}
+# jfn_model: what is wrong with a lab (lab.rs); jfn_sim: what a check found (goal.rs, Verdict::reason)
+Das Labor hat keinen Titel.	The lab has no title.
+Das Labor hat keine Ziele.	The lab has no goals.
+Ziel {} hat keinen Text.	Goal {} has no text.
+Ziel {} hat keine Prüfung.	Goal {} has no check.
+Ziel {}: „{}“ ist keine Prüfung: {}	Goal {}: “{}” is not a check: {}
+Ziel {}: das Gerät {} gibt es im Projekt nicht.	Goal {}: the project has no device {}.
+nicht in der Ausgabe	not in the output
+steht in der Ausgabe	in the output
+das Gerät gibt es nicht	no such device
+gemessen: {}	measured: {}
+gemessen: {}{}	measured: {}{}
+gemessen: {} {}	measured: {} {}
+gezählt: {}	counted: {}
+keine Route	no route
+gefunden: {}	found: {}
+es gibt {} Routen dorthin	there are {} routes to it
+unbekanntes Protokoll	unknown protocol
+keinen solchen Dienst oder Wert	no such service or value
+keinen solchen Dienst	no such service
+keine solche Reihe	no such series
+keine Werte im Zeitraum	no values in the span
+das Fenster der Latenzen hält den Zeitraum nicht mehr	the latency window no longer holds the span
+der Zeitraum endet erst nach jetzt	the span ends after now
+# the script editor (U7): a script's new definition, a service's new name (scriptsvc.rs, os.rs)
+Der Dienst „{}“ ist kein Skript.	The service “{}” is not a script.
+„{}“ taugt nicht als Name eines Dienstes.	“{}” cannot be the name of a service.
+Den Dienst „{}“ gibt es schon.	The service “{}” exists already.
+
+# jfn_sim: the lab's status lines (lb.rs, kv.rs, cache.rs, mq.rs: status_msg), the disk (disk.rs: Disk::msg), the lines of faults (fault.rs: FaultMark::msg)
+HTTP Port {}, {}: {} von {} Backends verfügbar, {} Anfragen, {} Fehler	HTTP port {}, {}: {} of {} backends available, {} requests, {} errors
+TCP Port {}, {}: {} von {} Backends verfügbar, {} Verbindungen, {} Fehler	TCP port {}, {}: {} of {} backends available, {} connections, {} errors
+{}: {} Schlüssel, {} von {} Knoten erreichbar, RF {}, {} W{}/R{}	{}: {} keys, {} of {} nodes reachable, RF {}, {} W{}/R{}
+nur Koordinator	coordinator only
+Port {} vor {}: {} Einträge, {} Treffer, {} Fehlschläge ({},{} % Treffer)	Port {} in front of {}: {} entries, {} hits, {} misses ({}.{} % hits)
+Port {}: {} Topics, {} wartend, {} unterwegs, {} bestätigt	Port {}: {} topics, {} waiting, {} out, {} acknowledged
+{} {}: {} von {} beschäftigt, {} erledigt, {} gescheitert	{} {}: {} of {} busy, {} done, {} failed
+{} von {}, {}	{} of {}, {}
+{} von {}, {} (verlangsamt)	{} of {}, {} (slowed down)
+Kabel {}	Cable {}
+Kabel {} getrennt	Cable {} pulled
++{} Laufzeit	+{} delay
++{} Jitter	+{} jitter
+{} % Verlust	{} % loss
+{},{} % Verlust	{}.{} % loss
+{} ppm Verlust	{} ppm loss
+höchstens {}	at most {}
+unverändert	unchanged
+Kabel {}: {}	Cable {}: {}
+{} ausgeschaltet	{} switched off
+Dienst {} auf {} gestoppt	Service {} on {} stopped
++{} je Zugriff	+{} per access
+Übertragung ×{}	transfer ×{}
+Übertragung ×{},{}	transfer ×{}.{}
+Disk von {} langsam: {}	Disk of {} slow: {}
+Partition: {} | alle anderen	Partition: {} | all others
+Partition: {} | {}	Partition: {} | {}

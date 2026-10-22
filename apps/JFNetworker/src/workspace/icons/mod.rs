@@ -49,6 +49,8 @@ pub(crate) const JN_PORT_CONSOLE: u32 = 0x10_F10E;
 pub(crate) const JN_PORT_USB: u32 = 0x10_F10F;
 pub(crate) const JN_PORT_RADIO: u32 = 0x10_F110;
 pub(crate) const JN_PORT_WAN: u32 = 0x10_F111;
+// the Metriken panel (U6a)
+pub(crate) const JN_METRICS: u32 = 0x10_F112;
 
 /// the icon of a kind of port
 pub(crate) fn port_icon(m: jfn_model::Media) -> u32 {

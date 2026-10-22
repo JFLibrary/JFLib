@@ -67,6 +67,8 @@ ICONS = [
     # a globe: the provider's line
     (["JN_PORT_WAN"], circle(12, 12, 8.5) + "M12 3.5C8 8 8 16 12 20.5C16 16 16 8 12 3.5"
      + line(3.5, 12, 20.5, 12), W),
+    # the lab's metrics (the Metriken panel): a line on its axes
+    (["JN_METRICS"], "M4 4V20H20" + poly([(7.5, 15.5), (11, 10.5), (14, 13), (19, 6.5)]), W),
 ]
 
 

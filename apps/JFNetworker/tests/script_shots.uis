@@ -1,0 +1,30 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/scripts.jfnet
+# the shot matrix of the script editor (U7): SRV1's Skripte tab with zaehler's runtime error
+# marked in line 13 and the caret on it (its message in the status line), the output of the
+# run below; light and dark at 100 and 150 % (build/jfnetworker/script_shots_<theme>_<scale>.png),
+# then the Fehler list.  Ids: 26624 the device window, 53280 the editor.
+size 1280 900
+theme light
+wait 3500
+rclick listitem:"SRV1"
+move 700,300
+click menuitem:"Skripte …"
+expect window 26624 open
+wait 600
+click #53280
+key f8
+expect text:"13:15: Fehler im Lauf (timer, bei 3,000 s): Division durch 0" exists
+shot build/jfnetworker/script_shots_light_100.png window 26624
+theme dark
+shot build/jfnetworker/script_shots_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/script_shots_dark_150.png window 26624
+theme light
+shot build/jfnetworker/script_shots_light_150.png window 26624
+scale 100 window 26624
+# the errors of the run, dark
+wait 600
+click tab:"Fehler (1)"
+theme dark
+shot build/jfnetworker/script_shots_errors_dark_100.png window 26624
+expect_nowarn
