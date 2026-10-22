@@ -77,7 +77,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
   <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [x509.rs](#netiox509rs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, a dissector, pcapng
-  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs)
+  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs)
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
   <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
@@ -22800,6 +22800,8 @@ parameters and the position of an error for the IOS-like messages ("% Invalid in
   help(mode, line, &dyn Names)         -> Help: the answer to "?" typed after `line`
   complete(mode, line, &dyn Names)     -> Completion (Tab)
   Error::render / Help::render         the text an IOS-like console shows
+  find_mode(prompt)                    a mode by its prompt (modes that parts of an app add
+                                       need no fixed number)
 
 Paths are words separated by spaces.  A keyword stands for itself ("shutdown"; "access=mode"
 stores it under the key "mode").  A parameter is TYPE or TYPE=key (a later value of a key
@@ -22954,6 +22956,8 @@ F_HIDDEN: u8 = 2
 - **`fn mode(&mut self, prompt: &str, title: &str, parent: Option<ModeId>, no_help: Option<&str>) -> ModeId`**
   a new mode; `no`: a "no" keyword negates its commands (`no_help` is its help text)
 - **`fn mode_info(&self, m: ModeId) -> &Mode`**
+- **`fn find_mode(&self, prompt: &str) -> Option<ModeId>`**
+  the mode with this prompt suffix ("(config-ext-nacl)#"; the first one made)
 - **`fn prompt(&self, m: ModeId, host: &str) -> String`**
   the prompt of a mode for a host name ("R1(config)#")
 - **`fn add(&mut self, mode: ModeId, path: &str, help: &str, cmd: Option<C>, flags: u8) -> NodeId`**
@@ -26336,6 +26340,12 @@ on every target (simulators, packet tools, tests).
   pcapng    Writer (section, interfaces, enhanced packets), read
   http      HTTP/1.1 without I/O: Parser (fed as bytes arrive, says when it needs more),
             Head, Headers, framing, encode_request / encode_response / chunks (RFC 9112)
+  stp       BPDUs of STP and RSTP: Configuration, TCN and RST BPDUs with their flags,
+            BridgeId, PortId, path_cost, the 802.3 / LLC frame (802.1D-1998, 802.1D-2004)
+  rip       RipView, Rip, Rte, Auth: RIP requests and responses, version 2 and 1, the
+            authentication entry recognised                       (RFC 2453, 1058)
+  nat       address and port translation in place: Flow (what translation and filters look
+            at), rewrite / rewrite_quoted with incremental checksums (RFC 3022, 1624, 5508)
 
 Views (XxxView::parse) check lengths once and then read fields without copying; records
 (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -26610,6 +26620,8 @@ checksum -- the Internet checksum (RFC 1071, 1624) and the Ethernet CRC-32
   pseudo_v4 / pseudo_v6          the pseudo-header sums of UDP, TCP and ICMPv6
   update16(ck, old, new) -> u16  incremental update after a 16-bit field changed (RFC 1624)
   crc32(data) -> u32             IEEE 802.3 FCS (reflected 0x04C11DB7, as zlib)
+  update(ck, old, new) -> u16    incremental update after a run of bytes changed (an address,
+                                 a whole quoted packet): update16 for every word that differs
 ```
 
 - **`fn sum(acc: u32, data: &[u8]) -> u32`**
@@ -26639,6 +26651,11 @@ checksum -- the Internet checksum (RFC 1071, 1624) and the Ethernet CRC-32
 - **`fn crc32(data: &[u8]) -> u32`**
   CRC-32 of IEEE 802.3 (the Ethernet frame check sequence; also zlib's and PNG's)
 
+- **`fn update(ck: u16, old: &[u8], new: &[u8]) -> u16`**
+  the new checksum after the bytes `old` became `new` (of the same length, starting at an even
+  offset of the data the checksum covers; an odd last byte is the high byte of its word, as
+  in sum): RFC 1624 eqn. 3 for every 16-bit word that changed
+
 ### `netpkt/decode.rs`
 
 Source: [`lib/netpkt/decode.rs`](../lib/netpkt/decode.rs)
@@ -26657,10 +26674,13 @@ decode -- dissects a frame into layers for packet inspectors and event filters
 Application protocols are recognised by their well-known ports.  DHCP (fixed fields and
 every option), DNS (header, questions and records, also over TCP), NTP and syslog have
 dissectors; the payload of the others shows as one field.
+BPDUs of STP and RSTP (LLC SAP 0x42) show every field and flag (stp.rs).
 Field names and values follow the usual capture-tool wording (English protocol terms).
 HTTP (ports 80, 8080, 8000, and any TCP segment that starts like a request or a response)
 shows the start line, the header lines and the body bytes of every message the segment
 holds; a segment in the middle of a message is a "Continuation".
+RIP (port 520) shows its header and one field per entry (route, authentication, the request
+for the whole table) with the problems a receiver would refuse (RFC 2453, RFC 1058).
 ```
 
 ```rust
@@ -28233,6 +28253,402 @@ LAST_CHUNK: &[u8] = b"0\r\n\r\n"
 
 - **`fn http_date(unix: i64) -> String`**
   the date of a Date header (IMF-fixdate) for seconds since 1970
+
+### `netpkt/stp.rs`
+
+Source: [`lib/netpkt/stp.rs`](../lib/netpkt/stp.rs)
+
+```text
+stp -- Bridge Protocol Data Units of the spanning tree protocols: Configuration and Topology
+Change Notification BPDUs (IEEE 802.1D-1998 clause 9) and RST BPDUs (IEEE 802.1D-2004 9.3.3,
+RSTP of 802.1w) with their flags, bridge and port identifiers, the recommended path costs,
+and the 802.3 frames with LLC that carry them to 01:80:c2:00:00:00
+
+  BridgeId(u64)            priority (16 bits: 4 settable, 12 system ID extension) and MAC:
+                           new(priority, mac), priority(), ext(), mac(); Display
+                           "4096/0/02:4a:00:00:01:00" as capture tools write it
+  PortId(u16)              priority (4 bits, in steps of 16) and port number (12 bits):
+                           new(priority, number), priority(), number(); Display "128.1"
+  path_cost(kbps)          the recommended Port Path Cost of 802.1D-2004 Table 17-3:
+                           20 000 000 000 / speed in kbit/s, 1 .. 200 000 000 (100M 200 000,
+                           1G 20 000, 2.5G 8 000, 10G 2 000, 25G 800, 100G 200)
+  Role                     the port role of an RST BPDU (Unknown, AltBackup, Root, Designated)
+  F_TC, F_PROPOSAL, F_ROLE, F_LEARNING, F_FORWARDING, F_AGREEMENT, F_TCA   the flag bits
+  Bpdu { kind, version, flags, root, cost, bridge, port, msg_age, max_age, hello, fwd_delay }
+                           times in 1/256 s (TIME_UNIT per second); config / tcn / rst build
+                           one from whole seconds (Times), with_role sets the role bits,
+                           times() reads them back in seconds
+  Bpdu::parse(b)           the BPDU after the LLC header, validated as 802.1D-2004 9.3.4 says
+                           (protocol identifier 0, type and length); Err with the reason
+  Bpdu::to_bytes()         35 (Configuration), 4 (TCN) or 36 bytes (RST)
+  Bpdu::frame(src)         the whole frame: 01:80:c2:00:00:00, the 802.3 length, LLC
+                           42 42 03, the BPDU, padded to 60 bytes
+  of_frame(frame)          the BPDU of a received frame (untagged or tagged), None for any
+                           other frame or a BPDU that does not validate
+  flags_text(kind, flags)  "Forwarding, Learning, Port Role: Designated" (dissectors)
+  summary(&Bpdu)           a one-line summary like a capture tool's ("RST. Root =
+                           4096/0/02:4a:00:00:01:00  Cost = 0  Port = 0x8001")
+
+Multi-byte fields are big endian.  The receiver checks what needs its own state (a Message Age
+that is not below Max Age, its own BPDU looped back); the codec only reads and writes.
+```
+
+```rust
+/// BPDU timer values count in 1/256 s
+TIME_UNIT: u16 = 256
+/// the lengths of the three BPDUs
+CONFIG_LEN: usize = 35
+TCN_LEN: usize = 4
+RST_LEN: usize = 36
+TYPE_CONFIG: u8 = 0x00
+TYPE_RST: u8 = 0x02
+TYPE_TCN: u8 = 0x80
+/// Protocol Version Identifiers: 802.1D STP, RSTP (802.1w), MSTP (802.1s)
+VERSION_STP: u8 = 0
+VERSION_RSTP: u8 = 2
+VERSION_MSTP: u8 = 3
+/// flag bits: Topology Change (both BPDUs), the RST BPDU's own ones, and the Topology Change
+/// Acknowledgment of Configuration BPDUs
+F_TC: u8 = 0x01
+F_PROPOSAL: u8 = 0x02
+F_ROLE: u8 = 0x0C
+F_LEARNING: u8 = 0x10
+F_FORWARDING: u8 = 0x20
+F_AGREEMENT: u8 = 0x40
+F_TCA: u8 = 0x80
+```
+
+- **`struct BridgeId(pub u64)`**
+  a bridge identifier: the 16-bit priority (4 settable bits and the 12-bit system ID
+  extension, 0 for one spanning tree) and the bridge's MAC address; lower is better
+
+**`impl BridgeId`**
+
+- **`fn new(priority: u16, mac: Mac) -> BridgeId`**
+- **`fn priority(&self) -> u16`**
+  the whole priority field (settable part plus system ID extension)
+- **`fn ext(&self) -> u16`**
+  the system ID extension (the low 12 bits of the priority field)
+- **`fn mac(&self) -> Mac`**
+- **`fn bytes(&self) -> [u8; 8]`**
+- **`fn from_bytes(b: &[u8]) -> BridgeId`**
+
+- **`struct PortId(pub u16)`**
+  a port identifier: 4 bits of priority (0 .. 240 in steps of 16) and a 12-bit port number
+
+**`impl PortId`**
+
+- **`fn new(priority: u8, number: u16) -> PortId`**
+- **`fn priority(&self) -> u8`**
+- **`fn number(&self) -> u16`**
+
+- **`fn path_cost(kbps: u32) -> u32`**
+  the recommended Port Path Cost of a link speed (802.1D-2004 Table 17-3: 20 000 000 000
+  divided by the speed in kbit/s, within 1 .. 200 000 000)
+
+- **`enum Role`**
+  the port role an RST BPDU conveys (flag bits 3 and 4)
+  - `Unknown`
+  - `AltBackup`
+  - `Root`
+  - `Designated`
+
+**`impl Role`**
+
+- **`fn bits(self) -> u8`**
+- **`fn of_flags(flags: u8) -> Role`**
+- **`fn name(self) -> &'static str`**
+
+- **`enum Kind`**
+  which BPDU
+  - `Config`
+  - `Tcn`
+  - `Rst`
+
+- **`struct Times`**
+  the four timer values of a BPDU in whole seconds
+  - `msg_age: u16`
+  - `max_age: u16`
+  - `hello: u16`
+  - `fwd_delay: u16`
+
+- **`struct Bpdu`**
+  a BPDU; the times count in 1/256 s
+  - `kind: Kind`
+  - `version: u8` -- the Protocol Version Identifier as sent (0 for Configuration and TCN BPDUs, 2 for RSTP)
+  - `flags: u8`
+  - `root: BridgeId`
+  - `cost: u32`
+  - `bridge: BridgeId`
+  - `port: PortId`
+  - `msg_age: u16`
+  - `max_age: u16`
+  - `hello: u16`
+  - `fwd_delay: u16`
+
+- **`enum BpduErr`**
+  why bytes are no BPDU
+  - `Short` -- shorter than its type needs
+  - `Protocol` -- the Protocol Identifier is not 0
+  - `Type` -- a BPDU type (or type and version) this codec does not know
+
+**`impl BpduErr`**
+
+- **`fn text(self) -> &'static str`**
+
+**`impl Bpdu`**
+
+- **`fn config(flags: u8, root: BridgeId, cost: u32, bridge: BridgeId, port: PortId, t: Times) -> Bpdu`**
+  a Configuration BPDU (only the TC and TC acknowledgment flags count)
+- **`fn tcn() -> Bpdu`**
+  a Topology Change Notification BPDU
+- **`fn rst(flags: u8, root: BridgeId, cost: u32, bridge: BridgeId, port: PortId, t: Times) -> Bpdu`**
+  an RST BPDU (the port role is part of the flags: Role::bits, with_role)
+- **`fn with_role(mut self, r: Role) -> Bpdu`**
+  the same BPDU conveying another port role
+- **`fn role(&self) -> Role`**
+- **`fn tc(&self) -> bool`**
+- **`fn tca(&self) -> bool`**
+- **`fn proposal(&self) -> bool`**
+- **`fn agreement(&self) -> bool`**
+- **`fn learning(&self) -> bool`**
+- **`fn forwarding(&self) -> bool`**
+- **`fn times(&self) -> Times`**
+  the timer values in whole seconds (rounded down)
+- **`fn parse(b: &[u8]) -> Result<Bpdu, BpduErr>`**
+  the BPDU in `b` (the bytes after the LLC header), as 802.1D-2004 9.3.4 validates it
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the bytes of the BPDU
+- **`fn frame(&self, src: Mac) -> Vec<u8>`**
+  the frame that carries the BPDU from a port with MAC `src`: IEEE 802.3 to the bridge
+  group address, LLC with SAP 0x42, padded to the 60-byte minimum
+
+- **`fn of_frame(frame: &[u8]) -> Option<Bpdu>`**
+  the BPDU a received frame carries: to 01:80:c2:00:00:00 (tagged or not), an 802.3 length,
+  LLC with SAP 0x42; None for any other frame and for one that does not validate
+
+- **`fn flags_text(kind: Kind, flags: u8) -> String`**
+  the flags in words, as capture tools list them ("Agreement, Forwarding, Learning, Port Role:
+  Root"; "Topology Change" first, the acknowledgment last; "none")
+
+- **`fn summary(b: &Bpdu) -> String`**
+  one line about a BPDU, as capture tools sum one up ("Conf. TC + Root = 32768/0/02:4a:00:00:01:00
+  Cost = 20000  Port = 0x8002", "RST. Root = ...", "Topology Change Notification")
+
+### `netpkt/rip.rs`
+
+Source: [`lib/netpkt/rip.rs`](../lib/netpkt/rip.rs)
+
+```text
+rip -- Routing Information Protocol messages (UDP port 520): version 2 after RFC 2453 and
+version 1 after RFC 1058; requests and responses with their route entries, and the
+authentication entry of RFC 2453 4.1 (recognised; simple passwords read and written)
+
+  RipView::parse(b)          command, version, must-be-zero field, the complete 20-byte
+                             entries (entry(i), entries(), routes() without the
+                             authentication entry), auth(), trailing() bytes after them
+  Rte { afi, tag, addr, mask, next_hop, metric }   one entry; Rte::v2 / Rte::v1 build route
+                             entries, prefix() is the destination with a version 2 mask,
+                             mbz_clear() checks the fields version 1 leaves zero
+  Auth { kind, data }        the first entry with AFI 0xFFFF: AUTH_PASSWORD (16 bytes of
+                             plain text: Auth::password, text()), AUTH_MD5 (RFC 4822: kind and
+                             bytes only, not checked)
+  Rip { command, version, auth, entries }   read / to_bytes / response / request_all /
+                             is_request_all (one entry, address family 0, metric 16)
+  CMD_REQUEST, CMD_RESPONSE, AFI_INET, AFI_AUTH, AUTH_*, INFINITY (16), MAX_ENTRIES (25),
+  GROUP (224.0.0.9, RIPv2's multicast address), command_name
+
+The view reads whatever is there: more than 25 entries, bytes after the last entry, a version
+1 message with a must-be-zero field set or an unknown command are for the receiver to judge
+(decode.rs reports them as problems).  Version 1 entries carry no mask; the receiver infers it
+from the address class and its own interfaces (RFC 1058 3.7).
+```
+
+```rust
+/// the header: command, version, two bytes that must be zero
+RIP_HDR: usize = 4
+/// one entry (route or authentication)
+RTE_LEN: usize = 20
+/// entries a message holds at most (RFC 2453 3.6); 24 routes with an authentication entry
+MAX_ENTRIES: usize = 25
+CMD_REQUEST: u8 = 1
+CMD_RESPONSE: u8 = 2
+/// the address family of IPv4 routes
+AFI_INET: u16 = 2
+/// the address family that marks the authentication entry (RFC 2453 4.1)
+AFI_AUTH: u16 = 0xFFFF
+/// a plain-text password of 16 bytes (RFC 2453 4.1)
+AUTH_PASSWORD: u16 = 2
+/// keyed MD5 (RFC 4822)
+AUTH_MD5: u16 = 3
+/// the metric of an unreachable destination
+INFINITY: u32 = 16
+/// where version 2 sends its updates (RFC 2453 4.5)
+GROUP: Ipv4 = Ipv4([224, 0, 0, 9])
+```
+
+- **`fn command_name(c: u8) -> &'static str`**
+  the name of a command as capture tools show it
+
+- **`struct Rte`**
+  one 20-byte entry; for the authentication entry `tag` holds the type and the 16 bytes from
+  `addr` on hold the authentication data (Auth reads them)
+  - `afi: u16`
+  - `tag: u16` -- the route tag (version 2; zero in version 1)
+  - `addr: Ipv4`
+  - `mask: Ipv4` -- the subnet mask (version 2; zero: not given)
+  - `next_hop: Ipv4` -- where to send packets for the destination (version 2; 0.0.0.0: to the sender)
+  - `metric: u32`
+
+**`impl Rte`**
+
+- **`fn read(b: &[u8]) -> Rte`**
+  an entry from its 20 bytes (the caller has checked the length)
+- **`fn write(&self, b: &mut [u8])`**
+  writes the entry into 20 bytes
+- **`fn v2(prefix: Prefix4, next_hop: Ipv4, metric: u32, tag: u16) -> Rte`**
+  a version 2 route: the destination with its mask, the next hop (0.0.0.0: the sender
+  itself), the metric and the route tag
+- **`fn v1(addr: Ipv4, metric: u32) -> Rte`**
+  a version 1 route: the address alone
+- **`fn prefix(&self) -> Option<Prefix4>`**
+  the destination with its version 2 mask (None: no mask, or one with gaps)
+- **`fn mbz_clear(&self) -> bool`**
+  the fields version 1 leaves zero are zero (route tag, mask, next hop)
+
+- **`struct Auth`**
+  the authentication entry of a version 2 message
+  - `kind: u16`
+  - `data: [u8; 16]`
+
+**`impl Auth`**
+
+- **`fn password(pw: &[u8]) -> Auth`**
+  a plain-text password: left-justified, padded with zero bytes, cut at 16 bytes
+- **`fn text(&self) -> Option<String>`**
+  the password of a plain-text entry (up to the first zero byte)
+
+- **`struct RipView<'a>`**
+  a received RIP message
+
+**`impl<'a> RipView<'a>`**
+
+- **`fn parse(b: &'a [u8]) -> Option<RipView<'a>>`**
+  at least the header
+- **`fn command(&self) -> u8`**
+- **`fn version(&self) -> u8`**
+- **`fn mbz(&self) -> u16`**
+  the two header bytes that must be zero
+- **`fn bytes(&self) -> &'a [u8]`**
+- **`fn count(&self) -> usize`**
+  complete entries
+- **`fn trailing(&self) -> usize`**
+  bytes after the last complete entry
+- **`fn entry(&self, i: usize) -> Option<Rte>`**
+  entry `i` (authentication entries included)
+- **`fn entries(&self) -> impl Iterator<Item = Rte> + '_`**
+- **`fn auth(&self) -> Option<Auth>`**
+  the authentication entry: only the first entry may be one (RFC 2453 4.1)
+- **`fn routes(&self) -> impl Iterator<Item = Rte> + '_`**
+  the entries after a leading authentication entry
+
+- **`struct Rip`**
+  a RIP message to write (or one read)
+  - `command: u8`
+  - `version: u8`
+  - `auth: Option<Auth>` -- written as the first entry
+  - `entries: Vec<Rte>`
+
+**`impl Rip`**
+
+- **`fn response(version: u8, entries: Vec<Rte>) -> Rip`**
+- **`fn request_all(version: u8) -> Rip`**
+  the request for the whole routing table: a single entry with address family 0 and
+  metric 16 (RFC 2453 3.9.1)
+- **`fn is_request_all(&self) -> bool`**
+  this is the request for the whole table
+- **`fn read(v: &RipView) -> Rip`**
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the message as bytes (no limit on the number of entries: the sender splits at 25)
+
+### `netpkt/nat.rs`
+
+Source: [`lib/netpkt/nat.rs`](../lib/netpkt/nat.rs)
+
+```text
+nat -- address and port translation of IPv4 packets in place (RFC 3022): addresses, TCP and
+UDP ports and the identifiers of ICMP queries change, and every checksum that covers them
+follows incrementally (RFC 1624); ICMP errors take the packet they quote along (RFC 5508)
+
+  Flow::of(packet) -> Option<Flow>      protocol, addresses, ports (the identifier of an ICMP
+                                        query in both), ICMP type and code, TCP flags; a
+                                        fragment after the first has no ports (`ports`
+                                        false)
+  Flow::quoted(packet) -> Option<Flow>  the packet an ICMP error quotes (its header and at
+                                        least 8 bytes of its payload)
+  rewrite(pkt, side, addr, port)        the source or destination address of a packet and,
+                                        with Some, its port (an ICMP query: its identifier);
+                                        the IPv4 header checksum, the TCP or UDP checksum
+                                        (pseudo header and port; a UDP checksum of 0 means
+                                        none and stays 0) and the ICMP checksum follow; a
+                                        later fragment changes its address only
+  rewrite_quoted(pkt, side, addr, port) the same for the packet inside an ICMP error: its
+                                        header checksum, its TCP or UDP checksum when the
+                                        quote holds it, an ICMP query's checksum, and the
+                                        error's own ICMP checksum over every changed byte
+                                        (the outer header stays; rewrite() changes it)
+  is_query(type) / reply_of(type)       ICMP queries that carry an identifier (echo,
+                                        timestamp, information, address mask) and the type
+                                        of their answers
+
+Translation needs no full recomputation: the segment of a first fragment is not complete,
+yet its checksum covers all of it, and an ICMP error quotes only the start of a packet.
+Every field these functions change lies on a 16-bit boundary of the data its checksum
+covers, so the old and new words are enough (checksum::update).
+```
+
+- **`enum Side`**
+  which address and port of a packet a translation changes
+  - `Src`
+  - `Dst`
+
+- **`struct Flow`**
+  what translation and filters look at in a packet
+  - `proto: u8`
+  - `src: Ipv4`
+  - `dst: Ipv4`
+  - `sport: u16` -- TCP and UDP ports; an ICMP query's identifier in both; 0 when unknown
+  - `dport: u16`
+  - `ports: bool` -- the ports (or the identifier) are known: not a later fragment, and the transport header
+    is there
+  - `icmp: Option<(u8, u8)>` -- ICMP type and code
+  - `flags: u8` -- TCP flags (netpkt::tcp::SYN ...)
+  - `later: bool` -- a fragment after the first (no transport header)
+  - `mf: bool` -- more fragments follow
+  - `id: u16` -- the identification field (fragments of one datagram share it)
+
+- **`fn is_query(typ: u8) -> bool`**
+  ICMP queries with an identifier: echo, timestamp, information, address mask (requests and
+  replies)
+
+- **`fn reply_of(typ: u8) -> Option<u8>`**
+  the type of the answer to an ICMP query request (None: not a request)
+
+**`impl Flow`**
+
+- **`fn of(packet: &[u8]) -> Option<Flow>`**
+  the flow of a whole packet
+- **`fn quoted(packet: &[u8]) -> Option<Flow>`**
+  the flow of the packet an ICMP error quotes (`packet`: the error's whole IPv4 packet)
+
+- **`fn rewrite(pkt: &mut [u8], side: Side, addr: Ipv4, port: Option<u16>) -> bool`**
+  sets the source or destination address of an IPv4 packet and, with `port`, its TCP / UDP
+  port or ICMP query identifier, with every checksum updated; false when it is no IPv4 packet
+
+- **`fn rewrite_quoted(pkt: &mut [u8], side: Side, addr: Ipv4, port: Option<u16>) -> bool`**
+  sets the source or destination address (and port or query identifier) of the packet an
+  ICMP error quotes, with the quote's checksums and the error's ICMP checksum; false when
+  `pkt` is no ICMP error with a quoted IPv4 header
 
 ## cas
 
