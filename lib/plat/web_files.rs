@@ -1,5 +1,8 @@
 // Worker-local virtual files. File codecs use their existing byte and streaming APIs;
 // durable storage is a separate asynchronous request confirmed by the browser host.
+// Files below /handles/ are the user's own files: the host keeps a FileSystemFileHandle for
+// each (web/handles.js) and every change is written back to it (web.rs write_back: write_file,
+// AtomicFile's commit, rename onto it, a File stream's sync and drop); imports never are.
 
 use crate::{FO_READ, FO_RW, FO_WRITE};
 use alloc::{format, string::String, sync::Arc, vec::Vec};
@@ -167,7 +170,12 @@ pub(crate) fn rename_raw(old: &str, new: &str) -> bool {
     let data = fs.entries.remove(i).data;
     fs.entries.retain(|e| e.path != new);
     data.lock().persisted = 0;
+    let back = bound(&new).then(|| new.clone());
     fs.entries.push(Entry { path: new, data });
+    drop(fs);
+    if let Some(p) = back {
+        super::write_back(&p);
+    }
     true
 }
 /// Enumerate immediate children from a stable snapshot, without holding a lock in callbacks.
@@ -218,8 +226,23 @@ pub(crate) fn read_file_raw(name: &str) -> Option<Vec<u8>> {
     let file = OsFile::open_raw(name, FO_READ)?;
     Some(file.data.lock().bytes.clone())
 }
-/// Atomically replace a worker-local file. This does not claim persistent storage.
+/// A file of the user's own, bound to a handle of the host (a normalised path).
+pub(crate) fn bound(path: &str) -> bool {
+    path.starts_with("/handles/")
+}
+/// Atomically replace a worker-local file. This does not claim persistent storage; a file of
+/// the user's own (bound) is written back to it.
 pub(crate) fn write_file_raw(name: &str, bytes: &[u8]) -> bool {
+    let ok = store(name, bytes);
+    if ok {
+        if let Some(p) = path(name).filter(|p| bound(p)) {
+            super::write_back(&p);
+        }
+    }
+    ok
+}
+/// Replace a worker-local file without writing anything back (host imports).
+pub(crate) fn store(name: &str, bytes: &[u8]) -> bool {
     let Some(name) = path(name) else {
         return false;
     };
@@ -281,6 +304,8 @@ pub(crate) struct OsFile {
     data: Arc<SpinLock<Data>>,
     writable: bool,
     temporary: Option<String>,
+    // a writable handle on a file of the user's own: its path (written back by sync and drop)
+    back: Option<String>,
 }
 impl OsFile {
     /// Open a virtual file with the standard FO_READ/FO_WRITE/FO_RW contract.
@@ -290,7 +315,8 @@ impl OsFile {
             return None;
         }
         if mode == FO_WRITE || (mode == FO_RW && file_exists_raw(&name) == 0) {
-            if !write_file_raw(&name, &[]) {
+            // (a file of the user's: written back once there is something, by sync / drop)
+            if !store(&name, &[]) {
                 return None;
             }
         }
@@ -299,6 +325,7 @@ impl OsFile {
             data: fs.entries.iter().find(|e| e.path == name)?.data.clone(),
             writable: mode != FO_READ,
             temporary: None,
+            back: (mode != FO_READ && bound(&name)).then(|| name.clone()),
         })
     }
     /// Create a virtual scratch file that is removed when this handle is dropped.
@@ -346,16 +373,28 @@ impl OsFile {
     pub fn size(&self) -> Option<u64> {
         Some(self.data.lock().bytes.len() as u64)
     }
-    /// True only when the current revision has a successful persistence completion.
+    /// True only when the current revision has a successful persistence completion; a file of
+    /// the user's own is written back first (false until the host confirmed it).
     pub fn sync(&self) -> bool {
-        let data = self.data.lock();
-        data.persisted != 0 && data.persisted == data.revision
+        let done = {
+            let data = self.data.lock();
+            data.persisted != 0 && data.persisted == data.revision
+        };
+        if !done {
+            if let Some(p) = &self.back {
+                super::write_back(p);
+            }
+        }
+        done
     }
 }
 impl Drop for OsFile {
     fn drop(&mut self) {
         if let Some(name) = &self.temporary {
             let _ = delete_raw(name);
+        }
+        if self.back.is_some() {
+            self.sync();
         }
     }
 }
@@ -382,6 +421,17 @@ impl Drop for OsFileLock {
     }
 }
 
+/// The normalised path of a name (it need not exist).
+pub(super) fn normal(name: &str) -> Option<String> {
+    path(name)
+}
+/// The normalised path and the current revision of a file.
+pub(super) fn revision(name: &str) -> Option<(String, u64)> {
+    let name = path(name)?;
+    let fs = FILES.lock();
+    let revision = fs.entries.iter().find(|e| e.path == name)?.data.lock().revision;
+    Some((name, revision))
+}
 pub(super) fn snapshot(name: &str) -> Option<(String, u64, Vec<u8>)> {
     let name = path(name)?;
     let fs = FILES.lock();

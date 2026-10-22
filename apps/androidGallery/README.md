@@ -84,6 +84,16 @@ python RustLib/build_rs.py app androidGallery --target android --android-abi x86
   Rust fragt Java synchron über `jfgui_host_call` → `GalleryHost.call` (JNI, eigener
   Antwortpuffer), Picker-Anfragen gehen über `jfgui_host_request` → `GalleryHost.request`,
   die Antwort kommt über `GalleryHost.nativeResult` zurück ([`../../android/GalleryHost.java`](../../android/GalleryHost.java)).
+  Seit 22.10.2026 schreibt `content://` über ein Journal im Datenordner der App (Kopie,
+  Schreiben an Ort und Stelle, Zurücklesen; ein unterbrochener Vorgang wird beim nächsten
+  Start vollendet), Namen in gewählten Ordnern werden zwischengespeichert, und ein
+  `ContentObserver` meldet Änderungen des Anbieters (`GalleryHost.nativeChanged`).
+- **Zuletzt geöffnet**: Öffnen und Speichern kommen in die Liste von `ui.recent_add`; „Zuletzt
+  öffnen“ liest die erste Datei wieder (Android über die dauerhafte Freigabe; im Browser die
+  Datei des Nutzers über ihr Handle, nach dem Neuladen per `plat::web::reopen`).
+- **Browser** (Chromium): Öffnen und Speichern zeigen die Picker des Systems (File System
+  Access API); gespeichert wird in die gewählte Datei des Nutzers zurück. Firefox nimmt den
+  eigenen Dialog über die virtuellen Dateien. Geprüft mit `tests/files_web.mjs`.
 - **Zwischenablage**: Text und HTML über den `ClipboardManager`; Bilder als PNG über den
   Provider `GalleryFiles` (im Manifest, Authority `org.jflib.gallery.jfgui.files`).
 
@@ -92,8 +102,10 @@ python RustLib/build_rs.py app androidGallery --target android --android-abi x86
 Der Adapter bietet eine einzelne Android-Activity und darin die Library-Oberflächen.
 Drucken, native Plugins, Hintergrundthreads, Papierkorb und `plat::fs` sind nicht
 angeschlossen; nicht verfügbare Host-Anfragen enden mit `Unsupported`. `content://` schreibt
-nicht atomar (SAF kann kein Dokument durch Umbenennen ersetzen), und die Zwischenablage lässt
-sich nur lesen, solange die App den Fensterfokus hat (direkt nach dem Picker kurz nicht).
+an Ort und Stelle (SAF kann kein Dokument durch Umbenennen ersetzen; das Journal vollendet
+einen abgebrochenen Vorgang erst beim nächsten Start, andere Apps sehen währenddessen einen
+Teil), und die Zwischenablage lässt sich nur lesen, solange die App den Fensterfokus hat
+(direkt nach dem Picker kurz nicht).
 
 Barrierefreiheit (seit 19.10.2026): `android/GalleryAccessibility.java` stellt jedes Widget
 als virtuelle View eines `AccessibilityNodeProvider` dar (Klasse, Text, Zustände, Werte,
@@ -202,6 +214,31 @@ Instrumentation-Prüfungen, Phase 2 15 + 6, alle bestanden; `GalleryInstrumentat
 `build/win/plattest.exe --test content` (55 Prüfungen) dieselbe Namenslogik gegen einen
 SAF-Anbieter im Speicher, `tests/folder.uis` den Ordnermodus des eigenen Dialogs. Ein echtes
 Gerät und Cloud-Anbieter wurden nicht geprüft.
+
+Seit 22.10.2026 prüft Phase 1 zusätzlich das Überschreiben vorhandener Dokumente (dieselbe
+Dokument-URI, keine Journal-Kopie übrig), den Namens-Cache (bekannte Namen ohne
+Ordnerauflistung), eine gemeldete Änderung (die Instrumentation ruft `notifyChange` für den
+gewählten Ordner, der Zähler des `ContentObserver` steigt) und einen nach sechs Bytes
+unterbrochenen Schreibvorgang (Teil im Dokument, Kopie im Journal); Phase 2 findet ihn beim
+ersten Zugriff auf `content://` vollendet. Das Skript sieht nach jeder Phase von außen nach
+(`cat` des Dokuments, `run-as … ls` des Journal-Ordners). Am 22.10.2026 auf dem Emulator
+(API 35): Phase 1 86 + 8, Phase 2 16 + 6, alle bestanden; `GalleryInstrumentation` (78) und
+`GalleryA11yInstrumentation` (31) weiter grün; `plattest --test content` 79 Prüfungen (Cache,
+Journal, Wiederherstellung, ein Anbieter, der Bytes verliert).
+
+Im Browser (Chromium und Firefox, vom Repository-Verzeichnis):
+
+```powershell
+python build_rs.py app androidGallery --target web
+node apps/androidGallery/tests/files_web.mjs build
+```
+
+Chromium: die Picker liefern Dateien des Origin Private File System (die echten lassen sich
+nicht fernsteuern); Öffnen (Handle in IndexedDB, Pfad `/handles/ID/brief.txt`), Speichern
+unter, Speichern über die geöffnete Datei (gleicher Pfad), ein fehlschlagender Schreibvorgang
+(Datei unverändert), Neuladen (Datei schon gelesen; mit „prompt“: `reopen` erlaubt und
+verweigert), abgebrochener Picker. Firefox: der eigene Dialog, keine Handle-Datenbank. Am
+22.10.2026: 25 Prüfungen bestanden; `secrets_web`, `text_web`, `a11y_web` weiter grün.
 
 ## Sicherer Speicher prüfen (seit 21.10.2026)
 

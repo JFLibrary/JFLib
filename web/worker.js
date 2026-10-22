@@ -134,6 +134,14 @@ function dispatch(m) {
       inbox(data);if(!wasm.jfgui_clipboard(0,data.length))throw new Error("Zwischenablage nicht importiert.");break;
     }
     case "complete": wasm.jfgui_complete(m.id,m.status);input();break;
+    // the answer of the system's picker (file_dialog): the bound path, or a negative status
+    case "file": {
+      const path=encode.encode(m.path||"");
+      if(m.status===2 && wasm.jfgui_file_result) {inbox(path);wasm.jfgui_file_result(m.id,2,path.length);}
+      else if(wasm.jfgui_file_result) wasm.jfgui_file_result(m.id,m.status,0);
+      else wasm.jfgui_complete(m.id,m.status===2?-3:m.status);
+      input();break;
+    }
     // the accessibility mirror on / off (a11y.js), an action of assistive technology
     case "a11y": if(wasm.jfgui_a11y) {wasm.jfgui_a11y(+!!m.on);input();} break;
     case "a11y-act": {

@@ -74,6 +74,9 @@
 //                                          one (Credential Manager + DPAPI, Secret Service; the
 //                                          test entries are removed again); Linux against a
 //                                          fake Secret Service (tools/platshared/secret_bus.py)
+//   plattest --test docs-bus               (t_docs.rs, Linux) plat::persistent_name: lasting
+//                                          document IDs of the documents portal, against a fake
+//                                          (tools/platshared/docs_bus.py) or the real portal
 //   plattest --test dirs                   (t_dirs.rs) the user's folders (known folders, XDG user
 //                                          dirs in a scratch HOME), log_dir, logs:// and
 //                                          documents://, $DOCUMENTS ... in a manifest (not in "all")
@@ -173,6 +176,7 @@ mod t_permask;
 mod t_plugperm;
 mod t_vfs;
 mod t_content;
+mod t_docs;
 mod t_portal;
 mod t_print;
 mod t_reg;
@@ -321,6 +325,7 @@ fn plattest() -> i32 {
         Some("plugperm") => t_plugperm::t_plugperm,    // the rights of plugins (not in "all")
         Some("vfs") => t_vfs::t_vfs,                   // vfs: mounts, bundles, overlays, zip, app folders
         Some("content") => t_content::t_content,       // Android's content:// names against a provider in memory
+        Some("docs-bus") => t_docs::t_docs_bus,        // Linux: lasting documents (tools/platshared/docs_bus.py)
         Some("dirs") => t_dirs::t_dirs,                // user folders, log folder, their schemes and variables
         Some("trash") => t_trash::t_trash,             // plat::trash (Windows: one file into the recycle bin)
         Some("instance") => t_instance::t_instance,    // single instance: claim, forwarding

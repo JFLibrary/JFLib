@@ -11,7 +11,10 @@ as well as the folder mounts. `plat::fs` (`stat`, `read_dir`, links, times ...) 
 names too. Names without a scheme stay paths of the OS, or of the browser's virtual files.
 The same code runs on Windows, Linux, the web and Android; on Android the app's folders are
 real files of its internal storage, and the documents the user picks in the system's picker
-are `content://` names ([below](#android-internal-storage-and-content)).
+are `content://` names ([below](#android-internal-storage-and-content)). In a browser with the
+File System Access API the user's own files are `/handles/ID/NAME`, written back to the file
+([below](#the-browser-the-users-own-files)); in a Flatpak the documents portal's files open
+again after a restart ([below](#flatpak-the-documents-portal)).
 
 ```rust
 let logo = plat::read_file("app://images/logo.png");          // built into the program
@@ -37,7 +40,9 @@ plat::trash("documents://old.txt");                          // into the recycle
 | Mounting at start-up | [`lib/plat/boot.rs`](../lib/plat/boot.rs): `ui::boot` ([`lib/ui/perm.rs`](../lib/ui/perm.rs), called by `ui::main!`) and `rt::main!` ([`lib/rt/boot.rs`](../lib/rt/boot.rs)) |
 | `content://` (Android's documents), its host | [`lib/plat/content.rs`](../lib/plat/content.rs), [`lib/plat/android_host.rs`](../lib/plat/android_host.rs), [`android/GalleryHost.java`](../android/GalleryHost.java) |
 | Android's internal storage | [`lib/plat/android_files.rs`](../lib/plat/android_files.rs) |
-| Tests | `plattest --test content` ([`t_content.rs`](../apps/plattest/t_content.rs): `content://` against a storage provider in memory), on an emulator [`apps/androidGallery/tests/android_files.py`](../apps/androidGallery/tests/android_files.py), `plattest --test vfs` ([`t_vfs.rs`](../apps/plattest/t_vfs.rs): also streams, `plat::fs` on mounts, whiteouts), `--test async` ([`t_async.rs`](../apps/plattest/t_async.rs): `plat::aio` and `AtomicFile` on OS files, `mem://`, a folder mount and a gated mount), `--test dirs` ([`t_dirs.rs`](../apps/plattest/t_dirs.rs)), `--test trash` ([`t_trash.rs`](../apps/plattest/t_trash.rs)), [`apps/permtest`](../apps/permtest/main.rs) with its `assets/`, [`apps/permcli`](../apps/permcli/src/main.rs) (`app://` in console programs and `BINS`) |
+| The browser's files of the user (`/handles/`) | [`web/handles.js`](../web/handles.js), [`web/loader.js`](../web/loader.js), [`lib/plat/web.rs`](../lib/plat/web.rs), [`lib/plat/web_files.rs`](../lib/plat/web_files.rs) |
+| Flatpak's documents portal, `plat::persistent_name` | [`lib/plat/linux_docs.rs`](../lib/plat/linux_docs.rs) over [`lib/plat/linux_dbus.rs`](../lib/plat/linux_dbus.rs) |
+| Tests | `plattest --test content` ([`t_content.rs`](../apps/plattest/t_content.rs): `content://` against a storage provider in memory, the name cache, the journal), on an emulator [`apps/androidGallery/tests/android_files.py`](../apps/androidGallery/tests/android_files.py), in Chromium and Firefox [`apps/androidGallery/tests/files_web.mjs`](../apps/androidGallery/tests/files_web.mjs) (`/handles/`), in WSL [`tools/platshared/docs_bus.py`](../tools/platshared/docs_bus.py) (`plattest --test docs-bus`: a fake documents portal, `--real` xdg-document-portal and xdg-desktop-portal's file chooser for an app in a sandbox), `plattest --test vfs` ([`t_vfs.rs`](../apps/plattest/t_vfs.rs): also streams, `plat::fs` on mounts, whiteouts), `--test async` ([`t_async.rs`](../apps/plattest/t_async.rs): `plat::aio` and `AtomicFile` on OS files, `mem://`, a folder mount and a gated mount), `--test dirs` ([`t_dirs.rs`](../apps/plattest/t_dirs.rs)), `--test trash` ([`t_trash.rs`](../apps/plattest/t_trash.rs)), [`apps/permtest`](../apps/permtest/main.rs) with its `assets/`, [`apps/permcli`](../apps/permcli/src/main.rs) (`app://` in console programs and `BINS`) |
 
 ## Built-in schemes
 
@@ -245,7 +250,7 @@ files list keeps them).
 
 | Name | What it is | What works |
 | --- | --- | --- |
-| `content://AUTH/document/ID` | one document (open, save as) | `read_file`, `write_file` (in place, truncated), `File` streams, `AtomicFile` (in place), `vfs::stat`, `display_name` |
+| `content://AUTH/document/ID` | one document (open, save as) | `read_file`, `write_file` (in place, through the journal, read back; below), `File` streams, `AtomicFile` (the same write at commit), `vfs::stat`, `display_name` |
 | `content://AUTH/tree/ID` | a folder the user chose | `dir_list`, `file_exists`, `display_name`; never deleted |
 | `content://AUTH/tree/ID/a/b.txt` | below it, by display names (each looked up among the children) | everything above, plus `mkdir`, `delete` (files, empty folders), `rename` inside a folder (replacing: the target goes first, since providers pick `name (1)`), to another folder (copy, then delete; files only) |
 | `content://AUTH/tree/ID/document/ID2` | Android's own form of a document in a tree | as a single document |
@@ -264,6 +269,118 @@ Without a manifest every granted document is reachable; with one, `content://` n
 `fs.user` ([PERMISSIONS.md](PERMISSIONS.md)) -- Android itself lets the app open only what the
 user granted. `plat::content::ContentFs` takes any `DocHost`, so the name logic is tested on
 the desktop against a provider in memory (`plattest --test content`).
+
+**Writing a document.** SAF cannot replace a document by renaming another one over it (a
+provider picks `name (1)`, and a new document gets a new ID, so the grants and the names the
+app keeps would no longer reach it). `write_file` and `AtomicFile`'s commit therefore write the
+document in place, as safely as SAF allows:
+
+1. the new bytes and the document's URI go into the app's journal first:
+   `data://.content-journal/<hash>.jw`, written atomically on internal storage;
+2. the document is opened truncated (`"rwt"`, else `"wt"`), written, synced, then read back and
+   compared with the bytes (size and contents; a second try if that fails);
+3. the journal file goes. A crash, a killed process or a failed write leave it: the next time
+   the process uses `content://`, `ContentFs::recover` writes it into the document again (if
+   the document still exists and is granted; otherwise the copy is dropped).
+
+The document keeps its URI, so the grants stay valid. What remains: while the write runs, other
+apps can see a part; a crash leaves a part until the app starts again; a `File` stream opened
+for writing writes in place without the journal (opening it, deleting or renaming the
+document drops a pending copy). On the desktop `ContentFs::with_journal(dir)` takes any folder
+(`plattest --test content` uses `mem://`).
+
+**Names below a tree** are cached: each name keeps its document's URI once a walk or a listing
+found it, so a name costs one query of the document itself instead of one listing per folder
+(`plat::content::listings()` counts the listings, for tests). A cached document that no longer
+answers (gone, renamed, no longer a file or folder) is walked again from the nearest cached
+folder, a name missing below a cached folder only counts once that folder still answers to
+its name, otherwise the walk starts at the tree's root. `mkdir`, `write`, `delete` and `rename`
+through the provider keep the cache right; a change the provider reports (a `ContentObserver`
+on its authority, registered when the app first lists a tree: `DocHost::generation`) empties
+it, and an entry is used for `CACHE_TTL_US` (60 s) at most. A folder another app moved
+elsewhere (with a stable document ID) can stay cached until then.
+
+<a id="the-browser-the-users-own-files"></a>
+
+## The browser: the user's own files
+
+Chromium has the File System Access API; the host ([`web/handles.js`](../web/handles.js),
+[`web/loader.js`](../web/loader.js)) tells the app so at start, and then:
+
+- `ui.filedlg` / `plat::file_dialog` with `FD_OPEN` or `FD_SAVE` shows `showOpenFilePicker` /
+  `showSaveFilePicker` (the dialog's types, the suggested name; a `/handles/` path as `path`
+  starts beside that file) and answers later (`FD_PENDING`, `plat::file_dialog_poll`). The
+  answer is `/handles/ID/NAME`, a path of the browser's virtual files bound to the handle of
+  the chosen file; an opened file is read in before the answer. `FD_FOLDER` keeps the
+  library's own dialog. `plat::web::pick_file` uses the open picker too (the files arrive as
+  drops at `/handles/` paths).
+- Every change of such a file is written back to the user's file: `write_file`, `AtomicFile`'s
+  commit, `rename` onto it, a `File` stream's `sync` and drop each start a `persist` request
+  for the revision, which the host writes with `createWritable` (the browser writes a swap file
+  and puts it in place at `close()`: a failed or interrupted write leaves the file as it was).
+  `plat::web::persist(path)` returns that request (`Durable` once written; `Denied` when the user
+  refused the permission). Writes go one after the other per file. Imports are never written
+  back.
+- The handles are kept in IndexedDB (`jfgui-handles-v1`, at most 256 per app; the same file
+  chosen again keeps its path). After a reload the host reads the remembered files whose
+  permission the browser still grants (at most 64 MiB in all) before the app starts, so
+  `read_file` and the recent-files list (`ui.recent_add`, kept in the browser's storage) work
+  at once. Browsers ask again after a reload or a restart: `plat::web::reopen(path)`, called
+  from the user's click or key (the browser wants a gesture), asks for the permission, reads
+  the file in and completes (`Completed`, `Denied`, `Failed` for a file that is gone,
+  `Unsupported` for an unknown path). Writing back asks for write permission the first time
+  (from the gesture that saved).
+
+```rust
+// a file of the recent list after a reload
+if plat::file_exists(&path) != 1 {
+    self.reopening = plat::web::reopen(&path);          // from the click on the entry
+}
+// later frames: request_status(id) == Some(Completed) -> plat::read_file(&path)
+plat::write_file(&path, &bytes);                        // written back into the user's file
+```
+
+With a manifest, `/handles/` paths need `fs.user` (no grant needed after a reload). Firefox
+and Safari have no pickers: `file_dialog` returns -1, `ui.filedlg` shows the library's own
+dialog over the virtual files (`/documents` ..., kept with `persist` in IndexedDB),
+`pick_file` uses the `<input type=file>` copy into `/imports`, and the user gets a file out
+with `plat::web::download(path)` (save as / download). Tested with
+[`files_web.mjs`](../apps/androidGallery/tests/files_web.mjs): Chromium with the pickers
+stubbed to hand out files of the origin private file system (open, save as, save over the opened
+file, a failed write, a reload with the permission granted and with "prompt" granted / denied,
+a cancelled picker), Firefox's own dialog.
+
+<a id="flatpak-the-documents-portal"></a>
+
+## Flatpak: the documents portal
+
+Inside a Flatpak sandbox the files the user hands the app are documents of the documents
+portal: OS paths below its FUSE mount, `$XDG_RUNTIME_DIR/doc/ID/NAME`. The portal's file dialog
+(`linux_portal.rs`) exports the chosen file as a lasting document: the ID stays with the app's
+permissions across log-outs and restarts (checked with xdg-desktop-portal 1.18: the document
+is still there after the document portal restarted). With `fs.user` every path below the
+mount is allowed without a grant inside the sandbox (the sandbox shows only what was given to
+the app), so a file from the recent-files list opens again after a restart without a dialog.
+
+`plat::persistent_name(path)` returns the name to keep for a chosen file; `ui.recent_add` keeps
+that one. For a document below the mount it asks the portal
+(`org.freedesktop.portal.Documents.Add` with an `O_PATH` descriptor, `reuse_existing` and
+`persistent`; [`linux_docs.rs`](../lib/plat/linux_docs.rs) over the library's own bus client,
+which now passes descriptors: `Conn::session_fds`, `Msg::fds`, `Value::H`) and returns
+`<mount>/<ID>/<NAME>` of its answer. Where the portal can reach the real file this is a lasting
+document of it; for a descriptor on its own mount the portal answers that document's own ID
+(xdg-document-portal 1.18, Documents version 4: it refuses `reuse_existing` false and has no
+`GetHostPaths`), so inside the sandbox the name stays what the file dialog gave. Every other
+name comes back unchanged.
+
+Tested in WSL by [`docs_bus.py`](../tools/platshared/docs_bus.py): a fake portal on a private bus
+(the call, the descriptor, the flags, one bus connection only for document paths), and
+`--real` in a private session (`dbus-run-session`, scratch `XDG_RUNTIME_DIR` and
+`XDG_DATA_HOME`): xdg-document-portal's answers, a lasting and a session document across a
+restart of the portal, and plattest inside a `bwrap` sandbox with a `/.flatpak-info` choosing a
+file through xdg-desktop-portal's file chooser (a fake chooser behind it), reading it with a
+manifest of `fs.user` only, then -- after the restart -- reading and writing it again without a
+dialog.
 
 ## Whiteouts in an overlay
 
@@ -337,17 +454,25 @@ providers touch no OS files.
 - Whiteouts work in the top layer of one `Overlay`; a lower layer's own markers mean nothing to
   it. Renaming a folder that a lower layer has fails.
 - Document handles:
-  - Flatpak's document portal: the portal's file dialog (`linux_portal.rs`) returns paths
-    below `/run/user/UID/doc/`, which are ordinary OS paths and work with `fs.user` like any
-    chosen file. A provider of their own is not needed for that, and none exists for
-    handles kept across runs (the portal's document IDs).
-  - Android's `content://`: writes are not atomic (SAF cannot rename over a document; a
-    crash while writing can leave a part), `rename` over an existing file deletes it first,
-    names below a tree are looked up anew on every call (no cache: each segment is one query),
-    `FileLock` holds inside the process only, no times can be set, and the picker answers only
-    while the app's process lives (one the system ended meanwhile drops the answer). Tested on
-    the emulator against Android's storage provider (`android_files.py`); providers that
-    stream through pipes only through the code path, not on a device.
-  - The browser: the host copies a chosen file into `/imports` before the request completes
-    (`pick_file`); writing back to the user's own file (File System Access API) needs a host
-    request that does not exist yet.
+  - Flatpak's documents portal: files of "Open with" (flatpak's file forwarding) and of the
+    portal's file transfer are documents for the session only; the app cannot make them
+    lasting (the portal answers a descriptor on its mount with the document's own ID), so after
+    a log-out they need the dialog again. Folders the portal exports and files inside them are
+    not asked about (`persistent_name` leaves them). Tested against the real portals in a
+    private session and a `bwrap` sandbox, not with an installed Flatpak bundle (`flatpak run`).
+  - Android's `content://`: a write is in place (journal and read-back above; others see a
+    part while it runs), `rename` over an existing file deletes it first, a cached folder that
+    another app moved elsewhere stays cached until a reported change or `CACHE_TTL_US`,
+    changes of providers that report none are noticed only by the check of each document,
+    `FileLock` holds inside the
+    process only, no times can be set, and the picker answers only while the app's process
+    lives (one the system ended meanwhile drops the answer). Tested on the emulator against
+    Android's storage provider (`android_files.py`: saved over, cached names, a reported change,
+    a write interrupted after six bytes and finished by the next start); providers that stream
+    through pipes only through the code path, not on a device.
+  - The browser: only Chromium has the pickers and handles (Firefox, Safari: the own dialog,
+    `/imports`, downloads); `FD_FOLDER` and dropped files (`getAsFileSystemHandle`) are not bound
+    to handles; a remembered file needs `reopen` from a gesture when the browser asks again; at
+    most 64 MiB of remembered files are read in at the start, larger ones through `reopen`.
+    The real pickers are not automated (`files_web.mjs` stubs them with files of the origin
+    private file system).

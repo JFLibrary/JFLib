@@ -21,7 +21,9 @@
 //            config:// data:// cache:// logs:// (the app's folders), documents:// and the
 //            other user folders, mem://, mounted providers
 //            (MemFs, DirFs, Overlay, Sub, Bundle); data_dir(), cache_dir()   (vfs.rs);
-//            display_name(path); Android content:// (ContentFs, DocHost)     (content.rs)
+//            display_name(path); Android content:// (ContentFs, DocHost)     (content.rs);
+//            persistent_name(path): a chosen file's name that lasts across restarts (Flatpak's
+//            documents portal: linux_docs.rs)
 //   secret:  secret_set / secret_get / secret_delete / secret_available: passwords, tokens and
 //            keys in the system's store (Credential Manager + DPAPI, Secret Service; needs
 //            `secrets` in the manifest)                                        (secret.rs)
@@ -268,9 +270,31 @@ pub struct Date {
     pub wday: u16, // 0 = Sunday
 }
 
+/// The name under which a file the user chose stays reachable after a restart, for a list of
+/// recent files or a session (ui.recent_add keeps this one).  A document of Flatpak's
+/// documents portal (`$XDG_RUNTIME_DIR/doc/ID/NAME`) is asked for its lasting form
+/// (`Documents.Add`, persistent; linux_docs.rs): `<mount>/<ID>/<NAME>` of the portal's answer.
+/// Where the portal reaches the real file that is a lasting document of it; for a document
+/// of its own mount the portal answers that document's own ID, so inside the sandbox the name
+/// stays as the dialog gave it (the portal's file dialog makes lasting documents, "Open with"
+/// session ones).  Every other name comes back unchanged: Android keeps the grant of a
+/// `content://` document and the browser the handle of a `/handles/` file when the user
+/// chooses it, and OS paths need nothing.  The name must be readable under the app's
+/// permissions.
+pub fn persistent_name(name: &str) -> String {
+    #[cfg(target_os = "linux")]
+    if crate::policy::fs_allowed(name, crate::policy::FS_READ) {
+        if let Some(p) = crate::linux_docs::persistent(name) {
+            return p;
+        }
+    }
+    String::from(name)
+}
+
 /// The answer of a system file dialog that answers later (file_dialog -> FD_PENDING: only
-/// Android's picker; web.rs): None while it is open, then once (1 chosen / 0 not, index, path).
-#[cfg(not(target_os = "android"))]
+/// Android's picker and the browser's; web.rs): None while it is open, then once (1 chosen /
+/// 0 not, index, path).
+#[cfg(not(any(target_os = "android", target_arch = "wasm32")))]
 pub fn file_dialog_poll() -> Option<(i32, u32, String)> {
     None
 }

@@ -3,10 +3,13 @@
 // portal dialogs keep their own client in linux_portal.rs):
 // $DBUS_SESSION_BUS_ADDRESS (unix:path= / unix:abstract=, else /run/user/<uid>/bus), the system
 // bus or another bus address, SASL EXTERNAL, Hello; little-endian messages built from and
-// parsed into Value trees; method calls, returns, errors and signals, no file descriptors.  One
-// owner at a time (its thread).
+// parsed into Value trees; method calls, returns, errors and signals; file descriptors are sent
+// (Msg::fds, Value::H; a connection made with Conn::session_fds), never received.  One owner at
+// a time (its thread).
 //
 //   Conn::session() -> Option<Conn>     connected and named (Conn::unique)
+//   Conn::session_fds() -> Option<Conn> the same with descriptor passing negotiated
+//                                       (Conn::fds_ok: the bus agreed)
 //   Conn::connect(address) -> Option<Conn>   the same for a bus address (the AT-SPI2 bus)
 //   Conn::system() -> Option<Conn>      the same on the system bus (logind; linux_life.rs)
 //   Conn::send(&Msg) -> serial          Conn::read(timeout_ms) -> Option<Msg> (None: nothing yet
@@ -29,7 +32,9 @@ const SYS_CLOSE: usize = 3;
 const SYS_POLL: usize = 7;
 const SYS_SOCKET: usize = 41;
 const SYS_CONNECT: usize = 42;
+const SYS_SENDMSG: usize = 46;
 const SYS_GETUID: usize = 102;
+const MSG_NOSIGNAL: usize = 0x4000;
 const MSG_MAX: usize = 1 << 20;
 
 pub(crate) const T_CALL: u8 = 1;
@@ -48,6 +53,8 @@ pub(crate) enum Value {
     U(u32),
     /// int64 (only sent: received 64-bit integers are read as U)
     X(i64),
+    /// a file descriptor: the index into the message's fds (only sent: received ones read as U)
+    H(u32),
     D(f64),
     S(String),
     O(String),
@@ -67,6 +74,7 @@ impl Value {
             Value::I(_) => String::from("i"),
             Value::U(_) => String::from("u"),
             Value::X(_) => String::from("x"),
+            Value::H(_) => String::from("h"),
             Value::D(_) => String::from("d"),
             Value::S(_) => String::from("s"),
             Value::O(_) => String::from("o"),
@@ -124,6 +132,8 @@ pub(crate) struct Msg {
     pub(crate) dest: String,
     pub(crate) sender: String,
     pub(crate) body: Vec<Value>,
+    /// descriptors sent with the message (Value::H indexes them; the caller keeps them open)
+    pub(crate) fds: Vec<i32>,
 }
 
 impl Msg {
@@ -174,7 +184,7 @@ fn put(b: &mut Vec<u8>, v: &Value) {
             pad(b, 4);
             b.extend_from_slice(&x.to_le_bytes());
         }
-        Value::U(x) => {
+        Value::U(x) | Value::H(x) => {
             pad(b, 4);
             b.extend_from_slice(&x.to_le_bytes());
         }
@@ -383,6 +393,9 @@ fn encode(m: &Msg, serial: u32) -> Vec<u8> {
     if !sig.is_empty() {
         field(8, Value::G(sig));
     }
+    if !m.fds.is_empty() {
+        field(9, Value::U(m.fds.len() as u32));
+    }
     let mut out = alloc::vec![b'l', m.typ, m.flags, 1];
     out.extend_from_slice(&(body.len() as u32).to_le_bytes());
     out.extend_from_slice(&serial.to_le_bytes());
@@ -452,6 +465,8 @@ pub(crate) struct Conn {
     rbuf: Vec<u8>,
     pub(crate) unique: String,
     pub(crate) broken: bool,
+    /// the bus agreed to descriptor passing (Conn::session_fds)
+    pub(crate) fds_ok: bool,
 }
 
 impl Drop for Conn {
@@ -506,22 +521,28 @@ impl Conn {
     /// connect to the session bus, authenticate, say Hello
     pub(crate) fn session() -> Option<Conn> {
         let (path, abstract_) = bus_address()?;
-        Conn::open(&path, abstract_)
+        Conn::open(&path, abstract_, false)
+    }
+
+    /// the session bus with descriptor passing (NEGOTIATE_UNIX_FD; fds_ok when it agreed)
+    pub(crate) fn session_fds() -> Option<Conn> {
+        let (path, abstract_) = bus_address()?;
+        Conn::open(&path, abstract_, true)
     }
 
     /// the same on the system bus (logind)
     pub(crate) fn system() -> Option<Conn> {
         let (path, abstract_) = system_address()?;
-        Conn::open(&path, abstract_)
+        Conn::open(&path, abstract_, false)
     }
 
     /// the same for a bus address ("unix:path=..." / "unix:abstract=...")
     pub(crate) fn connect(address: &str) -> Option<Conn> {
         let (path, abstract_) = parse_address(address)?;
-        Conn::open(&path, abstract_)
+        Conn::open(&path, abstract_, false)
     }
 
-    fn open(path: &[u8], abstract_: bool) -> Option<Conn> {
+    fn open(path: &[u8], abstract_: bool, fds: bool) -> Option<Conn> {
         if path.len() + 1 >= 108 {
             return None;
         }
@@ -535,7 +556,7 @@ impl Conn {
         if fd < 0 {
             return None;
         }
-        let mut c = Conn { fd: fd as i32, serial: 0, rbuf: Vec::new(), unique: String::new(), broken: false };
+        let mut c = Conn { fd: fd as i32, serial: 0, rbuf: Vec::new(), unique: String::new(), broken: false, fds_ok: false };
         // SAFETY: the address record lives during the call.
         if unsafe { syscall6(SYS_CONNECT, fd as usize, addr.as_ptr() as usize, len, 0, 0, 0) } < 0 {
             return None;
@@ -548,7 +569,16 @@ impl Conn {
             return None;
         }
         let line = c.read_line(3000)?;
-        if !line.starts_with(b"OK ") || !c.write_all(b"BEGIN\r\n") {
+        if !line.starts_with(b"OK ") {
+            return None;
+        }
+        if fds {
+            if !c.write_all(b"NEGOTIATE_UNIX_FD\r\n") {
+                return None;
+            }
+            c.fds_ok = c.read_line(3000)?.starts_with(b"AGREE_UNIX_FD");
+        }
+        if !c.write_all(b"BEGIN\r\n") {
             return None;
         }
         let hello = c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "Hello", Vec::new()))?;
@@ -611,11 +641,42 @@ impl Conn {
         }
     }
 
-    /// send a message -> its serial (None: the connection broke)
+    /// send a message -> its serial (None: the connection broke, or descriptors without
+    /// fds_ok)
     pub(crate) fn send(&mut self, m: &Msg) -> Option<u32> {
+        if !m.fds.is_empty() && (!self.fds_ok || m.fds.len() > 16) {
+            return None;
+        }
         self.serial = self.serial.wrapping_add(1).max(1);
         let s = self.serial;
-        self.write_all(&encode(m, s)).then_some(s)
+        let b = encode(m, s);
+        if m.fds.is_empty() {
+            return self.write_all(&b).then_some(s);
+        }
+        // the descriptors ride with the first bytes (SCM_RIGHTS), the rest follows plainly
+        let iov = [b.as_ptr() as usize, b.len()];
+        let mut ctl = [0u8; 16 + 16 * 4];
+        let len = 16 + 4 * m.fds.len();
+        ctl[..8].copy_from_slice(&(len as u64).to_le_bytes()); // cmsg_len = CMSG_LEN(4 n)
+        ctl[8..12].copy_from_slice(&1u32.to_le_bytes()); // SOL_SOCKET
+        ctl[12..16].copy_from_slice(&1u32.to_le_bytes()); // SCM_RIGHTS
+        for (i, fd) in m.fds.iter().enumerate() {
+            ctl[16 + 4 * i..20 + 4 * i].copy_from_slice(&fd.to_le_bytes());
+        }
+        // msghdr: name, namelen, iov, iovlen, control, controllen (CMSG_SPACE), flags
+        let mh = [0usize, 0, iov.as_ptr() as usize, 1, ctl.as_ptr() as usize, (len + 7) & !7, 0];
+        loop {
+            // SAFETY: a msghdr over live buffers of this frame.
+            let n = unsafe { syscall6(SYS_SENDMSG, self.fd as usize, mh.as_ptr() as usize, MSG_NOSIGNAL, 0, 0, 0) };
+            if n == -4 {
+                continue;
+            }
+            if n <= 0 {
+                self.broken = true;
+                return None;
+            }
+            return self.write_all(&b[n as usize..]).then_some(s);
+        }
     }
 
     /// the next message, waiting up to ms (-1: as long as it takes)

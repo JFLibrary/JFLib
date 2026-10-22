@@ -4,6 +4,12 @@
 // (android_files.rs), the documents of other apps as content:// names, the system clipboard and
 // the persisted grants (android_host.rs), the system's file picker behind file_dialog
 // (FD_PENDING, file_dialog_poll), download() as "save a copy" through the picker.
+// The browser with the File System Access API (Chromium; the host says so, HOST_HANDLES):
+// file_dialog shows the system's pickers too and answers later; the chosen file is the user's
+// own, bound to a path /handles/ID/NAME (web/handles.js keeps the handle in IndexedDB), and every
+// change of it is written back (write_back: the request of persist); reopen() reads it again
+// after a reload.  Without the API: the library's own dialog over the virtual files, export
+// through download().
 
 use crate::{Capabilities, Date, Event};
 use alloc::{boxed::Box, string::String, vec::Vec};
@@ -26,6 +32,11 @@ pub use files::*;
 pub(crate) mod android_host;
 #[cfg(target_os = "android")]
 pub use android_host::{content_fs, content_grants, content_release, jfgui_reply, AndroidDocs};
+// a host import: the bytes the host already has (never written back)
+#[cfg(target_os = "android")]
+use files::write_file_raw as import_raw;
+#[cfg(not(target_os = "android"))]
+use files::store as import_raw;
 #[path = "web_windows.rs"]
 mod windows;
 pub use windows::*;
@@ -88,6 +99,12 @@ pub const REQUEST_FILE_DIALOG: u32 = 12;
 /// 2 delete), app, service, account and for set the value, each as u32 length + bytes; the
 /// host encrypts and stores it in order and completes with 2, or an error
 pub const REQUEST_SECRET: u32 = 13;
+/// (browser) read a file of the user's own (/handles/..) again: the path (UTF-8); the host asks
+/// for the permission the handle needs (from the user's gesture), imports the file and
+/// completes with 2
+pub const REQUEST_REOPEN: u32 = 20;
+// jfgui_capabilities: the host has the File System Access API (pickers, handles)
+const HOST_HANDLES: u32 = 1 << 16;
 
 /// Completion state of one browser operation; durable and exported are distinct outcomes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -117,13 +134,13 @@ struct Request {
     status: RequestStatus,
     file: Option<(String, u64)>,
     detached: bool,
-    // (Android) the picker's answer: the chosen content:// URI
-    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    // the picker's answer: the chosen content:// URI / /handles/ path
     result: Option<String>,
 }
 static REQUESTS: SpinLock<Vec<Request>> = SpinLock::new(Vec::new());
 static NEXT_REQUEST: AtomicU32 = AtomicU32::new(1);
 static CAP_EXTRA: AtomicU32 = AtomicU32::new(0);
+static HANDLES: AtomicBool = AtomicBool::new(false);
 static ARGS: SpinLock<Vec<String>> = SpinLock::new(Vec::new());
 static ENV: SpinLock<Vec<(String, String)>> = SpinLock::new(Vec::new());
 static INBOX: SpinLock<Vec<u8>> = SpinLock::new(Vec::new());
@@ -235,10 +252,38 @@ fn file_request(kind: u32, path: &str) -> Option<u32> {
     bytes.extend_from_slice(&data);
     request(kind, &bytes, Some((path, revision)))
 }
-/// Request durable origin storage for the current virtual-file revision.
+/// Request durable origin storage for the current virtual-file revision.  A file of the user's
+/// own (/handles/.., chosen in the system's picker) is written back to that file instead
+/// (Durable once the browser closed the write); its change already started that request, which
+/// is returned while it is pending or done.
 #[cfg(not(target_os = "android"))]
 pub fn persist(path: &str) -> Option<u32> {
+    if let Some(file) = files::revision(path).filter(|(p, _)| files::bound(p)) {
+        let requests = REQUESTS.lock();
+        let same = requests.iter().rev().find(|r| r.kind == REQUEST_PERSIST && r.file.as_ref() == Some(&file));
+        if let Some(r) = same.filter(|r| matches!(r.status, RequestStatus::Pending | RequestStatus::Durable)) {
+            return Some(r.id);
+        }
+    }
     file_request(REQUEST_PERSIST, path)
+}
+/// (web_files.rs) a file of the user's own changed: written back (once per revision)
+#[cfg(not(target_os = "android"))]
+pub(super) fn write_back(path: &str) {
+    let _ = persist(path);
+}
+/// Read a file of the user's own (/handles/.., chosen in the system's picker before) again,
+/// e.g. after a reload: the host asks for the permission the browser wants again (call it from
+/// the user's click or key), imports the file's current bytes and completes (Completed; Denied,
+/// Failed when the file is gone, Unsupported without such a file).  None: refused by the
+/// permissions or no request slot.
+#[cfg(not(target_os = "android"))]
+pub fn reopen(path: &str) -> Option<u32> {
+    let p = files::normal(path)?;
+    if !files::bound(&p) || !crate::policy::fs_allowed(&p, crate::policy::FS_READ) {
+        return None;
+    }
+    request(REQUEST_REOPEN, p.as_bytes(), None)
 }
 /// Android: the file is on internal storage already; its data is synced (fsync) and the
 /// request is Durable (Failed for a missing file) at once.
@@ -441,10 +486,21 @@ pub fn wait_events(_deadline_us: u64, on_event: &mut dyn FnMut(&Event)) -> u32 {
 pub fn read_stdin(_bytes: &mut [u8]) -> Result<usize, u32> {
     Err(38)
 }
-/// The browser uses the shared virtual file dialog; its native synchronous picker is unavailable.
+/// The browser: with the File System Access API (Chromium) the system's pickers --
+/// FD_OPEN showOpenFilePicker, FD_SAVE showSaveFilePicker (the suggested name from path, the
+/// types from the extensions; a /handles/.. path starts beside that file).  They answer later:
+/// (FD_PENDING, 0) now, file_dialog_poll() once the user is done; the answer is a path
+/// /handles/ID/NAME bound to the chosen file (opened: imported already), whose changes are
+/// written back.  One picker at a time ((0, 0) while one is open).  FD_FOLDER and browsers
+/// without the API: (-1, 0), the library's own dialog over the virtual files.
 #[cfg(not(target_os = "android"))]
-pub fn file_dialog(_flags: u32, _path: &mut String, _extensions: &[&str]) -> (i32, u32) {
-    (-1, 0)
+pub fn file_dialog(flags: u32, path: &mut String, extensions: &[&str]) -> (i32, u32) {
+    if !HANDLES.load(Ordering::Relaxed) || flags & crate::FD_FOLDER != 0 {
+        return (-1, 0);
+    }
+    let name = String::from(path.rsplit(['/', '\\']).next().unwrap_or(""));
+    let start = files::normal(path).filter(|p| files::bound(p)).unwrap_or_default();
+    dialog_request(flags, &name, &start, extensions)
 }
 /// Android: the system's picker (Storage Access Framework) -- FD_OPEN ACTION_OPEN_DOCUMENT,
 /// FD_SAVE ACTION_CREATE_DOCUMENT (the suggested name from path, the type of the selected
@@ -454,15 +510,6 @@ pub fn file_dialog(_flags: u32, _path: &mut String, _extensions: &[&str]) -> (i3
 /// call while one is open answers (0, 0).  (-1, 0) when the host has no picker.
 #[cfg(target_os = "android")]
 pub fn file_dialog(flags: u32, path: &mut String, extensions: &[&str]) -> (i32, u32) {
-    let mut slot = DIALOG.lock();
-    if let Some(id) = *slot {
-        if request_status(id) == Some(RequestStatus::Pending) {
-            return (0, 0);
-        }
-        forget_request(id);
-    }
-    let mut bytes = Vec::new();
-    bytes.extend_from_slice(&flags.to_le_bytes());
     // the suggested name and where the picker starts: a content:// name -> its document (save
     // as: a new name in a chosen folder -> that folder), else the name's last segment
     let (mut name, mut start) = (String::from(path.rsplit(['/', '\\']).next().unwrap_or("")), String::new());
@@ -478,7 +525,22 @@ pub fn file_dialog(flags: u32, path: &mut String, extensions: &[&str]) -> (i32, 
             start = path.clone(); // an Android URI the app holds no grant for yet: the picker may know it
         }
     }
-    for s in [&name, &start] {
+    dialog_request(flags, &name, &start, extensions)
+}
+// the request of file_dialog: u32 flags, the suggested name, where the picker starts, u32
+// count, the extensions (the selected entry's first) -> FD_PENDING, or (0, 0) while a picker is
+// open, (-1, 0) without one
+fn dialog_request(flags: u32, name: &str, start: &str, extensions: &[&str]) -> (i32, u32) {
+    let mut slot = DIALOG.lock();
+    if let Some(id) = *slot {
+        if request_status(id) == Some(RequestStatus::Pending) {
+            return (0, 0);
+        }
+        forget_request(id);
+    }
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(&flags.to_le_bytes());
+    for s in [name, start] {
         bytes.extend_from_slice(&(s.len() as u32).to_le_bytes());
         bytes.extend_from_slice(s.as_bytes());
     }
@@ -508,8 +570,8 @@ pub fn file_dialog(flags: u32, path: &mut String, extensions: &[&str]) -> (i32, 
     (crate::FD_PENDING, 0)
 }
 /// The answer of the picker file_dialog opened: None while it is open (or there is none),
-/// then once (1, 0, the content:// name) or (0, 0, "") for cancelled / failed.
-#[cfg(target_os = "android")]
+/// then once (1, 0, the content:// name / the /handles/ path) or (0, 0, "") for cancelled /
+/// failed.
 pub fn file_dialog_poll() -> Option<(i32, u32, String)> {
     let mut slot = DIALOG.lock();
     let id = (*slot)?;
@@ -525,8 +587,7 @@ pub fn file_dialog_poll() -> Option<(i32, u32, String)> {
         _ => (0, 0, String::new()),
     })
 }
-// (Android) the request of the open picker
-#[cfg(target_os = "android")]
+// the request of the open picker
 static DIALOG: SpinLock<Option<u32>> = SpinLock::new(None);
 /// Native printing is disabled until a browser print adapter has been connected.
 pub fn print(_job: &mut crate::PrintJob<'_>) -> i32 {
@@ -847,6 +908,7 @@ pub extern "C" fn jfgui_agent(enabled: u32) -> u32 {
 pub extern "C" fn jfgui_capabilities(bits: u32) {
     let allowed = crate::CAP_PERSISTENT_STORAGE | crate::CAP_CLIPBOARD_TEXT;
     CAP_EXTRA.store(bits & allowed as u32, Ordering::Relaxed);
+    HANDLES.store(bits & HOST_HANDLES != 0, Ordering::Relaxed);
 }
 /// Refresh UTC calendar fields, validated before replacing the last host value.
 #[unsafe(no_mangle)]
@@ -895,7 +957,7 @@ pub extern "C" fn jfgui_import(path_len: u32, total_len: u32, dropped: u32, dura
     let Ok(path) = core::str::from_utf8(path_bytes) else {
         return 0;
     };
-    if !write_file_raw(path, &bytes[path_len as usize..]) {
+    if !import_raw(path, &bytes[path_len as usize..]) {
         return 0;
     }
     if durable != 0 {
@@ -951,13 +1013,14 @@ pub extern "C" fn jfgui_clipboard(format: u32, len: u32) -> u32 {
     clip.push((format, bytes));
     1
 }
-/// (Android) the answer of the system's picker: the inbox holds the chosen content:// URI
+/// The answer of the system's picker: the inbox holds the chosen content:// URI (Android) or
+/// the /handles/ path bound to the chosen file (browser; an opened file was imported first)
 /// (status 2), a negative status as in jfgui_complete (-4 cancelled).  A file_dialog request
-/// keeps the URI for file_dialog_poll; pick_file's becomes a drop (E_DROP).  1 = taken.
-#[cfg(target_os = "android")]
+/// keeps the name for file_dialog_poll; pick_file's becomes a drop (E_DROP).  1 = taken.
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_file_result(id: u32, status: i32, len: u32) -> u32 {
-    let uri = input(len).and_then(|b| String::from_utf8(b).ok()).filter(|u| u.starts_with("content://"));
+    let ours = |u: &String| if cfg!(target_os = "android") { u.starts_with("content://") } else { u.starts_with("/handles/") };
+    let uri = input(len).and_then(|b| String::from_utf8(b).ok()).filter(ours);
     let kind = {
         let mut requests = REQUESTS.lock();
         let Some(r) = requests.iter_mut().find(|r| r.id == id && r.status == RequestStatus::Pending) else {

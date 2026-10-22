@@ -6,7 +6,8 @@
 // GalleryHost.call(kind, byte[]) (android/GalleryHost.java) and copies its answer into the
 // buffer jfgui_reply hands out; null / an exception = None.  The file picker and the export of
 // download() answer later (web.rs: REQUEST_FILE_DIALOG / REQUEST_OPEN / REQUEST_DOWNLOAD,
-// jfgui_file_result).
+// jfgui_file_result).  A provider whose tree the app listed reports changes through
+// jfgui_content_changed (DocHost::generation: content.rs's name cache starts again).
 //
 // Wire (little endian): u32 numbers, i64 times, strings and byte blocks as u32 length + bytes.
 //   CALL_QUERY     uri -> DocInfo, or nothing (missing / not allowed)
@@ -184,11 +185,29 @@ impl DocHost for AndroidDocs {
         let fd = R(&a).u32()? as i32;
         (fd >= 0).then(|| FdStream::new(fd, mode)).flatten().map(|s| Box::new(s) as Box<dyn Stream>)
     }
+    fn generation(&self) -> u64 {
+        CHANGES.load(Ordering::Relaxed)
+    }
 }
 
-/// the provider of content:// (mounted by vfs::route on first use)
+// the changes the providers of listed trees reported (GalleryHost's ContentObserver)
+static CHANGES: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
+
+/// (bridge.c) a provider reported a change of its documents: content.rs's name cache starts again
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_content_changed() {
+    CHANGES.fetch_add(1, Ordering::Relaxed);
+}
+
+/// the provider of content:// (mounted by vfs::route on first use): writes go through a copy
+/// in the app's data folder (.content-journal), and what a crash left there is finished now
 pub fn content_fs() -> Arc<dyn Provider> {
-    Arc::new(ContentFs::new(AndroidDocs))
+    let mut fs = ContentFs::new(AndroidDocs);
+    if let Some(d) = crate::vfs::app_dir(crate::vfs::APP_DATA) {
+        fs = fs.with_journal(&alloc::format!("{d}/.content-journal"));
+    }
+    fs.recover();
+    Arc::new(fs)
 }
 
 /// the documents and folders the app keeps access to across restarts (the system's

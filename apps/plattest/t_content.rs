@@ -3,8 +3,11 @@
 // provider: path-like document IDs (a rename changes the URI), "name (1)" when a name is
 // taken, trees with their own URIs, recursive deletes.  Through the ordinary file functions:
 // names below a chosen folder, single documents, AtomicFile written in place, File streams,
-// rename / move, mkdir / delete, stat and display names; plus vfs::display_name for other
-// names and the file dialog's desktop answers (no picker that answers later, FD_FOLDER).
+// rename / move, mkdir / delete, stat and display names; the name cache (no listing for a
+// known name, checked against the document, emptied when the host reports a change) and the
+// journal of writes (a copy first, read back and compared, an interrupted write finished by
+// recover() in a new provider, as after a restart); plus vfs::display_name for other names and
+// the file dialog's desktop answers (no picker that answers later, FD_FOLDER).
 
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
@@ -12,8 +15,9 @@ use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
-use plat::content::{ContentFs, DocHost, DocInfo, DOC_CREATE, DOC_WRITE};
+use plat::content::{self, ContentFs, DocHost, DocInfo, DOC_CREATE, DOC_WRITE};
 use plat::vfs::{self, Stream};
 use plat::{AtomicFile, FO_READ, FO_RW, FO_WRITE, File};
 use rt::sync::SpinLock;
@@ -23,6 +27,10 @@ use crate::T;
 const AUTH: &str = "fake.docs";
 
 type Data = Arc<SpinLock<Vec<u8>>>;
+
+// the host's change counter (DocHost::generation); a provider that keeps only half of each write
+static GEN: AtomicU64 = AtomicU64::new(0);
+static LOSSY: AtomicBool = AtomicBool::new(false);
 
 // a storage provider in memory: documents by path ("Docs/a.txt"), IDs "root:" + path
 struct Fake {
@@ -116,19 +124,35 @@ impl Stream for MemStream {
             return None;
         }
         let mut g = self.d.lock();
+        let n = buf.len();
+        // (the lossy provider) says it took everything, keeps half
+        let buf = if LOSSY.load(Ordering::Relaxed) { &buf[..n / 2] } else { buf };
         let end = off as usize + buf.len();
         if g.len() < end {
             g.resize(end, 0);
         }
         g[off as usize..end].copy_from_slice(buf);
-        Some(buf.len())
+        Some(n)
     }
     fn size(&self) -> Option<u64> {
         Some(self.d.lock().len() as u64)
     }
 }
 
-impl DocHost for Fake {
+// the provider as a host: several ContentFs on the same documents (a restart)
+struct Host(Arc<Fake>);
+
+impl core::ops::Deref for Host {
+    type Target = Fake;
+    fn deref(&self) -> &Fake {
+        &self.0
+    }
+}
+
+impl DocHost for Host {
+    fn generation(&self) -> u64 {
+        GEN.load(Ordering::Relaxed)
+    }
     fn query(&self, uri: &str) -> Option<DocInfo> {
         let (t, p) = self.parse(uri)?;
         self.info(&t, &p)
@@ -204,7 +228,8 @@ fn names(path: &str) -> Vec<String> {
 }
 
 pub fn t_content(t: &mut T) {
-    t.check(vfs::mount("content", Arc::new(ContentFs::new(Fake::new()))), "content: a provider mounted under content://");
+    let fake = Arc::new(Fake::new());
+    t.check(vfs::mount("content", Arc::new(ContentFs::new(Host(fake.clone())))), "content: a provider mounted under content://");
     let tree = format!("content://{AUTH}/tree/{}", enc("root:Docs/jfgui-test"));
     let at = |n: &str| format!("{tree}/{n}");
     tree_names(t, &tree, &at);
@@ -213,6 +238,8 @@ pub fn t_content(t: &mut T) {
     tree_renames(t, &tree, &at);
     tree_folders(t, &tree, &at);
     single(t, &tree, &at);
+    cache(t, &fake, &at);
+    journal(t, &fake, &tree, &at);
     names_and_dialogs(t);
     vfs::unmount("content");
 }
@@ -297,10 +324,91 @@ fn single(t: &mut T, tree: &str, at: &dyn Fn(&str) -> String) {
     t.check(!plat::mkdir(&format!("{doc}/x")) && !plat::delete(&format!("{doc}/x")), "content: nothing below a single document");
     t.check(!plat::rename(&doc, &format!("content://{AUTH}/document/{}", enc("root:Docs/y.txt"))), "content: no rename of a single document");
     // Android's own form of a document inside a tree, as ContentFs::document reports it
-    let canon = ContentFs::new(Fake::new()).document(at("hello.txt").strip_prefix("content://").unwrap_or("")).map(|d| d.uri).unwrap_or_default();
+    let canon = ContentFs::new(Host(Arc::new(Fake::new()))).document(at("hello.txt").strip_prefix("content://").unwrap_or("")).map(|d| d.uri).unwrap_or_default();
     t.check(canon.starts_with(&format!("content://{AUTH}/tree/")) && canon.contains("/document/"), "content: document() gives the tree's own URI form");
     t.check(text(&canon).as_deref() == Some("Hallo vom Host\n"), "content: that form reads the same file");
     t.check(plat::policy::user_doc_allowed(tree), "content: without a manifest the user's documents are allowed");
+}
+
+// the name cache: a known name needs no listing; a document gone behind the provider's back is
+// noticed (its query fails); a change the host reports empties the cache
+fn cache(t: &mut T, fake: &Arc<Fake>, at: &dyn Fn(&str) -> String) {
+    t.check(plat::write_file(&at("c/d/e.txt"), b"tief") && plat::write_file(&at("c/d/f.txt"), b"daneben"), "cache: files two folders down");
+    let n = content::listings();
+    t.check(text(&at("c/d/e.txt")).as_deref() == Some("tief") && text(&at("c/d/f.txt")).as_deref() == Some("daneben")
+        && plat::file_exists(&at("c/d")) == 2 && vfs::stat(&at("c/d/e.txt")).is_some_and(|s| s.size == 4), "cache: read, kind, stat");
+    t.check(content::listings() == n, "cache: known names need no folder listing");
+    // a sibling never seen before: listed from the cached folder c/d, not from the root
+    fake.files.lock().insert(String::from("Docs/jfgui-test/c/d/g.txt"), Arc::new(SpinLock::new(b"neu".to_vec())));
+    t.check(text(&at("c/d/g.txt")).as_deref() == Some("neu") && content::listings() == n + 1, "cache: a new name: one listing (of its folder)");
+    // gone behind the provider's back (no change reported): the document's own answer counts
+    fake.files.lock().remove("Docs/jfgui-test/c/d/e.txt");
+    t.check(plat::file_exists(&at("c/d/e.txt")) == 0 && plat::read_file(&at("c/d/e.txt")).is_none(), "cache: a document gone meanwhile is missing");
+    // a cached folder renamed behind its back: walked again from the root
+    let moved: Vec<(String, Data)> = fake.files.lock().iter().filter(|(k, _)| k.starts_with("Docs/jfgui-test/c/")).map(|(k, v)| (k.replacen("/c/", "/c2/", 1), v.clone())).collect();
+    fake.files.lock().retain(|k, _| !k.starts_with("Docs/jfgui-test/c/"));
+    fake.files.lock().extend(moved);
+    for d in fake.dirs.lock().iter_mut() {
+        if d == "Docs/jfgui-test/c" || d.starts_with("Docs/jfgui-test/c/") {
+            *d = d.replacen("jfgui-test/c", "jfgui-test/c2", 1);
+        }
+    }
+    t.check(text(&at("c/d/f.txt")).is_none() && text(&at("c2/d/f.txt")).as_deref() == Some("daneben"), "cache: a folder renamed meanwhile");
+    // a reported change: the next lookup walks again
+    let n = content::listings();
+    t.check(text(&at("c2/d/f.txt")).is_some() && content::listings() == n, "cache: cached again");
+    GEN.fetch_add(1, Ordering::Relaxed);
+    t.check(text(&at("c2/d/f.txt")).is_some() && content::listings() == n + 3, "cache: emptied by a reported change (walked again: three listings)");
+    t.check(plat::delete(&at("c2/d/f.txt")) && plat::delete(&at("c2/d/g.txt")) && plat::delete(&at("c2/d")) && plat::delete(&at("c2")), "cache: cleaned up");
+    t.check(plat::file_exists(&at("c2/d")) == 0 && plat::file_exists(&at("c2")) == 0, "cache: deleted names are forgotten");
+}
+
+fn journal_files() -> Vec<String> {
+    let mut v = Vec::new();
+    plat::dir_list("mem://journal", &mut |n, _, _| v.push(String::from(n)));
+    v
+}
+
+// writes through a journal: nothing left after a good write; an interrupted or unverified write
+// keeps its copy, which recover() (a new provider: a restart) writes into the document
+fn journal(t: &mut T, fake: &Arc<Fake>, tree: &str, at: &dyn Fn(&str) -> String) {
+    let fresh = || ContentFs::new(Host(fake.clone())).with_journal("mem://journal");
+    let uri_of = |n: &str| ContentFs::new(Host(fake.clone())).document(at(n).strip_prefix("content://").unwrap_or("")).map(|d| d.uri);
+    vfs::mount("content", Arc::new(fresh()));
+    t.check(plat::write_file(&at("j.txt"), b"erster Inhalt") && text(&at("j.txt")).as_deref() == Some("erster Inhalt"), "journal: a write");
+    t.check(journal_files().is_empty(), "journal: no copy left after a good write");
+    let uri = uri_of("j.txt");
+    // a crash in the middle: a part in the document, the whole in the journal
+    content::interrupt_next_write(4);
+    t.check(!plat::write_file(&at("j.txt"), b"zweiter, ganzer Inhalt"), "journal: the interrupted write fails");
+    t.check(text(&at("j.txt")).as_deref() == Some("zwei") && journal_files().len() == 1, "journal: a part written, the copy kept");
+    let restarted = fresh();
+    t.check(restarted.recover() == 1 && journal_files().is_empty(), "journal: recover() finishes it (a new provider, as after a restart)");
+    vfs::mount("content", Arc::new(restarted));
+    t.check(text(&at("j.txt")).as_deref() == Some("zweiter, ganzer Inhalt"), "journal: the whole contents after recovery");
+    t.check(uri.is_some() && uri_of("j.txt") == uri, "journal: the document kept its URI");
+    // a provider that loses bytes: read back, compared, refused; the copy stays for later
+    LOSSY.store(true, Ordering::Relaxed);
+    let ok = plat::write_file(&at("j.txt"), b"verlorene Bytes");
+    LOSSY.store(false, Ordering::Relaxed);
+    t.check(!ok && journal_files().len() == 1, "journal: a write the provider did not keep is refused (verified)");
+    t.check(fresh().recover() == 1 && text(&at("j.txt")).as_deref() == Some("verlorene Bytes"), "journal: finished once the provider works");
+    // a stream for writing takes the document over: its pending copy goes
+    content::interrupt_next_write(1);
+    plat::write_file(&at("j.txt"), b"nie ganz");
+    t.check(journal_files().len() == 1, "journal: pending again");
+    drop(File::open(&at("j.txt"), FO_RW));
+    t.check(journal_files().is_empty() && fresh().recover() == 0, "journal: a stream opened for writing drops the copy");
+    // copies of a document that is gone, damaged copies: dropped
+    content::interrupt_next_write(0);
+    plat::write_file(&at("k.txt"), b"weg");
+    fake.files.lock().remove("Docs/jfgui-test/k.txt");
+    plat::write_file("mem://journal/0123456789abcdef.jw", b"JFCJ kaputt");
+    t.check(journal_files().len() == 2 && fresh().recover() == 0 && journal_files().is_empty(), "journal: copies of gone documents and damaged ones are dropped");
+    // AtomicFile goes through the same write
+    let ok = AtomicFile::create(&at("j.txt")).is_some_and(|a| a.write_at(0, b"atomar") == Some(6) && a.commit());
+    t.check(ok && text(&at("j.txt")).as_deref() == Some("atomar") && journal_files().is_empty(), "journal: AtomicFile's commit");
+    t.check(plat::delete(&at("j.txt")) && names(tree) == ["hello.txt=15"], "journal: cleaned up");
 }
 
 fn names_and_dialogs(t: &mut T) {

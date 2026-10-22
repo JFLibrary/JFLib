@@ -118,7 +118,7 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
 [`plat/dirs.rs`](../lib/plat/dirs.rs) (Standardordner), [`plat/trash.rs`](../lib/plat/trash.rs)
 (Papierkorb), [`lib/archive`](../lib/archive/lib.rs).
 
-- **P1** · *teilweise* · Einheitliche VFS-Schicht für nativ, Web und Android: Alle
+- **P1** · *erledigt* (2026-10-22) · Einheitliche VFS-Schicht für nativ, Web und Android: Alle
   Datei-Funktionen von `plat` verstehen `schema://pfad`. Fertig sind:
   - `app://` mit den eingebetteten Assets
   - `config://`, `data://`, `cache://` als App-Ordner, durch die Berechtigungen immer erlaubt
@@ -144,13 +144,39 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
     `mkdir`, `delete`, `rename`, `dir_list`, `vfs::stat`, `plat::display_name`; dauerhafte
     Freigaben. Getestet auf dem Desktop gegen einen SAF-Anbieter im Speicher (`plattest --test
     content`) und auf dem Emulator gegen Androids Speicher-Anbieter (§9)
+  - seit 2026-10-22 ([VFS.md](VFS.md) „Android“, „The browser“, „Flatpak“): Datei-Handles aus
+    Portalen und Dokumenten
+    - Browser (Chromium, File System Access API, `web/handles.js`): `ui.filedlg` /
+      `plat::file_dialog` mit `FD_OPEN` / `FD_SAVE` und `pick_file` zeigen die Picker des
+      Systems; die gewählte Datei ist `/handles/ID/NAME`, an ihr Handle gebunden, und jede
+      Änderung (`write_file`, `AtomicFile`, `rename`, `File`-`sync`/Drop) wird per
+      `createWritable` zurückgeschrieben (Swap-Datei des Browsers: ein Fehler lässt die Datei
+      unverändert; `persist` liefert die Anfrage, `Durable`). Handles bleiben in IndexedDB
+      (`jfgui-handles-v1`); nach dem Neuladen liest der Host Dateien mit weiter gewährter
+      Berechtigung vor dem Start ein, sonst `plat::web::reopen(path)` aus der Geste des Nutzers
+      (fragt nach der Berechtigung). Firefox/Safari: wie bisher eigener Dialog, `/imports`,
+      Download
+    - Android `content://`: Schreiben über ein Journal (`data://.content-journal`, erst die
+      Kopie, dann „rwt“ an Ort und Stelle, Zurücklesen und Vergleichen, Kopie weg;
+      unterbrochene Schreibvorgänge vollendet `ContentFs::recover` beim nächsten Start), die
+      Dokument-ID bleibt; Namens-Cache in gewählten Bäumen (Dokument-URI je Pfad, jedes
+      Dokument vor Gebrauch einmal gefragt, vergessen bei create/delete/rename, geleert bei
+      gemeldeten Änderungen über einen `ContentObserver`, höchstens 60 s)
+    - Flatpak: Dokumente des Dokumenten-Portals (`$XDG_RUNTIME_DIR/doc/ID/NAME`) sind im
+      Sandkasten mit `fs.user` ohne neue Freigabe erlaubt; der Dateidialog des Portals liefert
+      dauerhafte Dokumente (geprüft mit xdg-desktop-portal 1.18), sie öffnen nach einem Neustart
+      aus `ui.recent_add` ohne Dialog. `plat::persistent_name` fragt `Documents.Add` (persistent,
+      eigener D-Bus-Client mit Deskriptor-Übergabe) nach der dauerhaften ID
+    - getestet: `files_web.mjs` (Chromium mit OPFS-Handles statt der echten Picker, Firefox),
+      `android_files.py` auf dem Emulator (überschreiben, Cache, gemeldete Änderung, nach sechs
+      Bytes unterbrochener Schreibvorgang), `plattest --test content`, `docs_bus.py` (falsches
+      Portal; `--real` xdg-document-portal und der Dateidialog von xdg-desktop-portal für eine
+      App in einer `bwrap`-Sandbox)
 
-  Es fehlen noch:
-  - Datei-Handles aus Portalen bzw. Dokumenten: Flatpak-Pfade unter `/run/user/UID/doc` gehen
-    schon als OS-Pfade (mit `fs.user`), es fehlen dauerhafte Dokument-IDs; im Browser fehlt
-    das Zurückschreiben in die Datei des Nutzers (heute Kopie nach `/imports`); auf Android
-    schreibt `content://` nicht atomar (SAF kann kein Dokument durch Umbenennen ersetzen) und
-    löst Namen in Bäumen bei jedem Aufruf neu auf (kein Cache)
+  Grenzen: Dokumente aus „Öffnen mit“ und Datei-Transfer gelten im Flatpak nur für die Sitzung
+  (das Portal liefert für Deskriptoren auf seinem Mount die eigene ID, eine App kann sie nicht
+  dauerhaft machen); im Browser nur Chromium, keine Ordner-Handles, keine Handles für
+  gezogene Dateien; `content://` zeigt anderen Apps während des Schreibens einen Teil
 - **P1** · *erledigt* · Assets beim Build bündeln: `apps/NAME/assets/` wird von
   `tools/assetpack.py` als JFA1 gepackt (LZ4 wie `lib/compress`, „stored“, wenn LZ4 nicht
   mindestens ein Zehntel spart) und per `include_bytes!` eingebettet. Der Inhalts-Hash steuert

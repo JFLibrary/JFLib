@@ -1,5 +1,7 @@
 // "04 Dateien & Zwischenablage": the system's picker (open / save as / folder: Android's
-// Storage Access Framework, content:// names), a note kept in config:// across restarts, a
+// Storage Access Framework, content:// names; the browser's File System Access pickers,
+// /handles/ paths written back to the user's file), the last file of the recent list opened
+// again (the browser: reopen after a reload), a note kept in config:// across restarts, a
 // start counter in data://, copy and paste through the system clipboard.
 // With jfgui_SELFTEST=phase1 / phase2 (the start intent's extras of
 // android/tests/GalleryFilesInstrumentation.java) the app checks its files, the documents the
@@ -13,6 +15,9 @@ const NOTE: &str = "config://note.txt";
 const STARTS: &str = "data://starts.txt";
 const RESULTS: &str = "data://selftest.txt";
 const ID_FD: u32 = 0x4000;
+// what an interrupted write (phase 1) leaves to be finished by the next start (phase 2)
+const FULL: &str = "vollständig nach dem Neustart geschrieben";
+const JOURNAL: &str = "data://.content-journal";
 
 pub struct Files {
     loaded: bool,
@@ -25,13 +30,16 @@ pub struct Files {
     chosen: String,
     info: String,
     test: Option<SelfTest>,
+    // (browser) a file of the recent list read again: the request and its path
+    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+    reopening: Option<(u32, String)>,
 }
 
 impl Default for Files {
     fn default() -> Self {
         Self {
             loaded: false, note: String::new(), saved: String::new(), starts: 0, open: Shared::new(0),
-            mode: FD_OPEN, path: String::new(), chosen: String::new(), info: String::new(), test: None,
+            mode: FD_OPEN, path: String::new(), chosen: String::new(), info: String::new(), test: None, reopening: None,
         }
     }
 }
@@ -54,7 +62,57 @@ fn describe(path: &str) -> String {
     }
 }
 
+// the journal copies content:// writes leave until the document holds them (lib/plat/content.rs)
+fn journal_count() -> usize {
+    let mut n = 0;
+    plat::dir_list(JOURNAL, &mut |_, d, _| n += !d as usize);
+    n
+}
+
 impl Files {
+    // a chosen file read into the note
+    fn open_path(&mut self, ui: &mut Ui, path: &str, what: &str) {
+        self.info = match text_of(path) {
+            Some(t) => {
+                self.note = t.chars().take(400).collect();
+                ui.recent_add(path);
+                format!("{what}: {}", describe(path))
+            }
+            None => format!("Nicht lesbar: {}", plat::display_name(path)),
+        };
+    }
+
+    // the first file of the recent list again (the browser: after a reload read through reopen)
+    fn reopen(&mut self, ui: &mut Ui, path: &str) {
+        #[cfg(target_arch = "wasm32")]
+        if plat::file_exists(path) != 1 {
+            self.reopening = plat::web::reopen(path).map(|id| (id, String::from(path)));
+            self.info = String::from(if self.reopening.is_some() { "Wird wieder geöffnet …" } else { "Nicht wieder zu öffnen" });
+            return;
+        }
+        self.open_path(ui, path, "Wieder geöffnet");
+    }
+
+    // (browser) the answer of reopen
+    fn poll_reopen(&mut self, ui: &mut Ui) {
+        #[cfg(target_arch = "wasm32")]
+        if let Some((id, path)) = self.reopening.clone() {
+            let st = plat::web::request_status(id);
+            if st == Some(plat::web::RequestStatus::Pending) {
+                return;
+            }
+            plat::web::forget_request(id);
+            self.reopening = None;
+            if st == Some(plat::web::RequestStatus::Completed) {
+                self.open_path(ui, &path, "Wieder geöffnet");
+            } else {
+                self.info = format!("Nicht wieder geöffnet ({st:?}): {}", plat::display_name(&path));
+            }
+            ui.invalidate();
+        }
+        let _ = ui;
+    }
+
     // the note and the start counter, once (not in headless script runs: no files of the user)
     fn load(&mut self, ui: &mut Ui) {
         self.loaded = true;
@@ -77,6 +135,7 @@ impl Files {
         if let Some(t) = &mut self.test {
             t.step(ui);
         }
+        self.poll_reopen(ui);
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
         ui.heading(2, TS_SUBTITLE, "04  Dateien & Zwischenablage");
         ui.box_begin(0, BOX_H | BOX_WRAP, 8);
@@ -91,20 +150,28 @@ impl Files {
         ui.box_end();
         if ui.filedlg(ID_FD, self.mode, &self.open, &mut self.path, 4096, &["txt=Text"]) & EV_ACT != 0 {
             self.chosen = self.path.clone();
-            self.info = match self.mode {
-                FD_OPEN => match text_of(&self.chosen) {
-                    Some(t) => {
-                        self.note = t.chars().take(400).collect();
-                        format!("Geöffnet: {}", describe(&self.chosen))
-                    }
-                    None => format!("Nicht lesbar: {}", plat::display_name(&self.chosen)),
-                },
-                FD_SAVE if plat::write_file(&self.chosen, self.note.as_bytes()) => format!("Gespeichert: {}", describe(&self.chosen)),
-                FD_SAVE => format!("Nicht gespeichert: {}", plat::display_name(&self.chosen)),
-                _ => format!("Ordner: {}", describe(&self.chosen)),
-            };
+            let chosen = self.chosen.clone();
+            match self.mode {
+                FD_OPEN => self.open_path(ui, &chosen, "Geöffnet"),
+                // the browser: a file of the user's own is written back to it at once
+                FD_SAVE if plat::write_file(&chosen, self.note.as_bytes()) => {
+                    ui.recent_add(&chosen);
+                    self.info = format!("Gespeichert: {}", describe(&chosen));
+                }
+                FD_SAVE => self.info = format!("Nicht gespeichert: {}", plat::display_name(&chosen)),
+                _ => self.info = format!("Ordner: {}", describe(&chosen)),
+            }
         }
         ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, if self.info.is_empty() { "Noch keine Datei gewählt." } else { &self.info });
+        if let Some(last) = ui.recent_files().into_iter().next() {
+            ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+            ui.text(TS_CAPTION | TX_SECONDARY, &format!("Zuletzt: {}", plat::display_name(&last)));
+            ui.next_size(0, 44);
+            if ui.button(403, "Zuletzt öffnen") & EV_ACT != 0 {
+                self.reopen(ui, &last);
+            }
+            ui.box_end();
+        }
         ui.text(TS_BODY, "Notiz (bleibt nach dem Neustart):");
         ui.next_size(SIZE_FILL, 44);
         ui.textbox(410, Some("Etwas notieren"), &mut self.note, 400);
@@ -147,6 +214,9 @@ struct SelfTest {
     saved: String,
     waits: u32,
     done: bool,
+    // the providers' change counter after the tree checks
+    #[cfg_attr(not(target_os = "android"), allow(dead_code))]
+    changes: u64,
 }
 
 const TREE_FILES: &str = "hello.txt";
@@ -156,7 +226,7 @@ impl SelfTest {
     fn new(phase: &str) -> Self {
         Self {
             phase2: phase == "phase2", step: 0, log: Vec::new(), open: Shared::new(0), picking: false, path: String::new(),
-            tree: String::new(), doc: String::new(), saved: String::new(), waits: 0, done: false,
+            tree: String::new(), doc: String::new(), saved: String::new(), waits: 0, done: false, changes: 0,
         }
     }
 
@@ -279,6 +349,24 @@ impl SelfTest {
                 self.grants(&[self.tree.clone(), self.doc.clone(), self.saved.clone()]);
                 self.step = 5;
             }
+            // a change the provider reports (the instrumentation's notifyChange on the tree)
+            // empties the name cache: the counter moved (at most 10 s)
+            5 => {
+                #[cfg(target_os = "android")]
+                {
+                    use plat::content::DocHost;
+                    let now = plat::web::AndroidDocs.generation();
+                    if now == self.changes && self.waits < 100 {
+                        self.waits += 1;
+                        ui.timer(0x5E1E, 100);
+                        return;
+                    }
+                    let was = self.changes;
+                    self.check(now > was, "tree: the provider's change reported", || format!("{was} -> {now}"));
+                    self.waits = 0;
+                }
+                self.step = 6;
+            }
             _ => {
                 if !self.clip_ready(ui) {
                     return;
@@ -382,8 +470,28 @@ impl SelfTest {
         self.check(plat::vfs::stat(&at(TREE_FILES)).is_some_and(|s| s.kind == 1 && s.size == HELLO.len() as u64), "tree: stat", String::new);
         self.check(plat::write_file(&at("neu/datei.txt"), b"neuer Inhalt"), "tree: write new (with folder)", String::new);
         self.eq("tree: read new", text_of(&at("neu/datei.txt")), "neuer Inhalt");
+        #[cfg(target_os = "android")]
+        let uri = |p: &str| plat::content::ContentFs::new(plat::web::AndroidDocs).document(p.strip_prefix("content://").unwrap_or("")).map(|d| d.uri);
+        #[cfg(target_os = "android")]
+        let before = uri(&at("neu/datei.txt"));
         self.check(plat::write_file(&at("neu/datei.txt"), b"kurz"), "tree: replace", String::new);
         self.eq("tree: replaced (truncated)", text_of(&at("neu/datei.txt")), "kurz");
+        #[cfg(target_os = "android")]
+        {
+            let after = uri(&at("neu/datei.txt"));
+            self.check(before.is_some() && before == after, "tree: saved over: the same document", || format!("{before:?} {after:?}"));
+        }
+        self.check(journal_count() == 0, "tree: no journal copy left", || format!("{}", journal_count()));
+        // the name cache: names known from the walks above need no folder listing
+        let n = plat::content::listings();
+        let known = text_of(&at("neu/datei.txt")).is_some() && plat::file_exists(&at("neu")) == 2
+            && plat::vfs::stat(&at("neu/datei.txt")).is_some_and(|s| s.size == 4) && text_of(&at(TREE_FILES)).is_some();
+        self.check(known && plat::content::listings() == n, "tree: cached names: no listing", || format!("{known} {} listings", plat::content::listings() - n));
+        #[cfg(target_os = "android")]
+        {
+            use plat::content::DocHost;
+            self.changes = plat::web::AndroidDocs.generation();
+        }
         let mut names = Vec::new();
         plat::dir_list(&at("neu"), &mut |n, d, s| names.push((String::from(n), d, s)));
         self.check(names == [(String::from("datei.txt"), false, 4)], "tree: list", || format!("{names:?}"));
@@ -433,6 +541,16 @@ impl SelfTest {
         self.check(ok, "save: atomic (in place)", String::new);
         self.eq("save: read after atomic", text_of(&d), "atomar ersetzt");
         self.check(plat::vfs::stat(&d).is_some_and(|s| s.size == 14), "save: stat size", String::new);
+        // saved over again, longer and shorter: the same document (the name is its URI), whole
+        self.check(plat::write_file(&d, "länger als vorher, über SAF".as_bytes()) && plat::write_file(&d, b"kurz"), "save: over existing", String::new);
+        self.eq("save: over existing: read", text_of(&d), "kurz");
+        self.check(journal_count() == 0, "save: no journal copy left", || format!("{}", journal_count()));
+        // a write interrupted after 6 bytes, as by a crash: a part in the document, the whole in
+        // the journal; phase 2 (a new process) finds it finished
+        plat::content::interrupt_next_write(6);
+        self.check(!plat::write_file(&d, FULL.as_bytes()), "save: interrupted write fails", String::new);
+        self.eq("save: interrupted: a part in the document", text_of(&d), &FULL[..6]);
+        self.check(journal_count() == 1, "save: interrupted: the copy kept", || format!("{}", journal_count()));
     }
 
     fn grants(&mut self, uris: &[String]) {
@@ -464,7 +582,9 @@ impl SelfTest {
         if u.len() == 3 {
             self.eq("restart: tree still readable", text_of(&format!("{}/{TREE_FILES}", u[0])), HELLO);
             self.eq("restart: opened document readable", text_of(&u[1]), HELLO);
-            self.eq("restart: saved document readable", text_of(&u[2]), "atomar ersetzt");
+            // content:// was used first above: the interrupted write was finished then
+            self.eq("restart: the interrupted write finished from the journal", text_of(&u[2]), FULL);
+            self.check(journal_count() == 0, "restart: no journal copy left", || format!("{}", journal_count()));
             self.grants(&u);
             #[cfg(target_os = "android")]
             {

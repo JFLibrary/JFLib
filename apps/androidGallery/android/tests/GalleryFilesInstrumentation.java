@@ -5,10 +5,12 @@
  * Phase 1 starts the gallery's self-test (apps/androidGallery/files.rs: config:// data:// cache://
  * on internal storage, the clipboard) and answers the system's picker through UiAutomation like a
  * user: the folder Documents/jfgui-test (its button, then the confirmation), hello.txt to open,
- * the save button for gespeichert.txt; then it reads the image the app left on the clipboard the
- * way another app would.  Phase 2 (a new process) lets the self-test check the files and grants
- * after the restart, then pastes the system clipboard into the note with Ctrl+V and copies it back
- * with Ctrl+A, Ctrl+C. */
+ * the save button for gespeichert.txt; once the folder is chosen it reports a change of it
+ * (notifyChange, as its provider would: the app's name cache hears of it); then it reads the
+ * image the app left on the clipboard the way another app would.  Phase 2 (a new process) lets
+ * the self-test check the files and grants after the restart (and the write phase 1 interrupted,
+ * finished from the app's journal), then pastes the system clipboard into the note with Ctrl+V
+ * and copies it back with Ctrl+A, Ctrl+C. */
 package org.jflib.gallery;
 
 import android.app.Activity;
@@ -36,8 +38,9 @@ import java.util.List;
 
 public final class GalleryFilesInstrumentation extends Instrumentation {
     static final String DIR = "content://com.android.externalstorage.documents/document/primary%3ADocuments%2Fjfgui-test";
+    static final String TREE = "content://com.android.externalstorage.documents/tree/primary%3ADocuments%2Fjfgui-test";
     private String phase;
-    private int checks, clicks;
+    private int checks, clicks, notified;
     private String lastPressed;
     private long lastAt;
     private final StringBuilder log = new StringBuilder();
@@ -113,6 +116,14 @@ public final class GalleryFilesInstrumentation extends Instrumentation {
             if (b.isEmpty() || !String.valueOf(pressed).contentEquals(b.get(0).getText() == null ? "" : b.get(0).getText())) return;
         }
     }
+    private void notifyTree(Context target) {
+        try {
+            target.getContentResolver().notifyChange(Uri.parse(TREE), null);
+            if (notified++ == 0) log.append("notifyChange ").append(TREE).append('\n');
+        } catch (Exception e) {
+            if (notified++ == 0) log.append("notifyChange: ").append(e).append('\n');
+        }
+    }
     private static void shell(UiAutomation ui, String command) {
         try (ParcelFileDescriptor out = ui.executeShellCommand(command);
              InputStream in = new ParcelFileDescriptor.AutoCloseInputStream(out)) {
@@ -140,6 +151,9 @@ public final class GalleryFilesInstrumentation extends Instrumentation {
             while ((text = read(results)) == null || !text.contains("done ")) {
                 if (SystemClock.uptimeMillis() > end) throw new AssertionError("self-test timed out:\n" + text + log);
                 answerPicker(ui);
+                // once the folder is chosen: a change of it, as its provider would report one
+                // (the self-test waits for the app's name cache to hear of it)
+                if (phase.equals("1") && clicks >= 2) notifyTree(target);
                 SystemClock.sleep(250);
             }
             int ok = 0;

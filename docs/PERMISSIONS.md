@@ -185,6 +185,12 @@ With `fs.user` the UI runtime grants read and write access to:
 A granted folder includes everything below it. Without `fs.user` the user can still choose
 files, but the app cannot open them.
 
+Documents the system hands over one at a time are allowed with `fs.user` without a grant, so
+they open again after a restart (a recent-files list): Android's `content://` names, inside a
+Flatpak sandbox everything below the documents portal's mount (`$XDG_RUNTIME_DIR/doc/`: the
+sandbox shows only what the user gave the app), and the browser's `/handles/` files (one
+handle of the user's own file each). Outside a sandbox the portal's mount is an ordinary path.
+
 The library's own file dialog lists folders without checks, because the user is navigating.
 `--shot` and the file commands of `.uis` scripts (`shot`, `dump`, `clip file` ...) are also
 unchecked: they come from whoever started the process. The key (`plat::policy::Key`) that allows this stays
