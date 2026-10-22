@@ -7,8 +7,11 @@
 //        bracket pair at the caret, a find / replace bar, scroll bars.  Only the visible lines
 //        are laid out and highlighted (the editor keeps each line's start state and follows
 //        the document's change journal), so a file of 100 000 lines scrolls as fast as a
-//        short one.  EV_ACT: the text changed; EV_FOCUS while focused; EV_COMMIT: the focus
-//        left.  Ids id .. id + 15 (id + 1 / + 2 the scroll bars, + 3 .. 13 the find bar).
+//        short one; of a long line only the part in view (code_long.rs keeps the columns and
+//        tokens of long lines and works them again near an edit only), so typing in a line of
+//        1 MB is as fast as in a short one.  EV_ACT: the text changed; EV_FOCUS while
+//        focused; EV_COMMIT: the focus left.  Ids id .. id + 15 (id + 1 / + 2 the scroll bars,
+//        + 3 .. 13 the find bar).
 //        CE_READONLY: select, copy and find only; CE_NO_GUTTER: no line numbers;
 //        CE_NO_FRAME: no box; CE_NO_FIND: no find bar; CE_NO_LINE: no current-line highlight;
 //        CE_MARKS: the gutter keeps its column of diagnostic markers while there are none
@@ -60,6 +63,7 @@ use text::FS_SYN_ITALIC;
 
 use crate::cmd::{Draw, DrawRef, Gfx};
 use crate::code_doc::*;
+use crate::code_long::{Longs, COL_LONG};
 use crate::consts::*;
 use crate::ed_core::*;
 use crate::highlight::*;
@@ -170,6 +174,8 @@ struct View {
     hl_last: usize,
     // the most severe diagnostic at the caret
     caret_diag: Option<Diag>,
+    // columns and tokens of long lines
+    long: Longs,
 }
 
 /// shared state (Ui::m.code)
@@ -234,6 +240,7 @@ struct CView<'a> {
     cw: i32,
     lh: i32,
     tw: usize,
+    long: &'a Longs,
 }
 
 impl EdView for CView<'_> {
@@ -250,11 +257,11 @@ impl EdView for CView<'_> {
         (0, self.doc.line(line).len())
     }
     fn x_at(&self, line: usize, _: usize, byte: usize) -> i32 {
-        col_in(self.doc.line(line), byte, self.tw) as i32 * self.cw
+        self.long.col(self.doc, line, byte, self.tw) as i32 * self.cw
     }
     fn hit_x(&self, line: usize, _: usize, x: i32) -> usize {
         let col = ((x.max(0) + self.cw / 2) / self.cw.max(1)) as usize;
-        byte_in(self.doc.line(line), col, self.tw)
+        self.long.byte(self.doc, line, col, self.tw)
     }
     fn row_y(&self, line: usize, _: usize) -> (i32, i32) {
         (line as i32 * self.lh, self.lh)
@@ -386,12 +393,14 @@ impl Ui {
         hl.rev = doc.revision();
     }
 
-    // the start states right up to line `upto`
-    fn ce_hl_upto(hl: &mut Hl, doc: &CodeDoc, h: &Highlighter, upto: usize, toks: &mut Vec<Token>) {
+    // the start states right up to line `upto` (long lines from `keep` on keep their tokens)
+    fn ce_hl_upto(hl: &mut Hl, doc: &CodeDoc, h: &Highlighter, upto: usize, toks: &mut Vec<Token>, long: &Longs, keep: usize) {
         let upto = upto.min(doc.line_count());
+        let tw = doc.tab_width.clamp(1, 16) as usize;
         while hl.valid < upto {
             let k = hl.valid;
-            let st = h.line(doc.line(k), hl.states[k], toks);
+            let t = doc.line(k);
+            let st = if t.len() >= COL_LONG && k >= keep { long.tokens(doc, k, tw, h, hl.states[k]).0 } else { h.line(t, hl.states[k], toks) };
             hl.count += 1;
             let next = k + 1;
             if next >= hl.dirty && next <= hl.known && hl.states[next] == st {
@@ -418,18 +427,41 @@ impl Ui {
             }
         }
         let pairs: Vec<(u8, u8)> = h.grammar().pairs.as_bytes().chunks(2).filter(|c| c.len() == 2).map(|c| (c[0], c[1])).collect();
+        let tw = doc.tab_width.clamp(1, 16) as usize;
+        let long = &v.long;
         let mut toks = Vec::new();
-        let code_at = |hl: &mut Hl, toks: &mut Vec<Token>, l: usize, b: usize| -> bool {
-            Ui::ce_hl_upto(hl, doc, h, l, toks);
-            h.line(doc.line(l), hl.states[l], toks);
-            !toks.iter().any(|t| t.start <= b && b < t.end && matches!(t.kind, SY_STRING | SY_COMMENT | SY_CODE | SY_ESCAPE))
+        // the tokens of the line the scan is on, the one looked at last (the scan goes one way)
+        let mut cur: Option<(usize, Rc<Vec<Token>>, usize)> = None;
+        let mut code_at = |hl: &mut Hl, l: usize, b: usize| -> bool {
+            if cur.as_ref().is_none_or(|c| c.0 != l) {
+                Ui::ce_hl_upto(hl, doc, h, l, &mut toks, long, usize::MAX);
+                let t = doc.line(l);
+                let tk = if t.len() >= COL_LONG {
+                    long.tokens(doc, l, tw, h, hl.states[l]).1
+                } else {
+                    h.line(t, hl.states[l], &mut toks);
+                    Rc::new(toks.clone())
+                };
+                cur = Some((l, tk, 0));
+            }
+            let Some((_, tk, last)) = &mut cur else { return true };
+            // the first token that ends after b
+            let mut k = (*last).min(tk.len());
+            while k < tk.len() && tk[k].end <= b {
+                k += 1;
+            }
+            while k > 0 && tk[k - 1].end > b {
+                k -= 1;
+            }
+            *last = k;
+            !tk.get(k).is_some_and(|t| t.start <= b && matches!(t.kind, SY_STRING | SY_COMMENT | SY_CODE | SY_ESCAPE))
         };
         let line = doc.line(caret.line).as_bytes();
         let mut found = None;
         for at in [caret.byte, caret.byte.wrapping_sub(1)] {
             let Some(&c) = line.get(at) else { continue };
             let Some(&(o, cl)) = pairs.iter().find(|p| p.0 == c || p.1 == c) else { continue };
-            if !code_at(&mut v.hl, &mut toks, caret.line, at) {
+            if !code_at(&mut v.hl, caret.line, at) {
                 continue;
             }
             let fwd = c == o;
@@ -441,15 +473,17 @@ impl Ui {
             'scan: loop {
                 let t = doc.line(l).as_bytes();
                 loop {
-                    b += if fwd { 1 } else { -1 };
-                    if b < 0 || b as usize >= t.len() {
-                        break;
-                    }
+                    // the next of the two brackets
+                    let is = |x: &u8| *x == want || *x == other;
+                    let next = if fwd {
+                        t.get((b + 1) as usize..).and_then(|r| r.iter().position(is)).map(|k| b + 1 + k as isize)
+                    } else {
+                        t[..b.max(0) as usize].iter().rposition(is).map(|k| k as isize)
+                    };
+                    let Some(nb) = next else { break };
+                    b = nb;
                     let x = t[b as usize];
-                    if x != want && x != other {
-                        continue;
-                    }
-                    if !code_at(&mut v.hl, &mut toks, l, b as usize) {
+                    if !code_at(&mut v.hl, l, b as usize) {
                         continue;
                     }
                     if x == other {
@@ -608,7 +642,7 @@ impl Ui {
         let c = &self.wp.ctx;
         let press = c.pressed & (1 << BTN_LEFT) != 0 && ev & EV_HOVER != 0 && c.active == id;
         if press && !disabled {
-            let view = CView { doc: &*doc, cw: m.cw, lh: m.lh, tw };
+            let view = CView { doc: &*doc, cw: m.cw, lh: m.lh, tw, long: &v.long };
             let p = clamp_pos(&view, TextPos::new(view.row_at(cy).0, view.hit_x(view.row_at(cy).0, 0, cx)));
             v.prefx = -1;
             v.t0 = self.now_ms;
@@ -650,7 +684,7 @@ impl Ui {
             v.sy = v.sy.clamp(0, (total_h - th).max(0));
             v.sx = v.sx.clamp(0, (content_w - tw_px).max(0));
             let (cx, cy) = (mx - tx + v.sx, my - ty + v.sy);
-            let view = CView { doc: &*doc, cw: m.cw, lh: m.lh, tw };
+            let view = CView { doc: &*doc, cw: m.cw, lh: m.lh, tw, long: &v.long };
             let l = view.row_at(cy).0;
             let p = TextPos::new(l, view.hit_x(l, 0, cx));
             match v.drag {
@@ -693,7 +727,7 @@ impl Ui {
                     continue;
                 }
                 let act = {
-                    let view = CView { doc: &*doc, cw: m.cw, lh: m.lh, tw };
+                    let view = CView { doc: &*doc, cw: m.cw, lh: m.lh, tw, long: &v.long };
                     ed_key(&view, doc.selection(), &mut v.prefx, k, page, false)
                 };
                 let Some(act) = act else { break };
@@ -769,7 +803,7 @@ impl Ui {
             }
         }
         let caret = doc.clamp(doc.selection().caret);
-        let ccol = doc.col_of(caret.line, caret.byte) as i32;
+        let ccol = v.long.col(doc, caret.line, caret.byte, tw) as i32;
         if (focused || v.find.open) && (doc.selection() != v.last_sel || doc.revision() != v.last_rev) {
             let cy = caret.line as i32 * m.lh;
             if cy < v.sy {
@@ -795,7 +829,7 @@ impl Ui {
         let last = (((v.sy + th) / m.lh) as usize + 1).min(n);
         let mut toks = Vec::new();
         Ui::ce_hl_sync(&mut v.hl, doc, h);
-        Ui::ce_hl_upto(&mut v.hl, doc, h, last, &mut toks);
+        Ui::ce_hl_upto(&mut v.hl, doc, h, last, &mut toks, &v.long, first);
         let bracket = if focused { Ui::ce_bracket(&mut v, doc, h) } else { None };
 
         // ---- frame and gutter
@@ -820,17 +854,21 @@ impl Ui {
         let sel_col = if focused { theme.sel } else { theme.sel_inactive };
         let ital = |k: u8| theme.italic >> k & 1 != 0;
         let bold = |k: u8| theme.bold >> k & 1 != 0;
-        let vis_matches: Vec<(TextPos, TextPos, bool)> = if v.find.open && !v.find.matches.is_empty() {
-            let lo = v.find.matches.partition_point(|x| x.0.line < first);
-            let hi = v.find.matches.partition_point(|x| x.0.line < last);
-            let cur = v.find.current;
-            (lo..hi).map(|i| (v.find.matches[i].0, v.find.matches[i].1, Some(i) == cur)).collect()
-        } else {
-            Vec::new()
-        };
         let col0 = (v.sx / m.cw.max(1)) as usize;
         let cols = (tw_px / m.cw.max(1)) as usize + 2;
         let tx0 = tx - v.sx;
+        // the bytes of the visible lines in view (long lines: a few columns more on both sides;
+        // the rest of a line is not looked at)
+        let vis: Vec<(usize, usize)> = (first..last)
+            .map(|l| {
+                let len = doc.line(l).len();
+                if len < COL_LONG {
+                    (0, len)
+                } else {
+                    (v.long.floor(doc, l, col0.saturating_sub(4), tw).0, v.long.byte(doc, l, col0 + cols + 4, tw))
+                }
+            })
+            .collect();
         // the line numbers
         if nums {
             for l in first..last {
@@ -863,10 +901,12 @@ impl Ui {
         for &i in &dvis {
             let d = &doc.marks()[i];
             for l in d.a.line.max(first)..=d.b.line.min(last - 1) {
-                if !touches(d, l) {
+                let (b0, b1) = vis[l - first];
+                let (a, b) = (if d.a.line == l { d.a.byte } else { 0 }, if d.b.line == l { d.b.byte } else { usize::MAX });
+                if !touches(d, l) || b < b0 || a > b1 {
                     continue;
                 }
-                let (c0, c1) = mark_cols(d, l, doc.line(l), tw);
+                let (c0, c1) = mark_cols(d, l, doc.line(l).len(), |b| v.long.col(doc, l, b, tw));
                 waves.push((d.sev, tx0 + c0 as i32 * m.cw, tx0 + c1 as i32 * m.cw, ty + l as i32 * m.lh - v.sy));
             }
         }
@@ -886,7 +926,7 @@ impl Ui {
                         d.a.line == l
                     } else {
                         on_text && touches(d, l) && {
-                            let (c0, c1) = mark_cols(d, l, doc.line(l), tw);
+                            let (c0, c1) = mark_cols(d, l, doc.line(l).len(), |b| v.long.col(doc, l, b, tw));
                             col >= c0 && col < c1
                         }
                     }
@@ -905,21 +945,28 @@ impl Ui {
                 self.draw_rect(area[0], y, area[2], m.lh);
             }
             let (ls, le) = (TextPos::new(l, 0), TextPos::new(l, t.len()));
+            let col_of = |b: usize| v.long.col(doc, l, b, tw) as i32 * m.cw;
             if sa < sb && sa <= le && sb >= ls {
                 let (lo, hi) = (ls.max(sa), le.min(sb));
-                let x0 = col_in(t, lo.byte, tw) as i32 * m.cw;
-                let x1 = col_in(t, hi.byte, tw) as i32 * m.cw + if sb > le { m.cw / 2 } else { 0 };
+                let x0 = col_of(lo.byte);
+                let x1 = col_of(hi.byte) + if sb > le { m.cw / 2 } else { 0 };
                 if x1 > x0 {
                     self.draw_color(sel_col);
                     self.draw_rect(tx0 + x0, y, x1 - x0, m.lh);
                 }
             }
-            for (a, b, cur) in vis_matches.iter().filter(|x| x.0.line == l) {
-                let x0 = col_in(t, a.byte, tw) as i32 * m.cw;
-                let x1 = col_in(t, b.byte, tw) as i32 * m.cw;
-                self.draw_color(if *cur { theme.find_cur } else { theme.find });
+            // (the matches of a line do not overlap: by start and by end in order)
+            let (b0, b1) = vis[l - first];
+            let ms = if v.find.open { &v.find.matches[..] } else { &[] };
+            let k0 = ms.partition_point(|x| x.1 <= TextPos::new(l, b0));
+            let k1 = ms.partition_point(|x| x.0 < TextPos::new(l, b1)).max(k0);
+            for (k, &(a, b)) in ms[k0..k1].iter().enumerate() {
+                let cur = Some(k0 + k) == v.find.current;
+                let x0 = col_of(a.byte);
+                let x1 = col_of(b.byte);
+                self.draw_color(if cur { theme.find_cur } else { theme.find });
                 if theme.find_frame {
-                    self.draw_frame(tx0 + x0, y, (x1 - x0).max(m.cw / 2), m.lh, 0, if *cur { hair * 2 } else { hair });
+                    self.draw_frame(tx0 + x0, y, (x1 - x0).max(m.cw / 2), m.lh, 0, if cur { hair * 2 } else { hair });
                 } else {
                     self.draw_rect(tx0 + x0, y, (x1 - x0).max(m.cw / 2), m.lh);
                 }
@@ -927,30 +974,39 @@ impl Ui {
             if let Some((p, q)) = bracket {
                 for at in [p, q] {
                     if at.line == l {
-                        let x0 = col_in(t, at.byte, tw) as i32 * m.cw;
+                        let x0 = col_of(at.byte);
                         self.draw_color(theme.bracket);
                         self.draw_frame(tx0 + x0, y, m.cw, m.lh, 0, hair);
                     }
                 }
             }
-            // the text by tokens (the plain text between them: SY_TEXT), visible cells only
-            h.line(t, v.hl.states[l], &mut toks);
-            let mut runs: Vec<(usize, usize, u8)> = Vec::with_capacity(toks.len() * 2 + 1);
-            let mut at = 0;
-            for tk in &toks {
-                if tk.start > at {
-                    runs.push((at, tk.start, SY_TEXT));
-                }
-                runs.push((tk.start, tk.end, tk.kind));
-                at = tk.end;
-            }
-            if at < t.len() {
-                runs.push((at, t.len(), SY_TEXT));
-            }
-            let mut col = 0usize;
-            let mut i = 0;
+            // the text by tokens (the plain text between them: SY_TEXT), visible cells only; a
+            // long line from the cluster at its first visible column, with its kept tokens
+            let long = t.len() >= COL_LONG;
+            let (mut i, mut col) = if long { v.long.floor(doc, l, col0, tw) } else { (0, 0) };
+            let kept;
+            let tk: &[Token] = if long {
+                kept = v.long.tokens(doc, l, tw, h, v.hl.states[l]).1;
+                &kept
+            } else {
+                h.line(t, v.hl.states[l], &mut toks);
+                &toks
+            };
+            let mut k = if long { tk.partition_point(|x| x.end <= i) } else { 0 };
+            let mut at = i;
             let tb = t.as_bytes();
-            for (a, b, kind) in runs {
+            loop {
+                // the next run: the plain text before the next token, the token
+                let (a, b, kind) = match tk.get(k) {
+                    Some(x) if x.start > at => (at, x.start, SY_TEXT),
+                    Some(x) => {
+                        k += 1;
+                        (x.start, x.end, x.kind)
+                    }
+                    None if at < t.len() => (at, t.len(), SY_TEXT),
+                    None => break,
+                };
+                at = b;
                 if col > col0 + cols {
                     break;
                 }
@@ -958,15 +1014,17 @@ impl Ui {
                 let color = if theme.sel_text != 0 && inside { theme.sel_text } else { theme.tokens[kind as usize % SY_COUNT] };
                 // cells of a .. b: ASCII runs at once, other clusters one by one
                 i = i.max(a);
-                while i < b {
+                while i < b && col <= col0 + cols {
                     if tb[i] == b'\t' {
                         col += tw - col % tw;
                         i += 1;
                         continue;
                     }
                     if tb[i] < 0x80 && !m.per_cell {
+                        // (up to the end of the view)
+                        let lim = b.min(i + (col0 + cols + 1 - col));
                         let mut j = i;
-                        while j < b && tb[j] < 0x80 && tb[j] != b'\t' {
+                        while j < lim && tb[j] < 0x80 && tb[j] != b'\t' {
                             j += 1;
                         }
                         // only the visible part
@@ -1494,11 +1552,11 @@ fn touches(d: &Mark, l: usize) -> bool {
     d.a.line <= l && l <= last_line(d)
 }
 
-// the columns a diagnostic underlines on line l (its text t): over lines to the line's end and
-// one cell for its break; at least one cell
-fn mark_cols(d: &Mark, l: usize, t: &str, tw: usize) -> (usize, usize) {
-    let c0 = if d.a.line == l { col_in(t, d.a.byte, tw) } else { 0 };
-    let c1 = if d.b.line == l { col_in(t, d.b.byte, tw) } else { col_in(t, t.len(), tw) + 1 };
+// the columns a diagnostic underlines on line l (len bytes; col: the column of a byte): over
+// lines to the line's end and one cell for its break; at least one cell
+fn mark_cols(d: &Mark, l: usize, len: usize, col: impl Fn(usize) -> usize) -> (usize, usize) {
+    let c0 = if d.a.line == l { col(d.a.byte) } else { 0 };
+    let c1 = if d.b.line == l { col(d.b.byte) } else { col(len) + 1 };
     (c0, c1.max(c0 + 1))
 }
 

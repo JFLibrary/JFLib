@@ -4,7 +4,8 @@
 // block indent, closers, comments, moving lines, find / replace, columns, the change journal,
 // undo merging), its diagnostics (positions in characters, clamping, counts, at / next, how
 // they follow typing, Enter, deletes, points, block indent, comments, moved lines, undo,
-// replace_all; 100 000 lines) and the grammars (Rust, JSON, INI, TOML, Markdown, JFS: tokens
+// replace_all; 100 000 lines), what the code editor keeps of long lines through edits
+// (ui::code_long_check) and the grammars (Rust, JSON, INI, TOML, Markdown, JFS: tokens
 // and the states across lines; JFS also token by token against lib/script's tokens() on two
 // samples) plus a timing of 100 000 lines.  Prints FAIL lines and a summary; the exit code is
 // the number of failures.
@@ -712,10 +713,43 @@ fn jfs(t: &mut T) {
 }
 
 /// --test model -> failures
+// ------------------------------------------------------------------ long lines
+
+// what the code editor keeps of a long line (column checkpoints, tokens) follows edits as a
+// fresh look at the line sees it (ui::code_long_check): places spread over the line, text
+// that opens and closes strings, comments, interpolations, tabs, marks, emoji, ZWJ
+fn long(t: &mut T) {
+    t.group = "long";
+    let json = String::from(crate::long_json(30_000).line(0));
+    let rust = String::from(crate::long_mixed(30_000).line(0));
+    let jfs = "let s = \"a ${x + f(1)} \\u{41} b\"; log(\"${s}\") // é\t".repeat(600);
+    let ins = ["x", "\"", "\\", "/*", "*/", "'", "\t", "  ", "\u{301}", "\u{1F642}", "東", "{", "}", "[", "${", "\u{200D}", "//", "a = 1;", "r#\""];
+    let mut seed = 12345u32;
+    let mut rnd = |n: usize| {
+        seed = seed.wrapping_mul(1_103_515_245).wrapping_add(12345);
+        (seed >> 8) as usize % n.max(1)
+    };
+    let mut edits: Vec<(usize, usize, &str)> = Vec::new();
+    for k in 0..60 {
+        let a = rnd(32_000);
+        let del = if k % 3 == 0 { rnd(40) } else { 0 };
+        edits.push((a, a + del, if k % 5 == 4 { "" } else { ins[rnd(ins.len())] }));
+    }
+    // at the start, near it, at the end
+    edits.extend([(0, 0, "\""), (0, 1, ""), (usize::MAX, usize::MAX, "/*"), (5, 9, "\t\t"), (100, 100, "*/ \"")]);
+    for (name, text, h) in [("json", &json, Highlighter::json()), ("rust", &rust, Highlighter::rust()), ("jfs", &jfs, Highlighter::jfs()), ("plain", &rust, Highlighter::plain())] {
+        for tw in [4u8, 8] {
+            let d = code_long_check(text, &h, tw, &edits);
+            t.check(d.is_empty(), &format!("{name}, tab width {tw}: kept like a fresh look ({:?})", d.first()));
+        }
+    }
+}
+
 pub fn run() -> i32 {
     let mut t = T { group: "", ok: 0, failed: 0 };
     rich(&mut t);
     code(&mut t);
+    long(&mut t);
     diags(&mut t);
     grammars(&mut t);
     jfs(&mut t);

@@ -333,6 +333,28 @@ fn segment(t: &mut T) {
     t.eq("word_next", (word_next("Hello, world!", 0), word_next("Hello, world!", 5), word_next("ab  cd", 0)), (5, 7, 4));
     t.eq("word_prev", (word_prev("Hello, world!", 13), word_prev("Hello, world!", 12), word_prev("ab  cd", 4)), (12, 7, 0));
     t.eq("word_next ideographs", word_next("日本語", 0), 3);
+    // scans near i (long lines): the same boundaries as a scan of the whole text
+    let mut long = String::new();
+    for k in 0..40 {
+        long.push_str(["can't ", "3.14, ", "e\u{301}\u{302}x ", "\u{1F1E9}\u{1F1EA}\u{1F1EB}", "\u{1F468}\u{200D}\u{1F469}!", "\u{1100}\u{1161}\u{11A8}", "日本語 ", "\r\n", "foo_bar1", "ab\u{200D}cd", "{\"k\":[1,2]}", "\u{928}\u{93F}"][k % 12]);
+    }
+    long.push_str(&"x".repeat(600));
+    long.push_str("a, b");
+    let all = graphemes(&long);
+    let starts: Vec<usize> = long.char_indices().map(|(i, _)| i).collect();
+    t.check("long: grapheme_next walks the clusters", all.windows(2).all(|w| grapheme_next(&long, w[0]) == w[1]));
+    t.check("long: cluster_end walks the clusters", all.windows(2).all(|w| cluster_end(&long, w[0]) == w[1]));
+    t.eq("cluster_end: CR LF, a mark after ASCII", (cluster_end("\r\nx", 0), cluster_end("e\u{301}x", 0), cluster_end("ü!", 0)), (2, 3, 2));
+    t.check("long: grapheme_prev walks back", all.windows(2).all(|w| grapheme_prev(&long, w[1]) == w[0]));
+    t.check("long: is_grapheme_boundary", starts.iter().all(|&i| is_grapheme_boundary(&long, i) == all.contains(&i)));
+    let wall = word_bounds(&long);
+    t.check(
+        "long: word_at agrees with word_bounds",
+        starts.iter().all(|&i| {
+            let k = wall.partition_point(|&x| x <= i);
+            word_at(&long, i) == (wall[k - 1], wall[k])
+        }),
+    );
     // line break opportunities (UAX #14)
     let l = |s: &str| line_breaks(s);
     t.eq("spaces break", l("Hello world"), alloc::vec![(6, false), (11, true)]);

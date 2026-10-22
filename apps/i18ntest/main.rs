@@ -3,7 +3,8 @@
 // negotiation, numbers / currency / sizes / dates of several locales, CLDR plural categories,
 // messages with named, numbered, plural and select placeholders, collation by language
 // (strengths, numbers, the rules of de, sv, fi, da, nb, es, cs, sk, pl, tr, Cyrillic, Greek),
-// case mapping (ß, final sigma, Turkish i), the library's texts in all its languages.
+// case mapping (ß, final sigma, Turkish i), the library's texts in all its languages (also the
+// role names screen readers hear through plat::a11y).
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app i18ntest
@@ -23,6 +24,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use datetime::Civil;
+use plat::a11y::Role;
 use ui::i18n::{
     self, Arg, COLL_IDENTICAL, COLL_PRIMARY, COLL_SECONDARY, Catalog, Collator, DATE_LONG, DATE_SHORT, LANG_DE, LANG_EN, Locale, Plural, msg,
     plural, plural_int,
@@ -493,6 +495,20 @@ fn library(t: &mut T) {
     ] {
         i18n::set_language_code(lang);
         t.eq(lang, (i18n::tr("Heute"), i18n::month_name(10), i18n::weekday_short(0), i18n::tr("Öffnen")), want);
+    }
+    // the role names screen readers hear (plat::a11y::ROLE_TEXTS): library texts, in the UI
+    // language once ui hands the bridges its translation (they follow a change of it)
+    t.check("role names are library texts", plat::a11y::ROLE_TEXTS.iter().all(|k| keys.contains(k)));
+    plat::a11y::set_translator(i18n::tr);
+    let role = |r| plat::a11y::role_name(r);
+    for (lang, want) in [
+        ("de", ("Umschalter", "Überschrift", "Dialog")),
+        ("en", ("toggle switch", "heading", "dialog")),
+        ("fr", ("interrupteur", "titre", "boîte de dialogue")),
+        ("he", ("מתג", "כותרת", "תיבת דו-שיח")),
+    ] {
+        i18n::set_language_code(lang);
+        t.eq(&format!("{lang}: role names"), (role(Role::Switch), role(Role::Heading), role(Role::Dialog)), want);
     }
     i18n::set_language_code("ru");
     t.eq("other languages: English", (i18n::language_code(), i18n::tr("Öffnen"), i18n::month_name(1)), (s("ru"), "Open", "January"));

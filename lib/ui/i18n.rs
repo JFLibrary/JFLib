@@ -646,6 +646,33 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["aktuell", "current", "actuel", "actual", "attuale", "huidig", "bieżąca", "الحالية", "נוכחי"],
     ["min.", "min", "min", "mín.", "min", "min.", "min.", "الأدنى", "מינימום"],
     ["max.", "max", "max", "máx.", "max", "max.", "maks.", "الأقصى", "מקסימום"],
+    // the names of the roles screen readers hear (plat::a11y::ROLE_TEXTS: UIA
+    // LocalizedControlType, AT-SPI GetLocalizedRoleName), English as AT-SPI names them
+    ["Bereich", "panel", "panneau", "panel", "pannello", "paneel", "panel", "لوحة", "חלונית"],
+    ["Bezeichnung", "label", "étiquette", "etiqueta", "etichetta", "label", "etykieta", "تسمية", "תווית"],
+    ["Schaltfläche", "push button", "bouton", "botón", "pulsante", "knop", "przycisk", "زر", "לחצן"],
+    ["Kontrollkästchen", "check box", "case à cocher", "casilla", "casella di controllo", "selectievakje", "pole wyboru", "خانة اختيار", "תיבת סימון"],
+    ["Optionsfeld", "radio button", "bouton radio", "botón de opción", "pulsante di opzione", "keuzerondje", "przycisk opcji", "زر اختيار", "לחצן אפשרות"],
+    ["Umschalter", "toggle switch", "interrupteur", "interruptor", "interruttore", "schakelaar", "przełącznik", "مفتاح تبديل", "מתג"],
+    ["Schieberegler", "slider", "curseur", "control deslizante", "dispositivo di scorrimento", "schuifregelaar", "suwak", "شريط تمرير", "מחוון"],
+    ["Fortschrittsanzeige", "progress bar", "barre de progression", "barra de progreso", "barra di avanzamento", "voortgangsbalk", "pasek postępu", "شريط التقدم", "סרגל התקדמות"],
+    ["Eingabefeld", "entry", "zone de saisie", "campo de texto", "campo di testo", "invoerveld", "pole tekstowe", "حقل إدخال", "שדה קלט"],
+    ["Verweis", "link", "lien", "enlace", "collegamento", "koppeling", "łącze", "ارتباط", "קישור"],
+    ["Listenfeld", "list box", "zone de liste", "cuadro de lista", "casella di riepilogo", "keuzelijst", "pole listy", "مربع قائمة", "תיבת רשימה"],
+    ["Listeneintrag", "list item", "élément de liste", "elemento de lista", "elemento dell'elenco", "lijstitem", "element listy", "عنصر قائمة", "פריט ברשימה"],
+    ["Menüleiste", "menu bar", "barre de menus", "barra de menús", "barra dei menu", "menubalk", "pasek menu", "شريط القوائم", "סרגל תפריטים"],
+    ["Menü", "menu", "menu", "menú", "menu", "menu", "menu", "قائمة", "תפריט"],
+    ["Menüeintrag", "menu item", "élément de menu", "elemento de menú", "voce di menu", "menu-item", "element menu", "بند قائمة", "פריט תפריט"],
+    ["Registerleiste", "page tab list", "liste d'onglets", "lista de pestañas", "elenco schede", "tabbladenlijst", "lista kart", "قائمة علامات التبويب", "רשימת כרטיסיות"],
+    ["Registerkarte", "page tab", "onglet", "pestaña", "scheda", "tabblad", "karta", "علامة تبويب", "כרטיסייה"],
+    ["Kombinationsfeld", "combo box", "zone de liste déroulante", "cuadro combinado", "casella combinata", "keuzelijst met invoervak", "pole kombi", "مربع تحرير وسرد", "תיבה משולבת"],
+    ["Grafik", "image", "image", "imagen", "immagine", "afbeelding", "obraz", "صورة", "תמונה"],
+    ["Zeichenfläche", "canvas", "zone de dessin", "lienzo", "area di disegno", "tekenvlak", "obszar rysowania", "لوحة رسم", "משטח ציור"],
+    ["Dialog", "dialog", "boîte de dialogue", "cuadro de diálogo", "finestra di dialogo", "dialoogvenster", "okno dialogowe", "مربع حوار", "תיבת דו-שיח"],
+    ["Überschrift", "heading", "titre", "encabezado", "intestazione", "kop", "nagłówek", "عنوان", "כותרת"],
+    ["Rahmen", "frame", "cadre", "marco", "cornice", "kader", "ramka", "إطار", "מסגרת"],
+    ["Anwendung", "application", "application", "aplicación", "applicazione", "toepassing", "aplikacja", "تطبيق", "יישום"],
+    ["unbekannt", "unknown", "inconnu", "desconocido", "sconosciuto", "onbekend", "nieznany", "غير معروف", "לא ידוע"],
 ];
 
 /// a library text in the current language: the UI language when the library has it

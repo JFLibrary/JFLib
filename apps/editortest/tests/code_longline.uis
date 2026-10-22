@@ -1,0 +1,57 @@
+#!args --verify-dirty
+# long lines (lib/ui/code_long.rs): one line of 100 000 bytes of minified JSON, one line of 1 MB
+# of Rust with umlauts, CJK characters, emoji and tabs.  Only the part of a line in view is
+# drawn; its columns and tokens are kept and worked again near an edit only.  Each bench passes
+# when the median of its frames stays below 30 ms -- generous for a loaded machine: a frame takes
+# 0.1 to 2.5 ms here (before: up to a second per pass on a line of 7000 characters, two minutes
+# on 100 000).  Typing at the start and at the end, the caret by characters and words,
+# selecting, sideways scrolling, find and the next match, undo; the caret's column (the tab
+# after the typed text evens out the shift) and the matches show that what is kept follows the
+# edits
+size 1000 680
+click tab:"Code"
+cmd 904 100000
+expect text:"lines: 1" exists
+expect text:"lang: JSON" exists
+focus #3000
+bench 20 type "x" 30000
+expect text:"pos: 1:21" exists
+key end
+expect text:"pos: 1:100080" exists
+bench 20 type "y" 30000
+expect text:"pos: 1:100100" exists
+bench 20 key left 30000
+bench 20 key ctrl+left 30000
+bench 20 key shift+left 30000
+bench 20 wheel #3000 120 shift 30000
+key ctrl+home
+bench 20 key ctrl+right 30000
+key ctrl+f
+type "item 77"
+expect text:"find: 1/11" exists
+bench 20 key f3 30000
+expect text:"find: 10/11" exists
+key esc
+key end
+key ctrl+z
+expect text:"pos: 1:100080" exists
+cmd 905 1000000
+expect text:"lines: 1" exists
+expect text:"lang: Rust" exists
+focus #3000
+bench 10 type "x" 30000
+key end
+expect text:"pos: 1:851093" exists
+bench 10 type "y" 30000
+bench 10 key left 30000
+bench 10 key ctrl+left 30000
+bench 10 key shift+home 30000
+bench 10 wheel #3000 120 shift 30000
+key end
+key ctrl+f
+type "東京"
+expect text:"find: 1/21277" exists
+bench 10 key f3 30000
+expect text:"find: 11/21277" exists
+key esc
+expect_nowarn

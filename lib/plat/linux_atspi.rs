@@ -12,7 +12,8 @@
 // Objects (all on our connection): /org/a11y/atspi/accessible/root the application (role
 // application, Application interface), .../w<window> a window (frame / dialog),
 // .../n<window>_<key hex> a node; /org/a11y/atspi/null the null reference.  Interfaces:
-// Accessible (everything; headings: role heading, the attribute level:N), Component (windows,
+// Accessible (everything; headings: role heading, the attribute level:N; GetRoleName in
+// English, GetLocalizedRoleName in the UI language: a11y::role_name), Component (windows,
 // nodes), Action (A_CLICK: "click"), Value (sliders, progress bars; CurrentValue is writable),
 // Text (labels, headings, text boxes; the basic queries, the caret and the selection, which
 // SetCaretOffset / SetSelection move; character extents from Node::char_rect: exact at the
@@ -710,7 +711,15 @@ impl Bridge {
                 Obj::Node(..) => node.map_or(-1, |n| n.index as i32),
             })]),
             (I_ACC, "GetRole") => Ok(alloc::vec![Value::U(self.role(o, w, node))]),
-            (I_ACC, "GetRoleName" | "GetLocalizedRoleName") => Ok(alloc::vec![Value::str(role_name(self.role(o, w, node)))]),
+            (I_ACC, "GetRoleName") => Ok(alloc::vec![Value::str(role_name(self.role(o, w, node)))]),
+            // (what Orca says: in the UI language)
+            (I_ACC, "GetLocalizedRoleName") => Ok(alloc::vec![Value::str(match (o, w, node) {
+                (Obj::App, ..) => ax::role_text(ax::ROLE_APP),
+                (Obj::Win(_), Some(t), _) if t.dialog => ax::role_name(Role::Dialog),
+                (Obj::Win(_), Some(_), _) => ax::role_text(ax::ROLE_WINDOW),
+                (Obj::Node(..), _, Some(n)) => ax::role_name(n.role),
+                _ => ax::role_text(ax::ROLE_UNKNOWN),
+            })]),
             (I_ACC, "GetState") => {
                 let st = match (o, w, node) {
                     (Obj::Node(..), Some(t), Some(n)) => node_states(t, n),

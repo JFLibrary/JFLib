@@ -6,7 +6,8 @@
 //
 //   a11y_tree() -> plat::a11y::Snapshot   the tree as assistive technology gets it
 // Runtime (runtime.rs): a11y_frame after the passes (publishes while plat::a11y::active();
-// starts the bridge with the first window frame), a11y_poll on E_WAKE (takes the requests).
+// starts the bridge with the first window frame and hands it i18n::tr for the names of the
+// roles: plat::a11y::set_translator), a11y_poll on E_WAKE (takes the requests).
 // Widgets: behave asks a11y_click(id) (a pending click, toggle, select or open acts like
 // Space on the focused widget: EV_ACT); the sliders ask a11y_value(id), the text boxes
 // a11y_text(id) for a new value (both public for widgets of an app's own).  A click no widget took in its passes becomes a pointer
@@ -466,12 +467,16 @@ impl Ui {
         self.m.a11y.value = None;
         self.m.a11y.text = None;
         self.a11y_select();
-        if self.headless {
-            return;
-        }
         if !self.m.a11y.started {
             self.m.a11y.started = true;
-            plat::a11y::start(self.desc.title);
+            // the role names the bridges give, in the UI language (plat cannot ask ui)
+            plat::a11y::set_translator(crate::i18n::tr);
+            if !self.headless {
+                plat::a11y::start(self.desc.title);
+            }
+        }
+        if self.headless {
+            return;
         }
         if plat::a11y::active() {
             plat::a11y::publish(self.a11y_tree());

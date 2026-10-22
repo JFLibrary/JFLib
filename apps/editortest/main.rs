@@ -17,7 +17,9 @@
 // ui.code_diag) and where the first six are now (`ds: line:col-line:col E|W|I`, they follow
 // the edits until the next check).  Commands for scripts: `cmd 900` diagnostics over lines,
 // at a point and stacked on the Rust sample, `cmd 901` none, `cmd 902` one on every 7th line
-// of "100 000 Zeilen" that calls compute(), `cmd 903` CE_MARKS on / off.
+// of "100 000 Zeilen" that calls compute(), `cmd 903` CE_MARKS on / off, `cmd 904 N` one line
+// of minified JSON of N bytes (default 100 000), `cmd 905 N` one line of Rust with umlauts, CJK
+// characters, emoji and tabs.
 // Fonts: DejaVu Sans Mono (the code editor, mono_font_set; also registered as a family) and
 // DejaVu Serif (registered for the rich text) from lib/doc_view/assets (licence:
 // DejaVu-LICENSE.txt there).
@@ -65,6 +67,8 @@ const CMD_DIAGS: u32 = 900;
 const CMD_NO_DIAGS: u32 = 901;
 const CMD_BIG_DIAGS: u32 = 902;
 const CMD_MARKS: u32 = 903;
+const CMD_LONG_JSON: u32 = 904;
+const CMD_LONG_MIXED: u32 = 905;
 
 const LANGS: [&str; 7] = ["Rust", "JSON", "INI", "TOML", "Markdown", "Text", "JFS"];
 const JFS: i32 = 6;
@@ -329,6 +333,34 @@ pub fn big_code(n: usize) -> CodeDoc {
     }
     lines.truncate(n);
     CodeDoc::from_lines(lines)
+}
+
+/// one line of minified JSON of at least n bytes (cmd 904): objects with keys, strings,
+/// numbers, nested brackets
+pub fn long_json(n: usize) -> CodeDoc {
+    let mut s = String::with_capacity(n + 80);
+    s.push('[');
+    let mut i = 0;
+    while s.len() < n {
+        if i > 0 {
+            s.push(',');
+        }
+        s.push_str(&format!("{{\"id\":{},\"name\":\"item {}\",\"tags\":[\"a\",\"b\"],\"pos\":[{},{}],\"ok\":true}}", i, i, i % 97, i % 13));
+        i += 1;
+    }
+    s.push(']');
+    CodeDoc::from_lines(alloc::vec![s])
+}
+
+/// one line of Rust of at least n bytes with umlauts, CJK characters, emoji, a tab and
+/// brackets (cmd 905)
+pub fn long_mixed(n: usize) -> CodeDoc {
+    const PART: &str = "let grüße = f(x[1], \"東京 🙂\"); /* é */\t";
+    let mut s = String::with_capacity(n + PART.len());
+    while s.len() < n {
+        s.push_str(PART);
+    }
+    CodeDoc::from_lines(alloc::vec![s])
 }
 
 fn hex(c: u32) -> String {
@@ -637,7 +669,7 @@ impl App for EdTest {
         ui.box_end();
     }
 
-    fn command(&mut self, ui: &mut Ui, id: u32, _arg: u32) -> bool {
+    fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
         match id {
             CMD_DIAGS | CMD_NO_DIAGS | CMD_BIG_DIAGS => {
                 self.test_diags(id);
@@ -646,6 +678,13 @@ impl App for EdTest {
             }
             CMD_MARKS => {
                 self.marks = !self.marks;
+                ui.repass();
+                true
+            }
+            CMD_LONG_JSON | CMD_LONG_MIXED => {
+                let n = if arg > 0 { arg as usize } else { 100_000 };
+                (self.lang, self.code) = if id == CMD_LONG_JSON { (1, long_json(n)) } else { (0, long_mixed(n)) };
+                self.diag_row = self.live != 0;
                 ui.repass();
                 true
             }

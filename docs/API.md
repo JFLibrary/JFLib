@@ -2046,8 +2046,11 @@ highlighting (highlight.rs)
        bracket pair at the caret, a find / replace bar, scroll bars.  Only the visible lines
        are laid out and highlighted (the editor keeps each line's start state and follows
        the document's change journal), so a file of 100 000 lines scrolls as fast as a
-       short one.  EV_ACT: the text changed; EV_FOCUS while focused; EV_COMMIT: the focus
-       left.  Ids id .. id + 15 (id + 1 / + 2 the scroll bars, + 3 .. 13 the find bar).
+       short one; of a long line only the part in view (code_long.rs keeps the columns and
+       tokens of long lines and works them again near an edit only), so typing in a line of
+       1 MB is as fast as in a short one.  EV_ACT: the text changed; EV_FOCUS while
+       focused; EV_COMMIT: the focus left.  Ids id .. id + 15 (id + 1 / + 2 the scroll bars,
+       + 3 .. 13 the find bar).
        CE_READONLY: select, copy and find only; CE_NO_GUTTER: no line numbers;
        CE_NO_FRAME: no box; CE_NO_FIND: no find bar; CE_NO_LINE: no current-line highlight;
        CE_MARKS: the gutter keeps its column of diagnostic markers while there are none
@@ -3653,6 +3656,8 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                   a drag (press and release untimed; every other run drags back)
   bench N wheel S DY [shift|ctrl|alt]... [MAX_US]   ... for N wheel events at S, DY and -DY
                   by turns (with ctrl: zoom in and out)
+  bench N key CHORD [MAX_US]    ... for N presses of a key (e.g. bench 20 key shift+right)
+  bench N type "s" [MAX_US]     ... for N times typing the text (one frame each)
                   With MAX_US a run passes when its median is at most MAX_US; up to three
                   runs (the median and the retries ride out a busy machine), FAIL when none
                   does
@@ -5820,7 +5825,8 @@ out through the widgets' own behaviour.
 
   a11y_tree() -> plat::a11y::Snapshot   the tree as assistive technology gets it
 Runtime (runtime.rs): a11y_frame after the passes (publishes while plat::a11y::active();
-starts the bridge with the first window frame), a11y_poll on E_WAKE (takes the requests).
+starts the bridge with the first window frame and hands it i18n::tr for the names of the
+roles: plat::a11y::set_translator), a11y_poll on E_WAKE (takes the requests).
 Widgets: behave asks a11y_click(id) (a pending click, toggle, select or open acts like
 Space on the focused widget: EV_ACT); the sliders ask a11y_value(id), the text boxes
 a11y_text(id) for a new value (both public for widgets of an app's own).  A click no widget took in its passes becomes a pointer
@@ -6592,6 +6598,37 @@ scrolls its blocks with it.
   the selection of the innermost vlist while its rows are emitted (-1 outside one)
 - **`fn vlist_end(&mut self, st: &mut VListState) -> u32`**
   ui_vlist_end(&mut st) -> EV_\* (see the module header)
+
+#### `ui/code_long.rs`
+
+Source: [`lib/ui/code_long.rs`](../lib/ui/code_long.rs)
+
+```text
+code_long -- what ui.code_editor (code_edit.rs) keeps of the long lines it shows: checkpoints
+of their columns and their tokens, so that a pass looks at the part of a line in view and an
+edit works again only near it
+
+  Longs::col / byte / floor     columns (code_doc.rs: col_from, byte_from, cell_floor) from
+                                the checkpoint before the place
+  Longs::tokens                 the tokens of a long line (highlight.rs) and its end state
+
+A line of COL_LONG bytes or more gets checkpoints (byte, column) at cluster boundaries about
+every COL_STEP bytes and keeps its tokens with places outside every construct about every
+TOK_STEP bytes.  The entries follow the document's change journal (lines that moved keep
+theirs); a line changed in place keeps its text of before, and the next look at it compares:
+the columns are walked again from the checkpoint before the change to where they meet the
+old ones again (moved along after that, a tab evens out a shift of the columns), the tokens
+are scanned again from a place TOK_REACH bytes before the change (rules look ahead) to the
+first place after it where the scan is where the old scan was.  A construct that looks
+further ahead than TOK_REACH (Markdown emphasis waiting for its closer) is seen again when the
+whole line is scanned: a change of its start state, another grammar.
+```
+
+- **`fn code_long_check(text: &str, h: &Highlighter, tw: u8, edits: &[(usize, usize, &str)]) -> Vec<String>`**
+  (tests) line `text` changed by `edits` one after the other (bytes a..b of the line then
+  replaced by s): the column checkpoints and the tokens a code editor keeps of a long line,
+  brought along through each change, against a fresh look at the line -> what differs (empty:
+  nothing)
 
 #### `ui/text_surface.rs`
 
@@ -10559,6 +10596,8 @@ opportunities (UAX #14), Unicode 15.0 (segment_data.rs, tools/gen_segment.py)
 
   grapheme_next(s, i) -> index     the end of the grapheme cluster that starts at or holds i
   grapheme_prev(s, i) -> index     the start of the cluster before i (0 at the start)
+  cluster_end(s, i) -> index       the end of the cluster that starts at boundary i (walks
+                                   over a text cluster by cluster)
   is_grapheme_boundary(s, i)
   graphemes(s) -> Vec<usize>       every cluster boundary, 0 and s.len() included
   pictographic_cluster(s, a, b)    the cluster a..b is an emoji sequence (Backspace deletes it
@@ -10586,8 +10625,10 @@ opportunities (UAX #14), Unicode 15.0 (segment_data.rs, tools/gen_segment.py)
 Indices are byte offsets into UTF-8 text; an index inside a character is moved to that
 character's start.  Rules: UAX #29 GB3..GB13 and WB3..WB16 of Unicode 15.0 (no GB9c: that came
 with 15.1); UAX #14 LB2..LB31 with the pair rules of LB25 (numbers), LB30 for East Asian
-parentheses and LB30b for emoji modifiers.  Grapheme and word scans run from the paragraph
-start (the last '\n' before i), as a line feed always ends a cluster and a word.
+parentheses and LB30b for emoji modifiers.  Grapheme and word scans around i start at the
+nearest place before i where no rule joins or looks across (usually right there; at the
+latest the paragraph start, the last '\n' before i) and words end at the next such place,
+so the cost does not grow with the length of a line.
 ```
 
 ```rust
@@ -10604,6 +10645,10 @@ WK_PUNCT: u32 = 2
 
 - **`fn grapheme_next(s: &str, i: usize) -> usize`**
   the end of the grapheme cluster that starts at or holds i (s.len() at the end)
+
+- **`fn cluster_end(s: &str, i: usize) -> usize`**
+  the end of the grapheme cluster that starts at i, a cluster boundary (grapheme_next without
+  looking back: walks from boundary to boundary)
 
 - **`fn grapheme_prev(s: &str, i: usize) -> usize`**
   the start of the grapheme cluster before i (0 at the start)
@@ -17967,6 +18012,11 @@ assistive technology back to the UI thread:
   take() -> Vec<Request>       the actions asked for since the last call (UI thread)
   request(Request)             (bridges, tests) queue an action and wake the UI thread
   current() -> Option<Arc<Snapshot>>   (bridges) the tree last published
+  set_translator(f) / role_name(role) / role_text(k)   the names of the roles the bridges
+                               give (UIA LocalizedControlType, AT-SPI GetLocalizedRoleName) in
+                               the UI language: ROLE_TEXTS holds them in German, the keys of
+                               the UI's translation (ui registers i18n::tr; plat cannot ask
+                               ui itself); without one they stay German
 
 Linux: AT-SPI2 on the accessibility bus (linux_atspi.rs).  Windows: UI Automation providers
 answering WM_GETOBJECT (win_uia.rs).  The browser and Android (web_a11y.rs): the host keeps
@@ -18182,6 +18232,32 @@ A_TEXT: u32 = 8
 
 - **`fn take() -> Vec<Request>`**
   the actions asked for since the last call, oldest first (UI thread)
+
+*the texts of the bridges*
+
+```rust
+/// what the bridges call the roles (UIA LocalizedControlType, AT-SPI GetLocalizedRoleName) in
+/// Role order, then a window (AT-SPI frame), the application and an unknown role: in German,
+/// the keys of their translations (set_translator; ui's i18n::tr has them in its languages)
+ROLE_TEXTS: [&str; 25] = [ "Bereich", "Bezeichnung", "Schaltfläche", "Kontrollkäst ...
+/// ROLE_TEXTS: a window
+ROLE_WINDOW: usize = 22
+/// ROLE_TEXTS: the application
+ROLE_APP: usize = 23
+/// ROLE_TEXTS: an unknown role
+ROLE_UNKNOWN: usize = 24
+```
+
+- **`fn set_translator(f: fn(&'static str) -> &'static str)`**
+  the translation of the bridges' texts into the UI language (ui sets i18n::tr with its first
+  frame; it reads the language each time, so the texts follow a change of it); without one
+  they stay German
+
+- **`fn role_text(k: usize) -> &'static str`**
+  ROLE_TEXTS[k] in the UI language
+
+- **`fn role_name(r: Role) -> &'static str`**
+  what the bridges call a role, in the UI language
 
 ### `plat/a11y_wire.rs`
 
@@ -19588,7 +19664,9 @@ links, menu items), Toggle (check boxes, switches), Value (text boxes; drop-down
 RangeValue (sliders; progress bars read-only), SelectionItem (radio buttons, tabs, list rows),
 ExpandCollapse (drop-downs, menus), Text / Text2 (text boxes: ranges, the caret and the
 selection; win_uia_text.rs).  Headings are Text elements with HeadingLevel1 .. 9 (and the
-AriaRole "heading", AriaProperties "level=N").  Actions become a11y::request.  Events: focus
+AriaRole "heading", AriaProperties "level=N").  Dialogs, switches and headings name their
+control type themselves (LocalizedControlType: a11y::role_name, in the UI language), the
+others leave it to UIA.  Actions become a11y::request.  Events: focus
 changed, property changes (toggle state, selected, expand state, enabled, name, value, range
 value, heading level), text selection changed (the caret moved: screen readers and Magnifier
 follow it), text changed, structure changed (children invalidated).  UIAutomationCore.dll
@@ -19599,6 +19677,7 @@ and oleaut32.dll are loaded on the first WM_GETOBJECT.
   (tests) one element as a UI Automation client sees it
   - `name: String`
   - `control_type: i32`
+  - `localized_type: String` -- LocalizedControlType (UIA's own name of the control type unless the provider gives one)
   - `depth: u32` -- below the window's element (1 = a child of it)
   - `enabled: bool`
   - `focused: bool`

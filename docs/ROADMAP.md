@@ -632,6 +632,28 @@ Fensterrand hinaus.
     300 DIP abgeschnitten); das Folgen vergleicht alten und neuen Text der geänderten Zeilen –
     mehrdeutige Änderungen (eine Zeile löschen, die wie die nächste beginnt) können eine
     Diagnose bis zur nächsten Prüfung leicht verschieben.
+  * Lange Zeilen (2026-10-22): eine Zeile von 7000 Zeichen kostete bis zu 1 s je Durchgang,
+    100 000 Zeichen rund 2 Minuten – `text::segment` suchte für jeden Cluster und jedes Wort ab
+    dem Zeilenanfang (jede Spaltenberechnung quadratisch), der Editor tokenisierte die Zeile je
+    Frame und bei der Klammersuche je Kandidat neu und lief bis zur sichtbaren Spalte durch.
+    Jetzt schauen Graphem- und Wortfunktionen nur in die Nähe der Stelle (ab der nächsten Stelle
+    davor, an der keine Regel verbindet oder hinüberschaut; neu `segment::cluster_end`), und
+    [`ui/code_long.rs`](../lib/ui/code_long.rs) hält für Zeilen ab 4 KB Spalten-Stützpunkte
+    (alle ~1 KB) und die Token samt Wiederaufsetzpunkten; nach einer Änderung werden Spalten ab
+    dem Stützpunkt davor bis zum Wiedertreffen der alten neu gezählt (danach verschoben, ein Tab
+    gleicht die Verschiebung aus) und Token ab 4 KB vor der Änderung neu gescannt, bis der Scan
+    wieder dort ist, wo der alte war. Gezeichnet wird nur der sichtbare Teil, Treffer und
+    Diagnosen nur dort. 1 MB in einer Zeile (minifiziertes JSON, Rust mit Umlauten / CJK /
+    Emoji / Tabs): Tippen 0,7–2 ms, Caret, Auswahl, seitliches Scrollen, F3 0,05–0,2 ms je
+    Frame; das erste Laden ~30–80 ms. Getestet mit `tests/code_longline.uis` (Benchmarks mit
+    Grenze 30 ms, Spalten und Treffer nach Änderungen), `--test model` (`ui::code_long_check`:
+    gehaltene Spalten und Token durch 65 Änderungen gegen frisches Zählen und Scannen, Rust,
+    JSON, JFS, Text; jetzt 274 Prüfungen) und `uitest` (die nahen Graphem- und Wortsuchen gegen
+    die ganze Zeile); die 63 Shots von editortest und mdviewtest sind byteweise gleich geblieben.
+    Offen: ein Konstrukt, das weiter als 4 KB vorausschaut (Markdown-Hervorhebung, die auf ihr
+    Ende wartet), wird erst beim nächsten Scan der ganzen Zeile neu bewertet; Undo hält je
+    Schritt die ganze alte und neue Zeile (bei 1 MB 2 MB je Schritt); der
+    Barrierefreiheits-Text einer einzelnen Zeile über 64 KB bleibt leer.
   * Getestet mit `apps/editortest` (13 Skripte mit `--verify-dirty`, Windows und Linux, und
     `--test model`: 168 Prüfungen der Modelle und Grammatiken).
   * Offen: kein bidirektionaler Text innerhalb eines Absatzes (wie bei den Textfeldern bleibt
@@ -639,9 +661,7 @@ Fensterrand hinaus.
     auf Android kommt nur getippter Text an; keine Rechtschreibprüfung, kein Kontextmenü, kein
     Ziehen von Text, keine Bilder / Tabellen im Rich-Text; RTF-Export fehlt (nur HTML / Text /
     JSON); Code-Editor ohne Zeilenumbruch, Mehrfach-Cursor, Regex-Suche und Code-Faltung;
-    sehr lange Einzelzeilen (MB-JSON in einer Zeile) werden je Frame bis zum sichtbaren
-    Bereich durchlaufen; der Barrierefreiheits-Text großer Dateien (> 64 KB) enthält nur die
-    sichtbaren Zeilen.
+    der Barrierefreiheits-Text großer Dateien (> 64 KB) enthält nur die sichtbaren Zeilen.
 - **P2** · *erledigt* · Popups und Tooltips über den Fensterrand hinaus (2026-10-18; die Teile für
   Toolfenster seit U3): Flyouts, Menüs und Untermenüs, Kombolisten, der Kalender von
   `date_picker`, Kontextmenüs und Tooltips **aller** Fenster, auch des Hauptfensters, dürfen
@@ -1116,6 +1136,24 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   Text gelassen: Skripte wählen ihn als `text:`), die Ebene unter Android (keine API) und der
   API-26-Weg (nur auf einem API-35-Emulator getestet); mit echten Screenreadern nicht
   ausprobiert.
+- **P2** · *erledigt* · Rollennamen in der UI-Sprache (2026-10-22): UIA bekam für Dialoge,
+  Schalter und Überschriften fest „Dialog“, „Umschalter“, „Überschrift“ als
+  `LocalizedControlType`, AT-SPI2 für jede Rolle englisch („push button“) als
+  `GetLocalizedRoleName`. Jetzt hält `plat::a11y::ROLE_TEXTS` die Namen aller Rollen (dazu
+  Fenster, Anwendung, unbekannt) deutsch als Schlüssel; ui reicht der Plattform beim ersten
+  Frame `i18n::tr` (`plat::a11y::set_translator` – plat darf ui nicht kennen), `role_name`
+  liefert sie in der UI-Sprache und folgt einem Sprachwechsel sofort; die Texte stehen in
+  `LIB_TEXTS` in allen neun Sprachen (Englisch wie AT-SPI sie nennt). UIA nennt die übrigen
+  Steuerelementtypen weiter selbst (in der Sprache des Systems); `GetRoleName` bleibt englisch.
+  Web (ARIA-Rollen, die der Browser benennt) und Android (Klassennamen, die TalkBack benennt)
+  hatten keine festen Texte. Tests: `plattest --test a11y` (deutsch, englisch nach Wechsel),
+  `--test uia` (`LocalizedControlType` von Schalter und Überschrift deutsch, nach Wechsel
+  englisch und französisch, eine Schaltfläche behält den von UIA), `atspi_bus.py` (ein zweiter
+  Lauf mit `--lang en`), `i18ntest` (jeder Rollenname ein Bibliothekstext, in de / en / fr / he);
+  am 2026-10-22 grün: `--test a11y` 59, `--test uia` 54, `atspi_bus.py --real` 136, `i18ntest`
+  2514 (Windows und Linux). Offen: `web/index.html` hat fest `lang="de"` (die Seite folgt nicht der UI-Sprache); weitere
+  feste deutsche Texte in plat (Titel der Linux-Dateidialoge über das Portal, Fehlermeldungen von
+  Diensten, Zertifikaten, Prozessen) laufen noch nicht über eine Übersetzung.
 - **P1** · *erledigt* · Theme mit hohem Kontrast ([`ui/theme.rs`](../lib/ui/theme.rs)
   `contrast_tokens`): alle Tokens aus dem Kontrastschema – unter Windows die Systemfarben,
   sonst Weiß auf Schwarz bzw. Schwarz auf Weiß –, deckende Flächen, Ränder in Textfarbe,

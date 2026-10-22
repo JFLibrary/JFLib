@@ -35,6 +35,8 @@
 //                   a drag (press and release untimed; every other run drags back)
 //   bench N wheel S DY [shift|ctrl|alt]... [MAX_US]   ... for N wheel events at S, DY and -DY
 //                   by turns (with ctrl: zoom in and out)
+//   bench N key CHORD [MAX_US]    ... for N presses of a key (e.g. bench 20 key shift+right)
+//   bench N type "s" [MAX_US]     ... for N times typing the text (one frame each)
 //                   With MAX_US a run passes when its median is at most MAX_US; up to three
 //                   runs (the median and the retries ride out a busy machine), FAIL when none
 //                   does
@@ -262,6 +264,30 @@ fn parse_button(p: &[u8]) -> u32 {
         Some(b'm') => BTN_MIDDLE,
         _ => BTN_LEFT,
     }
+}
+
+// chord(p) -> (modifiers, virtual key, the rest after the chord's word): "ctrl+shift+f3"; None
+// = an unknown key
+fn chord(p: &[u8]) -> Option<(u32, u32, &[u8])> {
+    let mut p = p;
+    let mut mods = 0;
+    loop {
+        if p.starts_with(b"ctrl+") {
+            mods |= MOD_CTRL;
+            p = &p[5..];
+        } else if p.starts_with(b"shift+") {
+            mods |= MOD_SHIFT;
+            p = &p[6..];
+        } else if p.starts_with(b"alt+") {
+            mods |= MOD_ALT;
+            p = &p[4..];
+        } else {
+            break;
+        }
+    }
+    // the key name ends at a blank
+    let vk = key_lookup(p);
+    (vk != 0).then(|| (mods, vk, next_word(p)))
 }
 
 // mod_word(p) -> MOD_* of the word shift / ctrl / alt at p (0 = another word): the modifiers
@@ -1341,33 +1367,21 @@ impl Ui {
             if p.is_empty() {
                 break;
             }
-            let mut mods = 0;
-            loop {
-                if p.starts_with(b"ctrl+") {
-                    mods |= MOD_CTRL;
-                    p = &p[5..];
-                } else if p.starts_with(b"shift+") {
-                    mods |= MOD_SHIFT;
-                    p = &p[6..];
-                } else if p.starts_with(b"alt+") {
-                    mods |= MOD_ALT;
-                    p = &p[4..];
-                } else {
-                    break;
-                }
-            }
-            // the key name ends at a blank
-            let vk = key_lookup(p);
-            if vk == 0 {
+            let Some((mods, vk, rest)) = chord(p) else {
                 self.fail(b"unknown key");
                 return;
-            }
-            self.sc.script_mods = mods;
-            self.inject(app, plat::E_KEY_DOWN, 0, 0, 0, vk);
-            self.inject(app, plat::E_KEY_UP, 0, 0, 0, vk);
-            self.sc.script_mods = 0;
-            p = next_word(p);
+            };
+            self.press(app, mods, vk);
+            p = rest;
         }
+    }
+
+    // a key pressed and released with modifiers
+    fn press(&mut self, app: &mut dyn App, mods: u32, vk: u32) {
+        self.sc.script_mods = mods;
+        self.inject(app, plat::E_KEY_DOWN, 0, 0, 0, vk);
+        self.inject(app, plat::E_KEY_UP, 0, 0, 0, vk);
+        self.sc.script_mods = 0;
     }
 
     // commit "text" [N]: the commits of an input method (plat::ime_commit_text) to the window
@@ -1767,7 +1781,8 @@ impl Ui {
     }
 
     // bench N: time N frames: build (passes), full render, partial render (no change);
-    // bench N anim | drag S1 S2 [opts] | wheel S DY [mods], each [MAX_US]: frames that move
+    // bench N anim | drag S1 S2 [opts] | wheel S DY [mods] | key CHORD | type "s", each
+    // [MAX_US]: frames that move
     fn sc_bench(&mut self, app: &mut dyn App, a: &[u8]) {
         let (n, r) = parse_int(a);
         let w = skip_ws(r);
@@ -1804,14 +1819,16 @@ impl Ui {
         plat::write_stdout(s.as_bytes());
     }
 
-    // bench N anim | drag S1 S2 [middle|right|shift|ctrl|alt]... | wheel S DY [shift|ctrl|alt]...,
-    // each with an optional MAX_US: n frames that move per run, up to three runs with a limit
-    // (the first whose median is at most MAX_US passes)
+    // bench N anim | drag S1 S2 [middle|right|shift|ctrl|alt]... | wheel S DY [shift|ctrl|alt]... |
+    // key CHORD | type "s", each with an optional MAX_US: n frames that move per run, up to three
+    // runs with a limit (the first whose median is at most MAX_US passes)
     fn sc_bench_moving(&mut self, app: &mut dyn App, n: usize, a: &[u8]) {
         enum Kind {
             Anim,
             Drag { from: (i32, i32), to: (i32, i32), btn: u32, mods: u32, win: u32 },
             Wheel { at: (i32, i32), dy: i32, mods: u32, win: u32 },
+            Key { mods: u32, vk: u32 },
+            Type(Vec<u32>),
         }
         // the words of a drag / wheel up to the limit (a number)
         let opts = |r: &[u8], drag: bool| -> Result<(u32, u32, usize), Vec<u8>> {
@@ -1875,8 +1892,20 @@ impl Ui {
                     return;
                 }
             }
+        } else if let Some(r) = word_eq(a, "key") {
+            let Some((mods, vk, r)) = chord(skip_ws(r)) else {
+                self.fail(b"unknown key");
+                return;
+            };
+            (Kind::Key { mods, vk }, r)
+        } else if let Some(r) = word_eq(a, "type") {
+            let Some((s, r)) = parse_qstring(skip_ws(r), 256) else {
+                self.fail(b"expected a quoted string");
+                return;
+            };
+            (Kind::Type(String::from_utf8_lossy(&s).chars().map(|c| c as u32).collect()), r)
         } else {
-            self.fail(b"expected: bench N [anim | drag S1 S2 [options] | wheel S DY [options]] [MAX_US]");
+            self.fail(b"expected: bench N [anim | drag S1 S2 [options] | wheel S DY [options] | key CHORD | type \"s\"] [MAX_US]");
             return;
         };
         let (max, _) = parse_int(skip_ws(rest));
@@ -1884,6 +1913,8 @@ impl Ui {
             Kind::Anim => "anim",
             Kind::Drag { .. } => "drag",
             Kind::Wheel { .. } => "wheel",
+            Kind::Key { .. } => "key",
+            Kind::Type(_) => "type",
         };
         let runs = if max > 0 { 3 } else { 1 };
         let mut best = u64::MAX;
@@ -1924,6 +1955,20 @@ impl Ui {
                         t.push(self.bench_frame(app, |ui, app| ui.inject(app, plat::E_WHEEL, 0, x, y, v as u16 as u32)));
                     }
                     self.sc.script_mods = saved;
+                }
+                Kind::Key { mods, vk } => {
+                    for _ in 0..n {
+                        t.push(self.bench_frame(app, |ui, app| ui.press(app, mods, vk)));
+                    }
+                }
+                Kind::Type(ref cps) => {
+                    for _ in 0..n {
+                        t.push(self.bench_frame(app, |ui, app| {
+                            for &cp in cps {
+                                ui.inject(app, plat::E_TEXT, 0, 0, 0, cp);
+                            }
+                        }));
+                    }
                 }
             }
             let mut s: Vec<u64> = t.iter().map(|x| x.0).collect();

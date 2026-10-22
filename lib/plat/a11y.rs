@@ -11,6 +11,11 @@
 //   take() -> Vec<Request>       the actions asked for since the last call (UI thread)
 //   request(Request)             (bridges, tests) queue an action and wake the UI thread
 //   current() -> Option<Arc<Snapshot>>   (bridges) the tree last published
+//   set_translator(f) / role_name(role) / role_text(k)   the names of the roles the bridges
+//                                give (UIA LocalizedControlType, AT-SPI GetLocalizedRoleName) in
+//                                the UI language: ROLE_TEXTS holds them in German, the keys of
+//                                the UI's translation (ui registers i18n::tr; plat cannot ask
+//                                ui itself); without one they stay German
 //
 // Linux: AT-SPI2 on the accessibility bus (linux_atspi.rs).  Windows: UI Automation providers
 // answering WM_GETOBJECT (win_uia.rs).  The browser and Android (web_a11y.rs): the host keeps
@@ -584,6 +589,66 @@ pub fn request(r: Request) {
 /// the actions asked for since the last call, oldest first (UI thread)
 pub fn take() -> Vec<Request> {
     core::mem::take(&mut *REQ.lock())
+}
+
+// ---------------------------------------------------------------- the texts of the bridges
+
+/// what the bridges call the roles (UIA LocalizedControlType, AT-SPI GetLocalizedRoleName) in
+/// Role order, then a window (AT-SPI frame), the application and an unknown role: in German,
+/// the keys of their translations (set_translator; ui's i18n::tr has them in its languages)
+pub const ROLE_TEXTS: [&str; 25] = [
+    "Bereich",
+    "Bezeichnung",
+    "Schaltfläche",
+    "Kontrollkästchen",
+    "Optionsfeld",
+    "Umschalter",
+    "Schieberegler",
+    "Fortschrittsanzeige",
+    "Eingabefeld",
+    "Verweis",
+    "Listenfeld",
+    "Listeneintrag",
+    "Menüleiste",
+    "Menü",
+    "Menüeintrag",
+    "Registerleiste",
+    "Registerkarte",
+    "Kombinationsfeld",
+    "Grafik",
+    "Zeichenfläche",
+    "Dialog",
+    "Überschrift",
+    "Rahmen",
+    "Anwendung",
+    "unbekannt",
+];
+/// ROLE_TEXTS: a window
+pub const ROLE_WINDOW: usize = 22;
+/// ROLE_TEXTS: the application
+pub const ROLE_APP: usize = 23;
+/// ROLE_TEXTS: an unknown role
+pub const ROLE_UNKNOWN: usize = 24;
+
+static TR: SpinLock<Option<fn(&'static str) -> &'static str>> = SpinLock::new(None);
+
+/// the translation of the bridges' texts into the UI language (ui sets i18n::tr with its first
+/// frame; it reads the language each time, so the texts follow a change of it); without one
+/// they stay German
+pub fn set_translator(f: fn(&'static str) -> &'static str) {
+    *TR.lock() = Some(f);
+}
+
+/// ROLE_TEXTS[k] in the UI language
+pub fn role_text(k: usize) -> &'static str {
+    let de = ROLE_TEXTS[k.min(ROLE_UNKNOWN)];
+    let f = *TR.lock();
+    f.map_or(de, |f| f(de))
+}
+
+/// what the bridges call a role, in the UI language
+pub fn role_name(r: Role) -> &'static str {
+    role_text(r as usize)
 }
 
 #[cfg(target_os = "linux")]

@@ -240,31 +240,43 @@ impl Highlighter {
     /// the tokens of one line from the state of the line before -> the state at its end
     pub fn line(&self, t: &str, state: u32, out: &mut Vec<Token>) -> u32 {
         out.clear();
-        let mut i = 0;
+        self.line_part(t, state, 0, out, &mut |_, _| false).1.unwrap_or(0)
+    }
+
+    // (code_long.rs) the tokens of line t from `from` on -- 0, or a place outside every
+    // construct that a scan of the line from `state` passed -- appended to out; at(i, out) sees
+    // each place outside every construct from `from` on (and the tokens so far), true stops
+    // there -> (where the scan stopped, the state at the line end; None: at stopped it)
+    pub(crate) fn line_part(&self, t: &str, state: u32, from: usize, out: &mut Vec<Token>, at: &mut dyn FnMut(usize, &[Token]) -> bool) -> (usize, Option<u32>) {
+        let mut i = from;
         let bol = t.len() - t.trim_start_matches([' ', '\t']).len();
-        if state != 0 {
+        if from == 0 && state != 0 {
             let (e, st) = self.resume(t, state, bol, out);
             if st != 0 {
-                return st;
+                return (t.len(), Some(st));
             }
             i = e;
         }
-        self.scan(t, i, bol, false, out).1
+        self.scan(t, i, bol, false, out, at)
     }
 
-    // the tokens from i on (code: inside an interpolation, up to the '}' that closes it) ->
-    // (where it stopped, the state at the line end: 0 = nothing open)
-    fn scan(&self, t: &str, mut i: usize, bol: usize, code: bool, out: &mut Vec<Token>) -> (usize, u32) {
+    // the tokens from i on (code: inside an interpolation, up to the '}' that closes it; else
+    // at(i) sees each place between constructs, true stops there) -> (where it stopped, the
+    // state at the line end: 0 = nothing open; None: at stopped it)
+    fn scan(&self, t: &str, mut i: usize, bol: usize, code: bool, out: &mut Vec<Token>, at: &mut dyn FnMut(usize, &[Token]) -> bool) -> (usize, Option<u32>) {
         let b = t.as_bytes();
         let n = b.len();
         let rules = self.g.rules;
         let mut braces = 0u32;
         'outer: while i < n {
+            if !code && at(i, out) {
+                return (i, None);
+            }
             if code && b[i] == b'{' {
                 braces += 1;
             } else if code && b[i] == b'}' {
                 if braces == 0 {
-                    return (i, 0);
+                    return (i, Some(0));
                 }
                 braces -= 1;
             }
@@ -275,19 +287,19 @@ impl Highlighter {
                     Rule::LineComment(p) => {
                         if t[i..].starts_with(p) {
                             push(out, i, n, SY_COMMENT);
-                            return (n, 0);
+                            return (n, Some(0));
                         }
                     }
                     Rule::Block { open, close, kind, nested, bol: only } => {
                         if (!*only || at_bol) && t[i..].starts_with(open) && !(prev && open.starts_with(|c: char| c.is_alphanumeric())) {
                             if *only {
                                 push(out, i, n, *kind);
-                                return (n, enc(ri, 1, 0));
+                                return (n, Some(enc(ri, 1, 0)));
                             }
                             let (e, depth) = scan_block(t, i + open.len(), open, close, *nested, 1);
                             push(out, i, e, *kind);
                             if depth > 0 {
-                                return (n, enc(ri, depth, 0));
+                                return (n, Some(enc(ri, depth, 0)));
                             }
                             i = e;
                             continue 'outer;
@@ -297,7 +309,7 @@ impl Highlighter {
                         if t[i..].starts_with(open) && !(prev && open.starts_with(|c: char| c.is_alphanumeric())) {
                             let (e, done) = scan_str(t, i, i + open.len(), close, *escape, *kind, out);
                             if !done && *multi {
-                                return (n, enc(ri, 0, 0));
+                                return (n, Some(enc(ri, 0, 0)));
                             }
                             i = e;
                             continue 'outer;
@@ -313,7 +325,7 @@ impl Highlighter {
                                 }
                                 None => {
                                     push(out, i, n, SY_STRING);
-                                    return (n, enc(ri, 0, hashes as u32));
+                                    return (n, Some(enc(ri, 0, hashes as u32)));
                                 }
                             }
                         }
@@ -322,7 +334,7 @@ impl Highlighter {
                         if t[i..].starts_with(open) && !(prev && open.starts_with(|c: char| c.is_alphanumeric())) {
                             let (e, st) = self.interp(t, i, open.len(), close, start, bol, out);
                             if st != 0 {
-                                return (n, st);
+                                return (n, Some(st));
                             }
                             i = e;
                             continue 'outer;
@@ -399,7 +411,7 @@ impl Highlighter {
             }
             i += utf8_len(b[i]);
         }
-        (n, 0)
+        (n, Some(0))
     }
 
     // a string with interpolations from its open quote at i (open: its length) -> (its end,
@@ -434,7 +446,8 @@ impl Highlighter {
             if t[j..].starts_with(start) {
                 push(out, s, j, SY_STRING);
                 push(out, j, j + start.len(), SY_META);
-                let (e, st) = self.scan(t, j + start.len(), bol, true, out);
+                let (e, st) = self.scan(t, j + start.len(), bol, true, out, &mut |_, _| false);
+                let st = st.unwrap_or(0);
                 if st != 0 || e >= b.len() {
                     return (b.len(), st);
                 }
