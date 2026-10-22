@@ -35,6 +35,8 @@ pub(crate) struct S {
     next: u32,
 }
 
+// toasts shown at once: a fixed display policy, not a queue (a sixth closes the oldest early,
+// as the notification stacks of Windows and GNOME do)
 const TOAST_MAX: usize = 5;
 
 impl Ui {

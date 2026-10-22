@@ -47,16 +47,40 @@
 // Widget ids used internally: (id << 3 | k) | 0x80000000 for sub parts (k = 1..7),
 // (id + 1 + i) | 0xC0000000 for the content box of custom list rows.
 
+use alloc::vec::Vec;
+
 use super::consts::*;
 use super::keys::*;
 use super::{Sp, Ui};
 
+// nesting stacks (fixed: scroll views, lists and expanders inside each other; deeper ones
+// share the last record, limit_hit warns)
 const SCROLL_MAX: usize = 8;
 pub(crate) const SCR_F_LIST: u32 = 0x4000_0000; // internal: the list emits the semantic record itself
 const LIST_MAX: usize = 4;
 const EXP_MAX: usize = 16;
-const TABS_MAX: usize = 32;
+/// tab widths on the stack; more tabs (any number) use the heap
+const TABS_INLINE: usize = 32;
 const WHEEL_DIP: i32 = 48;
+
+// tab widths: on the stack up to TABS_INLINE tabs (no allocation), on the heap beyond
+#[derive(Default)]
+struct Tw {
+    inline: [i32; TABS_INLINE],
+    heap: Vec<i32>,
+}
+
+impl Tw {
+    // get(n): room for the widths of n tabs
+    fn get(&mut self, n: usize) -> &mut [i32] {
+        if n <= TABS_INLINE {
+            &mut self.inline[..n]
+        } else {
+            self.heap.resize(n, 0);
+            &mut self.heap[..]
+        }
+    }
+}
 
 // tabs_fit(widths, room, min): the widest tabs narrowed to one width so that the row fits
 // room (none below min)
@@ -263,6 +287,9 @@ impl Ui {
         self.box_begin(id, bf, 0);
         // stack entry
         let i = (self.wp.list.scr_sp as usize).min(SCROLL_MAX);
+        if i == SCROLL_MAX {
+            self.limit_hit(super::ctx::LIM_SCROLLS);
+        }
         self.wp.list.scr_sp = self.wp.list.scr_sp.wrapping_add(1);
         let c = &self.wp.ctx;
         let mut e = Scr {
@@ -851,6 +878,9 @@ impl Ui {
         let ih = self.dp(if ihd > 0 { ihd } else { 40 }).max(1);
         // list entry
         let li = (self.wp.list.list_sp as usize).min(LIST_MAX);
+        if li == LIST_MAX {
+            self.limit_hit(super::ctx::LIM_LISTS);
+        }
         self.wp.list.list_sp = self.wp.list.list_sp.wrapping_add(1);
         self.wp.list.list[li] = Ls { id, count, sel: *sel, ih, next: 0, old: *sel, ev: 0, vev: 0, y0: 0, flags, drop: -1, kdbl: false, ktog: false, notab: false };
         // viewport: a vertical scroll view that takes the keyboard focus (Space / Enter are the
@@ -1065,27 +1095,23 @@ impl Ui {
 
     // ------------------------------------------------------------------ tabs
 
-    fn tab_sizes<'a>(&mut self, flags: u32, names: &[&'a str]) -> (Sp<'a>, [i32; TABS_MAX], usize, i32) {
+    // tab_sizes(flags, names, widths) -> (paint record, tabs, total width): the tabs up to
+    // the first empty name, their widths into `widths` (Tw: any number of tabs)
+    fn tab_sizes<'a>(&mut self, flags: u32, names: &[&'a str], widths: &mut Tw) -> (Sp<'a>, usize, i32) {
         let st = self.style;
         let mut sp = Sp { flags, ..Sp::default() };
         st.tab_metrics(self, &mut sp); // padding, height, pill width
         let pad = sp.s[0];
         // The style selects its tab face; existing styles retain the body face.
         st.tab_font(self, false);
-        let mut widths = [0i32; TABS_MAX];
-        let mut n = 0;
+        let n = names.iter().position(|s| super::basic::cstr(s).is_empty()).unwrap_or(names.len());
+        let w = widths.get(n);
         let mut total = 0i32;
-        for name in names {
-            let name = super::basic::cstr(name);
-            if name.is_empty() || n >= TABS_MAX {
-                break;
-            }
-            let w = self.text.width(name).wrapping_add(pad).wrapping_add(pad);
-            widths[n] = w;
-            total = total.wrapping_add(w);
-            n += 1;
+        for (k, name) in names[..n].iter().enumerate() {
+            w[k] = self.text.width(super::basic::cstr(name)).wrapping_add(pad).wrapping_add(pad);
+            total = total.wrapping_add(w[k]);
         }
-        (sp, widths, n, total)
+        (sp, n, total)
     }
 
     /// Tab strip with horizontal overflow arrows. Mouse scrolling and Left/Right,
@@ -1094,7 +1120,9 @@ impl Ui {
     /// usual `(id * 8 + part) | 0x80000000` convention (parts 1, 2, 3 and 7).
     pub fn tabs_scrolling(&mut self, id: u32, sel: &mut i32, names: &[&str]) -> u32 {
         let flags = self.take_flags();
-        let (sp, widths, count, total) = self.tab_sizes(flags, names);
+        let mut tw = Tw::default();
+        let (sp, count, total) = self.tab_sizes(flags, names, &mut tw);
+        let widths = tw.get(count);
         let rect = self.place(total, sp.s[1]);
         let base = id.wrapping_mul(8) | 0x8000_0000;
         let state = self.slot(base + 7);
@@ -1150,18 +1178,21 @@ impl Ui {
         let old = *sel;
         let st = self.style;
         let flags = self.take_flags();
-        let (mut sp, mut widths, n, total) = self.tab_sizes(flags, names);
+        let (mut tw, mut tfull) = (Tw::default(), Tw::default());
+        let (mut sp, n, total) = self.tab_sizes(flags, names, &mut tw);
+        let widths = tw.get(n);
         let (h, pillw) = (sp.s[1], sp.s[2]);
         let count = n as i32;
         self.place(total, h);
         let strip = self.wp.ctx.last_rect;
         // a strip narrower than the tabs: the widest ones give way, their labels cut with "…"
-        let full = widths;
+        let full = tfull.get(n);
+        full.copy_from_slice(widths);
         if total > strip[2] && n > 0 {
             let pad = sp.s[0];
             st.tab_font(self, false);
             let min = pad * 2 + self.text.width("…");
-            tabs_fit(&mut widths[..n], strip[2], min);
+            tabs_fit(widths, strip[2], min);
         }
         let disabled = if flags & ST_DISABLED != 0 { HB_DISABLED } else { 0 };
         let ev = self.behave(id, HB_FOCUS | disabled);
@@ -1326,6 +1357,9 @@ impl Ui {
         self.wp.ctx.last_state = s;
         self.sem(K_BUTTON, id, Some(header), o);
         // remember whether a content box was opened
+        if self.wp.list.exp_sp as usize >= EXP_MAX {
+            self.limit_hit(super::ctx::LIM_EXPANDERS);
+        }
         let l = &mut self.wp.list;
         if (l.exp_sp as usize) < EXP_MAX {
             l.exp[l.exp_sp as usize] = o as u32;

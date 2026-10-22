@@ -38,7 +38,7 @@ use super::ctx::Hit;
 use super::keys::*;
 use super::Ui;
 
-const MEM_MAX: usize = 64; // remembered groups / panes per window
+const MEM_MAX: usize = 64; // remembered groups / panes per window (a cache: the oldest goes)
 const GRIP_STEP: i32 = 8; // DIP per arrow on a splitter
 const MOD3: u32 = MOD_SHIFT | MOD_CTRL | MOD_ALT;
 

@@ -16,3 +16,8 @@ compositor which moves popups (it rewrites xdg_popup.configure), checked against
 combo box list (--popup-edges-open): the app lays the popup out where the compositor put it.
 
     python3 tools/wlproxy/popflip.py [--exe build/linux/gallery] [--shift 120]
+
+wlinject.py's scenario burst serves tools/keyburst.py (run from the repository root, Windows side):
+N key presses in one write ahead of linuxtest's round trip and while it waits for events.
+
+    python tools/keyburst.py [--keys 1000] [--backend x11|wayland|both]

@@ -57,7 +57,7 @@ pub const DP_NOCLOSE: u32 = 1;
 pub const DP_NOFLOAT: u32 = 2;
 /// starts hidden (until DockState::show / focus); later the layout remembers it
 pub const DP_HIDDEN: u32 = 4;
-/// floating windows of one dock area at most
+/// floating windows of one dock area at most (fixed: each is a window, WIN_MAX)
 pub const DOCK_FLOAT_MAX: usize = 6;
 /// drop marker kinds (StyleShell::dock_marker, sp.value): the part of the place it fills
 pub const DOCK_MK_LEFT: i32 = 0;

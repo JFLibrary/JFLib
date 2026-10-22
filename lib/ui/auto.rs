@@ -16,6 +16,9 @@
 //                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
 //   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
 //                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
+//   keys [N] CHORD...   the chords N times over, queued for ONE pass of the window with the
+//                   keyboard (more keys than frames: what a tool window hands on); `key` gives
+//                   every key a pass of its own, as the platform does
 //   focus S         give the widget the keyboard focus (focus ring shown)
 //   type "text"     ("\n" presses Enter)
 //   commit "text" [N]   an input method commits the text (N times over: one long commit)
@@ -604,11 +607,11 @@ impl Ui {
         if l.is_empty() || l[0] == b'#' {
             return false;
         }
-        const CMDS: [&str; 42] = [
+        const CMDS: [&str; 43] = [
             "quit", "print", "size", "theme", "move", "down", "up", "click", "rclick", "dblclick", "drag", "wheel",
-            "key", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close", "movewin",
-            "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop", "clip",
-            "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
+            "key", "keys", "type", "commit", "cmd", "wait", "shot", "dump", "expect", "bench", "window", "close",
+            "movewin", "resizewin", "activate", "scale", "sync", "expect_warn", "expect_nowarn", "focus", "drop",
+            "clip", "pointer", "system", "dragover", "dragleave", "dragout", "screen", "perm", "agent", "inspect",
         ];
         let Some(&c) = CMDS.iter().find(|c| word_eq(l, c).is_some()) else {
             let mut o = alloc::format!("error: line {}: unknown command: ", self.sc.lineno).into_bytes();
@@ -705,6 +708,7 @@ impl Ui {
             "drag" => self.sc_drag(app, a),
             "wheel" => self.sc_wheel(app, a),
             "key" => self.sc_key(app, a),
+            "keys" => self.sc_keys(app, a),
             "type" => self.sc_type(app, a),
             "commit" => self.sc_commit(app, a),
             "cmd" => {
@@ -1335,11 +1339,43 @@ impl Ui {
 
     // key CHORD...
     fn sc_key(&mut self, app: &mut dyn App, a: &[u8]) {
+        let Some(keys) = self.chords(a) else { return };
+        for k in keys {
+            let vk = k & 0xFFFF;
+            self.sc.script_mods = k >> 16;
+            self.inject(app, plat::E_KEY_DOWN, 0, 0, 0, vk);
+            self.inject(app, plat::E_KEY_UP, 0, 0, 0, vk);
+            self.sc.script_mods = 0;
+        }
+    }
+
+    // keys [N] CHORD...: the chords N times over, all queued for ONE pass of the window with
+    // the keyboard (input faster than frames, the keys a tool window hands on)
+    fn sc_keys(&mut self, app: &mut dyn App, a: &[u8]) {
+        let (n, r) = if a.first().is_some_and(|c| c.is_ascii_digit()) { parse_int(a) } else { (1, a) };
+        let Some(keys) = self.chords(r) else { return };
+        let w = self.m.win.active & (WIN_MAX as u32 - 1);
+        if w != 0 && !self.uiw_drawable(w) {
+            self.fail(b"the window with the keyboard is not shown");
+            return;
+        }
+        let all: Vec<u32> = (0..n.max(0)).flat_map(|_| keys.iter().copied()).collect();
+        self.uiw_use(w);
+        self.keys_inject(&all);
+        self.m.win.edges |= 1 << w; // cleared after the first pass
+        self.uiw_use(0);
+        self.run_passes(app);
+    }
+
+    // chords(a) -> the keys of "ctrl+s tab shift+f10 ..." (VK | MOD_* << 16), None after a
+    // FAIL (an unknown key)
+    fn chords(&mut self, a: &[u8]) -> Option<Vec<u32>> {
+        let mut out = Vec::new();
         let mut p = a;
         loop {
             p = skip_ws(p);
             if p.is_empty() {
-                break;
+                return Some(out);
             }
             let mut mods = 0;
             loop {
@@ -1360,12 +1396,9 @@ impl Ui {
             let vk = key_lookup(p);
             if vk == 0 {
                 self.fail(b"unknown key");
-                return;
+                return None;
             }
-            self.sc.script_mods = mods;
-            self.inject(app, plat::E_KEY_DOWN, 0, 0, 0, vk);
-            self.inject(app, plat::E_KEY_UP, 0, 0, 0, vk);
-            self.sc.script_mods = 0;
+            out.push(vk | mods << 16);
             p = next_word(p);
         }
     }

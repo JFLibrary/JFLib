@@ -590,7 +590,7 @@ uiw_pass_begin / uiw_pass_end (one window), input_event, input_clear_edges, hot_
   anim_color(id, argb, ms, curve) -> the colour on its way to argb (a transition: hover
   fills, state colours); the first call starts at argb
 - **`fn cmd_run(&mut self, id: u32, arg: u32)`**
-  ui_cmd_run(id, arg): queue a command for App::command after this frame
+  ui_cmd_run(id, arg): queue a command for App::command after this frame (in order)
 - **`fn timer(&mut self, id: u32, ms: u32)`**
   ui_timer(id, ms): App::command(UIC_TIMER, id) after ms (replaces a timer with the
   same id)
@@ -2514,7 +2514,7 @@ DP_NOCLOSE: u32 = 1
 DP_NOFLOAT: u32 = 2
 /// starts hidden (until DockState::show / focus); later the layout remembers it
 DP_HIDDEN: u32 = 4
-/// floating windows of one dock area at most
+/// floating windows of one dock area at most (fixed: each is a window, WIN_MAX)
 DOCK_FLOAT_MAX: usize = 6
 /// drop marker kinds (StyleShell::dock_marker, sp.value): the part of the place it fills
 DOCK_MK_LEFT: i32 = 0
@@ -3634,6 +3634,9 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                   those modifiers during the wheel event (e.g. Ctrl + wheel zoom)
   key CHORD...    e.g. key ctrl+s   key tab   key shift+tab enter esc left f4 apps (menu key)
                   (also [ ] , . - + / and num0..num9 numadd numsub nummul numdiv numdec)
+  keys [N] CHORD...   the chords N times over, queued for ONE pass of the window with the
+                  keyboard (more keys than frames: what a tool window hands on); `key` gives
+                  every key a pass of its own, as the platform does
   focus S         give the widget the keyboard focus (focus ring shown)
   type "text"     ("\n" presses Enter)
   commit "text" [N]   an input method commits the text (N times over: one long commit)
@@ -4822,7 +4825,9 @@ FD_EXT_SHIFT: u32 = 8
 *windows (win.rs)*
 
 ```rust
-WIN_MAX: usize = 8  // windows including the main window (index 0)
+// windows including the main window (index 0); fixed: the index is a bit in u32 masks and
+// Event::win, plat keeps PW_MAX windows; one more warns (window_begin)
+WIN_MAX: usize = 8
 WF_TOOL: u32 = 1
 WF_DIALOG: u32 = 2
 WF_MODAL: u32 = 4
@@ -4890,7 +4895,7 @@ CUR_SIZE_NESW: u32 = 9
 CUR_NONE: u32 = 10
 CUR_COUNT: u32 = 11
 CUR_CUSTOM: u32 = 15  // hit boxes only: the cursor of cursor_custom
-CUR_USER_MAX: u32 = 32
+CUR_USER_MAX: u32 = 32  // fixed handle range; cursor_new answers 0 when it is full
 CUR_MAX_PX: i32 = 256
 // fonts
 FONT_REG: u32 = 0
@@ -20101,7 +20106,8 @@ linux_wl -- the Wayland display backend behind linux_disp::Display
   wl_connect() -> the backend, None when no compositor answers ($WAYLAND_DISPLAY in
        $XDG_RUNTIME_DIR, /run/user/UID, /mnt/wslg/runtime-dir)
   test hooks for linuxtest (synthetic events, no compositor needed): wl_test_event,
-       wl_test_setup, wl_input_service, wl_cursor_image, wl_cursor_render, wl_test_protoerr
+       wl_test_setup, wl_input_service, wl_cursor_image, wl_cursor_render, wl_test_protoerr,
+       wl_test_roundtrip (a compositor or tools/wlproxy/wlinject.py)
   xkb_* (linux_xkb.rs): the keymap of the Wayland keyboard, also used by X11
 
 The modules follow the assembly files:
@@ -20156,6 +20162,10 @@ UI thread calls in; wake() from other threads goes through the eventfd of linux_
 - **`fn wl_cursor_render(dst: &mut [u32], shape: u32, s: u32)`**
   expand a cursor image into ARGB pixels (S x S blocks, rows of width \* S pixels)
   [wl_cursor_render]
+
+- **`fn wl_test_roundtrip() -> i32`**
+  a wl_display.sync round trip: the events that arrive before its answer are dispatched
+  first (linuxtest --test burst: a burst of keys while it waits) -> 0 ok / -1 timeout
 
 - **`fn wl_test_protoerr()`**
   attach a buffer id that does not exist to the main window's surface: the compositor
@@ -21531,8 +21541,9 @@ Source: [`lib/plat/evq.rs`](../lib/plat/evq.rs)
 evq -- the platform event ring (shared by every platform and the script runner)
                                                                        [src/plat/evq.s]
 
-  evq_push(ev) -> false when the ring is full (event dropped)
+  evq_push(ev) -> false when the event was dropped (ring and overflow full)
   evq_pop() -> Some(event)        evq_count()        evq_clear()
+  evq_dropped() -> events dropped so far (tests)
   evq_pen_data(pressure, type, tilt_x, tilt_y) -> u32   (PN1) Event::data of a pointer
        event: pressure -1 = the device has none (-> 0), else clamped to 1..PRESSURE_ONE;
        type PTR_*; tilts in degrees, clamped to -63..63.  0 for PTR_MOUSE and while pen
@@ -21542,6 +21553,13 @@ evq -- the platform event ring (shared by every platform and the script runner)
 
 The OS layer pushes from its message handlers, the UI core pops between frames (one
 thread; the lock only makes the static safe).
+
+A burst larger than the ring (one socket read of synthetic keys on X11 / Wayland, a client
+flooding input: their dispatch must read on to an awaited reply, so it cannot stop at a
+full ring) waits in a second-level queue on the heap, in order; the ring takes from it as
+it drains.  Only beyond EVQ_MORE_MAX is an event dropped: counted (evq_dropped) and
+logged once per burst.  Windows keeps WM_CHAR bursts in its own message queue instead
+(wait() stops pumping at EVQ_CAP - 64).
 ```
 
 ```rust
@@ -21553,14 +21571,19 @@ PRESSURE_ONE: i32 = 65535
 ```
 
 - **`fn evq_push(e: Event) -> bool`**
-  append an event; false when the ring is full (the event is dropped)
+  append an event (behind a full ring: the overflow queue) -> false when it was dropped
+  (more than EVQ_MORE_MAX events wait)
 
 - **`fn evq_pop() -> Option<Event>`**
   the oldest queued event
 
 - **`fn evq_count() -> u32`**
+  events queued (the ring and the overflow queue)
 
 - **`fn evq_clear()`**
+
+- **`fn evq_dropped() -> u32`**
+  events dropped since the start because more than EVQ_MORE_MAX waited (tests)
 
 - **`fn evq_pen_data(pressure: i32, typ: u32, tilt_x: i32, tilt_y: i32) -> u32`**
   Event::data of a pen pointer event (0 for a mouse or while pen input is off)

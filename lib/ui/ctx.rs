@@ -33,17 +33,74 @@ use super::keys::*;
 use super::Ui;
 use plat::Event;
 
-pub(crate) const KEYQ_MAX: usize = 16;
+// The queues and stacks of a pass grow as needed (Vec: amortised growth, the capacity stays,
+// so the steady state allocates nothing).  Their ceilings only guard against runaway memory
+// (an app queueing in a loop); what a ceiling holds back is never dropped silently:
+// limit_hit counts it (Ui::limits) and warns the first time (UIWARN; scripts: expect_warn).
+
+/// keys one pass sees (the platform gives every key a pass of its own; more come from a tool
+/// window handing on what its widgets left, or the script command `keys`)
+pub(crate) const KEYQ_MAX: usize = 1024;
 /// typed codepoints a pass sees at most (one input method commit); more waits for the next
 /// passes (Ui::text_more), nothing typed is dropped
 pub(crate) const TEXTQ_MAX: usize = 4096;
-pub(crate) const PTS_MAX: usize = 2048;
-pub(crate) const CMDQ_MAX: usize = 32;
-pub(crate) const TIMERS_MAX: usize = 16;
-pub(crate) const UICLIP_MAX: usize = 32;
-pub(crate) const HITS_MAX: usize = 4096;
-pub(crate) const SEMS_MAX: usize = 8192;
-pub(crate) const SEMTEXT_MAX: usize = 256 * 1024;
+/// pointer positions of one pass for strokes (a 1 kHz pen during a long frame)
+pub(crate) const PTS_MAX: usize = 1 << 16;
+/// commands waiting for App::command (the UIC_TIMER of due timers among them)
+pub(crate) const CMDQ_MAX: usize = 1 << 16;
+/// timers waiting at once (distinct ids, the library's caret, tool tip, toast ... included)
+pub(crate) const TIMERS_MAX: usize = 4096;
+/// clip_push levels inside each other (the render's clip stack has no limit)
+pub(crate) const UICLIP_MAX: usize = 1024;
+/// hit boxes (and drop targets) of one window in one pass
+pub(crate) const HITS_MAX: usize = 1 << 16;
+/// semantic records of one pass (all windows) and the bytes of their labels
+pub(crate) const SEMS_MAX: usize = 1 << 16;
+pub(crate) const SEMTEXT_MAX: usize = 4 << 20;
+
+/// the ceilings limit_hit reports (Ui::limits[LIM_*]); fixed ones say next to their constant
+/// why they stay fixed
+pub(crate) const LIM_KEYS: usize = 0;
+pub(crate) const LIM_CMDS: usize = 1;
+pub(crate) const LIM_TIMERS: usize = 2;
+pub(crate) const LIM_POINTS: usize = 3;
+pub(crate) const LIM_HITS: usize = 4;
+pub(crate) const LIM_ZONES: usize = 5;
+pub(crate) const LIM_SEMS: usize = 6;
+pub(crate) const LIM_SEMTEXT: usize = 7;
+pub(crate) const LIM_CLIP: usize = 8;
+pub(crate) const LIM_WINNEST: usize = 9;
+pub(crate) const LIM_POPUP_SLOTS: usize = 10;
+pub(crate) const LIM_POPUPS: usize = 11;
+pub(crate) const LIM_FLYOUTS: usize = 12;
+pub(crate) const LIM_MENU_ROWS: usize = 13;
+pub(crate) const LIM_MENUBAR: usize = 14;
+pub(crate) const LIM_SCROLLS: usize = 15;
+pub(crate) const LIM_LISTS: usize = 16;
+pub(crate) const LIM_EXPANDERS: usize = 17;
+pub(crate) const LIM_WRAP: usize = 18;
+pub(crate) const LIM_N: usize = 19;
+const LIM_TEXT: [&str; LIM_N] = [
+    "more than 1024 keys in one pass: the rest dropped",
+    "more than 65536 commands waiting: the rest dropped",
+    "more than 4096 timers at once: new ones dropped",
+    "more than 65536 pointer positions in one pass: the rest dropped",
+    "more than 65536 hit boxes in one window pass: the rest cannot be hit",
+    "more than 65536 drop targets in one window pass: the rest take no drops",
+    "more than 65536 widget records in one pass: the rest missing (dump, expect, screen readers)",
+    "more than 4 MiB of record labels in one pass: the rest without labels",
+    "clip_push nested more than 1024 deep: deeper levels clip no hit boxes",
+    "window_begin nested more than 16 deep: deeper windows not shown",
+    "more than 4 popups outside their windows: the rest drawn clipped to the window",
+    "popups nested more than 6 deep: the deepest one replaced",
+    "flyouts nested more than 8 deep: deeper ones not shown",
+    "a menu with more than 250 rows: the rest not shown",
+    "a menu bar with more than 16 menus: the rest not shown",
+    "scroll views nested more than 8 deep: deeper ones share one record",
+    "lists nested more than 4 deep: deeper ones share one record",
+    "expanders nested more than 16 deep: deeper ones lose their content box",
+    "a wrapped text of more than 65536 lines: the rest not shown",
+];
 
 /// hit record of a pass (clipped, physical px; x1 / y1 exclusive)  [HR_*]
 #[derive(Clone, Copy, Default)]
@@ -138,6 +195,8 @@ pub(crate) struct W {
     /// x0, y0, x1, y1
     pub(crate) uiclip: [i32; 4],
     pub(crate) uiclip_stack: Vec<[i32; 4]>,
+    /// clip_push levels beyond UICLIP_MAX (their clip_pop restore nothing)
+    pub(crate) uiclip_over: u32,
     /// two lists: current / previous pass (hit_cur selects the current one)
     pub(crate) hits: [Vec<Hit>; 2],
     /// the drop targets of the same two passes (dnd.rs)
@@ -171,7 +230,6 @@ pub(crate) struct W {
     pub(crate) modal_prev: u32,
     pub(crate) disabled_depth: u32,
     pub(crate) cmd_layer_ui: u32,
-    pub(crate) hits_overflow: bool,
     /// keyboard navigation of this window (kbnav.rs)
     pub(crate) kb: super::kbnav::W,
 }
@@ -183,6 +241,7 @@ impl W {
             last_rect: [0; 4],
             uiclip: [0; 4],
             uiclip_stack: Vec::new(),
+            uiclip_over: 0,
             hits: [Vec::new(), Vec::new()],
             zones: [Vec::new(), Vec::new()],
             keyq: Vec::new(),
@@ -214,7 +273,6 @@ impl W {
             modal_prev: 0,
             disabled_depth: 0,
             cmd_layer_ui: 0,
-            hits_overflow: false,
             kb: Default::default(),
         }
     }
@@ -420,14 +478,30 @@ impl Ui {
         out
     }
 
-    /// ui_keys_inject(keys): (U3) append keys to the live window's queue
-    #[allow(dead_code)] // ui-win: key forwarding of tool windows (U3)
+    /// ui_keys_inject(keys): (U3) append keys to the live window's queue (the forwarded keys
+    /// of a tool window; the script command `keys`)
     pub(crate) fn keys_inject(&mut self, keys: &[u32]) {
         for &k in keys {
-            if self.wp.ctx.keyq.len() >= KEYQ_MAX {
-                break;
-            }
-            self.wp.ctx.keyq.push(k & 0x7FFF_FFFF);
+            self.key_push(k & 0x7FFF_FFFF);
+        }
+    }
+
+    // key_push(k): a key (VK | mods << 16) for the live window's pass
+    fn key_push(&mut self, k: u32) {
+        if self.wp.ctx.keyq.len() < KEYQ_MAX {
+            self.wp.ctx.keyq.push(k);
+        } else {
+            self.limit_hit(LIM_KEYS);
+        }
+    }
+
+    /// limit_hit(lim): a ceiling (LIM_*) held something back: counted in Ui::limits, a
+    /// UIWARN the first time
+    pub(crate) fn limit_hit(&mut self, lim: usize) {
+        let n = self.limits[lim];
+        self.limits[lim] = n.saturating_add(1);
+        if n == 0 {
+            self.warn(LIM_TEXT[lim]);
         }
     }
 
@@ -501,10 +575,7 @@ impl Ui {
                 }
                 let vk = ev.data & 0xFFFF;
                 self.keydown[(vk & 255) as usize] = 1;
-                if self.wp.ctx.keyq.len() < KEYQ_MAX {
-                    let k = (vk | self.mods << 16) & 0x7FFF_FFFF;
-                    self.wp.ctx.keyq.push(k);
-                }
+                self.key_push((vk | self.mods << 16) & 0x7FFF_FFFF);
                 1
             }
             plat::E_KEY_UP => {
@@ -560,6 +631,8 @@ impl Ui {
         if self.mpts.len() < PTS_MAX {
             self.mpts.push([self.wp.ctx.mx, self.wp.ctx.my]);
             self.mprs.push(self.mpress);
+        } else {
+            self.limit_hit(LIM_POINTS);
         }
     }
 
@@ -638,11 +711,12 @@ impl Ui {
     pub fn hit(&mut self, id: u32, hbflags: u32) {
         let c = &mut self.wp.ctx;
         let (group, pane, notab) = c.kb.hit_keys(hbflags);
-        let list = &mut c.hits[c.hit_cur];
-        if list.len() >= HITS_MAX {
-            c.hits_overflow = true;
+        if c.hits[c.hit_cur].len() >= HITS_MAX {
+            self.limit_hit(LIM_HITS);
             return;
         }
+        let c = &mut self.wp.ctx;
+        let list = &mut c.hits[c.hit_cur];
         let r = c.last_rect;
         let k = c.uiclip;
         list.push(Hit {
@@ -880,56 +954,62 @@ impl Ui {
 
     // ------------------------------------------------------------------ commands, timers
 
-    /// ui_cmd_run(id, arg): queue a command for App::command after this frame
+    /// ui_cmd_run(id, arg): queue a command for App::command after this frame (in order)
     pub fn cmd_run(&mut self, id: u32, arg: u32) {
         if self.cmdq.len() < CMDQ_MAX {
-            self.cmdq.push((id, arg));
+            self.cmdq.push_back((id, arg));
+        } else {
+            self.limit_hit(LIM_CMDS);
         }
     }
 
     /// ui_cmd_take -> the oldest queued command
     pub(crate) fn cmd_take(&mut self) -> Option<(u32, u32)> {
-        if self.cmdq.is_empty() { None } else { Some(self.cmdq.remove(0)) }
+        self.cmdq.pop_front()
     }
 
     /// ui_timer(id, ms): App::command(UIC_TIMER, id) after ms (replaces a timer with the
     /// same id)
     pub fn timer(&mut self, id: u32, ms: u32) {
         let deadline = self.now_ms.wrapping_add(ms);
-        let mut free = None;
-        let mut at = None;
-        for i in 0..TIMERS_MAX {
-            if self.timers[i].1 != 0 {
-                if self.timers[i].0 == id {
-                    at = Some(i);
-                    break;
-                }
-            } else if free.is_none() {
-                free = Some(i);
-            }
+        // set again: behind the others (of equal deadlines the one set first fires first)
+        if let Some(i) = self.timers.iter().position(|t| t.0 == id) {
+            self.timers.remove(i);
+        } else if self.timers.len() >= TIMERS_MAX {
+            self.limit_hit(LIM_TIMERS);
+            return;
         }
-        let Some(i) = at.or(free) else { return };
-        self.timers[i] = (id, deadline | 1); // 0 means unused
+        self.timers.push((id, deadline));
     }
 
-    /// ui_timer_due -> (id of an expired timer (removed) or -1, next deadline ms or -1)
+    /// ui_timer_due -> (id of the expired timer with the earliest deadline (removed; of
+    /// equal deadlines the one set first) or -1, the next deadline ms or -1)
     pub(crate) fn timer_due(&mut self) -> (u32, u32) {
+        match self.timer_scan() {
+            (Some(i), next) => (self.timers.remove(i).0, next),
+            (None, next) => (u32::MAX, next),
+        }
+    }
+
+    /// timer_scan -> (index of the expired timer timer_due takes next, the earliest deadline
+    /// still ahead or -1)
+    pub(crate) fn timer_scan(&self) -> (Option<usize>, u32) {
         let now = self.now_ms;
-        let mut next = u32::MAX;
-        for i in 0..TIMERS_MAX {
-            let d = self.timers[i].1;
-            if d == 0 {
-                continue;
-            }
-            if (d as i32) <= (now as i32) {
-                self.timers[i].1 = 0;
-                return (self.timers[i].0, next);
-            }
-            if d < next {
+        let (mut due, mut due_at) = (None, 0i32);
+        let (mut next, mut left) = (u32::MAX, u32::MAX);
+        for (i, &(_, d)) in self.timers.iter().enumerate() {
+            let rel = d.wrapping_sub(now) as i32; // ms until the deadline (wraps with the clock)
+            if rel <= 0 {
+                if due.is_none() || rel < due_at {
+                    due = Some(i);
+                    due_at = rel;
+                }
+            } else if (rel as u32) < left {
+                left = rel as u32;
                 next = d;
             }
         }
-        (u32::MAX, next)
+        (due, next)
     }
 
     // ------------------------------------------------------------------ semantic records
@@ -969,6 +1049,7 @@ impl Ui {
     /// behave); the label is copied
     pub fn sem(&mut self, kind: u16, id: u32, label: Option<&str>, value: i32) -> &mut Sem {
         if self.sems.len() >= SEMS_MAX {
+            self.limit_hit(LIM_SEMS);
             return &mut self.sem_dummy;
         }
         let c = &self.wp.ctx;
@@ -992,6 +1073,8 @@ impl Ui {
             if n <= SEMTEXT_MAX {
                 self.semtext_len = n;
                 r.label = Some(String::from(l));
+            } else {
+                self.limit_hit(LIM_SEMTEXT);
             }
         }
         self.sems.push(r);
@@ -1006,6 +1089,8 @@ impl Ui {
         self.draw_clip(x, y, w, h);
         let c = &mut self.wp.ctx;
         if c.uiclip_stack.len() >= UICLIP_MAX {
+            c.uiclip_over += 1;
+            self.limit_hit(LIM_CLIP);
             return;
         }
         c.uiclip_stack.push(c.uiclip);
@@ -1019,8 +1104,11 @@ impl Ui {
     /// ui_clip_pop
     pub fn clip_pop(&mut self) {
         self.draw_unclip();
-        if let Some(k) = self.wp.ctx.uiclip_stack.pop() {
-            self.wp.ctx.uiclip = k;
+        let c = &mut self.wp.ctx;
+        if c.uiclip_over != 0 {
+            c.uiclip_over -= 1; // a level beyond UICLIP_MAX: it clipped nothing
+        } else if let Some(k) = c.uiclip_stack.pop() {
+            c.uiclip = k;
         }
     }
 
@@ -1085,6 +1173,7 @@ impl Ui {
         c.disabled_depth = 0;
         c.kb.pass_begin();
         c.uiclip_stack.clear();
+        c.uiclip_over = 0;
         c.uiclip = [0, 0, w, h];
         let cur = c.hit_cur;
         c.hits[cur].clear();

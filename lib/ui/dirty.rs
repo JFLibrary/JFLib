@@ -23,11 +23,17 @@ use super::Ui;
 
 const CELL_SHIFT: u32 = 5; // 32 px cells
 const CELL: i32 = 32;
+/// dirty rectangles of a render; more: everything is redrawn (the same pixels, only slower)
 pub(crate) const DRECTS_MAX: usize = 128;
 const HASH_K: u64 = 0x9E37_79B9_7F4A_7C15;
-const DCLIP_MAX: usize = 32;
-const DMG_MAX: usize = 32; // pending damage rectangles (all windows)
-pub(crate) const CVS_MAX: usize = 16; // canvases whose rectangle is known
+/// clip levels tracked while hashing (as ctx::UICLIP_MAX); deeper ones clip nothing, which
+/// only marks more cells
+const DCLIP_MAX: usize = super::ctx::UICLIP_MAX;
+/// pending damage rectangles (all windows); more: merged into one of the same window
+const DMG_MAX: usize = 32;
+// (canvases whose rectangle is known: Ui::cvs grows; a record not drawn in the last two
+// passes is reused, so it holds at most the canvases of two passes and none is forgotten
+// while it is on the screen)
 
 /// a pending damage rectangle: window, x0, y0, x1, y1 (px)
 #[derive(Clone, Copy, Default)]
@@ -62,19 +68,23 @@ pub(crate) struct W {
 struct DClip {
     c: [i32; 4],
     stack: Vec<[i32; 4]>,
+    /// levels beyond DCLIP_MAX (they clip nothing)
+    over: u32,
 }
 
 impl DClip {
     // dclip_reset: no clip (start of a layer's command list)
     fn new() -> DClip {
-        DClip { c: [-0x4000_0000, -0x4000_0000, 0x4000_0000, 0x4000_0000], stack: Vec::new() }
+        DClip { c: [-0x4000_0000, -0x4000_0000, 0x4000_0000, 0x4000_0000], stack: Vec::new(), over: 0 }
     }
 
     // dclip_push: save the current clip (at most DCLIP_MAX levels), intersect it
     fn push(&mut self, r: [i32; 4]) {
-        if self.stack.len() < DCLIP_MAX {
-            self.stack.push(self.c);
+        if self.stack.len() >= DCLIP_MAX {
+            self.over += 1;
+            return;
         }
+        self.stack.push(self.c);
         let c = &mut self.c;
         c[0] = c[0].max(r[0]);
         c[1] = c[1].max(r[1]);
@@ -83,7 +93,9 @@ impl DClip {
     }
 
     fn pop(&mut self) {
-        if let Some(c) = self.stack.pop() {
+        if self.over != 0 {
+            self.over -= 1;
+        } else if let Some(c) = self.stack.pop() {
             self.c = c;
         }
     }
@@ -132,24 +144,26 @@ impl Ui {
     }
 
     /// dmg_canvas_seen(id): remember the rectangle (last_rect) and window of canvas id (a
-    /// new id replaces a free entry or the one seen longest ago)
+    /// new id takes the record seen longest ago when that canvas was not drawn in the last
+    /// two passes, else a new record)
     pub(crate) fn dmg_canvas_seen(&mut self, id: u32) {
-        let mut at = None;
-        let mut old = 0;
-        let mut old_frame = u32::MAX;
-        for (i, e) in self.cvs.iter().enumerate() {
-            if e.id == id {
-                at = Some(i);
-                break;
+        let e = Cvs { id, win: self.uiw_cur, frame: self.frame, rect: self.wp.ctx.last_rect };
+        let (mut old, mut age) = (0, 0u32);
+        for (i, c) in self.cvs.iter_mut().enumerate() {
+            if c.id == id {
+                *c = e;
+                return;
             }
-            let f = if e.id == 0 { 0 } else { e.frame }; // a free entry counts as frame 0
-            if f < old_frame {
-                old_frame = f;
-                old = i;
+            let a = self.frame.wrapping_sub(c.frame);
+            if a > age {
+                (old, age) = (i, a);
             }
         }
-        let i = at.unwrap_or(old);
-        self.cvs[i] = Cvs { id, win: self.uiw_cur, frame: self.frame, rect: self.wp.ctx.last_rect };
+        if age >= 2 {
+            self.cvs[old] = e;
+        } else {
+            self.cvs.push(e);
+        }
     }
 
     /// ui_canvas_damage(id, x, y, w, h): redraw part of a canvas with the next render (px
@@ -168,14 +182,15 @@ impl Ui {
         if x0 >= x1 || y0 >= y1 {
             return;
         }
-        if self.dmg.len() < DMG_MAX {
-            self.dmg.push(Dmg { win: e.win, x0, y0, x1, y1 });
-        } else if let Some(d) = self.dmg.iter_mut().rev().find(|d| d.win == e.win) {
+        let full = self.dmg.len() >= DMG_MAX;
+        if let Some(d) = self.dmg.iter_mut().rev().find(|d| d.win == e.win).filter(|_| full) {
             // full: grow the last entry of the same window to the union
             d.x0 = d.x0.min(x0);
             d.y0 = d.y0.min(y0);
             d.x1 = d.x1.max(x1);
             d.y1 = d.y1.max(y1);
+        } else {
+            self.dmg.push(Dmg { win: e.win, x0, y0, x1, y1 }); // (full: the window's first)
         }
         self.invalidate();
     }

@@ -88,7 +88,7 @@ impl plat::web::WebApplication for HostRuntime {
         let ui = &self.runtime.ui;
         if ui.need || ui.need_render || ui.animating || ui.tasks_ready() { return 0; }
         let task = ui.tasks_deadline().map(|t| (t.saturating_sub(plat::task::now_us()) / 1000).min(250) as i32);
-        ui.timers.iter().filter(|(_, deadline)| *deadline != 0)
+        ui.timers.iter()
             .map(|(_, deadline)| deadline.wrapping_sub(ui.now_ms) as i32)
             .chain(task)
             .min().unwrap_or(250).clamp(0, 250) as u32
@@ -338,9 +338,10 @@ impl Ui {
             mpress: 0,
             mptype: 0,
             mpts_win: 0,
-            cmdq: Vec::new(),
+            cmdq: alloc::collections::VecDeque::new(),
             text_more: Vec::new(),
-            timers: [(0, 0); super::ctx::TIMERS_MAX],
+            timers: Vec::new(),
+            limits: [0; super::ctx::LIM_N],
             mods: 0,
             frame: 0,
             now_ms: 0,
@@ -393,7 +394,7 @@ impl Ui {
             close_at: 0,
             drects: Vec::new(),
             dmg: Vec::new(),
-            cvs: [Default::default(); super::dirty::CVS_MAX],
+            cvs: Vec::new(),
             icon_hook: None,
             uiinput: UiInput::default(),
             sc: Default::default(),
@@ -983,15 +984,12 @@ impl Ui {
         self.set_time(ms);
     }
 
-    // ui_timer_due_peek -> earliest timer deadline (ms) or -1 (an expired one is re-armed
-    // for "now")
-    fn timer_due_peek(&mut self) -> u32 {
-        let (id, next) = self.timer_due();
-        if id != u32::MAX {
-            self.timer(id, 0);
-            return self.now_ms;
+    // ui_timer_due_peek -> earliest timer deadline (ms; "now" while one has expired) or -1
+    fn timer_due_peek(&self) -> u32 {
+        match self.timer_scan() {
+            (Some(_), _) => self.now_ms,
+            (None, next) => next,
         }
-        next
     }
 }
 

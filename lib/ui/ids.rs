@@ -37,7 +37,7 @@ const SEED: u32 = 0x811C_9DC5; // FNV-1a offset basis: the scope outside every s
 const PRIME: u32 = 0x0100_0193;
 const TAG_NAME: u32 = 1;
 const TAG_NUM: u32 = 2;
-const DEPTH_MAX: usize = 64;
+const DEPTH_MAX: usize = 64; // id scopes inside each other (fixed: nesting; deeper ones warn)
 
 const fn fnv(mut h: u32, b: &[u8], tag: u32) -> u32 {
     let mut i = 0;

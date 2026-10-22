@@ -3,7 +3,7 @@
 # compositor that plays the input devices and the other clipboard clients, so the same
 # synthetic session can be replayed against the assembly and the Rust build:
 #
-#   python3 wlinject.py REAL_SOCKET LISTEN_SOCKET LOG TIMEOUT SCENARIO FRAME_OUT
+#   python3 wlinject.py REAL_SOCKET LISTEN_SOCKET LOG TIMEOUT SCENARIO FRAME_OUT [KEYS]
 #
 # Real pointer / keyboard / data-device events for the client are dropped (the user's mouse
 # and clipboard never reach the app); the client's set_selection never reaches the
@@ -11,10 +11,13 @@
 # surface snapshots the attached shm buffer; the last one is written to FRAME_OUT (u32 w, u32
 # h, then w * h * 4 bytes BGRX).
 # Scenarios: input (pointer + keyboard), clip (paste a fake offer, then read our selection
-# as another client), drop (text/uri-list drag and drop).
+# as another client), drop (text/uri-list drag and drop), burst (tools/keyburst.py: KEYS
+# presses + releases of the digit keys in one write -- ahead of the client's next
+# wl_display.sync once its title is "linuxtest burst", at once for "linuxtest burst 2").
 import array, mmap, os, select, socket, struct, sys, time
 
 real, listen, logf, timeout, scen, frame_out = sys.argv[1], sys.argv[2], sys.argv[3], float(sys.argv[4]), sys.argv[5], sys.argv[6]
+burst_keys = int(sys.argv[7]) if len(sys.argv) > 7 else 1000
 log = open(logf, "w")
 
 
@@ -229,6 +232,19 @@ def scenario():
         L("drop sent")
 
 
+def burst():
+    # the keyboard enters our surface, then the digit keys 1 .. 0 (evdev 2 .. 11) in turn, all
+    # in one write
+    k, surf = st["kb"], st["surf"]
+    out = [msg(k, 1, u32(ser()) + u32(surf) + arr(b"")), msg(k, 4, u32(ser()) + u32(0) + u32(0) + u32(0) + u32(0))]
+    for n in range(burst_keys):
+        key = 2 + n % 10
+        out.append(msg(k, 3, u32(ser()) + u32(tm()) + u32(key) + u32(1)))
+        out.append(msg(k, 3, u32(ser()) + u32(tm()) + u32(key) + u32(0)))
+    to_client(b"".join(out))
+    L("burst", burst_keys, "keys, keyboard", k, "surface", surf)
+
+
 def selection_read(src):
     # another client pastes: wl_data_source.send(mime, fd) with a pipe, every offered type
     for mt in src_mimes.get(src, []):
@@ -262,6 +278,18 @@ def client_msgs():
             break
         m, cbuf = cbuf[:size], cbuf[size:]
         a = m[8:]
+        if scen == "burst":
+            if oid == st.get("top") and op == 2:      # xdg_toplevel.set_title
+                t, _ = rstr(a, 0)
+                if t and b"linuxtest burst 2" in t:
+                    if not st.get("done2"):
+                        st["done2"] = True
+                        burst()
+                elif t and b"linuxtest burst" in t:
+                    st["armed"] = True
+            elif oid == 1 and op == 0 and st.get("armed"):  # wl_display.sync: a round trip
+                st["armed"] = False
+                burst()
         if oid in fake_offers:
             if op == 1:   # receive(mime, fd)
                 mt, _ = rstr(a, 0)

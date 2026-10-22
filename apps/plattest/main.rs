@@ -13,6 +13,9 @@
 //                                          objects on worker threads
 //   plattest --test cpu                    cpu_features (--simd sse2 -> 0), brand, popcount,
 //                                          the date
+//   plattest --test evq                    the event ring and its overflow queue: a burst far
+//                                          beyond the ring whole and in order, the ceiling
+//                                          (dropped events counted), clear
 //   plattest --test crash                  plat::crash_hook: plat::crash_test writes to address
 //                                          0x10; the hook checks the CrashInfo (kind, access,
 //                                          address, ip, rax, code range) and prints the summary;
@@ -288,6 +291,7 @@ fn plattest() -> i32 {
         Some("files") => t_files,
         Some("ini") => t_ini,
         Some("cpu") => t_cpu,
+        Some("evq") => t_evq,
         Some("all") => t_all,
         Some("crash") => t_crash,
         Some("panic") => t_panic,
@@ -371,6 +375,7 @@ fn t_all(t: &mut T) {
     t_files(t);
     t_ini(t);
     t_cpu(t);
+    t_evq(t);
 }
 
 // ---------------------------------------------------------------- helpers
@@ -1317,6 +1322,39 @@ fn t_f64(t: &mut T) {
         }
     }
     t.check(bad == 0, "f64: 20000 random doubles: format + parse is bit-exact");
+}
+
+// ---------------------------------------------------------------- the event ring
+
+/// evq.rs: a burst beyond the 256-event ring (an X11 / Wayland read of synthetic keys) waits in
+/// the overflow queue, in order, while the ring drains; beyond 65536 waiting events new ones
+/// are dropped and counted; clear empties both
+fn t_evq(t: &mut T) {
+    let ev = |k: u32| plat::Event { typ: plat::E_TEXT, data: k, ..Default::default() };
+    plat::evq_clear();
+    let dropped = plat::evq_dropped();
+    let n = 3000u32;
+    let pushed = (0..n).filter(|&k| plat::evq_push(ev(k))).count() as u32;
+    t.check(pushed == n && plat::evq_count() == n, "evq: a burst of 3000 events (ring: 256) is queued whole");
+    // a part, then more behind it while it drains: one order across the ring and the overflow
+    let mut got: Vec<u32> = (0..1000).filter_map(|_| plat::evq_pop()).map(|e| e.data).collect();
+    let more = (n..n + 500).filter(|&k| plat::evq_push(ev(k))).count() as u32;
+    t.check(more == 500 && plat::evq_count() == n + 500 - 1000, "evq: pushes while it drains, counted");
+    while let Some(e) = plat::evq_pop() {
+        got.push(e.data);
+    }
+    t.check(got.len() == (n + 500) as usize && got.iter().enumerate().all(|(i, &d)| d == i as u32),
+            "evq: every event comes once, in order");
+    t.check(plat::evq_count() == 0 && plat::evq_dropped() == dropped, "evq: empty afterwards, nothing dropped");
+    // the ceiling: 65536 events behind the full ring; more are dropped and counted
+    let total = plat::EVQ_CAP as u32 + 65536 + 10;
+    let ok = (0..total).filter(|&k| plat::evq_push(ev(k))).count() as u32;
+    t.check(ok == total - 10 && plat::evq_dropped() == dropped + 10 && plat::evq_count() == total - 10,
+            "evq: beyond 65536 waiting events new ones are dropped and counted");
+    plat::evq_clear();
+    t.check(plat::evq_count() == 0 && plat::evq_pop().is_none(), "evq: clear empties the ring and the overflow");
+    plat::evq_push(ev(7));
+    t.check(plat::evq_pop().map(|e| e.data) == Some(7) && plat::evq_count() == 0, "evq: the ring works on after a clear");
 }
 
 // ---------------------------------------------------------------- cpu
