@@ -1,0 +1,7 @@
+#!args apps/JFNetworker/tests/fixtures/rip_ring.jfnet --scenario apps/JFNetworker/tests/scen/rip_ring.scn --golden apps/JFNetworker/tests/scen/rip_ring.report
+# golden scenario: RIPv2 in a ring of four routers with a LAN each: the first exchange and
+# triggered updates (debug ip rip), two equal-cost paths, a pulled cable with poison, holddown and
+# garbage collection, then the way round the other side with traceroute.  The GUI program runs
+# tests/scen/rip_ring.scn on tests/fixtures/rip_ring.jfnet without a window and ends with the
+# report, which must equal tests/scen/rip_ring.report byte for byte on every target (the script
+# itself is not run)

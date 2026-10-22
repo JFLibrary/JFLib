@@ -13,7 +13,8 @@
 //   NoCommonVlan        trunk ends that allow no VLAN in common
 //   AccessTrunk         an access port against a trunk (or a router port with subinterfaces)
 //   WrongCable          the wrong copper cable while the project wants strict MDI / MDI-X
-//   Loop                switches and hubs in a circle (there is no spanning tree yet)
+//   Loop                switches and hubs in a circle, unless every switch in it runs spanning
+//                       tree (stp.rs); the text names those that do not when some do
 //   ShutWithAddress     an interface with an address that is shut down
 //
 // Problem::text is German; Problem::msg is the same as a template with arguments for the app's
@@ -565,13 +566,27 @@ impl Engine {
             found.entry(devs.into_iter().collect()).or_insert((k, BTreeSet::new())).1.extend(vlans);
         }
         for (devs, (k, vlans)) in found {
+            // spanning tree breaks the circle when every bridge in it runs it (hubs repeat BPDUs)
+            let bridges: Vec<u32> = devs.iter().copied().filter(|&d| self.node(d).is_some_and(|n| n.bridge.is_some())).collect();
+            let without: Vec<u32> = bridges.iter().copied().filter(|&d| !self.node_index(d).is_some_and(|ni| self.stp_runs(ni))).collect();
+            if !bridges.is_empty() && without.is_empty() {
+                continue;
+            }
             let e = edges[k];
             let dev = self.dev_of(e.node);
             let names: Vec<String> = devs.iter().map(|&d| self.dev_name(d)).collect();
             let vl: Vec<String> = vlans.iter().map(|v| format!("{}", v)).collect();
             let link = self.links.get(e.link).and_then(|l| l.as_ref()).map(|l| l.id);
             let others: Vec<u32> = devs.iter().copied().filter(|&d| d != dev).collect();
-            let text = if vl.is_empty() {
+            let off: Vec<String> = without.iter().map(|&d| self.dev_name(d)).collect();
+            let text = if without.len() < bridges.len() {
+                // some bridges of the circle run spanning tree, these do not
+                if vl.is_empty() {
+                    msg!("Schleife über {}: {} ohne Spanning Tree, Broadcasts kreisen endlos; „spanning-tree mode rstp“ dort schaltet ihn ein.", names.join(", "), off.join(", "))
+                } else {
+                    msg!("Schleife über {} (VLAN {}): {} ohne Spanning Tree, Broadcasts kreisen endlos; „spanning-tree mode rstp“ dort schaltet ihn ein.", names.join(", "), vl.join(", "), off.join(", "))
+                }
+            } else if vl.is_empty() {
                 msg!("Schleife ohne Spanning Tree über {}: Broadcasts kreisen endlos.", names.join(", "))
             } else {
                 msg!("Schleife ohne Spanning Tree über {} (VLAN {}): Broadcasts kreisen endlos.", names.join(", "), vl.join(", "))

@@ -1,0 +1,226 @@
+# JFNetworker-Szenario nat_pat.scn: „Büro hinter NAT“, 8 Geräte, 7 Verbindungen, Seed 3
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/24 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/24 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  ISP     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  ISP     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  ISP     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  ISP     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  ISP     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/2 is up
+   0.000000000  ISP     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/2 is up
+   0.000000000  R1      R1>enable
+   0.000000000  R1      R1#ping 203.0.113.254
+   0.000000000  R1      Ctrl+Shift+6 stops the ping.
+   0.000000000  R1      Pinging 203.0.113.254 with 5 echo requests of 100 bytes, 2 s timeout each:
+   0.000000000  ISP     ISP>enable
+   0.000000000  ISP     ISP#ping 198.51.100.10
+   0.000000000  ISP     Ctrl+Shift+6 stops the ping.
+   0.000000000  ISP     Pinging 198.51.100.10 with 5 echo requests of 100 bytes, 2 s timeout each:
+   0.000000000  --      run 12s
+   2.000009232  R1      .!!!!
+   2.000009232  R1      Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms
+   2.000009232  ISP     .!!!!
+   2.000009232  ISP     Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms
+   2.000009232  ISP     ISP#ping 192.0.2.20
+   2.000009232  ISP     Ctrl+Shift+6 stops the ping.
+   2.000009232  ISP     Pinging 192.0.2.20 with 5 echo requests of 100 bytes, 2 s timeout each:
+   4.000018464  ISP     .!!!!
+   4.000018464  ISP     Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms
+  12.000000000  ok      expect R1 output contains ".!!!!"
+  12.000000000  ok      expect ISP output contains "Success rate is 80 percent (4/5)"
+  12.000000000  PC1     root@PC1:~# ping -c 3 198.51.100.10
+  12.000000000  PC1     PING 198.51.100.10 (198.51.100.10) 56(84) bytes of data.
+  12.000000000  PC2     root@PC2:~# ping -c 3 198.51.100.10
+  12.000000000  PC2     PING 198.51.100.10 (198.51.100.10) 56(84) bytes of data.
+  12.000000000  --      run 4s
+  12.000011096  PC1     64 bytes from 198.51.100.10: icmp_seq=1 ttl=62 time=0.011 ms
+  12.000012072  PC2     64 bytes from 198.51.100.10: icmp_seq=1 ttl=62 time=0.012 ms
+  13.000008208  PC1     64 bytes from 198.51.100.10: icmp_seq=2 ttl=62 time=0.008 ms
+  13.000009184  PC2     64 bytes from 198.51.100.10: icmp_seq=2 ttl=62 time=0.009 ms
+  14.000008208  PC1     64 bytes from 198.51.100.10: icmp_seq=3 ttl=62 time=0.008 ms
+  14.000008208  PC1     
+  14.000008208  PC1     --- 198.51.100.10 ping statistics ---
+  14.000008208  PC1     3 packets transmitted, 3 received, 0% packet loss, time 2000ms
+  14.000008208  PC1     rtt min/avg/max/mdev = 0.008/0.009/0.011/0.001 ms
+  14.000009184  PC2     64 bytes from 198.51.100.10: icmp_seq=3 ttl=62 time=0.009 ms
+  14.000009184  PC2     
+  14.000009184  PC2     --- 198.51.100.10 ping statistics ---
+  14.000009184  PC2     3 packets transmitted, 3 received, 0% packet loss, time 2000ms
+  14.000009184  PC2     rtt min/avg/max/mdev = 0.009/0.010/0.012/0.001 ms
+  16.000000000  ok      expect PC1 output contains "3 packets transmitted, 3 received, 0% packet loss"
+  16.000000000  ok      expect PC2 output contains "3 packets transmitted, 3 received, 0% packet loss"
+  16.000000000  R1      R1#show ip nat translations
+  16.000000000  R1      Pro Inside global         Inside local          Outside local         Outside global
+  16.000000000  R1      tcp 203.0.113.1:80        192.168.1.20:80       ---                   ---
+  16.000000000  R1      icmp 203.0.113.1:19848     192.168.1.11:19848    198.51.100.10:19848   198.51.100.10:19848
+  16.000000000  R1      icmp 203.0.113.1:41555     192.168.1.10:41555    198.51.100.10:41555   198.51.100.10:41555
+  16.000000000  ok      expect R1 output contains "icmp 203.0.113.1:"
+  16.000000000  ok      expect R1 output contains "tcp 203.0.113.1:80        192.168.1.20:80       ---                   ---"
+  16.000000000  PC1     root@PC1:~# curl -s http://198.51.100.10/
+  16.000000000  --      run 2s
+  16.002020512  PC1     Hallo aus dem Internet, 203.0.113.1 fragt SRV
+  18.000000000  ok      expect PC1 output contains "Hallo aus dem Internet, 203.0.113.1 fragt SRV"
+  18.000000000  PC2     root@PC2:~# curl -sS http://198.51.100.10/
+  18.000000000  --      run 2s
+  18.000003048  PC2     curl: (7) Failed to connect to 198.51.100.10 port 80 after 0 ms: Couldn't connect to server
+  20.000000000  ok      expect PC2 output contains "curl: (7) Failed to connect to 198.51.100.10 port 80"
+  20.000000000  R1      R1#show access-lists 110
+  20.000000000  R1      Extended IP access list 110
+  20.000000000  R1          10 deny tcp host 192.168.1.11 any eq www (1 match)
+  20.000000000  R1          20 permit ip any any (12 matches)
+  20.000000000  ok      expect R1 output contains "    10 deny tcp host 192.168.1.11 any eq www (1 match)"
+  20.000000000  EXT     root@EXT:~# curl -s http://203.0.113.1/
+  20.000000000  --      run 2s
+  21.002020608  EXT     Hallo vom Webserver im Buero, 192.0.2.20 fragt WEB
+  22.000000000  ok      expect EXT output contains "Hallo vom Webserver im Buero, 192.0.2.20 fragt WEB"
+  22.000000000  R1      R1#show ip nat translations
+  22.000000000  R1      Pro Inside global         Inside local          Outside local         Outside global
+  22.000000000  R1      tcp 203.0.113.1:80        192.168.1.20:80       ---                   ---
+  22.000000000  R1      tcp 203.0.113.1:80        192.168.1.20:80       192.0.2.20:44706      192.0.2.20:44706
+  22.000000000  R1      icmp 203.0.113.1:19848     192.168.1.11:19848    198.51.100.10:19848   198.51.100.10:19848
+  22.000000000  R1      icmp 203.0.113.1:41555     192.168.1.10:41555    198.51.100.10:41555   198.51.100.10:41555
+  22.000000000  R1      tcp 203.0.113.1:49506     192.168.1.10:49506    198.51.100.10:80      198.51.100.10:80
+  22.000000000  ok      expect R1 output contains "tcp 203.0.113.1:80        192.168.1.20:80       192.0.2.20:"
+  22.000000000  PC1     root@PC1:~# traceroute -n 198.51.100.10
+  22.000000000  PC1     traceroute to 198.51.100.10 (198.51.100.10), 30 hops max, 60 byte packets
+  22.000000000  --      run 10s
+  22.000009816  PC1      1  192.168.1.1  0.003 ms  0.003 ms  0.003 ms
+  22.000024540  PC1      2  203.0.113.254  0.005 ms  0.005 ms  0.005 ms
+  22.000047244  PC1      3  198.51.100.10  0.008 ms  0.008 ms  0.008 ms
+  32.000000000  ok      expect PC1 output contains " 1  192.168.1.1"
+  32.000000000  ok      expect PC1 output contains " 2  203.0.113.254"
+  32.000000000  ok      expect PC1 output contains " 3  198.51.100.10"
+  32.000000000  R1      R1#debug ip nat
+  32.000000000  R1      Debug output for NAT: on
+  32.000000000  PC2     root@PC2:~# ping -c 1 198.51.100.10
+  32.000000000  PC2     PING 198.51.100.10 (198.51.100.10) 56(84) bytes of data.
+  32.000000000  --      run 2s
+  32.000002052  R1      *Mar  1 00:00:32.000: NAT: new translation icmp 192.168.1.11:1529 = 203.0.113.1:1529, peer 198.51.100.10:1529
+  32.000002052  R1      *Mar  1 00:00:32.000: NAT: icmp source 192.168.1.11:1529 -> 203.0.113.1:1529
+  32.000006156  R1      *Mar  1 00:00:32.000: NAT: icmp destination 203.0.113.1:1529 -> 192.168.1.11:1529
+  32.000008208  PC2     64 bytes from 198.51.100.10: icmp_seq=1 ttl=62 time=0.008 ms
+  32.000008208  PC2     
+  32.000008208  PC2     --- 198.51.100.10 ping statistics ---
+  32.000008208  PC2     1 packets transmitted, 1 received, 0% packet loss, time 0ms
+  32.000008208  PC2     rtt min/avg/max/mdev = 0.008/0.008/0.008/0.000 ms
+  34.000000000  ok      expect R1 output contains "NAT: icmp source 192.168.1.11:"
+  34.000000000  ok      expect R1 output contains "NAT: icmp destination 203.0.113.1:"
+  34.000000000  R1      R1#undebug all
+  34.000000000  R1      Debug output: all off
+  34.000000000  R1      R1#show ip nat translations verbose
+  34.000000000  R1      Pro Inside global         Inside local          Outside local         Outside global
+  34.000000000  R1      tcp 203.0.113.1:80        192.168.1.20:80       ---                   ---
+  34.000000000  R1          static, never ends
+  34.000000000  R1      tcp 203.0.113.1:80        192.168.1.20:80       192.0.2.20:44706      192.0.2.20:44706
+  34.000000000  R1          created 00:00:13 ago, used 00:00:12 ago, ends in 00:03:47, static, with ports, tcp closing
+  34.000000000  R1      icmp 203.0.113.1:1529      192.168.1.11:1529     198.51.100.10:1529    198.51.100.10:1529
+  34.000000000  R1          created 00:00:01 ago, used 00:00:01 ago, ends in 00:00:58, dynamic, with ports
+  34.000000000  R1      icmp 203.0.113.1:19848     192.168.1.11:19848    198.51.100.10:19848   198.51.100.10:19848
+  34.000000000  R1          created 00:00:21 ago, used 00:00:19 ago, ends in 00:00:40, dynamic, with ports
+  34.000000000  R1      icmp 203.0.113.1:41555     192.168.1.10:41555    198.51.100.10:41555   198.51.100.10:41555
+  34.000000000  R1          created 00:00:21 ago, used 00:00:19 ago, ends in 00:00:40, dynamic, with ports
+  34.000000000  R1      udp 203.0.113.1:47340     192.168.1.10:47340    198.51.100.10:33437   198.51.100.10:33437
+  34.000000000  R1          created 00:00:11 ago, used 00:00:11 ago, ends in 00:04:48, dynamic, with ports
+  34.000000000  R1      udp 203.0.113.1:47340     192.168.1.10:47340    198.51.100.10:33438   198.51.100.10:33438
+  34.000000000  R1          created 00:00:11 ago, used 00:00:11 ago, ends in 00:04:48, dynamic, with ports
+  34.000000000  R1      udp 203.0.113.1:47340     192.168.1.10:47340    198.51.100.10:33439   198.51.100.10:33439
+  34.000000000  R1          created 00:00:11 ago, used 00:00:11 ago, ends in 00:04:48, dynamic, with ports
+  34.000000000  R1      udp 203.0.113.1:47340     192.168.1.10:47340    198.51.100.10:33440   198.51.100.10:33440
+  34.000000000  R1          created 00:00:11 ago, used 00:00:11 ago, ends in 00:04:48, dynamic, with ports
+  34.000000000  R1      udp 203.0.113.1:47340     192.168.1.10:47340    198.51.100.10:33441   198.51.100.10:33441
+  34.000000000  R1          created 00:00:11 ago, used 00:00:11 ago, ends in 00:04:48, dynamic, with ports
+  34.000000000  R1      udp 203.0.113.1:47340     192.168.1.10:47340    198.51.100.10:33442   198.51.100.10:33442
+  34.000000000  R1          created 00:00:11 ago, used 00:00:11 ago, ends in 00:04:48, dynamic, with ports
+  34.000000000  R1      tcp 203.0.113.1:49506     192.168.1.10:49506    198.51.100.10:80      198.51.100.10:80
+  34.000000000  R1          created 00:00:17 ago, used 00:00:17 ago, ends in 00:03:42, dynamic, with ports, tcp closing
+  34.000000000  R1      R1#show ip nat statistics
+  34.000000000  R1      Active translations: 12 (1 static, 11 dynamic; 12 with ports)
+  34.000000000  R1      Outside interfaces:
+  34.000000000  R1        GigabitEthernet0/0/1
+  34.000000000  R1      Inside interfaces:
+  34.000000000  R1        GigabitEthernet0/0/0
+  34.000000000  R1      Hits: 30  Misses: 11  Expired: 0  Refused: 0
+  34.000000000  R1      Dynamic rules:
+  34.000000000  R1        list 1 interface GigabitEthernet0/0/1 overload: 10 in use
+  34.000000000  R1      Timeouts: 86400 s (addresses), udp 300 s, dns 60 s, tcp 86400 s, finrst 240 s, syn 240 s, icmp 60 s
+  34.000000000  ok      expect R1 output contains "Inside interfaces:\n  GigabitEthernet0/0/0\n"
+  34.000000000  R1      R1#show running-config
+  34.000000000  R1      Collecting the configuration ...
+  34.000000000  R1      
+  34.000000000  R1      ! configuration in effect, 992 bytes
+  34.000000000  R1      !
+  34.000000000  R1      version 1.0
+  34.000000000  R1      !
+  34.000000000  R1      hostname R1
+  34.000000000  R1      !
+  34.000000000  R1      interface GigabitEthernet0/0/0
+  34.000000000  R1       description LAN
+  34.000000000  R1       ip address 192.168.1.1 255.255.255.0
+  34.000000000  R1       ip access-group 110 in
+  34.000000000  R1       ip nat inside
+  34.000000000  R1      !
+  34.000000000  R1      interface GigabitEthernet0/0/1
+  34.000000000  R1       description Provider
+  34.000000000  R1       ip address 203.0.113.1 255.255.255.0
+  34.000000000  R1       ip nat outside
+  34.000000000  R1      !
+  34.000000000  R1      interface GigabitEthernet0/0/2
+  34.000000000  R1       no ip address
+  34.000000000  R1       shutdown
+  34.000000000  R1      !
+  34.000000000  R1      interface GigabitEthernet0/0/3
+  34.000000000  R1       no ip address
+  34.000000000  R1       shutdown
+  34.000000000  R1      !
+  34.000000000  R1      interface TenGigabitEthernet0/1/0
+  34.000000000  R1       no ip address
+  34.000000000  R1       shutdown
+  34.000000000  R1      !
+  34.000000000  R1      interface TenGigabitEthernet0/1/1
+  34.000000000  R1       no ip address
+  34.000000000  R1       shutdown
+  34.000000000  R1      !
+  34.000000000  R1      interface Serial0/2/0
+  34.000000000  R1       no ip address
+  34.000000000  R1       shutdown
+  34.000000000  R1      !
+  34.000000000  R1      interface Serial0/2/1
+  34.000000000  R1       no ip address
+  34.000000000  R1       shutdown
+  34.000000000  R1      !
+  34.000000000  R1      ip nat inside source list 1 interface GigabitEthernet0/0/1 overload
+  34.000000000  R1      ip nat inside source static tcp 192.168.1.20 80 203.0.113.1 80
+  34.000000000  R1      !
+  34.000000000  R1      ip route 0.0.0.0 0.0.0.0 203.0.113.254
+  34.000000000  R1      !
+  34.000000000  R1      access-list 1 permit 192.168.1.0 0.0.0.255
+  34.000000000  R1      access-list 110 remark PC2 darf nicht ins Web
+  34.000000000  R1      access-list 110 deny tcp host 192.168.1.11 any eq www
+  34.000000000  R1      access-list 110 permit ip any any
+  34.000000000  R1      !
+  34.000000000  R1      line con 0
+  34.000000000  R1      line vty 0 4
+  34.000000000  R1       login
+  34.000000000  R1      !
+  34.000000000  R1      end
+  34.000000000  ok      expect R1 output contains " ip access-group 110 in\n ip nat inside\n!\n"
+  34.000000000  ok      expect R1 output contains "ip nat inside source list 1 interface GigabitEthernet0/0/1 overload\nip nat inside source static tcp 192.168.1.20 80 203.0.113.1 80\n!\nip route 0.0.0.0 0.0.0.0 203.0.113.254\n"
+  34.000000000  ok      expect R1 output contains "access-list 110 remark PC2 darf nicht ins Web\naccess-list 110 deny tcp host 192.168.1.11 any eq www\n"
+  34.000000000  --      run 300s
+ 334.000000000  R1      R1#show ip nat translations
+ 334.000000000  R1      Pro Inside global         Inside local          Outside local         Outside global
+ 334.000000000  R1      tcp 203.0.113.1:80        192.168.1.20:80       ---                   ---
+ 334.000000000  ok      expect R1 output not contains "icmp"
+ 334.000000000  ok      expect R1 output not contains "udp"
+ 334.000000000  ok      expect R1 output contains "tcp 203.0.113.1:80        192.168.1.20:80       ---                   ---"
+ 334.000000000  ok      expect hops icmp >= 30 (109)
+# 24 von 24 Erwartungen erfüllt

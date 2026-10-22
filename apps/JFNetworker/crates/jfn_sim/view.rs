@@ -17,8 +17,9 @@
 // hop_steps for the packet tab (the PDU a device got, its decisions, the PDUs it sent),
 // hop_layers / hop_info (the dissection, HDLC frames of serial lines included).
 //
-// LEDs: no power (grey), down (red: shut down, unplugged, far end off, wrong cable with strict
-// MDI-X), up (green); blocking and learning (amber) come with spanning tree.
+// LEDs: no power (grey), down (red: shut down, err-disabled, unplugged, far end off, wrong cable
+// with strict MDI-X), up (green); with spanning tree a bridge port that does not forward is
+// blocking (amber: Blocking, Listening, Discarding) or learning (amber: Learning).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -132,7 +133,11 @@ impl Engine {
             return Led::Down;
         };
         match port.link {
-            Some(li) if port.admin_up && self.link_up(li) => Led::Up,
+            Some(li) if port.admin_up && self.link_up(li) => match n.bridge.as_ref().filter(|b| b.stp.on() && b.ports.get(pi as usize).is_some_and(|bp| bp.member)).map(|b| b.stp.state(pi)) {
+                Some(crate::stp::PortState::Learning) => Led::Learning,
+                Some(crate::stp::PortState::Blocking | crate::stp::PortState::Listening | crate::stp::PortState::Discarding) => Led::Blocking,
+                _ => Led::Up,
+            },
             _ => Led::Down,
         }
     }

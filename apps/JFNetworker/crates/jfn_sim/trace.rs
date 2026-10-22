@@ -9,7 +9,9 @@
 //   Note::layer()                                 1 cable, 2 bridge and ARP, 3 IPv4, 4 UDP/TCP,
 //                                                 7 services (DHCP, DNS, syslog, NTP); TCP's
 //                                                 states and decisions are layer 4 (tcp.rs),
-//                                                 HTTP's layer 7 (http.rs, httpsvc.rs)
+//                                                 HTTP's layer 7 (http.rs, httpsvc.rs), and so
+//                                                 are RIP's (rip.rs: Note::is_rip); spanning
+//                                                 tree's layer 2 (stp.rs; is_stp, is_stp_event)
 //   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
 //                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
@@ -38,6 +40,7 @@ use netpkt::{Ipv4, Mac, Prefix4};
 
 use crate::kernel::{Frame, Ns};
 use crate::resolver::LookupErr;
+use crate::rip::{RipDrop, RipHow, RipLoss, RipOut};
 use crate::tcp::{RstWhy, TcpEnd, TcpState};
 
 pub type HopId = u64;
@@ -316,6 +319,89 @@ pub enum Note {
     ScriptBusy { svc: String, waiting: u32 },
     ScriptDropped { svc: String },
     ScriptError { svc: String, line: u32, col: u32, msg: String },
+    /// spanning tree (stp.rs, stp98.rs, rstp.rs): a BPDU arrived / went out on a port
+    StpRx { port: u16, bpdu: netpkt::stp::Bpdu },
+    StpTx { port: u16, bpdu: netpkt::stp::Bpdu },
+    /// a BPDU the protocol does not take (a type it does not know, Message Age at Max Age, its
+    /// own BPDU back over a loop)
+    StpDropped { port: u16, why: crate::stp::BpduDrop },
+    /// a frame met a port that does not forward (where it came in, or the port of its
+    /// destination)
+    StpBlocked { port: u16, state: crate::stp::PortState },
+    /// a port's role / state changed
+    StpRole { port: u16, from: crate::stp::PortRole, to: crate::stp::PortRole },
+    StpState { port: u16, from: crate::stp::PortState, to: crate::stp::PortState },
+    /// the root bridge as this bridge sees it now (port None: this bridge is the root)
+    StpRoot { root: netpkt::stp::BridgeId, port: Option<u16>, cost: u32 },
+    /// a topology change: detected, TCN sent or received, acknowledged, TC flag
+    StpTopology { port: Option<u16>, what: crate::stp::TcWhat },
+    /// RSTP: what was learned on a port is forgotten after a topology change
+    StpFlush { port: u16, entries: u32 },
+    /// MAC entries age after `secs` (fast: Forward Delay during an 802.1D topology change)
+    StpAging { secs: u16, fast: bool },
+    /// the information about a port's LAN aged out (no BPDU in time)
+    StpAged { port: u16 },
+    /// a port is an edge port now / is none any more
+    StpEdge { port: u16, edge: bool },
+    /// RSTP: a port speaks 802.1D because its neighbour does / tries RSTP again
+    StpMigrate { port: u16, rstp: bool },
+    /// BPDU guard shut a port off (err-disabled)
+    StpErrDisable { port: u16 },
+    /// RIP (rip.rs; `iface` is an IPv4 interface): a request for the whole table went out
+    RipRequest { iface: u16, ver: u8 },
+    /// a request arrived and is answered (for the whole table, or for single routes)
+    RipAsked { from: Ipv4, iface: u16, whole: bool },
+    /// an update went out (its routes with the metrics sent, how many split horizon poisoned)
+    RipSent { iface: u16, ver: u8, to: Ipv4, kind: RipOut, routes: Vec<(Prefix4, u8)>, poisoned: u16 },
+    /// an update arrived and is taken (its routes with the metrics as sent)
+    RipHeard { from: Ipv4, iface: u16, ver: u8, routes: Vec<(Prefix4, u8)> },
+    /// a message was ignored, or an entry of an update
+    RipIgnored { from: Ipv4, iface: u16, why: RipDrop },
+    RipBadEntry { from: Ipv4, addr: Ipv4, metric: u32 },
+    /// the table: a route learned, changed, one more equal-cost path
+    RipLearned { prefix: Prefix4, via: Ipv4, metric: u8 },
+    RipChanged { prefix: Prefix4, via: Ipv4, metric: u8, old: u8 },
+    RipPathAdded { prefix: Prefix4, via: Ipv4, metric: u8 },
+    /// a route lost its last path: unreachable (metric 16) until the garbage collection; a path
+    /// of several lost
+    RipDown { prefix: Prefix4, via: Ipv4, why: RipLoss },
+    RipPathGone { prefix: Prefix4, via: Ipv4, why: RipLoss },
+    /// held down: an offer no better than the route was is ignored
+    RipHeld { prefix: Prefix4, from: Ipv4, metric: u8 },
+    /// the garbage collection removed a route
+    RipFlushed { prefix: Prefix4 },
+    /// a network of the device itself is advertised now / no longer
+    RipLocal { prefix: Prefix4, how: RipHow },
+    RipLocalGone { prefix: Prefix4 },
+    /// IPv4: a multicast packet for a group no interface here listens to
+    IpGroupIgnored { dst: Ipv4 },
+    /// access lists (acl.rs): line `seq` of the list on interface `iface` (inbound or
+    /// outbound) let the packet through / dropped it; seq 0 is the implicit deny at the end
+    AclPermit { list: String, seq: u32, iface: u16, out: bool },
+    AclDeny { list: String, seq: u32, iface: u16, out: bool },
+    /// NAT (nat.rs; an endpoint is an address and a port or ICMP identifier, 0 when the
+    /// address alone counts): a new translation of a flow with its remote end, or a new
+    /// mapping (remote None; protocol 0: an address with every protocol)
+    NatCreate { proto: u8, local: (Ipv4, u16), global: (Ipv4, u16), remote: Option<(Ipv4, u16)> },
+    /// the source (inside to outside) or the destination (outside to inside) of a packet
+    NatTranslate { proto: u8, inbound: bool, from: (Ipv4, u16), to: (Ipv4, u16) },
+    /// an ICMP error about a translated packet: the packet it quotes translated back (RFC 5508)
+    NatQuote { inbound: bool, from: (Ipv4, u16), to: (Ipv4, u16) },
+    /// a translation ended after its time without traffic
+    NatExpire { proto: u8, local: (Ipv4, u16), global: (Ipv4, u16), remote: Option<(Ipv4, u16)> },
+    /// a packet to a global address with no translation for it: it goes on as it is
+    NatNoEntry { proto: u8, dst: (Ipv4, u16) },
+    /// a packet from inside that no rule translates: it leaves as it is
+    NatNoRule { src: Ipv4 },
+    /// no free address or port for a new translation ("pool NAME", "interface X"): dropped,
+    /// the sender gets "administratively prohibited"
+    NatExhausted { what: String },
+    /// an ICMP error about nothing NAT knows: dropped (RFC 5508)
+    NatErrorDropped,
+    /// a fragment waits for the first one of its datagram (its identification); the fragments
+    /// of a datagram whose first part never came are dropped
+    NatFragWait { id: u16 },
+    NatFragDropped { id: u16, parts: u16 },
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -432,8 +518,52 @@ impl Note {
             Note::PartitionDrop { .. } => 3,
             n if n.is_lab() => 7,
             Note::ScriptBusy { .. } | Note::ScriptDropped { .. } | Note::ScriptError { .. } => 7,
+            n if n.is_rip() => 7,
+            Note::IpGroupIgnored { .. } => 3,
+            n if n.is_filter() => 3,
             _ => 2,
         }
+    }
+    /// a decision of RIP (rip.rs)
+    pub fn is_rip(&self) -> bool {
+        matches!(
+            self,
+            Note::RipRequest { .. }
+                | Note::RipAsked { .. }
+                | Note::RipSent { .. }
+                | Note::RipHeard { .. }
+                | Note::RipIgnored { .. }
+                | Note::RipBadEntry { .. }
+                | Note::RipLearned { .. }
+                | Note::RipChanged { .. }
+                | Note::RipPathAdded { .. }
+                | Note::RipDown { .. }
+                | Note::RipPathGone { .. }
+                | Note::RipHeld { .. }
+                | Note::RipFlushed { .. }
+                | Note::RipLocal { .. }
+                | Note::RipLocalGone { .. }
+        )
+    }
+    /// a decision of an access list or of NAT (acl.rs, nat.rs)
+    pub fn is_filter(&self) -> bool {
+        matches!(self, Note::AclPermit { .. } | Note::AclDeny { .. }) || self.is_nat()
+    }
+    /// a decision of NAT (nat.rs)
+    pub fn is_nat(&self) -> bool {
+        matches!(
+            self,
+            Note::NatCreate { .. }
+                | Note::NatTranslate { .. }
+                | Note::NatQuote { .. }
+                | Note::NatExpire { .. }
+                | Note::NatNoEntry { .. }
+                | Note::NatNoRule { .. }
+                | Note::NatExhausted { .. }
+                | Note::NatErrorDropped
+                | Note::NatFragWait { .. }
+                | Note::NatFragDropped { .. }
+        )
     }
     /// a decision of the lab's services (lb.rs, kv.rs, cache.rs, mq.rs)
     pub fn is_lab(&self) -> bool {
@@ -517,6 +647,15 @@ impl Note {
                 | Note::DiskFull
                 | Note::MqDead { .. }
                 | Note::ScriptDropped { .. }
+                | Note::StpDropped { .. }
+                | Note::StpBlocked { .. }
+                | Note::StpErrDisable { .. }
+                | Note::RipIgnored { .. }
+                | Note::IpGroupIgnored { .. }
+                | Note::AclDeny { .. }
+                | Note::NatExhausted { .. }
+                | Note::NatErrorDropped
+                | Note::NatFragDropped { .. }
         )
     }
     /// a TCP decision (tcp.rs)
@@ -805,7 +944,144 @@ impl Note {
             Note::ScriptBusy { svc, waiting } => msg!("Skript {} rechnet noch: das Ereignis wartet ({} vor ihm).", svc, waiting),
             Note::ScriptDropped { svc } => msg!("Skript {} überlastet: Datagramm verworfen.", svc),
             Note::ScriptError { svc, line, col, msg: text } => msg!("Skript {}: Fehler in Zeile {}, Spalte {}: {}", svc, line, col, text),
+            Note::StpRx { port: p, bpdu } => match bpdu.kind {
+                netpkt::stp::Kind::Tcn => msg!("TCN-BPDU an {} empfangen.", port(*p)),
+                _ => msg!("BPDU an {}: {} von {}, Root {}, Kosten {}{}.", port(*p), bpdu_kind(bpdu), stp_id(bpdu.bridge), stp_id(bpdu.root), bpdu.cost, bpdu_flags(bpdu)),
+            },
+            Note::StpTx { port: p, bpdu } => match bpdu.kind {
+                netpkt::stp::Kind::Tcn => msg!("TCN-BPDU über {} an die Root-Bridge gesendet.", port(*p)),
+                _ => msg!("BPDU über {}: {}, Root {}, Kosten {}{}.", port(*p), bpdu_kind(bpdu), stp_id(bpdu.root), bpdu.cost, bpdu_flags(bpdu)),
+            },
+            Note::StpDropped { port: p, why } => match why {
+                crate::stp::BpduDrop::Type => msg!("BPDU an {} verworfen: diese Bridge spricht 802.1D (STP) und kennt RST-BPDUs nicht.", port(*p)),
+                crate::stp::BpduDrop::Aged => msg!("BPDU an {} verworfen: ihr Message Age hat Max Age erreicht.", port(*p)),
+                crate::stp::BpduDrop::Looped => msg!("BPDU an {} verworfen: die eigene BPDU kam über eine Schleife zurück.", port(*p)),
+            },
+            Note::StpBlocked { port: p, state } => msg!("Verworfen: {} ist im Zustand {} (Spanning Tree).", port(*p), state.msg()),
+            Note::StpRole { port: p, from, to } => msg!("Spanning Tree: {} ist jetzt {} (vorher {}).", port(*p), to.msg(), from.msg()),
+            Note::StpState { port: p, from, to } => msg!("Spanning Tree: {} wechselt von {} nach {}.", port(*p), from.msg(), to.msg()),
+            Note::StpRoot { root, port: None, .. } => msg!("Spanning Tree: diese Bridge ist die Root-Bridge ({}).", stp_id(*root)),
+            Note::StpRoot { root, port: Some(p), cost } => msg!("Spanning Tree: die Root-Bridge ist {}, über {} mit Kosten {}.", stp_id(*root), port(*p), cost),
+            Note::StpTopology { port: p, what } => match (what, p) {
+                (crate::stp::TcWhat::Detected, Some(p)) => msg!("Topologieänderung an {} erkannt.", port(*p)),
+                (crate::stp::TcWhat::Detected, None) => msg!("Topologieänderung erkannt."),
+                (crate::stp::TcWhat::TcnSent, Some(p)) => msg!("Topologieänderung: TCN-BPDU über {} zur Root-Bridge.", port(*p)),
+                (crate::stp::TcWhat::TcnSent, None) => msg!("Topologieänderung: TCN-BPDU zur Root-Bridge."),
+                (crate::stp::TcWhat::TcnReceived, Some(p)) => msg!("Topologieänderung: TCN-BPDU an {}, wird bestätigt und weitergegeben.", port(*p)),
+                (crate::stp::TcWhat::TcnReceived, None) => msg!("Topologieänderung: TCN-BPDU empfangen."),
+                (crate::stp::TcWhat::Acked, Some(p)) => msg!("Topologieänderung: die TCN-BPDU über {} ist bestätigt.", port(*p)),
+                (crate::stp::TcWhat::Acked, None) => msg!("Topologieänderung: die TCN-BPDU ist bestätigt."),
+                (crate::stp::TcWhat::Received, Some(p)) => msg!("Topologieänderung gemeldet an {} (TC-Flag).", port(*p)),
+                (crate::stp::TcWhat::Received, None) => msg!("Topologieänderung gemeldet (TC-Flag)."),
+                (crate::stp::TcWhat::RootFlag(true), _) => msg!("Root-Bridge: ihre BPDUs tragen das TC-Flag für Max Age + Forward Delay."),
+                (crate::stp::TcWhat::RootFlag(false), _) => msg!("Root-Bridge: die Topologieänderung ist vorbei, ihre BPDUs tragen kein TC-Flag mehr."),
+            },
+            Note::StpFlush { port: p, entries: 1 } => msg!("Topologieänderung: ein MAC-Eintrag an {} gelöscht.", port(*p)),
+            Note::StpFlush { port: p, entries } => msg!("Topologieänderung: {} MAC-Einträge an {} gelöscht.", entries, port(*p)),
+            Note::StpAging { secs, fast: true } => msg!("Topologieänderung: MAC-Einträge altern jetzt nach {} s (Forward Delay).", secs),
+            Note::StpAging { secs, fast: false } => msg!("MAC-Einträge altern wieder nach {} s.", secs),
+            Note::StpAged { port: p } => msg!("Spanning Tree: die Information an {} ist abgelaufen, keine BPDU in der Zeit.", port(*p)),
+            Note::StpEdge { port: p, edge: true } => msg!("Spanning Tree: {} ist ein Edge-Port.", port(*p)),
+            Note::StpEdge { port: p, edge: false } => msg!("Spanning Tree: an {} kam eine BPDU, er ist kein Edge-Port mehr.", port(*p)),
+            Note::StpMigrate { port: p, rstp: false } => msg!("Spanning Tree: an {} spricht der Nachbar 802.1D, der Port sendet Configuration BPDUs.", port(*p)),
+            Note::StpMigrate { port: p, rstp: true } => msg!("Spanning Tree: {} versucht wieder RSTP.", port(*p)),
+            Note::StpErrDisable { port: p } => msg!("BPDU Guard: BPDU an {}, der Port wird abgeschaltet (err-disabled).", port(*p)),
+            Note::RipRequest { iface: i, ver } => msg!("RIP: fragt über {} nach der ganzen Tabelle (Request, Version {}).", iface(*i), ver),
+            Note::RipAsked { from, iface: i, whole } => {
+                if *whole {
+                    msg!("RIP: {} fragt über {} nach der ganzen Tabelle: Antwort folgt.", from, iface(*i))
+                } else {
+                    msg!("RIP: {} fragt über {} nach einzelnen Routen: Antwort folgt.", from, iface(*i))
+                }
+            }
+            Note::RipSent { iface: i, ver, to, kind, routes, poisoned } => {
+                let n = routes.len();
+                match (kind, *poisoned) {
+                    (RipOut::Regular, 0) => msg!("RIP: Update (Version {}) über {} an {}, Routen: {}.", ver, iface(*i), to, n),
+                    (RipOut::Regular, p) => msg!("RIP: Update (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.", ver, iface(*i), to, n, p),
+                    (RipOut::Triggered, 0) => msg!("RIP: ausgelöstes Update (Version {}) über {} an {}, Routen: {}.", ver, iface(*i), to, n),
+                    (RipOut::Triggered, p) => msg!("RIP: ausgelöstes Update (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.", ver, iface(*i), to, n, p),
+                    (RipOut::Answer, 0) => msg!("RIP: Antwort (Version {}) über {} an {}, Routen: {}.", ver, iface(*i), to, n),
+                    (RipOut::Answer, p) => msg!("RIP: Antwort (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.", ver, iface(*i), to, n, p),
+                }
+            }
+            Note::RipHeard { from, iface: i, ver, routes } => msg!("RIP: Update (Version {}) von {} über {}, Routen: {}.", ver, from, iface(*i), routes.len()),
+            Note::RipIgnored { from, iface: i, why } => msg!("RIP: Nachricht von {} über {} ignoriert: {}.", from, iface(*i), phrase(why.text())),
+            Note::RipBadEntry { from, addr, metric } => msg!("RIP: Eintrag {} mit Metrik {} von {} ist ungültig: ignoriert.", addr, metric, from),
+            Note::RipLearned { prefix, via, metric } => msg!("RIP: Route {} gelernt: über {}, Metrik {}.", prefix, via, metric),
+            Note::RipChanged { prefix, via, metric, old } => msg!("RIP: Route {} jetzt über {}, Metrik {} (vorher {}).", prefix, via, metric, old),
+            Note::RipPathAdded { prefix, via, metric } => msg!("RIP: ein weiterer gleich guter Weg zu {} über {} (Metrik {}).", prefix, via, metric),
+            Note::RipDown { prefix, via, why } => msg!("RIP: {} über {} ist weg ({}): unerreichbar, wird mit Metrik 16 gemeldet.", prefix, via, why.msg()),
+            Note::RipPathGone { prefix, via, why } => msg!("RIP: der Weg zu {} über {} entfällt ({}); gleich gute Wege bleiben.", prefix, via, why.msg()),
+            Note::RipHeld { prefix, from, metric } => msg!("RIP: {} im Holddown: das Angebot von {} mit Metrik {} wird ignoriert.", prefix, from, metric),
+            Note::RipFlushed { prefix } => msg!("RIP: {} aus der Tabelle gelöscht (Garbage Collection abgelaufen).", prefix),
+            Note::RipLocal { prefix, how } => msg!("RIP: meldet {} ({}).", prefix, phrase(how.text())),
+            Note::RipLocalGone { prefix } => msg!("RIP: {} gibt es hier nicht mehr: wird mit Metrik 16 gemeldet.", prefix),
+            Note::IpGroupIgnored { dst } => msg!("Multicast an {} verworfen: kein Interface hört auf diese Gruppe.", dst),
+            Note::AclPermit { list, seq, iface: i, out } => {
+                if *out {
+                    msg!("Zugriffsliste {} ausgehend an {}: Zeile {} erlaubt das Paket.", list, iface(*i), seq)
+                } else {
+                    msg!("Zugriffsliste {} eingehend an {}: Zeile {} erlaubt das Paket.", list, iface(*i), seq)
+                }
+            }
+            Note::AclDeny { list, seq, iface: i, out } => match (*out, *seq) {
+                (true, 0) => msg!("Zugriffsliste {} ausgehend an {}: keine Zeile passt, verworfen (implizites deny).", list, iface(*i)),
+                (false, 0) => msg!("Zugriffsliste {} eingehend an {}: keine Zeile passt, verworfen (implizites deny).", list, iface(*i)),
+                (true, s) => msg!("Zugriffsliste {} ausgehend an {}: Zeile {} verwirft das Paket.", list, iface(*i), s),
+                (false, s) => msg!("Zugriffsliste {} eingehend an {}: Zeile {} verwirft das Paket.", list, iface(*i), s),
+            },
+            Note::NatCreate { proto, local, global, remote } => match remote {
+                Some(r) => msg!("NAT: neue Übersetzung {} {} = {} (Gegenstelle {}).", proto_word(*proto), ep(*proto, *local), ep(*proto, *global), ep(*proto, *r)),
+                None if *proto == 0 => msg!("NAT: {} bekommt {} für alle Protokolle.", local.0, global.0),
+                None => msg!("NAT: neue Zuordnung {} {} = {}.", proto_word(*proto), ep(*proto, *local), ep(*proto, *global)),
+            },
+            Note::NatTranslate { proto, inbound, from, to } => {
+                if *inbound {
+                    msg!("NAT: Ziel {} \u{2192} {} ({}).", ep(*proto, *from), ep(*proto, *to), proto_word(*proto))
+                } else {
+                    msg!("NAT: Quelle {} \u{2192} {} ({}).", ep(*proto, *from), ep(*proto, *to), proto_word(*proto))
+                }
+            }
+            Note::NatQuote { inbound, from, to } => {
+                if *inbound {
+                    msg!("NAT: ICMP-Fehler zurückübersetzt, zitierte Quelle {} \u{2192} {}.", ep(0, *from), ep(0, *to))
+                } else {
+                    msg!("NAT: ICMP-Fehler übersetzt, zitiertes Ziel {} \u{2192} {}.", ep(0, *from), ep(0, *to))
+                }
+            }
+            Note::NatExpire { proto, local, global, remote } => match remote {
+                Some(r) => msg!("NAT: Übersetzung {} {} = {} (Gegenstelle {}) abgelaufen.", proto_word(*proto), ep(*proto, *local), ep(*proto, *global), ep(*proto, *r)),
+                None => msg!("NAT: Zuordnung {} = {} abgelaufen.", local.0, global.0),
+            },
+            Note::NatNoEntry { proto, dst } => msg!("NAT: keine Übersetzung für {} ({}): unverändert weiter.", ep(*proto, *dst), proto_word(*proto)),
+            Note::NatNoRule { src } => msg!("NAT: keine Regel übersetzt {}: unverändert weiter.", src),
+            Note::NatExhausted { what } => msg!("NAT: keine freie Adresse und kein freier Port ({}): verworfen.", what),
+            Note::NatErrorDropped => msg!("NAT: ICMP-Fehler ohne passende Übersetzung verworfen."),
+            Note::NatFragWait { id } => msg!("NAT: Fragment (ID {}) wartet auf das erste Fragment.", id),
+            Note::NatFragDropped { id, parts } => msg!("NAT: {} Fragmente (ID {}) ohne erstes Fragment verworfen.", parts, id),
         }
+    }
+}
+
+/// a protocol as notes name it ("TCP", "ICMP"; "IP" for every protocol)
+fn proto_word(p: u8) -> String {
+    match p {
+        0 => String::from("IP"),
+        n => match netpkt::ipv4::proto_name(n) {
+            Some(s) => String::from(s),
+            None => format!("{}", n),
+        },
+    }
+}
+
+/// an endpoint in a note: "10.0.0.1:80", an ICMP query's identifier in words, the address
+/// alone without a port
+fn ep(proto: u8, e: (Ipv4, u16)) -> Msg {
+    match (proto, e.1) {
+        (_, 0) => Msg::plain(format!("{}", e.0)),
+        (netpkt::ipv4::PROTO_ICMP, id) => msg!("{} (Kennung {})", e.0, id),
+        (_, p) => Msg::plain(format!("{}:{}", e.0, p)),
     }
 }
 
@@ -1128,7 +1404,86 @@ impl Note {
             Note::KvMember { .. } => P_IPV4 | P_UDP,
             Note::DiskFull => 0,
             n if n.is_lab() => P_IPV4 | P_TCP | netpkt::decode::P_HTTP,
+            n if n.is_stp() => netpkt::decode::P_STP,
+            n if n.is_rip() => P_IPV4 | P_UDP | netpkt::decode::P_RIP,
+            Note::IpGroupIgnored { .. } => P_IPV4,
+            Note::NatCreate { proto, .. } | Note::NatTranslate { proto, .. } | Note::NatExpire { proto, .. } | Note::NatNoEntry { proto, .. } => {
+                P_IPV4
+                    | match *proto {
+                        netpkt::ipv4::PROTO_ICMP => P_ICMP,
+                        netpkt::ipv4::PROTO_UDP => P_UDP,
+                        netpkt::ipv4::PROTO_TCP => P_TCP,
+                        _ => 0,
+                    }
+            }
+            Note::NatQuote { .. } | Note::NatErrorDropped => P_IPV4 | P_ICMP,
+            n if n.is_filter() => P_IPV4,
             _ => 0,
         }
     }
+}
+
+// ---------------------------------------------------------------- spanning tree
+
+impl Note {
+    /// a decision of the spanning tree itself (StpBlocked is about the frame it drops)
+    pub fn is_stp(&self) -> bool {
+        matches!(
+            self,
+            Note::StpRx { .. }
+                | Note::StpTx { .. }
+                | Note::StpDropped { .. }
+                | Note::StpRole { .. }
+                | Note::StpState { .. }
+                | Note::StpRoot { .. }
+                | Note::StpTopology { .. }
+                | Note::StpFlush { .. }
+                | Note::StpAging { .. }
+                | Note::StpAged { .. }
+                | Note::StpEdge { .. }
+                | Note::StpMigrate { .. }
+                | Note::StpErrDisable { .. }
+        )
+    }
+    /// what "debug spanning-tree events" prints: the protocol's decisions without the BPDUs
+    pub fn is_stp_event(&self) -> bool {
+        self.is_stp() && !matches!(self, Note::StpRx { .. } | Note::StpTx { .. })
+    }
+}
+
+/// a bridge ID in notes: "32768.024a.0000.0100"
+pub fn stp_id(id: netpkt::stp::BridgeId) -> String {
+    format!("{}.{}", id.priority(), id.mac().cisco())
+}
+
+/// the kind of a BPDU in notes (protocol terms): "Configuration BPDU", "RST BPDU (Designated)"
+fn bpdu_kind(b: &netpkt::stp::Bpdu) -> String {
+    match b.kind {
+        netpkt::stp::Kind::Config => String::from("Configuration BPDU"),
+        netpkt::stp::Kind::Tcn => String::from("TCN BPDU"),
+        netpkt::stp::Kind::Rst => format!("RST BPDU ({})", b.role().name()),
+    }
+}
+
+/// the flags of a BPDU in notes: " [TC, Proposal]", "" without any that matter
+fn bpdu_flags(b: &netpkt::stp::Bpdu) -> String {
+    let mut v: Vec<&str> = Vec::new();
+    if b.tc() {
+        v.push("TC");
+    }
+    if b.tca() {
+        v.push("TCA");
+    }
+    if b.proposal() {
+        v.push("Proposal");
+    }
+    if b.agreement() {
+        v.push("Agreement");
+    }
+    if b.forwarding() {
+        v.push("Forwarding");
+    } else if b.learning() {
+        v.push("Learning");
+    }
+    if v.is_empty() { String::new() } else { format!(" [{}]", v.join(", ")) }
 }

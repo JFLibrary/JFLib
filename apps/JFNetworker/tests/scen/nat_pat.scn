@@ -1,0 +1,65 @@
+# Ein Büro hinter NAT: PC1, PC2 und der Webserver WEB (192.168.1.0/24) gehen über R1 ins
+# Internet, alle mit der Adresse 203.0.113.1 von R1 und eigenen Ports (PAT). ISP kennt das
+# Büronetz nicht: Antworten kommen nur über die Übersetzung zurück. WEB:80 ist von außen unter
+# 203.0.113.1:80 erreichbar (statische Port-Weiterleitung), und die Zugriffsliste 110 lässt
+# PC2 nicht ins Web (Ping geht weiter). Zuerst lernen R1 und ISP ihre Nachbarn: IOS verwirft
+# das Paket, für das es nach ARP fragt (".!!!!").
+R1: enable
+R1: ping 203.0.113.254
+ISP: enable
+ISP: ping 198.51.100.10
+ISP: ping 192.0.2.20
+run 12s
+expect R1 output contains ".!!!!"
+expect ISP output contains "Success rate is 80 percent (4/5)"
+# Pings von innen: beide PCs mit ihrer eigenen ICMP-Kennung auf 203.0.113.1
+PC1: ping -c 3 198.51.100.10
+PC2: ping -c 3 198.51.100.10
+run 4s
+expect PC1 output contains "3 packets transmitted, 3 received, 0% packet loss"
+expect PC2 output contains "3 packets transmitted, 3 received, 0% packet loss"
+R1: show ip nat translations
+expect R1 output contains "icmp 203.0.113.1:"
+expect R1 output contains "tcp 203.0.113.1:80        192.168.1.20:80       ---                   ---"
+# Web von innen: SRV sieht 203.0.113.1, PC2 bekommt von R1 "administratively prohibited"
+PC1: curl -s http://198.51.100.10/
+run 2s
+expect PC1 output contains "Hallo aus dem Internet, 203.0.113.1 fragt SRV"
+PC2: curl -sS http://198.51.100.10/
+run 2s
+expect PC2 output contains "curl: (7) Failed to connect to 198.51.100.10 port 80"
+R1: show access-lists 110
+expect R1 output contains "    10 deny tcp host 192.168.1.11 any eq www (1 match)"
+# von außen auf den Webserver im Büro: EXT spricht mit 203.0.113.1:80, WEB sieht EXT
+EXT: curl -s http://203.0.113.1/
+run 2s
+expect EXT output contains "Hallo vom Webserver im Buero, 192.0.2.20 fragt WEB"
+R1: show ip nat translations
+expect R1 output contains "tcp 203.0.113.1:80        192.168.1.20:80       192.0.2.20:"
+# traceroute durch PAT: die ICMP-Fehler von ISP und SRV kommen zurückübersetzt an (RFC 5508)
+PC1: traceroute -n 198.51.100.10
+run 10s
+expect PC1 output contains " 1  192.168.1.1"
+expect PC1 output contains " 2  203.0.113.254"
+expect PC1 output contains " 3  198.51.100.10"
+R1: debug ip nat
+PC2: ping -c 1 198.51.100.10
+run 2s
+expect R1 output contains "NAT: icmp source 192.168.1.11:"
+expect R1 output contains "NAT: icmp destination 203.0.113.1:"
+R1: undebug all
+R1: show ip nat translations verbose
+R1: show ip nat statistics
+expect R1 output contains "Inside interfaces:\n  GigabitEthernet0/0/0\n"
+R1: show running-config
+expect R1 output contains " ip access-group 110 in\n ip nat inside\n!\n"
+expect R1 output contains "ip nat inside source list 1 interface GigabitEthernet0/0/1 overload\nip nat inside source static tcp 192.168.1.20 80 203.0.113.1 80\n!\nip route 0.0.0.0 0.0.0.0 203.0.113.254\n"
+expect R1 output contains "access-list 110 remark PC2 darf nicht ins Web\naccess-list 110 deny tcp host 192.168.1.11 any eq www\n"
+# nach fünf Minuten ohne Verkehr sind die Übersetzungen abgelaufen (ICMP nach 60 s, TCP nach
+# FIN und RST nach 240 s, UDP nach 300 s); die statische bleibt
+run 300s
+R1: show ip nat translations
+expect R1 output not contains "icmp"
+expect R1 output not contains "udp"
+expect R1 output contains "tcp 203.0.113.1:80        192.168.1.20:80       ---                   ---"
+expect hops icmp >= 30

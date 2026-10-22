@@ -1,7 +1,8 @@
 // log -- what the IOS-like console prints by itself: interface changes (%LINK-3-UPDOWN,
 // %LINK-5-CHANGED, %LINEPROTO-5-UPDOWN), "%SYS-5-CONFIG_I", and debugging output made from
-// the device's decisions (debug ip icmp, debug arp), each line with a time stamp; the texts
-// after the message codes are our own words
+// the device's decisions (debug ip icmp, debug arp, debug spanning-tree events, debug ip rip:
+// cli/rip.rs, debug ip nat: cli/nat.rs), each line with a time stamp; the texts after the
+// message codes are our own words
 //
 //   Engine::if_state(ni, iface, port)   (not shut down, link, line protocol) of an interface
 //   Engine::ios_snap(ni)                compares every interface with the last look and logs
@@ -28,7 +29,7 @@ use netpkt::ipv4::Ipv4View;
 use netpkt::{Ipv4, Mac};
 
 use super::fmt::ios_stamp;
-use super::{IfSnap, D_ARP, D_ICMP};
+use super::{IfSnap, D_ARP, D_ICMP, D_RIP, D_STP};
 use crate::driver::Report;
 use crate::ip::IfKind;
 use crate::kernel::Engine;
@@ -233,6 +234,11 @@ impl Engine {
                 }
                 text.push_str(&format!("ARP: learned {} is at {}\n", ip, mac.cisco()));
             }
+            // "debug spanning-tree events" (cli/stp.rs)
+            n if d & D_STP != 0 && n.is_stp_event() => text = self.stp_debug(ni, n),
+            n if d & D_RIP != 0 && n.is_rip() => text = self.rip_debug(ni, n),
+            // debug ip nat (cli/nat.rs)
+            n if n.is_nat() && d & super::D_NAT != 0 => text = self.nat_debug(n),
             _ => {}
         }
         if text.is_empty() {

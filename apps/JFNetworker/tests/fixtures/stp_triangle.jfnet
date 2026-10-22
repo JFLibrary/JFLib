@@ -1,0 +1,209 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Spanning Tree im Dreieck",
+  "description": "Drei Switches im Dreieck mit 802.1D (spanning-tree mode stp), SW1 ist mit Priorität 4096 die Root-Bridge; an jedem Switch ein PC an einem Edge-Port (portfast).",
+  "seed": 11,
+  "next_id": 13,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 240,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nspanning-tree mode stp\nspanning-tree priority 4096\n!\ninterface GigabitEthernet1/0/3\n spanning-tree portfast\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SW2",
+      "model": "jf-s24p",
+      "x": 80,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname SW2\n!\nspanning-tree mode stp\n!\ninterface GigabitEthernet1/0/3\n spanning-tree portfast\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW3",
+      "model": "jf-s24p",
+      "x": 400,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname SW3\n!\nspanning-tree mode stp\n!\ninterface GigabitEthernet1/0/3\n spanning-tree portfast\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "PC1",
+      "model": "pc",
+      "x": 240,
+      "y": -160,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.1/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "PC2",
+      "model": "pc",
+      "x": -80,
+      "y": 340,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.0.2/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 6,
+      "name": "PC3",
+      "model": "pc",
+      "x": 560,
+      "y": 340,
+      "off": false,
+      "startup_config": "hostname PC3\nip addr add 10.0.0.3/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 7,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "b": {
+        "dev": 1,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 1,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 850,
+    "cx": 272,
+    "cy": 114,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

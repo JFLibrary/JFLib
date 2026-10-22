@@ -1,0 +1,158 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "RIP mit zwei Versionen",
+  "description": "Ein L3-Switch mit zwei VLANs und RIPv2, ein Router mit Standardroute, dahinter ein alter Router mit RIPv1.",
+  "seed": 11,
+  "next_id": 10,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "MLS1",
+      "model": "jf-s24l3",
+      "x": 100,
+      "y": 100,
+      "off": false,
+      "startup_config": "hostname MLS1\n!\nip routing\n!\nvlan 10\n name Staff\n!\nvlan 20\n name Students\n!\ninterface GigabitEthernet1/0/1\n switchport access vlan 10\n switchport mode access\n!\ninterface GigabitEthernet1/0/2\n switchport access vlan 20\n switchport mode access\n!\ninterface GigabitEthernet1/0/24\n no switchport\n ip address 10.0.1.1 255.255.255.252\n!\ninterface Vlan10\n ip address 10.10.10.1 255.255.255.0\n!\ninterface Vlan20\n ip address 10.10.20.1 255.255.255.0\n!\nrouter rip\n version 2\n passive-interface default\n no passive-interface GigabitEthernet1/0/24\n network 10.0.0.0\n no auto-summary\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 400,
+      "y": 100,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.2 255.255.255.252\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 192.168.5.1 255.255.255.0\n ip rip send version 1\n ip rip receive version 1\n no shutdown\n!\nrouter rip\n version 2\n network 10.0.0.0\n network 192.168.5.0\n default-information originate\n no auto-summary\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "R2",
+      "model": "jf-r4",
+      "x": 700,
+      "y": 100,
+      "off": false,
+      "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 192.168.5.2 255.255.255.0\n no shutdown\n!\ninterface Loopback0\n ip address 172.16.1.1 255.255.255.0\n!\ninterface Loopback1\n ip address 172.16.2.1 255.255.255.0\n!\nrouter rip\n version 1\n network 192.168.5.0\n network 172.16.0.0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 300,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.10.10.10/24 dev eth0\nip route add default via 10.10.10.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "PC2",
+      "model": "pc",
+      "x": 200,
+      "y": 300,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.10.20.10/24 dev eth0\nip route add default via 10.10.20.1\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 6,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet1/0/24"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 1,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 1,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper-straight",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

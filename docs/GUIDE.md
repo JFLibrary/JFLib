@@ -1817,7 +1817,14 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   (`push` adds bytes and gives the next event -- `More`, `Head`, `Data`, `End` --, `poll` the
   ones after it, pipelined messages one after the other, `finish` at the end of the stream)
   and `http::encode_request` / `encode_response` / `encode_chunked` by the wire rules of
-  `netio::http`.
+  `netio::http`. For address translation, `nat::rewrite(pkt, Side::Src | Side::Dst, addr,
+  Some(port))` changes a packet in place with every checksum it touches updated incrementally
+  (IPv4 header, TCP and UDP with their pseudo header -- a UDP checksum of 0 stays 0 --, the
+  identifier of an ICMP query; a later fragment changes its address only),
+  `nat::rewrite_quoted` does the same to the packet an ICMP error quotes together with the
+  error's own checksum (RFC 5508), `nat::Flow::of` / `Flow::quoted` give what translation and
+  filters look at (addresses, ports or the ICMP identifier, type and code, TCP flags, fragment
+  position), and `checksum::update(ck, old, new)` follows any changed run of bytes (RFC 1624).
 
   ```rust
   let mut p = Pkt::new(netpkt::pkt::HEADROOM, b"payload");
@@ -1844,6 +1851,43 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   let payload = m.to_bytes(dhcp::BOOTP_MIN);
   let q = dns::Message::query(id, "www.lab", dns::TYPE_A, true).to_bytes();
   let answer = dns::Message::parse(&reply)?;          // answers, authority, additional
+  ```
+
+  Spanning tree: `stp` has the BPDUs of STP and RSTP -- Configuration and TCN BPDUs of
+  802.1D-1998, RST BPDUs of 802.1D-2004 with their flags and port role (`Role`, `F_PROPOSAL`,
+  `F_AGREEMENT`, ...), `BridgeId` (priority with the system ID extension, then the MAC; lower
+  is better) and `PortId` (priority in steps of 16, port number), `path_cost(kbps)` after
+  802.1D-2004 Table 17-3 (1G 20 000, 10G 2 000, 100G 200). `Bpdu::parse` validates as 9.3.4
+  says (protocol identifier, type, length; an MST BPDU reads as an RST BPDU), `Bpdu::frame(src)`
+  writes the 802.3 frame with LLC 42 42 03 to 01:80:c2:00:00:00, `stp::of_frame` reads one
+  back. `decode::layers` shows every field and flag, `decode::info` sums a BPDU up as capture
+  tools do ("RST. Root = 4096/0/02:4a:00:00:01:00  Cost = 0  Port = 0x8001").
+
+  ```rust
+  let t = Times { msg_age: 0, max_age: 20, hello: 2, fwd_delay: 15 };     // seconds
+  let me = BridgeId::new(4096, mac);
+  let b = Bpdu::rst(stp::F_PROPOSAL, me, 0, me, PortId::new(128, 1), t).with_role(Role::Designated);
+  let frame = b.frame(port_mac);                      // 60 bytes, padded
+  let back = stp::of_frame(&frame);                   // Some(b)
+  ```
+
+  Routing: `rip` (RFC 2453, version 1 after RFC 1058) -- `RipView` reads a message (command,
+  version, the complete 20-byte entries, `routes()` without the authentication entry, `auth()`
+  for that entry of RFC 2453 4.1, `trailing()` bytes), `Rip` writes one (`response`,
+  `request_all` for the whole table, `to_bytes`; the sender splits at `rip::MAX_ENTRIES`),
+  `Rte::v2(prefix, next_hop, metric, tag)` and `Rte::v1(addr, metric)` build entries,
+  `Rte::prefix()` gives a version 2 destination (version 1 masks are the receiver's business),
+  `Auth::password` / `text()` the plain-text password (keyed MD5 is recognised, not checked).
+  `decode::layers` shows one field per entry with its bytes and the problems a receiver refuses
+  (a must-be-zero field of version 1, metrics outside 1 to 16, masks with gaps, bytes after the
+  last entry); `decode::info` sums it up ("RIPv2 Response, 3 routes", "RIPv1 Request for the
+  whole table").
+
+  ```rust
+  let m = rip::Rip::response(2, vec![rip::Rte::v2(net, Ipv4::UNSPECIFIED, 2, 0)]);
+  let mut p = Pkt::new(netpkt::pkt::HEADROOM, &m.to_bytes());
+  UdpHdr::new(udp::PORT_RIP, udp::PORT_RIP).push_v4(&mut p, src, rip::GROUP);
+  let heard = rip::RipView::parse(payload).map(|v| rip::Rip::read(&v));
   ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
@@ -2500,7 +2544,9 @@ let c = t.complete(conf, "int gi", &names);   // c.line == Some("int GigabitEthe
   (`show  shutdown  `). `F_HIDDEN` keeps a command out of help and Tab.
 * Modes carry their prompt suffix and the mode they fall back to (`mode_info(m).parent`): an
   IOS-like console tries a line that fails in a configuration submode again in the global
-  configuration; the app decides when to do that.
+  configuration; the app decides when to do that. `find_mode(prompt)` finds a mode by its
+  prompt, so a part of an app that adds its own modes later (JFNetworker's access-list modes)
+  needs no fixed mode number.
 * Write the help texts, mode titles and status lines in your own words; only the command
   words, their syntax, configuration lines and short `%` errors should follow the original
   (JFNetworker's rule, see its README).

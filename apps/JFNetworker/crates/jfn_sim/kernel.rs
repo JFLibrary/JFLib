@@ -8,7 +8,8 @@
 //   set_timer / cancel_timer (crate)       per node and slot; a newer setting cancels the older
 //                                          (slots: ip::SLOT_ARP, ip::SLOT_REASM; os::SLOT_OS
 //                                          and up: the inbox, the resolver, tcp::SLOT_TCP,
-//                                          services)
+//                                          services; stp::SLOT_STP the spanning tree's tick,
+//                                          nat::SLOT_NAT)
 //
 // Events are plain data in a slab and run in (time, sequence) order: two events at the same
 // time run in the order they were scheduled.  Nothing here reads a clock.  Before an event,
@@ -247,7 +248,9 @@ impl Engine {
 
     /// a node timer fired
     fn on_timer(&mut self, node: usize, slot: u32) {
-        if slot >= crate::os::SLOT_OS {
+        if slot == crate::stp::SLOT_STP {
+            self.stp_tick(node);
+        } else if slot >= crate::os::SLOT_OS {
             self.os_timer(node, slot);
         } else {
             self.l3_timer(node, slot);

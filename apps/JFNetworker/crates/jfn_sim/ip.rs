@@ -17,6 +17,13 @@
 //                                 the table of the last lookup is kept with what it was made of
 //                                 (the interfaces' states and addresses, the static routes) and
 //                                 made again only when that changed
+//   set_dynamic(src, routes)      the routes of a routing protocol (RIP: rip.rs) in the table,
+//                                 next to connected and static ones; equal-cost routes of a
+//                                 protocol share the destinations: one per destination address
+//   join(iface, group, on) / joined   IPv4 multicast groups an interface listens to (224.0.0.9
+//                                 for RIPv2); packets to other groups are not for the device
+//   acls / nat                    the device's access lists (acl.rs) and address translation
+//                                 (nat.rs); an interface that goes away takes its part along
 //
 // The engine decides which interfaces are up (iface_up in l3.rs); this module only keeps the
 // data and answers questions about it.
@@ -201,15 +208,26 @@ pub struct IpStack {
     pub arp_queue: usize,
     /// the routing table of the last lookup (every forwarded packet looks one up)
     pub(crate) rib_cache: RefCell<RibCache>,
+    /// the routes of routing protocols (set_dynamic); their interface is resolved
+    pub dynamic: Vec<Route>,
+    /// counts the changes of `dynamic` (the table of the last lookup compares it)
+    pub(crate) dyn_gen: u64,
+    /// multicast groups the device listens to: (interface, group)
+    pub groups: Vec<(u16, Ipv4)>,
+    /// access lists and where they are used (acl.rs)
+    pub acls: crate::acl::Acls,
+    /// address translation: interfaces, rules, translations (nat.rs)
+    pub nat: crate::nat::Nat,
 }
 
 /// a routing table with what it was made of: per interface its state and addresses, the static
-/// routes (equal inputs give the same table)
+/// routes, the generation of the protocols' routes (equal inputs give the same table)
 #[derive(Clone, Debug, Default)]
 pub(crate) struct RibCache {
     up: Vec<bool>,
     addrs: Vec<Vec<Prefix4>>,
     statics: Vec<Route>,
+    dyn_gen: u64,
     rib: Vec<Route>,
 }
 
@@ -291,6 +309,11 @@ impl IpStack {
             long_quote: !ios,
             arp_queue: if ios { 0 } else { ARP_QUEUE },
             rib_cache: RefCell::new(RibCache::default()),
+            dynamic: Vec::new(),
+            dyn_gen: 0,
+            groups: Vec::new(),
+            acls: crate::acl::Acls::default(),
+            nat: crate::nat::Nat::default(),
         })
     }
 
@@ -372,12 +395,18 @@ impl IpStack {
             self.statics.retain(|r| r.iface != Some(iface));
         }
         self.arp.retain(|(i, _), _| *i != iface);
+        // its access lists and its side of NAT go with it
+        self.acls.unbind(iface);
+        self.nat.unbind(iface);
     }
     /// what is forgotten when the device is switched off: learned neighbours, fragments
+    /// (NAT's translations and the hit counters of access lists too)
     pub fn reset(&mut self) {
         self.arp.retain(|_, e| e.fixed);
         self.reasm.clear();
         self.icmp_rate = IcmpRate::new();
+        self.nat.reset();
+        self.acls.clear_counters(None);
     }
 
     /// may an ICMP error of `typ` / `code` go to `to` now?  (Takes what it costs.)
@@ -434,8 +463,32 @@ impl IpStack {
         self.statics.len() != n
     }
 
+    /// the routes of a routing protocol replace the ones it gave before (their interfaces
+    /// resolved); false when nothing changed
+    pub fn set_dynamic(&mut self, src: RouteSrc, routes: Vec<Route>) -> bool {
+        let mine: Vec<&Route> = self.dynamic.iter().filter(|r| r.src == src).collect();
+        if mine.len() == routes.len() && mine.iter().zip(routes.iter()).all(|(a, b)| *a == b) {
+            return false;
+        }
+        self.dynamic.retain(|r| r.src != src);
+        self.dynamic.extend(routes);
+        self.dyn_gen += 1;
+        true
+    }
+    /// the interface listens to a multicast group (or no longer)
+    pub fn join(&mut self, iface: u16, group: Ipv4, on: bool) {
+        self.groups.retain(|g| *g != (iface, group));
+        if on {
+            self.groups.push((iface, group));
+        }
+    }
+    /// the interface listens to this group
+    pub fn joined(&self, iface: u16, group: Ipv4) -> bool {
+        self.groups.contains(&(iface, group))
+    }
+
     /// the routing table: connected and local routes of interfaces that are up, then the
-    /// usable static routes
+    /// usable static routes, then the routes of routing protocols over interfaces that are up
     pub fn rib(&self, up: &dyn Fn(u16) -> bool) -> Vec<Route> {
         let mut v: Vec<Route> = Vec::new();
         for (i, f) in self.ifaces.iter().enumerate() {
@@ -462,6 +515,12 @@ impl IpStack {
                 (None, None) => {}
             }
         }
+        // the routing protocols' routes (a static next hop may lie behind one of them)
+        for r in &self.dynamic {
+            if r.iface.is_some_and(up) {
+                v.push(r.clone());
+            }
+        }
         // a next hop behind another static route (one level)
         let direct = v.clone();
         for s in pending {
@@ -480,15 +539,24 @@ impl IpStack {
         let mut c = self.rib_cache.borrow_mut();
         let same = c.up.len() == self.ifaces.len()
             && c.statics == self.statics
+            && c.dyn_gen == self.dyn_gen
             && self.ifaces.iter().enumerate().all(|(i, f)| c.up[i] == up(i as u16) && c.addrs[i] == f.addrs);
         if !same {
             c.up = (0..self.ifaces.len()).map(|i| up(i as u16)).collect();
             c.addrs = self.ifaces.iter().map(|f| f.addrs.clone()).collect();
             c.statics = self.statics.clone();
+            c.dyn_gen = self.dyn_gen;
             c.rib = self.rib(up);
         }
         let rib = &c.rib;
         let r = best(rib, dst)?;
+        // equal-cost routes of a routing protocol: one per destination address
+        let r = if matches!(r.src, RouteSrc::Rip | RouteSrc::Ospf) {
+            let same: Vec<&Route> = rib.iter().filter(|x| x.prefix == r.prefix && x.src == r.src && x.ad == r.ad && x.metric == r.metric).collect();
+            same.get(ecmp_pick(dst, same.len())).copied().unwrap_or(r)
+        } else {
+            r
+        };
         let iface = r.iface?;
         let gw = match r.via {
             None => dst,
@@ -505,6 +573,16 @@ impl IpStack {
         };
         Some(NextHop { iface, gw, src: r.src })
     }
+}
+
+/// which of `n` equal-cost routes a destination takes: the same one every time
+pub fn ecmp_pick(dst: Ipv4, n: usize) -> usize {
+    if n < 2 {
+        return 0;
+    }
+    let x = dst.to_u32();
+    let h = x ^ (x >> 16);
+    ((h ^ (h >> 8)) as usize) % n
 }
 
 /// the best route for an address: longest prefix, then distance, then metric, then order

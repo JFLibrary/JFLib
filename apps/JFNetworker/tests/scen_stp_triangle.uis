@@ -1,0 +1,6 @@
+#!args apps/JFNetworker/tests/fixtures/stp_triangle.jfnet --scenario apps/JFNetworker/tests/scen/stp_triangle.scn --golden apps/JFNetworker/tests/scen/stp_triangle.report
+# golden scenario: spanning tree (IEEE 802.1D) on three switches in a triangle: the election, 30 s to
+# forwarding, a cable pulled and the wait for Max Age.  The GUI program runs
+# tests/scen/stp_triangle.scn on tests/fixtures/stp_triangle.jfnet without a window and ends with the
+# report, which must equal tests/scen/stp_triangle.report byte for byte on every target (the script
+# itself is not run)

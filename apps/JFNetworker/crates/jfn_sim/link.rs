@@ -3,9 +3,11 @@
 //
 //   LinkRt                 both ends, cable, speed, delay, jitter, loss, unplugged, cable fit
 //   Engine::send(n, p, f)  a node puts a frame on its port: serialise at once or queue
-//   Engine::link_up(l)     powered ends, ports not shut down, plugged in, the cable works
+//   Engine::link_up(l)     powered ends, ports not shut down (nor err-disabled), plugged in, the
+//                          cable works
 //   Engine::refresh_link   after any change: notes LinkUp / LinkDown, drops what was on the
-//                          cable, flushes the bridges' MAC entries of that port
+//                          cable, flushes the bridges' MAC entries of that port, tells spanning
+//                          tree (stp.rs), the services and RIP (rip.rs) of both ends
 //
 // Serialisation of Ethernet takes the frame (at least 60 bytes) + FCS + preamble + inter-frame
 // gap: (max(len, 60) + 24) * 8 bits at the link speed.  The receiver gets the frame when its
@@ -115,7 +117,7 @@ impl Engine {
             return false;
         }
         l.ends.iter().all(|&(n, p)| match self.nodes.get(n) {
-            Some(Some(node)) => node.power && node.ports.get(p as usize).is_some_and(|port| port.admin_up),
+            Some(Some(node)) => node.power && node.ports.get(p as usize).is_some_and(|port| port.admin_up && !port.err_disabled),
             _ => false,
         })
     }
@@ -168,6 +170,13 @@ impl Engine {
         }
         for (n, p) in ends {
             self.os_link(n, p, up);
+        }
+        for (n, p) in ends {
+            self.stp_link(n, p);
+        }
+        // RIP looks at its interfaces again (an SVI may have gone with its last port)
+        for (n, _) in ends {
+            self.rip_kick(n);
         }
     }
 

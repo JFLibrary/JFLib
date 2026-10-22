@@ -7,6 +7,11 @@
 //                             subinterface of their VLAN; serial ports carry Cisco HDLC
 //   ip_output(n, packet, origin)  route lookup, MTU (fragment or "fragmentation needed"),
 //                             next hop resolution with ARP, framing
+//   ip_input / ip_deliver     on IOS-like devices with access lists or NAT, the inbound list
+//                             of the interface and the translation from outside come between
+//                             the checks of a packet and its way to the device or onward;
+//                             ip_output translates and applies the outbound list after the
+//                             route lookup, ip_send does the rest (acl.rs, nat.rs: the order)
 //   icmp_error                RFC 1812 4.3.2.7 rules; limited as Linux (50 at once, 1000/s,
 //                             6 at once per destination, then 1/s) or IOS (an unreachable
 //                             every 500 ms) does
@@ -27,6 +32,8 @@
 // traceroute shows the inbound interfaces); Linux quotes up to 576 bytes of the packet, IOS
 // its header and 8 bytes.  Loopback addresses never come from a wire (martians); on Linux
 // devices all of 127.0.0.0/8 is the device itself.
+// Multicast packets are for the device when the receiving interface joined their group (RIPv2's
+// 224.0.0.9: ip.rs join, rip.rs); the others are dropped with a note.
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -50,7 +57,7 @@ pub const HDLC_IPV4: [u8; 4] = [0x0F, 0x00, 0x08, 0x00];
 
 /// a forwarded packet as it arrived (forwarding took one off its TTL already): what an ICMP
 /// error about it quotes
-fn as_received(pkt: &[u8]) -> Vec<u8> {
+pub(crate) fn as_received(pkt: &[u8]) -> Vec<u8> {
     let mut q = pkt.to_vec();
     if q.len() >= 20 {
         let hl = ((q[0] & 0x0F) as usize * 4).clamp(20, q.len());
@@ -108,8 +115,9 @@ impl Engine {
                 f.admin_up && !member && n.ports.get(p as usize).is_some_and(|port| port.admin_up && port.link.is_some_and(|li| self.link_up(li)))
             }
             IfKind::Svi(v) => {
+                // with spanning tree a port of the VLAN must forward (stp.rs)
                 f.admin_up
-                    && n.bridge.as_ref().is_some_and(|b| (0..b.ports.len() as u16).any(|p| b.carries(p, v) && n.ports[p as usize].link.is_some_and(|li| self.link_up(li))))
+                    && n.bridge.as_ref().is_some_and(|b| (0..b.ports.len() as u16).any(|p| b.carries(p, v) && b.stp.forwards(p) && n.ports[p as usize].link.is_some_and(|li| self.link_up(li))))
             }
             IfKind::Loopback(_) => f.admin_up,
         }
@@ -132,13 +140,13 @@ impl Engine {
         st.ifaces.get(nh.iface as usize)?.primary()
     }
 
-    /// `dst` is for this device (an own address, the limited broadcast, or the directed
-    /// broadcast of the receiving interface)
+    /// `dst` is for this device (an own address, the limited broadcast, the directed broadcast
+    /// of the receiving interface, or a multicast group the interface listens to)
     fn is_local(&self, ni: usize, iface: u16, dst: Ipv4) -> bool {
         let Some(st) = self.stack(ni) else {
             return false;
         };
-        dst.is_broadcast() || st.is_mine(dst) || st.ifaces.get(iface as usize).is_some_and(|f| f.is_broadcast(dst))
+        dst.is_broadcast() || st.is_mine(dst) || st.ifaces.get(iface as usize).is_some_and(|f| f.is_broadcast(dst)) || (dst.is_multicast() && st.joined(iface, dst))
     }
 
     // ---------------------------------------------------------------- input
@@ -228,11 +236,13 @@ impl Engine {
             && !a.tpa.is_multicast()
             && !a.tpa.is_broadcast()
             && self.route(ni, a.tpa).is_some_and(|nh| nh.iface != iface);
+        // the global addresses of NAT in the network of an outside interface (nat.rs)
+        let nat = a.op == OP_REQUEST && self.nat_arp(ni, iface, a.tpa);
         let Some(st) = self.stack_mut(ni) else {
             return;
         };
         let f = &st.ifaces[iface as usize];
-        let mine = f.has(a.tpa);
+        let mine = f.has(a.tpa) || nat;
         let my_mac = f.mac;
         let svi = matches!(f.kind, IfKind::Svi(_));
         let mut flushed: Option<(bool, Vec<Pending>)> = None;
@@ -299,19 +309,41 @@ impl Engine {
             self.note(dev, Some(hop), Note::PartitionDrop { src });
             return;
         }
+        // the inbound access list of the interface (acl.rs), then on an outside interface the
+        // translation of the destination back (nat.rs)
+        if self.stack(ni).is_some_and(|s| !s.acls.bound.is_empty() || s.nat.active()) {
+            if !self.acl_pass(ni, iface, false, v.packet(), v.packet(), iface, Some(hop)) {
+                return;
+            }
+            if self.nat_in(ni, iface, &v, hop) {
+                return;
+            }
+        }
+        self.ip_deliver(ni, iface, &v, hop);
+    }
+
+    /// a packet that passed the checks of its interface: for the device itself, or forwarded
+    pub(crate) fn ip_deliver(&mut self, ni: usize, iface: u16, v: &Ipv4View, hop: HopId) {
+        let dev = self.dev_of(ni);
+        let dst = v.dst();
         if self.is_local(ni, iface, dst) {
             if v.is_fragment() {
-                self.reassemble(ni, iface, &v, hop);
+                self.reassemble(ni, iface, v, hop);
             } else {
                 self.ip_local(ni, iface, v.packet().to_vec(), hop);
             }
             return;
         }
         // a DHCP client reads its port before it has an address (a packet socket)
-        if self.os_raw_udp(ni, iface, &v, hop) {
+        if self.os_raw_udp(ni, iface, v, hop) {
             return;
         }
-        if dst.is_multicast() || dst.is_unspecified() {
+        if dst.is_multicast() {
+            // a group nobody here listens to (a RIP update reaching a host)
+            self.note(dev, Some(hop), Note::IpGroupIgnored { dst });
+            return;
+        }
+        if dst.is_unspecified() {
             return;
         }
         if !self.stack(ni).is_some_and(|s| s.forwarding) {
@@ -439,7 +471,7 @@ impl Engine {
         let Some(v) = Ipv4View::parse(&pkt) else {
             return;
         };
-        let (dst, src, df, len) = (v.dst(), v.src(), v.df(), v.total_len());
+        let (dst, src) = (v.dst(), v.src());
         // to itself (Linux: anything in 127.0.0.0/8 is the device itself)
         if let Origin::Local { .. } = origin
             && let Some(st) = self.stack(ni)
@@ -478,6 +510,32 @@ impl Engine {
             }
             self.note(dev, cause, Note::IpRouted { dst, gw: nh.gw, iface: nh.iface });
         }
+        if !self.stack(ni).is_some_and(|s| !s.acls.bound.is_empty() || s.nat.active()) {
+            self.ip_send(ni, nh, pkt, None, origin, cause);
+            return;
+        }
+        // NAT on the way out (nat.rs), then the outbound access list of the interface for what
+        // the device forwards (acl.rs; it sees the translated packet, its ICMP answer quotes the
+        // packet as it arrived)
+        for (p, orig, c) in self.nat_out(ni, origin, nh.iface, pkt, cause) {
+            if let Origin::Forwarded { iface } = origin {
+                let q = as_received(orig.as_deref().unwrap_or(&p));
+                if !self.acl_pass(ni, nh.iface, true, &p, &q, iface, c) {
+                    continue;
+                }
+            }
+            self.ip_send(ni, nh, p, orig, origin, c);
+        }
+    }
+
+    /// the MTU of the way out (fragments, or "fragmentation needed"), then the neighbour;
+    /// `orig`: the packet before NAT changed it, which an ICMP error quotes
+    fn ip_send(&mut self, ni: usize, nh: NextHop, pkt: Vec<u8>, orig: Option<Vec<u8>>, origin: Origin, cause: Option<HopId>) {
+        let dev = self.dev_of(ni);
+        let Some(v) = Ipv4View::parse(&pkt) else {
+            return;
+        };
+        let (dst, df, len) = (v.dst(), v.df(), v.total_len());
         let mtu = self.stack(ni).and_then(|s| s.ifaces.get(nh.iface as usize)).map(|f| f.mtu as usize).unwrap_or(1500);
         let parts: Vec<Vec<u8>> = if len > mtu {
             if df {
@@ -488,7 +546,7 @@ impl Engine {
                         self.job_error(j, seq, from, IcmpKind::FragNeeded(mtu as u16));
                     }
                     Origin::Local { job: None } => {}
-                    Origin::Forwarded { iface } => self.icmp_error(ni, iface, &as_received(&pkt), Icmp::Unreachable { code: icmp::UNREACH_FRAG_NEEDED, mtu: mtu as u16 }, cause),
+                    Origin::Forwarded { iface } => self.icmp_error(ni, iface, &as_received(orig.as_deref().unwrap_or(&pkt)), Icmp::Unreachable { code: icmp::UNREACH_FRAG_NEEDED, mtu: mtu as u16 }, cause),
                 }
                 return;
             }
