@@ -5,7 +5,8 @@
 //
 // Speed in Mbit/s, delay in µs, loss in % (a decimal comma or point); Enter or "Setzen" applies
 // them, Esc puts the fields back.  Every change is one undo step the simulator follows
-// (SetCable, Impair, Unplug); a kind that does not plug into both ports is not offered.
+// (SetCable, Impair, Unplug); a kind that does not plug into both ports is not offered.  Below
+// them the lab's faults of the cable (faults.rs: pulled, worse, for a while).
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -32,8 +33,9 @@ fn decimal(v: u64, unit: u64) -> String {
     format!("{}{}{}", whole, if en() { '.' } else { ',' }, f.trim_end_matches('0'))
 }
 
-/// "2,5" / "2.5" -> 2500 for unit 1000 (None: no number, negative, too big)
-fn parse_decimal(s: &str, unit: u64, max: u64) -> Option<u64> {
+/// "2,5" / "2.5" -> 2500 for unit 1000 (None: no number, negative, too big); also the fields
+/// of the fault cards (faults.rs)
+pub(super) fn parse_decimal(s: &str, unit: u64, max: u64) -> Option<u64> {
     let t = s.trim().replace(',', ".");
     let (a, b) = t.split_once('.').unwrap_or((&t, ""));
     if a.is_empty() && b.is_empty() || !a.bytes().all(|c| c.is_ascii_digit()) || !b.bytes().all(|c| c.is_ascii_digit()) {
@@ -108,6 +110,10 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
         quality(n, ui, &l);
     }
     cable_tail(n, ui, &l);
+    // faults of the lab: pulled, worse (faults.rs)
+    if l.cable != CableKind::Console {
+        super::faults::cable(n, ui, id);
+    }
 }
 
 fn quality(n: &mut Net, ui: &mut Ui, l: &jfn_model::Link) {

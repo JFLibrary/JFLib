@@ -1,0 +1,417 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Geshardeter Speicher: ein Knoten fällt aus",
+  "description": "Labor: drei KV-Knoten hinter einem Webserver, zunächst ohne Replikate.",
+  "seed": 11,
+  "next_id": 13,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "GEN",
+      "model": "traffic-gen",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname GEN\nip addr add 10.0.2.10/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-load",
+          "name": "fill",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.2.11/"
+            ],
+            "mode": "closed",
+            "users": 1,
+            "requests": 200,
+            "timeout_ms": 5000,
+            "mix": [
+              {
+                "method": "PUT",
+                "path": "/item/k{seq}",
+                "body": "v{seq}"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "http-load",
+          "name": "load",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.2.11/"
+            ],
+            "mode": "open",
+            "rps": 60,
+            "arrival": "poisson",
+            "delay_ms": 4000,
+            "timeout_ms": 2000,
+            "mix": [
+              {
+                "path": "/item/k{rand:200}",
+                "weight": 4
+              },
+              {
+                "method": "PUT",
+                "path": "/item/k{rand:200}",
+                "body": "neu{seq}",
+                "weight": 1
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 200,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "WEB",
+      "model": "server-1u",
+      "x": 400,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname WEB\nip addr add 10.0.2.11/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "time_ms": 1,
+            "routes": [
+              {
+                "path": "/health",
+                "body": "ok\n"
+              },
+              {
+                "path": "/item/*",
+                "method": "*",
+                "backend": "kv"
+              }
+            ],
+            "kv": {
+              "nodes": [
+                "10.0.2.21",
+                "10.0.2.22",
+                "10.0.2.23"
+              ],
+              "rf": 3
+            }
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "KV1",
+      "model": "database",
+      "x": 40,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname KV1\nip addr add 10.0.2.21/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "kv",
+          "name": "kv",
+          "disabled": false,
+          "config": {
+            "nodes": [
+              "10.0.2.21",
+              "10.0.2.22",
+              "10.0.2.23"
+            ],
+            "rf": 1,
+            "consistency": "strong"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "KV2",
+      "model": "database",
+      "x": 200,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname KV2\nip addr add 10.0.2.22/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "kv",
+          "name": "kv",
+          "disabled": false,
+          "config": {
+            "nodes": [
+              "10.0.2.21",
+              "10.0.2.22",
+              "10.0.2.23"
+            ],
+            "rf": 1,
+            "consistency": "strong"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 6,
+      "name": "KV3",
+      "model": "database",
+      "x": 360,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname KV3\nip addr add 10.0.2.23/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "kv",
+          "name": "kv",
+          "disabled": false,
+          "config": {
+            "nodes": [
+              "10.0.2.21",
+              "10.0.2.22",
+              "10.0.2.23"
+            ],
+            "rf": 1,
+            "consistency": "strong"
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 7,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/5"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [
+    {
+      "id": 12,
+      "x": 0,
+      "y": 320,
+      "w": 420,
+      "h": 50,
+      "text": "10.0.2.0/24 · GEN .10 · WEB .11 · KV1 .21 · KV2 .22 · KV3 .23"
+    }
+  ],
+  "layout": {
+    "zoom_pm": 0,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Geshardeter Speicher: ein Knoten fällt aus",
+      "Sharded storage: a node fails"
+    ],
+    "summary": [
+      "Mit Replikationsfaktor 1 ist ein Drittel der Daten weg, sobald ein Knoten ausfällt: Replikate und Quoren so einstellen, dass der Speicher es übersteht.",
+      "With a replication factor of 1, a third of the data is gone when a node fails: set replicas and quorums so that the store survives it."
+    ],
+    "topic": "ds",
+    "intro": [
+      [
+        "Der Webserver WEB legt seine Daten im KV-Speicher aus KV1, KV2 und KV3 ab: ein Hash-Ring verteilt die Schlüssel, jeder Knoten hält etwa ein Drittel. GEN schreibt zuerst 200 Schlüssel und fragt danach ständig, 60 Anfragen pro Sekunde, vier von fünf lesen.",
+        "The web server WEB keeps its data in the key-value store of KV1, KV2 and KV3: a hash ring spreads the keys, each node holds about a third. GEN first writes 200 keys and then keeps asking, 60 requests per second, four of five read."
+      ],
+      [
+        "Mit Replikationsfaktor 1 liegt jeder Schlüssel auf genau einem Knoten. Fällt der aus, scheitern alle Anfragen nach seinen Schlüsseln. Stelle den Speicher so ein, dass er den Ausfall eines Knotens übersteht, möglichst ohne die Konsistenz strong aufzugeben. Probiere es dann aus: schalte KV2 aus und nach einer Weile wieder ein.",
+        "With a replication factor of 1 every key lives on exactly one node. When it fails, every request for its keys fails. Set the store up so that it survives the loss of a node, if possible without giving up its strong consistency. Then try it: switch KV2 off and after a while on again."
+      ]
+    ],
+    "ordered": true,
+    "goals": [
+      {
+        "text": [
+          "Jeder Schlüssel liegt auf mehreren Knoten",
+          "Every key lives on several nodes"
+        ],
+        "checks": [
+          "KV1 svc kv metric replica_writes > 0 over 10s",
+          "KV2 svc kv metric replica_writes > 0 over 10s",
+          "KV3 svc kv metric replica_writes > 0 over 10s"
+        ],
+        "hints": [
+          [
+            "Der Replikationsfaktor ist die Einstellung rf des Dienstes kv: Umschalt+Doppelklick auf KV1, Reiter Dienste, „Einstellungen …“.",
+            "The replication factor is the setting rf of the service kv: Shift+double-click KV1, tab Services, “Settings …”."
+          ],
+          [
+            "Alle drei Knoten brauchen denselben Wert, also dreimal dieselbe Änderung.",
+            "All three nodes need the same value, so the same change three times."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "KV2 fällt aus, und keine Anfrage scheitert",
+          "KV2 fails, and no request fails"
+        ],
+        "checks": [
+          "KV1 svc kv metric max members_up <= 2 over 10s",
+          "KV3 svc kv metric max members_up <= 2 over 10s",
+          "GEN svc load metric status_5xx == 0 over 10s",
+          "GEN svc load metric failed == 0 over 10s",
+          "GEN svc load metric responses >= 40 over 10s"
+        ],
+        "hints": [
+          [
+            "Schalte KV2 aus (Rechtsklick, „Eingeschaltet“). Geprüft werden die 10 s danach.",
+            "Switch KV2 off (right-click, “Powered on”). The check looks at the 10 s after that."
+          ],
+          [
+            "Mit strong braucht jedes Lesen und Schreiben eine Mehrheit der Replikate. Bei zwei Replikaten sind das beide: fällt eines aus, scheitert die Anfrage.",
+            "With strong, every read and write needs a majority of the replicas. With two replicas that is both: when one fails, the request fails."
+          ],
+          [
+            "Bei drei Replikaten (\"rf\": 3) ist die Mehrheit zwei, und eines darf fehlen. Mit \"consistency\": \"eventual\" reicht ein Replikat, dafür kann eine Antwort veraltet sein.",
+            "With three replicas (\"rf\": 3) the majority is two, and one may be missing. With \"consistency\": \"eventual\" one replica is enough, but an answer may be out of date."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "KV2 ist zurück und holt auf",
+          "KV2 is back and catches up"
+        ],
+        "checks": [
+          "KV1 svc kv metric members_up == 3",
+          "KV2 svc kv metric repaired > 0 over 10s"
+        ],
+        "hints": [
+          [
+            "Schalte KV2 wieder ein. Liest jemand einen Schlüssel, den KV2 verpasst hat, bekommt KV2 die neue Fassung nachgeliefert (Read Repair).",
+            "Switch KV2 on again. When someone reads a key that KV2 missed, KV2 gets the new version delivered (read repair)."
+          ]
+        ]
+      }
+    ],
+    "hints": [
+      [
+        "kvctl in der Konsole eines Knotens zeigt, wie er die anderen sieht; kvctl where k7 die Replikate eines Schlüssels.",
+        "kvctl in the console of a node shows how it sees the others; kvctl where k7 the replicas of a key."
+      ],
+      [
+        "Die Ziele gelten der Reihe nach: erst die Replikate, dann der Ausfall, dann die Rückkehr.",
+        "The goals count in order: first the replicas, then the failure, then the return."
+      ]
+    ]
+  }
+}

@@ -1,0 +1,281 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Ein Cache vor dem langsamen Katalog",
+  "description": "Labor: ein Cache, der zu wenig behält, vor einem Server am Limit.",
+  "seed": 17,
+  "next_id": 9,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "GEN",
+      "model": "traffic-gen",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname GEN\nip addr add 10.0.2.10/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-load",
+          "name": "load",
+          "disabled": false,
+          "config": {
+            "targets": [
+              "http://10.0.2.20/"
+            ],
+            "mode": "open",
+            "rps": 150,
+            "arrival": "poisson",
+            "delay_ms": 1000,
+            "timeout_ms": 3000,
+            "mix": [
+              {
+                "path": "/artikel/{hot:500}"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 200,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "CACHE1",
+      "model": "cache",
+      "x": 400,
+      "y": -80,
+      "off": false,
+      "startup_config": "hostname CACHE1\nip addr add 10.0.2.20/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "cache",
+          "name": "cache",
+          "disabled": false,
+          "config": {
+            "port": 80,
+            "backend": "http://10.0.2.30/",
+            "entries": 20,
+            "ttl_ms": 200
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "KAT",
+      "model": "server-1u",
+      "x": 400,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname KAT\nip addr add 10.0.2.30/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "queue": 30,
+            "time_ms": 35,
+            "jitter_ms": 10,
+            "routes": [
+              {
+                "path": "/artikel/*",
+                "body": "Artikel {path}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [
+    {
+      "id": 8,
+      "x": -20,
+      "y": 120,
+      "w": 300,
+      "h": 50,
+      "text": "10.0.2.0/24 · GEN .10 · CACHE1 .20 · KAT .30"
+    }
+  ],
+  "layout": {
+    "zoom_pm": 0,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Ein Cache vor dem langsamen Katalog",
+      "A cache in front of the slow catalogue"
+    ],
+    "summary": [
+      "Der Cache hält zu wenig und zu kurz: so einstellen, dass vier von fünf Anfragen aus ihm kommen.",
+      "The cache keeps too little for too short a time: set it up so that four of five requests come from it."
+    ],
+    "topic": "ds",
+    "intro": [
+      [
+        "Der Katalog-Server KAT braucht für jede Anfrage etwa 40 ms und hat vier Worker; mehr als rund 100 Anfragen pro Sekunde schafft er nicht. GEN fragt 150-mal pro Sekunde nach Artikeln, vier von fünf Anfragen nach den 100 beliebtesten.",
+        "The catalogue server KAT needs about 40 ms for each request and has four workers; it cannot manage much more than 100 requests per second. GEN asks for articles 150 times per second, four of five requests for the 100 most popular ones."
+      ],
+      [
+        "Vor KAT sitzt der Cache CACHE1, doch er behält nur 20 Antworten, jede für 200 ms. Fast alles geht weiter an KAT, der überläuft. Stelle den Cache so ein, dass er die beliebten Artikel behält.",
+        "In front of KAT sits the cache CACHE1, but it keeps only 20 answers, each for 200 ms. Almost everything goes on to KAT, which overflows. Set up the cache so that it keeps the popular articles."
+      ]
+    ],
+    "ordered": true,
+    "goals": [
+      {
+        "text": [
+          "Vier von fünf Anfragen kommen aus dem Cache",
+          "Four of five requests come from the cache"
+        ],
+        "checks": [
+          "CACHE1 svc cache metric hits >= 120 over 10s",
+          "CACHE1 svc cache metric misses <= 30 over 10s"
+        ],
+        "hints": [
+          [
+            "Zwei Einstellungen des Dienstes cache entscheiden: entries (wie viele Antworten er behält) und ttl_ms (wie lange). Umschalt+Doppelklick auf CACHE1, Reiter Dienste, „Einstellungen …“.",
+            "Two settings of the service cache decide: entries (how many answers it keeps) and ttl_ms (for how long). Shift+double-click CACHE1, tab Services, “Settings …”."
+          ],
+          [
+            "Mit nur 100 Einträgen verdrängen die selten gefragten Artikel die beliebten. Einige hundert Einträge (oder gleich alle 500) und 30 s Lebensdauer (30000) reichen für einen Katalog.",
+            "With only 100 entries the rarely asked articles push the popular ones out. A few hundred entries (or all 500 at once) and a lifetime of 30 s (30000) are enough for a catalogue."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "KAT hat wieder Luft",
+          "KAT has room to spare again"
+        ],
+        "checks": [
+          "KAT svc web metric max queued <= 4 over 10s"
+        ],
+        "hints": [
+          [
+            "queued zählt die Anfragen, die bei KAT auf einen Worker warten. cachectl in der Konsole von CACHE1 zeigt Treffer und Fehlschläge.",
+            "queued counts the requests that wait for a worker at KAT. cachectl in the console of CACHE1 shows hits and misses."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "99 % der Antworten kommen in unter 100 ms",
+          "99 % of the answers come in under 100 ms"
+        ],
+        "checks": [
+          "GEN svc load metric p99_us < 100000 over 10s"
+        ],
+        "hints": [
+          [
+            "Ein Treffer kommt fast sofort; ein Fehlschlag dauert so lange wie KAT. Läuft KAT über, warten die Fehlschläge zusätzlich.",
+            "A hit comes almost at once; a miss takes as long as KAT. When KAT overflows, the misses wait on top."
+          ]
+        ]
+      },
+      {
+        "text": [
+          "Keine Fehler mehr",
+          "No more errors"
+        ],
+        "checks": [
+          "GEN svc load metric errors == 0 over 10s"
+        ],
+        "hints": [
+          [
+            "Ist die Warteschlange von KAT voll, antwortet er sofort mit 503. Direkt nach dem Neustart des Caches ist er noch leer; nach ein paar Sekunden hat er die beliebten Artikel.",
+            "When KAT's queue is full, it answers 503 at once. Right after the cache restarts it is still empty; after a few seconds it has the popular articles."
+          ]
+        ]
+      }
+    ],
+    "hints": [
+      [
+        "Die Einstellungen eines Dienstes sind JSON. Übernehmen prüft sie, bevor das Gerät mit ihnen neu startet; Rückgängig nimmt sie zurück.",
+        "The settings of a service are JSON. Apply checks them before the device restarts with them; Undo takes them back."
+      ]
+    ]
+  }
+}

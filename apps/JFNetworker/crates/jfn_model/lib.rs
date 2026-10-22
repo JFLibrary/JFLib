@@ -14,6 +14,8 @@
 //             catalogue (src/locales/engine.tsv) can translate them (text / text_with)
 //   synth     topology(n): a synthetic campus of n devices with working configurations (tests
 //             of large projects: --gen-topology, jfn-sim gen)
+//   lab       Lab, Goal, Text: the task of a lab project (title, introduction, goals with checks
+//             in the expectation syntax of scenarios, hints; German and English)
 //
 // Device identity is the project's numeric id; ports are referenced by their full interface
 // name ("GigabitEthernet1/0/1", "eth0"), so files stay readable.
@@ -29,9 +31,11 @@ pub mod project;
 pub mod scenario;
 pub mod msg;
 pub mod synth;
+pub mod lab;
 
 pub use cable::{cable_fits, cable_kind, CableKind, Why};
 pub use catalog::{catalog, model, Category, CliStyle, DeviceKind, Media, Model, PortSpec};
 pub use project::{Device, Issue, Link, Note, PortRef, ProjErr, Project, ServiceDef};
 pub use scenario::Scenario;
 pub use msg::Msg;
+pub use lab::{Goal, Lab, Text};

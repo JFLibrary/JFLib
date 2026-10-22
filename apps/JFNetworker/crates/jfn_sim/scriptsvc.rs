@@ -13,6 +13,21 @@
 //   ScriptService::view(now) / errors() / output() / source() / load(now, secs)
 //                        for the shell (script: cli/scripts.rs), top and the app;
 //                        Engine::scripts(dev)
+//   ScriptService::run_errors() / run_output(from)   the errors and the output of the current
+//                        run only (since the script started last; stopped: of its last run),
+//                        for an editor's marks and its output pane; view().runs counts the
+//                        starts, so a new run is seen; run_output(from) gives what was printed
+//                        from byte `from` (of all the script ever printed) on and the end, the
+//                        `from` of the next call -- a pane that follows reads only what is new
+//   Action::ScriptSource { dev, svc, config }   a new definition for a script that exists
+//                        (the config of a project's ServiceDef, its source included): the
+//                        service stays -- its disk, its numbers, errors and output, its time
+//                        series -- and only the program is new; one that should run (enabled:
+//                        running, failed, waiting for the power) starts again with it at once,
+//                        a stopped one stays stopped.  A definition that does not compile is
+//                        refused (line and column), the old program goes on.  Replacing the
+//                        service with Action::Service instead gives a new one: its disk starts
+//                        empty.  Action::RenameService (os.rs) renames a script as it runs.
 //
 // The host API (the names of script::GLOBALS; times in milliseconds, int or float):
 //   log(x, ..), log.debug|info|warn|error(..)   a line in the device's log, tagged with the
@@ -91,7 +106,8 @@ use script::{num, Cx, ErrorKind, Fail, Limits, Pin, Program, Ref, Status, TraceL
 
 use crate::http::{Agent, Done, Reply, Req, ReqIn, Resp, Serve, ServeCfg, Url, Wheel};
 use crate::kernel::{Engine, Ns, MS, SEC, US};
-use crate::os::{Dgram, Metric, OsApi, Service, SvcEvent};
+use crate::action::ActErr;
+use crate::os::{Dgram, Job, Metric, OsApi, Service, SvcEvent};
 use crate::series::{metric_kind_of, LatStat, LatWindow, MetricKind};
 use crate::tcp::{SockOpts, TcpEnd};
 use crate::trace::{HopId, Note};
@@ -199,6 +215,8 @@ pub struct ScriptView {
     pub lines: usize,
     /// the script's own metrics as Service::metrics names them
     pub metrics: Vec<(&'static str, i64)>,
+    /// how often it started (a new run: run_errors and run_output begin again)
+    pub runs: u64,
 }
 
 // ---------------------------------------------------------------- the record
@@ -286,10 +304,18 @@ struct Book {
     busy: Busy,
     /// the disk's content: key -> JSON text
     store: BTreeMap<String, String>,
+    /// bytes printed in all (output holds the last ones)
+    printed: u64,
+    /// the starts; at the last one: the bytes printed and the errors so far (where the current
+    /// run's output and errors begin)
+    runs: u64,
+    out_mark: u64,
+    err_mark: u64,
 }
 
 impl Book {
     fn print(&mut self, s: &str) {
+        self.printed += s.len() as u64;
         self.output.push_str(s);
         if self.output.len() > OUTPUT_KEEP {
             let mut cut = self.output.len() - OUTPUT_KEEP;
@@ -2124,6 +2150,10 @@ impl Run {
 
 impl ScriptService {
     fn from_parts(source: String, prog: Program, cfg: ScriptCfg, conf: String, disk: Option<(Ns, u64, u64, u64)>) -> ScriptService {
+        ScriptService::of_def(Def { source, prog, cfg, conf, disk })
+    }
+
+    fn of_def(def: Def) -> ScriptService {
         let book = Book {
             name: String::new(),
             state: ScriptState::Stopped,
@@ -2134,8 +2164,12 @@ impl ScriptService {
             metrics: Vec::new(),
             busy: Busy::default(),
             store: BTreeMap::new(),
+            printed: 0,
+            runs: 0,
+            out_mark: 0,
+            err_mark: 0,
         };
-        ScriptService { def: Arc::new(Def { source, prog, cfg, conf, disk }), run: None, book, seen: 0 }
+        ScriptService { def: Arc::new(def), run: None, book, seen: 0 }
     }
 
     /// a script of `source` with the settings `cfg` and the script's `config` (a JSON object);
@@ -2162,6 +2196,27 @@ impl ScriptService {
     /// what it printed last (print), at most 16 KiB
     pub fn output(&self) -> &str {
         &self.book.output
+    }
+    /// the errors of the current run (since its last start; stopped: of its last run), oldest
+    /// first, as far as the last ERRORS_KEEP reach
+    pub fn run_errors(&self) -> Vec<ScriptErr> {
+        let b = &self.book;
+        let n = (b.stats.errors.saturating_sub(b.err_mark)).min(b.errors.len() as u64) as usize;
+        b.errors.iter().skip(b.errors.len() - n).cloned().collect()
+    }
+    /// what the current run printed from byte `from` on (counted over all the script ever
+    /// printed; 0: the whole run, as far as the kept 16 KiB reach) and where that ends, the
+    /// `from` of the next call
+    pub fn run_output(&self, from: u64) -> (&str, u64) {
+        let b = &self.book;
+        let first = b.printed - b.output.len() as u64;
+        let start = from.max(b.out_mark).max(first).min(b.printed);
+        // (marks and ends fall between two prints, the cut of the kept bytes on a character)
+        let mut i = (start - first) as usize;
+        while !b.output.is_char_boundary(i) {
+            i += 1;
+        }
+        (&b.output[i..], b.printed)
     }
     /// its CPU time in all
     pub fn busy_ns(&self) -> u64 {
@@ -2206,6 +2261,7 @@ impl ScriptService {
             cfg: self.def.cfg,
             lines: self.def.source.lines().count(),
             metrics: self.own_metrics(now).into_iter().map(|m| (m.name, m.value)).collect(),
+            runs: self.book.runs,
         }
     }
 
@@ -2258,6 +2314,10 @@ impl Service for ScriptService {
         self.book.name = os.svc_name();
         self.book.since = now;
         self.book.state = ScriptState::Running;
+        // a new run: its output and errors begin here
+        self.book.runs += 1;
+        self.book.out_mark = self.book.printed;
+        self.book.err_mark = self.book.stats.errors;
         if let Some((lat, bps, iops, cap)) = self.def.disk {
             os.disk_setup(lat, bps, iops, cap);
         }
@@ -2287,6 +2347,10 @@ impl Service for ScriptService {
         if self.book.state == ScriptState::Running {
             self.book.state = ScriptState::Stopped;
         }
+    }
+    fn renamed(&mut self, name: &str) {
+        // the log lines and notes of the running program carry the new name
+        self.book.name = String::from(name);
     }
     fn metrics(&self) -> Vec<Metric> {
         self.metrics_at(self.seen)
@@ -2370,6 +2434,12 @@ pub fn from_def(c: &Json) -> Result<Box<dyn Service>, String> {
 
 /// from_def, the reason as a message for the app's catalogue
 pub fn from_def_msg(c: &Json) -> Result<Box<dyn Service>, Msg> {
+    Ok(Box::new(ScriptService::of_def(def_of(c)?)))
+}
+
+/// what a definition makes: the source, the program, the settings, the script's config and
+/// the disk; the refusal as a message
+fn def_of(c: &Json) -> Result<Def, Msg> {
     let lines = || msg!("\u{201e}source\u{201c} ist ein Text oder eine Liste von Zeilen.");
     let source = match c.get("source") {
         Some(Json::String(s)) => s.clone(),
@@ -2406,7 +2476,7 @@ pub fn from_def_msg(c: &Json) -> Result<Box<dyn Service>, Msg> {
         }
     }
     let conf = agent_core::json::stringify(&conf).unwrap_or_else(|_| String::from("{}"));
-    Ok(Box::new(ScriptService::from_parts(source, prog, cfg, conf, crate::disk::setup_of(c))))
+    Ok(Def { source, prog, cfg, conf, disk: crate::disk::setup_of(c) })
 }
 
 /// the settings of a definition
@@ -2450,5 +2520,33 @@ impl Engine {
     pub fn scripts(&self, dev: u32) -> Vec<(String, ScriptView)> {
         let now = self.now;
         self.service_ids(dev).into_iter().filter_map(|(_, name, _, _)| self.service::<ScriptService>(dev, &name).map(|s| (name.clone(), s.view(now)))).collect()
+    }
+
+    /// Action::ScriptSource: script `name` takes the definition `c` and keeps its record (disk,
+    /// numbers, errors, output) and its service id (the disk's accounting, the time series);
+    /// a running program ends first, one that should run starts with the new one
+    pub(crate) fn script_source(&mut self, dev: u32, name: &str, c: &Json) -> Result<(), ActErr> {
+        let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+        let os = self.os(ni).ok_or(ActErr::NoIp(dev))?;
+        let slot = os.svc(name).filter(|s| !s.console).ok_or_else(|| ActErr::Refused(msg!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
+        let (id, running) = (slot.id, slot.running);
+        if !slot.svc.as_ref().is_some_and(|s| s.as_any().downcast_ref::<ScriptService>().is_some()) {
+            return Err(ActErr::Refused(msg!("Der Dienst \u{201e}{}\u{201c} ist kein Skript.", name)));
+        }
+        let def = def_of(c).map_err(|w| ActErr::Refused(msg!("Dienst {}: {}", "script", w)))?;
+        // the old program ends as with a stop: its sockets, timers and queued events go
+        if running {
+            self.svc_stop(ni, id);
+        }
+        let Some(s) = self.os_mut(ni).and_then(|o| o.svcs.iter_mut().find(|s| s.id == id)) else {
+            return Ok(());
+        };
+        if let Some(x) = s.svc.as_mut().and_then(|x| x.as_any_mut().downcast_mut::<ScriptService>()) {
+            x.def = Arc::new(def);
+        }
+        if s.enabled {
+            self.os_push(ni, Job::Start(id));
+        }
+        Ok(())
     }
 }

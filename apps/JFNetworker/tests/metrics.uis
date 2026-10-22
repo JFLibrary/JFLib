@@ -1,0 +1,128 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/lab_window.jfnet
+# the Metriken panel (workspace/metrics.rs) and the lab on the canvas (canvas/lab.rs) on
+# tests/fixtures/lab_window.jfnet: GEN asks the cache CACHE1 in front of the load balancer LB1,
+# two web servers, three KV nodes; PROD feeds the queue MQ1, WRK1 works it off; SRV1 has DNS and
+# DHCP, SCR1 a script.  Ctrl+Shift+M shows the panel with the first service of the lab (the
+# cache) before there are numbers; after 8 s of virtual time its status line, the tiles over
+# the last 5 s and a chart per group of series (the summaries of their records); the keyboard
+# in the tree (a device's row chooses its first service, Left and Right close and open), Tab to
+# the span and into a chart, its cursor on the newest point; the hover card's values; a device
+# chosen on the canvas comes into the panel (a KV node: load, share, keys, data, its disk); the
+# simulation mode ends the charts at the moment it shows, also in the past; the sparklines
+# under LB, KV, cache and queue from 75 % on and the services' pills, with their text records.  The numbers are those
+# of this run on the virtual clock.  World (332, 40) shows at 630, 236 (100 %).
+# Ids: the tree 47104 (rows 47105 + i), the span 45064 (segments 45065 ..), the charts 45088 ..,
+# the sparklines 45120 ..
+size 1280 800
+theme light
+# ---- no numbers yet
+key ctrl+shift+m
+wait 100
+expect tab:"Metriken" selected
+expect #47104 focused
+expect listitem:"Cache cache" selected
+expect text:"CACHE1 · Cache cache" exists
+expect text:"Noch keine Messwerte: der Simulator nimmt jede Sekunde einen Punkt jeder Zahl." exists
+expect #45088 text "Durchsatz – Keine Daten"
+expect #45089 text "Latenz – Keine Daten"
+# ---- 8 s of the lab: the cache's status line, its tiles over the last 5 s, its charts
+wait 8000
+expect text:"Port 80 vor http://10.0.1.1/: 22 Einträge, 265 Treffer, 99 Fehlschläge (72,8 % Treffer)" exists
+expect text:"Noch keine Messwerte: der Simulator nimmt jede Sekunde einen Punkt jeder Zahl." missing
+expect text:"Kacheln: die letzten 5 s" exists
+expect text:"64,2" exists
+expect text:"75,6 %" exists
+expect text:"1,52 kB" exists
+expect #45088 text "Durchsatz – Anfragen/s: aktuell 69, min. 0, max. 77; Treffer/s: aktuell 44, min. 0, max. 47; Fehlschläge/s: aktuell 11, min. 0, max. 19"
+expect #45091 text "Inhalt – Einträge: aktuell 22, min. 0, max. 30"
+shot build/jfnetworker/metrics_cache.png
+# ---- the keyboard in the tree: Down to LB1's row chooses its service; Left goes to the
+# device and closes it, Right opens it
+key down
+expect #47110 selected
+expect text:"LB1 · Loadbalancer lb" exists
+expect text:"HTTP Port 80, round-robin: 2 von 2 Backends verfügbar, 252 Anfragen, 0 Fehler" exists
+expect #45088 text "Durchsatz – Anfragen/s: aktuell 25, min. 22, max. 50; Antworten/s: aktuell 25, min. 22, max. 50"
+expect #45092 text "Backends – Verfügbare Backends: aktuell 2, min. 2, max. 2; Backends: aktuell 2, min. 2, max. 2"
+key down
+expect #47111 selected
+key left
+expect #47110 selected
+key left
+expect listitem:"Loadbalancer lb" missing
+key right
+expect listitem:"Loadbalancer lb" exists
+expect text:"LB1 · Loadbalancer lb" exists
+# Tab: the span (5 min), then the first chart; End puts its cursor on the newest point
+key tab
+expect #45064 focused
+key right
+expect tab:"5 min" selected
+key tab
+expect #45088 focused
+key end
+expect #45088 text "Anfragen/s, 0:08: 25. Durchsatz – Anfragen/s: aktuell 25, min. 22, max. 50; Antworten/s: aktuell 25, min. 22, max. 50"
+key left
+expect #45088 text "Anfragen/s, 0:07: 28. Durchsatz – Anfragen/s: aktuell 25, min. 22, max. 50; Antworten/s: aktuell 25, min. 22, max. 50"
+key esc
+# the hover card: the point nearest to the pointer, every series' value there
+move 900,690
+expect text:"0:08" exists
+expect text:"Anfragen/s: 25" exists
+expect text:"Antworten/s: 25" exists
+shot build/jfnetworker/metrics_hover.png
+move 630,236
+# ---- a device chosen on the canvas comes into the panel: KV2's node, its load and its disk
+click 930,204
+expect text:"KV2 · KV-Knoten kv" exists
+expect text:"Lastanteil" exists
+expect text:"Schlüssel" exists
+expect text:"Disk: 856 B von 1 GiB, 100 µs" exists
+expect #45092 text "Knoten – Erreichbare Knoten: aktuell 3, min. 3, max. 3"
+key ctrl+0
+# ---- the pills of the services (their records) and the sparklines: from 75 % on, the newest
+# value in their records
+expect text:"SRV1: DNS, DHCP" exists
+expect text:"CACHE1: Cache" exists
+expect text:"SCR1: Skript" exists
+expect text:"MQ1: Q" exists
+expect text:"WRK1: Worker" exists
+expect text:"WEB2: HTTP" exists
+cmd 22
+wait 100
+expect text:"KV2: Anfragen/s 13" exists
+expect text:"MQ1: Wartend 0" exists
+expect #45120 value 8
+cmd 21
+wait 100
+expect text:"75 %" exists
+expect #45120 exists
+cmd 21
+wait 100
+expect #45120 missing
+expect text:"KV2: Anfragen/s 13" missing
+cmd 22
+wait 100
+expect #45120 exists
+# ---- the simulation mode: the charts end at the moment shown, also in the past
+click tab:"Simulation"
+wait 200
+click tab:"Metriken"
+wait 100
+expect text:"KV2 · KV-Knoten kv" exists
+cmd 176 4000000000
+wait 100
+expect text:"Ansicht bei t = 4,000 000 000 s" exists
+expect #45088 text "Durchsatz – Anfragen/s: aktuell 14, min. 12, max. 23; Gelesen/s: aktuell 7, min. 0, max. 9; Geschrieben/s: aktuell 7, min. 3, max. 23"
+# the tiles cover the 5 s before it
+expect text:"23,5" exists
+expect text:"33,5 %" exists
+expect text:"812 B" exists
+shot build/jfnetworker/metrics_past.png
+cmd 170
+wait 100
+expect text:"Ansicht bei t = 4,000 000 000 s" missing
+expect text:"812 B" missing
+click tab:"Echtzeit"
+wait 100
+expect_nowarn

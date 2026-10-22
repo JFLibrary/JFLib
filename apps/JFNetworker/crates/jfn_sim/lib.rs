@@ -67,10 +67,12 @@
 //            letters) and the workers that take from it
 //   scriptsvc scripts as services: a .jfs program (lib/script) driven by events, its fuel the
 //            CPU time of a single-threaded program; the host API (log, timers, net, dns, http,
-//            disk, metrics)
+//            disk, metrics); a new source that keeps the disk and numbers (ScriptSource)
 //   series   time series on virtual time: every service's metrics (rates of counters, gauges,
 //            latency quantiles per interval) and the cables' traffic, KPIs, fault marks for
 //            charts, values over a span for scenarios, CSV
+//   goal     an expectation against the engine now (judge: the runner's and the lab's, with a
+//            report line and a reason as a Msg); LabRun: a lab's goals over a run
 //
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
@@ -79,7 +81,8 @@
 // catalogue src/locales/engine.tsv translates): Note::message / Engine::message (describe),
 // EventRow::msg, Problem::msg, ActErr::msg (Refused carries a Msg), SvcView::status_msg
 // (Service::status_msg), Fail::msg, PduSender::error_msg, TcpClient::error_msg, the *_msg
-// variants of the socket calls and of from_def.  The runner's reports stay German only.
+// variants of the socket calls and of from_def, Verdict::reason (goal.rs).  The runner's reports
+// stay German only.
 #![no_std]
 #![forbid(unsafe_code)]
 
@@ -123,6 +126,7 @@ pub mod cache;
 pub mod mq;
 pub mod scriptsvc;
 pub mod series;
+pub mod goal;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -162,3 +166,4 @@ pub use cache::{Cache, CacheView};
 pub use mq::{Queue, QueueView, SlotState, TopicView, Worker, WorkerView};
 pub use scriptsvc::{ScriptCfg, ScriptErr, ScriptService, ScriptState, ScriptView};
 pub use series::{AggOut, Kpi, LatStat, LatWindow, MetricKind, SeriesCfg, SeriesErr, SeriesKind, SeriesView, ShardLoad, SvcSeries, Unit};
+pub use goal::{judge, Found, GoalRun, LabRun, Verdict};

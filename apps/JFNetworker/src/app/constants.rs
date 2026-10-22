@@ -286,3 +286,88 @@ pub(crate) const ID_KEYS_SCROLL: u32 = 0xA241;
 // ---- performance (U5: commands 200 .. 209, widgets 0xA000 .. 0xA0FF, timers 0x120 .. 0x12F)
 /// the frames on the canvas in the simulation mode: a record whose value is their number
 pub(crate) const ID_SIM_FRAMES: u32 = 0xA000;
+// ---- U6b: tasks and labs (commands 300 .. 339, widgets 0xC000 .. 0xCFFF, timers 0x150 ..
+// 0x15F, the dock panel P_TASK)
+/// Datei › Labor öffnen …: the list of the labs in app://labs
+pub(crate) const CMD_LAB_OPEN: u32 = 300;
+/// the Aufgabe panel shows and gets the keyboard
+pub(crate) const CMD_TASK_PANEL: u32 = 301;
+/// "Prüfen": the goals are judged now and the open ones say why they are not reached
+pub(crate) const CMD_TASK_CHECK: u32 = 302;
+/// the next hint: of the first open goal, else of the whole task
+pub(crate) const CMD_TASK_HINT: u32 = 303;
+/// the list of labs chose one (arg: its index in the list; queued by the dialog)
+pub(crate) const CMD_LAB_CHOSEN: u32 = 304;
+/// the dock panel of the lab's task (right, a tab beside Eigenschaften)
+pub(crate) const P_TASK: u32 = 10;
+/// the Aufgabe panel: its scroll view, "Prüfen", the progress, the task's hint button, the
+/// empty state's "Labor öffnen …", the introduction; per goal its record (+ i) and its hint
+/// button (+ i)
+pub(crate) const ID_TASK: u32 = 0xC000;
+pub(crate) const ID_TASK_CHECK: u32 = 0xC001;
+pub(crate) const ID_TASK_PROGRESS: u32 = 0xC002;
+pub(crate) const ID_TASK_HINT: u32 = 0xC003;
+pub(crate) const ID_TASK_OPEN: u32 = 0xC004;
+/// the expander of the introduction
+pub(crate) const ID_TASK_INTRO: u32 = 0xC005;
+pub(crate) const ID_TASK_GOAL0: u32 = 0xC010;
+pub(crate) const ID_TASK_GOAL_HINT0: u32 = 0xC100;
+/// goals a lab shows at most
+pub(crate) const TASK_GOALS: usize = 200;
+/// the list of labs (a dialog) and its list (rows + 1 + i)
+pub(crate) const ID_LABS_DLG: u32 = 0xC400;
+pub(crate) const ID_LABS_LIST: u32 = 0xC410;
+/// the Dienste tab of device window k: "Einstellungen …" of service i is + 0x40 k + i; the
+/// settings editor of a service (a code editor: + 0 .. 15), Übernehmen, Abbrechen
+pub(crate) const ID_SVC_EDIT_BTN0: u32 = 0xC800;
+pub(crate) const ID_SVC_EDIT: u32 = 0xC900;
+pub(crate) const ID_SVC_EDIT_APPLY: u32 = 0xC910;
+pub(crate) const ID_SVC_EDIT_CANCEL: u32 = 0xC911;
+// ---- the script editor (U7: commands 340 .. 379, widgets 0xD000 .. 0xDFFF, timers 0x160 ..
+// 0x16F; no dock panel: P_SCRIPT = 11 stays free)
+/// the selected host's device window on its Skripte tab (the context menu of a device)
+pub(crate) const CMD_SCRIPTS: u32 = 340;
+/// the check of the edited scripts while typing (at most every devwin::scripts::CHECK_MS)
+pub(crate) const TIMER_SCRIPT_CHECK: u32 = 0x160;
+/// the Skripte tab of device window k: ID_SCRIPTS0 + 0x400 k .. + 0x3FF (devwin/scripts.rs:
+/// + 0x20 the code editor, + 0x30 the output, + 0x40 the errors (rows + 1 + i), + 0x100 the
+/// list of scripts (rows + 1 + i))
+pub(crate) const ID_SCRIPTS0: u32 = 0xD000;
+// ---- U6a: the lab in the window -- the Metriken panel, the badges and sparklines of the
+// canvas, faults in the inspector (commands 260 .. 299, widgets 0xB000 .. 0xBFFF, timers
+// 0x140 .. 0x14F)
+/// the Metriken panel shows and its service tree gets the keyboard (Ctrl+Shift+M)
+pub(crate) const CMD_METRICS: u32 = 260;
+/// every active fault heals (one undo step; Simulation › Alle Fehler beheben)
+pub(crate) const CMD_HEAL_ALL: u32 = 261;
+/// the dock panel of the lab's metrics (bottom, a tab beside Terminal .. Probleme)
+pub(crate) const P_METRICS: u32 = 9;
+/// the Metriken panel: the split between tree and charts, the scroll view of the charts, the
+/// span of the charts (+ 1 + i: its segments), the charts (+ k)
+pub(crate) const ID_MET_SPLIT: u32 = 0xB000;
+pub(crate) const ID_MET_SCROLL: u32 = 0xB001;
+pub(crate) const ID_MET_SPAN: u32 = 0xB008;
+pub(crate) const ID_MET_CHART0: u32 = 0xB020;
+/// the mini sparklines under the lab's devices on the canvas (+ k, at most 24)
+pub(crate) const ID_SPARK0: u32 = 0xB040;
+/// faults in the inspector: the duration; a device's power, service (+ its stop button),
+/// slower disk (extra ms, factor, button); a cable's unplug, delay, loss, rate, impair; the
+/// partition of a selection; "Alle wiederherstellen"; the heal buttons of the active faults
+/// (+ k, at most 64)
+pub(crate) const ID_FLT_DUR: u32 = 0xB100;
+pub(crate) const ID_FLT_POWER: u32 = 0xB101;
+pub(crate) const ID_FLT_SVC: u32 = 0xB102;
+pub(crate) const ID_FLT_STOP: u32 = 0xB103;
+pub(crate) const ID_FLT_DISK_MS: u32 = 0xB104;
+pub(crate) const ID_FLT_DISK_X: u32 = 0xB105;
+pub(crate) const ID_FLT_DISK: u32 = 0xB106;
+pub(crate) const ID_FLT_UNPLUG: u32 = 0xB107;
+pub(crate) const ID_FLT_DELAY: u32 = 0xB108;
+pub(crate) const ID_FLT_LOSS: u32 = 0xB109;
+pub(crate) const ID_FLT_RATE: u32 = 0xB10A;
+pub(crate) const ID_FLT_IMPAIR: u32 = 0xB10B;
+pub(crate) const ID_FLT_PART: u32 = 0xB10C;
+pub(crate) const ID_FLT_HEAL_ALL: u32 = 0xB10D;
+pub(crate) const ID_FLT_HEAL0: u32 = 0xB140;
+/// the service tree (its rows + 1 + i, at most 2000: up to 0xBFD1)
+pub(crate) const ID_MET_TREE: u32 = 0xB800;
