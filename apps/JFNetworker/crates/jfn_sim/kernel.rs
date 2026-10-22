@@ -8,7 +8,7 @@
 //   set_timer / cancel_timer (crate)       per node and slot; a newer setting cancels the older
 //                                          (slots: ip::SLOT_ARP, ip::SLOT_REASM; os::SLOT_OS
 //                                          and up: the inbox, the resolver, tcp::SLOT_TCP,
-//                                          services)
+//                                          services; nat::SLOT_NAT)
 //
 // Events are plain data in a slab and run in (time, sequence) order: two events at the same
 // time run in the order they were scheduled.  Nothing here reads a clock.  Before an event,

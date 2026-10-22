@@ -28,6 +28,10 @@
 //            mode), "ip dhcp excluded-address", "ip helper-address", show ip dhcp binding|
 //            pool|conflict, clear ip dhcp, "ntp server", "ntp master"; dhclient and cat
 //            /etc/resolv.conf on the shell
+//   acl      IOS access lists: access-list, ip access-list standard|extended (their own
+//            modes), ip access-group, show access-lists, clear access-list counters
+//   nat      IOS NAT: ip nat inside|outside, ip nat pool, ip nat inside source, translation
+//            timeouts, show ip nat translations|statistics, clear ip nat, debug ip nat
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -61,10 +65,14 @@ pub mod print;
 pub mod tools;
 pub mod lab;
 pub mod scripts;
+pub mod acl;
+pub mod nat;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
 pub const D_ARP: u32 = 2;
+/// "debug ip nat" (a bit of its own, away from the others' next ones)
+pub const D_NAT: u32 = 0x100;
 
 /// where an IOS console is
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -80,6 +88,9 @@ pub enum Mode {
     Out,
     /// "ip dhcp pool NAME": "(dhcp-config)#"
     DhcpPool,
+    /// "ip access-list standard|extended NAME": "(config-std-nacl)#", "(config-ext-nacl)#"
+    AclStd,
+    AclExt,
 }
 
 /// how an interface's address was set ("show ip interface brief", column Method)
@@ -197,6 +208,8 @@ pub struct CliDev {
     /// debug arp: the received request already printed
     pub(crate) rcvd_hop: HopId,
     pub(crate) booting: bool,
+    /// the list of an access list's mode
+    pub acl: String,
 }
 
 impl CliDev {
@@ -218,6 +231,7 @@ impl CliDev {
             snap: Vec::new(),
             rcvd_hop: 0,
             booting: false,
+            acl: String::new(),
         }
     }
 }
@@ -240,6 +254,7 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
     match n {
         Note::LinkUp { .. } | Note::LinkDown { .. } => true,
         Note::ArpRequest { .. } | Note::ArpReply { .. } | Note::ArpLearned { .. } | Note::ArpProxied { .. } | Note::EchoAnswered { .. } | Note::IcmpSent { .. } | Note::IpLocal { .. } => c.debug > 0,
+        n if n.is_nat() => c.debug > 0,
         _ => false,
     }
 }

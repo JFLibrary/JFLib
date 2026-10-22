@@ -11,7 +11,8 @@
 //
 // Modes: User ">", Priv "#", Config "(config)#", If "(config-if)#", SubIf "(config-subif)#",
 // Vlan "(config-vlan)#", Line "(config-line)#", DhcpPool "(dhcp-config)#" (the DHCP commands
-// are in netsvc.rs).  Interfaces are taken by any IOS spelling
+// are in netsvc.rs), AclStd "(config-std-nacl)#" and AclExt "(config-ext-nacl)#" (acl.rs;
+// found by their prompt, tree_mode).  Interfaces are taken by any IOS spelling
 // ("g0/0/0", "Gi 0/0/0", "lo0", "vlan 10"); "interface Loopback5", "interface Vlan20" and
 // "interface Gi0/0/0.10" make them.  A subinterface gets its VLAN with "encapsulation dot1Q";
 // until then it takes no address (as IOS).  Addresses: "ip address" replaces the primary
@@ -107,6 +108,25 @@ pub enum K {
     // NTP (cli/netsvc.rs)
     NtpServer,
     NtpMaster,
+    // access lists (cli/acl.rs)
+    AclStd,
+    AclExt,
+    AclRemark,
+    AclNamed,
+    AclSeqNo,
+    AclReseq,
+    AccessGroup,
+    ShowAcl,
+    ClearAcl,
+    // NAT (cli/nat.rs)
+    NatSide,
+    NatPool,
+    NatList,
+    NatStatic,
+    NatTimeout,
+    ShowNatTrans,
+    ShowNatStats,
+    ClearNat,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -133,6 +153,17 @@ fn mode_id(m: Mode) -> ModeId {
         Mode::Vlan => VLAN,
         Mode::Line => LINE,
         Mode::DhcpPool => POOL,
+        // modes of later parts are found by their prompt (tree_mode)
+        Mode::AclStd | Mode::AclExt => CONF,
+    }
+}
+
+/// the mode of the tree for a console mode: the fixed ones by number, those that cli/acl.rs
+/// (and later parts) add by their prompt, so their numbers may differ from tree to tree
+fn tree_mode(t: &Tree<K>, m: Mode) -> ModeId {
+    match m {
+        Mode::AclStd | Mode::AclExt => t.find_mode(prompt_suffix(m)).unwrap_or(CONF),
+        _ => mode_id(m),
     }
 }
 
@@ -148,6 +179,8 @@ pub fn prompt_suffix(m: Mode) -> &'static str {
         Mode::Line => "(config-line)#",
         Mode::Out => "",
         Mode::DhcpPool => "(dhcp-config)#",
+        Mode::AclStd => "(config-std-nacl)#",
+        Mode::AclExt => "(config-ext-nacl)#",
     }
 }
 
@@ -414,6 +447,11 @@ fn build(caps: u32) -> Tree<K> {
 
     // ---- DHCP server and relay, NTP (cli/netsvc.rs)
     super::netsvc::build_netsvc(&mut t, [user, prv, conf, ifm, sub, pool]);
+    // ---- access lists with their two modes, NAT on routing devices (cli/acl.rs, cli/nat.rs)
+    super::acl::build_acl(&mut t, [user, prv, conf, ifm, sub]);
+    if router {
+        super::nat::build_nat(&mut t, [user, prv, conf, ifm, sub]);
+    }
     t
 }
 
@@ -560,14 +598,14 @@ impl Engine {
             let off = line.len() - rest.len();
             return tree.help(PRIV, rest, &names).render(col + off, rest);
         }
-        tree.help(mode_id(mode), line, &names).render(col, line)
+        tree.help(tree_mode(&tree, mode), line, &names).render(col, line)
     }
 
     /// Tab
     pub(crate) fn ios_complete(&self, ni: usize, line: &str) -> (Option<String>, Vec<String>) {
         let tree = self.ios_tree_ro(ni);
         let names = IosNames { e: self, ni };
-        let c = tree.complete(mode_id(self.ios_mode(ni)), line, &names);
+        let c = tree.complete(tree_mode(&tree, self.ios_mode(ni)), line, &names);
         (c.line, c.choices)
     }
 
@@ -583,12 +621,12 @@ impl Engine {
             return Ok(());
         }
         let tree = self.ios_tree(ni);
-        let parsed = tree.parse(mode_id(mode), line, &IosNames { e: self, ni });
+        let parsed = tree.parse(tree_mode(&tree, mode), line, &IosNames { e: self, ni });
         let r = match parsed {
             Ok(p) => self.ios_do(ni, mode, &p, line),
             Err(err) => {
                 // a configuration submode falls back to the global configuration
-                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
+                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool | Mode::AclStd | Mode::AclExt) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
                 match up {
                     Some(p) => {
                         self.set_mode(ni, Mode::Config);
@@ -619,7 +657,7 @@ impl Engine {
     }
 
     fn ios_parse_error(&mut self, ni: usize, mode: Mode, tree: &Tree<K>, err: Error, line: &str) -> Result<(), String> {
-        if matches!(mode, Mode::User | Mode::Priv) && !tree.knows_first(mode_id(mode), line) {
+        if matches!(mode, Mode::User | Mode::Priv) && !tree.knows_first(tree_mode(tree, mode), line) {
             // IOS takes an unknown word in EXEC for a host to connect to
             let word = line.split_whitespace().next().unwrap_or("");
             let lookup = self.cdev(ni).is_some_and(|c| c.cfg.domain_lookup);
@@ -706,9 +744,11 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP
+                    D_ICMP | D_ARP | super::D_NAT
                 } else if p.has("icmp") {
                     D_ICMP
+                } else if p.has("nat") {
+                    super::D_NAT
                 } else {
                     D_ARP
                 };
@@ -726,6 +766,7 @@ impl Engine {
                     (true, true, _) => String::from("Debug output: all off\n"),
                     (false, true, _) => String::from("Debug output: all on (a busy network prints a lot)\n"),
                     (o, _, D_ICMP) => format!("Debug output for ICMP: {}\n", if o { "off" } else { "on" }),
+                    (o, _, super::D_NAT) => format!("Debug output for NAT: {}\n", if o { "off" } else { "on" }),
                     (o, _, _) => format!("Debug output for ARP: {}\n", if o { "off" } else { "on" }),
                 };
                 self.out(ni, &text);
@@ -862,6 +903,18 @@ impl Engine {
             }
             K::DhcpPool | K::DhcpExcluded | K::PoolNetwork | K::PoolRouter | K::PoolDns | K::PoolDomain | K::PoolLease | K::ShowDhcpBinding | K::ShowDhcpPool | K::ShowDhcpConflict | K::ClearDhcp => self.ios_dhcp(ni, p),
             K::NtpServer | K::NtpMaster => self.ios_ntp(ni, p),
+            K::AclStd | K::AclExt | K::AclRemark | K::AclNamed | K::AclSeqNo | K::AclReseq | K::ShowAcl | K::ClearAcl => self.ios_acl(ni, mode, p, line),
+            K::AccessGroup | K::NatSide => {
+                let ifs = self.cdev(ni).map(|c| c.ifs.clone()).unwrap_or_default();
+                let mut r = Ok(());
+                for f in ifs {
+                    if let Err(e) = self.ios_if_filter(ni, &f, p) {
+                        r = Err(e);
+                    }
+                }
+                r
+            }
+            K::NatPool | K::NatList | K::NatStatic | K::NatTimeout | K::ShowNatTrans | K::ShowNatStats | K::ClearNat => self.ios_nat(ni, p),
         }
     }
 

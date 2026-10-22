@@ -31,6 +31,10 @@
 //   ScriptSource / RenameService                       a script's new definition that keeps its
 //                                                      disk, numbers and errors (scriptsvc.rs);
 //                                                      a service's new name (os.rs)
+//   Acl / AccessGroup / AclCounters                    access lists: their lines, where they
+//                                                      are used, their hit counters (acl.rs)
+//   Nat                                                address translation: interfaces, pools,
+//                                                      rules, timeouts, clearing (nat.rs)
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -186,6 +190,17 @@ pub enum Action {
     ScriptSource { dev: u32, svc: String, config: agent_core::jmap::Value },
     /// a service goes on under another name, without a restart (os.rs)
     RenameService { dev: u32, name: String, to: String },
+    /// a change of an access list (acl.rs): made, a line added or removed, the whole list
+    /// removed, the lines numbered anew
+    Acl { dev: u32, list: String, op: crate::acl::AclOp },
+    /// the access list of an interface in a direction ("ip access-group L in|out"); None
+    /// takes it away
+    AccessGroup { dev: u32, iface: String, out: bool, list: Option<String> },
+    /// the hit counters of one list, or of all, back to 0 ("clear access-list counters")
+    AclCounters { dev: u32, list: Option<String> },
+    /// address translation (nat.rs): the side of an interface, pools, rules, timeouts,
+    /// clearing translations or counters
+    Nat { dev: u32, act: crate::nat::NatAct },
 }
 
 /// why an action was refused (German text through Display)
@@ -480,6 +495,33 @@ impl Engine {
                     n.cli.cfg.startup = text;
                 }
                 Ok(())
+            }
+            // access lists and address translation (acl.rs, nat.rs)
+            Action::Acl { dev, list, op } => {
+                let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+                self.ip_mut(ni, dev)?.acls.apply(&list, op).map_err(|e| ActErr::Refused(e.msg(&list)))
+            }
+            Action::AccessGroup { dev, iface, out, list } => {
+                let (ni, i) = self.ip_iface(dev, &iface)?;
+                let st = self.ip_mut(ni, dev)?;
+                match list {
+                    Some(l) => {
+                        st.acls.bound.insert((i, out), l);
+                    }
+                    None => {
+                        st.acls.bound.remove(&(i, out));
+                    }
+                }
+                Ok(())
+            }
+            Action::AclCounters { dev, list } => {
+                let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+                self.ip_mut(ni, dev)?.acls.clear_counters(list.as_deref());
+                Ok(())
+            }
+            Action::Nat { dev, act } => {
+                let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+                self.nat_apply(ni, dev, act)
             }
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),

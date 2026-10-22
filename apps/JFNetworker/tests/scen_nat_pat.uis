@@ -1,0 +1,7 @@
+#!args apps/JFNetworker/tests/fixtures/nat_pat.jfnet --scenario apps/JFNetworker/tests/scen/nat_pat.scn --golden apps/JFNetworker/tests/scen/nat_pat.report
+# golden scenario: an office behind NAT: PAT for PC1 and PC2 to a server on the internet, the
+# static port forward of 203.0.113.1:80 to the office's web server, an extended access list
+# that keeps PC2 off the web, traceroute through PAT, debug ip nat, the tables, and the
+# translations timing out.  The GUI program runs tests/scen/nat_pat.scn on
+# tests/fixtures/nat_pat.jfnet without a window and ends with the report, which must equal
+# tests/scen/nat_pat.report byte for byte on every target (the script itself is not run)

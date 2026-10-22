@@ -17,6 +17,8 @@
 //                                 the table of the last lookup is kept with what it was made of
 //                                 (the interfaces' states and addresses, the static routes) and
 //                                 made again only when that changed
+//   acls / nat                    the device's access lists (acl.rs) and address translation
+//                                 (nat.rs); an interface that goes away takes its part along
 //
 // The engine decides which interfaces are up (iface_up in l3.rs); this module only keeps the
 // data and answers questions about it.
@@ -201,6 +203,10 @@ pub struct IpStack {
     pub arp_queue: usize,
     /// the routing table of the last lookup (every forwarded packet looks one up)
     pub(crate) rib_cache: RefCell<RibCache>,
+    /// access lists and where they are used (acl.rs)
+    pub acls: crate::acl::Acls,
+    /// address translation: interfaces, rules, translations (nat.rs)
+    pub nat: crate::nat::Nat,
 }
 
 /// a routing table with what it was made of: per interface its state and addresses, the static
@@ -291,6 +297,8 @@ impl IpStack {
             long_quote: !ios,
             arp_queue: if ios { 0 } else { ARP_QUEUE },
             rib_cache: RefCell::new(RibCache::default()),
+            acls: crate::acl::Acls::default(),
+            nat: crate::nat::Nat::default(),
         })
     }
 
@@ -372,12 +380,18 @@ impl IpStack {
             self.statics.retain(|r| r.iface != Some(iface));
         }
         self.arp.retain(|(i, _), _| *i != iface);
+        // its access lists and its side of NAT go with it
+        self.acls.unbind(iface);
+        self.nat.unbind(iface);
     }
     /// what is forgotten when the device is switched off: learned neighbours, fragments
+    /// (NAT's translations and the hit counters of access lists too)
     pub fn reset(&mut self) {
         self.arp.retain(|_, e| e.fixed);
         self.reasm.clear();
         self.icmp_rate = IcmpRate::new();
+        self.nat.reset();
+        self.acls.clear_counters(None);
     }
 
     /// may an ICMP error of `typ` / `code` go to `to` now?  (Takes what it costs.)

@@ -19,6 +19,7 @@
 // that keep a running script's disk through undo and redo, keep_steps, the marks).
 // labuitest.rs: what the lab in the window builds on (group labui: the lab's texts as
 // messages, KPIs of past spans, the Metriken panel's tables, faults as undo steps).
+// nattest.rs: access lists and NAT (group nat: jfn_sim::acl, jfn_sim::nat, their console).
 
 use alloc::format;
 use alloc::string::String;
@@ -64,9 +65,11 @@ mod msgtest;
 mod scriptedtest;
 #[path = "labuitest.rs"]
 mod labuitest;
+#[path = "nattest.rs"]
+mod nattest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 25] = [
+    let groups: [(&'static str, fn(&mut T)); 26] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -92,6 +95,7 @@ pub fn run() -> i32 {
         ("task", crate::simtest::tasktest::run),
         ("scripted", scriptedtest::run),
         ("labui", labuitest::run),
+        ("nat", nattest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {
