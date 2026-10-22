@@ -3,6 +3,8 @@
 //
 //   grapheme_next(s, i) -> index     the end of the grapheme cluster that starts at or holds i
 //   grapheme_prev(s, i) -> index     the start of the cluster before i (0 at the start)
+//   cluster_end(s, i) -> index       the end of the cluster that starts at boundary i (walks
+//                                    over a text cluster by cluster)
 //   is_grapheme_boundary(s, i)
 //   graphemes(s) -> Vec<usize>       every cluster boundary, 0 and s.len() included
 //   pictographic_cluster(s, a, b)    the cluster a..b is an emoji sequence (Backspace deletes it
@@ -30,8 +32,10 @@
 // Indices are byte offsets into UTF-8 text; an index inside a character is moved to that
 // character's start.  Rules: UAX #29 GB3..GB13 and WB3..WB16 of Unicode 15.0 (no GB9c: that came
 // with 15.1); UAX #14 LB2..LB31 with the pair rules of LB25 (numbers), LB30 for East Asian
-// parentheses and LB30b for emoji modifiers.  Grapheme and word scans run from the paragraph
-// start (the last '\n' before i), as a line feed always ends a cluster and a word.
+// parentheses and LB30b for emoji modifiers.  Grapheme and word scans around i start at the
+// nearest place before i where no rule joins or looks across (usually right there; at the
+// latest the paragraph start, the last '\n' before i) and words end at the next such place,
+// so the cost does not grow with the length of a line.
 
 use alloc::vec::Vec;
 
@@ -158,9 +162,27 @@ fn para_start(s: &str, i: usize) -> usize {
 
 // ------------------------------------------------------------------ grapheme clusters
 
-// the cluster boundaries of s from `from` (a boundary) until one >= until
-fn grapheme_scan(s: &str, from: usize, until: usize, out: &mut Vec<usize>) {
-    out.push(from);
+// the characters with properties pp (before) and p stay in one cluster: ri regional indicators
+// in a row before p, emoji the state of GB11 (2: ExtPict Extend* ZWJ before p)
+fn joins(pp: u32, p: u32, ri: u32, emoji: u8) -> bool {
+    match (gcb(pp), gcb(p)) {
+        (G_CR, G_LF) => true,                                              // GB3
+        (G_CONTROL | G_CR | G_LF, _) | (_, G_CONTROL | G_CR | G_LF) => false, // GB4, GB5
+        (G_L, G_L | G_V | G_LV | G_LVT) => true,                           // GB6
+        (G_LV | G_V, G_V | G_T) => true,                                   // GB7
+        (G_LVT | G_T, G_T) => true,                                        // GB8
+        (_, G_EXTEND | G_ZWJ) => true,                                     // GB9
+        (_, G_SPACINGMARK) => true,                                        // GB9a
+        (G_PREPEND, _) => true,                                            // GB9b
+        _ if p & P_EXTPICT != 0 && emoji == 2 => true,                     // GB11
+        (G_RI, G_RI) => ri % 2 == 1,                                       // GB12, GB13
+        _ => false,                                                        // GB999
+    }
+}
+
+// the cluster boundaries of s after `from` (a boundary) in order: at(b) for each (s.len() last),
+// true stops
+fn grapheme_walk(s: &str, from: usize, at: &mut dyn FnMut(usize) -> bool) {
     let mut prev: Option<u32> = None;
     let mut ri = 0u32; // regional indicators in a row before this character
     let mut emoji = 0u8; // 1: ExtPict Extend*, 2: ExtPict Extend* ZWJ
@@ -169,25 +191,8 @@ fn grapheme_scan(s: &str, from: usize, until: usize, out: &mut Vec<usize>) {
         let p = char_props(c);
         let g = gcb(p);
         if let Some(pp) = prev {
-            let a = gcb(pp);
-            let keep = match (a, g) {
-                (G_CR, G_LF) => true,                                              // GB3
-                (G_CONTROL | G_CR | G_LF, _) | (_, G_CONTROL | G_CR | G_LF) => false, // GB4, GB5
-                (G_L, G_L | G_V | G_LV | G_LVT) => true,                           // GB6
-                (G_LV | G_V, G_V | G_T) => true,                                   // GB7
-                (G_LVT | G_T, G_T) => true,                                        // GB8
-                (_, G_EXTEND | G_ZWJ) => true,                                     // GB9
-                (_, G_SPACINGMARK) => true,                                        // GB9a
-                (G_PREPEND, _) => true,                                            // GB9b
-                _ if p & P_EXTPICT != 0 && emoji == 2 => true,                     // GB11
-                (G_RI, G_RI) => ri % 2 == 1,                                       // GB12, GB13
-                _ => false,                                                        // GB999
-            };
-            if !keep {
-                out.push(i);
-                if i >= until {
-                    return;
-                }
+            if !joins(pp, p, ri, emoji) && at(i) {
+                return;
             }
         }
         // the state after this character
@@ -203,9 +208,26 @@ fn grapheme_scan(s: &str, from: usize, until: usize, out: &mut Vec<usize>) {
         };
         prev = Some(p);
     }
-    if *out.last().unwrap_or(&usize::MAX) != s.len() {
-        out.push(s.len());
+    if from < s.len() {
+        at(s.len());
     }
+}
+
+// a cluster boundary at or before i that a scan may start from: back from i the first place
+// whose two characters stay apart in every state (GB11 only after a ZWJ, GB12 only between
+// regional indicators), usually i itself; a scan from there sees the boundaries a scan from
+// the paragraph start sees (a scan from any boundary does: the state there is the same)
+fn cluster_start(s: &str, i: usize) -> usize {
+    let mut k = floor(s, i);
+    while k > 0 && k < s.len() {
+        let (Some(a), Some(c)) = (s[..k].chars().next_back(), s[k..].chars().next()) else { break };
+        let pp = char_props(a);
+        if !joins(pp, char_props(c), 1, if gcb(pp) == G_ZWJ { 2 } else { 0 }) {
+            break;
+        }
+        k -= a.len_utf8();
+    }
+    k
 }
 
 /// the end of the grapheme cluster that starts at or holds i (s.len() at the end)
@@ -214,9 +236,33 @@ pub fn grapheme_next(s: &str, i: usize) -> usize {
     if i >= s.len() {
         return s.len();
     }
-    let mut b = Vec::new();
-    grapheme_scan(s, para_start(s, i), i + 1, &mut b);
-    b.into_iter().find(|&x| x > i).unwrap_or(s.len())
+    cluster_after(s, cluster_start(s, i), i)
+}
+
+/// the end of the grapheme cluster that starts at i, a cluster boundary (grapheme_next without
+/// looking back: walks from boundary to boundary)
+pub fn cluster_end(s: &str, i: usize) -> usize {
+    let i = floor(s, i);
+    let Some(c) = s.get(i..).and_then(|r| r.chars().next()) else { return s.len() };
+    let n = i + c.len_utf8();
+    // the common case: ASCII after a character that does not hold on to what follows (only a
+    // Prepend character or CR before LF join an ASCII character)
+    let pc = char_props(c);
+    match s.as_bytes().get(n) {
+        None => n,
+        Some(&b) if b < 0x80 && gcb(pc) != G_PREPEND && !(gcb(pc) == G_CR && b == b'\n') => n,
+        _ => cluster_after(s, i, i),
+    }
+}
+
+// the first cluster boundary after i, walking from boundary `from` <= i
+fn cluster_after(s: &str, from: usize, i: usize) -> usize {
+    let mut end = s.len();
+    grapheme_walk(s, from, &mut |b| {
+        end = b;
+        b > i
+    });
+    end
 }
 
 /// the start of the grapheme cluster before i (0 at the start)
@@ -225,10 +271,15 @@ pub fn grapheme_prev(s: &str, i: usize) -> usize {
     if i == 0 {
         return 0;
     }
-    let from = para_start(s, i - 1);
-    let mut b = Vec::new();
-    grapheme_scan(s, from, i, &mut b);
-    b.into_iter().rev().find(|&x| x < i).unwrap_or(0)
+    let from = cluster_start(s, i - 1);
+    let mut last = from;
+    grapheme_walk(s, from, &mut |b| {
+        if b < i {
+            last = b;
+        }
+        b >= i
+    });
+    last
 }
 
 /// i is a cluster boundary
@@ -239,16 +290,24 @@ pub fn is_grapheme_boundary(s: &str, i: usize) -> bool {
     if !s.is_char_boundary(i) {
         return false;
     }
-    let mut b = Vec::new();
-    grapheme_scan(s, para_start(s, i), i, &mut b);
-    b.contains(&i)
+    let from = cluster_start(s, i);
+    let mut hit = from == i;
+    if !hit {
+        grapheme_walk(s, from, &mut |b| {
+            hit = b == i;
+            b >= i
+        });
+    }
+    hit
 }
 
 /// every cluster boundary of s (0 and s.len() included)
 pub fn graphemes(s: &str) -> Vec<usize> {
-    let mut b = Vec::new();
-    grapheme_scan(s, 0, usize::MAX, &mut b);
-    b.dedup();
+    let mut b = alloc::vec![0];
+    grapheme_walk(s, 0, &mut |x| {
+        b.push(x);
+        false
+    });
     b
 }
 
@@ -361,10 +420,46 @@ pub fn word_kind(s: &str, a: usize, b: usize) -> u32 {
     if space { WK_SPACE } else { WK_PUNCT }
 }
 
-// the word segments of the paragraph of i: (bounds, offset of the paragraph)
+// a word boundary at k (a character start inside s) that no rule looks across: neither
+// character is ignored (WB4); a line break on one side, or Other or white space next to
+// something else -- every rule that keeps two characters together or looks past one needs
+// letters, digits, joiners, quotes or regional indicators on both sides
+fn word_hard(s: &str, k: usize) -> bool {
+    let (Some(a), Some(b)) = (s[..k].chars().next_back(), s[k..].chars().next()) else { return true };
+    let (x, y) = (wb(char_props(a)), wb(char_props(b)));
+    if ignorable(x) || ignorable(y) {
+        return false;
+    }
+    if matches!(x, W_NEWLINE | W_CR | W_LF) || matches!(y, W_NEWLINE | W_CR | W_LF) {
+        return !(x == W_CR && y == W_LF);
+    }
+    x == 0 || y == 0 || (x == W_WSEG) != (y == W_WSEG)
+}
+
+// how far word_window looks for a boundary no rule crosses before it takes the paragraph
+const WORD_REACH: usize = 256;
+
+// the word segments around i: (bounds, offset) between boundaries no rule looks across (a word
+// scan from there finds the bounds a scan of the whole paragraph finds), else the paragraph
 fn para_words(s: &str, i: usize) -> (Vec<usize>, usize) {
-    let a = para_start(s, i);
-    let e = s.as_bytes()[a..].iter().position(|&b| b == b'\n').map_or(s.len(), |k| a + k + 1);
+    let mut a = i;
+    let mut n = 0;
+    while a > 0 && !word_hard(s, a) && n < WORD_REACH {
+        a = floor(s, a - 1);
+        n += 1;
+    }
+    if a > 0 && !word_hard(s, a) {
+        a = para_start(s, i);
+    }
+    let mut e = i + s[i..].chars().next().map_or(0, |c| c.len_utf8());
+    n = 0;
+    while e < s.len() && !word_hard(s, e) && n < WORD_REACH {
+        e += s[e..].chars().next().map_or(1, |c| c.len_utf8());
+        n += 1;
+    }
+    if e < s.len() && !word_hard(s, e) {
+        e = s.as_bytes()[i..].iter().position(|&b| b == b'\n').map_or(s.len(), |k| i + k + 1);
+    }
     (word_bounds(&s[a..e]).into_iter().map(|x| x + a).collect(), a)
 }
 

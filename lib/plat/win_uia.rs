@@ -20,7 +20,9 @@
 // RangeValue (sliders; progress bars read-only), SelectionItem (radio buttons, tabs, list rows),
 // ExpandCollapse (drop-downs, menus), Text / Text2 (text boxes: ranges, the caret and the
 // selection; win_uia_text.rs).  Headings are Text elements with HeadingLevel1 .. 9 (and the
-// AriaRole "heading", AriaProperties "level=N").  Actions become a11y::request.  Events: focus
+// AriaRole "heading", AriaProperties "level=N").  Dialogs, switches and headings name their
+// control type themselves (LocalizedControlType: a11y::role_name, in the UI language), the
+// others leave it to UIA.  Actions become a11y::request.  Events: focus
 // changed, property changes (toggle state, selected, expand state, enabled, name, value, range
 // value, heading level), text selection changed (the caret moved: screen readers and Magnifier
 // follow it), text changed, structure changed (children invalidated).  UIAutomationCore.dll
@@ -676,9 +678,8 @@ unsafe extern "system" fn s_prop(this: This, id: i32, out: *mut Variant) -> Hr {
 fn prop(t: &WinTree, n: &Node, id: i32) -> Variant {
     match id {
         PR_CONTROL_TYPE => Variant::i4(control_type(n)),
-        PR_LOCALIZED_TYPE if n.role == Role::Dialog => Variant::bstr("Dialog"),
-        PR_LOCALIZED_TYPE if n.role == Role::Switch => Variant::bstr("Umschalter"),
-        PR_LOCALIZED_TYPE if n.role == Role::Heading => Variant::bstr("Überschrift"),
+        // (the other control types: UIA's own names, in the system's language)
+        PR_LOCALIZED_TYPE if matches!(n.role, Role::Dialog | Role::Switch | Role::Heading) => Variant::bstr(ax::role_name(n.role)),
         // headings: Text elements with their level (Narrator, NVDA: heading navigation), the
         // ARIA role and level for clients that read those
         PR_HEADING_LEVEL if n.role == Role::Heading => Variant::i4(HEADING_LEVEL_NONE + n.level() as i32),
@@ -1155,6 +1156,8 @@ const IID_IUIAUTOMATION: Guid = guid(0x30cbe57d, 0xd9d0, 0x452a, [0xab, 0x13, 0x
 pub struct UiaTestElem {
     pub name: String,
     pub control_type: i32,
+    /// LocalizedControlType (UIA's own name of the control type unless the provider gives one)
+    pub localized_type: String,
     /// below the window's element (1 = a child of it)
     pub depth: u32,
     pub enabled: bool,
@@ -1288,6 +1291,7 @@ fn describe(el: usize, depth: u32) -> UiaTestElem {
     UiaTestElem {
         name: prop_str(el, PR_NAME).unwrap_or_default(),
         control_type: prop_i(el, PR_CONTROL_TYPE).unwrap_or(0),
+        localized_type: prop_str(el, PR_LOCALIZED_TYPE).unwrap_or_default(),
         depth,
         enabled: has(PR_ENABLED),
         focused: has(PR_HAS_FOCUS),

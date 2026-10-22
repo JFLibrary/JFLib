@@ -2692,6 +2692,15 @@ let text = self.code.text();
   state each line starts in and follows `CodeDoc::changes_since`, so an edit re-highlights
   only until the old states agree again. 100 000 lines scroll and edit at the speed of a
   short file (`apps/editortest/tests/code_bench.uis`).
+* Long lines (minified JSON / JS, logs): of a line of 4 KB and more only the part in view is
+  drawn; the editor keeps checkpoints of its columns and its tokens, and after an edit works
+  them again only near it (tokens from 4 KB before the edit to where the old ones agree
+  again). Typing, moving the caret, selecting, scrolling sideways and find stay well under a
+  millisecond or two per pass on a line of 100 000 characters and on a 1 MB single-line file
+  (`apps/editortest/tests/code_longline.uis`). A construct that decides by looking more than
+  4 KB ahead (Markdown emphasis waiting for its closer) catches up when the whole line is
+  highlighted again (another start state or grammar). The editor has no soft wrap; very long
+  lines scroll sideways.
 * Highlighting: a `Grammar` is a list of `Rule`s tried at each position (line comments,
   blocks with nesting, strings with escapes and multi-line, word lists, numbers, punctuation,
   `Custom` functions) plus a few switches (identifiers before `(` are functions, capitalised

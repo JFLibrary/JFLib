@@ -106,8 +106,10 @@ pub use highlight::{
 };
 pub use highlight::JFS; // (L6) the grammar of lib/script's .jfs
 mod code_edit;
+mod code_long;
 pub use code_edit::{CodeStatus, CE_NO_FIND, CE_NO_FRAME, CE_NO_GUTTER, CE_NO_LINE, CE_READONLY};
 pub use code_edit::CE_MARKS; // (L6) the gutter's column of diagnostic markers
+pub use code_long::code_long_check; // (tests) what the code editor keeps of long lines
 mod dock;
 mod drop;
 mod edit;

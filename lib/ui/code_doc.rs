@@ -1186,34 +1186,88 @@ pub(crate) fn find_in(t: &str, q: &str, opts: u8, found: &mut dyn FnMut(usize, u
 
 /// the visual column of byte in t (tab stops every tw columns)
 pub(crate) fn col_in(t: &str, byte: usize, tw: usize) -> usize {
-    let tw = tw.clamp(1, 16);
-    let mut col = 0;
-    let mut i = 0;
-    let byte = byte.min(t.len());
-    while i < byte {
-        let n = segment::grapheme_next(t, i);
-        let c = t[i..].chars().next().unwrap_or(' ');
-        col += if c == '\t' { tw - col % tw } else { char_cols(c) };
-        i = n;
-    }
-    col
+    col_from(t, 0, 0, byte, tw)
 }
 
 /// the cluster boundary of t nearest to column col
 pub(crate) fn byte_in(t: &str, col: usize, tw: usize) -> usize {
-    let tw = tw.clamp(1, 16);
-    let mut c0 = 0;
-    let mut i = 0;
-    while i < t.len() {
-        let n = segment::grapheme_next(t, i);
-        let c = t[i..].chars().next().unwrap_or(' ');
-        let w = if c == '\t' { tw - c0 % tw } else { char_cols(c) };
-        if col < c0 + w {
-            // nearer to the start or to the end of this cluster
-            return if (col - c0) * 2 < w { i } else { n };
-        }
-        c0 += w;
-        i = n;
-    }
-    t.len()
+    byte_from(t, 0, 0, col, tw)
 }
+
+// plain ASCII from i on (before lim): one cluster and one column per byte; the last one before
+// a non-ASCII character is left out (a mark may join it)
+pub(crate) fn ascii_run(b: &[u8], i: usize, lim: usize) -> usize {
+    let mut j = i;
+    while j < lim && (0x20..0x7F).contains(&b[j]) {
+        j += 1;
+    }
+    if j > i && b.get(j).is_some_and(|&c| c >= 0x80) {
+        j -= 1;
+    }
+    j - i
+}
+
+// the cluster of t at boundary i, at column col: (its end, its columns)
+pub(crate) fn cell(t: &str, i: usize, col: usize, tw: usize) -> (usize, usize) {
+    let n = segment::cluster_end(t, i);
+    let c = t[i..].chars().next().unwrap_or(' ');
+    (n, if c == '\t' { tw - col % tw } else { char_cols(c) })
+}
+
+/// the column of byte in t, counted from boundary i at column col (a checkpoint of a long line)
+pub(crate) fn col_from(t: &str, i: usize, col: usize, byte: usize, tw: usize) -> usize {
+    let tw = tw.clamp(1, 16);
+    let (b, byte) = (t.as_bytes(), byte.min(t.len()));
+    let (mut i, mut col) = (i, col);
+    while i < byte {
+        let k = ascii_run(b, i, byte);
+        if k > 0 {
+            (i, col) = (i + k, col + k);
+            continue;
+        }
+        let (n, w) = cell(t, i, col, tw);
+        (i, col) = (n, col + w);
+    }
+    col
+}
+
+/// the cluster boundary nearest to column col, counted from boundary i at column c0 <= col
+pub(crate) fn byte_from(t: &str, i: usize, c0: usize, col: usize, tw: usize) -> usize {
+    let (i, c0, n, w) = cell_at(t, i, c0, col, tw);
+    // nearer to the start or to the end of this cluster
+    if i < t.len() && (col - c0) * 2 >= w { n } else { i }
+}
+
+/// the cluster boundary at or before column col and its column, counted from boundary i at
+/// column c0 <= col (where drawing a row from column col starts)
+pub(crate) fn cell_floor(t: &str, i: usize, c0: usize, col: usize, tw: usize) -> (usize, usize) {
+    let (i, c0, _, _) = cell_at(t, i, c0, col, tw);
+    (i, c0)
+}
+
+// the cluster that holds column col, counted from boundary i at column c0 <= col -> (its start,
+// its column, its end, its columns); past the end of t: (t.len(), the end's column, t.len(), 0)
+fn cell_at(t: &str, i: usize, c0: usize, col: usize, tw: usize) -> (usize, usize, usize, usize) {
+    let tw = tw.clamp(1, 16);
+    let b = t.as_bytes();
+    let (mut i, mut c0) = (i, c0);
+    while i < t.len() {
+        // (ASCII up to the column at most)
+        let k = ascii_run(b, i, t.len().min(i + (col - c0) + 1));
+        if k > 0 {
+            if col < c0 + k {
+                let j = i + (col - c0);
+                return (j, col, j + 1, 1);
+            }
+            (i, c0) = (i + k, c0 + k);
+            continue;
+        }
+        let (n, w) = cell(t, i, c0, tw);
+        if col < c0 + w {
+            return (i, c0, n, w);
+        }
+        (i, c0) = (n, c0 + w);
+    }
+    (t.len(), c0, t.len(), 0)
+}
+

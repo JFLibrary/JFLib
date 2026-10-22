@@ -7,15 +7,19 @@
 //                              reader asks them through plat::a11y::request: click, toggle,
 //                              select, set a slider and a text, focus, a disabled button, the
 //                              pointer click for a widget whose record id differs from its hit
-//                              box; the changes between two trees (plat::a11y::diff)
+//                              box; the changes between two trees (plat::a11y::diff); the role
+//                              names of the bridges in German and English
 //   plattest --test a11y-bus   (Linux; tools/platshared/atspi_bus.py starts it on a fake session
 //                              and accessibility bus) the demo in a real window with the AT-SPI2
 //                              bridge; the fake screen reader reads the tree and acts, then
-//                              presses "Beenden": the app state is checked at the end
+//                              presses "Beenden": the app state is checked at the end; with
+//                              --lang CODE in that UI language (the localized role names)
 //   plattest --test uia        (Windows, by hand: a window appears for a few seconds) the demo
 //                              with the UI Automation providers; a thread of the test reads the
 //                              tree through IUIAutomation (plat::uia_test_*: control types,
-//                              patterns, the heading's HeadingLevel), invokes, toggles,
+//                              patterns, the heading's HeadingLevel, the localized control
+//                              types of a switch and a heading in German, then English and
+//                              French after it changes the UI language), invokes, toggles,
 //                              sets values, follows the caret, then presses "Beenden"
 //   plattest --test caret      (Windows, by hand) only the caret as screen magnifiers see it:
 //                              the hidden system caret (GetGUIThreadInfo) and TextPattern2's
@@ -368,6 +372,15 @@ pub fn t_a11y(t: &mut T) {
     );
     t_wire(t, &mut r, chk);
     t.check(!ax::active(), "a11y: no bridge in a headless run");
+
+    // the names the bridges give the roles (UIA LocalizedControlType, AT-SPI
+    // GetLocalizedRoleName): ui hands plat its translation, they follow the UI language
+    let names = || (ax::role_name(Role::Switch), ax::role_name(Role::Heading), ax::role_text(ax::ROLE_WINDOW));
+    t.check(names() == ("Umschalter", "Überschrift", "Rahmen"), "a11y: role names in German (the default)");
+    ui::i18n::set_language_code("en");
+    t.check(names() == ("toggle switch", "heading", "frame"), "a11y: role names in English after the language changed");
+    ui::i18n::set_language(ui::i18n::LANG_DE);
+    t.check(names() == ("Umschalter", "Überschrift", "Rahmen"), "a11y: role names in German again");
 }
 
 // the browser's and Android's mirror (plat::a11y::wire): a full update, nothing when nothing
@@ -461,10 +474,19 @@ fn t_wire(t: &mut T, r: &mut Run, chk: Option<&Node>) {
     t.check(m.update(&s2, &[], &place).and_then(|b| read(&b)).is_some_and(|(f, ..)| f == wire::F_FULL), "a11y: wire: after reset a full update");
 }
 
+// --lang CODE: the UI language (the library's texts follow it; the demo has no catalogue of its
+// own, so the user's languages alone do not change it)
+fn lang_arg() {
+    if let Some(l) = plat::arg_value("--lang") {
+        ui::i18n::set_language_code(&l);
+    }
+}
+
 /// (Linux) the demo in a real window for tools/platshared/atspi_bus.py: the fake screen reader
 /// clicks "Drücken", toggles "Option", sets the slider to 75 and the text to "Bert", then
-/// presses "Beenden"
+/// presses "Beenden"; --lang en: the role names in English
 pub fn t_a11y_bus(t: &mut T) {
+    lang_arg();
     let mut app = Demo::new();
     let code = ui::run(&DESC, &mut app, &style::STYLE);
     t.expect_i(code as i64, 0, "a11y-bus: the window ran");
@@ -639,6 +661,22 @@ mod uia {
         record(find(t, "Gesperrt", CT_BUTTON).is_some_and(|e| !e.enabled), "uia: a disabled button");
         record(find(t, "Option", CT_CHECKBOX).is_some_and(|e| e.toggle == 0), "uia: check box, Toggle off");
         record(find(t, "Schalter", CT_BUTTON).is_some_and(|e| e.toggle == 0), "uia: switch, Toggle off");
+        // the control types the bridge names itself: in the UI language, following a change
+        let types = |t: &[UiaTestElem]| {
+            let ty = |name: &str, ct: i32| find(t, name, ct).map_or(String::new(), |e| e.localized_type.clone());
+            (ty("Schalter", CT_BUTTON), ty("Einstellungen", CT_TEXT))
+        };
+        let de = types(t);
+        record(de.0 == "Umschalter" && de.1 == "Überschrift", &alloc::format!("uia: LocalizedControlType of a switch and a heading in German ({de:?})"));
+        record(find(t, "Drücken", CT_BUTTON).is_some_and(|e| !e.localized_type.is_empty()), "uia: a button keeps UIA's own LocalizedControlType");
+        // (a catalogue with French: without one the library has German and English)
+        ui::i18n::set_catalog(ui::i18n::Catalog::from_tsv("de\ten\tfr\n"));
+        for (lang, want) in [("en", ("toggle switch", "heading")), ("fr", ("interrupteur", "titre"))] {
+            ui::i18n::set_language_code(lang);
+            let got = uia_test_tree(hwnd).map(|t| types(&t)).unwrap_or_default();
+            record(got.0 == want.0 && got.1 == want.1, &alloc::format!("uia: LocalizedControlType in {lang} after the language changed ({got:?})"));
+        }
+        ui::i18n::set_language(ui::i18n::LANG_DE);
         record(
             find(t, "Eins", CT_RADIO).is_some_and(|e| e.selected == Some(true)) && find(t, "Zwei", CT_RADIO).is_some_and(|e| e.selected == Some(false)),
             "uia: radio buttons, SelectionItem",

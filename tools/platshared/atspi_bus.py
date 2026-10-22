@@ -12,7 +12,7 @@ The fake buses (the marshalling of portal_bus.py) play the session bus (org.a11y
 GetAddress), the accessibility bus daemon, the registry (Socket.Embed) and a screen reader.
 plattest --test a11y-bus shows its demo window; the screen reader walks the tree (roles, names,
 states, interfaces, parents, extents, the node at a point, Value, Text, a heading with its level
-attribute), clicks "Drücken",
+attribute, the localized role names: a second run with --lang en has them in English), clicks "Drücken",
 toggles "Option", sets the slider to 75 and the text to "Bert", selects the second tab, follows the
 caret of the entry as a screen magnifier does (Focus brings TextCaretMoved along, the caret's
 GetCharacterExtents lie in the entry on the screen, SetCaretOffset / SetSelection move it and the
@@ -250,7 +250,7 @@ def walk(bus, path, depth=0, out=None):
     return out
 
 
-def fake(exe):
+def fake(exe, lang=None):
     with tempfile.TemporaryDirectory() as d:
         sess, a11y = os.path.join(d, "session"), os.path.join(d, "a11y")
         srec = {}
@@ -258,10 +258,10 @@ def fake(exe):
         bus = A11yBus(a11y)
         env = {k: v for k, v in os.environ.items() if k not in ("jfgui_A11Y", "NO_AT_BRIDGE")}
         env["DBUS_SESSION_BUS_ADDRESS"] = f"unix:path={sess}"
-        p = subprocess.Popen([str(exe), "--test", "a11y-bus", "--auto-close", "60000"], env=env,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        p = subprocess.Popen([str(exe), "--test", "a11y-bus", "--auto-close", "60000"] + (["--lang", lang] if lang else []),
+                             env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         try:
-            screen_reader(bus, srec)
+            screen_reader(bus, srec, lang or "de")
         except Exception as e:  # noqa: BLE001
             check("the screen reader ran through", False, repr(e))
             p.kill()
@@ -271,10 +271,16 @@ def fake(exe):
             p.kill()
             out, err = p.communicate()
     print(out.strip())
-    check("plattest --test a11y-bus passed", p.returncode == 0, (p.returncode, err.strip()[-800:]))
+    check(f"plattest --test a11y-bus passed ({lang or 'de'})", p.returncode == 0, (p.returncode, err.strip()[-800:]))
 
 
-def screen_reader(bus, srec):
+# GetLocalizedRoleName of the heading, a push button, the switch, the window and the application
+# in the UI language (plattest --lang); GetRoleName stays English
+LOCALIZED = {"de": ("Überschrift", "Schaltfläche", "Umschalter", "Rahmen", "Anwendung"),
+             "en": ("heading", "push button", "toggle switch", "frame", "application")}
+
+
+def screen_reader(bus, srec, lang="de"):
     check("embedded in the registry", bus.wait(lambda: bus.embedded is not None, 20), srec)
     if not bus.embedded:
         return
@@ -348,6 +354,12 @@ def screen_reader(bus, srec):
               and bus.call(head["path"], ti, "GetText", "ii", [0, -1])[0] == "Einstellungen"
               and "org.a11y.atspi.Action" not in head["ifaces"] and "focusable" not in head["states"], head)
     check("label: no attributes", bus.call(lab["path"], ACC, "GetAttributes")[0] == {})
+    sw = find("toggle button", "Schalter")
+    loc = lambda path: bus.call(path, ACC, "GetLocalizedRoleName")[0]  # noqa: E731
+    got = (loc(head["path"]) if head else None, loc(btn["path"]), loc(sw["path"]) if sw else None, loc(w), loc(ROOT))
+    check(f"GetLocalizedRoleName in the UI language ({lang})", got == LOCALIZED[lang], got)
+    check("GetRoleName stays English", bus.call(btn["path"], ACC, "GetRoleName")[0] == "push button"
+          and (sw is None or bus.call(sw["path"], ACC, "GetRoleName")[0] == "toggle button"))
     ext = bus.call(btn["path"], "org.a11y.atspi.Component", "GetExtents", "u", [1])[0]
     check("button extents (window)", ext[2] > 0 and ext[3] > 0, ext)
     at = bus.call(w, "org.a11y.atspi.Component", "GetAccessibleAtPoint", "iiu", [ext[0] + ext[2] // 2, ext[1] + ext[3] // 2, 1])[0]
@@ -587,6 +599,7 @@ def main():
         real_inner(exe)
     else:
         fake(exe)
+        fake(exe, "en")
         if a.real:
             real(exe, a.rs)
     print("atspi_bus:", "all passed" if fails == 0 else f"{fails} FAILED")
