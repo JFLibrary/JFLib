@@ -152,7 +152,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Layout](#layout): `next_size`, `next_rect`, `next_rect_px`, `box_offset`, `next_flags`, `take_flags`, `next_icon`, `take_icon`, `last_rect`, `box_id`, `box_rect`, `box_flags`, `place`, `avail_width`, `box_begin`, `box_end`, `spacer`, `dp`, `px2dip`, `dpi`, `set_dpi`, `dp_fx`
 - [Context: input, focus, timers, commands, semantics](#context-input-focus-timers-commands-semantics): `now`, `mods`, `mouse`, `pen`, `focus`, `focused`, `key`, `capture_shortcut`, `key_peek`, `key_down`, `key_first`, `text_take`, `hit_flags_at`, `hit`, `behave`, `hit_rect`, `focus_ring`, `slot`, `anim`, `anim_ex`, `anim_color`, `cmd_run`, `timer`, `last_reset`, `last_set`, `last_state`, `mbtn`, `pressed`, `released`, `sem`, `clip_push`, `clip_pop`, `layer_set`, `begin_pass`, `end_pass`, `repass`, `modal`, `modal_active`, `disabled_push`, `disabled_pop`, `warn`
 - [Keyboard: Tab order, focus groups, panes and windows (F6), splitters (F8)](#keyboard-tab-order-focus-groups-panes-and-windows-f6-splitters-f8): `focus_group_begin`, `focus_group_end`, `focus_pane_begin`, `focus_pane_end`, `group_arrived`, `splitter_keys`
-- [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
+- [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_cmd`, `menu_sep`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
 - [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_editor`
@@ -733,6 +733,10 @@ Label strings are copied, so they may live in scratch buffers.
   (ev: the widget's events; custom widgets built on hit_rect / behave call it last)
 - **`fn text(&mut self, style: u32, s: &str)`**
   ui_text(style, s): a text in a text style (TS_\* | TX_\*)
+- **`fn heading(&mut self, level: u32, style: u32, s: &str)`**
+  A section title: `text(style, s)` that screen readers know as a heading of `level`
+  (1 the top level ..= 9; record K_HEADING, value: the level) -- their heading navigation
+  finds it.
 - **`fn button(&mut self, id: u32, label: &str) -> u32`**
   ui_button(id, label) -> EV_\* (EV_ACT on click)
 - **`fn label_button(&mut self, id: u32, label: &str, typography: u32, inset: i32) -> u32`**
@@ -4464,7 +4468,7 @@ K_DIALOG: u16 = 18
 K_TITLEBAR: u16 = 19
 K_SWATCH: u16 = 20
 K_LINK: u16 = 21
-/// a heading of a document (value: its level 1 ..= 6; md_view.rs)
+/// a heading of a document or section (value: its level, 1 the top; md_view.rs, Ui::heading)
 K_HEADING: u16 = 22
 K_KIND_COUNT: u16 = 23
 SS_HOVER: u16 = 1
@@ -5821,15 +5825,16 @@ a11y_text(id) for a new value (both public for widgets of an app's own).  A clic
 click in the middle of the record.
 
 The tree: every record of a window becomes a node in the record order -- roles from the
-kinds (K_*), states from SS_* (a check box with value 2 is mixed).  Left out: title bars,
-empty texts, records without area, boxes without a label (a box with tab records inside
-is the tab strip).  Containers are lists, dialogs, titled boxes and tab strips: a node's
-parent is the smallest one on its layer whose rectangle holds the node's centre.  Menu bar
-entries next to each other get a menu bar; the rows of a popup (menus, drop-downs) a menu
-or list that hangs below the open record that opened it.  Names: the label; text boxes,
-drop-downs (their label is the text / the choice), sliders, progress bars and lists
-without one take the text record right before them (to the left, or above and aligned).  The
-focus of a list or tab strip is passed on to its selected row / tab.
+kinds (K_*), states from SS_* (a check box with value 2 is mixed), a heading's level from its
+value (K_HEADING: Node::value, clamped to 1 ..= 9).  Left out: title bars, empty texts,
+records without area, boxes without a label (a box with tab records inside is the tab
+strip).  Containers are lists, dialogs, titled boxes and tab strips: a node's parent is the
+smallest one on its layer whose rectangle holds the node's centre.  Menu bar entries next to
+each other get a menu bar; the rows of a popup (menus, drop-downs) a menu or list that hangs
+below the open record that opened it.  Names: the label; text boxes, drop-downs (their label
+is the text / the choice), sliders, progress bars and lists without one take the text or
+heading record right before them (to the left, or above and aligned).  The focus of a list
+or tab strip is passed on to its selected row / tab.
 ```
 
 **`impl Ui`**
@@ -18002,6 +18007,7 @@ NONE: u32 = u32::MAX
   - `Image`
   - `Canvas` -- a drawing surface (charts, the app's own views)
   - `Dialog`
+  - `Heading` -- a heading of a document or section (Node::value: its level, level())
 
 ```rust
 /// Node::state: the keyboard focus is on the node
@@ -18049,7 +18055,8 @@ A_TEXT: u32 = 8
   - `anchor: i32` -- text boxes: the other end of the selection in characters (== caret: nothing selected)
   - `caret_rect: [i32; 4]` -- text boxes: the caret's rectangle, physical px of the client area (w, h 0: unknown) --
     screen magnifiers follow it (char_rect)
-  - `value: f64` -- sliders and progress bars: value in min ..= max (value &lt; min: progress unknown)
+  - `value: f64` -- sliders and progress bars: value in min ..= max (value &lt; min: progress unknown);
+    headings: the level (1 ..= 9)
   - `min: f64`
   - `max: f64`
   - `step: f64`
@@ -18085,6 +18092,8 @@ A_TEXT: u32 = 8
 
 - **`fn text_str(&self) -> &str`**
   the text the text interfaces see: text boxes and drop-downs their text, labels their name
+- **`fn level(&self) -> u32`**
+  a heading's level 1 ..= 9 (0: not a heading)
 - **`fn selection(&self) -> (i32, i32)`**
   the selection of a text box: (start, end) in characters, start == end at the caret
 - **`fn char_rect(&self, k: i32) -> [i32; 4]`**
@@ -18125,7 +18134,7 @@ A_TEXT: u32 = 8
   - `Focus(u8, u64)` -- the keyboard focus moved to this node (in the active window)
   - `State(u8, u64, u32, bool)` -- state bit S_\* of a node went on (true) or off
   - `Name(u8, u64)`
-  - `Value(u8, u64)` -- the number of a slider / progress bar
+  - `Value(u8, u64)` -- the number of a slider / progress bar, the level of a heading
   - `Text(u8, u64, String)` -- the text of a text box / combo box (the old text)
   - `Caret(u8, u64, i32)` -- the caret of a text box (characters)
   - `Added(u8, u64, u64)` -- a node (with its subtree) appeared: parent key (0: the window), its key; in the order
@@ -18197,9 +18206,9 @@ The format: integers little-endian, str = u32 byte count + UTF-8, key = u64 (Nod
         key, u32 parent (its position in this list; UNCHANGED: a top-level node) --
         the nodes of the window that are not in the list are gone
     u32 node count, then the nodes that are new or changed: key, u8 role (Role in
-        declaration order: Group 0 .. Dialog 20), u32 state (S_*), u32 actions (A_*),
-        i32 x, y, w, h, str name, str text, i32 caret, i32 anchor, i32 caret x, y, w, h,
-        f64 value, min, max, step
+        declaration order: Group 0 .. Dialog 20, Heading 21), u32 state (S_*), u32 actions
+        (A_*), i32 x, y, w, h, str name, str text, i32 caret, i32 anchor, i32 caret x, y, w,
+        h, f64 value (headings: the level), min, max, step
   windows that are not listed are gone
   u32 number of events, each: u8 kind (E_*), u8 window, key, i32 a, i32 b, and for E_TEXT
     str old text -- the events of plat::a11y::diff without Added / Removed (the order
@@ -19572,11 +19581,12 @@ root; its host provider comes from UiaHostProviderFromHwnd) and the patterns Inv
 links, menu items), Toggle (check boxes, switches), Value (text boxes; drop-downs read-only),
 RangeValue (sliders; progress bars read-only), SelectionItem (radio buttons, tabs, list rows),
 ExpandCollapse (drop-downs, menus), Text / Text2 (text boxes: ranges, the caret and the
-selection; win_uia_text.rs).  Actions become a11y::request.  Events: focus changed, property
-changes (toggle state, selected, expand state, enabled, name, value, range value), text
-selection changed (the caret moved: screen readers and Magnifier follow it), text changed,
-structure changed (children invalidated).  UIAutomationCore.dll and oleaut32.dll are loaded
-on the first WM_GETOBJECT.
+selection; win_uia_text.rs).  Headings are Text elements with HeadingLevel1 .. 9 (and the
+AriaRole "heading", AriaProperties "level=N").  Actions become a11y::request.  Events: focus
+changed, property changes (toggle state, selected, expand state, enabled, name, value, range
+value, heading level), text selection changed (the caret moved: screen readers and Magnifier
+follow it), text changed, structure changed (children invalidated).  UIAutomationCore.dll
+and oleaut32.dll are loaded on the first WM_GETOBJECT.
 ```
 
 - **`struct UiaTestElem`**
@@ -19591,6 +19601,7 @@ on the first WM_GETOBJECT.
   - `range: Option<(f64, f64, f64)>` -- RangeValue: value, minimum, maximum
   - `selected: Option<bool>` -- SelectionItem: selected
   - `expand: i32` -- ExpandCollapse state (-1: no pattern)
+  - `heading: i32` -- HeadingLevel 1 ..= 9 (0: HeadingLevel_None)
   - `rect: [i32; 4]` -- the bounding rectangle: x, y, w, h (screen px)
 
 - **`enum UiaTestAct`**

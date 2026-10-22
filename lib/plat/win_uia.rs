@@ -19,11 +19,12 @@
 // links, menu items), Toggle (check boxes, switches), Value (text boxes; drop-downs read-only),
 // RangeValue (sliders; progress bars read-only), SelectionItem (radio buttons, tabs, list rows),
 // ExpandCollapse (drop-downs, menus), Text / Text2 (text boxes: ranges, the caret and the
-// selection; win_uia_text.rs).  Actions become a11y::request.  Events: focus changed, property
-// changes (toggle state, selected, expand state, enabled, name, value, range value), text
-// selection changed (the caret moved: screen readers and Magnifier follow it), text changed,
-// structure changed (children invalidated).  UIAutomationCore.dll and oleaut32.dll are loaded
-// on the first WM_GETOBJECT.
+// selection; win_uia_text.rs).  Headings are Text elements with HeadingLevel1 .. 9 (and the
+// AriaRole "heading", AriaProperties "level=N").  Actions become a11y::request.  Events: focus
+// changed, property changes (toggle state, selected, expand state, enabled, name, value, range
+// value, heading level), text selection changed (the caret moved: screen readers and Magnifier
+// follow it), text changed, structure changed (children invalidated).  UIAutomationCore.dll
+// and oleaut32.dll are loaded on the first WM_GETOBJECT.
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -86,6 +87,11 @@ const PR_RANGE_MAX: i32 = 30050;
 const PR_EXPAND_STATE: i32 = 30070;
 const PR_SELECTED: i32 = 30079;
 const PR_TOGGLE_STATE: i32 = 30086;
+const PR_ARIA_ROLE: i32 = 30101;
+const PR_ARIA_PROPERTIES: i32 = 30102;
+const PR_HEADING_LEVEL: i32 = 30173;
+// HeadingLevel_None; HeadingLevel1 .. 9 follow it
+const HEADING_LEVEL_NONE: i32 = 80050;
 
 // events
 const EV_FOCUS: i32 = 20005;
@@ -513,7 +519,7 @@ fn patterns(n: &Node) -> u32 {
 fn control_type(n: &Node) -> i32 {
     match n.role {
         Role::Group => CT_GROUP,
-        Role::Label => CT_TEXT,
+        Role::Label | Role::Heading => CT_TEXT,
         Role::Button | Role::Switch => CT_BUTTON,
         Role::CheckBox => CT_CHECKBOX,
         Role::Radio => CT_RADIO,
@@ -672,6 +678,12 @@ fn prop(t: &WinTree, n: &Node, id: i32) -> Variant {
         PR_CONTROL_TYPE => Variant::i4(control_type(n)),
         PR_LOCALIZED_TYPE if n.role == Role::Dialog => Variant::bstr("Dialog"),
         PR_LOCALIZED_TYPE if n.role == Role::Switch => Variant::bstr("Umschalter"),
+        PR_LOCALIZED_TYPE if n.role == Role::Heading => Variant::bstr("Überschrift"),
+        // headings: Text elements with their level (Narrator, NVDA: heading navigation), the
+        // ARIA role and level for clients that read those
+        PR_HEADING_LEVEL if n.role == Role::Heading => Variant::i4(HEADING_LEVEL_NONE + n.level() as i32),
+        PR_ARIA_ROLE if n.role == Role::Heading => Variant::bstr("heading"),
+        PR_ARIA_PROPERTIES if n.role == Role::Heading => Variant::bstr(&alloc::format!("level={}", n.level())),
         PR_NAME => Variant::bstr(&n.name),
         PR_AUTOMATION_ID => Variant::bstr(&alloc::format!("{:x}", n.key)),
         PR_ENABLED => Variant::bool(n.state & ax::S_DISABLED == 0),
@@ -1099,6 +1111,7 @@ pub fn changed(s: &Snapshot, c: Vec<Change>) {
                 _ => {}
             },
             Change::Name(..) => raise_prop(e, PR_NAME, Variant::bstr(&n.name)),
+            Change::Value(..) if n.role == Role::Heading => raise_prop(e, PR_HEADING_LEVEL, Variant::i4(HEADING_LEVEL_NONE + n.level() as i32)),
             Change::Value(..) => raise_prop(e, PR_RANGE_VALUE, Variant::r8(n.value)),
             Change::Text(..) => {
                 raise_prop(e, PR_VALUE, Variant::bstr(&n.text));
@@ -1156,6 +1169,8 @@ pub struct UiaTestElem {
     pub selected: Option<bool>,
     /// ExpandCollapse state (-1: no pattern)
     pub expand: i32,
+    /// HeadingLevel 1 ..= 9 (0: HeadingLevel_None)
+    pub heading: i32,
     /// the bounding rectangle: x, y, w, h (screen px)
     pub rect: [i32; 4],
 }
@@ -1287,6 +1302,7 @@ fn describe(el: usize, depth: u32) -> UiaTestElem {
         },
         selected: if has(30036) { Some(has(PR_SELECTED)) } else { None },
         expand: if has(30028) { prop_i(el, PR_EXPAND_STATE).unwrap_or(-1) } else { -1 },
+        heading: prop_i(el, PR_HEADING_LEVEL).map_or(0, |v| (v - HEADING_LEVEL_NONE).clamp(0, 9)),
         rect: {
             let mut r = Rect { l: 0, t: 0, r: 0, b: 0 };
             // SAFETY: IUIAutomationElement::get_CurrentBoundingRectangle(RECT*) (slot 43).

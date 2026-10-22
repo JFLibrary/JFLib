@@ -1,8 +1,9 @@
 // The accessibility tree in a real browser (web/a11y.js, lib/plat/web_a11y.rs): the ARIA
 // shadow tree of the androidGallery web build as Chromium's own accessibility tree shows it
-// (CDP Accessibility.getFullAXTree), clicks, slider values, text and selections through the
-// DOM as assistive technology does them, the DOM focus following Tab, a pointer giving the
-// keyboard back to #input, ?a11y=0. Playwright (tools/tests/playwright.mjs, PLAYWRIGHT_MODULE)
+// (CDP Accessibility.getFullAXTree; headings with their level), clicks, slider values, text
+// and selections through the DOM as assistive technology does them, the DOM focus following
+// Tab, a pointer giving the keyboard back to #input, ?a11y=0. Playwright
+// (tools/tests/playwright.mjs, PLAYWRIGHT_MODULE)
 // with chromiumOptions() (CHROME_PATH, the installed Chrome, else Playwright's Chromium), or
 // an installed browser channel such as --channel=msedge.
 //   python build_rs.py app androidGallery --target web
@@ -67,6 +68,10 @@ try {
   if(process.env.A11Y_DUMP) console.log(JSON.stringify(ax.filter(n=>!['generic','none'].includes(n.role)),null,0));
   ok(find(ax,'textbox','03  Texteingabe'),'text box named by the text above it');
   ok(ax.some(n=>n.role==='StaticText' && n.name==='Kleine Widgets.'),'labels are text');
+  const heading=find(ax,'heading','01  Interaktion');
+  ok(heading && Number(heading.props.level)===2,'a section title (ui.heading) is a heading of level 2');
+  ok(!find(ax,'heading','Kleine Widgets.'),'a text is no heading');
+  ok(await page.locator('#a11y [role=heading][aria-level="2"]').first().textContent()==='01  Interaktion','role=heading, aria-level in the shadow tree');
   ok(find(ax,'button','#0078D4'),'colour swatches');
 
   // clicks as a screen reader sends them (the overlay takes no pointer events)

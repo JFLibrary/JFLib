@@ -78,7 +78,7 @@ impl Files {
             t.step(ui);
         }
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
-        ui.text(TS_SUBTITLE, "04  Dateien & Zwischenablage");
+        ui.heading(2, TS_SUBTITLE, "04  Dateien & Zwischenablage");
         ui.box_begin(0, BOX_H | BOX_WRAP, 8);
         for (id, label, mode) in [(400, "Öffnen…", FD_OPEN), (401, "Speichern…", FD_SAVE), (402, "Ordner…", FD_FOLDER)] {
             ui.next_size(0, 44);

@@ -3,4 +3,5 @@
 # (src/unit.rs): Markdown blocks and inline parts, HTML documents, text and HTML of ranges,
 # malformed and adversarial input (nesting, runs of brackets, stars, backticks, tags, unclosed
 # constructs, mutations of the samples; each within a time limit), the Fenwick sums of 100 000
-# rows.  The whole test runs before the UI starts; the exit code is the number of failures.
+# rows, the view's accessibility tree (headings with their level).  The whole test runs before
+# the UI starts; the exit code is the number of failures.

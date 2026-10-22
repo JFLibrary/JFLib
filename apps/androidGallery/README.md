@@ -100,7 +100,9 @@ als virtuelle View eines `AccessibilityNodeProvider` dar (Klasse, Text, Zuständ
 Auswahl, Rechteck), nimmt die Aktionen von TalkBack entgegen (Klick, Fokus, Wert, Text,
 Auswahl, Explore-by-Touch) und sendet die Ereignisse; eingeschaltet wird der Spiegel mit dem
 Accessibility-Schalter des Systems (`docs/GUIDE.md`, Abschnitt 19). Im Browser derselben App
-liegt ein ARIA-Schattenbaum über dem Canvas (`web/a11y.js`).
+liegt ein ARIA-Schattenbaum über dem Canvas (`web/a11y.js`). Die Abschnittstitel („01
+Interaktion“ …) sind Überschriften (`ui.heading`, seit 22.10.2026): TalkBack und die
+Überschriften-Navigation der Screenreader im Browser springen von Abschnitt zu Abschnitt.
 Die IME-Anbindung unterstützt Composing-Text, Commit, Auswahl, umgebenden Text und
 Korrekturen. Composing-Unterstreichungen, Android-Auswahlgriffe und weitergehende
 Editor-/Tastaturvarianten sind noch nicht umgesetzt. Android zeichnet die Oberfläche
@@ -151,11 +153,13 @@ adb -s DEVICE_SERIAL shell am instrument -w -r org.jflib.gallery/.GalleryA11yIns
 ```
 
 Der Test verbindet sich über `UiAutomation` – die Client-Seite, die auch TalkBack benutzt –,
-liest Klassen, Texte, Zustände, Wertebereiche, Rechtecke und Auswahl der virtuellen Views,
-klickt, setzt Fortschritt, Text und Auswahl, verschiebt den Accessibility-Fokus und prüft die
-Ereignisse sowie Explore-by-Touch. Am 19.10.2026 auf einem x86_64-Emulator mit Android 15 /
-API 35: 30 Prüfungen bestanden; `GalleryInstrumentation` (78) weiter grün. TalkBack selbst
-war auf dem Image nicht installiert und wurde nicht ausprobiert.
+liest Klassen, Texte, Überschriften, Zustände, Wertebereiche, Rechtecke und Auswahl der
+virtuellen Views, klickt, setzt Fortschritt, Text und Auswahl, verschiebt den
+Accessibility-Fokus und prüft die Ereignisse sowie Explore-by-Touch. Am 19.10.2026 auf einem
+x86_64-Emulator mit Android 15 / API 35: 30 Prüfungen bestanden; `GalleryInstrumentation` (78)
+weiter grün. Am 22.10.2026 mit der Überschrift (`isHeading()`) 31 Prüfungen bestanden,
+`GalleryInstrumentation` (78) weiter grün. TalkBack selbst war auf dem Image nicht installiert
+und wurde nicht ausprobiert.
 
 Browser (Playwright über `PLAYWRIGHT_MODULE` oder die Node-Modulsuche; Chromium aus
 `CHROME_PATH`, sonst das installierte Chrome, sonst Playwrights Chromium, siehe
@@ -166,8 +170,9 @@ python RustLib/build_rs.py app androidGallery --target web
 node RustLib/apps/androidGallery/tests/a11y_web.mjs RustLib/build
 ```
 
-33 Prüfungen: Chromiums eigener Accessibility-Baum (DevTools-Protokoll), Klicks wie von
-einem Screenreader, Slider, Tab-Fokus, Tippen, Auswahl, Ersetzung, Zeiger, `?a11y=0`.
+36 Prüfungen (seit 22.10.2026): Chromiums eigener Accessibility-Baum (DevTools-Protokoll,
+auch die Abschnittstitel als Überschriften der Ebene 2), Klicks wie von einem Screenreader,
+Slider, Tab-Fokus, Tippen, Auswahl, Ersetzung, Zeiger, `?a11y=0`.
 
 ## Dateien, Picker und Zwischenablage prüfen
 

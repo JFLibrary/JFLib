@@ -62,7 +62,7 @@ pub const K_DIALOG: u16 = 18;
 pub const K_TITLEBAR: u16 = 19;
 pub const K_SWATCH: u16 = 20;
 pub const K_LINK: u16 = 21;
-/// a heading of a document (value: its level 1 ..= 6; md_view.rs)
+/// a heading of a document or section (value: its level, 1 the top; md_view.rs, Ui::heading)
 pub const K_HEADING: u16 = 22;
 pub const K_KIND_COUNT: u16 = 23;
 pub const SS_HOVER: u16 = 1;

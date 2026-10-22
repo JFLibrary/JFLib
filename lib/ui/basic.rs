@@ -156,6 +156,18 @@ impl Ui {
         self.sem(K_TEXT, 0, Some(s), cut);
     }
 
+    /// A section title: `text(style, s)` that screen readers know as a heading of `level`
+    /// (1 the top level ..= 9; record K_HEADING, value: the level) -- their heading navigation
+    /// finds it.
+    pub fn heading(&mut self, level: u32, style: u32, s: &str) {
+        let n = self.sems.len();
+        self.text(style, s);
+        if let Some(r) = self.sems.get_mut(n) {
+            r.kind = K_HEADING;
+            r.value = level.clamp(1, 9) as i32;
+        }
+    }
+
     // text_wrap(style, s): text with TX_WRAP: broken into lines at the width the layout
     // gives it (avail_width): after the last blank that fits, inside a word that is wider
     // than the line, and at '\n'.  Natural height = lines x line height; natural width =

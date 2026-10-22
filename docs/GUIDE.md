@@ -342,7 +342,9 @@ ui.box_end();
   `TS_TITLE`, `TS_TITLE_LARGE`, `TS_DISPLAY`; flags `TX_SECONDARY`, `TX_TERTIARY`, `TX_ACCENT`,
   `TX_WRAP` (wrap at the box width), `TX_HYPHENATE` (with `TX_WRAP`: hyphenate words that do
   not fit, section 11), `TX_ELLIPSIS` (cut with "…"; with `TX_WRAP` at the height of
-  `next_size`), `TX_CENTER`, `TX_RIGHT`.
+  `next_size`), `TX_CENTER`, `TX_RIGHT`. `heading(level, TS_* | TX_*, s)` draws the same text
+  as a section title that screen readers know as a heading of that level (1 the top; their
+  heading navigation finds it, section 19).
 * Buttons: `button`, `accent_button`, `icon_button(id, IC_*, label)`, `toggle_button(id, label,
   &mut v)`, `tool_button(id, IC_*, label, &mut sel, mine)` (tool palettes), `cmd_button(cmd, ST_*)`.
 * Modifiers for the next widget: `next_flags(ST_DISABLED | ST_SUBTLE | ST_ACCENT | ST_CHECKED |
@@ -1917,6 +1919,7 @@ the actions a screen reader can take):
 | Widget | Role | Name | State, value | Actions |
 |---|---|---|---|---|
 | `text` | label / Text | the text | | |
+| `heading`, the headings of `markdown_view` / `html_view` (`K_HEADING`) | heading / Text with HeadingLevel | the text | the level | |
 | `button`, `icon_button`, `tool_button`, `toggle_button`, `cmd_button` | push button / Button | the label (icon buttons: their tooltip label) | pressed when checked | click / Invoke |
 | `checkbox` | check box / CheckBox | the label | checked, mixed (value 2) | toggle |
 | `radio` | radio button / RadioButton | the label | checked (selected) | select |
@@ -1932,6 +1935,18 @@ the actions a screen reader can take):
 | `link` | link / Hyperlink | the label | | click |
 | colour swatches | push button / Button | `#RRGGBB` | | click |
 | titled boxes (notifications, info bars) | panel / Group | the title | | |
+
+**Headings** (`heading(level, ..)`, the headings of the document view; records `K_HEADING`
+with the level as value, `Role::Heading` with `Node::level()`) are headings on every platform,
+so heading navigation finds them (H / 1 .. 6 in the browse modes of NVDA, JAWS and Orca,
+Narrator's headings, TalkBack's heading navigation): UI Automation a Text element with
+`HeadingLevel1` .. `9` (plus AriaRole `heading` and AriaProperties `level=N`; a new level raises
+the property change), AT-SPI2 the role `heading` with the object attribute `level:N`
+(`GetAttributes`; a new level: `object:attributes-changed`), the browser `role="heading"` with
+`aria-level`, Android `setHeading(true)` (API 28 and later; API 26 / 27 the heading flag of a
+`CollectionItemInfo`, which `isHeading()` and TalkBack read there) -- Android has no heading
+level. A text box, drop-down, slider, progress bar or list without a label right after a heading
+takes its name from it, as from a text.
 
 Every node has its rectangle; disabled widgets (`ST_DISABLED`, `disabled_push`) report it and
 take no actions, and nothing behind a modal dialog can be acted on. The focus is the focused
@@ -1961,8 +1976,10 @@ if self.grid {
   another id gets a pointer click in its middle instead.
 * Name every control: icon-only buttons through their label, drawings through the label of
   their `K_CANVAS` record. Text boxes, sliders, drop-downs, progress bars and lists without a
-  label take the text record directly before them -- put `text(TS_BODY, "Name")` to the left in
-  the same row, or directly above with the same left edge.
+  label take the text (or heading) record directly before them -- put `text(TS_BODY, "Name")` to
+  the left in the same row, or directly above with the same left edge.
+* Section titles: `heading(2, TS_SUBTITLE, "Konto")` instead of `text` -- or a `K_HEADING` record
+  with the level as value for a title a widget of your own draws.
 * States the kind does not imply go into the returned record (`state |= SS_CHECKED`,
   `SS_SELECTED`, `SS_OPEN`); a slider-like widget sets `rec.min` / `rec.max` and applies
   `ui.a11y_value(id)` (a text widget `ui.a11y_text(id)`) when a screen reader sets a value.
@@ -2022,6 +2039,8 @@ web build in Chromium (Chromium's own accessibility tree through the DevTools pr
 values, Tab, typing, selections; Playwright through `tools/tests/playwright.mjs`), and the
 debug APK's `GalleryA11yInstrumentation` the Android provider through UiAutomation, the client
 side TalkBack uses (`adb shell am instrument -w -r org.jflib.gallery/.GalleryA11yInstrumentation`).
+Each of them also checks a heading and its level (the demo's `heading(2, ..)`, the gallery's
+section titles).
 
 ## 20. Secrets (passwords, tokens, keys)
 
@@ -3132,7 +3151,9 @@ self.status = ev.hover.unwrap_or_default();   // the link under the pointer
   position in DIP); per visible block a `K_HEADING` record (new kind; value: the level),
   `K_TEXT` (paragraphs, code, table cells), `K_LISTITEM` (value: the item's number),
   `K_CHECKBOX` (a task's box, checked), `K_LINK` per link, `K_IMAGE` (label: the alt text).
-  Scripts select them as `heading:"Title"`, `link:"Docs"` ...
+  Scripts select them as `heading:"Title"`, `link:"Docs"` ... Screen readers get the headings
+  as headings with their level on every platform (section 19): heading navigation jumps
+  through the document's visible blocks.
 * Robustness: malformed input never panics and takes linear time -- container nesting is capped
   at 32 (the HTML reader's at 64 open elements), the inline parser has a scan budget for link
   destinations and tags, code spans find their closing run through an index, nested images
@@ -3174,7 +3195,8 @@ self.vl.insert(0, n);
 * The document view scrolls its blocks with the same height cache (`Rows`).
 
 Tests: `apps/mdviewtest` (`--test unit`: the parser -- blocks, inline parts, HTML, text and HTML
-of ranges -- adversarial input with time limits and the list's height cache;
+of ranges -- adversarial input with time limits, the list's height cache and the headings in
+the accessibility tree;
 `doc_shots.uis` light / dark / high contrast / HTML / Hebrew, `doc_rtl.uis` (mirrored window),
 `doc_scale.uis` (150 % text), `doc_links.uis`, `doc_select.uis`, `doc_keys.uis` (also 50 000
 blocks), `vlist.uis` (100 000 rows); all with `--verify-dirty`).

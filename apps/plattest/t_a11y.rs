@@ -1,20 +1,21 @@
 // t_a11y -- the accessibility tree for screen readers (lib/ui/a11y.rs, lib/plat/a11y.rs)
 //
 //   plattest --test a11y       (headless) a demo window as a ui::Runtime: the tree of its
-//                              records (roles, names from labels and from the text before a
-//                              slider / text box, states, values, tab strip and list
-//                              containers, the focus), then actions as a screen reader asks
-//                              them through plat::a11y::request: click, toggle, select, set a
-//                              slider and a text, focus, a disabled button, the pointer click
-//                              for a widget whose record id differs from its hit box; the
-//                              changes between two trees (plat::a11y::diff)
+//                              records (roles, a heading and its level, names from labels and
+//                              from the text before a slider / text box, states, values, tab
+//                              strip and list containers, the focus), then actions as a screen
+//                              reader asks them through plat::a11y::request: click, toggle,
+//                              select, set a slider and a text, focus, a disabled button, the
+//                              pointer click for a widget whose record id differs from its hit
+//                              box; the changes between two trees (plat::a11y::diff)
 //   plattest --test a11y-bus   (Linux; tools/platshared/atspi_bus.py starts it on a fake session
 //                              and accessibility bus) the demo in a real window with the AT-SPI2
 //                              bridge; the fake screen reader reads the tree and acts, then
 //                              presses "Beenden": the app state is checked at the end
 //   plattest --test uia        (Windows, by hand: a window appears for a few seconds) the demo
 //                              with the UI Automation providers; a thread of the test reads the
-//                              tree through IUIAutomation (plat::uia_test_*), invokes, toggles,
+//                              tree through IUIAutomation (plat::uia_test_*: control types,
+//                              patterns, the heading's HeadingLevel), invokes, toggles,
 //                              sets values, follows the caret, then presses "Beenden"
 //   plattest --test caret      (Windows, by hand) only the caret as screen magnifiers see it:
 //                              the hidden system caret (GetGUIThreadInfo) and TextPattern2's
@@ -97,6 +98,7 @@ impl App for Demo {
     }
 
     fn frame(&mut self, ui: &mut Ui) {
+        ui.heading(2, ui::TS_SUBTITLE, "Einstellungen");
         ui.text(ui::TS_BODY, &format!("Klicks: {}", self.clicks));
         if ui.button(ID_BTN, "Drücken") & ui::EV_ACT != 0 {
             self.clicks += 1;
@@ -186,6 +188,20 @@ pub fn t_a11y(t: &mut T) {
     t.check(w.active, "a11y: the window is active (headless)");
     let label = find(&s, Role::Label, "Klicks: 0");
     t.check(label.is_some(), "a11y: a text record is a label with its text");
+    let head = find(&s, Role::Heading, "Einstellungen");
+    t.check(
+        head.is_some_and(|n| n.level() == 2 && n.value == 2.0 && n.actions == 0 && n.state & ax::S_FOCUSABLE == 0),
+        "a11y: ui.heading is a heading of level 2, no control",
+    );
+    t.check(label.is_some_and(|n| n.level() == 0), "a11y: a label has no heading level");
+    // a heading whose level changes: a value change (the bridges report the new level)
+    if let Some(h) = head {
+        let mut s2 = s.clone();
+        if let Some(n) = s2.wins[0].nodes.iter_mut().find(|n| n.key == h.key) {
+            n.value = 3.0;
+        }
+        t.check(ax::diff(&s, &s2) == alloc::vec![Change::Value(0, h.key)], "a11y: diff: a heading's new level is a value change");
+    }
     let btn = find(&s, Role::Button, "Drücken");
     t.check(btn.is_some_and(|n| n.actions & ax::A_CLICK != 0 && n.state & ax::S_FOCUSABLE != 0), "a11y: a button can be clicked and focused");
     let off = find(&s, Role::Button, "Gesperrt");
@@ -223,6 +239,7 @@ pub fn t_a11y(t: &mut T) {
         s.wins[0].nodes.iter().all(|n| n.parent == ax::NONE || (n.parent as usize) < s.wins[0].nodes.len()),
         "a11y: every parent exists",
     );
+    t.check(find(&s, Role::Button, "Beenden").is_some_and(|n| s.wins[0].on_screen(n)), "a11y: the demo fits its window");
 
     // actions
     let before = r.tree();
@@ -414,6 +431,10 @@ fn t_wire(t: &mut T, r: &mut Run, chk: Option<&Node>) {
         }
         (p == b.len()).then_some((flags, wins, events))
     }
+    t.check(
+        Role::Dialog as u8 == 20 && Role::Heading as u8 == 21,
+        "a11y: wire: the role numbers web/a11y.js and GalleryAccessibility.java read (Dialog 20, Heading 21)",
+    );
     let place = |w: &ax::WinTree| [0, 0, w.size[0], w.size[1]];
     let mut m = Mirror::new();
     let s1 = Arc::new(r.tree());
@@ -612,7 +633,8 @@ mod uia {
             return;
         }
         let t = &tree;
-        record(find(t, "Klicks: 0", CT_TEXT).is_some(), "uia: a label is a Text element");
+        record(find(t, "Klicks: 0", CT_TEXT).is_some_and(|e| e.heading == 0), "uia: a label is a Text element, no heading");
+        record(find(t, "Einstellungen", CT_TEXT).is_some_and(|e| e.heading == 2), "uia: a heading is a Text element with HeadingLevel2");
         record(find(t, "Drücken", CT_BUTTON).is_some_and(|e| e.enabled), "uia: a button, enabled");
         record(find(t, "Gesperrt", CT_BUTTON).is_some_and(|e| !e.enabled), "uia: a disabled button");
         record(find(t, "Option", CT_CHECKBOX).is_some_and(|e| e.toggle == 0), "uia: check box, Toggle off");

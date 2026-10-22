@@ -35,7 +35,7 @@ impl Secrets {
             }
         }
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
-        ui.text(TS_SUBTITLE, "05  Sicherer Speicher");
+        ui.heading(2, TS_SUBTITLE, "05  Sicherer Speicher");
         ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, if self.available {
             "Der Wert liegt verschlüsselt im Geheimnisspeicher des Systems."
         } else {

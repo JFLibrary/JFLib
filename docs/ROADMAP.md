@@ -735,15 +735,18 @@ Fensterrand hinaus.
   darüber dürfen wachsen, eingefügt oder entfernt werden, ohne dass die Ansicht springt),
   Tastatur, Auswahl, `reveal`, Bildlaufleiste und weiches Mausrad (100 000 Zeilen: rund 1 ms
   pro Bild); der Viewer scrollt seine Blöcke mit demselben Höhen-Cache.
-  * Getestet mit `apps/mdviewtest` (`--test unit`: 148 Prüfungen, darunter böswillige Eingaben
-    mit Zeitgrenzen und die Höhen von 100 000 Zeilen; `doc_shots.uis` hell / dunkel / hoher
+  * Getestet mit `apps/mdviewtest` (`--test unit`: 152 Prüfungen, darunter böswillige Eingaben
+    mit Zeitgrenzen, die Höhen von 100 000 Zeilen und die Überschriften im
+    Barrierefreiheits-Baum; `doc_shots.uis` hell / dunkel / hoher
     Kontrast / HTML / Hebräisch, `doc_rtl.uis`, `doc_scale.uis` (150 %), `doc_links.uis`,
     `doc_select.uis`, `doc_keys.uis` (auch 50 000 Blöcke), `vlist.uis` (100 000 Zeilen); alle mit
     `--verify-dirty`, Windows und Linux).
   * Offen: Suche im Dokument, Fußnoten und Definitionslisten, HTML-Blöcke nur bis zur nächsten
     Leerzeile, Bidi-Neuordnung über Formatwechsel hinweg (je Lauf), synthetischer Fettdruck für
-    Ersatzschriften in geformten Läufen, die Überschriftenebene erreicht die Plattform-Brücken
-    (UIA / AT-SPI) noch nicht (dort eine Beschriftung), Bilder aus dem Netz und `data:`-URIs.
+    Ersatzschriften in geformten Läufen, Bilder aus dem Netz und `data:`-URIs; Screenreader
+    finden nur die Überschriften der sichtbaren Blöcke (nur sie haben Records).
+  * Seit 2026-10-22 kommen die Überschriften als echte Überschriften mit Ebene bei den
+    Screenreadern an (UIA, AT-SPI, Web, Android; Abschnitt 11), vorher als Beschriftung.
 - **P3** · *teilweise* · Mehrfarbige Vektor-Symbole aus SVG (2026-10-19,
   [`ui/symbol.rs`](../lib/ui/symbol.rs), [`tools/vsym.py`](../tools/vsym.py)): handgezeichnete
   SVG-Dateien (Pfade, Grundformen, Gruppen, Transformationen) werden zu Pfad-Ebenen mit
@@ -1073,10 +1076,11 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   libatspi), `plattest --test uia` (IUIAutomation, von Hand),
   `apps/androidGallery/tests/a11y_web.mjs` (Chrome headless über das lokale Playwright:
   Chromiums eigener Accessibility-Baum per DevTools-Protokoll, Klicks, Slider, Tab-Fokus,
-  Tippen, Auswahl, Ersetzung, Zeiger, `?a11y=0`; 33 Prüfungen) und
-  `GalleryA11yInstrumentation` (x86_64-Emulator, Android 15 / API 35: über UiAutomation, die
-  Client-Seite von TalkBack – Baum, Aktionen, Ereignisse, Accessibility-Fokus, Hover mit
-  Touch-Exploration; 30 Prüfungen; dazu `uiautomator dump`). Von Hand geprüft
+  Tippen, Auswahl, Ersetzung, Zeiger, `?a11y=0`; 33 Prüfungen, seit 2026-10-22 mit
+  Überschriften 36) und `GalleryA11yInstrumentation` (x86_64-Emulator, Android 15 / API 35:
+  über UiAutomation, die Client-Seite von TalkBack – Baum, Aktionen, Ereignisse,
+  Accessibility-Fokus, Hover mit Touch-Exploration; 30 Prüfungen, seit 2026-10-22 31; dazu
+  `uiautomator dump`). Von Hand geprüft
   (2026-10-19): der Schattenbaum im eingebauten Browser der Desktop-App (Baum, Klicks,
   Slider, Fokus, Text). Offen: mit echten Screenreadern (Orca, Narrator, NVDA, JAWS,
   VoiceOver, TalkBack) noch nicht ausprobiert – auf dem vorhandenen Emulator-Image ist
@@ -1085,6 +1089,29 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   annimmt) ungetestet; IME-Kandidatenfenster liegt bei Tastaturfokus im Schatten-Textfeld nur
   ungefähr am Caret (Zeilenhöhe übernommen, Spalte nicht); Live-Regionen für Meldungen gibt es
   nicht (der Baum kennt keine).
+- **P2** · *erledigt* · Überschriften (2026-10-22): `K_HEADING`-Records (die Überschriften des
+  Markdown-/HTML-Betrachters, neu `ui.heading(level, style, text)` für Abschnittstitel) werden
+  `Role::Heading` mit Ebene (`Node::value`, `Node::level()`; vorher eine Beschriftung), damit
+  die Überschriften-Navigation der Screenreader (H / 1–6 in NVDA, JAWS, Orca, Narrator,
+  TalkBack) sie findet. UIA: Steuerelementtyp Text mit `HeadingLevel1`–`9`, dazu AriaRole
+  `heading` und AriaProperties `level=N`, Eigenschaftsereignis bei neuer Ebene; AT-SPI2: Rolle
+  `heading` mit Objektattribut `level:N` (`GetAttributes`, `object:attributes-changed`); Web:
+  `role="heading"` mit `aria-level` im Schattenbaum; Android: `setHeading(true)` ab API 28,
+  darunter (API 26 / 27) das Heading-Flag einer `CollectionItemInfo` (Android kennt keine
+  Ebene). Ein Textfeld, Slider usw. direkt unter einer Überschrift nimmt wie bei einem Text
+  deren Namen. Die Abschnittstitel der androidGallery sind Überschriften. Tests:
+  `plattest --test a11y` (Rolle, Ebene, Diff, Rollennummer im Update-Format), `--test uia`
+  (HeadingLevel über IUIAutomation), `atspi_bus.py` (Fake-Bus und libatspi: Rolle, `level:2`),
+  `a11y_web.mjs` (Chromiums Baum: heading, level 2), `GalleryA11yInstrumentation`
+  (`isHeading()`), `mdviewtest --test unit` (die Überschriften des Betrachters im Baum); am
+  2026-10-22 alle grün (`--test a11y` 56, `--test uia` 50, `atspi_bus.py --real` 78,
+  `a11y_web.mjs` 36, `GalleryA11yInstrumentation` 31 auf dem API-35-Emulator, `--test unit`
+  152). Offen:
+  Überschriften im Dokument des Rich-Text-Editors (ein Textfeld: bräuchte Text-Attribute, UIA
+  `StyleId_Heading1`… / AT-SPI-Textattribute), `nav_section` (Gruppentitel der Navigation, als
+  Text gelassen: Skripte wählen ihn als `text:`), die Ebene unter Android (keine API) und der
+  API-26-Weg (nur auf einem API-35-Emulator getestet); mit echten Screenreadern nicht
+  ausprobiert.
 - **P1** · *erledigt* · Theme mit hohem Kontrast ([`ui/theme.rs`](../lib/ui/theme.rs)
   `contrast_tokens`): alle Tokens aus dem Kontrastschema – unter Windows die Systemfarben,
   sonst Weiß auf Schwarz bzw. Schwarz auf Weiß –, deckende Flächen, Ränder in Textfarbe,

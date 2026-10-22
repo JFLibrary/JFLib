@@ -21,6 +21,7 @@ import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction;
+import android.view.accessibility.AccessibilityNodeInfo.CollectionItemInfo;
 import android.view.accessibility.AccessibilityNodeInfo.RangeInfo;
 import android.view.accessibility.AccessibilityNodeProvider;
 import java.nio.ByteBuffer;
@@ -35,7 +36,7 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
     // plat::a11y::Role in declaration order
     static final int GROUP = 0, LABEL = 1, BUTTON = 2, CHECKBOX = 3, RADIO = 4, SWITCH = 5, SLIDER = 6,
         PROGRESS = 7, TEXTBOX = 8, LINK = 9, LIST = 10, LISTITEM = 11, MENUBAR = 12, MENU = 13, MENUITEM = 14,
-        TABLIST = 15, TAB = 16, COMBO = 17, IMAGE = 18, CANVAS = 19, DIALOG = 20, WINDOW = -1;
+        TABLIST = 15, TAB = 16, COMBO = 17, IMAGE = 18, CANVAS = 19, DIALOG = 20, HEADING = 21, WINDOW = -1;
     // plat::a11y::S_* and A_*
     static final int S_FOCUSED = 1, S_FOCUSABLE = 2, S_DISABLED = 4, S_CHECKED = 8, S_MIXED = 16, S_SELECTED = 32,
         S_EXPANDED = 64, S_PRESSED = 128, S_MULTILINE = 256, S_PROTECTED = 512, S_READONLY = 1024;
@@ -311,7 +312,7 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
 
     private static String className(Node n) {
         switch (n.role) {
-            case LABEL: case LINK: case LISTITEM: case MENUITEM: case TAB: return "android.widget.TextView";
+            case LABEL: case HEADING: case LINK: case LISTITEM: case MENUITEM: case TAB: return "android.widget.TextView";
             case BUTTON: return (n.state & S_PRESSED) != 0 ? "android.widget.ToggleButton" : "android.widget.Button";
             case CHECKBOX: return "android.widget.CheckBox";
             case RADIO: return "android.widget.RadioButton";
@@ -420,6 +421,10 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
                 info.setText(s);
                 break;
             }
+            case HEADING:
+                info.setText(n.name);
+                setHeading(info);
+                break;
             default:
                 if (n.role != MENU || n.key >= 0) info.setText(n.name);
                 else if (!n.name.isEmpty()) info.setContentDescription(n.name);
@@ -446,6 +451,14 @@ final class GalleryAccessibility extends AccessibilityNodeProvider {
     }
     @SuppressWarnings("deprecation")
     private static void setBoundsInParent(AccessibilityNodeInfo info, Rect r) { info.setBoundsInParent(r); }
+    // a heading (TalkBack: "heading", its heading navigation; Android has no level): API 28+
+    // setHeading; API 26 / 27 the heading flag of a CollectionItemInfo, which isHeading() (and
+    // androidx's AccessibilityNodeInfoCompat, which TalkBack uses) reads there as well
+    @SuppressWarnings("deprecation")
+    private static void setHeading(AccessibilityNodeInfo info) {
+        if (Build.VERSION.SDK_INT >= 28) info.setHeading(true);
+        else info.setCollectionItemInfo(CollectionItemInfo.obtain(0, 1, 0, 1, true));
+    }
     private void addAccessibilityFocus(AccessibilityNodeInfo info, int vid) {
         info.setAccessibilityFocused(focusVid == vid);
         info.addAction(focusVid == vid ? AccessibilityAction.ACTION_CLEAR_ACCESSIBILITY_FOCUS : AccessibilityAction.ACTION_ACCESSIBILITY_FOCUS);

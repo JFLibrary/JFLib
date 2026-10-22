@@ -7,7 +7,8 @@
 // headings, lists, quotes, code, tables, images, rules), text and HTML of ranges; then
 // malformed and adversarial input (deep nesting, runs of brackets, stars, backticks, tags,
 // unclosed constructs, mutations of the samples) that must neither panic nor take more than
-// linear time; the list's heights (Fenwick sums, positions, insertions above the anchor).
+// linear time; the list's heights (Fenwick sums, positions, insertions above the anchor); the
+// view's accessibility tree in a headless runtime (headings with their level).
 // Prints FAIL lines and a summary; the exit code is the number of failures.
 
 use alloc::format;
@@ -445,9 +446,41 @@ fn heights(t: &mut T) {
     t.eq(st.first_visible().0, n - 1, "beyond the end: the last row");
 }
 
+// the view in a headless runtime as screen readers get it (ui/a11y.rs): headings with their
+// level inside the document's group, the paragraph a label, the link a link
+fn a11y(t: &mut T) {
+    use plat::a11y::Role;
+    t.group = "a11y";
+    struct View(MdViewState);
+    impl App for View {
+        fn frame(&mut self, ui: &mut Ui) {
+            ui.next_size(-1, -1);
+            ui.markdown_view(1, &mut self.0, "# Eins\n\nEin [Link](https://example.org).\n\n### Drei\n\n<h5>Fünf</h5>", MV_NO_FRAME);
+        }
+    }
+    const D: AppDesc = AppDesc { title: "a11y", w: 480, h: 320, ..AppDesc::NONE };
+    let Ok(mut rt) = ui::Runtime::new(&D, View(MdViewState::new()), &style::STYLE) else {
+        t.check(false, "the view starts headless");
+        return;
+    };
+    rt.step(50, &[]);
+    let s = rt.ui().a11y_tree();
+    let Some(w) = s.wins.first() else { return t.check(false, "a window") };
+    let heads: Vec<(String, u32)> = w.nodes.iter().filter(|n| n.role == Role::Heading).map(|n| (n.name.clone(), n.level())).collect();
+    t.eq(heads, alloc::vec![(String::from("Eins"), 1), (String::from("Drei"), 3), (String::from("Fünf"), 5)], "headings and their levels");
+    let doc = w.nodes.iter().position(|n| n.role == Role::Group && n.name == "Dokument");
+    t.check(
+        doc.is_some_and(|d| w.nodes.iter().filter(|n| n.role == Role::Heading).all(|n| n.parent == d as u32)),
+        "the headings lie in the document's group",
+    );
+    t.check(w.nodes.iter().any(|n| n.role == Role::Label && n.name == "Ein Link."), "a paragraph is a label");
+    t.check(w.nodes.iter().any(|n| n.role == Role::Link && n.name == "Link"), "a link");
+}
+
 pub fn run() -> i32 {
     let mut t = T { group: "", ok: 0, failed: 0 };
     let t0 = plat::time_us();
+    a11y(&mut t);
     blocks_md(&mut t);
     lists(&mut t);
     inlines(&mut t);

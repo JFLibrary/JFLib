@@ -18,9 +18,9 @@
 //         key, u32 parent (its position in this list; UNCHANGED: a top-level node) --
 //         the nodes of the window that are not in the list are gone
 //     u32 node count, then the nodes that are new or changed: key, u8 role (Role in
-//         declaration order: Group 0 .. Dialog 20), u32 state (S_*), u32 actions (A_*),
-//         i32 x, y, w, h, str name, str text, i32 caret, i32 anchor, i32 caret x, y, w, h,
-//         f64 value, min, max, step
+//         declaration order: Group 0 .. Dialog 20, Heading 21), u32 state (S_*), u32 actions
+//         (A_*), i32 x, y, w, h, str name, str text, i32 caret, i32 anchor, i32 caret x, y, w,
+//         h, f64 value (headings: the level), min, max, step
 //   windows that are not listed are gone
 //   u32 number of events, each: u8 kind (E_*), u8 window, key, i32 a, i32 b, and for E_TEXT
 //     str old text -- the events of plat::a11y::diff without Added / Removed (the order
