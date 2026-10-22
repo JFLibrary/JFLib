@@ -789,6 +789,7 @@ fs.user                              # the files the user picks (file dialog, dr
 # print                              print (plat::print)
 # secrets                            passwords and tokens in the system's store (plat::secret)
 # autostart                          start at login (plat::autostart_set)
+# audio.output                       play sound (plat::audio, ui.beep; Flatpak: --socket=pulseaudio)
 # ask fs.read $PICTURES/** "Bilder öffnen"   ask the user at the first access instead
 """
 

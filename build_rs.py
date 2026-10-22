@@ -29,7 +29,12 @@ dependencies are built through Cargo and linked as static .rlib files.
                                                                 the Markdown -> build/site/ (tools/site.py); --check
                                                                 builds into a temporary folder and checks links,
                                                                 anchors, images and the HTML (the suite runs it)
-  python build_rs.py ide                                     write rust-project.json
+  python build_rs.py i18n [APP|lib] [--update] [--unused]    the translatable texts against the catalogues
+                                                                (tools/i18n_check.py): missing, untranslated, unused,
+                                                                placeholders and plural forms; --update adds the
+                                                                missing rows (untranslated); --check: the suite's
+                                                                check (errors only, the gaps are reported)
+  python build_rs.py ide                                    write rust-project.json
   python build_rs.py plugin [NAME]                           plugins/NAME -> <out>/<t>/plugins/NAME.dll|.so
                                                                 (PaintCraft plugins: section "rust-plugin")
   options: --target win|linux|both (default both; run: win), --release, --out DIR, -j N,
@@ -405,9 +410,9 @@ def app_targets(name):
 # do everything (as before).  "ask KEY ARGS [\"reason\"]" asks the user at the first access;
 # agent.confirm / agent.deny name agent actions (patterns) the user confirms / an agent may not run.
 PERM_KEYS_ARGS = ("fs.read", "fs.write", "process", "plugins", "url", "net.connect", "net.listen")
-PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart")
+PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart", "audio.output")
 PERM_KEYS_AGENT = ("agent.confirm", "agent.deny")                  # agent actions: confirmed / refused
-PERM_ASKABLE = PERM_KEYS_ARGS + ("print", "secrets", "autostart")   # "ask KEY ARGS [\"reason\"]"
+PERM_ASKABLE = PERM_KEYS_ARGS + PERM_KEYS_FLAG[1:]                  # "ask KEY ARGS [\"reason\"]"
 PERM_VARS = ("CONFIG", "TEMP", "HOME", "EXE", "FONTS", "APPCONFIG", "APPDATA", "APPCACHE", "APPLOG",
              "DESKTOP", "DOCUMENTS", "DOWNLOADS", "PICTURES", "MUSIC", "VIDEOS")
 
@@ -554,6 +559,9 @@ PERM_CASES = [
     ("agent.deny", "needs at least one action name"),
     ('ask print "a\x07b"', "no control characters"),
     ("fs.read $PLUGIN/x", "unknown variable $PLUGIN"),
+    ('audio.output\nask audio.output "Klänge"', None),
+    ("audio.output on", "audio.output takes no arguments"),
+    ("ask audio.input", "audio.input cannot be asked for"),
 ]
 
 
@@ -1350,6 +1358,13 @@ def run_tests(builders, out, quick):
     print(r.stdout.strip() + (("\n" + r.stderr.strip()) if r.returncode and r.stderr.strip() else ""))
     if r.returncode:
         fails.append("tools/pkg_check.py --quick")
+    # the catalogues (tools/i18n_check.py --check): errors only (placeholders, plural forms,
+    # broken rows; the apps whose catalogues are complete stay so); the other gaps are reported
+    r = subprocess.run([sys.executable, str(RS / "tools" / "i18n_check.py"), "--check"], cwd=ROOT, capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+    print((r.stdout.strip() + ("\n" + r.stderr.strip() if r.stderr.strip() else "")).strip())
+    if r.returncode:
+        fails.append("tools/i18n_check.py --check")
     # the website (tools/site.py --check): every page, internal link, anchor and image, the HTML, two
     # builds byte-identical; a temporary folder below build/
     r = subprocess.run([sys.executable, str(RS / "tools" / "site.py"), "--check", "--summary"], cwd=ROOT,
@@ -2015,7 +2030,7 @@ def main():
         argv, extra = argv[:i], argv[i + 1:]
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["lib", "app", "all", "run", "test", "check", "ide", "plugin",
-                                    "new", "api-diff", "changelog", "release", "site"])
+                                    "new", "api-diff", "changelog", "release", "site", "i18n"])
     ap.add_argument("name", nargs="?")
     ap.add_argument("--target", choices=["win", "linux", "both", "web", "all", "android"])
     ap.add_argument("--android-abi", choices=["arm64-v8a", "x86_64"], default="arm64-v8a",
@@ -2043,7 +2058,9 @@ def main():
     ap.add_argument("--area", help="changelog: the part the entry is about (ui, plat, build ...)")
     ap.add_argument("--date", help="release: the release date (default today)")
     ap.add_argument("--force", action="store_true", help="release: also when the API changes need a larger step")
-    ap.add_argument("--check", action="store_true", help="site: build into a temporary folder and check it")
+    ap.add_argument("--check", action="store_true", help="site: build into a temporary folder and check it; i18n: errors only")
+    ap.add_argument("--update", action="store_true", help="i18n: add the missing texts to the app's catalogue (untranslated)")
+    ap.add_argument("--unused", action="store_true", help="i18n: list the unused rows of every app")
     a = ap.parse_args(argv)
     if a.cmd == "ide":
         write_ide()
@@ -2052,6 +2069,13 @@ def main():
         return subprocess.run([sys.executable, str(ROOT / "tools" / "site.py")]
                               + (["--out", str((ROOT / a.out).resolve())] if a.out else [])
                               + (["--check"] if a.check else []), cwd=ROOT).returncode
+    if a.cmd == "i18n":                             # tools/i18n_check.py
+        if a.update and not a.name:
+            print("i18n: --update needs the app (python build_rs.py i18n PaintCraft --update)")
+            return 1
+        return subprocess.run([sys.executable, str(ROOT / "tools" / "i18n_check.py")] + ([a.name] if a.name else [])
+                              + [f for f, on in (("--update", a.update), ("--check", a.check), ("--unused", a.unused)) if on],
+                              cwd=ROOT).returncode
     if a.cmd in ("new", "api-diff", "changelog", "release"):
         if a.cmd == "new" and not a.name:
             print("new: the name is missing (python build_rs.py new NAME [--kind window|console|tool|service])")

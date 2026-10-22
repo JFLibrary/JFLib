@@ -1,7 +1,8 @@
+# languages: de en fr (PaintCraft reads this catalogue itself: preferences/localization.rs)
 &Datei	&File	&Fichier
 &Bearbeiten	&Edit	&Édition
 &Ansicht	&View	&Affichage
-&Bild	&Image	&Image
+B&ild	&Image	&Image
 &Ebenen	&Layers	&Calques
 &Korrekturen	&Adjustments	&Réglages
 E&ffekte	E&ffects	E&ffets

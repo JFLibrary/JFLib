@@ -41,7 +41,10 @@ perm expect none
 expect text:"Bis zum Programmende erlaubt" exists
 expect text:"Bis zum Programmende abgelehnt" exists
 expect text:"Nie erlaubt" exists
-expect text:"Wird beim nächsten Zugriff gefragt" exists
+# "Wird beim nächsten Zugriff gefragt" twice: the worker's folder and the sounds (sound.uis)
+perm expect fs.write $TEMP/permprompt-bg/** unanswered
+perm expect audio.output unanswered
+expect "Zurücksetzen: audio.output" disabled
 expect "Zurücksetzen: fs.write $TEMP/permprompt-bg/**" disabled
 shot build/permprompt_page.png
 # revoked: asked again; Esc refuses

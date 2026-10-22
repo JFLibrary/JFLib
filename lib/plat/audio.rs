@@ -50,6 +50,11 @@
 // are on), Android the notification sound and ToneGenerator beeps, the browser short generated
 // tones (as Linux without a theme).  jfgui_AUDIO_DRYRUN=1 / set_dry_run: sound() only prints
 // "sound: NAME".
+//
+// Permissions: an app with a manifest needs `audio.output` (policy.rs, docs/PERMISSIONS.md) for
+// every sound: open / open_fill / play / play_file give AudioError::Denied, sound() false
+// (also in a dry run), available() false; the refusal is recorded once per run as
+// "PERMDENY audio.output".
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -93,6 +98,8 @@ pub enum AudioError {
     Io,
     /// the system refused (its code: an HRESULT, a PulseAudio error, an AAudio result)
     Failed(i32),
+    /// the app's permissions lack `audio.output`
+    Denied,
 }
 
 impl core::fmt::Display for AudioError {
@@ -103,6 +110,7 @@ impl core::fmt::Display for AudioError {
             AudioError::Format => f.write_str("not a readable sound file"),
             AudioError::Io => f.write_str("sound file not readable"),
             AudioError::Failed(c) => write!(f, "audio failed ({c:#x})"),
+            AudioError::Denied => f.write_str("sound output not permitted (audio.output)"),
         }
     }
 }
@@ -361,6 +369,9 @@ impl Stream {
     fn make(cfg: &Config, fill: Option<FillFn>) -> Result<Stream, AudioError> {
         if !(8000..=192_000).contains(&cfg.rate) || !(1..=8).contains(&cfg.channels) {
             return Err(AudioError::Invalid);
+        }
+        if !crate::policy::audio_allowed() {
+            return Err(AudioError::Denied);
         }
         let lat = cfg.latency_ms.clamp(10, 1000);
         let push = fill.is_none();
@@ -774,8 +785,11 @@ fn mix_fill(shared: Arc<MixShared>) -> impl FnMut(&mut [f32]) -> bool + Send {
 }
 
 /// play a sound once, mixed with the other sounds of play() (dropping the Voice lets it play
-/// on) -> Err(Unavailable) without an output
+/// on) -> Err(Unavailable) without an output, Err(Denied) without `audio.output`
 pub fn play(s: &Sound) -> Result<Voice, AudioError> {
+    if !crate::policy::audio_allowed() {
+        return Err(AudioError::Denied); // also while the mixer of an earlier sound plays on
+    }
     let ctl = Arc::new(VoiceCtl { stop: AtomicBool::new(false), done: AtomicBool::new(false), vol: AtomicU32::new(1.0f32.to_bits()) });
     let rs = (s.rate != MIX_RATE).then(|| Resampler::new(s.rate, MIX_RATE, s.channels as usize));
     let mut p = Some(Playing { sound: s.clone(), pos: 0, rs, ctl: ctl.clone(), tmp: Vec::new() });
@@ -804,8 +818,11 @@ pub fn play(s: &Sound) -> Result<Voice, AudioError> {
     Ok(Voice { ctl })
 }
 
-/// play a WAV or Ogg Vorbis file once (see play)
+/// play a WAV or Ogg Vorbis file once (see play; without `audio.output` the file is not read)
 pub fn play_file(path: &str) -> Result<Voice, AudioError> {
+    if !crate::policy::audio_allowed() {
+        return Err(AudioError::Denied);
+    }
     play(&Sound::load(path)?)
 }
 
@@ -837,9 +854,9 @@ pub fn sound_name(kind: u32) -> &'static str {
 }
 
 /// the system's sound for an event (SOUND_*) -> false: nothing played (unknown kind, sounds
-/// switched off by the system, no output)
+/// switched off by the system, no output, no `audio.output`)
 pub fn sound(kind: u32) -> bool {
-    if kind > SOUND_NOTIFY {
+    if kind > SOUND_NOTIFY || !crate::policy::audio_allowed() {
         return false;
     }
     if dry_run() {
@@ -858,9 +875,10 @@ pub fn dialog_sounds() -> bool {
     native::dialog_sounds()
 }
 
-/// an output device / sound service exists here (a quick probe)
+/// an output device / sound service exists here (a quick probe; false without `audio.output`,
+/// nothing recorded)
 pub fn available() -> bool {
-    native::available()
+    crate::policy::audio_granted() && native::available()
 }
 
 // the generated sound of a kind (browser; Linux without a sound theme)

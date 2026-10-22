@@ -3,5 +3,6 @@ ask fs.write $TEMP/permprompt-ask/**   "Briefe speichern"         # the UI threa
 ask fs.write $TEMP/permprompt-bg/**    "Im Hintergrund sichern"   # a worker thread writes here
 ask url mailto                         "Eine Mail an den Support schreiben"
 ask print
+ask audio.output                       "Hinweistöne"              # ui.beep asks; the dialog's sound never does
 agent.confirm doc.save                 # the user confirms it for an agent
 agent.deny doc.wipe                    # never for an agent
