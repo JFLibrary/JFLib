@@ -42,6 +42,10 @@ mod windows;
 pub use windows::*;
 #[path = "web_a11y.rs"]
 pub(crate) mod a11y_host;
+// screen.rs: the host's monitors (jfgui_screens), the browser's EyeDropper (jfgui_color)
+#[path = "web_screen.rs"]
+pub(crate) mod web_screen;
+pub use web_screen::{REQUEST_PICK_COLOR, jfgui_color, jfgui_screens};
 #[cfg(target_os = "android")]
 #[path = "android_ime.rs"]
 mod android_ime;
@@ -912,6 +916,7 @@ pub extern "C" fn jfgui_capabilities(bits: u32) {
     let allowed = crate::CAP_PERSISTENT_STORAGE | crate::CAP_CLIPBOARD_TEXT;
     CAP_EXTRA.store(bits & allowed as u32, Ordering::Relaxed);
     HANDLES.store(bits & HOST_HANDLES != 0, Ordering::Relaxed);
+    web_screen::set_eyedropper(bits & web_screen::HOST_EYEDROPPER != 0);
 }
 /// Refresh UTC calendar fields, validated before replacing the last host value.
 #[unsafe(no_mangle)]

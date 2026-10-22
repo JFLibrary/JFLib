@@ -350,8 +350,50 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   Kategorie „Zuletzt verwendet“ (§2). Es fehlen: eigene Kategorien in der Sprungliste
   (`AppendCategory`), Vorschau-Schaltflächen
   (`ThumbBarAddButtons`), Quicklists über dbusmenu unter Linux.
-- **P3** · *fehlt* · Globale Tastenkürzel; Screenshot- und Farbwähler-Portal (Pipette
-  außerhalb des Fensters); öffentliche Monitor-API (Liste, DPI, Arbeitsbereich).
+- **P3** · *erledigt* · Monitore, globale Tastenkürzel, Farbe vom Bildschirm, Bildschirmfotos
+  ([`plat/screen.rs`](../lib/plat/screen.rs), [`plat/hotkey.rs`](../lib/plat/hotkey.rs),
+  [`ui/screen.rs`](../lib/ui/screen.rs), seit 2026-10-22; GUIDE.md, Abschnitt 21):
+  `ui.monitors()` / `plat::monitors()` mit Name, Rechteck, Arbeitsbereich, DPI,
+  Bildwiederholrate, primär und einer stabilen ID; Änderungen kommen als `UIC_SETTINGS` mit
+  `SET_MONITORS`. Windows: `EnumDisplayMonitors`, `GetMonitorInfoW`, `GetDpiForMonitor`,
+  `EnumDisplaySettingsW`, `WM_DISPLAYCHANGE` und geänderter Arbeitsbereich; X11: RandR 1.5
+  (`GetMonitors`, die Wiederholrate aus dem Modus der CRTC), `_NET_WORKAREA`, RandR-Ereignisse;
+  Wayland: `wl_output` mit `xdg-output` (logische Lage und Größe, DPI auch bei gebrochener
+  Skalierung); Browser: `window.screen`, alle Bildschirme über `getScreenDetails`, wenn die
+  Seite es schon darf (fragt nie selbst); Android: die Anzeigen des `DisplayManager`. Globale
+  Tastenkürzel `ui.hotkey_register(id, "Ctrl+Alt+K", Beschreibung)` → `UIC_HOTKEY` (Recht
+  `input.global`): Windows `RegisterHotKey` (`MOD_NOREPEAT`, belegte Kürzel als `Conflict`),
+  X11 `XGrabKey` am Root-Fenster für jede Taste und jede Kombination aus Feststell- und
+  Num-Taste (`BadAccess` als `Conflict`), Wayland und Flatpak das GlobalShortcuts-Portal
+  (Sitzung, `BindShortcuts` mit Beschreibung und bevorzugtem Kürzel, `Activated`; was der
+  Desktop nicht bindet, kommt als `UIC_HOTKEY_LOST`); Browser und Android `Unavailable`. Eine
+  Farbe von irgendwo auf dem Bildschirm: `ui.pick_color()` → `UIC_PICK`, im Farbwähler
+  `CP_PIPETTE` (der Pipetten-Knopf erscheint nur, wo es geht; kein Recht nötig, der Nutzer
+  wählt das Pixel): Windows ein eingefrorenes Bild aller Monitore mit Lupe und Hex-Wert
+  (Pfeiltasten pixelweise, Esc bricht ab), X11 ein Zeigergriff mit Fadenkreuz (bei rootlosem
+  Xwayland das Pixel aus dem Fenster unter dem Zeiger), Wayland / Flatpak
+  `Screenshot.PickColor`, Chromium der `EyeDropper`. Bildschirmfotos `ui.screenshot(rect)` →
+  `UIC_SCREENSHOT`, `ui.screenshot_take()` als `Surface` (Recht `screen.capture`): Windows
+  `BitBlt` mit `CAPTUREBLT`, X11 `GetImage` des Root-Fensters in Streifen, Wayland / Flatpak
+  `Screenshot.Screenshot` (die PNG-Datei des Portals). Getestet: `plattest --test screen`
+  (Windows: Monitore gegen `GetSystemMetrics`, ein Musterfenster aufgenommen und gepickt, das
+  Overlay mit Klick und Esc, `RegisterHotKey` über `SendInput` einer freien F13–F24-Taste,
+  belegtes Kürzel eines zweiten Prozesses; Linux mit dem X-Server von WSLg: RandR, `GetImage`,
+  der Pick nach dem Klick-Ereignis, Esc über XTEST, `XGrabKey` mit XTEST-Tasten und den
+  Lock-Kombinationen, `BadAccess` eines zweiten Prozesses), `--test screen-wl` (die
+  Wayland-Ausgaben von WSLg), `--test screen-policy`, `tools/platshared/screen_bus.py`
+  (Fake-Portale: PickColor, Screenshot, GlobalShortcuts mit nicht gebundenem Kürzel,
+  `Activated`, neue Sitzung nach dem Abmelden, Ablehnung, kein Portal), `apps/screentest`
+  (Skripte für Monitore, Kürzel und Pipette; `tests/screen_web.mjs` in Chromium und Firefox;
+  `tests/android_screen.py` im Emulator: Größe, DPI, Bildwiederholrate und Name gegen `wm size`,
+  `wm density` und `dumpsys display`, Änderungen über `wm size`).
+  Es fehlen: ein echtes Bildschirmfoto über X11 auf einem rootlosen Server (WSLg verweigert
+  `GetImage` am Root-Fenster; dort ist nur dieser Fehler geprüft), die echten Dialoge der
+  Portale (nur gegen Fake-Busse getestet), unter X11 eine Lupe beim Pick und eine DPI je
+  Monitor, der Arbeitsbereich unter Wayland (kein Protokoll), Bildschirmfotos im Browser
+  (`getDisplayMedia` mit Auswahldialog), der Arbeitsbereich unter Android (ohne
+  Systemleisten) und DXGI Desktop Duplication statt `BitBlt` (schneller bei großen
+  Bildschirmen).
 - **P3** · *erledigt* · Audio-Ausgabe ([`plat/audio.rs`](../lib/plat/audio.rs),
   [`ui/sound.rs`](../lib/ui/sound.rs), seit 2026-10-22; GUIDE.md, Abschnitt 33): Streams mit
   Rate, Kanälen und Latenzziel (Standard 40 ms), gefüllt über einen Ring, den die Plattform

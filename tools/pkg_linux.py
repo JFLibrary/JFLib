@@ -448,7 +448,7 @@ def finish_args(perms, extra=()):
                              "erreichbar (flatpak-spawn --host bräuchte --talk-name=org.freedesktop.Flatpak; nicht vergeben)")
         elif key == "fs.user":
             notes.append("fs.user: Dateien über die Portale (Dateidialog, Dokument-Portal für „Öffnen mit“)")
-        elif key in ("url", "print", "autostart"):
+        elif key in ("url", "print", "autostart", "input.global", "screen.capture"):
             notes.append(f"{key}: über das Portal, kein Loch nötig")
     for loc in sorted(fs):
         args.append(f"--filesystem={loc}" + ("" if fs[loc] else ":ro"))

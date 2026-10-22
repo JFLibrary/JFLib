@@ -405,9 +405,9 @@ def app_targets(name):
 # do everything (as before).  "ask KEY ARGS [\"reason\"]" asks the user at the first access;
 # agent.confirm / agent.deny name agent actions (patterns) the user confirms / an agent may not run.
 PERM_KEYS_ARGS = ("fs.read", "fs.write", "process", "plugins", "url", "net.connect", "net.listen")
-PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart")
+PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart", "input.global", "screen.capture")
 PERM_KEYS_AGENT = ("agent.confirm", "agent.deny")                  # agent actions: confirmed / refused
-PERM_ASKABLE = PERM_KEYS_ARGS + ("print", "secrets", "autostart")   # "ask KEY ARGS [\"reason\"]"
+PERM_ASKABLE = PERM_KEYS_ARGS + ("print", "secrets", "autostart", "input.global", "screen.capture")   # "ask KEY ARGS [\"reason\"]"
 PERM_VARS = ("CONFIG", "TEMP", "HOME", "EXE", "FONTS", "APPCONFIG", "APPDATA", "APPCACHE", "APPLOG",
              "DESKTOP", "DOCUMENTS", "DOWNLOADS", "PICTURES", "MUSIC", "VIDEOS")
 

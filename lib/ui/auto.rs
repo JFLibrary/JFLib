@@ -1139,13 +1139,34 @@ impl Ui {
             (plat::E_SESSION_END, 0)
         } else if w("settings") {
             let r = next_word(a);
-            let bits = [("theme", plat::SET_THEME), ("locale", plat::SET_LOCALE), ("contrast", plat::SET_CONTRAST), ("fonts", plat::SET_FONTS)]
+            let bits = [("theme", plat::SET_THEME), ("locale", plat::SET_LOCALE), ("contrast", plat::SET_CONTRAST), ("fonts", plat::SET_FONTS), ("monitors", plat::SET_MONITORS)]
                 .iter()
                 .find(|(n, _)| word_eq(r, n).is_some())
                 .map_or_else(|| parse_int(r).0 as u32, |(_, b)| *b);
             (plat::E_SETTINGS, bits)
+        } else if w("hotkey") {
+            // a registered global shortcut pressed (screen.rs: UIC_HOTKEY)
+            let id = parse_int(next_word(a)).0 as u32;
+            if !plat::hotkey::hotkey_test_press(id) {
+                self.fail(b"system hotkey: no global shortcut with this id");
+                return;
+            }
+            self.inject(app, plat::E_WAKE, 0, 0, 0, 0);
+            self.run_passes(app);
+            return;
+        } else if w("pick") {
+            // the user's answer to a running colour pick: RRGGBB or cancel (screen.rs)
+            let r = next_word(a);
+            if !self.m.screen.picking {
+                self.fail(b"system pick: no colour pick is running");
+                return;
+            }
+            let ans = if word_eq(r, "cancel").is_some() { Err(plat::screen::ScreenError::Cancelled) } else { Ok(super::runtime::parse_hex(r).0 & 0xFF_FFFF) };
+            self.pick_done(ans);
+            self.run_passes(app);
+            return;
         } else {
-            self.fail(b"system: focus in|out, suspend, resume, session-end or settings WHAT");
+            self.fail(b"system: focus in|out, suspend, resume, session-end, settings WHAT, hotkey ID or pick RRGGBB|cancel");
             return;
         };
         self.inject(app, typ, 0, 0, 0, data);

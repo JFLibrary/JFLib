@@ -1,0 +1,3 @@
+#!args --test screen-policy
+# (Rust only) plattest --test screen-policy: a manifest without input.global and screen.capture
+# refuses global shortcuts and pictures of the screen (PERMDENY), the rights parse.

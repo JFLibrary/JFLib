@@ -1,0 +1,3 @@
+#!args --test screen-wl
+# (Rust only) plattest --test screen-wl: the Wayland outputs as monitors (wl_output, xdg-output;
+# Linux with a compositor, else SKIP).

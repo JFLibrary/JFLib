@@ -37,6 +37,12 @@ mod linux_ibus;
 // lifecycle: SIGTERM, logind's sleep, the settings portal
 #[path = "linux_life.rs"]
 mod linux_life;
+// screen.rs / hotkey.rs: the monitors, pictures of the screen, the colour pick, global shortcuts
+// (X11 or the Screenshot / GlobalShortcuts portals)
+#[path = "linux_screen.rs"]
+pub(crate) mod linux_screen;
+#[path = "linux_hotkey.rs"]
+pub(crate) mod linux_hotkey;
 // the system settings from the settings portal (settings.rs)
 #[path = "linux_settings.rs"]
 pub(crate) mod linux_settings;

@@ -1015,6 +1015,17 @@ pub fn xkb_key(evdev: u32) -> (u32, u32) {
     XKB.lock().key_of(evdev)
 }
 
+/// the evdev codes of the keys that give vk without modifiers (keypad keys: with Num Lock on)
+/// -- the keys a global shortcut grabs (linux_x11_screen.rs)
+pub fn xkb_vk_keys(vk: u32) -> alloc::vec::Vec<u32> {
+    let mut x = XKB.lock();
+    let saved = x.mods;
+    x.mods = x.m_num;
+    let v = (0..256u32).filter(|&e| x.keys[e as usize].flags & KF_DEF != 0 && x.key_of(e).0 == vk).collect();
+    x.mods = saved;
+    v
+}
+
 /// print every defined key: evdev, VK, flags, modifier id, 4 levels  [xkb_dump]
 pub fn xkb_dump() {
     let mut x = XKB.lock();

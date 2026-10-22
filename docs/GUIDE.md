@@ -210,7 +210,10 @@ and on Wayland compositors without server-side decorations the library draws a t
   | `UIC_ACTIVE` | `arg` 1: one of the app's windows got the keyboard, 0: none has it (pause animations, poll less) |
   | `UIC_SUSPEND` | `arg` 1: the system goes to sleep (save, close connections), 0: it woke up; to keep it awake see `plat::inhibit` (section 21) |
   | `UIC_SESSION_END` | logout, shutdown or SIGTERM: save now; `UIC_EXIT` and the end follow |
-  | `UIC_SETTINGS` | `arg` = `plat::SET_THEME \| SET_LOCALE \| SET_CONTRAST \| SET_FONTS`: system settings changed; a system theme and the format (`i18n::locale()`) are already updated |
+  | `UIC_SETTINGS` | `arg` = `plat::SET_THEME \| SET_LOCALE \| SET_CONTRAST \| SET_FONTS \| SET_MONITORS`: system settings changed; a system theme and the format (`i18n::locale()`) are already updated; `SET_MONITORS`: a monitor came, went, moved or changed its scale or work area (`ui.monitors()`, section 21) |
+  | `UIC_HOTKEY`, `UIC_HOTKEY_LOST` | `arg` = id: a global shortcut was pressed anywhere / the desktop dropped it (`ui.hotkey_error(id)`; section 21) |
+  | `UIC_PICK` | `arg` 1: the user picked a colour on the screen (`ui.picked_color()`), 0: cancelled or failed (`ui.screen_error()`) |
+  | `UIC_SCREENSHOT` | `arg` 1: the picture of `ui.screenshot(..)` is there (`ui.screenshot_take()`), 0: failed |
 
 * `App::init(ui)` runs before the first frame (register codecs, read arguments, load
   settings); `false` ends the program with exit code 2.
@@ -457,6 +460,10 @@ property rows with a reset button), `track_slider(id, &mut v, &range, Some(&trac
 over a gradient: `Track::new(TK_*, &stops)`), `pan(id, &mut x, &mut y, thumb, ver, flags)`,
 `color_picker_ex(id, &mut argb, CP_ALPHA | CP_FIELDS)`, `color_wheel(id, &mut hsv_or_argb,
 CW_HSV)`; `hsv_to_rgb` / `rgb_to_hsv` convert (hue in tenths of a degree, S / V 0..1000).
+`CP_PIPETTE` adds a pipette button beside the preview where the user can pick a colour anywhere
+on the screen (Windows, X11, the Wayland / Flatpak screenshot portal, Chromium's EyeDropper; not
+shown elsewhere): the picked colour (alpha kept) comes back as `EV_ACT | EV_COMMIT` of the
+picker's next pass. The pick itself is `ui.pick_color()` (section 21).
 
 **Containers**
 
@@ -1423,7 +1430,8 @@ in DIP):
 | `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back |
 | `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
-| `system focus in\|out`, `system suspend\|resume`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...) |
+| `system focus in\|out`, `system suspend\|resume`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...) |
+| `system hotkey ID`, `system pick RRGGBB\|cancel` | a recorded global shortcut pressed (`UIC_HOTKEY`); the user's answer to a running colour pick (`UIC_PICK`, a `CP_PIPETTE` picker; section 21) |
 | `clip text "s"`, `clip file F`, `clip dib F`, `clip clear`, `clip save F [bmp]`, `clip expect none\|text\|image\|png` | the headless clipboard (never the real one) |
 | `clip utf8 F` | exact UTF-8 text clipboard bytes from a file (up to 4 MiB), including CR/LF and long paste payloads; opt-in Rust extension |
 | `clip data FORMAT F [FORMAT F ...]` | publish one to four representations together; formats: `text`, `html`, `rtf`, `docx`; opt-in Rust extension |
@@ -2147,7 +2155,7 @@ let _ = secret_delete("imap.example.org", &self.user); // when the user signs ou
 Testing: `plattest --test secret` (the real store; its entries are removed again),
 `tools/platshared/secret_bus.py` (a fake Secret Service in WSL).
 
-## 21. Desktop integration: keeping awake, autostart, taskbar, file types, recent files
+## 21. Desktop integration: keeping awake, autostart, taskbar, file types, recent files, monitors, global shortcuts, the screen
 
 **Keeping the computer awake.** `plat::inhibit(reason, what)` asks the system not to sleep
 while the returned guard lives; dropping it lets the system sleep again. `INHIBIT_SUSPEND`
@@ -2279,6 +2287,101 @@ LauncherEntry signals on a fake bus). `apps/traydemo` has buttons for all of it.
 `plattest --test assoc` registers a test package (Windows: test names in the real HKCU,
 removed again; Linux: scratch XDG folders, `desktop-file-validate`), `--test recent` the xbel
 list through `jfgui_RECENT`, `--test recent-win` (by hand) the real shell.
+
+**Monitors.** `ui.monitors()` (or `plat::monitors()`) lists every monitor, the primary one
+first: `name`, `rect` and `work` (x, y, w, h without taskbars and panels), `dpi` (96 = 100 %),
+`refresh_mhz` (60000 = 60 Hz, 0 unknown), `primary` and an `id` that stays while the monitor is
+connected. `plat::screen::monitor_at(x, y)` finds the monitor of a point. A change (a monitor
+plugged in, another resolution or scale, a moved taskbar) arrives as `UIC_SETTINGS` with
+`plat::SET_MONITORS` in `arg`: read the list again.
+
+```rust
+for m in ui.monitors() {
+    let hz = m.refresh_mhz as f32 / 1000.0;
+    plat::log_info("app", &format!("{} {}x{} at {},{}, {} dpi, {hz} Hz", m.name, m.rect[2], m.rect[3], m.rect[0], m.rect[1], m.dpi));
+}
+```
+
+* The units are the desktop's: physical pixels on Windows (the process is per-monitor DPI
+  aware), X11 and Android; the compositor's logical units on Wayland (xdg-output; `dpi` from
+  the physical and logical width, so fractional scales show); CSS pixels in the browser.
+* Windows: `EnumDisplayMonitors`, `GetMonitorInfoW` (device name `\\.\DISPLAY1`, work area),
+  `GetDpiForMonitor`, `EnumDisplaySettingsW` (refresh); `WM_DISPLAYCHANGE` and a work area
+  change send `SET_MONITORS`. X11: RandR 1.5 (`GetMonitors`, the refresh rate of the CRTC's
+  mode, names such as `HDMI-1`), the work area of `_NET_WORKAREA`, RandR's change events; one
+  dpi for all monitors (the X server has one). Wayland: `wl_output` with `xdg-output`, no work
+  area (= the monitor) and no primary (the first output). Browser: `window.screen`, or every
+  screen where the page already may ask (`getScreenDetails`, the "window-management"
+  permission granted; the page never asks itself), no refresh rate. Android: the
+  `DisplayManager`'s displays. Linux knows the monitors only once the app has its first window.
+* Headless runs list one monitor: the window, or the virtual screen of the script command
+  `screen X Y W H`; `system settings monitors` sends the change.
+
+**Global shortcuts.** A chord registered with `ui.hotkey_register(id, "Ctrl+Alt+K",
+description)` reaches the app while another program has the keyboard: `App::command(UIC_HOTKEY,
+id)`. `ui.hotkey_unregister(id)` removes it (the program's end does too). The app needs
+`input.global` in its `PERMISSIONS` (else `HotkeyError::Denied` and `PERMDENY input.global`).
+
+```rust
+match ui.hotkey_register(HK_SHOW, "Ctrl+Alt+K", "Fenster zeigen") {
+    Ok(()) => {}
+    Err(HotkeyError::Conflict) => self.note = String::from("Strg+Alt+K gehört schon einem anderen Programm."),
+    Err(e) => self.note = format!("Kein globales Kürzel: {e}"),
+}
+// in command(): UIC_HOTKEY if arg == HK_SHOW => ui.bring_to_front(),
+```
+
+* Chords: modifiers `Ctrl`, `Alt`, `Shift`, `Super` (`Win`, `Meta`, `Logo`), one key: a letter,
+  a digit, `F1`..`F24`, `Space`, `Enter`, `Tab`, `Esc`, `Backspace`, `Delete`, `Insert`, `Home`,
+  `End`, `PageUp`, `PageDown`, the arrows, `Print`, `Pause`, `Num0`..`Num9`, `NumAdd` ...
+  (`plat::Chord::parse`; case does not matter). A held chord reports once. Ctrl+Alt+F1..F12
+  switch the console on Linux: never use them.
+* Windows: `RegisterHotKey` on a message-only window of the UI thread; a chord another
+  program holds is `HotkeyError::Conflict`. X11: `XGrabKey` on the root window for every key
+  that gives the key and every combination of Caps Lock and Num Lock; another client's grab is
+  `Conflict`. Wayland and Flatpak: the GlobalShortcuts portal -- the desktop shows the
+  shortcuts with their descriptions and the user binds them (maybe to another chord, maybe
+  not). There `hotkey_register` answers `Ok` at once and a shortcut the desktop did not bind
+  comes later as `UIC_HOTKEY_LOST` (`ui.hotkey_error(id)`: `Dismissed`). Browser and Android:
+  `Unavailable` (`ui.hotkeys_available()` is false).
+* Headless runs only record the registration; the script command `system hotkey ID` presses
+  it.
+
+**A colour from anywhere on the screen.** `ui.pick_color()` lets the user click any pixel of
+the screen (Esc or a right click cancels); then `App::command(UIC_PICK, 1)` and
+`ui.picked_color()` is `Some(0xRRGGBB)` (`UIC_PICK` with 0: cancelled or failed,
+`ui.screen_error()` says why). Colour pickers with `CP_PIPETTE` (section 5) do this for the
+user. `ui.pick_available()` says whether it works here. Picking needs no permission: the user
+chooses the one pixel the app gets.
+
+* Windows: a frozen picture of every monitor in a topmost window with a magnifier and the hex
+  value beside the pointer; the arrows move the pointer by a pixel (Shift: ten), Enter / Space
+  or a click takes it. X11: a pointer grab with a crosshair, the pixel read from the root
+  window (a rootless server such as WSLg's Xwayland: from the window under the pointer).
+  Wayland and Flatpak: the screenshot portal's `PickColor` (the desktop's own picker). Browser:
+  the `EyeDropper` (Chromium; call it from a click), elsewhere and on Android `Unavailable`.
+* Headless runs wait for the script's answer: `system pick RRGGBB` or `system pick cancel`.
+
+**Pictures of the screen.** `ui.screenshot(None)` takes the whole desktop (`Some([x, y, w, h])`
+a rectangle); then `App::command(UIC_SCREENSHOT, 1)` and `ui.screenshot_take()` is the picture
+as a `gfx::Surface` (save it with `img_png::enc`, show it with `ui.image`). The app needs
+`screen.capture` in its `PERMISSIONS` (else `ScreenError::Denied`, `PERMDENY screen.capture`).
+Windows: `BitBlt` from the screen DC. X11: `GetImage` of the root window (a rootless server
+refuses it: `Failed`). Wayland and Flatpak: the screenshot portal (the desktop may ask; the file
+it writes stays where it put it, the rectangle is ignored). Browser and Android: `Unavailable`;
+headless runs too. `plat::screen::capture_start` is the same without the UI (the picture as
+B, G, R, x rows or, from the portal, the PNG file's bytes).
+
+Testing: `plattest --test screen` (Windows: the monitors against `GetSystemMetrics`, a pattern
+window captured and picked, `RegisterHotKey` pressed through `SendInput`, a chord another
+process holds; Linux: the same on WSLg's X server with RandR, GetImage, XTEST and `XGrabKey`),
+`--test screen-wl` (the Wayland outputs), `--test screen-policy`, and
+`tools/platshared/screen_bus.py` in WSL (the Screenshot and GlobalShortcuts portals on a fake
+bus). `apps/screentest` shows all of it; `apps/screentest/tests/screen_web.mjs` checks the
+browser (the monitors of `window.screen`, the EyeDropper's pipette in Chromium only,
+`Unavailable` for shortcuts and pictures), `apps/screentest/tests/android_screen.py` an Android
+emulator (the display against `wm size`, `wm density` and `dumpsys display`, a change through
+`wm size`).
 
 ## 22. Diagrams: nodes, ports and edges
 

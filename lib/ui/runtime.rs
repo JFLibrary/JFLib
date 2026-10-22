@@ -556,6 +556,7 @@ impl Ui {
                     self.cmd_run(UIC_WAKE, 0); // plat::wake() from another thread
                     self.open_poll();
                     self.tray_poll();
+                    self.screen_poll(); // global shortcuts, picks, pictures (screen.rs)
                     self.a11y_poll(); // actions of screen readers (a11y.rs)
                     self.spell_poll(); // suggestions made on a worker (edit_spell.rs)
                     self.need = true;

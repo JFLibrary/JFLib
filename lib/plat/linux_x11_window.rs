@@ -281,6 +281,7 @@ impl X11 {
             self.input_init();
             self.clip_init();
             self.xi_init(); // (PN1) XInput 2 pens
+            self.screen_init(); // RandR changes, the work area (linux_x11_screen.rs)
         }
         self.xi_select(win); // (PN1) the pens' events on this window
         self.flush();
@@ -841,6 +842,7 @@ impl X11 {
     fn deferred(&mut self) {
         self.dnd_deferred(); // XDND: drops, positions, the app's drag (linux_x11_dnd.rs)
         self.xi_deferred(); // (PN1) pen devices changed
+        self.screen_deferred(); // the pick's pixel, SET_MONITORS (linux_x11_screen.rs)
         if self.want & WANT_DPI != 0 {
             self.want &= !WANT_DPI;
             self.dpi_check();
@@ -883,6 +885,9 @@ impl X11 {
 
     /// x11_event(packet): handle one event (dispatch, the self tests)
     pub(super) fn event(&mut self, b: &mut [u8]) {
+        if self.screen_event(b) {
+            return; // shortcuts, the pick, RandR (linux_x11_screen.rs)
+        }
         let typ = b[0] & 0x7F;
         // the window it is about -> evwin (0: the main window / not ours)
         let xid = match typ {

@@ -206,6 +206,11 @@ pub const UIC_SETTINGS: u32 = 0x7FFF_0012; // arg = plat::SET_* bits: system set
 pub const UIC_DRAG_END: u32 = 0x7FFF_0013; // arg = DE_* effect (0 = cancelled / refused): a drag of the app ended
 // permissions (perm.rs)
 pub const UIC_PERMISSION: u32 = 0x7FFF_0014; // arg 1 allowed, 0 refused: the user answered a permission question (try the access again)
+// the screen and global shortcuts (screen.rs)
+pub const UIC_HOTKEY: u32 = 0x7FFF_0015; // arg = id: a global shortcut was pressed (hotkey_register)
+pub const UIC_HOTKEY_LOST: u32 = 0x7FFF_0016; // arg = id: the desktop dropped the shortcut (hotkey_error tells why)
+pub const UIC_PICK: u32 = 0x7FFF_0017; // arg 1: a colour was picked (picked_color), 0: cancelled / failed (pick_color)
+pub const UIC_SCREENSHOT: u32 = 0x7FFF_0018; // arg 1: the picture is there (screenshot_take), 0: failed (screen_error)
 pub const TRAY_ACTIVATE: u32 = 1; // UIC_TRAY: the symbol was clicked
 pub const TRAY_SECONDARY: u32 = 2; // UIC_TRAY: double click (Windows) / middle click (Linux)
 
@@ -314,6 +319,7 @@ pub const PAN_UNIT: u32 = 1; // pan: coordinates 0 .. 1 instead of -1 .. 1
 pub const CW_HSV: u32 = 1; // color_wheel: an HSV record instead of 0xAARRGGBB
 pub const CP_ALPHA: u32 = 1; // color_picker_ex: alpha (transparency) track
 pub const CP_FIELDS: u32 = 2; // ... number boxes R G B (A) H S V and a hex text box
+pub const CP_PIPETTE: u32 = 4; // ... a pipette button: a colour from anywhere on the screen (only where possible)
 pub const PART_BASE: u32 = 0x6000_0000; // part_id(id, k): ids of the parts of composite widgets
 
 /// UIINPUT -- pointer state handed to custom widgets (canvas)

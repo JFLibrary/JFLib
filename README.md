@@ -55,8 +55,9 @@ without changing the application logic.
   language.
 - **Desktop integration:** one instance per app, file types and URL schemes, system
   notifications and a notification-area icon, drag and drop between widgets and other
-  programs, taskbar progress, badges, and jump lists, starting at login, and keeping the
-  system awake.
+  programs, taskbar progress, badges, and jump lists, starting at login, keeping the
+  system awake, the monitor list (work areas, DPI, refresh rates), global shortcuts, a colour
+  picked anywhere on the screen, and pictures of the screen.
 - **Sound:** output streams with a target latency on every platform (WASAPI, the PulseAudio
   protocol that PipeWire serves, WebAudio, AAudio), short sounds from WAV and Ogg Vorbis
   files mixed together, and the system's own sounds for events and message dialogs.
@@ -614,7 +615,7 @@ For rust-analyzer, `python build_rs.py ide` generates `rust-project.json`.
 | [Build Manager](apps/buildManager/README.md) | Profiles, queue, tests, launching, and releases |
 | [Packaging](docs/PACKAGING.md) | Windows installers, Debian packages, AppImage, Flatpak, MSIX, RPM, icons, and package metadata |
 | [Virtual files and assets](docs/VFS.md) | `app://`, `config://`, `data://`, `cache://`, `mem://`, mounts, and bundling `apps/NAME/assets` |
-| [Permissions](docs/PERMISSIONS.md) | The `PERMISSIONS` manifest: files, programs, URLs, plugins, printing, secrets, autostart, and network addresses an app may use |
+| [Permissions](docs/PERMISSIONS.md) | The `PERMISSIONS` manifest: files, programs, URLs, plugins, printing, secrets, autostart, global shortcuts, pictures of the screen, and network addresses an app may use |
 | [Secrets](docs/SECRETS.md) | Passwords, tokens, and keys in the system's secret store (Credential Manager, Secret Service) |
 | [Third-party notices](THIRD_PARTY_NOTICES.md) | Ported third-party code, Unicode data, fonts, and artwork with their copyright holders and licenses (texts in `licenses/`) |
 | [Versions](docs/VERSIONING.md) | The library's version, the public API and its SemVer rules, deprecations, `build_rs.py api-diff` and releases |

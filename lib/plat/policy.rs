@@ -5,7 +5,8 @@
 //                                          before that, and in apps without one, all is allowed
 //   active() -> bool
 //   fs_allowed(path, FS_READ | FS_WRITE) / process_allowed(program) / url_allowed(url) /
-//   plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed()
+//   plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed() /
+//   input_global_allowed() / screen_capture_allowed()
 //                                          -> bool
 //                                          a refusal is recorded (denials) and printed once
 //                                          per target to stderr: "PERMDENY kind target"
@@ -65,6 +66,10 @@
 //   print                 plat::print
 //   secrets               plat::secret (the system's store for passwords, tokens and keys)
 //   autostart             plat::autostart_set (start the app at login; reading is free)
+//   input.global          plat::hotkey_register (global shortcuts: chords pressed while
+//                         another program has the keyboard)
+//   screen.capture        plat::screen::capture_start (pictures of the screen; picking one
+//                         pixel's colour needs nothing: the user chooses it)
 //   net.connect HOST:PORT..   TCP connections and UDP datagrams to HOST (a name, *.name for
 //                         every name below it, an IPv4 / [IPv6] address, a block 10.0.0.0/8
 //                         or [fd00::]/8, localhost = the loopback addresses, * = any) on PORT
@@ -115,10 +120,10 @@ pub const STORE: &str = "config://permission-decisions.txt";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Denial {
     /// "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart",
-    /// "net.connect", "net.listen" or "agent"
+    /// "net.connect", "net.listen", "agent", "input.global" or "screen.capture"
     pub kind: &'static str,
-    /// the path, program, URL, address, the service of a secret, the agent's action or ""
-    /// (print, autostart)
+    /// the path, program, URL, address, the service of a secret, the agent's action, the
+    /// chord of a shortcut or "" (print, autostart, screen.capture)
     pub target: String,
     /// the plugin the call was made for ("" = the app itself)
     pub plugin: String,
@@ -214,8 +219,10 @@ pub enum AgentRule {
 }
 
 // the kinds of access (Denial::kind, Question::kind)
-const KINDS: [&str; 11] =
-    ["fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "net.connect", "net.listen", "agent"];
+const KINDS: [&str; 13] = [
+    "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "net.connect", "net.listen", "agent",
+    "input.global", "screen.capture",
+];
 
 fn kind_of(rule: &str) -> &'static str {
     let w = rule.split(' ').next().unwrap_or("");
@@ -257,6 +264,8 @@ struct Policy {
     print: Option<u16>,
     secrets: Option<u16>,
     autostart: Option<u16>,
+    hotkeys: Option<u16>,
+    capture: Option<u16>,
     connect: Vec<NetRule>,
     listen: Vec<NetRule>,
     resolved: Vec<Resolved>,
@@ -404,6 +413,16 @@ pub fn secrets_allowed(service: &str) -> bool {
 /// whether plat::autostart_set may change the app's autostart entry (`autostart`)
 pub fn autostart_allowed() -> bool {
     decide("autostart", "", &Req::Autostart, false) == Verdict::Allow
+}
+
+/// whether plat::hotkey_register may register global shortcuts (`input.global`)
+pub fn input_global_allowed() -> bool {
+    decide("input.global", "", &Req::Hotkeys, false) == Verdict::Allow
+}
+
+/// whether plat::screen::capture_start may take pictures of the screen (`screen.capture`)
+pub fn screen_capture_allowed() -> bool {
+    decide("screen.capture", "", &Req::Capture, false) == Verdict::Allow
 }
 
 /// the last refusals, oldest first
@@ -573,6 +592,8 @@ enum Req<'a> {
     Print,
     Secrets,
     Autostart,
+    Hotkeys,
+    Capture,
     #[cfg(any(windows, target_os = "linux"))]
     Connect([u8; 16], u16),
     #[cfg(any(windows, target_os = "linux"))]
@@ -634,6 +655,8 @@ impl Policy {
             Req::Print => flag(self.print),
             Req::Secrets => flag(self.secrets),
             Req::Autostart => flag(self.autostart),
+            Req::Hotkeys => flag(self.hotkeys),
+            Req::Capture => flag(self.capture),
             #[cfg(any(windows, target_os = "linux"))]
             Req::Connect(ip, port) => {
                 let dns = *port == 53 && self.connect.iter().any(|r| matches!(r.host, Host::Any | Host::Name(_)));
@@ -1192,8 +1215,10 @@ fn scope_name() -> String {
 // ---------------------------------------------------------------- the manifest
 
 // the keys an ask line may carry
-const ASK_KEYS: [&str; 10] =
-    ["fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "net.connect", "net.listen"];
+const ASK_KEYS: [&str; 12] = [
+    "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "net.connect", "net.listen",
+    "input.global", "screen.capture",
+];
 
 // a line -> (rule text, reason): the reason is a "quoted text" at the end; '#' outside it
 // starts a comment
@@ -1300,7 +1325,7 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
                     p.explicit_read = true;
                 }
             }
-            "fs.user" | "print" | "secrets" | "autostart" => {
+            "fs.user" | "print" | "secrets" | "autostart" | "input.global" | "screen.capture" => {
                 if !args.is_empty() {
                     return Err(at("takes no arguments"));
                 }
@@ -1310,6 +1335,8 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
                     "print" => set(&mut p.print),
                     "secrets" => set(&mut p.secrets),
                     "autostart" => set(&mut p.autostart),
+                    "input.global" => set(&mut p.hotkeys),
+                    "screen.capture" => set(&mut p.capture),
                     _ => p.user = true,
                 }
             }
@@ -1377,7 +1404,7 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
             }
             _ => {
                 return Err(at(
-                    "unknown permission (fs.read, fs.write, fs.user, process, url, plugins, print, secrets, autostart, net.connect, net.listen, ask, agent.confirm, agent.deny)",
+                    "unknown permission (fs.read, fs.write, fs.user, process, url, plugins, print, secrets, autostart, net.connect, net.listen, input.global, screen.capture, ask, agent.confirm, agent.deny)",
                 ))
             }
         }
