@@ -61,7 +61,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -3683,6 +3683,9 @@ Windows (ID = the app's window id, 0 / main = the main window):
   sync [MS]                     wait until no background job is pending: the app's sync hook,
                                 the async tasks' work (blocking jobs, wake-ups) and the spell
                                 checker's workers (suggestions, edit_spell.rs)
+  expect sound KIND|none        the last sound ui.beep / ui.dialog_sound asked for since the
+                                last check (default, information, warning, error, question,
+                                notify; headless runs play none)
   expect_warn / expect_nowarn   a UIWARN was / was not printed since the last check (a
                                 script also warns about a widget id used twice in a pass)
 (K1) Files and clipboard, drag and drop:
@@ -7792,6 +7795,39 @@ Source: [`lib/ui/slider.rs`](../lib/ui/slider.rs)
   Map pixel travel to the nearest integer value, before step snapping. The
   logarithmic inverse uses bounded binary search (at most 31 iterations).
   Keyboard steps and semantic values always remain in the original units.
+
+#### `ui/sound.rs`
+
+Source: [`lib/ui/sound.rs`](../lib/ui/sound.rs)
+
+```text
+sound -- the system's sounds from the UI (plat::audio::sound)
+
+  beep(SOUND_*) -> bool    the system's sound for an event (plat::audio::SOUND_INFO,
+                           SOUND_WARNING, SOUND_ERROR, SOUND_QUESTION, SOUND_NOTIFY,
+                           SOUND_DEFAULT) unless sounds are off -> false: nothing played
+  dialog_sound(SOUND_*)    right after dialog_begin returned true: the sound once, when the
+                           dialog has just opened, where the platform's message dialogs play
+                           one (plat::audio::dialog_sounds: Windows like MessageBox, Linux
+                           desktops while event sounds are on; not Android, not the browser)
+  set_sounds(on), sounds() the app's own switch (default on; an app setting "Klänge");
+                           jfgui_SOUNDS=0 turns them off for the process
+
+Headless runs (scripts, --shot) play nothing: plat::audio's dry run prints "sound: NAME", and
+the script command `expect sound KIND|none` checks the last sound requested (auto.rs).
+```
+
+**`impl Ui`**
+
+- **`fn beep(&mut self, kind: u32) -> bool`**
+  the system's sound for kind (plat::audio::SOUND_\*) -> false: off, unknown or not played
+- **`fn dialog_sound(&mut self, kind: u32) -> bool`**
+  inside an open content dialog: its sound, once when it has just opened, where message
+  dialogs play one on this platform -> whether a sound was asked for
+- **`fn set_sounds(&mut self, on: bool)`**
+  the app's switch for its sounds (beep, dialog_sound); on by default
+- **`fn sounds(&self) -> bool`**
+  sounds are on: the app's switch and jfgui_SOUNDS (0: off)
 
 #### `ui/rtl.rs`
 
@@ -15775,6 +15811,9 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            shared-mime-info, mimeapps.list), file_uri_path                    (assoc.rs)
   recent:  recent_add / recent_list / recent_remove / recent_clear: the system's recent files
            (SHAddToRecentDocs and the jump list; recently-used.xbel)          (recent.rs)
+  audio:   Stream (open / open_fill, write, start / pause / stop, volume, latency, the default
+           device followed), play / play_file (WAV, Ogg Vorbis), sound(SOUND_*): the system's
+           sounds (WASAPI, PulseAudio protocol, WebAudio, AAudio)               (audio.rs)
   threads: thread_spawn(stack, f) -> Thread (join), thread_yield(), Sem (post / wait),
            wake() (any thread: E_WAKE on the UI thread), wait_events(deadline, on_event)
            (headless), cpu_count(), mem_total()
@@ -17989,6 +18028,241 @@ then.  Web and Android: false / empty.
 
 - **`fn recent_clear() -> bool`**
   forget every recent file of this app
+
+### `plat/audio.rs`
+
+Source: [`lib/plat/audio.rs`](../lib/plat/audio.rs)
+
+```text
+audio -- sound output: streams the app fills, short sounds from memory or files, the
+system's own sounds
+
+  Stream::open(&Config) -> Result<Stream, AudioError>   the app pushes samples into the
+                          stream's ring (write / write_i16; never blocks, takes what fits),
+                          the platform drains it on its audio thread
+  Stream::open_fill(&Config, fill)   fill(&mut [f32]) -> bool tops up the device's buffer
+                          instead (false: this was the last buffer)
+  s.write(&[f32]) / s.write_i16(&[i16]) -> frames taken;  s.writable(), s.queued()
+  s.start() / s.pause() / s.stop() (empties the ring) / s.finish() (ends once all is played)
+  s.set_volume(0 ..= 1), s.state() -> State, s.latency_ms(), s.played(), s.underruns(),
+  s.device(), s.device_changes()
+  play(&Sound) -> Result<Voice, AudioError>    a short sound through the shared mixer
+  play_file(path)         a WAV or Ogg Vorbis file through the VFS (app://, data://, ..)
+  Sound::wav(bytes) / ogg / decode / load(path) / tone(freq, ms)
+  sound(SOUND_*) -> bool  the system's own sound for an event (dialog_sounds(): whether the
+                          platform plays one when a message dialog opens)
+  available() -> bool     an output device / sound service exists here
+
+Samples are f32 in -1 ..= 1, interleaved frames (WAVE channel order: 1 mono, 2 left / right,
+6 = 5.1); the device side always runs in f32 at the stream's rate (the system converts the
+rate and the channels where needed; the browser's context rate is converted here).
+
+One model everywhere: the ring.  The app writes, a platform thread drains -- this works on
+all four targets, where a callback on the audio thread does not: the browser's audio runs in
+an AudioWorklet that cannot call into the app's WASM instance, so it is fed from a buffer
+anyway.  The ring also keeps app code (allocation, locks, the UI's pace) off the real-time
+thread.  open_fill is the same stream without a ring: fill runs on the audio thread
+(Windows, Linux, Android) or in the browser worker's pump, and must not block.
+
+Latency: Config::latency_ms (default 40) is split between the device buffer (half, 10 ..= 100
+ms) and the ring (the rest; writable() keeps the ring within it); a fill stream gives all of it
+to the device buffer.  An app that writes from UI timers (16 ms frames) wants >= 50 ms.
+A stream starts playing at once (silence until data arrives); pause() first to prefill.
+
+Platforms: Windows WASAPI shared mode, event-driven on its own thread, the default device
+followed through IMMNotificationClient (win_audio.rs); Linux the PulseAudio native protocol
+(pipewire-pulse on current desktops, WSLg's server), the server moves the stream to a new
+default device itself (linux_audio.rs); the browser WebAudio, an AudioWorklet fed from a
+SharedArrayBuffer ring or posted buffers, started after a user gesture (State::Blocked
+before; web_audio.rs, web/audio.js); Android AAudio through the JNI host (android_audio.rs,
+android/bridge.c).  No device or service: AudioError::Unavailable.
+
+play() mixes into one stream of 48 kHz stereo that opens on demand and ends after 2 s of
+silence (each sound converted to 48 kHz once, while it plays).  System sounds: Windows the
+sound scheme's aliases (PlaySound: SystemAsterisk, SystemExclamation, SystemHand,
+SystemQuestion, .Default, Notification.Default), Linux the freedesktop sound theme
+(dialog-information, dialog-warning, dialog-error, dialog-question, bell, message-new-instant
+as .oga / .ogg / .wav, the theme of org.gnome.desktop.sound, only while its event-sounds
+are on), Android the notification sound and ToneGenerator beeps, the browser short generated
+tones (as Linux without a theme).  jfgui_AUDIO_DRYRUN=1 / set_dry_run: sound() only prints
+"sound: NAME".
+```
+
+```rust
+/// the default beep (Windows ".Default", freedesktop "bell")
+SOUND_DEFAULT: u32 = 0
+/// information (SystemAsterisk, dialog-information)
+SOUND_INFO: u32 = 1
+/// a warning (SystemExclamation, dialog-warning)
+SOUND_WARNING: u32 = 2
+/// an error (SystemHand, dialog-error)
+SOUND_ERROR: u32 = 3
+/// a question (SystemQuestion, dialog-question)
+SOUND_QUESTION: u32 = 4
+/// a notification (Notification.Default, message-new-instant)
+SOUND_NOTIFY: u32 = 5
+```
+
+- **`enum AudioError`**
+  why audio is not possible
+  - `Unavailable` -- no output device or sound service here
+  - `Invalid` -- a rate or channel count out of range
+  - `Format` -- not a sound file read here (WAV PCM / float, Ogg Vorbis) or a damaged one
+  - `Io` -- the file could not be read
+  - `Failed(i32)` -- the system refused (its code: an HRESULT, a PulseAudio error, an AAudio result)
+
+- **`enum State`**
+  what a stream does
+  - `Starting` -- the device is being opened (browser: until its host answers)
+  - `Playing`
+  - `Paused`
+  - `Stopped` -- stop(): the ring emptied; start() plays again
+  - `Ended` -- finish() or a fill that returned false: everything was played (start() plays again)
+  - `Blocked` -- the browser waits for a user gesture before it plays sound
+  - `Lost` -- no device right now (the old one went away); the stream plays again when one appears
+
+- **`struct Config<'a>`**
+  what a stream plays
+  - `rate: u32` -- frames per second (8000 ..= 192000)
+  - `channels: u16` -- interleaved channels (1 ..= 8)
+  - `latency_ms: u32` -- the latency aimed for, device buffer and ring together (10 ..= 1000 ms)
+  - `name: &'a str` -- the stream's name in the system's mixer ("" = the app's name)
+
+**`impl Config<'static>`**
+
+- **`const fn new(rate: u32, channels: u16) -> Config<'static>`**
+  rate and channels, 40 ms, the app's name
+
+- **`struct Stream`**
+  an output stream
+
+**`impl Stream`**
+
+- **`fn open(cfg: &Config) -> Result<Stream, AudioError>`**
+  a stream the app writes into (starts playing at once: silence until data arrives)
+- **`fn open_fill<F: FnMut(&mut [f32]) -> bool + Send + 'static>(cfg: &Config, fill: F) -> Result<Stream, AudioError>`**
+  a stream that calls fill to top up the device's buffer (on the platform's audio thread
+  or the browser worker's pump; the buffer comes zeroed); fill returns false after its
+  last buffer
+- **`fn rate(&self) -> u32`**
+  frames per second
+- **`fn channels(&self) -> u16`**
+- **`fn write(&mut self, samples: &[f32]) -> usize`**
+  interleaved samples into the ring -> whole frames taken (at most writable(); 0 for a
+  fill stream)
+- **`fn write_i16(&mut self, samples: &[i16]) -> usize`**
+  the same for 16-bit samples
+- **`fn writable(&self) -> usize`**
+  frames write() takes now
+- **`fn queued(&self) -> usize`**
+  frames waiting in the ring
+- **`fn start(&self)`**
+  play (again): after pause(), stop() or the end
+- **`fn pause(&self)`**
+  hold: the queued frames stay
+- **`fn stop(&self)`**
+  stop and drop what is queued (ring and device buffer)
+- **`fn finish(&self)`**
+  no more data: the stream ends (State::Ended) once the ring is played
+- **`fn set_volume(&self, v: f32)`**
+  0 silent ..= 1 as written (applied here, ramped over one buffer)
+- **`fn volume(&self) -> f32`**
+- **`fn state(&self) -> State`**
+- **`fn latency_ms(&self) -> f32`**
+  what is written now is heard after about this long (ring, device buffer, the device's
+  own latency; ms)
+- **`fn played(&self) -> u64`**
+  frames played so far (handed to the device minus its buffer)
+- **`fn underruns(&self) -> u32`**
+  how often the ring ran dry while data was coming (and the device's own count where
+  it reports one)
+- **`fn device(&self) -> String`**
+  the output device's name ("" not known yet)
+- **`fn device_changes(&self) -> u32`**
+  how often the stream followed a new default device (or the server moved it)
+- **`fn server_id(&self) -> u32`**
+  (tests) the server's id of the stream: PulseAudio's sink input index (u32::MAX: none)
+- **`fn test_device_change(&self)`**
+  (tests) act as if the default device changed (Windows: reopen on the default device)
+  or the server went away (Linux: the connection is dropped and made anew); the stream
+  plays on, device_changes() counts it.  Elsewhere nothing happens.
+
+- **`struct Sound`**
+  decoded PCM: interleaved f32 samples (cheap to clone: shared)
+
+**`impl Sound`**
+
+- **`fn new(rate: u32, channels: u16, samples: Vec<f32>) -> Result<Sound, AudioError>`**
+  interleaved samples (1 ..= 8 channels, 1 kHz ..= 384 kHz)
+- **`fn wav(bytes: &[u8]) -> Result<Sound, AudioError>`**
+  a RIFF WAVE file (PCM 8 / 16 / 24 / 32 bits, float 32 / 64)
+- **`fn ogg(bytes: &[u8]) -> Result<Sound, AudioError>`**
+  an Ogg Vorbis file (.ogg, .oga)
+- **`fn decode(bytes: &[u8]) -> Result<Sound, AudioError>`**
+  WAV or Ogg Vorbis, told apart by their first bytes
+- **`fn load(path: &str) -> Result<Sound, AudioError>`**
+  a sound file through the VFS (app://, data://, a path, ..)
+- **`fn tone(freq: f32, ms: u32) -> Sound`**
+  a sine of freq Hz, ms long, 48 kHz mono, at half scale with 5 ms fades
+- **`fn rate(&self) -> u32`**
+- **`fn channels(&self) -> u16`**
+- **`fn frames(&self) -> usize`**
+- **`fn samples(&self) -> &[f32]`**
+- **`fn duration_ms(&self) -> u32`**
+- **`fn to_wav(&self) -> Vec<u8>`**
+  as a 16-bit PCM WAVE file
+
+- **`struct Voice`**
+  a sound play() started; dropping the handle lets it play on
+
+**`impl Voice`**
+
+- **`fn stop(&self)`**
+  end it now
+- **`fn playing(&self) -> bool`**
+  still playing (or waiting for the device)
+- **`fn set_volume(&self, v: f32)`**
+  0 ..= 1
+
+- **`fn play(s: &Sound) -> Result<Voice, AudioError>`**
+  play a sound once, mixed with the other sounds of play() (dropping the Voice lets it play
+  on) -> Err(Unavailable) without an output
+
+- **`fn play_file(path: &str) -> Result<Voice, AudioError>`**
+  play a WAV or Ogg Vorbis file once (see play)
+
+- **`fn set_dry_run(on: bool)`**
+  true: sound() only prints "sound: NAME" (headless runs; also jfgui_AUDIO_DRYRUN=1)
+
+- **`fn sound_name(kind: u32) -> &'static str`**
+  the name of a SOUND_\* kind ("default", "information", "warning", "error", "question",
+  "notify"; "" for others)
+
+- **`fn sound(kind: u32) -> bool`**
+  the system's sound for an event (SOUND_\*) -> false: nothing played (unknown kind, sounds
+  switched off by the system, no output)
+
+- **`fn dialog_sounds() -> bool`**
+  whether message dialogs play the system's sound when they open (Windows like MessageBox;
+  Linux desktops while event sounds are on; not Android, not the browser)
+
+- **`fn available() -> bool`**
+  an output device / sound service exists here (a quick probe)
+
+- **`fn level(samples: &[f32], channels: usize, ch: usize, rate: u32, freq: f32) -> f32`**
+  (tests) the amplitude of the sine at freq in channel ch of interleaved frames (Goertzel,
+  Hann window: a full-scale sine reads 1.0)
+
+- **`fn resample(samples: &[f32], channels: usize, from: u32, to: u32) -> Vec<f32>`**
+  (tests) samples converted from one rate to another by the streams' resampler
+
+- **`fn ring_check(n: usize, piece: usize, take: usize, threaded: bool) -> bool`**
+  (tests) the ring of a push stream: n samples written in pieces of `piece` and read in
+  pieces of `take`, by turns or (threaded, Windows / Linux) by a writer thread while this one
+  reads -> whether every sample arrived once and in order
+
+- **`fn theme_path(kind: u32) -> Option<String>`** *(Linux)*
+  (tests, Linux) the sound theme's file for a SOUND_\* kind (".disabled": switched off)
 
 ### `plat/log.rs`
 
@@ -20821,6 +21095,9 @@ REQUEST_SECRET: u32 = 13
 /// for the permission the handle needs (from the user's gesture), imports the file and
 /// completes with 2
 REQUEST_REOPEN: u32 = 20
+/// (browser) sound output (audio.rs, web_audio.rs, web/audio.js): five u32, op (1 open, 2 close,
+/// 3 play, 4 pause, 5 flush), stream id, rate, channels, latency frames; no completion
+REQUEST_AUDIO: u32 = 14
 ```
 
 - **`enum RequestStatus`**

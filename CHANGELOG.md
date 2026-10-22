@@ -36,6 +36,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** RIP messages (netpkt::rip: version 2 after RFC 2453 and version 1 after RFC 1058, requests and responses with their route entries, the authentication entry recognised, simple passwords read and written) and their dissection (decode::layers: a field per entry with its bytes and what a receiver refuses; decode::info: "RIPv2 Response, 3 routes")
 - **netpkt:** Address and port translation of IPv4 packets in place (netpkt::nat: Flow::of / Flow::quoted, rewrite and rewrite_quoted with incremental checksums of the header, TCP, UDP and ICMP, ICMP errors with the packet they quote per RFC 5508) and checksum::update for a changed run of bytes
 - **base:** Tree::find_mode(prompt): a mode by its prompt, so modes that parts of an app add need no fixed number
+- **plat:** plat::audio: sound output on every target -- streams (Stream::open + write / write_i16 into a ring the platform drains, or open_fill with a callback on the audio thread; start / pause / stop / finish, volume, latency, played frames, underruns, the default device followed), short sounds mixed by play / play_file (WAV PCM and float, Ogg Vorbis), the system's sounds by sound(SOUND_*); Windows WASAPI, Linux the PulseAudio protocol (pipewire-pulse, WSLg), the browser an AudioWorklet (web/audio.js), Android AAudio (android/audio.c). ui.beep, ui.dialog_sound and ui.set_sounds play them from the UI; scripts check them with expect sound
 
 ### Changed
 

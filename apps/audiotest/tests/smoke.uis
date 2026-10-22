@@ -1,0 +1,33 @@
+# audiotest: the UI headless. Nothing is played here: the system sounds of ui.beep and of the
+# dialog only print "sound: NAME" in a headless run, and `expect sound` checks what was asked
+# for (the script language: docs/GUIDE.md section 12; the sounds: section 33).
+size 720 1000
+expect "Abspielen" exists
+expect "Glocke (WAV)" exists
+expect text:"Aus" exists
+# a dialog that plays the warning sound when it opens (Windows and Linux desktops do)
+click "Warnung im Dialog"
+expect dialog:"Achtung" exists
+expect sound warning
+wait 100
+expect sound none
+click "OK"
+expect dialog:"Achtung" missing
+# the system's sounds through ui.beep
+click "Information"
+expect sound information
+click "Benachrichtigung"
+expect sound notify
+# the app's switch: no sound any more, neither from buttons nor from the dialog
+click "Klänge an"
+expect "Klänge an" unchecked
+click "Fehler"
+expect sound none
+click "Warnung im Dialog"
+expect dialog:"Achtung" exists
+expect sound none
+click "OK"
+click "Klänge an"
+click "Frage"
+expect sound question
+shot build/audiotest.png

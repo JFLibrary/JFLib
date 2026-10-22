@@ -62,6 +62,9 @@
 //   sync [MS]                     wait until no background job is pending: the app's sync hook,
 //                                 the async tasks' work (blocking jobs, wake-ups) and the spell
 //                                 checker's workers (suggestions, edit_spell.rs)
+//   expect sound KIND|none        the last sound ui.beep / ui.dialog_sound asked for since the
+//                                 last check (default, information, warning, error, question,
+//                                 notify; headless runs play none)
 //   expect_warn / expect_nowarn   a UIWARN was / was not printed since the last check (a
 //                                 script also warns about a widget id used twice in a pass)
 // (K1) Files and clipboard, drag and drop:
@@ -1611,6 +1614,16 @@ impl Ui {
     fn sc_expect(&mut self, a: &[u8]) {
         if let Some(r) = word_eq(a, "window") {
             self.expect_window(r);
+            return;
+        }
+        if let Some(r) = word_eq(a, "sound") {
+            // the last sound ui.beep / ui.dialog_sound asked for since the last check
+            let want = skip_ws(r);
+            let got = self.m.sound.last.take();
+            let name = got.map_or("none", plat::audio::sound_name);
+            if !want.starts_with(name.as_bytes()) || (want.len() > name.len() && want[name.len()] > b' ') {
+                self.fail(alloc::format!("sound {name}").as_bytes());
+            }
             return;
         }
         let (s, rest) = self.resolve(a);

@@ -90,6 +90,7 @@ final class GalleryHost {
     static byte[] call(int kind, byte[] in) {
         if (kind >= GallerySecrets.CALL_SECRET_AVAILABLE && kind <= GallerySecrets.CALL_SECRET_DELETE)
             return app == null ? null : GallerySecrets.call(app, kind, in);
+        if (kind == GalleryAudio.CALL_SOUND) return app == null ? null : GalleryAudio.call(app, in);
         Context context = activity;
         if (context == null) return null;
         try {

@@ -1,0 +1,4 @@
+#!args --test audio
+# (Rust only) plattest --test audio: plat::audio without a device (lib/plat/audio.rs): WAV files
+# in every format and the damaged ones, the stream's ring, the resampler, generated tones, Ogg
+# Vorbis files, the PulseAudio wire format (Linux).

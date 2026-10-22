@@ -146,6 +146,8 @@ mod ribbon;
 mod settings_page;
 mod shell;
 mod slider;
+// the system's sounds: ui.beep, the sound of a message dialog, the app's switch (sound.rs)
+mod sound;
 mod rtl;
 mod runtime;
 mod stock;
@@ -376,6 +378,8 @@ pub(crate) struct Mods {
     pub(crate) hyph: hyph::S,
     /// (ROADMAP §6) the open lists of ui.vlist_begin (vlist.rs)
     pub(crate) vlist: vlist::S,
+    /// (ROADMAP §3) the app's sound switch, the last sound asked for (sound.rs)
+    pub(crate) sound: sound::S,
 }
 
 /// the UI context: everything ASMLIB keeps in g_* variables

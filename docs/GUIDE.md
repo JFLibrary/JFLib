@@ -1418,6 +1418,7 @@ in DIP):
 | `close window ID`, `movewin ID X Y`, `resizewin ID W H`, `activate ID` | the user moves / closes windows |
 | `sync [MS]` | wait until no background job is pending (`sync_hook_set`) |
 | `expect_warn`, `expect_nowarn` | a `UIWARN` was / was not printed since the last check |
+| `expect sound KIND\|none` | the last sound `ui.beep` / `ui.dialog_sound` asked for since the last check (`default`, `information`, `warning`, `error`, `question`, `notify`; headless runs play nothing, §33) |
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |
 | `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back |
 | `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
@@ -3278,3 +3279,118 @@ the accessibility tree;
 `doc_shots.uis` light / dark / high contrast / HTML / Hebrew, `doc_rtl.uis` (mirrored window),
 `doc_scale.uis` (150 % text), `doc_links.uis`, `doc_select.uis`, `doc_keys.uis` (also 50 000
 blocks), `vlist.uis` (100 000 rows); all with `--verify-dirty`).
+
+## 33. Sound: streams, short sounds, the system's sounds
+
+[`plat::audio`](../lib/plat/audio.rs) plays sound on all four targets: **streams** the app fills
+(a synthesizer, a decoder, a tone generator), **short sounds** from memory or files mixed
+together (`play`, `play_file`), and **the system's own sounds** for events (`sound`). The UI
+side is `ui.beep(kind)` and `ui.dialog_sound(kind)` ([`ui/sound.rs`](../lib/ui/sound.rs)).
+
+```rust
+use plat::audio::{self, Config, Stream};
+
+// a stream that calls back for its samples (f32, interleaved, -1 ..= 1): a 440 Hz sine
+let cfg = Config { rate: 48_000, channels: 2, latency_ms: 30, name: "Ton" };
+let mut phase = 0.0f64;
+let tone = Stream::open_fill(&cfg, move |buf: &mut [f32]| {
+    for frame in buf.chunks_exact_mut(2) {
+        let s = (0.2 * rt::x87::sin(phase)) as f32;  // (a table is cheaper)
+        frame[0] = s;
+        frame[1] = s;
+        phase += core::f64::consts::TAU * 440.0 / 48_000.0;
+    }
+    true                                          // false: this was the last buffer
+})?;
+tone.set_volume(0.5);                             // ramped over one buffer, no click
+tone.pause(); tone.start();                       // the queued frames stay while paused
+drop(tone);                                       // closes the device stream
+
+// a stream the app writes into (from a decoder, a timer): write takes what fits
+let mut s = Stream::open(&Config::new(44_100, 2))?;   // 40 ms, the app's name
+let n = s.write(&samples);                        // whole frames taken; s.writable() before
+s.write_i16(&pcm16);                              // 16-bit samples, converted
+s.finish();                                       // State::Ended once the ring is played
+
+// short sounds: mixed into one shared stream, the file decoded once per call
+audio::play_file("app://klick.wav")?;             // WAV or Ogg Vorbis through the VFS
+let chime = audio::Sound::load("app://glocke.oga")?;   // keep it, play it often
+let v = audio::play(&chime)?;                     // v.stop(), v.playing(), v.set_volume(0.3)
+
+// the system's sound for an event (the user's sound scheme / theme)
+ui.beep(audio::SOUND_WARNING);
+if ui.dialog_begin(ID_ASK, "Datei überschreiben?", &open) {
+    ui.dialog_sound(audio::SOUND_QUESTION);       // once, as it opens -- where dialogs do that
+    // ...
+}
+```
+
+* **One model: the ring.** A stream has a ring the app writes into and the platform's audio
+  thread drains; `open_fill` is the same stream without a ring, its `fill` called on that
+  thread. This works on all four targets alike: the browser's sound runs in an AudioWorklet
+  that cannot call into the app's WASM instance, so it is fed from a buffer anyway, and the
+  ring keeps the app's code (allocation, locks, the UI's pace) off the real-time thread.
+  `fill` runs on Windows / Linux / Android on the audio thread and in the browser in the
+  worker's pump (every 10 ms): it must not block. `write` never blocks either -- it takes what
+  fits (`writable()`); a stream that runs dry plays silence and counts an underrun
+  (`underruns()`), not when the app said `finish()`.
+* **Latency**: `Config::latency_ms` (default 40, 10 ..= 1000) is split between the device's
+  buffer (half, 10 ..= 100 ms) and the ring (the rest); a fill stream gives all of it to the
+  device. `latency_ms()` is what is queued now plus the device's own latency (WASAPI's stream
+  latency, PulseAudio's sink latency, the AudioContext's base and output latency). An app that
+  writes from UI timers (16 ms frames) wants 50 ms or more; a fill stream reaches 20 ms.
+  `played()` counts the frames heard so far.
+* **States**: `Starting` (the browser host has not answered yet), `Playing`, `Paused`,
+  `Stopped` (`stop()`: the ring and the device's buffer emptied), `Ended` (after `finish()` or
+  a fill that returned false; the device stream stops, `start()` or another `write` plays
+  again), `Blocked` (the browser waits for a user gesture), `Lost` (the device went away and no
+  other is there; the stream plays again when one appears). No device or sound service at all:
+  `open` gives `AudioError::Unavailable`; `available()` asks beforehand.
+* **Formats**: the device side is always f32 at the stream's rate and channels (WAVE order:
+  1 mono, 2 left / right, 6 = 5.1 as FL FR FC LFE BL BR); the system converts rate and
+  channels where needed, the browser's context rate is converted here (windowed sinc).
+  `Sound::wav` reads RIFF WAVE with PCM 8 / 16 / 24 / 32 bits and float 32 / 64 (also
+  extensible), `Sound::ogg` Ogg Vorbis (floor 1, residues 0 / 1 / 2, coupling; matches
+  libvorbis to 5e-5), `Sound::decode` tells them apart, `Sound::tone(freq, ms)` makes a sine,
+  `to_wav()` writes 16-bit PCM. A `Sound` holds everything decoded (10 minutes at most):
+  music belongs in a stream.
+* **`play`** mixes into one stream of 48 kHz stereo that opens with the first sound and ends
+  after 2 s of silence (an idle open stream would keep the computer from sleeping); each sound
+  is converted to 48 kHz while it plays. Dropping the `Voice` lets the sound play on.
+
+| | Streams | Default device | System sounds |
+|---|---|---|---|
+| Windows | WASAPI shared mode, event-driven, a thread per stream ("Audio" MMCSS class), f32 with `AUTOCONVERTPCM` | `IMMNotificationClient`: a new default device or an unplugged one reopens the stream there (`device_changes()`); `device()` is its friendly name | `PlaySound` aliases of the sound scheme: `SystemAsterisk`, `SystemExclamation`, `SystemHand`, `SystemQuestion`, `.Default`, `Notification.Default` |
+| Linux | the PulseAudio native protocol over its Unix socket (`$PULSE_SERVER`, `$XDG_RUNTIME_DIR/pulse/native`): pipewire-pulse on current desktops, PulseAudio, WSLg's server; a connection and thread per stream, the cookie for auth | the server moves the stream to a new default sink itself (`device()`: the sink's name, `device_changes()` counts the moves); a lost server: `Lost`, reconnected every second | the freedesktop sound theme (`dialog-information`, `-warning`, `-error`, `-question`, `bell`, `message-new-instant`; `.oga` / `.ogg` / `.wav`, `Inherits=`, `.disabled`), the theme and the switch of `org.gnome.desktop.sound` (settings portal); no file: a generated tone |
+| Browser | WebAudio: an AudioWorklet per stream fed from a SharedArrayBuffer ring (cross-origin isolated pages) or posted buffers ([`web/audio.js`](../web/audio.js)) | the browser follows the system's output itself | generated tones |
+| Android | AAudio (shared, low latency) through the host ([`android/audio.c`](../android/audio.c)), its callback renders | a disconnected device reopens the stream on the new default | the notification sound (`SOUND_NOTIFY`), `ToneGenerator` beeps on the system stream |
+
+* **The browser** keeps an AudioContext suspended until the page had a user gesture: a stream
+  opened before shows `State::Blocked`; the first pointer or key event resumes it (the host
+  listens for them). Background tabs throttle the worker's timers less than the page's, but a
+  long busy frame of the app delays the pump: give such apps a larger latency.
+  `window.jfguiAudio` (read-only) gives tests the context and the nodes.
+* **Sounds off**: `ui.set_sounds(false)` (an app setting) or `jfgui_SOUNDS=0` silence
+  `ui.beep` and `ui.dialog_sound`; the systems' own switches apply too (Windows' "No sounds"
+  scheme; Linux's `event-sounds`, also for `plat::audio::sound`; Android's system volume).
+  `dialog_sound` plays only where message dialogs play one (`audio::dialog_sounds()`: Windows,
+  Linux desktops; not Android, not the browser). Overrides: `jfgui_SOUND_THEME`,
+  `jfgui_EVENT_SOUNDS=0|1`; `jfgui_AUDIO_DRYRUN=1` (or `audio::set_dry_run`) prints
+  `sound: NAME` instead of playing.
+* **Scripts**: headless runs play nothing; `expect sound KIND|none` checks what `ui.beep` /
+  `ui.dialog_sound` asked for since the last check (section 12).
+* Not there yet: output without a sound server on Linux (raw ALSA), choosing an output device,
+  the stream's name in Windows' volume mixer (it names the program), capture (microphone),
+  video. Sound needs no `PERMISSIONS` right (output reveals nothing), but a Flatpak package
+  only reaches the sound server with `--socket=pulseaudio`, which `tools/package.py` does not
+  add yet (that socket also allows recording): add it to the finish-args by hand for now.
+
+Tests: `apps/audiotest` -- the demo (tone generator, the chime as WAV and Ogg Vorbis, the
+system sounds, a dialog with its sound) and `--test play` (push and fill streams, pause / stop,
+volume, a device change, the mixer; Windows: WASAPI loopback must hear the tones at their
+frequency), `--test sounds`, `--test pulse` (Linux: the server lists the stream, corks it,
+reports its latency; WSLg's server), `tests/audio_web.mjs` (Chromium and Firefox: an
+AnalyserNode hears the tone through the ring and through posted buffers, `Blocked` until a
+click), `tests/android_audio.py` (an emulator: audioserver plays the app's AAudio track, the
+self-test passes). `plattest --test audio`: WAV formats and damaged files, the ring, the
+resampler, Ogg Vorbis files against their sines, the PulseAudio wire format, the sound theme.

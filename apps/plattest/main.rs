@@ -124,6 +124,9 @@
 //                                          chosen folder, single documents, AtomicFile in place,
 //                                          streams, rename / move, folders, display names, the
 //                                          file dialog's desktop answers
+//   plattest --test audio                  (t_audio.rs) plat::audio without a device: WAV files
+//                                          (formats, damaged ones), the ring, the resampler,
+//                                          tones, Ogg Vorbis, the PulseAudio wire format (Linux)
 //   plattest --test all                    threads, files, ini, cpu
 //   --repeat N                             run the selected tests N times (only failures are
 //                                          printed then) -- a stress loop for races
@@ -191,6 +194,8 @@ mod t_taskbar;
 mod t_spell;
 // file types without a setup, the system's recent files
 mod t_assoc;
+// sound output without a device: WAV, ring, resampler, Vorbis, the PulseAudio wire format
+mod t_audio;
 mod t_recent;
 
 use plat::{
@@ -359,6 +364,8 @@ fn plattest() -> i32 {
         Some("assoc") => t_assoc::t_assoc,             // file types / schemes without a setup (removed again)
         Some("recent") => t_recent::t_recent,          // the system's recent files (redirected, scratch)
         Some("recent-win") => t_recent::t_recent_win,  // Windows, by hand: the real shell and jump list
+        Some("audio") => t_audio::t_audio,             // plat::audio without a device (files, ring, resampler)
+        Some("audio-ref") => t_audio::t_audio_ref,     // development: Ogg Vorbis against another decoder
         Some("async") => t_async::t_async,             // plat::task / plat::aio: executors, pool, timers, files
         Some("async-panic") => t_async::t_async_panic, // its children: a panic in a task,
         Some("async-panic-job") => t_async::t_async_panic_job, // in a blocking job,
