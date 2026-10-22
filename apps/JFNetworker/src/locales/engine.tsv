@@ -857,3 +857,9 @@ OSPF: SPF-Lauf {}: Routen: {}, neu: {}, geändert: {}, entfallen: {}.	OSPF: SPF 
 OSPF: Route {} ({}) über {}, Kosten {}.	OSPF: route {} ({}) via {}, cost {}.
 OSPF: Route {} ({}) jetzt über {}, Kosten {}.	OSPF: route {} ({}) now via {}, cost {}.
 OSPF: Route {} ({}) entfällt.	OSPF: route {} ({}) is gone.
+{} ist keine Adresse dieses Geräts.	{} is not an address of this device.
+[{}]:{} ist kein Ziel für TCP.	[{}]:{} is no destination for TCP.
+Packet Too Big: kleinere Segmente, MSS {}.	Packet Too Big: smaller segments, MSS {}.
+eine Adresse der anderen Familie	an address of the other family
+„server“ fehlt oder ist keine IP-Adresse.	“server” is missing or not an IP address.
+Backend {} braucht „addr“ mit einer IP-Adresse.	Backend {} needs “addr” with an IP address.

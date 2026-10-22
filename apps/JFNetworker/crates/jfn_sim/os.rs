@@ -45,6 +45,20 @@
 //                             its name on the device
 //   Engine::rename_service    Action::RenameService: a service goes on under another name
 //                             (Service::renamed tells it; its time series follow)
+//   both families             Sock::addr says what a UDP socket takes: 0.0.0.0 every IPv4
+//                             address (bind, as before), :: every address of both families
+//                             (bind_any; tcp_listen likewise: an IPv6 socket that also takes
+//                             IPv4, as Linux opens one with net.ipv6.bindv6only = 0), one
+//                             address otherwise (bind_on, tcp_listen_on); one on :: conflicts
+//                             with every other socket of its port.  Dgram and the TCP rows carry
+//                             netpkt::IpAddr; a peer that came over IPv4 stays an IPv4 address
+//                             (Linux would hand it out as ::ffff:a.b.c.d).  send / send_from /
+//                             tcp_connect take either family.  udp_connect makes a socket
+//                             connected: ICMP and ICMPv6 errors about its datagrams to that peer
+//                             reach the service as SvcEvent::UdpError.  OsApi::resolve_host is
+//                             getaddrinfo: A, AAAA or both as the device can use them, in the
+//                             order of RFC 6724 (resolver.rs)
+//   Engine::udp6_input        from l3v6.rs: the socket for a UDP datagram over IPv6
 //
 // Everything a service sees goes through its node's inbox, which a node timer (SLOT_OS)
 // empties at the same virtual time: a service never runs inside another one's call, and a
@@ -70,10 +84,11 @@ use netpkt::arp::{Arp, OP_REQUEST};
 use netpkt::eth::{ET_ARP, ET_IPV4};
 use netpkt::icmp::Icmp;
 use netpkt::ipv4::{Ipv4Hdr, Ipv4View, PROTO_ICMP, PROTO_UDP};
+use netpkt::ipv6::{Ipv6Hdr, Ipv6View, NH_UDP};
 use netpkt::pkt::{Pkt, HEADROOM};
 use netpkt::syslog;
 use netpkt::udp::{UdpHdr, UdpView, PORT_SYSLOG};
-use netpkt::{Ipv4, Mac, Prefix4};
+use netpkt::{IpAddr, Ipv4, Ipv6, Mac, Prefix4};
 
 use crate::action::ActErr;
 use crate::ip::{IfKind, Iface, Origin, Route};
@@ -106,28 +121,73 @@ pub enum Owner {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Sock {
     pub port: u16,
+    /// what it takes: 0.0.0.0 every IPv4 address, :: every address of both families, else
+    /// datagrams to that address
+    pub addr: IpAddr,
     /// only datagrams that arrive on this interface (SO_BINDTODEVICE)
     pub iface: Option<u16>,
     /// also datagrams to addresses the device does not have yet (a packet socket)
     pub raw: bool,
     pub owner: Owner,
+    /// connected to this peer (udp_connect): ICMP errors about datagrams to it reach the owner
+    pub peer: Option<(IpAddr, u16)>,
     pub rx: u64,
     pub tx: u64,
+}
+
+/// every IPv4 address (what bind gives)
+pub const ANY4: IpAddr = IpAddr::V4(Ipv4::UNSPECIFIED);
+/// every address of both families (an IPv6 socket on :: that takes IPv4 too)
+pub const ANY: IpAddr = IpAddr::V6(Ipv6::UNSPECIFIED);
+
+/// a socket bound to `bound` takes a packet to `dst`
+pub(crate) fn takes(bound: IpAddr, dst: IpAddr) -> bool {
+    match (bound, dst) {
+        (IpAddr::V6(b), _) if b.is_unspecified() => true,
+        (IpAddr::V4(b), IpAddr::V4(d)) => b.is_unspecified() || b == d,
+        (IpAddr::V6(b), IpAddr::V6(d)) => b == d,
+        _ => false,
+    }
+}
+
+/// two sockets bound to `a` and `b` would share an address (one port cannot hold both)
+pub(crate) fn overlap(a: IpAddr, b: IpAddr) -> bool {
+    if a == ANY || b == ANY {
+        return true;
+    }
+    match (a, b) {
+        (IpAddr::V4(x), IpAddr::V4(y)) => x.is_unspecified() || y.is_unspecified() || x == y,
+        (IpAddr::V6(x), IpAddr::V6(y)) => x == y,
+        _ => false,
+    }
 }
 
 /// a received UDP datagram
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Dgram {
-    pub src: Ipv4,
+    pub src: IpAddr,
     pub sport: u16,
-    pub dst: Ipv4,
+    pub dst: IpAddr,
     pub dport: u16,
-    /// the IPv4 interface it arrived on
+    /// the interface it arrived on (IPv6 runs on the IPv4 interface numbers)
     pub iface: u16,
+    /// its TTL or hop limit
     pub ttl: u8,
     pub data: Vec<u8>,
     /// the frame that brought it (0: made by the device itself)
     pub hop: HopId,
+}
+
+impl Dgram {
+    /// the sender as an IPv4 address (0.0.0.0 for one over IPv6): for the services that bind
+    /// IPv4 sockets only (DHCP, NTP, syslog, RIP)
+    pub fn src4(&self) -> Ipv4 {
+        self.src.v4().unwrap_or(Ipv4::UNSPECIFIED)
+    }
+    /// the destination as an IPv4 address (0.0.0.0 for one over IPv6)
+    pub fn dst4(&self) -> Ipv4 {
+        self.dst.v4().unwrap_or(Ipv4::UNSPECIFIED)
+    }
 }
 
 /// a received IP packet of a protocol a service takes without a transport header (OSPF,
@@ -187,6 +247,9 @@ pub enum SvcEvent {
     Console(ConsoleEv),
     /// an IP packet of a protocol the service takes directly (OSPF: ospf.rs)
     Ip(IpPkt),
+    /// an ICMP or ICMPv6 error about a datagram of a connected UDP socket (udp_connect) to its
+    /// peer: Refused for port unreachable (ECONNREFUSED), else Unreachable
+    UdpError { port: u16, peer: (IpAddr, u16), err: crate::tcp::TcpEnd, hop: HopId },
 }
 
 /// what the console gives a program the shell started
@@ -420,8 +483,8 @@ pub struct Os {
     next_svc: u32,
     pub(crate) inbox: VecDeque<Job>,
     pub resolver: Resolver,
-    /// static host names (/etc/hosts, IOS "ip host")
-    pub hosts: Vec<(String, Ipv4)>,
+    /// static host names (/etc/hosts, IOS "ip host" and "ipv6 host"), both families
+    pub hosts: Vec<(String, IpAddr)>,
     pub log: LogCfg,
     pub clock: Clock,
     /// ICMP echo identifiers of services
@@ -470,9 +533,13 @@ impl Os {
     pub(crate) fn running(&self, id: u32) -> bool {
         self.svcs.iter().any(|s| s.id == id && s.running)
     }
-    /// a port is free for a new socket on `iface` (None: every interface)
+    /// a port is free for a new IPv4 socket on `iface` (None: every interface)
     pub fn port_free(&self, port: u16, iface: Option<u16>) -> bool {
-        !self.socks.iter().any(|s| s.port == port && (s.iface.is_none() || iface.is_none() || s.iface == iface))
+        self.port_free_on(ANY4, port, iface)
+    }
+    /// a port is free for a new socket bound to `addr` on `iface`
+    pub fn port_free_on(&self, addr: IpAddr, port: u16, iface: Option<u16>) -> bool {
+        !self.socks.iter().any(|s| s.port == port && overlap(s.addr, addr) && (s.iface.is_none() || iface.is_none() || s.iface == iface))
     }
 }
 
@@ -515,18 +582,35 @@ impl OsApi<'_> {
             _ => 0,
         }
     }
-    /// a socket on `port` (0: a free ephemeral port), on one interface or all
+    /// an IPv4 socket on `port` (0: a free ephemeral port), on one interface or all
     pub fn bind(&mut self, port: u16, iface: Option<u16>) -> Result<u16, String> {
         self.bind_msg(port, iface).map_err(|m| m.text())
     }
     /// bind(), the refusal as a message
     pub fn bind_msg(&mut self, port: u16, iface: Option<u16>) -> Result<u16, Msg> {
-        self.eng.sock_bind(self.ni, port, iface, false, Owner::Svc(self.id))
+        self.eng.sock_bind(self.ni, ANY4, port, iface, false, Owner::Svc(self.id))
+    }
+    /// a socket bound to an address: 0.0.0.0 every IPv4 address, :: every address of both
+    /// families, else one of the device's addresses
+    pub fn bind_on(&mut self, addr: IpAddr, port: u16, iface: Option<u16>) -> Result<u16, String> {
+        self.bind_on_msg(addr, port, iface).map_err(|m| m.text())
+    }
+    /// bind_on(), the refusal as a message
+    pub fn bind_on_msg(&mut self, addr: IpAddr, port: u16, iface: Option<u16>) -> Result<u16, Msg> {
+        if !addr.is_unspecified() && !self.is_mine(addr) {
+            return Err(msg!("{} ist keine Adresse dieses Geräts.", addr));
+        }
+        self.eng.sock_bind(self.ni, addr, port, iface, false, Owner::Svc(self.id))
+    }
+    /// a socket on `port` for both families (bind_on ::), as the services that speak IPv4 and
+    /// IPv6 open theirs
+    pub fn bind_any(&mut self, port: u16, iface: Option<u16>) -> Result<u16, String> {
+        self.bind_on(ANY, port, iface)
     }
     /// a packet socket on one interface: datagrams to `port` arrive even before the device has
     /// an address there
     pub fn bind_raw(&mut self, port: u16, iface: u16) -> Result<u16, String> {
-        self.eng.sock_bind(self.ni, port, Some(iface), true, Owner::Svc(self.id)).map_err(|m| m.text())
+        self.eng.sock_bind(self.ni, ANY4, port, Some(iface), true, Owner::Svc(self.id)).map_err(|m| m.text())
     }
     pub fn close(&mut self, port: u16) {
         let id = self.id;
@@ -534,14 +618,22 @@ impl OsApi<'_> {
             os.socks.retain(|s| !(s.port == port && s.owner == Owner::Svc(id)));
         }
     }
-    /// sends over the routing table (the source address is the outgoing interface's); false
-    /// without a route
-    pub fn send(&mut self, sport: u16, dst: Ipv4, dport: u16, data: &[u8]) -> bool {
-        self.eng.udp_send(self.ni, None, sport, dst, dport, data, self.cause)
+    /// connects the socket on `port` to a peer (connect(2) on UDP): ICMP errors about what it
+    /// sends there come as SvcEvent::UdpError; None makes it unconnected again
+    pub fn udp_connect(&mut self, port: u16, peer: Option<(IpAddr, u16)>) {
+        let id = self.id;
+        if let Some(s) = self.eng.os_mut(self.ni).and_then(|os| os.socks.iter_mut().find(|s| s.port == port && s.owner == Owner::Svc(id))) {
+            s.peer = peer;
+        }
     }
-    /// sends over the routing table from a given address
-    pub fn send_from(&mut self, src: Ipv4, sport: u16, dst: Ipv4, dport: u16, data: &[u8]) -> bool {
-        self.eng.udp_send(self.ni, Some(src), sport, dst, dport, data, self.cause)
+    /// sends over the routing table (the source address is the outgoing interface's, for IPv6
+    /// the one source address selection picks); false without a route
+    pub fn send(&mut self, sport: u16, dst: impl Into<IpAddr>, dport: u16, data: &[u8]) -> bool {
+        self.eng.udp_send(self.ni, None, sport, dst.into(), dport, data, self.cause)
+    }
+    /// sends over the routing table from a given address (of the destination's family)
+    pub fn send_from(&mut self, src: impl Into<IpAddr>, sport: u16, dst: impl Into<IpAddr>, dport: u16, data: &[u8]) -> bool {
+        self.eng.udp_send(self.ni, Some(src.into()), sport, dst.into(), dport, data, self.cause)
     }
     /// sends out of an interface to a MAC address, without routing and ARP (DHCP to a client
     /// without an address, broadcasts on one interface)
@@ -582,12 +674,22 @@ impl OsApi<'_> {
     pub fn iface_of(&self, ip: Ipv4) -> Option<u16> {
         self.ifaces().iter().position(|f| !f.hidden && f.has(ip)).map(|i| i as u16)
     }
-    pub fn is_mine(&self, ip: Ipv4) -> bool {
-        self.eng.stack(self.ni).is_some_and(|s| s.is_mine(ip))
+    /// an address of this device (IPv6: a usable one of an interface that runs IPv6)
+    pub fn is_mine(&self, ip: impl Into<IpAddr>) -> bool {
+        self.eng.is_mine_ip(self.ni, ip.into())
     }
     /// the address a packet to `dst` would leave with
     pub fn source_for(&self, dst: Ipv4) -> Option<Ipv4> {
         self.eng.source_for(self.ni, dst)
+    }
+    /// the same for either family (IPv6: source address selection, RFC 6724); None without a
+    /// route
+    pub fn source_for_ip(&self, dst: IpAddr) -> Option<IpAddr> {
+        self.eng.source_ip(self.ni, dst)
+    }
+    /// the device runs IPv6 (an interface is configured for it)
+    pub fn uses_v6(&self) -> bool {
+        self.eng.v6_used(self.ni)
     }
     pub fn add_addr(&mut self, i: u16, p: Prefix4) -> Result<(), String> {
         match self.eng.stack_mut(self.ni) {
@@ -616,6 +718,13 @@ impl OsApi<'_> {
     pub fn resolve(&mut self, name: &str, qtype: u16) -> u32 {
         let id = self.id;
         self.eng.lookup_start(self.ni, name, qtype, LookupOwner::Svc(id))
+    }
+    /// starts a lookup of a host's addresses as getaddrinfo does (Family::Any: A and AAAA as
+    /// the device can use them; Answer::sorted gives them in the order to try);
+    /// SvcEvent::Resolved(id) follows
+    pub fn resolve_host(&mut self, name: &str, fam: crate::resolver::Family) -> u32 {
+        let id = self.id;
+        self.eng.lookup_host(self.ni, name, fam, LookupOwner::Svc(id))
     }
     pub fn lookup(&self, id: u32) -> Option<&Lookup> {
         self.eng.os(self.ni)?.resolver.lookups.get(&id)
@@ -710,29 +819,55 @@ impl Engine {
         self.set_timer(ni, SLOT_OS, now);
     }
 
-    /// a free ephemeral port (random, as Linux and IOS pick them)
-    pub(crate) fn ephemeral_port(&mut self, ni: usize) -> u16 {
+    /// a free ephemeral port (random, as Linux and IOS pick them) for a socket bound to `addr`
+    pub(crate) fn ephemeral_port(&mut self, ni: usize, addr: IpAddr) -> u16 {
         let (lo, hi) = self.os(ni).map(|o| o.ephemeral).unwrap_or((49152, 65535));
         for _ in 0..64 {
             let p = match self.nodes.get_mut(ni) {
                 Some(Some(n)) => lo + n.rng.below((hi - lo) as u32 + 1) as u16,
                 _ => lo,
             };
-            if self.os(ni).is_some_and(|o| o.port_free(p, None)) {
+            if self.os(ni).is_some_and(|o| o.port_free_on(addr, p, None)) {
                 return p;
             }
         }
-        (lo..=hi).find(|&p| self.os(ni).is_some_and(|o| o.port_free(p, None))).unwrap_or(0)
+        (lo..=hi).find(|&p| self.os(ni).is_some_and(|o| o.port_free_on(addr, p, None))).unwrap_or(0)
     }
 
-    pub(crate) fn sock_bind(&mut self, ni: usize, port: u16, iface: Option<u16>, raw: bool, owner: Owner) -> Result<u16, Msg> {
-        let port = if port == 0 { self.ephemeral_port(ni) } else { port };
+    /// a UDP socket bound to `addr` (ANY4: every IPv4 address, ANY: both families)
+    pub(crate) fn sock_bind(&mut self, ni: usize, addr: IpAddr, port: u16, iface: Option<u16>, raw: bool, owner: Owner) -> Result<u16, Msg> {
+        let port = if port == 0 { self.ephemeral_port(ni, addr) } else { port };
         let os = self.os_mut(ni).ok_or_else(|| msg!("kein IP"))?;
-        if port == 0 || !os.port_free(port, iface) {
+        if port == 0 || !os.port_free_on(addr, port, iface) {
             return Err(msg!("Port {} ist schon belegt.", port));
         }
-        os.socks.push(Sock { port, iface, raw, owner, rx: 0, tx: 0 });
+        os.socks.push(Sock { port, addr, iface, raw, owner, peer: None, rx: 0, tx: 0 });
         Ok(port)
+    }
+
+    /// an address of the device (IPv4: of any interface; IPv6: a usable one where IPv6 runs)
+    pub(crate) fn is_mine_ip(&self, ni: usize, ip: IpAddr) -> bool {
+        match ip {
+            IpAddr::V4(a) => self.stack(ni).is_some_and(|s| s.is_mine(a)),
+            IpAddr::V6(a) => self.v6(ni).is_some_and(|v| v.find(a).is_some()),
+        }
+    }
+
+    /// the source address of a packet to `dst` (IPv6: RFC 6724 source address selection); None
+    /// without a route
+    pub(crate) fn source_ip(&self, ni: usize, dst: IpAddr) -> Option<IpAddr> {
+        match dst {
+            IpAddr::V4(d) => self.source_for(ni, d).map(IpAddr::V4),
+            IpAddr::V6(d) => {
+                let routed = self.v6(ni).is_some_and(|v| v.find(d).is_some()) || self.ip6_route(ni, d, None).is_some();
+                if routed { self.ip6_source(ni, d, None).map(IpAddr::V6) } else { None }
+            }
+        }
+    }
+
+    /// IPv6 is configured on the device
+    pub(crate) fn v6_used(&self, ni: usize) -> bool {
+        self.v6(ni).is_some_and(|v| v.used())
     }
 
     /// a UDP datagram as an IPv4 packet
@@ -747,16 +882,31 @@ impl Engine {
         Some(p.into_vec())
     }
 
-    fn count_tx(&mut self, ni: usize, sport: u16) {
-        if let Some(s) = self.os_mut(ni).and_then(|o| o.socks.iter_mut().find(|s| s.port == sport)) {
+    /// counts a datagram the socket of `sport` sent from `src` (the socket of its family when
+    /// two share the port)
+    fn count_tx(&mut self, ni: usize, sport: u16, src: IpAddr) {
+        let Some(os) = self.os_mut(ni) else {
+            return;
+        };
+        let i = os.socks.iter().position(|s| s.port == sport && takes(s.addr, src)).or_else(|| os.socks.iter().position(|s| s.port == sport));
+        if let Some(s) = i.and_then(|i| os.socks.get_mut(i)) {
             s.tx += 1;
         }
     }
 
     /// sends a datagram over the routing table; false without a route
-        pub(crate) fn udp_send(&mut self, ni: usize, src: Option<Ipv4>, sport: u16, dst: Ipv4, dport: u16, data: &[u8], cause: Option<HopId>) -> bool {
+        pub(crate) fn udp_send(&mut self, ni: usize, src: Option<IpAddr>, sport: u16, dst: IpAddr, dport: u16, data: &[u8], cause: Option<HopId>) -> bool {
+        let dst = match dst {
+            IpAddr::V4(d) => d,
+            IpAddr::V6(d) => return self.udp6_send(ni, src, sport, d, dport, data, cause),
+        };
         let dev = self.dev_of(ni);
-        let src = match src.or_else(|| self.source_for(ni, dst)) {
+        let src = match src {
+            Some(IpAddr::V4(s)) => Some(s),
+            Some(IpAddr::V6(_)) => return false,
+            None => self.source_for(ni, dst),
+        };
+        let src = match src {
             Some(s) => s,
             None => {
                 self.note(dev, cause, Note::IpNoRoute { dst });
@@ -766,8 +916,38 @@ impl Engine {
         let Some(pkt) = self.udp_packet(ni, src, sport, dst, dport, data) else {
             return false;
         };
-        self.count_tx(ni, sport);
+        self.count_tx(ni, sport, IpAddr::V4(src));
         self.ip_output(ni, pkt, Origin::Local { job: None }, cause);
+        true
+    }
+
+    /// a datagram over IPv6: the source from the caller or source address selection, a
+    /// link-local destination on the interface of the source (or of the socket); false without
+    /// a route
+    #[allow(clippy::too_many_arguments)]
+    fn udp6_send(&mut self, ni: usize, src: Option<IpAddr>, sport: u16, dst: Ipv6, dport: u16, data: &[u8], cause: Option<HopId>) -> bool {
+        let src = match src {
+            Some(IpAddr::V6(s)) => Some(s),
+            Some(IpAddr::V4(_)) => return false,
+            None => None,
+        };
+        let scoped = dst.is_link_local() || (dst.is_multicast() && dst.mc_scope() <= 2);
+        let bound = self.os(ni).and_then(|o| o.socks.iter().find(|s| s.port == sport && s.addr.v4().is_none()).and_then(|s| s.iface));
+        let oif = if scoped { src.and_then(|s| self.v6(ni).and_then(|v| v.find(s))).or(bound) } else { None };
+        let mine = self.v6(ni).is_some_and(|v| v.find(dst).is_some());
+        let routed = mine || dst.is_multicast() || self.ip6_route(ni, dst, oif).is_some();
+        let src = if routed { src.or_else(|| self.ip6_source(ni, dst, oif)) } else { None };
+        let Some(src) = src.filter(|s| !s.is_unspecified()) else {
+            self.note6(ni, cause, crate::trace6::Note6::NoRoute { dst });
+            return false;
+        };
+        let out = oif.or_else(|| self.ip6_route(ni, dst, None).map(|nh| nh.iface));
+        let hops = self.ip6_hops(ni, out);
+        let mut p = Pkt::new(HEADROOM, data);
+        UdpHdr::new(sport, dport).push_v6(&mut p, src, dst);
+        Ipv6Hdr::new(src, dst, NH_UDP, hops).push_onto(&mut p);
+        self.count_tx(ni, sport, IpAddr::V6(src));
+        self.ip6_output(ni, p.into_vec(), oif, Origin::Local { job: None }, cause);
         true
     }
 
@@ -776,7 +956,7 @@ impl Engine {
         let Some(pkt) = self.udp_packet(ni, src, sport, dst, dport, data) else {
             return false;
         };
-        self.count_tx(ni, sport);
+        self.count_tx(ni, sport, IpAddr::V4(src));
         self.frame_out(ni, iface, mac, ET_IPV4, &pkt, cause);
         true
     }
@@ -846,21 +1026,50 @@ impl Engine {
 
     /// a UDP datagram for this device; false when nobody listens on its port
     pub(crate) fn udp_input(&mut self, ni: usize, iface: u16, v: &Ipv4View, u: &UdpView, hop: HopId) -> bool {
-        let port = u.dst_port();
+        let d = Dgram { src: IpAddr::V4(v.src()), sport: u.src_port(), dst: IpAddr::V4(v.dst()), dport: u.dst_port(), iface, ttl: v.ttl(), data: u.payload().to_vec(), hop };
+        self.udp_deliver(ni, d)
+    }
+
+    /// a UDP datagram over IPv6 for this device (its checksum was checked); false when nobody
+    /// listens on its port
+    pub(crate) fn udp6_input(&mut self, ni: usize, iface: u16, v: &Ipv6View, u: &UdpView, hop: HopId) -> bool {
+        let d = Dgram { src: IpAddr::V6(v.src()), sport: u.src_port(), dst: IpAddr::V6(v.dst()), dport: u.dst_port(), iface, ttl: v.hop_limit(), data: u.payload().to_vec(), hop };
+        self.udp_deliver(ni, d)
+    }
+
+    /// the socket of a datagram's port that takes its destination: one bound to the receiving
+    /// interface before one on every interface, one bound to the address before a wildcard,
+    /// an IPv4 socket before one on :: for IPv4 (Linux's score), the first bound of equals
+    fn udp_pick(os: &Os, port: u16, dst: IpAddr, iface: u16) -> Option<usize> {
+        let mut best: Option<(u8, usize)> = None;
+        for (i, s) in os.socks.iter().enumerate() {
+            if s.port != port || !takes(s.addr, dst) || s.iface.is_some_and(|f| f != iface) {
+                continue;
+            }
+            let score = 4 * s.iface.is_some() as u8 + 2 * !s.addr.is_unspecified() as u8 + (s.addr.is_v4() == dst.is_v4()) as u8;
+            if best.is_none_or(|b| score > b.0) {
+                best = Some((score, i));
+            }
+        }
+        best.map(|b| b.1)
+    }
+
+    /// hands a datagram to its socket's owner
+    fn udp_deliver(&mut self, ni: usize, d: Dgram) -> bool {
+        let port = d.dport;
         let Some(os) = self.os(ni) else {
             return false;
         };
-        let pick = os.socks.iter().position(|s| s.port == port && s.iface == Some(iface)).or_else(|| os.socks.iter().position(|s| s.port == port && s.iface.is_none()));
-        let Some(si) = pick else {
+        let Some(si) = Engine::udp_pick(os, port, d.dst, d.iface) else {
             return false;
         };
         let owner = os.socks[si].owner;
-        let d = Dgram { src: v.src(), sport: u.src_port(), dst: v.dst(), dport: port, iface, ttl: v.ttl(), data: u.payload().to_vec(), hop };
         if let Some(os) = self.os_mut(ni) {
             os.socks[si].rx += 1;
         }
         let dev = self.dev_of(ni);
         let to = self.owner_name(ni, owner);
+        let hop = d.hop;
         self.note(dev, Some(hop), Note::UdpToSocket { port, to });
         match owner {
             Owner::Svc(id) => self.os_push(ni, Job::Ev(id, SvcEvent::Udp(d))),
@@ -868,6 +1077,17 @@ impl Engine {
             Owner::Log => {}
         }
         true
+    }
+
+    /// an ICMP or ICMPv6 error quoting a UDP datagram this device sent from `src`:`sport` to
+    /// `dst`:`dport`: a socket connected to that peer hears of it (Linux reports it to
+    /// connected sockets only)
+    pub(crate) fn udp_icmp_error(&mut self, ni: usize, src: IpAddr, sport: u16, dst: IpAddr, dport: u16, refused: bool, hop: HopId) {
+        let hit = self.os(ni).and_then(|os| os.socks.iter().find(|s| s.port == sport && takes(s.addr, src) && s.peer == Some((dst, dport))).map(|s| s.owner));
+        if let Some(Owner::Svc(id)) = hit {
+            let err = if refused { crate::tcp::TcpEnd::Refused } else { crate::tcp::TcpEnd::Unreachable };
+            self.os_push(ni, Job::Ev(id, SvcEvent::UdpError { port: sport, peer: (dst, dport), err, hop }));
+        }
     }
 
     /// a UDP datagram to an address the device does not have: a packet socket on the
@@ -968,7 +1188,7 @@ impl Engine {
                         let cause = match &ev {
                             SvcEvent::Udp(d) => Some(d.hop),
                             SvcEvent::Ip(p) => Some(p.hop).filter(|&h| h != 0),
-                            SvcEvent::TcpAccept { hop, .. } | SvcEvent::TcpConnected { hop, .. } | SvcEvent::TcpData { hop, .. } | SvcEvent::TcpEof { hop, .. } => Some(*hop).filter(|&h| h != 0),
+                            SvcEvent::TcpAccept { hop, .. } | SvcEvent::TcpConnected { hop, .. } | SvcEvent::TcpData { hop, .. } | SvcEvent::TcpEof { hop, .. } | SvcEvent::UdpError { hop, .. } => Some(*hop).filter(|&h| h != 0),
                             _ => None,
                         };
                         self.svc_call(ni, id, cause, |s, api| s.on(ev, api));
@@ -1066,7 +1286,7 @@ impl Engine {
         let port = match os.log.port {
             Some(p) => p,
             None => {
-                let Ok(p) = self.sock_bind(ni, 0, None, false, Owner::Log) else {
+                let Ok(p) = self.sock_bind(ni, ANY4, 0, None, false, Owner::Log) else {
                     return;
                 };
                 if let Some(os) = self.os_mut(ni) {
@@ -1076,7 +1296,7 @@ impl Engine {
             }
         };
         for h in hosts {
-            if self.udp_send(ni, None, port, h, PORT_SYSLOG, &msg, cause) {
+            if self.udp_send(ni, None, port, IpAddr::V4(h), PORT_SYSLOG, &msg, cause) {
                 self.note(dev, cause, Note::SyslogSent { to: h, sev });
             }
         }
@@ -1227,8 +1447,13 @@ impl Engine {
         self.node_index(dev).and_then(|ni| self.os(ni)).map(|o| o.clock.clone())
     }
 
-    /// the static host names of a device
+    /// the static host names of a device with an IPv4 address
     pub fn hosts(&self, dev: u32) -> Vec<(String, Ipv4)> {
+        self.node_index(dev).and_then(|ni| self.os(ni)).map(|o| o.hosts.iter().filter_map(|(h, a)| a.v4().map(|x| (h.clone(), x))).collect()).unwrap_or_default()
+    }
+
+    /// the static host names of a device, both families, in the order they were made
+    pub fn hosts_all(&self, dev: u32) -> Vec<(String, IpAddr)> {
         self.node_index(dev).and_then(|ni| self.os(ni)).map(|o| o.hosts.clone()).unwrap_or_default()
     }
 
@@ -1241,34 +1466,47 @@ impl Engine {
 // ---------------------------------------------------------------- TCP sockets of services (tcp.rs)
 
 impl OsApi<'_> {
-    /// a listening socket on `port` of every address (0: an ephemeral port); `backlog` 0: the
-    /// system's
+    /// a listening socket on `port` of every address of both families (0: an ephemeral port);
+    /// `backlog` 0: the system's
     pub fn tcp_listen(&mut self, port: u16, backlog: u32, opts: crate::tcp::SockOpts) -> Result<u32, String> {
         self.tcp_listen_msg(port, backlog, opts).map_err(|m| m.text())
     }
     /// tcp_listen(), the refusal as a message
     pub fn tcp_listen_msg(&mut self, port: u16, backlog: u32, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
-        self.eng.tcp_listen(self.ni, self.id, Ipv4::UNSPECIFIED, port, backlog, opts)
+        self.eng.tcp_listen(self.ni, self.id, ANY, port, backlog, opts)
+    }
+    /// a listening socket bound to an address: 0.0.0.0 every IPv4 address, :: both families,
+    /// else one address of the device
+    pub fn tcp_listen_on(&mut self, addr: IpAddr, port: u16, backlog: u32, opts: crate::tcp::SockOpts) -> Result<u32, String> {
+        self.tcp_listen_on_msg(addr, port, backlog, opts).map_err(|m| m.text())
+    }
+    /// tcp_listen_on(), the refusal as a message
+    pub fn tcp_listen_on_msg(&mut self, addr: IpAddr, port: u16, backlog: u32, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
+        if !addr.is_unspecified() && !self.is_mine(addr) {
+            return Err(msg!("{} ist keine Adresse dieses Geräts.", addr));
+        }
+        self.eng.tcp_listen(self.ni, self.id, addr, port, backlog, opts)
     }
     /// takes the next connection from the queue of a listening socket
     pub fn tcp_accept(&mut self, listener: u32) -> Option<u32> {
         self.eng.tcp_accept(self.ni, self.id, listener)
     }
-    /// opens a connection from an ephemeral port; TcpConnected or TcpClosed follows
-    pub fn tcp_connect(&mut self, dst: Ipv4, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, String> {
+    /// opens a connection from an ephemeral port (to an IPv4 or IPv6 address); TcpConnected or
+    /// TcpClosed follows
+    pub fn tcp_connect(&mut self, dst: impl Into<IpAddr>, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, String> {
         self.tcp_connect_msg(dst, dport, opts).map_err(|m| m.text())
     }
     /// tcp_connect(), the refusal as a message
-    pub fn tcp_connect_msg(&mut self, dst: Ipv4, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
-        self.eng.tcp_connect(self.ni, self.id, 0, dst, dport, opts, self.cause)
+    pub fn tcp_connect_msg(&mut self, dst: impl Into<IpAddr>, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
+        self.eng.tcp_connect(self.ni, self.id, 0, dst.into(), dport, opts, self.cause)
     }
     /// the same from a given local port (bind, then connect)
-    pub fn tcp_connect_from(&mut self, sport: u16, dst: Ipv4, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, String> {
+    pub fn tcp_connect_from(&mut self, sport: u16, dst: impl Into<IpAddr>, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, String> {
         self.tcp_connect_from_msg(sport, dst, dport, opts).map_err(|m| m.text())
     }
     /// tcp_connect_from(), the refusal as a message
-    pub fn tcp_connect_from_msg(&mut self, sport: u16, dst: Ipv4, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
-        self.eng.tcp_connect(self.ni, self.id, sport, dst, dport, opts, self.cause)
+    pub fn tcp_connect_from_msg(&mut self, sport: u16, dst: impl Into<IpAddr>, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
+        self.eng.tcp_connect(self.ni, self.id, sport, dst.into(), dport, opts, self.cause)
     }
     /// queues bytes for sending: how many the send buffer took (TcpWritable follows when it
     /// has room again)

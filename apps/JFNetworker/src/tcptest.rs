@@ -414,10 +414,10 @@ fn handshake(t: &mut T) {
     t.eq(
         "client row",
         c.first().map(|r| (r.state, r.local, r.remote, r.owner.clone(), r.mss, r.snd_wnd, r.rcv_wnd, r.cwnd, r.srtt, r.rttvar, r.rto)),
-        Some((TcpState::Established, (a, port), (b, 7), Some(String::from("cli")), 1460, 64240, 64240, 14600, Some(2888), 1444, 200 * MS)),
+        Some((TcpState::Established, (a.into(), port), (b.into(), 7), Some(String::from("cli")), 1460, 64240, 64240, 14600, Some(2888), 1444, 200 * MS)),
     );
     let s = e.tcp_conns(pc2);
-    t.eq("server rows", s.iter().map(|r| (r.state, r.local, r.remote, r.recv_q, r.send_q)).collect::<Vec<_>>(), vec![(TcpState::Listen, (Ipv4::UNSPECIFIED, 7), (Ipv4::UNSPECIFIED, 0), 0, 128), (TcpState::Established, (b, 7), (a, port), 0, 0)]);
+    t.eq("server rows", s.iter().map(|r| (r.state, r.local, r.remote, r.recv_q, r.send_q)).collect::<Vec<_>>(), vec![(TcpState::Listen, (netpkt::IpAddr::V6(netpkt::Ipv6::UNSPECIFIED), 7), (netpkt::IpAddr::V6(netpkt::Ipv6::UNSPECIFIED), 0), 0, 128), (TcpState::Established, (b.into(), 7), (a.into(), port), 0, 0)]);
     t.eq("server rtt from the syn-ack", s.get(1).map(|r| r.srtt), Some(Some(2888)));
     let est = e.trace.events().find(|x| x.dev == pc1 && matches!(x.note, Note::TcpStateChange { to: TcpState::Established, .. })).cloned();
     t.eq("describe", est.map(|x| e.describe(&x)), Some(format!("TCP {} \u{2194} 10.0.0.2:7: SYN-SENT \u{2192} ESTABLISHED.", port)));
@@ -794,9 +794,9 @@ fn refused(t: &mut T) {
         "client notes",
         notes(&e, pc1).into_iter().filter(|n| n.1.is_tcp()).collect::<Vec<_>>(),
         vec![
-            (0, Note::TcpStateChange { port, peer: ip("10.0.0.2"), pport: 80, from: TcpState::Closed, to: TcpState::SynSent }),
+            (0, Note::TcpStateChange { port, peer: ip("10.0.0.2").into(), pport: 80, from: TcpState::Closed, to: TcpState::SynSent }),
             (2888, Note::TcpReset { refused: true }),
-            (2888, Note::TcpStateChange { port, peer: ip("10.0.0.2"), pport: 80, from: TcpState::SynSent, to: TcpState::Closed }),
+            (2888, Note::TcpStateChange { port, peer: ip("10.0.0.2").into(), pport: 80, from: TcpState::SynSent, to: TcpState::Closed }),
         ],
     );
     t.eq("counted", (e.tcp_stats(pc2).map(|s| s.out_rsts), e.tcp_stats(pc1).map(|s| s.attempt_fails)), (Some(1), Some(1)));
@@ -1166,7 +1166,7 @@ fn views(t: &mut T) {
     t.eq("describe acked", d(Note::TcpAcked { bytes: 1460, cwnd: 16060, rtt: Some(26 * US) }), String::from("1460 Bytes bestätigt, RTT 26 \u{b5}s, cwnd 16060 Bytes."));
     t.eq("describe rto", d(Note::TcpRto { seq: 7, rto: 400 * MS, n: 1 }), String::from("Zeitüberschreitung: Neuübertragung ab Seq 7 (Versuch 1), nächstes RTO 400,000 ms."));
     t.eq("describe fast", d(Note::TcpFastRetransmit { seq: 9, ssthresh: 11680, cwnd: 16060 }), String::from("Drei doppelte Bestätigungen: Fast Retransmit ab Seq 9, ssthresh 11680, cwnd 16060 Bytes."));
-    t.eq("describe listen", d(Note::TcpStateChange { port: 7, peer: Ipv4::UNSPECIFIED, pport: 0, from: TcpState::Closed, to: TcpState::Listen }), String::from("TCP Port 7: CLOSED \u{2192} LISTEN."));
+    t.eq("describe listen", d(Note::TcpStateChange { port: 7, peer: Ipv4::UNSPECIFIED.into(), pport: 0, from: TcpState::Closed, to: TcpState::Listen }), String::from("TCP Port 7: CLOSED \u{2192} LISTEN."));
     t.eq("describe give-up", d(Note::TcpGiveUp { why: TcpEnd::Timeout }), String::from("Verbindung aufgegeben: keine Antwort mehr (Zeitüberschreitung)."));
     // the counters of a busy connection
     let (e, pc1, _) = lossy_transfer(SEED);

@@ -26,9 +26,12 @@
 // Routers never fragment (Packet Too Big with the MTU of the next link, RFC 8201) and never
 // forward link-local addresses: a destination stays on its link, a link-local source going to
 // another link gets "beyond scope of source address".  Packets to a tentative address are
-// dropped (RFC 4862 5.4).  Hosts follow the weak host model for global addresses.  There are
-// no IPv6 sockets yet: UDP gets "port unreachable" (so traceroute ends at its target), TCP a
-// RST; another next header a Parameter Problem pointing at it.
+// dropped (RFC 4862 5.4).  Hosts follow the weak host model for global addresses.  UDP goes to
+// the socket of its port (os.rs: udp6_input) and gets "port unreachable" where nobody listens
+// (so traceroute ends at its target), TCP goes to tcp.rs (tcp6_input: a RST where nobody
+// listens); another next header gets a Parameter Problem pointing at it.  ICMPv6 errors about
+// the device's own datagrams and segments reach their jobs, TCP connections (Packet Too Big
+// also the path MTU) and connected UDP sockets (os.rs: udp_icmp_error).
 
 use alloc::vec::Vec;
 
@@ -37,9 +40,8 @@ use netpkt::eth::ET_IPV6;
 use netpkt::icmpv6::{self, Icmp6, Icmp6View};
 use netpkt::ipv6::{self, Ipv6Hdr, Ipv6View, ReasmErr, IPV6_HDR, MIN_MTU, NH_ICMPV6, NH_NONE, NH_TCP, NH_UDP};
 use netpkt::pkt::{Pkt, HEADROOM};
-use netpkt::tcp::{self, TcpHdr, TcpOpts, TcpView};
 use netpkt::udp::UdpView;
-use netpkt::{Ipv6, Mac};
+use netpkt::{IpAddr, Ipv6, Mac};
 
 use crate::ip::{IfKind, Origin};
 use crate::ip6::{Ip6, Limit6, NextHop6, IOS_ERR_BUCKET, IOS_ERR_INTERVAL, REASM_TIME6, SLOT_V6_REASM};
@@ -234,12 +236,15 @@ impl Engine {
                     self.note6(ni, Some(hop), Note6::BadChecksum);
                     return;
                 }
+                if self.udp6_input(ni, iface, &v, &u, hop) {
+                    return;
+                }
                 self.note6(ni, Some(hop), Note6::UdpNoPort { port: u.dst_port() });
                 if !group {
                     self.icmp6_error(ni, iface, v.packet(), Icmp6::DestUnreach { code: icmpv6::UNREACH_PORT }, Some(hop));
                 }
             }
-            NH_TCP => self.tcp6_reset(ni, &v, body, hop),
+            NH_TCP => self.tcp6_input(ni, &v, body, hop),
             NH_NONE => {}
             _ => {
                 if !group {
@@ -250,30 +255,6 @@ impl Engine {
                 }
             }
         }
-    }
-
-    /// TCP over IPv6 has no sockets yet: every segment but a RST gets one (RFC 9293 3.10.7.1)
-    fn tcp6_reset(&mut self, ni: usize, v: &Ipv6View, body: &[u8], hop: HopId) {
-        let Some(t) = TcpView::parse(body) else {
-            return;
-        };
-        if !t.checksum_ok_v6(v.src(), v.dst()) {
-            self.note6(ni, Some(hop), Note6::BadChecksum);
-            return;
-        }
-        if t.has(tcp::RST) || v.dst().is_multicast() {
-            return;
-        }
-        self.note6(ni, Some(hop), Note6::TcpReset { port: t.dst_port() });
-        let len = t.payload().len() as u32 + t.has(tcp::SYN) as u32 + t.has(tcp::FIN) as u32;
-        let (seq, ack, flags) = if t.has(tcp::ACK) { (t.ack(), 0, tcp::RST) } else { (0, t.seq().wrapping_add(len), tcp::RST | tcp::ACK) };
-        let h = TcpHdr { src_port: t.dst_port(), dst_port: t.src_port(), seq, ack, flags, window: 0, urgent: 0, opts: TcpOpts::default() };
-        let mut p = Pkt::new(HEADROOM, &[]);
-        h.push_v6(&mut p, v.dst(), v.src());
-        let hops = self.ip6_hops(ni, None);
-        Ipv6Hdr::new(v.dst(), v.src(), NH_TCP, hops).push_onto(&mut p);
-        let oif = if v.src().is_link_local() { self.v6(ni).and_then(|x| x.find(v.dst())) } else { None };
-        self.ip6_output(ni, p.into_vec(), oif, Origin::Local { job: None }, Some(hop));
     }
 
     fn icmp6_input(&mut self, ni: usize, iface: u16, v: &Ipv6View, body: &[u8], hop: HopId) {
@@ -308,6 +289,18 @@ impl Engine {
                         self.pmtu_learn(ni, q.dst(), ic.value(), hop);
                     }
                     self.jobs6_icmp_error(ni, src, t, ic.code(), ic.value(), &q);
+                    self.tcp_icmp6_error(ni, t, ic.code(), ic.value(), &q);
+                    // a connected UDP socket hears the hard errors (Linux: icmpv6_err_convert's
+                    // fatal ones)
+                    let code = ic.code();
+                    let hard = (t == icmpv6::T_DEST_UNREACH && matches!(code, icmpv6::UNREACH_ADMIN | icmpv6::UNREACH_PORT | icmpv6::UNREACH_POLICY | icmpv6::UNREACH_REJECT)) || t == icmpv6::T_PARAM_PROBLEM;
+                    if hard
+                        && let Some((NH_UDP, off)) = ipv6::upper_layer(&q)
+                        && let Some(u) = q.payload().get(off..off + 4)
+                    {
+                        let refused = t == icmpv6::T_DEST_UNREACH && code == icmpv6::UNREACH_PORT;
+                        self.udp_icmp_error(ni, IpAddr::V6(q.src()), netpkt::be16(u, 0), IpAddr::V6(q.dst()), netpkt::be16(u, 2), refused, hop);
+                    }
                 }
             }
             t if (icmpv6::T_ROUTER_SOLICIT..=icmpv6::T_REDIRECT).contains(&t) => self.nd_input(ni, iface, v, &ic, hop),

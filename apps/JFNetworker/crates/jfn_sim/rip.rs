@@ -785,7 +785,7 @@ impl Rip {
 
     fn ignore(&mut self, os: &mut OsApi, d: &Dgram, why: RipDrop) {
         self.n.ignored += 1;
-        os.note(Note::RipIgnored { from: d.src, iface: d.iface, why });
+        os.note(Note::RipIgnored { from: d.src4(), iface: d.iface, why });
     }
 
     fn input(&mut self, os: &mut OsApi, d: Dgram) {
@@ -827,14 +827,14 @@ impl Rip {
         if r.send & (if ver == 1 { V1 } else { V2 }) == 0 {
             return self.ignore(os, d, RipDrop::NoAnswer);
         }
-        let to = Some((d.src, d.sport));
+        let to = Some((d.src4(), d.sport));
         if m.is_request_all() {
-            os.note(Note::RipAsked { from: d.src, iface: d.iface, whole: true });
+            os.note(Note::RipAsked { from: d.src4(), iface: d.iface, whole: true });
             let a = self.advert(d.iface, r, ver, false);
             self.send(os, d.iface, ver, RipOut::Answer, to, a);
             return;
         }
-        os.note(Note::RipAsked { from: d.src, iface: d.iface, whole: false });
+        os.note(Note::RipAsked { from: d.src4(), iface: d.iface, whole: false });
         let mut a = Advert::default();
         for e in m.entries.iter().filter(|e| e.afi == wire::AFI_INET) {
             let p = if ver == 1 { self.infer(os, d.iface, e.addr) } else { e.prefix().map(|p| p.trunc()).or_else(|| self.infer(os, d.iface, e.addr)) };
@@ -868,15 +868,15 @@ impl Rip {
         if d.sport != PORT_RIP {
             return self.ignore(os, d, RipDrop::Port);
         }
-        if !os.iface(d.iface).is_some_and(|f| f.on_link(d.src)) {
+        if !os.iface(d.iface).is_some_and(|f| f.on_link(d.src4())) {
             return self.ignore(os, d, RipDrop::Neighbour);
         }
-        if os.is_mine(d.src) {
+        if os.is_mine(d.src4()) {
             return self.ignore(os, d, RipDrop::Own);
         }
         let now = os.now();
         self.n.updates_rcvd += 1;
-        self.sources.insert(d.src, now);
+        self.sources.insert(d.src4(), now);
         let mut shown: Vec<(Prefix4, u8)> = Vec::new();
         let mut bad: Vec<Rte> = Vec::new();
         let mut offers: Vec<(Prefix4, u8, Ipv4, u16)> = Vec::new();
@@ -896,16 +896,16 @@ impl Rip {
             };
             shown.push((p, e.metric as u8));
             // a next hop on the interface's subnet is taken; otherwise the sender (4.4)
-            let via = if ver >= 2 && !e.next_hop.is_unspecified() && !os.is_mine(e.next_hop) && os.iface(d.iface).is_some_and(|f| f.on_link(e.next_hop)) { e.next_hop } else { d.src };
+            let via = if ver >= 2 && !e.next_hop.is_unspecified() && !os.is_mine(e.next_hop) && os.iface(d.iface).is_some_and(|f| f.on_link(e.next_hop)) { e.next_hop } else { d.src4() };
             offers.push((p, (e.metric as u8).saturating_add(COST).min(INFINITY), via, if ver >= 2 { e.tag } else { 0 }));
         }
-        os.note(Note::RipHeard { from: d.src, iface: d.iface, ver, routes: shown });
+        os.note(Note::RipHeard { from: d.src4(), iface: d.iface, ver, routes: shown });
         for e in bad {
             self.n.bad_entries += 1;
-            os.note(Note::RipBadEntry { from: d.src, addr: e.addr, metric: e.metric });
+            os.note(Note::RipBadEntry { from: d.src4(), addr: e.addr, metric: e.metric });
         }
         for (p, m, via, tag) in offers {
-            self.offer(os, p, m, d.src, via, d.iface, tag);
+            self.offer(os, p, m, d.src4(), via, d.iface, tag);
         }
     }
 

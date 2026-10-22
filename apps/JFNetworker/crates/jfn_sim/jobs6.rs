@@ -8,12 +8,16 @@
 //                                                   limit 1, 2, ...: Time Exceeded names the
 //                                                   hops, Port Unreachable the target
 //   Ping6Ev / Trace6Probe / Icmp6Kind              what the consoles print (cli/print6.rs)
+//   ping_becomes6 / trace_becomes6 (crate)         a ping or traceroute by name (jobs.rs)
+//                                                  whose name gave an IPv6 address first goes
+//                                                  on as one of these (host and lookup kept)
 //
 // The jobs live with the IPv4 ones (JobKind::Ping6, JobKind::Trace6: the same ids, events,
 // Ctrl+C and console binding).  Round trip times are virtual: from handing the probe to IPv6
 // (neighbor discovery included) until the answer is delivered.
 
 use alloc::collections::BTreeMap;
+use alloc::string::String;
 use alloc::vec::Vec;
 
 use netpkt::icmpv6::{self, Icmp6};
@@ -119,6 +123,10 @@ pub struct Ping6Job {
     pub rtt_max: Ns,
     pub rtt_sum: Ns,
     next_send: Ns,
+    /// the name it was started with (a ping by name whose address is IPv6: ping_becomes6)
+    pub host: Option<String>,
+    /// the lookup of the device's resolver for the name
+    pub lookup: Option<u32>,
 }
 
 /// one probe of a hop: who answered and how fast (None: no answer, "*")
@@ -148,6 +156,10 @@ pub struct Trace6Job {
     pub reached: bool,
     waiting: Option<(u16, Ns)>,
     next_port: u16,
+    /// the name it was started with (trace_becomes6)
+    pub host: Option<String>,
+    /// the lookup of the device's resolver for the name
+    pub lookup: Option<u32>,
 }
 
 fn push_probe(t: &mut Trace6Job, ttl: u8, p: Trace6Probe) {
@@ -187,7 +199,7 @@ impl Engine {
         let src = o.src.or_else(|| self.ip6_source(ni, dst, o.oif)).unwrap_or(Ipv6::UNSPECIFIED);
         let routed = dst.is_multicast() || self.ip6_route(ni, dst, o.oif).is_some() || self.v6(ni).is_some_and(|v| v.find(dst).is_some());
         let now = self.now;
-        let job = Ping6Job { dst, src, opts: o, ident, next_seq: 1, sent: 0, received: 0, errors: 0, out: BTreeMap::new(), events: Vec::new(), rtt_min: 0, rtt_max: 0, rtt_sum: 0, next_send: now };
+        let job = Ping6Job { dst, src, opts: o, ident, next_seq: 1, sent: 0, received: 0, errors: 0, out: BTreeMap::new(), events: Vec::new(), rtt_min: 0, rtt_max: 0, rtt_sum: 0, next_send: now, host: None, lookup: None };
         let id = self.new_job6(ni, JobKind::Ping6(job));
         if src.is_unspecified() || !routed {
             // no route: the probe never leaves
@@ -408,7 +420,7 @@ impl Engine {
         let src = self.ip6_source(ni, dst, oif).unwrap_or(Ipv6::UNSPECIFIED);
         let routed = self.ip6_route(ni, dst, oif).is_some() || self.v6(ni).is_some_and(|v| v.find(dst).is_some());
         let port = o.port;
-        let job = Trace6Job { dst, src, oif, opts: o, ident, ttl: 1, hops: Vec::new(), reached: false, waiting: None, next_port: port };
+        let job = Trace6Job { dst, src, oif, opts: o, ident, ttl: 1, hops: Vec::new(), reached: false, waiting: None, next_port: port, host: None, lookup: None };
         let id = self.new_job6(ni, JobKind::Trace6(job));
         if src.is_unspecified() || !routed {
             if let Some(j) = self.jobs.get_mut(&id)
@@ -475,5 +487,77 @@ impl Engine {
             push_probe(t, ttl, Trace6Probe { from: None, rtt: 0, kind: None });
             self.trace6_next(id);
         }
+    }
+
+    // ---------------------------------------------------------------- by name
+
+    /// a ping by name (jobs.rs) found an IPv6 address first: the job goes on as a Ping6 job
+    /// with its id, identifier and options (IPv4's TTL as the hop limit, "-M do" as no
+    /// fragments)
+    pub(crate) fn ping_becomes6(&mut self, id: JobId, dst: Ipv6) {
+        let now = self.now;
+        let Some(j) = self.jobs.get(&id) else {
+            return;
+        };
+        let ni = j.node;
+        let JobKind::Ping(p) = &j.kind else {
+            return;
+        };
+        let o = Ping6Opts { count: p.opts.count, size: p.size6.unwrap_or(p.opts.size), hops: p.opts.ttl, no_frag: p.opts.df, interval: p.opts.interval, timeout: p.opts.timeout, src: None, oif: None };
+        let (ident, host, lookup) = (p.ident, p.host.clone(), p.lookup);
+        let src = self.ip6_source(ni, dst, None).unwrap_or(Ipv6::UNSPECIFIED);
+        let routed = dst.is_multicast() || self.ip6_route(ni, dst, None).is_some() || self.v6(ni).is_some_and(|v| v.find(dst).is_some());
+        let job = Ping6Job { dst, src, opts: o, ident, next_seq: 1, sent: 0, received: 0, errors: 0, out: BTreeMap::new(), events: Vec::new(), rtt_min: 0, rtt_max: 0, rtt_sum: 0, next_send: now, host, lookup };
+        let Some(j) = self.jobs.get_mut(&id) else {
+            return;
+        };
+        j.kind = JobKind::Ping6(job);
+        if src.is_unspecified() || !routed {
+            if let JobKind::Ping6(p) = &mut j.kind {
+                p.sent = 1;
+                p.errors = 1;
+                p.events.push(Ping6Ev::Error { seq: 1, from: Ipv6::UNSPECIFIED, kind: Icmp6Kind::LocalNoRoute });
+            }
+            j.done = true;
+            j.epoch = j.epoch.wrapping_add(1);
+            self.cli_job(id);
+            return;
+        }
+        self.ping6_send(id);
+        self.ping6_schedule(id);
+        // the console prints its first line now
+        self.cli_job(id);
+    }
+
+    /// a traceroute by name found an IPv6 address first: it goes on as a Trace6 job
+    pub(crate) fn trace_becomes6(&mut self, id: JobId, dst: Ipv6) {
+        let Some(j) = self.jobs.get(&id) else {
+            return;
+        };
+        let ni = j.node;
+        let JobKind::Trace(t) = &j.kind else {
+            return;
+        };
+        let (opts, ident, host, lookup) = (t.opts.clone(), t.ident, t.host.clone(), t.lookup);
+        let src = self.ip6_source(ni, dst, None).unwrap_or(Ipv6::UNSPECIFIED);
+        let routed = self.ip6_route(ni, dst, None).is_some() || self.v6(ni).is_some_and(|v| v.find(dst).is_some());
+        let port = opts.port;
+        let job = Trace6Job { dst, src, oif: None, opts, ident, ttl: 1, hops: Vec::new(), reached: false, waiting: None, next_port: port, host, lookup };
+        let Some(j) = self.jobs.get_mut(&id) else {
+            return;
+        };
+        j.kind = JobKind::Trace6(job);
+        if src.is_unspecified() || !routed {
+            if let JobKind::Trace6(t) = &mut j.kind {
+                push_probe(t, 1, Trace6Probe { from: None, rtt: 0, kind: Some(Icmp6Kind::LocalNoRoute) });
+                t.reached = true;
+            }
+            j.done = true;
+            j.epoch = j.epoch.wrapping_add(1);
+            self.cli_job(id);
+            return;
+        }
+        self.trace6_send(id);
+        self.cli_job(id);
     }
 }

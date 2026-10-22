@@ -1,0 +1,214 @@
+# JFNetworker-Szenario ipv6_web.scn: „Dual-Stack-Web“, 5 Geräte, 4 Verbindungen, Seed 9
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  PC1     net.ipv6.conf.all.disable_ipv6 = 0
+   0.000000000  PC2     net.ipv6.conf.all.disable_ipv6 = 0
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/24 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/24 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  WEB     net.ipv6.conf.all.disable_ipv6 = 0
+   0.000000000  WEB     net.ipv6.conf.eth0.autoconf = 0
+   0.000000000  --      run 20s
+  20.000000000  PC1     root@PC1:~# cat /etc/resolv.conf
+  20.000000000  PC1     domain lab
+  20.000000000  PC1     search lab
+  20.000000000  PC1     nameserver 10.0.2.10
+  20.000000000  ok      expect PC1 output contains "nameserver 10.0.2.10"
+  20.000000000  PC1     root@PC1:~# ip -6 addr show dev eth0
+  20.000000000  PC1     2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP qlen 1000
+  20.000000000  PC1         inet6 2001:db8:1:0:4a:ff:fe00:101/64 scope global dynamic 
+  20.000000000  PC1            valid_lft 2591985sec preferred_lft 604785sec
+  20.000000000  PC1         inet6 fe80::4a:ff:fe00:101/64 scope link 
+  20.000000000  PC1            valid_lft forever preferred_lft forever
+  20.000000000  ok      expect PC1 output contains "inet6 2001:db8:1:0:4a:ff:fe00:101/64 scope global dynamic"
+  20.000000000  PC1     root@PC1:~# curl -v http://www.lab/
+  20.000000000  --      run 6s
+  25.000006196  PC1     *   Trying [2001:db8:2::10]:80...
+  25.000016972  PC1     * Connected to www.lab (2001:db8:2::10) port 80
+  25.000016972  PC1     > GET / HTTP/1.1
+  25.000016972  PC1     > Host: www.lab
+  25.000016972  PC1     > User-Agent: curl/8.5.0
+  25.000016972  PC1     > Accept: */*
+  25.000016972  PC1     > 
+  25.000029136  PC1     < HTTP/1.1 200 OK
+  25.000029136  PC1     < Server: jfn-httpd/1.0
+  25.000029136  PC1     < Date: Thu, 01 Jan 2026 00:00:26 GMT
+  25.000029136  PC1     < Content-Type: text/plain
+  25.000029136  PC1     < Content-Length: 14
+  25.000029136  PC1     < Connection: keep-alive
+  25.000029136  PC1     < 
+  25.000029136  PC1     Hallo von WEB
+  25.000029136  PC1     * Connection #0 to host www.lab left intact
+  26.000000000  ok      expect PC1 output contains "*   Trying [2001:db8:2::10]:80..."
+  26.000000000  ok      expect PC1 output contains "Hallo von WEB"
+  26.000000000  PC2     root@PC2:~# curl -s http://10.0.2.10/
+  26.000000000  --      run 1s
+  26.000018248  PC2     Hallo von WEB
+  27.000000000  ok      expect PC2 output contains "Hallo von WEB"
+  27.000000000  PC1     root@PC1:~# ss -tan
+  27.000000000  PC1     State     Recv-Q Send-Q                 Local Address:Port      Peer Address:PortProcess
+  27.000000000  PC1     TIME-WAIT 0      0      [2001:db8:1:0:4a:ff:fe00:101]:38216 [2001:db8:2::10]:80         
+  27.000000000  ok      expect PC1 output contains "[2001:db8:2::10]:80"
+  27.000000000  WEB     root@WEB:~# ss -tln
+  27.000000000  WEB     State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+  27.000000000  WEB     LISTEN 0      128                *:80              *:*          
+  27.000000000  ok      expect WEB output contains "*:80"
+  27.000000000  WEB     root@WEB:~# ss -uln
+  27.000000000  WEB     State  Recv-Q Send-Q Local Address:Port Peer Address:PortProcess
+  27.000000000  WEB     UNCONN 0      0                  *:53              *:*          
+  27.000000000  ok      expect WEB output contains "*:53"
+  27.000000000  PC2     root@PC2:~# dig AAAA www.lab
+  27.000000000  --      run 1s
+  27.000005868  PC2     
+  27.000005868  PC2     ; dig of the JFNetworker shell: AAAA www.lab
+  27.000005868  PC2     ;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 35069
+  27.000005868  PC2     ;; flags: qr aa rd; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+  27.000005868  PC2     ;; WARNING: recursion requested but not available
+  27.000005868  PC2     
+  27.000005868  PC2     ;; OPT PSEUDOSECTION:
+  27.000005868  PC2     ; EDNS: version: 0, flags:; udp: 1232
+  27.000005868  PC2     ;; QUESTION SECTION:
+  27.000005868  PC2     ;www.lab.			IN	AAAA
+  27.000005868  PC2     
+  27.000005868  PC2     ;; ANSWER SECTION:
+  27.000005868  PC2     www.lab.		300	IN	AAAA	2001:db8:2::10
+  27.000005868  PC2     
+  27.000005868  PC2     ;; Query time: 0 msec
+  27.000005868  PC2     ;; SERVER: 10.0.2.10#53(10.0.2.10) (UDP)
+  27.000005868  PC2     ;; WHEN: Thu Jan 01 00:00:28 UTC 2026
+  27.000005868  PC2     ;; MSG SIZE  rcvd: 64
+  27.000005868  PC2     
+  28.000000000  ok      expect PC2 output contains "www.lab.\t\t300\tIN\tAAAA\t2001:db8:2::10"
+  28.000000000  PC2     root@PC2:~# host web.lab
+  28.000000000  --      run 1s
+  28.000005484  PC2     web.lab is an alias for www.lab.
+  28.000005484  PC2     www.lab has address 10.0.2.10
+  28.000011256  PC2     www.lab has IPv6 address 2001:db8:2::10
+  29.000000000  ok      expect PC2 output contains "web.lab is an alias for www.lab.\nwww.lab has address 10.0.2.10\nwww.lab has IPv6 address 2001:db8:2::10"
+  29.000000000  PC1     root@PC1:~# ping -c 2 www.lab
+  29.000000000  PC1     PING www.lab(2001:db8:2::10) 56 data bytes
+  29.000000000  --      run 3s
+  29.000007116  PC1     64 bytes from 2001:db8:2::10: icmp_seq=1 ttl=63 time=0.007 ms
+  30.000007116  PC1     64 bytes from 2001:db8:2::10: icmp_seq=2 ttl=63 time=0.007 ms
+  30.000007116  PC1     
+  30.000007116  PC1     --- www.lab ping statistics ---
+  30.000007116  PC1     2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+  30.000007116  PC1     rtt min/avg/max/mdev = 0.007/0.007/0.007/0.000 ms
+  32.000000000  ok      expect PC1 output contains "PING www.lab(2001:db8:2::10) 56 data bytes"
+  32.000000000  ok      expect PC1 output contains "2 packets transmitted, 2 received, 0% packet loss"
+  32.000000000  PC2     root@PC2:~# ping -4 -c 1 www.lab
+  32.000000000  --      run 2s
+  32.000005052  PC2     PING www.lab (10.0.2.10) 56(84) bytes of data.
+  32.000011208  PC2     64 bytes from 10.0.2.10: icmp_seq=1 ttl=63 time=0.006 ms
+  32.000011208  PC2     
+  32.000011208  PC2     --- www.lab ping statistics ---
+  32.000011208  PC2     1 packets transmitted, 1 received, 0% packet loss, time 0ms
+  32.000011208  PC2     rtt min/avg/max/mdev = 0.006/0.006/0.006/0.000 ms
+  34.000000000  ok      expect PC2 output contains "PING www.lab (10.0.2.10) 56(84) bytes of data."
+  34.000000000  PC1     root@PC1:~# traceroute -6 -n www.lab
+  34.000000000  PC1     traceroute to www.lab (2001:db8:2::10), 30 hops max, 80 byte packets
+  34.000000000  --      run 5s
+  34.000014232  PC1      1  2001:db8:1::1  0.005 ms  0.005 ms  0.005 ms
+  34.000035580  PC1      2  2001:db8:2::10  0.007 ms  0.007 ms  0.007 ms
+  39.000000000  ok      expect PC1 output contains " 2  2001:db8:2::10  "
+  39.000000000  R1      R1>enable
+  39.000000000  R1      R1#configure terminal
+  39.000000000  R1      Configuration mode: one command per line; end or Ctrl+Z leaves it.
+  39.000000000  R1      R1(config)#ip name-server 2001:DB8:2::10
+  39.000000000  R1      R1(config)#ipv6 host web6 2001:DB8:2::10
+  39.000000000  R1      R1(config)#end
+  39.000000000  R1      *Mar  1 00:00:39.000: %SYS-5-CONFIG_I: configuration changed at the console
+  39.000000000  R1      R1#ping www.lab
+  39.000000000  R1      Resolving "www.lab" via DNS (2001:DB8:2::10) ...
+  39.000000000  --      run 3s
+  39.000003864  R1      Ctrl+Shift+6 stops the ping.
+  39.000003864  R1      Pinging 10.0.2.10 with 5 echo requests of 100 bytes, 2 s timeout each:
+  39.000015404  R1      !!!!!
+  39.000015404  R1      Success rate is 100 percent (5/5), round-trip min/avg/max = 0/0/0 ms
+  42.000000000  ok      expect R1 output contains "Pinging 10.0.2.10 with 5 echo requests"
+  42.000000000  ok      expect R1 output contains "!!!!!"
+  42.000000000  R1      R1#ping ipv6 www.lab
+  42.000000000  R1      Resolving "www.lab" via DNS (2001:DB8:2::10) ...
+  42.000000000  --      run 3s
+  42.000002100  R1      Ctrl+Shift+6 stops the ping.
+  42.000002100  R1      Pinging 2001:DB8:2::10 with 5 echo requests of 100 bytes, 2 s timeout each:
+  42.000013640  R1      !!!!!
+  42.000013640  R1      Success rate is 100 percent (5/5), round-trip min/avg/max = 0/0/0 ms
+  45.000000000  ok      expect R1 output contains "Pinging 2001:DB8:2::10 with 5 echo requests"
+  45.000000000  R1      R1#ping web6
+  45.000000000  R1      Ctrl+Shift+6 stops the ping.
+  45.000000000  R1      Pinging 2001:DB8:2::10 with 5 echo requests of 100 bytes, 2 s timeout each:
+  45.000000000  --      run 3s
+  45.000011540  R1      !!!!!
+  45.000011540  R1      Success rate is 100 percent (5/5), round-trip min/avg/max = 0/0/0 ms
+  48.000000000  ok      expect R1 output contains "!!!!!"
+  48.000000000  R1      R1#show running-config
+  48.000000000  R1      Collecting the configuration ...
+  48.000000000  R1      
+  48.000000000  R1      ! configuration in effect, 893 bytes
+  48.000000000  R1      !
+  48.000000000  R1      version 1.0
+  48.000000000  R1      !
+  48.000000000  R1      hostname R1
+  48.000000000  R1      !
+  48.000000000  R1      ipv6 host web6 2001:DB8:2::10
+  48.000000000  R1      ip name-server 2001:DB8:2::10
+  48.000000000  R1      !
+  48.000000000  R1      ipv6 unicast-routing
+  48.000000000  R1      !
+  48.000000000  R1      ip dhcp excluded-address 10.0.1.1 10.0.1.99
+  48.000000000  R1      !
+  48.000000000  R1      ip dhcp pool CLIENTS
+  48.000000000  R1       network 10.0.1.0 255.255.255.0
+  48.000000000  R1       default-router 10.0.1.1
+  48.000000000  R1       dns-server 10.0.2.10
+  48.000000000  R1       domain-name lab
+  48.000000000  R1      !
+  48.000000000  R1      interface GigabitEthernet0/0/0
+  48.000000000  R1       description clients
+  48.000000000  R1       ip address 10.0.1.1 255.255.255.0
+  48.000000000  R1       ipv6 address 2001:DB8:1::1/64
+  48.000000000  R1      !
+  48.000000000  R1      interface GigabitEthernet0/0/1
+  48.000000000  R1       description servers
+  48.000000000  R1       ip address 10.0.2.1 255.255.255.0
+  48.000000000  R1       ipv6 address 2001:DB8:2::1/64
+  48.000000000  R1      !
+  48.000000000  R1      interface GigabitEthernet0/0/2
+  48.000000000  R1       no ip address
+  48.000000000  R1       shutdown
+  48.000000000  R1      !
+  48.000000000  R1      interface GigabitEthernet0/0/3
+  48.000000000  R1       no ip address
+  48.000000000  R1       shutdown
+  48.000000000  R1      !
+  48.000000000  R1      interface TenGigabitEthernet0/1/0
+  48.000000000  R1       no ip address
+  48.000000000  R1       shutdown
+  48.000000000  R1      !
+  48.000000000  R1      interface TenGigabitEthernet0/1/1
+  48.000000000  R1       no ip address
+  48.000000000  R1       shutdown
+  48.000000000  R1      !
+  48.000000000  R1      interface Serial0/2/0
+  48.000000000  R1       no ip address
+  48.000000000  R1       shutdown
+  48.000000000  R1      !
+  48.000000000  R1      interface Serial0/2/1
+  48.000000000  R1       no ip address
+  48.000000000  R1       shutdown
+  48.000000000  R1      !
+  48.000000000  R1      line con 0
+  48.000000000  R1      line vty 0 4
+  48.000000000  R1       login
+  48.000000000  R1      !
+  48.000000000  R1      end
+  48.000000000  ok      expect R1 output contains "ipv6 host web6 2001:DB8:2::10\nip name-server 2001:DB8:2::10\n"
+  48.000000000  ok      expect hops tcp >= 10 (60)
+  48.000000000  ok      expect hops dns >= 8 (50)
+# 21 von 21 Erwartungen erfüllt

@@ -2005,6 +2005,22 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   let lsa = ospf::Lsa::new(ospf::LSA_ROUTER, rid, rid, ospf::INITIAL_SEQ, ospf::OPT_E, body).to_bytes();
   assert!(ospf::lsa_checksum_ok(&lsa));
   ```
+
+  Address selection: `addrsel` orders the addresses a name resolves to as RFC 6724 6 says,
+  given the source address each one would leave with (`Dest::new(addr, Some(src))`, `None`
+  for one that cannot be reached; `src_len` is the source's prefix length, `src_deprecated` its
+  preferred lifetime ended): unusable destinations last, matching scope, no deprecated source,
+  matching label, higher precedence, smaller scope, the longest matching prefix between IPv6
+  destinations (capped at the source's prefix, as glibc does), else the given order (`sort` is
+  stable). `scope`, `precedence` and `label` give the values of 3.1 / 3.2 and of the default
+  policy table of 2.1 (an IPv4 address as ::ffff:a.b.c.d), so a host with a global IPv6 address
+  tries IPv6 first and one with only a link-local address IPv4. Rules 4 and 7 (home addresses,
+  native transport) need Mobile IPv6 and tunnels and are left out.
+
+  ```rust
+  let mut d = vec![addrsel::Dest::new(v4, Some(my_v4)), addrsel::Dest::new(v6, Some(my_v6))];
+  addrsel::sort(&mut d);                              // v6 first: precedence 40 against 35
+  ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
   nonces use `plat::random_bytes`.

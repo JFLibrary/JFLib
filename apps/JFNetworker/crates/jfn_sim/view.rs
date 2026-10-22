@@ -483,7 +483,8 @@ impl Engine {
     pub fn event_row(&self, e: &DevEvent) -> EventRow {
         let hop = e.hop.and_then(|h| self.trace.hop(h));
         let hm = hop.map_or(0, |h| h.mask);
-        let own = e.note.mask() & !hm;
+        let nm = e.mask(hm);
+        let own = nm & !hm;
         let msg = self.message(e);
         EventRow {
             seq: e.seq,
@@ -492,8 +493,8 @@ impl Engine {
             dev: e.dev,
             hop: e.hop,
             layer: e.note.layer(),
-            proto: proto_name(if own != 0 { own } else { hm | e.note.mask() }),
-            mask: hm | e.note.mask(),
+            proto: proto_name(if own != 0 { own } else { hm | nm }),
+            mask: hm | nm,
             text: msg.text(),
             drop: e.note.is_drop(),
             msg,

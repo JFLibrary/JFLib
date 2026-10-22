@@ -37,7 +37,7 @@ use super::fmt::{iputils_time, isqrt, ms3, pct_g};
 use super::CliJob;
 use crate::jobs::{IcmpKind, JobKind, PingEv, PingOpts, TraceOpts};
 use crate::kernel::{Engine, Ns, MS, SEC};
-use crate::resolver::LookupErr;
+use crate::resolver::{Family, LookupErr};
 
 /// how a console job prints and how far it got
 #[derive(Clone, Debug)]
@@ -122,6 +122,14 @@ pub enum JobOut {
         numeric: bool,
         head: bool,
         shown: String,
+    },
+    /// an IOS-like ping by name (cli/names.rs) while its name is looked up: then the first
+    /// lines and IosPing, or Ping6 for an IPv6 address
+    IosByName {
+        count: u32,
+        bytes: u16,
+        timeout: Ns,
+        df: bool,
     },
 }
 
@@ -253,10 +261,11 @@ impl Engine {
         self.cli_start_job(ni, id, JobOut::IosTrace { hop: 0, probe: 0, last: None, wrote: false });
     }
 
-    /// iputils "ping" of an address or a name (`opts.count` 0: until Ctrl+C)
-    pub(crate) fn linux_ping_start(&mut self, ni: usize, host: &str, o: PingOpts) {
+    /// iputils "ping" of an address or a name (`opts.count` 0: until Ctrl+C), the name looked
+    /// up for the families of `fam` (an IPv6 address first makes it a ping over IPv6)
+    pub(crate) fn linux_ping_start(&mut self, ni: usize, host: &str, o: PingOpts, fam: Family) {
         let dev = self.dev_of(ni);
-        let Ok(id) = self.ping_host(dev, host, o) else {
+        let Ok(id) = self.ping_host_fam(dev, host, o, fam, false, None) else {
             return;
         };
         let now = self.now;
@@ -265,9 +274,9 @@ impl Engine {
     }
 
     /// Linux "traceroute" to an address or a name
-    pub(crate) fn linux_trace_start(&mut self, ni: usize, host: &str, o: TraceOpts, numeric: bool) {
+    pub(crate) fn linux_trace_start(&mut self, ni: usize, host: &str, o: TraceOpts, numeric: bool, fam: Family) {
         let dev = self.dev_of(ni);
-        let Ok(id) = self.traceroute_host(dev, host, o) else {
+        let Ok(id) = self.traceroute_host_fam(dev, host, o, fam) else {
             return;
         };
         let name = if Ipv4::parse(host).is_some() { None } else { Some(String::from(host)) };
@@ -281,6 +290,7 @@ impl Engine {
         match err {
             Some(LookupErr::NotFound | LookupErr::BadName) => "Name or service not known",
             Some(LookupErr::NoData) => "No address associated with hostname",
+            Some(LookupErr::Family) => "Address family for hostname not supported",
             _ => "Temporary failure in name resolution",
         }
     }
@@ -303,6 +313,16 @@ impl Engine {
             self.dhclient_progress(ni);
             return;
         }
+        // a job by name that knows its address now (IOS-like: the first lines) or went on
+        // over IPv6 (jobs6.rs: ping_becomes6)
+        match self.job_switch(ni, &cj) {
+            Some(true) => {
+                self.job_progress(ni);
+                return;
+            }
+            Some(false) => return,
+            None => {}
+        }
         // over IPv6 (print6.rs)
         if matches!(cj.out, JobOut::Ping6 { .. } | JobOut::Trace6 { .. }) {
             self.job6_progress(ni);
@@ -316,6 +336,12 @@ impl Engine {
         let mut out = cj.out.clone();
         let mut done = job.done;
         match (&mut out, &job.kind) {
+            (JobOut::IosByName { .. }, JobKind::Ping(_)) => {
+                // the name is still looked up, or it was not found
+                if done {
+                    text.push_str("% Unrecognized host or address, or protocol not running.\n\n");
+                }
+            }
             (JobOut::IosPing { col, seen, fake, .. }, JobKind::Ping(p)) => {
                 if *fake > 0 {
                     return;
@@ -467,6 +493,71 @@ impl Engine {
         if done {
             self.cli_job_done(ni);
         }
+    }
+
+    /// a console job whose engine job changed: the IOS-like ping by name once its address is
+    /// known (the first lines now), a ping or traceroute by name that went on over IPv6;
+    /// Some(true) when it now prints another way, Some(false) when it ended here, None when
+    /// nothing changed
+    fn job_switch(&mut self, ni: usize, cj: &CliJob) -> Option<bool> {
+        // only a job by name changes what it is
+        if !matches!(cj.out, JobOut::LinuxPing { .. } | JobOut::LinuxTrace { .. } | JobOut::IosByName { .. }) {
+            return None;
+        }
+        let job = self.job(cj.id)?.clone();
+        let now = self.now;
+        let new = match (&cj.out, &job.kind) {
+            (JobOut::LinuxPing { name, .. }, JobKind::Ping6(p)) => {
+                let shown = match name {
+                    Some(n) => self.canonical(ni, p.lookup, n),
+                    None => format!("{}", p.dst),
+                };
+                JobOut::Ping6 { ios: false, col: 0, seen: 0, sent: 0, last_send: now, head: false, t0: now, shown, from: None }
+            }
+            (JobOut::LinuxTrace { name, numeric, .. }, JobKind::Trace6(t)) => {
+                let shown = match name {
+                    Some(n) => self.canonical(ni, t.lookup, n),
+                    None => format!("{}", t.dst),
+                };
+                JobOut::Trace6 { ios: false, hop: 0, probe: 0, last: None, wrote: false, numeric: *numeric, head: false, shown }
+            }
+            (JobOut::IosByName { count, bytes, timeout, df }, JobKind::Ping(p)) if !p.dst.is_unspecified() => {
+                let (count, timeout) = (*count, *timeout);
+                let mut head = format!("Ctrl+Shift+6 stops the ping.\nPinging {} with {} echo request{} of {} bytes, {} s timeout each:\n", p.dst, count, if count == 1 { "" } else { "s" }, bytes, timeout / SEC);
+                if *df {
+                    head.push_str("Fragmentation forbidden (DF bit set)\n");
+                }
+                // no route: every probe waits its timeout, as ios_ping_start shows it
+                let no_route = job.done && matches!(p.events.first(), Some(PingEv::Error { kind: IcmpKind::NoRoute, .. }));
+                self.out(ni, &head);
+                if no_route {
+                    let at = now + timeout;
+                    self.cli_wake_at(ni, at);
+                    JobOut::IosPing { col: 0, seen: 1, fake: count, count, timeout }
+                } else {
+                    JobOut::IosPing { col: 0, seen: 0, fake: 0, count, timeout }
+                }
+            }
+            (JobOut::IosByName { count, bytes, timeout, .. }, JobKind::Ping6(p)) => {
+                let (count, timeout) = (*count, *timeout);
+                let no_route = job.done && matches!(p.events.first(), Some(crate::jobs6::Ping6Ev::Error { kind: crate::jobs6::Icmp6Kind::LocalNoRoute, .. }));
+                if no_route {
+                    self.out(ni, "% No valid route for destination\n");
+                    self.cli_job_done(ni);
+                    return Some(false);
+                }
+                let head = format!("Ctrl+Shift+6 stops the ping.\nPinging {} with {} echo request{} of {} bytes, {} s timeout each:\n", super::print6::up6(p.dst), count, if count == 1 { "" } else { "s" }, (*bytes).max(48), timeout / SEC);
+                self.out(ni, &head);
+                JobOut::Ping6 { ios: true, col: 0, seen: 0, sent: 0, last_send: 0, head: true, t0: now, shown: String::new(), from: None }
+            }
+            _ => return None,
+        };
+        if let Some(c) = self.cdev_mut(ni)
+            && let Some(j) = c.job.as_mut()
+        {
+            j.out = new;
+        }
+        Some(true)
     }
 
     /// a line of iputils ping for one probe

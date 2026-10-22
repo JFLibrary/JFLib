@@ -227,6 +227,12 @@ pub enum Action {
     Ip6 { dev: u32, set: crate::ip6::Ip6Set },
     /// a change of OSPF's configuration, or "clear ip ospf process" (ospf.rs)
     Ospf { dev: u32, set: crate::ospf::OspfSet },
+    /// the static name servers of either family in their order ("ip name-server A B",
+    /// "nameserver" lines); empty: those from DHCP again
+    NameServers { dev: u32, servers: Vec<netpkt::IpAddr> },
+    /// a static host name with an IPv6 address ("ipv6 host", /etc/hosts); None removes it (the
+    /// IPv4 entries of the name stay)
+    HostEntry6 { dev: u32, name: String, ip: Option<netpkt::Ipv6> },
 }
 
 /// why an action was refused (German text through Display)

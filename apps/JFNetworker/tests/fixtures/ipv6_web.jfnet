@@ -1,0 +1,211 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Dual-Stack-Web",
+  "description": "PC1 und PC2 holen sich IPv4 per DHCP von R1 (mit dem Namensserver 10.0.2.10 und der Domäne lab) und IPv6 per SLAAC. WEB hinter R1 hat beide Familien fest und betreibt den Namensserver (A und AAAA für www.lab) und den Webserver.",
+  "seed": 9,
+  "next_id": 10,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nsysctl -w net.ipv6.conf.all.disable_ipv6=0\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": 0,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname PC2\nsysctl -w net.ipv6.conf.all.disable_ipv6=0\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@eth0",
+          "disabled": false,
+          "config": {
+            "iface": "eth0"
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 160,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 320,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname R1\n!\nip dhcp excluded-address 10.0.1.1 10.0.1.99\n!\nip dhcp pool CLIENTS\n network 10.0.1.0 255.255.255.0\n default-router 10.0.1.1\n dns-server 10.0.2.10\n domain-name lab\n!\nipv6 unicast-routing\n!\ninterface GigabitEthernet0/0/0\n description clients\n ip address 10.0.1.1 255.255.255.0\n ipv6 address 2001:DB8:1::1/64\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n description servers\n ip address 10.0.2.1 255.255.255.0\n ipv6 address 2001:DB8:2::1/64\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "WEB",
+      "model": "server-1u",
+      "x": 480,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname WEB\nsysctl -w net.ipv6.conf.all.disable_ipv6=0\nsysctl -w net.ipv6.conf.eth0.autoconf=0\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\nip -6 addr add 2001:db8:2::10/64 dev eth0\n",
+      "services": [
+        {
+          "kind": "dns-server",
+          "name": "named",
+          "disabled": false,
+          "config": {
+            "zones": [
+              {
+                "origin": "lab",
+                "ttl": 300,
+                "records": [
+                  "www A 10.0.2.10",
+                  "www AAAA 2001:db8:2::10",
+                  "web CNAME www",
+                  "r1 A 10.0.1.1",
+                  "r1 AAAA 2001:db8:1::1"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "port": 80,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Hallo von WEB\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 6,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/24"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}
