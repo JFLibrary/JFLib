@@ -1,0 +1,4 @@
+#!args --test play
+# audiotest --test play (src/tests.rs): a push stream, a fill stream, pause / start / stop, volume,
+# play() and play_file(app://klang.wav) with the real output; Windows: the default device's mix
+# captured by WASAPI loopback must contain the tones. No output device: SKIP. The tones are quiet.

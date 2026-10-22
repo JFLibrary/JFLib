@@ -88,6 +88,9 @@ pub const REQUEST_FILE_DIALOG: u32 = 12;
 /// 2 delete), app, service, account and for set the value, each as u32 length + bytes; the
 /// host encrypts and stores it in order and completes with 2, or an error
 pub const REQUEST_SECRET: u32 = 13;
+/// (browser) sound output (audio.rs, web_audio.rs, web/audio.js): five u32, op (1 open, 2 close,
+/// 3 play, 4 pause, 5 flush), stream id, rate, channels, latency frames; no completion
+pub const REQUEST_AUDIO: u32 = 14;
 
 /// Completion state of one browser operation; durable and exported are distinct outcomes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -184,7 +187,7 @@ fn with_app<R>(f: impl FnOnce(&mut dyn WebApplication) -> R) -> Option<R> {
     Some(result)
 }
 
-pub(super) fn notice(kind: u32, data: &[u8]) {
+pub(crate) fn notice(kind: u32, data: &[u8]) {
     // SAFETY: host copies bytes synchronously and schedules any completion asynchronously.
     unsafe {
         host_request(kind, 0, data.as_ptr(), data.len());

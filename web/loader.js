@@ -9,6 +9,9 @@ const app=document.body.dataset.app, params=new URLSearchParams(location.search)
 const ctx=canvas.getContext("2d",{alpha:false}), text=new TextDecoder();
 let started=false, enabled=params.get("agent")==="1", nextId=1, composing=false, openRequest=0, database=null, pasteModifiers=2;
 let bridgeDisconnect=null, bridgeAttempt=0, secretStore=null;
+// sound (audio.js, lib/plat/web_audio.rs): loaded with the first stream
+let audio=null;
+const audioHost=()=>audio||=import("./audio.js").then(x=>new x.AudioHost(worker));
 const pending=new Map(), ports=new Set();
 // One acknowledged batch at a time: a busy worker must not accumulate old frames
 // or hover positions. Input edges and every pressed-pointer sample stay ordered.
@@ -213,6 +216,7 @@ async function service(m) {
       // the differences of the accessibility tree; a mirror that went wrong asks for all anew
       if(shadow) try {shadow.apply(decodeA11y(m.data));} catch(error) {console.error(error);send({type:"a11y",on:true});}
     }
+    else if(m.kind===14) audioHost().then(h=>h.request(m.data)).catch(error=>console.warn("Audio:",error));
     else complete(m.id,-3);
   } catch(error) {complete(m.id,errorCode(error));report(error.message);}
 }

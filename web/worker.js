@@ -3,6 +3,8 @@ let wasm, memory, ready = false;
 let module, failure, threaded=false, computeWorker=false, workerLimit=0;
 let clockOrigin=performance.timeOrigin || 0;
 const workers=new Set();
+// sound (audio.js): the pump between WASM and the page's worklets, loaded with the first stream
+let audio=null;
 const idleWorkers=[];
 function checkWorkers() { if(failure && Atomics.load(failure,0)) throw new Error("Ein WASM-Rechen-Worker ist fehlgeschlagen."); }
 function failedWorker(error) {
@@ -164,6 +166,10 @@ function dispatch(m) {
 self.onmessage = async ({data:m}) => {
   try {
     checkWorkers();
+    if(m.type==="audio-port"||m.type==="audio-state") {
+      (audio||=import("./audio.js").then(x=>new x.WorkerAudio(()=>wasm,()=>memory))).then(a=>a.message(m)).catch(error=>postMessage({type:"error",message:String(error?.message||error)}));
+      return;
+    }
     if(m.type==="start-compute") {
       computeWorker=true;threaded=true;module=m.module;memory=m.memory;
       failure=new Int32Array(m.failure);workerLimit=m.workerLimit;

@@ -1,0 +1,3 @@
+#!args --test sounds
+# audiotest --test sounds (src/tests.rs): the system sounds -- the dry run, every kind, whether
+# dialogs play one here; Windows: what PlaySound played reaches the device (loopback).

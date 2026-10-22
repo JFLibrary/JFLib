@@ -42,6 +42,9 @@
 //            shared-mime-info, mimeapps.list), file_uri_path                    (assoc.rs)
 //   recent:  recent_add / recent_list / recent_remove / recent_clear: the system's recent files
 //            (SHAddToRecentDocs and the jump list; recently-used.xbel)          (recent.rs)
+//   audio:   Stream (open / open_fill, write, start / pause / stop, volume, latency, the default
+//            device followed), play / play_file (WAV, Ogg Vorbis), sound(SOUND_*): the system's
+//            sounds (WASAPI, PulseAudio protocol, WebAudio, AAudio)               (audio.rs)
 //   threads: thread_spawn(stack, f) -> Thread (join), thread_yield(), Sem (post / wait),
 //            wake() (any thread: E_WAKE on the UI thread), wait_events(deadline, on_event)
 //            (headless), cpu_count(), mem_total()
@@ -143,6 +146,8 @@ pub mod assoc;
 /// The system's list of recently used files (jump lists, recently-used.xbel).
 pub mod recent;
 pub use recent::{recent_add, recent_clear, recent_list, recent_remove};
+/// Sound output: streams, short sounds from memory or files, the system's own sounds.
+pub mod audio;
 // what the desktop integration shares on Linux (the session-bus link, the .desktop id)
 #[cfg(target_os = "linux")]
 mod linux_desk;

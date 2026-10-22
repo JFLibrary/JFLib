@@ -1,0 +1,4 @@
+#!args --test pulse
+# audiotest --test pulse (src/tests.rs, Linux): the PulseAudio server (WSLg's, pipewire-pulse) lists
+# our stream (rate, channels, media.name), corks it while paused, reports its latency; a system
+# sound from a scratch sound theme. No server, or not Linux: SKIP.

@@ -171,9 +171,9 @@ def build_apk(builder, name, style, variant, root, crates, run, notices):
     native = work / 'libjfgui_android.so'
     run([llvm / 'bin' / ('clang' + suffix), f'--target={triple}{MIN_API}',
          f'--sysroot={llvm / "sysroot"}', '-std=c11', '-O2', '-fPIC', '-fvisibility=hidden',
-         '-Wall', '-Wextra', '-Werror', '-shared', ROOT / 'android' / 'bridge.c', archive,
+         '-Wall', '-Wextra', '-Werror', '-shared', ROOT / 'android' / 'bridge.c', ROOT / 'android' / 'audio.c', archive,
          '-Wl,--gc-sections,--exclude-libs,ALL,--no-undefined', '-Wl,-z,max-page-size=16384',
-         '-Wl,-z,common-page-size=16384', '-Wl,-z,relro,-z,now', '-llog', '-ljnigraphics', '-ldl', '-lm', '-o', native])
+         '-Wl,-z,common-page-size=16384', '-Wl,-z,relro,-z,now', '-llog', '-ljnigraphics', '-laaudio', '-ldl', '-lm', '-o', native])
     run([llvm / 'bin' / ('llvm-strip' + suffix), '--strip-unneeded', native])
     try:
         verify_elf(native, builder.android_abi)

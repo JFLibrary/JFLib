@@ -326,8 +326,31 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   (`ThumbBarAddButtons`), Quicklists über dbusmenu unter Linux.
 - **P3** · *fehlt* · Globale Tastenkürzel; Screenshot- und Farbwähler-Portal (Pipette
   außerhalb des Fensters); öffentliche Monitor-API (Liste, DPI, Arbeitsbereich).
-- **P3** · *fehlt* · Audio-Ausgabe (WASAPI, PipeWire / ALSA), auch Systemklänge; später Video,
-  Kamera, Mikrofon.
+- **P3** · *erledigt* · Audio-Ausgabe ([`plat/audio.rs`](../lib/plat/audio.rs),
+  [`ui/sound.rs`](../lib/ui/sound.rs), seit 2026-10-22; GUIDE.md, Abschnitt 33): Streams mit
+  Rate, Kanälen und Latenzziel (Standard 40 ms), gefüllt über einen Ring, den die Plattform
+  leert (`Stream::open` + `write` / `write_i16`), oder per Callback auf dem Audio-Thread
+  (`open_fill`); Start / Pause / Stopp / Ende, Lautstärke, Latenz, gespielte Frames, Aussetzer,
+  Gerätename und Gerätewechsel; `play` / `play_file` mischt kurze Klänge (WAV PCM 8–32 Bit und
+  Float, Ogg Vorbis mit eigenem Decoder) in einen gemeinsamen 48-kHz-Stream; `sound(SOUND_*)`
+  spielt die Systemklänge, `ui.beep(kind)` und `ui.dialog_sound(kind)` (nur wo Meldungsdialoge
+  klingen) mit dem App-Schalter `ui.set_sounds`. Windows: WASAPI Shared Mode ereignisgesteuert
+  auf eigenem Thread, `IMMNotificationClient` folgt dem Standardgerät, Systemklänge über
+  `PlaySound`-Aliase. Linux: eigener Client des PulseAudio-Protokolls über den Unix-Socket
+  (pipewire-pulse, PulseAudio, WSLg) mit Cookie, der Server verschiebt Streams zum neuen
+  Standardgerät; Systemklänge aus dem freedesktop-Soundtheme (Theme und `event-sounds` über das
+  Settings-Portal). Browser: AudioWorklet aus einem SharedArrayBuffer-Ring (bei
+  Cross-Origin-Isolation) oder geposteten Puffern, Pumpe im Worker, `Blocked` bis zur ersten
+  Nutzergeste ([`web/audio.js`](../web/audio.js)); Systemklänge als erzeugte Töne. Android:
+  AAudio über den Host ([`android/audio.c`](../android/audio.c)), getrenntes Gerät öffnet neu;
+  Benachrichtigungston und `ToneGenerator`. Getestet: WASAPI-Loopback hört die Töne,
+  WSLg-PulseServer listet den Stream samt Latenz, Playwright (Chromium, Firefox) misst den Ton
+  mit einem AnalyserNode, im Emulator spielt audioserver die AAudio-Spur
+  (`apps/audiotest`, `plattest --test audio`). Es fehlen: Ausgabe ohne Soundserver unter
+  Linux (ALSA direkt), Wahl des Ausgabegeräts, der Stream-Name im Windows-Lautstärkemixer,
+  Floor 0 von Vorbis, `--socket=pulseaudio` im Flatpak-Paket (fügt `tools/package.py` noch
+  nicht hinzu; der Socket erlaubt auch Aufnahmen, eine Manifest-Regel dafür ist zu
+  entscheiden); später Video, Kamera, Mikrofon.
 - **P3** · *fehlt* · WebView einbetten (WebView2, WebKitGTK); ohne libc schwierig, bewusst
   zu entscheiden.
 

@@ -57,6 +57,9 @@ without changing the application logic.
   notifications and a notification-area icon, drag and drop between widgets and other
   programs, taskbar progress, badges, and jump lists, starting at login, and keeping the
   system awake.
+- **Sound:** output streams with a target latency on every platform (WASAPI, the PulseAudio
+  protocol that PipeWire serves, WebAudio, AAudio), short sounds from WAV and Ogg Vorbis
+  files mixed together, and the system's own sounds for events and message dialogs.
 - **Files, permissions, and updates:** one file namespace (`app://`, `config://`, `data://`,
   `cache://`, `mem://`, ZIP archives, overlays), assets built into the program, a
   `PERMISSIONS` manifest per app enforced at run time with questions to the user, the

@@ -64,12 +64,14 @@ pub(crate) struct S {
 pub(crate) struct W {
     dlg_clip: [i32; 4],
     dlg_openp: Option<Shared<i32>>,
-    dlg_active: bool,
+    pub(crate) dlg_active: bool,
     dlg_nest: u32,
     dlg_id: u32,
     dlg_phase: u32,
     dlg_layer: u32,
     dlg_dis: u32,
+    /// the dialog opened in this pass (ui.dialog_sound, sound.rs)
+    pub(crate) dlg_fresh: bool,
     tb_state: u32,
     /// This titlebar overlays app content and places the agent badge by the window controls.
     tb_overlay: bool,
@@ -109,6 +111,7 @@ impl Ui {
             c.dlg_id = id;
             c.dlg_openp = Some(open.clone());
             c.dlg_phase = 1;
+            c.dlg_fresh = false;
         }
         let focus = self.wp.ctx.focus;
         let s = self.slot(id);
@@ -118,6 +121,7 @@ impl Ui {
             s.scrollx = focus as i32;
             self.wp.ctx.focus = id;
             self.wp.ctx.focus_visible = false;
+            self.wp.chrome.dlg_fresh = true;
         }
         self.wp.chrome.dlg_layer = self.layer_set(L_DIALOG);
         self.modal(L_DIALOG);

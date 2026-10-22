@@ -22,6 +22,7 @@ noch offenen Office-Funktionen und Browserdiensten.
 | `web/loader.js`, `worker.js`, `bridge.js` | Gemeinsamer Browserhost, DOM-Eingabe, Worker, Canvas und aktivierbarer Agentenzugang |
 | `web/a11y.js` | ARIA-Schattenbaum über dem Canvas: Spiegel des Barrierefreiheitsbaums, Aktionen von Screenreadern (GUIDE.md, Abschnitt 19) |
 | `web/secrets.js` | Geheimnisspeicher des Hosts für `plat::secret`: nicht exportierbarer WebCrypto-Schlüssel pro App und verschlüsselte Werte in IndexedDB (SECRETS.md) |
+| `web/audio.js` | Klangausgabe für `plat::audio`: AudioContext und ein AudioWorklet je Stream auf der Seite, die Pumpe im Worker (SharedArrayBuffer-Ring oder gepostete Puffer; GUIDE.md, Abschnitt 33) |
 
 Neue Bibliotheksprojekte nutzen `src/lib.rs`. jfWord nutzt `src/main.rs` mit `app`, `ui`,
 `workflows` und `checks`. Andere bestehende Projekte dürfen ihre flachen Einstiegspunkte

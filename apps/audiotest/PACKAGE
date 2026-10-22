@@ -1,0 +1,18 @@
+# apps/audiotest/PACKAGE: the app's identity and packages (docs/PACKAGING.md)
+#   python tools/package.py audiotest --formats all
+# version= is the app's own version (MAJOR.MINOR.PATCH, docs/VERSIONING.md); the program reads it
+# as rt::app_version!(), the packages and lib/update use it.  The library has its own (lib/VERSION).
+display=Audio-Test
+version=0.1.0
+publisher=Graphsto
+summary=Klangausgabe der Bibliothek: Ton-Generator, Klänge, Systemklänge
+description=Audio-Test: ein Ton-Generator (Sinus, Rechteck), WAV- und Ogg-Vorbis-Dateien, die Systemklänge und ein Dialog mit Warnklang; die Testanwendung von plat::audio.
+generic=Klangtest
+categories=AudioVideo;Audio;Utility;
+deb_name=audiotest
+# Flatpak, AppStream and the MSIX identity: reverse DNS of a domain or project you control
+app_id=org.jflib.audiotest
+homepage=https://github.com/JFLibrary/JFLib
+default_win=winui
+default_linux=winui
+styles=winui
