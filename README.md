@@ -530,6 +530,10 @@ and [developer guide](docs/GUIDE.md).
 
 The style is selected **at build time**. Light/dark themes, accent colors, and scaling
 can change at runtime. The style and operating system are independent of each other.
+Apps can lay their own **theme** over any style at runtime -- colors, corner radii, spacing,
+control heights, and type from a small INI file, no style crate needed -- and an app that
+links several styles can switch between them while it runs
+([App themes](docs/STYLES.md#app-themes), `apps/themedemo`).
 
 | Style | Appearance |
 | --- | --- |

@@ -1154,7 +1154,7 @@ impl Ui {
         let view_h = vh;
         // the layouts belong to a width, dpi, text scale, direction and fonts
         let fc = self.md_faces();
-        let key = (self.wp.rt.dpi, cw, self.text_scale, drtl, fc);
+        let key = (self.wp.rt.dpi, cw, self.layout_scale(), drtl, fc);
         let n = st.doc.blocks().len();
         if key != st.lc.key || !st.sized || st.rows.len() != n {
             if key != st.lc.key {

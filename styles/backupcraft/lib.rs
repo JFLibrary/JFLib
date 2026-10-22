@@ -43,6 +43,9 @@ pub struct BackupCraft;
 pub static STYLE: BackupCraft = BackupCraft;
 
 impl Style for BackupCraft {
+    fn name(&self) -> &'static str {
+        "backupcraft"
+    }
     fn tokens(&self, dark: bool) -> [u32; T_COUNT] {
         if dark { palette::DARK } else { palette::LIGHT }
     }

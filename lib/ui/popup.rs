@@ -1757,6 +1757,7 @@ impl Ui {
         let st = self.style;
         let mut sp = Sp { flags, icon, label: Some(label), ..Sp::default() };
         let (w, h) = st.dropdown_size(self, &mut sp);
+        let (w, h) = self.ctrl_size(w, h, flags, false); // (theme) control height
         self.place(w, h);
         let mut hb = HB_FOCUS;
         if flags & ST_DISABLED != 0 {
@@ -1802,6 +1803,7 @@ impl Ui {
         let st = self.style;
         let mut sp = Sp { icon, label: Some(label), ..Sp::default() };
         let (w, h) = st.split_size(self, &mut sp);
+        let (w, h) = self.ctrl_size(w, h, flags, false); // (theme) control height
         let (mw, cw) = (sp.s[0], sp.s[1]);
         let whole = self.place(w, h);
         let dis = if flags & ST_DISABLED != 0 { HB_DISABLED } else { 0 };
@@ -1872,6 +1874,7 @@ impl Ui {
         let st = self.style;
         let mut sp = Sp { flags, value: widest, ..Sp::default() };
         let (w, h) = st.combo_size(self, &mut sp);
+        let (w, h) = self.ctrl_size(w, h, flags, false); // (theme) control height
         let rect = self.place(w, h);
         let mut hb = HB_FOCUS;
         if flags & ST_DISABLED != 0 {

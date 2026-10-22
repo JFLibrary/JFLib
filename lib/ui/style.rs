@@ -67,6 +67,11 @@ impl Sp<'_> {
 
 /// a style: tokens, type ramp, fonts and every widget family's paint functions
 pub trait Style: StyleBasic + StyleValue + StyleEdit + StyleList + StylePopup + StyleChrome + StyleMisc + Sync {
+    /// the style's short name, as build_rs.py --style knows it ("winui", "kde"): the name
+    /// Ui::set_style switches to (several styles linked into one app)
+    fn name(&self) -> &'static str {
+        ""
+    }
     /// Ribbon height in DIP. Existing styles retain the original 110-DIP layout.
     fn ribbon_height(&self) -> i32 { 110 }
     /// Outer ribbon padding in DIP, independently styled from control content heights.

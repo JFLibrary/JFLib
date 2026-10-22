@@ -1,0 +1,147 @@
+# app themes at run time (ui/theme.rs, theme_app.rs; docs/STYLES.md "App themes"): the
+# style's own look, the two sample themes in light / dark / high contrast, back to the
+# style's look with the same pixels, every linked style with and without a theme, broken
+# files, the editor, saving and loading
+size 980 760
+theme light
+# (the tab pill slides to its place in the first frames)
+wait 500
+expect theme none
+expect style winui
+expect token bg #F3F3F3
+expect token accent #005FB8
+expect "Schaltfläche" rect 464 180 96 32
+expect #207 rect 464 268 200 32
+expect pixel 5 5 #F3F3F3
+shot build/themedemo/default_light.png
+# ---- Ozean by the library (theme file): colours, the accent through the style's ramp,
+# 8 DIP corners, 110 % spacing, 36 DIP controls, 15 DIP body text
+theme file app://themes/ocean.theme
+expect theme error none
+expect theme "Ozean"
+expect "Ozean" checked
+expect token bg #EAF3F5
+expect token text #0B2A33
+expect token card_stroke #1F0F5560
+expect token accent #0C6875
+expect token accent_text #094F59
+expect pixel 5 5 #EAF3F5
+expect "Schaltfläche" rect 470 191 101 36
+expect #207 rect 470 285 200 36
+expect #208 rect 679 285 160 36
+expect #211 rect 760 191 81 36
+shot build/themedemo/ocean_light.png
+theme dark
+expect token bg #0E1E24
+expect token text #E6F4F7
+expect pixel 5 5 #0E1E24
+shot build/themedemo/ocean_dark.png
+theme contrast
+expect token accent #00E5FF
+expect token bg #000000
+shot build/themedemo/ocean_hc.png
+theme light
+# back to the style's own look: the same pixels as before
+theme none
+expect theme none
+expect token accent #005FB8
+expect same build/themedemo/default_light.png
+# ---- Papier by the page: square corners, 90 % spacing, 28 DIP controls
+click "Papier"
+expect theme "Papier"
+expect "Papier" checked
+expect token bg #F5F1E8
+expect token crit #B3261E
+expect "Schaltfläche" rect * * * 28
+expect #207 rect * * 200 28
+shot build/themedemo/paper_light.png
+theme dark
+expect token bg #24201B
+expect token crit #B3261E
+shot build/themedemo/paper_dark.png
+theme contrast
+shot build/themedemo/paper_hc.png
+theme light
+click "Ohne Theme"
+move -50,-50
+wait 400
+expect theme none
+expect same build/themedemo/default_light.png
+# ---- the run-time style switch: every linked style, with and without a theme; back to
+# winui gives the same pixels
+style classic
+expect style classic
+shot build/themedemo/classic.png
+theme file app://themes/ocean.theme
+expect token bg #EAF3F5
+expect "Schaltfläche" rect * * * 36
+shot build/themedemo/classic_ocean.png
+theme none
+style kde
+expect style kde
+shot build/themedemo/kde.png
+theme file app://themes/paper.theme
+expect token bg #F5F1E8
+expect "Schaltfläche" rect * * * 28
+shot build/themedemo/kde_paper.png
+theme none
+style macos
+expect style macos
+theme dark
+shot build/themedemo/macos_dark.png
+theme file app://themes/ocean.theme
+expect token bg #0E1E24
+shot build/themedemo/macos_ocean_dark.png
+theme none
+theme light
+style winui
+expect style winui
+expect same build/themedemo/default_light.png
+# the style through the page's combo box
+click #100
+click "kde"
+expect style kde
+expect text:"Stil: kde" exists
+click #100
+click "winui"
+expect style winui
+# ---- broken files: a clear error, the theme stays
+theme file app://themes/paper.theme
+theme file apps/themedemo/tests/fixtures/broken.theme
+expect theme error "Zeile 5: „#12345“ ist keine Farbe (#RRGGBB oder #AARRGGBB)"
+expect theme "Papier"
+expect token bg #F5F1E8
+theme file apps/themedemo/tests/fixtures/nofont.theme
+expect theme error "Schrift nicht ladbar: apps/themedemo/tests/fixtures/fonts/fehlt.ttf"
+expect theme "Papier"
+theme file apps/themedemo/tests/fixtures/fehlt.theme
+expect theme error "Theme-Datei nicht lesbar: apps/themedemo/tests/fixtures/fehlt.theme"
+expect theme "Papier"
+# ... and through the page
+focus #182
+type "apps/themedemo/tests/fixtures/broken.theme"
+click "Laden"
+expect #184 exists
+expect text:"Zeile 5: „#12345“ ist keine Farbe (#RRGGBB oder #AARRGGBB)" exists
+expect theme "Papier"
+# ---- the editor: a change makes the active theme "Eigenes", live
+click #142
+expect theme "Eigenes"
+expect "Eigenes" checked
+expect token bg #F5F1E8
+expect token accent #5B439F
+focus #162
+key ctrl+a
+type "40\n"
+expect "Schaltfläche" rect * * * 40
+click "Speichern"
+expect text:"Gespeichert: mem://themedemo/eigenes.theme" exists
+click "Ozean"
+expect theme "Ozean"
+expect "Schaltfläche" rect * * * 36
+click "Gespeichertes laden"
+expect theme "Eigenes"
+expect "Schaltfläche" rect * * * 40
+expect token bg #F5F1E8
+expect token accent #5B439F
+shot build/themedemo/custom.png

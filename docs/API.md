@@ -112,7 +112,8 @@ ui -- the immediate-mode runtime: one Ui context instead of ASMLIB's g_* globals
 
 Modules (one per ASMLIB file): ctx (ui_ctx.s: input, hit testing, behaviour, slots,
 timers, commands, semantics, clip, layers, passes), layout (ui_layout.s), cmd (ui_cmd.s:
-draw command lists and their replay), dirty (ui_dirty.s), theme (ui_theme.s), basic
+draw command lists and their replay), dirty (ui_dirty.s), theme (ui_theme.s; app themes
+over the style and the run-time style switch, theme_app.rs: Theme and its file), basic
 (ui_basic.s), auto (ui_auto.s: scripts and the widget dump), runtime (ui_main.s), cursor
 (ui_cursor.s), drop (ui_drop.s), dnd (drag and drop between widgets and programs), dock
 (docking: panels at the sides in tab groups, floating tool windows), kbnav (keyboard
@@ -169,7 +170,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [File dialog](#file-dialog): `filedlg`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
 - [Scripts and the widget dump](#scripts-and-the-widget-dump): `dump`
-- [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `dp_text`, `ts_base`
+- [Theme](#theme): `theme_set`, `theme_dark`, `accent_set`, `high_contrast`, `set_contrast`, `set_reduced_motion`, `text_scale`, `font_prefs`, `set_text_scale`, `color`, `ts_font`, `ts_line`, `set_theme`, `clear_theme`, `app_theme`, `load_theme`, `styles_add`, `style_names`, `style_name`, `set_style`, `dp_text`, `ts_base`
 - [Cursors, drag and drop, clipboard images, dirty regions](#cursors-drag-and-drop-clipboard-images-dirty-regions): `cursor_new`, `cursor_custom`, `cursor_current`, `cursor_render`, `drop_count`, `drop_path`, `open_take`, `drop_list`, `drop_pos`, `drop_window`, `drop_data`, `drop_types`, `drop_text`, `clip_has`, `drag_source`, `drag_set`, `drag_out`, `drag_effect`, `dragging`, `drop_target`, `drop_accept`, `drag_over`, `drop_effect`, `clip_set_image`, `clip_get_image`, `dirty_force_full`, `canvas_damage`
 
 ### App, AppDesc, Ui, run, async tasks
@@ -3626,7 +3627,10 @@ auto -- UI automation for headless tests: scripts and the widget dump  [src/ui/u
 
 Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   size W H                      resize the headless window
-  theme dark|light
+  theme dark|light|contrast
+  theme file PATH | none        an app theme from a file (an error is printed and kept for
+                                `expect theme error`; the theme stays) / no app theme
+  style NAME                    another style linked into the app (Ui::set_style)
   move S          down S [l|r|m]      up [S] [l|r|m]      click S [l|r]
   rclick S        dblclick S [shift|ctrl|alt]...
                   drag S1 S2 [steps] [shift|ctrl|alt|right|middle]...
@@ -3650,6 +3654,12 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   dump [FILE]     print / save the widget tree
   expect S exists | missing | hover | focused | checked | unchecked | disabled |
            enabled | selected | open | pressed | value N | max N | text "s" | rect X Y W H
+           (rect: '*' takes any value)
+  expect theme "NAME" | none    the app theme;  expect theme error "TEXT" | none  the error
+                                of the last `theme file` contains TEXT
+  expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
+  expect pixel X Y #RRGGBB      the main window's pixel at (X, Y), rendered now
+  expect same FILE.png          the main window rendered now has the pixels of that shot
   print TEXT      echo
   bench N         time N frames (build, full render, unchanged frame) with the real clock
   bench N anim [MAX_US]   N frames 16 ms apart on the virtual clock (timers, animations):
@@ -3758,6 +3768,22 @@ theme -- colour tokens, accent colour and type ramp of the linked style  [src/ui
   color_mix(a, b, t)         per-channel a + (b - a) * t / 256 (t 0..256)
   luminance(rgb) / contrast_ratio(a, b)   WCAG 2 relative luminance (0..1) of 0xRRGGBB and
                              the contrast of two colours (1..21; text wants 4.5, graphics 3)
+App themes (theme_app.rs: Theme, its file format and errors) on top of the style:
+  set_theme(&theme) -> Result   from the next frame on; a font that cannot be loaded is an
+                             error and the previous theme stays; clear_theme() the style's
+                             own look again; app_theme() -> Option<&Theme>;
+                             load_theme(path) = Theme::load + set_theme
+  The theme layer: theme_build (colours: the theme's tokens over the style's, its accent
+  through the style's ramp), cmd_rrect / cmd_shadow (look_radius: corners that are not pills),
+  box_begin / gridbox_begin (dp_space: padding and gaps), the size calls of buttons, text
+  boxes, combo boxes, drop-down and split buttons (ctrl_size), ts_font / ts_line (sizes,
+  line heights, weights, the family's faces).  Without a theme every value is the style's.
+The run-time style switch (styles linked side by side, build_rs.py: every style_NAME the
+app's sources name):
+  styles_add(&[&style_kde::STYLE, ..])   style_names() -> names   style_name() -> current
+  set_style(name) -> bool    the style's fonts replace ids 0..3 (Text::set_embedded), the
+                             tokens are built again, everything is redrawn and laid out
+look.serial counts the changes of theme and style: caches of laid-out text compare it.
 
 The values come from the style (Style::tokens, accent, ts_size / ts_line / ts_font).
 ```
@@ -3807,6 +3833,28 @@ The values come from the style (Style::tokens, accent, ts_size / ts_line / ts_fo
   ui_ts_font(ts): select the font and pixel size (size \* dpi / 96, 24.8) of a style
 - **`fn ts_line(&self, ts: u32) -> i32`**
   ui_ts_line(ts): line height of a text style in px
+- **`fn set_theme(&mut self, th: &Theme) -> Result<(), ThemeError>`**
+  the app's theme over the style (theme_app.rs) from the next frame on: colours of light,
+  dark and high contrast, the accent, corners, spacing, control heights, text styles and
+  a font family.  A font that cannot be loaded is an error; the previous theme stays.
+- **`fn clear_theme(&mut self)`**
+  no app theme: the style's own look again
+- **`fn app_theme(&self) -> Option<&Theme>`**
+  the active app theme (None: the style's look)
+- **`fn load_theme(&mut self, path: &str) -> Result<(), ThemeError>`**
+  read a theme file (app://, config://, a path) and make it the app's theme; on an error
+  the previous theme stays
+- **`fn styles_add(&mut self, styles: &[&'static dyn Style])`**
+  the styles set_style can switch to: the app names the style crates it links besides its
+  own (build_rs.py links every style_NAME its sources name):
+  `ui.styles_add(&[&style_classic::STYLE, &style_kde::STYLE])`
+- **`fn style_names(&self) -> Vec<&'static str>`**
+  the names of the styles set_style knows (the app's own first, then as added)
+- **`fn style_name(&self) -> &'static str`**
+  the name of the style in use (Style::name)
+- **`fn set_style(&mut self, name: &str) -> bool`**
+  switch to another linked style (styles_add) from the next frame on: its tokens, fonts,
+  metrics and painters; the app theme stays on top -> false: no such style
 - **`fn dp_text(&self, dip: i32) -> i32`**
   dp_text(dip): DIP -> px, grown with a text scale above 100 % (the height of parts
   around one line of text, such as badge pills)
@@ -4102,6 +4150,9 @@ the widget families are being ported; a finished style overrides every function.
 
 - **`trait Style: StyleBasic + StyleValue + StyleEdit + StyleList + StylePopup + StyleChrome + StyleMisc + Sync`**
   a style: tokens, type ramp, fonts and every widget family's paint functions
+  - `fn name(&self) -> &'static str`
+    the style's short name, as build_rs.py --style knows it ("winui", "kde"): the name
+    Ui::set_style switches to (several styles linked into one app)
   - `fn ribbon_height(&self) -> i32`
     Ribbon height in DIP. Existing styles retain the original 110-DIP layout.
   - `fn ribbon_padding(&self) -> u32`
@@ -8165,6 +8216,100 @@ TK_KEY: u32 = 0x8000_0000  // TermEv::Raw: a key (VK | MOD_* << 16), not a chara
 - **`fn terminal(&mut self, id: u32, st: &mut TermState, flags: u32) -> Vec<TermEv>`**
   ui_terminal(id, st, flags) -> events: the console (see the module header)
 
+#### `ui/theme_app.rs`
+
+Source: [`lib/ui/theme_app.rs`](../lib/ui/theme_app.rs)
+
+```text
+theme_app -- app themes: the active style's tokens overridden from a small text file
+
+  Theme::from_ini(text) -> Result<Theme, ThemeError>   parse a theme (the format below)
+  Theme::load(path) -> Result<Theme, ThemeError>       ... from a file (app://, config://, a
+                             path); relative font files are taken from the theme's folder
+  theme.to_ini() -> String / theme.save(path) -> bool  the text form of what the theme sets
+  token_index(name) -> Option<usize>   the T_* index (token / 4) of a token name ("bg")
+  TOKEN_NAMES, TS_NAMES      the names of the tokens and of the text styles
+
+The format is INI (base::ini):
+  [theme]     name = the theme's name
+  [colors]    TOKEN = #RRGGBB | #AARRGGBB for light and dark; [light], [dark] for one of
+              them, [contrast] for high contrast (on top of the scheme's colours).  TOKEN is
+              a T_* name in lower case (bg, card, ctrl_stroke, text2, accent_text, ...);
+              accent is the colour the style derives its accent ramp from (as accent_set;
+              high contrast: the accent fills)
+  [metrics]   radius = DIP | PERCENT%   rounded corners that are not pills (0: square)
+              spacing = PERCENT%        padding and gaps of boxes and grid boxes
+              control_height = DIP      buttons, text boxes, combo boxes, drop-down and split
+                                        buttons (not compact or large ones)
+  [text]      family = FILE | installed family   (family.semibold, family.bold: their faces;
+              else from the family: a file gets a synthetic bold); STYLE.size = DIP (24.8),
+              STYLE.line = DIP, STYLE.weight = regular | semibold | bold | 100..900 for STYLE
+              in caption, body, body_strong, subtitle, title, title_large, display
+Errors name the line (in the UI language): an unknown section or key, a line without '=',
+a key before the first section or twice in one section, a value out of range.  A theme is
+applied whole or not at all (Ui::set_theme).
+```
+
+```rust
+/// Theme::colors / accent index: the light theme
+THEME_LIGHT: usize = 0
+/// ... the dark theme
+THEME_DARK: usize = 1
+/// ... high contrast
+THEME_CONTRAST: usize = 2
+/// the T_* tokens by name, in token order (index = token / 4); theme files write them in
+/// lower case
+TOKEN_NAMES: [&str; T_COUNT] = [ "BG", "BG_ALT", "LAYER", "LAYER_STROKE", "CARD", "CARD_ ...
+/// the TS_* text styles by name (theme files: body.size, title.weight)
+TS_NAMES: [&str; TS_COUNT as usize] = ["caption", "body", "body_strong", "subtitle", "title", " ...
+```
+
+- **`fn token_index(name: &str) -> Option<usize>`**
+  the T_\* index of a token name (any case, "T_" in front allowed)
+
+- **`enum Radius`**
+  rounded corners of a theme: every corner radius that is not a pill becomes this many DIP,
+  or the style's radius scaled by this percentage
+  - `Dip(u16)`
+  - `Percent(u16)`
+
+- **`struct TextStyle`**
+  a text style of a theme: size in DIP (24.8), line height in DIP, weight 100..900; None =
+  the style's (a size alone scales the style's line height with it)
+  - `size_fx: Option<u16>`
+  - `line: Option<u16>`
+  - `weight: Option<u16>`
+
+- **`struct Theme`**
+  an app theme (see the module header); Default = nothing overridden
+  - `name: String`
+  - `colors: [[Option<u32>; T_COUNT]; 3]` -- colour tokens per THEME_LIGHT / \_DARK / \_CONTRAST (index token / 4), 0xAARRGGBB
+  - `accent: [Option<u32>; 3]` -- the accent per mode, 0xRRGGBB: the style derives its accent ramp from it
+  - `radius: Option<Radius>`
+  - `spacing: u16` -- box padding and gaps in percent (100: the app's values)
+  - `control_height: u16` -- DIP; 0 = the style's
+  - `text: [TextStyle; TS_COUNT as usize]`
+  - `family: String` -- "" = the style's faces; a font file (VFS path) or an installed family
+  - `family_semibold: String`
+  - `family_bold: String`
+
+- **`struct ThemeError`**
+  why a theme could not be read or applied: the line of the file (0: not a line) and the
+  message in the UI language ("Zeile 4: ...")
+  - `line: u32`
+  - `msg: String`
+
+**`impl Theme`**
+
+- **`fn from_ini(text: &str) -> Result<Theme, ThemeError>`**
+  parse a theme file's text (module header); every error names its line
+- **`fn load(path: &str) -> Result<Theme, ThemeError>`**
+  read and parse a theme file; relative font files then name files in its folder
+- **`fn to_ini(&self) -> String`**
+  the theme as the text of a theme file (only what it sets)
+- **`fn save(&self, path: &str) -> bool`**
+  write the theme file (missing folders are made) -> written
+
 #### `ui/timeline.rs`
 
 Source: [`lib/ui/timeline.rs`](../lib/ui/timeline.rs)
@@ -10585,6 +10730,10 @@ FONT_MAX_IDS: u32 = 4096  // registry capacity
 
 - **`fn register(&mut self, data: &'static [u8]) -> i32`**
   font_register(data) -> id / -1
+- **`fn set_embedded(&mut self, fonts: [&'static [u8]; 4], names: [[&'static str; 5]; 4])`**
+  replace the embedded fonts 0..3 (SGF1 or TrueType / OpenType; a style switched at run
+  time): the ids keep their meaning, fonts derived from them (style) take the new
+  metrics, cached glyphs are dropped; each face starts with the legacy raster policy
 - **`fn face_count(data: &[u8]) -> i32`**
   font_face_count(data) -> faces (1 for a plain sfnt, n for a TTC / OTC) / ERR_\*
 - **`fn load_mem(&mut self, data: &[u8], face: u32) -> i32`**
@@ -22726,6 +22875,8 @@ ini -- settings files: UTF-8 "[section]" / "key=value" text              [src/co
   ini.remove(sec, key) -> bool
   ini.section(sec) -> Vec<(&str, &str)>   the keys of a section and their values, in order
   ini.sections() -> Vec<&str>   the section names in file order (each once; not "")
+  ini.items() -> Vec<Item>      headers, keys and malformed lines with their line numbers
+                                (files that are checked: a theme names a mistake's line)
 
 Format: one entry per line; sec "" = the keys before the first [section].  Section and
 key names compare ASCII case-insensitively; values are stored as written (blanks around
@@ -22744,6 +22895,12 @@ a blank (set -> false).  CR / LF inside a value are written as blanks.
 - **`struct Ini`**
   a settings object (one thread at a time)
 
+- **`enum Item<'a>`**
+  a line of the file as Ini::items lists it (line numbers from 1)
+  - `Section { line: usize, name: &'a str }` -- a "[name]" header
+  - `Key { line: usize, sec: &'a str, key: &'a str, value: &'a str }` -- "key = value" of section sec ("" before the first header)
+  - `Bad { line: usize, text: &'a [u8] }` -- neither blank, a comment, a header nor a key (or not UTF-8)
+
 **`impl Ini`**
 
 - **`fn new() -> Ini`**
@@ -22761,6 +22918,9 @@ a blank (set -> false).  CR / LF inside a value are written as blanks.
 - **`fn sections(&self) -> Vec<&str>`**
   the names of the sections in file order, each once (names that are not UTF-8 are left
   out; the keys before the first header are not a section here)
+- **`fn items(&self) -> Vec<Item<'_>>`**
+  every header, key and malformed line in file order with its line number; blank lines
+  and comments are left out
 - **`fn get(&self, sec: &str, key: &str) -> Option<&str>`**
   the value, or None when missing or not UTF-8  [ini_get]
 - **`fn get_bytes(&self, sec: &str, key: &str) -> Option<&[u8]>`**

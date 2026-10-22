@@ -1,0 +1,5 @@
+# a theme with a bad colour in line 5: loading it is an error, the theme stays
+[theme]
+name = Kaputt
+[light]
+bg = #12345

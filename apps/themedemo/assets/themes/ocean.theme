@@ -1,0 +1,45 @@
+# Ozean -- a sample app theme (docs/STYLES.md, "App themes"): cool blue-green surfaces, a
+# teal accent, rounder corners, a little more room, 36 DIP controls and larger body text
+[theme]
+name = Ozean
+
+[light]
+accent = #0F7B8A
+bg = #EAF3F5
+bg_alt = #DDEBEF
+layer = #F4FAFB
+card = #FFFFFF
+card_stroke = #1F0F5560
+text = #0B2A33
+text2 = #3E5A63
+divider = #240F5560
+flyout = #F7FCFD
+input_active = #FFFFFF
+
+[dark]
+accent = #4FC3D1
+bg = #0E1E24
+bg_alt = #0B181D
+layer = #13262D
+card = #16303A
+card_stroke = #2A9FD4DE
+text = #E6F4F7
+text2 = #A9C6CD
+divider = #2A9FD4DE
+flyout = #183540
+input_active = #0B181D
+
+[contrast]
+accent = #00E5FF
+
+[metrics]
+radius = 8
+spacing = 110%
+control_height = 36
+
+[text]
+body.size = 15
+body.line = 22
+body_strong.size = 15
+body_strong.line = 22
+subtitle.weight = bold

@@ -1,0 +1,65 @@
+# app themes over the style (ui/theme.rs, theme_app.rs; docs/STYLES.md "App themes"): the
+# two sample themes of apps/themedemo and a theme with a font family from files, in light /
+# dark / high contrast.  Every expectation holds in every style (build_rs.py app gallery
+# --style classic|kde): the theme sets the values.  Back to the style's own look gives the
+# same pixels; a broken file names its line and keeps the theme.
+theme light
+# (selection pills slide to their place in the first frames)
+wait 500
+expect theme none
+shot build/gal_themes/default.png
+# ---- Ozean: colours, 36 DIP controls, 110 % spacing
+theme file apps/themedemo/assets/themes/ocean.theme
+expect theme error none
+expect theme "Ozean"
+expect token bg #EAF3F5
+expect token text #0B2A33
+expect token card #FFFFFF
+expect #100 rect * * * 36
+expect #101 rect * * * 36
+expect #8701 rect * * * 36
+expect #8702 rect * * 120 36
+shot build/gal_themes/ocean_light.png
+theme dark
+expect token bg #0E1E24
+expect token text #E6F4F7
+shot build/gal_themes/ocean_dark.png
+theme contrast
+expect token accent #00E5FF
+shot build/gal_themes/ocean_hc.png
+theme light
+# ---- Papier: square corners, 28 DIP controls, 90 % spacing
+theme file apps/themedemo/assets/themes/paper.theme
+expect theme "Papier"
+expect token bg #F5F1E8
+expect token crit #B3261E
+expect #100 rect * * * 28
+expect #8701 rect * * * 28
+shot build/gal_themes/paper_light.png
+theme dark
+expect token bg #24201B
+expect token crit #B3261E
+shot build/gal_themes/paper_dark.png
+theme contrast
+shot build/gal_themes/paper_hc.png
+theme light
+# ---- a font family from files (Inter of styles/jfoffice) at 14 DIP: the same text widths
+# in every style
+theme file apps/gallery/fixtures/inter.theme
+expect theme "Inter"
+expect text:"Wert: 40 %   Klicks: 0" rect * * 143 *
+shot build/gal_themes/inter_light.png
+theme dark
+shot build/gal_themes/inter_dark.png
+theme light
+# ---- broken files: the error names the line or the file, the theme stays
+theme file apps/themedemo/tests/fixtures/broken.theme
+expect theme error "Zeile 5: „#12345“ ist keine Farbe"
+expect theme "Inter"
+theme file apps/themedemo/tests/fixtures/nofont.theme
+expect theme error "Schrift nicht ladbar"
+expect theme "Inter"
+# ---- back to the style's own look: the same pixels as before any theme
+theme none
+expect theme none
+expect same build/gal_themes/default.png

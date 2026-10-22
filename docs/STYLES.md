@@ -1,8 +1,11 @@
 # Styles -- how the library looks
 
 The `ui` crate is style-neutral: widgets, layout, input, windows, files, codecs, effects.
-**How widgets look** comes from exactly one *style*, a crate that is linked into the program at
-build time. Nothing is chosen at run time and only the linked style ends up in the executable.
+**How widgets look** comes from a *style*, a crate that is linked into the program at build
+time; only the linked styles end up in the executable. On top of it an app can lay an **app
+theme** -- its own colours, corners, spacing, control heights and type -- without writing a
+style crate ([App themes](#app-themes)), and an app that links several styles can switch
+between them at run time ([Switching the style at run time](#switching-the-style-at-run-time)).
 
 | Style | Crate | Look | Used by |
 |---|---|---|---|
@@ -31,13 +34,142 @@ assembly counterpart either; its fonts (Inter, OFL) and icons (own artwork) may 
   and passes `&style::STYLE` to `ui::run`; the core reaches the style only through that
   `&'static dyn ui::Style` (one indirect call per widget). The core is not recompiled per
   style, so switching styles only relinks the app.
+* Every further style crate the app's sources name (`style_kde::STYLE`) is linked as well, under
+  its own name: the app can switch to it at run time (below).
 
 ```
 python build_rs.py app gallery --style classic --out build/classic
 build/classic/win/gallery.exe --shot g.png --theme dark
 ```
 
-## The contract (`lib/ui/style.rs`)
+## App themes
+
+An **app theme** overrides the tokens of whatever style is active: colours of light, dark and
+high contrast, the accent, corner radii, spacing, the height of standard controls and the type
+ramp (size, line height, weight, a font family). It needs no style crate and no rebuild: a
+theme is a small INI file (the format of `base::ini`) or a `ui::Theme` value, applied on the
+next frame and removed again just as quickly. Without a theme every value is the style's, and
+the rendering is unchanged to the pixel.
+
+```rust
+use ui::theme::{Radius, Theme, THEME_DARK, THEME_LIGHT};
+
+// a file of the app's assets (app://), the user's (config://) or any path
+if let Err(e) = ui.load_theme("app://themes/ocean.theme") {
+    self.error = e.to_string();            // "Zeile 5: „#12345“ ist keine Farbe ..." (UI language)
+}
+// or built in code / edited live
+let mut th = ui.app_theme().cloned().unwrap_or_default();
+th.accent = [Some(0x0F7B8A), Some(0x4FC3D1), None];   // light, dark, high contrast
+th.radius = Some(Radius::Dip(8));
+th.control_height = 36;
+ui.set_theme(&th)?;                        // Result<(), ThemeError>: a font that cannot be
+th.save("config://themes/mine.theme");     //   loaded keeps the previous theme
+let back = ui::Theme::load("config://themes/mine.theme")?;
+ui.clear_theme();                          // the style's own look again
+```
+
+`--theme-file PATH` applies a theme from the command line (after `App::init`, so it wins over
+the app's own), for shots: `gallery.exe --shot g.png --theme-file app://themes/ocean.theme
+--theme dark --text-scale 150`.
+
+**The format** (`lib/ui/theme_app.rs`; `#` and `;` start comments; section and key names
+ignore case):
+
+```ini
+# Ozean -- apps/themedemo/assets/themes/ocean.theme
+[theme]
+name = Ozean
+
+[colors]            ; light and dark
+crit = #B3261E
+
+[light]
+accent = #0F7B8A    ; the colour the style derives its accent ramp from (hover, pressed, text)
+bg = #EAF3F5
+card = #FFFFFF
+card_stroke = #1F0F5560
+text = #0B2A33
+
+[dark]
+accent = #4FC3D1
+bg = #0E1E24
+text = #E6F4F7
+
+[contrast]          ; high contrast: on top of the scheme's colours
+accent = #00E5FF
+
+[metrics]
+radius = 8          ; DIP, or a percentage of the style's radii: radius = 150%
+spacing = 110%      ; padding and gaps of boxes and grid boxes
+control_height = 36 ; DIP: buttons, text boxes, combo boxes, drop-down and split buttons
+
+[text]
+family = fonts/Inter-Regular.ttf        ; relative to the theme file, a VFS path, or an
+family.semibold = fonts/Inter-SemiBold.ttf  ; installed family ("DejaVu Sans")
+body.size = 15      ; DIP, decimals allowed
+body.line = 22
+subtitle.weight = bold                  ; regular, semibold, bold or 100 .. 900
+```
+
+| Section | Keys | Effect |
+|---|---|---|
+| `[theme]` | `name` | the theme's name (`ui.app_theme().name`) |
+| `[colors]`, `[light]`, `[dark]`, `[contrast]` | every `T_*` token in lower case: `bg`, `bg_alt`, `layer`, `layer_stroke`, `card`, `card_stroke`, `ctrl` .. `ctrl_disabled`, `ctrl_stroke`, `ctrl_stroke2`, `strong_stroke`, `subtle` .. `subtle_disabled`, `text`, `text2`, `text3`, `text_disabled`, `accent_hover`, `accent_pressed`, `accent_disabled`, `on_accent`, `on_accent_dis`, `accent_text`, `focus_out`, `focus_in`, `flyout`, `flyout_stroke`, `smoke`, `divider`, `input_active`, `crit`, `ok`, `warn`, `info` and their `_bg`, `close_hover`, `shadow`, `scroll`, `track`, `knob`, `alt_fill`, `strong_fill` (`ui::theme::TOKEN_NAMES`) | `#RRGGBB` (opaque), `#AARRGGBB` (alpha first, as the inspector shows tokens) or `#RGB`. `[colors]` sets light and dark, `[light]` / `[dark]` one of them (after `[colors]`), `[contrast]` high contrast over the scheme's colours |
+| same | `accent` | the accent colour: the style derives `T_ACCENT`, `_HOVER`, `_PRESSED` and `T_ACCENT_TEXT` from it (as from `accent_set`); it wins over the app's and the system's accent. In `[contrast]` it is the accent fill itself |
+| `[metrics]` | `radius = N` (0 .. 64 DIP) or `radius = P%` (0 .. 400) | every rounded corner that is not a pill becomes N DIP (or the style's radius times P %); square corners stay square, pills and circles stay pills (`cmd_rrect`, `cmd_shadow`) |
+| | `spacing = P%` (25 .. 400) | the padding and gaps of `box_begin` and `gridbox_begin` |
+| | `control_height = N` (12 .. 96 DIP) | the height of standard buttons, single-line text boxes, combo boxes, drop-down and split buttons (not `ST_COMPACT` / `ST_LARGE` ones; icon-only buttons stay square); it grows with a text scale above 100 % like the parts around one line of text |
+| `[text]` | `family`, `family.semibold`, `family.bold` | a font file (`.ttf` / `.otf` / `.ttc`, a path with `/` or a scheme; relative to the theme file) or an installed family (resolved like `ui.font_load`). Without the semibold / bold faces a file gets a synthetic bold, a family its own weights |
+| | `STYLE.size`, `STYLE.line`, `STYLE.weight` for `caption`, `body`, `body_strong`, `subtitle`, `title`, `title_large`, `display` | the text styles `TS_*`: size 4 .. 200 DIP, line height 4 .. 300 DIP (without one the style's line height grows with the size), weight |
+
+**Errors** (`ThemeError { line, msg }`): an unknown section or key, a line without `=`, a key
+before the first section or twice in one section, a colour or number out of its form or range,
+a file that cannot be read, a font that cannot be loaded. The message names the line and is in
+the UI language (library texts, `i18n.rs`); nothing is half applied, the previous theme stays.
+
+**How the styles read it.** No style needed a change: a style already takes every colour from
+the token table (`ui.color(T_*)`), its type ramp through `ui.ts_font` / `ts_line`, and draws
+its shapes with the core's commands. The theme layer sits there: `theme_build` lays the
+theme's colours over `Style::tokens` (its accent through `Style::accent`), `cmd_rrect` /
+`cmd_shadow` map the radii, `box_begin` / `gridbox_begin` scale padding and gaps, the size
+calls of the standard controls take the theme's height (the paint functions get the placed
+rectangle and centre their content), `ts_font` / `ts_line` take sizes, lines, weights and the
+family's faces. What a style draws with fixed values of its own stays as it is: title bar
+fonts, the internal paddings of a widget, a style's own icons, and colours from a palette of
+its own instead of the tokens (classic's 3D face and bevels, `styles/classic/common.rs` `pal`:
+classic buttons stay grey under any theme). Rendering without a theme is byte-identical to
+before (light, dark, high contrast, 150 % scale and text: the shots of gallery in winui,
+classic and kde and of datagallery, and the shots of their scripts, on Windows and Linux).
+
+## Switching the style at run time
+
+An app can link several styles and switch between them while it runs, e.g. on a settings page
+"Darstellung". `build_rs.py` links every style crate an app's sources name (`style_classic::`,
+`style_kde::` ...) besides its own style (`apps/NAME/STYLE`, the crate `style`); the app tells
+the UI which ones it has:
+
+```rust
+fn init(&mut self, ui: &mut Ui) -> bool {
+    ui.styles_add(&[&style_winui::STYLE, &style_classic::STYLE, &style_kde::STYLE, &style_macos::STYLE]);
+    true
+}
+// ...
+let names = ui.style_names();               // ["winui", "classic", "kde", "macos"]: the app's own first
+if ui.combobox(ID_STYLE, &mut sel, &names) & EV_ACT != 0 {
+    ui.set_style(names[sel as usize]);      // false: no such style
+}
+```
+
+`Style::name()` gives each style's short name. `set_style` makes the next frame use the other
+style's tokens, type ramp, metrics and painters; its four embedded fonts replace the ids
+`FONT_REG` .. `FONT_ICON` (`Text::set_embedded`: fonts derived from them follow, the glyph cache
+is dropped), the token table is built again (an app theme stays on top), every window is laid
+out and drawn again, and caches of laid-out text (Markdown viewer, rich text, `vlist`) start
+over. Each linked style adds its fonts and painters to the executable and its licence notices
+next to it. `apps/themedemo` links winui, classic, kde and macos;
+its scripts switch between them with and without themes and back (`style NAME` in scripts,
+the same pixels after the round trip).
 
 `ui::Style` is split like the files of a style. A style crate implements the eight traits below
 for one unit struct and exports it as `pub static STYLE`; two more families -- data views and
@@ -82,6 +214,8 @@ entries, so the stock painters fit every style's palette.
 
 **`Style`** (lib.rs):
 
+* `name() -> &'static str` -- the style's short name as `--style` knows it (`"winui"`), the name
+  `ui.set_style` switches to.
 * `tokens(dark) -> [u32; T_COUNT]` -- the semantic `T_*` colours of `ui::consts` (so an app's own
   drawing with `ui.color(T_TEXT)` works in every style). Accent entries may be 0:
 * `accent(&mut theme, dark, rgb)` fills `T_ACCENT`, `_HOVER`, `_PRESSED` and `T_ACCENT_TEXT` from
@@ -248,8 +382,9 @@ DejaVu names. Every bundled style may be redistributed (see
    `styles/NAME/`. Rename the unit struct; the crate root keeps `#![no_std]` and
    `#![forbid(unsafe_code)]` (the build lint checks both) and exports
    `pub static STYLE: Name = Name;`.
-2. Tokens, accent ramp and type ramp in `lib.rs`; fonts in `assets/` (above). Keep the token
-   order of `ui::consts` (`T_*` are byte offsets / 4 into the array).
+2. `name()` (the folder's name), tokens, accent ramp and type ramp in `lib.rs`; fonts in
+   `assets/` (above). Keep the token order of `ui::consts` (`T_*` are byte offsets / 4 into the
+   array).
 3. Implement every trait method. Keep each size function consistent with its paint function:
    the core places the widget with the size, then paints it into the placed rectangle.
 4. Add an `INFO` file: line 1 the name shown by the installers, line 2 a one-line description

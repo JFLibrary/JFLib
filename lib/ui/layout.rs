@@ -519,8 +519,8 @@ impl Ui {
             k.wrapping_add(0x2545_F491).wrapping_mul(0x9E37_79B1) | 0x8000_0000
         };
         let s = *self.slot(id);
-        let pad = self.dp(((flags >> PAD_SHIFT) & 255) as i32);
-        let gap = self.dp(gap);
+        let pad = self.dp_space(((flags >> PAD_SHIFT) & 255) as i32); // (theme) spacing
+        let gap = self.dp_space(gap);
         // natural size from the previous pass (a wrapping box: one row, but at most as wide as
         // a wrapping text would be there)
         let pgrid = self.wp.lay.boxes.last().map_or(0, |b| b.grid);

@@ -163,7 +163,7 @@ impl Ui {
         self.box_begin(id, BOX_V | (flags & !0x3F), 0);
         let id = self.box_id();
         let b = *self.wp.lay.boxes.last().unwrap_or(&Default::default());
-        let gap = self.dp(gap);
+        let gap = self.dp_space(gap); // (theme) spacing
         let dpi = self.wp.rt.dpi;
         let mem = self.wp.lay.grid.mem.get(&id).cloned().unwrap_or_default();
         let cols = if cols.is_empty() { &[0][..] } else { cols };

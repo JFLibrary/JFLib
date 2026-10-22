@@ -530,6 +530,7 @@ impl Ui {
     /// optional fill and border (stroke2: the bottom edge)
     #[allow(clippy::too_many_arguments)]
     pub fn cmd_rrect(&mut self, x: i32, y: i32, w: i32, h: i32, r: i32, t: i32, fill: u32, stroke: u32, stroke2: u32) {
+        let r = if self.look.rad_mode != 0 { self.look_radius(r, w, h) } else { r }; // (theme)
         self.push(Cmd::RRect { x, y, w, h, r: r as u16, t: t as u16, fill, stroke, stroke2 });
     }
 
@@ -618,6 +619,7 @@ impl Ui {
 
     /// cmd_shadow(x, y, w, h, r, depth): soft shadow in the draw colour
     pub fn cmd_shadow(&mut self, x: i32, y: i32, w: i32, h: i32, r: i32, depth: i32) {
+        let r = if self.look.rad_mode != 0 { self.look_radius(r, w, h) } else { r }; // (theme)
         let c = self.wp.cmd.dcol;
         self.push(Cmd::Shadow { x, y, w, h, r, depth, c });
     }
