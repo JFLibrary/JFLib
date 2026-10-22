@@ -77,7 +77,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
   <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [x509.rs](#netiox509rs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, a dissector, pcapng
-  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs)
+  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs)
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
   <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
@@ -23291,6 +23291,8 @@ hides an earlier one, so "mode access=mode" reads as "access"):
   A.B.C.D      an IPv4 address                         Val::Ipv4
   MASK         a contiguous dotted netmask              Val::Mask (its length)
   A.B.C.D/nn   an address with a prefix length          Val::Prefix
+  X:X:X:X::X   an IPv6 address (every RFC 4291 form)    Val::Ipv6
+  X:X:X:X::X/<0-128>   an IPv6 address with a prefix length   Val::Prefix6
   H.H.H        a MAC address (H.H.H or with colons)     Val::Mac
   WORD         one word                                 Val::Word
   LINE         the rest of the line, spaces included    Val::Line
@@ -23330,6 +23332,8 @@ F_HIDDEN: u8 = 2
   - `Word`
   - `Line`
   - `Name(u8)`
+  - `Ipv6`
+  - `Prefix6`
 
 **`impl Param`**
 
@@ -23347,6 +23351,8 @@ F_HIDDEN: u8 = 2
   - `Word(String)`
   - `Line(String)`
   - `Name(String)`
+  - `Ipv6([u8; 16])`
+  - `Prefix6([u8; 16], u8)`
 
 - **`trait Names`**
   the names a NAME parameter takes (interfaces of a device); "\*" in a name stands for a number
@@ -23384,6 +23390,9 @@ F_HIDDEN: u8 = 2
   a netmask's length
 - **`fn prefix(&self, key: &str) -> Option<([u8; 4], u8)>`**
 - **`fn mac(&self, key: &str) -> Option<[u8; 6]>`**
+- **`fn ip6(&self, key: &str) -> Option<[u8; 16]>`**
+- **`fn prefix6(&self, key: &str) -> Option<([u8; 16], u8)>`**
+  an IPv6 address with its prefix length
 - **`fn text(&self, key: &str) -> Option<&str>`**
   a word, line, name or keyword as text
 
@@ -23426,6 +23435,11 @@ F_HIDDEN: u8 = 2
 
 - **`fn parse_mac(s: &str) -> Option<[u8; 6]>`**
   "aabb.ccdd.eeff", "aa:bb:cc:dd:ee:ff" or "aa-bb-cc-dd-ee-ff"
+
+- **`fn parse_ipv6(s: &str) -> Option<[u8; 16]>`**
+  an IPv6 address in any RFC 4291 text form: eight groups of up to four hex digits, "::" once
+  for a run of zero groups, the last 32 bits as dotted decimal ("::ffff:10.0.0.1"); hex digits
+  in either case
 
 - **`struct Tree<C>`**
   a tree of commands in modes
@@ -26807,7 +26821,8 @@ on every target (simulators, packet tools, tests).
             L2), 802.2 LLC
   arp       ArpView, Arp (request / reply / probe / announce)          (RFC 826, 5227)
   ipv4      Ipv4View, Ipv4Hdr, dec_ttl, fragment, Reassembly           (RFC 791, 1624)
-  ipv6      Ipv6View, Ipv6Hdr, upper_layer (extension header walk)     (RFC 8200)
+  ipv6      Ipv6View, Ipv6Hdr, upper_layer / ext_headers (extension header walk),
+            FragHdr, fragment, Reassembly6                             (RFC 8200, 5722)
   icmp      IcmpView, Icmp, error_quote, name                          (RFC 792, 1191)
   udp       UdpView, UdpHdr (push_v4 / push_v6 with checksum)          (RFC 768)
   tcp       TcpView, TcpHdr, TcpOpts (MSS, WS, SACK, TS), seq_lt ...   (RFC 9293, 7323, 2018)
@@ -26826,6 +26841,12 @@ on every target (simulators, packet tools, tests).
             authentication entry recognised                       (RFC 2453, 1058)
   nat       address and port translation in place: Flow (what translation and filters look
             at), rewrite / rewrite_quoted with incremental checksums (RFC 3022, 1624, 5508)
+  icmpv6    Icmp6View, Icmp6 (echo and the errors with their quote), Nd: router and neighbor
+            solicitations and advertisements, redirects, their options (link-layer
+            addresses, prefix information, MTU); error_quote, name   (RFC 4443, 4861, 4862)
+  ospf      OspfView, Packet (Hello, Database Description, Link State Request, Update,
+            Acknowledgment), LsaHeader, Lsa (router, network, summary, AS-external) with the
+            Fletcher checksum, compare (which instance is newer)      (RFC 2328, RFC 905)
 
 Views (XxxView::parse) check lengths once and then read fields without copying; records
 (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -26858,7 +26879,8 @@ addr -- link and network addresses: MAC, IPv4, IPv6, prefixes
   Ipv4([u8; 4])       strict dotted decimal (no leading zeros); masks <-> prefix lengths;
                       class tests (private, loopback, link local, multicast, broadcast)
   Ipv6([u8; 16])      every RFC 4291 text form in, RFC 5952 out; solicited-node and
-                      link-local (EUI-64) addresses; multicast MAC mapping
+                      link-local (EUI-64) addresses; multicast MAC mapping; multicast
+                      scope, global unicast, the common prefix of two addresses
   IpAddr              V4 | V6
   Prefix4 / Prefix6   an address with a prefix length ("10.0.0.1/24"): network, broadcast,
                       contains, host range (/31 and /32 per RFC 3021); masks and wildcards
@@ -26964,6 +26986,16 @@ These are value types for packets, not OS socket addresses (those are plat::net'
   fe80::/64 with the modified EUI-64 of a MAC
 - **`fn eui64_in(prefix: Ipv6, mac: Mac) -> Ipv6`**
   a /64 prefix plus the modified EUI-64 of a MAC (SLAAC, RFC 4862)
+- **`fn is_solicited_node(&self) -> bool`**
+  ff02::1:ff00:0/104, a solicited-node multicast address
+- **`fn mc_scope(&self) -> u8`**
+  the scope of a multicast address (1 interface, 2 link, 5 site, 8 organisation, 14
+  global; RFC 4291 2.7)
+- **`fn is_global_unicast(&self) -> bool`**
+  a global unicast address (not unspecified, loopback, link-local, multicast; unique
+  local addresses count as global in scope, RFC 4193)
+- **`fn common_prefix(&self, other: &Ipv6) -> u8`**
+  the number of leading bits two addresses share (source address selection, RFC 6724)
 
 - **`enum IpAddr`**
   an IPv4 or IPv6 address
@@ -27028,6 +27060,8 @@ These are value types for packets, not OS socket addresses (those are plat::net'
 - **`fn trunc(&self) -> Prefix6`**
 - **`fn contains(&self, ip: Ipv6) -> bool`**
 - **`fn covers(&self, other: &Prefix6) -> bool`**
+- **`fn overlaps(&self, other: &Prefix6) -> bool`**
+  two prefixes share addresses
 
 ### `netpkt/arp.rs`
 
@@ -27161,6 +27195,13 @@ shows the start line, the header lines and the body bytes of every message the s
 holds; a segment in the middle of a message is a "Continuation".
 RIP (port 520) shows its header and one field per entry (route, authentication, the request
 for the whole table) with the problems a receiver would refuse (RFC 2453, RFC 1058).
+IPv6 shows its extension headers as fields of its layer (a later fragment carries data only);
+ICMPv6 every field of echo, the errors (with the quoted packet) and Neighbor Discovery (RS, RA,
+NS, NA, redirect and one field per option) with what a receiver refuses: a checksum over the
+pseudo header that does not fit, an ND message whose hop limit is not 255 (RFC 4443, 4861).
+OSPF (IP protocol 89) shows the common header, the fields of the five packet types, every LSA
+header and the links, routers and metrics of the LSAs an update carries, with what a receiver
+refuses: another version, a wrong packet or LSA checksum, bodies that do not fit (RFC 2328).
 ```
 
 ```rust
@@ -27995,18 +28036,37 @@ PROTO_VRRP: u8 = 112
 Source: [`lib/netpkt/ipv6.rs`](../lib/netpkt/ipv6.rs)
 
 ```text
-ipv6 -- the IPv6 fixed header (RFC 8200) and the walk over extension headers
+ipv6 -- the IPv6 fixed header (RFC 8200), the walk over extension headers, the fragment
+header, fragmentation and reassembly
 
   Ipv6View::parse(b)    version 6, payload length within the buffer
+  Ipv6View::parse_truncated(b)   a packet that may be cut after its header (the quote inside
+                        an ICMPv6 error): payload() ends at the end of the buffer
   Ipv6Hdr { .. }        write(out, payload_len), push_onto(&mut Pkt)
   upper_layer(v)        (next header, offset in the payload) after hop-by-hop, routing,
                         fragment and destination options headers
+  ext_headers(v)        the extension headers in order (type, offset, length, next header);
+                        None for a malformed chain
+  FragHdr / frag(v)     the fragment header (offset in bytes, more fragments, identification)
+                        and where it sits
+  fragment(pkt, mtu, id)  fragments of at most `mtu` bytes with a fragment header (RFC 8200
+                        4.5: the unfragmentable part -- the header, hop-by-hop and routing
+                        headers -- in front of each); None when even one 8-byte unit does
+                        not fit
+  Reassembly6           collects the fragments of one packet; overlapping fragments drop the
+                        whole packet (RFC 5722); no timers: the caller expires it after 60 s
+  dec_hop_limit(pkt)    hop limit - 1 in place (IPv6 has no header checksum)
 
-ICMPv6 / NDP and SLAAC follow with the IPv6 milestone of the simulator.
+ICMPv6 and Neighbor Discovery are in icmpv6.rs; the addresses of ND (solicited-node groups,
+EUI-64 interface identifiers, multicast MACs) in addr.rs.
 ```
 
 ```rust
 IPV6_HDR: usize = 40
+/// the minimum link MTU of IPv6 (RFC 8200 5)
+MIN_MTU: usize = 1280
+/// the length of the fragment header
+FRAG_HDR: usize = 8
 NH_HOPOPT: u8 = 0
 NH_TCP: u8 = 6
 NH_UDP: u8 = 17
@@ -28019,12 +28079,19 @@ NH_NONE: u8 = 59
 NH_DSTOPTS: u8 = 60
 ```
 
+- **`fn ext_name(nh: u8) -> Option<&'static str>`**
+  a name for an extension header type ("Hop-by-Hop Options", "Fragment", ...)
+
 - **`struct Ipv6View<'a>`**
   a received IPv6 packet
 
 **`impl<'a> Ipv6View<'a>`**
 
 - **`fn parse(b: &'a [u8]) -> Option<Ipv6View<'a>>`**
+- **`fn parse_truncated(b: &'a [u8]) -> Option<Ipv6View<'a>>`**
+  a packet that may be cut after its header (the quote inside an ICMPv6 error)
+- **`fn is_truncated(&self) -> bool`**
+  fewer bytes than the payload length are present
 - **`fn traffic_class(&self) -> u8`**
 - **`fn flow_label(&self) -> u32`**
 - **`fn payload_len(&self) -> usize`**
@@ -28033,11 +28100,73 @@ NH_DSTOPTS: u8 = 60
 - **`fn src(&self) -> Ipv6`**
 - **`fn dst(&self) -> Ipv6`**
 - **`fn payload(&self) -> &'a [u8]`**
+  the payload up to the payload length (or the end of a truncated quote)
 - **`fn packet(&self) -> &'a [u8]`**
+  header and payload, without trailing padding
 
 - **`fn upper_layer(v: &Ipv6View) -> Option<(u8, usize)>`**
   the upper-layer protocol and its offset in the payload, after the extension headers;
   None for a malformed chain
+
+- **`struct ExtHdr`**
+  one extension header of a packet
+  - `kind: u8` -- its type (the Next Header value that announced it)
+  - `off: usize` -- offset and length in the payload
+  - `len: usize`
+  - `next: u8` -- the Next Header field it carries
+
+- **`fn ext_headers(v: &Ipv6View) -> Option<Vec<ExtHdr>>`**
+  the extension headers of a packet in order; None for a malformed chain
+
+- **`struct FragHdr`**
+  the fragment header of a packet
+  - `next: u8`
+  - `offset: usize` -- the offset of the fragment's data in bytes (a multiple of 8)
+  - `more: bool`
+  - `id: u32`
+
+**`impl FragHdr`**
+
+- **`fn read(b: &[u8]) -> FragHdr`**
+- **`fn write(&self, out: &mut [u8])`**
+
+- **`fn frag(v: &Ipv6View) -> Option<(FragHdr, usize)>`**
+  the fragment header of a packet and its offset in the payload (None: not a fragment)
+
+- **`fn fragment(packet: &[u8], mtu: usize, id: u32) -> Option<Vec<Vec<u8>>>`**
+  splits a packet into fragments of at most `mtu` bytes (RFC 8200 4.5); a packet that fits
+  comes back alone.  None when the packet is malformed, is a fragment already, or not even
+  one 8-byte unit of data fits.
+
+- **`fn dec_hop_limit(pkt: &mut [u8]) -> u8`**
+  lowers the hop limit by one in place; the new value
+
+- **`enum ReasmErr`**
+  why a fragment could not be taken (the receiver answers the first two with a Parameter
+  Problem, RFC 8200 4.5)
+  - `BadLength` -- a fragment with more to come whose data is not a multiple of 8 bytes (pointer: the
+    Payload Length field)
+  - `TooLong` -- offset and length go beyond 65535 bytes (pointer: the Fragment Offset field)
+  - `Overlap` -- it overlaps a fragment already held: the whole packet is dropped (RFC 5722)
+
+- **`struct Reassembly6`**
+  the fragments of one packet (key: source, destination, identification)
+
+- **`fn reassembly_key(v: &Ipv6View, f: &FragHdr) -> (Ipv6, Ipv6, u32)`**
+  the reassembly key of a fragment
+
+**`impl Reassembly6`**
+
+- **`fn new() -> Reassembly6`**
+- **`fn add(&mut self, v: &Ipv6View, f: &FragHdr, at: usize) -> Result<Option<Vec<u8>>, ReasmErr>`**
+  adds a fragment (`at`: the offset of its fragment header in the payload); Ok(Some(the
+  complete packet)) when all parts are there
+- **`fn has_first(&self) -> bool`**
+  the first fragment (offset 0) is here: a timeout is answered with Time Exceeded
+- **`fn first_packet(&self) -> Option<Vec<u8>>`**
+  the source and header of the first fragment (what a timeout's error quotes)
+- **`fn collected(&self) -> usize`**
+  bytes collected so far
 
 - **`struct Ipv6Hdr`**
   an IPv6 fixed header to write
@@ -29129,6 +29258,566 @@ covers, so the old and new words are enough (checksum::update).
   sets the source or destination address (and port or query identifier) of the packet an
   ICMP error quotes, with the quote's checksums and the error's ICMP checksum; false when
   `pkt` is no ICMP error with a quoted IPv4 header
+
+### `netpkt/icmpv6.rs`
+
+Source: [`lib/netpkt/icmpv6.rs`](../lib/netpkt/icmpv6.rs)
+
+```text
+icmpv6 -- ICMP for IPv6 (RFC 4443) and the messages of Neighbor Discovery (RFC 4861)
+
+  Icmp6View::parse(b)     type, code, checksum (checksum_ok over the IPv6 pseudo header, RFC
+                          4443 2.3), the 4 bytes after it, the body; quoted() for the packet
+                          an error message carries
+  Icmp6                   EchoRequest / EchoReply { id, seq }, DestUnreach { code },
+                          PacketTooBig { mtu }, TimeExceeded { code }, ParamProblem { code,
+                          pointer }, Other; encode(src, dst, body) and push_v6(&mut Pkt, src,
+                          dst) with the checksum
+  Nd { msg, opts }        RouterSolicit, RouterAdvert(Ra), NeighborSolicit { target },
+                          NeighborAdvert { router, solicited, override_, target },
+                          Redirect { target, dst } with their options (NdOpt: source / target
+                          link-layer address, prefix information, redirected header, MTU, any
+                          other kept as bytes); Nd::parse checks what RFC 4861 asks a receiver
+                          to check in the message itself (code 0, lengths, no option of length
+                          0, no group as target); hop limit 255, the checksum and the rules
+                          that need the addresses are the caller's (check_ip)
+  Nd::encode(src, dst)    the message with its checksum
+  error_quote(packet)     what an error quotes: as much of the offending packet as fits into
+                          an ICMPv6 packet of the minimum MTU (1280 bytes, RFC 4443 2.4 (c))
+  name(type, code)        "Echo (ping) request", "Neighbor Solicitation", "Time Exceeded (hop
+                          limit exceeded in transit)", ... (the wording of capture tools)
+
+The multicast addresses and MACs of ND are Ipv6::solicited_node, Ipv6::ALL_NODES,
+ALL_ROUTERS and Mac::of_ipv6_multicast (addr.rs); interface identifiers Mac::eui64.
+```
+
+```rust
+/// type, code, checksum and the 4 bytes every message has after them
+ICMPV6_HDR: usize = 8
+T_DEST_UNREACH: u8 = 1
+T_PACKET_TOO_BIG: u8 = 2
+T_TIME_EXCEEDED: u8 = 3
+T_PARAM_PROBLEM: u8 = 4
+T_ECHO_REQUEST: u8 = 128
+T_ECHO_REPLY: u8 = 129
+T_MLD_QUERY: u8 = 130
+T_MLD_REPORT: u8 = 131
+T_MLD_DONE: u8 = 132
+T_ROUTER_SOLICIT: u8 = 133
+T_ROUTER_ADVERT: u8 = 134
+T_NEIGHBOR_SOLICIT: u8 = 135
+T_NEIGHBOR_ADVERT: u8 = 136
+T_REDIRECT: u8 = 137
+T_MLD2_REPORT: u8 = 143
+/// codes of Destination Unreachable
+UNREACH_NO_ROUTE: u8 = 0
+UNREACH_ADMIN: u8 = 1
+UNREACH_BEYOND_SCOPE: u8 = 2
+UNREACH_ADDR: u8 = 3
+UNREACH_PORT: u8 = 4
+UNREACH_POLICY: u8 = 5
+UNREACH_REJECT: u8 = 6
+/// codes of Time Exceeded
+EXCEEDED_HOP_LIMIT: u8 = 0
+EXCEEDED_REASSEMBLY: u8 = 1
+/// codes of Parameter Problem
+PARAM_HEADER: u8 = 0
+PARAM_NEXT_HEADER: u8 = 1
+PARAM_OPTION: u8 = 2
+/// ND option types (RFC 4861 4.6)
+OPT_SRC_LLA: u8 = 1
+OPT_TGT_LLA: u8 = 2
+OPT_PREFIX: u8 = 3
+OPT_REDIRECTED: u8 = 4
+OPT_MTU: u8 = 5
+/// the lifetime that never ends (prefix information, RFC 4861 4.6.2)
+INFINITE: u32 = 0xFFFF_FFFF
+```
+
+- **`struct Icmp6View<'a>`**
+  a received ICMPv6 message
+
+**`impl<'a> Icmp6View<'a>`**
+
+- **`fn parse(b: &'a [u8]) -> Option<Icmp6View<'a>>`**
+  at least type, code and checksum
+- **`fn typ(&self) -> u8`**
+- **`fn code(&self) -> u8`**
+- **`fn checksum(&self) -> u16`**
+- **`fn checksum_ok(&self, src: Ipv6, dst: Ipv6) -> bool`**
+  the checksum over the pseudo header of `src` and `dst` and the whole message
+- **`fn checksum_want(&self, src: Ipv6, dst: Ipv6) -> u16`**
+  the checksum the message should carry (for a dissector's "should be")
+- **`fn rest(&self) -> [u8; 4]`**
+  the 4 bytes after the checksum (zeros when the message is shorter)
+- **`fn id(&self) -> u16`**
+- **`fn seq(&self) -> u16`**
+- **`fn value(&self) -> u32`**
+  the MTU of Packet Too Big, the pointer of Parameter Problem
+- **`fn body(&self) -> &'a [u8]`**
+  what follows the first 8 bytes (an error's quote, an echo's data)
+- **`fn bytes(&self) -> &'a [u8]`**
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn is_error(&self) -> bool`**
+  an error message (types 0 to 127, RFC 4443 2.1)
+- **`fn is_nd(&self) -> bool`**
+  a message of Neighbor Discovery
+- **`fn quoted(&self) -> Option<Ipv6View<'a>>`**
+  the packet an error message quotes (cut where the quote ends)
+
+- **`fn error_quote(packet: &[u8]) -> &[u8]`**
+  as much of the offending packet as an error may quote: the error packet stays within the
+  minimum MTU of 1280 bytes (40 bytes IPv6, 8 bytes ICMPv6, at most 1232 of the packet)
+
+- **`enum Icmp6`**
+  an ICMPv6 message with the 8-byte header (echo and the errors) to write
+  - `EchoRequest { id: u16, seq: u16 }`
+  - `EchoReply { id: u16, seq: u16 }`
+  - `DestUnreach { code: u8 }`
+  - `PacketTooBig { mtu: u32 }`
+  - `TimeExceeded { code: u8 }`
+  - `ParamProblem { code: u8, pointer: u32 }`
+  - `Other { typ: u8, code: u8, rest: [u8; 4] }`
+
+**`impl Icmp6`**
+
+- **`fn read(v: &Icmp6View) -> Icmp6`**
+- **`fn type_code(&self) -> (u8, u8)`**
+- **`fn is_error(&self) -> bool`**
+- **`fn encode(&self, src: Ipv6, dst: Ipv6, body: &[u8]) -> Vec<u8>`**
+  header + body with the checksum over the pseudo header
+- **`fn push_v6(&self, p: &mut Pkt, src: Ipv6, dst: Ipv6)`**
+  prepends the header (the packet's content is the body) with the checksum
+
+- **`struct Ra`**
+  the fixed fields of a Router Advertisement (RFC 4861 4.2; the preference bits of RFC 4191)
+  - `hop_limit: u8` -- 0: unspecified
+  - `managed: bool` -- addresses from DHCPv6 (M) / other settings from DHCPv6 (O)
+  - `other: bool`
+  - `prf: u8` -- default router preference: 0 medium, 1 high, 3 low (2 is reserved, read as medium)
+  - `lifetime: u16` -- seconds; 0: not a default router
+  - `reachable: u32` -- milliseconds; 0: unspecified
+  - `retrans: u32`
+
+- **`struct PrefixInfo`**
+  a prefix information option (RFC 4861 4.6.2)
+  - `len: u8`
+  - `on_link: bool` -- the prefix is on the link (L)
+  - `auto: bool` -- addresses may be formed from it (A, RFC 4862)
+  - `valid: u32` -- seconds, INFINITE for ever
+  - `preferred: u32`
+  - `prefix: Ipv6`
+
+- **`enum NdOpt`**
+  an option of an ND message
+  - `SrcLla(Mac)`
+  - `TgtLla(Mac)`
+  - `Prefix(PrefixInfo)`
+  - `Redirected(Vec<u8>)` -- what a redirect carries of the redirected packet
+  - `Mtu(u32)`
+  - `Other(u8, Vec<u8>)` -- any other option: its type and its bytes after type and length
+
+**`impl NdOpt`**
+
+- **`fn kind(&self) -> u8`**
+
+- **`enum NdMsg`**
+  the message of ND
+  - `RouterSolicit`
+  - `RouterAdvert(Ra)`
+  - `NeighborSolicit { target: Ipv6 }`
+  - `NeighborAdvert { router: bool, solicited: bool, override_: bool, target: Ipv6 }`
+  - `Redirect { target: Ipv6, dst: Ipv6 }`
+
+- **`enum NdErr`**
+  why a receiver drops an ND message (RFC 4861 6.1, 7.1, 8.1)
+  - `Code(u8)` -- the ICMP code is not 0
+  - `Short` -- shorter than the message's fixed part
+  - `BadOption` -- an option with length 0, or one that runs past the end
+  - `Multicast` -- a group address as the target of NS / NA or as the destination of a redirect
+  - `NotNd` -- not an ND type
+  - `HopLimit` -- the hop limit is not 255: the message did not come from this link
+  - `Source` -- a router advertisement or redirect from an address that is not link-local
+  - `DadDest` -- an address detection probe (unspecified source) not sent to a solicited-node group
+  - `SourceLla` -- an unspecified source with a source link-layer address option
+  - `SolicitedToGroup` -- a solicited advertisement sent to a group
+
+**`impl NdErr`**
+
+- **`fn text(&self) -> &'static str`**
+  the reason in the words of capture tools (English)
+
+- **`struct Nd`**
+  a Neighbor Discovery message with its options
+  - `msg: NdMsg`
+  - `opts: Vec<NdOpt>`
+
+- **`fn options(b: &[u8]) -> Result<Vec<(NdOpt, usize, usize)>, NdErr>`**
+  the options of `b` (the bytes after the fixed part): each with its offset and length in
+  `b`; Err when one has length 0 or runs past the end
+
+- **`fn fixed_len(typ: u8) -> Option<usize>`**
+  the length of the fixed part of an ND message type
+
+**`impl Nd`**
+
+- **`fn new(msg: NdMsg, opts: Vec<NdOpt>) -> Nd`**
+- **`fn rs(src_lla: Option<Mac>) -> Nd`**
+  a Router Solicitation (with the sender's MAC unless it has no address yet)
+- **`fn ns(target: Ipv6, src_lla: Option<Mac>) -> Nd`**
+  a Neighbor Solicitation (DAD probes carry no source link-layer address)
+- **`fn na(target: Ipv6, router: bool, solicited: bool, override_: bool, tgt_lla: Option<Mac>) -> Nd`**
+  a Neighbor Advertisement
+- **`fn parse(v: &Icmp6View) -> Result<Nd, NdErr>`**
+  reads an ND message (the checks RFC 4861 makes on the message itself)
+- **`fn typ(&self) -> u8`**
+- **`fn encode(&self, src: Ipv6, dst: Ipv6) -> Vec<u8>`**
+  the message with its checksum
+- **`fn src_lla(&self) -> Option<Mac>`**
+  the source link-layer address option
+- **`fn tgt_lla(&self) -> Option<Mac>`**
+  the target link-layer address option
+- **`fn prefixes(&self) -> impl Iterator<Item = &PrefixInfo>`**
+  the prefix information options
+- **`fn mtu(&self) -> Option<u32>`**
+  the MTU option
+- **`fn check_ip(&self, src: Ipv6, dst: Ipv6, hop_limit: u8) -> Option<NdErr>`**
+  the rules of RFC 4861 that need the packet's addresses and hop limit: hop limit 255 for
+  every message, a link-local source for RA and redirect, an unspecified source only with a
+  solicited-node destination and without a source link-layer address (NS) or without it
+  (RS), solicited NA never to a group; None when the message may be taken
+
+- **`fn name(typ: u8, code: u8) -> &'static str`**
+  a name of an ICMPv6 type and code as capture tools write it
+
+### `netpkt/ospf.rs`
+
+Source: [`lib/netpkt/ospf.rs`](../lib/netpkt/ospf.rs)
+
+```text
+ospf -- OSPF version 2 packets and LSAs byte for byte (RFC 2328 appendix A): the 24-byte
+header with its checksum and authentication field, the five packet types, LSA headers with
+the Fletcher checksum of RFC 2328 12.1.7 (RFC 905 annex B), router-, network-, summary- and
+AS-external-LSAs, and how two instances of an LSA compare (13.1)
+
+  OspfView::parse(b)       version, kind, length, router ID, area, checksum, authentication
+                           type and field, body(); checksum_ok() (the IP checksum of the
+                           packet without the authentication field, A.3.1); None when the
+                           bytes are shorter than the header or than its length field
+  Header { kind, router, area, autype, auth }   the common header
+  Packet { hdr, body }     read(&view) (Err with the reason: OspfErr::text) / to_bytes()
+                           (length and checksum filled in; with AU_CRYPTO the checksum stays
+                           0 and no digest is appended)
+  Body::Hello(Hello)       network mask, HelloInterval, options, priority, RouterDeadInterval,
+                           DR, BDR, the neighbours seen
+       Dd(Dd)              interface MTU, options, the I / M / MS flags, DD sequence number,
+                           LSA headers
+       Lsr(Vec<LsaKey>)    the LSAs asked for (type, Link State ID, advertising router)
+       Lsu(Vec<Vec<u8>>)   whole LSAs as they travel (flooding forwards them byte for byte)
+       Ack(Vec<LsaHeader>) the LSA headers acknowledged
+  LsaHeader                age, options, type, Link State ID, advertising router, sequence
+                           number, checksum, length; read / write / of(lsa) / key()
+  Lsa { hdr, body }        parse(lsa) (Err: LsaErr) / to_bytes() (length and Fletcher
+                           checksum filled in); LsaBody::Router (flags V / E / B and links
+                           with metrics), Network (mask, attached routers), Summary (types 3
+                           and 4: mask and metric), External (mask, type 1 or 2, metric,
+                           forwarding address, route tag), Other (bytes of an unknown type)
+  lsa_checksum(lsa) / lsa_checksum_ok(lsa)   the Fletcher checksum over the LSA without its
+                           age, C0 and C1 both zero for a correct one
+  set_age(lsa, age)        a new LS age (outside the checksum)
+  compare(a, b)            which instance is more recent: sequence number (signed), checksum,
+                           MaxAge, an age difference beyond MaxAgeDiff (13.1)
+  type_name, lsa_name, options_text, dd_flags_text, area_text   names for dissectors
+
+Constants: VERSION, the packet types T_*, ALL_SPF_ROUTERS (224.0.0.5), ALL_D_ROUTERS
+(224.0.0.6), authentication types AU_*, option bits OPT_*, the DD flags DD_I, DD_M, DD_MS,
+LSA types LSA_*, router-LSA link types LINK_* and flags RTR_B / RTR_E / RTR_V, the
+architectural constants of appendix B (MAX_AGE, LS_REFRESH_TIME, MIN_LS_INTERVAL, ...),
+INITIAL_SEQ / MAX_SEQ and LS_INFINITY.
+
+The codec reads and writes; what a receiver refuses because of its own state (mismatched
+timers, the area, the neighbours) is the protocol's business.  TOS metrics other than TOS 0
+are read and written but carry no meaning (RFC 2328 dropped TOS routing).
+```
+
+```rust
+/// OSPF version 2
+VERSION: u8 = 2
+/// the common header, an LSA header, an entry of a Link State Request
+HDR_LEN: usize = 24
+LSA_HDR_LEN: usize = 20
+LSR_ENTRY_LEN: usize = 12
+/// the fixed part of a Hello and of a Database Description packet
+HELLO_LEN: usize = 20
+DD_LEN: usize = 8
+/// packet types
+T_HELLO: u8 = 1
+T_DD: u8 = 2
+T_LSR: u8 = 3
+T_LSU: u8 = 4
+T_ACK: u8 = 5
+/// every OSPF router listens to AllSPFRouters, the DR and the BDR to AllDRouters (A.1)
+ALL_SPF_ROUTERS: Ipv4 = Ipv4([224, 0, 0, 5])
+ALL_D_ROUTERS: Ipv4 = Ipv4([224, 0, 0, 6])
+/// authentication types (appendix D)
+AU_NULL: u16 = 0
+AU_SIMPLE: u16 = 1
+AU_CRYPTO: u16 = 2
+/// option bits (A.2; DN and O came later: RFC 4576, RFC 5250)
+OPT_E: u8 = 0x02
+OPT_MC: u8 = 0x04
+OPT_NP: u8 = 0x08
+OPT_EA: u8 = 0x10
+OPT_DC: u8 = 0x20
+OPT_O: u8 = 0x40
+OPT_DN: u8 = 0x80
+/// the flags of a Database Description packet: Init, More, Master/Slave
+DD_I: u8 = 0x04
+DD_M: u8 = 0x02
+DD_MS: u8 = 0x01
+/// LSA types
+LSA_ROUTER: u8 = 1
+LSA_NETWORK: u8 = 2
+LSA_SUMMARY: u8 = 3
+LSA_ASBR: u8 = 4
+LSA_EXTERNAL: u8 = 5
+/// the links of a router-LSA
+LINK_P2P: u8 = 1
+LINK_TRANSIT: u8 = 2
+LINK_STUB: u8 = 3
+LINK_VIRTUAL: u8 = 4
+/// the flags of a router-LSA: area border router, AS boundary router, virtual link endpoint
+RTR_B: u8 = 0x01
+RTR_E: u8 = 0x02
+RTR_V: u8 = 0x04
+/// architectural constants (appendix B), in seconds
+LS_REFRESH_TIME: u16 = 1800
+MIN_LS_INTERVAL: u16 = 5
+MIN_LS_ARRIVAL: u16 = 1
+MAX_AGE: u16 = 3600
+CHECK_AGE: u16 = 300
+MAX_AGE_DIFF: u16 = 900
+/// the metric of an unreachable destination in summary- and AS-external-LSAs
+LS_INFINITY: u32 = 0xFF_FFFF
+/// LS sequence numbers are signed: the first one, the largest one (12.1.6)
+INITIAL_SEQ: u32 = 0x8000_0001
+MAX_SEQ: u32 = 0x7FFF_FFFF
+```
+
+- **`fn type_name(t: u8) -> &'static str`**
+  the name of a packet type as capture tools show it
+
+- **`fn lsa_name(t: u8) -> &'static str`**
+  the name of an LSA type
+
+- **`fn options_text(o: u8) -> String`**
+  the set option bits: "E, MC" ("none" without any)
+
+- **`fn dd_flags_text(f: u8) -> String`**
+  the flags of a Database Description packet: "I, M, MS" ("none")
+
+- **`fn area_text(a: u32) -> String`**
+  an area ID as dissectors show it: "0.0.0.0 (Backbone)", "0.0.0.1"
+
+- **`fn lsa_checksum(lsa: &[u8]) -> u16`**
+  the Fletcher checksum of an LSA (RFC 2328 12.1.7): over the bytes from the options field to
+  the end of the LSA (the LS age left out), the checksum field taken as zero; the two check
+  bytes X and Y of RFC 905 B.4 that make C0 and C1 zero, a zero byte written as 255
+
+- **`fn lsa_checksum_ok(lsa: &[u8]) -> bool`**
+  an LSA's checksum is correct: C0 and C1 over the bytes after the age are both zero (RFC 905
+  B.2); a checksum of 0 is never correct
+
+- **`fn set_age(lsa: &mut [u8], age: u16)`**
+  writes a new LS age into an LSA (the checksum does not cover it)
+
+- **`struct LsaKey`**
+  what identifies an LSA: its type, Link State ID and advertising router (12.1)
+  - `kind: u8`
+  - `id: Ipv4`
+  - `adv: Ipv4`
+
+- **`struct LsaHeader`**
+  the 20-byte header of an LSA
+  - `age: u16` -- seconds since it was originated
+  - `options: u8`
+  - `kind: u8`
+  - `id: Ipv4`
+  - `adv: Ipv4`
+  - `seq: u32` -- signed: INITIAL_SEQ (0x80000001) is the smallest one used
+  - `checksum: u16`
+  - `len: u16` -- the whole LSA with this header
+
+**`impl LsaHeader`**
+
+- **`fn read(b: &[u8]) -> LsaHeader`**
+  a header from its 20 bytes (the caller has checked the length)
+- **`fn of(lsa: &[u8]) -> Option<LsaHeader>`**
+  the header of an LSA (None when it is shorter than a header)
+- **`fn write(&self, b: &mut [u8])`**
+  writes the header into 20 bytes
+- **`fn key(&self) -> LsaKey`**
+
+- **`fn compare(a: &LsaHeader, b: &LsaHeader) -> Ordering`**
+  which of two instances of the same LSA is more recent (RFC 2328 13.1): Greater when `a` is,
+  Equal when they are the same instance
+
+- **`struct RouterLink`**
+  one link of a router-LSA (A.4.2)
+  - `id: Ipv4` -- LINK_P2P: the neighbour's router ID; LINK_TRANSIT: the DR's interface address;
+    LINK_STUB: the network
+  - `data: Ipv4` -- the router's interface address (LINK_P2P, LINK_TRANSIT; an interface index when
+    unnumbered) or the network mask (LINK_STUB)
+  - `kind: u8`
+  - `metric: u16` -- the TOS 0 metric
+  - `tos: Vec<(u8, u16)>` -- further TOS metrics: (TOS, metric)
+
+- **`struct RouterLsa`**
+  the body of a router-LSA
+  - `flags: u8` -- RTR_V, RTR_E, RTR_B
+  - `links: Vec<RouterLink>`
+
+- **`struct NetworkLsa`**
+  the body of a network-LSA (A.4.3)
+  - `mask: Ipv4`
+  - `routers: Vec<Ipv4>` -- the routers fully adjacent to the DR, the DR itself included
+
+- **`struct SummaryLsa`**
+  the body of a summary-LSA of type 3 or 4 (A.4.4; type 4 has the mask 0)
+  - `mask: Ipv4`
+  - `metric: u32` -- 24 bits; LS_INFINITY: unreachable
+  - `tos: Vec<(u8, u32)>`
+
+- **`struct ExternalLsa`**
+  the TOS 0 part of an AS-external-LSA and its further TOS entries (A.4.5)
+  - `mask: Ipv4`
+  - `e2: bool` -- the E bit: a type 2 metric (larger than any path inside the AS)
+  - `metric: u32` -- 24 bits
+  - `fwd: Ipv4` -- where traffic for the destination should go (0.0.0.0: to the AS boundary router)
+  - `tag: u32`
+  - `tos: Vec<(u8, u32, Ipv4, u32)>` -- further TOS entries: (E bit and TOS, metric, forwarding address, tag)
+
+- **`enum LsaBody`**
+  what an LSA says
+  - `Router(RouterLsa)`
+  - `Network(NetworkLsa)`
+  - `Summary(SummaryLsa)`
+  - `External(ExternalLsa)`
+  - `Other(Vec<u8>)` -- an LSA of another type: its bytes after the header
+
+- **`enum LsaErr`**
+  why an LSA cannot be read
+  - `Short` -- fewer bytes than its header or its length field
+  - `Length` -- the length field does not fit what the body needs
+
+**`impl LsaErr`**
+
+- **`fn text(self) -> &'static str`**
+
+- **`struct Lsa`**
+  an LSA as a record
+  - `hdr: LsaHeader`
+  - `body: LsaBody`
+
+**`impl Lsa`**
+
+- **`fn new(kind: u8, id: Ipv4, adv: Ipv4, seq: u32, options: u8, body: LsaBody) -> Lsa`**
+  a new instance: age 0; to_bytes fills in length and checksum
+- **`fn key(&self) -> LsaKey`**
+- **`fn parse(b: &[u8]) -> Result<Lsa, LsaErr>`**
+  reads an LSA (the bytes may go on after it: its length field says where it ends)
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the LSA as bytes: the header with the length and the Fletcher checksum filled in (the
+  record's age stays as it is)
+
+- **`struct Header`**
+  the common header (A.3.1)
+  - `kind: u8`
+  - `router: Ipv4` -- the sender's router ID
+  - `area: u32`
+  - `autype: u16`
+  - `auth: [u8; 8]` -- the authentication field: zeros (AU_NULL), the password (AU_SIMPLE), key ID, length and
+    sequence number (AU_CRYPTO)
+
+- **`struct Hello`**
+  a Hello packet (A.3.2)
+  - `mask: Ipv4`
+  - `interval: u16` -- HelloInterval in seconds
+  - `options: u8`
+  - `priority: u8`
+  - `dead: u32` -- RouterDeadInterval in seconds
+  - `dr: Ipv4` -- the interface addresses of the DR and the BDR as the sender sees them (0.0.0.0: none)
+  - `bdr: Ipv4`
+  - `neighbors: Vec<Ipv4>` -- the router IDs it heard Hellos from within RouterDeadInterval
+
+- **`struct Dd`**
+  a Database Description packet (A.3.3)
+  - `mtu: u16` -- the largest IP datagram the interface sends without fragmentation
+  - `options: u8`
+  - `flags: u8` -- DD_I, DD_M, DD_MS
+  - `seq: u32`
+  - `lsas: Vec<LsaHeader>`
+
+- **`enum Body`**
+  the body of a packet
+  - `Hello(Hello)`
+  - `Dd(Dd)`
+  - `Lsr(Vec<LsaKey>)`
+  - `Lsu(Vec<Vec<u8>>)` -- whole LSAs (each as long as its length field)
+  - `Ack(Vec<LsaHeader>)`
+
+- **`enum OspfErr`**
+  why a packet cannot be read
+  - `Version(u8)` -- not version 2
+  - `Kind(u8)` -- not one of the five packet types
+  - `Body` -- the body is shorter than its fixed part, or its entries do not fill it
+  - `Lsa` -- an LSA of an update is cut or longer than the packet
+
+**`impl OspfErr`**
+
+- **`fn text(self) -> String`**
+
+- **`struct Packet`**
+  an OSPF packet as a record
+  - `hdr: Header`
+  - `body: Body`
+
+- **`struct OspfView<'a>`**
+  a received OSPF packet (the bytes are cut to its length field)
+
+**`impl<'a> OspfView<'a>`**
+
+- **`fn parse(b: &'a [u8]) -> Option<OspfView<'a>>`**
+  at least the header, and as many bytes as its length field says (more are ignored)
+- **`fn version(&self) -> u8`**
+- **`fn kind(&self) -> u8`**
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn router(&self) -> Ipv4`**
+- **`fn area(&self) -> u32`**
+- **`fn checksum(&self) -> u16`**
+- **`fn autype(&self) -> u16`**
+- **`fn auth(&self) -> [u8; 8]`**
+- **`fn bytes(&self) -> &'a [u8]`**
+- **`fn body(&self) -> &'a [u8]`**
+- **`fn computed_checksum(&self) -> u16`**
+  the checksum the packet should carry
+- **`fn checksum_ok(&self) -> bool`**
+  the checksum is right (with cryptographic authentication there is none: always true)
+- **`fn header(&self) -> Header`**
+- **`fn lsu_spans(&self) -> Option<Vec<(usize, usize)>>`**
+  where the LSAs of an update start and end within the packet: (offset, length); None when
+  one does not fit
+
+**`impl Packet`**
+
+- **`fn kind(&self) -> u8`**
+- **`fn read(v: &OspfView) -> Result<Packet, OspfErr>`**
+  reads a packet; the checksum and the authentication are for the receiver to judge
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the packet as bytes: version 2, the type of the body, the length, the checksum (none with
+  AU_CRYPTO)
 
 ## cas
 
