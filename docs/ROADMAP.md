@@ -886,6 +886,10 @@ Fensterrand hinaus.
   Seit D2 fasst `Window::hist_between` die Slots eines Zeitraums zu einem Histogramm zusammen
   (die Zeitreihen des Labors von JFNetworker: ein Punkt pro Intervall, Perzentile beliebiger
   Zeiträume; Gruppe `metrics`).
+  Seit R4 auch die BPDUs von STP und RSTP ([`netpkt/stp.rs`](../lib/netpkt/stp.rs):
+  Configuration-, TCN- und RST-BPDUs mit ihren Flags, Bridge- und Port-IDs, Pfadkosten nach
+  802.1D-2004, Prüfung nach 9.3.4, Frames mit LLC, Dissektor; Gruppe `stp`), im Einsatz im
+  Spanning Tree der Switches von JFNetworker.
 - **P2** · *erledigt* · Style `netlab` ([`styles/netlab`](../styles/netlab)) für JFNetworker:
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene

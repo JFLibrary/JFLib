@@ -5,7 +5,7 @@
 //                                interfaces [NAME] | interfaces trunk | debugging | version
 //   Engine::ios_config(ni)       the configuration from "!" to "end" (what copy run start
 //                                stores and the startup replay reads back; the DHCP lines
-//                                come from netsvc.rs)
+//                                come from netsvc.rs, the spanning tree's from stp.rs)
 //
 // The layouts follow IOS 15 / IOS-XE: column widths of "show ip interface brief" (22, 15, 3,
 // 6, 21), "show arp" (address 15, age right-aligned in 9), "show mac address-table" and "show
@@ -90,6 +90,9 @@ impl Engine {
                 if d & D_ARP != 0 {
                     s.push_str("Debug output for ARP: on\n");
                 }
+                if d & super::D_STP != 0 {
+                    s.push_str("Debug output for spanning tree events: on\n");
+                }
                 s
             }
             K::ShowVersion => self.show_version(ni),
@@ -118,6 +121,8 @@ impl Engine {
         }
         // excluded addresses and pools of the DHCP server (netsvc.rs)
         s.push_str(&self.ios_dhcp_config(ni));
+        // spanning tree (stp.rs)
+        s.push_str(&self.ios_stp_config(ni));
         if let Some(b) = &n.bridge {
             for (vid, name) in &b.vlans {
                 if *vid == 1 {
@@ -261,6 +266,10 @@ impl Engine {
         if !admin {
             s.push_str(" shutdown\n");
         }
+        // spanning tree of a switch port (stp.rs)
+        if let Some(p) = port {
+            s.push_str(&self.ios_stp_if_config(ni, p));
+        }
         s.push_str("!\n");
         s
     }
@@ -319,9 +328,12 @@ impl Engine {
             };
             let x = f.and_then(|f| n.ip.as_ref().map(|st| &st.ifaces[f as usize]));
             let switch = port.is_some_and(|p| n.bridge.as_ref().is_some_and(|b| b.ports.get(p as usize).is_some_and(|bp| bp.member)));
+            let err = port.is_some_and(|p| n.ports.get(p as usize).is_some_and(|x| x.err_disabled));
             let tail = if switch {
                 if !admin {
                     " (disabled)"
+                } else if err {
+                    " (err-disabled)"
                 } else if proto {
                     " (connected)"
                 } else {

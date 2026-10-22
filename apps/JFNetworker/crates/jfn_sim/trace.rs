@@ -9,7 +9,8 @@
 //   Note::layer()                                 1 cable, 2 bridge and ARP, 3 IPv4, 4 UDP/TCP,
 //                                                 7 services (DHCP, DNS, syslog, NTP); TCP's
 //                                                 states and decisions are layer 4 (tcp.rs),
-//                                                 HTTP's layer 7 (http.rs, httpsvc.rs)
+//                                                 HTTP's layer 7 (http.rs, httpsvc.rs); spanning
+//                                                 tree's layer 2 (stp.rs; is_stp, is_stp_event)
 //   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
 //                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
@@ -316,6 +317,34 @@ pub enum Note {
     ScriptBusy { svc: String, waiting: u32 },
     ScriptDropped { svc: String },
     ScriptError { svc: String, line: u32, col: u32, msg: String },
+    /// spanning tree (stp.rs, stp98.rs, rstp.rs): a BPDU arrived / went out on a port
+    StpRx { port: u16, bpdu: netpkt::stp::Bpdu },
+    StpTx { port: u16, bpdu: netpkt::stp::Bpdu },
+    /// a BPDU the protocol does not take (a type it does not know, Message Age at Max Age, its
+    /// own BPDU back over a loop)
+    StpDropped { port: u16, why: crate::stp::BpduDrop },
+    /// a frame met a port that does not forward (where it came in, or the port of its
+    /// destination)
+    StpBlocked { port: u16, state: crate::stp::PortState },
+    /// a port's role / state changed
+    StpRole { port: u16, from: crate::stp::PortRole, to: crate::stp::PortRole },
+    StpState { port: u16, from: crate::stp::PortState, to: crate::stp::PortState },
+    /// the root bridge as this bridge sees it now (port None: this bridge is the root)
+    StpRoot { root: netpkt::stp::BridgeId, port: Option<u16>, cost: u32 },
+    /// a topology change: detected, TCN sent or received, acknowledged, TC flag
+    StpTopology { port: Option<u16>, what: crate::stp::TcWhat },
+    /// RSTP: what was learned on a port is forgotten after a topology change
+    StpFlush { port: u16, entries: u32 },
+    /// MAC entries age after `secs` (fast: Forward Delay during an 802.1D topology change)
+    StpAging { secs: u16, fast: bool },
+    /// the information about a port's LAN aged out (no BPDU in time)
+    StpAged { port: u16 },
+    /// a port is an edge port now / is none any more
+    StpEdge { port: u16, edge: bool },
+    /// RSTP: a port speaks 802.1D because its neighbour does / tries RSTP again
+    StpMigrate { port: u16, rstp: bool },
+    /// BPDU guard shut a port off (err-disabled)
+    StpErrDisable { port: u16 },
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -517,6 +546,9 @@ impl Note {
                 | Note::DiskFull
                 | Note::MqDead { .. }
                 | Note::ScriptDropped { .. }
+                | Note::StpDropped { .. }
+                | Note::StpBlocked { .. }
+                | Note::StpErrDisable { .. }
         )
     }
     /// a TCP decision (tcp.rs)
@@ -805,6 +837,48 @@ impl Note {
             Note::ScriptBusy { svc, waiting } => msg!("Skript {} rechnet noch: das Ereignis wartet ({} vor ihm).", svc, waiting),
             Note::ScriptDropped { svc } => msg!("Skript {} überlastet: Datagramm verworfen.", svc),
             Note::ScriptError { svc, line, col, msg: text } => msg!("Skript {}: Fehler in Zeile {}, Spalte {}: {}", svc, line, col, text),
+            Note::StpRx { port: p, bpdu } => match bpdu.kind {
+                netpkt::stp::Kind::Tcn => msg!("TCN-BPDU an {} empfangen.", port(*p)),
+                _ => msg!("BPDU an {}: {} von {}, Root {}, Kosten {}{}.", port(*p), bpdu_kind(bpdu), stp_id(bpdu.bridge), stp_id(bpdu.root), bpdu.cost, bpdu_flags(bpdu)),
+            },
+            Note::StpTx { port: p, bpdu } => match bpdu.kind {
+                netpkt::stp::Kind::Tcn => msg!("TCN-BPDU über {} an die Root-Bridge gesendet.", port(*p)),
+                _ => msg!("BPDU über {}: {}, Root {}, Kosten {}{}.", port(*p), bpdu_kind(bpdu), stp_id(bpdu.root), bpdu.cost, bpdu_flags(bpdu)),
+            },
+            Note::StpDropped { port: p, why } => match why {
+                crate::stp::BpduDrop::Type => msg!("BPDU an {} verworfen: diese Bridge spricht 802.1D (STP) und kennt RST-BPDUs nicht.", port(*p)),
+                crate::stp::BpduDrop::Aged => msg!("BPDU an {} verworfen: ihr Message Age hat Max Age erreicht.", port(*p)),
+                crate::stp::BpduDrop::Looped => msg!("BPDU an {} verworfen: die eigene BPDU kam über eine Schleife zurück.", port(*p)),
+            },
+            Note::StpBlocked { port: p, state } => msg!("Verworfen: {} ist im Zustand {} (Spanning Tree).", port(*p), state.msg()),
+            Note::StpRole { port: p, from, to } => msg!("Spanning Tree: {} ist jetzt {} (vorher {}).", port(*p), to.msg(), from.msg()),
+            Note::StpState { port: p, from, to } => msg!("Spanning Tree: {} wechselt von {} nach {}.", port(*p), from.msg(), to.msg()),
+            Note::StpRoot { root, port: None, .. } => msg!("Spanning Tree: diese Bridge ist die Root-Bridge ({}).", stp_id(*root)),
+            Note::StpRoot { root, port: Some(p), cost } => msg!("Spanning Tree: die Root-Bridge ist {}, über {} mit Kosten {}.", stp_id(*root), port(*p), cost),
+            Note::StpTopology { port: p, what } => match (what, p) {
+                (crate::stp::TcWhat::Detected, Some(p)) => msg!("Topologieänderung an {} erkannt.", port(*p)),
+                (crate::stp::TcWhat::Detected, None) => msg!("Topologieänderung erkannt."),
+                (crate::stp::TcWhat::TcnSent, Some(p)) => msg!("Topologieänderung: TCN-BPDU über {} zur Root-Bridge.", port(*p)),
+                (crate::stp::TcWhat::TcnSent, None) => msg!("Topologieänderung: TCN-BPDU zur Root-Bridge."),
+                (crate::stp::TcWhat::TcnReceived, Some(p)) => msg!("Topologieänderung: TCN-BPDU an {}, wird bestätigt und weitergegeben.", port(*p)),
+                (crate::stp::TcWhat::TcnReceived, None) => msg!("Topologieänderung: TCN-BPDU empfangen."),
+                (crate::stp::TcWhat::Acked, Some(p)) => msg!("Topologieänderung: die TCN-BPDU über {} ist bestätigt.", port(*p)),
+                (crate::stp::TcWhat::Acked, None) => msg!("Topologieänderung: die TCN-BPDU ist bestätigt."),
+                (crate::stp::TcWhat::Received, Some(p)) => msg!("Topologieänderung gemeldet an {} (TC-Flag).", port(*p)),
+                (crate::stp::TcWhat::Received, None) => msg!("Topologieänderung gemeldet (TC-Flag)."),
+                (crate::stp::TcWhat::RootFlag(true), _) => msg!("Root-Bridge: ihre BPDUs tragen das TC-Flag für Max Age + Forward Delay."),
+                (crate::stp::TcWhat::RootFlag(false), _) => msg!("Root-Bridge: die Topologieänderung ist vorbei, ihre BPDUs tragen kein TC-Flag mehr."),
+            },
+            Note::StpFlush { port: p, entries: 1 } => msg!("Topologieänderung: ein MAC-Eintrag an {} gelöscht.", port(*p)),
+            Note::StpFlush { port: p, entries } => msg!("Topologieänderung: {} MAC-Einträge an {} gelöscht.", entries, port(*p)),
+            Note::StpAging { secs, fast: true } => msg!("Topologieänderung: MAC-Einträge altern jetzt nach {} s (Forward Delay).", secs),
+            Note::StpAging { secs, fast: false } => msg!("MAC-Einträge altern wieder nach {} s.", secs),
+            Note::StpAged { port: p } => msg!("Spanning Tree: die Information an {} ist abgelaufen, keine BPDU in der Zeit.", port(*p)),
+            Note::StpEdge { port: p, edge: true } => msg!("Spanning Tree: {} ist ein Edge-Port.", port(*p)),
+            Note::StpEdge { port: p, edge: false } => msg!("Spanning Tree: an {} kam eine BPDU, er ist kein Edge-Port mehr.", port(*p)),
+            Note::StpMigrate { port: p, rstp: false } => msg!("Spanning Tree: an {} spricht der Nachbar 802.1D, der Port sendet Configuration BPDUs.", port(*p)),
+            Note::StpMigrate { port: p, rstp: true } => msg!("Spanning Tree: {} versucht wieder RSTP.", port(*p)),
+            Note::StpErrDisable { port: p } => msg!("BPDU Guard: BPDU an {}, der Port wird abgeschaltet (err-disabled).", port(*p)),
         }
     }
 }
@@ -1128,7 +1202,73 @@ impl Note {
             Note::KvMember { .. } => P_IPV4 | P_UDP,
             Note::DiskFull => 0,
             n if n.is_lab() => P_IPV4 | P_TCP | netpkt::decode::P_HTTP,
+            n if n.is_stp() => netpkt::decode::P_STP,
             _ => 0,
         }
     }
+}
+
+// ---------------------------------------------------------------- spanning tree
+
+impl Note {
+    /// a decision of the spanning tree itself (StpBlocked is about the frame it drops)
+    pub fn is_stp(&self) -> bool {
+        matches!(
+            self,
+            Note::StpRx { .. }
+                | Note::StpTx { .. }
+                | Note::StpDropped { .. }
+                | Note::StpRole { .. }
+                | Note::StpState { .. }
+                | Note::StpRoot { .. }
+                | Note::StpTopology { .. }
+                | Note::StpFlush { .. }
+                | Note::StpAging { .. }
+                | Note::StpAged { .. }
+                | Note::StpEdge { .. }
+                | Note::StpMigrate { .. }
+                | Note::StpErrDisable { .. }
+        )
+    }
+    /// what "debug spanning-tree events" prints: the protocol's decisions without the BPDUs
+    pub fn is_stp_event(&self) -> bool {
+        self.is_stp() && !matches!(self, Note::StpRx { .. } | Note::StpTx { .. })
+    }
+}
+
+/// a bridge ID in notes: "32768.024a.0000.0100"
+pub fn stp_id(id: netpkt::stp::BridgeId) -> String {
+    format!("{}.{}", id.priority(), id.mac().cisco())
+}
+
+/// the kind of a BPDU in notes (protocol terms): "Configuration BPDU", "RST BPDU (Designated)"
+fn bpdu_kind(b: &netpkt::stp::Bpdu) -> String {
+    match b.kind {
+        netpkt::stp::Kind::Config => String::from("Configuration BPDU"),
+        netpkt::stp::Kind::Tcn => String::from("TCN BPDU"),
+        netpkt::stp::Kind::Rst => format!("RST BPDU ({})", b.role().name()),
+    }
+}
+
+/// the flags of a BPDU in notes: " [TC, Proposal]", "" without any that matter
+fn bpdu_flags(b: &netpkt::stp::Bpdu) -> String {
+    let mut v: Vec<&str> = Vec::new();
+    if b.tc() {
+        v.push("TC");
+    }
+    if b.tca() {
+        v.push("TCA");
+    }
+    if b.proposal() {
+        v.push("Proposal");
+    }
+    if b.agreement() {
+        v.push("Agreement");
+    }
+    if b.forwarding() {
+        v.push("Forwarding");
+    } else if b.learning() {
+        v.push("Learning");
+    }
+    if v.is_empty() { String::new() } else { format!(" [{}]", v.join(", ")) }
 }

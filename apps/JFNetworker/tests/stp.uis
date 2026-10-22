@@ -1,0 +1,24 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/stp_triangle.jfnet
+# spanning tree on the canvas (jfn_sim view.rs, canvas/paint.rs): the ports between the
+# switches are amber while they listen and learn, the PCs' edge ports green at once; after 30 s
+# every port forwards (green) but SW3's port to SW2, which stays amber as an alternate port;
+# the cables say "blockiert" for screen readers, the inspector of SW3 shows the port so
+theme light
+expect listitem:"Kabel SW1 Gi1/0/1 – SW2 Gi1/0/1, Kupfer, gerade, blockiert" exists
+expect listitem:"Kabel PC1 eth0 – SW1 Gi1/0/3, Kupfer, gerade, aktiv" exists
+shot build/jfnetworker/stp_listening.png
+wait 16000
+expect listitem:"Kabel SW1 Gi1/0/1 – SW2 Gi1/0/1, Kupfer, gerade, blockiert" exists
+shot build/jfnetworker/stp_learning.png
+wait 15000
+expect listitem:"Kabel SW1 Gi1/0/1 – SW2 Gi1/0/1, Kupfer, gerade, aktiv" exists
+expect listitem:"Kabel SW3 Gi1/0/2 – SW1 Gi1/0/2, Kupfer, gerade, aktiv" exists
+expect listitem:"Kabel SW2 Gi1/0/2 – SW3 Gi1/0/1, Kupfer, gerade, blockiert" exists
+shot build/jfnetworker/stp_tree.png
+click listitem:"SW3"
+expect text:"blockiert" exists
+shot build/jfnetworker/stp_inspector.png
+theme dark
+shot build/jfnetworker/stp_tree_dark.png
+theme light
+expect_nowarn

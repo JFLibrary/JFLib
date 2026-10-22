@@ -108,8 +108,9 @@ impl Engine {
                 f.admin_up && !member && n.ports.get(p as usize).is_some_and(|port| port.admin_up && port.link.is_some_and(|li| self.link_up(li)))
             }
             IfKind::Svi(v) => {
+                // with spanning tree a port of the VLAN must forward (stp.rs)
                 f.admin_up
-                    && n.bridge.as_ref().is_some_and(|b| (0..b.ports.len() as u16).any(|p| b.carries(p, v) && n.ports[p as usize].link.is_some_and(|li| self.link_up(li))))
+                    && n.bridge.as_ref().is_some_and(|b| (0..b.ports.len() as u16).any(|p| b.carries(p, v) && b.stp.forwards(p) && n.ports[p as usize].link.is_some_and(|li| self.link_up(li))))
             }
             IfKind::Loopback(_) => f.admin_up,
         }

@@ -107,6 +107,14 @@ pub enum K {
     // NTP (cli/netsvc.rs)
     NtpServer,
     NtpMaster,
+    // spanning tree (cli/stp.rs)
+    ShowStp,
+    DebugStp,
+    ClearStp,
+    StpMode,
+    StpPriority,
+    StpTimer,
+    StpIf,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -414,6 +422,10 @@ fn build(caps: u32) -> Tree<K> {
 
     // ---- DHCP server and relay, NTP (cli/netsvc.rs)
     super::netsvc::build_netsvc(&mut t, [user, prv, conf, ifm, sub, pool]);
+    // ---- spanning tree on switches (cli/stp.rs)
+    if bridge && caps & CAP_AP == 0 {
+        super::stp::build_stp(&mut t, [user, prv, conf, ifm]);
+    }
     t
 }
 
@@ -603,7 +615,7 @@ impl Engine {
     }
 
     /// "% Invalid input detected at '^' marker." under byte `at` of the line
-    fn ios_marker(&mut self, ni: usize, line: &str, at: usize) -> Result<(), String> {
+    pub(crate) fn ios_marker(&mut self, ni: usize, line: &str, at: usize) -> Result<(), String> {
         self.ios_error(ni, line, Error::Invalid(at.min(line.len())))
     }
 
@@ -706,7 +718,7 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP
+                    D_ICMP | D_ARP | super::D_STP
                 } else if p.has("icmp") {
                     D_ICMP
                 } else {
@@ -862,6 +874,17 @@ impl Engine {
             }
             K::DhcpPool | K::DhcpExcluded | K::PoolNetwork | K::PoolRouter | K::PoolDns | K::PoolDomain | K::PoolLease | K::ShowDhcpBinding | K::ShowDhcpPool | K::ShowDhcpConflict | K::ClearDhcp => self.ios_dhcp(ni, p),
             K::NtpServer | K::NtpMaster => self.ios_ntp(ni, p),
+            K::ShowStp | K::DebugStp | K::ClearStp | K::StpMode | K::StpPriority | K::StpTimer => self.ios_stp(ni, p),
+            K::StpIf => {
+                let ifs = self.cdev(ni).map(|c| c.ifs.clone()).unwrap_or_default();
+                let mut r = Ok(());
+                for f in ifs {
+                    if let Err(e) = self.ios_stp_if(ni, &f, p, line) {
+                        r = Err(e);
+                    }
+                }
+                r
+            }
         }
     }
 

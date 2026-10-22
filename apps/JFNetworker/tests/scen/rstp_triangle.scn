@@ -1,0 +1,28 @@
+# Rapid Spanning Tree (IEEE 802.1w, eingegeben als „rapid-pvst“) im Dreieck: SW1 schlägt vor, SW2
+# und SW3 stimmen zu, nach Mikrosekunden leiten die Ports weiter, SW3 blockiert seinen Port zu SW2.
+# Dann fällt das Kabel SW1–SW2 aus: SW2 meldet sich als Root-Bridge, SW3 nimmt den Port zu SW2 als
+# Designated-Port und schlägt vor, SW2 stimmt zu – der neue Baum steht nach drei BPDUs.
+SW1: enable
+SW2: enable
+SW3: enable
+SW3: debug spanning-tree events
+at 1s SW3: show spanning-tree
+expect SW3 output contains "Gi1/0/1             Altn BLK 20000     128.1    P2p"
+PC2: ping -c 2 10.0.0.3
+run 2s
+expect PC2 output contains "2 packets transmitted, 2 received, 0% packet loss"
+SW1: show spanning-tree
+expect SW1 output contains "This bridge itself is the root"
+SW2: show spanning-tree
+expect SW2 output contains "Gi1/0/2             Desg FWD 20000     128.2    P2p"
+SW3: show spanning-tree root
+at 40s link down SW1 Gi1/0/1
+PC2: ping -c 3 10.0.0.1
+run 4s
+expect PC2 output contains "3 packets transmitted, 3 received, 0% packet loss"
+SW2: show spanning-tree
+expect SW2 output contains "Gi1/0/2             Root FWD 20000     128.2    P2p"
+SW3: show spanning-tree
+expect SW3 output contains "Gi1/0/1             Desg FWD 20000     128.1    P2p"
+SW3: show spanning-tree interface gi1/0/1 detail
+expect hops stp >= 50

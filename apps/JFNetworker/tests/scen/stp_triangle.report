@@ -1,0 +1,231 @@
+# JFNetworker-Szenario stp_triangle.scn: „Spanning Tree im Dreieck“, 6 Geräte, 6 Verbindungen, Seed 11
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW3     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW3     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW3     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW3     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW3     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW3     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW1     SW1>enable
+   0.000000000  SW2     SW2>enable
+   0.000000000  SW3     SW3>enable
+   0.000000000  SW3     SW3#debug spanning-tree events
+   0.000000000  SW3     Debug output for spanning tree events: on
+   0.000000722  SW3     *Mar  1 00:00:00.000: STP: the root is 4096.024a.0000.0100, over Gi1/0/2 at cost 20000
+   0.000000722  SW3     *Mar  1 00:00:00.000: STP: Gi1/0/2 is now root (was designated)
+   1.000000000  SW3     SW3#show spanning-tree
+   1.000000000  SW3     Spanning tree: IEEE 802.1D (STP), one tree for every VLAN
+   1.000000000  SW3       Root ID    Priority    4096
+   1.000000000  SW3                  Address     024a.0000.0100
+   1.000000000  SW3                  Cost        20000
+   1.000000000  SW3                  Port        2 (GigabitEthernet1/0/2)
+   1.000000000  SW3                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+   1.000000000  SW3     
+   1.000000000  SW3       Bridge ID  Priority    32768  (priority 32768 sys-id-ext 0)
+   1.000000000  SW3                  Address     024a.0000.0300
+   1.000000000  SW3                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+   1.000000000  SW3                  Aging Time  300 sec
+   1.000000000  SW3     
+   1.000000000  SW3     Interface           Role Sts Cost      Prio.Nbr Type
+   1.000000000  SW3     ------------------- ---- --- --------- -------- --------------------------------
+   1.000000000  SW3     Gi1/0/1             Desg LIS 20000     128.1    P2p
+   1.000000000  SW3     Gi1/0/2             Root LIS 20000     128.2    P2p
+   1.000000000  SW3     Gi1/0/3             Desg FWD 20000     128.3    P2p Edge
+   1.000000000  ok      expect SW3 output contains "Gi1/0/1             Desg LIS 20000     128.1    P2p"
+   1.000000722  SW3     *Mar  1 00:00:01.000: STP: Gi1/0/1 goes from listening to blocking
+   1.000000722  SW3     *Mar  1 00:00:01.000: STP: Gi1/0/1 is now alternate (was designated)
+   2.000000000  PC2     root@PC2:~# ping -c 2 10.0.0.3
+   2.000000000  PC2     PING 10.0.0.3 (10.0.0.3) 56(84) bytes of data.
+   2.000000000  --      run 4s
+   5.000000000  PC2     From 10.0.0.2 icmp_seq=1 Destination Host Unreachable
+   5.000000000  PC2     From 10.0.0.2 icmp_seq=2 Destination Host Unreachable
+   5.000000000  PC2     
+   5.000000000  PC2     --- 10.0.0.3 ping statistics ---
+   5.000000000  PC2     2 packets transmitted, 0 received, +2 errors, 100% packet loss, time 1000ms
+   6.000000000  ok      expect PC2 output contains "100% packet loss"
+  15.000000000  SW3     *Mar  1 00:00:15.000: STP: Gi1/0/2 goes from listening to learning
+  16.000000000  SW2     SW2#show spanning-tree
+  16.000000000  SW2     Spanning tree: IEEE 802.1D (STP), one tree for every VLAN
+  16.000000000  SW2       Root ID    Priority    4096
+  16.000000000  SW2                  Address     024a.0000.0100
+  16.000000000  SW2                  Cost        20000
+  16.000000000  SW2                  Port        1 (GigabitEthernet1/0/1)
+  16.000000000  SW2                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  16.000000000  SW2     
+  16.000000000  SW2       Bridge ID  Priority    32768  (priority 32768 sys-id-ext 0)
+  16.000000000  SW2                  Address     024a.0000.0200
+  16.000000000  SW2                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  16.000000000  SW2                  Aging Time  300 sec
+  16.000000000  SW2     
+  16.000000000  SW2     Interface           Role Sts Cost      Prio.Nbr Type
+  16.000000000  SW2     ------------------- ---- --- --------- -------- --------------------------------
+  16.000000000  SW2     Gi1/0/1             Root LRN 20000     128.1    P2p
+  16.000000000  SW2     Gi1/0/2             Desg LRN 20000     128.2    P2p
+  16.000000000  SW2     Gi1/0/3             Desg FWD 20000     128.3    P2p Edge
+  16.000000000  ok      expect SW2 output contains "Gi1/0/1             Root LRN 20000     128.1    P2p"
+  30.000000000  SW3     *Mar  1 00:00:30.000: STP: Gi1/0/2 goes from learning to forwarding
+  30.000000000  SW3     *Mar  1 00:00:30.000: STP: topology change on Gi1/0/2
+  30.000000000  SW3     *Mar  1 00:00:30.000: STP: TCN to the root on Gi1/0/2
+  30.000000722  SW3     *Mar  1 00:00:30.000: STP: MAC entries age after 15 s during the topology change
+  31.000000000  PC2     root@PC2:~# ping -c 2 10.0.0.3
+  31.000000000  PC2     PING 10.0.0.3 (10.0.0.3) 56(84) bytes of data.
+  31.000000000  --      run 2s
+  31.000000722  SW3     *Mar  1 00:00:31.000: STP: TCN acknowledged on Gi1/0/2
+  31.000013984  PC2     64 bytes from 10.0.0.3: icmp_seq=1 ttl=64 time=0.013 ms
+  32.000008208  PC2     64 bytes from 10.0.0.3: icmp_seq=2 ttl=64 time=0.008 ms
+  32.000008208  PC2     
+  32.000008208  PC2     --- 10.0.0.3 ping statistics ---
+  32.000008208  PC2     2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+  32.000008208  PC2     rtt min/avg/max/mdev = 0.008/0.010/0.013/0.002 ms
+  33.000000000  ok      expect PC2 output contains "2 packets transmitted, 2 received, 0% packet loss"
+  33.000000000  SW1     SW1#show spanning-tree
+  33.000000000  SW1     Spanning tree: IEEE 802.1D (STP), one tree for every VLAN
+  33.000000000  SW1       Root ID    Priority    4096
+  33.000000000  SW1                  Address     024a.0000.0100
+  33.000000000  SW1                  This bridge itself is the root
+  33.000000000  SW1                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  33.000000000  SW1     
+  33.000000000  SW1       Bridge ID  Priority    4096  (priority 4096 sys-id-ext 0)
+  33.000000000  SW1                  Address     024a.0000.0100
+  33.000000000  SW1                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  33.000000000  SW1                  Aging Time  15 sec
+  33.000000000  SW1     
+  33.000000000  SW1     Interface           Role Sts Cost      Prio.Nbr Type
+  33.000000000  SW1     ------------------- ---- --- --------- -------- --------------------------------
+  33.000000000  SW1     Gi1/0/1             Desg FWD 20000     128.1    P2p
+  33.000000000  SW1     Gi1/0/2             Desg FWD 20000     128.2    P2p
+  33.000000000  SW1     Gi1/0/3             Desg FWD 20000     128.3    P2p Edge
+  33.000000000  ok      expect SW1 output contains "This bridge itself is the root"
+  33.000000000  SW3     SW3#show spanning-tree
+  33.000000000  SW3     Spanning tree: IEEE 802.1D (STP), one tree for every VLAN
+  33.000000000  SW3       Root ID    Priority    4096
+  33.000000000  SW3                  Address     024a.0000.0100
+  33.000000000  SW3                  Cost        20000
+  33.000000000  SW3                  Port        2 (GigabitEthernet1/0/2)
+  33.000000000  SW3                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  33.000000000  SW3     
+  33.000000000  SW3       Bridge ID  Priority    32768  (priority 32768 sys-id-ext 0)
+  33.000000000  SW3                  Address     024a.0000.0300
+  33.000000000  SW3                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  33.000000000  SW3                  Aging Time  15 sec
+  33.000000000  SW3     
+  33.000000000  SW3     Interface           Role Sts Cost      Prio.Nbr Type
+  33.000000000  SW3     ------------------- ---- --- --------- -------- --------------------------------
+  33.000000000  SW3     Gi1/0/1             Altn BLK 20000     128.1    P2p
+  33.000000000  SW3     Gi1/0/2             Root FWD 20000     128.2    P2p
+  33.000000000  SW3     Gi1/0/3             Desg FWD 20000     128.3    P2p Edge
+  33.000000000  ok      expect SW3 output contains "Gi1/0/1             Altn BLK 20000     128.1    P2p"
+  33.000000000  SW3     SW3#show spanning-tree root
+  33.000000000  SW3                                                Root Hello Max Fwd
+  33.000000000  SW3     Tree             Root ID                   Cost  Time Age Dly  Root Port
+  33.000000000  SW3     ---------------- -------------------- --------- ----- --- ---  ------------
+  33.000000000  SW3     all VLANs        4096 024a.0000.0100      20000     2  20  15  Gi1/0/2
+  40.000000000  --      link down SW1 Gi1/0/1
+  40.000000000  SW1     *Mar  1 00:00:40.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is down
+  40.000000000  SW1     *Mar  1 00:00:40.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is down
+  40.000000000  SW2     *Mar  1 00:00:40.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is down
+  40.000000000  SW2     *Mar  1 00:00:40.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is down
+  40.000000000  --      run 1s
+  41.000000000  SW2     SW2#show spanning-tree
+  41.000000000  SW2     Spanning tree: IEEE 802.1D (STP), one tree for every VLAN
+  41.000000000  SW2       Root ID    Priority    32768
+  41.000000000  SW2                  Address     024a.0000.0200
+  41.000000000  SW2                  This bridge itself is the root
+  41.000000000  SW2                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  41.000000000  SW2     
+  41.000000000  SW2       Bridge ID  Priority    32768  (priority 32768 sys-id-ext 0)
+  41.000000000  SW2                  Address     024a.0000.0200
+  41.000000000  SW2                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  41.000000000  SW2                  Aging Time  15 sec
+  41.000000000  SW2     
+  41.000000000  SW2     Interface           Role Sts Cost      Prio.Nbr Type
+  41.000000000  SW2     ------------------- ---- --- --------- -------- --------------------------------
+  41.000000000  SW2     Gi1/0/2             Desg FWD 20000     128.2    P2p
+  41.000000000  SW2     Gi1/0/3             Desg FWD 20000     128.3    P2p Edge
+  41.000000000  ok      expect SW2 output contains "This bridge itself is the root"
+  41.000000000  PC2     root@PC2:~# ping -c 2 -W 1 10.0.0.1
+  41.000000000  PC2     PING 10.0.0.1 (10.0.0.1) 56(84) bytes of data.
+  41.000000000  --      run 4s
+  43.000000000  PC2     
+  43.000000000  PC2     --- 10.0.0.1 ping statistics ---
+  43.000000000  PC2     2 packets transmitted, 0 received, 100% packet loss, time 1000ms
+  45.000000000  ok      expect PC2 output contains "100% packet loss"
+  57.000000000  SW3     *Mar  1 00:00:57.000: STP: the information on Gi1/0/1 aged out
+  57.000000000  SW3     *Mar  1 00:00:57.000: STP: Gi1/0/1 goes from blocking to listening
+  57.000000000  SW3     *Mar  1 00:00:57.000: STP: Gi1/0/1 is now designated (was alternate)
+  58.000002166  SW3     *Mar  1 00:00:58.000: STP: TCN received on Gi1/0/1
+  58.000002166  SW3     *Mar  1 00:00:58.000: STP: topology change on Gi1/0/1
+  58.000002166  SW3     *Mar  1 00:00:58.000: STP: TCN to the root on Gi1/0/2
+  59.000000722  SW3     *Mar  1 00:00:59.000: STP: TCN acknowledged on Gi1/0/2
+  60.000000000  SW3     SW3#show spanning-tree
+  60.000000000  SW3     Spanning tree: IEEE 802.1D (STP), one tree for every VLAN
+  60.000000000  SW3       Root ID    Priority    4096
+  60.000000000  SW3                  Address     024a.0000.0100
+  60.000000000  SW3                  Cost        20000
+  60.000000000  SW3                  Port        2 (GigabitEthernet1/0/2)
+  60.000000000  SW3                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  60.000000000  SW3     
+  60.000000000  SW3       Bridge ID  Priority    32768  (priority 32768 sys-id-ext 0)
+  60.000000000  SW3                  Address     024a.0000.0300
+  60.000000000  SW3                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  60.000000000  SW3                  Aging Time  15 sec
+  60.000000000  SW3     
+  60.000000000  SW3     Interface           Role Sts Cost      Prio.Nbr Type
+  60.000000000  SW3     ------------------- ---- --- --------- -------- --------------------------------
+  60.000000000  SW3     Gi1/0/1             Desg LIS 20000     128.1    P2p
+  60.000000000  SW3     Gi1/0/2             Root FWD 20000     128.2    P2p
+  60.000000000  SW3     Gi1/0/3             Desg FWD 20000     128.3    P2p Edge
+  60.000000000  ok      expect SW3 output contains "Gi1/0/1             Desg LIS 20000     128.1    P2p"
+  72.000000000  SW3     *Mar  1 00:01:12.000: STP: Gi1/0/1 goes from listening to learning
+  87.000000000  SW3     *Mar  1 00:01:27.000: STP: Gi1/0/1 goes from learning to forwarding
+  87.000000000  SW3     *Mar  1 00:01:27.000: STP: topology change on Gi1/0/1
+  87.000000000  SW3     *Mar  1 00:01:27.000: STP: TCN to the root on Gi1/0/2
+  87.000001444  SW3     *Mar  1 00:01:27.000: STP: TCN acknowledged on Gi1/0/2
+  88.000000000  PC2     root@PC2:~# ping -c 2 10.0.0.1
+  88.000000000  PC2     PING 10.0.0.1 (10.0.0.1) 56(84) bytes of data.
+  88.000000000  --      run 2s
+  88.000013984  PC2     64 bytes from 10.0.0.1: icmp_seq=1 ttl=64 time=0.013 ms
+  89.000008208  PC2     64 bytes from 10.0.0.1: icmp_seq=2 ttl=64 time=0.008 ms
+  89.000008208  PC2     
+  89.000008208  PC2     --- 10.0.0.1 ping statistics ---
+  89.000008208  PC2     2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+  89.000008208  PC2     rtt min/avg/max/mdev = 0.008/0.010/0.013/0.002 ms
+  90.000000000  ok      expect PC2 output contains "2 packets transmitted, 2 received, 0% packet loss"
+  90.000000000  SW2     SW2#show spanning-tree
+  90.000000000  SW2     Spanning tree: IEEE 802.1D (STP), one tree for every VLAN
+  90.000000000  SW2       Root ID    Priority    4096
+  90.000000000  SW2                  Address     024a.0000.0100
+  90.000000000  SW2                  Cost        40000
+  90.000000000  SW2                  Port        2 (GigabitEthernet1/0/2)
+  90.000000000  SW2                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  90.000000000  SW2     
+  90.000000000  SW2       Bridge ID  Priority    32768  (priority 32768 sys-id-ext 0)
+  90.000000000  SW2                  Address     024a.0000.0200
+  90.000000000  SW2                  Hello Time   2 sec  Max Age 20 sec  Forward Delay 15 sec
+  90.000000000  SW2                  Aging Time  15 sec
+  90.000000000  SW2     
+  90.000000000  SW2     Interface           Role Sts Cost      Prio.Nbr Type
+  90.000000000  SW2     ------------------- ---- --- --------- -------- --------------------------------
+  90.000000000  SW2     Gi1/0/2             Root FWD 20000     128.2    P2p
+  90.000000000  SW2     Gi1/0/3             Desg FWD 20000     128.3    P2p Edge
+  90.000000000  ok      expect SW2 output contains "Gi1/0/2             Root FWD 20000     128.2    P2p"
+  90.000000000  SW3     SW3#show spanning-tree interface gi1/0/1 detail
+  90.000000000  SW3     GigabitEthernet1/0/1 (port 128.1) is a designated port, forwarding
+  90.000000000  SW3        Path cost 20000, port priority 128, link type point-to-point (found from the cable)
+  90.000000000  SW3        Designated root 4096.024a.0000.0100, root path cost 20000
+  90.000000000  SW3        Designated bridge 32768.024a.0000.0300, port 128.1
+  90.000000000  SW3        Timers: forward delay 0, information age 0
+  90.000000000  SW3        To forwarding 1 times; BPDUs sent 21, received 34
+  90.000000000  ok      expect hops stp >= 100 (282)
+# 12 von 12 Erwartungen erfüllt

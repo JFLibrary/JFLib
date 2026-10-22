@@ -18,6 +18,11 @@
 // MAC entries age out after 300 s and are flushed when a port's link goes down.  Frames to the
 // device's own MAC go to its interface in that VLAN (SVI) when it has one that is up;
 // broadcasts and groups reach it as a copy.
+//
+// Spanning tree (stp.rs, Bridge::stp): while it runs, a port receives and sends frames only in
+// the Forwarding state and learns in Learning and Forwarding; BPDUs go to the protocol, BPDU
+// guard shuts a port off on the first one.  During an 802.1D topology change entries age out
+// after Forward Delay (fast_aging).
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -202,6 +207,10 @@ pub struct Bridge {
     pub max_entries: usize,
     /// configured VLANs and their names (VLAN 1 "default" always)
     pub vlans: BTreeMap<u16, String>,
+    /// spanning tree: its settings and, while it runs, the protocol (stp.rs)
+    pub stp: crate::stp::Stp,
+    /// the shorter aging of an 802.1D topology change (Forward Delay), None: `aging`
+    pub fast_aging: Option<Ns>,
 }
 
 impl Bridge {
@@ -214,7 +223,13 @@ impl Bridge {
             aging: 300 * SEC,
             max_entries: 16_384,
             vlans,
+            stp: crate::stp::Stp::default(),
+            fast_aging: None,
         }
+    }
+    /// how long an entry lives now
+    pub fn age_limit(&self) -> Ns {
+        self.fast_aging.map_or(self.aging, |f| f.min(self.aging))
     }
     pub fn set_access(&mut self, port: u16, vlan: u16) -> bool {
         if !(1..=4094).contains(&vlan) {
@@ -316,11 +331,11 @@ impl Bridge {
     /// the port behind a MAC in a VLAN, unless the entry aged out
     pub fn lookup(&self, vlan: u16, mac: Mac, now: Ns) -> Option<u16> {
         let e = self.fdb.get(&(vlan, mac))?;
-        if e.fixed || now.saturating_sub(e.last) <= self.aging { Some(e.port) } else { None }
+        if e.fixed || now.saturating_sub(e.last) <= self.age_limit() { Some(e.port) } else { None }
     }
     /// learns a source address; the note when something changed
     pub fn learn(&mut self, vlan: u16, mac: Mac, port: u16, now: Ns) -> Option<Note> {
-        let aging = self.aging;
+        let aging = self.age_limit();
         if let Some(e) = self.fdb.get_mut(&(vlan, mac)) {
             if e.fixed {
                 return None;
@@ -353,7 +368,8 @@ impl Bridge {
     }
     /// the live entries: (vlan, mac, port, fixed), sorted by VLAN and MAC
     pub fn entries(&self, now: Ns) -> Vec<(u16, Mac, u16, bool)> {
-        self.fdb.iter().filter(|(_, e)| e.fixed || now.saturating_sub(e.last) <= self.aging).map(|(&(v, m), e)| (v, m, e.port, e.fixed)).collect()
+        let limit = self.age_limit();
+        self.fdb.iter().filter(|(_, e)| e.fixed || now.saturating_sub(e.last) <= limit).map(|(&(v, m), e)| (v, m, e.port, e.fixed)).collect()
     }
 }
 
@@ -366,9 +382,10 @@ impl Engine {
     /// the forwarding decision of a bridge for one frame received on port `pi`
     pub(crate) fn bridge_input(&mut self, ni: usize, pi: u16, frame: Frame, hop: HopId) {
         let now = self.now;
-        // ports whose link carries traffic (a bridge floods only to those)
+        // ports whose link carries traffic (a bridge floods only to those; with spanning tree
+        // only to those that forward)
         let live: Vec<bool> = match self.nodes.get(ni) {
-            Some(Some(n)) => n.ports.iter().map(|p| p.link.is_some_and(|li| self.link_up(li))).collect(),
+            Some(Some(n)) => n.ports.iter().enumerate().map(|(i, p)| p.link.is_some_and(|li| self.link_up(li)) && n.bridge.as_ref().is_none_or(|b| b.stp.forwards(i as u16))).collect(),
             _ => return,
         };
         // the bridge's own interfaces that are up: (vlan, interface)
@@ -407,7 +424,21 @@ impl Engine {
             }
         };
         if link_local(l2.dst) {
+            // BPDUs go to spanning tree or BPDU guard (stp.rs); the rest stays here
+            if self.stp_bpdu(ni, pi, &frame, hop) {
+                return;
+            }
             self.note(dev, Some(hop), Note::Consumed { port: pi });
+            return;
+        }
+        if !br.stp.forwards(pi) {
+            // spanning tree: a port that does not forward takes nothing in (Learning learns)
+            let state = br.stp.state(pi);
+            let learned = if state.learns() && l2.src.is_unicast() { br.learn(vlan, l2.src, pi, now) } else { None };
+            if let Some(n) = learned {
+                self.note(dev, Some(hop), n);
+            }
+            self.note(dev, Some(hop), Note::StpBlocked { port: pi, state });
             return;
         }
         let learned = if l2.src.is_unicast() { br.learn(vlan, l2.src, pi, now) } else { None };
@@ -427,6 +458,18 @@ impl Engine {
             return;
         }
         let target = if l2.dst.is_unicast() { br.lookup(vlan, l2.dst, now) } else { None };
+        if let Some(p) = target
+            && p != pi
+            && !br.stp.forwards(p)
+        {
+            // spanning tree: the port of the destination does not forward
+            let state = br.stp.state(p);
+            if let Some(n) = learned {
+                self.note(dev, Some(hop), n);
+            }
+            self.note(dev, Some(hop), Note::StpBlocked { port: p, state });
+            return;
+        }
         // the ports that carry the VLAN and have a cable
         let out: Vec<u16> = match target {
             Some(p) if p == pi => Vec::new(),
@@ -474,7 +517,7 @@ impl Engine {
         let Some(br) = node.bridge.as_ref() else {
             return;
         };
-        let live = |p: u16| node.ports[p as usize].link.is_some_and(|li| self.link_up(li));
+        let live = |p: u16| node.ports[p as usize].link.is_some_and(|li| self.link_up(li)) && br.stp.forwards(p);
         let dst = netpkt::eth::EthView::parse(&frame).map(|e| e.dst());
         let target = dst.filter(|d| d.is_unicast()).and_then(|d| br.lookup(vlan, d, now)).filter(|&p| live(p) && br.carries(p, vlan));
         let out: Vec<u16> = match target {

@@ -31,6 +31,9 @@
 //   ScriptSource / RenameService                       a script's new definition that keeps its
 //                                                      disk, numbers and errors (scriptsvc.rs);
 //                                                      a service's new name (os.rs)
+//   Stp                                                a setting of a bridge's spanning tree
+//                                                      (stp.rs: mode, priority, timers, the
+//                                                      settings of a port, mcheck)
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -186,6 +189,8 @@ pub enum Action {
     ScriptSource { dev: u32, svc: String, config: agent_core::jmap::Value },
     /// a service goes on under another name, without a restart (os.rs)
     RenameService { dev: u32, name: String, to: String },
+    /// a setting of a bridge's spanning tree (stp.rs)
+    Stp { dev: u32, set: crate::stp::StpSet },
 }
 
 /// why an action was refused (German text through Display)
@@ -285,9 +290,13 @@ impl Engine {
                 }
                 if !on {
                     self.end_jobs_of(ni);
+                    self.stp_power(ni, false);
                 }
                 self.refresh_node_links(ni);
                 self.os_power(ni, on);
+                if on {
+                    self.stp_power(ni, true);
+                }
                 Ok(())
             }
             Action::PortAdmin { dev, port, up } => {
@@ -295,6 +304,10 @@ impl Engine {
                 let li = match self.nodes.get_mut(ni) {
                     Some(Some(n)) => {
                         n.ports[pi as usize].admin_up = up;
+                        // "shutdown" ends an err-disabled state (stp.rs)
+                        if !up {
+                            n.ports[pi as usize].err_disabled = false;
+                        }
                         n.ports[pi as usize].link
                     }
                     _ => None,
@@ -387,6 +400,9 @@ impl Engine {
                     let li = match self.nodes.get_mut(ni) {
                         Some(Some(n)) => {
                             n.ports[p as usize].admin_up = up;
+                            if !up {
+                                n.ports[p as usize].err_disabled = false;
+                            }
                             n.ports[p as usize].link
                         }
                         _ => None,
@@ -481,6 +497,7 @@ impl Engine {
                 }
                 Ok(())
             }
+            Action::Stp { dev, set } => self.stp_apply(dev, set),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }
@@ -613,6 +630,8 @@ impl Engine {
             }
             (false, None) => {}
         }
+        // a routed port leaves the spanning tree, a switch port joins it
+        self.stp_link(ni, pi);
         Ok(())
     }
 

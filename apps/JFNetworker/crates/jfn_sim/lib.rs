@@ -73,6 +73,10 @@
 //            charts, values over a span for scenarios, CSV
 //   goal     an expectation against the engine now (judge: the runner's and the lab's, with a
 //            report line and a reason as a Msg); LabRun: a lab's goals over a run
+//   stp      spanning tree on the bridges: settings, the protocol that runs, BPDUs in and out,
+//            port states for the bridge, MAC flushing, BPDU guard (off unless configured)
+//   stp98    STP: the spanning tree algorithm of IEEE 802.1D-1998 clause 8
+//   rstp     RSTP: the state machines of IEEE 802.1D-2004 clause 17 (802.1w)
 //
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
@@ -127,6 +131,9 @@ pub mod mq;
 pub mod scriptsvc;
 pub mod series;
 pub mod goal;
+pub mod stp;
+pub mod stp98;
+pub mod rstp;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -167,3 +174,4 @@ pub use mq::{Queue, QueueView, SlotState, TopicView, Worker, WorkerView};
 pub use scriptsvc::{ScriptCfg, ScriptErr, ScriptService, ScriptState, ScriptView};
 pub use series::{AggOut, Kpi, LatStat, LatWindow, MetricKind, SeriesCfg, SeriesErr, SeriesKind, SeriesView, ShardLoad, SvcSeries, Unit};
 pub use goal::{judge, Found, GoalRun, LabRun, Verdict};
+pub use stp::{LinkType, ModeWord, PortRole, PortState, StpPortView, StpSet, TreeView};

@@ -1845,6 +1845,24 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   let q = dns::Message::query(id, "www.lab", dns::TYPE_A, true).to_bytes();
   let answer = dns::Message::parse(&reply)?;          // answers, authority, additional
   ```
+
+  Spanning tree: `stp` has the BPDUs of STP and RSTP -- Configuration and TCN BPDUs of
+  802.1D-1998, RST BPDUs of 802.1D-2004 with their flags and port role (`Role`, `F_PROPOSAL`,
+  `F_AGREEMENT`, ...), `BridgeId` (priority with the system ID extension, then the MAC; lower
+  is better) and `PortId` (priority in steps of 16, port number), `path_cost(kbps)` after
+  802.1D-2004 Table 17-3 (1G 20 000, 10G 2 000, 100G 200). `Bpdu::parse` validates as 9.3.4
+  says (protocol identifier, type, length; an MST BPDU reads as an RST BPDU), `Bpdu::frame(src)`
+  writes the 802.3 frame with LLC 42 42 03 to 01:80:c2:00:00:00, `stp::of_frame` reads one
+  back. `decode::layers` shows every field and flag, `decode::info` sums a BPDU up as capture
+  tools do ("RST. Root = 4096/0/02:4a:00:00:01:00  Cost = 0  Port = 0x8001").
+
+  ```rust
+  let t = Times { msg_age: 0, max_age: 20, hello: 2, fwd_delay: 15 };     // seconds
+  let me = BridgeId::new(4096, mac);
+  let b = Bpdu::rst(stp::F_PROPOSAL, me, 0, me, PortId::new(128, 1), t).with_role(Role::Designated);
+  let frame = b.frame(port_mac);                      // 60 bytes, padded
+  let back = stp::of_frame(&frame);                   // Some(b)
+  ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
   nonces use `plat::random_bytes`.
