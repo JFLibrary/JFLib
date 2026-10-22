@@ -818,10 +818,7 @@ Konflikte/s	Conflicts/s
 Rückrufe/s	Callbacks/s
 Rechenzeit (µs/s)	CPU time (µs/s)
 Verworfen/s	Dropped/s
-Loadbalancer	Load balancer
-KV-Knoten	KV node
 Queue	Queue
-Worker	Worker
 Webserver	Web server
 Lastgenerator	Load generator
 Nachrichten/s	Messages/s
