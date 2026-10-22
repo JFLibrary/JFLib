@@ -1,5 +1,5 @@
 // coretest -- self-checks of the foundation crates (datetime, crypto, compress, datastore,
-// cas, netio incl. TLS and SSH, netpkt incl. DHCP, DNS, NTP and syslog, base::rng,
+// cas, netio incl. TLS and SSH, netpkt incl. DHCP, DNS, NTP, syslog and RIP, base::rng,
 // base::metrics, base::cmdtree, base::hashring, base::lru, agent_core::jmap, script, its VM and
 // its standard library): known-answer vectors, round trips, edge cases.  Console program; exit
 // code 1 when a check fails.
@@ -41,6 +41,7 @@ mod httpmsgt;
 mod scriptlibt;
 mod hashringt;
 mod lrut;
+mod ript;
 
 /// the result collector of a check group
 pub struct T {
@@ -114,7 +115,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 24] = [
+    let groups: [(&'static str, fn(&mut T)); 25] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -139,6 +140,7 @@ fn run() -> i32 {
         ("scriptlib", scriptlibt::run),
         ("hashring", hashringt::run),
         ("lru", lrut::run),
+        ("rip", ript::run),
     ];
     let mut failed = 0;
     let mut total = 0;

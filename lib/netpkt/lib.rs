@@ -23,6 +23,8 @@
 //   pcapng    Writer (section, interfaces, enhanced packets), read
 //   http      HTTP/1.1 without I/O: Parser (fed as bytes arrive, says when it needs more),
 //             Head, Headers, framing, encode_request / encode_response / chunks (RFC 9112)
+//   rip       RipView, Rip, Rte, Auth: RIP requests and responses, version 2 and 1, the
+//             authentication entry recognised                       (RFC 2453, 1058)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -49,6 +51,7 @@ pub mod syslog;
 pub mod tcp;
 pub mod udp;
 pub mod http;
+pub mod rip;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

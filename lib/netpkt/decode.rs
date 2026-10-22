@@ -15,6 +15,8 @@
 // HTTP (ports 80, 8080, 8000, and any TCP segment that starts like a request or a response)
 // shows the start line, the header lines and the body bytes of every message the segment
 // holds; a segment in the middle of a message is a "Continuation".
+// RIP (port 520) shows its header and one field per entry (route, authentication, the request
+// for the whole table) with the problems a receiver would refuse (RFC 2453, RFC 1058).
 
 use alloc::format;
 use alloc::string::String;
@@ -35,6 +37,7 @@ use crate::tcp::{self, TcpView};
 use crate::udp::{self, UdpView};
 use crate::be16;
 use crate::http;
+use crate::rip::{self, RipView};
 
 pub const P_ETH: u32 = 1 << 0;
 pub const P_VLAN: u32 = 1 << 1;
@@ -482,6 +485,7 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Ntp => Some(ntp_layer(frame, off, len)),
             Proto::Syslog => Some(syslog_layer(frame, off, len)),
             Proto::Http => Some(http_layer(frame, off, len)),
+            Proto::Rip => Some(rip_layer(frame, off, len)),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -901,6 +905,7 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Ntp => NtpView::parse(b).map(|v| format!("NTP Version {}, {}", v.vn(), ntp::mode_name(v.mode()))),
         Proto::Syslog => syslog::parse(b).map(|m| format!("{}.{}: {}", syslog::facility_name(syslog::facility_of(m.pri)).to_ascii_uppercase(), syslog::severity_name(syslog::severity_of(m.pri)).to_ascii_uppercase(), m.rest)),
         Proto::Http => Some(http_info(b)),
+        Proto::Rip => rip_info(b),
         _ => None,
     }
 }
@@ -1452,4 +1457,125 @@ fn http_info(b: &[u8]) -> String {
         }
     }
     parts.join(" , ")
+}
+
+// ---------------------------------------------------------------- RIP
+
+/// "RIPv2" (version 0 and unknown ones as their number)
+fn rip_version(v: u8) -> String {
+    format!("RIPv{}", v)
+}
+
+/// the request for the whole table: one entry, address family 0, metric 16
+fn rip_whole_request(v: &RipView) -> bool {
+    v.command() == rip::CMD_REQUEST && v.routes().count() == 1 && v.routes().next().is_some_and(|e| e.afi == 0 && e.metric == rip::INFINITY)
+}
+
+fn rip_metric(m: u32) -> String {
+    if m == rip::INFINITY { String::from("16 (unreachable)") } else { format!("{}", m) }
+}
+
+fn rip_layer(frame: &[u8], off: usize, len: usize) -> B {
+    let b = &frame[off..off + len];
+    let Some(v) = RipView::parse(b) else {
+        let mut l = payload_layer(Proto::Rip, off, len);
+        l.bad(String::from("shorter than a RIP header"));
+        return l;
+    };
+    let (cmd, ver) = (v.command(), v.version());
+    let mut l = B::new(Proto::Rip, off, len, format!("Routing Information Protocol ({} {})", rip_version(ver), rip::command_name(cmd)));
+    l.f("Command", off, 1, format!("{} ({})", rip::command_name(cmd), cmd));
+    l.f("Version", off + 1, 1, format!("{} ({})", rip_version(ver), ver));
+    l.f("Must be zero", off + 2, 2, format!("0x{:04x}", v.mbz()));
+    let whole = rip_whole_request(&v);
+    let mut mbz = v.mbz() != 0;
+    for i in 0..v.count() {
+        let o = off + rip::RIP_HDR + i * rip::RTE_LEN;
+        let Some(e) = v.entry(i) else {
+            break;
+        };
+        if e.afi == rip::AFI_AUTH {
+            let what = match v.auth() {
+                Some(a) if i == 0 => match a.text() {
+                    Some(pw) => format!("Simple Password: {}", pw),
+                    None if a.kind == rip::AUTH_MD5 => String::from("Keyed MD5 (3)"),
+                    None => format!("type {}", a.kind),
+                },
+                _ => String::from("not the first entry: ignored"),
+            };
+            l.f("Authentication", o, rip::RTE_LEN, what);
+            if i > 0 {
+                l.bad(String::from("an authentication entry after the first one"));
+            }
+            continue;
+        }
+        if whole && e.afi == 0 {
+            l.f("Request", o, rip::RTE_LEN, String::from("the whole routing table (address family 0, metric 16)"));
+            continue;
+        }
+        if e.afi != rip::AFI_INET {
+            l.f("Entry", o, rip::RTE_LEN, format!("address family {}, metric {}", e.afi, e.metric));
+            continue;
+        }
+        let mut s = if ver >= 2 {
+            match e.prefix() {
+                Some(p) => format!("{}/{}, Metric: {}", e.addr, p.len, rip_metric(e.metric)),
+                None if e.mask.is_unspecified() => format!("{}, Metric: {}", e.addr, rip_metric(e.metric)),
+                None => {
+                    l.bad(format!("netmask {} of {} is not contiguous", e.mask, e.addr));
+                    format!("{} mask {}, Metric: {}", e.addr, e.mask, rip_metric(e.metric))
+                }
+            }
+        } else {
+            format!("{}, Metric: {}", e.addr, rip_metric(e.metric))
+        };
+        if ver >= 2 && !e.next_hop.is_unspecified() {
+            s.push_str(&format!(", Next Hop: {}", e.next_hop));
+        }
+        if ver >= 2 && e.tag != 0 {
+            s.push_str(&format!(", Route Tag: {}", e.tag));
+        }
+        l.f("IP Address", o, rip::RTE_LEN, s);
+        if e.metric == 0 || e.metric > rip::INFINITY {
+            l.bad(format!("metric {} of {} is out of range (1 to 16)", e.metric, e.addr));
+        }
+        if ver == 1 && !e.mbz_clear() {
+            mbz = true;
+        }
+    }
+    if v.trailing() > 0 {
+        let n = v.trailing();
+        l.f("Trailing bytes", off + len - n, n, format!("{} bytes", n));
+        l.bad(format!("{} bytes after the last entry", n));
+    }
+    if v.count() > rip::MAX_ENTRIES {
+        l.bad(format!("{} entries, more than 25", v.count()));
+    }
+    if ver == 1 && mbz {
+        l.bad(String::from("a must-be-zero field is set: RIPv1 receivers ignore the message (RFC 1058)"));
+    }
+    if ver == 0 {
+        l.bad(String::from("version 0: receivers ignore the message"));
+    }
+    if cmd != rip::CMD_REQUEST && cmd != rip::CMD_RESPONSE {
+        l.bad(format!("command {} is not a request or a response", cmd));
+    }
+    l
+}
+
+/// "RIPv2 Response, 3 routes", "RIPv2 Request for the whole table", "RIPv1 Request, 2 entries"
+fn rip_info(b: &[u8]) -> Option<String> {
+    let v = RipView::parse(b)?;
+    let n = v.routes().count();
+    let mut s = if rip_whole_request(&v) {
+        format!("{} Request for the whole table", rip_version(v.version()))
+    } else if v.command() == rip::CMD_REQUEST {
+        format!("{} Request, {} entr{}", rip_version(v.version()), n, if n == 1 { "y" } else { "ies" })
+    } else {
+        format!("{} {}, {} route{}", rip_version(v.version()), rip::command_name(v.command()), n, if n == 1 { "" } else { "s" })
+    };
+    if v.auth().is_some() {
+        s.push_str(", authenticated");
+    }
+    Some(s)
 }
