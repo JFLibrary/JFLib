@@ -24,6 +24,8 @@
 // nattest.rs: access lists and NAT (group nat: jfn_sim::acl, jfn_sim::nat, their console).
 // ipv6test.rs: IPv6 (group ipv6: jfn_sim::ip6, nd, l3v6, jobs6, their consoles).
 // ospftest.rs: OSPF version 2 on routers and L3 switches (group ospf: jfn_sim::ospf, cli/ospf.rs).
+// ipv6tcptest.rs: UDP and TCP over IPv6 and what uses them (group ipv6tcp: jfn_sim::os, tcp,
+// resolver, the services, cli/tools.rs, cli/names.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -75,9 +77,11 @@ mod nattest;
 mod ipv6test;
 #[path = "ospftest.rs"]
 mod ospftest;
+#[path = "ipv6tcptest.rs"]
+mod ipv6tcptest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 30] = [
+    let groups: [(&'static str, fn(&mut T)); 31] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -108,6 +112,7 @@ pub fn run() -> i32 {
         ("nat", nattest::run),
         ("ipv6", ipv6test::run),
         ("ospf", ospftest::run),
+        ("ipv6tcp", ipv6tcptest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

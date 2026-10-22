@@ -129,7 +129,18 @@ impl Engine {
         }
         let t = self.now;
         let hop = hop.filter(|&h| h != 0);
-        self.trace.push_event(DevEvent { t, dev, hop, note, seq: 0, batch: 0 });
+        self.trace.push_event(DevEvent { t, dev, hop, note, seq: 0, batch: 0, v6: false });
+    }
+
+    /// note() for a decision about traffic over IPv6 (DevEvent::v6: a TCP connection or UDP
+    /// datagram of that family)
+    pub(crate) fn note_v6(&mut self, dev: u32, hop: Option<HopId>, note: Note) {
+        if crate::cli::wants(&self.cli, &note) {
+            self.cli_note(dev, hop, &note);
+        }
+        let t = self.now;
+        let hop = hop.filter(|&h| h != 0);
+        self.trace.push_event(DevEvent { t, dev, hop, note, seq: 0, batch: 0, v6: true });
     }
 
     /// re-evaluates a link after a change of power, port state, cable or plug

@@ -102,6 +102,10 @@
 //            (redistribution, default route); its routes in the RIB with distance 110;
 //            OspfCfg / OspfSet (Action::Ospf)
 //
+// UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
+// services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
+// device has it; dig, host and nslookup are console programs too (cli/names.rs).
+//
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
 //
@@ -216,3 +220,5 @@ pub use nd::{Addr6View, Neigh6Row};
 pub use jobs6::{Icmp6Kind, Ping6Ev, Ping6Job, Ping6Opts, Trace6Hop, Trace6Job, Trace6Probe};
 pub use trace6::{Note6, RaWhy};
 pub use ospf::{IfState, LsaDrop, LsaRef, LsuWhy, NbrEvent, NbrState, NetType, OrigWhy, Ospf, OspfCfg, OspfDrop, OspfSet, RtChange, RtKind};
+pub use resolver::Family;
+pub use os::{ANY, ANY4};

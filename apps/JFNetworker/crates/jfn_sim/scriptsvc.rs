@@ -45,7 +45,11 @@
 //                        once that callback returned
 //   net.udp(port, fn(sock, msg), {binary}) -> sock {kind, port}: send(addr, port, data),
 //                        close(); msg {data, from, port}; port 0: an ephemeral one
-//   dns.resolve(name, fn(err, addrs))   the device's resolver; addrs: a list of str
+//   dns.resolve(name, fn(err, addrs))   the device's resolver; addrs: a list of str (IPv4
+//                        and, on a device with IPv6, IPv6 addresses in the order to try)
+//   addresses are IPv4 or IPv6 text ("2001:db8::1", also in brackets); net.listen, net.udp
+//                        and http.serve take both families (os.rs: ANY), a peer over IPv6 is
+//                        its IPv6 address
 //   http.serve(port, fn(req, res))      once per script: req {method, path, target, query,
 //                        headers, body, peer, peer_port}, res.send(status, body, headers),
 //                        res.json(status, value, headers), even from a later callback; a
@@ -101,7 +105,7 @@ use base::rng::Pcg32;
 use jfn_model::msg;
 use jfn_model::msg::{dur, Msg};
 use netpkt::syslog::{SEV_DEBUG, SEV_ERR, SEV_INFO, SEV_WARNING};
-use netpkt::Ipv4;
+use netpkt::{IpAddr, Ipv4};
 use script::{num, Cx, ErrorKind, Fail, Limits, Pin, Program, Ref, Status, TraceLine, Value, Vm};
 
 use crate::http::{Agent, Done, Reply, Req, ReqIn, Resp, Serve, ServeCfg, Url, Wheel};
@@ -404,7 +408,7 @@ enum Effect {
     Note(Note),
     /// the script ends (an error)
     Halt,
-    UdpSend { port: u16, dst: Ipv4, dport: u16, data: Vec<u8> },
+    UdpSend { port: u16, dst: IpAddr, dport: u16, data: Vec<u8> },
     UdpClose(u16),
     Connect(u64),
     Send(u64, Vec<u8>),
@@ -483,7 +487,7 @@ struct Conn {
     handle: Pin,
     href: Option<Ref>,
     handlers: Pin,
-    remote: (Ipv4, u16),
+    remote: (IpAddr, u16),
     /// established (sending may begin)
     open: bool,
     /// bytes the socket did not take yet
@@ -503,7 +507,7 @@ struct Conn {
 }
 
 impl Conn {
-    fn new(handle: Pin, href: Option<Ref>, handlers: Pin, remote: (Ipv4, u16), binary: bool) -> Conn {
+    fn new(handle: Pin, href: Option<Ref>, handlers: Pin, remote: (IpAddr, u16), binary: bool) -> Conn {
         Conn { sock: None, handle, href, handlers, remote, open: false, out: Vec::new(), closed: false, closing: false, released: false, ended: false, carry: Vec::new(), binary, data_queued: false }
     }
 }
@@ -712,8 +716,9 @@ fn data_of(cx: &Cx, v: Value) -> Option<Vec<u8>> {
     cx.bytes(v).map(Vec::from)
 }
 
-fn ip_of(cx: &Cx, v: Value) -> Option<Ipv4> {
-    cx.str(v).and_then(|s| Ipv4::parse(s.trim()))
+/// an IPv4 or IPv6 address (text)
+fn ip_of(cx: &Cx, v: Value) -> Option<IpAddr> {
+    cx.str(v).and_then(|s| IpAddr::parse(s.trim().trim_start_matches('[').trim_end_matches(']')))
 }
 
 /// m.key is truthy
@@ -968,7 +973,7 @@ impl Api<'_, '_> {
 
     fn connect(&mut self, cx: &mut Cx, addr: Value, port: Value, h: Value) -> Result<Value, Fail> {
         let Some(dst) = ip_of(cx, addr) else {
-            return Err(cx.error("net.connect: die Adresse muss eine IPv4-Adresse sein (Namen löst dns.resolve auf)"));
+            return Err(cx.error("net.connect: die Adresse muss eine IP-Adresse sein (Namen löst dns.resolve auf)"));
         };
         let Some(port) = port_of(port).filter(|&p| p > 0) else {
             return Err(cx.error("net.connect: der Port muss eine ganze Zahl von 1 bis 65535 sein"));
@@ -999,7 +1004,8 @@ impl Api<'_, '_> {
             return Err(cx.error("net.udp: das zweite Argument muss eine Funktion sein: fn(sock, msg)"));
         }
         let binary = flag(cx, opts, "binary");
-        let p = match self.os.bind_msg(port, None) {
+        // one socket for both families (os.rs: ANY)
+        let p = match self.os.bind_on_msg(crate::os::ANY, port, None) {
             Ok(p) => p,
             Err(m) => return Err(cx.error(&format!("net.udp: {}", m.text()))),
         };
@@ -1216,7 +1222,7 @@ impl Api<'_, '_> {
             }
             (Handle::Udp(p), "send") => {
                 let Some(dst) = ip_of(cx, a(1)) else {
-                    return Err(cx.error("send: die Adresse muss eine IPv4-Adresse sein"));
+                    return Err(cx.error("send: die Adresse muss eine IP-Adresse sein"));
                 };
                 let Some(dport) = port_of(a(2)).filter(|&x| x > 0) else {
                     return Err(cx.error("send: der Port muss eine ganze Zahl von 1 bis 65535 sein"));
@@ -1609,7 +1615,7 @@ impl Run {
                 }
             }
             Effect::Resolve(id, name) => {
-                let l = os.resolve(&name, netpkt::dns::TYPE_A);
+                let l = os.resolve_host(&name, crate::resolver::Family::Any);
                 self.by_lookup.insert(l, id);
             }
             Effect::Disk(id) => self.disk_start(book, def, os, id),
@@ -1828,7 +1834,7 @@ impl Run {
                 let mut fresh = Vec::new();
                 while let Some(s) = os.tcp_accept(x.sock) {
                     let row = os.tcp_info(s);
-                    let remote = row.as_ref().map_or((Ipv4::UNSPECIFIED, 0), |r| r.remote);
+                    let remote = row.as_ref().map_or((IpAddr::V4(Ipv4::UNSPECIFIED), 0), |r| r.remote);
                     let local = row.as_ref().map_or(x.port, |r| r.local.1);
                     self.next += 1;
                     let id = self.next;
@@ -1940,8 +1946,9 @@ impl Run {
                 };
                 let (err, addrs) = match os.lookup(l).and_then(|x| x.result.clone()) {
                     Some(Ok(a)) => {
-                        let mut items = Vec::with_capacity(a.addrs.len());
-                        for x in &a.addrs {
+                        // both families in the order to try them (getaddrinfo)
+                        let mut items = Vec::with_capacity(a.sorted.len());
+                        for x in &a.sorted {
                             items.push(vm.new_str(&format!("{}", x))?);
                         }
                         (Value::Nil, vm.new_list(items)?)

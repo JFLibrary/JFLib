@@ -118,11 +118,11 @@ fn notes(t: &mut T) {
         (Note::DhcpRelayDrop { why: RelayDrop::NotMine }, "DHCP verworfen: giaddr gehört nicht zu diesem Gerät."),
         (Note::DnsAnswer { name: s("www.lab"), qtype: 1, n: 1 }, "DNS: www.lab A beantwortet (1 Eintrag)."),
         (Note::DnsAnswer { name: s("www.lab"), qtype: 1, n: 2 }, "DNS: www.lab A beantwortet (2 Einträge)."),
-        (Note::ResolveAnswer { name: s("www.lab"), addr: Some(ip("10.0.0.2")), cached: true }, "www.lab ist 10.0.0.2 (aus dem Cache)."),
+        (Note::ResolveAnswer { name: s("www.lab"), addr: Some(ip("10.0.0.2").into()), cached: true }, "www.lab ist 10.0.0.2 (aus dem Cache)."),
         (Note::ResolveAnswer { name: s("www.lab"), addr: None, cached: false }, "www.lab aufgelöst."),
         (Note::ResolveFailed { name: s("x.lab"), why: LookupErr::NotFound }, "x.lab nicht aufgelöst: unbekannter Name."),
         (Note::NtpSample { server: ip("10.0.0.53"), offset: -1_250_000, delay: 450_000 }, "NTP-Antwort von 10.0.0.53: Abweichung -1,250 ms, Laufzeit 450 \u{b5}s."),
-        (Note::TcpStateChange { port: 7, peer: Ipv4::UNSPECIFIED, pport: 0, from: TcpState::Closed, to: TcpState::Listen }, "TCP Port 7: CLOSED \u{2192} LISTEN."),
+        (Note::TcpStateChange { port: 7, peer: Ipv4::UNSPECIFIED.into(), pport: 0, from: TcpState::Closed, to: TcpState::Listen }, "TCP Port 7: CLOSED \u{2192} LISTEN."),
         (Note::TcpRstSent { why: RstWhy::NoConn }, "RST gesendet: keine solche Verbindung."),
         (Note::TcpAcked { bytes: 1460, cwnd: 16060, rtt: Some(26 * US) }, "1460 Bytes bestätigt, RTT 26 \u{b5}s, cwnd 16060 Bytes."),
         (Note::TcpRto { seq: 7, rto: 400 * MS, n: 1 }, "Zeitüberschreitung: Neuübertragung ab Seq 7 (Versuch 1), nächstes RTO 400,000 ms."),
@@ -233,7 +233,7 @@ fn engine(t: &mut T) {
     }
     let bad = ServiceDef { kind: s("tcp-client"), name: s("c"), disabled: false, config: agent_core::json::parse(b"{\"server\": \"x\"}").unwrap_or(Value::Null) };
     match e.apply(Action::Service { dev: pc1, def: bad }) {
-        Err(err) => t.eq("bad service", (err.to_string(), err.msg().text_with(&en)), (s("Dienst tcp-client: \u{201e}server\u{201c} fehlt oder ist keine IPv4-Adresse."), s("Service tcp-client: \u{201c}server\u{201d} is missing or not an IPv4 address."))),
+        Err(err) => t.eq("bad service", (err.to_string(), err.msg().text_with(&en)), (s("Dienst tcp-client: \u{201e}server\u{201c} fehlt oder ist keine IP-Adresse."), s("Service tcp-client: \u{201c}server\u{201d} is missing or not an IP address."))),
         Ok(()) => t.check("bad service refused", false),
     }
     // problems: the German text is the message's

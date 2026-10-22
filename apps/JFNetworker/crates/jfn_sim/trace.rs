@@ -39,7 +39,7 @@ use alloc::string::String;
 
 use jfn_model::msg;
 use jfn_model::msg::{dur, phrase, Msg};
-use netpkt::{Ipv4, Mac, Prefix4};
+use netpkt::{IpAddr, Ipv4, Mac, Prefix4};
 
 use crate::kernel::{Frame, Ns};
 use crate::resolver::LookupErr;
@@ -193,10 +193,10 @@ pub enum Note {
     DnsRefused { name: String },
     DnsForward { name: String },
     /// resolver of the device
-    ResolveQuery { name: String, qtype: u16, server: Ipv4 },
-    ResolveAnswer { name: String, addr: Option<Ipv4>, cached: bool },
+    ResolveQuery { name: String, qtype: u16, server: IpAddr },
+    ResolveAnswer { name: String, addr: Option<IpAddr>, cached: bool },
     ResolveNegative { name: String, nx: bool },
-    ResolveTimeout { name: String, server: Ipv4 },
+    ResolveTimeout { name: String, server: IpAddr },
     ResolveFailed { name: String, why: LookupErr },
     /// syslog
     SyslogSent { to: Ipv4, sev: u8 },
@@ -209,7 +209,7 @@ pub enum Note {
     NtpServed { to: Ipv4, stratum: u8 },
     NtpNoTime { to: Ipv4 },
     /// TCP (tcp.rs; `port` is this device's, `peer`:`pport` the other end): a state change
-    TcpStateChange { port: u16, peer: Ipv4, pport: u16, from: TcpState, to: TcpState },
+    TcpStateChange { port: u16, peer: IpAddr, pport: u16, from: TcpState, to: TcpState },
     /// a segment (not a SYN) for no connection: answered with RST
     TcpNoConn { port: u16 },
     /// the accept queue of a listening socket is full: a SYN, or the last ACK of a
@@ -448,6 +448,9 @@ pub enum Note {
     /// came, changed (next hop or cost) or went (`via` 0.0.0.0: a network the router is on)
     OspfSpf { run: u32, routes: u16, added: u16, changed: u16, removed: u16 },
     OspfRoute { prefix: Prefix4, kind: crate::ospf::RtKind, cost: u32, via: Ipv4, what: crate::ospf::RtChange },
+    /// TCP over IPv6 (tcp.rs): Packet Too Big about a segment in flight, smaller segments from
+    /// now on
+    TcpPtb { mss: u16 },
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -741,6 +744,7 @@ impl Note {
                 | Note::TcpKeepalive { .. }
                 | Note::TcpGiveUp { .. }
                 | Note::TcpPmtu { .. }
+                | Note::TcpPtb { .. }
         )
     }
     /// a German sentence; `port` names a port index, `iface` an IPv4 interface of the
@@ -881,10 +885,12 @@ impl Note {
             Note::NtpServed { to, stratum } => msg!("NTP-Zeit an {} (Stratum {}).", to, stratum),
             Note::NtpNoTime { to } => msg!("NTP-Anfrage von {} unbeantwortet: die eigene Uhr ist nicht synchronisiert.", to),
             Note::TcpStateChange { port: p, peer, pport, from, to } => {
+                // an IPv6 peer in brackets before its port
+                let who = if peer.is_v4() { format!("{}", peer) } else { format!("[{}]", peer) };
                 if *pport == 0 {
                     msg!("TCP Port {}: {} \u{2192} {}.", p, from.name(), to.name())
                 } else {
-                    msg!("TCP {} \u{2194} {}:{}: {} \u{2192} {}.", p, peer, pport, from.name(), to.name())
+                    msg!("TCP {} \u{2194} {}:{}: {} \u{2192} {}.", p, who, pport, from.name(), to.name())
                 }
             }
             Note::TcpNoConn { port: p } => msg!("TCP an Port {}: keine solche Verbindung, Antwort RST.", p),
@@ -1134,6 +1140,7 @@ impl Note {
             | Note::OspfLsaDropped { .. }
             | Note::OspfSpf { .. }
             | Note::OspfRoute { .. }) => ospf_message(n, iface),
+            Note::TcpPtb { mss } => msg!("Packet Too Big: kleinere Segmente, MSS {}.", mss),
         }
     }
 }
@@ -1261,6 +1268,20 @@ pub struct DevEvent {
     pub seq: u64,
     /// the batch it belongs to
     pub batch: u64,
+    /// about traffic over IPv6 (a TCP connection or a UDP datagram of that family): mask()
+    /// says IPv6 where the note says IPv4
+    pub v6: bool,
+}
+
+impl DevEvent {
+    /// the P_* bits of the decision (Note::mask), IPv6 in place of IPv4 when it is about IPv6
+    /// traffic (`v6`, or the frame it is about, of mask `hop_mask`, carries IPv6)
+    pub fn mask(&self, hop_mask: u32) -> u32 {
+        use netpkt::decode::{P_IPV4, P_IPV6};
+        let m = self.note.mask();
+        let six = self.v6 || (hop_mask & P_IPV6 != 0 && hop_mask & P_IPV4 == 0);
+        if six && m & P_IPV4 != 0 { (m & !P_IPV4) | P_IPV6 } else { m }
+    }
 }
 
 /// the recording of a run
@@ -1519,7 +1540,8 @@ impl Filter {
     /// frame or the decision itself (Note::mask) carries one of the protocols
     pub fn event(&self, tr: &Trace, e: &DevEvent) -> bool {
         let hop = e.hop.and_then(|h| tr.hop(h));
-        let bits = hop.map_or(0, |h| h.mask) | e.note.mask();
+        let hm = hop.map_or(0, |h| h.mask);
+        let bits = hm | e.mask(hm);
         (self.mask == 0 || bits & self.mask != 0) && (self.has_dev(e.dev) || hop.is_some_and(|h| self.has_dev(h.from.0)))
     }
 }

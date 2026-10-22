@@ -36,6 +36,8 @@
 //   ospf      OspfView, Packet (Hello, Database Description, Link State Request, Update,
 //             Acknowledgment), LsaHeader, Lsa (router, network, summary, AS-external) with the
 //             Fletcher checksum, compare (which instance is newer)      (RFC 2328, RFC 905)
+//   addrsel   destination address selection: scope, the default policy table (precedence,
+//             label), Dest and sort, the order getaddrinfo tries addresses in   (RFC 6724)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -67,6 +69,7 @@ pub mod rip;
 pub mod nat;
 pub mod icmpv6;
 pub mod ospf;
+pub mod addrsel;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

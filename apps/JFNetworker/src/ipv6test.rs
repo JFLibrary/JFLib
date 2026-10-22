@@ -969,7 +969,8 @@ fn console_linux(t: &mut T) {
     t.eq("linux: ip -br addr", cli(&mut e, PC2, &["ip -br addr show eth0"]), s("eth0             UP             2001:db8:1:0:4a:ff:fe00:201/64 fe80::4a:ff:fe00:201/64\n"));
     // ping6 and traceroute6 complaints in the words of iputils and traceroute
     t.eq("linux: ping6 no target", cli(&mut e, PC2, &["ping6"]), s("ping: usage error: Destination address required\n"));
-    t.eq("linux: ping6 name", cli(&mut e, PC2, &["ping6 -c 1 server"]), s("ping: server: Address family for hostname not supported\n"));
+    // a name is looked up for AAAA (R5b); PC2 knows no name server
+    t.eq("linux: ping6 name", cli(&mut e, PC2, &["ping6 -c 1 server"]), s("ping: server: Temporary failure in name resolution\n"));
     t.eq("linux: ping6 link-local", cli(&mut e, PC2, &["ping6 -c 1 fe80::1"]), s("ping: connect: Invalid argument\n"));
     let o = cli_for(&mut e, PC2, "ping -6 -c 1 fe80::4a:ff:fe00:101%eth0", 2 * SEC);
     t.check("linux: ping with zone", o.starts_with("PING fe80::4a:ff:fe00:101%eth0(fe80::4a:ff:fe00:101%eth0) 56 data bytes\n64 bytes from fe80::4a:ff:fe00:101: icmp_seq=1 ttl=64 time="));

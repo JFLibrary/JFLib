@@ -706,7 +706,7 @@ impl Service for DhcpClient {
     }
     fn on(&mut self, ev: SvcEvent, os: &mut OsApi) {
         match ev {
-            SvcEvent::Udp(d) => self.on_reply(os, d.src, &d.data),
+            SvcEvent::Udp(d) => self.on_reply(os, d.src4(), &d.data),
             SvcEvent::Timer(k) => self.on_timer(os, k),
             SvcEvent::ArpConflict { ip, mac, .. } => {
                 if self.state == ClientState::Checking && self.pending.as_ref().is_some_and(|l| l.addr.addr == ip) {

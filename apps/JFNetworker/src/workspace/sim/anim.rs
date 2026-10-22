@@ -164,7 +164,7 @@ pub(crate) fn drops_at(n: &mut Net, t: Ns, now: u64) {
         .filter(|d| {
             let mask = match (d.hop.and_then(|h| eng.trace.hop(h)), d.seq.and_then(|s| eng.trace.event(s))) {
                 (Some(h), _) => h.mask,
-                (None, Some(e)) => e.note.mask(),
+                (None, Some(e)) => e.mask(0),
                 _ => 0,
             };
             shows(n, mask, d.dev, None)

@@ -1088,7 +1088,7 @@ impl Service for KvNode {
             }
             SvcEvent::Udp(ref d) if d.dport == self.hb_port => {
                 if d.data.starts_with(b"kvhb ") {
-                    self.heard(os, d.src);
+                    self.heard(os, d.src4());
                 }
                 return;
             }
@@ -1439,7 +1439,8 @@ impl KvClient {
             let Some(id) = self.by_agent.remove(&d.id) else {
                 continue;
             };
-            let node = d.remote.map(|r| r.0);
+            // the KV nodes are IPv4 addresses
+            let node = d.remote.and_then(|r| r.0.v4());
             match d.result {
                 Ok(resp) => self.finish(os, id, resp.head.status, resp.head.headers, resp.body, node, None),
                 Err(f) => {

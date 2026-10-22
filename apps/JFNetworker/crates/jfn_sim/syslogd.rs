@@ -75,8 +75,8 @@ impl Service for SyslogServer {
         if self.msgs.len() >= self.max.max(1) {
             self.msgs.pop_front();
         }
-        self.msgs.push_back(SyslogMsg { t: os.now(), from: d.src, pri: m.pri, text: m.rest });
-        os.note(Note::SyslogStored { from: d.src, sev });
+        self.msgs.push_back(SyslogMsg { t: os.now(), from: d.src4(), pri: m.pri, text: m.rest });
+        os.note(Note::SyslogStored { from: d.src4(), sev });
     }
     fn metrics(&self) -> Vec<Metric> {
         let total: u64 = self.by_sev.iter().sum();

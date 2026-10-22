@@ -143,6 +143,8 @@ impl Engine {
         if !cfg.domain_lookup {
             s.push_str("no ip domain lookup\n!\n");
         }
+        // static names and name servers (cli/names.rs)
+        s.push_str(&self.ios_names_config(ni));
         if let Some(st) = &n.ip {
             let default = n.model.has(F_ROUTER) && (!n.model.has(F_BRIDGE) || n.model.has(F_HOST));
             if st.forwarding != default {

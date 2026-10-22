@@ -45,6 +45,20 @@
 // time: TCP never runs inside its own call.  Each connection is processed with the engine at
 // hand but owns nothing of it: Tcb methods collect what is to happen (Out: segments, notes,
 // events) and the engine does it in that order afterwards.
+//
+// IPv6 (RFC 9293 with RFC 8200 8.1): a connection's addresses are netpkt::IpAddr, both of one
+// family; its segments carry the checksum over the IPv6 pseudo header and go to l3v6.rs with the
+// hop limit of the way out (Engine::tcp6_input takes them in).  The MSS is the MTU of the route's
+// interface (or the path MTU learned for the destination, RFC 8201) - 60, so at least 1220 for
+// the minimum MTU of 1280; a peer that names none counts as 1220 (RFC 9293 3.7.1); IOS-like
+// devices offer 1220 beyond their connected prefixes.  Packet Too Big about a segment in flight
+// lowers the MSS to the MTU - 60 and sends what was lost again; a segment that still does not
+// fit the path is not fragmented by the sender (as Linux: TCP adapts its MSS instead).  ICMPv6
+// errors (Engine::tcp_icmp6_error) end a connection attempt at once and are remembered by an
+// established connection, as the IPv4 ones are: port unreachable means refused, the others
+// unreachable.  Ports and ISNs come from the device's random numbers as for IPv4.  A listening
+// socket on :: takes both families (os.rs: ANY); a connection to a link-local address needs
+// the interface of its source and is not offered by the socket calls.
 
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::String;
@@ -54,10 +68,12 @@ use jfn_model::msg;
 use jfn_model::msg::Msg;
 
 use netpkt::icmp::{T_TIME_EXCEEDED, T_UNREACH, UNREACH_FRAG_NEEDED, UNREACH_PORT, UNREACH_PROTO};
+use netpkt::icmpv6;
 use netpkt::ipv4::{Ipv4Hdr, Ipv4View, PROTO_TCP};
+use netpkt::ipv6::{Ipv6Hdr, Ipv6View, NH_TCP};
 use netpkt::pkt::{Pkt, HEADROOM};
 use netpkt::tcp::{seq_ge, seq_gt, seq_le, seq_lt, TcpHdr, TcpOpts, TcpView, ACK, FIN, PSH, RST, SYN};
-use netpkt::Ipv4;
+use netpkt::{IpAddr, Ipv4, Ipv6};
 
 use crate::ip::Origin;
 use crate::kernel::{Engine, Ns, MS, SEC};
@@ -68,6 +84,8 @@ use crate::trace::{HopId, Note};
 pub const SLOT_TCP: u32 = 5;
 /// the MSS of a peer that names none (RFC 9293 3.7.1)
 pub const MSS_DEFAULT: u16 = 536;
+/// the same over IPv6: the minimum MTU 1280 - 60 (RFC 9293 3.7.1)
+pub const MSS_DEFAULT6: u16 = 1220;
 /// the smallest MSS a path MTU may bring (Linux TCP_MIN_MSS)
 pub const MSS_MIN: u16 = 88;
 /// the largest window without window scaling
@@ -449,9 +467,10 @@ impl TcpStats {
 pub struct TcpRow {
     pub id: u32,
     pub state: TcpState,
-    pub local: (Ipv4, u16),
-    /// 0.0.0.0:0 for a listening socket
-    pub remote: (Ipv4, u16),
+    /// a listening socket on :: takes both families (os.rs: ANY)
+    pub local: (IpAddr, u16),
+    /// the unspecified address of the local one's family and port 0 for a listening socket
+    pub remote: (IpAddr, u16),
     /// the service that holds it
     pub owner: Option<String>,
     /// bytes not read yet and bytes not acknowledged yet; for a listening socket the
@@ -485,8 +504,9 @@ pub struct Listener {
     pub id: u32,
     /// the service
     pub owner: u32,
-    /// the address it listens on (0.0.0.0: every address of the device)
-    pub addr: Ipv4,
+    /// the address it listens on (0.0.0.0: every IPv4 address, ::: every address of both
+    /// families)
+    pub addr: IpAddr,
     pub port: u16,
     pub backlog: u32,
     /// connections that completed the handshake and wait for tcp_accept
@@ -509,9 +529,9 @@ pub struct TcpStack {
     pub listeners: BTreeMap<u32, Listener>,
     pub stats: TcpStats,
     /// (local address, local port, remote address, remote port) -> connection
-    tuples: BTreeMap<(Ipv4, u16, Ipv4, u16), u32>,
+    tuples: BTreeMap<(IpAddr, u16, IpAddr, u16), u32>,
     next_id: u32,
-    /// IPv4 packets the device sent to itself; the TCP timer delivers them
+    /// IPv4 and IPv6 packets the device sent to itself; the TCP timer delivers them
     loopq: VecDeque<Vec<u8>>,
     /// when the TCP timer fires next
     armed: Option<Ns>,
@@ -536,18 +556,16 @@ impl TcpStack {
         *self = TcpStack { cfg: self.cfg, next_id: next, ..TcpStack::new(false) };
     }
     /// the listening socket for a segment to `addr`:`port` (one on the address before one on
-    /// every address)
-    fn listener_for(&self, addr: Ipv4, port: u16) -> Option<u32> {
-        let mut any = None;
-        for l in self.listeners.values().filter(|l| l.port == port) {
-            if l.addr == addr {
-                return Some(l.id);
-            }
-            if l.addr.is_unspecified() && any.is_none() {
-                any = Some(l.id);
+    /// every address of its family, before one on :: for both)
+    fn listener_for(&self, addr: IpAddr, port: u16) -> Option<u32> {
+        let mut best: Option<(u8, u32)> = None;
+        for l in self.listeners.values().filter(|l| l.port == port && crate::os::takes(l.addr, addr)) {
+            let score = if l.addr == addr { 2 } else if l.addr.is_v4() == addr.is_v4() { 1 } else { 0 };
+            if best.is_none_or(|b| score > b.0) {
+                best = Some((score, l.id));
             }
         }
-        any
+        best.map(|b| b.1)
     }
 }
 
@@ -566,8 +584,9 @@ struct Sent {
 pub struct Tcb {
     pub id: u32,
     pub state: TcpState,
-    pub local: (Ipv4, u16),
-    pub remote: (Ipv4, u16),
+    /// both of one family
+    pub local: (IpAddr, u16),
+    pub remote: (IpAddr, u16),
     /// the service that holds it (None: not accepted yet, or closed by its service)
     pub owner: Option<u32>,
     /// the listening socket it came from, until it is accepted
@@ -765,9 +784,11 @@ fn syn_window(cfg: &TcpCfg, rcvbuf: u32, mss: u16) -> u16 {
 }
 
 impl Tcb {
-    fn new(id: u32, local: (Ipv4, u16), remote: (Ipv4, u16), iss: u32, ip_id: u16, adv_mss: u16, opts: SockOpts, cfg: &TcpCfg, now: Ns) -> Tcb {
+    #[allow(clippy::too_many_arguments)]
+    fn new(id: u32, local: (IpAddr, u16), remote: (IpAddr, u16), iss: u32, ip_id: u16, adv_mss: u16, opts: SockOpts, cfg: &TcpCfg, now: Ns) -> Tcb {
         let rcvbuf = if opts.rcvbuf > 0 { opts.rcvbuf } else { cfg.rcvbuf };
         let sndbuf = if opts.sndbuf > 0 { opts.sndbuf } else { cfg.sndbuf };
+        let peer_mss = if remote.0.is_v4() { MSS_DEFAULT } else { MSS_DEFAULT6 };
         Tcb {
             id,
             state: TcpState::Closed,
@@ -803,7 +824,7 @@ impl Tcb {
             fin_rcvd: false,
             zero_adv: false,
             adv_mss,
-            peer_mss: MSS_DEFAULT,
+            peer_mss,
             mss: adv_mss,
             syn_wnd: syn_window(cfg, rcvbuf, adv_mss),
             rcvbuf,
@@ -965,9 +986,11 @@ impl Tcb {
             self.t_delack.map(|t| (TcpTimer::DelayedAck, left(t)))
         }
     }
-    /// the peer's MSS option: the size of what this side sends
+    /// the peer's MSS option: the size of what this side sends (without one: 536 over IPv4,
+    /// 1220 over IPv6)
     fn peer(&mut self, mss: Option<u16>) {
-        self.peer_mss = mss.unwrap_or(MSS_DEFAULT).max(MSS_MIN);
+        let default = if self.remote.0.is_v4() { MSS_DEFAULT } else { MSS_DEFAULT6 };
+        self.peer_mss = mss.unwrap_or(default).max(MSS_MIN);
         self.mss = self.peer_mss.min(self.adv_mss);
     }
 
@@ -2118,6 +2141,38 @@ impl Tcb {
         }
     }
 
+    /// an ICMPv6 error about a segment of this connection (RFC 4443, RFC 5927: only about data
+    /// in flight): Packet Too Big lowers the MSS to the MTU - 60 (never below 1280 - 60, RFC
+    /// 8201) and the lost segments go again; the other errors end an attempt or are kept
+    fn icmp6(&mut self, typ: u8, code: u8, mtu: u32, seq: u32, cx: &mut Cx) {
+        if !(seq_le(self.snd_una, seq) && seq_lt(seq, self.snd_max)) {
+            return;
+        }
+        if typ == icmpv6::T_PACKET_TOO_BIG {
+            let mtu = (mtu as usize).clamp(netpkt::ipv6::MIN_MTU, 65535) as u16;
+            let m = mtu.saturating_sub(60).max(MSS_MIN);
+            if m < self.mss {
+                self.mss = m;
+                self.note(Note::TcpPtb { mss: m }, cx);
+                self.mark_retx(self.snd_max);
+                self.snd_nxt = self.snd_una;
+                self.output(cx);
+            }
+            return;
+        }
+        if !matches!(typ, icmpv6::T_DEST_UNREACH | icmpv6::T_TIME_EXCEEDED | icmpv6::T_PARAM_PROBLEM) {
+            return;
+        }
+        let why = if typ == icmpv6::T_DEST_UNREACH && code == icmpv6::UNREACH_PORT { TcpEnd::Refused } else { TcpEnd::Unreachable };
+        if self.state == TcpState::SynSent {
+            // the attempt ends at once (Linux: tcp_v6_err)
+            self.note(Note::TcpGiveUp { why }, cx);
+            self.end(why, cx);
+        } else {
+            self.soft_err = Some(why);
+        }
+    }
+
     fn row(&self, now: Ns, owner: Option<String>) -> TcpRow {
         TcpRow {
             id: self.id,
@@ -2183,12 +2238,14 @@ impl Engine {
         Some(r)
     }
 
-    fn tcp_apply(&mut self, ni: usize, id: u32, ends: ((Ipv4, u16), (Ipv4, u16)), listener: Option<u32>, out: Vec<Out>, cause: Option<HopId>) {
+    fn tcp_apply(&mut self, ni: usize, id: u32, ends: ((IpAddr, u16), (IpAddr, u16)), listener: Option<u32>, out: Vec<Out>, cause: Option<HopId>) {
         let dev = self.dev_of(ni);
+        let v6 = !ends.1.0.is_v4();
         for o in out {
             match o {
+                Out::Note(n) if v6 => self.note_v6(dev, cause, n),
                 Out::Note(n) => self.note(dev, cause, n),
-                Out::Seg(s) => self.tcp_xmit(ni, ends.0, ends.1, &s, cause),
+                Out::Seg(s) => self.tcp_xmit(ni, id, ends.0, ends.1, &s, cause),
                 Out::Ev(svc, ev) => self.os_push(ni, Job::Ev(svc, ev)),
                 Out::Accept => self.tcp_queue(ni, id, listener, cause),
                 Out::Gone => self.tcp_forget(ni, id),
@@ -2273,10 +2330,16 @@ impl Engine {
         tcp.armed = None;
         let q: Vec<Vec<u8>> = tcp.loopq.drain(..).collect();
         for p in q {
-            if let Some(v) = Ipv4View::parse(&p)
+            if p.first().is_some_and(|b| b >> 4 == 6) {
+                if let Some(v) = Ipv6View::parse(&p)
+                    && let Some(t) = TcpView::parse(v.payload())
+                {
+                    self.tcp_segment(ni, IpAddr::V6(v.src()), IpAddr::V6(v.dst()), &t, 0);
+                }
+            } else if let Some(v) = Ipv4View::parse(&p)
                 && let Some(t) = TcpView::parse(v.payload())
             {
-                self.tcp_segment(ni, v.src(), v.dst(), &t, 0);
+                self.tcp_segment(ni, IpAddr::V4(v.src()), IpAddr::V4(v.dst()), &t, 0);
             }
         }
         let due: Vec<u32> = match self.tcp(ni) {
@@ -2289,9 +2352,14 @@ impl Engine {
         self.tcp_arm(ni);
     }
 
-    /// puts a segment of a connection on its way: IPv4 to the routing table, or to the device
-    /// itself through the TCP timer
-    fn tcp_xmit(&mut self, ni: usize, (lip, lport): (Ipv4, u16), (rip, rport): (Ipv4, u16), s: &Seg, cause: Option<HopId>) {
+    /// puts a segment of a connection on its way: to the routing table of its family, or to the
+    /// device itself through the TCP timer
+    fn tcp_xmit(&mut self, ni: usize, id: u32, (lip, lport): (IpAddr, u16), (rip, rport): (IpAddr, u16), s: &Seg, cause: Option<HopId>) {
+        let (lip, rip) = match (lip, rip) {
+            (IpAddr::V4(l), IpAddr::V4(r)) => (l, r),
+            (IpAddr::V6(l), IpAddr::V6(r)) => return self.tcp6_xmit(ni, id, (l, lport), (r, rport), s, cause),
+            _ => return,
+        };
         let df = self.tcp(ni).is_some_and(|t| t.cfg.df);
         let ios = self.os(ni).is_some_and(|o| o.ios);
         let Some(st) = self.stack_mut(ni) else {
@@ -2318,9 +2386,44 @@ impl Engine {
         self.ip_output(ni, pkt, Origin::Local { job: None }, cause);
     }
 
+    /// a segment over IPv6: the hop limit of the way out, a link-local peer on the interface of
+    /// the local address; one larger than the path MTU is not sent (the sender never
+    /// fragments TCP): its connection lowers the MSS as for Packet Too Big
+    fn tcp6_xmit(&mut self, ni: usize, id: u32, (lip, lport): (Ipv6, u16), (rip, rport): (Ipv6, u16), s: &Seg, cause: Option<HopId>) {
+        let local = self.v6(ni).is_some_and(|v| v.find(rip).is_some());
+        let oif = if rip.is_link_local() { self.v6(ni).and_then(|v| v.find(lip)) } else { None };
+        let out = oif.or_else(|| self.ip6_route(ni, rip, None).map(|nh| nh.iface));
+        let hops = self.ip6_hops(ni, out);
+        let mut p = Pkt::new(HEADROOM, &s.data);
+        let opts = TcpOpts { mss: s.mss, ..TcpOpts::default() };
+        TcpHdr { src_port: lport, dst_port: rport, seq: s.seq, ack: s.ack, flags: s.flags, window: s.wnd, urgent: 0, opts }.push_v6(&mut p, lip, rip);
+        Ipv6Hdr::new(lip, rip, NH_TCP, hops).push_onto(&mut p);
+        let pkt = p.into_vec();
+        if local {
+            if let Some(tcp) = self.tcp_mut(ni) {
+                tcp.loopq.push_back(pkt);
+            }
+            self.tcp_arm(ni);
+            return;
+        }
+        let path = self.v6(ni).and_then(|v| v.pmtu.get(&rip)).map(|x| x.0 as usize);
+        let mtu = out.map(|i| self.ip6_mtu(ni, i)).unwrap_or(netpkt::ipv6::MIN_MTU).min(path.unwrap_or(usize::MAX));
+        if pkt.len() > mtu {
+            let seq = s.seq;
+            self.with_tcb(ni, id, cause, |c, cx| c.icmp6(icmpv6::T_PACKET_TOO_BIG, 0, mtu as u32, seq, cx));
+            return;
+        }
+        self.ip6_output(ni, pkt, oif, Origin::Local { job: None }, cause);
+    }
+
     /// the RST for a segment that belongs to nothing (RFC 9293 3.10.7.1); Linux sends it
     /// with Don't Fragment and IP identification 0
-    fn tcp_reset_reply(&mut self, ni: usize, src: Ipv4, dst: Ipv4, t: &TcpView, cause: Option<HopId>) {
+    fn tcp_reset_reply(&mut self, ni: usize, src: IpAddr, dst: IpAddr, t: &TcpView, cause: Option<HopId>) {
+        let (src, dst) = match (src, dst) {
+            (IpAddr::V4(s), IpAddr::V4(d)) => (s, d),
+            (IpAddr::V6(s), IpAddr::V6(d)) => return self.tcp6_reset_reply(ni, s, d, t, cause),
+            _ => return,
+        };
         let (seq, ack, flags) = if t.has(ACK) { (t.ack(), 0, RST) } else { (0, t.seq().wrapping_add(t.seg_len()), RST | ACK) };
         let df = self.tcp(ni).is_some_and(|x| x.cfg.df);
         let ios = self.os(ni).is_some_and(|o| o.ios);
@@ -2351,6 +2454,31 @@ impl Engine {
         self.ip_output(ni, pkt, Origin::Local { job: None }, cause);
     }
 
+    /// the RST for a segment over IPv6 that belongs to nothing: back with the device's hop
+    /// limit, to a link-local sender on the interface it came to
+    fn tcp6_reset_reply(&mut self, ni: usize, src: Ipv6, dst: Ipv6, t: &TcpView, cause: Option<HopId>) {
+        let (seq, ack, flags) = if t.has(ACK) { (t.ack(), 0, RST) } else { (0, t.seq().wrapping_add(t.seg_len()), RST | ACK) };
+        let local = self.v6(ni).is_some_and(|v| v.find(src).is_some());
+        let mut p = Pkt::new(HEADROOM, &[]);
+        TcpHdr { src_port: t.dst_port(), dst_port: t.src_port(), seq, ack, flags, window: 0, urgent: 0, opts: TcpOpts::default() }.push_v6(&mut p, dst, src);
+        let hops = self.ip6_hops(ni, None);
+        Ipv6Hdr::new(dst, src, NH_TCP, hops).push_onto(&mut p);
+        let pkt = p.into_vec();
+        if let Some(tcp) = self.tcp_mut(ni) {
+            tcp.stats.out_rsts += 1;
+            tcp.stats.out_segs += 1;
+        }
+        if local {
+            if let Some(tcp) = self.tcp_mut(ni) {
+                tcp.loopq.push_back(pkt);
+            }
+            self.tcp_arm(ni);
+            return;
+        }
+        let oif = if src.is_link_local() { self.v6(ni).and_then(|v| v.find(dst)) } else { None };
+        self.ip6_output(ni, pkt, oif, Origin::Local { job: None }, cause);
+    }
+
     /// a TCP segment for this device (from ip_local)
     pub(crate) fn tcp_input(&mut self, ni: usize, v: &Ipv4View, bcast: bool, hop: HopId) {
         let dev = self.dev_of(ni);
@@ -2369,11 +2497,32 @@ impl Engine {
         if bcast || v.dst().is_multicast() {
             return;
         }
-        self.tcp_segment(ni, v.src(), v.dst(), &t, hop);
+        self.tcp_segment(ni, IpAddr::V4(v.src()), IpAddr::V4(v.dst()), &t, hop);
+    }
+
+    /// a TCP segment over IPv6 for this device (from l3v6.rs; `body`: what follows the
+    /// extension headers): the checksum over the IPv6 pseudo header (RFC 8200 8.1), never to a
+    /// group
+    pub(crate) fn tcp6_input(&mut self, ni: usize, v: &Ipv6View, body: &[u8], hop: HopId) {
+        let Some(t) = TcpView::parse(body) else {
+            self.note6(ni, Some(hop), crate::trace6::Note6::Malformed);
+            return;
+        };
+        if !t.checksum_ok_v6(v.src(), v.dst()) {
+            if let Some(tcp) = self.tcp_mut(ni) {
+                tcp.stats.in_errs += 1;
+            }
+            self.note6(ni, Some(hop), crate::trace6::Note6::BadChecksum);
+            return;
+        }
+        if v.dst().is_multicast() {
+            return;
+        }
+        self.tcp_segment(ni, IpAddr::V6(v.src()), IpAddr::V6(v.dst()), &t, hop);
     }
 
     /// a segment to its connection, to a listening socket, or answered with a RST
-    fn tcp_segment(&mut self, ni: usize, src: Ipv4, dst: Ipv4, t: &TcpView, hop: HopId) {
+    fn tcp_segment(&mut self, ni: usize, src: IpAddr, dst: IpAddr, t: &TcpView, hop: HopId) {
         let dev = self.dev_of(ni);
         let cause = if hop == 0 { None } else { Some(hop) };
         let Some(tcp) = self.tcp_mut(ni) else {
@@ -2447,7 +2596,8 @@ impl Engine {
 
     /// a SYN for a listening socket: a new connection in SYN-RECEIVED, unless more
     /// connections wait for tcp_accept than the backlog allows (Linux then drops the SYN)
-    fn tcp_syn(&mut self, ni: usize, lid: u32, src: Ipv4, dst: Ipv4, t: &TcpView, cause: Option<HopId>, iss: Option<u32>) {
+    #[allow(clippy::too_many_arguments)]
+    fn tcp_syn(&mut self, ni: usize, lid: u32, src: IpAddr, dst: IpAddr, t: &TcpView, cause: Option<HopId>, iss: Option<u32>) {
         let now = self.now;
         let dev = self.dev_of(ni);
         let Some(tcp) = self.tcp_mut(ni) else {
@@ -2487,8 +2637,13 @@ impl Engine {
     }
 
     /// the MSS this side announces towards `dst`: the MTU of the route's interface - 40
-    /// (IOS-like: 536 beyond the connected subnets)
-    fn tcp_adv_mss(&self, ni: usize, dst: Ipv4) -> u16 {
+    /// (IOS-like: 536 beyond the connected subnets); over IPv6 the MTU (or the path MTU) - 60
+    /// (IOS-like: 1220 beyond the connected prefixes)
+    fn tcp_adv_mss(&self, ni: usize, dst: IpAddr) -> u16 {
+        let dst = match dst {
+            IpAddr::V4(d) => d,
+            IpAddr::V6(d) => return self.tcp_adv_mss6(ni, d),
+        };
         let Some(st) = self.stack(ni) else {
             return MSS_DEFAULT;
         };
@@ -2510,8 +2665,28 @@ impl Engine {
         }
     }
 
+    /// the MSS towards an IPv6 destination: the IPv6 MTU of the way out, or the path MTU
+    /// learned for it, - 60 (the loopback's to the device itself)
+    fn tcp_adv_mss6(&self, ni: usize, dst: Ipv6) -> u16 {
+        let remote = self.tcp(ni).and_then(|t| t.cfg.mss_remote);
+        if self.v6(ni).is_some_and(|v| v.find(dst).is_some()) {
+            let lo = self.stack(ni).and_then(|st| st.ifaces.iter().find(|x| x.is_loopback() && x.name == "lo")).map(|f| f.mtu as usize);
+            return (lo.unwrap_or(65536).min(65535) as u16).saturating_sub(60).max(MSS_MIN);
+        }
+        let Some(nh) = self.ip6_route(ni, dst, None) else {
+            return MSS_DEFAULT6;
+        };
+        let path = self.v6(ni).and_then(|v| v.pmtu.get(&dst)).map(|p| p.0 as usize);
+        let mtu = self.ip6_mtu(ni, nh.iface).min(path.unwrap_or(usize::MAX)).min(65535) as u16;
+        let mss = mtu.saturating_sub(60).max(MSS_MIN);
+        match remote {
+            Some(_) if nh.gw != dst => MSS_DEFAULT6.min(mss),
+            _ => mss,
+        }
+    }
+
     /// a free port for a connection to `dst`:`dport` (Linux: even ones first)
-    fn tcp_port(&mut self, ni: usize, src: Ipv4, dst: Ipv4, dport: u16) -> Option<u16> {
+    fn tcp_port(&mut self, ni: usize, src: IpAddr, dst: IpAddr, dport: u16) -> Option<u16> {
         let cfg = self.tcp(ni)?.cfg;
         let (lo, hi) = cfg.ports;
         let n = (hi as u32).saturating_sub(lo as u32) + 1;
@@ -2535,28 +2710,36 @@ impl Engine {
 
     // ------------------------------------------------------------ the socket calls
 
-    /// a listening socket (on every address when `addr` is 0.0.0.0)
-    pub(crate) fn tcp_listen(&mut self, ni: usize, owner: u32, addr: Ipv4, port: u16, backlog: u32, opts: SockOpts) -> Result<u32, Msg> {
-        let port = if port == 0 { self.tcp_port(ni, addr, Ipv4::UNSPECIFIED, 0).ok_or_else(|| msg!("Keine freien Ports."))? } else { port };
+    /// a listening socket (0.0.0.0: every IPv4 address, ::: every address of both families)
+    pub(crate) fn tcp_listen(&mut self, ni: usize, owner: u32, addr: IpAddr, port: u16, backlog: u32, opts: SockOpts) -> Result<u32, Msg> {
+        let any_of = if addr.is_v4() { IpAddr::V4(Ipv4::UNSPECIFIED) } else { IpAddr::V6(Ipv6::UNSPECIFIED) };
+        let port = if port == 0 { self.tcp_port(ni, addr, any_of, 0).ok_or_else(|| msg!("Keine freien Ports."))? } else { port };
         let dev = self.dev_of(ni);
         let tcp = self.tcp_mut(ni).ok_or_else(|| msg!("kein IP"))?;
-        if tcp.listeners.values().any(|l| l.port == port && (l.addr == addr || l.addr.is_unspecified() || addr.is_unspecified())) {
+        if tcp.listeners.values().any(|l| l.port == port && crate::os::overlap(l.addr, addr)) {
             return Err(msg!("Port {} ist schon belegt.", port));
         }
         let id = tcp.next_id;
         tcp.next_id += 1;
         let backlog = if backlog == 0 { tcp.cfg.backlog } else { backlog };
         tcp.listeners.insert(id, Listener { id, owner, addr, port, backlog, queue: VecDeque::new(), half: 0, opts, accepted: 0, dropped: 0, ev: false });
-        self.note(dev, None, Note::TcpStateChange { port, peer: Ipv4::UNSPECIFIED, pport: 0, from: TcpState::Closed, to: TcpState::Listen });
+        self.note(dev, None, Note::TcpStateChange { port, peer: any_of, pport: 0, from: TcpState::Closed, to: TcpState::Listen });
         Ok(id)
     }
 
-    /// an active open from `sport` (0: an ephemeral port)
-    pub(crate) fn tcp_connect(&mut self, ni: usize, owner: u32, sport: u16, dst: Ipv4, dport: u16, opts: SockOpts, cause: Option<HopId>) -> Result<u32, Msg> {
-        if dport == 0 || dst.is_unspecified() || dst.is_broadcast() || dst.is_multicast() {
-            return Err(msg!("{}:{} ist kein Ziel für TCP.", dst, dport));
+    /// an active open from `sport` (0: an ephemeral port) to an IPv4 or IPv6 address
+    pub(crate) fn tcp_connect(&mut self, ni: usize, owner: u32, sport: u16, dst: IpAddr, dport: u16, opts: SockOpts, cause: Option<HopId>) -> Result<u32, Msg> {
+        let bad = match dst {
+            IpAddr::V4(d) => d.is_unspecified() || d.is_broadcast() || d.is_multicast(),
+            IpAddr::V6(d) => d.is_unspecified() || d.is_multicast() || d.to_ipv4_mapped().is_some(),
+        };
+        if dport == 0 || bad {
+            return Err(match dst {
+                IpAddr::V4(d) => msg!("{}:{} ist kein Ziel für TCP.", d, dport),
+                IpAddr::V6(d) => msg!("[{}]:{} ist kein Ziel für TCP.", d, dport),
+            });
         }
-        let src = self.source_for(ni, dst).ok_or_else(|| msg!("Das Netz ist nicht erreichbar."))?;
+        let src = self.source_ip(ni, dst).ok_or_else(|| msg!("Das Netz ist nicht erreichbar."))?;
         let sport = if sport == 0 {
             self.tcp_port(ni, src, dst, dport).ok_or_else(|| msg!("Keine freien Ports."))?
         } else {
@@ -2686,7 +2869,8 @@ impl Engine {
             return;
         };
         let kids: Vec<u32> = tcp.conns.values().filter(|c| c.listener == Some(lid)).map(|c| c.id).collect();
-        self.note(dev, cause, Note::TcpStateChange { port: l.port, peer: Ipv4::UNSPECIFIED, pport: 0, from: TcpState::Listen, to: TcpState::Closed });
+        let none = if l.addr.is_v4() { IpAddr::V4(Ipv4::UNSPECIFIED) } else { IpAddr::V6(Ipv6::UNSPECIFIED) };
+        self.note(dev, cause, Note::TcpStateChange { port: l.port, peer: none, pport: 0, from: TcpState::Listen, to: TcpState::Closed });
         for id in kids {
             let queued = l.queue.contains(&id);
             self.with_tcb(ni, id, cause, |c, cx| {
@@ -2728,10 +2912,29 @@ impl Engine {
         let sport = u16::from_be_bytes([p[0], p[1]]);
         let dport = u16::from_be_bytes([p[2], p[3]]);
         let seq = u32::from_be_bytes([p[4], p[5], p[6], p[7]]);
-        let Some(id) = self.tcp(ni).and_then(|t| t.tuples.get(&(q.src(), sport, q.dst(), dport))).copied() else {
+        let Some(id) = self.tcp(ni).and_then(|t| t.tuples.get(&(IpAddr::V4(q.src()), sport, IpAddr::V4(q.dst()), dport))).copied() else {
             return;
         };
         self.with_tcb(ni, id, None, |c, cx| c.icmp(typ, code, mtu, seq, cx));
+    }
+
+    /// an ICMPv6 error quoting one of this device's TCP segments over IPv6 (from l3v6.rs and
+    /// a neighbor that never answered, nd.rs); `value`: the MTU of Packet Too Big
+    pub(crate) fn tcp_icmp6_error(&mut self, ni: usize, typ: u8, code: u8, value: u32, q: &Ipv6View) {
+        let Some((nh, off)) = netpkt::ipv6::upper_layer(q) else {
+            return;
+        };
+        let p = q.payload().get(off..).unwrap_or(&[]);
+        if nh != NH_TCP || p.len() < 8 {
+            return;
+        }
+        let sport = u16::from_be_bytes([p[0], p[1]]);
+        let dport = u16::from_be_bytes([p[2], p[3]]);
+        let seq = u32::from_be_bytes([p[4], p[5], p[6], p[7]]);
+        let Some(id) = self.tcp(ni).and_then(|t| t.tuples.get(&(IpAddr::V6(q.src()), sport, IpAddr::V6(q.dst()), dport))).copied() else {
+            return;
+        };
+        self.with_tcb(ni, id, None, |c, cx| c.icmp6(typ, code, value, seq, cx));
     }
 
     // ------------------------------------------------------------ queries
@@ -2748,11 +2951,12 @@ impl Engine {
             return Some(c.row(self.now, self.tcp_owner_name(ni, c.owner)));
         }
         let l = tcp.listeners.get(&id)?;
+        let none = if l.addr.is_v4() { IpAddr::V4(Ipv4::UNSPECIFIED) } else { IpAddr::V6(Ipv6::UNSPECIFIED) };
         Some(TcpRow {
             id: l.id,
             state: TcpState::Listen,
             local: (l.addr, l.port),
-            remote: (Ipv4::UNSPECIFIED, 0),
+            remote: (none, 0),
             owner: self.tcp_owner_name(ni, Some(l.owner)),
             recv_q: l.queue.len() as u32,
             send_q: l.backlog,
