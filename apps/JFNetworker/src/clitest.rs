@@ -155,9 +155,9 @@ fn help_and_tab(t: &mut T) {
     let h = e.cli_help(r1, "");
     t.check("exec help", h.starts_with("Commands at the user level:\n") && h.contains("\n  enable      Switch to the privileged level\n") && h.ends_with("\n\n"));
     let _ = cli(&mut e, r1, "enable");
-    t.eq("show ip ?", e.cli_help(r1, "show ip "), String::from("  arp        Learned IPv4-to-MAC mappings\n  dhcp       State of the DHCP server\n  interface  IPv4 settings of the interfaces\n  route      Routes this device knows\n\n"));
+    t.eq("show ip ?", e.cli_help(r1, "show ip "), String::from("  arp        Learned IPv4-to-MAC mappings\n  dhcp       State of the DHCP server\n  interface  IPv4 settings of the interfaces\n  protocols  The routing processes and their settings\n  rip        State of RIP\n  route      Routes this device knows\n\n"));
     t.eq("partial word", e.cli_help(r1, "sh"), String::from("show  \n\n"));
-    t.eq("help with <cr>", e.cli_help(r1, "show ip route "), String::from("  <cr>\n\n"));
+    t.eq("help with <cr>", e.cli_help(r1, "show ip route "), String::from("  connected  Only the networks of the interfaces\n  rip        Only the routes RIP learned\n  static     Only the static routes\n  <cr>\n\n"));
     t.eq("help marker", e.cli_help(r1, "show ipx "), String::from("          ^\n% Invalid input detected at '^' marker.\n\n"));
     let _ = cli(&mut e, r1, "conf t");
     let ih = e.cli_help(r1, "interface ");

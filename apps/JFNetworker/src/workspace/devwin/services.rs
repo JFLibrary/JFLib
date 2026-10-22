@@ -40,6 +40,7 @@ fn kind_name(kind: &str) -> &str {
         "cache" => "Cache",
         "mq" => "Message Queue",
         "worker" => "Worker",
+        "rip" => "Routing (RIP)",
         _ => return kind,
     })
 }

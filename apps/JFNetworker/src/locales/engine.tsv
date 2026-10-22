@@ -613,3 +613,52 @@ Spanning Tree: {} versucht wieder RSTP.	Spanning tree: {} tries RSTP again.
 BPDU Guard: BPDU an {}, der Port wird abgeschaltet (err-disabled).	BPDU guard: BPDU on {}, the port is shut off (err-disabled).
 Schleife über {}: {} ohne Spanning Tree, Broadcasts kreisen endlos; „spanning-tree mode rstp“ dort schaltet ihn ein.	Loop through {}: {} without spanning tree, broadcasts circle endlessly; "spanning-tree mode rstp" there turns it on.
 Schleife über {} (VLAN {}): {} ohne Spanning Tree, Broadcasts kreisen endlos; „spanning-tree mode rstp“ dort schaltet ihn ein.	Loop through {} (VLAN {}): {} without spanning tree, broadcasts circle endlessly; "spanning-tree mode rstp" there turns it on.
+# jfn_sim: RIP (rip.rs): its decisions (Note::message), the reasons in them, its status lines and refusals
+RIP: fragt über {} nach der ganzen Tabelle (Request, Version {}).	RIP: asks on {} for the whole table (request, version {}).
+RIP: {} fragt über {} nach der ganzen Tabelle: Antwort folgt.	RIP: {} asks on {} for the whole table: an answer follows.
+RIP: {} fragt über {} nach einzelnen Routen: Antwort folgt.	RIP: {} asks on {} for single routes: an answer follows.
+RIP: Update (Version {}) über {} an {}, Routen: {}.	RIP: update (version {}) on {} to {}, routes: {}.
+RIP: Update (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.	RIP: update (version {}) on {} to {}, routes: {}, poisoned by split horizon: {}.
+RIP: ausgelöstes Update (Version {}) über {} an {}, Routen: {}.	RIP: triggered update (version {}) on {} to {}, routes: {}.
+RIP: ausgelöstes Update (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.	RIP: triggered update (version {}) on {} to {}, routes: {}, poisoned by split horizon: {}.
+RIP: Antwort (Version {}) über {} an {}, Routen: {}.	RIP: answer (version {}) on {} to {}, routes: {}.
+RIP: Antwort (Version {}) über {} an {}, Routen: {}, davon per Split Horizon vergiftet: {}.	RIP: answer (version {}) on {} to {}, routes: {}, poisoned by split horizon: {}.
+RIP: Update (Version {}) von {} über {}, Routen: {}.	RIP: update (version {}) from {} on {}, routes: {}.
+RIP: Nachricht von {} über {} ignoriert: {}.	RIP: message from {} on {} ignored: {}.
+RIP: Eintrag {} mit Metrik {} von {} ist ungültig: ignoriert.	RIP: entry {} with metric {} from {} is invalid: ignored.
+RIP: Route {} gelernt: über {}, Metrik {}.	RIP: route {} learned: via {}, metric {}.
+RIP: Route {} jetzt über {}, Metrik {} (vorher {}).	RIP: route {} now via {}, metric {} (was {}).
+RIP: ein weiterer gleich guter Weg zu {} über {} (Metrik {}).	RIP: one more equal-cost path to {} via {} (metric {}).
+RIP: {} über {} ist weg ({}): unerreichbar, wird mit Metrik 16 gemeldet.	RIP: {} via {} is lost ({}): unreachable, advertised with metric 16.
+RIP: der Weg zu {} über {} entfällt ({}); gleich gute Wege bleiben.	RIP: the path to {} via {} is dropped ({}); equal-cost paths remain.
+RIP: {} im Holddown: das Angebot von {} mit Metrik {} wird ignoriert.	RIP: {} is held down: the offer of {} with metric {} is ignored.
+RIP: {} aus der Tabelle gelöscht (Garbage Collection abgelaufen).	RIP: {} removed from the table (garbage collection over).
+RIP: meldet {} ({}).	RIP: advertises {} ({}).
+RIP: {} gibt es hier nicht mehr: wird mit Metrik 16 gemeldet.	RIP: {} is gone here: advertised with metric 16.
+Multicast an {} verworfen: kein Interface hört auf diese Gruppe.	Multicast to {} dropped: no interface listens to this group.
+diese Version nimmt das Interface nicht an	the interface does not take this version
+sie kommt nicht vom RIP-Port 520	it does not come from the RIP port 520
+der Absender liegt in keinem Netz des Interfaces	the sender is on none of the interface's subnets
+sie kommt von einer eigenen Adresse	it comes from an address of this device
+sie ist authentifiziert, hier ist keine Authentifizierung eingerichtet	it is authenticated, and no authentication is set up here
+RIP läuft auf diesem Interface nicht	RIP does not run on this interface
+Version 1 mit einem Feld, das null sein muss	version 1 with a must-be-zero field set
+unbekanntes Kommando	unknown command
+das Interface ist passiv	the interface is passive
+das Interface sendet diese Version nicht	the interface does not send this version
+unlesbare Nachricht	unreadable message
+der Nachbar meldet Metrik 16	the neighbour reports metric 16
+{} s ohne Update	no update for {} s
+das Interface ist ausgefallen	the interface went down
+der Nachbar meldet eine schlechtere Metrik	the neighbour reports a worse metric
+direkt angeschlossen	directly connected
+angeschlossen, über redistribute connected	connected, through redistribute connected
+statische Route, über redistribute static	static route, through redistribute static
+Standardroute, über default-information originate	default route, through default-information originate
+RIP ist nicht eingerichtet (kein router rip).	RIP is not set up (no router rip).
+RIP Version {}: Routen: {}, davon gelernt: {}, Nachbarn: {}; nächstes Update bei {}.	RIP version {}: routes: {}, learned: {}, neighbours: {}; next update at {}.
+RIP Version {}: wartet auf das Gerät.	RIP version {}: waiting for the device.
+{} routet nicht: hier gibt es kein RIP.	{} does not route: there is no RIP here.
+RIP kennt die Versionen 1 und 2.	RIP has the versions 1 and 2.
+{} ist kein Netz für RIP.	{} is no network for RIP.
+Die Zeiten passen nicht: Update und Invalid größer als 0, Flush nicht kürzer als Invalid.	The times do not fit: update and invalid above 0, flush not shorter than invalid.

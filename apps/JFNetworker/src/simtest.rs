@@ -44,6 +44,8 @@ pub mod seriestest;
 pub mod tasktest;
 #[path = "stptest.rs"]
 pub mod stptest;
+#[path = "riptest.rs"]
+pub mod riptest;
 
 const BUDGET: usize = 1_000_000;
 

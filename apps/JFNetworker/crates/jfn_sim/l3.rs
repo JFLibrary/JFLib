@@ -27,6 +27,8 @@
 // traceroute shows the inbound interfaces); Linux quotes up to 576 bytes of the packet, IOS
 // its header and 8 bytes.  Loopback addresses never come from a wire (martians); on Linux
 // devices all of 127.0.0.0/8 is the device itself.
+// Multicast packets are for the device when the receiving interface joined their group (RIPv2's
+// 224.0.0.9: ip.rs join, rip.rs); the others are dropped with a note.
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -133,13 +135,13 @@ impl Engine {
         st.ifaces.get(nh.iface as usize)?.primary()
     }
 
-    /// `dst` is for this device (an own address, the limited broadcast, or the directed
-    /// broadcast of the receiving interface)
+    /// `dst` is for this device (an own address, the limited broadcast, the directed broadcast
+    /// of the receiving interface, or a multicast group the interface listens to)
     fn is_local(&self, ni: usize, iface: u16, dst: Ipv4) -> bool {
         let Some(st) = self.stack(ni) else {
             return false;
         };
-        dst.is_broadcast() || st.is_mine(dst) || st.ifaces.get(iface as usize).is_some_and(|f| f.is_broadcast(dst))
+        dst.is_broadcast() || st.is_mine(dst) || st.ifaces.get(iface as usize).is_some_and(|f| f.is_broadcast(dst)) || (dst.is_multicast() && st.joined(iface, dst))
     }
 
     // ---------------------------------------------------------------- input
@@ -312,7 +314,12 @@ impl Engine {
         if self.os_raw_udp(ni, iface, &v, hop) {
             return;
         }
-        if dst.is_multicast() || dst.is_unspecified() {
+        if dst.is_multicast() {
+            // a group nobody here listens to (a RIP update reaching a host)
+            self.note(dev, Some(hop), Note::IpGroupIgnored { dst });
+            return;
+        }
+        if dst.is_unspecified() {
             return;
         }
         if !self.stack(ni).is_some_and(|s| s.forwarding) {

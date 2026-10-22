@@ -34,6 +34,12 @@
 //   Stp                                                a setting of a bridge's spanning tree
 //                                                      (stp.rs: mode, priority, timers, the
 //                                                      settings of a port, mcheck)
+//   Rip                                                RIP's configuration: "router rip", its
+//                                                      commands, "ip rip ... version", "clear ip
+//                                                      route *" (rip.rs)
+//
+// After a change of interfaces, addresses or routes the device's RIP looks again at once
+// (rip::touches, Engine::rip_kick).
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -191,6 +197,8 @@ pub enum Action {
     RenameService { dev: u32, name: String, to: String },
     /// a setting of a bridge's spanning tree (stp.rs)
     Stp { dev: u32, set: crate::stp::StpSet },
+    /// a change of RIP's configuration, or "clear ip route *" (rip.rs)
+    Rip { dev: u32, set: crate::rip::RipSet },
 }
 
 /// why an action was refused (German text through Display)
@@ -260,6 +268,16 @@ fn addr_refused(s: String) -> ActErr {
 impl Engine {
     /// applies a change
     pub fn apply(&mut self, a: Action) -> Result<(), ActErr> {
+        // a routing process looks at what the change did to its device (rip.rs)
+        let touched = crate::rip::touches(&a);
+        let r = self.apply_one(a);
+        if let Some(dev) = touched {
+            self.rip_kick_dev(dev);
+        }
+        r
+    }
+
+    fn apply_one(&mut self, a: Action) -> Result<(), ActErr> {
         self.trace.new_batch();
         match a {
             Action::AddDevice(d) => {
@@ -498,6 +516,7 @@ impl Engine {
                 Ok(())
             }
             Action::Stp { dev, set } => self.stp_apply(dev, set),
+            Action::Rip { dev, set } => self.rip_apply(dev, set),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }

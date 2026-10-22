@@ -5,7 +5,10 @@
 //                                interfaces [NAME] | interfaces trunk | debugging | version
 //   Engine::ios_config(ni)       the configuration from "!" to "end" (what copy run start
 //                                stores and the startup replay reads back; the DHCP lines
-//                                come from netsvc.rs, the spanning tree's from stp.rs)
+//                                come from netsvc.rs, the spanning tree's from stp.rs, "router
+//                                rip" and "ip rip" from rip.rs)
+//   show ip route [connected|static|rip]   RIP routes with the age of their last update and
+//                                their interface; the legend names R only where RIP runs
 //
 // The layouts follow IOS 15 / IOS-XE: column widths of "show ip interface brief" (22, 15, 3,
 // 6, 21), "show arp" (address 15, age right-aligned in 9), "show mac address-table" and "show
@@ -26,12 +29,14 @@ use netpkt::{Ipv4, Prefix4};
 
 use super::fmt::{ios_hw, mask_str, pad};
 use super::ios::K;
-use super::{Method, D_ARP, D_ICMP};
+use super::{Method, D_ARP, D_ICMP, D_RIP};
 use crate::bridge::{PortMode, SwMode, VlanSet};
 use crate::ip::{IfKind, Route, RouteSrc};
 use crate::kernel::{Engine, SEC};
 
 const ROUTE_CODES: &str = "Codes: C - connected network, L - address of this device, S - static route,\n       * - default route\n\n";
+/// the codes on a device that runs RIP
+const ROUTE_CODES_RIP: &str = "Codes: C - connected network, L - address of this device, S - static route,\n       R - learned by RIP, * - default route\n\n";
 
 /// the length of the classful network of an address
 fn classful(a: Ipv4) -> u8 {
@@ -75,7 +80,7 @@ impl Engine {
                 if s.trim().is_empty() { String::from("No startup configuration saved yet\n") } else { format!("! startup configuration, {} bytes\n{}{}", s.len(), s, if s.ends_with('\n') { "" } else { "\n" }) }
             }
             K::ShowIpBrief => self.show_ip_brief(ni),
-            K::ShowIpRoute => self.show_ip_route(ni),
+            K::ShowIpRoute => self.show_ip_route(ni, p.text("only")),
             K::ShowArp => self.show_arp(ni),
             K::ShowMac => self.show_mac(ni),
             K::ShowVlan => self.show_vlan(ni, p.has("brief")),
@@ -92,6 +97,9 @@ impl Engine {
                 }
                 if d & super::D_STP != 0 {
                     s.push_str("Debug output for spanning tree events: on\n");
+                }
+                if d & D_RIP != 0 {
+                    s.push_str("Debug output for RIP: on\n");
                 }
                 s
             }
@@ -167,6 +175,8 @@ impl Engine {
                 s.push_str(&self.if_config(ni, name, *f, *port));
             }
         }
+        // "router rip" (cli/rip.rs)
+        s.push_str(&self.ios_rip_config(ni));
         if let Some(st) = &n.ip {
             let mut routes: Vec<&Route> = st.statics.iter().collect();
             routes.sort_by_key(|r| (r.prefix.addr.to_u32(), r.prefix.len, r.via.map(|v| v.to_u32()).unwrap_or(0)));
@@ -251,6 +261,7 @@ impl Engine {
                 s.push_str(&format!(" ip address {} {}{}\n", a.addr, mask_str(a.len), if k > 0 { " secondary" } else { "" }));
             }
             s.push_str(&self.ios_helper_config(ni, name));
+            s.push_str(&self.ios_rip_if_config(ni, name));
             if x.mtu != 1500 && !x.is_loopback() {
                 s.push_str(&format!(" ip mtu {}\n", x.mtu));
             }
@@ -475,7 +486,8 @@ impl Engine {
 
     // ---------------------------------------------------------------- routes, ARP, MAC, VLANs
 
-    fn show_ip_route(&self, ni: usize) -> String {
+    /// "show ip route [connected|static|rip]"
+    fn show_ip_route(&self, ni: usize, only: Option<&str>) -> String {
         let dev = self.dev_of(ni);
         let Some(st) = self.stack(ni) else {
             return String::new();
@@ -483,7 +495,9 @@ impl Engine {
         if !st.forwarding {
             return String::from("Default gateway is not set\n\nHost               Gateway           Last Use    Total Uses  Interface\nICMP redirect cache is empty\n");
         }
-        let all = self.routes(dev);
+        let mut all = self.routes(dev);
+        let rip = self.rip_on(ni);
+        let rip_db = self.rip_of(ni);
         // per prefix only the routes of the best distance are in the table
         let mut best: BTreeMap<(u32, u8), u8> = BTreeMap::new();
         for r in &all {
@@ -491,8 +505,16 @@ impl Engine {
             let e = best.entry(k).or_insert(r.ad);
             *e = (*e).min(r.ad);
         }
-        let routes: Vec<&Route> = all.iter().filter(|r| best.get(&(r.prefix.addr.to_u32(), r.prefix.len)) == Some(&r.ad)).collect();
-        let mut s = String::from(ROUTE_CODES);
+        // "show ip route rip" and the like: only the routes of that source
+        let keep = |r: &Route| match only {
+            Some("rip") => r.src == RouteSrc::Rip,
+            Some("static") => r.src == RouteSrc::Static,
+            Some("connected") => matches!(r.src, RouteSrc::Connected | RouteSrc::Local),
+            _ => true,
+        };
+        all.retain(|r| best.get(&(r.prefix.addr.to_u32(), r.prefix.len)) == Some(&r.ad) && keep(r));
+        let routes: Vec<&Route> = all.iter().collect();
+        let mut s = String::from(if rip { ROUTE_CODES_RIP } else { ROUTE_CODES });
         let default = routes.iter().find(|r| r.prefix.len == 0);
         match default {
             Some(r) => s.push_str(&format!("Gateway of last resort is {} to network 0.0.0.0\n\n", r.via.unwrap_or(Ipv4::UNSPECIFIED))),
@@ -531,7 +553,11 @@ impl Engine {
                     (RouteSrc::Connected | RouteSrc::Local, _) | (_, None) => format!("{} is directly connected, {}", lead, name(r.iface)),
                     (_, Some(v)) => {
                         let mut l = format!("{} [{}/{}] via {}", lead, r.ad, r.metric, v);
-                        if configured_if(r) {
+                        if r.src == RouteSrc::Rip {
+                            // RIP: how long ago the route was heard, and the interface
+                            let age = rip_db.and_then(|x| x.age(r.prefix, v, self.now)).unwrap_or(0);
+                            l.push_str(&format!(", {}, {}", super::rip::hms(age), name(r.iface)));
+                        } else if configured_if(r) {
                             l.push_str(&format!(", {}", name(r.iface)));
                         }
                         l

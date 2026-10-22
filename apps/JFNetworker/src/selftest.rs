@@ -20,6 +20,7 @@
 // labuitest.rs: what the lab in the window builds on (group labui: the lab's texts as
 // messages, KPIs of past spans, the Metriken panel's tables, faults as undo steps).
 // stptest.rs: spanning tree on the switches (group stp: STP and RSTP, jfn_sim::stp).
+// riptest.rs: RIP on routers and L3 switches (group rip: jfn_sim::rip, cli/rip.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -67,7 +68,7 @@ mod scriptedtest;
 mod labuitest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 26] = [
+    let groups: [(&'static str, fn(&mut T)); 27] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -94,6 +95,7 @@ pub fn run() -> i32 {
         ("scripted", scriptedtest::run),
         ("labui", labuitest::run),
         ("stp", crate::simtest::stptest::run),
+        ("rip", crate::simtest::riptest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

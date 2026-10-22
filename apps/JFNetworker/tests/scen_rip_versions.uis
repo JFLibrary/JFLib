@@ -1,0 +1,8 @@
+#!args apps/JFNetworker/tests/fixtures/rip_versions.jfnet --scenario apps/JFNetworker/tests/scen/rip_versions.scn --golden apps/JFNetworker/tests/scen/rip_versions.report
+# golden scenario: RIP in two versions: an L3 switch with two VLANs speaking RIPv2 on its routed
+# uplink only (passive-interface default), a router with a default route that speaks version 1 to
+# an old RIPv1 router (classful summaries, masks inferred), a floating static route that takes
+# over when the RIP route times out, clear ip route *.  The GUI program runs
+# tests/scen/rip_versions.scn on tests/fixtures/rip_versions.jfnet without a window and ends with
+# the report, which must equal tests/scen/rip_versions.report byte for byte on every target (the
+# script itself is not run)

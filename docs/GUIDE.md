@@ -1863,6 +1863,25 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   let frame = b.frame(port_mac);                      // 60 bytes, padded
   let back = stp::of_frame(&frame);                   // Some(b)
   ```
+
+  Routing: `rip` (RFC 2453, version 1 after RFC 1058) -- `RipView` reads a message (command,
+  version, the complete 20-byte entries, `routes()` without the authentication entry, `auth()`
+  for that entry of RFC 2453 4.1, `trailing()` bytes), `Rip` writes one (`response`,
+  `request_all` for the whole table, `to_bytes`; the sender splits at `rip::MAX_ENTRIES`),
+  `Rte::v2(prefix, next_hop, metric, tag)` and `Rte::v1(addr, metric)` build entries,
+  `Rte::prefix()` gives a version 2 destination (version 1 masks are the receiver's business),
+  `Auth::password` / `text()` the plain-text password (keyed MD5 is recognised, not checked).
+  `decode::layers` shows one field per entry with its bytes and the problems a receiver refuses
+  (a must-be-zero field of version 1, metrics outside 1 to 16, masks with gaps, bytes after the
+  last entry); `decode::info` sums it up ("RIPv2 Response, 3 routes", "RIPv1 Request for the
+  whole table").
+
+  ```rust
+  let m = rip::Rip::response(2, vec![rip::Rte::v2(net, Ipv4::UNSPECIFIED, 2, 0)]);
+  let mut p = Pkt::new(netpkt::pkt::HEADROOM, &m.to_bytes());
+  UdpHdr::new(udp::PORT_RIP, udp::PORT_RIP).push_v4(&mut p, src, rip::GROUP);
+  let heard = rip::RipView::parse(payload).map(|v| rip::Rip::read(&v));
+  ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
   nonces use `plat::random_bytes`.

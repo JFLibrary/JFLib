@@ -878,8 +878,8 @@ Fensterrand hinaus.
   `httpmsg`). Seit D1 auch Consistent Hashing mit vnodes und Präferenzlisten
   ([`base/hashring.rs`](../lib/base/hashring.rs)) und eine LRU-Tabelle nach Anzahl und Gewicht
   ([`base/lru.rs`](../lib/base/lru.rs); Gruppen `hashring`, `lru`), im Einsatz im
-  Loadbalancer, KV-Speicher und Cache des Labors von JFNetworker. Es fehlen: ICMPv6/NDP, STP,
-  RIP, OSPF – sie kommen mit den Meilensteinen des Simulators. Dazu typisiertes JSON
+  Loadbalancer, KV-Speicher und Cache des Labors von JFNetworker. Es fehlen: ICMPv6/NDP und
+  OSPF – sie kommen mit den Meilensteinen des Simulators. Dazu typisiertes JSON
   ([`agent_core/src/jmap.rs`](../lib/agent_core/src/jmap.rs): `record!`, `wire_enum!`, aus
   BackupCraft in die Library gezogen; `bc_proto` nutzt es mit) und eingerücktes JSON für
   Dateien (`json::stringify_pretty`), getestet mit der coretest-Gruppe `jmap`.
@@ -890,6 +890,10 @@ Fensterrand hinaus.
   Configuration-, TCN- und RST-BPDUs mit ihren Flags, Bridge- und Port-IDs, Pfadkosten nach
   802.1D-2004, Prüfung nach 9.3.4, Frames mit LLC, Dissektor; Gruppe `stp`), im Einsatz im
   Spanning Tree der Switches von JFNetworker.
+  Seit R2 auch RIP ([`netpkt/rip.rs`](../lib/netpkt/rip.rs): Version 2 nach RFC 2453 und 1 nach
+  RFC 1058, Requests und Antworten mit ihren Einträgen, der Authentifizierungs-Eintrag erkannt,
+  Dissektor mit den Problemen, die ein Empfänger ablehnt; Gruppe `rip`), im Einsatz in den
+  Routern und L3-Switches von JFNetworker.
 - **P2** · *erledigt* · Style `netlab` ([`styles/netlab`](../styles/netlab)) für JFNetworker:
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene

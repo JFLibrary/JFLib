@@ -11,7 +11,8 @@
 //
 // Modes: User ">", Priv "#", Config "(config)#", If "(config-if)#", SubIf "(config-subif)#",
 // Vlan "(config-vlan)#", Line "(config-line)#", DhcpPool "(dhcp-config)#" (the DHCP commands
-// are in netsvc.rs).  Interfaces are taken by any IOS spelling
+// are in netsvc.rs), Router "(config-router)#" ("router rip": rip.rs).  Interfaces are taken
+// by any IOS spelling
 // ("g0/0/0", "Gi 0/0/0", "lo0", "vlan 10"); "interface Loopback5", "interface Vlan20" and
 // "interface Gi0/0/0.10" make them.  A subinterface gets its VLAN with "encapsulation dot1Q";
 // until then it takes no address (as IOS).  Addresses: "ip address" replaces the primary
@@ -27,7 +28,7 @@ use base::cmdtree::{Error, ModeId, Names, Parsed, Tree, F_HIDDEN, F_NO};
 use jfn_model::catalog::{Media, F_AP, F_BRIDGE, F_ROUTER};
 use netpkt::{Ipv4, Mac, Prefix4};
 
-use super::{Ask, AskKind, LineCfg, Method, Mode, D_ARP, D_ICMP};
+use super::{Ask, AskKind, LineCfg, Method, Mode, D_ARP, D_ICMP, D_RIP};
 use crate::action::{ActErr, Action};
 use crate::bridge::{SwMode, SwSet, VlanSet};
 use crate::driver::Report;
@@ -115,6 +116,21 @@ pub enum K {
     StpPriority,
     StpTimer,
     StpIf,
+    // RIP (cli/rip.rs)
+    RouterRip,
+    RipVersion,
+    RipNetwork,
+    RipPassive,
+    RipAutoSummary,
+    RipDefault,
+    RipRedist,
+    RipTimers,
+    RipDistance,
+    RipMaxPaths,
+    RipIfVersion,
+    ShowRipDb,
+    ShowProtocols,
+    ClearRoute,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -126,6 +142,7 @@ const SUBIF: ModeId = 4;
 const VLAN: ModeId = 5;
 const LINE: ModeId = 6;
 const POOL: ModeId = 7;
+const ROUTER: ModeId = 8;
 
 const CAP_BRIDGE: u32 = 1;
 const CAP_ROUTER: u32 = 2;
@@ -141,6 +158,7 @@ fn mode_id(m: Mode) -> ModeId {
         Mode::Vlan => VLAN,
         Mode::Line => LINE,
         Mode::DhcpPool => POOL,
+        Mode::Router => ROUTER,
     }
 }
 
@@ -156,6 +174,7 @@ pub fn prompt_suffix(m: Mode) -> &'static str {
         Mode::Line => "(config-line)#",
         Mode::Out => "",
         Mode::DhcpPool => "(dhcp-config)#",
+        Mode::Router => "(config-router)#",
     }
 }
 
@@ -175,7 +194,8 @@ fn build(caps: u32) -> Tree<K> {
     let vlan = t.mode("(config-vlan)#", "Commands for this VLAN:", Some(conf), Some(NEGATE));
     let line = t.mode("(config-line)#", "Commands for this line:", Some(conf), Some(NEGATE));
     let pool = t.mode("(dhcp-config)#", "Commands for this address pool:", Some(conf), Some(NEGATE));
-    debug_assert!(user == USER && prv == PRIV && conf == CONF && ifm == IFM && sub == SUBIF && vlan == VLAN && line == LINE && pool == POOL);
+    let rtr = t.mode("(config-router)#", "Commands for this routing process:", Some(conf), Some(NEGATE));
+    debug_assert!(user == USER && prv == PRIV && conf == CONF && ifm == IFM && sub == SUBIF && vlan == VLAN && line == LINE && pool == POOL && rtr == ROUTER);
 
     // ---- EXEC (user and privileged)
     for m in [user, prv] {
@@ -426,6 +446,8 @@ fn build(caps: u32) -> Tree<K> {
     if bridge && caps & CAP_AP == 0 {
         super::stp::build_stp(&mut t, [user, prv, conf, ifm]);
     }
+    // ---- RIP (cli/rip.rs)
+    super::rip::build_rip(&mut t, [user, prv, conf, ifm, sub, rtr], router);
     t
 }
 
@@ -600,7 +622,7 @@ impl Engine {
             Ok(p) => self.ios_do(ni, mode, &p, line),
             Err(err) => {
                 // a configuration submode falls back to the global configuration
-                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
+                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool | Mode::Router) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
                 match up {
                     Some(p) => {
                         self.set_mode(ni, Mode::Config);
@@ -718,9 +740,11 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP | super::D_STP
+                    D_ICMP | D_ARP | super::D_STP | D_RIP
                 } else if p.has("icmp") {
                     D_ICMP
+                } else if p.has("rip") {
+                    D_RIP
                 } else {
                     D_ARP
                 };
@@ -738,6 +762,7 @@ impl Engine {
                     (true, true, _) => String::from("Debug output: all off\n"),
                     (false, true, _) => String::from("Debug output: all on (a busy network prints a lot)\n"),
                     (o, _, D_ICMP) => format!("Debug output for ICMP: {}\n", if o { "off" } else { "on" }),
+                    (o, _, D_RIP) => format!("Debug output for RIP: {}\n", if o { "off" } else { "on" }),
                     (o, _, _) => format!("Debug output for ARP: {}\n", if o { "off" } else { "on" }),
                 };
                 self.out(ni, &text);
@@ -769,6 +794,10 @@ impl Engine {
             K::IpRoute => self.ios_route(ni, p),
             K::IpRouting => {
                 let _ = self.apply(Action::Forwarding { dev, on: !p.no });
+                // without routing there is no routing process either
+                if p.no {
+                    let _ = self.apply(Action::Rip { dev, set: crate::rip::RipSet::Process(false) });
+                }
                 Ok(())
             }
             K::DomainLookup => {
@@ -885,6 +914,20 @@ impl Engine {
                 }
                 r
             }
+            K::RouterRip
+            | K::RipVersion
+            | K::RipNetwork
+            | K::RipPassive
+            | K::RipAutoSummary
+            | K::RipDefault
+            | K::RipRedist
+            | K::RipTimers
+            | K::RipDistance
+            | K::RipMaxPaths
+            | K::RipIfVersion
+            | K::ShowRipDb
+            | K::ShowProtocols
+            | K::ClearRoute => self.ios_rip(ni, p),
         }
     }
 
