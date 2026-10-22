@@ -24,6 +24,9 @@ pub struct WinUi;
 pub static STYLE: WinUi = WinUi;
 
 impl Style for WinUi {
+    fn name(&self) -> &'static str {
+        "winui"
+    }
     fn tokens(&self, dark: bool) -> [u32; T_COUNT] {
         if dark { TOKENS_DARK } else { TOKENS_LIGHT }
     }

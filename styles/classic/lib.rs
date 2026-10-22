@@ -28,6 +28,9 @@ pub struct Classic;
 pub static STYLE: Classic = Classic;
 
 impl Style for Classic {
+    fn name(&self) -> &'static str {
+        "classic"
+    }
     fn tokens(&self, dark: bool) -> [u32; T_COUNT] {
         if dark { TOKENS_DARK } else { TOKENS_LIGHT }
     }

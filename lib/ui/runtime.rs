@@ -378,6 +378,7 @@ impl Ui {
             theme: [0; super::theme::THEME_N],
             theme_dark: false,
             accent: 0,
+            look: super::theme::Look::new(style),
             title: String::new(),
             t0_us: 0,
             headless: false,
@@ -1090,6 +1091,17 @@ fn prepare(desc: &AppDesc, style: &'static dyn Style) -> (Ui, i32, i32) {
     (ui, w, h)
 }
 
+// --theme-file PATH: an app theme from the command line, after App::init (it wins over the
+// app's own); an error is printed and the app's theme stays
+fn cli_theme(ui: &mut Ui) {
+    let args = Args(plat::args());
+    if let Some(f) = args.value("--theme-file") {
+        if let Err(e) = super::perm::trusted(|| ui.load_theme(f)) {
+            plat::write_stderr(alloc::format!("error: --theme-file: {}\n", e).as_bytes());
+        }
+    }
+}
+
 pub fn run(desc: &AppDesc, app: &mut dyn App, style: &'static dyn Style) -> i32 {
     let (mut ui, w, h) = prepare(desc, style);
     let ui = &mut ui;
@@ -1117,6 +1129,7 @@ pub fn run(desc: &AppDesc, app: &mut dyn App, style: &'static dyn Style) -> i32 
         plat::write_stderr(b"error: app initialisation failed\n");
         return 2;
     }
+    cli_theme(ui);
     ui.run_passes(app);
     if let Some(protocol) = agent_mode {
         return super::agent::serve(ui, app, protocol);
@@ -1183,6 +1196,7 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
         plat::write_stderr(b"error: app initialisation failed\n");
         return 2;
     }
+    cli_theme(ui);
     ui.need = true;
     if Args(plat::args()).flag("--agent") { ui.set_agent_enabled(true); }
     ui.close_at = ui.autoclose_ms;

@@ -1,6 +1,7 @@
 // uitest -- self-checks of ui logic without a window: the undo history (ui::History, Snapshot,
 // groups, merging, the limit, the saved state), the easing curves (ui::ease), typed settings
-// (base::settings: types, limits, the file, versions and migrations), the hashed widget ids
+// (base::settings: types, limits, the file, versions and migrations; Ini::items), app themes
+// (ui::Theme: the file format, its errors with their lines, the text form), the hashed widget ids
 // (ui::wid, wid_path) and Unicode segmentation (text::segment: UAX #29, UAX #14), the line
 // chart's series ring and axis maths (ui::SeriesBuf, LcUnit, lc_nice, lc_time_step,
 // lc_time_text).  Console program; exit code 1 when a check fails.
@@ -19,6 +20,7 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use base::ini::Item as IniItem;
 use base::{Ini, Key, Schema, Settings};
 use ui::{EASE_IN, EASE_IN_OUT, EASE_LINEAR, EASE_OUT, EASE_OUT_BACK, EASE_OUT_CUBIC, Edit, History, Snapshot, ease};
 use ui::{lc_nice, lc_time_step, lc_time_text, LcUnit, SeriesBuf, SeriesCol};
@@ -269,6 +271,66 @@ fn settings(t: &mut T) {
     // sections of an Ini
     let ini = Ini::parse(b"a=1\n[One]\nx=1\n[two]\n[ONE]\ny=2\n");
     t.eq("sections", ini.sections(), alloc::vec!["One", "two"]);
+    // every header, key and malformed line with its line number (Ini::items)
+    let ini = Ini::parse(b"# c\na = 1\n\n[Sec]\nkey = v w\nnonsense\n[bad\n; c2\n");
+    let items = ini.items();
+    t.eq("items", items.len(), 5);
+    t.eq("item key outside", items[0], IniItem::Key { line: 2, sec: "", key: "a", value: "1" });
+    t.eq("item section", items[1], IniItem::Section { line: 4, name: "Sec" });
+    t.eq("item key", items[2], IniItem::Key { line: 5, sec: "Sec", key: "key", value: "v w" });
+    t.eq("item bad", items[3], IniItem::Bad { line: 6, text: &b"nonsense"[..] });
+    t.eq("item bad header", items[4], IniItem::Bad { line: 7, text: &b"[bad"[..] });
+}
+
+// ---- app themes (ui::theme, the theme file)
+
+fn themes(t: &mut T) {
+    use ui::theme::{token_index, Radius, Theme, THEME_CONTRAST, THEME_DARK, THEME_LIGHT};
+    t.eq("token bg", token_index("bg"), Some(0));
+    t.eq("token T_ACCENT", token_index("T_ACCENT"), Some((ui::T_ACCENT / 4) as usize));
+    t.eq("token strong_fill", token_index("Strong_Fill"), Some(ui::T_COUNT - 1));
+    t.eq("token unknown", token_index("bgcolor"), None);
+    let text = "# a theme\n[theme]\nname = Probe\n[colors]\nbg = #102030\ncrit = #ABC\n[light]\naccent = #0F7B8A\ntext = #80112233\n\
+                [dark]\nbg = #000000\n[contrast]\naccent = #00E5FF\n[metrics]\nradius = 150%\nspacing = 90%\ncontrol_height = 30\n\
+                [text]\nfamily = fonts/x.ttf\nfamily.bold = fonts/x-bold.ttf\nbody.size = 14.5\nbody.line = 21\ntitle.weight = semibold\n\
+                caption.weight = 300\n";
+    let th = Theme::from_ini(text);
+    t.check("parsed", th.is_ok());
+    let th = th.unwrap_or_default();
+    let bg = (ui::T_BG / 4) as usize;
+    t.eq("name", th.name.as_str(), "Probe");
+    t.eq("colors: both modes", (th.colors[THEME_LIGHT][bg], th.colors[THEME_DARK][bg]), (Some(0xFF10_2030), Some(0xFF00_0000)));
+    t.eq("#RGB", th.colors[THEME_DARK][(ui::T_CRIT / 4) as usize], Some(0xFFAA_BBCC));
+    t.eq("#AARRGGBB", th.colors[THEME_LIGHT][(ui::T_TEXT / 4) as usize], Some(0x8011_2233));
+    t.eq("accent", th.accent, [Some(0x0F7B8A), None, Some(0x00E5FF)]);
+    t.eq("contrast keeps the rest", th.colors[THEME_CONTRAST][bg], None);
+    t.eq("metrics", (th.radius, th.spacing, th.control_height), (Some(Radius::Percent(150)), 90, 30));
+    t.eq("body", (th.text[1].size_fx, th.text[1].line), (Some(14 * 256 + 128), Some(21)));
+    t.eq("weights", (th.text[4].weight, th.text[0].weight), (Some(600), Some(300)));
+    t.eq("family", (th.family.as_str(), th.family_semibold.as_str(), th.family_bold.as_str()), ("fonts/x.ttf", "", "fonts/x-bold.ttf"));
+    // the text form reads back to the same theme
+    let back = Theme::from_ini(&th.to_ini());
+    t.check("to_ini round trip", back.as_ref() == Ok(&th));
+    t.check("to_ini: radius in percent", th.to_ini().contains("radius=150%"));
+    t.eq("empty theme", Theme::from_ini("").map(|x| x == Theme::default()), Ok(true));
+    // mistakes: the line and what is wrong (German: the UI language of a program without ui)
+    let err = |s: &str| Theme::from_ini(s).err().map(|e| (e.line, e.msg)).unwrap_or_default();
+    t.eq("unknown section", err("[theme]\nname = x\n[farben]\n"), (3, String::from("Zeile 3: unbekannter Abschnitt [farben]")));
+    t.eq("unknown key", err("[light]\nbackground = #fff\n"), (2, String::from("Zeile 2: unbekannter Schlüssel „background“ in [light]")));
+    t.eq("bad colour", err("[dark]\nbg = #12345\n"), (2, String::from("Zeile 2: „#12345“ ist keine Farbe (#RRGGBB oder #AARRGGBB)")));
+    t.eq("twice", err("[metrics]\nradius = 4\nRadius = 5\n"), (3, String::from("Zeile 3: „Radius“ steht zweimal in [metrics]")));
+    t.eq("no '='", err("[metrics]\nradius 4\n"), (2, String::from("Zeile 2: „Schlüssel = Wert“ erwartet")));
+    t.eq("outside", err("name = x\n"), (1, String::from("Zeile 1: „name“ steht vor dem ersten Abschnitt")));
+    t.eq("range", err("[metrics]\ncontrol_height = 200\n"), (2, String::from("Zeile 2: „200“ ist keine Zahl von 12 bis 96")));
+    t.eq("radius range", err("[metrics]\nradius = 500%\n"), (2, String::from("Zeile 2: „500%“ ist keine Zahl von 0 bis 400")));
+    t.eq("weight", err("[text]\nbody.weight = fett\n"), (2, String::from("Zeile 2: „fett“ ist keine Schriftstärke (regular, semibold, bold, 100 bis 900)")));
+    t.eq("text style", err("[text]\nheading.size = 12\n"), (2, String::from("Zeile 2: unbekannter Schlüssel „heading.size“ in [text]")));
+    t.eq("unreadable", Theme::load("mem://uitest/fehlt.theme").err().map(|e| (e.line, e.msg)),
+         Some((0, String::from("Theme-Datei nicht lesbar: mem://uitest/fehlt.theme"))));
+    // a file: relative font files are found next to it
+    t.check("written", plat::write_file("mem://uitest/themes/t.theme", b"[text]\nfamily = fonts/a.ttf\nfamily.bold = Arial\n"));
+    let th = Theme::load("mem://uitest/themes/t.theme").unwrap_or_default();
+    t.eq("relative font", (th.family.as_str(), th.family_bold.as_str()), ("mem://uitest/themes/fonts/a.ttf", "Arial"));
 }
 
 // ---- hashed widget ids
@@ -496,7 +558,8 @@ fn chart(t: &mut T) {
 
 fn run() -> i32 {
     let only = plat::arg_value("--only").map(String::from);
-    let groups: &[(&str, fn(&mut T))] = &[("history", history), ("easing", easing), ("settings", settings), ("ids", ids), ("segment", segment), ("chart", chart)];
+    let groups: &[(&str, fn(&mut T))] =
+        &[("history", history), ("easing", easing), ("settings", settings), ("themes", themes), ("ids", ids), ("segment", segment), ("chart", chart)];
     let (mut failed, mut total) = (0, 0);
     for (name, f) in groups {
         if only.as_deref().is_some_and(|o| o != *name) {

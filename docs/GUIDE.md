@@ -1275,7 +1275,8 @@ if (desc.render)(&args, &mut dst) == 0 {
 * The look comes from one style crate linked at build time: `winui` (default), `classic`,
   `macos`, `kde`. `apps/NAME/STYLE` sets an app's style, `build_rs.py ... --style S` overrides
   it. Only the linked style is in the executable. [STYLES.md](STYLES.md) has the model and how
-  to write one.
+  to write one. Your own colours, corners, spacing, control heights and type without a style
+  crate: an app theme; several styles in one app, switched at run time: §34.
 * Colours of your own drawing come from the theme tokens: `ui.color(T_TEXT)`, `T_ACCENT`,
   `T_CTRL`, `T_BG`, ... (`ui::consts`), so they work in every style, light and dark.
   `ui.theme_set(0 | 1 | 2)` (light, dark, system), `ui.theme_dark()`, `ui.accent_set(rgb)`;
@@ -1378,7 +1379,8 @@ if (desc.render)(&args, &mut dst) == 0 {
 * **Command line of every app**: `--shot FILE.png` (headless render, no window system needed),
   `--script FILE.uis` (headless UI test, exit code 0 = every `expect` met), `--dump` (widget tree
   as JSON lines), `--verify-dirty` (compare every incremental redraw with a full redraw),
-  `--size WxH` (DIP), `--scale PERCENT`, `--theme light|dark`, `--accent RRGGBB`, `--anim off`,
+  `--size WxH` (DIP), `--scale PERCENT`, `--theme light|dark`, `--theme-file PATH` (an app
+  theme, §34), `--accent RRGGBB`, `--anim off`,
   `--log-events`, `--auto-close MS`, `--threads N`, `--simd sse2` (no AVX2 paths), `--inspect`
   (the live inspector, §30). Environment: `jfgui_DEBUG=1` (layout / render trace), `jfgui_CSD=1`,
   `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`,
@@ -1416,9 +1418,12 @@ in DIP):
 | `focus S` | keyboard focus to a widget (focus ring shown) |
 | `cmd ID [ARG]` | run a command as if a menu row was chosen |
 | `wait MS` | advance the virtual clock (16 ms frames) |
-| `size W H`, `theme dark\|light`, `scale P [window ID]` | window size, theme, dpi |
+| `size W H`, `theme dark\|light\|contrast`, `scale P [window ID]` | window size, theme, dpi |
+| `theme file PATH`, `theme none`, `style NAME` | an app theme from a file (an error is printed and remembered, the theme stays), none, another linked style (§34) |
+| `expect theme "NAME"\|none`, `expect theme error "TEXT"\|none`, `expect style NAME` | the app theme, the error of the last `theme file` (contains TEXT), the style in use |
+| `expect token NAME #RRGGBB\|#AARRGGBB`, `expect pixel X Y #RRGGBB`, `expect same FILE.png` | a colour token now (`bg`, `accent_text`, ...), the rendered colour at a point of the main window (DIP), the main window rendered now has the pixels of an earlier `shot` |
 | `expect S exists\|missing\|hover\|focused\|checked\|unchecked\|disabled\|enabled\|selected\|open\|pressed` | widget states |
-| `expect S value N`, `expect S max N`, `expect S text "s"`, `expect S rect X Y W H` | values, texts, rectangles (DIP) |
+| `expect S value N`, `expect S max N`, `expect S text "s"`, `expect S rect X Y W H` | values, texts, rectangles (DIP; `*` takes any value: `rect * * * 36`) |
 | `shot FILE.png [window ID\|desktop] [X Y W H]`, `dump [FILE]`, `print TEXT`, `bench N`, `quit` | output |
 | `bench N anim [MAX_US]`, `bench N drag S1 S2 [middle\|right\|shift\|ctrl\|alt]... [MAX_US]`, `bench N wheel S DY [shift\|ctrl\|alt]... [MAX_US]` | frame times while things move: N frames 16 ms apart on the virtual clock, the N moves of a drag (every other run drags back), N wheel events (DY and -DY by turns); each frame's passes and the render of its dirty cells are timed; prints mean, render, median and max; with `MAX_US` a run passes when its median is at most `MAX_US`, up to three runs, else FAIL |
 | `window ID\|main\|any` | selectors only look into that window |
@@ -3432,3 +3437,90 @@ AnalyserNode hears the tone through the ring and through posted buffers, `Blocke
 click), `tests/android_audio.py` (an emulator: audioserver plays the app's AAudio track, the
 self-test passes). `plattest --test audio`: WAV formats and damaged files, the ring, the
 resampler, Ogg Vorbis files against their sines, the PulseAudio wire format, the sound theme.
+
+## 34. App themes and the style at run time
+
+An app's own colours, corners, spacing, control heights and type do not need a style crate: an
+**app theme** ([`ui/theme_app.rs`](../lib/ui/theme_app.rs)) lays them over the active style,
+from a small INI file or built in code, and takes effect on the next frame. An app that links
+several styles switches between them at run time. [STYLES.md](STYLES.md) has the whole format
+and how the styles read it.
+
+```rust
+use ui::theme::{Radius, Theme, THEME_DARK, THEME_LIGHT};
+
+// a theme file of the app (apps/NAME/assets/themes/...) or of the user (config://)
+match ui.load_theme("app://themes/ocean.theme") {
+    Ok(()) => {}
+    Err(e) => self.error = e.to_string(),   // "Zeile 5: „#12345“ ist keine Farbe (#RRGGBB oder #AARRGGBB)"
+}
+// an editor: start from the active theme, change a token, apply it live, save it
+let mut th = ui.app_theme().cloned().unwrap_or_default();
+th.name = String::from("Eigenes");
+th.accent[THEME_LIGHT] = Some(0x6B4FBB);                 // the style derives its accent ramp
+th.colors[THEME_DARK][(T_BG / 4) as usize] = Some(0xFF17_2029);
+th.radius = Some(Radius::Dip(8));
+th.spacing = 110;                                        // percent: box padding and gaps
+th.control_height = 36;                                  // DIP: buttons, text / combo boxes
+th.text[TS_BODY as usize].size_fx = Some(15 << 8);
+ui.set_theme(&th)?;                                      // a font that cannot be loaded: Err, theme stays
+th.save("config://themes/eigenes.theme");                // the text of a theme file (to_ini)
+ui.clear_theme();                                        // the style's own look again
+
+// several styles: build_rs.py links every style_NAME the sources name
+ui.styles_add(&[&style_winui::STYLE, &style_classic::STYLE, &style_kde::STYLE]);
+let names = ui.style_names();                            // the app's own style first
+ui.set_style("kde");                                     // tokens, fonts, metrics, painters
+```
+
+```ini
+# app://themes/ocean.theme (apps/themedemo/assets/themes)
+[theme]
+name = Ozean
+[light]
+accent = #0F7B8A
+bg = #EAF3F5
+text = #0B2A33
+[dark]
+accent = #4FC3D1
+bg = #0E1E24
+[metrics]
+radius = 8
+spacing = 110%
+control_height = 36
+[text]
+body.size = 15
+subtitle.weight = bold
+```
+
+* **What a theme sets**: every `T_*` colour token for light, dark (`[colors]` both) and high
+  contrast, the accent (through the style's ramp; it wins over the app's and the system's),
+  rounded corners that are not pills (`radius = 8` DIP or `150%`), box padding and gaps
+  (`spacing`), the height of standard buttons, text boxes, combo boxes, drop-down and split
+  buttons (`control_height`; it grows with a text scale above 100 %), size, line height and
+  weight of each text style and a font family (a font file next to the theme, a VFS path, or an
+  installed family). Light / dark / system and high contrast stay the app's and the user's
+  choice: the theme has colours for each.
+* **Errors** name the line and come in the UI language (`ThemeError { line, msg }`); a broken
+  file or a missing font leaves the previous theme as it was. Without a theme the rendering is
+  the style's to the pixel.
+* **Limits**: a style's own fixed values stay (classic's grey 3D face and bevels come from its
+  palette, not from tokens; title bar fonts; paddings inside a widget). The style switch
+  replaces the embedded fonts (`FONT_REG` .. `FONT_ICON`) for the whole process; fonts the app
+  loaded itself keep their ids. `build_rs.py` passes the extra style crates on every target;
+  `apps/themedemo` is built and tested on Windows and Linux.
+* **Command line and scripts**: `--theme-file PATH` (after `App::init`); scripts `theme file
+  PATH`, `theme none`, `style NAME`, `expect theme "NAME"|none`, `expect theme error "TEXT"`,
+  `expect style NAME`, `expect token NAME #RRGGBB`, `expect pixel X Y #RRGGBB`, `expect same
+  FILE.png` (the same pixels as an earlier shot), `rect * * * 36` (§12).
+
+Tests: `apps/themedemo` -- the page "Darstellung" (style, light / dark / system, high contrast,
+the two sample themes, a live editor for accent, background, corners, spacing, control height,
+text size and a system font, saving to `config://themes/eigenes.theme` and loading a theme
+file by its path) with a preview of the common widgets; `tests/themes.uis` (tokens, pixels and
+rectangles of both themes in light, dark and high contrast, back to the same pixels, all four
+linked styles with and without a theme, broken files, the editor, save and load),
+`tests/text150.uis` (at 150 % text). `apps/gallery/tests/themes.uis` and `themes150.uis` (the
+sample themes and a font family from files over the gallery; they hold in the builds of every
+style), `uitest --only themes` (the format, the errors with their lines, the text form,
+`Ini::items`).

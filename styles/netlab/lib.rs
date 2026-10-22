@@ -46,6 +46,9 @@ pub struct Netlab;
 pub static STYLE: Netlab = Netlab;
 
 impl Style for Netlab {
+    fn name(&self) -> &'static str {
+        "netlab"
+    }
     fn tokens(&self, dark: bool) -> [u32; T_COUNT] {
         if dark { palette::DARK } else { palette::LIGHT }
     }

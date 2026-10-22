@@ -1,0 +1,45 @@
+# Papier -- a sample app theme (docs/STYLES.md, "App themes"): warm paper colours, a brick
+# accent, square corners, tighter spacing, compact 28 DIP controls, regular-weight titles
+[theme]
+name = Papier
+
+[colors]
+crit = #B3261E
+ok = #2E7D32
+
+[light]
+accent = #B5482A
+bg = #F5F1E8
+bg_alt = #EDE7DA
+layer = #FAF7F0
+card = #FFFDF8
+card_stroke = #26594A3A
+text = #2B2620
+text2 = #5E554A
+divider = #26594A3A
+flyout = #FFFDF8
+
+[dark]
+accent = #E08A6A
+bg = #24201B
+bg_alt = #1E1B17
+layer = #2A2621
+card = #2E2923
+card_stroke = #33EFE7DA
+text = #EFE7DA
+text2 = #BDB3A5
+divider = #33EFE7DA
+flyout = #2E2923
+
+[metrics]
+radius = 0
+spacing = 90%
+control_height = 28
+
+[text]
+caption.size = 11
+caption.line = 15
+subtitle.weight = regular
+title.weight = regular
+title.size = 30
+title.line = 38

@@ -23,11 +23,75 @@
 //   color_mix(a, b, t)         per-channel a + (b - a) * t / 256 (t 0..256)
 //   luminance(rgb) / contrast_ratio(a, b)   WCAG 2 relative luminance (0..1) of 0xRRGGBB and
 //                              the contrast of two colours (1..21; text wants 4.5, graphics 3)
+// App themes (theme_app.rs: Theme, its file format and errors) on top of the style:
+//   set_theme(&theme) -> Result   from the next frame on; a font that cannot be loaded is an
+//                              error and the previous theme stays; clear_theme() the style's
+//                              own look again; app_theme() -> Option<&Theme>;
+//                              load_theme(path) = Theme::load + set_theme
+//   The theme layer: theme_build (colours: the theme's tokens over the style's, its accent
+//   through the style's ramp), cmd_rrect / cmd_shadow (look_radius: corners that are not pills),
+//   box_begin / gridbox_begin (dp_space: padding and gaps), the size calls of buttons, text
+//   boxes, combo boxes, drop-down and split buttons (ctrl_size), ts_font / ts_line (sizes,
+//   line heights, weights, the family's faces).  Without a theme every value is the style's.
+// The run-time style switch (styles linked side by side, build_rs.py: every style_NAME the
+// app's sources name):
+//   styles_add(&[&style_kde::STYLE, ..])   style_names() -> names   style_name() -> current
+//   set_style(name) -> bool    the style's fonts replace ids 0..3 (Text::set_embedded), the
+//                              tokens are built again, everything is redrawn and laid out
+// look.serial counts the changes of theme and style: caches of laid-out text compare it.
 //
 // The values come from the style (Style::tokens, accent, ts_size / ts_line / ts_font).
 
+use alloc::boxed::Box;
+use alloc::string::String;
+use alloc::vec::Vec;
+
 use super::consts::*;
-use super::Ui;
+use super::{FontSel, Style, Ui};
+
+#[path = "theme_app.rs"]
+mod app;
+pub use app::{token_index, Radius, TextStyle, Theme, ThemeError, THEME_CONTRAST, THEME_DARK, THEME_LIGHT, TOKEN_NAMES, TS_NAMES};
+pub(crate) use app::parse_color;
+
+/// the app's theme, resolved for the drawing calls, and the styles set_style can switch to
+pub(crate) struct Look {
+    /// the active theme (None: the style's look)
+    pub(crate) theme: Option<Box<Theme>>,
+    /// corners: 0 the style's, 1 rad DIP, 2 rad percent of the style's
+    pub(crate) rad_mode: u8,
+    pub(crate) rad: i32,
+    /// box padding and gaps in percent
+    pub(crate) spacing: i32,
+    /// standard control height in DIP (0: the style's)
+    pub(crate) ctrl_h: i32,
+    /// the theme changes text styles; the font ids it uses for FONT_REG / _SEMI / _BOLD
+    pub(crate) text: bool,
+    pub(crate) fonts: [u32; 3],
+    /// font files themes loaded (path, id): a theme applied again reuses them
+    files: Vec<(String, u32)>,
+    /// the styles set_style can switch to (the app's own first)
+    styles: Vec<&'static dyn Style>,
+    /// changes of theme and style so far
+    pub(crate) serial: u32,
+}
+
+impl Look {
+    pub(crate) fn new(style: &'static dyn Style) -> Look {
+        Look {
+            theme: None,
+            rad_mode: 0,
+            rad: 0,
+            spacing: 100,
+            ctrl_h: 0,
+            text: false,
+            fonts: [FONT_REG, FONT_SEMI, FONT_BOLD],
+            files: Vec::new(),
+            styles: alloc::vec![style],
+            serial: 0,
+        }
+    }
+}
 
 /// g_theme: the T_COUNT tokens padded to a power of two (256 bytes)
 pub(crate) const THEME_N: usize = 64;
@@ -82,6 +146,15 @@ pub fn contrast_ratio(a: u32, b: u32) -> f32 {
 // the brightness of 0xRRGGBB (0..255)
 fn luma(rgb: u32) -> u32 {
     ((rgb >> 16 & 255) * 299 + (rgb >> 8 & 255) * 587 + (rgb & 255) * 114) / 1000
+}
+
+// the colours a theme sets for a mode over the tokens
+fn look_tokens(t: &mut [u32; T_COUNT], th: &Theme, mode: usize) {
+    for (v, c) in t.iter_mut().zip(th.colors[mode].iter()) {
+        if let Some(c) = c {
+            *v = *c;
+        }
+    }
 }
 
 /// the tokens of a high-contrast scheme: opaque fills from its colours, borders and strokes
@@ -199,6 +272,12 @@ impl Ui {
         self.text_scale
     }
 
+    /// (caches of laid-out text) the text scale and the changes of theme and style in one
+    /// key: the text scale (50..300) in the low bits, look.serial above
+    pub(crate) fn layout_scale(&self) -> u32 {
+        self.text_scale | self.look.serial << 16
+    }
+
     /// the system's font rendering: (smoothing, plat::FONT_HINT_*, plat::FONT_RGBA_*), None
     /// where the system says nothing; smoothing off (ui.text.antialias()) and the subpixel
     /// order (ui.text.subpixel(): subpixel smoothing on the window's framebuffer) are applied,
@@ -270,12 +349,27 @@ impl Ui {
             let dark = self.theme_base_dark;
             let c = self.hc_sys.unwrap_or(if dark { plat::HcColors::BLACK } else { plat::HcColors::WHITE });
             self.theme_dark = luma(c.bg) < 128;
-            contrast_tokens(&c)
+            let mut t = contrast_tokens(&c);
+            if let Some(th) = &self.look.theme {
+                if let Some(a) = th.accent[THEME_CONTRAST] {
+                    for tok in [T_ACCENT, T_ACCENT_HOVER, T_ACCENT_PRESSED] {
+                        t[(tok / 4) as usize] = a | 0xFF00_0000;
+                    }
+                }
+                look_tokens(&mut t, th, THEME_CONTRAST);
+            }
+            t
         } else {
             self.theme_dark = self.theme_base_dark;
             let st = self.style;
             let mut t = st.tokens(self.theme_dark);
-            st.accent(&mut t, self.theme_dark, self.accent); // the style derives the accent tokens
+            let mode = if self.theme_dark { THEME_DARK } else { THEME_LIGHT };
+            // the theme's accent wins over the app's and the system's
+            let acc = self.look.theme.as_ref().and_then(|th| th.accent[mode]).unwrap_or(self.accent);
+            st.accent(&mut t, self.theme_dark, acc); // the style derives the accent tokens
+            if let Some(th) = &self.look.theme {
+                look_tokens(&mut t, th, mode);
+            }
             t
         };
         let changed = self.theme[..T_COUNT] != t || before != self.theme_dark;
@@ -302,16 +396,214 @@ impl Ui {
     /// ui_ts_font(ts): select the font and pixel size (size * dpi / 96, 24.8) of a style
     pub fn ts_font(&mut self, ts: u32) {
         let ts = if (ts & 7) < TS_COUNT { ts & 7 } else { TS_BODY } as usize;
-        let size = (self.style.ts_size_fx()[ts] as u32).wrapping_mul(self.wp.rt.dpi as u32) / 96;
+        let (fx, font) = if self.look.text {
+            self.look_ts(ts)
+        } else {
+            (self.style.ts_size_fx()[ts] as u32, self.style.ts_font()[ts] as u32)
+        };
+        let size = fx.wrapping_mul(self.wp.rt.dpi as u32) / 96;
         let size = if self.text_scale == 100 { size } else { size * self.text_scale / 100 };
-        self.text.set_font(self.style.ts_font()[ts] as u32, size as i32);
+        self.text.set_font(font, size as i32);
     }
 
     /// ui_ts_line(ts): line height of a text style in px
     pub fn ts_line(&self, ts: u32) -> i32 {
         let ts = if (ts & 7) < TS_COUNT { ts & 7 } else { TS_BODY } as usize;
-        let dip = self.style.ts_line()[ts] as i32;
+        let dip = if self.look.text { self.look_line(ts) } else { self.style.ts_line()[ts] as i32 };
         self.dp(if self.text_scale == 100 { dip } else { (dip * self.text_scale as i32 + 50) / 100 })
+    }
+
+    // (theme) size (24.8 DIP) and font id of a text style: the theme's size and weight, the
+    // family's face of that weight
+    fn look_ts(&self, ts: usize) -> (u32, u32) {
+        let st = self.style;
+        let t = self.look.theme.as_ref().map_or(TextStyle::default(), |th| th.text[ts]);
+        let fx = t.size_fx.map_or(st.ts_size_fx()[ts] as u32, u32::from);
+        let face = match t.weight {
+            Some(w) if w >= 650 => FONT_BOLD,
+            Some(w) if w >= 500 => FONT_SEMI,
+            Some(_) => FONT_REG,
+            None => st.ts_font()[ts] as u32,
+        };
+        (fx, if face < 3 { self.look.fonts[face as usize] } else { face })
+    }
+
+    // (theme) the line height of a text style in DIP: the theme's, else the style's (grown
+    // with a size of the theme)
+    fn look_line(&self, ts: usize) -> i32 {
+        let st = self.style;
+        let base = st.ts_line()[ts] as i32;
+        let t = self.look.theme.as_ref().map_or(TextStyle::default(), |th| th.text[ts]);
+        match (t.line, t.size_fx) {
+            (Some(l), _) => l as i32,
+            (None, Some(s)) => {
+                let ss = st.ts_size_fx()[ts] as i32;
+                if ss > 0 { (base * s as i32 + ss / 2) / ss } else { base }
+            }
+            _ => base,
+        }
+    }
+
+    // ------------------------------------------------------------------ app themes
+
+    /// the app's theme over the style (theme_app.rs) from the next frame on: colours of light,
+    /// dark and high contrast, the accent, corners, spacing, control heights, text styles and
+    /// a font family.  A font that cannot be loaded is an error; the previous theme stays.
+    pub fn set_theme(&mut self, th: &Theme) -> Result<(), ThemeError> {
+        let fonts = self.theme_fonts(th)?;
+        let l = &mut self.look;
+        (l.rad_mode, l.rad) = match th.radius {
+            None => (0, 0),
+            Some(Radius::Dip(d)) => (1, d.min(64) as i32),
+            Some(Radius::Percent(p)) => (2, p.min(400) as i32),
+        };
+        l.spacing = (th.spacing as i32).clamp(25, 400);
+        l.ctrl_h = if th.control_height == 0 { 0 } else { (th.control_height as i32).clamp(12, 96) };
+        l.text = th.has_text();
+        l.fonts = fonts;
+        l.theme = Some(Box::new(th.clone()));
+        self.look_changed();
+        Ok(())
+    }
+
+    /// no app theme: the style's own look again
+    pub fn clear_theme(&mut self) {
+        if self.look.theme.is_none() {
+            return;
+        }
+        let l = &mut self.look;
+        l.theme = None;
+        (l.rad_mode, l.rad, l.spacing, l.ctrl_h, l.text) = (0, 0, 100, 0, false);
+        l.fonts = [FONT_REG, FONT_SEMI, FONT_BOLD];
+        self.look_changed();
+    }
+
+    /// the active app theme (None: the style's look)
+    pub fn app_theme(&self) -> Option<&Theme> {
+        self.look.theme.as_deref()
+    }
+
+    /// read a theme file (app://, config://, a path) and make it the app's theme; on an error
+    /// the previous theme stays
+    pub fn load_theme(&mut self, path: &str) -> Result<(), ThemeError> {
+        let th = Theme::load(path)?;
+        self.set_theme(&th)
+    }
+
+    // the font ids of a theme's family for FONT_REG / _SEMI / _BOLD (none: the style's)
+    fn theme_fonts(&mut self, th: &Theme) -> Result<[u32; 3], ThemeError> {
+        if th.family.is_empty() {
+            return Ok([FONT_REG, FONT_SEMI, FONT_BOLD]);
+        }
+        let reg = self.theme_font(&th.family, 400)?;
+        let face = |ui: &mut Ui, own: &str, other: &str, weight: u32| -> Result<u32, ThemeError> {
+            if !own.is_empty() {
+                ui.theme_font(own, weight)
+            } else if !other.is_empty() {
+                ui.theme_font(other, weight)
+            } else if app::is_file(&th.family) {
+                // a file without its bold faces: a synthetic bold
+                let id = ui.text.style(reg, text::FS_SYN_BOLD);
+                if id < 0 { Err(ThemeError::general(app::E_FONT, &th.family)) } else { Ok(id as u32) }
+            } else {
+                ui.theme_font(&th.family, weight)
+            }
+        };
+        let semi = face(self, &th.family_semibold, &th.family_bold, 600)?;
+        let bold = face(self, &th.family_bold, &th.family_semibold, 700)?;
+        Ok([reg, semi, bold])
+    }
+
+    // one face: a font file (VFS path) or an installed family (ui.font_load)
+    fn theme_font(&mut self, spec: &str, weight: u32) -> Result<u32, ThemeError> {
+        let err = || ThemeError::general(app::E_FONT, spec);
+        if !app::is_file(spec) {
+            return self.font_load(&FontSel { family: String::from(spec), weight, italic: false, size: 11.0 }).ok_or_else(err);
+        }
+        if let Some(&(_, id)) = self.look.files.iter().find(|f| f.0 == spec) {
+            return Ok(id);
+        }
+        let data = plat::read_file(spec).ok_or_else(err)?;
+        let id = self.text.load_mem(&data, 0);
+        if id < 0 {
+            return Err(err());
+        }
+        self.look.files.push((String::from(spec), id as u32));
+        Ok(id as u32)
+    }
+
+    // the theme or the style changed: tokens again, everything laid out and drawn again
+    fn look_changed(&mut self) {
+        self.look.serial = self.look.serial.wrapping_add(1);
+        self.theme_build();
+        self.theme_invalidate();
+        self.repass = true;
+    }
+
+    /// (theme) a corner radius in px of a rounded rectangle w x h: corners that are not pills
+    /// take the theme's radius (square ones stay square)
+    pub(crate) fn look_radius(&self, r: i32, w: i32, h: i32) -> i32 {
+        let half = w.min(h) >> 1;
+        if r <= 0 || r >= half {
+            return r;
+        }
+        let n = if self.look.rad_mode == 1 { self.dp(self.look.rad) } else { (r * self.look.rad + 50) / 100 };
+        n.clamp(0, half)
+    }
+
+    /// (theme) DIP of box padding and gaps -> px, scaled by the theme's spacing
+    pub(crate) fn dp_space(&self, dip: i32) -> i32 {
+        let s = self.look.spacing;
+        self.dp(if s == 100 { dip } else { (dip * s + 50) / 100 })
+    }
+
+    /// (theme) the size of a standard control with the theme's control height (flags ST_*;
+    /// compact and large controls keep theirs); square: an icon-only control stays square
+    pub(crate) fn ctrl_size(&self, w: i32, h: i32, flags: u32, square: bool) -> (i32, i32) {
+        if self.look.ctrl_h == 0 || flags & (ST_LARGE | ST_COMPACT) != 0 {
+            return (w, h);
+        }
+        let nh = self.dp_text(self.look.ctrl_h);
+        (if square && w == h { nh } else { w }, nh)
+    }
+
+    // ------------------------------------------------------------------ the style at run time
+
+    /// the styles set_style can switch to: the app names the style crates it links besides its
+    /// own (build_rs.py links every style_NAME its sources name):
+    /// `ui.styles_add(&[&style_classic::STYLE, &style_kde::STYLE])`
+    pub fn styles_add(&mut self, styles: &[&'static dyn Style]) {
+        for &s in styles {
+            if !self.look.styles.iter().any(|x| x.name() == s.name()) {
+                self.look.styles.push(s);
+            }
+        }
+    }
+
+    /// the names of the styles set_style knows (the app's own first, then as added)
+    pub fn style_names(&self) -> Vec<&'static str> {
+        self.look.styles.iter().map(|s| s.name()).collect()
+    }
+
+    /// the name of the style in use (Style::name)
+    pub fn style_name(&self) -> &'static str {
+        self.style.name()
+    }
+
+    /// switch to another linked style (styles_add) from the next frame on: its tokens, fonts,
+    /// metrics and painters; the app theme stays on top -> false: no such style
+    pub fn set_style(&mut self, name: &str) -> bool {
+        let Some(&st) = self.look.styles.iter().find(|s| s.name() == name) else { return false };
+        if self.style.name() == name {
+            return true;
+        }
+        self.style = st;
+        self.text.set_embedded(st.fonts(), st.font_names());
+        for (font, raster) in st.font_raster().iter().enumerate() {
+            self.text.set_font_raster(font as u32, *raster);
+        }
+        self.look_changed();
+        true
     }
 
     /// dp_text(dip): DIP -> px, grown with a text scale above 100 % (the height of parts

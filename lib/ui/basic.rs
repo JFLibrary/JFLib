@@ -377,6 +377,8 @@ impl Ui {
         let st = self.style;
         let mut sp = Sp { flags, icon, label, ..Sp::default() };
         let (w, h) = st.button_size(self, &mut sp);
+        let square = icon != 0 && (flags & ST_ICON_ONLY != 0 || label.is_none_or(str::is_empty));
+        let (w, h) = self.ctrl_size(w, h, flags, square); // (theme) control height
         self.place(w, h);
         let mut hb = if flags & ST_NOFOCUS != 0 { 0 } else { HB_FOCUS };
         if flags & ST_DISABLED != 0 {

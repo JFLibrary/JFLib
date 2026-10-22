@@ -1,0 +1,26 @@
+#!args --text-scale 150
+# the sample themes at a text scale of 150 %: control heights grow with the text, in every
+# linked style; back to the style's look gives the same pixels
+size 980 900
+theme light
+wait 500
+shot build/themedemo/default_ts150.png
+click "Ozean"
+expect theme "Ozean"
+expect "Schaltfläche" rect * * * 54
+expect #207 rect * * 200 54
+shot build/themedemo/ocean_ts150.png
+click "Papier"
+expect "Schaltfläche" rect * * * 42
+shot build/themedemo/paper_ts150.png
+style kde
+expect "Schaltfläche" rect * * * 42
+shot build/themedemo/kde_paper_ts150.png
+theme dark
+shot build/themedemo/kde_paper_ts150_dark.png
+theme light
+style winui
+click "Ohne Theme"
+move -50,-50
+wait 500
+expect same build/themedemo/default_ts150.png

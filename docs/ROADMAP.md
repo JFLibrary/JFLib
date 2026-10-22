@@ -982,8 +982,30 @@ Fensterrand hinaus.
   Werte als Konstanten. Gehashte IDs liegen ab `ID_HASH_BASE` (0x0800_0000) und treffen nie
   handvergebene IDs; Skripte und `jfgui_DEBUG=1` warnen bei zwei Namen mit gleichem Hash, bei
   doppelt benutzten IDs (mit Namen) und bei offenen Bereichen am Ende des Frames.
-- **P3** · *fehlt* · Stil zur Laufzeit wechseln bzw. eigene Themes für Apps ohne neues
-  Style-Crate.
+- **P3** · *erledigt* (2026-10-22) · Stil zur Laufzeit wechseln bzw. eigene Themes für Apps ohne
+  neues Style-Crate: App-Themes ([`ui/theme_app.rs`](../lib/ui/theme_app.rs),
+  [STYLES.md](STYLES.md#app-themes), [GUIDE §34](GUIDE.md)) überschreiben die Tokens des aktiven
+  Stils – Farben je Rolle für Hell, Dunkel und hohen Kontrast, den Akzent (über die Akzent-Rampe
+  des Stils), Eckenradien (DIP oder Prozent; Pillen bleiben Pillen), Abstände (Polsterung und
+  Lücken der Boxen und Raster), die Höhe der Standard-Steuerelemente, Größe, Zeilenhöhe und
+  Stärke je Textstil und eine Schriftfamilie (Datei neben dem Theme, VFS-Pfad oder installierte
+  Familie). Format: INI (`base::ini`, neu `Ini::items` mit Zeilennummern); `Theme::from_ini` /
+  `load` / `to_ini` / `save`, `ui.set_theme` / `clear_theme` / `load_theme`, `--theme-file`.
+  Fehler nennen die Zeile in der UI-Sprache, ein kaputtes Theme lässt das alte stehen; wirksam
+  ab dem nächsten Frame. Kein Stil musste dafür umgebaut werden: die Theme-Schicht sitzt in
+  `theme_build`, `cmd_rrect` / `cmd_shadow`, `box_begin` / `gridbox_begin`, den Größenaufrufen
+  der Standard-Controls und `ts_font` / `ts_line`; ohne Theme rendert alles pixelgleich (Shots
+  von gallery in winui, classic und kde und von datagallery samt den Shots ihrer Skripte unter
+  Windows und Linux). Stilwechsel zur Laufzeit: `build_rs.py` linkt jedes `style_NAME`, das die
+  Quellen einer App nennen, dazu; `ui.styles_add` / `style_names` / `set_style` (`Style::name`;
+  `Text::set_embedded` tauscht die eingebetteten Schriften, abgeleitete Schriften folgen).
+  Getestet mit `apps/themedemo` (Seite „Darstellung“ mit Live-Editor, Speichern nach
+  `config://`, vier gelinkte Stile; Skripte für Token, Pixel und Rechtecke in Hell, Dunkel,
+  hohem Kontrast und bei 150 % Text, kaputte Dateien, gleiche Pixel nach dem Rückweg),
+  `apps/gallery/tests/themes*.uis` (mit jedem der sieben Stile gebaut) und `uitest --only
+  themes` (Format, Fehler mit Zeile, Textform). Grenzen: feste Werte eines Stils bleiben (die
+  graue 3D-Fläche von classic kommt aus seiner eigenen Palette, Titelleisten-Schriften,
+  Innenabstände der Widgets).
 - **P3** · *erledigt* · Bausteine für Simulationen (seit 2026-10-19, für JFNetworker):
   deterministische Zufallszahlen [`base/rng.rs`](../lib/base/rng.rs) (PCG32 nach der
   Referenzimplementierung, SplitMix64, Sprung nach vorn, abgeleitete Generatoren pro Objekt)

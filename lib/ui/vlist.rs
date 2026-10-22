@@ -504,8 +504,8 @@ impl Ui {
         let r = self.place(self.dp(NAT_W), self.dp(NAT_H));
         let sbw = self.style.scrollbar_thickness(self);
         let view = r[3].max(1);
-        // the measurements belong to a dpi, a width and a text scale
-        let key = (self.wp.rt.dpi, r[2], self.text_scale);
+        // the measurements belong to a dpi, a width and a text scale (and theme / style)
+        let key = (self.wp.rt.dpi, r[2], self.layout_scale());
         if key != s.key {
             let dpi_changed = key.0 != s.key.0;
             s.key = key;
