@@ -43,7 +43,7 @@ impl App for Gallery {
             "Tippen, ziehen, ausprobieren. Dieselben Rust-Widgets auf dem Smartphone.");
 
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
-        ui.text(TS_SUBTITLE, "01  Interaktion");
+        ui.heading(2, TS_SUBTITLE, "01  Interaktion");
         ui.text(TS_BODY, &format!("Klicks: {}", self.clicks));
         ui.box_begin(0, BOX_H, 8);
         ui.next_size(SIZE_FILL, 44);
@@ -63,7 +63,7 @@ impl App for Gallery {
         ui.box_end();
 
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
-        ui.text(TS_SUBTITLE, "02  Farben & Design");
+        ui.heading(2, TS_SUBTITLE, "02  Farben & Design");
         ui.box_begin(0, BOX_H, 8);
         for (i, color) in COLORS.iter().enumerate() {
             ui.next_size(40, 40);
@@ -80,7 +80,7 @@ impl App for Gallery {
         ui.box_end();
 
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
-        ui.text(TS_SUBTITLE, "03  Texteingabe");
+        ui.heading(2, TS_SUBTITLE, "03  Texteingabe");
         ui.next_size(SIZE_FILL, 44);
         ui.textbox(300, Some("Dein Name"), &mut self.name, 128);
         // Android's IME reduces the content viewport. Keep the focused editor above it;

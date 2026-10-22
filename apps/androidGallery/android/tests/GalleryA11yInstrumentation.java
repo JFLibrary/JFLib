@@ -1,7 +1,7 @@
 /* The accessibility tree through Android's own accessibility framework, run explicitly:
  *   adb shell am instrument -w -r org.jflib.gallery/.GalleryA11yInstrumentation
  * UiAutomation is an accessibility client like TalkBack: it reads the virtual views of
- * GalleryAccessibility (classes, texts, states, ranges, bounds, selections) and acts on them
+ * GalleryAccessibility (classes, texts, headings, states, ranges, bounds, selections) and acts on them
  * (click, set progress, scroll, set text, focus, select, accessibility focus); events arrive
  * for text and focus; the hit test of explore by touch finds the node under a point.
  */
@@ -102,7 +102,10 @@ public final class GalleryA11yInstrumentation extends Instrumentation {
             AccessibilityNodeInfo sw = node(ui, "android.widget.Switch", "Regler aktiv");
             check(sw.isChecked(), "switch on");
             node(ui, "android.widget.Button", "Klick mich");
-            node(ui, "android.widget.TextView", "Kleine Widgets.");
+            AccessibilityNodeInfo hero = node(ui, "android.widget.TextView", "Kleine Widgets.");
+            // a section title (ui.heading): a heading (TalkBack's heading navigation); a text is none
+            AccessibilityNodeInfo heading = node(ui, "android.widget.TextView", "01  Interaktion");
+            check(heading.isHeading() && !hero.isHeading(), "section title a heading, a text none");
             AccessibilityNodeInfo slider = node(ui, "android.widget.SeekBar", "Wert: 40 %");
             check(slider.getRangeInfo() != null && slider.getRangeInfo().getCurrent() == 40f
                 && slider.getRangeInfo().getMax() == 100f, "slider range 0..100 at 40");

@@ -12,20 +12,19 @@
 // Objects (all on our connection): /org/a11y/atspi/accessible/root the application (role
 // application, Application interface), .../w<window> a window (frame / dialog),
 // .../n<window>_<key hex> a node; /org/a11y/atspi/null the null reference.  Interfaces:
-// Accessible (everything), Component (windows, nodes), Action (A_CLICK: "click"), Value
-// (sliders, progress bars; CurrentValue is writable), Text (labels, text boxes; the basic
-// queries, the caret and the selection, which SetCaretOffset / SetSelection move; character
-// extents from Node::char_rect: exact at the caret, which screen magnifiers follow (Orca, GNOME
-// Shell's zoom), estimated elsewhere), EditableText (text boxes).  They answer from
-// a11y::current(); actions become a11y::request (the UI thread carries them out after its next
-// wake-up).
+// Accessible (everything; headings: role heading, the attribute level:N), Component (windows,
+// nodes), Action (A_CLICK: "click"), Value (sliders, progress bars; CurrentValue is writable),
+// Text (labels, headings, text boxes; the basic queries, the caret and the selection, which
+// SetCaretOffset / SetSelection move; character extents from Node::char_rect: exact at the
+// caret, which screen magnifiers follow (Orca, GNOME Shell's zoom), estimated elsewhere),
+// EditableText (text boxes).  They answer from a11y::current(); actions become a11y::request
+// (the UI thread carries them out after its next wake-up).
 // Events: Object:StateChanged (focused, checked, indeterminate, selected, expanded, enabled /
 // sensitive, pressed, active), Focus:Focus, Object:PropertyChange (accessible-name,
-// accessible-value), Object:TextChanged (delete / insert), Object:TextCaretMoved (also when a
-// text box gets the focus),
-// Object:ChildrenChanged (add / remove with the child), Window:Create / Destroy / Activate /
-// Deactivate.  The UI thread hands its changes over in a queue and wakes the thread with an
-// eventfd.
+// accessible-value), Object:AttributesChanged (a heading's level), Object:TextChanged (delete /
+// insert), Object:TextCaretMoved (also when a text box gets the focus), Object:ChildrenChanged
+// (add / remove with the child), Window:Create / Destroy / Activate / Deactivate.  The UI
+// thread hands its changes over in a queue and wakes the thread with an eventfd.
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -78,6 +77,7 @@ const R_SLIDER: u32 = 51;
 const R_TOGGLE_BUTTON: u32 = 62;
 const R_APPLICATION: u32 = 75;
 const R_ENTRY: u32 = 79;
+const R_HEADING: u32 = 83;
 const R_LINK: u32 = 88;
 const R_LIST_BOX: u32 = 98;
 
@@ -294,6 +294,7 @@ fn role_of(r: Role) -> u32 {
         Role::Image => R_IMAGE,
         Role::Canvas => R_CANVAS,
         Role::Dialog => R_DIALOG,
+        Role::Heading => R_HEADING,
     }
 }
 
@@ -320,6 +321,7 @@ fn role_name(r: u32) -> &'static str {
         R_TOGGLE_BUTTON => "toggle button",
         R_APPLICATION => "application",
         R_ENTRY => "entry",
+        R_HEADING => "heading",
         R_LINK => "link",
         R_LIST_BOX => "list box",
         _ => "unknown",
@@ -406,7 +408,7 @@ fn state_name(bit: u32) -> &'static str {
 fn text_of(n: &Node) -> Option<&str> {
     match n.role {
         Role::TextBox | Role::Combo => Some(&n.text),
-        Role::Label => Some(&n.name),
+        Role::Label | Role::Heading => Some(&n.name),
         _ => None,
     }
 }
@@ -564,8 +566,14 @@ impl Bridge {
                 self.emit(c, obj(w, key), EV_OBJECT, "PropertyChange", "accessible-name", 0, 0, Value::S(name));
             }
             Change::Value(w, key) => {
-                let v = s.win(w).and_then(|t| t.find(key).map(|k| t.nodes[k].value)).unwrap_or(0.0);
-                self.emit(c, obj(w, key), EV_OBJECT, "PropertyChange", "accessible-value", 0, 0, Value::D(v));
+                let n = s.win(w).and_then(|t| t.find(key).map(|k| &t.nodes[k]));
+                if n.is_some_and(|n| n.role == Role::Heading) {
+                    // a heading's level is an attribute
+                    self.emit(c, obj(w, key), EV_OBJECT, "AttributesChanged", "", 0, 0, Value::I(0));
+                } else {
+                    let v = n.map_or(0.0, |n| n.value);
+                    self.emit(c, obj(w, key), EV_OBJECT, "PropertyChange", "accessible-value", 0, 0, Value::D(v));
+                }
             }
             Change::Text(w, key, old) => {
                 let new = s.win(w).and_then(|t| t.find(key).map(|k| t.nodes[k].text.clone())).unwrap_or_default();
@@ -711,8 +719,13 @@ impl Bridge {
                 };
                 Ok(alloc::vec![Value::A(String::from("u"), alloc::vec![Value::U(st as u32), Value::U((st >> 32) as u32)])])
             }
-            (I_ACC, "GetAttributes") => Ok(alloc::vec![match o {
-                Obj::App => Value::A(String::from("{ss}"), alloc::vec![Value::E(Box::new(Value::str("toolkit")), Box::new(Value::str("JFLib")))]),
+            (I_ACC, "GetAttributes") => Ok(alloc::vec![match (o, node) {
+                (Obj::App, _) => Value::A(String::from("{ss}"), alloc::vec![Value::E(Box::new(Value::str("toolkit")), Box::new(Value::str("JFLib")))]),
+                // a heading's level (Orca: "heading level 2", heading navigation by level)
+                (Obj::Node(..), Some(n)) if n.role == Role::Heading => Value::A(
+                    String::from("{ss}"),
+                    alloc::vec![Value::E(Box::new(Value::str("level")), Box::new(Value::S(alloc::format!("{}", n.level()))))],
+                ),
                 _ => empty_ss(),
             }]),
             (I_ACC, "GetApplication") => Ok(alloc::vec![self.obj_ref(Obj::App)]),

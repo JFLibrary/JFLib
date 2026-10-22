@@ -13,15 +13,16 @@
 // click in the middle of the record.
 //
 // The tree: every record of a window becomes a node in the record order -- roles from the
-// kinds (K_*), states from SS_* (a check box with value 2 is mixed).  Left out: title bars,
-// empty texts, records without area, boxes without a label (a box with tab records inside
-// is the tab strip).  Containers are lists, dialogs, titled boxes and tab strips: a node's
-// parent is the smallest one on its layer whose rectangle holds the node's centre.  Menu bar
-// entries next to each other get a menu bar; the rows of a popup (menus, drop-downs) a menu
-// or list that hangs below the open record that opened it.  Names: the label; text boxes,
-// drop-downs (their label is the text / the choice), sliders, progress bars and lists
-// without one take the text record right before them (to the left, or above and aligned).  The
-// focus of a list or tab strip is passed on to its selected row / tab.
+// kinds (K_*), states from SS_* (a check box with value 2 is mixed), a heading's level from its
+// value (K_HEADING: Node::value, clamped to 1 ..= 9).  Left out: title bars, empty texts,
+// records without area, boxes without a label (a box with tab records inside is the tab
+// strip).  Containers are lists, dialogs, titled boxes and tab strips: a node's parent is the
+// smallest one on its layer whose rectangle holds the node's centre.  Menu bar entries next to
+// each other get a menu bar; the rows of a popup (menus, drop-downs) a menu or list that hangs
+// below the open record that opened it.  Names: the label; text boxes, drop-downs (their label
+// is the text / the choice), sliders, progress bars and lists without one take the text or
+// heading record right before them (to the left, or above and aligned).  The focus of a list
+// or tab strip is passed on to its selected row / tab.
 
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -98,7 +99,8 @@ fn union(a: [i32; 4], b: &[i32; 4]) -> [i32; 4] {
 fn role_of(s: &Sem) -> Option<Role> {
     let label = s.label.as_deref().unwrap_or("");
     Some(match s.kind {
-        K_TEXT | K_HEADING if !label.is_empty() => Role::Label,
+        K_TEXT if !label.is_empty() => Role::Label,
+        K_HEADING if !label.is_empty() => Role::Heading,
         K_BUTTON | K_SWATCH => Role::Button,
         K_CHECKBOX => Role::CheckBox,
         K_RADIO => Role::Radio,
@@ -339,6 +341,7 @@ impl Ui {
                 nd.value = if s.value < 0 { -1.0 } else { s.value as f64 };
                 nd.max = s.max as f64;
             }
+            Role::Heading => nd.value = s.value.clamp(1, 9) as f64,
             _ => {}
         }
         if nd.state & ax::S_DISABLED == 0 {
@@ -362,14 +365,14 @@ impl Ui {
         nd
     }
 
-    // the label of the text record right before record k (records without a label in
-    // between, e.g. boxes, do not count): on its layer, to the left of it in the same row, or
-    // above it with the same left edge and at most a line apart
+    // the label of the text (or heading) record right before record k (records without a
+    // label in between, e.g. boxes, do not count): on its layer, to the left of it in the same
+    // row, or above it with the same left edge and at most a line apart
     fn a11y_label_before(recs: &[&Sem], k: usize) -> Option<String> {
         let me = recs[k];
         let r = me.rect;
         let t = recs[..k].iter().rev().find(|t| t.kind != K_BOX || t.label.is_some())?;
-        if t.kind != K_TEXT || t.layer != me.layer {
+        if !matches!(t.kind, K_TEXT | K_HEADING) || t.layer != me.layer {
             return None;
         }
         let q = t.rect;

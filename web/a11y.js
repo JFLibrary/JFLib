@@ -11,7 +11,7 @@
 export const VERSION=1;
 /** Node::role in plat::a11y::Role declaration order */
 export const ROLES=["group","label","button","checkbox","radio","switch","slider","progress","textbox","link",
-  "list","listitem","menubar","menu","menuitem","tablist","tab","combo","image","canvas","dialog"];
+  "list","listitem","menubar","menu","menuitem","tablist","tab","combo","image","canvas","dialog","heading"];
 /** Node::state bits (plat::a11y::S_*) */
 export const S={FOCUSED:1,FOCUSABLE:2,DISABLED:4,CHECKED:8,MIXED:16,SELECTED:32,EXPANDED:64,PRESSED:128,
   MULTILINE:256,PROTECTED:512,READONLY:1024};
@@ -132,6 +132,7 @@ function ariaRole(n) {
     case "combo": return "combobox";
     case "image": case "canvas": return "img";
     case "dialog": return "dialog";
+    case "heading": return "heading"; // with aria-level (Node::value: the level)
     default: return null; // labels: their text; text boxes and sliders: native elements
   }
 }
@@ -205,9 +206,10 @@ export class Shadow {
     if(!el) el=this.make(t,n,kind,v);
     const r=ROLES[n.role], st=n.state;
     set(el,"role",ariaRole(n));
-    if(r==="label") {if(el.textContent!==n.name) el.textContent=n.name; set(el,"aria-label",null);}
+    if(r==="label" || r==="heading") {if(el.textContent!==n.name) el.textContent=n.name; set(el,"aria-label",null);}
     else if(r==="combo") {if(el.textContent!==n.text) el.textContent=n.text; set(el,"aria-label",n.name || null);}
     else set(el,"aria-label",n.name || null);
+    set(el,"aria-level",r==="heading" ? Math.min(9,Math.max(1,Math.round(n.value) || 1)) : null);
     set(el,"aria-disabled",st&S.DISABLED ? "true" : null);
     set(el,"tabindex",st&S.FOCUSABLE ? (el===this.tabbed ? "0" : "-1") : null);
     const checks=["checkbox","radio","switch"].includes(r) || (r==="menuitem" && st&S.CHECKED);

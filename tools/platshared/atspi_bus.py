@@ -11,7 +11,8 @@ from the repository root (needs a display: WSLg):
 The fake buses (the marshalling of portal_bus.py) play the session bus (org.a11y.Bus: IsEnabled,
 GetAddress), the accessibility bus daemon, the registry (Socket.Embed) and a screen reader.
 plattest --test a11y-bus shows its demo window; the screen reader walks the tree (roles, names,
-states, interfaces, parents, extents, the node at a point, Value, Text), clicks "Drücken",
+states, interfaces, parents, extents, the node at a point, Value, Text, a heading with its level
+attribute), clicks "Drücken",
 toggles "Option", sets the slider to 75 and the text to "Bert", selects the second tab, follows the
 caret of the entry as a screen magnifier does (Focus brings TextCaretMoved along, the caret's
 GetCharacterExtents lie in the entry on the screen, SetCaretOffset / SetSelection move it and the
@@ -37,7 +38,7 @@ ACC = "org.a11y.atspi.Accessible"
 PROPS = "org.freedesktop.DBus.Properties"
 ROLE = {"frame": 23, "label": 29, "push button": 43, "check box": 7, "radio button": 44, "toggle button": 62,
         "slider": 51, "progress bar": 42, "entry": 79, "list box": 98, "list item": 32, "page tab list": 38,
-        "page tab": 37, "application": 75}
+        "page tab": 37, "application": 75, "heading": 83}
 ST = {"active": 1, "checked": 4, "enabled": 8, "focusable": 11, "focused": 12, "selected": 23, "sensitive": 24,
       "showing": 25, "visible": 30, "checkable": 41, "editable": 7}
 
@@ -336,6 +337,17 @@ def screen_reader(bus, srec):
           and "editable" in txt["states"])
     check("label: Text", bus.call(lab["path"], ti, "GetText", "ii", [0, 6])[0] == "Klicks"
           and bus.call(lab["path"], ti, "GetStringAtOffset", "iu", [8, 1]) == ["0", 8, 9])
+    # a heading (ui.heading level 2): role heading, the attribute level, its text; no control
+    head = find("heading", "Einstellungen")
+    check("heading: role heading, GetRoleName 'heading'", head is not None
+          and bus.call(head["path"], ACC, "GetRoleName")[0] == "heading", [(o["role"], o["name"]) for o in tree])
+    if head:
+        check("heading: GetAttributes level 2", bus.call(head["path"], ACC, "GetAttributes")[0] == {"level": "2"},
+              bus.call(head["path"], ACC, "GetAttributes"))
+        check("heading: Text 'Einstellungen', no Action, not focusable", ti in head["ifaces"]
+              and bus.call(head["path"], ti, "GetText", "ii", [0, -1])[0] == "Einstellungen"
+              and "org.a11y.atspi.Action" not in head["ifaces"] and "focusable" not in head["states"], head)
+    check("label: no attributes", bus.call(lab["path"], ACC, "GetAttributes")[0] == {})
     ext = bus.call(btn["path"], "org.a11y.atspi.Component", "GetExtents", "u", [1])[0]
     check("button extents (window)", ext[2] > 0 and ext[3] > 0, ext)
     at = bus.call(w, "org.a11y.atspi.Component", "GetAccessibleAtPoint", "iiu", [ext[0] + ext[2] // 2, ext[1] + ext[3] // 2, 1])[0]
@@ -445,6 +457,7 @@ def real_inner(exe):
         ("atspi_text_get_character_extents", vp, [vp, ctypes.c_int, ctypes.c_int, vp]),
         ("atspi_component_grab_focus", ctypes.c_int, [vp, vp]), ("atspi_accessible_get_component_iface", vp, [vp]),
         ("atspi_accessible_clear_cache", None, [vp]),
+        ("atspi_accessible_get_attributes_as_array", vp, [vp, vp]),
     ]:
         f = getattr(at, name)
         f.restype, f.argtypes = res, args
@@ -506,6 +519,17 @@ def real_inner(exe):
               sorted((r, n) for r, n in nodes))
         if not all([btn, chk, sld, txt, quit_, lab]):
             return
+        # the heading as Orca reads it: role heading, the object attribute level:2
+        head = nodes.get((ROLE["heading"], "Einstellungen"))
+        attrs = []
+        if head:
+            class GArray(ctypes.Structure):
+                _fields_ = [("data", ctypes.POINTER(ctypes.c_char_p)), ("len", ctypes.c_uint)]
+            arr = at.atspi_accessible_get_attributes_as_array(head, None)
+            if arr:
+                ga = ctypes.cast(arr, ctypes.POINTER(GArray)).contents
+                attrs = [ga.data[i].decode() for i in range(ga.len)]
+        check("libatspi: the heading (role heading) with the attribute level:2", head is not None and "level:2" in attrs, attrs)
         check("the button's parent is the window", at.atspi_accessible_get_parent(btn, None) == win
               or s(at.atspi_accessible_get_name(at.atspi_accessible_get_parent(btn, None), None)) == "a11y-Test")
         check("libatspi: do_action on the button", at.atspi_action_do_action(at.atspi_accessible_get_action_iface(btn), 0, None) == 1)

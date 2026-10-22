@@ -66,6 +66,8 @@ pub enum Role {
     /// a drawing surface (charts, the app's own views)
     Canvas,
     Dialog,
+    /// a heading of a document or section (Node::value: its level, level())
+    Heading,
 }
 
 /// Node::state: the keyboard focus is on the node
@@ -122,7 +124,8 @@ pub struct Node {
     /// text boxes: the caret's rectangle, physical px of the client area (w, h 0: unknown) --
     /// screen magnifiers follow it (char_rect)
     pub caret_rect: [i32; 4],
-    /// sliders and progress bars: value in min ..= max (value < min: progress unknown)
+    /// sliders and progress bars: value in min ..= max (value < min: progress unknown);
+    /// headings: the level (1 ..= 9)
     pub value: f64,
     pub min: f64,
     pub max: f64,
@@ -179,6 +182,11 @@ impl Node {
             Role::TextBox | Role::Combo => &self.text,
             _ => &self.name,
         }
+    }
+
+    /// a heading's level 1 ..= 9 (0: not a heading)
+    pub fn level(&self) -> u32 {
+        if self.role == Role::Heading { (self.value as u32).clamp(1, 9) } else { 0 }
     }
 
     /// the selection of a text box: (start, end) in characters, start == end at the caret
@@ -366,7 +374,7 @@ pub enum Change {
     /// state bit S_* of a node went on (true) or off
     State(u8, u64, u32, bool),
     Name(u8, u64),
-    /// the number of a slider / progress bar
+    /// the number of a slider / progress bar, the level of a heading
     Value(u8, u64),
     /// the text of a text box / combo box (the old text)
     Text(u8, u64, String),
