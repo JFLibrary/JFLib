@@ -34,13 +34,14 @@
 // devices all of 127.0.0.0/8 is the device itself.
 // Multicast packets are for the device when the receiving interface joined their group (RIPv2's
 // 224.0.0.9: ip.rs join, rip.rs); the others are dropped with a note.
+// IPv6 frames (ethertype 86DD, Cisco HDLC 86DD on serial lines) go to l3v6.rs.
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use jfn_model::catalog::Media;
 use netpkt::arp::{Arp, ArpView, OP_REQUEST};
-use netpkt::eth::{self, EthHdr, VlanTag, ET_ARP, ET_IPV4, L2};
+use netpkt::eth::{self, EthHdr, VlanTag, ET_ARP, ET_IPV4, ET_IPV6, L2};
 use netpkt::icmp::{self, Icmp, IcmpView};
 use netpkt::ipv4::{self, Ipv4Hdr, Ipv4View, PROTO_ICMP, PROTO_TCP, PROTO_UDP};
 use netpkt::pkt::{Pkt, HEADROOM};
@@ -54,6 +55,8 @@ use crate::trace::{HopId, Note};
 
 /// the first bytes of a Cisco HDLC frame carrying IPv4 (address, control, protocol)
 pub const HDLC_IPV4: [u8; 4] = [0x0F, 0x00, 0x08, 0x00];
+/// the same for IPv6
+pub const HDLC_IPV6: [u8; 4] = [0x0F, 0x00, 0x86, 0xDD];
 
 /// a forwarded packet as it arrived (forwarding took one off its TTL already): what an ICMP
 /// error about it quotes
@@ -165,6 +168,8 @@ impl Engine {
         if media == Media::Serial {
             if frame.len() > 4 && frame[..4] == HDLC_IPV4 {
                 self.ip_input(ni, iface, &frame[4..], hop);
+            } else if frame.len() > 4 && frame[..4] == HDLC_IPV6 {
+                self.ip6_input(ni, iface, &frame[4..], hop);
             } else {
                 self.note(dev, Some(hop), Note::DropMalformed { port: pi });
             }
@@ -196,6 +201,7 @@ impl Engine {
                 None => self.note(dev, Some(hop), Note::DropMalformed { port: pi }),
             },
             ET_IPV4 => self.ip_input(ni, iface, payload, hop),
+            ET_IPV6 => self.ip6_input(ni, iface, payload, hop),
             _ => self.note(dev, Some(hop), Note::Delivered { port: pi }),
         }
     }
@@ -212,6 +218,7 @@ impl Engine {
                 }
             }
             ET_IPV4 => self.ip_input(ni, iface, l2.payload(frame), hop),
+            ET_IPV6 => self.ip6_input(ni, iface, l2.payload(frame), hop),
             _ => {}
         }
     }

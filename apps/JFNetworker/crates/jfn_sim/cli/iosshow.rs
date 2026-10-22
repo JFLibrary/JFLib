@@ -7,7 +7,7 @@
 //                                stores and the startup replay reads back; the DHCP lines
 //                                come from netsvc.rs, the spanning tree's from stp.rs, "router
 //                                rip" and "ip rip" from rip.rs, those of NAT and access lists
-//                                from nat.rs and acl.rs)
+//                                from nat.rs and acl.rs, the IPv6 lines from ip6.rs)
 //   show ip route [connected|static|rip]   RIP routes with the age of their last update and
 //                                their interface; the legend names R only where RIP runs
 //
@@ -105,6 +105,7 @@ impl Engine {
                 if d & super::D_NAT != 0 {
                     s.push_str("Debug output for NAT: on\n");
                 }
+                s.push_str(&Self::ios_debug6_lines(d));
                 s
             }
             K::ShowVersion => self.show_version(ni),
@@ -131,6 +132,8 @@ impl Engine {
                 s.push_str(if st.forwarding { "ip routing\n!\n" } else { "no ip routing\n!\n" });
             }
         }
+        // IPv6: "ipv6 unicast-routing" with the global lines (cli/ip6.rs)
+        s.push_str(&self.ios_ip6_global_config(ni));
         // excluded addresses and pools of the DHCP server (netsvc.rs)
         s.push_str(&self.ios_dhcp_config(ni));
         // spanning tree (stp.rs)
@@ -214,6 +217,8 @@ impl Engine {
                 s.push_str("!\n");
             }
         }
+        // "ipv6 route" and "ipv6 neighbor" (cli/ip6.rs)
+        s.push_str(&self.ios_ip6_route_config(ni));
         // the access lists: named ones, then the numbered lines (cli/acl.rs)
         s.push_str(&self.ios_acl_config(ni));
         for l in &cfg.lines {
@@ -288,6 +293,10 @@ impl Engine {
         };
         if !admin {
             s.push_str(" shutdown\n");
+        }
+        // its IPv6 lines (cli/ip6.rs)
+        if let Some(i) = f {
+            s.push_str(&self.ios_ip6_if_config(ni, i));
         }
         // spanning tree of a switch port (stp.rs)
         if let Some(p) = port {

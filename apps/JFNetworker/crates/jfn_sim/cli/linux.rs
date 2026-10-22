@@ -12,6 +12,8 @@
 //   lbctl, kvctl, cachectl, mqctl, workerctl (lab.rs: the services of the lab)
 //   script [list|status|start|stop|restart|errors|output] [NAME] (scripts.rs: the scripts)
 //   dhclient [-v] [-r] [IF], cat /etc/resolv.conf|/etc/hosts|/etc/hostname (netsvc.rs)
+//   ip -6 addr|route|neigh, ping6 / ping -6, traceroute6 / traceroute -6, sysctl net.ipv6.*
+//   (linux6.rs; ip addr and ip neigh show both families, an IPv6 target picks IPv6 by itself)
 //
 // Objects and commands of ip take any prefix, the first one of iproute2's order winning ("ip
 // a" is address, "ip r" route, "ip n" neighbour); output and error messages are those of
@@ -61,12 +63,12 @@ fn words(line: &str) -> Vec<String> {
 }
 
 /// iproute2's matches(): `w` is a prefix of `full`
-fn is(w: &str, full: &str) -> bool {
+pub(super) fn is(w: &str, full: &str) -> bool {
     !w.is_empty() && full.starts_with(w)
 }
 
 /// "0.2" seconds -> ns (at most microseconds)
-fn secs(s: &str) -> Option<Ns> {
+pub(super) fn secs(s: &str) -> Option<Ns> {
     let (i, f) = s.split_once('.').unwrap_or((s, ""));
     if (i.is_empty() && f.is_empty()) || !i.bytes().all(|b| b.is_ascii_digit()) || !f.bytes().all(|b| b.is_ascii_digit()) {
         return None;
@@ -86,7 +88,7 @@ const ROUTE_USAGE: &str = "Usage: ip route [show]\n       ip route add|del PREFI
 const NEIGH_USAGE: &str = "Usage: ip neigh [show]\n       ip neigh add ADDR lladdr MAC dev IF\n       ip neigh del ADDR dev IF\n       ip neigh flush all|dev IF\n";
 
 impl Engine {
-    fn sh_err(&mut self, ni: usize, text: &str) -> Result<(), String> {
+    pub(super) fn sh_err(&mut self, ni: usize, text: &str) -> Result<(), String> {
         self.out(ni, text);
         Err(String::from(text.lines().next().unwrap_or("")))
     }
@@ -112,6 +114,8 @@ impl Engine {
             "ip" => self.sh_ip(ni, &args),
             "ping" => self.sh_ping(ni, &args),
             "traceroute" => self.sh_traceroute(ni, &args),
+            "ping6" => self.sh_ping6(ni, &args),
+            "traceroute6" => self.sh_traceroute6(ni, &args),
             "hostname" => self.sh_hostname(ni, &args),
             "sysctl" => self.sh_sysctl(ni, &args),
             "curl" => self.sh_curl(ni, &args),
@@ -163,10 +167,13 @@ impl Engine {
 
     fn sh_ip(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
         let mut brief = false;
+        // the address family: 0 both, 4, 6 (linux6.rs)
+        let mut family = 0u8;
         let mut i = 0;
         while let Some(a) = args.get(i) {
             match *a {
-                "-4" => {}
+                "-4" => family = 4,
+                "-6" => family = 6,
                 "-br" | "-brief" => brief = true,
                 "-help" => {
                     self.out(ni, IP_USAGE);
@@ -198,11 +205,32 @@ impl Engine {
             return Ok(());
         }
         if is(obj, "address") {
-            self.sh_addr(ni, sub, brief)
+            if family == 6 {
+                return self.sh_addr6(ni, sub, brief);
+            }
+            self.sh_addr(ni, sub, brief, family == 0)
         } else if is(obj, "route") {
+            if family == 6 {
+                return self.sh_route6(ni, sub);
+            }
             self.sh_route(ni, sub)
         } else if is(obj, "neighbor") || is(obj, "neighbour") {
-            self.sh_neigh(ni, sub)
+            if family == 6 {
+                return self.sh_neigh6(ni, sub);
+            }
+            let r = self.sh_neigh(ni, sub);
+            if family == 0 && r.is_ok() {
+                // both families: the IPv6 entries after the IPv4 ones, a flush takes both
+                let cmd = sub.first().copied().unwrap_or("show");
+                if is(cmd, "flush") {
+                    let dev = self.dev_of(ni);
+                    let _ = self.apply(Action::Ip6 { dev, set: crate::ip6::Ip6Set::ClearNeighbors { iface: None } });
+                } else if is(cmd, "show") || is(cmd, "list") || sub.is_empty() {
+                    let s = self.neigh6_lines(ni);
+                    self.out(ni, &s);
+                }
+            }
+            r
         } else if is(obj, "link") {
             self.sh_link(ni, sub, brief)
         } else if is(obj, "help") {
@@ -214,7 +242,7 @@ impl Engine {
     }
 
     /// an interface by its Linux name (removed ones are not found)
-    fn sh_iface(&self, ni: usize, name: &str) -> Option<u16> {
+    pub(super) fn sh_iface(&self, ni: usize, name: &str) -> Option<u16> {
         let st = self.stack(ni)?;
         st.ifaces.iter().position(|f| !f.hidden && f.name == name).map(|i| i as u16)
     }
@@ -233,7 +261,7 @@ impl Engine {
 
     /// the two lines of `ip link` for an interface: "2: eth0: <...> mtu .. state UP" and
     /// "link/ether ..."
-    fn link_line(&self, ni: usize, i: u16) -> (String, String) {
+    pub(super) fn link_line(&self, ni: usize, i: u16) -> (String, String) {
         let Some(st) = self.stack(ni) else {
             return (String::new(), String::new());
         };
@@ -278,11 +306,11 @@ impl Engine {
         }
     }
 
-    fn visible_ifaces(&self, ni: usize) -> Vec<u16> {
+    pub(super) fn visible_ifaces(&self, ni: usize) -> Vec<u16> {
         self.stack(ni).map(|s| (0..s.ifaces.len() as u16).filter(|&i| !s.ifaces[i as usize].hidden).collect()).unwrap_or_default()
     }
 
-    fn sh_addr(&mut self, ni: usize, args: &[&str], brief: bool) -> Result<(), String> {
+    fn sh_addr(&mut self, ni: usize, args: &[&str], brief: bool, v6: bool) -> Result<(), String> {
         let dev = self.dev_of(ni);
         let cmd = args.first().copied().unwrap_or("show");
         if is(cmd, "add") || is(cmd, "delete") {
@@ -347,7 +375,10 @@ impl Engine {
             if brief {
                 let state = head.rsplit_once("state ").map(|x| x.1).unwrap_or("UNKNOWN");
                 let name = head.split(": ").nth(1).unwrap_or("");
-                let addrs: Vec<String> = f.addrs.iter().map(|a| format!("{}", a)).collect();
+                let mut addrs: Vec<String> = f.addrs.iter().map(|a| format!("{}", a)).collect();
+                if v6 {
+                    addrs.extend(self.brief6(ni, i));
+                }
                 s.push_str(format!("{:<16} {:<14} {}", name, state, addrs.join(" ")).trim_end());
                 s.push('\n');
                 continue;
@@ -358,6 +389,9 @@ impl Engine {
                 let brd = if a.len <= 30 && scope == "global" { format!(" brd {}", a.broadcast()) } else { String::new() };
                 let sec = if k > 0 { " secondary" } else { "" };
                 s.push_str(&format!("    inet {}{} scope {}{} {}\n       valid_lft forever preferred_lft forever\n", a, brd, scope, sec, f.name));
+            }
+            if v6 {
+                s.push_str(&self.inet6_lines(ni, i));
             }
         }
         self.out(ni, &s);
@@ -673,6 +707,10 @@ impl Engine {
     // ---------------------------------------------------------------- ping, traceroute
 
     fn sh_ping(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
+        // "-6" or an IPv6 address: iputils pings over IPv6 (linux6.rs)
+        if args.contains(&"-6") || args.iter().any(|a| !a.starts_with('-') && a.contains(':')) {
+            return self.sh_ping6(ni, args);
+        }
         let mut o = PingOpts { count: 0, size: 56, ttl: None, df: false, interval: SEC, timeout: 10 * SEC, src: None };
         let mut dst: Option<&str> = None;
         let mut k = 0;
@@ -732,6 +770,9 @@ impl Engine {
     }
 
     fn sh_traceroute(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
+        if args.contains(&"-6") || args.iter().any(|a| !a.starts_with('-') && a.contains(':')) {
+            return self.sh_traceroute6(ni, args);
+        }
         let mut o = TraceOpts { max_hops: 30, probes: 3, timeout: 5 * SEC, port: 33434, size: 32 };
         let mut numeric = false;
         let mut dst: Option<&str> = None;
@@ -802,6 +843,13 @@ impl Engine {
                 Some((k, v)) => (k.trim(), Some(v.trim())),
                 None => (a.trim(), None),
             };
+            if key.starts_with("net.ipv6.") || key.starts_with("net/ipv6/") {
+                match self.sysctl6(ni, key, val) {
+                    Ok(l) => s.push_str(&l),
+                    Err(e) => return self.sh_err(ni, &e),
+                }
+                continue;
+            }
             if key != "net.ipv4.ip_forward" && key != "net/ipv4/ip_forward" {
                 let path = key.replace('.', "/");
                 return self.sh_err(ni, &format!("sysctl: cannot stat /proc/sys/{}: No such file or directory\n", path));
@@ -885,6 +933,8 @@ impl Engine {
                 s.push_str(&format!("ip neigh add {} lladdr {} dev {}\n", ip, m, st.ifaces[*i as usize].name));
             }
         }
+        // IPv6 (linux6.rs)
+        s.push_str(&self.linux_config6(ni));
         s
     }
 }

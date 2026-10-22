@@ -5,7 +5,8 @@
 //   Ipv4([u8; 4])       strict dotted decimal (no leading zeros); masks <-> prefix lengths;
 //                       class tests (private, loopback, link local, multicast, broadcast)
 //   Ipv6([u8; 16])      every RFC 4291 text form in, RFC 5952 out; solicited-node and
-//                       link-local (EUI-64) addresses; multicast MAC mapping
+//                       link-local (EUI-64) addresses; multicast MAC mapping; multicast
+//                       scope, global unicast, the common prefix of two addresses
 //   IpAddr              V4 | V6
 //   Prefix4 / Prefix6   an address with a prefix length ("10.0.0.1/24"): network, broadcast,
 //                       contains, host range (/31 and /32 per RFC 3021); masks and wildcards
@@ -389,6 +390,24 @@ impl Ipv6 {
         b[8..].copy_from_slice(&mac.eui64());
         Ipv6(b)
     }
+    /// ff02::1:ff00:0/104, a solicited-node multicast address
+    pub fn is_solicited_node(&self) -> bool {
+        self.0[..13] == [0xFF, 0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01, 0xFF]
+    }
+    /// the scope of a multicast address (1 interface, 2 link, 5 site, 8 organisation, 14
+    /// global; RFC 4291 2.7)
+    pub fn mc_scope(&self) -> u8 {
+        self.0[1] & 0x0F
+    }
+    /// a global unicast address (not unspecified, loopback, link-local, multicast; unique
+    /// local addresses count as global in scope, RFC 4193)
+    pub fn is_global_unicast(&self) -> bool {
+        !self.is_unspecified() && !self.is_loopback() && !self.is_link_local() && !self.is_multicast() && self.to_ipv4_mapped().is_none()
+    }
+    /// the number of leading bits two addresses share (source address selection, RFC 6724)
+    pub fn common_prefix(&self, other: &Ipv6) -> u8 {
+        (self.to_u128() ^ other.to_u128()).leading_zeros() as u8
+    }
 }
 
 impl fmt::Display for Ipv6 {
@@ -633,6 +652,10 @@ impl Prefix6 {
     }
     pub fn covers(&self, other: &Prefix6) -> bool {
         other.len >= self.len && self.contains(other.addr)
+    }
+    /// two prefixes share addresses
+    pub fn overlaps(&self, other: &Prefix6) -> bool {
+        self.contains(other.addr) || other.contains(self.addr)
     }
 }
 

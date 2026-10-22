@@ -12,6 +12,10 @@
 // also its default gateway.  They apply at once and land in the startup configuration
 // (doc/config.rs), one undo step each; a refusal shows below them.  Last the lab's faults of
 // the device (faults.rs: power off, a service stopped, a slower disk, for a while).
+//
+// A device with IPv6 gets a column IPv6 after IP (the first global address, else the
+// link-local one; "+1" for more) and the chosen interface lists all its IPv6 addresses with
+// how they came and their state; without IPv6 nothing changes.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -19,7 +23,7 @@ use alloc::vec::Vec;
 
 use jfn_model::catalog::{self, CliStyle, F_HOST};
 use jfn_model::ifname;
-use jfn_sim::{IfKind, IfView, Led, PortMode, PortView};
+use jfn_sim::{Addr6View, AddrState, IfKind, IfView, Led, Origin6, PortMode, PortView};
 use ui::*;
 
 use super::{row, rows_begin, Inspector};
@@ -44,6 +48,21 @@ fn cols() -> [GridCol<'static>; 7] {
     ]
 }
 const GRID_W: i32 = 668;
+/// the column of IPv6 addresses (only devices with IPv6 get it)
+const IP6_W: i32 = 200;
+
+fn col6() -> GridCol<'static> {
+    GridCol::new(t("IPv6"), IP6_W).flags(GC_NOSORT)
+}
+
+/// the columns with IPv6 after IP when `v6`
+fn cols_for(v6: bool) -> Vec<GridCol<'static>> {
+    let mut v: Vec<GridCol<'static>> = cols().into_iter().collect();
+    if v6 {
+        v.insert(3, col6());
+    }
+    v
+}
 /// interface rows shown at most (the grid scrolls beyond)
 const GRID_ROWS: i32 = 10;
 
@@ -62,6 +81,8 @@ pub(crate) struct IfRow {
     pub peer: String,
     /// its IPv4 interface
     pub iface: Option<IfView>,
+    /// the first IPv6 address ("–" without one)
+    pub ip6: String,
     /// not shut down
     pub admin: bool,
 }
@@ -97,6 +118,42 @@ fn addrs(f: &IfView) -> String {
         0 => String::from("–"),
         1 => f.addrs[0].to_string(),
         k => format!("{} +{}", f.addrs[0], k - 1),
+    }
+}
+
+/// the first global IPv6 address (else the link-local one), "+N" for the others
+fn addrs6(f: Option<&IfView>) -> String {
+    let Some(f) = f.filter(|f| !f.addrs6.is_empty()) else {
+        return String::from("–");
+    };
+    let first = f.addrs6.iter().find(|a| !a.addr.is_link_local()).or(f.addrs6.first()).map(|a| format!("{}/{}", a.addr, a.len)).unwrap_or_default();
+    match f.addrs6.len() {
+        1 => first,
+        k => format!("{} +{}", first, k - 1),
+    }
+}
+
+/// how an IPv6 address came and where it stands, in words
+fn addr6_line(a: &Addr6View) -> String {
+    // i18n
+    let how = match a.origin {
+        Origin6::LinkLocal => "Link-Local",
+        Origin6::LinkLocalManual => "Link-Local, manuell",
+        Origin6::Manual => "manuell",
+        Origin6::Eui64 => "EUI-64",
+        Origin6::Slaac => "SLAAC",
+        Origin6::Loopback => "Loopback",
+    };
+    let how = t(how);
+    let state = match a.state {
+        AddrState::Tentative => Some(t("wird geprüft (DAD)")),
+        AddrState::Duplicate => Some(t("doppelt (DAD)")),
+        AddrState::Deprecated => Some(t("veraltet")),
+        AddrState::Preferred => None,
+    };
+    match state {
+        Some(s) => format!("{}/{} · {}, {}", a.addr, a.len, how, s),
+        None => format!("{}/{} · {}", a.addr, a.len, how),
     }
 }
 
@@ -138,6 +195,7 @@ pub(crate) fn if_rows(n: &Net, id: u32) -> Vec<IfRow> {
             mac: if console { String::from("–") } else { pv.mac.to_string() },
             vlan,
             peer,
+            ip6: addrs6(iface.as_ref()),
             iface,
             admin: pv.admin_up,
         });
@@ -168,6 +226,7 @@ pub(crate) fn if_rows(n: &Net, id: u32) -> Vec<IfRow> {
             mac: if f.mac.is_zero() { String::from("–") } else { f.mac.to_string() },
             vlan,
             peer: String::from("–"),
+            ip6: addrs6(Some(f)),
             iface: Some(f.clone()),
             admin: f.admin_up,
         });
@@ -312,10 +371,13 @@ fn interfaces(n: &mut Net, ui: &mut Ui, id: u32) {
     ins.ifs.retain(&keys);
     let (hh, rh, _) = ui.style.data().grid_metrics(ui);
     let h = hh + rh * (rows.len() as i32).min(GRID_ROWS) + 2;
+    // a column for IPv6 only where the device has IPv6
+    let v6 = rows.iter().any(|r| r.ip6 != "–");
+    let k = v6 as usize;
     ui.next_size(-1, h + 8);
     ui.scroll_begin(ID_INS_IF_SCROLL, SC_H);
-    ui.next_size(GRID_W, h);
-    let cols = cols();
+    ui.next_size(GRID_W + if v6 { IP6_W } else { 0 }, h);
+    let cols = cols_for(v6);
     let (first, end) = ui.grid_begin(ID_INS_IFACES, &mut ins.ifs, &cols, &keys);
     for i in first..end {
         let r = &rows[i as usize];
@@ -333,10 +395,13 @@ fn interfaces(n: &mut Net, ui: &mut Ui, id: u32) {
         ui.text(TS_BODY | TX_ELLIPSIS, r.status);
         ui.box_end();
         ui.grid_text(&ins.ifs, 2, &r.ip);
-        ui.grid_text(&ins.ifs, 3, &r.peer);
-        ui.grid_text(&ins.ifs, 4, &r.speed);
-        ui.grid_text(&ins.ifs, 5, &r.vlan);
-        ui.grid_text_ts(&ins.ifs, 6, TS_CAPTION, &r.mac);
+        if v6 {
+            ui.grid_text(&ins.ifs, 3, &r.ip6);
+        }
+        ui.grid_text(&ins.ifs, 3 + k, &r.peer);
+        ui.grid_text(&ins.ifs, 4 + k, &r.speed);
+        ui.grid_text(&ins.ifs, 5 + k, &r.vlan);
+        ui.grid_text_ts(&ins.ifs, 6 + k, TS_CAPTION, &r.mac);
     }
     ui.grid_end(&mut ins.ifs);
     ui.scroll_end();
@@ -392,6 +457,14 @@ fn quick(n: &mut Net, ui: &mut Ui, id: u32, r: &IfRow) {
         let mut on = dhcp as i32;
         if ui.checkbox(ID_INS_DHCP, t("Adresse per DHCP beziehen"), &mut on) & EV_ACT != 0 {
             result = Some(config::dhcp(&mut n.doc, id, &f.name, on != 0));
+        }
+        // its IPv6 addresses (read only: the consoles set them)
+        if !f.addrs6.is_empty() {
+            ui.text(TS_BODY | TX_SECONDARY, t("IPv6-Adressen"));
+            for a in &f.addrs6 {
+                ui.next_size(-1, 0);
+                ui.text(TS_CAPTION | TX_ELLIPSIS, &addr6_line(a));
+            }
         }
     }
     // the default gateway of a host

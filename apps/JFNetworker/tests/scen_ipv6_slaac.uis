@@ -1,0 +1,8 @@
+#!args apps/JFNetworker/tests/fixtures/ipv6_slaac.jfnet --scenario apps/JFNetworker/tests/scen/ipv6_slaac.scn --golden apps/JFNetworker/tests/scen/ipv6_slaac.report
+# golden scenario: IPv6 in two LANs behind R1: duplicate address detection of the link-local
+# addresses, router solicitations and advertisements, SLAAC addresses from the prefixes and
+# the MACs, ping and traceroute into the other LAN, the IOS-like tables (show ipv6 interface,
+# route, neighbors), ip -6 addr / route / neigh, debug ipv6 nd.  The GUI program runs
+# tests/scen/ipv6_slaac.scn on tests/fixtures/ipv6_slaac.jfnet without a window and ends with
+# the report, which must equal tests/scen/ipv6_slaac.report byte for byte on every target (the
+# script itself is not run)

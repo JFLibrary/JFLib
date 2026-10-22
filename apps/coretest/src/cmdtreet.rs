@@ -1,6 +1,7 @@
 // cmdtreet -- checks of base::cmdtree: IOS-like abbreviations, the "^" position of errors,
 // incomplete and ambiguous lines, typed parameters, interface names in one or two words, the
-// "no" form, options in any order, "?" help with its IOS-like layout, Tab completion
+// "no" form, options in any order, "?" help with its IOS-like layout, Tab completion; the IPv6
+// parameters (X:X:X:X::X, X:X:X:X::X/<0-128>) and parse_ipv6
 
 use alloc::string::String;
 use alloc::vec;
@@ -220,4 +221,45 @@ pub fn run(t: &mut T) {
     t.eq("mac bad", cmdtree::parse_mac("aa:bb-cc:dd:ee:ff"), None);
     let v = tr.parse(cf, "interface lo1", n).map(|p| p.vals);
     t.eq("values in order", v, Ok(vec![(String::from("interface"), Val::Key(String::from("interface"))), (String::from("if"), Val::Name(String::from("Loopback1")))]));
+    ipv6(t);
+}
+
+/// IPv6 addresses and prefixes as parameters
+fn ipv6(t: &mut T) {
+    let mut tr: Tree<C> = Tree::new();
+    let ifm = tr.mode("(config-if)#", "Commands for this interface:", None, Some("Undo a setting or restore its default"));
+    tr.add(ifm, "ipv6", "IPv6 settings of this interface", None, F_NO);
+    tr.add(ifm, "ipv6 address", "Give the interface an IPv6 address", None, 0);
+    tr.add(ifm, "ipv6 address X:X:X:X::X/<0-128>=pfx", "Address with its prefix length", Some(C::IpAddr), 0);
+    tr.add(ifm, "ipv6 address X:X:X:X::X/<0-128>=pfx eui-64", "The interface identifier from the MAC", Some(C::IpAddr), 0);
+    tr.add(ifm, "ipv6 address X:X:X:X::X=ll", "A link-local address", None, 0);
+    tr.add(ifm, "ipv6 address X:X:X:X::X=ll link-local", "Use it as the link-local address", Some(C::IpAddr), 0);
+    tr.add(ifm, "ipv6 address autoconfig", "Take addresses from router advertisements", Some(C::IpAddr), 0);
+    tr.add_no(ifm, "ipv6 address", C::IpAddr);
+    let n = &Ifs;
+    let p = tr.parse(ifm, "ipv6 address 2001:DB8:1::1/64", n);
+    t.check("prefix6", p.as_ref().is_ok_and(|p| p.prefix6("pfx") == Some(([0x20, 0x01, 0x0D, 0xB8, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], 64)) && p.ip6("ll").is_none()));
+    t.check("eui-64 abbreviated", tr.parse(ifm, "ipv6 add 2001:db8:1::/64 eui", n).is_ok_and(|p| p.has("eui-64")));
+    t.check("link-local", tr.parse(ifm, "ipv6 address fe80::1 link-local", n).is_ok_and(|p| p.ip6("ll").is_some_and(|a| a[0] == 0xFE && a[15] == 1)));
+    t.check("a keyword next to addresses", tr.parse(ifm, "ipv6 address autoconfig", n).is_ok_and(|p| p.has("autoconfig")));
+    t.eq("prefix length 129", tr.parse(ifm, "ipv6 address 2001:db8::1/129", n).map(|p| p.cmd), Err(Error::Invalid(13)));
+    t.eq("two gaps", tr.parse(ifm, "ipv6 address 2001:db8::1::2/64", n).map(|p| p.cmd), Err(Error::Invalid(13)));
+    t.eq("an address alone needs link-local", tr.parse(ifm, "ipv6 address fe80::1", n).map(|p| p.cmd), Err(Error::Incomplete));
+    t.check("no ipv6 address", tr.parse(ifm, "no ipv6 address", n).is_ok_and(|p| p.no));
+    let h = tr.help(ifm, "ipv6 address ", n);
+    t.check("help lists both forms", matches!(&h, Help::List { items, .. } if items.iter().map(|i| i.0.as_str()).collect::<Vec<_>>() == vec!["X:X:X:X::X", "X:X:X:X::X/<0-128>", "autoconfig"]));
+    t.eq("partial prefix", tr.help(ifm, "ipv6 address 2001:db8::/6", n), Help::Words(vec![String::from("X:X:X:X::X/<0-128>")]));
+    t.eq("partial address", tr.help(ifm, "ipv6 address fe80::1", n), Help::Words(vec![String::from("X:X:X:X::X")]));
+    // the text forms (RFC 4291 2.2)
+    let six = |s: &str| cmdtree::parse_ipv6(s);
+    t.eq("::", six("::"), Some([0; 16]));
+    t.eq("::1", six("::1").map(|a| a[15]), Some(1));
+    t.eq("1::", six("1::").map(|a| (a[1], a[15])), Some((1, 0)));
+    t.eq("full", six("2001:db8:0:0:1:0:0:1"), six("2001:db8::1:0:0:1"));
+    t.eq("ipv4 tail", six("::ffff:10.0.0.1").map(|a| (a[10], a[11], a[12], a[15])), Some((0xFF, 0xFF, 10, 1)));
+    t.eq("upper case", six("FE80::4A:FF:FE00:101"), six("fe80::4a:ff:fe00:101"));
+    for bad in ["1:2:3:4:5:6:7:8:9", "1::2::3", "12345::", ":1", "1:", "g::", "1:2:3:4:5:6:7", "", "::ffff:10.0.0.256", "1:2:3:4:5:6:7::8"] {
+        t.eq(&alloc::format!("bad {:?}", bad), six(bad), None);
+    }
+    t.eq("seven groups and a gap", six("1:2:3:4:5:6:7::").map(|a| a[13]), Some(7));
 }
