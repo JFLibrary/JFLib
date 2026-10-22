@@ -36,6 +36,9 @@
 //   ospf      OspfView, Packet (Hello, Database Description, Link State Request, Update,
 //             Acknowledgment), LsaHeader, Lsa (router, network, summary, AS-external) with the
 //             Fletcher checksum, compare (which instance is newer)      (RFC 2328, RFC 905)
+//   eapol     EapolView, Key: EAPOL-Key frames of the 4-way handshake (Key Information bits,
+//             replay counter, nonces, MIC field, key data), the RSN element, KDEs (GTK,
+//             IGTK); mic_input / set_mic for the caller's MIC (802.1X-2004, 802.11-2020 12.7)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -67,6 +70,7 @@ pub mod rip;
 pub mod nat;
 pub mod icmpv6;
 pub mod ospf;
+pub mod eapol;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

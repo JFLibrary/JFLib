@@ -1,6 +1,8 @@
 // crypto -- known-answer vectors of lib/crypto (FIPS 180-4 / 197, SP 800-38D, RFC 4231 / 5869 /
 // 7693 / 7748 / 7914 / 8032 / 8439 / 9106, draft-irtf-cfrg-xchacha, the BLAKE3 test vectors;
 // RSA and ECDSA signatures made by OpenSSL through Python's cryptography) and round trips
+// wpa(): what WPA2 and WPA3 build on -- SHA-1 (FIPS 180-4), HMAC-SHA1 (RFC 2202), PBKDF2-HMAC-SHA1
+// (RFC 6070, the PSKs of IEEE 802.11 J.4), the AES key wrap (RFC 3394) and AES-CMAC (RFC 4493)
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -31,6 +33,7 @@ pub fn run(t: &mut T) {
     argon(t);
     misc(t);
     web_pki(t);
+    wpa(t);
 }
 
 /// the inverse cipher: FIPS 197 C.1 / C.3 backwards, then random blocks and keys both ways
@@ -550,4 +553,65 @@ pub fn vectors(path: &str) -> i32 {
     }
     plat::write_stdout(out.as_bytes());
     0
+}
+
+/// the primitives of WPA2 / WPA3: SHA-1, HMAC-SHA1, PBKDF2-HMAC-SHA1, AES key wrap, AES-CMAC
+fn wpa(t: &mut T) {
+    t.eq("sha1 empty", hex(&crypto::sha1(b"")), String::from("da39a3ee5e6b4b0d3255bfef95601890afd80709"));
+    t.eq("sha1 abc", hex(&crypto::sha1(b"abc")), String::from("a9993e364706816aba3e25717850c26c9cd0d89d"));
+    t.eq("sha1 448 bits", hex(&crypto::sha1(b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq")), String::from("84983e441c3bd26ebaae4aa1f95129e5e54670f1"));
+    let mut s = crypto::Sha1::new();
+    let chunk = [b'a'; 1000];
+    for _ in 0..1000 {
+        s.update(&chunk);
+    }
+    t.eq("sha1 million a", hex(&s.finalize()), String::from("34aa973cd4c4daa4f61eeb2bdbad27316534016f"));
+    // streaming in odd pieces equals one shot (block boundaries, the 56-byte padding edge)
+    let data: Vec<u8> = (0..300u32).map(|i| (i * 11 + 5) as u8).collect();
+    for n in [55usize, 56, 63, 64, 65, 300] {
+        let mut s = crypto::Sha1::new();
+        for c in data[..n].chunks(7) {
+            s.update(c);
+        }
+        t.eq(&alloc::format!("sha1 pieces {}", n), s.finalize(), crypto::sha1(&data[..n]));
+    }
+    t.eq("hmac-sha1 rfc2202 1", hex(&crypto::hmac_sha1(&[0x0b; 20], b"Hi There")), String::from("b617318655057264e28bc0b6fb378c8ef146be00"));
+    t.eq("hmac-sha1 rfc2202 2", hex(&crypto::hmac_sha1(b"Jefe", b"what do ya want for nothing?")), String::from("effcdf6ae5eb2fa2d27416d5f184df9c259a7c79"));
+    t.eq("hmac-sha1 long key", hex(&crypto::hmac_sha1(&[0xaa; 80], b"Test Using Larger Than Block-Size Key - Hash Key First")), String::from("aa4ae5e15272d00e95705637ce8a3b55ed402112"));
+    let mut dk = [0u8; 20];
+    for (c, want) in [(1u32, "0c60c80f961f0e71f3a9b524af6012062fe037a6"), (2, "ea6c014dc72d6f8ccd1ed92ace1d41f0d8de8957"), (4096, "4b007901b765489abead49d926f721d065a429c1")] {
+        crypto::pbkdf2_sha1(b"password", b"salt", c, &mut dk);
+        t.eq(&alloc::format!("pbkdf2-sha1 rfc6070 c={}", c), hex(&dk), String::from(want));
+    }
+    // the PSK of WPA2-Personal: 4096 rounds, 256 bits (IEEE 802.11-2020 J.4)
+    let mut psk = [0u8; 32];
+    crypto::pbkdf2_sha1(b"password", b"IEEE", 4096, &mut psk);
+    t.eq("psk J.4 1", hex(&psk), String::from("f42c6fc52df0ebef9ebb4b90b38a5f902e83fe1b135a70e23aed762e9710a12e"));
+    crypto::pbkdf2_sha1(b"ThisIsAPassword", b"ThisIsASSID", 4096, &mut psk);
+    t.eq("psk J.4 2", hex(&psk), String::from("0dc0d6eb90555ed6419756b9a15ec3e3209b63df707dd508d14581f8982721af"));
+    // the generic PBKDF2 gives the same as the one of SHA-256 already there
+    let (mut a, mut b) = ([0u8; 40], [0u8; 40]);
+    crypto::pbkdf2::<crypto::Sha256>(b"pw", b"salty", 3, &mut a);
+    crypto::pbkdf2_sha256(b"pw", b"salty", 3, &mut b);
+    t.eq("pbkdf2 generic", a, b);
+    // RFC 3394 4.1: a 128-bit key under a 128-bit KEK
+    let kek = h("000102030405060708090a0b0c0d0e0f");
+    let wrapped = crypto::aes_wrap(&kek, &h("00112233445566778899aabbccddeeff"));
+    t.eq("aes key wrap rfc3394 4.1", wrapped.as_deref().map(hex), Some(String::from("1fa68b0a8112b447aef34bd8fb5a7b829d3e862371d2cfe5")));
+    if let Some(w) = wrapped {
+        t.eq("aes key unwrap", crypto::aes_unwrap(&kek, &w).map(|v| hex(&v)), Some(String::from("00112233445566778899aabbccddeeff")));
+        let mut bad = w.clone();
+        bad[9] ^= 1;
+        t.check("aes key unwrap refuses a changed one", crypto::aes_unwrap(&kek, &bad).is_none());
+    }
+    let long: Vec<u8> = (0..48u8).collect();
+    t.eq("aes key wrap round trip", crypto::aes_wrap(&kek, &long).and_then(|w| crypto::aes_unwrap(&kek, &w)), Some(long.clone()));
+    t.check("aes key wrap wants whole blocks", crypto::aes_wrap(&kek, &long[..20]).is_none() && crypto::aes_wrap(&kek, &long[..8]).is_none());
+    // RFC 4493 4: AES-CMAC with AES-128
+    let k = h("2b7e151628aed2a6abf7158809cf4f3c");
+    let m = h("6bc1bee22e409f96e93d7e117393172aae2d8a571e03ac9c9eb76fac45af8e5130c81c46a35ce411e5fbc1191a0a52eff69f2445df4f9b17ad2b417be66c3710");
+    for (n, want) in [(0usize, "bb1d6929e95937287fa37d129b756746"), (16, "070a16b46b4d4144f79bdd9dd04a287c"), (40, "dfa66747de9ae63030ca32611497c827"), (64, "51f0bebf7e3b9d92fc49741779363cfe")] {
+        t.eq(&alloc::format!("aes-cmac rfc4493 {} bytes", n), crypto::cmac_aes(&k, &m[..n]).map(|c| hex(&c)), Some(String::from(want)));
+    }
+    t.check("aes-cmac wants a 128-bit key", crypto::cmac_aes(&k[..15], b"x").is_none());
 }
