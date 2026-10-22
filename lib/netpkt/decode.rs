@@ -11,6 +11,7 @@
 // Application protocols are recognised by their well-known ports.  DHCP (fixed fields and
 // every option), DNS (header, questions and records, also over TCP), NTP and syslog have
 // dissectors; the payload of the others shows as one field.
+// BPDUs of STP and RSTP (LLC SAP 0x42) show every field and flag (stp.rs).
 // Field names and values follow the usual capture-tool wording (English protocol terms).
 // HTTP (ports 80, 8080, 8000, and any TCP segment that starts like a request or a response)
 // shows the start line, the header lines and the body bytes of every message the segment
@@ -482,6 +483,7 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Ntp => Some(ntp_layer(frame, off, len)),
             Proto::Syslog => Some(syslog_layer(frame, off, len)),
             Proto::Http => Some(http_layer(frame, off, len)),
+            Proto::Stp => Some(stp_layer(frame, off, len)),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -901,6 +903,7 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Ntp => NtpView::parse(b).map(|v| format!("NTP Version {}, {}", v.vn(), ntp::mode_name(v.mode()))),
         Proto::Syslog => syslog::parse(b).map(|m| format!("{}.{}: {}", syslog::facility_name(syslog::facility_of(m.pri)).to_ascii_uppercase(), syslog::severity_name(syslog::severity_of(m.pri)).to_ascii_uppercase(), m.rest)),
         Proto::Http => Some(http_info(b)),
+        Proto::Stp => crate::stp::Bpdu::parse(b).ok().map(|x| crate::stp::summary(&x)),
         _ => None,
     }
 }
@@ -1452,4 +1455,82 @@ fn http_info(b: &[u8]) -> String {
         }
     }
     parts.join(" , ")
+}
+
+// ---------------------------------------------------------------- STP and RSTP
+
+/// a BPDU timer value (1/256 s) in seconds: "20", "1.50"
+fn bpdu_time(v: u16) -> String {
+    let (s, r) = (v / crate::stp::TIME_UNIT, v % crate::stp::TIME_UNIT);
+    if r == 0 { format!("{}", s) } else { format!("{}.{:02}", s, r as u32 * 100 / crate::stp::TIME_UNIT as u32) }
+}
+
+/// "32768 / 0 / 02:4a:00:00:01:00"
+fn bridge_id_str(id: crate::stp::BridgeId) -> String {
+    format!("{} / {} / {}", id.priority() & 0xF000, id.ext(), id.mac())
+}
+
+fn stp_layer(frame: &[u8], off: usize, len: usize) -> B {
+    use crate::stp::{self, Bpdu, Kind};
+    let b = &frame[off..off + len];
+    let parsed = Bpdu::parse(b);
+    let title = match &parsed {
+        Ok(x) if x.kind == Kind::Config => "Spanning Tree Protocol (Configuration BPDU)",
+        Ok(x) if x.kind == Kind::Tcn => "Spanning Tree Protocol (Topology Change Notification)",
+        Ok(x) if x.version >= stp::VERSION_MSTP => "Spanning Tree Protocol (MST BPDU)",
+        Ok(_) => "Spanning Tree Protocol (RST BPDU)",
+        Err(_) => "Spanning Tree Protocol",
+    };
+    let mut l = B::new(Proto::Stp, off, len, String::from(title));
+    if b.len() >= 2 {
+        let pid = be16(b, 0);
+        l.f("Protocol Identifier", off, 2, if pid == 0 { String::from("Spanning Tree Protocol (0x0000)") } else { format!("0x{:04x}", pid) });
+    }
+    if b.len() >= 3 {
+        let v = match b[2] {
+            stp::VERSION_STP => String::from("Spanning Tree (0)"),
+            stp::VERSION_RSTP => String::from("Rapid Spanning Tree (2)"),
+            stp::VERSION_MSTP => String::from("Multiple Spanning Tree (3)"),
+            n => format!("{}", n),
+        };
+        l.f("Protocol Version Identifier", off + 2, 1, v);
+    }
+    if b.len() >= 4 {
+        let t = match b[3] {
+            stp::TYPE_CONFIG => String::from("Configuration (0x00)"),
+            stp::TYPE_TCN => String::from("Topology Change Notification (0x80)"),
+            stp::TYPE_RST => String::from("Rapid/Multiple Spanning Tree (0x02)"),
+            n => format!("0x{:02x}", n),
+        };
+        l.f("BPDU Type", off + 3, 1, t);
+    }
+    let x = match parsed {
+        Ok(x) => x,
+        Err(e) => {
+            l.bad(format!("not a valid BPDU: {}", e.text()));
+            if b.len() > 4 {
+                l.f("Data", off + 4, b.len() - 4, format!("{} bytes", b.len() - 4));
+            }
+            return l;
+        }
+    };
+    if x.kind == Kind::Tcn {
+        return l;
+    }
+    l.f("BPDU flags", off + 4, 1, format!("0x{:02x} ({})", x.flags, stp::flags_text(x.kind, x.flags)));
+    l.f("Root Identifier", off + 5, 8, bridge_id_str(x.root));
+    l.f("Root Path Cost", off + 13, 4, format!("{}", x.cost));
+    l.f("Bridge Identifier", off + 17, 8, bridge_id_str(x.bridge));
+    l.f("Port identifier", off + 25, 2, format!("0x{:04x} (priority {}, port {})", x.port.0, x.port.priority(), x.port.number()));
+    l.f("Message Age", off + 27, 2, bpdu_time(x.msg_age));
+    l.f("Max Age", off + 29, 2, bpdu_time(x.max_age));
+    l.f("Hello Time", off + 31, 2, bpdu_time(x.hello));
+    l.f("Forward Delay", off + 33, 2, bpdu_time(x.fwd_delay));
+    if x.kind == Kind::Rst && b.len() > stp::CONFIG_LEN {
+        l.f("Version 1 Length", off + stp::CONFIG_LEN, 1, format!("{}", b[stp::CONFIG_LEN]));
+    }
+    if x.msg_age >= x.max_age {
+        l.bad(String::from("Message Age is not below Max Age: a bridge drops this BPDU"));
+    }
+    l
 }
