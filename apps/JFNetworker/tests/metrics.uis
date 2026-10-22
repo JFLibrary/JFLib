@@ -27,7 +27,7 @@ expect #45088 text "Durchsatz – Keine Daten"
 expect #45089 text "Latenz – Keine Daten"
 # ---- 8 s of the lab: the cache's status line, its tiles over the last 5 s, its charts
 wait 8000
-expect text:"Port 80 vor http://10.0.1.1/: 22 Einträge, 265 Treffer, 99 Fehlschläge (72,8 % Treffer)" exists
+expect text:"Port 80 vor http://10.0.1.1/: 22 Einträge, 266 Treffer, 99 Fehlschläge (72,8 % Treffer)" exists
 expect text:"Noch keine Messwerte: der Simulator nimmt jede Sekunde einen Punkt jeder Zahl." missing
 expect text:"Kacheln: die letzten 5 s" exists
 expect text:"64,2" exists

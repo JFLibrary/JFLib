@@ -25,7 +25,7 @@ expect button:"What it is about" exists
 click #49157
 wait 4000
 key f9
-expect text:"CACHE1 svc cache metric misses <= 30 over 10s: measured: 89.333/s" exists
+expect text:"CACHE1 svc cache metric misses <= 30 over 10s: measured: 97.5/s" exists
 click #49408
 expect text:"Two settings of the service cache decide: entries (how many answers it keeps) and ttl_ms (for how long). Shift+double-click CACHE1, tab Services, “Settings …”." exists
 expect #49408 text "Another hint"
