@@ -69,7 +69,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [script](#script) -- the JFNetworker scripting language (.jfs): lexer, parser, editor diagnostics, compiler, a VM with fuel and a garbage collector, the standard library (str, list, map, bytes, math, json), float arithmetic and math in software
   <br>[lib.rs](#script-crate-root) · [ast.rs](#scriptastrs) · [check.rs](#scriptcheckrs) · [lex.rs](#scriptlexrs) · [parse.rs](#scriptparsers) · [code.rs](#scriptcoders) · [heap.rs](#scriptheaprs) · [num.rs](#scriptnumrs) · [math.rs](#scriptmathrs) · [vm.rs](#scriptvmrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
-  <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs)
+  <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs)
 - [compress](#compress) -- LZ4 block and frame, xxHash32, codec ids
   <br>[lib.rs](#compress-crate-root) · [lz4.rs](#compresslz4rs) · [xxh.rs](#compressxxhrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery
@@ -77,7 +77,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
   <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [x509.rs](#netiox509rs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, a dissector, pcapng
-  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs)
+  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs)
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
   <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
@@ -25498,6 +25498,10 @@ crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rus
   p256      Diffie-Hellman on P-256 in constant time (complete formulas)      (SEC 1)
   b64       Base64 (standard and URL alphabet, with or without padding)
   ct_eq / zeroize / hex
+  sha1      Sha1, sha1(data); with hmac_sha1, pbkdf2 (any Hash) and pbkdf2_sha1 in hmac:
+            only for protocols defined with SHA-1 (WPA2-Personal)          (FIPS 180-4)
+  keywrap   aes_wrap / aes_unwrap: the AES key wrap                         (RFC 3394)
+  cmac      cmac_aes: AES-CMAC                                              (RFC 4493)
 
 No randomness here: callers pass random bytes in (plat::fill_random), so everything is
 deterministic and testable.  Secret-dependent work avoids branches and table lookups
@@ -25929,7 +25933,8 @@ partial products meet in one position, so no carry reaches the next used bit).
 Source: [`lib/crypto/hmac.rs`](../lib/crypto/hmac.rs)
 
 ```text
-hmac -- HMAC (RFC 2104) over any Hash, HKDF (RFC 5869), PBKDF2 (RFC 8018)
+hmac -- HMAC (RFC 2104) over any Hash, HKDF (RFC 5869), PBKDF2 (RFC 8018); HMAC-SHA1 and
+PBKDF2-HMAC-SHA1 only for protocols defined with them (WPA2-Personal: its PMK, PRF and MIC)
 ```
 
 - **`struct Hmac<H: Hash>`**
@@ -25962,6 +25967,15 @@ hmac -- HMAC (RFC 2104) over any Hash, HKDF (RFC 5869), PBKDF2 (RFC 8018)
 
 - **`fn pbkdf2_sha256(password: &[u8], salt: &[u8], iterations: u32, out: &mut [u8])`**
   PBKDF2-HMAC-SHA256 (only for importing foreign key files; new keys use Argon2id)
+
+- **`fn hmac_sha1(key: &[u8], data: &[u8]) -> [u8; 20]`**
+  HMAC-SHA1 of a message (older protocols only: WPA2's PRF and MIC)
+
+- **`fn pbkdf2<H: Hash>(password: &[u8], salt: &[u8], iterations: u32, out: &mut [u8])`**
+  PBKDF2 (RFC 8018 5.2) with HMAC over any Hash: fills `out` (any length)
+
+- **`fn pbkdf2_sha1(password: &[u8], salt: &[u8], iterations: u32, out: &mut [u8])`**
+  PBKDF2-HMAC-SHA1 (the PMK of WPA2-Personal: passphrase, SSID, 4096 rounds, 32 bytes)
 
 ### `crypto/p256.rs`
 
@@ -26131,6 +26145,65 @@ x25519 -- Diffie-Hellman on Curve25519 (RFC 7748): Montgomery ladder with masked
 
 - **`fn shared(secret: &[u8; 32], their_public: &[u8; 32]) -> Option<[u8; 32]>`**
   the shared secret with a peer (None when it is all zero)
+
+### `crypto/sha1.rs`
+
+Source: [`lib/crypto/sha1.rs`](../lib/crypto/sha1.rs)
+
+```text
+sha1 -- SHA-1 (FIPS 180-4), streaming and one-shot: only for protocols that are defined with
+it (WPA2's PBKDF2 and PRF, HMAC-SHA1 of older standards); it is broken for collisions, so
+new designs take SHA-256
+```
+
+- **`struct Sha1`**
+  SHA-1
+
+**`impl Sha1`**
+
+- **`const fn new() -> Sha1`**
+- **`fn update(&mut self, mut data: &[u8])`**
+- **`fn finalize(mut self) -> [u8; 20]`**
+
+- **`fn sha1(data: &[u8]) -> [u8; 20]`**
+  SHA-1 of a byte string
+
+### `crypto/keywrap.rs`
+
+Source: [`lib/crypto/keywrap.rs`](../lib/crypto/keywrap.rs)
+
+```text
+keywrap -- the AES key wrap of RFC 3394 (the default initial value A6A6A6A6A6A6A6A6): keys
+that travel encrypted under a key-encrypting key, as WPA2 and WPA3 hand the group key to a
+station in message 3 of the 4-way handshake
+
+  aes_wrap(kek, plain) -> Option<Vec<u8>>     plain: a multiple of 8 bytes, at least 16;
+                                              the result is 8 bytes longer
+  aes_unwrap(kek, wrapped) -> Option<Vec<u8>> None when the integrity check fails
+
+kek is a 16- or 32-byte AES key.
+```
+
+- **`fn aes_wrap(kek: &[u8], plain: &[u8]) -> Option<Vec<u8>>`**
+  wraps `plain` (n \* 8 bytes, n >= 2) under `kek`
+
+- **`fn aes_unwrap(kek: &[u8], wrapped: &[u8]) -> Option<Vec<u8>>`**
+  unwraps what aes_wrap made; None when it is not a multiple of 8 bytes of at least 24 or the
+  check value does not come out
+
+### `crypto/cmac.rs`
+
+Source: [`lib/crypto/cmac.rs`](../lib/crypto/cmac.rs)
+
+```text
+cmac -- AES-CMAC (RFC 4493, NIST SP 800-38B): a message authentication code from the AES
+block cipher, as the MIC of WPA3-Personal's 4-way handshake (AKM 8) and of 802.11w use it
+
+  cmac_aes(key, data) -> Option<[u8; 16]>   key: 16 (AES-128) or 32 bytes; None otherwise
+```
+
+- **`fn cmac_aes(key: &[u8], data: &[u8]) -> Option<[u8; 16]>`**
+  the CMAC of `data` under `key`
 
 ## compress
 
@@ -27554,6 +27627,11 @@ on every target (simulators, packet tools, tests).
   ospf      OspfView, Packet (Hello, Database Description, Link State Request, Update,
             Acknowledgment), LsaHeader, Lsa (router, network, summary, AS-external) with the
             Fletcher checksum, compare (which instance is newer)      (RFC 2328, RFC 905)
+  addrsel   destination address selection: scope, the default policy table (precedence,
+            label), Dest and sort, the order getaddrinfo tries addresses in   (RFC 6724)
+  eapol     EapolView, Key: EAPOL-Key frames of the 4-way handshake (Key Information bits,
+            replay counter, nonces, MIC field, key data), the RSN element, KDEs (GTK,
+            IGTK); mic_input / set_mic for the caller's MIC (802.1X-2004, 802.11-2020 12.7)
 
 Views (XxxView::parse) check lengths once and then read fields without copying; records
 (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -27909,6 +27987,9 @@ pseudo header that does not fit, an ND message whose hop limit is not 255 (RFC 4
 OSPF (IP protocol 89) shows the common header, the fields of the five packet types, every LSA
 header and the links, routers and metrics of the LSAs an update carries, with what a receiver
 refuses: another version, a wrong packet or LSA checksum, bodies that do not fit (RFC 2328).
+EAPOL (ethertype 0x888E) shows its header and an EAPOL-Key body field by field: the Key
+Information bits, replay counter, nonce, MIC and the key data (the RSN element and, when it is
+not encrypted, the KDEs); the summary names the message of the 4-way handshake (eapol.rs).
 ```
 
 ```rust
@@ -27937,6 +28018,7 @@ P_TFTP: u32 = 1 << 21
 P_SNMP: u32 = 1 << 22
 P_LLDP: u32 = 1 << 23
 P_DHCPV6: u32 = 1 << 24
+P_EAPOL: u32 = 1 << 25
 P_DATA: u32 = 1 << 31
 ```
 
@@ -27968,6 +28050,7 @@ P_DATA: u32 = 1 << 31
   - `Snmp`
   - `Lldp`
   - `Data`
+  - `Eapol`
 
 **`impl Proto`**
 
@@ -28446,6 +28529,8 @@ ET_VLAN: u16 = 0x8100
 ET_IPV6: u16 = 0x86DD
 ET_QINQ: u16 = 0x88A8
 ET_LLDP: u16 = 0x88CC
+/// IEEE 802.1X (EAPOL: the 4-way handshake of WPA2 and WPA3)
+ET_EAPOL: u16 = 0x888E
 ```
 
 - **`fn ethertype_name(t: u16) -> Option<&'static str>`**
@@ -30525,6 +30610,232 @@ MAX_SEQ: u32 = 0x7FFF_FFFF
 - **`fn to_bytes(&self) -> Vec<u8>`**
   the packet as bytes: version 2, the type of the body, the length, the checksum (none with
   AU_CRYPTO)
+
+### `netpkt/addrsel.rs`
+
+Source: [`lib/netpkt/addrsel.rs`](../lib/netpkt/addrsel.rs)
+
+```text
+addrsel -- destination address selection after RFC 6724: the scope of an address, the
+default policy table (precedence and label) and the order in which the addresses a name
+resolves to are tried (what getaddrinfo sorts), given the source address each one would use
+
+  scope(a) -> u8            RFC 6724 3.1 and 3.2: the scope of an IPv6 multicast address,
+                            2 (link-local) for fe80::/10 and ::1, 5 for the old site-local
+                            fec0::/10, 14 (global) for the other unicast addresses (unique
+                            local ones included); IPv4: 127/8 and 169.254/16 link-local, the
+                            rest global (private addresses too)
+  precedence(a) / label(a)  the default policy table of RFC 6724 2.1 (an IPv4 address as
+                            ::ffff:a.b.c.d)
+  Dest { addr, src, src_len, src_deprecated }   a destination and what source address
+                            selection gave it (src None: unusable, no route or no source)
+  compare(a, b) / sort(&mut [Dest])   the rules of RFC 6724 6: 1 (unusable last), 2 (matching
+                            scope), 3 (no deprecated source), 5 (matching label), 6 (higher
+                            precedence), 8 (smaller scope), 9 (longest matching prefix, as
+                            glibc only between two IPv6 destinations), 10 (else the order as
+                            given: the sort is stable)
+
+Rules 4 (home addresses) and 7 (native transport) decide nothing without Mobile IPv6 and
+tunnels and are left out.  The default table makes 2001:db8::/32 and other global IPv6
+destinations (precedence 40) come before IPv4 ones (35), and IPv4 before unique local IPv6
+addresses (3): a host with a global IPv6 address tries IPv6 first, one with only a link-local
+IPv6 address IPv4 first (rule 2).
+```
+
+```rust
+/// RFC 6724 3.1: link-local scope (fe80::/10, ::1, IPv4 127/8 and 169.254/16)
+SCOPE_LINK: u8 = 2
+/// the deprecated site-local fec0::/10
+SCOPE_SITE: u8 = 5
+/// global scope
+SCOPE_GLOBAL: u8 = 14
+```
+
+- **`fn precedence(a: IpAddr) -> u8`**
+  the precedence of the default policy table (higher is preferred)
+
+- **`fn label(a: IpAddr) -> u8`**
+  the label of the default policy table (a source and a destination with the same label
+  belong together)
+
+- **`fn scope(a: IpAddr) -> u8`**
+  the scope of an address (RFC 6724 3.1, 3.2)
+
+- **`struct Dest`**
+  a destination to sort and the source address it would leave with
+  - `addr: IpAddr`
+  - `src: Option<IpAddr>` -- the source address selection gave it; None: it cannot be reached (no route, no source)
+  - `src_len: u8` -- the prefix length of the source (the part before its interface identifier: rule 9
+    counts common bits up to it)
+  - `src_deprecated: bool` -- the source is deprecated (its preferred lifetime ended)
+
+**`impl Dest`**
+
+- **`fn new(addr: IpAddr, src: Option<IpAddr>) -> Dest`**
+
+- **`fn compare(a: &Dest, b: &Dest) -> Ordering`**
+  which of two destinations comes first (Less: `a`); Equal leaves their order
+
+- **`fn sort(d: &mut [Dest])`**
+  sorts destinations by RFC 6724 (stable: rule 10 keeps the given order)
+
+### `netpkt/eapol.rs`
+
+Source: [`lib/netpkt/eapol.rs`](../lib/netpkt/eapol.rs)
+
+```text
+eapol -- EAPOL frames (IEEE 802.1X-2004 clause 11) with the EAPOL-Key body of IEEE 802.11-2020
+12.7.2: the four messages of the 4-way handshake, the RSN element a station and an access
+point put into them, and the key data elements (KDEs) of message 3.  No cryptography here:
+the caller computes the MIC over mic_input() (HMAC-SHA1-128 or AES-128-CMAC by the key
+descriptor version) and wraps the key data (the AES key wrap of RFC 3394)
+
+  ET_EAPOL (eth.rs)              0x888E
+  EapolView::parse(pdu)          version, packet type, body length, body
+  Key { info, key_len, replay, nonce, iv, rsc, mic, data }     the EAPOL-Key body
+  Key::parse(body) / Key::pdu(version) -> Vec<u8>   read one, write the whole EAPOL PDU
+  Key::message() -> Option<u8>   1 .. 4 of the 4-way handshake by its Key Information bits
+  mic_input(pdu) -> Vec<u8>      the PDU with the MIC field zero (what the MIC covers)
+  set_mic(pdu, mic)              puts the MIC into a written PDU
+  Rsne { akm, caps }             the RSN element (CCMP for group and pairwise, one AKM):
+                                 to_bytes / parse
+  kde_gtk(id, gtk) / kde_igtk(id, ipn, igtk) / kdes(data)   KDEs and the elements of key
+                                 data (with the padding of 12.7.2 j: 0xdd 0x00 ...)
+  pad_key_data(data)             the padding for the key wrap (a multiple of 8, at least 16)
+  KI_* (Key Information), AKM_* and CIPHER_CCMP (the suites of 00-0F-AC)
+
+The fields are big endian; the key replay counter is a 64-bit number.  Lengths are checked
+once by parse; a body shorter than the 95 fixed bytes is no Key.
+```
+
+```rust
+/// EAPOL packet types (802.1X-2004 11.3.2)
+T_EAP: u8 = 0
+T_START: u8 = 1
+T_LOGOFF: u8 = 2
+T_KEY: u8 = 3
+/// the version 802.1X-2004 writes
+VERSION_2004: u8 = 2
+/// the RSN key descriptor type (802.11-2020 12.7.2)
+DESC_RSN: u8 = 2
+/// Key Information bits (802.11-2020 Figure 12-33)
+KI_VERSION: u16 = 0x0007
+KI_PAIRWISE: u16 = 0x0008
+KI_INSTALL: u16 = 0x0040
+KI_ACK: u16 = 0x0080
+KI_MIC: u16 = 0x0100
+KI_SECURE: u16 = 0x0200
+KI_ERROR: u16 = 0x0400
+KI_REQUEST: u16 = 0x0800
+KI_ENCRYPTED: u16 = 0x1000
+/// key descriptor versions: 2 HMAC-SHA1-128 MIC with the AES key wrap (AKM 2, PSK), 3 AES-128-CMAC
+/// (AKM 6), 0 what the AKM defines (AKM 8, SAE: AES-128-CMAC)
+KDV_AKM: u16 = 0
+KDV_SHA1: u16 = 2
+KDV_CMAC: u16 = 3
+/// the fixed part of an EAPOL-Key body with a 16-byte MIC
+KEY_FIXED: usize = 95
+/// where the MIC sits in the body, its length
+MIC_OFF: usize = 77
+MIC_LEN: usize = 16
+/// the OUI of IEEE 802.11 suites and KDEs
+OUI: [u8; 3] = [0x00, 0x0F, 0xAC]
+/// cipher suite: CCMP-128
+CIPHER_CCMP: u8 = 4
+/// AKM suites: PSK (WPA2-Personal), PSK-SHA256, SAE (WPA3-Personal)
+AKM_PSK: u8 = 2
+AKM_PSK_SHA256: u8 = 6
+AKM_SAE: u8 = 8
+/// RSN capabilities: management frame protection capable / required
+RSN_MFPR: u16 = 0x0040
+RSN_MFPC: u16 = 0x0080
+/// the element id of the RSN element, the id of a vendor element (KDEs)
+EID_RSN: u8 = 48
+EID_VENDOR: u8 = 0xDD
+/// KDE types (802.11-2020 Table 12-10)
+KDE_GTK: u8 = 1
+KDE_PMKID: u8 = 4
+KDE_IGTK: u8 = 9
+```
+
+- **`struct EapolView<'a>`**
+  the EAPOL header and body of a PDU
+
+**`impl<'a> EapolView<'a>`**
+
+- **`fn parse(b: &'a [u8]) -> Option<EapolView<'a>>`**
+  the 4-byte header and a body as long as it says
+- **`fn version(&self) -> u8`**
+- **`fn kind(&self) -> u8`**
+- **`fn body_len(&self) -> usize`**
+- **`fn body(&self) -> &'a [u8]`**
+- **`fn pdu(&self) -> &'a [u8]`**
+  header and body without what follows (Ethernet padding)
+
+- **`fn kind_name(t: u8) -> &'static str`**
+  the name of a packet type ("EAPOL-Key")
+
+- **`struct Key`**
+  an EAPOL-Key body (RSN descriptor, a 16-byte MIC)
+  - `info: u16`
+  - `key_len: u16`
+  - `replay: u64`
+  - `nonce: [u8; 32]`
+  - `iv: [u8; 16]`
+  - `rsc: [u8; 8]`
+  - `mic: [u8; 16]`
+  - `data: Vec<u8>`
+
+**`impl Key`**
+
+- **`fn parse(body: &[u8]) -> Option<Key>`**
+  a key body; None when it is shorter than its fixed part or its key data, or is no RSN
+  descriptor
+- **`fn body(&self) -> Vec<u8>`**
+  the body bytes
+- **`fn pdu(&self, version: u8) -> Vec<u8>`**
+  the whole EAPOL PDU (header with `version`, packet type EAPOL-Key, the body)
+- **`fn version(&self) -> u16`**
+  the key descriptor version (KDV_\*)
+- **`fn has(&self, bits: u16) -> bool`**
+- **`fn message(&self) -> Option<u8>`**
+  which message of the 4-way handshake: 1 (Ack), 2 (MIC), 3 (Ack, MIC, Install), 4 (MIC,
+  Secure); None for a group key message or a request
+
+- **`fn mic_input(pdu: &[u8]) -> Option<Vec<u8>>`**
+  the PDU with the MIC field set to zero: what the MIC covers (None when it holds no key
+  body)
+
+- **`fn set_mic(pdu: &mut [u8], mic: &[u8; 16])`**
+  writes the MIC into a PDU made by Key::pdu
+
+- **`struct Rsne`**
+  the RSN element of a personal network: CCMP for group and pairwise traffic, one AKM
+  - `akm: u8`
+  - `caps: u16`
+
+**`impl Rsne`**
+
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the element with its id and length (22 bytes)
+- **`fn parse(elems: &[u8]) -> Option<Rsne>`**
+  the first RSN element of a list of elements (key data); one pairwise and one AKM suite
+  of 00-0F-AC are read, the counts are little endian as in every element
+
+- **`fn elements(b: &[u8]) -> Vec<(u8, &[u8])>`**
+  the elements of a list: (id, contents); stops at one that does not fit
+
+- **`fn kde_gtk(id: u8, gtk: &[u8]) -> Vec<u8>`**
+  the GTK KDE: key id (0..3), transmit bit clear, the key
+
+- **`fn kde_igtk(id: u16, ipn: u64, igtk: &[u8]) -> Vec<u8>`**
+  the IGTK KDE (management frame protection): key id (4 or 5), its packet number, the key
+
+- **`fn kdes(data: &[u8]) -> Vec<(u8, &[u8])>`**
+  the KDEs of key data: (type, contents after the type); other elements are left out
+
+- **`fn pad_key_data(data: &[u8]) -> Vec<u8>`**
+  key data padded for the key wrap: 0xdd and zeros up to a multiple of 8, at least 16 bytes
 
 ## cas
 
