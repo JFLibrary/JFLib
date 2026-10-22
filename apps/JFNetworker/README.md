@@ -63,6 +63,14 @@ Queues, Lastgeneratoren, eigene Skripte).
   (PAT, Pools, statische Adressen und Port-Weiterleitungen, ICMP-Fehler nach RFC 5508) und
   filtern mit Standard- und erweiterten Zugriffslisten, nummeriert und benannt, mit Zählern und
   den Befehlen des Vorbilds (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)).
+- **Routing mit OSPF (R3):** Router, L3-Switches und die Firewall sprechen OSPF Version 2 nach
+  RFC 2328: `router ospf N` mit `network … area`, `router-id`, `passive-interface`, `auto-cost
+  reference-bandwidth`, `area … stub [no-summary]`, `redistribute`, `default-information
+  originate`, `distance` und `maximum-paths`, an Interfaces Kosten, Priorität, Timer und
+  Netztyp; Hellos, Wahl von DR und BDR, Nachbarn bis Full mit Datenbankabgleich, Flooding mit
+  Bestätigungen und Wiederholungen, Altern der LSAs, SPF mit gleich guten Wegen, Bereiche über
+  einen ABR, Stub-Bereiche und externe Routen (E1, E2); `show ip ospf
+  [neighbor|interface|database]`, `debug ip ospf` (siehe [Routing mit OSPF](#routing-mit-ospf)).
 
 ## Bedienung
 
@@ -165,6 +173,7 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `stp.uis` | Spanning Tree auf der Zeichenfläche (`fixtures/stp_triangle.jfnet`): LEDs bernstein beim Listening und Learning, Edge-Ports grün, nach 30 s nur noch der Alternate-Port von SW3 bernstein, die Kabel „blockiert“ für Screenreader, der Inspektor von SW3; Bilder hell und dunkel (`build/jfnetworker/stp_*.png`) |
 | `model.uis`, Gruppe `rip` | RIP (siehe [Routing mit RIP](#routing-mit-rip)): der erste Austausch auf die Nanosekunde (Request, Update ohne das Netz des Interfaces, die Antwort, die das IOS-artige ARP verliert), Konvergenz und Metriken über zwei Hops, periodische Updates mit Zufallsversatz und ausgelöste mit ihrer Pause, Split Horizon mit Poisoned Reverse auf dem Kabel, ein gezogenes Kabel (ausgelöstes Update mit Metrik 16, Holddown, Garbage Collection nach 120 s), ein schweigender Nachbar (Timeout nach 180 s, gelöscht nach 300 s), passive Interfaces, Distanzen gegen statische Routen, gleich gute Wege (ein Weg je Ziel, `maximum-paths`), Version 1 neben 2, `auto-summary`, Standardroute und Redistribution, RIP auf dem VLAN-Interface eines L3-Switches, die Befehlszeile (Modus, Hilfe, `show`, `debug`, `clear`, die Running-Config als Startkonfiguration), Strom, die Texte auf Deutsch und Englisch, Determinismus |
 | `model.uis`, Gruppe `nat` | Zugriffslisten und NAT (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)): jeder Port-Operator, Wildcards, Protokolle, ICMP-Typen, `established`, spätere Fragmente, die erste Zeile gewinnt, das implizite deny; Zeilennummern, Bemerkungen, `no`, `resequence`; die Konsole mit Modi, Hilfe, `show access-lists` und der Konfiguration, die gelesen wieder dieselbe ist; Listen an Interfaces mit Zählern, Notizen und „administratively prohibited“ unter der Grenze (auf die Nanosekunde), die ausgehende Liste nach NAT, eigene Pakete des Routers; PAT mit zwei Hosts am selben UDP- und TCP-Port (Parität), gleichen ICMP-Kennungen, ein erschöpfter Pool, statische Adressen und Ports mit ARP für die globale Adresse, Filter von außen, ICMP-Fehler in beide Richtungen, Fragmente auch außer der Reihe, die Zeiten der Übersetzungen, Löschen, Strom, `debug ip nat`, deutsche und englische Texte, VLAN-Interfaces, Subinterfaces, die Firewall; die Prüfsummen jedes Frames |
+| `model.uis`, Gruppe `ospf` | OSPF (siehe [Routing mit OSPF](#routing-mit-ospf)): Hellos auf dem Kabel (an 224.0.0.5 mit TTL 1 und Präzedenz 6, alle 10 s) und das Dead-Intervall, die Wahl von DR und BDR mit Prioritäten (ohne Verdrängen; fällt der DR aus, übernimmt der BDR), eine Nachbarschaft durch jeden Zustand auf die Nanosekunde (Master und Slave, Database Description, Request, Update), am LAN die Wartezeit und die erste DD, die das IOS-artige ARP verliert, ein LSA, das vor MinLSArrival kommt, verworfen und wiederholt, Flooding mit verzögerten und direkten Bestätigungen, MinLSInterval, SPF 200 ms nach einer Änderung, Kosten aus der Referenzbandbreite und je Interface, gleich gute Wege, ein gezogenes Kabel und der neue Weg, passive Interfaces mit `traceroute`, Redistribution (E1, E2, `subnets`) und die Standardroute gegen statische Routen und Distanzen, zwei Bereiche über einen ABR mit Stub und `no-summary`, das Erneuern nach 1800 s und MaxAge nach 3600 s, Unstimmigkeiten (Hello-Intervall, Bereich, MTU), die Befehlszeile (Modus, Hilfe, `show`, `debug`, `clear ip ospf process`, die Running-Config als Startkonfiguration), die Texte auf Deutsch und Englisch, Determinismus |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -173,7 +182,7 @@ Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein S
 `stp_triangle.jfnet` und `rstp_triangle.jfnet` (drei Switches im Dreieck mit STP bzw. RSTP) und
 die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`, `rng`, `metrics`, `jmap`,
-`cmdtree`, `hashring`, `lru`, `stp`), die Skriptsprache die Gruppe `script`.
+`cmdtree`, `hashring`, `lru`, `stp`, `ospf`), die Skriptsprache die Gruppe `script`.
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -195,7 +204,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 
 | Teil | Ort | Inhalt |
 |---|---|---|
-| Pakete | [`lib/netpkt`](../../lib/netpkt/lib.rs) | Adressen, Prüfsummen, Codecs von Ethernet bis TCP, DHCP, DNS, NTP, Syslog, HTTP/1.1 (inkrementell, [`http.rs`](../../lib/netpkt/http.rs)), RIP ([`rip.rs`](../../lib/netpkt/rip.rs)), Dissektor, pcapng (Library, ohne I/O) |
+| Pakete | [`lib/netpkt`](../../lib/netpkt/lib.rs) | Adressen, Prüfsummen, Codecs von Ethernet bis TCP, DHCP, DNS, NTP, Syslog, HTTP/1.1 (inkrementell, [`http.rs`](../../lib/netpkt/http.rs)), RIP ([`rip.rs`](../../lib/netpkt/rip.rs)), OSPF ([`ospf.rs`](../../lib/netpkt/ospf.rs)), Dissektor, pcapng (Library, ohne I/O) |
 | Metriken | [`lib/base/metrics.rs`](../../lib/base/metrics.rs) | Counter, Gauge, log-lineares Histogramm, Fenster 300 × 1 s für p50/p95/p99 |
 | Zufall | [`lib/base/rng.rs`](../../lib/base/rng.rs) | deterministische Zufallszahlen (PCG32) für reproduzierbare Läufe |
 | Befehlsbaum | [`lib/base/cmdtree.rs`](../../lib/base/cmdtree.rs) | IOS-artige Befehlszeilen: Abkürzungen, `?`, Tab, Modi, `no`, typisierte Parameter, Fehlerposition |
@@ -220,6 +229,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Spanning Tree | [`crates/jfn_sim/stp.rs`](crates/jfn_sim/stp.rs), [`stp98.rs`](crates/jfn_sim/stp98.rs), [`rstp.rs`](crates/jfn_sim/rstp.rs), [`cli/stp.rs`](crates/jfn_sim/cli/stp.rs), [`lib/netpkt/stp.rs`](../../lib/netpkt/stp.rs), [`src/stptest.rs`](src/stptest.rs) | STP (802.1D-1998) und RSTP (802.1D-2004) auf den Switches, Einstellungen und Befehle, BPDUs, ihr Selbsttest (siehe [Spanning Tree](#spanning-tree)) |
 | Routing | [`crates/jfn_sim/rip.rs`](crates/jfn_sim/rip.rs), [`cli/rip.rs`](crates/jfn_sim/cli/rip.rs), [`src/riptest.rs`](src/riptest.rs), [`lib/netpkt/rip.rs`](../../lib/netpkt/rip.rs) | RIP als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit RIP](#routing-mit-rip)) |
 | NAT und Zugriffslisten | [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs), [`nat.rs`](crates/jfn_sim/nat.rs), [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs), [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs), [`lib/netpkt/nat.rs`](../../lib/netpkt/nat.rs), [`src/nattest.rs`](src/nattest.rs) | Zugriffslisten und Adressübersetzung der IOS-artigen Geräte, ihre Befehle, das Umschreiben der Pakete mit ihren Prüfsummen (Library), ihr Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
+| OSPF | [`crates/jfn_sim/ospf.rs`](crates/jfn_sim/ospf.rs), [`cli/ospf.rs`](crates/jfn_sim/cli/ospf.rs), [`src/ospftest.rs`](src/ospftest.rs), [`lib/netpkt/ospf.rs`](../../lib/netpkt/ospf.rs) | OSPF als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Pakete und LSAs Byte für Byte (siehe [Routing mit OSPF](#routing-mit-ospf)) |
 
 ### Gerätekatalog
 
@@ -911,6 +921,11 @@ IOS-artige Befehlszeile:
   access-group`, `show access-lists`, `ip nat …`, `show ip nat translations|statistics`,
   `clear ip nat translation *`, `debug ip nat` (siehe
   [NAT und Zugriffslisten](#nat-und-zugriffslisten)).
+- OSPF ([`cli/ospf.rs`](crates/jfn_sim/cli/ospf.rs)): `router ospf N` mit eigenem Modus hinter
+  demselben Prompt `(config-router)#`, `ip ospf cost|priority|hello-interval|dead-interval`, `ip
+  ospf network point-to-point|broadcast` und `ip ospf N area M` an Interfaces, `show ip ospf
+  [neighbor|interface [brief|IF]|database]`, `show ip route ospf`, `debug ip ospf
+  adj|events|hello`, `clear ip ospf process` (siehe [Routing mit OSPF](#routing-mit-ospf)).
 
 Hosts und Server haben eine Linux-Shell (`root@PC1:~#`): `ip addr|link|route|neigh` mit den
 Ausgaben und Fehlermeldungen von iproute2, `ping` wie iputils (bis Strg+C oder `-c`; `-i`,
@@ -1077,6 +1092,20 @@ Das Büro hinter NAT (`nat_pat.scn` auf `fixtures/nat_pat.jfnet`, siehe
 [NAT und Zugriffslisten](#nat-und-zugriffslisten)): 24 Erwartungen zu PAT, der
 Port-Weiterleitung von außen, einer Zugriffsliste, `traceroute` durch PAT, `debug ip nat` und
 den abgelaufenen Übersetzungen nach fünf Minuten.
+Zwei Szenarien zeigen OSPF (siehe [Routing mit OSPF](#routing-mit-ospf)).
+`ospf_triangle.scn` auf `fixtures/ospf_triangle.jfnet`: drei Router im Dreieck mit einem
+LAN-Kabel (DR und BDR nach 40 s), einer seriellen Leitung (Kosten 48) und einer
+Ethernet-Verbindung als Punkt-zu-Punkt-Netz, hinter jedem ein PC; `debug ip ospf adj` zeigt die
+Nachbarschaften bis Full, `show ip ospf neighbor`, `interface brief`, `database`, `show ip
+route` und `show ip protocols` die Lage nach 60 s mit zwei gleich guten Wegen zur seriellen
+Leitung; dann fehlt das LAN-Kabel R1–R2: R1 verliert R2 sofort, SPF rechnet 200 ms später, und
+`traceroute` führt über R3 und die serielle Leitung; mit dem Kabel kommt nach einer neuen Wahl
+der kurze Weg zurück. `ospf_areas.scn` auf `fixtures/ospf_areas.jfnet`: vier Router an einem
+Switch wählen DR und BDR nach Priorität (R3 mit 0 nie), R1 ist ABR zu Bereich 1 und zum
+Stub-Bereich 2, R4 ASBR mit einer statischen Route und der Standardroute zu einem Router „im
+Internet“; Summaries (O IA), externe Routen (O E2) über die ASBR-Summaries, die Standardroute
+des Stub-Bereichs (O*IA), Pings und `traceroute` aus beiden Bereichen, der Ausfall des DR (nach
+dem Dead-Intervall übernimmt der BDR, R4 wird BDR) und `area 2 stub no-summary`.
 
 ### Skripte in Hosts
 
@@ -1443,6 +1472,96 @@ nicht ins Web lässt; Pings, `curl` von innen (SRV sieht 203.0.113.1) und von au
 EXT), `traceroute` durch PAT, `debug ip nat`, die Tabellen und nach fünf Minuten die
 abgelaufenen Übersetzungen.
 
+### Routing mit OSPF
+
+Router, L3-Switches und die Firewall sprechen OSPF Version 2 nach RFC 2328
+([`ospf.rs`](crates/jfn_sim/ospf.rs)). OSPF ist ein Dienst des Geräts („ospf“; im Gerätefenster
+unter Dienste mit Statuszeile und Zahlen: Nachbarn, davon Full, LSAs, Routen, SPF-Läufe, Hellos,
+Updates, Wiederholungen …), den die Befehlszeile einrichtet. Er läuft auf virtueller Zeit mit den
+Zufallszahlen des Geräts (die Sequenznummern der Database Description), gleiche Projekte ergeben
+gleiche Läufe. Die Pakete gehen als IP-Protokoll 89 mit TTL 1 und Präzedenz 6 an 224.0.0.5
+(AllSPFRouters) oder 224.0.0.6 (AllDRouters), was einem Nachbarn auf einem Broadcast-Netz allein
+gilt, an seine Adresse.
+
+- **Einrichten** ([`cli/ospf.rs`](crates/jfn_sim/cli/ospf.rs)): `router ospf N` öffnet einen
+  eigenen Modus hinter demselben Prompt `(config-router)#` wie RIP mit `router-id`, `network
+  ADRESSE WILDCARD area BEREICH` (die genaueste Anweisung gewinnt; der Bereich als Zahl oder in
+  Punktschreibweise), `passive-interface IF|default`, `auto-cost reference-bandwidth MBIT/S`
+  (100), `area N stub [no-summary]`, `redistribute connected|static|rip [metric N] [metric-type
+  1|2] [subnets]`, `default-information originate [always] [metric N] [metric-type 1|2]`,
+  `distance`, `maximum-paths` und `log-adjacency-changes [detail]`; an Interfaces `ip ospf cost`,
+  `priority`, `hello-interval`, `dead-interval` (ohne: das Vierfache des Hello-Intervalls),
+  `network point-to-point|broadcast` und `ip ospf N area M`. Ein Gerät hat einen Prozess. Die
+  Router-ID kommt aus `router-id`, sonst von der höchsten Adresse eines Loopbacks, sonst eines
+  anderen Interfaces, und wechselt erst mit `clear ip ospf process` oder einem Neustart. Ein
+  L3-Switch braucht `ip routing`. Alles steht in der Running-Config (nach dem Block von RIP) und
+  kommt beim Start durch dieselbe Befehlszeile zurück.
+- **Interfaces und Nachbarn:** Ethernet ist ein Broadcast-Netz, serielle Leitungen sind
+  Punkt-zu-Punkt, Loopbacks stehen als Host-Route mit Kosten 0 in der Datenbank. Die Kosten sind
+  Referenzbandbreite durch Bandbreite, mindestens 1 (1 Gbit/s: 1, die serielle Leitung mit 2048
+  kbit/s: 48). Hellos gehen alle 10 s; ein Nachbar, von dem 40 s lang keiner kommt, ist weg.
+  Hellos mit anderem Hello- oder Dead-Intervall, anderer Netzmaske (auf einem Broadcast-Netz),
+  anderem Bereich oder anderer Stub-Einstellung werden mit ihrem Grund ignoriert. Interfaces und
+  Nachbarn folgen den Automaten des RFC (9.3, 10.3) mit seinen Ereignisnamen.
+- **DR und BDR:** Auf einem Broadcast-Netz wartet ein Interface 40 s (oder bis sich ein BDR
+  meldet) und wählt dann nach 9.4: höchste Priorität, dann höchste Router-ID; mit Priorität 0
+  nimmt ein Router nie teil. Ein gewählter DR oder BDR bleibt, auch wenn ein besserer kommt;
+  fällt der DR aus, übernimmt der BDR, und ein neuer BDR wird gewählt. Nachbarschaften bis Full
+  gibt es nur zum DR und BDR, die anderen bleiben untereinander in 2-Way. Der DR beschreibt das
+  Netz mit einem Network-LSA.
+- **Datenbankabgleich:** In ExStart wird der Router mit der höheren Router-ID Master; die
+  Database Descriptions tragen die LSA-Köpfe, was dem Nachbarn fehlt oder älter ist, holt er per
+  Link State Request. Der Master wiederholt eine unbeantwortete DD alle 5 s, eine DD mit größerer
+  MTU als die des Interfaces wird abgewiesen. Auf einem Broadcast-Netz geht die erste DD an die
+  Adresse des Nachbarn, das IOS-artige ARP verliert sie, sie kommt 5 s später wieder: eine
+  Nachbarschaft am LAN braucht so gut 45 s.
+- **Flooding:** Ein neues LSA geht über die passenden Interfaces weiter (am LAN über den DR an
+  alle), Bestätigungen gesammelt nach 1 s an die Gruppe oder sofort an den Absender, wo 13.5 das
+  verlangt; was unbestätigt bleibt, geht alle 5 s wieder an den Nachbarn. Eine neuere Instanz, die
+  weniger als 1 s nach der letzten kommt (MinLSArrival), wird verworfen, eigene LSAs entstehen
+  höchstens alle 5 s (MinLSInterval). Eigene LSAs werden nach 1800 s erneuert, fremde mit
+  MaxAge (3600 s) gelöscht; eigene, die es nicht mehr geben soll, gehen vorzeitig mit MaxAge
+  hinaus. Kommt ein eigenes LSA aus früherer Zeit zurück (nach `clear ip ospf process`), überholt
+  der Router es mit der nächsten Sequenznummer.
+- **SPF und Routen:** 200 ms nach einer Änderung rechnet der Router die kürzesten Wege nach
+  Dijkstra (16.1, mit der Prüfung in beide Richtungen), dann die Routen anderer Bereiche über die
+  Summaries der ABRs (16.2) und die externen (16.4: E1 zählt die Kosten zum ASBR dazu und gewinnt
+  vor E2, bei E2 entscheidet bei gleicher Metrik die Entfernung zum ASBR). Bis zu
+  `maximum-paths` (4) gleich gute nächste Hops kommen ins RIB, mit der Distanz 110.
+- **Bereiche:** Ein Router mit Interfaces im Backbone und in anderen Bereichen ist ABR: er meldet
+  die Netze jedes Bereichs als Summary-LSAs (Typ 3) in die anderen und die ASBRs mit Typ 4. Ein
+  Stub-Bereich nimmt keine externen LSAs; der ABR schickt ihm eine Standardroute (Kosten 1), mit
+  `no-summary` nur diese. Wer redistribuiert oder `default-information originate` hat, ist ASBR
+  und schickt AS-externe LSAs (Typ 5; ohne Angabe Typ 2 mit Metrik 20, die Standardroute mit 1).
+  Ohne `subnets` gehen nur Klassennetze hinaus, die Standardroute nie über `redistribute`,
+  sondern über `default-information originate` (mit `always` auch ohne eigene Standardroute).
+- **Anzeigen:** `show ip route [ospf]` mit O, O IA, O E1 und O E2, `[110/Kosten]`, dem Alter und
+  dem Interface; `show ip ospf` (Prozess, Router-ID, Rollen, SPF-Läufe, Bereiche), `show ip ospf
+  neighbor` (Nachbar, Priorität, Zustand mit Rolle, Dead Time, Adresse, Interface), `show ip
+  ospf interface [brief|IF]`, `show ip ospf database` (je Bereich und Typ mit Alter,
+  Sequenznummer und Prüfsumme), `show ip protocols`, `debug ip ospf adj|events|hello`, `clear ip
+  ospf process` (fragt nach, dann beginnt der Prozess neu). Mit `log-adjacency-changes`
+  (eingeschaltet) meldet die Konsole jeden Wechsel nach und von Full, mit `detail` jeden.
+- **Ereignisse:** Jede Entscheidung – Hellos, ignorierte Pakete mit ihrem Grund, Zustände von
+  Interfaces und Nachbarn, die Wahl, Master und Slave, jede DD, jeder Request, jedes Update und
+  jede Bestätigung, neue, eigene, geflutete, bestätigte, gealterte und verworfene LSAs, SPF-Läufe
+  und Routen – steht mit deutschem Text in der Ereignisliste und im Paket-Tab (englisch in
+  `engine.tsv`). Der Simulationsmodus zeigt OSPF-Pakete braun (Filter „OSPF/RIP“), der Paket-Tab
+  zerlegt sie mit jedem LSA und prüft die Prüfsummen ([`netpkt::ospf`](../../lib/netpkt/ospf.rs),
+  [`decode.rs`](../../lib/netpkt/decode.rs)).
+
+Noch offen: virtuelle Links, NSSA, Zusammenfassen an Bereichsgrenzen (`area range`), NBMA und
+Punkt-zu-Mehrpunkt, Authentifizierung (nur Typ 0), mehrere Prozesse auf einem Gerät, Distanzen
+je Art der Route und OSPFv3.
+
+Für Programme: `Action::Ospf { dev, set: OspfSet }` (`Process`, `RouterId`, `Network`, `Passive`,
+`RefBw`, `DefaultOrig`, `Redistribute`, `Stub`, `Distance`, `MaxPaths`, `LogAdj`, `IfCost`,
+`IfPriority`, `IfHello`, `IfDead`, `IfNetwork`, `IfArea`, `Clear`) und `Engine::ospf(dev)` mit
+`cfg`, `ifaces()`, `database(area)`, `externals()`, `routes()`, `border_routers()`,
+`neighbours()` und `route_of()`. Geprüft wird OSPF in der Selbsttest-Gruppe `ospf`
+([`src/ospftest.rs`](src/ospftest.rs)), die Pakete in der coretest-Gruppe `ospf`, dazu die
+Szenarien `ospf_triangle.scn` und `ospf_areas.scn` (siehe [Szenarien](#szenarien-scn)).
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -1508,7 +1627,7 @@ Geste).
 | Phase | Meilensteine |
 |---|---|
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
-| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, OSPF, R4 Spanning Tree (STP, RSTP) ✓, IPv6 · L5 Liniendiagramm und L6 Code-Editor ✓ |
+| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, IPv6 · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
 | 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 

@@ -178,6 +178,10 @@ impl Engine {
         for (n, _) in ends {
             self.rip_kick(n);
         }
+        // and so does OSPF
+        for (n, _) in ends {
+            self.ospf_kick(n);
+        }
     }
 
     /// re-evaluates every link of a node

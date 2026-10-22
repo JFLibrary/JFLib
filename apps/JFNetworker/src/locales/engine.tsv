@@ -697,3 +697,78 @@ Pool {} ist in Gebrauch.	Pool {} is in use.
 Pool {} gibt es nicht.	Pool {} does not exist.
 Diese Adresse hat schon eine statische Übersetzung.	This address has a static translation already.
 Keine solche NAT-Regel.	No such NAT rule.
+# jfn_sim: OSPF (ospf.rs, trace.rs): its decisions (Note::message), the reasons in them, its status lines and refusals
+die Prüfsumme stimmt nicht	the checksum is wrong
+es ist nicht OSPF Version 2	it is not OSPF version 2
+das Paket ist unlesbar	the packet is unreadable
+es gehört zu einem anderen Bereich	it belongs to another area
+die Authentifizierung passt nicht	the authentication does not match
+es trägt die eigene Router-ID	it carries this router's own router ID
+der Absender liegt nicht im Netz des Interfaces	the sender is not on the interface's network
+die Netzmaske passt nicht	the network mask does not match
+das Hello-Intervall passt nicht	the hello interval does not match
+das Dead-Intervall passt nicht	the dead interval does not match
+die Stub-Einstellung des Bereichs passt nicht (E-Bit)	the stub setting of the area does not match (E bit)
+es geht an AllDRouters, das Interface ist weder DR noch BDR	it goes to AllDRouters, the interface is neither DR nor BDR
+OSPF läuft auf diesem Interface nicht	OSPF does not run on this interface
+der Nachbar ist dafür nicht weit genug	the neighbour is not far enough for it
+die MTU des Nachbarn ist größer als die des Interfaces	the neighbour's MTU is larger than the interface's
+eine Wiederholung der letzten Database Description	a repeat of the last database description
+seine Prüfsumme stimmt nicht	its checksum is wrong
+der LSA-Typ ist unbekannt	the LSA type is unknown
+ein AS-externes LSA gehört nicht in einen Stub-Bereich	an AS-external LSA does not belong in a stub area
+die letzte Instanz kam vor weniger als 1 s (MinLSArrival)	the last instance came less than 1 s ago (MinLSArrival)
+neu	new
+erneuert nach 1800 s	refreshed after 1800 s
+eine eigene Instanz von früher kam zurück	an own instance from before came back
+im Bereich	intra-area
+aus einem anderen Bereich	inter-area
+extern Typ 1	external type 1
+extern Typ 2	external type 2
+keiner	none
+{} {} von {} (0x{}, Bereich {})	{} {} from {} (0x{}, area {})
+{} {} von {} (0x{})	{} {} from {} (0x{})
+OSPF ist nicht eingerichtet (kein router ospf).	OSPF is not set up (no router ospf).
+OSPF-Prozess {}, Router-ID {}: Nachbarn: {}, davon Full: {}; LSAs: {}, Routen: {}.	OSPF process {}, router ID {}: neighbours: {}, full: {}; LSAs: {}, routes: {}.
+OSPF-Prozess {}: wartet auf eine Adresse für die Router-ID.	OSPF process {}: waiting for an address for the router ID.
+OSPF-Prozess {}: wartet auf das Gerät.	OSPF process {}: waiting for the device.
+{} routet nicht: hier gibt es kein OSPF.	{} does not route: there is no OSPF here.
+Hier läuft schon OSPF-Prozess {}: ein Gerät hat nur einen.	OSPF process {} runs here already: a device has only one.
+OSPF-Prozess {} gibt es hier nicht.	There is no OSPF process {} here.
+{} taugt nicht als Router-ID.	{} cannot be a router ID.
+Der Backbone (Bereich 0) kann kein Stub-Bereich sein.	The backbone (area 0) cannot be a stub area.
+OSPF: der Prozess arbeitet mit der Router-ID {}.	OSPF: the process works with the router ID {}.
+OSPF: Hello über {} an 224.0.0.5, noch kein Nachbar gesehen.	OSPF: hello on {} to 224.0.0.5, no neighbour seen yet.
+OSPF: Hello über {} an 224.0.0.5, gesehene Nachbarn: {}.	OSPF: hello on {} to 224.0.0.5, neighbours seen: {}.
+OSPF: Hello von {} über {}.	OSPF: hello from {} on {}.
+OSPF: Paket von {} über {} ignoriert: {}.	OSPF: packet from {} on {} ignored: {}.
+OSPF: {} wechselt von {} nach {}.	OSPF: {} goes from {} to {}.
+OSPF: Wahl an {}: DR ist {}, BDR ist {}.	OSPF: election on {}: the DR is {}, the BDR is {}.
+OSPF: Nachbar {} an {}: {} → {} ({}).	OSPF: neighbour {} on {}: {} → {} ({}).
+OSPF: Austausch mit {} an {}: dieser Router ist Master.	OSPF: exchange with {} on {}: this router is the master.
+OSPF: Austausch mit {} an {}: dieser Router ist Slave.	OSPF: exchange with {} on {}: this router is the slave.
+OSPF: Database Description an {} über {} (Flags {}, Nummer 0x{}, LSA-Köpfe: {}).	OSPF: database description to {} on {} (flags {}, sequence 0x{}, LSA headers: {}).
+OSPF: Database Description von {} über {} (Flags {}, Nummer 0x{}, LSA-Köpfe: {}).	OSPF: database description from {} on {} (flags {}, sequence 0x{}, LSA headers: {}).
+OSPF: Link State Request an {} über {}, LSAs: {}.	OSPF: link state request to {} on {}, LSAs: {}.
+OSPF: Link State Request von {} über {}, LSAs: {}.	OSPF: link state request from {} on {}, LSAs: {}.
+OSPF: Link State Update über {} an die Gruppe, LSAs: {} (Flooding).	OSPF: link state update on {} to the group, LSAs: {} (flooding).
+OSPF: Link State Update an {} über {}, LSAs: {} (Antwort auf den Request).	OSPF: link state update to {} on {}, LSAs: {} (the answer to a request).
+OSPF: Link State Update an {} über {}, LSAs: {} (Wiederholung, nicht bestätigt).	OSPF: link state update to {} on {}, LSAs: {} (again, not acknowledged).
+OSPF: Link State Update an {} über {}, LSAs: {} (die neuere Kopie der Datenbank).	OSPF: link state update to {} on {}, LSAs: {} (the newer copy of the database).
+OSPF: Link State Update von {} über {}, LSAs: {}.	OSPF: link state update from {} on {}, LSAs: {}.
+OSPF: verzögerte Bestätigung über {} an die Gruppe, LSAs: {}.	OSPF: delayed acknowledgement on {} to the group, LSAs: {}.
+OSPF: direkte Bestätigung an {} über {}, LSAs: {}.	OSPF: direct acknowledgement to {} on {}, LSAs: {}.
+OSPF: Bestätigung von {} über {}, LSAs: {}.	OSPF: acknowledgement from {} on {}, LSAs: {}.
+OSPF: {} von {} übernommen.	OSPF: {} taken from {}.
+OSPF: eigenes {} ({}).	OSPF: own {} ({}).
+OSPF: {} geflutet, Interfaces: {}.	OSPF: {} flooded, interfaces: {}.
+OSPF: {} hat {} bestätigt.	OSPF: {} acknowledged {}.
+OSPF: eigenes {} wird mit MaxAge zurückgezogen.	OSPF: own {} is withdrawn with MaxAge.
+OSPF: {} hat MaxAge (3600 s) erreicht und wird noch einmal geflutet.	OSPF: {} reached MaxAge (3600 s) and is flooded once more.
+OSPF: {} aus der Datenbank entfernt.	OSPF: {} removed from the database.
+OSPF: {} schickte eine ältere Instanz von {}: es bekommt die neuere.	OSPF: {} sent an older instance of {}: it gets the newer one.
+OSPF: {} verworfen: {}.	OSPF: {} dropped: {}.
+OSPF: SPF-Lauf {}: Routen: {}, neu: {}, geändert: {}, entfallen: {}.	OSPF: SPF run {}: routes: {}, new: {}, changed: {}, gone: {}.
+OSPF: Route {} ({}) über {}, Kosten {}.	OSPF: route {} ({}) via {}, cost {}.
+OSPF: Route {} ({}) jetzt über {}, Kosten {}.	OSPF: route {} ({}) now via {}, cost {}.
+OSPF: Route {} ({}) entfällt.	OSPF: route {} ({}) is gone.

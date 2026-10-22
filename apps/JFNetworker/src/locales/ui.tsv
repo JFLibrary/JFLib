@@ -870,3 +870,6 @@ Fehler|Zeitleiste	Faults
 
 # RIP (R2): the kind of the service in the Dienste tab and the Metriken panel
 Routing (RIP)	Routing (RIP)
+
+# OSPF (R3): the kind of the service in the Dienste tab and the Metriken panel
+Routing (OSPF)	Routing (OSPF)

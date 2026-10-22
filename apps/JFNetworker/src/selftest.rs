@@ -22,6 +22,7 @@
 // stptest.rs: spanning tree on the switches (group stp: STP and RSTP, jfn_sim::stp).
 // riptest.rs: RIP on routers and L3 switches (group rip: jfn_sim::rip, cli/rip.rs).
 // nattest.rs: access lists and NAT (group nat: jfn_sim::acl, jfn_sim::nat, their console).
+// ospftest.rs: OSPF version 2 on routers and L3 switches (group ospf: jfn_sim::ospf, cli/ospf.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -69,9 +70,11 @@ mod scriptedtest;
 mod labuitest;
 #[path = "nattest.rs"]
 mod nattest;
+#[path = "ospftest.rs"]
+mod ospftest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 28] = [
+    let groups: [(&'static str, fn(&mut T)); 29] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -100,6 +103,7 @@ pub fn run() -> i32 {
         ("stp", crate::simtest::stptest::run),
         ("rip", crate::simtest::riptest::run),
         ("nat", nattest::run),
+        ("ospf", ospftest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

@@ -37,6 +37,10 @@
 //            modes), ip access-group, show access-lists, clear access-list counters
 //   nat      IOS NAT: ip nat inside|outside, ip nat pool, ip nat inside source, translation
 //            timeouts, show ip nat translations|statistics, clear ip nat, debug ip nat
+//   ospf     OSPF at the IOS-like command line: "router ospf N" (its own tree mode behind
+//            "(config-router)#"), "ip ospf ...", show ip ospf [neighbor|interface|database],
+//            the O routes of show ip route, debug ip ospf adj|events|hello, clear ip ospf
+//            process, the lines of the running configuration
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -74,6 +78,7 @@ pub mod stp;
 pub mod rip;
 pub mod acl;
 pub mod nat;
+pub mod ospf;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -84,6 +89,17 @@ pub const D_STP: u32 = 4;
 pub const D_RIP: u32 = 0x100;
 /// "debug ip nat" (a bit of its own, away from the others' next ones)
 pub const D_NAT: u32 = 0x200;
+/// "debug ip ospf adj|events|hello" (which of them: CliDev::ospf_debug)
+pub const D_OSPF: u32 = 0x400;
+
+/// the routing process a "(config-router)#" console sets up
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Proc {
+    /// "router rip"
+    Rip,
+    /// "router ospf N"
+    Ospf(u16),
+}
 
 /// where an IOS console is
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -99,8 +115,8 @@ pub enum Mode {
     Out,
     /// "ip dhcp pool NAME": "(dhcp-config)#"
     DhcpPool,
-    /// "router rip": "(config-router)#"
-    Router,
+    /// "router rip", "router ospf N": "(config-router)#" for the process it names
+    Router(Proc),
     /// "ip access-list standard|extended NAME": "(config-std-nacl)#", "(config-ext-nacl)#"
     AclStd,
     AclExt,
@@ -175,6 +191,8 @@ pub struct Ask {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AskKind {
     CopyRunStart,
+    /// "clear ip ospf process"
+    ClearOspf,
 }
 
 /// a console command that runs over virtual time
@@ -223,6 +241,8 @@ pub struct CliDev {
     pub(crate) booting: bool,
     /// the list of an access list's mode
     pub acl: String,
+    /// what "debug ip ospf" shows (cli/ospf.rs DO_*; none: everything)
+    pub ospf_debug: u8,
 }
 
 impl CliDev {
@@ -245,6 +265,7 @@ impl CliDev {
             rcvd_hop: 0,
             booting: false,
             acl: String::new(),
+            ospf_debug: 0,
         }
     }
 }
@@ -270,6 +291,7 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
         n if n.is_stp_event() => c.debug > 0,
         n if n.is_rip() => c.debug > 0,
         n if n.is_nat() => c.debug > 0,
+        n if n.is_ospf() => c.debug > 0,
         _ => false,
     }
 }

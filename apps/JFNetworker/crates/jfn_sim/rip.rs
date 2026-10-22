@@ -773,8 +773,11 @@ impl Rip {
                 v.push(Route { prefix: *k, via: Some(p.via), iface: Some(p.iface), src: RouteSrc::Rip, ad: self.cfg.distance, metric: e.metric as u32 });
             }
         }
-        if let Some(st) = os.eng.stack_mut(os.ni) {
-            st.set_dynamic(RouteSrc::Rip, v);
+        let ni = os.ni;
+        let changed = os.eng.stack_mut(ni).is_some_and(|st| st.set_dynamic(RouteSrc::Rip, v));
+        // OSPF may redistribute them (ospf.rs)
+        if changed {
+            os.eng.ospf_kick(ni);
         }
     }
 

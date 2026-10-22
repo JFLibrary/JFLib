@@ -11,7 +11,8 @@
 //
 // Modes: User ">", Priv "#", Config "(config)#", If "(config-if)#", SubIf "(config-subif)#",
 // Vlan "(config-vlan)#", Line "(config-line)#", DhcpPool "(dhcp-config)#" (the DHCP commands
-// are in netsvc.rs), Router "(config-router)#" ("router rip": rip.rs), AclStd
+// are in netsvc.rs), Router "(config-router)#" ("router rip": rip.rs; "router ospf N": ospf.rs,
+// a tree mode of its own behind the same prompt, found by its key), AclStd
 // "(config-std-nacl)#" and AclExt "(config-ext-nacl)#" (acl.rs; found by their prompt,
 // tree_mode).  Interfaces are taken by any IOS spelling
 // ("g0/0/0", "Gi 0/0/0", "lo0", "vlan 10"); "interface Loopback5", "interface Vlan20" and
@@ -151,6 +152,25 @@ pub enum K {
     ShowNatTrans,
     ShowNatStats,
     ClearNat,
+    // OSPF (cli/ospf.rs)
+    RouterOspf,
+    OspfRouterId,
+    OspfNetwork,
+    OspfPassive,
+    OspfAutoCost,
+    OspfDefault,
+    OspfRedist,
+    OspfStub,
+    OspfDistance,
+    OspfMaxPaths,
+    OspfLogAdj,
+    OspfIf,
+    ShowOspf,
+    ShowOspfNbr,
+    ShowOspfIf,
+    ShowOspfDb,
+    DebugOspf,
+    ClearOspf,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -178,7 +198,7 @@ fn mode_id(m: Mode) -> ModeId {
         Mode::Vlan => VLAN,
         Mode::Line => LINE,
         Mode::DhcpPool => POOL,
-        Mode::Router => ROUTER,
+        Mode::Router(_) => ROUTER,
         // modes of later parts are found by their prompt (tree_mode)
         Mode::AclStd | Mode::AclExt => CONF,
     }
@@ -189,6 +209,8 @@ fn mode_id(m: Mode) -> ModeId {
 fn tree_mode(t: &Tree<K>, m: Mode) -> ModeId {
     match m {
         Mode::AclStd | Mode::AclExt => t.find_mode(prompt_suffix(m)).unwrap_or(CONF),
+        // OSPF's router mode shares the prompt with RIP's: the tree knows it by its key
+        Mode::Router(super::Proc::Ospf(_)) => t.find_mode(super::ospf::MODE_KEY).unwrap_or(CONF),
         _ => mode_id(m),
     }
 }
@@ -205,7 +227,7 @@ pub fn prompt_suffix(m: Mode) -> &'static str {
         Mode::Line => "(config-line)#",
         Mode::Out => "",
         Mode::DhcpPool => "(dhcp-config)#",
-        Mode::Router => "(config-router)#",
+        Mode::Router(_) => "(config-router)#",
         Mode::AclStd => "(config-std-nacl)#",
         Mode::AclExt => "(config-ext-nacl)#",
     }
@@ -486,6 +508,8 @@ fn build(caps: u32) -> Tree<K> {
     if router {
         super::nat::build_nat(&mut t, [user, prv, conf, ifm, sub]);
     }
+    // ---- OSPF with its own router mode (cli/ospf.rs)
+    super::ospf::build_ospf(&mut t, [user, prv, conf, ifm, sub], router);
     t
 }
 
@@ -660,7 +684,7 @@ impl Engine {
             Ok(p) => self.ios_do(ni, mode, &p, line),
             Err(err) => {
                 // a configuration submode falls back to the global configuration
-                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool | Mode::Router | Mode::AclStd | Mode::AclExt) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
+                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool | Mode::Router(_) | Mode::AclStd | Mode::AclExt) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
                 match up {
                     Some(p) => {
                         self.set_mode(ni, Mode::Config);
@@ -778,7 +802,7 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT
+                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_OSPF
                 } else if p.has("icmp") {
                     D_ICMP
                 } else if p.has("rip") {
@@ -838,6 +862,9 @@ impl Engine {
                 // without routing there is no routing process either
                 if p.no {
                     let _ = self.apply(Action::Rip { dev, set: crate::rip::RipSet::Process(false) });
+                    if let Some(pid) = self.ospf_of(ni).filter(|o| o.cfg.on).map(|o| o.cfg.pid) {
+                        let _ = self.apply(Action::Ospf { dev, set: crate::ospf::OspfSet::Process { pid, on: false } });
+                    }
                 }
                 Ok(())
             }
@@ -981,6 +1008,24 @@ impl Engine {
             | K::ShowProtocols
             | K::ClearRoute => self.ios_rip(ni, p),
             K::NatPool | K::NatList | K::NatStatic | K::NatTimeout | K::ShowNatTrans | K::ShowNatStats | K::ClearNat => self.ios_nat(ni, p),
+            K::RouterOspf
+            | K::OspfRouterId
+            | K::OspfNetwork
+            | K::OspfPassive
+            | K::OspfAutoCost
+            | K::OspfDefault
+            | K::OspfRedist
+            | K::OspfStub
+            | K::OspfDistance
+            | K::OspfMaxPaths
+            | K::OspfLogAdj
+            | K::OspfIf
+            | K::ShowOspf
+            | K::ShowOspfNbr
+            | K::ShowOspfIf
+            | K::ShowOspfDb
+            | K::DebugOspf
+            | K::ClearOspf => self.ios_ospf(ni, p),
         }
     }
 
@@ -995,6 +1040,7 @@ impl Engine {
                     self.out(ni, &format!("%Error opening {} (Invalid argument)\n", t));
                 }
             }
+            AskKind::ClearOspf => self.ios_ospf_clear(ni, line),
         }
     }
 

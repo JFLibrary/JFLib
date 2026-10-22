@@ -86,6 +86,12 @@
 //   nat      address translation of IOS-like devices: inside and outside interfaces, pools,
 //            PAT, static addresses and ports; TCP, UDP, ICMP queries and errors (RFC 5508),
 //            fragments, timeouts; the order of lists, routing and translation
+//   ospf     OSPF version 2 (RFC 2328) as the service "ospf" of IOS-like routers and L3
+//            switches: interfaces with DR / BDR election, neighbours from Down to Full with the
+//            database exchange, flooding with acknowledgements and retransmission, aging and
+//            refresh, SPF per area, inter-area routes over an ABR, AS-external routes
+//            (redistribution, default route); its routes in the RIB with distance 110;
+//            OspfCfg / OspfSet (Action::Ospf)
 //
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
@@ -146,6 +152,7 @@ pub mod rstp;
 pub mod rip;
 pub mod acl;
 pub mod nat;
+pub mod ospf;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -190,3 +197,4 @@ pub use stp::{LinkType, ModeWord, PortRole, PortState, StpPortView, StpSet, Tree
 pub use rip::{Redist, Rip, RipCfg, RipDrop, RipHow, RipLoss, RipOut, RipSet, RipTimers};
 pub use acl::{Ace, Acl, AclKind, AclOp, AclView};
 pub use nat::{Nat, NatAct, NatStats, Tmo, XlateRow};
+pub use ospf::{IfState, LsaDrop, LsaRef, LsuWhy, NbrEvent, NbrState, NetType, OrigWhy, Ospf, OspfCfg, OspfDrop, OspfSet, RtChange, RtKind};
