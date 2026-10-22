@@ -17,6 +17,10 @@
 //                       tree (stp.rs); the text names those that do not when some do
 //   ShutWithAddress     an interface with an address that is shut down
 //   DuplicateIpv6       duplicate address detection found another node with an IPv6 address
+//   WlanNoNetwork       a WLAN station whose SSID no access point offers (error), or none of
+//                       them in range on the station's bands (warning)
+//   WlanPassphrase      a station's passphrase is not the one of its network, or it has none
+//   WlanBadNet          a network an access point cannot offer (jfn_model::wlan::check_net)
 //
 // Problem::text is German; Problem::msg is the same as a template with arguments for the app's
 // catalogue (jfn_model::msg).
@@ -78,6 +82,12 @@ pub enum ProblemKind {
     Loop,
     ShutWithAddress,
     DuplicateIpv6,
+    /// a WLAN station whose network no access point offers, or none in range
+    WlanNoNetwork,
+    /// a WLAN station whose passphrase does not fit its network (or is missing)
+    WlanPassphrase,
+    /// a network an access point cannot offer (SSID, channel, 6 GHz without WPA3, passphrase)
+    WlanBadNet,
 }
 
 /// a problem of the set-up
@@ -227,6 +237,7 @@ impl Engine {
         self.cables(&mut out);
         self.loops(&tags, &mut out);
         self.dup_ip6s(&mut out);
+        self.wlan_problems(&mut out);
         out.sort_by(|a, b| (a.severity, a.dev, a.port, a.kind, &a.text).cmp(&(b.severity, b.dev, b.port, b.kind, &b.text)));
         out
     }
@@ -281,6 +292,11 @@ impl Engine {
                 let Some(Some(node)) = self.nodes.get(n) else {
                     continue;
                 };
+                // the access point's end of a WLAN association: the station's VLAN (wlan.rs)
+                if let Some(vid) = self.wlan_end_vlan(li, n) {
+                    v.push(Edge { a: Spot::Wire(li, 0), b: Spot::Vlan(n, vid), node: n, port: p, link: li });
+                    continue;
+                }
                 let Some(BridgePort { mode, member: true, .. }) = node.bridge.as_ref().and_then(|b| b.ports.get(p as usize)) else {
                     continue;
                 };

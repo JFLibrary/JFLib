@@ -21,6 +21,8 @@
 // Reduced motion draws no tweens and lets the crosses stand.  A frame's label (hit area,
 // tooltip) is made once (Labels: decoding costs, hundreds of frames move at once); frames whose
 // numbers meet in ID_PKT0 + number % 1024 share no id: the first one shown keeps it.
+// A WLAN association has no cable: its frames move along its radio line from the station to
+// the access point (canvas/wlan.rs, route).
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -322,12 +324,23 @@ fn frames(n: &Net, ui: &mut Ui) -> (Vec<Hit>, usize) {
     let g = (w + ui.dp(8)) as f32;
     let (x0, y0, x1, y1) = (r[0] as f32 - g, r[1] as f32 - g, (r[0] + r[2]) as f32 + g, (r[1] + r[3]) as f32 + g);
     for it in items {
-        let Some(rt) = st.route(it.link as u64) else { continue };
-        if rt.pts.len() < 2 {
+        // a cable's route, or the radio line of a WLAN association (canvas/wlan.rs)
+        let wl;
+        let pts: &[[f32; 2]] = match st.route(it.link as u64) {
+            Some(rt) => &rt.pts,
+            None => match crate::workspace::canvas::wlan::route(n, it.link) {
+                Some(p) => {
+                    wl = p;
+                    &wl
+                }
+                None => continue,
+            },
+        };
+        if pts.len() < 2 {
             continue;
         }
         let f = if it.dir == 0 { it.pos } else { 1.0 - it.pos };
-        let p = vp.to_screen(dg_point_at(&rt.pts, f));
+        let p = vp.to_screen(dg_point_at(pts, f));
         if p[0] < x0 || p[0] > x1 || p[1] < y0 || p[1] > y1 {
             continue;
         }
@@ -380,10 +393,15 @@ fn crosses(n: &Net, ui: &mut Ui) {
     let lw = ui.dp(2) * 256;
     for d in &n.sim.drops.marks {
         let at = match (d.lost, d.hop.and_then(|h| eng.trace.hop(h))) {
-            (Some(_), Some(h)) => st.route(h.link as u64).filter(|rt| rt.pts.len() >= 2).map(|rt| {
-                let forward = n.doc.proj.link(h.link).is_none_or(|l| l.a.dev == h.from.0);
-                dg_point_at(&rt.pts, if forward { 0.85 } else { 0.15 })
-            }),
+            (Some(_), Some(h)) => {
+                // a cable, or the radio line of a WLAN association (from its station)
+                let forward = match n.doc.proj.link(h.link) {
+                    Some(l) => l.a.dev == h.from.0,
+                    None => n.doc.sim.wlan.iter().find(|a| a.id == h.link).is_none_or(|a| a.sta == h.from.0),
+                };
+                let pts = st.route(h.link as u64).map(|rt| rt.pts.clone()).or_else(|| crate::workspace::canvas::wlan::route(n, h.link));
+                pts.filter(|p| p.len() >= 2).map(|p| dg_point_at(&p, if forward { 0.85 } else { 0.15 }))
+            }
             _ => n.doc.proj.device(d.dev).map(|x| [x.x as f32 + DEV_W - 6.0, x.y as f32 + 6.0]),
         };
         let Some(w) = at else { continue };

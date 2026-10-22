@@ -1,0 +1,41 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/wlan_office.jfnet
+# WLAN live on the canvas (canvas/wlan.rs, doc/sim.rs Sim::moved): Laptop1 dragged out of the
+# range of both access points while the button is held.  The simulator follows the drag at
+# once: the radio line says "außer Reichweite" until the station has missed seven beacons
+# (716.8 ms), then the association is gone and the station looks for its network in vain.
+# Dropped, the move is one undo step; undone, Laptop1 is back and joins AP1 again (a scan of
+# 760 ms, authentication, association, the 4-way handshake).  The window fits the office at
+# 71 %: Laptop1 at 536,471 (46 x 34), AP1 at 494,371.
+size 1280 900
+theme light
+wait 2000
+expect text:"Funk: Laptop1 – AP1 (Buero, 5 GHz, -71 dBm, 576,0 Mbit/s)" exists
+expect text:"Funk: Phone1 – AP1 (Gaeste, 2,4 GHz, -71 dBm, 137,6 Mbit/s)" exists
+move listitem:"Laptop1"
+down listitem:"Laptop1"
+move 700,560
+move 899,638
+wait 200
+expect text:"Funk: Laptop1 – AP1 (Buero, 5 GHz, außer Reichweite)" exists
+wait 1000
+expect text:"Funk: Laptop1 – AP1 (Buero, 5 GHz, außer Reichweite)" missing
+expect text:"Funk: Laptop1 – nicht verbunden („Buero“)" exists
+shot build/jfnetworker/wlan_drag_out.png
+up
+expect text:"Funk: Laptop1 – nicht verbunden („Buero“)" exists
+expect text:"Funk: Phone1 – AP1 (Gaeste, 2,4 GHz, -71 dBm, 137,6 Mbit/s)" exists
+# the inspector of the station says why (after its new scan of 760 ms)
+wait 1000
+click listitem:"Laptop1"
+expect text:"„Buero“ ist nicht in Reichweite" exists
+# one undo step: back at its place it finds AP1 again
+click button:"Rückgängig"
+wait 1500
+expect text:"Funk: Laptop1 – AP1 (Buero, 5 GHz, -71 dBm, 576,0 Mbit/s)" exists
+expect text:"Funk: Laptop1 – nicht verbunden („Buero“)" missing
+expect text:"verbunden" exists
+shot build/jfnetworker/wlan_drag_back.png
+# redo: out of reach again (the step brings the position, the simulator the rest)
+click button:"Wiederholen"
+wait 1000
+expect text:"Funk: Laptop1 – nicht verbunden („Buero“)" exists

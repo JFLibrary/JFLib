@@ -1,0 +1,51 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/wlan_office.jfnet
+# the ranges of the access points (canvas/wlan.rs): a selected access point shows the circles of
+# its bands (AP1: 2.4 GHz 50 m for the guest network, 5 GHz 35 m for Buero, at 10 units per
+# metre), Ansicht › WLAN-Reichweiten (command 480) shows those of all of them, also from the
+# keyboard (Alt+A, W); every circle is a text record for screen readers and scripts.  The scale on
+# the project's page changes the circles (one undo step).  Ids: 62752 the scale's field.
+size 1280 900
+theme light
+wait 1000
+expect text:"Reichweite: AP1, 2,4 GHz 50 m, 5 GHz 35 m" missing
+expect text:"Reichweite: AP2, 5 GHz 35 m" missing
+click listitem:"AP1"
+expect text:"Reichweite: AP1, 2,4 GHz 50 m, 5 GHz 35 m" exists
+expect text:"Reichweite: AP2, 5 GHz 35 m" missing
+shot build/jfnetworker/wlan_range_ap1.png
+# all of them from the menu
+click menu:"Ansicht"
+expect menuitem:"WLAN-Reichweiten" unchecked
+click menuitem:"WLAN-Reichweiten"
+expect text:"Reichweite: AP1, 2,4 GHz 50 m, 5 GHz 35 m" exists
+expect text:"Reichweite: AP2, 5 GHz 35 m" exists
+click 300,640
+expect text:"Reichweite: AP2, 5 GHz 35 m" exists
+shot build/jfnetworker/wlan_range_all.png
+# off from the keyboard: nothing selected, no circles
+key alt+a
+expect menuitem:"WLAN-Reichweiten" checked
+key w
+expect text:"Reichweite: AP1, 2,4 GHz 50 m, 5 GHz 35 m" missing
+expect text:"Reichweite: AP2, 5 GHz 35 m" missing
+cmd 480
+expect text:"Reichweite: AP2, 5 GHz 35 m" exists
+# the scale on the project's page: 20 units per metre, the circles twice as large
+expect text:"Maßstab" exists
+click #62752
+key ctrl+a
+type "20\n"
+expect text:"Ein Meter sind 20 Einheiten der Zeichenfläche (bei 100 % Pixel); danach richten sich die Reichweiten im WLAN." exists
+shot build/jfnetworker/wlan_range_scale.png
+click listitem:"AP2"
+expect text:"2,4 GHz: 50 m (1000 Einheiten)\n5 GHz: 35 m (700 Einheiten)\n6 GHz: 25 m (500 Einheiten)" exists
+click button:"Rückgängig"
+expect text:"2,4 GHz: 50 m (500 Einheiten)\n5 GHz: 35 m (350 Einheiten)\n6 GHz: 25 m (250 Einheiten)" exists
+click 300,640
+expect text:"Ein Meter sind 10 Einheiten der Zeichenfläche (bei 100 % Pixel); danach richten sich die Reichweiten im WLAN." exists
+# a wrong scale is refused
+click #62752
+key ctrl+a
+type "0\n"
+expect text:"Eine ganze Zahl von 1 bis 1000." exists
+key esc

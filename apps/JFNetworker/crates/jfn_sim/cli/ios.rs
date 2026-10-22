@@ -183,6 +183,8 @@ pub enum K {
     ShowOspfDb,
     DebugOspf,
     ClearOspf,
+    // WLAN on access points (cli/wlan.rs)
+    ShowDot11,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -524,6 +526,10 @@ fn build(caps: u32) -> Tree<K> {
     super::ip6::build_ip6(&mut t, [user, prv, conf, ifm, sub], router);
     // ---- OSPF with its own router mode (cli/ospf.rs)
     super::ospf::build_ospf(&mut t, [user, prv, conf, ifm, sub], router);
+    // ---- WLAN on access points (cli/wlan.rs)
+    if caps & CAP_AP != 0 {
+        super::wlan::build_wlan(&mut t, [user, prv]);
+    }
     t
 }
 
@@ -1041,6 +1047,7 @@ impl Engine {
             | K::ShowOspfDb
             | K::DebugOspf
             | K::ClearOspf => self.ios_ospf(ni, p),
+            K::ShowDot11 => self.ios_dot11(ni, p),
         }
     }
 

@@ -23,6 +23,13 @@
 // the Forwarding state and learns in Learning and Forwarding; BPDUs go to the protocol, BPDU
 // guard shuts a port off on the first one.  During an 802.1D topology change entries age out
 // after Forward Delay (fast_aging).
+//
+// WLAN (wlan.rs): the radio port of an access point without a cable has all its stations
+// behind it.  A frame from one of them (bridge_input_from with its association) to another
+// station of the same port is relayed instead of filtered, a flood goes back out of the radio
+// too (to the other stations), and what goes out of a radio port goes through wlan_ap_send,
+// which knows the sender (client isolation, guest networks); such a port counts as live while
+// a station of it has finished its handshake.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -381,12 +388,27 @@ fn link_local(m: Mac) -> bool {
 impl Engine {
     /// the forwarding decision of a bridge for one frame received on port `pi`
     pub(crate) fn bridge_input(&mut self, ni: usize, pi: u16, frame: Frame, hop: HopId) {
+        self.bridge_input_from(ni, pi, frame, hop, None);
+    }
+
+    /// bridge_input for a frame of a WLAN station (`from`: its association) or of a cable
+    pub(crate) fn bridge_input_from(&mut self, ni: usize, pi: u16, frame: Frame, hop: HopId, from: Option<u32>) {
         let now = self.now;
         // ports whose link carries traffic (a bridge floods only to those; with spanning tree
-        // only to those that forward)
-        let live: Vec<bool> = match self.nodes.get(ni) {
-            Some(Some(n)) => n.ports.iter().enumerate().map(|(i, p)| p.link.is_some_and(|li| self.link_up(li)) && n.bridge.as_ref().is_none_or(|b| b.stp.forwards(i as u16))).collect(),
+        // only to those that forward); the radio ports of an access point (wlan.rs)
+        let radio: Vec<bool> = match self.nodes.get(ni) {
+            Some(Some(n)) => (0..n.ports.len() as u16).map(|i| self.wlan_dyn_radio(ni, i)).collect(),
             _ => return,
+        };
+        let live: Vec<bool> = match self.nodes.get(ni) {
+            Some(Some(n)) => n.ports.iter().enumerate().map(|(i, p)| (p.link.is_some_and(|li| self.link_up(li)) || radio[i] && self.wlan_radio_live(ni, i as u16)) && n.bridge.as_ref().is_none_or(|b| b.stp.forwards(i as u16))).collect(),
+            _ => return,
+        };
+        // a guest of a routing device reaches only the device itself
+        let guest = from.is_some_and(|a| self.wlan_guest_router(a));
+        let src = match from {
+            Some(a) => crate::wlan::Src::Sta(a),
+            None => crate::wlan::Src::Wired,
         };
         // the bridge's own interfaces that are up: (vlan, interface)
         let svis: Vec<(u16, u16)> = match self.stack(ni) {
@@ -470,18 +492,27 @@ impl Engine {
             self.note(dev, Some(hop), Note::StpBlocked { port: p, state });
             return;
         }
-        // the ports that carry the VLAN and have a cable
+        // the ports that carry the VLAN and have a cable (a radio relays between its stations;
+        // a guest of a routing device reaches no port)
+        let radio_in = radio[pi as usize];
         let out: Vec<u16> = match target {
-            Some(p) if p == pi => Vec::new(),
+            _ if guest => Vec::new(),
+            Some(p) if p == pi && !radio_in => Vec::new(),
             Some(p) => alloc::vec![p],
-            None => (0..br.ports.len() as u16).filter(|&p| p != pi && br.carries(p, vlan) && live[p as usize]).collect(),
+            None => (0..br.ports.len() as u16).filter(|&p| (p != pi || radio_in) && br.carries(p, vlan) && live[p as usize]).collect(),
         };
         let tagged_on: Vec<bool> = out.iter().map(|&p| br.tags(p, vlan)).collect();
         if let Some(n) = learned {
             self.note(dev, Some(hop), n);
         }
         match target {
-            Some(p) if p == pi => {
+            _ if guest => {
+                if !l2.dst.is_multicast() {
+                    self.note(dev, Some(hop), Note::Wlan(crate::wlantrace::WNote::Isolated { mac: l2.dst, guest: true }));
+                    return;
+                }
+            }
+            Some(p) if p == pi && !radio_in => {
                 self.note(dev, Some(hop), Note::Filtered { vlan });
                 return;
             }
@@ -497,7 +528,11 @@ impl Engine {
             } else {
                 plain.clone()
             };
-            self.send(ni, p, f, Some(hop));
+            if radio[p as usize] {
+                self.wlan_ap_send(ni, p, f, Some(hop), src);
+            } else {
+                self.send(ni, p, f, Some(hop));
+            }
         }
         // broadcasts and groups also reach the bridge's own interface in the VLAN
         if l2.dst.is_multicast()
@@ -517,7 +552,7 @@ impl Engine {
         let Some(br) = node.bridge.as_ref() else {
             return;
         };
-        let live = |p: u16| node.ports[p as usize].link.is_some_and(|li| self.link_up(li)) && br.stp.forwards(p);
+        let live = |p: u16| (node.ports[p as usize].link.is_some_and(|li| self.link_up(li)) || self.wlan_dyn_radio(ni, p) && self.wlan_radio_live(ni, p)) && br.stp.forwards(p);
         let dst = netpkt::eth::EthView::parse(&frame).map(|e| e.dst());
         let target = dst.filter(|d| d.is_unicast()).and_then(|d| br.lookup(vlan, d, now)).filter(|&p| live(p) && br.carries(p, vlan));
         let out: Vec<u16> = match target {

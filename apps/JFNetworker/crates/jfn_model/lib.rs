@@ -16,6 +16,9 @@
 //             of large projects: --gen-topology, jfn-sim gen)
 //   lab       Lab, Goal, Text: the task of a lab project (title, introduction, goals with checks
 //             in the expectation syntax of scenarios, hints; German and English)
+//   wlan      Wlan, WlanNet, WlanJoin, Band, Security: the networks of access points and what
+//             stations join; bands, ranges, radio ports, channels of the models; the scale
+//             of the canvas (dip_per_m)
 //
 // Device identity is the project's numeric id; ports are referenced by their full interface
 // name ("GigabitEthernet1/0/1", "eth0"), so files stay readable.
@@ -32,6 +35,7 @@ pub mod scenario;
 pub mod msg;
 pub mod synth;
 pub mod lab;
+pub mod wlan;
 
 pub use cable::{cable_fits, cable_kind, CableKind, Why};
 pub use catalog::{catalog, model, Category, CliStyle, DeviceKind, Media, Model, PortSpec};
@@ -39,3 +43,4 @@ pub use project::{Device, Issue, Link, Note, PortRef, ProjErr, Project, ServiceD
 pub use scenario::Scenario;
 pub use msg::Msg;
 pub use lab::{Goal, Lab, Text};
+pub use wlan::{Band, Security, Wlan, WlanJoin, WlanNet};

@@ -101,6 +101,14 @@
 //            refresh, SPF per area, inter-area routes over an ABR, AS-external routes
 //            (redistribution, default route); its routes in the RIB with distance 110;
 //            OspfCfg / OspfSet (Action::Ospf)
+//   wlan     WLAN on layer 2: access points offer networks, stations scan, authenticate,
+//            associate and run the 4-way handshake; associations as radio links the simulator
+//            makes and drops, the AP's bridge to its stations (VLANs, client isolation, guest
+//            networks), signal and rate from the distance, roaming, beacon loss, back-off;
+//            Action::Move / Wlan / Scale; the views wlan_assocs / wlan_station / wlan_survey
+//   wlankey  the keys of WPA2-Personal and WPA3-Personal (PMK, PTK, MICs, the key wrap of the
+//            group key) and the EAPOL-Key messages of the 4-way handshake
+//   wlantrace WNote: the decisions of WLAN as notes (Note::Wlan) with their German sentences
 //
 // Ids: devices and links keep the project's numeric ids; inside the engine they live in slots
 // that are never reused, so events of removed devices and cables simply find nothing.
@@ -167,6 +175,9 @@ pub mod l3v6;
 pub mod jobs6;
 pub mod trace6;
 pub mod ospf;
+pub mod wlan;
+pub mod wlankey;
+pub mod wlantrace;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -216,3 +227,5 @@ pub use nd::{Addr6View, Neigh6Row};
 pub use jobs6::{Icmp6Kind, Ping6Ev, Ping6Job, Ping6Opts, Trace6Hop, Trace6Job, Trace6Probe};
 pub use trace6::{Note6, RaWhy};
 pub use ospf::{IfState, LsaDrop, LsaRef, LsuWhy, NbrEvent, NbrState, NetType, OrigWhy, Ospf, OspfCfg, OspfDrop, OspfSet, RtChange, RtKind};
+pub use wlan::{AssocView, Bss, StaState, StaView};
+pub use wlantrace::WNote;

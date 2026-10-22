@@ -21,12 +21,15 @@
 // devices (tool C, port dots, the port choice), cables.rs edits cables (route, kind,
 // waypoints, the ×, tooltips); the LEDs come from the simulator.  lab.rs puts the lab on it:
 // the pills of the devices' services, mini sparklines from 75 %, devices a fault switched off.
+// wlan.rs draws WLAN: the associations of the simulator as radio lines, the ranges of access
+// points, signal bars; a drag of a device with a radio tells the simulator at once.
 
 pub(crate) mod cables;
 pub(crate) mod connect;
 pub(crate) mod lab;
 pub(crate) mod paint;
 pub(crate) mod tools;
+pub(crate) mod wlan;
 
 use alloc::collections::BTreeSet;
 use alloc::rc::Rc;
@@ -83,6 +86,8 @@ pub(crate) struct Canvas {
     pub kb_from: Option<u32>,
     /// the lab on the canvas: service pills, sparklines, devices a fault switched off (lab.rs)
     pub lab: lab::Lab,
+    /// WLAN: the toggle of the ranges (wlan.rs)
+    pub wl: wlan::Wl,
 }
 
 impl Canvas {
@@ -101,6 +106,7 @@ impl Canvas {
             x_link: None,
             kb_from: None,
             lab: lab::Lab::default(),
+            wl: wlan::Wl::default(),
         }
     }
 
@@ -183,7 +189,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     // language (the placeholder of an empty note) and the services and power the simulator
     // has (the pills, devices a fault switched off: lab.rs)
     lab::update(n);
-    let ver = n.syms.key() ^ if n.prefs.grid { 0 } else { 0x8000_0000 } ^ if crate::app::tr::en() { 0x4000_0000 } else { 0 } ^ n.doc.sim.led_key.rotate_left(7) ^ n.canvas.lab.key().rotate_left(13);
+    let ver = n.syms.key() ^ if n.prefs.grid { 0 } else { 0x8000_0000 } ^ if crate::app::tr::en() { 0x4000_0000 } else { 0 } ^ n.doc.sim.led_key.rotate_left(7) ^ n.canvas.lab.key().rotate_left(13) ^ wlan::key(n).rotate_left(19);
     let tool = n.canvas.tool.dg();
     let dragging = n.palette.dragging;
     ui.next_size(-1, -1);
@@ -233,6 +239,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     }
     lab::pill_records(n, ui);
     lab::sparklines(n, ui);
+    wlan::records(n, ui);
     cables::leds_on_top(n, ui);
     cables::plus_handles(n, ui);
     connect::overlay(n, ui);
@@ -396,6 +403,8 @@ fn move_items(n: &mut Net, keys: &[u64], total: [f32; 2], done: bool) {
         edits::set_pos(&mut n.doc.proj, id, [p[0] + d[0], p[1] + d[1]]);
     }
     n.doc.touch();
+    // WLAN follows the drag live (doc/sim.rs)
+    n.doc.sim.moved(&n.doc.proj);
     if done {
         if let Some(e) = edits::moves(&n.doc.proj, &from) {
             n.doc.record(e);

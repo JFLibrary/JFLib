@@ -371,3 +371,30 @@ pub(crate) const ID_FLT_HEAL_ALL: u32 = 0xB10D;
 pub(crate) const ID_FLT_HEAL0: u32 = 0xB140;
 /// the service tree (its rows + 1 + i, at most 2000: up to 0xBFD1)
 pub(crate) const ID_MET_TREE: u32 = 0xB800;
+// ---- W1: WLAN (commands 480 .. 509, widgets 0xF400 .. 0xF7FF, timers 0x184 .. 0x187)
+/// the ranges of every access point on the canvas (Ansicht › WLAN-Reichweiten)
+pub(crate) const CMD_WLAN_RANGES: u32 = 480;
+/// the inspector's WLAN of an access point: network k's fields at ID_WL_NET0 + 0x10 k + WL_*
+/// (at most 16 networks), "Netz hinzufügen"
+pub(crate) const ID_WL_NET0: u32 = 0xF400;
+pub(crate) const WL_SSID: u32 = 0;
+pub(crate) const WL_BAND: u32 = 1;
+pub(crate) const WL_CHANNEL: u32 = 2;
+pub(crate) const WL_SECURITY: u32 = 3;
+pub(crate) const WL_PASS: u32 = 4;
+pub(crate) const WL_SHOW: u32 = 5;
+pub(crate) const WL_VLAN: u32 = 6;
+pub(crate) const WL_GUEST: u32 = 7;
+pub(crate) const WL_ISOLATE: u32 = 8;
+pub(crate) const WL_APPLY: u32 = 9;
+pub(crate) const WL_REMOVE: u32 = 10;
+pub(crate) const ID_WL_ADD: u32 = 0xF500;
+/// the inspector's WLAN of a station: SSID, passphrase, show it, join, leave
+pub(crate) const ID_WL_JOIN_SSID: u32 = 0xF510;
+pub(crate) const ID_WL_JOIN_PASS: u32 = 0xF511;
+pub(crate) const ID_WL_JOIN_SHOW: u32 = 0xF512;
+pub(crate) const ID_WL_JOIN_APPLY: u32 = 0xF513;
+pub(crate) const ID_WL_JOIN_LEAVE: u32 = 0xF514;
+/// the project's scale (world units per metre) and its button
+pub(crate) const ID_WL_SCALE: u32 = 0xF520;
+pub(crate) const ID_WL_SCALE_APPLY: u32 = 0xF521;

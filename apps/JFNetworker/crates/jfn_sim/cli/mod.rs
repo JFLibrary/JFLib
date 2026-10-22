@@ -48,6 +48,8 @@
 //            "(config-router)#"), "ip ospf ...", show ip ospf [neighbor|interface|database],
 //            the O routes of show ip route, debug ip ospf adj|events|hello, clear ip ospf
 //            process, the lines of the running configuration
+//   wlan     WLAN: iw in the shell (dev, info, link, scan, connect, disconnect, station dump),
+//            show dot11 associations on the IOS-like access point
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -89,6 +91,7 @@ pub mod ip6;
 pub mod linux6;
 pub mod print6;
 pub mod ospf;
+pub mod wlan;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;

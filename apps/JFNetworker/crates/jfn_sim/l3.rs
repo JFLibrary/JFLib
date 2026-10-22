@@ -37,6 +37,8 @@
 // the device's OSPF (ospf.rs: 224.0.0.5 and 224.0.0.6 joined where it runs); without OSPF it
 // gets "protocol unreachable" like any protocol the device does not speak.
 // IPv6 frames (ethertype 86DD, Cisco HDLC 86DD on serial lines) go to l3v6.rs.
+// WLAN (wlan.rs): the radio of an access point that sends a network counts as a live port of
+// its VLAN for the VLAN interface (an AP's BVI1 is up without a cable while it beacons).
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -122,7 +124,7 @@ impl Engine {
             IfKind::Svi(v) => {
                 // with spanning tree a port of the VLAN must forward (stp.rs)
                 f.admin_up
-                    && n.bridge.as_ref().is_some_and(|b| (0..b.ports.len() as u16).any(|p| b.carries(p, v) && b.stp.forwards(p) && n.ports[p as usize].link.is_some_and(|li| self.link_up(li))))
+                    && n.bridge.as_ref().is_some_and(|b| (0..b.ports.len() as u16).any(|p| b.carries(p, v) && b.stp.forwards(p) && (n.ports[p as usize].link.is_some_and(|li| self.link_up(li)) || self.wlan_radio_up(ni, p))))
             }
             IfKind::Loopback(_) => f.admin_up,
         }

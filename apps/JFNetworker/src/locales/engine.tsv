@@ -857,3 +857,64 @@ OSPF: SPF-Lauf {}: Routen: {}, neu: {}, geändert: {}, entfallen: {}.	OSPF: SPF 
 OSPF: Route {} ({}) über {}, Kosten {}.	OSPF: route {} ({}) via {}, cost {}.
 OSPF: Route {} ({}) jetzt über {}, Kosten {}.	OSPF: route {} ({}) now via {}, cost {}.
 OSPF: Route {} ({}) entfällt.	OSPF: route {} ({}) is gone.
+
+# jfn_model and jfn_sim: WLAN (W1) -- bands and security (jfn_model wlan.rs) and its refusals, the decisions of jfn_sim wlan.rs (Note::Wlan, wlantrace.rs) with their reason codes, its problems
+2,4 GHz	2.4 GHz
+5 GHz	5 GHz
+6 GHz	6 GHz
+Offen	Open
+WPA2-Personal	WPA2-Personal
+WPA3-Personal	WPA3-Personal
+Eine SSID hat 1 bis 32 Bytes.	An SSID has 1 to 32 bytes.
+Kanal {} gibt es im Band {} nicht.	There is no channel {} in the {} band.
+Im 6-GHz-Band gibt es nur WPA3-Personal.	The 6 GHz band takes WPA3-Personal only.
+Die Passphrase von „{}“ braucht 8 bis 63 Zeichen (ASCII).	The passphrase of “{}” needs 8 to 63 characters (ASCII).
+Kein Access Point bietet das WLAN „{}“ an, das {} sucht.	No access point offers the WLAN “{}” that {} looks for.
+Das WLAN „{}“ ist für {} außer Reichweite.	The WLAN “{}” is out of range for {}.
+{} hat keine Passphrase für das WLAN „{}“.	{} has no passphrase for the WLAN “{}”.
+Die Passphrase von {} passt nicht zum WLAN „{}“.	The passphrase of {} does not match the WLAN “{}”.
+Grund {}: ohne Angabe	reason {}: unspecified
+Grund {}: der Absender verlässt das Netz	reason {}: the sender leaves the network
+Grund {}: zu lange still	reason {}: silent for too long
+Grund {}: nicht assoziiert	reason {}: not associated
+Grund {}: Zeitüberschreitung im 4-Wege-Handshake	reason {}: 4-way handshake timeout
+Grund {}	reason {}
+WLAN: sucht „{}“ auf {} ({} ms).	WLAN: looking for “{}” on {} ({} ms).
+WLAN: „{}“ gefunden bei {} ({}, Kanal {}, {} dBm).	WLAN: “{}” found at {} ({}, channel {}, {} dBm).
+WLAN: „{}“ bei {} Access Points gefunden, der beste ist {} ({}, Kanal {}, {} dBm).	WLAN: “{}” found at {} access points, the best is {} ({}, channel {}, {} dBm).
+WLAN: „{}“ ist nicht in Reichweite.	WLAN: “{}” is not in range.
+WLAN: „{}“ braucht eine Passphrase, die Station hat keine.	WLAN: “{}” needs a passphrase, the station has none.
+WLAN: Authentifizierung bei {} (Open System).	WLAN: authentication with {} (Open System).
+WLAN: Authentifizierung bei {} (SAE).	WLAN: authentication with {} (SAE).
+WLAN: Authentifizierung bei {} für den Wechsel (Open System).	WLAN: authentication with {} for roaming (Open System).
+WLAN: Authentifizierung bei {} für den Wechsel (SAE).	WLAN: authentication with {} for roaming (SAE).
+WLAN: {} authentifiziert sich (Open System).	WLAN: {} authenticates (Open System).
+WLAN: {} authentifiziert sich (SAE).	WLAN: {} authenticates (SAE).
+WLAN: die SAE-Bestätigung von {} passt nicht: die Passphrase ist eine andere.	WLAN: the SAE confirm of {} does not match: the passphrase is a different one.
+WLAN: keine Bestätigung von {}: Authentifizierung gescheitert.	WLAN: no confirm from {}: authentication failed.
+WLAN: assoziiert mit {} (AID {}, {}, Kanal {}, {} dBm, {}).	WLAN: associated with {} (AID {}, {}, channel {}, {} dBm, {}).
+WLAN: reassoziiert mit {} (AID {}, {}, Kanal {}, {} dBm, {}).	WLAN: reassociated with {} (AID {}, {}, channel {}, {} dBm, {}).
+WLAN: {} ist an {} in „{}“ assoziiert (AID {}).	WLAN: {} is associated on {} in “{}” (AID {}).
+WLAN: {} wechselt an {} in „{}“ (AID {}).	WLAN: {} roams to {} in “{}” (AID {}).
+WLAN: meldet {} den Switches (Layer-2-Update).	WLAN: announces {} to the switches (Layer 2 Update).
+WLAN: 4-Wege-Handshake, Nachricht {} von 4 an {}.	WLAN: 4-way handshake, message {} of 4 to {}.
+WLAN: 4-Wege-Handshake, Nachricht {} von 4 von {}.	WLAN: 4-way handshake, message {} of 4 from {}.
+WLAN: der MIC von Nachricht {} von {} passt nicht: die Passphrase ist eine andere. Verworfen.	WLAN: the MIC of message {} from {} does not match: the passphrase is a different one. Dropped.
+WLAN: Nachricht {} an {} noch einmal (Versuch {}).	WLAN: message {} to {} once more (attempt {}).
+WLAN: Schlüssel mit {} gesetzt (CCMP): Daten dürfen fließen.	WLAN: keys with {} installed (CCMP): data may flow.
+WLAN: der 4-Wege-Handshake mit {} kommt nicht zustande: Verbindung beendet (Grund 15).	WLAN: the 4-way handshake with {} does not complete: connection ended (reason 15).
+WLAN: {} beendet die Verbindung ({}).	WLAN: {} ends the connection ({}).
+WLAN: verlässt {}.	WLAN: leaves {}.
+WLAN: {} ist abgemeldet ({}).	WLAN: {} has left ({}).
+WLAN: wechselt von {} ({} dBm) zu {} ({} dBm).	WLAN: roams from {} ({} dBm) to {} ({} dBm).
+WLAN: {} ist zu {} gewechselt.	WLAN: {} moved over to {}.
+WLAN: {} ist außer Reichweite.	WLAN: {} is out of range.
+WLAN: {} ist wieder in Reichweite ({} dBm).	WLAN: {} is back in range ({} dBm).
+WLAN: keine Beacons mehr von {}: die Verbindung ist verloren.	WLAN: no more beacons from {}: the connection is lost.
+WLAN: Signal von {} jetzt {} dBm, {}.	WLAN: signal of {} now {} dBm, {}.
+WLAN: neuer Versuch in {} s ({}. Fehlschlag).	WLAN: next attempt in {} s (failure {}).
+WLAN: gibt nach {} Fehlschlägen auf, bis sich etwas ändert.	WLAN: gives up after {} failures until something changes.
+WLAN: Frame von {} verworfen: der 4-Wege-Handshake ist noch nicht fertig.	WLAN: frame from {} dropped: the 4-way handshake is not finished yet.
+WLAN: Frame an {} verworfen: keine solche Station.	WLAN: frame to {} dropped: no such station.
+WLAN: Frame an {} verworfen: Client-Isolation.	WLAN: frame to {} dropped: client isolation.
+WLAN: Frame an {} verworfen: das Gastnetz erreicht nur den Router.	WLAN: frame to {} dropped: the guest network reaches the router only.
