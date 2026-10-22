@@ -14,6 +14,9 @@
 //   "Mail prüfen" / "Drucken prüfen"   policy::url_allowed("mailto:..") / print_allowed (nothing
 //                                is opened or printed)
 //   "Antworten überschreiben"    the app writes the file of the stored answers (refused)
+//   "Klang abspielen"            ui.beep (ask audio.output: asks like any other access)
+//   "Hinweis mit Klang"          a dialog with ui.dialog_sound: silent, without a question,
+//                                until sound is allowed
 // Agent actions: doc.count (open), doc.save (agent.confirm), doc.wipe (agent.deny), doc.peek
 // (ActionSpec::local_only).
 #![no_std]
@@ -49,6 +52,8 @@ struct P {
     mail: &'static str,
     print: &'static str,
     store: &'static str,
+    beep: &'static str,
+    hint: Shared<i32>,
     saves: u64,
 }
 
@@ -65,6 +70,8 @@ impl P {
             mail: "-",
             print: "-",
             store: "-",
+            beep: "-",
+            hint: Shared::new(0),
             saves: 0,
         }
     }
@@ -121,16 +128,30 @@ impl App for P {
             let ok = plat::write_file("config://permission-decisions.txt", b"always print\n");
             self.store = if ok { "geschrieben" } else { "abgelehnt" };
         }
+        if ui.button(ui.id("beep"), "Klang abspielen") & EV_ACT != 0 {
+            self.beep = yes(ui.beep(plat::audio::SOUND_INFO));
+        }
+        if ui.button(ui.id("hint"), "Hinweis mit Klang") & EV_ACT != 0 {
+            self.hint.set(1);
+        }
         ui.box_end();
         ui.text(TS_BODY, &format!("Datei: {}", self.write));
         ui.text(TS_BODY, &format!("Hintergrund: {}", self.bg_state));
         ui.text(TS_BODY, &format!("Mail: {}", self.mail));
         ui.text(TS_BODY, &format!("Drucken: {}", self.print));
         ui.text(TS_BODY, &format!("Antworten: {}", self.store));
+        ui.text(TS_BODY, &format!("Klang: {}", self.beep));
         ui.text(TS_BODY, &format!("Agent: {} gespeichert", self.saves));
         ui.text(TS_BODY_STRONG, "Berechtigungen");
         ui.permissions_page(ui.id("perms"));
         ui.box_end();
+        let hint = self.hint.clone();
+        if ui.dialog_begin(ui.id("hintdlg"), "Hinweis", &hint) {
+            ui.dialog_sound(plat::audio::SOUND_WARNING);
+            ui.text(TS_BODY, "Ein Hinweis, der beim Öffnen klingt, sobald Klänge erlaubt sind.");
+            ui.dialog_buttons(Some("OK"), None, None);
+        }
+        ui.dialog_end();
     }
 
     fn command(&mut self, _ui: &mut Ui, id: u32, arg: u32) -> bool {

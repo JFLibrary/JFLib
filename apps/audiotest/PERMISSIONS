@@ -4,6 +4,7 @@
 # logs://) and app:// need no line.  The build checks the syntax; the packages follow the file
 # (Flatpak finish-args, MSIX capabilities: docs/PACKAGING.md).
 fs.user                              # the files the user picks (file dialog, drops, "Open with")
+audio.output                         # sound is the app: streams, the chime, the system's sounds
 #
 # Remove the # of a rule the app needs:
 # fs.read  $DOCUMENTS/**             read below the documents folder (documents://)

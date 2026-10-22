@@ -1,8 +1,8 @@
 # App permissions (`apps/NAME/PERMISSIONS`)
 
 An app can declare which files, programs, URL schemes, plugins, printers and network
-addresses it uses, whether it keeps secrets in the system's store and whether it may start
-itself at login. The
+addresses it uses, whether it keeps secrets in the system's store, whether it may start
+itself at login and whether it plays sound. The
 platform layer then refuses everything else, in every part of the process: the app's own
 code, the library, codecs, plugins that go through the host API, scripts and agent actions.
 Apps without a `PERMISSIONS` file keep the old behaviour and may do everything.
@@ -26,13 +26,14 @@ From then on the rules can only grow by files the user hands over.
 | Checked sockets and name lookups | [`lib/plat/net.rs`](../lib/plat/net.rs), [`lib/netio/dns.rs`](../lib/netio/dns.rs) |
 | Checked secret store | [`lib/plat/secret.rs`](../lib/plat/secret.rs) ([SECRETS.md](SECRETS.md)) |
 | Checked autostart entry | [`lib/plat/autostart.rs`](../lib/plat/autostart.rs) |
+| Checked sound output (streams, `play`, the system's sounds; `ui.beep`, `ui.dialog_sound`) | [`lib/plat/audio.rs`](../lib/plat/audio.rs), [`lib/ui/sound.rs`](../lib/ui/sound.rs) |
 | Install at start-up, the command line's paths | [`lib/plat/boot.rs`](../lib/plat/boot.rs) (console programs reach it through [`rt::boot`](../lib/rt/boot.rs) and `rt::main!`) |
 | Grants for the user's files, trusted library code, the question dialog, `ui.permissions_page` | [`lib/ui/perm.rs`](../lib/ui/perm.rs) |
 | Questions, answers, plugin scopes, agent rules | [`lib/plat/policy.rs`](../lib/plat/policy.rs) (`questions`, `Key::answer`, `decisions`, `forget`, `plugin_rights`, `on_behalf`, `agent_rule`, `agent_ask`) |
 | Agent actions: `Access`, `forbidden`, `confirmation_required` | [`lib/agent_core/src/action.rs`](../lib/agent_core/src/action.rs), the UI's host [`lib/ui/agent.rs`](../lib/ui/agent.rs) |
 | Script commands `perm ...`, `agent ...` | [`lib/ui/auto_perm.rs`](../lib/ui/auto_perm.rs) |
 | Syntax check, hand-over to `rustc` | `app_permissions`, `perm_split`, `Builder.boot_inputs` / `boot_args` in [`build_rs.py`](../build_rs.py), `build_apk` in [`tools/android.py`](../tools/android.py) |
-| Tests | `plattest --test policy` ([`t_policy.rs`](../apps/plattest/t_policy.rs)), `--test permask` ([`t_permask.rs`](../apps/plattest/t_permask.rs): questions without the UI), `--test plugperm` ([`t_plugperm.rs`](../apps/plattest/t_plugperm.rs): plugins), `--test dirs` and `--test trash` (the user folders' variables, `trash` as a write), [`apps/permtest`](../apps/permtest/main.rs) (GUI program), [`apps/permcli`](../apps/permcli/src/main.rs) (`rt::main!` and the programs of `BINS`), [`apps/permprompt`](../apps/permprompt/main.rs) (the dialog, each answer, a worker thread, headless answers, the stored answers, the settings section, agent actions) |
+| Tests | `plattest --test policy` ([`t_policy.rs`](../apps/plattest/t_policy.rs)), `--test permask` ([`t_permask.rs`](../apps/plattest/t_permask.rs): questions without the UI), `--test plugperm` ([`t_plugperm.rs`](../apps/plattest/t_plugperm.rs): plugins), `--test dirs` and `--test trash` (the user folders' variables, `trash` as a write), [`apps/permtest`](../apps/permtest/main.rs) (GUI program; sound refused without `audio.output`), [`apps/permcli`](../apps/permcli/src/main.rs) (`rt::main!` and the programs of `BINS`), [`apps/permprompt`](../apps/permprompt/main.rs) (the dialog, each answer, a worker thread, headless answers, the stored answers, the settings section, agent actions; `tests/sound.uis`: `ask audio.output`, `ui.beep` and the silent dialog sound), [`apps/audiotest`](../apps/audiotest/PERMISSIONS) (`audio.output`: plays) |
 
 ## The manifest
 
@@ -52,6 +53,7 @@ plugins  $EXE/plugins/*.dll $EXE/plugins/*.so
 print                                 # plat::print
 secrets                               # plat::secret (Credential Manager, Secret Service, Keystore)
 autostart                             # plat::autostart_set (start at login)
+audio.output                          # plat::audio, ui.beep (sound)
 net.connect api.example.com:443 *.cdn.example.com:443
 net.connect 192.168.0.0/16:631 localhost:8000-8099
 net.listen  127.0.0.1:0               # a local server on a free port
@@ -73,6 +75,7 @@ agent.deny document.delete ui.render  # never for an agent
 | `print` | – | `plat::print` |
 | `secrets` | – | `plat::secret`: the app's own entries in the system's secret store ([SECRETS.md](SECRETS.md)) |
 | `autostart` | – | `plat::autostart_set`: the app's own entry that starts it at login (Run key, XDG autostart, Background portal); `autostart_get` / `autostart_entry` need nothing |
+| `audio.output` | – | `plat::audio`: streams (`Stream::open`, `open_fill`), `play`, `play_file` and the system's sounds (`sound`), so also `ui.beep` and `ui.dialog_sound`; without it they are refused and `available()` is `false`. Only apps that play sound list it: a Flatpak gets the sound server's socket for it, which also allows recording ([Packages](#limits)) |
 | `net.connect` | `HOST:PORT` | TCP connections and UDP datagrams (`TcpStream::connect`, `UdpSocket::send_to`, and everything built on them: `netio` HTTP, TLS, SMTP, SSH) |
 | `net.listen` | `ADDR:PORT` | `TcpListener::bind` and UDP sockets with a fixed port |
 | `ask KEY ...` | a rule of any key but `fs.user`, then an optional `"reason"` | the same access after the user agreed ([Asking the user](#asking-the-user)) |
@@ -213,6 +216,9 @@ ask print
 ```
 
 Every key but `fs.user` can be asked for (`fs.user` already is the user's choice).
+`ask audio.output` asks when the app plays a sound itself (`ui.beep`, a stream, `play`); the
+sound of a dialog that opens (`ui.dialog_sound`) never asks: it stays silent until the line
+is allowed (`policy::audio_granted`, no question, no `PERMDENY`).
 
 - **One decision per line.** The answer decides the whole line: allowing
   `ask fs.read $DOCUMENTS/**` once allows every file below `$DOCUMENTS` for the rest of the
@@ -295,7 +301,7 @@ net.connect updates.example.org:443
 The host loads the rights with `policy::plugin_rights(lib_path)` (an `Err` names the bad
 line: do not load the plugin) and runs every call into the plugin's code inside
 `policy::on_behalf(&rights, || ...)`. On that thread every check of `plat` -- files, the
-network and its name lookups, processes, URLs, plugins, printing, secrets, autostart -- then
+network and its name lookups, processes, URLs, plugins, printing, secrets, autostart, sound -- then
 needs the plugin's rules **and** the app's: the plugin cannot do what the app may not, and the
 app's rights do not pass to the plugin. Jobs started inside the scope keep it
 (`task::spawn_blocking`, `parallel_for` items on every worker); nested scopes (a plugin
@@ -359,13 +365,15 @@ ui.type ui.key`). `actions/describe` and `actions/list` report each action's `ac
 A refused call fails the way a missing or unreadable target fails: `None`, `false`, `0`,
 `-1`, `Err(LIBE_IO)`, `ERR_UNSUPPORTED` (print), `Err(5 / 13)` (access denied, process), a
 `NetError` of kind `NetErrorKind::Denied` (network), `SecretError::Denied` (secrets;
-`secret_available()` is `false`), or `AutostartError::Denied` (autostart).
+`secret_available()` is `false`), `AutostartError::Denied` (autostart), or
+`AudioError::Denied` (sound: `sound()` and `ui.beep` give `false`, `audio::available()` is
+`false`; a headless script sees `expect sound none`).
 In addition:
 
 - stderr shows `PERMDENY <kind> <target>` once per target, for example
   `PERMDENY fs.write C:/Users/me/Desktop/out.png`, `PERMDENY net.connect evil.example` or
   `PERMDENY secrets imap.example.org` (the service of the refused secret), `PERMDENY autostart`,
-  `PERMDENY agent document.delete`; a call on behalf of a plugin ends with ` (plugin NAME)`;
+  `PERMDENY audio.output` (once per run, however many sounds), `PERMDENY agent document.delete`; a call on behalf of a plugin ends with ` (plugin NAME)`;
   a question put to the user shows as `PERMASK <kind> <target> (<rule>)`;
 - `plat::policy::denials()` returns the last 64 refusals (`kind`, `target`, `plugin`) for a
   log or a diagnostics page;
@@ -407,13 +415,17 @@ In addition:
   dropped), and the other user folders do not exist. `plat` has no processes, sockets or
   native plugins on Android, so `process`, `net.*` and `plugins` have nothing to allow;
   `secrets` allows the store of the Android Keystore (checked in `plat` before the Java side
-  is asked). The rules do not reach Android's own storage (the app's private folders,
+  is asked), `audio.output` the AAudio streams and the system's sounds (Android itself asks
+  no permission for playing sound). The rules do not reach Android's own storage (the app's private folders,
   `content://` documents): the Java side of the bridge (`android/*.java`) does not go through
   `plat`. The Android build is checked by building it;
   the manifest has not been run on a device in the test suite.
 - **Packages.** `tools/package.py` derives the Flatpak sandbox (finish-args) and the MSIX
   capabilities and StartupTask from the manifest ([PACKAGING.md](PACKAGING.md) "Flatpak",
-  "MSIX"); in Flatpak the kernel then enforces the file and network holes as well.
+  "MSIX"); in Flatpak the kernel then enforces the file and network holes as well. Sound in a
+  Flatpak needs the sound server's socket (`--socket=pulseaudio`), which also allows
+  recording: only an app with `audio.output` (or without a manifest) gets it; `plat` itself
+  records nothing. MSIX needs no capability for playing sound.
 - **Agent mode.** An agent that drives the library's file dialog (`--agent-json`,
   `--agent-mcp`) can choose files like a user. It cannot answer a permission question: while
   one is open the `ui.*` input actions are refused (`unavailable`). Agent mode must be enabled

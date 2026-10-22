@@ -418,12 +418,13 @@ def finish_args(perms, extra=()):
     -> (args, notes).  Always: Wayland with X11 as fallback, IPC (X11 shared memory).  The
     file dialog, open_url, open_folder, printing and autostart go through portals and need
     nothing; fs.* rules become --filesystem (fs.read :ro), secrets the Secret Service on the
-    session bus, net.* the network"""
+    session bus, net.* the network, audio.output the sound server (--socket=pulseaudio, which
+    also allows recording: only apps that play sound get it)"""
     args = ["--share=ipc", "--socket=wayland", "--socket=fallback-x11"]
     notes = []
     if perms is None:
-        args += ["--share=network", "--filesystem=host", "--talk-name=org.freedesktop.secrets"]
-        notes.append("kein PERMISSIONS: weite Rechte (Netz, alle Dateien, Secret Service); "
+        args += ["--share=network", "--filesystem=host", "--talk-name=org.freedesktop.secrets", "--socket=pulseaudio"]
+        notes.append("kein PERMISSIONS: weite Rechte (Netz, alle Dateien, Secret Service, Soundserver); "
                      "apps/NAME/PERMISSIONS macht sie enger (docs/PERMISSIONS.md)")
         return args + list(extra), notes
     fs = {}                                                 # location -> writable
@@ -441,6 +442,11 @@ def finish_args(perms, extra=()):
         elif key == "secrets":
             if "--talk-name=org.freedesktop.secrets" not in args:
                 args.append("--talk-name=org.freedesktop.secrets")
+        elif key == "audio.output":
+            if "--socket=pulseaudio" not in args:
+                args.append("--socket=pulseaudio")
+                notes.append("audio.output: --socket=pulseaudio (der Socket erlaubt auch Aufnahmen; "
+                             "plat nimmt nichts auf)")
         elif key == "process":
             outside = [w for w in words if not w.startswith("$EXE")]
             if outside:

@@ -4,8 +4,8 @@
 //   permtest FILE     FILE (named on the command line: the user's, fs.user) may be written,
 //                     a neighbour of it may not; $TEMP/permtest-* may be written, the rest
 //                     of $TEMP not; print, secrets and the listed URL schemes are allowed,
-//                     plugins, other schemes and the network (no net.* rule) are not.  Prints
-//                     PASS / FAIL; exit code = failures.
+//                     plugins, other schemes, the network (no net.* rule) and sound (no
+//                     audio.output) are not.  Prints PASS / FAIL; exit code = failures.
 //   (build_rs.py test runs it through tests/manifest.uis; --script is ignored)
 #![no_std]
 #![no_main]
@@ -85,11 +85,24 @@ fn permtest() -> i32 {
     // the other permissions
     t.check(policy::url_allowed("mailto:a@b") && !policy::url_allowed("file:///etc/passwd"), "permtest: url https mailto");
     t.check(policy::secrets_allowed("permtest"), "permtest: secrets (the manifest's key, the store itself is not used)");
+
+    // no audio.output: no sound at all (apps/audiotest has the line and plays)
+    {
+        use plat::audio::{self, AudioError, Config, Sound, Stream};
+        audio::set_dry_run(true); // a refused sound() must not even print "sound: NAME"
+        t.check(!audio::sound(audio::SOUND_WARNING), "permtest: sound() refused without audio.output");
+        audio::set_dry_run(false);
+        t.check(Stream::open(&Config::new(48_000, 2)).err() == Some(AudioError::Denied), "permtest: Stream::open refused");
+        t.check(audio::play(&Sound::tone(440.0, 10)).err() == Some(AudioError::Denied), "permtest: play refused");
+        t.check(audio::play_file("app://hello.txt").err() == Some(AudioError::Denied), "permtest: play_file refused before reading");
+        t.check(!audio::available() && !policy::audio_granted(), "permtest: available() is false");
+    }
     let caps = plat::capabilities();
     t.check(caps.supports(plat::CAP_PRINT | plat::CAP_FILE_WRITE), "permtest: print and files in capabilities()");
     t.check(!caps.supports(plat::CAP_NATIVE_PLUGINS), "permtest: no plugins in capabilities()");
     let d = policy::denials();
     t.check(d.iter().any(|x| x.kind == "fs.write" && x.target == other), "permtest: the refusal is recorded");
+    t.check(d.iter().any(|x| x.kind == "audio.output" && x.target.is_empty()), "permtest: the sound refusal is recorded");
     plat::write_stdout(format!("permtest: {} failure(s)\n", t.fails).as_bytes());
     t.fails
 }

@@ -1472,6 +1472,7 @@ python build_rs.py test NAME        # one app: build it, run its tests/*.uis
 python build_rs.py check            # the rules lint alone
 python tools/gendoc.py --check      # docs/API.md matches the doc comments
 python build_rs.py api-diff         # the public API since the last release (VERSIONING.md)
+python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unused texts ("Languages")
 ```
 
 * Run new scripts with `--verify-dirty` too (`build_rs.py test` does not add it): it reports
@@ -1708,9 +1709,31 @@ Polish, Arabic and Hebrew (`i18n::library_languages()`), every other language ge
 An app without a catalogue stays German; one whose texts are language-neutral can install a
 catalogue that only names languages (`Catalog::from_tsv("de\ten\tfr\tar\n")`, as
 `datagallery` does) to let the library follow the user.
-`python tools/i18n_check.py apps/NAME` lists the texts of an app (`t("…")`, `tf("…")`,
-message templates, tables marked `// i18n`) that no `src/locales/*.tsv` has, and rows whose
-translation uses other placeholders (`--unused`: rows no source uses any more).
+
+**Checking the catalogues**: `python build_rs.py i18n` ([`tools/i18n_check.py`](../tools/i18n_check.py))
+extracts the translatable texts of every app with a catalogue (`apps/NAME/**/locales/*.tsv`)
+and of the library, and reports per app:
+
+| Report | Means |
+| --- | --- |
+| `missing` | a text of the sources without a row (the app shows German in every language) |
+| `untranslated` | a row with an empty or missing cell for a language |
+| `unused` | a row whose text is no string literal of the app's sources any more (counted; `--unused` or `i18n APP` lists them) |
+| `error` | a translation whose placeholders differ (`{}` / `{0}` / `{name}`, the kinds of `{n, number}` ...), a `plural` without `other` or without the categories of its language (`pl` needs `one few many`, `en` never uses `few`), a `tf` text whose translation uses more than `"{}"` (`i18n::fill` fills only those), a message template with formats or names, a text translated differently in two rows |
+
+The texts are the string literals of `t("…")`, `tc("…")`, `tr("…")` (not the library's
+`i18n::tr`), `tf("…")`, `msg!` / `Msg::new` / `phrase` templates, `list(&TABLE)`, tables
+marked `// i18n` (`// i18n: name title` for some fields of a table, `… // i18n` for one
+line), and the labels of `Command::new` and `Mi::*` when the app translates its command
+table and menus. A text the library translates (`LIB_TEXTS`) needs no row in an app that
+installs its catalogue with `i18n::set_catalog` (`t` falls back to the library). `python build_rs.py i18n APP` lists one app's gaps (`lib`: the library's `tr("…")`
+against `LIB_TEXTS`), `--update` adds the missing texts as rows with empty cells to the app's
+catalogue (the one whose texts come from the same folder, `src/` or `crates/`), at its end in
+source order; existing rows are never changed, and the app keeps showing German there until
+the cells are filled. A catalogue the app reads itself without `Catalog::from_tsv` names its
+languages in a comment (`# languages: de en fr`, PaintCraft's). The suite runs
+`i18n --check`: it fails on errors and on gaps in the catalogues that are complete
+(BackupCraft, JFNetworker, the library) and only counts the others (PaintCraft's).
 
 **Sorting and case** follow the user's format locale, as Windows' `CompareStringEx` does:
 `i18n::collate(a, b)` orders base letters, then accents, then case ("a" < "A" < "ä" < "b"),
@@ -3379,11 +3402,18 @@ if ui.dialog_begin(ID_ASK, "Datei überschreiben?", &open) {
   `sound: NAME` instead of playing.
 * **Scripts**: headless runs play nothing; `expect sound KIND|none` checks what `ui.beep` /
   `ui.dialog_sound` asked for since the last check (section 12).
+* **Permissions**: an app with a `PERMISSIONS` manifest needs the line `audio.output` for any
+  sound ([PERMISSIONS.md](PERMISSIONS.md)). Without it `Stream::open`, `open_fill`, `play` and
+  `play_file` give `AudioError::Denied`, `sound()` and `ui.beep` return `false` (a script sees
+  `expect sound none`), `available()` is `false`, and stderr shows `PERMDENY audio.output` once.
+  `ui.dialog_sound` stays silent without a question or a record, also under
+  `ask audio.output` until that line is allowed. Only apps that play sound list the right: a
+  Flatpak package (`tools/package.py`) reaches the sound server through
+  `--socket=pulseaudio`, which also allows recording, and gets it only with `audio.output`;
+  MSIX, the setup, .deb, .rpm, AppImage and Android need nothing for playing sound.
 * Not there yet: output without a sound server on Linux (raw ALSA), choosing an output device,
   the stream's name in Windows' volume mixer (it names the program), capture (microphone),
-  video. Sound needs no `PERMISSIONS` right (output reveals nothing), but a Flatpak package
-  only reaches the sound server with `--socket=pulseaudio`, which `tools/package.py` does not
-  add yet (that socket also allows recording): add it to the finish-args by hand for now.
+  video.
 
 Tests: `apps/audiotest` -- the demo (tone generator, the chime as WAV and Ogg Vorbis, the
 system sounds, a dialog with its sound) and `--test play` (push and fill streams, pause / stop,

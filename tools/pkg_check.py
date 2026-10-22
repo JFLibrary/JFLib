@@ -325,7 +325,7 @@ FIX_META = {"display": 'Prüf & "Fixture"', "version": "1.2.3-beta", "publisher"
 FIX_PERMS = [("fs.read", ["$PICTURES/**", "/opt/fixture/data/*.bin"]),
              ("fs.write", ["$DOCUMENTS/Fixture/**", "$CONFIG/Fixture/**", "$TEMP/fx-*/**", "C:/Fixture/**", "$HOME/.fixture/**"]),
              ("fs.user", []), ("net.connect", ["api.example.org:443"]), ("net.listen", ["127.0.0.1:0"]), ("secrets", []),
-             ("autostart", []), ("process", ["gmic", "$EXE/helper"]), ("print", []), ("url", ["https"]),
+             ("autostart", []), ("audio.output", []), ("process", ["gmic", "$EXE/helper"]), ("print", []), ("url", ["https"]),
              ("plugins", ["$EXE/plugins/*.so", "/opt/fixture/plugins/*.so"])]
 
 
@@ -388,16 +388,20 @@ def meta_checks(d):
     # Flatpak
     args, notes = pkg_linux.finish_args(FIX_PERMS, ["--talk-name=org.kde.StatusNotifierWatcher"])
     want = ["--share=ipc", "--socket=wayland", "--socket=fallback-x11", "--share=network", "--talk-name=org.freedesktop.secrets",
-            "--filesystem=/opt/fixture/data:ro", "--filesystem=/opt/fixture/plugins:ro", "--filesystem=xdg-documents/Fixture",
+            "--socket=pulseaudio", "--filesystem=/opt/fixture/data:ro", "--filesystem=/opt/fixture/plugins:ro", "--filesystem=xdg-documents/Fixture",
             "--filesystem=xdg-pictures:ro", "--filesystem=~/.fixture", "--talk-name=org.kde.StatusNotifierWatcher"]
     check(args == want, f"flatpak: finish-args of every PERMISSIONS key ({' '.join(args)})")
     check(any("$CONFIG" in n for n in notes) and any("$TEMP" in n for n in notes) and any("gmic" in n for n in notes)
           and not any("helper" in n for n in notes) and any(n.startswith("fs.user") for n in notes),
           "flatpak: notes for the folders inside the sandbox, programs outside it, the portals")
     a2, n2 = pkg_linux.finish_args(None)
-    check("--filesystem=host" in a2 and "--share=network" in a2 and n2, "flatpak: no PERMISSIONS: wide holes and a note")
+    check("--filesystem=host" in a2 and "--share=network" in a2 and "--socket=pulseaudio" in a2 and n2,
+          "flatpak: no PERMISSIONS: wide holes (also the sound server) and a note")
     a3, _ = pkg_linux.finish_args([("fs.user", [])])
-    check(a3 == ["--share=ipc", "--socket=wayland", "--socket=fallback-x11"], "flatpak: fs.user alone: no file system hole")
+    check(a3 == ["--share=ipc", "--socket=wayland", "--socket=fallback-x11"], "flatpak: fs.user alone: no file system hole, no sound server")
+    a4, n4 = pkg_linux.finish_args([("fs.user", []), ("audio.output", []), ("audio.output", [])])
+    check(a4 == ["--share=ipc", "--socket=wayland", "--socket=fallback-x11", "--socket=pulseaudio"] and any(n.startswith("audio.output") for n in n4),
+          "flatpak: audio.output: --socket=pulseaudio once, with a note")
     files = pkg_linux.flatpak_files(job)
     man, _ = pkg_linux.flatpak_manifest(job, files)
     check(man["id"] == "org.jflib.Fixture" and man["command"] == "jf-fixture" and man["runtime"] == "org.freedesktop.Platform"
@@ -442,6 +446,8 @@ def meta_checks(d):
     job_none = fixture_job(d, perms=[("fs.user", [])])
     xml2 = pkg_msix.appx_manifest(job_none, "winui")
     check("StartupTask" not in xml2 and "internetClient" not in xml2, "msix: without autostart / net rules: no StartupTask, no capabilities")
+    caps, cnotes = pkg_msix.capabilities([("fs.user", []), ("audio.output", [])])
+    check(caps == [] and any(n.startswith("audio.output") for n in cnotes), "msix: audio.output needs no capability (noted)")
     for bad_meta, what in (({"schemes": "https"}, "a reserved scheme"), ({"version": "70000.1"}, "a version part > 65535"),
                            ({"msix_name": "x"}, "a short identity name"),
                            ({"filetypes": "fxd|application/x-jf-fixture|Fixture|own; png,fxd|image/png|PNG"}, "an extension in two file types")):

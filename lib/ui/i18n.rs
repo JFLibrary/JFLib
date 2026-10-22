@@ -455,6 +455,7 @@ static LIB_TEXTS: &[[&str; 9]] = &[
         "التشغيل عند تسجيل الدخول",
         "הפעלה בעת הכניסה",
     ],
+    ["Klänge abspielen", "Play sounds", "Jouer des sons", "Reproducir sonidos", "Riprodurre suoni", "Geluiden afspelen", "Odtwarzać dźwięki", "تشغيل الأصوات", "השמעת צלילים"],
     [
         "Eine Netzwerkverbindung aufbauen",
         "Connect to the network",
@@ -646,6 +647,8 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["aktuell", "current", "actuel", "actual", "attuale", "huidig", "bieżąca", "الحالية", "נוכחי"],
     ["min.", "min", "min", "mín.", "min", "min.", "min.", "الأدنى", "מינימום"],
     ["max.", "max", "max", "máx.", "max", "max.", "maks.", "الأقصى", "מקסימום"],
+    // the terminal (term.rs): the button that jumps down to new output
+    ["Neue Ausgabe", "New output", "Nouvelle sortie", "Nueva salida", "Nuovo output", "Nieuwe uitvoer", "Nowe dane wyjściowe", "مخرجات جديدة", "פלט חדש"],
     // the names of the roles screen readers hear (plat::a11y::ROLE_TEXTS: UIA
     // LocalizedControlType, AT-SPI GetLocalizedRoleName), English as AT-SPI names them
     ["Bereich", "panel", "panneau", "panel", "pannello", "paneel", "panel", "لوحة", "חלונית"],

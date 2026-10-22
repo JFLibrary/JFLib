@@ -26,7 +26,8 @@ Host bietet (13 `CAP_*`-Bits). Seit Paket 1 und 2 (2026-10-16) gibt es das Manif
   `plat` setzt es durch. Ohne Datei bleibt alles erlaubt.
 - **P1** · *erledigt* · Scopes: Dateien unter Mustern mit `$CONFIG` / `$TEMP` / `$HOME` /
   `$EXE` / `$FONTS`, vom Nutzer gewählte Dateien (`fs.user`: Dialog, Drop, Kommandozeile),
-  Prozesse, `open_url`-Schemes, Plugins, Drucken und Netz (`net.connect` / `net.listen`:
+  Prozesse, `open_url`-Schemes, Plugins, Drucken, Klangausgabe (`audio.output`, seit
+  2026-10-22) und Netz (`net.connect` / `net.listen`:
   Namen, `*.domain`, IPs, Adressblöcke, `localhost`, Port-Bereiche; Namen werden beim
   Auflösen geprüft, ihre Adressen dann vorgemerkt).
 - **P1** · *erledigt* · Zentrale Durchsetzung in `plat` (Dateien, `fs.rs`, Prozesse, Shell,
@@ -372,11 +373,18 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   Benachrichtigungston und `ToneGenerator`. Getestet: WASAPI-Loopback hört die Töne,
   WSLg-PulseServer listet den Stream samt Latenz, Playwright (Chromium, Firefox) misst den Ton
   mit einem AnalyserNode, im Emulator spielt audioserver die AAudio-Spur
-  (`apps/audiotest`, `plattest --test audio`). Es fehlen: Ausgabe ohne Soundserver unter
+  (`apps/audiotest`, `plattest --test audio`). Seit 2026-10-22 braucht Klang bei einem
+  Manifest das Recht `audio.output` (Entscheidung: nur Apps, die Klang brauchen, bekommen es;
+  [PERMISSIONS.md](PERMISSIONS.md)): ohne es verweigert `plat` Streams, `play`, `play_file`
+  und Systemklänge (`AudioError::Denied`, `ui.beep` liefert `false`, einmal
+  `PERMDENY audio.output`), Dialogklänge bleiben ohne Rückfrage still; `ask audio.output`
+  fragt beim ersten eigenen Klang. Das Flatpak-Paket bekommt `--socket=pulseaudio` (der auch
+  Aufnahmen erlaubt) nur mit dem Recht (`tools/package.py`, geprüft in `tools/pkg_check.py`),
+  MSIX und die übrigen Pakete brauchen nichts. Getestet: `permtest` (verweigert),
+  `permprompt/tests/sound.uis` (Rückfrage, stiller Dialog), `audiotest` (mit Recht),
+  `plattest --test policy` / `permask`. Es fehlen: Ausgabe ohne Soundserver unter
   Linux (ALSA direkt), Wahl des Ausgabegeräts, der Stream-Name im Windows-Lautstärkemixer,
-  Floor 0 von Vorbis, `--socket=pulseaudio` im Flatpak-Paket (fügt `tools/package.py` noch
-  nicht hinzu; der Socket erlaubt auch Aufnahmen, eine Manifest-Regel dafür ist zu
-  entscheiden); später Video, Kamera, Mikrofon.
+  Floor 0 von Vorbis; später Video, Kamera, Mikrofon.
 - **P3** · *fehlt* · WebView einbetten (WebView2, WebKitGTK); ohne libc schwierig, bewusst
   zu entscheiden.
 
@@ -599,8 +607,23 @@ Sortierung nach Sprache und Groß- / Kleinschreibung.
   `i18ntest --only collate`, `--only case`. Es fehlen noch: weitere Sprachregeln (hu, ro, lt,
   hr, Litauisch-Punkt, Griechisch-Großschreibung ohne Akzente), Persisch-Reihenfolge,
   `contains` ohne Groß / Klein für Filter.
-- **P3** · *fehlt* · Werkzeug, das Übersetzungsschlüssel extrahiert und fehlende Einträge
-  meldet.
+- **P3** · *erledigt* · Werkzeug, das Übersetzungsschlüssel extrahiert und fehlende Einträge
+  meldet (`python build_rs.py i18n [APP|lib] [--update]`, [`tools/i18n_check.py`](../tools/i18n_check.py),
+  seit 2026-10-22; GUIDE.md „Checking the catalogues“): liest die Texte aus den Quellen
+  (`t` / `tc` / `tr` / `tf`, `msg!`-Vorlagen, `list(&TABELLE)`, mit `// i18n` markierte
+  Tabellen, Befehls- und Menübeschriftungen, wenn die App sie übersetzt; bei der Bibliothek
+  `tr("…")` gegen `LIB_TEXTS`) und meldet je App fehlende Zeilen, unübersetzte Zellen je
+  Sprache, nicht mehr benutzte Zeilen, abweichende Platzhalter (`{}`, `{0}`, `{name}`, Arten
+  von `i18n::msg`; `tf`-Texte nur `{}`) und Pluralformen (`other`, die CLDR-Kategorien der
+  Sprache). `--update` hängt fehlende Texte mit leeren Zellen an den passenden Katalog an
+  (Quellreihenfolge, bestehende Zeilen bleiben unberührt). Die Suite prüft mit `--check`:
+  Fehler und Lücken in den heute vollständigen Katalogen (BackupCraft, JFNetworker,
+  Bibliothek) machen sie rot, die übrigen Lücken werden nur gezählt. Stand 2026-10-22:
+  BackupCraft und JFNetworker vollständig (JFNetworker: eine unbenutzte Zeile „Disk“),
+  Bibliothek vollständig („Neue Ausgabe“ des Terminals ergänzt; „Dateityp:“ und „Neuer
+  Ordner“ unbenutzt), PaintCraft: 147 Texte ohne Zeile (u. a. Effekt-Untermenüs,
+  Einstellungen, Druck-, Speicher- und Absturzdialog) und 7 unbenutzte Zeilen; „B&ild“ (das
+  Menü hieß im Katalog noch „&Bild“) korrigiert. Getestet in `tools/tests/test_devkit.py`.
 
 ## 6. Widgets und Layout
 

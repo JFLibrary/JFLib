@@ -10,6 +10,10 @@
 //   set_sounds(on), sounds() the app's own switch (default on; an app setting "Klänge");
 //                            jfgui_SOUNDS=0 turns them off for the process
 //
+// An app whose PERMISSIONS lack `audio.output` plays nothing: beep is refused like any other
+// access (an ask line asks, "PERMDENY audio.output" once, plat::policy::denials), dialog_sound
+// stays silent without a question or a record (plat::policy::audio_granted).
+//
 // Headless runs (scripts, --shot) play nothing: plat::audio's dry run prints "sound: NAME", and
 // the script command `expect sound KIND|none` checks the last sound requested (auto.rs).
 
@@ -25,9 +29,10 @@ pub(crate) struct S {
 }
 
 impl Ui {
-    /// the system's sound for kind (plat::audio::SOUND_*) -> false: off, unknown or not played
+    /// the system's sound for kind (plat::audio::SOUND_*) -> false: off, unknown, not
+    /// permitted (`audio.output`) or not played
     pub fn beep(&mut self, kind: u32) -> bool {
-        if !self.sounds() || audio::sound_name(kind).is_empty() {
+        if !self.sounds() || audio::sound_name(kind).is_empty() || !plat::policy::audio_allowed() {
             return false;
         }
         self.m.sound.last = Some(kind);
@@ -36,14 +41,15 @@ impl Ui {
     }
 
     /// inside an open content dialog: its sound, once when it has just opened, where message
-    /// dialogs play one on this platform -> whether a sound was asked for
+    /// dialogs play one on this platform and the app may play sound -> whether a sound was
+    /// asked for
     pub fn dialog_sound(&mut self, kind: u32) -> bool {
         let c = &mut self.wp.chrome;
         if !c.dlg_active || !c.dlg_fresh {
             return false;
         }
         c.dlg_fresh = false;
-        audio::dialog_sounds() && self.beep(kind)
+        audio::dialog_sounds() && plat::policy::audio_granted() && self.beep(kind)
     }
 
     /// the app's switch for its sounds (beep, dialog_sound); on by default

@@ -7813,6 +7813,10 @@ sound -- the system's sounds from the UI (plat::audio::sound)
   set_sounds(on), sounds() the app's own switch (default on; an app setting "Klänge");
                            jfgui_SOUNDS=0 turns them off for the process
 
+An app whose PERMISSIONS lack `audio.output` plays nothing: beep is refused like any other
+access (an ask line asks, "PERMDENY audio.output" once, plat::policy::denials), dialog_sound
+stays silent without a question or a record (plat::policy::audio_granted).
+
 Headless runs (scripts, --shot) play nothing: plat::audio's dry run prints "sound: NAME", and
 the script command `expect sound KIND|none` checks the last sound requested (auto.rs).
 ```
@@ -7820,10 +7824,12 @@ the script command `expect sound KIND|none` checks the last sound requested (aut
 **`impl Ui`**
 
 - **`fn beep(&mut self, kind: u32) -> bool`**
-  the system's sound for kind (plat::audio::SOUND_\*) -> false: off, unknown or not played
+  the system's sound for kind (plat::audio::SOUND_\*) -> false: off, unknown, not
+  permitted (`audio.output`) or not played
 - **`fn dialog_sound(&mut self, kind: u32) -> bool`**
   inside an open content dialog: its sound, once when it has just opened, where message
-  dialogs play one on this platform -> whether a sound was asked for
+  dialogs play one on this platform and the app may play sound -> whether a sound was
+  asked for
 - **`fn set_sounds(&mut self, on: bool)`**
   the app's switch for its sounds (beep, dialog_sound); on by default
 - **`fn sounds(&self) -> bool`**
@@ -16625,10 +16631,12 @@ start-up, then checked by the public file, process, shell, plugin and print func
                                          before that, and in apps without one, all is allowed
   active() -> bool
   fs_allowed(path, FS_READ | FS_WRITE) / process_allowed(program) / url_allowed(url) /
-  plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed()
-                                         -> bool
+  plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed() /
+  audio_allowed()                        -> bool
                                          a refusal is recorded (denials) and printed once
                                          per target to stderr: "PERMDENY kind target"
+  audio_granted() -> bool                sound is allowed now, without asking or recording a
+                                         refusal (ui's dialog sounds stay silent without it)
   net_connect_allowed(addr) / net_listen_allowed(addr) / net_name_allowed(host) -> bool
   net_resolved(host, addrs)              (resolvers) the addresses of a permitted name:
                                          connections to them follow that name's rules
@@ -16685,6 +16693,7 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
   print                 plat::print
   secrets               plat::secret (the system's store for passwords, tokens and keys)
   autostart             plat::autostart_set (start the app at login; reading is free)
+  audio.output          plat::audio: streams, play / play_file, the system's sounds (sound)
   net.connect HOST:PORT..   TCP connections and UDP datagrams to HOST (a name, *.name for
                         every name below it, an IPv4 / [IPv6] address, a block 10.0.0.0/8
                         or [fd00::]/8, localhost = the loopback addresses, * = any) on PORT
@@ -16730,9 +16739,9 @@ STORE: &str = "config://permission-decisions.txt"
 - **`struct Denial`**
   one refused access
   - `kind: &'static str` -- "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart",
-    "net.connect", "net.listen" or "agent"
+    "audio.output", "net.connect", "net.listen" or "agent"
   - `target: String` -- the path, program, URL, address, the service of a secret, the agent's action or ""
-    (print, autostart)
+    (print, autostart, audio.output)
   - `plugin: String` -- the plugin the call was made for ("" = the app itself)
 
 - **`enum Answer`**
@@ -16822,6 +16831,14 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn autostart_allowed() -> bool`**
   whether plat::autostart_set may change the app's autostart entry (`autostart`)
+
+- **`fn audio_allowed() -> bool`**
+  whether plat::audio may play sound (`audio.output`): streams, play, play_file, the
+  system's sounds
+
+- **`fn audio_granted() -> bool`**
+  whether sound is allowed now without a question or a recorded refusal: no manifest, a plain
+  `audio.output` line or an ask line already answered with yes (ui's dialog sounds)
 
 - **`fn denials() -> Vec<Denial>`**
   the last refusals, oldest first
@@ -18086,6 +18103,11 @@ as .oga / .ogg / .wav, the theme of org.gnome.desktop.sound, only while its even
 are on), Android the notification sound and ToneGenerator beeps, the browser short generated
 tones (as Linux without a theme).  jfgui_AUDIO_DRYRUN=1 / set_dry_run: sound() only prints
 "sound: NAME".
+
+Permissions: an app with a manifest needs `audio.output` (policy.rs, docs/PERMISSIONS.md) for
+every sound: open / open_fill / play / play_file give AudioError::Denied, sound() false
+(also in a dry run), available() false; the refusal is recorded once per run as
+"PERMDENY audio.output".
 ```
 
 ```rust
@@ -18110,6 +18132,7 @@ SOUND_NOTIFY: u32 = 5
   - `Format` -- not a sound file read here (WAV PCM / float, Ogg Vorbis) or a damaged one
   - `Io` -- the file could not be read
   - `Failed(i32)` -- the system refused (its code: an HRESULT, a PulseAudio error, an AAudio result)
+  - `Denied` -- the app's permissions lack `audio.output`
 
 - **`enum State`**
   what a stream does
@@ -18226,10 +18249,10 @@ SOUND_NOTIFY: u32 = 5
 
 - **`fn play(s: &Sound) -> Result<Voice, AudioError>`**
   play a sound once, mixed with the other sounds of play() (dropping the Voice lets it play
-  on) -> Err(Unavailable) without an output
+  on) -> Err(Unavailable) without an output, Err(Denied) without `audio.output`
 
 - **`fn play_file(path: &str) -> Result<Voice, AudioError>`**
-  play a WAV or Ogg Vorbis file once (see play)
+  play a WAV or Ogg Vorbis file once (see play; without `audio.output` the file is not read)
 
 - **`fn set_dry_run(on: bool)`**
   true: sound() only prints "sound: NAME" (headless runs; also jfgui_AUDIO_DRYRUN=1)
@@ -18240,14 +18263,15 @@ SOUND_NOTIFY: u32 = 5
 
 - **`fn sound(kind: u32) -> bool`**
   the system's sound for an event (SOUND_\*) -> false: nothing played (unknown kind, sounds
-  switched off by the system, no output)
+  switched off by the system, no output, no `audio.output`)
 
 - **`fn dialog_sounds() -> bool`**
   whether message dialogs play the system's sound when they open (Windows like MessageBox;
   Linux desktops while event sounds are on; not Android, not the browser)
 
 - **`fn available() -> bool`**
-  an output device / sound service exists here (a quick probe)
+  an output device / sound service exists here (a quick probe; false without `audio.output`,
+  nothing recorded)
 
 - **`fn level(samples: &[f32], channels: usize, ch: usize, rate: u32, freq: f32) -> f32`**
   (tests) the amplitude of the sine at freq in channel ch of interleaved frames (Goertzel,

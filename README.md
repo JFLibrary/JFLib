@@ -614,7 +614,7 @@ For rust-analyzer, `python build_rs.py ide` generates `rust-project.json`.
 | [Build Manager](apps/buildManager/README.md) | Profiles, queue, tests, launching, and releases |
 | [Packaging](docs/PACKAGING.md) | Windows installers, Debian packages, AppImage, Flatpak, MSIX, RPM, icons, and package metadata |
 | [Virtual files and assets](docs/VFS.md) | `app://`, `config://`, `data://`, `cache://`, `mem://`, mounts, and bundling `apps/NAME/assets` |
-| [Permissions](docs/PERMISSIONS.md) | The `PERMISSIONS` manifest: files, programs, URLs, plugins, printing, secrets, autostart, and network addresses an app may use |
+| [Permissions](docs/PERMISSIONS.md) | The `PERMISSIONS` manifest: files, programs, URLs, plugins, printing, secrets, autostart, sound, and network addresses an app may use |
 | [Secrets](docs/SECRETS.md) | Passwords, tokens, and keys in the system's secret store (Credential Manager, Secret Service) |
 | [Third-party notices](THIRD_PARTY_NOTICES.md) | Ported third-party code, Unicode data, fonts, and artwork with their copyright holders and licenses (texts in `licenses/`) |
 | [Versions](docs/VERSIONING.md) | The library's version, the public API and its SemVer rules, deprecations, `build_rs.py api-diff` and releases |

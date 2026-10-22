@@ -5,10 +5,12 @@
 //                                          before that, and in apps without one, all is allowed
 //   active() -> bool
 //   fs_allowed(path, FS_READ | FS_WRITE) / process_allowed(program) / url_allowed(url) /
-//   plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed()
-//                                          -> bool
+//   plugin_allowed(path) / print_allowed() / secrets_allowed(service) / autostart_allowed() /
+//   audio_allowed()                        -> bool
 //                                          a refusal is recorded (denials) and printed once
 //                                          per target to stderr: "PERMDENY kind target"
+//   audio_granted() -> bool                sound is allowed now, without asking or recording a
+//                                          refusal (ui's dialog sounds stay silent without it)
 //   net_connect_allowed(addr) / net_listen_allowed(addr) / net_name_allowed(host) -> bool
 //   net_resolved(host, addrs)              (resolvers) the addresses of a permitted name:
 //                                          connections to them follow that name's rules
@@ -65,6 +67,7 @@
 //   print                 plat::print
 //   secrets               plat::secret (the system's store for passwords, tokens and keys)
 //   autostart             plat::autostart_set (start the app at login; reading is free)
+//   audio.output          plat::audio: streams, play / play_file, the system's sounds (sound)
 //   net.connect HOST:PORT..   TCP connections and UDP datagrams to HOST (a name, *.name for
 //                         every name below it, an IPv4 / [IPv6] address, a block 10.0.0.0/8
 //                         or [fd00::]/8, localhost = the loopback addresses, * = any) on PORT
@@ -115,10 +118,10 @@ pub const STORE: &str = "config://permission-decisions.txt";
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Denial {
     /// "fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart",
-    /// "net.connect", "net.listen" or "agent"
+    /// "audio.output", "net.connect", "net.listen" or "agent"
     pub kind: &'static str,
     /// the path, program, URL, address, the service of a secret, the agent's action or ""
-    /// (print, autostart)
+    /// (print, autostart, audio.output)
     pub target: String,
     /// the plugin the call was made for ("" = the app itself)
     pub plugin: String,
@@ -214,8 +217,8 @@ pub enum AgentRule {
 }
 
 // the kinds of access (Denial::kind, Question::kind)
-const KINDS: [&str; 11] =
-    ["fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "net.connect", "net.listen", "agent"];
+const KINDS: [&str; 12] =
+    ["fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "audio.output", "net.connect", "net.listen", "agent"];
 
 fn kind_of(rule: &str) -> &'static str {
     let w = rule.split(' ').next().unwrap_or("");
@@ -257,6 +260,7 @@ struct Policy {
     print: Option<u16>,
     secrets: Option<u16>,
     autostart: Option<u16>,
+    audio: Option<u16>,
     connect: Vec<NetRule>,
     listen: Vec<NetRule>,
     resolved: Vec<Resolved>,
@@ -404,6 +408,40 @@ pub fn secrets_allowed(service: &str) -> bool {
 /// whether plat::autostart_set may change the app's autostart entry (`autostart`)
 pub fn autostart_allowed() -> bool {
     decide("autostart", "", &Req::Autostart, false) == Verdict::Allow
+}
+
+/// whether plat::audio may play sound (`audio.output`): streams, play, play_file, the
+/// system's sounds
+pub fn audio_allowed() -> bool {
+    decide("audio.output", "", &Req::Audio, false) == Verdict::Allow
+}
+
+/// whether sound is allowed now without a question or a recorded refusal: no manifest, a plain
+/// `audio.output` line or an ask line already answered with yes (ui's dialog sounds)
+pub fn audio_granted() -> bool {
+    granted(&Req::Audio)
+}
+
+// the quiet form of decide: the plugin scopes of this thread and the app's rules, an ask line
+// only by its answer; nothing is recorded, nobody is asked
+fn granted(req: &Req) -> bool {
+    let scopes = scopes_here();
+    if scopes.iter().any(|s| s.p.as_ref().is_some_and(|pp| pp.grant(req, &[], &[], false) != Grant::Allow)) {
+        return false;
+    }
+    if !active() {
+        return true;
+    }
+    let rule = {
+        let g = POLICY.lock();
+        let Some(p) = g.as_ref() else { return true };
+        match p.grant(req, &p.granted, &p.resolved, true) {
+            Grant::Allow => return true,
+            Grant::No => return false,
+            Grant::Ask(k) => p.asks.get(k as usize - 1).map(|a| a.0.clone()),
+        }
+    };
+    rule.is_some_and(|r| decided(&r) == Some(true))
 }
 
 /// the last refusals, oldest first
@@ -573,6 +611,7 @@ enum Req<'a> {
     Print,
     Secrets,
     Autostart,
+    Audio,
     #[cfg(any(windows, target_os = "linux"))]
     Connect([u8; 16], u16),
     #[cfg(any(windows, target_os = "linux"))]
@@ -634,6 +673,7 @@ impl Policy {
             Req::Print => flag(self.print),
             Req::Secrets => flag(self.secrets),
             Req::Autostart => flag(self.autostart),
+            Req::Audio => flag(self.audio),
             #[cfg(any(windows, target_os = "linux"))]
             Req::Connect(ip, port) => {
                 let dns = *port == 53 && self.connect.iter().any(|r| matches!(r.host, Host::Any | Host::Name(_)));
@@ -1192,8 +1232,8 @@ fn scope_name() -> String {
 // ---------------------------------------------------------------- the manifest
 
 // the keys an ask line may carry
-const ASK_KEYS: [&str; 10] =
-    ["fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "net.connect", "net.listen"];
+const ASK_KEYS: [&str; 11] =
+    ["fs.read", "fs.write", "process", "url", "plugins", "print", "secrets", "autostart", "audio.output", "net.connect", "net.listen"];
 
 // a line -> (rule text, reason): the reason is a "quoted text" at the end; '#' outside it
 // starts a comment
@@ -1300,7 +1340,7 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
                     p.explicit_read = true;
                 }
             }
-            "fs.user" | "print" | "secrets" | "autostart" => {
+            "fs.user" | "print" | "secrets" | "autostart" | "audio.output" => {
                 if !args.is_empty() {
                     return Err(at("takes no arguments"));
                 }
@@ -1310,6 +1350,7 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
                     "print" => set(&mut p.print),
                     "secrets" => set(&mut p.secrets),
                     "autostart" => set(&mut p.autostart),
+                    "audio.output" => set(&mut p.audio),
                     _ => p.user = true,
                 }
             }
@@ -1377,7 +1418,7 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
             }
             _ => {
                 return Err(at(
-                    "unknown permission (fs.read, fs.write, fs.user, process, url, plugins, print, secrets, autostart, net.connect, net.listen, ask, agent.confirm, agent.deny)",
+                    "unknown permission (fs.read, fs.write, fs.user, process, url, plugins, print, secrets, autostart, audio.output, net.connect, net.listen, ask, agent.confirm, agent.deny)",
                 ))
             }
         }
