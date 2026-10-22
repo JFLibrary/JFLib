@@ -4,8 +4,11 @@ on a device or emulator (android/tests/GalleryFilesInstrumentation.java, apps/an
     python apps/androidGallery/tests/android_files.py [--serial emulator-5554] [--apk PATH]
 
 Puts /sdcard/Documents/jfgui-test/hello.txt in place, clears the gallery's data (and with it its
-grants), runs phase 1 (the self-test, the picker answered through UiAutomation), stops the app,
-runs phase 2 (a new process: files and grants after the restart, paste / copy in a text box).
+grants), runs phase 1 (the self-test, the picker answered through UiAutomation; content://
+saved over existing documents, the name cache, a reported change, a write interrupted after six
+bytes), stops the app, runs phase 2 (a new process: files and grants after the restart, the
+interrupted write finished from the journal, paste / copy in a text box).  After each phase the
+saved document and the app's journal folder are looked at from outside (cat, run-as ls).
 The APK must be a debug build (the self-test reads jfgui_* extras only there).  Exit code 0 when
 both phases pass.  adb comes from ANDROID_SDK_ROOT / ANDROID_HOME / %LOCALAPPDATA%\\Android\\Sdk.
 """
@@ -69,6 +72,14 @@ def main():
         run("shell", "am", "force-stop", PKG)
         # a picker left open by a failed phase belongs to DocumentsUI's process
         run("shell", "am", "force-stop", "com.android.documentsui", check=False)
+        # the write phase 1 interrupted: a part in the document, the whole in the app's journal
+        # (lib/plat/content.rs); phase 2 finished it when content:// was first used
+        journal = run("shell", "run-as", PKG, "ls", "files/fs/data/androidGallery/.content-journal", check=False).split()
+        saved = run("shell", f"cat {DIR}/gespeichert.txt", check=False)
+        want = ("vollst", 1) if phase == "1" else ("vollständig nach dem Neustart geschrieben", 0)
+        good = saved == want[0] and len([j for j in journal if j.endswith(".jw")]) == want[1]
+        print(f"after phase {phase}: gespeichert.txt {saved!r}, journal {journal}: {'PASS' if good else 'FAIL'}", flush=True)
+        failures += not good
     left = run("shell", f"ls {DIR}", check=False).split()
     print("Documents/jfgui-test:", " ".join(left))
     print("android_files:", "ok" if failures == 0 else f"{failures} phase(s) failed")

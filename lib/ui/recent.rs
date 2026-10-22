@@ -11,10 +11,13 @@
 //   recent_clear()           both lists emptied (the system's: this app's entries)
 //
 // The app's list is config://recent.list (one path per line, newest first), read on first use
-// and kept in memory.  OS paths are kept absolute ("C:/x/a.png", "/home/u/a.png"; a folder
-// mount's file as its OS path), so another spelling of the same file is no new entry.  Headless
-// runs (--shot, --script, agents) never touch the file and leave the system's list alone (the
-// list lives in memory there; jfgui_RECENT redirects the system's list, plat/recent.rs).
+// and kept in memory (the browser: persisted in its storage).  OS paths are kept absolute
+// ("C:/x/a.png", "/home/u/a.png"; a folder mount's file as its OS path), so another spelling of
+// the same file is no new entry, and as plat::persistent_name gives them (a Flatpak's file from
+// the documents portal as its lasting document: one of the portal's file dialog opens again
+// after a restart without a new dialog).  Headless runs (--shot, --script, agents) never touch
+// the file and leave the system's list alone (the list lives in memory there; jfgui_RECENT
+// redirects the system's list, plat/recent.rs).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -32,6 +35,11 @@ static LIST: SpinLock<Option<Vec<String>>> = SpinLock::new(None);
 /// the form a path is kept in: absolute OS path when it is one, else as given
 fn canon(path: &str) -> String {
     plat::vfs::os_path(path).and_then(|p| plat::policy::normalize(&p)).unwrap_or_else(|| String::from(path))
+}
+
+/// the form a path is added in: canon, as a name that lasts across restarts
+fn lasting(path: &str) -> String {
+    plat::persistent_name(&canon(path))
 }
 
 impl Ui {
@@ -60,15 +68,19 @@ impl Ui {
         if list.is_empty() {
             plat::delete(FILE);
         } else if let Some(d) = plat::vfs::app_dir(plat::vfs::APP_CONFIG) {
-            if plat::mkdir(&d) {
-                plat::write_file(FILE, text.as_bytes());
+            if plat::mkdir(&d) && plat::write_file(FILE, text.as_bytes()) {
+                // the browser keeps it in its storage (a reload starts with it)
+                #[cfg(target_arch = "wasm32")]
+                if let Some(os) = plat::vfs::os_path(FILE) {
+                    let _ = plat::web::persist(&os);
+                }
             }
         }
     }
 
     /// a file the user opened or saved: first in the app's recent files and in the system's
     pub fn recent_add(&mut self, path: &str) {
-        let p = canon(path);
+        let p = lasting(path);
         if p.is_empty() || p.contains(['\n', '\r']) {
             return;
         }

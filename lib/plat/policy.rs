@@ -55,7 +55,10 @@
 // Manifest: one rule per line, '#' starts a comment, a key may repeat:
 //   fs.read PATTERN..     read files below PATTERN
 //   fs.write PATTERN..    write (and read) files below PATTERN
-//   fs.user               files the user chooses (dialog, drop, command line): read + write
+//   fs.user               files the user chooses (dialog, drop, command line): read + write;
+//                         also every document the system hands over one at a time (Android's
+//                         content://, a Flatpak's documents portal mount, the browser's
+//                         /handles/), so they work after a restart too
 //   process PATTERN|NAME..   programs Command::spawn / run_elevated may start (NAME: no '/')
 //   url SCHEME..|*        open_url schemes (https, mailto, ...)
 //   plugins PATTERN..     native libraries for lib_open
@@ -320,7 +323,27 @@ pub fn fs_allowed(path: &str, mode: u32) -> bool {
         record(kind, path, &scope_name(), true); // the stored answers are the user's
         return false;
     }
+    // documents the system hands over one at a time, like Android's content://: with fs.user
+    if user_doc_path(&n) && scopes_here().is_empty() && POLICY.lock().as_ref().is_some_and(|p| p.user) {
+        return true;
+    }
     decide(kind, path, &Req::Fs(&segs, mode), true) == Verdict::Allow
+}
+
+// a normalised path of such a document: Flatpak's documents portal inside the sandbox (it shows
+// only what was granted to the app; linux_docs.rs), the browser's files of the user (a handle
+// each, web_files.rs)
+#[cfg(target_os = "linux")]
+fn user_doc_path(n: &str) -> bool {
+    crate::linux_docs::sandboxed(n)
+}
+#[cfg(target_arch = "wasm32")]
+fn user_doc_path(n: &str) -> bool {
+    n.starts_with("/handles/")
+}
+#[cfg(not(any(target_os = "linux", target_arch = "wasm32")))]
+fn user_doc_path(_: &str) -> bool {
+    false
 }
 
 /// whether the app may reach a document the user chose by its URI (Android's content://

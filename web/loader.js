@@ -1,6 +1,7 @@
 // One browser adapter for every jfguiLib app. All application UI is rendered in Rust.
 import {openFilesStorage} from "./storage.js";
 import {openSecrets, encodeSecrets} from "./secrets.js";
+import * as handles from "./handles.js";
 import {Shadow, decode as decodeA11y} from "./a11y.js";
 const canvas=document.querySelector("#screen"), input=document.querySelector("#input"), status=document.querySelector("#status");
 const fileInput=document.querySelector("#files"), controlButton=document.querySelector("#control");
@@ -8,7 +9,7 @@ const viewport=document.querySelector("#viewport"), a11yRoot=document.querySelec
 const app=document.body.dataset.app, params=new URLSearchParams(location.search), worker=new Worker("worker.js",{type:"module"});
 const ctx=canvas.getContext("2d",{alpha:false}), text=new TextDecoder();
 let started=false, enabled=params.get("agent")==="1", nextId=1, composing=false, openRequest=0, database=null, pasteModifiers=2;
-let bridgeDisconnect=null, bridgeAttempt=0, secretStore=null;
+let bridgeDisconnect=null, bridgeAttempt=0, secretStore=null, handleStore=null;
 const pending=new Map(), ports=new Set();
 // One acknowledged batch at a time: a busy worker must not accumulate old frames
 // or hover positions. Input edges and every pressed-pointer sample stay ordered.
@@ -183,6 +184,26 @@ async function importFiles(files) {
     send({type:"import",path,bytes:await file.arrayBuffer(),dropped:true,durable:false});
   }
 }
+// The user's own files (handles.js): the picker's handle bound to a /handles/ path, an opened
+// file imported there (its bytes count as stored: they are the file's).
+async function pickHandles(kind, {name="", start="", exts=[]}) {
+  const r=start && handleStore.byPath.get(start);
+  const options={types:handles.types(exts),...(r?{startIn:r.handle}:{}),id:("jfgui-"+app).replace(/[^A-Za-z0-9_-]/g,"_").slice(0,32)};
+  if(kind==="save") return [await showSaveFilePicker({...options,suggestedName:name || undefined})];
+  return showOpenFilePicker({...options,multiple:kind==="many"});
+}
+async function importHandle(handle, path, dropped) {
+  send({type:"import",path,bytes:await handles.readHandle(handle,true),dropped,durable:true});
+}
+// file_dialog's payload: u32 flags, name, start, u32 count, extensions (strings: u32 length + UTF-8)
+function dialogPayload(data) {
+  const v=new DataView(data.buffer,data.byteOffset,data.byteLength);let at=0;
+  const u32=()=>{const x=v.getUint32(at,true);at+=4;return x;};
+  const str=()=>{const n=u32();const t=text.decode(data.subarray(at,at+n));at+=n;return t;};
+  const flags=u32(),name=str(),start=str(),exts=[];
+  for(let n=u32();n>0;n--) exts.push(str());
+  return {flags,name,start,exts};
+}
 document.querySelector("#open").onclick=()=>{fileInput.value="";fileInput.click();};
 fileInput.onchange=async()=>{try{await importFiles(fileInput.files);complete(openRequest,2);}catch(e){complete(openRequest,errorCode(e));report(e.message);}openRequest=0;};
 fileInput.oncancel=()=>{complete(openRequest,-4);openRequest=0;};
@@ -194,9 +215,38 @@ async function service(m) {
       const len=new DataView(m.data).getUint32(0,true);
       if(len>data.length-4) throw new Error("Ungültiger Dateiauftrag");
       const path=text.decode(data.subarray(4,4+len)), bytes=data.slice(4+len).buffer;
-      if(m.kind===1) {await persist(path,bytes);complete(m.id,0);report("Im Browserspeicher gesichert");}
+      // a file of the user's own: written back into it
+      if(m.kind===1 && path.startsWith("/handles/")) {
+        if(!handleStore) {complete(m.id,-3);return;}
+        await handles.writeBack(handleStore,path,bytes);complete(m.id,0);report("In die Datei geschrieben: "+path.split("/").pop());
+      }
+      else if(m.kind===1) {await persist(path,bytes);complete(m.id,0);report("Im Browserspeicher gesichert");}
       else {const url=URL.createObjectURL(new Blob([bytes]));const link=document.createElement("a");link.href=url;link.download=path.split("/").pop()||"document";link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);complete(m.id,1);report("Download angefordert");}
-    } else if(m.kind===3) {openRequest=m.id;fileInput.accept=value();fileInput.value="";fileInput.click();}
+    } else if(m.kind===3 && handleStore) {
+      // pick_file with handles: the files imported as drops, each bound to its file
+      const accept=value().split(/[,;\s]+/).filter(Boolean);
+      let chosen;
+      try {chosen=await pickHandles("many",{exts:accept});} catch(error) {complete(m.id,error?.name==="AbortError"?-4:errorCode(error));return;}
+      for(const h of chosen) await importHandle(h,await handles.bind(handleStore,h),true);
+      complete(m.id,2);
+    }
+    else if(m.kind===3) {openRequest=m.id;fileInput.accept=value();fileInput.value="";fileInput.click();}
+    // file_dialog: the system's open / save picker; the answer is the bound path
+    else if(m.kind===12) {
+      if(!handleStore) {complete(m.id,-3);return;}
+      const d=dialogPayload(data), save=(d.flags&1)!==0;
+      let handle;
+      try {[handle]=await pickHandles(save?"save":"one",d);} catch(error) {send({type:"file",id:m.id,status:error?.name==="AbortError"?-4:errorCode(error)});return;}
+      const path=await handles.bind(handleStore,handle);
+      if(!save) await importHandle(handle,path,false);
+      send({type:"file",id:m.id,status:2,path});
+    }
+    // reopen: a remembered file read again (the permission asked for from the user's gesture)
+    else if(m.kind===20) {
+      const r=handleStore?.byPath.get(value());
+      if(!r) {complete(m.id,-3);return;}
+      await importHandle(r.handle,r.path,false);complete(m.id,2);
+    }
     else if(m.kind===4) {if(!navigator.clipboard?.readText){complete(m.id,-3);return;}send({type:"clipboard",text:await navigator.clipboard.readText()});complete(m.id,2);}
     else if(m.kind===5) {if(!navigator.clipboard?.writeText){complete(m.id,-3);return;}await navigator.clipboard.writeText(value());complete(m.id,2);}
     else if(m.kind===6) {const v=new DataView(m.data);input.style.left=Math.max(0,Math.min(canvas.clientWidth-2,v.getInt32(0,true)/devicePixelRatio))+"px";input.style.top=Math.max(0,Math.min(canvas.clientHeight-20,v.getInt32(4,true)/devicePixelRatio))+"px";input.style.height=Math.max(16,v.getInt32(8,true)/devicePixelRatio)+"px";}
@@ -242,6 +292,21 @@ try {
   const restored=await storage();database=restored.database;initialFiles=restored.entries.filter(f=>f.app===app);
   if(restored.error)report("Gespeicherte Dateien sind lesbar; dauerhafte Datenübernahme derzeit nicht verfügbar.");
 }catch(error){report("Browserspeicher nicht verfügbar; Dateien bleiben temporär.");}
+// the user's files remembered from earlier visits: read again where the browser still lets the
+// page read them (at most 64 MiB in all; the others through reopen, from a gesture)
+if(handles.supported()) try {
+  handleStore=await handles.openHandles(app);
+  let budget=64<<20;
+  for(const r of [...handleStore.records].sort((a,b)=>b.at-a.at)) {
+    try {
+      if(!await handles.permitted(r.handle,"read",false)) continue;
+      const file=await r.handle.getFile();
+      if(file.size>budget) continue;
+      budget-=file.size;
+      initialFiles.push({path:r.path,bytes:await file.arrayBuffer()});
+    } catch {}
+  }
+}catch(error){handleStore=null;console.warn("Dateizugriff (File System Access) nicht verfügbar:",error);}
 // the secret store: the app's values decrypted for the worker (none: plat::secret is Unavailable)
 let initialSecrets=null;
 try {
@@ -249,5 +314,5 @@ try {
   if(store) {secretStore=store;initialSecrets=encodeSecrets(store.entries);for(const e of store.entries)e.value?.fill(0);store.entries=null;}
 }catch(error){console.warn("Geheimnisspeicher nicht verfügbar:",error);}
 const args=[];if(enabled)args.push("--agent");if(params.get("theme"))args.push("--theme",params.get("theme"));
-send({type:"start",url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)});
+send({type:"start",url:`${app}.wasm`,mode:params.get("compute") || "auto",workers:Number(params.get("workers")) || undefined,...sizes(),args,files:initialFiles,secrets:initialSecrets,capabilities:(database?4:0)|(navigator.clipboard?8:0)|(handleStore?65536:0)});
 initialSecrets?.fill(0); // postMessage copied them

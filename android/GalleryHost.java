@@ -1,7 +1,8 @@
 /* The system services plat asks for (lib/plat/android_host.rs, web.rs; bridge.c):
  * call(kind, bytes) answers at once on the UI thread -- the ContentResolver behind content://
  * names, the ClipboardManager, the persisted grants, the secret store (GallerySecrets: the
- * Android Keystore); request(kind, id, bytes) starts the
+ * Android Keystore); a ContentObserver per provider whose tree is listed reports changes
+ * (nativeChanged); request(kind, id, bytes) starts the
  * system's picker (Storage Access Framework) and answers later through nativeResult.
  * Wire: little endian; strings and byte blocks as u32 length + bytes (android_host.rs). */
 package org.jflib.gallery;
@@ -14,8 +15,11 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.UriPermission;
+import android.database.ContentObserver;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
 import android.provider.OpenableColumns;
@@ -31,11 +35,13 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 
 final class GalleryHost {
     static native void nativeResult(int id, int status, byte[] uri);
+    static native void nativeChanged();
 
     // android_host.rs
     static final int CALL_QUERY = 1, CALL_CHILDREN = 2, CALL_CREATE = 3, CALL_DELETE = 4, CALL_RENAME = 5,
@@ -152,6 +158,7 @@ final class GalleryHost {
     static byte[] children(Context context, String text) {
         Uri u = Uri.parse(text);
         if (!DocumentsContract.isTreeUri(u)) return null; // only below a folder the user chose
+        watch(u);
         u = document(u);
         Uri kids = DocumentsContract.buildChildDocumentsUriUsingTree(u, DocumentsContract.getDocumentId(u));
         try (Cursor c = context.getContentResolver().query(kids, DOC_COLUMNS, null, null, null)) {
@@ -160,6 +167,21 @@ final class GalleryHost {
             while (c.moveToNext())
                 info(out, DocumentsContract.buildDocumentUriUsingTree(u, c.getString(5)), c, true, null);
             return out.done();
+        }
+    }
+    // the providers of the trees the app lists: a change they report (notifyChange) empties
+    // plat's name cache of content:// (content.rs; nativeChanged -> jfgui_content_changed)
+    private static final HashSet<String> watched = new HashSet<>();
+    private static void watch(Uri u) {
+        String auth = u.getAuthority();
+        if (app == null || auth == null || !watched.add(auth)) return;
+        try {
+            app.getContentResolver().registerContentObserver(new Uri.Builder().scheme("content").authority(auth).build(), true,
+                new ContentObserver(new Handler(Looper.getMainLooper())) {
+                    @Override public void onChange(boolean self) { nativeChanged(); }
+                });
+        } catch (Exception e) {
+            Log.i(TAG, "no change reports of " + auth + ": " + e);
         }
     }
     static String mimeOf(String name) {

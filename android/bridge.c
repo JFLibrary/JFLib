@@ -31,6 +31,7 @@ extern uint32_t jfgui_a11y_take(void);
 extern uintptr_t jfgui_a11y_data(void);
 extern uintptr_t jfgui_reply(uint32_t length);
 extern uint32_t jfgui_file_result(uint32_t id, int32_t status, uint32_t length);
+extern void jfgui_content_changed(void);
 
 static JNIEnv *target_env;
 static jobject target_bitmap;
@@ -309,6 +310,12 @@ JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryHost_nativeResult(
         (void)jfgui_complete((uint32_t)id, status);
     }
     jfgui_input(time_ms());
+}
+/* A provider whose tree the app listed reported a change (GalleryHost's ContentObserver): the
+ * name cache of content:// starts again.  Any thread; only a counter. */
+JNIEXPORT void JNICALL Java_org_jflib_gallery_GalleryHost_nativeChanged(JNIEnv *env, jclass cls) {
+    (void)env; (void)cls;
+    jfgui_content_changed();
 }
 JNIEXPORT jboolean JNICALL Java_org_jflib_gallery_GalleryActivity_nativeIme(
         JNIEnv *env, jclass cls) {

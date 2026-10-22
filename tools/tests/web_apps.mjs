@@ -19,7 +19,7 @@ const server=createServer(async (request,response)=>{
     if(url.pathname==='/favicon.ico') {response.writeHead(204).end();return;}
     const parts=decodeURIComponent(url.pathname).split('/').filter(Boolean);
     if(parts.length===1) parts.push('index.html');
-    const common=['loader.js','worker.js','host.css','bridge.js','storage.js','secrets.js','a11y.js'];
+    const common=['loader.js','worker.js','host.css','bridge.js','storage.js','secrets.js','handles.js','a11y.js'];
     const filename=parts.length===2 && common.includes(parts[1]) ? resolve(root,'web',parts[1]) : resolve(build,'web',...parts);
     if(!filename.startsWith(resolve(build,'web')+sep) && !filename.startsWith(resolve(root,'web')+sep)) throw new Error('Invalid path');
     const bytes=await readFile(filename);

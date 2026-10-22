@@ -363,6 +363,10 @@ own repositories and bundles.
 `plat::recent_add`; without it the list stays in the sandbox's own data folder).  The exported
 `.desktop` file's `Exec` gets flatpak's file forwarding (`@@u %U @@`): opened files come as
 `file:///run/user/<uid>/doc/...` URIs that `plat` turns into paths and grants (`fs.user`).
+With `fs.user` every document of the portal's mount stays readable and writable without a
+new grant, so a file the user chose in the portal's file dialog (a lasting document) opens
+again from `ui.recent_add`'s list after a restart; files of "Open with" are documents for the
+session only (flatpak forwards them so) and are gone after it ([VFS.md](VFS.md), "Flatpak").
 `--register` is `Unavailable` inside the sandbox (the export registers).  Not covered: files dropped from
 other programs arrive as paths the sandbox may not see (no portal file transfer), and the
 library's own file dialog (used without a portal) sees only the sandbox.

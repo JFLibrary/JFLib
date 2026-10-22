@@ -25,6 +25,9 @@ pub(crate) mod linux_tray;
 // a small session-bus connection of its own (linux_tray.rs, linux_ibus.rs)
 #[path = "linux_dbus.rs"]
 pub(crate) mod linux_dbus;
+// the documents portal: lasting document IDs (persistent_name)
+#[path = "linux_docs.rs"]
+pub(crate) mod linux_docs;
 // a11y.rs: the accessibility tree on the AT-SPI2 bus (D-Bus)
 #[path = "linux_atspi.rs"]
 pub(crate) mod linux_atspi;

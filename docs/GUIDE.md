@@ -801,9 +801,16 @@ ui.dialog_end(); // always
   selected or shown folder is the answer). On Android it is the system's picker (Storage
   Access Framework): `path` becomes a `content://` name ([VFS.md](VFS.md), "Android"),
   readable and writable with the ordinary file functions and kept across restarts; show the
-  user `plat::display_name(&path)`, not the name itself. The picker answers a few frames later
-  (nothing is drawn meanwhile), so keep calling `filedlg` every frame as usual. Ids
-  `id .. id + 0x3FFF` belong to it. `i` preselects a file type of `exts`:
+  user `plat::display_name(&path)`, not the name itself. In a browser with the File System
+  Access API (Chromium) `FD_OPEN` / `FD_SAVE` show the system's pickers too: `path` becomes
+  `/handles/ID/NAME`, the user's own file (an opened one already read in); `write_file` on it
+  writes the file back (`plat::web::persist` confirms it), `plat::web::reopen` reads it again
+  after a reload ([VFS.md](VFS.md), "The browser"). Firefox and Safari keep the library's own
+  dialog over the browser's virtual files. These pickers answer a few frames later (nothing is
+  drawn meanwhile), so keep calling `filedlg` every frame as usual. Keep chosen files in
+  `ui.recent_add` (a Flatpak's documents of the portal stay reachable after a restart, Android's
+  grants and the browser's handles are kept). Ids `id .. id + 0x3FFF` belong to it. `i`
+  preselects a file type of `exts`:
 
   ```rust
   static EXTS: [&str; 2] = ["png=PNG-Bild", "jpg;jpeg=JPEG-Bild"];

@@ -7555,10 +7555,13 @@ recent -- the app's list of recent files ("Zuletzt geöffnet") and the system's 
   recent_clear()           both lists emptied (the system's: this app's entries)
 
 The app's list is config://recent.list (one path per line, newest first), read on first use
-and kept in memory.  OS paths are kept absolute ("C:/x/a.png", "/home/u/a.png"; a folder
-mount's file as its OS path), so another spelling of the same file is no new entry.  Headless
-runs (--shot, --script, agents) never touch the file and leave the system's list alone (the
-list lives in memory there; jfgui_RECENT redirects the system's list, plat/recent.rs).
+and kept in memory (the browser: persisted in its storage).  OS paths are kept absolute
+("C:/x/a.png", "/home/u/a.png"; a folder mount's file as its OS path), so another spelling of
+the same file is no new entry, and as plat::persistent_name gives them (a Flatpak's file from
+the documents portal as its lasting document: one of the portal's file dialog opens again
+after a restart without a new dialog).  Headless runs (--shot, --script, agents) never touch
+the file and leave the system's list alone (the list lives in memory there; jfgui_RECENT
+redirects the system's list, plat/recent.rs).
 ```
 
 ```rust
@@ -15699,7 +15702,9 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
            config:// data:// cache:// logs:// (the app's folders), documents:// and the
            other user folders, mem://, mounted providers
            (MemFs, DirFs, Overlay, Sub, Bundle); data_dir(), cache_dir()   (vfs.rs);
-           display_name(path); Android content:// (ContentFs, DocHost)     (content.rs)
+           display_name(path); Android content:// (ContentFs, DocHost)     (content.rs);
+           persistent_name(path): a chosen file's name that lasts across restarts (Flatpak's
+           documents portal: linux_docs.rs)
   secret:  secret_set / secret_get / secret_delete / secret_available: passwords, tokens and
            keys in the system's store (Credential Manager + DPAPI, Secret Service; needs
            `secrets` in the manifest)                                        (secret.rs)
@@ -15798,9 +15803,23 @@ FO_RW: u32 = 2  // open or create (contents kept), read + write
   - `ms: u16`
   - `wday: u16` -- 0 = Sunday
 
+- **`fn persistent_name(name: &str) -> String`**
+  The name under which a file the user chose stays reachable after a restart, for a list of
+  recent files or a session (ui.recent_add keeps this one).  A document of Flatpak's
+  documents portal (`$XDG_RUNTIME_DIR/doc/ID/NAME`) is asked for its lasting form
+  (`Documents.Add`, persistent; linux_docs.rs): `<mount>/<ID>/<NAME>` of the portal's answer.
+  Where the portal reaches the real file that is a lasting document of it; for a document
+  of its own mount the portal answers that document's own ID, so inside the sandbox the name
+  stays as the dialog gave it (the portal's file dialog makes lasting documents, "Open with"
+  session ones).  Every other name comes back unchanged: Android keeps the grant of a
+  `content://` document and the browser the handle of a `/handles/` file when the user
+  chooses it, and OS paths need nothing.  The name must be readable under the app's
+  permissions.
+
 - **`fn file_dialog_poll() -> Option<(i32, u32, String)>`**
   The answer of a system file dialog that answers later (file_dialog -> FD_PENDING: only
-  Android's picker; web.rs): None while it is open, then once (1 chosen / 0 not, index, path).
+  Android's picker and the browser's; web.rs): None while it is open, then once (1 chosen /
+  0 not, index, path).
 
 - **`fn arg_value(name: &str) -> Option<String>`**
   the argument after `name` on the command line (argument 0, the program, is skipped)  [arg_value]
@@ -16567,7 +16586,10 @@ Agent control (agent.confirm / agent.deny lines):
 Manifest: one rule per line, '#' starts a comment, a key may repeat:
   fs.read PATTERN..     read files below PATTERN
   fs.write PATTERN..    write (and read) files below PATTERN
-  fs.user               files the user chooses (dialog, drop, command line): read + write
+  fs.user               files the user chooses (dialog, drop, command line): read + write;
+                        also every document the system hands over one at a time (Android's
+                        content://, a Flatpak's documents portal mount, the browser's
+                        /handles/), so they work after a restart too
   process PATTERN|NAME..   programs Command::spawn / run_elevated may start (NAME: no '/')
   url SCHEME..|*        open_url schemes (https, mailto, ...)
   plugins PATTERN..     native libraries for lib_open
@@ -17116,10 +17138,14 @@ content -- the documents of other apps as files: Android's Storage Access Framew
 tests it with a host of its own
 
   ContentFs::new(host) -> a vfs Provider for the names after "content://".  On Android the
-       vfs mounts it on first use with the ContentResolver as its host (android_host.rs);
-       elsewhere only a test mounts it (apps/plattest/t_content.rs: a host in memory).
+       vfs mounts it on first use with the ContentResolver as its host (android_host.rs,
+       with_journal in the app's data folder, recover() at once); elsewhere only a test
+       mounts it (apps/plattest/t_content.rs: a host in memory).
+  .with_journal(dir)   writes go through a copy in dir first (below); recover() finishes the
+       writes a crash interrupted -> how many
   DocHost (trait)   what the provider asks the system: query (one document), children (of a
-       folder document), create, delete, rename, open (a Stream: Android a file descriptor)
+       folder document), create, delete, rename, open (a Stream: Android a file descriptor),
+       generation (a counter the system bumps when a provider reports a change)
   DocInfo           uri, display name, folder?, size, mtime, flags (DOC_*)
   uri_of(path)      "content://" + path -- the document's own URI where the name is one
 
@@ -17136,9 +17162,31 @@ Inside a tree mkdir, write (new files are created), delete (files, empty folders
 chosen folder itself), rename (inside one folder, replacing; to another folder: copy and
 delete, files only) and dir_list work.
 
-SAF has no rename over an existing document (providers pick "name (1)"), so the provider
-says atomic_rename() == false: AtomicFile (write_file in pieces, aio) collects the bytes and
-writes the document in place at commit ("wt").  rename replaces by deleting the target first.
+Names below a tree are cached: name -> the document's URI (and folder?), filled by every walk
+and listing, forgotten on create / delete / rename through the provider, emptied when the
+host's generation changes (Android: a ContentObserver on the provider's authority) and
+unused after CACHE_TTL_US.  A cached document is asked once (query) before it is used: gone,
+renamed or no longer a file / folder, the name is walked again from the nearest cached folder
+(from the tree's root at worst).  So a name costs one query instead of one listing per
+folder; only the leaf is checked, a folder moved elsewhere by another app stays cached until
+a change is reported or its time is up.
+
+Writing: SAF has no rename over an existing document (providers pick "name (1)", and a new
+document would get a new ID, losing the grants), so the provider says atomic_rename() ==
+false: AtomicFile (write_file in pieces, aio) collects the bytes and writes the document in
+place.  rename replaces by deleting the target first.  write (write_file, AtomicFile's commit)
+is made as safe as SAF allows:
+  1. with a journal folder, the new bytes (and the URI) go there first: one file per document
+     (JOURNAL, written atomically on internal storage);
+  2. the document is opened truncated ("rwt" / "wt") and written, synced, then read back and
+     compared (size and every byte) -- once more if that fails;
+  3. the journal file goes.  A crash or a failed write leaves it: recover() (Android: when
+     content:// is first used in a process) writes it again into the document if it still
+     exists (else the copy is dropped).
+The document keeps its URI (grants stay valid).  What remains: between the truncation and the
+end of the write other readers see a part; without a journal (none set) a crash leaves that
+part; File streams (File::open) write in place without any of this; opening a document for
+writing, deleting or renaming it drops its pending journal copy.
 ```
 
 ```rust
@@ -17150,7 +17198,16 @@ DOC_DELETE: u32 = 2
 DOC_RENAME: u32 = 4
 /// DocInfo::flags: the folder takes new documents
 DOC_CREATE: u32 = 8
+/// how long a cached name is used without a reported change (µs)
+CACHE_TTL_US: u64 = 60_000_000
 ```
+
+- **`fn listings() -> u64`**
+  (tests) how many folder listings (DocHost::children) the walks of every ContentFs asked for
+
+- **`fn interrupt_next_write(n: u64)`**
+  (tests) the next write of a document stops after n bytes and fails, its journal copy kept
+  -- what a crash in the middle of a write leaves
 
 - **`struct DocInfo`**
   one document as the host describes it
@@ -17177,6 +17234,9 @@ DOC_CREATE: u32 = 8
     change; a provider may pick another name when name is taken)
   - `fn open(&self, uri: &str, mode: u32) -> Option<Box<dyn Stream>>`
     the document opened: FO_READ, FO_WRITE (truncated) or FO_RW
+  - `fn generation(&self) -> u64`
+    a counter that changes when a provider reports a change of its documents (the name
+    cache starts again then); 0 = never
 
 - **`fn uri_of(path: &str) -> String`**
   "content://" + path
@@ -17187,10 +17247,18 @@ DOC_CREATE: u32 = 8
 **`impl<H: DocHost> ContentFs<H>`**
 
 - **`fn new(host: H) -> ContentFs<H>`**
+- **`fn with_journal(mut self, dir: &str) -> ContentFs<H>`**
+  keep a copy of every write in dir (a folder of the app's own, any plat name) until the
+  document holds all of it; recover() finishes what a crash interrupted
 - **`fn host(&self) -> &H`**
   the host the provider asks
 - **`fn document(&self, path: &str) -> Option<DocInfo>`**
   the document a name (after "content://") means -- its own URI, display name, size
+- **`fn recover(&self) -> u32`**
+  finish the writes a crash (or a failure) left in the journal: each copy is written into
+  its document again if that still exists, then removed; copies of documents that are gone
+  or not granted any more, and damaged ones, are removed -> how many documents were
+  completed
 
 ### `plat/secret.rs`
 
@@ -20621,6 +20689,12 @@ Android differs where its system offers more: real files on internal storage
 (android_files.rs), the documents of other apps as content:// names, the system clipboard and
 the persisted grants (android_host.rs), the system's file picker behind file_dialog
 (FD_PENDING, file_dialog_poll), download() as "save a copy" through the picker.
+The browser with the File System Access API (Chromium; the host says so, HOST_HANDLES):
+file_dialog shows the system's pickers too and answers later; the chosen file is the user's
+own, bound to a path /handles/ID/NAME (web/handles.js keeps the handle in IndexedDB), and every
+change of it is written back (write_back: the request of persist); reopen() reads it again
+after a reload.  Without the API: the library's own dialog over the virtual files, export
+through download().
 ```
 
 ```rust
@@ -20654,6 +20728,10 @@ REQUEST_FILE_DIALOG: u32 = 12
 /// 2 delete), app, service, account and for set the value, each as u32 length + bytes; the
 /// host encrypts and stores it in order and completes with 2, or an error
 REQUEST_SECRET: u32 = 13
+/// (browser) read a file of the user's own (/handles/..) again: the path (UTF-8); the host asks
+/// for the permission the handle needs (from the user's gesture), imports the file and
+/// completes with 2
+REQUEST_REOPEN: u32 = 20
 ```
 
 - **`enum RequestStatus`**
@@ -20685,7 +20763,17 @@ REQUEST_SECRET: u32 = 13
   Install the owned runtime. Returns false if an app is already registered.
 
 - **`fn persist(path: &str) -> Option<u32>`**
-  Request durable origin storage for the current virtual-file revision.
+  Request durable origin storage for the current virtual-file revision.  A file of the user's
+  own (/handles/.., chosen in the system's picker) is written back to that file instead
+  (Durable once the browser closed the write); its change already started that request, which
+  is returned while it is pending or done.
+
+- **`fn reopen(path: &str) -> Option<u32>`**
+  Read a file of the user's own (/handles/.., chosen in the system's picker before) again,
+  e.g. after a reload: the host asks for the permission the browser wants again (call it from
+  the user's click or key), imports the file's current bytes and completes (Completed; Denied,
+  Failed when the file is gone, Unsupported without such a file).  None: refused by the
+  permissions or no request slot.
 
 - **`fn persist(path: &str) -> Option<u32>`**
   Android: the file is on internal storage already; its data is synced (fsync) and the
@@ -20779,8 +20867,14 @@ REQUEST_SECRET: u32 = 13
 - **`fn read_stdin(_bytes: &mut [u8]) -> Result<usize, u32>`**
   Browser MessagePort replaces process stdin.
 
-- **`fn file_dialog(_flags: u32, _path: &mut String, _extensions: &[&str]) -> (i32, u32)`**
-  The browser uses the shared virtual file dialog; its native synchronous picker is unavailable.
+- **`fn file_dialog(flags: u32, path: &mut String, extensions: &[&str]) -> (i32, u32)`**
+  The browser: with the File System Access API (Chromium) the system's pickers --
+  FD_OPEN showOpenFilePicker, FD_SAVE showSaveFilePicker (the suggested name from path, the
+  types from the extensions; a /handles/.. path starts beside that file).  They answer later:
+  (FD_PENDING, 0) now, file_dialog_poll() once the user is done; the answer is a path
+  /handles/ID/NAME bound to the chosen file (opened: imported already), whose changes are
+  written back.  One picker at a time ((0, 0) while one is open).  FD_FOLDER and browsers
+  without the API: (-1, 0), the library's own dialog over the virtual files.
 
 - **`fn file_dialog(flags: u32, path: &mut String, extensions: &[&str]) -> (i32, u32)`**
   Android: the system's picker (Storage Access Framework) -- FD_OPEN ACTION_OPEN_DOCUMENT,
@@ -20792,7 +20886,8 @@ REQUEST_SECRET: u32 = 13
 
 - **`fn file_dialog_poll() -> Option<(i32, u32, String)>`**
   The answer of the picker file_dialog opened: None while it is open (or there is none),
-  then once (1, 0, the content:// name) or (0, 0, "") for cancelled / failed.
+  then once (1, 0, the content:// name / the /handles/ path) or (0, 0, "") for cancelled /
+  failed.
 
 - **`fn print(_job: &mut crate::PrintJob<'_>) -> i32`**
   Native printing is disabled until a browser print adapter has been connected.
@@ -20886,9 +20981,10 @@ REQUEST_SECRET: u32 = 13
   Update a browser clipboard representation before delivering the corresponding paste key.
 
 - **`extern "C" fn jfgui_file_result(id: u32, status: i32, len: u32) -> u32`**
-  (Android) the answer of the system's picker: the inbox holds the chosen content:// URI
+  The answer of the system's picker: the inbox holds the chosen content:// URI (Android) or
+  the /handles/ path bound to the chosen file (browser; an opened file was imported first)
   (status 2), a negative status as in jfgui_complete (-4 cancelled).  A file_dialog request
-  keeps the URI for file_dialog_poll; pick_file's becomes a drop (E_DROP).  1 = taken.
+  keeps the name for file_dialog_poll; pick_file's becomes a drop (E_DROP).  1 = taken.
 
 - **`extern "C" fn jfgui_complete(id: u32, status: i32) -> u32`**
   Confirm a host operation: 0 durable, 1 exported, 2 completed; negatives are explicit errors.
@@ -20900,6 +20996,9 @@ Source: [`lib/plat/web_files.rs`](../lib/plat/web_files.rs)
 ```text
 Worker-local virtual files. File codecs use their existing byte and streaming APIs;
 durable storage is a separate asynchronous request confirmed by the browser host.
+Files below /handles/ are the user's own files: the host keeps a FileSystemFileHandle for
+each (web/handles.js) and every change is written back to it (web.rs write_back: write_file,
+AtomicFile's commit, rename onto it, a File stream's sync and drop); imports never are.
 ```
 
 - **`fn cwd() -> String`**
@@ -20939,7 +21038,8 @@ Rust asks synchronously on the UI thread: jfgui_host_call(kind, bytes) in bridge
 GalleryHost.call(kind, byte[]) (android/GalleryHost.java) and copies its answer into the
 buffer jfgui_reply hands out; null / an exception = None.  The file picker and the export of
 download() answer later (web.rs: REQUEST_FILE_DIALOG / REQUEST_OPEN / REQUEST_DOWNLOAD,
-jfgui_file_result).
+jfgui_file_result).  A provider whose tree the app listed reports changes through
+jfgui_content_changed (DocHost::generation: content.rs's name cache starts again).
 
 Wire (little endian): u32 numbers, i64 times, strings and byte blocks as u32 length + bytes.
   CALL_QUERY     uri -> DocInfo, or nothing (missing / not allowed)
@@ -20973,7 +21073,8 @@ provider when the manifest has one (else only inside the app).
   the ContentResolver as ContentFs's host
 
 - **`fn content_fs() -> Arc<dyn Provider>`**
-  the provider of content:// (mounted by vfs::route on first use)
+  the provider of content:// (mounted by vfs::route on first use): writes go through a copy
+  in the app's data folder (.content-journal), and what a crash left there is finished now
 
 - **`fn content_grants() -> Vec<(String, bool, bool)>`**
   the documents and folders the app keeps access to across restarts (the system's
