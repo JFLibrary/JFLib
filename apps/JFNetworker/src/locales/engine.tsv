@@ -182,7 +182,6 @@ Für {} gibt es keine passende Zone oder keinen solchen Eintrag.	There is no mat
 Diese Aktion kennt der Simulator nicht.	The simulator does not know this action.
 Unbekannte Dienstart „{}“.	Unknown kind of service “{}”.
 Port {} gibt es nicht.	Port {} does not exist.
-„server“ fehlt oder ist keine IPv4-Adresse.	“server” is missing or not an IPv4 address.
 „close“ kennt {} nicht (shutdown, close, abort, keep).	“close” does not know {} (shutdown, close, abort, keep).
 „{}“: nur http geht.	“{}”: only http works.
 Die URL nennt keinen Host.	The URL names no host.
@@ -444,7 +443,6 @@ Fehler {} ist schon behoben.	Fault {} is healed already.
 Das Backend {} gibt es schon.	Backend {} exists already.
 Das Backend {} gibt es nicht.	Backend {} does not exist.
 Das Backend {} steht zweimal da.	Backend {} is listed twice.
-Backend {} braucht „addr“ mit einer IPv4-Adresse.	Backend {} needs “addr” with an IPv4 address.
 „backends“ fehlt.	“backends” is missing.
 „mode“ kennt {} nicht (http, tcp).	“mode” does not know {} (http, tcp).
 „algorithm“ kennt {} nicht (round-robin, least-conn, weighted, hash).	“algorithm” does not know {} (round-robin, least-conn, weighted, hash).

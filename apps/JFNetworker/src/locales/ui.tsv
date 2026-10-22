@@ -848,7 +848,6 @@ Fehler einspielen	Inject a fault
 Ausschalten	Power off
 Das Gerät verliert den Strom und kommt beim Wiederherstellen wieder (das Projekt bleibt eingeschaltet).	The device loses its power and comes back when restored (the project keeps it switched on).
 Dienst	Service
-Disk	Disk
 Verlangsamen	Slow down
 Die Disk braucht mehr Zeit je Zugriff (ms) oder einen Faktor für die Übertragung (größer als 0, nicht 1), z. B. 10 und 3.	The disk needs more time per access (ms) or a factor for the transfer (greater than 0, not 1), e.g. 10 and 3.
 Kabel ziehen	Pull the cable
