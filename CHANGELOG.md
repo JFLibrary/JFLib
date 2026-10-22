@@ -33,6 +33,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **img_core:** img_core::icc_xform: ICC_BI_ADOBE is now ICC_BI_A98 and ICC_BI_PROPHOTO is ICC_BI_ROMM (the same values; names of the standards instead of trademarks)
 - **ui:** ui::KIND_NAMES has 23 entries: the new record kind K_HEADING (level as the value, dump name heading) of the Markdown / HTML viewer; K_KIND_COUNT is 23
 - **plat:** plat::a11y::Role has the new variant Heading (the level in Node::value, Node::level()); a match over every role needs an arm for it
+- **ui:** The fixed limits of a pass grow as needed: keys of one pass (16 before), commands (32), timers (16), pointer positions, hit boxes, widget records, clip levels, tabs of a tab bar, known canvases and wrapped lines; their ceilings (1024 keys, 65536 commands, 4096 timers ...) only stop runaway apps, and whatever a ceiling or a fixed nesting depth (windows, popups, menus, lists) holds back is reported once with a UIWARN. Due timers fire by deadline, equal deadlines in the order set; the script command keys [N] CHORD... queues many keys for one pass
 
 ### Fixed
 
@@ -41,6 +42,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** The weekday toggles (ui.weekday_toggles) wrap their seven buttons (BOX_WRAP) where the row has less room than they need, instead of running past the edge of a narrow card
 - **ui:** Typed text is never dropped: a long insert or input method commit (beyond 64 characters, a burst of WM_CHAR on Windows, an IBus commit over 4 KB) reaches text boxes and editors whole and in order; a pass takes up to 4096 characters, the rest comes in the next passes, also what a widget leaves with a smaller ui.text_take cap
 - **web:** Browser: long text (a 5000-character insert, emoji, combining sequences) reaches the app whole as commits instead of one event per character; in Firefox, typing, inserting and IME compositions in a field of the ARIA shadow tree reach the app (the input event Firefox sends after compositionend no longer undoes the committed text)
+- **plat:** X11 and Wayland no longer lose input when one socket read brings more than about 85 key presses (a burst of synthetic keys, a client flooding input, also while the backend waits for a reply): plat's 256-event ring has an overflow queue that keeps the order (up to 65536 events; plat::evq_dropped counts what is lost beyond)
 
 ## [0.1.0] - 2026-10-20
 

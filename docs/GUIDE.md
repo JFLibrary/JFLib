@@ -192,8 +192,9 @@ and on Wayland compositors without server-side decorations the library draws a t
 * After an action the library builds the frame once more, so everything shows the new state.
   Keep `frame` free of side effects other than reacting to `EV_*` flags.
 * Heavy or structural work (file I/O, opening dialogs, big edits) goes through
-  `ui.cmd_run(cmd, arg)`; it reaches `App::command(ui, id, arg)` between frames. Return `true`
-  when you handled it. The library also delivers:
+  `ui.cmd_run(cmd, arg)`; it reaches `App::command(ui, id, arg)` between frames, in the order
+  queued (the queue grows as needed; only beyond 65536 waiting commands does it drop new ones,
+  with a `UIWARN`). Return `true` when you handled it. The library also delivers:
 
   | Id | When |
   |---|---|
@@ -690,7 +691,16 @@ ui.menubar(None);                        // the menu bar of the AppDesc
   elsewhere in the app, with Esc, and when the app loses the keyboard. Headless runs keep the
   main window's popups inside it unless a script sets a virtual screen (`screen X Y W H`, §12).
 * Timers: `ui.timer(id, ms)` -> `App::command(UIC_TIMER, id)` once; start it again for a
-  periodic timer. Library timers (caret, tooltips) arrive as well: ignore ids you did not start.
+  periodic timer (the same id replaces the waiting one). Library timers (caret, tooltips) arrive
+  as well: ignore ids you did not start. Any number may wait (up to 4096 ids); due timers fire
+  by their deadlines, equal deadlines in the order they were set.
+* Limits: the queues and stacks of a pass grow as needed (keys of one pass, commands, timers,
+  pointer positions, hit boxes, widget records, clips, tabs, canvases); their ceilings only
+  stop runaway memory. Where a ceiling or a fixed nesting depth (windows, popups, menus inside
+  each other) holds something back, a `UIWARN` names it once (scripts: `expect_warn`). The
+  platform's event ring holds 256 events; a larger burst (synthetic keys, a flooding client)
+  waits behind it in order, up to 65536 events (`plat::evq_dropped()` counts what is lost
+  beyond).
 
 ## 7. Dialogs, windows, title bar, files
 
@@ -1384,7 +1394,8 @@ in DIP):
 | `drag ... pen P0 P1`, `drag ... eraser P0 P1` | a pen stroke, pressure P0 -> P1 (%) |
 | `pointer mouse \| pen [P [TX TY]] \| eraser [P ...] \| touch` | pen data of the following pointer events |
 | `wheel S DY [shift] [ctrl] [alt]` | raw wheel units (120 = one notch); the modifiers are held during the wheel event (Ctrl + wheel zoom) |
-| `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... |
+| `key CHORD...` | `key ctrl+s`, `key tab shift+tab enter esc left f4`, also `[ ] , . - + /`, `num0`..`num9`, `numadd` ... (every key a pass of its own, as the platform delivers them) |
+| `keys [N] CHORD...` | the chords N times over, queued for ONE pass of the window with the keyboard (more keys than frames, as a tool window hands them on) |
 | `type "text"` | typed text (`"\n"` presses Enter) |
 | `commit "text" [N]` | an input method commits the text (N times over: one long commit, as the platform queues it) |
 | `focus S` | keyboard focus to a widget (focus ring shown) |
@@ -1439,6 +1450,10 @@ shot build/template.png
   Real windows: `tools/wincheck.py popups|edges`, `tools/x11check.py popups|edges --backend
   x11|wayland`, `tools/wlproxy/popflip.py` (a compositor that moves popups). `UIC_EXIT` is never
   sent in `--script` / `--shot` runs.
+* Input bursts on Linux: `python tools/keyburst.py [--keys N]` puts a proxy between
+  `linuxtest --test burst` and WSLg's X server / compositor that writes N synthetic key presses
+  in one go (while the backend waits for a reply, and while it waits for events); every key
+  must arrive, in order.
 
 **Test commands**
 

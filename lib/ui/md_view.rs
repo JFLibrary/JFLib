@@ -104,7 +104,6 @@ const HEAD_SCALE: [u32; 6] = [200, 150, 125, 100, 88, 85];
 const TABLE_SAMPLE: usize = 200;
 const LAYS_KEEP: usize = 400;
 const LABEL_MAX: usize = 4000;
-const LINKS_MAX: usize = 1024; // link records and hit boxes per frame
 
 /// what a document view reports (see the module header)
 #[derive(Clone, Debug, Default)]
@@ -1961,9 +1960,7 @@ impl Ui {
         };
         let sp = doc.link_spots()[spot];
         let t = doc.plain_range(TextPos::new(k, sp.a as usize), TextPos::new(k, sp.b as usize));
-        if links.len() < LINKS_MAX {
-            links.push(Link { r: lr, logical: self.ltr_rect(lr), label: t, spot });
-        }
+        links.push(Link { r: lr, logical: self.ltr_rect(lr), label: t, spot }); // (visible rows only)
     }
 
     // an image at x, y (w x h px): the picture, else a frame with its alt text

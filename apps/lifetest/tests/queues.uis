@@ -1,0 +1,35 @@
+# the runtime's queues (ctx.rs) beyond their old fixed limits (16 keys in one pass, 32
+# commands, 16 timers): nothing is lost and the order stays; a ceiling that is reached warns
+theme light
+expect text:"Tasten: 0, höchstens 0 in einem Durchgang" exists
+# 100 keys in one pass (the platform gives every key a pass; `keys` queues them together)
+keys 4 a b c d e f g h i j k l m n o p q r s t u v w x y
+expect text:"Tasten: 100, höchstens 100 in einem Durchgang" exists
+expect text:"Folge: ABCDEFGHIJKLMNOPQRSTUVWXYABCDEFGHIJKLMNOPQRSTUVWXYABCDEFGHIJKLMNOPQRSTUVWXYABCDEFGHIJKLMNOPQRSTUVWXY" exists
+# keys with their own passes still come one per pass
+key 1 2 3
+expect text:"Tasten: 103, höchstens 100 in einem Durchgang" exists
+expect text:"Folge: ABCDEFGHIJKLMNOPQRSTUVWXYABCDEFGHIJKLMNOPQRSTUVWXYABCDEFGHIJKLMNOPQRSTUVWXYABCDEFGHIJKLMNOPQRSTUVWXY123" exists
+# 200 commands queued in one frame arrive, in order
+cmd 9101 200
+expect text:"Befehle: 200, Reihenfolge: ja" exists
+cmd 9101 5000
+expect text:"Befehle: 5000, Reihenfolge: ja" exists
+# 100 timers with different intervals (20 .. 119 ms, set out of order) fire by their
+# deadlines, several within one frame of the virtual clock
+cmd 9102 100
+wait 48
+expect text:"Timer: 29 von 100, Reihenfolge: ja" exists
+wait 100
+expect text:"Timer: 100 von 100, Reihenfolge: ja" exists
+# 100 timers due within the first frame (ten deadlines): 100 UIC_TIMER commands at once;
+# equal deadlines fire in the order they were set
+cmd 9103 100
+expect text:"Timer: 0 von 100, Reihenfolge: ja" exists
+wait 16
+expect text:"Timer: 100 von 100, Reihenfolge: ja" exists
+expect_nowarn
+# the ceiling of one pass's key queue (1024 keys): the rest is dropped, with a warning
+keys 1100 z
+expect text:"Tasten: 1127, höchstens 1024 in einem Durchgang" exists
+expect_warn

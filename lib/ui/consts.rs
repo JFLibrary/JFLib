@@ -388,7 +388,9 @@ pub const FD_FOLDER: u32 = 2;
 pub const FD_EXT_SHIFT: u32 = 8;
 
 // ------------------------------------------------------------------ windows (win.rs)
-pub const WIN_MAX: usize = 8; // windows including the main window (index 0)
+// windows including the main window (index 0); fixed: the index is a bit in u32 masks and
+// Event::win, plat keeps PW_MAX windows; one more warns (window_begin)
+pub const WIN_MAX: usize = 8;
 pub const WF_TOOL: u32 = 1;
 pub const WF_DIALOG: u32 = 2;
 pub const WF_MODAL: u32 = 4;
@@ -456,7 +458,7 @@ pub const CUR_SIZE_NESW: u32 = 9;
 pub const CUR_NONE: u32 = 10;
 pub const CUR_COUNT: u32 = 11;
 pub const CUR_CUSTOM: u32 = 15; // hit boxes only: the cursor of cursor_custom
-pub const CUR_USER_MAX: u32 = 32;
+pub const CUR_USER_MAX: u32 = 32; // fixed handle range; cursor_new answers 0 when it is full
 pub const CUR_MAX_PX: i32 = 256;
 
 // fonts

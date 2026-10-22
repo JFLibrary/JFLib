@@ -754,8 +754,18 @@ Fensterrand hinaus.
   hoher Kontrast, `SymbolCache` rastert einmal pro Größe und Palette. Erster Nutzer: die 26
   Gerätesymbole von JFNetworker (`apps/symboltest`). Beliebige SVG-Dateien (Verläufe, Text,
   Clipping, CSS, Bilder) zeichnet seit 2026-10-20 `lib/img_svg` (`ui.svg`).
-- **P3** · *fehlt* · Feste Obergrenzen lockern: `TIMERS_MAX` 16, `KEYQ_MAX` 16, `CMDQ_MAX` 32
-  ([`ui/ctx.rs`](../lib/ui/ctx.rs)).
+- **P3** · *erledigt* · Feste Obergrenzen lockern (2026-10-22, [`ui/ctx.rs`](../lib/ui/ctx.rs)):
+  Tasten eines Durchgangs, Befehle und Timer wachsen nach Bedarf (vorher 16 / 32 / 16), ebenso
+  Zeigerpunkte, Hit-Boxen, Widget-Records, Clip-Ebenen, Register (Tabs), Leinwände und
+  umbrochene Zeilen; die Obergrenzen (1024 Tasten, 65536 Befehle, 4096 Timer ...) fangen nur
+  durchgehende Apps ab, im Normalbetrieb wird nichts nachalloziert. Fällige Timer feuern nach
+  ihrer Frist, gleiche Fristen in der Reihenfolge des Setzens. Was eine Obergrenze oder eine
+  feste Schachtelungstiefe (Fenster, Popups, Menüs, Listen) zurückhält, meldet ein `UIWARN`
+  einmal (`limit_hit`). Getestet mit `apps/lifetest/tests/queues.uis` (neuer Skriptbefehl
+  `keys N`: 100 Tasten in einem Durchgang, 200 und 5000 Befehle, 100 Timer). Der 256er-
+  Ereignisring von plat hat eine Überlaufschlange (bis 65536 Ereignisse, in Reihenfolge): X11
+  und Wayland verlieren keine Tasten mehr, wenn ein Lesevorgang mehr als etwa 85 Tastendrücke
+  bringt, auch nicht beim Warten auf eine Antwort (`tools/keyburst.py`, `plattest --test evq`).
 - **P2** · *erledigt* · Knoten-/Kanten-Leinwand ([`ui/diagram.rs`](../lib/ui/diagram.rs),
   `ui.diagram` / `diagram_minimap` / `diagram_sems`, 2026-10-19): Zoom und Verschieben (Rad,
   Strg+Rad am Zeiger, Mitteltaste, Leertaste, Hand-Werkzeug), Raster mit Einrasten,

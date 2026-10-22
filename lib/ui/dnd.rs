@@ -301,10 +301,14 @@ impl Ui {
             x1: r[0].wrapping_add(r[2]).min(k[2]),
             y1: r[1].wrapping_add(r[3]).min(k[3]),
         };
-        if z.x1 > z.x0 && z.y1 > z.y0 && c.zones[cur].len() < super::ctx::HITS_MAX {
+        let full = c.zones[cur].len() >= super::ctx::HITS_MAX;
+        if z.x1 > z.x0 && z.y1 > z.y0 && !full {
             c.zones[cur].push(z);
         } else {
-            z.x1 = z.x0; // clipped away: no highlight
+            z.x1 = z.x0; // clipped away (or no room): no highlight
+            if full {
+                self.limit_hit(super::ctx::LIM_ZONES);
+            }
         }
         let win = self.uiw_cur;
         let d = &self.dnd;

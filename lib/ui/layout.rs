@@ -36,6 +36,7 @@ use alloc::vec::Vec;
 use super::consts::*;
 use super::{Sp, Ui};
 
+// boxes inside each other (fixed: nesting; deeper ones warn and are left out)
 pub(crate) const BOX_STACK_MAX: usize = 48;
 
 /// layout frame (box stack)  [BX_*]

@@ -45,16 +45,20 @@ use gfx::{Surface, FMT_XRGB};
 use plat::Event;
 use rt::sync::SpinLock;
 
-const WSTACK_MAX: usize = 16; // window_begin records (entered or not)
-const NEST_MAX: u32 = 4; // windows entered inside each other
+// fixed: a window index is a bit in u32 masks and Event::win (WIN_MAX, plat's PW_MAX); the
+// stacks below are nesting depths of window_begin, which real apps keep at two or three
+const WSTACK_MAX: usize = 16; // window_begin records inside each other (entered or not)
+const NEST_MAX: u32 = 4; // windows entered inside each other (warns)
 const DEF_W: i32 = 280;
 const DEF_H: i32 = 400;
 const WSE_ENTERED: u32 = 0x10000; // stack entry: prev | index << 8 | WSE_ENTERED
 const TITLE_MAX: usize = 256;
 const SIZE_MAX_DIP: i32 = 8192; // largest client width / height of a window (DIP)
-const FWDQ_MAX: usize = 16; // (U3) keys a borrowing tool window hands on per frame
+const FWDQ_MAX: usize = super::ctx::KEYQ_MAX; // (U3) keys a borrowing tool window hands on per pass (all)
 const FWDT_MAX: usize = super::ctx::TEXTQ_MAX; // (U3) typed codepoints handed on per pass (all)
-const EXT_MAX: usize = 4; // (U3) popup slots (items outside their window)
+// (U3) popup slots (items outside their window): fixed, plat has PPW_MAX popup windows;
+// more open at once are drawn clipped to their window (limit_hit)
+const EXT_MAX: usize = 4;
 const POPUP_ITEMS: u32 = 7; // (U3) popup_ext items: 6 popups + the tooltip
 
 /// chrome ids of window i: WCH_BASE | i << 4 | part
@@ -678,6 +682,7 @@ impl Ui {
         let sp = self.m.win.sp;
         if sp as usize >= WSTACK_MAX {
             self.m.win.over += 1;
+            self.limit_hit(super::ctx::LIM_WINNEST);
             return false;
         }
         let owner = self.uiw_cur; // the window being built
@@ -2290,7 +2295,10 @@ impl Ui {
                         e.rect[2] = 0;
                         k
                     }
-                    None => continue, // all slots taken: drawn clipped
+                    None => {
+                        self.limit_hit(super::ctx::LIM_POPUP_SLOTS); // all slots taken: drawn clipped
+                        continue;
+                    }
                 },
             };
             // changed: the window rendered something, or the item moved / resized / is new

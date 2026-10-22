@@ -4,7 +4,8 @@
 //   wl_connect() -> the backend, None when no compositor answers ($WAYLAND_DISPLAY in
 //        $XDG_RUNTIME_DIR, /run/user/UID, /mnt/wslg/runtime-dir)
 //   test hooks for linuxtest (synthetic events, no compositor needed): wl_test_event,
-//        wl_test_setup, wl_input_service, wl_cursor_image, wl_cursor_render, wl_test_protoerr
+//        wl_test_setup, wl_input_service, wl_cursor_image, wl_cursor_render, wl_test_protoerr,
+//        wl_test_roundtrip (a compositor or tools/wlproxy/wlinject.py)
 //   xkb_* (linux_xkb.rs): the keymap of the Wayland keyboard, also used by X11
 //
 // The modules follow the assembly files:
@@ -266,6 +267,12 @@ pub fn wl_cursor_render(dst: &mut [u32], shape: u32, s: u32) {
     if let Some(a) = cursor::image(shape) {
         cursor::render(dst, a, s);
     }
+}
+
+/// a wl_display.sync round trip: the events that arrive before its answer are dispatched
+/// first (linuxtest --test burst: a burst of keys while it waits) -> 0 ok / -1 timeout
+pub fn wl_test_roundtrip() -> i32 {
+    with(|wl| wl.roundtrip())
 }
 
 /// attach a buffer id that does not exist to the main window's surface: the compositor

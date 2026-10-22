@@ -36,7 +36,7 @@ use super::{Sp, Ui};
 use gfx::Surface;
 
 const ELL_MAX: usize = 1024; // ellipsis buffer (bytes)
-const WRAP_MAX: usize = 256; // lines of a TX_WRAP text
+const WRAP_MAX: usize = 1 << 16; // lines of a TX_WRAP text (more: limit_hit)
 
 // a wrapped line: byte offset in the text, bytes drawn (without trailing blanks), width px
 // (with the hyphen), hyphenated (a hyphen drawn after it)
@@ -265,7 +265,7 @@ impl Ui {
     }
 
     // wrap_lines(s, width, hyph) -> widest line (px); the lines (at most WRAP_MAX; the rest of
-    // a longer text is dropped).  Lines end at '\n' and where the text reaches `width`: after
+    // a longer text is dropped with a warning).  Lines end at '\n' and where the text reaches `width`: after
     // the last blank that fits (the blanks stay on the line but are not measured or drawn),
     // after a soft hyphen, at a hyphenation point (hyph: TX_HYPHENATE) with a hyphen drawn,
     // inside a word that is wider than a line (at a character boundary, at least one
@@ -279,6 +279,7 @@ impl Ui {
             let pe = pos + s[pos..].iter().position(|&c| c == b'\n' || c == 0).unwrap_or(s.len() - pos);
             loop {
                 if out.len() >= WRAP_MAX {
+                    self.limit_hit(super::ctx::LIM_WRAP);
                     break 'para;
                 }
                 let (end, hy) = self.wrap_break(s, pos, pe, width, hyph);

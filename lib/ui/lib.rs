@@ -162,7 +162,7 @@ mod vicon;
 mod win;
 mod winstate;
 
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -402,11 +402,15 @@ pub struct Ui {
     pub(crate) mpress: u32,
     pub(crate) mptype: u32,
     pub(crate) mpts_win: u32,
-    pub(crate) cmdq: Vec<(u32, u32)>,
+    /// commands for App::command in the order queued (ctx.rs cmd_run, CMDQ_MAX)
+    pub(crate) cmdq: VecDeque<(u32, u32)>,
     /// typed text that waits for the next passes (beyond a pass's TEXTQ_MAX, or left by a
     /// text_take cap): (window, codepoints) in typing order (ctx.rs text_refill)
     pub(crate) text_more: Vec<(u32, Vec<u32>)>,
-    pub(crate) timers: [(u32, u32); ctx::TIMERS_MAX],
+    /// (id, deadline ms) in the order set (ctx.rs timer, TIMERS_MAX)
+    pub(crate) timers: Vec<(u32, u32)>,
+    /// what each ceiling held back (ctx.rs limit_hit, LIM_*)
+    pub(crate) limits: [u32; ctx::LIM_N],
     pub(crate) mods: u32,
     pub(crate) frame: u32,
     pub(crate) now_ms: u32,
@@ -478,7 +482,7 @@ pub struct Ui {
     // ---- dirty regions (ui_dirty.s, shared part)
     pub(crate) drects: Vec<[i32; 4]>,
     pub(crate) dmg: Vec<dirty::Dmg>,
-    pub(crate) cvs: [dirty::Cvs; dirty::CVS_MAX],
+    pub(crate) cvs: Vec<dirty::Cvs>,
 
     // ---- commands (ui_cmd.s, shared part)
     pub(crate) icon_hook: Option<IconHook>,

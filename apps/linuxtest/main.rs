@@ -21,6 +21,9 @@
 //                                                synthetic X11 events -> E_* (no server)
 //   linuxtest --test x11err                      bad X request: error recorded, no exit;
 //                                                every cursor shape without an X error
+//   linuxtest --test burst [--keys N]            (tools/keyburst.py) N synthetic keys in one
+//                                                read, while waiting for a reply and while
+//                                                waiting for events: all arrive, in order
 //
 // Every window test runs on the backend linux_disp picks (jfgui_BACKEND=x11|wayland).
 // Every test prints PASS/FAIL lines and ends the process with exit(failures).
@@ -33,7 +36,7 @@
 // before the test unless --shot / --script make the run headless, and the framebuffer is
 // its own surface.  Modules: t_files.rs (files, crash), t_x11.rs (x11synth, x11err),
 // t_wl.rs (cursors, protoerr, synth) and t_xkb.rs (xkb) -- the last two belong to the
-// plat-wayland agent.
+// plat-wayland agent -- and t_burst.rs (burst).
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -54,6 +57,8 @@ use plat::{
     WCMD_MINIMIZE, WCMD_RESTORE, WST_MAXIMIZED, WST_MINIMIZED,
 };
 
+#[cfg(target_os = "linux")]
+mod t_burst;
 mod t_files;
 #[cfg(target_os = "linux")]
 mod t_wl;
@@ -273,6 +278,8 @@ fn linuxtest() -> i32 {
         Some("x11synth") => Some(t_x11::test_x11synth),
         #[cfg(target_os = "linux")]
         Some("x11err") => Some(t_x11::test_x11err),
+        #[cfg(target_os = "linux")]
+        Some("burst") => Some(t_burst::test_burst),
         _ => None,
     };
     if let Some(t) = test {

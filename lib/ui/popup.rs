@@ -60,7 +60,8 @@ use crate::keys::*;
 use crate::{Sp, Ui};
 use plat::{PA_ABOVE, PA_BELOW, PA_FREE, PA_POINT, PA_SIDE};
 
-// popup stack
+// popup stack: fixed (menus and submenus inside each other; the platform shows a few popup
+// windows, plat::PPW_MAX); a popup opened deeper replaces the deepest one (limit_hit)
 const POPUP_MAX: usize = 6;
 pub(crate) const PPF_FOCUS: u32 = 1; // focus the first focusable row once drawn
 const PPF_AUTO: u32 = 2; // drawn by the runtime (menu_popup)
@@ -69,10 +70,12 @@ const PPF_QUIET: u32 = 8; // focusid without the focus visual
 const PPF_TWOCOL: u32 = 16; // a checked row with an icon: check column + icon column (U1)
 const PPF_SCROLLED: u32 = 32; // (U3) a scrolling combo list was scrolled to its selection
 
-const FLN_MAX: usize = 8;
+const FLN_MAX: usize = 8; // flyouts inside each other (fixed: nesting; deeper: limit_hit)
 const CST_LIMIT: usize = 1536; // at most this many commands with a state
-const MENU_MAX: usize = 48; // rows per menu reachable by mnemonics
-const MB_MAX: usize = 16; // menus per menu bar
+// rows of a menu (fixed: a row's record index is a byte; more: limit_hit), all of them
+// reachable by keys and mnemonics
+const MENU_MAX: usize = 250;
+const MB_MAX: usize = 16; // menus per menu bar (fixed: wider than any window; more: limit_hit)
 const LAB_MAX: usize = 256;
 const CATCH_ID: u32 = 0x7FFE_0C0C; // hit box under the popups (light dismiss)
 const CTX_SALT: u32 = 0x00C0_FFEE;
@@ -381,14 +384,12 @@ impl Ui {
 
     // pp_push(id, level) -> index: close popups >= level, open `id` at level
     fn pp_push(&mut self, id: u32, level: u32) -> usize {
-        let w = &mut self.wp.popup;
-        let mut l = level;
-        if l > w.pp_n {
-            l = w.pp_n;
-        }
+        let mut l = level.min(self.wp.popup.pp_n);
         if l > POPUP_MAX as u32 - 1 {
             l = POPUP_MAX as u32 - 1;
+            self.limit_hit(super::ctx::LIM_POPUPS);
         }
+        let w = &mut self.wp.popup;
         w.pp_n = l + 1;
         w.pp[l as usize] = Pp {
             id,
@@ -571,6 +572,7 @@ impl Ui {
         let sp_i = self.wp.popup.fl_sp as usize;
         if sp_i >= FLN_MAX {
             self.wp.popup.fl_over += 1;
+            self.limit_hit(super::ctx::LIM_FLYOUTS);
             return false;
         }
         self.wp.popup.fl_sp += 1;
@@ -1242,7 +1244,8 @@ impl Ui {
             }
         };
         for (ri, rec) in menu.iter().enumerate() {
-            if ri >= 250 {
+            if ri >= MENU_MAX {
+                self.limit_hit(super::ctx::LIM_MENU_ROWS);
                 break;
             }
             let rid = pid.wrapping_add(ri as u32 + 1); // row id
@@ -1454,6 +1457,9 @@ impl Ui {
             mn[n] = m as u8;
             mpos[n] = pos as u8;
             n += 1;
+        }
+        if n == MB_MAX && matches!(mb.get(n), Some(Mi::Menu(..))) {
+            self.limit_hit(super::ctx::LIM_MENUBAR);
         }
         if n == 0 {
             return 0;
