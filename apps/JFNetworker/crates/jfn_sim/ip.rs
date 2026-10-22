@@ -24,6 +24,8 @@
 //                                 for RIPv2); packets to other groups are not for the device
 //   acls / nat                    the device's access lists (acl.rs) and address translation
 //                                 (nat.rs); an interface that goes away takes its part along
+//   v6                            the IPv6 part on the same interfaces (ip6.rs), reset and
+//                                 forgotten with them
 //
 // The engine decides which interfaces are up (iface_up in l3.rs); this module only keeps the
 // data and answers questions about it.
@@ -218,6 +220,8 @@ pub struct IpStack {
     pub acls: crate::acl::Acls,
     /// address translation: interfaces, rules, translations (nat.rs)
     pub nat: crate::nat::Nat,
+    /// the IPv6 part on the same interfaces (ip6.rs; off until configured)
+    pub v6: crate::ip6::Ip6,
 }
 
 /// a routing table with what it was made of: per interface its state and addresses, the static
@@ -314,6 +318,7 @@ impl IpStack {
             groups: Vec::new(),
             acls: crate::acl::Acls::default(),
             nat: crate::nat::Nat::default(),
+            v6: crate::ip6::Ip6::new(model.cli == CliStyle::Linux),
         })
     }
 
@@ -398,6 +403,8 @@ impl IpStack {
         // its access lists and its side of NAT go with it
         self.acls.unbind(iface);
         self.nat.unbind(iface);
+        // and its IPv6 part
+        self.v6.forget(iface);
     }
     /// what is forgotten when the device is switched off: learned neighbours, fragments
     /// (NAT's translations and the hit counters of access lists too)
@@ -407,6 +414,7 @@ impl IpStack {
         self.icmp_rate = IcmpRate::new();
         self.nat.reset();
         self.acls.clear_counters(None);
+        self.v6.reset();
     }
 
     /// may an ICMP error of `typ` / `code` go to `to` now?  (Takes what it costs.)

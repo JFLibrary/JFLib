@@ -44,6 +44,11 @@
 //                                                      are used, their hit counters (acl.rs)
 //   Nat                                                address translation: interfaces, pools,
 //                                                      rules, timeouts, clearing (nat.rs)
+//   Ip6                                                IPv6: routing, addresses, the link-local
+//                                                      one, autoconfiguration, advertisements,
+//                                                      routes, neighbors (ip6.rs, nd.rs); IPv6
+//                                                      looks at a device again after the changes
+//                                                      RIP looks after, and after the power
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -214,6 +219,8 @@ pub enum Action {
     /// address translation (nat.rs): the side of an interface, pools, rules, timeouts,
     /// clearing translations or counters
     Nat { dev: u32, act: crate::nat::NatAct },
+    /// a change of the IPv6 configuration (ip6.rs, nd.rs)
+    Ip6 { dev: u32, set: crate::ip6::Ip6Set },
 }
 
 /// why an action was refused (German text through Display)
@@ -288,6 +295,7 @@ impl Engine {
         let r = self.apply_one(a);
         if let Some(dev) = touched {
             self.rip_kick_dev(dev);
+            self.ip6_kick_dev(dev);
         }
         r
     }
@@ -327,6 +335,7 @@ impl Engine {
                 }
                 self.refresh_node_links(ni);
                 self.os_power(ni, on);
+                self.ip6_kick(ni);
                 if on {
                     self.stp_power(ni, true);
                 }
@@ -559,6 +568,7 @@ impl Engine {
                 let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
                 self.nat_apply(ni, dev, act)
             }
+            Action::Ip6 { dev, set } => self.ip6_apply(dev, set),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }

@@ -37,6 +37,13 @@
 //            modes), ip access-group, show access-lists, clear access-list counters
 //   nat      IOS NAT: ip nat inside|outside, ip nat pool, ip nat inside source, translation
 //            timeouts, show ip nat translations|statistics, clear ip nat, debug ip nat
+//   ip6      IPv6 at the IOS-like console: ipv6 unicast-routing, route, neighbor, the interface
+//            commands (ipv6 enable, address, autoconfig, nd ...), show ipv6 interface|route|
+//            neighbors|routers, ping / traceroute ipv6, debug ipv6 icmp|nd, clear ipv6
+//            neighbors, the running configuration
+//   linux6   IPv6 in the shell: ip -6 addr|route|neigh, ping6 / ping -6, traceroute6 /
+//            traceroute -6, sysctl net.ipv6.conf.*, the device's configuration
+//   print6   ping and traceroute over IPv6 as console commands
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -74,6 +81,9 @@ pub mod stp;
 pub mod rip;
 pub mod acl;
 pub mod nat;
+pub mod ip6;
+pub mod linux6;
+pub mod print6;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -84,6 +94,9 @@ pub const D_STP: u32 = 4;
 pub const D_RIP: u32 = 0x100;
 /// "debug ip nat" (a bit of its own, away from the others' next ones)
 pub const D_NAT: u32 = 0x200;
+/// "debug ipv6 icmp", "debug ipv6 nd" (cli/ip6.rs)
+pub const D_ICMP6: u32 = 0x800;
+pub const D_ND: u32 = 0x1000;
 
 /// where an IOS console is
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -175,6 +188,8 @@ pub struct Ask {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AskKind {
     CopyRunStart,
+    /// "Output Interface: " of a ping to a link-local IPv6 address (cli/ip6.rs)
+    Ping6Out { dst: netpkt::Ipv6, count: u32, bytes: u16, timeout: Ns },
 }
 
 /// a console command that runs over virtual time
@@ -270,6 +285,7 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
         n if n.is_stp_event() => c.debug > 0,
         n if n.is_rip() => c.debug > 0,
         n if n.is_nat() => c.debug > 0,
+        Note::V6(_) => c.debug > 0,
         _ => false,
     }
 }

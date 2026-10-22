@@ -1,0 +1,190 @@
+# JFNetworker-Szenario ipv6_routing.scn: „IPv6 über zwei Router“, 6 Geräte, 5 Verbindungen, Seed 9
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  PC1     net.ipv6.conf.all.disable_ipv6 = 0
+   0.000000000  PC2     net.ipv6.conf.all.disable_ipv6 = 0
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/24 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/24 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  SRV     net.ipv6.conf.all.disable_ipv6 = 0
+   0.000000000  SRV     net.ipv6.conf.eth0.autoconf = 0
+   0.000000000  --      run 20s
+  20.000000000  R1      R1>enable
+  20.000000000  R1      R1#show ipv6 route
+  20.000000000  R1      IPv6 Routing Table - default - 6 entries
+  20.000000000  R1      Codes: C - connected network, L - address of this device, S - static route,
+  20.000000000  R1             ND - default router from advertisements, NDp - prefix from advertisements
+  20.000000000  R1      
+  20.000000000  R1      C   2001:DB8:1::/64 [0/0]
+  20.000000000  R1           via GigabitEthernet0/0/0, directly connected
+  20.000000000  R1      L   2001:DB8:1::1/128 [0/0]
+  20.000000000  R1           via GigabitEthernet0/0/0, receive
+  20.000000000  R1      S   2001:DB8:2::/64 [1/0]
+  20.000000000  R1           via 2001:DB8:12::2
+  20.000000000  R1      C   2001:DB8:12::/64 [0/0]
+  20.000000000  R1           via GigabitEthernet0/0/1, directly connected
+  20.000000000  R1      L   2001:DB8:12::1/128 [0/0]
+  20.000000000  R1           via GigabitEthernet0/0/1, receive
+  20.000000000  R1      L   FF00::/8 [0/0]
+  20.000000000  R1           via Null0, receive
+  20.000000000  ok      expect R1 output contains "S   2001:DB8:2::/64 [1/0]\n     via 2001:DB8:12::2\n"
+  20.000000000  R2      R2>enable
+  20.000000000  R2      R2#show ipv6 route static
+  20.000000000  R2      IPv6 Routing Table - default - 1 entries
+  20.000000000  R2      Codes: C - connected network, L - address of this device, S - static route,
+  20.000000000  R2             ND - default router from advertisements, NDp - prefix from advertisements
+  20.000000000  R2      
+  20.000000000  R2      S   ::/0 [1/0]
+  20.000000000  R2           via FE80::1, GigabitEthernet0/0/0
+  20.000000000  ok      expect R2 output contains "S   ::/0 [1/0]\n     via FE80::1, GigabitEthernet0/0/0\n"
+  20.000000000  R2      R2#show running-config
+  20.000000000  R2      Collecting the configuration ...
+  20.000000000  R2      
+  20.000000000  R2      ! configuration in effect, 712 bytes
+  20.000000000  R2      !
+  20.000000000  R2      version 1.0
+  20.000000000  R2      !
+  20.000000000  R2      hostname R2
+  20.000000000  R2      !
+  20.000000000  R2      ipv6 unicast-routing
+  20.000000000  R2      !
+  20.000000000  R2      interface GigabitEthernet0/0/0
+  20.000000000  R2       description to R1
+  20.000000000  R2       no ip address
+  20.000000000  R2       ipv6 address 2001:DB8:12::2/64
+  20.000000000  R2      !
+  20.000000000  R2      interface GigabitEthernet0/0/1
+  20.000000000  R2       description servers
+  20.000000000  R2       no ip address
+  20.000000000  R2       ipv6 address 2001:DB8:2::1/64
+  20.000000000  R2       ipv6 mtu 1280
+  20.000000000  R2       ipv6 nd ra mtu suppress
+  20.000000000  R2      !
+  20.000000000  R2      interface GigabitEthernet0/0/2
+  20.000000000  R2       no ip address
+  20.000000000  R2       shutdown
+  20.000000000  R2      !
+  20.000000000  R2      interface GigabitEthernet0/0/3
+  20.000000000  R2       no ip address
+  20.000000000  R2       shutdown
+  20.000000000  R2      !
+  20.000000000  R2      interface TenGigabitEthernet0/1/0
+  20.000000000  R2       no ip address
+  20.000000000  R2       shutdown
+  20.000000000  R2      !
+  20.000000000  R2      interface TenGigabitEthernet0/1/1
+  20.000000000  R2       no ip address
+  20.000000000  R2       shutdown
+  20.000000000  R2      !
+  20.000000000  R2      interface Serial0/2/0
+  20.000000000  R2       no ip address
+  20.000000000  R2       shutdown
+  20.000000000  R2      !
+  20.000000000  R2      interface Serial0/2/1
+  20.000000000  R2       no ip address
+  20.000000000  R2       shutdown
+  20.000000000  R2      !
+  20.000000000  R2      ipv6 route ::/0 GigabitEthernet0/0/0 FE80::1
+  20.000000000  R2      !
+  20.000000000  R2      line con 0
+  20.000000000  R2      line vty 0 4
+  20.000000000  R2       login
+  20.000000000  R2      !
+  20.000000000  R2      end
+  20.000000000  ok      expect R2 output contains " ipv6 address 2001:DB8:2::1/64\n ipv6 mtu 1280\n ipv6 nd ra mtu suppress\n"
+  20.000000000  ok      expect R2 output contains "ipv6 route ::/0 GigabitEthernet0/0/0 FE80::1\n"
+  20.000000000  PC1     root@PC1:~# ping -c 2 2001:db8:2::10
+  20.000000000  PC1     PING 2001:db8:2::10(2001:db8:2::10) 56 data bytes
+  20.000000000  --      run 3s
+  20.000016928  PC1     64 bytes from 2001:db8:2::10: icmp_seq=1 ttl=62 time=0.016 ms
+  21.000009488  PC1     64 bytes from 2001:db8:2::10: icmp_seq=2 ttl=62 time=0.009 ms
+  21.000009488  PC1     
+  21.000009488  PC1     --- 2001:db8:2::10 ping statistics ---
+  21.000009488  PC1     2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+  21.000009488  PC1     rtt min/avg/max/mdev = 0.009/0.012/0.016/0.003 ms
+  23.000000000  ok      expect PC1 output contains "2 packets transmitted, 2 received, 0% packet loss"
+  23.000000000  ok      expect PC1 output contains "ttl=62"
+  23.000000000  PC1     root@PC1:~# traceroute6 -n 2001:db8:2::10
+  23.000000000  PC1     traceroute to 2001:db8:2::10 (2001:db8:2::10), 30 hops max, 80 byte packets
+  23.000000000  --      run 10s
+  23.000014232  PC1      1  2001:db8:1::1  0.005 ms  0.005 ms  0.005 ms
+  23.000035580  PC1      2  2001:db8:12::2  0.007 ms  0.007 ms  0.007 ms
+  23.000064044  PC1      3  2001:db8:2::10  0.009 ms  0.009 ms  0.009 ms
+  33.000000000  ok      expect PC1 output contains " 2  2001:db8:12::2  "
+  33.000000000  ok      expect PC1 output contains " 3  2001:db8:2::10  "
+  33.000000000  PC1     root@PC1:~# ping -c 3 -s 1400 2001:db8:2::10
+  33.000000000  PC1     PING 2001:db8:2::10(2001:db8:2::10) 1400 data bytes
+  33.000000000  --      run 4s
+  33.000067596  PC1     From 2001:db8:12::2 icmp_seq=1 Packet too big: mtu=1280
+  34.000092224  PC1     1408 bytes from 2001:db8:2::10: icmp_seq=2 ttl=62 time=0.092 ms
+  35.000092224  PC1     1408 bytes from 2001:db8:2::10: icmp_seq=3 ttl=62 time=0.092 ms
+  35.000092224  PC1     
+  35.000092224  PC1     --- 2001:db8:2::10 ping statistics ---
+  35.000092224  PC1     3 packets transmitted, 2 received, +1 errors, 33.3333% packet loss, time 2000ms
+  35.000092224  PC1     rtt min/avg/max/mdev = 0.092/0.092/0.092/0.000 ms
+  37.000000000  ok      expect PC1 output contains "From 2001:db8:12::2 icmp_seq=1 Packet too big: mtu=1280"
+  37.000000000  ok      expect PC1 output contains "1408 bytes from 2001:db8:2::10: icmp_seq=2 ttl=62"
+  37.000000000  PC1     root@PC1:~# ping -c 1 -M do -s 1400 2001:db8:2::10
+  37.000000000  PC1     PING 2001:db8:2::10(2001:db8:2::10) 1400 data bytes
+  37.000000000  PC1     ping: local error: message too long, mtu=1280
+  37.000000000  PC1     
+  37.000000000  PC1     --- 2001:db8:2::10 ping statistics ---
+  37.000000000  PC1     1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+  37.000000000  --      run 2s
+  39.000000000  ok      expect PC1 output contains "ping: local error: message too long, mtu=1280"
+  39.000000000  PC2     root@PC2:~# ping -c 1 -t 1 2001:db8:2::10
+  39.000000000  PC2     PING 2001:db8:2::10(2001:db8:2::10) 56 data bytes
+  39.000000000  --      run 2s
+  39.000009232  PC2     From 2001:db8:1::1 icmp_seq=1 Time exceeded: Hop limit
+  39.000009232  PC2     
+  39.000009232  PC2     --- 2001:db8:2::10 ping statistics ---
+  39.000009232  PC2     1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+  41.000000000  ok      expect PC2 output contains "From 2001:db8:1::1 icmp_seq=1 Time exceeded: Hop limit"
+  41.000000000  PC2     root@PC2:~# ping -c 1 2001:db8:99::1
+  41.000000000  PC2     PING 2001:db8:99::1(2001:db8:99::1) 56 data bytes
+  41.000000000  --      run 2s
+  41.000005512  PC2     From 2001:db8:1::1 icmp_seq=1 Destination unreachable: No route
+  41.000005512  PC2     
+  41.000005512  PC2     --- 2001:db8:99::1 ping statistics ---
+  41.000005512  PC2     1 packets transmitted, 0 received, +1 errors, 100% packet loss, time 0ms
+  43.000000000  ok      expect PC2 output contains "From 2001:db8:1::1 icmp_seq=1 Destination unreachable: No route"
+  43.000000000  R1      R1#traceroute ipv6 2001:DB8:2::10
+  43.000000000  R1      Ctrl+Shift+6 stops the traceroute.
+  43.000000000  R1      Route to 2001:DB8:2::10, up to 30 hops:
+  43.000000000  --      run 5s
+  43.000011160  R1        1 2001:DB8:12::2 0 msec 0 msec 0 msec
+  43.000018600  R1        2 2001:DB8:2::10 0 msec 0 msec 0 msec
+  48.000000000  ok      expect R1 output contains "  2 2001:DB8:2::10 "
+  48.000000000  PC2     root@PC2:~# ip -6 addr add 2001:db8:1::4a:ff:fe00:101/64 dev eth0
+  48.000000000  --      run 3s
+  51.000000000  PC2     root@PC2:~# ip -6 addr show dev eth0
+  51.000000000  PC2     2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP qlen 1000
+  51.000000000  PC2         inet6 2001:db8:1:0:4a:ff:fe00:101/64 scope global dadfailed tentative 
+  51.000000000  PC2            valid_lft forever preferred_lft forever
+  51.000000000  PC2         inet6 2001:db8:1:0:4a:ff:fe00:201/64 scope global dynamic 
+  51.000000000  PC2            valid_lft 2591986sec preferred_lft 604786sec
+  51.000000000  PC2         inet6 fe80::4a:ff:fe00:201/64 scope link 
+  51.000000000  PC2            valid_lft forever preferred_lft forever
+  51.000000000  ok      expect PC2 output contains "inet6 2001:db8:1:0:4a:ff:fe00:101/64 scope global dadfailed tentative"
+  51.000000000  R1      R1#configure terminal
+  51.000000000  R1      Configuration mode: one command per line; end or Ctrl+Z leaves it.
+  51.000000000  R1      R1(config)#no ipv6 unicast-routing
+  51.000000000  R1      R1(config)#end
+  51.000000000  R1      *Mar  1 00:00:51.000: %SYS-5-CONFIG_I: configuration changed at the console
+  51.000000000  --      run 2s
+  53.000000000  PC1     root@PC1:~# ip -6 route
+  53.000000000  PC1     ::1 dev lo proto kernel metric 256 pref medium
+  53.000000000  PC1     2001:db8:1::/64 dev eth0 proto kernel metric 256 expires 2591998sec pref medium
+  53.000000000  PC1     fe80::/64 dev eth0 proto kernel metric 256 pref medium
+  53.000000000  ok      expect PC1 output not contains "default"
+  53.000000000  ok      expect hops icmpv6 >= 60 (192)
+# 17 von 17 Erwartungen erfüllt

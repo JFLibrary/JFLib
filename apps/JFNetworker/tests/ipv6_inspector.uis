@@ -1,0 +1,31 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/ipv6_slaac.jfnet
+# the inspector of a device with IPv6 (workspace/inspector/device.rs): the interface grid gets
+# a column IPv6 after IP (the first global address, else the link-local one; "+1" for more)
+# and the chosen interface lists its IPv6 addresses with how they came and where they stand;
+# a device without IPv6 keeps its columns; the device window (workspace/devwin) lists the
+# IPv6 addresses after the IPv4 ones.  The simulator runs in real time: after 3 s R1's
+# addresses have passed duplicate address detection.
+# Ids: the device window 26624.
+size 1280 900
+theme light
+wait 3000
+click listitem:"R1"
+expect "IPv6" exists
+expect text:"2001:db8:1::1/64 +1" exists
+expect text:"2001:db8:2::1/64 +1" exists
+expect text:"IPv6-Adressen" exists
+expect text:"fe80::4a:ff:fe00:401/64 · Link-Local" exists
+expect text:"2001:db8:1::1/64 · manuell" exists
+shot build/jfnetworker/inspector_ipv6.png
+# a switch without IPv6: no column, no list
+click listitem:"SW1"
+expect text:"IPv6-Adressen" missing
+expect "IPv6" missing
+expect text:"2001:db8:1::1/64 +1" missing
+# the device window: the addresses at a glance, the IPv6 column of the interfaces
+dblclick listitem:"R1" shift
+expect window 26624 open
+expect text:"Gi0/0/0 2001:db8:1::1/64 +1" exists
+expect text:"Gi0/0/1 2001:db8:2::1/64 +1" exists
+click tab:"Schnittstellen"
+expect "IPv6" exists

@@ -1,0 +1,55 @@
+# Zwei LANs mit IPv6: R1 kündigt 2001:db8:1::/64 und 2001:db8:2::/64 an (Router
+# Advertisements), die PCs bilden ihre Adressen per SLAAC aus Präfix und MAC (EUI-64) und
+# nehmen R1 als Standard-Router; SRV hat 2001:db8:2::10 fest. Zuerst prüft jedes Gerät seine
+# Link-Local-Adresse (DAD, nach einer zufälligen Pause bis 1 s), dann fragen die PCs nach
+# Routern (Router Solicitation), R1 antwortet binnen 500 ms.
+run 20s
+PC1: ip -6 addr
+expect PC1 output contains "inet6 2001:db8:1:0:4a:ff:fe00:101/64 scope global dynamic"
+expect PC1 output contains "inet6 fe80::4a:ff:fe00:101/64 scope link"
+PC1: ip -6 route
+expect PC1 output contains "default via fe80::4a:ff:fe00:401 dev eth0 proto ra metric 1024"
+PC3: ip -6 addr show dev eth0
+expect PC3 output contains "inet6 2001:db8:2:0:4a:ff:fe00:601/64 scope global dynamic"
+SRV: ip -6 addr show dev eth0
+expect SRV output contains "inet6 2001:db8:2::10/64 scope global"
+R1: enable
+R1: show ipv6 interface brief
+expect R1 output contains "GigabitEthernet0/0/0   [up/up]\n    FE80::4A:FF:FE00:401\n    2001:DB8:1::1\n"
+R1: show ipv6 interface GigabitEthernet0/0/1
+expect R1 output contains "  Global unicast address(es):\n    2001:DB8:2::1, subnet is 2001:DB8:2::/64\n"
+R1: show ipv6 route
+expect R1 output contains "C   2001:DB8:2::/64 [0/0]\n     via GigabitEthernet0/0/1, directly connected\n"
+# Ping und Traceroute ins andere LAN: R1 ist der einzige Hop
+PC1: ping -c 3 2001:db8:2::10
+run 4s
+expect PC1 output contains "3 packets transmitted, 3 received, 0% packet loss"
+expect PC1 output contains "icmp_seq=1 ttl=63"
+PC2: traceroute6 -n 2001:db8:2::10
+run 10s
+expect PC2 output contains " 1  2001:db8:1::1  "
+expect PC2 output contains " 2  2001:db8:2::10  "
+R1: ping 2001:DB8:1::4A:FF:FE00:201
+run 3s
+expect R1 output contains "!!!!!"
+# die Nachbarn: R1 kennt die PCs und SRV, PC1 seinen Router
+R1: show ipv6 neighbors
+expect R1 output contains "2001:DB8:2::10 "
+PC1: ip -6 neigh
+expect PC1 output contains "fe80::4a:ff:fe00:401 dev eth0 lladdr 02:4a:00:00:04:01 router"
+# debug ipv6 nd: Neighbor Discovery in eigenen Worten
+R1: debug ipv6 nd
+R1: clear ipv6 neighbors
+PC3: ping -c 1 2001:db8:1::4a:ff:fe00:101
+run 2s
+expect R1 output contains "ICMPv6-ND: NS for 2001:DB8:1:0:4A:FF:FE00:101 on GigabitEthernet0/0/0"
+expect PC3 output contains "1 packets transmitted, 1 received, 0% packet loss"
+R1: undebug all
+# eine Minute später: die Einträge sind STALE, die Lebensdauern laufen ab
+run 60s
+PC1: ip -6 neigh
+expect PC1 output contains "STALE"
+PC1: ip -6 addr show dev eth0
+SRV: ip -6 route
+expect SRV output contains "default via fe80::4a:ff:fe00:402 dev eth0 proto ra metric 1024"
+expect hops icmpv6 >= 40

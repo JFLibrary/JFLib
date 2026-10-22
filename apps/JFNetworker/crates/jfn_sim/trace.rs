@@ -12,6 +12,7 @@
 //                                                 HTTP's layer 7 (http.rs, httpsvc.rs), and so
 //                                                 are RIP's (rip.rs: Note::is_rip); spanning
 //                                                 tree's layer 2 (stp.rs; is_stp, is_stp_event)
+//                                                 and IPv6's layer 3 (trace6.rs: Note::V6)
 //   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
 //                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
@@ -402,6 +403,8 @@ pub enum Note {
     /// of a datagram whose first part never came are dropped
     NatFragWait { id: u16 },
     NatFragDropped { id: u16, parts: u16 },
+    /// IPv6 (trace6.rs: neighbor discovery, addresses, forwarding, ICMPv6)
+    V6(crate::trace6::Note6),
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -521,6 +524,7 @@ impl Note {
             n if n.is_rip() => 7,
             Note::IpGroupIgnored { .. } => 3,
             n if n.is_filter() => 3,
+            Note::V6(_) => 3,
             _ => 2,
         }
     }
@@ -656,7 +660,7 @@ impl Note {
                 | Note::NatExhausted { .. }
                 | Note::NatErrorDropped
                 | Note::NatFragDropped { .. }
-        )
+        ) || matches!(self, Note::V6(n) if n.is_drop())
     }
     /// a TCP decision (tcp.rs)
     pub fn is_tcp(&self) -> bool {
@@ -1060,6 +1064,7 @@ impl Note {
             Note::NatErrorDropped => msg!("NAT: ICMP-Fehler ohne passende Übersetzung verworfen."),
             Note::NatFragWait { id } => msg!("NAT: Fragment (ID {}) wartet auf das erste Fragment.", id),
             Note::NatFragDropped { id, parts } => msg!("NAT: {} Fragmente (ID {}) ohne erstes Fragment verworfen.", parts, id),
+            Note::V6(n) => n.message(port, iface),
         }
     }
 }
@@ -1418,6 +1423,7 @@ impl Note {
             }
             Note::NatQuote { .. } | Note::NatErrorDropped => P_IPV4 | P_ICMP,
             n if n.is_filter() => P_IPV4,
+            Note::V6(n) => n.mask(),
             _ => 0,
         }
     }

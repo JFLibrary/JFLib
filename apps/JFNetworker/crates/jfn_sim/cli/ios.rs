@@ -19,6 +19,8 @@
 // until then it takes no address (as IOS).  Addresses: "ip address" replaces the primary
 // address, "secondary" adds one; masks must fit (no network or broadcast address, no overlap
 // with another interface).
+// IPv6 (cli/ip6.rs): its commands in every mode, "ping X:X::X" and "traceroute X:X::X" go
+// there too, and "Output Interface: " of a link-local ping is one more question of the console.
 
 use alloc::format;
 use alloc::string::String;
@@ -151,6 +153,16 @@ pub enum K {
     ShowNatTrans,
     ShowNatStats,
     ClearNat,
+    // IPv6 (cli/ip6.rs)
+    Ipv6Global,
+    Ipv6Route,
+    Ipv6Neighbor,
+    Ipv6If,
+    ShowIpv6,
+    Ping6,
+    Trace6,
+    Debug6,
+    ClearIpv6,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -486,6 +498,8 @@ fn build(caps: u32) -> Tree<K> {
     if router {
         super::nat::build_nat(&mut t, [user, prv, conf, ifm, sub]);
     }
+    // ---- IPv6 (cli/ip6.rs)
+    super::ip6::build_ip6(&mut t, [user, prv, conf, ifm, sub], router);
     t
 }
 
@@ -778,7 +792,7 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT
+                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND
                 } else if p.has("icmp") {
                     D_ICMP
                 } else if p.has("rip") {
@@ -981,6 +995,7 @@ impl Engine {
             | K::ShowProtocols
             | K::ClearRoute => self.ios_rip(ni, p),
             K::NatPool | K::NatList | K::NatStatic | K::NatTimeout | K::ShowNatTrans | K::ShowNatStats | K::ClearNat => self.ios_nat(ni, p),
+            K::Ipv6Global | K::Ipv6Route | K::Ipv6Neighbor | K::Ipv6If | K::ShowIpv6 | K::Ping6 | K::Trace6 | K::Debug6 | K::ClearIpv6 => self.ios_ip6(ni, p),
         }
     }
 
@@ -995,6 +1010,7 @@ impl Engine {
                     self.out(ni, &format!("%Error opening {} (Invalid argument)\n", t));
                 }
             }
+            AskKind::Ping6Out { dst, count, bytes, timeout } => self.ios_ping6_answer(ni, dst, count, bytes, timeout, line),
         }
     }
 
@@ -1425,6 +1441,9 @@ impl Engine {
     /// "ping ..." in EXEC
     fn ios_ping(&mut self, ni: usize, p: &Parsed<K>) -> Result<(), String> {
         let target = p.text("target").unwrap_or("");
+        if netpkt::Ipv6::parse(target).is_some() {
+            return self.ios_ping6(ni, p);
+        }
         let Some(dst) = Ipv4::parse(target) else {
             let lookup = self.cdev(ni).is_some_and(|c| c.cfg.domain_lookup);
             let text = if lookup {
@@ -1457,6 +1476,9 @@ impl Engine {
     /// "traceroute ..." in EXEC
     fn ios_traceroute(&mut self, ni: usize, p: &Parsed<K>) -> Result<(), String> {
         let target = p.text("target").unwrap_or("");
+        if netpkt::Ipv6::parse(target).is_some() {
+            return self.ios_trace6(ni, p);
+        }
         let Some(dst) = Ipv4::parse(target) else {
             let lookup = self.cdev(ni).is_some_and(|c| c.cfg.domain_lookup);
             let text = if lookup {

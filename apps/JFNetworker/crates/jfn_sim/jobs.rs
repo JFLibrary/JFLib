@@ -16,6 +16,7 @@
 //   Engine::ping_many(k) -> started                    one probe each from k hosts at once
 //                                                      (load for performance tests)
 //
+// Ping and traceroute over IPv6 are jobs6.rs (JobKind::Ping6, JobKind::Trace6).
 // The command lines (cli/print.rs) print the events in the IOS or Linux way; this module only
 // measures.  It tells them when a job moved on (Engine::cli_job).  Round trip times are virtual: from handing the probe to IP (ARP included)
 // until the answer is delivered.
@@ -176,6 +177,9 @@ pub struct TraceJob {
 pub enum JobKind {
     Ping(PingJob),
     Trace(TraceJob),
+    /// over IPv6 (jobs6.rs)
+    Ping6(crate::jobs6::Ping6Job),
+    Trace6(crate::jobs6::Trace6Job),
 }
 
 /// a running or finished job
@@ -509,6 +513,7 @@ impl Engine {
                     self.trace_next(id);
                 }
             }
+            _ => {}
         }
     }
 
@@ -724,6 +729,8 @@ impl Engine {
         match j.kind {
             JobKind::Ping(_) => self.ping_tick(id),
             JobKind::Trace(_) => self.trace_tick(id),
+            JobKind::Ping6(_) => self.ping6_tick(id),
+            JobKind::Trace6(_) => self.trace6_tick(id),
         }
     }
 }

@@ -63,6 +63,13 @@ Queues, Lastgeneratoren, eigene Skripte).
   (PAT, Pools, statische Adressen und Port-Weiterleitungen, ICMP-Fehler nach RFC 5508) und
   filtern mit Standard- und erweiterten Zugriffslisten, nummeriert und benannt, mit Zählern und
   den Befehlen des Vorbilds (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)).
+- **IPv6 (R5):** auf denselben Interfaces wie IPv4, aus bis ein Gerät dafür eingerichtet wird:
+  Link-Local-Adressen aus der MAC, Duplikaterkennung, Router Advertisements und SLAAC mit
+  Lebensdauern, der Neighbor Cache mit allen Zuständen, statische Routen, Weiterleiten mit Hop
+  Limit, Packet Too Big und die Fragmente des Absenders, ICMPv6 mit den Grenzen des Vorbilds;
+  `ipv6 …`, `show ipv6 interface|route|neighbors`, `ping ipv6`, `traceroute ipv6`, `debug ipv6
+  icmp|nd` und unter Linux `ip -6`, `ping6`, `traceroute6`, `sysctl net.ipv6.*` (siehe
+  [IPv6](#ipv6)).
 
 ## Bedienung
 
@@ -165,6 +172,8 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `stp.uis` | Spanning Tree auf der Zeichenfläche (`fixtures/stp_triangle.jfnet`): LEDs bernstein beim Listening und Learning, Edge-Ports grün, nach 30 s nur noch der Alternate-Port von SW3 bernstein, die Kabel „blockiert“ für Screenreader, der Inspektor von SW3; Bilder hell und dunkel (`build/jfnetworker/stp_*.png`) |
 | `model.uis`, Gruppe `rip` | RIP (siehe [Routing mit RIP](#routing-mit-rip)): der erste Austausch auf die Nanosekunde (Request, Update ohne das Netz des Interfaces, die Antwort, die das IOS-artige ARP verliert), Konvergenz und Metriken über zwei Hops, periodische Updates mit Zufallsversatz und ausgelöste mit ihrer Pause, Split Horizon mit Poisoned Reverse auf dem Kabel, ein gezogenes Kabel (ausgelöstes Update mit Metrik 16, Holddown, Garbage Collection nach 120 s), ein schweigender Nachbar (Timeout nach 180 s, gelöscht nach 300 s), passive Interfaces, Distanzen gegen statische Routen, gleich gute Wege (ein Weg je Ziel, `maximum-paths`), Version 1 neben 2, `auto-summary`, Standardroute und Redistribution, RIP auf dem VLAN-Interface eines L3-Switches, die Befehlszeile (Modus, Hilfe, `show`, `debug`, `clear`, die Running-Config als Startkonfiguration), Strom, die Texte auf Deutsch und Englisch, Determinismus |
 | `model.uis`, Gruppe `nat` | Zugriffslisten und NAT (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)): jeder Port-Operator, Wildcards, Protokolle, ICMP-Typen, `established`, spätere Fragmente, die erste Zeile gewinnt, das implizite deny; Zeilennummern, Bemerkungen, `no`, `resequence`; die Konsole mit Modi, Hilfe, `show access-lists` und der Konfiguration, die gelesen wieder dieselbe ist; Listen an Interfaces mit Zählern, Notizen und „administratively prohibited“ unter der Grenze (auf die Nanosekunde), die ausgehende Liste nach NAT, eigene Pakete des Routers; PAT mit zwei Hosts am selben UDP- und TCP-Port (Parität), gleichen ICMP-Kennungen, ein erschöpfter Pool, statische Adressen und Ports mit ARP für die globale Adresse, Filter von außen, ICMP-Fehler in beide Richtungen, Fragmente auch außer der Reihe, die Zeiten der Übersetzungen, Löschen, Strom, `debug ip nat`, deutsche und englische Texte, VLAN-Interfaces, Subinterfaces, die Firewall; die Prüfsummen jedes Frames |
+| `model.uis`, Gruppe `ipv6` | IPv6 (siehe [IPv6](#ipv6)): Link-Local-Adressen aus der MAC und ihre Duplikaterkennung mit der Pause aus dem eigenen Zufallsstrom des Geräts auf die Nanosekunde, eine doppelte Adresse unter Linux und IOS-artig (`dadfailed`, `[DUP]`, das Problem), Router Solicitations und Advertisements (Zeiten, Inhalt, Rahmen), SLAAC mit Lebensdauern (veraltet, abgelaufen, die Zwei-Stunden-Regel), der Neighbor Cache durch INCOMPLETE, REACHABLE, STALE, DELAY und PROBE und beide Arten zu scheitern, Ping und Traceroute über zwei Router (statische Routen, ein Link-Local-Next-Hop, Hop Limit, keine Route, eine Schleife), Packet Too Big und die Fragmente des Absenders, die Path MTU nach 10 Minuten, aufgegebene Fragmente, die Grenzen der ICMPv6-Fehler (IOS-artig und Linux), die Befehlszeilen (Hilfe, `show`, `debug`, `clear`, die Konfiguration gelesen wieder dieselbe), Strom und abgeschaltetes Routing, ein Projekt ohne IPv6 wie zuvor, deutsche und englische Texte, die Prüfsummen jedes Rahmens, Determinismus |
+| `ipv6_inspector.uis` | IPv6 im Fenster (`fixtures/ipv6_slaac.jfnet`): die Spalte IPv6 im Inspektor und im Gerätefenster, die Adressen des gewählten Interfaces mit Herkunft und Zustand, ein Switch ohne IPv6 behält seine Spalten; ein Bild (`build/jfnetworker/inspector_ipv6.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -173,7 +182,7 @@ Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein S
 `stp_triangle.jfnet` und `rstp_triangle.jfnet` (drei Switches im Dreieck mit STP bzw. RSTP) und
 die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`, `rng`, `metrics`, `jmap`,
-`cmdtree`, `hashring`, `lru`, `stp`), die Skriptsprache die Gruppe `script`.
+`cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`), die Skriptsprache die Gruppe `script`.
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -220,6 +229,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Spanning Tree | [`crates/jfn_sim/stp.rs`](crates/jfn_sim/stp.rs), [`stp98.rs`](crates/jfn_sim/stp98.rs), [`rstp.rs`](crates/jfn_sim/rstp.rs), [`cli/stp.rs`](crates/jfn_sim/cli/stp.rs), [`lib/netpkt/stp.rs`](../../lib/netpkt/stp.rs), [`src/stptest.rs`](src/stptest.rs) | STP (802.1D-1998) und RSTP (802.1D-2004) auf den Switches, Einstellungen und Befehle, BPDUs, ihr Selbsttest (siehe [Spanning Tree](#spanning-tree)) |
 | Routing | [`crates/jfn_sim/rip.rs`](crates/jfn_sim/rip.rs), [`cli/rip.rs`](crates/jfn_sim/cli/rip.rs), [`src/riptest.rs`](src/riptest.rs), [`lib/netpkt/rip.rs`](../../lib/netpkt/rip.rs) | RIP als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit RIP](#routing-mit-rip)) |
 | NAT und Zugriffslisten | [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs), [`nat.rs`](crates/jfn_sim/nat.rs), [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs), [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs), [`lib/netpkt/nat.rs`](../../lib/netpkt/nat.rs), [`src/nattest.rs`](src/nattest.rs) | Zugriffslisten und Adressübersetzung der IOS-artigen Geräte, ihre Befehle, das Umschreiben der Pakete mit ihren Prüfsummen (Library), ihr Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
+| IPv6 | [`crates/jfn_sim/ip6.rs`](crates/jfn_sim/ip6.rs), [`nd.rs`](crates/jfn_sim/nd.rs), [`l3v6.rs`](crates/jfn_sim/l3v6.rs), [`jobs6.rs`](crates/jfn_sim/jobs6.rs), [`trace6.rs`](crates/jfn_sim/trace6.rs), [`cli/ip6.rs`](crates/jfn_sim/cli/ip6.rs), [`cli/linux6.rs`](crates/jfn_sim/cli/linux6.rs), [`cli/print6.rs`](crates/jfn_sim/cli/print6.rs), [`lib/netpkt/icmpv6.rs`](../../lib/netpkt/icmpv6.rs), [`lib/netpkt/ipv6.rs`](../../lib/netpkt/ipv6.rs), [`src/ipv6test.rs`](src/ipv6test.rs) | der IPv6-Teil der Geräte (Adressen, Neighbor Cache, Router, Routen), Neighbor Discovery, DAD und SLAAC, Weiterleiten und ICMPv6, Ping und Traceroute, die Notizen, die Befehle beider Befehlszeilen, ICMPv6 und Neighbor Discovery Byte für Byte und die Fragmente (Library), der Selbsttest (siehe [IPv6](#ipv6)) |
 
 ### Gerätekatalog
 
@@ -911,6 +921,11 @@ IOS-artige Befehlszeile:
   access-group`, `show access-lists`, `ip nat …`, `show ip nat translations|statistics`,
   `clear ip nat translation *`, `debug ip nat` (siehe
   [NAT und Zugriffslisten](#nat-und-zugriffslisten)).
+- IPv6 ([`cli/ip6.rs`](crates/jfn_sim/cli/ip6.rs)): `ipv6 unicast-routing`, `ipv6 enable`,
+  `ipv6 address … [eui-64|anycast|link-local]`, `ipv6 address autoconfig [default]`, `ipv6
+  nd …`, `ipv6 mtu`, `ipv6 route`, `ipv6 neighbor`, `show ipv6 interface [brief|IF]`, `show
+  ipv6 route`, `show ipv6 neighbors`, `show ipv6 routers`, `ping ipv6`, `traceroute ipv6`,
+  `debug ipv6 icmp|nd`, `clear ipv6 neighbors` (siehe [IPv6](#ipv6)).
 
 Hosts und Server haben eine Linux-Shell (`root@PC1:~#`): `ip addr|link|route|neigh` mit den
 Ausgaben und Fehlermeldungen von iproute2, `ping` wie iputils (bis Strg+C oder `-c`; `-i`,
@@ -1077,6 +1092,15 @@ Das Büro hinter NAT (`nat_pat.scn` auf `fixtures/nat_pat.jfnet`, siehe
 [NAT und Zugriffslisten](#nat-und-zugriffslisten)): 24 Erwartungen zu PAT, der
 Port-Weiterleitung von außen, einer Zugriffsliste, `traceroute` durch PAT, `debug ip nat` und
 den abgelaufenen Übersetzungen nach fünf Minuten.
+Zwei Szenarien zeigen IPv6 (siehe [IPv6](#ipv6)). `ipv6_slaac.scn` auf
+`fixtures/ipv6_slaac.jfnet`: R1 kündigt die Präfixe zweier LANs an, die PCs bilden ihre
+Adressen per SLAAC (`ip -6 addr`, `ip -6 route` mit dem Router aus den Advertisements), SRV hat
+eine feste; `show ipv6 interface`, `show ipv6 route`, Ping und `traceroute6` ins andere LAN,
+`show ipv6 neighbors`, `debug ipv6 nd` und eine Minute später die Einträge in STALE.
+`ipv6_routing.scn` auf `fixtures/ipv6_routing.jfnet`: zwei Router mit statischen Routen (R2s
+Standardroute zur Link-Local-Adresse von R1), Ping und `traceroute6` über beide, Packet Too
+Big an der MTU 1280 vor SRV mit den Fragmenten des Absenders, `ping -M do`, Hop Limit 1, ein
+Ziel ohne Route, eine doppelte Adresse (`dadfailed`) und R1 ohne IPv6-Routing.
 
 ### Skripte in Hosts
 
@@ -1443,6 +1467,88 @@ nicht ins Web lässt; Pings, `curl` von innen (SRV sieht 203.0.113.1) und von au
 EXT), `traceroute` durch PAT, `debug ip nat`, die Tabellen und nach fünf Minuten die
 abgelaufenen Übersetzungen.
 
+### IPv6
+
+Geräte sprechen IPv6 auf denselben Interfaces wie IPv4 nach RFC 8200, 4443, 4861, 4862, 4291
+und 8201 ([`ip6.rs`](crates/jfn_sim/ip6.rs), [`nd.rs`](crates/jfn_sim/nd.rs),
+[`l3v6.rs`](crates/jfn_sim/l3v6.rs), [`jobs6.rs`](crates/jfn_sim/jobs6.rs); die Befehle in
+[`cli/ip6.rs`](crates/jfn_sim/cli/ip6.rs) und [`cli/linux6.rs`](crates/jfn_sim/cli/linux6.rs);
+die Pakete in [`netpkt::icmpv6`](../../lib/netpkt/icmpv6.rs) und
+[`netpkt::ipv6`](../../lib/netpkt/ipv6.rs)).
+
+- **Voreinstellung:** IPv6 ist aus, bis ein Gerät dafür eingerichtet wird, damit bestehende
+  Projekte genau so weiterlaufen (kein IPv6-Rahmen, keine Notiz, keine andere Zeile im
+  Bericht). IOS-artige Geräte schalten es je Interface ein (`ipv6 enable`, eine `ipv6 address`
+  oder `ipv6 address autoconfig`), Linux-Geräte mit `sysctl -w
+  net.ipv6.conf.all.disable_ipv6=0` (alle Interfaces, auch später angelegte) oder
+  `net.ipv6.conf.IF.disable_ipv6=0`; zurück auf 1 nimmt dem Interface wie beim Kernel jede
+  IPv6-Adresse. Weiterleiten erst mit `ipv6 unicast-routing` bzw.
+  `net.ipv6.conf.all.forwarding=1`.
+- **Adressen:** jedes Interface bekommt seine Link-Local-Adresse aus der MAC (EUI-64, RFC 4291
+  Anhang A; IOS-artig auch `ipv6 address FE80::1 link-local`), dazu feste Adressen (`ipv6
+  address 2001:DB8:1::1/64`, `… eui-64`, `… anycast`, `ip -6 addr add`) und auf Hosts per SLAAC
+  eine aus jedem autonomen /64-Präfix der Router (Linux, solange es nicht weiterleitet;
+  IOS-artig mit `ipv6 address autoconfig [default]`). Jede Adresse ist zuerst vorläufig: die
+  Duplikaterkennung (DAD, RFC 4862) wartet zufällig bis 1 s, fragt einmal und gilt nach 1 s
+  ohne Antwort; hat ein anderes Gerät sie, bleibt sie unbenutzt (`dadfailed`, `[DUP]`,
+  `%IPV6_ND-4-DUPLICATE`, ein Fehler in der Probleme-Liste). SLAAC-Adressen haben
+  Lebensdauern: veraltet nach der Preferred, entfernt nach der Valid Lifetime, mit der
+  Zwei-Stunden-Regel von RFC 4862 5.5.3 (e). Adressen stehen nach RFC 5952 da
+  (`2001:db8:1:0:4a:ff:fe00:101`: eine einzelne Null wird nicht zu `::`), IOS-artig in
+  Großbuchstaben.
+- **Neighbor Discovery (RFC 4861):** der Neighbor Cache mit INCOMPLETE (bis drei Neighbor
+  Solicitations an die Solicited-Node-Gruppe, eine je Sekunde; Pakete warten, unter Linux bis
+  101, IOS-artig eines; danach „Address unreachable“), REACHABLE (die zufällige ReachableTime
+  von 15 bis 45 s), STALE, DELAY (5 s) und PROBE (drei direkte Solicitations, dann ist der
+  Eintrag weg); feste Einträge mit `ipv6 neighbor` und `ip -6 neigh add`. Router schicken
+  Router Advertisements (die ersten drei höchstens 16 s auseinander, dann alle 150 bis 200 s;
+  auf Anfrage nach 0 bis 500 ms, nie früher als 3 s nach dem letzten) mit Hop Limit,
+  Lebensdauer 1800 s, MTU und dem Präfix jeder globalen Adresse (30 Tage gültig, 7 bevorzugt);
+  dazu `ipv6 nd ra suppress [all]`, `ra interval`, `ra lifetime`, `ra mtu suppress`, `prefix
+  …`, `dad attempts`, `reachable-time` und `ns-interval`. Hosts fragen bis zu dreimal im
+  Abstand von 4 s, sobald ihre Link-Local-Adresse gilt, und führen Standard-Router und
+  On-Link-Präfixe mit Ablauf. Schaltet ein Router das Routing ab, sagt er es mit einem
+  letzten Advertisement (Lebensdauer 0). Linux-Geräte, die weiterleiten, schicken keine
+  Advertisements (dafür bräuchte es radvd). Der Zufall (DAD-Pausen, ReachableTime, Abstände
+  der Advertisements) kommt aus einem eigenen Strom je Gerät, in ganzen Millisekunden.
+- **Weiterleiten:** die Routing-Tabelle aus angeschlossenen Netzen, eigenen Adressen,
+  statischen Routen (`ipv6 route PRÄFIX [IF] [NEXT-HOP] [DISTANZ]`, auch zu einer
+  Link-Local-Adresse mit ihrem Interface; `ip -6 route add`) und bei Hosts den Routern und
+  Präfixen der Advertisements; das längste Präfix, dann die Distanz, dann die Metrik. Das Hop
+  Limit sinkt je Router (Time Exceeded bei 1). Router fragmentieren nie: zu große Pakete
+  beantworten sie mit Packet Too Big und der MTU des nächsten Links (`ipv6 mtu`), der Absender
+  merkt sich die Path MTU 10 Minuten (RFC 8201) und teilt seine Pakete selbst mit Fragment
+  Header; zusammengesetzt wird 60 s lang. Link-Local-Adressen verlassen ihren Link nicht.
+- **ICMPv6 (RFC 4443):** Echo (auch an Gruppen), Destination Unreachable (keine Route, Address
+  unreachable, Port unreachable, beyond scope of source address), Packet Too Big, Time
+  Exceeded und Parameter Problem; nie über Fehler oder Redirects, über Pakete an Gruppen nur
+  Packet Too Big und Parameter Problem zu Optionen; das Zitat füllt höchstens 1280 Byte.
+  Begrenzt wie beim Vorbild: IOS-artig ein Eimer von 10, alle 100 ms einer mehr; Linux 50 auf
+  einmal und 1000 je Sekunde, je Ziel einer pro Sekunde, geteilt nach der Präfixlänge der
+  Route zurück (hinter einem /64 alle 250 ms, sechs auf Vorrat), Packet Too Big ohne Grenze.
+- **Anzeigen:** jede Entscheidung ist eine Notiz mit deutschem Text (englisch in
+  `engine.tsv`): DAD, gebildete, veraltete und abgelaufene Adressen, Solicitations und
+  Advertisements, jeder Zustandswechsel im Neighbor Cache, Router und Präfixe, Weiterleiten
+  und warum ein Paket verworfen wurde, Fragmente und Path MTU, ICMPv6 mit seiner Grenze.
+  Simulationsmodus und Paket-Tab zerlegen IPv6 mit Erweiterungsköpfen und ICMPv6 mit jedem Feld
+  und jeder Option (ICMPv6 grün im Filter ICMP), Mitschnitte öffnen ohne Prüfsummenfehler. Bei
+  Geräten mit IPv6 haben die Interface-Tabellen im Inspektor und im Gerätefenster eine Spalte
+  IPv6, das gewählte Interface listet seine Adressen mit Herkunft und Zustand.
+- **Für Programme:** `Action::Ip6` mit `Ip6Set` (auch die Befehle gehen darüber),
+  `Engine::ip6`, `ip6_routes`, `ip6_neighbors`, `addrs6`, `ping6`, `traceroute6` und
+  `IfView::addrs6`.
+
+Noch offen: UDP und TCP über IPv6 (Sockets, Dienste, DNS mit AAAA): ein UDP-Paket an ein Gerät
+bekommt Port unreachable, ein TCP-Segment ein RST, `ping6 NAME` sagt „Address family for
+hostname not supported“. Dazu MLD (Switches fluten Multicast ohnehin), Redirects (der Codec
+kennt sie, kein Gerät sendet oder nimmt sie), DHCPv6, Privacy Extensions, Router
+Advertisements auf seriellen Leitungen, RIPng und OSPFv3.
+
+Geprüft wird IPv6 in der Selbsttest-Gruppe `ipv6` ([`src/ipv6test.rs`](src/ipv6test.rs)), in
+den Golden-Szenarien `ipv6_slaac.scn` und `ipv6_routing.scn` (siehe
+[Szenarien](#szenarien-scn)), im Fensterskript `ipv6_inspector.uis` und mit der
+coretest-Gruppe `icmpv6` (die Nachrichten Byte für Byte).
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -1508,7 +1614,7 @@ Geste).
 | Phase | Meilensteine |
 |---|---|
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
-| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, OSPF, R4 Spanning Tree (STP, RSTP) ✓, IPv6 · L5 Liniendiagramm und L6 Code-Editor ✓ |
+| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, OSPF, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
 | 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 

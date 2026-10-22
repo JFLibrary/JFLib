@@ -26,6 +26,8 @@
 //   A.B.C.D      an IPv4 address                         Val::Ipv4
 //   MASK         a contiguous dotted netmask              Val::Mask (its length)
 //   A.B.C.D/nn   an address with a prefix length          Val::Prefix
+//   X:X:X:X::X   an IPv6 address (every RFC 4291 form)    Val::Ipv6
+//   X:X:X:X::X/<0-128>   an IPv6 address with a prefix length   Val::Prefix6
 //   H.H.H        a MAC address (H.H.H or with colons)     Val::Mac
 //   WORD         one word                                 Val::Word
 //   LINE         the rest of the line, spaces included    Val::Line
@@ -66,6 +68,8 @@ pub enum Param {
     Word,
     Line,
     Name(u8),
+    Ipv6,
+    Prefix6,
 }
 
 impl Param {
@@ -79,6 +83,8 @@ impl Param {
             Param::Word => String::from("WORD"),
             Param::Line => String::from("LINE"),
             Param::Name(_) => String::from("NAME"),
+            Param::Ipv6 => String::from("X:X:X:X::X"),
+            Param::Prefix6 => String::from("X:X:X:X::X/<0-128>"),
         }
     }
     fn of(s: &str) -> Option<Param> {
@@ -90,6 +96,8 @@ impl Param {
             "WORD" => Param::Word,
             "LINE" => Param::Line,
             "NAME" => Param::Name(0),
+            "X:X:X:X::X" => Param::Ipv6,
+            "X:X:X:X::X/<0-128>" => Param::Prefix6,
             _ => {
                 if let Some(d) = s.strip_prefix("NAME")
                     && d.len() == 1
@@ -119,6 +127,8 @@ pub enum Val {
     Word(String),
     Line(String),
     Name(String),
+    Ipv6([u8; 16]),
+    Prefix6([u8; 16], u8),
 }
 
 /// the names a NAME parameter takes (interfaces of a device); "*" in a name stands for a number
@@ -219,6 +229,19 @@ impl<C> Parsed<C> {
     pub fn mac(&self, key: &str) -> Option<[u8; 6]> {
         match self.get(key)? {
             Val::Mac(m) => Some(*m),
+            _ => None,
+        }
+    }
+    pub fn ip6(&self, key: &str) -> Option<[u8; 16]> {
+        match self.get(key)? {
+            Val::Ipv6(a) => Some(*a),
+            _ => None,
+        }
+    }
+    /// an IPv6 address with its prefix length
+    pub fn prefix6(&self, key: &str) -> Option<([u8; 16], u8)> {
+        match self.get(key)? {
+            Val::Prefix6(a, l) => Some((*a, *l)),
             _ => None,
         }
     }
@@ -413,6 +436,54 @@ pub fn parse_mac(s: &str) -> Option<[u8; 6]> {
     Some(m)
 }
 
+/// an IPv6 address in any RFC 4291 text form: eight groups of up to four hex digits, "::" once
+/// for a run of zero groups, the last 32 bits as dotted decimal ("::ffff:10.0.0.1"); hex digits
+/// in either case
+pub fn parse_ipv6(s: &str) -> Option<[u8; 16]> {
+    if s.is_empty() || s.len() > 45 {
+        return None;
+    }
+    // the groups before and after "::" (one side only without it)
+    let (head, tail, gap) = match s.find("::") {
+        Some(p) if s[p + 2..].contains("::") => return None,
+        Some(p) => (&s[..p], &s[p + 2..], true),
+        None => (s, "", false),
+    };
+    let groups = |part: &str, last: bool| -> Option<Vec<u16>> {
+        let mut v: Vec<u16> = Vec::new();
+        if part.is_empty() {
+            return Some(v);
+        }
+        let pieces: Vec<&str> = part.split(':').collect();
+        for (i, p) in pieces.iter().enumerate() {
+            if last && i + 1 == pieces.len() && p.contains('.') {
+                let a = parse_ipv4(p)?;
+                v.push(u16::from_be_bytes([a[0], a[1]]));
+                v.push(u16::from_be_bytes([a[2], a[3]]));
+            } else if p.is_empty() || p.len() > 4 || !p.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return None;
+            } else {
+                v.push(u16::from_str_radix(p, 16).ok()?);
+            }
+        }
+        Some(v)
+    };
+    let front = groups(head, !gap)?;
+    let back = if gap { groups(tail, true)? } else { Vec::new() };
+    let n = front.len() + back.len();
+    if (gap && n > 7) || (!gap && n != 8) {
+        return None;
+    }
+    let mut seg = [0u16; 8];
+    seg[..front.len()].copy_from_slice(&front);
+    seg[8 - back.len()..].copy_from_slice(&back);
+    let mut out = [0u8; 16];
+    for (i, g) in seg.iter().enumerate() {
+        out[2 * i..2 * i + 2].copy_from_slice(&g.to_be_bytes());
+    }
+    Some(out)
+}
+
 /// the value of a typed parameter for a word (WORD, LINE and NAME are decided elsewhere)
 fn typed_value(p: Param, s: &str) -> Option<Val> {
     match p {
@@ -435,6 +506,16 @@ fn typed_value(p: Param, s: &str) -> Option<Val> {
             if l <= 32 { Some(Val::Prefix(a, l)) } else { None }
         }
         Param::Mac => parse_mac(s).map(Val::Mac),
+        Param::Ipv6 => parse_ipv6(s).map(Val::Ipv6),
+        Param::Prefix6 => {
+            let (a, l) = s.split_once('/')?;
+            let a = parse_ipv6(a)?;
+            if l.is_empty() || l.len() > 3 || !l.bytes().all(|b| b.is_ascii_digit()) {
+                return None;
+            }
+            let l: u8 = l.parse().ok()?;
+            if l <= 128 { Some(Val::Prefix6(a, l)) } else { None }
+        }
         Param::Word | Param::Line | Param::Name(_) => None,
     }
 }
@@ -713,7 +794,7 @@ impl<C: Copy> Tree<C> {
                 }
                 Some(p) => {
                     let v = match p {
-                        Param::Num(..) | Param::Ipv4 | Param::Mask | Param::Prefix | Param::Mac => typed_value(p, t.s),
+                        Param::Num(..) | Param::Ipv4 | Param::Mask | Param::Prefix | Param::Mac | Param::Ipv6 | Param::Prefix6 => typed_value(p, t.s),
                         Param::Word => {
                             loose.push((c, Val::Word(String::from(t.s))));
                             None

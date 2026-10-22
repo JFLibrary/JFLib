@@ -697,3 +697,88 @@ Pool {} ist in Gebrauch.	Pool {} is in use.
 Pool {} gibt es nicht.	Pool {} does not exist.
 Diese Adresse hat schon eine statische Übersetzung.	This address has a static translation already.
 Keine solche NAT-Regel.	No such NAT rule.
+# jfn_sim: IPv6 (trace6.rs notes and the reasons in them, nd.rs refusals, problems.rs duplicates)
+IPv6 läuft an {}: Link-Local-Adresse {}.	IPv6 runs on {}: link-local address {}.
+IPv6 läuft an {}.	IPv6 runs on {}.
+IPv6 an {} angehalten: Nachbarn vergessen.	IPv6 stopped on {}: neighbors forgotten.
+Adressprüfung (DAD) für {} an {} beginnt in {} ms.	Duplicate address detection (DAD) for {} on {} starts in {} ms.
+DAD: Neighbor Solicitation für {} über {}: benutzt jemand diese Adresse?	DAD: neighbor solicitation for {} via {}: is anyone using this address?
+DAD: niemand antwortet, {} gilt an {} jetzt.	DAD: nobody answers, {} is valid on {} now.
+DAD: {} ist an {} doppelt, {} hat sie schon: die Adresse bleibt unbenutzt.	DAD: {} is a duplicate on {}, {} has it already: the address stays unused.
+DAD: {} ist an {} doppelt: die Adresse bleibt unbenutzt.	DAD: {} is a duplicate on {}: the address stays unused.
+SLAAC: {} an {} gebildet (Präfix des Routers und EUI-64).	SLAAC: {} formed on {} (the router's prefix and EUI-64).
+Adresse {} an {} eingerichtet.	Address {} set up on {}.
+SLAAC: {} an {} gilt noch {} s, bevorzugt {} s.	SLAAC: {} on {} stays valid for {} s, preferred for {} s.
+{} an {} ist veraltet (Preferred Lifetime abgelaufen): nicht mehr für neue Verbindungen.	{} on {} is deprecated (preferred lifetime over): no longer for new connections.
+{} an {} ist abgelaufen (Valid Lifetime): entfernt.	{} on {} has expired (valid lifetime): removed.
+Adresse {} an {} entfernt.	Address {} removed from {}.
+Neighbor Solicitation über {}: Wer hat {}?	Neighbor solicitation via {}: who has {}?
+Erreichbarkeitsprüfung: Neighbor Solicitation direkt an {} über {}.	Reachability check: neighbor solicitation straight to {} via {}.
+Neighbor Solicitation von {} an {}: gesucht ist {}.	Neighbor solicitation from {} on {}: looking for {}.
+Neighbor Solicitation nach {} ist nicht für dieses Gerät: verworfen.	Neighbor solicitation for {} is not for this device: dropped.
+Neighbor Advertisement über {} an {}: {} ist hier.	Neighbor advertisement via {} to {}: {} is here.
+Neighbor Advertisement über {} an {}: {} ist schon vergeben.	Neighbor advertisement via {} to {}: {} is taken already.
+Neighbor Advertisement an {}: {} ist {} (Router, Antwort).	Neighbor advertisement on {}: {} is {} (router, answer).
+Neighbor Advertisement an {}: {} ist {} (Router).	Neighbor advertisement on {}: {} is {} (router).
+Neighbor Advertisement an {}: {} ist {} (Antwort).	Neighbor advertisement on {}: {} is {} (answer).
+Neighbor Advertisement an {}: {} ist {}.	Neighbor advertisement on {}: {} is {}.
+Neighbor Advertisement an {} für {} ohne Link-Layer-Adresse.	Neighbor advertisement on {} for {} without a link-layer address.
+Neighbor Advertisement für {}: kein Eintrag im Neighbor Cache, verworfen.	Neighbor advertisement for {}: no entry in the neighbor cache, dropped.
+Neighbor Cache: {} ist {} an {} ({}).	Neighbor cache: {} is {} on {} ({}).
+Neighbor Cache: neuer Eintrag {} an {} ({}).	Neighbor cache: new entry {} on {} ({}).
+Neighbor Cache: {} an {} wechselt von {} nach {}.	Neighbor cache: {} on {} goes from {} to {}.
+Wartet auf die Adressauflösung von {}.	Waiting for the address resolution of {}.
+Warteschlange für {} voll: das älteste wartende Paket wird verworfen.	Queue for {} full: the oldest waiting packet is dropped.
+{} antwortet nicht auf Neighbor Solicitations: Eintrag gelöscht, wartende Pakete verworfen.	{} does not answer neighbor solicitations: entry deleted, waiting packets dropped.
+Neighbor-Discovery-Nachricht verworfen: {}.	Neighbor Discovery message dropped: {}.
+der Code ist nicht 0	the code is not 0
+kürzer als ihre festen Felder	shorter than its fixed fields
+eine Option mit Länge 0 oder über das Ende hinaus	an option of length 0 or past the end
+eine Multicast-Adresse als Ziel	a multicast address as the target
+keine Neighbor-Discovery-Nachricht	not a Neighbor Discovery message
+das Hop Limit ist nicht 255, sie kam nicht von diesem Link	the hop limit is not 255, it did not come from this link
+der Absender ist keine Link-Local-Adresse	the sender is not a link-local address
+eine Adressprüfung muss an eine Solicited-Node-Gruppe gehen	an address check must go to a solicited-node group
+ein unspezifizierter Absender mit Link-Layer-Adresse	an unspecified sender with a link-layer address
+eine Antwort an eine Multicast-Gruppe	an answer to a multicast group
+Router Solicitation über {}: gibt es hier einen Router?	Router solicitation via {}: is there a router here?
+Router Solicitation von {} an {}: ein Router Advertisement folgt.	Router solicitation from {} on {}: a router advertisement follows.
+Router Advertisement über {} an {} (auf Anfrage): Lebensdauer {} s, Präfixe: {}.	Router advertisement via {} to {} (on request): lifetime {} s, prefixes: {}.
+Router Advertisement über {} an {}: Lebensdauer {} s, Präfixe: {}.	Router advertisement via {} to {}: lifetime {} s, prefixes: {}.
+Router Advertisement von {} an {}: Lebensdauer {} s, Präfixe: {}.	Router advertisement from {} on {}: lifetime {} s, prefixes: {}.
+Router Advertisement an {} ignoriert: dieses Gerät routet selbst.	Router advertisement on {} ignored: this device routes itself.
+Router Advertisement an {} ignoriert: das Interface nimmt keine an.	Router advertisement on {} ignored: the interface takes none.
+Standard-Router {} an {} für {} s.	Default router {} on {} for {} s.
+Standard-Router {} an {} ist weg (Lebensdauer abgelaufen oder 0).	Default router {} on {} is gone (lifetime over or 0).
+Präfix {} liegt an {} (gültig {} s).	Prefix {} is on {} (valid {} s).
+Präfix {} an {} ist abgelaufen.	Prefix {} on {} has expired.
+IPv6-Paket für dieses Gerät ({}).	IPv6 packet for this device ({}).
+IPv6-Route zu {}: direkt angeschlossen an {}.	IPv6 route to {}: directly connected on {}.
+IPv6-Route zu {}: über {} an {}.	IPv6 route to {}: via {} on {}.
+Keine IPv6-Route zu {}.	No IPv6 route to {}.
+Hop Limit abgelaufen: Paket von {} verworfen.	Hop limit expired: packet from {} dropped.
+Paket größer als die MTU {}: Router fragmentieren IPv6 nicht, verworfen.	Packet larger than the MTU {}: routers do not fragment IPv6, dropped.
+IPv6-Paket an {} verworfen: nicht für dieses Gerät, es routet nicht.	IPv6 packet to {} dropped: not for this device, it does not route.
+Multicast an {} verworfen: das Interface hört nicht auf diese Gruppe.	Multicast to {} dropped: the interface does not listen to this group.
+{} an {} bleibt auf seinem Link: Link-Local-Adressen werden nicht weitergeleitet.	{} to {} stays on its link: link-local addresses are not forwarded.
+Verworfen: {} darf keine Absenderadresse sein.	Dropped: {} may not be a source address.
+Verworfen: unlesbares IPv6-Paket.	Dropped: unreadable IPv6 packet.
+IPv6 ist an {} aus: verworfen.	IPv6 is off on {}: dropped.
+In {} Fragmente mit Fragment Header geteilt (MTU {}).	Split into {} fragments with a fragment header (MTU {}).
+IPv6-Fragmente zu {} Bytes zusammengesetzt.	IPv6 fragments reassembled into {} bytes.
+IPv6-Fragmente nach 60 s verworfen: nicht vollständig.	IPv6 fragments dropped after 60 s: incomplete.
+IPv6-Fragment verworfen: überlappend oder mit falscher Länge.	IPv6 fragment dropped: overlapping or of a wrong length.
+Path MTU zu {} ist {}: größere Pakete werden fragmentiert.	Path MTU to {} is {}: larger packets are fragmented.
+ICMPv6-Echo-Anfrage beantwortet an {}.	ICMPv6 echo request answered to {}.
+ICMPv6 an {}: {}.	ICMPv6 to {}: {}.
+ICMPv6-Fehlermeldung unterdrückt (Ratenbegrenzung).	ICMPv6 error message suppressed (rate limit).
+UDP über IPv6 an Port {}: niemand lauscht.	UDP over IPv6 to port {}: nobody listens.
+TCP über IPv6 an Port {}: niemand lauscht, Antwort RST.	TCP over IPv6 to port {}: nobody listens, answer RST.
+{} taugt nicht als IPv6-Adresse.	{} cannot be an IPv6 address.
+IPv6 ist an {} aus (disable_ipv6).	IPv6 is off on {} (disable_ipv6).
+{} ist keine Link-Local-Adresse (fe80::/10).	{} is not a link-local address (fe80::/10).
+Die IPv6-MTU muss mindestens 1280 sein.	The IPv6 MTU must be at least 1280.
+{} taugt nicht als Eintrag für {}.	{} cannot be an entry for {}.
+Für {} gibt es keinen statischen Eintrag.	There is no static entry for {}.
+{} ist an {} doppelt: die Adressprüfung (DAD) fand {} damit.	{} is a duplicate on {}: duplicate address detection (DAD) found {} with it.
+{} ist an {} doppelt: ein anderes Gerät prüft oder benutzt dieselbe Adresse.	{} is a duplicate on {}: another device checks or uses the same address.

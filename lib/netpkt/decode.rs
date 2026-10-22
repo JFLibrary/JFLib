@@ -18,6 +18,10 @@
 // holds; a segment in the middle of a message is a "Continuation".
 // RIP (port 520) shows its header and one field per entry (route, authentication, the request
 // for the whole table) with the problems a receiver would refuse (RFC 2453, RFC 1058).
+// IPv6 shows its extension headers as fields of its layer (a later fragment carries data only);
+// ICMPv6 every field of echo, the errors (with the quoted packet) and Neighbor Discovery (RS, RA,
+// NS, NA, redirect and one field per option) with what a receiver refuses: a checksum over the
+// pseudo header that does not fit, an ND message whose hop limit is not 255 (RFC 4443, 4861).
 
 use alloc::format;
 use alloc::string::String;
@@ -39,6 +43,7 @@ use crate::udp::{self, UdpView};
 use crate::be16;
 use crate::http;
 use crate::rip::{self, RipView};
+use crate::icmpv6::{self, Icmp6View, NdMsg, NdOpt};
 
 pub const P_ETH: u32 = 1 << 0;
 pub const P_VLAN: u32 = 1 << 1;
@@ -283,13 +288,8 @@ pub fn stack(frame: &[u8]) -> Stack {
                 s.push(Proto::Data, off, rest.len());
                 return s;
             };
-            s.push(Proto::Ipv6, off, ipv6::IPV6_HDR);
             s.trailer = (rest.len() - v.packet().len()) as u32;
-            let Some((nh, ext)) = ipv6::upper_layer(&v) else {
-                return s;
-            };
-            let poff = off + ipv6::IPV6_HDR + ext;
-            transport(&mut s, nh, &v.payload()[ext..], poff);
+            ipv6_stack(&mut s, &v, off);
         }
         eth::ET_LLDP => s.push(Proto::Lldp, off, rest.len()),
         _ => {
@@ -299,6 +299,23 @@ pub fn stack(frame: &[u8]) -> Stack {
         }
     }
     s
+}
+
+/// the IPv6 layer with its extension headers and what it carries (a later fragment: data only)
+fn ipv6_stack(s: &mut Stack, v: &Ipv6View, off: usize) {
+    let Some((nh, ext)) = ipv6::upper_layer(v) else {
+        s.push(Proto::Ipv6, off, ipv6::IPV6_HDR);
+        return;
+    };
+    s.push(Proto::Ipv6, off, ipv6::IPV6_HDR + ext);
+    let poff = off + ipv6::IPV6_HDR + ext;
+    if ipv6::frag(v).is_some_and(|(f, _)| f.offset > 0) {
+        if ext < v.payload().len() {
+            s.push(Proto::Data, poff, v.payload().len() - ext);
+        }
+        return;
+    }
+    transport(s, nh, &v.payload()[ext..], poff);
 }
 
 fn transport(s: &mut Stack, proto: u8, p: &[u8], off: usize) {
@@ -373,11 +390,8 @@ pub fn stack_ip(packet: &[u8]) -> Stack {
         }
         Some(6) => {
             if let Some(v) = Ipv6View::parse(packet) {
-                s.push(Proto::Ipv6, 0, ipv6::IPV6_HDR);
                 s.trailer = (packet.len() - v.packet().len()) as u32;
-                if let Some((nh, ext)) = ipv6::upper_layer(&v) {
-                    transport(&mut s, nh, &v.payload()[ext..], ipv6::IPV6_HDR + ext);
-                }
+                ipv6_stack(&mut s, &v, 0);
             }
         }
         _ => {
@@ -455,6 +469,9 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
     let st = stack(frame);
     let mut out: Vec<Layer> = Vec::new();
     let mut net = Net::None;
+    // the hop limit of the IPv6 packet and whether it is a fragment (ND, ICMPv6 checksums)
+    let mut hop6: Option<u8> = None;
+    let mut frag6 = false;
     // the end of the network packet: TCP has no length of its own
     let ip_end = frame.len() - st.trailer as usize;
     for &(p, off, len) in st.layers() {
@@ -475,6 +492,8 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
                 let v = Ipv6View::parse(&frame[off..]);
                 if let Some(v) = v {
                     net = Net::V6(v.src(), v.dst());
+                    hop6 = Some(v.hop_limit());
+                    frag6 = ipv6::frag(&v).is_some();
                 }
                 v.map(|v| ipv6_layer(&v, off))
             }
@@ -488,6 +507,7 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Http => Some(http_layer(frame, off, len)),
             Proto::Stp => Some(stp_layer(frame, off, len)),
             Proto::Rip => Some(rip_layer(frame, off, len)),
+            Proto::Icmpv6 => Some(icmpv6_layer(frame, off, len, net, hop6, frag6)),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -639,21 +659,43 @@ fn ipv4_layer(v: &Ipv4View, off: usize) -> B {
     b
 }
 
+/// a Next Header value with its name ("ICMPv6 (58)", "Fragment Header (44)")
+fn nh_str(nh: u8) -> String {
+    match ipv6::ext_name(nh).or_else(|| ipv4::proto_name(nh)) {
+        Some(n) => format!("{} ({})", n, nh),
+        None if nh == ipv6::NH_NONE => format!("No Next Header ({})", nh),
+        None => format!("{}", nh),
+    }
+}
+
 fn ipv6_layer(v: &Ipv6View, off: usize) -> B {
-    let mut b = B::new(Proto::Ipv6, off, ipv6::IPV6_HDR, format!("Internet Protocol Version 6, Src: {}, Dst: {}", v.src(), v.dst()));
+    let ext = ipv6::ext_headers(v);
+    let elen = ext.as_ref().and_then(|e| e.last()).map_or(0, |e| e.off + e.len);
+    let mut b = B::new(Proto::Ipv6, off, ipv6::IPV6_HDR + elen, format!("Internet Protocol Version 6, Src: {}, Dst: {}", v.src(), v.dst()));
     b.f("Version", off, 1, String::from("6"));
     b.f("Traffic Class", off, 2, format!("0x{:02x}", v.traffic_class()));
     b.f("Flow Label", off + 1, 3, format!("0x{:05x}", v.flow_label()));
     b.f("Payload Length", off + 4, 2, format!("{}", v.payload_len()));
-    let nh = v.next_header();
-    let nn = match ipv4::proto_name(nh) {
-        Some(n) => format!("{} ({})", n, nh),
-        None => format!("{}", nh),
-    };
-    b.f("Next Header", off + 6, 1, nn);
+    b.f("Next Header", off + 6, 1, nh_str(v.next_header()));
     b.f("Hop Limit", off + 7, 1, format!("{}", v.hop_limit()));
     b.f("Source Address", off + 8, 16, format!("{}", v.src()));
     b.f("Destination Address", off + 24, 16, format!("{}", v.dst()));
+    for e in ext.iter().flatten() {
+        let at = off + ipv6::IPV6_HDR + e.off;
+        let value = if e.kind == ipv6::NH_FRAGMENT {
+            let f = ipv6::FragHdr::read(&v.payload()[e.off..e.off + e.len]);
+            format!("offset {}, {}, identification 0x{:08x}, next header {}", f.offset, if f.more { "more fragments" } else { "last fragment" }, f.id, nh_str(f.next))
+        } else {
+            format!("next header {}, {} bytes", nh_str(e.next), e.len)
+        };
+        b.f(ipv6::ext_name(e.kind).unwrap_or("Extension Header"), at, e.len, value);
+    }
+    if ext.is_none() {
+        b.bad(String::from("malformed extension headers"));
+    }
+    if v.hop_limit() == 0 {
+        b.bad(String::from("Hop Limit is 0"));
+    }
     b
 }
 
@@ -815,6 +857,11 @@ pub fn info(frame: &[u8]) -> (Proto, String) {
     {
         ttl = Some(v.hop_limit());
         net = Net::V6(v.src(), v.dst());
+        if let Some((f, _)) = ipv6::frag(&v)
+            && f.offset > 0
+        {
+            return (Proto::Ipv6, format!("IPv6 fragment (off={} more={} ident=0x{:08x} nxt={})", f.offset, if f.more { "y" } else { "n" }, f.id, f.next));
+        }
     }
     let s = match top {
         Proto::Arp => {
@@ -826,6 +873,10 @@ pub fn info(frame: &[u8]) -> (Proto, String) {
                 Some(a) if a.op() == OP_REPLY => format!("{} is at {}", a.spa(), a.sha()),
                 _ => String::from("ARP"),
             }
+        }
+        Proto::Icmpv6 => {
+            let (o, l) = st.find(Proto::Icmpv6).unwrap_or((0, 0));
+            icmpv6_info(&frame[o..o + l], ttl.unwrap_or(0))
         }
         Proto::Icmp => {
             let (o, l) = st.find(Proto::Icmp).unwrap_or((0, 0));
@@ -1658,4 +1709,211 @@ fn rip_info(b: &[u8]) -> Option<String> {
         s.push_str(", authenticated");
     }
     Some(s)
+}
+
+// ---------------------------------------------------------------- ICMPv6 and Neighbor Discovery
+
+/// "Destination Unreachable" without the code (the Type field names the type alone)
+fn icmpv6_type_name(t: u8) -> &'static str {
+    match t {
+        icmpv6::T_DEST_UNREACH => "Destination Unreachable",
+        icmpv6::T_PACKET_TOO_BIG => "Packet Too Big",
+        icmpv6::T_TIME_EXCEEDED => "Time Exceeded",
+        icmpv6::T_PARAM_PROBLEM => "Parameter Problem",
+        t => icmpv6::name(t, 0),
+    }
+}
+
+/// a lifetime of a prefix: "2592000 s", "infinity"
+fn lifetime_str(v: u32) -> String {
+    if v == icmpv6::INFINITE { String::from("infinity") } else { format!("{} s", v) }
+}
+
+/// the flags of a Neighbor Advertisement as capture tools abbreviate them: "rtr, sol, ovr"
+fn na_flags(router: bool, solicited: bool, override_: bool) -> String {
+    let mut v: Vec<&str> = Vec::new();
+    if router {
+        v.push("rtr");
+    }
+    if solicited {
+        v.push("sol");
+    }
+    if override_ {
+        v.push("ovr");
+    }
+    v.join(", ")
+}
+
+fn icmpv6_layer(frame: &[u8], off: usize, len: usize, net: Net, hop: Option<u8>, frag: bool) -> B {
+    let b = &frame[off..off + len];
+    let Some(v) = Icmp6View::parse(b) else {
+        return payload_layer(Proto::Icmpv6, off, len);
+    };
+    let (t, c) = (v.typ(), v.code());
+    let mut l = B::new(Proto::Icmpv6, off, len, String::from("Internet Control Message Protocol v6"));
+    l.f("Type", off, 1, format!("{} ({})", t, icmpv6_type_name(t)));
+    l.f("Code", off + 1, 1, format!("{}", c));
+    match net {
+        Net::V6(s, d) if !frag => {
+            let ok = v.checksum_ok(s, d);
+            let want = if ok { None } else { Some(v.checksum_want(s, d)) };
+            l.f("Checksum", off + 2, 2, ck_str(v.checksum(), ok, want));
+            if !ok {
+                l.bad(format!("bad ICMPv6 checksum (should be 0x{:04x})", want.unwrap_or(0)));
+            }
+        }
+        Net::V6(..) => l.f("Checksum", off + 2, 2, format!("0x{:04x} [the message goes on in later fragments]", v.checksum())),
+        _ => l.f("Checksum", off + 2, 2, format!("0x{:04x}", v.checksum())),
+    }
+    let short = |l: &mut B, need: usize| {
+        if b.len() < need {
+            l.bad(format!("shorter than its fixed fields ({} of {} bytes)", b.len(), need));
+            true
+        } else {
+            false
+        }
+    };
+    match t {
+        icmpv6::T_ECHO_REQUEST | icmpv6::T_ECHO_REPLY => {
+            if short(&mut l, icmpv6::ICMPV6_HDR) {
+                return l;
+            }
+            l.f("Identifier", off + 4, 2, format!("0x{:04x} ({})", v.id(), v.id()));
+            l.f("Sequence Number", off + 6, 2, format!("{}", v.seq()));
+            if !v.body().is_empty() {
+                l.f("Data", off + 8, v.body().len(), format!("{} bytes", v.body().len()));
+            }
+            return l;
+        }
+        icmpv6::T_DEST_UNREACH | icmpv6::T_TIME_EXCEEDED | icmpv6::T_PACKET_TOO_BIG | icmpv6::T_PARAM_PROBLEM => {
+            if short(&mut l, icmpv6::ICMPV6_HDR) {
+                return l;
+            }
+            match t {
+                icmpv6::T_PACKET_TOO_BIG => l.f("MTU", off + 4, 4, format!("{}", v.value())),
+                icmpv6::T_PARAM_PROBLEM => l.f("Pointer", off + 4, 4, format!("{}", v.value())),
+                _ => l.f("Reserved", off + 4, 4, format!("0x{:08x}", v.value())),
+            }
+            if let Some(q) = v.quoted() {
+                let nh = ipv6::upper_layer(&q).map_or(q.next_header(), |x| x.0);
+                l.f("Quoted packet", off + 8, v.body().len(), format!("{} -> {}, {}", q.src(), q.dst(), ipv4::proto_name(nh).unwrap_or("?")));
+            } else if !v.body().is_empty() {
+                l.f("Data", off + 8, v.body().len(), format!("{} bytes", v.body().len()));
+            }
+            return l;
+        }
+        _ => {}
+    }
+    let Some(fixed) = icmpv6::fixed_len(t) else {
+        if b.len() > 4 {
+            l.f("Data", off + 4, b.len() - 4, format!("{} bytes", b.len() - 4));
+        }
+        return l;
+    };
+    // Neighbor Discovery: the fixed fields, then one field per option
+    if short(&mut l, fixed) {
+        return l;
+    }
+    match t {
+        icmpv6::T_ROUTER_ADVERT => {
+            l.f("Cur hop limit", off + 4, 1, format!("{}", b[4]));
+            let prf = match (b[5] >> 3) & 3 {
+                1 => "high",
+                3 => "low",
+                _ => "medium",
+            };
+            l.f("Flags", off + 5, 1, format!("0x{:02x} (managed: {}, other: {}, preference: {})", b[5], if b[5] & 0x80 != 0 { "yes" } else { "no" }, if b[5] & 0x40 != 0 { "yes" } else { "no" }, prf));
+            l.f("Router lifetime", off + 6, 2, format!("{} s", be16(b, 6)));
+            l.f("Reachable time", off + 8, 4, format!("{} ms", crate::be32(b, 8)));
+            l.f("Retrans timer", off + 12, 4, format!("{} ms", crate::be32(b, 12)));
+        }
+        icmpv6::T_NEIGHBOR_ADVERT => {
+            let fl = na_flags(b[4] & 0x80 != 0, b[4] & 0x40 != 0, b[4] & 0x20 != 0);
+            l.f("Flags", off + 4, 4, format!("0x{:08x}{}", crate::be32(b, 4), if fl.is_empty() { String::new() } else { format!(" ({})", fl) }));
+            l.f("Target Address", off + 8, 16, format!("{}", Ipv6(b[8..24].try_into().unwrap_or([0; 16]))));
+        }
+        _ => {
+            l.f("Reserved", off + 4, 4, format!("0x{:08x}", crate::be32(b, 4)));
+            if fixed >= 24 {
+                l.f("Target Address", off + 8, 16, format!("{}", Ipv6(b[8..24].try_into().unwrap_or([0; 16]))));
+            }
+            if fixed >= 40 {
+                l.f("Destination Address", off + 24, 16, format!("{}", Ipv6(b[24..40].try_into().unwrap_or([0; 16]))));
+            }
+        }
+    }
+    match icmpv6::options(&b[fixed..]) {
+        Ok(opts) => {
+            for (o, at, n) in opts {
+                let at = off + fixed + at;
+                match o {
+                    NdOpt::SrcLla(m) => l.f("Source link-layer address", at, n, format!("{}", m)),
+                    NdOpt::TgtLla(m) => l.f("Target link-layer address", at, n, format!("{}", m)),
+                    NdOpt::Prefix(p) => {
+                        let mut fl: Vec<&str> = Vec::new();
+                        if p.on_link {
+                            fl.push("on-link");
+                        }
+                        if p.auto {
+                            fl.push("autonomous");
+                        }
+                        let fl = if fl.is_empty() { String::from("no flags") } else { fl.join(", ") };
+                        l.f("Prefix information", at, n, format!("{}/{}, {}, valid lifetime {}, preferred lifetime {}", p.prefix, p.len, fl, lifetime_str(p.valid), lifetime_str(p.preferred)));
+                        if p.preferred != icmpv6::INFINITE && (p.valid != icmpv6::INFINITE && p.preferred > p.valid) {
+                            l.bad(format!("prefix {}/{}: the preferred lifetime exceeds the valid one", p.prefix, p.len));
+                        }
+                    }
+                    NdOpt::Redirected(d) => l.f("Redirected header", at, n, format!("{} bytes of the redirected packet", d.len())),
+                    NdOpt::Mtu(m) => l.f("MTU", at, n, format!("{}", m)),
+                    NdOpt::Other(k, d) => l.f("Option", at, n, format!("type {}, {} bytes", k, d.len() + 2)),
+                }
+            }
+        }
+        Err(e) => l.bad(format!("options: {}", e.text())),
+    }
+    match icmpv6::Nd::parse(&v) {
+        Ok(nd) => {
+            if let (Net::V6(s, d), Some(h)) = (net, hop)
+                && let Some(why) = nd.check_ip(s, d, h)
+            {
+                l.bad(format!("a receiver drops this message: {}", why.text()));
+            }
+        }
+        Err(e) => l.bad(format!("not a valid Neighbor Discovery message: {}", e.text())),
+    }
+    l
+}
+
+/// "Echo (ping) request id=0x0001, seq=1, hop limit=64", "Neighbor Solicitation for 2001:db8::1
+/// from 02:4a:00:00:01:01", "Neighbor Advertisement 2001:db8::1 (sol, ovr) is at ...", "Router
+/// Advertisement from ..."
+fn icmpv6_info(b: &[u8], hop: u8) -> String {
+    let Some(v) = Icmp6View::parse(b) else {
+        return String::from("ICMPv6");
+    };
+    let (t, c) = (v.typ(), v.code());
+    if t == icmpv6::T_ECHO_REQUEST || t == icmpv6::T_ECHO_REPLY {
+        return format!("{} id=0x{:04x}, seq={}, hop limit={}", icmpv6::name(t, c), v.id(), v.seq(), hop);
+    }
+    let Ok(nd) = icmpv6::Nd::parse(&v) else {
+        return String::from(icmpv6::name(t, c));
+    };
+    let from = |m: Option<Mac>| m.map(|m| format!(" from {}", m)).unwrap_or_default();
+    match nd.msg {
+        NdMsg::RouterSolicit => format!("Router Solicitation{}", from(nd.src_lla())),
+        NdMsg::RouterAdvert(_) => format!("Router Advertisement{}", from(nd.src_lla())),
+        NdMsg::NeighborSolicit { target } => format!("Neighbor Solicitation for {}{}", target, from(nd.src_lla())),
+        NdMsg::NeighborAdvert { router, solicited, override_, target } => {
+            let fl = na_flags(router, solicited, override_);
+            let mut s = format!("Neighbor Advertisement {}", target);
+            if !fl.is_empty() {
+                s.push_str(&format!(" ({})", fl));
+            }
+            if let Some(m) = nd.tgt_lla() {
+                s.push_str(&format!(" is at {}", m));
+            }
+            s
+        }
+        NdMsg::Redirect { .. } => String::from("Redirect"),
+    }
 }

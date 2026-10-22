@@ -1,0 +1,195 @@
+# JFNetworker-Szenario ipv6_slaac.scn: „Zwei LANs mit IPv6“, 7 Geräte, 6 Verbindungen, Seed 6
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  PC1     net.ipv6.conf.all.disable_ipv6 = 0
+   0.000000000  PC2     net.ipv6.conf.all.disable_ipv6 = 0
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/24 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/24 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/24 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/24 is up
+   0.000000000  PC3     net.ipv6.conf.all.disable_ipv6 = 0
+   0.000000000  SRV     net.ipv6.conf.all.disable_ipv6 = 0
+   0.000000000  SRV     net.ipv6.conf.eth0.autoconf = 0
+   0.000000000  --      run 20s
+  20.000000000  PC1     root@PC1:~# ip -6 addr
+  20.000000000  PC1     1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 state UNKNOWN qlen 1000
+  20.000000000  PC1         inet6 ::1/128 scope host 
+  20.000000000  PC1            valid_lft forever preferred_lft forever
+  20.000000000  PC1     2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP qlen 1000
+  20.000000000  PC1         inet6 2001:db8:1:0:4a:ff:fe00:101/64 scope global dynamic 
+  20.000000000  PC1            valid_lft 2591998sec preferred_lft 604798sec
+  20.000000000  PC1         inet6 fe80::4a:ff:fe00:101/64 scope link 
+  20.000000000  PC1            valid_lft forever preferred_lft forever
+  20.000000000  ok      expect PC1 output contains "inet6 2001:db8:1:0:4a:ff:fe00:101/64 scope global dynamic"
+  20.000000000  ok      expect PC1 output contains "inet6 fe80::4a:ff:fe00:101/64 scope link"
+  20.000000000  PC1     root@PC1:~# ip -6 route
+  20.000000000  PC1     ::1 dev lo proto kernel metric 256 pref medium
+  20.000000000  PC1     2001:db8:1::/64 dev eth0 proto kernel metric 256 expires 2591998sec pref medium
+  20.000000000  PC1     fe80::/64 dev eth0 proto kernel metric 256 pref medium
+  20.000000000  PC1     default via fe80::4a:ff:fe00:401 dev eth0 proto ra metric 1024 expires 1798sec hoplimit 64 pref medium
+  20.000000000  ok      expect PC1 output contains "default via fe80::4a:ff:fe00:401 dev eth0 proto ra metric 1024"
+  20.000000000  PC3     root@PC3:~# ip -6 addr show dev eth0
+  20.000000000  PC3     2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP qlen 1000
+  20.000000000  PC3         inet6 2001:db8:2:0:4a:ff:fe00:601/64 scope global dynamic 
+  20.000000000  PC3            valid_lft 2591984sec preferred_lft 604784sec
+  20.000000000  PC3         inet6 fe80::4a:ff:fe00:601/64 scope link 
+  20.000000000  PC3            valid_lft forever preferred_lft forever
+  20.000000000  ok      expect PC3 output contains "inet6 2001:db8:2:0:4a:ff:fe00:601/64 scope global dynamic"
+  20.000000000  SRV     root@SRV:~# ip -6 addr show dev eth0
+  20.000000000  SRV     2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP qlen 1000
+  20.000000000  SRV         inet6 2001:db8:2::10/64 scope global 
+  20.000000000  SRV            valid_lft forever preferred_lft forever
+  20.000000000  SRV         inet6 fe80::4a:ff:fe00:701/64 scope link 
+  20.000000000  SRV            valid_lft forever preferred_lft forever
+  20.000000000  ok      expect SRV output contains "inet6 2001:db8:2::10/64 scope global"
+  20.000000000  R1      R1>enable
+  20.000000000  R1      R1#show ipv6 interface brief
+  20.000000000  R1      GigabitEthernet0/0/0   [up/up]
+  20.000000000  R1          FE80::4A:FF:FE00:401
+  20.000000000  R1          2001:DB8:1::1
+  20.000000000  R1      GigabitEthernet0/0/1   [up/up]
+  20.000000000  R1          FE80::4A:FF:FE00:402
+  20.000000000  R1          2001:DB8:2::1
+  20.000000000  R1      GigabitEthernet0/0/2   [administratively down/down]
+  20.000000000  R1          unassigned
+  20.000000000  R1      GigabitEthernet0/0/3   [administratively down/down]
+  20.000000000  R1          unassigned
+  20.000000000  R1      TenGigabitEthernet0/1/0 [administratively down/down]
+  20.000000000  R1          unassigned
+  20.000000000  R1      TenGigabitEthernet0/1/1 [administratively down/down]
+  20.000000000  R1          unassigned
+  20.000000000  R1      Serial0/2/0            [administratively down/down]
+  20.000000000  R1          unassigned
+  20.000000000  R1      Serial0/2/1            [administratively down/down]
+  20.000000000  R1          unassigned
+  20.000000000  ok      expect R1 output contains "GigabitEthernet0/0/0   [up/up]\n    FE80::4A:FF:FE00:401\n    2001:DB8:1::1\n"
+  20.000000000  R1      R1#show ipv6 interface GigabitEthernet0/0/1
+  20.000000000  R1      GigabitEthernet0/0/1 is up, line protocol is up
+  20.000000000  R1        IPv6 is enabled, link-local address is FE80::4A:FF:FE00:402
+  20.000000000  R1        No Virtual link-local address(es):
+  20.000000000  R1        Global unicast address(es):
+  20.000000000  R1          2001:DB8:2::1, subnet is 2001:DB8:2::/64
+  20.000000000  R1        Joined group address(es):
+  20.000000000  R1          FF02::1
+  20.000000000  R1          FF02::2
+  20.000000000  R1          FF02::1:FF00:402
+  20.000000000  R1          FF02::1:FF00:1
+  20.000000000  R1        MTU is 1500 bytes
+  20.000000000  R1        ICMP error messages limited to one every 100 milliseconds
+  20.000000000  R1        ICMP redirects are disabled
+  20.000000000  R1        ICMP unreachables are sent
+  20.000000000  R1        ND DAD is enabled, number of DAD attempts: 1
+  20.000000000  R1        ND reachable time is 30000 milliseconds (using 19950)
+  20.000000000  R1        ND advertised reachable time is 0 (unspecified)
+  20.000000000  R1        ND advertised retransmit interval is 0 (unspecified)
+  20.000000000  R1        ND router advertisements are sent every 200 seconds
+  20.000000000  R1        ND router advertisements live for 1800 seconds
+  20.000000000  R1        ND advertised default router preference is Medium
+  20.000000000  R1        Hosts use stateless autoconfig for addresses.
+  20.000000000  ok      expect R1 output contains "  Global unicast address(es):\n    2001:DB8:2::1, subnet is 2001:DB8:2::/64\n"
+  20.000000000  R1      R1#show ipv6 route
+  20.000000000  R1      IPv6 Routing Table - default - 5 entries
+  20.000000000  R1      Codes: C - connected network, L - address of this device, S - static route,
+  20.000000000  R1             ND - default router from advertisements, NDp - prefix from advertisements
+  20.000000000  R1      
+  20.000000000  R1      C   2001:DB8:1::/64 [0/0]
+  20.000000000  R1           via GigabitEthernet0/0/0, directly connected
+  20.000000000  R1      L   2001:DB8:1::1/128 [0/0]
+  20.000000000  R1           via GigabitEthernet0/0/0, receive
+  20.000000000  R1      C   2001:DB8:2::/64 [0/0]
+  20.000000000  R1           via GigabitEthernet0/0/1, directly connected
+  20.000000000  R1      L   2001:DB8:2::1/128 [0/0]
+  20.000000000  R1           via GigabitEthernet0/0/1, receive
+  20.000000000  R1      L   FF00::/8 [0/0]
+  20.000000000  R1           via Null0, receive
+  20.000000000  ok      expect R1 output contains "C   2001:DB8:2::/64 [0/0]\n     via GigabitEthernet0/0/1, directly connected\n"
+  20.000000000  PC1     root@PC1:~# ping -c 3 2001:db8:2::10
+  20.000000000  PC1     PING 2001:db8:2::10(2001:db8:2::10) 56 data bytes
+  20.000000000  --      run 4s
+  20.000016928  PC1     64 bytes from 2001:db8:2::10: icmp_seq=1 ttl=63 time=0.016 ms
+  21.000009488  PC1     64 bytes from 2001:db8:2::10: icmp_seq=2 ttl=63 time=0.009 ms
+  22.000009488  PC1     64 bytes from 2001:db8:2::10: icmp_seq=3 ttl=63 time=0.009 ms
+  22.000009488  PC1     
+  22.000009488  PC1     --- 2001:db8:2::10 ping statistics ---
+  22.000009488  PC1     3 packets transmitted, 3 received, 0% packet loss, time 2000ms
+  22.000009488  PC1     rtt min/avg/max/mdev = 0.009/0.011/0.016/0.003 ms
+  24.000000000  ok      expect PC1 output contains "3 packets transmitted, 3 received, 0% packet loss"
+  24.000000000  ok      expect PC1 output contains "icmp_seq=1 ttl=63"
+  24.000000000  PC2     root@PC2:~# traceroute6 -n 2001:db8:2::10
+  24.000000000  PC2     traceroute to 2001:db8:2::10 (2001:db8:2::10), 30 hops max, 80 byte packets
+  24.000000000  --      run 10s
+  24.000017952  PC2      1  2001:db8:1::1  0.008 ms  0.005 ms  0.005 ms
+  24.000046416  PC2      2  2001:db8:2::10  0.009 ms  0.009 ms  0.009 ms
+  34.000000000  ok      expect PC2 output contains " 1  2001:db8:1::1  "
+  34.000000000  ok      expect PC2 output contains " 2  2001:db8:2::10  "
+  34.000000000  R1      R1#ping 2001:DB8:1::4A:FF:FE00:201
+  34.000000000  R1      Ctrl+Shift+6 stops the ping.
+  34.000000000  R1      Pinging 2001:DB8:1:0:4A:FF:FE00:201 with 5 echo requests of 100 bytes, 2 s timeout each:
+  34.000000000  --      run 3s
+  34.000023080  R1      !!!!!
+  34.000023080  R1      Success rate is 100 percent (5/5), round-trip min/avg/max = 0/0/0 ms
+  37.000000000  ok      expect R1 output contains "!!!!!"
+  37.000000000  R1      R1#show ipv6 neighbors
+  37.000000000  R1      IPv6 Address                              Age Link-layer Addr State Interface
+  37.000000000  R1      2001:DB8:1:0:4A:FF:FE00:101                 0 024a.0000.0101  REACH Gi0/0/0
+  37.000000000  R1      2001:DB8:1:0:4A:FF:FE00:201                 0 024a.0000.0201  REACH Gi0/0/0
+  37.000000000  R1      FE80::4A:FF:FE00:101                        0 024a.0000.0101  REACH Gi0/0/0
+  37.000000000  R1      FE80::4A:FF:FE00:201                        0 024a.0000.0201  REACH Gi0/0/0
+  37.000000000  R1      2001:DB8:2::10                              0 024a.0000.0701  REACH Gi0/0/1
+  37.000000000  R1      FE80::4A:FF:FE00:601                        0 024a.0000.0601  STALE Gi0/0/1
+  37.000000000  R1      FE80::4A:FF:FE00:701                        0 024a.0000.0701  REACH Gi0/0/1
+  37.000000000  ok      expect R1 output contains "2001:DB8:2::10 "
+  37.000000000  PC1     root@PC1:~# ip -6 neigh
+  37.000000000  PC1     fe80::4a:ff:fe00:401 dev eth0 lladdr 02:4a:00:00:04:01 router REACHABLE
+  37.000000000  ok      expect PC1 output contains "fe80::4a:ff:fe00:401 dev eth0 lladdr 02:4a:00:00:04:01 router"
+  37.000000000  R1      R1#debug ipv6 nd
+  37.000000000  R1      Debug output for IPv6 Neighbor Discovery: on
+  37.000000000  R1      R1#clear ipv6 neighbors
+  37.000000000  PC3     root@PC3:~# ping -c 1 2001:db8:1::4a:ff:fe00:101
+  37.000000000  PC3     PING 2001:db8:1::4a:ff:fe00:101(2001:db8:1::4a:ff:fe00:101) 56 data bytes
+  37.000000000  --      run 2s
+  37.000002372  R1      *Mar  1 00:00:37.000: ICMPv6-ND: new entry 2001:DB8:1:0:4A:FF:FE00:101 on GigabitEthernet0/0/0 (INCMP)
+  37.000002372  R1      *Mar  1 00:00:37.000: ICMPv6-ND: NS for 2001:DB8:1:0:4A:FF:FE00:101 on GigabitEthernet0/0/0
+  37.000006092  R1      *Mar  1 00:00:37.000: ICMPv6-ND: NA for 2001:DB8:1:0:4A:FF:FE00:101 on GigabitEthernet0/0/0: at 024a.0000.0101
+  37.000006092  R1      *Mar  1 00:00:37.000: ICMPv6-ND: 2001:DB8:1:0:4A:FF:FE00:101 on GigabitEthernet0/0/0: INCMP -> REACH
+  37.000010836  R1      *Mar  1 00:00:37.000: ICMPv6-ND: new entry 2001:DB8:2:0:4A:FF:FE00:601 on GigabitEthernet0/0/1 (INCMP)
+  37.000010836  R1      *Mar  1 00:00:37.000: ICMPv6-ND: NS for 2001:DB8:2:0:4A:FF:FE00:601 on GigabitEthernet0/0/1
+  37.000014556  R1      *Mar  1 00:00:37.000: ICMPv6-ND: NA for 2001:DB8:2:0:4A:FF:FE00:601 on GigabitEthernet0/0/1: at 024a.0000.0601
+  37.000014556  R1      *Mar  1 00:00:37.000: ICMPv6-ND: 2001:DB8:2:0:4A:FF:FE00:601 on GigabitEthernet0/0/1: INCMP -> REACH
+  37.000016928  PC3     64 bytes from 2001:db8:1:0:4a:ff:fe00:101: icmp_seq=1 ttl=63 time=0.016 ms
+  37.000016928  PC3     
+  37.000016928  PC3     --- 2001:db8:1::4a:ff:fe00:101 ping statistics ---
+  37.000016928  PC3     1 packets transmitted, 1 received, 0% packet loss, time 0ms
+  37.000016928  PC3     rtt min/avg/max/mdev = 0.016/0.016/0.016/0.000 ms
+  39.000000000  ok      expect R1 output contains "ICMPv6-ND: NS for 2001:DB8:1:0:4A:FF:FE00:101 on GigabitEthernet0/0/0"
+  39.000000000  ok      expect PC3 output contains "1 packets transmitted, 1 received, 0% packet loss"
+  39.000000000  R1      R1#undebug all
+  39.000000000  R1      Debug output: all off
+  39.000000000  --      run 60s
+  99.000000000  PC1     root@PC1:~# ip -6 neigh
+  99.000000000  PC1     fe80::4a:ff:fe00:401 dev eth0 lladdr 02:4a:00:00:04:01 router STALE
+  99.000000000  ok      expect PC1 output contains "STALE"
+  99.000000000  PC1     root@PC1:~# ip -6 addr show dev eth0
+  99.000000000  PC1     2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 state UP qlen 1000
+  99.000000000  PC1         inet6 2001:db8:1:0:4a:ff:fe00:101/64 scope global dynamic 
+  99.000000000  PC1            valid_lft 2591935sec preferred_lft 604735sec
+  99.000000000  PC1         inet6 fe80::4a:ff:fe00:101/64 scope link 
+  99.000000000  PC1            valid_lft forever preferred_lft forever
+  99.000000000  SRV     root@SRV:~# ip -6 route
+  99.000000000  SRV     ::1 dev lo proto kernel metric 256 pref medium
+  99.000000000  SRV     2001:db8:2::/64 dev eth0 proto kernel metric 256 pref medium
+  99.000000000  SRV     fe80::/64 dev eth0 proto kernel metric 256 pref medium
+  99.000000000  SRV     default via fe80::4a:ff:fe00:402 dev eth0 proto ra metric 1024 expires 1721sec hoplimit 64 pref medium
+  99.000000000  ok      expect SRV output contains "default via fe80::4a:ff:fe00:402 dev eth0 proto ra metric 1024"
+  99.000000000  ok      expect hops icmpv6 >= 40 (197)
+# 20 von 20 Erwartungen erfüllt

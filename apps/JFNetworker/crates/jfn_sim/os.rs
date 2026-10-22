@@ -923,6 +923,7 @@ impl Engine {
             SLOT_RESOLVER => self.resolver_timer(ni),
             crate::tcp::SLOT_TCP => self.tcp_timer(ni),
             crate::nat::SLOT_NAT => self.nat_timer(ni),
+            s if (crate::ip6::SLOT_V6_KICK..=crate::ip6::SLOT_V6_LAST).contains(&s) => self.ip6_timer(ni, s),
             s if s >= SLOT_SVC => {
                 let id = (s - SLOT_SVC) / SVC_TIMERS;
                 let key = (s - SLOT_SVC) % SVC_TIMERS;

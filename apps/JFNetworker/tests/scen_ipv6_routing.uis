@@ -1,0 +1,8 @@
+#!args apps/JFNetworker/tests/fixtures/ipv6_routing.jfnet --scenario apps/JFNetworker/tests/scen/ipv6_routing.scn --golden apps/JFNetworker/tests/scen/ipv6_routing.report
+# golden scenario: IPv6 across two routers: static routes (one to a link-local next hop),
+# ping and traceroute, Packet Too Big at an MTU of 1280 and the fragments of the sender, ping
+# -M do, the hop limit, no route, a duplicate address found by DAD, and IPv6 routing switched
+# off (a last router advertisement with lifetime 0).  The GUI program runs
+# tests/scen/ipv6_routing.scn on tests/fixtures/ipv6_routing.jfnet without a window and ends
+# with the report, which must equal tests/scen/ipv6_routing.report byte for byte on every
+# target (the script itself is not run)
