@@ -432,7 +432,7 @@ impl Lsa {
                     return Err(LsaErr::Length);
                 }
                 let n = be16(d, 2) as usize;
-                let mut links = Vec::with_capacity(n);
+                let mut links = Vec::with_capacity(n.min(d.len() / 12));
                 let mut o = 4;
                 for _ in 0..n {
                     let l = d.get(o..o + 12).ok_or(LsaErr::Length)?;

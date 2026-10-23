@@ -71,7 +71,7 @@ impl Ui {
         if reqs.is_empty() {
             return;
         }
-        for p in reqs.iter().flat_map(|r| r.paths()).filter(|p| !p.contains("://")) {
+        for p in reqs.iter().flat_map(|r| r.paths()).filter(|p| !p.contains("://") && grantable(p)) {
             super::perm::grant_user(&p);
         }
         self.bring_to_front();
@@ -218,4 +218,16 @@ impl Ui {
         }
         None
     }
+}
+
+/// whether a command-line path of a later start may be granted: no `..` parts and not a
+/// drive / file system root (those would open the whole disk)
+fn grantable(p: &str) -> bool {
+    let rest = p.strip_prefix("\\\\?\\").unwrap_or(p);
+    let rest = match rest.as_bytes() {
+        [d, b':', ..] if d.is_ascii_alphabetic() => &rest[2..],
+        _ => rest,
+    };
+    let rest = rest.trim_matches(|c| c == '/' || c == '\\');
+    !rest.is_empty() && !p.split(|c| c == '/' || c == '\\').any(|s| s == "..")
 }

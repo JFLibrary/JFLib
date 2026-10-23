@@ -354,20 +354,24 @@ impl Reassembly {
         let off = v.frag_off();
         let data = v.payload();
         let end = off + data.len();
-        if end > Reassembly::MAX {
+        if end > Reassembly::MAX || data.is_empty() || (v.mf() && data.len() % 8 != 0) {
             return None;
         }
-        if !v.mf() {
-            if self.total.is_some_and(|t| t != end) {
+        let total = if v.mf() { self.total } else { Some(end) };
+        if let Some(t) = total {
+            if end > t || self.total.is_some_and(|s| s != t) {
                 return None;
             }
-            self.total = Some(end);
+            if self.parts.iter().any(|(&o, d)| o + d.len() > t) {
+                return None;
+            }
         }
         for (&o, d) in self.parts.iter() {
             if o < end && off < o + d.len() {
                 return None;
             }
         }
+        self.total = total;
         if off == 0 {
             self.first = Some(v.header().to_vec());
         }

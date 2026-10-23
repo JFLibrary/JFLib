@@ -43,7 +43,8 @@ pub fn utf8_decode(s: &[u8], i: usize) -> (u32, usize) {
     // invalid bytes, overlong forms, surrogates and values above U+10FFFF: U+FFFD, one byte
     // (as the assembly's utf8_decode; a sequence cut by the end of s is invalid)
     const BAD: u32 = 0xFFFD;
-    let b0 = s[i] as u32;
+    let Some(&b0) = s.get(i) else { return (BAD, i.saturating_add(1)) };
+    let b0 = b0 as u32;
     if b0 < 0x80 {
         return (b0, i + 1);
     }

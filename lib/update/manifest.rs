@@ -153,19 +153,44 @@ pub fn target() -> &'static str {
 
 /// a is newer than b: the numbers before a '-' compared part by part ("1.10" > "1.9",
 /// missing parts are 0, a leading 'v' is ignored); with equal numbers a release is newer than
-/// a pre-release ("2.0.0" > "2.0.0-rc1"), pre-releases compare by their text; "+build" is
-/// ignored
+/// a pre-release ("2.0.0" > "2.0.0-rc1"), pre-releases compare by SemVer's rules (numeric
+/// parts as numbers, lower than text parts; more parts win); "+build" is ignored; a version
+/// that does not parse is never newer and nothing is newer than it
 pub fn newer(a: &str, b: &str) -> bool {
-    fn key(v: &str) -> (Vec<u64>, Option<&str>) {
+    use core::cmp::Ordering;
+    fn key(v: &str) -> Option<(Vec<u64>, Option<&str>)> {
         let v = v.trim().trim_start_matches('v');
         let v = v.split_once('+').map_or(v, |(c, _)| c);
         let (core, pre) = match v.split_once('-') {
             Some((c, p)) => (c, Some(p)),
             None => (v, None),
         };
-        (core.split('.').map(|p| p.parse().unwrap_or(0)).collect(), pre)
+        if pre.is_some_and(|p| p.split('.').any(|i| i.is_empty() || !i.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-'))) {
+            return None;
+        }
+        let nums = core.split('.').map(|p| if p.bytes().all(|c| c.is_ascii_digit()) { p.parse().ok() } else { None }).collect::<Option<Vec<u64>>>()?;
+        Some((nums, pre))
     }
-    let (ka, kb) = (key(a), key(b));
+    fn pre_cmp(p: &str, q: &str) -> Ordering {
+        let (mut pi, mut qi) = (p.split('.'), q.split('.'));
+        loop {
+            let ord = match (pi.next(), qi.next()) {
+                (None, None) => return Ordering::Equal,
+                (None, Some(_)) => return Ordering::Less,
+                (Some(_), None) => return Ordering::Greater,
+                (Some(x), Some(y)) => match (x.bytes().all(|c| c.is_ascii_digit()), y.bytes().all(|c| c.is_ascii_digit())) {
+                    (true, true) => (x.len().cmp(&y.len())).then(x.cmp(y)),
+                    (true, false) => Ordering::Less,
+                    (false, true) => Ordering::Greater,
+                    (false, false) => x.cmp(y),
+                },
+            };
+            if ord != Ordering::Equal {
+                return ord;
+            }
+        }
+    }
+    let (Some(ka), Some(kb)) = (key(a), key(b)) else { return false };
     for i in 0..ka.0.len().max(kb.0.len()) {
         let (x, y) = (ka.0.get(i).copied().unwrap_or(0), kb.0.get(i).copied().unwrap_or(0));
         if x != y {
@@ -174,7 +199,7 @@ pub fn newer(a: &str, b: &str) -> bool {
     }
     match (ka.1, kb.1) {
         (None, Some(_)) => true,
-        (Some(p), Some(q)) => p > q,
+        (Some(p), Some(q)) => pre_cmp(p, q) == Ordering::Greater,
         _ => false,
     }
 }

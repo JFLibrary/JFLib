@@ -60,7 +60,12 @@ pub fn clip_bmp_from_sf(sf: &Surface) -> Option<Vec<u8>> {
     }
     let row = w as usize * 4;
     let size = row * h as usize + HDR_SIZE;
-    let mut b = vec![0u8; size];
+    if size > u32::MAX as usize {
+        return None;
+    }
+    let mut b = Vec::new();
+    b.try_reserve_exact(size).ok()?;
+    b.resize(size, 0);
     let put32 = |b: &mut [u8], o: usize, v: u32| b[o..o + 4].copy_from_slice(&v.to_le_bytes());
     b[0] = b'B';
     b[1] = b'M';

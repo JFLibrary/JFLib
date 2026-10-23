@@ -67,10 +67,14 @@ pub use render::{FontSpec, Opts, TextHook};
 /// the largest document (bytes; also the inflated size of .svgz)
 pub const MAX_INPUT: usize = 32 << 20;
 
+/// the pixels all embedded images of one document may decode to together
+pub(crate) const MAX_IMAGE_PX: u64 = 1 << 26;
+
 /// inflate a gzip member (.svgz)
 pub(crate) fn gunzip(data: &[u8]) -> Result<Vec<u8>, i32> {
     let n = img_core::gzip::gzip_isize(data)? as usize;
-    if n > MAX_INPUT {
+    // deflate expands at most ~1032:1: a larger ISIZE is a lie that would only cost memory
+    if n > MAX_INPUT || n as u64 > data.len() as u64 * 1100 + 64 {
         return Err(ERR_LIMIT);
     }
     let mut out = alloc::vec![0u8; n.max(1)];
@@ -123,11 +127,11 @@ pub(crate) fn data_uri_bytes(href: &str) -> Option<Vec<u8>> {
 
 /// decode embedded image bytes with the registered decoders (at the first draw, so the
 /// codecs may be registered after parsing)
-pub(crate) fn decode_image(bytes: &[u8]) -> Option<Surface> {
-    if img_core::io::detect(bytes, 0) == IMGF_SVG {
+pub(crate) fn decode_image(bytes: &[u8], budget: u64) -> Option<Surface> {
+    if budget == 0 || img_core::io::detect(bytes, 0) == IMGF_SVG {
         return None;
     }
-    let dec = ImgDec { maxpx: 1 << 26, ..ImgDec::default() };
+    let dec = ImgDec { maxpx: budget.min(MAX_IMAGE_PX), ..ImgDec::default() };
     let sf = img_core::io::decode_ex(bytes, Some(&dec), None).ok()?;
     if sf.fmt == FMT_PARGB { Some(sf) } else { None }
 }

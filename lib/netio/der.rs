@@ -1,5 +1,5 @@
 // der -- the DER subset X.509 needs: a bounded reader (definite lengths, no indefinite
-// forms, at most 64 KiB per element) and a writer
+// forms, at most 16 MiB per element) and a writer
 //
 //   Der::new(bytes).read(tag) -> Option<(content, rest)>, peek_tag, int, oid, ...
 //   writer: tlv(tag, content), seq(&[parts]), int_u(bytes), oid(&[arcs]), utf8(s) ...

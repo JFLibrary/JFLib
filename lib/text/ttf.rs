@@ -1591,6 +1591,9 @@ fn gp_coverage(tb: Tb, off: u32, g: u32) -> i32 {
                     continue;
                 }
                 let e = tb.u16(r.wrapping_add(2));
+                if e < 0 {
+                    return -1;
+                }
                 if g > e as u32 {
                     lo = mid + 1;
                     continue;
@@ -1640,6 +1643,9 @@ fn gp_class(tb: Tb, off: u32, g: u32) -> u32 {
                     continue;
                 }
                 let e = tb.u16(r.wrapping_add(2));
+                if e < 0 {
+                    return 0;
+                }
                 if g > e as u32 {
                     lo = mid + 1;
                     continue;

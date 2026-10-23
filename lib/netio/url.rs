@@ -20,6 +20,10 @@ impl Url {
     /// parse; the port defaults to 80 / 443
     pub fn parse(s: &str) -> Option<Url> {
         let (scheme, rest) = s.split_once("://")?;
+        let rest = rest.split('#').next().unwrap_or("");
+        if rest.bytes().any(|b| b <= b' ' || b == 0x7f || b == b'\\') {
+            return None;
+        }
         let scheme = scheme.to_ascii_lowercase();
         let default = match scheme.as_str() {
             "http" => 80,

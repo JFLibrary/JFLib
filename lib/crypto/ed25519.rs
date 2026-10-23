@@ -187,13 +187,14 @@ impl Keypair {
 
     pub fn sign(&self, msg: &[u8]) -> [u8; 64] {
         let c = Curve::new();
-        let r = hash_reduce(&[&self.prefix, msg]);
+        let mut r = hash_reduce(&[&self.prefix, msg]);
         let rb = c.base.mul(&r, &c).encode();
         let k = hash_reduce(&[&rb, &self.public, msg]);
         let s = scalar::mul_add(&k, &self.a, &r);
         let mut sig = [0u8; 64];
         sig[..32].copy_from_slice(&rb);
         sig[32..].copy_from_slice(&s);
+        crate::zeroize(&mut r);
         sig
     }
 }

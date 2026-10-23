@@ -26,6 +26,8 @@ use crate::frm::Jmh;
 use crate::hdr::unpack_signed;
 
 pub const JM_MAXPIX: u64 = 0x7FFF_FFFF;
+/// total samples of all channels of one image (large channels are summed up when they are inserted)
+pub const JM_MAXTOT: u64 = 1 << 32;
 pub const JM_MAXCH: u32 = 1 << 16;
 pub const MTR_RCT: u32 = 0;
 pub const MTR_PALETTE: u32 = 1;
@@ -100,13 +102,6 @@ pub fn zvec<T: Clone + Default>(n: usize) -> Result<Vec<T>, i32> {
     if v.try_reserve_exact(n).is_err() {
         return Err(ERR_NOMEM);
     }
-    if n.saturating_mul(core::mem::size_of::<T>()) >= 1 << 16 {
-        // jxl-speed: the size can be allocated; large blocks come from the zeroed allocation
-        // (fresh pages from the OS), so they are not cleared here in one serial pass (the
-        // threads that fill them touch the pages)
-        drop(v);
-        return Ok(alloc::vec![T::default(); n]);
-    }
     v.resize(n, T::default());
     Ok(v)
 }
@@ -133,6 +128,9 @@ impl Mi {
             return 0;
         }
         if n > JM_MAXPIX {
+            return ERR_LIMIT;
+        }
+        if n >= 1 << 20 && n + self.ch.iter().map(|c| c.d.len() as u64).sum::<u64>() > JM_MAXTOT {
             return ERR_LIMIT;
         }
         match zvec::<i32>(n as usize) {

@@ -24,7 +24,7 @@ impl Eval<'_>{
             Expr::Unary(a)=>Number::checked(-self.scalar(p,a)?.0).map(|n|vec![n]),
             Expr::Binary(op,a,b)=>{
                 let a=self.scalar(p,a)?;let b=self.scalar(p,b)?;
-                let n=match op {b'+'=>a.add(b)?,b'-'=>a.sub(b)?,b'*'=>a.mul(b)?,b'/'=>a.div(b)?,b'%'=>{if b.0==0{return Err(E::DivisionByZero);}Number::checked(a.0%b.0)?},
+                let n=match op {b'+'=>a.add(b)?,b'-'=>a.sub(b)?,b'*'=>a.mul(b)?,b'/'=>a.div(b)?,b'%'=>modulo(a,b)?,
                     b'^'=>{if b.0%SCALE!=0||b.0.abs()/SCALE>32{return Err(E::Number);}let mut v=Number(SCALE);for _ in 0..b.0.abs()/SCALE{v=v.mul(a)?;}if b.0<0{Number(SCALE).div(v)?}else{v}},
                     b'='|b'<'|b'>'|b'l'|b'g'|b'n'=>Number::integer(i128::from(match op {b'='=>a.0==b.0,b'<'=>a.0<b.0,b'>'=>a.0>b.0,b'l'=>a.0<=b.0,b'g'=>a.0>=b.0,_=>a.0!=b.0}))?,_=>return Err(E::Syntax),};
                 Ok(vec![n])
@@ -34,7 +34,7 @@ impl Eval<'_>{
     }
     fn call(&mut self,p:Id,name:&str,args:&[Expr])->Result<Number,E>{
         if name=="IF"{if args.len()!=3{return Err(E::Value);}let condition=self.scalar(p,&args[0])?;return self.scalar(p,&args[if condition.truth(){1}else{2}]);}
-        if name=="DEFINED"{if args.len()!=1{return Err(E::Value);}return Number::integer(i128::from(self.scalar(p,&args[0]).is_ok()));}
+        if name=="DEFINED"{if args.len()!=1{return Err(E::Value);}return match self.scalar(p,&args[0]){Err(e@(E::Cycle|E::Limit))=>Err(e),r=>Number::integer(i128::from(r.is_ok()))};}
         if name=="TRUE"||name=="FALSE"{if !args.is_empty(){return Err(E::Value);}return Number::integer(i128::from(name=="TRUE"));}
         let mut values=Vec::new();for arg in args{values.extend(self.values(p,arg)?);}let v=&values;
         match name {
@@ -51,14 +51,14 @@ impl Eval<'_>{
                 }
             },
             "ROUND"=>{if v.len()!=2||v[1].0%SCALE!=0{return Err(E::Value);}v[0].round(v[1].0/SCALE)},
-            "MOD"=>{if v.len()!=2{return Err(E::Value);}if v[1].0==0{return Err(E::DivisionByZero);}let r=v[0].0.rem_euclid(v[1].0.abs());Number::checked(if v[1].0<0&&r!=0{r-v[1].0.abs()}else{r})},
+            "MOD"=>{if v.len()!=2{return Err(E::Value);}modulo(v[0],v[1])},
             _=>Err(E::Unsupported),
         }
     }
     fn field(&mut self,p:Id,index:usize,f:&Formula)->Result<Number,E>{
         let key=(p,index);if let Some(result)=self.memo.get(&key){return *result;}
         if self.stack.contains(&key){return Err(E::Cycle);}if self.stack.len()>=32{return Err(E::Limit);}
-        self.stack.push(key);let result=parser::parse(&f.expression).and_then(|tree|self.scalar(p,&tree));self.stack.pop();self.memo.insert(key,result);result
+        self.stack.push(key);let result=parser::parse(&f.expression).and_then(|tree|self.scalar(p,&tree));self.stack.pop();if !matches!(result,Err(E::Cycle|E::Limit)){self.memo.insert(key,result);}result
     }
     fn cell(&mut self,cell:&TableCell)->Result<Option<Number>,E>{
         self.step()?;
@@ -91,7 +91,7 @@ impl Eval<'_>{
         let many=positional||end.is_some()||start=="R"||start=="C";
         let mut seen=BTreeSet::new();let mut out=Vec::new();
         for r in r1..=r2 {for c in c1..=c2 {
-            self.step()?;if positional&&r<usize::from(table.header_rows){continue;}
+            self.step()?;if matches!(start,"ABOVE"|"BELOW")&&r<usize::from(table.header_rows){continue;}
             let Some(cell)=table.cell(r,c)else{continue;};if !seen.insert(cell.id){continue;}
             if cell.id==own{if many{continue;}else{return Err(E::Cycle);}}
             if self.root_cell==Some(cell.id){return Err(E::Cycle);}
@@ -100,8 +100,13 @@ impl Eval<'_>{
         Ok(out)
     }
 }
+// Result takes the sign of the divisor, shared by `%` and MOD.
+fn modulo(a:Number,b:Number)->Result<Number,E>{
+    if b.0==0{return Err(E::DivisionByZero);}
+    let r=a.0.rem_euclid(b.0.abs());Number::checked(if b.0<0&&r!=0{r-b.0.abs()}else{r})
+}
 fn address(name:&str,t:&Table)->Result<(usize,usize),E>{
-    let pair=if let Some((r,c))=name.strip_prefix('R').and_then(|s|s.split_once('C')){
+    let pair=if let Some((r,c))=name.strip_prefix('R').and_then(|s|s.split_once('C')).filter(|(r,c)|[r,c].iter().all(|s|!s.is_empty()&&s.bytes().all(|b|b.is_ascii_digit()))){
         (r.parse::<usize>().map_err(|_|E::Reference)?,c.parse::<usize>().map_err(|_|E::Reference)?)
     }else{
         let at=name.bytes().position(|b|b.is_ascii_digit()).ok_or(E::Reference)?;

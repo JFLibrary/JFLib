@@ -34,6 +34,7 @@ const O_EXCL: usize = 0x80;
 const O_TRUNC: usize = 0x200;
 const O_DIRECTORY: usize = 0x10000;
 const O_CLOEXEC: usize = 0x80000;
+const O_NOFOLLOW: usize = 0x20000;
 const O_TMPFILE: usize = 0x410000; // __O_TMPFILE | O_DIRECTORY
 const EPERM: isize = 1;
 const EINTR: isize = 4;
@@ -403,6 +404,14 @@ impl OsFile {
         let p = path_z(path);
         // SAFETY: NUL-terminated path; 0666 (the umask applies).
         let fd = unsafe { syscall6(SYS_OPENAT, AT_FDCWD, p.as_ptr() as usize, flags, 0o666, 0, 0) };
+        if fd < 0 { None } else { Some(OsFile(fd as i32)) }
+    }
+
+    /// read only, never through a final symbolic link (the plugin loader checks the policy on the path)
+    pub(crate) fn open_read_nofollow(path: &str) -> Option<OsFile> {
+        let p = path_z(path);
+        // SAFETY: NUL-terminated path.
+        let fd = unsafe { syscall6(SYS_OPENAT, AT_FDCWD, p.as_ptr() as usize, O_CLOEXEC | O_NOFOLLOW, 0, 0, 0) };
         if fd < 0 { None } else { Some(OsFile(fd as i32)) }
     }
 

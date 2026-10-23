@@ -282,7 +282,7 @@ impl<'a> Parser<'a> {
             }
         }
         if !node.children.is_empty() {
-            if !node.text.trim().is_empty() {
+            if !node.text.trim_matches([' ', '\t', '\r', '\n']).is_empty() {
                 return Err(Error::Unsupported);
             }
             node.text.clear();
@@ -300,7 +300,8 @@ pub fn parse(s: &str) -> Result<Node, Error> {
         return Err(Error::Syntax);
     }
     let normalized = s
-        .trim_start_matches('\u{feff}')
+        .strip_prefix('\u{feff}')
+        .unwrap_or(s)
         .replace("\r\n", "\n")
         .replace('\r', "\n");
     let mut p = Parser {

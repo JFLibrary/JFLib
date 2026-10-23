@@ -120,6 +120,7 @@ struct Cache {
     faces: Vec<FaceRec>,
     pool: Vec<u8>,
     hash: Vec<u64>,
+    by_hash: Vec<(u64, u32)>, // (path hash, file index) sorted
 }
 
 #[derive(Default)]
@@ -342,7 +343,12 @@ impl FontDb {
     fn from_cache(&mut self, path: &str, size: u32, file: u32) -> bool {
         let Some(c) = &self.cache else { return false };
         let h = fnv64(path.as_bytes());
-        for (i, f) in c.files.iter().enumerate() {
+        let start = c.by_hash.partition_point(|e| e.0 < h);
+        for &(eh, i) in &c.by_hash[start..] {
+            if eh != h {
+                break;
+            }
+            let (i, f) = (i as usize, &c.files[i as usize]);
             if c.hash[i] != h || f.size != size || pstr(&c.pool, f.path) != path.as_bytes() {
                 continue;
             }
@@ -599,7 +605,7 @@ impl FontDb {
 
     /// fontdb_find(family, weight, italic) -> (face index, FS_SYN_* flags to add)
     pub fn find(&self, family: &str, weight: u32, italic: bool) -> Option<(usize, u32)> {
-        let w = if weight == 0 { 400 } else { weight as i32 };
+        let w = if weight == 0 { 400 } else { weight.min(1000) as i32 };
         for pass in 0..2 {
             let mut best = i32::MAX;
             let mut bi = None;
@@ -789,6 +795,8 @@ impl FontDb {
         c.pool = pool.to_vec();
         // path hashes
         c.hash = c.files.iter().map(|f| fnv64(pstr(&c.pool, f.path))).collect();
+        c.by_hash = c.hash.iter().enumerate().map(|(i, &h)| (h, i as u32)).collect();
+        c.by_hash.sort_unstable();
         self.cache = Some(c);
         0
     }

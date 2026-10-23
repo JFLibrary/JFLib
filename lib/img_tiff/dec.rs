@@ -1699,7 +1699,7 @@ impl<'a> Tc<'a> {
             5 => JDF_CMYK,
             _ => 0,
         };
-        let jsf = match img_jpeg::decode_abbrev(tables, &self.d[off..off + n], flags) {
+        let jsf = match img_jpeg::decode_abbrev_max(tables, &self.d[off..off + n], flags, (self.cw + 31) & !31, (self.ch + 31) & !31) {
             Ok(sf) => sf,
             Err(e) => return e,
         };

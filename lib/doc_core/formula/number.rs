@@ -23,6 +23,18 @@ pub(super) fn parse(s:&str)->Result<Number,E>{
     let s=s.trim();if s.is_empty()||s.len()>64{return Err(E::Value);}
     let (s,negative)=if let Some(s)=s.strip_prefix('-'){(s,true)}else{(s.strip_prefix('+').unwrap_or(s),false)};
     let (s,percent)=s.strip_suffix('%').map_or((s,false),|s|(s,true));
+    let commas=s.bytes().filter(|c|*c==b',').count();let dots=s.bytes().filter(|c|*c==b'.').count();
+    let cleaned;let s=if commas>1||(commas==1&&dots==1){
+        // A comma next to a dot, or repeated commas, can only be a thousands separator.
+        let whole=s.split('.').next().unwrap_or("");let mut groups=whole.split(',');
+        let first=groups.next().unwrap_or("");
+        if dots>1||!(1..=3).contains(&first.len())||!groups.all(|g|g.len()==3)||s.rfind(',').zip(s.find('.')).is_some_and(|(c,d)|c>d){return Err(E::Value);}
+        cleaned=s.replace(',',"");cleaned.as_str()
+    }else{
+        // "1,000" is ambiguous between a decimal comma and a thousands separator.
+        if let Some((a,b))=s.split_once(','){if b.len()==3&&(1..=3).contains(&a.len())&&a.bytes().all(|c|c.is_ascii_digit())&&b.bytes().all(|c|c.is_ascii_digit()){return Err(E::Number);}}
+        s
+    };
     if s.bytes().filter(|c|*c==b'.'||*c==b',').count()>1{return Err(E::Value);}
     let mut value=0i128;let mut fractional=None;let mut count=0;
     for b in s.bytes(){

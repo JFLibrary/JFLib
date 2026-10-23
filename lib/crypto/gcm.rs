@@ -101,6 +101,8 @@ impl AesGcm {
 
     /// XOR the key stream of counter blocks 2, 3, ... into data
     fn ctr(&self, nonce: &[u8; 12], data: &mut [u8]) {
+        // a wrapped block counter would reuse the keystream
+        assert!(data.len().div_ceil(16) as u64 <= (1u64 << 32) - 2, "aes-gcm: message too long");
         let mut ctr = 2u32;
         for chunk in data.chunks_mut(64) {
             let mut blocks = [[0u8; 16]; 4];

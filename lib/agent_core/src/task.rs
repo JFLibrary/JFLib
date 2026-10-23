@@ -114,8 +114,14 @@ impl TaskTable {
             capacity: capacity.clamp(1, 1024),
         }
     }
-    /// Allocate a pending task. Completed tasks are retained until explicitly forgotten.
+    /// Allocate a pending task. Completed tasks are retained until explicitly forgotten or,
+    /// when the table is full, evicted oldest first.
     pub fn create(&mut self, action: &str, cancellable: bool) -> Result<u64, ActionError> {
+        if self.tasks.len() >= self.capacity {
+            if let Some(oldest) = self.tasks.iter().position(|t| t.status.terminal()) {
+                self.tasks.remove(oldest);
+            }
+        }
         if self.tasks.len() >= self.capacity || self.next_id == u64::MAX {
             return Err(ActionError::new(
                 ErrorCode::LimitExceeded,

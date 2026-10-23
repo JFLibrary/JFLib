@@ -122,6 +122,12 @@ fn packbits(data: &[u8], row: &mut [u8]) -> Result<(), i32> {
     }
     Ok(())
 }
+fn zeroed(n: usize) -> Result<Vec<u8>, i32> {
+    let mut v = Vec::new();
+    v.try_reserve_exact(n).map_err(|_| ERR_NOMEM)?;
+    v.resize(n, 0);
+    Ok(v)
+}
 fn decoded(data: &[u8], dec: &ImgDec, m: &mut ImgMeta) -> Result<Surface, i32> {
     let (w, h, channels, gray) = header(data, m)?;
     let check = meta::dims_check(w as u32, h as u32, dec);
@@ -140,7 +146,8 @@ fn decoded(data: &[u8], dec: &ImgDec, m: &mut ImgMeta) -> Result<Surface, i32> {
         .and_then(|n| n.checked_mul(channels))
         .and_then(|n| n.checked_mul(bpc))
         .ok_or(ERR_OVERFLOW)?;
-    let check = meta::mem_check((size + w * h * 4) as u64, dec);
+    let total = (size as u64).checked_add(w as u64 * h as u64 * 4).ok_or(ERR_OVERFLOW)?;
+    let check = meta::mem_check(total, dec);
     if check != 0 {
         return Err(check);
     }
@@ -150,11 +157,16 @@ fn decoded(data: &[u8], dec: &ImgDec, m: &mut ImgMeta) -> Result<Surface, i32> {
     let plane = match compression {
         0 => r.take(size)?.to_vec(),
         1 => {
-            let mut lengths = Vec::with_capacity(channels * h);
+            let rest = data.len().saturating_sub(r.pos);
+            // PackBits expands at most 64:1
+            if size / 64 > rest {
+                return Err(ERR_TRUNC);
+            }
+            let mut lengths = Vec::with_capacity((channels * h).min(rest / 2));
             for _ in 0..channels * h {
                 lengths.push(if data[5] == 2 { r.u32()? as usize } else { r.u16()? as usize });
             }
-            let mut out = vec![0; size];
+            let mut out = zeroed(size)?;
             for (i, n) in lengths.into_iter().enumerate() {
                 if dec.cancelled() {
                     return Err(ERR_CANCEL);
@@ -164,7 +176,10 @@ fn decoded(data: &[u8], dec: &ImgDec, m: &mut ImgMeta) -> Result<Surface, i32> {
             out
         }
         2 | 3 => {
-            let mut out = vec![0; size];
+            if size / 1032 > data.len().saturating_sub(r.pos) + 1 {
+                return Err(ERR_TRUNC);
+            }
+            let mut out = zeroed(size)?;
             if inflate::zlib_inflate(&data[r.pos..], &mut out)? != size {
                 return Err(ERR_TRUNC);
             }

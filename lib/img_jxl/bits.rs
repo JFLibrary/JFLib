@@ -42,13 +42,19 @@ pub static DENUM: [u32; 8] = [0, 0, 1, 0, 2, 4, 18, 6];
 impl<'a> Jb<'a> {
     /// jb_init: reader over buf (incl. padding), section end = len bytes
     pub fn init(buf: &'a [u8], len: u64) -> Self {
-        Jb { buf, pos: 0, lim: (buf.len() as u64).wrapping_sub(8), end: len << 3, err: 0 }
+        if buf.len() < 8 {
+            return Jb { buf, pos: 1 << 62, lim: 0, end: 0, err: ERR_TRUNC };
+        }
+        Jb { buf, pos: 0, lim: buf.len() as u64 - 8, end: len << 3, err: 0 }
     }
 
     /// jb_section: reader over bytes start .. start + size of buf
     pub fn section(buf: &'a [u8], start: u64, size: u64) -> Self {
         let pos = start << 3;
-        Jb { buf, pos, lim: (buf.len() as u64).wrapping_sub(8), end: (size << 3).wrapping_add(pos), err: 0 }
+        if buf.len() < 8 {
+            return Jb { buf, pos: 1 << 62, lim: 0, end: 0, err: ERR_TRUNC };
+        }
+        Jb { buf, pos, lim: buf.len() as u64 - 8, end: (size << 3).wrapping_add(pos), err: 0 }
     }
 
     /// jb_check: 0, the sticky error, or ERR_TRUNC (read past the section end)

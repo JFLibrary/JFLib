@@ -130,7 +130,7 @@ fn read_parts(b: &[u8], limits: Limits) -> Result<(Vec<Entry>, Vec<u32>), Error>
             return Err(Error::Unsupported);
         }
         let name = core::str::from_utf8(raw).map_err(|_| Error::Invalid)?;
-        if !name_ok(name) || entries.iter().any(|e| e.name.eq_ignore_ascii_case(name)) {
+        if !name_ok(name) || entries.iter().any(|e| same_name(&e.name, name)) {
             return Err(Error::Invalid);
         }
         let local = u32at(b, p + 42)? as usize;
@@ -219,11 +219,17 @@ fn read_parts(b: &[u8], limits: Limits) -> Result<(Vec<Entry>, Vec<u32>), Error>
     }
     Ok((entries, times))
 }
+// names that collide on a case-insensitive file system (Unicode lower-casing)
+fn same_name(a: &str, b: &str) -> bool {
+    a.eq_ignore_ascii_case(b) || a.to_lowercase() == b.to_lowercase()
+}
 // a DOS time and date (time in the low 16 bits) -> ns since 1970, read as UTC; 0 when invalid
 fn dos_ns(td: u32) -> i64 {
     let (t, d) = ((td & 0xFFFF) as i64, (td >> 16) as i64);
     let (y, m, day) = (1980 + (d >> 9), (d >> 5) & 15, d & 31);
-    if !(1..=12).contains(&m) || day == 0 {
+    let leap = (1980 + (d >> 9)) % 4 == 0;
+    let mdays = [31, if leap { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if !(1..=12).contains(&m) || day == 0 || day > mdays[(m - 1) as usize] || (t >> 11) > 23 || ((t >> 5) & 63) > 59 || (t & 31) > 29 {
         return 0;
     }
     // days since 1970-01-01 of a civil date (Howard Hinnant's algorithm)
@@ -250,7 +256,7 @@ pub fn write(entries: &[Entry], limits: Limits) -> Result<Vec<u8>, Error> {
         if !name_ok(&e.name)
             || entries[..i]
                 .iter()
-                .any(|a| a.name.eq_ignore_ascii_case(&e.name))
+                .any(|a| same_name(&a.name, &e.name))
         {
             return Err(Error::Invalid);
         }

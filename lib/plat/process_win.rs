@@ -32,19 +32,22 @@ unsafe extern "system" {
     fn WriteFile(h: isize, buf: *const u8, n: u32, done: *mut u32, ov: *mut crate::win::Overlapped) -> i32;
     fn GetEnvironmentStringsW() -> *mut u16;
     fn FreeEnvironmentStringsW(env: *mut u16) -> i32;
-    fn LoadLibraryA(name: *const u8) -> isize;
+    fn LoadLibraryExA(name: *const u8, file: isize, flags: u32) -> isize;
     fn GetProcAddress(module: isize, name: *const u8) -> usize;
 }
-/// SHELLEXECUTEINFOW (x64, 112 bytes)
+/// SHELLEXECUTEINFOW
 #[repr(C)]
 struct ShellExecuteInfo {
     size: u32, mask: u32, hwnd: isize, verb: *const u16, file: *const u16, params: *const u16, dir: *const u16,
     show: i32, inst_app: isize, id_list: usize, class: *const u16, hkey_class: isize, hot_key: u32, icon: isize, process: isize,
 }
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(core::mem::size_of::<ShellExecuteInfo>() == 112);
+/// a function of a system DLL (0 = missing); only System32 is searched
 fn proc_of(dll: &[u8], name: &[u8]) -> usize {
     // SAFETY: NUL-terminated names; the module stays loaded for the process.
     unsafe {
-        let m = LoadLibraryA(dll.as_ptr());
+        let m = LoadLibraryExA(dll.as_ptr(), 0, 0x800); // LOAD_LIBRARY_SEARCH_SYSTEM32
         if m == 0 { 0 } else { GetProcAddress(m, name.as_ptr()) }
     }
 }
@@ -54,15 +57,19 @@ pub(super) fn run_elevated(program: &str, args: &[&str]) -> Result<i32, String> 
     let exec = proc_of(b"shell32.dll\0", b"ShellExecuteExW\0");
     if exec == 0 { return Err(String::from("ShellExecuteExW fehlt")); }
     let co = proc_of(b"ole32.dll\0", b"CoInitializeEx\0");
+    let couninit = proc_of(b"ole32.dll\0", b"CoUninitialize\0");
+    let mut com = false;
     if co != 0 {
         // SAFETY: CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) for the shell on this thread.
         let ci: unsafe extern "system" fn(usize, u32) -> i32 = unsafe { core::mem::transmute(co) };
-        unsafe { ci(0, 6) };
+        // S_OK / S_FALSE need the matching CoUninitialize; RPC_E_CHANGED_MODE leaves COM as it was
+        com = unsafe { ci(0, 6) } >= 0;
     }
+    let _com = ComGuard(if com { couninit } else { 0 });
     let mut line = String::new();
     for (i, a) in args.iter().enumerate() { if i > 0 { line.push(' '); } line.push_str(&quote(a)); }
     let (verb, file, params) = (wide0("runas"), wide0(program), wide0(&line));
-    let mut info = ShellExecuteInfo { size: 112, mask: 0x40 | 0x100, hwnd: 0, verb: verb.as_ptr(), file: file.as_ptr(), params: params.as_ptr(),
+    let mut info = ShellExecuteInfo { size: core::mem::size_of::<ShellExecuteInfo>() as u32, mask: 0x40 | 0x100, hwnd: 0, verb: verb.as_ptr(), file: file.as_ptr(), params: params.as_ptr(),
         dir: core::ptr::null(), show: 0, inst_app: 0, id_list: 0, class: core::ptr::null(), hkey_class: 0, hot_key: 0, icon: 0, process: 0 };
     // SAFETY: ShellExecuteExW(SHELLEXECUTEINFOW*) with live NUL-terminated strings.
     let f: unsafe extern "system" fn(*mut ShellExecuteInfo) -> i32 = unsafe { core::mem::transmute(exec) };
@@ -86,6 +93,14 @@ pub(super) fn elevated() -> bool {
 }
 /// Windows cannot replace a process by another program: ERROR_NOT_SUPPORTED
 pub(super) fn exec(_program: &str, _args: &[&str], _env: &[(&str, Option<&str>)]) -> u32 { 50 }
+struct ComGuard(usize);
+impl Drop for ComGuard { fn drop(&mut self) {
+    if self.0 != 0 {
+        // SAFETY: CoUninitialize() balances the successful CoInitializeEx of this thread.
+        let f: unsafe extern "system" fn() = unsafe { core::mem::transmute(self.0) };
+        unsafe { f() };
+    }
+} }
 struct Handle(isize);
 impl Drop for Handle { fn drop(&mut self) {
     // SAFETY: uniquely owned Windows handle.
@@ -114,25 +129,36 @@ fn quote(s: &str) -> String {
     }
     for _ in 0..slashes * 2 { out.push('\\'); } out.push('"'); out
 }
+fn fold(u: u16) -> u32 {
+    char::from_u32(u as u32).map_or(u as u32, |c| c.to_lowercase().next().unwrap_or(c) as u32)
+}
 fn environment(c: &Command<'_>) -> Result<Vec<u16>, u32> {
     if c.env.is_empty() { return Ok(Vec::new()); }
-    let mut entries = Vec::new();
+    for (key, value) in c.env {
+        if key.is_empty() || key.contains(['=', '\0']) || value.is_some_and(|v| v.contains('\0')) { return Err(87); }
+    }
+    // entries stay UTF-16 so unpaired surrogates of the inherited block are passed on unchanged
+    let mut entries: Vec<Vec<u16>> = Vec::new();
     // SAFETY: OS supplies a double-NUL terminated environment block; freed after copying.
     unsafe {
         let p = GetEnvironmentStringsW(); if p.is_null() { return Err(error()); }
         let mut n = 0;
         while *p.add(n) != 0 {
             let start = n; while *p.add(n) != 0 { n += 1; }
-            entries.push(String::from_utf16_lossy(core::slice::from_raw_parts(p.add(start), n - start))); n += 1;
+            entries.push(core::slice::from_raw_parts(p.add(start), n - start).to_vec()); n += 1;
         }
         FreeEnvironmentStringsW(p);
     }
     for (key, value) in c.env {
-        entries.retain(|s| !s.split_once('=').is_some_and(|(k, _)| k.eq_ignore_ascii_case(key)));
-        if let Some(v) = value { entries.push(format!("{key}={v}")); }
+        let k: Vec<u32> = key.encode_utf16().map(fold).collect();
+        entries.retain(|s| {
+            let at = s.iter().position(|&u| u == b'=' as u16).unwrap_or(s.len());
+            !(at == k.len() && s[..at].iter().map(|&u| fold(u)).eq(k.iter().copied()))
+        });
+        if let Some(v) = value { entries.push(format!("{key}={v}").encode_utf16().collect()); }
     }
-    entries.sort_by_key(|s| s.to_lowercase());
-    let mut block = Vec::new(); for s in entries { block.extend(s.encode_utf16()); block.push(0); }
+    entries.sort_by_key(|s| s.iter().map(|&u| fold(u)).collect::<Vec<u32>>());
+    let mut block = Vec::new(); for s in entries { block.extend(s); block.push(0); }
     if block.is_empty() { block.push(0); } block.push(0); Ok(block)
 }
 /// Native child with captured output and a kill-on-close Windows job.
@@ -185,6 +211,7 @@ pub(super) fn spawn(c: &Command<'_>) -> Result<Child, u32> {
     Ok(Child { process, job, input: Some(iw), output: or, error: er })
 }
 fn read(h: &Handle, bytes: &mut [u8]) -> Result<Option<usize>, u32> {
+    if bytes.is_empty() { return Ok(None); } // no room: neither data nor EOF
     let mut available = 0; let mut n = 0;
     // SAFETY: PeekNamedPipe queries available bytes; ReadFile reads at most that many.
     unsafe {
@@ -222,7 +249,7 @@ impl Child {
     /// Terminate all processes in the owned job.
     pub fn terminate(&mut self) {
         // SAFETY: this job contains only this child and descendants.
-        unsafe { TerminateJobObject(self.job.0, 1); WaitForSingleObject(self.process.0, 5000); }
+        unsafe { TerminateJobObject(self.job.0, 1); WaitForSingleObject(self.process.0, 200); }
     }
 }
 impl Drop for Child { fn drop(&mut self) { self.terminate(); } }

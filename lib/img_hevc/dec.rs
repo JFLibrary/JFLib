@@ -28,7 +28,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use img_core::{ERR_HDR, ERR_TRUNC};
+use img_core::{ERR_HDR, ERR_LIMIT, ERR_NOMEM, ERR_TRUNC};
 
 // ---- flags (hevc_new)
 pub const HVF_NODEBLOCK: u32 = 1; // skip the deblocking filter (test hook)
@@ -452,6 +452,16 @@ pub(crate) fn zvec<T: Clone + Default>(n: usize) -> Vec<T> {
     vec![T::default(); n]
 }
 
+fn zvec_try<T: Clone + Default>(n: usize) -> Option<Vec<T>> {
+    let mut v = Vec::new();
+    v.try_reserve_exact(n).ok()?;
+    v.resize(n, T::default());
+    Some(v)
+}
+
+// luma samples a picture may have (level 6.2 allows about 35.6 million)
+const HV_MAXPIX: u64 = 1 << 26;
+
 impl<'a> Hevc<'a> {
     /// hevc_new: a fresh (zeroed) record
     pub fn new(flags: u32, maxctu: u32) -> Hevc<'a> {
@@ -541,6 +551,9 @@ impl<'a> Hevc<'a> {
     /// encoder uses the record for prediction / reconstruction)
     pub fn newpic(&mut self) -> i32 {
         self.picfree();
+        if self.s.w as u64 * self.s.h as u64 > HV_MAXPIX {
+            return ERR_LIMIT;
+        }
         let r = self.tiles();
         if r != 0 {
             return r;
@@ -554,7 +567,10 @@ impl<'a> Hevc<'a> {
             }
             self.pw[c] = w;
             self.ph[c] = h;
-            self.pl[c] = zvec(w as usize * h as usize);
+            self.pl[c] = match zvec_try(w as usize * h as usize) {
+                Some(v) => v,
+                None => return ERR_NOMEM,
+            };
         }
         self.mw = (self.s.w + 3) >> 2;
         self.mh = (self.s.h + 3) >> 2;
@@ -700,11 +716,13 @@ impl<'a> Hevc<'a> {
             }
         }
         let s = &self.s;
-        let x0 = s.confl.wrapping_mul(s.subw);
-        let y0 = s.conft.wrapping_mul(s.subh);
+        let x0 = s.confl.checked_mul(s.subw).ok_or(ERR_HDR)?;
+        let y0 = s.conft.checked_mul(s.subh).ok_or(ERR_HDR)?;
+        let cr = s.confr.checked_mul(s.subw).and_then(|v| v.checked_add(x0));
+        let cb = s.confb.checked_mul(s.subh).and_then(|v| v.checked_add(y0));
         Ok(Pic {
-            w: s.w.wrapping_sub(s.confr.wrapping_mul(s.subw).wrapping_add(x0)),
-            h: s.h.wrapping_sub(s.confb.wrapping_mul(s.subh).wrapping_add(y0)),
+            w: cr.and_then(|v| s.w.checked_sub(v)).ok_or(ERR_HDR)?,
+            h: cb.and_then(|v| s.h.checked_sub(v)).ok_or(ERR_HDR)?,
             x0,
             y0,
             bd: s.bdy,

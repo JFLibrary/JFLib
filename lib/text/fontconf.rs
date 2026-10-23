@@ -116,16 +116,17 @@ impl FontConf {
     }
 
     fn load_file(&mut self, path: &str, seen: &mut Vec<String>) -> bool {
-        if seen.len() >= FILES_MAX || seen.iter().any(|s| s == path) {
+        let norm = path_norm(path);
+        if seen.len() >= FILES_MAX || seen.iter().any(|s| *s == norm) {
             return false;
         }
-        seen.push(String::from(path));
+        seen.push(norm);
         let Some(data) = plat::read_file(path) else { return false };
         if data.len() > FILE_MAX {
             return false;
         }
         let text = String::from_utf8_lossy(&data);
-        let dir = path.rsplit_once('/').map_or("", |x| x.0);
+        let dir = path.rsplit_once(['/', '\\']).map_or("", |x| x.0);
         let root = parse_xml(&text);
         self.nfiles += 1;
         for e in &root.kids {
@@ -258,7 +259,8 @@ impl FontConf {
         let mut out: Vec<String> = Vec::new();
         for (k, layer) in [&self.files, &self.builtin].into_iter().enumerate() {
             // the first layer decides whether the name itself stays (assign removes it)
-            for f in expand(layer, family, &langs, 0) {
+            let mut memo = Memo { done: Vec::new(), steps: 0 };
+            for f in expand(layer, family, &langs, 0, &mut memo) {
                 if !out.iter().any(|o| same(o, &f)) && (k == 0 || !same(&f, family)) {
                     out.push(f);
                 }
@@ -277,7 +279,15 @@ impl FontConf {
 }
 
 // the list for one family in one layer (see the module header)
-fn expand(rules: &[Rule], family: &str, langs: &[String], depth: u32) -> Vec<String> {
+// expansions already done (name, depth) and the steps spent: a crafted config cannot blow up the recursion
+struct Memo {
+    done: Vec<(String, u32, Vec<String>)>,
+    steps: u32,
+}
+
+const STEPS_MAX: u32 = 2000;
+
+fn expand(rules: &[Rule], family: &str, langs: &[String], depth: u32, memo: &mut Memo) -> Vec<String> {
     let mut list: Vec<String> = alloc::vec![String::from(family)];
     let mut fpos = Some(0usize);
     for r in rules {
@@ -321,7 +331,19 @@ fn expand(rules: &[Rule], family: &str, langs: &[String], depth: u32) -> Vec<Str
     let mut out: Vec<String> = Vec::new();
     for f in list {
         let own = depth < DEPTH_MAX && !same(&f, family) && rules.iter().any(|r| r.family().is_some_and(|x| same(x, &f)));
-        let parts = if own { expand(rules, &f, langs, depth + 1) } else { alloc::vec![f] };
+        let parts = if own && memo.steps < STEPS_MAX {
+            let key = f.trim().to_ascii_lowercase();
+            if let Some(d) = memo.done.iter().find(|d| d.1 == depth + 1 && d.0 == key) {
+                d.2.clone()
+            } else {
+                memo.steps += 1;
+                let r = expand(rules, &f, langs, depth + 1, memo);
+                memo.done.push((key, depth + 1, r.clone()));
+                r
+            }
+        } else {
+            alloc::vec![f]
+        };
         for x in parts {
             if !out.iter().any(|o| same(o, &x)) {
                 out.push(x);
@@ -336,6 +358,21 @@ fn insert(list: &mut Vec<String>, at: usize, items: &[String]) {
     for (k, it) in items.iter().enumerate() {
         list.insert(at + k, it.clone());
     }
+}
+
+// a path with '\' as '/' and its "." / ".." segments resolved (include cycle detection)
+fn path_norm(p: &str) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    for s in p.split(['/', '\\']) {
+        match s {
+            "." => {}
+            ".." if parts.last().is_some_and(|l| !l.is_empty() && *l != "..") => {
+                parts.pop();
+            }
+            _ => parts.push(s),
+        }
+    }
+    parts.join("/")
 }
 
 // fontconfig's language form: lower case, '-' (ja_JP -> ja-jp)
