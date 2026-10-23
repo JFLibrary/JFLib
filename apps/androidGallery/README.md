@@ -59,7 +59,8 @@ python RustLib/build_rs.py app androidGallery --target android --android-abi x86
   Spezifische NEON-Kernel sind noch nicht umgesetzt.
 - Der bestehende Host-Adapter in `lib/plat/web*.rs` wird für Android nativ kompiliert:
   Ereignisse, Fenster-Komposition und der besitzende UI-Laufzeitkern sind derselbe Code.
-- `android/bridge.c` überträgt die BGRA-Pixel in ein Android-Bitmap. Die schmale Java-Hülle
+- `android/bridge.c` kopiert die geänderten Zeilen (schon R, G, B, A; bei einem einzelnen
+  Fenster ohne Popup direkt aus dessen Pixeln, ohne Komposition) in ein Android-Bitmap. Die schmale Java-Hülle
   kümmert sich um Lebenszyklus, Insets, Touch, Hardwaretastatur und IME-Eingabe.
   Widgets, Layout, Schriften und Rendering kommen vollständig aus der Rust-Library.
 - Die Java-Hülle zeichnet nur geänderte Bitmaps. JNI sperrt und kopiert ausschließlich
@@ -292,3 +293,17 @@ Fingerkontakt bis zur Ausgabe durch das Android-Display.
 Bei der Kontrolle des ruhenden Vordergrundprozesses sank die beobachtete CPU-Auslastung
 von etwa 68 % auf 0–1 %. In 32 Sekunden ohne Eingabe wurden keine neuen UI-Frames
 gezeichnet. Die sichtbare Eingabe wurde zusätzlich mit der Samsung-Tastatur geprüft.
+
+## Darstellung messen (seit 22.10.2026)
+
+```powershell
+adb -s DEVICE_SERIAL shell am instrument -w -r org.jflib.gallery/.GalleryPresentInstrumentation
+```
+
+Misst 30 ganze Bilder (`nativeRender` mit neuer Fläche: alles wird neu gezeigt, nichts neu
+gerechnet) und 30 Bilder mit Zeigerbewegungen, prüft, dass die Bitmap nach Teilbildern einer
+vollen Darstellung gleicht, und meldet einen Hash der Bitmap (gleich in jedem Build, der
+dieselben Pixel zeigt). x86_64-Emulator (Android 15, 1080 × 2400, Dichte 420, Bitmap
+823 × 1635): ein ganzes Bild 4,0–4,9 ms vorher, 0,8–1,5 ms mit RGBA-Fensterpixeln ohne
+Komposition, gleicher Hash. Eine native Auflösung (ohne die Skala ≤ 2/density) kostete beim
+Zeigen etwa 1,7 ms je ganzem Bild; die Grenze setzt jetzt das Rechnen der Bilder.

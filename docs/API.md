@@ -20063,7 +20063,9 @@ wait, presentation, cursors                                     [src/plat/win/wi
   win_size(w) -> (w, h)             win_dpi(w) -> 96 = 100 %
   win_set_min_size(w, w_dip, h_dip) (also before the window exists)
   win_present(w, frame, rects)      rects x, y, w, h; None = all.  The window keeps a copy
-                                    of the presented pixels: WM_PAINT repaints from it.
+                                    of the presented pixels (a DIB section the rectangles
+                                    are copied into and BitBlt from): WM_PAINT repaints from
+                                    it.
   win_set_cursor(w, shape)          CUR_* or a custom cursor CUR_USER0..CUR_TABLE-1
   cursor_create(px, w, h, hot_x, hot_y, dpi) -> CUR_USER0 + k / -1   a cursor from
                                     premultiplied ARGB pixels (rows of w * 4 bytes,
@@ -20115,7 +20117,8 @@ callbacks (refresh, hit hook) never hold a reference across a Win32 call.
 
 - **`fn win_present(w: i32, f: &Frame, rects: Option<&[[i32; 4]]>)`**
   show the frame's dirty rectangles (x, y, w, h; None = the whole frame); the window keeps a
-  copy of the pixels (WM_PAINT repaints from it)  [plat_win_present]
+  copy of the pixels (WM_PAINT repaints from it; jfgui_WINPRESENT=dibits: a plain buffer and
+  SetDIBitsToDevice instead of the DIB section)  [plat_win_present]
 
 - **`fn win_destroy(w: i32)`**
   close the window (w = 0: ends the message loop)  [plat_win_destroy]
@@ -20434,6 +20437,10 @@ and poke our own windows only (no input is injected into the system)
     WT_POST_CHARS a burst: a[0] WM_CHAR messages posted to window w, the characters a[1],
                   a[1] + 1, ... a[1] + a[2] - 1 by turns (as an input method commits a long
                   text) -> the number posted
+    WT_SCROLL     move the client rows a[0] .. a[0] + a[1] by a[2] rows inside the window
+                  (BitBlt from its DC to itself, GdiFlush; what a scroll could cost without
+                  sending the pixels again) -> microseconds taken
+  win_test_image(w) -> (w, h, px)   the client area as the window shows it (BitBlt from its DC)
   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms by a timer of the
                   UI thread: name None = Cancel, Some(name) = the name typed + OK
 ```
@@ -20453,10 +20460,16 @@ WT_ACTIVE: u32 = 11
 WT_CLIP_ACCESS: u32 = 12
 WT_POPUP_SEND: u32 = 13
 WT_POST_CHARS: u32 = 14
+WT_SCROLL: u32 = 15
 ```
 
 - **`fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64`**
   see the file header
+
+- **`fn win_test_image(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+  (test aid) what window w shows: its client area read back from the window's DC (BitBlt into
+  a DIB section; under DWM the window's own surface, also where other windows cover it) ->
+  (w, h, rows of w \* 4 bytes B, G, R, x)
 
 - **`fn file_dialog_autoclose(ms: u32, name: Option<&str>)`**
   (test aid) close the next file_dialog after ms: Cancel (name None) or name + OK
@@ -21078,6 +21091,8 @@ BK_X11: u32 = 2
 - **`fn win_set_min_size(w: i32, w_dip: i32, h_dip: i32)`**
 
 - **`fn win_present(w: i32, f: &Frame, rects: Option<&[[i32; 4]]>)`**
+  show the frame's dirty rectangles (x, y, w, h; None = all) in window w; pixels outside
+  them must be what the last present of w showed (linux_x11_present.rs, linux_wl_present.rs)
 
 - **`fn win_set_cursor(w: i32, shape: u32)`**
 
@@ -21215,6 +21230,10 @@ UI thread calls in; wake() from other threads goes through the eventfd of linux_
   a wl_display.sync round trip: the events that arrive before its answer are dispatched
   first (linuxtest --test burst: a burst of keys while it waits) -> 0 ok / -1 timeout
 
+- **`fn wl_test_presented(w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+  the pixels of window w's last committed buffer -- what the compositor shows -- as (w, h,
+  rows of w \* 4 bytes B, G, R, x); None while damage waits (linuxtest --test pcheck)
+
 - **`fn wl_test_protoerr()`**
   attach a buffer id that does not exist to the main window's surface: the compositor
   answers with wl_display.error, which ends the process (linuxtest --test protoerr)
@@ -21340,10 +21359,11 @@ bug and panics.  Files:
   linux_x11_screen.rs   the monitor list, global shortcuts (GrabKey), GetImage of the root,
                         the colour pick (pointer grab), RandR change events
 
-Deviation from the assembly (the Rust API hands the frame over only for the call):
-presented pixels are copied into a per-window shadow image (the damaged rectangles), and
-popups keep a copy of their pixels; repaints (Expose, after a map, the PutImage fallback)
-read these copies where the assembly re-read the caller's framebuffer.
+Deviation from the assembly (the Rust API hands the frame over only for the call): the
+MIT-SHM segments are whole frames brought up to date from the caller's frame (what each
+lacks, linux_x11_present.rs), so repaints (Expose, after a map) read the segment of the
+last put; the PutImage fallback keeps a shadow image of the frame, and popups keep a copy
+of their pixels -- where the assembly re-read the caller's framebuffer.
 ```
 
 - **`fn x11_connect() -> Option<Box<dyn Display>>`**
@@ -21955,6 +21975,10 @@ REQUEST_AUDIO: u32 = 14
 - **`extern "C" fn jfgui_start(width: i32, height: i32, dpi: i32, args_len: u32) -> i32`**
   Start once. Inbox contains newline-separated arguments, excluding the synthetic program name.
 
+- **`extern "C" fn jfgui_present_us() -> f64`**
+  Microseconds spent presenting so far (present_time: the windows' copies, the composition,
+  the hand-over to the host); for measurements.
+
 - **`extern "C" fn jfgui_tick(time_ms: u32)`**
   Advance the owned runtime and cooperative jobs, then submit the composed framebuffer.
 
@@ -22112,6 +22136,11 @@ Source: [`lib/plat/web_windows.rs`](../lib/plat/web_windows.rs)
 ```text
 Library windows and popups composited into one browser canvas. Every surface is drawn
 by the existing software renderer; the browser host receives pixels, not another UI.
+The windows keep their pixels as R, G, B, A rows (the order of the browser's ImageData and
+Android's Bitmap): the frames' B, G, R, x is swapped once, while copying the dirty
+rectangles in, and the host copies rows without touching pixels.  One window over the
+whole canvas without popups is the canvas itself (no composition); otherwise the windows
+and popups are composited into the canvas buffer.
 ```
 
 - **`fn win_create( title: &str, width: i32, height: i32, _flags: u32, _owner: i32, x: i32, y: i32, ) -> i32`**
@@ -22163,7 +22192,8 @@ by the existing software renderer; the browser host receives pixels, not another
   Minimum drag-resize dimensions in DIP.
 
 - **`fn win_present(id: i32, frame: &Frame<'_>, rects: Option<&[[i32; 4]]>)`**
-  Copy an existing software-renderer frame into its composited browser surface.
+  Copy the dirty rectangles of a software-renderer frame into the window's surface (R, G,
+  B, A); the next flush shows them.
 
 - **`fn win_set_cursor(_id: i32, shape: u32)`**
   Request one of the shared browser pointer shapes.
@@ -22829,9 +22859,16 @@ pwin0 -- the single-window platform API on top of the window-indexed win_* funct
   dpi() -> i32   set_title(utf8)   present(frame, rects)     window 0
   set_cursor(shape)  window_state() -> WST_*  window_cmd(cmd)  begin_move()
   begin_resize(edges)              the current window
+  present_time() -> (frames, us)   what showing frames cost so far (every window)
 
 The OS layers (win_api.rs; linux_disp.rs -> Wayland / X11) implement the win_* calls.
 ```
+
+- **`fn present_time() -> (u64, u64)`**
+  (frames handed to win_present, microseconds spent in the platform's present paths) since
+  the start, all windows together: win_present itself plus the work it defers (X11: a
+  segment that frees up, Wayland: the frame callback, the browser and Android: the
+  composition and the hand-over to the host).  For measurements (linuxtest --test pbench).
 
 - **`fn win_use(w: i32)`**
   the window the single-window per-window calls refer to (-1 = none)
@@ -22858,7 +22895,9 @@ The OS layers (win_api.rs; linux_disp.rs -> Wayland / X11) implement the win_* c
 - **`fn set_title(title: &str)`**
 
 - **`fn present(f: &Frame, rects: Option<&[[i32; 4]]>)`**
-  show dirty rectangles (None = everything) of the main window's framebuffer
+  show dirty rectangles (None = everything) of the main window's framebuffer; its pixels
+  outside them must be what the last present showed (the backends keep whole frames up to
+  date from it)
 
 - **`fn set_cursor(shape: u32)`**
   CUR_\* pointer shape of the current window

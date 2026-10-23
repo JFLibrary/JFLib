@@ -1162,6 +1162,59 @@ Fensterrand hinaus.
 
 - **P2** · *fehlt* · GPU-Rendering (D3D11 / Vulkan / OpenGL / WebGPU); heute rechnet alles
   die CPU.
+- **P2** · *erledigt* (2026-10-22) · GPU-Plan Stufe 0, Teil 3: weniger Kopien zwischen dem
+  fertigen Bild und dem Bildschirm ([GUIDE §12](GUIDE.md) „Presenting“). Die Änderungsrechtecke
+  gehen einmal aus dem Framebuffer zum Bildschirm; Pixel außerhalb müssen sein, was das letzte
+  Present zeigte (die Dirty-Rechtecke der UI decken jede Änderung).
+  - X11: die zwei MIT-SHM-Segmente sind ganze Bilder, die wissen, wo sie veraltet sind
+    (`lib/plat/linux_damage.rs`), und bekommen genau das aus dem Framebuffer – bevorzugt das
+    Segment des letzten Puts. Das Schattenbild entfällt (vorher Framebuffer → Schatten →
+    Segment); nur wenn beide Segmente belegt sind, wartet der Schaden in einem Zwischenbild.
+    Expose und das Neuzeichnen nach dem Mappen lesen das Segment des letzten Puts.
+    PutImage-Modus unverändert.
+  - Wayland: ein freier wl_shm-Puffer bekommt das Bild direkt (Pufferalter: der eigene Schaden
+    plus der seit seiner letzten Verwendung) und wartet auf seinen Commit (Frame-Callback);
+    die Kopie des Fensters entfällt, ein Zwischenbild nur, wenn alle drei Puffer belegt sind.
+    Nach dem Ausblenden kommt das letzte Bild aus dem zuletzt committeten Puffer.
+  - Windows: die Kopie für WM_PAINT ist eine DIB-Section (BitBlt statt SetDIBitsToDevice,
+    GdiFlush, WM_PAINT malt nur seinen Bereich; `jfgui_WINPRESENT=dibits` nimmt den alten
+    Weg). Die Kopie selbst bleibt: sie ist 35–70 % eines ganzen Bildes, entfällt aber erst,
+    wenn der Framebuffer selbst in einer Section liegt (rt-Allokator) und nie gezeichnet wird,
+    während Nachrichten laufen. Für Scrollen gemessen (`WT_SCROLL`): die halbe Fensterfläche
+    per BitBlt im Fenster zu verschieben kostet 60–70 µs statt ~830 µs für neues Zeigen
+    (1920 × 530 px), 0,3 statt 1,5 ms bei 3840 × 530.
+  - Browser und Android: die Fensterpixel liegen als R, G, B, A vor (getauscht beim Kopieren in
+    Rust statt pro Rechteck in JS bzw. C), ein einzelnes Fenster ohne Popup ist die Leinwand
+    selbst (keine Komposition), der Worker packt die Rechtecke eines Bildes in einen Puffer aus
+    einem Pool, Android kopiert Zeilen ins Bitmap (`memcpy`).
+  - Gemessen (`plat::present_time`; `linuxtest --test pbench`, `tools/tests/web_present.mjs`,
+    `GalleryPresentInstrumentation`), Mediane pro Bild, vorher → nachher: X11 (WSLg) 1920 × 1080
+    Viertel 0,54 → 0,27 ms, 40 Rechtecke 1,14 → 0,13 ms, zwei Kästchen 48 → 44 µs; 3840 × 2160
+    Viertel 2,05 → 0,93 ms, 40 Rechtecke 5,7 → 0,27 ms. Ganze Bilder (`None`) kopierte der alte
+    X11-Weg bei gleicher Größe gar nicht ins Schattenbild (ein Fehler: ein volles Neuzeichnen –
+    Themenwechsel, Fenster wieder gezeigt – erschien nur, wo spätere Teilbilder kopierten); jetzt
+    kommen sie an (1920 × 1080 0,94 ms; 3840 × 2160 13 ms, wenn der Server nicht nachkommt und
+    jedes Bild über das Zwischenbild geht). Wayland (WSLg) 1920 × 1080 ganz 1,77 → 0,98 ms,
+    Viertel 0,96 → 0,30 ms, 40 Rechtecke 2,62 → 0,18 ms; 3840 × 2160 ganz 12,9 → 5,3 ms, Viertel
+    2,56 → 1,0 ms, 40 Rechtecke 8,2 → 0,26 ms. Browser-Worker (gallery) ganz 10,0 → 4,6 ms
+    (1920 × 1080) und 51 → 17 ms (3840 × 2160), Hover 91 → 43 µs, offenes Menü (komponiert)
+    130 → 100 µs. Android-Emulator (Bitmap 823 × 1635) ganzes Bild 4,0–4,9 → 0,8–1,5 ms.
+    Windows (hier höchstens 3840 × 1061: zwei 1080p-Monitore) unverändert: ganz 1,76 / 3,8 ms,
+    40 Rechtecke 0,80 → 0,68 ms; davon ist das Kopieren in die WM_PAINT-Kopie 0,63 ms bzw.
+    1,8–2,7 ms.
+  - Geprüft: `linuxtest --test pcheck` (Fensterinhalt zurückgelesen: Windows-DC, GetImage,
+    der committete wl_shm-Puffer; Teilbilder, Bilder ohne Pause, viele Rechtecke, ein ganzes Bild
+    bei gleicher Größe, Aus-/Einblenden, minimiert, WM_PAINT, neue Größe) auf Windows, X11 (fd,
+    SysV, PutImage) und Wayland; Browser: Leinwand gleich Framebuffer in Chromium und Firefox
+    (100/200 %), dieselben Pixel wie vorher, Teilbilder gleich Vollkomposition; Android:
+    dieselbe Bitmap wie vorher, `GalleryInstrumentation` (78), `GalleryA11yInstrumentation`
+    (31), `android_files.py`.
+  - Es fehlen: der Framebuffer in einer Section (Windows ohne Kopie), Scrollen per BitBlt /
+    ScrollDC im Fenster und in der Kopie, DwmFlush-Taktung (nicht eingebaut: kein messbares
+    Reißen, würde den UI-Thread pro Bild bis zu einem Refresh blockieren), `ImageBitmap` /
+    `OffscreenCanvas` im Browser; Androids Renderskala (≤ 2/density, ≤ 2048 px) ließe sich
+    vom Present her lockern (ein ganzes Bild in nativer Auflösung ~1,7 ms), begrenzt ist
+    jetzt das Rechnen des Bildes.
 
 ## 9. Plattformen
 

@@ -36,7 +36,7 @@ function instruments(){
   const WorkerBase=window.Worker;
   window.Worker=class extends WorkerBase{
     constructor(...args){super(...args);this.addEventListener('message',({data:m})=>{
-      if(m.type==='frame'){stats.frames++;stats.bytes+=(m.patches||[{pixels:m.pixels}]).reduce((n,p)=>n+p.pixels.byteLength,0);}
+      if(m.type==='frame'){stats.frames++;stats.bytes+=m.buffer?m.patches.reduce((n,p)=>n+p.width*p.height*4,0):(m.patches||[{pixels:m.pixels}]).reduce((n,p)=>n+p.pixels.byteLength,0);}
       if(m.type==='batch-complete')stats.flight--;
     });}
     postMessage(message,...rest){

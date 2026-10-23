@@ -64,7 +64,8 @@ unsafe extern "C" {
     fn host_time_us() -> f64;
     #[cfg_attr(target_arch = "wasm32", link_name = "present")]
     #[cfg_attr(target_os = "android", link_name = "jfgui_host_present")]
-    fn host_present(ptr: *const u8, len: usize, width: i32, height: i32, stride: i32, rects: *const [i32; 4], count: usize);
+    fn host_present(ptr: *const u8, len: usize, width: i32, height: i32, stride: i32, rects: *const [i32; 4], count: usize,
+                    order: u32);
     #[cfg_attr(target_arch = "wasm32", link_name = "request")]
     #[cfg_attr(target_os = "android", link_name = "jfgui_host_request")]
     fn host_request(kind: u32, id: u32, ptr: *const u8, len: usize);
@@ -214,12 +215,15 @@ pub(crate) fn notice(kind: u32, data: &[u8]) {
         host_request(kind, 0, data.as_ptr(), data.len());
     }
 }
+/// hand R, G, B, A rows (stride bytes each) and the rectangles to show of them to the host
+/// (order 1: RGBA; hosts take a missing order as the former B, G, R, x)
 pub(super) fn present_bytes(data: &[u8], width: i32, height: i32, stride: i32, rects: &[[i32; 4]]) {
     // SAFETY: the host copies both valid slices before returning; no retained linear-memory views.
     unsafe {
-        host_present(data.as_ptr(), data.len(), width, height, stride, rects.as_ptr(), rects.len());
+        host_present(data.as_ptr(), data.len(), width, height, stride, rects.as_ptr(), rects.len(), PRESENT_RGBA);
     }
 }
+const PRESENT_RGBA: u32 = 1;
 pub(crate) fn request(kind: u32, bytes: &[u8], file: Option<(String, u64)>) -> Option<u32> {
     let id = {
         let mut pending = REQUESTS.lock();
@@ -795,6 +799,12 @@ pub extern "C" fn jfgui_start(width: i32, height: i32, dpi: i32, args_len: u32) 
     rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest
     // SAFETY: app entry is linked into this module, invoked only once on its worker.
     unsafe { jfgui_main() }
+}
+/// Microseconds spent presenting so far (present_time: the windows' copies, the composition,
+/// the hand-over to the host); for measurements.
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_present_us() -> f64 {
+    crate::present_time().1 as f64
 }
 /// Advance the owned runtime and cooperative jobs, then submit the composed framebuffer.
 #[unsafe(no_mangle)]

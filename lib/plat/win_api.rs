@@ -20,7 +20,9 @@
 //   win_size(w) -> (w, h)             win_dpi(w) -> 96 = 100 %
 //   win_set_min_size(w, w_dip, h_dip) (also before the window exists)
 //   win_present(w, frame, rects)      rects x, y, w, h; None = all.  The window keeps a copy
-//                                     of the presented pixels: WM_PAINT repaints from it.
+//                                     of the presented pixels (a DIB section the rectangles
+//                                     are copied into and BitBlt from): WM_PAINT repaints from
+//                                     it.
 //   win_set_cursor(w, shape)          CUR_* or a custom cursor CUR_USER0..CUR_TABLE-1
 //   cursor_create(px, w, h, hot_x, hot_y, dpi) -> CUR_USER0 + k / -1   a cursor from
 //                                     premultiplied ARGB pixels (rows of w * 4 bytes,
@@ -265,6 +267,11 @@ unsafe extern "system" {
                         off: u32) -> isize;
     fn CreateBitmap(w: i32, h: i32, planes: u32, bpp: u32, bits: *const u8) -> isize;
     fn DeleteObject(h: isize) -> i32;
+    fn CreateCompatibleDC(dc: isize) -> isize;
+    fn DeleteDC(dc: isize) -> i32;
+    fn SelectObject(dc: isize, obj: isize) -> isize;
+    fn BitBlt(dst: isize, x: i32, y: i32, w: i32, h: i32, src: isize, xs: i32, ys: i32, rop: u32) -> i32;
+    fn GdiFlush() -> i32;
 }
 
 #[link(name = "kernel32", kind = "raw-dylib")]
@@ -289,6 +296,7 @@ const WM_SIZE: u32 = 0x0005;
 const WM_SETFOCUS: u32 = 0x0007;
 const WM_KILLFOCUS: u32 = 0x0008;
 const WM_PAINT: u32 = 0x000F;
+const SRCCOPY: u32 = 0x00CC_0020;
 const WM_CLOSE: u32 = 0x0010;
 const WM_QUIT: u32 = 0x0012;
 const WM_ERASEBKGND: u32 = 0x0014;
@@ -469,9 +477,13 @@ struct Ww {
     selfp: Cell<u32>,     // SELF_*
     req: Cell<[i32; 4]>, // what our SetWindowPos asked for (x, y, w, h)
     movepend: Cell<bool>, // moved inside the modal move loop: reported at its end
-    psf: Cell<bool>,      // kept holds the pixels of the last present
-    kept: Cell<Vec<u8>>,  // copy of those pixels (WM_PAINT repaints from it)
-    kdim: Cell<(i32, i32, i32)>, // its width, height, stride
+    psf: Cell<bool>,         // the kept copy holds the pixels of the last present
+    kdc: Cell<isize>,        // memory DC with the copy's DIB section (0: kbuf instead)
+    kbmp: Cell<isize>,       // the DIB section: top-down, 32 bit, rows of width * 4 bytes
+    kold: Cell<isize>,       // the DC's bitmap before
+    kbits: Cell<usize>,      // the section's pixels
+    kbuf: Cell<Vec<u8>>,     // the copy when no section can be made (SetDIBitsToDevice)
+    kdim: Cell<(i32, i32)>,  // its width, height
 }
 
 impl Ww {
@@ -497,8 +509,12 @@ impl Ww {
             req: Cell::new([0; 4]),
             movepend: Cell::new(false),
             psf: Cell::new(false),
-            kept: Cell::new(Vec::new()),
-            kdim: Cell::new((0, 0, 0)),
+            kdc: Cell::new(0),
+            kbmp: Cell::new(0),
+            kold: Cell::new(0),
+            kbits: Cell::new(0),
+            kbuf: Cell::new(Vec::new()),
+            kdim: Cell::new((0, 0)),
         }
     }
 
@@ -523,9 +539,7 @@ impl Ww {
         self.selfp.set(SELF_NONE);
         self.req.set([0; 4]);
         self.movepend.set(false);
-        self.psf.set(false);
-        drop(self.kept.take());
-        self.kdim.set((0, 0, 0));
+        self.kept_free();
     }
 }
 
@@ -1299,7 +1313,8 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             let mut ps: PaintStruct = unsafe { core::mem::zeroed() };
             let dc = unsafe { BeginPaint(hwnd, &mut ps) };
             if r.psf.get() {
-                present_kept(r, dc, None);
+                let q = ps.rc;
+                r.kept_show(dc, &[q.l, q.t, q.r - q.l, q.b - q.t]);
             }
             unsafe { EndPaint(hwnd, &ps) };
             win_push(E_PAINT, 0, 0, 0, 0);
@@ -1663,52 +1678,44 @@ fn frame_ok(f: &Frame) -> bool {
 }
 
 /// show the frame's dirty rectangles (x, y, w, h; None = the whole frame); the window keeps a
-/// copy of the pixels (WM_PAINT repaints from it)  [plat_win_present]
+/// copy of the pixels (WM_PAINT repaints from it; jfgui_WINPRESENT=dibits: a plain buffer and
+/// SetDIBitsToDevice instead of the DIB section)  [plat_win_present]
 pub fn win_present(w: i32, f: &Frame, rects: Option<&[[i32; 4]]>) {
+    let t0 = crate::time_us();
+    present_to(w, f, rects);
+    crate::present_account(t0, true);
+}
+
+fn present_to(w: i32, f: &Frame, rects: Option<&[[i32; 4]]>) {
     let Some(r) = rec(w) else { return };
     if !frame_ok(f) {
         return;
     }
-    // the copy: everything when the size changed, else the rectangles
-    let mut k = r.kept.take();
-    let dim = (f.w, f.h, f.stride);
-    let n = (f.stride * f.h) as usize;
-    match rects {
-        Some(rs) if r.psf.get() && r.kdim.get() == dim && k.len() == n => {
-            for q in rs {
-                if let Some((x, y, cw, ch)) = clip_rect(q, f.w, f.h) {
-                    let (x0, x1) = (x as usize * 4, (x + cw) as usize * 4);
-                    for row in y..y + ch {
-                        let o = row as usize * f.stride as usize;
-                        k[o + x0..o + x1].copy_from_slice(&f.px[o + x0..o + x1]);
-                    }
-                }
-            }
-        }
-        _ => {
-            k.clear();
-            k.extend_from_slice(&f.px[..n]);
-        }
+    // into the copy and onto the screen: everything when the size changed, else the rectangles
+    let all = [[0, 0, f.w, f.h]];
+    let fresh = !r.psf.get() || r.kdim.get() != (f.w, f.h);
+    if fresh && !r.kept_alloc(f.w, f.h) {
+        return;
     }
-    r.kept.set(k);
-    r.kdim.set(dim);
+    let rs = match rects {
+        Some(rs) if !fresh => rs,
+        _ => &all[..],
+    };
+    r.kept_copy(f, rs);
     r.psf.set(true);
     if r.min.get() {
         return;
     }
     let hwnd = r.hwnd.get();
-    // SAFETY: a DC of our window, released again.
-    let dc = unsafe { GetDC(hwnd) };
-    match rects {
-        None => present_kept(r, dc, None),
-        Some(rs) => {
-            for q in rs {
-                present_kept(r, dc, Some(*q));
-            }
+    // SAFETY: a DC of our window, released again; GdiFlush hands the batched BitBlts over now.
+    unsafe {
+        let dc = GetDC(hwnd);
+        for q in rs {
+            r.kept_show(dc, q);
         }
+        GdiFlush();
+        ReleaseDC(hwnd, dc);
     }
-    // SAFETY: the DC from above.
-    unsafe { ReleaseDC(hwnd, dc) };
 }
 
 /// a rectangle clipped to w x h -> (x, y, w, h) with w, h > 0
@@ -1727,29 +1734,131 @@ fn clip_rect(q: &[i32; 4], fw: i32, fh: i32) -> Option<(i32, i32, i32, i32)> {
     if w <= 0 || h <= 0 { None } else { Some((x, y, w, h)) }
 }
 
-/// one SetDIBitsToDevice call from the kept copy (rect None = all, clipped)  [present_rect]
-fn present_kept(r: &Ww, dc: isize, rect: Option<[i32; 4]>) {
-    let (fw, fh, stride) = r.kdim.get();
-    let k = r.kept.take();
-    let q = rect.unwrap_or([0, 0, fw, fh]);
-    if let Some((x, y, w, h)) = clip_rect(&q, fw, fh)
-        && k.len() >= (stride * fh) as usize
-    {
-        let bmi = BitmapInfoHeader {
-            size: 40,
-            w: stride / 4, // biWidth = stride in pixels
-            h: -h,         // top-down, h rows
-            planes: 1,
-            bits: 32,
-            ..Default::default()
-        };
-        // SAFETY: rows y .. y + h of the copy (stride bytes each) lie inside it (checked).
-        unsafe {
-            let bits = k.as_ptr().add(y as usize * stride as usize);
-            SetDIBitsToDevice(dc, x, y, w as u32, h as u32, x, 0, 0, h as u32, bits, &bmi, 0);
+impl Ww {
+    /// a kept copy of w x h pixels (the old one goes when the size changed) -> it exists.  A
+    /// DIB section in a memory DC: the presents copy the dirty rectangles into it and BitBlt
+    /// them out, which GDI batches and reads without a copy of its own (SetDIBitsToDevice
+    /// takes the caller's memory per call); a plain buffer for SetDIBitsToDevice when no
+    /// section can be made (or with jfgui_WINPRESENT=dibits)
+    fn kept_alloc(&self, w: i32, h: i32) -> bool {
+        if self.kdim.get() == (w, h) && (self.kdc.get() != 0 || !self.kbuf_empty()) {
+            return true;
         }
+        self.kept_free();
+        let bytes = w as usize * h as usize * 4;
+        let dib = crate::env("jfgui_WINPRESENT").as_deref() != Some("dibits");
+        let bmi = BitmapInfoHeader { size: 40, w, h: -h, planes: 1, bits: 32, ..Default::default() };
+        let mut bits: *mut u8 = core::ptr::null_mut();
+        // SAFETY: a memory DC compatible with the screen and a DIB section of w x h 32-bit
+        // pixels (a valid BITMAPINFOHEADER, BI_RGB); on failure nothing is left behind.
+        unsafe {
+            let dc = if dib { CreateCompatibleDC(0) } else { 0 };
+            let bmp = if dc != 0 { CreateDIBSection(dc, &bmi, 0, &mut bits, 0, 0) } else { 0 };
+            if bmp != 0 && !bits.is_null() {
+                self.kold.set(SelectObject(dc, bmp));
+                self.kdc.set(dc);
+                self.kbmp.set(bmp);
+                self.kbits.set(bits as usize);
+                self.kdim.set((w, h));
+                return true;
+            }
+            if bmp != 0 {
+                DeleteObject(bmp);
+            }
+            if dc != 0 {
+                DeleteDC(dc);
+            }
+        }
+        let mut b = Vec::new();
+        if b.try_reserve_exact(bytes).is_err() {
+            return false;
+        }
+        b.resize(bytes, 0);
+        self.kbuf.set(b);
+        self.kdim.set((w, h));
+        true
     }
-    r.kept.set(k);
+
+    fn kbuf_empty(&self) -> bool {
+        let b = self.kbuf.take();
+        let e = b.is_empty();
+        self.kbuf.set(b);
+        e
+    }
+
+    /// drop the kept copy
+    fn kept_free(&self) {
+        self.psf.set(false);
+        let dc = self.kdc.replace(0);
+        if dc != 0 {
+            // SAFETY: our memory DC and its section, made by kept_alloc.
+            unsafe {
+                SelectObject(dc, self.kold.get());
+                DeleteObject(self.kbmp.get());
+                DeleteDC(dc);
+            }
+        }
+        self.kbmp.set(0);
+        self.kold.set(0);
+        self.kbits.set(0);
+        drop(self.kbuf.take());
+        self.kdim.set((0, 0));
+    }
+
+    /// copy the frame's rectangles (clipped) into the kept copy of the frame's size
+    fn kept_copy(&self, f: &Frame, rs: &[[i32; 4]]) {
+        let (kw, kh) = self.kdim.get();
+        let row = kw as usize * 4;
+        let mut buf = self.kbuf.take();
+        let dst: &mut [u8] = if self.kdc.get() != 0 {
+            // SAFETY: the section holds kw * kh 32-bit pixels until kept_free; only this thread
+            // touches it, and no GDI call runs while this slice lives.
+            unsafe { core::slice::from_raw_parts_mut(self.kbits.get() as *mut u8, row * kh as usize) }
+        } else {
+            &mut buf[..]
+        };
+        if dst.len() >= row * kh as usize {
+            for q in rs {
+                let Some((x, y, w, h)) = clip_rect(q, kw.min(f.w), kh.min(f.h)) else { continue };
+                let (x0, n) = (x as usize * 4, w as usize * 4);
+                for yy in y as usize..(y + h) as usize {
+                    let s = yy * f.stride as usize + x0;
+                    let d = yy * row + x0;
+                    dst[d..d + n].copy_from_slice(&f.px[s..s + n]);
+                }
+            }
+        }
+        self.kbuf.set(buf);
+    }
+
+    /// show a rectangle of the kept copy (clipped) in the window's DC  [present_rect]
+    fn kept_show(&self, dc: isize, q: &[i32; 4]) {
+        let (kw, kh) = self.kdim.get();
+        let Some((x, y, w, h)) = clip_rect(q, kw, kh) else { return };
+        let mdc = self.kdc.get();
+        if mdc != 0 {
+            // SAFETY: our memory DC with the section; the rectangle lies inside it.
+            unsafe { BitBlt(dc, x, y, w, h, mdc, x, y, SRCCOPY) };
+            return;
+        }
+        let k = self.kbuf.take();
+        if k.len() >= kw as usize * kh as usize * 4 {
+            let bmi = BitmapInfoHeader {
+                size: 40,
+                w: kw,  // biWidth = the row in pixels
+                h: -h,  // top-down, h rows
+                planes: 1,
+                bits: 32,
+                ..Default::default()
+            };
+            // SAFETY: rows y .. y + h of the copy (kw * 4 bytes each) lie inside it (checked).
+            unsafe {
+                let bits = k.as_ptr().add(y as usize * kw as usize * 4);
+                SetDIBitsToDevice(dc, x, y, w as u32, h as u32, x, 0, 0, h as u32, bits, &bmi, 0);
+            }
+        }
+        self.kbuf.set(k);
+    }
 }
 
 // ---------------------------------------------------------------- window operations

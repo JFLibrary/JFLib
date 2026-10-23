@@ -303,9 +303,13 @@ worker.onmessage=({data:m})=>{
     // Assigning even an unchanged dimension clears the backing store and context.
     if(canvas.width!==m.width) canvas.width=m.width;
     if(canvas.height!==m.height) canvas.height=m.height;
+    // the patches lie in one buffer (m.buffer, at their offsets), which goes back to the pool
     const patches=m.patches || [{x:0,y:0,width:m.width,height:m.height,pixels:m.pixels}];
-    for(const p of patches) ctx.putImageData(new ImageData(new Uint8ClampedArray(p.pixels),p.width,p.height),p.x,p.y);
-    const buffers=patches.map(p=>p.pixels);
+    for(const p of patches) {
+      const data=m.buffer ? new Uint8ClampedArray(m.buffer,p.offset,p.width*p.height*4) : new Uint8ClampedArray(p.pixels);
+      ctx.putImageData(new ImageData(data,p.width,p.height),p.x,p.y);
+    }
+    const buffers=m.buffer ? [m.buffer] : patches.map(p=>p.pixels);
     worker.postMessage({type:"recycle",buffers},buffers);
   }
   else if(m.type==="batch-complete") {inFlight=false;schedule();}

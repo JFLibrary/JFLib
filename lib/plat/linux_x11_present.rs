@@ -2,14 +2,20 @@
 //                                                              [src/plat/linux/x11_present.s]
 //
 //   win_present(w, frame, rects)     rects = x, y, w, h; None = all.  The frame is FMT_XRGB
-//        (== ZPixmap depth 24 / 32 bpp LSBFirst, no swizzle).  Its damaged rectangles are
-//        copied into the window's shadow image; with MIT-SHM they go into one of the
-//        window's two shared segments and are shown with ShmPutImage; the segment is busy
-//        until the ShmCompletion of its last put (then the other one is used; with both busy
-//        the damage waits, 1 s safety).  Without MIT-SHM (remote, refused attach, any MIT-SHM
-//        error) the rectangles go out as PutImage strips that fit the maximum request length.
+//        (== ZPixmap depth 24 / 32 bpp LSBFirst, no swizzle).  With MIT-SHM the window has two
+//        shared segments, each a whole frame; a segment remembers where it differs from the
+//        latest frame (the damage of the frames put from the other one since) and gets exactly
+//        that from the caller's frame -- one copy per frame, preferably into the segment of the
+//        last put (it only lacks this frame's damage).  The damaged rectangles go out with
+//        ShmPutImage; a segment is busy until the ShmCompletion of its last put.  With both
+//        busy the frame's damage is copied into the staging image and put later (from there
+//        and from the segment of the last put; 1 s safety).  Without MIT-SHM (remote, refused
+//        attach, any MIT-SHM error) the window keeps a shadow image of the whole frame and the
+//        rectangles go out as PutImage strips that fit the maximum request length.  Pixels
+//        outside the rectangles must be what the last present of the window showed.
 //   present_service(now) -> next deadline (u64::MAX none)    (wait)
-//   expose(ev)                       Expose: repaint from the shadow image
+//   expose(ev)                       Expose: repaint (from the segment of the last put, or the
+//                                    shadow image)
 //   present_mapped(i)                MapNotify: the whole window is shown again 250 ms and
 //                                    1 s later (WSLg: the first frames of a new RAIL window
 //                                    are sometimes lost, the window stays black until the
@@ -31,6 +37,7 @@ use rt::os::{syscall3, syscall6};
 
 use super::wire::sys_close;
 use super::*;
+use crate::linux_damage::{clip_box, copy_boxes};
 
 const REPAINT_FIRST: u64 = 250000; // us after MapNotify
 const REPAINT_AGAIN: u64 = 750000; // us after the first one
@@ -67,7 +74,7 @@ impl Xp {
         }
     }
 
-    /// pr_add_clip(x0, y0, x1, y1): clip to the shadow image, then add
+    /// pr_add_clip(x0, y0, x1, y1): clip to the frame, then add
     fn add_clip(&mut self, x0: i32, y0: i32, x1: i32, y1: i32) {
         let (x0, y0, x1, y1) = (x0.max(0), y0.max(0), x1.min(self.sw), y1.min(self.shh));
         if x0 < x1 && y0 < y1 {
@@ -91,47 +98,71 @@ impl Xp {
         self.bx[0] = 0;
         self.bx[2] = 0;
     }
+
+    /// segment k holds the frame of the window's size
+    fn seg_valid(&self, k: usize) -> bool {
+        k < 2 && self.slots[k].seg != 0 && self.slots[k].cw == self.sw && self.slots[k].ch == self.shh
+    }
 }
 
 impl X11 {
     /// x11_plat_win_present(w, frame, rects)
     pub(super) fn win_present(&mut self, w: i32, f: &Frame, rects: Option<&[[i32; 4]]>) {
         let Some(i) = self.rec(w) else { return };
+        if self.mode == 0 {
+            self.shm_decide();
+        }
+        let shm = self.mode > 0;
         let xp = &mut self.xp[i];
         let (fw, fh) = (f.w.max(0), f.h.max(0));
-        let row = fw as usize * 4;
-        // the shadow image: everything when the size changed, else the damaged rectangles
+        let (row, ss) = (fw as usize * 4, f.stride.max(0) as usize);
+        // a new size: everything (the segments, the staging image and the pending boxes are
+        // of the old one)
         let full = !xp.sfok || xp.sw != fw || xp.shh != fh;
         if full {
-            xp.sh = vec![0u8; row * fh as usize];
             xp.sw = fw;
             xp.shh = fh;
-            for y in 0..fh as usize {
-                let s = y * f.stride as usize;
-                xp.sh[y * row..y * row + row].copy_from_slice(&f.px[s..s + row]);
-            }
+            xp.drop_pending();
+            xp.stg.clear();
+            xp.newest = 2;
+            xp.sh = if shm { Vec::new() } else { vec![0u8; row * fh as usize] };
         }
         xp.sfok = true;
-        match rects {
-            None => xp.add(0, 0, fw, fh),
-            Some(list) => {
-                for r in list {
-                    let (x0, y0) = (r[0].max(0), r[1].max(0));
-                    let (x1, y1) = (r[0].wrapping_add(r[2]).min(fw), r[1].wrapping_add(r[3]).min(fh));
-                    if !full && x0 < x1 && y0 < y1 {
-                        let n = (x1 - x0) as usize * 4;
-                        for y in y0 as usize..y1 as usize {
-                            let s = y * f.stride as usize + x0 as usize * 4;
-                            let d = y * row + x0 as usize * 4;
-                            xp.sh[d..d + n].copy_from_slice(&f.px[s..s + n]);
-                        }
-                    }
-                    xp.add_clip(r[0], r[1], r[0].wrapping_add(r[2]), r[1].wrapping_add(r[3]));
+        let all = [[0, 0, fw, fh]];
+        let rs = match rects {
+            Some(r) if !full => r,
+            _ => &all[..],
+        };
+        for r in rs {
+            if let Some(b) = clip_box(r, fw, fh) {
+                xp.add(b[0], b[1], b[2], b[3]);
+                xp.st[0].add(b); // both segments now differ there
+                xp.st[1].add(b);
+                if !shm {
+                    // PutImage: the shadow image follows the frame
+                    copy_boxes(&mut xp.sh, row, f.px, ss, &[b], fw, fh);
                 }
             }
         }
         let now = crate::time_us();
-        self.present_try(i, now);
+        if self.present_try(i, now, Some(f)) || self.mode <= 0 {
+            return;
+        }
+        // both segments busy: the damage waits in the staging image
+        let xp = &mut self.xp[i];
+        if xp.sh.len() != row * fh as usize {
+            xp.sh = vec![0u8; row * fh as usize];
+        }
+        for r in rs {
+            if let Some(b) = clip_box(r, fw, fh) {
+                copy_boxes(&mut xp.sh, row, f.px, ss, &[b], fw, fh);
+                xp.stg.add(b);
+            }
+        }
+        if xp.stg.over() {
+            let b = xp.stg.bbox(); // all of the bounding box: the region is only that now
+            copy_boxes(&mut xp.sh, row, f.px, ss, &[b], fw, fh);
+        }
     }
 
     /// x11_present_mapped(i): the window was mapped -- repaint all of it again later
@@ -164,7 +195,9 @@ impl X11 {
                 }
             }
             if self.xp[i].pend {
-                self.present_try(i, now);
+                let t0 = crate::time_us();
+                self.present_try(i, now, None);
+                crate::present_account(t0, false);
                 if self.xp[i].pend {
                     // waiting for a segment: wake up at the safety deadline of the older one
                     for s in self.xp[i].slots {
@@ -219,7 +252,9 @@ impl X11 {
         if self.debug {
             eprint(&format!("x11: MIT-SHM request {minor} failed (error {code}): using PutImage\n"));
         }
-        for xp in self.xp.iter_mut() {
+        for i in 0..PW_MAX {
+            self.shadow_full(i, None);
+            let xp = &mut self.xp[i];
             xp.slots[0].busy = false;
             xp.slots[1].busy = false;
             if xp.sfok {
@@ -236,67 +271,74 @@ impl X11 {
         self.slot_free(i, 1);
         let xp = &mut self.xp[i];
         xp.sh = Vec::new();
+        xp.stg.clear();
         xp.sw = 0;
         xp.shh = 0;
         xp.sfok = false;
         xp.drop_pending();
         xp.slots = [SEG0; 2];
+        xp.st[0].clear();
+        xp.st[1].clear();
+        xp.newest = 2;
         xp.rpt = 0;
         xp.rptn = 0;
     }
 
     // ------------------------------------------------------------------ presenting
 
-    /// present_try(i, now): show the pending damage of window i (unless both segments are busy)
-    fn present_try(&mut self, i: usize, now: u64) {
-        let Some(_) = self.rec(i as i32) else { return };
+    /// present_try(i, now, frame) -> the pending damage of window i was shown (not: both
+    /// segments are busy).  With the frame (win_present) the segment gets its stale boxes from
+    /// it, else (later: Expose, a ShmCompletion) from the segment of the last put and the
+    /// staging image.
+    fn present_try(&mut self, i: usize, now: u64, f: Option<&Frame>) -> bool {
+        let Some(_) = self.rec(i as i32) else { return true };
         let xid = self.xw[i].win;
         if !self.xp[i].pend {
-            return;
+            return true;
         }
         let (w, h) = (self.xp[i].sw, self.xp[i].shh);
         if !self.xp[i].sfok || w <= 0 || h <= 0 || w > 32767 || h > 32767 {
             self.xp[i].drop_pending();
-            return;
+            return true;
         }
         if self.mode == 0 {
             self.shm_decide();
         }
         let mut put = self.mode <= 0;
         if !put {
-            // a free segment (or one whose completion is overdue)
-            let mut k = None;
-            for s in 0..2 {
-                let sl = self.xp[i].slots[s];
-                if !sl.busy {
-                    k = Some(s);
-                    break;
-                }
-                if sl.t0 + SHM_SAFETY < now {
-                    if self.debug {
-                        eprint(&format!("x11: no ShmCompletion for segment {:x} within 1 s\n", sl.seg));
-                    }
-                    k = Some(s);
-                    break;
+            // a free segment, the one of the last put first (it lacks the least), else one
+            // whose completion is overdue
+            let xp = &self.xp[i];
+            let free = |k: usize| k < 2 && !xp.slots[k].busy;
+            let mut k = [xp.newest, 0, 1].into_iter().find(|&k| free(k));
+            if k.is_none() {
+                k = (0..2).find(|&s| xp.slots[s].t0 + SHM_SAFETY < now);
+                if let Some(s) = k
+                    && self.debug
+                {
+                    eprint(&format!("x11: no ShmCompletion for segment {:x} within 1 s\n", xp.slots[s].seg));
                 }
             }
-            let Some(k) = k else { return }; // retried on ShmCompletion
+            let Some(k) = k else { return false }; // retried on ShmCompletion
             let need = w as usize * h as usize * 4;
             if need > self.xp[i].slots[k].cap && !self.slot_alloc(i, k, need, i != 0) {
                 self.mode = MODE_OFF;
+                for j in 0..PW_MAX {
+                    self.shadow_full(j, if j == i { f } else { None });
+                }
                 put = true;
             }
             if !put {
-                // copy each rectangle into the segment (stride = width * 4), then put it
+                self.seg_update(i, k, f);
                 let n = self.xp[i].nrects();
                 for j in 0..n {
                     let r = self.xp[i].rect(j);
-                    self.copy_rect(i, k, &r);
                     self.shm_put(i, k, &r, j + 1 == n, xid);
                 }
-                let sl = &mut self.xp[i].slots[k];
-                sl.busy = true;
-                sl.t0 = now;
+                let xp = &mut self.xp[i];
+                xp.slots[k].busy = true;
+                xp.slots[k].t0 = now;
+                xp.newest = k;
             }
         }
         if put {
@@ -307,23 +349,64 @@ impl X11 {
         }
         self.flush();
         self.xp[i].drop_pending();
+        true
     }
 
-    /// copy_rect(slot, box): shadow rows of the box into the segment
-    fn copy_rect(&mut self, i: usize, k: usize, r: &[i32; 4]) {
-        let xp = &self.xp[i];
-        let sl = xp.slots[k];
-        let (x0, y0, x1, y1) = (r[0], r[1], r[2], r[3]);
-        if x1 <= x0 {
+    /// seg_update(i, k, frame): bring segment k up to the latest frame -- its stale boxes
+    /// from the frame, or (without one) from the segment of the last put, then the staging
+    /// image on top
+    fn seg_update(&mut self, i: usize, k: usize, f: Option<&Frame>) {
+        let xp = &mut self.xp[i];
+        let (w, h) = (xp.sw, xp.shh);
+        let row = w as usize * 4;
+        if xp.slots[k].cw != w || xp.slots[k].ch != h {
+            xp.st[k].set_full(w, h); // a new segment or one of another size
+            xp.slots[k].cw = w;
+            xp.slots[k].ch = h;
+        }
+        // SAFETY: the segment's mapping holds cap >= w * h * 4 bytes (present_try checked);
+        // it is not busy (or its completion is overdue): the server does not read it now.
+        let dst = unsafe { core::slice::from_raw_parts_mut(xp.slots[k].mem, row * h as usize) };
+        match f {
+            Some(f) => copy_boxes(dst, row, f.px, f.stride.max(0) as usize, xp.st[k].boxes(), w, h),
+            None => {
+                let n = xp.newest;
+                if n != k && xp.seg_valid(n) {
+                    // SAFETY: another mapping of ours with the frame of this size; the server
+                    // may read it too, nobody writes it.
+                    let src = unsafe { core::slice::from_raw_parts(xp.slots[n].mem, row * h as usize) };
+                    for b in xp.st[k].boxes().iter().filter(|b| !xp.stg.covers(b)) {
+                        copy_boxes(dst, row, src, row, core::slice::from_ref(b), w, h);
+                    }
+                }
+                copy_boxes(dst, row, &xp.sh, row, xp.stg.boxes(), w, h);
+            }
+        }
+        xp.st[k].clear();
+        xp.stg.clear();
+    }
+
+    /// shadow_full(i, frame): the shadow image of the PutImage mode as the whole frame, from
+    /// the frame, else from the segment of the last put and the staging image
+    fn shadow_full(&mut self, i: usize, f: Option<&Frame>) {
+        let xp = &mut self.xp[i];
+        if !xp.sfok {
             return;
         }
-        let n = (x1 - x0) as usize * 4;
-        for y in y0.max(0)..y1 {
-            let o = (y as usize * xp.sw as usize + x0 as usize) * 4;
-            let src = &xp.sh[o..o + n];
-            // SAFETY: o + n <= sw * shh * 4 <= the segment's cap (checked before the copy).
-            unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), sl.mem.add(o), n) };
+        let (w, h) = (xp.sw.max(0), xp.shh.max(0));
+        let row = w as usize * 4;
+        let mut sh = vec![0u8; row * h as usize];
+        let n = xp.newest;
+        if let Some(f) = f {
+            copy_boxes(&mut sh, row, f.px, f.stride.max(0) as usize, &[[0, 0, w, h]], w, h);
+        } else if xp.seg_valid(n) {
+            // SAFETY: our mapping of that segment with the frame of this size (still attached).
+            let src = unsafe { core::slice::from_raw_parts(xp.slots[n].mem, row * h as usize) };
+            sh.copy_from_slice(src);
         }
+        copy_boxes(&mut sh, row, &xp.sh, row, xp.stg.boxes(), w, h);
+        xp.sh = sh;
+        xp.stg.clear();
     }
 
     /// shm_put(slot, box, send_event, window): ShmPutImage of the box (same place in the window)
@@ -350,8 +433,8 @@ impl X11 {
         wr32(b, o + 32, 0); // offset
     }
 
-    /// put_rect(box, window): PutImage (ZPixmap, depth 24) in strips of whole rows that fit
-    /// the maximum request length
+    /// put_rect(box, window): PutImage (ZPixmap, depth 24) from the shadow image in strips of
+    /// whole rows that fit the maximum request length
     fn put_rect(&mut self, i: usize, r: &[i32; 4], xid: u32) {
         let (x0, mut y, y1) = (r[0], r[1], r[3]);
         let width = r[2] - x0;
@@ -379,7 +462,9 @@ impl X11 {
             let mut d = o + 20;
             for _ in 0..hh {
                 let s = (y as usize * sw + x0 as usize) * 4;
-                b[d..d + bpr as usize].copy_from_slice(&self.xp[i].sh[s..s + bpr as usize]);
+                if let Some(src) = self.xp[i].sh.get(s..s + bpr as usize) {
+                    b[d..d + bpr as usize].copy_from_slice(src);
+                }
                 d += bpr as usize;
                 y += 1;
             }
@@ -419,6 +504,11 @@ impl X11 {
         s.seg = 0;
         s.busy = false;
         s.cap = 0;
+        s.cw = 0;
+        s.ch = 0;
+        if self.xp[i].newest == k {
+            self.xp[i].newest = 2; // its frame is gone
+        }
         // SAFETY: mem / cap describe our own mapping of this segment.
         unsafe {
             if sl.shmid == -1 {
@@ -443,7 +533,7 @@ impl X11 {
                 // ---- memfd + ShmAttachFd
                 if let Some((mem, seg)) = self.attach_fd(size) {
                     let s = &mut self.xp[i].slots[k];
-                    *s = Seg { seg, busy: false, shmid: -1, cap: size, mem, t0: s.t0 };
+                    *s = Seg { seg, busy: false, shmid: -1, cap: size, mem, t0: s.t0, cw: 0, ch: 0 };
                     return true;
                 }
                 self.mode = MODE_SYSV;
@@ -455,7 +545,7 @@ impl X11 {
             // ---- shmget + shmat + ShmAttach, removed after the server attached it
             if let Some((mem, seg, id)) = self.attach_sysv(size) {
                 let s = &mut self.xp[i].slots[k];
-                *s = Seg { seg, busy: false, shmid: id, cap: size, mem, t0: s.t0 };
+                *s = Seg { seg, busy: false, shmid: id, cap: size, mem, t0: s.t0, cw: 0, ch: 0 };
                 return true;
             }
             if self.debug {

@@ -1,5 +1,5 @@
 // Real WASM/worker regression: lossless input batches and incremental composition.
-// node tools/tests/web_frames.mjs build/wasm-responsive/after
+// node tools/tests/web_frames.mjs build/wasm-responsive/after [--apps=gallery,...]
 import assert from 'node:assert/strict';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {resolve} from 'node:path';
@@ -14,6 +14,7 @@ async function appWorker(app,width=1280,height=800,dpi=96){
   let now=1000,pixels=new Uint8Array(),size=[0,0],frames=0,transferred=0,captureMs=0;
   const errors=[],recycled=[];
   const sandbox={URL,TextDecoder,TextEncoder,Uint8Array,Uint8ClampedArray,Uint32Array,Int32Array,ArrayBuffer,DataView,WebAssembly,Date,console,
+    navigator:{languages:['en-US'],language:'en-US',hardwareConcurrency:4},
     location:{href:`http://localhost/${app}/worker.js`},performance:{timeOrigin:0,now:()=>now},fetch:async url=>{
       const b=await readFile(resolve(build,'web',app,new URL(url,`http://localhost/${app}/`).pathname.split('/').at(-1)));
       return {ok:true,arrayBuffer:async()=>b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),json:async()=>JSON.parse(b.toString())};
@@ -21,11 +22,13 @@ async function appWorker(app,width=1280,height=800,dpi=96){
       if(m.type==='frame'){
         const start=performance.now();frames++;
         if(size[0]!==m.width||size[1]!==m.height){size=[m.width,m.height];pixels=new Uint8Array(m.width*m.height*4);}
+        // the patches lie in one buffer at their offsets (older hosts: a buffer per patch)
         for(const p of m.patches||[{x:0,y:0,width:m.width,height:m.height,pixels:m.pixels}]){
-          const source=new Uint8Array(p.pixels);transferred+=source.length;
+          const source=m.buffer?new Uint8Array(m.buffer,p.offset,p.width*p.height*4):new Uint8Array(p.pixels);transferred+=source.length;
           for(let y=0;y<p.height;y++)pixels.set(source.subarray(y*p.width*4,(y+1)*p.width*4),((p.y+y)*m.width+p.x)*4);
-          recycled.push(p.pixels);
+          if(!m.buffer)recycled.push(p.pixels);
         }
+        if(m.buffer)recycled.push(m.buffer);
         captureMs+=performance.now()-start;
       }
       if(m.type==='error'||m.type==='exit')errors.push(m);
@@ -39,7 +42,8 @@ async function appWorker(app,width=1280,height=800,dpi=96){
     async fullCheck(){const before=this.hash();await send({type:'event',event:[8,0,0,0,...size,0]});assert.equal(this.hash(),before,'partial composition equals forced full composition');}};
 }
 const event=(type,x,y,button=0,data=0,mods=0)=>({type:'event',event:[type,button,mods,0,x,y,data>>>0]});
-for(const app of ['template','gallery','Kritzel','PaintCraft','jfWord']){
+const only=process.argv.find(a=>a.startsWith('--apps='))?.slice(7).split(',');
+for(const app of only||['template','gallery','Kritzel','PaintCraft','jfWord']){
   const one=await appWorker(app),batch=await appWorker(app);
   const initial=one.hash();assert.equal(batch.hash(),initial);
   // Curves, repeated pressure changes and release must not collapse to an endpoint.
@@ -70,7 +74,7 @@ for(const app of ['template','gallery','Kritzel','PaintCraft','jfWord']){
   const result={app,ok:true,strokeChanged:one.hash()!==initial,idle,hover};results.push(result);console.log(JSON.stringify(result));
 }
 // DPI and patch bounds at narrow/high-density viewports.
-for(const app of ['PaintCraft','gallery'])for(const dpi of [144,192]){
+for(const app of ['PaintCraft','gallery'].filter(a=>!only||only.includes(a)))for(const dpi of [144,192]){
   const instance=await appWorker(app,950,1268,dpi);
   for(let i=0;i<12;i++){await instance.send(event(1,420+i*10,700));await instance.fullCheck();}
   results.push({app,dpi,ok:true});

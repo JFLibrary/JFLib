@@ -53,10 +53,13 @@ function input() {
   if(wasm.jfgui_input) wasm.jfgui_input(Math.floor(performance.now()) >>> 0);
   else tick();
 }
+// a frame's pixels travel in one buffer: the smallest pooled one that holds them (the page
+// sends it back after putImageData), else a new one rounded up to 64 KiB
 function pixelBuffer(length) {
-  const index=buffers.findIndex(b=>b.byteLength===length);
-  if(index<0) return new ArrayBuffer(length);
-  const [buffer]=buffers.splice(index,1); pooledBytes-=length; return buffer;
+  let index=-1;
+  for(let i=0;i<buffers.length;i++) if(buffers[i].byteLength>=length && (index<0 || buffers[i].byteLength<buffers[index].byteLength)) index=i;
+  if(index<0) return new ArrayBuffer(Math.max(65536,Math.ceil(length/65536)*65536));
+  const [buffer]=buffers.splice(index,1); pooledBytes-=buffer.byteLength; return buffer;
 }
 function importFile(path, data, dropped, durable) {
   const name = encode.encode(path), content = new Uint8Array(data);
@@ -79,30 +82,38 @@ const imports = { jfgui: {
     checkWorkers();
   },
   thread_notify(address,count) { Atomics.notify(new Int32Array(memory.buffer),(address>>>0)/4,count>>>0); },
-  present(ptr, len, width, height, stride, rectsPtr=0, rectsCount=0) {
-    ptr>>>=0;rectsPtr>>>=0;
-    const source=bytes(ptr,len), patches=[];
-    const rects=rectsCount ? new Int32Array(memory.buffer,rectsPtr,rectsCount*4) : [0,0,width,height];
-    const words=littleEndian && !(ptr&3) && !(stride&3) ? new Uint32Array(memory.buffer,ptr,len>>>2) : null;
+  // the rectangles of a frame packed into one buffer for the page; order 1: R, G, B, A rows
+  // (copied as they are), else B, G, R, x (older bundles: swapped here)
+  present(ptr, len, width, height, stride, rectsPtr=0, rectsCount=0, order=0) {
+    ptr>>>=0;rectsPtr>>>=0;stride>>>=0;
+    const rects=rectsCount ? new Int32Array(memory.buffer,rectsPtr,rectsCount*4).slice() : new Int32Array([0,0,width,height]);
+    let total=0;
+    for(let r=0;r<rects.length;r+=4) total+=rects[r+2]*rects[r+3]*4;
+    const buffer=pixelBuffer(total), patches=[];
+    const source=new Uint8Array(memory.buffer,ptr,len>>>0), out=new Uint8Array(buffer);
+    const words=order!==1 && littleEndian && !(ptr&3) && !(stride&3) ? new Uint32Array(memory.buffer,ptr,len>>>2) : null;
+    let at=0;
     for(let r=0;r<rects.length;r+=4) {
-      const [x,y,w,h]=rects.subarray ? rects.subarray(r,r+4) : rects;
-      const buffer=pixelBuffer(w*h*4);
-      if(words) {
-        const rgba=new Uint32Array(buffer);
-        for(let row=0;row<h;row++) {
-          let a=(y+row)*(stride>>>2)+x, b=row*w;
+      const x=rects[r],y=rects[r+1],w=rects[r+2],h=rects[r+3],row=w*4;
+      if(order===1) {
+        if(row===stride) out.set(source.subarray(y*stride,(y+h)*stride),at);
+        else for(let k=0;k<h;k++) out.set(source.subarray((y+k)*stride+x*4,(y+k)*stride+x*4+row),at+k*row);
+      } else if(words) {
+        const rgba=new Uint32Array(buffer,at,w*h);
+        for(let k=0;k<h;k++) {
+          let a=(y+k)*(stride>>>2)+x, b=k*w;
           for(let col=0;col<w;col++) {const c=words[a++];rgba[b++]=0xff000000|(c&0x0000ff00)|((c&255)<<16)|((c>>>16)&255);}
         }
       } else {
-        const rgba=new Uint8ClampedArray(buffer);
-        for(let row=0;row<h;row++) for(let col=0;col<w;col++) {
-          const a=(y+row)*stride+(x+col)*4,b=(row*w+col)*4;
-          rgba[b]=source[a+2];rgba[b+1]=source[a+1];rgba[b+2]=source[a];rgba[b+3]=255;
+        for(let k=0;k<h;k++) for(let col=0;col<w;col++) {
+          const a=(y+k)*stride+(x+col)*4,b=at+(k*w+col)*4;
+          out[b]=source[a+2];out[b+1]=source[a+1];out[b+2]=source[a];out[b+3]=255;
         }
       }
-      patches.push({x,y,width:w,height:h,pixels:buffer});
+      patches.push({x,y,width:w,height:h,offset:at});
+      at+=row*h;
     }
-    postMessage({type:"frame",width,height,patches},patches.map(p=>p.pixels));
+    postMessage({type:"frame",width,height,buffer,patches},[buffer]);
   },
   request(kind, id, ptr, len) {
     // Copy before returning to Rust: no async task borrows linear memory.

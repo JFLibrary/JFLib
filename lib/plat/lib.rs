@@ -171,6 +171,9 @@ pub use hotkey::{Chord, HotkeyError, HotkeyEvent, hotkey_register, hotkey_take, 
 // what the desktop integration shares on Linux (the session-bus link, the .desktop id)
 #[cfg(target_os = "linux")]
 mod linux_desk;
+// the damage regions of the X11 / Wayland presents
+#[cfg(target_os = "linux")]
+mod linux_damage;
 // the log: levels, a ring for crash reports, stderr, a rotating file
 mod log;
 pub use log::*;
