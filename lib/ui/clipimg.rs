@@ -12,7 +12,6 @@
 // u64 PNG length (LE), the PNG, u64 BMP length, the BMP (clipimg_record / clipimg_parse);
 // plat::clip_set(CLIP_IMAGE, ..) takes this record.
 
-use alloc::vec;
 use alloc::vec::Vec;
 
 use super::consts::*;

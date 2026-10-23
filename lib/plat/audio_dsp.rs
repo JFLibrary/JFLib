@@ -95,7 +95,8 @@ pub(crate) struct Resampler {
 impl Resampler {
     /// from `from` to `to` frames per second, ch channels
     pub(crate) fn new(from: u32, to: u32, ch: usize) -> Resampler {
-        let step = from.max(1) as f64 / to.max(1) as f64;
+        // (a device rate of 1 Hz from a faulty host would ask for a gigabyte-sized kernel table)
+        let step = (from.max(1) as f64 / to.max(1) as f64).clamp(1.0 / 1024.0, 1024.0);
         let cut = 0.95 * if step > 1.0 { 1.0 / step } else { 1.0 };
         let half = libm_ceil(ZERO_CROSSINGS / cut) as usize;
         let n = half * PHASES + 2;

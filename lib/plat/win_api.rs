@@ -1227,7 +1227,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
                     s.hi_surr.set(0);
                     c = ((hi - 0xD800) << 10) + (c - 0xDC00) + 0x10000;
                 }
-                _ => {}
+                _ => s.hi_surr.set(0), // a lone high surrogate before this is dropped
             }
             if c >= 32 && c != 127 {
                 win_push(E_TEXT, 0, 0, 0, c); // control characters come as keys

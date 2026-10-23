@@ -22,8 +22,8 @@
 // last key of their section, new sections to the end.  A UTF-8 BOM is skipped.  Files are
 // read up to FILE_MAX bytes; after LINES_MAX lines the rest is kept as one verbatim block.
 // Line ends: LF, CRLF (any number of CRs before the LF are dropped) when reading; written as
-// CRLF on Windows, LF on Linux.  Key names must not contain '=', CR or LF nor start with
-// ';' '#' '['; section names must not contain ']', CR or LF; neither may start or end with
+// CRLF on Windows, LF on Linux.  Key names must not contain '=', NUL, CR or LF nor start with
+// ';' '#' '['; section names must not contain ']', NUL, CR or LF; neither may start or end with
 // a blank (set -> false).  CR / LF inside a value are written as blanks.
 
 use alloc::format;
@@ -95,7 +95,7 @@ fn name_ok(s: &[u8], is_key: bool) -> bool {
         return false;
     }
     let forbid = if is_key { b'=' } else { b']' };
-    !s.iter().any(|&c| c == b'\r' || c == b'\n' || c == forbid)
+    !s.iter().any(|&c| c == b'\r' || c == b'\n' || c == 0 || c == forbid)
 }
 
 fn trim(mut s: &[u8]) -> &[u8] {

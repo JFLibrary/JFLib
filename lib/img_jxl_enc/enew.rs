@@ -18,7 +18,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use img_core::{ImgOpt, Surface, ERR_CANCEL, IOF_EMBED_EXIF, IOF_EMBED_XMP};
+use img_core::{ImgOpt, Surface, ERR_CANCEL, ERR_DIMS, IMG_MAXDIM, IOF_EMBED_EXIF, IOF_EMBED_XMP};
 
 use crate::eans::HParams;
 use crate::efrm::{self, Colour, Dims, FrameHdr, ImgHdr};
@@ -69,6 +69,9 @@ pub fn encode(sf: &Surface, o: &Opts) -> Result<Vec<u8>, i32> {
 
 /// encode the samples of image_of (jxl-module: what the module runs; the linked writer too)
 pub fn encode_px(px: &Px, o: &Opts) -> Result<Vec<u8>, i32> {
+    if px.w == 0 || px.h == 0 || px.w > IMG_MAXDIM || px.h > IMG_MAXDIM || px.rgba.len() as u64 != px.w as u64 * px.h as u64 * 4 {
+        return Err(ERR_DIMS);
+    }
     let mut cs = if o.lossless() { encode_lossless(px, o)? } else { crate::evdct::encode_lossy(px, o)? };
     let p = EncParams { flags: o.flags & (IOF_EMBED_EXIF | IOF_EMBED_XMP), quality: 0, exif: o.exif, xmp: o.xmp, cancel: None };
     je_container(&p, &mut cs)?;

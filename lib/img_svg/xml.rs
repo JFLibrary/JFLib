@@ -129,7 +129,8 @@ impl P<'_> {
                 i += 1;
                 continue;
             }
-            let Some(semi) = raw[i..].iter().take(64).position(|&c| c == b';') else {
+            // a bare '&' must not swallow a real reference after it ("AT&T &amp; Co")
+            let Some(semi) = raw[i + 1..].iter().take(63).position(|&c| c == b';' || c == b'&').filter(|&k| raw[i + 1 + k] == b';').map(|k| k + 1) else {
                 i += 1;
                 continue;
             };

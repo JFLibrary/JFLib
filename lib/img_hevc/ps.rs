@@ -519,8 +519,11 @@ impl Hevc<'_> {
         }
         if s.log2ctb < 4
             || s.log2ctb > 6
+            || s.log2mincb < 3
             || s.log2mincb > s.log2ctb
+            || s.log2mintb < 2
             || s.log2mintb >= s.log2mincb
+            || s.log2maxtb < s.log2mintb
             || s.log2maxtb > 5
             || s.log2maxtb > s.log2ctb
             || s.maxthintra > 4

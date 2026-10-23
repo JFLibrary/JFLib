@@ -611,6 +611,9 @@ impl Dhcp {
         b[108..108 + fl].copy_from_slice(&self.file[..fl]);
         b[BOOTP_HDR..DHCP_MIN].copy_from_slice(&MAGIC);
         for o in &self.opts {
+            if o.code() == O_PAD || o.code() == O_END {
+                continue;
+            }
             let d = o.data();
             // RFC 3396: longer data goes into several options with the same code
             let mut chunks = d.chunks(255).peekable();

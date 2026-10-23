@@ -34,8 +34,7 @@ pub fn checks(t: &mut T, _dir: &str, st: &Status) {
     t.check(st.win_mitigations, "sandboxtest: the process mitigation policies were set");
 
     // dynamic code prohibited (the manifest allows no plugins): the policy reads back as set;
-    // executable memory should then be refused.  Some Windows builds report the policy but do
-    // not refuse it (10.0.26200 here, the same in any process): reported, not failed
+    // executable memory should then be refused (a build that still grants it is reported, not failed)
     t.check(st.win_dynamic_code, "sandboxtest: the dynamic code policy is set (no plugins allowed)");
     if st.win_dynamic_code {
         // SAFETY: a plain anonymous allocation request; freed when it succeeds.

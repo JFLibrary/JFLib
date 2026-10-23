@@ -406,7 +406,7 @@ pub fn unix_time_ns() -> i64 {
     let doy = (153 * ((m + 9) % 12) + 2) / 5 + d.day as i64 - 1;
     let days = era * 146_097 + yoe * 365 + yoe / 4 - yoe / 100 + doy - 719_468;
     let secs = days * 86_400 + d.hour as i64 * 3600 + d.min as i64 * 60 + d.sec as i64;
-    secs * 1_000_000_000 + d.ms as i64 * 1_000_000
+    secs.saturating_mul(1_000_000_000).saturating_add(d.ms as i64 * 1_000_000)
 }
 /// Theme requested by the host: 0 light, 1 dark, or -1 unspecified.
 pub fn theme() -> i32 {

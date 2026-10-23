@@ -105,7 +105,7 @@ fn parse_v6(s: &str) -> Option<[u8; 16]> {
                 out.push(u16::from_be_bytes([v4[0], v4[1]]));
                 out.push(u16::from_be_bytes([v4[2], v4[3]]));
             } else {
-                if w.is_empty() || w.len() > 4 {
+                if w.is_empty() || w.len() > 4 || !w.bytes().all(|b| b.is_ascii_hexdigit()) {
                     return None;
                 }
                 out.push(u16::from_str_radix(w, 16).ok()?);
@@ -194,6 +194,9 @@ impl SocketAddr {
             s.rsplit_once(':')?
         };
         if !s.starts_with('[') && host.contains(':') {
+            return None;
+        }
+        if port.is_empty() || !port.bytes().all(|b| b.is_ascii_digit()) {
             return None;
         }
         Some(SocketAddr { ip: IpAddr::parse(host)?, port: port.parse().ok()? })

@@ -323,7 +323,7 @@ pub fn encode(sf: &Surface, opt: &ImgOpt) -> Result<Vec<u8>, i32> {
 
 /// VP8 stream of the w x h straight BGRA pixels  [vp8_enc_argb]
 pub fn enc_argb(px: &[u32], w: u32, h: u32, cfg: &Cfg) -> Result<Vec<u8>, i32> {
-    if w.wrapping_sub(1) >= 16383 || h.wrapping_sub(1) >= 16383 {
+    if w.wrapping_sub(1) >= 16383 || h.wrapping_sub(1) >= 16383 || px.len() < w as usize * h as usize {
         return Err(ERR_DIMS);
     }
     let mut ve = Ve::new(w, h, cfg);
@@ -1798,7 +1798,7 @@ impl<'a> Ve<'a> {
             let old = PROBA0[i] as u32;
             let upd = UPDATE[i] as u32;
             // new = ones ? 255 - ones * 255 / total : 255
-            let new = if ones != 0 { 255 - ones.wrapping_mul(255) / total } else { 255 };
+            let new = if ones != 0 { 255 - (ones as u64 * 255 / total as u64) as u32 } else { 255 };
             let branch = |p: u32| -> u64 {
                 bcost(ec, 1, p) as u64 * ones as u64 + bcost(ec, 0, p) as u64 * total.wrapping_sub(ones) as u64
             };

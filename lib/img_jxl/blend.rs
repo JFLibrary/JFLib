@@ -311,6 +311,9 @@ pub fn jx_patches(jx: &Jx, jf: &mut Jf, jb: &mut Jb) -> i32 {
         return ERR_HDR;
     }
     let nec = jx.nec;
+    // libjxl's memory bounds: patches 4 per reference limit, blending infos 4 per patch limit
+    let maxp = (((jf.xb as u64 * jf.yb as u64) << 4) + 1024) * 4;
+    let mut total = 0u64;
     for _ in 0..nref {
         let rf = jr.read(jb, 1);
         if rf >= 4 {
@@ -335,6 +338,10 @@ pub fn jx_patches(jx: &Jx, jf: &mut Jf, jb: &mut Jb) -> i32 {
         }
         let cnt = jr.read(jb, 7).wrapping_add(1);
         if cnt == 0 {
+            return ERR_HDR;
+        }
+        total += cnt as u64;
+        if total > maxp || total * (nec as u64 + 1) > maxp * 4 {
             return ERR_HDR;
         }
         let (mut x, mut y) = (0i64, 0i64);

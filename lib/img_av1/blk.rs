@@ -885,7 +885,7 @@ impl T<'_> {
                     mx - (diff + 1)
                 };
             }
-            seg = v as u32;
+            seg = v.max(0).min(h.lastseg as i32) as u32; // Clip3( 0, LastActiveSegId, segment_id )
         }
         let seg = seg & 7;
         self.s.seg = seg;

@@ -305,6 +305,9 @@ pub fn fragment(packet: &[u8], mtu: usize) -> Option<Vec<Vec<u8>>> {
     later.set_options(&copied_options(v.options()));
     let data = v.payload();
     let base_off = v.frag_off();
+    if base_off + data.len() > Reassembly::MAX {
+        return None;
+    }
     let last_mf = v.mf();
     let mut out = Vec::new();
     let mut pos = 0;
@@ -389,6 +392,10 @@ impl Reassembly {
         })?);
         h.mf = false;
         h.frag_off = 0;
+        if h.len() + total > Reassembly::MAX {
+            *self = Reassembly::new();
+            return None;
+        }
         let mut out = alloc::vec![0u8; h.len() + total];
         h.write(&mut out, total);
         let hl = h.len();

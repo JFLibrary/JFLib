@@ -325,7 +325,7 @@ fn elf_load(b: &[u8], el: &mut El, base: usize) -> Result<(), u32> {
         }
         // lib_sym reads both tables after the protection is set: they must be readable
         let readable = |a: u64, n: u64| {
-            el.segs[..el.nseg].iter().any(|s| s.flags & PF_R != 0 && a >= s.va && n <= s.end - a)
+            el.segs[..el.nseg].iter().any(|s| s.flags & PF_R != 0 && a >= s.va && a <= s.end && n <= s.end - a)
         };
         if !readable(el.symtab, nsym * 24) || !readable(el.strtab, el.strsz) {
             return Err(fmt);

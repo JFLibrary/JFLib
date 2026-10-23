@@ -1960,7 +1960,7 @@ fn norm(path: &str, win: bool, glob: bool, cwd: &dyn Fn() -> String) -> Option<S
     // \\?\ and \\.\ prefixes: only drive and UNC paths
     for pre in ["//?/", "//./", "/??/"] {
         if let Some(rest) = s.strip_prefix(pre) {
-            if rest.len() >= 4 && rest[..4].eq_ignore_ascii_case("UNC/") {
+            if rest.get(..4).is_some_and(|p| p.eq_ignore_ascii_case("UNC/")) {
                 s = alloc::format!("//{}", &rest[4..]);
             } else if is_drive(rest) {
                 s = String::from(rest);

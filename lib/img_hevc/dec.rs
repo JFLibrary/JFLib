@@ -460,7 +460,7 @@ fn zvec_try<T: Clone + Default>(n: usize) -> Option<Vec<T>> {
 }
 
 // luma samples a picture may have (level 6.2 allows about 35.6 million)
-const HV_MAXPIX: u64 = 1 << 26;
+pub(crate) const HV_MAXPIX: u64 = 1 << 26;
 
 impl<'a> Hevc<'a> {
     /// hevc_new: a fresh (zeroed) record

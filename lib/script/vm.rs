@@ -1657,6 +1657,8 @@ impl Vm {
                 Value::Str(r) => s.push_str(heap::text(&self.heap, r)),
                 v => self.write_value(&mut s, v, false, 0, &mut Vec::new()),
             }
+            // (the limit holds while the text is built, not only when it is stored)
+            crate::stdlib::cap(self, s.len() as u64)?;
         }
         self.used += s.len() as u64 / 64;
         let v = self.alloc_str(s)?;

@@ -392,7 +392,7 @@ impl Window {
     pub fn per_slot(&self, t: u64, per_mille: u32) -> Vec<(u64, u64, Option<u64>)> {
         let now = t / self.span;
         let len = self.ring.len() as u64;
-        let first = (now + 1).saturating_sub(len);
+        let first = now.saturating_sub(len - 1);
         (first..=now)
             .map(|i| {
                 let s = &self.ring[(i % len) as usize];

@@ -55,7 +55,8 @@ pub enum Trust {
 pub struct ClientConfig {
     pub trust: Trust,
     pub identity: Option<Identity>,
-    /// the name the certificate must carry (DNS name or IP address; "" = not checked)
+    /// the name the certificate must carry (DNS name or IP address); may be empty only with
+    /// Trust::Pinned / Trust::Any, which do not check it
     pub server_name: String,
 }
 
@@ -134,10 +135,22 @@ impl TlsStream {
     /// run until the handshake is done
     fn handshake(&self) -> Result<(), TlsError> {
         let mut buf = alloc::vec![0u8; 16 * 1024 + 512];
+        // the stream's timeout counts each read: a peer sending a byte at a time must not hold
+        // the connection (a server worker) forever
+        let deadline = plat::time_us() + 60_000_000;
         loop {
             self.flush()?;
-            if self.conn.lock().established() {
-                return Ok(());
+            {
+                let c = self.conn.lock();
+                if c.established() {
+                    return Ok(());
+                }
+                if c.closed() {
+                    return Err(TlsError::Closed);
+                }
+            }
+            if plat::time_us() > deadline {
+                return Err(TlsError::Net(NetError::new(NetErrorKind::TimedOut, 0)));
             }
             let n = self.inner.read(&mut buf).map_err(TlsError::Net)?;
             if n == 0 {

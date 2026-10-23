@@ -258,7 +258,7 @@ impl Dib {
 
     fn bytes(&self) -> &[u8] {
         // SAFETY: the DIB section holds w * h 32-bit pixels while it lives.
-        unsafe { core::slice::from_raw_parts(self.bits, (self.w * self.h * 4) as usize) }
+        unsafe { core::slice::from_raw_parts(self.bits, self.w as usize * self.h as usize * 4) }
     }
 
     /// 0xRRGGBB at x, y (0 outside)
@@ -266,7 +266,7 @@ impl Dib {
         if x < 0 || y < 0 || x >= self.w || y >= self.h {
             return 0;
         }
-        let o = ((y * self.w + x) * 4) as usize;
+        let o = (y as usize * self.w as usize + x as usize) * 4;
         let b = self.bytes();
         (b[o + 2] as u32) << 16 | (b[o + 1] as u32) << 8 | b[o] as u32
     }

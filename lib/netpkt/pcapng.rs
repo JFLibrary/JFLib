@@ -41,6 +41,7 @@ pub struct Writer {
 }
 
 fn opt(body: &mut Vec<u8>, code: u16, val: &[u8]) {
+    let val = &val[..val.len().min(0xFFFF)];
     body.extend_from_slice(&code.to_le_bytes());
     body.extend_from_slice(&(val.len() as u16).to_le_bytes());
     body.extend_from_slice(val);
@@ -253,7 +254,7 @@ pub fn read(bytes: &[u8]) -> Result<Capture, ReadErr> {
                 if end < body + 20 {
                     return Err(ReadErr::BadBlock);
                 }
-                let iface = base + r.u32(body);
+                let iface = base.saturating_add(r.u32(body));
                 let ts = ((r.u32(body + 4) as u64) << 32) | r.u32(body + 8) as u64;
                 let caplen = r.u32(body + 12) as usize;
                 let orig_len = r.u32(body + 16);
