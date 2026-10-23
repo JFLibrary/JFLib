@@ -13,10 +13,11 @@
 //   dpi() -> i32   set_title(utf8)   present(frame, rects)     window 0
 //   set_cursor(shape)  window_state() -> WST_*  window_cmd(cmd)  begin_move()
 //   begin_resize(edges)              the current window
+//   present_time() -> (frames, us)   what showing frames cost so far (every window)
 //
 // The OS layers (win_api.rs; linux_disp.rs -> Wayland / X11) implement the win_* calls.
 
-use core::sync::atomic::{AtomicI32, Ordering};
+use core::sync::atomic::{AtomicI32, AtomicU64, Ordering};
 
 use crate::*;
 
@@ -24,6 +25,24 @@ const AF_CUSTOM_TITLEBAR: u32 = 1;
 const AF_RESIZABLE: u32 = 2;
 
 static CUR: AtomicI32 = AtomicI32::new(0);
+static PRESENT_N: AtomicU64 = AtomicU64::new(0);
+static PRESENT_US: AtomicU64 = AtomicU64::new(0);
+
+/// (frames handed to win_present, microseconds spent in the platform's present paths) since
+/// the start, all windows together: win_present itself plus the work it defers (X11: a
+/// segment that frees up, Wayland: the frame callback, the browser and Android: the
+/// composition and the hand-over to the host).  For measurements (linuxtest --test pbench).
+pub fn present_time() -> (u64, u64) {
+    (PRESENT_N.load(Ordering::Relaxed), PRESENT_US.load(Ordering::Relaxed))
+}
+
+/// add the time since t0 (time_us) to present_time; frame: a win_present call
+pub(crate) fn present_account(t0: u64, frame: bool) {
+    PRESENT_US.fetch_add(time_us().saturating_sub(t0), Ordering::Relaxed);
+    if frame {
+        PRESENT_N.fetch_add(1, Ordering::Relaxed);
+    }
+}
 
 /// the window the single-window per-window calls refer to (-1 = none)
 pub fn win_use(w: i32) {
@@ -85,7 +104,9 @@ pub fn set_title(title: &str) {
     win_set_title(0, title)
 }
 
-/// show dirty rectangles (None = everything) of the main window's framebuffer
+/// show dirty rectangles (None = everything) of the main window's framebuffer; its pixels
+/// outside them must be what the last present showed (the backends keep whole frames up to
+/// date from it)
 pub fn present(f: &Frame, rects: Option<&[[i32; 4]]>) {
     win_present(0, f, rects)
 }

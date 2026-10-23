@@ -280,6 +280,12 @@ pub fn wl_test_roundtrip() -> i32 {
     with(|wl| wl.roundtrip())
 }
 
+/// the pixels of window w's last committed buffer -- what the compositor shows -- as (w, h,
+/// rows of w * 4 bytes B, G, R, x); None while damage waits (linuxtest --test pcheck)
+pub fn wl_test_presented(w: i32) -> Option<(i32, i32, Vec<u8>)> {
+    with(|wl| wl.test_presented(w))
+}
+
 /// attach a buffer id that does not exist to the main window's surface: the compositor
 /// answers with wl_display.error, which ends the process (linuxtest --test protoerr)
 pub fn wl_test_protoerr() {

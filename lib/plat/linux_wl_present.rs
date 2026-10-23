@@ -2,26 +2,28 @@
 //                                                                [src/plat/linux/wl_present.s]
 //
 //   Wl::win_present(w, frame, rects)   rects = x, y, w, h; None = all.  The frame's pixels
-//        (B, G, R, x rows) are kept in the window's own copy (the assembly keeps the caller's
-//        surface record: in Rust the frame is borrowed only for the call).  Dirty areas are
-//        copied into one of three wl_shm buffers of the window (XRGB8888 == our BGRX memory,
-//        no swizzle), then attached + damaged + committed.  While a frame callback is
-//        outstanding the damage is accumulated and presented when wl_callback.done arrives
-//        (or after 1 s, e.g. while minimized; only one callback is ever outstanding per
-//        window).  Before the window's first configure (a window just shown) the damage
-//        waits for it.
+//        (B, G, R, x rows; XRGB8888 == our BGRX memory, no swizzle) go straight into one of
+//        three wl_shm buffers of the window: a free buffer gets what it lacks of the frame
+//        (its stale boxes: the damage of the frames committed from the other buffers since it
+//        was last brought up to date) and waits for its commit; later frames add their damage
+//        to it.  It is attached + damaged + committed at once, or -- while a frame callback is
+//        outstanding -- when wl_callback.done arrives (or after 1 s, e.g. while minimized;
+//        only one callback is ever outstanding per window).  Before the window's first
+//        configure (a window just shown) the commit waits for it.  Only with all three
+//        buffers busy does the damage go into a staging image; the buffer that frees up then
+//        gets its stale boxes from the buffer of the last commit and the staged ones from
+//        there.  Pixels outside the rectangles must be what the last present of the window
+//        showed.
 //   Wl::present_service(now) -> next deadline (u64::MAX none)      (wait)
 //   Wl::present_unmapped(w)            the window was unmapped
 //   Wl::present_free(w)                the window is destroyed: its buffers and pools
 //   Wl::shm_pool_new(bytes) -> (wl_shm_pool, mapping)   memfd + mmap
 //   wlh_buffer_release / wlh_frame_done    event handlers (udata = window)
 //
-// Every slot remembers the area that changed since it was last drawn ("stale" box), so a
-// slot that comes back from the compositor gets that area too.  Growing beyond the pool
-// creates a new pool (slot = max(1.25 x need, largest output mode; 256 KB for secondary
-// windows)); buffers of the old pool that are still busy are destroyed on release and the
-// old mapping is unmapped when none remain.  A window mapped again (shown after a hide) gets
-// its last frame when it is configured.
+// Growing beyond the pool creates a new pool (slot = max(1.25 x need, largest output mode;
+// 256 KB for secondary windows)); buffers of the old pool that are still busy are destroyed on
+// release and the old mapping is unmapped when none remain.  A window mapped again (shown
+// after a hide) gets its last frame when it is configured (from the buffer of the last commit).
 
 use alloc::vec;
 use alloc::vec::Vec;
@@ -32,6 +34,7 @@ use super::proto::*;
 use super::wire::{sys_close, Args, A, EINTR};
 use super::window::WLWF_TOP;
 use super::Wl;
+use crate::linux_damage::{clip_box, copy_boxes, Reg};
 use crate::{Frame, PW_MAX};
 
 const SLOT_N: usize = 3;
@@ -49,8 +52,7 @@ struct Slot {
     h: i32,
     busy: bool, // attached, not yet released
     pool: u32,  // pool index + 1
-    st: [i32; 4], // stale box (empty when x0 >= x1)
-    mem: usize,   // pixels in our mapping
+    mem: usize, // pixels in our mapping
 }
 
 #[derive(Clone, Copy, Default)]
@@ -66,8 +68,9 @@ struct Pool {
 /// the presentation record of a window
 #[derive(Default)]
 pub(crate) struct Wp {
-    sf: Vec<u8>, // the last presented frame (rows of sf_w * 4 bytes)
-    sf_w: i32,
+    sf: Vec<u8>, // the staging image: damage waiting for a free buffer (rows of sf_w * 4 bytes)
+    stg: Reg,    // where it holds frame pixels no buffer has yet
+    sf_w: i32,   // the frame size (sfok: a frame was presented)
     sf_h: i32,
     sfok: bool,
     pend: bool, // damage waits to be presented
@@ -75,8 +78,11 @@ pub(crate) struct Wp {
     over: bool,
     bx: [i32; 4], // bounding box (x0, y0, x1, y1)
     pr: [[i32; 4]; PR_MAX],
-    frame_cb: u32,    // outstanding wl_callback (0 = none)
-    frame_wait: bool, // presents wait for it (or FRAME_SAFETY)
+    back: Option<usize>,   // the buffer with the latest frame that waits for its commit
+    newest: Option<usize>, // the buffer of the last commit
+    st: [Reg; SLOT_N],     // per buffer: where it differs from the latest frame
+    frame_cb: u32,         // outstanding wl_callback (0 = none)
+    frame_wait: bool,      // presents wait for it (or FRAME_SAFETY)
     frame_t0: u64,
     cur_pool: u32,
     sent_scale: i32,
@@ -108,53 +114,12 @@ impl Wp {
         }
     }
 
-    /// copy the frame's box into the kept copy
-    fn keep(&mut self, f: &Frame, b: [i32; 4]) {
-        let n = (b[2] - b[0]) as usize * 4;
-        for y in b[1]..b[3] {
-            let s = y as usize * f.stride as usize + b[0] as usize * 4;
-            let d = (y as usize * self.sf_w as usize + b[0] as usize) * 4;
-            if let (Some(src), Some(dst)) = (f.px.get(s..s + n), self.sf.get_mut(d..d + n)) {
-                dst.copy_from_slice(src);
-            }
-        }
-    }
-}
-
-/// dst |= src (empty boxes ignored)  [box_union]
-fn box_union(d: &mut [i32; 4], s: &[i32; 4]) {
-    if s[0] >= s[2] {
-        return;
-    }
-    if d[0] >= d[2] {
-        *d = *s;
-        return;
-    }
-    d[0] = d[0].min(s[0]);
-    d[1] = d[1].min(s[1]);
-    d[2] = d[2].max(s[2]);
-    d[3] = d[3].max(s[3]);
-}
-
-/// copy a box of the kept frame into the slot (clipped)  [copy_box]
-fn copy_box(sl: &Slot, b: &[i32; 4], sf: &[u8], sf_w: i32) {
-    let x0 = b[0].max(0);
-    let y0 = b[1].max(0);
-    let x1 = b[2].min(sl.w);
-    let y1 = b[3].min(sl.h);
-    if x1 - x0 <= 0 {
-        return;
-    }
-    let n = (x1 - x0) as usize * 4;
-    // SAFETY: the slot's buffer lies in our mapping, sl.w * sl.h pixels from sl.mem (the
-    // pool's slot size is at least that).
-    let dst = unsafe { core::slice::from_raw_parts_mut(sl.mem as *mut u8, sl.w as usize * sl.h as usize * 4) };
-    for y in y0..y1 {
-        let d = (y as usize * sl.w as usize + x0 as usize) * 4;
-        let s = (y as usize * sf_w as usize + x0 as usize) * 4;
-        if let Some(src) = sf.get(s..s + n) {
-            dst[d..d + n].copy_from_slice(src);
-        }
+    /// the buffer of the last commit while it holds a frame of the window's size in the
+    /// current pool (its mapping is alive)
+    fn newest_ok(&self) -> Option<usize> {
+        let n = self.newest?;
+        let s = self.slots[n];
+        (s.buf != 0 && s.w == self.sf_w && s.h == self.sf_h && s.pool == self.cur_pool).then_some(n)
     }
 }
 
@@ -163,35 +128,34 @@ impl Wl {
     pub(crate) fn win_present(&mut self, w: i32, f: &Frame, rects: Option<&[[i32; 4]]>) {
         let Some(i) = self.rec(w) else { return };
         let wp = &mut self.wp[i];
-        let (sw, sh) = (f.w, f.h);
-        let fresh = sw != wp.sf_w || sh != wp.sf_h || wp.sf.len() != (sw.max(0) as usize) * (sh.max(0) as usize) * 4;
+        let (sw, sh) = (f.w.max(0), f.h.max(0));
+        // a new size: everything (the buffers and the pending boxes are of the old one)
+        let fresh = !wp.sfok || sw != wp.sf_w || sh != wp.sf_h;
         if fresh {
-            wp.sf = vec![0; (sw.max(0) as usize) * (sh.max(0) as usize) * 4];
             wp.sf_w = sw;
             wp.sf_h = sh;
-            if sw > 0 && sh > 0 {
-                wp.keep(f, [0, 0, sw, sh]);
+            wp.sf = Vec::new();
+            wp.stg.clear();
+            wp.back = None;
+            wp.newest = None;
+            wp.prn = 0;
+            wp.over = false;
+            wp.bx = [0; 4];
+            for st in wp.st.iter_mut() {
+                st.set_full(sw, sh);
             }
         }
         wp.sfok = true;
-        match rects {
-            None => {
-                if !fresh && sw > 0 && sh > 0 {
-                    wp.keep(f, [0, 0, sw, sh]);
-                }
-                wp.pr_add([0, 0, sw, sh]);
-            }
-            Some(rs) => {
-                for r in rs {
-                    // clip x, y, x + w, y + h to the frame
-                    let b = [r[0].max(0), r[1].max(0), r[0].wrapping_add(r[2]).min(sw), r[1].wrapping_add(r[3]).min(sh)];
-                    if b[0] >= b[2] || b[1] >= b[3] {
-                        continue;
-                    }
-                    if !fresh {
-                        wp.keep(f, b);
-                    }
-                    wp.pr_add(b);
+        let all = [[0, 0, sw, sh]];
+        let rs = match rects {
+            Some(r) if !fresh => r,
+            _ => &all[..],
+        };
+        for r in rs {
+            if let Some(b) = clip_box(r, sw, sh) {
+                wp.pr_add(b);
+                for st in wp.st.iter_mut() {
+                    st.add(b); // every buffer now differs there
                 }
             }
         }
@@ -199,7 +163,93 @@ impl Wl {
             return; // nothing to show
         }
         wp.pend = true;
+        self.back_fill(i, f, rs);
         self.present_maybe(i, crate::time_us());
+    }
+
+    /// back_fill(i, frame, rects): the frame into the buffer that waits for its commit -- a
+    /// free buffer becomes it and gets all it lacks; with every buffer busy the rectangles go
+    /// into the staging image
+    fn back_fill(&mut self, i: usize, f: &Frame, rs: &[[i32; 4]]) {
+        let (w, h) = (self.wp[i].sf_w, self.wp[i].sf_h);
+        let (row, ss) = (w as usize * 4, f.stride.max(0) as usize);
+        let k = match self.wp[i].back {
+            Some(k) => Some(k),
+            None => self.slot_pick(i),
+        };
+        let wp = &mut self.wp[i];
+        let Some(k) = k else {
+            if wp.sf.len() != row * h as usize {
+                wp.sf = vec![0; row * h as usize];
+            }
+            for r in rs {
+                if let Some(b) = clip_box(r, w, h) {
+                    copy_boxes(&mut wp.sf, row, f.px, ss, &[b], w, h);
+                    wp.stg.add(b);
+                }
+            }
+            if wp.stg.over() {
+                let b = wp.stg.bbox(); // all of the bounding box: the region is only that now
+                copy_boxes(&mut wp.sf, row, f.px, ss, &[b], w, h);
+            }
+            return;
+        };
+        let sl = wp.slots[k];
+        // SAFETY: the buffer lies in our mapping, sl.w * sl.h (= w * h) pixels from sl.mem (the
+        // pool's slot size is at least that); it is not attached: the compositor does not read it.
+        let dst = unsafe { core::slice::from_raw_parts_mut(sl.mem as *mut u8, row * h as usize) };
+        copy_boxes(dst, row, f.px, ss, wp.st[k].boxes(), w, h);
+        wp.st[k].clear();
+        wp.stg.clear(); // (staged boxes are stale boxes of every buffer)
+        wp.back = Some(k);
+    }
+
+    /// a free buffer of window i of the frame's size (made or remade here: then it lacks
+    /// everything), the one of the last commit first -> its slot; None: all busy (or no pool)
+    fn slot_pick(&mut self, i: usize) -> Option<usize> {
+        let (w, h) = (self.wp[i].sf_w, self.wp[i].sf_h);
+        if w <= 0 || h <= 0 {
+            return None;
+        }
+        let wp = &self.wp[i];
+        let cur = wp.cur_pool;
+        let fits = |k: usize| {
+            let s = wp.slots[k];
+            !s.busy && s.buf != 0 && s.w == w && s.h == h && s.pool == cur
+        };
+        let k = wp
+            .newest
+            .filter(|&n| fits(n))
+            .or_else(|| (0..SLOT_N).find(|&k| fits(k)))
+            .or_else(|| (0..SLOT_N).find(|&k| !wp.slots[k].busy))?;
+        // pool large enough?
+        let need = (w as u32).wrapping_mul(h as u32) as u64 * 4;
+        if (cur == 0 || need > self.wp[i].pools[cur as usize - 1].slot as u64) && !self.pool_grow(i, need, i != 0) {
+            return None;
+        }
+        let cur = self.wp[i].cur_pool;
+        let sl = self.wp[i].slots[k];
+        if sl.buf == 0 || sl.w != w || sl.h != h || sl.pool != cur {
+            if sl.buf != 0 {
+                self.wp[i].slots[k].buf = 0;
+                self.buf_drop(i, sl.pool, sl.buf);
+            }
+            let pl = self.wp[i].pools[cur as usize - 1];
+            let off = pl.slot.wrapping_mul(k as u32);
+            let buf = self.w.send(pl.id, &SHM_POOL_CREATE_BUFFER,
+                                  &[A::N(&IFACE_WL_BUFFER), A::I(off as i32), A::I(w), A::I(h), A::I(w * 4),
+                                    A::U(SHM_XRGB8888)]);
+            self.w.set_udata(buf, i as u64); // its window
+            self.wp[i].pools[cur as usize - 1].nbuf += 1;
+            let slr = &mut self.wp[i].slots[k];
+            slr.pool = cur;
+            slr.mem = pl.map + off as usize;
+            slr.buf = buf;
+            slr.w = w;
+            slr.h = h;
+            self.wp[i].st[k].set_full(w, h); // everything is stale
+        }
+        Some(k)
     }
 
     /// present the window's pending damage now unless it waits for its first configure or
@@ -230,8 +280,8 @@ impl Wl {
             }
             let mapped = self.win[i].mapped;
             let wp = &mut self.wp[i];
-            // mapped again (or first map without a present yet): the last frame
-            if !mapped && wp.sfok && !wp.pend {
+            // mapped again (or first map without a present yet): the whole last frame
+            if !mapped && wp.sfok {
                 let b = [0, 0, wp.sf_w, wp.sf_h];
                 wp.pr_add(b);
                 wp.pend = true;
@@ -239,7 +289,9 @@ impl Wl {
             if !wp.pend {
                 continue;
             }
+            let t0 = crate::time_us();
             self.present_maybe(i, now);
+            crate::present_account(t0, false);
             let wp = &self.wp[i];
             if wp.pend && wp.frame_wait {
                 next = next.min(wp.frame_t0 + FRAME_SAFETY); // wake up at the safety deadline
@@ -249,12 +301,11 @@ impl Wl {
     }
 
     /// the window's surface was destroyed: its frame callback will not come and its buffers
-    /// are free (the next present copies everything)  [wl_present_unmapped]
+    /// are free (they keep their pixels)  [wl_present_unmapped]
     pub(crate) fn present_unmapped(&mut self, w: usize) {
         let wp = &mut self.wp[w & (PW_MAX - 1)];
         for s in wp.slots.iter_mut() {
             s.busy = false;
-            s.st = [0, 0, s.w, s.h];
         }
         wp.frame_cb = 0;
         wp.frame_wait = false;
@@ -263,6 +314,20 @@ impl Wl {
         wp.sent_scale = 0;
         wp.sent_vw = 0;
         wp.sent_vh = 0;
+    }
+
+    /// (test aid) window w's last committed buffer: (w, h, rows of w * 4 bytes); None while
+    /// damage waits or before the first commit
+    pub(crate) fn test_presented(&mut self, w: i32) -> Option<(i32, i32, Vec<u8>)> {
+        let i = self.rec(w)?;
+        let wp = &self.wp[i];
+        if wp.pend {
+            return None;
+        }
+        let s = wp.slots[wp.newest_ok()?];
+        // SAFETY: the buffer lies in our live mapping (newest_ok), s.w * s.h pixels.
+        let px = unsafe { core::slice::from_raw_parts(s.mem as *const u8, s.w as usize * s.h as usize * 4) };
+        Some((s.w, s.h, px.to_vec()))
     }
 
     /// the window is destroyed: its buffers, pools and mappings go  [wl_present_free]
@@ -386,6 +451,9 @@ impl Wl {
         let oid = self.wp[i].pools[old as usize - 1].id;
         self.wp[i].pools[old as usize - 1].id = 0;
         self.w.send(oid, &SHM_POOL_DESTROY, &[]);
+        if self.wp[i].back.is_some_and(|b| self.wp[i].slots[b].pool == old) {
+            self.wp[i].back = None;
+        }
         for s in 0..SLOT_N {
             let sl = self.wp[i].slots[s];
             if sl.buf == 0 || sl.pool != old {
@@ -406,7 +474,9 @@ impl Wl {
         true
     }
 
-    /// copy window i's pending damage into a free slot and commit it  [present_do]
+    /// commit the buffer with window i's latest frame; without one waiting, a buffer that
+    /// frees up gets what it lacks from the buffer of the last commit and the staging image
+    /// [present_do]
     fn present_do(&mut self, i: usize, now: u64) {
         let r = self.win[i];
         let (w, h) = (self.wp[i].sf_w, self.wp[i].sf_h);
@@ -421,74 +491,28 @@ impl Wl {
         if !r.frac && ((w as u32) % s as u32 != 0 || (h as u32) % s as u32 != 0) {
             return; // integer scale: the size must be a multiple
         }
-        // a free slot, preferably one that already has this size
-        let cur = self.wp[i].cur_pool;
-        let mut pick: Option<usize> = None;
-        for (k, sl) in self.wp[i].slots.iter().enumerate() {
-            if sl.busy {
-                continue;
-            }
-            if sl.buf != 0 && sl.w == w && sl.h == h && sl.pool == cur {
-                pick = Some(k);
-                break;
-            }
-            if pick.is_none() {
-                pick = Some(k);
-            }
-        }
-        let Some(k) = pick else { return }; // all busy: retry on buffer release
-        // pool large enough?
-        let need = (w as u32).wrapping_mul(h as u32) as u64 * 4;
-        let cur = self.wp[i].cur_pool;
-        if (cur == 0 || need > self.wp[i].pools[cur as usize - 1].slot as u64) && !self.pool_grow(i, need, i != 0) {
-            return;
-        }
-        let cur = self.wp[i].cur_pool;
-        let sl = self.wp[i].slots[k];
-        if sl.buf == 0 || sl.w != w || sl.h != h || sl.pool != cur {
-            if sl.buf != 0 {
-                self.wp[i].slots[k].buf = 0;
-                self.buf_drop(i, sl.pool, sl.buf);
-            }
-            let pl = self.wp[i].pools[cur as usize - 1];
-            let off = pl.slot.wrapping_mul(k as u32);
-            let buf = self.w.send(pl.id, &SHM_POOL_CREATE_BUFFER,
-                                  &[A::N(&IFACE_WL_BUFFER), A::I(off as i32), A::I(w), A::I(h), A::I(w * 4),
-                                    A::U(SHM_XRGB8888)]);
-            self.w.set_udata(buf, i as u64); // its window
-            self.wp[i].pools[cur as usize - 1].nbuf += 1;
-            let slr = &mut self.wp[i].slots[k];
-            slr.pool = cur;
-            slr.mem = pl.map + off as usize;
-            slr.buf = buf;
-            slr.w = w;
-            slr.h = h;
-            slr.st = [0, 0, w, h]; // everything is stale
-        }
-        // pending rectangles (or their bounding box), then the slot's stale box
-        {
-            let wp = &mut self.wp[i];
-            let sl = wp.slots[k];
-            if wp.over {
-                copy_box(&sl, &wp.bx, &wp.sf, wp.sf_w);
-            } else {
-                for b in &wp.pr[..wp.prn] {
-                    copy_box(&sl, b, &wp.sf, wp.sf_w);
+        let k = match self.wp[i].back {
+            Some(k) => k,
+            None => {
+                let Some(k) = self.slot_pick(i) else { return }; // all busy: retry on buffer release
+                let wp = &mut self.wp[i];
+                let row = w as usize * 4;
+                // SAFETY: as in back_fill: w * h pixels of our mapping, not attached.
+                let dst = unsafe { core::slice::from_raw_parts_mut(wp.slots[k].mem as *mut u8, row * h as usize) };
+                if let Some(n) = wp.newest_ok().filter(|&n| n != k) {
+                    // SAFETY: another buffer of the same (live) pool mapping, w * h pixels, no
+                    // overlap with k; the compositor may read it, nobody writes it.
+                    let src = unsafe { core::slice::from_raw_parts(wp.slots[n].mem as *const u8, row * h as usize) };
+                    for b in wp.st[k].boxes().iter().filter(|b| !wp.stg.covers(b)) {
+                        copy_boxes(dst, row, src, row, core::slice::from_ref(b), w, h);
+                    }
                 }
+                copy_boxes(dst, row, &wp.sf, row, wp.stg.boxes(), w, h);
+                wp.st[k].clear();
+                wp.stg.clear();
+                k
             }
-            if sl.st[0] < sl.st[2] {
-                copy_box(&sl, &sl.st, &wp.sf, wp.sf_w);
-            }
-            wp.slots[k].st[0] = 0;
-            wp.slots[k].st[2] = 0;
-            // the other slots now miss this damage
-            let bx = wp.bx;
-            for (o, os) in wp.slots.iter_mut().enumerate() {
-                if o != k && os.buf != 0 {
-                    box_union(&mut os.st, &bx);
-                }
-            }
-        }
+        };
         // configure acknowledgement (only with a buffer of the configured size)
         let matches = w == r.pw && h == r.ph;
         if matches {
@@ -543,6 +567,8 @@ impl Wl {
         self.w.send(r.surf, &SURFACE_COMMIT, &[]);
         self.w.flush();
         self.wp[i].slots[k].busy = true;
+        self.wp[i].newest = Some(k);
+        self.wp[i].back = None;
         self.win[i].mapped = true;
         self.present_drop(i);
     }

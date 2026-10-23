@@ -1503,6 +1503,27 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
   a machine that builds other things meanwhile; give a frame budget as the limit (33000 for 30
   fps) rather than today's times. Example: `apps/JFNetworker/tests/perf.uis` (500 devices, 800
   cables, 300 frames moving, pan, zoom and a drag at 1920 x 1080).
+* **Presenting** (`plat::win_present(w, frame, rects)`, `bench` leaves it out): the frame's
+  dirty rectangles are copied once toward the screen, straight from the framebuffer. Windows:
+  into the window's kept copy, a DIB section, then BitBlt (batched, `GdiFlush`); WM_PAINT
+  repaints its area from that copy. X11: into one of the window's two MIT-SHM segments, each a
+  whole frame that knows where it is stale (the segment of the last put first), then
+  ShmPutImage of the rectangles; Expose reads the segment of the last put. Wayland: into a free
+  wl_shm buffer that waits for its commit (the frame callback). Only with every segment / buffer
+  busy does the damage wait in a staging image. Browser and Android: the B, G, R, x of the
+  frame becomes the window's R, G, B, A copy while it is copied in; one window over the whole
+  canvas without popups is the canvas itself (no composition), and the host copies rows into
+  one buffer per frame (the page's ImageData, Android's Bitmap). Pixels outside the rectangles
+  must be what the last present of that window showed (the UI's dirty rectangles cover every
+  change; `--verify-dirty` checks it). `plat::present_time()` sums the time spent there;
+  `linuxtest --test pbench [--size WxH] [--gap MS]` prints it per frame (the whole frame, two
+  boxes, a quarter, 40 rectangles) on Windows, X11 and Wayland; `linuxtest --test pcheck` reads
+  the presented pixels back (the window's DC, GetImage, the committed wl_shm buffer) after
+  partial presents, frames back to back, hide + show, minimize, WM_PAINT and a new size (Linux:
+  `jfgui_BACKEND=x11|wayland`, `jfgui_X11SHM=fd|sysv|off`). `node tools/tests/web_present.mjs
+  BUILD [--base OLD]` measures the browser worker and compares canvas and framebuffer in
+  Chromium and Firefox; `GalleryPresentInstrumentation` (`apps/androidGallery`) measures
+  Android's frames and compares partial frames with a full one.
 * **Parity** (apps that also exist in `legacy/`): `python tools/parity.py app NAME` runs the
   shot matrix (light / dark × 100 / 150 %, with dumps) and every script on the assembly
   reference and the Rust build and compares pixels, dumps, stdout and exit codes;

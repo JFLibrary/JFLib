@@ -209,8 +209,12 @@ eine Warteschlange alter Bilder bei schnellen Eingabefolgen. Verdeckte Tabs verw
 einen Timer, damit Speicherbestätigungen auch ohne sichtbaren Animationsframe ankommen.
 
 Der Fensteradapter hält Fenster- und Kompositionspuffer vor und berücksichtigt die von
-`ui` gelieferten Änderungsrechtecke. Der Worker konvertiert und überträgt nur diese
-Bildbereiche; der Host gibt deren Puffer nach `putImageData` zur Wiederverwendung zurück.
+`ui` gelieferten Änderungsrechtecke. Die Fensterpuffer liegen in der Reihenfolge R, G, B, A
+vor (getauscht wird einmal, beim Kopieren der Rechtecke aus dem Framebuffer); ein einzelnes
+Fenster über der ganzen Leinwand ohne Popup ist die Leinwand selbst, ohne Komposition. Der
+Worker kopiert nur die geänderten Bildbereiche Zeile für Zeile in einen Puffer pro Bild
+(Pool, kleinster passender); der Host legt `ImageData`-Ansichten darauf, ruft `putImageData`
+und gibt den Puffer zur Wiederverwendung zurück.
 Die Canvas-Abmessungen werden ausschließlich bei echten Größenänderungen gesetzt.
 Fenster-/Popup-Geometrieänderungen erzwingen weiterhin eine vollständige Komposition,
 damit zuvor verdeckte Bereiche zuverlässig wieder erscheinen. Native Ereignisschleifen
@@ -288,6 +292,11 @@ landet es wie Firefox dort).
   Zeichenbewegungen, Stiftdruck, Undo/Redo und Größenänderungen. Stapel und einzeln
   verarbeitete Ereignisse müssen dieselben Pixel ergeben; Teilbildkomposition wird
   gegen erzwungene Vollbildkomposition geprüft, auch bei 150/200 Prozent DPI.
+- `tools/tests/web_present.mjs BUILD [--base OLD]`: Kosten der Darstellung im Worker
+  (`jfgui_present_us`, ganze Bilder, Hover, offenes Menü bei 1920 x 1080 und 3840 x 2160),
+  Teilbilder gegen erzwungene Vollkomposition, mit `--base` dieselben Pixel wie der ältere
+  Build; danach in Chromium und Firefox (100/200 %) Canvas (`getImageData`) gleich
+  Framebuffer (`ui.render`) nach Hover, Menü auf/zu und neuer Größe.
 - `tools/tests/web_responsiveness.mjs BUILD [BASELINE_WEB]`: Chromium/Firefox, fünf
   GUI-Apps, Canvas-Reset-Zähler, schnelle Hover-Folgen, künstlich verzögerter Worker,
   Begrenzung auf einen laufenden Stapel und 200-Prozent-DPI. Der optionale Vergleich

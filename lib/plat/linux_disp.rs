@@ -269,8 +269,12 @@ pub fn win_set_min_size(w: i32, w_dip: i32, h_dip: i32) {
     }
 }
 
+/// show the frame's dirty rectangles (x, y, w, h; None = all) in window w; pixels outside
+/// them must be what the last present of w showed (linux_x11_present.rs, linux_wl_present.rs)
 pub fn win_present(w: i32, f: &Frame, rects: Option<&[[i32; 4]]>) {
+    let t0 = crate::time_us();
     with(|b| b.win_present(w, f, rects));
+    crate::present_account(t0, true);
 }
 
 pub fn win_set_cursor(w: i32, shape: u32) {
