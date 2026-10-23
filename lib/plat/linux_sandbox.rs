@@ -18,6 +18,7 @@ use crate::sandbox::Status;
 // syscall numbers (x86-64)
 const SYS_OPENAT: usize = 257;
 const SYS_CLOSE: usize = 3;
+const SYS_FSTAT: usize = 5;
 const SYS_PRCTL: usize = 157;
 const SYS_SECCOMP: usize = 317;
 const SYS_LANDLOCK_CREATE_RULESET: usize = 444;
@@ -32,12 +33,16 @@ const PR_SET_NO_NEW_PRIVS: usize = 38;
 
 // Landlock filesystem access rights
 const FS_EXECUTE: u64 = 1 << 0;
+const FS_WRITE_FILE: u64 = 1 << 1;
 const FS_READ_FILE: u64 = 1 << 2;
 const FS_READ_DIR: u64 = 1 << 3;
 const FS_REFER: u64 = 1 << 13;
 const FS_TRUNCATE: u64 = 1 << 14;
 const FS_BASE: u64 = 0x1FFF; // bits 0..12 (read, write, remove, make*)
 const FS_READ: u64 = FS_EXECUTE | FS_READ_FILE | FS_READ_DIR;
+const ACCESS_FILE: u64 = FS_EXECUTE | FS_WRITE_FILE | FS_READ_FILE | FS_TRUNCATE; // the rights a file can carry
+const S_IFMT: u32 = 0xF000;
+const S_IFDIR: u32 = 0x4000;
 
 // Landlock network access rights (ABI 4+)
 const NET_BIND_TCP: u64 = 1 << 0;
@@ -175,6 +180,15 @@ fn landlock(plan: &LinuxPlan, abi: i32, st: &mut Status) {
 fn add_path(ruleset: i32, path: &str, access: u64) {
     let pfd = open_path(path);
     if pfd < 0 {
+        return;
+    }
+    // the kernel rejects (EINVAL) directory-only rights on a file: a granted file keeps its own
+    let mut st = [0u64; 18]; // struct stat; st_mode at 24
+    // SAFETY: a live descriptor and storage for the x86-64 stat structure.
+    let is_dir = unsafe { syscall3(SYS_FSTAT, pfd as usize, st.as_mut_ptr() as usize, 0) } == 0 && st[3] as u32 & S_IFMT == S_IFDIR;
+    let access = if is_dir { access } else { access & ACCESS_FILE };
+    if access == 0 {
+        close(pfd);
         return;
     }
     let attr = PathBeneathAttr { allowed_access: access, parent_fd: pfd };

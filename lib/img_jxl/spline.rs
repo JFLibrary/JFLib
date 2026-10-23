@@ -40,6 +40,10 @@ pub const NUM_CTX: u32 = 6;
 
 const MAX_POINTS: u64 = 1 << 20;
 const MAX_POINTS_PER_PIXEL: u64 = 2;
+/// bounds of the draw cache (blobs, and blob / row pairs inside the image): the area estimate of
+/// Dequantize does not bound the memory of a long curve
+const MAX_SEGMENTS: usize = 1 << 22;
+const MAX_ROWS: usize = 1 << 25;
 const DELTA_LIMIT: i64 = 1 << 30;
 const POINT_LIMIT: f32 = (1 << 23) as f32;
 const RENDER_DIST: f32 = 1.0;
@@ -458,7 +462,7 @@ fn catmull_rom(pts: &[(f32, f32)], out: &mut Vec<(f32, f32)>) {
 
 /// ForEachEquallySpacedPoint: points one unit apart along the polyline (the last with the
 /// remaining length as its multiplier)
-fn equally_spaced(pts: &[(f32, f32)], out: &mut Vec<((f32, f32), f32)>) {
+fn equally_spaced(pts: &[(f32, f32)], out: &mut Vec<((f32, f32), f32)>, limit: usize) -> Result<(), i32> {
     let mut cur = pts[0];
     out.push((cur, RENDER_DIST));
     let mut next = 0usize;
@@ -468,7 +472,7 @@ fn equally_spaced(pts: &[(f32, f32)], out: &mut Vec<((f32, f32), f32)>) {
         loop {
             if next == pts.len() {
                 out.push((prev, from_prev));
-                return;
+                return Ok(());
             }
             let dx = pts[next].0 - prev.0;
             let dy = pts[next].1 - prev.1;
@@ -477,6 +481,9 @@ fn equally_spaced(pts: &[(f32, f32)], out: &mut Vec<((f32, f32), f32)>) {
                 let f = (RENDER_DIST - from_prev) / to_next;
                 cur = (prev.0 + f * dx, prev.1 + f * dy);
                 out.push((cur, RENDER_DIST));
+                if out.len() > limit {
+                    return Err(ERR_LIMIT);
+                }
                 break;
             }
             from_prev += to_next;
@@ -484,12 +491,16 @@ fn equally_spaced(pts: &[(f32, f32)], out: &mut Vec<((f32, f32), f32)>) {
             next += 1;
         }
     }
+    Ok(())
 }
 
 /// ComputeSegments: the blob of one point (skipped for a degenerate sigma)
-fn compute_segment(center: (f32, f32), intensity: f32, color: [f32; 3], sigma: f32, segs: &mut Vec<Seg>, by_y: &mut Vec<(u64, u32)>) {
+fn compute_segment(center: (f32, f32), intensity: f32, color: [f32; 3], sigma: f32, h: u32, segs: &mut Vec<Seg>, by_y: &mut Vec<(u32, u32)>) -> Result<(), i32> {
     if !(sigma.is_finite() && sigma != 0.0 && (1.0 / sigma).is_finite() && intensity.is_finite()) {
-        return;
+        return Ok(());
+    }
+    if segs.len() >= MAX_SEGMENTS {
+        return Err(ERR_LIMIT);
     }
     let mut maxc = 0.01f32;
     for c in color {
@@ -506,13 +517,19 @@ fn compute_segment(center: (f32, f32), intensity: f32, color: [f32; 3], sigma: f
         s4i: 0.25 * sigma * intensity,
         maxd: md,
     };
-    let y0 = (center.1 - md + 0.5) as i64;
-    let y1 = (center.1 + md + 1.5) as i64;
+    let y0 = ((center.1 - md + 0.5) as i64).max(0);
+    let y1 = ((center.1 + md + 1.5) as i64).min(h as i64);
     let i = segs.len() as u32;
-    for y in y0.max(0)..y1 {
-        by_y.push((y as u64, i));
+    if y1 > y0 {
+        if by_y.len() as u64 + (y1 - y0) as u64 > MAX_ROWS as u64 {
+            return Err(ERR_LIMIT);
+        }
+        for y in y0..y1 {
+            by_y.push((y as u32, i));
+        }
     }
     segs.push(seg);
+    Ok(())
 }
 
 impl Splines {
@@ -520,7 +537,7 @@ impl Splines {
     /// the colour correlation's base ratios
     pub fn new(q: &Quantized, w: u32, h: u32, ytox: f32, ytob: f32) -> Result<Splines, i32> {
         let mut segs: Vec<Seg> = Vec::new();
-        let mut by_y: Vec<(u64, u32)> = Vec::new();
+        let mut by_y: Vec<(u32, u32)> = Vec::new();
         let mut total = 0u64;
         let mut sps = Vec::with_capacity(q.splines.len());
         for (i, s) in q.splines.iter().enumerate() {
@@ -536,7 +553,7 @@ impl Splines {
             inter.clear();
             draw.clear();
             catmull_rom(&sp.points, &mut inter);
-            equally_spaced(&inter, &mut draw);
+            equally_spaced(&inter, &mut draw, MAX_SEGMENTS - segs.len())?;
             let arc = ((draw.len() - 2) as f32 * RENDER_DIST + draw[draw.len() - 1].1) as f64;
             if arc <= 0.0 {
                 continue;
@@ -547,7 +564,7 @@ impl Splines {
                 let t = 31.0 * prog;
                 let color = [continuous_idct(&sp.color[0], t), continuous_idct(&sp.color[1], t), continuous_idct(&sp.color[2], t)];
                 let sigma = continuous_idct(&sp.sigma, t);
-                compute_segment(pt, mult, color, sigma, &mut segs, &mut by_y);
+                compute_segment(pt, mult, color, sigma, h, &mut segs, &mut by_y)?;
             }
         }
         by_y.sort_unstable();
@@ -555,9 +572,7 @@ impl Splines {
         let mut idx = Vec::with_capacity(by_y.len());
         for &(y, i) in &by_y {
             idx.push(i);
-            if y < h as u64 {
-                ystart[y as usize + 1] += 1;
-            }
+            ystart[y as usize + 1] += 1;
         }
         for y in 0..h as usize {
             ystart[y + 1] += ystart[y];
@@ -567,10 +582,14 @@ impl Splines {
 
     /// add the segments to the first three planes (their size: the frame before upsampling)
     pub fn add_to(&self, p: &mut [Jrp]) {
-        let (w, h, s) = (p[0].w, p[0].h, p[0].s as usize);
-        if p.len() < 3 || p[1].s as usize != s || p[2].s as usize != s {
+        if p.len() < 3 {
             return;
         }
+        let (w, h, s) = (p[0].w.min(p[1].w).min(p[2].w), p[0].h, p[0].s as usize);
+        if s == 0 || p[1].s as usize != s || p[2].s as usize != s || w as usize > s {
+            return;
+        }
+        let h = h.min(p[1].h).min(p[2].h).min((p[0].d.len().min(p[1].d.len()).min(p[2].d.len()) / s) as u32);
         let (a, rest) = p.split_at_mut(1);
         let (b, c) = rest.split_at_mut(1);
         let rows: [&mut [f32]; 3] = [&mut a[0].d, &mut b[0].d, &mut c[0].d];

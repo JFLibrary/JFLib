@@ -499,7 +499,12 @@ pub fn find(p: [&[f32]; 3], s: usize, ph: usize, w: usize, h: usize, threads: bo
     let keep = MAX_CC.min(ccs.len());
     if ccs.len() > keep {
         let mut perm: Vec<u32> = (0..ccs.len() as u32).collect();
-        crate::epatch::cxx_sort(&mut perm, |a, b| ccs[*a as usize].score > ccs[*b as usize].score);
+        // a NaN score (flat surroundings) must not make the comparison inconsistent
+        let key = |i: u32| {
+            let v = ccs[i as usize].score;
+            if v.is_nan() { f32::NEG_INFINITY } else { v }
+        };
+        crate::epatch::cxx_sort(&mut perm, |a, b| key(*a) > key(*b));
         let mut slots: Vec<Option<Cc>> = ccs.into_iter().map(Some).collect();
         ccs = perm[..keep].iter().filter_map(|&i| slots[i as usize].take()).collect();
     }

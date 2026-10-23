@@ -83,30 +83,35 @@ const P_REGDELETE: usize = 5;
 const P_REGTREE: usize = 6;
 const P_REGDELVAL: usize = 7;
 const P_CHANGENOTIFY: usize = 8;
-static LOADED: AtomicU32 = AtomicU32::new(0);
+static LOADED: AtomicU32 = AtomicU32::new(0); // 0 not loaded, 1 loading, 2 loaded (PROCS valid)
 static PROCS: [AtomicUsize; 9] = [const { AtomicUsize::new(0) }; 9];
 
 /// resolve the optional APIs once and initialise COM  [sh_load]
 fn inst_load() {
-    if LOADED.swap(1, Ordering::SeqCst) != 0 {
-        return;
-    }
-    let set = |i: usize, dll: &[u8], name: &[u8]| PROCS[i].store(dll_proc(dll, name), Ordering::SeqCst);
-    set(P_COINIT, b"ole32.dll\0", b"CoInitializeEx\0");
-    set(P_COCREATE, b"ole32.dll\0", b"CoCreateInstance\0");
-    set(P_REGCREATE, b"advapi32.dll\0", b"RegCreateKeyExW\0");
-    set(P_REGSET, b"advapi32.dll\0", b"RegSetValueExW\0");
-    set(P_REGCLOSE, b"advapi32.dll\0", b"RegCloseKey\0");
-    set(P_REGDELETE, b"advapi32.dll\0", b"RegDeleteKeyW\0");
-    set(P_REGTREE, b"advapi32.dll\0", b"RegDeleteTreeW\0");
-    set(P_REGDELVAL, b"advapi32.dll\0", b"RegDeleteKeyValueW\0");
-    set(P_CHANGENOTIFY, b"shell32.dll\0", b"SHChangeNotify\0");
-    let p = PROCS[P_COINIT].load(Ordering::SeqCst);
-    if p != 0 {
-        // SAFETY: CoInitializeEx(LPVOID reserved, DWORD) -> HRESULT; S_FALSE / RPC_E_CHANGED_MODE
-        // are fine.
-        let f: unsafe extern "system" fn(usize, u32) -> i32 = unsafe { core::mem::transmute(p) };
-        unsafe { f(0, COINIT_APT) };
+    while LOADED.load(Ordering::Acquire) != 2 {
+        // a second thread waits until the first one has filled PROCS
+        if LOADED.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire).is_err() {
+            core::hint::spin_loop();
+            continue;
+        }
+        let set = |i: usize, dll: &[u8], name: &[u8]| PROCS[i].store(dll_proc(dll, name), Ordering::SeqCst);
+        set(P_COINIT, b"ole32.dll\0", b"CoInitializeEx\0");
+        set(P_COCREATE, b"ole32.dll\0", b"CoCreateInstance\0");
+        set(P_REGCREATE, b"advapi32.dll\0", b"RegCreateKeyExW\0");
+        set(P_REGSET, b"advapi32.dll\0", b"RegSetValueExW\0");
+        set(P_REGCLOSE, b"advapi32.dll\0", b"RegCloseKey\0");
+        set(P_REGDELETE, b"advapi32.dll\0", b"RegDeleteKeyW\0");
+        set(P_REGTREE, b"advapi32.dll\0", b"RegDeleteTreeW\0");
+        set(P_REGDELVAL, b"advapi32.dll\0", b"RegDeleteKeyValueW\0");
+        set(P_CHANGENOTIFY, b"shell32.dll\0", b"SHChangeNotify\0");
+        let p = PROCS[P_COINIT].load(Ordering::SeqCst);
+        if p != 0 {
+            // SAFETY: CoInitializeEx(LPVOID reserved, DWORD) -> HRESULT; S_FALSE / RPC_E_CHANGED_MODE
+            // are fine.
+            let f: unsafe extern "system" fn(usize, u32) -> i32 = unsafe { core::mem::transmute(p) };
+            unsafe { f(0, COINIT_APT) };
+        }
+        LOADED.store(2, Ordering::Release);
     }
 }
 

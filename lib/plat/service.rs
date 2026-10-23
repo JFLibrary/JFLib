@@ -62,10 +62,11 @@ impl ServiceState {
 /// one argument of an ExecStart line (systemd quoting)
 fn unit_arg(a: &str) -> String {
     let e = a.replace('%', "%%").replace('$', "$$");
-    if !e.is_empty() && !e.contains([' ', '\t', '"', '\'', '\\', ';']) {
+    if !e.is_empty() && !e.contains([' ', '\t', '\n', '\r', '"', '\'', '\\', ';']) {
         return e;
     }
-    format!("\"{}\"", e.replace('\\', "\\\\").replace('"', "\\\""))
+    // a line break would end the ExecStart line: the C escape keeps it inside the argument
+    format!("\"{}\"", e.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r"))
 }
 
 /// the systemd unit of a service
@@ -211,8 +212,9 @@ mod win {
             let run: fn() -> i32 = unsafe { core::mem::transmute::<usize, fn() -> i32>(f) };
             EXIT.store(run(), Ordering::Release);
         }));
-        if let Some(t) = t {
-            t.join();
+        match t {
+            Some(t) => t.join(),
+            None => EXIT.store(1, Ordering::Release), // run() never started: not a success
         }
         let code = EXIT.load(Ordering::Acquire);
         report(STOPPED, if code == 0 { 0 } else { 1066 }, 0);
@@ -442,11 +444,21 @@ mod linux {
         format!("/etc/systemd/system/{}.service", name)
     }
 
+    /// a unit name that is a file name (no '/', no "..") and no systemctl option
+    fn valid_name(name: &str) -> Result<(), String> {
+        let ok = !name.is_empty()
+            && name.len() <= 200
+            && !name.starts_with(['-', '.'])
+            && name.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b'.' | b'@' | b':'));
+        if ok { Ok(()) } else { Err(format!("{}: kein gültiger Dienstname", name)) }
+    }
+
     fn need_root() -> Result<(), String> {
         if is_root() { Ok(()) } else { Err(String::from("nur als root (sudo) möglich")) }
     }
 
     pub fn install(s: &ServiceSpec) -> Result<(), String> {
+        valid_name(s.name)?;
         need_root()?;
         if crate::fs::stat("/run/systemd/system").is_none() {
             return Err(String::from("systemd läuft auf diesem Rechner nicht"));
@@ -463,16 +475,19 @@ mod linux {
     }
 
     pub fn start(name: &str) -> Result<(), String> {
+        valid_name(name)?;
         need_root()?;
         systemctl(&["start", name]).map(|_| ())
     }
 
     pub fn stop(name: &str) -> Result<(), String> {
+        valid_name(name)?;
         need_root()?;
         systemctl(&["stop", name]).map(|_| ())
     }
 
     pub fn uninstall(name: &str) -> Result<(), String> {
+        valid_name(name)?;
         need_root()?;
         let p = unit_path(name);
         if crate::fs::stat(&p).is_none() {
@@ -484,6 +499,9 @@ mod linux {
     }
 
     pub fn state(name: &str) -> ServiceState {
+        if valid_name(name).is_err() {
+            return ServiceState::NotInstalled;
+        }
         if crate::fs::stat(&unit_path(name)).is_none() && crate::fs::stat(&format!("/lib/systemd/system/{}.service", name)).is_none() {
             return ServiceState::NotInstalled;
         }

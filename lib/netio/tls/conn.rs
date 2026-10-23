@@ -855,7 +855,7 @@ impl Conn {
         let exts = extensions(if r.b.is_empty() { &[] } else { r.v16()? })?;
         r.done()?;
         let Some(v) = ext(&exts, EXT_VERSIONS) else {
-            if self.web && random != HRR_RANDOM {
+            if self.web && !self.hrr && random != HRR_RANDOM {
                 return self.server_hello12(msg, random, suite, &exts);
             }
             return Err(fail(AL_PROTOCOL_VERSION, "the server does not speak TLS 1.3"));

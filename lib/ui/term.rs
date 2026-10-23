@@ -401,7 +401,8 @@ impl Screen {
             b'\n' => self.newline(),
             b'\r' => self.col = 0,
             b'\t' => {
-                let to = (self.col / 8 + 1) * 8;
+                // (never past the forced break: put() would wrap and the loop never ends)
+                let to = ((self.col / 8 + 1) * 8).min(LINE_MAX);
                 while self.col < to {
                     self.put(' ');
                 }
@@ -1895,6 +1896,11 @@ impl Ui {
         }
         if self.term_key(0x55, MOD_CTRL) {
             // Ctrl+U: the line before the caret goes
+            // (the line may have changed above: Enter, Ctrl+C, history)
+            let mut caret = caret.min(st.input.len());
+            while !st.input.is_char_boundary(caret) {
+                caret -= 1;
+            }
             st.input.drain(..caret);
             st.caret_want = Some(0);
         }

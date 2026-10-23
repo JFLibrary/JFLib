@@ -186,7 +186,9 @@ impl Ntp {
 /// the clock offset and the round-trip delay from the four times of an exchange (client send
 /// t1, server receive t2, server send t3, client receive t4; all in ns)
 pub fn offset_delay(t1: i64, t2: i64, t3: i64, t4: i64) -> (i64, i64) {
-    (((t2 - t1) + (t3 - t4)) / 2, (t4 - t1) - (t3 - t2))
+    let (t1, t2, t3, t4) = (t1 as i128, t2 as i128, t3 as i128, t4 as i128);
+    let clamp = |v: i128| v.clamp(i64::MIN as i128, i64::MAX as i128) as i64;
+    (clamp(((t2 - t1) + (t3 - t4)) / 2), clamp((t4 - t1) - (t3 - t2)))
 }
 
 /// the UTC calendar date and time of a Unix time (days from civil, H. Hinnant)

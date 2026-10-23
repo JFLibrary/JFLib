@@ -700,6 +700,10 @@ impl Message {
         let mut counts = [0u16; 4];
         let mut cut = false;
         for q in &self.questions {
+            if counts[0] == u16::MAX {
+                cut = true;
+                break;
+            }
             let mark = out.len();
             let ok = write_name(&mut out, &q.name, &mut c);
             out.extend_from_slice(&q.qtype.to_be_bytes());
@@ -720,6 +724,10 @@ impl Message {
                 break;
             }
             for r in sec {
+                if counts[i + 1] == u16::MAX {
+                    cut = true;
+                    break;
+                }
                 let mark = out.len();
                 let ok = write_rr(&mut out, r, &mut c);
                 if !ok || out.len() > limit {

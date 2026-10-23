@@ -1,6 +1,6 @@
 //! Raster layer interchange. Unsupported Photoshop constructs are explicitly marked
 //! as lossy or rejected so the application can protect the source document.
-use super::{Reader, header, packbits, resources, sample, undo_prediction};
+use super::{Reader, header, packbits, resources, sample, undo_prediction, zeroed};
 use alloc::{string::String, vec, vec::Vec};
 use gfx::{Surface, FMT_ARGB};
 use img_core::*;
@@ -54,6 +54,9 @@ const MODES: [(u8, &[u8; 4]); 10] = [
     (7,b"over"), (8,b"diff"), (10,b"lite"), (11,b"dark"), (12,b"scrn"),
 ];
 
+// Tagged blocks whose length field is 8 bytes in PSB.
+const LONG_KEYS: [&[u8]; 13] = [b"LMsk", b"Lr16", b"Lr32", b"Layr", b"Mt16", b"Mt32", b"Mtrn", b"Alph", b"FMsk", b"lnk2", b"FEid", b"FXid", b"PxSD"];
+
 pub fn decode(data: &[u8], dec: &ImgDec) -> Result<Option<Document>, i32> {
     let mut meta = ImgMeta { fmt: IMGF_PSD, ..ImgMeta::default() };
     let (w, h, _, gray) = header(data, &mut meta)?;
@@ -73,8 +76,7 @@ pub fn decode(data: &[u8], dec: &ImgDec) -> Result<Option<Document>, i32> {
         while r.pos + 12 <= section.len() {
             if ![b"8BIM".as_slice(), b"8B64"].contains(&r.take(4)?) { return Err(ERR_HDR); }
             let key = r.take(4)?;
-            let long = large && [b"LMsk".as_slice(),b"Lr16",b"Lr32",b"Layr",b"Mt16",b"Mt32",b"Mtrn",b"Alph",b"FMsk",b"lnk2",b"FEid",b"FXid",b"PxSD"].contains(&key);
-            let block = r.large_section(long)?;
+            let block = r.large_section(large && LONG_KEYS.contains(&key))?;
             if key == if meta.bits == 16 { b"Lr16" } else { b"Lr32" } { layers = block; }
             if block.len() % 2 != 0 { r.take(1)?; }
         }
@@ -132,7 +134,7 @@ pub fn decode(data: &[u8], dec: &ImgDec) -> Result<Option<Document>, i32> {
         while e.pos + 12 <= extra.len() {
             if ![b"8BIM".as_slice(),b"8B64"].contains(&e.take(4)?) { return Err(ERR_HDR); }
             let key = e.take(4)?;
-            let block = e.section()?;
+            let block = e.large_section(large && LONG_KEYS.contains(&key))?;
             if block.len() & 1 != 0 { e.take(1)?; }
             match key {
                 b"luni" => {
@@ -211,9 +213,11 @@ fn channel(data: &[u8], w: usize, h: usize, depth: u8, large: bool, dec: &ImgDec
     match compression {
         0 => Ok(r.take(size)?.to_vec()),
         1 => {
-            let mut lengths = Vec::with_capacity(h);
+            // PackBits expands at most 64:1
+            if size / 64 > data.len().saturating_sub(r.pos) { return Err(ERR_TRUNC); }
+            let mut lengths = Vec::with_capacity(h.min(data.len() / 2));
             for _ in 0..h { lengths.push(if large {r.u32()? as usize} else {r.u16()? as usize}); }
-            let mut output = vec![0;size];
+            let mut output = zeroed(size)?;
             for (y, n) in lengths.into_iter().enumerate() {
                 if dec.cancelled() { return Err(ERR_CANCEL); }
                 packbits(r.take(n)?, &mut output[y*row..(y+1)*row])?;
@@ -221,7 +225,8 @@ fn channel(data: &[u8], w: usize, h: usize, depth: u8, large: bool, dec: &ImgDec
             Ok(output)
         },
         2 | 3 => {
-            let mut output = vec![0;size];
+            if size / 1032 > data.len().saturating_sub(r.pos) + 1 { return Err(ERR_TRUNC); }
+            let mut output = zeroed(size)?;
             if inflate::zlib_inflate(&data[r.pos..], &mut output)? != size { return Err(ERR_TRUNC); }
             if compression == 3 { undo_prediction(&mut output, w, depth)?; }
             Ok(output)

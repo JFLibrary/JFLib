@@ -2155,7 +2155,7 @@ pub fn decode(cs: &[u8], dec: Option<&ImgDec>) -> Result<Cs, i32> {
             return Err(ERR_HDR);
         }
         let p = d.r.bytepos();
-        if entries > end.wrapping_sub(p) {
+        if p > end || entries > end - p {
             return Err(ERR_TRUNC); // every entry takes at least one byte
         }
         let mut idx = vec![0u64; entries as usize];
@@ -2171,7 +2171,7 @@ pub fn decode(cs: &[u8], dec: Option<&ImgDec>) -> Result<Cs, i32> {
     let (n, ok) = d.r.vlwesc(cs); // SubsequentBytes
     let n = if ok { n } else { 0 };
     let p = d.r.bytepos();
-    if n > end.wrapping_sub(p) {
+    if p > end || n > end - p {
         return Err(ERR_TRUNC);
     }
     let base = p.wrapping_add(n); // first tile packet
@@ -2198,6 +2198,14 @@ pub fn decode(cs: &[u8], dec: Option<&ImgDec>) -> Result<Cs, i32> {
     }
     if total > JXR_MAXELEM {
         return Err(ERR_LIMIT);
+    }
+    let r = meta::mem_check(total * 4, dec.unwrap_or(&dd));
+    if r != 0 {
+        return Err(r);
+    }
+    // spatial mode reads at least one bit per macroblock and plane: fewer bytes cannot be complete
+    if !have_idx && d.mbw as u64 * d.mbh as u64 * d.npl as u64 > end.saturating_sub(base).saturating_mul(8) {
+        return Err(ERR_TRUNC);
     }
     for p in 0..d.npl as usize {
         d.setplane(p);

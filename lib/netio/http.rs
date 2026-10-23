@@ -389,6 +389,9 @@ impl<'a> Reader<'a> {
             loop {
                 let l = self.line(1024, false)?;
                 let size = l.split(';').next().unwrap_or("").trim();
+                if !size.bytes().all(|c| c.is_ascii_hexdigit()) {
+                    return Err(ReadError::Bad);
+                }
                 let n = u64::from_str_radix(size, 16).map_err(|_| ReadError::Bad)?;
                 if n == 0 {
                     // trailers up to the empty line

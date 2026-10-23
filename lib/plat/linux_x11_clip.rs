@@ -512,6 +512,9 @@ impl X11 {
             }
             let bytes = (rd32(&r, 16) as usize).wrapping_mul((r[1] >> 3) as usize) as u32 as usize;
             let after = rd32(&r, 12);
+            if bytes == 0 && after != 0 {
+                return u32::MAX; // no progress: the loop would never end
+            }
             if self.rb.len() + bytes + usize::from(limit == CLIP_MAX) > limit {
                 return u32::MAX; // other programs' data is bounded
             }

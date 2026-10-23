@@ -34,6 +34,8 @@ use crate::xml::{Item, NONE};
 const MAX_DRAWS: u32 = 1_000_000;
 const MAX_NEST: u32 = 64;
 const MAX_LAYERS: u32 = 8;
+// element visits of all bounds queries per render (a use DAG makes one query exponential)
+const MAX_BOUNDS: u32 = 4_000_000;
 const MAX_LAYER_PX: u64 = 1 << 26;
 const MAX_STOPS: usize = 1024;
 const KAPPA: f64 = 0.5522847498307936;
@@ -440,6 +442,7 @@ struct R<'a, 'h> {
     buf: Vec<u8>,
     text: Option<&'h mut dyn TextHook>,
     draws: u32,
+    bvis: u32,
     depth: u32,
     layers: u32,
     layer_px: u64, // pixels of the layers alive (bounded by MAX_LAYER_PX)
@@ -652,9 +655,10 @@ impl<'a, 'h> R<'a, 'h> {
     fn bounds_in(&mut self, k: u32, ps: &Style, m: &Matrix, vp: Vp, stroke: bool, depth: u32, own_tf: bool) -> Option<[f64; 4]> {
         let doc = self.doc;
         let n = doc.node(k)?;
-        if depth > MAX_NEST || display_none(n) {
+        if depth > MAX_NEST || display_none(n) || self.bvis >= MAX_BOUNDS {
             return None;
         }
+        self.bvis += 1;
         let cs = ps.child(n);
         let m2 = match n.tf {
             Some(t) if own_tf && !matches!(n.kind, Kind::LinearGradient | Kind::RadialGradient) => mul(m, &t),
@@ -1436,6 +1440,7 @@ impl Svg {
             buf: Vec::new(),
             text: opts.text.as_mut().map(|h| &mut **h as &mut dyn TextHook),
             draws: 0,
+            bvis: 0,
             depth: 0,
             layers: 0,
             layer_px: 0,

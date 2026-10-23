@@ -8686,7 +8686,9 @@ New library code, independent of native windows, document types and language mod
   - `fn rollback_transaction(&mut self) -> Result<(), ActionError>`
     Restore state and revision to before begin_transaction.
   - `fn inspect(&self, _query: &Value) -> Result<Value, ActionError>`
-    Filtered, paginated semantic state; hosts may accept a `sinceRevision` query.
+    Filtered, paginated semantic state; these control methods (inspect, tasks, resources)
+    are not gated by `access`, so the host must apply its own access rules to them and
+    should not hand out guessable task ids; hosts may accept a `sinceRevision` query.
   - `fn task_status(&self, _id: u64) -> Result<Value, ActionError>`
     Query a host-managed asynchronous task.
   - `fn task_cancel(&mut self, _id: u64) -> Result<Value, ActionError>`
@@ -9057,7 +9059,8 @@ Bounded cooperative tasks for long native/browser operations. New shared impleme
 - **`fn new(capacity: usize) -> Self`**
   Create a table; capacity is clamped to 1..=1024 tasks.
 - **`fn create(&mut self, action: &str, cancellable: bool) -> Result<u64, ActionError>`**
-  Allocate a pending task. Completed tasks are retained until explicitly forgotten.
+  Allocate a pending task. Completed tasks are retained until explicitly forgotten or,
+  when the table is full, evicted oldest first.
 - **`fn get(&self, id: u64) -> Result<&Task, ActionError>`**
   Inspect one task, without allowing external callers to mutate its state directly.
 - **`fn request_cancel(&mut self, id: u64) -> Result<&Task, ActionError>`**
@@ -13298,10 +13301,16 @@ From [`lib/img_jpeg/dec.rs`](../lib/img_jpeg/dec.rs) (`img_jpeg::dec`):
 - **`fn decode_fl(data: &[u8], flags: u32) -> Result<Surface, i32>`**
   jpeg_decode_fl
 
+- **`fn decode_fl_max(data: &[u8], flags: u32, maxw: u32, maxh: u32) -> Result<Surface, i32>`**
+  decode_fl with a limit on the frame size: a larger SOF is ERR_DIMS before any allocation
+
 - **`fn decode_abbrev(tables: &[u8], data: &[u8], flags: u32) -> Result<Surface, i32>`**
   jpeg_decode_abbrev: an abbreviated image stream (JPEG-in-TIFF strip / tile) with the
   tables of a tables-only stream (TIFF JPEGTables; empty = none); the orientation is never
   applied
+
+- **`fn decode_abbrev_max(tables: &[u8], data: &[u8], flags: u32, maxw: u32, maxh: u32) -> Result<Surface, i32>`**
+  decode_abbrev with a limit on the frame size (see decode_fl_max)
 
 From [`lib/img_jpeg/enc.rs`](../lib/img_jpeg/enc.rs) (`img_jpeg::enc`):
 
@@ -14874,7 +14883,7 @@ layers alive at once (deeper opacity is applied to the paints), use cycles are c
   viewBox mapped into it by preserveAspectRatio: sharp at any size)
 - **`fn rasterize(&self, w: i32, h: i32, opts: &mut Opts) -> Result<Surface, i32>`**
   a new FMT_PARGB surface w x h with the document drawn into it (render_rect);
-  Err(ERR_DIMS) for sides outside 1 .. 65535
+  Err(ERR_DIMS) for sides outside 1 .. 65535, Err(ERR_LIMIT) beyond IMG_MAXPX_DEF pixels
 
 ## fx
 
@@ -17215,7 +17224,8 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn normalize(path: &str) -> Option<String>`**
   path as an absolute, normalised path of this OS (relative paths against cwd()), or None
-  for a path the policy refuses
+  for a path the policy refuses. The normalisation is lexical: junctions, symbolic links and
+  8.3 names are not resolved, so rules match the path as written, not its final target.
 
 - **`fn normalize_for(path: &str, windows: bool, cwd: &str) -> Option<String>`**
   normalize with the rules of Windows (windows = true) or Linux against the folder cwd
@@ -23434,8 +23444,8 @@ all lines not touched by set (the original spacing survives).  New keys go after
 last key of their section, new sections to the end.  A UTF-8 BOM is skipped.  Files are
 read up to FILE_MAX bytes; after LINES_MAX lines the rest is kept as one verbatim block.
 Line ends: LF, CRLF (any number of CRs before the LF are dropped) when reading; written as
-CRLF on Windows, LF on Linux.  Key names must not contain '=', CR or LF nor start with
-';' '#' '['; section names must not contain ']', CR or LF; neither may start or end with
+CRLF on Windows, LF on Linux.  Key names must not contain '=', NUL, CR or LF nor start with
+';' '#' '['; section names must not contain ']', NUL, CR or LF; neither may start or end with
 a blank (set -> false).  CR / LF inside a value are written as blanks.
 ```
 
@@ -23453,6 +23463,9 @@ a blank (set -> false).  CR / LF inside a value are written as blanks.
 - **`fn new() -> Ini`**
 - **`fn load(path: &str) -> Ini`**
   the parsed file; empty when it is missing or unreadable  [ini_load]
+- **`fn load_checked(path: &str) -> Option<Ini>`**
+  like load, but None when the file exists and could not be read completely (unreadable
+  or longer than FILE_MAX); a missing or empty file gives an empty Ini
 - **`fn parse(data: &[u8]) -> Ini`**
   parse settings text  [ini_parse]
 - **`fn to_bytes(&self) -> Vec<u8>`**
@@ -25970,7 +25983,7 @@ Source: [`lib/crypto/p256.rs`](../lib/crypto/p256.rs)
 ```text
 p256 -- Diffie-Hellman on NIST P-256 (SEC 1, RFC 8446 4.2.8.2) in constant time
 
-  public_key(&secret) -> [u8; 65]          04 || x || y of secret * G
+  public_key(&secret) -> [u8; 65]          (panics on an invalid secret) 04 || x || y of secret * G
   shared(&secret, &peer_point) -> Option<[u8; 32]>   the x coordinate of secret * peer;
                                            None for a point that is not on the curve
   secret_from(random) -> Option<[u8; 32]>  a scalar in [1, n - 1] from 32 random bytes
@@ -26536,7 +26549,7 @@ Source: [`lib/netio/der.rs`](../lib/netio/der.rs)
 
 ```text
 der -- the DER subset X.509 needs: a bounded reader (definite lengths, no indefinite
-forms, at most 64 KiB per element) and a writer
+forms, at most 16 MiB per element) and a writer
 
   Der::new(bytes).read(tag) -> Option<(content, rest)>, peek_tag, int, oid, ...
   writer: tlv(tag, content), seq(&[parts]), int_u(bytes), oid(&[arcs]), utf8(s) ...
@@ -26696,6 +26709,9 @@ MAX_HEADERS: usize = 100
 - **`fn set(&mut self, name: &str, value: &str)`**
   replace (or add) a header
 - **`fn add(&mut self, name: &str, value: &str)`**
+- **`fn content_length(&self) -> Result<Option<u64>, ()>`**
+  the Content-Length: Ok(None) without one, Err for a value that is not plain digits or
+  headers that disagree
 - **`fn remove(&mut self, name: &str)`**
 - **`fn has_token(&self, name: &str, token: &str) -> bool`**
   whether a comma-separated header contains a token (Connection: close, ...)
@@ -26762,6 +26778,9 @@ MAX_HEADERS: usize = 100
 **`impl<'a> Reader<'a>`**
 
 - **`fn new(s: &'a dyn Stream) -> Reader<'a>`**
+- **`fn set_deadline(&mut self, deadline_us: Option<u64>)`**
+  reads fail with TimedOut once plat::time_us() is past this (a limit for a whole head,
+  where the stream's timeout counts each read)
 - **`fn has_buffered(&self) -> bool`**
   whether unread bytes are buffered (a pipelined next request)
 - **`fn head(&mut self) -> Result<(String, Headers), ReadError>`**
@@ -27091,7 +27110,8 @@ conn.rs is the I/O-free core (feed bytes, take bytes); this file drives it over 
 - **`struct ClientConfig`**
   - `trust: Trust`
   - `identity: Option<Identity>`
-  - `server_name: String` -- the name the certificate must carry (DNS name or IP address; "" = not checked)
+  - `server_name: String` -- the name the certificate must carry (DNS name or IP address); may be empty only with
+    Trust::Pinned / Trust::Any, which do not check it
 
 - **`struct ServerConfig`**
   - `identity: Identity`
@@ -30806,6 +30826,8 @@ BLOB_OVERHEAD: usize = 2 + 24 + 16
 
 - **`fn new() -> PackBuf`**
 - **`fn push(&mut self, id: ChunkId, kind: u8, raw: usize, blob: &[u8]) -> Loc`**
+- **`fn fits(&self, blob_len: usize, raw: usize) -> bool`**
+  whether a blob of `blob_len` bytes (`raw` unpacked) still has u32 offsets and lengths
 - **`fn is_empty(&self) -> bool`**
 - **`fn finish(&mut self, keys: &Keys) -> Vec<u8>`**
   the complete pack file (with its trailer)
@@ -31220,8 +31242,9 @@ MAX_SIG: usize = 4096
 - **`fn newer(a: &str, b: &str) -> bool`**
   a is newer than b: the numbers before a '-' compared part by part ("1.10" > "1.9",
   missing parts are 0, a leading 'v' is ignored); with equal numbers a release is newer than
-  a pre-release ("2.0.0" > "2.0.0-rc1"), pre-releases compare by their text; "+build" is
-  ignored
+  a pre-release ("2.0.0" > "2.0.0-rc1"), pre-releases compare by SemVer's rules (numeric
+  parts as numbers, lower than text parts; more parts win); "+build" is ignored; a version
+  that does not parse is never newer and nothing is newer than it
 
 ## archive
 

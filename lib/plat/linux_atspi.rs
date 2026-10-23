@@ -155,7 +155,7 @@ fn call(dest: &str, path: &str, iface: &str, member: &str, body: Vec<Value>) -> 
 fn wait(c: &mut Conn, serial: u32, mut b: Option<&mut Bridge>) -> Option<Msg> {
     let end = crate::time_us() + 3_000_000;
     while crate::time_us() < end {
-        let m = c.read(((end - crate::time_us()) / 1000) as i32 + 1)?;
+        let m = c.read((end.saturating_sub(crate::time_us()) / 1000) as i32 + 1)?;
         if (m.typ == T_RETURN || m.typ == crate::linux_dbus::T_ERROR) && m.reply_to == serial {
             return (m.typ == T_RETURN).then_some(m);
         }

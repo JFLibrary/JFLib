@@ -122,6 +122,9 @@ pub(crate) fn split(vm: &mut Vm, _: &mut dyn Host, a: &[Value]) -> Result<Value,
         Some(k) if k >= 1 => k as usize,
         Some(k) => return err(format!("{}: n muss mindestens 1 sein, nicht {}", F, k)),
     };
+    // a part takes 32 bytes of heap at least: more than this many cannot be stored, and
+    // the list of ranges must not grow beyond the limit before new_str notices
+    let n = n.min(usize::try_from((vm.lim.heap / 32).saturating_add(1)).unwrap_or(usize::MAX));
     let s = heap::text(&vm.heap, r);
     let ranges = match sep.map(|x| heap::text(&vm.heap, x)) {
         None => words(s, n),
@@ -356,6 +359,8 @@ pub(crate) fn repeat(vm: &mut Vm, _: &mut dyn Host, a: &[Value]) -> Result<Value
 /// a list of one-character strings
 pub(crate) fn chars(vm: &mut Vm, _: &mut dyn Host, a: &[Value]) -> Result<Value, Exc> {
     let r = want_str("str.chars", a, 0, "s")?;
+    // every character becomes a string of 33 bytes of heap: check before the buffers are built
+    cap(vm, (vm.heap.str(r).chars as u64).saturating_mul(33))?;
     let cs: Vec<char> = heap::text(&vm.heap, r).chars().collect();
     let mut items = Vec::with_capacity(cs.len());
     for c in cs {

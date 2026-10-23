@@ -364,6 +364,14 @@ pub fn pdf_write_image(src: &PrintSrc, opt: &PdfOpt) -> Result<Vec<u8>, i32> {
     }
     let level = if opt.level <= 0 { PDF_LEVEL_DEF } else { opt.level };
     let (wu, hu) = (w as usize, h as usize);
+    // w and h size the buffers below: the rows must lie inside px
+    if src.stride < w.saturating_mul(4) {
+        return Err(ERR_DIMS);
+    }
+    let covered = wu.checked_mul(4).and_then(|rw| (hu - 1).checked_mul(src.stride as usize)?.checked_add(rw));
+    if covered.is_none_or(|n| n > src.px.len()) {
+        return Err(ERR_DIMS);
+    }
     let stride = src.stride as isize;
     let row_of = |y: usize| -> &[u8] {
         let o = (y as isize * stride) as usize;

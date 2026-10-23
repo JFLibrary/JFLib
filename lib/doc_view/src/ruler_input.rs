@@ -26,14 +26,14 @@ impl RulerDraw {
             let left = self.page.left as i32 + i32::from(self.paragraph.left);
             if y >= self.dp(3) && y <= self.dp(10) && close(left + self.paragraph.first_line) { return Some(RulerHandle::FirstLine); }
             if y >= self.dp(10) && close(left) { return Some(if y >= self.dp(16) { RulerHandle::LeftIndent } else { RulerHandle::Hanging }); }
-            if y >= self.dp(10) && close((self.page.width - self.page.right) as i32 - i32::from(self.paragraph.right)) { return Some(RulerHandle::RightIndent); }
+            if y >= self.dp(10) && close(self.page.width.saturating_sub(self.page.right) as i32 - i32::from(self.paragraph.right)) { return Some(RulerHandle::RightIndent); }
             if y >= self.dp(8) {
                 if let Some(t) = self.paragraph.tabs.as_slice().iter().filter(|t| t.alignment != TabAlignment::Clear).min_by_key(|t| (at - self.pixel_at(self.page.left as i32 + t.position)).abs()) {
                     if close(self.page.left as i32 + t.position) { return Some(RulerHandle::Tab(t.position)); }
                 }
             }
         }
-        let (start, end) = if horizontal { (self.page.left, self.page.width - self.page.right) } else { (self.page.top, self.page.height - self.page.bottom) };
+        let (start, end) = if horizontal { (self.page.left, self.page.width.saturating_sub(self.page.right)) } else { (self.page.top, self.page.height.saturating_sub(self.page.bottom)) };
         if close(start as i32) { if self.paragraph_only { None } else { Some(RulerHandle::MarginStart) } }
         else if close(end as i32) { if self.paragraph_only { None } else { Some(RulerHandle::MarginEnd) } }
         else if horizontal && at > self.pixel_at(start as i32) && at < self.pixel_at(end as i32) { Some(RulerHandle::NewTab) }

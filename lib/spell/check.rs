@@ -142,14 +142,19 @@ pub(crate) const CHECK: Opt = Opt { compounds: true, sug: false, upcase: true };
 /// the work a check may do (compound search steps)
 pub(crate) struct Ctx {
     pub(crate) steps: u32,
+    /// BREAK pieces still allowed to be looked up (the splits of a long hyphenated word grow
+    /// exponentially)
+    pub(crate) breaks: u32,
     /// the compound parts seen by earlier lookups (suggestions: the candidates share most
     /// of their parts)
     pub(crate) parts: Option<Parts>,
 }
 
+pub(crate) const BREAK_WORK: u32 = 8192;
+
 impl Ctx {
     pub(crate) fn new(steps: u32) -> Ctx {
-        Ctx { steps, parts: None }
+        Ctx { steps, breaks: BREAK_WORK, parts: None }
     }
 }
 
@@ -575,7 +580,16 @@ impl Dictionary {
         if depth > 8 || w.is_empty() {
             return false;
         }
-        let piece = |s: &str, cx: &mut Ctx| s.is_empty() || crate::is_number(s) || matches!(self.check_cased(s, opt, cx), Look::Hit(_)) || self.check_break(s, depth + 1, opt, cx);
+        let piece = |s: &str, cx: &mut Ctx| {
+            if s.is_empty() || crate::is_number(s) {
+                return true;
+            }
+            if cx.breaks == 0 {
+                return false;
+            }
+            cx.breaks -= 1;
+            matches!(self.check_cased(s, opt, cx), Look::Hit(_)) || self.check_break(s, depth + 1, opt, cx)
+        };
         for pat in &self.aff.breaks {
             if let Some(p) = pat.strip_prefix('^') {
                 if !p.is_empty() && w.len() > p.len() && w.starts_with(p) && piece(&w[p.len()..], cx) {

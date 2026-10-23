@@ -22,6 +22,10 @@ use super::AudioError;
 const FMT: AudioError = AudioError::Format;
 const PI: f64 = core::f64::consts::PI;
 const MAX_SECONDS: u64 = 600;
+// what a setup header may ask for (a few header bytes alone can name 2^24 entries per book): the
+// entries of one book and of all books, the VQ values of all books (real encoders: < 10^5 / 10^6)
+const MAX_ENTRIES: usize = 1 << 22;
+const MAX_VQ_TOTAL: usize = 1 << 24;
 
 // ---------------------------------------------------------------- Ogg
 
@@ -180,7 +184,7 @@ impl Codebook {
         }
         let dims = r.read(16).ok_or(FMT)? as usize;
         let entries = r.read(24).ok_or(FMT)? as usize;
-        if dims == 0 || entries == 0 {
+        if dims == 0 || entries == 0 || entries > MAX_ENTRIES {
             return Err(FMT);
         }
         let mut lens = vec![0u8; entries]; // 0: unused
@@ -405,8 +409,15 @@ fn read_setup(p: &[u8], ch: usize) -> Result<Setup, AudioError> {
     r.pos = 7 * 8;
     let nbooks = r.read(8).ok_or(FMT)? + 1;
     let mut books = Vec::new();
+    let (mut entries, mut vq) = (0usize, 0usize);
     for _ in 0..nbooks {
-        books.push(Codebook::read(&mut r)?);
+        let b = Codebook::read(&mut r)?;
+        entries += b.entries;
+        vq += b.vq.len();
+        if entries > MAX_ENTRIES || vq > MAX_VQ_TOTAL {
+            return Err(FMT);
+        }
+        books.push(b);
     }
     let ntimes = r.read(6).ok_or(FMT)? + 1;
     for _ in 0..ntimes {

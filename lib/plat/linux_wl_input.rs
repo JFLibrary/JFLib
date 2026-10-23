@@ -432,6 +432,6 @@ pub(crate) fn wlh_kb_modifiers(_wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
 
 /// repeat_info(rate per s, delay ms)  [wlh_kb_repeat]
 pub(crate) fn wlh_kb_repeat(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
-    wl.inp.rep_rate = a.i(0);
-    wl.inp.rep_delay = a.i(1);
+    wl.inp.rep_rate = a.i(0).clamp(0, 1000); // a huge rate would make the repeat deadline "now" forever
+    wl.inp.rep_delay = a.i(1).clamp(0, 60_000);
 }

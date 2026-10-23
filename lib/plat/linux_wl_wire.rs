@@ -502,6 +502,9 @@ impl Wire {
         loop {
             let len = self.inb.len();
             let room = WL_IN_CAP.saturating_sub(len);
+            if room == 0 {
+                return 0; // full until dispatched (a zero-length read would look like EOF)
+            }
             // SAFETY: the vector has capacity for WL_IN_CAP bytes; we write behind len.
             let iov = IoVec { base: unsafe { self.inb.as_mut_ptr().add(len) } as usize, len: room };
             let mut ctl = [0u64; WL_CTRL / 8];

@@ -414,7 +414,10 @@ impl Ui {
         // the width (24.8) of a..b laid out from pen x (tabs to the next stop)
         let width = |ui: &mut Ui, a: usize, b: usize, x: i32| -> i32 {
             let mut pen = x;
-            for s in segs.iter() {
+            for s in &segs[segs.partition_point(|s| s.b <= a)..] {
+                if s.a >= b {
+                    break;
+                }
                 let (s0, s1) = (s.a.max(a), s.b.min(b));
                 if s0 >= s1 {
                     continue;
@@ -463,7 +466,22 @@ impl Ui {
                     // an atom wider than the row: clusters while they fit
                     let mut a = start;
                     loop {
-                        let w_all = width(self, a, vis(o, a), 0);
+                        // measured in growing chunks: a long atom is not re-measured whole for every row
+                        let w_all = {
+                            let ve = vis(o, a);
+                            let mut n = 64;
+                            loop {
+                                let mut pe = (a + n).min(ve);
+                                while !text.is_char_boundary(pe) {
+                                    pe -= 1;
+                                }
+                                let w = width(self, a, pe, 0);
+                                if w > lim || pe >= ve {
+                                    break w;
+                                }
+                                n *= 2;
+                            }
+                        };
                         if w_all <= lim || a >= o {
                             break;
                         }
@@ -497,7 +515,10 @@ impl Ui {
             let (mut asc, mut desc, mut lh) = (0, 0, 0);
             let mut pen = 0; // 24.8
             let justify = p.align == RA_JUSTIFY && ri + 1 < nrows;
-            for s in segs.iter() {
+            for s in &segs[segs.partition_point(|s| s.b <= ra)..] {
+                if s.a >= rb {
+                    break;
+                }
                 let (s0, s1) = (s.a.max(ra), s.b.min(rb));
                 if s0 >= s1 {
                     continue;

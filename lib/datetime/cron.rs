@@ -94,11 +94,11 @@ fn field(s: &str, field: u8, min: u32, max: u32) -> Result<(u64, bool), CronErro
                 star = true;
             }
             (min, max)
-        } else if let Some((a, b)) = range.split_once('-') {
+        } else if let Some((a, hi_s)) = range.split_once('-') {
             let a = value(a, field, min, max)?;
-            let mut b = value(b, field, min, max)?;
-            if field == 4 && b == 0 && a > 0 {
-                b = 7; // mon-sun
+            let mut b = value(hi_s, field, min, max)?;
+            if field == 4 && b == 0 && (a > 0 || matches!(hi_s, "7" | "07")) {
+                b = 7; // mon-sun, 0-7
             }
             if a > b {
                 return Err(CronError { field, msg: "range runs backwards" });

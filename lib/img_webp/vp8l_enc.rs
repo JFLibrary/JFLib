@@ -684,7 +684,7 @@ pub fn enc_argb(px: &[u32], w: u32, h: u32, cfg: &Cfg) -> Result<Vec<u8>, i32> {
 /// enc_argb with the test outputs: WEF_T_DUMPM -> (0, the main image's match array),
 /// WEF_T_REPORT -> (0x1000000 + (cache bits | groups << 8), the 16 cache-size estimates)
 pub fn enc_argb_ex(px: &[u32], w: u32, h: u32, cfg: &Cfg) -> Result<(i32, Vec<u8>), i32> {
-    if w.wrapping_sub(1) >= 16384 || h.wrapping_sub(1) >= 16384 {
+    if w.wrapping_sub(1) >= 16384 || h.wrapping_sub(1) >= 16384 || px.len() < w as usize * h as usize {
         return Err(ERR_DIMS);
     }
     let effort = match cfg.effort {

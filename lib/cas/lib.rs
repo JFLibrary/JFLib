@@ -610,6 +610,9 @@ impl Repo {
         if !self.trusted(&signer.public) {
             self.trust_signer(&signer.public)?;
         }
+        if bad_snap_id(&snap.id) {
+            return Err(CasError::NotFound(snap.id.clone()));
+        }
         let b = snapshot::seal(&self.keys.snapshot, signer, snap)?;
         let p = self.snap_path(&snap.id);
         if !plat::fs::write_file_private(&p, &b) {
@@ -631,7 +634,7 @@ impl Repo {
 
     /// a snapshot, checked (signature by a trusted key, authentic encryption)
     pub fn load_snapshot(&self, id: &str) -> CasResult<Snapshot> {
-        if id.is_empty() || id.contains(['/', '\\', '.']) {
+        if bad_snap_id(id) {
             return Err(CasError::NotFound(String::from(id)));
         }
         let p = self.snap_path(id);
@@ -879,6 +882,11 @@ fn write_cfg(path: &str, v: &mut Value, keys: &Keys) -> CasResult<()> {
 /// the id of a repository folder without opening it
 pub fn peek_id(path: &str) -> CasResult<String> {
     Ok(String::from(str_of(&read_cfg(path)?, "id")))
+}
+
+/// an id that would leave the snapshots folder or name a stream or a temp file
+fn bad_snap_id(id: &str) -> bool {
+    id.is_empty() || id.contains(['/', '\\', '.', ':'])
 }
 
 /// writes new chunks into packs

@@ -169,7 +169,7 @@ pub fn encode(cfg: &EncIn) -> Result<EncOut, i32> {
     ef.seqhdr();
     ef.framehdr();
     let av = ef.state()?;
-    ef.source(&av);
+    ef.source(&av)?;
     let tiles = ef.tiles(&av)?;
     Ok(ef.output(&tiles))
 }
@@ -369,7 +369,15 @@ impl<'a> Ef<'a> {
         let mut av = crate::Av1Dec::new();
         av.obus(&obus)?;
         let (state, h, _) = av.enc_view();
-        if state != 2 || h.micols != self.micols {
+        // (the decoder's geometry must be the encoder's: an identity matrix implies 4:4:4)
+        if state != 2
+            || h.micols != self.micols
+            || h.mirows != self.mirows
+            || h.np != self.np
+            || h.bd != self.bd
+            || h.ssx != self.ssx
+            || h.ssy != self.ssy
+        {
             return Err(ERR_HDR);
         }
         self.nt = h.tcols * h.trows;
@@ -378,8 +386,9 @@ impl<'a> Ef<'a> {
 
     // ef_source: source planes with the decoder's plane geometry (AV_PS x AV_PH), the image
     // replicated into the padding (model residual_of clamps to the image)
-    fn source(&mut self, av: &crate::Av1Dec) {
+    fn source(&mut self, av: &crate::Av1Dec) -> Result<(), i32> {
         let (_, _, f) = av.enc_view();
+        let maxv = ((1u32 << self.bd) - 1) as u16;
         for p in 0..self.np as usize {
             let (sw, sh) = if p == 0 {
                 (self.w, self.h)
@@ -393,16 +402,25 @@ impl<'a> Ef<'a> {
             self.sst[p] = st;
             let src = self.cfg.planes[p];
             let sst = self.cfg.strides[p] as usize;
-            let mut pl = alloc::vec![0u16; st as usize * rows as usize];
+            // the caller's plane must hold sh rows of sw samples
+            if (sst as u64) < sw as u64
+                || (src.len() as u64) < (sh as u64 - 1) * sst as u64 + sw as u64
+            {
+                return Err(ERR_DIMS);
+            }
+            let mut pl = zvec::<u16>(st as usize * rows as usize)?;
             for (y, row) in pl.chunks_exact_mut(st as usize).enumerate() {
                 let sy = (y as u32).min(sh - 1) as usize; // source row (clamped)
                 let sr = &src[sy * sst..sy * sst + sw as usize];
-                row[..sw as usize].copy_from_slice(sr);
-                let last = sr[sw as usize - 1];
+                for (d, s) in row[..sw as usize].iter_mut().zip(sr) {
+                    *d = (*s).min(maxv);
+                }
+                let last = row[sw as usize - 1];
                 row[sw as usize..].fill(last);
             }
             self.spl[p] = pl;
         }
+        Ok(())
     }
 
     // ef_output: sequence header OBU, then OBU_FRAME: frame header, (tile_start_and_end_present_flag

@@ -522,6 +522,9 @@ impl Cert {
 /// whether a DNS name lies in a constraint subtree ("example.com": it and its subdomains;
 /// ".example.com": subdomains only)
 fn dns_in(name: &str, base: &str) -> bool {
+    if base.is_empty() {
+        return true;
+    }
     let name = name.trim_start_matches("*.");
     if let Some(b) = base.strip_prefix('.') {
         return name.ends_with(base) && name.len() > b.len();
@@ -576,11 +579,13 @@ pub fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&st
     }
     let mut why = String::from("keine vertrauenswürdige Zertifizierungsstelle");
     let mut used = alloc::vec![false; chain.len()];
-    if path(leaf, chain, anchors, now, 0, &mut used, &mut why) { Ok(()) } else { Err(why) }
+    let mut budget = 64u32;
+    if path(leaf, chain, anchors, now, 0, &mut used, &mut budget, &mut why) { Ok(()) } else { Err(why) }
 }
 
 /// a path from `cur` upwards (depth: CAs between the leaf and cur)
-fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, used: &mut [bool], why: &mut String) -> bool {
+#[allow(clippy::too_many_arguments)]
+fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, used: &mut [bool], budget: &mut u32, why: &mut String) -> bool {
     if depth > 8 {
         *why = String::from("Zertifikatskette zu lang");
         return false;
@@ -606,7 +611,17 @@ fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, us
     }
     for i in 1..chain.len() {
         let next = &chain[i];
-        if used[i] || next.subject != cur.issuer || !cur.signed_by(next) {
+        if used[i] || next.subject != cur.issuer {
+            continue;
+        }
+        // certificates with equal names and keys would otherwise make this a factorial search
+        // of signature checks
+        if *budget == 0 {
+            *why = String::from("Zertifikatskette zu komplex");
+            return false;
+        }
+        *budget -= 1;
+        if !cur.signed_by(next) {
             continue;
         }
         if !next.is_ca || next.unknown_critical || now < next.not_before || now > next.not_after
@@ -620,7 +635,7 @@ fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, us
             continue;
         }
         used[i] = true;
-        if path(next, chain, anchors, now, depth + 1, used, why) {
+        if path(next, chain, anchors, now, depth + 1, used, budget, why) {
             return true;
         }
         used[i] = false;

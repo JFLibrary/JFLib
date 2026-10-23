@@ -555,7 +555,7 @@ impl Conn {
         let tag = self.send(cmd, args).ok_or(-1)?;
         let end = crate::time_us() + 5_000_000;
         while crate::time_us() < end {
-            let Some(p) = self.read(((end - crate::time_us()) / 1000) as i32 + 1) else {
+            let Some(p) = self.read((end.saturating_sub(crate::time_us()) / 1000) as i32 + 1) else {
                 if self.broken {
                     return Err(-1);
                 }

@@ -331,7 +331,7 @@ fn replay(bytes: &[u8], after: u64, data: &mut Data, last_seq: &mut u64, replaye
             };
         }
         if seq > after {
-            if seq != *last_seq + 1 && *last_seq != 0 {
+            if seq != last_seq.saturating_add(1) && *last_seq != 0 {
                 return Scan::Damaged(i as u64, format!("sequence gap {} -> {}", last_seq, seq));
             }
             if !apply_payload(data, payload) {
@@ -389,6 +389,10 @@ impl Store {
         let mut rec = Recovery { snapshot_seq: snap_seq, ..Recovery::default() };
         if let Some(s) = skipped {
             rec.repaired = Some(format!("{} damaged, older snapshot used", s));
+        }
+        // logs that start after seq 1 need the snapshot that precedes them
+        if snap_seq == 0 && !opts.repair && wals.first().is_some_and(|&w| w > 1) {
+            return Err(StoreError::Corrupt(format!("{} needs a snapshot that is missing (open with repair to use what is left)", wal_name(wals[0]))));
         }
         let mut last = snap_seq;
         let mut replayed = 0u64;

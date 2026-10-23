@@ -122,9 +122,8 @@ Host bietet (13 `CAP_*`-Bits). Seit Paket 1 und 2 (2026-10-16) gibt es das Manif
   (`fs.user`) kann Landlock nicht nachträglich freigeben – in einer Flatpak laufen sie über das
   Dokumente-Portal, nativ bleibt der Dialogpfad außerhalb der Freigaben (dokumentiert).
   **Windows** (`win_sandbox.rs`): Prozess-Mitigation-Policies (`SetProcessMitigationPolicy`):
-  Image-Load (keine Remote-/Low-Label-Images), Extension-Points aus, dynamischer Code verboten
-  (außer das Manifest erlaubt Plugins; auf Windows 10.0.26200 meldet die Policy sich als
-  gesetzt, ausführbarer Speicher wird aber trotzdem vergeben – in jedem Prozess); `strict`
+  Image-Load (keine Remote-/Low-Label-Images), Extension-Points aus,   dynamischer Code verboten
+    (außer das Manifest erlaubt Plugins; `VirtualAlloc(PAGE_EXECUTE_READWRITE)` scheitert dann); `strict`
   sperrt zusätzlich die Erzeugung von Kindprozessen, wenn weder `process` noch `url`/`print`
   im Manifest stehen (geprüft: `CreateProcess` scheitert). AppContainer per Re-exec ist bewusst nicht
   umgesetzt (bräuchte ACL-Änderungen an den echten Nutzerordnern und Tests pro App; die
