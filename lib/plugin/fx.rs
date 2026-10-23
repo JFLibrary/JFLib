@@ -38,6 +38,18 @@ pub trait Effect: 'static {
     }
 }
 
+/// the source image and the destination ROI share bytes (the host never does that)
+fn overlaps(src: &Surface, dst: &Surface, a: &FxArgs) -> bool {
+    if dst.px.is_null() || a.x0 >= a.x1 || a.y0 >= a.y1 || dst.stride < 0 {
+        return false;
+    }
+    let s0 = src.px as usize;
+    let s1 = s0.saturating_add(src.stride as usize * src.h as usize);
+    let d0 = (dst.px as usize).saturating_add(a.y0 as usize * dst.stride as usize + a.x0 as usize * 4);
+    let d1 = (dst.px as usize).saturating_add((a.y1 as usize - 1) * dst.stride as usize + a.x1 as usize * 4);
+    s0 < d1 && d0 < s1
+}
+
 /// one call of render / prepare: the validated FXARGS
 pub struct Fx<'a> {
     src: Surface,
@@ -77,7 +89,7 @@ impl<'a> Fx<'a> {
             && src.stride as i64 >= w * 4
             && src.stride % 4 == 0;
         let ok_roi = 0 <= a.x0 && a.x0 <= a.x1 && a.x1 as i64 <= w && 0 <= a.y0 && a.y0 <= a.y1 && a.y1 as i64 <= h;
-        if !ok_src || !ok_roi {
+        if !ok_src || !ok_roi || overlaps(&src, &dst, a) {
             return None;
         }
         Some(Fx {
@@ -144,8 +156,7 @@ impl<'a> Fx<'a> {
 
     /// the raw 8 bytes of parameter slot `slot` (0 when the host passed none)
     pub fn param(&self, slot: usize) -> u64 {
-        assert!(slot < FX_NSLOTS, "Fx::param: slot >= FX_NSLOTS");
-        if self.param.is_null() {
+        if slot >= FX_NSLOTS || self.param.is_null() {
             return 0;
         }
         // SAFETY: the parameter block has FX_NSLOTS 8-byte slots (fx.inc); slot is checked.

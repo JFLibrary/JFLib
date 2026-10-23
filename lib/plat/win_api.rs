@@ -270,7 +270,7 @@ unsafe extern "system" {
 #[link(name = "kernel32", kind = "raw-dylib")]
 unsafe extern "system" {
     fn GetModuleHandleW(name: *const u16) -> isize;
-    fn LoadLibraryA(name: *const u8) -> isize;
+    fn LoadLibraryExA(name: *const u8, file: isize, flags: u32) -> isize;
     fn GetProcAddress(m: isize, name: *const u8) -> usize;
     fn WaitForSingleObject(h: isize, ms: u32) -> u32;
 }
@@ -640,7 +640,7 @@ fn wide_cap(s: &str, cap: usize) -> Vec<u16> {
 fn dll_proc(dll: &[u8], name: &[u8]) -> usize {
     // SAFETY: NUL-terminated names; both calls return 0 on failure.
     unsafe {
-        let m = LoadLibraryA(dll.as_ptr());
+        let m = LoadLibraryExA(dll.as_ptr(), 0, 0x800) /* LOAD_LIBRARY_SEARCH_SYSTEM32 */;
         if m == 0 { 0 } else { GetProcAddress(m, name.as_ptr()) }
     }
 }

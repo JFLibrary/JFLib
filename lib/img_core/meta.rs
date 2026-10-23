@@ -89,7 +89,26 @@ pub fn surf_alloc(w: u32, h: u32, fmt: u8, dec: &ImgDec) -> Result<Surface, i32>
     if r != 0 {
         return Err(r);
     }
-    Ok(Surface::new(w as i32, h as i32, fmt))
+    let row = if fmt == FMT_A8 { w as u64 } else { w as u64 * 4 };
+    let bytes = ((row + 63) & !63) * h as u64;
+    let r = mem_check(bytes, dec);
+    if r != 0 {
+        return Err(r);
+    }
+    let mut sf = Surface::new(0, 0, fmt);
+    let n = (bytes as usize).max(64);
+    // fallible allocation: an unsatisfiable size is ERR_NOMEM, not an abort
+    let mut px = Vec::new();
+    if px.try_reserve_exact(n).is_err() {
+        return Err(ERR_NOMEM);
+    }
+    px.resize(n, 0);
+    sf.px = px;
+    sf.w = w as i32;
+    sf.h = h as i32;
+    sf.stride = ((row + 63) & !63) as i32;
+    sf.flags = gfx::SFF_OWNED;
+    Ok(sf)
 }
 
 // ------------------------------------------------------------------ pixel formats

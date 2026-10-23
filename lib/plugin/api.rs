@@ -33,7 +33,16 @@ pub struct Api(PnApi);
 #[doc(hidden)]
 pub fn query_entry(api: *const PnApi, query: fn(&'static PnApi) -> Option<&'static PluginInfo>) -> *const PluginInfo {
     // SAFETY: the host passes its PNAPI table, valid for the life of the process (or 0).
-    let Some(t) = (unsafe { api.as_ref() }) else { return null() };
+    if api.is_null() {
+        return null();
+    }
+    // SAFETY: size is the first field of every version of the table; it is read before a
+    // reference to the whole PnApi exists (an older host's table may be shorter).
+    if unsafe { (api as *const u32).read() } < PA_SIZE_V1 {
+        return null();
+    }
+    // SAFETY: the table is at least PA_SIZE_V1 bytes (checked above).
+    let t = unsafe { &*api };
     if t.size >= PA_SIZE_V1 && t.version >= PNAPI_VERSION {
         API.store(api as *mut PnApi, Ordering::Release);
     }
@@ -193,20 +202,28 @@ macro_rules! log {
 struct Line {
     b: [u8; LINE_CAP],
     n: usize,
+    full: bool,
 }
 
 const LINE_CAP: usize = 512;
 
 impl Line {
     fn new() -> Line {
-        Line { b: [0; LINE_CAP], n: 0 }
+        Line { b: [0; LINE_CAP], n: 0, full: false }
     }
 
     // (written without index panics: the panic handler uses it)
     fn push(&mut self, s: &[u8]) {
         for &c in s {
+            if self.full {
+                return;
+            }
             if self.n >= LINE_CAP - 1 {
-                // drop a cut UTF-8 sequence
+                self.full = true;
+                // a complete last character stays; only a cut UTF-8 sequence is dropped
+                if c & 0xC0 != 0x80 {
+                    return;
+                }
                 while self.n > 0 && self.b.get(self.n - 1).is_some_and(|&x| x & 0xC0 == 0x80) {
                     self.n -= 1;
                 }

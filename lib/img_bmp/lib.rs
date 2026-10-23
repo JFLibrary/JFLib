@@ -202,6 +202,10 @@ pub fn decode_fl(d: &[u8], sf: &mut Surface, flags: u32) -> i32 {
             if c.off > len {
                 return ERR_TRUNC;
             }
+            // a 2-byte RLE code paints at most 255 pixels
+            if c.w as u64 * c.h as u64 > (len - c.off) as u64 * 128 {
+                return ERR_TRUNC;
+            }
             let mut out = Surface::new(c.w as i32, c.h as i32, if c.straight { FMT_ARGB } else { FMT_PARGB });
             if out.px.is_empty() {
                 return ERR_NOMEM;
@@ -530,6 +534,9 @@ pub fn encode_cfg(sf: &Surface, cfg: &BmpCfg, out: &mut Vec<u8>) -> i32 {
     let img = stride * h;
     let off = 14 + hsz + ncol * 4;
     let total = img + off;
+    if total as u64 > u32::MAX as u64 {
+        return ERR_LIMIT;
+    }
     let mut f = vec![0u8; total];
     let put = |f: &mut [u8], o: usize, v: u32| f[o..o + 4].copy_from_slice(&v.to_le_bytes());
     f[0] = b'B';

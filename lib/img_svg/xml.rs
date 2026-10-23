@@ -216,7 +216,17 @@ impl P<'_> {
                     }
                 }
                 b'<' if depth > 0 && s[i..].starts_with(b"<!ENTITY") => {
-                    let end = find(s, i, b">").unwrap_or(s.len());
+                    // the declaration ends at the first ">" outside quotes
+                    let mut end = i + 8;
+                    let mut q = 0u8;
+                    while end < s.len() && (q != 0 || s[end] != b'>') {
+                        if q == 0 && (s[end] == b'"' || s[end] == b'\'') {
+                            q = s[end];
+                        } else if s[end] == q {
+                            q = 0;
+                        }
+                        end += 1;
+                    }
                     self.entity(&s[i + 8..end]);
                     i = end;
                 }

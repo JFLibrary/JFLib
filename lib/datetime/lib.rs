@@ -48,10 +48,10 @@ impl Timestamp {
         Timestamp { secs: ms.div_euclid(1000), nanos: (ms.rem_euclid(1000) * 1_000_000) as u32 }
     }
     pub const fn as_millis(&self) -> i64 {
-        self.secs * 1000 + (self.nanos / 1_000_000) as i64
+        self.secs.saturating_mul(1000).saturating_add((self.nanos / 1_000_000) as i64)
     }
     pub const fn add_secs(&self, s: i64) -> Timestamp {
-        Timestamp { secs: self.secs + s, nanos: self.nanos }
+        Timestamp { secs: self.secs.saturating_add(s), nanos: self.nanos }
     }
 }
 
@@ -168,7 +168,10 @@ pub fn rfc3339(ts: Timestamp) -> String {
 
 /// the timestamp as local time with its UTC offset: "2026-10-12T21:58:00+02:00"
 pub fn rfc3339_offset(ts: Timestamp, offset_secs: i32) -> String {
-    let c = Civil::from_unix(ts.secs + offset_secs as i64);
+    // years 0000..9999 only: anything beyond is clamped
+    let lo = days_from_civil(0, 1, 1) * 86_400;
+    let hi = days_from_civil(9999, 12, 31) * 86_400 + 86_399;
+    let c = Civil::from_unix(ts.secs.saturating_add(offset_secs as i64).clamp(lo, hi));
     let ms = ts.nanos / 1_000_000;
     let frac = if ms != 0 { format!(".{:03}", ms) } else { String::new() };
     let zone = if offset_secs == 0 {
@@ -225,6 +228,9 @@ pub fn parse_rfc3339(s: &str) -> Option<Timestamp> {
                 return None;
             }
             let m = two(b, i + 4)? as i64;
+            if h > 23 || m > 59 {
+                return None;
+            }
             i += 6;
             let o = h * 3600 + m * 60;
             if sign == b'-' { -o } else { o }

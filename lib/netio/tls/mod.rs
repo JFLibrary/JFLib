@@ -120,11 +120,14 @@ pub struct TlsStream {
 }
 
 impl TlsStream {
-    fn flush(&self, out: Vec<u8>) -> Result<(), TlsError> {
+    /// sends what the connection has sealed; taking it and writing it happen under wlock, so
+    /// records leave in the order of their sequence numbers
+    fn flush(&self) -> Result<(), TlsError> {
+        let _g = self.wlock.lock();
+        let out = self.conn.lock().take_out();
         if out.is_empty() {
             return Ok(());
         }
-        let _g = self.wlock.lock();
         self.inner.write_all(&out).map_err(TlsError::Net)
     }
 
@@ -132,8 +135,7 @@ impl TlsStream {
     fn handshake(&self) -> Result<(), TlsError> {
         let mut buf = alloc::vec![0u8; 16 * 1024 + 512];
         loop {
-            let out = self.conn.lock().take_out();
-            self.flush(out)?;
+            self.flush()?;
             if self.conn.lock().established() {
                 return Ok(());
             }
@@ -143,8 +145,7 @@ impl TlsStream {
             }
             let r = self.conn.lock().feed(&buf[..n]);
             if let Err(e) = r {
-                let out = self.conn.lock().take_out();
-                let _ = self.flush(out);
+                let _ = self.flush();
                 return Err(e);
             }
         }
@@ -198,8 +199,7 @@ impl Stream for TlsStream {
                 return Ok(0);
             }
             let r = self.conn.lock().feed(&raw[..n]);
-            let out = self.conn.lock().take_out(); // KeyUpdate answers, alerts
-            let _ = self.flush(out);
+            let _ = self.flush(); // KeyUpdate answers, alerts
             if let Err(e) = r {
                 *self.last_error.lock() = Some(e);
                 return Err(to_net(e));
@@ -208,12 +208,8 @@ impl Stream for TlsStream {
     }
 
     fn write_all(&self, data: &[u8]) -> NetResult<()> {
-        let out = {
-            let mut c = self.conn.lock();
-            c.write_plain(data).map_err(to_net)?;
-            c.take_out()
-        };
-        self.flush(out).map_err(to_net)
+        self.conn.lock().write_plain(data).map_err(to_net)?;
+        self.flush().map_err(to_net)
     }
 
     fn set_timeouts(&self, read_ms: Option<u32>, write_ms: Option<u32>) {
@@ -221,12 +217,8 @@ impl Stream for TlsStream {
     }
 
     fn shutdown(&self) {
-        let out = {
-            let mut c = self.conn.lock();
-            c.close();
-            c.take_out()
-        };
-        let _ = self.flush(out);
+        self.conn.lock().close();
+        let _ = self.flush();
         self.inner.shutdown();
     }
 

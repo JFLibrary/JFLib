@@ -307,6 +307,8 @@ pub struct Vm {
     escaped: Option<(Option<Value>, Vec<TraceLine>)>,
 }
 
+const WRITE_CAP: usize = 4 << 20; // bytes of one value text (shared nodes print once per use)
+
 impl Vm {
     /// a VM for the program with its top-level code pending (run() runs it)
     pub fn new(prog: &Program, limits: Limits) -> Vm {
@@ -1910,6 +1912,10 @@ impl Vm {
                 seen.push(r);
                 o.push('[');
                 for (i, x) in self.heap.list(r).iter().enumerate() {
+                    if o.len() > WRITE_CAP {
+                        o.push('?');
+                        break;
+                    }
                     if i > 0 {
                         o.push_str(", ");
                     }
@@ -1926,6 +1932,10 @@ impl Vm {
                 seen.push(r);
                 o.push('{');
                 for (i, e) in self.heap.map(r).iter().enumerate() {
+                    if o.len() > WRITE_CAP {
+                        o.push('?');
+                        break;
+                    }
                     if i > 0 {
                         o.push_str(", ");
                     }

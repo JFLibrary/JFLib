@@ -115,6 +115,16 @@ pub struct Keys {
     pub index: [u8; 32],
     pub snapshot: [u8; 32],
     pub gear: [u8; 32],
+    /// authenticates repo.json
+    cfg: [u8; 32],
+}
+
+impl Drop for Keys {
+    fn drop(&mut self) {
+        for k in [&mut self.id, &mut self.data, &mut self.index, &mut self.snapshot, &mut self.gear, &mut self.cfg] {
+            crypto::zeroize(k);
+        }
+    }
 }
 
 impl Keys {
@@ -126,6 +136,7 @@ impl Keys {
             index: d("BackupCraft bcrepo-1 index"),
             snapshot: d("BackupCraft bcrepo-1 snapshot"),
             gear: d("BackupCraft bcrepo-1 gear"),
+            cfg: d("BackupCraft bcrepo-1 config"),
         }
     }
 
@@ -156,6 +167,13 @@ pub struct CreateOptions {
     pub immutable_days: u32,
 }
 
+/// bounds for values read from repo.json
+const MAX_ARGON_KIB: u64 = 1 << 20;
+const MAX_ARGON_T: u64 = 10;
+const MAX_ARGON_P: u64 = 16;
+const MIN_CHUNK_AVG: usize = 4 << 10;
+const MAX_CHUNK_AVG: usize = 64 << 20;
+
 const AAD_MASTER: &[u8] = b"bcrepo-1 master";
 const AAD_PASS: &[u8] = b"bcrepo-1 passphrase";
 const AAD_RECOVERY: &[u8] = b"bcrepo-1 recovery";
@@ -174,11 +192,14 @@ fn unwrap(kek: &[u8; 32], aad: &[u8], nonce: &str, wrapped: &str) -> Option<[u8;
     let mut nn = [0u8; 24];
     nn.copy_from_slice(&n);
     let k = aead::x_open(kek, &nn, aad, &w)?;
-    (k.len() == 32).then(|| {
+    let mut k = k;
+    let out = (k.len() == 32).then(|| {
         let mut out = [0u8; 32];
         out.copy_from_slice(&k);
         out
-    })
+    });
+    crypto::zeroize(&mut k);
+    out
 }
 
 fn str_of<'a>(v: &'a Value, k: &str) -> &'a str {
@@ -277,9 +298,9 @@ impl Repo {
             ("signers", Value::Array(alloc::vec![Value::string(crypto::hex(&o.signer))])),
             ("keys", Value::Array(keys)),
         ]);
-        write_cfg(path, &cfg)?;
         let mut rk = repo_key;
-        let r = Repo::open_with_key(path, &rk, cfg);
+        let mut cfg = cfg;
+        let r = write_cfg(path, &mut cfg, &Keys::derive(&rk)).and_then(|_| Repo::open_with_key(path, &rk, cfg));
         crypto::zeroize(&mut rk);
         r
     }
@@ -294,18 +315,17 @@ impl Repo {
                 (Unlock::Master(k), "master") => unwrap(k, AAD_MASTER, str_of(e, "nonce"), str_of(e, "wrapped")),
                 (Unlock::Passphrase(p), "passphrase") => {
                     let salt = b64::decode_url(str_of(e, "salt")).unwrap_or_default();
-                    let params = argon2::Params {
-                        m_kib: e.get("m").and_then(|x| x.as_u64()).unwrap_or(65536) as u32,
-                        t: e.get("t").and_then(|x| x.as_u64()).unwrap_or(3) as u32,
-                        p: e.get("p").and_then(|x| x.as_u64()).unwrap_or(1) as u32,
-                        out_len: 32,
+                    // repo.json is not authenticated yet: bound what it can make us compute
+                    let param = |k: &str, default: u64, max: u64| match e.get(k) {
+                        None => Some(default as u32),
+                        Some(x) => x.as_u64().filter(|&v| v <= max).map(|v| v as u32),
                     };
+                    let (Some(m_kib), Some(t), Some(p_par)) = (param("m", 65536, MAX_ARGON_KIB), param("t", 3, MAX_ARGON_T), param("p", 1, MAX_ARGON_P)) else { continue };
+                    let params = argon2::Params { m_kib, t, p: p_par, out_len: 32 };
                     let mut kek = [0u8; 32];
-                    if argon2::argon2id(p.as_bytes(), &salt, &params, &mut kek) {
-                        unwrap(&kek, AAD_PASS, str_of(e, "nonce"), str_of(e, "wrapped"))
-                    } else {
-                        None
-                    }
+                    let r = if argon2::argon2id(p.as_bytes(), &salt, &params, &mut kek) { unwrap(&kek, AAD_PASS, str_of(e, "nonce"), str_of(e, "wrapped")) } else { None };
+                    crypto::zeroize(&mut kek);
+                    r
                 }
                 (Unlock::Recovery(sk), "recovery") => b64::decode_url(str_of(e, "sealed")).and_then(|s| crypto::sealbox::open(sk, AAD_RECOVERY, &s)).and_then(|k| {
                     (k.len() == 32).then(|| {
@@ -329,7 +349,19 @@ impl Repo {
     fn open_with_key(path: &str, repo_key: &[u8; 32], cfg: Value) -> CasResult<Repo> {
         let lock = plat::FileLock::acquire(&join(path, "LOCK")).ok_or(CasError::InUse)?;
         let keys = Keys::derive(repo_key);
-        let avg = cfg.get("chunk_avg").and_then(|x| x.as_u64()).unwrap_or(1 << 20) as usize;
+        let mut cfg = cfg;
+        match cfg.get("mac").and_then(|m| m.as_str()) {
+            Some(m) if crypto::ct_eq(m.as_bytes(), cfg_mac(&keys, &cfg)?.as_bytes()) => {}
+            Some(_) => return Err(CasError::Corrupt(String::from("repo.json does not authenticate"))),
+            // a repository from before the config was authenticated: seal it now (best effort)
+            None => {
+                let mut sealed = cfg.clone();
+                if write_cfg(path, &mut sealed, &keys).is_ok() {
+                    cfg = sealed;
+                }
+            }
+        }
+        let avg = cfg.get("chunk_avg").and_then(|x| x.as_u64()).unwrap_or(1 << 20).clamp(MIN_CHUNK_AVG as u64, MAX_CHUNK_AVG as u64) as usize;
         let codec = Codec::from_name(str_of(&cfg, "compression")).unwrap_or(Codec::Lz4);
         let chunker = Chunker::new(&keys.gear, avg);
         let repo = Repo { path: String::from(path), cfg: Mutex::new(cfg), keys, chunker, codec, index: Mutex::new(BTreeMap::new()), gc_lock: RwLock::new(()), files: Mutex::new(Vec::new()), _lock: lock };
@@ -398,7 +430,7 @@ impl Repo {
         let mut cfg = self.cfg.lock();
         let mut v = cfg.clone();
         f(&mut v);
-        write_cfg(&self.path, &v)?;
+        write_cfg(&self.path, &mut v, &self.keys)?;
         *cfg = v;
         Ok(())
     }
@@ -742,6 +774,9 @@ impl Repo {
             }
             for (id, loc) in &used {
                 let blob = self.read_blob(loc)?;
+                if !out.fits(blob.len(), loc.raw as usize) {
+                    return Err(CasError::TooLarge);
+                }
                 let nl = out.push(*id, loc.kind, loc.raw as usize, &blob);
                 moved.push((*id, nl));
                 if out.data.len() >= pack::PACK_TARGET {
@@ -822,7 +857,17 @@ fn read_cfg(path: &str) -> CasResult<Value> {
     Ok(v)
 }
 
-fn write_cfg(path: &str, v: &Value) -> CasResult<()> {
+/// the MAC of repo.json (signers, retention, wrapped keys), computed with "mac" emptied
+fn cfg_mac(keys: &Keys, v: &Value) -> CasResult<String> {
+    let mut c = v.clone();
+    c.insert("mac", Value::string(""));
+    let text = json::stringify_with_limits(&c, big_limits()).map_err(|_| CasError::TooLarge)?;
+    Ok(crypto::hex(&crypto::blake3::keyed_hash(&keys.cfg, text.as_bytes())))
+}
+
+fn write_cfg(path: &str, v: &mut Value, keys: &Keys) -> CasResult<()> {
+    let mac = cfg_mac(keys, v)?;
+    v.insert("mac", Value::string(mac));
     let text = json::stringify_with_limits(v, big_limits()).map_err(|_| CasError::TooLarge)?;
     let p = Repo::cfg_path(path);
     if !plat::fs::write_file_private(&p, text.as_bytes()) {
@@ -865,6 +910,9 @@ impl Writer<'_> {
         }
         let (codec, level) = if kind == KIND_TREE { (Codec::Lz4, 0) } else { (self.codec, self.level) };
         let blob = pack::seal_blob(&self.repo.keys, &id, kind, data, codec, level);
+        if !self.pack.fits(blob.len(), data.len()) {
+            return Err(CasError::TooLarge);
+        }
         self.pack.push(id, kind, data.len(), &blob);
         self.pending.insert(id, ());
         self.stats.new_chunks += 1;

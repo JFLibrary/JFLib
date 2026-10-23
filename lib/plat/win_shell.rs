@@ -48,21 +48,28 @@ const PATHW_MAX: usize = 1024; // wide chars of the exe path / one spawn argumen
 const SPAWN_CMD_MAX: usize = 16384; // wide chars of a spawn_self command line
 static S_WOPEN: [u16; 5] = [b'o' as u16, b'p' as u16, b'e' as u16, b'n' as u16, 0];
 
+// 0 not loaded, 1 loading, 2 loaded (SH_EXEC valid)
 static SH_STATE: AtomicU32 = AtomicU32::new(0);
 static SH_EXEC: AtomicUsize = AtomicUsize::new(0);
 
 /// ShellExecuteW or 0 (shell32 loaded, COM initialised on the first call)  [sh_load]
 fn sh_load() -> usize {
-    if SH_STATE.swap(1, Ordering::SeqCst) == 0 {
+    while SH_STATE.load(Ordering::Acquire) != 2 {
+        if SH_STATE.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire).is_err() {
+            core::hint::spin_loop();
+            continue;
+        }
         let co = dll_proc(b"ole32.dll\0", b"CoInitializeEx\0");
         if co != 0 {
             // SAFETY: CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE).
             let ci: unsafe extern "system" fn(usize, u32) -> i32 = unsafe { core::mem::transmute(co) };
+            // RPC_E_CHANGED_MODE (COM already set up by the host) is harmless here
             unsafe { ci(0, 6) };
         }
-        SH_EXEC.store(dll_proc(b"shell32.dll\0", b"ShellExecuteW\0"), Ordering::SeqCst);
+        SH_EXEC.store(dll_proc(b"shell32.dll\0", b"ShellExecuteW\0"), Ordering::Relaxed);
+        SH_STATE.store(2, Ordering::Release);
     }
-    SH_EXEC.load(Ordering::SeqCst)
+    SH_EXEC.load(Ordering::Relaxed)
 }
 
 /// ShellExecuteW(no owner, "open", file, params, no directory, SW_SHOWNORMAL) > 32

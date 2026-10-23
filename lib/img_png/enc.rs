@@ -40,6 +40,7 @@ pub struct PngCfg<'a> {
 
 /// append a chunk: length, type (4 bytes), data, CRC-32 of type + data  [png_put_chunk]
 pub fn put_chunk(out: &mut Vec<u8>, typ: &[u8; 4], data: &[u8]) {
+    debug_assert!(data.len() <= u32::MAX as usize, "PNG chunk length exceeds 32 bits");
     out.extend_from_slice(&(data.len() as u32).to_be_bytes());
     let s = out.len();
     out.extend_from_slice(typ);

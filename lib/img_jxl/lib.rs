@@ -190,7 +190,7 @@ pub fn box_contents(data: &[u8], b: (usize, usize, bool)) -> Result<Vec<u8>, i32
         v.extend_from_slice(s);
         return Ok(v);
     }
-    brotli::decompress(s, 1 << 28).map(|(v, _)| v).map_err(|e| if e == ERR_NOMEM { e } else { ERR_HDR })
+    brotli::decompress(s, 1 << 26).map(|(v, _)| v).map_err(|e| if e == ERR_NOMEM { e } else { ERR_HDR })
 }
 
 /// jx_open: codestream copy and image headers
@@ -218,6 +218,7 @@ pub fn open(data: &[u8]) -> Result<Dec, i32> {
         let mut v: Vec<u8> = Vec::new();
         for pass in 0..2 {
             let mut pos: u64 = 0;
+            let (mut nextp, mut lastp) = (0u32, false);
             while pos + 8 <= len as u64 {
                 let (bs, be, next, typ) = xc_box(data, pos)?;
                 if pass == 0 {
@@ -260,6 +261,18 @@ pub fn open(data: &[u8]) -> Result<Dec, i32> {
                     0x706C_786A => Some(bs + 4), // "jxlp"
                     _ => None,
                 };
+                if typ == 0x706C_786A && pass == 0 {
+                    // jxlp: u32 BE sequence number (top bit: last box), counting up from 0
+                    if be.wrapping_sub(bs) < 4 {
+                        return Err(ERR_HDR);
+                    }
+                    let q = be32(data, bs as usize);
+                    if lastp || q & 0x7FFF_FFFF != nextp {
+                        return Err(ERR_HDR);
+                    }
+                    lastp = q >> 31 != 0;
+                    nextp += 1;
+                }
                 if let Some(st) = start
                     && be > st
                 {

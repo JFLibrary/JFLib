@@ -9,6 +9,7 @@
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use gfx::pathdata::PData;
 use gfx::xform::Matrix;
@@ -200,6 +201,7 @@ pub struct Svg {
     pub(crate) par: Par,
     title: String,
     truncated: bool,
+    img_px: AtomicU64, // pixels of the embedded images decoded so far (the document budget)
 }
 
 const DEFAULT_W: f64 = 300.0;
@@ -356,7 +358,7 @@ impl Svg {
                 }
             }
         }
-        Ok(Svg { nodes, ids, images, width, height, view_box, par, title, truncated: dom.truncated })
+        Ok(Svg { nodes, ids, images, width, height, view_box, par, title, truncated: dom.truncated, img_px: AtomicU64::new(0) })
     }
 
     /// the intrinsic size in px (CSS px = DIP): width / height of the root, else its viewBox,
@@ -390,7 +392,12 @@ impl Svg {
         let img = self.images.get(i as usize)?;
         let mut g = img.sf.lock();
         if g.is_none() {
-            *g = Some(crate::decode_image(&img.data));
+            let used = self.img_px.load(Ordering::Relaxed);
+            let sf = crate::decode_image(&img.data, crate::MAX_IMAGE_PX.saturating_sub(used));
+            if let Some(s) = &sf {
+                self.img_px.fetch_add(s.w as u64 * s.h as u64, Ordering::Relaxed);
+            }
+            *g = Some(sf);
         }
         match &*g {
             Some(Some(sf)) => Some(f(sf)),

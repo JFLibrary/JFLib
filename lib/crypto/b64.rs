@@ -23,7 +23,13 @@ fn enc(data: &[u8], alpha: &[u8; 64], pad: bool) -> String {
 }
 
 fn dec(s: &str, url: bool) -> Option<Vec<u8>> {
-    let b = s.trim_end_matches('=').as_bytes();
+    let body = s.trim_end_matches('=');
+    let pad = s.len() - body.len();
+    // padding is optional, but when present it completes the last group of four
+    if pad > 2 || (pad > 0 && s.len() % 4 != 0) {
+        return None;
+    }
+    let b = body.as_bytes();
     if b.len() % 4 == 1 {
         return None;
     }

@@ -231,8 +231,8 @@ impl Jf {
         self.yg = h.wrapping_add(m) >> gs;
         self.xdg = self.xb.wrapping_add(m) >> gs;
         self.ydg = self.yb.wrapping_add(m) >> gs;
-        self.ng = self.xg.wrapping_mul(self.yg);
-        self.ndg = self.xdg.wrapping_mul(self.ydg);
+        self.ng = self.xg.saturating_mul(self.yg);
+        self.ndg = self.xdg.saturating_mul(self.ydg);
     }
 }
 
@@ -463,8 +463,15 @@ pub fn jf_toc(br: &mut Jb, jf: &mut Jf) -> i32 {
     let n = if jf.ng == 1 && jf.passes == 1 {
         1
     } else {
-        jf.ng.wrapping_mul(jf.passes).wrapping_add(jf.ndg).wrapping_add(2)
+        match jf.ng.checked_mul(jf.passes).and_then(|v| v.checked_add(jf.ndg)).and_then(|v| v.checked_add(2)) {
+            Some(n) => n,
+            None => return ERR_HDR,
+        }
     };
+    // every TOC entry takes at least 2 bits
+    if n as u64 > br.end.saturating_sub(br.pos) / 2 {
+        return ERR_HDR;
+    }
     jf.ntoc = n;
     let nn = n as usize;
     let mut sz: Vec<u32> = Vec::new();
@@ -507,16 +514,47 @@ pub fn jf_toc(br: &mut Jb, jf: &mut Jf) -> i32 {
             return ERR_HDR;
         }
         // decode the Lehmer code: perm[i] = remaining.pop(lehmer[i])
-        let mut rem: Vec<u32> = (0..n).collect();
+        // (Fenwick tree over the remaining entries: the k-th remaining one in O(log n))
+        let mut fw: Vec<u32> = Vec::new();
+        if fw.try_reserve_exact(nn + 1).is_err() {
+            return ERR_NOMEM;
+        }
+        fw.resize(nn + 1, 0);
+        for i in 1..=nn {
+            fw[i] += 1;
+            let j = i + (i & i.wrapping_neg());
+            if j <= nn {
+                let v = fw[i];
+                fw[j] += v;
+            }
+        }
+        let top = if nn == 0 { 0 } else { 1usize << (usize::BITS - 1 - nn.leading_zeros()) };
         for p in perm.iter_mut() {
-            let k = *p as usize;
-            *p = rem.remove(k);
+            let mut k = *p;
+            let (mut idx, mut step) = (0usize, top);
+            while step != 0 {
+                let nx = idx + step;
+                if nx <= nn && fw[nx] <= k {
+                    idx = nx;
+                    k -= fw[nx];
+                }
+                step >>= 1;
+            }
+            *p = idx as u32;
+            let mut i = idx + 1;
+            while i <= nn {
+                fw[i] -= 1;
+                i += i & i.wrapping_neg();
+            }
         }
     }
     br.align();
     let mut run: u64 = 0;
     for i in 0..nn {
         let s = br.u32f(&D_TOC);
+        if br.err != 0 || br.pos > br.end {
+            break;
+        }
         jf.tocsz[i] = s;
         jf.tocoff[i] = run;
         run = run.wrapping_add(s as u64);

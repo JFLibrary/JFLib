@@ -16,6 +16,16 @@ pub struct Poly1305 {
     n: usize,
 }
 
+impl Drop for Poly1305 {
+    fn drop(&mut self) {
+        crate::zeroize_words(&mut self.r);
+        crate::zeroize_words(&mut self.s);
+        crate::zeroize_words(&mut self.h);
+        crate::zeroize_words(&mut self.pad);
+        crate::zeroize(&mut self.buf);
+    }
+}
+
 impl Poly1305 {
     pub fn new(key: &[u8; 32]) -> Poly1305 {
         let t0 = le64(&key[0..]);

@@ -117,13 +117,25 @@ impl P<'_> {
             }
             _ => false,
         };
-        let mut t = self.num()? * 3600;
+        let h = self.num()?;
+        if h > 167 {
+            return None; // POSIX / TZif: at most +-167 hours
+        }
+        let mut t = h * 3600;
         if self.peek() == Some(b':') {
             self.i += 1;
-            t += self.num()? * 60;
+            let m = self.num()?;
+            if m > 59 {
+                return None;
+            }
+            t += m * 60;
             if self.peek() == Some(b':') {
                 self.i += 1;
-                t += self.num()?;
+                let s = self.num()?;
+                if s > 59 {
+                    return None;
+                }
+                t += s;
             }
         }
         Some(if neg { -t } else { t })
@@ -132,17 +144,17 @@ impl P<'_> {
         let r = match self.peek()? {
             b'M' => {
                 self.i += 1;
-                let month = self.num()? as u8;
+                let month = u8::try_from(self.num()?).ok()?;
                 if self.peek()? != b'.' {
                     return None;
                 }
                 self.i += 1;
-                let week = self.num()? as u8;
+                let week = u8::try_from(self.num()?).ok()?;
                 if self.peek()? != b'.' {
                     return None;
                 }
                 self.i += 1;
-                let wday = self.num()? as u8;
+                let wday = u8::try_from(self.num()?).ok()?;
                 if !(1..=12).contains(&month) || !(1..=5).contains(&week) || wday > 6 {
                     return None;
                 }
@@ -150,9 +162,10 @@ impl P<'_> {
             }
             b'J' => {
                 self.i += 1;
-                Rule::J { day: self.num()? as u16, time: 7200 }
+                let day = u16::try_from(self.num()?).ok().filter(|d| (1..=365).contains(d))?;
+                Rule::J { day, time: 7200 }
             }
-            _ => Rule::D { day: self.num()? as u16, time: 7200 },
+            _ => Rule::D { day: u16::try_from(self.num()?).ok().filter(|&d| d <= 365)?, time: 7200 },
         };
         let time = if self.peek() == Some(b'/') {
             self.i += 1;

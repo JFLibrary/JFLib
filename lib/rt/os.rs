@@ -29,9 +29,17 @@ mod imp {
     }
 
     fn write_handle(n: u32, b: &[u8]) {
-        let mut done = 0u32;
-        // SAFETY: b is a valid buffer; a missing console handle makes WriteFile fail harmlessly.
-        unsafe { WriteFile(GetStdHandle(n), b.as_ptr(), b.len() as u32, &mut done, 0) };
+        let mut off = 0;
+        while off < b.len() {
+            let chunk = (b.len() - off).min(1 << 30);
+            let mut done = 0u32;
+            // SAFETY: b[off..] is a valid buffer; a missing console handle makes WriteFile fail harmlessly.
+            let ok = unsafe { WriteFile(GetStdHandle(n), b.as_ptr().add(off), chunk as u32, &mut done, 0) };
+            if ok == 0 || done == 0 {
+                break;
+            }
+            off += done as usize;
+        }
     }
 
     pub fn write_stdout(b: &[u8]) {
@@ -148,6 +156,13 @@ mod imp {
         while off < b.len() {
             // SAFETY: b is a valid buffer.
             let r = unsafe { syscall3(SYS_WRITE, fd, b.as_ptr() as usize + off, b.len() - off) };
+            if r == -4 {
+                continue; // EINTR
+            }
+            if r == -11 {
+                yield_now(); // EAGAIN on a non-blocking descriptor
+                continue;
+            }
             if r <= 0 {
                 break;
             }

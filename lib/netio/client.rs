@@ -311,7 +311,9 @@ impl Session {
                 }
                 Err((e, retry)) => {
                     self.conn = None;
-                    if !(retry && attempt == 0) {
+                    // a request that may have run already is not sent twice
+                    let idempotent = matches!(method, "GET" | "HEAD" | "PUT" | "DELETE" | "OPTIONS" | "TRACE");
+                    if !(retry && idempotent && attempt == 0) {
                         return Err(e);
                     }
                 }

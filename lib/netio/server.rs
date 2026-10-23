@@ -182,7 +182,10 @@ fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfi
             }
         }
         s.set_timeouts(Some(cfg.read_ms), Some(cfg.write_ms));
-        let (start, headers) = match rd.head() {
+        rd.set_deadline(Some(plat::time_us() + cfg.read_ms as u64 * 1000));
+        let head = rd.head();
+        rd.set_deadline(None);
+        let (start, headers) = match head {
             Ok(x) => x,
             Err(ReadError::Closed) | Err(ReadError::Net(_)) => return,
             Err(ReadError::HeadTooLarge) => return error(s, 431, stop),
@@ -208,8 +211,10 @@ fn serve(s: &dyn Stream, peer: SocketAddr, id: Option<String>, cfg: &ServerConfi
         }
         let keep = if http11 { !headers.has_token("connection", "close") } else { headers.has_token("connection", "keep-alive") };
         if headers.has_token("expect", "100-continue") {
-            if headers.get("content-length").and_then(|v| v.trim().parse::<usize>().ok()).is_some_and(|n| n > cfg.max_body) {
-                return error(s, 413, stop);
+            match headers.content_length() {
+                Err(()) => return error(s, 400, stop),
+                Ok(Some(n)) if n > cfg.max_body as u64 => return error(s, 413, stop),
+                _ => {}
             }
             if s.write_all(b"HTTP/1.1 100 Continue\r\n\r\n").is_err() {
                 return;

@@ -162,6 +162,11 @@ impl PackBuf {
         loc
     }
 
+    /// whether a blob of `blob_len` bytes (`raw` unpacked) still has u32 offsets and lengths
+    pub fn fits(&self, blob_len: usize, raw: usize) -> bool {
+        u32::try_from(raw).is_ok() && u32::try_from(self.data.len() as u64 + blob_len as u64).is_ok()
+    }
+
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }

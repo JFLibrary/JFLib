@@ -1,6 +1,6 @@
 // p256 -- Diffie-Hellman on NIST P-256 (SEC 1, RFC 8446 4.2.8.2) in constant time
 //
-//   public_key(&secret) -> [u8; 65]          04 || x || y of secret * G
+//   public_key(&secret) -> [u8; 65]          (panics on an invalid secret) 04 || x || y of secret * G
 //   shared(&secret, &peer_point) -> Option<[u8; 32]>   the x coordinate of secret * peer;
 //                                            None for a point that is not on the curve
 //   secret_from(random) -> Option<[u8; 32]>  a scalar in [1, n - 1] from 32 random bytes
@@ -265,6 +265,7 @@ pub fn secret_from(random: &[u8; 32]) -> Option<[u8; 32]> {
 
 /// the public key of a secret scalar: 04 || x || y
 pub fn public_key(secret: &[u8; 32]) -> [u8; 65] {
+    assert!(secret_from(secret).is_some(), "p256 secret outside [1, n - 1]");
     let b = to_mont(&B);
     let g = Pt { x: to_mont(&GX), y: to_mont(&GY), z: to_mont(&[1, 0, 0, 0]) };
     let r = scalar_mul(secret, &g, &b);

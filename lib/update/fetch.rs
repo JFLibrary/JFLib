@@ -63,6 +63,11 @@ pub fn join(base: &Url, href: &str) -> Option<Url> {
     Some(base.with_target(&target))
 }
 
+// a redirect from https must stay on https
+fn no_downgrade(from: &Url, to: Url) -> Option<Url> {
+    (from.scheme != "https" || to.scheme == "https").then_some(to)
+}
+
 fn redirect(status: u16) -> bool {
     matches!(status, 301 | 302 | 303 | 307 | 308)
 }
@@ -81,7 +86,7 @@ pub fn get(cfg: &Config, url: &Url, max: usize) -> Result<(Url, Vec<u8>), Error>
         if !redirect(r.status) {
             return Err(Error::Http(r.status));
         }
-        u = r.headers.get("location").and_then(|l| join(&u, l.trim())).ok_or(Error::Http(r.status))?;
+        u = r.headers.get("location").and_then(|l| join(&u, l.trim())).and_then(|n| no_downgrade(&u, n)).ok_or(Error::Http(r.status))?;
     }
     Err(Error::Net(format!("{}: zu viele Umleitungen", url)))
 }
@@ -95,7 +100,7 @@ fn content_range(v: &str) -> Option<(u64, Option<u64>)> {
     Some((start.trim().parse().ok()?, total))
 }
 
-fn write_all(f: &plat::File, mut off: u64, mut data: &[u8]) -> bool {
+pub(crate) fn write_all(f: &plat::File, mut off: u64, mut data: &[u8]) -> bool {
     while !data.is_empty() {
         match f.write_at(off, data) {
             Some(n) if n > 0 => {
@@ -219,7 +224,7 @@ pub fn download(cfg: &Config, url: &Url, part: &str, size: u64, sha256: &[u8; 32
             Err(_) => {}
             Ok(_) if redirect(status) => {
                 hops += 1;
-                u = location.as_deref().and_then(|l| join(&u, l.trim())).filter(|_| hops <= MAX_REDIRECTS).ok_or(Error::Http(status))?;
+                u = location.as_deref().and_then(|l| join(&u, l.trim())).and_then(|n| no_downgrade(&u, n)).filter(|_| hops <= MAX_REDIRECTS).ok_or(Error::Http(status))?;
                 continue;
             }
             Ok(_) if status != 200 && status != 206 => return Err(Error::Http(status)),

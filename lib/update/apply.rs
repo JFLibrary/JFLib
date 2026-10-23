@@ -102,7 +102,7 @@ impl State {
                 "from" => s.from = String::from(v),
                 "starts" => s.starts = v.parse().unwrap_or(0),
                 "kind" => s.kind = String::from(v),
-                "file" => s.file = String::from(v),
+                "file" => s.file = if rel_ok(v) && !v.contains('/') { String::from(v) } else { String::new() },
                 "bad" => s.bad = v.split_whitespace().map(String::from).collect(),
                 "seen" => s.seen = String::from(v),
                 _ => {}
@@ -196,6 +196,15 @@ pub(crate) fn load_staged(cfg: &Config, st: &State) -> Result<(Manifest, Kind, V
     }
     let man = Manifest::parse(&m).map_err(Error::Manifest)?;
     let pkg = man.package(&cfg.target).ok_or(Error::Nothing)?;
+    if man.expires != 0 && crate::now_secs() > man.expires {
+        return Err(Error::Expired);
+    }
+    if !st.seen.is_empty() && manifest::newer(&st.seen, &man.version) {
+        return Err(Error::Replay(String::from(&st.seen)));
+    }
+    if !manifest::newer(&man.version, &cfg.version) {
+        return Err(Error::Manifest(String::from("das bereitgestellte Update ist nicht neuer als die laufende Version")));
+    }
     if man.app != cfg.app || man.version != st.version {
         return Err(Error::Manifest(String::from("das bereitgestellte Update passt nicht zum Zustand")));
     }
@@ -252,15 +261,27 @@ fn not_writable(p: &str) -> Error {
 fn swap(target: &str, data: &[u8]) -> Result<(), Error> {
     let new = format!("{}.jfupd-new", target);
     let (dir, _) = split_dir(target);
-    if (plat::file_exists(dir) != 2 && !plat::mkdir(dir)) || !plat::write_file(&new, data) {
-        plat::delete(&new);
+    if plat::file_exists(dir) != 2 && !plat::mkdir(dir) {
         return Err(not_writable(target));
     }
-    #[cfg(target_os = "linux")]
-    {
-        // the old file's permissions (a new file: executable, like a program)
-        let mode = plat::fs::stat(target).map_or(0o755, |m| m.mode & 0o7777);
-        plat::fs::set_mode(&new, mode);
+    // never write through a name that already exists (a leftover or a planted link)
+    plat::delete(&new);
+    #[cfg(any(windows, target_os = "linux"))]
+    let file = plat::File::create_new(&new);
+    #[cfg(not(any(windows, target_os = "linux")))]
+    let file = plat::File::open(&new, plat::FO_RW);
+    let written = file.is_some_and(|f| {
+        // the old file's permissions (a new file: executable, like a program), before the data
+        #[cfg(target_os = "linux")]
+        {
+            let mode = plat::fs::stat(target).map_or(0o755, |m| m.mode & 0o7777);
+            plat::fs::set_mode(&new, mode);
+        }
+        crate::fetch::write_all(&f, 0, data) && f.sync()
+    });
+    if !written {
+        plat::delete(&new);
+        return Err(not_writable(target));
     }
     let exists = plat::file_exists(target) == 1;
     if cfg!(windows) && exists {
@@ -274,12 +295,14 @@ fn swap(target: &str, data: &[u8]) -> Result<(), Error> {
             plat::delete(&new);
             return Err(not_writable(target));
         }
+        plat::fs::sync_dir(dir);
         return Ok(());
     }
     if !plat::rename(&new, target) {
         plat::delete(&new);
         return Err(not_writable(target));
     }
+    plat::fs::sync_dir(dir);
     Ok(())
 }
 
@@ -317,13 +340,14 @@ pub(crate) fn apply_staged(cfg: &Config, st: &mut State) -> Result<(), Error> {
     };
     // the backup of every file the update touches
     let backup = path(cfg, "backup");
-    remove_tree(&backup);
+    let fresh = path(cfg, "backup.new");
+    remove_tree(&fresh);
     let mut list = format!("from={}\n", cfg.version);
     for (rel, _) in &files {
         let target = format!("{}/{}", dir, rel);
         if plat::file_exists(&target) == 1 {
             let old = plat::read_file(&target).ok_or_else(|| Error::Io(format!("{} kann nicht gelesen werden", target)))?;
-            if !write(&format!("{}/files/{}", backup, rel), &old) {
+            if !write(&format!("{}/files/{}", fresh, rel), &old) {
                 return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
             }
             list.push_str(&format!("R {}\n", rel));
@@ -331,7 +355,12 @@ pub(crate) fn apply_staged(cfg: &Config, st: &mut State) -> Result<(), Error> {
             list.push_str(&format!("N {}\n", rel));
         }
     }
-    if !write(&format!("{}/list", backup), list.as_bytes()) {
+    if !write(&format!("{}/list", fresh), list.as_bytes()) {
+        return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
+    }
+    // the previous backup goes only now that the new one is complete
+    remove_tree(&backup);
+    if !plat::rename(&fresh, &backup) {
         return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
     }
     // the new files; on a failure the old ones come back
