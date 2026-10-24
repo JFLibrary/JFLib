@@ -19,7 +19,8 @@
 //   saveopt_frame()               the window (fio_frame)
 //   saveopt_poll()                UI thread: collect / restart the preview job (frame, UIC_WAKE)
 //   saveopt_pending() -> bool     the preview is computed (script `sync`; tool::SYNC_SAVEOPT)
-//   saveopt_take() -> bytes | ERR_*   OK: the file bytes; the options become the document's
+//   saveopt_take() -> bytes | ERR_*   OK: the file bytes
+//   saveopt_accept()              the file was written: the options become the document's
 //                                 (DOC_SAVEOPT, DF_OPTOK)
 //   saveopt_close()               cancel the job, free the preview
 // Widget ids ID_DLG_SAVEOPT + n, window WINID_DLG0 + 3.  Probes: ID_SO_PROBE value = file size
@@ -727,21 +728,24 @@ fn so_collect(s: &mut SaveOpt) {
     s.cver = s.cver.wrapping_add(1);
 }
 
-/// saveopt_take() -> the encoded file for the current options | ERR_*; the options become the
-/// document's
+/// saveopt_accept() -- the file was written: the options become the document's (paint.net:
+/// Speichern asks no more).  Not before: a failed or cancelled save asks again.
+pub(crate) fn saveopt_accept(p: &mut Pn) {
+    let Some(doc) = p.saveopt.doc else { return };
+    let opt = p.saveopt.opt;
+    let d = p.doc.dm(doc);
+    d.saveopt = opt;
+    d.flags |= DF_OPTOK as u32;
+}
+
+/// saveopt_take() -> the encoded file for the current options | ERR_*
 pub(crate) fn saveopt_take(p: &mut Pn, _ui: &mut Ui) -> Result<Vec<u8>, i32> {
     if p.saveopt.jact {
         let _ = p.saveopt.job.wait();
         so_collect(&mut p.saveopt);
     }
-    // the document keeps the options (paint.net: Speichern asks no more)
     let Some(doc) = p.saveopt.doc else { return Err(ERR_UNSUPPORTED) };
     let opt = p.saveopt.opt;
-    {
-        let d = p.doc.dm(doc);
-        d.saveopt = opt;
-        d.flags |= DF_OPTOK as u32;
-    }
     let s = &mut p.saveopt;
     if s.ver == s.rver {
         if s.err != 0 {

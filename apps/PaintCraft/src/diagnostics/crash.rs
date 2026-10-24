@@ -40,6 +40,8 @@ use crate::app::Pn;
 const PATH_CAP: usize = 1040;
 const REPORT_CAP: usize = 65536; // protocol text (also the report window's buffer)
 const DIAG_SNAP: usize = 8192; // the diagnostics snapshot (the settings text is <= 4 KB)
+const KEEP_REPORTS: usize = 20; // protocols kept in the crash folder (older ones are removed at start)
+const NAME_PREFIX: &str = "Absturz_";
 const ID_CR_DETAILS: u32 = ID_CRASH_FIRST + 1;
 const ID_CR_COPY: u32 = ID_CRASH_FIRST + 2;
 const ID_CR_FOLDER: u32 = ID_CRASH_FIRST + 3;
@@ -99,7 +101,7 @@ pub(crate) fn crash_mode_init(p: &mut Pn, _ui: &mut Ui) -> bool {
     let Some(path) = plat::arg_value("--crash-report") else { return false };
     c.mode = true;
     c.path = cap_str(&path, PATH_CAP);
-    if let Some(data) = plat::read_file(&c.path) {
+    if let Some(data) = crash_read(&c.path) {
         // str_copy: up to the first NUL, cut at REPORT_CAP - 1 bytes
         let n = data.iter().position(|&b| b == 0).unwrap_or(data.len());
         let s = String::from_utf8_lossy(&data[..n]);
@@ -109,6 +111,15 @@ pub(crate) fn crash_mode_init(p: &mut Pn, _ui: &mut Ui) -> bool {
     c.dir = cut_name(&c.path);
     c.config = plat::arg_value("--config");
     true
+}
+
+// crash_read(path) -- only the first REPORT_CAP bytes: the rest would be cut anyway
+fn crash_read(path: &str) -> Option<alloc::vec::Vec<u8>> {
+    let f = plat::File::open(path, plat::FO_READ)?;
+    let mut buf = alloc::vec![0u8; REPORT_CAP];
+    let got = f.read_at(0, &mut buf)?;
+    buf.truncate(got.min(REPORT_CAP));
+    Some(buf)
 }
 
 /// crash_mode() -> eax 1 in report mode
@@ -297,8 +308,9 @@ static HOOK: SpinLock<HookState> = SpinLock::new(HookState {
 pub(crate) fn crash_setup(p: &mut Pn, ui: &mut Ui) {
     let config = plat::arg_value("--config");
     p.crash.config = config.clone();
-    let dir = if let Some(d) = plat::arg_value("--crash-dir") {
-        cap_str(&d, PATH_CAP - 64)
+    // a folder too long for the hook's buffers is not shortened (that would write elsewhere)
+    let dir = if let Some(d) = plat::arg_value("--crash-dir").filter(|d| d.len() < PATH_CAP - 64) {
+        d
     } else if p.st.on {
         let d = cut_name(&cap_str(&p.st.file, PATH_CAP - 64));
         cap_str(&format!("{}/CrashLogs", d), PATH_CAP - 64)
@@ -312,9 +324,29 @@ pub(crate) fn crash_setup(p: &mut Pn, ui: &mut Ui) {
         h.config.set(config.as_deref().unwrap_or(""));
         h.spawn = !ui.headless(); // only a real window starts the report window
     }
+    cr_prune(&dir);
     p.crash.hooked = true;
     crash_states(p);
     plat::crash_hook(Some(crash_hook));
+}
+
+// cr_prune(dir) -- keep the newest KEEP_REPORTS - 1 protocols of the crash folder (the names
+// begin with the date, so the name order is the age order); the next crash adds one
+fn cr_prune(dir: &str) {
+    let mut names: alloc::vec::Vec<String> = alloc::vec::Vec::new();
+    plat::dir_list(dir, &mut |name: &str, is_dir: bool, _size: u32| {
+        if !is_dir && name.starts_with(NAME_PREFIX) && name.ends_with(".txt") && names.len() < 4096 {
+            names.push(String::from(name));
+        }
+    });
+    if names.len() < KEEP_REPORTS {
+        return;
+    }
+    names.sort();
+    let old = names.len() - (KEEP_REPORTS - 1);
+    for n in &names[..old] {
+        plat::delete(&format!("{}/{}", dir, n));
+    }
 }
 
 /// crash_states() -- (Rust) the hook's snapshot of the diagnostics text (set_diag_text); the
@@ -338,23 +370,35 @@ pub(crate) fn crash_test() {
 // itself, then again with the diagnostics; with a real window PaintCraft is started again to
 // show it
 fn crash_hook(ci: &plat::CrashInfo) {
-    let mut g = HOOK.lock();
+    // a crash while the state is being updated (or a second one at the same time) must not
+    // wait for the lock forever
+    let Some(mut g) = HOOK.try_lock() else { return };
     let h = &mut *g;
     h.buf.n = 0;
     let (dt, utc) = plat::date();
     // the file name: Absturz_JJJJ-MM-TT_hh-mm-ss.txt
-    h.path.n = 0;
-    let _ = write!(
-        h.path,
-        "{}/Absturz_{:04}-{:02}-{:02}_{:02}-{:02}-{:02}.txt",
-        h.dir.as_str(),
-        dt.year,
-        dt.month,
-        dt.day,
-        dt.hour,
-        dt.min,
-        dt.sec
-    );
+    // (a second protocol within the same second gets a counter, none is overwritten)
+    for seq in 0..100u32 {
+        h.path.n = 0;
+        let _ = write!(
+            h.path,
+            "{}/Absturz_{:04}-{:02}-{:02}_{:02}-{:02}-{:02}",
+            h.dir.as_str(),
+            dt.year,
+            dt.month,
+            dt.day,
+            dt.hour,
+            dt.min,
+            dt.sec
+        );
+        if seq > 0 {
+            let _ = write!(h.path, "_{}", seq);
+        }
+        let _ = h.path.write_str(".txt");
+        if plat::file_exists(h.path.as_str()) == 0 {
+            break;
+        }
+    }
     // the protocol
     let b = &mut h.buf;
     let _ = b.write_str("PaintCraft ist abgestürzt.\n\nPaintCraft hat diesen Bericht nach einem unerwarteten Fehler geschrieben. Er enthält Angaben, mit denen sich die Ursache finden und beheben lässt.\n\n");

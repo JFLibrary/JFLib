@@ -219,6 +219,11 @@ pub(crate) fn lay_new_d(d: &mut Doc, index: i32, name: Option<&str>) -> Option<i
 /// lay_add_sf(doc, index, sf, name) -> index (sf is given back on failure)
 pub(crate) fn lay_add_sf(p: &mut Pn, doc: DocId, index: i32, sf: Surface, name: Option<&str>) -> Result<i32, Surface> {
     let Some(d) = p.doc.get_mut(doc) else { return Err(sf) };
+    // a surface that does not fit its own geometry would make every pixel loop read out of range
+    let rows = (sf.h.max(0) as usize).saturating_mul(sf.stride.max(0) as usize);
+    if sf.fmt != FMT_ARGB || sf.w <= 0 || sf.h <= 0 || sf.stride < sf.w.saturating_mul(4) || sf.px.len() < rows {
+        return Err(sf);
+    }
     let i = lay_insert_rec(d, index);
     let nm = default_name(d, name);
     let l = &mut d.layers[i];

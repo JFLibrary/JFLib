@@ -1209,7 +1209,9 @@ pub(crate) fn sel_crop(p: &mut Pn, doc: DocId) -> bool {
     }
     // install the new surfaces (the old ones: history or freed)
     for (i, sf) in nsf.into_iter().enumerate() {
-        let old = core::mem::replace(&mut p.doc.dm(doc).layers[i].sf, sf);
+        let l = &mut p.doc.dm(doc).layers[i];
+        let old = core::mem::replace(&mut l.sf, sf);
+        l.ver = l.ver.wrapping_add(1);
         hist_release(p, doc, Layer { sf: old, ..Layer::default() });
     }
     let d = p.doc.dm(doc);
@@ -1459,6 +1461,8 @@ fn parse_int(s: &[u8], mut i: usize) -> (i32, usize) {
     (if neg { v.wrapping_neg() } else { v }, i)
 }
 
+const GEOM_POINTS_MAX: usize = 4_000_000;
+
 /// sel_geom_parse(text) -> POLY of the text of sel_geom_text | None (not that format)
 pub(crate) fn sel_geom_parse(text: &[u8]) -> Option<PolyRef> {
     let t = &text[..text.iter().position(|&c| c == 0).unwrap_or(text.len())]; // a NUL ends it
@@ -1468,6 +1472,7 @@ pub(crate) fn sel_geom_parse(text: &[u8]) -> Option<PolyRef> {
     let at = |k: usize| t.get(k).copied().unwrap_or(0);
     let mut b = Builder::default();
     let mut buf: Vec<[f32; 2]> = Vec::new();
+    let mut total = 0usize;
     let mut i = GEOM_HDR.len();
     loop {
         while matches!(at(i), b' ' | b'\t' | b'\r' | b'\n') {
@@ -1481,6 +1486,10 @@ pub(crate) fn sel_geom_parse(text: &[u8]) -> Option<PolyRef> {
         let (n, j) = parse_int(t, i);
         if j == i || n <= 0 || n > 0x100_0000 {
             return None;
+        }
+        total += n as usize;
+        if total > GEOM_POINTS_MAX {
+            return None; // pasted text must not build an unbounded outline
         }
         i = j;
         buf.clear();

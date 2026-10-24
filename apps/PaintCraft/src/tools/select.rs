@@ -225,8 +225,8 @@ fn ts_constrain(t: &mut TSel) {
             // w = |dx|, h = |dy|; the larger one wins, the other follows rw : rh
             let aw = dx.wrapping_abs() as u32 as u64;
             let ah = dy.wrapping_abs() as u32 as u64;
-            let rw = t.rw as u32 as u64;
-            let rh = t.rh as u32 as u64;
+            let rw = (t.rw as u32 as u64).max(1);
+            let rh = (t.rh as u32 as u64).max(1);
             if ((aw * rh) as i64) < ((ah * rw) as i64) {
                 h = ah as i32;
                 w = ((ah * rw + (rh >> 1)) / rh) as i32;
