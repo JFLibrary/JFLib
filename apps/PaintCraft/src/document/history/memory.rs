@@ -110,6 +110,7 @@ const ZC_CAP: usize = ZMAX + 16; // zlib_deflate_to capacity (larger = too big a
 const ZS_SLOTS: usize = plat::THR_MAX + 1; // per-thread states
 const SP_EXT_MAX: usize = 4096; // free extents of the spill file
 const BUDGET_MAX: u64 = 0x1_0000_0000; // 4 GB
+const WEB_BUDGET: u64 = 0x2000_0000; // 512 MB
 const LD_PAR: i32 = 8; // load_entry: decode on the pool from this many tiles
 // freed tiles kept for reuse: the asm carves tiles from 32-tile slabs, so a large undo / redo
 // costs it one allocation per slab; a tile here is one page run of the global allocator, so a
@@ -185,14 +186,24 @@ fn new_tile() -> Option<Tile> {
     gfx::try_zeroed(TILE_BYTES)?.into_boxed_slice().try_into().ok()
 }
 
-/// hm_init() -- budget = min(40 % of the RAM, 4 GB) (1 GB when unknown)
+/// hm_init() -- budget = min(40 % of the RAM, 4 GB) (1 GB when unknown).  On the web there is
+/// no disk: the "spill file" would be a buffer in the same wasm memory (copied, and not
+/// counted), so nothing spills and the budget is a quarter of the 2 GB the wasm memory can
+/// grow to (plat::mem_total() is only the size at the moment, 32 MB at the start).
 pub(crate) fn hm_init(p: &mut Pn) {
     let hm = &mut p.hm;
+    let web = cfg!(target_arch = "wasm32");
     let t = plat::mem_total();
-    let b = if t == 0 { 0x4000_0000 } else { (t / 5 * 2).min(BUDGET_MAX) };
+    let b = if web {
+        WEB_BUDGET
+    } else if t == 0 {
+        0x4000_0000
+    } else {
+        (t / 5 * 2).min(BUDGET_MAX)
+    };
     hm.budget = b;
     hm.budget_def = b;
-    hm.sp_on = true;
+    hm.sp_on = !web;
 }
 
 /// hm_fail() -> true when this allocation must fail (fault injection)

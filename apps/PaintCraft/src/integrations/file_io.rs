@@ -113,12 +113,12 @@ const CH_CLOSE: i32 = 1; // close chain_doc
 const CH_EXIT: i32 = 2; // close every image, then quit
 const CH_SAVEALL: i32 = 3; // save every modified image
 
-// command line options that take a value (their value is no file to open)
+// the app's command line options that take a value (their value is no file to open); the
+// library's own options are plat::VALUE_OPTS
 static VALUE_OPTS: &[&str] = &[
     "--pdn-plugins", "--gmic-qt", "--gmic-command", "--brush-tip", "--language", "--text-font",
     "--pdn-wine", "--pdn-wine-prefix", "--pdn-dotnet", "--pdn-install", "--brush-presets", "--brush-preset",
-    "--size", "--scale", "--auto-close", "--anim", "--theme", "--accent", "--shot", "--script", "--threads", "--simd",
-    "--config", "--settings-save-at", "--plugins", "--crash-dir",
+    "--config", "--settings-save-at", "--plugins", "--plugin-fuzz", "--crash-dir", "--crash-report",
     "--pdn-plugin", "--pdn-host", "--pdn-type", "--acquire-file", "--update-feed",
 ];
 
@@ -163,6 +163,9 @@ pub(crate) struct Fio {
     err_title: String,
     err_msg: String,
     title: String,
+    /// web: the page was told that a document has unsaved changes (it then asks before it is closed)
+    #[cfg(target_arch = "wasm32")]
+    unsaved: bool,
     /// g_recent: newest first
     recent: Vec<String>,
     /// g_open_exts / g_save_exts: the type lists of the file dialogs
@@ -203,6 +206,8 @@ impl Default for Fio {
             err_title: String::new(),
             err_msg: String::new(),
             title: String::new(),
+            #[cfg(target_arch = "wasm32")]
+            unsaved: false,
             recent: Vec::new(),
             open_exts: Vec::new(),
             save_exts: Vec::new(),
@@ -281,15 +286,20 @@ fn fio_open_args(p: &mut Pn, ui: &mut Ui, cwd: &str, a: &[String]) {
         if absolute { String::from(f) } else { format!("{}/{}", cwd.trim_end_matches(['/', '\\']), f) }
     };
     let mut i = 0;
+    let mut opts = true; // "--" ends the options: every later argument is a file
     while i < a.len() {
         let s = a[i].clone();
         i += 1;
-        if s.starts_with('-') {
+        if opts && s == "--" {
+            opts = false;
+            continue;
+        }
+        if opts && s.starts_with('-') {
             if s == "--open" {
                 let Some(f) = a.get(i).cloned() else { break };
                 i += 1;
                 fio_open_path(p, ui, &full(&f));
-            } else if VALUE_OPTS.contains(&s.as_str()) {
+            } else if VALUE_OPTS.contains(&s.as_str()) || plat::VALUE_OPTS.contains(&s.as_str()) {
                 i += 1; // options with a value: skip the value
             }
             continue;
@@ -425,12 +435,17 @@ fn file_part(path: &str) -> &str {
 }
 
 // canon_path(src) -> absolute path with '/' separators and without "." / ".." segments (a
-// relative src starts in the current directory)
+// relative src starts in the current directory); "" when the path exceeds PATH_LONG (never a
+// silently shortened path, which would name another file)
+const PATH_LONG: usize = 32768;
 fn canon_path(src: &str) -> String {
     let s = src.as_bytes();
     let abs = matches!(s.first(), None | Some(b'/') | Some(b'\\')) || s.get(1) == Some(&b':');
-    let t = if abs { String::from(src) } else { cap(cap(plat::cwd(), PATH_CAP) + "/", PATH_CAP) + src };
-    let mut b = cap(t, PATH_CAP).replace('\\', "/").into_bytes();
+    let t = if abs { String::from(src) } else { format!("{}/{}", plat::cwd(), src) };
+    if t.len() > PATH_LONG {
+        return String::new();
+    }
+    let mut b = t.replace('\\', "/").into_bytes();
     // the root that stays: "C:/", "/", "//"
     let mut p = 0;
     if b.get(1) == Some(&b':') {
@@ -662,14 +677,17 @@ fn opened(p: &mut Pn, ui: &mut Ui, doc: DocId, path: &str, fmt: u32) {
     doc_set_active(p, doc);
 }
 
+/// largest resolution taken from a file (dots per inch)
+const DPI_MAX: f64 = 100_000.0;
+
 // set_dpi(doc, dpix_16_16, dpiy_16_16, unit) -- resolution from file metadata (0 = keep 96)
 fn set_dpi(d: &mut Doc, dpix: u32, dpiy: u32, unit: u32) {
     if dpix == 0 {
         return;
     }
     let dpiy = if dpiy == 0 { dpix } else { dpiy };
-    let mut x = dpix as i32 as f64 / 65536.0;
-    let mut y = dpiy as i32 as f64 / 65536.0;
+    let mut x = (dpix as f64 / 65536.0).min(DPI_MAX);
+    let mut y = (dpiy as f64 / 65536.0).min(DPI_MAX);
     d.dpu_unit = 1;
     if unit == IMR_CM {
         d.dpu_unit = 2;
@@ -1142,6 +1160,7 @@ fn save_options_done(p: &mut Pn, ui: &mut Ui, result: u32) -> i32 {
     let err = match crate::workspace::dialogs::save_options::saveopt_take(p, ui) {
         Ok(b) => {
             if plat::write_file(&p.fio.sv_path, &b) {
+                crate::workspace::dialogs::save_options::saveopt_accept(p);
                 0
             } else {
                 ERR_IO
@@ -1160,6 +1179,11 @@ fn save_options_done(p: &mut Pn, ui: &mut Ui, result: u32) -> i32 {
 fn request_save(p: &mut Pn, ui: &mut Ui, doc: DocId, path: Option<&str>, fmt: u32) -> i32 {
     if let Some(path) = path {
         p.fio.sv_path = canon_path(path);
+        if p.fio.sv_path.is_empty() {
+            fio_error(p, None, "Der Pfad ist zu lang.");
+            p.fio.sv_saveas = false;
+            return -1;
+        }
     }
     p.fio.sv_doc = Some(doc);
     p.fio.sv_fmt = fmt;
@@ -1380,6 +1404,14 @@ pub(crate) fn fio_states(p: &mut Pn, ui: &mut Ui) {
 
 // update_title() -- "Name – PaintCraft" ('*' in front while modified), "PaintCraft" without images
 fn update_title(p: &mut Pn, ui: &mut Ui) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let u = p.doc.docs.iter().any(|d| d.flags & DF_MODIFIED as u32 != 0);
+        if u != p.fio.unsaved {
+            p.fio.unsaved = u;
+            plat::set_unsaved(u);
+        }
+    }
     let t = match p.doc.active() {
         None => String::from("PaintCraft"),
         Some(d) => {

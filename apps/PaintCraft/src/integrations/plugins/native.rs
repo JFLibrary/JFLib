@@ -221,6 +221,9 @@ struct A64([u8; 64]);
 /// PA_ALLOC blocks by address: (memory, size asked for)
 static BLOCKS: SpinLock<BTreeMap<u64, (Box<[A64]>, usize)>> = SpinLock::new(BTreeMap::new());
 
+/// all PA_ALLOC blocks together may not exceed this (a plugin that never frees)
+const BLOCKS_MAX: usize = 1 << 30;
+
 /// the state of plugins.s the UI keeps (probe texts, shapes, counters)
 #[derive(Default)]
 pub(crate) struct Plug {
@@ -383,7 +386,10 @@ fn cstr(a: u64, max: usize) -> Option<String> {
 fn blk_alloc(size: u64) -> u64 {
     let n = (size.saturating_add(63) / 64).max(1) as usize;
     let mut v: Vec<A64> = Vec::new();
-    if size > (1u64 << 40) || v.try_reserve_exact(n).is_err() {
+    if size > BLOCKS_MAX as u64 || v.try_reserve_exact(n).is_err() {
+        return 0;
+    }
+    if BLOCKS.lock().values().fold(n * 64, |s, e| s.saturating_add(e.0.len() * 64)) > BLOCKS_MAX {
         return 0;
     }
     v.resize(n, A64([0; 64]));
@@ -555,6 +561,7 @@ extern "win64" fn pa_fmt(buf: u64, cap: u64, fmt: u64, a1: u64, a2: u64, a3: u64
 }
 
 // fmt_printf(fmt, args) -- the conversions of fmt_buf
+const FMT_MAXW: usize = 4096; // largest width / precision of a conversion
 fn fmt_printf(f: &[u8], args: &[u64]) -> String {
     let mut out = String::new();
     let mut ai = 0usize;
@@ -587,25 +594,30 @@ fn fmt_printf(f: &[u8], args: &[u64]) -> String {
             }
             i += 1;
         }
+        // width and precision come from the plugin: a negative `*` width means left-justified
+        // (as in C) and both are clamped to FMT_MAXW (no capacity panic in the host)
         let mut width = 0usize;
         if i < f.len() && f[i] == b'*' {
-            width = next(&mut ai) as i32 as usize;
+            let w = next(&mut ai) as i32;
+            left |= w < 0;
+            width = w.unsigned_abs() as usize;
             i += 1;
         } else {
             while i < f.len() && f[i].is_ascii_digit() {
-                width = width * 10 + (f[i] - b'0') as usize;
+                width = (width * 10 + (f[i] - b'0') as usize).min(FMT_MAXW);
                 i += 1;
             }
         }
+        width = width.min(FMT_MAXW);
         let mut prec = None;
         if i < f.len() && f[i] == b'.' {
             i += 1;
             let mut p = 0usize;
             while i < f.len() && f[i].is_ascii_digit() {
-                p = p * 10 + (f[i] - b'0') as usize;
+                p = (p * 10 + (f[i] - b'0') as usize).min(FMT_MAXW);
                 i += 1;
             }
-            prec = Some(p);
+            prec = Some(p.min(FMT_MAXW));
         }
         if i < f.len() && f[i] == b'l' {
             long = true;
@@ -999,7 +1011,16 @@ fn pft_decode_slot(j: usize, data: &[u8], out: &mut Surface, dec: &ImgDec, meta:
     {
         return ERR_FAIL; // (a bad surface is dropped, not freed)
     }
-    let mut o = Surface::new(rec.w, rec.h, rec.fmt);
+    // the plugin's size is checked like the built-in decoders do, before anything is allocated
+    let mut e = img_core::meta::dims_check(rec.w as u32, rec.h as u32, dec);
+    if e == 0 {
+        e = img_core::meta::mem_check(rec.w as u64 * rec.h as u64 * 4, dec);
+    }
+    let o = if e == 0 { Surface::try_new(rec.w, rec.h, rec.fmt) } else { None };
+    let Some(mut o) = o else {
+        blk_free(rec.px);
+        return if e != 0 { e } else { img_core::ERR_NOMEM };
+    };
     let (ds, nb) = (o.stride as usize, rec.w as usize * 4);
     let Some(px) = plat::guard_read(rec.px as usize, rec.stride as usize * (rec.h as usize - 1) + nb) else { return ERR_FAIL };
     for y in 0..rec.h as usize {

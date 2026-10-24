@@ -9,7 +9,8 @@ const viewport=document.querySelector("#viewport"), a11yRoot=document.querySelec
 const app=document.body.dataset.app, params=new URLSearchParams(location.search), worker=new Worker("worker.js",{type:"module"});
 const ctx=canvas.getContext("2d",{alpha:false}), text=new TextDecoder();
 let started=false, enabled=params.get("agent")==="1", nextId=1, composing=false, openRequest=0, database=null, pasteModifiers=2;
-let bridgeDisconnect=null, bridgeAttempt=0, secretStore=null, handleStore=null;
+let bridgeDisconnect=null, bridgeAttempt=0, secretStore=null, handleStore=null, unsaved=false;
+window.addEventListener("beforeunload",e=>{ if(unsaved) {e.preventDefault();e.returnValue="";} });
 // sound (audio.js, lib/plat/web_audio.rs): loaded with the first stream
 let audio=null;
 const audioHost=()=>audio||=import("./audio.js").then(x=>new x.AudioHost(worker));
@@ -277,6 +278,8 @@ async function service(m) {
     else if(m.kind===6) {const v=new DataView(m.data);input.style.left=Math.max(0,Math.min(canvas.clientWidth-2,v.getInt32(0,true)/devicePixelRatio))+"px";input.style.top=Math.max(0,Math.min(canvas.clientHeight-20,v.getInt32(4,true)/devicePixelRatio))+"px";input.style.height=Math.max(16,v.getInt32(8,true)/devicePixelRatio)+"px";}
     else if(m.kind===7) canvas.style.cursor=["default","text","pointer","crosshair","move","wait","ns-resize","ew-resize","nwse-resize","nesw-resize","none"][new DataView(m.data).getUint32(0,true)]||"default";
     else if(m.kind===8) document.title=value();
+    // unsaved work (plat::set_unsaved): leaving the page asks first
+    else if(m.kind===22) unsaved=data[0]===1;
     else if(m.kind===9) {const url=new URL(value());if(!["https:","http:","mailto:"].includes(url.protocol))throw new Error("URL nicht unterstützt");if(!window.open(url.href,"_blank","noopener,noreferrer"))complete(m.id,-1);else complete(m.id,2);}
     else if(m.kind===10) {const on=data[0]===1;if(on!==enabled)activate(on);}
     // a change of the secret store (secrets.js): encrypted and committed in order

@@ -312,7 +312,7 @@ fn decode<const I: usize>(
         &[&entry.path, &entry.kind, "--decode"],
         data,
         400_000_024,
-        120_000,
+        120_000 + (data.len() as u64 >> 10), // plus a second per MiB of the file
         || dec.cancelled(),
     );
     let bytes = match result {
@@ -398,7 +398,7 @@ fn encode<const I: usize>(sf: &gfx::Surface, opt: &img_core::ImgOpt, out: &mut V
         &[&entry.path, &entry.kind, "--encode"],
         &data,
         500_000_000,
-        120_000,
+        120_000 + (data.len() as u64 >> 10), // plus a second per MiB of the image
         || opt.cancelled(),
     ) {
         Ok(data) => {

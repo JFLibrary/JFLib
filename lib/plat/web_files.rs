@@ -362,7 +362,7 @@ impl OsFile {
         let mut data = self.data.lock();
         if end > data.bytes.len() {
             let extra = end - data.bytes.len();
-            data.bytes.try_reserve_exact(extra).ok()?;
+            data.bytes.try_reserve(extra).ok()?; // grows by doubling: appends stay linear
             data.bytes.resize(end, 0);
         }
         data.bytes[offset..end].copy_from_slice(bytes);
