@@ -101,8 +101,9 @@ fn output_number(name: &str) -> Option<u32> {
 fn run(program: &str, filter: Option<&str>, pixels: gfx::Surface, job: &Job) -> Result<Vec<gfx::Surface>, String> {
     let fail = |s: &str| String::from(s);
     let root = plat::temp_dir().ok_or_else(|| fail("Kein temporärer Ordner verfügbar."))?;
-    let folder = format!("{root}/paintcraft-gmic-{}", plat::time_us());
-    if plat::file_exists(&folder) != 0 || !plat::mkdir(&folder) { return Err(fail("Der temporäre G’MIC-Ordner ließ sich nicht anlegen.")); }
+    // unpredictable name, owner-only directory: other users cannot pre-create or read it
+    let folder = format!("{root}/paintcraft-gmic-{:016x}", plat::random_u64());
+    if plat::file_exists(&folder) != 0 || !plat::fs::mkdir_private(&folder) { return Err(fail("Der temporäre G’MIC-Ordner ließ sich nicht anlegen.")); }
     let temp = Temp(folder);
     let input = format!("{}/input.png", temp.0);
     let output = format!("{}/output-%l.png", temp.0);
