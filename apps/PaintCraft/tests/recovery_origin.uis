@@ -1,0 +1,12 @@
+#!args --config build/tests/pn_recovery_origin --open apps/PaintCraft/tests/fixtures/a1_rgba.png
+# recovery_origin.uis -- a modified image that came from a file keeps that file when the session
+# ends: the copy is written next to a note with the original path (recovery_origin_restore.uis,
+# run right after, opens it again).
+size 1280 800
+theme light
+expect #9901 value 1
+expect #9905 value 0
+cmd 902 1
+cmd 904 655370
+expect #9905 value 1
+system session-end

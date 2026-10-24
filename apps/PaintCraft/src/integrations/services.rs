@@ -163,6 +163,7 @@ fn run(scan: bool, beta: bool, fixture: Option<&str>, job: &Job) -> Result<Vec<u
     } else {
         program = if cfg!(windows) { "python" } else { "python3" };
         args.extend_from_slice(&[
+            "-I", // isolated: neither the current directory nor PYTHON* variables or user site-packages are trusted
             "-u",
             "-c",
             include_str!("../../update_check.py"),

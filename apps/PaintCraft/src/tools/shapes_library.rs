@@ -221,19 +221,26 @@ pub(crate) fn shl_init(p: &mut Pn) {
     }
     s.nbi = s.shapes.len();
     s.icons.clear();
-    // <exe dir>/Shapes (argv[0] up to its last separator; no separator: ./Shapes)
-    let a0 = plat::args().into_iter().next().unwrap_or_default();
-    let a0 = cut(&a0, PATH_CAP - 16);
-    let path = match a0.bytes().take(PATH_CAP - 16).rposition(|c| c == b'/' || c == b'\\') {
+    // <exe dir>/Shapes, from the real executable path: a bare argv[0] would load ./Shapes
+    // from the current directory (desktop; other targets keep the virtual "Shapes" folder)
+    #[cfg(any(windows, target_os = "linux"))]
+    let exe = plat::current_exe().unwrap_or_default();
+    #[cfg(not(any(windows, target_os = "linux")))]
+    let exe = String::new();
+    let exe = cut(&exe, PATH_CAP - 16);
+    let path = match exe.bytes().take(PATH_CAP - 16).rposition(|c| c == b'/' || c == b'\\') {
         Some(k) => {
-            let mut s = String::from(&a0[..k + 1]);
+            let mut s = String::from(&exe[..k + 1]);
             s.push_str("Shapes");
-            s
+            Some(s)
         }
-        None => String::from("Shapes"),
+        None if cfg!(any(windows, target_os = "linux")) => None,
+        None => Some(String::from("Shapes")),
     };
-    shl_load_dir(p, &path);
-    crate::integrations::paint_dot_net::catalog::shapes_feed(p,&path);
+    if let Some(path) = path {
+        shl_load_dir(p, &path);
+        crate::integrations::paint_dot_net::catalog::shapes_feed(p, &path);
+    }
 }
 
 // shl_free_custom() -- drop the custom shapes and the error text

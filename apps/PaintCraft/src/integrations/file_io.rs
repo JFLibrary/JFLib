@@ -31,6 +31,7 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use rt::sync::SpinLock;
 
+use base::ini::Ini;
 use gfx::Surface;
 use img_core::{ImgDec, ImgMeta, ImgOpt, ERR_DIMS, ERR_FAIL, ERR_IO, ERR_LIMIT, ERR_NOMEM, ERR_UNSUPPORTED};
 use img_core::{IFC_DECODE, IFC_ENCODE, IMGD_EXIF, IMGD_ICC, IMGD_STRAIGHT, IMGD_XMP, IMGF_COUNT, IMGF_PDN, IMGF_PNG, IMR_CM};
@@ -244,8 +245,11 @@ fn dir_path(f: &mut Fio, name: &str) {
     f.fd_path = cap(s, PATH_CAP);
 }
 
-// fio_start() -- command line files (--open FILE, plain arguments), else one new image
+// fio_start() -- the images a session end kept, then command line files (--open FILE, plain
+// arguments), else one new image
 fn fio_start(p: &mut Pn, ui: &mut Ui) {
+    // first: a command line file that was recovered is then found open (with its changes)
+    fio_recover(p, ui);
     let a = plat::args();
     fio_open_args(p, ui, "", a.get(1..).unwrap_or(&[]));
     if doc_count(&p.doc) == 0 {
@@ -741,7 +745,14 @@ fn install_pdn(p: &mut Pn, ui: &mut Ui, pd: img_pdn::PdnDoc, path: &str) -> i32 
     }
     d.cur = d.layers.len() as i32 - 1;
     crate::document::model::doc_mark_layers(p, doc);
-    opened(p, ui, doc, path, IMGF_PDN);
+    if path.is_empty() {
+        // recovered after a session end: unsaved, no file yet (fio_recover gives it one)
+        crate::document::history::hist_init(p, doc, "Wiederhergestellt", IC_FOLDER_OPEN);
+        doc_set_modified(p, doc, true);
+        doc_set_active(p, doc);
+    } else {
+        opened(p, ui, doc, path, IMGF_PDN);
+    }
     0
 }
 
@@ -771,6 +782,127 @@ fn install_psd(p: &mut Pn, ui: &mut Ui, psd: img_all::psd::document::Document, p
         opened(p, ui, doc, path, img_core::IMGF_PSD);
     }
     0
+}
+
+// ------------------------------------------------------------------ session end / recovery
+//
+// A session end (Windows log-off or shutdown, SIGTERM) leaves no time for "Änderungen
+// speichern?".  Every modified image is then written to the recovery folder as <run>-<n>.pdn (all
+// layers) with <run>-<n>.ini (the file it came from); the next start opens them again, still
+// modified, and removes the copies.  A copy only counts as complete under its .pdn name: it is
+// written as .tmp and renamed last.
+
+// recovery_dir(ui) -> --config DIR or $PaintCraft_CONFIG_DIR + "/recovery" (like the settings),
+// a headless run without them keeps it in memory, else the app's data folder
+fn recovery_dir(ui: &Ui) -> String {
+    let dir = plat::arg_value("--config")
+        .filter(|v| !v.is_empty())
+        .or_else(|| plat::env("PaintCraft_CONFIG_DIR").filter(|v| !v.is_empty()));
+    match dir {
+        Some(d) if d.len() < PATH_CAP - 64 => format!("{}/recovery", d.trim_end_matches(['/', '\\'])),
+        _ if ui.headless() => String::from("mem://paintcraft/recovery"),
+        _ => String::from("data://recovery"),
+    }
+}
+
+/// fio_session_end() -- UIC_SESSION_END: a recovery copy of every modified image
+pub(crate) fn fio_session_end(p: &mut Pn, ui: &Ui) {
+    let docs: Vec<DocId> = p.doc.docs.iter().filter(|d| d.flags & DF_MODIFIED as u32 != 0).map(|d| d.id).collect();
+    if docs.is_empty() {
+        return;
+    }
+    let dir = recovery_dir(ui);
+    plat::mkdir(&dir);
+    let run = format!("{:x}", plat::unix_time_ns());
+    for (n, doc) in docs.into_iter().enumerate() {
+        let base = format!("{}/{}-{}", dir, run, n);
+        let (tmp, ini_path, pdn) = (format!("{}.tmp", base), format!("{}.ini", base), format!("{}.pdn", base));
+        let mut ini = Ini::new();
+        {
+            let d = p.doc.d(doc);
+            if let Some(path) = d.path.as_deref() {
+                ini.set("recovery", "path", path);
+                ini.set_int("recovery", "fmt", d.fmt as i64);
+            }
+        }
+        let ok = save_pdn(p, doc, &tmp) == 0 && ini.save(&ini_path) && plat::rename(&tmp, &pdn);
+        if !ok {
+            plat::delete(&tmp);
+            plat::delete(&ini_path);
+        }
+    }
+}
+
+// absolute_path(s) -- a drive path, a UNC path or a rooted path of the operating system
+fn absolute_path(s: &str) -> bool {
+    let b = s.as_bytes();
+    s.len() < PATH_CAP
+        && !s.contains('\0')
+        && (matches!(b.first(), Some(b'/') | Some(b'\\')) || (b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':'))
+}
+
+// fio_recover() -- the copies of the last session end are open again (modified, "Wiederhergestellt");
+// a copy that cannot be read is removed, one that does not fit (DOC_MAX, memory) stays for the next
+// start; leftovers of an interrupted write go
+fn fio_recover(p: &mut Pn, ui: &mut Ui) {
+    let dir = recovery_dir(ui);
+    let (mut copies, mut other): (Vec<String>, Vec<String>) = (Vec::new(), Vec::new());
+    plat::dir_list(&dir, &mut |name, is_dir, _| {
+        if is_dir {
+            return;
+        }
+        if name.ends_with(".pdn") {
+            copies.push(String::from(name));
+        } else if name.ends_with(".tmp") || name.ends_with(".ini") {
+            other.push(String::from(name));
+        }
+    });
+    for name in other {
+        let has_copy = name.strip_suffix(".ini").is_some_and(|b| copies.contains(&format!("{}.pdn", b)));
+        if !has_copy {
+            plat::delete(&format!("{}/{}", dir, name));
+        }
+    }
+    copies.sort();
+    for name in copies {
+        if doc_count(&p.doc) >= DOC_MAX {
+            break;
+        }
+        let file = format!("{}/{}", dir, name);
+        let ini_path = format!("{}.ini", file.trim_end_matches(".pdn"));
+        let Some(data) = plat::read_file(&file) else { continue };
+        match decode_open(&data, &file, None) {
+            Ok(LoadedImage::Pdn(pd)) => {
+                if install_pdn(p, ui, pd, "") != 0 {
+                    continue;
+                }
+                recovered_origin(p, &ini_path);
+            }
+            Err(ERR_NOMEM) => continue,
+            _ => {}
+        }
+        plat::delete(&file);
+        plat::delete(&ini_path);
+    }
+}
+
+// recovered_origin(ini_path) -- the file the recovered (active) image belonged to, when it is
+// still a valid absolute path of its own: Speichern then writes there again
+fn recovered_origin(p: &mut Pn, ini_path: &str) {
+    let Some(doc) = doc_active(&p.doc) else { return };
+    let ini = Ini::load(ini_path);
+    let Some(origin) = ini.get("recovery", "path").filter(|v| absolute_path(v)) else { return };
+    let origin = canon_path(origin);
+    if doc_find_path(&p.doc, &origin).is_some() {
+        return; // that file is open in another tab
+    }
+    let fmt = ini.get_int("recovery", "fmt", 0);
+    crate::document::model::doc_set_path(p, doc, &origin);
+    if fmt > 0 && fmt < IMGF_COUNT as i64 {
+        let d = p.doc.dm(doc);
+        d.fmt = fmt as u32;
+        d.saveopt = img_core::io::opt_init(fmt as u32);
+    }
 }
 
 // ------------------------------------------------------------------ recent files

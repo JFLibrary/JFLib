@@ -1128,19 +1128,24 @@ fn plug_root(p: &mut Pn) -> bool {
     if plat::args().iter().skip(1).any(|a| a == "--no-plugins") {
         return false;
     }
-    p.plug.root = match p1_arg("--plugins") {
+    let root = match p1_arg("--plugins") {
         Some(v) if v.starts_with('@') => {
             // "@name": <exe folder>/name (build.py test)
-            let r = format!("{}/{}", plug_exedir(), &v[1..]);
-            fmt_cap(r, PATH_CAP - 256)
+            plug_exedir().map(|d| fmt_cap(format!("{}/{}", d, &v[1..]), PATH_CAP - 256))
         }
-        Some(v) => fmt_cap(v, PATH_CAP - 256),
+        Some(v) => Some(fmt_cap(v, PATH_CAP - 256)),
         None => match plat::getenv("PDN_PLUGIN_DIR") {
-            Some(e) if !e.is_empty() => fmt_cap(e, PATH_CAP - 256),
+            Some(e) if !e.is_empty() => Some(fmt_cap(e, PATH_CAP - 256)),
             _ => plug_exedir(),
         },
     };
-    true
+    match root {
+        Some(root) => {
+            p.plug.root = root;
+            true
+        }
+        None => false,
+    }
 }
 
 // p1_arg(name) -> value of "name=VALUE" or of "name VALUE" on the command line (the "=" form
@@ -1156,13 +1161,15 @@ fn p1_arg(name: &str) -> Option<String> {
     plat::arg_value(name)
 }
 
-// plug_exedir() -- the folder of argv[0] ("." when it has no separator)
-fn plug_exedir() -> String {
-    let a0 = fmt_cap(plat::args().into_iter().next().unwrap_or_default(), PATH_CAP - 256);
-    match a0.rfind(['/', '\\']) {
-        Some(k) => String::from(&a0[..k]),
-        None => String::from("."),
-    }
+// plug_exedir() -- the folder of the running executable, never derived from argv[0] (a bare
+// name would resolve plugins from the current directory); None = no default plugin root
+fn plug_exedir() -> Option<String> {
+    #[cfg(any(windows, target_os = "linux"))]
+    let exe = plat::current_exe()?;
+    #[cfg(not(any(windows, target_os = "linux")))]
+    let exe = String::new(); // native plugins are not loadable there (plat::lib_open)
+    let k = exe.rfind(['/', '\\'])?;
+    Some(fmt_cap(String::from(&exe[..k]), PATH_CAP - 256))
 }
 
 // plug_scan(folder) -> the plugin files of <root>/folder, sorted

@@ -127,6 +127,9 @@ fn init_desktop(p: &mut Pn, ui: &mut Ui) {
         return;
     }
     let root = crate::integrations::plugins::root(p);
+    if root.is_empty() {
+        return; // no plugin root (the executable folder is unknown): the host must not fall back to the current directory
+    }
     let explicit = plat::arg_value("--pdn-plugins");
     let mut args = alloc::vec!["--catalog", "--root", root];
     if let Some(root) = explicit.as_deref() {

@@ -1,0 +1,18 @@
+#!args --config build/tests/pn_recovery
+# recovery_restore.uis -- the images of a session end (recovery.uis, run just before) are open
+# again: both modified ones, unsaved and without a file, with their pixels; the unchanged image
+# is not back and no empty default image is added.
+size 1280 800
+theme light
+expect #9901 value 2
+# the last copy is the active one (green), the first one is red; both are modified
+expect #9905 value 1
+expect #9910 text ""
+cmd 900 327685
+expect #9900 text "FF00FF00"
+click #1200
+expect #9902 value 0
+expect #9905 value 1
+expect #9910 text ""
+cmd 900 327685
+expect #9900 text "FFFF0000"
