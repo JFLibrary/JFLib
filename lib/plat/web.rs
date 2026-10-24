@@ -112,6 +112,15 @@ const HOST_HANDLES: u32 = 1 << 16;
 /// (browser) sound output (audio.rs, web_audio.rs, web/audio.js): five u32, op (1 open, 2 close,
 /// 3 play, 4 pause, 5 flush), stream id, rate, channels, latency frames; no completion
 pub const REQUEST_AUDIO: u32 = 14;
+/// (browser) the app holds unsaved work (one byte, 1 / 0): the page asks before the tab is
+/// closed or reloaded (loader.js beforeunload)
+#[cfg(target_arch = "wasm32")]
+pub const REQUEST_UNSAVED: u32 = 22;
+/// set_unsaved(on) -- tell the page whether closing the tab would lose unsaved work
+#[cfg(target_arch = "wasm32")]
+pub fn set_unsaved(on: bool) {
+    notice(REQUEST_UNSAVED, &[on as u8]);
+}
 
 /// Completion state of one browser operation; durable and exported are distinct outcomes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

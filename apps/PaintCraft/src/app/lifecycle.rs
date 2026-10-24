@@ -287,6 +287,8 @@ pub(super) fn pn_frame(p: &mut Pn, ui: &mut Ui) {
 ///   ids 100..999: the module of ROUTE_TAB
 ///   UIC_CLOSE:    fio_cmd only (true keeps the window: "save changes?")
 ///   UIC_EXIT:     the settings are saved (every end of a real window run, U3)
+///   UIC_SESSION_END: log-off / shutdown: the settings and a recovery copy of every modified
+///                 image are saved (file_io::fio_session_end); the next start opens them again
 ///   other UIC_*:  broadcast in MOD_CMD order; UIC_THEME / UIC_DPI / UIC_WAKE reach every
 ///                 module, the others stop at the first module that returns true
 pub(super) fn pn_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
@@ -304,6 +306,13 @@ pub(super) fn pn_cmd(p: &mut Pn, ui: &mut Ui, id: u32, arg: u32) -> bool {
         if id == UIC_EXIT {
             // (U3) the window loop ends in any way (also --auto-close): save the settings
             crate::preferences::set_save_quit(p, ui);
+            return true;
+        }
+        if id == UIC_SESSION_END {
+            // the app quits whatever happens next (UIC_EXIT follows): nothing may be lost
+            crate::tools::tool_commit_live(p, ui);
+            crate::preferences::set_save_quit(p, ui);
+            crate::integrations::file_io::fio_session_end(p, ui);
             return true;
         }
         if id == UIC_CLOSE {

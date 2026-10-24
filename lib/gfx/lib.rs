@@ -71,21 +71,44 @@ pub struct Surface {
     pub blend: u8, // layer blend mode
 }
 
+/// n zeroed bytes | None when the memory is not there (instead of an abort). A probe
+/// reservation first, then vec![0; n]: that is alloc_zeroed, whose fresh pages need no
+/// clearing pass.
+pub fn try_zeroed(n: usize) -> Option<Vec<u8>> {
+    let mut probe: Vec<u8> = Vec::new();
+    probe.try_reserve_exact(n).ok()?;
+    drop(probe);
+    Some(vec![0u8; n])
+}
+
 impl Surface {
     /// zeroed pixels, stride 64-byte aligned; sides outside 0..65536 give an empty surface
     /// (surf_alloc fails). Byte lengths beyond the target's addressable allocation size
     /// also give an empty surface, before allocating pixels.
     pub fn new(w: i32, h: i32, fmt: u8) -> Surface {
-        if !(0..=SURF_MAX).contains(&w) || !(0..=SURF_MAX).contains(&h) {
+        let Some((stride, bytes)) = Surface::layout(w, h, fmt) else {
             return Surface { px: Vec::new(), w: 0, h: 0, stride: 0, fmt, flags: 0, opac: 255, blend: 0 };
+        };
+        Surface { px: vec![0u8; bytes], w, h, stride, fmt, flags: SFF_OWNED, opac: 255, blend: 0 }
+    }
+
+    /// like `new`, but None (instead of an empty surface or an abort) when the size is
+    /// invalid or the memory is not there (try_zeroed). For sizes that come from a file or
+    /// from the user.
+    pub fn try_new(w: i32, h: i32, fmt: u8) -> Option<Surface> {
+        let (stride, bytes) = Surface::layout(w, h, fmt)?;
+        Some(Surface { px: try_zeroed(bytes)?, w, h, stride, fmt, flags: SFF_OWNED, opac: 255, blend: 0 })
+    }
+
+    // (stride, pixel bytes) or None for sides outside 0..=SURF_MAX or a size beyond isize::MAX
+    fn layout(w: i32, h: i32, fmt: u8) -> Option<(i32, usize)> {
+        if !(0..=SURF_MAX).contains(&w) || !(0..=SURF_MAX).contains(&h) {
+            return None;
         }
         let row = if fmt == FMT_A8 { w } else { w * 4 };
         let stride = (row + 63) & !63;
-        let Some(bytes) = (stride as usize).checked_mul(h as usize).filter(|&n| n <= isize::MAX as usize) else {
-            return Surface { px: Vec::new(), w: 0, h: 0, stride: 0, fmt, flags: 0, opac: 255, blend: 0 };
-        };
-        let bytes = bytes.max(64);
-        Surface { px: vec![0u8; bytes], w, h, stride, fmt, flags: SFF_OWNED, opac: 255, blend: 0 }
+        let bytes = (stride as usize).checked_mul(h as usize).filter(|&n| n <= isize::MAX as usize)?;
+        Some((stride, bytes.max(64)))
     }
 
     /// a tightly packed A8 surface (glyph masks: stride = w)

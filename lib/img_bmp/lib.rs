@@ -206,10 +206,9 @@ pub fn decode_fl(d: &[u8], sf: &mut Surface, flags: u32) -> i32 {
             if c.w as u64 * c.h as u64 > (len - c.off) as u64 * 128 {
                 return ERR_TRUNC;
             }
-            let mut out = Surface::new(c.w as i32, c.h as i32, if c.straight { FMT_ARGB } else { FMT_PARGB });
-            if out.px.is_empty() {
+            let Some(mut out) = Surface::try_new(c.w as i32, c.h as i32, if c.straight { FMT_ARGB } else { FMT_PARGB }) else {
                 return ERR_NOMEM;
-            }
+            };
             rle(d, &c, &mut out);
             *sf = out;
             return 0;
@@ -246,10 +245,9 @@ pub fn decode_fl(d: &[u8], sf: &mut Surface, flags: u32) -> i32 {
     if c.off > len || need > len - c.off {
         return ERR_TRUNC;
     }
-    let mut out = Surface::new(c.w as i32, c.h as i32, if c.straight { FMT_ARGB } else { FMT_PARGB });
-    if out.px.is_empty() {
+    let Some(mut out) = Surface::try_new(c.w as i32, c.h as i32, if c.straight { FMT_ARGB } else { FMT_PARGB }) else {
         return ERR_NOMEM;
-    }
+    };
     let ostride = out.stride as usize;
     let rowb = c.w as usize * 4;
     for y in 0..c.h as usize {

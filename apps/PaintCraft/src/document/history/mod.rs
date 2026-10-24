@@ -17,7 +17,7 @@ pub(crate) mod memory;
 //   hist_px_end(doc, name, icon) -> step     hist_px_cancel(doc)   hist_px_active(doc)
 //   hist_push_layer_props(doc, i, name, icon)   hist_push_layers / hist_push_doc(doc, name, icon)
 //   hist_push_sel(doc, name, icon)   hist_begin_compound(doc)   hist_end_compound(doc, name, icon)
-// Navigation and queries: hist_init, hist_undo, hist_redo, hist_jump, hist_count, hist_pos,
+// Navigation and queries: hist_init, hist_init_unsaved, hist_undo, hist_redo, hist_jump, hist_count, hist_pos,
 //   hist_can_undo, hist_can_redo, hist_entry, hist_entry_name, hist_entry_icon, hist_clear,
 //   hist_free, hist_mark_clean
 // Resources: hist_release(doc, rec) -- see below
@@ -447,6 +447,15 @@ pub(crate) fn hist_init(p: &mut Pn, doc: DocId, name: &'static str, icon: u32) {
     }
     hs_drop_all(p, doc);
     hs_new_base(p, doc, name, icon);
+}
+
+/// hist_init_unsaved(doc, name, icon) -- hist_init for a document that exists nowhere yet (scan,
+/// import, recovery): modified, and no position of the history is a saved state, so undoing
+/// every step does not make it look unchanged
+pub(crate) fn hist_init_unsaved(p: &mut Pn, doc: DocId, name: &'static str, icon: u32) {
+    hist_init(p, doc, name, icon);
+    p.doc.dm(doc).hist.clean = -1;
+    doc_set_modified(p, doc, true);
 }
 
 /// hs_drop_all(doc) -- destroy every entry, the open compound and the capture's tiles

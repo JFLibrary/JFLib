@@ -32,6 +32,8 @@ unsafe extern "system" {
     fn WriteFile(h: isize, buf: *const u8, n: u32, done: *mut u32, ov: *mut crate::win::Overlapped) -> i32;
     fn GetEnvironmentStringsW() -> *mut u16;
     fn FreeEnvironmentStringsW(env: *mut u16) -> i32;
+    fn GetSystemDirectoryW(buf: *mut u16, size: u32) -> u32;
+    fn GetWindowsDirectoryW(buf: *mut u16, size: u32) -> u32;
     fn LoadLibraryExA(name: *const u8, file: isize, flags: u32) -> isize;
     fn GetProcAddress(module: isize, name: *const u8) -> usize;
 }
@@ -161,9 +163,44 @@ fn environment(c: &Command<'_>) -> Result<Vec<u16>, u32> {
     let mut block = Vec::new(); for s in entries { block.extend(s); block.push(0); }
     if block.is_empty() { block.push(0); } block.push(0); Ok(block)
 }
+fn known_dir(windows: bool) -> Option<String> {
+    let mut buf = [0u16; 260];
+    // SAFETY: the buffer holds 260 UTF-16 units; the result is the length without the NUL (0 or too large: failure).
+    let n = unsafe { if windows { GetWindowsDirectoryW(buf.as_mut_ptr(), 260) } else { GetSystemDirectoryW(buf.as_mut_ptr(), 260) } } as usize;
+    (n != 0 && n < buf.len()).then(|| crate::from_wide(&buf[..n]))
+}
+fn is_absolute(p: &str) -> bool {
+    let b = p.as_bytes();
+    p.starts_with("\\\\") || (b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'\\' || b[2] == b'/'))
+}
+/// A bare program name is looked up like CreateProcess does (application folder, system folders,
+/// PATH) but never in the current directory, which an attacker may control. A name with a
+/// separator or drive is an explicit path and stays untouched (None).
+fn resolve(program: &str) -> Result<Option<Vec<u16>>, u32> {
+    if program.contains('\0') { return Err(87); }
+    if program.contains(['\\', '/', ':']) { return Ok(None); }
+    if program.is_empty() || program.ends_with(['.', ' ']) { return Err(2); }
+    let file = if program.contains('.') { String::from(program) } else { format!("{program}.exe") };
+    let mut dirs: Vec<String> = Vec::new();
+    if let Some(exe) = crate::current_exe() {
+        if let Some((dir, _)) = exe.rsplit_once(['\\', '/']) { dirs.push(String::from(dir)); }
+    }
+    dirs.extend(known_dir(false));
+    dirs.extend(known_dir(true));
+    if let Some(path) = crate::env("PATH") {
+        // empty and relative entries mean the current directory: skipped
+        dirs.extend(path.split(';').map(|d| d.trim().trim_matches('"')).filter(|d| is_absolute(d)).map(String::from));
+    }
+    for dir in dirs {
+        let candidate = format!("{}\\{file}", dir.trim_end_matches(['\\', '/']));
+        if crate::file_exists_raw(&candidate) == 1 { return Ok(Some(wide0(&candidate))); }
+    }
+    Err(2)
+}
 /// Native child with captured output and a kill-on-close Windows job.
 pub struct Child { process: Handle, job: Handle, input: Option<Handle>, output: Handle, error: Handle }
 pub(super) fn spawn(c: &Command<'_>) -> Result<Child, u32> {
+    let application = resolve(c.program)?;
     let mut line = quote(c.program); for a in c.args { line.push(' '); line.push_str(&quote(a)); }
     let mut line: Vec<u16> = line.encode_utf16().chain(core::iter::once(0)).collect();
     if line.len() > 32767 { return Err(206); }
@@ -192,7 +229,7 @@ pub(super) fn spawn(c: &Command<'_>) -> Result<Child, u32> {
     // SAFETY: explicit inheritable endpoints and live UTF-16 strings; child starts suspended.
     let (ok, err) = unsafe {
         let attr_ok = UpdateProcThreadAttribute(list, 0, 0x20002, handles.as_ptr() as usize, 24, 0, 0);
-        let ok = if attr_ok == 0 { 0 } else { CreateProcessW(core::ptr::null(), line.as_mut_ptr(), 0, 0, 1,
+        let ok = if attr_ok == 0 { 0 } else { CreateProcessW(application.as_ref().map_or(core::ptr::null(), |a| a.as_ptr()), line.as_mut_ptr(), 0, 0, 1,
             0x08080004 | 0x400, if env.is_empty() { 0 } else { env.as_ptr() as usize },
             dir.as_ref().map_or(core::ptr::null(), |d| d.as_ptr()), &sx.info, &mut pi) };
         let err = GetLastError(); DeleteProcThreadAttributeList(list); (ok, err)

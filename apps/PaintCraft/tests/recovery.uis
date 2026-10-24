@@ -1,0 +1,33 @@
+#!args --config build/tests/pn_recovery
+# recovery.uis -- a session end (Windows log-off / shutdown, SIGTERM) keeps the modified images
+# (integrations/file_io.rs: fio_session_end -> <config>/recovery/<run>-<n>.pdn).  Two modified
+# images and an unchanged one; the unchanged one is not kept.  recovery_restore.uis (run next)
+# opens them again with the same --config folder.
+size 1280 800
+theme light
+expect #9901 value 1
+expect #9905 value 0
+# image 1: red square, modified
+cmd 902 1
+cmd 903 0
+cmd 904 655370
+expect #9905 value 1
+cmd 900 327685
+expect #9900 text "FFFF0000"
+# image 2: green square, modified
+key ctrl+n
+click button:"OK"
+expect #9901 value 2
+cmd 902 2
+cmd 903 0
+cmd 904 655370
+expect #9905 value 1
+cmd 900 327685
+expect #9900 text "FF00FF00"
+# image 3: unchanged
+key ctrl+n
+click button:"OK"
+expect #9901 value 3
+expect #9905 value 0
+# the session ends: the copies stay for the next start (recovery_restore.uis)
+system session-end

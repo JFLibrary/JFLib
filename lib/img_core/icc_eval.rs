@@ -269,7 +269,8 @@ pub(crate) fn tag_find(data: &[u8], sig: u32) -> Option<&[u8]> {
         if le32(data, o) == sig {
             let off = be32(data, o + 4) as usize;
             let sz = be32(data, o + 8) as usize;
-            return Some(&data[off..off + sz]);
+            // 32-bit usize: off + sz may wrap
+            return data.get(off..off.checked_add(sz)?);
         }
     }
     None
@@ -400,7 +401,7 @@ fn lt_curves(p: &[u8], off: u32) -> Result<[Curve<'_>; 3], i32> {
         }
         let (cv, used) = cv_parse(&p[off..])?;
         *c = cv;
-        off += (used + 3) & !3;
+        off = off.saturating_add((used + 3) & !3);
     }
     Ok(cvs)
 }
@@ -511,7 +512,8 @@ pub(crate) fn lt_parse(p: &[u8], pcslab: bool, dir: u32) -> Result<Lut<'_>, i32>
     // matrix: 12 s15.16
     let off = be32(p, 16) as usize;
     if off != 0 {
-        if off + 48 > size {
+        // off comes from the file: compare without off + 48 (it wraps on a 32-bit usize)
+        if off > size || size - off < 48 {
             return Err(ERR_HDR);
         }
         for i in 0..12 {
@@ -524,10 +526,10 @@ pub(crate) fn lt_parse(p: &[u8], pcslab: bool, dir: u32) -> Result<Lut<'_>, i32>
     if off == 0 {
         return Ok(lt);
     }
-    let mut end = off + 20; // end of the CLUT header
-    if end > size {
+    if off > size || size - off < 20 {
         return Err(ERR_HDR);
     }
+    let mut end = off + 20; // end of the CLUT header
     let prec = p[off + 16] as u32;
     if prec.wrapping_sub(1) > 1 {
         return Err(ERR_HDR);
@@ -542,7 +544,7 @@ pub(crate) fn lt_parse(p: &[u8], pcslab: bool, dir: u32) -> Result<Lut<'_>, i32>
         lt.g[i] = g;
         n *= g as usize;
     }
-    end += n * 3;
+    end = end.checked_add(n * 3).ok_or(ERR_HDR)?;
     if end > size {
         return Err(ERR_HDR);
     }

@@ -1411,10 +1411,9 @@ impl Svg {
         if w as u64 * h as u64 > img_core::IMG_MAXPX_DEF {
             return Err(img_core::ERR_LIMIT);
         }
-        let mut sf = Surface::new(w, h, FMT_PARGB);
-        if sf.px.is_empty() {
+        let Some(mut sf) = Surface::try_new(w, h, FMT_PARGB) else {
             return Err(img_core::ERR_NOMEM);
-        }
+        };
         self.render_rect(&mut sf, 0.0, 0.0, w as f64, h as f64, None, opts);
         Ok(sf)
     }

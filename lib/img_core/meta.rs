@@ -212,10 +212,9 @@ pub fn surf_convert(src: &Surface, fmt: u8) -> Result<Surface, i32> {
     if fmt != FMT_PARGB && fmt != FMT_ARGB {
         return Err(ERR_UNSUPPORTED);
     }
-    let mut d = Surface::new(src.w, src.h, fmt);
-    if d.px.is_empty() {
+    let Some(mut d) = Surface::try_new(src.w, src.h, fmt) else {
         return Err(ERR_NOMEM);
-    }
+    };
     let stride = d.stride as usize;
     let w = src.w.max(0) as usize;
     for y in 0..src.h.max(0) as usize {

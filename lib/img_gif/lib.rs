@@ -238,10 +238,9 @@ fn decode_lim(data: &[u8], sf: &mut Surface, flags: u32, dec: Option<&ImgDec>) -
         }
     }
     let fmt = if flags & JDF_STRAIGHT != 0 { FMT_ARGB } else { FMT_PARGB };
-    let mut out = Surface::new(cw as i32, ch as i32, fmt);
-    if out.px.is_empty() {
+    let Some(mut out) = Surface::try_new(cw as i32, ch as i32, fmt) else {
         return ERR_NOMEM;
-    }
+    };
     if mcs != 0 {
         // an LZW string is at most 4096 bytes: more pixels than the data can hold stay unset
         let total = total.min(stream.len().saturating_mul(4096));

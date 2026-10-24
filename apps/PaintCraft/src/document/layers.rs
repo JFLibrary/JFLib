@@ -202,12 +202,12 @@ pub(crate) fn lay_new(p: &mut Pn, doc: DocId, index: i32, name: Option<&str>) ->
 /// lay_new of a document record (doc_mark_layers included: the UI must be invalidated)
 pub(crate) fn lay_new_d(d: &mut Doc, index: i32, name: Option<&str>) -> Option<i32> {
     let i = lay_insert_rec(d, index);
-    let sf = Surface::new(d.w, d.h, FMT_ARGB); // opacity 255, Normal
-    if sf.px.is_empty() {
+    // opacity 255, Normal
+    let Some(sf) = Surface::try_new(d.w, d.h, FMT_ARGB) else {
         d.layers.remove(i);
         fix_cur_after_remove(d, i as i32);
         return None;
-    }
+    };
     let nm = default_name(d, name);
     let l = &mut d.layers[i];
     l.sf = sf;
@@ -219,6 +219,11 @@ pub(crate) fn lay_new_d(d: &mut Doc, index: i32, name: Option<&str>) -> Option<i
 /// lay_add_sf(doc, index, sf, name) -> index (sf is given back on failure)
 pub(crate) fn lay_add_sf(p: &mut Pn, doc: DocId, index: i32, sf: Surface, name: Option<&str>) -> Result<i32, Surface> {
     let Some(d) = p.doc.get_mut(doc) else { return Err(sf) };
+    // a surface that does not fit its own geometry would make every pixel loop read out of range
+    let rows = (sf.h.max(0) as usize).saturating_mul(sf.stride.max(0) as usize);
+    if sf.fmt != FMT_ARGB || sf.w <= 0 || sf.h <= 0 || sf.stride < sf.w.saturating_mul(4) || sf.px.len() < rows {
+        return Err(sf);
+    }
     let i = lay_insert_rec(d, index);
     let nm = default_name(d, name);
     let l = &mut d.layers[i];
@@ -978,8 +983,9 @@ fn imp_load(p: &mut Pn, path: &str) -> i32 {
     };
     let hint = img_core::io::format_from_path(path);
     let mut err = ERR_UNSUPPORTED;
+    let dec = ImgDec { flags: IMGD_STRAIGHT, hint, maxmem: crate::integrations::file_io::img_mem_budget(), ..ImgDec::default() };
     if img_core::io::detect(&data, hint) == IMGF_PDN {
-        match img_pdn::decode(&data, None) {
+        match img_pdn::decode(&data, Some(&dec)) {
             Ok(pd) => {
                 imp_take_pdn(&mut p.lay, path, pd);
                 err = 0;
@@ -988,7 +994,6 @@ fn imp_load(p: &mut Pn, path: &str) -> i32 {
         }
     }
     if err == ERR_UNSUPPORTED {
-        let dec = ImgDec { flags: IMGD_STRAIGHT, hint, ..ImgDec::default() };
         match img_core::io::decode_ex(&data, Some(&dec), None) {
             Ok(sf) => {
                 let (w, h) = (sf.w, sf.h);

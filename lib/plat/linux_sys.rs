@@ -17,6 +17,8 @@ const SYS_PREAD64: usize = 17;
 const SYS_PWRITE64: usize = 18;
 const SYS_FSYNC: usize = 74;
 const SYS_FCHMOD: usize = 91;
+const SYS_FCHOWN: usize = 93;
+const SYS_READLINK: usize = 89;
 const SYS_GETCWD: usize = 79;
 const SYS_RENAME: usize = 82;
 const SYS_GETDENTS64: usize = 217;
@@ -43,6 +45,7 @@ const EISDIR: isize = 21;
 const S_IFMT: u32 = 0xF000;
 const S_IFDIR: u32 = 0x4000;
 const S_IFREG: u32 = 0x8000;
+const LINK_MAX: usize = 40; // symbolic links followed (the kernel's limit)
 const IO_CHUNK: usize = 0x4000_0000;
 const TEMP_TRIES: u32 = 16;
 const DL_BUF: usize = 32768;
@@ -255,6 +258,11 @@ pub(crate) fn read_file_raw(path: &str) -> Option<Vec<u8>> {
     }
     // plat-x11: capacity size + 4096, doubled while full, as plat_file_read (a /proc file
     // reports size 0; linuxtest --test files reads /proc/self/stat)
+    // memory that is not there is None, not an abort: a probe reservation before the
+    // zeroed allocation, try_reserve_exact before each doubling
+    let mut probe: Vec<u8> = Vec::new();
+    probe.try_reserve_exact(size as usize + 4096).ok()?;
+    drop(probe);
     let mut data = alloc::vec![0u8; size as usize + 4096];
     let mut n = 0;
     loop {
@@ -262,6 +270,7 @@ pub(crate) fn read_file_raw(path: &str) -> Option<Vec<u8>> {
         if n < data.len() {
             break; // the end of the file came first
         }
+        data.try_reserve_exact(data.len()).ok()?;
         data.resize(data.len() * 2, 0);
     }
     data.truncate(n);
@@ -280,6 +289,32 @@ pub(crate) struct OsAtomic {
     tmp: Vec<u8>, // NUL-terminated; empty once renamed
     dst: Vec<u8>,
     mode: Option<usize>,
+    owner: (usize, usize), // uid, gid of the replaced file
+}
+
+/// The file a symbolic link at path finally points to (path itself when it is no link or
+/// does not exist): the sibling of an atomic write must lie beside that file, and the rename
+/// must replace it, not the link.  None for a loop or a link that cannot be read.
+fn link_target(path: &str) -> Option<String> {
+    let mut cur = String::from(path);
+    for _ in 0..LINK_MAX {
+        let z = path_z(&cur);
+        let mut buf = [0u8; 4096];
+        // SAFETY: NUL-terminated path and a writable buffer of the given size.
+        let n = unsafe { syscall3(SYS_READLINK, z.as_ptr() as usize, buf.as_mut_ptr() as usize, buf.len()) };
+        if n == -22 || n == -2 { return Some(cur); } // EINVAL: not a link; ENOENT: nothing there
+        if n <= 0 || n as usize >= buf.len() { return None; }
+        let t = core::str::from_utf8(&buf[..n as usize]).ok()?;
+        cur = if t.starts_with('/') {
+            String::from(t)
+        } else {
+            match cur.rfind('/') {
+                Some(k) => format!("{}{}", &cur[..=k], t),
+                None => String::from(t),
+            }
+        };
+    }
+    None
 }
 
 impl OsAtomic {
@@ -287,6 +322,8 @@ impl OsAtomic {
     /// access bits at commit, anything else at path (a folder, a device) refuses.
     pub(crate) fn begin(path: &str) -> Option<OsAtomic> {
         if path.is_empty() || path.contains('\0') { return None; }
+        let path = link_target(path)?;
+        let path = path.as_str();
         let dst = path_z(path);
         let mut st = [0u64; 18];
         // SAFETY: NUL-terminated path and storage for the x86-64 stat structure.
@@ -308,7 +345,8 @@ impl OsAtomic {
                 if fd == -EEXIST { continue; }
                 return None;
             }
-            return Some(OsAtomic { f: Some(OsFile(fd as i32)), tmp, dst, mode });
+            let owner = (st[3] as usize >> 32, st[4] as usize & 0xFFFF_FFFF); // st_uid at 28, st_gid at 32
+            return Some(OsAtomic { f: Some(OsFile(fd as i32)), tmp, dst, mode, owner });
         }
         None
     }
@@ -324,7 +362,9 @@ impl OsAtomic {
         let Some(f) = self.f.take() else { return false };
         let mut ok = true;
         if let Some(mode) = self.mode {
-            // SAFETY: f owns its fd; restore access bits only, not setuid/setgid bits.
+            // SAFETY: f owns its fd; the owner is restored when the process may (otherwise the
+            // file stays ours), then the access bits, not the setuid/setgid bits.
+            unsafe { syscall3(SYS_FCHOWN, f.0 as usize, self.owner.0, self.owner.1) };
             ok &= unsafe { syscall3(SYS_FCHMOD, f.0 as usize, mode, 0) } == 0;
         }
         ok &= f.sync();

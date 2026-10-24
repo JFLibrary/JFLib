@@ -286,6 +286,10 @@ pub(crate) fn read_file_raw(path: &str) -> Option<Vec<u8>> {
     if size > 0x7FFF_FFF0 {
         return None;
     }
+    // a probe reservation first: an unavailable size is None, not an abort
+    let mut probe: Vec<u8> = Vec::new();
+    probe.try_reserve_exact(size as usize).ok()?;
+    drop(probe);
     let mut data = alloc::vec![0u8; size as usize];
     let got = f.read_at(0, &mut data)?;
     data.truncate(got);

@@ -6,6 +6,9 @@ pub(crate) fn fmt_cap(s: String, cap: usize) -> String {
     if s.len() < cap {
         return s;
     }
+    if cap == 0 {
+        return String::new();
+    }
     let mut n = cap - 1;
     while !s.is_char_boundary(n) {
         n -= 1;

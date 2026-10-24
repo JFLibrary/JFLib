@@ -75,8 +75,11 @@ fn apply(p: &mut Pn, ui: &mut Ui) -> Result<(), String> {
     let builtin_path = format!("brush-factory:{}", preset.image);
     let path = if builtin(&builtin_path).is_some() {
         builtin_path
-    } else if preset.image.starts_with('/') || preset.image.as_bytes().get(1) == Some(&b':') {
-        preset.image.clone()
+    } else if !presets::image_is_local(&preset.image) {
+        return Err(format!(
+            "{}: Das Pinselbild muss relativ zum Ordner der Preset-Datei liegen: {}",
+            preset.name, preset.image
+        ));
     } else {
         format!(
             "{}/{}",

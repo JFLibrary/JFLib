@@ -197,6 +197,9 @@ pub(crate) fn tabs_frame(p: &mut Pn, ui: &mut Ui) {
         p.tabs.tabw[i as usize] = w;
         total += w + ui.dp(TAB_GAP);
     }
+    // closed documents drop their cached thumbnail copy
+    let docs = &p.doc.docs;
+    p.tabs.thumbs.retain(|e| docs.iter().take(n as usize).any(|d| d.id == e.0));
     // changed images: refresh their thumbnails 250 ms after the last change
     let t = &mut p.tabs;
     if sum != t.thumb_sum {

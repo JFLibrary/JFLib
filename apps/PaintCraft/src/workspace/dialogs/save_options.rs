@@ -14,11 +14,13 @@
 //   saveopt_needed(doc, fmt, saveas) -> true = ask first: Speichern unter, or the first save
 //                                 of the document in this format (paint.net); never .pdn or a
 //                                 format without options
-//   saveopt_open(doc, fmt)        the dialog with the document's options for fmt
+//   saveopt_open(doc, fmt) -> ok  the dialog with the document's options for fmt (false: no
+//                                 memory for the preview copy, reported)
 //   saveopt_frame()               the window (fio_frame)
 //   saveopt_poll()                UI thread: collect / restart the preview job (frame, UIC_WAKE)
 //   saveopt_pending() -> bool     the preview is computed (script `sync`; tool::SYNC_SAVEOPT)
-//   saveopt_take() -> bytes | ERR_*   OK: the file bytes; the options become the document's
+//   saveopt_take() -> bytes | ERR_*   OK: the file bytes
+//   saveopt_accept()              the file was written: the options become the document's
 //                                 (DOC_SAVEOPT, DF_OPTOK)
 //   saveopt_close()               cancel the job, free the preview
 // Widget ids ID_DLG_SAVEOPT + n, window WINID_DLG0 + 3.  Probes: ID_SO_PROBE value = file size
@@ -367,9 +369,10 @@ pub(crate) fn saveopt_needed(p: &Pn, doc: DocId, fmt: u32, saveas: bool) -> bool
     !(d.flags & DF_OPTOK as u32 != 0 && d.saveopt.fmt == fmt)
 }
 
-/// saveopt_open(doc, fmt) -- the document's options for fmt (paint.net's defaults when it has
-/// none for this format), the widget values, the window; the first frame starts the job
-pub(crate) fn saveopt_open(p: &mut Pn, ui: &mut Ui, doc: DocId, fmt: u32) {
+/// saveopt_open(doc, fmt) -> true | false (no memory for the preview copy; reported) -- the
+/// document's options for fmt (paint.net's defaults when it has none for this format), the
+/// widget values, the window; the first frame starts the job
+pub(crate) fn saveopt_open(p: &mut Pn, ui: &mut Ui, doc: DocId, fmt: u32) -> bool {
     saveopt_close(p, ui); // nothing may be left of an earlier one
     let iom = img_core::io::format_info(fmt).map_or(0, |fi| fi.iom);
     // options: the document's when they are for this format, else the defaults
@@ -381,7 +384,16 @@ pub(crate) fn saveopt_open(p: &mut Pn, ui: &mut Ui, doc: DocId, fmt: u32) {
     // the composite (a copy for the worker; the modal dialog keeps the document unchanged)
     crate::document::composite::comp_update(p, doc);
     let c = crate::document::composite::comp_sf(p.doc.d(doc));
-    let src = Surface { px: c.px.clone(), w: c.w, h: c.h, stride: c.stride, fmt: c.fmt, flags: c.flags, opac: c.opac, blend: c.blend };
+    let mut px: Vec<u8> = Vec::new();
+    let copied = px.try_reserve_exact(c.px.len()).is_ok();
+    if copied {
+        px.extend_from_slice(&c.px);
+    }
+    let src = Surface { px, w: c.w, h: c.h, stride: c.stride, fmt: c.fmt, flags: c.flags, opac: c.opac, blend: c.blend };
+    if !copied {
+        crate::integrations::file_io::fio_error(p, Some("Speicheroptionen"), "Zu wenig Arbeitsspeicher f\u{fc}r die Vorschau.");
+        return false;
+    }
     let s = &mut p.saveopt;
     s.doc = Some(doc);
     s.fmt = fmt;
@@ -403,6 +415,7 @@ pub(crate) fn saveopt_open(p: &mut Pn, ui: &mut Ui, doc: DocId, fmt: u32) {
     s.pending = true;
     sync_flag(s);
     ui.repass();
+    true
 }
 
 /// saveopt_close() -- cancel and wait for the job, free buffers and surfaces
@@ -715,21 +728,24 @@ fn so_collect(s: &mut SaveOpt) {
     s.cver = s.cver.wrapping_add(1);
 }
 
-/// saveopt_take() -> the encoded file for the current options | ERR_*; the options become the
-/// document's
+/// saveopt_accept() -- the file was written: the options become the document's (paint.net:
+/// Speichern asks no more).  Not before: a failed or cancelled save asks again.
+pub(crate) fn saveopt_accept(p: &mut Pn) {
+    let Some(doc) = p.saveopt.doc else { return };
+    let opt = p.saveopt.opt;
+    let d = p.doc.dm(doc);
+    d.saveopt = opt;
+    d.flags |= DF_OPTOK as u32;
+}
+
+/// saveopt_take() -> the encoded file for the current options | ERR_*
 pub(crate) fn saveopt_take(p: &mut Pn, _ui: &mut Ui) -> Result<Vec<u8>, i32> {
     if p.saveopt.jact {
         let _ = p.saveopt.job.wait();
         so_collect(&mut p.saveopt);
     }
-    // the document keeps the options (paint.net: Speichern asks no more)
     let Some(doc) = p.saveopt.doc else { return Err(ERR_UNSUPPORTED) };
     let opt = p.saveopt.opt;
-    {
-        let d = p.doc.dm(doc);
-        d.saveopt = opt;
-        d.flags |= DF_OPTOK as u32;
-    }
     let s = &mut p.saveopt;
     if s.ver == s.rver {
         if s.err != 0 {
