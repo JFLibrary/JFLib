@@ -255,6 +255,11 @@ pub(crate) fn read_file_raw(path: &str) -> Option<Vec<u8>> {
     }
     // plat-x11: capacity size + 4096, doubled while full, as plat_file_read (a /proc file
     // reports size 0; linuxtest --test files reads /proc/self/stat)
+    // memory that is not there is None, not an abort: a probe reservation before the
+    // zeroed allocation, try_reserve_exact before each doubling
+    let mut probe: Vec<u8> = Vec::new();
+    probe.try_reserve_exact(size as usize + 4096).ok()?;
+    drop(probe);
     let mut data = alloc::vec![0u8; size as usize + 4096];
     let mut n = 0;
     loop {
@@ -262,6 +267,7 @@ pub(crate) fn read_file_raw(path: &str) -> Option<Vec<u8>> {
         if n < data.len() {
             break; // the end of the file came first
         }
+        data.try_reserve_exact(data.len()).ok()?;
         data.resize(data.len() * 2, 0);
     }
     data.truncate(n);

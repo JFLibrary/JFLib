@@ -353,7 +353,9 @@ pub(crate) fn dlgnew_create(p: &mut Pn, _ui: &mut Ui) -> i32 {
         3 => crate::workspace::palette::pal_secondary(&p.pal),
         _ => 0xFFFF_FFFF,
     };
-    let Some(doc) = crate::document::model::doc_new(p, w, h, background, 0) else {
+    let too_big = w as u64 * h as u64 * 4 > crate::integrations::file_io::img_mem_budget();
+    let doc = if too_big { None } else { crate::document::model::doc_new(p, w, h, background, 0) };
+    let Some(doc) = doc else {
         crate::integrations::file_io::fio_error(p, Some("Neues Bild"), "Zu wenig Arbeitsspeicher für ein Bild dieser Größe.");
         return -1;
     };

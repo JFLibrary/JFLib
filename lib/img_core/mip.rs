@@ -202,7 +202,7 @@ impl MipChain {
         for _ in 0..n {
             lw = (lw + 1) >> 1;
             lh = (lh + 1) >> 1;
-            lv.push(Surface::new(lw, lh, FMT_PARGB));
+            lv.push(Surface::try_new(lw, lh, FMT_PARGB)?);
         }
         Some(MipChain { n, w, h, levels: lv })
     }

@@ -549,10 +549,9 @@ fn decode_inner(data: &[u8], straight: bool, maxmem: u64) -> Result<Surface, i32
     }
     // ---- convert
     pd.build_lut(data);
-    let mut sf = Surface::new(pd.w as i32, pd.h as i32, if straight { FMT_ARGB } else { FMT_PARGB });
-    if sf.px.is_empty() {
+    let Some(mut sf) = Surface::try_new(pd.w as i32, pd.h as i32, if straight { FMT_ARGB } else { FMT_PARGB }) else {
         return Err(ERR_NOMEM);
-    }
+    };
     let stride = sf.stride as usize;
     let mut off = 0usize;
     let mut tmp = if pd.ilace != 0 { vec![0u8; pd.w as usize * 4] } else { Vec::new() };

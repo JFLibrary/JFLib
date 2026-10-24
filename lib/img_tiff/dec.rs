@@ -887,7 +887,7 @@ impl<'a> Tc<'a> {
         if e != 0 {
             return Err(e);
         }
-        Ok(Surface::new(self.w as i32, self.h as i32, self.ofmt))
+        Surface::try_new(self.w as i32, self.h as i32, self.ofmt).ok_or(ERR_NOMEM)
     }
 
     // the per-worker buffers: chunk buffers (literal area 0..255 in front of each plane),

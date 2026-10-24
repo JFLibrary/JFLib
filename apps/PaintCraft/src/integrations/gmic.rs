@@ -168,7 +168,7 @@ fn commit(p: &mut Pn, mut images: Vec<gfx::Surface>) {
             if crate::document::layers::lay_add_sf(p, id, i as i32, sf, Some(&format!("G’MIC {}", i+1))).is_err() { crate::document::model::doc_close(p, id); return; }
         }
         p.doc.dm(id).cur = p.doc.d(id).layers.len() as i32 - 1;
-        crate::document::model::doc_mark_layers(p, id); crate::document::history::hist_init(p, id, "G’MIC importieren", 0);
+        crate::document::model::doc_mark_layers(p, id); crate::document::history::hist_init_unsaved(p, id, "G’MIC importieren", 0);
         crate::document::model::doc_set_modified(p, id, true);
         return;
     }

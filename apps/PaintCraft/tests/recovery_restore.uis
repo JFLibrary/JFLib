@@ -16,3 +16,8 @@ expect #9905 value 1
 expect #9910 text ""
 cmd 900 327685
 expect #9900 text "FFFF0000"
+# the restored image was never saved: undoing every step still leaves it modified
+cmd 905 128
+expect #9905 value 1
+key ctrl+z
+expect #9905 value 1

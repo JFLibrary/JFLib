@@ -680,7 +680,11 @@ fn sd_diag_build(p: &mut Pn) {
         if d.dark { "Dunkel" } else { "Hell" }
     ));
     lines.push(format!("Geöffnete Bilder: {}\n", crate::document::model::doc_count(&p.doc)));
-    let file = if p.st.on { p.st.file.clone() } else { String::from("(keine: Testlauf ohne --config / PaintCraft_CONFIG_DIR)") };
+    let file = if p.st.on && p.st.unreadable {
+        format!("{} (nicht lesbar, wird nicht \u{fc}berschrieben)", p.st.file)
+    } else if p.st.on {
+        p.st.file.clone()
+    } else { String::from("(keine: Testlauf ohne --config / PaintCraft_CONFIG_DIR)") };
     lines.push(format!("Einstellungsdatei: {}\n", file));
     let tmp = if p.st.st.tempdir.is_empty() { d.tmpdef.clone() } else { p.st.st.tempdir.clone() };
     lines.push(format!("Temp-Ordner: {}\n", tmp));

@@ -180,12 +180,9 @@ impl Default for HistMem {
     }
 }
 
-/// a zeroed tile
-fn new_tile() -> Tile {
-    match vec![0u8; TILE_BYTES].into_boxed_slice().try_into() {
-        Ok(t) => t,
-        Err(_) => unreachable!(),
-    }
+/// a zeroed tile | None when out of memory
+fn new_tile() -> Option<Tile> {
+    gfx::try_zeroed(TILE_BYTES)?.into_boxed_slice().try_into().ok()
 }
 
 /// hm_init() -- budget = min(40 % of the RAM, 4 GB) (1 GB when unknown)
@@ -234,7 +231,10 @@ impl HistMem {
         if self.fail() {
             return None;
         }
-        Some(self.free.pop().unwrap_or_else(new_tile))
+        match self.free.pop() {
+            Some(t) => Some(t),
+            None => new_tile(),
+        }
     }
 
     /// hm_tile_free(tile)
@@ -249,12 +249,12 @@ impl HistMem {
         self.free = Vec::new();
     }
 
-    /// zp_alloc(len) -> a deflate payload | None (fault injection)
+    /// zp_alloc(len) -> a deflate payload | None (fault injection, out of memory)
     fn zp_alloc(&mut self, len: usize) -> Option<Box<[u8]>> {
         if self.fail() {
             return None;
         }
-        Some(vec![0u8; len].into_boxed_slice())
+        Some(gfx::try_zeroed(len)?.into_boxed_slice())
     }
 
     // -------------------------------------------------------------- spill file
@@ -668,7 +668,7 @@ impl HistMem {
         // side records: the new raw tile, the scratch offset of a spilled payload
         let mut dst: Vec<Option<Tile>> = (0..n).map(|_| None).collect();
         let mut soff: Vec<usize> = vec![0; n];
-        let mut scratch = vec![0u8; dbytes];
+        let Some(mut scratch) = gfx::try_zeroed(dbytes) else { return ERR_NOMEM };
         let mut sp = 0usize;
         let mut run: Option<(u64, usize, usize)> = None; // file offset, scratch offset, length
         let mut err = 0;

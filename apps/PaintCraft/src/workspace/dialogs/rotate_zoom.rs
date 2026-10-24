@@ -180,7 +180,7 @@ pub(crate) fn rz_open(p: &mut Pn, ui: &mut Ui, doc: DocId) {
     p.rz.doc = Some(doc);
     p.rz.uid = uid;
     rz_defaults(&mut p.rz);
-    p.rz.prev = Surface::new(lw, lh, FMT_ARGB);
+    p.rz.prev = Surface::try_new(lw, lh, FMT_ARGB).unwrap_or_default();
     if p.rz.prev.px.is_empty() {
         crate::integrations::file_io::fio_error(p, Some("Rotationszoom"), "Der Arbeitsspeicher reicht für diesen Schritt nicht aus.");
         return;

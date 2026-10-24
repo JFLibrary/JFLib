@@ -22,7 +22,7 @@
 //                                                (the bands of rstest's rt_bands)
 //
 // Results keep the source format; the Err value is ERR_FAIL (-1, the assembly's -1) when a
-// surface size is out of range.  Rows are 4 bytes per pixel (blit_copy, scale, skew and the
+// surface size is out of range or its memory is not there.  Rows are 4 bytes per pixel (blit_copy, scale, skew and the
 // flips copy whole pixels).
 
 use alloc::vec::Vec;
@@ -83,7 +83,7 @@ fn alloc(w: i32, h: i32, fmt: u8) -> Result<Surface, i32> {
     if w as u32 > SURF_MAX as u32 || h as u32 > SURF_MAX as u32 {
         return Err(ERR_FAIL);
     }
-    Ok(Surface::new(w, h, fmt))
+    Surface::try_new(w, h, fmt).ok_or(ERR_FAIL)
 }
 
 #[inline]

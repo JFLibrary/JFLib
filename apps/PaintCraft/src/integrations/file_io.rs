@@ -45,6 +45,20 @@ use crate::app::commands::pn_cmd_label;
 use crate::app::commands::pn_cmd_set;
 use crate::app::Pn;
 
+/// memory budget of one image (ImgDec::maxmem, size of a new image): 50 % of the RAM, at
+/// least 1.5 GB (one image at the default pixel limit needs 1 GB plus scratch); 2 GB when
+/// the RAM is unknown. The wasm memory is capped at 2 GB, so there it is 1 GB. A small file
+/// with many big layers (PDN, PSD) is refused with ERR_LIMIT instead of running out of memory.
+pub(crate) fn img_mem_budget() -> u64 {
+    #[cfg(target_arch = "wasm32")]
+    { 0x4000_0000 }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let t = plat::mem_total();
+        if t == 0 { 0x8000_0000 } else { (t / 2).max(0x6000_0000) }
+    }
+}
+
 const PATH_CAP: usize = 1040;
 const EXTS_CAP: usize = 4096;
 const FMTS_MAX: usize = 64;
@@ -492,7 +506,7 @@ pub(crate) fn fio_open_path(p: &mut Pn, ui: &mut Ui, path: &str) -> i32 {
 
 fn decode_open(data: &[u8], path: &str, cancel: Option<&AtomicU32>) -> Result<LoadedImage, i32> {
     let hint = img_core::io::format_from_path(path);
-    let dec = ImgDec { flags: IMGD_STRAIGHT | IMGD_ICC | IMGD_EXIF | IMGD_XMP, hint, cancel, ..ImgDec::default() };
+    let dec = ImgDec { flags: IMGD_STRAIGHT | IMGD_ICC | IMGD_EXIF | IMGD_XMP, hint, cancel, maxmem: img_mem_budget(), ..ImgDec::default() };
     if dec.cancelled() { return Err(img_core::ERR_CANCEL); }
     if data.starts_with(b"8BPS") {
         match img_all::psd::document::decode(data, &dec) {
@@ -668,7 +682,7 @@ fn set_dpi(d: &mut Doc, dpix: u32, dpiy: u32, unit: u32) {
 
 // open_flat(data, path, hint) -> 0 / ERR_* -- one layer "Hintergrund"
 fn open_flat(p: &mut Pn, ui: &mut Ui, data: &[u8], path: &str, hint: u32) -> i32 {
-    let dec = ImgDec { flags: IMGD_STRAIGHT | IMGD_ICC | IMGD_EXIF | IMGD_XMP, hint, ..ImgDec::default() };
+    let dec = ImgDec { flags: IMGD_STRAIGHT | IMGD_ICC | IMGD_EXIF | IMGD_XMP, hint, maxmem: img_mem_budget(), ..ImgDec::default() };
     let mut meta = ImgMeta::default();
     let sf = match img_core::io::decode_ex(data, Some(&dec), Some(&mut meta)) {
         Ok(sf) => sf,
@@ -696,8 +710,7 @@ fn install_flat(p: &mut Pn, ui: &mut Ui, sf: Surface, mut meta: ImgMeta, path: &
     }
     let fmt = if meta.fmt != 0 { meta.fmt } else { hint };
     if path.is_empty() {
-        crate::document::history::hist_init(p,doc,"Bilderfassung",IC_SCAN);
-        doc_set_modified(p,doc,true);
+        crate::document::history::hist_init_unsaved(p, doc, "Bilderfassung", IC_SCAN);
         doc_set_active(p,doc);
     } else {opened(p, ui, doc, path, fmt);}
     0
@@ -747,8 +760,7 @@ fn install_pdn(p: &mut Pn, ui: &mut Ui, pd: img_pdn::PdnDoc, path: &str) -> i32 
     crate::document::model::doc_mark_layers(p, doc);
     if path.is_empty() {
         // recovered after a session end: unsaved, no file yet (fio_recover gives it one)
-        crate::document::history::hist_init(p, doc, "Wiederhergestellt", IC_FOLDER_OPEN);
-        doc_set_modified(p, doc, true);
+        crate::document::history::hist_init_unsaved(p, doc, "Wiederhergestellt", IC_FOLDER_OPEN);
         doc_set_active(p, doc);
     } else {
         opened(p, ui, doc, path, IMGF_PDN);
@@ -775,8 +787,7 @@ fn install_psd(p: &mut Pn, ui: &mut Ui, psd: img_all::psd::document::Document, p
     d.cur = d.layers.len() as i32 - 1;
     crate::document::model::doc_mark_layers(p, doc);
     if psd.converted {
-        crate::document::history::hist_init(p, doc, "PSD-Ebenen importieren", IC_FOLDER_OPEN);
-        doc_set_modified(p, doc, true);
+        crate::document::history::hist_init_unsaved(p, doc, "PSD-Ebenen importieren", IC_FOLDER_OPEN);
         fio_error(p, Some("PSD-Import"), "Die Rasterebenen wurden als neues 8-Bit-Dokument importiert. Masken wurden angewendet; höhere Farbtiefen, Bereiche außerhalb der Leinwand oder zusätzliche Photoshop-Daten bleiben in der Originaldatei. Bitte unter einem neuen Namen speichern.");
     } else {
         opened(p, ui, doc, path, img_core::IMGF_PSD);
@@ -1174,7 +1185,9 @@ fn save_now(p: &mut Pn, ui: &mut Ui) -> i32 {
     let fmt = p.fio.sv_fmt;
     let saveas = core::mem::take(&mut p.fio.sv_saveas);
     if crate::workspace::dialogs::save_options::saveopt_needed(p, doc, fmt, saveas) {
-        crate::workspace::dialogs::save_options::saveopt_open(p, ui, doc, fmt);
+        if !crate::workspace::dialogs::save_options::saveopt_open(p, ui, doc, fmt) {
+            return -1;
+        }
         return 1;
     }
     let path = p.fio.sv_path.clone();

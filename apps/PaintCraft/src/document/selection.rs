@@ -720,7 +720,10 @@ fn render_ops(path: &mut Path, ras: &mut Raster, s: &mut DocSel) {
         };
         i += 1;
         if op.feather!=0 {
-            feather_mask(s.keep.as_mut().unwrap(),op.feather as i32);
+            // (no memory: the selection keeps its hard edge)
+            if !feather_mask(s.keep.as_mut().unwrap(),op.feather as i32) {
+                plat::log_warn("selection", "feather: out of memory, edge not softened");
+            }
             rendered+=1;lastq=0;continue;
         }
         let mut mode = op.mode;
@@ -765,10 +768,11 @@ fn render_ops(path: &mut Path, ras: &mut Raster, s: &mut DocSel) {
 
 // Separable box filter of A8 coverage, with zero coverage outside the canvas.
 // Rolling sums keep work linear in pixel count even for a large feather radius.
-fn feather_mask(mask:&mut TMask,r:i32) {
+// -> false (mask unchanged) when the work buffers do not fit into memory.
+fn feather_mask(mask:&mut TMask,r:i32) -> bool {
     let (w,h)=(mask.w as usize,mask.h as usize);
     let n=(2*r+1) as u32;
-    let mut rows=vec![0u8;w*h];
+    let Some(mut rows)=w.checked_mul(h).and_then(gfx::try_zeroed) else {return false};
     for y in 0..h {
         let mut sum=0u32;
         for x in -r..=r {sum+=mask.get(x,y as i32) as u32;}
@@ -796,6 +800,7 @@ fn feather_mask(mask:&mut TMask,r:i32) {
         }
     }
     mask.optimize();
+    true
 }
 
 /// sel_combine(doc, poly, mode, qual) -> true -- append an op (SM_REPLACE drops the others);
@@ -1218,15 +1223,7 @@ pub(crate) fn sel_crop(p: &mut Pn, doc: DocId) -> bool {
 
 /// a zeroed FMT_ARGB surface (surf_alloc) | None when out of memory
 pub(crate) fn surf_try(w: i32, h: i32) -> Option<Surface> {
-    if !(0..=65536).contains(&w) || !(0..=65536).contains(&h) {
-        return None;
-    }
-    let stride = (w * 4 + 63) & !63;
-    let bytes = (stride as usize).checked_mul(h as usize)?.max(64);
-    let mut px = Vec::new();
-    px.try_reserve_exact(bytes).ok()?;
-    px.resize(bytes, 0);
-    Some(Surface { px, w, h, stride, fmt: FMT_ARGB, flags: gfx::SFF_OWNED, opac: 255, blend: 0 })
+    Surface::try_new(w, h, FMT_ARGB)
 }
 
 // ================================================================== marching ants
