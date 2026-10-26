@@ -9,7 +9,8 @@
 // pcapng), Beenden; Bearbeiten: Rückgängig, Wiederholen, Löschen, Alles auswählen, Umbenennen
 // (F2); Ansicht: Zoom, 100 %, Alles zeigen, Raster, Einrasten, Minimap, Bereiche (Ctrl+1 .. 8);
 // Simulation: Echtzeit / Simulationsmodus, Abspielen (F6), Schritt vor (F7) und zurück
-// (Shift+F7), Zurück zu live, Tempo, PDUs, Nur Auswahl, Zurücksetzen (workspace/sim);
+// (Shift+F7), Zurück zu live, Von hier fortsetzen (K1: after its question), Tempo, PDUs, Nur
+// Auswahl, Zurücksetzen (workspace/sim);
 // Werkzeuge: the tools with their single keys (V, H, C, N, P) and Einstellungen (Ctrl+,);
 // Hilfe: Tastenkürzel (F1), Info.  Simulation (F5) and Echtzeit (Shift+F5) switch the mode,
 // Ctrl+9 gives the topology the keyboard as Ctrl+1 .. 8 do for the panels.  The context menus of the canvas:
@@ -34,7 +35,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 86] = [
+pub(crate) static CMDS: [Command; 87] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -121,6 +122,7 @@ pub(crate) static CMDS: [Command; 86] = [
     Command::new(CMD_AUTHOR_START, "Ausgangsnetz erzeugen", IC_REFRESH, 0, 0, CF_DISABLED),
     Command::new(CMD_AUTHOR_SAVE, "Als Aufgabe speichern …", IC_SAVE_AS, 0, 0, CF_DISABLED),
     Command::new(CMD_WLAN_RANGES, "&WLAN-Reichweiten", JN_PORT_RADIO, 0, 0, 0),
+    Command::new(CMD_SIM_RESUME, "&Von hier fortsetzen …", IC_PLAY, 0, 0, CF_DISABLED),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -183,7 +185,7 @@ static M_PANELS: [Mi; 13] = [
     Mi::Sep,
     Mi::Cmd(CMD_LAYOUT_RESET),
 ];
-static M_SIM: [Mi; 21] = [
+static M_SIM: [Mi; 22] = [
     Mi::Cmd(CMD_SIM_REALTIME),
     Mi::Cmd(CMD_SIM_MODE),
     Mi::Sep,
@@ -191,6 +193,7 @@ static M_SIM: [Mi; 21] = [
     Mi::Cmd(CMD_SIM_STEP),
     Mi::Cmd(CMD_SIM_BACK),
     Mi::Cmd(CMD_SIM_LIVE),
+    Mi::Cmd(CMD_SIM_RESUME),
     Mi::Sub("&Tempo", &M_TEMPO),
     Mi::Sep,
     Mi::Cmd(CMD_TOOL_PDU),
@@ -434,6 +437,8 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         // the simulation mode (workspace/sim)
         CMD_SIM_REALTIME | CMD_SIM_MODE | CMD_SIM_PLAY | CMD_SIM_STEP | CMD_SIM_BACK | CMD_SIM_RESET => return crate::workspace::sim::command(n, ui, id, arg),
         _ if (CMD_SIM_TEMPO0..200).contains(&id) => return crate::workspace::sim::command(n, ui, id, arg),
+        // rewinding (K1): "Von hier fortsetzen", its answer, a moment in ms (scripts)
+        CMD_SIM_RESUME | CMD_SIM_RESUME_GO | CMD_SIM_SEEK_MS => return crate::workspace::sim::command(n, ui, id, arg),
         // the labs and the Aufgabe panel (workspace/task.rs)
         CMD_LAB_OPEN..=CMD_LAB_CHOSEN => return crate::workspace::task::command(n, ui, id, arg),
         // the script editor (workspace/devwin/scripts.rs): the check while typing, the tab

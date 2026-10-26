@@ -90,7 +90,7 @@ struct IfInfo {
 
 // the interfaces the form can set (no console or USB ports)
 fn interfaces(n: &Net, dev: u32) -> Vec<IfInfo> {
-    let e = n.doc.sim.engine();
+    let e = n.doc.sim.state();
     let descr = e.node(dev).map(|x| x.cli.cfg.descr.clone()).unwrap_or_default();
     let bridge = e.bridge(dev);
     let d = n.doc.proj.device(dev);
@@ -134,9 +134,9 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     let Some(d) = n.doc.proj.device(dev).cloned() else { return };
     let ios = n.doc.proj.model_of(dev).is_some_and(|m| m.cli == CliStyle::Ios);
     let ifs = interfaces(n, dev);
-    let gws: Vec<Ipv4> = config::default_gateways(n.doc.sim.engine(), dev);
-    let statics: Vec<(Prefix4, Option<Ipv4>)> = n.doc.sim.engine().node(dev).and_then(|x| x.ip.as_ref()).map(|st| st.statics.iter().filter(|r| r.prefix.len > 0).map(|r| (r.prefix, r.via)).collect()).unwrap_or_default();
-    let has_ip = n.doc.sim.engine().node(dev).is_some_and(|x| x.ip.is_some());
+    let gws: Vec<Ipv4> = config::default_gateways(n.doc.sim.state(), dev);
+    let statics: Vec<(Prefix4, Option<Ipv4>)> = n.doc.sim.state().node(dev).and_then(|x| x.ip.as_ref()).map(|st| st.statics.iter().filter(|r| r.prefix.len > 0).map(|r| (r.prefix, r.via)).collect()).unwrap_or_default();
+    let has_ip = n.doc.sim.state().node(dev).is_some_and(|x| x.ip.is_some());
     let Some(w) = n.devwin.get(k) else { return };
     let f = &mut w.cfg;
     if f.dev != dev {

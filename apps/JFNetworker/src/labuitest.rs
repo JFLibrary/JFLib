@@ -215,7 +215,7 @@ fn steps(t: &mut T) {
     let (kv1, kv2, kv3) = (id("KV1"), id("KV2"), id("KV3"));
     let mut d = Doc::new();
     d.replace(p.clone(), None);
-    d.sim.with_engine(|e| {
+    d.sim.with_engine("test: run", |e| {
         e.run_until(2 * SEC, BUDGET);
     });
     // an injection: one step, the document stays clean
@@ -228,11 +228,11 @@ fn steps(t: &mut T) {
     t.check("redo injects anew", d.redo() && active(&d) == alloc::vec![(2, "power", None)] && !d.dirty());
     t.eq("redo: the step's run", item.as_ref().and_then(|i| d.fault_run(i)), Some(2));
     // a fault with a duration healed early: its undo brings it back with the time it had left
-    d.sim.with_engine(|e| {
+    d.sim.with_engine("test: run", |e| {
         e.run_until(3 * SEC, BUDGET);
     });
     t.eq("inject for 10 s", d.inject(Fault::Stop { dev: kv1, svc: s("kv") }, Some(10 * SEC)), Ok(3));
-    d.sim.with_engine(|e| {
+    d.sim.with_engine("test: run", |e| {
         e.run_until(5 * SEC, BUDGET);
     });
     t.eq("heal", d.heal(&[3]), Ok(1));

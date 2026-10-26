@@ -50,7 +50,7 @@ fn kind_name(kind: &str) -> &str {
 /// ID_SVC_EDIT_BTN0 + 0x40 k + i)
 pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     let Some(d) = n.doc.proj.device(dev).cloned() else { return };
-    let svcs = n.doc.sim.engine().services(dev);
+    let svcs = n.doc.sim.state().services(dev);
     let mut switch: Option<(usize, bool)> = None;
     ui.next_size(-1, -1);
     ui.scroll_begin(id, SC_V);

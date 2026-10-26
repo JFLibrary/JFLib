@@ -167,7 +167,7 @@ pub(crate) fn if_rows(n: &Net, id: u32) -> Vec<IfRow> {
     let p = &n.doc.proj;
     let view = &n.doc.sim.view;
     let Some(dv) = view.devices.iter().find(|d| d.dev == id) else { return Vec::new() };
-    let bridge = n.doc.sim.engine().bridge(id);
+    let bridge = n.doc.sim.state().bridge(id);
     let ports = p.model_of(id).map(|m| m.ports()).unwrap_or_default();
     let mut out = Vec::new();
     for pv in &dv.ports {
@@ -476,7 +476,7 @@ fn quick(n: &mut Net, ui: &mut Ui, id: u32, r: &IfRow) {
     }
     // the default gateway of a host
     if host && r.iface.is_some() {
-        let now = config::default_gateways(n.doc.sim.engine(), id).first().map(|g| g.to_string()).unwrap_or_default();
+        let now = config::default_gateways(n.doc.sim.state(), id).first().map(|g| g.to_string()).unwrap_or_default();
         let ins = &mut n.inspector;
         if ins.gw_src != (id, now.clone()) {
             ins.gw = now.clone();

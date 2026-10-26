@@ -321,6 +321,11 @@ pub trait Service: Send {
     fn renamed(&mut self, name: &str) {
         let _ = name;
     }
+    /// the bytes it holds besides its own size (tables, buffers, stored data): what it adds to
+    /// a keyframe of the engine (keyframe.rs, the memory budget); the default guesses 1 KiB
+    fn footprint(&self) -> usize {
+        1024
+    }
 }
 
 impl Clone for Box<dyn Service> {

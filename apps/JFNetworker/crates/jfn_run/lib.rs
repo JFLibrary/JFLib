@@ -8,6 +8,9 @@
 //                                    [--golden F] [--series F] | check PROJECT | decode HEX |
 //                                    gen N [--out F]
 //   generate(&args) -> i32           jfn-sim gen: a synthetic project (jfn_model::synth)
+//   rewind(&args) -> i32             jfn-sim rewind PROJECT [SECONDS] [--traffic K]: the
+//                                    keyframes of a run (K1) and how long restores take (times
+//                                    of this machine)
 //
 // Exit codes: 0 everything held, 1 an expectation failed, the project has errors or the report
 // differs from the golden file, 2 a file could not be read or the command line is wrong.  The
@@ -286,7 +289,7 @@ pub fn generate(args: &[String]) -> i32 {
     0
 }
 
-const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F] [--series F]\n  jfn-sim check PROJEKT\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n";
+const USAGE: &str = "jfn-sim -- JFNetworker ohne Fenster\n\n  jfn-sim run PROJEKT [--scenario S] [--pcap F] [--report F] [--golden F] [--series F]\n  jfn-sim check PROJEKT\n  jfn-sim decode HEX\n  jfn-sim gen N [--out DATEI]\n  jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]\n";
 
 /// jfn-sim's command line (args[0] is the program)
 pub fn main(args: &[String]) -> i32 {
@@ -307,6 +310,7 @@ pub fn main(args: &[String]) -> i32 {
         },
         Some("decode") if args.len() > 2 => decode(&args[2..].join(" ")),
         Some("gen") => generate(&args[2..]),
+        Some("rewind") => rewind(&args[2..]),
         Some("help" | "--help" | "-h") => {
             say(USAGE);
             0
@@ -316,4 +320,82 @@ pub fn main(args: &[String]) -> i32 {
             2
         }
     }
+}
+
+// ---------------------------------------------------------------- rewinding (K1)
+
+/// jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]: what rewinding costs for a project -- it
+/// runs SEKUNDEN (default 60) of virtual time in slices of 16 ms, once without and once with
+/// keyframes (the window's budget, jfn_sim::Budget::default()), K pings at the start; then the
+/// keyframes (how many, how big) and ten moments restored (time, events replayed).  Times are
+/// of this machine, so the output differs from run to run.
+pub fn rewind(args: &[String]) -> i32 {
+    use jfn_sim::{Budget, Cmd, Engine, Inline};
+    let Some(path) = args.first() else {
+        complain(USAGE);
+        return 2;
+    };
+    let secs = args.get(1).and_then(|a| a.parse::<u64>().ok()).unwrap_or(60).max(1);
+    let traffic = args.iter().position(|a| a == "--traffic").and_then(|i| args.get(i + 1)).and_then(|v| v.parse::<usize>().ok()).unwrap_or(0);
+    let proj = match load(path) {
+        Ok(p) => p,
+        Err(e) => {
+            complain(&format!("{}\n", e));
+            return 2;
+        }
+    };
+    let ms = |us: u64| format!("{},{:02}", us / 1000, us % 1000 / 10);
+    let kib = |b: usize| format!("{} KiB", b.div_ceil(1024));
+    // the same run twice: without keyframes, then with them
+    let mut runs = Vec::new();
+    for on in [false, true] {
+        let mut d = Inline::new(Engine::from_project(&proj).unwrap_or_else(|_| Engine::new(proj.seed)));
+        let t0 = plat::time_us();
+        if on {
+            d.rewind_on(Budget::default());
+        }
+        if traffic > 0 {
+            d.call("traffic", move |e| e.ping_many(traffic));
+        }
+        let _ = d.send(Cmd::Realtime { speed_pm: 1000 }, 0);
+        let mut wall = 0;
+        while wall < secs * 1_000_000 {
+            wall += 16_000;
+            let _ = d.tick(wall);
+            let _ = d.reports();
+        }
+        runs.push((d, plat::time_us() - t0));
+    }
+    let Some((d, on_us)) = runs.pop() else { return 2 };
+    let off_us = runs.pop().map_or(0, |r| r.1);
+    let Some(rw) = d.rewind() else { return 2 };
+    let kf = rw.keyframes();
+    let (min, max) = (kf.iter().map(|k| k.1).min().unwrap_or(0), kf.iter().map(|k| k.1).max().unwrap_or(0));
+    say(&format!("{}: {} s virtuelle Zeit, {} Ereignisse; ohne Keyframes {} ms, mit {} ms\n", base_name(path), secs, d.eng.events_done(), ms(off_us), ms(on_us)));
+    say(&format!("Keyframes: {} (gemacht {}, ausgedünnt {}), zusammen {}, je {} bis {}\n", kf.len(), rw.made, rw.thinned, kib(rw.bytes()), kib(min), kib(max)));
+    // what a keyframe of the present would hold, by part (the recording left out)
+    let f = jfn_sim::Footprint::of(&d.eng);
+    let rec = d.eng.trace.hops().len() * (core::mem::size_of::<jfn_sim::Hop>() + 16);
+    say(&format!("  jetzt: Geräte {}, davon Logs {}, Dienste {}, TCP {}; Kabel {}, Zeitreihen {}, Ereignisse {}, Rest {}\n", kib(f.devices + f.logs + f.services + f.tcp), kib(f.logs), kib(f.services), kib(f.tcp), kib(f.cables), kib(f.series), kib(f.queue), kib(f.rest.saturating_sub(rec))));
+    let times: Vec<String> = kf.iter().map(|k| format!("{},{:03}", k.0.t / jfn_sim::SEC, k.0.t % jfn_sim::SEC / jfn_sim::MS)).collect();
+    say(&format!("  bei t = {} s\n", times.join("; ")));
+    // ten moments, from the start to the end
+    let end = d.eng.now();
+    let mut took = Vec::new();
+    for i in 0..10u64 {
+        let t = end / 10 * i + end / 20;
+        let t0 = plat::time_us();
+        let Some(mut r) = d.restore(t, None) else { continue };
+        let from = kf.iter().rev().find(|k| k.0.t <= t).map_or(0, |k| k.0.events);
+        let _ = r.run(rw, usize::MAX);
+        let past = r.finish();
+        let us = plat::time_us() - t0;
+        say(&format!("  t = {:>7} s: {} ms, {} Ereignisse nachgespielt\n", format!("{},{:03}", t / jfn_sim::SEC, t % jfn_sim::SEC / jfn_sim::MS), ms(us), past.pos.events - from));
+        took.push(us);
+    }
+    took.sort_unstable();
+    if let (Some(a), Some(b)) = (took.first(), took.last()) {
+        say(&format!("Wiederherstellen: {} / {} / {} ms (min / Median / max)\n", ms(*a), ms(took[took.len() / 2]), ms(*b)));
+    }
+    0
 }

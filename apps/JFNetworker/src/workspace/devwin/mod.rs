@@ -287,7 +287,7 @@ fn overview(n: &mut Net, ui: &mut Ui, id: u32, dev: u32) {
     let ports = rows.iter().filter(|r| r.key < 0x1_0000).count();
     let up = rows.iter().filter(|r| r.badge == BADGE_OK).count();
     let used = n.doc.proj.ports(dev).iter().filter(|(_, l)| l.is_some()).count();
-    let svcs = n.doc.sim.engine().services(dev);
+    let svcs = n.doc.sim.state().services(dev);
     let running = svcs.iter().filter(|s| s.running).count();
     ui.box_begin(0, BOX_V | BOX_CARD | pad(12), 6);
     if let Some(m) = m {

@@ -30,6 +30,8 @@
 // the reach expectation, the Aufgabe panel's run, authoring, the samples of assets/assess).
 // wlantest.rs: WLAN (group wlan: jfn_model::wlan, jfn_sim::wlan, wlankey, wlantrace, cli/wlan.rs,
 // doc/wlan.rs).
+// keyframetest.rs: rewinding with keyframes (group keyframes: jfn_sim::keyframe, the driver's
+// recording, doc/sim.rs's state in the past, "Von hier fortsetzen").
 
 use alloc::format;
 use alloc::string::String;
@@ -87,9 +89,11 @@ mod ipv6tcptest;
 mod assesstest;
 #[path = "wlantest.rs"]
 mod wlantest;
+#[path = "keyframetest.rs"]
+mod keyframetest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 33] = [
+    let groups: [(&'static str, fn(&mut T)); 34] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -123,6 +127,7 @@ pub fn run() -> i32 {
         ("ipv6tcp", ipv6tcptest::run),
         ("assess", assesstest::run),
         ("wlan", wlantest::run),
+        ("keyframes", keyframetest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

@@ -42,6 +42,29 @@
 // Doc calls sync after every change of the project (edits, undo, redo), so undo and redo send
 // the opposite actions and project and engine never part.  Everything runs on the UI thread
 // (jfn_sim::Inline); the clock is plat::task::now_us, which a script run drives with `wait`.
+//
+// Rewinding (K1, jfn_sim::keyframe): the driver keeps keyframes within Budget::default() (64 MiB,
+// 256 keyframes) and records what changes the engine (with_engine names its change and runs it
+// again in every replay).  While the view stands in the past the devices show their state at
+// that moment:
+//   state()                       the engine whose state the window shows: the past one once it
+//                                 is restored, else the present (the canvas' view, LEDs and
+//                                 WLAN, `view` / `leds` / `wlan`, follow it; engine() stays the
+//                                 present for the recording, PDUs, faults and edits)
+//   past() / restoring() / past_gone()   the moment of the state shown; a replay on its way (per
+//                                 mille); a moment before the earliest keyframe (the present
+//                                 is shown)
+//   past_line(dev, line)          a console line in the past: it runs on a copy of the state
+//                                 shown and changes nothing; what the copy printed
+//   resume(&project)              "Von hier fortsetzen": the state shown becomes the present,
+//                                 the recording and inputs after it go, the engine is told the
+//                                 project as it is now (what the engine was told then comes back
+//                                 first, so a change of the project after that moment takes
+//                                 effect at it); the project and its undo list stay
+// A short replay runs at once (RESTORE_NOW events), a longer one in slices of RESTORE_TICK per
+// timer tick, meanwhile the state shown before stays.  A change that goes to the engine (an
+// edit, a setting, a console line of a form, a fault, a PDU) brings the view back to the
+// present first; moving devices does not.
 
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::rc::Rc;
@@ -50,6 +73,7 @@ use alloc::vec::Vec;
 
 use jfn_model::{CableKind, Device, Link, PortRef, Project, ServiceDef};
 use jfn_sim::{ActErr, Action, Cmd, Engine, Inline, Led, Mode, Ns, Problem, Report, Tick, View, SEC};
+use jfn_sim::{Budget, Restore};
 
 /// reports kept for the terminals at most (the oldest go)
 const REPORTS_MAX: usize = 4096;
@@ -58,6 +82,9 @@ const TICK_MS: u32 = 16;
 const TICK_MAX_MS: u32 = 250;
 /// while only the clock moves, a new snapshot at most this often (µs)
 const SHOT_US: u64 = 50_000;
+/// events a replay to a past moment runs at once, and per timer tick after that (K1)
+const RESTORE_NOW: usize = 50_000;
+const RESTORE_TICK: usize = 20_000;
 
 /// what the engine was told of a device
 #[derive(Clone, PartialEq)]
@@ -100,6 +127,62 @@ impl MLink {
     fn of(l: &Link) -> MLink {
         MLink { a: l.a.clone(), b: l.b.clone(), cable: l.cable, kbps: l.kbps, delay_ns: l.delay_ns, jitter_ns: l.jitter_ns, loss_ppm: l.loss_ppm, down: l.down }
     }
+}
+
+/// what the engine was told of the project (K1: "Von hier fortsetzen" goes back to it)
+#[derive(Clone, PartialEq)]
+struct Told {
+    devs: BTreeMap<u32, MDev>,
+    links: BTreeMap<u32, MLink>,
+    stash: BTreeMap<u32, String>,
+    scale: u32,
+}
+
+/// a snapshot of an engine for the canvas and the inspector
+struct Shot {
+    view: Rc<View>,
+    leds: BTreeMap<u32, [Led; 2]>,
+    led_key: u32,
+    wlan: Rc<Vec<jfn_sim::AssocView>>,
+    wlan_key: u32,
+}
+
+/// the snapshot of engine `e` (its view given)
+fn shot_of(e: &Engine, v: View) -> Shot {
+    let mut leds = BTreeMap::new();
+    // the cables of the project (WLAN associations have their own key)
+    for l in v.links.iter().filter(|l| !jfn_sim::wlan::is_assoc_id(l.id)) {
+        leds.insert(l.id, l.led);
+    }
+    let mut led_key: u32 = 0x811C_9DC5;
+    for (id, l) in &leds {
+        for x in [*id, l[0] as u32, l[1] as u32] {
+            led_key = (led_key ^ x).wrapping_mul(0x0100_0193);
+        }
+    }
+    let assocs = e.wlan_assocs();
+    let mut wlan_key: u32 = 0x811C_9DC5;
+    for a in &assocs {
+        for x in [a.id, a.sta, a.ap, a.dbm as u32, a.kbps, a.lost as u32 | (a.authorized as u32) << 1] {
+            wlan_key = (wlan_key ^ x).wrapping_mul(0x0100_0193);
+        }
+    }
+    Shot { view: Rc::new(v), leds, led_key, wlan: Rc::new(assocs), wlan_key }
+}
+
+/// the view in the past and the devices' state then (K1)
+struct Past {
+    /// the moment the view shows
+    at: Ns,
+    /// the replay on its way to `at`
+    job: Option<Restore>,
+    /// the state shown (at `shown`; None before the first replay arrived)
+    state: Option<jfn_sim::Past>,
+    shown: Ns,
+    /// `at` lies before the earliest keyframe: the present is shown
+    gone: bool,
+    /// the present's snapshot while the past one is shown
+    live: Option<Shot>,
 }
 
 /// the new value when it differs from the old one
@@ -208,6 +291,10 @@ pub(crate) struct Sim {
     /// the WLAN associations of the last snapshot, a key that changes with them
     pub wlan: Rc<Vec<jfn_sim::AssocView>>,
     pub wlan_key: u32,
+    /// the view in the past and the state shown (K1)
+    past: Option<Past>,
+    /// what the engine was told, after input number n
+    told: Vec<(usize, Rc<Told>)>,
 }
 
 impl Sim {
@@ -242,6 +329,8 @@ impl Sim {
             scale: if whole { p.dip_per_m } else { 0 },
             wlan: Rc::new(Vec::new()),
             wlan_key: 0,
+            past: None,
+            told: Vec::new(),
         };
         if whole {
             for d in &p.devices {
@@ -255,6 +344,9 @@ impl Sim {
             // piece by piece: what the engine takes runs, the rest is in `errors`
             s.sync(p);
         }
+        // keyframes and inputs from here on (K1)
+        s.drv.rewind_on(Budget::default());
+        s.note_told();
         s.snapshot();
         s
     }
@@ -296,6 +388,9 @@ impl Sim {
     }
 
     fn act(&mut self, a: Action) -> Result<(), ActErr> {
+        if !matches!(a, Action::Move { .. } | Action::Scale { .. }) {
+            self.to_live();
+        }
         self.topo = self.topo.wrapping_add(1);
         self.drv.send(Cmd::Apply(a), plat::task::now_us()).map(|_| ())
     }
@@ -397,6 +492,7 @@ impl Sim {
         if self.topo != before {
             self.changed();
         }
+        self.note_told();
     }
 
     // a device of the project starts running (as it ran when an undo brings it back)
@@ -456,6 +552,7 @@ impl Sim {
             self.topo = self.topo.wrapping_add(1);
             self.changed();
         }
+        self.note_told();
     }
 
     /// the engine runs this device as the project has it now: its configuration was applied
@@ -466,14 +563,24 @@ impl Sim {
             let _ = self.act(Action::Startup { dev: d.id, text: d.startup_config.clone() });
         }
         self.devs.insert(d.id, MDev { startup: d.startup_config.clone(), services: d.services.clone(), ..m });
+        self.note_told();
     }
 
     /// a command of the UI (its effect is in the next snapshot, taken at once)
     pub(crate) fn send(&mut self, c: Cmd) -> Result<Tick, ActErr> {
         self.catch_up();
+        let edit = match &c {
+            Cmd::Apply(a) => !matches!(a, Action::Move { .. } | Action::Scale { .. }),
+            Cmd::Cli { .. } | Cmd::Interrupt { .. } => true,
+            _ => false,
+        };
+        if edit {
+            self.to_live();
+        }
         self.topo = self.topo.wrapping_add(1);
         let r = self.drv.send(c, plat::task::now_us());
         self.changed();
+        self.follow();
         r
     }
 
@@ -483,38 +590,17 @@ impl Sim {
         self.soon = true;
     }
 
-    // the view, the LEDs, the reports
+    // the view, the LEDs, the reports (while a past state is shown, the present's snapshot is
+    // kept aside for when the view comes back)
     fn snapshot(&mut self) {
-        let v = self.drv.eng.view();
-        let mut leds = BTreeMap::new();
-        // the cables of the project (WLAN associations have their own key)
-        for l in v.links.iter().filter(|l| !jfn_sim::wlan::is_assoc_id(l.id)) {
-            leds.insert(l.id, l.led);
-        }
-        let assocs = self.drv.eng.wlan_assocs();
-        let mut h: u32 = 0x811C_9DC5;
-        for a in &assocs {
-            for x in [a.id, a.sta, a.ap, a.dbm as u32, a.kbps, a.lost as u32 | (a.authorized as u32) << 1] {
-                h = (h ^ x).wrapping_mul(0x0100_0193);
-            }
-        }
-        if h != self.wlan_key || assocs.len() != self.wlan.len() {
-            self.wlan_key = h;
-            self.wlan = Rc::new(assocs);
-        }
-        if leds != self.leds {
-            let mut h: u32 = 0x811C_9DC5;
-            for (id, l) in &leds {
-                for x in [*id, l[0] as u32, l[1] as u32] {
-                    h = (h ^ x).wrapping_mul(0x0100_0193);
-                }
-            }
-            self.led_key = h;
-            self.leds = leds;
+        let s = shot_of(&self.drv.eng, self.drv.eng.view());
+        let shown = self.past.as_ref().and_then(|p| p.live.as_ref());
+        if &s.leds != shown.map_or(&self.leds, |l| &l.leds) {
             // loops count the cables that are up: the problems follow the LEDs
             self.topo = self.topo.wrapping_add(1);
         }
         // frames per second on every cable: what both ends sent, sampled once a second
+        let v = &s.view;
         let mut sent: BTreeMap<(u32, u16), u64> = BTreeMap::new();
         for d in &v.devices {
             for p in d.ports.iter().filter(|p| p.link.is_some()) {
@@ -531,12 +617,31 @@ impl Sim {
                 (r.0, r.1) = (now, total);
             }
         }
-        self.rates.retain(|id, _| self.leds.contains_key(id));
-        self.view = Rc::new(v);
-        self.ver = self.ver.wrapping_add(1);
+        self.rates.retain(|id, _| s.leds.contains_key(id));
+        match self.past.as_mut().filter(|p| p.live.is_some()) {
+            Some(p) => p.live = Some(s),
+            None => self.install(s),
+        }
         self.dirty = false;
         self.shot_at = plat::task::now_us();
         self.drain();
+    }
+
+    // a snapshot becomes the one the window shows
+    fn install(&mut self, s: Shot) {
+        self.view = s.view;
+        self.leds = s.leds;
+        self.led_key = s.led_key;
+        if s.wlan_key != self.wlan_key || s.wlan.len() != self.wlan.len() {
+            self.wlan_key = s.wlan_key;
+            self.wlan = s.wlan;
+        }
+        self.ver = self.ver.wrapping_add(1);
+    }
+
+    // the snapshot shown now
+    fn current(&self) -> Shot {
+        Shot { view: self.view.clone(), leds: self.leds.clone(), led_key: self.led_key, wlan: self.wlan.clone(), wlan_key: self.wlan_key }
     }
 
     // the engine's reports into the bounded queue
@@ -561,7 +666,7 @@ impl Sim {
         if self.armed {
             return None;
         }
-        let ms = if self.soon {
+        let ms = if self.soon || self.restoring().is_some() {
             TICK_MS
         } else if let Mode::Realtime { speed_pm } = self.drv.mode() {
             match self.drv.eng.next_time() {
@@ -586,6 +691,11 @@ impl Sim {
     /// the timer fired: the clock moves on -> a new snapshot was taken
     pub(crate) fn tick(&mut self) -> bool {
         self.armed = false;
+        if self.restoring().is_some() {
+            // the replay to the moment the view shows goes on
+            self.soon = true;
+            return self.work(RESTORE_TICK);
+        }
         let now = plat::task::now_us();
         let t = self.drv.tick(now);
         if t.events > 0 || t.new_hops {
@@ -629,6 +739,7 @@ impl Sim {
         }
         let services = if steps.is_some() { d.services.clone() } else { m.services.clone() };
         self.devs.insert(d.id, MDev { startup: d.startup_config.clone(), services, ..m });
+        self.note_told();
     }
 }
 
@@ -651,12 +762,191 @@ impl Sim {
     }
 
     /// a change of the engine that is no command: a ping job, a PDU's service, a lookup (the
-    /// workspace's PDUs); like send, a snapshot follows
-    pub(crate) fn with_engine<R>(&mut self, f: impl FnOnce(&mut Engine) -> R) -> R {
+    /// workspace's PDUs); like send, a snapshot follows.  `f` runs again in every replay of
+    /// that moment (K1), so it takes what it needs by value; `what` names it in the inputs
+    pub(crate) fn with_engine<R>(&mut self, what: &'static str, f: impl Fn(&mut Engine) -> R + Send + Sync + 'static) -> R {
         self.catch_up();
+        self.to_live();
         self.topo = self.topo.wrapping_add(1);
-        let r = f(&mut self.drv.eng);
+        let r = self.drv.call(what, f);
         self.changed();
         r
+    }
+}
+
+// ---------------------------------------------------------------- the state in the past (K1)
+
+impl Sim {
+    /// the engine whose state the window shows: the past one while the view stands in the past
+    /// and its state is restored, else the present
+    pub(crate) fn state(&self) -> &Engine {
+        match self.past.as_ref() {
+            Some(p) if p.live.is_some() => p.state.as_ref().map_or(&self.drv.eng, |s| &s.eng),
+            _ => &self.drv.eng,
+        }
+    }
+
+    /// the moment whose state of the devices is shown (None: the present)
+    pub(crate) fn past(&self) -> Option<Ns> {
+        self.past.as_ref().filter(|p| p.live.is_some() && p.state.is_some()).map(|p| p.shown)
+    }
+
+    /// a replay to the moment the view shows is on its way: how far (per mille)
+    pub(crate) fn restoring(&self) -> Option<u32> {
+        self.past.as_ref().and_then(|p| p.job.as_ref()).map(|j| j.progress())
+    }
+
+    /// the view shows a moment before the earliest keyframe (the devices show the present)
+    pub(crate) fn past_gone(&self) -> bool {
+        self.past.as_ref().is_some_and(|p| p.gone)
+    }
+
+    /// the present's view, also while a past one is shown (what changes the present looks at)
+    pub(crate) fn live_view(&self) -> Rc<View> {
+        match self.past.as_ref().and_then(|p| p.live.as_ref()) {
+            Some(l) => l.view.clone(),
+            None => self.view.clone(),
+        }
+    }
+
+    /// the keyframes and inputs of the run
+    pub(crate) fn rewind(&self) -> Option<&jfn_sim::Rewind> {
+        self.drv.rewind()
+    }
+
+    /// another budget for the keyframes: the recording starts afresh from now (tests)
+    #[allow(dead_code)]
+    pub(crate) fn set_budget(&mut self, cfg: Budget) {
+        self.drv.rewind_on(cfg);
+        self.told.clear();
+        self.note_told();
+    }
+
+    /// a line typed on a console while the view stands in the past: it runs on a copy of the
+    /// state shown, which then goes, so nothing changes (a command that ran then, or a question
+    /// that waited, is given up on the copy first); what the copy printed (None: no past state
+    /// is shown)
+    pub(crate) fn past_line(&self, dev: u32, line: &str) -> Option<Result<String, ActErr>> {
+        let p = self.past.as_ref().filter(|p| p.live.is_some())?;
+        let mut e = p.state.as_ref()?.eng.clone();
+        if e.cli_busy(dev) || e.node(dev).is_some_and(|x| x.cli.ask.is_some()) {
+            let _ = e.cli_interrupt(dev);
+        }
+        let _ = e.take_reports();
+        if let Err(x) = e.cli_line(dev, line) {
+            return Some(Err(x));
+        }
+        let mut s = String::new();
+        for r in e.take_reports() {
+            if let Report::CliOut { dev: d, bytes, .. } = r
+                && d == dev
+            {
+                s.push_str(&String::from_utf8_lossy(&bytes));
+            }
+        }
+        Some(Ok(s))
+    }
+
+    /// "Von hier fortsetzen": the state shown becomes the present -- the recording and what came
+    /// from outside after its moment go; what the engine was told then comes back and the
+    /// project as it is now follows (sync) -> false when no past state is shown
+    pub(crate) fn resume(&mut self, proj: &Project) -> bool {
+        if self.past().is_none() || self.restoring().is_some() {
+            return false;
+        }
+        let Some(state) = self.past.take().and_then(|p| p.state) else { return false };
+        let k = state.pos.inputs;
+        self.drv.resume(state);
+        if let Some(i) = self.told.iter().rposition(|(n, _)| *n <= k) {
+            let t = self.told[i].1.clone();
+            self.told.truncate(i + 1);
+            self.devs = t.devs.clone();
+            self.links = t.links.clone();
+            self.stash = t.stash.clone();
+            self.scale = t.scale;
+        }
+        self.reports.clear();
+        self.rates.clear();
+        self.problems = None;
+        self.topo = self.topo.wrapping_add(1);
+        self.sync(proj);
+        self.changed();
+        true
+    }
+
+    // the view goes back to the present before a change of the engine
+    fn to_live(&mut self) {
+        if self.drv.view().is_some() {
+            let _ = self.drv.send(Cmd::Live, plat::task::now_us());
+        }
+        self.follow();
+    }
+
+    // the view moved: the devices' state at its moment -- from a keyframe, or from the state
+    // shown when the view moved forward; a short replay at once, a longer one in slices
+    fn follow(&mut self) {
+        let Some(t) = self.drv.view() else {
+            if let Some(l) = self.past.take().and_then(|p| p.live) {
+                self.install(l);
+            }
+            return;
+        };
+        if self.past.as_ref().is_some_and(|p| p.at == t) {
+            return;
+        }
+        let job = {
+            let prev = self.past.as_ref().and_then(|p| p.state.as_ref());
+            self.drv.restore(t, prev)
+        };
+        let p = self.past.get_or_insert_with(|| Past { at: t, job: None, state: None, shown: 0, gone: false, live: None });
+        p.at = t;
+        p.gone = job.is_none();
+        p.job = job;
+        // before the earliest keyframe there is nothing to show but the present
+        let back = if p.gone { p.state = None; p.live.take() } else { None };
+        if let Some(l) = back {
+            self.install(l);
+        }
+        self.work(RESTORE_NOW);
+        self.soon = true;
+    }
+
+    // the replay goes on (at most `budget` events) -> it arrived and its state is shown
+    fn work(&mut self, budget: usize) -> bool {
+        let shot = {
+            let (Some(p), Some(rw)) = (self.past.as_mut(), self.drv.rewind()) else { return false };
+            let Some(job) = p.job.as_mut() else { return false };
+            if !job.run(rw, budget) {
+                return false;
+            }
+            p.state = p.job.take().map(|j| j.finish());
+            p.shown = p.at;
+            match p.state.as_ref() {
+                Some(s) => shot_of(&s.eng, s.eng.view()),
+                None => return false,
+            }
+        };
+        if self.past.as_ref().is_some_and(|p| p.live.is_none()) {
+            let live = self.current();
+            if let Some(p) = self.past.as_mut() {
+                p.live = Some(live);
+            }
+        }
+        self.install(shot);
+        true
+    }
+
+    // what the engine was told, when it changed (resume goes back to it)
+    fn note_told(&mut self) {
+        if self.told.last().is_some_and(|(_, t)| t.devs == self.devs && t.links == self.links && t.stash == self.stash && t.scale == self.scale) {
+            return;
+        }
+        let k = self.drv.pos().inputs;
+        // what was told before the earliest keyframe can no longer come back
+        let first = self.drv.rewind().map_or(0, |r| r.inputs().0);
+        if let Some(i) = self.told.iter().rposition(|(n, _)| *n <= first) {
+            self.told.drain(..i);
+        }
+        self.told.push((k, Rc::new(Told { devs: self.devs.clone(), links: self.links.clone(), stash: self.stash.clone(), scale: self.scale })));
     }
 }

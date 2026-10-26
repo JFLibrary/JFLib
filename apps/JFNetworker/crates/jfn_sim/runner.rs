@@ -280,7 +280,7 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
                     d.eng.step();
                 }
                 if !idle {
-                    d.eng.run_until(end, usize::MAX);
+                    d.run_until(end, usize::MAX);
                     drain(&mut d, &mut r);
                     let t = d.eng.now();
                     r.line(t, "--", "nach einer Stunde virtueller Zeit noch nicht zur Ruhe gekommen");

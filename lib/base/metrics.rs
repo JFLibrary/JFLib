@@ -12,7 +12,10 @@
 //                  p50 / p95 / p99 / count / sum / mean / min / max over the slots still in
 //                  the window at t / per_slot(t, pm) for charts / hist(t)
 //                  hist_between(from, to): the slots that start in [from, to) as one
-//                  histogram (a time series: one point per interval, quantiles of any span)
+//                  histogram (a time series: one point per interval, quantiles of any span);
+//                  bytes(): the heap memory it holds -- its slots come with the first value,
+//                  so a window that never got one costs nothing (a simulator keeps one per
+//                  device and copies them often)
 //
 // Quantiles use the nearest rank (rank = ceil(pm * n / 1000)) and give the midpoint of that
 // rank's bucket, clamped to the smallest and largest value seen (the first and the last rank
@@ -286,7 +289,9 @@ fn add_slot(h: &mut Hist, s: &Slot) {
 pub struct Window {
     span: u64,
     bits: u8,
+    /// `len` slots, made when the first value comes (empty until then)
     ring: Vec<Slot>,
+    len: usize,
     /// the newest slot number recorded into
     head: u64,
 }
@@ -297,10 +302,14 @@ impl Window {
         Window::with_bits(slots, span, HIST_BITS)
     }
     pub fn with_bits(slots: usize, span: u64, bits: u8) -> Window {
-        Window { span: span.max(1), bits: bits.clamp(1, 8), ring: alloc::vec![Slot::empty(); slots.max(1)], head: 0 }
+        Window { span: span.max(1), bits: bits.clamp(1, 8), ring: Vec::new(), len: slots.max(1), head: 0 }
     }
     pub fn slots(&self) -> usize {
-        self.ring.len()
+        self.len
+    }
+    /// the heap memory it holds: its slots and their histograms (none before the first value)
+    pub fn bytes(&self) -> usize {
+        self.ring.capacity() * core::mem::size_of::<Slot>() + self.ring.iter().map(|s| s.cells.capacity() * core::mem::size_of::<(u16, u32)>()).sum::<usize>()
     }
     pub fn span(&self) -> u64 {
         self.span
@@ -312,7 +321,7 @@ impl Window {
     }
     pub fn record_n(&mut self, t: u64, v: u64, n: u32) -> bool {
         let i = t / self.span;
-        let len = self.ring.len() as u64;
+        let len = self.len as u64;
         if i == u64::MAX {
             return false; // the slot number of "never used"
         }
@@ -323,6 +332,9 @@ impl Window {
             return false;
         }
         let bucket = bucket_of(self.bits as u32, v);
+        if self.ring.is_empty() {
+            self.ring = alloc::vec![Slot::empty(); self.len];
+        }
         let s = &mut self.ring[(i % len) as usize];
         if s.idx != i {
             s.reset(i);
@@ -333,7 +345,7 @@ impl Window {
     /// the slots still in the window at time t
     fn live(&self, t: u64) -> impl Iterator<Item = &Slot> {
         let now = t / self.span;
-        let len = self.ring.len() as u64;
+        let len = self.len as u64;
         self.ring.iter().filter(move |s| s.idx != u64::MAX && s.idx <= now && s.idx.saturating_add(len) > now)
     }
     /// everything in the window at time t as one histogram
@@ -348,12 +360,13 @@ impl Window {
     /// times, to the resolution of the slots; slots the ring no longer holds are left out
     pub fn hist_between(&self, from: u64, to: u64) -> Hist {
         let mut h = Hist::with_bits(self.bits);
-        let len = self.ring.len() as u64;
+        let len = self.len as u64;
         let (a, b) = (from.div_ceil(self.span), to.div_ceil(self.span));
         // only the newest `len` slot numbers can still be in the ring
         for i in a.max(b.saturating_sub(len))..b {
-            let s = &self.ring[(i % len) as usize];
-            if s.idx == i {
+            if let Some(s) = self.ring.get((i % len) as usize)
+                && s.idx == i
+            {
                 add_slot(&mut h, s);
             }
         }
@@ -391,14 +404,13 @@ impl Window {
     /// count, quantile or None when the slot is empty)
     pub fn per_slot(&self, t: u64, per_mille: u32) -> Vec<(u64, u64, Option<u64>)> {
         let now = t / self.span;
-        let len = self.ring.len() as u64;
+        let len = self.len as u64;
         let first = now.saturating_sub(len - 1);
         (first..=now)
             .map(|i| {
-                let s = &self.ring[(i % len) as usize];
-                if s.idx != i || s.n == 0 {
+                let Some(s) = self.ring.get((i % len) as usize).filter(|s| s.idx == i && s.n > 0) else {
                     return (i * self.span, 0, None);
-                }
+                };
                 let r = rank(per_mille, s.n);
                 let mut cum = 0u64;
                 let mut v = if r == 1 { s.min } else { s.max };

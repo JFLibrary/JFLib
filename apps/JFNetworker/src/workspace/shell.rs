@@ -117,6 +117,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     sim::pdu::file_dialog(n, ui);
     crate::workspace::task::dialog(n, ui);
     crate::workspace::assess::dialog(n, ui);
+    sim::resume_dialog(n, ui);
     n.sim_timer(ui);
     sim::timer(n, ui);
 }

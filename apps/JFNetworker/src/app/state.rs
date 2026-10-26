@@ -136,7 +136,7 @@ impl Net {
             file::open_generated(self, ui, k);
         }
         if let Some(k) = num("--traffic") {
-            self.doc.sim.with_engine(|e| e.ping_many(k));
+            self.doc.sim.with_engine("traffic", move |e| e.ping_many(k));
         }
         true
     }

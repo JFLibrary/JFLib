@@ -459,3 +459,14 @@ pub(crate) const ID_WL_JOIN_LEAVE: u32 = 0xF514;
 /// the project's scale (world units per metre) and its button
 pub(crate) const ID_WL_SCALE: u32 = 0xF520;
 pub(crate) const ID_WL_SCALE_APPLY: u32 = 0xF521;
+// ---- K1: rewinding with keyframes (commands 420 .. 449, widgets 0xEC00 .. 0xEFFF, timers
+// 0x174 .. 0x177)
+/// "Von hier fortsetzen" (the hint above the canvas, Simulation): its question first
+pub(crate) const CMD_SIM_RESUME: u32 = 420;
+/// the question's answer: the state shown becomes the present
+pub(crate) const CMD_SIM_RESUME_GO: u32 = 421;
+/// the view at a moment of the recording, arg: ms of virtual time (scripts; CMD_SIM_SEEK takes
+/// ns up to 4,29 s)
+pub(crate) const CMD_SIM_SEEK_MS: u32 = 422;
+/// the question "Von hier fortsetzen?"
+pub(crate) const ID_SIM_RESUME_ASK: u32 = 0xEC00;
