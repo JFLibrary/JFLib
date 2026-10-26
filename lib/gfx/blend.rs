@@ -5,6 +5,8 @@
 //   mask_over(row, mask, pcol)       the colour through an 8-bit coverage row
 //   blit_over(dst, src, opacity)     premultiplied src over dst (x opacity 0..255)
 //   a8_over(dst, cov, alpha)         8-bit target: c = cov * alpha / 255, dst = c + dst * (255 - c) / 255
+//   copy_stream(dst, src) / stream_fence()   a row copy past the caches (simd; row bands
+//                                    drawn on worker threads go back to the framebuffer so)
 //
 // "over": dst = src + dst * (255 - src_alpha) / 255 with exact rounding (div255) and the
 // saturation of the SSE2 kernels (packuswb).  fill_over, mask_over and a8_over are SIMD
@@ -14,6 +16,8 @@
 
 use rt::fx::div255;
 use simd::{Kernel, Simd};
+
+pub use simd::{copy_stream, stream_fence};
 
 /// k_fill_solid: store one colour into every pixel of the row
 pub fn fill_solid(row: &mut [u8], c: u32) {

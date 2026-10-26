@@ -22,6 +22,8 @@
 //                                  on opaque targets (lcd.rs); NONE (default): greyscale
 //   set_fallback_fonts / set_system_fallback / fallback_for   characters the font lacks come
 //                                  from other fonts (fallback.rs; also when shaping)
+//   record_n / record_icon / glyphs   glyphs placed now, blended later from the glyph cache by
+//                                  any thread (record.rs: GlyphRec, GlyphView)
 //
 // Pen positions are 24.8 fixed point; glyphs are placed on quarter pixels and their
 // coverage masks are cached per (font, glyph, size, phase, greyscale / subpixel).  Colour
@@ -45,6 +47,7 @@ pub mod fontdb;
 pub mod glyphcache;
 pub mod lcd;
 pub mod outline;
+mod record;
 pub mod rendering;
 pub mod registry;
 pub mod segment;
@@ -62,6 +65,7 @@ use rt::fx::{cvt, div255};
 pub use font::*;
 pub use glyphcache::{GcEntry, GcRef};
 pub use lcd::{SUBPIXEL_BGR, SUBPIXEL_NONE, SUBPIXEL_RGB, SUBPIXEL_VBGR, SUBPIXEL_VRGB};
+pub use record::{GlyphRec, GlyphView};
 pub use registry::{FONT_EMBEDDED, FONT_MAX_IDS};
 pub use rendering::FontRaster;
 
@@ -100,6 +104,8 @@ pub struct Text {
     /// SUBPIXEL_* (lcd.rs) and its blend tables
     lcd: u8,
     lcd_lut: Option<alloc::boxed::Box<lcd::Lut>>,
+    /// record_n / record_icon: glyph_draw appends here instead of blending (record.rs)
+    rec: Option<record::GlyphRec>,
 }
 
 pub(crate) fn utf8_put(out: &mut Vec<u8>, cp: u32) {
@@ -146,6 +152,7 @@ impl Text {
             layers: Vec::new(),
             lcd: SUBPIXEL_NONE,
             lcd_lut: None,
+            rec: None,
         };
         t.ol.reset();
         for f in fonts {
@@ -306,12 +313,14 @@ impl Text {
 
     // draw one glyph with the current colour at pen (absolute 24.8) on the baseline run_y:
     // cached mask, or a direct fill when too large; lcd: subpixel smoothing allowed (not
-    // for colour layers)  [glyph_draw]
+    // for colour layers); while recording (record.rs) the glyph is appended to the record
+    // instead  [glyph_draw]
     pub(crate) fn glyph_draw(&mut self, dc: &Dc, sf: &mut Surface, font: u32, g: u32, pen: i32, lcd: bool) {
         let size = self.size;
         let pen = self.font_raster(font).position(pen);
         let phase = (pen >> 6) & 3;
         let base = self.run_y;
+        let rec = self.rec.is_some();
         if lcd && self.lcd_for(sf, font) {
             self.lcd_prepare(dc.color);
             let order = self.lcd;
@@ -322,7 +331,10 @@ impl Text {
                 GcRef::Entry(_) => {
                     let key = glyphcache::lcd_key(font, g, size, phase, vertical);
                     if let (Some(e), Some(lut)) = (self.gc.map.get(&key), self.lcd_lut.as_deref()) {
-                        lcd::blit(dc, sf, pen >> 8, base, e, bgr, lut);
+                        match self.rec.as_mut() {
+                            Some(r) => r.lcd(key, e, pen >> 8, base, dc.color, bgr, lut.adj()),
+                            None => lcd::blit(dc, sf, pen >> 8, base, e, bgr, lut, lut.adj()),
+                        }
                     }
                     return;
                 }
@@ -331,7 +343,18 @@ impl Text {
         }
         match self.gc_get(font, g, size, phase) {
             GcRef::None => {}
-            GcRef::Entry(e) => mask_blit(dc, sf, pen >> 8, base, e),
+            GcRef::Entry(e) if !rec => mask_blit(dc, sf, pen >> 8, base, e),
+            GcRef::Entry(_) => {
+                let key = glyphcache::gc_key(font, g, size, phase);
+                if let (Some(e), Some(r)) = (self.gc.map.get(&key), self.rec.as_mut()) {
+                    r.mask(key, e, pen >> 8, base, dc.color);
+                }
+            }
+            GcRef::Direct if rec => {
+                if let Some(r) = self.rec.as_mut() {
+                    r.fail(); // a filled path: not in the cache
+                }
+            }
             GcRef::Direct => {
                 // same placement as a cache entry: integer x + quarter-pixel phase
                 let (sx, sy) = self.gc_scale(font, size);
@@ -348,9 +371,23 @@ impl Text {
         if self.hdr(font).flags & SGH_CBDT != 0 {
             let size = self.size;
             let base = self.run_y;
-            if let Some(e) = self.gc_get_bitmap(font, g, size) {
-                bitmap_blit(dc, sf, pen >> 8, base, e);
-                return true;
+            let rec = self.rec.is_some();
+            match self.gc_get_bitmap(font, g, size) {
+                Some(e) if !rec => {
+                    bitmap_blit(dc, sf, pen >> 8, base, e);
+                    return true;
+                }
+                Some(_) => {
+                    // a bitmap above the cache's limit is not in the table: not recordable
+                    let key = glyphcache::bitmap_key(font, g, size);
+                    match (self.gc.map.get(&key), self.rec.as_mut()) {
+                        (Some(e), Some(r)) => r.bitmap(key, e, pen >> 8, base, dc.color),
+                        (None, Some(r)) => r.fail(),
+                        _ => {}
+                    }
+                    return true;
+                }
+                None => {}
             }
         }
         let mut layers = core::mem::take(&mut self.layers);
@@ -458,7 +495,7 @@ fn utf8_next(s: &[u8], i: usize) -> usize {
 
 // blend a glyph mask with the colour of dc at pen x / baseline (absolute target
 // coordinates), clipped  [mask_blit]
-fn mask_blit(dc: &Dc, sf: &mut Surface, pen_x: i32, base: i32, gl: &GcEntry) {
+pub(crate) fn mask_blit(dc: &Dc, sf: &mut Surface, pen_x: i32, base: i32, gl: &GcEntry) {
     let mut x0 = pen_x.wrapping_add(gl.left);
     let mut y0 = base.wrapping_add(gl.top);
     let mut sx = 0i32;
@@ -482,7 +519,7 @@ fn mask_blit(dc: &Dc, sf: &mut Surface, pen_x: i32, base: i32, gl: &GcEntry) {
     for r in 0..h as usize {
         let mo = (sy as usize + r) * gl.w as usize + sx as usize;
         let mask = &gl.px[mo..mo + w as usize];
-        let o = (y0 as usize + r) * stride;
+        let o = ((y0 - dc.row0) as usize + r) * stride;
         if sf.fmt == FMT_A8 {
             blend::a8_over(&mut sf.px[o + x0 as usize..o + x1 as usize], mask, dc.pcol32 >> 24);
         } else {
@@ -493,7 +530,7 @@ fn mask_blit(dc: &Dc, sf: &mut Surface, pen_x: i32, base: i32, gl: &GcEntry) {
 
 // draw a PARGB glyph bitmap (absolute target coordinates), clipped, multiplied by the
 // colour's alpha and the global opacity  [bitmap_blit]
-fn bitmap_blit(dc: &Dc, sf: &mut Surface, pen_x: i32, base: i32, e: &GcEntry) {
+pub(crate) fn bitmap_blit(dc: &Dc, sf: &mut Surface, pen_x: i32, base: i32, e: &GcEntry) {
     if sf.fmt == FMT_A8 {
         return;
     }
@@ -521,7 +558,7 @@ fn bitmap_blit(dc: &Dc, sf: &mut Surface, pen_x: i32, base: i32, e: &GcEntry) {
     let sstride = e.w as usize * 4;
     for r in 0..h as usize {
         let so = (sy as usize + r) * sstride + sx as usize * 4;
-        let o = (y0 as usize + r) * stride + x0 as usize * 4;
+        let o = ((y0 - dc.row0) as usize + r) * stride + x0 as usize * 4;
         blend::blit_over(&mut sf.px[o..o + w as usize * 4], &e.px[so..so + w as usize * 4], op);
     }
 }

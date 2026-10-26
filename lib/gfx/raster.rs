@@ -91,7 +91,7 @@ impl Raster {
         let a8 = sf.fmt == FMT_A8;
         let px = &mut sf.px;
         self.fill_rows(dc.clip, rule, &mut |ty, tx, cov| {
-            let o = ty as usize * stride;
+            let o = (ty - dc.row0) as usize * stride;
             let tx = tx as usize;
             if a8 {
                 blend::a8_over(&mut px[o + tx..o + tx + cov.len()], cov, dc.pcol32 >> 24);

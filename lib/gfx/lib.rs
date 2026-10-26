@@ -4,6 +4,9 @@
 //   Dc::new(w, h) / dc.begin(&sf) / dc.end()      the draw context of a target; begin saves
 //                                      clip, origin and opacity and resets them for another
 //                                      target, end restores them (gfx_begin / gfx_end)
+//   dc.begin_rows(&sf, row0, h)        sf holds rows row0 .. row0 + sf.h of a target h rows
+//                                      high (a row band drawn on a thread of its own): the
+//                                      coordinates stay the target's, only the pixel rows move
 //   dc: set_color(argb), set_opacity(op), clip_push(x, y, w, h) / clip_pop(), origin(x, y),
 //       translate(dx, dy), fill / clear / hline / vline / frame / blit / blit_scaled (sf, ...)
 //   path (Path, 24.8 and float API), raster (Raster), stroke (Path::stroke), shapes (Shapes),
@@ -137,6 +140,7 @@ struct Saved {
     ox: i32,
     oy: i32,
     opac: u32,
+    row0: i32,
 }
 
 /// the draw context of a target: clip (x0, y0, x1, y1 exclusive, in target pixels), origin,
@@ -154,6 +158,10 @@ pub struct Dc {
     pub pcol: [u32; 4], // premultiplied B, G, R, A
     pub pcol32: u32,
     pub ia: u32, // 255 - premultiplied alpha
+    /// the target row in the surface's first row (begin_rows: a band of a taller target);
+    /// 0 otherwise.  The fills and blits here, the rasterizer (paths, shapes, panels) and the
+    /// text engine's glyph blits honour it; other row writers (tmask, gradient, flood) expect 0.
+    pub row0: i32,
 }
 
 impl Dc {
@@ -172,6 +180,7 @@ impl Dc {
             pcol: [0; 4],
             pcol32: 0,
             ia: 255,
+            row0: 0,
         };
         dc.set_color(0xFF00_0000);
         dc
@@ -180,6 +189,13 @@ impl Dc {
     /// draw into another target: clip, origin and opacity of the current one are saved; the
     /// clip becomes the whole new target, the origin 0  [gfx_begin]
     pub fn begin(&mut self, sf: &Surface) {
+        self.begin_rows(sf, 0, sf.h);
+    }
+
+    /// begin for a band: sf holds rows row0 .. row0 + sf.h of a target h rows high.  Drawing
+    /// keeps the target's coordinates (clip, origin, paths, glyph positions), so a band gets
+    /// the bytes the whole target would get there; the clip starts as the band's rows.
+    pub fn begin_rows(&mut self, sf: &Surface, row0: i32, h: i32) {
         self.targets.push(Saved {
             w: self.w,
             h: self.h,
@@ -188,12 +204,15 @@ impl Dc {
             ox: self.ox,
             oy: self.oy,
             opac: self.opac,
+            row0: self.row0,
         });
         self.w = sf.w;
-        self.h = sf.h;
+        self.h = h;
         self.ox = 0;
         self.oy = 0;
-        self.clip = [0, 0, sf.w, sf.h];
+        self.row0 = row0;
+        let y1 = row0.saturating_add(sf.h).min(h);
+        self.clip = [0, row0.clamp(0, y1.max(0)), sf.w, y1.max(0)];
     }
 
     /// back to the previous target with its clip, origin and opacity  [gfx_end]
@@ -205,6 +224,7 @@ impl Dc {
         self.clip_stack.truncate(s.csp);
         self.ox = s.ox;
         self.oy = s.oy;
+        self.row0 = s.row0;
         self.clamp_clip();
         self.set_opacity(s.opac);
     }
@@ -292,7 +312,7 @@ impl Dc {
         if sf.fmt == FMT_A8 {
             let a = (self.pcol32 >> 24) as u8;
             for yy in y0..y1 {
-                let o = yy as usize * stride;
+                let o = (yy - self.row0) as usize * stride;
                 sf.px[o + x0 as usize..o + x1 as usize].fill(a);
             }
             return;
@@ -301,7 +321,7 @@ impl Dc {
             return; // fully transparent
         }
         for yy in y0..y1 {
-            let o = yy as usize * stride + x0 as usize * 4;
+            let o = (yy - self.row0) as usize * stride + x0 as usize * 4;
             let row = &mut sf.px[o..o + (x1 - x0) as usize * 4];
             if self.ia == 0 {
                 blend::fill_solid(row, self.pcol32);
@@ -327,7 +347,7 @@ impl Dc {
         }
         let stride = sf.stride as usize;
         for yy in y0..y1 {
-            let o = yy as usize * stride;
+            let o = (yy - self.row0) as usize * stride;
             if sf.fmt == FMT_A8 {
                 sf.px[o + x0 as usize..o + x1 as usize].fill((c >> 24) as u8);
             } else {
@@ -374,7 +394,7 @@ impl Dc {
         let sy = (y0 - y.wrapping_add(self.oy)) as usize;
         let n = (x1 - x0) as usize;
         for r in 0..(y1 - y0) as usize {
-            let d = (y0 as usize + r) * sf.stride as usize + x0 as usize * 4;
+            let d = ((y0 - self.row0) as usize + r) * sf.stride as usize + x0 as usize * 4;
             let s = (sy + r) * src.stride as usize + sx * 4;
             let dst = &mut sf.px[d..d + n * 4];
             let srow = &src.px[s..s + n * 4];
@@ -411,7 +431,7 @@ impl Dc {
                 row[i * 4..i * 4 + 4].copy_from_slice(&src.px[s..s + 4]);
                 fx += xstep;
             }
-            let d = (y0 + r) as usize * sf.stride as usize + x0 as usize * 4;
+            let d = (y0 + r - self.row0) as usize * sf.stride as usize + x0 as usize * 4;
             let dst = &mut sf.px[d..d + vw * 4];
             if src.fmt == FMT_XRGB {
                 dst.copy_from_slice(&row);

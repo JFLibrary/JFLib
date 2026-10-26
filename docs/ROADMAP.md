@@ -1240,6 +1240,35 @@ Fensterrand hinaus.
     paralleles Zeichnen der Rechtecke macht Neuzeichnen billiger -- die gemessene Wahl passt
     sich an, die Kopie selbst läuft auf einem Kern; Ansichten mit `Draw`-Objekten (Terminal,
     Bildbetrachter) kopieren nicht.
+- **P2** · *erledigt* (2026-10-22) · Große Neuzeichnungen auf mehreren Threads (Stufe 0 des
+  GPU-Plans, Teil 2; [`ui/render_par.rs`](../lib/ui/render_par.rs)): ab etwa drei Millionen
+  schmutzigen Pixeln (1,5-mal Full HD; in einem Framebuffer über 16 MB wie 4K ab 750 000)
+  zerlegt `render_live` die schmutzigen Rechtecke in Zeilenbänder (etwa 256 KiB
+  Framebuffer, mindestens vier je Thread), die der Worker-Pool in eigene Puffer zeichnet
+  (`Dc::begin_rows`: die Koordinaten bleiben die des Fensters, also rechnen Pfade, Rasterizer
+  und Glyphen wie auf einem Thread) und ab 4 MiB Framebuffer am Cache vorbei zurückkopiert
+  (`gfx::blend::copy_stream`, `movntdq`). Jedes Band bekommt nur seine Befehle, jeder Befehl
+  trägt seinen Clip mit. Texte und Font-Icons setzt der UI-Thread vorher (`Text::record_n` /
+  `record_icon`: Shaping, Fallback-Schriften, Masken in den Glyph-Cache), die Worker mischen
+  sie lesend aus dem Cache (`text::GlyphView`). Eigene `Draw`-Objekte, Icons aus Icon-Hook
+  oder Stil und Glyphen über der Cache-Grenze zeichnet der UI-Thread: die Worker zeichnen ein
+  solches Band bis zum ersten davon, der UI-Thread den Rest (`render_from`); die API bleibt
+  unverändert (`Rc`, `Draw` ohne `Send`). Die Bytes sind die der Ein-Thread-Schleife
+  (Abdeckung des Rasterizers je Pixel unabhängig vom Clip, `panel_fx` beginnt seine
+  Maskenbänder jetzt an der Platte); `jfgui_RENDER_PAR=0` schaltet ab, `=1` erzwingt die
+  Bänder, `=2` zeichnet jedes Bild auf beide Arten und warnt bei einem abweichenden Byte
+  (alle Skripte von gallery, uitest, datagallery, editortest, mdviewtest, PaintCraft,
+  Kritzel und JFNetworker damit ohne Abweichung). Nach dem Zeichnen gilt wieder die Schrift
+  der Durchläufe. Im Browser ohne Shared Memory und auf Android (kein Pool) bleibt alles auf
+  einem Thread. Gemessen (`bench 30`, volle Neuzeichnung, Ryzen 5 3600, 6 Kerne / 12
+  Threads, gallery, datagallery, editortest, PaintCraft, Kritzel, mdviewtest): 2560 x 1440
+  1,3- bis 2,9-mal, 4K 2,3- bis 5,4-mal (4,7 .. 11,9 ms auf 1,8 .. 3,2 ms), 8K 1,8- bis
+  4,7-mal so schnell (21 .. 35 ms auf 6,9 .. 11,6 ms); Mausrad in 4K (gallery, editortest,
+  mdviewtest) 2,6- bis 2,8-mal; Full HD bleibt auf einem Thread. 4K und 8K begrenzt der
+  Speicherdurchsatz, gallery in 8K zusätzlich seine `Draw`-Objekte auf dem UI-Thread. Es
+  fehlen: eigene `Draw`-Objekte auf Workern (Leinwände von PaintCraft und Kritzel, Charts,
+  Diagramme, der Farbwähler; dafür bräuchte `Draw` eine Variante ohne `&mut Text`) und Icons
+  der Stile netlab, jfoffice und backupcraft bleiben auf dem UI-Thread.
 - **P2** · *erledigt* (2026-10-22) · GPU-Plan Stufe 0, Teil 3: weniger Kopien zwischen dem
   fertigen Bild und dem Bildschirm ([GUIDE §12](GUIDE.md) „Presenting“). Die Änderungsrechtecke
   gehen einmal aus dem Framebuffer zum Bildschirm; Pixel außerhalb müssen sein, was das letzte

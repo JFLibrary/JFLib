@@ -530,8 +530,10 @@ if self.tab == 0 {
 * `canvas(id, Some(draw), user, version)` is a custom area with full pointer input. The draw
   object implements `ui::Draw` and runs at render time with the clip set to the widget; it gets
   a `Gfx` (the draw context `dc`, the target surface `sf`, the text engine; `g.shapes()` for
-  anti-aliased rounded rectangles, circles and lines). Share the data it draws through `Rc` /
-  `RefCell` / `Cell`:
+  anti-aliased rounded rectangles, circles and lines). It always runs on the UI thread (large
+  redraws draw the other commands on several threads, section 9), and the clip may be only a
+  part of the widget (a dirty rectangle, a row band): draw the same pixels whatever the clip.
+  Share the data it draws through `Rc` / `RefCell` / `Cell`:
 
   ```rust
   struct Board {
@@ -1147,6 +1149,15 @@ fn brighten(sf: &mut gfx::Surface, add: u8) {
 
 * `parallel_for(count, &f)` runs `f(index, job)` on the workers and the calling thread; nested
   loops are fine; `job.cancel()` skips the remaining items -> `Err(Cancelled)`.
+* The renderer uses the pool too: a redraw of about 3 million pixels or more (1.5 times
+  1920 x 1080), in a framebuffer of more than 16 MB (4K, 8K) of 750 000 pixels or more, is
+  cut into row bands that the workers draw into buffers of their own (`ui/render_par.rs`),
+  with the bytes one thread draws. Texts and font icons are placed on the UI thread first
+  (`Text::record_n`, the glyph masks go into the cache), the workers blend them read-only
+  (`text::GlyphView`). Canvases (`Draw`), icons an icon hook or the style paints and glyphs
+  too large for the cache are drawn on the UI thread: the workers draw their bands up to the
+  first of them, the UI thread the rest. Without workers (the browser without shared memory,
+  Android) everything stays on one thread; `jfgui_RENDER_PAR=0` turns it off (section 12).
 * Background work: `plat::Job` -- `set(count, f)` with a `'static + Send + Sync` closure (share
   data through `alloc::sync::Arc`), `start()`, `done()`, `wait()`, `cancel()`,
   `items_done()`. When it finishes the pool calls `plat::wake()`, which arrives as
@@ -1404,7 +1415,10 @@ if (desc.render)(&args, &mut dst) == 0 {
   `--log-events`, `--auto-close MS`, `--threads N`, `--simd sse2` (no AVX2 paths), `--inspect`
   (the live inspector, §30). Environment: `jfgui_DEBUG=1` (layout / render trace), `jfgui_CSD=1`,
   `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`,
-  `jfgui_INSPECT=1` (the inspector's hot keys Ctrl+Shift+I / F12 work).
+  `jfgui_INSPECT=1` (the inspector's hot keys Ctrl+Shift+I / F12 work), `jfgui_RENDER_PAR=0`
+  (every render on one thread), `=1` (row bands for every render, whatever its size), `=2`
+  (every render both ways, a `UIWARN` when a byte differs: run the scripts with it after a
+  change to the renderer or a `Draw`).
 * **Never start an app without `--shot`, `--script` or `--auto-close`**: a plain start opens a
   real window on the user's desktop. PaintCraft saves its settings when a real window closes:
   every real-window run needs `--config build/<name>/cfg` (the capture tools set
