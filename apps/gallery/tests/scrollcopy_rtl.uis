@@ -1,0 +1,32 @@
+#!args --verify-dirty --rtl
+# scroll copies (lib/ui/scrollcopy.rs) in a mirrored window: the recorded commands are mirrored
+# before they are hashed, so vertical moves copy as in a left-to-right window (a sideways move
+# is drawn again).  The page by the wheel, the virtualized list by Down at its lower edge, at
+# 100 % and 150 %; every frame is compared with a full redraw (--verify-dirty)
+size 1000 800
+theme light
+wheel 100,300 -120
+wait 300
+wheel 100,300 -120
+wait 300
+wheel 100,300 -120
+wait 300
+move 100,310
+expect #7000 value 144
+expect scrollcopy 1
+focus #7100
+key down down down down down down down down
+expect #7100 value 10
+expect scrollcopy 2
+scale 150
+wait 50
+key esc
+wheel 100,300 120
+wait 300
+wheel 100,300 120
+wait 300
+wheel 100,300 120
+wait 300
+move 100,310
+expect scrollcopy 1
+expect_nowarn

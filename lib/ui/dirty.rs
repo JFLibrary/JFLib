@@ -13,18 +13,23 @@
 //
 // A command's hash covers all of its content (colours, coordinates, text, a custom draw
 // function's identity and version) and the clip it is drawn in, so any visible change
-// marks its cells.
+// marks its cells.  The same pass fills the content grids of the scroll views
+// (scrollcopy.rs): dirty cells whose pixels a scrolled view still shows elsewhere are copied
+// there before the rectangles are drawn.
 
 use alloc::vec;
 use alloc::vec::Vec;
 
-use super::cmd::{cmd_bbox, cmd_hash, Cmd};
+use super::cmd::{cmd_bbox, cmd_parts, pos_mix, Cmd};
 use super::Ui;
 
 const CELL_SHIFT: u32 = 5; // 32 px cells
 const CELL: i32 = 32;
 /// dirty rectangles of a render; more: everything is redrawn (the same pixels, only slower)
 pub(crate) const DRECTS_MAX: usize = 128;
+/// a frame with a scroll copy may draw this many rectangles more than without it (each one
+/// replays the commands)
+const COPY_RECTS_MORE: usize = 16;
 const HASH_K: u64 = 0x9E37_79B9_7F4A_7C15;
 /// clip levels tracked while hashing (as ctx::UICLIP_MAX); deeper ones clip nothing, which
 /// only marks more cells
@@ -108,6 +113,41 @@ impl DClip {
         bb[3] = bb[3].min(self.c[3]);
         bb[2] > bb[0] && bb[3] > bb[1]
     }
+}
+
+// rects_build(out, cols, rows, dirty) -> the number of dirty cells (dirty(row * cols + col)),
+// as rectangles (px) in out: a run of dirty cells in a row extends a rectangle of the row above
+// with the same columns; None when more than DRECTS_MAX
+fn rects_build(out: &mut Vec<[i32; 4]>, cols: i32, rows: i32, dirty: impl Fn(usize) -> bool) -> Option<u32> {
+    out.clear();
+    let mut cells = 0u32;
+    for row in 0..rows {
+        let at = |col: i32| dirty((row * cols + col) as usize);
+        let mut col = 0;
+        while col < cols {
+            if !at(col) {
+                col += 1;
+                continue;
+            }
+            // a run of dirty cells [col, end)
+            let mut end = col + 1;
+            while end < cols && at(end) {
+                end += 1;
+            }
+            cells += (end - col) as u32;
+            // extend a rectangle from the row above with the same columns
+            let (x, w, y) = (col << CELL_SHIFT, (end - col) << CELL_SHIFT, row << CELL_SHIFT);
+            if let Some(r) = out.iter_mut().find(|r| r[0] == x && r[2] == w && r[1] + r[3] == y) {
+                r[3] += CELL;
+            } else if out.len() < DRECTS_MAX {
+                out.push([x, y, w, CELL]);
+            } else {
+                return None;
+            }
+            col = end;
+        }
+    }
+    Some(cells)
 }
 
 impl Ui {
@@ -226,45 +266,67 @@ impl Ui {
         n
     }
 
-    /// dirty_compute(w, h) -> rectangles in drects, or -1 for a full redraw
+    /// dirty_compute(w, h) -> rectangles in drects, or -1 for a full redraw.  Scroll views whose
+    /// content only moved copy their still valid cells first (scrollcopy.rs).
     pub(crate) fn dirty_compute(&mut self, w: i32, h: i32) -> i32 {
         self.cells_ensure(w, h);
+        let mut sc = self.sc_pass(w, h);
         if self.wp.dirty.cells.is_none() || self.wp.dirty.cells_prev.is_none() {
+            self.sc_plan(sc, 0, 0, false);
             return self.dirty_full_take(w, h);
         }
         let cols = self.wp.dirty.cols as i32;
         let rows = self.wp.dirty.rows as i32;
-        // ---- hash every command into its cells
+        // ---- hash every command into its cells (and into the scroll views' content grids)
         {
             let Ui { wp, .. } = self;
             let cells = wp.dirty.cells.as_mut().unwrap();
             cells.fill(0);
-            for layer in wp.cmd.layers.iter() {
+            let grids = sc.on();
+            for (l, layer) in wp.cmd.layers.iter().enumerate() {
                 let mut dc = DClip::new();
-                for c in layer {
+                for (i, c) in layer.iter().enumerate() {
+                    if grids {
+                        sc.reach(l, i, dc.c, dc.over == 0);
+                    }
                     match c {
                         Cmd::Clip { x, y, w, h } => {
                             dc.push([*x, *y, *w, *h]);
+                            if grids {
+                                sc.clip(l, i, [*x, *y, x.wrapping_add(*w), y.wrapping_add(*h)]);
+                            }
                             continue;
                         }
                         Cmd::Unclip => {
                             dc.pop();
+                            if grids {
+                                sc.unclip(l, i);
+                            }
                             continue;
                         }
                         _ => {}
                     }
-                    let Some(mut bb) = cmd_bbox(c) else { continue };
+                    let Some(bb0) = cmd_bbox(c) else { continue };
                     // only the part inside the clip can change pixels
-                    if !dc.cut(&mut bb) {
+                    let mut bb = bb0;
+                    let vis = dc.cut(&mut bb);
+                    if !vis && !grids {
                         continue;
                     }
                     // hash of the record and of the clip (a moved clip edge changes pixels
                     // although the command stayed the same)
-                    let mut hh = cmd_hash(c);
+                    let parts = cmd_parts(c);
+                    let mut hh = pos_mix(parts.0, parts.1 as i64, parts.2 as i64);
                     hh ^= (dc.c[0] as u32 as u64) | (dc.c[1] as u32 as u64) << 32;
                     hh = hh.wrapping_mul(HASH_K);
                     hh ^= (dc.c[2] as u32 as u64) | (dc.c[3] as u32 as u64) << 32;
                     hh = hh.wrapping_mul(HASH_K);
+                    if grids {
+                        sc.cmd(l, i, c, parts, bb0, dc.c, dc.over == 0, hh);
+                    }
+                    if !vis {
+                        continue;
+                    }
                     // cell range (clamped)
                     let c0 = (bb[0] >> CELL_SHIFT).max(0);
                     let c1 = ((bb[2] - 1) >> CELL_SHIFT).min(cols - 1);
@@ -284,47 +346,45 @@ impl Ui {
             }
         }
         // ---- compare with the previous frame, build rectangles
-        self.drects.clear();
-        let mut dirty_cells: u32 = 0;
-        let mut overflow = false;
-        {
-            let d = &self.wp.dirty;
+        let pending = self.dmg.iter().any(|d| d.win == self.uiw_cur);
+        let allowed = !self.wp.dirty.full && !pending;
+        let mut plan = self.sc_plan(sc, cols, rows, allowed);
+        let want = plan.as_ref().is_some_and(|p| self.sc_want(p));
+        let force = self.verify_dirty; // (checked frames copy whenever they can)
+        let (built, copy) = {
+            let Ui { wp, drects, .. } = &mut *self;
+            let d = &wp.dirty;
             let (cur, prev) = (d.cells.as_ref().unwrap(), d.cells_prev.as_ref().unwrap());
-            let is_dirty = |row: i32, col: i32| {
-                let i = (row * cols + col) as usize;
-                cur[i] != prev[i]
-            };
-            'rows: for row in 0..rows {
-                let mut col = 0;
-                while col < cols {
-                    if !is_dirty(row, col) {
-                        col += 1;
-                        continue;
+            let changed = |i: usize| cur[i] != prev[i];
+            let mut built = rects_build(drects, cols, rows, changed);
+            // a scroll copy (scrollcopy.rs) provides the cells it covers: when the view's costs
+            // favour it (sc_want), it takes over at least a quarter of what would be drawn
+            // without it and does not split the rest into many more rectangles (each one
+            // replays the commands); frames checked by --verify-dirty take any copy
+            let mut copy = false;
+            if let Some(p) = plan.as_mut().filter(|_| want) {
+                let copied = p.settle(cols as usize, changed);
+                let total = cols as u32 * rows as u32;
+                let draw = built.filter(|&n| n * 5 <= total * 3).unwrap_or(total);
+                let mut alt = Vec::new();
+                let cv = &p.covered;
+                if let Some(n) = rects_build(&mut alt, cols, rows, |i| changed(i) && cv[i] == 0) {
+                    if copied > 0 && (force || (copied * 4 >= draw as usize && alt.len() <= drects.len() + COPY_RECTS_MORE)) {
+                        *drects = alt;
+                        built = Some(n);
+                        copy = true;
                     }
-                    // a run of dirty cells [col, end)
-                    let mut end = col + 1;
-                    while end < cols && is_dirty(row, end) {
-                        end += 1;
-                    }
-                    dirty_cells += (end - col) as u32;
-                    // extend a rectangle from the row above with the same columns
-                    let (x, w, y) = (col << CELL_SHIFT, (end - col) << CELL_SHIFT, row << CELL_SHIFT);
-                    if let Some(r) = self.drects.iter_mut().find(|r| r[0] == x && r[2] == w && r[1] + r[3] == y) {
-                        r[3] += CELL;
-                    } else if self.drects.len() < DRECTS_MAX {
-                        self.drects.push([x, y, w, CELL]);
-                    } else {
-                        overflow = true;
-                        break 'rows;
-                    }
-                    col = end;
                 }
             }
+            (built, copy)
+        };
+        if !copy {
+            plan = None;
         }
-        if overflow {
+        let Some(dirty_cells) = built else {
             self.dirty_swap();
             return self.dirty_full_take(w, h);
-        }
+        };
         // (U1) explicit damage (canvas_damage) of this window
         let n0 = self.drects.len() as i32;
         let n = self.dmg_take(n0, w, h);
@@ -345,9 +405,13 @@ impl Ui {
         }
         // more than 60 % of the cells dirty: one full redraw is cheaper
         let total = (cols as u32).wrapping_mul(rows as u32).wrapping_mul(3);
-        if dirty_cells.wrapping_mul(5) > total || self.wp.dirty.full {
+        if (dirty_cells.wrapping_mul(5) > total && !(force && plan.is_some())) || self.wp.dirty.full {
             self.dirty_swap();
             return self.dirty_full_take(w, h);
+        }
+        // the copies come first: the rectangles drawn next may cover their sources
+        if let Some(p) = plan {
+            self.sc_copy(&p, cols, rows);
         }
         self.dirty_swap();
         n

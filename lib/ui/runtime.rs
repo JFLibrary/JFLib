@@ -888,11 +888,11 @@ impl Ui {
         if ins {
             n = self.ins_render_begin(n); // the inspector's overlay (inspect.rs)
         }
-        self.wp.rt.present_n = n;
+        self.wp.rt.present_n = self.scopy_present(n); // + the cells a scroll copy moved (scrollcopy.rs)
         if self.ui_debug {
             plat::write_stderr(alloc::format!("render: {} dirty rects (-1 = full)\n", n).as_bytes());
         }
-        if n == 0 {
+        if self.wp.rt.present_n == 0 {
             return; // nothing changed
         }
         self.dc.begin(&self.wp.rt.fb);
@@ -910,6 +910,7 @@ impl Ui {
             }
         }
         self.dc.end();
+        self.scopy_done(); // the frame's cost (scrollcopy.rs)
         if ins {
             self.ins_render_end(); // the inspector's overlay on top (inspect.rs)
         }

@@ -496,6 +496,19 @@ if self.tab == 0 {
 * `tabs(id, &mut sel, names)`, `expander_begin(id, header, &mut open)` (non-zero: emit the
   content) / `expander_end()`, `scrollbar(id, &mut pos, content, view, vertical)` for custom
   canvases.
+* Only what changed is drawn (dirty regions: every command is hashed into 32 × 32 px cells and
+  compared with the last frame). When a scroll view's content only moved, the pixels it still
+  shows are **copied** in the framebuffer and just the band that came into view (and what
+  really changed) is drawn -- byte for byte what a full redraw gives. Scroll views, lists,
+  data views, `vlist`, the document and code views and multi-line text boxes do this. A
+  widget of your own that scrolls its content by drawing it at `origin - offset` can join in:
+  call `ui.scroll_copy_begin(id, ox, oy)` right after its `clip_push` (`ox`, `oy`: window px
+  of the content's origin, i.e. its place minus the scroll offset; `i64` for long contents)
+  and `ui.scroll_copy_end()` before the `clip_pop`. Content that does not move with the
+  origin (a sticky header) is simply drawn again; text, icons and images are copied, rounded
+  corners, circles, lines and `Draw` objects are drawn again (the rasterizer works in absolute
+  coordinates). Whether a frame copies is measured per view: copying costs memory bandwidth, so
+  flat content (cards, backgrounds) is cheaper to fill again.
 
 **Images, custom drawing, canvases**
 
@@ -1438,6 +1451,7 @@ in DIP):
 | `close window ID`, `movewin ID X Y`, `resizewin ID W H`, `activate ID` | the user moves / closes windows |
 | `sync [MS]` | wait until no background job is pending (`sync_hook_set`) |
 | `expect_warn`, `expect_nowarn` | a `UIWARN` was / was not printed since the last check |
+| `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
 | `expect sound KIND\|none` | the last sound `ui.beep` / `ui.dialog_sound` asked for since the last check (`default`, `information`, `warning`, `error`, `question`, `notify`; headless runs play nothing, §33) |
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |
 | `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back |
@@ -1497,7 +1511,9 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
 ```
 
 * Run new scripts with `--verify-dirty` too (`build_rs.py test` does not add it): it reports
-  missed pixels with their bounding box.
+  missed pixels with their bounding box. Checked frames also take every scroll copy they can
+  (§5), so a script that scrolls tests those; it renders after each input event (a view copies
+  from the second frame that moves it) and `bench N anim` renders the frames of smooth scrolling.
 * **Frame times**: the moving forms of `bench` measure with the real clock; `--verify-dirty`
   compares each frame after the timed part, untimed. The median and up to three runs ride out
   a machine that builds other things meanwhile; give a frame budget as the limit (33000 for 30

@@ -123,6 +123,8 @@ pub(crate) struct Scr {
     layer: u32,
     /// events of the viewport hit box (lists)
     ev: u32,
+    /// its content is a scroll copy region (scrollcopy.rs)
+    copy: bool,
 }
 
 /// a list on the stack  [LS_*]
@@ -300,6 +302,7 @@ impl Ui {
             sem0: self.sems.len(),
             hit0: c.hits[c.hit_cur].len(),
             ev: 0,
+            copy: false,
         };
         self.slot(id);
         // viewport hit box (the content's hit boxes follow it)
@@ -350,12 +353,19 @@ impl Ui {
         cx || cy
     }
 
-    // scr_offset: settle the innermost view and shift its content by the position
+    // scr_offset: settle the innermost view and shift its content by the position (a view
+    // that can scroll: its content moves with the position, scrollcopy.rs)
     pub(crate) fn scr_offset(&mut self) {
-        let e = self.wp.list.scr[self.scr_top()];
+        let top = self.scr_top();
+        let e = self.wp.list.scr[top];
         self.scr_settle(&e);
         let s = *self.slot(e.id);
         self.box_offset(s.scrollx, s.scrolly);
+        let (mx, my) = self.scr_max(&e);
+        if mx | my != 0 {
+            self.wp.list.scr[top].copy = true;
+            self.scroll_copy_begin(e.id, e.rect[0].wrapping_sub(s.scrollx) as i64, e.rect[1].wrapping_sub(s.scrolly) as i64);
+        }
     }
 
     // scr_follow(entry): keyboard focus moved onto a widget of this view: scroll it into view
@@ -501,6 +511,9 @@ impl Ui {
             return;
         }
         let e = self.wp.list.scr[self.scr_top()];
+        if e.copy {
+            self.scroll_copy_end();
+        }
         self.box_end();
         self.scr_follow(&e);
         if self.scr_settle(&e) {
