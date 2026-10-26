@@ -1162,6 +1162,48 @@ Fensterrand hinaus.
 
 - **P2** · *fehlt* · GPU-Rendering (D3D11 / Vulkan / OpenGL / WebGPU); heute rechnet alles
   die CPU.
+- **P2** · *erledigt* (2026-10-22) · Stufe 0 des GPU-Plans, Teil 1: Scroll-Kopie
+  (`lib/ui/scrollcopy.rs`). Hat sich in einer Scroll-Ansicht nur der Inhalt verschoben, werden
+  die noch sichtbaren Pixel im Framebuffer verschoben (Zeilen per `copy_within`, Reihenfolge
+  gegen Überlappung) und nur der neu sichtbare Streifen und echte Änderungen gezeichnet --
+  bytegleich zum vollen Neuzeichnen (`--verify-dirty`).
+  - Jede Ansicht, deren Ursprung sich in den letzten 60 Frames bei gleichem Clip bewegt hat,
+    bekommt beim Hashen der Dirty-Zellen ein Raster aus 32-px-Zellen am Inhaltsursprung:
+    Inhaltsbefehle zählen mit Hash und Box relativ zum Ursprung, andere Befehle über der
+    Ansicht nur dort, wo sie flach sind (Fensterhintergrund, Karten; deckende setzen die Zelle
+    zurück). Neu gezeichnet wird, was sich beim Verschieben ändern kann (der Rasterizer rechnet
+    in absoluten f32-Koordinaten: runde Ecken, Kreise, Linien; `Draw`-Objekte, vom Stil oder
+    Icon-Hook gemalte Icons, Schrift über 128 px oder links vom Fenster), und alles, was andere
+    Ebenen darüberlegen (Scrollbalken, Popups, Tooltips, Fokusrahmen).
+  - Mitmachende Ansichten: `scroll_begin`, Listen, Grids, Bäume, Hex-Ansicht, `vlist`,
+    Markdown-Ansicht, Code-Editor, mehrzeilige Textfelder; eigene Widgets über
+    `ui.scroll_copy_begin(id, ox, oy)` / `scroll_copy_end()`. Haken in `render_live`: drei Zeilen
+    (die verschobenen Zellen werden mitpräsentiert, die Kosten des Frames gemessen).
+  - Eine Kopie liest und schreibt die Zelle (bei 4K etwa 0,4 µs je 32er-Zelle), flache Flächen
+    neu zu füllen ist kaum teurer: kopiert werden nur Zellen mit Text, Icons, Bildern; je
+    Ansicht entscheiden gemessene Frame-Kosten (kopieren gegen zeichnen, alle 16 Frames erneut
+    probiert); eine Ansicht, die vier bewegte Frames lang nicht kopiert, bekommt 60 Frames kein
+    Raster. Mit `--verify-dirty` kopiert jeder Frame, der kann.
+  - Keine Kopie: waagrechte Bewegung im gespiegelten Fenster, offener Inspektor, ausstehender
+    Canvas-Schaden, voller Redraw (Größe, DPI, Theme); seitenweise Sprünge (PgDn) lassen nichts
+    zu kopieren; der Code-Editor zeichnet waagrecht nur die sichtbaren Spalten, also neu.
+  - Messung (Windows-Dev-Build, `bench 20`, Median aus fünf abwechselnden Läufen, µs vorher →
+    nachher): Code-Editor Rad 1134 → 833 (1920×1080) und 3327 → 1917 (3840×2160),
+    Strg+Unten 1051 → 670 und 3483 → 1627; Markdown Rad 1617 → 1442 und 3960 → 3605, Unten
+    2883 → 2577 und 5245 → 4854; vlist-Rad 1626 → 1373 (1080p), bei 4K gleich; Galerie-Seite
+    und Daten-Galerie unverändert im Rauschen (flache Widgets: die Messung wählt das
+    Neuzeichnen). Die Läufe streuen auf der belasteten Maschine um ±15 %.
+  - Getestet: neue Skripte `gallery/scrollcopy.uis`, `gallery/scrollcopy_rtl.uis`,
+    `mdviewtest/doc_scrollcopy.uis`, `editortest/code_scrollcopy.uis`,
+    `datagallery/scrollcopy.uis` (Rad, Tasten, Scrollbalken-Daumen, flüssiges Scrollen per
+    `bench N anim`, 150 %, RTL, Inspektor ohne Kopie; `expect scrollcopy [N]|none`); alle
+    Skripte von gallery, datagallery, mdviewtest, editortest, uitest und JFNetworker zusätzlich
+    mit erzwungenem `--verify-dirty` ohne Abweichung; alle Shots dieser vier Apps bytegleich
+    (außer dem Inspektor-Shot, der die von der Binär-Adresse abgeleitete Menüleisten-Id zeigt).
+  - Offen: die Kopie auch in der Present-Schicht (ScrollWindowEx / XCopyArea, eigener Teil);
+    paralleles Zeichnen der Rechtecke macht Neuzeichnen billiger -- die gemessene Wahl passt
+    sich an, die Kopie selbst läuft auf einem Kern; Ansichten mit `Draw`-Objekten (Terminal,
+    Bildbetrachter) kopieren nicht.
 - **P2** · *erledigt* (2026-10-22) · GPU-Plan Stufe 0, Teil 3: weniger Kopien zwischen dem
   fertigen Bild und dem Bildschirm ([GUIDE §12](GUIDE.md) „Presenting“). Die Änderungsrechtecke
   gehen einmal aus dem Framebuffer zum Bildschirm; Pixel außerhalb müssen sein, was das letzte

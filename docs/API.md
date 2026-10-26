@@ -3532,7 +3532,9 @@ cmd_shadow, render_all, render_popup(dx, dy).
 
 Every record keeps the byte size the asm gives it (cmd_alloc rounds to 8): a layer holds
 at most its capacity (CAPS_MAIN / CAPS_SMALL), further commands are dropped as in the asm.
-The dirty regions (dirty.rs) hash every record's content (cmd_hash) and its box (cmd_bbox).
+The dirty regions (dirty.rs) hash every record's content (cmd_parts: without its position,
+which is mixed in separately, so scrollcopy.rs can hash it relative to a scrolled content)
+and its box (cmd_bbox).
 ```
 
 - **`struct Gfx<'a>`**
@@ -3703,6 +3705,8 @@ Windows (ID = the app's window id, 0 / main = the main window):
   expect sound KIND|none        the last sound ui.beep / ui.dialog_sound asked for since the
                                 last check (default, information, warning, error, question,
                                 notify; headless runs play none)
+  expect scrollcopy [N]|none    at least N (default 1) frames / no frame moved pixels by a
+                                scroll copy since the last check (scrollcopy.rs)
   expect_warn / expect_nowarn   a UIWARN was / was not printed since the last check (a
                                 script also warns about a widget id used twice in a pass)
 (K1) Files and clipboard, drag and drop:
@@ -4098,7 +4102,9 @@ dirty -- dirty regions: only redraw and present what changed        [src/ui/ui_d
 
 A command's hash covers all of its content (colours, coordinates, text, a custom draw
 function's identity and version) and the clip it is drawn in, so any visible change
-marks its cells.
+marks its cells.  The same pass fills the content grids of the scroll views
+(scrollcopy.rs): dirty cells whose pixels a scrolled view still shows elsewhere are copied
+there before the rectangles are drawn.
 ```
 
 **`impl Ui`**
@@ -8005,6 +8011,63 @@ Unavailable.
   the picture of the last screenshot, once
 - **`fn screen_error(&self) -> Option<ScreenError>`**
   why the last pick or picture failed (None: it worked or was not asked for)
+
+#### `ui/scrollcopy.rs`
+
+Source: [`lib/ui/scrollcopy.rs`](../lib/ui/scrollcopy.rs)
+
+```text
+scrollcopy -- scroll copies: when only a scroll view's content moved, the pixels that stay
+valid are moved inside the framebuffer; the band that came into view and whatever really
+changed are drawn again
+
+  scroll_copy_begin(id, ox, oy)   the commands recorded until scroll_copy_end are the content
+                                  of scroll view `id` and move with it; (ox, oy) = window px
+                                  of the content's origin (its place minus the scroll offset).
+                                  Call right after the view's clip.  Scroll views, lists, data
+                                  views, vlist, document, code and multi-line text views do.
+  scroll_copy_end()
+  (dirty.rs) Pass: the content grids of a frame while dirty_compute hashes the commands;
+  sc_plan: the window cells a copy can make valid; sc_want: copy or draw; sc_copy: the copy
+  scopy_present(n) (render_live): the moved cells join the presented rectangles
+  scopy_done() (render_live, after drawing): the frame's cost for sc_want
+
+A view whose origin moved (its clip staying) in the last RECENT frames gets a grid of 32 x 32 px cells aligned
+at its content's origin, over its clip.  A cell's hash mixes, in drawing order, every content
+command touching it (hash and box relative to the origin, so a moved command keeps them) and
+every other command over the view that is flat there (a fill covering the cell's visible
+part: window background, cards; an opaque one forgets what was below).  Anything else over
+the cell (text or shapes of other layers, scroll bars, popups, the uneven edge of a fill) and
+content whose pixels may change when it moves (the rasterizer works in absolute f32
+coordinates: rounded corners, circles, lines; custom drawings, icons painted by the style or
+an icon hook, very large or left-cut text) marks the cell bad.  When the origin moved by
+(dx, dy) since the last frame and the view's clip stayed, a cell with its old hash that is
+bad in neither frame shows the same pixels moved by (dx, dy): the dirty window cells covered
+by such cells may be copied instead of drawn -- byte-identical to a full redraw
+(--verify-dirty checks it).
+
+A copy reads and writes a cell's pixels: filling a flat cell again is cheaper, drawing text
+or icons is not, and every rectangle left to draw replays the commands.  So only cells with
+detail are copied, small gaps between drawn cells are drawn too, a copy must take over a
+quarter of what would be drawn, and per view the measured cost of frames that copied and of
+frames that drew decides (the other way is tried again every EXPLORE frames; the first
+frames try both); a view that moved IDLE_MAX frames in a row with grids but without copying
+gets none for SKIP frames.  Frames checked by --verify-dirty always copy when they can (and
+never skip).  No copy: a horizontal move in a mirrored window, the inspector, pending canvas
+damage, a full redraw.  `expect scrollcopy` (auto.rs) counts the frames that copied,
+jfgui_DEBUG=1 prints them.
+```
+
+**`impl Ui`**
+
+- **`fn scroll_copy_begin(&mut self, id: u32, ox: i64, oy: i64)`**
+  ui_scroll_copy_begin(id, ox, oy): the commands recorded until scroll_copy_end are the
+  content of scroll view `id`; (ox, oy) = the window px of the content's origin (its
+  position minus the scroll offset).  Call right after the view's clip.  When only the
+  origin moved between two frames, pixels still shown may be moved in the framebuffer
+  instead of drawn again (content that does not move with the origin is simply drawn).
+- **`fn scroll_copy_end(&mut self)`**
+  ui_scroll_copy_end: the end of the content of scroll_copy_begin
 
 #### `ui/symbol.rs`
 

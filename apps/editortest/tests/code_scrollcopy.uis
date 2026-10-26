@@ -1,0 +1,50 @@
+#!args --verify-dirty
+# scroll copies (lib/ui/scrollcopy.rs) in the code editor: when only the lines moved, the pixels
+# still shown are moved in the framebuffer and the rest is drawn; every frame is compared with a
+# full redraw (--verify-dirty), `expect scrollcopy N` counts the frames that copied.  A file of
+# 100 000 lines: Ctrl+Down / Ctrl+Up by a line, the wheel, PgDn (a page: nothing left to copy);
+# a long line scrolled sideways (Shift+wheel: not copied); at 150 %
+size 1000 680
+click tab:"Code"
+click "100 000 Zeilen"
+expect text:"lines: 100000" exists
+focus #3000
+key ctrl+down
+key ctrl+down
+key ctrl+down
+key ctrl+down
+expect scrollcopy 3
+key ctrl+up
+key ctrl+up
+expect scrollcopy 2
+wheel #3000 -120
+wheel #3000 -120
+wheel #3000 120
+expect scrollcopy 3
+# a page down leaves nothing of the old view to copy
+key pgdn
+key pgdn
+expect scrollcopy none
+key ctrl+home
+# sideways: only the columns in view are drawn, so the drawn runs of text change -- drawn again
+cmd 904 100000
+expect text:"lines: 1" exists
+focus #3000
+wheel #3000 -120 shift
+wheel #3000 -120 shift
+wheel #3000 -120 shift
+expect scrollcopy none
+key ctrl+home
+# ---- 150 %
+click "100 000 Zeilen"
+scale 150
+wait 50
+focus #3000
+key ctrl+down
+key ctrl+down
+key ctrl+down
+expect scrollcopy 2
+wheel #3000 -120
+wheel #3000 -120
+expect scrollcopy 2
+expect_nowarn

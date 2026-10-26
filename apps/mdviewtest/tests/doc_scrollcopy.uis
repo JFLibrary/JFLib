@@ -1,0 +1,76 @@
+#!args --verify-dirty
+# scroll copies (lib/ui/scrollcopy.rs) in the document view and the vlist: when only the content
+# moved, the pixels still shown are moved in the framebuffer and the rest is drawn; every frame
+# is compared with a full redraw (--verify-dirty), `expect scrollcopy N` counts the frames that
+# copied.  Down / Up by a line, the wheel (smooth: frame by frame), the scroll bar's thumb, the
+# long document; the vlist by Down at its edge and the wheel; at 150 %; the Hebrew document (it
+# runs right to left)
+size 1000 720
+theme light
+click 900,360
+key down
+key down
+key down
+key down
+expect "Hilfe" value 160
+expect scrollcopy 3
+key up
+key up
+expect "Hilfe" value 80
+expect scrollcopy 2
+# the wheel: one notch, its animation frame by frame (every frame checked after its timed
+# render; whether a timed frame copies depends on the measured costs)
+wheel 500,300 -120
+bench 12 anim
+expect "Hilfe" value 128
+# the scroll bar's thumb dragged a little (each step moves the view by less than its height)
+drag 981,80 981,140
+expect scrollcopy 1
+key home
+expect "Hilfe" value 0
+# the long document: lines down from the top
+click "Langes Dokument"
+click 900,400
+key down
+key down
+key down
+expect scrollcopy 2
+key home
+click "Beispiel"
+# ---- the vlist: Down moves the selection, at the lower edge the rows scroll; the wheel
+click "Liste"
+click 400,230
+expect #16777216 value 2
+key down down down down down down down down down down down down
+expect #16777216 value 14
+expect scrollcopy 2
+wheel 400,400 -120
+wait 300
+wheel 400,400 -120
+wait 300
+wheel 400,400 -120
+wait 300
+move 400,410
+expect scrollcopy 2
+key home
+# ---- 150 %
+scale 150
+wait 50
+click "Markdown"
+click 900,360
+key down
+key down
+key down
+expect scrollcopy 2
+key home
+scale 100
+wait 50
+# ---- right to left: the Hebrew document
+click "Hebräisch"
+click 900,360
+key down
+key down
+key down
+expect scrollcopy 1
+key home
+expect_nowarn

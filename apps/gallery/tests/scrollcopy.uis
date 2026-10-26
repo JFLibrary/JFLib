@@ -1,0 +1,92 @@
+#!args --verify-dirty
+# scroll copies (lib/ui/scrollcopy.rs): when only a scroll view's content moved, the pixels it
+# still shows are moved in the framebuffer and only the rest is drawn.  --verify-dirty compares
+# every rendered frame with a full redraw (such frames copy whenever they can); `expect
+# scrollcopy N` counts the frames that copied since the last check.  A script renders after
+# each input event; a view gets its content grid once it moves, so the second frame that moves
+# it copies.  The page (#7000): wheel notches, smooth scrolling frame by frame (bench anim),
+# its scroll bar's thumb dragged; the virtualized list (#7100): Down at its lower edge, the
+# wheel; a multi-line text box typed into; again at 150 %; the inspector's overlay turns copies
+# off
+size 1000 800
+theme dark
+expect #7000 value 0
+# ---- the page: three notches (smooth: each frame shows where the animation got to)
+wheel 900,300 -120
+wait 300
+wheel 900,300 -120
+wait 300
+wheel 900,300 -120
+wait 300
+move 900,310
+expect #7000 value 144
+expect scrollcopy 1
+# smooth scrolling, frame by frame (bench: every frame checked after its timed render; whether
+# a timed frame copies depends on the measured costs)
+wheel 900,300 360
+bench 12 anim
+expect #7000 value 0
+# the scroll bar's thumb dragged down and back
+drag 995,60 995,300
+drag 995,300 995,60
+expect scrollcopy 2
+expect #7000 value 0
+# ---- the virtualized list: Down moves the selection, at the lower edge the rows scroll
+focus #7100
+expect #7100 value 2
+key down down down down down down down down
+expect #7100 value 10
+expect "Eintrag 11" selected
+expect scrollcopy 2
+wheel #7100 -120
+wait 300
+wheel #7100 -120
+wait 300
+wheel #7100 -120
+wait 300
+move #7100
+expect scrollcopy 1
+# ---- a multi-line text box with more lines than it shows: the caret scrolls them
+focus #7960
+click #7960
+key ctrl+end
+key enter
+type "Zeile 4"
+key enter
+type "Zeile 5"
+key enter
+type "Zeile 6"
+key enter
+type "Zeile 7"
+key enter
+type "Zeile 8"
+expect scrollcopy 1
+key esc
+# ---- 150 %
+scale 150
+wait 50
+wheel 600,300 -120
+wait 300
+wheel 600,300 -120
+wait 300
+wheel 600,300 -120
+wait 300
+move 600,310
+expect scrollcopy 1
+focus #7100
+key down down down down down down down down down down
+expect scrollcopy 2
+scale 100
+wait 50
+# ---- the inspector draws its overlay into the framebuffer: no copies while it is open
+inspect on
+wheel 900,300 -120
+wait 300
+wheel 900,300 -120
+wait 300
+wheel 900,300 -120
+wait 300
+move 900,320
+expect scrollcopy none
+inspect off
+expect_nowarn
