@@ -41,6 +41,10 @@
 //   eapol     EapolView, Key: EAPOL-Key frames of the 4-way handshake (Key Information bits,
 //             replay counter, nonces, MIC field, key data), the RSN element, KDEs (GTK,
 //             IGTK); mic_input / set_mic for the caller's MIC (802.1X-2004, 802.11-2020 12.7)
+//   tftp      TftpView, Packet (RRQ, WRQ, DATA, ACK, ERROR, OACK) with their options, error
+//             codes, netascii, looks_like (a transfer away from port 69)  (RFC 1350, 2347-2349)
+//   ftp       Command, Reply (multi-line), Lines, ReplyReader, host_port (PORT, 227), eprt,
+//             epsv_port (229), the reply texts as the server's own words  (RFC 959, 2428, 2389)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -74,6 +78,8 @@ pub mod icmpv6;
 pub mod ospf;
 pub mod addrsel;
 pub mod eapol;
+pub mod tftp;
+pub mod ftp;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

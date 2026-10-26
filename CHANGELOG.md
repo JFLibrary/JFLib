@@ -48,6 +48,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** Destination address selection after RFC 6724 (netpkt::addrsel: scope, precedence and label of the default policy table, Dest and sort with rules 1, 2, 3, 5, 6, 8, 9 and 10, the order getaddrinfo tries the addresses of a name in)
 - **crypto:** SHA-1 (crypto::sha1, Sha1, hmac_sha1; for protocols defined with it, broken for collisions), PBKDF2 over any hash (pbkdf2::<H>, pbkdf2_sha1), the AES key wrap of RFC 3394 (aes_wrap / aes_unwrap with its integrity check) and AES-CMAC of RFC 4493 (cmac_aes): what WPA2 and WPA3 need
 - **netpkt:** EAPOL of IEEE 802.1X-2004 (netpkt::eapol: EapolView, the EAPOL-Key body of the 4-way handshake with its Key Information bits, which of the four messages a frame is, the MIC field and what it covers, RSN elements, GTK and IGTK KDEs, key data padding; eth::ET_EAPOL) and its dissection (decode::layers: every field, the Key Information bits by name, the RSN element and KDEs of plain key data; decode::info: "Key (Message 2 of 4)")
+- **netpkt:** TFTP and FTP (netpkt::tftp: RRQ, WRQ, DATA, ACK, ERROR and OACK of RFC 1350 and 2347 with options, netascii, the shape of a transfer's packets after it left port 69; netpkt::ftp: commands, replies with the multi-line form, a reader for bytes in pieces, PORT, 227, EPRT and 229 of RFC 959 and 2428) and their dissection (decode::layers: every TFTP field and each FTP line, P_FTP, Proto::Ftp and FtpData; decode::info: Data Packet, Block: 3 (last); Request: USER anna)
 
 ### Changed
 
