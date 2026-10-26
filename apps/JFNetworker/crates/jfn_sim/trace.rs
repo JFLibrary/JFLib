@@ -1699,3 +1699,66 @@ fn bpdu_flags(b: &netpkt::stp::Bpdu) -> String {
     }
     if v.is_empty() { String::new() } else { format!(" [{}]", v.join(", ")) }
 }
+
+// ---------------------------------------------------------------- keyframes (keyframe.rs)
+
+impl Trace {
+    /// what a keyframe keeps of the recording at `now`: the counters and the frames that may
+    /// still be on a cable (their arrival looks them up, a cable that goes down marks them
+    /// lost); everything else stays with the run's recording
+    pub(crate) fn stub(&self, now: Ns) -> Trace {
+        let flight = self.max_flight;
+        let from = self.hops.partition_point(|h| h.t_tx.saturating_add(flight) < now);
+        let hops: VecDeque<Hop> = self.hops.range(from..).cloned().collect();
+        let first = hops.front().map_or(self.next_hop, |h| h.id);
+        Trace {
+            hops,
+            events: VecDeque::new(),
+            next_hop: self.next_hop,
+            max_hops: self.max_hops,
+            max_events: self.max_events,
+            next_ev: self.next_ev,
+            batch: self.batch,
+            batches: self.batches,
+            batch_t: self.batch_t,
+            outside: self.outside,
+            max_flight: self.max_flight,
+            late: self.late.iter().filter(|l| l.0 >= first).copied().collect(),
+        }
+    }
+
+    /// the recording of a run that goes on from a restored moment: this one (the run's) up to
+    /// where `past` (the restored engine's: a keyframe's stub and what the replay recorded)
+    /// begins, then that one with its counters
+    pub(crate) fn rejoin(mut self, past: Trace) -> Trace {
+        let hop0 = past.hops.front().map_or(past.next_hop, |h| h.id);
+        while self.hops.back().is_some_and(|h| h.id >= hop0) {
+            self.hops.pop_back();
+        }
+        let ev0 = past.events.front().map_or(past.next_ev, |e| e.seq);
+        while self.events.back().is_some_and(|e| e.seq >= ev0) {
+            self.events.pop_back();
+        }
+        self.late.retain(|l| l.0 < hop0);
+        let Trace { hops, events, next_hop, next_ev, batch, batches, batch_t, outside, max_flight, late, .. } = past;
+        self.hops.extend(hops);
+        self.events.extend(events);
+        self.late.extend(late);
+        while self.hops.len() > self.max_hops.max(1) {
+            self.hops.pop_front();
+        }
+        while self.events.len() > self.max_events.max(1) {
+            self.events.pop_front();
+        }
+        let first = self.hops.front().map_or(next_hop, |h| h.id);
+        self.late.retain(|l| l.0 >= first);
+        (self.next_hop, self.next_ev, self.batch, self.batches, self.batch_t, self.outside, self.max_flight) = (next_hop, next_ev, batch, batches, batch_t, outside, max_flight);
+        self
+    }
+
+    /// the counters as text (keyframe::digest: what a replay must give exactly; the rings are
+    /// compared frame by frame, trace_digest)
+    pub(crate) fn counters(&self, w: &mut dyn core::fmt::Write) -> core::fmt::Result {
+        write!(w, "trace {} {} {} {} {:?} {} {}", self.next_hop, self.next_ev, self.batch, self.batches, self.batch_t, self.outside, self.max_flight)
+    }
+}

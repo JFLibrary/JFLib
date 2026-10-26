@@ -130,6 +130,9 @@
 //   ftpd     the FTP server (RFC 959, EPSV / EPRT of RFC 2428): users, anonymous login,
 //            passive and active data connections, LIST, NLST, RETR, STOR ...; "ftp-server"
 //   ftpc     the FTP client of the consoles (curl with ftp:// URLs, IOS-like copy ... ftp:)
+//   keyframe rewinding (K1): keyframes of the whole engine within a memory budget and the inputs
+//            between them (Inline::rewind_on), a replay to any recorded moment (Restore), a
+//            past state that becomes the present (Inline::resume); footprint, digest
 //
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
@@ -212,6 +215,7 @@ pub mod tftpd;
 pub mod tftpc;
 pub mod ftpd;
 pub mod ftpc;
+pub mod keyframe;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -273,3 +277,4 @@ pub use tftpd::TftpServer;
 pub use tftpc::{Sink, Style, TftpClient};
 pub use ftpd::{FtpServer, FtpUser};
 pub use ftpc::FtpProgram;
+pub use keyframe::{Budget, Footprint, InKind, Input, Past, Pos, Restore, Rewind, Target};

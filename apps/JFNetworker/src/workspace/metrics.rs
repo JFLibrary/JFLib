@@ -448,7 +448,7 @@ pub(crate) fn svc_state(off: &BTreeSet<u32>, s: &SvcBrief) -> (&'static str, u32
 /// the services of the project's devices, in the project's order
 fn by_device(n: &Net) -> Vec<(u32, Vec<SvcBrief>)> {
     let mut all: BTreeMap<u32, Vec<SvcBrief>> = BTreeMap::new();
-    for s in n.doc.sim.engine().service_list() {
+    for s in n.doc.sim.state().service_list() {
         all.entry(s.dev).or_default().push(s);
     }
     n.doc.proj.devices.iter().filter_map(|d| all.remove(&d.id).map(|v| (d.id, v))).collect()
@@ -642,7 +642,7 @@ fn detail(n: &mut Net, ui: &mut Ui, devs: &[(u32, Vec<SvcBrief>)]) {
     }
     ui.box_end();
     // its status line; the span of the tiles
-    let status = n.doc.sim.engine().services(dev).into_iter().find(|s| s.name == svc).map(|s| s.status_msg);
+    let status = n.doc.sim.state().services(dev).into_iter().find(|s| s.name == svc).map(|s| s.status_msg);
     ui.box_begin(0, BOX_H, 8);
     ui.next_size(-1, 0);
     ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, &status.filter(|m| !m.is_empty()).map(|m| crate::app::tr::msg(&m)).unwrap_or_default());
@@ -676,7 +676,7 @@ fn detail(n: &mut Net, ui: &mut Ui, devs: &[(u32, Vec<SvcBrief>)]) {
     }
     // the disk of services that store
     if matches!(brief.kind, "kv" | "mq" | "script") {
-        if let Some(d) = n.doc.sim.engine().disk_of(dev) {
+        if let Some(d) = n.doc.sim.state().disk_of(dev) {
             ui.text(TS_CAPTION | TX_SECONDARY, &tf("Disk: {}", &[&crate::app::tr::msg(&d.msg())]));
         }
     }

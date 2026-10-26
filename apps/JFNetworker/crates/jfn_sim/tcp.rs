@@ -3031,3 +3031,15 @@ impl Engine {
         Some(self.tcp(self.node_index(dev)?)?.cfg)
     }
 }
+
+// ---------------------------------------------------------------- keyframes (keyframe.rs)
+
+impl TcpStack {
+    /// the bytes its connections and listeners hold: their state, what waits to be sent or
+    /// read, segments out of order, packets to itself (keyframe::footprint, an estimate)
+    pub(crate) fn footprint(&self) -> usize {
+        let conns: usize = self.conns.values().map(|c| core::mem::size_of::<Tcb>() + 48 + c.sbuf.len() + c.rbuf.len() + c.ooo.iter().map(|o| o.1.len() + 32).sum::<usize>()).sum();
+        let lst: usize = self.listeners.values().map(|l| core::mem::size_of::<Listener>() + 48 + l.queue.len() * 4).sum();
+        conns + lst + self.tuples.len() * 80 + self.loopq.iter().map(|p| p.len() + 24).sum::<usize>()
+    }
+}

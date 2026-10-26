@@ -10,7 +10,9 @@
 //   toolbar(n, ui)                  Echtzeit | Simulation, play / pause, step back, step, the
 //                                   speed, the PDU tools
 //   hint(n, ui)                     above the canvas while the view stands in the past:
-//                                   "Ansicht bei t = …" and "Zurück zu live"
+//                                   "Ansicht bei t = …", "Von hier fortsetzen" and "Zurück
+//                                   zu live"
+//   resume_dialog(n, ui)            the question before "Von hier fortsetzen" (K1)
 //   status(n, ui)                   mode, clock and events in the status bar
 //   timer(n, ui) / tick(n, ui)      the animation timer (TIMER_ANIM): it runs only while
 //                                   something moves or plays
@@ -32,10 +34,18 @@
 // Echtzeit: the engine follows the wall clock times the speed; pause stops it.  Simulation:
 // the engine stands; a step runs it to the next moment a shown frame leaves (or walks the
 // recording while the view stands in the past), play steps by itself (one step a second at
-// 1×), back moves the view along the recording; the devices keep their present state.  Steps
+// 1×), back moves the view along the recording; the devices show their state at the moment
+// shown (K1: keyframes and a replay, doc/sim.rs; the hint says while it is computed).  Steps
 // tween the frames on the canvas from the old moment to the new one (anim.rs), reduced motion
 // jumps.  Moving the timeline's playhead or choosing a line of the event list goes to the
 // simulation mode and shows that moment.
+//
+// "Von hier fortsetzen" (K1) asks first: the state shown becomes the present, the recording
+// after it and what came from outside after it (console lines, PDUs, faults) go; the project
+// and its undo list stay as they are, so a change of the project made after that moment takes
+// effect at it, and undo and redo go on working on the project (a fault step whose fault is
+// gone finds nothing to heal).  PDUs started later are shown as gone, the event list and the
+// packet tab start afresh, consoles and the log say where the run goes on.
 //
 // anim.rs draws the frames on the canvas, events.rs the Ereignisse panel (chips, timeline,
 // grid, the PDU list), packet.rs the Paket panel, pdu.rs makes PDUs and exports the recording.
@@ -138,6 +148,8 @@ pub(crate) struct SimUi {
     pub pdu: pdu::Pdus,
     /// the labels of the frames on the canvas (anim.rs)
     pub labels: anim::Labels,
+    /// the question "Von hier fortsetzen?" is open (K1)
+    pub ask: Shared<i32>,
 }
 
 impl SimUi {
@@ -161,6 +173,7 @@ impl SimUi {
             pk: packet::Packet::new(),
             pdu: pdu::Pdus::new(),
             labels: anim::Labels::default(),
+            ask: Shared::new(0),
         }
     }
 }
@@ -427,6 +440,8 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     ui.cmd_state(CMD_TOOL_PDU, flag(n.canvas.tool == Tool::Pdu, CF_CHECKED));
     ui.cmd_state(CMD_PDU_COMPLEX, 0);
     ui.cmd_state(CMD_EXPORT_PCAP, flag(!recorded, CF_DISABLED));
+    let shown = n.doc.sim.past().is_some() && n.doc.sim.restoring().is_none();
+    ui.cmd_state(CMD_SIM_RESUME, flag(!shown, CF_DISABLED));
 }
 
 /// the commands of the simulation mode -> handled
@@ -459,6 +474,9 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_PDU_COMPLEX => pdu::open_dialog(n),
         CMD_EXPORT_PCAP => pdu::export(n, ui),
         CMD_PCAP_DONE => pdu::export_done(n, ui),
+        CMD_SIM_RESUME if n.doc.sim.past().is_some() => n.sim.ask.set(1),
+        CMD_SIM_RESUME_GO => resume(n, ui),
+        CMD_SIM_SEEK_MS => seek(n, ui, arg as Ns * 1_000_000),
         _ if (CMD_SIM_TEMPO0..CMD_SIM_TEMPO0 + SPEEDS.len() as u32).contains(&id) => {
             n.sim.tempo = (id - CMD_SIM_TEMPO0) as usize;
             if !n.sim.sim_mode && n.sim.playing {
@@ -592,13 +610,60 @@ pub(crate) fn hint(n: &mut Net, ui: &mut Ui) {
     ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_CARD | pad(6), 10);
     ui.icon(IC_HISTORY, 16);
     ui.text(TS_BODY_STRONG, &tf("Ansicht bei t = {} s", &[&secs(at)]));
+    // the devices' state at that moment (K1): computed, shown, or older than the keyframes
+    let what = match (n.doc.sim.restoring(), n.doc.sim.past_gone()) {
+        (Some(pm), _) => tf("Zustand wird berechnet … {} %", &[&(pm / 10).to_string()]),
+        (None, true) => String::from(t("Den Zustand der Geräte von damals gibt es nicht mehr.")),
+        (None, false) => String::from(t("Zustand von damals")),
+    };
     ui.next_size(-1, 0);
-    ui.text(TS_BODY | TX_SECONDARY | TX_ELLIPSIS, t("Die Aufzeichnung zu diesem Zeitpunkt; die Geräte zeigen ihren jetzigen Zustand."));
+    ui.text(TS_BODY | TX_SECONDARY | TX_ELLIPSIS, &what);
+    ui.cmd_button(CMD_SIM_RESUME, 0);
     if ui.button(ID_SIM_LIVE, t("Zurück zu live")) & EV_ACT != 0 {
         ui.cmd_run(CMD_SIM_LIVE, 0);
     }
     ui.box_end();
     ui.box_end();
+}
+
+/// "Von hier fortsetzen?" (at the end of the frame)
+pub(crate) fn resume_dialog(n: &mut Net, ui: &mut Ui) {
+    let ask = n.sim.ask.clone();
+    let at = n.doc.sim.past().unwrap_or(0);
+    if ui.dialog_begin(ID_SIM_RESUME_ASK, t("Von hier fortsetzen?"), &ask) {
+        ui.next_size(420, 0);
+        ui.text(TS_BODY | TX_WRAP, &tf("Die Geräte machen bei t = {} s weiter. Was danach aufgezeichnet wurde und was danach von außen kam (Befehle in den Konsolen, PDUs, Fehler), geht verloren.", &[&secs(at)]));
+        ui.next_size(420, 0);
+        ui.text(TS_BODY | TX_WRAP | TX_SECONDARY, t("Das Projekt und die Liste zum Rückgängigmachen bleiben, wie sie sind: spätere Änderungen am Projekt gelten ab diesem Zeitpunkt."));
+        if ui.dialog_buttons(Some(t("Fortsetzen")), None, Some(t("Abbrechen"))) == DLG_PRIMARY {
+            ui.cmd_run(CMD_SIM_RESUME_GO, 0);
+        }
+    }
+    ui.dialog_end();
+}
+
+// "Von hier fortsetzen" after its question: the state shown becomes the present
+// (doc/sim.rs Sim::resume); PDUs started later never ran, the event list and the packet tab
+// start afresh from the recording that is left, consoles and the log say where it goes on
+fn resume(n: &mut Net, ui: &mut Ui) {
+    let Some(at) = n.doc.sim.past() else { return };
+    if !n.doc.sim.resume(&n.doc.proj) {
+        return;
+    }
+    n.sim.pdu.resumed(at);
+    n.sim.tween = None;
+    n.sim.drops = anim::Drops::default();
+    n.sim.sel_hop = None;
+    n.sim.sel_ev = None;
+    n.sim.held = None;
+    n.sim.playing = false;
+    n.sim.stalled = false;
+    n.sim.ev.reset();
+    n.sim.pk.reset();
+    crate::doc::console::resumed(n, at);
+    n.log.drop_after(at);
+    events::follow(n, at);
+    ui.repass();
 }
 
 /// the mode in words (the status bar, the inspector's project), in the current language

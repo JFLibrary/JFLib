@@ -167,8 +167,8 @@ fn field(ui: &mut Ui, label: &'static str) {
 // IP-Konfiguration
 fn ipconfig(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     let Some(d) = n.doc.proj.device(dev).cloned() else { return };
-    let ifs: Vec<(String, Option<Prefix4>)> = n.doc.sim.engine().ifaces(dev).into_iter().filter(|f| f.name != "lo").map(|f| (f.name.clone(), f.addrs.first().copied())).collect();
-    let gw_now = config::default_gateways(n.doc.sim.engine(), dev).first().map(|g| g.to_string()).unwrap_or_default();
+    let ifs: Vec<(String, Option<Prefix4>)> = n.doc.sim.state().ifaces(dev).into_iter().filter(|f| f.name != "lo").map(|f| (f.name.clone(), f.addrs.first().copied())).collect();
+    let gw_now = config::default_gateways(n.doc.sim.state(), dev).first().map(|g| g.to_string()).unwrap_or_default();
     let Some(w) = n.devwin.get(k) else { return };
     let s = &mut w.desk;
     if ifs.is_empty() {
@@ -338,7 +338,7 @@ fn editor(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
 // Webbrowser: an address and where it leads (the page itself: curl in the Eingabeaufforderung,
 // the simulator speaks HTTP there)
 fn browser(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
-    let hosts = n.doc.sim.engine().hosts(dev);
+    let hosts = n.doc.sim.state().hosts(dev);
     let Some(w) = n.devwin.get(k) else { return };
     let s = &mut w.desk;
     let mut go = false;

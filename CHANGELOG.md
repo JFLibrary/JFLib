@@ -60,6 +60,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** The fixed limits of a pass grow as needed: keys of one pass (16 before), commands (32), timers (16), pointer positions, hit boxes, widget records, clip levels, tabs of a tab bar, known canvases and wrapped lines; their ceilings (1024 keys, 65536 commands, 4096 timers ...) only stop runaway apps, and whatever a ceiling or a fixed nesting depth (windows, popups, menus, lists) holds back is reported once with a UIWARN. Due timers fire by deadline, equal deadlines in the order set; the script command keys [N] CHORD... queues many keys for one pass
 - **plat:** In Chromium plat::file_dialog answers FD_PENDING for FD_OPEN / FD_SAVE (the system's pickers) instead of -1; code that calls it directly polls plat::file_dialog_poll as on Android (ui.filedlg does)
 - **netpkt:** netpkt::decode::Proto has the new variant Bgp (bit P_BGP, TCP port 179); a match over every protocol needs an arm for it
+- **base:** base::metrics::Window makes its slots with the first value (a window that never got one holds no memory, so an engine with a resolver window per device copies fast); Window::bytes() tells the heap memory a window holds
 
 ### Fixed
 

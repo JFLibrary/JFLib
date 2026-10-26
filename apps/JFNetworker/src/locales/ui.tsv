@@ -403,7 +403,6 @@ Anhalten (F6)	Pause (F6)
 Abspielen (F6)	Play (F6)
 Tempo	Speed
 Ansicht bei t = {} s	View at t = {} s
-Die Aufzeichnung zu diesem Zeitpunkt; die Geräte zeigen ihren jetzigen Zustand.	The recording at this moment; the devices show their present state.
 Zurück zu live	Back to live
 Simulationsmodus, spielt ab	Simulation mode, playing
 Simulationsmodus	Simulation mode
@@ -1012,6 +1011,16 @@ Eine ganze Zahl von 1 bis 1000.	A whole number from 1 to 1000.
 Ein Meter sind {} Einheiten der Zeichenfläche (bei 100 % Pixel); danach richten sich die Reichweiten im WLAN.	One meter is {} units of the canvas (pixels at 100%); the WLAN ranges follow it.
 Anmelden	Join
 Abmelden	Leave
+&Von hier fortsetzen …	Contin&ue from here …
+Zustand wird berechnet … {} %	Computing the state … {} %
+Den Zustand der Geräte von damals gibt es nicht mehr.	The devices' state of then is no longer kept.
+Zustand von damals	State back then
+Von hier fortsetzen?	Continue from here?
+Die Geräte machen bei t = {} s weiter. Was danach aufgezeichnet wurde und was danach von außen kam (Befehle in den Konsolen, PDUs, Fehler), geht verloren.	The devices go on at t = {} s. What was recorded after it and what came from outside after it (console commands, PDUs, faults) is lost.
+Das Projekt und die Liste zum Rückgängigmachen bleiben, wie sie sind: spätere Änderungen am Projekt gelten ab diesem Zeitpunkt.	The project and its undo list stay as they are: later changes of the project take effect from this moment.
+Fortsetzen	Continue
+Zustand bei t = {} s: nur Anzeige, nichts wird geändert	State at t = {} s: for viewing only, nothing changes
+fortgesetzt bei t = {} s: was danach kam, ist verworfen	continued at t = {} s: what came after it is discarded
 
 # X1a: the Dateien tab of the device windows (workspace/devwin/files.rs), the new services
 Geändert	Modified

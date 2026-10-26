@@ -144,7 +144,7 @@ pub(crate) fn update(n: &mut Net) {
         return;
     }
     lab.ver = seen;
-    let list = n.doc.sim.engine().service_list();
+    let list = n.doc.sim.state().service_list();
     let (pills, spark_of) = (pills_from(&list), sparks_from(&list));
     // a device off in the simulator, on in the project: a power fault
     let p = &n.doc.proj;
@@ -280,7 +280,7 @@ pub(crate) fn sparklines(n: &mut Net, ui: &mut Ui) {
         return;
     }
     // their values, read again with new samples
-    let eng = n.doc.sim.engine();
+    let eng = n.doc.sim.state();
     let sgen = eng.series_gen();
     let lab = &mut n.canvas.lab;
     if lab.spark_gen != sgen {

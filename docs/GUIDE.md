@@ -2111,7 +2111,9 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   charts). Integer arithmetic only, so every target computes the same numbers.
   `Window::hist_between(from, to)` merges the slots of a time span into one `Hist`: a time
   series takes a point per interval from it and the quantiles of any span (JFNetworker's
-  `jfn_sim::series`, which samples every service on virtual time).
+  `jfn_sim::series`, which samples every service on virtual time). A window makes its slots
+  with the first value, so one that never got a value holds no memory; `Window::bytes()` is
+  what it holds (JFNetworker's keyframes count it into their memory budget).
 * `base::hashring` -- consistent hashing: `Ring::add(member, key, vnodes)` puts a member's
   tokens on the ring (made from its key, so every device that knows the members builds the same
   ring), `owner(hash64(key))` is the member of the first token at or after the hash,

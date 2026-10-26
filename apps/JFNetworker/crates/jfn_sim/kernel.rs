@@ -291,3 +291,16 @@ impl Engine {
         self.links.get(*self.link_idx.get(&id)?)?.as_ref()
     }
 }
+
+// ---------------------------------------------------------------- keyframes (keyframe.rs)
+
+impl Engine {
+    /// the clock and the event queue as text (keyframe::digest)
+    pub(crate) fn queue_text(&self, w: &mut dyn core::fmt::Write) -> core::fmt::Result {
+        write!(w, "now {} seq {} done {} heap {:?} slab {:?} free {:?}", self.now, self.seq, self.events_done, self.heap, self.slab, self.free)
+    }
+    /// entries of the event queue and slots of its slab (keyframe::footprint)
+    pub(crate) fn queue_len(&self) -> (usize, usize) {
+        (self.heap.len(), self.slab.len())
+    }
+}

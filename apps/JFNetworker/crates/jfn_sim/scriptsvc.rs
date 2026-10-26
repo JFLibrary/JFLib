@@ -2359,6 +2359,11 @@ impl Service for ScriptService {
         // the log lines and notes of the running program carry the new name
         self.book.name = String::from(name);
     }
+    fn footprint(&self) -> usize {
+        // the program's heap and stacks, its pending work (the code is shared)
+        let vm = self.run.as_ref().and_then(|r| r.vm.as_ref()).map_or(0, |v| v.heap_bytes() as usize + 4096);
+        4096 + vm + self.run.as_ref().map_or(0, |r| (r.queue.len() + r.effects.len()) * 256)
+    }
     fn metrics(&self) -> Vec<Metric> {
         self.metrics_at(self.seen)
     }

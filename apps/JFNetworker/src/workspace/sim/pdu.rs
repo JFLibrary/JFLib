@@ -116,6 +116,8 @@ pub(crate) struct UserPdu {
     pub id: u32,
     pub spec: Spec,
     run: Run,
+    /// the virtual time it last started (K1: the run going on from an earlier moment drops it)
+    at: Ns,
 }
 
 /// how a PDU stands: its words and whether it runs, worked or failed
@@ -177,6 +179,13 @@ impl Pdus {
             fd: Shared::new(0),
             fd_path: String::new(),
             fd_active: false,
+        }
+    }
+
+    /// the run goes on from moment `t` ("Von hier fortsetzen"): what started after it never ran
+    pub(crate) fn resumed(&mut self, t: Ns) {
+        for p in self.list.iter_mut().filter(|p| p.at > t) {
+            p.run = Run::Gone;
         }
     }
 
@@ -262,12 +271,12 @@ fn start(n: &mut Net, id: u32, s: &Spec) -> Run {
     match s.proto {
         Proto::Icmp => {
             let o = PingOpts { count: s.count, size: s.size.min(65_000) as u16, ttl: (s.ttl > 0).then_some(s.ttl), interval, ..PingOpts::default() };
-            match n.doc.sim.with_engine(|e| e.ping_host(src, &to, o)) {
+            match n.doc.sim.with_engine("pdu: ping", move |e| e.ping_host(src, &to, o.clone())) {
                 Ok(job) => Run::Ping(job),
                 Err(e) => Run::Refused(e.to_string()),
             }
         }
-        Proto::Dns => match n.doc.sim.with_engine(|e| e.lookup(src, &to, netpkt::dns::TYPE_A)) {
+        Proto::Dns => match n.doc.sim.with_engine("pdu: lookup", move |e| e.lookup(src, &to, netpkt::dns::TYPE_A)) {
             Ok(l) => Run::Lookup(l),
             Err(e) => Run::Refused(e.to_string()),
         },
@@ -285,7 +294,8 @@ fn start(n: &mut Net, id: u32, s: &Spec) -> Run {
             // a name of its own each time it starts
             let name = format!("pdu-{}-{}", id, n.sim.pdu.runs);
             n.sim.pdu.runs += 1;
-            match n.doc.sim.with_engine(|e| e.add_service(src, &name, Box::new(PduSender::new(spec)), true)) {
+            let svc = name.clone();
+            match n.doc.sim.with_engine("pdu: service", move |e| e.add_service(src, &svc, Box::new(PduSender::new(spec.clone())), true)) {
                 Ok(()) => Run::Svc(name),
                 Err(e) => Run::Refused(e.to_string()),
             }
@@ -298,7 +308,8 @@ pub(crate) fn send(n: &mut Net, s: Spec) {
     let id = n.sim.pdu.next;
     n.sim.pdu.next += 1;
     let run = start(n, id, &s);
-    n.sim.pdu.list.push(UserPdu { id, spec: s, run });
+    let at = n.doc.sim.engine().now();
+    n.sim.pdu.list.push(UserPdu { id, spec: s, run, at });
     n.shell.dock.show(P_PDUS);
 }
 
@@ -308,10 +319,10 @@ fn stop(n: &mut Net, i: usize) {
     let src = p.spec.src;
     match p.run.clone() {
         Run::Ping(job) => {
-            n.doc.sim.with_engine(|e| e.cancel_job(job));
+            n.doc.sim.with_engine("pdu: stop", move |e| e.cancel_job(job));
         }
         Run::Svc(name) => {
-            let _ = n.doc.sim.with_engine(|e| e.set_service_running(src, &name, false));
+            let _ = n.doc.sim.with_engine("pdu: stop", move |e| e.set_service_running(src, &name, false));
         }
         _ => {}
     }
@@ -322,7 +333,7 @@ fn remove(n: &mut Net, i: usize) {
     stop(n, i);
     if let Some(Run::Svc(name)) = n.sim.pdu.list.get(i).map(|p| p.run.clone()) {
         let src = n.sim.pdu.list[i].spec.src;
-        let _ = n.doc.sim.with_engine(|e| e.remove_service(src, &name));
+        let _ = n.doc.sim.with_engine("pdu: remove", move |e| e.remove_service(src, &name));
     }
     n.sim.pdu.list.remove(i);
 }
@@ -332,12 +343,13 @@ fn again(n: &mut Net, i: usize) {
     stop(n, i);
     if let Some(Run::Svc(name)) = n.sim.pdu.list.get(i).map(|p| p.run.clone()) {
         let src = n.sim.pdu.list[i].spec.src;
-        let _ = n.doc.sim.with_engine(|e| e.remove_service(src, &name));
+        let _ = n.doc.sim.with_engine("pdu: remove", move |e| e.remove_service(src, &name));
     }
     let Some(p) = n.sim.pdu.list.get(i) else { return };
     let (id, s) = (p.id, p.spec.clone());
     let run = start(n, id, &s);
     n.sim.pdu.list[i].run = run;
+    n.sim.pdu.list[i].at = n.doc.sim.engine().now();
 }
 
 /// a click with the tool P: the source, then the destination (an ICMP echo)

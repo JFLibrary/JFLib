@@ -468,3 +468,15 @@ pub(crate) const CMD_FILES_EXPORT_DONE: u32 = 551;
 pub(crate) const ID_FILES0: u32 = 0xF100;
 /// its file dialog: a block of its own like ID_PCAP_DLG (.. + 0x3FFF)
 pub(crate) const ID_FILES_DLG: u32 = 0x0016_0000;
+
+// ---- K1: rewinding with keyframes (commands 420 .. 449, widgets 0xEC00 .. 0xEFFF, timers
+// 0x174 .. 0x177)
+/// "Von hier fortsetzen" (the hint above the canvas, Simulation): its question first
+pub(crate) const CMD_SIM_RESUME: u32 = 420;
+/// the question's answer: the state shown becomes the present
+pub(crate) const CMD_SIM_RESUME_GO: u32 = 421;
+/// the view at a moment of the recording, arg: ms of virtual time (scripts; CMD_SIM_SEEK takes
+/// ns up to 4,29 s)
+pub(crate) const CMD_SIM_SEEK_MS: u32 = 422;
+/// the question "Von hier fortsetzen?"
+pub(crate) const ID_SIM_RESUME_ASK: u32 = 0xEC00;

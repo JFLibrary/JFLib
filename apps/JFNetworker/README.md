@@ -109,6 +109,11 @@ Queues, Lastgeneratoren, eigene Skripte).
   `copy running-config tftp:` und zurück, `copy … ftp:`, `dir`, `more`, `delete`, in der Shell
   `ls`, `cat`, `cp`, `rm`, `mkdir`, `echo … >`, `tftp` und `curl ftp://`; der Reiter Dateien im
   Gerätefenster mit Import und Export (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
+- **Zurückspulen (K1):** im Simulationsmodus zeigen die Geräte zu jedem Zeitpunkt der
+  Aufzeichnung ihren Zustand von damals – LEDs und Kabel, Inspektor, Gerätefenster, Metriken
+  und Konsolen, die `show`-Befehle aus diesem Zustand beantworten; der Simulator hält dafür
+  Keyframes in einer Speichergrenze und spielt den Rest exakt nach. „Von hier fortsetzen“ macht
+  einen solchen Zeitpunkt zur Gegenwart (siehe [Zurückspulen](#zurückspulen)).
 
 ## Bedienung
 
@@ -123,7 +128,8 @@ Queues, Lastgeneratoren, eigene Skripte).
   (Strg+3), mit Umschalt das Gerätefenster.
 - **Simulation:** F5 Simulationsmodus, Umschalt+F5 Echtzeit, F6 Abspielen/Anhalten, F7 Schritt
   vor, Umschalt+F7 zurück; das Werkzeug P sendet eine einfache PDU (Quelle, dann Ziel – auch mit
-  Tab und Eingabe).
+  Tab und Eingabe). In der Vergangenheit zeigen die Geräte ihren Zustand von damals, „Von hier
+  fortsetzen …“ (Simulation) macht dort weiter.
 - **Tastatur:** Strg+1 … 8 zeigen die Bereiche und geben ihnen die Tastatur, Strg+9 die
   Topologie; dort wählt Tab die Geräte und Notizen, dann die Kabel (Eingabe auf einem Kabel: seine
   Eigenschaften). Werkzeugleiste und Palette sind Fokusgruppen (ein Tab-Halt, Pfeiltasten
@@ -163,6 +169,7 @@ build/win/jfn-sim.exe run apps/JFNetworker/tests/fixtures/lab_shards.jfnet --sce
 build/win/jfn-sim.exe check apps/JFNetworker/tests/fixtures/lan_router.jfnet
 build/win/jfn-sim.exe decode "ff ff ff ff ff ff 02 4a 00 00 01 01 08 06 ..."
 build/win/jfn-sim.exe gen 500 --out build/campus.jfnet
+build/win/jfn-sim.exe rewind apps/JFNetworker/tests/fixtures/lab_window.jfnet 60   # Keyframes und Zeit zum Zurückspulen
 build/win/JFNetworker.exe apps/JFNetworker/tests/fixtures/two_pcs.jfnet --scenario apps/JFNetworker/tests/scen/two_pcs.scn
 python tools/i18n_check.py apps/JFNetworker crates            # jeder Text der Crates hat sein Englisch
 ```
@@ -232,6 +239,9 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `files_services.uis` | TFTP- und FTP-Server im Reiter Dienste: Karten mit Statuszeile, Einstellungen als JSON (nur lesend mit Quote, ein abgelehnter Port, ein Benutzer ohne Namen, ein fehlendes Heimatverzeichnis in der Probleme-Liste), Rückgängig; eine Sicherung landet nur beim schreibbaren Server |
 | `files_console.uis` | eine Sicherung an R1s Konsole: `copy running-config tftp:` mit Fragen, Fortschritt und Ergebnis, die Datei als Rückgängig-Schritt auf SRV1, ein falscher Name aus der Sicherung zurückgeholt, eine Kopie nach `flash:` mit `dir`, Rückgängig nimmt sie wieder weg |
 | `files_shots.uis` | die Bilder von Dateien, TFTP und FTP (Konsole nach einer Sicherung, der Reiter Dateien, die Einstellungen des TFTP-Servers) hell und dunkel mit 100 und 150 % (`build/jfnetworker/files_*.png`) |
+| `model.uis`, Gruppe `keyframes` | Zurückspulen (siehe [Zurückspulen](#zurückspulen)): der erste Keyframe beim Start und seine Größe, der Start und die Gegenwart wiederhergestellt (der Moment 0 mit seinen Ereignissen, ein Moment zwischen zwei Ereignissen), der Lauf bleibt unberührt; ein Campus in Echtzeit mit Konsolenzeilen, einem gezogenen und wieder gesteckten Kabel, einem Ping über `Inline::call` und Schritten des Simulationsmodus zwischen den Ereignissen eines Moments, an 13 Stellen wiederhergestellt und Byte für Byte gleich dem Lauf (der ganze Zustand und die Aufzeichnung der Wiederholung), auch sieben Sekunden vom ersten Keyframe aus; Leases, ARP-Tabellen und LEDs von damals gegen die heutigen; eine Wiederholung in Stücken mit wachsendem Fortschritt; die Speichergrenze nach Zahl (sechs Keyframes mit ihren Zeiten, der erste bleibt, die Abstände schrumpfen zur Gegenwart hin) und nach Bytes, zu knapp für zwei (der Start und die Eingaben davor gehen); die Eingaben mit ihren Zeiten (Uhr, Konsole, Abbruch, Aktion, Aufruf); „Von hier fortsetzen“ gegen einen Lauf, der nie weiterkam (Zustand, Aufzeichnung und Eingaben gleich); im Fenster: der gezeigte Zustand, LEDs von damals und von jetzt, Zeilen in der Vergangenheit ändern nichts, eine Bearbeitung holt in die Gegenwart, Fortsetzen mit einer späteren Änderung am Projekt, Rückgängig und Wiederholen danach, ein Zeitpunkt vor dem ersten Keyframe |
+| `rewind.uis` | Zurückspulen im Fenster (`fixtures/lan_router.jfnet`): R1 pingt, bekommt eine statische Route und schaltet Gi0/0/0 ab und wieder an; ein Schritt zurück zeigt die ARP-Tabelle mit PC2, aber die Route noch nicht (der Ping lief damals noch), bei 0,5 s nur die eigenen Adressen, eine Zeile in der Vergangenheit ändert nichts, bei 4,5 s das Kabel PC1 – R1 unten, die Route da und das Netz von Gi0/0/0 weg; „Zurück zu live“; „Von hier fortsetzen“ bei 4,5 s mit Rückfrage (abgebrochen, dann bestätigt): das Kabel bleibt unten, die Konsole sagt, wo es weitergeht, und antwortet wieder live |
+| `rewind_shots.uis` | die Bilder des Zurückspulens (die Ansicht bei 4,5 s mit Hinweis, LEDs und Konsole von damals; die Rückfrage) hell und dunkel mit 100 und 150 % (`build/jfnetworker/rewind_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -298,6 +308,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Aufgaben mit Bewertung | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/assess.rs`](crates/jfn_sim/assess.rs), [`src/workspace/assess.rs`](src/workspace/assess.rs), [`src/workspace/author.rs`](src/workspace/author.rs), [`src/doc/assess.rs`](src/doc/assess.rs), [`assets/assess`](assets/assess), [`src/assesstest.rs`](src/assesstest.rs) | das Format einer Aufgabe, das Bewerten ihrer Kriterien, die Prüfung `reaches`, das Panel mit Punkten, Zeit und Abgeben, der Bereich zum Erstellen mit seinen Rückgängig-Schritten, die drei Aufgaben, ihr Selbsttest (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)) |
 | WLAN | [`crates/jfn_model/wlan.rs`](crates/jfn_model/wlan.rs), [`crates/jfn_sim/wlan.rs`](crates/jfn_sim/wlan.rs), [`wlankey.rs`](crates/jfn_sim/wlankey.rs), [`wlantrace.rs`](crates/jfn_sim/wlantrace.rs), [`cli/wlan.rs`](crates/jfn_sim/cli/wlan.rs), [`src/doc/wlan.rs`](src/doc/wlan.rs), [`src/workspace/canvas/wlan.rs`](src/workspace/canvas/wlan.rs), [`src/workspace/inspector/wlan.rs`](src/workspace/inspector/wlan.rs), [`src/wlantest.rs`](src/wlantest.rs), [`lib/netpkt/eapol.rs`](../../lib/netpkt/eapol.rs), [`lib/crypto`](../../lib/crypto/lib.rs) (`sha1.rs`, `keywrap.rs`, `cmac.rs`) | die WLAN-Einstellungen im Projekt, Stationen und Access Points im Simulator mit Funk, Schlüsseln und Notizen, `iw` und `show dot11`, die Einstellungen als Rückgängig-Schritte, Funklinien, Reichweiten und Balken, der Inspektor, der Selbsttest, EAPOL Byte für Byte und die Kryptografie von WPA2 und WPA3 (siehe [WLAN](#wlan)) |
 | Dateien, TFTP und FTP | [`crates/jfn_model/files.rs`](crates/jfn_model/files.rs), [`crates/jfn_sim/files.rs`](crates/jfn_sim/files.rs), [`tftpd.rs`](crates/jfn_sim/tftpd.rs), [`tftpc.rs`](crates/jfn_sim/tftpc.rs), [`ftpd.rs`](crates/jfn_sim/ftpd.rs), [`ftpc.rs`](crates/jfn_sim/ftpc.rs), [`xfertrace.rs`](crates/jfn_sim/xfertrace.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`src/workspace/devwin/files.rs`](src/workspace/devwin/files.rs), [`src/filestest.rs`](src/filestest.rs), [`lib/netpkt/tftp.rs`](../../lib/netpkt/tftp.rs), [`lib/netpkt/ftp.rs`](../../lib/netpkt/ftp.rs) | die Dateien eines Geräts im Projekt und im Simulator, TFTP- und FTP-Server und ihre Clients an beiden Befehlszeilen, die Notizen, die Befehle für Dateien, der Reiter Dateien, der Selbsttest, TFTP und FTP Byte für Byte (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)) |
+| Zurückspulen | [`crates/jfn_sim/keyframe.rs`](crates/jfn_sim/keyframe.rs), [`crates/jfn_sim/driver.rs`](crates/jfn_sim/driver.rs), [`src/doc/sim.rs`](src/doc/sim.rs), [`src/workspace/sim/mod.rs`](src/workspace/sim/mod.rs), [`src/keyframetest.rs`](src/keyframetest.rs) | Keyframes in einer Speichergrenze, die Eingaben dazwischen, die Wiederholung bis zu einem Zeitpunkt und ihre Prüfsummen, das Fortsetzen von dort (Simulator); der Zustand von damals im Fenster, Konsolen in der Vergangenheit, „Von hier fortsetzen“ mit Rückfrage; ihr Selbsttest (siehe [Zurückspulen](#zurückspulen)) |
 
 ### Gerätekatalog
 
@@ -564,8 +575,8 @@ Rolle, Zustand, Kosten, Port-ID, Edge, Link-Typ, Designated-Werten, Zählern) un
 Im Simulationsmodus läuft die Uhr nur auf Knopfdruck. Ein Schritt geht bis zum nächsten
 Frame, der auf ein Kabel geht, auf Wunsch nur für bestimmte Protokolle (ARP, ICMP, …) oder
 Geräte. „Schritt zurück“ wandert die Aufzeichnung entlang und zeigt Kabel, Ereignisse und
-Pakete zu diesem Zeitpunkt; die Geräte behalten dabei ihren heutigen Zustand (den Zustand von
-damals bringen Keyframes in Phase 4). Der nächste Schritt geht durch die Aufzeichnung wieder
+Pakete zu diesem Zeitpunkt, die Geräte zeigen ihren Zustand von damals (siehe
+[Zurückspulen](#zurückspulen)). Der nächste Schritt geht durch die Aufzeichnung wieder
 vor, „Zurück zu live“ springt sofort in die Gegenwart. Für die Oberfläche liefert der
 Simulator:
 
@@ -592,8 +603,8 @@ Simulator:
   Projekt). In Echtzeit läuft die Uhr mit dem Tempo, im Simulationsmodus geht jeder Schritt zum
   nächsten Zeitpunkt, an dem ein gezeigter Frame ein Gerät verlässt; Abspielen macht einen
   Schritt pro Sekunde bei 1×. Steht die Ansicht in der Vergangenheit, sagt ein Hinweis über der
-  Zeichenfläche „Ansicht bei t = …“ mit dem Knopf „Zurück zu live“. Die Statusleiste nennt
-  Modus, Uhr und Ereignisse.
+  Zeichenfläche „Ansicht bei t = …“ mit den Knöpfen „Von hier fortsetzen …“ und „Zurück zu
+  live“. Die Statusleiste nennt Modus, Uhr und Ereignisse.
 - **Pakete auf der Leinwand:** kleine Umschläge in gedämpften Farben je Protokoll (ICMP grün,
   ARP bernstein, DNS violett, TCP/HTTP blau, UDP cyan, DHCP petrol, STP grau, OSPF/RIP braun
   wie BGP, Rest schiefergrau), unter 50 % Zoom Punkte, dort auf dem Kabel, wo der Frame zum
@@ -622,6 +633,80 @@ Simulator:
   periodisch.
 - **Export:** Datei › Exportieren › „Aufzeichnung als pcapng …“ schreibt alle aufgezeichneten
   Frames für Wireshark.
+
+### Zurückspulen
+
+Steht die Ansicht im Simulationsmodus in der Vergangenheit (Schritt zurück, Zeitleiste,
+Ereignisliste), zeigen die Geräte ihren Zustand von damals
+([`keyframe.rs`](crates/jfn_sim/keyframe.rs), [`src/doc/sim.rs`](src/doc/sim.rs)).
+
+- **Keyframes:** der Simulator merkt sich während des Laufs Schnappschüsse seines ganzen
+  Zustands. Ein Keyframe ist eine Kopie der Engine ohne ihre Aufzeichnung: was sich nie ändert,
+  teilen sich alle Kopien (die Bytes der Frames, die Modelle des Katalogs, die Befehlsbäume,
+  der übersetzte Code der Skripte); von der Aufzeichnung behält er nur die Zähler und die
+  Frames, die gerade auf einem Kabel sind. Was spätere Meilensteine an Diensten und Zustand
+  dazubringen, kopiert `Clone` ohne eigenen Code mit.
+- **Eingaben:** alles, was den Simulator von außen ändert, wird mit seiner Position
+  aufgezeichnet (virtuelle Zeit und Zahl der bis dahin gelaufenen Ereignisse): Aktionen
+  (Bearbeiten, Strom, Kabel, Fehler, Verschieben, Schritte eines Szenarios), Zeilen und
+  Abbrüche an den Konsolen, PDUs, Pings und Abfragen (`Inline::call`) und die Stellen, an denen
+  ein Lauf die Uhr anhält und die Zeitreihen eine Probe nehmen. Der Zustand zum Zeitpunkt t ist
+  der nächste Keyframe davor und die Wiederholung der Ereignisse und Eingaben bis t. Sie ist
+  exakt, weil der Simulator deterministisch ist: der Selbsttest vergleicht Zustand und
+  Aufzeichnung der Wiederholung Byte für Byte mit dem Lauf.
+- **Speichergrenze** (`Budget::default()`): Abstände zählen in Ereignissen, denn die kostet
+  eine Wiederholung (eine ruhige Minute ist sofort nachgespielt, ein Labor rechnet Tausende
+  Ereignisse pro Sekunde). Ein Keyframe nach 20 000 Ereignissen, in langen Läufen erst nach
+  1/64 der bisher gelaufenen (je länger der Lauf, desto seltener); zusammen höchstens 64 MiB
+  (geschätzt aus Tabellen, Puffern, Logs, Warteschlangen und Zeitreihen, `Service::footprint`
+  für die Dienste; `Footprint::of` nennt die Teile) und 256 Stück. Darüber fällt der Keyframe,
+  dessen Lücke im Verhältnis zu ihrem Alter am kleinsten wäre: die jüngste Vergangenheit bleibt
+  dicht, ältere Keyframes werden zuerst ausgedünnt, ihre Abstände wachsen mit dem Alter. Der
+  erste und der neueste bleiben; reicht der Platz nicht einmal für diese zwei, fällt der erste,
+  und für frühere Zeitpunkte zeigt das Fenster nur die Aufzeichnung (der Hinweis sagt es).
+- **Was die Vergangenheit zeigt:** LEDs und Zustand der Kabel auf der Zeichenfläche, den
+  Inspektor (Schnittstellen, Adressen, VLANs, WLAN), die Gerätefenster (Übersicht,
+  Schnittstellen, Konfiguration, Dienste, Desktop), Dienst-Pillen und Sparklines und im Bereich
+  Metriken Baum, Statuszeile und Disk (Diagramme und Kacheln enden ohnehin beim gezeigten
+  Zeitpunkt). Eine kurze Wiederholung läuft sofort (bis 50 000 Ereignisse), eine längere in
+  Stücken von 20 000 je Takt; dann zeigt der Hinweis „Zustand wird berechnet … n %“, und bis
+  dahin bleibt der vorige Zeitpunkt zu sehen. Geht die Ansicht vorwärts, rechnet der Simulator
+  vom gezeigten Zustand aus weiter statt vom Keyframe.
+- **Konsolen in der Vergangenheit:** Prompt, `?` und Tab kommen aus dem Zustand von damals; eine
+  Zeile läuft auf einer Kopie, die danach verworfen wird. `show ip route`, `show arp`, `show mac
+  address-table`, `ip neigh` … zeigen also die Tabellen von damals, Konfiguration und laufende
+  Befehle bleiben ohne Wirkung (eine graue Zeile sagt es einmal je Zeitpunkt); Strg+C und
+  Strg+Z tun dort nichts.
+- **Bearbeiten in der Vergangenheit:** jede Änderung, die zum Simulator geht (Bearbeiten,
+  Einstellungen, Formulare, Fehler, PDUs, Strom), holt die Ansicht zuerst in die Gegenwart;
+  das Verschieben von Geräten nicht.
+- **Von hier fortsetzen** (im Hinweis und im Menü Simulation, nach einer Rückfrage): der
+  gezeigte Zustand wird die Gegenwart. Die Aufzeichnung danach und alles, was danach von außen
+  kam (Konsolen, PDUs, Fehler), geht verloren; später gestartete PDUs gelten als
+  zurückgesetzt, Konsolen und Protokoll vermerken, wo es weitergeht. Das Projekt und seine
+  Rückgängig-Liste bleiben, wie sie sind: der Simulator bekommt den Stand des Projekts, den er
+  damals kannte, und folgt dann dem heutigen, Änderungen am Projekt nach dem Zeitpunkt gelten
+  also ab ihm. Rückgängig und Wiederholen arbeiten weiter auf dem Projekt; ein Fehler-Schritt,
+  dessen Fehler es nicht mehr gibt, findet nichts zu heilen, und erreichte Ziele eines Labors
+  bleiben erreicht.
+- `jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]` lässt ein Projekt einmal ohne und einmal mit
+  Keyframes laufen und nennt Zahl und Größe der Keyframes und die Zeit, zehn Zeitpunkte
+  wiederherzustellen.
+
+Messwerte auf dem Entwicklungsrechner (Windows, `jfn-sim rewind`, mit anderen Builds
+parallel):
+
+| Projekt | Lauf | Keyframes | je Keyframe | Wiederherstellen (min / Median / max) |
+|---|---|---|---|---|
+| `campus.jfnet` (7 Geräte, ruhig) | 60 s, 286 Ereignisse | 1 | 140 KiB | 0,24 / 0,52 / 0,64 ms |
+| `lab_window.jfnet` (Labor: Cache, Loadbalancer, KV, Queue, Skript) | 60 s, 236 470 Ereignisse | 12 | 0,3–1,3 MiB, zusammen 10,6 MiB | 1,9 / 22 / 35 ms (bis 18 000 Ereignisse) |
+| `lab_shards.jfnet` (KV-Speicher unter Last) | 60 s, 125 415 Ereignisse | 7 | 0,25–1,1 MiB | 1,3 / 25 / 33 ms |
+| synthetischer Campus (`jfn-sim gen 500`, `--traffic 300`) | 10 s, 20 962 Ereignisse | 2 | 7,4–8,1 MiB | 2,0 / 2,3 / 3,1 ms |
+
+Mit und ohne Keyframes läuft der Simulator gleich schnell (im Rahmen der Messgenauigkeit, das
+Labor: 476 gegen 481 ms für 60 s). Von einem Keyframe aus kostet die Wiederholung im Labor rund
+2 µs je Ereignis; die Größe bestimmen vor allem die Zeitreihen, die TCP-Puffer, die
+Ereigniswarteschlange und die Tabellen der Geräte.
 
 ### Mitschnitt (pcapng)
 
@@ -2339,7 +2424,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · physische Ansicht, Zurückspulen mit Keyframes, Gruppen · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; SNMP, AAA mit RADIUS, Mail) |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · physische Ansicht, Gruppen · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; SNMP, AAA mit RADIUS, Mail) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

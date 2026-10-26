@@ -50,7 +50,7 @@ fn project() -> Project {
 
 /// the engine runs on by `ms` of virtual time
 fn go(doc: &mut Doc, ms: u64) {
-    doc.sim.with_engine(|e| {
+    doc.sim.with_engine("test: run", move |e| {
         let t = e.now() + ms * MS;
         e.run_until(t, BUDGET);
     });
