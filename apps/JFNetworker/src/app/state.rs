@@ -74,6 +74,8 @@ pub(crate) struct Net {
     pub metrics: Metrics,
     /// the author's panel: an assessment in the making (workspace/author.rs, A1)
     pub author: crate::workspace::author::Author,
+    /// the physical view: places, plans, racks (workspace/phys, P1)
+    pub phys: crate::workspace::phys::Phys,
 }
 
 impl Net {
@@ -100,6 +102,7 @@ impl Net {
             task: crate::workspace::task::Task::new(),
             metrics: Metrics::new(),
             author: crate::workspace::author::Author::new(),
+            phys: crate::workspace::phys::Phys::new(),
         }
     }
 
@@ -113,6 +116,8 @@ impl Net {
         }
         let painter: Rc<dyn DgPaint> = Rc::new(Painter { net: self.me.clone() });
         self.canvas.painter = Some(painter);
+        let painter: Rc<dyn DgPaint> = Rc::new(crate::workspace::phys::paint::Painter { net: self.me.clone() });
+        self.phys.painter = Some(painter);
         // the settings (headless: the defaults in memory), the language, the motion
         crate::app::tr::install();
         self.prefs = Prefs::open(ui.headless());
@@ -145,6 +150,7 @@ impl Net {
     /// running in real time
     pub(crate) fn after_load(&mut self) {
         self.canvas.reset(&self.doc.proj);
+        self.phys.reset(&self.doc.proj);
         self.inspector.reset();
         self.doc.sim.start();
         // the consoles, the log and the device windows belong to the old project

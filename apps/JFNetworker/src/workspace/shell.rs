@@ -18,7 +18,8 @@
 // simulation mode over it.  Metriken (bottom, U6a: workspace/metrics.rs) shows the lab's
 // services with KPI tiles and charts of their time series.  Aufgabe erstellen (right, A1:
 // workspace/author.rs) makes an assessment from the project; the question before handing one
-// in is workspace/assess.rs's dialog.
+// in is workspace/assess.rs's dialog.  The physical view (P1, workspace/phys) takes the dock's
+// centre while it is shown; the toolbar's switch Logisch | Physisch follows the view group.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -86,6 +87,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.dock_begin(ID_DOCK, &mut n.shell.dock, &panels);
     while let Some(p) = ui.dock_next(&mut n.shell.dock) {
         match p {
+            // the physical view instead of the canvas (workspace/phys)
+            DOCK_CENTER if n.phys.on => crate::workspace::phys::frame(n, ui),
             DOCK_CENTER => {
                 sim::hint(n, ui);
                 canvas::frame(n, ui);
@@ -154,11 +157,11 @@ fn toolbar(n: &mut Net, ui: &mut Ui) {
     sep(ui);
     ui.focus_group_begin(ID_TB_GRP_ZOOM);
     ui.cmd_button(CMD_ZOOM_OUT, ST_ICON_ONLY | ST_SUBTLE);
-    let z = (n.canvas.st.vp.zoom * 100.0 + 0.5) as i32;
+    let z = (crate::workspace::phys::zoom_of(n) * 100.0 + 0.5) as i32;
     ui.next_size(52, 0);
     ui.next_flags(ST_SUBTLE);
     if ui.label_button(ID_TB_ZOOM, &tf("{} %", &[&z.to_string()]), TS_BODY, 4) & EV_ACT != 0 {
-        canvas::zoom(n, ui, 0);
+        ui.cmd_run(CMD_ZOOM_100, 0);
     }
     ui.tooltip(t("Zoom: auf 100 % setzen"));
     for c in [CMD_ZOOM_IN, CMD_FIT] {
@@ -171,6 +174,8 @@ fn toolbar(n: &mut Net, ui: &mut Ui) {
         ui.cmd_button(c, ST_ICON_ONLY | ST_SUBTLE);
     }
     ui.focus_group_end();
+    // Logisch | Physisch (workspace/phys)
+    crate::workspace::phys::toolbar(n, ui);
     ui.spacer(-1);
     sim::toolbar(n, ui);
     ui.spacer(4);
@@ -195,7 +200,7 @@ fn statusbar(n: &mut Net, ui: &mut Ui) {
     sep(ui);
     sim::status(n, ui);
     sep(ui);
-    ui.text(TS_CAPTION | TX_SECONDARY, &tf("{} %", &[&((n.canvas.st.vp.zoom * 100.0 + 0.5) as i32).to_string()]));
+    ui.text(TS_CAPTION | TX_SECONDARY, &tf("{} %", &[&((crate::workspace::phys::zoom_of(n) * 100.0 + 0.5) as i32).to_string()]));
     sep(ui);
     let k = n.canvas.st.sel.len();
     ui.text(TS_CAPTION | TX_SECONDARY, &if k == 0 { String::from(t("Nichts ausgewählt")) } else { tf("{} ausgewählt", &[&k.to_string()]) });

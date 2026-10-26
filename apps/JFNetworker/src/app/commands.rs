@@ -23,6 +23,11 @@
 // a time limit's countdown.
 // WLAN (W1): Ansicht › WLAN-Reichweiten shows the range of every access
 // point on the canvas (canvas/wlan.rs; without it the selected ones show theirs).
+// The physical view (P1, workspace/phys): Ansicht › Logische Ansicht (Ctrl+Shift+L) and
+// Physische Ansicht (Ctrl+Shift+P), Ansicht › Physischer Plan (Eine Ebene höher Backspace,
+// Zurück Shift+Backspace, Öffnen, the places to add, Ort umbenennen, Ort entfernen) and the
+// context menus of a place and of the plan's background; while the view is shown, zoom, Alles
+// zeigen, Löschen, Umbenennen, Alles auswählen and Ctrl+9 act on it (phys::command first).
 
 use jfn_model::CableKind;
 use ui::*;
@@ -34,7 +39,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 86] = [
+pub(crate) static CMDS: [Command; 99] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -121,6 +126,19 @@ pub(crate) static CMDS: [Command; 86] = [
     Command::new(CMD_AUTHOR_START, "Ausgangsnetz erzeugen", IC_REFRESH, 0, 0, CF_DISABLED),
     Command::new(CMD_AUTHOR_SAVE, "Als Aufgabe speichern …", IC_SAVE_AS, 0, 0, CF_DISABLED),
     Command::new(CMD_WLAN_RANGES, "&WLAN-Reichweiten", JN_PORT_RADIO, 0, 0, 0),
+    Command::new(CMD_VIEW_LOGICAL, "&Logische Ansicht", JN_CONNECT, MOD_CTRL | MOD_SHIFT, b'L' as u32, CF_CHECKED),
+    Command::new(CMD_VIEW_PHYS, "&Physische Ansicht", IC_HOME, MOD_CTRL | MOD_SHIFT, b'P' as u32, 0),
+    Command::new(CMD_PHYS_UP, "Eine Ebene &höher", IC_UP, 0, VK_BACK, CF_DISABLED),
+    Command::new(CMD_PHYS_BACK, "&Zurück", IC_BACK, MOD_SHIFT, VK_BACK, CF_DISABLED),
+    Command::new(CMD_PHYS_OPEN, "Ö&ffnen", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_PHYS_RENAME, "Ort &umbenennen …", IC_EDIT, 0, 0, CF_DISABLED),
+    Command::new(CMD_PHYS_REMOVE, "Ort &entfernen", IC_DELETE, 0, 0, CF_DISABLED),
+    Command::new(CMD_PHYS_ADD0, "&Standort hinzufügen", IC_ADD, 0, 0, CF_DISABLED),
+    Command::new(CMD_PHYS_ADD0 + 1, "&Gebäude hinzufügen", IC_ADD, 0, 0, CF_DISABLED),
+    Command::new(CMD_PHYS_ADD0 + 2, "E&tage hinzufügen", IC_ADD, 0, 0, CF_DISABLED),
+    Command::new(CMD_PHYS_ADD0 + 3, "&Raum hinzufügen", IC_ADD, 0, 0, CF_DISABLED),
+    Command::new(CMD_PHYS_ADD0 + 4, "R&ack hinzufügen", IC_ADD, 0, 0, CF_DISABLED),
+    Command::new(CMD_PHYS_ADD0 + 5, "T&isch hinzufügen", IC_ADD, 0, 0, CF_DISABLED),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -155,7 +173,7 @@ static M_EDIT: [Mi; 7] = [
     Mi::Sep,
     Mi::Cmd(CMD_RENAME),
 ];
-static M_VIEW: [Mi; 11] = [
+static M_VIEW: [Mi; 15] = [
     Mi::Cmd(CMD_ZOOM_IN),
     Mi::Cmd(CMD_ZOOM_OUT),
     Mi::Cmd(CMD_ZOOM_100),
@@ -167,6 +185,40 @@ static M_VIEW: [Mi; 11] = [
     Mi::Cmd(CMD_WLAN_RANGES),
     Mi::Sep,
     Mi::Sub("&Bereiche", &M_PANELS),
+    Mi::Sep,
+    Mi::Cmd(CMD_VIEW_LOGICAL),
+    Mi::Cmd(CMD_VIEW_PHYS),
+    Mi::Sub("P&hysischer Plan", &M_PHYS),
+];
+/// the physical view's places (workspace/phys)
+static M_PHYS: [Mi; 13] = [
+    Mi::Cmd(CMD_PHYS_UP),
+    Mi::Cmd(CMD_PHYS_BACK),
+    Mi::Cmd(CMD_PHYS_OPEN),
+    Mi::Sep,
+    Mi::Cmd(CMD_PHYS_ADD0),
+    Mi::Cmd(CMD_PHYS_ADD0 + 1),
+    Mi::Cmd(CMD_PHYS_ADD0 + 2),
+    Mi::Cmd(CMD_PHYS_ADD0 + 3),
+    Mi::Cmd(CMD_PHYS_ADD0 + 4),
+    Mi::Cmd(CMD_PHYS_ADD0 + 5),
+    Mi::Sep,
+    Mi::Cmd(CMD_PHYS_RENAME),
+    Mi::Cmd(CMD_PHYS_REMOVE),
+];
+/// the context menu of a place in the physical view
+pub(crate) static M_PHYS_PLACE: [Mi; 3] = [Mi::Cmd(CMD_PHYS_OPEN), Mi::Cmd(CMD_PHYS_RENAME), Mi::Cmd(CMD_PHYS_REMOVE)];
+/// the context menu of the physical view's background
+pub(crate) static M_PHYS_BG: [Mi; 9] = [
+    Mi::Cmd(CMD_PHYS_ADD0),
+    Mi::Cmd(CMD_PHYS_ADD0 + 1),
+    Mi::Cmd(CMD_PHYS_ADD0 + 2),
+    Mi::Cmd(CMD_PHYS_ADD0 + 3),
+    Mi::Cmd(CMD_PHYS_ADD0 + 4),
+    Mi::Cmd(CMD_PHYS_ADD0 + 5),
+    Mi::Sep,
+    Mi::Cmd(CMD_PHYS_UP),
+    Mi::Cmd(CMD_PHYS_BACK),
 ];
 static M_PANELS: [Mi; 13] = [
     Mi::Cmd(CMD_FOCUS_CANVAS),
@@ -300,6 +352,7 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     crate::workspace::metrics::states(n, ui);
     crate::workspace::assess::states(n, ui);
     crate::workspace::author::states(n, ui);
+    crate::workspace::phys::states(n, ui);
 }
 
 // Ctrl+1 .. 8: the panel shows; the keyboard goes into it -- the device search, the shown
@@ -323,6 +376,10 @@ fn focus_panel(n: &mut Net, ui: &mut Ui, p: u32) {
 
 /// App::command
 pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
+    // the physical view's commands, and while it is shown zoom, Löschen, Umbenennen ...
+    if let Some(r) = crate::workspace::phys::command(n, ui, id, arg) {
+        return r;
+    }
     match id {
         UIC_TIMER if arg == TIMER_SIM => {
             // the simulator's clock: a new snapshot needs a new pass

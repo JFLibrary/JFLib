@@ -13,6 +13,9 @@
 //                          (WLAN: the handshake before an association carries data; the AP's
 //                          frames to its stations)
 //
+// A cable longer than its medium allows, or a fibre whose optics do not fit, stays down too
+// (phys.rs, P1): link_up asks phys_bad, refresh_link notes why when it goes down.
+//
 // WLAN associations (wlan.rs) are links too, between a station's port and the radio port of
 // its access point, which has no link of its own: they are up while the station is (powered,
 // its port up, the handshake done); the AP's side sends through wlan_ap_send (a radio port
@@ -126,7 +129,7 @@ impl Engine {
         if crate::wlan::is_assoc_id(l.id) {
             return self.wlan_link_up(li, l);
         }
-        if l.down || (l.wrong_cable && self.strict_mdix) || self.faults.link(li).is_some_and(|o| o.cut > 0) {
+        if l.down || (l.wrong_cable && self.strict_mdix) || self.faults.link(li).is_some_and(|o| o.cut > 0) || self.phys_bad(li) {
             return false;
         }
         l.ends.iter().all(|&(n, p)| match self.nodes.get(n) {
@@ -174,6 +177,10 @@ impl Engine {
                 d.queued_bytes = 0;
                 d.busy_until = 0;
             }
+        }
+        // too long, optics that do not fit: why, before the ports go down (phys.rs)
+        if !up {
+            self.phys_down(li);
         }
         // a WLAN association: the AP's radio port keeps its other stations (wlan.rs)
         let ap_end = self.wlan_ap_end(li);

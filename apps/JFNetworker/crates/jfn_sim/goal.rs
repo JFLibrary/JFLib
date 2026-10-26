@@ -25,6 +25,9 @@
 // virtual time.  The texts of report() are the runner's, which golden reports compare byte for
 // byte; reason() words the same findings as messages (jfn_model::msg) for the app's languages.
 //
+//   "expect cable SW1 Gi1/0/1 length <= 100" / "... up" (P1): the length the engine runs the
+//                                         cable at the port with (phys.rs), whether it carries
+//
 //   probe(&engine, dev, host) -> Found::Ping     "expect PC1 reaches 10.0.2.10" (A1): a ping on
 //                                         a copy of the engine (Engine::clone) -- up to PROBES
 //                                         echoes, the next when the last is answered or a second
@@ -41,7 +44,7 @@ use jfn_model::lab::Lab;
 use jfn_model::msg;
 use jfn_model::msg::Msg;
 use jfn_model::project::Project;
-use jfn_model::scenario::{Agg, Expect, Span, Via};
+use jfn_model::scenario::{Agg, CableCheck, Expect, Span, Via};
 use netpkt::decode;
 
 use crate::ip::RouteSrc;
@@ -77,6 +80,10 @@ pub enum Found {
     /// something said so (the device is off or has no address, the name is unknown, an ICMP
     /// error came back)
     Ping { sent: u32, received: u32, why: Option<Msg> },
+    /// no cable at the port (expect cable)
+    NoCable,
+    /// the cable carries or not (expect cable ... up | down)
+    Carries(bool),
 }
 
 /// whether an expectation holds and what it found
@@ -188,6 +195,8 @@ pub fn expect_text(x: &Expect) -> String {
             format!("expect {} svc {} metric {}{} {} {} {}", dev, svc, how, name, cmp.as_str(), milli_text(*milli), what)
         }
         Expect::Reach { dev, host, negate } => format!("expect {} {}reaches {}", dev, if *negate { "not " } else { "" }, host),
+        Expect::Cable { dev, port, check: CableCheck::Len(c, m) } => format!("expect cable {} {} length {} {}", dev, port, c.as_str(), m),
+        Expect::Cable { dev, port, check: CableCheck::Up(up) } => format!("expect cable {} {} {}", dev, port, if *up { "up" } else { "down" }),
     }
 }
 
@@ -272,6 +281,21 @@ fn judge_found(p: &Project, e: &Engine, x: &Expect, out: &dyn Fn(u32) -> String)
             let f = probe(e, id, host);
             let answered = matches!(f, Found::Ping { received, .. } if received > 0);
             (answered != *negate, f)
+        }
+        Expect::Cable { port, check, .. } => {
+            let Some(l) = p.link_at(id, port) else {
+                return (false, Found::NoCable);
+            };
+            match check {
+                CableCheck::Len(c, m) => {
+                    let len = e.cable_phys(l.id).map_or(0, |x| x.len_m);
+                    (c.holds(len, *m), Found::Value { text: format!("{}", len), unit: "m" })
+                }
+                CableCheck::Up(up) => {
+                    let now = e.link_rt(l.id).is_some() && e.link_idx_up(l.id);
+                    (now == *up, if now == *up { Found::Nothing } else { Found::Carries(now) })
+                }
+            }
         }
     }
 }
@@ -371,6 +395,9 @@ impl Verdict {
             Found::Later => format!("{} (der Zeitraum endet erst nach jetzt)", t),
             Found::Ping { why: Some(w), received: 0, .. } => format!("{} (keine Antwort: {})", t, w.text()),
             Found::Ping { sent, received, .. } => format!("{} ({} von {} beantwortet)", t, received, sent),
+            Found::NoCable => format!("{} (an dem Port steckt kein Kabel)", t),
+            Found::Carries(true) => format!("{} (die Leitung ist aktiv)", t),
+            Found::Carries(false) => format!("{} (die Leitung ist unten)", t),
         }
     }
 
@@ -401,6 +428,9 @@ impl Verdict {
             Found::Ping { sent, received: 0, .. } => msg!("keine Antwort auf {} Pings", sent),
             Found::Ping { .. } if self.held => Msg::default(),
             Found::Ping { sent, received, .. } => msg!("{} von {} Pings beantwortet", received, sent),
+            Found::NoCable => msg!("an dem Port steckt kein Kabel"),
+            Found::Carries(true) => msg!("die Leitung ist aktiv"),
+            Found::Carries(false) => msg!("die Leitung ist unten"),
         }
     }
 }

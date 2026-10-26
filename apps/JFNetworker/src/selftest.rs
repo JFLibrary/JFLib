@@ -30,6 +30,8 @@
 // the reach expectation, the Aufgabe panel's run, authoring, the samples of assets/assess).
 // wlantest.rs: WLAN (group wlan: jfn_model::wlan, jfn_sim::wlan, wlankey, wlantrace, cli/wlan.rs,
 // doc/wlan.rs).
+// phystest.rs: the physical view (group phys: jfn_model::phys, the forms and optics of the
+// catalogue, jfn_sim::phys, doc/phys.rs, the scenario steps place / cable and expect cable).
 
 use alloc::format;
 use alloc::string::String;
@@ -87,9 +89,11 @@ mod ipv6tcptest;
 mod assesstest;
 #[path = "wlantest.rs"]
 mod wlantest;
+#[path = "phystest.rs"]
+mod phystest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 33] = [
+    let groups: [(&'static str, fn(&mut T)); 34] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -123,6 +127,7 @@ pub fn run() -> i32 {
         ("ipv6tcp", ipv6tcptest::run),
         ("assess", assesstest::run),
         ("wlan", wlantest::run),
+        ("phys", phystest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {
@@ -144,6 +149,7 @@ fn port(model: &str, name: &str) -> PortSpec {
         kbps: 0,
         mdix: false,
         poe: catalog::Poe::None,
+        optic: None,
     })
 }
 

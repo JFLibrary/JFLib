@@ -12,7 +12,8 @@
 // the dialogs of the settings and the shortcuts, task.rs the Aufgabe panel and the list of labs.
 // metrics.rs: the Metriken panel of the lab (services, KPI tiles, charts of the time series
 // with the faults).  assess.rs: an assessment in the Aufgabe panel (score, items, time limit,
-// handing in); author.rs: the panel that makes one from the project (A1).
+// handing in); author.rs: the panel that makes one from the project (A1).  phys/: the physical
+// view beside the canvas (P1): places, floor plans, racks, cable lengths.
 
 pub(crate) mod canvas;
 pub(crate) mod devwin;
@@ -28,6 +29,7 @@ pub(crate) mod task;
 pub(crate) mod metrics;
 pub(crate) mod assess;
 pub(crate) mod author;
+pub(crate) mod phys;
 
 use alloc::string::String;
 use alloc::vec::Vec;

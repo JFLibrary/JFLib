@@ -239,6 +239,7 @@ pub(crate) fn save_as(n: &mut Net, ui: &mut Ui) {
 /// write the project with the current view into path -> it worked
 pub(crate) fn save_to(n: &mut Net, ui: &mut Ui, path: &str) -> bool {
     n.canvas.store_view(&mut n.doc.proj);
+    n.phys.store_view(&mut n.doc.proj);
     if write(path, &n.doc.proj) {
         n.doc.saved(path);
         n.file.add_recent(path);

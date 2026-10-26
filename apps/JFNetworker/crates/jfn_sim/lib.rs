@@ -113,6 +113,9 @@
 //   wlankey  the keys of WPA2-Personal and WPA3-Personal (PMK, PTK, MICs, the key wrap of the
 //            group key) and the EAPOL-Key messages of the 4-way handshake
 //   wlantrace WNote: the decisions of WLAN as notes (Note::Wlan) with their German sentences
+//   phys     the physical layer (P1): cable lengths against the reach of their media, the
+//            optics of fibres; Action::CableLen / Optic, cable_phys, PhysNote (Note::Phys),
+//            the problems CableTooLong and OpticMismatch
 //
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
@@ -187,6 +190,7 @@ pub mod assess;
 pub mod wlan;
 pub mod wlankey;
 pub mod wlantrace;
+pub mod phys;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -241,3 +245,4 @@ pub use os::{ANY, ANY4};
 pub use assess::{Cand, Graded, Grader, Lines, Score};
 pub use wlan::{AssocView, Bss, StaState, StaView};
 pub use wlantrace::WNote;
+pub use phys::{CablePhys, PhysFault, PhysNote};

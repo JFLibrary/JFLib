@@ -1,0 +1,111 @@
+# JFNetworker-Szenario phys_lengths.scn: „Campus mit zwei Häusern“, 9 Geräte, 8 Verbindungen, Seed 7
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/4 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/4 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %PHY-4-CABLE_LENGTH: GigabitEthernet1/0/5: the cable is 208 m long, 1000BASE-T allows 100 m; the link stays down
+   0.000000000  AP1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: TwoGigabitEthernet0 is up
+   0.000000000  AP1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on TwoGigabitEthernet0 is up
+   0.000000000  AP1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: BVI1 is up
+   0.000000000  AP1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on BVI1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/6 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/6 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/7 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/7 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: TenGigabitEthernet1/1/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on TenGigabitEthernet1/1/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: TenGigabitEthernet1/1/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on TenGigabitEthernet1/1/1 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Vlan1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Vlan1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Vlan1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Vlan1 is up
+   0.000000000  --      run 2s
+   2.000000000  ok      expect cable SW1 Gi1/0/1 length == 1 (1)
+   2.000000000  ok      expect cable SW1 Gi1/0/3 length == 16 (16)
+   2.000000000  ok      expect cable SW1 Te1/1/1 length == 203 (203)
+   2.000000000  ok      expect cable SW1 Te1/1/1 up
+   2.000000000  ok      expect cable SW1 Gi1/0/5 length == 208 (208)
+   2.000000000  ok      expect cable SW1 Gi1/0/5 down
+   2.000000000  SW1     SW1>enable
+   2.000000000  SW1     SW1#show interfaces GigabitEthernet1/0/5
+   2.000000000  SW1     GigabitEthernet1/0/5 is down, line protocol is down (notconnect)
+   2.000000000  SW1       Hardware is Gigabit Ethernet, address is 024a.0000.0205 (bia 024a.0000.0205)
+   2.000000000  SW1       MTU 1500 bytes, BW 1000000 Kbit/sec, DLY 10 usec,
+   2.000000000  SW1          reliability 255/255, txload 1/255, rxload 1/255
+   2.000000000  SW1       Encapsulation ARPA, loopback not set
+   2.000000000  SW1       Keepalive set (10 sec)
+   2.000000000  SW1       Auto Duplex, Auto Speed, link type is auto, media type is RJ45
+   2.000000000  SW1       Cable is 208 m long, 1000BASE-T allows 100 m: no link
+   2.000000000  SW1       Last input never, output never, output hang never
+   2.000000000  SW1       Last clearing of "show interface" counters never
+   2.000000000  SW1       Input queue: 0/375/0/0 (size/max/drops/flushes); Total output drops: 0
+   2.000000000  SW1       Queueing strategy: fifo
+   2.000000000  SW1       Output queue: 0/40 (size/max)
+   2.000000000  SW1       5 minute input rate 0 bits/sec, 0 packets/sec
+   2.000000000  SW1       5 minute output rate 0 bits/sec, 0 packets/sec
+   2.000000000  SW1          0 packets input, 0 bytes, 0 no buffer
+   2.000000000  SW1          Received 0 broadcasts (0 IP multicasts)
+   2.000000000  SW1          0 runts, 0 giants, 0 throttles
+   2.000000000  SW1          0 input errors, 0 CRC, 0 frame, 0 overrun, 0 ignored
+   2.000000000  SW1          0 packets output, 0 bytes, 0 underruns
+   2.000000000  SW1          0 output errors, 0 collisions, 0 interface resets
+   2.000000000  SW1          0 unknown protocol drops
+   2.000000000  SW1          0 babbles, 0 late collision, 0 deferred
+   2.000000000  SW1          0 lost carrier, 0 no carrier
+   2.000000000  SW1          0 output buffer failures, 0 output buffers swapped out
+   2.000000000  ok      expect SW1 output contains "Cable is 208 m long, 1000BASE-T allows 100 m: no link"
+   2.000000000  PC4     root@PC4:~# ip link
+   2.000000000  PC4     1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+   2.000000000  PC4         link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+   2.000000000  PC4     2: eth0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc fq_codel state DOWN mode DEFAULT group default qlen 1000
+   2.000000000  PC4         link/ether 02:4a:00:00:07:01 brd ff:ff:ff:ff:ff:ff
+   2.000000000  ok      expect PC4 output contains "eth0: <NO-CARRIER,BROADCAST,MULTICAST,UP>"
+   2.000000000  --      place PC4 Büro 1: PC4 eth0 – SW1 Gi1/0/5 23 m
+   2.000000000  SW1     *Mar  1 00:00:02.000: %LINK-3-UPDOWN: GigabitEthernet1/0/5 is up
+   2.000000000  SW1     *Mar  1 00:00:02.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/5 is up
+   2.000000000  --      run 3s
+   5.000000000  ok      expect cable SW1 Gi1/0/5 length == 23 (23)
+   5.000000000  ok      expect cable SW1 Gi1/0/5 up
+   5.000000000  ok      expect SW1 output contains "%LINK-3-UPDOWN: GigabitEthernet1/0/5 is up"
+   5.000000000  PC4     root@PC4:~# ping -c 2 10.0.0.11
+   5.000000000  PC4     PING 10.0.0.11 (10.0.0.11) 56(84) bytes of data.
+   5.000000000  --      run until idle
+   5.000007372  PC4     64 bytes from 10.0.0.11: icmp_seq=1 ttl=64 time=0.007 ms
+   6.000004294  PC4     64 bytes from 10.0.0.11: icmp_seq=2 ttl=64 time=0.004 ms
+   6.000004294  PC4     
+   6.000004294  PC4     --- 10.0.0.11 ping statistics ---
+   6.000004294  PC4     2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+   6.000004294  PC4     rtt min/avg/max/mdev = 0.004/0.005/0.007/0.001 ms
+  16.000000000  ok      expect PC4 output contains "2 packets transmitted, 2 received, 0% packet loss"
+  16.000000000  --      cable SW1 Gi1/0/5 length 132: PC4 eth0 – SW1 Gi1/0/5 132 m
+  16.000000000  SW1     *Mar  1 00:00:16.000: %PHY-4-CABLE_LENGTH: GigabitEthernet1/0/5: the cable is 132 m long, 1000BASE-T allows 100 m; the link stays down
+  16.000000000  SW1     *Mar  1 00:00:16.000: %LINK-3-UPDOWN: GigabitEthernet1/0/5 is down
+  16.000000000  SW1     *Mar  1 00:00:16.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/5 is down
+  16.000000000  --      run 1s
+  17.000000000  ok      expect cable SW1 Gi1/0/5 down
+  17.000000000  ok      expect SW1 output contains "%PHY-4-CABLE_LENGTH: GigabitEthernet1/0/5: the cable is 132 m long, 1000BASE-T allows 100 m; the link stays down"
+  17.000000000  --      cable SW1 Gi1/0/5 length auto: PC4 eth0 – SW1 Gi1/0/5 23 m
+  17.000000000  SW1     *Mar  1 00:00:17.000: %LINK-3-UPDOWN: GigabitEthernet1/0/5 is up
+  17.000000000  SW1     *Mar  1 00:00:17.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/5 is up
+  17.000000000  --      run 3s
+  20.000000000  ok      expect cable SW1 Gi1/0/5 length <= 100 (23)
+  20.000000000  ok      expect cable SW1 Gi1/0/5 up
+  20.000000000  --      place SW2 Rack B1 5
+  20.000000000  --      run 1s
+  21.000000000  ok      expect cable SW1 Te1/1/1 length == 203 (203)
+  21.000000000  ok      expect cable SW1 Te1/1/1 up
+  21.000000000  SW1     SW1#ping 10.0.0.3
+  21.000000000  SW1     Ctrl+Shift+6 stops the ping.
+  21.000000000  SW1     Pinging 10.0.0.3 with 5 echo requests of 100 bytes, 2 s timeout each:
+  21.000000000  --      run until idle
+  23.000009000  SW1     .!!!!
+  23.000009000  SW1     Success rate is 80 percent (4/5), round-trip min/avg/max = 0/0/0 ms
+  25.000006750  ok      expect SW1 output contains "!!!!"
+# 19 von 19 Erwartungen erfüllt

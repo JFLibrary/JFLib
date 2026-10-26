@@ -167,6 +167,7 @@ fn write(n: &mut Net) -> bool {
     }
     let mut p = n.doc.proj.clone();
     n.canvas.store_view(&mut p);
+    n.phys.store_view(&mut p);
     let a = &mut n.autosave;
     if !plat::write_file(&a.file(&a.id.clone(), "jfnet"), p.to_text().as_bytes()) {
         return false;

@@ -15,7 +15,9 @@
 //                                                 OSPF's layer 3, as IP carries it directly
 //                                                 (ospf.rs: Note::is_ospf), and IPv6's layer 3
 //                                                 (trace6.rs: Note::V6); WLAN's layer 2
-//                                                 (wlantrace.rs: Note::Wlan)
+//                                                 (wlantrace.rs: Note::Wlan); a cable too
+//                                                 long or with optics that do not fit layer 1
+//                                                 (phys.rs: Note::Phys)
 //   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
 //                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
@@ -455,6 +457,8 @@ pub enum Note {
     /// WLAN (wlan.rs, wlantrace.rs): scans, authentication, association, the 4-way handshake,
     /// roaming, range, what an access point drops (layer 2)
     Wlan(crate::wlantrace::WNote),
+    /// the physical layer (phys.rs, P1): a cable too long, optics that do not fit (layer 1)
+    Phys(crate::phys::PhysNote),
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -576,6 +580,7 @@ impl Note {
             n if n.is_filter() => 3,
             Note::V6(_) => 3,
             n if n.is_ospf() => 3,
+            Note::Phys(_) => 1,
             _ => 2,
         }
     }
@@ -1147,6 +1152,7 @@ impl Note {
             | Note::OspfRoute { .. }) => ospf_message(n, iface),
             Note::TcpPtb { mss } => msg!("Packet Too Big: kleinere Segmente, MSS {}.", mss),
             Note::Wlan(n) => n.message(port),
+            Note::Phys(n) => n.message(port),
         }
     }
 }

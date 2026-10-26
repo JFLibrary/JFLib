@@ -13,7 +13,9 @@
 // project unless "strict_mdix" is set) both cables work; the simulator decides that, this
 // module only names the right one.  Optics: SFP, SFP+ and SFP28 cages take each other's
 // optics at the lower speed; QSFP28 only joins QSFP28.  Radios: a client associates with an
-// access point (no ad-hoc mode).
+// access point (no ad-hoc mode).  The optics in the cages (PortSpec::optic, P1) pick the fibre:
+// long-reach (LR) at both ends single-mode, else multimode; the lengths each medium allows at a
+// speed are phys::reach.
 
 use alloc::string::String;
 use core::fmt;
@@ -63,16 +65,15 @@ impl CableKind {
     pub fn is_ethernet(self) -> bool {
         self.is_copper() || self.is_fiber() || self == CableKind::Wireless || self == CableKind::Wan
     }
-    /// the longest cable of this kind at a speed (None: no limit modelled)
+    /// the longest cable of this kind at a speed with the optics that belong to it (None: no
+    /// limit modelled; the table is phys::reach)
     pub fn max_len_m(self, kbps: u32) -> Option<u32> {
-        match self {
-            CableKind::CopperStraight | CableKind::CopperCross => Some(100),
-            // OM3: 300 m at 10G, 100 m for 25G-SR and 100G-SR4
-            CableKind::FiberMm => Some(if kbps >= 25_000_000 { 100 } else { 300 }),
-            CableKind::FiberSm => Some(10_000),
-            CableKind::Console => Some(15),
-            CableKind::Serial | CableKind::Wireless | CableKind::Wan => None,
-        }
+        let optic = match self {
+            CableKind::FiberSm => Some(crate::catalog::Optic::Lr),
+            CableKind::FiberMm => Some(crate::catalog::Optic::Sr),
+            _ => None,
+        };
+        crate::phys::reach(self, kbps, optic).map(|r| r.max_m)
     }
 }
 
@@ -128,7 +129,10 @@ pub fn cable_kind(a: &PortSpec, b: &PortSpec) -> Result<CableKind, Why> {
         (Rj45, Rj45) => Ok(if needs_crossover(a, b) { CableKind::CopperCross } else { CableKind::CopperStraight }),
         (x, y) if x.is_optical() && y.is_optical() => {
             if optics_join(x, y) {
-                Ok(CableKind::FiberMm)
+                // long-reach optics at both ends take single-mode fibre (P1); optics that do
+                // not match still plug in, the link stays down (phys.rs)
+                let lr = |p: &PortSpec| p.optic == Some(crate::catalog::Optic::Lr);
+                Ok(if lr(a) && lr(b) { CableKind::FiberSm } else { CableKind::FiberMm })
             } else {
                 Err(Why::MediaMismatch(x, y))
             }

@@ -21,6 +21,9 @@
 //   wlan      Wlan, WlanNet, WlanJoin, Band, Security: the networks of access points and what
 //             stations join; bands, ranges, radio ports, channels of the models; the scale
 //             of the canvas (dip_per_m)
+//   phys      Place, PlaceKind, Spot, Tree (P1): the places of the physical view -- sites,
+//             buildings, floors, rooms, racks, desks --, where the devices stand, the length of
+//             every cable (by hand or automatic) and the reach of its medium (IEEE 802.3)
 //
 // Device identity is the project's numeric id; ports are referenced by their full interface
 // name ("GigabitEthernet1/0/1", "eth0"), so files stay readable.
@@ -38,6 +41,7 @@ pub mod msg;
 pub mod synth;
 pub mod lab;
 pub mod wlan;
+pub mod phys;
 
 pub use cable::{cable_fits, cable_kind, CableKind, Why};
 pub use catalog::{catalog, model, Category, CliStyle, DeviceKind, Media, Model, PortSpec};
@@ -47,3 +51,5 @@ pub use msg::Msg;
 pub use lab::{Goal, Lab, Text};
 pub use lab::{Assess, Compare, Feedback, Item, ItemKind, Target};
 pub use wlan::{Band, Security, Wlan, WlanJoin, WlanNet};
+pub use catalog::{Form, Optic};
+pub use phys::{Len, Place, PlaceKind, Reach, Spot, Tree};

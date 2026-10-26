@@ -47,7 +47,17 @@
 //            "wpa2-personal", "passphrase": "geheim123", "vlan": 0, "guest": false,
 //            "isolate": false}], "join": null}
 //   "wlan": {"nets": [], "join": {"ssid": "Büro", "passphrase": "geheim123"}}
+//
+// The physical view (phys.rs, P1): the project's "places" (sites, buildings, floors, rooms,
+// racks, desks; empty: one default room), a device's "phys" (its place, rack unit and spot in
+// the room; place 0: the default room) and "optics" (the transceivers it has instead of the
+// model's SR ones, by port), a link's "len_m" (its length set by hand; 0: automatic from the
+// places), the layout's "phys" and "phys_at" (the view shown and its place).  Older files have
+// none of these: every device stands in the default room, every cable gets its automatic
+// length (7 m between two devices in one room without a spot, 4 m to one on the ceiling, 3 m
+// to the cloud), nothing else changes.
 
+use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -123,6 +133,10 @@ record! {
         /// the WLAN settings: the networks of an access point, the one a station joins
         /// (wlan.rs; None: none)
         pub wlan: Option<crate::wlan::Wlan>,
+        /// where it stands in the physical view (phys.rs; place 0: the default room)
+        pub phys: crate::phys::Spot,
+        /// the optics plugged into its cages other than the model's (full port name -> optic)
+        pub optics: BTreeMap<String, crate::catalog::Optic>,
     }
 }
 
@@ -144,6 +158,9 @@ record! {
         pub down: bool,
         pub route: Route,
         pub waypoints: Vec<Point>,
+        /// its length in metres set by hand (0: automatic from the places of both ends,
+        /// phys::length)
+        pub len_m: u32,
     }
 }
 
@@ -171,6 +188,9 @@ record! {
         pub no_snap: bool,
         /// hidden protocols of the event list
         pub filters: Vec<String>,
+        /// the physical view was shown, and the place it showed (0: the top)
+        pub phys: bool,
+        pub phys_at: u32,
     }
 }
 
@@ -196,6 +216,9 @@ record! {
         /// the scale of the canvas: world units (DIP at 100 %) per metre, for the range of
         /// radios (0: wlan::DIP_PER_M, 10)
         pub dip_per_m: u32,
+        /// the places of the physical view: sites, buildings, floors, rooms, racks, desks
+        /// (phys.rs; empty: the default room alone)
+        pub places: Vec<crate::phys::Place>,
     }
 }
 
@@ -339,12 +362,12 @@ impl Project {
     }
     /// every port of a device with the id of its link
     pub fn ports(&self, dev: u32) -> Vec<(PortSpec, Option<u32>)> {
-        let Some(m) = self.model_of(dev) else {
+        let (Some(m), Some(d)) = (self.model_of(dev), self.device(dev)) else {
             return Vec::new();
         };
         m.ports().into_iter().map(|p| {
             let l = self.link_at(dev, &p.name).map(|l| l.id);
-            (p, l)
+            (d.with_optic(p), l)
         }).collect()
     }
     /// the ports of a device without a link
@@ -480,7 +503,7 @@ impl Project {
     pub fn resolve_port(&self, r: &PortRef) -> Result<PortSpec, ProjErr> {
         let d = self.device(r.dev).ok_or(ProjErr::UnknownDevice(r.dev))?;
         let m = catalog::model(&d.model).ok_or_else(|| ProjErr::UnknownModel(d.model.clone()))?;
-        m.port(&r.port).ok_or_else(|| ProjErr::UnknownPort { dev: d.name.clone(), port: r.port.clone() })
+        m.port(&r.port).map(|p| d.with_optic(p)).ok_or_else(|| ProjErr::UnknownPort { dev: d.name.clone(), port: r.port.clone() })
     }
     /// connects two ports; `cable` None takes the right cable for them
     pub fn connect(&mut self, a: &PortRef, b: &PortRef, cable: Option<CableKind>) -> Result<u32, ProjErr> {
@@ -649,6 +672,10 @@ impl Project {
                 v.push(Issue::new(false, Some(d.id), None, m));
             }
         }
+        // the places and where the devices stand (phys.rs)
+        for (error, dev, m) in crate::phys::issues(self) {
+            v.push(Issue::new(error, dev, None, m));
+        }
         v
     }
 
@@ -672,5 +699,17 @@ impl Project {
         }
         p.next_id = p.next_id.max(p.max_id() + 1);
         Ok(p)
+    }
+}
+
+impl Device {
+    /// a port of its model with the optic it has plugged in (Device::optics; P1)
+    pub fn with_optic(&self, mut p: PortSpec) -> PortSpec {
+        if p.optic.is_some()
+            && let Some(o) = self.optics.iter().find(|(k, _)| ifname::same(k, &p.name)).map(|(_, o)| *o)
+        {
+            p.optic = Some(o);
+        }
+        p
     }
 }

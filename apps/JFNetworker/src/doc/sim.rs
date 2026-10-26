@@ -39,6 +39,11 @@
 //                                 devices' WLAN settings (Action::Wlan, no restart), their
 //                                 positions and the project's scale (Action::Scale)
 //
+// The physical view (P1): sync tells the engine every cable's length as the project resolves it
+// (jfn_model::phys::length: by hand or from the places; Action::CableLen, and Connect carries it
+// in Link::len_m), the delay that follows from it (phys::delay_ns; Action::Impair) and the
+// optics of the devices' cages (Action::Optic, no restart).
+//
 // Doc calls sync after every change of the project (edits, undo, redo), so undo and redo send
 // the opposite actions and project and engine never part.  Everything runs on the UI thread
 // (jfn_sim::Inline); the clock is plat::task::now_us, which a script run drives with `wait`.
@@ -70,11 +75,13 @@ struct MDev {
     /// WLAN: its settings and position (no restart for either)
     wlan: Option<jfn_model::Wlan>,
     pos: (i32, i32),
+    /// the optics in its cages (no restart)
+    optics: BTreeMap<String, jfn_model::Optic>,
 }
 
 impl MDev {
     fn of(d: &Device) -> MDev {
-        MDev { name: d.name.clone(), model: d.model.clone(), off: d.off, startup: d.startup_config.clone(), services: d.services.clone(), wlan: d.wlan.clone(), pos: (d.x, d.y) }
+        MDev { name: d.name.clone(), model: d.model.clone(), off: d.off, startup: d.startup_config.clone(), services: d.services.clone(), wlan: d.wlan.clone(), pos: (d.x, d.y), optics: d.optics.clone() }
     }
 
     /// the device must start again: another model, configuration or services
@@ -94,12 +101,25 @@ struct MLink {
     jitter_ns: u64,
     loss_ppm: u32,
     down: bool,
+    /// the length the project resolves (by hand or from the places; phys.rs)
+    len_m: u32,
 }
 
 impl MLink {
-    fn of(l: &Link) -> MLink {
-        MLink { a: l.a.clone(), b: l.b.clone(), cable: l.cable, kbps: l.kbps, delay_ns: l.delay_ns, jitter_ns: l.jitter_ns, loss_ppm: l.loss_ppm, down: l.down }
+    /// a link as the engine runs it: its resolved length and the delay that follows (phys.rs)
+    fn of(l: &Link, len_m: u32, delay_ns: u64) -> MLink {
+        MLink { a: l.a.clone(), b: l.b.clone(), cable: l.cable, kbps: l.kbps, delay_ns, jitter_ns: l.jitter_ns, loss_ppm: l.loss_ppm, down: l.down, len_m }
     }
+}
+
+/// a project's link with the length and delay its places give it (what Action::Connect takes)
+fn resolved(p: &Project, tree: &jfn_model::Tree, l: &Link) -> (Link, u32, u64) {
+    let len = jfn_model::phys::length(p, tree, l).m;
+    let delay = jfn_model::phys::delay_ns(p, tree, l);
+    let mut x = l.clone();
+    x.len_m = len;
+    x.delay_ns = delay;
+    (x, len, delay)
 }
 
 /// the new value when it differs from the old one
@@ -248,8 +268,10 @@ impl Sim {
                 s.devs.insert(d.id, MDev::of(d));
                 s.fix_name(d);
             }
+            let tree = jfn_model::Tree::of(p);
             for l in &p.links {
-                s.links.insert(l.id, MLink::of(l));
+                let (_, len, delay) = resolved(p, &tree, l);
+                s.links.insert(l.id, MLink::of(l, len, delay));
             }
         } else {
             // piece by piece: what the engine takes runs, the rest is in `errors`
@@ -349,18 +371,31 @@ impl Sim {
             if m.pos != (d.x, d.y) && self.act(Action::Move { dev: d.id, x: d.x, y: d.y }).is_ok() {
                 now.pos = (d.x, d.y);
             }
+            // the optics in its cages (phys.rs, no restart)
+            if m.optics != d.optics {
+                let ports: alloc::collections::BTreeSet<String> = m.optics.keys().chain(d.optics.keys()).cloned().collect();
+                for port in ports {
+                    let optic = d.optics.get(&port).copied().unwrap_or(jfn_model::Optic::Sr);
+                    if m.optics.get(&port).copied().unwrap_or(jfn_model::Optic::Sr) != optic {
+                        let _ = self.act(Action::Optic { dev: d.id, port, optic });
+                    }
+                }
+                now.optics = d.optics.clone();
+            }
             self.devs.insert(d.id, now);
         }
         // the scale of the canvas (the ranges of the radios)
         if self.scale != p.dip_per_m && self.act(Action::Scale { dip_per_m: p.dip_per_m }).is_ok() {
             self.scale = p.dip_per_m;
         }
-        // new links; kind, plug and quality
+        // new links; kind, plug and quality; the lengths and delays of the places (phys.rs)
+        let tree = jfn_model::Tree::of(p);
         for l in &p.links {
+            let (x, len, delay) = resolved(p, &tree, l);
             let Some(m) = self.links.get(&l.id).cloned() else {
-                match self.act(Action::Connect(l.clone())) {
+                match self.act(Action::Connect(x)) {
                     Ok(()) => {
-                        self.links.insert(l.id, MLink::of(l));
+                        self.links.insert(l.id, MLink::of(l, len, delay));
                         self.errors.remove(&l.id);
                     }
                     Err(e) => {
@@ -386,9 +421,12 @@ impl Sim {
             }
             // a speed of 0 is no speed (the engine keeps the ports' one)
             let kbps = if l.kbps == 0 { None } else { diff(m.kbps, l.kbps) };
-            let (delay_ns, jitter_ns, loss_ppm) = (diff(m.delay_ns, l.delay_ns), diff(m.jitter_ns, l.jitter_ns), diff(m.loss_ppm, l.loss_ppm));
+            let (delay_ns, jitter_ns, loss_ppm) = (diff(m.delay_ns, delay), diff(m.jitter_ns, l.jitter_ns), diff(m.loss_ppm, l.loss_ppm));
             if (kbps, delay_ns, jitter_ns, loss_ppm) != (None, None, None, None) && self.act(Action::Impair { link: l.id, kbps, delay_ns, jitter_ns, loss_ppm }).is_ok() {
-                (now.kbps, now.delay_ns, now.jitter_ns, now.loss_ppm) = (l.kbps, l.delay_ns, l.jitter_ns, l.loss_ppm);
+                (now.kbps, now.delay_ns, now.jitter_ns, now.loss_ppm) = (l.kbps, delay, l.jitter_ns, l.loss_ppm);
+            }
+            if m.len_m != len && self.act(Action::CableLen { link: l.id, len_m: len }).is_ok() {
+                now.len_m = len;
             }
             self.links.insert(l.id, now);
         }

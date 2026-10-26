@@ -1,0 +1,57 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/phys_campus.jfnet
+# the shot matrix of the physical view (P1): the server room (racks, the ways out, PC4's cable
+# marked too long, its inspector), the front of Rack 1, the ground floor of Haus A and the
+# campus, each light and dark at 100 and 150 % (build/jfnetworker/phys_<view>_<theme>_<scale>.png)
+size 1280 900
+theme light
+wait 1000
+# ---- the server room with PC4's cable selected (on the canvas: the views share the selection)
+click listitem:"Kabel PC4 eth0 – SW1 Gi1/0/5, Kupfer, gerade, unten"
+cmd 381
+wait 100
+expect listitem:"Kabel PC4 eth0 – SW1 Gi1/0/5, 208 m, erlaubt 100 m (1000BASE-T), zu lang" selected
+shot build/jfnetworker/phys_room_light_100.png
+theme dark
+shot build/jfnetworker/phys_room_dark_100.png
+scale 150
+shot build/jfnetworker/phys_room_dark_150.png
+theme light
+shot build/jfnetworker/phys_room_light_150.png
+scale 100
+# ---- the front of Rack 1
+dblclick listitem:"Rack Rack 1, 2 Geräte"
+wait 100
+click listitem:"SW1, Rack 1, HE 20"
+wait 100
+shot build/jfnetworker/phys_rack_light_100.png
+theme dark
+shot build/jfnetworker/phys_rack_dark_100.png
+scale 150
+shot build/jfnetworker/phys_rack_dark_150.png
+theme light
+shot build/jfnetworker/phys_rack_light_150.png
+scale 100
+# ---- the ground floor of Haus A
+click button:"EG"
+wait 100
+click listitem:"Raum Büro 1, 3 Geräte"
+wait 100
+shot build/jfnetworker/phys_floor_light_100.png
+theme dark
+shot build/jfnetworker/phys_floor_dark_100.png
+scale 150
+shot build/jfnetworker/phys_floor_dark_150.png
+theme light
+shot build/jfnetworker/phys_floor_light_150.png
+scale 100
+# ---- the campus
+click button:"Campus"
+wait 100
+shot build/jfnetworker/phys_site_light_100.png
+theme dark
+shot build/jfnetworker/phys_site_dark_100.png
+scale 150
+shot build/jfnetworker/phys_site_dark_150.png
+theme light
+shot build/jfnetworker/phys_site_light_150.png
+scale 100
