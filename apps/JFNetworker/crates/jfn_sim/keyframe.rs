@@ -525,6 +525,8 @@ fn node_bytes(n: &crate::node::Node, f: &mut Footprint) {
         f.tcp += os.tcp.footprint();
         // the resolver's cache and lookups, its latency window, the disk
         b += os.resolver.cache.len() * 128 + os.resolver.lookups.len() * 256 + os.resolver.latency.bytes() + 1024;
+        // the files on the device (each copy holds their bytes; the system image has none)
+        b += os.files.len() * 96 + (os.files.used() - os.files.image.as_ref().map_or(0, |i| i.1)) as usize;
     }
     f.devices += b;
 }
