@@ -245,7 +245,8 @@ impl Ui {
     // the platform takes the drag over (headless: kept for the scripts) -> it did
     fn dnd_go_out(&mut self) -> bool {
         let data = self.dnd.data.clone();
-        let ok = if self.headless {
+        // (hot reload: the replay keeps the drag inside; recording, it ends the replays)
+        let ok = if self.headless || self.hr_outside("a drag out of the app") {
             self.dnd.out = Some(data);
             true
         } else {

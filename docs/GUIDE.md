@@ -161,6 +161,7 @@ depend on the host; never report a VFS write as durable before its completion ar
 python build_rs.py app NAME                    # build/win/NAME.exe and build/linux/NAME
 python build_rs.py app NAME --target win       # one target
 python build_rs.py run NAME -- --shot out.png  # build and start (Linux: --target linux, via WSL)
+python build_rs.py watch NAME                  # hot reload: build on save, restart in the session (section 30)
 python build_rs.py app NAME --style kde --out build/kde
 python build_rs.py app NAME --release          # opt-level 2 + LTO
 python build_rs.py app NAME --profile size     # smaller release variant (packages)
@@ -1391,7 +1392,8 @@ if (desc.render)(&args, &mut dst) == 0 {
   `--log-events`, `--auto-close MS`, `--threads N`, `--simd sse2` (no AVX2 paths), `--inspect`
   (the live inspector, §30). Environment: `jfgui_DEBUG=1` (layout / render trace), `jfgui_CSD=1`,
   `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`,
-  `jfgui_INSPECT=1` (the inspector's hot keys Ctrl+Shift+I / F12 work).
+  `jfgui_INSPECT=1` (the inspector's hot keys Ctrl+Shift+I / F12 work), `jfgui_HOTRELOAD=DIR`
+  (hot reload's session, set by `build_rs.py watch`; development builds, §30).
 * **Never start an app without `--shot`, `--script` or `--auto-close`**: a plain start opens a
   real window on the user's desktop. PaintCraft saves its settings when a real window closes:
   every real-window run needs `--config build/<name>/cfg` (the capture tools set
@@ -3312,6 +3314,55 @@ S|none`, `inspect option outlines|order|dirty on|off`, `inspect tab widgets|fram
 excluded|selected S|none|hover S|none|selector "s"|copied "s"` (`excluded`: no record of the
 inspector's window in the tree). The inspector's window has the id 2147422208 (`expect window
 2147422208 open`, `shot F window 2147422208`).
+
+### Hot reload: `build_rs.py watch`
+
+`python build_rs.py watch NAME [--target win|linux] [-- ARGS]` builds the app, starts it and
+watches its sources, its assets and build files and the sources of every library and style
+crate it links. When files were saved it builds again (a development build, incremental; never
+`--release`) and starts the app again in its *session*: the app is where it was, with the
+change in it. Nothing in the app changes for this -- the widgets stay compiled Rust, no state
+structure is prescribed:
+
+* **The app's state** comes back by replaying the session's input. A development build of `ui`
+  (`--cfg jfgui_dev`, `lib/ui/hotreload.rs`) started with `jfgui_HOTRELOAD=DIR` records every
+  platform event that reaches the app (pointer, wheel, keys, text, input-method commits, a
+  window's close button: the fields `--log-events` prints, with the time), the main window's
+  size and dpi, the app's keyboard state (`UIC_ACTIVE`) and what the app's clipboard reads
+  returned. The next start replays the log before its first wait: the clock goes from record
+  to record (timers fire at their deadlines, animations jump), every batch of events goes
+  through the normal event handling, so the new code builds the state from the same input.
+  The replay leaves the system's clipboard, file dialogs, sounds, URLs and drags to other
+  programs alone.
+* **Divergence**: every press, wheel turn, release, key and text event must reach the same
+  widget id as when it was recorded (the widget under the pointer, the pressed one, the
+  focused one). When the change moved widgets so that an event reaches another one, the start
+  reports `diverged: a press reached #40 instead of #20` and ends with exit code 3; `watch`
+  puts the log aside and starts the app afresh. Input a replay cannot repeat -- a drop or drag
+  of another program, the system's file dialog, a drag out of the app -- marks the log: the
+  next start is fresh as well.
+* **Kept besides the state**: the window's position and size (the session's `window.ini`
+  through `jfgui_STATE`; tool windows open again only when the replay opens them), the style,
+  the text scale and the inspector -- open, tab, options and its selection (by its script
+  selector) -- in `carry.ini`; a fresh start keeps them too.
+* **A failed build**: the old version keeps running; the error appears in the console and at
+  the top of the inspector ("Bau fehlgeschlagen"), which opens for it.
+* The session lives in `build/<target>/hot/NAME/` (`events.log`, `carry.ini`, `window.ini`,
+  `replay.txt` with the start's report, `build.txt`, the watcher's request `ctl`); the program
+  runs as a copy `build/<target>/NAME.hot[.exe]`, so the next build can write the exe. Asked
+  to end, the app ends as with `--auto-close` (placement, log and carried state written); one
+  that does not end within 5 s is killed. `watch` begins a new session; an app closed by the
+  user starts afresh after the next change; Ctrl+C ends `watch` and the app.
+* Off it costs nothing: without `jfgui_HOTRELOAD` the runtime's hooks test one flag, nothing
+  is recorded or read (the inspector's `expect same` / `idle` hold); in `--release` builds (and
+  for the browser and Android) the flag is a constant false and the hooks fold away.
+* What a replay does not know: files the app read or wrote, the network, the timing of
+  background tasks, agent actions, the real clock -- such parts of the state may differ after
+  a restart.
+* Tests: `python tools/tests/test_hotreload.py [--quick] [--target win|linux]` (the watcher with
+  a stand-in program -- the suite runs this part; a temporary app built, recorded, replayed,
+  diverged and failed headless on Windows and Linux; the window loop on a Windows desktop of
+  its own, never on the user's screen).
 
 ## 31. SVG images and the image viewer
 

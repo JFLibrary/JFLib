@@ -754,6 +754,7 @@ impl Ui {
         if self.m.ins.picking {
             self.text(TS_CAPTION | TX_ACCENT, tr("Klicken Sie auf ein Widget (Esc beendet)"));
         }
+        self.hr_ins_note(); // a failed build of hot reload (hotreload.rs)
         let mut tab = self.m.ins.tab;
         self.segmented(ID_TABS, &mut tab, &[tr("Widgets"), tr("Bildaufbau"), tr("Farben")]);
         self.m.ins.tab = tab;
@@ -1393,12 +1394,40 @@ impl Ui {
                 self.fail(b"expected a quoted string");
                 return;
             };
-            let have = self.clip_get(CLIP_TEXT).unwrap_or_default();
+            let have = self.clip_read(CLIP_TEXT).unwrap_or_default();
             if have != want {
                 self.fail(format!("the clipboard holds {:?}", String::from_utf8_lossy(&have)).as_bytes());
             }
         } else {
             self.fail(b"inspect expect open|closed|pick on|off|flash on|off|idle|same|excluded|selected S|hover S|selector \"s\"|copied \"s\"");
         }
+    }
+
+    // ------------------------------------------------------------------ hot reload
+
+    /// (hotreload.rs) what a restart keeps: armed, open, tab, options (outlines, order,
+    /// dirty), the selected widget's script selector
+    pub(crate) fn ins_carry(&self) -> (bool, bool, i32, [i32; 3], Option<String>) {
+        let s = &self.m.ins;
+        let sel = s.sel_rec.as_ref().map(|r| self.ins_selector(r));
+        (s.armed, s.on, s.tab, [s.outlines, s.order, s.flash], sel)
+    }
+
+    /// (hotreload.rs) set it again after a restart; the selector is looked up in the tree of a
+    /// pass with the inspector open (a widget that is gone stays unselected)
+    pub(crate) fn ins_restore(&mut self, app: &mut dyn App, armed: bool, on: bool, tab: i32, opts: [i32; 3], sel: Option<&str>) {
+        self.inspect_enable(armed || on);
+        self.inspect_show(on);
+        [self.m.ins.outlines, self.m.ins.order, self.m.ins.flash] = opts;
+        self.run_passes(app);
+        if let Some(Sel::Rec(k)) = sel.filter(|_| on).and_then(|p| self.resolve(p.as_bytes()).0) {
+            let nodes = self.ins_tree();
+            if let Some(i) = nodes.iter().position(|n| n.sem == k) {
+                self.ins_select(&nodes, i);
+            }
+        }
+        self.m.ins.tab = tab.clamp(0, 2);
+        self.invalidate();
+        self.run_passes(app);
     }
 }

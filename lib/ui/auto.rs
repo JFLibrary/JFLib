@@ -2521,10 +2521,10 @@ impl Ui {
                 Some((f, rest)) => {
                     let name = String::from_utf8_lossy(&f).into_owned();
                     let data = match rest {
-                        b"text" => self.clip_get(CLIP_TEXT),
-                        b"html" => self.clip_get(CLIP_HTML),
-                        b"rtf" => self.clip_get(CLIP_RTF),
-                        b"docx" => self.clip_get(CLIP_DOCX),
+                        b"text" => self.clip_read(CLIP_TEXT),
+                        b"html" => self.clip_read(CLIP_HTML),
+                        b"rtf" => self.clip_read(CLIP_RTF),
+                        b"docx" => self.clip_read(CLIP_DOCX),
                         _ if rest.first() == Some(&b'b') => self.dr.hi_bmp.clone(),
                         _ => self.hclip_img_get(CLIP_PNG),
                     };

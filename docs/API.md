@@ -286,6 +286,8 @@ Command line (every app):
   --auto-close MS     close the window after MS milliseconds (smoke tests)
   --verify-dirty      after every partial redraw compare with a full redraw
   --inspect           the live inspector open (inspect.rs; jfgui_INSPECT=1: its hot keys only)
+  (jfgui_HOTRELOAD=DIR: hot reload's session of `build_rs.py watch`, development builds:
+  the input recorded and replayed at the next start, hotreload.rs)
 
 The frame loop: platform events are applied to the input state one "edge" (button,
 key, wheel) at a time; each edge runs App::frame (plus up to three settle passes when

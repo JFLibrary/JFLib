@@ -24,6 +24,8 @@
 //   --auto-close MS     close the window after MS milliseconds (smoke tests)
 //   --verify-dirty      after every partial redraw compare with a full redraw
 //   --inspect           the live inspector open (inspect.rs; jfgui_INSPECT=1: its hot keys only)
+//   (jfgui_HOTRELOAD=DIR: hot reload's session of `build_rs.py watch`, development builds:
+//   the input recorded and replayed at the next start, hotreload.rs)
 //
 // The frame loop: platform events are applied to the input state one "edge" (button,
 // key, wheel) at a time; each edge runs App::frame (plus up to three settle passes when
@@ -491,10 +493,13 @@ impl Ui {
 
     // Browser batches retain every input edge and its app passes, but rasterize only
     // after the batch. Routing/capture changes must take effect before the next edge.
-    fn process_events_deferred(&mut self, app: &mut dyn App, render: bool) {
+    pub(crate) fn process_events_deferred(&mut self, app: &mut dyn App, render: bool) {
         let mut text_pending = false;
         let mut text_win: i32 = -1;
         while let Some(mut ev) = plat::evq_pop() {
+            if self.hr_on() {
+                self.hr_popped(&ev); // (hotreload.rs) replayed or recorded
+            }
             if !self.headless {
                 let w = self.uiw_from_pw(ev.win as i32);
                 if w < 0 {
@@ -622,6 +627,9 @@ impl Ui {
                 self.need_render = true;
             }
             self.uiw_use(t as u32);
+            if self.hr_on() {
+                self.hr_input(&ev, t as u32); // (hotreload.rs) recorded or checked
+            }
             match self.input_event(&ev) {
                 2 => {
                     text_pending = true;
@@ -639,9 +647,9 @@ impl Ui {
             self.need_render = true;
         }
         // the app as a whole got or lost the keyboard (focus moving between its windows
-        // within one batch does not count)
+        // within one batch does not count; hot reload: recorded, not while replaying)
         let active = self.app_focus != 0;
-        if active != self.app_active {
+        if active != self.app_active && self.hr_active(active) {
             self.app_active = active;
             if !active {
                 // (§6) like the system's menus: the popups of every window close (they may
@@ -655,6 +663,9 @@ impl Ui {
         if self.uiw_moved_passes() {
             self.run_passes(app);
             self.need_render = true;
+        }
+        if self.hr_on() {
+            self.hr_batch_end(); // (hotreload.rs) the batch's records written
         }
         if render && self.need_render {
             self.need_render = false;
@@ -1106,6 +1117,7 @@ fn cli_theme(ui: &mut Ui) {
 pub fn run(desc: &AppDesc, app: &mut dyn App, style: &'static dyn Style) -> i32 {
     let (mut ui, w, h) = prepare(desc, style);
     let ui = &mut ui;
+    ui.hr_init(); // hot reload: jfgui_HOTRELOAD (hotreload.rs; development builds)
     let args = Args(plat::args());
     let shot = args.value("--shot");
     let script = args.value("--script");
@@ -1132,11 +1144,19 @@ pub fn run(desc: &AppDesc, app: &mut dyn App, style: &'static dyn Style) -> i32 
     }
     cli_theme(ui);
     ui.run_passes(app);
+    // hot reload: the session's log replayed first (hotreload.rs)
+    if !ui.hr_start(app) {
+        return super::hotreload::HR_EXIT_DIVERGED;
+    }
     if let Some(protocol) = agent_mode {
-        return super::agent::serve(ui, app, protocol);
+        let r = super::agent::serve(ui, app, protocol);
+        ui.hr_end();
+        return r;
     }
     if let Some(s) = script {
-        return ui.script_run(app, s);
+        let r = ui.script_run(app, s);
+        ui.hr_end();
+        return r;
     }
     let shot = shot.unwrap_or("");
     ui.render();
@@ -1147,6 +1167,7 @@ pub fn run(desc: &AppDesc, app: &mut dyn App, style: &'static dyn Style) -> i32 
     if args.flag("--dump") {
         ui.dump(None);
     }
+    ui.hr_end();
     plat::write_stdout(alloc::format!("wrote {}\n", shot).as_bytes());
     0
 }
@@ -1210,6 +1231,14 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
     if let Some(ini) = &saved {
         ui.ws_windows(ini);
     }
+    // hot reload: the session's log replayed before the first wait (hotreload.rs); diverged:
+    // the watcher starts the app again afresh
+    if !ui.hr_start(app) {
+        ui.call_cmd(app, UIC_EXIT, 0);
+        ui.set_agent_enabled(false);
+        super::perm::ask_here(false);
+        return super::hotreload::HR_EXIT_DIVERGED;
+    }
     loop {
         if ui.quit {
             break;
@@ -1239,6 +1268,9 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
         if ui.close_at != 0 && ui.close_at < dl {
             dl = ui.close_at;
         }
+        if ui.hr_on() && ui.hr_deadline().wrapping_sub(ui.now_ms) < dl.wrapping_sub(ui.now_ms) {
+            dl = ui.hr_deadline(); // hot reload: the watcher's files (hotreload.rs)
+        }
         // ms since start -> absolute us; tasks: their timers (the task clock is time_us here),
         // no wait while some are ready
         let mut deadline = if dl == u32::MAX { u64::MAX } else { dl as u64 * 1000 + ui.t0_us };
@@ -1257,6 +1289,9 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
         if ui.animating || ui.tasks_ready() {
             ui.need = true;
         }
+        if ui.hr_on() {
+            ui.hr_poll(); // hot reload: "quit", a failed build (hotreload.rs)
+        }
         ui.tick_timers();
         ui.process_events(app);
     }
@@ -1269,6 +1304,7 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
             plat::log_warn("app", &alloc::format!("could not write {}", p));
         }
     }
+    ui.hr_end(); // hot reload: the log's end, the carried state (hotreload.rs)
     ui.call_cmd(app, UIC_EXIT, 0);
     ui.set_agent_enabled(false);
     super::perm::ask_here(false); // threads still waiting for an answer are refused

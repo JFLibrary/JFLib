@@ -126,6 +126,9 @@ pub use imgview::{ImageViewState, SvgFonts, SvgText, ViewImage, IV_NO_BARS, IV_N
 pub use img_svg::Svg;
 mod history;
 pub use history::{Edit, History, Snapshot};
+// hot reload: the session's input recorded and replayed after a restart (build_rs.py watch;
+// development builds only)
+mod hotreload;
 // hyphenation of wrapped texts and text boxes (TX_HYPHENATE, TB_HYPHENATE)
 mod hyph;
 pub mod i18n;
@@ -378,6 +381,8 @@ pub(crate) struct Mods {
     pub(crate) code: code_edit::S,
     /// (ROADMAP §12) the live inspector (inspect.rs)
     pub(crate) ins: inspect::S,
+    /// (ROADMAP §11) hot reload: the session's record and replay (hotreload.rs)
+    pub(crate) hr: hotreload::S,
     /// (ROADMAP §6) ui.svg's draw objects, the faces of SVG text (imgview.rs)
     pub(crate) svg: imgview::S,
     /// (ROADMAP §4) hyphenation: languages, dictionaries (hyph.rs)
