@@ -133,6 +133,9 @@
 //   keyframe rewinding (K1): keyframes of the whole engine within a memory budget and the inputs
 //            between them (Inline::rewind_on), a replay to any recorded moment (Restore), a
 //            past state that becomes the present (Inline::resume); footprint, digest
+//   phys     the physical layer (P1): cable lengths against the reach of their media, the
+//            optics of fibres; Action::CableLen / Optic, cable_phys, PhysNote (Note::Phys),
+//            the problems CableTooLong and OpticMismatch
 //
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
@@ -216,6 +219,7 @@ pub mod tftpc;
 pub mod ftpd;
 pub mod ftpc;
 pub mod keyframe;
+pub mod phys;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -278,3 +282,4 @@ pub use tftpc::{Sink, Style, TftpClient};
 pub use ftpd::{FtpServer, FtpUser};
 pub use ftpc::FtpProgram;
 pub use keyframe::{Budget, Footprint, InKind, Input, Past, Pos, Restore, Rewind, Target};
+pub use phys::{CablePhys, PhysFault, PhysNote};

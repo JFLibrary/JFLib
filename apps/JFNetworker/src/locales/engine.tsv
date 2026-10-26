@@ -1103,3 +1103,47 @@ FTP: aktive Datenverbindung zu {} Port {}.	FTP: active data connection to {} por
 FTP: {} abgelehnt ({}).	FTP: {} refused ({}).
 FTP: {} fertig, {} Bytes.	FTP: {} done, {} bytes.
 FTP: {} passt nicht: Kontingent oder Speicher erschöpft.	FTP: {} does not fit: quota or space used up.
+
+# P1: the physical view -- optics, forms, places, their refusals, cables too long (catalog.rs, phys.rs of jfn_model and jfn_sim, goal.rs)
+SR, Multimode (kurze Strecken)	SR, multimode (short reach)
+LR, Singlemode (bis 10 km)	LR, single-mode (up to 10 km)
+Rack-Gerät	Rack device
+Tischgerät	Desktop device
+Mobilgerät	Mobile device
+Decken- oder Wandgerät	Ceiling or wall device
+Standgerät	Floor-standing device
+ohne Ort	no place
+Standort	Site
+Gebäude	Building
+Etage	Floor
+Raum	Room
+Rack	Rack
+Tisch	Desk
+Die Ortsnummer {} kommt doppelt vor.	The place number {} appears twice.
+Der Ort „{}“ liegt in keinem passenden Ort.	The place “{}” lies in no fitting place.
+Der Plan hat keinen Raum: die Geräte haben keinen Ort.	The plan has no room: the devices have no place.
+{} steht an keinem gültigen Ort (Nummer {}); es zählt der erste Raum.	{} stands in no valid place (number {}); the first room counts.
+{} ist kein Rack-Gerät und steckt doch im Rack „{}“.	{} is no rack device but sits in the rack “{}”.
+{} belegt im Rack „{}“ Höheneinheiten, die nicht frei sind (ab HE {}).	{} takes rack units of the rack “{}” that are not free (from U {}).
+Den Ort {} gibt es nicht.	There is no place {}.
+Ein Ort der Art {} gehört nicht in einen Ort der Art {}.	A place of the kind {} does not belong in a place of the kind {}.
+„{}“ taugt nicht als Name: 1 bis 63 Zeichen.	“{}” is no name: 1 to 63 characters.
+Der letzte Raum bleibt: jedes Gerät braucht einen Ort.	The last room stays: every device needs a place.
+In einem Ort der Art {} stehen keine Geräte: in einen Raum, ein Rack oder auf einen Tisch.	No devices stand in a place of the kind {}: into a room, a rack or onto a desk.
+{} ist kein Rack-Gerät.	{} is no rack device.
+Im Rack „{}“ ist die Höheneinheit {} nicht frei.	In the rack “{}” the rack unit {} is not free.
+Im Rack „{}“ sind die Höheneinheiten {} bis {} nicht frei.	In the rack “{}” the rack units {} to {} are not free.
+Im Rack „{}“ ist kein Platz mehr.	The rack “{}” has no room left.
+Die Geräte im Rack brauchen mindestens {} Höheneinheiten.	The devices in the rack need at least {} rack units.
+Breite und Tiefe: 0,1 bis 10 000 m.	Width and depth: 0.1 to 10,000 m.
+{} m geht nicht: 0 (automatisch) bis 100 000 m.	{} m is not possible: 0 (automatic) to 100,000 m.
+{} hat keinen Schacht für eine Optik.	{} has no cage for optics.
+an dem Port steckt kein Kabel	no cable at the port
+die Leitung ist aktiv	the link is up
+die Leitung ist unten	the link is down
+Kabel an {} zu lang: {} m, erlaubt {} m ({}); die Leitung bleibt aus.	Cable at {} too long: {} m, {} m allowed ({}); the link stays down.
+Optik {} an {} passt nicht zur Optik {} am anderen Ende; die Leitung bleibt aus.	Optics {} at {} do not fit the optics {} at the far end; the link stays down.
+{} passt nicht zur Optik {} an {}; die Leitung bleibt aus.	{} does not fit the optics {} at {}; the link stays down.
+Kabel zu lang: {} m, erlaubt {} m ({} zwischen {} und {}); die Leitung bleibt aus.	Cable too long: {} m, {} m allowed ({} between {} and {}); the link stays down.
+Optiken passen nicht: {} an {}, {} an {}; die Leitung bleibt aus.	Optics do not fit: {} at {}, {} at {}; the link stays down.
+{} zwischen {} und {} passt nicht zur Optik {} (SR braucht Multimode, LR Singlemode); die Leitung bleibt aus.	{} between {} and {} does not fit the optics {} (SR needs multimode, LR single-mode); the link stays down.

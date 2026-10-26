@@ -1,0 +1,78 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/phys_campus.jfnet
+# a cable that is too long, shown and fixed (P1) on tests/fixtures/phys_campus.jfnet: PC4 in
+# the lab of Haus B hangs on SW1 in Haus A by 208 m of copper -- the problem in the Probleme
+# panel, the cable "unten" on the canvas, its length, limit and refusal in the inspector, the
+# marked cable in the physical view; 90 m by hand brings it up (undone: down again), PC4 moved
+# into Büro 1 from the inspector brings it up for good (23 m).  Ids: 57456 the length by hand,
+# 57448 the list of places.
+size 1280 900
+theme light
+wait 1000
+# the problem
+click tab:"Probleme"
+expect text:"Kabel zu lang: 208 m, erlaubt 100 m (1000BASE-T zwischen PC4 eth0 und SW1 Gi1/0/5); die Leitung bleibt aus." exists
+# the cable on the canvas: down, its length and limit in the inspector
+expect listitem:"Kabel PC4 eth0 – SW1 Gi1/0/5, Kupfer, gerade, unten" exists
+click listitem:"Kabel PC4 eth0 – SW1 Gi1/0/5, Kupfer, gerade, unten"
+wait 100
+expect text:"208 m (automatisch)" exists
+expect text:"100 m (1000BASE-T)" exists
+expect text:"Zu lang: 208 m, erlaubt 100 m. Die Leitung bleibt aus." exists
+expect text:"Campus › Haus B › EG › Labor" exists
+shot build/jfnetworker/phys_length_inspector.png
+# the same cable in the physical view: marked, with its length and limit
+cmd 381
+wait 100
+expect listitem:"Kabel PC4 eth0 – SW1 Gi1/0/5, 208 m, erlaubt 100 m (1000BASE-T), zu lang" exists
+shot build/jfnetworker/phys_length_plan.png
+cmd 380
+wait 100
+# 90 m by hand: it comes up
+focus #57456
+click #57456
+key ctrl+a
+type "90\n"
+wait 500
+expect text:"90 m (von Hand; automatisch 208 m)" exists
+expect listitem:"Kabel PC4 eth0 – SW1 Gi1/0/5, Kupfer, gerade, aktiv" exists
+expect text:"Kabel zu lang: 208 m, erlaubt 100 m (1000BASE-T zwischen PC4 eth0 und SW1 Gi1/0/5); die Leitung bleibt aus." missing
+# more than 100 m by hand: down again with that length
+focus #57456
+click #57456
+key ctrl+a
+type "132\n"
+wait 500
+expect text:"Kabel zu lang: 132 m, erlaubt 100 m (1000BASE-T zwischen PC4 eth0 und SW1 Gi1/0/5); die Leitung bleibt aus." exists
+expect listitem:"Kabel PC4 eth0 – SW1 Gi1/0/5, Kupfer, gerade, unten" exists
+focus button:"Automatisch"
+click button:"Automatisch"
+wait 500
+expect text:"208 m (automatisch)" exists
+click button:"Rückgängig"
+wait 500
+expect text:"132 m (von Hand; automatisch 208 m)" exists
+click button:"Rückgängig"
+click button:"Rückgängig"
+wait 500
+expect text:"208 m (automatisch)" exists
+expect listitem:"Kabel PC4 eth0 – SW1 Gi1/0/5, Kupfer, gerade, unten" exists
+# a length that is no number
+focus #57456
+click #57456
+key ctrl+a
+type "lang\n"
+expect text:"Die Länge ist eine ganze Zahl von Metern (0: automatisch)." exists
+# PC4 into Büro 1 from its inspector: 23 m, the cable comes up
+click listitem:"PC4"
+wait 100
+expect text:"Labor (ohne Platz)" exists
+focus #57448
+click #57448
+click "Campus › Haus A › EG › Büro 1"
+wait 500
+expect text:"Büro 1 (ohne Platz)" exists
+expect listitem:"Kabel PC4 eth0 – SW1 Gi1/0/5, Kupfer, gerade, aktiv" exists
+expect text:"Kabel zu lang: 208 m, erlaubt 100 m (1000BASE-T zwischen PC4 eth0 und SW1 Gi1/0/5); die Leitung bleibt aus." missing
+click listitem:"Kabel PC4 eth0 – SW1 Gi1/0/5, Kupfer, gerade, aktiv"
+expect text:"23 m (automatisch)" exists
+shot build/jfnetworker/phys_length_fixed.png

@@ -18,7 +18,9 @@
 //                                                 (wlantrace.rs: Note::Wlan); BGP's layer 7,
 //                                                 as TCP carries it (bgptrace.rs: Note::Bgp);
 //                                                 TFTP's and FTP's layer 7 (xfertrace.rs:
-//                                                 Note::Xfer)
+//                                                 Note::Xfer); a cable too long or with
+//                                                 optics that do not fit layer 1 (phys.rs:
+//                                                 Note::Phys)
 //   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
 //                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
@@ -464,6 +466,8 @@ pub enum Note {
     /// file transfers (tftpd.rs, tftpc.rs, ftpd.rs, ftpc.rs; xfertrace.rs): requests, blocks,
     /// logins, data connections, errors (layer 7)
     Xfer(crate::xfertrace::XNote),
+    /// the physical layer (phys.rs, P1): a cable too long, optics that do not fit (layer 1)
+    Phys(crate::phys::PhysNote),
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -587,6 +591,7 @@ impl Note {
             n if n.is_ospf() => 3,
             Note::Bgp(_) => 7,
             Note::Xfer(_) => 7,
+            Note::Phys(_) => 1,
             _ => 2,
         }
     }
@@ -1162,6 +1167,7 @@ impl Note {
             Note::Wlan(n) => n.message(port),
             Note::Bgp(n) => n.message(),
             Note::Xfer(n) => n.message(),
+            Note::Phys(n) => n.message(port),
         }
     }
 }

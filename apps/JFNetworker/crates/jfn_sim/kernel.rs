@@ -92,6 +92,8 @@ pub struct Engine {
     pub(crate) series: crate::series::Sampler,
     /// WLAN: positions, settings, stations and associations (wlan.rs)
     pub(crate) wlan: crate::wlan::WlanState,
+    /// the cables' lengths and the ones too long or with optics that do not fit (phys.rs)
+    pub(crate) phys: crate::phys::PhysState,
 }
 
 impl Engine {
@@ -116,6 +118,7 @@ impl Engine {
             faults: crate::fault::Faults::default(),
             series: crate::series::Sampler::default(),
             wlan: crate::wlan::WlanState::default(),
+            phys: crate::phys::PhysState::default(),
         }
     }
     /// the virtual time
@@ -302,5 +305,12 @@ impl Engine {
     /// entries of the event queue and slots of its slab (keyframe::footprint)
     pub(crate) fn queue_len(&self) -> (usize, usize) {
         (self.heap.len(), self.slab.len())
+    }
+}
+
+impl Engine {
+    /// the cable with this project id carries traffic now (link_up of its slot)
+    pub fn link_idx_up(&self, link: u32) -> bool {
+        self.link_idx.get(&link).is_some_and(|&li| self.link_up(li))
     }
 }

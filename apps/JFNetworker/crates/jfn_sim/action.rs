@@ -63,6 +63,11 @@
 //                                                      tell WLAN too
 //   Files                                              a device's files as the project has them
 //                                                      (files.rs: load, undo; no report back)
+//   CableLen / Optic                                   a cable's length, the optic in a port's
+//                                                      cage (phys.rs, P1: too long or optics that
+//                                                      do not fit keep a cable down); Connect
+//                                                      takes Link::len_m as the cable's length
+//                                                      (0: unknown), AddDevice the device's optics
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -254,6 +259,10 @@ pub enum Action {
     Bgp { dev: u32, set: crate::bgp::BgpSet },
     /// a device's files as the project has them (files.rs): the store takes them as they are
     Files { dev: u32, files: Vec<jfn_model::files::File> },
+    /// the length of a cable in metres (0: unknown, never too long; phys.rs)
+    CableLen { link: u32, len_m: u32 },
+    /// the transceiver in a port's optics cage (phys.rs)
+    Optic { dev: u32, port: String, optic: jfn_model::catalog::Optic },
 }
 
 /// why an action was refused (German text through Display)
@@ -432,6 +441,10 @@ impl Engine {
                         l.loss_ppm = p.min(1_000_000);
                     }
                 }
+                // another speed may have another limit (phys.rs)
+                if kbps.is_some() {
+                    self.phys_update(li);
+                }
                 Ok(())
             }
             Action::SetCable { link, cable } => {
@@ -449,7 +462,8 @@ impl Engine {
                     l.wrong_cable = !crate::link::right_cable(cable, &pa, &pb);
                     l.down = was_down;
                 }
-                self.refresh_link(li);
+                // another medium has another limit, a fibre needs its optics (phys.rs)
+                self.phys_update(li);
                 Ok(())
             }
             Action::Inject { dev, port, frame } => {
@@ -627,6 +641,9 @@ impl Engine {
             Action::Bgp { dev, set } => self.bgp_apply(dev, set),
             // the files of a device (files.rs)
             Action::Files { dev, files } => self.files_set(dev, &files),
+            // the physical layer (phys.rs)
+            Action::CableLen { link, len_m } => self.set_cable_len(link, len_m),
+            Action::Optic { dev, port, optic } => self.set_optic(dev, &port, optic),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }
@@ -875,7 +892,11 @@ impl Engine {
             return Err(ActErr::DeviceExists(d.id));
         }
         let m = catalog::model(&d.model).ok_or_else(|| ActErr::UnknownModel(d.model.clone()))?;
-        let node = Node::new(d.id, &d.name, m, !d.off, self.seed);
+        let mut node = Node::new(d.id, &d.name, m, !d.off, self.seed);
+        // the optics it has plugged in instead of the model's (phys.rs)
+        for p in node.ports.iter_mut() {
+            p.spec = d.with_optic(p.spec.clone());
+        }
         self.nodes.push(Some(node));
         let ni = self.nodes.len() - 1;
         self.dev_idx.insert(d.id, ni);
@@ -957,7 +978,12 @@ impl Engine {
                 node.ports[p as usize].link = Some(li);
             }
         }
+        // its length and what follows from it (phys.rs); one that never comes up says why
+        self.phys_init(li, l.len_m);
         self.refresh_link(li);
+        if self.phys_bad(li) {
+            self.phys_down(li);
+        }
         Ok(li)
     }
 
@@ -976,6 +1002,7 @@ impl Engine {
         }
         self.links[li] = None;
         self.link_idx.remove(&id);
+        self.phys_forget(li);
         Ok(())
     }
 }

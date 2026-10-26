@@ -22,7 +22,11 @@
 // line names how many series and values it has and the CRC-32 of the file.  The expectations
 // are judged by goal.rs (judge, Verdict::report), which the lab's goals in the window share.
 // "move DEV X Y" puts a device's box elsewhere (Action::Move: WLAN stations and access points
-// look again, wlan.rs).
+// look again, wlan.rs).  "place DEV PLACE [UNIT]" (P1) puts a device in another room, rack or
+// desk of the project's places (jfn_model::phys::place_device) and "cable DEV PORT length M"
+// gives a cable a length by hand (0, "auto": automatic again); either way every cable whose
+// length (or the delay that follows from it, phys::delay_ns) changed goes to the engine
+// (Action::CableLen, Action::Impair), and the line names the cables with their new lengths.
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -366,6 +370,50 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
                     ok = false;
                 }
             },
+            // the physical view (P1): a device elsewhere, a cable's length by hand
+            StepKind::Place { dev, place, unit } => {
+                let res = match dev_of(dev, &d) {
+                    None => Err(format!("das Gerät {} gibt es nicht", dev)),
+                    Some(id) => {
+                        let tree = jfn_model::phys::Tree::of(&proj);
+                        match tree.places.iter().find(|x| x.name.eq_ignore_ascii_case(place)).map(|x| x.id) {
+                            None => Err(format!("den Ort {} gibt es nicht", place)),
+                            Some(to) => {
+                                let before = proj.clone();
+                                jfn_model::phys::place_device(&mut proj, id, to, *unit, None, &jfn_model::phys::DEFAULT_NAMES).map_err(|e| e.msg().text()).map(|_| before)
+                            }
+                        }
+                    }
+                };
+                match res {
+                    Ok(before) => {
+                        let what = phys_follow(&before, &proj, &mut d);
+                        r.line(now, "--", &format!("place {} {}{}{}", dev, place, if *unit > 0 { format!(" {}", unit) } else { String::new() }, what));
+                    }
+                    Err(e) => {
+                        r.line(now, "FEHLER", &format!("Zeile {}: {}", step.line, e));
+                        ok = false;
+                    }
+                }
+            }
+            StepKind::CableLen { dev, port, m } => {
+                let Some(link) = dev_of(dev, &d).and_then(|id| proj.link_at(id, port)).map(|l| l.id) else {
+                    r.line(now, "FEHLER", &format!("Zeile {}: an {} {} steckt kein Kabel", step.line, dev, port));
+                    ok = false;
+                    continue;
+                };
+                let before = proj.clone();
+                match jfn_model::phys::set_len(&mut proj, link, *m) {
+                    Ok(()) => {
+                        let what = phys_follow(&before, &proj, &mut d);
+                        r.line(now, "--", &format!("cable {} {} length {}{}", dev, port, if *m == 0 { String::from("auto") } else { format!("{}", m) }, what));
+                    }
+                    Err(e) => {
+                        r.line(now, "FEHLER", &format!("Zeile {}: {}", step.line, e.msg().text()));
+                        ok = false;
+                    }
+                }
+            }
             StepKind::Fault { fault, dur } => match fault_of(&proj, &d.eng, fault) {
                 Ok(f) => {
                     let id = d.eng.next_fault_id();
@@ -443,4 +491,26 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
 fn expect(p: &Project, e: &Engine, r: &Rep, x: &Expect) -> (bool, String) {
     let v = judge(p, e, x, &|id| r.since.get(&id).cloned().unwrap_or_default());
     (v.held, v.report())
+}
+
+/// the engine follows a change of the physical view: every cable whose length or delay is
+/// another now (Action::CableLen, Action::Impair) -> ": NAME 12 m, ..." for the report
+fn phys_follow(before: &Project, after: &Project, d: &mut Inline) -> String {
+    use jfn_model::phys::{delay_ns, length, Tree};
+    let (ta, tb) = (Tree::of(before), Tree::of(after));
+    let mut said = Vec::new();
+    for l in &after.links {
+        let Some(o) = before.link(l.id) else { continue };
+        let (la, lb) = (length(before, &ta, o).m, length(after, &tb, l).m);
+        let (da, db) = (delay_ns(before, &ta, o), delay_ns(after, &tb, l));
+        if la != lb {
+            let _ = d.send(Cmd::Apply(Action::CableLen { link: l.id, len_m: lb }), 0);
+            let name = |r: &jfn_model::PortRef| format!("{} {}", after.device(r.dev).map_or("?", |x| x.name.as_str()), ifname::short(&r.port));
+            said.push(format!("{} \u{2013} {} {} m", name(&l.a), name(&l.b), lb));
+        }
+        if da != db {
+            let _ = d.send(Cmd::Apply(Action::Impair { link: l.id, kbps: None, delay_ns: Some(db), jitter_ns: None, loss_ppm: None }), 0);
+        }
+    }
+    if said.is_empty() { String::new() } else { format!(": {}", said.join(", ")) }
 }

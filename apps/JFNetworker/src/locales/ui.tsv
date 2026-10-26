@@ -1044,3 +1044,101 @@ der Name geht nicht	the name does not work
 das Gerät nimmt sie nicht	the device does not take it
 TFTP-Server	TFTP server
 FTP-Server	FTP server
+
+# P1: the physical view (workspace/phys, doc/phys.rs, app/commands.rs)
+&Logische Ansicht	&Logical view
+&Physische Ansicht	&Physical view
+Eine Ebene &höher	&Up one level
+&Zurück	&Back
+Ö&ffnen	&Open
+Ort &umbenennen …	&Rename place …
+Ort &entfernen	R&emove place
+&Standort hinzufügen	Add &site
+&Gebäude hinzufügen	Add &building
+E&tage hinzufügen	Add &floor
+&Raum hinzufügen	Add r&oom
+R&ack hinzufügen	Add r&ack
+T&isch hinzufügen	Add &desk
+P&hysischer Plan	P&hysical plan
+Erdgeschoss	Ground floor
+Etage hinzufügen	Add floor
+Gebäude hinzufügen	Add building
+Rack hinzufügen	Add rack
+Raum hinzufügen	Add room
+Standort hinzufügen	Add site
+Tisch hinzufügen	Add desk
+Logisch	Logical
+Physisch	Physical
+Ansicht: logisch (Strg+Umschalt+L) oder physisch (Strg+Umschalt+P)	View: logical (Ctrl+Shift+L) or physical (Ctrl+Shift+P)
+Physische Ansicht	Physical view
+Zurück (Umschalt+Rücktaste)	Back (Shift+Backspace)
+Eine Ebene höher	Up one level
+Eine Ebene höher (Rücktaste)	Up one level (Backspace)
+Alle Standorte	All sites
+Ort umbenennen	Rename place
+Ort umbenennen (F2)	Rename place (F2)
+Ort entfernen	Remove place
+Ort entfernen (Entf): seine Geräte kommen in den ersten Raum	Remove place (Del): its devices go to the first room
+Ort	Place
+Höhe	Height
+{} HE	{} U
+Breite (m)	Width (m)
+Höhe (HE)	Height (U)
+Ost (m)	East (m)
+Süd (m)	South (m)
+Tiefe (m)	Depth (m)
+Die Etage ist eine ganze Zahl von -9 bis 99.	The floor is a whole number from -9 to 99.
+Die Höhe ist eine Zahl von Höheneinheiten (1 bis 60).	The height is a number of rack units (1 to 60).
+Position und Größe in Metern, z. B. 2,5; Breite und Tiefe größer als 0.	Position and size in meters, e.g. 2.5; width and depth above 0.
+Platz	Spot
+Bauform	Form
+{}, {} HE	{}, {} U
+Ort wählen …	Choose a place …
+Höheneinheit	Rack unit
+Die Höheneinheit ist eine Zahl ab 1.	The rack unit is a number from 1.
+Im Plan zeigen	Show in the plan
+Optiken	Optics
+Länge	Length
+{} m (automatisch)	{} m (automatic)
+{} m (von Hand; automatisch {} m)	{} m (by hand; automatic {} m)
+Grenze	Limit
+{} m ({})	{} m ({})
+Nach	To
+Laufzeit	Delay
+{} ns aus der Länge	{} ns from the length
+Zu lang: {} m, erlaubt {} m. Die Leitung bleibt aus.	Too long: {} m, {} m allowed. The link stays down.
+Die Optiken passen nicht: {} und {}. Die Leitung bleibt aus.	The optics do not fit: {} and {}. The link stays down.
+Die Faser passt nicht zur Optik {}. Die Leitung bleibt aus.	The fiber does not fit the optics {}. The link stays down.
+Von Hand (m)	By hand (m)
+0: automatisch	0: automatic
+Länge setzen	Set length
+Die Länge ist eine ganze Zahl von Metern (0: automatisch).	The length is a whole number of meters (0: automatic).
+{} (ohne Höheneinheit)	{} (no rack unit)
+{}, HE {}	{}, U {}
+{}, HE {}–{}	{}, U {}–{}
+{} bei {} m Ost, {} m Süd	{} at {} m east, {} m south
+{} (ohne Platz)	{} (no spot)
+{} m	{} m
+{} m (von Hand)	{} m (by hand)
+{} von {} HE	{} of {} U
+Etage {}	Floor {}
+Im Raum, ohne Platz	In the room, no spot
+Im Raum, in keinem Rack	In the room, in no rack
+Weg nach {} {}	Way to {} {}
+{}–{} m	{}–{} m
+1 Kabel · {}	1 cable · {}
+{} Kabel · {}	{} cables · {}
+{} · {} zu lang oder falsch	{} · {} too long or wrong
+Kabel zwischen {} und {}: {}	Cables between {} and {}: {}
+{} – zu lang, erlaubt {} m	{} – too long, {} m allowed
+{} – Optik passt nicht	{} – optics do not fit
+erlaubt {} m ({})	{} m allowed ({})
+ohne Grenze	no limit
+{}, zu lang	{}, too long
+{}, Optik passt nicht	{}, optics do not fit
+Ziehen verschiebt Standorte; ein Doppelklick öffnet einen Standort.	Drag to move sites; a double click opens a site.
+Ziehen verschiebt Gebäude; ein Doppelklick öffnet ein Gebäude.	Drag to move buildings; a double click opens a building.
+Die Etagen übereinander; ein Doppelklick öffnet eine Etage.	The floors on top of each other; a double click opens a floor.
+Ziehen verschiebt Räume und Geräte in einen anderen Raum; ein Doppelklick öffnet einen Raum.	Drag to move rooms, and devices into another room; a double click opens a room.
+Ziehen stellt Geräte an einen Platz, auf einen Tisch, in ein Rack oder zurück in die Ablage; ein Doppelklick öffnet ein Rack.	Drag devices to a spot, onto a desk, into a rack or back to the tray; a double click opens a rack.
+Ziehen steckt Geräte in andere Höheneinheiten, nach rechts aus dem Rack.	Drag devices to other rack units, to the right out of the rack.

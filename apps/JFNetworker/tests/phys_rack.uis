@@ -1,0 +1,127 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/phys_campus.jfnet
+# placing devices in the physical view (P1) on tests/fixtures/phys_campus.jfnet: SRV1 in Rack 2
+# moved up two times ten rack units from the keyboard (each an undo step), out of the rack from
+# the inspector's list of places, dragged from the room's tray into Rack 1 (its lowest free
+# unit) and onto R1's units in the rack's front (refused: taken), the automatic lengths of its
+# cable following; PC4, a desktop, dragged onto Rack B1 (refused: no rack device) and onto a
+# spot of the lab; the rack's height in the inspector.  Ids: 57360 the plan, 57448 the
+# inspector's list of places, 57449 the rack unit, 57432 the first field of a place (+ k).
+size 1280 900
+theme light
+wait 500
+cmd 381
+wait 100
+# Rack 2 in front view: SRV1 at unit 10
+dblclick listitem:"Rack Rack 2, 1 Gerät"
+wait 100
+expect text:"Rack 2" exists
+expect listitem:"SRV1, Rack 2, HE 10" exists
+click listitem:"SRV1, Rack 2, HE 10"
+expect text:"Rack 2, HE 10" exists
+expect text:"Rack-Gerät, 1 HE" exists
+key shift+up
+wait 100
+expect listitem:"SRV1, Rack 2, HE 20" exists
+key shift+up
+wait 100
+expect listitem:"SRV1, Rack 2, HE 30" exists
+expect text:"Rack 2, HE 30" exists
+shot build/jfnetworker/phys_rack_front.png
+key ctrl+z
+wait 100
+expect listitem:"SRV1, Rack 2, HE 20" exists
+key ctrl+y
+wait 100
+expect listitem:"SRV1, Rack 2, HE 30" exists
+# the unit from the inspector: 40
+focus #57449
+click #57449
+key ctrl+a
+type "40\n"
+wait 100
+expect listitem:"SRV1, Rack 2, HE 40" exists
+# the top unit; one past the top is refused
+focus #57449
+click #57449
+key ctrl+a
+type "42\n"
+wait 100
+expect listitem:"SRV1, Rack 2, HE 42" exists
+focus #57449
+click #57449
+key ctrl+a
+type "50\n"
+wait 100
+expect text:"Im Rack „Rack 2“ ist die Höheneinheit 50 nicht frei." exists
+expect listitem:"SRV1, Rack 2, HE 42" exists
+# out of the rack: the room's list of places in the inspector
+focus #57448
+click #57448
+click "Campus › Haus A › EG › Serverraum"
+wait 100
+expect listitem:"SRV1, Serverraum (ohne Platz)" exists
+expect listitem:"SRV1, Rack 2, HE 42" missing
+expect text:"Serverraum (ohne Platz)" exists
+# into Rack 1 by a drag from the room's tray: the lowest free unit
+click button:"Eine Ebene höher"
+wait 100
+expect listitem:"SRV1, Serverraum (ohne Platz)" exists
+drag listitem:"SRV1, Serverraum (ohne Platz)" listitem:"Rack Rack 1, 2 Geräte" 8
+wait 100
+expect listitem:"Rack Rack 1, 3 Geräte" exists
+expect listitem:"Kabel SRV1 eth0 – SW1 Gi1/0/2, 2 m, erlaubt 100 m (1000BASE-T)" missing
+dblclick listitem:"Rack Rack 1, 3 Geräte"
+wait 100
+expect listitem:"SRV1, Rack 1, HE 1" exists
+shot build/jfnetworker/phys_rack_rack1.png
+# onto R1's unit: taken, everything stays
+drag listitem:"SRV1, Rack 1, HE 1" listitem:"R1, Rack 1, HE 30" 8
+wait 100
+expect text:"Im Rack „Rack 1“ ist die Höheneinheit 30 nicht frei." exists
+expect listitem:"SRV1, Rack 1, HE 1" exists
+# undo: back in the room without a spot, then in Rack 2 at 42
+key ctrl+z
+wait 100
+expect listitem:"SRV1, Rack 1, HE 1" missing
+expect listitem:"SRV1, Serverraum (ohne Platz)" exists
+key ctrl+z
+key ctrl+z
+wait 100
+expect listitem:"SRV1, Serverraum (ohne Platz)" missing
+# the lab in Haus B: PC4 in the tray, Rack B1
+click button:"Alle Standorte"
+wait 100
+dblclick listitem:"Standort Campus, 9 Geräte"
+dblclick listitem:"Gebäude Haus B, 2 Geräte"
+dblclick listitem:"Etage EG, 2 Geräte"
+dblclick listitem:"Raum Labor, 2 Geräte"
+wait 100
+expect listitem:"PC4, Labor (ohne Platz)" exists
+drag listitem:"PC4, Labor (ohne Platz)" listitem:"Rack Rack B1, 1 Gerät" 8
+wait 100
+expect text:"PC4 ist kein Rack-Gerät." exists
+expect listitem:"PC4, Labor (ohne Platz)" exists
+# onto a spot of the lab: the middle of the room
+drag listitem:"PC4, Labor (ohne Platz)" #57360 8
+wait 100
+expect listitem:"PC4, Labor (ohne Platz)" missing
+shot build/jfnetworker/phys_rack_lab.png
+# the rack's height in the inspector: 24 units, SW2 at 20 needs 20
+click listitem:"Rack Rack B1, 1 Gerät"
+wait 100
+expect text:"24 HE" exists
+focus #57436
+click #57436
+key ctrl+a
+type "12\n"
+wait 100
+expect text:"Die Geräte im Rack brauchen mindestens 20 Höheneinheiten." exists
+focus #57436
+click #57436
+key ctrl+a
+type "20\n"
+wait 100
+expect text:"20 HE" exists
+click button:"Rückgängig"
+wait 100
+expect text:"24 HE" exists

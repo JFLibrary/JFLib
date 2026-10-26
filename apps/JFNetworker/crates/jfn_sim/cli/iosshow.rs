@@ -16,6 +16,8 @@
 //   show ip route bgp            BGP routes as B with the time since they are as they are, without
 //                                an interface (the next hop may be further away); the legend
 //                                names B only where BGP runs (cli/bgp.rs)
+//   show interfaces              a port whose cable is too long or whose optics do not fit
+//                                (phys.rs, P1) gets a line in our own words that says so
 //
 // The layouts follow IOS 15 / IOS-XE: column widths of "show ip interface brief" (22, 15, 3,
 // 6, 21), "show arp" (address 15, age right-aligned in 9), "show mac address-table" and "show
@@ -486,6 +488,15 @@ impl Engine {
                     s.push_str(&format!("  Full Duplex, {}Mbps, link type is auto, media type is {}\n", kbps / 1000, media));
                 } else {
                     s.push_str(&format!("  Auto Duplex, Auto Speed, link type is auto, media type is {}\n", media));
+                }
+            }
+            // a cable that stays down for a physical reason says why (phys.rs, P1)
+            if kind.is_none_or(|k| matches!(k, IfKind::Port(_)))
+                && let Some(f) = pv.and_then(|p| p.link).and_then(|li| self.phys.bad.get(&li))
+            {
+                match *f {
+                    crate::phys::PhysFault::TooLong { len_m, max_m, std } => s.push_str(&format!("  Cable is {} m long, {} allows {} m: no link\n", len_m, std, max_m)),
+                    crate::phys::PhysFault::Optics(_) => s.push_str("  Optics do not fit the far end or the fibre: no link\n"),
                 }
             }
             if x.is_some() && !serial && !matches!(kind, Some(IfKind::Loopback(_))) {

@@ -480,3 +480,50 @@ pub(crate) const CMD_SIM_RESUME_GO: u32 = 421;
 pub(crate) const CMD_SIM_SEEK_MS: u32 = 422;
 /// the question "Von hier fortsetzen?"
 pub(crate) const ID_SIM_RESUME_ASK: u32 = 0xEC00;
+
+// ---- P1: the physical view (commands 380 .. 419, widgets 0xE000 .. 0xEBFF, timers 0x170 ..
+// 0x173 unused, no dock panel: P_PHYS = 14 stays free)
+/// Ansicht › Logische Ansicht (Ctrl+Shift+L) / Physische Ansicht (Ctrl+Shift+P)
+pub(crate) const CMD_VIEW_LOGICAL: u32 = 380;
+pub(crate) const CMD_VIEW_PHYS: u32 = 381;
+/// the physical view: one level up (Backspace), back (Shift+Backspace), open the selected place, rename
+/// it, remove it; add a place of kind workspace::phys::KINDS[k] to the place shown (+ k)
+pub(crate) const CMD_PHYS_UP: u32 = 382;
+pub(crate) const CMD_PHYS_BACK: u32 = 383;
+pub(crate) const CMD_PHYS_OPEN: u32 = 384;
+pub(crate) const CMD_PHYS_RENAME: u32 = 385;
+pub(crate) const CMD_PHYS_REMOVE: u32 = 386;
+pub(crate) const CMD_PHYS_ADD0: u32 = 387;
+/// the toolbar's switch Logisch | Physisch (+ 1 + i: its segments)
+pub(crate) const ID_TB_VIEW: u32 = 0xE000;
+/// the physical view: the plan (ui::diagram), back, up, rename and remove the selected place,
+/// the breadcrumbs (+ 1 + i), the buttons that add a place (+ k), the rename flyout (a popup
+/// id) and its widgets
+pub(crate) const ID_PH_CANVAS: u32 = 0xE010;
+pub(crate) const ID_PH_BACK: u32 = 0xE011;
+pub(crate) const ID_PH_UP: u32 = 0xE012;
+pub(crate) const ID_PH_RENAME: u32 = 0xE013;
+pub(crate) const ID_PH_REMOVE: u32 = 0xE014;
+pub(crate) const ID_PH_CRUMB: u32 = 0xE020;
+pub(crate) const ID_PH_ADD0: u32 = 0xE030;
+pub(crate) const ID_PH_FLY: u32 = 0xE040;
+pub(crate) const ID_PH_FLY_BOX: u32 = 0xE041;
+pub(crate) const ID_PH_FLY_OK: u32 = 0xE042;
+pub(crate) const ID_PH_FLY_CANCEL: u32 = 0xE043;
+/// the inspector (workspace/phys/props.rs): a place's name, its fields (+ k: east, south,
+/// width, depth, rack units, storey), Setzen, Öffnen, Entfernen; a device's place, its rack
+/// unit and Setzen, Im Plan zeigen; a cable's length by hand, Länge setzen, Automatisch; the
+/// optic of cage i (+ i, at most 64)
+pub(crate) const ID_PHY_NAME: u32 = 0xE050;
+pub(crate) const ID_PHY_FIELD0: u32 = 0xE058;
+pub(crate) const ID_PHY_SET: u32 = 0xE05F;
+pub(crate) const ID_PHY_OPEN: u32 = 0xE060;
+pub(crate) const ID_PHY_REMOVE: u32 = 0xE061;
+pub(crate) const ID_PHY_PLACE: u32 = 0xE068;
+pub(crate) const ID_PHY_UNIT: u32 = 0xE069;
+pub(crate) const ID_PHY_UNIT_SET: u32 = 0xE06A;
+pub(crate) const ID_PHY_SHOW: u32 = 0xE06B;
+pub(crate) const ID_PHY_LEN: u32 = 0xE070;
+pub(crate) const ID_PHY_LEN_SET: u32 = 0xE071;
+pub(crate) const ID_PHY_LEN_AUTO: u32 = 0xE072;
+pub(crate) const ID_PHY_OPTIC0: u32 = 0xE080;

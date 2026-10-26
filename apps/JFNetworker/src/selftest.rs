@@ -36,6 +36,8 @@
 // tftpd, tftpc, ftpd, ftpc, cli/files.rs).
 // keyframetest.rs: rewinding with keyframes (group keyframes: jfn_sim::keyframe, the driver's
 // recording, doc/sim.rs's state in the past, "Von hier fortsetzen").
+// phystest.rs: the physical view (group phys: jfn_model::phys, the forms and optics of the
+// catalogue, jfn_sim::phys, doc/phys.rs, the scenario steps place / cable and expect cable).
 
 use alloc::format;
 use alloc::string::String;
@@ -99,9 +101,11 @@ mod bgptest;
 mod filestest;
 #[path = "keyframetest.rs"]
 mod keyframetest;
+#[path = "phystest.rs"]
+mod phystest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 36] = [
+    let groups: [(&'static str, fn(&mut T)); 37] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -138,6 +142,7 @@ pub fn run() -> i32 {
         ("bgp", bgptest::run),
         ("files", filestest::run),
         ("keyframes", keyframetest::run),
+        ("phys", phystest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {
@@ -159,6 +164,7 @@ fn port(model: &str, name: &str) -> PortSpec {
         kbps: 0,
         mdix: false,
         poe: catalog::Poe::None,
+        optic: None,
     })
 }
 

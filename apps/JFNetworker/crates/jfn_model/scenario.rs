@@ -45,6 +45,13 @@
 //   move Laptop1 900 300                         put a device's box at x, y (world units, its
 //                                                top left corner, as in the project): WLAN
 //                                                stations and access points look again
+//   place PC1 "Raum 2"                           a device to another place of the physical
+//   place SW1 "Rack 1" 12                        view (P1, phys.rs): a room, a desk, a rack at
+//                                                a unit (none: the lowest free one); the
+//                                                automatic lengths of its cables follow
+//   cable SW1 Gi1/0/1 length 132 | length auto   a cable's length by hand (metres), automatic
+//   expect cable SW1 Gi1/0/1 length <= 100       the length of the cable at a port (no
+//   expect cable SW1 Gi1/0/1 up | down           comparison: ==), whether it carries
 //
 // Device and port names are resolved when the scenario runs; this module only checks syntax.
 
@@ -88,6 +95,11 @@ pub enum StepKind {
     Series(String),
     /// a device moves on the canvas ("move DEV X Y"): its new top left corner
     Move { dev: String, x: i32, y: i32 },
+    /// a device goes to another place of the physical view ("place DEV PLACE [UNIT]"; unit 0:
+    /// the lowest free one of a rack)
+    Place { dev: String, place: String, unit: u16 },
+    /// the length of the cable at a port set by hand ("cable DEV PORT length M|auto"; 0: auto)
+    CableLen { dev: String, port: String, m: u32 },
 }
 
 /// a fault of a scenario (the names are resolved when it runs)
@@ -148,6 +160,15 @@ pub enum Expect {
     Series { dev: String, svc: String, name: String, agg: Agg, cmp: Cmp, milli: i64, span: Span },
     /// a ping from the device to an address or a name gets an answer (negate: none does)
     Reach { dev: String, host: String, negate: bool },
+    /// the cable at a port: its length in metres compared, or whether it carries (P1)
+    Cable { dev: String, port: String, check: CableCheck },
+}
+
+/// what "expect cable DEV PORT ..." looks at
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CableCheck {
+    Len(Cmp, u32),
+    Up(bool),
 }
 
 impl Expect {
@@ -156,6 +177,7 @@ impl Expect {
         match self {
             Expect::Output { dev, .. } | Expect::Route { dev, .. } | Expect::NoRoute { dev, .. } | Expect::Metric { dev, .. } | Expect::Series { dev, .. } => Some(dev),
             Expect::Reach { dev, .. } => Some(dev),
+            Expect::Cable { dev, .. } => Some(dev),
             Expect::Hops { .. } => None,
         }
     }
@@ -370,7 +392,7 @@ fn words(s: &str) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
-const KEYWORDS: &[&str] = &["seed", "run", "link", "impair", "power", "expect", "pcap", "print", "at", "fault", "heal", "series", "move"];
+const KEYWORDS: &[&str] = &["seed", "run", "link", "impair", "power", "expect", "pcap", "print", "at", "fault", "heal", "series", "move", "place", "cable"];
 
 /// parses a scenario; all syntax errors are collected
 pub fn parse(text: &str) -> Result<Scenario, Vec<ScnErr>> {
@@ -454,6 +476,12 @@ fn parse_line(t: &str, sc: &mut Scenario) -> Result<Option<(Option<u64>, StepKin
             let num = |s: &str| s.parse::<i32>().map_err(|_| format!("\u{201e}{}\u{201c} ist keine Zahl.", s));
             StepKind::Move { dev: String::from(*dev), x: num(x)?, y: num(y)? }
         }
+        ["place", dev, place] => StepKind::Place { dev: String::from(*dev), place: String::from(*place), unit: 0 },
+        ["place", dev, place, unit] => {
+            let u = unit.parse::<u16>().ok().filter(|&u| u > 0).ok_or_else(|| format!("\u{201e}{}\u{201c} ist keine Höheneinheit (1, 2, ...).", unit))?;
+            StepKind::Place { dev: String::from(*dev), place: String::from(*place), unit: u }
+        }
+        ["cable", dev, port, "length", m] => StepKind::CableLen { dev: String::from(*dev), port: String::from(*port), m: metres(m)? },
         [k, ..] => return Err(format!("Unbekannter Schritt \u{201e}{}\u{201c}.", k)),
         [] => return Ok(None),
     };
@@ -606,6 +634,9 @@ fn parse_expect(w: &[&str]) -> Result<Expect, String> {
         [dev, "no", "route", p] => Expect::NoRoute { dev: String::from(*dev), prefix: prefix(p)? },
         [dev, "reaches", host] => Expect::Reach { dev: String::from(*dev), host: String::from(*host), negate: false },
         [dev, "not", "reaches", host] => Expect::Reach { dev: String::from(*dev), host: String::from(*host), negate: true },
+        ["cable", dev, port, "length", c, v] => Expect::Cable { dev: String::from(*dev), port: String::from(*port), check: CableCheck::Len(cmp(c)?, metres(v)?) },
+        ["cable", dev, port, "length", v] => Expect::Cable { dev: String::from(*dev), port: String::from(*port), check: CableCheck::Len(Cmp::Eq, metres(v)?) },
+        ["cable", dev, port, st] if *st == "up" || *st == "down" => Expect::Cable { dev: String::from(*dev), port: String::from(*port), check: CableCheck::Up(*st == "up") },
         ["hops", proto, c, n] => Expect::Hops {
             proto: proto.to_ascii_lowercase(),
             cmp: cmp(c)?,
@@ -620,4 +651,12 @@ fn parse_expect(w: &[&str]) -> Result<Expect, String> {
         },
         _ => return Err(format!("Diese Erwartung kenne ich nicht: expect {}", w.join(" "))),
     })
+}
+
+/// "132", "132m" -> 132; "auto" -> 0 (a cable's length)
+fn metres(s: &str) -> Result<u32, String> {
+    if s == "auto" {
+        return Ok(0);
+    }
+    s.strip_suffix('m').unwrap_or(s).parse::<u32>().map_err(|_| format!("\u{201e}{}\u{201c} ist keine Länge in Metern.", s))
 }

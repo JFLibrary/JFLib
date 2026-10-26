@@ -114,6 +114,12 @@ Queues, Lastgeneratoren, eigene Skripte).
   und Konsolen, die `show`-Befehle aus diesem Zustand beantworten; der Simulator hält dafür
   Keyframes in einer Speichergrenze und spielt den Rest exakt nach. „Von hier fortsetzen“ macht
   einen solchen Zeitpunkt zur Gegenwart (siehe [Zurückspulen](#zurückspulen)).
+- **Physische Ansicht (P1):** neben der logischen Zeichenfläche die Orte des Projekts --
+  Standorte, Gebäude, Etagen, Räume, Racks und Tische -- als Hierarchie zum Durchwandern, ein
+  Raum als Grundriss, ein Rack von vorn mit den Geräten in ihren Höheneinheiten; Geräte werden
+  hineingezogen, jedes Kabel bekommt eine Länge (automatisch aus den Orten oder von Hand) mit der
+  Grenze seines Mediums nach IEEE 802.3, ein zu langes kommt nicht hoch und ist überall zu sehen
+  (siehe [Physische Ansicht](#physische-ansicht)).
 
 ## Bedienung
 
@@ -242,6 +248,11 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `model.uis`, Gruppe `keyframes` | Zurückspulen (siehe [Zurückspulen](#zurückspulen)): der erste Keyframe beim Start und seine Größe, der Start und die Gegenwart wiederhergestellt (der Moment 0 mit seinen Ereignissen, ein Moment zwischen zwei Ereignissen), der Lauf bleibt unberührt; ein Campus in Echtzeit mit Konsolenzeilen, einem gezogenen und wieder gesteckten Kabel, einem Ping über `Inline::call` und Schritten des Simulationsmodus zwischen den Ereignissen eines Moments, an 13 Stellen wiederhergestellt und Byte für Byte gleich dem Lauf (der ganze Zustand und die Aufzeichnung der Wiederholung), auch sieben Sekunden vom ersten Keyframe aus; Leases, ARP-Tabellen und LEDs von damals gegen die heutigen; eine Wiederholung in Stücken mit wachsendem Fortschritt; die Speichergrenze nach Zahl (sechs Keyframes mit ihren Zeiten, der erste bleibt, die Abstände schrumpfen zur Gegenwart hin) und nach Bytes, zu knapp für zwei (der Start und die Eingaben davor gehen); die Eingaben mit ihren Zeiten (Uhr, Konsole, Abbruch, Aktion, Aufruf); „Von hier fortsetzen“ gegen einen Lauf, der nie weiterkam (Zustand, Aufzeichnung und Eingaben gleich); im Fenster: der gezeigte Zustand, LEDs von damals und von jetzt, Zeilen in der Vergangenheit ändern nichts, eine Bearbeitung holt in die Gegenwart, Fortsetzen mit einer späteren Änderung am Projekt, Rückgängig und Wiederholen danach, ein Zeitpunkt vor dem ersten Keyframe |
 | `rewind.uis` | Zurückspulen im Fenster (`fixtures/lan_router.jfnet`): R1 pingt, bekommt eine statische Route und schaltet Gi0/0/0 ab und wieder an; ein Schritt zurück zeigt die ARP-Tabelle mit PC2, aber die Route noch nicht (der Ping lief damals noch), bei 0,5 s nur die eigenen Adressen, eine Zeile in der Vergangenheit ändert nichts, bei 4,5 s das Kabel PC1 – R1 unten, die Route da und das Netz von Gi0/0/0 weg; „Zurück zu live“; „Von hier fortsetzen“ bei 4,5 s mit Rückfrage (abgebrochen, dann bestätigt): das Kabel bleibt unten, die Konsole sagt, wo es weitergeht, und antwortet wieder live |
 | `rewind_shots.uis` | die Bilder des Zurückspulens (die Ansicht bei 4,5 s mit Hinweis, LEDs und Konsole von damals; die Rückfrage) hell und dunkel mit 100 und 150 % (`build/jfnetworker/rewind_*.png`) |
+| `model.uis`, Gruppe `phys` | die physische Ansicht (siehe [Physische Ansicht](#physische-ansicht)): die Grenze jedes Mediums bei jeder Speed (Kupfer, SR und LR, Konsole, V.35, WAN und Funk ohne), Bauformen und Höhen der Modelle, Optiken und die Faser, die sie wählen, der Baum ohne Orte, ältere Projekte im Standardraum (sechs Fixtures: 7 m, zur Decke 4 m, zur Wolke 3 m, nichts über der Grenze, Verzögerungen wie bisher), die automatischen Längen des Campus auf den Meter (im Rack, auf dem Tisch, zwischen Räumen, Etagen und Häusern, an der Decke), ein Kabel über seiner Grenze an beiden Enden unten mit Notiz, Protokollzeilen, Problem, `show interfaces` und `ip link`, wieder oben, wenn es kürzer wird (ein anderer Raum, eine Länge von Hand, automatisch), Optiken, die nicht passen, die Laufzeit aus dem Plan, Orte hinzufügen, umbenennen, verschieben, vergrößern, entfernen und Geräte aufstellen als Rückgängig-Schritte, denen der Simulator folgt, die Ablehnungen, die Datei, die Wahl der Ansicht im Layout, die Syntax der Szenarien und ein Szenario zweimal (Determinismus) |
+| `phys_view.uis` | die physische Ansicht auf `fixtures/phys_campus.jfnet`: der Schalter der Werkzeugleiste, Ansicht › Logische / Physische Ansicht mit ihren Tastenkürzeln, durch die Orte (Serverraum, Etage, Gebäude, Campus, alle Standorte), Zurück, die Brotkrumen, Doppelklicks auf Orte und Wege, Tab und Eingabe, ein Ort im Inspektor |
+| `phys_rack.uis` | Geräte aufstellen: SRV1 im Rack von der Tastatur zehn Höheneinheiten höher (mit Rückgängig), die Höheneinheit im Inspektor (eine über dem Rack abgelehnt), aus dem Rack über die Liste der Orte, aus der Ablage ins Rack gezogen (die unterste freie Einheit), auf die Einheiten von R1 gezogen (abgelehnt), PC4 auf ein Rack (abgelehnt: kein Rack-Gerät) und an einen Platz im Labor, die Höhe des Racks im Inspektor (zu niedrig für seine Geräte abgelehnt) |
+| `phys_length.uis` | ein zu langes Kabel, gezeigt und behoben: das Problem, das Kabel „unten“ auf der Zeichenfläche, Länge, Grenze und Ablehnung im Inspektor, das markierte Kabel in der physischen Ansicht, 90 m von Hand (oben), 132 m (unten), Automatisch und Rückgängig, eine Länge, die keine Zahl ist, PC4 über den Inspektor in Büro 1 (23 m, oben) |
+| `phys_shots.uis` | die Bilder der physischen Ansicht (Serverraum mit dem markierten Kabel und seinem Inspektor, die Vorderseite von Rack 1, das Erdgeschoss von Haus A, der Campus) hell und dunkel mit 100 und 150 % (`build/jfnetworker/phys_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -250,8 +261,10 @@ Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein S
 `stp_triangle.jfnet` und `rstp_triangle.jfnet` (drei Switches im Dreieck mit STP bzw. RSTP),
 `wlan_office.jfnet` (zwei Access Points, ein Gastnetz, zwei Laptops und ein Smartphone; das
 Szenario `wlan_office.scn` und die WLAN-Fensterskripte), `backup.jfnet` (drei Router, SRV1 mit
-TFTP- und FTP-Server, PC1; das Szenario `backup.scn` und die Fensterskripte `files_*.uis`) und
-die Netze der Golden-Szenarien. Die
+TFTP- und FTP-Server, PC1; das Szenario `backup.scn` und die Fensterskripte `files_*.uis`),
+`phys_campus.jfnet` (die physische Ansicht: zwei Häuser, Serverraum mit zwei Racks, Büros auf
+zwei Etagen, ein Labor 180 m entfernt, dessen PC4 mit 208 m Kupfer an SW1 hängt;
+`phys_lengths.scn` und die `phys_*.uis`) und die Netze der Golden-Szenarien. Die
 Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`,
 `rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
 für WLAN `crypto` und `netpkt`, für BGP `bgp`, für Dateien `tftp` und `ftp`), die
@@ -306,6 +319,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | OSPF | [`crates/jfn_sim/ospf.rs`](crates/jfn_sim/ospf.rs), [`cli/ospf.rs`](crates/jfn_sim/cli/ospf.rs), [`src/ospftest.rs`](src/ospftest.rs), [`lib/netpkt/ospf.rs`](../../lib/netpkt/ospf.rs) | OSPF als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Pakete und LSAs Byte für Byte (siehe [Routing mit OSPF](#routing-mit-ospf)) |
 | BGP | [`crates/jfn_sim/bgp.rs`](crates/jfn_sim/bgp.rs), [`bgptrace.rs`](crates/jfn_sim/bgptrace.rs), [`cli/bgp.rs`](crates/jfn_sim/cli/bgp.rs), [`src/bgptest.rs`](src/bgptest.rs), [`lib/netpkt/bgp.rs`](../../lib/netpkt/bgp.rs) | BGP als Dienst der Router, L3-Switches und der Firewall, seine Notizen, Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit BGP](#routing-mit-bgp)) |
 | Aufgaben mit Bewertung | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/assess.rs`](crates/jfn_sim/assess.rs), [`src/workspace/assess.rs`](src/workspace/assess.rs), [`src/workspace/author.rs`](src/workspace/author.rs), [`src/doc/assess.rs`](src/doc/assess.rs), [`assets/assess`](assets/assess), [`src/assesstest.rs`](src/assesstest.rs) | das Format einer Aufgabe, das Bewerten ihrer Kriterien, die Prüfung `reaches`, das Panel mit Punkten, Zeit und Abgeben, der Bereich zum Erstellen mit seinen Rückgängig-Schritten, die drei Aufgaben, ihr Selbsttest (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)) |
+| Physische Ansicht | [`crates/jfn_model/phys.rs`](crates/jfn_model/phys.rs), [`crates/jfn_sim/phys.rs`](crates/jfn_sim/phys.rs), [`src/workspace/phys/`](src/workspace/phys/mod.rs) (`scene.rs`, `paint.rs`, `props.rs`), [`src/doc/phys.rs`](src/doc/phys.rs), [`src/phystest.rs`](src/phystest.rs) | die Orte, wo die Geräte stehen, Kabellängen und die Grenzen der Medien (Modell), Kabel, die zu lang sind oder deren Optiken nicht passen, im Simulator mit Notizen, Protokollzeilen und Problemen, die Ansicht mit ihren Plänen und dem Inspektor, die Änderungen als Rückgängig-Schritte, ihr Selbsttest (siehe [Physische Ansicht](#physische-ansicht)) |
 | WLAN | [`crates/jfn_model/wlan.rs`](crates/jfn_model/wlan.rs), [`crates/jfn_sim/wlan.rs`](crates/jfn_sim/wlan.rs), [`wlankey.rs`](crates/jfn_sim/wlankey.rs), [`wlantrace.rs`](crates/jfn_sim/wlantrace.rs), [`cli/wlan.rs`](crates/jfn_sim/cli/wlan.rs), [`src/doc/wlan.rs`](src/doc/wlan.rs), [`src/workspace/canvas/wlan.rs`](src/workspace/canvas/wlan.rs), [`src/workspace/inspector/wlan.rs`](src/workspace/inspector/wlan.rs), [`src/wlantest.rs`](src/wlantest.rs), [`lib/netpkt/eapol.rs`](../../lib/netpkt/eapol.rs), [`lib/crypto`](../../lib/crypto/lib.rs) (`sha1.rs`, `keywrap.rs`, `cmac.rs`) | die WLAN-Einstellungen im Projekt, Stationen und Access Points im Simulator mit Funk, Schlüsseln und Notizen, `iw` und `show dot11`, die Einstellungen als Rückgängig-Schritte, Funklinien, Reichweiten und Balken, der Inspektor, der Selbsttest, EAPOL Byte für Byte und die Kryptografie von WPA2 und WPA3 (siehe [WLAN](#wlan)) |
 | Dateien, TFTP und FTP | [`crates/jfn_model/files.rs`](crates/jfn_model/files.rs), [`crates/jfn_sim/files.rs`](crates/jfn_sim/files.rs), [`tftpd.rs`](crates/jfn_sim/tftpd.rs), [`tftpc.rs`](crates/jfn_sim/tftpc.rs), [`ftpd.rs`](crates/jfn_sim/ftpd.rs), [`ftpc.rs`](crates/jfn_sim/ftpc.rs), [`xfertrace.rs`](crates/jfn_sim/xfertrace.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`src/workspace/devwin/files.rs`](src/workspace/devwin/files.rs), [`src/filestest.rs`](src/filestest.rs), [`lib/netpkt/tftp.rs`](../../lib/netpkt/tftp.rs), [`lib/netpkt/ftp.rs`](../../lib/netpkt/ftp.rs) | die Dateien eines Geräts im Projekt und im Simulator, TFTP- und FTP-Server und ihre Clients an beiden Befehlszeilen, die Notizen, die Befehle für Dateien, der Reiter Dateien, der Selbsttest, TFTP und FTP Byte für Byte (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)) |
 | Zurückspulen | [`crates/jfn_sim/keyframe.rs`](crates/jfn_sim/keyframe.rs), [`crates/jfn_sim/driver.rs`](crates/jfn_sim/driver.rs), [`src/doc/sim.rs`](src/doc/sim.rs), [`src/workspace/sim/mod.rs`](src/workspace/sim/mod.rs), [`src/keyframetest.rs`](src/keyframetest.rs) | Keyframes in einer Speichergrenze, die Eingaben dazwischen, die Wiederholung bis zu einem Zeitpunkt und ihre Prüfsummen, das Fortsetzen von dort (Simulator); der Zustand von damals im Fenster, Konsolen in der Vergangenheit, „Von hier fortsetzen“ mit Rückfrage; ihr Selbsttest (siehe [Zurückspulen](#zurückspulen)) |
@@ -424,7 +438,10 @@ Befehlszeile einspielt. Positionen sind Weltkoordinaten (DIP bei 100 %): bei Ger
 obere Ecke ihres 64 × 48 großen Symbols, bei Notizen die der Karte. `layout` hält die Ansicht
 beim Speichern (`zoom_pm` in Promille, Mitte `cx`, `cy`, Raster `grid`); fehlt sie, zeigt das
 Programm beim Öffnen alles. Ein Labor hat dazu den Abschnitt `lab` mit seiner Aufgabe (siehe
-[Labore und Aufgaben](#labore-und-aufgaben)), ein freies Projekt dort `null`.
+[Labore und Aufgaben](#labore-und-aufgaben)), ein freies Projekt dort `null`. Die physische
+Ansicht (siehe [Physische Ansicht](#physische-ansicht)) bringt `places` (die Orte), `phys` und
+`optics` je Gerät, `len_m` je Kabel und im Layout `phys` und `phys_at` (die gezeigte Ansicht
+und ihr Ort) mit; ältere Dateien haben nichts davon und laufen wie bisher.
 
 ```json
 {
@@ -1211,6 +1228,11 @@ selbst, steht „Fehler N behoben“ mit der Zeit dabei.
 `move GERÄT X Y` setzt ein Gerät an eine andere Stelle der Zeichenfläche (Weltkoordinaten der
 linken oberen Ecke), wie ein Verschieben im Fenster; für WLAN zählen Reichweite und Signal neu
 (siehe [WLAN](#wlan)).
+
+`place GERÄT ORT [HE]` stellt ein Gerät in einen anderen Raum, auf einen Tisch oder in ein Rack
+der physischen Ansicht, `cable GERÄT PORT length M` (oder `length auto`) gibt einem Kabel eine
+Länge von Hand; `expect cable GERÄT PORT length [VERGLEICH] M` und `expect cable GERÄT PORT up`
+(`down`) prüfen Länge und Zustand (siehe [Physische Ansicht](#physische-ansicht)).
 
 `expect … svc NAME metric WERT VERGLEICH ZAHL over 5s` (oder `… between 6s and 12s`) prüft
 statt des Werts von jetzt seine Zeitreihe
@@ -2357,6 +2379,137 @@ und FTP Byte für Byte in den coretest-Gruppen `tftp` und `ftp`, dazu das Szenar
 und die Fensterskripte `files_window.uis`, `files_services.uis`, `files_console.uis` und
 `files_shots.uis`.
 
+### Physische Ansicht
+
+Neben der logischen Zeichenfläche hat das Fenster eine zweite Ansicht: wo die Geräte stehen
+([`jfn_model/phys.rs`](crates/jfn_model/phys.rs), [`jfn_sim/phys.rs`](crates/jfn_sim/phys.rs),
+[`src/workspace/phys/`](src/workspace/phys/mod.rs), [`src/doc/phys.rs`](src/doc/phys.rs)).
+Umgeschaltet wird mit „Logisch | Physisch“ in der Werkzeugleiste oder über Ansicht › Logische
+Ansicht (Strg+Umschalt+L) und Physische Ansicht (Strg+Umschalt+P); die Wahl und der gezeigte
+Ort werden mit dem Layout gespeichert.
+
+- **Orte:** ein Baum aus Standorten (ein Campus, eine Stadt), Gebäuden, Etagen, Räumen und in
+  den Räumen Racks (Höhe in Höheneinheiten, ohne Angabe 42) und Tischen. Position (die linke
+  obere Ecke im übergeordneten Ort, nach Osten und Süden) und Größe stehen in Dezimetern; Etagen
+  liegen übereinander (ihre Nummer, 0 das Erdgeschoss) und haben den Grundriss ihres Gebäudes.
+  In der Datei `places`, zum Beispiel `{"id": 5, "kind": "rack", "name": "Rack 1", "parent": 4,
+  "x_dm": 10, "y_dm": 10, "w_dm": 6, "d_dm": 10, "units": 42}`; Orte zählen ihre Nummern
+  eigenständig, Geräte und Kabel behalten ihre.
+- **Geräte:** `phys` nennt den Raum, das Rack (mit der untersten Höheneinheit, die das Gerät
+  belegt) oder den Tisch, im Raum auch einen Platz (`"phys": {"place": 5, "unit": 20}`,
+  `{"place": 11, "x_dm": 50, "y_dm": 40, "placed": true}`). Jedes Modell hat eine Bauform:
+  Rack-Gerät (1 HE, Core-Router, DB-Shard und Container-Host 2 HE), Tischgerät, Mobilgerät,
+  Decken- oder Wandgerät (Access Point, Kamera, Sensor), Standgerät (Tower-Server) oder ohne Ort
+  (die Internet-Wolke); nur Rack-Geräte kommen in ein Rack.
+- **Ältere Projekte:** Ohne `places` gilt der Baum Standort › Gebäude › Erdgeschoss › Raum, alle
+  Geräte stehen ohne Platz in diesem Raum, jedes Kabel ist 7 m lang (zu einem Access Point oder
+  einer Kamera an der Decke 4 m, zur Wolke 3 m) und alles läuft wie bisher. Die erste Änderung in der physischen Ansicht speichert den Baum.
+- **Die Ansicht:** oben Zurück (Umschalt+Rücktaste), Eine Ebene höher (Rücktaste) und die
+  Brotkrumen „Alle Standorte › Campus › Haus A › EG › Serverraum“, rechts Ort umbenennen (F2)
+  und entfernen (Entf: seine Geräte kommen ohne Platz in den ersten Raum, der letzte Raum
+  bleibt), darunter die Orte, die hier dazukommen können. Alle Standorte und ein Standort sind
+  Karten, ein Gebäude zeigt seine Etagen übereinander, eine Etage ihren Grundriss mit Räumen,
+  Racks, Tischen und frei stehenden Geräten, ein Raum seinen Plan (Racks, Tische mit ihren
+  Geräten, Geräte an ihrem Platz, darunter die Ablage „Im Raum, ohne Platz“), ein Rack seine
+  Vorderseite mit den Höheneinheiten von 1 unten an und den Geräten in ihren Einschüben, rechts
+  daneben die Rack-Geräte des Raums, die in keinem Rack stecken. Doppelklick oder Eingabe öffnet
+  einen Ort; ein Kabel, dessen anderes Ende woanders liegt, führt zu einer Karte „→ Haus B“ am
+  rechten Rand, die dorthin führt. Zwischen Standorten, Gebäuden und Etagen stehen die Kabel
+  zusammengefasst („2 Kabel · 203–208 m · 1 zu lang oder falsch“), auf Plänen von Etagen und
+  Räumen einzeln mit ihrer Länge.
+- **Ziehen:** Orte verschieben sich auf ihrem Plan; Geräte gehen im Raum an einen Platz, auf
+  einen Tisch, in ein Rack (die unterste freie Höheneinheit) oder zurück in die Ablage, auf
+  einer Etage in einen anderen Raum, im Rack in andere Höheneinheiten oder nach rechts hinaus.
+  Jedes Ziehen ist ein Rückgängig-Schritt; eine Ablehnung (ein Tischgerät ins Rack, belegte
+  Einheiten) stellt alles zurück und sagt über dem Plan, warum. Die Kabel bleiben an ihren Ports,
+  ihre automatischen Längen folgen.
+- **Inspektor:** ein Ort mit Name, Lage, Größe, Höhe des Racks oder Nummer der Etage (Setzen
+  ist ein Schritt), Öffnen und Entfernen; ein Gerät zuletzt mit Ort und Platz, einer Liste aller
+  Räume, Racks und Tische zum Umstellen, der Höheneinheit, „Im Plan zeigen“ und der Optik jedes
+  Schachts; ein Kabel zuletzt mit seiner Länge (automatisch oder von Hand; „0“ oder Automatisch
+  macht sie wieder automatisch), der Grenze seines Mediums mit der Norm, von wo nach wo und der
+  Laufzeit aus der Länge.
+- **Tastatur und Screenreader:** wie auf der logischen Zeichenfläche (Strg+9, Tab über Orte,
+  Geräte und Wege, dann die Kabel, Pfeiltasten verschieben, Eingabe öffnet); die Einträge
+  heißen „Rack Rack 1, 2 Geräte“, „SW1, Rack 1, HE 20“, „Weg nach Gebäude Haus B“ und „Kabel PC4
+  eth0 – SW1 Gi1/0/5, 208 m, erlaubt 100 m (1000BASE-T), zu lang“.
+
+**Kabellänge:** von Hand (`len_m` des Kabels) oder automatisch aus den Orten beider Enden, in
+ganzen Metern aufgerundet. Ein Ende steht in der Mitte seines Racks, seines Tisches, seines
+Platzes oder (ohne Platz) seines Raums, in einer Höhe über seiner Etage: im Rack 0,1 m plus
+44,45 mm je Höheneinheit darunter, auf dem Tisch 0,75 m, an der Decke 2,8 m, sonst am Boden. Im
+selben Rack ist es ein Patchkabel von 0,5 m plus dem Höhenunterschied, auf demselben Tisch 2 m;
+sonst läuft das Kabel hinauf zu den Trassen unter der Decke (2,8 m), im rechten Winkel über die
+Pläne (|Δx| + |Δy| in den Koordinaten aller Standorte), 3,5 m je Etage (zwischen Gebäuden
+hinunter ins Erdgeschoss und wieder hinauf) und hinunter zum anderen Ende, dazu 10 % Reserve.
+Die Internet-Wolke hat keinen Ort (3 m), Funk keine Länge.
+
+**Grenzen** nach den Reichweiten-Tabellen von IEEE 802.3 (Kupfer als Cat6A, Multimode als OM3),
+für die Speed, mit der das Kabel läuft (die kleinere beider Ports und seiner Einstellung):
+
+| Medium | Speed | Norm | Grenze |
+|---|---|---|---|
+| Kupfer (gerade, gekreuzt) | 10M bis 10G | 10BASE-T, 100BASE-TX, 1000BASE-T, 2.5GBASE-T, 5GBASE-T, 10GBASE-T | 100 m |
+| Kupfer | 25G, 40G | 25GBASE-T, 40GBASE-T | 30 m |
+| Glasfaser, Multimode (SR-Optik) | 1G / 10G / 25G / 40G / 100G | 1000BASE-SX / 10GBASE-SR / 25GBASE-SR / 40GBASE-SR4 / 100GBASE-SR4 | 550 / 300 / 70 / 100 / 70 m |
+| Glasfaser, Singlemode (LR-Optik) | 1G / 10G bis 100G | 1000BASE-LX / 10GBASE-LR, 25GBASE-LR, 40GBASE-LR4, 100GBASE-LR4 | 5 km / 10 km |
+| Konsole | | RS-232 bei 9600 bit/s | 15 m |
+| Seriell | bis 2,4 / 4,8 / 9,6 / 19,2 / 38,4 / 64 kbit/s, darüber (T1, E1) | V.35, EIA-530 | 1250 / 625 / 312 / 156 / 78 / 51 m, 15 m |
+| WAN-Leitung, Funk | | | keine |
+
+**Optiken:** Jeder SFP-, SFP+-, SFP28- und QSFP28-Schacht hat ab Werk eine SR-Optik (Multimode,
+850 nm); im Inspektor lässt sich eine LR-Optik (Singlemode, 1310 nm) einsetzen (`optics` des
+Geräts, nur was abweicht). Ein automatisches Kabel folgt: LR an beiden Enden ist Singlemode,
+sonst Multimode. Optiken, die nicht zueinander oder zur Faser passen (SR an einem Ende, LR am
+anderen; eine von Hand gewählte Singlemode-Faser zwischen SR-Optiken), stecken zwar, die Leitung
+bleibt aber aus. Das ändert nur Projekte mit einer solchen Faser von Hand; die Fixtures, Labore
+und Aufgaben haben keine.
+
+**Zu lang:** Entscheidung: Ein Kabel über seiner Grenze kommt gar nicht hoch (statt mit
+Fehlern zu laufen), weil die Norm jenseits ihrer Reichweite nichts zusagt und ein klarer Zustand
+besser lehrt. Zu sehen ist es überall: beide LEDs rot, der Port unten (`show interfaces`:
+„down, line protocol is down“ und die Zeile „Cable is 208 m long, 1000BASE-T allows 100 m: no
+link“; unter Linux `NO-CARRIER` in `ip link`), eine Notiz an beiden Enden („Kabel an Gi1/0/5 zu
+lang: 208 m, erlaubt 100 m (1000BASE-T); die Leitung bleibt aus.“), eine Protokollzeile
+(IOS-artig `%PHY-4-CABLE_LENGTH: …`, unter Linux die des Kernels), das Problem „Kabel zu lang:
+208 m, erlaubt 100 m (1000BASE-T zwischen PC4 eth0 und SW1 Gi1/0/5); die Leitung bleibt aus.“
+und in der physischen Ansicht ein gestricheltes Kabel mit Warndreieck und „zu lang, erlaubt 100
+m“. Wird es kürzer (ein Gerät woanders, eine Länge von Hand), kommt es hoch wie ein
+eingestecktes Kabel. Optiken, die nicht passen, zeigen sich genauso (`%PHY-4-OPTICS`, das
+Problem „Optiken passen nicht: …“).
+
+**Laufzeit:** Ein Kupfer- oder Glasfaserkabel, dessen Verzögerung auf dem Vorgabewert seiner
+Art steht und dessen Länge aus dem Plan kommt (von Hand gesetzt oder beide Enden in der
+physischen Ansicht aufgestellt), läuft mit 5 ns je Meter; jedes andere behält seine
+Verzögerung. So bleiben ältere Projekte und alle Golden-Berichte unverändert.
+
+**WLAN** rechnet seine Reichweiten weiter mit den Abständen der logischen Zeichenfläche und dem
+Maßstab `dip_per_m` (siehe [WLAN](#wlan)); die Plätze der physischen Ansicht gehen dort noch
+nicht ein, weil frei stehende Geräte und solche auf Tischen sonst andere Signale bekämen als in
+älteren Projekten.
+
+**Szenarien:** `place GERÄT ORT [HE]` stellt ein Gerät in einen anderen Raum, auf einen Tisch
+oder in ein Rack (ohne HE die unterste freie), `cable GERÄT PORT length M` gibt dem Kabel am
+Port eine Länge von Hand (`length auto`: wieder automatisch); der Bericht nennt die Kabel mit
+ihren neuen Längen. `expect cable GERÄT PORT length [VERGLEICH] M` prüft die Länge, `expect
+cable GERÄT PORT up|down`, ob es trägt. Das Golden-Szenario `phys_lengths.scn` auf
+`fixtures/phys_campus.jfnet` prüft die Längen des Campus, PC4s Kabel von 208 m (unten, `show
+interfaces`, `ip link`), im Büro 1 23 m mit einem Ping, 132 m von Hand mit seiner
+Protokollzeile, wieder automatisch und SW2 in einer anderen Höheneinheit.
+
+Noch offen: Kabel mit Fehlern statt ganz aus, Medien-Konverter und Patchfelder, Trassen und
+Durchbrüche als eigene Wege, Kabel im Plan ziehen statt auf der logischen Fläche, die
+WLAN-Reichweite aus den Plätzen, neue Geräte aus der Palette direkt in den Plan.
+
+Für Programme: `jfn_model::phys` (`Tree`, `length`, `delay_ns`, `reach`, `link_reach`,
+`optic_fault`, `issues`, die Änderungen `add_place`, `rename_place`, `remove_place`,
+`set_place`, `place_device`, `set_len`, `set_optic`), `catalog::form`, `rack_units`, `Optic`,
+`Action::CableLen { link, len_m }`, `Action::Optic { dev, port, optic }`,
+`Engine::cable_phys(link)`, `link_idx_up(link)`, `Note::Phys(PhysNote)`,
+`ProblemKind::CableTooLong` und `OpticMismatch`. Geprüft wird das in der Selbsttest-Gruppe
+`phys` ([`src/phystest.rs`](src/phystest.rs)), mit `scen_phys_lengths.uis` und den
+Fensterskripten `phys_view.uis`, `phys_rack.uis`, `phys_length.uis` und `phys_shots.uis`.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -2424,7 +2577,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · physische Ansicht, Gruppen · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; SNMP, AAA mit RADIUS, Mail) |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · Gruppen · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; SNMP, AAA mit RADIUS, Mail) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

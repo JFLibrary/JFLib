@@ -6,7 +6,8 @@
 // Speed in Mbit/s, delay in µs, loss in % (a decimal comma or point); Enter or "Setzen" applies
 // them, Esc puts the fields back.  Every change is one undo step the simulator follows
 // (SetCable, Impair, Unplug); a kind that does not plug into both ports is not offered.  Below
-// them the lab's faults of the cable (faults.rs: pulled, worse, for a while).
+// them the lab's faults of the cable (faults.rs: pulled, worse, for a while), last its length
+// and the limit of its medium (P1, workspace/phys/props.rs).
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -114,6 +115,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
     if l.cable != CableKind::Console {
         super::faults::cable(n, ui, id);
     }
+    // its length and the limit of its medium (the physical view, last: workspace/phys/props.rs)
+    crate::workspace::phys::props::cable(n, ui, id);
 }
 
 fn quality(n: &mut Net, ui: &mut Ui, l: &jfn_model::Link) {
