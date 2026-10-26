@@ -715,7 +715,7 @@ mod lnx {
     const O_RDONLY: usize = 0;
     const O_WRONLY: usize = 1;
     const O_CREAT: usize = 0x40;
-    const O_TRUNC: usize = 0x200;
+    const O_EXCL: usize = 0x80;
     const O_DIRECTORY: usize = 0x10000;
     const O_CLOEXEC: usize = 0x80000;
     const O_NOFOLLOW: usize = 0x20000;
@@ -972,8 +972,16 @@ mod lnx {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
             return false;
         }
-        let tmp = alloc::format!("{}.tmp{}", path, crate::time_us() % 1_000_000);
-        let Some(fd) = open(&tmp, O_WRONLY | O_CREAT | O_TRUNC, 0o600) else { return false };
+        // O_EXCL: a guessed name that exists (a planted link, a stale file) is never written through
+        let mut opened = None;
+        for k in 0..16u64 {
+            let name = alloc::format!("{}.tmp{}", path, crate::time_us().wrapping_add(k) % 1_000_000);
+            if let Some(fd) = open(&name, O_WRONLY | O_CREAT | O_EXCL, 0o600) {
+                opened = Some((name, fd));
+                break;
+            }
+        }
+        let Some((tmp, fd)) = opened else { return false };
         let mut off = 0;
         while off < data.len() {
             // SAFETY: the slice is readable for its length.

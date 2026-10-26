@@ -34,6 +34,9 @@ use crate::xml::{Item, NONE};
 const MAX_DRAWS: u32 = 1_000_000;
 const MAX_NEST: u32 = 64;
 const MAX_LAYERS: u32 = 8;
+// element visits of all bounds queries per render (a use DAG makes one query exponential)
+const MAX_BOUNDS: u32 = 4_000_000;
+const MAX_LAYER_PX: u64 = 1 << 26;
 const MAX_STOPS: usize = 1024;
 const KAPPA: f64 = 0.5522847498307936;
 // the bounds of content whose extent is not followed (everything)
@@ -439,8 +442,10 @@ struct R<'a, 'h> {
     buf: Vec<u8>,
     text: Option<&'h mut dyn TextHook>,
     draws: u32,
+    bvis: u32,
     depth: u32,
     layers: u32,
+    layer_px: u64, // pixels of the layers alive (bounded by MAX_LAYER_PX)
     active: Vec<u32>, // use targets being drawn (cycles)
     op_mul: f64,      // the opacity of groups beyond MAX_LAYERS
 }
@@ -650,9 +655,10 @@ impl<'a, 'h> R<'a, 'h> {
     fn bounds_in(&mut self, k: u32, ps: &Style, m: &Matrix, vp: Vp, stroke: bool, depth: u32, own_tf: bool) -> Option<[f64; 4]> {
         let doc = self.doc;
         let n = doc.node(k)?;
-        if depth > MAX_NEST || display_none(n) {
+        if depth > MAX_NEST || display_none(n) || self.bvis >= MAX_BOUNDS {
             return None;
         }
+        self.bvis += 1;
         let cs = ps.child(n);
         let m2 = match n.tf {
             Some(t) if own_tf && !matches!(n.kind, Kind::LinearGradient | Kind::RadialGradient) => mul(m, &t),
@@ -918,7 +924,7 @@ impl<'a, 'h> R<'a, 'h> {
         // others are drawn into a layer (beyond MAX_LAYERS the opacity goes to every paint)
         let leaf = !matches!(n.kind, Kind::Svg | Kind::G | Kind::A | Kind::Switch | Kind::Use);
         let paints = (cs.fill != Paint::None) as u32 + (cs.stroke != Paint::None) as u32;
-        let layer = op < 1.0 && (!leaf || paints > 1 || n.kind == Kind::Text) && self.layers < MAX_LAYERS;
+        let layer = op < 1.0 && (!leaf || paints > 1 || n.kind == Kind::Text) && self.layers < MAX_LAYERS && self.layer_px < MAX_LAYER_PX;
         let saved_mul = self.op_mul;
         let fold = if layer {
             self.op_mul
@@ -942,11 +948,14 @@ impl<'a, 'h> R<'a, 'h> {
                 let mut sf = Surface::new(r[2] - r[0], r[3] - r[1], FMT_PARGB);
                 if !sf.px.is_empty() {
                     self.layers += 1;
+                    let lpx = sf.w as u64 * sf.h as u64;
+                    self.layer_px += lpx;
                     {
                         let mut lt = Tgt { sf: &mut sf, ox: r[0], oy: r[1], clip: r };
                         self.content(&mut lt, n, &cs, &m2, vp2, None, fold);
                     }
                     self.layers -= 1;
+                    self.layer_px -= lpx;
                     paint::composite(t, &sf, r[0], r[1], (op * 255.0 + 0.5) as u32, mask);
                 }
             }
@@ -1394,15 +1403,17 @@ impl Svg {
     }
 
     /// a new FMT_PARGB surface w x h with the document drawn into it (render_rect);
-    /// Err(ERR_DIMS) for sides outside 1 .. 65535
+    /// Err(ERR_DIMS) for sides outside 1 .. 65535, Err(ERR_LIMIT) beyond IMG_MAXPX_DEF pixels
     pub fn rasterize(&self, w: i32, h: i32, opts: &mut Opts) -> Result<Surface, i32> {
         if !(1..=65535).contains(&w) || !(1..=65535).contains(&h) {
             return Err(img_core::ERR_DIMS);
         }
-        let mut sf = Surface::new(w, h, FMT_PARGB);
-        if sf.px.is_empty() {
-            return Err(img_core::ERR_NOMEM);
+        if w as u64 * h as u64 > img_core::IMG_MAXPX_DEF {
+            return Err(img_core::ERR_LIMIT);
         }
+        let Some(mut sf) = Surface::try_new(w, h, FMT_PARGB) else {
+            return Err(img_core::ERR_NOMEM);
+        };
         self.render_rect(&mut sf, 0.0, 0.0, w as f64, h as f64, None, opts);
         Ok(sf)
     }
@@ -1428,8 +1439,10 @@ impl Svg {
             buf: Vec::new(),
             text: opts.text.as_mut().map(|h| &mut **h as &mut dyn TextHook),
             draws: 0,
+            bvis: 0,
             depth: 0,
             layers: 0,
+            layer_px: 0,
             active: Vec::new(),
             op_mul: 1.0,
         };

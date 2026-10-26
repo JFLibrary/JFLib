@@ -182,7 +182,7 @@ impl X11 {
             return false;
         }
         // ---- setup request
-        let mut sr = [0u8; 64];
+        let mut sr = [0u8; 32 + AUTH_MAX]; // cookie at 32, at most AUTH_MAX bytes
         sr[0] = 0x6C; // 'l': little endian
         sr[2] = 11;
         let mut len = 12;
@@ -406,7 +406,7 @@ impl X11 {
             self.xid_mask = xid_mask;
             self.xid_inc = xid_mask & xid_mask.wrapping_neg(); // lowest set bit
             self.xid_last = 0;
-            self.maxreq = maxreq;
+            self.maxreq = maxreq.max(4096); // the protocol's minimum; `maxreq - 64` must not wrap
             self.min_kc = min_kc;
             self.max_kc = max_kc;
             self.root = root;
@@ -457,7 +457,7 @@ impl X11 {
             let (_, seq) = self.req(big_op, 4); // BigReqEnable (minor 0)
             if let Some(r) = self.reply(seq) {
                 let words = rd32(&r, 8).min(0x3FFFFFF); // maximum request length in 4-byte units
-                self.maxreq = words << 2;
+                self.maxreq = (words << 2).max(4096);
                 self.bigreq = true;
             }
         }
@@ -530,11 +530,7 @@ impl X11 {
         let path = match crate::env("XAUTHORITY") {
             Some(p) if !p.is_empty() => p,
             _ => match crate::env("HOME") {
-                Some(h) => {
-                    let mut p = format!("{h}/.Xauthority");
-                    p.truncate(255);
-                    p
-                }
+                Some(h) => format!("{h}/.Xauthority"),
                 None => return,
             },
         };

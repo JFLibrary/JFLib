@@ -197,6 +197,8 @@ fn put(b: &mut Vec<u8>, v: &Value) {
             b.extend_from_slice(&x.to_le_bytes());
         }
         Value::S(s) | Value::O(s) => {
+            // an embedded NUL is invalid: the bus would drop the connection
+            let s = s.find('\0').map_or(s.as_str(), |i| &s[..i]);
             pad(b, 4);
             b.extend_from_slice(&(s.len() as u32).to_le_bytes());
             b.extend_from_slice(s.as_bytes());
@@ -342,6 +344,9 @@ impl Rd<'_> {
             b'(' | b'{' => {
                 self.align(8)?;
                 let close = type_end(sig, 0)? - 1;
+                if close == 1 {
+                    return None; // "()" takes no bytes: an array of it would never end
+                }
                 let mut j = 1;
                 let mut fields = Vec::new();
                 while j < close {
@@ -635,6 +640,10 @@ impl Conn {
                 self.rbuf.drain(..k + 2);
                 return Some(line);
             }
+            if self.rbuf.len() > 4096 {
+                self.broken = true; // no line end in a handshake line
+                return None;
+            }
             if !self.fill(ms) {
                 return None;
             }
@@ -703,7 +712,7 @@ impl Conn {
     pub(crate) fn wait_reply(&mut self, serial: u32, ms: i32) -> Option<Msg> {
         let end = crate::time_us() + ms as u64 * 1000;
         while crate::time_us() < end {
-            let m = self.read(((end - crate::time_us()) / 1000) as i32 + 1)?;
+            let m = self.read((end.saturating_sub(crate::time_us()) / 1000) as i32 + 1)?;
             if (m.typ == T_RETURN || m.typ == T_ERROR) && m.reply_to == serial {
                 return (m.typ == T_RETURN).then_some(m);
             }

@@ -221,19 +221,26 @@ pub(crate) fn shl_init(p: &mut Pn) {
     }
     s.nbi = s.shapes.len();
     s.icons.clear();
-    // <exe dir>/Shapes (argv[0] up to its last separator; no separator: ./Shapes)
-    let a0 = plat::args().into_iter().next().unwrap_or_default();
-    let a0 = cut(&a0, PATH_CAP - 16);
-    let path = match a0.bytes().take(PATH_CAP - 16).rposition(|c| c == b'/' || c == b'\\') {
+    // <exe dir>/Shapes, from the real executable path: a bare argv[0] would load ./Shapes
+    // from the current directory (desktop; other targets keep the virtual "Shapes" folder)
+    #[cfg(any(windows, target_os = "linux"))]
+    let exe = plat::current_exe().unwrap_or_default();
+    #[cfg(not(any(windows, target_os = "linux")))]
+    let exe = String::new();
+    let exe = cut(&exe, PATH_CAP - 16);
+    let path = match exe.bytes().take(PATH_CAP - 16).rposition(|c| c == b'/' || c == b'\\') {
         Some(k) => {
-            let mut s = String::from(&a0[..k + 1]);
+            let mut s = String::from(&exe[..k + 1]);
             s.push_str("Shapes");
-            s
+            Some(s)
         }
-        None => String::from("Shapes"),
+        None if cfg!(any(windows, target_os = "linux")) => None,
+        None => Some(String::from("Shapes")),
     };
-    shl_load_dir(p, &path);
-    crate::integrations::paint_dot_net::catalog::shapes_feed(p,&path);
+    if let Some(path) = path {
+        shl_load_dir(p, &path);
+        crate::integrations::paint_dot_net::catalog::shapes_feed(p, &path);
+    }
 }
 
 // shl_free_custom() -- drop the custom shapes and the error text
@@ -285,7 +292,7 @@ fn str_ends_ci(s: &str, suf: &str) -> bool {
 pub(crate) fn shl_add_xaml(p: &mut Pn, buf: &[u8], name: &str) -> i32 {
     let s = &mut p.shl;
     let before = s.shapes.len();
-    let mut r = shl_parse_xaml(s, buf, name);
+    let mut r = if buf.len() <= XAML_MAX { shl_parse_xaml(s, buf, name) } else { -1 };
     if r <= 0 {
         s.shapes.truncate(before);
         shl_fail(s, name);
@@ -310,13 +317,27 @@ fn shl_fail(s: &mut Shl, name: &str) {
 fn shl_load_file(p: &mut Pn, path: &str, name: &str) {
     let s = &mut p.shl;
     let before = s.shapes.len();
-    if let Some(data) = plat::read_file(path) {
-        if data.len() <= XAML_MAX && shl_parse_xaml(s, &data, name) > 0 {
+    if let Some(data) = shl_read(path) {
+        if shl_parse_xaml(s, &data, name) > 0 {
             return;
         }
         s.shapes.truncate(before); // drop what this file added
     }
     shl_fail(s, name);
+}
+
+// shl_read(path) -- the file's bytes; None when it cannot be read or exceeds XAML_MAX (checked
+// before anything is read)
+fn shl_read(path: &str) -> Option<Vec<u8>> {
+    let f = plat::File::open(path, plat::FO_READ)?;
+    let size = f.size()?;
+    if size > XAML_MAX as u64 {
+        return None;
+    }
+    let mut buf = alloc::vec![0u8; size as usize];
+    let got = f.read_at(0, &mut buf)?;
+    buf.truncate(got.min(buf.len()));
+    Some(buf)
 }
 
 // shl_find(buf, p, end, needle) -> first occurrence of needle in [p, end)
@@ -524,7 +545,9 @@ fn shl_parse_xaml(s: &mut Shl, buf: &[u8], fname: &str) -> i32 {
         // an element start: '<' [prefix:] SimpleGeometryShape (white space | '/' | '>')
         let mut i = hit;
         loop {
-            if i == 0 {
+            // a prefix is short: without the bound a run of name characters in front of
+            // many hits would be scanned again for each of them (quadratic)
+            if i == 0 || hit - i > 64 {
                 continue 'next;
             }
             let c = buf[i - 1];
@@ -604,8 +627,7 @@ fn shl_parse_xaml(s: &mut Shl, buf: &[u8], fname: &str) -> i32 {
             }
             // FillRule="EvenOdd" anywhere inside
             if let Some((a, 7)) = shl_attr(buf, te, ce, b"FillRule") {
-                let w = u32::from_le_bytes([buf[a], buf[a + 1], buf[a + 2], buf[a + 3]]) | 0x2020_2020;
-                if w == 0x6E65_7665 {
+                if buf[a..a + 7].eq_ignore_ascii_case(b"EvenOdd") {
                     pd.rule = RULE_EVENODD;
                 }
             }

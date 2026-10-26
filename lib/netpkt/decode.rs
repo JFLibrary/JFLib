@@ -1483,7 +1483,7 @@ fn http_chunks(l: &mut B, b: &[u8], off: usize, complete: bool) {
             l.f("End of chunked encoding", off + p, b.len() - p, String::from("0"));
             return;
         }
-        let end = (p + i + 1 + n + 2).min(b.len());
+        let end = (p + i + 1).saturating_add(n).saturating_add(2).min(b.len());
         l.f("Data chunk", off + p, end - p, format!("{} octets", n));
         p = end;
     }

@@ -57,6 +57,8 @@ pub fn block(key: &[u8; 32], counter: u32, nonce: &[u8; 12]) -> [u8; 64] {
 
 /// XOR the keystream (starting at block `counter`) into data
 pub fn xor(key: &[u8; 32], counter: u32, nonce: &[u8; 12], data: &mut [u8]) {
+    // a wrapped block counter would reuse the keystream
+    assert!(data.len().div_ceil(64) as u64 <= (1u64 << 32) - counter as u64, "chacha20: message too long");
     let base = init(key, counter, nonce);
     for (n, chunk) in data.chunks_mut(64).enumerate() {
         let mut st = base;

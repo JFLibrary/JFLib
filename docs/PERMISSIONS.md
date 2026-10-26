@@ -441,9 +441,9 @@ from the manifest, as defence in depth:
 - **Always** (`sandbox`): image load (no images from a remote/UNC path or with a low integrity
   label), extension points disabled, and -- unless the manifest has a `plugins` rule --
   dynamic code prohibited (no new executable memory; the plugin loader maps on-disk images,
-  which stays allowed). On the Windows build this was tested on (10.0.26200) the dynamic code
-  policy reads back as set, but `VirtualAlloc(PAGE_EXECUTE_READWRITE)` and `VirtualProtect` to
-  executable still succeed, in any process; `sandboxtest` reports that instead of failing.
+  which stays allowed). `VirtualAlloc(PAGE_EXECUTE_READWRITE)` is then refused; `sandboxtest`
+  checks that. Third-party code loaded into the process (shell extensions of the file dialog,
+  IMEs, printer drivers) that needs executable memory fails under this policy.
 - **`sandbox strict`** also blocks child-process creation when the app may not start other
   programs: no `process` rule and no `url` / `print` rule (`open_url`'s `ShellExecute` and the
   print dialog can start one). This stops `plat::spawn_self` too. Strict handle checks are

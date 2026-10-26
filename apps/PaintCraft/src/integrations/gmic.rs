@@ -101,8 +101,9 @@ fn output_number(name: &str) -> Option<u32> {
 fn run(program: &str, filter: Option<&str>, pixels: gfx::Surface, job: &Job) -> Result<Vec<gfx::Surface>, String> {
     let fail = |s: &str| String::from(s);
     let root = plat::temp_dir().ok_or_else(|| fail("Kein temporärer Ordner verfügbar."))?;
-    let folder = format!("{root}/paintcraft-gmic-{}", plat::time_us());
-    if plat::file_exists(&folder) != 0 || !plat::mkdir(&folder) { return Err(fail("Der temporäre G’MIC-Ordner ließ sich nicht anlegen.")); }
+    // unpredictable name, owner-only directory: other users cannot pre-create or read it
+    let folder = format!("{root}/paintcraft-gmic-{:016x}", plat::random_u64());
+    if plat::file_exists(&folder) != 0 || !plat::fs::mkdir_private(&folder) { return Err(fail("Der temporäre G’MIC-Ordner ließ sich nicht anlegen.")); }
     let temp = Temp(folder);
     let input = format!("{}/input.png", temp.0);
     let output = format!("{}/output-%l.png", temp.0);
@@ -168,7 +169,7 @@ fn commit(p: &mut Pn, mut images: Vec<gfx::Surface>) {
             if crate::document::layers::lay_add_sf(p, id, i as i32, sf, Some(&format!("G’MIC {}", i+1))).is_err() { crate::document::model::doc_close(p, id); return; }
         }
         p.doc.dm(id).cur = p.doc.d(id).layers.len() as i32 - 1;
-        crate::document::model::doc_mark_layers(p, id); crate::document::history::hist_init(p, id, "G’MIC importieren", 0);
+        crate::document::model::doc_mark_layers(p, id); crate::document::history::hist_init_unsaved(p, id, "G’MIC importieren", 0);
         crate::document::model::doc_set_modified(p, id, true);
         return;
     }

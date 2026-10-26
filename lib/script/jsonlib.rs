@@ -27,7 +27,7 @@ use agent_core::json::{self as js, Number, Value as J};
 
 use crate::heap::{self, Map, Ref, Value};
 use crate::num;
-use crate::stdlib::{arg, bad, err, heap_full, list_fuel, new_list, new_map, new_str, opt_int, parse_float, spend, text_fuel};
+use crate::stdlib::{arg, bad, cap, err, heap_full, list_fuel, new_list, new_map, new_str, opt_int, parse_float, spend, text_fuel};
 use crate::vm::{fuel_msg, ErrorKind, Exc, Host, Vm};
 
 /// the most levels: no value deeper than this below the outermost one
@@ -46,9 +46,16 @@ struct Enc<'a> {
     most: u64,
     /// the fuel the invocation has left
     budget: u64,
+    /// the bytes of text copied into the tree so far (a shared string is copied per visit)
+    strings: u64,
 }
 
 impl Enc<'_> {
+    fn charge(&mut self, len: usize) -> Result<(), Exc> {
+        self.strings = self.strings.saturating_add(len as u64);
+        cap(self.vm, self.strings)
+    }
+
     fn value(&mut self, v: Value, depth: usize) -> Result<J, Exc> {
         let vm = self.vm;
         self.count += 1;
@@ -73,7 +80,11 @@ impl Enc<'_> {
                     None => return err(format!("json.encode: {} lässt sich nicht als JSON darstellen", s)),
                 }
             }
-            Value::Str(r) => J::String(heap::text(&vm.heap, r).to_string()),
+            Value::Str(r) => {
+                let s = heap::text(&vm.heap, r);
+                self.charge(s.len())?;
+                J::String(s.to_string())
+            }
             Value::Bytes(_) => return err(String::from("json.encode: bytes lassen sich nicht als JSON darstellen – erst b.hex() oder b.text()")),
             Value::Func(_) | Value::Native(_) => return err(String::from("json.encode: Funktionen lassen sich nicht als JSON darstellen")),
             Value::List(r) => {
@@ -100,6 +111,7 @@ impl Enc<'_> {
                         Value::Bool(b) => String::from(if b { "true" } else { "false" }),
                         _ => String::new(),
                     };
+                    self.charge(k.len())?;
                     if mixed && !names.insert(k.clone()) {
                         return err(format!("json.encode: Der Schlüssel \"{}\" kommt doppelt vor", k));
                     }
@@ -123,7 +135,7 @@ impl Enc<'_> {
 /// v as JSON text (indent 0: compact)
 pub(crate) fn encode(vm: &mut Vm, v: Value, indent: u32) -> Result<String, Exc> {
     let budget = vm.lim.fuel.saturating_sub(vm.call_fuel + vm.used);
-    let mut enc = Enc { vm: &*vm, seen: Vec::new(), count: 0, most: most(vm), budget };
+    let mut enc = Enc { vm: &*vm, seen: Vec::new(), count: 0, most: most(vm), budget, strings: 0 };
     let tree = enc.value(v, 0)?;
     let count = enc.count;
     let lim = js::Limits {

@@ -205,8 +205,10 @@ impl Table {
             let w = total / self.columns.len() as u32;
             self.columns.fill(w);
             for row in &mut self.rows {
+                let gap_start=old_nc-usize::from(row.grid_after);
                 if at<usize::from(row.grid_before){if insert{row.grid_before+=1;}else{row.grid_before-=1;}}
-                else if at>=old_nc-usize::from(row.grid_after){if insert{row.grid_after+=1;}else{row.grid_after-=1;}}
+                // Inserting at the gap start (or appending without a gap) creates a real cell.
+                else if at>gap_start || at==gap_start && !insert {if insert{row.grid_after+=1;}else{row.grid_after-=1;}}
                 if insert {
                     row.cells.insert(at, new_cell(allocate)?);
                 } else {

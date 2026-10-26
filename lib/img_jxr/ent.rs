@@ -22,7 +22,20 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use img_core::{ERR_CANCEL, ERR_DIMS, ERR_HDR, ERR_TRUNC, ERR_UNSUPPORTED, ImgDec, meta};
+use img_core::{ERR_CANCEL, ERR_DIMS, ERR_HDR, ERR_LIMIT, ERR_NOMEM, ERR_TRUNC, ERR_UNSUPPORTED, ImgDec, meta};
+
+/// the limit of the elements (4 bytes each) of all planes of an image
+const JXR_MAXELEM: u64 = 1 << 31;
+
+/// a zeroed vector, ERR_NOMEM when it cannot be allocated
+fn zvec<T: Clone + Default>(n: usize) -> Result<Vec<T>, i32> {
+    let mut v = Vec::new();
+    if v.try_reserve_exact(n).is_err() {
+        return Err(ERR_NOMEM);
+    }
+    v.resize(n, T::default());
+    Ok(v)
+}
 
 use crate::pct::ict4x4;use crate::tab::{JXV_DELTA, JXV_LUT};
 
@@ -2142,7 +2155,7 @@ pub fn decode(cs: &[u8], dec: Option<&ImgDec>) -> Result<Cs, i32> {
             return Err(ERR_HDR);
         }
         let p = d.r.bytepos();
-        if entries > end.wrapping_sub(p) {
+        if p > end || entries > end - p {
             return Err(ERR_TRUNC); // every entry takes at least one byte
         }
         let mut idx = vec![0u64; entries as usize];
@@ -2158,7 +2171,7 @@ pub fn decode(cs: &[u8], dec: Option<&ImgDec>) -> Result<Cs, i32> {
     let (n, ok) = d.r.vlwesc(cs); // SubsequentBytes
     let n = if ok { n } else { 0 };
     let p = d.r.bytepos();
-    if n > end.wrapping_sub(p) {
+    if p > end || n > end - p {
         return Err(ERR_TRUNC);
     }
     let base = p.wrapping_add(n); // first tile packet
@@ -2167,14 +2180,41 @@ pub fn decode(cs: &[u8], dec: Option<&ImgDec>) -> Result<Cs, i32> {
         *v = if *v < end.wrapping_sub(base) { base + *v } else { 0 };
     }
     // ---- buffers
+    let mut total = 0u64;
+    for p in 0..d.npl as usize {
+        d.setplane(p);
+        let (mbs, nch) = (d.mbw as u64 * d.mbh as u64, d.nch as u64);
+        total += mbs * (nch * 16 + nch + 1);
+        for c in 0..nch {
+            let (mut w, mut h) = (d.mbw as u64 * 16, d.mbh as u64 * 16);
+            if c != 0 && d.cf == 1 {
+                w >>= 1;
+                h >>= 1;
+            } else if c != 0 && d.cf == 2 {
+                w >>= 1;
+            }
+            total += w * h + (w * h >> 4);
+        }
+    }
+    if total > JXR_MAXELEM {
+        return Err(ERR_LIMIT);
+    }
+    let r = meta::mem_check(total * 4, dec.unwrap_or(&dd));
+    if r != 0 {
+        return Err(r);
+    }
+    // spatial mode reads at least one bit per macroblock and plane: fewer bytes cannot be complete
+    if !have_idx && d.mbw as u64 * d.mbh as u64 * d.npl as u64 > end.saturating_sub(base).saturating_mul(8) {
+        return Err(ERR_TRUNC);
+    }
     for p in 0..d.npl as usize {
         d.setplane(p);
         let nch = d.nch as usize;
         let mbs = (d.mbw * d.mbh) as usize;
         let cf = d.cf;
         let pl = &mut d.jx.pl[p];
-        pl.lpq = vec![0; mbs * nch * 16];
-        pl.cbp = vec![0; mbs * (nch + 1)];
+        pl.lpq = zvec(mbs * nch * 16)?;
+        pl.cbp = zvec(mbs * (nch + 1))?;
         for c in 0..nch {
             let mut w = d.mbw << 4;
             let mut h = d.mbh << 4;
@@ -2189,8 +2229,8 @@ pub fn decode(cs: &[u8], dec: Option<&ImgDec>) -> Result<Cs, i32> {
             pl.gw[c] = w >> 2;
             pl.gh[c] = h >> 2;
             let n = w as usize * h as usize;
-            pl.buf.push(vec![0; n]);
-            pl.dcg.push(vec![0; n >> 4]);
+            pl.buf.push(zvec(n)?);
+            pl.dcg.push(zvec(n >> 4)?);
         }
     }
     // ---- tiles

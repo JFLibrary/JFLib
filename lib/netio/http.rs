@@ -44,6 +44,27 @@ impl Headers {
         self.0.push((String::from(name), String::from(value)));
     }
 
+    /// the Content-Length: Ok(None) without one, Err for a value that is not plain digits or
+    /// headers that disagree
+    pub fn content_length(&self) -> Result<Option<u64>, ()> {
+        let mut found: Option<u64> = None;
+        for (k, v) in &self.0 {
+            if !k.eq_ignore_ascii_case("content-length") {
+                continue;
+            }
+            let v = v.trim();
+            if v.is_empty() || !v.bytes().all(|b| b.is_ascii_digit()) {
+                return Err(());
+            }
+            let n: u64 = v.parse().map_err(|_| ())?;
+            if found.is_some_and(|f| f != n) {
+                return Err(());
+            }
+            found = Some(n);
+        }
+        Ok(found)
+    }
+
     pub fn remove(&mut self, name: &str) {
         self.0.retain(|(k, _)| !k.eq_ignore_ascii_case(name));
     }
@@ -232,11 +253,18 @@ pub struct Reader<'a> {
     s: &'a dyn Stream,
     buf: Vec<u8>,
     pos: usize,
+    deadline_us: Option<u64>,
 }
 
 impl<'a> Reader<'a> {
     pub fn new(s: &'a dyn Stream) -> Reader<'a> {
-        Reader { s, buf: Vec::with_capacity(8192), pos: 0 }
+        Reader { s, buf: Vec::with_capacity(8192), pos: 0, deadline_us: None }
+    }
+
+    /// reads fail with TimedOut once plat::time_us() is past this (a limit for a whole head,
+    /// where the stream's timeout counts each read)
+    pub fn set_deadline(&mut self, deadline_us: Option<u64>) {
+        self.deadline_us = deadline_us;
     }
 
     /// whether unread bytes are buffered (a pipelined next request)
@@ -248,6 +276,9 @@ impl<'a> Reader<'a> {
         if self.pos > 0 && self.pos == self.buf.len() {
             self.buf.clear();
             self.pos = 0;
+        }
+        if self.deadline_us.is_some_and(|d| plat::time_us() > d) {
+            return Err(NetError::new(NetErrorKind::TimedOut, 0));
         }
         let old = self.buf.len();
         self.buf.resize(old + 16 * 1024, 0);
@@ -305,7 +336,11 @@ impl<'a> Reader<'a> {
             if k.is_empty() || k.bytes().any(|b| b <= b' ' || b == 0x7f) {
                 return Err(ReadError::Bad);
             }
-            h.add(k, v.trim());
+            let v = v.trim();
+            if v.bytes().any(|b| (b < b' ' && b != b'\t') || b == 0x7f) {
+                return Err(ReadError::Bad);
+            }
+            h.add(k, v);
         }
         Ok((start, h))
     }
@@ -332,8 +367,8 @@ impl<'a> Reader<'a> {
     pub fn body(&mut self, h: &Headers, max: usize, until_close: bool) -> Result<Vec<u8>, ReadError> {
         let mut out = Vec::new();
         if h.get("transfer-encoding").is_none() {
-            if let Some(n) = h.get("content-length").and_then(|c| c.trim().parse::<usize>().ok()) {
-                out.reserve(n.min(max).min(1 << 20));
+            if let Ok(Some(n)) = h.content_length() {
+                out.reserve((n.min(max as u64) as usize).min(1 << 20));
             }
         }
         self.body_to(h, max as u64, until_close, &mut |b| {
@@ -354,15 +389,21 @@ impl<'a> Reader<'a> {
             loop {
                 let l = self.line(1024, false)?;
                 let size = l.split(';').next().unwrap_or("").trim();
+                if !size.bytes().all(|c| c.is_ascii_hexdigit()) {
+                    return Err(ReadError::Bad);
+                }
                 let n = u64::from_str_radix(size, 16).map_err(|_| ReadError::Bad)?;
                 if n == 0 {
                     // trailers up to the empty line
-                    loop {
-                        if self.line(MAX_HEAD, false)?.is_empty() {
-                            break;
+                    let mut budget = MAX_HEAD;
+                    for _ in 0..=MAX_HEADERS {
+                        let l = self.line(budget, false)?;
+                        if l.is_empty() {
+                            return Ok(total);
                         }
+                        budget = budget.checked_sub(l.len() + 2).ok_or(ReadError::HeadTooLarge)?;
                     }
-                    return Ok(total);
+                    return Err(ReadError::HeadTooLarge);
                 }
                 if total.saturating_add(n) > max {
                     return Err(ReadError::BodyTooLarge);
@@ -374,8 +415,7 @@ impl<'a> Reader<'a> {
                 }
             }
         }
-        if let Some(cl) = h.get("content-length") {
-            let n: u64 = cl.trim().parse().map_err(|_| ReadError::Bad)?;
+        if let Some(n) = h.content_length().map_err(|_| ReadError::Bad)? {
             if n > max {
                 return Err(ReadError::BodyTooLarge);
             }
@@ -497,6 +537,10 @@ pub fn write_response(s: &dyn Stream, r: &mut Response, head_only: bool, keep_al
 
 /// send a request (the body as Content-Length)
 pub fn write_request(s: &dyn Stream, method: &str, target: &str, h: &Headers, body: &[u8]) -> bool {
+    let token = |b: u8| b.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&b);
+    if method.is_empty() || !method.bytes().all(token) || target.is_empty() || target.bytes().any(|b| b <= b' ' || b == 0x7f) {
+        return false;
+    }
     let mut h = h.clone();
     if !body.is_empty() || matches!(method, "POST" | "PUT" | "PATCH") {
         h.set("Content-Length", &format!("{}", body.len()));

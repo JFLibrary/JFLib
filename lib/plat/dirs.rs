@@ -84,7 +84,7 @@ mod win {
 
     #[link(name = "kernel32", kind = "raw-dylib")]
     unsafe extern "system" {
-        fn LoadLibraryA(name: *const u8) -> isize;
+        fn LoadLibraryExA(name: *const u8, file: isize, flags: u32) -> isize;
         fn GetProcAddress(m: isize, name: *const u8) -> usize;
     }
 
@@ -119,7 +119,7 @@ mod win {
         }
         // SAFETY: NUL-terminated names; both calls return 0 on failure.
         let p = unsafe {
-            let m = LoadLibraryA(dll.as_ptr());
+            let m = LoadLibraryExA(dll.as_ptr(), 0, 0x800) /* LOAD_LIBRARY_SEARCH_SYSTEM32 */;
             if m == 0 { 0 } else { GetProcAddress(m, name.as_ptr()) }
         };
         slot.store(if p == 0 { 1 } else { p }, Ordering::Release);

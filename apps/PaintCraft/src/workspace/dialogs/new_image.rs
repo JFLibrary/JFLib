@@ -33,6 +33,8 @@ const LABEL_W: i32 = 110; // DIP
 const FIELD_W: i32 = 120;
 const UNIT_W: i32 = 130;
 const MAXDIM: i32 = 65535;
+/// largest resolution, hundredths: 100000 Pixel/in (keeps the unit conversions in range)
+const RES_MAX: i32 = 10_000_000;
 const RANGE_DIM: Range = Range::new(1, MAXDIM, 1, 0);
 static RESUNIT_LIST: [&str; 2] = ["Pixel/in", "Pixel/cm"];
 static PUNIT_LIST: [&str; 2] = ["Zoll", "Zentimeter"];
@@ -120,17 +122,18 @@ pub(crate) fn dlgnew_open(p: &mut Pn, ui: &mut Ui) {
 
 // ppu_x100() -> print-unit pixels * 100 (resolution converted to the print unit)
 fn ppu_x100(g: &DlgNew) -> u32 {
-    let r = g.res as u32;
     if g.resunit == g.punit {
-        return r;
+        return g.res.clamp(0, RES_MAX) as u32;
     }
-    if g.resunit == 0 {
-        // Pixel/in, print in cm: / 2.54
-        r.wrapping_mul(100).wrapping_add(127) / 254
-    } else {
-        // Pixel/cm, print in inches: * 2.54
-        r.wrapping_mul(254).wrapping_add(50) / 100
-    }
+    // Pixel/in with print in cm: / 2.54; Pixel/cm with print in inches: * 2.54
+    res_convert(g.res, g.resunit == 0) as u32
+}
+
+// res_convert(res, to_cm) -> the resolution (hundredths) in the other unit, within 0 ..= RES_MAX
+fn res_convert(r: i32, to_cm: bool) -> i32 {
+    let r = r.clamp(0, RES_MAX) as u64;
+    let v = if to_cm { (r * 100 + 127) / 254 } else { (r * 254 + 50) / 100 };
+    v.min(RES_MAX as u64) as i32
 }
 
 // fmt_hundredths(v) -- "8,33"
@@ -278,7 +281,7 @@ pub(crate) fn dlgnew_frame(p: &mut Pn, ui: &mut Ui) {
         if ui.textbox(ID_ND_RES, None, &mut g.res_txt, NUM_CAP) & EV_COMMIT != 0 {
             let v = parse_hundredths(&g.res_txt);
             if v > 0 {
-                g.res = v;
+                g.res = v.min(RES_MAX);
             }
             nd_res_text(g);
             nd_print_texts(g, ui);
@@ -286,12 +289,7 @@ pub(crate) fn dlgnew_frame(p: &mut Pn, ui: &mut Ui) {
         ui.next_size(UNIT_W, 0);
         if ui.combobox(ID_ND_RESUNIT, &mut g.resunit, &RESUNIT_LIST) & EV_ACT != 0 {
             // convert the value: Pixel/in <-> Pixel/cm (the pixel size stays)
-            let r = g.res as u32;
-            g.res = if g.resunit != 0 {
-                r.wrapping_mul(100).wrapping_add(127) / 254
-            } else {
-                r.wrapping_mul(254).wrapping_add(50) / 100
-            } as i32;
+            g.res = res_convert(g.res, g.resunit != 0);
             nd_res_text(g);
             nd_print_texts(g, ui);
         }
@@ -353,7 +351,9 @@ pub(crate) fn dlgnew_create(p: &mut Pn, _ui: &mut Ui) -> i32 {
         3 => crate::workspace::palette::pal_secondary(&p.pal),
         _ => 0xFFFF_FFFF,
     };
-    let Some(doc) = crate::document::model::doc_new(p, w, h, background, 0) else {
+    let too_big = w as u64 * h as u64 * 4 > crate::integrations::file_io::img_mem_budget();
+    let doc = if too_big { None } else { crate::document::model::doc_new(p, w, h, background, 0) };
+    let Some(doc) = doc else {
         crate::integrations::file_io::fio_error(p, Some("Neues Bild"), "Zu wenig Arbeitsspeicher für ein Bild dieser Größe.");
         return -1;
     };
@@ -373,7 +373,7 @@ pub(crate) fn dlgnew_create(p: &mut Pn, _ui: &mut Ui) -> i32 {
     g.last_h = h;
     let mut res = g.res;
     if g.resunit != 0 {
-        res = ((res as u32).wrapping_mul(254).wrapping_add(50) / 100) as i32; // remember as Pixel/in
+        res = res_convert(res, false); // remember as Pixel/in
     }
     g.last_res = res;
     0

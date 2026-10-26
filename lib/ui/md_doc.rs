@@ -85,6 +85,7 @@ const LABEL_MAX: usize = 999;
 const PARENS_MAX: usize = 32;
 const HTML_STACK: usize = 64;
 const COLS_MAX: usize = 128;
+const CELLS_MAX: usize = 1 << 21;
 
 /// a range of a block's text with its style
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -331,6 +332,8 @@ struct BlockParser {
     // a blank line since the last block (the next one gets a paragraph's gap)
     blank: bool,
     truncated: bool,
+    // the cells of all tables so far (a row always costs the table's width)
+    table_cells: usize,
 }
 
 // a list marker at the start of s (after up to 3 blanks) -> (ordered, bullet / delim, number,
@@ -655,7 +658,7 @@ fn parse_title(s: &str, k: usize) -> Option<(String, usize)> {
 
 impl BlockParser {
     fn new() -> BlockParser {
-        BlockParser { conts: Vec::new(), leaf: Leaf::None, raws: Vec::new(), defs: BTreeMap::new(), tables: Vec::new(), blank: false, truncated: false }
+        BlockParser { conts: Vec::new(), leaf: Leaf::None, raws: Vec::new(), defs: BTreeMap::new(),         tables: Vec::new(), blank: false, truncated: false, table_cells: 0 }
     }
 
     // a raw block in the place of the open containers
@@ -977,15 +980,19 @@ impl BlockParser {
                     } else {
                         self.close_leaf();
                     }
+                    self.table_cells = self.table_cells.saturating_add(aligns.len());
                     self.leaf = Leaf::Table { aligns, rows: vec![(head, true)] };
                     return;
                 }
             }
         }
-        if let Leaf::Table { rows, .. } = &mut self.leaf {
+        if let Leaf::Table { aligns, rows } = &mut self.leaf {
             if !blank(&rest) && !Self::starts_block(&rest, false) {
-                if rows.len() < BLOCKS_MAX {
+                if rows.len() < BLOCKS_MAX && self.table_cells + aligns.len() <= CELLS_MAX {
+                    self.table_cells += aligns.len();
                     rows.push((split_cells(&rest), false));
+                } else {
+                    self.truncated = true;
                 }
                 return;
             }
@@ -1038,6 +1045,8 @@ struct Bracket {
     node: usize,
     src: usize,
     image: bool,
+    // the intervals there were when it opened (those before end at or before its node)
+    ivs: usize,
 }
 
 // a style or link over nodes a .. b
@@ -1196,12 +1205,12 @@ impl<'a> Inline<'a> {
                 }
                 b'[' => {
                     let node = self.push(String::from("["), N_TEXT);
-                    self.brackets.push(Bracket { node, src: i + 1, image: false });
+                    self.brackets.push(Bracket { node, src: i + 1, image: false, ivs: self.ivs.len() });
                     i += 1;
                 }
                 b'!' if b.get(i + 1) == Some(&b'[') => {
                     let node = self.push(String::from("!["), N_TEXT);
-                    self.brackets.push(Bracket { node, src: i + 2, image: true });
+                    self.brackets.push(Bracket { node, src: i + 2, image: true, ivs: self.ivs.len() });
                     i += 2;
                 }
                 b']' => i = self.close_bracket(i),
@@ -1268,7 +1277,10 @@ impl<'a> Inline<'a> {
         while !s.is_char_boundary(e) {
             e -= 1;
         }
-        // trailing punctuation is no part of it, nor an unbalanced ')'
+        // trailing punctuation is no part of it, nor an unbalanced ')' (the counts are kept, the
+        // trimmed punctuation holds no parentheses)
+        let opens = s[i..e].matches('(').count();
+        let mut closes = s[i..e].matches(')').count();
         loop {
             let t = &s[i..e];
             let Some(last) = t.chars().next_back() else { break };
@@ -1276,7 +1288,8 @@ impl<'a> Inline<'a> {
                 e -= last.len_utf8();
                 continue;
             }
-            if last == ')' && t.matches(')').count() > t.matches('(').count() {
+            if last == ')' && closes > opens {
+                closes -= 1;
                 e -= 1;
                 continue;
             }
@@ -1339,7 +1352,9 @@ impl<'a> Inline<'a> {
             found = r;
         }
         // references: [label], [], or the text itself
-        if found.is_none() && i - br.src <= LABEL_MAX {
+        if found.is_none() && i - br.src <= LABEL_MAX && !self.defs.is_empty() && self.budget > 0 {
+            // (nested brackets would read the same label bytes again and again)
+            self.budget = self.budget.saturating_sub(i - br.src + 1);
             let text_label = &s[br.src..i];
             let mut label = String::from(text_label);
             let mut end = i + 1;
@@ -1368,7 +1383,8 @@ impl<'a> Inline<'a> {
         if br.image {
             // the alt text: the plain text inside (without delimiter runs); the nodes give way
             // to one image (they go: nested images stay linear)
-            let runs: Vec<usize> = self.delims.iter().filter(|d| d.node >= a).map(|d| d.node).collect();
+            let first = self.delims.partition_point(|d| d.node < a);
+            let runs: Vec<usize> = self.delims[first..].iter().map(|d| d.node).collect();
             let mut alt = String::new();
             for (k, n) in self.nodes[a..].iter().enumerate() {
                 if (n.k == N_TEXT || n.k == N_CODE) && runs.binary_search(&(a + k)).is_err() {
@@ -1376,12 +1392,13 @@ impl<'a> Inline<'a> {
                 }
             }
             self.nodes.truncate(a);
-            self.ivs.retain(|iv| iv.a < a);
-            for iv in self.ivs.iter_mut() {
+            let tail = self.ivs.split_off(br.ivs.min(self.ivs.len()));
+            self.ivs.extend(tail.into_iter().filter(|iv| iv.a < a).map(|mut iv| {
                 iv.b = iv.b.min(a);
-            }
+                iv
+            }));
             self.html.retain(|h| h.1 < a);
-            self.delims.retain(|d| d.node < a);
+            self.delims.truncate(first);
             self.images.push(MdImage { src: dest, alt, title, w: 0, h: 0 });
             let img = self.images.len() as u32;
             let nd = &mut self.nodes[br.node];

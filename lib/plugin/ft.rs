@@ -196,7 +196,25 @@ pub(crate) extern "win64" fn decode_tramp<T: FileType>(data: *const u8, len: usi
 /// FT_ENCODE of T
 pub(crate) extern "win64" fn encode_tramp<T: FileType>(sf: *const Surface, opt: *const ImgOpt, buf: *mut *mut u8, len: *mut usize) -> i32 {
     // SAFETY: the host's SURFACE and IMGOPT (or null), alive during the call.
-    let (Some(s), Some(o)) = (unsafe { sf.as_ref() }, unsafe { opt.as_ref() }) else { return ERR_FAIL };
+    let Some(s) = (unsafe { sf.as_ref() }) else { return ERR_FAIL };
+    let none = ImgOpt {
+        fmt: 0,
+        quality: 0,
+        flags: 0,
+        bitdepth: 0,
+        samplebits: 0,
+        dither: 0,
+        athresh: 0,
+        chroma: 0,
+        effort: 0,
+        ddsfmt: 0,
+        mipfilter: 0,
+        tiffcomp: 0,
+        meta: core::ptr::null(),
+        cancel: core::ptr::null(),
+    };
+    // SAFETY: as above; a null IMGOPT means the defaults.
+    let o = unsafe { opt.as_ref() }.unwrap_or(&none);
     let ok = !s.px.is_null() && s.px as usize % 4 == 0 && s.w >= 0 && s.h >= 0 && s.stride as i64 >= s.w as i64 * 4 && s.stride % 4 == 0;
     if !ok || buf.is_null() || len.is_null() {
         return ERR_FAIL;

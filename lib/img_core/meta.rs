@@ -89,7 +89,26 @@ pub fn surf_alloc(w: u32, h: u32, fmt: u8, dec: &ImgDec) -> Result<Surface, i32>
     if r != 0 {
         return Err(r);
     }
-    Ok(Surface::new(w as i32, h as i32, fmt))
+    let row = if fmt == FMT_A8 { w as u64 } else { w as u64 * 4 };
+    let bytes = ((row + 63) & !63) * h as u64;
+    let r = mem_check(bytes, dec);
+    if r != 0 {
+        return Err(r);
+    }
+    let mut sf = Surface::new(0, 0, fmt);
+    let n = (bytes as usize).max(64);
+    // fallible allocation: an unsatisfiable size is ERR_NOMEM, not an abort
+    let mut px = Vec::new();
+    if px.try_reserve_exact(n).is_err() {
+        return Err(ERR_NOMEM);
+    }
+    px.resize(n, 0);
+    sf.px = px;
+    sf.w = w as i32;
+    sf.h = h as i32;
+    sf.stride = ((row + 63) & !63) as i32;
+    sf.flags = gfx::SFF_OWNED;
+    Ok(sf)
 }
 
 // ------------------------------------------------------------------ pixel formats
@@ -193,10 +212,9 @@ pub fn surf_convert(src: &Surface, fmt: u8) -> Result<Surface, i32> {
     if fmt != FMT_PARGB && fmt != FMT_ARGB {
         return Err(ERR_UNSUPPORTED);
     }
-    let mut d = Surface::new(src.w, src.h, fmt);
-    if d.px.is_empty() {
+    let Some(mut d) = Surface::try_new(src.w, src.h, fmt) else {
         return Err(ERR_NOMEM);
-    }
+    };
     let stride = d.stride as usize;
     let w = src.w.max(0) as usize;
     for y in 0..src.h.max(0) as usize {

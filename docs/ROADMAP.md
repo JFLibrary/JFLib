@@ -122,9 +122,8 @@ Host bietet (13 `CAP_*`-Bits). Seit Paket 1 und 2 (2026-10-16) gibt es das Manif
   (`fs.user`) kann Landlock nicht nachträglich freigeben – in einer Flatpak laufen sie über das
   Dokumente-Portal, nativ bleibt der Dialogpfad außerhalb der Freigaben (dokumentiert).
   **Windows** (`win_sandbox.rs`): Prozess-Mitigation-Policies (`SetProcessMitigationPolicy`):
-  Image-Load (keine Remote-/Low-Label-Images), Extension-Points aus, dynamischer Code verboten
-  (außer das Manifest erlaubt Plugins; auf Windows 10.0.26200 meldet die Policy sich als
-  gesetzt, ausführbarer Speicher wird aber trotzdem vergeben – in jedem Prozess); `strict`
+  Image-Load (keine Remote-/Low-Label-Images), Extension-Points aus,   dynamischer Code verboten
+    (außer das Manifest erlaubt Plugins; `VirtualAlloc(PAGE_EXECUTE_READWRITE)` scheitert dann); `strict`
   sperrt zusätzlich die Erzeugung von Kindprozessen, wenn weder `process` noch `url`/`print`
   im Manifest stehen (geprüft: `CreateProcess` scheitert). AppContainer per Re-exec ist bewusst nicht
   umgesetzt (bräuchte ACL-Änderungen an den echten Nutzerordnern und Tests pro App; die
@@ -1159,6 +1158,43 @@ Fensterrand hinaus.
   laufenden Programms mit Zeile und Spalte als Marken, F8), Übernehmen ist ein
   Rückgängig-Schritt, nach dem das laufende Skript Disk und Zahlen behält
   (`Action::ScriptSource`; App-README „Skript-Editor“).
+- **P3** · *fehlt* · Eigenständiger jfs-Runner mit Konsolenausgabe (gewünscht am 2026-10-25):
+  Skripte der Sprache aus `lib/script` auch außerhalb von JFNetworker ausführen, wie
+  `python datei.py`. Ein CLI-Programm `jfs` (eigene App `apps/jfs` mit `rt::main!` wie
+  `apps/permcli`, oder eine Zeile in einer `BINS`-Datei): `jfs DATEI.jfs [ARGS…]` übersetzt
+  und startet ein Skript, `jfs --check DATEI.jfs` meldet nur die Diagnosen von `check()` mit
+  Zeile und Spalte, `jfs -e "CODE"` und `-` (stdin) für Einzeiler; optional eine kleine REPL.
+  Ein Konsolen-Host (`impl Host`): `print` nach stdout (`plat::write_stdout`), `log` nach stderr,
+  `now` / `rand` über `plat`, `config` mit Kommandozeile und Umgebung, `timer` über eine
+  Ereignisschleife mit echter Uhr oder virtueller Uhr (`--virtual-time`, für reproduzierbare
+  Tests), `disk` in einer Datei (`--disk DATEI`, sonst im Speicher). Kein freier
+  Dateisystem- oder Netzzugriff aus Skripten (die Sprache bleibt eine Sandbox); `net`, `dns` und
+  `http` gehören JFNetworker und melden im Runner einen fangbaren Fehler. Grenzen per Flag
+  (`--fuel`, `--heap`, `--depth`, sonst `Limits::default()`). Fehler beim Übersetzen oder
+  Laufen erscheinen mit Meldung, Zeile:Spalte und Aufrufkette auf stderr, Exit-Code 1.
+  Sprache und VM bleiben unverändert; in `lib/script` höchstens `compile_with(name, src,
+  globals)`, damit unbekannte Namen gegen die Globals des jeweiligen Hosts geprüft werden (heute
+  nur Warnungen). Dasselbe Skript läuft in JFNetworker und im Runner, solange es nur die
+  Standardbibliothek, `print`, `log` und `timer` nutzt; Export und Import als `.jfs`-Datei im
+  Skript-Editor gehören zu JFNetworker (SK5 im App-README). Tests: Beispielskripte mit
+  erwarteter Ausgabe (stdout, stderr, Exit-Code) über `build_rs.py test`, Windows und Linux.
+- **P3** · *fehlt* · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
+  der Browser selbst mit den Meilensteinen B1 bis B4 steht im App-README unter „Fahrplan“).
+  Der Browser zeigt Seiten mit `ui.html_view` (`md_doc`, `md_view`, `rich_html`) statt mit einer
+  eigenen Engine. Dafür braucht die Library: (1) Bilder aus anderen Quellen: eine Rückfrage,
+  über die die App die Bytes einer Adresse liefert (für B1; heute nur VFS und lokale Pfade,
+  sonst der Alt-Text). (2) Formulare im Dokument (für B2): `<form>`, `<input>` (Text, Passwort,
+  Häkchen, Radio, versteckt), `<textarea>`, `<select>`, `<button>` als bedienbare Elemente im
+  Textfluss, ihre Werte im `MdViewState`, `MdEv` meldet Eingabe und Absenden mit den Feldern;
+  ohne Formular bleibt die Ansicht lesend wie heute. (3) Ein veränderbares Dokument (für B3,
+  Seitenskripte): Elemente in `md_doc` über id, Klasse oder Tag finden, Text, Attribute und
+  Klassen ändern, Elemente einfügen und entfernen, danach neu setzen, ohne Bildlauf und
+  Auswahl zu verlieren. (4) Später eine CSS-Teilmenge in `rich_html` (für B4): `<style>` mit
+  Selektoren nach Tag, Klasse und id, die Eigenschaften, die heute aus `style=` gelesen werden,
+  dazu Abstände und Rahmen. In `lib/script` nur `compile_with` (siehe den Runner), damit der
+  Browser-Host seine eigenen Globals (`document`, `fetch` …) prüfen lässt. Bewusst nicht: eine
+  vollständige HTML/CSS-Engine (Box-Modell, Floats, Flexbox, Grid) und JavaScript. Tests:
+  coretest für Dokument-Änderungen, `.uis`-Skripte mit einem Formular (Windows und Linux).
 - **P3** · *erledigt* · Befehlsbäume für Konsolen (seit 2026-10-19, für JFNetworker):
   [`base/cmdtree.rs`](../lib/base/cmdtree.rs) mit IOS-Abkürzungen (`sh ip int br`), `?`-Hilfe
   im IOS-Layout, Tab, Modi mit Prompt, `no`-Form, typisierten Parametern (Zahl mit Bereich,
@@ -1494,4 +1530,35 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   (der Klick erreicht die App nicht, Esc beendet). Das eigene Fenster fehlt in Baum, Overlay und
   Auswahl; es stiehlt keinen Fokus. Skriptbefehle `inspect …` (u. a. `expect same` / `idle`
   für „aus ändert nichts“), Tests `apps/gallery/tests/inspect.uis` und `inspect_rtl.uis`
-  (Windows und Linux, auch mit `--verify-dirty`). Es fehlt: Hot-Reload.
+  (Windows und Linux, auch mit `--verify-dirty`). Es fehlt: Bearbeiten im Inspektor (nächster
+  Eintrag) und Hot-Reload.
+- **P2** · *fehlt* · Hot-Reload und beschreibbarer Inspektor („Live-Edit“, wie das F12-Menü
+  eines Browsers), als Debug-Variante. Festgelegt am 2026-10-25: (a) Eine Art Hot-Reload: Code
+  ändern, die laufende App zeigt die Änderung; die Elemente bleiben gebauter Rust-Code, nichts
+  wird zur Laufzeit beschrieben oder interpretiert. (b) Nur als Debug-Variante und nur wenn
+  möglich: im Entwicklungs-Build (Standard von `build_rs.py`), nicht in `--release`. (c) Es wird
+  nichts umgebaut, damit der Inspektor veränderlicher wird: keine neue Pflicht-API in den Apps,
+  keine vorgeschriebene Zustandsstruktur, kein Plugin-Umbau. Grundgrenze: immediate-mode, die
+  Werte von Slider, Häkchen und Textfeld gehören der App, der Inspektor schreibt sie nicht
+  direkt. Stufen, jede einzeln nützlich: (1) Hot-Reload (`build_rs.py watch NAME`): beobachtet
+  die Quellen (Dateibeobachter `lib/plat/watch.rs` prüfen), baut beim Speichern inkrementell und
+  startet die App neu; wiederhergestellt werden Fensterposition und -größe, Seite, Skalierung,
+  Stil und der Inspektor mit seiner Auswahl; den App-Zustand holt das Abspielen des mit
+  `--log-events` protokollierten Eingabestroms zurück (virtuelle Uhr, wie ein `.uis`-Skript),
+  ohne Änderung am App-Code, bei Abweichung startet die App frisch; schlägt der Bau fehl, läuft
+  die alte Fassung weiter und der Fehler erscheint im Inspektor. (2) Werte im Inspektor ändern,
+  nur was es schon gibt: Tab „Farben“ editierbar (`T_*`-Tokens mit Farbwähler), Eckenradius,
+  Abstände, Höhe der Steuerelemente, Textgrößen und Schrift, Skalierung, hell/dunkel/Kontrast,
+  Akzent, Stil und Sprache, über das vorhandene App-Theme (`ui.set_theme`,
+  [GUIDE.md §34](GUIDE.md); `apps/themedemo` hat einen Live-Editor); das ausgewählte Widget
+  bedienen (ziehen, setzen, tippen, `cmd ID`) über dieselben synthetischen Eingaben wie die
+  `.uis`-Skripte (`lib/ui/auto.rs`); geänderte Werte markiert, einzeln zurücksetzbar,
+  Rückgängig/Wiederholen (`Snapshot`). (3) Übernehmen: als `.theme`-Datei speichern oder die
+  Änderungen als Liste kopieren; Layout und Texte ändert man im Code, das zeigt Stufe 1.
+  (4) Optional Quelltext öffnen: Datei und Zeile des Widget-Aufrufs per `#[track_caller]`, nur
+  im Entwicklungs-Build bei eingeschaltetem Inspektor, „Im Editor öffnen“. Bewusst nicht:
+  Debug-Variablen per `ui.inspect_var`, App-Logik als nachladbares Plugin, Zustand als `Ini`
+  sichern (alle verlangen Änderungen an den Apps). Bleibt wie bisher: aus kostet nichts und
+  ändert kein Bild (`inspect expect same` / `idle`); Änderungen im Inspektor gelten nur für die
+  laufende Sitzung, bis man sie übernimmt. Tests: Skriptbefehle `inspect set …` /
+  `inspect reset`, `apps/gallery/tests/inspect*.uis`.

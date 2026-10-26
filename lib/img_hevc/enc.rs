@@ -20,13 +20,13 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering};
 
-use img_core::ERR_CANCEL;
+use img_core::{ERR_CANCEL, ERR_DIMS, ERR_LIMIT};
 
 use crate::ctu::{
     ctx_init_into, sbscan, CTXMAP4, CX_CBFCHROMA, CX_CBFLUMA, CX_CHROMAMODE, CX_CSBF, CX_GT1, CX_GT2, CX_LASTX,
     CX_LASTY, CX_PARTMODE, CX_PREVINTRA, CX_SIG, CX_SPLITCU, CX_TQBYPASS, LPS, SCAN4, SCANS, TLPS, TMPS,
 };
-use crate::dec::{Hevc, HV_NCTX};
+use crate::dec::{Hevc, HV_MAXPIX, HV_NCTX};
 use crate::rec::{DCT32, QPC};
 
 pub const HEF_LOSSLESS: u32 = 1; // cu_transquant_bypass for every CU (QP ignored)
@@ -198,6 +198,12 @@ struct He<'a> {
 
 /// hevc_encode: encode the picture of cfg (see the file header)
 pub fn encode(cfg: &EncCfg) -> Result<EncOut, i32> {
+    if cfg.w == 0 || cfg.h == 0 {
+        return Err(ERR_DIMS);
+    }
+    if cfg.w as u64 * cfg.h as u64 > HV_MAXPIX {
+        return Err(ERR_LIMIT); // the decoder record would refuse it after the planes are allocated
+    }
     let mut he = Box::new(He {
         hv: Hevc::new(0, 0),
         src: [Vec::new(), Vec::new(), Vec::new()],

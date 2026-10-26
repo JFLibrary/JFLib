@@ -37,7 +37,7 @@ pub fn decompress(src: &[u8], max_out: usize) -> Option<Vec<u8>> {
         let magic = rd_le(src.get(i..i + 4)?) as u32;
         if magic & 0xFFFF_FFF0 == 0x184D_2A50 {
             let n = rd_le(src.get(i + 4..i + 8)?) as usize;
-            i = i.checked_add(8 + n).filter(|&e| e <= src.len())?;
+            i = i.checked_add(n)?.checked_add(8).filter(|&e| e <= src.len())?;
             continue;
         }
         if magic != MAGIC {
@@ -106,7 +106,7 @@ fn frame(src: &[u8], out: &mut Vec<u8>, max_out: usize) -> Option<usize> {
     };
     let start = out.len();
     if let Some(n) = fcs {
-        out.reserve(n as usize);
+        out.reserve((n as usize).min(64 << 20));
     }
     let mut st = State { huf: None, ll: None, of: None, ml: None, rep: [1, 4, 8], lits: Vec::new() };
     loop {

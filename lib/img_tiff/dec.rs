@@ -887,7 +887,7 @@ impl<'a> Tc<'a> {
         if e != 0 {
             return Err(e);
         }
-        Ok(Surface::new(self.w as i32, self.h as i32, self.ofmt))
+        Surface::try_new(self.w as i32, self.h as i32, self.ofmt).ok_or(ERR_NOMEM)
     }
 
     // the per-worker buffers: chunk buffers (literal area 0..255 in front of each plane),
@@ -1699,7 +1699,7 @@ impl<'a> Tc<'a> {
             5 => JDF_CMYK,
             _ => 0,
         };
-        let jsf = match img_jpeg::decode_abbrev(tables, &self.d[off..off + n], flags) {
+        let jsf = match img_jpeg::decode_abbrev_max(tables, &self.d[off..off + n], flags, (self.cw + 31) & !31, (self.ch + 31) & !31) {
             Ok(sf) => sf,
             Err(e) => return e,
         };

@@ -307,6 +307,8 @@ pub struct Vm {
     escaped: Option<(Option<Value>, Vec<TraceLine>)>,
 }
 
+const WRITE_CAP: usize = 4 << 20; // bytes of one value text (shared nodes print once per use)
+
 impl Vm {
     /// a VM for the program with its top-level code pending (run() runs it)
     pub fn new(prog: &Program, limits: Limits) -> Vm {
@@ -1655,6 +1657,8 @@ impl Vm {
                 Value::Str(r) => s.push_str(heap::text(&self.heap, r)),
                 v => self.write_value(&mut s, v, false, 0, &mut Vec::new()),
             }
+            // (the limit holds while the text is built, not only when it is stored)
+            crate::stdlib::cap(self, s.len() as u64)?;
         }
         self.used += s.len() as u64 / 64;
         let v = self.alloc_str(s)?;
@@ -1910,6 +1914,10 @@ impl Vm {
                 seen.push(r);
                 o.push('[');
                 for (i, x) in self.heap.list(r).iter().enumerate() {
+                    if o.len() > WRITE_CAP {
+                        o.push('?');
+                        break;
+                    }
                     if i > 0 {
                         o.push_str(", ");
                     }
@@ -1926,6 +1934,10 @@ impl Vm {
                 seen.push(r);
                 o.push('{');
                 for (i, e) in self.heap.map(r).iter().enumerate() {
+                    if o.len() > WRITE_CAP {
+                        o.push('?');
+                        break;
+                    }
                     if i > 0 {
                         o.push_str(", ");
                     }

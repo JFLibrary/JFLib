@@ -156,6 +156,9 @@ impl Sd {
 
     /// av1_ns: NS( n ) (n >= 1)
     pub fn ns(&mut self, d: &[u8], n: u32) -> u32 {
+        if n == 0 {
+            return 0;
+        }
         let w = 32 - n.leading_zeros(); // FloorLog2( n ) + 1
         let m = 1u32.wrapping_shl(w).wrapping_sub(n);
         let v = self.lit(d, w - 1);

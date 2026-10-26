@@ -364,7 +364,12 @@ impl<const BPP: usize> Kernel for UnfK<'_, BPP> {
 /// decode a PNG file into a new surface: FMT_PARGB, or FMT_ARGB with JDF_STRAIGHT; on an
 /// error out is left as it is  [png_decode_fl]
 pub fn decode_fl(data: &[u8], out: &mut Surface, flags: u32) -> i32 {
-    match decode_inner(data, flags & JDF_STRAIGHT != 0) {
+    decode_lim(data, out, flags, 0)
+}
+
+/// decode_fl with the raw scanline buffer and the surface held to maxmem bytes (0 = no limit)
+pub fn decode_lim(data: &[u8], out: &mut Surface, flags: u32, maxmem: u64) -> i32 {
+    match decode_inner(data, flags & JDF_STRAIGHT != 0, maxmem) {
         Ok(sf) => {
             *out = sf;
             0
@@ -378,7 +383,7 @@ pub fn decode(data: &[u8], out: &mut Surface) -> i32 {
     decode_fl(data, out, 0)
 }
 
-fn decode_inner(data: &[u8], straight: bool) -> Result<Surface, i32> {
+fn decode_inner(data: &[u8], straight: bool, maxmem: u64) -> Result<Surface, i32> {
     let len = data.len();
     if len < 8 {
         return Err(ERR_TRUNC);
@@ -516,7 +521,12 @@ fn decode_inner(data: &[u8], straight: bool) -> Result<Surface, i32> {
     if rawsz as u64 > idatsz as u64 * 1040 + 4096 {
         return Err(ERR_TRUNC);
     }
-    let mut raw = vec![0u8; rawsz];
+    if maxmem != 0 && rawsz as u64 + pd.w as u64 * pd.h as u64 * 4 > maxmem {
+        return Err(ERR_LIMIT);
+    }
+    let mut raw = Vec::new();
+    raw.try_reserve_exact(rawsz).map_err(|_| ERR_NOMEM)?;
+    raw.resize(rawsz, 0);
     let n = zlib_inflate(&idat, &mut raw)?;
     if n != rawsz {
         return Err(ERR_TRUNC);
@@ -539,10 +549,9 @@ fn decode_inner(data: &[u8], straight: bool) -> Result<Surface, i32> {
     }
     // ---- convert
     pd.build_lut(data);
-    let mut sf = Surface::new(pd.w as i32, pd.h as i32, if straight { FMT_ARGB } else { FMT_PARGB });
-    if sf.px.is_empty() {
+    let Some(mut sf) = Surface::try_new(pd.w as i32, pd.h as i32, if straight { FMT_ARGB } else { FMT_PARGB }) else {
         return Err(ERR_NOMEM);
-    }
+    };
     let stride = sf.stride as usize;
     let mut off = 0usize;
     let mut tmp = if pd.ilace != 0 { vec![0u8; pd.w as usize * 4] } else { Vec::new() };

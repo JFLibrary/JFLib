@@ -31,7 +31,7 @@ impl Chunker {
         for (i, g) in gear.iter_mut().enumerate() {
             *g = u64::from_le_bytes([bytes[i * 8], bytes[i * 8 + 1], bytes[i * 8 + 2], bytes[i * 8 + 3], bytes[i * 8 + 4], bytes[i * 8 + 5], bytes[i * 8 + 6], bytes[i * 8 + 7]]);
         }
-        let avg = avg.next_power_of_two().max(4096);
+        let avg = avg.clamp(4096, 64 << 20).next_power_of_two();
         let bits = avg.trailing_zeros();
         Chunker { gear, min: avg / 4, avg, max: avg * 4, mask_s: mask(bits + 2), mask_l: mask(bits - 2) }
     }

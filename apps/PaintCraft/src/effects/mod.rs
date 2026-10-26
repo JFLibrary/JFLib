@@ -1127,7 +1127,11 @@ fn fs_tile_job(d: &FxData, run: &Run, index: usize, ctl: &plat::JobCtl) {
     let ti = d.order[index] as usize;
     let t = d.g.tile_rect(ti as u32);
     let stride = (t[2] - t[0]).max(0) as usize * 4;
-    let mut buf = vec![0u8; stride * (t[3] - t[1]).max(0) as usize];
+    // (a whole-image tile is as big as the image)
+    let Some(mut buf) = gfx::try_zeroed(stride * (t[3] - t[1]).max(0) as usize) else {
+        d.err.store(::fx::ERR_NOMEM, SeqCst);
+        return;
+    };
     let a = FxArgs {
         src: &d.src,
         x0: t[0],
@@ -1150,9 +1154,12 @@ fn fs_tile_job(d: &FxData, run: &Run, index: usize, ctl: &plat::JobCtl) {
         return;
     }
     *d.pending[ti].lock() = Some(buf);
-    d.state[ti].fetch_or(3, SeqCst);
+    // unmarked counts the tiles with bit 2 set: a tile rendered again before fs_mark_tiles
+    // took it (a restart) is already counted
+    if d.state[ti].fetch_or(3, SeqCst) & 2 == 0 {
+        d.unmarked.fetch_add(1, SeqCst);
+    }
     d.ndone.fetch_add(1, SeqCst);
-    d.unmarked.fetch_add(1, SeqCst);
     plat::wake();
 }
 

@@ -7,6 +7,7 @@
 //   write_icc(jw, icc)             U64 size + the predicted bytes entropy coded with the 41
 //                                  ICC contexts (prefix codes, LZ77)
 
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::eans::{self, HParams, Lz, Token};
@@ -153,7 +154,7 @@ pub fn predict_icc(icc: &[u8]) -> Vec<u8> {
     let bxyz = tag(b"bXYZ");
     let mut tagstarts: Vec<usize> = Vec::new();
     let mut tagsizes: Vec<usize> = Vec::new();
-    let mut tagmap: Vec<(usize, usize)> = Vec::new(); // (start, index), last wins
+    let mut tagmap: BTreeMap<usize, usize> = BTreeMap::new(); // start -> index, last wins
     let mut pos = HDR;
     if pos + 4 <= size {
         let numtags = be32(icc, pos) as u64;
@@ -173,11 +174,7 @@ pub fn predict_icc(icc: &[u8]) -> Vec<u8> {
             tagstarts.push(tstart as usize);
             tagsizes.push(tsize as usize);
             let idx = tagstarts.len() - 1;
-            if let Some(e) = tagmap.iter_mut().find(|e| e.0 == tstart as usize) {
-                e.1 = idx;
-            } else {
-                tagmap.push((tstart as usize, idx));
-            }
+            tagmap.insert(tstart as usize, idx);
             let mut code: u8 = 1;
             for (j, &s) in tab::ICCTAGS.iter().enumerate() {
                 if t == s {
@@ -262,7 +259,7 @@ pub fn predict_icc(icc: &[u8]) -> Vec<u8> {
         if pos > tstart + tsize && tsize < LIMIT {
             t = 0;
         }
-        if let Some(&(_, index)) = tagmap.iter().find(|e| e.0 == pos)
+        if let Some(&index) = tagmap.get(&pos)
             && pos + 4 <= size
         {
             t = kw(icc, pos);

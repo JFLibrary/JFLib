@@ -31,6 +31,7 @@ use alloc::sync::Arc;
 use core::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use rt::sync::SpinLock;
 
+use base::ini::Ini;
 use gfx::Surface;
 use img_core::{ImgDec, ImgMeta, ImgOpt, ERR_DIMS, ERR_FAIL, ERR_IO, ERR_LIMIT, ERR_NOMEM, ERR_UNSUPPORTED};
 use img_core::{IFC_DECODE, IFC_ENCODE, IMGD_EXIF, IMGD_ICC, IMGD_STRAIGHT, IMGD_XMP, IMGF_COUNT, IMGF_PDN, IMGF_PNG, IMR_CM};
@@ -43,6 +44,20 @@ use crate::app::formatting::fmt_cap;
 use crate::app::commands::pn_cmd_label;
 use crate::app::commands::pn_cmd_set;
 use crate::app::Pn;
+
+/// memory budget of one image (ImgDec::maxmem, size of a new image): 50 % of the RAM, at
+/// least 1.5 GB (one image at the default pixel limit needs 1 GB plus scratch); 2 GB when
+/// the RAM is unknown. The wasm memory is capped at 2 GB, so there it is 1 GB. A small file
+/// with many big layers (PDN, PSD) is refused with ERR_LIMIT instead of running out of memory.
+pub(crate) fn img_mem_budget() -> u64 {
+    #[cfg(target_arch = "wasm32")]
+    { 0x4000_0000 }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let t = plat::mem_total();
+        if t == 0 { 0x8000_0000 } else { (t / 2).max(0x6000_0000) }
+    }
+}
 
 const PATH_CAP: usize = 1040;
 const EXTS_CAP: usize = 4096;
@@ -98,12 +113,12 @@ const CH_CLOSE: i32 = 1; // close chain_doc
 const CH_EXIT: i32 = 2; // close every image, then quit
 const CH_SAVEALL: i32 = 3; // save every modified image
 
-// command line options that take a value (their value is no file to open)
+// the app's command line options that take a value (their value is no file to open); the
+// library's own options are plat::VALUE_OPTS
 static VALUE_OPTS: &[&str] = &[
     "--pdn-plugins", "--gmic-qt", "--gmic-command", "--brush-tip", "--language", "--text-font",
     "--pdn-wine", "--pdn-wine-prefix", "--pdn-dotnet", "--pdn-install", "--brush-presets", "--brush-preset",
-    "--size", "--scale", "--auto-close", "--anim", "--theme", "--accent", "--shot", "--script", "--threads", "--simd",
-    "--config", "--settings-save-at", "--plugins", "--crash-dir",
+    "--config", "--settings-save-at", "--plugins", "--plugin-fuzz", "--crash-dir", "--crash-report",
     "--pdn-plugin", "--pdn-host", "--pdn-type", "--acquire-file", "--update-feed",
 ];
 
@@ -148,6 +163,9 @@ pub(crate) struct Fio {
     err_title: String,
     err_msg: String,
     title: String,
+    /// web: the page was told that a document has unsaved changes (it then asks before it is closed)
+    #[cfg(target_arch = "wasm32")]
+    unsaved: bool,
     /// g_recent: newest first
     recent: Vec<String>,
     /// g_open_exts / g_save_exts: the type lists of the file dialogs
@@ -188,6 +206,8 @@ impl Default for Fio {
             err_title: String::new(),
             err_msg: String::new(),
             title: String::new(),
+            #[cfg(target_arch = "wasm32")]
+            unsaved: false,
             recent: Vec::new(),
             open_exts: Vec::new(),
             save_exts: Vec::new(),
@@ -244,8 +264,11 @@ fn dir_path(f: &mut Fio, name: &str) {
     f.fd_path = cap(s, PATH_CAP);
 }
 
-// fio_start() -- command line files (--open FILE, plain arguments), else one new image
+// fio_start() -- the images a session end kept, then command line files (--open FILE, plain
+// arguments), else one new image
 fn fio_start(p: &mut Pn, ui: &mut Ui) {
+    // first: a command line file that was recovered is then found open (with its changes)
+    fio_recover(p, ui);
     let a = plat::args();
     fio_open_args(p, ui, "", a.get(1..).unwrap_or(&[]));
     if doc_count(&p.doc) == 0 {
@@ -263,15 +286,20 @@ fn fio_open_args(p: &mut Pn, ui: &mut Ui, cwd: &str, a: &[String]) {
         if absolute { String::from(f) } else { format!("{}/{}", cwd.trim_end_matches(['/', '\\']), f) }
     };
     let mut i = 0;
+    let mut opts = true; // "--" ends the options: every later argument is a file
     while i < a.len() {
         let s = a[i].clone();
         i += 1;
-        if s.starts_with('-') {
+        if opts && s == "--" {
+            opts = false;
+            continue;
+        }
+        if opts && s.starts_with('-') {
             if s == "--open" {
                 let Some(f) = a.get(i).cloned() else { break };
                 i += 1;
                 fio_open_path(p, ui, &full(&f));
-            } else if VALUE_OPTS.contains(&s.as_str()) {
+            } else if VALUE_OPTS.contains(&s.as_str()) || plat::VALUE_OPTS.contains(&s.as_str()) {
                 i += 1; // options with a value: skip the value
             }
             continue;
@@ -407,12 +435,17 @@ fn file_part(path: &str) -> &str {
 }
 
 // canon_path(src) -> absolute path with '/' separators and without "." / ".." segments (a
-// relative src starts in the current directory)
+// relative src starts in the current directory); "" when the path exceeds PATH_LONG (never a
+// silently shortened path, which would name another file)
+const PATH_LONG: usize = 32768;
 fn canon_path(src: &str) -> String {
     let s = src.as_bytes();
     let abs = matches!(s.first(), None | Some(b'/') | Some(b'\\')) || s.get(1) == Some(&b':');
-    let t = if abs { String::from(src) } else { cap(cap(plat::cwd(), PATH_CAP) + "/", PATH_CAP) + src };
-    let mut b = cap(t, PATH_CAP).replace('\\', "/").into_bytes();
+    let t = if abs { String::from(src) } else { format!("{}/{}", plat::cwd(), src) };
+    if t.len() > PATH_LONG {
+        return String::new();
+    }
+    let mut b = t.replace('\\', "/").into_bytes();
     // the root that stays: "C:/", "/", "//"
     let mut p = 0;
     if b.get(1) == Some(&b':') {
@@ -488,7 +521,7 @@ pub(crate) fn fio_open_path(p: &mut Pn, ui: &mut Ui, path: &str) -> i32 {
 
 fn decode_open(data: &[u8], path: &str, cancel: Option<&AtomicU32>) -> Result<LoadedImage, i32> {
     let hint = img_core::io::format_from_path(path);
-    let dec = ImgDec { flags: IMGD_STRAIGHT | IMGD_ICC | IMGD_EXIF | IMGD_XMP, hint, cancel, ..ImgDec::default() };
+    let dec = ImgDec { flags: IMGD_STRAIGHT | IMGD_ICC | IMGD_EXIF | IMGD_XMP, hint, cancel, maxmem: img_mem_budget(), ..ImgDec::default() };
     if dec.cancelled() { return Err(img_core::ERR_CANCEL); }
     if data.starts_with(b"8BPS") {
         match img_all::psd::document::decode(data, &dec) {
@@ -644,14 +677,17 @@ fn opened(p: &mut Pn, ui: &mut Ui, doc: DocId, path: &str, fmt: u32) {
     doc_set_active(p, doc);
 }
 
+/// largest resolution taken from a file (dots per inch)
+const DPI_MAX: f64 = 100_000.0;
+
 // set_dpi(doc, dpix_16_16, dpiy_16_16, unit) -- resolution from file metadata (0 = keep 96)
 fn set_dpi(d: &mut Doc, dpix: u32, dpiy: u32, unit: u32) {
     if dpix == 0 {
         return;
     }
     let dpiy = if dpiy == 0 { dpix } else { dpiy };
-    let mut x = dpix as i32 as f64 / 65536.0;
-    let mut y = dpiy as i32 as f64 / 65536.0;
+    let mut x = (dpix as f64 / 65536.0).min(DPI_MAX);
+    let mut y = (dpiy as f64 / 65536.0).min(DPI_MAX);
     d.dpu_unit = 1;
     if unit == IMR_CM {
         d.dpu_unit = 2;
@@ -664,7 +700,7 @@ fn set_dpi(d: &mut Doc, dpix: u32, dpiy: u32, unit: u32) {
 
 // open_flat(data, path, hint) -> 0 / ERR_* -- one layer "Hintergrund"
 fn open_flat(p: &mut Pn, ui: &mut Ui, data: &[u8], path: &str, hint: u32) -> i32 {
-    let dec = ImgDec { flags: IMGD_STRAIGHT | IMGD_ICC | IMGD_EXIF | IMGD_XMP, hint, ..ImgDec::default() };
+    let dec = ImgDec { flags: IMGD_STRAIGHT | IMGD_ICC | IMGD_EXIF | IMGD_XMP, hint, maxmem: img_mem_budget(), ..ImgDec::default() };
     let mut meta = ImgMeta::default();
     let sf = match img_core::io::decode_ex(data, Some(&dec), Some(&mut meta)) {
         Ok(sf) => sf,
@@ -692,8 +728,7 @@ fn install_flat(p: &mut Pn, ui: &mut Ui, sf: Surface, mut meta: ImgMeta, path: &
     }
     let fmt = if meta.fmt != 0 { meta.fmt } else { hint };
     if path.is_empty() {
-        crate::document::history::hist_init(p,doc,"Bilderfassung",IC_SCAN);
-        doc_set_modified(p,doc,true);
+        crate::document::history::hist_init_unsaved(p, doc, "Bilderfassung", IC_SCAN);
         doc_set_active(p,doc);
     } else {opened(p, ui, doc, path, fmt);}
     0
@@ -741,7 +776,13 @@ fn install_pdn(p: &mut Pn, ui: &mut Ui, pd: img_pdn::PdnDoc, path: &str) -> i32 
     }
     d.cur = d.layers.len() as i32 - 1;
     crate::document::model::doc_mark_layers(p, doc);
-    opened(p, ui, doc, path, IMGF_PDN);
+    if path.is_empty() {
+        // recovered after a session end: unsaved, no file yet (fio_recover gives it one)
+        crate::document::history::hist_init_unsaved(p, doc, "Wiederhergestellt", IC_FOLDER_OPEN);
+        doc_set_active(p, doc);
+    } else {
+        opened(p, ui, doc, path, IMGF_PDN);
+    }
     0
 }
 
@@ -764,13 +805,133 @@ fn install_psd(p: &mut Pn, ui: &mut Ui, psd: img_all::psd::document::Document, p
     d.cur = d.layers.len() as i32 - 1;
     crate::document::model::doc_mark_layers(p, doc);
     if psd.converted {
-        crate::document::history::hist_init(p, doc, "PSD-Ebenen importieren", IC_FOLDER_OPEN);
-        doc_set_modified(p, doc, true);
+        crate::document::history::hist_init_unsaved(p, doc, "PSD-Ebenen importieren", IC_FOLDER_OPEN);
         fio_error(p, Some("PSD-Import"), "Die Rasterebenen wurden als neues 8-Bit-Dokument importiert. Masken wurden angewendet; höhere Farbtiefen, Bereiche außerhalb der Leinwand oder zusätzliche Photoshop-Daten bleiben in der Originaldatei. Bitte unter einem neuen Namen speichern.");
     } else {
         opened(p, ui, doc, path, img_core::IMGF_PSD);
     }
     0
+}
+
+// ------------------------------------------------------------------ session end / recovery
+//
+// A session end (Windows log-off or shutdown, SIGTERM) leaves no time for "Änderungen
+// speichern?".  Every modified image is then written to the recovery folder as <run>-<n>.pdn (all
+// layers) with <run>-<n>.ini (the file it came from); the next start opens them again, still
+// modified, and removes the copies.  A copy only counts as complete under its .pdn name: it is
+// written as .tmp and renamed last.
+
+// recovery_dir(ui) -> --config DIR or $PaintCraft_CONFIG_DIR + "/recovery" (like the settings),
+// a headless run without them keeps it in memory, else the app's data folder
+fn recovery_dir(ui: &Ui) -> String {
+    let dir = plat::arg_value("--config")
+        .filter(|v| !v.is_empty())
+        .or_else(|| plat::env("PaintCraft_CONFIG_DIR").filter(|v| !v.is_empty()));
+    match dir {
+        Some(d) if d.len() < PATH_CAP - 64 => format!("{}/recovery", d.trim_end_matches(['/', '\\'])),
+        _ if ui.headless() => String::from("mem://paintcraft/recovery"),
+        _ => String::from("data://recovery"),
+    }
+}
+
+/// fio_session_end() -- UIC_SESSION_END: a recovery copy of every modified image
+pub(crate) fn fio_session_end(p: &mut Pn, ui: &Ui) {
+    let docs: Vec<DocId> = p.doc.docs.iter().filter(|d| d.flags & DF_MODIFIED as u32 != 0).map(|d| d.id).collect();
+    if docs.is_empty() {
+        return;
+    }
+    let dir = recovery_dir(ui);
+    plat::mkdir(&dir);
+    let run = format!("{:x}", plat::unix_time_ns());
+    for (n, doc) in docs.into_iter().enumerate() {
+        let base = format!("{}/{}-{}", dir, run, n);
+        let (tmp, ini_path, pdn) = (format!("{}.tmp", base), format!("{}.ini", base), format!("{}.pdn", base));
+        let mut ini = Ini::new();
+        {
+            let d = p.doc.d(doc);
+            if let Some(path) = d.path.as_deref() {
+                ini.set("recovery", "path", path);
+                ini.set_int("recovery", "fmt", d.fmt as i64);
+            }
+        }
+        let ok = save_pdn(p, doc, &tmp) == 0 && ini.save(&ini_path) && plat::rename(&tmp, &pdn);
+        if !ok {
+            plat::delete(&tmp);
+            plat::delete(&ini_path);
+        }
+    }
+}
+
+// absolute_path(s) -- a drive path, a UNC path or a rooted path of the operating system
+fn absolute_path(s: &str) -> bool {
+    let b = s.as_bytes();
+    s.len() < PATH_CAP
+        && !s.contains('\0')
+        && (matches!(b.first(), Some(b'/') | Some(b'\\')) || (b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':'))
+}
+
+// fio_recover() -- the copies of the last session end are open again (modified, "Wiederhergestellt");
+// a copy that cannot be read is removed, one that does not fit (DOC_MAX, memory) stays for the next
+// start; leftovers of an interrupted write go
+fn fio_recover(p: &mut Pn, ui: &mut Ui) {
+    let dir = recovery_dir(ui);
+    let (mut copies, mut other): (Vec<String>, Vec<String>) = (Vec::new(), Vec::new());
+    plat::dir_list(&dir, &mut |name, is_dir, _| {
+        if is_dir {
+            return;
+        }
+        if name.ends_with(".pdn") {
+            copies.push(String::from(name));
+        } else if name.ends_with(".tmp") || name.ends_with(".ini") {
+            other.push(String::from(name));
+        }
+    });
+    for name in other {
+        let has_copy = name.strip_suffix(".ini").is_some_and(|b| copies.contains(&format!("{}.pdn", b)));
+        if !has_copy {
+            plat::delete(&format!("{}/{}", dir, name));
+        }
+    }
+    copies.sort();
+    for name in copies {
+        if doc_count(&p.doc) >= DOC_MAX {
+            break;
+        }
+        let file = format!("{}/{}", dir, name);
+        let ini_path = format!("{}.ini", file.trim_end_matches(".pdn"));
+        let Some(data) = plat::read_file(&file) else { continue };
+        match decode_open(&data, &file, None) {
+            Ok(LoadedImage::Pdn(pd)) => {
+                if install_pdn(p, ui, pd, "") != 0 {
+                    continue;
+                }
+                recovered_origin(p, &ini_path);
+            }
+            Err(ERR_NOMEM) => continue,
+            _ => {}
+        }
+        plat::delete(&file);
+        plat::delete(&ini_path);
+    }
+}
+
+// recovered_origin(ini_path) -- the file the recovered (active) image belonged to, when it is
+// still a valid absolute path of its own: Speichern then writes there again
+fn recovered_origin(p: &mut Pn, ini_path: &str) {
+    let Some(doc) = doc_active(&p.doc) else { return };
+    let ini = Ini::load(ini_path);
+    let Some(origin) = ini.get("recovery", "path").filter(|v| absolute_path(v)) else { return };
+    let origin = canon_path(origin);
+    if doc_find_path(&p.doc, &origin).is_some() {
+        return; // that file is open in another tab
+    }
+    let fmt = ini.get_int("recovery", "fmt", 0);
+    crate::document::model::doc_set_path(p, doc, &origin);
+    if fmt > 0 && fmt < IMGF_COUNT as i64 {
+        let d = p.doc.dm(doc);
+        d.fmt = fmt as u32;
+        d.saveopt = img_core::io::opt_init(fmt as u32);
+    }
 }
 
 // ------------------------------------------------------------------ recent files
@@ -999,6 +1160,7 @@ fn save_options_done(p: &mut Pn, ui: &mut Ui, result: u32) -> i32 {
     let err = match crate::workspace::dialogs::save_options::saveopt_take(p, ui) {
         Ok(b) => {
             if plat::write_file(&p.fio.sv_path, &b) {
+                crate::workspace::dialogs::save_options::saveopt_accept(p);
                 0
             } else {
                 ERR_IO
@@ -1017,6 +1179,11 @@ fn save_options_done(p: &mut Pn, ui: &mut Ui, result: u32) -> i32 {
 fn request_save(p: &mut Pn, ui: &mut Ui, doc: DocId, path: Option<&str>, fmt: u32) -> i32 {
     if let Some(path) = path {
         p.fio.sv_path = canon_path(path);
+        if p.fio.sv_path.is_empty() {
+            fio_error(p, None, "Der Pfad ist zu lang.");
+            p.fio.sv_saveas = false;
+            return -1;
+        }
     }
     p.fio.sv_doc = Some(doc);
     p.fio.sv_fmt = fmt;
@@ -1042,7 +1209,9 @@ fn save_now(p: &mut Pn, ui: &mut Ui) -> i32 {
     let fmt = p.fio.sv_fmt;
     let saveas = core::mem::take(&mut p.fio.sv_saveas);
     if crate::workspace::dialogs::save_options::saveopt_needed(p, doc, fmt, saveas) {
-        crate::workspace::dialogs::save_options::saveopt_open(p, ui, doc, fmt);
+        if !crate::workspace::dialogs::save_options::saveopt_open(p, ui, doc, fmt) {
+            return -1;
+        }
         return 1;
     }
     let path = p.fio.sv_path.clone();
@@ -1235,6 +1404,14 @@ pub(crate) fn fio_states(p: &mut Pn, ui: &mut Ui) {
 
 // update_title() -- "Name – PaintCraft" ('*' in front while modified), "PaintCraft" without images
 fn update_title(p: &mut Pn, ui: &mut Ui) {
+    #[cfg(target_arch = "wasm32")]
+    {
+        let u = p.doc.docs.iter().any(|d| d.flags & DF_MODIFIED as u32 != 0);
+        if u != p.fio.unsaved {
+            p.fio.unsaved = u;
+            plat::set_unsaved(u);
+        }
+    }
     let t = match p.doc.active() {
         None => String::from("PaintCraft"),
         Some(d) => {

@@ -525,6 +525,8 @@ struct Dec<'a> {
     pblk: [i16; 64],
     pend: Option<(usize, usize)>, // component, plane offset
     pair: bool,                   // AVX2: pair the IDCTs (SSE2 runs them one by one anyway)
+    maxw: u32, // caller limits on the frame size (SOF)
+    maxh: u32,
     nostream: bool,               // the plane path only (planes allocated at SOF)
     planes: bool,                 // the sample planes (or rings) are allocated
     stream: Option<Stream>,
@@ -595,6 +597,8 @@ impl<'a> Dec<'a> {
             pblk: [0; 64],
             pend: None,
             pair: simd::has_avx2(),
+            maxw: MAX_DIM,
+            maxh: MAX_DIM,
             nostream: false,
             planes: false,
             stream: None,
@@ -767,7 +771,7 @@ impl<'a> Dec<'a> {
         if h == 0 {
             return ERR_UNSUPPORTED; // height from DNL
         }
-        if w > MAX_DIM || h > MAX_DIM || h as u64 * w as u64 > MAX_PIXELS {
+        if w > self.maxw || h > self.maxh || h as u64 * w as u64 > MAX_PIXELS {
             return ERR_DIMS;
         }
         self.w = w;
@@ -1914,8 +1918,13 @@ fn blk_acr(br: &mut Br, bb: &mut Bb, act: &Huff, blk: &mut [i16; 64], ss: u32, s
 
 /// jpeg_decode_fl
 pub fn decode_fl(data: &[u8], flags: u32) -> Result<Surface, i32> {
-    match decode_run(&[], data, flags, false) {
-        Err(RESTART) => decode_run(&[], data, flags, true),
+    decode_fl_max(data, flags, MAX_DIM, MAX_DIM)
+}
+
+/// decode_fl with a limit on the frame size: a larger SOF is ERR_DIMS before any allocation
+pub fn decode_fl_max(data: &[u8], flags: u32, maxw: u32, maxh: u32) -> Result<Surface, i32> {
+    match decode_run(&[], data, flags, false, maxw, maxh) {
+        Err(RESTART) => decode_run(&[], data, flags, true, maxw, maxh),
         r => r,
     }
 }
@@ -1924,17 +1933,24 @@ pub fn decode_fl(data: &[u8], flags: u32) -> Result<Surface, i32> {
 /// tables of a tables-only stream (TIFF JPEGTables; empty = none); the orientation is never
 /// applied
 pub fn decode_abbrev(tables: &[u8], data: &[u8], flags: u32) -> Result<Surface, i32> {
+    decode_abbrev_max(tables, data, flags, MAX_DIM, MAX_DIM)
+}
+
+/// decode_abbrev with a limit on the frame size (see decode_fl_max)
+pub fn decode_abbrev_max(tables: &[u8], data: &[u8], flags: u32, maxw: u32, maxh: u32) -> Result<Surface, i32> {
     let flags = flags | JDF_NO_ORIENT;
-    match decode_run(tables, data, flags, false) {
-        Err(RESTART) => decode_run(tables, data, flags, true),
+    match decode_run(tables, data, flags, false, maxw, maxh) {
+        Err(RESTART) => decode_run(tables, data, flags, true, maxw, maxh),
         r => r,
     }
 }
 
 /// decode_fl / decode_abbrev (tables-only stream first when not empty); nostream: the plane
 /// path only -> Err(RESTART) when a streamed decode has to be done again on the plane path
-fn decode_run(tables: &[u8], data: &[u8], flags: u32, nostream: bool) -> Result<Surface, i32> {
+fn decode_run(tables: &[u8], data: &[u8], flags: u32, nostream: bool, maxw: u32, maxh: u32) -> Result<Surface, i32> {
     let mut dec = Dec::new(flags);
+    dec.maxw = maxw.min(MAX_DIM);
+    dec.maxh = maxh.min(MAX_DIM);
     dec.nostream = nostream;
     let mut out = None;
     if !tables.is_empty() {

@@ -305,6 +305,9 @@ pub fn fragment(packet: &[u8], mtu: usize) -> Option<Vec<Vec<u8>>> {
     later.set_options(&copied_options(v.options()));
     let data = v.payload();
     let base_off = v.frag_off();
+    if base_off + data.len() > Reassembly::MAX {
+        return None;
+    }
     let last_mf = v.mf();
     let mut out = Vec::new();
     let mut pos = 0;
@@ -354,20 +357,24 @@ impl Reassembly {
         let off = v.frag_off();
         let data = v.payload();
         let end = off + data.len();
-        if end > Reassembly::MAX {
+        if end > Reassembly::MAX || data.is_empty() || (v.mf() && data.len() % 8 != 0) {
             return None;
         }
-        if !v.mf() {
-            if self.total.is_some_and(|t| t != end) {
+        let total = if v.mf() { self.total } else { Some(end) };
+        if let Some(t) = total {
+            if end > t || self.total.is_some_and(|s| s != t) {
                 return None;
             }
-            self.total = Some(end);
+            if self.parts.iter().any(|(&o, d)| o + d.len() > t) {
+                return None;
+            }
         }
         for (&o, d) in self.parts.iter() {
             if o < end && off < o + d.len() {
                 return None;
             }
         }
+        self.total = total;
         if off == 0 {
             self.first = Some(v.header().to_vec());
         }
@@ -385,6 +392,10 @@ impl Reassembly {
         })?);
         h.mf = false;
         h.frag_off = 0;
+        if h.len() + total > Reassembly::MAX {
+            *self = Reassembly::new();
+            return None;
+        }
         let mut out = alloc::vec![0u8; h.len() + total];
         h.write(&mut out, total);
         let hl = h.len();

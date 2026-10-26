@@ -129,6 +129,14 @@ pub fn upper_layer(v: &Ipv6View) -> Option<(u8, usize)> {
                 off += (p[off + 1] as usize + 1) * 8;
                 nh = next;
             }
+            NH_AH => {
+                if off + 2 > p.len() {
+                    return None;
+                }
+                let next = p[off];
+                off += (p[off + 1] as usize + 2) * 4;
+                nh = next;
+            }
             NH_FRAGMENT => {
                 if off + 8 > p.len() {
                     return None;
@@ -311,8 +319,8 @@ impl Reassembly6 {
     /// adds a fragment (`at`: the offset of its fragment header in the payload); Ok(Some(the
     /// complete packet)) when all parts are there
     pub fn add(&mut self, v: &Ipv6View, f: &FragHdr, at: usize) -> Result<Option<Vec<u8>>, ReasmErr> {
-        let data = &v.payload()[at + FRAG_HDR..];
-        if f.more && data.len() % 8 != 0 {
+        let data = v.payload().get(at + FRAG_HDR..).ok_or(ReasmErr::BadLength)?;
+        if data.is_empty() || (f.more && data.len() % 8 != 0) {
             return Err(ReasmErr::BadLength);
         }
         let end = f.offset + data.len();
@@ -337,6 +345,12 @@ impl Reassembly6 {
             }
             self.total = Some(end);
         }
+        if self.total.is_some_and(|t| end > t || self.parts.iter().any(|(&o, d)| o + d.len() > t)) {
+            self.dead = true;
+            self.parts.clear();
+            self.first = None;
+            return Err(ReasmErr::TooLong);
+        }
         if f.offset == 0 {
             self.first = Some((v.packet()[..IPV6_HDR + at].to_vec(), f.next));
         }
@@ -353,16 +367,20 @@ impl Reassembly6 {
         };
         let mut out = head.clone();
         // the Next Header that announced the fragment header now announces what it carried
-        let hv = Ipv6View::parse_truncated(head).ok_or(ReasmErr::Overlap)?;
-        let nh_at = match ext_headers(&Ipv6View { b: head, end: head.len() }).and_then(|x| x.last().copied()) {
-            Some(e) if hv.next_header() != NH_FRAGMENT => IPV6_HDR + e.off,
-            _ => 6,
-        };
+        let mut nh_at = 6;
+        let mut off = IPV6_HDR;
+        while head[nh_at] != NH_FRAGMENT {
+            if !matches!(head[nh_at], NH_HOPOPT | NH_ROUTING | NH_DSTOPTS) || off + 2 > head.len() {
+                return Err(ReasmErr::Overlap);
+            }
+            nh_at = off;
+            off += (head[off + 1] as usize + 1) * 8;
+        }
         out[nh_at] = *next;
         for d in self.parts.values() {
             out.extend_from_slice(d);
         }
-        let pl = (out.len() - IPV6_HDR) as u16;
+        let pl = u16::try_from(out.len() - IPV6_HDR).map_err(|_| ReasmErr::TooLong)?;
         put16(&mut out, 4, pl);
         Ok(Some(out))
     }

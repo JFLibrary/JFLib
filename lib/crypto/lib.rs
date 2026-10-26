@@ -128,6 +128,15 @@ pub fn zeroize(buf: &mut [u8]) {
     core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
 }
 
+/// zeroize for words (like zeroize)
+pub(crate) fn zeroize_words(buf: &mut [u64]) {
+    for w in buf.iter_mut() {
+        *w = 0;
+    }
+    core::hint::black_box(&buf);
+    core::sync::atomic::compiler_fence(core::sync::atomic::Ordering::SeqCst);
+}
+
 /// lower-case hex
 pub fn hex(data: &[u8]) -> String {
     const D: &[u8; 16] = b"0123456789abcdef";

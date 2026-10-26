@@ -237,6 +237,10 @@ pub fn argon2id_ex(password: &[u8], salt: &[u8], secret: &[u8], ad: &[u8], param
     }
     let cb = block_bytes(&c);
     blake2b::long(out, &[&cb]);
+    let mut cb = cb;
+    crate::zeroize(&mut cb);
+    crate::zeroize(&mut buf);
+    crate::zeroize_words(&mut c);
     for b in mem.iter_mut() {
         b.fill(0);
     }

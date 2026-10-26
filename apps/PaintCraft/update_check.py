@@ -21,18 +21,16 @@ try:
     def version(text):
         match = re.search(r"(?i)(?:paintcraft[- _v]*)?(\d+(?:\.\d+){1,3})", text)
         return tuple(map(int, match[1].split("."))) if match else ()
+    # The repository contains multiple apps: only tags that start with "PaintCraft" count.
+    own = re.compile(r"(?i)^\s*paintcraft[-_ ]*v?(\d+(?:\.\d+){1,3})")
     candidates = []
     for release in releases:
         if release.get("draft") or (release.get("prerelease") and not beta):
             continue
-        tag = release.get("tag_name", "")
-        name = release.get("name", "")
-        # The repository contains multiple apps: never announce another app's release.
-        if "paintcraft" not in (tag + " " + name).lower():
-            continue
-        v = version(tag) or version(name)
-        if v:
-            candidates.append((v, tag))
+        tag = str(release.get("tag_name") or "")[:64]
+        match = own.match(tag)
+        if match:
+            candidates.append((tuple(map(int, match[1].split("."))), tag))
     if not candidates:
         message = "Keine passende PaintCraft-Veroeffentlichung gefunden."
     else:

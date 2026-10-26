@@ -180,12 +180,13 @@ pub(crate) fn parse_time(s: &str) -> Option<i64> {
     }
     let num = |r: core::ops::Range<usize>| s.get(r)?.parse::<i64>().ok();
     let days = days_of(num(0..4)?, num(5..7)?, num(8..10)?);
-    let mut ns = ((days * 24 + num(11..13)?) * 60 + num(14..16)?) * 60 + num(17..19)?;
-    ns *= 1_000_000_000;
+    let secs = ((days * 24 + num(11..13)?) * 60 + num(14..16)?) * 60 + num(17..19)?;
+    // a year beyond 2262 does not fit nanoseconds in an i64: no time rather than a wrapped one
+    let mut ns = secs.checked_mul(1_000_000_000)?;
     if b[19] == b'.' {
         let frac: String = s[20..].chars().take_while(|c| c.is_ascii_digit()).take(9).collect();
         let digits = frac.len() as u32;
-        ns += frac.parse::<i64>().ok()? * 10i64.pow(9 - digits);
+        ns = ns.checked_add(frac.parse::<i64>().ok()? * 10i64.pow(9 - digits))?;
     }
     Some(ns)
 }
@@ -278,6 +279,9 @@ fn attr_set(tag: &str, name: &str, value: &str) -> String {
         let pad = after.len() - after.trim_start().len();
         let vstart = from + eq + 1 + pad;
         let q = tag[vstart..].chars().next().unwrap_or('"');
+        if q != '"' && q != '\'' {
+            continue; // an unquoted value (not XML): q may be a multi-byte character
+        }
         let Some(len) = tag[vstart + 1..].find(q) else { break };
         return format!("{}\"{v}\"{}", &tag[..vstart], &tag[vstart + 1 + len + 1..]);
     }
@@ -484,7 +488,7 @@ fn xbel_list(file: &str) -> Vec<String> {
         let Some(path) = block_path(bt) else { continue };
         let el = &bt[s..e];
         let when = attr(el, "modified").and_then(|t| parse_time(&t))
-            .or_else(|| attr(el, "timestamp").and_then(|t| t.parse::<i64>().ok()).map(|t| t * 1_000_000_000))
+            .or_else(|| attr(el, "timestamp").and_then(|t| t.parse::<i64>().ok()?.checked_mul(1_000_000_000)))
             .or_else(|| tag_end(bt, 0).and_then(|te| attr(&bt[..te], "modified")).and_then(|t| parse_time(&t)))
             .unwrap_or(0);
         out.push((when, path));

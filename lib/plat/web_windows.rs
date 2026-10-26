@@ -548,8 +548,9 @@ pub(super) fn event(mut event: Event) -> bool {
                             w.rect[0] = rect[0] + dx;
                             w.rect[1] = rect[1] + dy;
                         } else {
-                            let minw = w.min.0 * w.dpi / 96;
-                            let minh = w.min.1 * w.dpi / 96;
+                            // (clamp panics when min > max: a large min size must not reach it)
+                            let minw = (w.min.0 as i64 * w.dpi as i64 / 96).clamp(1, 16384) as i32;
+                            let minh = (w.min.1 as i64 * w.dpi as i64 / 96).clamp(1, 16384) as i32;
                             if edges & EDGE_RIGHT != 0 {
                                 w.rect[2] = (rect[2] + dx).clamp(minw, 16384);
                             }

@@ -94,11 +94,11 @@ fn field(s: &str, field: u8, min: u32, max: u32) -> Result<(u64, bool), CronErro
                 star = true;
             }
             (min, max)
-        } else if let Some((a, b)) = range.split_once('-') {
+        } else if let Some((a, hi_s)) = range.split_once('-') {
             let a = value(a, field, min, max)?;
-            let mut b = value(b, field, min, max)?;
-            if field == 4 && b == 0 && a > 0 {
-                b = 7; // mon-sun
+            let mut b = value(hi_s, field, min, max)?;
+            if field == 4 && b == 0 && (a > 0 || matches!(hi_s, "7" | "07")) {
+                b = 7; // mon-sun, 0-7
             }
             if a > b {
                 return Err(CronError { field, msg: "range runs backwards" });
@@ -161,6 +161,9 @@ impl Cron {
 
     /// whether a date matches the month, day-of-month and day-of-week fields
     pub fn matches_date(&self, y: i32, m: u8, d: u8) -> bool {
+        if !(1..=12).contains(&m) || !(1..=31).contains(&d) {
+            return false;
+        }
         if self.months & (1 << m) == 0 {
             return false;
         }
@@ -276,12 +279,7 @@ impl Cron {
                 if n > 1 && 24 % n == 0 {
                     let step = 24 / n;
                     let first = self.hours.trailing_zeros();
-                    let mut ok = first < step;
-                    for k in 0..n {
-                        if self.hours & (1 << (first + k * step)) == 0 {
-                            ok = false;
-                        }
-                    }
+                    let ok = first < step && (0..n).all(|k| self.hours & (1 << (first + k * step)) != 0);
                     if ok {
                         return if en {
                             format!("Every {} hours at minute {}", step, m)
@@ -324,12 +322,12 @@ impl Cron {
 
 /// "M H * * *"
 pub fn daily(h: u8, m: u8) -> String {
-    format!("{} {} * * *", m, h)
+    format!("{} {} * * *", m.min(59), h.min(23))
 }
 
 /// "M * * * *"
 pub fn hourly(m: u8) -> String {
-    format!("{} * * * *", m)
+    format!("{} * * * *", m.min(59))
 }
 
 /// "M H * * days" with mask bit 0 = Monday .. bit 6 = Sunday (empty mask: every day)
@@ -343,12 +341,12 @@ pub fn weekly(mask: u8, h: u8, m: u8) -> String {
             days.push(format!("{}", (d + 1) % 7));
         }
     }
-    format!("{} {} * * {}", m, h, days.join(","))
+    format!("{} {} * * {}", m.min(59), h.min(23), days.join(","))
 }
 
 /// "M H D * *"
 pub fn monthly(day: u8, h: u8, m: u8) -> String {
-    format!("{} {} {} * *", m, h, day.clamp(1, 31))
+    format!("{} {} {} * *", m.min(59), h.min(23), day.clamp(1, 31))
 }
 
 /// the (kind, hour, minute, weekday mask, day of month) of an expression built by the helpers

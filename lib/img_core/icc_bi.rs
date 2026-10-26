@@ -285,7 +285,7 @@ pub fn icc_describe(icc: &[u8], buf: &mut [u8]) -> usize {
         let rec = mluc_pick(el, nrec, recsz, *b"de").or_else(|| mluc_pick(el, nrec, recsz, *b"en")).unwrap_or(16);
         let bytes = be32(el, rec + 4) as usize;
         let off = be32(el, rec + 8) as usize;
-        if bytes + off > size {
+        if bytes.checked_add(off).is_none_or(|e| e > size) {
             return 0;
         }
         let units = bytes >> 1;

@@ -16,7 +16,8 @@ pub(crate) mod localization;
 //   st_states()              (set_states) the first call applies the tool windows and the
 //                            default tool (their modules initialise after set_init); every
 //                            call tracks the main window's normal rectangle
-//   st_save() -> 0 written, 1 no persistence, -1 write error
+//   st_save() -> 0 written, 1 no persistence (also: the file could not be read, so it stays as
+//                it is), -1 write error
 //   set_save_quit()          app/lifecycle.rs: Beenden / closing the window (= st_save)
 //   st_reload()              factory state, then read the file again (test hook)
 //   st_factory()             factory state of everything the file holds (test hook)
@@ -178,6 +179,8 @@ pub(crate) struct St {
     pub(crate) file: String,
     /// g_st_on: a settings file is used
     pub(crate) on: bool,
+    /// the settings file exists but could not be read: it is not overwritten (st_save)
+    pub(crate) unreadable: bool,
     /// g_st_bauto: automatic history budget (bytes)
     pub(crate) bauto: u64,
     /// g_st_mrect: main window: normal rect (x, y px; w, h DIP)
@@ -323,6 +326,23 @@ fn st_find_path(s: &mut St, ui: &Ui) {
     s.on = true;
 }
 
+// st_read(s) -> the INI of the settings file.  A file that exists but cannot be read (locked,
+// no access, too large) is not the same as a missing one: it gives the defaults for this run,
+// but st_save leaves the file alone instead of replacing it with them.
+fn st_read(s: &mut St) -> Ini {
+    match Ini::load_checked(&s.file) {
+        Some(ini) => {
+            s.unreadable = false;
+            ini
+        }
+        None => {
+            s.unreadable = true;
+            plat::log_warn("settings", &format!("could not read {}, it is not overwritten", s.file));
+            Ini::new()
+        }
+    }
+}
+
 /// st_init() -- see the header (set_init: after tool_init, before the tool windows' inits)
 pub(crate) fn st_init(p: &mut Pn, ui: &mut Ui) {
     let cfg = *crate::tools::tool_cfg(&p.tool); // factory tool options
@@ -339,7 +359,9 @@ pub(crate) fn st_init(p: &mut Pn, ui: &mut Ui) {
     s.bauto = crate::document::history::memory::hist_budget(&p.hm);
     s.late = true;
     st_find_path(s, ui);
-    s.ini = Some(if s.on { Ini::load(&s.file) } else { Ini::new() }); // a missing file = an empty INI
+    s.unreadable = false;
+    let ini = if s.on { st_read(s) } else { Ini::new() }; // a missing file = an empty INI
+    s.ini = Some(ini);
     if s.on {
         st_load_early(p, ui);
     }
@@ -879,7 +901,7 @@ fn st_collect(p: &mut Pn, ui: &mut Ui) {
 
 /// st_save() -> 0 written, 1 no persistence, -1 write error
 pub(crate) fn st_save(p: &mut Pn, ui: &mut Ui) -> i32 {
-    if !p.st.on || p.st.ini.is_none() {
+    if !p.st.on || p.st.ini.is_none() || p.st.unreadable {
         return 1;
     }
     st_collect(p, ui);
@@ -952,7 +974,8 @@ pub(crate) fn st_reload(p: &mut Pn, ui: &mut Ui) {
     if !p.st.on {
         return;
     }
-    p.st.ini = Some(Ini::load(&p.st.file));
+    let ini = st_read(&mut p.st);
+    p.st.ini = Some(ini);
     st_load_early(p, ui);
     st_apply_late(p, ui);
     crate::preferences::localization::init(p,ui);

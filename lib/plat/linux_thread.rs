@@ -100,7 +100,10 @@ pub fn thread_spawn(stack: usize, f: Start) -> Option<Thread> {
             return None;
         }
         let base = base as usize;
-        syscall3(SYS_MPROTECT, base, GUARD_SIZE, 0);
+        if syscall3(SYS_MPROTECT, base, GUARD_SIZE, 0) < 0 {
+            syscall3(SYS_MUNMAP, base, size, 0);
+            return None;
+        }
         let rec = (base + size - 64) as *mut ThreadRec;
         let start = Box::into_raw(Box::new(f));
         rec.write(ThreadRec { tid: AtomicU32::new(0), _pad: 0, base, size, start, _rsv: [0; 4] });
@@ -159,7 +162,9 @@ impl Sem {
         if n == 0 {
             return;
         }
-        self.0.count.fetch_add(n as i32, Ordering::SeqCst);
+        // saturating: an i32 overflow would turn the count negative and block waiters for good
+        let add = n.min(i32::MAX as u32) as i32;
+        let _ = self.0.count.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |c| Some(c.saturating_add(add)));
         if self.0.waiters.load(Ordering::SeqCst) != 0 {
             // SAFETY: the futex word lives as long as self.
             unsafe {

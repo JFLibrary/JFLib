@@ -720,7 +720,10 @@ fn render_ops(path: &mut Path, ras: &mut Raster, s: &mut DocSel) {
         };
         i += 1;
         if op.feather!=0 {
-            feather_mask(s.keep.as_mut().unwrap(),op.feather as i32);
+            // (no memory: the selection keeps its hard edge)
+            if !feather_mask(s.keep.as_mut().unwrap(),op.feather as i32) {
+                plat::log_warn("selection", "feather: out of memory, edge not softened");
+            }
             rendered+=1;lastq=0;continue;
         }
         let mut mode = op.mode;
@@ -765,10 +768,11 @@ fn render_ops(path: &mut Path, ras: &mut Raster, s: &mut DocSel) {
 
 // Separable box filter of A8 coverage, with zero coverage outside the canvas.
 // Rolling sums keep work linear in pixel count even for a large feather radius.
-fn feather_mask(mask:&mut TMask,r:i32) {
+// -> false (mask unchanged) when the work buffers do not fit into memory.
+fn feather_mask(mask:&mut TMask,r:i32) -> bool {
     let (w,h)=(mask.w as usize,mask.h as usize);
     let n=(2*r+1) as u32;
-    let mut rows=vec![0u8;w*h];
+    let Some(mut rows)=w.checked_mul(h).and_then(gfx::try_zeroed) else {return false};
     for y in 0..h {
         let mut sum=0u32;
         for x in -r..=r {sum+=mask.get(x,y as i32) as u32;}
@@ -796,6 +800,7 @@ fn feather_mask(mask:&mut TMask,r:i32) {
         }
     }
     mask.optimize();
+    true
 }
 
 /// sel_combine(doc, poly, mode, qual) -> true -- append an op (SM_REPLACE drops the others);
@@ -1204,7 +1209,9 @@ pub(crate) fn sel_crop(p: &mut Pn, doc: DocId) -> bool {
     }
     // install the new surfaces (the old ones: history or freed)
     for (i, sf) in nsf.into_iter().enumerate() {
-        let old = core::mem::replace(&mut p.doc.dm(doc).layers[i].sf, sf);
+        let l = &mut p.doc.dm(doc).layers[i];
+        let old = core::mem::replace(&mut l.sf, sf);
+        l.ver = l.ver.wrapping_add(1);
         hist_release(p, doc, Layer { sf: old, ..Layer::default() });
     }
     let d = p.doc.dm(doc);
@@ -1218,15 +1225,7 @@ pub(crate) fn sel_crop(p: &mut Pn, doc: DocId) -> bool {
 
 /// a zeroed FMT_ARGB surface (surf_alloc) | None when out of memory
 pub(crate) fn surf_try(w: i32, h: i32) -> Option<Surface> {
-    if !(0..=65536).contains(&w) || !(0..=65536).contains(&h) {
-        return None;
-    }
-    let stride = (w * 4 + 63) & !63;
-    let bytes = (stride as usize).checked_mul(h as usize)?.max(64);
-    let mut px = Vec::new();
-    px.try_reserve_exact(bytes).ok()?;
-    px.resize(bytes, 0);
-    Some(Surface { px, w, h, stride, fmt: FMT_ARGB, flags: gfx::SFF_OWNED, opac: 255, blend: 0 })
+    Surface::try_new(w, h, FMT_ARGB)
 }
 
 // ================================================================== marching ants
@@ -1462,6 +1461,8 @@ fn parse_int(s: &[u8], mut i: usize) -> (i32, usize) {
     (if neg { v.wrapping_neg() } else { v }, i)
 }
 
+const GEOM_POINTS_MAX: usize = 4_000_000;
+
 /// sel_geom_parse(text) -> POLY of the text of sel_geom_text | None (not that format)
 pub(crate) fn sel_geom_parse(text: &[u8]) -> Option<PolyRef> {
     let t = &text[..text.iter().position(|&c| c == 0).unwrap_or(text.len())]; // a NUL ends it
@@ -1471,6 +1472,7 @@ pub(crate) fn sel_geom_parse(text: &[u8]) -> Option<PolyRef> {
     let at = |k: usize| t.get(k).copied().unwrap_or(0);
     let mut b = Builder::default();
     let mut buf: Vec<[f32; 2]> = Vec::new();
+    let mut total = 0usize;
     let mut i = GEOM_HDR.len();
     loop {
         while matches!(at(i), b' ' | b'\t' | b'\r' | b'\n') {
@@ -1484,6 +1486,10 @@ pub(crate) fn sel_geom_parse(text: &[u8]) -> Option<PolyRef> {
         let (n, j) = parse_int(t, i);
         if j == i || n <= 0 || n > 0x100_0000 {
             return None;
+        }
+        total += n as usize;
+        if total > GEOM_POINTS_MAX {
+            return None; // pasted text must not build an unbounded outline
         }
         i = j;
         buf.clear();

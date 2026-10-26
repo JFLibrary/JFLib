@@ -183,14 +183,15 @@ fn lv_get(l: &Levels, prm: &Params, slot: usize) -> i32 {
 // lv_set(slot, v) -- the byte of colour slot 0..3 = v for every checked channel
 fn lv_set(l: &Levels, prm: &mut Params, slot: usize, v: i32) {
     let s = slot & 3;
+    let v = v.clamp(0, 255) as u8;
     if l.mask[0] != 0 {
-        prm.set_byte(s, 2, v as u8);
+        prm.set_byte(s, 2, v);
     }
     if l.mask[1] != 0 {
-        prm.set_byte(s, 1, v as u8);
+        prm.set_byte(s, 1, v);
     }
     if l.mask[2] != 0 {
-        prm.set_byte(s, 0, v as u8);
+        prm.set_byte(s, 0, v);
     }
 }
 

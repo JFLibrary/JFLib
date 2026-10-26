@@ -22,7 +22,7 @@ fn entities(s:&str)->Result<String,Error>{
             "ndash"=>Some('–'),"mdash"=>Some('—'),"bull"=>Some('•'),"copy"=>Some('©'),
             _ if key.starts_with("#x") || key.starts_with("#X")=>u32::from_str_radix(&key[2..],16).ok().and_then(char::from_u32),
             _ if key.starts_with('#')=>key[1..].parse::<u32>().ok().and_then(char::from_u32),_=>None};
-        if let Some(c)=c {if c=='\0'{return Err(Error::Invalid);}out.push(c);rest=&rest[end+1..];}else{return Err(failure("unknown character reference"));}
+        if let Some(c)=c {if c=='\0'{return Err(Error::Invalid);}out.push(c);rest=&rest[end+1..];}else{out.push('&');}
     }
     out.push_str(rest);Ok(out)
 }
@@ -50,7 +50,7 @@ fn tokenize(s:&str)->Result<Vec<Node>,Error>{
         }
         if matches!(tag.as_str(),"script"|"style"|"head") {
             // Metadata and active content are never evaluated. Limit the scan to the input budget.
-            let lower=s[at..].to_ascii_lowercase();let marker=format!("</{tag}");let end=lower.find(&marker).ok_or(Error::Invalid)?;at+=end;at+=s[at..].find('>').ok_or(Error::Invalid)?+1;continue;
+            let marker=format!("</{tag}");let end=bytes[at..].windows(marker.len()).position(|w|w.eq_ignore_ascii_case(marker.as_bytes())).ok_or(Error::Invalid)?;at+=end;at+=s[at..].find('>').ok_or(Error::Invalid)?+1;continue;
         }
         // HTML permits omitted p, td/th and tr end tags. Only close within the nearest table.
         if matches!(tag.as_str(),"p"|"tr"|"td"|"th"|"tbody"|"thead"|"tfoot") {

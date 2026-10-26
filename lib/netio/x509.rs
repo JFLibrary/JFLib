@@ -177,7 +177,13 @@ fn parse_time(tag: u8, c: &[u8]) -> Option<i64> {
         return None;
     }
     let (mo, d, h, mi, s) = (digits(&rest[0..2])?, digits(&rest[2..4])?, digits(&rest[4..6])?, digits(&rest[6..8])?, digits(&rest[8..10])?);
-    if !(1..=12).contains(&mo) || !(1..=31).contains(&d) || h > 23 || mi > 59 || s > 60 {
+    let leap = y % 4 == 0 && (y % 100 != 0 || y % 400 == 0);
+    let dim = match mo {
+        2 => 28 + leap as i64,
+        4 | 6 | 9 | 11 => 30,
+        _ => 31,
+    };
+    if !(1..=12).contains(&mo) || !(1..=dim).contains(&d) || h > 23 || mi > 59 || s > 59 {
         return None;
     }
     Some(days_from_civil(y, mo, d) * 86_400 + h * 3600 + mi * 60 + s)
@@ -476,7 +482,7 @@ impl Cert {
                     let mut d = Der::new(sig).seq()?;
                     let r = d.read(der::INTEGER)?;
                     let s = d.read(der::INTEGER)?;
-                    d.is_empty().then_some((r, s))
+                    (d.is_empty() && r.first().is_some_and(|b| b & 0x80 == 0) && s.first().is_some_and(|b| b & 0x80 == 0)).then_some((r, s))
                 };
                 rs().is_some_and(|(r, s)| crypto::ecdsa::verify(*curve, point, &h.digest(data), unsigned(r), unsigned(s)))
             }
@@ -503,13 +509,22 @@ impl Cert {
             return self.ips.contains(&ip);
         }
         let h = host.to_ascii_lowercase();
-        self.dns.iter().any(|d| *d == h || (d.starts_with("*.") && h.split_once('.').is_some_and(|(_, rest)| rest == &d[2..])))
+        let h = h.strip_suffix('.').unwrap_or(&h);
+        self.dns.iter().any(|d| {
+            d == h
+                || d.strip_prefix("*.").is_some_and(|base| {
+                    base.contains('.') && h.split_once('.').is_some_and(|(label, rest)| !label.is_empty() && rest == base)
+                })
+        })
     }
 }
 
 /// whether a DNS name lies in a constraint subtree ("example.com": it and its subdomains;
 /// ".example.com": subdomains only)
 fn dns_in(name: &str, base: &str) -> bool {
+    if base.is_empty() {
+        return true;
+    }
     let name = name.trim_start_matches("*.");
     if let Some(b) = base.strip_prefix('.') {
         return name.ends_with(base) && name.len() > b.len();
@@ -564,11 +579,13 @@ pub fn verify_chain(chain: &[Cert], anchors: &[Cert], now: i64, name: Option<&st
     }
     let mut why = String::from("keine vertrauenswürdige Zertifizierungsstelle");
     let mut used = alloc::vec![false; chain.len()];
-    if path(leaf, chain, anchors, now, 0, &mut used, &mut why) { Ok(()) } else { Err(why) }
+    let mut budget = 64u32;
+    if path(leaf, chain, anchors, now, 0, &mut used, &mut budget, &mut why) { Ok(()) } else { Err(why) }
 }
 
 /// a path from `cur` upwards (depth: CAs between the leaf and cur)
-fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, used: &mut [bool], why: &mut String) -> bool {
+#[allow(clippy::too_many_arguments)]
+fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, used: &mut [bool], budget: &mut u32, why: &mut String) -> bool {
     if depth > 8 {
         *why = String::from("Zertifikatskette zu lang");
         return false;
@@ -582,7 +599,7 @@ fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, us
             *why = String::from("die Zertifizierungsstelle ist abgelaufen");
             continue;
         }
-        if !(a.is_ca || a.version == 1) || a.key_usage.is_some_and(|k| k & KU_KEY_CERT_SIGN == 0) {
+        if !(a.is_ca || a.version == 1) || a.key_usage.is_some_and(|k| k & KU_KEY_CERT_SIGN == 0) || a.path_len.is_some_and(|p| (p as usize) < depth) {
             *why = String::from("Vertrauensanker ist keine Zertifizierungsstelle");
             continue;
         }
@@ -594,7 +611,17 @@ fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, us
     }
     for i in 1..chain.len() {
         let next = &chain[i];
-        if used[i] || next.subject != cur.issuer || !cur.signed_by(next) {
+        if used[i] || next.subject != cur.issuer {
+            continue;
+        }
+        // certificates with equal names and keys would otherwise make this a factorial search
+        // of signature checks
+        if *budget == 0 {
+            *why = String::from("Zertifikatskette zu komplex");
+            return false;
+        }
+        *budget -= 1;
+        if !cur.signed_by(next) {
             continue;
         }
         if !next.is_ca || next.unknown_critical || now < next.not_before || now > next.not_after
@@ -608,7 +635,7 @@ fn path(cur: &Cert, chain: &[Cert], anchors: &[Cert], now: i64, depth: usize, us
             continue;
         }
         used[i] = true;
-        if path(next, chain, anchors, now, depth + 1, used, why) {
+        if path(next, chain, anchors, now, depth + 1, used, budget, why) {
             return true;
         }
         used[i] = false;

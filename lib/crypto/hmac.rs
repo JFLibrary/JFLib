@@ -49,6 +49,7 @@ impl<H: Hash> Hmac<H> {
         let mut o = self.outer;
         o.update(&ih[..H::OUT]);
         o.finish_into(out);
+        zeroize(&mut ih);
     }
 }
 

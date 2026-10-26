@@ -61,7 +61,7 @@ use ui::*;
 use crate::document::composite::{comp_mark, comp_mark_all, comp_set_tool, CompHook, HookKey};
 use crate::app::constants::*;
 use crate::document::model::{doc_active, doc_index, doc_mark_px, Doc, DocId};
-use crate::document::history::{hist_count, hist_pos, hist_px_begin, hist_px_end, hist_px_touch};
+use crate::document::history::{hist_count, hist_pos, hist_px_begin, hist_px_cancel, hist_px_end, hist_px_touch};
 use crate::document::layers::lay_find_uid;
 use crate::workspace::palette::{pal_primary, pal_reset, pal_secondary, pal_set_primary, pal_set_secondary, pal_swap};
 use crate::document::selection::sel_clip_row;
@@ -1531,13 +1531,21 @@ pub(crate) fn tl_commit(p: &mut Pn, tl: usize, name: &'static str, icon: u32) ->
         tl_hide(p, tl);
         return false;
     }
-    hist_px_begin(p, doc, -1);
+    // no pixel is written that the history could not save (out of memory / budget): then no step
+    if hist_px_begin(p, doc, -1) != 0 {
+        tl_hide(p, tl);
+        return false;
+    }
     for &(tx, ty) in &list {
         let ax = (tx << 6).max(x0);
         let ay = (ty << 6).max(y0);
         let bx = ((tx << 6) + 64).min(x1);
         let by = ((ty << 6) + 64).min(y1);
-        hist_px_touch(p, doc, ax, ay, bx, by);
+        if hist_px_touch(p, doc, ax, ay, bx, by) != 0 {
+            hist_px_cancel(p, doc);
+            tl_hide(p, tl);
+            return false;
+        }
     }
     // tl_row in place over the rows of the listed tiles (worker pool); the layer's surface is
     // taken out of the document meanwhile (tl_row reads the document's selection)

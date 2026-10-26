@@ -25,7 +25,7 @@ use alloc::vec::Vec;
 use rt::os::syscall6;
 
 use crate::{
-    FO_READ, OsFile, LH_SEGMAX, LIB_FILE_MAX, LIBE_DEPS, LIBE_FORMAT, LIBE_INIT, LIBE_IO, LIBE_MAP, LIBE_NOMEM,
+    OsFile, LH_SEGMAX, LIB_FILE_MAX, LIBE_DEPS, LIBE_FORMAT, LIBE_INIT, LIBE_IO, LIBE_MAP, LIBE_NOMEM,
     LIBE_RELOC, Lib, LibSeg,
 };
 
@@ -57,6 +57,9 @@ const DT_STRSZ: u64 = 10;
 const DT_SYMENT: u64 = 11;
 const DT_INIT: u64 = 12;
 const DT_REL: u64 = 17;
+const DT_TEXTREL: u64 = 22;
+const DT_RELRSZ: u64 = 35;
+const DT_RELR: u64 = 36;
 const DT_RELSZ: u64 = 18;
 const DT_PLTREL: u64 = 20;
 const DT_JMPREL: u64 = 23;
@@ -125,7 +128,7 @@ pub fn lib_open(path: &str) -> Result<Lib, u32> {
     if !crate::policy::plugin_allowed(path) {
         return Err(LIBE_IO);
     }
-    let f = OsFile::open_raw(path, FO_READ).ok_or(LIBE_IO)?;
+    let f = OsFile::open_read_nofollow(path).ok_or(LIBE_IO)?;
     let size = f.size().ok_or(LIBE_IO)?;
     if size > LIB_FILE_MAX {
         return Err(LIBE_IO);
@@ -281,7 +284,8 @@ fn elf_load(b: &[u8], el: &mut El, base: usize) -> Result<(), u32> {
                 DT_NEEDED => return Err(LIBE_DEPS),
                 DT_INIT => return Err(LIBE_INIT),
                 DT_INIT_ARRAYSZ | DT_PREINIT_ARRAYSZ if val != 0 => return Err(LIBE_INIT),
-                DT_REL | DT_RELSZ if val != 0 => return Err(LIBE_RELOC),
+                DT_REL | DT_RELSZ | DT_RELRSZ if val != 0 => return Err(LIBE_RELOC),
+                DT_RELR | DT_TEXTREL => return Err(LIBE_RELOC),
                 DT_HASH => el.hash = val,
                 DT_STRTAB => el.strtab = val,
                 DT_SYMTAB => el.symtab = val,
@@ -317,6 +321,13 @@ fn elf_load(b: &[u8], el: &mut El, base: usize) -> Result<(), u32> {
             gnu_count(m, el).ok_or(fmt)?
         };
         if nsym > SYM_MAX || nsym * 24 + el.symtab > span {
+            return Err(fmt);
+        }
+        // lib_sym reads both tables after the protection is set: they must be readable
+        let readable = |a: u64, n: u64| {
+            el.segs[..el.nseg].iter().any(|s| s.flags & PF_R != 0 && a >= s.va && a <= s.end && n <= s.end - a)
+        };
+        if !readable(el.symtab, nsym * 24) || !readable(el.strtab, el.strsz) {
             return Err(fmt);
         }
         el.nsym = nsym;

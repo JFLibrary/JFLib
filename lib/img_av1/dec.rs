@@ -15,11 +15,13 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::sync::atomic::AtomicU32;
 
-use img_core::{ERR_HDR, ERR_NOMEM, ERR_TRUNC, ERR_UNSUPPORTED};
+use img_core::{ERR_HDR, ERR_LIMIT, ERR_NOMEM, ERR_TRUNC, ERR_UNSUPPORTED};
 
 use crate::blk::{self, Ts};
 use crate::tab::*;
 use crate::{Pic, AVS_CDEF, AVS_FINAL, AVS_LF, AVS_RECON, AVS_SR};
+
+const AV_MAXPIX: u64 = 1 << 27; // luma samples of a frame (ERR_LIMIT beyond)
 
 // ---- limits / constants of the specification used here  [av1_int.inc]
 pub(crate) const AV_MAXTILES: u32 = 64; // tile columns / rows each
@@ -233,6 +235,9 @@ impl Br<'_> {
 
     /// ab_ns: ns(n) (n >= 1)
     fn ns(&mut self, n: u32) -> u32 {
+        if n == 0 {
+            return 0;
+        }
         let w = 32 - n.leading_zeros();
         let m = 1u32.wrapping_shl(w).wrapping_sub(n);
         let v = self.f(w - 1);
@@ -551,9 +556,12 @@ impl<'a> Av1Dec<'a> {
             if !skip {
                 match typ {
                     1 => {
-                        seqhdr(&mut self.h, &mut b)?;
-                        if self.state < 1 {
-                            self.state = 1;
+                        // (not between a frame header and its tile group: the buffers are allocated)
+                        if self.state != 2 {
+                            seqhdr(&mut self.h, &mut b)?;
+                            if self.state < 1 {
+                                self.state = 1;
+                            }
                         }
                     }
                     2 => {
@@ -675,6 +683,7 @@ impl<'a> Av1Dec<'a> {
         h.usesr = if h.esr != 0 { b.f(1) } else { 0 };
         h.srden = if h.usesr != 0 { b.f(3) + 9 } else { 8 };
         h.fw = (h.upw.wrapping_shl(3).wrapping_add(h.srden >> 1)) / h.srden;
+        h.fw = h.fw.max(h.upw.min(16)); // (libaom / dav1d: at least 16 samples wide)
         h.micols = ((h.fw.wrapping_add(7)) >> 3).wrapping_mul(2);
         h.mirows = ((h.fh.wrapping_add(7)) >> 3).wrapping_mul(2);
         // render_size
@@ -695,6 +704,9 @@ impl<'a> Av1Dec<'a> {
         quantseg(h, b);
         filters(h, b);
         grainparams(h, b);
+        if h.upw as u64 * h.fh as u64 > AV_MAXPIX {
+            return Err(ERR_LIMIT);
+        }
         self.alloc()?;
         self.state = 2;
         self.ntile = 0;

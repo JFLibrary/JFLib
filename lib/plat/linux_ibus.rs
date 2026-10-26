@@ -268,7 +268,7 @@ fn forward(win: u8, keyval: u32, release: bool) {
     } else if !release {
         let cp = if (0x20..0x7F).contains(&keyval) || (0xA0..0x100).contains(&keyval) {
             keyval
-        } else if keyval & 0xFF00_0000 == 0x0100_0000 {
+        } else if keyval & 0xFF00_0000 == 0x0100_0000 && char::from_u32(keyval & 0x00FF_FFFF).is_some() {
             keyval & 0x00FF_FFFF
         } else {
             0

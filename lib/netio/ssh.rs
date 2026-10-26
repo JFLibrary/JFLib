@@ -183,7 +183,7 @@ impl<'a> R<'a> {
         core::str::from_utf8(self.bytes()?).ok()
     }
     pub fn skip(&mut self, n: usize) -> Option<()> {
-        self.b.get(self.p..self.p + n)?;
+        self.b.get(self.p..self.p.checked_add(n)?)?;
         self.p += n;
         Some(())
     }
@@ -574,7 +574,7 @@ impl Transport {
                 let sig = r.bytes().ok_or(SshError::Protocol(String::from("bad ECDH reply")))?.to_vec();
                 let fp = fingerprint(&blob);
                 let mut kr = R::new(&blob);
-                if kr.str() != Some(HOST_KEY_ALG) || kr.bytes().is_none_or(|p| p.len() != 32) {
+                if kr.str() != Some(HOST_KEY_ALG) || kr.bytes().is_none_or(|p| p.len() != 32) || !kr.rest().is_empty() {
                     return proto("host key is not ssh-ed25519");
                 }
                 if let HostKeyCheck::Pinned(want) = check {

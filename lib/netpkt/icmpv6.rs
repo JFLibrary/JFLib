@@ -322,13 +322,14 @@ impl NdOpt {
             }
             NdOpt::Redirected(d) => {
                 out.extend_from_slice(&[0; 6]);
-                out.extend_from_slice(d);
+                // the length field is one byte of 8-byte units
+                out.extend_from_slice(&d[..d.len().min(255 * 8 - 8)]);
             }
             NdOpt::Mtu(m) => {
                 out.extend_from_slice(&[0; 2]);
                 out.extend_from_slice(&m.to_be_bytes());
             }
-            NdOpt::Other(_, d) => out.extend_from_slice(d),
+            NdOpt::Other(_, d) => out.extend_from_slice(&d[..d.len().min(255 * 8 - 2)]),
         }
         while (out.len() - at) % 8 != 0 {
             out.push(0);

@@ -276,9 +276,32 @@ pub(crate) fn parse(data: &[u8]) -> Result<Vec<Preset>, String> {
     Ok(presets)
 }
 
+// A custom tip image must stay inside the preset library folder: relative, no drive, UNC, device
+// or stream syntax (':'), no parent segment (also in its Windows-normalized forms like ".. ").
+pub(crate) fn image_is_local(image: &str) -> bool {
+    !image.is_empty()
+        && !image.contains(['\0', ':'])
+        && !image.starts_with(['/', '\\'])
+        && image
+            .split(['/', '\\'])
+            .all(|s| s.is_empty() || s == "." || !s.trim_matches(['.', ' ']).is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn image_paths_stay_inside_the_library() {
+        for ok in ["tip.png", "tips/a b.png", "./tip.png", "a/./b.png", "a//b.png", "..tip.png", "a.b.png"] {
+            assert!(image_is_local(ok), "{ok}");
+        }
+        for bad in [
+            "", "/etc/x.png", "\\\\host\\share\\x.png", "//host/share/x.png", "C:\\x.png", "C:x.png",
+            "../x.png", "a/../x.png", "a\\..\\x.png", ".. /x.png", ".../x.png", "a/.. /x.png", "x.png:s", "a\0b.png", "\\\\?\\C:\\x.png",
+        ] {
+            assert!(!image_is_local(bad), "{bad}");
+        }
+    }
     #[test]
     fn json_argb_and_controls() {
         let p = parse(br#"{"Version":"4.0","CustomBrushes":{"Ink":{"BrushColor":-65536,"BrushSize":21,"BrushFlow":128,"BrushOpacity":77,"BlendMode":1,"BrushRotation":-90,"DoRotateWithMouse":true}}}"#).unwrap().remove(0);

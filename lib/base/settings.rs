@@ -94,7 +94,7 @@ impl Desc {
         match (self.kind, v) {
             (Kind::Bool(_), Val::Bool(b)) => Val::Bool(b),
             (Kind::Int { min, max, .. }, Val::Int(x)) => Val::Int(x.clamp(min, max.max(min))),
-            (Kind::Num { min, max, .. }, Val::Num(x)) if !x.is_nan() => Val::Num(x.clamp(min, max.max(min))),
+            (Kind::Num { min, max, .. }, Val::Num(x)) if !x.is_nan() && !min.is_nan() && !max.is_nan() => Val::Num(x.clamp(min, max.max(min))),
             (Kind::Text { max, .. }, Val::Text(mut s)) => {
                 cut(&mut s, max);
                 Val::Text(s)
@@ -137,7 +137,7 @@ impl Desc {
             Kind::Choice { items, .. } => Val::Choice(items.iter().position(|it| it.0.eq_ignore_ascii_case(t))?),
             Kind::Color(_) => {
                 let h = t.strip_prefix('#').unwrap_or(t);
-                if h.len() != 6 {
+                if h.len() != 6 || !h.bytes().all(|b| b.is_ascii_hexdigit()) {
                     return None;
                 }
                 Val::Color(u32::from_str_radix(h, 16).ok()?)
@@ -358,8 +358,13 @@ pub fn rename(ini: &mut Ini, old: &str, new: &str) -> bool {
     let (os, ok) = split(old);
     let Some(v) = ini.get(os, ok).map(String::from) else { return false };
     let (ns, nk) = split(new);
-    ini.remove(os, ok);
-    ini.set(ns, nk, &v)
+    if !ini.set(ns, nk, &v) {
+        return false;
+    }
+    if (os, ok) != (ns, nk) {
+        ini.remove(os, ok);
+    }
+    true
 }
 
 // cut s to at most max bytes at a character boundary
@@ -382,14 +387,21 @@ pub struct Settings {
     dirty: bool,
     rev: u32,
     file_version: u32,
+    unreadable: bool, // the file exists but could not be read: save must not overwrite it
 }
 
 impl Settings {
     /// the settings of a file (a missing or unreadable file: the defaults)
     pub fn open(path: &str, schema: &'static Schema) -> Settings {
         let exists = plat::file_exists(path) == 1;
-        let mut s = Settings::from_ini_ex(Ini::load(path), schema, exists);
+        let loaded = Ini::load_checked(path);
+        let unreadable = loaded.is_none();
+        let mut s = Settings::from_ini_ex(loaded.unwrap_or_else(Ini::new), schema, exists && !unreadable);
         s.path = String::from(path);
+        s.unreadable = unreadable;
+        if unreadable {
+            plat::log_warn("settings", &alloc::format!("could not read {}, it is not overwritten", path));
+        }
         s
     }
 
@@ -417,7 +429,7 @@ impl Settings {
             plat::log_warn("settings", &alloc::format!("the file has version {}, the program knows {}", file_version, schema.version));
         }
         let vals = schema.keys.iter().map(|d| read(&ini, d)).collect();
-        Settings { schema, path: String::new(), ini, vals, dirty, rev: 0, file_version }
+        Settings { schema, path: String::new(), ini, vals, dirty, rev: 0, file_version, unreadable: false }
     }
 
     pub fn schema(&self) -> &'static Schema {
@@ -440,7 +452,10 @@ impl Settings {
             Some(i) => T::from_val(&self.vals[i]),
             None => T::from_val(&read(&self.ini, &k.d)),
         };
-        v.or_else(|| T::from_val(&k.d.default_val())).expect("settings: the type of a key")
+        v.or_else(|| T::from_val(&k.d.default_val())).unwrap_or_else(|| {
+            plat::log_warn("settings", &alloc::format!("{}: the key has another type than the schema's", k.d.name));
+            T::from_val(&Val::Bool(false)).or_else(|| T::from_val(&Val::Int(0))).or_else(|| T::from_val(&Val::Num(0.0))).or_else(|| T::from_val(&Val::Text(String::new()))).or_else(|| T::from_val(&Val::Choice(0))).or_else(|| T::from_val(&Val::Color(0))).expect("settings: the type of a key")
+        })
     }
 
     /// a text without copying it
@@ -565,6 +580,9 @@ impl Settings {
         if self.path.is_empty() {
             self.dirty = false;
             return true;
+        }
+        if self.unreadable {
+            return false;
         }
         if self.ini.get("", "version").is_none() || self.file_version < self.schema.version {
             self.ini.set_int("", "version", self.schema.version.max(self.file_version) as i64);

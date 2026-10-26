@@ -299,6 +299,8 @@ pub struct Conn {
     client_random: [u8; 32],
     server_random: [u8; 32],
     ems: bool,
+    /// KeyUpdate messages received (a flood is answered with an alert)
+    key_updates: u32,
     /// TLS 1.2: the ECDHE secret, the master secret, the server's keys until its CCS
     pms: Option<[u8; 32]>,
     master12: [u8; 48],
@@ -340,6 +342,7 @@ impl Conn {
             client_random: [0; 32],
             server_random: [0; 32],
             ems: false,
+            key_updates: 0,
             pms: None,
             master12: [0; 48],
             rd_next: None,
@@ -502,6 +505,10 @@ impl Conn {
 
     fn records(&mut self) -> Result<(), TlsError> {
         loop {
+            if self.peer_closed {
+                self.inbuf.clear();
+                return Ok(());
+            }
             if self.inbuf.len() < 5 {
                 return Ok(());
             }
@@ -569,7 +576,7 @@ impl Conn {
                     self.handshake_bytes(&body)?;
                 }
                 // a peer that fails before it has our keys may still send a plaintext alert
-                ALERT => self.peer_alert(&body)?,
+                ALERT if self.rd.is_none() => self.peer_alert(&body)?,
                 _ => return Err(fail(AL_UNEXPECTED_MESSAGE, "record type")),
             }
             if self.state == State::Closed {
@@ -750,6 +757,10 @@ impl Conn {
                 if requested > 1 {
                     return Err(fail(AL_ILLEGAL_PARAMETER, "key_update"));
                 }
+                self.key_updates += 1;
+                if self.key_updates > 1024 {
+                    return Err(fail(AL_UNEXPECTED_MESSAGE, "too many key updates"));
+                }
                 let peer_secret = if self.server { &mut self.c_ap } else { &mut self.s_ap };
                 *peer_secret = keysched::update(peer_secret);
                 let ps = *peer_secret;
@@ -844,7 +855,7 @@ impl Conn {
         let exts = extensions(if r.b.is_empty() { &[] } else { r.v16()? })?;
         r.done()?;
         let Some(v) = ext(&exts, EXT_VERSIONS) else {
-            if self.web && random != HRR_RANDOM {
+            if self.web && !self.hrr && random != HRR_RANDOM {
                 return self.server_hello12(msg, random, suite, &exts);
             }
             return Err(fail(AL_PROTOCOL_VERSION, "the server does not speak TLS 1.3"));
@@ -976,6 +987,9 @@ impl Conn {
         self.v12 = true;
         self.suite = suite;
         self.ems = ext(exts, EXT_EMS).is_some();
+        if !self.ems {
+            return Err(fail(AL_HANDSHAKE_FAILURE, "extended_master_secret"));
+        }
         self.server_random.copy_from_slice(random);
         self.add(msg);
         self.state = State::Client12Cert;
@@ -998,6 +1012,9 @@ impl Conn {
         let sig = r.v16()?;
         r.done()?;
         let leaf = &self.peer[0];
+        if !WEB_SIG_ALGS.contains(&sch) {
+            return Err(fail(AL_ILLEGAL_PARAMETER, "signature scheme"));
+        }
         let alg = scheme(sch, &leaf.key, true).ok_or(fail(AL_ILLEGAL_PARAMETER, "signature scheme"))?;
         // ECDHE_ECDSA suites need an EC (or Ed25519, RFC 8422) key, ECDHE_RSA an RSA key
         let ecdsa_suite = matches!(self.suite, ECDHE_ECDSA_AES128_GCM | ECDHE_ECDSA_CHACHA20);
@@ -1241,6 +1258,9 @@ fn verify_cv(body: &[u8], leaf: &Cert, server: bool, hash: &[u8; 32], web: bool)
     let sig = r.v16()?;
     r.done()?;
     let alg = if web {
+        if !WEB_SIG_ALGS.contains(&sch) {
+            return Err(fail(AL_ILLEGAL_PARAMETER, "signature scheme"));
+        }
         scheme(sch, &leaf.key, false).ok_or(fail(AL_ILLEGAL_PARAMETER, "signature scheme"))?
     } else {
         if sch != ED25519 {
@@ -1258,6 +1278,9 @@ fn verify_cv(body: &[u8], leaf: &Cert, server: bool, hash: &[u8; 32], web: bool)
 }
 
 fn check_trust(trust: &Trust, chain: &[Cert], name: Option<&String>, usage: Usage) -> Result<(), TlsError> {
+    if matches!(trust, Trust::Anchors(_) | Trust::System(_)) && name.is_some_and(|n| n.is_empty()) {
+        return Err(fail(AL_BAD_CERTIFICATE, "no server name to check"));
+    }
     let leaf = &chain[0];
     let now = plat::unix_time_ns() / 1_000_000_000;
     let expired = now > leaf.not_after || now < leaf.not_before;

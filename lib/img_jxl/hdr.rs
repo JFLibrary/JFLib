@@ -287,6 +287,10 @@ impl Jx {
             return;
         }
         let (b, f, x) = bitdepth(br);
+        if b == 0 || b > 31 {
+            br.err = ERR_HDR;
+            return;
+        }
         e.bits = b;
         e.flt = f;
         e.expb = x;

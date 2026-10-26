@@ -40,19 +40,20 @@ pub fn maxss(a: f32, b: f32) -> f32 {
 #[inline]
 pub fn floor_i(x: f32) -> i32 {
     let t = cvtt(x);
-    if (t as f32) > x { t - 1 } else { t }
+    if (t as f32) > x { t.wrapping_sub(1) } else { t }
 }
 
 #[inline]
 pub fn ceil_i(x: f32) -> i32 {
     let t = cvtt(x);
-    if (t as f32) < x { t + 1 } else { t }
+    if (t as f32) < x { t.wrapping_add(1) } else { t }
 }
 
 /// round(x / 255) for x in 0..=65025: ((x + 128) * 257) >> 16 (pmulhuw), equal to
 /// (x + 128 + ((x + 128) >> 8)) >> 8
 #[inline]
 pub fn div255(x: u32) -> u32 {
+    debug_assert!(x < 1 << 24, "div255 is for x <= 65025");
     ((x + 128) * 257) >> 16
 }
 

@@ -15,7 +15,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::dec::{CHANS, decode_fl};
+use crate::dec::{CHANS, decode_lim};
 use crate::enc::{PngCfg, encode_cfg, put_chunk};
 use img_core::deflate::zlib_deflate;
 use img_core::exif::{exif_copy_orient1, exif_orientation};
@@ -227,7 +227,15 @@ pub fn probe(data: &[u8], meta: &mut ImgMeta) -> bool {
 
 /// IMGDEC-aware decode through png_decode_fl  [png_decode_ex]
 pub fn decode_ex(data: &[u8], sf: &mut Surface, dec: &ImgDec, meta: &mut ImgMeta) -> i32 {
-    core_decode(data, sf, dec, meta, scan, decode_fl)
+    // core_decode runs the shared checks; the decode itself needs dec's memory budget
+    fn checked(_: &[u8], _: &mut Surface, _: u32) -> i32 {
+        0
+    }
+    let e = core_decode(data, sf, dec, meta, scan, checked);
+    if e != 0 || dec.flags & IMGD_PROBE != 0 {
+        return e;
+    }
+    decode_lim(data, sf, dec.flags & IMGD_STRAIGHT, dec.maxmem)
 }
 
 // png_meta_chunks: pHYs / iCCP / eXIf / iTXt chunks from opt.meta
