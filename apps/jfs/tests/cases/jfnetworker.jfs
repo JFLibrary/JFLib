@@ -1,0 +1,8 @@
+// jfnetworker.jfs -- net, dns, http and metrics belong to JFNetworker: a catchable error here
+try { net.listen(7000, {}) } catch e { print("caught:", e) }
+try { net.udp(53, fn(sock, msg) { }) } catch e { print("caught:", e) }
+try { dns.resolve("example.org", fn(err, addrs) { }) } catch e { print("caught:", e) }
+try { http.request("http://example.org/", fn(err, resp) { }) } catch e { print("caught:", e) }
+try { metrics.inc("hits") } catch e { print("caught:", e) }
+http.serve(8080, fn(req, res) { return "hello" })
+print("not reached")

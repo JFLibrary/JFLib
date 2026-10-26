@@ -1,0 +1,12 @@
+# print goes to stdout, log to stderr (log and log.info without a prefix)
+args: {dir}/log.jfs
+--- stdout
+one
+three
+--- stderr
+two 2 [3]
+info
+debug: debug
+warn: warn
+error: {code: 5}
+log as a value

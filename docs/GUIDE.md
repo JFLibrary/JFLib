@@ -3247,6 +3247,35 @@ let shard = "user:42".hash() % 8                     // FNV-1a, stable everywher
   allocating. JSON needs up to about three times the heap limit as temporary memory for its
   syntax tree.
 
+**Hosts with names of their own**: `compile` checks names against `script::GLOBALS` (the host
+API of JFNetworker) and only warns about others. A host with another set passes its names to
+`script::compile_with(name, src, &["document", "fetch"])`: the built-ins and the standard
+library are known anyway, and a name that is neither declared nor known is an error with its
+line and column ("Unbekannter Name prnt – meinst du print?"), so a typing error stops the script
+before it runs. `check_with(src, globals)` gives the editor's diagnostics for such a host.
+
+**The runner `jfs`** ([`apps/jfs`](../apps/jfs/README.md)) runs scripts on the command line:
+
+```sh
+jfs hello.jfs Anna Ben                  # config.args = ["Anna", "Ben"]
+jfs -e "print([3, 1, 2].sort())"        # a one-liner; "-" reads the script from stdin
+jfs --check hello.jfs                   # only the diagnostics: hello.jfs:4:1: Fehler: …
+jfs --virtual-time --seed 7 sim.jfs     # timers without waiting, rand() reproducible
+jfs --disk store.json -c port=7000 --fuel 0 --heap 64M server.jfs
+```
+
+Its console host answers the names of `GLOBALS`: `print` to stdout, `log` to stderr, `now`,
+`rand`, `config` (from `JFS_CONFIG`, `--config K=V` and `--env NAME`), `timer` (an event loop on
+the real clock or with `--virtual-time` a virtual one; the program ends when no timer and no
+callback is left, or at `--until MS`) and `disk` (in memory, or in a JSON file with
+`--disk FILE`); `net`, `dns`, `http` and `metrics` throw a catchable error. So a script that
+uses only the standard library, `print`, `log` and `timer` runs the same in JFNetworker and in
+`jfs`. The limits come from `--fuel`, `--heap`, `--depth` and `--stack` (else
+`Limits::default()`). Errors of the compiler and of the run go to stderr with file, line,
+column, the source line and the calls; exit code 1 (2 for a wrong command line). Its tests
+are example scripts with their expected stdout, stderr, exit code and files
+(`apps/jfs/tests/cases/*.test`), run by `python build_rs.py test jfs` on Windows and Linux.
+
 ## 30. Live inspector
 
 A running app can be looked into without changing it: the inspector shows which widget is

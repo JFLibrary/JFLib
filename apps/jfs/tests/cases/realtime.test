@@ -1,0 +1,7 @@
+# timers on the real clock (no --virtual-time): in the order of their times, none early
+args: {dir}/realtime.jfs
+--- stdout
+waiting
+after 30 late enough: true
+after 60 late enough: true
+after 90 late enough: true

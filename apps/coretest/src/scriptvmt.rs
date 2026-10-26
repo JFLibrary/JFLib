@@ -1086,6 +1086,13 @@ fn compile_errors(t: &mut T) {
     t.eq("break outside", first("let a = 1\nbreak"), Some((2, String::from("break steht außerhalb einer Schleife"))));
     t.eq("duplicate", first("let a = 1\nlet a = 2"), Some((2, String::from("a ist schon deklariert (Zeile 1)"))));
     t.check("warnings do not stop it", script::compile("print(unknown_name)").is_ok());
+    // compile_with: the host's names, the built-ins and the library; an unknown name stops it
+    let with = |src: &str| script::compile_with("t.jfs", src, &["log", "document"]).err().map(|d| d.iter().map(|x| (x.line, x.col, x.error, x.msg.clone())).collect::<Vec<_>>());
+    t.eq("compile_with host and library names", with("log(document.title, math.sqrt(2), \"a\".upper(), len([]), json.encode({}))"), None);
+    t.eq("compile_with unknown name", with("let a = 1\nlog(a)\nprnt(a)"), Some(vec![(3, 1, true, String::from("Unbekannter Name prnt – meinst du print?"))]));
+    t.eq("compile_with JFNetworker names are unknown", with("timer.after(1, fn() { })").map(|d| d.len()), Some(1));
+    t.check("compile_with: other warnings do not stop it", script::compile_with("", "fn f() { return late }\nprint(late2)\nlet late2 = 1\nlet late = 2", &[]).is_ok());
+    t.eq("compile_with keeps syntax errors", with("let = 1").map(|d| d[0].3.clone()), Some(String::from("Nach let fehlt ein Name")));
     t.check("check reports the range", script::check("for i, x in 0..3 { }").iter().any(|d| d.error && d.msg.contains("nur eine Laufvariable")));
     let Ok(p) = script::compile("print(1)\nhttp.serve(1)\nconfig.port") else { return };
     t.eq("host names", p.host_names(), vec!["print", "http", "http.serve", "config", "config.port"]);

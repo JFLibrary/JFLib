@@ -1,0 +1,59 @@
+# limits by flag: fuel, heap, call depth, stack; crossing one ends the program (not catchable)
+args: --fuel 5000 -e "let i = 0; while true { i += 1 }"
+exit: 1
+--- stderr
+-e:1:18: Fehler: Rechenzeit aufgebraucht: mehr als 5000 Schritte in einem Aufruf – eine Endlosschleife?
+    let i = 0; while true { i += 1 }
+                     ^
+  im Hauptprogramm (1:18)
+===
+args: --fuel 5000 -e "try { while true { } } catch e { print(\"never\") }"
+exit: 1
+--- stderr
+-e:1:20: Fehler: Rechenzeit aufgebraucht: mehr als 5000 Schritte in einem Aufruf – eine Endlosschleife?
+    try { while true { } } catch e { print("never") }
+                       ^
+  im Hauptprogramm (1:20)
+===
+args: --heap 64k -e "let s = \"x\"; while true { s = s + s }"
+exit: 1
+--- stderr
+-e:1:33: Fehler: Speichergrenze erreicht (65536 Bytes)
+    let s = "x"; while true { s = s + s }
+                                    ^
+  im Hauptprogramm (1:33)
+===
+# a recursion: its frames once, with their count
+args: --depth 25 {dir}/recurse.jfs
+exit: 1
+--- stderr
+{dir}/recurse.jfs:3:10: Fehler: Zu viele Aufrufe ineinander (mehr als 25) – endet die Rekursion?
+      return down(n + 1)
+             ^
+  in down (3:10)
+  … dieselbe Zeile noch 23-mal
+  im Hauptprogramm (5:1)
+===
+args: --stack 10 -e "print([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])"
+exit: 1
+--- stderr
+-e:1:8: Fehler: Der Stapel ist voll (mehr als 10 Werte)
+    print([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+           ^
+  im Hauptprogramm (1:8)
+===
+# fuel holds per invocation: every callback starts afresh
+args: --virtual-time --fuel 20000 -e "let n = 0; let id = timer.every(1, fn() { let i = 0; while i < 1000 { i += 1 }; n += 1; if n == 30 { print(n, \"callbacks at\", now()); timer.cancel(id) } })"
+--- stdout
+30 callbacks at 30.0
+===
+# --fuel 0: no limit (this loop needs more than the default 10 000 000)
+args: --fuel 0 -e "let i = 0; while i < 3000000 { i += 1 }; print(i)"
+--- stdout
+3000000
+===
+args: --fuel abc -e "print(1)"
+exit: 2
+--- stderr
+jfs: --fuel braucht eine Zahl, nicht „abc“
+(jfs --help zeigt die Optionen)

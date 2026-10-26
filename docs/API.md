@@ -24564,7 +24564,9 @@ diagnostics, compiler, VM with fuel and a garbage collector
   outline(src)                 the top-level fns and lets with their lines
   compile(src) -> Result<Program, Vec<Diagnostic>>   bytecode (code.rs, compile.rs), or the
                                errors of parse() and check() (warnings do not stop it);
-                               compile_named(name, src) names the file
+                               compile_named(name, src) names the file; compile_with(name,
+                               src, globals) for a host with other names (the standalone
+                               runner apps/jfs): unknown names are errors there
   Vm::new(&program, limits)    a VM (vm.rs): run(host, fuel) -> Done | Yielded | Error,
                                call(name, args), call_value, global / set_global, pin,
                                output; Value (16 bytes, heap.rs), Host and Cx for native
@@ -24636,6 +24638,13 @@ GLOBALS: &[&str] = &[ "print", "log", "len", "str", "int", "float", "type", ...
 
 - **`fn compile_named(name: &str, src: &str) -> Result<Program, Vec<Diagnostic>>`**
   compile() with a file name (Program::name)
+
+- **`fn compile_with(name: &str, src: &str, globals: &[&str]) -> Result<Program, Vec<Diagnostic>>`**
+  compile_named() for a host with names of its own instead of GLOBALS: `globals` are the
+  names it answers (Host::call, set_global; "log", "timer", "config"), the built-ins and the
+  standard library are known without them.  Unlike compile(), a name that is neither
+  declared nor known is an error ("Unbekannter Name prnt – meinst du print?"), so a typing
+  error stops the script before it runs; the other warnings still do not
 
 ### `script/ast.rs`
 
@@ -24804,6 +24813,8 @@ check -- name resolution over the syntax tree, with the scope rules of ast.rs
     warnings: a name that is neither declared nor in globals (with a suggestion for a
               typing error), a top-level let read by top-level code before it ran
   globals: the predeclared names (crate::GLOBALS for check())
+  resolve_strict(&program, globals)   the same with unknown names as errors
+              (crate::compile_with: the host says which names it has)
 ```
 
 - **`fn resolve(prog: &Program, globals: &[&str]) -> Vec<Diagnostic>`**

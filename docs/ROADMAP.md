@@ -1158,26 +1158,35 @@ Fensterrand hinaus.
   laufenden Programms mit Zeile und Spalte als Marken, F8), Übernehmen ist ein
   Rückgängig-Schritt, nach dem das laufende Skript Disk und Zahlen behält
   (`Action::ScriptSource`; App-README „Skript-Editor“).
-- **P3** · *fehlt* · Eigenständiger jfs-Runner mit Konsolenausgabe (gewünscht am 2026-10-25):
-  Skripte der Sprache aus `lib/script` auch außerhalb von JFNetworker ausführen, wie
-  `python datei.py`. Ein CLI-Programm `jfs` (eigene App `apps/jfs` mit `rt::main!` wie
-  `apps/permcli`, oder eine Zeile in einer `BINS`-Datei): `jfs DATEI.jfs [ARGS…]` übersetzt
-  und startet ein Skript, `jfs --check DATEI.jfs` meldet nur die Diagnosen von `check()` mit
-  Zeile und Spalte, `jfs -e "CODE"` und `-` (stdin) für Einzeiler; optional eine kleine REPL.
-  Ein Konsolen-Host (`impl Host`): `print` nach stdout (`plat::write_stdout`), `log` nach stderr,
-  `now` / `rand` über `plat`, `config` mit Kommandozeile und Umgebung, `timer` über eine
-  Ereignisschleife mit echter Uhr oder virtueller Uhr (`--virtual-time`, für reproduzierbare
-  Tests), `disk` in einer Datei (`--disk DATEI`, sonst im Speicher). Kein freier
-  Dateisystem- oder Netzzugriff aus Skripten (die Sprache bleibt eine Sandbox); `net`, `dns` und
-  `http` gehören JFNetworker und melden im Runner einen fangbaren Fehler. Grenzen per Flag
-  (`--fuel`, `--heap`, `--depth`, sonst `Limits::default()`). Fehler beim Übersetzen oder
-  Laufen erscheinen mit Meldung, Zeile:Spalte und Aufrufkette auf stderr, Exit-Code 1.
-  Sprache und VM bleiben unverändert; in `lib/script` höchstens `compile_with(name, src,
-  globals)`, damit unbekannte Namen gegen die Globals des jeweiligen Hosts geprüft werden (heute
-  nur Warnungen). Dasselbe Skript läuft in JFNetworker und im Runner, solange es nur die
-  Standardbibliothek, `print`, `log` und `timer` nutzt; Export und Import als `.jfs`-Datei im
-  Skript-Editor gehören zu JFNetworker (SK5 im App-README). Tests: Beispielskripte mit
-  erwarteter Ausgabe (stdout, stderr, Exit-Code) über `build_rs.py test`, Windows und Linux.
+- **P3** · *erledigt* · Eigenständiger jfs-Runner mit Konsolenausgabe (gewünscht am 2026-10-25,
+  seit 2026-10-26): [`apps/jfs`](../apps/jfs/README.md) führt Skripte der Sprache aus
+  `lib/script` außerhalb von JFNetworker aus, wie `python datei.py` (`rt::main!`, Windows und
+  Linux). `jfs DATEI.jfs [ARGS…]` übersetzt und startet ein Skript (die Argumente in
+  `config.args`), `jfs -e "CODE"` und `jfs -` (stdin) für Einzeiler, `jfs --check` gibt nur die
+  Diagnosen als `DATEI:ZEILE:SPALTE: Fehler: …` und Warnungen auf stdout aus (Exit-Code 1 bei
+  einem Fehler). Der Konsolen-Host beantwortet die Namen von `script::GLOBALS`: `print` nach
+  stdout, `log` / `log.debug|info|warn|error` nach stderr (ein Log beendet den Fuel-Abschnitt,
+  so bleibt die Reihenfolge zu stdout), `now` in Millisekunden seit dem Start, `rand` (PCG32,
+  `--seed N`), `config` aus `JFS_CONFIG` (JSON), `--config K=WERT` oder einem JSON-Objekt und
+  `--env NAME`, `timer.after/every/cancel` in einer Ereignisschleife mit echter Uhr oder
+  virtueller Uhr (`--virtual-time`; `--until MS` beendet sie), `disk.get/put/delete/scan` wie in
+  JFNetworker, im Speicher oder mit `--disk DATEI` als JSON-Objekt mit einem Schlüssel je
+  Zeile. `net`, `dns`, `http` und `metrics` werfen einen fangbaren Fehler; sonst hat ein Skript
+  keinen Zugriff auf Dateien, Programme oder das Netz. Grenzen per `--fuel` (0: keine),
+  `--heap` (auch `64k`, `16M`), `--depth`, `--stack`, sonst `Limits::default()`. Fehler beim
+  Übersetzen oder Laufen erscheinen auf stderr mit Datei, Zeile:Spalte, der Quellzeile mit
+  Marke und der Aufrufkette (Rekursionen zusammengefasst), Exit-Code 1; ein falscher Aufruf
+  ergibt 2. Sprache und VM sind unverändert; neu in `lib/script` ist nur
+  `compile_with(name, src, globals)`: Namen gegen die des Hosts (dazu Built-ins und
+  Standardbibliothek), ein unbekannter Name ist dort ein Fehler statt einer Warnung (getestet
+  in `coretest --only scriptvm`). Eine REPL gibt es nicht. Tests: `python build_rs.py test jfs`
+  startet `jfs --selftest apps/jfs/tests/cases`, 14 Fälle (`*.test`) mit Läufen von `jfs`
+  samt Argumenten, Umgebung und stdin und der erwarteten Ausgabe auf stdout und stderr, dem
+  Exit-Code und Dateiinhalten: Hallo Welt, Argumente und `config`, Timer mit virtueller und
+  echter Uhr, Fehler mit Zeile:Spalte und Aufrufkette, `--check`, `-e`, stdin, überschrittene
+  Grenzen, die Namen von JFNetworker, die Disk-Datei über zwei Läufe, `log`, `rand` mit
+  Startwert; Windows und Linux. Export und Import als `.jfs`-Datei im Skript-Editor gehören zu
+  JFNetworker (SK5 im App-README).
 - **P3** · *fehlt* · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
   der Browser selbst mit den Meilensteinen B1 bis B4 steht im App-README unter „Fahrplan“).
   Der Browser zeigt Seiten mit `ui.html_view` (`md_doc`, `md_view`, `rich_html`) statt mit einer

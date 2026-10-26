@@ -1,0 +1,6 @@
+// syntax.jfs -- what the compiler finds before anything runs
+print("never printed")
+let x = (1 + 2
+prnt(x)
+print(later)
+let later = 1

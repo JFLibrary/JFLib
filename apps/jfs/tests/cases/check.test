@@ -1,0 +1,23 @@
+# --check: only the diagnostics, on stdout, with line and column; exit code 1 for an error
+args: --check {dir}/syntax.jfs
+exit: 1
+--- stdout
+{dir}/syntax.jfs:3:15: Fehler: Hier fehlt eine schließende Klammer )
+{dir}/syntax.jfs:4:1: Fehler: Unbekannter Name prnt – meinst du print?
+{dir}/syntax.jfs:5:7: Warnung: later wird benutzt, bevor es mit let angelegt wird (Zeile 6)
+===
+# a clean script: no output, nothing runs
+args: --check {dir}/hello.jfs
+===
+# warnings alone: exit code 0; the script from stdin
+args: --check -
+--- stdin
+print(late)
+let late = 1
+--- stdout
+<stdin>:1:7: Warnung: late wird benutzt, bevor es mit let angelegt wird (Zeile 2)
+===
+args: --check -e "print(1)) // too many"
+exit: 1
+--- stdout
+-e:1:9: Fehler: Unerwartete Klammer ) – fehlt ein Operator oder ein Zeilenumbruch?
