@@ -8,7 +8,9 @@
 // malformed and adversarial input (deep nesting, runs of brackets, stars, backticks, tags,
 // unclosed constructs, mutations of the samples) that must neither panic nor take more than
 // linear time; the list's heights (Fenwick sums, positions, insertions above the anchor); the
-// view's accessibility tree in a headless runtime (headings with their level).
+// view's accessibility tree in a headless runtime (headings with their level); forms (fields,
+// labels, choices, task boxes of list items, the values in the state, the data a form sends,
+// reset) and in a headless runtime the fields' records and the images the app supplies.
 // Prints FAIL lines and a summary; the exit code is the number of failures.
 
 use alloc::format;
@@ -338,10 +340,21 @@ fn adversarial(t: &mut T) {
         ("html pre", rep("<pre>x\n", 30_000)),
         ("html images", rep("<img src=x>", 50_000)),
         ("html unclosed tag", format!("<p {}", rep("a", 200_000))),
+        ("html inputs", rep("<input name=a>", 80_000)),
+        ("html selects", rep("<select><option>x", 40_000)),
+        ("html options", format!("<select>{}", rep("<option value=v>t", 60_000))),
+        ("html buttons", rep("<button><b>x", 40_000)),
+        ("html text areas", rep("<textarea>x", 40_000)),
+        ("html labels", rep("<label for=a>x<input id=a>", 30_000)),
+        ("html forms", rep("<form action=x><input></form>", 30_000)),
     ];
     for (name, s) in &html_cases {
         timed(t, name, lim, &|| MdDoc::html(s).blocks().len());
     }
+    let d = MdDoc::html(&rep("<input>", 70_000));
+    t.check(d.fields().len() <= 0xFFFE && valid(&d), "fields capped");
+    let d = MdDoc::html(&format!("<select>{}", rep("<option>t", 10_000)));
+    t.check(d.fields().first().is_some_and(|f| f.options.len() <= 4096), "choices capped");
     // prefixes and mutations of the samples: no panics, ranges inside the texts
     let mut rng = Lcg(0x5EED);
     let syms = b"*_~`[]()<>!#|-+>\\&;:\n \t1.x";
@@ -393,7 +406,8 @@ fn valid(d: &MdDoc) -> bool {
                 && b.text.is_char_boundary(s.a as usize)
                 && b.text.is_char_boundary(s.b as usize)
                 && (s.link as usize) <= d.links().len()
-                && (s.image as usize) <= d.images().len();
+                && (s.image as usize) <= d.images().len()
+                && (s.field as usize) <= d.fields().len();
             prev = s.b;
             ok
         }) && b.cells.iter().all(|c| c.0 <= c.1 && (c.1 as usize) <= b.text.len())
@@ -477,10 +491,125 @@ fn a11y(t: &mut T) {
     t.check(w.nodes.iter().any(|n| n.role == Role::Link && n.name == "Link"), "a link");
 }
 
+fn forms(t: &mut T) {
+    t.group = "forms";
+    let d = MdDoc::html(concat!(
+        "<p>vor</p><form action=\" /a \" method=\"POST\" id=\"f\"><p><label for=\"n\">Name</label> <input id=\"n\" name=\"n\" value=\"x\" size=\"10\" maxlength=\"5\"></p>",
+        "<p><label><input type=checkbox name=c checked> Ja</label> <input type=radio name=r value=1> <input type=radio name=r value=2 checked aria-label=\"Zwei\"></p>",
+        "<select name=s><option>A</option><option value=b selected> B  b </option></select><textarea name=t rows=4 cols=9>\nz &amp; <b>y</b></textarea>",
+        "<input type=hidden name=h value=v><button name=go value=1>Los <b>jetzt</b></button><input type=submit><input type=reset>",
+        "<input type=password name=p title=\"Geheim\"></form><p>nach</p><input name=out form=f><form><input name=inner></form>"
+    ));
+    t.eq(d.forms().len(), 2, "two forms");
+    t.eq(d.forms().first().map(|f| (f.action.clone(), f.method.clone())), Some((String::from("/a"), String::from("post"))), "action and method");
+    t.eq(d.fields().iter().map(|f| f.kind).collect::<Vec<_>>(), alloc::vec![MF_TEXT, MF_CHECKBOX, MF_RADIO, MF_RADIO, MF_SELECT, MF_TEXTAREA, MF_HIDDEN, MF_SUBMIT, MF_SUBMIT, MF_RESET, MF_PASSWORD, MF_TEXT, MF_TEXT], "kinds");
+    t.eq(d.fields().iter().map(|f| f.label.as_str()).collect::<Vec<_>>(), alloc::vec!["Name", "Ja", "", "Zwei", "", "", "", "Los jetzt", "", "", "Geheim", "", ""], "labels, aria-label, title, captions");
+    t.eq(d.fields().iter().map(|f| f.form).collect::<Vec<_>>(), alloc::vec![1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2], "forms (form= the last but one)");
+    t.eq(d.fields().iter().map(|f| f.value.as_str()).collect::<Vec<_>>(), alloc::vec!["x", "on", "1", "2", "", "z & <b>y</b>", "v", "1", "", "", "", "", ""], "values (a text area's text raw)");
+    let s = d.fields().get(4).cloned().unwrap_or_default();
+    t.eq(s.options.iter().map(|o| (o.value.as_str(), o.label.as_str())).collect::<Vec<_>>(), alloc::vec![("A", "A"), ("b", "B b")], "choices");
+    t.eq(s.selected, 1, "the chosen one");
+    t.eq((d.fields()[0].size, d.fields()[0].maxlength, d.fields()[5].rows, d.fields()[5].size), (10, 5, 4, 9), "sizes");
+    t.eq(d.field_spots().len(), 12, "visible fields (not the hidden one)");
+    t.check(d.field_spots().windows(2).all(|w| (w[0].block, w[0].a) < (w[1].block, w[1].a)), "field spots in reading order");
+    t.check(d.blocks().iter().any(|b| b.text == "vor") && d.blocks().iter().any(|b| b.text == "nach"), "a form is a block of its own");
+    t.check(!d.fields()[8].caption().is_empty() && d.fields()[7].caption() == "Los jetzt", "captions");
+    t.check(d.plain().contains("Los jetzt") && !d.plain().contains('\u{FFFC}'), "plain text: captions, no field characters");
+    t.check(!d.to_html().contains("<input"), "HTML: no fields");
+    // a disabled check box at the start of a list item is its task box (html_range writes them)
+    let d = MdDoc::html("<ul><li><input type=checkbox disabled checked> fertig</li><li><input type=\"checkbox\" disabled> offen</li></ul>");
+    t.eq(d.blocks().iter().map(|b| (b.task, b.text.clone())).collect::<Vec<_>>(), alloc::vec![(2, String::from("fertig")), (1, String::from("offen"))], "task boxes");
+    t.eq(d.fields().len(), 0, "task boxes are no fields");
+    let d = MdDoc::html(&md("- [x] a\n- [ ] b").to_html());
+    t.eq(d.blocks().iter().map(|b| b.task).collect::<Vec<_>>(), alloc::vec![2, 1], "task items round trip through HTML");
+    // fields in Markdown's HTML blocks, the rich-text reader unchanged
+    let d = md("Text\n\n<form action=\"/q\">\n<input name=q> <button>Los</button>\n</form>\n\n*nach*");
+    t.eq((d.forms().len(), d.fields().len(), d.fields().first().map_or(0, |f| f.form)), (1, 2, 1), "a form in an HTML block");
+    t.eq(RichDoc::from_html("<p>a<input value=x>b<select><option>o</option></select></p>").text(), String::from("abo"), "the rich-text reader ignores fields");
+    // the values in the view's state
+    let mut st = MdViewState::new();
+    st.set_html("<form action=/s><input name=a value=1><input type=radio name=r value=x checked><input type=radio name=r value=y><select name=s><option>p<option>q</select><input type=checkbox name=c><button name=b value=k>B</button><input disabled name=d value=no></form>");
+    t.eq((st.field_text(0), st.field_checked(1), st.field_checked(2), st.field_selected(3)), ("1", true, false, 0), "first values");
+    st.set_field_text(0, "neu");
+    st.set_field_checked(2, true);
+    st.set_field_checked(4, true);
+    st.set_field_selected(3, 1);
+    t.eq((st.field_checked(1), st.field_checked(2)), (false, true), "one radio of a group");
+    let pairs = |v: Vec<(String, String)>| v.iter().map(|(n, v)| format!("{}={}", n, v)).collect::<Vec<_>>().join("&");
+    t.eq(pairs(st.form_data(0, Some(5))), String::from("a=neu&r=y&s=q&c=on&b=k"), "form data with its button");
+    t.eq(pairs(st.form_data(0, None)), String::from("a=neu&r=y&s=q&c=on"), "form data without a button");
+    st.reset_form(0);
+    t.eq(pairs(st.form_data(0, None)), String::from("a=1&r=x&s=p"), "reset");
+    st.set_field_selected(3, 7);
+    t.eq(st.field_selected(3), -1, "a choice out of range");
+}
+
+// the view in a headless runtime: forms as screen readers get them (names from the labels,
+// the password protected and dotted), images the app supplies (asked once, a placeholder of
+// the given size, the picture's size when the bytes come, the alt text when they fail)
+fn form_view(t: &mut T) {
+    use alloc::rc::Rc;
+    use core::cell::RefCell;
+    use plat::a11y::{Role, S_CHECKED, S_PROTECTED};
+    t.group = "form view";
+    const PAGE: &str = concat!(
+        "<form><p><label for=a>Name</label> <input id=a name=a></p><p><label>Kennwort <input type=password name=p value=\"geheim\"></label></p>",
+        "<p><label><input type=checkbox name=c checked> Merken</label></p><p><select aria-label=\"Land\"><option>A</option></select> <button>Los</button></p></form>",
+        "<p><img src=\"https://x.org/a.png\" alt=\"A\" width=\"20\" height=\"10\"><img src=\"https://x.org/b.svg\" alt=\"B\"><img src=\"data:image/png;base64,xx\" alt=\"C\"><img src=\"http://x.org/b.svg\" alt=\"D\"></p>"
+    );
+    #[derive(Default)]
+    struct Io {
+        asked: Vec<String>,
+        give: Vec<(String, Option<Vec<u8>>)>,
+    }
+    struct View(MdViewState, Rc<RefCell<Io>>);
+    impl App for View {
+        fn frame(&mut self, ui: &mut Ui) {
+            for (a, d) in core::mem::take(&mut self.1.borrow_mut().give) {
+                self.0.set_image(&a, d.as_deref());
+            }
+            ui.next_size(-1, -1);
+            ui.html_view(1, &mut self.0, PAGE, MV_NO_FRAME);
+            self.1.borrow_mut().asked.extend(self.0.image_requests());
+        }
+    }
+    const D: AppDesc = AppDesc { title: "forms", w: 640, h: 480, ..AppDesc::NONE };
+    let io = Rc::new(RefCell::new(Io::default()));
+    let mut st = MdViewState::new();
+    st.images = MI_ASK;
+    let Ok(mut rt) = ui::Runtime::new(&D, View(st, io.clone()), &style::STYLE) else {
+        t.check(false, "the view starts headless");
+        return;
+    };
+    rt.step(50, &[]);
+    let tree = |rt: &ui::Runtime| rt.ui().a11y_tree().wins.first().map(|w| w.nodes.clone()).unwrap_or_default();
+    let nodes = tree(&rt);
+    let find = |role: Role, name: &str| nodes.iter().find(|n| n.role == role && n.name == name).cloned();
+    t.check(find(Role::TextBox, "Name").is_some(), "a text box named by its label");
+    let pw = find(Role::TextBox, "Kennwort");
+    t.check(pw.as_ref().is_some_and(|n| n.state & S_PROTECTED != 0 && !n.text.contains("geheim")), "a password field: protected, its text never read out");
+    t.check(find(Role::CheckBox, "Merken").is_some_and(|n| n.state & S_CHECKED != 0), "a check box named by its label");
+    t.check(find(Role::Combo, "Land").is_some(), "a list named by aria-label");
+    t.check(find(Role::Button, "Los").is_some(), "a button");
+    t.eq(io.borrow().asked.clone(), alloc::vec![String::from("https://x.org/a.png"), String::from("https://x.org/b.svg"), String::from("data:image/png;base64,xx"), String::from("http://x.org/b.svg")], "the addresses asked, each once");
+    let img_w = |rt: &ui::Runtime, name: &str| tree(rt).iter().find(|n| n.role == Role::Image && n.name == name).map_or(0, |n| n.rect[2]);
+    t.eq(img_w(&rt, "A"), 20, "a placeholder of the size the HTML gives");
+    let svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"30\" height=\"12\"><rect width=\"30\" height=\"12\"/></svg>".to_vec();
+    io.borrow_mut().give = alloc::vec![(String::from("https://x.org/b.svg"), Some(svg)), (String::from("https://x.org/a.png"), None)];
+    // (the bytes came outside a frame: the app asks for one)
+    rt.command(1, 0);
+    rt.step(100, &[]);
+    t.eq(img_w(&rt, "B"), 30, "the picture when its bytes come");
+    t.check(img_w(&rt, "A") != 20 && img_w(&rt, "A") > 0, "the alt text when they fail");
+    t.eq(io.borrow().asked.len(), 4, "nothing asked twice (http: and https: are two addresses)");
+}
+
 pub fn run() -> i32 {
     let mut t = T { group: "", ok: 0, failed: 0 };
     let t0 = plat::time_us();
     a11y(&mut t);
+    forms(&mut t);
+    form_view(&mut t);
     blocks_md(&mut t);
     lists(&mut t);
     inlines(&mut t);

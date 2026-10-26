@@ -1178,18 +1178,36 @@ Fensterrand hinaus.
   Standardbibliothek, `print`, `log` und `timer` nutzt; Export und Import als `.jfs`-Datei im
   Skript-Editor gehören zu JFNetworker (SK5 im App-README). Tests: Beispielskripte mit
   erwarteter Ausgabe (stdout, stderr, Exit-Code) über `build_rs.py test`, Windows und Linux.
-- **P3** · *fehlt* · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
+- **P3** · *teilweise* · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
   der Browser selbst mit den Meilensteinen B1 bis B4 steht im App-README unter „Fahrplan“).
   Der Browser zeigt Seiten mit `ui.html_view` (`md_doc`, `md_view`, `rich_html`) statt mit einer
-  eigenen Engine. Dafür braucht die Library: (1) Bilder aus anderen Quellen: eine Rückfrage,
-  über die die App die Bytes einer Adresse liefert (für B1; heute nur VFS und lokale Pfade,
-  sonst der Alt-Text). (2) Formulare im Dokument (für B2): `<form>`, `<input>` (Text, Passwort,
-  Häkchen, Radio, versteckt), `<textarea>`, `<select>`, `<button>` als bedienbare Elemente im
-  Textfluss, ihre Werte im `MdViewState`, `MdEv` meldet Eingabe und Absenden mit den Feldern;
-  ohne Formular bleibt die Ansicht lesend wie heute. (3) Ein veränderbares Dokument (für B3,
-  Seitenskripte): Elemente in `md_doc` über id, Klasse oder Tag finden, Text, Attribute und
-  Klassen ändern, Elemente einfügen und entfernen, danach neu setzen, ohne Bildlauf und
-  Auswahl zu verlieren. (4) Später eine CSS-Teilmenge in `rich_html` (für B4): `<style>` mit
+  eigenen Engine. Dafür braucht die Library: (1) *erledigt* (2026-10-26) Bilder aus anderen
+  Quellen: `MdViewState::images` = `MI_ASK` (http:, https: und data: fragt die Ansicht bei der
+  App an, VFS und Pfade liest sie weiter selbst) oder `MI_APP` (jedes Bild kommt von der App,
+  die Ansicht liest keine Datei); `image_requests()` nennt jede Adresse der Bilder im Blick
+  einmal, `set_image(adresse, Some(bytes) | None)` antwortet (sofort dekodiert: SVG oder
+  img_core; Fehler: der Alt-Text); bis dahin steht ein Rahmen mit dem Alt-Text in der Größe aus
+  dem HTML, danach wird der Block neu gesetzt, ohne dass die Ansicht springt. (2) *erledigt*
+  (2026-10-26) Formulare im Dokument: `<form action method>`, `<input>` (Text und weitere
+  Texttypen, Passwort, Häkchen, Radio, versteckt, submit, image, reset, button),
+  `<textarea>`, `<select>`/`<option>`, `<button>`, `<label>` (umschließend oder `for=`),
+  `form=`; die Felder sind die Widgets der Library im Textfluss (Stil, hoher Kontrast,
+  Textgröße, gespiegeltes Fenster), `MdDoc::forms()` / `fields()` beschreiben sie, die Werte
+  liegen im `MdViewState` (`field_text` / `field_checked` / `field_selected`, Setter,
+  `form_data`, `reset_form`, `focused_field`); `MdEv::field` meldet Eingaben, `MdEv::submit`
+  das Absenden (`MdSubmit`: Formular, action, method, Name/Wert-Paare wie ein Browser, Knopf).
+  Tastatur: Tab/Umschalt+Tab durch Links und Felder in Lesereihenfolge (eine Radiogruppe ist
+  ein Halt, die Pfeile wählen), Leertaste schaltet, Eingabe sendet (mit dem ersten
+  Absendeknopf), Esc zurück in die Ansicht; Passwortfelder geben ihren Text weder an
+  Screenreader noch an die Zwischenablage; ohne Felder bleibt die Ansicht lesend wie zuvor
+  (alle bisherigen Shots byteweise gleich). Getestet mit `mdviewtest --test unit` (Gruppen
+  `forms`, `form view`) und `--page form` (`form_keys.uis`, `form_mouse.uis`,
+  `form_images.uis`, `form_scale.uis`, `form_rtl.uis`; Windows und Linux). Offen: die Felder
+  folgen der Spiegelung des Fensters, nicht der Richtung ihres Absatzes; keine Datei-Felder,
+  keine Mehrfachauswahl. (3) *fehlt* Ein veränderbares Dokument (für B3, Seitenskripte):
+  Elemente in `md_doc` über id, Klasse oder Tag finden, Text, Attribute und Klassen ändern,
+  Elemente einfügen und entfernen, danach neu setzen, ohne Bildlauf und Auswahl zu verlieren.
+  (4) *fehlt* Später eine CSS-Teilmenge in `rich_html` (für B4): `<style>` mit
   Selektoren nach Tag, Klasse und id, die Eigenschaften, die heute aus `style=` gelesen werden,
   dazu Abstände und Rahmen. In `lib/script` nur `compile_with` (siehe den Runner), damit der
   Browser-Host seine eigenen Globals (`document`, `fetch` …) prüfen lässt. Bewusst nicht: eine

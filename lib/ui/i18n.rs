@@ -604,6 +604,8 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Standardschrift", "Default font", "Police par défaut", "Fuente predeterminada", "Carattere predefinito", "Standaardlettertype", "Domyślna czcionka", "الخط الافتراضي", "גופן ברירת מחדל"],
     // (ROADMAP §6) the Markdown / HTML viewer's name for screen readers (md_view.rs)
     ["Dokument", "Document", "Document", "Documento", "Documento", "Document", "Dokument", "مستند", "מסמך"],
+    // (ROADMAP §7) the caption of a form's submit button that has none (md_doc.rs)
+    ["Senden", "Submit", "Envoyer", "Enviar", "Invia", "Verzenden", "Wyślij", "إرسال", "שליחה"],
     // (ROADMAP §12) the live inspector's tool window (inspect.rs)
     ["Inspektor", "Inspector", "Inspecteur", "Inspector", "Ispettore", "Inspector", "Inspektor", "أداة الفحص", "כלי בדיקה"],
     ["Auswählen", "Pick", "Choisir", "Elegir", "Scegli", "Kiezen", "Wskaż", "انتقاء", "בחירה"],

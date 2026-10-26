@@ -3398,8 +3398,9 @@ if ui.button(ID_ONE, "100 %") & EV_ACT != 0 { self.view.set_actual(); }
 
 ## 32. Markdown / HTML viewer and lists with rows of different heights
 
-**The document view** shows Markdown or HTML read-only: help pages, README-like content,
-release notes, chat output. [`MdDoc`](../lib/ui/md_doc.rs) is its model -- blocks of formatted
+**The document view** shows Markdown or HTML: help pages, README-like content, release notes,
+chat output, pages of a browser (read-only but for the fields of forms; images the app
+fetches). [`MdDoc`](../lib/ui/md_doc.rs) is its model -- blocks of formatted
 text -- read from Markdown (CommonMark with GitHub's tables, task lists, strikethrough and bare
 links) or from HTML (the reader of the rich-text editor, extended by rules, images,
 preformatted code and tables). [`ui.markdown_view` / `ui.html_view`](../lib/ui/md_view.rs)
@@ -3428,7 +3429,7 @@ self.status = ev.hover.unwrap_or_default();   // the link under the pointer
   HTML (`br`, `b`, `i`, `s`, `u`, `code`, `kbd`, `a href`, `img`). HTML: what
   `RichDoc::from_html` reads (headings h1 .. h6, paragraphs, lists, quotes, formats, colours,
   links) and `hr`, `img` (width / height), `pre` / `code class="language-x"`, tables (`th`,
-  `thead`, alignment).
+  `thead`, alignment), forms (below).
 * Layout: the blocks in a column; quotes indented with a bar, list markers in front (bullets by
   depth, numbers, task boxes), headings 2 / 1.5 / 1.25 / 1 / 0.875 / 0.85 times the body text
   (h1 / h2 underlined), code blocks in the monospace font with the code editor's highlighting
@@ -3447,8 +3448,9 @@ self.status = ev.hover.unwrap_or_default();   // the link under the pointer
   while the document grows -- chat output.
 * Mouse: drag selects (the view scrolls at its edges), Shift + press extends, a double click
   selects a word, a click on a link activates it. Keys: Up / Down scroll by a line, PgUp / PgDn
-  and Space / Shift+Space by a view, Home / End, Tab / Shift+Tab through the links (the focused
-  one is framed and scrolled into view; past the last one the focus moves on), Enter activates
+  and Space / Shift+Space by a view, Home / End, Tab / Shift+Tab through the links and fields
+  (the focused link is framed, a field gets the focus, scrolled into view; past the last one the
+  focus moves on), Enter activates
   the focused link, Esc drops it, Ctrl+A, Ctrl+C / Ctrl+Insert copy text (list markers, cells by
   tabs, images as their alt texts) and HTML. `MdViewState` also gives `selection()`,
   `selected_text()`, `selected_html()`, `select_all()`, `scroll_to_block(i)`.
@@ -3456,8 +3458,58 @@ self.status = ev.hover.unwrap_or_default();   // the link under the pointer
   also hands it to `open_url` (whose scheme rules and the app's `url` permission apply) -- only
   after the user's click or Enter, never by itself.
 * Images: names of the VFS (`app://`, `data://` ...) and paths -- relative ones after `st.base`
-  -- are read when first shown and kept in the state; `http(s)` and `data:` addresses are never
-  fetched (the alt text shows in a frame instead).
+  -- are read when first shown and kept in the state; the view never fetches `http(s)` and
+  `data:` addresses itself. By default (`st.images = MI_LOCAL`) they show their alt text in a
+  frame. With `MI_ASK` the app supplies them (VFS names and paths are still read), with
+  `MI_APP` the app supplies every image (the view reads no file: pages from the network).
+  The view asks once per address for the images it lays out; until the bytes come a frame with
+  the alt text stands in (at the width / height the HTML gives), then the block is laid out
+  again at the picture's size without moving the view:
+
+  ```rust
+  // state: st.images = MI_ASK (or MI_APP); per frame:
+  for (addr, bytes) in self.fetched.drain(..) {        // what the app's downloads brought
+      st.set_image(&addr, bytes.as_deref());           // None: failed -> the alt text stays
+  }
+  let ev = ui.html_view(ID_PAGE, &mut st, &self.html, 0);
+  for addr in st.image_requests() {                    // the addresses the view waits for
+      self.start_download(addr);                       // (each one once)
+  }
+  // bytes that come outside a frame: set_image, then ui.invalidate() for a frame
+  ```
+
+  `set_image` decodes at once with the library's decoders (SVG through `img_svg`, the rest
+  through `img_core`); bytes it cannot decode count as a failure.
+* Forms (HTML, also in Markdown's HTML blocks): `<form action method>`, `<input>` (text and
+  the other text types, `password`, `checkbox`, `radio`, `hidden`, `submit`, `image`, `reset`,
+  `button`), `<textarea>`, `<select>` / `<option>`, `<button>`, `<label>` (around a field or
+  `for=` its id) become fields in the text flow -- the library's own text boxes, check boxes,
+  radios, drop-down lists and buttons, so the style, high contrast, text scale, HiDPI and a
+  mirrored window apply. `doc.forms()` / `doc.fields()` hold what the page says (`MdForm`,
+  `MdField`: kind `MF_*`, name, first value, label, options, size ...); the current values live
+  in the state (`field_text(i)`, `field_checked(i)`, `field_selected(i)` and their setters). A
+  document without fields reads exactly as before.
+
+  ```rust
+  let ev = ui.html_view(ID_PAGE, &mut st, &self.html, 0);
+  if let Some(i) = ev.field { /* field i changed (or a plain button was pressed) */ }
+  if let Some(s) = ev.submit {                         // Enter in a field, a submit button
+      // s.action, s.method ("get" / "post"), s.fields: [(name, value)], s.button
+      self.navigate(&s.action, &s.method, &s.fields);
+  }
+  ```
+
+  Keys: Tab / Shift+Tab go through links and fields in reading order (a group of radios is one
+  stop: the checked one; the arrows choose inside it), Space toggles, Enter in a text field,
+  check box or radio sends the form with its first submit button (nothing when that is
+  disabled), Enter / Space press a button, Esc in a text field returns to the view, PgUp / PgDn
+  on a field scroll the view. `form_data(form, button)` gives the pairs a browser would send
+  (named, enabled fields; checked boxes and radios; a list's chosen value; only the submitting
+  button), `reset_form(form)` (also the reset button) the first values. Password fields show
+  dots, never copy, and give screen readers dots and the protected state. Each field has its
+  record (`K_TEXTBOX`, `K_CHECKBOX`, `K_RADIO`, `K_COMBO`, `K_BUTTON`) named by its `<label>`,
+  `aria-label`, `title` or placeholder; the widget ids are `md_field_id(view_id, i)`. Not
+  supported: JavaScript, CSS, file inputs (they are text fields), several choices in one list.
 * Accessibility: the view is a `K_BOX` (label `st.label`, default "Dokument"; value: the scroll
   position in DIP); per visible block a `K_HEADING` record (new kind; value: the level),
   `K_TEXT` (paragraphs, code, table cells), `K_LISTITEM` (value: the item's number),
@@ -3506,11 +3558,13 @@ self.vl.insert(0, n);
 * The document view scrolls its blocks with the same height cache (`Rows`).
 
 Tests: `apps/mdviewtest` (`--test unit`: the parser -- blocks, inline parts, HTML, text and HTML
-of ranges -- adversarial input with time limits, the list's height cache and the headings in
-the accessibility tree;
+of ranges, forms -- adversarial input with time limits, the list's height cache, the headings
+and the fields in the accessibility tree, images the app supplies;
 `doc_shots.uis` light / dark / high contrast / HTML / Hebrew, `doc_rtl.uis` (mirrored window),
 `doc_scale.uis` (150 % text), `doc_links.uis`, `doc_select.uis`, `doc_keys.uis` (also 50 000
-blocks), `vlist.uis` (100 000 rows); all with `--verify-dirty`).
+blocks), `vlist.uis` (100 000 rows); with `--page form` a form page: `form_keys.uis`,
+`form_mouse.uis`, `form_images.uis`, `form_scale.uis` (150 %), `form_rtl.uis`; all with
+`--verify-dirty`).
 
 ## 33. Sound: streams, short sounds, the system's sounds
 

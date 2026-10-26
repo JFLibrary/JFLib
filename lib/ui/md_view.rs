@@ -6,16 +6,44 @@
 //   ui.html_view(id, &mut MdViewState, html, MV_*) -> MdEv        HTML (the rich-text reader)
 //   ui.doc_view(id, &mut MdViewState, MV_*) -> MdEv                the document set before
 //        (st.set_markdown / set_html / set_doc)
-//   MdEv { ev, link, hover }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was activated); link: the
-//        activated link's target (a click on it, Enter on the focused one); hover: the target
-//        of the link under the pointer.  The view fills the place it gets (natural 480 x 320
-//        DIP; next_size(-1, -1) fills).
+//   MdEv { ev, link, hover, field, submit }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was
+//        activated); link: the activated link's target (a click on it, Enter on the focused
+//        one); hover: the target of the link under the pointer; field: a form field the user
+//        changed (typed, toggled, chose) or a button without a submit / reset action he pressed;
+//        submit: a form was sent (MdSubmit: the form, its action and method, the name / value
+//        pairs, the button).  The view fills the place it gets (natural 480 x 320 DIP;
+//        next_size(-1, -1) fills).
 //   MdViewState::new() / base (where relative image paths start, e.g. "app://help/") / label
 //        (the name for screen readers; "" = "Dokument") / doc() / selection() /
 //        set_selection(sel) / select_all() / selected_text() / selected_html() /
 //        scroll_to_block(i) / scroll_to_end() (the end, also while the document grows: chat
 //        output; scrolling to the end of a long document does the same until the user scrolls
 //        away) / first_visible() -> (block, px above the view) / focused_link()
+//   Images from the app: st.images = MI_LOCAL (default: VFS names and paths, other addresses
+//        show their alt text), MI_ASK (as MI_LOCAL; http:, https: and data: addresses are asked
+//        from the app) or MI_APP (every image is asked: nothing is read by the view -- pages
+//        from the network).  st.image_requests() -> the addresses the view waits for (each
+//        once; relative ones after base, the rest as written); st.set_image(addr, Some(bytes) |
+//        None) answers (decoded at once by the image decoders: SVG or img_core; None or bytes
+//        it cannot decode: the alt text) -- in a frame before the view, or the app asks for one
+//        (invalidate) when the bytes come outside.  Until then a frame with the alt text stands
+//        in (at the width / height the HTML gives, else the frame's size); the image's block is
+//        laid out again when its bytes come, the view stays where it is.
+//   Forms (HTML: md_doc.rs "Forms"): the fields are the library's widgets in the text flow --
+//        text boxes (password fields: dots, nothing to copy or read out), text areas, check
+//        boxes, radios, drop-down lists, buttons -- with the style's look, high contrast, text
+//        scale and mirroring.  Their values live in the state: field_text(i) / field_checked(i)
+//        / field_selected(i), set_field_text / set_field_checked / set_field_selected,
+//        form_data(form, button) (the pairs a browser sends), reset_form(form),
+//        focused_field(); a new document starts with its first values.  Keys: Tab / Shift+Tab
+//        go through links and fields in reading order (a group of radios is one stop: the
+//        checked one; Up / Down and Left / Right -- as the radios lie in their paragraph --
+//        choose inside it), Space toggles, Enter in a text field, check
+//        box or radio sends its form (with its first submit button, none when that is
+//        disabled), Enter / Space on a button presses it, Esc in a text field returns to the
+//        view, PgUp / PgDn that a field does not take scroll the view.  The fields follow the
+//        window's mirroring (as every widget), not the direction of their paragraph.  A
+//        document without fields reads as before.
 //   Flags: MV_NO_FRAME (no card, a smaller padding), MV_OPEN_LINKS (an activated link is also
 //        opened with open_url: its scheme rules and the app's policy apply; never without the
 //        user's click or Enter), MV_RTL / MV_LTR (the document's direction; default: that of
@@ -37,19 +65,23 @@
 // Mouse: a drag selects (the view scrolls at its edges), Shift+click extends, a double click
 // selects a word; a click on a link activates it.  Keys (focused): Up / Down scroll by a line,
 // PgUp / PgDn and Space / Shift+Space by a view, Home / End to the ends, Tab / Shift+Tab
-// through the links (the focused one is framed and scrolled into view; past the last one the
-// focus moves on), Enter activates the focused link, Esc drops it, Ctrl+A selects all,
+// through the links and fields (the focused link is framed, a field gets the focus; scrolled
+// into view; past the last one the focus moves on), Enter activates the focused link, Esc
+// drops it, Ctrl+A selects all,
 // Ctrl+C / Ctrl+Insert copy the selection as text (list markers, cells by tabs) and HTML.
 // Images: names of the VFS ("app://", "data://" ...) and paths (relative ones after base) are
-// read on first view and kept in the state; http(s) addresses are never fetched (the alt text
-// shows in a frame instead).
+// read on first view and kept in the state; http(s) addresses are never fetched by the view
+// (MI_LOCAL: the alt text shows in a frame instead; MI_ASK / MI_APP: the app fetches them).
 // Records: K_BOX id (label: the label, value: the scroll position in DIP); per visible block
 // K_HEADING (value: the level), K_TEXT (paragraphs, code, table cells), K_LISTITEM (the first
 // block of a list item, value: its number), K_CHECKBOX (a task's box, checked), K_LINK per
-// link, K_IMAGE (label: the alt text) per image.  Ids: id (focus, keys), part_id(id, 1) the
-// scroll bar.
+// link, K_IMAGE (label: the alt text) per image; per visible field the widget's record
+// (K_TEXTBOX, K_CHECKBOX, K_RADIO, K_COMBO, K_BUTTON: label the field's name -- its <label>,
+// aria-label, title, placeholder -- or a button's caption; text boxes and lists take it from a
+// K_TEXT record without area along their top edge).  Ids: id (focus, keys), part_id(id, 1)
+// the scroll bar, md_field_id(id, i) the fields.
 
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
 use alloc::rc::Rc;
 use alloc::string::String;
@@ -83,6 +115,13 @@ pub const MV_RTL: u32 = 4;
 /// the document runs left to right (also in a mirrored window)
 pub const MV_LTR: u32 = 8;
 
+/// MdViewState::images: VFS names and paths are read, other addresses show their alt text
+pub const MI_LOCAL: u8 = 0;
+/// as MI_LOCAL, but http:, https: and data: addresses are asked from the app
+pub const MI_ASK: u8 = 1;
+/// every image is asked from the app (the view reads no file)
+pub const MI_APP: u8 = 2;
+
 const NAT_W: i32 = 480;
 const NAT_H: i32 = 320;
 const PAD: i32 = 16;
@@ -104,6 +143,10 @@ const HEAD_SCALE: [u32; 6] = [200, 150, 125, 100, 88, 85];
 const TABLE_SAMPLE: usize = 200;
 const LAYS_KEEP: usize = 400;
 const LABEL_MAX: usize = 4000;
+const FIELD_CHARS: u32 = 20; // a text field's width in characters (HTML's default size / cols)
+const FIELD_ROWS: u32 = 2; // a text area's lines (rows)
+const FIELD_GAP: i32 = 2; // room above and below a field in its row (DIP)
+const FIELD_CAP: u32 = 1 << 20; // bytes a field holds without maxlength
 
 /// what a document view reports (see the module header)
 #[derive(Clone, Debug, Default)]
@@ -114,18 +157,128 @@ pub struct MdEv {
     pub link: Option<String>,
     /// the target of the link under the pointer
     pub hover: Option<String>,
+    /// a field the user changed this frame, or a button (MF_BUTTON) he pressed (index of
+    /// doc().fields())
+    pub field: Option<usize>,
+    /// a form sent this frame (Enter in a field, a submit button)
+    pub submit: Option<MdSubmit>,
 }
 
-// an image of the document as loaded
+/// a form being sent: what a browser would send (MdViewState::form_data)
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MdSubmit {
+    /// the form (index of doc().forms()), its action (as written) and method ("get" / "post")
+    pub form: usize,
+    pub action: String,
+    pub method: String,
+    /// the name / value pairs in document order
+    pub fields: Vec<(String, String)>,
+    /// the submit button that sent it (None: Enter in a form without one)
+    pub button: Option<usize>,
+}
+
+// an image of the document as loaded (Pending: asked from the app, its address)
 #[derive(Clone)]
 enum Img {
     Unread,
     Failed,
+    Pending(Rc<str>),
     Bitmap(Rc<Surface>),
     Vector(Rc<Svg>),
 }
 
-// a piece of a row: bytes a .. b of the block's text in one font and colour, or an image
+// an address the app supplies: asked, or its picture
+enum Req {
+    Asked,
+    Got(Img),
+}
+
+// the current value of a field: text (text fields, hidden ones), checked, the chosen option
+#[derive(Clone, Default)]
+struct Val {
+    text: String,
+    on: bool,
+    sel: i32,
+}
+
+// a stop of Tab: a link spot, a field
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Stop {
+    Link(usize),
+    Field(usize),
+}
+
+/// the widget id of field i of the view `id` (the drop-down lists' rows take ids of their own)
+pub fn md_field_id(id: u32, i: usize) -> u32 {
+    (id.wrapping_mul(0x9E37_79B1) & 0x0FFF_0000) | 0xE000_0000 | (i as u32 + 1) & 0xFFFF
+}
+
+// the field of view `id` whose widget id is fid (n fields)
+fn field_of(id: u32, fid: u32, n: usize) -> Option<usize> {
+    let k = (fid & 0xFFFF) as usize;
+    (fid & 0xFFFF_0000 == md_field_id(id, 0) & 0xFFFF_0000 && k >= 1 && k <= n).then(|| k - 1)
+}
+
+// a field's name for screen readers: its label, else its placeholder, else its name
+fn field_name(f: &MdField) -> &str {
+    if !f.label.is_empty() {
+        &f.label
+    } else if !f.placeholder.is_empty() {
+        &f.placeholder
+    } else {
+        &f.name
+    }
+}
+
+// a scheme at the start of an address ("http:", "data:"; not a drive letter)
+fn has_scheme(s: &str) -> bool {
+    match s.find(':') {
+        Some(i) if i >= 2 => s.as_bytes()[0].is_ascii_alphabetic() && s[..i].bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'+' | b'-' | b'.')),
+        _ => false,
+    }
+}
+
+// where an image comes from: (a file to read, else an address the app supplies); (None, None):
+// nowhere (the alt text)
+fn img_at(src: &str, base: &str, mode: u8) -> (Option<String>, Option<String>) {
+    let src = src.trim();
+    let low = src.to_ascii_lowercase();
+    if src.is_empty() || low.starts_with("javascript:") {
+        return (None, None);
+    }
+    let remote = low.starts_with("http:") || low.starts_with("https:") || low.starts_with("data:");
+    let path = if src.contains("://") || src.starts_with('/') || base.is_empty() || (mode == MI_APP && has_scheme(src)) {
+        String::from(src)
+    } else {
+        let s = src.strip_prefix("./").unwrap_or(src);
+        if base.ends_with('/') { format!("{}{}", base, s) } else { format!("{}/{}", base, s) }
+    };
+    match mode {
+        MI_APP => (None, Some(path)),
+        MI_ASK if remote => (None, Some(String::from(src))),
+        _ if remote => (None, None),
+        _ => (Some(path), None),
+    }
+}
+
+// a picture from its bytes (an SVG by its name or its first character, else what img_core
+// decodes)
+fn img_decode(d: &[u8], name: &str) -> Img {
+    if d.len() > IMG_BYTES {
+        return Img::Failed;
+    }
+    let low = name.to_ascii_lowercase();
+    let head = core::str::from_utf8(&d[..d.len().min(256)]).unwrap_or("");
+    let svg = low.ends_with(".svg") || low.ends_with(".svgz") || head.trim_start_matches('\u{FEFF}').trim_start().starts_with('<');
+    if svg {
+        Svg::parse(d).map(|s| Img::Vector(Rc::new(s))).unwrap_or(Img::Failed)
+    } else {
+        img_core::io::decode(d).map(|s| Img::Bitmap(Rc::new(s))).unwrap_or(Img::Failed)
+    }
+}
+
+// a piece of a row: bytes a .. b of the block's text in one font and colour, an image or a
+// field (asc: its height above the baseline)
 #[derive(Clone)]
 struct Piece {
     a: u32,
@@ -143,6 +296,7 @@ struct Piece {
     ih: i32,
     syn: u8,
     shaped: bool,
+    field: u32,
 }
 
 // a visual row: its bytes, top, height, baseline, pieces and caret stops (byte, x)
@@ -227,6 +381,9 @@ struct Seg {
     shaped: bool,
     // room at both ends (inline code's box)
     pad: i32,
+    // a field (index + 1): iw x ih, asc above the baseline, desc below it (its row's room
+    // included)
+    field: u32,
 }
 
 // the layout cache of a view
@@ -239,6 +396,11 @@ struct Cache {
     imgs: Vec<Img>,
     scaled: BTreeMap<(usize, i32, i32), Rc<Surface>>,
     svgs: BTreeMap<(usize, u32), Rc<SvgDraw>>,
+    // where the images come from (MI_*), the addresses the app supplies, the ones it has not
+    // taken yet (image_requests)
+    mode: u8,
+    req: BTreeMap<String, Req>,
+    queue: Vec<String>,
 }
 
 /// the state of a document view (see the module header)
@@ -250,6 +412,16 @@ pub struct MdViewState {
     pub base: String,
     /// the name for screen readers ("" = "Dokument")
     pub label: String,
+    /// where the images come from: MI_LOCAL (default), MI_ASK, MI_APP (see the module header)
+    pub images: u8,
+    // the block of every image
+    img_block: Vec<usize>,
+    // the fields' values, the Tab stops (links and fields in reading order), the first radio of
+    // every radio's group (+ 1; 0: no group), the field with the focus (last pass)
+    vals: Vec<Val>,
+    stops: Vec<Stop>,
+    group: Vec<usize>,
+    ffocus: Option<usize>,
     rows: Rows,
     sel: TextSel,
     link: Option<usize>,
@@ -317,6 +489,12 @@ impl MdViewState {
             src: (0, 0, 0),
             base: String::new(),
             label: String::new(),
+            images: MI_LOCAL,
+            img_block: Vec::new(),
+            vals: Vec::new(),
+            stops: Vec::new(),
+            group: Vec::new(),
+            ffocus: None,
             rows: Rows::default(),
             sel: TextSel::default(),
             link: None,
@@ -380,11 +558,55 @@ impl MdViewState {
         self.lc.svgs.clear();
         self.lc.imgs = alloc::vec![Img::Unread; self.doc.images().len()];
         self.lc.rows_of.clear();
+        self.img_block = alloc::vec![0; self.doc.images().len()];
         for (k, b) in self.doc.blocks().iter().enumerate() {
             if b.kind == MB_ROW {
                 self.lc.rows_of.entry(b.table).or_default().push(k);
             }
+            for s in b.spans.iter().filter(|s| s.image != 0) {
+                if let Some(x) = self.img_block.get_mut(s.image as usize - 1) {
+                    *x = k;
+                }
+            }
         }
+        // the app's images: the ones this document uses stay (asked or supplied)
+        if !self.lc.req.is_empty() {
+            let used: BTreeSet<String> = self.doc.images().iter().filter_map(|m| img_at(&m.src, &self.base, self.lc.mode).1).collect();
+            self.lc.req.retain(|a, _| used.contains(a));
+            self.lc.queue.retain(|a| used.contains(a));
+        }
+        // the fields: their first values, the Tab stops, the radios' groups (form and name)
+        self.vals = self.doc.fields().iter().map(|f| Val { text: if f.kind == MF_CHECKBOX || f.kind == MF_RADIO { String::new() } else { f.value.clone() }, on: f.checked, sel: f.selected }).collect();
+        let mut first: BTreeMap<(u32, &str), usize> = BTreeMap::new();
+        self.group = alloc::vec![0; self.doc.fields().len()];
+        for (i, f) in self.doc.fields().iter().enumerate() {
+            if f.kind == MF_RADIO && !f.name.is_empty() {
+                self.group[i] = *first.entry((f.form, f.name.as_str())).or_insert(i) + 1;
+            }
+        }
+        // (one checked radio per group: the last one, as browsers parse it)
+        let mut checked: BTreeMap<usize, usize> = BTreeMap::new();
+        for i in 0..self.vals.len() {
+            if self.vals[i].on && self.group[i] != 0 {
+                if let Some(p) = checked.insert(self.group[i], i) {
+                    self.vals[p].on = false;
+                }
+            }
+        }
+        let (links, fields) = (self.doc.link_spots(), self.doc.field_spots());
+        self.stops = Vec::with_capacity(links.len() + fields.len());
+        let (mut a, mut b) = (0, 0);
+        while a < links.len() || b < fields.len() {
+            let take_link = b >= fields.len() || (a < links.len() && (links[a].block, links[a].a) <= (fields[b].block, fields[b].a));
+            if take_link {
+                self.stops.push(Stop::Link(a));
+                a += 1;
+            } else {
+                self.stops.push(Stop::Field(fields[b].field as usize - 1));
+                b += 1;
+            }
+        }
+        self.ffocus = None;
         self.sized = false;
         self.auto_rtl = self.doc.blocks().iter().filter(|b| b.kind != MB_CODE).find_map(|b| text_rtl(&b.text));
     }
@@ -444,6 +666,199 @@ impl MdViewState {
     /// the link focused with Tab (an index of doc().link_spots())
     pub fn focused_link(&self) -> Option<usize> {
         self.link
+    }
+
+    // ------------------------------------------------------------------ images from the app
+
+    /// the image addresses the view waits for since the last call (MI_ASK / MI_APP; each one
+    /// once): the app fetches them and answers with set_image
+    pub fn image_requests(&mut self) -> Vec<String> {
+        core::mem::take(&mut self.lc.queue)
+    }
+
+    /// the bytes of an image address (None: it could not be had): decoded now, shown from the
+    /// next frame on (the alt text when they are no picture) -> an image of the document waited
+    /// for it.  An address not asked yet is kept for the images that need it later.
+    pub fn set_image(&mut self, addr: &str, data: Option<&[u8]>) -> bool {
+        let img = data.map_or(Img::Failed, |d| img_decode(d, addr));
+        self.lc.req.insert(String::from(addr), Req::Got(img.clone()));
+        self.lc.queue.retain(|a| a != addr);
+        let mut hit = false;
+        for i in 0..self.lc.imgs.len() {
+            if matches!(&self.lc.imgs[i], Img::Pending(a) if &**a == addr) {
+                self.lc.imgs[i] = img.clone();
+                self.lc.scaled.retain(|k, _| k.0 != i);
+                self.lc.svgs.retain(|k, _| k.0 != i);
+                // its block is laid out again (a table row: the whole table, its columns may
+                // change)
+                let k = self.img_block.get(i).copied().unwrap_or(0);
+                match self.doc.blocks().get(k) {
+                    Some(b) if b.kind == MB_ROW => {
+                        self.lc.cols.remove(&b.table);
+                        for r in self.lc.rows_of.get(&b.table).into_iter().flatten() {
+                            self.lc.lays.remove(r);
+                        }
+                    }
+                    _ => {
+                        self.lc.lays.remove(&k);
+                    }
+                }
+                hit = true;
+            }
+        }
+        hit
+    }
+
+    // ------------------------------------------------------------------ forms
+
+    /// field i's text (text fields, text areas, hidden fields; "" for the other kinds)
+    pub fn field_text(&self, i: usize) -> &str {
+        self.vals.get(i).map_or("", |v| v.text.as_str())
+    }
+
+    /// field i is checked (check boxes, radios)
+    pub fn field_checked(&self, i: usize) -> bool {
+        self.vals.get(i).is_some_and(|v| v.on)
+    }
+
+    /// the option chosen in field i (drop-down lists; -1: none)
+    pub fn field_selected(&self, i: usize) -> i32 {
+        self.vals.get(i).map_or(-1, |v| v.sel)
+    }
+
+    /// set field i's text (text fields, text areas, hidden fields)
+    pub fn set_field_text(&mut self, i: usize, s: &str) {
+        if let Some(v) = self.vals.get_mut(i) {
+            v.text = String::from(s);
+        }
+    }
+
+    /// check field i or not (a radio: the others of its group go off)
+    pub fn set_field_checked(&mut self, i: usize, on: bool) {
+        if i >= self.vals.len() {
+            return;
+        }
+        let g = self.group[i];
+        if on && g != 0 {
+            for (v, &h) in self.vals.iter_mut().zip(self.group.iter()) {
+                if h == g {
+                    v.on = false;
+                }
+            }
+        }
+        self.vals[i].on = on;
+    }
+
+    /// choose option k of field i (a drop-down list; -1: none)
+    pub fn set_field_selected(&mut self, i: usize, k: i32) {
+        let n = self.doc.fields().get(i).map_or(0, |f| f.options.len()) as i32;
+        if let Some(v) = self.vals.get_mut(i) {
+            v.sel = if k >= 0 && k < n { k } else { -1 };
+        }
+    }
+
+    /// the name / value pairs form `form` sends with the submit button `button` (as browsers
+    /// build them: fields with a name that are not disabled; check boxes and radios when
+    /// checked; a list's chosen value; of the buttons only `button`)
+    pub fn form_data(&self, form: usize, button: Option<usize>) -> Vec<(String, String)> {
+        let mut out = Vec::new();
+        for (i, f) in self.doc.fields().iter().enumerate() {
+            if f.form as usize != form + 1 || f.disabled || f.name.is_empty() {
+                continue;
+            }
+            let v = &self.vals[i];
+            let value = match f.kind {
+                MF_CHECKBOX | MF_RADIO if v.on => f.value.clone(),
+                MF_SELECT if v.sel >= 0 => f.options.get(v.sel as usize).map_or(String::new(), |o| o.value.clone()),
+                MF_SUBMIT if button == Some(i) => f.value.clone(),
+                MF_TEXT | MF_PASSWORD | MF_TEXTAREA | MF_HIDDEN => v.text.clone(),
+                _ => continue,
+            };
+            out.push((f.name.clone(), value));
+        }
+        out
+    }
+
+    /// the fields of form `form` get their first values back
+    pub fn reset_form(&mut self, form: usize) {
+        for (i, f) in self.doc.fields().iter().enumerate() {
+            if f.form as usize == form + 1 {
+                let v = &mut self.vals[i];
+                if f.kind != MF_CHECKBOX && f.kind != MF_RADIO {
+                    v.text = f.value.clone();
+                }
+                v.on = f.checked;
+                v.sel = f.selected;
+            }
+        }
+    }
+
+    /// the field with the keyboard focus (an index of doc().fields())
+    pub fn focused_field(&self) -> Option<usize> {
+        self.ffocus
+    }
+
+    // the form field i sends with Enter: its form with the first submit button (none when
+    // that is disabled; a field outside a form sends nothing)
+    fn implicit(&self, i: usize) -> Option<MdSubmit> {
+        let f = self.doc.fields().get(i)?;
+        let form = (f.form as usize).checked_sub(1)?;
+        let button = self.doc.fields().iter().position(|b| b.kind == MF_SUBMIT && b.form == f.form);
+        if button.is_some_and(|b| self.doc.fields()[b].disabled) {
+            return None;
+        }
+        Some(self.submit(form, button))
+    }
+
+    // form `form` sent with `button`
+    fn submit(&self, form: usize, button: Option<usize>) -> MdSubmit {
+        let fm = self.doc.forms().get(form);
+        MdSubmit {
+            form,
+            action: fm.map_or(String::new(), |m| m.action.clone()),
+            method: fm.map_or(String::from("get"), |m| m.method.clone()),
+            fields: self.form_data(form, button),
+            button,
+        }
+    }
+
+    // the next / previous Tab stop after stop `cur` (None: before the first) -> None: past the
+    // ends.  A field is one when it is not disabled; of a group of radios only the checked one
+    // (else its first).
+    fn step(&self, cur: Option<usize>, back: bool) -> Option<Stop> {
+        let n = self.stops.len();
+        let checked: BTreeMap<usize, usize> = (0..self.vals.len()).filter(|&j| self.group[j] != 0 && self.vals[j].on).map(|j| (self.group[j], j)).collect();
+        let stop = |i: usize| {
+            let Some(f) = self.doc.fields().get(i) else { return false };
+            let g = self.group[i];
+            !f.disabled && (g == 0 || checked.get(&g).copied().unwrap_or(g - 1) == i)
+        };
+        let mut k = cur;
+        loop {
+            k = match (k, back) {
+                (None, false) => (n > 0).then_some(0),
+                (None, true) => None,
+                (Some(i), false) => (i + 1 < n).then_some(i + 1),
+                (Some(i), true) => i.checked_sub(1),
+            };
+            let s = self.stops[k?];
+            match s {
+                Stop::Field(f) if !stop(f) => continue,
+                _ => return Some(s),
+            }
+        }
+    }
+
+    // the radio before / after radio i in its group (wrapping)
+    fn radio_step(&self, i: usize, back: bool) -> Option<usize> {
+        let g = *self.group.get(i)?;
+        if g == 0 {
+            return None;
+        }
+        let members: Vec<usize> = (0..self.group.len()).filter(|&j| self.group[j] == g && !self.doc.fields()[j].disabled).collect();
+        let p = members.iter().position(|&j| j == i)?;
+        let n = members.len();
+        Some(members[if back { (p + n - 1) % n } else { (p + 1) % n }])
     }
 
     fn clamp(&self, p: TextPos) -> TextPos {
@@ -507,45 +922,42 @@ impl Ui {
         (asc, desc, self.text.line_h().max(asc + desc))
     }
 
-    // an image: loaded on first use (VFS names, paths after base; never http)
+    // an image: loaded on first use (VFS names, paths after base; the app's addresses asked
+    // once: Pending until they come)
     fn md_img(&mut self, lc: &mut Cache, doc: &MdDoc, base: &str, i: usize) -> Img {
         if let Some(Img::Unread) = lc.imgs.get(i) {
             let src = doc.images().get(i).map_or("", |m| m.src.as_str()).trim();
-            let low = src.to_ascii_lowercase();
-            let img = if src.is_empty() || low.starts_with("http:") || low.starts_with("https:") || low.starts_with("data:") || low.starts_with("javascript:") {
-                Img::Failed
-            } else {
-                let path = if src.contains("://") || src.starts_with('/') || base.is_empty() {
-                    String::from(src)
-                } else {
-                    let s = src.strip_prefix("./").unwrap_or(src);
-                    if base.ends_with('/') { format!("{}{}", base, s) } else { format!("{}/{}", base, s) }
-                };
-                match plat::read_file(&path) {
-                    Some(d) if d.len() <= IMG_BYTES => {
-                        let head = core::str::from_utf8(&d[..d.len().min(256)]).unwrap_or("");
-                        let svg = low.ends_with(".svg") || low.ends_with(".svgz") || head.trim_start_matches('\u{FEFF}').trim_start().starts_with('<');
-                        if svg {
-                            Svg::parse(&d).map(|s| Img::Vector(Rc::new(s))).unwrap_or(Img::Failed)
-                        } else {
-                            img_core::io::decode(&d).map(|s| Img::Bitmap(Rc::new(s))).unwrap_or(Img::Failed)
-                        }
+            let img = match img_at(src, base, lc.mode) {
+                (Some(path), _) => match plat::read_file(&path) {
+                    Some(d) => img_decode(&d, src),
+                    None => Img::Failed,
+                },
+                (None, Some(addr)) => match lc.req.get(&addr) {
+                    Some(Req::Got(img)) => img.clone(),
+                    Some(Req::Asked) => Img::Pending(Rc::from(addr.as_str())),
+                    None => {
+                        lc.queue.push(addr.clone());
+                        let p = Img::Pending(Rc::from(addr.as_str()));
+                        lc.req.insert(addr, Req::Asked);
+                        p
                     }
-                    _ => Img::Failed,
-                }
+                },
+                _ => Img::Failed,
             };
             lc.imgs[i] = img;
         }
         lc.imgs.get(i).cloned().unwrap_or(Img::Failed)
     }
 
-    // an image's size in px at most `avail` wide (a frame with the alt text when it failed)
+    // an image's size in px at most `avail` wide (a frame with the alt text when it failed;
+    // while it is asked: the size the HTML gives, else that frame)
     fn md_img_size(&mut self, lc: &mut Cache, doc: &MdDoc, base: &str, i: usize, avail: i32, fc: &Faces) -> (i32, i32) {
         let m = doc.images().get(i);
         let (aw, ah) = m.map_or((0, 0), |m| (m.w as i32, m.h as i32));
         let nat = match self.md_img(lc, doc, base, i) {
             Img::Bitmap(sf) => Some((sf.w as f64, sf.h as f64)),
             Img::Vector(s) => Some(s.size()),
+            Img::Pending(_) if aw > 0 && ah > 0 => Some((aw as f64, ah as f64)),
             _ => None,
         };
         let (w, h) = match nat {
@@ -572,6 +984,59 @@ impl Ui {
         } else {
             (w, h)
         }
+    }
+
+    // a field's box in px (at most `avail` wide; the style's sizes, text fields as wide as their
+    // characters) and its room above / below the baseline: its middle on the middle of the
+    // body text, a gap above and below
+    fn md_field_size(&mut self, doc: &MdDoc, i: usize, avail: i32, fc: &Faces) -> (i32, i32, i32, i32) {
+        let Some(f) = doc.fields().get(i) else { return (1, 1, 1, 0) };
+        let st = self.style;
+        self.ts_font(TS_BODY);
+        let cw = self.text.width("0").max(1);
+        let (w, h) = match f.kind {
+            MF_TEXT | MF_PASSWORD | MF_TEXTAREA => {
+                let multi = f.kind == MF_TEXTAREA;
+                let lh = self.ts_line(TS_BODY);
+                let mut sp = Sp { value2: lh, flags: multi as u32, ..Sp::default() };
+                let (_, h) = st.textbox_metrics(self, &mut sp);
+                let n = if f.size > 0 { f.size.min(1000) } else { FIELD_CHARS } as i32;
+                let w = sp.s[0] + sp.s[1] + cw * n;
+                if multi {
+                    let rows = if f.rows > 0 { f.rows.min(200) } else { FIELD_ROWS } as i32;
+                    (w, sp.s[2] * 2 + lh * rows)
+                } else {
+                    self.ctrl_size(w, h, 0, false)
+                }
+            }
+            MF_CHECKBOX | MF_RADIO => {
+                let mut sp = Sp::default();
+                if f.kind == MF_CHECKBOX {
+                    st.checkbox_size(self, &mut sp);
+                } else {
+                    st.radio_size(self, &mut sp);
+                }
+                (sp.s[0], sp.s[0])
+            }
+            MF_SELECT => {
+                self.ts_font(TS_BODY);
+                let widest = f.options.iter().map(|o| self.text.width(&o.label)).max().unwrap_or(0);
+                let mut sp = Sp { value: widest, ..Sp::default() };
+                let (w, h) = st.combo_size(self, &mut sp);
+                self.ctrl_size(w, h, 0, false)
+            }
+            MF_HIDDEN => (1, 1),
+            _ => {
+                let mut sp = Sp { label: Some(f.caption()), ..Sp::default() };
+                let (w, h) = st.button_size(self, &mut sp);
+                self.ctrl_size(w, h, 0, false)
+            }
+        };
+        let (w, h) = (w.min(avail.max(1)).max(1), h.max(1));
+        let (asc, desc, _) = self.md_metrics(fc.get(false, false, false), fc.size);
+        let up = ((h + asc - desc) / 2).clamp(0, h);
+        let gap = self.dp(FIELD_GAP);
+        (w, h, up + gap, h - up + gap)
     }
 
     // the runs of bytes a .. b of a block's text from its spans
@@ -605,6 +1070,14 @@ impl Ui {
             };
             let image = sp.map_or(0, |s| s.image);
             let (iw, ih) = if image != 0 { ui.md_img_size(lc, doc, base, image as usize - 1, avail, fc) } else { (0, 0) };
+            // a field: its box and its room above / below the baseline
+            let field = sp.map_or(0, |s| s.field);
+            let (iw, ih, m) = if field != 0 {
+                let (w, h, up, down) = ui.md_field_size(doc, field as usize - 1, avail, fc);
+                (w, h, (up, down, up + down))
+            } else {
+                (iw, ih, m)
+            };
             out.push(Seg {
                 a: s0,
                 b: s1,
@@ -623,6 +1096,7 @@ impl Ui {
                 syn: 0,
                 shaped,
                 pad: if code { ui.dp_text(CODE_PAD) } else { 0 },
+                field,
             });
         };
         let mut i = a;
@@ -700,6 +1174,7 @@ impl Ui {
                 syn: kind + 1,
                 shaped: false,
                 pad: 0,
+                field: 0,
             });
         };
         let mut state = 0;
@@ -747,7 +1222,7 @@ impl Ui {
                 if s0 >= s1 {
                     continue;
                 }
-                if s.image != 0 {
+                if s.image != 0 || s.field != 0 {
                     pen += (s.iw as i64) << 8;
                     continue;
                 }
@@ -850,7 +1325,16 @@ impl Ui {
                     ih: s.ih,
                     syn: s.syn,
                     shaped: s.shaped,
+                    field: s.field,
                 };
+                if s.field != 0 {
+                    asc = asc.max(s.asc);
+                    desc = desc.max(s.desc);
+                    lh = lh.max(s.lh);
+                    pieces.push(Piece { w: s.iw, ..base });
+                    pen += (s.iw as i64) << 8;
+                    continue;
+                }
                 if s.image != 0 {
                     asc = asc.max(s.ih);
                     lh = lh.max(s.ih);
@@ -897,7 +1381,7 @@ impl Ui {
                 if !stops_too {
                     continue;
                 }
-                if p.image != 0 {
+                if p.image != 0 || p.field != 0 {
                     let (l, r) = if rtl { (p.x + p.w, p.x) } else { (p.x, p.x + p.w) };
                     stops.push((p.a, l));
                     stops.push((p.b, r));
@@ -1152,6 +1636,15 @@ impl Ui {
         // (island coordinates: in a mirrored window the scroll bar is at the left)
         let cx = if self.rtl { vx + pad + sbw } else { vx + pad };
         let view_h = vh;
+        // the images come from elsewhere now: read again
+        if st.lc.mode != st.images {
+            st.lc.mode = st.images;
+            st.lc.imgs.iter_mut().for_each(|m| *m = Img::Unread);
+            st.lc.lays.clear();
+            st.lc.cols.clear();
+            st.lc.scaled.clear();
+            st.lc.svgs.clear();
+        }
         // the layouts belong to a width, dpi, text scale, direction and fonts
         let fc = self.md_faces();
         let key = (self.wp.rt.dpi, cw, self.layout_scale(), drtl, fc);
@@ -1186,7 +1679,7 @@ impl Ui {
         let mut activate: Option<usize> = None;
         // ---- keys
         if focused && n > 0 {
-            activate = self.md_keys(st, view_h, cw, drtl, &fc);
+            activate = self.md_keys(st, id, view_h, cw, drtl, &fc);
         }
         // ---- smooth scrolling (the wheel)
         if st.pending != 0 {
@@ -1299,11 +1792,12 @@ impl Ui {
         self.ltr_begin(vx, vw);
         let bgc = self.md_bg(frame);
         let mut links: Vec<Link> = Vec::new();
+        let mut fields: Vec<(usize, [i32; 4])> = Vec::new();
         let mut hover: Option<usize> = None;
         for &(k, y) in &vis {
             let lay = st.lc.lays.get(&k).cloned();
             if let Some(lay) = lay {
-                self.md_draw_block(&st.doc, &mut st.lc, st.sel, k, &lay, cx, vy + y, cw, drtl, focused, bgc, (vy, vy + view_h), &mut links);
+                self.md_draw_block(&st.doc, &mut st.lc, st.sel, k, &lay, cx, vy + y, cw, drtl, focused, bgc, (vy, vy + view_h), &mut links, &mut fields);
             }
         }
         // the focused link: a frame around its pieces
@@ -1333,6 +1827,8 @@ impl Ui {
             self.wp.ctx.last_state = if st.link == Some(l.spot) && focused { SS_FOCUSED as u32 } else { 0 };
             self.sem(K_LINK, 0, Some(&l.label), 0);
         }
+        // the fields in view: widgets over the text
+        self.md_fields(st, id, &fields, disabled, view_h, cw, drtl, &fc, &mut out);
         self.clip_pop();
         if let Some(k) = hover {
             if let Some(sp) = st.doc.link_spots().get(k) {
@@ -1363,9 +1859,10 @@ impl Ui {
             st.sb_y = py;
             st.sb_pos = pos;
         }
-        // ---- the wheel
+        // ---- the wheel (over the text or one of its fields)
         let wy = self.wp.ctx.wheel_y;
-        if ev & EV_HOVER != 0 && wy != 0 {
+        let over = ev & EV_HOVER != 0 || field_of(id, self.wp.ctx.hot, st.doc.fields().len()).is_some();
+        if over && wy != 0 {
             let d = wy.wrapping_neg().wrapping_mul(self.dp(WHEEL_DIP)) / 120;
             let max = (st.rows.total() - view_h as i64).max(0);
             let p = st.rows.pos();
@@ -1532,7 +2029,8 @@ impl Ui {
     }
 
     // the keys of a focused view -> a link to activate
-    fn md_keys(&mut self, st: &mut MdViewState, view_h: i32, cw: i32, drtl: bool, fc: &Faces) -> Option<usize> {
+    #[allow(clippy::too_many_arguments)]
+    fn md_keys(&mut self, st: &mut MdViewState, id: u32, view_h: i32, cw: i32, drtl: bool, fc: &Faces) -> Option<usize> {
         let find = |ui: &Ui, vk: u32, need: u32, mask: u32| -> Option<usize> {
             ui.wp.ctx.keyq.iter().position(|&k| (k as i32) >= 0 && k & 0xFFFF == vk && (k >> 16) & mask == need)
         };
@@ -1584,23 +2082,22 @@ impl Ui {
             let (t, h) = (st.selected_text(), st.selected_html());
             self.clip_set_many(&[(CLIP_TEXT, t.as_bytes()), (CLIP_HTML, h.as_bytes())]);
         }
-        // Tab / Shift+Tab: the next / previous link (past the ends the focus moves on)
+        // Tab / Shift+Tab: the next / previous link or field (past the ends the focus moves on)
         if let Some(i) = find(self, VK_TAB, 0, MOD_CTRL | MOD_ALT) {
             let back = (self.wp.ctx.keyq[i] >> 16) & MOD_SHIFT != 0;
-            let n = st.doc.link_spots().len();
-            let next = match (st.link, back) {
-                (None, false) => (n > 0).then_some(0),
-                (None, true) => None,
-                (Some(k), false) => (k + 1 < n).then_some(k + 1),
-                (Some(k), true) => k.checked_sub(1),
-            };
-            match next {
-                Some(k) => {
+            let cur = st.link.and_then(|k| st.stops.iter().position(|&s| s == Stop::Link(k)));
+            match st.step(cur, back) {
+                Some(Stop::Link(k)) => {
                     take(self, i);
                     st.link = Some(k);
                     self.wp.ctx.focus_visible = true;
                     self.md_reveal_link(st, k, cw, drtl, fc);
                     self.repass();
+                }
+                Some(Stop::Field(f)) => {
+                    take(self, i);
+                    st.link = None;
+                    self.md_focus_field(st, id, f, cw, drtl, fc);
                 }
                 None if st.link.is_some() && back => {
                     take(self, i);
@@ -1643,6 +2140,262 @@ impl Ui {
         act
     }
 
+    // give field f the keyboard focus (its ring shown) and scroll it into view
+    fn md_focus_field(&mut self, st: &mut MdViewState, id: u32, f: usize, cw: i32, drtl: bool, fc: &Faces) {
+        self.wp.ctx.focus = md_field_id(id, f);
+        self.wp.ctx.focus_visible = true;
+        st.ffocus = Some(f);
+        self.repass();
+        let Some(sp) = st.doc.field_spots().iter().find(|s| s.field as usize == f + 1).copied() else { return };
+        let lay = self.md_lay(st, sp.block, cw, drtl, fc);
+        let (mut y0, mut y1) = (i32::MAX, 0);
+        for fb in &lay.boxes {
+            for r in &fb.flow.rows {
+                if r.pieces.iter().any(|p| p.field == sp.field) {
+                    y0 = y0.min(lay.gap + fb.y + r.y);
+                    y1 = y1.max(lay.gap + fb.y + r.y + r.h);
+                }
+            }
+        }
+        if y0 <= y1 {
+            st.reveal = Some((sp.block, y0, y1));
+        }
+    }
+
+    // an unconsumed key vk of this pass with none of the modifiers in `mask` -> its place in
+    // the queue
+    fn md_key_at(&self, vk: u32, mask: u32) -> Option<usize> {
+        self.wp.ctx.keyq.iter().position(|&k| (k as i32) >= 0 && k & 0xFFFF == vk && (k >> 16) & mask == 0)
+    }
+
+    // consume the key at place i of the queue
+    fn md_key_take(&mut self, i: usize) {
+        if let Some(k) = self.wp.ctx.keyq.get_mut(i) {
+            *k |= 0x8000_0000;
+        }
+    }
+
+    // a check box, radio or button of a form at r (logical px): behave, the style's picture (a
+    // box alone: its text is the document's), the focus ring, the record (label: the field's
+    // name, a button's caption)
+    fn md_ctl(&mut self, fid: u32, kind: u8, r: [i32; 4], label: &str, on: bool, disabled: bool) -> u32 {
+        self.wp.ctx.last_rect = r;
+        let button = !matches!(kind, MF_CHECKBOX | MF_RADIO);
+        let mut hb = HB_FOCUS | if button { 0 } else { HB_SPACE };
+        if disabled {
+            hb |= HB_DISABLED;
+        }
+        let ev = self.behave(fid, hb);
+        let st = self.style;
+        let mut sp = Sp { flags: if disabled { ST_DISABLED } else { 0 }, label: button.then_some(label), ..Sp::default() };
+        match kind {
+            MF_CHECKBOX => st.checkbox_size(self, &mut sp),
+            MF_RADIO => st.radio_size(self, &mut sp),
+            _ => st.button_size(self, &mut sp),
+        };
+        self.sp_placed(&mut sp, ev);
+        sp.value = on as i32;
+        match kind {
+            MF_CHECKBOX => st.checkbox(self, &sp),
+            MF_RADIO => st.radio(self, &sp),
+            _ => st.button(self, &sp),
+        }
+        self.focus_ring_draw(ev);
+        if on {
+            self.wp.ctx.last_state |= SS_CHECKED as u32;
+        }
+        let k = match kind {
+            MF_CHECKBOX => K_CHECKBOX,
+            MF_RADIO => K_RADIO,
+            _ => K_BUTTON,
+        };
+        self.sem(k, fid, Some(label), on as i32);
+        ev
+    }
+
+    // the fields in view: the library's widgets at the rectangles of the layout (logical px;
+    // off: the view is disabled, so are they), their values in the state; Enter sends the
+    // form, the arrows choose a radio, Tab leaves a field for the next / previous link or field;
+    // what the user did goes to `out`
+    #[allow(clippy::too_many_arguments)]
+    fn md_fields(&mut self, st: &mut MdViewState, id: u32, drawn: &[(usize, [i32; 4])], off: bool, view_h: i32, cw: i32, drtl: bool, fc: &Faces, out: &mut MdEv) {
+        let n = st.doc.fields().len();
+        if n == 0 {
+            return;
+        }
+        const M: u32 = MOD_SHIFT | MOD_CTRL | MOD_ALT;
+        let mut changed: Option<usize> = None;
+        let mut submit: Option<MdSubmit> = None;
+        let mut reset: Option<usize> = None;
+        let mut moved: Option<usize> = None;
+        for &(f, r) in drawn {
+            let fid = md_field_id(id, f);
+            let focused = self.wp.ctx.focus == fid;
+            let h0 = self.wp.ctx.hits[self.wp.ctx.hit_cur].len();
+            let fd = &st.doc.fields()[f];
+            let (kind, form, disabled, maxlength) = (fd.kind, fd.form as usize, fd.disabled || off, fd.maxlength as usize);
+            match kind {
+                MF_TEXT | MF_PASSWORD | MF_TEXTAREA | MF_SELECT => {
+                    // the name: a record without area along the top edge (text boxes and lists
+                    // take the text record right above them as their name)
+                    let name = field_name(fd);
+                    if !name.is_empty() {
+                        self.wp.ctx.last_rect = [r[0], r[1], r[2], 0];
+                        self.wp.ctx.last_state = 0;
+                        self.sem(K_TEXT, 0, Some(name), 0);
+                    }
+                    let enter = if focused && kind != MF_TEXTAREA && kind != MF_SELECT { self.md_key_at(VK_RETURN, 0) } else { None };
+                    let esc = focused && kind != MF_SELECT && self.md_key_at(VK_ESCAPE, M).is_some();
+                    if disabled {
+                        self.next_flags(ST_DISABLED);
+                    }
+                    self.next_rect_px(r[0], r[1], r[2], r[3]);
+                    let ev = if kind == MF_SELECT {
+                        let opts: Vec<&str> = fd.options.iter().map(|o| if o.label.is_empty() { " " } else { o.label.as_str() }).collect();
+                        self.combobox(fid, &mut st.vals[f].sel, &opts)
+                    } else {
+                        let mut flags = match kind {
+                            MF_PASSWORD => TB_PASSWORD,
+                            MF_TEXTAREA => TB_MULTI | TB_WRAP,
+                            _ => 0,
+                        };
+                        if fd.readonly {
+                            flags |= TB_READONLY;
+                        }
+                        let cap = if maxlength > 0 { (maxlength as u32 * 4 + 1).min(FIELD_CAP) } else { FIELD_CAP };
+                        let ph = (!fd.placeholder.is_empty()).then_some(fd.placeholder.as_str());
+                        self.textbox(fid, ph, &mut st.vals[f].text, cap | flags)
+                    };
+                    if ev & EV_ACT != 0 {
+                        // (maxlength counts characters)
+                        let t = &mut st.vals[f].text;
+                        if maxlength > 0 && t.chars().count() > maxlength {
+                            let cut = t.char_indices().nth(maxlength).map_or(t.len(), |c| c.0);
+                            t.truncate(cut);
+                        }
+                        changed = Some(f);
+                    }
+                    if enter.is_some() && ev & EV_COMMIT != 0 {
+                        submit = st.implicit(f);
+                    }
+                    if esc && self.wp.ctx.focus == 0 {
+                        // Esc in a text field: back to the view
+                        self.wp.ctx.focus = id;
+                        self.wp.ctx.focus_visible = true;
+                    }
+                }
+                _ => {
+                    let label = if matches!(kind, MF_CHECKBOX | MF_RADIO) { field_name(fd) } else { fd.caption() };
+                    let on = st.vals[f].on;
+                    let ev = self.md_ctl(fid, kind, r, label, on, disabled);
+                    match kind {
+                        MF_CHECKBOX | MF_RADIO => {
+                            if focused {
+                                if let Some(i) = self.md_key_at(VK_RETURN, M) {
+                                    self.md_key_take(i);
+                                    submit = st.implicit(f);
+                                }
+                            }
+                            if focused && kind == MF_RADIO {
+                                // Up / Down: the previous / next radio; Left / Right as they lie
+                                // in the paragraph (its direction; the window's mirroring undone:
+                                // the text keeps its order)
+                                let rtl = st.doc.field_spots().iter().find(|s| s.field as usize == f + 1).and_then(|s| st.doc.blocks().get(s.block)).and_then(|b| text_rtl(&b.text)).unwrap_or(drtl);
+                                for vk in [VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN] {
+                                    if let Some(i) = self.md_key_at(vk, M) {
+                                        let k = self.rtl_text_key(self.wp.ctx.keyq[i]) & 0xFFFF;
+                                        self.md_key_take(i);
+                                        let back = k == VK_UP || (k != VK_DOWN && ((k == VK_LEFT) != rtl));
+                                        moved = st.radio_step(f, back);
+                                        break;
+                                    }
+                                }
+                            }
+                            if ev & EV_ACT != 0 && (kind == MF_CHECKBOX || !on) {
+                                st.set_field_checked(f, !on);
+                                changed = Some(f);
+                            }
+                        }
+                        MF_SUBMIT if ev & EV_ACT != 0 => match form.checked_sub(1) {
+                            Some(fm) => submit = Some(st.submit(fm, Some(f))),
+                            None => changed = Some(f),
+                        },
+                        MF_RESET if ev & EV_ACT != 0 => {
+                            reset = form.checked_sub(1);
+                            changed = Some(f);
+                        }
+                        _ if ev & EV_ACT != 0 => changed = Some(f),
+                        _ => {}
+                    }
+                }
+            }
+            // (no Tab stop of the window: the view steps through its links and fields)
+            let c = &mut self.wp.ctx;
+            for h in c.hits[c.hit_cur][h0..].iter_mut() {
+                if h.id == fid {
+                    h.continuation = true;
+                }
+            }
+        }
+        if let Some(fm) = reset {
+            st.reset_form(fm);
+            self.repass();
+        }
+        if let Some(g) = moved {
+            st.set_field_checked(g, true);
+            self.md_focus_field(st, id, g, cw, drtl, fc);
+            changed = Some(g);
+        }
+        // Tab / Shift+Tab from a field: the next / previous link or field; past the last one the
+        // focus moves on from the view, before the first one it stays on the view
+        if let Some(f) = field_of(id, self.wp.ctx.focus, n) {
+            if let Some(i) = self.md_key_at(VK_TAB, MOD_CTRL | MOD_ALT) {
+                let back = (self.wp.ctx.keyq[i] >> 16) & MOD_SHIFT != 0;
+                let cur = st.stops.iter().position(|&s| s == Stop::Field(f));
+                match st.step(cur, back) {
+                    Some(Stop::Field(g)) => {
+                        self.md_key_take(i);
+                        self.md_focus_field(st, id, g, cw, drtl, fc);
+                    }
+                    s => {
+                        st.link = None;
+                        if let Some(Stop::Link(k)) = s {
+                            st.link = Some(k);
+                            self.md_reveal_link(st, k, cw, drtl, fc);
+                        }
+                        if s.is_some() || back {
+                            self.md_key_take(i);
+                        }
+                        self.wp.ctx.focus = id;
+                        self.wp.ctx.focus_visible = true;
+                        self.repass();
+                    }
+                }
+            }
+        }
+        // PgUp / PgDn on a field the field does not take: the view scrolls by a page (the field
+        // keeps the focus)
+        if field_of(id, self.wp.ctx.focus, n).is_some() {
+            for (vk, dir) in [(VK_PRIOR, -1i64), (VK_NEXT, 1)] {
+                if let Some(i) = self.md_key_at(vk, MOD_CTRL | MOD_ALT) {
+                    self.md_key_take(i);
+                    let line = self.dp(LINE_DIP);
+                    st.rows.set_pos((st.rows.pos() + dir * (view_h - line).max(line) as i64).max(0));
+                    st.pending = 0;
+                    st.reveal = None;
+                    st.follow = false;
+                    self.repass();
+                }
+            }
+        }
+        st.ffocus = field_of(id, self.wp.ctx.focus, n);
+        if changed.is_some() || submit.is_some() {
+            self.repass();
+        }
+        out.field = changed;
+        out.submit = submit;
+    }
+
     // scroll link spot k into view
     fn md_reveal_link(&mut self, st: &mut MdViewState, k: usize, cw: i32, drtl: bool, fc: &Faces) {
         let Some(sp) = st.doc.link_spots().get(k).copied() else { return };
@@ -1664,8 +2417,9 @@ impl Ui {
     // ------------------------------------------------------------------ drawing
 
     #[allow(clippy::too_many_arguments)]
-    // (rows outside vis: y0 .. y1 are skipped -- a block may be far taller than the view)
-    fn md_draw_block(&mut self, doc: &MdDoc, lc: &mut Cache, sel: TextSel, k: usize, lay: &BLay, cx: i32, top: i32, cw: i32, drtl: bool, focused: bool, bgc: u32, vis: (i32, i32), links: &mut Vec<Link>) {
+    // (rows outside vis: y0 .. y1 are skipped -- a block may be far taller than the view; the
+    // fields go to `fields` with their logical rectangles: md_fields builds their widgets)
+    fn md_draw_block(&mut self, doc: &MdDoc, lc: &mut Cache, sel: TextSel, k: usize, lay: &BLay, cx: i32, top: i32, cw: i32, drtl: bool, focused: bool, bgc: u32, vis: (i32, i32), links: &mut Vec<Link>, fields: &mut Vec<(usize, [i32; 4])>) {
         let hc = self.high_contrast;
         let bl = &doc.blocks()[k];
         let ctop = top + lay.gap;
@@ -1766,7 +2520,7 @@ impl Ui {
         // the first row: the list marker's baseline and font
         let first_base: Option<(i32, i32, u32, i32, i32)> = lay.boxes.first().and_then(|fb| {
             let r = fb.flow.rows.first()?;
-            let (f, s, a) = r.pieces.iter().find(|p| p.image == 0).map_or((0, 0, 0), |p| (p.font, p.size, p.asc));
+            let (f, s, a) = r.pieces.iter().find(|p| p.image == 0 && p.field == 0).map_or((0, 0, 0), |p| (p.font, p.size, p.asc));
             Some((ctop + fb.y + r.y + r.base, box_x(cx, cw, fb.x, fb.w, drtl), f, s, a))
         });
         for fb in &lay.boxes {
@@ -1787,6 +2541,10 @@ impl Ui {
                         self.wp.ctx.last_state = 0;
                         let label = if alt.is_empty() { tr("Bild") } else { alt };
                         self.sem(K_IMAGE, 0, Some(label), 0);
+                    } else if p.field != 0 {
+                        // a field: its widget after the blocks, here (its row's gap above it)
+                        let y = base - p.asc + self.dp(FIELD_GAP);
+                        fields.push((p.field as usize - 1, self.ltr_rect([x, y, p.w, p.ih])));
                     } else {
                         let link = p.link != 0;
                         let col = if let Some(t) = &theme {

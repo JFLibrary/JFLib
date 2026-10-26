@@ -10,6 +10,11 @@
 //   doc.plain() / doc.to_html()          everything as text (list markers, cells by tabs) / HTML
 //   doc.plain_range(a, b) / html_range(a, b)   a part: TextPos { line: block, byte }
 //   doc.link_spots()                     every link in reading order (block, bytes, link)
+//   doc.forms() / fields() / field_spots()   the forms of HTML, their fields (MdSpan::field - 1;
+//                                        hidden ones have no character; their first values:
+//                                        md_view keeps the current ones) and where the visible
+//                                        ones stand in reading order; field.caption(): a
+//                                        button's caption
 //   doc.truncated()                      a limit cut the input
 //
 // The model: a block is a paragraph, a heading (level 1..6), a code block (its text, the
@@ -29,6 +34,16 @@
 // http:// https:// www.), hard breaks (two spaces, backslash) and soft breaks, a little inline
 // HTML (br, b / strong, i / em, s / del, u / ins, code / kbd, a href, img).  Other tags are
 // dropped, their text stays.  Tabs expand to 4 columns.
+//
+// Forms (HTML, also in Markdown's HTML blocks): <form action method> (forms do not nest),
+// <input> of type text (and the other text types: email, search, url, tel, number ...),
+// password, checkbox, radio, hidden, submit, image (a submit button), reset and button,
+// <textarea> (its text read raw, one leading line end dropped), <select> with <option value
+// selected> (one choice), <button type> (its text the caption), <label> (around a field or
+// for= its id: the field's name; aria-label wins, title is the last resort) and form= (a field
+// outside its form).  A field is one U+FFFC in the text with a span of its own (MdSpan::field);
+// a disabled check box at the start of a list item is that item's task box (as Markdown's
+// "[x]" is written out by html_range).
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -37,8 +52,9 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::ed_core::TextPos;
+use crate::i18n::tr;
 use crate::rich_doc::*;
-use crate::rich_html::{attrs, entity, html_read, HExt};
+use crate::rich_html::{attrs, entity, html_read, HExt, HRead};
 
 /// MdBlock::kind: a paragraph
 pub const MB_PARA: u8 = 0;
@@ -78,6 +94,28 @@ pub const MA_CENTER: u8 = 2;
 /// right (end)
 pub const MA_RIGHT: u8 = 3;
 
+/// MdField::kind: a one-line text field (<input> of type text, email, search, url, tel,
+/// number and every type not named below)
+pub const MF_TEXT: u8 = 0;
+/// a password field (its text never leaves the view but in the form's data)
+pub const MF_PASSWORD: u8 = 1;
+/// a check box
+pub const MF_CHECKBOX: u8 = 2;
+/// a radio button: one of the radios of its form with its name
+pub const MF_RADIO: u8 = 3;
+/// a hidden field (no character in the text)
+pub const MF_HIDDEN: u8 = 4;
+/// a text area (<textarea>: several lines)
+pub const MF_TEXTAREA: u8 = 5;
+/// a drop-down list (<select>)
+pub const MF_SELECT: u8 = 6;
+/// a submit button (<button>, <input type=submit> / image)
+pub const MF_SUBMIT: u8 = 7;
+/// a reset button: the form's fields get their first values back
+pub const MF_RESET: u8 = 8;
+/// a button without an action of its own (<button type=button>, <input type=button>)
+pub const MF_BUTTON: u8 = 9;
+
 const INPUT_MAX: usize = 16 << 20; // bytes read (the rest is cut)
 const NEST_MAX: usize = 32; // block quotes and lists inside each other
 const BLOCKS_MAX: usize = 1 << 20;
@@ -86,6 +124,7 @@ const PARENS_MAX: usize = 32;
 const HTML_STACK: usize = 64;
 const COLS_MAX: usize = 128;
 const CELLS_MAX: usize = 1 << 21;
+const FIELDS_MAX: usize = 0xFFFE; // form fields of a document (the view's ids: md_field_id)
 
 /// a range of a block's text with its style
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -102,6 +141,8 @@ pub struct MdSpan {
     /// HTML colours 0xAARRGGBB (0: the theme's)
     pub color: u32,
     pub bg: u32,
+    /// a form field (the text is U+FFFC): index + 1 into MdDoc::fields (0: none)
+    pub field: u32,
 }
 
 /// a block of the document (see the module header)
@@ -169,6 +210,75 @@ pub struct MdLinkSpot {
     pub link: u32,
 }
 
+/// a form of HTML
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MdForm {
+    /// where its data goes (as written: the app resolves it) and how ("get" / "post": lower
+    /// case, "get" when not given)
+    pub action: String,
+    pub method: String,
+    pub id: String,
+    pub name: String,
+}
+
+/// a choice of a drop-down list: the value sent, the text shown
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MdOption {
+    pub value: String,
+    pub label: String,
+}
+
+/// a field of a form (its first value: the view keeps the current one, MdViewState)
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MdField {
+    /// MF_*
+    pub kind: u8,
+    /// its form: index + 1 into MdDoc::forms (0: none -- it sends nothing)
+    pub form: u32,
+    pub name: String,
+    pub id: String,
+    /// text fields: the text; check boxes, radios, buttons: the value sent ("on" for check
+    /// boxes and radios without one)
+    pub value: String,
+    /// the name screen readers say (aria-label, the <label>, title); buttons: the caption
+    pub label: String,
+    pub placeholder: String,
+    /// check boxes and radios: checked at first
+    pub checked: bool,
+    /// drop-down lists: the choices, the one chosen at first (-1: none)
+    pub options: Vec<MdOption>,
+    pub selected: i32,
+    /// text fields: the width in characters (size; text areas: cols; 0: the default), text
+    /// areas: the lines (rows)
+    pub size: u32,
+    pub rows: u32,
+    /// at most this many characters (0: no limit)
+    pub maxlength: u32,
+    pub disabled: bool,
+    pub readonly: bool,
+}
+
+impl MdField {
+    /// a button's caption: its own, else "Senden" / "Zurücksetzen" (submit / reset, in the UI
+    /// language); "" for the other kinds
+    pub fn caption(&self) -> &str {
+        match self.kind {
+            MF_SUBMIT | MF_RESET | MF_BUTTON if !self.label.is_empty() => &self.label,
+            MF_SUBMIT => tr("Senden"),
+            MF_RESET => tr("Zurücksetzen"),
+            _ => "",
+        }
+    }
+}
+
+/// a visible field in reading order: block, byte of its U+FFFC, the field (index + 1)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct MdFieldSpot {
+    pub block: usize,
+    pub a: u32,
+    pub field: u32,
+}
+
 /// the document (see the module header)
 #[derive(Clone, Debug, Default)]
 pub struct MdDoc {
@@ -177,6 +287,9 @@ pub struct MdDoc {
     images: Vec<MdImage>,
     tables: Vec<MdTable>,
     spots: Vec<MdLinkSpot>,
+    forms: Vec<MdForm>,
+    fields: Vec<MdField>,
+    fspots: Vec<MdFieldSpot>,
     truncated: bool,
 }
 
@@ -511,9 +624,10 @@ fn html_start(s: &str) -> bool {
     }
     matches!(
         name.as_str(),
-        "address" | "article" | "aside" | "blockquote" | "center" | "dd" | "details" | "dialog" | "div" | "dl" | "dt" | "figcaption"
-            | "figure" | "footer" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "header" | "hr" | "li" | "main" | "nav" | "ol" | "p"
-            | "pre" | "section" | "summary" | "table" | "tbody" | "td" | "tfoot" | "th" | "thead" | "tr" | "ul" | "img" | "picture"
+        "address" | "article" | "aside" | "blockquote" | "center" | "dd" | "details" | "dialog" | "div" | "dl" | "dt" | "fieldset"
+            | "figcaption" | "figure" | "footer" | "form" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "header" | "hr" | "legend" | "li"
+            | "main" | "nav" | "ol" | "p" | "pre" | "section" | "summary" | "table" | "tbody" | "td" | "tfoot" | "th" | "thead" | "tr"
+            | "ul" | "img" | "picture"
     )
 }
 
@@ -1686,7 +1800,7 @@ impl<'a> Inline<'a> {
             }
             match spans.last_mut() {
                 Some(l) if l.b == a && l.style == style && l.link == link && img == 0 && l.image == 0 => l.b = b,
-                _ => spans.push(MdSpan { a, b, style, link, image: img, color: 0, bg: 0 }),
+                _ => spans.push(MdSpan { a, b, style, link, image: img, color: 0, bg: 0, field: 0 }),
             }
         }
         (text, spans)
@@ -1707,7 +1821,17 @@ fn html_blocks(s: &str, doc: &mut MdDoc, quote: u8, list: u8, path: u32, first_s
     let depth = (quote + list) as u32;
     // the HTML's own quotes inside the Markdown's containers, its lists inside them
     let path_of = |dq: u8| path | (((1u64 << dq.min(31)) - 1) << depth.min(31)) as u32;
-    let (paras, ext) = html_read(s);
+    let HRead { paras, ext, forms, fields } = html_read(s);
+    // the forms and fields (MdField::form and HExt::Field::n count from the ones before)
+    let (form0, field0) = (doc.forms.len() as u32, doc.fields.len() as u32);
+    let room = FIELDS_MAX.saturating_sub(doc.fields.len());
+    doc.forms.extend(forms);
+    doc.fields.extend(fields.into_iter().take(room).map(|mut f| {
+        if f.form > 0 {
+            f.form += form0;
+        }
+        f
+    }));
     let mut by: BTreeMap<usize, Vec<&HExt>> = BTreeMap::new();
     for (at, e) in &ext {
         by.entry(*at).or_default().push(e);
@@ -1731,12 +1855,17 @@ fn html_blocks(s: &str, doc: &mut MdDoc, quote: u8, list: u8, path: u32, first_s
         }
         let p = &paras[k];
         let mut b = MdBlock { quote, list, path, ..MdBlock::default() };
-        // the images of the paragraph by byte (their U+FFFC gets a span of its own)
-        let mut imgs: Vec<(usize, u32)> = Vec::new();
+        // the images and fields of the paragraph by byte (their U+FFFC gets a span of its own):
+        // byte, index + 1, a field
+        let mut imgs: Vec<(usize, u32, bool)> = Vec::new();
         for e in &items {
-            if let HExt::Image { byte, src, alt, w, h } = e {
-                doc.images.push(MdImage { src: src.clone(), alt: alt.clone(), title: String::new(), w: *w, h: *h });
-                imgs.push((*byte, doc.images.len() as u32));
+            match e {
+                HExt::Image { byte, src, alt, w, h } => {
+                    doc.images.push(MdImage { src: src.clone(), alt: alt.clone(), title: String::new(), w: *w, h: *h });
+                    imgs.push((*byte, doc.images.len() as u32, false));
+                }
+                HExt::Field { byte: Some(byte), n } if *n < room => imgs.push((*byte, field0 + *n as u32 + 1, true)),
+                _ => {}
             }
         }
         imgs.sort_unstable();
@@ -1776,16 +1905,21 @@ fn html_blocks(s: &str, doc: &mut MdDoc, quote: u8, list: u8, path: u32, first_s
             };
             last_link = (link != 0).then_some((e0, link));
             let styled = style != 0 || link != 0 || f.color != 0 || f.bg != 0;
-            let span = |a: usize, e: usize, image: u32| MdSpan { a: a as u32, b: e as u32, style, link, image, color: f.color, bg: f.bg };
+            let span = |a: usize, e: usize, image: u32| MdSpan { a: a as u32, b: e as u32, style, link, image, color: f.color, bg: f.bg, field: 0 };
             let mut s0 = a0;
             while ii < imgs.len() && imgs[ii].0 < e0 {
-                let (ib, img) = imgs[ii];
+                let (ib, obj, field) = imgs[ii];
                 ii += 1;
                 if ib >= s0 && b.text.get(ib..ib + 3) == Some("\u{FFFC}") {
                     if ib > s0 && styled {
                         b.spans.push(span(s0, ib, 0));
                     }
-                    b.spans.push(span(ib, ib + 3, img));
+                    if field {
+                        // (a field has no style or link of its own)
+                        b.spans.push(MdSpan { a: ib as u32, b: ib as u32 + 3, field: obj, ..MdSpan::default() });
+                    } else {
+                        b.spans.push(span(ib, ib + 3, obj));
+                    }
                     s0 = ib + 3;
                 }
             }
@@ -1819,6 +1953,7 @@ fn html_blocks(s: &str, doc: &mut MdDoc, quote: u8, list: u8, path: u32, first_s
                     b.delim = b'.';
                     sp = if b.list > 0 && doc.blocks.last().is_some_and(|l| l.list > 0) { 1 } else { 2 };
                 }
+                HExt::Task(done) => b.task = if *done { 2 } else { 1 },
                 HExt::Pre { block, lang } => pre = Some((*block, lang.clone())),
                 HExt::Row { table, head, cells } => {
                     let next_t = doc.tables.len() as u32;
@@ -1987,7 +2122,7 @@ impl MdDoc {
 
     /// a document from HTML: what the rich-text editor reads (paragraphs, headings h1 .. h6,
     /// lists, block quotes, formats, links, colours) and rules, images, preformatted blocks
-    /// (<pre><code class="language-x">) and tables
+    /// (<pre><code class="language-x">), tables and forms (see the module header)
     pub fn html(s: &str) -> MdDoc {
         let mut doc = MdDoc::default();
         let mut s = s;
@@ -2012,14 +2147,18 @@ impl MdDoc {
         }
     }
 
-    // the links in reading order
+    // the links and fields in reading order
     fn finish(&mut self) {
         if let Some(b) = self.blocks.first_mut() {
             b.space = 0;
         }
         self.spots.clear();
+        self.fspots.clear();
         for (k, b) in self.blocks.iter().enumerate() {
             for s in &b.spans {
+                if s.field != 0 && (s.field as usize) <= self.fields.len() {
+                    self.fspots.push(MdFieldSpot { block: k, a: s.a, field: s.field });
+                }
                 if s.link == 0 {
                     continue;
                 }
@@ -2061,6 +2200,21 @@ impl MdDoc {
         &self.spots
     }
 
+    /// the forms (MdField::form - 1)
+    pub fn forms(&self) -> &[MdForm] {
+        &self.forms
+    }
+
+    /// the fields of the forms in document order (MdSpan::field - 1)
+    pub fn fields(&self) -> &[MdField] {
+        &self.fields
+    }
+
+    /// every visible field in reading order
+    pub fn field_spots(&self) -> &[MdFieldSpot] {
+        &self.fspots
+    }
+
     /// a limit cut the input (size, blocks)
     pub fn truncated(&self) -> bool {
         self.truncated
@@ -2082,7 +2236,8 @@ impl MdDoc {
         self.html_range(TextPos::default(), self.end())
     }
 
-    // the text of block k from a to b with images as their alt texts
+    // the text of block k from a to b with images as their alt texts, buttons as their captions
+    // (other fields as nothing: their values are the view's)
     fn block_text(&self, k: usize, a: usize, b: usize) -> String {
         let bl = &self.blocks[k];
         let t = &bl.text;
@@ -2090,11 +2245,15 @@ impl MdDoc {
         let mut out = String::new();
         let mut i = a;
         for s in &bl.spans {
-            if s.image == 0 || (s.b as usize) <= a || (s.a as usize) >= b {
+            if (s.image == 0 && s.field == 0) || (s.b as usize) <= a || (s.a as usize) >= b {
                 continue;
             }
             out.push_str(&t[i..s.a as usize]);
-            out.push_str(&self.images.get(s.image as usize - 1).map_or(String::new(), |m| m.alt.clone()));
+            if s.image != 0 {
+                out.push_str(&self.images.get(s.image as usize - 1).map_or(String::new(), |m| m.alt.clone()));
+            } else if let Some(f) = self.fields.get(s.field as usize - 1) {
+                out.push_str(f.caption());
+            }
             i = s.b as usize;
         }
         out.push_str(&t[i.min(b)..b]);
@@ -2102,7 +2261,8 @@ impl MdDoc {
     }
 
     /// the text of a .. b: blocks on lines of their own (a blank line before paragraphs),
-    /// list markers ("- ", "1. ", "[x] "), cells by tabs, images as their alt texts
+    /// list markers ("- ", "1. ", "[x] "), cells by tabs, images as their alt texts, buttons
+    /// as their captions (the other fields: nothing)
     pub fn plain_range(&self, a: TextPos, b: TextPos) -> String {
         let (a, b) = if a <= b { (a, b) } else { (b, a) };
         let mut out = String::new();
@@ -2146,7 +2306,8 @@ impl MdDoc {
 
     /// the HTML of a .. b: h1 .. h6, p, ul / ol / li (task items with a disabled check box),
     /// blockquote, pre / code (class language-x), hr, table / tr / th / td (align), strong,
-    /// em, del, u, code, a href, img src alt, colours as span styles
+    /// em, del, u, code, a href, img src alt, colours as span styles; of forms only the
+    /// buttons' captions (as text)
     pub fn html_range(&self, a: TextPos, b: TextPos) -> String {
         let (a, b) = if a <= b { (a, b) } else { (b, a) };
         let mut out = String::new();
@@ -2316,6 +2477,13 @@ impl MdDoc {
                     out.push_str("\" alt=\"");
                     esc(&m.alt, out);
                     out.push_str("\">");
+                }
+                i = sb;
+                continue;
+            }
+            if s.field != 0 {
+                if let Some(f) = self.fields.get(s.field as usize - 1) {
+                    esc(f.caption(), out);
                 }
                 i = sb;
                 continue;

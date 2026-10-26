@@ -1,0 +1,133 @@
+#!args --page form --verify-dirty
+# a form in html_view (--page form), by the keyboard: Tab / Shift+Tab go through the fields
+# and links in reading order (the radios one stop: the checked one), typed text goes into the
+# text fields (the password shows dots), Space toggles the check box, the arrows choose a radio,
+# Down chooses in the drop-down list, the text area takes lines; Enter on a button sends the
+# form (MdEv::submit: "Senden: method action pairs" with every field, the hidden one and the
+# button), Enter in a text field or on a check box sends it with the first submit button, Esc
+# returns to the view, PgDn on a field scrolls the view; past the last stop the focus moves on
+size 1000 720
+theme light
+expect heading:"Anmeldung" exists
+expect checkbox:"Angemeldet bleiben" unchecked
+expect radio:"Rot" checked
+expect radio:"Grün" unchecked
+expect combo:"Österreich" exists
+expect textbox:"Hallo" exists
+expect button:"Senden" exists
+expect button:"Speichern" exists
+expect button:"Zurücksetzen" exists
+expect text:"Fokus: -" exists
+# into the view, Tab: the first field
+click 600,330
+expect "Formular" focused
+key tab
+expect text:"Fokus: user" exists
+type "anna"
+expect textbox:"anna" focused
+expect text:"Feld: user" exists
+key tab
+expect text:"Fokus: pw" exists
+type "geheim"
+expect textbox:"●●●●●●" focused
+expect textbox:"geheim" missing
+key tab
+expect checkbox:"Angemeldet bleiben" focused
+key space
+expect checkbox:"Angemeldet bleiben" checked
+expect text:"Feld: keep" exists
+# the radios are one stop; the arrows choose
+key tab
+expect radio:"Rot" focused
+key right
+expect radio:"Grün" checked
+expect radio:"Grün" focused
+expect radio:"Rot" unchecked
+expect text:"Feld: farbe" exists
+key right
+key right
+expect radio:"Rot" checked
+key left
+expect radio:"Blau" checked
+key tab
+expect combo:"Österreich" focused
+key down
+expect combo:"Schweiz" focused
+expect text:"Feld: land" exists
+key tab
+expect textbox:"Hallo" focused
+key ctrl+end
+type " Welt"
+expect textbox:"Hallo Welt" focused
+key tab
+expect text:"Fokus: ort" exists
+type "Berlin"
+expect textbox:"Berlin" focused
+shot build/mdviewtest/form_keys.png
+key tab
+expect button:"Senden" focused
+key enter
+expect text:"Senden: post /login user=anna&pw=geheim&keep=ja&farbe=blau&land=ch&text=Hallo Welt&ort=Berlin&token=abc123&aktion=senden" exists
+key tab
+expect button:"Speichern" focused
+key space
+expect text:"Senden: post /login user=anna&pw=geheim&keep=ja&farbe=blau&land=ch&text=Hallo Welt&ort=Berlin&token=abc123&aktion=Speichern" exists
+# back: Shift+Tab reaches the checked radio of the group
+key shift+tab
+key shift+tab
+key shift+tab
+key shift+tab
+key shift+tab
+expect radio:"Blau" focused
+key shift+tab
+expect checkbox:"Angemeldet bleiben" focused
+key enter
+expect text:"Senden: post /login user=anna&pw=geheim&keep=ja&farbe=blau&land=ch&text=Hallo Welt&ort=Berlin&token=abc123&aktion=senden" exists
+key space
+expect checkbox:"Angemeldet bleiben" unchecked
+# Enter in a text field: the first submit button sends
+key shift+tab
+key shift+tab
+expect textbox:"anna" focused
+key end
+type "-lena"
+key enter
+expect text:"Senden: post /login user=anna-lena&pw=geheim&farbe=blau&land=ch&text=Hallo Welt&ort=Berlin&token=abc123&aktion=senden" exists
+# Shift+Tab before the first field: the view; Esc in a field: the view
+key shift+tab
+expect "Formular" focused
+expect text:"Fokus: -" exists
+key tab
+expect textbox:"anna-lena" focused
+key esc
+expect "Formular" focused
+# PgDn on a field scrolls the view (the field keeps the focus; a lower window: to the end)
+size 1000 500
+key tab
+key pgdn
+expect "Formular" value 238
+expect text:"Fokus: user" exists
+size 1000 720
+# the reset button, the link after it; past the last stop the focus moves on
+click 600,330
+key home
+key tab
+key tab
+key tab
+key tab
+key tab
+key tab
+key tab
+key tab
+key tab
+key tab
+expect button:"Zurücksetzen" focused
+key enter
+expect textbox:"Hallo" exists
+expect radio:"Rot" checked
+expect combo:"Österreich" exists
+key tab
+expect link:"Hilfe" focused
+key tab
+expect "Bilder liefern" focused
+expect_nowarn
