@@ -991,3 +991,85 @@ WLAN: Frame von {} verworfen: der 4-Wege-Handshake ist noch nicht fertig.	WLAN: 
 WLAN: Frame an {} verworfen: keine solche Station.	WLAN: frame to {} dropped: no such station.
 WLAN: Frame an {} verworfen: Client-Isolation.	WLAN: frame to {} dropped: client isolation.
 WLAN: Frame an {} verworfen: das Gastnetz erreicht nur den Router.	WLAN: frame to {} dropped: the guest network reaches the router only.
+
+# jfn_sim: BGP (R6: bgp.rs, bgptrace.rs): its decisions (Note::Bgp), the reasons in them, the steps of the decision process, its status lines, refusals and problems
+abgeschaltet (neighbor shutdown)	shut down (neighbor shutdown)
+noch keine Router-ID	no router ID yet
+nicht direkt verbunden, ebgp-multihop fehlt	not directly connected, ebgp-multihop missing
+die update-source hat keine Adresse	the update-source has no address
+Pause nach einem Fehler	a pause after an error
+der einzige Weg	the only path
+höheres Gewicht	higher weight
+höhere LOCAL_PREF	higher LOCAL_PREF
+selbst erzeugt	originated here
+kürzerer AS-Pfad	shorter AS path
+niedrigerer ORIGIN	lower ORIGIN
+niedrigere MED	lower MED
+extern vor intern	external before internal
+kürzerer Weg zum Next Hop	nearer next hop
+niedrigere BGP-ID	lower BGP identifier
+niedrigere Nachbaradresse	lower neighbour address
+BGP ist nicht eingerichtet (kein router bgp).	BGP is not set up (no router bgp).
+BGP in AS {}, Router-ID {}: Nachbarn: {}, davon Established: {}; Netze: {}.	BGP in AS {}, router ID {}: neighbours: {}, Established: {}; networks: {}.
+BGP in AS {}: wartet auf eine Adresse für die Router-ID.	BGP in AS {}: waiting for an address to take the router ID from.
+BGP in AS {}: wartet auf das Gerät.	BGP in AS {}: waiting for the device.
+{} routet nicht: hier gibt es kein BGP.	{} does not route: there is no BGP here.
+Hier läuft schon BGP in AS {}: ein Gerät hat nur einen Prozess.	BGP in AS {} runs here already: a device has one process only.
+BGP in AS {} gibt es hier nicht.	There is no BGP in AS {} here.
+AS 0 gibt es nicht (1 bis 4294967295).	There is no AS 0 (1 to 4294967295).
+{} ist eine eigene Adresse und kein Nachbar.	{} is an address of this device, not a neighbour.
+{} in AS {} taugt nicht als Nachbar.	{} in AS {} cannot be a neighbour.
+{} ist kein Nachbar: zuerst neighbor {} remote-as.	{} is no neighbour: first neighbor {} remote-as.
+Eine Haltezeit von {} s geht nicht (0 oder 3 bis 65535).	A hold time of {} s is not possible (0 or 3 to 65535).
+{}: zu network {} fehlt die Route im Routing-Table: BGP kündigt das Netz nicht an.	{}: network {} has no route in the routing table: BGP does not advertise the network.
+{}: der externe BGP-Nachbar {} liegt in keinem angeschlossenen Netz; ohne ebgp-multihop beginnt keine Sitzung.	{}: the external BGP neighbour {} is in no connected network; without ebgp-multihop no session starts.
+{}: keine Route zum BGP-Nachbarn {}.	{}: no route to the BGP neighbour {}.
+{}: kein Gerät hat die Adresse des BGP-Nachbarn {}.	{}: no device has the address of the BGP neighbour {}.
+{}: auf {} ({}) läuft kein BGP.	{}: {} ({}) runs no BGP.
+{}: der Nachbar {} ({}) ist in AS {}, nicht in AS {} (neighbor {} remote-as).	{}: the neighbour {} ({}) is in AS {}, not in AS {} (neighbor {} remote-as).
+{}: {} hat keine Adresse von {} als BGP-Nachbarn eingerichtet.	{}: {} has no address of {} set up as a BGP neighbour.
+{}: {} erwartet diesen Router als {}, er verbindet sich aber von {}, und {} kommt von {} statt von {}: update-source passt nicht.	{}: {} expects this router as {}, but it connects from {}, and {} comes from {} instead of {}: the update-source does not fit.
+{}: die Sitzung mit {} kommt nicht zustande, zuletzt NOTIFICATION {}/{} gesendet ({}).	{}: the session with {} does not come up, the last NOTIFICATION {}/{} sent ({}).
+{}: die Sitzung mit {} kommt nicht zustande, zuletzt NOTIFICATION {}/{} empfangen ({}).	{}: the session with {} does not come up, the last NOTIFICATION {}/{} received ({}).
+BGP: der Prozess arbeitet mit der Router-ID {}.	BGP: the process works with the router ID {}.
+BGP: Nachbar {}: {} → {}.	BGP: neighbour {}: {} → {}.
+BGP: öffnet eine TCP-Verbindung zu {}, Port 179, von {}.	BGP: opens a TCP connection to {}, port 179, from {}.
+BGP: öffnet eine TCP-Verbindung zu {}, Port 179.	BGP: opens a TCP connection to {}, port 179.
+BGP: keine Route zu {}: keine Verbindung.	BGP: no route to {}: no connection.
+BGP: die Verbindung zu {} kam nicht zustande: {}.	BGP: the connection to {} did not come up: {}.
+BGP: Verbindung von {} an {} angenommen.	BGP: connection from {} to {} taken.
+BGP: Verbindung von {} zurückgesetzt: kein Nachbar mit dieser Adresse.	BGP: connection from {} reset: no neighbour with this address.
+BGP: Verbindung von {} zurückgesetzt: der Nachbar ist abgeschaltet (neighbor shutdown).	BGP: connection from {} reset: the neighbour is shut down (neighbor shutdown).
+BGP: Verbindung von {} zurückgesetzt: die Sitzung besteht schon.	BGP: connection from {} reset: the session is up already.
+BGP: Nachbar {} bleibt Idle: {}.	BGP: neighbour {} stays idle: {}.
+BGP: OPEN an {} (AS {}, Haltezeit {} s, BGP-ID {}).	BGP: OPEN to {} (AS {}, hold time {} s, BGP identifier {}).
+BGP: OPEN von {} (AS {}, Haltezeit {} s, BGP-ID {}).	BGP: OPEN from {} (AS {}, hold time {} s, BGP identifier {}).
+BGP: mit {} vereinbart: keine Haltezeit, keine Keepalives.	BGP: agreed with {}: no hold time, no keepalives.
+BGP: mit {} vereinbart: Haltezeit {} s, Keepalive alle {} s.	BGP: agreed with {}: hold time {} s, a keepalive every {} s.
+BGP: KEEPALIVE an {}.	BGP: KEEPALIVE to {}.
+BGP: KEEPALIVE von {}.	BGP: KEEPALIVE from {}.
+BGP: UPDATE an {}: Netze: {}, zurückgezogen: {}.	BGP: UPDATE to {}: networks: {}, withdrawn: {}.
+BGP: UPDATE von {}: Netze: {}, zurückgezogen: {}.	BGP: UPDATE from {}: networks: {}, withdrawn: {}.
+BGP: ROUTE-REFRESH an {}: er schickt seine Netze noch einmal.	BGP: ROUTE-REFRESH to {}: it sends its networks once more.
+BGP: ROUTE-REFRESH von {}: er bekommt alle Netze noch einmal.	BGP: ROUTE-REFRESH from {}: it gets every network once more.
+BGP: NOTIFICATION an {}: {}/{} ({}).	BGP: NOTIFICATION to {}: {}/{} ({}).
+BGP: NOTIFICATION von {}: {}/{} ({}).	BGP: NOTIFICATION from {}: {}/{} ({}).
+BGP: zwei Verbindungen mit {}: die eigene bleibt (höhere BGP-ID), die andere wird geschlossen.	BGP: two connections with {}: the own one stays (higher BGP identifier), the other is closed.
+BGP: zwei Verbindungen mit {}: die des Nachbarn bleibt (höhere BGP-ID), die eigene wird geschlossen.	BGP: two connections with {}: the neighbour's stays (higher BGP identifier), the own one is closed.
+BGP: von {} kam in der Haltezeit nichts: der Hold Timer ist abgelaufen.	BGP: nothing came from {} within the hold time: the hold timer expired.
+BGP: die Sitzung mit {} ist beendet ({}); seine Wege sind zurückgezogen.	BGP: the session with {} has ended ({}); its paths are withdrawn.
+BGP: {} von {} verworfen: das eigene AS {} steht im AS-Pfad (Schleife).	BGP: {} from {} dropped: the own AS {} is in the AS path (a loop).
+BGP: {} von {} verworfen: der Next Hop {} ist eine eigene Adresse.	BGP: {} from {} dropped: the next hop {} is an address of this device.
+BGP: {} von {} verworfen: {} taugt nicht als Next Hop.	BGP: {} from {} dropped: {} cannot be a next hop.
+BGP: bester Weg zu {} über {} (von {}): {}.	BGP: best path to {} via {} (from {}): {}.
+BGP: bester Weg zu {}: selbst erzeugt ({}).	BGP: best path to {}: originated here ({}).
+BGP: kein Weg mehr zu {}.	BGP: no path to {} any more.
+BGP: erzeugt {} selbst ({}).	BGP: originates {} ({}).
+BGP: erzeugt {} nicht mehr selbst.	BGP: originates {} no longer.
+BGP: neue Wege für {} warten noch {} (Mindestabstand zwischen Ankündigungen).	BGP: new paths for {} wait {} more (the minimum interval between advertisements).
+Hold Timer abgelaufen	hold timer expired
+NOTIFICATION {}/{} gesendet: {}	NOTIFICATION {}/{} sent: {}
+NOTIFICATION {}/{} empfangen: {}	NOTIFICATION {}/{} received: {}
+der Nachbar hat die TCP-Verbindung geschlossen	the neighbour closed the TCP connection
+TCP: {}	TCP: {}
+das Interface zum Nachbarn ist ausgefallen	the interface towards the neighbour went down

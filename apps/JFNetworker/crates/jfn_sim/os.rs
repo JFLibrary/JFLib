@@ -30,7 +30,8 @@
 //   service::<T>(dev, name) / metric(dev, svc, name) / log_lines(dev) / clock(dev) /
 //   hosts(dev)
 //
-//   TCP sockets (tcp.rs)      OsApi::tcp_listen / tcp_accept / tcp_connect / tcp_send / tcp_recv /
+//   TCP sockets (tcp.rs)      OsApi::tcp_listen / tcp_accept / tcp_connect (tcp_connect_src from
+//                             an address of the device) / tcp_send / tcp_recv /
 //                             tcp_shutdown / tcp_close / tcp_abort / tcp_setopts / tcp_info; their
 //                             events: SvcEvent::TcpAccept, TcpConnected, TcpData, TcpWritable,
 //                             TcpEof, TcpClosed; bind_msg, tcp_listen_msg, tcp_connect_msg and
@@ -1510,6 +1511,14 @@ impl OsApi<'_> {
     /// tcp_connect_from(), the refusal as a message
     pub fn tcp_connect_from_msg(&mut self, sport: u16, dst: impl Into<IpAddr>, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
         self.eng.tcp_connect(self.ni, self.id, sport, dst.into(), dport, opts, self.cause)
+    }
+    /// a connection from an address of the device (bind to it, then connect; BGP's
+    /// update-source), from an ephemeral port
+    pub fn tcp_connect_src(&mut self, src: IpAddr, dst: impl Into<IpAddr>, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
+        if !self.is_mine(src) {
+            return Err(msg!("{} ist keine Adresse dieses Geräts.", src));
+        }
+        self.eng.tcp_connect_src(self.ni, self.id, Some(src), 0, dst.into(), dport, opts, self.cause)
     }
     /// queues bytes for sending: how many the send buffer took (TcpWritable follows when it
     /// has room again)

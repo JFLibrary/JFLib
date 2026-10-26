@@ -53,6 +53,9 @@
 //                                                      commands, "ip ospf ...", "clear ip ospf
 //                                                      process" (ospf.rs); OSPF looks again
 //                                                      after the same changes as RIP
+//   Bgp                                                BGP's configuration: "router bgp", its
+//                                                      commands, "clear ip bgp" (bgp.rs); BGP
+//                                                      looks again after the same changes as RIP
 //   Move / Wlan / Scale                                a device's position, its WLAN settings,
 //                                                      the scale of the canvas (wlan.rs: stations
 //                                                      and access points look again); power,
@@ -245,6 +248,8 @@ pub enum Action {
     Wlan { dev: u32, wlan: Option<jfn_model::wlan::Wlan> },
     /// the scale of the canvas: world units per metre (0: 10), for the ranges of the radios
     Scale { dip_per_m: u32 },
+    /// a change of BGP's configuration, or "clear ip bgp" (bgp.rs)
+    Bgp { dev: u32, set: crate::bgp::BgpSet },
 }
 
 /// why an action was refused (German text through Display)
@@ -321,6 +326,7 @@ impl Engine {
             self.rip_kick_dev(dev);
             self.ip6_kick_dev(dev);
             self.ospf_kick_dev(dev);
+            self.bgp_kick_dev(dev);
         }
         r
     }
@@ -614,6 +620,7 @@ impl Engine {
             Action::Move { dev, x, y } => self.wlan_move(dev, x, y),
             Action::Wlan { dev, wlan } => self.wlan_set(dev, wlan),
             Action::Scale { dip_per_m } => self.wlan_set_scale(dip_per_m),
+            Action::Bgp { dev, set } => self.bgp_apply(dev, set),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }

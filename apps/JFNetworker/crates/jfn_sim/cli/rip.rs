@@ -161,8 +161,8 @@ impl Engine {
                 return Ok(());
             }
             K::ShowProtocols => {
-                // RIP's process, then OSPF's (cli/ospf.rs)
-                let text = format!("{}{}", self.show_protocols(ni), self.ospf_protocols(ni));
+                // RIP's process, then OSPF's (cli/ospf.rs) and BGP's (cli/bgp.rs)
+                let text = format!("{}{}{}", self.show_protocols(ni), self.ospf_protocols(ni), self.bgp_protocols(ni));
                 self.out(ni, &text);
                 return Ok(());
             }

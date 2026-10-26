@@ -216,6 +216,10 @@ impl Engine {
         for (n, _) in ends {
             self.ip6_kick(n);
         }
+        // and BGP (fast external fallover, next hops)
+        for (n, _) in ends {
+            self.bgp_kick(n);
+        }
     }
 
     /// re-evaluates every link of a node

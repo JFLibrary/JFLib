@@ -28,6 +28,12 @@
 // EAPOL (ethertype 0x888E) shows its header and an EAPOL-Key body field by field: the Key
 // Information bits, replay counter, nonce, MIC and the key data (the RSN element and, when it is
 // not encrypted, the KDEs); the summary names the message of the 4-way handshake (eapol.rs).
+// BGP (TCP port 179) shows every message a segment holds: the header, the fields of OPEN with each
+// capability, UPDATE with each withdrawn route, path attribute (its flags and value) and NLRI,
+// NOTIFICATION with the names of its code and subcode, ROUTE-REFRESH; what a receiver would answer
+// with a NOTIFICATION is a problem with that code; a segment that does not start with the marker
+// is the rest of a message of an earlier one (bgp.rs; AS numbers of 2 or 4 octets as
+// bgp::as_path_4 guesses).
 
 use alloc::format;
 use alloc::string::String;
@@ -51,6 +57,7 @@ use crate::http;
 use crate::rip::{self, RipView};
 use crate::icmpv6::{self, Icmp6View, NdMsg, NdOpt};
 use crate::ospf;
+use crate::bgp;
 
 pub const P_ETH: u32 = 1 << 0;
 pub const P_VLAN: u32 = 1 << 1;
@@ -78,6 +85,8 @@ pub const P_SNMP: u32 = 1 << 22;
 pub const P_LLDP: u32 = 1 << 23;
 pub const P_DHCPV6: u32 = 1 << 24;
 pub const P_EAPOL: u32 = 1 << 25;
+/// BGP (TCP port 179); a bit far from the next free ones, which other protocols take in order
+pub const P_BGP: u32 = 1 << 30;
 pub const P_DATA: u32 = 1 << 31;
 
 /// a protocol layer
@@ -110,6 +119,7 @@ pub enum Proto {
     Lldp,
     Data,
     Eapol,
+    Bgp,
 }
 
 impl Proto {
@@ -142,6 +152,7 @@ impl Proto {
             Proto::Lldp => "LLDP",
             Proto::Data => "Data",
             Proto::Eapol => "EAPOL",
+            Proto::Bgp => "BGP",
         }
     }
     pub fn bit(self) -> u32 {
@@ -173,6 +184,7 @@ impl Proto {
             Proto::Lldp => P_LLDP,
             Proto::Data => P_DATA,
             Proto::Eapol => P_EAPOL,
+            Proto::Bgp => P_BGP,
         }
     }
 }
@@ -232,6 +244,7 @@ fn tcp_app(sp: u16, dp: u16) -> Option<Proto> {
             443 | 8443 => Proto::Tls,
             22 => Proto::Ssh,
             53 => Proto::Dns,
+            bgp::PORT => Proto::Bgp,
             _ => return None,
         })
     };
@@ -528,6 +541,7 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Icmpv6 => Some(icmpv6_layer(frame, off, len, net, hop6, frag6)),
             Proto::Ospf => Some(ospf_layer(frame, off, len)),
             Proto::Eapol => Some(eapol_layer(frame, off, len)),
+            Proto::Bgp => Some(bgp_layer(frame, off, len)),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -982,6 +996,7 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Rip => rip_info(b),
         Proto::Ospf => ospf_info(b),
         Proto::Eapol => Some(eapol_info(b)),
+        Proto::Bgp => Some(bgp_info(b)),
         _ => None,
     }
 }
@@ -2301,4 +2316,276 @@ fn eapol_info(b: &[u8]) -> String {
         },
         None => String::from("Key"),
     }
+}
+
+// ---------------------------------------------------------------- BGP
+
+/// the attributes of an UPDATE as they lie: (offset, header length, value length, flags, type);
+/// stops where one does not fit
+fn bgp_attr_walk(b: &[u8]) -> Vec<(usize, usize, usize, u8, u8)> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i + 3 <= b.len() {
+        let (flags, kind) = (b[i], b[i + 1]);
+        let ext = flags & bgp::F_EXTENDED != 0;
+        let hl = if ext { 4 } else { 3 };
+        if i + hl > b.len() {
+            break;
+        }
+        let n = if ext { be16(b, i + 2) as usize } else { b[i + 2] as usize };
+        if i + hl + n > b.len() {
+            break;
+        }
+        out.push((i, hl, n, flags, kind));
+        i += hl + n;
+    }
+    out
+}
+
+/// "Optional, Transitive, Partial"; "Well-known, Transitive"
+fn bgp_flags_text(f: u8) -> String {
+    let mut v: Vec<&str> = alloc::vec![if f & bgp::F_OPTIONAL != 0 { "Optional" } else { "Well-known" }];
+    if f & bgp::F_TRANSITIVE != 0 {
+        v.push("Transitive");
+    }
+    if f & bgp::F_PARTIAL != 0 {
+        v.push("Partial");
+    }
+    if f & bgp::F_EXTENDED != 0 {
+        v.push("Extended Length");
+    }
+    v.join(", ")
+}
+
+fn bgp_attr_text(v: &bgp::AttrVal) -> String {
+    use crate::bgp::AttrVal;
+    match v {
+        AttrVal::Origin(o) => String::from(bgp::origin_name(*o)),
+        AttrVal::AsPath(s) | AttrVal::As4Path(s) => {
+            if s.is_empty() {
+                String::from("empty")
+            } else {
+                bgp::path_text(s)
+            }
+        }
+        AttrVal::NextHop(a) => format!("{}", a),
+        AttrVal::Med(m) | AttrVal::LocalPref(m) => format!("{}", m),
+        AttrVal::AtomicAggregate => String::from("set"),
+        AttrVal::Aggregator { asn, id } | AttrVal::As4Aggregator { asn, id } => format!("AS {}, {}", asn, id),
+        AttrVal::Communities(c) => {
+            let v: Vec<String> = c.iter().map(|x| bgp::community_text(*x)).collect();
+            v.join(" ")
+        }
+        AttrVal::Other { kind, data } => format!("type {}, {} bytes", kind, data.len()),
+    }
+}
+
+/// the fields of one message `m` (complete, at frame offset `o`); its kind's summary
+fn bgp_message(l: &mut B, m: &[u8], o: usize) {
+    let kind = m[18];
+    let marker = if m[..16] == bgp::MARKER { String::from("ffffffffffffffffffffffffffffffff") } else { String::from("not all ones [incorrect]") };
+    l.f("Marker", o, 16, marker);
+    l.f("Length", o + 16, 2, format!("{}", m.len()));
+    l.f("Type", o + 18, 1, format!("{} Message ({})", bgp::type_name(kind), kind));
+    let body = &m[bgp::HDR_LEN..];
+    let bo = o + bgp::HDR_LEN;
+    let as4 = match kind {
+        bgp::T_UPDATE => {
+            let wl = if body.len() >= 2 { be16(body, 0) as usize } else { 0 };
+            let ab = body.get(4 + wl..).unwrap_or(&[]);
+            let al = body.get(2 + wl..4 + wl).map(|x| be16(x, 0) as usize).unwrap_or(0);
+            let ab = ab.get(..al.min(ab.len())).unwrap_or(&[]);
+            bgp_attr_walk(ab).iter().find(|a| a.4 == bgp::A_AS_PATH).map(|a| bgp::as_path_4(&ab[a.0 + a.1..a.0 + a.1 + a.2])).unwrap_or(true)
+        }
+        _ => true,
+    };
+    if let Err(e) = bgp::Message::read(m, as4) {
+        l.bad(format!("{}: {} (the receiver answers with NOTIFICATION {}/{})", bgp::type_name(kind), e.text(), e.code, e.sub));
+    }
+    match kind {
+        bgp::T_OPEN if body.len() >= 10 => {
+            l.f("Version", bo, 1, format!("{}", body[0]));
+            let asn = be16(body, 1);
+            l.f("My AS", bo + 1, 2, if asn == bgp::AS_TRANS { format!("{} (AS_TRANS: the AS is in a capability)", asn) } else { format!("{}", asn) });
+            l.f("Hold Time", bo + 3, 2, format!("{} s", be16(body, 3)));
+            l.f("BGP Identifier", bo + 5, 4, format!("{}", Ipv4([body[5], body[6], body[7], body[8]])));
+            l.f("Optional Parameters Length", bo + 9, 1, format!("{}", body[9]));
+            let mut i = 10;
+            while i + 2 <= body.len() {
+                let (t, n) = (body[i], body[i + 1] as usize);
+                let Some(v) = body.get(i + 2..i + 2 + n) else {
+                    break;
+                };
+                if t != bgp::OPT_CAPS {
+                    l.f("Optional Parameter", bo + i, 2 + n, format!("type {}, {} bytes", t, n));
+                    i += 2 + n;
+                    continue;
+                }
+                let mut j = 0;
+                while j + 2 <= v.len() {
+                    let (c, k) = (v[j], v[j + 1] as usize);
+                    let Some(x) = v.get(j + 2..j + 2 + k) else {
+                        break;
+                    };
+                    let what = match (c, k) {
+                        (bgp::CAP_MP, 4) => format!("{}: {}", bgp::cap_name(c), bgp::afi_name(be16(x, 0), x[3])),
+                        (bgp::CAP_AS4, 4) => format!("{}: {}", bgp::cap_name(c), crate::be32(x, 0)),
+                        (_, 0) => format!("{} ({})", bgp::cap_name(c), c),
+                        _ => format!("{} ({}), {} bytes", bgp::cap_name(c), c, k),
+                    };
+                    l.f("Capability", bo + i + 2 + j, 2 + k, what);
+                    j += 2 + k;
+                }
+                i += 2 + n;
+            }
+        }
+        bgp::T_UPDATE if body.len() >= 4 => {
+            let wl = be16(body, 0) as usize;
+            l.f("Withdrawn Routes Length", bo, 2, format!("{}", wl));
+            let w = body.get(2..2 + wl).unwrap_or(&[]);
+            let mut i = 0;
+            while i < w.len() {
+                let n = 1 + (w[i] as usize).div_ceil(8);
+                match bgp::read_prefixes(&w[i..(i + n).min(w.len())]) {
+                    Ok(p) if !p.is_empty() => l.f("Withdrawn Route", bo + 2 + i, n.min(w.len() - i), format!("{}", p[0])),
+                    _ => {
+                        l.f("Withdrawn Route", bo + 2 + i, w.len() - i, String::from("invalid"));
+                        break;
+                    }
+                }
+                i += n;
+            }
+            let Some(al) = body.get(2 + wl..4 + wl).map(|x| be16(x, 0) as usize) else {
+                return;
+            };
+            l.f("Total Path Attribute Length", bo + 2 + wl, 2, format!("{}", al));
+            let ao = 4 + wl;
+            let ab = body.get(ao..(ao + al).min(body.len())).unwrap_or(&[]);
+            let parsed = bgp::Update::read(body, as4).ok();
+            for (k, &(i, hl, n, flags, t)) in bgp_attr_walk(ab).iter().enumerate() {
+                let val = match parsed.as_ref().and_then(|u| u.attrs.get(k)) {
+                    Some(a) => bgp_attr_text(&a.val),
+                    None => format!("{} bytes", n),
+                };
+                let name = match t {
+                    bgp::A_ORIGIN..=bgp::A_COMMUNITIES | bgp::A_AS4_PATH | bgp::A_AS4_AGGREGATOR => bgp::attr_name(t),
+                    _ => "Path Attribute",
+                };
+                l.f(name, bo + ao + i, hl + n, format!("{} [{}]", val, bgp_flags_text(flags)));
+            }
+            let nl = body.get(ao + al..).unwrap_or(&[]);
+            let mut i = 0;
+            while i < nl.len() {
+                let n = 1 + (nl[i] as usize).div_ceil(8);
+                match bgp::read_prefixes(&nl[i..(i + n).min(nl.len())]) {
+                    Ok(p) if !p.is_empty() => l.f("NLRI", bo + ao + al + i, n.min(nl.len() - i), format!("{}", p[0])),
+                    _ => {
+                        l.f("NLRI", bo + ao + al + i, nl.len() - i, String::from("invalid"));
+                        break;
+                    }
+                }
+                i += n;
+            }
+        }
+        bgp::T_NOTIFICATION if body.len() >= 2 => {
+            l.f("Error Code", bo, 1, format!("{} ({})", bgp::code_name(body[0]), body[0]));
+            l.f("Error Subcode", bo + 1, 1, format!("{} ({})", bgp::error_name(body[0], body[1]), body[1]));
+            if body.len() > 2 {
+                l.f("Data", bo + 2, body.len() - 2, hex_short(&body[2..]));
+            }
+        }
+        bgp::T_ROUTE_REFRESH if body.len() >= 4 => l.f("Address Family", bo, 4, bgp::afi_name(be16(body, 0), body[3])),
+        _ => {}
+    }
+}
+
+fn bgp_layer(frame: &[u8], off: usize, len: usize) -> B {
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Bgp, off, len, String::new());
+    let mut kinds: Vec<&str> = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        let rest = &b[i..];
+        if (rest.len() >= 16 && rest[..16] != bgp::MARKER) || (rest.len() < 16 && !bgp::MARKER.starts_with(rest)) {
+            // the rest of a message an earlier segment began
+            l.f("Continuation", off + i, rest.len(), format!("{} bytes of a message", rest.len()));
+            kinds.push("Continuation");
+            break;
+        }
+        match bgp::frame(rest) {
+            Ok(Some(n)) => {
+                bgp_message(&mut l, &rest[..n], off + i);
+                kinds.push(bgp::type_name(rest[18]));
+                i += n;
+            }
+            Ok(None) => {
+                l.f("Segment of a message", off + i, rest.len(), format!("{} bytes, the rest follows", rest.len()));
+                kinds.push("Segment");
+                break;
+            }
+            Err(e) => {
+                l.f("Data", off + i, rest.len(), format!("{} bytes", rest.len()));
+                l.bad(format!("{} (the receiver answers with NOTIFICATION {}/{})", e.text(), e.code, e.sub));
+                break;
+            }
+        }
+    }
+    let msgs: Vec<String> = kinds.iter().map(|k| format!("{} Message", k)).collect();
+    l.l.title = format!("Border Gateway Protocol - {}", msgs.join(", "));
+    l
+}
+
+/// one message in a few words ("UPDATE Message, 2 routes, 1 withdrawn")
+fn bgp_msg_info(m: &[u8]) -> String {
+    let as4 = true;
+    let kind = m[18];
+    let name = bgp::type_name(kind);
+    match bgp::Message::read(m, as4).or_else(|_| bgp::Message::read(m, false)) {
+        Ok(bgp::Message::Open(o)) => format!("OPEN Message, AS {}, hold time {}, ID {}", o.peer_as(), o.hold, o.id),
+        Ok(bgp::Message::Update(u)) => {
+            let mut s = String::from("UPDATE Message");
+            if !u.nlri.is_empty() {
+                s.push_str(&format!(", {} route{}", u.nlri.len(), if u.nlri.len() == 1 { "" } else { "s" }));
+            }
+            if !u.withdrawn.is_empty() {
+                s.push_str(&format!(", {} withdrawn", u.withdrawn.len()));
+            }
+            if u.nlri.is_empty() && u.withdrawn.is_empty() {
+                s.push_str(", nothing (End-of-RIB)");
+            }
+            s
+        }
+        Ok(bgp::Message::Notification(n)) => format!("NOTIFICATION Message, {}/{} {}", n.code, n.sub, bgp::error_name(n.code, n.sub)),
+        Ok(bgp::Message::Keepalive) => String::from("KEEPALIVE Message"),
+        Ok(bgp::Message::RouteRefresh { afi, safi }) => format!("ROUTE-REFRESH Message, {}", bgp::afi_name(afi, safi)),
+        Err(e) => format!("{} Message ({})", name, bgp::error_name(e.code, e.sub)),
+    }
+}
+
+/// the messages of a segment, one after the other
+fn bgp_info(b: &[u8]) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        let rest = &b[i..];
+        if rest.len() < 16 || rest[..16] != bgp::MARKER {
+            parts.push(String::from("Continuation"));
+            break;
+        }
+        match bgp::frame(rest) {
+            Ok(Some(n)) => {
+                parts.push(bgp_msg_info(&rest[..n]));
+                i += n;
+            }
+            Ok(None) => {
+                parts.push(String::from("Segment of a message"));
+                break;
+            }
+            Err(e) => {
+                parts.push(format!("Malformed ({})", bgp::error_name(e.code, e.sub)));
+                break;
+            }
+        }
+    }
+    parts.join(", ")
 }

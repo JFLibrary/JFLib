@@ -19,7 +19,9 @@
 //                                 made again only when that changed
 //   set_dynamic(src, routes)      the routes of a routing protocol (RIP: rip.rs) in the table,
 //                                 next to connected and static ones; equal-cost routes of a
-//                                 protocol share the destinations: one per destination address
+//                                 protocol share the destinations: one per destination address;
+//                                 BGP's (bgp.rs) carry the next hop of the path and the interface
+//                                 towards it, which lookup resolves one step further
 //   join(iface, group, on) / joined   IPv4 multicast groups an interface listens to (224.0.0.9
 //                                 for RIPv2); packets to other groups are not for the device
 //   acls / nat                    the device's access lists (acl.rs) and address translation
@@ -110,6 +112,8 @@ pub enum RouteSrc {
     Static,
     Rip,
     Ospf,
+    /// BGP (bgp.rs): external routes with distance 20, internal ones with 200
+    Bgp,
 }
 
 impl RouteSrc {
@@ -121,6 +125,7 @@ impl RouteSrc {
             RouteSrc::Static => "S",
             RouteSrc::Rip => "R",
             RouteSrc::Ospf => "O",
+            RouteSrc::Bgp => "B",
         }
     }
 }
