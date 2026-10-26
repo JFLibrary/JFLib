@@ -12,23 +12,25 @@
 //   Engine::linux_config6   the IPv6 part of the device's configuration as such commands
 //
 // The interfaces start with IPv6 off (as with net.ipv6.conf.all.disable_ipv6 = 1): sysctl turns
-// it on.  Names are not looked up for IPv6 yet (no AAAA lookups in the resolver): ping and
-// traceroute say so as glibc does for a family a name has no address in.
+// it on.  A name after -6 is looked up for its AAAA records (resolver.rs: Family::V6), and the
+// ping or traceroute runs over IPv6 once the address is known (print.rs: job_switch); an IPv4
+// address after -6 gets glibc's "Address family for hostname not supported".
 
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use netpkt::{Ipv6, Mac, Prefix6};
+use netpkt::{Ipv4, Ipv6, Mac, Prefix6};
 
 use super::linux::{is, secs};
 use super::print::JobOut;
 use crate::action::Action;
 use crate::ip6::{AddrCfg, AddrState, Ip6Set, Origin6, Route6, Src6};
-use crate::jobs::TraceOpts;
+use crate::jobs::{PingOpts, TraceOpts};
 use crate::jobs6::Ping6Opts;
 use crate::kernel::{Engine, Ns, MS, SEC};
 use crate::nd::Addr6View;
+use crate::resolver::Family;
 
 /// "fe80::1%eth0" -> (address text, interface name)
 fn zone(s: &str) -> (&str, Option<&str>) {
@@ -458,7 +460,13 @@ impl Engine {
             o.oif = Some(self.sh_oif(ni, z, "ping")?);
         }
         let Some(a) = Ipv6::parse(addr) else {
-            return self.sh_err(ni, &format!("ping: {}: Address family for hostname not supported\n", d));
+            if Ipv4::parse(addr).is_some() || z.is_some() {
+                return self.sh_err(ni, &format!("ping: {}: Address family for hostname not supported\n", d));
+            }
+            // a name: its AAAA records first (print.rs prints it as a ping over IPv6)
+            let p4 = PingOpts { count: o.count, size: o.size, ttl: o.hops, df: o.no_frag, interval: o.interval, timeout: o.timeout, src: None };
+            self.linux_ping_start(ni, d, p4, Family::V6);
+            return Ok(());
         };
         if (a.is_link_local() || (a.is_multicast() && a.mc_scope() <= 2)) && o.oif.is_none() {
             return self.sh_err(ni, "ping: connect: Invalid argument\n");
@@ -519,7 +527,12 @@ impl Engine {
             oif = Some(self.sh_oif(ni, z, "traceroute")?);
         }
         let Some(a) = Ipv6::parse(addr) else {
-            return self.sh_err(ni, &format!("{}: Address family for hostname not supported\nCannot handle \"host\" cmdline arg `{}' on position 1 (argc {})\n", d, d, args.len()));
+            if Ipv4::parse(addr).is_some() || z.is_some() {
+                return self.sh_err(ni, &format!("{}: Address family for hostname not supported\nCannot handle \"host\" cmdline arg `{}' on position 1 (argc {})\n", d, d, args.len()));
+            }
+            // a name: its AAAA records first
+            self.linux_trace_start(ni, d, o, numeric, Family::V6);
+            return Ok(());
         };
         let Ok(id) = self.traceroute6(dev, a, o, oif) else {
             return Ok(());

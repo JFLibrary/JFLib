@@ -1,0 +1,7 @@
+#!args apps/JFNetworker/tests/fixtures/wlan_office.jfnet --scenario apps/JFNetworker/tests/scen/wlan_office.scn --golden apps/JFNetworker/tests/scen/wlan_office.report
+# golden scenario: WLAN in an office: two access points with one WPA2 network, an open guest network
+# in VLAN 20, DHCP over WLAN, a wrong passphrase with its retries and giving up, a laptop roaming
+# while it pings, out of range and back, an access point switched off and on.  The GUI program
+# runs tests/scen/wlan_office.scn on tests/fixtures/wlan_office.jfnet without a window and ends
+# with the report, which must equal tests/scen/wlan_office.report byte for byte on every target
+# (the script itself is not run)

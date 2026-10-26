@@ -4,9 +4,10 @@
 //   kind          config (JSON; every member may be left out except the client's server)
 //   tcp-echo      {"port": 7, "backlog": 0, "rcvbuf": 0, "sndbuf": 0, "nodelay": false}
 //   tcp-discard   {"port": 9, "backlog": 0, "rcvbuf": 0, "read": true, "read_after_ms": 0}
-//   tcp-client    {"server": "10.0.0.2", "port": 7, "bytes": 10000, "chunk": 0,
-//                  "interval_ms": 0, "delay_ms": 0, "close": "shutdown", "sport": 0,
-//                  "nodelay": false, "keepalive": false, "rcvbuf": 0, "sndbuf": 0}
+//   tcp-client    {"server": "10.0.0.2" (or an IPv6 address), "port": 7, "bytes": 10000,
+//                  "chunk": 0, "interval_ms": 0, "delay_ms": 0, "close": "shutdown",
+//                  "sport": 0, "nodelay": false, "keepalive": false, "rcvbuf": 0, "sndbuf": 0}
+//                  (the servers listen on both families: os.rs ANY)
 //
 //   from_def(kind, &config)   the service of a project's definition (svcact.rs); from_def_msg:
 //                             the refusal as a Msg for the app's catalogue
@@ -36,7 +37,7 @@ use core::any::Any;
 use agent_core::jmap::Value;
 use jfn_model::msg;
 use jfn_model::msg::{phrase, Msg};
-use netpkt::Ipv4;
+use netpkt::IpAddr;
 
 use crate::kernel::{Ns, MS};
 use crate::os::{Metric, OsApi, Service, SvcEvent};
@@ -304,7 +305,8 @@ pub enum CloseMode {
 /// a client that sends a number of bytes
 #[derive(Clone, Debug)]
 pub struct TcpClient {
-    pub server: Ipv4,
+    /// an IPv4 or IPv6 address
+    pub server: IpAddr,
     pub port: u16,
     pub bytes: u64,
     /// bytes per write (0: what the send buffer takes)
@@ -334,9 +336,9 @@ pub struct TcpClient {
 }
 
 impl TcpClient {
-    pub fn new(server: Ipv4, port: u16, bytes: u64) -> TcpClient {
+    pub fn new(server: impl Into<IpAddr>, port: u16, bytes: u64) -> TcpClient {
         TcpClient {
-            server,
+            server: server.into(),
             port,
             bytes,
             chunk: 0,
@@ -498,11 +500,13 @@ impl Service for TcpClient {
     }
     fn status_msg(&self) -> Msg {
         let error = self.error_msg.clone().or_else(|| self.error.clone().map(Msg::plain));
+        // an IPv6 server in brackets before its port
+        let server = if self.server.is_v4() { alloc::format!("{}", self.server) } else { alloc::format!("[{}]", self.server) };
         match (error, self.end, self.connected) {
-            (Some(e), _, _) => msg!("{}:{}: {}", self.server, self.port, e),
-            (None, Some(end), _) => msg!("{}:{}: {} von {} Bytes gesendet, {} empfangen; {}", self.server, self.port, self.sent, self.bytes, self.received, phrase(end.text())),
-            (None, None, Some(_)) => msg!("verbunden mit {}:{}: {} von {} Bytes gesendet, {} empfangen", self.server, self.port, self.sent, self.bytes, self.received),
-            (None, None, None) => msg!("verbindet mit {}:{} ...", self.server, self.port),
+            (Some(e), _, _) => msg!("{}:{}: {}", server, self.port, e),
+            (None, Some(end), _) => msg!("{}:{}: {} von {} Bytes gesendet, {} empfangen; {}", server, self.port, self.sent, self.bytes, self.received, phrase(end.text())),
+            (None, None, Some(_)) => msg!("verbunden mit {}:{}: {} von {} Bytes gesendet, {} empfangen", server, self.port, self.sent, self.bytes, self.received),
+            (None, None, None) => msg!("verbindet mit {}:{} ...", server, self.port),
         }
     }
     fn clone_box(&self) -> Box<dyn Service> {
@@ -552,7 +556,7 @@ pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
             Box::new(s)
         }
         "tcp-client" => {
-            let server = c.get("server").and_then(|v| v.as_str()).and_then(|s| Ipv4::parse(s.trim())).ok_or_else(|| msg!("\u{201e}server\u{201c} fehlt oder ist keine IPv4-Adresse."))?;
+            let server = c.get("server").and_then(|v| v.as_str()).and_then(|s| IpAddr::parse(s.trim())).ok_or_else(|| msg!("\u{201e}server\u{201c} fehlt oder ist keine IP-Adresse."))?;
             let mut s = TcpClient::new(server, port(7)?, num("bytes", 10_000));
             s.chunk = size("chunk");
             s.interval = num("interval_ms", 0).saturating_mul(MS);

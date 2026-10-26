@@ -20,7 +20,9 @@
 //
 // LEDs: no power (grey), down (red: shut down, err-disabled, unplugged, far end off, wrong cable
 // with strict MDI-X), up (green); with spanning tree a bridge port that does not forward is
-// blocking (amber: Blocking, Listening, Discarding) or learning (amber: Learning).
+// blocking (amber: Blocking, Listening, Discarding) or learning (amber: Learning).  The radio of
+// an access point without a cable is up while it sends a network (wlan.rs); WLAN associations
+// are links of the view too (ids from wlan::ASSOC_ID0), the views of wlan.rs tell more.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -141,6 +143,8 @@ impl Engine {
                 Some(crate::stp::PortState::Blocking | crate::stp::PortState::Listening | crate::stp::PortState::Discarding) => Led::Blocking,
                 _ => Led::Up,
             },
+            // the radio of an access point that beacons (wlan.rs)
+            None if self.wlan_radio_up(ni, pi) => Led::Up,
             _ => Led::Down,
         }
     }
@@ -166,7 +170,7 @@ impl Engine {
                     index: i as u16,
                     name: p.spec.name.clone(),
                     admin_up: p.admin_up,
-                    up: p.link.is_some_and(|li| self.link_up(li)),
+                    up: p.link.is_some_and(|li| self.link_up(li)) || self.wlan_radio_up(ni, i as u16),
                     led: self.led_of(ni, i as u16),
                     link: p.link.and_then(|li| self.links.get(li)?.as_ref().map(|l| l.id)),
                     mac: p.mac,
@@ -366,7 +370,7 @@ pub struct DevStep {
 }
 
 /// protocols from the top of the stack down: a P_* mask is named after its highest one
-const TOP_DOWN: [Proto; 25] = [
+const TOP_DOWN: [Proto; 26] = [
     Proto::Dhcpv6,
     Proto::Lldp,
     Proto::Snmp,
@@ -388,6 +392,7 @@ const TOP_DOWN: [Proto; 25] = [
     Proto::Icmp,
     Proto::Ipv6,
     Proto::Ipv4,
+    Proto::Eapol,
     Proto::Arp,
     Proto::Llc,
     Proto::Vlan,
@@ -483,7 +488,8 @@ impl Engine {
     pub fn event_row(&self, e: &DevEvent) -> EventRow {
         let hop = e.hop.and_then(|h| self.trace.hop(h));
         let hm = hop.map_or(0, |h| h.mask);
-        let own = e.note.mask() & !hm;
+        let nm = e.mask(hm);
+        let own = nm & !hm;
         let msg = self.message(e);
         EventRow {
             seq: e.seq,
@@ -492,8 +498,8 @@ impl Engine {
             dev: e.dev,
             hop: e.hop,
             layer: e.note.layer(),
-            proto: proto_name(if own != 0 { own } else { hm | e.note.mask() }),
-            mask: hm | e.note.mask(),
+            proto: proto_name(if own != 0 { own } else { hm | nm }),
+            mask: hm | nm,
             text: msg.text(),
             drop: e.note.is_drop(),
             msg,

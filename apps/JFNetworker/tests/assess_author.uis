@@ -1,0 +1,160 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/lan_router.jfnet
+# making an assessment (A1, workspace/author.rs) from the router between two networks: Werkzeuge
+# › Aufgabe erstellen …, the network as the target, items from the tree (R1's name with a second
+# accepted value, the address of Gi0/0/1 for 3 points, its state), a check refused and one
+# taken, the texts, a time limit of one minute, the start network (undone and redone), the
+# assessment into the project (undone and redone: the Aufgabe panel follows), saved as
+# build/jfn_assess.jfnet; the minute runs out; the file opened again with its assessment and the
+# author's panel filled from it.  Ids: 63489 "Aktuelles Netz als Ziel", 63490 "Ausgangsnetz
+# erzeugen", 63491 "Als Aufgabe speichern …", 63492 the item's points, 63498 "einer von mehreren
+# Werten", 63500 the other values, 63501 the item's German text, 63505 / 63508 / 63512 a new
+# check, its points, "Hinzufügen", 63520 .. 63525 the task's texts, 63540 the minutes, 63824 + i
+# the items of the Aufgabe panel, 1048588 the file dialog's name.
+size 1280 800
+theme light
+wait 1000
+# ---- the panel, before a target
+cmd 510
+expect text:"Aufgabe erstellen" exists
+expect text:"Noch kein Ziel. Das Netz fertig einrichten, dann übernehmen." exists
+expect text:"Erst mit einem Ziel." exists
+expect #63520 text "Router zwischen zwei Netzen"
+# ---- the target: the network as it runs
+click button:"Aktuelles Netz als Ziel"
+expect text:"Ziel: 3 Geräte, 2 Kabel." exists
+expect text:"Ziel übernommen: 3 Geräte, 2 Kabel." exists
+expect listitem:"Hostname R1" exists
+expect text:"Keine Einstellung gewählt." exists
+# ---- items from the tree: the address of Gi0/0/1 for 3 points, its state
+dblclick listitem:"Gi0/0/1"
+expect checkbox:"Adresse 10.0.2.1/24" unchecked
+click checkbox:"Adresse 10.0.2.1/24"
+expect checkbox:"Adresse 10.0.2.1/24" checked
+expect text:"R1 Gi0/0/1: Adresse 10.0.2.1/24" exists
+expect #63501 text "R1 Gi0/0/1: Adresse 10.0.2.1/24"
+expect #63502 text "R1 Gi0/0/1: address 10.0.2.1/24"
+focus #63492
+key ctrl+a
+type "3\n"
+click checkbox:"eingeschaltet"
+expect text:"R1 Gi0/0/1 ist eingeschaltet" exists
+# R1's name, "Core" counts too; a value that is none is refused
+click checkbox:"Hostname R1"
+focus #63498
+key space
+expect #63500 text "R1"
+focus #63500
+key end
+type " | Core | 1bad"
+expect text:"„1bad“ ist kein gültiger Wert." exists
+key ctrl+a
+type "R1 | Core"
+expect text:"„1bad“ ist kein gültiger Wert." missing
+focus #63501
+key ctrl+a
+type "Der Router heißt R1 (oder Core)"
+shot build/jfnetworker/assess_author_items.png
+# ---- a check: refused while it does not parse, then taken with 4 points
+focus #63505
+type "PC1 frobnicates"
+focus #63512
+key enter
+expect text:"Diese Erwartung kenne ich nicht: expect PC1 frobnicates" exists
+focus #63505
+key ctrl+a
+type "PC1 reaches 10.0.2.10"
+focus #63508
+key ctrl+a
+type "4\n"
+focus #63512
+key enter
+expect button:"PC1 erreicht 10.0.2.10 · 4 Punkte" exists
+expect #63504 text "PC1 reaches 10.0.2.10"
+# ---- the texts, the time
+focus #63520
+key ctrl+a
+type "Das zweite Netz"
+focus #63521
+type "The second network"
+focus #63522
+type "R1 bekommt sein zweites Interface."
+focus #63523
+type "R1 gets its second interface."
+focus #63524
+type "Richte Gi0/0/1 von R1 ein, bis PC1 PC2 erreicht."
+focus #63525
+type "Set up Gi0/0/1 of R1 until PC1 reaches PC2."
+focus #63540
+key ctrl+a
+type "1\n"
+expect text:"4 Kriterien, 9 Punkte." exists
+# ---- the start network: the target without what the items check (one undo step)
+focus #63490
+key enter
+wait 1000
+expect text:"Ausgangsnetz erzeugt (rückgängig mit Strg+Z)." exists
+expect text:"Das Projekt jetzt: 0 von 9 Punkten." exists
+expect listitem:"JF-R4-1" exists
+cmd 10
+wait 1000
+expect listitem:"JF-R4-1" missing
+expect text:"Das Projekt jetzt: 9 von 9 Punkten." exists
+cmd 11
+wait 1000
+expect listitem:"JF-R4-1" exists
+expect text:"Das Projekt jetzt: 0 von 9 Punkten." exists
+shot build/jfnetworker/assess_author_start.png
+# ---- into the project (the save dialog cancelled): the Aufgabe panel follows undo and redo
+focus #63491
+key enter
+expect dialog:"Speichern unter" exists
+click button:"Abbrechen"
+expect text:"Die Aufgabe steht im Projekt; jetzt die Datei wählen." exists
+cmd 301
+expect text:"Das zweite Netz" exists
+expect text:"Netzwerk · 9 Punkte" exists
+expect text:"0 von 9 Punkten · 0 %" exists
+expect text:"Noch 1:00" exists
+expect #63824 unchecked
+expect text:"Der Router heißt R1 (oder Core)" exists
+cmd 10
+expect text:"Keine Aufgabe" exists
+cmd 11
+expect text:"0 von 9 Punkten · 0 %" exists
+# ---- saved as build/jfn_assess.jfnet (the dialog starts at the fixture)
+cmd 4
+expect dialog:"Speichern unter" exists
+click #1048588
+key ctrl+a
+type "../../../../build/jfn_assess.jfnet"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+# ---- the minute runs out: the grade is final, every item shows what it found
+wait 30500
+expect text:"Noch 0:30" exists
+wait 30000
+expect text:"Die Zeit ist um: die Bewertung ist endgültig." exists
+expect text:"0 von 9 Punkten · 0 %" exists
+expect text:"heißt JF-R4-1" exists
+expect text:"hat keine Adresse" exists
+expect text:"ist ausgeschaltet (shutdown)" exists
+expect button:"Abgeben" missing
+shot build/jfnetworker/assess_author_timeup.png
+# ---- the file again: its assessment starts over, the author's panel takes it
+cmd 2
+expect dialog:"Öffnen" exists
+click #1048588
+key ctrl+a
+type "jfn_assess.jfnet"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect text:"Das zweite Netz" exists
+expect text:"0 von 9 Punkten · 0 %" exists
+expect text:"Noch 1:00" exists
+cmd 510
+expect text:"Ziel: 3 Geräte, 2 Kabel." exists
+expect #63520 text "Das zweite Netz"
+expect #63521 text "The second network"
+expect button:"PC1 erreicht 10.0.2.10 · 4 Punkte" exists
+expect text:"4 Kriterien, 9 Punkte." exists
+expect_nowarn

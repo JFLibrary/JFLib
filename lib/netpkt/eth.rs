@@ -29,6 +29,8 @@ pub const ET_VLAN: u16 = 0x8100;
 pub const ET_IPV6: u16 = 0x86DD;
 pub const ET_QINQ: u16 = 0x88A8;
 pub const ET_LLDP: u16 = 0x88CC;
+/// IEEE 802.1X (EAPOL: the 4-way handshake of WPA2 and WPA3)
+pub const ET_EAPOL: u16 = 0x888E;
 
 /// a name for an ethertype ("IPv4", "ARP", ...), None for unknown types
 pub fn ethertype_name(t: u16) -> Option<&'static str> {
@@ -39,6 +41,7 @@ pub fn ethertype_name(t: u16) -> Option<&'static str> {
         ET_IPV6 => "IPv6",
         ET_QINQ => "802.1ad",
         ET_LLDP => "LLDP",
+        ET_EAPOL => "802.1X Authentication",
         _ => return None,
     })
 }

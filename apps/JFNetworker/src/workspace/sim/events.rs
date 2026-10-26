@@ -179,7 +179,9 @@ pub(crate) fn refresh(n: &mut Net, dark: bool) {
     }
     for e in eng.trace.events_after(ev.last) {
         let hop = e.hop.and_then(|id| eng.trace.hop(id));
-        let (hm, nm) = (hop.map_or(0, |x| x.mask), e.note.mask());
+        let hm = hop.map_or(0, |x| x.mask);
+        // IPv6 in place of IPv4 for decisions about IPv6 traffic (DevEvent::mask)
+        let nm = e.mask(hm);
         let own = if nm & !hm != 0 { nm & !hm } else { hm | nm };
         ev.rows.push(Row { seq: e.seq, t: e.t, from: hop.map_or(0, |x| x.from.0), dev: e.dev, own });
     }

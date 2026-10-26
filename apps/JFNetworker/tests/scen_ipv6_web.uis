@@ -1,0 +1,8 @@
+#!args apps/JFNetworker/tests/fixtures/ipv6_web.jfnet --scenario apps/JFNetworker/tests/scen/ipv6_web.scn --golden apps/JFNetworker/tests/scen/ipv6_web.report
+# golden scenario: a dual-stack network: the PCs take IPv4 from DHCP and IPv6 from SLAAC, the
+# server WEB answers names (A and AAAA) and web requests on both families; curl fetches by name
+# over IPv6 and by address over IPv4, ss shows the sockets, dig and host ask the name server,
+# ping and traceroute by name pick IPv6, ping -4 IPv4, and the IOS-like router asks its name
+# server over IPv6.  The GUI program runs tests/scen/ipv6_web.scn on tests/fixtures/ipv6_web.jfnet
+# without a window and ends with the report, which must equal tests/scen/ipv6_web.report byte
+# for byte on every target (the script itself is not run)

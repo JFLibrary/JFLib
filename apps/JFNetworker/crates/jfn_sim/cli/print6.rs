@@ -10,7 +10,9 @@
 //                    unreachable: Address unreachable", the statistics of IPv4's ping
 //   Linux traceroute "traceroute to ... 30 hops max, 80 byte packets" and a line per hop
 //
-// The jobs print through JobOut::Ping6 / JobOut::Trace6 (print.rs hands them here).
+// The jobs print through JobOut::Ping6 / JobOut::Trace6 (print.rs hands them here).  A ping or
+// traceroute by name whose name gave an IPv6 address comes here too (print.rs: job_switch):
+// "PING www.lab(2001:db8::2) 56 data bytes" names the address it found.
 
 use alloc::format;
 use alloc::string::String;
@@ -109,7 +111,11 @@ impl Engine {
                             Some(f) => format!(" from {} {}:", p.src, f),
                             None => String::new(),
                         };
-                        text.push_str(&format!("PING {}({}){} {} data bytes\n", shown, shown, via, p.opts.size));
+                        // a name: its address in the parentheses (no reverse lookup gives one
+                        // back); an address as typed, with its zone
+                        let typed = Ipv6::parse(shown.split('%').next().unwrap_or("")).is_some();
+                        let addr = if typed { shown.clone() } else { format!("{}", p.dst) };
+                        text.push_str(&format!("PING {}({}){} {} data bytes\n", shown, addr, via, p.opts.size));
                         *head = true;
                         *t0 = now;
                         *last_send = now;

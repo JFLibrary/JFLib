@@ -27,7 +27,9 @@
 // ignored as Linux does; UDP goes to the socket of its port (os.rs) and gets "port
 // unreachable" when nobody listens; a DHCP client's packet socket also takes datagrams to an
 // address the device does not have yet; TCP goes to tcp.rs (a RST where nobody listens, ICMP
-// errors about own segments to their connection).  Time Exceeded and the
+// errors about own segments to their connection); the hard errors about own datagrams (port
+// and protocol unreachable, prohibited, parameter problem) reach a UDP socket connected to that
+// peer (os.rs: udp_icmp_error).  Time Exceeded and the
 // unreachables come from the address of the interface the packet arrived on (as IOS does;
 // traceroute shows the inbound interfaces); Linux quotes up to 576 bytes of the packet, IOS
 // its header and 8 bytes.  Loopback addresses never come from a wire (martians); on Linux
@@ -37,6 +39,8 @@
 // the device's OSPF (ospf.rs: 224.0.0.5 and 224.0.0.6 joined where it runs); without OSPF it
 // gets "protocol unreachable" like any protocol the device does not speak.
 // IPv6 frames (ethertype 86DD, Cisco HDLC 86DD on serial lines) go to l3v6.rs.
+// WLAN (wlan.rs): the radio of an access point that sends a network counts as a live port of
+// its VLAN for the VLAN interface (an AP's BVI1 is up without a cable while it beacons).
 
 use alloc::sync::Arc;
 use alloc::vec::Vec;
@@ -122,7 +126,7 @@ impl Engine {
             IfKind::Svi(v) => {
                 // with spanning tree a port of the VLAN must forward (stp.rs)
                 f.admin_up
-                    && n.bridge.as_ref().is_some_and(|b| (0..b.ports.len() as u16).any(|p| b.carries(p, v) && b.stp.forwards(p) && n.ports[p as usize].link.is_some_and(|li| self.link_up(li))))
+                    && n.bridge.as_ref().is_some_and(|b| (0..b.ports.len() as u16).any(|p| b.carries(p, v) && b.stp.forwards(p) && (n.ports[p as usize].link.is_some_and(|li| self.link_up(li)) || self.wlan_radio_up(ni, p))))
             }
             IfKind::Loopback(_) => f.admin_up,
         }
@@ -471,6 +475,16 @@ impl Engine {
                 {
                     self.jobs_icmp_error(ni, v.src(), ic.typ(), ic.code(), u16::from_be_bytes([ic.rest()[2], ic.rest()[3]]), &q);
                     self.tcp_icmp_error(ni, ic.typ(), ic.code(), u16::from_be_bytes([ic.rest()[2], ic.rest()[3]]), &q);
+                    // a connected UDP socket hears the hard errors (Linux: icmp_err_convert's
+                    // fatal ones: protocol and port unreachable, administratively prohibited)
+                    let hard = (ic.typ() == icmp::T_UNREACH && matches!(ic.code(), icmp::UNREACH_PROTO | icmp::UNREACH_PORT | icmp::UNREACH_ADMIN)) || ic.typ() == icmp::T_PARAM_PROBLEM;
+                    if hard
+                        && q.proto() == PROTO_UDP
+                        && let Some(u) = q.payload().get(..4)
+                    {
+                        let refused = ic.typ() == icmp::T_UNREACH && matches!(ic.code(), icmp::UNREACH_PROTO | icmp::UNREACH_PORT);
+                        self.udp_icmp_error(ni, netpkt::IpAddr::V4(q.src()), netpkt::be16(u, 0), netpkt::IpAddr::V4(q.dst()), netpkt::be16(u, 2), refused, hop);
+                    }
                 }
             }
         }

@@ -13,6 +13,13 @@
 // data]" lines, and the times are virtual.  Help and version texts are our own words; ss lays
 // out its columns as iproute2 does when its output is not a terminal (no padding to a screen
 // width); a device counts as four CPUs for top.
+//
+// Both families: curl and nc take IPv6 addresses ("http://[2001:db8::1]/", "nc 2001:db8::1 80")
+// and names (A and AAAA in the order of resolver.rs, the next address when the first does not
+// connect), -4 / -6 keep them to one family; nc -l listens on 0.0.0.0, on :: with -6 or on the
+// address given, and its UDP socket is connected to the peer (an ICMP port unreachable ends it).
+// ss shows IPv6 addresses in brackets and a socket on :: as "*" where the device runs IPv6 (as
+// 0.0.0.0 elsewhere), -4 / -6 pick a family; show tcp brief writes IPv6 in capitals.
 
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
@@ -22,13 +29,20 @@ use alloc::vec::Vec;
 use core::any::Any;
 
 use netpkt::http::{Head, Headers, Version};
-use netpkt::Ipv4;
+use netpkt::IpAddr;
 
 use super::print::JobOut;
+use super::print6::up6;
 use crate::http::{Agent, AgentEv, Done, Fail, Req, Url, UrlErr};
 use crate::kernel::{Engine, Ns, MS, SEC};
-use crate::os::{ConsoleEv, Metric, Owner, OsApi, Service, SvcEvent};
+use crate::os::{ConsoleEv, Metric, Owner, OsApi, Service, SvcEvent, ANY, ANY4};
+use crate::resolver::Family;
 use crate::tcp::{SockOpts, TcpEnd, TcpRow, TcpState, TcpTimer};
+
+/// "addr:port" with an IPv6 address in brackets (curl's "Trying", nc, the TCP client)
+fn ep(a: IpAddr, p: u16) -> String {
+    if a.is_v4() { format!("{}:{}", a, p) } else { format!("[{}]:{}", a, p) }
+}
 
 /// the timer keys of a console program: its own, the HTTP agent's
 const K_OWN: u32 = 0;
@@ -330,6 +344,8 @@ struct CurlOpts {
     http10: bool,
     dump_header: Option<String>,
     no_meter: bool,
+    /// -4 / -6: the address family to look names up for
+    family: Option<Family>,
 }
 
 const CURL_HELP: &str = concat!(
@@ -350,8 +366,11 @@ const CURL_HELP: &str = concat!(
     " -A, --user-agent NAME     the User-Agent header\n",
     " -D, --dump-header -       write the response head to the console\n",
     " -0, --http1.0             speak HTTP/1.0\n",
+    " -4, --ipv4                look names up for IPv4 addresses only\n",
+    " -6, --ipv6                look names up for IPv6 addresses only\n",
     " -V, --version             say which curl this is\n",
-    "Only http:// URLs work here; the transfer runs in the simulator's virtual time.\n",
+    "Only http:// URLs work here (an IPv6 address in brackets: http://[2001:db8::1]/); the\n",
+    "transfer runs in the simulator's virtual time.\n",
 );
 
 const CURL_VERSION: &str = "curl 8.5.0 (JFNetworker): HTTP/1.1 over the simulator's TCP\nProtocols: http\nFeatures: (none)\n";
@@ -389,6 +408,8 @@ fn parse_curl(args: &[String]) -> Result<CurlOpts, (String, i32)> {
             "f" | "fail" => o.fail = true,
             "0" | "http1.0" => o.http10 = true,
             "http1.1" => o.http10 = false,
+            "4" | "ipv4" => o.family = Some(Family::V4),
+            "6" | "ipv6" => o.family = Some(Family::V6),
             "k" | "insecure" | "compressed" | "no-buffer" | "N" => {}
             "no-progress-meter" => o.no_meter = true,
             "X" | "request" => o.method = Some(String::from(v())),
@@ -575,6 +596,7 @@ impl Curl {
     fn new(o: CurlOpts) -> Curl {
         let mut agent = Agent::new(K_HTTP);
         agent.trace = true;
+        agent.family = o.family.unwrap_or(Family::Any);
         let queue = o.urls.iter().cloned().collect();
         Curl { o, agent, queue, cur: None, exit: 0, conns_before: 0 }
     }
@@ -678,7 +700,7 @@ impl Curl {
         for e in self.agent.take_events() {
             let host = self.cur.as_ref().map(|t| t.url.host.clone()).unwrap_or_default();
             match e {
-                AgentEv::Trying { addr, port, .. } => self.v(os, &format!("*   Trying {}:{}...\n", addr, port)),
+                AgentEv::Trying { addr, port, .. } => self.v(os, &format!("*   Trying {}...\n", ep(addr, port))),
                 AgentEv::Connected { remote, .. } => self.v(os, &format!("* Connected to {} ({}) port {}\n", host, remote.0, remote.1)),
                 AgentEv::Reusing { .. } => self.v(os, &format!("* Re-using existing connection with host {}\n", host)),
                 AgentEv::ConnectFailed { addr, port, local, end, .. } => {
@@ -1012,10 +1034,14 @@ struct NcOpts {
     sport: u16,
     host: String,
     ports: Vec<u16>,
+    /// -4 / -6 (a listener: IPv4 by default, :: for both with -6)
+    family: Option<Family>,
 }
 
 const NC_HELP: &str = "nc: a network Swiss army knife of the simulator\n\
 usage: nc [-46CdhklNnuvz] [-p source_port] [-q seconds] [-w timeout] [destination] [port]\n\
+\t-4\t\tIPv4 only\n\
+\t-6\t\tIPv6 only (with -l: listen on ::, which takes IPv4 too)\n\
 \t-C\t\tsend CRLF as the line end\n\
 \t-d\t\tdo not read from the console\n\
 \t-h\t\tthis help\n\
@@ -1069,7 +1095,9 @@ fn parse_nc(args: &[String]) -> Result<NcOpts, (String, i32)> {
                     'C' => o.crlf = true,
                     'N' => o.shutdown = true,
                     'd' => o.detach = true,
-                    'n' | '4' | 'D' | 'r' | 'S' | 't' => {}
+                    '4' => o.family = Some(Family::V4),
+                    '6' => o.family = Some(Family::V6),
+                    'n' | 'D' | 'r' | 'S' | 't' => {}
                     'h' => return Err((String::from(NC_HELP), 1)),
                     _ => return Err((format!("nc: invalid option -- '{}'\n{}", c, NC_USAGE), 1)),
                 }
@@ -1127,7 +1155,11 @@ fn parse_nc(args: &[String]) -> Result<NcOpts, (String, i32)> {
 #[derive(Clone, Debug)]
 pub struct Nc {
     o: NcOpts,
-    addr: Option<Ipv4>,
+    addr: Option<IpAddr>,
+    /// the name's other addresses, tried when the connection to one fails (an answer with
+    /// both families), and all of them for the next port of a scan
+    alts: Vec<IpAddr>,
+    all: Vec<IpAddr>,
     lookup: Option<u32>,
     /// the port being tried (index into o.ports)
     at: usize,
@@ -1135,7 +1167,7 @@ pub struct Nc {
     connected: bool,
     listener: Option<u32>,
     udp_port: Option<u16>,
-    peer: Option<(Ipv4, u16)>,
+    peer: Option<(IpAddr, u16)>,
     /// typed or piped bytes not sent yet, and whether the input ended
     pending: Vec<u8>,
     eof: bool,
@@ -1145,7 +1177,25 @@ pub struct Nc {
 impl Nc {
     fn new(o: NcOpts, input: Option<Vec<u8>>) -> Nc {
         let eof = input.is_some() || o.detach;
-        Nc { o, addr: None, lookup: None, at: 0, sock: None, connected: false, listener: None, udp_port: None, peer: None, pending: input.unwrap_or_default(), eof, any_ok: false }
+        Nc { o, addr: None, alts: Vec::new(), all: Vec::new(), lookup: None, at: 0, sock: None, connected: false, listener: None, udp_port: None, peer: None, pending: input.unwrap_or_default(), eof, any_ok: false }
+    }
+    /// the addresses to connect to: the first now, the others when it fails (only an answer
+    /// with both families gives others)
+    fn set_addrs(&mut self, all: Vec<IpAddr>) {
+        let both = all.iter().any(|a| a.is_v4()) && all.iter().any(|a| !a.is_v4());
+        self.all = if both { all } else { all.into_iter().take(1).collect() };
+        self.addr = self.all.first().copied();
+        self.alts = self.all.iter().skip(1).copied().collect();
+    }
+    /// the connection to the current address failed: the next one of the name, if any
+    fn next_addr(&mut self, os: &mut OsApi) -> bool {
+        if self.alts.is_empty() {
+            return false;
+        }
+        self.addr = Some(self.alts.remove(0));
+        self.sock = None;
+        self.connect(os);
+        true
     }
     fn port(&self) -> u16 {
         self.o.ports.get(self.at).copied().unwrap_or(0)
@@ -1172,11 +1222,14 @@ impl Nc {
         };
         let port = self.port();
         if self.o.udp {
-            match os.bind(self.o.sport, None) {
+            // a socket of the peer's family, connected to it: ICMP errors reach nc
+            let bind = if addr.is_v4() { ANY4 } else { ANY };
+            match os.bind_on(bind, self.o.sport, None) {
                 Ok(p) => {
                     self.udp_port = Some(p);
                     self.connected = true;
                     self.peer = Some((addr, port));
+                    os.udp_connect(p, Some((addr, port)));
                     self.flush(os);
                 }
                 Err(_) => {
@@ -1199,7 +1252,9 @@ impl Nc {
                 if self.o.verbose {
                     os.print(&format!("nc: connect to {} port {} ({}) failed: Network is unreachable\n", self.o.host, port, self.tag()));
                 }
-                self.next_port(os);
+                if !self.next_addr(os) {
+                    self.next_port(os);
+                }
             }
         }
     }
@@ -1209,6 +1264,10 @@ impl Nc {
         self.connected = false;
         self.at += 1;
         if self.at < self.o.ports.len() {
+            let all = core::mem::take(&mut self.all);
+            if !all.is_empty() {
+                self.set_addrs(all);
+            }
             self.connect(os);
         } else {
             let code = if self.any_ok { 0 } else { 1 };
@@ -1257,12 +1316,21 @@ impl Service for Nc {
     fn start(&mut self, os: &mut OsApi) {
         if self.o.listen {
             let port = self.port();
+            // the address to listen on: one given, :: for both families with -6, else every
+            // IPv4 address (as OpenBSD netcat binds)
+            let given = IpAddr::parse(self.o.host.trim_start_matches('[').trim_end_matches(']'));
+            let bind = match (given, self.o.family) {
+                (Some(a), _) => a,
+                (None, Some(Family::V6)) => ANY,
+                _ => ANY4,
+            };
+            let shown = if bind == ANY { String::from("::") } else { format!("{}", bind) };
             if self.o.udp {
-                match os.bind(port, None) {
+                match os.bind_on(bind, port, None) {
                     Ok(p) => {
                         self.udp_port = Some(p);
                         if self.o.verbose {
-                            os.print(&format!("Bound on 0.0.0.0 {}\n", port));
+                            os.print(&format!("Bound on {} {}\n", shown, port));
                         }
                     }
                     Err(_) => {
@@ -1272,11 +1340,11 @@ impl Service for Nc {
                 }
                 return;
             }
-            match os.tcp_listen(port, 1, SockOpts::default()) {
+            match os.tcp_listen_on(bind, port, 1, SockOpts::default()) {
                 Ok(l) => {
                     self.listener = Some(l);
                     if self.o.verbose {
-                        os.print(&format!("Listening on 0.0.0.0 {}\n", port));
+                        os.print(&format!("Listening on {} {}\n", shown, port));
                     }
                 }
                 Err(_) => {
@@ -1286,27 +1354,30 @@ impl Service for Nc {
             }
             return;
         }
-        match Ipv4::parse(&self.o.host) {
-            Some(a) => {
-                self.addr = Some(a);
+        let fam = self.o.family.unwrap_or(Family::Any);
+        let literal = IpAddr::parse(self.o.host.trim_start_matches('[').trim_end_matches(']'));
+        match literal {
+            Some(a) if fam == Family::Any || (fam == Family::V4) == a.is_v4() => {
+                self.set_addrs(alloc::vec![a]);
                 self.connect(os);
             }
-            None => self.lookup = Some(os.resolve(&self.o.host, netpkt::dns::TYPE_A)),
+            Some(_) => {
+                os.print(&format!("nc: getaddrinfo for host \"{}\" port {}: Address family for hostname not supported\n", self.o.host, self.port()));
+                self.exit(os, 1);
+            }
+            None => self.lookup = Some(os.resolve_host(&self.o.host, fam)),
         }
     }
     fn on(&mut self, ev: SvcEvent, os: &mut OsApi) {
         match ev {
             SvcEvent::Resolved(l) if Some(l) == self.lookup => {
-                let a = os.lookup(l).and_then(|x| x.result.clone()).and_then(|r| r.ok()).and_then(|r| r.addrs.first().copied());
-                match a {
-                    Some(a) => {
-                        self.addr = Some(a);
-                        self.connect(os);
-                    }
-                    None => {
-                        os.print(&format!("nc: getaddrinfo for host \"{}\" port {}: Name or service not known\n", self.o.host, self.port()));
-                        self.exit(os, 1);
-                    }
+                let all = os.lookup(l).and_then(|x| x.result.clone()).and_then(|r| r.ok()).map(|r| r.sorted).unwrap_or_default();
+                if all.is_empty() {
+                    os.print(&format!("nc: getaddrinfo for host \"{}\" port {}: Name or service not known\n", self.o.host, self.port()));
+                    self.exit(os, 1);
+                } else {
+                    self.set_addrs(all);
+                    self.connect(os);
                 }
             }
             SvcEvent::TcpConnected { sock, .. } if Some(sock) == self.sock => {
@@ -1366,7 +1437,9 @@ impl Service for Nc {
                     if self.o.verbose {
                         os.print(&format!("nc: connect to {} port {} ({}) failed: {}\n", self.o.host, self.port(), self.tag(), end.errno().unwrap_or("Connection refused")));
                     }
-                    self.next_port(os);
+                    if !self.next_addr(os) {
+                        self.next_port(os);
+                    }
                     return;
                 }
                 self.connected = false;
@@ -1390,6 +1463,9 @@ impl Service for Nc {
                 os.print(&String::from_utf8_lossy(&d.data));
                 self.flush(os);
             }
+            // the peer of a connected UDP socket refused (port unreachable): OpenBSD netcat's
+            // poll sees the error on the socket and ends without a word
+            SvcEvent::UdpError { port, .. } if Some(port) == self.udp_port && !self.o.listen => self.exit(os, 0),
             SvcEvent::Console(ConsoleEv::Line(l)) => {
                 if !self.o.detach {
                     self.line(os, &l);
@@ -1446,14 +1522,16 @@ const SS_HELP: &str = concat!(
     "   -i, --info          what TCP knows about each connection (windows, RTT, counters)\n",
     "   -s, --summary       counts by protocol and state\n",
     "   -H, --no-header     no title line\n",
-    "   -4, --ipv4          IPv4 sockets (the only ones here)\n",
+    "   -4, --ipv4          IPv4 sockets only\n",
+    "   -6, --ipv6          IPv6 sockets only (one on :: that takes both families is one of them)\n",
     "   -t, --tcp           TCP sockets\n",
     "   -u, --udp           UDP sockets\n",
     "   FILTER := [ state STATE ]... [ EXPRESSION ]\n",
     "   STATE := established | syn-sent | syn-recv | fin-wait-1 | fin-wait-2 | time-wait |\n",
     "            closed | close-wait | last-ack | listening | closing | all | connected |\n",
     "            synchronized | bucket | big\n",
-    "   EXPRESSION: sport|dport OP :PORT, src|dst ADDRESS[:PORT], joined by and, or, not, ( );\n",
+    "   EXPRESSION: sport|dport OP :PORT, src|dst ADDRESS[:PORT] (IPv6: [ADDRESS]:PORT), joined\n",
+    "               by and, or, not, ( );\n",
     "   OP := = | != | < | > | <= | >= (or eq, ne, lt, gt, le, ge)\n",
 );
 
@@ -1507,10 +1585,12 @@ struct SsRow {
     state: &'static str,
     recv_q: u32,
     send_q: u32,
-    local: (Ipv4, u16),
+    local: (IpAddr, u16),
     /// "%eth0" of a socket bound to an interface
     dev: String,
-    remote: (Ipv4, u16),
+    remote: (IpAddr, u16),
+    /// an IPv6 socket of the kernel's (on a device with IPv6, a socket on :: is one)
+    v6: bool,
     listening: bool,
     owner: Option<(String, u32, u32)>,
     timer: Option<(TcpTimer, Ns, u8)>,
@@ -1521,7 +1601,7 @@ struct SsRow {
 #[derive(Clone, Debug)]
 enum SsExpr {
     Port { local: bool, op: &'static str, port: u16 },
-    Addr { local: bool, addr: Ipv4, port: Option<u16> },
+    Addr { local: bool, addr: IpAddr, port: Option<u16> },
     Not(Box<SsExpr>),
     And(Box<SsExpr>, Box<SsExpr>),
     Or(Box<SsExpr>, Box<SsExpr>),
@@ -1626,15 +1706,40 @@ impl SsParser<'_> {
             }
             "src" | "dst" => {
                 let v = self.take().unwrap_or_default();
-                let (a, p) = match v.rsplit_once(':') {
-                    Some((a, p)) => (a, Some(port_of(p).ok_or_else(|| format!("ss: \"{}\" is no port\n", p))?)),
-                    None => (v.as_str(), None),
+                let port = |p: &str| port_of(p).ok_or_else(|| format!("ss: \"{}\" is no port\n", p));
+                // "[2001:db8::1]:80", "[2001:db8::1]", "2001:db8::1", "10.0.0.1:80", "10.0.0.1"
+                let (a, p) = if let Some(r) = v.strip_prefix('[') {
+                    match r.split_once(']') {
+                        Some((a, rest)) => (a, match rest.strip_prefix(':') {
+                            Some(x) => Some(port(x)?),
+                            None => None,
+                        }),
+                        None => (r, None),
+                    }
+                } else if v.matches(':').count() > 1 {
+                    (v.as_str(), None)
+                } else {
+                    match v.rsplit_once(':') {
+                        Some((a, x)) => (a, Some(port(x)?)),
+                        None => (v.as_str(), None),
+                    }
                 };
-                let addr = Ipv4::parse(a).ok_or_else(|| format!("ss: \"{}\" is no IPv4 address\n", a))?;
+                let addr = IpAddr::parse(a).ok_or_else(|| format!("ss: \"{}\" is no IP address\n", a))?;
                 Ok(SsExpr::Addr { local: t == "src", addr, port: p })
             }
             other => Err(format!("ss: the filter does not know \"{}\"\n", other)),
         }
+    }
+}
+
+/// an address as ss writes it: IPv4 as it is, IPv6 in brackets, the :: of a socket that takes
+/// both families "*" (as iproute2 shows a socket without IPV6_V6ONLY) when it is an IPv6 socket
+/// (`v6`: the device runs IPv6), else 0.0.0.0
+fn ss_addr(a: IpAddr, v6: bool) -> String {
+    match a {
+        IpAddr::V4(x) => format!("{}", x),
+        IpAddr::V6(x) if x.is_unspecified() => String::from(if v6 { "*" } else { "0.0.0.0" }),
+        IpAddr::V6(x) => format!("[{}]", x),
     }
 }
 
@@ -1681,7 +1786,9 @@ fn ss_info(r: &TcpRow) -> String {
         s.push_str(&format!(" rtt:{}/{}", ms_3(rtt), ms_3(r.rttvar)));
     }
     let mss = r.mss.max(1) as u32;
-    s.push_str(&format!(" mss:{} pmtu:{} advmss:{} cwnd:{}", r.mss, r.mss as u32 + 40, r.mss, r.cwnd / mss));
+    // the headers the MSS leaves out: 40 bytes over IPv4, 60 over IPv6
+    let hdr = if r.local.0.is_v4() { 40 } else { 60 };
+    s.push_str(&format!(" mss:{} pmtu:{} advmss:{} cwnd:{}", r.mss, r.mss as u32 + hdr, r.mss, r.cwnd / mss));
     if r.ssthresh < crate::tcp::SSTHRESH_INF {
         s.push_str(&format!(" ssthresh:{}", r.ssthresh / mss));
     }
@@ -1809,7 +1916,7 @@ impl Engine {
     }
 
     /// starts a console program; the console is busy until it ends
-    fn run_program(&mut self, ni: usize, name: &str, svc: Box<dyn Service>, stdin: bool) -> Result<(), String> {
+    pub(crate) fn run_program(&mut self, ni: usize, name: &str, svc: Box<dyn Service>, stdin: bool) -> Result<(), String> {
         let Some(id) = self.console_program(ni, name, svc) else {
             return self.tool_err(ni, &format!("{}: this device has no network stack\n", name));
         };
@@ -1921,13 +2028,18 @@ impl Engine {
         let _ = numeric_owner;
         let mut rows = Vec::new();
         let st = self.stack(ni);
+        // a socket on :: is an IPv6 socket of the kernel when the device runs IPv6 (else the
+        // device has IPv4 sockets only)
+        let six = self.v6_used(ni);
+        let is6 = |a: IpAddr| !a.is_v4() && (six || a != ANY);
         for s in self.sockets(dev) {
             let owner = match s.owner {
                 Owner::Svc(id) => ids.iter().find(|x| x.0 == id).map(|x| (x.1.clone(), 100 + id, next_fd(id))),
                 _ => None,
             };
             let devname = s.iface.and_then(|i| st.and_then(|x| x.ifaces.get(i as usize))).map(|f| format!("%{}", f.name)).unwrap_or_default();
-            rows.push(SsRow { udp: true, bit: 1 << 7, state: "UNCONN", recv_q: 0, send_q: 0, local: (Ipv4::UNSPECIFIED, s.port), dev: devname, remote: (Ipv4::UNSPECIFIED, 0), listening: true, owner, timer: None, info: None });
+            let none = if s.addr.is_v4() { ANY4 } else { ANY };
+            rows.push(SsRow { udp: true, bit: 1 << 7, state: "UNCONN", recv_q: 0, send_q: 0, local: (s.addr, s.port), dev: devname, remote: (none, 0), v6: is6(s.addr), listening: true, owner, timer: None, info: None });
         }
         for r in self.tcp_conns(dev) {
             let owner = r.owner.as_ref().and_then(|n| id_of(n).map(|id| (n.clone(), 100 + id, next_fd(id))));
@@ -1941,6 +2053,7 @@ impl Engine {
                 local: r.local,
                 dev: String::new(),
                 remote: r.remote,
+                v6: is6(r.local.0),
                 listening: r.state == TcpState::Listen,
                 owner,
                 timer,
@@ -1952,6 +2065,8 @@ impl Engine {
 
     pub(crate) fn sh_ss(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
         let (mut tcp, mut udp, mut all, mut listen, mut numeric, mut procs, mut opts, mut info, mut summary, mut header) = (false, false, false, false, false, false, false, false, false, true);
+        // -4 / -6: one family (0: both)
+        let mut fam = 0u8;
         let mut k = 0;
         while k < args.len() {
             let a = args[k];
@@ -1967,7 +2082,9 @@ impl Engine {
                     "info" => info = true,
                     "summary" => summary = true,
                     "no-header" => header = false,
-                    "ipv4" | "resolve" => {}
+                    "ipv4" => fam = 4,
+                    "ipv6" => fam = 6,
+                    "resolve" => {}
                     "help" => {
                         self.out(ni, SS_HELP);
                         return Ok(());
@@ -1991,7 +2108,9 @@ impl Engine {
                         'i' => info = true,
                         's' => summary = true,
                         'H' => header = false,
-                        '4' | 'r' => {}
+                        '4' => fam = 4,
+                        '6' => fam = 6,
+                        'r' => {}
                         'h' => {
                             self.out(ni, SS_HELP);
                             return Ok(());
@@ -2068,23 +2187,25 @@ impl Engine {
         if summary {
             let t: Vec<&SsRow> = rows.iter().filter(|r| !r.udp).collect();
             let u = rows.iter().filter(|r| r.udp).count();
+            let u6 = rows.iter().filter(|r| r.udp && r.v6).count();
             let tw = t.iter().filter(|r| r.state == "TIME-WAIT").count();
             let closed = tw + t.iter().filter(|r| r.state == "UNCONN").count();
             let estab = t.iter().filter(|r| r.state == "ESTAB").count();
             let orphan = t.iter().filter(|r| r.owner.is_none() && !r.listening && r.state != "TIME-WAIT").count();
             let hashed = t.len() - closed;
-            let line = |name: &str, n: usize| format!("{}\t  {:<9} {:<9} {:<9}\n", name, n, n, 0);
+            let hashed6 = t.iter().filter(|r| r.v6 && r.state != "TIME-WAIT" && r.state != "UNCONN").count();
+            let line = |name: &str, n: usize, n6: usize| format!("{}\t  {:<9} {:<9} {:<9}\n", name, n, n - n6, n6);
             let mut s = format!("Total: {}\nTCP:   {} (estab {}, closed {}, orphaned {}, timewait {})\n\nTransport Total     IP        IPv6\n", t.len() + u, t.len(), estab, closed, orphan, tw);
-            s.push_str(&line("RAW", 0));
-            s.push_str(&line("UDP", u));
-            s.push_str(&line("TCP", hashed));
-            s.push_str(&line("INET", u + hashed));
-            s.push_str(&line("FRAG", 0));
+            s.push_str(&line("RAW", 0, 0));
+            s.push_str(&line("UDP", u, u6));
+            s.push_str(&line("TCP", hashed, hashed6));
+            s.push_str(&line("INET", u + hashed, u6 + hashed6));
+            s.push_str(&line("FRAG", 0, 0));
             s.push('\n');
             self.out(ni, &s);
             return Ok(());
         }
-        let shown: Vec<&SsRow> = rows.iter().filter(|r| (if r.udp { udp } else { tcp }) && r.bit & states != 0 && expr.as_ref().is_none_or(|e| e.holds(r))).collect();
+        let shown: Vec<&SsRow> = rows.iter().filter(|r| (if r.udp { udp } else { tcp }) && (fam == 0 || r.v6 == (fam == 6)) && r.bit & states != 0 && expr.as_ref().is_none_or(|e| e.holds(r))).collect();
         // UDP before TCP, as iproute2 lists them
         let mut table: Vec<Vec<String>> = Vec::new();
         if header {
@@ -2123,9 +2244,9 @@ impl Engine {
                 String::from(r.state),
                 format!("{}", r.recv_q),
                 format!("{}", r.send_q),
-                format!("{}{}:", r.local.0, r.dev),
+                format!("{}{}:", ss_addr(r.local.0, r.v6), r.dev),
                 port(r.local.1, r.udp),
-                format!("{}:", r.remote.0),
+                format!("{}:", ss_addr(r.remote.0, r.v6)),
                 port(r.remote.1, r.udp),
                 proc,
             ]);
@@ -2297,7 +2418,12 @@ impl Engine {
     pub(crate) fn ios_tcp_brief(&self, ni: usize, all: bool) -> String {
         let dev = self.dev_of(ni);
         let mut s = String::from("TCB       Local Address               Foreign Address             (state)\n");
-        let at = |a: Ipv4, p: u16| if a.is_unspecified() { format!("*.{}", p) } else { format!("{}.{}", a, p) };
+        // IPv6 in capitals, the port after a dot as for IPv4
+        let at = |a: IpAddr, p: u16| match a {
+            _ if a.is_unspecified() => format!("*.{}", p),
+            IpAddr::V4(x) => format!("{}.{}", x, p),
+            IpAddr::V6(x) => format!("{}.{}", up6(x), p),
+        };
         for r in self.tcp_conns(dev) {
             if r.state == TcpState::Listen && !all {
                 continue;
@@ -2323,7 +2449,11 @@ impl Engine {
         let dev = self.dev_of(ni);
         let ids = self.service_ids(dev);
         let mut s = String::from("Active internet connections (servers and established)\nProt               Local Address             Foreign Address                  Service    State\n");
-        let addr = |a: Ipv4, p: u16| if a.is_unspecified() { format!("*:{}", p) } else { format!("{}:{}", a, p) };
+        let addr = |a: IpAddr, p: u16| match a {
+            _ if a.is_unspecified() => format!("*:{}", p),
+            IpAddr::V4(x) => format!("{}:{}", x, p),
+            IpAddr::V6(x) => format!("[{}]:{}", up6(x), p),
+        };
         for r in self.tcp_conns(dev) {
             if !matches!(r.state, TcpState::Listen | TcpState::Established) {
                 continue;
@@ -2338,7 +2468,7 @@ impl Engine {
                 Owner::Resolver(_) => String::from("Resolver"),
                 Owner::Log => String::from("Syslog"),
             };
-            s.push_str(&format!("{:>4}{:>28}{:>28}{:>25}{:>9}\n", "udp", addr(Ipv4::UNSPECIFIED, u.port), "*:0", svc, "LISTEN"));
+            s.push_str(&format!("{:>4}{:>28}{:>28}{:>25}{:>9}\n", "udp", addr(u.addr, u.port), "*:0", svc, "LISTEN"));
         }
         s
     }

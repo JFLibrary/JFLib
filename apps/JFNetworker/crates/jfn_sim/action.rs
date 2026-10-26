@@ -53,6 +53,11 @@
 //                                                      commands, "ip ospf ...", "clear ip ospf
 //                                                      process" (ospf.rs); OSPF looks again
 //                                                      after the same changes as RIP
+//   Move / Wlan / Scale                                a device's position, its WLAN settings,
+//                                                      the scale of the canvas (wlan.rs: stations
+//                                                      and access points look again); power,
+//                                                      ports, cables and devices that come and go
+//                                                      tell WLAN too
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -227,6 +232,19 @@ pub enum Action {
     Ip6 { dev: u32, set: crate::ip6::Ip6Set },
     /// a change of OSPF's configuration, or "clear ip ospf process" (ospf.rs)
     Ospf { dev: u32, set: crate::ospf::OspfSet },
+    /// the static name servers of either family in their order ("ip name-server A B",
+    /// "nameserver" lines); empty: those from DHCP again
+    NameServers { dev: u32, servers: Vec<netpkt::IpAddr> },
+    /// a static host name with an IPv6 address ("ipv6 host", /etc/hosts); None removes it (the
+    /// IPv4 entries of the name stay)
+    HostEntry6 { dev: u32, name: String, ip: Option<netpkt::Ipv6> },
+    /// a device moves on the canvas: the top left corner of its box (WLAN looks again)
+    Move { dev: u32, x: i32, y: i32 },
+    /// a device's WLAN settings: the networks of an access point, the network a station joins
+    /// (wlan.rs; None: none)
+    Wlan { dev: u32, wlan: Option<jfn_model::wlan::Wlan> },
+    /// the scale of the canvas: world units per metre (0: 10), for the ranges of the radios
+    Scale { dip_per_m: u32 },
 }
 
 /// why an action was refused (German text through Display)
@@ -314,11 +332,23 @@ impl Engine {
                 self.add_node(&d)?;
                 // it boots with its configuration (an undone delete keeps its running one)
                 self.cli_boot(d.id, &d.startup_config);
+                self.wlan_added(d.id);
                 Ok(())
             }
-            Action::RemoveDevice(dev) => self.remove_node(dev),
+            Action::RemoveDevice(dev) => {
+                self.wlan_removing(dev);
+                self.remove_node(dev)
+            }
             Action::Connect(l) => self.add_link(&l).map(|_| ()),
-            Action::Disconnect(id) => self.remove_link(id),
+            Action::Disconnect(id) => {
+                // a radio port that is free again: WLAN may use it (wlan.rs)
+                let ends = self.link_idx.get(&id).and_then(|&li| self.links.get(li)?.as_ref().map(|l| l.ends));
+                self.remove_link(id)?;
+                for (n, p) in ends.into_iter().flatten() {
+                    self.wlan_unfixed(n, p);
+                }
+                Ok(())
+            }
             Action::Power { dev, on } => {
                 let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
                 if let Some(Some(n)) = self.nodes.get_mut(ni) {
@@ -346,6 +376,7 @@ impl Engine {
                 if on {
                     self.stp_power(ni, true);
                 }
+                self.wlan_power(ni, on);
                 Ok(())
             }
             Action::PortAdmin { dev, port, up } => {
@@ -364,6 +395,7 @@ impl Engine {
                 if let Some(li) = li {
                     self.refresh_link(li);
                 }
+                self.wlan_port_admin(ni, pi);
                 Ok(())
             }
             Action::Unplug { link, down } => {
@@ -459,6 +491,7 @@ impl Engine {
                     if let Some(li) = li {
                         self.refresh_link(li);
                     }
+                    self.wlan_port_admin(ni, p);
                     return Ok(());
                 }
                 let st = self.ip_mut(ni, dev)?;
@@ -577,6 +610,10 @@ impl Engine {
             }
             Action::Ip6 { dev, set } => self.ip6_apply(dev, set),
             Action::Ospf { dev, set } => self.ospf_apply(dev, set),
+            // WLAN (wlan.rs)
+            Action::Move { dev, x, y } => self.wlan_move(dev, x, y),
+            Action::Wlan { dev, wlan } => self.wlan_set(dev, wlan),
+            Action::Scale { dip_per_m } => self.wlan_set_scale(dip_per_m),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }
@@ -833,6 +870,8 @@ impl Engine {
         for s in &d.services {
             let _ = self.service_def(d.id, s);
         }
+        // its place on the canvas and its WLAN settings (wlan.rs)
+        self.wlan_register(d, ni);
         Ok(ni)
     }
 
@@ -861,6 +900,9 @@ impl Engine {
         if na == nb {
             return Err(ActErr::Cable(Why::SameDevice));
         }
+        // an association of WLAN on a radio port gives way to the cable (wlan.rs)
+        self.wlan_fixing(na, pa);
+        self.wlan_fixing(nb, pb);
         let spec = |e: &Engine, n: usize, p: u16| match e.nodes.get(n) {
             Some(Some(node)) => Some((node.ports[p as usize].spec.clone(), node.ports[p as usize].link.is_some())),
             _ => None,

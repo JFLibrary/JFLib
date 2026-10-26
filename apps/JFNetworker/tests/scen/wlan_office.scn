@@ -1,0 +1,71 @@
+# WLAN im Büro: zwei Access Points mit dem WLAN „Buero“ (WPA2-Personal, 5 GHz, Kanal 36 und 44)
+# und ein offenes Gastnetz „Gaeste“ (2,4 GHz, VLAN 20) an AP1; R1 vergibt die Adressen beider
+# Netze.  Laptop1 und Phone1 melden sich an und bekommen ihre Adressen per DHCP, Laptop2 hat eine
+# falsche Passphrase: der 4-Wege-Handshake scheitert, er versucht es nach 10, 20 und 30 s wieder
+# und gibt nach dem vierten Fehlschlag auf.  Laptop1 geht beim Pingen von AP1 zu AP2 (Roaming
+# ohne Verlust), dann zu weit weg und zurück; AP1 wird aus- und wieder eingeschaltet.
+run 5s
+Laptop1: iw dev wlan0 link
+expect Laptop1 output contains "wlan0: connected to 02:4a:00:00:04:03 (AP1)"
+expect Laptop1 output contains "\tsignal: -71 dBm\n"
+Laptop1: ip -br addr show wlan0
+expect Laptop1 output contains "192.168.10.21/24"
+Phone1: iw dev wlan0 link
+expect Phone1 output contains "\tSSID: Gaeste\n\tfreq: 2412\n"
+Phone1: ip -br addr show wlan0
+expect Phone1 output contains "192.168.20.21/24"
+Laptop2: iw dev wlan0 link
+expect Laptop2 output contains "wlan0: not connected (next try in 9 s)"
+AP1: show dot11 associations
+expect AP1 output contains "Dot11Radio0  Gaeste           Phone1"
+expect AP1 output contains "Dot11Radio1  Buero            Laptop1"
+Laptop1: iw dev wlan0 scan
+run 1s
+expect Laptop1 output contains "SSID: Buero"
+# Laptop1 geht beim Pingen zu AP2: in der Mitte bleibt er (nicht 8 dB besser), nahe AP2 wechselt er
+Laptop1: ping -c 12 192.168.10.10
+at 8s move Laptop1 500 300
+at 10s move Laptop1 620 300
+run 12s
+expect Laptop1 output contains "12 packets transmitted, 12 received, 0% packet loss"
+Laptop1: iw dev wlan0 link
+expect Laptop1 output contains "(AP2)"
+AP2: show dot11 associations
+expect AP2 output contains "Dot11Radio1  Buero            Laptop1"
+# zu weit weg: nach sieben fehlenden Beacons ist die Verbindung verloren, er sucht vergeblich
+move Laptop1 1300 300
+run 3s
+Laptop1: iw dev wlan0 link
+expect Laptop1 output contains "wlan0: not connected (Buero is out of reach)"
+Laptop1: ip link show wlan0
+expect Laptop1 output contains "NO-CARRIER"
+# zurück: er sucht sofort und meldet sich bei AP1 an
+move Laptop1 360 300
+run 2s
+Laptop1: iw dev wlan0 link
+expect Laptop1 output contains "(AP1)"
+# AP1 aus: das Gastnetz ist weg, Laptop1 findet AP2 nicht (zu weit); wieder an: beide kommen zurück
+power off AP1
+run 2s
+Phone1: iw dev wlan0 link
+expect Phone1 output contains "wlan0: not connected (Gaeste is out of reach)"
+power on AP1
+run 3s
+Phone1: iw dev wlan0 link
+expect Phone1 output contains "wlan0: connected to"
+Phone1: ping -c 2 192.168.20.1
+run 3s
+expect Phone1 output contains "2 packets transmitted, 2 received, 0% packet loss"
+# Laptop2 gibt nach dem vierten Fehlschlag auf; mit der richtigen Passphrase aus der Shell klappt es
+run 60s
+Laptop2: iw dev wlan0 link
+expect Laptop2 output contains "wlan0: not connected (gave up after 4 failures)"
+Laptop2: iw dev wlan0 connect Buero psk Sommer2026!
+run 5s
+Laptop2: iw dev wlan0 link
+expect Laptop2 output contains "wlan0: connected to"
+Laptop2: ping -c 2 192.168.10.10
+run 3s
+expect Laptop2 output contains "2 packets transmitted, 2 received, 0% packet loss"
+AP1: show dot11 associations
+expect AP1 output contains "Laptop2"

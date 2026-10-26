@@ -4,7 +4,9 @@
 //
 //   Wheel<T>      many deadlines of a service on one of its four timer keys
 //   Url           http://host[:port][/target] ("host/path" alone means http); the host may be
-//                 a name, which the device's resolver looks up
+//                 a name, which the device's resolver looks up, or an IPv6 address in brackets
+//                 (http://[2001:db8::1]:8080/, RFC 3986 3.2.2; Url::host is without them, the
+//                 Host header and text() put them back)
 //   Serve         the server side: a listening socket and its connections, requests read
 //                 incrementally (pipelined ones answered in their order), keep-alive with an
 //                 idle timeout and a request limit, a header timeout, 100-continue, 400 / 413 /
@@ -15,7 +17,10 @@
 //                 connect and total timeouts, one retry when a reused connection turns out to
 //                 be closed before any byte came; the owner takes Done records with the times
 //                 of every step and, when it traces, each step as it happens (AgentEv, for
-//                 curl -v)
+//                 curl -v); names are looked up for the families of Agent::family (getaddrinfo
+//                 order: resolver.rs), and when they have addresses of both families a
+//                 connection that cannot be set up goes on to the next address (as curl tries
+//                 them one after the other; no parallel attempts of Happy Eyeballs)
 //
 // Both live inside a service: the service hands them its SvcEvents (on() says whether an event
 // was theirs) and the firing of their timer key.  Times are the engine's virtual time; a Date
@@ -30,11 +35,11 @@ use alloc::vec::Vec;
 use jfn_model::msg;
 use jfn_model::msg::{phrase, Msg};
 use netpkt::http::{self, Event, Framing, Head, Headers, HttpErr, Parser, Version};
-use netpkt::Ipv4;
+use netpkt::{IpAddr, Ipv4, Ipv6};
 
 use crate::kernel::Ns;
 use crate::os::{OsApi, SvcEvent};
-use crate::resolver::LookupErr;
+use crate::resolver::{Family, LookupErr};
 use crate::tcp::{SockOpts, TcpEnd};
 use crate::trace::{HopId, Note};
 
@@ -162,16 +167,40 @@ impl Url {
         };
         // user info is accepted and left out
         let auth = auth.rsplit_once('@').map(|x| x.1).unwrap_or(auth);
-        let (host, port) = match auth.rsplit_once(':') {
-            Some((h, p)) => {
-                if p.is_empty() {
-                    (h, 80)
-                } else if p.len() > 5 || !p.bytes().all(|b| b.is_ascii_digit()) {
-                    return Err(UrlErr::Port);
-                } else {
-                    (h, p.parse::<u32>().ok().filter(|&n| n <= 65535).ok_or(UrlErr::Port)? as u16)
-                }
+        // an IPv6 address in brackets, maybe with a port after them
+        let (bracketed, after) = match auth.strip_prefix('[') {
+            Some(r) => match r.split_once(']') {
+                Some((a, rest)) => (Some(a), rest),
+                None => return Err(UrlErr::BadHost),
+            },
+            None => (None, ""),
+        };
+        let port_of = |p: &str| -> Result<u16, UrlErr> {
+            if p.is_empty() {
+                Ok(80)
+            } else if p.len() > 5 || !p.bytes().all(|b| b.is_ascii_digit()) {
+                Err(UrlErr::Port)
+            } else {
+                Ok(p.parse::<u32>().ok().filter(|&n| n <= 65535).ok_or(UrlErr::Port)? as u16)
             }
+        };
+        if let Some(a) = bracketed {
+            let port = match after.strip_prefix(':') {
+                Some(p) => port_of(p)?,
+                None if after.is_empty() => 80,
+                None => return Err(UrlErr::BadHost),
+            };
+            if a.is_empty() {
+                return Err(UrlErr::NoHost);
+            }
+            let Some(ip) = Ipv6::parse(a) else {
+                return Err(UrlErr::BadHost);
+            };
+            let target = Url::target_of(target);
+            return Ok(Url { host: format!("{}", ip), port, target });
+        }
+        let (host, port) = match auth.rsplit_once(':') {
+            Some((h, p)) => (h, port_of(p)?),
             None => (auth, 80),
         };
         if host.is_empty() {
@@ -180,19 +209,26 @@ impl Url {
         if !host.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'.' || b == b'-' || b == b'_') {
             return Err(UrlErr::BadHost);
         }
+        Ok(Url { host: String::from(host), port, target: Url::target_of(target) })
+    }
+    /// the path and query of a URL ("/" when empty, the fragment left out)
+    fn target_of(target: &str) -> String {
         let target = target.split('#').next().unwrap_or("");
-        let target = if target.is_empty() {
+        if target.is_empty() {
             String::from("/")
         } else if target.starts_with('?') {
             format!("/{}", target)
         } else {
             String::from(target)
-        };
-        Ok(Url { host: String::from(host), port, target })
+        }
     }
-    /// the Host header: the port only when it is not 80
+    /// the host as a URL writes it: an IPv6 address in brackets
+    pub fn host_text(&self) -> String {
+        if self.host.contains(':') { format!("[{}]", self.host) } else { self.host.clone() }
+    }
+    /// the Host header: the port only when it is not 80 (an IPv6 address in brackets)
     pub fn host_header(&self) -> String {
-        if self.port == 80 { self.host.clone() } else { format!("{}:{}", self.host, self.port) }
+        if self.port == 80 { self.host_text() } else { format!("{}:{}", self.host_text(), self.port) }
     }
     /// the whole URL again ("http://10.0.0.2/")
     pub fn text(&self) -> String {
@@ -252,8 +288,8 @@ impl Default for ServeCfg {
 pub struct ReqIn {
     pub id: u64,
     pub sock: u32,
-    pub peer: (Ipv4, u16),
-    pub local: (Ipv4, u16),
+    pub peer: (IpAddr, u16),
+    pub local: (IpAddr, u16),
     pub head: Head,
     pub body: Vec<u8>,
     /// when its last byte came
@@ -308,8 +344,8 @@ enum SWait {
 
 #[derive(Clone, Debug)]
 struct SConn {
-    peer: (Ipv4, u16),
-    local: (Ipv4, u16),
+    peer: (IpAddr, u16),
+    local: (IpAddr, u16),
     parser: Parser,
     /// requests in the order they came, until their answers went (pipelining)
     order: VecDeque<Waiting>,
@@ -409,7 +445,8 @@ impl Serve {
         match *ev {
             SvcEvent::TcpAccept { listener, .. } if Some(listener) == self.listener => {
                 while let Some(s) = os.tcp_accept(listener) {
-                    let (local, peer) = os.tcp_info(s).map(|r| (r.local, r.remote)).unwrap_or(((Ipv4::UNSPECIFIED, 0), (Ipv4::UNSPECIFIED, 0)));
+                    let none = (IpAddr::V4(Ipv4::UNSPECIFIED), 0);
+                    let (local, peer) = os.tcp_info(s).map(|r| (r.local, r.remote)).unwrap_or((none, none));
                     let mut parser = Parser::requests();
                     parser.max_body = self.cfg.max_body;
                     self.conns.insert(s, SConn { peer, local, parser, order: VecDeque::new(), answers: BTreeMap::new(), out: Vec::new(), cur: None, served: 0, closing: false, eof: false, timer: None });
@@ -792,8 +829,8 @@ pub struct Done {
     /// reused
     pub conn: Option<u32>,
     pub reused: bool,
-    pub local: Option<(Ipv4, u16)>,
-    pub remote: Option<(Ipv4, u16)>,
+    pub local: Option<(IpAddr, u16)>,
+    pub remote: Option<(IpAddr, u16)>,
     /// body bytes (kept or not), bytes of the answer's heads, bytes of the request and of its
     /// head
     pub body_len: u64,
@@ -805,11 +842,11 @@ pub struct Done {
 /// a step of a request as it happens (when the Agent traces)
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AgentEv {
-    Trying { id: u64, addr: Ipv4, port: u16 },
-    Connected { id: u64, conn: u32, local: (Ipv4, u16), remote: (Ipv4, u16) },
+    Trying { id: u64, addr: IpAddr, port: u16 },
+    Connected { id: u64, conn: u32, local: (IpAddr, u16), remote: (IpAddr, u16) },
     Reusing { id: u64, conn: u32 },
     /// the connection was not set up (local: the port it tried from)
-    ConnectFailed { id: u64, addr: Ipv4, port: u16, local: Option<(Ipv4, u16)>, end: Option<TcpEnd> },
+    ConnectFailed { id: u64, addr: IpAddr, port: u16, local: Option<(IpAddr, u16)>, end: Option<TcpEnd> },
     /// the request went: its head as bytes and the body length
     Sent { id: u64, head: Vec<u8>, body: usize },
     Interim { id: u64, head: Head },
@@ -830,7 +867,7 @@ enum CState {
 #[derive(Clone, Debug)]
 struct CConn {
     no: u32,
-    key: (Ipv4, u16),
+    key: (IpAddr, u16),
     state: CState,
     parser: Parser,
     /// assigned, waiting for the connection
@@ -844,13 +881,16 @@ struct CConn {
     got: bool,
     used: u32,
     timer: Option<u64>,
-    local: Option<(Ipv4, u16)>,
+    local: Option<(IpAddr, u16)>,
 }
 
 #[derive(Clone, Debug)]
 struct AReq {
     req: Req,
-    addr: Option<Ipv4>,
+    addr: Option<IpAddr>,
+    /// the name's other addresses to try when this one cannot be reached (an answer with both
+    /// families)
+    alts: VecDeque<IpAddr>,
     sock: Option<u32>,
     start: Ns,
     resolved: Option<Ns>,
@@ -868,7 +908,7 @@ struct AReq {
     reused: bool,
     retried: bool,
     timer: Option<u64>,
-    local: Option<(Ipv4, u16)>,
+    local: Option<(IpAddr, u16)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -901,6 +941,8 @@ pub struct Agent {
     pub opts: SockOpts,
     /// record every step (AgentEv)
     pub trace: bool,
+    /// the address families names are looked up for (curl -4 / -6)
+    pub family: Family,
     reqs: BTreeMap<u64, AReq>,
     conns: BTreeMap<u32, CConn>,
     lookups: BTreeMap<u32, Vec<u64>>,
@@ -922,6 +964,7 @@ impl Agent {
             idle_timeout: 0,
             opts: SockOpts::default(),
             trace: false,
+            family: Family::Any,
             reqs: BTreeMap::new(),
             conns: BTreeMap::new(),
             lookups: BTreeMap::new(),
@@ -979,13 +1022,19 @@ impl Agent {
         let id = self.next;
         let now = os.now();
         let timer = if req.timeout > 0 { Some(self.wheel.add(now + req.timeout, ATimer::Req(id))) } else { None };
-        let literal = Ipv4::parse(&req.url.host);
+        // an address of the URL (of a family the agent may use); else a name to look up
+        let literal = IpAddr::parse(&req.url.host).filter(|a| match self.family {
+            Family::Any => true,
+            Family::V4 => a.is_v4(),
+            Family::V6 => !a.is_v4(),
+        });
         let host = req.url.host.clone();
         self.reqs.insert(
             id,
             AReq {
                 req,
                 addr: literal,
+                alts: VecDeque::new(),
                 sock: None,
                 start: now,
                 resolved: literal.map(|_| now),
@@ -1010,7 +1059,7 @@ impl Agent {
         if literal.is_some() {
             self.dispatch(os, id);
         } else {
-            let l = os.resolve(&host, netpkt::dns::TYPE_A);
+            let l = os.resolve_host(&host, self.family);
             self.lookups.entry(l).or_default().push(id);
         }
         self.wheel.arm(os);
@@ -1071,9 +1120,12 @@ impl Agent {
         let now = os.now();
         for id in ids {
             match &res {
-                Some(Ok(a)) if !a.addrs.is_empty() => {
+                Some(Ok(a)) if !a.sorted.is_empty() => {
+                    // the others only when both families came (curl goes through the list)
+                    let both = a.sorted.iter().any(|x| x.is_v4()) && a.sorted.iter().any(|x| !x.is_v4());
                     if let Some(r) = self.reqs.get_mut(&id) {
-                        r.addr = Some(a.addrs[0]);
+                        r.addr = Some(a.sorted[0]);
+                        r.alts = if both { a.sorted[1..].iter().copied().collect() } else { VecDeque::new() };
                         r.resolved = Some(now);
                     }
                     self.dispatch(os, id);
@@ -1161,9 +1213,28 @@ impl Agent {
             }
             Err(e) => {
                 self.ev(AgentEv::ConnectFailed { id, addr, port: key.1, local: None, end: None });
-                self.fail(os, id, Fail::NoRoute(e));
+                if !self.next_addr(os, id) {
+                    self.fail(os, id, Fail::NoRoute(e));
+                }
             }
         }
+    }
+
+    /// the connection to a request's address could not be set up: its next address, when the
+    /// name gave more of both families; false when there is none
+    fn next_addr(&mut self, os: &mut OsApi, id: u64) -> bool {
+        let Some(r) = self.reqs.get_mut(&id) else {
+            return false;
+        };
+        let Some(next) = r.alts.pop_front() else {
+            return false;
+        };
+        r.addr = Some(next);
+        r.sock = None;
+        r.conn = None;
+        r.local = None;
+        self.dispatch(os, id);
+        true
     }
 
     fn connected(&mut self, os: &mut OsApi, sock: u32) {
@@ -1176,7 +1247,7 @@ impl Agent {
             self.wheel.cancel(t);
         }
         let info = os.tcp_info(sock);
-        let (local, remote) = info.map(|r| (r.local, r.remote)).unwrap_or(((Ipv4::UNSPECIFIED, 0), (c.key.0, c.key.1)));
+        let (local, remote) = info.map(|r| (r.local, r.remote)).unwrap_or(((IpAddr::V4(Ipv4::UNSPECIFIED), 0), (c.key.0, c.key.1)));
         c.local = Some(local);
         let no = c.no;
         let ids: Vec<u64> = c.queue.drain(..).collect();
@@ -1263,7 +1334,9 @@ impl Agent {
             os.tcp_close(sock);
             for id in c.queue {
                 self.ev(AgentEv::ConnectFailed { id, addr: c.key.0, port: c.key.1, local: c.local, end });
-                self.fail(os, id, Fail::Connect(end.unwrap_or(TcpEnd::Closed)));
+                if !self.next_addr(os, id) {
+                    self.fail(os, id, Fail::Connect(end.unwrap_or(TcpEnd::Closed)));
+                }
             }
             self.pump(os);
             return;

@@ -207,7 +207,7 @@ fn relay_scenario(t: &mut T) {
     t.check("pc1 renewal time", l.as_ref().is_some_and(|l| (225 * SEC..=300 * SEC).contains(&(l.t1 - l.obtained)) && l.t2 == l.obtained + 525 * SEC));
     t.eq("pc1 address", addrs(&e, pc1, "eth0"), vec![pf("10.0.1.198/24")]);
     t.check("pc1 default route", e.routes(pc1).iter().any(|r| r.prefix == pf("0.0.0.0/0") && r.via == Some(ip("10.0.1.1")) && r.src == RouteSrc::Static));
-    t.eq("pc1 resolv.conf", e.resolv_conf(pc1).map(|c| (c.servers, c.search)), Some((vec![ip("10.0.2.10")], vec![String::from("lab")])));
+    t.eq("pc1 resolv.conf", e.resolv_conf(pc1).map(|c| (c.servers, c.search)), Some((vec![ip("10.0.2.10").into()], vec![String::from("lab")])));
     let b: Vec<(Ipv4, Mac, BindState, u64)> = e.dhcp_bindings(srv1).iter().map(|b| (b.ip, b.mac, b.state, b.until)).collect();
     // the server counts the lease from its ACK
     t.eq("bindings", b, vec![(ip("10.0.1.198"), mac(pc1), BindState::Bound, 604_419_127_736), (ip("10.0.1.199"), mac(pc2), BindState::Bound, 601_000_038_664)]);
@@ -229,10 +229,10 @@ fn relay_scenario(t: &mut T) {
     t.eq(
         "lookup",
         look.as_ref().and_then(|l| l.result.clone()).map(|r| r.map(|a| (a.name, a.canonical, a.addrs, a.from, a.ttl))),
-        Some(Ok((String::from("www.lab"), String::from("web.lab"), vec![ip("10.0.2.20")], Source::Server(ip("10.0.2.10")), 300))),
+        Some(Ok((String::from("www.lab"), String::from("web.lab"), vec![ip("10.0.2.20")], Source::Server(ip("10.0.2.10").into()), 300))),
     );
     t.eq("lookup done", look.as_ref().and_then(|l| l.done), Some(20 * SEC + 10_200));
-    t.eq("one question", look.as_ref().map(|l| l.tries.iter().map(|x| (x.name.clone(), x.server, x.outcome, x.rtt)).collect::<Vec<_>>()), Some(vec![(String::from("www.lab"), ip("10.0.2.10"), Some(TryOut::Answer), 10_200)]));
+    t.eq("one question", look.as_ref().map(|l| l.tries.iter().map(|x| (x.name.clone(), x.server, x.outcome, x.rtt)).collect::<Vec<_>>()), Some(vec![(String::from("www.lab"), ip("10.0.2.10").into(), Some(TryOut::Answer), 10_200)]));
     t.eq("echoes", ping_ev(&e, id), vec![reply(2, "10.0.2.20", 63, 8208), PingEv::Timeout { seq: 1 }, reply(3, "10.0.2.20", 63, 8208)]);
     t.check("server answered", notes(&e, srv1).contains(&Note::DnsAnswer { name: String::from("www.lab"), qtype: dns::TYPE_A, n: 2 }));
     // PC2 pings SRV1 by its short name: R1 knows SRV1 already, nothing is lost
@@ -539,7 +539,7 @@ fn resolver(t: &mut T) {
     t.check("cache rows", cache.iter().any(|c| c.0 == "host.corp" && !c.1) && cache.iter().any(|c| c.0 == "host.lab" && c.1));
     e.run_until(e.now() + 61 * SEC, BUDGET);
     let (later, _) = look(&mut e, pc1, "host.corp", dns::TYPE_A);
-    t.eq("ttl over: asked again", later.map(|r| r.map(|a| a.from)), Some(Ok(Source::Server(ip("10.0.0.53")))));
+    t.eq("ttl over: asked again", later.map(|r| r.map(|a| a.from)), Some(Ok(Source::Server(ip("10.0.0.53").into()))));
     // nothing anywhere: every candidate NXDOMAIN or REFUSED
     let (none, _) = look(&mut e, pc1, "nosuch", dns::TYPE_A);
     t.check("unknown name", matches!(none, Some(Err(LookupErr::NotFound | LookupErr::Refused))));
@@ -559,7 +559,7 @@ fn resolver(t: &mut T) {
     let (fo, took) = look(&mut e, pc1, "mail.lab", dns::TYPE_A);
     t.eq("failover", addrs_of(&fo), Some(Ok(vec![ip("10.0.0.25")])));
     t.check("after the timeout", (5 * SEC..5 * SEC + 20_000).contains(&took));
-    t.check("timeout noted", notes(&e, pc1).contains(&Note::ResolveTimeout { name: String::from("mail.lab"), server: ip("10.0.0.99") }));
+    t.check("timeout noted", notes(&e, pc1).contains(&Note::ResolveTimeout { name: String::from("mail.lab"), server: ip("10.0.0.99").into() }));
     // nobody answers: two rounds of 5 s, then the lookup gives up
     let _ = e.apply(Action::Resolver { dev: pc1, servers: Some(vec![ip("10.0.0.99")]), search: None });
     let (dead, took) = look(&mut e, pc1, "web.lab", dns::TYPE_A);

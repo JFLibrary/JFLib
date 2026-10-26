@@ -1,0 +1,58 @@
+#!args --verify-dirty --lang en
+# assessments in English (--lang en; A1): the list with the samples and their points, the
+# Aufgabe panel with the texts of the assessment file, F9 and what the items found, the score
+# after R1's first interface; the author's panel (Tools › Author an assessment …) filled from the
+# sample: the target, the tree with the chosen items checked, the editor of one item with the
+# file's texts.  Ids: 63496 "equivalent", 63501 / 63502 the item's texts, 63824 + i the items.
+size 1280 800
+theme light
+# ---- the list
+cmd 300
+expect dialog:"Open lab" exists
+expect text:"One router for two networks" exists
+expect text:"20 points · Name the new router and set up its two interfaces until the PCs find each other." exists
+expect text:"Static routes across three routers" exists
+click text:"One router for two networks"
+click button:"Open"
+# ---- the panel in English, F9
+expect text:"Network · 20 points" exists
+expect text:"0 of 20 points · 0%" exists
+expect text:"Items" exists
+expect text:"The router is called R1" exists
+expect text:"PC2 reaches the gateway of PC1" exists
+key f9
+expect text:"is called Router1" exists
+expect text:"PC1 reaches 10.0.2.10: no answer: no route to the destination" exists
+# ---- R1 named, its first interface: 7 points
+dblclick listitem:"Router1"
+type "enable\n"
+type "configure terminal\n"
+type "hostname R1\n"
+type "interface GigabitEthernet0/0/0\n"
+type "ip address 10.0.1.1 255.255.255.0\n"
+type "no shutdown\n"
+type "end\n"
+wait 3000
+expect text:"7 of 20 points · 35%" exists
+expect #63824 checked
+expect #63827 unchecked
+expect text:"has no address" exists
+shot build/jfnetworker/assess_en_panel.png
+# ---- the author's panel, filled from the sample
+cmd 510
+expect text:"Author an assessment" exists
+expect text:"Target: 3 devices, 2 cables." exists
+expect listitem:"Hostname R1" exists
+expect checkbox:"Hostname R1" checked
+dblclick listitem:"Gi0/0/0"
+expect checkbox:"Address 10.0.1.1/24" checked
+expect checkbox:"up (not shut down)" checked
+click listitem:"Address 10.0.1.1/24"
+expect text:"R1 Gi0/0/0 has the address 10.0.1.1/24" exists
+expect #63501 text "R1 Gi0/0/0 hat die Adresse 10.0.1.1/24"
+expect #63502 text "R1 Gi0/0/0 has the address 10.0.1.1/24"
+expect #63496 checked
+expect text:"7 items, 20 points." exists
+expect button:"PC1 reaches PC2 · 4 points" exists
+shot build/jfnetworker/assess_en_author.png
+expect_nowarn

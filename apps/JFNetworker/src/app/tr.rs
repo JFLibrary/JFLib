@@ -11,6 +11,8 @@
 //   menu(m)                a context menu in the current language (built once per language)
 //   msg(m) / speed(kbps)   a jfn_model::Msg of the model or the simulator, a link speed
 //   en()                   English is active
+//   msg_en(m)              a message in English whatever the window's language (the texts an
+//                          author's assessment gets in both languages, workspace/author.rs)
 //
 // The command table and the menus are static German tables; a language gets translated
 // copies, made once and kept (labels keep their '&' mnemonics: the catalogue has them too).
@@ -132,4 +134,26 @@ fn menu_in(m: &'static [Mi], k: usize) -> &'static [Mi] {
     let done: &'static [Mi] = Vec::leak(v);
     MENUS.lock().push((key, k, done));
     done
+}
+
+// German template -> English of both catalogues (made once, for msg_en)
+static EN: rt::sync::SpinLock<Option<alloc::collections::BTreeMap<&'static str, &'static str>>> = rt::sync::SpinLock::new(None);
+
+/// a message of the model or the simulator in English, whatever the window's language
+pub(crate) fn msg_en(m: &Msg) -> String {
+    let mut g = EN.lock();
+    let map = g.get_or_insert_with(|| {
+        let mut map = alloc::collections::BTreeMap::new();
+        for tsv in [UI_TSV, ENGINE_TSV] {
+            for line in tsv.lines().skip(1).filter(|l| !l.starts_with('#')) {
+                if let Some((de, en)) = line.split_once('\t')
+                    && !en.is_empty()
+                {
+                    map.insert(de, en);
+                }
+            }
+        }
+        map
+    });
+    m.text_with(&|s| map.get(s).copied().unwrap_or(s))
 }

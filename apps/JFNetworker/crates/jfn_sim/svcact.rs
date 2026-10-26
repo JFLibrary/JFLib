@@ -3,7 +3,8 @@
 //   Engine::os_apply(Action)       Service, RemoveService, ServiceRun, DhcpClient, DhcpRenew,
 //                                  DhcpPool, DhcpExclude, DhcpHelper, DhcpClear, DnsZone,
 //                                  DnsRecord, DnsForward, Resolver, HostEntry, ClearDnsCache,
-//                                  LogHost, LogLevel, Log, NtpServer, NtpMaster, ClockSet
+//                                  LogHost, LogLevel, Log, NtpServer, NtpMaster, ClockSet;
+//                                  NameServers (either family), HostEntry6 (an IPv6 name)
 //   Engine::service_def(dev, &ServiceDef)   a service from a project's definition:
 //
 //     kind            config (JSON)
@@ -61,7 +62,7 @@ use agent_core::jmap::Value;
 use jfn_model::msg;
 use jfn_model::msg::Msg;
 use jfn_model::project::ServiceDef;
-use netpkt::{Ipv4, Prefix4};
+use netpkt::{IpAddr, Ipv4, Prefix4};
 
 use crate::action::{ActErr, Action};
 use crate::dhcpc::DhcpClient;
@@ -368,19 +369,33 @@ impl Engine {
                 let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
                 let os = self.os_mut(ni).ok_or(ActErr::NoIp(dev))?;
                 if let Some(s) = servers {
-                    os.resolver.statics.servers = s;
+                    os.resolver.statics.servers = s.into_iter().map(IpAddr::V4).collect();
                 }
                 if let Some(d) = search {
                     os.resolver.statics.search = d.into_iter().map(|x| String::from(x.trim_end_matches('.'))).collect();
                 }
                 Ok(())
             }
+            Action::NameServers { dev, servers } => {
+                let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+                self.os_mut(ni).ok_or(ActErr::NoIp(dev))?.resolver.statics.servers = servers;
+                Ok(())
+            }
             Action::HostEntry { dev, name, ip } => {
                 let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
                 let os = self.os_mut(ni).ok_or(ActErr::NoIp(dev))?;
-                os.hosts.retain(|(h, _)| !h.eq_ignore_ascii_case(&name));
+                os.hosts.retain(|(h, a)| !(h.eq_ignore_ascii_case(&name) && a.is_v4()));
                 if let Some(a) = ip {
-                    os.hosts.push((name, a));
+                    os.hosts.push((name, IpAddr::V4(a)));
+                }
+                Ok(())
+            }
+            Action::HostEntry6 { dev, name, ip } => {
+                let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+                let os = self.os_mut(ni).ok_or(ActErr::NoIp(dev))?;
+                os.hosts.retain(|(h, a)| !(h.eq_ignore_ascii_case(&name) && !a.is_v4()));
+                if let Some(a) = ip {
+                    os.hosts.push((name, IpAddr::V6(a)));
                 }
                 Ok(())
             }

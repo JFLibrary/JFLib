@@ -1099,6 +1099,15 @@ Fensterrand hinaus.
   der Prüfung des Empfängers; [`netpkt/ipv6.rs`](../lib/netpkt/ipv6.rs): Erweiterungsköpfe,
   Fragmente und Reassembly nach RFC 8200 und 5722; Solicited-Node-Gruppen und EUI-64,
   Dissektor mit jedem Feld; Gruppe `icmpv6`), im Einsatz im IPv6 von JFNetworker.
+  Seit R5b auch die Auswahl der Zieladresse nach RFC 6724
+  ([`netpkt/addrsel.rs`](../lib/netpkt/addrsel.rs): Scope, Präzedenz und Label der
+  Standard-Policy-Tabelle, die Regeln 1, 2, 3, 5, 6, 8, 9 und 10; Gruppe `addrsel` mit den
+  Beispielen aus RFC 6724 10.2), im Einsatz im Resolver von JFNetworker.
+  Seit W1 auch EAPOL ([`netpkt/eapol.rs`](../lib/netpkt/eapol.rs): der EAPOL-Key-Rumpf des
+  4-Wege-Handshakes mit seinen Key-Information-Bits, welche der vier Nachrichten ein Frame ist,
+  das MIC-Feld und was es abdeckt, RSN-Element, GTK- und IGTK-KDEs, Dissektor; Gruppe `netpkt`)
+  und in [`crypto`](../lib/crypto/lib.rs) SHA-1, PBKDF2 über jeden Hash, der AES Key Wrap nach
+  RFC 3394 und AES-CMAC nach RFC 4493 (Gruppe `crypto`), im Einsatz im WLAN von JFNetworker.
 - **P2** · *erledigt* · Style `netlab` ([`styles/netlab`](../styles/netlab)) für JFNetworker:
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene

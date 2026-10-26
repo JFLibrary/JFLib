@@ -12,6 +12,13 @@
 //                                                      hops, Port Unreachable the target
 //   Engine::traceroute_host(dev, host, TraceOpts)      the same for a name (looked up first, as
 //                                                      ping_host does)
+//   Engine::ping_host_fam / traceroute_host_fam        the same with the families to ask for
+//                                                      (resolver::Family: as getaddrinfo, -4,
+//                                                      -6); a name whose first address is IPv6
+//                                                      turns the job into JobKind::Ping6 /
+//                                                      Trace6 (same id); `then6`: when the name
+//                                                      has no IPv4 address, look up its IPv6
+//                                                      one next (IOS-like devices prefer IPv4)
 //   Engine::job(id) / jobs() / cancel_job(id)          the results grow while it runs
 //   Engine::ping_many(k) -> started                    one probe each from k hosts at once
 //                                                      (load for performance tests)
@@ -29,11 +36,12 @@ use netpkt::icmp::{self, Icmp};
 use netpkt::ipv4::{Ipv4Hdr, Ipv4View, PROTO_ICMP, PROTO_UDP};
 use netpkt::pkt::{Pkt, HEADROOM};
 use netpkt::udp::UdpHdr;
-use netpkt::{be16, Ipv4};
+use netpkt::{be16, IpAddr, Ipv4};
 
 use crate::action::ActErr;
 use crate::ip::Origin;
 use crate::kernel::{Engine, Ev, Ns, SEC};
+use crate::resolver::Family;
 
 pub type JobId = u32;
 
@@ -120,6 +128,10 @@ pub struct PingJob {
     pub host: Option<String>,
     /// the lookup of the device's resolver for the name
     pub lookup: Option<u32>,
+    /// a name without an IPv4 address is looked up for IPv6 next (IOS-like)
+    pub then6: bool,
+    /// the ICMPv6 data bytes when the name leads to IPv6 (None: those of IPv4)
+    pub size6: Option<u16>,
 }
 
 /// how to trace a route
@@ -269,6 +281,8 @@ impl Engine {
             next_send: now,
             host: None,
             lookup: None,
+            then6: false,
+            size6: None,
         };
         let id = self.new_job(ni, JobKind::Ping(job));
         if src.is_unspecified() {
@@ -288,9 +302,19 @@ impl Engine {
         Ok(id)
     }
 
-    /// pings a name or an address; a name is looked up by the device's resolver first
+    /// pings a name or an address; a name is looked up by the device's resolver first (for
+    /// the families the device can use: getaddrinfo)
     pub fn ping_host(&mut self, dev: u32, host: &str, o: PingOpts) -> Result<JobId, ActErr> {
-        if let Some(ip) = Ipv4::parse(host.trim()) {
+        self.ping_host_fam(dev, host, o, Family::Any, false, None)
+    }
+
+    /// ping_host for the families of `fam`; `then6`: a name without an IPv4 address is looked
+    /// up for IPv6 next (IOS-like devices prefer IPv4); `size6`: the ICMPv6 data bytes when
+    /// the name leads to IPv6 (None: those of `o`)
+    pub fn ping_host_fam(&mut self, dev: u32, host: &str, o: PingOpts, fam: Family, then6: bool, size6: Option<u16>) -> Result<JobId, ActErr> {
+        if fam != Family::V6
+            && let Some(ip) = Ipv4::parse(host.trim())
+        {
             return self.ping(dev, ip, o);
         }
         let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
@@ -318,19 +342,35 @@ impl Engine {
             next_send: Ns::MAX,
             host: Some(String::from(host.trim())),
             lookup: None,
+            then6,
+            size6,
         };
         let id = self.new_job(ni, JobKind::Ping(job));
-        let lookup = self.lookup_start(ni, host, netpkt::dns::TYPE_A, crate::resolver::Owner::Ping(id));
-        if let Some(j) = self.jobs.get_mut(&id)
-            && let JobKind::Ping(p) = &mut j.kind
-        {
-            p.lookup = Some(lookup);
-        }
+        let lookup = self.lookup_host(ni, host, fam, crate::resolver::Owner::Ping(id));
+        // a lookup that ended at once (an address of the table, a bad name) was handled already
+        self.job_lookup(id, lookup, false);
         Ok(id)
     }
 
-    /// the lookup of a ping_host job is done: ping the address, or end without probes
-    pub(crate) fn ping_resolved(&mut self, id: JobId, addr: Option<Ipv4>) {
+    /// records the lookup of a job by name (`replace`: a later lookup of the same job)
+    fn job_lookup(&mut self, id: JobId, lookup: u32, replace: bool) {
+        let Some(j) = self.jobs.get_mut(&id) else {
+            return;
+        };
+        let slot = match &mut j.kind {
+            JobKind::Ping(p) => &mut p.lookup,
+            JobKind::Trace(t) => &mut t.lookup,
+            JobKind::Ping6(p) => &mut p.lookup,
+            JobKind::Trace6(t) => &mut t.lookup,
+        };
+        if replace || slot.is_none() {
+            *slot = Some(lookup);
+        }
+    }
+
+    /// the lookup of a ping_host job is done: ping the address (an IPv6 one makes it a Ping6
+    /// job), look up IPv6 next (`then6`), or end without probes
+    pub(crate) fn ping_resolved(&mut self, id: JobId, addr: Option<IpAddr>) {
         let now = self.now;
         let Some(j) = self.jobs.get(&id) else {
             return;
@@ -339,17 +379,44 @@ impl Engine {
             return;
         }
         let ni = j.node;
-        let Some(dst) = addr else {
-            if let Some(j) = self.jobs.get_mut(&id) {
-                j.done = true;
-                j.epoch = j.epoch.wrapping_add(1);
-            }
-            // a console waits for it ("ping: NAME: Name or service not known")
-            self.cli_job(id);
-            return;
+        let (then6, host) = match &j.kind {
+            JobKind::Ping(p) => (p.then6 && self.v6_used(ni), p.host.clone().unwrap_or_default()),
+            _ => (false, String::new()),
         };
-        let src = match &j.kind {
-            JobKind::Ping(p) => p.opts.src,
+        // name servers that did not answer are not asked again for IPv6
+        let silent = || {
+            let os = self.os(ni)?;
+            let l = os.resolver.lookups.values().rev().find(|l| l.owner == crate::resolver::Owner::Ping(id))?;
+            l.result.clone()?.err()
+        };
+        if addr.is_none() && then6 && silent() != Some(crate::resolver::LookupErr::Timeout) {
+            if let Some(j) = self.jobs.get_mut(&id)
+                && let JobKind::Ping(p) = &mut j.kind
+            {
+                p.then6 = false;
+            }
+            let lookup = self.lookup_host(ni, &host, Family::V6, crate::resolver::Owner::Ping(id));
+            self.job_lookup(id, lookup, true);
+            return;
+        }
+        let dst = match addr {
+            None => {
+                if let Some(j) = self.jobs.get_mut(&id) {
+                    j.done = true;
+                    j.epoch = j.epoch.wrapping_add(1);
+                }
+                // a console waits for it ("ping: NAME: Name or service not known")
+                self.cli_job(id);
+                return;
+            }
+            Some(IpAddr::V6(d)) => {
+                self.ping_becomes6(id, d);
+                return;
+            }
+            Some(IpAddr::V4(d)) => d,
+        };
+        let src = match self.jobs.get(&id).map(|j| &j.kind) {
+            Some(JobKind::Ping(p)) => p.opts.src,
             _ => return,
         }
         .or_else(|| self.source_for(ni, dst))
@@ -597,7 +664,15 @@ impl Engine {
     /// traces the route to a name or an address; a name is looked up by the device's resolver
     /// first (a failed lookup ends the job without probes)
     pub fn traceroute_host(&mut self, dev: u32, host: &str, o: TraceOpts) -> Result<JobId, ActErr> {
-        if let Some(ip) = Ipv4::parse(host.trim()) {
+        self.traceroute_host_fam(dev, host, o, Family::Any)
+    }
+
+    /// traceroute_host for the families of `fam` (a name whose first address is IPv6 makes it
+    /// a Trace6 job)
+    pub fn traceroute_host_fam(&mut self, dev: u32, host: &str, o: TraceOpts, fam: Family) -> Result<JobId, ActErr> {
+        if fam != Family::V6
+            && let Some(ip) = Ipv4::parse(host.trim())
+        {
             return self.traceroute(dev, ip, o);
         }
         self.trace.new_batch();
@@ -612,17 +687,14 @@ impl Engine {
         let port = o.port;
         let job = TraceJob { dst: Ipv4::UNSPECIFIED, src: Ipv4::UNSPECIFIED, opts: o, ident, ttl: 1, hops: Vec::new(), reached: false, waiting: None, next_port: port, host: Some(String::from(host.trim())), lookup: None };
         let id = self.new_job(ni, JobKind::Trace(job));
-        let lookup = self.lookup_start(ni, host, netpkt::dns::TYPE_A, crate::resolver::Owner::Trace(id));
-        if let Some(j) = self.jobs.get_mut(&id)
-            && let JobKind::Trace(t) = &mut j.kind
-        {
-            t.lookup = Some(lookup);
-        }
+        let lookup = self.lookup_host(ni, host, fam, crate::resolver::Owner::Trace(id));
+        self.job_lookup(id, lookup, false);
         Ok(id)
     }
 
-    /// the lookup of a traceroute_host job is done: trace the address, or end without probes
-    pub(crate) fn trace_resolved(&mut self, id: JobId, addr: Option<Ipv4>) {
+    /// the lookup of a traceroute_host job is done: trace the address (an IPv6 one makes it a
+    /// Trace6 job), or end without probes
+    pub(crate) fn trace_resolved(&mut self, id: JobId, addr: Option<IpAddr>) {
         let Some(j) = self.jobs.get(&id) else {
             return;
         };
@@ -630,6 +702,14 @@ impl Engine {
             return;
         }
         let ni = j.node;
+        let addr = match addr {
+            Some(IpAddr::V6(d)) => {
+                self.trace_becomes6(id, d);
+                return;
+            }
+            Some(IpAddr::V4(d)) => Some(d),
+            None => None,
+        };
         let src = addr.and_then(|dst| self.source_for(ni, dst));
         let Some(j) = self.jobs.get_mut(&id) else {
             return;

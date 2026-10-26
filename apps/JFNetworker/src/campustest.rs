@@ -138,7 +138,7 @@ fn leases(t: &mut T) {
         let def = e.routes(pc).into_iter().find(|r| r.prefix.len == 0).and_then(|r| r.via);
         t.eq(&format!("{} gateway", pc), def, Some(ip(gw)));
         let rc = e.resolv_conf(pc);
-        t.eq(&format!("{} name server", pc), rc.as_ref().map(|c| c.servers.clone()), Some(alloc::vec![ip("10.10.100.10")]));
+        t.eq(&format!("{} name server", pc), rc.as_ref().map(|c| c.servers.clone()), Some(alloc::vec![ip("10.10.100.10").into()]));
         t.eq(&format!("{} search", pc), rc.map(|c| c.search), Some(alloc::vec![String::from("lab")]));
     }
     // R1 handed them out from the pool of the relay's VLAN interface

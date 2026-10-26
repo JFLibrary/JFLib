@@ -470,8 +470,8 @@ impl Dhcpd {
     /// the server identifier for a request that came as `d`: the address it was sent to, or
     /// the address of the interface
     fn sid(os: &OsApi, d: &Dgram) -> Ipv4 {
-        if os.is_mine(d.dst) {
-            d.dst
+        if os.is_mine(d.dst4()) {
+            d.dst4()
         } else {
             os.iface(d.iface).and_then(|f| f.primary()).unwrap_or(Ipv4::UNSPECIFIED)
         }

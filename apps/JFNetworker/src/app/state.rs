@@ -72,6 +72,8 @@ pub(crate) struct Net {
     pub task: crate::workspace::task::Task,
     /// the Metriken panel of the lab (workspace/metrics.rs)
     pub metrics: Metrics,
+    /// the author's panel: an assessment in the making (workspace/author.rs, A1)
+    pub author: crate::workspace::author::Author,
 }
 
 impl Net {
@@ -97,6 +99,7 @@ impl Net {
             keys_open: Shared::new(0),
             task: crate::workspace::task::Task::new(),
             metrics: Metrics::new(),
+            author: crate::workspace::author::Author::new(),
         }
     }
 
@@ -152,6 +155,8 @@ impl Net {
         crate::workspace::sim::loaded(self, false);
         // the lab's goals start over (its panel shows)
         crate::workspace::task::loaded(self);
+        // an assessment in the making belongs to the old project
+        self.author = crate::workspace::author::Author::new();
         // the copy of the project that went is no longer needed
         crate::doc::autosave::clean(self);
     }

@@ -1862,7 +1862,10 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
 * `crypto` -- hashes (SHA-2 incl. SHA-384, BLAKE2b, BLAKE3), MACs, KDFs, Argon2id, AEAD
   (ChaCha20-Poly1305, XChaCha, AES-GCM), X25519, P-256 key exchange, Ed25519, RSA (PKCS#1 v1.5,
   PSS) and ECDSA P-256 / P-384 verification (randomness comes from the caller:
-  `plat::random_bytes`).
+  `plat::random_bytes`). For protocols that are defined with them (WPA2 and WPA3): SHA-1
+  (`sha1`, `Sha1`, `hmac_sha1`; broken for collisions, new designs take SHA-256), PBKDF2 over
+  any hash (`pbkdf2::<H>`, `pbkdf2_sha1`), the AES key wrap of RFC 3394 (`aes_wrap` /
+  `aes_unwrap`, which checks the integrity value) and AES-CMAC of RFC 4493 (`cmac_aes`).
 * `compress` -- LZ4 and zstd (`compress::zstd::compress(data, level)` / `decompress`; levels
   1 to 19, single-segment frames with checksums); `Codec` picks one by name.
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
@@ -2004,6 +2007,44 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   let back = ospf::OspfView::parse(&bytes).filter(|v| v.checksum_ok()).map(|v| ospf::Packet::read(&v));
   let lsa = ospf::Lsa::new(ospf::LSA_ROUTER, rid, rid, ospf::INITIAL_SEQ, ospf::OPT_E, body).to_bytes();
   assert!(ospf::lsa_checksum_ok(&lsa));
+  ```
+
+  Address selection: `addrsel` orders the addresses a name resolves to as RFC 6724 6 says,
+  given the source address each one would leave with (`Dest::new(addr, Some(src))`, `None`
+  for one that cannot be reached; `src_len` is the source's prefix length, `src_deprecated` its
+  preferred lifetime ended): unusable destinations last, matching scope, no deprecated source,
+  matching label, higher precedence, smaller scope, the longest matching prefix between IPv6
+  destinations (capped at the source's prefix, as glibc does), else the given order (`sort` is
+  stable). `scope`, `precedence` and `label` give the values of 3.1 / 3.2 and of the default
+  policy table of 2.1 (an IPv4 address as ::ffff:a.b.c.d), so a host with a global IPv6 address
+  tries IPv6 first and one with only a link-local address IPv4. Rules 4 and 7 (home addresses,
+  native transport) need Mobile IPv6 and tunnels and are left out.
+
+  ```rust
+  let mut d = vec![addrsel::Dest::new(v4, Some(my_v4)), addrsel::Dest::new(v6, Some(my_v6))];
+  addrsel::sort(&mut d);                              // v6 first: precedence 40 against 35
+  ```
+
+  WLAN security: `eapol` has the EAPOL frames of IEEE 802.1X-2004 (ethertype `eth::ET_EAPOL`,
+  0x888E) with the EAPOL-Key body of the 4-way handshake (IEEE 802.11-2020 12.7.2) --
+  `EapolView` reads the header, `Key` reads and writes the RSN key descriptor (Key Information
+  bits `KI_*` with the descriptor version, replay counter, nonce, IV, RSC, MIC, key data) and
+  tells which message of the handshake it is (`message()`: 1 to 4, None for group key messages
+  and requests); `mic_input` gives what the MIC covers (the PDU with its MIC field zeroed) and
+  `set_mic` writes one, so the caller computes it with its key (HMAC-SHA1-128 or AES-CMAC from
+  `crypto`). `Rsne` writes and reads the RSN element of a personal network (CCMP, AKM PSK, PSK-
+  SHA256 or SAE, management frame protection bits), `kde_gtk` / `kde_igtk` the key data
+  encapsulations of message 3, `kdes` and `elements` read key data, `pad_key_data` pads it for
+  the key wrap. `decode::layers` shows every field ("802.1X Authentication, EAPOL-Key (Message
+  3 of 4)", the bits of Key Information by name, the RSN element and the KDEs of plain key
+  data), `decode::info` sums it up ("Key (Message 2 of 4)").
+
+  ```rust
+  let m1 = eapol::Key { info: eapol::KDV_SHA1 | eapol::KI_PAIRWISE | eapol::KI_ACK, key_len: 16, replay: 1, nonce: anonce, ..Default::default() };
+  let frame = EthHdr { dst: sta, src: bssid, ethertype: eth::ET_EAPOL }.frame(&m1.pdu(eapol::VERSION_2004));
+  let mut pdu = m2.pdu(1);                       // message 2 of the station: KI_MIC set
+  let mic = crypto::hmac_sha1(&kck, &eapol::mic_input(&pdu).unwrap_or_default());
+  eapol::set_mic(&mut pdu, mic[..16].try_into().unwrap_or(&[0; 16]));
   ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
