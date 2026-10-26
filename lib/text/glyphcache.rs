@@ -63,6 +63,8 @@ pub(crate) struct Gc {
     big: Option<GcEntry>,
     /// set_antialias(false): masks are black and white
     sharp: bool,
+    /// counts the flushes (recorded glyphs name their masks by key: record.rs)
+    pub(crate) epoch: u32,
 }
 
 impl Gc {
@@ -78,7 +80,7 @@ impl Gc {
 }
 
 // gc_key(font, glyph, size_fx, phase) (bit 63 set)
-fn gc_key(font: u32, glyph: u32, size: i32, phase: i32) -> u64 {
+pub(crate) fn gc_key(font: u32, glyph: u32, size: i32, phase: i32) -> u64 {
     1u64 << 63
         | ((font & GC_FONT_MASK) as u64) << 40
         | ((phase & 3) as u64) << 36
@@ -91,12 +93,18 @@ pub(crate) fn lcd_key(font: u32, glyph: u32, size: i32, phase: i32, vertical: bo
     gc_key(font, glyph, size, phase) | (if vertical { 2u64 } else { 1 }) << 38
 }
 
+// the key of a colour bitmap (bit 62)
+pub(crate) fn bitmap_key(font: u32, glyph: u32, size: i32) -> u64 {
+    gc_key(font, glyph, size, 0) | 1 << 62
+}
+
 impl Text {
     /// gc_flush(): forget every cached glyph
     pub fn gc_flush(&mut self) {
         self.gc.map.clear();
         self.gc.bytes = 0;
         self.gc.big = None;
+        self.gc.epoch = self.gc.epoch.wrapping_add(1);
     }
 
     /// gc_usage() -> (entries, the entries at which it starts over, bytes, its arena's bytes)
@@ -260,7 +268,7 @@ impl Text {
         if self.hdr(font).flags & SGH_CBDT == 0 {
             return None;
         }
-        let key = gc_key(font, g, size, 0) | 1 << 62;
+        let key = bitmap_key(font, g, size);
         if !self.gc.map.contains_key(&key) {
             if self.gc.map.len() as u32 >= GC_SLOTS / 2 {
                 self.gc_flush();

@@ -302,12 +302,15 @@ fn cmd_visible(c: &Cmd, dc: &Dc) -> bool {
     !(b[0] >= k[2] || b[2] <= k[0] || b[1] >= k[3] || b[3] <= k[1])
 }
 
-/// cmd_render_layer: replay one layer into the current gfx target
-pub(crate) fn render_layer(list: &[Cmd], dc: &mut Dc, sf: &mut Surface, text: &mut Text, hook: &Option<IconHook>,
+/// cmd_render_layer: replay one layer into the current gfx target; the drawing commands
+/// before index `from` are skipped (their clip records still count: render_par.rs draws the
+/// part before a custom draw on other threads)
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn render_layer(list: &[Cmd], from: usize, dc: &mut Dc, sf: &mut Surface, text: &mut Text, hook: &Option<IconHook>,
                           icon_style: (&dyn crate::Style, u32, bool, u32, u32)) {
     let mut depth = 0; // clip depth opened by this layer
-    for c in list {
-        if !matches!(c, Cmd::Clip { .. } | Cmd::Unclip) && !cmd_visible(c, dc) {
+    for (i, c) in list.iter().enumerate() {
+        if !matches!(c, Cmd::Clip { .. } | Cmd::Unclip) && (i < from || !cmd_visible(c, dc)) {
             continue;
         }
         match c {
@@ -320,27 +323,8 @@ pub(crate) fn render_layer(list: &[Cmd], dc: &mut Dc, sf: &mut Surface, text: &m
                 dc.fill(sf, x, y, w, h);
             }
             &Cmd::RRect { x, y, w, h, r, t, fill, stroke, stroke2 } => {
-                let (r, t) = (r as i32, t as i32);
                 let mut sh = Shapes { dc: &mut *dc, sf: &mut *sf, path: &mut text.path, ras: &mut text.ras };
-                if fill & 0xFF00_0000 != 0 {
-                    sh.dc.set_color(fill);
-                    sh.fill_rrect(x, y, w, h, r);
-                }
-                if t == 0 {
-                    continue;
-                }
-                if stroke & 0xFF00_0000 != 0 {
-                    sh.dc.set_color(stroke);
-                    sh.stroke_rrect(x, y, w, h, r, t);
-                }
-                // different bottom edge colour: overdraw the lower corner band of the border
-                if stroke2 != stroke && stroke2 & 0xFF00_0000 != 0 {
-                    sh.dc.set_color(stroke2);
-                    let band = r.max(t);
-                    sh.dc.clip_push(x, y.wrapping_add(h).wrapping_sub(band), w, band);
-                    sh.stroke_rrect(x, y, w, h, r, t);
-                    sh.dc.clip_pop();
-                }
+                draw_rrect(&mut sh, [x, y, w, h], r as i32, t as i32, fill, stroke, stroke2);
             }
             Cmd::Text { x, y, font, size, c, maxw, s } => {
                 dc.set_color(*c);
@@ -408,28 +392,58 @@ pub(crate) fn render_layer(list: &[Cmd], dc: &mut Dc, sf: &mut Surface, text: &m
                 dc.clip_pop();
             }
             &Cmd::Shadow { x, y, w, h, r, depth: d, c } => {
-                // soft shadow: `depth` expanding rounded rectangles with fading alpha,
-                // offset downwards by depth / 3
-                if d <= 0 {
-                    continue;
-                }
-                let base = c >> 24;
-                let down = (d as u32 / 3) as i32;
-                let mut i = d;
-                while i != 0 {
-                    // alpha_i = base * (depth - i + 1) / (depth * 2)
-                    let a = base.wrapping_mul((d - i + 1) as u32) / ((d + d) as u32);
-                    let mut sh = Shapes { dc: &mut *dc, sf: &mut *sf, path: &mut text.path, ras: &mut text.ras };
-                    sh.dc.set_color((c & 0xFF_FFFF) | a << 24);
-                    sh.fill_rrect(x - i, y - i + down, w + i * 2, h + i * 2, r + i);
-                    i -= 1;
-                }
+                let mut sh = Shapes { dc: &mut *dc, sf: &mut *sf, path: &mut text.path, ras: &mut text.ras };
+                draw_shadow(&mut sh, [x, y, w, h], r, d, c);
             }
         }
     }
     while depth > 0 {
         dc.clip_pop();
         depth -= 1;
+    }
+}
+
+/// a Cmd::RRect: fill (alpha 0 = none), border t px in `stroke`, its bottom band in `stroke2`
+/// (render_layer and the row bands of render_par.rs)
+pub(crate) fn draw_rrect(sh: &mut Shapes, b: [i32; 4], r: i32, t: i32, fill: u32, stroke: u32, stroke2: u32) {
+    let [x, y, w, h] = b;
+    if fill & 0xFF00_0000 != 0 {
+        sh.dc.set_color(fill);
+        sh.fill_rrect(x, y, w, h, r);
+    }
+    if t == 0 {
+        return;
+    }
+    if stroke & 0xFF00_0000 != 0 {
+        sh.dc.set_color(stroke);
+        sh.stroke_rrect(x, y, w, h, r, t);
+    }
+    // different bottom edge colour: overdraw the lower corner band of the border
+    if stroke2 != stroke && stroke2 & 0xFF00_0000 != 0 {
+        sh.dc.set_color(stroke2);
+        let band = r.max(t);
+        sh.dc.clip_push(x, y.wrapping_add(h).wrapping_sub(band), w, band);
+        sh.stroke_rrect(x, y, w, h, r, t);
+        sh.dc.clip_pop();
+    }
+}
+
+/// a Cmd::Shadow: `depth` expanding rounded rectangles with fading alpha, offset downwards by
+/// depth / 3
+pub(crate) fn draw_shadow(sh: &mut Shapes, b: [i32; 4], r: i32, d: i32, c: u32) {
+    let [x, y, w, h] = b;
+    if d <= 0 {
+        return;
+    }
+    let base = c >> 24;
+    let down = (d as u32 / 3) as i32;
+    let mut i = d;
+    while i != 0 {
+        // alpha_i = base * (depth - i + 1) / (depth * 2)
+        let a = base.wrapping_mul((d - i + 1) as u32) / ((d + d) as u32);
+        sh.dc.set_color((c & 0xFF_FFFF) | a << 24);
+        sh.fill_rrect(x - i, y - i + down, w + i * 2, h + i * 2, r + i);
+        i -= 1;
     }
 }
 
@@ -627,11 +641,17 @@ impl Ui {
     /// cmd_render_all: replay every layer of the live window into the current gfx target
     /// (sf = the target the dc began)
     pub(crate) fn render_all_to(&mut self, shadow: bool) {
+        self.render_from(shadow, 0, 0);
+    }
+
+    /// render_all_to from command `from` of layer `layer` on (the earlier commands drawn
+    /// already; their clip records still count)
+    pub(crate) fn render_from(&mut self, shadow: bool, layer: usize, from: usize) {
         let icon_style = (self.style, self.color(T_ACCENT), self.theme_dark, self.color(T_TEXT_DISABLED), self.wp.rt.dpi as u32);
         let Ui { wp, dc, text, icon_hook, .. } = self;
         let sf = if shadow { &mut wp.rt.shadow } else { &mut wp.rt.fb };
-        for l in wp.cmd.layers.iter() {
-            render_layer(l, dc, sf, text, icon_hook, icon_style);
+        for (k, l) in wp.cmd.layers.iter().enumerate().skip(layer) {
+            render_layer(l, if k == layer { from } else { 0 }, dc, sf, text, icon_hook, icon_style);
         }
     }
 
@@ -644,8 +664,8 @@ impl Ui {
         let layers = &mut wp.cmd.layers;
         translate(&mut layers[L_POPUP as usize], dx, dy);
         translate(&mut layers[L_TIP as usize], dx, dy);
-        render_layer(&layers[L_POPUP as usize], dc, sf, text, icon_hook, icon_style);
-        render_layer(&layers[L_TIP as usize], dc, sf, text, icon_hook, icon_style);
+        render_layer(&layers[L_POPUP as usize], 0, dc, sf, text, icon_hook, icon_style);
+        render_layer(&layers[L_TIP as usize], 0, dc, sf, text, icon_hook, icon_style);
         translate(&mut layers[L_POPUP as usize], -dx, -dy);
         translate(&mut layers[L_TIP as usize], -dx, -dy);
     }

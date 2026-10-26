@@ -17,7 +17,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [gfx](#gfx) -- surfaces, the draw context, blend kernels, paths, strokes, masks, gradients
   <br>[lib.rs](#gfx-crate-root) · [blend.rs](#gfxblendrs) · [blendmode.rs](#gfxblendmoders) · [dash.rs](#gfxdashrs) · [flood.rs](#gfxfloodrs) · [gradient.rs](#gfxgradientrs) · [path.rs](#gfxpathrs) · [panel.rs](#gfxpanelrs) · [pathdata.rs](#gfxpathdatars) · [raster.rs](#gfxrasterrs) · [shapes.rs](#gfxshapesrs) · [straight.rs](#gfxstraightrs) · [stroke.rs](#gfxstrokers) · [tmask.rs](#gfxtmaskrs) · [xform.rs](#gfxxformrs)
 - [text](#text) -- fonts (SGF1, TrueType, CFF, COLR), glyph cache, text runs
-  <br>[lib.rs](#text-crate-root) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs)
+  <br>[lib.rs](#text-crate-root) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs)
 - [spell](#spell) -- spell checking: Hunspell dictionaries, the system's checker, a personal word list
   <br>[lib.rs](#spell-crate-root) · [hyphen.rs](#spellhyphenrs) · [speller.rs](#spellspellerrs) · [token.rs](#spelltokenrs)
 - [img_core](#img_core) -- image I/O dispatch, records, metadata, colour, resampling, image operations
@@ -9146,6 +9146,9 @@ gfx -- surfaces and the draw context (clip, origin, colour), fills, blits  [src/
   Dc::new(w, h) / dc.begin(&sf) / dc.end()      the draw context of a target; begin saves
                                      clip, origin and opacity and resets them for another
                                      target, end restores them (gfx_begin / gfx_end)
+  dc.begin_rows(&sf, row0, h)        sf holds rows row0 .. row0 + sf.h of a target h rows
+                                     high (a row band drawn on a thread of its own): the
+                                     coordinates stay the target's, only the pixel rows move
   dc: set_color(argb), set_opacity(op), clip_push(x, y, w, h) / clip_pop(), origin(x, y),
       translate(dx, dy), fill / clear / hline / vline / frame / blit / blit_scaled (sf, ...)
   path (Path, 24.8 and float API), raster (Raster), stroke (Path::stroke), shapes (Shapes),
@@ -9218,6 +9221,9 @@ ERR_LIMIT: i32 = -15
   - `pcol: [u32; 4]` -- premultiplied B, G, R, A
   - `pcol32: u32`
   - `ia: u32` -- 255 - premultiplied alpha
+  - `row0: i32` -- the target row in the surface's first row (begin_rows: a band of a taller target);
+    0 otherwise.  The fills and blits here, the rasterizer (paths, shapes, panels) and the
+    text engine's glyph blits honour it; other row writers (tmask, gradient, flood) expect 0.
 
 **`impl Dc`**
 
@@ -9226,6 +9232,10 @@ ERR_LIMIT: i32 = -15
 - **`fn begin(&mut self, sf: &Surface)`**
   draw into another target: clip, origin and opacity of the current one are saved; the
   clip becomes the whole new target, the origin 0  [gfx_begin]
+- **`fn begin_rows(&mut self, sf: &Surface, row0: i32, h: i32)`**
+  begin for a band: sf holds rows row0 .. row0 + sf.h of a target h rows high.  Drawing
+  keeps the target's coordinates (clip, origin, paths, glyph positions), so a band gets
+  the bytes the whole target would get there; the clip starts as the band's rows.
 - **`fn end(&mut self)`**
   back to the previous target with its clip, origin and opacity  [gfx_end]
 - **`fn set_color(&mut self, argb: u32)`**
@@ -9265,6 +9275,8 @@ blend -- pixel row kernels (premultiplied 0xAARRGGBB, bytes B G R A)   [src/gfx/
   mask_over(row, mask, pcol)       the colour through an 8-bit coverage row
   blit_over(dst, src, opacity)     premultiplied src over dst (x opacity 0..255)
   a8_over(dst, cov, alpha)         8-bit target: c = cov * alpha / 255, dst = c + dst * (255 - c) / 255
+  copy_stream(dst, src) / stream_fence()   a row copy past the caches (simd; row bands
+                                   drawn on worker threads go back to the framebuffer so)
 
 "over": dst = src + dst * (255 - src_alpha) / 255 with exact rounding (div255) and the
 saturation of the SSE2 kernels (packuswb).  fill_over, mask_over and a8_over are SIMD
@@ -9272,6 +9284,8 @@ kernels (simd::Kernel; their fast paths are exact shortcuts, so SSE2 and AVX2 ag
 blit_over is the assembly's SSE2 loop on pixel pairs, because its pair skip (both
 transparent: dst kept) is visible for invalid premultiplied input.
 ```
+
+Re-exports: `simd::{copy_stream, stream_fence}`
 
 - **`fn fill_solid(row: &mut [u8], c: u32)`**
   k_fill_solid: store one colour into every pixel of the row
@@ -9581,6 +9595,8 @@ halo from drawing two antialiased shapes on top of the same boundary pixel.
   Rounded panel in 24.8 pixels, with an inside border. Fill and stroke are
   straight ARGB. Honors draw origin, clipping and opacity, on PARGB and A8.
   Temporary mask storage is bounded to two 64-row bands of the visible area.
+  The bands start at the panel's first row whatever the clip, so a row gets the
+  same coverage when the clip cuts the panel (dirty rectangles, row bands).
 
 ### `gfx/pathdata.rs`
 
@@ -10007,6 +10023,8 @@ colour glyphs), the glyph cache and text runs                        [src/text/*
                                  on opaque targets (lcd.rs); NONE (default): greyscale
   set_fallback_fonts / set_system_fallback / fallback_for   characters the font lacks come
                                  from other fonts (fallback.rs; also when shaping)
+  record_n / record_icon / glyphs   glyphs placed now, blended later from the glyph cache by
+                                 any thread (record.rs: GlyphRec, GlyphView)
 
 Pen positions are 24.8 fixed point; glyphs are placed on quarter pixels and their
 coverage masks are cached per (font, glyph, size, phase, greyscale / subpixel).  Colour
@@ -10747,6 +10765,65 @@ F_INV30: f32 = 0.033333335
 - **`fn cubic(path: &mut Path, p: [f32; 8])`**
   flatten the cubic {p0, c1, c2, p3} (device px; p0 is the current point) into the path,
   the subdivision of path_cubic (tolerance 0.2 px)  [ol_cubic]
+
+### `text/record.rs`
+
+Source: [`lib/text/record.rs`](../lib/text/record.rs)
+
+```text
+record -- glyphs placed now and blended later from the glyph cache, by any thread (the row
+bands of ui's render_par.rs)
+
+  GlyphRec::default() / rec.begin(&text)   an empty record, bound to the cache as it is now
+  text.record_n(&mut rec, dc, sf, x, y, s, len) -> placed   draw_n's glyphs appended to rec
+       instead of blended (dc and sf as draw_n would get them; dc's colour is recorded with
+       every glyph): layout, shaping, fallback fonts and rasterizing the masks into the cache
+       happen now.  false: a glyph cannot come from the cache (too large: a filled path; a
+       colour bitmap above the cache's limit) -- that text must be drawn with draw_n
+  text.record_icon(&mut rec, dc, sf, cp, x, y, size_fx) -> placed   the same for icon_draw
+  rec.len()                          glyphs so far (a text's range: len before .. after)
+  rec.valid(&text)                   the cache was not flushed since begin (the keys hold)
+  text.glyphs() -> GlyphView         the cache read-only, Send + Sync
+  view.draw(&rec, from, to, dc, sf)  blend glyphs from .. to in their colours inside dc's
+                                     clip (dc.row0 honoured): the bytes draw_n gives there
+
+A glyph is its cache key, pen x and baseline (absolute target pixels), its box (cheap
+culling against the clip), the colour and how it is blended (mask, colour bitmap, subpixel
+mask with a copy of the colour's coverage adjustment).  Masks depend only on the key, so
+blending them later, clipped, gives the pixels of drawing them now.
+```
+
+- **`struct GlyphRec`**
+  glyphs placed by record_n / record_icon, blended later by GlyphView::draw
+
+**`impl GlyphRec`**
+
+- **`fn begin(&mut self, t: &Text)`**
+  empty, bound to the glyph cache as it is now
+- **`fn len(&self) -> usize`**
+  glyphs recorded so far
+- **`fn is_empty(&self) -> bool`**
+- **`fn valid(&self, t: &Text) -> bool`**
+  the glyph cache was not flushed since begin: every recorded key is still there
+
+**`impl Text`**
+
+- **`fn record_n(&mut self, rec: &mut GlyphRec, dc: &mut Dc, sf: &mut Surface, x: i32, y: i32, s: &[u8], len: usize) -> bool`**
+  draw_n's glyphs appended to rec instead of blended (record.rs); false: one of them
+  cannot be blended from the cache, draw that text with draw_n
+- **`fn record_icon(&mut self, rec: &mut GlyphRec, dc: &mut Dc, sf: &mut Surface, cp: u32, x: i32, y: i32, size_fx: i32) -> bool`**
+  icon_draw's glyph appended to rec (record_n)
+- **`fn glyphs(&self) -> GlyphView<'_>`**
+  the glyph cache read-only, for blending recorded glyphs on other threads
+
+- **`struct GlyphView<'a>`**
+  the glyph cache read-only (Text::glyphs): blends recorded glyphs, from any thread
+
+**`impl GlyphView<'_>`**
+
+- **`fn draw(&self, rec: &GlyphRec, from: usize, to: usize, dc: &mut Dc, sf: &mut Surface)`**
+  blend the glyphs from .. to of rec in their colours inside dc's clip (rec.valid must
+  hold: a missing mask is skipped)
 
 ### `text/rendering.rs`
 

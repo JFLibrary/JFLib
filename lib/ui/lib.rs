@@ -143,6 +143,8 @@ mod perm;
 mod popup;
 // the app's recent files and the system's (ui.recent_add / recent_files)
 mod recent;
+// large redraws on several threads: row bands of the dirty rectangles (render_live's hook)
+mod render_par;
 mod ribbon;
 mod settings_page;
 mod shell;
@@ -388,6 +390,8 @@ pub(crate) struct Mods {
     pub(crate) sound: sound::S,
     /// (ROADMAP §3) the colour pick, the last picture, dropped shortcuts (screen.rs)
     pub(crate) screen: screen::S,
+    /// (ROADMAP §8) the band buffers and glyph record of multi-threaded renders (render_par.rs)
+    pub(crate) rpar: render_par::S,
 }
 
 /// the UI context: everything ASMLIB keeps in g_* variables

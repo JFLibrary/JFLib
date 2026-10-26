@@ -84,6 +84,11 @@ impl Lut {
         l
     }
 
+    /// the coverage adjustment of the colour prepared last (recorded glyphs keep a copy)
+    pub(crate) fn adj(&self) -> &[u8; 256] {
+        &self.adj
+    }
+
     #[inline]
     fn from_lin(&self, l: i32) -> u8 {
         if l < 4096 { self.from_lo[l.max(0) as usize] } else { self.from_hi[(l.min(65535) >> 4) as usize] }
@@ -153,8 +158,10 @@ pub(crate) fn filter(px: &[u8], w: usize, h: usize, vertical: bool) -> Vec<u8> {
 }
 
 /// blend a subpixel mask (3 bytes per pixel in physical order; bgr: the first one is blue)
-/// with the colour of dc on an XRGB target at pen x / baseline (absolute), clipped
-pub(crate) fn blit(dc: &Dc, sf: &mut Surface, pen_x: i32, base: i32, e: &GcEntry, bgr: bool, lut: &Lut) {
+/// with the colour of dc on an XRGB target at pen x / baseline (absolute), clipped; adj: the
+/// coverage adjustment for dc's colour (Lut::adj after lcd_prepare)
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn blit(dc: &Dc, sf: &mut Surface, pen_x: i32, base: i32, e: &GcEntry, bgr: bool, lut: &Lut, adj: &[u8; 256]) {
     let mut x0 = pen_x.wrapping_add(e.left);
     let mut y0 = base.wrapping_add(e.top);
     let mut sx = 0i32;
@@ -184,7 +191,7 @@ pub(crate) fn blit(dc: &Dc, sf: &mut Surface, pen_x: i32, base: i32, e: &GcEntry
     let stride = sf.stride as usize;
     for r in 0..h as usize {
         let mo = ((sy as usize + r) * e.w as usize + sx as usize) * 3;
-        let o = (y0 as usize + r) * stride + x0 as usize * 4;
+        let o = ((y0 - dc.row0) as usize + r) * stride + x0 as usize * 4;
         let row = &mut sf.px[o..o + w as usize * 4];
         let mask = &e.px[mo..mo + w as usize * 3];
         for (p, m) in row.chunks_exact_mut(4).zip(mask.chunks_exact(3)) {
@@ -192,7 +199,7 @@ pub(crate) fn blit(dc: &Dc, sf: &mut Surface, pen_x: i32, base: i32, e: &GcEntry
                 continue;
             }
             for ch in 0..3 {
-                let cov = lut.adj[m[pick[ch]] as usize] as u32;
+                let cov = adj[m[pick[ch]] as usize] as u32;
                 let a = (cov * alpha + 127) / 255;
                 if a == 0 {
                     continue;
