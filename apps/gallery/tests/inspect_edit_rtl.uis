@@ -1,0 +1,64 @@
+#!args --rtl --inspect
+# the inspector's editing (ui/inspect_edit.rs) in mirrored windows at 150 %, the main window and
+# the tool window: a token through the tab "Farben" (hex box, picker), the corners, the change
+# list, a widget operated; at 150 % text the tool window keeps the style's own look.  The
+# inspector's window is 2147422208; ids as in inspect_edit.uis
+theme light
+scale 150
+scale 150 window 2147422208
+inspect expect open
+inspect tab colors
+window 2147422208
+click text:"T_CARD"
+click #0x07FD0010
+key ctrl+a
+type "#FFF8E0\n"
+window any
+expect token card #FFF8E0
+inspect expect changes 1
+window 2147422208
+click button:"Farbwähler"
+shot build/insp/edit_rtl_colors.png window 2147422208
+drag #0x27FD0012 #0x17FD0012
+window any
+expect token card #000000
+inspect expect changes 1
+inspect undo
+expect token card #FFF8E0
+# the corners: a click on the slider's middle, an arrow key (mirrored: Left adds)
+inspect tab look
+window 2147422208
+click #0x07FD0026
+key left
+window any
+inspect expect value radius "17 DIP"
+inspect set textscale 150
+inspect set height 40
+expect #100 rect * * * 60
+inspect expect changes 4
+shot build/insp/edit_rtl_look.png window 2147422208
+shot build/insp/edit_rtl_main.png
+# the change list at the end of the tab, one change reset there (the height: 0x07FD0803)
+window 2147422208
+wheel #0x07FD0026 -9600
+wait 800
+shot build/insp/edit_rtl_changes.png window 2147422208
+click #0x07FD0803
+window any
+inspect expect value height "vom Stil"
+inspect expect changes 3
+# a widget operated: a slider's value, a click through the flyout
+inspect select #140
+inspect do value 30
+expect #140 value 30
+inspect select button:"Standard"
+window 2147422208
+click button:"Bedienen"
+shot build/insp/edit_rtl_ops.png window 2147422208
+click button:"Klicken"
+window any
+expect text:"Wert: 30 %   Klicks: 1" exists
+inspect reset
+inspect expect changes 0
+expect theme none
+expect_nowarn

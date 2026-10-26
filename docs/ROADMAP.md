@@ -1532,7 +1532,7 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   für „aus ändert nichts“), Tests `apps/gallery/tests/inspect.uis` und `inspect_rtl.uis`
   (Windows und Linux, auch mit `--verify-dirty`). Es fehlt: Bearbeiten im Inspektor (nächster
   Eintrag) und Hot-Reload.
-- **P2** · *fehlt* · Hot-Reload und beschreibbarer Inspektor („Live-Edit“, wie das F12-Menü
+- **P2** · *teilweise* · Hot-Reload und beschreibbarer Inspektor („Live-Edit“, wie das F12-Menü
   eines Browsers), als Debug-Variante. Festgelegt am 2026-10-25: (a) Eine Art Hot-Reload: Code
   ändern, die laufende App zeigt die Änderung; die Elemente bleiben gebauter Rust-Code, nichts
   wird zur Laufzeit beschrieben oder interpretiert. (b) Nur als Debug-Variante und nur wenn
@@ -1562,3 +1562,23 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   ändert kein Bild (`inspect expect same` / `idle`); Änderungen im Inspektor gelten nur für die
   laufende Sitzung, bis man sie übernimmt. Tests: Skriptbefehle `inspect set …` /
   `inspect reset`, `apps/gallery/tests/inspect*.uis`.
+  Stufen 2 und 3 *erledigt* (2026-10-26, [`ui/inspect_edit.rs`](../lib/ui/inspect_edit.rs),
+  [GUIDE.md §30](GUIDE.md)): nur im Entwicklungs-Build (`build_rs.py` setzt dort
+  `--cfg jfgui_dev`; in `--release` bleibt der Inspektor nur lesend). Tab „Farben“ editierbar
+  (Hex-Feld und Farbwähler, die Farben des Modus in Gebrauch; die Zeile von `T_ACCENT` setzt den
+  Akzent, aus dem der Stil seine Abstufungen ableitet), neuer Tab „Darstellung“: Stil,
+  hell/dunkel/hoher Kontrast, Akzent, Sprache, Skalierung des Hauptfensters, Textskalierung,
+  Eckenradius, Abstände, Höhe der Steuerelemente, Schriftfamilie, Textgrößen; Theme-Werte über
+  `ui.set_theme` über dem App-Theme, der Rest über die vorhandenen Aufrufe. Geänderte Werte
+  markiert, einzeln zurücksetzbar, „Alles zurücksetzen“, Rückgängig/Wiederholen (Leiste,
+  Strg+Z/Strg+Y; `History` mit `Snapshot`-Schritten, ein Ziehen ist ein Schritt); das
+  Werkzeugfenster selbst bleibt im Aussehen des Stils, damit es bedienbar bleibt. „Bedienen“
+  (Tab „Widgets“): Klicken, Ziehen um dx/dy, Wert eines Schiebereglers (wie ein Screenreader
+  ihn setzt), Text tippen, `cmd ID` -- als synthetische Ereignisse in der Ereignisschlange, mit
+  der passenden Skriptzeile. Übernehmen: „Als Theme speichern“ (das App-Theme mit den
+  Änderungen; Schriftdateien relativ zur Theme-Datei), „Liste kopieren“ („Das hast du
+  geändert“: Theme-Zeilen, der Rest als Code-Zeilen). Skriptbefehle `inspect set|reset|undo|
+  redo|save|list|do …`, `inspect expect changes|value|list|undo|redo|message`; Tests
+  `apps/gallery/tests/inspect_edit.uis`, `inspect_edit_rtl.uis` (gespiegelt, 150 %),
+  `apps/themedemo/tests/inspect_edit.uis` (die gelinkten Stile, Änderungen über einem
+  App-Theme), Windows und Linux, auch mit `--verify-dirty`. Offen: Stufe 4 (Quelltext öffnen).

@@ -3724,9 +3724,15 @@ Permissions and agent control (auto_perm.rs):
   agent on|off   agent call ACTION [JSON]   agent expect ok|error CODE
 The live inspector (inspect.rs):
   inspect on|off|toggle|arm|disarm|pick|copy|snap   inspect select S|none
-  inspect option outlines|order|dirty on|off   inspect tab widgets|frame|colors
+  inspect option outlines|order|dirty on|off   inspect tab widgets|frame|colors|look
   inspect expect open|closed|pick on|off|flash on|off|idle|same|excluded|selected S|
                  hover S|selector "s"|copied "s"
+  ... editing in it (development builds, inspect_edit.rs; KEY = token NAME | accent |
+  radius | spacing | height | size STYLE | font | mode | style | lang | scale | textscale):
+  inspect set KEY VALUE   inspect reset [KEY]   inspect undo|redo   inspect save PATH
+  inspect list (copy the change list)   inspect do click|drag DX DY|value N|type "s"|cmd ID
+  [ARG] (the selected widget)   inspect expect changes N|list "s"|value KEY "s"|undo on|off|
+  redo on|off|message "s"|none
 Selectors S:  #123  (widget id)   "Label"   kind:"Label"   X,Y  (a point in DIP)
 A label must match exactly one widget (plain text is ignored when a control with the
 same label exists; matches in several windows: the topmost window, then the topmost
@@ -7542,11 +7548,13 @@ recorded or drawn.  Open:
     tokens; "Auswählen" picks a widget with a click into the app (the click does not reach
     it; Esc ends the pick)
 The inspector's own window is left out of the tree, the overlay and the pick.
+Development builds edit in it (inspect_edit.rs): the tab "Farben" is editable, the tab
+"Darstellung" and the widget operations below the properties are added.
 
 Script commands (auto.rs `inspect ...`, sc_inspect):
   inspect on|off|toggle      open / close (on arms it)     inspect arm|disarm   hot keys
   inspect pick               the pick mode ("Auswählen")   inspect select S|none
-  inspect option outlines|order|dirty on|off               inspect tab widgets|frame|colors
+  inspect option outlines|order|dirty on|off               inspect tab widgets|frame|colors|look
   inspect copy               copy the selector ("Kopieren")
   inspect snap               remember the main window's frame (for `inspect expect same`)
   inspect expect open|closed|idle|same|excluded            inspect expect pick|flash on|off
@@ -7554,7 +7562,8 @@ Script commands (auto.rs `inspect ...`, sc_inspect):
   inspect expect selector "s"      inspect expect copied "s"
 idle: the inspector did no work since it closed (or since the last idle check); same: the main
 window renders byte for byte as at `inspect snap`; excluded: the tree holds no record of the
-inspector's own window.
+inspector's own window.  Editing (development builds): inspect set|reset|undo|redo|save|list|
+do ..., inspect expect changes|list|value|undo|redo|message (inspect_edit.rs).
 ```
 
 **`impl Ui`**

@@ -26,11 +26,13 @@
 //     tokens; "Auswählen" picks a widget with a click into the app (the click does not reach
 //     it; Esc ends the pick)
 // The inspector's own window is left out of the tree, the overlay and the pick.
+// Development builds edit in it (inspect_edit.rs): the tab "Farben" is editable, the tab
+// "Darstellung" and the widget operations below the properties are added.
 //
 // Script commands (auto.rs `inspect ...`, sc_inspect):
 //   inspect on|off|toggle      open / close (on arms it)     inspect arm|disarm   hot keys
 //   inspect pick               the pick mode ("Auswählen")   inspect select S|none
-//   inspect option outlines|order|dirty on|off               inspect tab widgets|frame|colors
+//   inspect option outlines|order|dirty on|off               inspect tab widgets|frame|colors|look
 //   inspect copy               copy the selector ("Kopieren")
 //   inspect snap               remember the main window's frame (for `inspect expect same`)
 //   inspect expect open|closed|idle|same|excluded            inspect expect pick|flash on|off
@@ -38,7 +40,8 @@
 //   inspect expect selector "s"      inspect expect copied "s"
 // idle: the inspector did no work since it closed (or since the last idle check); same: the main
 // window renders byte for byte as at `inspect snap`; excluded: the tree holds no record of the
-// inspector's own window.
+// inspector's own window.  Editing (development builds): inspect set|reset|undo|redo|save|list|
+// do ..., inspect expect changes|list|value|undo|redo|message (inspect_edit.rs).
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -155,7 +158,7 @@ pub(crate) struct S {
     up_eat: u32,
     /// the selected node (0 = none) and its record in the last pass
     sel: u64,
-    sel_rec: Option<Sem>,
+    pub(crate) sel_rec: Option<Sem>,
     /// passes that still scroll the selected row into view (the view's height may change
     /// with the properties shown below it)
     reveal: u8,
@@ -663,7 +666,7 @@ impl Ui {
 
     // the script selector of a record: kind:"Label" when that names it alone, else #id, else
     // its centre (DIP)
-    fn ins_selector(&self, r: &Sem) -> String {
+    pub(crate) fn ins_selector(&self, r: &Sem) -> String {
         let iw = self.ins_win();
         if let Some(l) = r.label.as_deref().filter(|l| !l.is_empty() && l.len() < 250) {
             let n = self.sems.iter().filter(|s| s.win as i32 != iw && s.kind == r.kind && s.label.as_deref() == Some(l)).count();
@@ -710,10 +713,13 @@ impl Ui {
         }
         let open = self.m.ins.open.clone();
         let rect = self.m.ins.rect.clone();
+        self.ied_plain(true); // (inspect_edit.rs) the style's own look: the edits do not reach it
         if self.window_begin(INSPECT_WIN, tr("Inspektor"), Some(&open), WF_TOOL | WF_RESIZABLE, Some(&rect)) {
             self.ins_ui(&nodes);
         }
         self.window_end();
+        self.ied_plain(false);
+        self.ied_after(); // the edits its controls asked for (inspect_edit.rs)
     }
 
     // the first placement: beside the main window when the monitor has room (headless:
@@ -755,11 +761,20 @@ impl Ui {
             self.text(TS_CAPTION | TX_ACCENT, tr("Klicken Sie auf ein Widget (Esc beendet)"));
         }
         let mut tab = self.m.ins.tab;
-        self.segmented(ID_TABS, &mut tab, &[tr("Widgets"), tr("Bildaufbau"), tr("Farben")]);
+        let mut tabs = alloc::vec![tr("Widgets"), tr("Bildaufbau"), tr("Farben")];
+        if super::inspect_edit::EDIT {
+            tabs.push(tr("Darstellung")); // (inspect_edit.rs) development builds
+        }
+        self.segmented(ID_TABS, &mut tab, &tabs);
         self.m.ins.tab = tab;
         match tab {
             1 => self.ins_stats(nodes),
-            2 => self.ins_colors(),
+            2 => {
+                if !self.ied_colors() {
+                    self.ins_colors(); // (a --release build: read only)
+                }
+            }
+            3 => self.ied_look(),
             _ => {
                 self.ins_tree_ui(nodes);
                 self.ins_props();
@@ -769,6 +784,7 @@ impl Ui {
         if self.kb_chord(VK_C, MOD_CTRL) {
             self.ins_copy();
         }
+        self.ied_keys(); // Ctrl+Z / Ctrl+Y: the changes (inspect_edit.rs)
         if self.key(VK_ESCAPE) {
             self.m.ins.picking = false;
             self.repass();
@@ -900,6 +916,7 @@ impl Ui {
             self.ins_copy();
         }
         self.box_end();
+        self.ied_operate(&r); // click, drag, set, type, cmd (inspect_edit.rs)
     }
 
     // the frame statistics
@@ -1199,7 +1216,7 @@ impl Ui {
 
     /// `inspect ...` (auto.rs; see the module header)
     pub(crate) fn sc_inspect(&mut self, app: &mut dyn App, a: &[u8]) {
-        const BAD: &[u8] = b"inspect on|off|toggle|arm|disarm|pick|select S|option outlines|order|dirty on|off|tab widgets|frame|colors|copy|snap|expect ...";
+        const BAD: &[u8] = b"inspect on|off|toggle|arm|disarm|pick|select S|option outlines|order|dirty on|off|tab widgets|frame|colors|look|copy|snap|expect ...|set|reset|undo|redo|save|list|do ...";
         let w = |n: &str| word_eq(a, n).is_some();
         if w("on") || w("off") || w("toggle") {
             let on = if w("toggle") { !self.m.ins.on } else { w("on") };
@@ -1251,11 +1268,13 @@ impl Ui {
             self.run_passes(app);
         } else if let Some(r) = word_eq(a, "tab") {
             let r = skip_ws(r);
-            let t = ["widgets", "frame", "colors"].iter().position(|n| word_eq(r, n).is_some());
+            // look: "Darstellung" (development builds, inspect_edit.rs)
+            let n = if super::inspect_edit::EDIT { 4 } else { 3 };
+            let t = ["widgets", "frame", "colors", "look"][..n].iter().position(|n| word_eq(r, n).is_some());
             match t {
                 Some(t) => self.m.ins.tab = t as i32,
                 None => {
-                    self.fail(b"inspect tab widgets|frame|colors");
+                    self.fail(if n == 4 { &b"inspect tab widgets|frame|colors|look"[..] } else { b"inspect tab widgets|frame|colors" });
                     return;
                 }
             }
@@ -1270,7 +1289,8 @@ impl Ui {
             self.m.ins.snap = Some((fb.w, fb.h, fb.px.clone()));
         } else if let Some(r) = word_eq(a, "expect") {
             self.sc_inspect_expect(skip_ws(r));
-        } else {
+        } else if !self.ied_script(app, a) {
+            // (set, reset, undo, redo, save, list, do: inspect_edit.rs)
             self.fail(BAD);
         }
     }
@@ -1397,7 +1417,8 @@ impl Ui {
             if have != want {
                 self.fail(format!("the clipboard holds {:?}", String::from_utf8_lossy(&have)).as_bytes());
             }
-        } else {
+        } else if !self.ied_expect(a) {
+            // (changes, list, undo, redo, message: inspect_edit.rs)
             self.fail(b"inspect expect open|closed|pick on|off|flash on|off|idle|same|excluded|selected S|hover S|selector \"s\"|copied \"s\"");
         }
     }
