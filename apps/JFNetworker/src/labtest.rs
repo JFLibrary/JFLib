@@ -445,7 +445,7 @@ fn lb_drain(t: &mut T) {
     t.eq("drain: the view", e.lb_view(h[0], "lb").map(|v| v.backends.iter().map(|b| b.name.clone()).collect::<Vec<_>>()), Some(names(&["fast"])));
     t.eq("drain: backends metric", metric(&e, h[0], "lb", "backends"), 1);
     // add it back, and change weights and the algorithm
-    let add_op = jfn_sim::LbOp::Add { name: String::from("slow"), addr: addr(1), port: 80, weight: 2 };
+    let add_op = jfn_sim::LbOp::Add { name: String::from("slow"), addr: addr(1).into(), port: 80, weight: 2 };
     t.check("drain: add again", e.apply(Action::LbBackend { dev: h[0], svc: String::from("lb"), op: add_op.clone() }).is_ok());
     t.check("drain: not twice", e.apply(Action::LbBackend { dev: h[0], svc: String::from("lb"), op: add_op }).is_err());
     t.check("drain: unknown backend", e.apply(Action::LbBackend { dev: h[0], svc: String::from("lb"), op: jfn_sim::LbOp::Drain { name: String::from("nope") } }).is_err());

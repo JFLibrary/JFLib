@@ -11,7 +11,8 @@
 // windows of consoles, logview.rs the Protokoll panel, devwin/ the device windows, settings.rs
 // the dialogs of the settings and the shortcuts, task.rs the Aufgabe panel and the list of labs.
 // metrics.rs: the Metriken panel of the lab (services, KPI tiles, charts of the time series
-// with the faults).
+// with the faults).  assess.rs: an assessment in the Aufgabe panel (score, items, time limit,
+// handing in); author.rs: the panel that makes one from the project (A1).
 
 pub(crate) mod canvas;
 pub(crate) mod devwin;
@@ -25,6 +26,8 @@ pub(crate) mod terminal;
 pub(crate) mod sim;
 pub(crate) mod task;
 pub(crate) mod metrics;
+pub(crate) mod assess;
+pub(crate) mod author;
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -37,8 +40,9 @@ use crate::app::Net;
 pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     // what the simulator reported: console output, saved configurations, names, the log
     crate::doc::console::pump(n);
-    // the lab's goals follow the simulation (workspace/task.rs)
+    // the lab's goals follow the simulation (workspace/task.rs), an assessment grades
     task::tick(n);
+    assess::tick(n, ui);
     shell::frame(n, ui);
     terminal::windows(n, ui);
     devwin::frame(n, ui);

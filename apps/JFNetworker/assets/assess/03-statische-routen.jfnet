@@ -1,0 +1,394 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Statische Routen über drei Router",
+  "description": "Aufgabe mit Bewertung: ein Kabel und die statischen Routen einer Kette aus drei Routern.",
+  "seed": 13,
+  "next_id": 10,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 160,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.12.1 255.255.255.252\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "R2",
+      "model": "jf-r4",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.2 255.255.255.252\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.23.1 255.255.255.252\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "R3",
+      "model": "jf-r4",
+      "x": 480,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R3\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.23.2 255.255.255.252\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.3.1 255.255.255.0\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "PC2",
+      "model": "pc",
+      "x": 640,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.3.10/24 dev eth0\nip route add default via 10.0.3.1\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 6,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": {
+    "title": [
+      "Statische Routen über drei Router",
+      "Static routes across three routers"
+    ],
+    "summary": [
+      "Das fehlende Kabel stecken und die Routen setzen, bis PC1 PC2 erreicht; 15 Minuten, die Bewertung erst am Ende.",
+      "Plug in the missing cable and set the routes until PC1 reaches PC2; 15 minutes, the grade only at the end."
+    ],
+    "topic": "net",
+    "intro": [
+      [
+        "PC1 (10.0.1.0/24) und PC2 (10.0.3.0/24) liegen an den Enden einer Kette aus R1, R2 und R3; die Router sind über die kleinen Netze 10.0.12.0/30 und 10.0.23.0/30 verbunden. Ihre Interfaces sind fertig, aber zwischen R2 und R3 fehlt das Kabel, und kein Router kennt die Netze hinter seinen Nachbarn.",
+        "PC1 (10.0.1.0/24) and PC2 (10.0.3.0/24) sit at the ends of a chain of R1, R2 and R3; the routers are joined by the small networks 10.0.12.0/30 and 10.0.23.0/30. Their interfaces are ready, but the cable between R2 and R3 is missing, and no router knows the networks behind its neighbours."
+      ],
+      [
+        "Die Bewertung zeigt sich erst nach „Abgeben“ oder wenn die 15 Minuten um sind. Für R1 und R3 genügt auch eine Standardroute.",
+        "The grade shows only after “Hand in” or when the 15 minutes are up. For R1 and R3 a default route is enough as well."
+      ]
+    ],
+    "ordered": false,
+    "goals": [],
+    "hints": [
+      [
+        "Das Kabel: Werkzeug Verbinden (C), von R2 auf R3 ziehen, dann Gi0/0/1 an R2 und Gi0/0/0 an R3.",
+        "The cable: the Connect tool (C), drag from R2 to R3, then Gi0/0/1 on R2 and Gi0/0/0 on R3."
+      ],
+      [
+        "Eine statische Route im Konfigurationsmodus: ip route ZIELNETZ MASKE NÄCHSTER-HOP, etwa ip route 10.0.3.0 255.255.255.0 10.0.23.2 auf R2.",
+        "A static route in configuration mode: ip route NETWORK MASK NEXT-HOP, for example ip route 10.0.3.0 255.255.255.0 10.0.23.2 on R2."
+      ]
+    ],
+    "assess": {
+      "feedback": "end",
+      "time_limit_s": 900,
+      "items": [
+        {
+          "what": "cable",
+          "dev": "R2",
+          "id": 3,
+          "port": "GigabitEthernet0/0/1",
+          "peer": "R3",
+          "peer_id": 4,
+          "peer_port": "GigabitEthernet0/0/0",
+          "points": 2,
+          "text": [
+            "Kabel R2 Gi0/0/1 – R3 Gi0/0/0",
+            "Cable R2 Gi0/0/1 – R3 Gi0/0/0"
+          ]
+        },
+        {
+          "what": "route",
+          "dev": "R1",
+          "id": 2,
+          "value": [
+            "10.0.3.0/24 via 10.0.12.2",
+            "default via 10.0.12.2"
+          ],
+          "cmp": "any",
+          "points": 3,
+          "text": [
+            "R1 kennt den Weg zu 10.0.3.0/24 (eine Route oder die Standardroute über R2)",
+            "R1 knows the way to 10.0.3.0/24 (a route or the default route via R2)"
+          ]
+        },
+        {
+          "what": "route",
+          "dev": "R2",
+          "id": 3,
+          "value": "10.0.1.0/24 via 10.0.12.1",
+          "points": 3,
+          "text": [
+            "R2 kennt den Weg zu 10.0.1.0/24 über R1",
+            "R2 knows the way to 10.0.1.0/24 via R1"
+          ]
+        },
+        {
+          "what": "route",
+          "dev": "R2",
+          "id": 3,
+          "value": "10.0.3.0/24 via 10.0.23.2",
+          "points": 3,
+          "text": [
+            "R2 kennt den Weg zu 10.0.3.0/24 über R3",
+            "R2 knows the way to 10.0.3.0/24 via R3"
+          ]
+        },
+        {
+          "what": "route",
+          "dev": "R3",
+          "id": 4,
+          "value": [
+            "10.0.1.0/24 via 10.0.23.1",
+            "default via 10.0.23.1"
+          ],
+          "cmp": "any",
+          "points": 3,
+          "text": [
+            "R3 kennt den Weg zu 10.0.1.0/24 (eine Route oder die Standardroute über R2)",
+            "R3 knows the way to 10.0.1.0/24 (a route or the default route via R2)"
+          ]
+        },
+        {
+          "what": "check",
+          "checks": [
+            "PC1 reaches 10.0.3.10"
+          ],
+          "points": 6,
+          "text": [
+            "PC1 erreicht PC2",
+            "PC1 reaches PC2"
+          ]
+        }
+      ],
+      "target": {
+        "devices": [
+          {
+            "id": 1,
+            "name": "PC1",
+            "model": "pc",
+            "x": 0,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 2,
+            "name": "R1",
+            "model": "jf-r4",
+            "x": 160,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.12.1 255.255.255.252\n!\nip route 0.0.0.0 0.0.0.0 10.0.12.2\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 3,
+            "name": "R2",
+            "model": "jf-r4",
+            "x": 320,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.2 255.255.255.252\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.23.1 255.255.255.252\n!\nip route 10.0.1.0 255.255.255.0 10.0.12.1\nip route 10.0.3.0 255.255.255.0 10.0.23.2\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 4,
+            "name": "R3",
+            "model": "jf-r4",
+            "x": 480,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname R3\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.23.2 255.255.255.252\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.3.1 255.255.255.0\n!\nip route 10.0.1.0 255.255.255.0 10.0.23.1\n!\nend\n",
+            "services": [],
+            "comment": ""
+          },
+          {
+            "id": 5,
+            "name": "PC2",
+            "model": "pc",
+            "x": 640,
+            "y": 0,
+            "off": false,
+            "startup_config": "hostname PC2\nip addr add 10.0.3.10/24 dev eth0\nip route add default via 10.0.3.1\n",
+            "services": [],
+            "comment": ""
+          }
+        ],
+        "links": [
+          {
+            "id": 6,
+            "a": {
+              "dev": 1,
+              "port": "eth0"
+            },
+            "b": {
+              "dev": 2,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 7,
+            "a": {
+              "dev": 2,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 3,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 8,
+            "a": {
+              "dev": 3,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 4,
+              "port": "GigabitEthernet0/0/0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          },
+          {
+            "id": 9,
+            "a": {
+              "dev": 4,
+              "port": "GigabitEthernet0/0/1"
+            },
+            "b": {
+              "dev": 5,
+              "port": "eth0"
+            },
+            "cable": "copper-cross",
+            "cable_fixed": false,
+            "kbps": 1000000,
+            "delay_ns": 50,
+            "jitter_ns": 0,
+            "loss_ppm": 0,
+            "down": false,
+            "route": "straight",
+            "waypoints": []
+          }
+        ]
+      }
+    }
+  }
+}

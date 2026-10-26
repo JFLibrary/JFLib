@@ -67,9 +67,12 @@ Queues, Lastgeneratoren, eigene Skripte).
   Link-Local-Adressen aus der MAC, Duplikaterkennung, Router Advertisements und SLAAC mit
   Lebensdauern, der Neighbor Cache mit allen Zuständen, statische Routen, Weiterleiten mit Hop
   Limit, Packet Too Big und die Fragmente des Absenders, ICMPv6 mit den Grenzen des Vorbilds;
+  UDP und TCP über beide Familien (ein Socket auf `::` nimmt beide), der Resolver fragt A und
+  AAAA und ordnet sie nach RFC 6724, DNS, HTTP, die TCP-Testdienste und Skripte über IPv6;
   `ipv6 …`, `show ipv6 interface|route|neighbors`, `ping ipv6`, `traceroute ipv6`, `debug ipv6
-  icmp|nd` und unter Linux `ip -6`, `ping6`, `traceroute6`, `sysctl net.ipv6.*` (siehe
-  [IPv6](#ipv6)).
+  icmp|nd`, `ip host`, `ipv6 host`, `ip name-server` und unter Linux `ip -6`, `ping6`,
+  `traceroute6`, `sysctl net.ipv6.*`, `curl`, `nc` und `ss` mit `-4`/`-6`, `dig`, `host` und
+  `nslookup` (siehe [IPv6](#ipv6)).
 - **Routing mit OSPF (R3):** Router, L3-Switches und die Firewall sprechen OSPF Version 2 nach
   RFC 2328: `router ospf N` mit `network … area`, `router-id`, `passive-interface`, `auto-cost
   reference-bandwidth`, `area … stub [no-summary]`, `redistribute`, `default-information
@@ -78,6 +81,19 @@ Queues, Lastgeneratoren, eigene Skripte).
   Bestätigungen und Wiederholungen, Altern der LSAs, SPF mit gleich guten Wegen, Bereiche über
   einen ABR, Stub-Bereiche und externe Routen (E1, E2); `show ip ospf
   [neighbor|interface|database]`, `debug ip ospf` (siehe [Routing mit OSPF](#routing-mit-ospf)).
+- **Aufgaben mit Bewertung (A1):** Labore mit Kriterien, die Punkte bringen: Namen, Adressen und
+  Zustände von Interfaces, VLANs und Modi von Switchports, statische Routen, Kabel, Einstellungen
+  von Diensten, Zeilen der Running-Config (Abkürzungen zählen) und Verbindungsprüfungen; die
+  Rückmeldung je Kriterium, nur als Punktzahl oder erst nach dem Abgeben, wahlweise mit
+  Zeitgrenze; Werkzeuge › Aufgabe erstellen … macht aus einem fertigen Netz eine Aufgabe mit
+  Ausgangsnetz; drei Beispiele (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)).
+- **WLAN (W1):** Access Points und der Heimrouter bieten Netze an (SSID, 2,4, 5 oder 6 GHz mit
+  Kanal, offen, WPA2- oder WPA3-Personal, VLAN, Gastnetz, Client-Isolation), Laptops, Smartphones
+  und andere Stationen melden sich ohne Kabel an: Suche, Authentifizierung, Assoziation und der
+  4-Wege-Handshake mit echten EAPOL-Frames, Signal und Rate aus der Entfernung im Maßstab des
+  Projekts, Roaming beim Verschieben, Verbindungsverlust außer Reichweite; Funklinien,
+  Reichweiten und Signalbalken auf der Zeichenfläche, die Einstellungen im Inspektor, `iw` in der
+  Shell, `show dot11 associations` am Access Point (siehe [WLAN](#wlan)).
 
 ## Bedienung
 
@@ -183,15 +199,28 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `model.uis`, Gruppe `ipv6` | IPv6 (siehe [IPv6](#ipv6)): Link-Local-Adressen aus der MAC und ihre Duplikaterkennung mit der Pause aus dem eigenen Zufallsstrom des Geräts auf die Nanosekunde, eine doppelte Adresse unter Linux und IOS-artig (`dadfailed`, `[DUP]`, das Problem), Router Solicitations und Advertisements (Zeiten, Inhalt, Rahmen), SLAAC mit Lebensdauern (veraltet, abgelaufen, die Zwei-Stunden-Regel), der Neighbor Cache durch INCOMPLETE, REACHABLE, STALE, DELAY und PROBE und beide Arten zu scheitern, Ping und Traceroute über zwei Router (statische Routen, ein Link-Local-Next-Hop, Hop Limit, keine Route, eine Schleife), Packet Too Big und die Fragmente des Absenders, die Path MTU nach 10 Minuten, aufgegebene Fragmente, die Grenzen der ICMPv6-Fehler (IOS-artig und Linux), die Befehlszeilen (Hilfe, `show`, `debug`, `clear`, die Konfiguration gelesen wieder dieselbe), Strom und abgeschaltetes Routing, ein Projekt ohne IPv6 wie zuvor, deutsche und englische Texte, die Prüfsummen jedes Rahmens, Determinismus |
 | `ipv6_inspector.uis` | IPv6 im Fenster (`fixtures/ipv6_slaac.jfnet`): die Spalte IPv6 im Inspektor und im Gerätefenster, die Adressen des gewählten Interfaces mit Herkunft und Zustand, ein Switch ohne IPv6 behält seine Spalten; ein Bild (`build/jfnetworker/inspector_ipv6.png`) |
 | `model.uis`, Gruppe `ospf` | OSPF (siehe [Routing mit OSPF](#routing-mit-ospf)): Hellos auf dem Kabel (an 224.0.0.5 mit TTL 1 und Präzedenz 6, alle 10 s) und das Dead-Intervall, die Wahl von DR und BDR mit Prioritäten (ohne Verdrängen; fällt der DR aus, übernimmt der BDR), eine Nachbarschaft durch jeden Zustand auf die Nanosekunde (Master und Slave, Database Description, Request, Update), am LAN die Wartezeit und die erste DD, die das IOS-artige ARP verliert, ein LSA, das vor MinLSArrival kommt, verworfen und wiederholt, Flooding mit verzögerten und direkten Bestätigungen, MinLSInterval, SPF 200 ms nach einer Änderung, Kosten aus der Referenzbandbreite und je Interface, gleich gute Wege, ein gezogenes Kabel und der neue Weg, passive Interfaces mit `traceroute`, Redistribution (E1, E2, `subnets`) und die Standardroute gegen statische Routen und Distanzen, zwei Bereiche über einen ABR mit Stub und `no-summary`, das Erneuern nach 1800 s und MaxAge nach 3600 s, Unstimmigkeiten (Hello-Intervall, Bereich, MTU), die Befehlszeile (Modus, Hilfe, `show`, `debug`, `clear ip ospf process`, die Running-Config als Startkonfiguration), die Texte auf Deutsch und Englisch, Determinismus |
+| `model.uis`, Gruppe `ipv6tcp` | UDP und TCP über IPv6 (siehe [IPv6](#ipv6)): der Handshake Byte für Byte auf die Nanosekunde (Port und ISN aus dem Zufallsstrom des Geräts, MSS 1440 aus der MTU des Pfads, Linux' Fenster 64800, die Prüfsumme über den IPv6-Pseudo-Header), Daten und Abbau bis TIME-WAIT, RST an einem geschlossenen Port, die sechs SYN-Wiederholungen bis 127 s, Packet Too Big von R1 senkt die MSS auf 1220, ICMPv6-Fehler beenden einen Verbindungsaufbau und erreichen verbundene UDP-Sockets (auch über IPv4), nie unverbundene; die Dual-Stack-Sockets (`::` nimmt beide Familien, `0.0.0.0` nur IPv4, eine Adresse nur sich, was sich einen Port teilen darf, `ss -4`/`-6`), der Resolver mit A und AAAA in der Reihenfolge von RFC 6724 (globale IPv6-Adresse: IPv6 zuerst, nur Link-Local: IPv4 zuerst, ohne IPv6 nur A), `curl`, `nc`, der TCP-Client am Echo, ein Skript mit `http.request` und `dns.resolve`, `ping` und `traceroute` per Name, `dig`, `host`, `nslookup` (auch ohne Antwort und abgewiesen), die IOS-artige Konsole (`ip name-server` über IPv6, `ip host`, `ipv6 host`, `ping` per Name, die Running-Config, `show tcp brief`), Masken, Sätze und Mitschnitt, Determinismus |
+| `model.uis`, Gruppe `assess` | Aufgaben mit Bewertung (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)): das Format (was auf seinem Vorgabewert steht, fehlt in der Datei; ohne `points` 1 Punkt), was `Assess::issues` findet, die kanonischen Werte (Masken, Präfixe, IOS-artige und Linux-Schreibweisen von Adressen und Routen), `reaches` auf einer Kopie des Simulators (beantwortet, keine Route, ein ausgeschalteter Router oder PC, ein unbekannter Name, der Lauf unberührt, die Zeile des Runners), jede Art von Kriterium mit ihren Schreibweisen, gleichwertig, genau und einer von mehreren Werten, Zeilen der Konfiguration abgekürzt, mit `no shutdown` und einer abgelehnten Zeile, Punkte und Prozent, ein umbenanntes Gerät über seine Nummer, die Rückmeldungen, wann bewertet wird und die Zeitgrenze, das Erstellen (das laufende Netz als Ziel, der Baum der Kandidaten, das Ausgangsnetz: was ein Kriterium prüft, fehlt dort und gilt im Ziel), die vier Labore wie bisher, die drei Aufgaben ohne Befund, ungelöst mit 0 Punkten, mit ihrem Zielnetz und gelöst wie im Fenster mit 20, dieselben Punkte zweimal |
+| `assess_author.uis` | eine Aufgabe erstellen aus dem Router zwischen zwei Netzen: das Ziel, Kriterien aus dem Baum mit Punkten, einem zweiten zulässigen Wert (ein ungültiger abgelehnt) und eigenem Text, eine abgelehnte und eine angenommene Prüfung, die Texte, eine Minute Zeit, das Ausgangsnetz (rückgängig und wieder), die Aufgabe ins Projekt (das Panel „Aufgabe“ folgt Rückgängig und Wiederholen), gespeichert als `build/jfn_assess.jfnet`, die Minute läuft ab, die Datei wieder geöffnet und der Bereich aus ihr gefüllt |
+| `assess_solve.uis` | die Aufgaben im Panel: die Liste mit ihnen, „Ein Router für zwei Netze“ mit „Prüfen“ und den Befunden, in zwei Schritten in der Konsole gelöst (7, dann 20 von 20 Punkten), Rückgängig des Namens kostet seine Punkte; „Statische Routen über drei Router“ ohne Rückmeldung bis zum Abgeben (der Countdown, eine Route, die Rückfrage abgebrochen und beantwortet, dann alle Kriterien mit ihren Befunden); „VLANs und ein Trunk zum Router“ nur mit der Punktzahl, früh abgegeben |
+| `assess_en.uis` | dasselbe auf Englisch: die Liste, das Panel mit den Texten der Datei, F9 mit den Befunden, der Bereich „Author an assessment“ aus der Aufgabe gefüllt |
+| `assess_shots.uis` | die Bilder der Liste, des Panels (halb gelöst nach „Prüfen“) und des Bereichs „Aufgabe erstellen“ hell und dunkel mit 100 und 150 % (`build/jfnetworker/assess_*.png`) |
+| `model.uis`, Gruppe `wlan` | WLAN (siehe [WLAN](#wlan)): Signal, Rate, Verlust und Zugang zum Medium aus der Entfernung, Kanäle, Bänder, Reichweiten und Ports der Modelle, was ein Netz ungültig macht; PRF und KDF des 802.11-Standards, PMK und PTK gegen unabhängig gerechnete Werte, MICs mit HMAC-SHA1 und AES-CMAC, der GTK im Key Wrap, SAEs Ersatz-PMK; Suche, Authentifizierung und Assoziation auf die Nanosekunde (offen, WPA2, WPA3 mit SAE), die vier EAPOL-Frames mit ihren Zeiten und von außen nachgerechneten MICs, eine falsche Passphrase (Wiederholungen nach 100 ms und 1 s, Grund 15, Pausen von 10, 20 und 30 s, Aufgeben), ein falsches SAE-Passwort, WPA2 auf 6 GHz; die Wahl von Band und Access Point, DHCP und Ping über WLAN, Roaming während eines Pings ohne Verlust, der Rand der Reichweite, Verbindungsverlust nach sieben Beacons, Access Point aus, umkonfiguriert und mit abgeschaltetem Funk, Client-Isolation und Gastnetze (auch am Heimrouter), Funkkabel älterer Projekte (feste Zuordnungen wie bisher, ausgesteckt sucht die Station), `iw` und `show dot11 associations`, die Probleme-Liste, Datei, Szenario-Schritt `move`, Rückgängig über das Dokument, Texte auf Deutsch und Englisch, Determinismus |
+| `wlan_inspector.uis` | der WLAN-Teil des Inspektors auf `fixtures/wlan_office.jfnet`: die Netze von AP1 (Passphrase maskiert, bis sie gezeigt wird), eine neue SSID schickt Phone1 weg und rückgängig gemacht kommt es wieder, offen zu WPA2 erst mit Passphrase, ein Netz hinzugefügt und entfernt; eine Station mit Zustand, Access Point, Signal mit Balken, Rate und den Netzen in Reichweite, ihre Passphrase im Inspektor korrigiert und rückgängig gemacht, Abmelden |
+| `wlan_range.uis` | die Reichweiten: ein gewählter Access Point zeigt seine Kreise, Ansicht › WLAN-Reichweiten alle (auch mit Alt+A, W), die Kreise als Texteinträge, der Maßstab im Inspektor des Projekts mit Rückgängig und einer Ablehnung |
+| `wlan_drag.uis` | Laptop1 bei gehaltener Maustaste aus der Reichweite gezogen: „außer Reichweite“, nach sieben fehlenden Beacons getrennt, die Station sucht; Loslassen ist ein Rückgängig-Schritt, rückgängig gemacht meldet sie sich wieder bei AP1 an |
+| `wlan_shots.uis` | die Bilder von WLAN (Reichweiten, Funklinien, Signalbalken, Inspektor eines Access Points und einer Station) hell und dunkel mit 100 und 150 % (`build/jfnetworker/wlan_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
 `campus.jfnet` (die Abnahme), `lab_window.jfnet` (das Labor der Fenstertests: Cache,
 Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein Skript),
-`stp_triangle.jfnet` und `rstp_triangle.jfnet` (drei Switches im Dreieck mit STP bzw. RSTP) und
-die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
-`coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`, `rng`, `metrics`, `jmap`,
-`cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`), die Skriptsprache die Gruppe `script`.
+`stp_triangle.jfnet` und `rstp_triangle.jfnet` (drei Switches im Dreieck mit STP bzw. RSTP),
+`wlan_office.jfnet` (zwei Access Points, ein Gastnetz, zwei Laptops und ein Smartphone; das
+Szenario `wlan_office.scn` und die WLAN-Fensterskripte) und die Netze der Golden-Szenarien. Die
+Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`,
+`rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
+für WLAN `crypto` und `netpkt`), die Skriptsprache die Gruppe `script`.
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -238,8 +267,10 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Spanning Tree | [`crates/jfn_sim/stp.rs`](crates/jfn_sim/stp.rs), [`stp98.rs`](crates/jfn_sim/stp98.rs), [`rstp.rs`](crates/jfn_sim/rstp.rs), [`cli/stp.rs`](crates/jfn_sim/cli/stp.rs), [`lib/netpkt/stp.rs`](../../lib/netpkt/stp.rs), [`src/stptest.rs`](src/stptest.rs) | STP (802.1D-1998) und RSTP (802.1D-2004) auf den Switches, Einstellungen und Befehle, BPDUs, ihr Selbsttest (siehe [Spanning Tree](#spanning-tree)) |
 | Routing | [`crates/jfn_sim/rip.rs`](crates/jfn_sim/rip.rs), [`cli/rip.rs`](crates/jfn_sim/cli/rip.rs), [`src/riptest.rs`](src/riptest.rs), [`lib/netpkt/rip.rs`](../../lib/netpkt/rip.rs) | RIP als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit RIP](#routing-mit-rip)) |
 | NAT und Zugriffslisten | [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs), [`nat.rs`](crates/jfn_sim/nat.rs), [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs), [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs), [`lib/netpkt/nat.rs`](../../lib/netpkt/nat.rs), [`src/nattest.rs`](src/nattest.rs) | Zugriffslisten und Adressübersetzung der IOS-artigen Geräte, ihre Befehle, das Umschreiben der Pakete mit ihren Prüfsummen (Library), ihr Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
-| IPv6 | [`crates/jfn_sim/ip6.rs`](crates/jfn_sim/ip6.rs), [`nd.rs`](crates/jfn_sim/nd.rs), [`l3v6.rs`](crates/jfn_sim/l3v6.rs), [`jobs6.rs`](crates/jfn_sim/jobs6.rs), [`trace6.rs`](crates/jfn_sim/trace6.rs), [`cli/ip6.rs`](crates/jfn_sim/cli/ip6.rs), [`cli/linux6.rs`](crates/jfn_sim/cli/linux6.rs), [`cli/print6.rs`](crates/jfn_sim/cli/print6.rs), [`lib/netpkt/icmpv6.rs`](../../lib/netpkt/icmpv6.rs), [`lib/netpkt/ipv6.rs`](../../lib/netpkt/ipv6.rs), [`src/ipv6test.rs`](src/ipv6test.rs) | der IPv6-Teil der Geräte (Adressen, Neighbor Cache, Router, Routen), Neighbor Discovery, DAD und SLAAC, Weiterleiten und ICMPv6, Ping und Traceroute, die Notizen, die Befehle beider Befehlszeilen, ICMPv6 und Neighbor Discovery Byte für Byte und die Fragmente (Library), der Selbsttest (siehe [IPv6](#ipv6)) |
+| IPv6 | [`crates/jfn_sim/ip6.rs`](crates/jfn_sim/ip6.rs), [`nd.rs`](crates/jfn_sim/nd.rs), [`l3v6.rs`](crates/jfn_sim/l3v6.rs), [`jobs6.rs`](crates/jfn_sim/jobs6.rs), [`trace6.rs`](crates/jfn_sim/trace6.rs), [`cli/ip6.rs`](crates/jfn_sim/cli/ip6.rs), [`cli/linux6.rs`](crates/jfn_sim/cli/linux6.rs), [`cli/print6.rs`](crates/jfn_sim/cli/print6.rs), [`cli/names.rs`](crates/jfn_sim/cli/names.rs), [`lib/netpkt/icmpv6.rs`](../../lib/netpkt/icmpv6.rs), [`lib/netpkt/ipv6.rs`](../../lib/netpkt/ipv6.rs), [`lib/netpkt/addrsel.rs`](../../lib/netpkt/addrsel.rs), [`src/ipv6test.rs`](src/ipv6test.rs), [`src/ipv6tcptest.rs`](src/ipv6tcptest.rs) | der IPv6-Teil der Geräte (Adressen, Neighbor Cache, Router, Routen), Neighbor Discovery, DAD und SLAAC, Weiterleiten und ICMPv6, Ping und Traceroute, die Notizen, die Befehle beider Befehlszeilen, Namen an beiden Befehlszeilen (`dig`, `host`, `nslookup`, `ip host`, `ip name-server`), ICMPv6 und Neighbor Discovery Byte für Byte, die Fragmente und die Adressauswahl nach RFC 6724 (Library), die Selbsttests (siehe [IPv6](#ipv6)) |
 | OSPF | [`crates/jfn_sim/ospf.rs`](crates/jfn_sim/ospf.rs), [`cli/ospf.rs`](crates/jfn_sim/cli/ospf.rs), [`src/ospftest.rs`](src/ospftest.rs), [`lib/netpkt/ospf.rs`](../../lib/netpkt/ospf.rs) | OSPF als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Pakete und LSAs Byte für Byte (siehe [Routing mit OSPF](#routing-mit-ospf)) |
+| Aufgaben mit Bewertung | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/assess.rs`](crates/jfn_sim/assess.rs), [`src/workspace/assess.rs`](src/workspace/assess.rs), [`src/workspace/author.rs`](src/workspace/author.rs), [`src/doc/assess.rs`](src/doc/assess.rs), [`assets/assess`](assets/assess), [`src/assesstest.rs`](src/assesstest.rs) | das Format einer Aufgabe, das Bewerten ihrer Kriterien, die Prüfung `reaches`, das Panel mit Punkten, Zeit und Abgeben, der Bereich zum Erstellen mit seinen Rückgängig-Schritten, die drei Aufgaben, ihr Selbsttest (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)) |
+| WLAN | [`crates/jfn_model/wlan.rs`](crates/jfn_model/wlan.rs), [`crates/jfn_sim/wlan.rs`](crates/jfn_sim/wlan.rs), [`wlankey.rs`](crates/jfn_sim/wlankey.rs), [`wlantrace.rs`](crates/jfn_sim/wlantrace.rs), [`cli/wlan.rs`](crates/jfn_sim/cli/wlan.rs), [`src/doc/wlan.rs`](src/doc/wlan.rs), [`src/workspace/canvas/wlan.rs`](src/workspace/canvas/wlan.rs), [`src/workspace/inspector/wlan.rs`](src/workspace/inspector/wlan.rs), [`src/wlantest.rs`](src/wlantest.rs), [`lib/netpkt/eapol.rs`](../../lib/netpkt/eapol.rs), [`lib/crypto`](../../lib/crypto/lib.rs) (`sha1.rs`, `keywrap.rs`, `cmac.rs`) | die WLAN-Einstellungen im Projekt, Stationen und Access Points im Simulator mit Funk, Schlüsseln und Notizen, `iw` und `show dot11`, die Einstellungen als Rückgängig-Schritte, Funklinien, Reichweiten und Balken, der Inspektor, der Selbsttest, EAPOL Byte für Byte und die Kryptografie von WPA2 und WPA3 (siehe [WLAN](#wlan)) |
 
 ### Gerätekatalog
 
@@ -621,6 +652,8 @@ Dienste eines Geräts in der Projektdatei (`"services": [{"kind": "dns-server", 
   Weiterleitung über den eigenen Resolver. Der Resolver jedes Geräts arbeitet wie glibc mit
   Suchdomänen (`ndots`), Timeout 5 s (IOS 3 s) und zwei Durchgängen über alle Server und hält
   Antworten für ihre TTL im Cache, negative für das SOA-Minimum. `ping www` geht damit per Name.
+  Server und Resolver sprechen auch IPv6: der Server nimmt Fragen beider Familien auf einem
+  Socket, der Resolver fragt wie getaddrinfo A und AAAA (siehe [IPv6](#ipv6)).
 - **Syslog:** IOS schickt `<189>12: *Oct 19 12:00:05.123: %LINK-3-UPDOWN: …`, Linux das
   BSD-Format mit Hostname und Programm; ein Syslog-Server sammelt die Meldungen.
 - **NTP:** Client und Server mit der virtuellen Uhr: die erste Antwort stellt die Uhr, später
@@ -639,9 +672,9 @@ weil er erst nach der MAC von SRV1 fragt (IOS hält nichts zurück); PC1 bekommt
 deshalb erst nach der Wiederholung.
 ### TCP
 
-TCP folgt RFC 9293 und läuft als Sockets im virtuellen Betriebssystem jedes Geräts
-([`tcp.rs`](crates/jfn_sim/tcp.rs)). Die Zahlen kommen vom System des Geräts: Hosts verhalten
-sich wie Linux, Router und Switches IOS-artig.
+TCP folgt RFC 9293 und läuft über IPv4 und IPv6 (siehe [IPv6](#ipv6)) als Sockets im
+virtuellen Betriebssystem jedes Geräts ([`tcp.rs`](crates/jfn_sim/tcp.rs)). Die Zahlen kommen
+vom System des Geräts: Hosts verhalten sich wie Linux, Router und Switches IOS-artig.
 
 - **Zustände:** alle elf, mit Simultaneous Open (die SYNs kreuzen sich, beide antworten mit
   SYN-ACK) und Simultaneous Close (CLOSING). Ein SYN an einen Port ohne Listener bekommt RST,
@@ -935,7 +968,9 @@ IOS-artige Befehlszeile:
   `ipv6 address … [eui-64|anycast|link-local]`, `ipv6 address autoconfig [default]`, `ipv6
   nd …`, `ipv6 mtu`, `ipv6 route`, `ipv6 neighbor`, `show ipv6 interface [brief|IF]`, `show
   ipv6 route`, `show ipv6 neighbors`, `show ipv6 routers`, `ping ipv6`, `traceroute ipv6`,
-  `debug ipv6 icmp|nd`, `clear ipv6 neighbors` (siehe [IPv6](#ipv6)).
+  `debug ipv6 icmp|nd`, `clear ipv6 neighbors` (siehe [IPv6](#ipv6)); Namen
+  ([`cli/names.rs`](crates/jfn_sim/cli/names.rs)): `ip host`, `ipv6 host`, `ip name-server`
+  mit Adressen beider Familien, `ping NAME` und `ping ipv6 NAME`.
 - OSPF ([`cli/ospf.rs`](crates/jfn_sim/cli/ospf.rs)): `router ospf N` mit eigenem Modus hinter
   demselben Prompt `(config-router)#`, `ip ospf cost|priority|hello-interval|dead-interval`, `ip
   ospf network point-to-point|broadcast` und `ip ospf N area M` an Interfaces, `show ip ospf
@@ -953,6 +988,8 @@ mit Port-Bereichen, `-v`, `-C`, `-q`, `-w`, `-N`), `ss` (TCP und UDP mit Zustän
 `-u`, `-l`, `-a`, `-n`, `-p`, `-o`, `-i`, `-s`, `-H`, Filter wie `state established` und
 `( sport = :80 or dst 10.0.0.1 )`, Spalten wie iproute2 ohne Terminal), `top` (die Dienste
 des Geräts mit CPU-Anteil, `-b`, `-n`, `-d`) und `printf` mit `|` in ein Programm.
+`dig`, `host` und `nslookup` fragen den Namensserver selbst; `curl`, `nc`, `ss`, `ping` und
+`traceroute` nehmen `-4` und `-6` (siehe [IPv6](#ipv6)).
 Router und Switches zeigen `show tcp brief [all]`, `show tcp statistics` und
 `show control-plane host open-ports`. Die Dienste des Labors zeigen `lbctl` (Backends mit
 Zustand und Zahlen), `kvctl` (Mitglieder, `ring`, `where SCHLÜSSEL` mit den Replikaten und
@@ -1033,6 +1070,10 @@ heilen soll. `heal NUMMER`, `heal all` oder `heal` mit Art und Ziel (`heal power
 `heal partition`) heilt. Der Bericht nennt Nummer und Text jedes Fehlers; heilt einer von
 selbst, steht „Fehler N behoben“ mit der Zeit dabei.
 
+`move GERÄT X Y` setzt ein Gerät an eine andere Stelle der Zeichenfläche (Weltkoordinaten der
+linken oberen Ecke), wie ein Verschieben im Fenster; für WLAN zählen Reichweite und Signal neu
+(siehe [WLAN](#wlan)).
+
 `expect … svc NAME metric WERT VERGLEICH ZAHL over 5s` (oder `… between 6s and 12s`) prüft
 statt des Werts von jetzt seine Zeitreihe
 (siehe [Metriken und Zeitreihen](#metriken-und-zeitreihen)): die Punkte der letzten 5 s oder
@@ -1107,7 +1148,7 @@ Das Büro hinter NAT (`nat_pat.scn` auf `fixtures/nat_pat.jfnet`, siehe
 [NAT und Zugriffslisten](#nat-und-zugriffslisten)): 24 Erwartungen zu PAT, der
 Port-Weiterleitung von außen, einer Zugriffsliste, `traceroute` durch PAT, `debug ip nat` und
 den abgelaufenen Übersetzungen nach fünf Minuten.
-Zwei Szenarien zeigen IPv6 (siehe [IPv6](#ipv6)). `ipv6_slaac.scn` auf
+Drei Szenarien zeigen IPv6 (siehe [IPv6](#ipv6)). `ipv6_slaac.scn` auf
 `fixtures/ipv6_slaac.jfnet`: R1 kündigt die Präfixe zweier LANs an, die PCs bilden ihre
 Adressen per SLAAC (`ip -6 addr`, `ip -6 route` mit dem Router aus den Advertisements), SRV hat
 eine feste; `show ipv6 interface`, `show ipv6 route`, Ping und `traceroute6` ins andere LAN,
@@ -1116,6 +1157,12 @@ eine feste; `show ipv6 interface`, `show ipv6 route`, Ping und `traceroute6` ins
 Standardroute zur Link-Local-Adresse von R1), Ping und `traceroute6` über beide, Packet Too
 Big an der MTU 1280 vor SRV mit den Fragmenten des Absenders, `ping -M do`, Hop Limit 1, ein
 Ziel ohne Route, eine doppelte Adresse (`dadfailed`) und R1 ohne IPv6-Routing.
+`ipv6_web.scn` auf `fixtures/ipv6_web.jfnet`: PC1 und PC2 holen sich IPv4 per DHCP (mit
+Namensserver und Domäne `lab`) und IPv6 per SLAAC, WEB hinter R1 betreibt Namens- und
+Webserver auf beiden Familien; `curl` per Name über IPv6 (A und AAAA, IPv6 zuerst) und per
+Adresse über IPv4, `ss` mit den Sockets beider Familien, `dig AAAA` und `host`, `ping` und
+`traceroute -6` per Name, `ping -4`, und R1 fragt seinen Namensserver über IPv6 (`ip
+name-server`, `ping NAME`, `ping ipv6 NAME`, `ipv6 host`).
 
 Zwei Szenarien zeigen OSPF (siehe [Routing mit OSPF](#routing-mit-ospf)).
 `ospf_triangle.scn` auf `fixtures/ospf_triangle.jfnet`: drei Router im Dreieck mit einem
@@ -1131,6 +1178,25 @@ Stub-Bereich 2, R4 ASBR mit einer statischen Route und der Standardroute zu eine
 Internet“; Summaries (O IA), externe Routen (O E2) über die ASBR-Summaries, die Standardroute
 des Stub-Bereichs (O*IA), Pings und `traceroute` aus beiden Bereichen, der Ausfall des DR (nach
 dem Dead-Intervall übernimmt der BDR, R4 wird BDR) und `area 2 stub no-summary`.
+
+`expect PC1 reaches 10.0.2.10` prüft die Verbindung selbst (A1): Auf einer Kopie des Simulators
+pingt PC1 die Adresse (oder einen Namen über seinen Resolver) bis zu fünfmal, das nächste Echo
+nach der Antwort oder nach einer Sekunde, bis eine Antwort kommt; `not reaches` verlangt, dass
+keine kommt. Der Lauf selbst bleibt unberührt. Der Bericht nennt, wie viele Pings beantwortet
+wurden, oder warum keiner („keine Antwort: 10.0.1.1 meldet: Netz nicht erreichbar“, „keine
+Route zum Ziel“, „der Name … ist unbekannt“, „das Gerät ist ausgeschaltet“).
+
+Ein Szenario zeigt WLAN (siehe [WLAN](#wlan)). `wlan_office.scn` auf `fixtures/wlan_office.jfnet`:
+zwei Access Points mit dem Netz „Buero“ (WPA2-Personal, 5 GHz, Kanal 36 und 44), an AP1 dazu das
+offene Gastnetz „Gaeste“ (2,4 GHz, VLAN 20), R1 vergibt die Adressen beider Netze. Laptop1 und
+Phone1 sind nach 761 ms angemeldet und bekommen ihre Adressen per DHCP (`iw dev wlan0 link`, `ip
+-br addr`, `show dot11 associations`, `iw dev wlan0 scan`), Laptop2 mit falscher Passphrase
+scheitert am Handshake (`%DOT11-4-MAXRETRIES` nach 3,861 s) und versucht es nach 10, 20 und 30 s
+wieder. Laptop1 pingt SRV1 und geht dabei zu AP2: in der Mitte bleibt er, nahe AP2 wechselt er
+(alle 12 Antworten kommen); zu weit weg ist er nach 716,8 ms getrennt (`NO-CARRIER`), zurück
+meldet er sich sofort wieder an. AP1 aus: Phone1 verliert das Gastnetz, wieder an: beide sind
+761 ms später zurück. Laptop2 gibt nach dem vierten Fehlschlag auf und kommt mit `iw dev wlan0
+connect Buero psk …` ins Netz; 22 Erwartungen.
 
 ### Skripte in Hosts
 
@@ -1333,6 +1399,113 @@ deterministisch. Geprüft wird das in der Selbsttest-Gruppe `task`
 gelöst wie im Fenster (das Projekt geändert, der Simulator folgt ihm wie in `doc/sim.rs`), und
 in den Fensterskripten `task.uis`, `labs.uis` und `task_shots.uis`.
 
+### Aufgaben mit Bewertung
+
+Ein Labor kann die Arbeit auch bewerten (A1): mit Kriterien, die Punkte bringen, einem
+Zielnetz und wahlweise einer Zeitgrenze. Das Projekt selbst ist das Netz, mit dem Lernende
+beginnen; das Ziel, die fertige Lösung, steht mit in der Datei. **Wer die Datei öffnet, kann
+die Lösung lesen: Aufgaben mit Bewertung sind zum Üben und für Selbstkontrollen gedacht, nicht
+für Prüfungen, die manipulationssicher sein müssen.**
+
+- **Kriterien:** der Name eines Geräts, die Adresse eines Interfaces (IPv4 oder IPv6), sein
+  Zustand (eingeschaltet oder `shutdown`), das VLAN und der Modus eines Switchports (access,
+  trunk, dynamic, geroutet), eine statische Route, eine Einstellung eines Dienstes (ein Wert
+  seines JSON, auch tiefer: `pools.0.range`), ein Kabel zwischen zwei Ports (ein Port, der
+  fehlt: irgendeiner) und Zeilen der Running-Config; dazu Verbindungsprüfungen in der Sprache
+  der Szenarien (siehe [Szenarien](#szenarien-scn)), etwa `PC1 reaches 10.0.2.10`: ein Ping
+  auf einer Kopie des Simulators bekommt eine Antwort. Jedes Kriterium hat Punkte, einen Text
+  auf Deutsch und Englisch und einen Vergleich: gleichwertig (Groß- und Kleinschreibung,
+  Leerzeichen, Masken statt Präfixlängen, `Gi0/1` statt `GigabitEthernet0/1`, IOS-artige und
+  Linux-Schreibweisen von Routen, die Reihenfolge der Einstellungen eines Dienstes), genau
+  (derselbe Text) oder einer von mehreren Werten (eine Route oder die Standardroute).
+- **Zeilen der Konfiguration** gelten, wenn sie auf dem Gerät nichts ändern würden: Eine Kopie
+  des Geräts mit seiner Running-Config bekommt sie eingetippt, wie Lernende tippen (`int
+  g0/0/1`, `ip add …`, `no shut`), und ihre Running-Config muss bleiben, wie sie ist. Was
+  dazukäme, fehlt („es fehlt: interface GigabitEthernet0/0/0.10 › encapsulation dot1Q 10“), was
+  wegfiele, ist zu viel („zu viel: … › shutdown“ für `no shutdown` an einem ausgeschalteten
+  Port).
+- **Bewertung:** die Punkte der erfüllten Kriterien, ein Prozentsatz (abgerundet), je Kriterium
+  erfüllt oder nicht und was es fand. Bewertet wird der Stand jetzt: Ein Kriterium kann wieder
+  verloren gehen. Ein Kriterium findet sein Gerät über dessen Nummer, auch wenn es umbenannt
+  wurde; Prüfungen nennen Geräte wie das Zielnetz.
+- **Rückmeldung:** jedes Kriterium erfüllt oder nicht (nach „Prüfen“, F9, auch was fehlt), nur
+  die Punktzahl, oder nichts, bis abgegeben ist. Eine Zeitgrenze läuft ab dem Öffnen auf der
+  Uhr des Fensters (Anhalten und Tempo der Simulation ändern sie nicht) und wird nicht
+  mitgespeichert. Ist sie um oder wurde abgegeben („Abgeben“, Simulation › Aufgabe abgeben, nach
+  der Rückfrage „Jetzt abgeben?“), steht die Bewertung fest, und alle Kriterien zeigen, was sie
+  fanden.
+- **Das Panel „Aufgabe“** zeigt dann die Punkte („7 von 20 Punkten · 35 %“) mit
+  Fortschrittsbalken, die verbleibende Zeit und die Kriterien, so weit die Rückmeldung es
+  erlaubt. Es bewertet nach jeder Änderung des Projekts (höchstens alle 0,5 s) und, wenn sich
+  im Simulator etwas tat (eine Zeile in einer Konsole, Ereignisse), höchstens alle 2 s; steht
+  alles still, bewertet es nicht. Für Screenreader ist jedes Kriterium ein Kontrollkästchen
+  (angehakt: erfüllt), die Punkte ein Fortschrittsbalken.
+- **Aufgabe erstellen** (Werkzeuge › Aufgabe erstellen …, ein Bereich rechts) in sieben
+  Schritten: 1 „Aktuelles Netz als Ziel“: das Netz, wie es läuft, mit den Running-Configs,
+  wird die Lösung. 2 Ein Baum seiner Einstellungen (Geräte mit Namen, Interfaces mit Adresse,
+  Zustand, VLAN und Modus, statische Routen, Dienste und ihre Einstellungen, die Zeilen der
+  Konfiguration, die ein neues Gerät nicht hat, die Kabel): ein Häkchen bewertet eine
+  Einstellung, darunter stehen ihre Punkte, der Vergleich (mit den weiteren Werten) und der
+  Text in beiden Sprachen (bis zu einem eigenen der des Kriteriums). 3 Verbindungsprüfungen mit
+  Punkten (eine, die sich nicht lesen lässt, wird mit dem Grund abgelehnt). 4 Titel, Kurztext
+  für die Liste, Einleitung, Thema. 5 Rückmeldung und Zeit in Minuten. 6 „Ausgangsnetz
+  erzeugen“ nimmt dem Ziel, was die Kriterien prüfen (Adressen, Routen, VLANs, Modi und Zeilen
+  aus den Konfigurationen; ein Interface, das eingeschaltet sein soll, wird ausgeschaltet;
+  Einstellungen von Diensten entfallen, Kabel werden entfernt, ein Name wird neutral wie
+  `JF-R4-1`), als ein Rückgängig-Schritt; oder das Netz wird von Hand zurückgebaut. Darunter
+  steht, wie viele Punkte das Projekt jetzt hätte. 7 „Als Aufgabe speichern …“ legt das Labor
+  mit der Aufgabe ins Projekt (ein Rückgängig-Schritt) und fragt nach der Datei. Ein Projekt mit
+  Aufgabe füllt den Bereich aus seiner Datei.
+
+| Aufgabe | worum es geht |
+|---|---|
+| `01-router-zwei-netze.jfnet` | einen neuen Router benennen und seine zwei Interfaces einrichten, bis die PCs einander erreichen; jedes Kriterium zeigt sich sofort (20 Punkte) |
+| `02-vlans-trunk.jfnet` | zwei VLANs auf SW1, ein Trunk zu R1 und dort ein Subinterface je VLAN (Router-on-a-stick); nur die Punktzahl, 20 Minuten |
+| `03-statische-routen.jfnet` | das fehlende Kabel stecken und die statischen Routen dreier Router setzen (für R1 und R3 genügt eine Standardroute); die Bewertung erst nach dem Abgeben, 15 Minuten |
+
+Die Aufgaben liegen in `assets/assess` (im Programm `app://assess`) und stehen in Datei › Labor
+öffnen … nach den Laboren, mit ihren Punkten und dem Zeichen „Mit Punkten“. In der Datei ist
+die Aufgabe der Abschnitt `assess` des Labors (siehe [`lab.rs`](crates/jfn_model/lab.rs)):
+
+```json
+"assess": {
+  "feedback": "score",
+  "time_limit_s": 1200,
+  "items": [
+    {"what": "address", "dev": "R1", "id": 2, "port": "GigabitEthernet0/0/0", "value": "10.0.1.1/24", "points": 3,
+     "text": ["R1 Gi0/0/0 hat die Adresse 10.0.1.1/24", "R1 Gi0/0/0 has the address 10.0.1.1/24"]},
+    {"what": "route", "dev": "R1", "id": 2, "value": ["10.0.3.0/24 via 10.0.12.2", "default via 10.0.12.2"], "cmp": "any", "points": 3},
+    {"what": "config", "dev": "R1", "id": 4, "value": ["interface GigabitEthernet0/0/0.10", " encapsulation dot1Q 10"], "points": 3},
+    {"what": "cable", "dev": "R2", "port": "GigabitEthernet0/0/1", "peer": "R3", "peer_port": "GigabitEthernet0/0/0", "points": 2},
+    {"what": "check", "checks": ["PC1 reaches 10.0.3.10"], "points": 6}
+  ],
+  "target": {"devices": [...], "links": [...]}
+}
+```
+
+`feedback` ist `items`, `score` oder `end`, `time_limit_s` 0 ohne Grenze. `what` ist
+`hostname`, `address`, `state`, `vlan`, `mode`, `route`, `service` (mit `svc` und dem Pfad
+`key`), `cable` (mit `peer` und `peer_port`; ein `value` verlangt eine Kabelart), `config`
+(Zeilen, die eines Blocks eingerückt) oder `check` (`checks`: Erwartungen, die zugleich
+gelten); `cmp` ist `norm` (Vorgabe), `exact` oder `any` (dann ist `value` eine Liste). Was auf
+seinem Vorgabewert steht, fehlt in der Datei; ohne `points` zählt ein Kriterium 1. Ein Labor
+ohne Aufgabe hat `"assess": null` und verhält sich wie bisher; ein Labor mit Aufgabe braucht
+keine Ziele, kann aber welche haben.
+
+Für Programme: `jfn_model::lab` (`Assess`, `Item`, `ItemKind`, `Compare`, `Feedback`, `Target`,
+`canon`, `RouteVal`, `Assess::issues`), `jfn_sim::assess` (`Grader::new(&aufgabe)`,
+`grade(&projekt, &engine, ausgabe)` -> `Score` mit `points`, `total`, `percent()` und je
+Kriterium `Graded` mit `held` und `found`; `would_change`, `normalise`; zum Erstellen
+`capture`, `candidates`, `start_network`, `item_text`, `item_key`) und `jfn_sim::goal::probe`
+(die Erwartung `reaches`). Geprüft wird das in der Selbsttest-Gruppe `assess`
+([`src/assesstest.rs`](src/assesstest.rs)) und in den Fensterskripten `assess_author.uis`,
+`assess_solve.uis`, `assess_en.uis` und `assess_shots.uis` (siehe
+[Bauen und testen](#bauen-und-testen)).
+
+Noch offen: Kriterien für ACLs, NAT, OSPF und RIP über ihre Zeilen hinaus (heute über
+Zeilen der Konfiguration und Prüfungen), Teilpunkte, Zufallswerte je Lernendem und eine
+verschlüsselte Lösung.
+
 ### Routing mit RIP
 
 Router, L3-Switches und die Firewall sprechen RIP ([`rip.rs`](crates/jfn_sim/rip.rs)): Version 2
@@ -1500,11 +1673,14 @@ abgelaufenen Übersetzungen.
 ### IPv6
 
 Geräte sprechen IPv6 auf denselben Interfaces wie IPv4 nach RFC 8200, 4443, 4861, 4862, 4291
-und 8201 ([`ip6.rs`](crates/jfn_sim/ip6.rs), [`nd.rs`](crates/jfn_sim/nd.rs),
-[`l3v6.rs`](crates/jfn_sim/l3v6.rs), [`jobs6.rs`](crates/jfn_sim/jobs6.rs); die Befehle in
-[`cli/ip6.rs`](crates/jfn_sim/cli/ip6.rs) und [`cli/linux6.rs`](crates/jfn_sim/cli/linux6.rs);
-die Pakete in [`netpkt::icmpv6`](../../lib/netpkt/icmpv6.rs) und
-[`netpkt::ipv6`](../../lib/netpkt/ipv6.rs)).
+und 8201, UDP, TCP und Namen darüber nach RFC 768, 9293, 3596 und 6724
+([`ip6.rs`](crates/jfn_sim/ip6.rs), [`nd.rs`](crates/jfn_sim/nd.rs),
+[`l3v6.rs`](crates/jfn_sim/l3v6.rs), [`jobs6.rs`](crates/jfn_sim/jobs6.rs), für UDP, TCP und
+Namen [`os.rs`](crates/jfn_sim/os.rs), [`tcp.rs`](crates/jfn_sim/tcp.rs) und
+[`resolver.rs`](crates/jfn_sim/resolver.rs); die Befehle in
+[`cli/ip6.rs`](crates/jfn_sim/cli/ip6.rs), [`cli/linux6.rs`](crates/jfn_sim/cli/linux6.rs) und
+[`cli/names.rs`](crates/jfn_sim/cli/names.rs); die Pakete in
+[`netpkt::icmpv6`](../../lib/netpkt/icmpv6.rs) und [`netpkt::ipv6`](../../lib/netpkt/ipv6.rs)).
 
 - **Voreinstellung:** IPv6 ist aus, bis ein Gerät dafür eingerichtet wird, damit bestehende
   Projekte genau so weiterlaufen (kein IPv6-Rahmen, keine Notiz, keine andere Zeile im
@@ -1564,20 +1740,62 @@ die Pakete in [`netpkt::icmpv6`](../../lib/netpkt/icmpv6.rs) und
   und jeder Option (ICMPv6 grün im Filter ICMP), Mitschnitte öffnen ohne Prüfsummenfehler. Bei
   Geräten mit IPv6 haben die Interface-Tabellen im Inspektor und im Gerätefenster eine Spalte
   IPv6, das gewählte Interface listet seine Adressen mit Herkunft und Zustand.
+- **UDP und TCP:** dieselben Sockets für beide Familien, wie Linux mit `bindv6only = 0`: ein
+  Socket auf `::` (`os::ANY`) nimmt IPv4 und IPv6, einer auf `0.0.0.0` (`ANY4`) nur IPv4, einer
+  auf einer Adresse nur diese; ein Partner über IPv4 bleibt eine IPv4-Adresse (keine
+  `::ffff:`-Adressen). `::` belegt den Port für beide Familien: eine Adresse darunter oder
+  `0.0.0.0` bekommt ihn nicht mehr, eine Adresse der anderen Familie neben einer Adresse
+  schon. DNS, HTTP, TCP-Echo und -Discard, die Skripte (`net.listen`, `net.udp`,
+  `http.serve`), Loadbalancer und Queue öffnen ihre Sockets auf `::`; `ss` zeigt sie auf
+  Geräten ohne IPv6 als `0.0.0.0` wie zuvor, sonst als `*`. TCP über IPv6: die Prüfsumme über
+  den Pseudo-Header von RFC 8200 8.1, die MSS aus der MTU des Pfads weniger 60 (1440 auf
+  Ethernet, ohne Option 1220, IOS-artig 1220 außerhalb der eigenen Netze), Linux' Fenster
+  64800; Packet Too Big senkt Path MTU und MSS (nie unter 1220) und schickt das Verlorene
+  sofort neu. ICMPv6-Fehler erreichen die Sockets wie die von IPv4 (RFC 4443 3; wie Linux
+  nur die harten): Port unreachable einen verbundenen UDP-Socket (ECONNREFUSED, auch über
+  IPv4), jeder Fehler einen Verbindungsaufbau. Flüchtige Ports und ISNs kommen aus den
+  Zufallszahlen des Geräts.
+- **Namen:** der Resolver arbeitet wie getaddrinfo mit AI_ADDRCONFIG: ein Gerät mit IPv4 und
+  IPv6 fragt A und AAAA zugleich (ein Socket, A zuerst, je eigene Kennung), eines ohne IPv6
+  nur A wie zuvor, `-4`/`-6` je eine Familie. Die Adressen ordnet er nach einer Teilmenge von
+  RFC 6724 ([`netpkt::addrsel`](../../lib/netpkt/addrsel.rs): unbrauchbare Ziele zuletzt,
+  passender Scope, keine veraltete Quelle, passendes Label, höhere Präzedenz, kleinerer Scope,
+  längstes gemeinsames Präfix zwischen IPv6-Zielen, sonst die Reihenfolge der Antwort; eine
+  Antwort nur mit A bleibt wie sie kam): ein Host mit globaler IPv6-Adresse probiert IPv6
+  zuerst, einer nur mit Link-Local-Adresse IPv4. Namensserver dürfen IPv6-Adressen haben.
+  `curl`, `nc`, der HTTP-Client und der Lastgenerator nehmen die nächste Adresse, wenn die
+  erste nicht verbindet (nur wenn beide Familien kamen); URLs mit `[…]` gehen überall, auch in
+  Skripten und als Backends von Cache und Worker; der Loadbalancer nimmt Backends mit
+  IPv6-Adressen.
+- **Befehle:** `curl -4|-6`, `nc -4|-6`, `ss -4|-6` (IPv6 in Klammern, `*` für `::`), `ping
+  NAME` und `traceroute NAME` mit AAAA (eine IPv6-Adresse zuerst macht daraus ein Ping über
+  IPv6), `ping -6 NAME`, `traceroute -6 NAME`, `dig [@SERVER] [TYP] NAME [+short]`, `host [-t
+  TYP] NAME [SERVER]` und `nslookup NAME [SERVER]` (Konsolenprogramme mit eigenen Fragen an
+  den Namensserver, die Ausgaben wie BIND 9.18, die erste Zeile von `dig` in eigenen Worten);
+  IOS-artig `ip host NAME A.B.C.D`, `ipv6 host NAME X:X::X`, `ip name-server A [B [C]]` (beide
+  Familien, in der Running-Config), `ping NAME` (IPv4; IPv6, wenn der Name keine IPv4-Adresse
+  hat), `ping ipv6 NAME`, `show tcp brief` und `show control-plane host open-ports` mit
+  IPv6-Verbindungen in Großbuchstaben.
+- **Anzeigen von UDP und TCP:** Segmente und Datagramme über IPv6 stehen wie die über IPv4 im
+  Simulationsmodus, im Paket-Tab und im Mitschnitt, ihre Prüfsummen von netpkt geprüft; ihre
+  Notizen zählen im Filter zu IPv6 statt zu IPv4.
 - **Für Programme:** `Action::Ip6` mit `Ip6Set` (auch die Befehle gehen darüber),
   `Engine::ip6`, `ip6_routes`, `ip6_neighbors`, `addrs6`, `ping6`, `traceroute6` und
   `IfView::addrs6`.
 
-Noch offen: UDP und TCP über IPv6 (Sockets, Dienste, DNS mit AAAA): ein UDP-Paket an ein Gerät
-bekommt Port unreachable, ein TCP-Segment ein RST, `ping6 NAME` sagt „Address family for
-hostname not supported“. Dazu MLD (Switches fluten Multicast ohnehin), Redirects (der Codec
-kennt sie, kein Gerät sendet oder nimmt sie), DHCPv6, Privacy Extensions, Router
-Advertisements auf seriellen Leitungen, RIPng und OSPFv3.
+Noch offen: MLD (Switches fluten Multicast ohnehin), Redirects (der Codec kennt sie, kein
+Gerät sendet oder nimmt sie), DHCPv6 und RDNSS (Linux-Hosts bekommen Namensserver nur über
+DHCP für IPv4), Privacy Extensions, Router Advertisements auf seriellen Leitungen, RIPng und
+OSPFv3; bei UDP und TCP `IPV6_V6ONLY` (ein Socket auf `::` nimmt immer beide Familien),
+`::ffff:`-Adressen, Happy Eyeballs (RFC 8305: die Werkzeuge probieren die Adressen der Reihe
+nach), die KV-Knoten des Labors, DHCP, NTP, Syslog und RIP (nur IPv4).
 
-Geprüft wird IPv6 in der Selbsttest-Gruppe `ipv6` ([`src/ipv6test.rs`](src/ipv6test.rs)), in
-den Golden-Szenarien `ipv6_slaac.scn` und `ipv6_routing.scn` (siehe
-[Szenarien](#szenarien-scn)), im Fensterskript `ipv6_inspector.uis` und mit der
-coretest-Gruppe `icmpv6` (die Nachrichten Byte für Byte).
+Geprüft wird IPv6 in den Selbsttest-Gruppen `ipv6` ([`src/ipv6test.rs`](src/ipv6test.rs)) und
+`ipv6tcp` ([`src/ipv6tcptest.rs`](src/ipv6tcptest.rs): UDP, TCP, Namen, Dienste und
+Werkzeuge), in den Golden-Szenarien `ipv6_slaac.scn`, `ipv6_routing.scn` und `ipv6_web.scn`
+(siehe [Szenarien](#szenarien-scn)), im Fensterskript `ipv6_inspector.uis` und mit den
+coretest-Gruppen `icmpv6` (die Nachrichten Byte für Byte) und `addrsel` (die Beispiele von
+RFC 6724 10.2).
 
 ### Routing mit OSPF
 
@@ -1669,6 +1887,106 @@ Für Programme: `Action::Ospf { dev, set: OspfSet }` (`Process`, `RouterId`, `Ne
 ([`src/ospftest.rs`](src/ospftest.rs)), die Pakete in der coretest-Gruppe `ospf`, dazu die
 Szenarien `ospf_triangle.scn` und `ospf_areas.scn` (siehe [Szenarien](#szenarien-scn)).
 
+### WLAN
+
+Access Points und der Heimrouter bieten WLAN-Netze an, Laptops, Smartphones, Tablets, Drucker,
+der IoT-Sensor und der Smart-TV melden sich an ([`jfn_model/wlan.rs`](crates/jfn_model/wlan.rs),
+[`jfn_sim/wlan.rs`](crates/jfn_sim/wlan.rs)). Statt eines Kabels verbindet eine Zuordnung
+(Assoziation) die Station mit ihrem Access Point; der Simulator legt sie an und löst sie wieder,
+die Zeichenfläche zeigt sie als dünne, gepunktete Funklinie (gestrichelt, solange der Handshake
+läuft, blass, wenn die Station außer Reichweite ist).
+
+- **Einstellungen** (Inspektor, in der Projektdatei `wlan` je Gerät): Ein Access Point hat ein
+  oder mehrere Netze mit SSID, Band und Kanal (2,4 GHz Kanal 1 bis 13, 5 GHz 36 bis 64 und 100
+  bis 140, 6 GHz 1 bis 93; der JF-AP6E sendet auf allen drei Bändern über je einen Funkport, der
+  Heimrouter 2,4 und 5 GHz über `wlan0`), Sicherheit (offen, WPA2-Personal oder WPA3-Personal
+  mit einer Passphrase von 8 bis 63 Zeichen; 6 GHz nur mit WPA3), VLAN (auf Access Points: ihre
+  Funkports und die Kabelports in der Grundeinstellung werden dafür Trunks mit VLAN 1 ungetaggt;
+  der Heimrouter behält seine Stationen in seinem LAN), Gastnetz und Client-Isolation. Eine Station hat das
+  Netz, das sie sucht (SSID und Passphrase), oder keins. Jede Änderung ist ein Rückgängig-Schritt,
+  der Simulator folgt ohne Neustart des Geräts.
+- **Maßstab und Reichweite:** Der Maßstab des Projekts (`dip_per_m`: Einheiten der Zeichenfläche
+  je Meter, ohne Angabe 10, also 10 Pixel je Meter bei 100 %) steht im Inspektor des Projekts.
+  Ein JF-AP6E reicht 50 m auf 2,4 GHz, 35 m auf 5 GHz und 25 m auf 6 GHz, der Heimrouter 40, 30
+  und 20 m, gemessen von Mitte zu Mitte der Geräte.
+- **Anmelden:** Eine Station hört alle Kanäle ihrer Bänder ab (20 ms je Kanal, auf 6 GHz die
+  sechs bevorzugten; ein Laptop braucht 760 ms), nimmt das Netz ihrer SSID mit der besten
+  geschätzten Rate (dann das stärkere Signal, das höhere Band, den Access Point mit der kleineren
+  Nummer), authentifiziert sich (Open System; bei WPA3 SAE mit 10 ms Rechenzeit) und assoziiert
+  sich (je zwei Management-Frames zu 250 µs; der Access Point vergibt eine AID und meldet die
+  Station mit einem Layer-2-Update den Switches). Bei WPA2 und WPA3 folgt der 4-Wege-Handshake
+  mit echten EAPOL-Key-Frames ([`wlankey.rs`](crates/jfn_sim/wlankey.rs): PMK mit PBKDF2, PTK,
+  MIC, der GTK und bei WPA3 der IGTK im AES Key Wrap); erst danach fließen Daten, und ein
+  DHCP-Client des Ports beginnt sofort. Mit falscher Passphrase verwirft der Access Point
+  Nachricht 2 (der MIC passt nicht), schickt Nachricht 1 nach 100 ms und dann jede Sekunde
+  wieder, viermal insgesamt, und beendet die Zuordnung (Grund 15); die Station versucht es nach
+  10, 20 und 30 s wieder und gibt nach dem vierten Fehlschlag auf, bis sich ihre Einstellung,
+  ein Netz eines Access Points oder `iw … connect` ändert. Bei WPA3 scheitert schon SAE: der
+  Access Point bestätigt nicht, die Station gibt nach 1 s auf.
+- **Funk:** Keine Funkphysik, aber ein festes Modell in ganzzahliger Rechnung, auf jedem Ziel
+  gleich: am Rand der Reichweite -82 dBm, je Zehntel der Entfernung 30 dB mehr (ein
+  Pfadverlust-Exponent von 3); aus dem Signal die Rate nach der Mindestempfindlichkeit von
+  802.11ax MCS 0 bis 11 (-82 bis -52 dBm) als Anteil der schnellsten Rate des Bands (2,4 GHz
+  573,5 Mbit/s, 5 und 6 GHz 2,4 Gbit/s), begrenzt durch die Funkports beider Seiten. Die
+  Funkstrecke trägt zwei Drittel davon, jeder Frame braucht 300 µs (2,4 GHz), 200 µs (5 GHz)
+  oder 150 µs (6 GHz) für den Zugang zum Medium plus die Laufzeit; unter -78 dBm gehen bis zu
+  2 % der Frames verloren.
+- **Bewegen:** Wird eine Station oder ein Access Point verschoben (im Fenster schon während des
+  Ziehens, im Szenario mit `move`), zählt der Simulator neu: Außer Reichweite verliert die
+  Station nach sieben fehlenden Beacons (716,8 ms) die Verbindung und sucht wieder; unter -70
+  dBm und mit einem Access Point ihres Netzes, der 8 dB besser ist, wechselt sie dorthin
+  (Roaming: Reassoziation und ein neuer Handshake; ihr Port bleibt dabei oben, so bleiben
+  Adressen, Nachbarn und Lease). Ein Access Point, der ausgeschaltet wird, verstummt (seine
+  Stationen merken es an den Beacons); einer, dessen Netz sich ändert oder dessen Funkport
+  abgeschaltet wird, meldet seine Stationen ab.
+- **Weiterleiten:** Der Access Point verbindet seine Stationen mit seiner Kabelseite und
+  untereinander, mit Client-Isolation nicht untereinander; ein Gastnetz erreicht keine andere
+  Station, am Heimrouter nur den Router selbst (seine Adresse, DHCP, DNS, den Weg nach draußen).
+  Daten fahren als Ethernet-II-Frames über die Funkstrecke, so wie der Treiber der Station sie
+  ihrem Stack gibt, der Handshake als EAPOL; Management-Frames (Beacons, Suche,
+  Authentifizierung, Assoziation) sind keine Frames, sondern Ereignisse mit ihren Zeiten. Die
+  Ereignisliste nennt jeden Schritt („WLAN: assoziiert mit AP1 (AID 1, 5 GHz, Kanal 36, -71
+  dBm, 576,0 Mbit/s).“), Paket-Tab und pcapng zeigen Daten und EAPOL.
+- **Ältere Projekte:** Ein Funkkabel des Projekts bleibt ein Kabel wie bisher, eine feste
+  Zuordnung ohne Suche, Reichweite und Schlüssel; WLAN-Einstellungen gelten für Funkports ohne
+  Kabel. Wird es ausgesteckt, sucht die Station ihr Netz.
+- **Fenster:** Ansicht › WLAN-Reichweiten zeigt die Reichweiten aller Access Points als Kreise
+  mit Band und Metern, sonst zeigt sie ein gewählter Access Point. Stationen tragen vier
+  Signalbalken (ab -60, -67 und -75 dBm und darunter einen; leer, solange sie nicht verbunden
+  sind). Funklinien, Kreise und suchende Stationen sind Texteinträge für Screenreader und
+  Skripte („Funk: Laptop1 – AP1 (Buero, 5 GHz, -71 dBm, 576,0 Mbit/s)“, „Reichweite: AP1, 2,4
+  GHz 50 m, 5 GHz 35 m“, „Funk: Laptop2 – nicht verbunden („Buero“)“). Der Inspektor eines
+  Access Points zeigt seine Netze (die Passphrase maskiert, bis „Passphrase zeigen“ sie
+  aufdeckt), warum eines nicht angeboten wird, die Stationen je Netz und die Reichweiten; der
+  einer Station ihren Zustand, den Access Point, Netz, Signal und Rate, ihr Netz zum Ändern
+  und die Netze in Reichweite.
+- **Befehlszeilen** ([`cli/wlan.rs`](crates/jfn_sim/cli/wlan.rs)): unter Linux `iw dev`, `iw dev
+  wlan0 info|link|scan|station dump`, `iw dev wlan0 connect SSID [psk PASSPHRASE]` (für den
+  Lauf; das Projekt behält seine Einstellung) und `iw dev wlan0 disconnect`; der Heimrouter
+  nennt ein zweites Netz auf seinem Funkport `wlan0-1`. `ip link` zeigt `wlan0` mit
+  `NO-CARRIER`, solange keine Zuordnung steht; `wpa_supplicant` und `hostapd` schreiben ins
+  Protokoll. Der IOS-artige JF-AP6E kennt `show dot11 associations` und meldet Anmeldungen und
+  Abschiede als `%DOT11-…`-Zeilen auf der Konsole. Andere IOS-artige Geräte haben laut Katalog
+  keine Funkports.
+- **Probleme:** Stationen, die kein Netz ihrer SSID finden (keines angeboten: Fehler, außer
+  Reichweite: Warnung), Stationen ohne oder mit falscher Passphrase, Netze, die nicht angeboten
+  werden können (etwa WPA2 auf 6 GHz), mit dem Grund.
+
+Entscheidungen: SAE (die Dragonfly-Rechnung von WPA3) wird nicht gerechnet; für sein PMK steht
+ein HKDF-SHA256 über Passwort, beide MAC-Adressen und je einen Zufallswert beider Seiten (gleich
+auf beiden Seiten bei gleichem Passwort, neu bei jeder Zuordnung), alles danach ist echt. Die
+Daten werden nicht mit CCMP verschlüsselt (die Schlüssel entstehen, die Frames bleiben lesbar).
+
+Noch offen: Kanäle, die sich gegenseitig stören, Ad-hoc-Netze, WPA-Enterprise (802.1X mit
+RADIUS), Band Steering und 802.11r, Netze über die IOS-artige Befehlszeile einrichten.
+
+Für Programme: `Action::Move { dev, x, y }`, `Action::Wlan { dev, wlan }`, `Action::Scale {
+dip_per_m }`, `Engine::wlan_assocs()`, `wlan_station(dev)`, `wlan_stations_of(ap)`,
+`wlan_survey(dev, ssid)`, `wlan_scale()`, die Notizen `Note::Wlan(WNote)`. Geprüft wird WLAN in
+der Selbsttest-Gruppe `wlan` ([`src/wlantest.rs`](src/wlantest.rs)), SHA-1, PBKDF2, Key Wrap und
+CMAC in der coretest-Gruppe `crypto`, EAPOL in `netpkt`, dazu das Szenario `wlan_office.scn` und
+die Fensterskripte `wlan_inspector.uis`, `wlan_range.uis`, `wlan_drag.uis` und `wlan_shots.uis`.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -1734,9 +2052,9 @@ Geste).
 | Phase | Meilensteine |
 |---|---|
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
-| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
+| 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | WLAN, physische Ansicht, Aufgaben, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · physische Ansicht, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

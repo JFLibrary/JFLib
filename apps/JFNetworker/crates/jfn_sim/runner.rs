@@ -21,6 +21,8 @@
 // as a decimal; "series FILE" makes the time series a CSV at the end, like the capture, and its
 // line names how many series and values it has and the CRC-32 of the file.  The expectations
 // are judged by goal.rs (judge, Verdict::report), which the lab's goals in the window share.
+// "move DEV X Y" puts a device's box elsewhere (Action::Move: WLAN stations and access points
+// look again, wlan.rs).
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -340,6 +342,20 @@ pub fn run_scenario(p: &Project, sc: &Scenario, name: &str, pcap: bool) -> Outco
             StepKind::Pcap(f) => pcap = Some(f.clone()),
             StepKind::Series(f) => series = Some(f.clone()),
             StepKind::Print(t) => r.line(now, "--", t),
+            // a device moves (WLAN looks again: wlan.rs)
+            StepKind::Move { dev, x, y } => match dev_of(dev, &d) {
+                Some(id) => {
+                    r.line(now, "--", &format!("move {} {} {}", dev, x, y));
+                    if let Err(e) = d.send(Cmd::Apply(Action::Move { dev: id, x: *x, y: *y }), 0) {
+                        r.line(now, "FEHLER", &format!("Zeile {}: {}", step.line, e));
+                        ok = false;
+                    }
+                }
+                None => {
+                    r.line(now, "FEHLER", &format!("Zeile {}: das Gerät {} gibt es nicht", step.line, dev));
+                    ok = false;
+                }
+            },
             StepKind::Fault { fault, dur } => match fault_of(&proj, &d.eng, fault) {
                 Ok(f) => {
                     let id = d.eng.next_fault_id();

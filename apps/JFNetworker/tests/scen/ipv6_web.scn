@@ -1,0 +1,66 @@
+# Dual-Stack-Web: PC1 und PC2 holen sich IPv4 per DHCP von R1 (Namensserver 10.0.2.10, Domäne
+# lab) und bilden ihre IPv6-Adressen per SLAAC aus den Router Advertisements von R1. WEB hinter
+# R1 hat 10.0.2.10 und 2001:db8:2::10 fest, sein Namensserver kennt www.lab mit A und AAAA, sein
+# Webserver antwortet auf beiden Familien (ein Socket auf ::).
+run 20s
+PC1: cat /etc/resolv.conf
+expect PC1 output contains "nameserver 10.0.2.10"
+PC1: ip -6 addr show dev eth0
+expect PC1 output contains "inet6 2001:db8:1:0:4a:ff:fe00:101/64 scope global dynamic"
+# per Name: der Resolver fragt A und AAAA und probiert IPv6 zuerst (RFC 6724: PC1 hat eine
+# globale IPv6-Adresse); die DNS-Fragen gehen über IPv4 zu 10.0.2.10. R1 verwirft die ersten
+# beiden, während er per ARP nach der MAC von WEB fragt (IOS hält nichts zurück); nach 5 s
+# fragt der Resolver noch einmal
+PC1: curl -v http://www.lab/
+run 6s
+expect PC1 output contains "*   Trying [2001:db8:2::10]:80..."
+expect PC1 output contains "Hallo von WEB"
+# per Adresse über IPv4
+PC2: curl -s http://10.0.2.10/
+run 1s
+expect PC2 output contains "Hallo von WEB"
+PC1: ss -tan
+expect PC1 output contains "[2001:db8:2::10]:80"
+WEB: ss -tln
+expect WEB output contains "*:80"
+WEB: ss -uln
+expect WEB output contains "*:53"
+# dig und host fragen den Namensserver selbst
+PC2: dig AAAA www.lab
+run 1s
+expect PC2 output contains "www.lab.\t\t300\tIN\tAAAA\t2001:db8:2::10"
+PC2: host web.lab
+run 1s
+expect PC2 output contains "web.lab is an alias for www.lab.\nwww.lab has address 10.0.2.10\nwww.lab has IPv6 address 2001:db8:2::10"
+# ping und traceroute per Name: AAAA zuerst, -4 nur A
+PC1: ping -c 2 www.lab
+run 3s
+expect PC1 output contains "PING www.lab(2001:db8:2::10) 56 data bytes"
+expect PC1 output contains "2 packets transmitted, 2 received, 0% packet loss"
+PC2: ping -4 -c 1 www.lab
+run 2s
+expect PC2 output contains "PING www.lab (10.0.2.10) 56(84) bytes of data."
+PC1: traceroute -6 -n www.lab
+run 5s
+expect PC1 output contains " 2  2001:db8:2::10  "
+# der IOS-artige Router fragt einen Namensserver über IPv6; ping NAME nimmt IPv4, ping ipv6
+# NAME die IPv6-Adresse
+R1: enable
+R1: configure terminal
+R1: ip name-server 2001:DB8:2::10
+R1: ipv6 host web6 2001:DB8:2::10
+R1: end
+R1: ping www.lab
+run 3s
+expect R1 output contains "Pinging 10.0.2.10 with 5 echo requests"
+expect R1 output contains "!!!!!"
+R1: ping ipv6 www.lab
+run 3s
+expect R1 output contains "Pinging 2001:DB8:2::10 with 5 echo requests"
+R1: ping web6
+run 3s
+expect R1 output contains "!!!!!"
+R1: show running-config
+expect R1 output contains "ipv6 host web6 2001:DB8:2::10\nip name-server 2001:DB8:2::10\n"
+expect hops tcp >= 10
+expect hops dns >= 8

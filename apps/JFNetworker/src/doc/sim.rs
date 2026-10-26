@@ -32,6 +32,12 @@
 //   mode() / view_at() / view_time() / with_engine(f)   the simulation mode: the driver's
 //                                 mode, the moment the view shows, a change of the engine
 //                                 that is no command (PDUs: a ping job, a service, a lookup)
+//   moved(&project)               WLAN: the positions of a drag in progress go to the engine
+//                                 at once (Action::Move), so stations come and go live
+//   wlan / wlan_key               the WLAN associations of the last snapshot (the canvas draws
+//                                 them, its version follows wlan_key); sync also sends the
+//                                 devices' WLAN settings (Action::Wlan, no restart), their
+//                                 positions and the project's scale (Action::Scale)
 //
 // Doc calls sync after every change of the project (edits, undo, redo), so undo and redo send
 // the opposite actions and project and engine never part.  Everything runs on the UI thread
@@ -61,11 +67,14 @@ struct MDev {
     off: bool,
     startup: String,
     services: Vec<ServiceDef>,
+    /// WLAN: its settings and position (no restart for either)
+    wlan: Option<jfn_model::Wlan>,
+    pos: (i32, i32),
 }
 
 impl MDev {
     fn of(d: &Device) -> MDev {
-        MDev { name: d.name.clone(), model: d.model.clone(), off: d.off, startup: d.startup_config.clone(), services: d.services.clone() }
+        MDev { name: d.name.clone(), model: d.model.clone(), off: d.off, startup: d.startup_config.clone(), services: d.services.clone(), wlan: d.wlan.clone(), pos: (d.x, d.y) }
     }
 
     /// the device must start again: another model, configuration or services
@@ -194,6 +203,11 @@ pub(crate) struct Sim {
     dirty: bool,
     /// the task clock at the last snapshot (µs)
     shot_at: u64,
+    /// the scale the engine was told (Project::dip_per_m)
+    scale: u32,
+    /// the WLAN associations of the last snapshot, a key that changes with them
+    pub wlan: Rc<Vec<jfn_sim::AssocView>>,
+    pub wlan_key: u32,
 }
 
 impl Sim {
@@ -225,6 +239,9 @@ impl Sim {
             soon: true,
             dirty: false,
             shot_at: 0,
+            scale: if whole { p.dip_per_m } else { 0 },
+            wlan: Rc::new(Vec::new()),
+            wlan_key: 0,
         };
         if whole {
             for d in &p.devices {
@@ -325,7 +342,18 @@ impl Sim {
             if m.off != d.off && self.act(Action::Power { dev: d.id, on: !d.off }).is_ok() {
                 now.off = d.off;
             }
+            // WLAN: settings and position (no restart)
+            if m.wlan != d.wlan && self.act(Action::Wlan { dev: d.id, wlan: d.wlan.clone() }).is_ok() {
+                now.wlan = d.wlan.clone();
+            }
+            if m.pos != (d.x, d.y) && self.act(Action::Move { dev: d.id, x: d.x, y: d.y }).is_ok() {
+                now.pos = (d.x, d.y);
+            }
             self.devs.insert(d.id, now);
+        }
+        // the scale of the canvas (the ranges of the radios)
+        if self.scale != p.dip_per_m && self.act(Action::Scale { dip_per_m: p.dip_per_m }).is_ok() {
+            self.scale = p.dip_per_m;
         }
         // new links; kind, plug and quality
         for l in &p.links {
@@ -401,6 +429,35 @@ impl Sim {
         }
     }
 
+    /// a drag in progress: the positions of the devices with a radio go to the engine at once
+    /// (WLAN stations come and go live); a snapshot only when WLAN changed (the step at the
+    /// drag's end brings the rest)
+    pub(crate) fn moved(&mut self, p: &Project) {
+        let moved: Vec<(u32, i32, i32)> = p
+            .devices
+            .iter()
+            .filter(|d| self.devs.get(&d.id).is_some_and(|m| m.pos != (d.x, d.y)))
+            .filter(|d| jfn_model::catalog::model(&d.model).is_some_and(|m| jfn_model::wlan::role(m) != jfn_model::wlan::Role::None))
+            .map(|d| (d.id, d.x, d.y))
+            .collect();
+        if moved.is_empty() {
+            return;
+        }
+        self.catch_up();
+        let ver = self.drv.eng.wlan_ver();
+        for (id, x, y) in moved {
+            if self.drv.send(Cmd::Apply(Action::Move { dev: id, x, y }), plat::task::now_us()).is_ok()
+                && let Some(m) = self.devs.get_mut(&id)
+            {
+                m.pos = (x, y);
+            }
+        }
+        if self.drv.eng.wlan_ver() != ver {
+            self.topo = self.topo.wrapping_add(1);
+            self.changed();
+        }
+    }
+
     /// the engine runs this device as the project has it now: its configuration was applied
     /// by the caller (no restart), the engine's startup configuration follows
     pub(crate) fn adopt(&mut self, d: &Device) {
@@ -430,8 +487,20 @@ impl Sim {
     fn snapshot(&mut self) {
         let v = self.drv.eng.view();
         let mut leds = BTreeMap::new();
-        for l in &v.links {
+        // the cables of the project (WLAN associations have their own key)
+        for l in v.links.iter().filter(|l| !jfn_sim::wlan::is_assoc_id(l.id)) {
             leds.insert(l.id, l.led);
+        }
+        let assocs = self.drv.eng.wlan_assocs();
+        let mut h: u32 = 0x811C_9DC5;
+        for a in &assocs {
+            for x in [a.id, a.sta, a.ap, a.dbm as u32, a.kbps, a.lost as u32 | (a.authorized as u32) << 1] {
+                h = (h ^ x).wrapping_mul(0x0100_0193);
+            }
+        }
+        if h != self.wlan_key || assocs.len() != self.wlan.len() {
+            self.wlan_key = h;
+            self.wlan = Rc::new(assocs);
         }
         if leds != self.leds {
             let mut h: u32 = 0x811C_9DC5;

@@ -258,8 +258,8 @@ impl Service for Ntp {
                     return;
                 };
                 match v.mode() {
-                    ntp::MODE_SERVER => self.on_reply(os, d.src, &v),
-                    ntp::MODE_CLIENT => self.on_request(os, d.src, d.sport, &v),
+                    ntp::MODE_SERVER => self.on_reply(os, d.src4(), &v),
+                    ntp::MODE_CLIENT => self.on_request(os, d.src4(), d.sport, &v),
                     _ => {}
                 }
             }

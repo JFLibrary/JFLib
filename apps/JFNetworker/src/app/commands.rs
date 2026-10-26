@@ -18,7 +18,11 @@
 // the simulation mode's animation.  The consoles' commands (CMD_CONSOLE .. CMD_LOG_CLEAR: tabs,
 // windows, the log) are workspace/terminal.rs's.  The labs (U6b, workspace/task.rs): Datei ›
 // Labor öffnen …, Ansicht › Bereiche › Aufgabe (Ctrl+Shift+A), Simulation › Ziele prüfen (F9)
-// and Nächster Hinweis.
+// and Nächster Hinweis.  Assessments (A1): Werkzeuge › Aufgabe erstellen … (the author's panel,
+// workspace/author.rs), Simulation › Aufgabe abgeben (workspace/assess.rs); TIMER_ASSESS moves
+// a time limit's countdown.
+// WLAN (W1): Ansicht › WLAN-Reichweiten shows the range of every access
+// point on the canvas (canvas/wlan.rs; without it the selected ones show theirs).
 
 use jfn_model::CableKind;
 use ui::*;
@@ -30,7 +34,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 80] = [
+pub(crate) static CMDS: [Command; 86] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -111,6 +115,12 @@ pub(crate) static CMDS: [Command; 80] = [
     Command::new(CMD_SCRIPTS, "&Skripte …", IC_DEV_TOOLS, 0, 0, CF_DISABLED | CF_HIDDEN),
     Command::new(CMD_METRICS, "Me&triken", JN_METRICS, MOD_CTRL | MOD_SHIFT, b'M' as u32, 0),
     Command::new(CMD_HEAL_ALL, "Alle &Fehler beheben", IC_REPAIR, 0, 0, CF_DISABLED),
+    Command::new(CMD_AUTHOR, "&Aufgabe erstellen …", IC_EDIT, 0, 0, 0),
+    Command::new(CMD_ASSESS_SUBMIT, "Aufgabe a&bgeben", IC_UPLOAD, 0, 0, CF_DISABLED),
+    Command::new(CMD_AUTHOR_TARGET, "Aktuelles Netz als Ziel", IC_FLAG, 0, 0, 0),
+    Command::new(CMD_AUTHOR_START, "Ausgangsnetz erzeugen", IC_REFRESH, 0, 0, CF_DISABLED),
+    Command::new(CMD_AUTHOR_SAVE, "Als Aufgabe speichern …", IC_SAVE_AS, 0, 0, CF_DISABLED),
+    Command::new(CMD_WLAN_RANGES, "&WLAN-Reichweiten", JN_PORT_RADIO, 0, 0, 0),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -145,7 +155,7 @@ static M_EDIT: [Mi; 7] = [
     Mi::Sep,
     Mi::Cmd(CMD_RENAME),
 ];
-static M_VIEW: [Mi; 10] = [
+static M_VIEW: [Mi; 11] = [
     Mi::Cmd(CMD_ZOOM_IN),
     Mi::Cmd(CMD_ZOOM_OUT),
     Mi::Cmd(CMD_ZOOM_100),
@@ -154,6 +164,7 @@ static M_VIEW: [Mi; 10] = [
     Mi::Cmd(CMD_GRID),
     Mi::Cmd(CMD_SNAP),
     Mi::Cmd(CMD_MINIMAP),
+    Mi::Cmd(CMD_WLAN_RANGES),
     Mi::Sep,
     Mi::Sub("&Bereiche", &M_PANELS),
 ];
@@ -172,7 +183,7 @@ static M_PANELS: [Mi; 13] = [
     Mi::Sep,
     Mi::Cmd(CMD_LAYOUT_RESET),
 ];
-static M_SIM: [Mi; 20] = [
+static M_SIM: [Mi; 21] = [
     Mi::Cmd(CMD_SIM_REALTIME),
     Mi::Cmd(CMD_SIM_MODE),
     Mi::Sep,
@@ -193,6 +204,7 @@ static M_SIM: [Mi; 20] = [
     Mi::Sep,
     Mi::Cmd(CMD_TASK_CHECK),
     Mi::Cmd(CMD_TASK_HINT),
+    Mi::Cmd(CMD_ASSESS_SUBMIT),
 ];
 static M_TEMPO: [Mi; 6] = [
     Mi::Cmd(CMD_SIM_TEMPO0),
@@ -203,7 +215,7 @@ static M_TEMPO: [Mi; 6] = [
     Mi::Cmd(CMD_SIM_TEMPO0 + 5),
 ];
 /// the tools (their single keys) and the settings
-static M_TOOLS: [Mi; 7] = [
+static M_TOOLS: [Mi; 9] = [
     Mi::Cmd(CMD_TOOL_SELECT),
     Mi::Cmd(CMD_TOOL_HAND),
     Mi::Cmd(CMD_TOOL_CONNECT),
@@ -211,6 +223,8 @@ static M_TOOLS: [Mi; 7] = [
     Mi::Cmd(CMD_TOOL_PDU),
     Mi::Sep,
     Mi::Cmd(CMD_SETTINGS),
+    Mi::Sep,
+    Mi::Cmd(CMD_AUTHOR),
 ];
 static M_HELP: [Mi; 3] = [Mi::Cmd(CMD_SHORTCUTS), Mi::Sep, Mi::Cmd(CMD_ABOUT)];
 /// the canvas' context menu (the background, notes)
@@ -269,6 +283,7 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     ui.cmd_state(CMD_GRID, flag(n.prefs.grid, CF_CHECKED));
     ui.cmd_state(CMD_SNAP, flag(n.prefs.snap, CF_CHECKED));
     ui.cmd_state(CMD_MINIMAP, flag(n.prefs.minimap, CF_CHECKED));
+    ui.cmd_state(CMD_WLAN_RANGES, flag(n.canvas.wl.ranges, CF_CHECKED));
     for (k, &p) in PANELS.iter().enumerate() {
         ui.cmd_state(CMD_PANEL0 + k as u32, flag(n.shell.dock.visible(p), CF_CHECKED));
     }
@@ -283,6 +298,8 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     crate::workspace::task::states(n, ui);
     crate::workspace::devwin::scripts::states(n, ui);
     crate::workspace::metrics::states(n, ui);
+    crate::workspace::assess::states(n, ui);
+    crate::workspace::author::states(n, ui);
 }
 
 // Ctrl+1 .. 8: the panel shows; the keyboard goes into it -- the device search, the shown
@@ -427,6 +444,15 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_SCRIPTS => return crate::workspace::devwin::scripts::command(n, ui, id),
         // the lab (U6a: the Metriken panel, faults)
         CMD_METRICS | CMD_HEAL_ALL => return crate::workspace::metrics::command(n, ui, id, arg),
+        // assessments (A1): handing in, the author's panel, the countdown
+        CMD_ASSESS_SUBMIT => return crate::workspace::assess::command(n, ui, id),
+        CMD_AUTHOR | CMD_AUTHOR_TARGET | CMD_AUTHOR_START | CMD_AUTHOR_SAVE => return crate::workspace::author::command(n, ui, id),
+        UIC_TIMER if arg == TIMER_ASSESS => {
+            crate::workspace::assess::timer(n, ui);
+            return true;
+        }
+        // WLAN: the ranges of every access point on the canvas (canvas/wlan.rs)
+        CMD_WLAN_RANGES => n.canvas.wl.ranges = !n.canvas.wl.ranges,
         _ => return false,
     }
     ui.repass();

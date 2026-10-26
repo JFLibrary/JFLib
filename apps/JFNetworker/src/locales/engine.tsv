@@ -182,7 +182,6 @@ Für {} gibt es keine passende Zone oder keinen solchen Eintrag.	There is no mat
 Diese Aktion kennt der Simulator nicht.	The simulator does not know this action.
 Unbekannte Dienstart „{}“.	Unknown kind of service “{}”.
 Port {} gibt es nicht.	Port {} does not exist.
-„server“ fehlt oder ist keine IPv4-Adresse.	“server” is missing or not an IPv4 address.
 „close“ kennt {} nicht (shutdown, close, abort, keep).	“close” does not know {} (shutdown, close, abort, keep).
 „{}“: nur http geht.	“{}”: only http works.
 Die URL nennt keinen Host.	The URL names no host.
@@ -444,7 +443,6 @@ Fehler {} ist schon behoben.	Fault {} is healed already.
 Das Backend {} gibt es schon.	Backend {} exists already.
 Das Backend {} gibt es nicht.	Backend {} does not exist.
 Das Backend {} steht zweimal da.	Backend {} is listed twice.
-Backend {} braucht „addr“ mit einer IPv4-Adresse.	Backend {} needs “addr” with an IPv4 address.
 „backends“ fehlt.	“backends” is missing.
 „mode“ kennt {} nicht (http, tcp).	“mode” does not know {} (http, tcp).
 „algorithm“ kennt {} nicht (round-robin, least-conn, weighted, hash).	“algorithm” does not know {} (round-robin, least-conn, weighted, hash).
@@ -857,3 +855,139 @@ OSPF: SPF-Lauf {}: Routen: {}, neu: {}, geändert: {}, entfallen: {}.	OSPF: SPF 
 OSPF: Route {} ({}) über {}, Kosten {}.	OSPF: route {} ({}) via {}, cost {}.
 OSPF: Route {} ({}) jetzt über {}, Kosten {}.	OSPF: route {} ({}) now via {}, cost {}.
 OSPF: Route {} ({}) entfällt.	OSPF: route {} ({}) is gone.
+{} ist keine Adresse dieses Geräts.	{} is not an address of this device.
+[{}]:{} ist kein Ziel für TCP.	[{}]:{} is no destination for TCP.
+Packet Too Big: kleinere Segmente, MSS {}.	Packet Too Big: smaller segments, MSS {}.
+eine Adresse der anderen Familie	an address of the other family
+„server“ fehlt oder ist keine IP-Adresse.	“server” is missing or not an IP address.
+Backend {} braucht „addr“ mit einer IP-Adresse.	Backend {} needs “addr” with an IP address.
+# A1: assessments -- what Assess::issues finds (jfn_model lab.rs)
+Die Aufgabe hat keine Kriterien.	The assessment has no items.
+Die Aufgabe hat kein Zielnetz.	The assessment has no target network.
+Kriterium {}: unbekannte Art „{}“.	Item {}: unknown kind “{}”.
+Kriterium {} hat keine Prüfung.	Item {} has no check.
+Kriterium {}: „{}“ ist keine Prüfung: {}	Item {}: “{}” is not a check: {}
+Kriterium {}: das Gerät {} gibt es im Projekt nicht.	Item {}: the project has no device {}.
+Kriterium {} nennt kein Gerät.	Item {} names no device.
+Kriterium {} nennt keine Schnittstelle.	Item {} names no interface.
+Kriterium {} nennt keinen Dienst.	Item {} names no service.
+Kriterium {} nennt kein zweites Gerät.	Item {} names no second device.
+Kriterium {}: „any“ braucht eine Liste von Werten.	Item {}: “any” needs a list of values.
+Kriterium {} erwartet keinen Wert.	Item {} expects no value.
+Kriterium {}: „{}“ ist kein gültiger Wert.	Item {}: “{}” is not a valid value.
+# A1: what a graded item found (jfn_sim assess.rs)
+unbekannte Art {}	unknown kind {}
+das Gerät {} gibt es nicht	there is no device {}
+heißt {}	is called {}
+kein Interface {}	no interface {}
+hat keine Adresse	has no address
+hat {}	has {}
+ist ausgeschaltet (shutdown)	is shut down
+ist eingeschaltet	is up (not shut down)
+{} ist kein Switchport	{} is no switch port
+im VLAN {}	in VLAN {}
+im Modus {}	in mode {}
+keine statische Route nach {}	no static route to {}
+statt dessen: {}	instead: {}
+kein Dienst {}	no service {}
+keine Einstellung {}	no setting {}
+ist {}	is {}
+{} {} hängt an {} {}	{} {} is connected to {} {}
+nicht verbunden	not connected
+falsches Kabel: {}	wrong cable: {}
+keine Prüfung	no check
+es fehlt: {}	missing: {}
+zu viel: {}	too much: {}
+# A1: the default texts of items and the rows of the author's tree (jfn_sim assess.rs)
+{} heißt {}	{} is called {}
+{} {}: Adresse {}	{} {}: address {}
+{} {} ist ausgeschaltet	{} {} is shut down
+{} {} ist eingeschaltet	{} {} is up
+{} {} im VLAN {}	{} {} in VLAN {}
+{} {} im Modus {}	{} {} in mode {}
+{}: statische Route {}	{}: static route {}
+Kabel zwischen {} und {}	Cable between {} and {}
+Kabel {} {} – {} {}	Cable {} {} – {} {}
+{} erreicht {}	{} reaches {}
+{} erreicht {} nicht	{} does not reach {}
+Hostname {}	Hostname {}
+Adresse {}	Address {}
+ausgeschaltet (shutdown)	shut down
+eingeschaltet	up (not shut down)
+VLAN {}	VLAN {}
+Modus {}	Mode {}
+Konfiguration (IOS-artig)	Configuration (IOS-like)
+# A1: a ping on a copy of the engine ("expect ... reaches", jfn_sim goal.rs)
+{} meldet: Netz nicht erreichbar	{} reports: network unreachable
+{} meldet: Host nicht erreichbar	{} reports: host unreachable
+{} meldet: Ziel nicht erreichbar	{} reports: destination unreachable
+{} meldet: durch eine Zugriffsliste verboten	{} reports: prohibited by an access list
+{} meldet: TTL abgelaufen	{} reports: TTL exceeded
+{} meldet: Fragmentierung nötig (MTU {})	{} reports: fragmentation needed (MTU {})
+{} meldet: ICMP Typ {} Code {}	{} reports: ICMP type {} code {}
+das Gerät ist ausgeschaltet	the device is switched off
+der Name {} ist unbekannt	the name {} is unknown
+keine Antwort: {}	no answer: {}
+keine Antwort auf {} Pings	no answer to {} pings
+{} von {} Pings beantwortet	{} of {} pings answered
+
+# jfn_model and jfn_sim: WLAN (W1) -- bands and security (jfn_model wlan.rs) and its refusals, the decisions of jfn_sim wlan.rs (Note::Wlan, wlantrace.rs) with their reason codes, its problems
+2,4 GHz	2.4 GHz
+5 GHz	5 GHz
+6 GHz	6 GHz
+Offen	Open
+WPA2-Personal	WPA2-Personal
+WPA3-Personal	WPA3-Personal
+Eine SSID hat 1 bis 32 Bytes.	An SSID has 1 to 32 bytes.
+Kanal {} gibt es im Band {} nicht.	There is no channel {} in the {} band.
+Im 6-GHz-Band gibt es nur WPA3-Personal.	The 6 GHz band takes WPA3-Personal only.
+Die Passphrase von „{}“ braucht 8 bis 63 Zeichen (ASCII).	The passphrase of “{}” needs 8 to 63 characters (ASCII).
+Kein Access Point bietet das WLAN „{}“ an, das {} sucht.	No access point offers the WLAN “{}” that {} looks for.
+Das WLAN „{}“ ist für {} außer Reichweite.	The WLAN “{}” is out of range for {}.
+{} hat keine Passphrase für das WLAN „{}“.	{} has no passphrase for the WLAN “{}”.
+Die Passphrase von {} passt nicht zum WLAN „{}“.	The passphrase of {} does not match the WLAN “{}”.
+Grund {}: ohne Angabe	reason {}: unspecified
+Grund {}: der Absender verlässt das Netz	reason {}: the sender leaves the network
+Grund {}: zu lange still	reason {}: silent for too long
+Grund {}: nicht assoziiert	reason {}: not associated
+Grund {}: Zeitüberschreitung im 4-Wege-Handshake	reason {}: 4-way handshake timeout
+Grund {}	reason {}
+WLAN: sucht „{}“ auf {} ({} ms).	WLAN: looking for “{}” on {} ({} ms).
+WLAN: „{}“ gefunden bei {} ({}, Kanal {}, {} dBm).	WLAN: “{}” found at {} ({}, channel {}, {} dBm).
+WLAN: „{}“ bei {} Access Points gefunden, der beste ist {} ({}, Kanal {}, {} dBm).	WLAN: “{}” found at {} access points, the best is {} ({}, channel {}, {} dBm).
+WLAN: „{}“ ist nicht in Reichweite.	WLAN: “{}” is not in range.
+WLAN: „{}“ braucht eine Passphrase, die Station hat keine.	WLAN: “{}” needs a passphrase, the station has none.
+WLAN: Authentifizierung bei {} (Open System).	WLAN: authentication with {} (Open System).
+WLAN: Authentifizierung bei {} (SAE).	WLAN: authentication with {} (SAE).
+WLAN: Authentifizierung bei {} für den Wechsel (Open System).	WLAN: authentication with {} for roaming (Open System).
+WLAN: Authentifizierung bei {} für den Wechsel (SAE).	WLAN: authentication with {} for roaming (SAE).
+WLAN: {} authentifiziert sich (Open System).	WLAN: {} authenticates (Open System).
+WLAN: {} authentifiziert sich (SAE).	WLAN: {} authenticates (SAE).
+WLAN: die SAE-Bestätigung von {} passt nicht: die Passphrase ist eine andere.	WLAN: the SAE confirm of {} does not match: the passphrase is a different one.
+WLAN: keine Bestätigung von {}: Authentifizierung gescheitert.	WLAN: no confirm from {}: authentication failed.
+WLAN: assoziiert mit {} (AID {}, {}, Kanal {}, {} dBm, {}).	WLAN: associated with {} (AID {}, {}, channel {}, {} dBm, {}).
+WLAN: reassoziiert mit {} (AID {}, {}, Kanal {}, {} dBm, {}).	WLAN: reassociated with {} (AID {}, {}, channel {}, {} dBm, {}).
+WLAN: {} ist an {} in „{}“ assoziiert (AID {}).	WLAN: {} is associated on {} in “{}” (AID {}).
+WLAN: {} wechselt an {} in „{}“ (AID {}).	WLAN: {} roams to {} in “{}” (AID {}).
+WLAN: meldet {} den Switches (Layer-2-Update).	WLAN: announces {} to the switches (Layer 2 Update).
+WLAN: 4-Wege-Handshake, Nachricht {} von 4 an {}.	WLAN: 4-way handshake, message {} of 4 to {}.
+WLAN: 4-Wege-Handshake, Nachricht {} von 4 von {}.	WLAN: 4-way handshake, message {} of 4 from {}.
+WLAN: der MIC von Nachricht {} von {} passt nicht: die Passphrase ist eine andere. Verworfen.	WLAN: the MIC of message {} from {} does not match: the passphrase is a different one. Dropped.
+WLAN: Nachricht {} an {} noch einmal (Versuch {}).	WLAN: message {} to {} once more (attempt {}).
+WLAN: Schlüssel mit {} gesetzt (CCMP): Daten dürfen fließen.	WLAN: keys with {} installed (CCMP): data may flow.
+WLAN: der 4-Wege-Handshake mit {} kommt nicht zustande: Verbindung beendet (Grund 15).	WLAN: the 4-way handshake with {} does not complete: connection ended (reason 15).
+WLAN: {} beendet die Verbindung ({}).	WLAN: {} ends the connection ({}).
+WLAN: verlässt {}.	WLAN: leaves {}.
+WLAN: {} ist abgemeldet ({}).	WLAN: {} has left ({}).
+WLAN: wechselt von {} ({} dBm) zu {} ({} dBm).	WLAN: roams from {} ({} dBm) to {} ({} dBm).
+WLAN: {} ist zu {} gewechselt.	WLAN: {} moved over to {}.
+WLAN: {} ist außer Reichweite.	WLAN: {} is out of range.
+WLAN: {} ist wieder in Reichweite ({} dBm).	WLAN: {} is back in range ({} dBm).
+WLAN: keine Beacons mehr von {}: die Verbindung ist verloren.	WLAN: no more beacons from {}: the connection is lost.
+WLAN: Signal von {} jetzt {} dBm, {}.	WLAN: signal of {} now {} dBm, {}.
+WLAN: neuer Versuch in {} s ({}. Fehlschlag).	WLAN: next attempt in {} s (failure {}).
+WLAN: gibt nach {} Fehlschlägen auf, bis sich etwas ändert.	WLAN: gives up after {} failures until something changes.
+WLAN: Frame von {} verworfen: der 4-Wege-Handshake ist noch nicht fertig.	WLAN: frame from {} dropped: the 4-way handshake is not finished yet.
+WLAN: Frame an {} verworfen: keine solche Station.	WLAN: frame to {} dropped: no such station.
+WLAN: Frame an {} verworfen: Client-Isolation.	WLAN: frame to {} dropped: client isolation.
+WLAN: Frame an {} verworfen: das Gastnetz erreicht nur den Router.	WLAN: frame to {} dropped: the guest network reaches the router only.

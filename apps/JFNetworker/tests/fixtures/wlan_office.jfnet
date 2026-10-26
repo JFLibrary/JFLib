@@ -1,0 +1,292 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "WLAN im Büro",
+  "description": "Zwei Access Points mit dem WLAN „Buero“ (WPA2, 5 GHz, Kanal 36 und 44) und ein Gastnetz „Gaeste“ (offen, VLAN 20, 2,4 GHz) an AP1; R1 vergibt die Adressen beider Netze (Router-on-a-stick). Laptop2 kennt die Passphrase nicht richtig.",
+  "seed": 11,
+  "next_id": 20,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 500,
+      "y": -160,
+      "off": false,
+      "startup_config": "hostname R1\n!\nip dhcp excluded-address 192.168.10.1 192.168.10.20\nip dhcp excluded-address 192.168.20.1 192.168.20.20\n!\nip dhcp pool BUERO\n network 192.168.10.0 255.255.255.0\n default-router 192.168.10.1\n dns-server 192.168.10.10\n!\nip dhcp pool GAESTE\n network 192.168.20.0 255.255.255.0\n default-router 192.168.20.1\n dns-server 192.168.10.10\n!\ninterface GigabitEthernet0/0/0\n description office LAN (VLAN 1)\n ip address 192.168.10.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/0.20\n description guests (VLAN 20)\n encapsulation dot1Q 20\n ip address 192.168.20.1 255.255.255.0\n!\n",
+      "services": [],
+      "comment": "",
+      "wlan": null
+    },
+    {
+      "id": 2,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 760,
+      "y": -160,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 192.168.10.10/24 dev eth0\nip route add default via 192.168.10.1\n",
+      "services": [],
+      "comment": "",
+      "wlan": null
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 500,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nvlan 20\n name Gaeste\n!\ninterface GigabitEthernet1/0/1\n description uplink to R1\n switchport mode trunk\n!\ninterface GigabitEthernet1/0/2\n description AP1\n switchport mode trunk\n!\ninterface GigabitEthernet1/0/3\n description AP2\n!\n",
+      "services": [],
+      "comment": "",
+      "wlan": null
+    },
+    {
+      "id": 4,
+      "name": "AP1",
+      "model": "jf-ap6e",
+      "x": 300,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname AP1\n",
+      "services": [],
+      "comment": "",
+      "wlan": {
+        "nets": [
+          {
+            "ssid": "Buero",
+            "band": "5",
+            "channel": 36,
+            "security": "wpa2-personal",
+            "passphrase": "Sommer2026!",
+            "vlan": 0,
+            "guest": false,
+            "isolate": false
+          },
+          {
+            "ssid": "Gaeste",
+            "band": "2.4",
+            "channel": 1,
+            "security": "open",
+            "passphrase": "",
+            "vlan": 20,
+            "guest": true,
+            "isolate": false
+          }
+        ],
+        "join": null
+      }
+    },
+    {
+      "id": 5,
+      "name": "AP2",
+      "model": "jf-ap6e",
+      "x": 700,
+      "y": 160,
+      "off": false,
+      "startup_config": "hostname AP2\n",
+      "services": [],
+      "comment": "",
+      "wlan": {
+        "nets": [
+          {
+            "ssid": "Buero",
+            "band": "5",
+            "channel": 44,
+            "security": "wpa2-personal",
+            "passphrase": "Sommer2026!",
+            "vlan": 0,
+            "guest": false,
+            "isolate": false
+          }
+        ],
+        "join": null
+      }
+    },
+    {
+      "id": 6,
+      "name": "Laptop1",
+      "model": "laptop",
+      "x": 360,
+      "y": 300,
+      "off": false,
+      "startup_config": "hostname Laptop1\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@wlan0",
+          "disabled": false,
+          "config": {
+            "iface": "wlan0"
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": {
+        "nets": [],
+        "join": {
+          "ssid": "Buero",
+          "passphrase": "Sommer2026!"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "name": "Laptop2",
+      "model": "laptop",
+      "x": 200,
+      "y": 300,
+      "off": false,
+      "startup_config": "hostname Laptop2\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@wlan0",
+          "disabled": false,
+          "config": {
+            "iface": "wlan0"
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": {
+        "nets": [],
+        "join": {
+          "ssid": "Buero",
+          "passphrase": "Winter2026!"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "name": "Phone1",
+      "model": "smartphone",
+      "x": 440,
+      "y": 320,
+      "off": false,
+      "startup_config": "hostname Phone1\n",
+      "services": [
+        {
+          "kind": "dhcp-client",
+          "name": "dhcp-client@wlan0",
+          "disabled": false,
+          "config": {
+            "iface": "wlan0"
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": {
+        "nets": [],
+        "join": {
+          "ssid": "Gaeste",
+          "passphrase": ""
+        }
+      }
+    }
+  ],
+  "links": [
+    {
+      "id": 10,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "b": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "b": {
+        "dev": 4,
+        "port": "TwoGigabitEthernet0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "b": {
+        "dev": 5,
+        "port": "TwoGigabitEthernet0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 13,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "b": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [
+    {
+      "id": 14,
+      "x": 160,
+      "y": 420,
+      "w": 260,
+      "h": 56,
+      "text": "Buero: WPA2-Personal, 5 GHz\nGaeste: offen, VLAN 20 (nur AP1)"
+    }
+  ],
+  "layout": {
+    "zoom_pm": 0,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null,
+  "dip_per_m": 10
+}

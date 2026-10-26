@@ -13,10 +13,15 @@
 // the cables that are up).  Every change is one undo step; the simulator follows each.  Edit buffers
 // keep what the user typed until Enter, a button or Esc; they start over when the value
 // changes elsewhere (undo, the canvas).
+//
+// wlan.rs: the WLAN part of access points (their networks) and stations (the network they
+// join, where they stand in the simulator) and the scale on the project's page (shown once the
+// project has a device with a radio).
 
 mod cable;
 pub(crate) mod device;
 pub(crate) mod faults;
+pub(crate) mod wlan;
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -64,6 +69,8 @@ pub(crate) struct Inspector {
     link_err: String,
     /// the fields of the fault cards (faults.rs)
     flt: faults::Bufs,
+    /// the WLAN fields (wlan.rs)
+    wl: wlan::Bufs,
 }
 
 impl Inspector {
@@ -242,4 +249,9 @@ fn project(n: &mut Net, ui: &mut Ui) {
     );
     // the lab's active faults (faults.rs)
     faults::project(n, ui);
+    // the scale of the WLAN ranges, once there is a radio (wlan.rs)
+    let p: &Project = &n.doc.proj;
+    if p.devices.iter().any(|d| p.model_of(d.id).is_some_and(|m| jfn_model::wlan::role(m) != jfn_model::wlan::Role::None)) {
+        wlan::project(n, ui);
+    }
 }

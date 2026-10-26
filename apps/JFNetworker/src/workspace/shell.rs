@@ -16,7 +16,9 @@
 // simulation mode over it.  Aufgabe (right, a tab beside Eigenschaften that comes forward with
 // a lab) is the lab's task (workspace/task.rs), its dialog the list of labs.
 // simulation mode over it.  Metriken (bottom, U6a: workspace/metrics.rs) shows the lab's
-// services with KPI tiles and charts of their time series.
+// services with KPI tiles and charts of their time series.  Aufgabe erstellen (right, A1:
+// workspace/author.rs) makes an assessment from the project; the question before handing one
+// in is workspace/assess.rs's dialog.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -78,6 +80,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_PDUS, t("PDUs"), IC_MAIL).at(DOCK_RIGHT, 1) },
         DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_TASK, t("Aufgabe"), IC_FLAG).at(DOCK_RIGHT, 0) },
         DockPanel::new(P_METRICS, t("Metriken"), JN_METRICS).at(DOCK_BOTTOM, 0),
+        DockPanel { flags: DP_HIDDEN, ..DockPanel::new(P_AUTHOR, t("Aufgabe erstellen"), IC_EDIT).at(DOCK_RIGHT, 0) },
     ];
     ui.next_size(-1, -1);
     ui.dock_begin(ID_DOCK, &mut n.shell.dock, &panels);
@@ -98,6 +101,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
             P_LOG => crate::workspace::logview::panel(n, ui),
             P_TASK => crate::workspace::task::panel(n, ui),
             P_METRICS => crate::workspace::metrics::panel(n, ui),
+            P_AUTHOR => crate::workspace::author::panel(n, ui),
             _ => {}
         }
     }
@@ -112,6 +116,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     sim::pdu::dialog(n, ui);
     sim::pdu::file_dialog(n, ui);
     crate::workspace::task::dialog(n, ui);
+    crate::workspace::assess::dialog(n, ui);
     n.sim_timer(ui);
     sim::timer(n, ui);
 }

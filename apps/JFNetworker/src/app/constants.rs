@@ -371,3 +371,91 @@ pub(crate) const ID_FLT_HEAL_ALL: u32 = 0xB10D;
 pub(crate) const ID_FLT_HEAL0: u32 = 0xB140;
 /// the service tree (its rows + 1 + i, at most 2000: up to 0xBFD1)
 pub(crate) const ID_MET_TREE: u32 = 0xB800;
+// ---- A1: assessments -- an assessment in the Aufgabe panel, the author's panel (commands
+// 510 .. 539, widgets 0xF800 .. 0xFBFF, timers 0x188 .. 0x18B, the dock panel P_AUTHOR)
+/// Werkzeuge › Aufgabe erstellen …: the author's panel shows (filled from the project's
+/// assessment when it has one)
+pub(crate) const CMD_AUTHOR: u32 = 510;
+/// hand the assessment in (Simulation › Aufgabe abgeben; the question "Jetzt abgeben?" queues it)
+pub(crate) const CMD_ASSESS_SUBMIT: u32 = 511;
+/// the author's panel: the network as it runs becomes the target; the start network made from
+/// the target; the lab with its assessment into the project, then the save dialog
+pub(crate) const CMD_AUTHOR_TARGET: u32 = 512;
+pub(crate) const CMD_AUTHOR_START: u32 = 513;
+pub(crate) const CMD_AUTHOR_SAVE: u32 = 514;
+/// the countdown of a time limit (every second while it runs)
+pub(crate) const TIMER_ASSESS: u32 = 0x188;
+/// the dock panel of the author (right, a tab beside Eigenschaften)
+pub(crate) const P_AUTHOR: u32 = 13;
+/// the author's panel: its scroll view, the buttons of the target, the start network and
+/// saving; the chosen item's points (a number box: + 1 .. 3 are its own), comparison (+ k),
+/// other accepted values, texts, "Entfernen" and expectation; a new check's expectation,
+/// points and button; the task's texts, topic (+ k), feedback (+ k) and time limit; per check
+/// its row (+ i) and its remove button (+ i)
+pub(crate) const ID_AU: u32 = 0xF800;
+pub(crate) const ID_AU_TARGET: u32 = 0xF801;
+pub(crate) const ID_AU_START: u32 = 0xF802;
+pub(crate) const ID_AU_SAVE: u32 = 0xF803;
+pub(crate) const ID_AU_POINTS: u32 = 0xF804;
+pub(crate) const ID_AU_CMP: u32 = 0xF808;
+pub(crate) const ID_AU_ALTS: u32 = 0xF80C;
+pub(crate) const ID_AU_TEXT_DE: u32 = 0xF80D;
+pub(crate) const ID_AU_TEXT_EN: u32 = 0xF80E;
+pub(crate) const ID_AU_REMOVE: u32 = 0xF80F;
+pub(crate) const ID_AU_CHECK: u32 = 0xF810;
+pub(crate) const ID_AU_NEW_CHECK: u32 = 0xF811;
+pub(crate) const ID_AU_NEW_POINTS: u32 = 0xF814;
+pub(crate) const ID_AU_ADD_CHECK: u32 = 0xF818;
+pub(crate) const ID_AU_TITLE_DE: u32 = 0xF820;
+pub(crate) const ID_AU_TITLE_EN: u32 = 0xF821;
+pub(crate) const ID_AU_SUMMARY_DE: u32 = 0xF822;
+pub(crate) const ID_AU_SUMMARY_EN: u32 = 0xF823;
+pub(crate) const ID_AU_INTRO_DE: u32 = 0xF824;
+pub(crate) const ID_AU_INTRO_EN: u32 = 0xF825;
+pub(crate) const ID_AU_TOPIC: u32 = 0xF828;
+pub(crate) const ID_AU_FEEDBACK: u32 = 0xF830;
+pub(crate) const ID_AU_MINUTES: u32 = 0xF834;
+pub(crate) const ID_AU_CHECK0: u32 = 0xF840;
+pub(crate) const ID_AU_CHECK_X0: u32 = 0xF8C0;
+/// checks the author's panel lists at most
+pub(crate) const AUTHOR_CHECKS: usize = 128;
+/// the Aufgabe panel: an assessment's card, its progress, "Abgeben" beside the time, the
+/// question before handing in; per item its record (+ i)
+pub(crate) const ID_AS_CARD: u32 = 0xF940;
+pub(crate) const ID_AS_PROGRESS: u32 = 0xF941;
+pub(crate) const ID_AS_SUBMIT: u32 = 0xF942;
+pub(crate) const ID_AS_ASK: u32 = 0xF943;
+pub(crate) const ID_AS_ITEM0: u32 = 0xF950;
+/// items an assessment shows at most
+pub(crate) const ASSESS_ITEMS: usize = 200;
+/// the author's tree of the target's settings, last (its rows + 1 + i, at most AUTHOR_ROWS: up
+/// to 0xFBFF)
+pub(crate) const ID_AU_TREE: u32 = 0xFA20;
+pub(crate) const AUTHOR_ROWS: usize = 478;
+// ---- W1: WLAN (commands 480 .. 509, widgets 0xF400 .. 0xF7FF, timers 0x184 .. 0x187)
+/// the ranges of every access point on the canvas (Ansicht › WLAN-Reichweiten)
+pub(crate) const CMD_WLAN_RANGES: u32 = 480;
+/// the inspector's WLAN of an access point: network k's fields at ID_WL_NET0 + 0x10 k + WL_*
+/// (at most 16 networks), "Netz hinzufügen"
+pub(crate) const ID_WL_NET0: u32 = 0xF400;
+pub(crate) const WL_SSID: u32 = 0;
+pub(crate) const WL_BAND: u32 = 1;
+pub(crate) const WL_CHANNEL: u32 = 2;
+pub(crate) const WL_SECURITY: u32 = 3;
+pub(crate) const WL_PASS: u32 = 4;
+pub(crate) const WL_SHOW: u32 = 5;
+pub(crate) const WL_VLAN: u32 = 6;
+pub(crate) const WL_GUEST: u32 = 7;
+pub(crate) const WL_ISOLATE: u32 = 8;
+pub(crate) const WL_APPLY: u32 = 9;
+pub(crate) const WL_REMOVE: u32 = 10;
+pub(crate) const ID_WL_ADD: u32 = 0xF500;
+/// the inspector's WLAN of a station: SSID, passphrase, show it, join, leave
+pub(crate) const ID_WL_JOIN_SSID: u32 = 0xF510;
+pub(crate) const ID_WL_JOIN_PASS: u32 = 0xF511;
+pub(crate) const ID_WL_JOIN_SHOW: u32 = 0xF512;
+pub(crate) const ID_WL_JOIN_APPLY: u32 = 0xF513;
+pub(crate) const ID_WL_JOIN_LEAVE: u32 = 0xF514;
+/// the project's scale (world units per metre) and its button
+pub(crate) const ID_WL_SCALE: u32 = 0xF520;
+pub(crate) const ID_WL_SCALE_APPLY: u32 = 0xF521;

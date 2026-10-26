@@ -5,6 +5,8 @@
 //   Resolver                 the static settings (resolv.conf, "ip name-server", "ip
 //                            domain-name") and the ones from DHCP; static ones win
 //   Engine::lookup(dev, name, qtype) -> lookup id              starts a lookup
+//   Engine::lookup_host(dev, name, Family) -> lookup id        a host's addresses as
+//                            getaddrinfo finds them (below)
 //   Engine::lookup_state(dev, id) -> Option<&Lookup>           progress and result: every
 //                            question to every server (nslookup, dig), the last reply
 //   Engine::resolver_cache(dev) -> Vec<CacheRow>               "show hosts", resolvectl
@@ -21,7 +23,22 @@
 // server, and when all of them failed, the next candidate.  Answers are cached for the
 // smallest TTL of their records, negative answers for the SOA minimum (RFC 2308), at most an
 // hour.  Linux waits 5 s for an answer and tries twice; IOS waits 3 s and tries twice.  Query
-// ids and source ports come from the device's random numbers.
+// ids and source ports come from the device's random numbers.  Name servers may be IPv4 or
+// IPv6 addresses (the socket of a lookup takes both families when one of them is IPv6).
+//
+// lookup_host is getaddrinfo with AI_ADDRCONFIG: Family::Any asks for A and AAAA at once (one
+// socket, A first, each query with its own id, as glibc sends them) when the device has an
+// IPv4 address and uses IPv6 with an address other than ::1, for AAAA alone on a device with
+// IPv6 only, and for A alone on a device without IPv6 (so it asks exactly as before IPv6
+// came); Family::V4 / V6 ask for one type (ping -4 / -6).  Both answers of a candidate are
+// awaited: one with addresses ends the lookup (the other may be empty, or time out after one
+// with addresses came), two negative ones go on to the next candidate.  Answer::sorted lists
+// the addresses in the order getaddrinfo returns them: RFC 6724 destination address selection
+// (netpkt::addrsel: unusable ones last, matching scope, no deprecated source, matching label,
+// higher precedence, smaller scope, the longest matching prefix between IPv6 destinations, else
+// the order of the answers), each with the source address the device would use; so a host with
+// a global IPv6 address tries IPv6 first, one with only a link-local IPv6 address IPv4 first.
+// An A lookup alone keeps the order of its answer.
 
 use alloc::collections::BTreeMap;
 use alloc::string::String;
@@ -29,13 +46,14 @@ use alloc::vec::Vec;
 
 use base::metrics::Window;
 
-use netpkt::dns::{self, Message, RData, Rr, CLASS_IN, TYPE_A, TYPE_CNAME, TYPE_SOA};
+use netpkt::addrsel::{self, Dest};
+use netpkt::dns::{self, Message, RData, Rr, CLASS_IN, TYPE_A, TYPE_AAAA, TYPE_CNAME, TYPE_SOA};
 use netpkt::udp::PORT_DNS;
-use netpkt::Ipv4;
+use netpkt::{IpAddr, Ipv4, Ipv6};
 
 use crate::action::ActErr;
 use crate::kernel::{Engine, Ns, SEC};
-use crate::os::{Dgram, Job, Owner as SockOwner, SvcEvent, SLOT_RESOLVER};
+use crate::os::{Dgram, Job, Owner as SockOwner, SvcEvent, ANY, ANY4, SLOT_RESOLVER};
 use crate::trace::Note;
 
 /// cached entries at most
@@ -49,7 +67,7 @@ const CNAME_DEPTH: usize = 8;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ResolvConf {
     /// name servers, at most three are asked
-    pub servers: Vec<Ipv4>,
+    pub servers: Vec<IpAddr>,
     /// search domains (resolv.conf "search", IOS "ip domain-name")
     pub search: Vec<String>,
     /// names with fewer dots go through the search list first
@@ -72,6 +90,17 @@ pub enum Owner {
     Trace(u32),
 }
 
+/// the address families a host lookup asks for (getaddrinfo's ai_family)
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Family {
+    /// what the device can use (AF_UNSPEC with AI_ADDRCONFIG)
+    Any,
+    /// IPv4 only (AF_INET: "-4")
+    V4,
+    /// IPv6 only (AF_INET6: "-6")
+    V6,
+}
+
 /// why a lookup failed
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LookupErr {
@@ -86,6 +115,8 @@ pub enum LookupErr {
     /// no name server is set
     NoServer,
     BadName,
+    /// an address of the other family where one family was asked for (EAI_ADDRFAMILY)
+    Family,
 }
 
 impl LookupErr {
@@ -100,6 +131,7 @@ impl LookupErr {
             LookupErr::Refused => "der DNS-Server lehnt ab",
             LookupErr::NoServer => "kein DNS-Server eingetragen",
             LookupErr::BadName => "ungültiger Name",
+            LookupErr::Family => "eine Adresse der anderen Familie",
         }
     }
 }
@@ -110,7 +142,7 @@ pub enum Source {
     Literal,
     Hosts,
     Cache,
-    Server(Ipv4),
+    Server(IpAddr),
 }
 
 /// a successful lookup
@@ -120,12 +152,24 @@ pub struct Answer {
     pub name: String,
     /// the end of the CNAME chain
     pub canonical: String,
+    /// the IPv4 addresses (A records) in the order of the answer
     pub addrs: Vec<Ipv4>,
-    /// the answer section
+    /// the answer section (both answers of a lookup for A and AAAA, A first)
     pub records: Vec<Rr>,
     pub from: Source,
     /// seconds it stays valid
     pub ttl: u32,
+    /// the IPv6 addresses (AAAA records) in the order of the answer
+    pub addrs6: Vec<Ipv6>,
+    /// both kinds in the order to try them (RFC 6724; an A lookup alone: the answer's order)
+    pub sorted: Vec<IpAddr>,
+}
+
+impl Answer {
+    /// the address to use first
+    pub fn first(&self) -> Option<IpAddr> {
+        self.sorted.first().copied()
+    }
 }
 
 /// what became of one question to one server
@@ -145,11 +189,25 @@ pub enum TryOut {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Try {
     pub name: String,
-    pub server: Ipv4,
+    pub server: IpAddr,
     pub sent: Ns,
     /// None while waiting
     pub outcome: Option<TryOut>,
     pub rtt: Ns,
+    /// the type asked for
+    pub qtype: u16,
+}
+
+/// an answer of the current round: its type, the outcome, the answer section, the TTL to keep
+/// it (seconds left for one from the cache) and the CNAME chain's end
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Got {
+    qtype: u16,
+    out: TryOut,
+    records: Vec<Rr>,
+    ttl: u32,
+    canon: String,
+    cached: bool,
 }
 
 /// a lookup in progress or done
@@ -158,6 +216,8 @@ pub struct Lookup {
     pub id: u32,
     pub name: String,
     pub qtype: u16,
+    /// asked together with qtype: AAAA beside A (a host lookup for both families)
+    pub qtype2: Option<u16>,
     pub owner: Owner,
     pub started: Ns,
     pub done: Option<Ns>,
@@ -167,16 +227,19 @@ pub struct Lookup {
     pub reply: Option<Message>,
     cands: Vec<String>,
     cand: usize,
-    servers: Vec<Ipv4>,
+    servers: Vec<IpAddr>,
     server: usize,
     round: u8,
     qid: u16,
+    qid2: u16,
     port: u16,
     deadline: Option<Ns>,
     last_err: LookupErr,
     /// the error of the name as it is, when it was asked first (dots >= ndots)
     asis_err: Option<LookupErr>,
     nodata: bool,
+    /// the answers of the current candidate so far
+    got: Vec<Got>,
 }
 
 impl Lookup {
@@ -189,6 +252,20 @@ impl Lookup {
         self.nodata |= !nx;
         self.last_err = e;
         self.cand += 1;
+    }
+    /// the types it asks for, in the order they go out
+    fn types(&self) -> Vec<u16> {
+        let mut v = alloc::vec![self.qtype];
+        v.extend(self.qtype2);
+        v
+    }
+    /// the types the current round still waits for
+    fn missing(&self) -> Vec<u16> {
+        self.types().into_iter().filter(|t| !self.got.iter().any(|g| g.qtype == *t)).collect()
+    }
+    /// the query id of a type
+    fn qid_of(&self, t: u16) -> u16 {
+        if Some(t) == self.qtype2 && t != self.qtype { self.qid2 } else { self.qid }
     }
 }
 
@@ -249,7 +326,7 @@ impl Resolver {
         let mut c = self.statics.clone();
         if let Some((s, d)) = &self.dhcp {
             if c.servers.is_empty() {
-                c.servers = s.clone();
+                c.servers = s.iter().map(|a| IpAddr::V4(*a)).collect();
             }
             if c.search.is_empty() {
                 c.search = d.clone();
@@ -284,7 +361,7 @@ impl Resolver {
 }
 
 /// the candidates for a name (glibc order)
-fn candidates(name: &str, c: &ResolvConf) -> Vec<String> {
+pub(crate) fn candidates(name: &str, c: &ResolvConf) -> Vec<String> {
     if let Some(abs) = name.strip_suffix('.') {
         return alloc::vec![String::from(abs)];
     }
@@ -323,6 +400,15 @@ fn follow(records: &[Rr], name: &str, qtype: u16) -> (String, Vec<Rr>, u32) {
     (canon, hits, if ttl == u32::MAX { 0 } else { ttl })
 }
 
+/// the addresses of records (A and AAAA at the end of their chains)
+fn addrs_of(records: &[Rr], name: &str) -> (String, Vec<Ipv4>, Vec<Ipv6>) {
+    let (canon4, a, _) = follow(records, name, TYPE_A);
+    let (canon6, aaaa, _) = follow(records, name, TYPE_AAAA);
+    let v4: Vec<Ipv4> = a.iter().filter_map(|r| if let RData::A(x) = r.data { Some(x) } else { None }).collect();
+    let v6: Vec<Ipv6> = aaaa.iter().filter_map(|r| if let RData::Aaaa(x) = r.data { Some(x) } else { None }).collect();
+    (if v4.is_empty() && !v6.is_empty() { canon6 } else { canon4 }, v4, v6)
+}
+
 /// the TTL of a negative answer: SOA minimum and the SOA's own TTL (RFC 2308 5)
 fn neg_ttl(m: &Message) -> u32 {
     m.authority
@@ -344,6 +430,15 @@ impl Engine {
             return Err(ActErr::NoIp(dev));
         }
         Ok(self.lookup_start(ni, name, qtype, Owner::Cli))
+    }
+
+    /// starts a lookup of a host's addresses as getaddrinfo does (see the header)
+    pub fn lookup_host_of(&mut self, dev: u32, name: &str, fam: Family) -> Result<u32, ActErr> {
+        let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+        if self.os(ni).is_none() {
+            return Err(ActErr::NoIp(dev));
+        }
+        Ok(self.lookup_host(ni, name, fam, Owner::Cli))
     }
 
     /// a lookup of a device
@@ -382,7 +477,33 @@ impl Engine {
         LatencyView { count: h.count(), p50: h.p50().unwrap_or(0), p95: h.p95().unwrap_or(0), p99: h.p99().unwrap_or(0), max: h.max().unwrap_or(0) }
     }
 
+    /// the families a device can use for a host lookup (AI_ADDRCONFIG): an IPv4 address other
+    /// than 127/8, and IPv6 with an address other than ::1
+    pub(crate) fn lookup_families(&self, ni: usize) -> (bool, bool) {
+        let v4 = self.stack(ni).is_some_and(|s| s.ifaces.iter().any(|f| !f.hidden && f.addrs.iter().any(|a| !a.addr.is_loopback())));
+        let v6 = self.v6(ni).is_some_and(|v| v.used() && v.ifs.iter().any(|f| f.up && f.addrs.iter().any(|a| a.state.usable() && !a.addr.is_loopback())));
+        (v4, v6)
+    }
+
+    /// a host lookup of node `ni` (getaddrinfo, see the header)
+    pub(crate) fn lookup_host(&mut self, ni: usize, name: &str, fam: Family, owner: Owner) -> u32 {
+        let (qtype, qtype2) = match fam {
+            Family::V4 => (TYPE_A, None),
+            Family::V6 => (TYPE_AAAA, None),
+            Family::Any => match self.lookup_families(ni) {
+                (_, false) => (TYPE_A, None),
+                (false, true) => (TYPE_AAAA, None),
+                (true, true) => (TYPE_A, Some(TYPE_AAAA)),
+            },
+        };
+        self.lookup_begin(ni, name, qtype, qtype2, owner)
+    }
+
     pub(crate) fn lookup_start(&mut self, ni: usize, name: &str, qtype: u16, owner: Owner) -> u32 {
+        self.lookup_begin(ni, name, qtype, None, owner)
+    }
+
+    fn lookup_begin(&mut self, ni: usize, name: &str, qtype: u16, qtype2: Option<u16>, owner: Owner) -> u32 {
         let now = self.now;
         let name = String::from(name.trim());
         let Some(os) = self.os_mut(ni) else {
@@ -395,6 +516,7 @@ impl Engine {
             id,
             name: name.clone(),
             qtype,
+            qtype2,
             owner,
             started: now,
             done: None,
@@ -407,29 +529,52 @@ impl Engine {
             server: 0,
             round: 0,
             qid: 0,
+            qid2: 0,
             port: 0,
             deadline: None,
             last_err: LookupErr::NotFound,
             asis_err: None,
             nodata: false,
+            got: Vec::new(),
         };
+        let wants4 = qtype == TYPE_A;
+        let wants6 = qtype == TYPE_AAAA || qtype2 == Some(TYPE_AAAA);
         // a literal, the host table
-        let literal = if qtype == TYPE_A { Ipv4::parse(&name) } else { None };
-        let bare = name.trim_end_matches('.');
-        let hosted = if qtype != TYPE_A {
-            None
-        } else if bare.eq_ignore_ascii_case("localhost") {
-            Some(Ipv4::LOCALHOST)
-        } else {
-            os.hosts.iter().find(|(h, _)| h.eq_ignore_ascii_case(bare)).map(|h| h.1)
+        let parsed = if wants4 || wants6 { IpAddr::parse(&name) } else { None };
+        let literal = match parsed {
+            Some(IpAddr::V4(a)) if wants4 => Some(IpAddr::V4(a)),
+            Some(IpAddr::V6(a)) if wants6 => Some(IpAddr::V6(a)),
+            _ => None,
         };
+        // an address of the other family is no name to ask for (getaddrinfo: EAI_ADDRFAMILY)
+        let other = parsed.is_some() && literal.is_none();
+        let bare = String::from(name.trim_end_matches('.'));
+        let mut hosted: Vec<IpAddr> = Vec::new();
+        if wants4 || wants6 {
+            if bare.eq_ignore_ascii_case("localhost") {
+                if wants4 {
+                    hosted.push(IpAddr::V4(Ipv4::LOCALHOST));
+                }
+                if wants6 {
+                    hosted.push(IpAddr::V6(Ipv6::LOCALHOST));
+                }
+            } else {
+                hosted.extend(os.hosts.iter().filter(|(h, a)| h.eq_ignore_ascii_case(&bare) && (if a.is_v4() { wants4 } else { wants6 })).map(|h| h.1));
+            }
+        }
         os.resolver.lookups.insert(id, l);
-        if let Some(ip) = literal {
-            self.lookup_finish(ni, id, Ok(Answer { name: name.clone(), canonical: name, addrs: alloc::vec![ip], records: Vec::new(), from: Source::Literal, ttl: 0 }));
+        if other {
+            self.lookup_finish(ni, id, Err(LookupErr::Family));
             return id;
         }
-        if let Some(ip) = hosted {
-            self.lookup_finish(ni, id, Ok(Answer { name: String::from(bare), canonical: String::from(bare), addrs: alloc::vec![ip], records: Vec::new(), from: Source::Hosts, ttl: 0 }));
+        if let Some(ip) = literal {
+            let (v4, v6) = split(&[ip]);
+            self.lookup_finish(ni, id, Ok(Answer { name: name.clone(), canonical: name, addrs: v4, records: Vec::new(), from: Source::Literal, ttl: 0, addrs6: v6, sorted: Vec::new() }));
+            return id;
+        }
+        if !hosted.is_empty() {
+            let (v4, v6) = split(&hosted);
+            self.lookup_finish(ni, id, Ok(Answer { name: bare.clone(), canonical: bare, addrs: v4, records: Vec::new(), from: Source::Hosts, ttl: 0, addrs6: v6, sorted: Vec::new() }));
             return id;
         }
         if dns::labels(&name).is_none() || name.is_empty() {
@@ -462,42 +607,74 @@ impl Engine {
                 return;
             }
             let cand = l.cands[l.cand].clone();
-            let qtype = l.qtype;
-            let hit = if os.resolver.cache_on { os.resolver.cached(now, &cand, qtype).map(|(e, left)| (e.clone(), left)) } else { None };
-            match hit {
-                Some((e, left)) if e.rcode == 0 && !e.records.is_empty() => {
-                    let (canon, hits, _) = follow(&e.records, &cand, qtype);
-                    let addrs = hits.iter().filter_map(|r| if let RData::A(a) = r.data { Some(a) } else { None }).collect();
-                    self.lookup_finish(ni, id, Ok(Answer { name: cand.clone(), canonical: canon, addrs, records: e.records.clone(), from: Source::Cache, ttl: left }));
-                    return;
-                }
-                Some((e, _)) => {
-                    let nx = e.rcode == dns::RCODE_NXDOMAIN;
-                    self.note(dev, None, Note::ResolveNegative { name: cand.clone(), nx });
-                    if let Some(l) = self.lookup_mut(ni, id) {
-                        l.negative(nx);
+            // what the cache knows of each type
+            let mut got: Vec<Got> = Vec::new();
+            if os.resolver.cache_on {
+                for t in l.types() {
+                    if let Some((e, left)) = os.resolver.cached(now, &cand, t) {
+                        let (canon, hits, _) = follow(&e.records, &cand, t);
+                        let out = if e.rcode == 0 && !e.records.is_empty() && !hits.is_empty() {
+                            TryOut::Answer
+                        } else if e.rcode == 0 && !e.records.is_empty() {
+                            TryOut::NoData
+                        } else if e.rcode == dns::RCODE_NXDOMAIN {
+                            TryOut::NxDomain
+                        } else {
+                            TryOut::NoData
+                        };
+                        // a positive entry of the old kind (records without a hit) still answers
+                        let out = if e.rcode == 0 && !e.records.is_empty() && l.qtype2.is_none() { TryOut::Answer } else { out };
+                        got.push(Got { qtype: t, out, records: e.records.clone(), ttl: left, canon, cached: true });
                     }
-                    continue;
                 }
-                None => {}
             }
+            let all = got.len() == l.types().len();
+            if let Some(l) = self.lookup_mut(ni, id) {
+                l.got = got;
+            }
+            if all {
+                match self.round_result(ni, id) {
+                    Some(Ok(a)) => {
+                        self.lookup_finish(ni, id, Ok(a));
+                        return;
+                    }
+                    Some(Err(nx)) => {
+                        self.note(dev, None, Note::ResolveNegative { name: cand.clone(), nx });
+                        if let Some(l) = self.lookup_mut(ni, id) {
+                            l.got.clear();
+                            l.negative(nx);
+                        }
+                        continue;
+                    }
+                    None => {}
+                }
+            }
+            let Some(l) = self.os(ni).and_then(|o| o.resolver.lookups.get(&id)) else {
+                return;
+            };
             if l.servers.is_empty() {
                 self.lookup_finish(ni, id, Err(LookupErr::NoServer));
                 return;
             }
-            // a fresh socket per candidate, as glibc opens one per query
+            // a fresh socket per candidate, as glibc opens one per query (both families when a
+            // server is an IPv6 address)
             let old = l.port;
+            let bind = if l.servers.iter().any(|s| !s.is_v4()) { ANY } else { ANY4 };
+            let two = l.qtype2.is_some() && l.missing().len() > 1;
             if let Some(os) = self.os_mut(ni) {
                 os.socks.retain(|s| !(s.port == old && s.owner == SockOwner::Resolver(id)));
             }
-            let port = self.sock_bind(ni, 0, None, false, SockOwner::Resolver(id)).unwrap_or(0);
-            let qid = match self.nodes.get_mut(ni) {
+            let port = self.sock_bind(ni, bind, 0, None, false, SockOwner::Resolver(id)).unwrap_or(0);
+            let mut draw = || match self.nodes.get_mut(ni) {
                 Some(Some(n)) => n.rng.next_u32() as u16,
                 _ => 0,
             };
+            let qid = draw();
+            let qid2 = if two { draw() } else { qid };
             if let Some(l) = self.lookup_mut(ni, id) {
                 l.port = port;
                 l.qid = qid;
+                l.qid2 = qid2;
                 l.server = 0;
                 l.round = 0;
             }
@@ -506,7 +683,36 @@ impl Engine {
         }
     }
 
-    /// asks the current server
+    /// what the answers of the current round say once every type is in: Ok with the
+    /// addresses, Err(nx) when all are negative (nx: every one NXDOMAIN), None when a server
+    /// failed (SERVFAIL, REFUSED) and nothing else answered
+    fn round_result(&self, ni: usize, id: u32) -> Option<Result<Answer, bool>> {
+        let l = self.os(ni)?.resolver.lookups.get(&id)?;
+        let cand = l.cands.get(l.cand)?.clone();
+        let pos: Vec<&Got> = l.got.iter().filter(|g| g.out == TryOut::Answer).collect();
+        if !pos.is_empty() {
+            let mut records: Vec<Rr> = Vec::new();
+            for t in l.types() {
+                if let Some(g) = l.got.iter().find(|g| g.qtype == t) {
+                    records.extend(g.records.iter().cloned());
+                }
+            }
+            let (_, v4, v6) = addrs_of(&records, &cand);
+            let canon = pos[0].canon.clone();
+            let ttl = pos.iter().map(|g| g.ttl).min().unwrap_or(0);
+            let from = if pos.iter().all(|g| g.cached) { Source::Cache } else { Source::Server(l.servers.get(l.server).copied().unwrap_or(ANY4)) };
+            // one type alone keeps its answer's addresses (an A lookup has no AAAA ones)
+            let v4 = if l.types().contains(&TYPE_A) { v4 } else { Vec::new() };
+            let v6 = if l.types().contains(&TYPE_AAAA) { v6 } else { Vec::new() };
+            return Some(Ok(Answer { name: cand, canonical: canon, addrs: v4, records, from, ttl, addrs6: v6, sorted: Vec::new() }));
+        }
+        if l.got.iter().any(|g| matches!(g.out, TryOut::ServFail | TryOut::Refused)) {
+            return None;
+        }
+        Some(Err(l.got.iter().all(|g| g.out == TryOut::NxDomain)))
+    }
+
+    /// asks the current server what the round still lacks (A before AAAA)
     fn lookup_send(&mut self, ni: usize, id: u32) {
         let now = self.now;
         let dev = self.dev_of(ni);
@@ -515,15 +721,23 @@ impl Engine {
             let Some(l) = self.os(ni).and_then(|o| o.resolver.lookups.get(&id)) else {
                 return;
             };
-            let (cand, qtype, server, port, qid) = (l.cands[l.cand].clone(), l.qtype, l.servers[l.server], l.port, l.qid);
-            let q = Message::query(qid, &cand, qtype, true).to_bytes();
-            self.note(dev, None, Note::ResolveQuery { name: cand.clone(), qtype, server });
-            let sent = self.udp_send(ni, None, port, server, PORT_DNS, &q, None);
+            let (cand, server, port) = (l.cands[l.cand].clone(), l.servers[l.server], l.port);
+            let asks: Vec<(u16, u16)> = l.missing().into_iter().map(|t| (t, l.qid_of(t))).collect();
+            let mut any = false;
+            for (qtype, qid) in asks {
+                let q = Message::query(qid, &cand, qtype, true).to_bytes();
+                self.note(dev, None, Note::ResolveQuery { name: cand.clone(), qtype, server });
+                let sent = self.udp_send(ni, None, port, server, PORT_DNS, &q, None);
+                any |= sent;
+                let Some(l) = self.lookup_mut(ni, id) else {
+                    return;
+                };
+                l.tries.push(Try { name: cand.clone(), server, sent: now, outcome: if sent { None } else { Some(TryOut::NoRoute) }, rtt: 0, qtype });
+            }
             let Some(l) = self.lookup_mut(ni, id) else {
                 return;
             };
-            l.tries.push(Try { name: cand, server, sent: now, outcome: if sent { None } else { Some(TryOut::NoRoute) }, rtt: 0 });
-            if sent {
+            if any {
                 l.deadline = Some(now + timeout);
                 break;
             }
@@ -572,8 +786,15 @@ impl Engine {
             l.deadline = None;
             l.last_err = LookupErr::Timeout;
             let (name, server) = (l.cands[l.cand].clone(), l.servers[l.server]);
-            if let Some(t) = l.tries.last_mut() {
+            for t in l.tries.iter_mut().filter(|t| t.outcome.is_none()) {
                 t.outcome = Some(TryOut::Timeout);
+            }
+            // one type answered with addresses, the other did not come: what came is the answer
+            if l.got.iter().any(|g| g.out == TryOut::Answer)
+                && let Some(Ok(a)) = self.round_result(ni, id)
+            {
+                self.lookup_finish(ni, id, Ok(a));
+                continue;
             }
             self.note(dev, None, Note::ResolveTimeout { name, server });
             // nobody answers at all: the lookup ends (glibc does not search on)
@@ -600,8 +821,11 @@ impl Engine {
             return;
         };
         let cand = l.cands[l.cand].clone();
-        let qtype = l.qtype;
-        if !m.header.qr || m.header.id != l.qid || !m.questions.first().is_some_and(|q| q.qtype == qtype && dns::name_eq(&q.name, &cand)) {
+        let missing = l.missing();
+        let Some(qtype) = missing.iter().copied().find(|&t| m.header.id == l.qid_of(t) && m.questions.first().is_some_and(|q| q.qtype == t && dns::name_eq(&q.name, &cand))) else {
+            return;
+        };
+        if !m.header.qr {
             return;
         }
         let server = d.src;
@@ -618,41 +842,61 @@ impl Engine {
         let Some(l) = self.lookup_mut(ni, id) else {
             return;
         };
-        l.deadline = None;
+        let last = missing.len() == 1;
+        if last {
+            l.deadline = None;
+        }
         l.reply = Some(m.clone());
-        if let Some(t) = l.tries.last_mut() {
+        if let Some(t) = l.tries.iter_mut().rev().find(|t| t.qtype == qtype && t.outcome.is_none()) {
             t.outcome = Some(out);
             t.rtt = now - t.sent;
         }
         let key = (cand.to_ascii_lowercase(), qtype);
+        let gttl = if out == TryOut::Answer { ttl } else { neg_ttl(&m) };
+        l.got.push(Got { qtype, out, records: if out == TryOut::Answer { m.answers.clone() } else { Vec::new() }, ttl: gttl, canon, cached: false });
         match out {
             TryOut::Answer => {
-                let addrs: Vec<Ipv4> = hits.iter().filter_map(|r| if let RData::A(a) = r.data { Some(a) } else { None }).collect();
                 if cache_on {
                     self.cache_put(ni, key, CacheEntry { at: now, ttl, rcode: 0, records: m.answers.clone() });
                 }
-                self.lookup_finish(ni, id, Ok(Answer { name: cand, canonical: canon, addrs, records: m.answers.clone(), from: Source::Server(server), ttl }));
             }
             TryOut::NxDomain | TryOut::NoData => {
                 let nx = out == TryOut::NxDomain;
                 if cache_on {
                     self.cache_put(ni, key, CacheEntry { at: now, ttl: neg_ttl(&m), rcode, records: Vec::new() });
                 }
-                self.note(dev, Some(d.hop), Note::ResolveNegative { name: cand, nx });
+                self.note(dev, Some(d.hop), Note::ResolveNegative { name: cand.clone(), nx });
+            }
+            _ => {}
+        }
+        if !last {
+            // the other answer of the round is still to come
+            self.arm_resolver(ni);
+            return;
+        }
+        match self.round_result(ni, id) {
+            Some(Ok(a)) => {
+                let a = Answer { from: Source::Server(server), ..a };
+                self.lookup_finish(ni, id, Ok(a));
+            }
+            Some(Err(nx)) => {
                 if let Some(l) = self.lookup_mut(ni, id) {
+                    l.got.clear();
                     l.negative(nx);
                 }
                 self.lookup_next(ni, id);
             }
-            _ => {
+            None => {
                 // the next server; when all failed, the next candidate (glibc's got_servfail)
                 if let Some(l) = self.lookup_mut(ni, id) {
-                    l.last_err = if out == TryOut::Refused { LookupErr::Refused } else { LookupErr::ServFail };
+                    l.last_err = if l.got.iter().any(|g| g.out == TryOut::Refused) { LookupErr::Refused } else { LookupErr::ServFail };
+                    l.got.retain(|g| !matches!(g.out, TryOut::ServFail | TryOut::Refused));
                 }
                 if self.lookup_rotate(ni, id) {
                     self.lookup_send(ni, id);
                 } else {
                     if let Some(l) = self.lookup_mut(ni, id) {
+                        l.got.clear();
                         l.cand += 1;
                     }
                     self.lookup_next(ni, id);
@@ -677,17 +921,46 @@ impl Engine {
         }
     }
 
+    /// the addresses of an answer in the order to try them: an A lookup alone in the order of
+    /// the answer, else RFC 6724 with the source address each would leave with
+    fn lookup_sorted(&self, ni: usize, v4: &[Ipv4], v6: &[Ipv6]) -> Vec<IpAddr> {
+        let all: Vec<IpAddr> = v4.iter().map(|a| IpAddr::V4(*a)).chain(v6.iter().map(|a| IpAddr::V6(*a))).collect();
+        if v6.is_empty() {
+            return all;
+        }
+        let mut d: Vec<Dest> = all
+            .iter()
+            .map(|&a| {
+                let src = self.source_ip(ni, a);
+                let mut x = Dest::new(a, src);
+                if let (Some(IpAddr::V6(s)), Some(v)) = (src, self.v6(ni))
+                    && let Some(e) = v.ifs.iter().find_map(|f| f.addr(s))
+                {
+                    x.src_len = e.len;
+                    x.src_deprecated = e.state == crate::ip6::AddrState::Deprecated;
+                }
+                x
+            })
+            .collect();
+        addrsel::sort(&mut d);
+        d.into_iter().map(|x| x.addr).collect()
+    }
+
     /// a lookup is done: its socket closes, its owner hears of it
     fn lookup_finish(&mut self, ni: usize, id: u32, r: Result<Answer, LookupErr>) {
         let now = self.now;
         let dev = self.dev_of(ni);
+        let r = r.map(|a| {
+            let sorted = self.lookup_sorted(ni, &a.addrs, &a.addrs6);
+            Answer { sorted, ..a }
+        });
         let Some(l) = self.lookup_mut(ni, id) else {
             return;
         };
         l.done = Some(now);
         l.deadline = None;
         let (owner, port, name, took) = (l.owner, l.port, l.name.clone(), now - l.started);
-        let addr = r.as_ref().ok().and_then(|a| a.addrs.first().copied());
+        let addr = r.as_ref().ok().and_then(|a| a.first());
         let note = match &r {
             Ok(a) => Note::ResolveAnswer { name: a.name.clone(), addr, cached: a.from == Source::Cache },
             Err(e) => Note::ResolveFailed { name: name.clone(), why: *e },
@@ -705,4 +978,9 @@ impl Engine {
             Owner::Trace(job) => self.trace_resolved(job, addr),
         }
     }
+}
+
+/// addresses by family
+fn split(a: &[IpAddr]) -> (Vec<Ipv4>, Vec<Ipv6>) {
+    (a.iter().filter_map(|x| x.v4()).collect(), a.iter().filter_map(|x| x.v6()).collect())
 }

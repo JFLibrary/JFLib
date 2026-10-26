@@ -16,6 +16,9 @@
 // A device with IPv6 gets a column IPv6 after IP (the first global address, else the
 // link-local one; "+1" for more) and the chosen interface lists all its IPv6 addresses with
 // how they came and their state; without IPv6 nothing changes.
+//
+// Access points and stations get their WLAN part after the interfaces (wlan.rs); the radio of an
+// access point that sends a network is "aktiv" without a cable.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -103,6 +106,8 @@ fn port_status(power: bool, p: &PortView) -> (&'static str, u32) {
         ("abgeschaltet", BADGE_NEUTRAL)
     } else {
         match (p.link, p.led) {
+            // the radio of an access point that sends a network (no cable)
+            (None, Led::Up) => ("aktiv", BADGE_OK),
             (None, _) => ("frei", BADGE_NEUTRAL),
             (Some(_), Led::Up) => ("aktiv", BADGE_OK),
             (Some(_), Led::Blocking | Led::Learning) => ("blockiert", BADGE_WARN),
@@ -286,6 +291,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
     }
     ui.box_end();
     interfaces(n, ui, id);
+    // WLAN: an access point's networks, a station's network (wlan.rs)
+    super::wlan::device(n, ui, id);
     // its cables
     let p = &n.doc.proj;
     let nb = p.neighbors(id);

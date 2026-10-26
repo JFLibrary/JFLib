@@ -149,7 +149,8 @@ impl Engine {
                 Admin::Disabled => "abgeschaltet",
                 Admin::Removed => "entfernt",
             };
-            rows.push(alloc::vec![b.name.clone(), format!("{}:{}", b.addr, b.port), format!("{}", b.weight), String::from(state), fmt_ns(b.since as i64), format!("{}", b.active), format!("{}", b.total), format!("{}", b.errors), opt_ns(b.p99)]);
+            let at = if b.addr.is_v4() { format!("{}:{}", b.addr, b.port) } else { format!("[{}]:{}", b.addr, b.port) };
+            rows.push(alloc::vec![b.name.clone(), at, format!("{}", b.weight), String::from(state), fmt_ns(b.since as i64), format!("{}", b.active), format!("{}", b.total), format!("{}", b.errors), opt_ns(b.p99)]);
         }
         s.push_str(&table(&rows));
         self.out(ni, &s);

@@ -22,6 +22,8 @@
 // with another interface).
 // IPv6 (cli/ip6.rs): its commands in every mode, "ping X:X::X" and "traceroute X:X::X" go
 // there too, and "Output Interface: " of a link-local ping is one more question of the console.
+// Names (cli/names.rs): "ip host", "ipv6 host", "ip name-server"; "ping NAME" and "ping ipv6
+// NAME" look the name up.
 
 use alloc::format;
 use alloc::string::String;
@@ -183,6 +185,11 @@ pub enum K {
     ShowOspfDb,
     DebugOspf,
     ClearOspf,
+    IpHost,
+    Ipv6Host,
+    NameServer,
+    // WLAN on access points (cli/wlan.rs)
+    ShowDot11,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -524,6 +531,12 @@ fn build(caps: u32) -> Tree<K> {
     super::ip6::build_ip6(&mut t, [user, prv, conf, ifm, sub], router);
     // ---- OSPF with its own router mode (cli/ospf.rs)
     super::ospf::build_ospf(&mut t, [user, prv, conf, ifm, sub], router);
+    // ---- static names and name servers of either family (cli/names.rs)
+    super::names::build_names(&mut t, conf);
+    // ---- WLAN on access points (cli/wlan.rs)
+    if caps & CAP_AP != 0 {
+        super::wlan::build_wlan(&mut t, [user, prv]);
+    }
     t
 }
 
@@ -1041,6 +1054,8 @@ impl Engine {
             | K::ShowOspfDb
             | K::DebugOspf
             | K::ClearOspf => self.ios_ospf(ni, p),
+            K::IpHost | K::Ipv6Host | K::NameServer => self.ios_names(ni, p),
+            K::ShowDot11 => self.ios_dot11(ni, p),
         }
     }
 
@@ -1491,32 +1506,33 @@ impl Engine {
             return self.ios_ping6(ni, p);
         }
         let Some(dst) = Ipv4::parse(target) else {
-            let lookup = self.cdev(ni).is_some_and(|c| c.cfg.domain_lookup);
-            let text = if lookup {
-                format!("Resolving \"{}\" via DNS (255.255.255.255) ...\n% Unrecognized host or address, or protocol not running.\n\n", target)
-            } else {
-                String::from("% Unrecognized host or address, or protocol not running.\n\n")
-            };
-            return self.ios_err(ni, &text);
+            // a name: the host table or the name servers (cli/names.rs)
+            return self.ios_ping_name(ni, p, target, false);
         };
+        let src = self.ios_ping_src(ni, p)?;
+        let count = p.num("count").unwrap_or(5) as u32;
+        let bytes = p.num("bytes").unwrap_or(100) as u16;
+        let timeout = p.num("secs").unwrap_or(2) as u64 * SEC;
+        self.ios_ping_start(ni, dst, count, bytes, timeout, src, p.has("df-bit"));
+        Ok(())
+    }
+
+    /// the source of an IPv4 ping ("source A.B.C.D", "source IF"), checked
+    pub(crate) fn ios_ping_src(&mut self, ni: usize, p: &Parsed<K>) -> Result<Option<Ipv4>, String> {
         let src = match (p.ip("src"), p.text("srcif")) {
             (Some(a), _) => Some(Ipv4(a)),
             (None, Some(f)) => match self.stack(ni).and_then(|s| s.iface_by_name(f).and_then(|i| s.ifaces[i as usize].primary())) {
                 Some(a) => Some(a),
-                None => return self.ios_err(ni, &format!("% Invalid source interface - {} has no IP address\n", f)),
+                None => return self.ios_err(ni, &format!("% Invalid source interface - {} has no IP address\n", f)).map(|_| None),
             },
             _ => None,
         };
         if let Some(s) = src
             && !self.stack(ni).is_some_and(|st| st.is_mine(s))
         {
-            return self.ios_err(ni, &format!("% Invalid source address- IP address not on any of our up interfaces\n{}", ""));
+            return self.ios_err(ni, &format!("% Invalid source address- IP address not on any of our up interfaces\n{}", "")).map(|_| None);
         }
-        let count = p.num("count").unwrap_or(5) as u32;
-        let bytes = p.num("bytes").unwrap_or(100) as u16;
-        let timeout = p.num("secs").unwrap_or(2) as u64 * SEC;
-        self.ios_ping_start(ni, dst, count, bytes, timeout, src, p.has("df-bit"));
-        Ok(())
+        Ok(src)
     }
 
     /// "traceroute ..." in EXEC

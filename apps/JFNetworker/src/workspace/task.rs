@@ -22,6 +22,9 @@
 //                                first): a project without a file (doc/file.rs open_lab)
 //   states(n, ui) / command(n, ui, id, arg)   CMD_LAB_OPEN .. CMD_LAB_CHOSEN
 //   labs() -> Vec<LabInfo>       the labs of the app
+//   assessments() -> Vec<LabInfo>   the app's assessments (app://assess/*.jfnet, A1), listed after
+//                                the labs with their points; an assessment's score card, items,
+//                                time limit and handing in are workspace/assess.rs's
 //
 // A goal is reached when all its checks hold at one moment and stays reached; an ordered lab
 // looks at a goal once the goals before it are reached.  "output contains" reads the console
@@ -60,6 +63,8 @@ pub(crate) struct LabInfo {
     pub summary: Text,
     pub topic: String,
     pub goals: usize,
+    /// an assessment: the points it has (0: a lab without one)
+    pub points: u32,
 }
 
 /// the lab of the open project over the run, the hints shown, the list of labs
@@ -83,11 +88,16 @@ pub(crate) struct Task {
     pub dlg: Shared<i32>,
     pub labs: Vec<LabInfo>,
     pub lab_sel: i32,
+    /// the assessment of the lab (A1, workspace/assess.rs), its countdown's timer is set
+    pub assess: Option<crate::workspace::assess::Run>,
+    pub timer_armed: bool,
+    /// the project's revision when its lab was last compared with this one's
+    pub lab_rev: u32,
 }
 
 impl Task {
     pub(crate) fn new() -> Task {
-        Task { lab: None, run: None, explain: false, goal_hints: Vec::new(), hints: 0, intro: 1, rev: 0, at_us: 0, force: false, dlg: Shared::new(0), labs: Vec::new(), lab_sel: 0 }
+        Task { lab: None, run: None, explain: false, goal_hints: Vec::new(), hints: 0, intro: 1, rev: 0, at_us: 0, force: false, dlg: Shared::new(0), labs: Vec::new(), lab_sel: 0, assess: None, timer_armed: false, lab_rev: 0 }
     }
 
     // another lab (or none): everything starts over
@@ -111,7 +121,26 @@ pub(crate) fn labs() -> Vec<LabInfo> {
         .filter_map(|name| {
             let path = format!("{}/{}", LABS, name);
             let lab = file::read(&path).ok()?.lab?;
-            Some(LabInfo { path, title: lab.title, summary: lab.summary, topic: lab.topic, goals: lab.goals.len() })
+            let points = lab.assess.as_ref().map_or(0, |a| a.total());
+            Some(LabInfo { path, title: lab.title, summary: lab.summary, topic: lab.topic, goals: lab.goals.len(), points })
+        })
+        .collect()
+}
+
+/// the folder of the assessments in the app's assets (apps/JFNetworker/assets/assess)
+pub(crate) const ASSESS: &str = "app://assess";
+
+/// the assessments of the app (app://assess/*.jfnet with an assessment), by file name
+pub(crate) fn assessments() -> Vec<LabInfo> {
+    let mut names: Vec<String> = plat::fs::read_dir(ASSESS).unwrap_or_default().into_iter().filter(|e| e.kind == plat::fs::FileKind::File && e.name.ends_with(".jfnet")).map(|e| e.name).collect();
+    names.sort();
+    names
+        .into_iter()
+        .filter_map(|name| {
+            let path = format!("{}/{}", ASSESS, name);
+            let lab = file::read(&path).ok()?.lab?;
+            let points = lab.assess.as_ref()?.total();
+            Some(LabInfo { path, title: lab.title, summary: lab.summary, topic: lab.topic, goals: lab.goals.len(), points })
         })
         .collect()
 }
@@ -122,6 +151,7 @@ pub(crate) fn loaded(n: &mut Net) {
     let lab = n.doc.proj.lab.clone();
     let has = lab.is_some();
     n.task.reset(lab);
+    crate::workspace::assess::loaded(n);
     if has {
         n.shell.dock.show(P_TASK);
         if n.shell.dock.size(DOCK_RIGHT) < TASK_W {
@@ -130,8 +160,23 @@ pub(crate) fn loaded(n: &mut Net) {
     }
 }
 
+// the project's lab changed through an edit (the author's panel saved an assessment, an undo):
+// its task starts over where the panel is
+fn follow(n: &mut Net) {
+    if n.doc.rev == n.task.lab_rev {
+        return;
+    }
+    n.task.lab_rev = n.doc.rev;
+    if n.doc.proj.lab != n.task.lab {
+        let lab = n.doc.proj.lab.clone();
+        n.task.reset(lab);
+        crate::workspace::assess::loaded(n);
+    }
+}
+
 /// every frame: the goals follow the simulation
 pub(crate) fn tick(n: &mut Net) {
+    follow(n);
     let task = &mut n.task;
     let (Some(run), Some(lab)) = (task.run.as_mut(), task.lab.as_ref()) else { return };
     let eng = n.doc.sim.engine();
@@ -154,8 +199,9 @@ pub(crate) fn tick(n: &mut Net) {
     run.eval(&n.doc.proj, eng, &out);
 }
 
-/// "Prüfen": judged now; the open goals say why they are not reached
+/// "Prüfen": judged now; the open goals say why they are not reached (an assessment's items too)
 pub(crate) fn check(n: &mut Net) {
+    crate::workspace::assess::check(n);
     if n.task.run.is_none() {
         return;
     }
@@ -197,6 +243,7 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
     match id {
         CMD_LAB_OPEN => {
             n.task.labs = labs();
+            n.task.labs.extend(assessments());
             n.task.lab_sel = n.task.lab_sel.clamp(0, (n.task.labs.len() as i32 - 1).max(0));
             n.task.dlg.set(1);
         }
@@ -234,6 +281,15 @@ fn topic_name(topic: &str) -> &str {
         "net" => t("Netzwerk"),
         "ds" => t("Verteilte Systeme"),
         other => other,
+    }
+}
+
+/// "1 Ziel", "4 Ziele"; an assessment's points ("20 Punkte"), with its goals when it has some
+fn size_text(goals: usize, points: u32) -> String {
+    match (goals, points) {
+        (_, 0) => goals_text(goals),
+        (0, p) => crate::workspace::assess::points_text(p),
+        (g, p) => format!("{} · {}", goals_text(g), crate::workspace::assess::points_text(p)),
     }
 }
 
@@ -295,35 +351,42 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
     ui.next_size(-1, 0);
     ui.text(TS_SUBTITLE | TX_WRAP, lab.title.get(en));
     ui.box_end();
-    ui.text(TS_CAPTION | TX_SECONDARY, &format!("{} · {}", topic_name(&lab.topic), goals_text(total)));
+    let points = n.task.assess.as_ref().map(|r| r.grader.total());
+    ui.text(TS_CAPTION | TX_SECONDARY, &format!("{} · {}", topic_name(&lab.topic), size_text(total, points.unwrap_or(0))));
+    // an assessment: its score card ("Prüfen" there when there are no goals)
+    if points.is_some() {
+        crate::workspace::assess::card(n, ui, total == 0);
+    }
     // the progress and "Prüfen"
-    ui.next_size(-1, 0);
-    ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 6);
-    ui.next_size(-1, 0);
-    ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-    ui.next_size(-1, 0);
-    ui.text(TS_BODY_STRONG, &tf("{} von {} Zielen erreicht", &[&reached.to_string(), &total.to_string()]));
-    ui.next_icon(IC_ACCEPT);
-    if ui.accent_button(ID_TASK_CHECK, t("Prüfen")) & EV_ACT != 0 {
-        act_check = true;
-    }
-    ui.tooltip(t("Die Ziele jetzt prüfen und bei den offenen zeigen, was fehlt (F9)"));
-    ui.box_end();
-    ui.next_size(-1, 0);
-    ui.progress(ID_TASK_PROGRESS, reached as i32, total.max(1) as i32);
-    if run.done() {
-        let at = run.goals.iter().filter_map(|g| g.reached).max().unwrap_or(0);
+    if points.is_none() || total > 0 {
         ui.next_size(-1, 0);
-        ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
-        mark(ui, IC_CHECK_CIRCLE_FILL, T_OK, 16);
+        ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 6);
         ui.next_size(-1, 0);
-        ui.text(TS_BODY | TX_WRAP, t("Geschafft: alle Ziele erreicht."));
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
+        ui.next_size(-1, 0);
+        ui.text(TS_BODY_STRONG, &tf("{} von {} Zielen erreicht", &[&reached.to_string(), &total.to_string()]));
+        ui.next_icon(IC_ACCEPT);
+        if ui.accent_button(ID_TASK_CHECK, t("Prüfen")) & EV_ACT != 0 {
+            act_check = true;
+        }
+        ui.tooltip(t("Die Ziele jetzt prüfen und bei den offenen zeigen, was fehlt (F9)"));
         ui.box_end();
-        ui.text(TS_CAPTION | TX_TERTIARY, &tf("das letzte bei t = {}", &[&time_text(at)]));
-    } else if let Some(at) = run.at {
-        ui.text(TS_CAPTION | TX_TERTIARY, &tf("geprüft bei t = {}", &[&time_text(at)]));
+        ui.next_size(-1, 0);
+        ui.progress(ID_TASK_PROGRESS, reached as i32, total.max(1) as i32);
+        if run.done() {
+            let at = run.goals.iter().filter_map(|g| g.reached).max().unwrap_or(0);
+            ui.next_size(-1, 0);
+            ui.box_begin(0, BOX_H | BOX_XCENTER, 6);
+            mark(ui, IC_CHECK_CIRCLE_FILL, T_OK, 16);
+            ui.next_size(-1, 0);
+            ui.text(TS_BODY | TX_WRAP, t("Geschafft: alle Ziele erreicht."));
+            ui.box_end();
+            ui.text(TS_CAPTION | TX_TERTIARY, &tf("das letzte bei t = {}", &[&time_text(at)]));
+        } else if let Some(at) = run.at {
+            ui.text(TS_CAPTION | TX_TERTIARY, &tf("geprüft bei t = {}", &[&time_text(at)]));
+        }
+        ui.box_end();
     }
-    ui.box_end();
     // the introduction (it may be folded away)
     if !lab.intro.is_empty() {
         ui.next_size(-1, 0);
@@ -335,8 +398,14 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
         }
         ui.expander_end();
     }
+    // an assessment's items, as its feedback allows
+    if points.is_some() {
+        crate::workspace::assess::items(n, ui);
+    }
     // the goals
-    ui.text(TS_BODY_STRONG, t("Ziele"));
+    if total > 0 || points.is_none() {
+        ui.text(TS_BODY_STRONG, t("Ziele"));
+    }
     for (i, g) in lab.goals.iter().enumerate().take(TASK_GOALS) {
         let gr = &run.goals[i];
         let done = gr.reached.is_some();
@@ -460,10 +529,14 @@ pub(crate) fn dialog(n: &mut Net, ui: &mut Ui) {
                 ui.next_size(-1, 0);
                 ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
                 ui.badge(if l.topic == "net" { BADGE_INFO } else { BADGE_ACCENT }, topic_name(&l.topic));
+                if l.points > 0 {
+                    ui.next_icon(IC_ACCEPT);
+                    ui.badge(BADGE_OK, t("Mit Punkten"));
+                }
                 ui.next_size(-1, 0);
                 ui.text(TS_BODY_STRONG | TX_ELLIPSIS, l.title.get(en));
                 ui.box_end();
-                let line = format!("{} · {}", goals_text(l.goals), l.summary.get(en));
+                let line = format!("{} · {}", size_text(l.goals, l.points), l.summary.get(en));
                 ui.next_size(-1, 0);
                 ui.text(TS_CAPTION | TX_SECONDARY | TX_ELLIPSIS, &line);
                 ui.tooltip(&line);

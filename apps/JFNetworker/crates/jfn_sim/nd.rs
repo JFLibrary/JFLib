@@ -1114,7 +1114,13 @@ impl Engine {
                 let from = Ipv6View::parse(&p.pkt).map(|v| v.src()).unwrap_or(Ipv6::UNSPECIFIED);
                 self.job6_error(j, seq, from, crate::jobs6::Icmp6Kind::AddrUnreachable);
             }
-            Origin::Local { job: None } => {}
+            Origin::Local { job: None } => {
+                // the device's own TCP hears of it as of "address unreachable": a connection
+                // attempt ends with "No route to host" (Linux: ndisc_error_report)
+                if let Some(v) = Ipv6View::parse(&p.pkt) {
+                    self.tcp_icmp6_error(ni, icmpv6::T_DEST_UNREACH, icmpv6::UNREACH_ADDR, 0, &v);
+                }
+            }
             Origin::Forwarded { iface: inif } => {
                 self.icmp6_error(ni, inif, &p.pkt, Icmp6::DestUnreach { code: icmpv6::UNREACH_ADDR }, p.cause);
             }

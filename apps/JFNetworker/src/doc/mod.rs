@@ -31,6 +31,10 @@
 // faults.rs: the lab's faults (inject, heal, heal_all) as steps of the history that change
 // nothing in the project; undo and redo hand such a step to Doc::fault_step, which runs the
 // engine's fault actions (and the document stays as clean as it was).
+//
+// assess.rs: the steps of making an assessment (A1): the lab with its assessment into the
+// project, the start network in place of the network.
+// wlan.rs: the WLAN settings of devices and the scale of the canvas as steps.
 
 pub(crate) mod autosave;
 pub(crate) mod config;
@@ -40,6 +44,8 @@ pub(crate) mod faults;
 pub(crate) mod file;
 pub(crate) mod sim;
 pub(crate) mod scripts;
+pub(crate) mod assess;
+pub(crate) mod wlan;
 
 use alloc::boxed::Box;
 use alloc::string::String;

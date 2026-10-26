@@ -417,7 +417,11 @@ impl Engine {
     pub(crate) fn ios_ping6(&mut self, ni: usize, p: &Parsed<K>) -> Result<(), String> {
         let target = p.text("target").unwrap_or("");
         let Some(dst) = Ipv6::parse(target) else {
-            return self.ios_err(ni, "% Unrecognized host or address, or protocol not running.\n\n");
+            // a name: its IPv6 address from the host table or the name servers (cli/names.rs)
+            if netpkt::Ipv4::parse(target).is_some() {
+                return self.ios_err(ni, "% Unrecognized host or address, or protocol not running.\n\n");
+            }
+            return self.ios_ping_name(ni, p, target, true);
         };
         let count = p.num("count").unwrap_or(5) as u32;
         let bytes = p.num("bytes").unwrap_or(100).max(48) as u16;

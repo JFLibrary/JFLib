@@ -18,7 +18,9 @@
 // every zone: REFUSED, or, with forwarding on and recursion desired, the device's resolver
 // looks them up (RA set).  Over UDP an answer is cut at 512 bytes (TC) unless the query offers
 // more with EDNS: then at most 1232 bytes, and an OPT record goes back.  The answer comes
-// from the address the query was sent to.
+// from the address the query was sent to.  The server takes questions over IPv4 and IPv6 on
+// one socket (port 53 on ::, which takes both families when the device runs IPv6) and answers
+// in the family they came in.
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -31,7 +33,7 @@ use jfn_model::msg;
 use jfn_model::msg::{phrase, Msg};
 use netpkt::dns::{self, Message, RData, Rr, Soa, CLASS_IN, TYPE_ANY, TYPE_CNAME, TYPE_NS, TYPE_OPT, TYPE_SOA};
 use netpkt::udp::PORT_DNS;
-use netpkt::{Ipv4, Ipv6};
+use netpkt::{IpAddr, Ipv4, Ipv6};
 
 use crate::kernel::Engine;
 use crate::os::{Dgram, Metric, OsApi, Service, SvcEvent};
@@ -205,8 +207,8 @@ enum Outcome {
 struct Fwd {
     lookup: u32,
     query: Message,
-    to: (Ipv4, u16),
-    from: Option<Ipv4>,
+    to: (IpAddr, u16),
+    from: Option<IpAddr>,
     edns: Option<u16>,
     hop: u64,
 }
@@ -329,7 +331,7 @@ impl DnsServer {
     }
 
     /// sends an answer from the address the query went to
-    fn send(os: &mut OsApi, r: &Message, edns: Option<u16>, to: (Ipv4, u16), from: Option<Ipv4>) {
+    fn send(os: &mut OsApi, r: &Message, edns: Option<u16>, to: (IpAddr, u16), from: Option<IpAddr>) {
         let mut r = r.clone();
         let limit = match edns {
             Some(sz) if sz as usize > dns::UDP_MAX => {
@@ -435,7 +437,8 @@ impl Service for DnsServer {
     }
     fn start(&mut self, os: &mut OsApi) {
         self.pending.clear();
-        if os.bind(PORT_DNS, None).is_err() {
+        // one socket for both families (os.rs: ANY)
+        if os.bind_any(PORT_DNS, None).is_err() {
             os.note(Note::PortInUse { port: PORT_DNS, svc: String::from("dns-server") });
         }
     }

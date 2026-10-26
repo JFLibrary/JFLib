@@ -1,0 +1,63 @@
+#!args --verify-dirty
+# the shot matrix of assessments (A1): the list of labs with the samples, the Aufgabe panel of
+# "Ein Router für zwei Netze" half solved after "Prüfen" (items right and wrong, what they
+# found), the author's panel filled from it with an item chosen, each light and dark at 100 and
+# 150 % (build/jfnetworker/assess_<view>_<theme>_<scale>.png).  Ids: 63824 + i the items.
+size 1280 800
+theme light
+# ---- the list of labs, the first sample chosen
+cmd 300
+expect dialog:"Labor öffnen" exists
+click text:"Ein Router für zwei Netze"
+move 640,790
+shot build/jfnetworker/assess_list_light_100.png
+theme dark
+shot build/jfnetworker/assess_list_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/assess_list_dark_150.png
+theme light
+shot build/jfnetworker/assess_list_light_150.png
+scale 100
+click button:"Öffnen"
+expect dialog:"Labor öffnen" missing
+# ---- the panel half solved, after "Prüfen" (the introduction folded)
+dblclick listitem:"Router1"
+type "enable\n"
+type "configure terminal\n"
+type "hostname R1\n"
+type "interface GigabitEthernet0/0/0\n"
+type "ip address 10.0.1.1 255.255.255.0\n"
+type "no shutdown\n"
+type "end\n"
+wait 3000
+click #49157
+click button:"Prüfen"
+expect text:"7 von 20 Punkten · 35 %" exists
+expect #63824 checked
+move 640,790
+shot build/jfnetworker/assess_panel_light_100.png
+theme dark
+shot build/jfnetworker/assess_panel_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/assess_panel_dark_150.png
+theme light
+shot build/jfnetworker/assess_panel_light_150.png
+scale 100
+# ---- the author's panel with the address of Gi0/0/0 chosen
+cmd 510
+dblclick listitem:"Gi0/0/0"
+click listitem:"Adresse 10.0.1.1/24"
+expect text:"R1 Gi0/0/0 hat die Adresse 10.0.1.1/24" exists
+move 640,790
+shot build/jfnetworker/assess_author_light_100.png
+theme dark
+shot build/jfnetworker/assess_author_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/assess_author_dark_150.png
+theme light
+shot build/jfnetworker/assess_author_light_150.png
+scale 100
+expect_nowarn

@@ -53,7 +53,7 @@ use jfn_model::msg::Msg;
 use base::hashring::{hash64, Ring};
 use base::metrics::Window;
 use netpkt::http::{Headers, Version};
-use netpkt::Ipv4;
+use netpkt::{IpAddr, Ipv4};
 
 use crate::http::{Agent, Done, Fail, Reply, Req, ReqIn, Serve, ServeCfg, Url, Wheel};
 use crate::httpsvc::decimal;
@@ -149,7 +149,7 @@ pub enum Admin {
 #[derive(Clone, Debug)]
 pub struct Backend {
     pub name: String,
-    pub addr: Ipv4,
+    pub addr: IpAddr,
     pub port: u16,
     pub weight: u32,
     pub admin: Admin,
@@ -186,7 +186,7 @@ pub struct Backend {
 }
 
 impl Backend {
-    fn new(name: &str, addr: Ipv4, port: u16, weight: u32, now: Ns) -> Backend {
+    fn new(name: &str, addr: IpAddr, port: u16, weight: u32, now: Ns) -> Backend {
         Backend {
             name: String::from(name),
             addr,
@@ -222,7 +222,7 @@ impl Backend {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LbOp {
     /// a new backend (or a removed one back, with this address)
-    Add { name: String, addr: Ipv4, port: u16, weight: u32 },
+    Add { name: String, addr: IpAddr, port: u16, weight: u32 },
     /// drains it, then it is gone
     Remove { name: String },
     /// drains it, then it is disabled
@@ -374,7 +374,8 @@ impl Lb {
     }
 
     /// adds a backend to the configuration (before it runs)
-    pub fn add_backend(&mut self, name: &str, addr: Ipv4, port: u16, weight: u32) {
+    pub fn add_backend(&mut self, name: &str, addr: impl Into<IpAddr>, port: u16, weight: u32) {
+        let addr = addr.into();
         self.backends.push(Backend::new(name, addr, port, weight, 0));
         self.rering();
     }
@@ -451,7 +452,7 @@ impl Lb {
     fn key_of(&self, r: &ReqIn) -> u64 {
         match &self.hash_key {
             HashKey::Path => hash64(r.head.target.as_bytes()),
-            HashKey::Client => hash64(&r.peer.0.0),
+            HashKey::Client => hash64(&ip_bytes(r.peer.0)),
             HashKey::Header(h) => hash64(r.head.header(h).unwrap_or("").as_bytes()),
         }
     }
@@ -652,12 +653,12 @@ impl Lb {
     fn accept(&mut self, os: &mut OsApi, listener: u32) {
         while let Some(c) = os.tcp_accept(listener) {
             let now = os.now();
-            let peer = os.tcp_info(c).map(|r| r.remote.0).unwrap_or(Ipv4::UNSPECIFIED);
+            let peer = os.tcp_info(c).map(|r| r.remote.0).unwrap_or(IpAddr::V4(Ipv4::UNSPECIFIED));
             self.requests += 1;
             self.next_pipe += 1;
             let id = self.next_pipe;
             let key = match &self.hash_key {
-                HashKey::Client => hash64(&peer.0),
+                HashKey::Client => hash64(&ip_bytes(peer)),
                 _ => hash64(&id.to_be_bytes()),
             };
             self.socks.insert(c, (id, false));
@@ -1206,7 +1207,7 @@ impl Lb {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BackendView {
     pub name: String,
-    pub addr: Ipv4,
+    pub addr: IpAddr,
     pub port: u16,
     pub weight: u32,
     pub admin: Admin,
@@ -1459,12 +1460,12 @@ pub fn from_def_msg(c: &Value) -> Result<Box<dyn Service>, Msg> {
         lb.health.fall = h.get("fall").and_then(|v| v.as_u64()).unwrap_or(3).clamp(1, 100) as u32;
     }
     for (k, b) in c.get("backends").and_then(|b| b.as_array()).unwrap_or(&[]).iter().enumerate() {
-        let addr = b.get("addr").and_then(|v| v.as_str()).and_then(|s| Ipv4::parse(s.trim())).ok_or_else(|| msg!("Backend {} braucht \u{201e}addr\u{201c} mit einer IPv4-Adresse.", k + 1))?;
+        let addr = b.get("addr").and_then(|v| v.as_str()).and_then(|s| IpAddr::parse(s.trim())).ok_or_else(|| msg!("Backend {} braucht \u{201e}addr\u{201c} mit einer IP-Adresse.", k + 1))?;
         let bport = b.get("port").and_then(|v| v.as_u64()).unwrap_or(if mode == LbMode::Http { 80 } else { port as u64 });
         if !(1..=65535).contains(&bport) {
             return Err(msg!("Port {} gibt es nicht.", bport));
         }
-        let name = b.get("name").and_then(|v| v.as_str()).map(String::from).unwrap_or_else(|| format!("{}:{}", addr, bport));
+        let name = b.get("name").and_then(|v| v.as_str()).map(String::from).unwrap_or_else(|| if addr.is_v4() { format!("{}:{}", addr, bport) } else { format!("[{}]:{}", addr, bport) });
         if lb.backends.iter().any(|x| x.name.eq_ignore_ascii_case(&name)) {
             return Err(msg!("Das Backend {} steht zweimal da.", name));
         }
@@ -1481,5 +1482,13 @@ impl Engine {
     /// a load balancer's view for the lab
     pub fn lb_view(&self, dev: u32, svc: &str) -> Option<LbView> {
         Some(self.service::<Lb>(dev, svc)?.view(self.now))
+    }
+}
+
+/// the bytes of an address for hashing (an IPv4 address: its four bytes, as before)
+fn ip_bytes(a: IpAddr) -> Vec<u8> {
+    match a {
+        IpAddr::V4(x) => x.0.to_vec(),
+        IpAddr::V6(x) => x.0.to_vec(),
     }
 }

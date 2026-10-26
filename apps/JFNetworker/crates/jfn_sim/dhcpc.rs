@@ -30,6 +30,10 @@
 // retransmission (4, 8, 16, 32, 64 s, each +-1 s; while renewing half the time to T2, at least
 // 60 s), no ARP check, the default route with distance 254, a new start when the interface
 // comes up, and nothing kept over a restart.
+//
+// WLAN (wlan.rs): when a station's connection is up, the client hears of it (Ctl::Carrier, as a
+// supplicant's hook starts dhclient): without a lease it starts its DISCOVER (or INIT-REBOOT)
+// at once instead of waiting for its next retransmission.
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -706,7 +710,7 @@ impl Service for DhcpClient {
     }
     fn on(&mut self, ev: SvcEvent, os: &mut OsApi) {
         match ev {
-            SvcEvent::Udp(d) => self.on_reply(os, d.src, &d.data),
+            SvcEvent::Udp(d) => self.on_reply(os, d.src4(), &d.data),
             SvcEvent::Timer(k) => self.on_timer(os, k),
             SvcEvent::ArpConflict { ip, mac, .. } => {
                 if self.state == ClientState::Checking && self.pending.as_ref().is_some_and(|l| l.addr.addr == ip) {
@@ -722,6 +726,12 @@ impl Service for DhcpClient {
             SvcEvent::Ctl(Ctl::Renew) => match self.state {
                 ClientState::Bound => self.begin_request(os, ClientState::Renewing, DhcpReq::Renew),
                 ClientState::Stopped | ClientState::Idle | ClientState::Declined | ClientState::Init => self.discover(os),
+                _ => {}
+            },
+            // a WLAN connection came up (wlan.rs): without a lease, at once
+            SvcEvent::Ctl(Ctl::Carrier) => match self.state {
+                ClientState::Init | ClientState::Selecting | ClientState::Idle => self.discover(os),
+                ClientState::Rebooting => self.reboot_or_discover(os),
                 _ => {}
             },
             _ => {}

@@ -848,7 +848,6 @@ Fehler einspielen	Inject a fault
 Ausschalten	Power off
 Das Gerät verliert den Strom und kommt beim Wiederherstellen wieder (das Projekt bleibt eingeschaltet).	The device loses its power and comes back when restored (the project keeps it switched on).
 Dienst	Service
-Disk	Disk
 Verlangsamen	Slow down
 Die Disk braucht mehr Zeit je Zugriff (ms) oder einen Faktor für die Übertragung (größer als 0, nicht 1), z. B. 10 und 3.	The disk needs more time per access (ms) or a factor for the transfer (greater than 0, not 1), e.g. 10 and 3.
 Kabel ziehen	Pull the cable
@@ -885,3 +884,131 @@ veraltet	deprecated
 
 # OSPF (R3): the kind of the service in the Dienste tab and the Metriken panel
 Routing (OSPF)	Routing (OSPF)
+# A1: assessments -- the commands, the score card and items of the Aufgabe panel (workspace/assess.rs)
+&Aufgabe erstellen …	&Author an assessment …
+Aufgabe a&bgeben	Hand &in the assessment
+Aktuelles Netz als Ziel	Current network as the target
+Ausgangsnetz erzeugen	Make the start network
+Als Aufgabe speichern …	Save as an assessment …
+1 Punkt	1 point
+{} Punkte	{} points
+{} von {} Punkten · {} %	{} of {} points · {}%
+? von {} Punkten	? of {} points
+Die Bewertung zeigt sich nach dem Abgeben.	The grade shows once the work is handed in.
+Abgeben	Hand in
+Die Arbeit abgeben: danach zählt die Bewertung, wie sie jetzt ist	Hand the work in: from then on the grade counts as it is now
+Die Kriterien jetzt prüfen und bei den falschen zeigen, was fehlt (F9)	Check the items now and show what the wrong ones lack (F9)
+Abgegeben: die Bewertung ist endgültig.	Handed in: the grade is final.
+Die Zeit ist um: die Bewertung ist endgültig.	Time is up: the grade is final.
+bewertet bei t = {}	graded at t = {}
+Noch {}	{} left
+Diese Aufgabe zeigt nur die Punktzahl, nicht die einzelnen Kriterien.	This assessment shows the score only, not the single items.
+Kriterien	Items
+Jetzt abgeben?	Hand in now?
+Danach zählt die Bewertung, wie sie jetzt ist, und die Kriterien zeigen, was fehlt. Weiterarbeiten geht, die Punkte bleiben.	From then on the grade counts as it is now, and the items show what is missing. You may go on working; the points stay.
+# A1: the author's panel (workspace/author.rs)
+Aufgabe erstellen	Author an assessment
+Aus dem Projekt wird eine Aufgabe mit Punkten: das fertige Netz als Ziel, die Kriterien daraus, dann das Netz, mit dem Lernende beginnen. Das Ziel steht in der Datei: zum Üben, nicht für Prüfungen, die niemand einsehen darf.	The project becomes an assessment with points: the finished network as the target, the items taken from it, then the network learners start with. The target is stored in the file: for practice, not for exams nobody may look into.
+1  Zielnetz	1  Target network
+Ziel: {} Geräte, {} Kabel.	Target: {} devices, {} cables.
+Noch kein Ziel. Das Netz fertig einrichten, dann übernehmen.	No target yet. Finish setting up the network, then take it.
+Das Netz, wie es jetzt läuft (mit den Running-Configs), wird die Lösung	The network as it runs now (with the running configs) becomes the answer
+Ziel übernommen: {} Geräte, {} Kabel.	Target taken: {} devices, {} cables.
+2  Kriterien aus dem Zielnetz	2  Items from the target network
+Erst mit einem Ziel.	Only with a target.
+Ein Häkchen bewertet die Einstellung; ausgewählt lassen sich Punkte und Texte ändern.	A check mark grades the setting; select it to change its points and texts.
+Keine Einstellung gewählt.	No setting selected.
+Punkte	Points
+Vergleich	Comparison
+gleichwertig	equivalent
+genau	exact
+einer von mehreren Werten	one of several values
+Werte	Values
+Werte, durch | getrennt	values, separated by |
+„{}“ ist kein gültiger Wert.	“{}” is not a valid value.
+Prüfung	Check
+z. B. PC1 reaches 10.0.2.10	e.g. PC1 reaches 10.0.2.10
+Text	Text
+Nicht bewerten	Do not grade
+3  Verbindungsprüfungen	3  Connectivity checks
+Prüfungen in der Sprache der Szenarien, z. B. „PC1 reaches 10.0.2.10“ (ein Ping kommt an) oder „R1 route 10.0.3.0/24“; mehrere mit „;“ gelten zusammen.	Checks in the language of scenarios, e.g. “PC1 reaches 10.0.2.10” (a ping gets an answer) or “R1 route 10.0.3.0/24”; several joined by “;” hold together.
+Prüfung entfernen	Remove the check
+Neue Prüfung	New check
+Die Prüfung ist leer.	The check is empty.
+4  Texte	4  Texts
+Kurztext	Summary
+Einleitung	Introduction
+Thema	Topic
+5  Bewertung	5  Grading
+Jedes Kriterium richtig oder falsch zeigen	Show each item right or wrong
+Nur die Punktzahl zeigen	Show the score only
+Nichts zeigen, bis abgegeben ist	Show nothing until it is handed in
+Zeit (Minuten)	Time (minutes)
+0: ohne Grenze	0: no limit
+6  Ausgangsnetz	6  Start network
+Lernende beginnen mit dem Netz des Projekts. „Ausgangsnetz erzeugen“ nimmt dem Ziel, was die Kriterien prüfen; oder das Netz von Hand zurückbauen.	Learners start with the project's network. “Make the start network” takes from the target what the items check; or take the network apart by hand.
+Das Projekt jetzt: {} von {} Punkten.	The project now: {} of {} points.
+Ausgangsnetz erzeugt (rückgängig mit Strg+Z).	Start network made (undo with Ctrl+Z).
+7  Speichern	7  Save
+{} Kriterien, {}.	{} items, {}.
+Zuerst ein Ziel: „Aktuelles Netz als Ziel“.	First a target: “Current network as the target”.
+Die Aufgabe braucht mindestens ein Kriterium.	The assessment needs at least one item.
+Die Aufgabe braucht einen Titel (Deutsch).	The assessment needs a title (German).
+Die Aufgabe steht im Projekt; jetzt die Datei wählen.	The assessment is in the project; now choose the file.
+Mit Punkten	With points
+
+# WLAN (W1): View › WLAN ranges, the radio lines and ranges on the canvas (canvas/wlan.rs), the WLAN part of the inspector and the scale (inspector/wlan.rs)
+&WLAN-Reichweiten	&WLAN ranges
+außer Reichweite	out of range
+{} dBm, {} Mbit/s	{} dBm, {} Mbit/s
+Handshake läuft	handshake running
+Funk: {} – {} ({}, {}, {})	Radio: {} – {} ({}, {}, {})
+Reichweite: {}, {}	Range: {}, {}
+Funk: {} – nicht verbunden („{}“)	Radio: {} – not connected (“{}”)
+WLAN ({})	WLAN ({})
+Die Netze dieses Access Points. Eine Station nimmt in ihrer Reichweite das beste Netz ihrer SSID.	The networks of this access point. A station takes the best network of its SSID within its range.
+Netz ohne SSID	Network without SSID
+SSID	SSID
+Name des Netzes	Name of the network
+Band	Band
+Kanal	Channel
+Passphrase	Passphrase
+8 bis 63 Zeichen	8 to 63 characters
+Passphrase zeigen	Show passphrase
+keins	none
+Gastnetz	Guest network
+Client-Isolation	Client isolation
+Wird nicht angeboten: {}	Not offered: {}
+{} · {} dBm · {} Mbit/s	{} · {} dBm · {} Mbit/s
+Stationen	Stations
+Netz hinzufügen	Add network
+Reichweite	Range
+{}: {} m ({} Einheiten)	{}: {} m ({} units)
+kein Netz eingestellt	no network set
+aus (Gerät oder Port)	off (device or port)
+fest verbunden (Funkkabel des Projekts)	fixed (a radio cable of the project)
+sucht „{}“	looking for “{}”
+meldet sich bei „{}“ an	joining “{}”
+4-Wege-Handshake läuft	4-way handshake running
+verbunden	connected
+wechselt den Access Point	changing the access point
+{}. Fehlschlag, neuer Versuch in {} s	failure {}, next try in {} s
+„{}“ ist nicht in Reichweite	“{}” is not in range
+„{}“ braucht eine Passphrase	“{}” needs a passphrase
+aufgegeben nach {} Fehlschlägen: Passphrase prüfen	gave up after {} failures: check the passphrase
+WLAN	WLAN
+Access Point	Access point
+Netz	Network
+Signal	Signal
+{} dBm ({} von 4 Balken)	{} dBm ({} of 4 bars)
+Rate	Rate
+für WPA2 / WPA3	for WPA2 / WPA3
+In Reichweite	In range
+offen	open
+Die Station sucht ihr Netz, meldet sich beim besten Access Point an und wechselt, wenn ein anderer deutlich besser ist.	The station looks for its network, joins the best access point and moves on when another one is clearly better.
+Maßstab	Scale
+Je Meter	Per meter
+Eine ganze Zahl von 1 bis 1000.	A whole number from 1 to 1000.
+Ein Meter sind {} Einheiten der Zeichenfläche (bei 100 % Pixel); danach richten sich die Reichweiten im WLAN.	One meter is {} units of the canvas (pixels at 100%); the WLAN ranges follow it.
+Anmelden	Join
+Abmelden	Leave

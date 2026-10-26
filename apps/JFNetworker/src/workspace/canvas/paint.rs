@@ -519,9 +519,14 @@ impl DgPaint for Painter {
             let shown = nodes.iter().filter(|&&i| sc.nodes.get(i as usize).is_some_and(|x| f.visible(x.rect))).count();
             shown + edges.iter().filter(|&&i| f.geo.routes.get(i as usize).is_some_and(|rt| f.route_visible(rt, 2.0))).count() > LOD_MIN
         };
+        // WLAN (wlan.rs): the ranges below everything, the radio lines with the cables, the
+        // signal bars over the devices
+        super::wlan::paint_ranges(g, f, &n);
         paint_notes(g, f, sc, &nodes, lod);
         paint_links(g, f, sc, &edges, lod);
+        super::wlan::paint_assocs(g, f, &n);
         paint_devices(g, f, sc, &n.syms, &n.canvas.lab, &nodes, lod);
+        super::wlan::paint_bars(g, f, &n, lod);
         if !lod {
             paint_ends(g, f, sc, &n.doc.sim.leds, &edges);
         }

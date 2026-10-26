@@ -14,6 +14,9 @@
 //   dhclient [-v] [-r] [IF], cat /etc/resolv.conf|/etc/hosts|/etc/hostname (netsvc.rs)
 //   ip -6 addr|route|neigh, ping6 / ping -6, traceroute6 / traceroute -6, sysctl net.ipv6.*
 //   (linux6.rs; ip addr and ip neigh show both families, an IPv6 target picks IPv6 by itself)
+//   dig, host, nslookup (names.rs: their own questions to a name server)
+//   iw dev [IF info|link|scan|connect SSID [psk PASS]|disconnect|station dump] (cli/wlan.rs:
+//   WLAN; wlan0 shows in ip link as any port, NO-CARRIER until the handshake is done)
 //
 // Objects and commands of ip take any prefix, the first one of iproute2's order winning ("ip
 // a" is address, "ip r" route, "ip n" neighbour); output and error messages are those of
@@ -32,6 +35,7 @@ use crate::driver::Report;
 use crate::ip::{IfKind, RouteSrc};
 use crate::jobs::{PingOpts, TraceOpts};
 use crate::kernel::{Engine, Ns, MS, SEC};
+use crate::resolver::Family;
 
 /// the words of a shell line: spaces separate, '...' and "..." quote
 fn words(line: &str) -> Vec<String> {
@@ -122,6 +126,9 @@ impl Engine {
             "nc" | "netcat" => self.sh_nc(ni, &args, None),
             "ss" => self.sh_ss(ni, &args),
             "top" => self.sh_top(ni, &args),
+            "dig" => self.sh_dig(ni, &args),
+            "host" => self.sh_host(ni, &args),
+            "nslookup" => self.sh_nslookup(ni, &args),
             "printf" => self.sh_printf(ni, line),
             "lbctl" => self.sh_lbctl(ni, &args),
             "kvctl" => self.sh_kvctl(ni, &args),
@@ -131,6 +138,7 @@ impl Engine {
             "script" => self.sh_script(ni, &args),
             "dhclient" => self.sh_dhclient(ni, &args),
             "cat" => self.sh_cat(ni, &args),
+            "iw" => self.sh_iw(ni, &args),
             "echo" => {
                 let t = format!("{}\n", args.join(" "));
                 self.out(ni, &t);
@@ -151,7 +159,7 @@ impl Engine {
         let w = words(line);
         let partial = !line.is_empty() && !line.ends_with(char::is_whitespace);
         let (list, done): (&[&str], usize) = match w.len() {
-            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "echo", "hostname", "ip", "kvctl", "lbctl", "mqctl", "nc", "ping", "printf", "script", "ss", "sysctl", "top", "traceroute", "workerctl"], 0),
+            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "top", "traceroute", "workerctl"], 0),
             2 if partial && w[0] == "ip" => (&["address", "link", "neighbour", "route"], 1),
             3 if partial && w[0] == "ip" => (&["add", "del", "flush", "get", "set", "show"], 2),
             _ => return (None, Vec::new()),
@@ -713,6 +721,9 @@ impl Engine {
         }
         let mut o = PingOpts { count: 0, size: 56, ttl: None, df: false, interval: SEC, timeout: 10 * SEC, src: None };
         let mut dst: Option<&str> = None;
+        // "-4": a name is looked up for IPv4 only; else for what the device can use
+        // (getaddrinfo: an IPv6 address first makes it a ping over IPv6)
+        let mut fam = Family::Any;
         let mut k = 0;
         while k < args.len() {
             let a = args[k];
@@ -752,7 +763,8 @@ impl Engine {
                         Some("dont" | "want") => o.df = false,
                         _ => return self.sh_err(ni, &format!("ping: invalid -M argument: {}\n", val.unwrap_or(""))),
                     },
-                    "n" | "q" | "4" => {}
+                    "4" => fam = Family::V4,
+                    "n" | "q" => {}
                     "w" | "I" => {}
                     f => return self.sh_err(ni, &format!("ping: invalid option -- '{}'\n", f)),
                 }
@@ -765,7 +777,7 @@ impl Engine {
             return self.sh_err(ni, "ping: usage error: Destination address required\n");
         };
         // a name goes to the device's resolver first (print.rs)
-        self.linux_ping_start(ni, d, o);
+        self.linux_ping_start(ni, d, o, fam);
         Ok(())
     }
 
@@ -776,11 +788,13 @@ impl Engine {
         let mut o = TraceOpts { max_hops: 30, probes: 3, timeout: 5 * SEC, port: 33434, size: 32 };
         let mut numeric = false;
         let mut dst: Option<&str> = None;
+        let mut fam = Family::Any;
         let mut k = 0;
         while k < args.len() {
             let a = args[k];
             match a {
                 "-n" => numeric = true,
+                "-4" => fam = Family::V4,
                 "-m" | "-q" | "-w" => {
                     k += 1;
                     let v = args.get(k).copied().unwrap_or("");
@@ -808,7 +822,7 @@ impl Engine {
             return self.sh_err(ni, "Specify \"host\" missing argument.\n");
         };
         // a name goes to the device's resolver first (print.rs)
-        self.linux_trace_start(ni, d, o, numeric);
+        self.linux_trace_start(ni, d, o, numeric, fam);
         Ok(())
     }
 
