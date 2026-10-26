@@ -30,6 +30,8 @@
 // the reach expectation, the Aufgabe panel's run, authoring, the samples of assets/assess).
 // wlantest.rs: WLAN (group wlan: jfn_model::wlan, jfn_sim::wlan, wlankey, wlantrace, cli/wlan.rs,
 // doc/wlan.rs).
+// bgptest.rs: BGP-4 on routers, L3 switches and the firewall (group bgp: jfn_sim::bgp, bgptrace,
+// cli/bgp.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -87,9 +89,11 @@ mod ipv6tcptest;
 mod assesstest;
 #[path = "wlantest.rs"]
 mod wlantest;
+#[path = "bgptest.rs"]
+mod bgptest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 33] = [
+    let groups: [(&'static str, fn(&mut T)); 34] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -123,6 +127,7 @@ pub fn run() -> i32 {
         ("ipv6tcp", ipv6tcptest::run),
         ("assess", assesstest::run),
         ("wlan", wlantest::run),
+        ("bgp", bgptest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

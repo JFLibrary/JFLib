@@ -2,8 +2,8 @@
 // cas, netio incl. TLS and SSH, netpkt incl. DHCP, DNS, NTP, syslog, RIP and OSPF, base::rng,
 // base::metrics, base::cmdtree, base::hashring, base::lru, agent_core::jmap, script, its VM and
 // its standard library, the BPDUs of netpkt::stp, ICMPv6 and Neighbor Discovery of
-// netpkt::icmpv6, the address selection of netpkt::addrsel): known-answer vectors, round trips,
-// edge cases.  Console program; exit code 1 when a check fails.
+// netpkt::icmpv6, the address selection of netpkt::addrsel, the BGP messages of netpkt::bgp):
+// known-answer vectors, round trips, edge cases.  Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app coretest
 //   build/win/coretest.exe [--only NAME] [--bench] [--vectors FILE]  (FILE: tools/crypto_check.py)
@@ -47,6 +47,7 @@ mod ript;
 mod icmpv6t;
 mod ospft;
 mod addrselt;
+mod bgpt;
 
 /// the result collector of a check group
 pub struct T {
@@ -120,7 +121,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 29] = [
+    let groups: [(&'static str, fn(&mut T)); 30] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -150,6 +151,7 @@ fn run() -> i32 {
         ("icmpv6", icmpv6t::run),
         ("ospf", ospft::run),
         ("addrsel", addrselt::run),
+        ("bgp", bgpt::run),
     ];
     let mut failed = 0;
     let mut total = 0;

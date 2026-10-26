@@ -113,6 +113,12 @@
 //   wlankey  the keys of WPA2-Personal and WPA3-Personal (PMK, PTK, MICs, the key wrap of the
 //            group key) and the EAPOL-Key messages of the 4-way handshake
 //   wlantrace WNote: the decisions of WLAN as notes (Note::Wlan) with their German sentences
+//   bgp      BGP-4 (RFC 4271, 4-octet AS numbers of RFC 6793) as the service "bgp" of IOS-like
+//            routers, L3 switches and the firewall: sessions over TCP port 179 with the state
+//            machine, its timers and collisions, eBGP and iBGP, Adj-RIBs-In, the decision
+//            process, Adj-RIBs-Out with MRAI, network statements and redistribution; its routes
+//            in the RIB with distance 20 / 200; BgpCfg / BgpSet (Action::Bgp)
+//   bgptrace BNote: the decisions of BGP as notes (Note::Bgp) with their German sentences
 //
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
@@ -187,6 +193,8 @@ pub mod assess;
 pub mod wlan;
 pub mod wlankey;
 pub mod wlantrace;
+pub mod bgp;
+pub mod bgptrace;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -241,3 +249,5 @@ pub use os::{ANY, ANY4};
 pub use assess::{Cand, Graded, Grader, Lines, Score};
 pub use wlan::{AssocView, Bss, StaState, StaView};
 pub use wlantrace::WNote;
+pub use bgp::{Bgp, BgpCfg, BgpSet, DownWhy, DropWhy, How, IdleWhy, NbrCfg, RefuseWhy, Soft, Step};
+pub use bgptrace::BNote;

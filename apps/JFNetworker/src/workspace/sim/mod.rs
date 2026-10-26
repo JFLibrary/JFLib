@@ -85,7 +85,7 @@ pub(crate) const CATS: [Cat; 9] = [
     Cat { name: "UDP", bits: P_UDP | P_NTP | P_SYSLOG | P_TFTP | P_SNMP, argb: 0xFF2A_8AA6 },
     Cat { name: "DHCP", bits: P_DHCP | P_DHCPV6, argb: 0xFF2F_7D72 },
     Cat { name: "STP", bits: P_STP, argb: 0xFF7A_818A },
-    Cat { name: "OSPF/RIP", bits: P_OSPF | P_RIP, argb: 0xFF8C_6A4F },
+    Cat { name: "OSPF/RIP", bits: P_OSPF | P_RIP | P_BGP, argb: 0xFF8C_6A4F },
     Cat { name: "Andere", bits: P_ETH | P_VLAN | P_LLC | P_IPV4 | P_IPV6 | P_IGMP | P_LLDP | P_DATA, argb: 0xFF6A_737D },
 ];
 /// the category "Andere"

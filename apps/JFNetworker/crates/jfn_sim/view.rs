@@ -370,7 +370,8 @@ pub struct DevStep {
 }
 
 /// protocols from the top of the stack down: a P_* mask is named after its highest one
-const TOP_DOWN: [Proto; 26] = [
+const TOP_DOWN: [Proto; 27] = [
+    Proto::Bgp,
     Proto::Dhcpv6,
     Proto::Lldp,
     Proto::Snmp,

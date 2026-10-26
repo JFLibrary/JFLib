@@ -1,0 +1,65 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "BGP an der Konsole",
+  "description": "R1 und R2 an einem Kabel; R2 hat BGP in AS 65002 schon eingerichtet und wartet auf R1 (AS 65001), dessen BGP an der Konsole entsteht.",
+  "seed": 31,
+  "next_id": 4,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface Loopback0\n ip address 1.1.1.1 255.255.255.255\n no shutdown\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.1 255.255.255.252\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "R2",
+      "model": "jf-r4",
+      "x": 300,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R2\n!\ninterface Loopback0\n ip address 2.2.2.2 255.255.255.255\n no shutdown\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.12.2 255.255.255.252\n no shutdown\n!\nrouter bgp 65002\n network 2.2.2.2 mask 255.255.255.255\n neighbor 10.0.12.1 remote-as 65001\n!\nend\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 3,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

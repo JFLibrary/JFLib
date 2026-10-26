@@ -539,7 +539,7 @@ pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
             p => Err(msg!("Port {} gibt es nicht.", p)),
         }
     };
-    let opts = SockOpts { nodelay: flag("nodelay", false), keepalive: flag("keepalive", false), rcvbuf: size("rcvbuf"), sndbuf: size("sndbuf") };
+    let opts = SockOpts { nodelay: flag("nodelay", false), keepalive: flag("keepalive", false), rcvbuf: size("rcvbuf"), sndbuf: size("sndbuf"), ttl: 0 };
     Ok(match kind {
         "tcp-echo" => {
             let mut s = TcpEcho::new(port(7)?);

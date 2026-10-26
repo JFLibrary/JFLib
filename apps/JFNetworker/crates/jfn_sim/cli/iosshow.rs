@@ -13,6 +13,9 @@
 //   show ip route ospf           OSPF routes as O, O IA, O E1 and O E2 (cli/ospf.rs) with the
 //                                time since they are as they are and their interface; the legend
 //                                names them only where OSPF runs
+//   show ip route bgp            BGP routes as B with the time since they are as they are, without
+//                                an interface (the next hop may be further away); the legend
+//                                names B only where BGP runs (cli/bgp.rs)
 //
 // The layouts follow IOS 15 / IOS-XE: column widths of "show ip interface brief" (22, 15, 3,
 // 6, 21), "show arp" (address 15, age right-aligned in 9), "show mac address-table" and "show
@@ -44,6 +47,18 @@ const ROUTE_CODES_RIP: &str = "Codes: C - connected network, L - address of this
 /// the codes on a device that runs OSPF, and on one that runs both
 const ROUTE_CODES_OSPF: &str = "Codes: C - connected network, L - address of this device, S - static route,\n       O - learned by OSPF, IA - from another area, E1 / E2 - external of type 1 / 2,\n       * - default route\n\n";
 const ROUTE_CODES_BOTH: &str = "Codes: C - connected network, L - address of this device, S - static route,\n       R - learned by RIP, O - learned by OSPF, IA - from another area,\n       E1 / E2 - external of type 1 / 2, * - default route\n\n";
+
+/// the codes on a device that runs BGP (and RIP or OSPF)
+fn route_codes_bgp(rip: bool, ospf: bool) -> String {
+    let mut s = String::from("Codes: C - connected network, L - address of this device, S - static route,\n");
+    s.push_str(match (rip, ospf) {
+        (false, false) => "       B - learned by BGP, * - default route\n\n",
+        (true, false) => "       R - learned by RIP, B - learned by BGP, * - default route\n\n",
+        (false, true) => "       O - learned by OSPF, IA - from another area, E1 / E2 - external of type 1 / 2,\n       B - learned by BGP, * - default route\n\n",
+        (true, true) => "       R - learned by RIP, O - learned by OSPF, IA - from another area,\n       E1 / E2 - external of type 1 / 2, B - learned by BGP, * - default route\n\n",
+    });
+    s
+}
 
 /// the length of the classful network of an address
 fn classful(a: Ipv4) -> u8 {
@@ -120,6 +135,17 @@ impl Engine {
                     for (bit, what) in [(super::ospf::DO_ADJ, "adjacencies"), (super::ospf::DO_EVENTS, "events"), (super::ospf::DO_HELLO, "hellos")] {
                         if k & bit != 0 {
                             s.push_str(&format!("Debug output for OSPF {}: on\n", what));
+                        }
+                    }
+                }
+                if d & super::D_BGP != 0 {
+                    let k = match self.cdev(ni).map(|c| c.bgp_debug).unwrap_or(0) {
+                        0 => super::bgp::DB_EVENTS | super::bgp::DB_UPDATES,
+                        k => k,
+                    };
+                    for (bit, what) in [(super::bgp::DB_EVENTS, "events"), (super::bgp::DB_UPDATES, "updates")] {
+                        if k & bit != 0 {
+                            s.push_str(&format!("Debug output for BGP {}: on\n", what));
                         }
                     }
                 }
@@ -205,6 +231,8 @@ impl Engine {
         s.push_str(&self.ios_rip_config(ni));
         // "router ospf" (cli/ospf.rs)
         s.push_str(&self.ios_ospf_config(ni));
+        // "router bgp" (cli/bgp.rs)
+        s.push_str(&self.ios_bgp_config(ni));
         // the global lines of NAT come before the static routes (cli/nat.rs)
         s.push_str(&self.ios_nat_config(ni));
         if let Some(st) = &n.ip {
@@ -542,6 +570,7 @@ impl Engine {
         let rip = self.rip_on(ni);
         let rip_db = self.rip_of(ni);
         let ospf = self.ospf_on(ni);
+        let bgp = self.bgp_on(ni);
         // per prefix only the routes of the best distance are in the table
         let mut best: BTreeMap<(u32, u8), u8> = BTreeMap::new();
         for r in &all {
@@ -553,18 +582,23 @@ impl Engine {
         let keep = |r: &Route| match only {
             Some("rip") => r.src == RouteSrc::Rip,
             Some("ospf") => r.src == RouteSrc::Ospf,
+            Some("bgp") => r.src == RouteSrc::Bgp,
             Some("static") => r.src == RouteSrc::Static,
             Some("connected") => matches!(r.src, RouteSrc::Connected | RouteSrc::Local),
             _ => true,
         };
         all.retain(|r| best.get(&(r.prefix.addr.to_u32(), r.prefix.len)) == Some(&r.ad) && keep(r));
         let routes: Vec<&Route> = all.iter().collect();
-        let mut s = String::from(match (rip, ospf) {
-            (true, true) => ROUTE_CODES_BOTH,
-            (true, false) => ROUTE_CODES_RIP,
-            (false, true) => ROUTE_CODES_OSPF,
-            (false, false) => ROUTE_CODES,
-        });
+        let mut s = if bgp {
+            route_codes_bgp(rip, ospf)
+        } else {
+            String::from(match (rip, ospf) {
+                (true, true) => ROUTE_CODES_BOTH,
+                (true, false) => ROUTE_CODES_RIP,
+                (false, true) => ROUTE_CODES_OSPF,
+                (false, false) => ROUTE_CODES,
+            })
+        };
         let default = routes.iter().find(|r| r.prefix.len == 0);
         match default {
             Some(r) => s.push_str(&format!("Gateway of last resort is {} to network 0.0.0.0\n\n", r.via.unwrap_or(Ipv4::UNSPECIFIED))),
@@ -616,6 +650,9 @@ impl Engine {
                         } else if r.src == RouteSrc::Ospf {
                             // OSPF: how long the route is as it is, and the interface
                             l.push_str(&format!(", {}, {}", super::rip::hms(self.ospf_route_age(ni, r.prefix)), name(r.iface)));
+                        } else if r.src == RouteSrc::Bgp {
+                            // BGP: how long the route is as it is (the next hop may lie further away)
+                            l.push_str(&format!(", {}", super::rip::hms(self.bgp_route_age(ni, r.prefix))));
                         } else if configured_if(r) {
                             l.push_str(&format!(", {}", name(r.iface)));
                         }

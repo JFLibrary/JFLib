@@ -48,6 +48,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** Destination address selection after RFC 6724 (netpkt::addrsel: scope, precedence and label of the default policy table, Dest and sort with rules 1, 2, 3, 5, 6, 8, 9 and 10, the order getaddrinfo tries the addresses of a name in)
 - **crypto:** SHA-1 (crypto::sha1, Sha1, hmac_sha1; for protocols defined with it, broken for collisions), PBKDF2 over any hash (pbkdf2::<H>, pbkdf2_sha1), the AES key wrap of RFC 3394 (aes_wrap / aes_unwrap with its integrity check) and AES-CMAC of RFC 4493 (cmac_aes): what WPA2 and WPA3 need
 - **netpkt:** EAPOL of IEEE 802.1X-2004 (netpkt::eapol: EapolView, the EAPOL-Key body of the 4-way handshake with its Key Information bits, which of the four messages a frame is, the MIC field and what it covers, RSN elements, GTK and IGTK KDEs, key data padding; eth::ET_EAPOL) and its dissection (decode::layers: every field, the Key Information bits by name, the RSN element and KDEs of plain key data; decode::info: "Key (Message 2 of 4)")
+- **netpkt:** BGP-4 messages (netpkt::bgp after RFC 4271: frame for a message out of a TCP stream, OPEN with the capabilities of RFC 5492 -- multiprotocol, route refresh of RFC 2918, 4-octet AS numbers of RFC 6793 --, UPDATE with every path attribute in 2- and 4-octet form, AS_SET, the extended length bit and unknown attributes byte for byte, NOTIFICATION with the codes of RFC 4271 and the Cease subcodes of RFC 4486, KEEPALIVE, ROUTE-REFRESH; the checks of RFC 4271 6.1 to 6.3 as the NOTIFICATION a receiver sends) and their dissection (decode::layers: every message of a TCP segment of port 179 field by field with what a receiver refuses; decode::info: "OPEN Message, AS 65001, hold time 180, ID 1.1.1.1"; decode::P_BGP)
 
 ### Changed
 
@@ -57,6 +58,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** plat::a11y::Role has the new variant Heading (the level in Node::value, Node::level()); a match over every role needs an arm for it
 - **ui:** The fixed limits of a pass grow as needed: keys of one pass (16 before), commands (32), timers (16), pointer positions, hit boxes, widget records, clip levels, tabs of a tab bar, known canvases and wrapped lines; their ceilings (1024 keys, 65536 commands, 4096 timers ...) only stop runaway apps, and whatever a ceiling or a fixed nesting depth (windows, popups, menus, lists) holds back is reported once with a UIWARN. Due timers fire by deadline, equal deadlines in the order set; the script command keys [N] CHORD... queues many keys for one pass
 - **plat:** In Chromium plat::file_dialog answers FD_PENDING for FD_OPEN / FD_SAVE (the system's pickers) instead of -1; code that calls it directly polls plat::file_dialog_poll as on Android (ui.filedlg does)
+- **netpkt:** netpkt::decode::Proto has the new variant Bgp (bit P_BGP, TCP port 179); a match over every protocol needs an arm for it
 
 ### Fixed
 

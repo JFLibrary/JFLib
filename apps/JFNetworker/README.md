@@ -94,6 +94,15 @@ Queues, Lastgeneratoren, eigene Skripte).
   Projekts, Roaming beim Verschieben, Verbindungsverlust außer Reichweite; Funklinien,
   Reichweiten und Signalbalken auf der Zeichenfläche, die Einstellungen im Inspektor, `iw` in der
   Shell, `show dot11 associations` am Access Point (siehe [WLAN](#wlan)).
+- **Routing mit BGP (R6):** Router, L3-Switches und die Firewall sprechen BGP-4 nach RFC 4271
+  über TCP-Port 179 (4-Byte-AS-Nummern nach RFC 6793, Route Refresh nach RFC 2918): `router bgp
+  ASN` mit `bgp router-id`, `neighbor … remote-as|update-source|next-hop-self|ebgp-multihop|
+  shutdown|description|weight`, `network … mask …`, `redistribute connected|static|rip|ospf`,
+  `timers bgp`, `bgp default local-preference`; die Zustände von Idle bis Established mit
+  ConnectRetry, Hold- und Keepalive-Timer und Kollisionen, eBGP mit TTL 1 und iBGP zwischen
+  Loopbacks, die Entscheidung Schritt für Schritt, Schleifen im AS-Pfad, Fast External
+  Fallover; `show ip bgp [summary|neighbors]`, `show ip route bgp`, `clear ip bgp`, `debug ip
+  bgp` (siehe [Routing mit BGP](#routing-mit-bgp)).
 
 ## Bedienung
 
@@ -210,6 +219,8 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `wlan_range.uis` | die Reichweiten: ein gewählter Access Point zeigt seine Kreise, Ansicht › WLAN-Reichweiten alle (auch mit Alt+A, W), die Kreise als Texteinträge, der Maßstab im Inspektor des Projekts mit Rückgängig und einer Ablehnung |
 | `wlan_drag.uis` | Laptop1 bei gehaltener Maustaste aus der Reichweite gezogen: „außer Reichweite“, nach sieben fehlenden Beacons getrennt, die Station sucht; Loslassen ist ein Rückgängig-Schritt, rückgängig gemacht meldet sie sich wieder bei AP1 an |
 | `wlan_shots.uis` | die Bilder von WLAN (Reichweiten, Funklinien, Signalbalken, Inspektor eines Access Points und einer Station) hell und dunkel mit 100 und 150 % (`build/jfnetworker/wlan_*.png`) |
+| `model.uis`, Gruppe `bgp` | BGP (siehe [Routing mit BGP](#routing-mit-bgp)): eine eBGP-Sitzung durch jeden Zustand auf die Nanosekunde (der erste SYN, den das IOS-artige ARP verliert, die Kollision der beiden Verbindungen, die der höheren BGP-ID bleibt), das OPEN auf dem Kabel (Version, AS, Haltezeit, ID, die drei Capabilities), TTL 1, Keepalives alle 60 s ab dem letzten UPDATE, `timers bgp 10 30` auf einer Seite (Haltezeit 30, Keepalive 10 auf beiden), iBGP zwischen Loopbacks mit `update-source` und TTL 255, ein Next Hop, den das IGP nicht kennt, bis `next-hop-self`, kein iBGP-Weg an einen anderen internen Nachbarn; jeder Schritt der Entscheidung (Gewicht, LOCAL_PREF, selbst erzeugt, AS-Pfad, ORIGIN, MED gleicher und verschiedener Nachbar-ASe, extern vor intern, IGP-Metrik über eine serielle Leitung, BGP-ID, Nachbaradresse); eine Schleife im AS-Pfad; ein falsches `remote-as` mit NOTIFICATION 2/2 auf dem Kabel, der Pause von 60 s und dem Problem, dann behoben; Ausfälle über den Hold Timer hinter einem Switch, über einen RST nach einem Neustart des Nachbarn und über Fast External Fallover; Redistribution mit MED, RIB-Failure (`r`), ein `network` ohne Route als Problem und mit Route nach der Mindestpause; die Befehlszeile (Modus, Hilfe, Tab, Fehlermeldungen, `show`, `clear ip bgp … soft in` mit ROUTE-REFRESH, `clear ip bgp *` mit Cease, `shutdown`, `no router bgp`, die Running-Config als Startkonfiguration, `% IP routing not enabled`); Texte auf Deutsch und Englisch; Determinismus |
+| `bgp_console.uis` | BGP an R1s Konsole (`fixtures/bgp_pair.jfnet`, R2 wartet schon): `router bgp` mit seinem Modus, `?` darin, Nachbar und Netz getippt, die Sitzung kommt (die Konsole meldet sie), `show ip bgp summary`, `show ip bgp` und `show ip route bgp` mit der Route von R2 |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -220,7 +231,7 @@ Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein S
 Szenario `wlan_office.scn` und die WLAN-Fensterskripte) und die Netze der Golden-Szenarien. Die
 Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`,
 `rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
-für WLAN `crypto` und `netpkt`), die Skriptsprache die Gruppe `script`.
+für WLAN `crypto` und `netpkt`, für BGP `bgp`), die Skriptsprache die Gruppe `script`.
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -269,6 +280,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | NAT und Zugriffslisten | [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs), [`nat.rs`](crates/jfn_sim/nat.rs), [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs), [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs), [`lib/netpkt/nat.rs`](../../lib/netpkt/nat.rs), [`src/nattest.rs`](src/nattest.rs) | Zugriffslisten und Adressübersetzung der IOS-artigen Geräte, ihre Befehle, das Umschreiben der Pakete mit ihren Prüfsummen (Library), ihr Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
 | IPv6 | [`crates/jfn_sim/ip6.rs`](crates/jfn_sim/ip6.rs), [`nd.rs`](crates/jfn_sim/nd.rs), [`l3v6.rs`](crates/jfn_sim/l3v6.rs), [`jobs6.rs`](crates/jfn_sim/jobs6.rs), [`trace6.rs`](crates/jfn_sim/trace6.rs), [`cli/ip6.rs`](crates/jfn_sim/cli/ip6.rs), [`cli/linux6.rs`](crates/jfn_sim/cli/linux6.rs), [`cli/print6.rs`](crates/jfn_sim/cli/print6.rs), [`cli/names.rs`](crates/jfn_sim/cli/names.rs), [`lib/netpkt/icmpv6.rs`](../../lib/netpkt/icmpv6.rs), [`lib/netpkt/ipv6.rs`](../../lib/netpkt/ipv6.rs), [`lib/netpkt/addrsel.rs`](../../lib/netpkt/addrsel.rs), [`src/ipv6test.rs`](src/ipv6test.rs), [`src/ipv6tcptest.rs`](src/ipv6tcptest.rs) | der IPv6-Teil der Geräte (Adressen, Neighbor Cache, Router, Routen), Neighbor Discovery, DAD und SLAAC, Weiterleiten und ICMPv6, Ping und Traceroute, die Notizen, die Befehle beider Befehlszeilen, Namen an beiden Befehlszeilen (`dig`, `host`, `nslookup`, `ip host`, `ip name-server`), ICMPv6 und Neighbor Discovery Byte für Byte, die Fragmente und die Adressauswahl nach RFC 6724 (Library), die Selbsttests (siehe [IPv6](#ipv6)) |
 | OSPF | [`crates/jfn_sim/ospf.rs`](crates/jfn_sim/ospf.rs), [`cli/ospf.rs`](crates/jfn_sim/cli/ospf.rs), [`src/ospftest.rs`](src/ospftest.rs), [`lib/netpkt/ospf.rs`](../../lib/netpkt/ospf.rs) | OSPF als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Pakete und LSAs Byte für Byte (siehe [Routing mit OSPF](#routing-mit-ospf)) |
+| BGP | [`crates/jfn_sim/bgp.rs`](crates/jfn_sim/bgp.rs), [`bgptrace.rs`](crates/jfn_sim/bgptrace.rs), [`cli/bgp.rs`](crates/jfn_sim/cli/bgp.rs), [`src/bgptest.rs`](src/bgptest.rs), [`lib/netpkt/bgp.rs`](../../lib/netpkt/bgp.rs) | BGP als Dienst der Router, L3-Switches und der Firewall, seine Notizen, Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit BGP](#routing-mit-bgp)) |
 | Aufgaben mit Bewertung | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/assess.rs`](crates/jfn_sim/assess.rs), [`src/workspace/assess.rs`](src/workspace/assess.rs), [`src/workspace/author.rs`](src/workspace/author.rs), [`src/doc/assess.rs`](src/doc/assess.rs), [`assets/assess`](assets/assess), [`src/assesstest.rs`](src/assesstest.rs) | das Format einer Aufgabe, das Bewerten ihrer Kriterien, die Prüfung `reaches`, das Panel mit Punkten, Zeit und Abgeben, der Bereich zum Erstellen mit seinen Rückgängig-Schritten, die drei Aufgaben, ihr Selbsttest (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)) |
 | WLAN | [`crates/jfn_model/wlan.rs`](crates/jfn_model/wlan.rs), [`crates/jfn_sim/wlan.rs`](crates/jfn_sim/wlan.rs), [`wlankey.rs`](crates/jfn_sim/wlankey.rs), [`wlantrace.rs`](crates/jfn_sim/wlantrace.rs), [`cli/wlan.rs`](crates/jfn_sim/cli/wlan.rs), [`src/doc/wlan.rs`](src/doc/wlan.rs), [`src/workspace/canvas/wlan.rs`](src/workspace/canvas/wlan.rs), [`src/workspace/inspector/wlan.rs`](src/workspace/inspector/wlan.rs), [`src/wlantest.rs`](src/wlantest.rs), [`lib/netpkt/eapol.rs`](../../lib/netpkt/eapol.rs), [`lib/crypto`](../../lib/crypto/lib.rs) (`sha1.rs`, `keywrap.rs`, `cmac.rs`) | die WLAN-Einstellungen im Projekt, Stationen und Access Points im Simulator mit Funk, Schlüsseln und Notizen, `iw` und `show dot11`, die Einstellungen als Rückgängig-Schritte, Funklinien, Reichweiten und Balken, der Inspektor, der Selbsttest, EAPOL Byte für Byte und die Kryptografie von WPA2 und WPA3 (siehe [WLAN](#wlan)) |
 
@@ -552,9 +564,9 @@ Simulator:
   Zeichenfläche „Ansicht bei t = …“ mit dem Knopf „Zurück zu live“. Die Statusleiste nennt
   Modus, Uhr und Ereignisse.
 - **Pakete auf der Leinwand:** kleine Umschläge in gedämpften Farben je Protokoll (ICMP grün,
-  ARP bernstein, DNS violett, TCP/HTTP blau, UDP cyan, DHCP petrol, STP grau, OSPF/RIP braun,
-  Rest schiefergrau), unter 50 % Zoom Punkte, dort auf dem Kabel, wo der Frame zum gezeigten
-  Zeitpunkt ist. Ein Schritt bewegt sie vom alten zum neuen Zeitpunkt (Ankommende laufen in ihr
+  ARP bernstein, DNS violett, TCP/HTTP blau, UDP cyan, DHCP petrol, STP grau, OSPF/RIP braun
+  wie BGP, Rest schiefergrau), unter 50 % Zoom Punkte, dort auf dem Kabel, wo der Frame zum
+  gezeigten Zeitpunkt ist. Ein Schritt bewegt sie vom alten zum neuen Zeitpunkt (Ankommende laufen in ihr
   Ziel und verblassen, neue erscheinen am Absender); Verworfenes zeigt ein rotes ×, das danach
   ausblendet. Reduzierte Bewegung springt ohne Übergang. Ein Klick wählt den Frame und öffnet den
   Paket-Tab. Gezeichnet wird über der Leinwand; ihr eigenes Bild bleibt im Cache, ein
@@ -976,6 +988,10 @@ IOS-artige Befehlszeile:
   ospf network point-to-point|broadcast` und `ip ospf N area M` an Interfaces, `show ip ospf
   [neighbor|interface [brief|IF]|database]`, `show ip route ospf`, `debug ip ospf
   adj|events|hello`, `clear ip ospf process` (siehe [Routing mit OSPF](#routing-mit-ospf)).
+- BGP ([`cli/bgp.rs`](crates/jfn_sim/cli/bgp.rs)): `router bgp ASN` mit eigenem Modus hinter
+  demselben Prompt `(config-router)#`, `show ip bgp [A.B.C.D|summary|neighbors [X [routes|
+  advertised-routes]]]`, `show ip route bgp`, `clear ip bgp *|X [soft [in|out]]`, `debug ip bgp
+  [events|updates]` (siehe [Routing mit BGP](#routing-mit-bgp)).
 
 Hosts und Server haben eine Linux-Shell (`root@PC1:~#`): `ip addr|link|route|neigh` mit den
 Ausgaben und Fehlermeldungen von iproute2, `ping` wie iputils (bis Strg+C oder `-c`; `-i`,
@@ -1197,6 +1213,19 @@ wieder. Laptop1 pingt SRV1 und geht dabei zu AP2: in der Mitte bleibt er, nahe A
 meldet er sich sofort wieder an. AP1 aus: Phone1 verliert das Gastnetz, wieder an: beide sind
 761 ms später zurück. Laptop2 gibt nach dem vierten Fehlschlag auf und kommt mit `iw dev wlan0
 connect Buero psk …` ins Netz; 22 Erwartungen.
+
+Ein Szenario zeigt BGP (siehe [Routing mit BGP](#routing-mit-bgp)). `bgp_isp.scn` auf
+`fixtures/bgp_isp.jfnet`: Kunde A (AS 65010, CA mit PC-A) hängt an zwei Providern (ISP1 in AS
+100, ISP2 in AS 200), Kunde B (AS 65020, CB mit PC-B, `redistribute connected`) nur an ISP2;
+die Provider verbindet der Transit-Provider AS 300 aus TR1 und TR2 mit iBGP zwischen ihren
+Loopbacks (OSPF darunter, `update-source`, `next-hop-self`). Alle Sitzungen kommen nach 1 s mit
+einer Kollision ihrer beiden Verbindungen, die iBGP-Sitzung, sobald OSPF die Loopbacks kennt;
+nach 120 s (neue Wege gehen höchstens alle 30 s an externe Nachbarn) kennt jeder jedes Netz:
+`show ip bgp` mit `>i` bei TR1 und `r` bei ISP2, `show ip bgp summary`, `show ip bgp
+neighbors`, der Weg von PC-A zu PC-B über ISP2. Dann fehlt das Kabel CA–ISP2: die Sitzung endet
+sofort (Fast External Fallover), der Weg führt über ISP1 und AS 300 (`traceroute`), und ISP2
+findet CAs Netz über AS 300; mit dem Kabel kommt die Sitzung zurück, was ISP2 noch über AS 300
+kannte, fällt bei CA als Schleife weg (65010 im AS-Pfad), und der kurze Weg gilt wieder.
 
 ### Skripte in Hosts
 
@@ -1987,6 +2016,131 @@ der Selbsttest-Gruppe `wlan` ([`src/wlantest.rs`](src/wlantest.rs)), SHA-1, PBKD
 CMAC in der coretest-Gruppe `crypto`, EAPOL in `netpkt`, dazu das Szenario `wlan_office.scn` und
 die Fensterskripte `wlan_inspector.uis`, `wlan_range.uis`, `wlan_drag.uis` und `wlan_shots.uis`.
 
+### Routing mit BGP
+
+Router, L3-Switches und die Firewall sprechen BGP-4 nach RFC 4271
+([`bgp.rs`](crates/jfn_sim/bgp.rs)), mit 4-Byte-AS-Nummern nach RFC 6793 und Route Refresh nach RFC 2918. BGP ist ein Dienst des
+Geräts („bgp“; im Gerätefenster unter Dienste mit Statuszeile und Zahlen: Nachbarn, davon
+Established, Netze, Wege, OPEN, UPDATE, KEEPALIVE und NOTIFICATION in beide Richtungen,
+Verbindungsversuche, abgewiesene Verbindungen, Sitzungsenden, verworfene Wege), den die
+Befehlszeile einrichtet. Seine Sitzungen laufen über TCP-Port 179 durch die Sockets des Geräts
+(der TCP von [TCP](#tcp)), auf virtueller Zeit; gleiche Projekte ergeben gleiche Läufe.
+
+- **Einrichten** ([`cli/bgp.rs`](crates/jfn_sim/cli/bgp.rs)): `router bgp ASN` (1 bis 4294967295)
+  öffnet einen eigenen Modus hinter demselben Prompt `(config-router)#` wie RIP und OSPF mit `bgp
+  router-id`, `bgp log-neighbor-changes` (an), `bgp default local-preference` (100), `timers bgp
+  KEEPALIVE HALTEZEIT` (60 180; gilt für neue Sitzungen), `network A.B.C.D [mask M]`
+  (Klassennetze ohne Maske), `redistribute connected|static|rip [metric N]` und `redistribute
+  ospf N [metric N]`, je Nachbar `neighbor X remote-as N` (das eigene AS: iBGP, ein anderes:
+  eBGP), `description`, `update-source IF`, `next-hop-self`, `ebgp-multihop [TTL]`, `shutdown`
+  und `weight`; `no neighbor X` nimmt ihn weg, die anderen Befehle eines Nachbarn brauchen
+  zuerst sein `remote-as` (`% Specify remote-as or peer-group commands first`). Ein L3-Switch
+  braucht `ip routing`, ein Gerät hat einen Prozess (`% BGP is already running; AS is …`), `no
+  ip routing` und `no router bgp ASN` nehmen ihn mit. Die Running-Config listet nach dem Block
+  von OSPF, was vom Vorgabewert abweicht, und kommt beim Start durch dieselbe Befehlszeile
+  zurück. Was die Konfiguration ändert, gilt sofort (IOS will dafür bei Gewicht,
+  `next-hop-self` und lokaler Präferenz ein `clear ip bgp … soft`); eine neue Router-ID, ein
+  anderes `remote-as` oder `update-source` beginnt die Sitzung neu.
+- **Sitzungen:** Jeder Nachbar durchläuft die Zustände des RFC: Idle, Connect (der eigene
+  Verbindungsversuch läuft), Active (er wartet auf den Nachbarn oder auf ConnectRetry, 120 s),
+  OpenSent, OpenConfirm, Established. Ein externer Nachbar beginnt nur, wenn seine Adresse in
+  einem angeschlossenen Netz liegt oder `ebgp-multihop` gesetzt ist (sonst bleibt er Idle: „nicht
+  direkt verbunden“), einer mit `update-source`, wenn das Interface eine Adresse hat. Die
+  Verbindung geht von der Adresse der `update-source` aus, sonst von der des Wegs hinaus, mit
+  TTL 1 zu externen Nachbarn (oder dem Wert von `ebgp-multihop`) und 255 im eigenen AS. Ohne
+  Route zum Nachbarn wartet er Active und versucht es sofort, wenn eine Route kommt (etwa wenn
+  OSPF die Loopbacks kennt). Verbindungen von Adressen, die kein Nachbar sind (oder einem
+  abgeschalteten), setzt BGP gleich nach dem Handshake zurück. Fangen beide Seiten zugleich an
+  – wie beim gemeinsamen Start nach 1 s, wenn der erste SYN am IOS-artigen ARP hängen blieb –,
+  bleibt nach RFC 4271 6.8 die Verbindung, die die Seite mit der höheren BGP-ID geöffnet hat; die
+  andere endet mit Cease / Connection Collision Resolution.
+- **OPEN:** Version 4, das AS (AS_TRANS über 65535, das echte in der Capability), Haltezeit,
+  Router-ID und die Capabilities IPv4 Unicast, Route Refresh und 4-Byte-AS. Abgelehnt wird mit
+  der NOTIFICATION des RFC: eine andere Version, ein AS, das nicht `remote-as` ist (2/2 Bad Peer
+  AS), die eigene Router-ID (2/3), eine Haltezeit von 1 oder 2 s (2/6), ein unbekannter
+  Parameter (2/4). Die Haltezeit ist die kleinere beider Seiten, das Keepalive-Intervall das
+  eingestellte, höchstens ein Drittel davon (`timers bgp 10 30` auf einer Seite: 30 und 10 auf
+  beiden). Was ankommt, startet den Hold Timer neu, jedes gesendete KEEPALIVE oder UPDATE den
+  Keepalive-Timer. Kein Timer wird zufällig verschoben (RFC 4271 10 schlägt es vor).
+- **Ende einer Sitzung:** eine NOTIFICATION (gesendet oder empfangen), eine zurückgesetzte, nicht
+  mehr beantwortete oder geschlossene TCP-Verbindung, der abgelaufene Hold Timer (NOTIFICATION
+  4/0). Die Wege des Nachbarn verschwinden sofort, er beginnt wieder – sofort nach einer Sitzung,
+  60 s später (Pause, unsere Wahl) nach einem abgelehnten OPEN, damit ein Nachbar mit falschem AS
+  nicht im Sekundentakt flattert. Fällt das Interface zu einem direkt verbundenen externen
+  Nachbarn aus, endet die Sitzung sofort (Fast External Fallover, wie IOS). `clear ip bgp`
+  schickt Cease / Administrative Reset, `neighbor … shutdown` Cease / Administrative Shutdown,
+  `no neighbor` Cease / Peer De-configured; `clear ip bgp X soft in` fragt mit ROUTE-REFRESH nach
+  den Wegen, `soft out` schickt die eigenen noch einmal, `soft` beides. Die Konsole meldet
+  `%BGP-5-ADJCHANGE` (mit `bgp log-neighbor-changes`) und jede NOTIFICATION
+  (`%BGP-3-NOTIFICATION`).
+- **UPDATE:** Die Prüfungen von RFC 4271 6.3 (Längen, Flags und Länge jedes Attributs, die
+  Pflichtattribute ORIGIN, AS_PATH und NEXT_HOP, ORIGIN-Werte, AS_PATH-Segmente, Präfixe) mit
+  ihrer NOTIFICATION; von einem externen Nachbarn muss das erste AS des Pfads seines sein
+  (Malformed AS_PATH, wie IOS' enforce-first-as). Wege mit dem eigenen AS im Pfad fallen weg
+  (Schleife), ebenso Wege, deren Next Hop eine eigene Adresse oder keine Unicast-Adresse ist;
+  LOCAL_PREF zählt nur von internen Nachbarn. Unbekannte optionale transitive Attribute gehen mit
+  dem Partial-Bit weiter, COMMUNITIES und AGGREGATOR wie empfangen.
+- **Eigene Wege:** `network` erzeugt ein Netz, solange der Routing-Table genau dieses Präfix aus
+  einer anderen Quelle hat (ORIGIN IGP, MED die Metrik dieser Route); `redistribute` nimmt die
+  Netze der Interfaces, die oben sind, oder die Routen der Quelle, die im Routing-Table gewinnen
+  (ORIGIN incomplete, MED ihre Metrik oder die angegebene). Eigene Wege haben Next Hop 0.0.0.0
+  (auf dem Kabel die Adresse der Sitzung), Gewicht 32768 und die eigene lokale Präferenz.
+- **Die Entscheidung:** Ein Weg zählt, wenn sein Next Hop über eine Route aufgelöst wird, die
+  nicht von BGP stammt (deren Interface und Metrik: die IGP-Metrik). Unter den Wegen eines
+  Präfixes behält jeder Schritt die besten, der Schritt, der einen übrig lässt, steht in der
+  Notiz und in `show ip bgp A.B.C.D`: 1. höchstes Gewicht (`neighbor … weight`, eigene 32768),
+  2. höchste LOCAL_PREF, 3. selbst erzeugt, 4. kürzester AS-Pfad (ein AS_SET zählt eins), 5.
+  niedrigster ORIGIN (IGP, EGP, incomplete), 6. niedrigste MED unter Wegen vom selben
+  Nachbar-AS (ohne MED: 0), 7. extern vor intern, 8. niedrigste IGP-Metrik zum Next Hop, 9.
+  niedrigste BGP-ID des Nachbarn, 10. niedrigste Nachbaradresse. Den Schritt „ältester externer
+  Weg“ von IOS gibt es nicht. Der beste Weg kommt mit Distanz 20 (extern) oder 200 (intern) und
+  seiner MED als Metrik ins RIB, mit seinem Next Hop, den die Weiterleitung über das IGP
+  auflöst (`show ip route bgp`: B). Hat eine andere Quelle das Präfix mit besserer Distanz,
+  zeigt `show ip bgp` ein `r`.
+- **Weitergeben:** Jeder Nachbar in Established bekommt den besten Weg jedes Präfixes, außer
+  dem, von dem er kam; was ein interner Nachbar brachte, geht nicht an andere interne (kein
+  Route Reflector). Externe Nachbarn bekommen das eigene AS vorn im Pfad, die Adresse der
+  Sitzung als Next Hop, keine LOCAL_PREF und eine MED nur für Wege aus dem eigenen AS; interne
+  den Next Hop des Wegs (mit `next-hop-self` und für eigene Wege die Adresse der Sitzung),
+  LOCAL_PREF und MED. Gleiche Attribute teilen sich ein UPDATE (bis 4096 Bytes). Rücknahmen
+  gehen sofort hinaus, neue Wege höchstens alle 30 s an einen externen Nachbarn
+  (MinRouteAdvertisementInterval wie IOS, je Nachbar statt je Präfix; intern ohne Pause), die
+  erste Tabelle nach Established sofort.
+- **Anzeigen:** `show ip bgp` (Tabellenversion, Router-ID, die Spalten Network, Next Hop, Metric,
+  LocPrf, Weight, Path mit `*`, `>`, `i`, `r`), `show ip bgp A.B.C.D` (die Wege eines Netzes mit
+  dem entscheidenden Schritt), `show ip bgp summary` (die Tabelle des Vorbilds mit Zuständen wie
+  `Idle (Admin)`), `show ip bgp neighbors [X [routes|advertised-routes]]`, `show ip route bgp`,
+  `show ip protocols`, `debug ip bgp [events|updates]` (in eigenen Worten).
+- **Ereignisse:** Jede Entscheidung – Router-ID, Zustände, Verbindungen (geöffnet, angenommen,
+  zurückgesetzt, gescheitert), OPEN und was es vereinbart, KEEPALIVE, UPDATE, ROUTE-REFRESH und
+  NOTIFICATION in beide Richtungen, Kollisionen, der Hold Timer, das Ende einer Sitzung mit
+  Grund, verworfene Wege, beste Wege mit ihrem Schritt, verlorene, eigene und die Pause vor neuen
+  Wegen – steht mit deutschem Text in der Ereignisliste und im Paket-Tab
+  ([`bgptrace.rs`](crates/jfn_sim/bgptrace.rs), englisch in `engine.tsv`). Der Simulationsmodus
+  zeigt BGP braun wie OSPF und RIP, der Paket-Tab zerlegt jede Nachricht eines Segments
+  ([`netpkt::bgp`](../../lib/netpkt/bgp.rs), [`decode.rs`](../../lib/netpkt/decode.rs)).
+- **Probleme:** ein Nachbar, der nicht Established wird, mit dem Grund, den die Konfiguration
+  beider Seiten verrät: nicht direkt verbunden ohne `ebgp-multihop`, keine Route, kein Gerät mit
+  der Adresse, dort kein BGP, das falsche AS, die Gegenseite kennt diesen Router nicht, die
+  Adressen von `update-source` passen auf keiner Seite; sonst die letzte NOTIFICATION. Dazu ein
+  `network` ohne seine Route (Warnung).
+
+Noch offen: Route-Maps, Präfix-Listen und andere Richtlinien (`neighbor … route-map`,
+`distribute-list`, `filter-list`, `prefix-list`; es gibt sie im Simulator noch nicht), eigene
+Communities, `aggregate-address`, Route Reflectors, Konföderationen, Peer-Gruppen,
+MD5-Authentifizierung, `maximum-prefix`, BGP über IPv6 und andere Adressfamilien, Graceful
+Restart, Dampening, Synchronisation und mehrere gleich gute Wege.
+
+Für Programme: `Action::Bgp { dev, set: BgpSet }` (`Process`, `RouterId`, `LogChanges`, `Timers`,
+`LocalPref`, `Network`, `Redistribute`, `RemoteAs`, `Descr`, `UpdateSource`, `NextHopSelf`,
+`Multihop`, `Shutdown`, `Weight`, `Clear`) und `Engine::bgp(dev)` mit `cfg`, `router_id()`,
+`peers()` / `peer(addr)` (Zustand, was vereinbart ist, Zähler, Adj-RIB-In und -Out),
+`loc_rib()` (Kandidaten, bester Weg, Schritt), `local()` und `version()`; die Notizen als
+`Note::Bgp(BNote)`. Geprüft wird BGP in der Selbsttest-Gruppe `bgp`
+([`src/bgptest.rs`](src/bgptest.rs)), die Nachrichten in der coretest-Gruppe `bgp`, dazu das
+Szenario `bgp_isp.scn` (siehe [Szenarien](#szenarien-scn)) und das Fensterskript
+`bgp_console.uis`.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -2054,7 +2208,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · physische Ansicht, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · physische Ansicht, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

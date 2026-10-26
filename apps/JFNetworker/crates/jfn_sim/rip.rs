@@ -775,9 +775,10 @@ impl Rip {
         }
         let ni = os.ni;
         let changed = os.eng.stack_mut(ni).is_some_and(|st| st.set_dynamic(RouteSrc::Rip, v));
-        // OSPF may redistribute them (ospf.rs)
+        // OSPF may redistribute them (ospf.rs), BGP resolves next hops over them (bgp.rs)
         if changed {
             os.eng.ospf_kick(ni);
+            os.eng.bgp_kick(ni);
         }
     }
 

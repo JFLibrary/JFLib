@@ -2046,6 +2046,37 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   let mic = crypto::hmac_sha1(&kck, &eapol::mic_input(&pdu).unwrap_or_default());
   eapol::set_mic(&mut pdu, mic[..16].try_into().unwrap_or(&[0; 16]));
   ```
+
+  BGP: `bgp` has the BGP-4 messages of RFC 4271 -- `frame(stream)` says how long the first
+  message of a TCP byte stream is once all of it is there (`Ok(None)`: more bytes needed) after
+  the header checks of 6.1; `Message::read(bytes, as4)` turns one into `Open` (version, AS --
+  `AS_TRANS` above 65535 with the real one in the 4-octet capability --, hold time, identifier,
+  optional parameters with the capabilities of RFC 5492: `Cap::Mp`, `RouteRefresh`, `As4`,
+  `Other`), `Update` (withdrawn routes, path attributes in their order with their flags --
+  `AttrVal::Origin`, `AsPath` with AS_SEQUENCE and AS_SET `Segment`s in 2- or 4-octet form,
+  `NextHop`, `Med`, `LocalPref`, `AtomicAggregate`, `Aggregator`, `Communities` of RFC 1997,
+  `As4Path`, `As4Aggregator`, unknown ones as `Other` byte for byte -- and NLRI),
+  `Notification`, `Keepalive` or `RouteRefresh` (RFC 2918), and `to_bytes(as4)` writes it back
+  the same; `as4` says whether the session agreed on 4-octet AS numbers. What a receiver refuses
+  (6.1 to 6.3: marker, lengths, types, version, hold time, identifier, unknown parameters,
+  attribute flags and lengths, a missing well-known attribute, ORIGIN, AS_PATH, prefixes) comes
+  back as a `BgpErr` with the code, subcode and data of its NOTIFICATION (`error_name`,
+  `code_name`, the Cease subcodes of RFC 4486). `path_len` counts an AS_SET as one AS,
+  `path_text` writes "65002 {65010,65011}", `Attr::new(val)` gives a type its usual flags (the
+  extended length bit when the value needs it). `decode::layers` shows every message of a TCP
+  segment to or from port 179 field by field (each capability, attribute, withdrawn route and
+  prefix; the rest of a message of an earlier segment as such), with what a receiver would
+  answer with a NOTIFICATION as a problem; `decode::info` sums it up ("OPEN Message, AS 65001,
+  hold time 180, ID 1.1.1.1, KEEPALIVE Message"); its bit is `decode::P_BGP`.
+
+  ```rust
+  let caps = vec![bgp::Cap::Mp { afi: bgp::AFI_IPV4, safi: bgp::SAFI_UNICAST }, bgp::Cap::RouteRefresh, bgp::Cap::As4(65001)];
+  let open = bgp::Message::Open(bgp::Open::new(65001, 180, rid, caps)).to_bytes(true);
+  while let Some(n) = bgp::frame(&stream)? {                  // Err: the NOTIFICATION to send
+      let m = bgp::Message::read(&stream[..n], as4)?;
+      stream.drain(..n);
+  }
+  ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
   nonces use `plat::random_bytes`.

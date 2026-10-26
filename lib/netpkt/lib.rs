@@ -41,6 +41,10 @@
 //   eapol     EapolView, Key: EAPOL-Key frames of the 4-way handshake (Key Information bits,
 //             replay counter, nonces, MIC field, key data), the RSN element, KDEs (GTK,
 //             IGTK); mic_input / set_mic for the caller's MIC (802.1X-2004, 802.11-2020 12.7)
+//   bgp       BGP-4 messages: frame (a message out of a TCP stream), BgpView, Message (OPEN with
+//             capabilities, UPDATE with its path attributes, NOTIFICATION, KEEPALIVE,
+//             ROUTE-REFRESH), BgpErr (the NOTIFICATION a receiver sends)   (RFC 4271, 5492,
+//             6793, 2918, 1997, 4486)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -74,6 +78,7 @@ pub mod icmpv6;
 pub mod ospf;
 pub mod addrsel;
 pub mod eapol;
+pub mod bgp;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;
