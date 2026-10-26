@@ -6,7 +6,6 @@ use alloc::{string::String, vec::Vec};
 use plat::control_ipc::{Listener, Stream};
 
 const MAX_CLIENTS: usize = 8;
-const MAX_QUEUED: usize = 32;
 const MAX_OUTPUT: usize = 2_097_152;
 
 struct Peer {
@@ -41,8 +40,10 @@ impl Server {
             Protocol::Mcp => "-mcp",
         };
         let mut name = String::new();
+        let mut truncated = false;
         for character in app.chars() {
             if name.len() == 27 {
+                truncated = true;
                 break;
             }
             if character.is_ascii_alphanumeric() {
@@ -53,6 +54,18 @@ impl Server {
         }
         while name.ends_with('-') {
             name.pop();
+        }
+        if truncated {
+            // keep long names that share a prefix apart
+            let mut hash = 0x811c9dc5u32;
+            for byte in app.bytes() {
+                hash = (hash ^ byte as u32).wrapping_mul(0x0100_0193);
+            }
+            name.truncate(18);
+            while name.ends_with('-') {
+                name.pop();
+            }
+            name.push_str(&alloc::format!("-{:08x}", hash));
         }
         if name.is_empty() {
             name.push_str("app");
@@ -128,10 +141,9 @@ impl Server {
                     Ok(Some(0)) | Err(_) => peer.closed = true,
                     Ok(Some(count)) => {
                         peer.framer.feed(&buffer[..count], &mut |record| {
-                            if peer.queue.len() < MAX_QUEUED {
+                            // Reads only happen with an empty queue, so one 4096-byte read bounds it.
+                            if !matches!(&record, Record::Line(line) if line.is_empty()) {
                                 peer.queue.push(record);
-                            } else {
-                                peer.closed = true;
                             }
                         });
                     }

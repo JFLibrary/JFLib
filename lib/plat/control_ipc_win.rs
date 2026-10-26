@@ -369,7 +369,12 @@ unsafe extern "system" {
     fn SetNamedPipeHandleState(pipe: isize, mode: *const u32, max: *const u32, timeout: *const u32) -> i32;
     fn GetNamedPipeServerProcessId(pipe: isize, pid: *mut u32) -> i32;
     fn OpenProcess(access: u32, inherit: i32, pid: u32) -> isize;
-    fn FlushFileBuffers(file: isize) -> i32;
+    fn Sleep(ms: u32);
+}
+
+#[link(name = "ntdll", kind = "raw-dylib")]
+unsafe extern "system" {
+    fn NtQueryInformationFile(file: isize, io: *mut [usize; 2], info: *mut u32, len: u32, class: u32) -> i32;
 }
 
 #[link(name = "user32", kind = "raw-dylib")]
@@ -456,8 +461,9 @@ impl Drop for InstServer {
 pub(crate) fn inst_connect(app: &str) -> Result<InstConn, i32> {
     let name = inst_name(app)?;
     for _ in 0..3 {
-        // SAFETY: name is zero-terminated; GENERIC_READ | GENERIC_WRITE, OPEN_EXISTING.
-        let pipe = unsafe { CreateFileW(name.as_ptr(), 0xC000_0000, 0, 0, 3, 0, 0) };
+        // SAFETY: name is zero-terminated; GENERIC_READ | GENERIC_WRITE, OPEN_EXISTING,
+        // SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION: the server may not impersonate this process.
+        let pipe = unsafe { CreateFileW(name.as_ptr(), 0xC000_0000, 0, 0, 3, 0x0011_0000, 0) };
         if pipe == -1 {
             let error = last_error();
             if error != 231 {
@@ -509,16 +515,34 @@ impl InstConn {
 impl Drop for InstConn {
     fn drop(&mut self) {
         if self.server {
-            // SAFETY: the server's pipe: wait until the client read the answer, then make the
-            // pipe ready for the next client.
+            // SAFETY: the server's pipe: wait (at most 200 ms) until the client read the answer, then
+            // make the pipe ready for the next client.
             unsafe {
-                FlushFileBuffers(self.pipe);
+                unread_wait(self.pipe);
                 DisconnectNamedPipe(self.pipe);
                 SetNamedPipeHandleState(self.pipe, &PIPE_WAIT, core::ptr::null(), core::ptr::null());
             }
         } else {
             close(self.pipe);
         }
+    }
+}
+
+/// wait up to 200 ms until the client has read what the server wrote (a blocking flush would hang
+/// on a client that never reads)
+fn unread_wait(pipe: isize) {
+    for _ in 0..50 {
+        // FILE_PIPE_LOCAL_INFORMATION (FilePipeLocalInformation = 24): ten ULONGs
+        let mut info = [0u32; 10];
+        let mut io = [0usize; 2];
+        // SAFETY: a pipe handle and a buffer of the structure's size.
+        let status = unsafe { NtQueryInformationFile(pipe, &mut io, info.as_mut_ptr(), 40, 24) };
+        // info[6] OutboundQuota, info[7] WriteQuotaAvailable
+        if status < 0 || info[6] <= info[7] {
+            return;
+        }
+        // SAFETY: a plain sleep.
+        unsafe { Sleep(4) };
     }
 }
 

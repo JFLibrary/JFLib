@@ -522,6 +522,10 @@ impl<'a> Px<'a, '_> {
         }
         p += 5;
         let count = (total + chunk - 1) / chunk;
+        // every chunk has an 8-byte header: bound the bookkeeping by the data
+        if count > (len - p) as u64 / 8 {
+            return ERR_TRUNC;
+        }
         let nseen = count.div_ceil(8) as usize;
         if self.seen.len() < nseen {
             self.seen = vec![0u8; nseen];

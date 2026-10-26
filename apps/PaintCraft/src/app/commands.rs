@@ -628,9 +628,27 @@ pub(crate) fn pn_cmd_ptr(p: &mut Pn, id: u32) -> Option<&mut Command> {
 /// pn_cmd_label(id, str) -- replace the label of a command ('&' marks the mnemonic, "&&" is a
 /// literal '&')
 pub(crate) fn pn_cmd_label(p: &mut Pn, id: u32, s: &str) {
-    let l: &'static str = String::from(s).leak();
+    if id == 0 || p.cmds.iter().find(|c| c.id == id).is_none_or(|c| c.label == s) {
+        return;
+    }
+    let l = label_intern(s);
     if let Some(c) = pn_cmd_ptr(p, id) {
         c.label = l;
         p.repass();
     }
+}
+
+/// a 'static copy of a label; the same text is leaked once (recent-file rows and "wiederholen"
+/// labels change often and come back)
+fn label_intern(s: &str) -> &'static str {
+    static LABELS: rt::sync::SpinLock<alloc::vec::Vec<&'static str>> = rt::sync::SpinLock::new(alloc::vec::Vec::new());
+    let mut t = LABELS.lock();
+    if let Some(l) = t.iter().find(|l| **l == s) {
+        return l;
+    }
+    let l: &'static str = String::from(s).leak();
+    if t.len() < 1024 {
+        t.push(l);
+    }
+    l
 }

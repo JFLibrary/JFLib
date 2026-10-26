@@ -332,6 +332,13 @@ pub fn arg_value(name: &str) -> Option<String> {
     a.get(i + 1).cloned()
 }
 
+/// the library's options that take a value (`--size 800x600`): a program whose plain
+/// arguments are files skips the value after these
+pub const VALUE_OPTS: &[&str] = &[
+    "--size", "--scale", "--auto-close", "--anim", "--theme", "--accent", "--theme-file", "--contrast", "--text-scale",
+    "--lang", "--shot", "--script", "--threads", "--simd",
+];
+
 // ---- crashes (docs/modules/CRASH.md)
 pub use rt::crash::{CK_ACCESS, CK_BUS, CK_DIVIDE, CK_ILLEGAL, CK_OTHER, CK_PANIC, CK_STACK, CrashHook, CrashInfo};
 

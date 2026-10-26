@@ -29,7 +29,7 @@
 
 use alloc::vec::Vec;
 
-use img_core::{ERR_HDR, ERR_LIMIT, ERR_TRUNC, ERR_UNSUPPORTED};
+use img_core::{ERR_HDR, ERR_LIMIT, ERR_NOMEM, ERR_TRUNC, ERR_UNSUPPORTED};
 
 // ------------------------------------------------------------------ limits
 const BMFF_ITEM_MAX: u32 = 8192; // items in iinf (ERR_LIMIT beyond)
@@ -38,6 +38,7 @@ const BMFF_PROP_MAX: u64 = 32767; // properties in ipco (15-bit ipma index)
 const BMFF_TOP_MAX: u32 = 4096; // top-level boxes looked at
 const BMFF_META_MAX: u32 = 1024; // children of meta looked at
 const BMFF_DATA_MAX: u64 = 0x7FFF_FFFF; // reassembled item data (ERR_LIMIT beyond)
+const BMFF_JOIN_MAX: u64 = 1 << 28; // item data copied from several extents (ERR_LIMIT beyond)
 
 // ------------------------------------------------------------------ construction methods (Item::cm)
 pub(crate) const CM_FILE: u32 = 0; // extents are file offsets
@@ -154,6 +155,8 @@ pub(crate) struct Bx<'a> {
     pub props: Vec<Prop>,      // ipma indices 1..len
     pub assoc: Vec<u32>,       // property index (1-based, 0 = none) | essential << 31
     refs: Vec<Ref>,            // iref order
+    by_from: Vec<u32>,         // indices into refs, sorted by (type, from), iref order within
+    by_to: Vec<u32>,           // the same sorted by (type, to)
     pub idat: u64,             // offset of the idat payload (0 = none)
     pub idatlen: u64,
     pub major: u32, // ftyp major brand
@@ -253,6 +256,8 @@ impl<'a> Bx<'a> {
             props: Vec::new(),
             assoc: Vec::new(),
             refs: Vec::new(),
+            by_from: Vec::new(),
+            by_to: Vec::new(),
             idat: 0,
             idatlen: 0,
             major: 0,
@@ -343,6 +348,11 @@ impl<'a> Bx<'a> {
         let (s, e) = ch[CH_IREF];
         if s != 0 {
             bx.iref(s, e);
+            let mut idx: Vec<u32> = (0..bx.refs.len() as u32).collect();
+            idx.sort_by_key(|&i| (bx.refs[i as usize].ty, bx.refs[i as usize].from));
+            bx.by_from = idx.clone();
+            idx.sort_by_key(|&i| (bx.refs[i as usize].ty, bx.refs[i as usize].to));
+            bx.by_to = idx;
         }
         Ok(bx)
     }
@@ -393,7 +403,13 @@ impl<'a> Bx<'a> {
             let (o, l) = ex[0];
             return Ok(ItemData::File(&self.data[o as usize..(o + l) as usize]));
         }
-        let mut v = Vec::with_capacity(total as usize);
+        if total > BMFF_JOIN_MAX {
+            return Err(ERR_LIMIT);
+        }
+        let mut v = Vec::new();
+        if v.try_reserve_exact(total as usize).is_err() {
+            return Err(ERR_NOMEM);
+        }
         for &(o, l) in ex {
             v.extend_from_slice(&self.data[o as usize..(o + l) as usize]);
         }
@@ -439,31 +455,27 @@ impl<'a> Bx<'a> {
 
     /// isobmff_ref: the k-th to_item_ID of the references of that type from item from, or -1
     pub fn ref_(&self, ty: u32, from: u32, k: u32) -> i32 {
-        let mut k = k;
-        for r in &self.refs {
-            if r.ty == ty && r.from == from {
-                if k == 0 {
-                    return r.to as i32;
-                }
-                k -= 1;
-            }
+        let s = self.by_from.partition_point(|&i| {
+            let r = &self.refs[i as usize];
+            (r.ty, r.from) < (ty, from)
+        });
+        match self.by_from.get(s + k as usize) {
+            Some(&i) if self.refs[i as usize].ty == ty && self.refs[i as usize].from == from => self.refs[i as usize].to as i32,
+            _ => -1,
         }
-        -1
     }
 
     /// isobmff_rref: the from_item_ID of the k-th reference of that type that points to
     /// item to, or -1
     pub fn rref(&self, ty: u32, to: u32, k: u32) -> i32 {
-        let mut k = k;
-        for r in &self.refs {
-            if r.ty == ty && r.to == to {
-                if k == 0 {
-                    return r.from as i32;
-                }
-                k -= 1;
-            }
+        let s = self.by_to.partition_point(|&i| {
+            let r = &self.refs[i as usize];
+            (r.ty, r.to) < (ty, to)
+        });
+        match self.by_to.get(s + k as usize) {
+            Some(&i) if self.refs[i as usize].ty == ty && self.refs[i as usize].to == to => self.refs[i as usize].from as i32,
+            _ => -1,
         }
-        -1
     }
 
     // ------------------------------------------------------------------ meta children

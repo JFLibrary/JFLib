@@ -192,8 +192,11 @@ fn write(target: &str, n: &Name, value: &[u8], file: Option<&[u8; 32]>) -> Resul
 
 // DPAPI: protect (true) or unprotect data, entropy bound to the entry
 fn dpapi(protect: bool, data: &[u8], entropy: &[u8]) -> Result<Vec<u8>, SecretError> {
-    let input = Blob { size: data.len() as u32, data: data.as_ptr() as *mut u8 };
-    let ent = Blob { size: entropy.len() as u32, data: entropy.as_ptr() as *mut u8 };
+    let (Ok(data_len), Ok(entropy_len)) = (u32::try_from(data.len()), u32::try_from(entropy.len())) else {
+        return Err(SecretError::Failed(String::from("the value is too large for DPAPI")));
+    };
+    let input = Blob { size: data_len, data: data.as_ptr() as *mut u8 };
+    let ent = Blob { size: entropy_len, data: entropy.as_ptr() as *mut u8 };
     let mut out = Blob { size: 0, data: null_mut() };
     // SAFETY: the blobs describe live slices the calls only read; the output buffer is
     // allocated by the call and released with LocalFree below.

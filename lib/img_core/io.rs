@@ -44,7 +44,7 @@
 
 use alloc::vec::Vec;
 
-use crate::meta::{convert, dims_check, meta_free, orient};
+use crate::meta::{convert, dims_check, mem_check, meta_free, orient};
 use crate::*;
 use gfx::{FMT_A8, FMT_ARGB, FMT_PARGB};
 use rt::sync::SpinLock;
@@ -910,8 +910,11 @@ pub fn core_decode(data: &[u8], sf: &mut Surface, dec: &ImgDec, meta: &mut ImgMe
     if dec.frame != 0 {
         return ERR_UNSUPPORTED;
     }
-    if r == 0 && dims_check(meta.w, meta.h, dec) == ERR_LIMIT {
-        return ERR_LIMIT; // (a failed scan: the decoder reports the error)
+    if r == 0 {
+        // (a failed scan: the decoder reports the error)
+        if dims_check(meta.w, meta.h, dec) == ERR_LIMIT || mem_check(meta.w as u64 * meta.h as u64 * 4, dec) != 0 {
+            return ERR_LIMIT;
+        }
     }
     if dec.cancelled() {
         return ERR_CANCEL;

@@ -1020,7 +1020,7 @@ impl RichDoc {
 
     /// one level deeper (delta 1) or out (-1), 0..LEVEL_MAX
     pub fn indent(&mut self, delta: i32) -> bool {
-        self.map_paras(tr("Einzug"), &|p: &mut Para| p.level = (p.level as i32 + delta).clamp(0, LEVEL_MAX as i32) as u8)
+        self.map_paras(tr("Einzug"), &|p: &mut Para| p.level = (p.level as i32).saturating_add(delta).clamp(0, LEVEL_MAX as i32) as u8)
     }
 
     /// PS_* for the selected paragraphs
@@ -1262,7 +1262,7 @@ pub(crate) fn parse_tenths(s: &str) -> Option<u16> {
     let (i, f) = s.split_once('.').unwrap_or((s, ""));
     let i: u32 = i.parse().ok()?;
     let f: u32 = f.chars().next().map_or(Some(0), |c| c.to_digit(10))?;
-    Some((i * 10 + f).min(u16::MAX as u32) as u16)
+    Some((i.min(u16::MAX as u32) * 10 + f).min(u16::MAX as u32) as u16)
 }
 
 fn size_of_json(v: &Value) -> Option<u16> {

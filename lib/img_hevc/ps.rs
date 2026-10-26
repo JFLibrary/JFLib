@@ -259,7 +259,12 @@ impl Hevc<'_> {
             }
         } else {
             cnt = self.rue(); // num_negative_pics
-            cnt = cnt.wrapping_add(self.rue()); // num_positive_pics
+            let pos = self.rue(); // num_positive_pics
+            if cnt > 16 || pos > 16 {
+                self.err = ERR_HDR;
+                return;
+            }
+            cnt += pos;
             if cnt > 32 {
                 self.err = ERR_HDR;
                 return;
@@ -452,8 +457,13 @@ impl Hevc<'_> {
         if self.s.pcm != 0 {
             self.s.pcmbdy = self.rd(4) + 1;
             self.s.pcmbdc = self.rd(4) + 1;
-            self.s.log2minpcm = self.rue().wrapping_add(3);
-            self.s.log2maxpcm = self.rue().wrapping_add(self.s.log2minpcm);
+            let minc = self.rue();
+            let maxd = self.rue();
+            if minc > 2 || maxd > 2 {
+                return ERR_HDR;
+            }
+            self.s.log2minpcm = minc + 3;
+            self.s.log2maxpcm = maxd + self.s.log2minpcm;
             self.s.pcmlfdis = self.rd1();
         }
         let n = self.rue();
@@ -509,8 +519,11 @@ impl Hevc<'_> {
         }
         if s.log2ctb < 4
             || s.log2ctb > 6
+            || s.log2mincb < 3
             || s.log2mincb > s.log2ctb
+            || s.log2mintb < 2
             || s.log2mintb >= s.log2mincb
+            || s.log2maxtb < s.log2mintb
             || s.log2maxtb > 5
             || s.log2maxtb > s.log2ctb
             || s.maxthintra > 4
@@ -524,7 +537,7 @@ impl Hevc<'_> {
         if s.w & m != 0 || s.h & m != 0 {
             return ERR_HDR;
         }
-        if s.pcm != 0 && (s.log2maxpcm > 5 || s.pcmbdy > s.bdy || s.pcmbdc > s.bdc) {
+        if s.pcm != 0 && (s.log2minpcm > 5 || s.log2maxpcm > 5 || s.pcmbdy > s.bdy || s.pcmbdc > s.bdc) {
             return ERR_HDR;
         }
         // derived
@@ -540,7 +553,9 @@ impl Hevc<'_> {
         s.pwctb = (s.w + s.ctbsize - 1) >> s.log2ctb;
         s.phctb = (s.h + s.ctbsize - 1) >> s.log2ctb;
         // conformance window inside the picture
-        if s.confl.wrapping_add(s.confr).wrapping_mul(s.subw) >= s.w || s.conft.wrapping_add(s.confb).wrapping_mul(s.subh) >= s.h {
+        let cw = (s.w / s.subw) as u64;
+        let ch = (s.h / s.subh) as u64;
+        if s.confl as u64 + s.confr as u64 >= cw || s.conft as u64 + s.confb as u64 >= ch {
             return ERR_HDR;
         }
         s.valid = 1;
@@ -774,9 +789,7 @@ impl Hevc<'_> {
                 if b > 32 {
                     return ERR_HDR;
                 }
-                for _ in 0..n {
-                    self.skip(b);
-                }
+                self.skip(n * b);
             }
         }
         if self.p.shext != 0 {

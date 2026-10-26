@@ -181,6 +181,12 @@ fn del_value(sub: &str, name: &str) -> bool {
 }
 
 fn del_tree(sub: &str) -> bool {
+    // only below Software\Classes: a damaged record line (an empty key name would clear HKCU
+    // itself) must not reach further
+    let b = sub.as_bytes();
+    if b.len() <= CLASSES.len() + 1 || !b[..CLASSES.len()].eq_ignore_ascii_case(CLASSES.as_bytes()) || b[CLASSES.len()] != b'\\' {
+        return false;
+    }
     let w = wide(sub);
     // SAFETY: NUL-terminated name; RegDeleteTreeW leaves the (then empty) key, RegDeleteKeyW
     // removes it.

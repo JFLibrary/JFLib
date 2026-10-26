@@ -230,7 +230,7 @@ fn table_flow(d: &Document, table: &doc_core::Table, bibliography: &str, measure
     for (r,c,cell) in table.anchors() {
         let x=(d.table_x(table).map_err(Error::Model)?+table.columns[..c].iter().sum::<u32>()) as i32;
         let width=table.cell_width(r,c).unwrap() as i32;
-        let mut area=d.page;area.left=(x+pad) as u32;area.right=area.width-(x+width-pad) as u32;
+        let mut area=d.page;area.left=(x+pad) as u32;area.right=area.width.saturating_sub((x+width-pad).max(0) as u32);
         let mut lines=Vec::new();let mut nested=Vec::new();let mut regions:Vec<RepeatRegion>=Vec::new();let mut keeps=Vec::new();let mut anchors=Vec::new();let mut y=pad;
         for mut item in story_flow(area,d,&cell.paragraphs,bibliography,measure,budget)? {
             y+=if y==pad {item.at_top} else {item.before};

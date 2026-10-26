@@ -91,7 +91,7 @@ impl TcpOpts {
                 (OPT_WSCALE, 3) => o.wscale = Some(d[0].min(14)),
                 (OPT_SACK_OK, 2) => o.sack_ok = true,
                 (OPT_SACK, _) if (l - 2) % 8 == 0 => {
-                    for blk in d.chunks_exact(8).take(4) {
+                    for blk in d.chunks_exact(8).take(4 - o.sack_n as usize) {
                         o.sack[o.sack_n as usize] = (be32(blk, 0), be32(blk, 4));
                         o.sack_n += 1;
                     }

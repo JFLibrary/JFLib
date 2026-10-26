@@ -172,8 +172,15 @@ impl Pn {
         if self.cmds_dirty {
             self.cmds_dirty = false;
             // the library keeps a 'static table: publish a copy (labels change rarely:
-            // recent files, "<Effekt> wiederholen", plugin rows)
-            ui.desc.cmds = Vec::leak(self.cmds.clone());
+            // recent files, "<Effekt> wiederholen", plugin rows); an unchanged table is not
+            // published again (every publication leaks the old copy)
+            let same = ui.desc.cmds.len() == self.cmds.len()
+                && ui.desc.cmds.iter().zip(&self.cmds).all(|(a, b)| {
+                    a.id == b.id && a.icon == b.icon && a.label == b.label && a.key == b.key && a.mods == b.mods && a.flags == b.flags
+                });
+            if !same {
+                ui.desc.cmds = Vec::leak(self.cmds.clone());
+            }
         }
     }
 }

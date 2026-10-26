@@ -685,7 +685,8 @@ impl Parser {
 
 fn head_bytes(start: &str, h: &Headers) -> Vec<u8> {
     let mut s = String::with_capacity(256);
-    s.push_str(start);
+    // no request / response splitting through method, target or reason either
+    s.extend(start.chars().filter(|c| !matches!(c, '\r' | '\n')));
     s.push_str("\r\n");
     for (k, v) in &h.0 {
         // no header injection: values with CR / LF are left out
@@ -710,12 +711,13 @@ pub fn encode_head(h: &Head) -> Vec<u8> {
 /// the headers say chunked: then the body goes as one chunk)
 pub fn encode_request(method: &str, target: &str, version: Version, h: &Headers, body: &[u8]) -> Vec<u8> {
     let start = format!("{} {} {}", method, target, version.as_str());
+    let mut h = h.clone();
     if h.chunked() {
-        let mut out = head_bytes(&start, h);
+        h.remove("Content-Length");
+        let mut out = head_bytes(&start, &h);
         out.extend_from_slice(&encode_chunked(body, body.len().max(1)));
         return out;
     }
-    let mut h = h.clone();
     if !body.is_empty() || matches!(method, "POST" | "PUT" | "PATCH") {
         h.set("Content-Length", &format!("{}", body.len()));
     }
@@ -730,14 +732,15 @@ pub fn encode_request(method: &str, target: &str, version: Version, h: &Headers,
 pub fn encode_response(version: Version, status: u16, h: &Headers, body: &[u8], head_only: bool) -> Vec<u8> {
     let start = format!("{} {} {}", version.as_str(), status, reason(status));
     let no_body = status < 200 || status == 204 || status == 304;
+    let mut h = h.clone();
     if h.chunked() && !no_body {
-        let mut out = head_bytes(&start, h);
+        h.remove("Content-Length");
+        let mut out = head_bytes(&start, &h);
         if !head_only {
             out.extend_from_slice(&encode_chunked(body, body.len().max(1)));
         }
         return out;
     }
-    let mut h = h.clone();
     if !no_body {
         h.set("Content-Length", &format!("{}", body.len()));
     }

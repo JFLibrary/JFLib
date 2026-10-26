@@ -39,7 +39,8 @@ pub struct Child {
 fn resolve(program: &str) -> Result<String, u32> {
     if program.contains('/') { return Ok(String::from(program)); }
     crate::env("PATH").unwrap_or_else(|| String::from("/usr/bin:/bin")).split(':')
-        .map(|p| format!("{}/{}", if p.is_empty() { "." } else { p }, program))
+        .filter(|p| !p.is_empty())
+        .map(|p| format!("{}/{}", p, program))
         .find(|p| crate::file_exists_raw(p) == 1).ok_or(2u32)
 }
 // this process's environment with the overrides, NUL-terminated entries
@@ -72,6 +73,8 @@ pub(super) fn spawn(c: &Command<'_>) -> Result<Child, u32> {
                 }
             }
             if failure >= 0 { if let Some(d) = &dir { failure = syscall3(80, d.as_ptr() as usize, 0, 0); } }
+            // close_range(3, ~0, CLOSE_RANGE_CLOEXEC): no other descriptor reaches the program (old kernels: ignored)
+            if failure >= 0 { syscall3(436, 3, 0xFFFF_FFFF, 4); }
             if failure >= 0 { failure = syscall3(59, exe.as_ptr() as usize, argv.as_ptr() as usize, envp.as_ptr() as usize); }
             let code = (-failure) as u32;
             syscall3(1, failw.0 as usize, &code as *const u32 as usize, 4);
@@ -91,6 +94,7 @@ pub(super) fn spawn(c: &Command<'_>) -> Result<Child, u32> {
     Ok(child)
 }
 fn read(fd: &Fd, bytes: &mut [u8]) -> Result<Option<usize>, u32> {
+    if bytes.is_empty() { return Ok(None); } // no room: neither data nor EOF
     loop {
         // SAFETY: writable slice lives for the syscall, descriptor is owned.
         let r = unsafe { syscall3(0, fd.0 as usize, bytes.as_mut_ptr() as usize, bytes.len()) };
@@ -169,15 +173,17 @@ pub(super) fn exec(program: &str, args: &[&str], env: &[(&str, Option<&str>)]) -
 /// as root: the program itself; otherwise pkexec (polkit asks for the password)
 pub(super) fn run_elevated(program: &str, args: &[&str]) -> Result<i32, String> {
     let mut all: Vec<&str> = Vec::new();
+    // pkexec only from the system directories, never through the caller's PATH
+    let mut pkexec = false;
     let tool = if elevated() {
         program
     } else {
-        let found = crate::env("PATH").unwrap_or_else(|| String::from("/usr/bin:/bin")).split(':').any(|p| crate::file_exists_raw(&format!("{}/pkexec", p)) == 1);
-        if !found {
+        let Some(found) = ["/usr/bin/pkexec", "/bin/pkexec"].into_iter().find(|p| crate::file_exists_raw(p) == 1) else {
             return Err(format!("Root-Rechte nötig: sudo {} {}", program, args.join(" ")));
-        }
+        };
         all.push(program);
-        "pkexec"
+        pkexec = true;
+        found
     };
     all.extend_from_slice(args);
     let c = Command { program: tool, args: &all, cwd: None, env: &[] };
@@ -187,7 +193,9 @@ pub(super) fn run_elevated(program: &str, args: &[&str]) -> Result<i32, String> 
         while let Ok(Some(n)) = child.read_stdout(&mut b) { if n == 0 { break; } }
         while let Ok(Some(n)) = child.read_stderr(&mut b) { if n == 0 { break; } }
         match child.try_wait() {
-            Ok(Some(126)) | Ok(Some(127)) if tool == "pkexec" => return Err(String::from("Die Rechteabfrage wurde abgelehnt")),
+            // pkexec's own codes (a program that returns them itself looks the same)
+            Ok(Some(126)) if pkexec => return Err(String::from("Die Rechteabfrage wurde abgelehnt")),
+            Ok(Some(127)) if pkexec => return Err(format!("pkexec konnte {} nicht ausführen", program)),
             Ok(Some(code)) => return Ok(code),
             Ok(None) => crate::sleep_ms(100),
             Err(e) => return Err(format!("Fehler {}", e)),

@@ -504,13 +504,14 @@ impl<'a, 'b> Hc<'a, 'b> {
             let on = be32(p, b + 16) as i32 as i64;
             let od = be32(p, b + 20) as i64;
             let dim = if d == 0 { dw } else { dh } as i64;
-            let num = (dim * cd as i64 - cn as i64) * od + on * 2 * cd as i64;
-            let den = od * cd as i64 * 2;
+            let (cdw, odw) = (cd as i128, od as i128);
+            let num = (dim as i128 * cdw - cn as i128) * odw + on as i128 * 2 * cdw;
+            let den = odw * cdw * 2;
             let mut q = num / den;
             if num % den < 0 {
                 q -= 1;
             }
-            lt[d] = q;
+            lt[d] = q.clamp(i64::MIN as i128, i64::MAX as i128) as i64;
         }
         // rectangle in display coordinates, clamped
         let mut l = lt[0];
@@ -684,6 +685,14 @@ impl<'a, 'b> Hc<'a, 'b> {
         }
         if tiles <= 1 {
             return 0;
+        }
+        // no tile may lie wholly outside the output: bounds the decoded pixels by the grid area
+        if self.tw == 0
+            || self.th == 0
+            || (gd[1] as u64 - 1) * self.tw as u64 >= gd[2] as u64
+            || (gd[0] as u64 - 1) * self.th as u64 >= gd[3] as u64
+        {
+            return ERR_HDR;
         }
         let cols = gd[1];
         let (gtw, gth) = (self.tw, self.th);

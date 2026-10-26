@@ -24,7 +24,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::aff::{has, Flag, ONLYUPCASE};
-use crate::check::{captype, lower, title, upper, Cap, Ctx, Look, Opt, Parts};
+use crate::check::{captype, lower, title, upper, Cap, Ctx, Look, Opt, Parts, BREAK_WORK};
 use crate::Dictionary;
 
 /// suggestions at most
@@ -57,7 +57,7 @@ impl Dictionary {
             return Vec::new();
         }
         let cap = captype(w, self.aff.sharps);
-        let mut s = Sugs { out: Vec::new(), max, work: WORK_PASS1, cpd: false, exact: false, cx: Ctx { steps: 0, parts: Some(Parts::new()) } };
+        let mut s = Sugs { out: Vec::new(), max, work: WORK_PASS1, cpd: false, exact: false, cx: Ctx { steps: 0, breaks: BREAK_WORK, parts: Some(Parts::new()) } };
         // pass 1: without compounds
         let base: String = if cap == Cap::All { lower(w) } else { String::from(w) };
         self.generate(&base, cap, &mut s, true);

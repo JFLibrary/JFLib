@@ -258,7 +258,12 @@ pub(crate) fn exchange(
                 Ok(Some(0)) => {
                     return Err(String::from("Plugin-Host hat die Eingabe abgebrochen."));
                 }
-                Ok(Some(n)) => sent += n,
+                // no pause while data flows: a pause per 4 KiB write capped the upload at
+                // about 260 KB/s, so images of 30 MB and more ran into the timeout
+                Ok(Some(n)) => {
+                    sent += n;
+                    continue;
+                }
                 Ok(None) => {}
                 Err(e) => {
                     return Err(format!(

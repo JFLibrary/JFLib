@@ -68,6 +68,9 @@ pub fn fingerprint_text(d: &[u8]) -> String {
 
 /// "AB:CD:.." / "abcd.." / with spaces -> the 32 bytes
 pub fn parse_fingerprint(s: &str) -> Option<[u8; 32]> {
+    if s.chars().any(|c| !(c.is_ascii_hexdigit() || matches!(c, ':' | '.' | '-') || c.is_whitespace())) {
+        return None;
+    }
     let hex: String = s.chars().filter(|c| c.is_ascii_hexdigit()).collect();
     let b = crypto::unhex(&hex)?;
     let mut out = [0u8; 32];

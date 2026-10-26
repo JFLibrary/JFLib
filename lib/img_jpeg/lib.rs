@@ -25,7 +25,7 @@ pub mod dsp;
 pub mod enc;
 pub mod glue;
 
-pub use dec::{decode_abbrev, decode_fl};
+pub use dec::{decode_abbrev, decode_abbrev_max, decode_fl, decode_fl_max};
 pub use enc::{encode, encode_ex, EncCfg};
 pub use glue::{decode_ex, encode_opt, meta, probe};
 // decode flags (img.inc JDF_*) and the encoder options this codec honours

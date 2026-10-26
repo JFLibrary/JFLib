@@ -393,6 +393,10 @@ pub fn process_allowed(program: &str) -> bool {
 
 /// whether open_url may open url (its scheme)
 pub fn url_allowed(url: &str) -> bool {
+    // control characters and over-long URLs (the shell buffer would truncate them) are refused
+    if url.chars().any(|c| c < ' ' || c == '\x7f') || url.encode_utf16().count() >= 2048 {
+        return false;
+    }
     let scheme = match url.find(':') {
         Some(k) if k > 0 => url[..k].to_ascii_lowercase(),
         _ => String::new(),
@@ -1920,7 +1924,8 @@ pub fn net_resolved(host: &str, addrs: &[crate::net::SocketAddr]) {
 // ---------------------------------------------------------------- paths
 
 /// path as an absolute, normalised path of this OS (relative paths against cwd()), or None
-/// for a path the policy refuses
+/// for a path the policy refuses. The normalisation is lexical: junctions, symbolic links and
+/// 8.3 names are not resolved, so rules match the path as written, not its final target.
 pub fn normalize(path: &str) -> Option<String> {
     norm(path, cfg!(windows), false, &crate::cwd)
 }
@@ -1955,7 +1960,7 @@ fn norm(path: &str, win: bool, glob: bool, cwd: &dyn Fn() -> String) -> Option<S
     // \\?\ and \\.\ prefixes: only drive and UNC paths
     for pre in ["//?/", "//./", "/??/"] {
         if let Some(rest) = s.strip_prefix(pre) {
-            if rest.len() >= 4 && rest[..4].eq_ignore_ascii_case("UNC/") {
+            if rest.get(..4).is_some_and(|p| p.eq_ignore_ascii_case("UNC/")) {
                 s = alloc::format!("//{}", &rest[4..]);
             } else if is_drive(rest) {
                 s = String::from(rest);

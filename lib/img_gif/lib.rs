@@ -97,6 +97,11 @@ pub fn decode(data: &[u8], sf: &mut Surface) -> i32 {
 
 /// gif_decode_fl: gif_decode; flags JDF_STRAIGHT: FMT_ARGB surface (same bytes)
 pub fn decode_fl(data: &[u8], sf: &mut Surface, flags: u32) -> i32 {
+    decode_lim(data, sf, flags, None)
+}
+
+/// decode_fl with the canvas and the index buffer held to dec's pixel and memory budgets
+fn decode_lim(data: &[u8], sf: &mut Surface, flags: u32, dec: Option<&ImgDec>) -> i32 {
     let end = data.len();
     if end < 6 {
         return ERR_TRUNC;
@@ -182,6 +187,16 @@ pub fn decode_fl(data: &[u8], sf: &mut Surface, flags: u32) -> i32 {
     if cw > GIF_MAX_DIM || ch > GIF_MAX_DIM || cw as u64 * ch as u64 > GIF_MAX_PIX {
         return ERR_DIMS;
     }
+    if let Some(d) = dec {
+        let canvas = cw as u64 * ch as u64;
+        if canvas > d.max_pixels() {
+            return ERR_LIMIT;
+        }
+        let r = img_core::meta::mem_check(canvas * 4 + fw as u64 * fh as u64 + GIF_SLACK as u64, d);
+        if r != 0 {
+            return r;
+        }
+    }
     // from here on truncation is not an error
     let (mut pal, mut npal) = (gct, ngct);
     let mut mcs = 0u32;
@@ -223,11 +238,12 @@ pub fn decode_fl(data: &[u8], sf: &mut Surface, flags: u32) -> i32 {
         }
     }
     let fmt = if flags & JDF_STRAIGHT != 0 { FMT_ARGB } else { FMT_PARGB };
-    let mut out = Surface::new(cw as i32, ch as i32, fmt);
-    if out.px.is_empty() {
+    let Some(mut out) = Surface::try_new(cw as i32, ch as i32, fmt) else {
         return ERR_NOMEM;
-    }
+    };
     if mcs != 0 {
+        // an LZW string is at most 4096 bytes: more pixels than the data can hold stay unset
+        let total = total.min(stream.len().saturating_mul(4096));
         let mut idx = vec![0u8; total + GIF_SLACK];
         let npix = lzw_decode(&mut stream, mcs, &mut idx, total);
         // ------------------------------------------------------ colours
@@ -371,7 +387,11 @@ pub fn encode_q(sf: &Surface, qcfg: u32) -> Option<Vec<u8>> {
         return None;
     }
     let n = w as usize * h as usize;
-    let mut idx = vec![0u8; n];
+    let mut idx = Vec::new();
+    if idx.try_reserve_exact(n).is_err() {
+        return None;
+    }
+    idx.resize(n, 0);
     let mut pal = [0u32; 256];
     let (ncol, trans) = quantize::quantize_ex(sf, 256, qcfg, &mut pal, &mut idx);
     if ncol == 0 {
@@ -633,7 +653,14 @@ pub fn probe(data: &[u8], m: &mut ImgMeta) -> bool {
 /// gif_decode_ex: the first frame through decode_fl (core_decode); meta.w / h become the canvas
 /// size decode_fl produced
 pub fn decode_ex(data: &[u8], sf: &mut Surface, dec: &ImgDec, m: &mut ImgMeta) -> i32 {
-    let e = core_decode(data, sf, dec, m, meta, decode_fl);
+    // core_decode runs the shared checks; the decode itself needs dec's limits
+    fn checked(_: &[u8], _: &mut Surface, _: u32) -> i32 {
+        0
+    }
+    let mut e = core_decode(data, sf, dec, m, meta, checked);
+    if e == 0 && dec.flags & IMGD_PROBE == 0 {
+        e = decode_lim(data, sf, dec.flags & IMGD_STRAIGHT, Some(dec));
+    }
     if e == 0 && dec.flags & IMGD_PROBE == 0 {
         m.w = sf.w as u32;
         m.h = sf.h as u32;

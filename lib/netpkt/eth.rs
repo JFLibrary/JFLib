@@ -146,6 +146,9 @@ pub fn tag_of(frame: &[u8]) -> Option<VlanTag> {
 
 /// the frame with a tag inserted after the source MAC (an existing tag stays inside)
 pub fn tagged(frame: &[u8], tag: VlanTag) -> Vec<u8> {
+    if frame.len() < ETH_HDR {
+        return frame.to_vec();
+    }
     let mut v = Vec::with_capacity(frame.len() + VLAN_TAG);
     v.extend_from_slice(&frame[..12]);
     v.extend_from_slice(&ET_VLAN.to_be_bytes());

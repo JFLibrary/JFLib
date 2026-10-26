@@ -355,6 +355,7 @@ impl PluginInfo {
 
     /// the effects / adjustments (at most 16)
     pub const fn effects(mut self, list: &'static [&'static FxDesc]) -> PluginInfo {
+        assert!(list.len() <= 16, "at most 16 effects");
         self.nfx = list.len() as u32;
         self.fx = list.as_ptr().cast();
         self
@@ -362,6 +363,7 @@ impl PluginInfo {
 
     /// the file types (at most 4)
     pub const fn file_types(mut self, list: &'static [FtDesc]) -> PluginInfo {
+        assert!(list.len() <= 4, "at most 4 file types");
         self.nft = list.len() as u32;
         self.ft = list.as_ptr();
         self
@@ -369,6 +371,7 @@ impl PluginInfo {
 
     /// the shapes (at most 32)
     pub const fn shapes(mut self, list: &'static [ShapeDesc]) -> PluginInfo {
+        assert!(list.len() <= 32, "at most 32 shapes");
         self.nshape = list.len() as u32;
         self.shapes = list.as_ptr();
         self
@@ -407,6 +410,7 @@ impl FxDesc {
     /// the effect E named `name` (the menu name, 1..47 bytes), FXF_* `flags` (FXF_PREPARE is
     /// added when E has a prepare step), FXC_* `category`, the properties of its dialog
     pub const fn new<E: crate::Effect>(name: &'static CStr, flags: u32, category: u32, props: &'static [FxProp]) -> FxDesc {
+        assert!(name.count_bytes() >= 1 && name.count_bytes() <= 47, "FxDesc: name of 1..47 bytes");
         let prep = E::PREPARE;
         FxDesc {
             id: 0,
@@ -426,6 +430,7 @@ impl FxDesc {
 
 impl FxProp {
     const fn base(typ: u8, slot: u8, name: &'static CStr, min: f64, max: f64, def: f64) -> FxProp {
+        assert!((slot as usize) < crate::FX_NSLOTS, "FxProp: slot >= FX_NSLOTS");
         FxProp { typ, dec: 0, slot, flags: 0, rsv: 0, name: cs(name), min, max, def, choices: core::ptr::null() }
     }
 
@@ -465,6 +470,7 @@ impl FxProp {
 
     /// FP_PAN: a point -1..1 (slots slot and slot + 1: f64 x, y)
     pub const fn pan(slot: u8, name: &'static CStr, dec: u8, x: f64, y: f64) -> FxProp {
+        assert!((slot as usize) + 1 < crate::FX_NSLOTS, "FxProp::pan: slot + 1 >= FX_NSLOTS");
         let mut p = FxProp::base(FP_PAN, slot, name, -1.0, 1.0, x);
         p.dec = dec;
         p.choices = y.to_bits() as usize as *const u8;

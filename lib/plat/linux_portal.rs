@@ -590,6 +590,9 @@ impl Bus {
             self.msg.extend_from_slice(&[9, 1, b'u', 0]);
             self.msg.extend_from_slice(&self.m_nfds.to_le_bytes());
         }
+        if self.b_over {
+            return false; // a header field did not fit
+        }
         let fl = (self.msg.len() - 16) as u32;
         self.msg[12..16].copy_from_slice(&fl.to_le_bytes());
         while self.msg.len() & 7 != 0 {
@@ -1158,6 +1161,9 @@ impl Bus {
                 }
                 c = (hexval(at(k)) << 4 | hexval(at(k + 1))) as u8;
                 k += 2;
+                if c == 0 {
+                    break; // "%00": the C string of the assembly ends here
+                }
             }
             out.push(c);
         }

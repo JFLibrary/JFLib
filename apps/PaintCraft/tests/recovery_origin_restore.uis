@@ -1,0 +1,12 @@
+#!args --config build/tests/pn_recovery_origin
+# recovery_origin_restore.uis -- the next start (after recovery_origin.uis) shows the edited
+# image again under its original name, still modified and with the edit.
+size 1280 800
+theme light
+expect #9901 value 1
+expect #9905 value 1
+expect tab:"a1_rgba.png" selected
+expect #9911 text "a1_rgba.png"
+expect #9913 value 64
+cmd 900 327685
+expect #9900 text "FFFF0000"

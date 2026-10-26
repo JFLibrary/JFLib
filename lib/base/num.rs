@@ -289,6 +289,9 @@ pub fn parse_i64(s: &[u8]) -> Option<i64> {
             digits += 1;
             i += 1;
         }
+        if v > i64::MAX as u64 + neg as u64 {
+            return None; // not a bit pattern: the value must fit
+        }
     } else {
         loop {
             let d = at(s, i).wrapping_sub(b'0');

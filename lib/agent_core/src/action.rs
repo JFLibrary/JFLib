@@ -2,7 +2,7 @@
 // New library code, independent of native windows, document types and language models.
 
 use crate::{json::Value, schema::Schema};
-use alloc::{format, string::String, vec::Vec};
+use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
 
 /// Stable structured failure categories.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -333,7 +333,9 @@ pub trait Host {
             "Transactions are unavailable",
         ))
     }
-    /// Filtered, paginated semantic state; hosts may accept a `sinceRevision` query.
+    /// Filtered, paginated semantic state; these control methods (inspect, tasks, resources)
+    /// are not gated by `access`, so the host must apply its own access rules to them and
+    /// should not hand out guessable task ids; hosts may accept a `sinceRevision` query.
     fn inspect(&self, _query: &Value) -> Result<Value, ActionError> {
         Err(ActionError::new(
             ErrorCode::Unsupported,
@@ -597,8 +599,19 @@ impl Dispatcher {
             atomic: false,
             local: false,
         };
+        let access = host.access(&action);
+        // a Local action reveals nothing about its schema or availability to external callers
+        if matches!(access, Access::Local) {
+            self.consent(host, &action, call.input)?;
+        }
         self.validate(host, &action, call.input, &context, host.revision())?;
-        self.consent(host, &action, call.input)?;
+        if !matches!(access, Access::Local) {
+            self.consent(host, &action, call.input)?;
+            if matches!(access, Access::Confirm) {
+                // the document may have changed while the user was asked
+                self.validate(host, &action, call.input, &context, host.revision())?;
+            }
+        }
         self.invoke(host, &action, call.input, &context)
     }
     // An external call: the action's access (Local is refused, Confirm asks the host's user).
@@ -697,6 +710,9 @@ impl Dispatcher {
                     atomic: true,
                     local: false,
                 };
+                if matches!(host.access(&action), Access::Local) {
+                    self.consent(host, &action, &call.input)?;
+                }
                 self.validate(host, &action, &call.input, &context, start_revision)?;
                 self.consent(host, &action, &call.input)?;
                 prepared.push(action);
@@ -852,7 +868,9 @@ pub fn validate_registry(actions: &[ActionSpec]) -> Result<(), ActionError> {
             "Too many registered actions",
         ));
     }
-    for (index, action) in actions.iter().enumerate() {
+    let mut names = BTreeSet::new();
+    let mut commands = BTreeSet::new();
+    for action in actions.iter() {
         if action.name.is_empty()
             || action.name.len() > 128
             || !action
@@ -865,10 +883,9 @@ pub fn validate_registry(actions: &[ActionSpec]) -> Result<(), ActionError> {
                 "Invalid registered action name",
             ));
         }
-        if actions[..index].iter().any(|a| {
-            a.name == action.name
-                || action.command_id.is_some() && a.command_id == action.command_id
-        }) {
+        if !names.insert(action.name)
+            || action.command_id.is_some_and(|id| !commands.insert(id))
+        {
             return Err(ActionError::new(
                 ErrorCode::Internal,
                 format!("Duplicate action or command: {}", action.name),

@@ -33,8 +33,9 @@ pub(crate) fn parse(b: &[u8]) -> Result<(u32, u16, Vec<f32>), AudioError> {
     }
     let mut fmt: Option<&[u8]> = None;
     let mut data: Option<&[u8]> = None;
-    let mut at = 12;
-    while at + 8 <= b.len() {
+    let mut at: usize = 12;
+    // `at` saturates for a huge chunk size (32-bit usize): `at + 8` must not wrap
+    while at.checked_add(8).is_some_and(|e| e <= b.len()) {
         let id = &b[at..at + 4];
         let size = u32_at(b, at + 4).ok_or(AudioError::Format)? as usize;
         let body = at + 8;

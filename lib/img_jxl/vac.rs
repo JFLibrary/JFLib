@@ -361,7 +361,10 @@ fn acglobal(jf: &Jf, jv: &mut Jv, jb: &mut Jb) -> i32 {
         return r;
     }
     let bits = ceillog2(jf.ng);
-    jv.nhist = jb.f(bits) + 1;
+    jv.nhist = match jb.f(bits).checked_add(1) {
+        Some(h) if h <= jf.ng => h,
+        _ => return ERR_HDR,
+    };
     jv.nacctx = jv.nctx * (37 + 458);
     jv.np = jf.passes;
     jv.ord = Vec::new();
@@ -373,7 +376,7 @@ fn acglobal(jf: &Jf, jv: &mut Jv, jb: &mut Jb) -> i32 {
         if r != 0 {
             return r;
         }
-        match je_read(jb, jv.nhist.wrapping_mul(jv.nacctx), false) {
+        match je_read(jb, jv.nhist.saturating_mul(jv.nacctx), false) {
             Ok(c) => jv.acc.push(c),
             Err(e) => return e,
         }

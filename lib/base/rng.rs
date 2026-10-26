@@ -81,6 +81,19 @@ impl Pcg32 {
             }
         }
     }
+    /// uniform in 0..n for a 64-bit n without modulo bias (n = 0 gives 0)
+    fn below64(&mut self, n: u64) -> u64 {
+        if n == 0 {
+            return 0;
+        }
+        let threshold = n.wrapping_neg() % n;
+        loop {
+            let r = self.next_u64();
+            if r >= threshold {
+                return r % n;
+            }
+        }
+    }
     /// uniform in lo..=hi
     pub fn range(&mut self, lo: i64, hi: i64) -> i64 {
         if hi <= lo {
@@ -125,7 +138,7 @@ impl Pcg32 {
     pub fn shuffle<T>(&mut self, v: &mut [T]) {
         let mut i = v.len();
         while i > 1 {
-            let j = self.below(i as u32) as usize;
+            let j = if i <= u32::MAX as usize { self.below(i as u32) as usize } else { self.below64(i as u64) as usize };
             i -= 1;
             v.swap(i, j);
         }

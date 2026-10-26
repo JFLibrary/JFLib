@@ -136,21 +136,41 @@ mod imp {
 
     pub fn start(roots: &[String], shared: &Arc<Shared>) -> Result<Vec<crate::Thread>, String> {
         let mut out = Vec::new();
+        let fail = |out: &mut Vec<crate::Thread>, msg: String| {
+            // the threads started so far must not outlive the failed watcher
+            shared.stop.store(true, Ordering::SeqCst);
+            for t in out.drain(..) {
+                t.join();
+            }
+            Err(msg)
+        };
         for root in roots {
             let w: Vec<u16> = crate::fs::long_path(root).encode_utf16().chain(core::iter::once(0)).collect();
             // SAFETY: a NUL-terminated wide path; no security attributes or template.
             let dir = unsafe { CreateFileW(w.as_ptr(), FILE_LIST_DIRECTORY, SHARE_ALL, 0, OPEN_EXISTING, BACKUP_SEMANTICS | OVERLAPPED, 0) };
             if dir == INVALID {
-                return Err(alloc::format!("{} kann nicht überwacht werden", root));
+                return fail(&mut out, alloc::format!("{} kann nicht überwacht werden", root));
             }
             // SAFETY: an unnamed manual-reset event.
             let event = unsafe { CreateEventW(0, 1, 0, 0) };
+            if event == 0 {
+                // SAFETY: the directory handle opened above.
+                unsafe { CloseHandle(dir) };
+                return fail(&mut out, alloc::format!("{} kann nicht überwacht werden", root));
+            }
             let h = Handles { dir, event };
             let sh = shared.clone();
             let base = root.clone();
             match crate::thread_spawn(128 * 1024, alloc::boxed::Box::new(move || run(h, &sh, &base))) {
                 Some(t) => out.push(t),
-                None => return Err(String::from("kein Thread für die Überwachung")),
+                None => {
+                    // SAFETY: the handles opened above; the closure that owned them never ran.
+                    unsafe {
+                        CloseHandle(event);
+                        CloseHandle(dir);
+                    }
+                    return fail(&mut out, String::from("kein Thread für die Überwachung"));
+                }
             }
         }
         Ok(out)
@@ -260,19 +280,24 @@ mod imp {
         dirs: BTreeMap<i32, String>,
     }
 
+    // dir and every folder below it; a worklist, not recursion: the depth of a tree is not ours
+    // to trust and the watching thread has a small stack
     fn add(st: &mut State, dir: &str, sh: &Shared) {
-        let z: Vec<u8> = dir.bytes().chain(core::iter::once(0)).collect();
-        // SAFETY: a NUL-terminated path.
-        let wd = unsafe { syscall3(SYS_INOTIFY_ADD_WATCH, st.fd, z.as_ptr() as usize, MASK as usize) };
-        if wd < 0 {
-            sh.overflow(); // the watch limit or a folder that went away: rescans cover it
-            return;
-        }
-        st.dirs.insert(wd as i32, String::from(dir));
-        for e in crate::fs::read_dir(dir).unwrap_or_default() {
-            if e.kind == crate::fs::FileKind::Dir {
-                add(st, &crate::fs::join(dir, &e.name), sh);
+        let mut todo = alloc::vec![String::from(dir)];
+        while let Some(dir) = todo.pop() {
+            let z: Vec<u8> = dir.bytes().chain(core::iter::once(0)).collect();
+            // SAFETY: a NUL-terminated path.
+            let wd = unsafe { syscall3(SYS_INOTIFY_ADD_WATCH, st.fd, z.as_ptr() as usize, MASK as usize) };
+            if wd < 0 {
+                sh.overflow(); // the watch limit or a folder that went away: rescans cover it
+                continue;
             }
+            for e in crate::fs::read_dir(&dir).unwrap_or_default() {
+                if e.kind == crate::fs::FileKind::Dir {
+                    todo.push(crate::fs::join(&dir, &e.name));
+                }
+            }
+            st.dirs.insert(wd as i32, dir);
         }
     }
 
@@ -295,7 +320,11 @@ mod imp {
         let owned = Fd(fd as usize);
         match crate::thread_spawn(128 * 1024, alloc::boxed::Box::new(move || run(owned, st, &sh))) {
             Some(t) => Ok(alloc::vec![t]),
-            None => Err(String::from("kein Thread für die Überwachung")),
+            None => {
+                // SAFETY: our descriptor; the closure that owned it never ran.
+                unsafe { syscall3(SYS_CLOSE, fd as usize, 0, 0) };
+                Err(String::from("kein Thread für die Überwachung"))
+            }
         }
     }
 

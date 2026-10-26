@@ -110,6 +110,9 @@ impl Conv {
             if !more {
                 return Ok((code, lines));
             }
+            if lines.len() >= 256 {
+                return Err(String::from("zu lange Antwort des Mailservers"));
+            }
         }
     }
 
@@ -142,6 +145,9 @@ pub fn send(cfg: &SmtpConfig, mail: &Mail) -> Result<String, String> {
         if !a.contains('@') || a.contains(['<', '>', '\r', '\n', ' ']) {
             return Err(format!("ungültige Adresse „{}“", a));
         }
+    }
+    if cfg.helo.contains(['\r', '\n']) {
+        return Err(String::from("ungültiger EHLO-Name"));
     }
     let addrs = crate::dns::resolve(&cfg.host, cfg.port).map_err(|e| format!("{}: {}", cfg.host, e))?;
     let tcp = TcpStream::connect_any(&addrs, cfg.timeout_ms).map_err(|e| format!("{}:{} nicht erreichbar: {}", cfg.host, cfg.port, e))?;

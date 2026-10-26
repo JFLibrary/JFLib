@@ -1,7 +1,7 @@
 // Statically registered input/output schemas and runtime validation. New shared code.
 
 use crate::json::Value;
-use alloc::{format, string::String, vec::Vec};
+use alloc::{collections::BTreeSet, format, string::String, vec::Vec};
 
 /// Supported JSON Schema subset, represented without parsing schema text at runtime.
 #[derive(Clone, Copy, Debug)]
@@ -182,8 +182,9 @@ impl Schema {
                         None => (),
                     }
                 }
-                for (index, (name, _)) in fields.iter().enumerate() {
-                    if fields[..index].iter().any(|(previous, _)| previous == name) {
+                let mut seen = BTreeSet::new();
+                for (name, _) in fields.iter() {
+                    if !seen.insert(name.as_str()) {
                         return Err(Violation {
                             path: pointer(&path, name),
                             reason: "duplicate_key",

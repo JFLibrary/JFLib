@@ -313,7 +313,7 @@ impl Executor {
                 if at <= now {
                     return;
                 }
-                ((at - now + 999) / 1000).min(i32::MAX as u64) as i32
+                ((at - now).saturating_add(999) / 1000).min(i32::MAX as u64) as i32
             }
         };
         match &self.sh.park {

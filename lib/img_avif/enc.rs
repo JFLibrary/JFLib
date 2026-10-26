@@ -23,7 +23,13 @@ use gfx::{Surface, FMT_ARGB};
 use img_av1::{EncIn, EncOut};
 use img_core::exif::exif_copy_orient1;
 use img_core::meta::get_row;
-use img_core::{ImgOpt, ERR_DIMS, IMG_MAXDIM, IOF_EMBED_EXIF, IOF_EMBED_ICC, IOF_EMBED_XMP, IOF_LOSSLESS};
+use img_core::{
+    ImgOpt, ERR_DIMS, ERR_LIMIT, ERR_NOMEM, IMG_MAXDIM, IOF_EMBED_EXIF, IOF_EMBED_ICC, IOF_EMBED_XMP,
+    IOF_LOSSLESS,
+};
+
+// the pixel limit of img_av1 (AV_MAXPIX): checked before the planes are allocated
+const AVIF_MAXPX: u64 = 1 << 27;
 
 // the auxC type string; the assembly copies 45 bytes (one beyond its NUL: a zero padding byte of
 // the reference builds' .rodata), the output keeps that byte
@@ -73,6 +79,9 @@ pub fn encode(sf: &Surface, opt: &ImgOpt, out: &mut Vec<u8>) -> i32 {
     if w <= 0 || h <= 0 || w as u32 > IMG_MAXDIM || h as u32 > IMG_MAXDIM {
         return ERR_DIMS;
     }
+    if w as u64 * h as u64 > AVIF_MAXPX {
+        return ERR_LIMIT;
+    }
     let mut a = Aw {
         sf,
         opt,
@@ -120,7 +129,9 @@ pub fn encode(sf: &Surface, opt: &ImgOpt, out: &mut Vec<u8>) -> i32 {
     }
     (a.cw, a.ch) = if a.chroma == 1 { (a.w.div_ceil(2), a.h.div_ceil(2)) } else { (a.w, a.h) };
     a.meta();
-    a.yuv();
+    if let Err(e) = a.yuv() {
+        return e;
+    }
     // AV1 items: colour, then alpha
     if let Err(e) = a.item(0) {
         return e;
@@ -165,12 +176,16 @@ impl<'a> Aw<'a> {
 
     // aw_yuv: Y / Cb / Cr (and alpha) planes of the image size: BT.709 full range (4:2:0: chroma
     // of the 2 x 2 pixels, clamped at the edges), lossless: G, B, R
-    fn yuv(&mut self) {
+    fn yuv(&mut self) -> Result<(), i32> {
         let (w, h) = (self.w as usize, self.h as usize);
         for k in 0..4 {
             let (pw, ph) = if k == 1 || k == 2 { (self.cw, self.ch) } else { (self.w, self.h) };
             self.pst[k] = pw;
-            self.pl[k] = alloc::vec![0u16; pw as usize * ph as usize];
+            let n = pw as usize * ph as usize;
+            let mut v: Vec<u16> = Vec::new();
+            v.try_reserve_exact(n).map_err(|_| ERR_NOMEM)?;
+            v.resize(n, 0);
+            self.pl[k] = v;
         }
         let mut row = alloc::vec![0u8; w * 8]; // two BGRA rows
         // luma, alpha (and 4:4:4 chroma) per row
@@ -200,7 +215,7 @@ impl<'a> Aw<'a> {
         }
         // 4:2:0 chroma: 2 x 2 pixels (clamped to the image), averaged with rounding
         if self.chroma != 1 {
-            return;
+            return Ok(());
         }
         let (cw, ch) = (self.cw as usize, self.ch as usize);
         for cy in 0..ch {
@@ -213,6 +228,7 @@ impl<'a> Aw<'a> {
                 self.pl[2][cy * cw + cx] = cr;
             }
         }
+        Ok(())
     }
 
     // aw_item: encode the colour (k 0) or alpha (k 1) AV1 item into out[k]

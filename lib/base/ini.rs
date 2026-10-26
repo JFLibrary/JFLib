@@ -22,8 +22,8 @@
 // last key of their section, new sections to the end.  A UTF-8 BOM is skipped.  Files are
 // read up to FILE_MAX bytes; after LINES_MAX lines the rest is kept as one verbatim block.
 // Line ends: LF, CRLF (any number of CRs before the LF are dropped) when reading; written as
-// CRLF on Windows, LF on Linux.  Key names must not contain '=', CR or LF nor start with
-// ';' '#' '['; section names must not contain ']', CR or LF; neither may start or end with
+// CRLF on Windows, LF on Linux.  Key names must not contain '=', NUL, CR or LF nor start with
+// ';' '#' '['; section names must not contain ']', NUL, CR or LF; neither may start or end with
 // a blank (set -> false).  CR / LF inside a value are written as blanks.
 
 use alloc::format;
@@ -95,7 +95,7 @@ fn name_ok(s: &[u8], is_key: bool) -> bool {
         return false;
     }
     let forbid = if is_key { b'=' } else { b']' };
-    !s.iter().any(|&c| c == b'\r' || c == b'\n' || c == forbid)
+    !s.iter().any(|&c| c == b'\r' || c == b'\n' || c == 0 || c == forbid)
 }
 
 fn trim(mut s: &[u8]) -> &[u8] {
@@ -130,6 +130,29 @@ impl Ini {
         let got = f.read_at(0, &mut data).unwrap_or(0);
         drop(f);
         Ini::parse(&data[..got])
+    }
+
+    /// like load, but None when the file exists and could not be read completely (unreadable
+    /// or longer than FILE_MAX); a missing or empty file gives an empty Ini
+    pub fn load_checked(path: &str) -> Option<Ini> {
+        let Some(f) = plat::File::open(path, plat::FO_READ) else {
+            return if plat::file_exists(path) == 1 { None } else { Some(Ini::new()) };
+        };
+        let full = f.size().unwrap_or(0);
+        if full > FILE_MAX {
+            return None;
+        }
+        let size = full as usize;
+        if size == 0 {
+            return Some(Ini::new());
+        }
+        let mut data = alloc::vec![0u8; size];
+        let got = f.read_at(0, &mut data)?;
+        drop(f);
+        if got != size {
+            return None;
+        }
+        Some(Ini::parse(&data))
     }
 
     /// parse settings text  [ini_parse]
@@ -359,7 +382,7 @@ impl Ini {
         if !name_ok(key.as_bytes(), true) || (!sec.is_empty() && !name_ok(sec.as_bytes(), false)) {
             return false;
         }
-        let v: Vec<u8> = value.bytes().map(|c| if c == b'\r' || c == b'\n' { b' ' } else { c }).collect();
+        let v: Vec<u8> = value.bytes().map(|c| if c == b'\r' || c == b'\n' || c == 0 { b' ' } else { c }).collect();
         if let Some(i) = self.find_kv(sec, key) {
             let l = &mut self.lines[i];
             l.value = v;

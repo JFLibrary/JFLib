@@ -95,7 +95,7 @@ unsafe extern "system" {
 
 #[link(name = "kernel32", kind = "raw-dylib")]
 unsafe extern "system" {
-    fn LoadLibraryA(name: *const u8) -> isize;
+    fn LoadLibraryExA(name: *const u8, file: isize, flags: u32) -> isize;
     fn GetProcAddress(m: isize, name: *const u8) -> usize;
     fn GlobalAlloc(flags: u32, n: usize) -> isize;
     fn GlobalLock(h: isize) -> *mut u8;
@@ -118,7 +118,7 @@ static WP: UiOnly = UiOnly(Wp { state: Cell::new(0), dlg: Cell::new(0), defprn: 
 fn dll_proc(dll: &[u8], name: &[u8]) -> usize {
     // SAFETY: NUL-terminated names; both calls return 0 on failure.
     unsafe {
-        let m = LoadLibraryA(dll.as_ptr());
+        let m = LoadLibraryExA(dll.as_ptr(), 0, 0x800) /* LOAD_LIBRARY_SEARCH_SYSTEM32 */;
         if m == 0 { 0 } else { GetProcAddress(m, name.as_ptr()) }
     }
 }

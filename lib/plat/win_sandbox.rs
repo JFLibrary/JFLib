@@ -23,8 +23,8 @@ unsafe extern "system" {
 }
 
 // PROCESS_MITIGATION_POLICY values
+const DYNAMIC_CODE: i32 = 2; // ProcessDynamicCodePolicy (8 is ProcessSignaturePolicy)
 const EXTENSION_POINT_DISABLE: i32 = 6;
-const DYNAMIC_CODE: i32 = 8;
 const IMAGE_LOAD: i32 = 10;
 const CHILD_PROCESS: i32 = 13;
 

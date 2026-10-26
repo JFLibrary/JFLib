@@ -1243,6 +1243,15 @@ fn t_ini(t: &mut T) {
     t.write_small("empty.ini", b"");
     let ini = Ini::load(&t.subp("empty.ini"));
     t.check(ini.get("S", "k").is_none(), "ini: an empty file");
+    // ---- load_checked: missing / empty / ordinary files load, a file it cannot read completely
+    // does not come back as an empty one
+    let ok = Ini::load_checked(&t.subp("nowhere.ini")).is_some_and(|i| i.get("S", "k").is_none())
+        && Ini::load_checked(&t.subp("empty.ini")).is_some_and(|i| i.get("S", "k").is_none())
+        && Ini::load_checked(&path).is_some();
+    t.check(ok, "ini: load_checked loads a missing, an empty and an ordinary file");
+    let big = t.subp("toobig.ini");
+    plat::write_file(&big, &vec![b'\n'; 0x100_0001]);
+    t.check(Ini::load_checked(&big).is_none(), "ini: load_checked: a file over 16 MB is not an empty Ini");
     ini_self(t);
     ini_random(t);
     t_f64(t);

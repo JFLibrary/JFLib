@@ -17,7 +17,6 @@
 
 use alloc::vec;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU32, Ordering};
 
 use rt::fx::{cvtt, sqrt};
 
@@ -32,9 +31,6 @@ const OPS_MAX: usize = 48; // DICT operands kept
 const F_INV65536: f32 = 0.000_015_258_789_062_5;
 const F_INV8M: f32 = 0.000_000_119_209_29; // 1 / 2^23
 const F_EPS: f32 = 0.000_001;
-
-static CS_TRANS: [AtomicU32; 32] = [const { AtomicU32::new(0) }; 32];
-static CS_RAND: AtomicU32 = AtomicU32::new(0);
 
 /// a CFF INDEX: count, offSize, offsets position, data position (table offsets)
 #[derive(Clone, Copy, Default)]
@@ -439,23 +435,24 @@ impl Cff {
                     return -1;
                 }
                 // ranges {u16 first, u8 fd}, sentinel u16
-                let mut best = -1;
-                for r in 0..n as u32 {
-                    let o = r.wrapping_mul(3).wrapping_add(fs).wrapping_add(3);
-                    let first = c16(t, o);
+                // binary search: the last range whose first glyph is <= glyph
+                let (mut lo, mut hi) = (0u32, n as u32);
+                while lo < hi {
+                    let mid = lo + (hi - lo) / 2;
+                    let first = c16(t, mid.wrapping_mul(3).wrapping_add(fs).wrapping_add(3));
                     if first < 0 {
                         return -1;
                     }
                     if first as u32 > glyph {
-                        break;
+                        hi = mid;
+                    } else {
+                        lo = mid + 1;
                     }
-                    let fd = c8(t, o.wrapping_add(2));
-                    if fd < 0 {
-                        return -1;
-                    }
-                    best = fd;
                 }
-                best
+                if lo == 0 {
+                    return -1;
+                }
+                c8(t, (lo - 1).wrapping_mul(3).wrapping_add(fs).wrapping_add(5))
             }
             _ => -1,
         }
@@ -491,6 +488,8 @@ impl Cff {
             wd: false,
             open: false,
             budget: CS_BUDGET,
+            trans: [0.0; 32],
+            rand: 0,
             ol,
         };
         if cs.run(s, s.wrapping_add(l), 0) < 0 {
@@ -544,6 +543,8 @@ struct Cs<'a, 'o> {
     wd: bool,
     open: bool,
     budget: i32,
+    trans: [f32; 32], // transient array and random state live per glyph
+    rand: u32,
     ol: &'o mut Outline,
 }
 
@@ -1137,7 +1138,7 @@ impl Cs<'_, '_> {
                 let Some((a, b)) = self.pop2() else { return Flow::Err };
                 let i = cvtt(b) as u32;
                 if i < 32 {
-                    CS_TRANS[i as usize].store(a.to_bits(), Ordering::Relaxed);
+                    self.trans[i as usize] = a;
                 }
                 Flow::Loop
             }
@@ -1148,7 +1149,7 @@ impl Cs<'_, '_> {
                 if i >= 32 {
                     return Flow::Err;
                 }
-                self.settop(f32::from_bits(CS_TRANS[i as usize].load(Ordering::Relaxed)))
+                self.settop(self.trans[i as usize])
             }
             22 => {
                 // s1 s2 v1 v2 ifelse -> v1 <= v2 ? s1 : s2
@@ -1164,8 +1165,8 @@ impl Cs<'_, '_> {
             }
             23 => {
                 // random
-                let r = CS_RAND.load(Ordering::Relaxed).wrapping_mul(1_103_515_245).wrapping_add(12345);
-                CS_RAND.store(r, Ordering::Relaxed);
+                let r = self.rand.wrapping_mul(1_103_515_245).wrapping_add(12345);
+                self.rand = r;
                 let v = ((r >> 9) | 1) as i32 as f32 * F_INV8M; // never 0
                 self.push(v)
             }

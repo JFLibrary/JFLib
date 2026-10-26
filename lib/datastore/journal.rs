@@ -44,10 +44,12 @@ impl Journal {
         line.push(b'\n');
         let _g = self.lock.lock();
         let d = plat::fs::join(&self.dir, name);
+        let new_dir = plat::fs::read_dir(&d).is_none();
         if !plat::fs::mkdir_private(&d) {
             return Err(StoreError::Io(format!("cannot create {}", d)));
         }
         let path = self.file(name, month);
+        let new_file = plat::fs::read_dir(&d).map_or(true, |l| !l.iter().any(|e| e.name == format!("{:06}.jl", month)));
         let f = plat::File::open(&path, plat::FO_RW).ok_or_else(|| StoreError::Io(format!("cannot open {}", path)))?;
         let mut end = f.size().unwrap_or(0);
         // a partial last line from a crash: start the new entry on a fresh line
@@ -67,11 +69,20 @@ impl Journal {
         if self.durable && !f.sync() {
             return Err(StoreError::Io(format!("cannot sync {}", path)));
         }
+        if self.durable && new_file {
+            plat::fs::sync_dir(&d);
+            if new_dir {
+                plat::fs::sync_dir(&self.dir);
+            }
+        }
         Ok(())
     }
 
     /// the months that have entries, oldest first
     pub fn months(&self, name: &str) -> Vec<u32> {
+        if !valid_name(name) {
+            return Vec::new();
+        }
         let mut m: Vec<u32> = plat::fs::read_dir(&plat::fs::join(&self.dir, name))
             .unwrap_or_default()
             .iter()
@@ -83,6 +94,9 @@ impl Journal {
 
     /// the entries of one month, oldest first
     pub fn read_month(&self, name: &str, month: u32) -> Vec<Value> {
+        if !valid_name(name) {
+            return Vec::new();
+        }
         let Some(b) = plat::read_file(&self.file(name, month)) else { return Vec::new() };
         b.split(|&c| c == b'\n').filter(|l| !l.is_empty()).filter_map(|l| json::parse_with_limits(l, record_limits()).ok()).collect()
     }
@@ -118,6 +132,9 @@ impl Journal {
 
     /// remove a whole journal (e.g. the log of a deleted session)
     pub fn remove(&self, name: &str) {
+        if !valid_name(name) {
+            return;
+        }
         for m in self.months(name) {
             plat::delete(&self.file(name, m));
         }

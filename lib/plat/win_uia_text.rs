@@ -247,7 +247,7 @@ struct Range {
 }
 
 fn new_range(hwnd: isize, pw: i32, key: u64, a: i32, b: i32) -> This {
-    let (a, b) = (a.min(b), a.max(b));
+    let (a, b) = (a.min(b).max(0), a.max(b).max(0)); // offset_at answers -1 outside the box
     Box::into_raw(Box::new(Range { vt: &VT_RANGE, refs: AtomicU32::new(1), hwnd, pw, key, a: AtomicI32::new(a), b: AtomicI32::new(b) }))
         as This
 }
@@ -485,6 +485,8 @@ unsafe extern "system" fn r_rects(this: This, out: *mut *mut u8) -> Hr {
     let (a, b) = r.get();
     let (ox, oy) = origin(r.hwnd);
     let rects = r.with(|n, c| {
+        // the text may have shrunk since the range was made
+        let (a, b) = (a.clamp(0, c.len() as i32), b.clamp(0, c.len() as i32));
         let mut out: Vec<[i32; 4]> = Vec::new();
         if a >= b {
             // the insertion point: the caret, or where character a would be

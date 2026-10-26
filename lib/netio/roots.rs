@@ -29,6 +29,9 @@ pub fn system_anchors() -> Arc<Vec<Cert>> {
 
 /// a server chain (leaf first) against the system's trust for this host name
 pub fn verify_system(chain: &[Cert], host: &str, now: i64) -> Result<(), String> {
+    if host.is_empty() {
+        return Err(String::from("no host name to check"));
+    }
     let ders: Vec<&[u8]> = chain.iter().map(|c| c.der.as_slice()).collect();
     if let Some(r) = plat::certs::verify_tls_server(&ders, host) {
         return r;

@@ -89,7 +89,7 @@ impl<K: Ord + Clone, V> Lru<K, V> {
         let t = self.tick;
         self.order.insert(t, k.clone());
         self.map.insert(k, Slot { v, tick: t, weight });
-        self.weight += weight;
+        self.weight = self.weight.saturating_add(weight);
         let mut out = Vec::new();
         while (self.max_len > 0 && self.map.len() > self.max_len) || (self.max_weight > 0 && self.weight > self.max_weight) {
             match self.pop_lru() {
@@ -102,7 +102,7 @@ impl<K: Ord + Clone, V> Lru<K, V> {
     pub fn remove(&mut self, k: &K) -> Option<V> {
         let s = self.map.remove(k)?;
         self.order.remove(&s.tick);
-        self.weight -= s.weight;
+        self.weight = self.weight.saturating_sub(s.weight);
         Some(s.v)
     }
     /// takes the least recently used entry
@@ -110,7 +110,7 @@ impl<K: Ord + Clone, V> Lru<K, V> {
         let (&t, _) = self.order.iter().next()?;
         let k = self.order.remove(&t)?;
         let s = self.map.remove(&k)?;
-        self.weight -= s.weight;
+        self.weight = self.weight.saturating_sub(s.weight);
         Some((k, s.v))
     }
     pub fn clear(&mut self) {

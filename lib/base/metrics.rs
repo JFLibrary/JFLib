@@ -151,9 +151,9 @@ impl Hist {
         if self.counts.len() <= i {
             self.counts.resize(i + 1, 0);
         }
-        self.counts[i] += n;
-        self.n += n;
-        self.sum += v as u128 * n as u128;
+        self.counts[i] = self.counts[i].saturating_add(n);
+        self.n = self.n.saturating_add(n);
+        self.sum = self.sum.saturating_add(v as u128 * n as u128);
         self.min = self.min.min(v);
         self.max = self.max.max(v);
     }
@@ -212,10 +212,10 @@ impl Hist {
             self.counts.resize(o.counts.len(), 0);
         }
         for (i, &c) in o.counts.iter().enumerate() {
-            self.counts[i] += c;
+            self.counts[i] = self.counts[i].saturating_add(c);
         }
-        self.n += o.n;
-        self.sum += o.sum;
+        self.n = self.n.saturating_add(o.n);
+        self.sum = self.sum.saturating_add(o.sum);
         self.min = self.min.min(o.min);
         self.max = self.max.max(o.max);
         true
@@ -259,8 +259,8 @@ impl Slot {
             Ok(i) => self.cells[i].1 = self.cells[i].1.saturating_add(n),
             Err(i) => self.cells.insert(i, (b, n)),
         }
-        self.n += n as u64;
-        self.sum += v as u128 * n as u128;
+        self.n = self.n.saturating_add(n as u64);
+        self.sum = self.sum.saturating_add(v as u128 * n as u128);
         self.min = self.min.min(v);
         self.max = self.max.max(v);
     }
@@ -273,10 +273,10 @@ fn add_slot(h: &mut Hist, s: &Slot) {
         if h.counts.len() <= i {
             h.counts.resize(i + 1, 0);
         }
-        h.counts[i] += c as u64;
+        h.counts[i] = h.counts[i].saturating_add(c as u64);
     }
-    h.n += s.n;
-    h.sum += s.sum;
+    h.n = h.n.saturating_add(s.n);
+    h.sum = h.sum.saturating_add(s.sum);
     h.min = h.min.min(s.min);
     h.max = h.max.max(s.max);
 }
@@ -313,10 +313,13 @@ impl Window {
     pub fn record_n(&mut self, t: u64, v: u64, n: u32) -> bool {
         let i = t / self.span;
         let len = self.ring.len() as u64;
+        if i == u64::MAX {
+            return false; // the slot number of "never used"
+        }
         if i > self.head {
             self.head = i;
         }
-        if i + len <= self.head || n == 0 {
+        if i.saturating_add(len) <= self.head || n == 0 {
             return false;
         }
         let bucket = bucket_of(self.bits as u32, v);
@@ -331,7 +334,7 @@ impl Window {
     fn live(&self, t: u64) -> impl Iterator<Item = &Slot> {
         let now = t / self.span;
         let len = self.ring.len() as u64;
-        self.ring.iter().filter(move |s| s.idx != u64::MAX && s.idx <= now && s.idx + len > now)
+        self.ring.iter().filter(move |s| s.idx != u64::MAX && s.idx <= now && s.idx.saturating_add(len) > now)
     }
     /// everything in the window at time t as one histogram
     pub fn hist(&self, t: u64) -> Hist {
@@ -389,7 +392,7 @@ impl Window {
     pub fn per_slot(&self, t: u64, per_mille: u32) -> Vec<(u64, u64, Option<u64>)> {
         let now = t / self.span;
         let len = self.ring.len() as u64;
-        let first = (now + 1).saturating_sub(len);
+        let first = now.saturating_sub(len - 1);
         (first..=now)
             .map(|i| {
                 let s = &self.ring[(i % len) as usize];

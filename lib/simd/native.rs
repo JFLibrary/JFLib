@@ -639,7 +639,7 @@ impl Simd for Avx2 {
     fn load_raw(self, b: &[u8]) -> __m256i {
         chk(b, 16);
         // SAFETY: 16 readable bytes (checked), AVX2 present.
-        unsafe { _mm256_castsi128_si256(_mm_loadu_si128(b.as_ptr() as *const __m128i)) }
+        unsafe { _mm256_zextsi128_si256(_mm_loadu_si128(b.as_ptr() as *const __m128i)) }
     }
     #[inline(always)]
     fn store_raw(self, b: &mut [u8], v: __m256i) {

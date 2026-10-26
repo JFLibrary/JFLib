@@ -86,7 +86,7 @@ impl Alloc {
     unsafe fn alloc_inner(&self, layout: Layout) -> (*mut u8, bool) {
         let size = layout.size().max(layout.align());
         match class_of(size) {
-            Some(c) if layout.align() <= 16 << c => {
+            Some(c) if layout.align() <= 16 => {
                 self.lock();
                 // SAFETY: the lock gives exclusive access to the heap state.
                 let h = unsafe { &mut *self.heap.get() };
@@ -98,6 +98,19 @@ impl Alloc {
                 } else {
                     let bytes = 16usize << c;
                     if h.chunk_left < bytes {
+                        // the rest of the old chunk goes to the free lists
+                        while h.chunk_left >= 16 {
+                            let mut k = CLASSES - 1;
+                            while 16usize << k > h.chunk_left {
+                                k -= 1;
+                            }
+                            // SAFETY: the block lies inside the old chunk.
+                            unsafe { *(h.chunk as *mut *mut u8) = h.free[k] };
+                            h.free[k] = h.chunk;
+                            // SAFETY: the block lies inside the old chunk.
+                            h.chunk = unsafe { h.chunk.add(16 << k) };
+                            h.chunk_left -= 16 << k;
+                        }
                         // SAFETY: plain page allocation.
                         h.chunk = unsafe { os::pages_alloc(CHUNK) };
                         h.chunk_left = if h.chunk.is_null() { 0 } else { CHUNK };
@@ -114,6 +127,28 @@ impl Alloc {
                 };
                 self.unlock();
                 (r, true)
+            }
+            _ if layout.align() > 64 => {
+                // over-aligned: the pointer is rounded up inside the run; the run's base and
+                // byte count sit right before it
+                let Some(total) = size
+                    .checked_add(layout.align() + 64 + PAGE - 1)
+                    .map(|t| t & !(PAGE - 1))
+                else {
+                    return (core::ptr::null_mut(), false);
+                };
+                // SAFETY: plain page allocation.
+                let base = unsafe { os::pages_alloc(total) };
+                if base.is_null() {
+                    return (base, false);
+                }
+                let user = (base as usize + 64).next_multiple_of(layout.align()) as *mut u8;
+                // SAFETY: user - 16 >= base and user + size <= base + total.
+                unsafe {
+                    *(user as *mut usize).sub(1) = base as usize;
+                    *(user as *mut usize).sub(2) = total;
+                }
+                (user, false)
             }
             _ => {
                 // page run with a 64-byte header holding the byte count
@@ -162,7 +197,7 @@ unsafe impl GlobalAlloc for Alloc {
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         let size = layout.size().max(layout.align());
         match class_of(size) {
-            Some(c) if layout.align() <= 16 << c => {
+            Some(c) if layout.align() <= 16 => {
                 self.lock();
                 // SAFETY: exclusive access under the lock; the block is at least 16 bytes.
                 unsafe {
@@ -172,6 +207,12 @@ unsafe impl GlobalAlloc for Alloc {
                 }
                 self.unlock();
             }
+            _ if layout.align() > 64 => unsafe {
+                // SAFETY: ptr came from the over-aligned path of alloc.
+                let base = *(ptr as *mut usize).sub(1) as *mut u8;
+                let total = *(ptr as *mut usize).sub(2);
+                os::pages_free(base, total);
+            },
             _ => unsafe {
                 // SAFETY: ptr came from the page path of alloc.
                 let base = ptr.sub(64);
