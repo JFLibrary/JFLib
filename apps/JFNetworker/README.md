@@ -103,6 +103,12 @@ Queues, Lastgeneratoren, eigene Skripte).
   Loopbacks, die Entscheidung Schritt für Schritt, Schleifen im AS-Pfad, Fast External
   Fallover; `show ip bgp [summary|neighbors]`, `show ip route bgp`, `clear ip bgp`, `debug ip
   bgp` (siehe [Routing mit BGP](#routing-mit-bgp)).
+- **Dateien, TFTP und FTP (X1a):** jedes Gerät hat Dateien, die mit dem Projekt gespeichert
+  werden: `flash:` mit dem Systemabbild und `nvram:startup-config` auf den IOS-artigen Geräten,
+  ein kleiner Verzeichnisbaum auf den Linux-Hosts; ein TFTP- und ein FTP-Server als Dienste,
+  `copy running-config tftp:` und zurück, `copy … ftp:`, `dir`, `more`, `delete`, in der Shell
+  `ls`, `cat`, `cp`, `rm`, `mkdir`, `echo … >`, `tftp` und `curl ftp://`; der Reiter Dateien im
+  Gerätefenster mit Import und Export (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
 
 ## Bedienung
 
@@ -221,6 +227,11 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `wlan_shots.uis` | die Bilder von WLAN (Reichweiten, Funklinien, Signalbalken, Inspektor eines Access Points und einer Station) hell und dunkel mit 100 und 150 % (`build/jfnetworker/wlan_*.png`) |
 | `model.uis`, Gruppe `bgp` | BGP (siehe [Routing mit BGP](#routing-mit-bgp)): eine eBGP-Sitzung durch jeden Zustand auf die Nanosekunde (der erste SYN, den das IOS-artige ARP verliert, die Kollision der beiden Verbindungen, die der höheren BGP-ID bleibt), das OPEN auf dem Kabel (Version, AS, Haltezeit, ID, die drei Capabilities), TTL 1, Keepalives alle 60 s ab dem letzten UPDATE, `timers bgp 10 30` auf einer Seite (Haltezeit 30, Keepalive 10 auf beiden), iBGP zwischen Loopbacks mit `update-source` und TTL 255, ein Next Hop, den das IGP nicht kennt, bis `next-hop-self`, kein iBGP-Weg an einen anderen internen Nachbarn; jeder Schritt der Entscheidung (Gewicht, LOCAL_PREF, selbst erzeugt, AS-Pfad, ORIGIN, MED gleicher und verschiedener Nachbar-ASe, extern vor intern, IGP-Metrik über eine serielle Leitung, BGP-ID, Nachbaradresse); eine Schleife im AS-Pfad; ein falsches `remote-as` mit NOTIFICATION 2/2 auf dem Kabel, der Pause von 60 s und dem Problem, dann behoben; Ausfälle über den Hold Timer hinter einem Switch, über einen RST nach einem Neustart des Nachbarn und über Fast External Fallover; Redistribution mit MED, RIB-Failure (`r`), ein `network` ohne Route als Problem und mit Route nach der Mindestpause; die Befehlszeile (Modus, Hilfe, Tab, Fehlermeldungen, `show`, `clear ip bgp … soft in` mit ROUTE-REFRESH, `clear ip bgp *` mit Cease, `shutdown`, `no router bgp`, die Running-Config als Startkonfiguration, `% IP routing not enabled`); Texte auf Deutsch und Englisch; Determinismus |
 | `bgp_console.uis` | BGP an R1s Konsole (`fixtures/bgp_pair.jfnet`, R2 wartet schon): `router bgp` mit seinem Modus, `?` darin, Nachbar und Netz getippt, die Sitzung kommt (die Konsole meldet sie), `show ip bgp summary`, `show ip bgp` und `show ip route bgp` mit der Route von R2 |
+| `model.uis`, Gruppe `files` | Dateien, TFTP und FTP (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)): der Speicher (Pfade beider Arten, Verzeichnisse, das Systemabbild, Grenzen, die Einträge der Projektdatei mit Text und Base64), die Befehle (`dir`, `show flash:`, `more`, `delete`, `copy`; `ls`, `cat`, `echo > DATEI`, `cp`, `mkdir`, `rm`, `rmdir`, `touch`), eine Sicherung per TFTP und das Zurückholen auf die Nanosekunde, ein verlorenes ACK, eine fehlende Datei, ein Server nur zum Lesen, eine Quote, Optionen für die Blockgröße, FTP mit Anmeldung, Liste, Hoch- und Herunterladen passiv und aktiv, ein falsches Passwort, eine volle Quote, die Probleme-Liste, die Projektdatei hin und zurück, Determinismus |
+| `files_window.uis` | der Reiter Dateien auf `fixtures/backup.jfnet`: SRV1s Dateien aus dem Projekt mit Text, Exportieren … in eine Datei des Rechners, Löschen als Rückgängig-Schritt und zurück, Importieren … in das gewählte Verzeichnis (die Shell hat die Datei sofort), was die Shell schreibt, kommt ins Projekt; R1s `flash:` mit dem Systemabbild und `nvram:startup-config` |
+| `files_services.uis` | TFTP- und FTP-Server im Reiter Dienste: Karten mit Statuszeile, Einstellungen als JSON (nur lesend mit Quote, ein abgelehnter Port, ein Benutzer ohne Namen, ein fehlendes Heimatverzeichnis in der Probleme-Liste), Rückgängig; eine Sicherung landet nur beim schreibbaren Server |
+| `files_console.uis` | eine Sicherung an R1s Konsole: `copy running-config tftp:` mit Fragen, Fortschritt und Ergebnis, die Datei als Rückgängig-Schritt auf SRV1, ein falscher Name aus der Sicherung zurückgeholt, eine Kopie nach `flash:` mit `dir`, Rückgängig nimmt sie wieder weg |
+| `files_shots.uis` | die Bilder von Dateien, TFTP und FTP (Konsole nach einer Sicherung, der Reiter Dateien, die Einstellungen des TFTP-Servers) hell und dunkel mit 100 und 150 % (`build/jfnetworker/files_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -228,10 +239,13 @@ Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder K
 Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein Skript),
 `stp_triangle.jfnet` und `rstp_triangle.jfnet` (drei Switches im Dreieck mit STP bzw. RSTP),
 `wlan_office.jfnet` (zwei Access Points, ein Gastnetz, zwei Laptops und ein Smartphone; das
-Szenario `wlan_office.scn` und die WLAN-Fensterskripte) und die Netze der Golden-Szenarien. Die
+Szenario `wlan_office.scn` und die WLAN-Fensterskripte), `backup.jfnet` (drei Router, SRV1 mit
+TFTP- und FTP-Server, PC1; das Szenario `backup.scn` und die Fensterskripte `files_*.uis`) und
+die Netze der Golden-Szenarien. Die
 Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`,
 `rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
-für WLAN `crypto` und `netpkt`, für BGP `bgp`), die Skriptsprache die Gruppe `script`.
+für WLAN `crypto` und `netpkt`, für BGP `bgp`, für Dateien `tftp` und `ftp`), die
+Skriptsprache die Gruppe `script`.
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -283,6 +297,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | BGP | [`crates/jfn_sim/bgp.rs`](crates/jfn_sim/bgp.rs), [`bgptrace.rs`](crates/jfn_sim/bgptrace.rs), [`cli/bgp.rs`](crates/jfn_sim/cli/bgp.rs), [`src/bgptest.rs`](src/bgptest.rs), [`lib/netpkt/bgp.rs`](../../lib/netpkt/bgp.rs) | BGP als Dienst der Router, L3-Switches und der Firewall, seine Notizen, Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit BGP](#routing-mit-bgp)) |
 | Aufgaben mit Bewertung | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/assess.rs`](crates/jfn_sim/assess.rs), [`src/workspace/assess.rs`](src/workspace/assess.rs), [`src/workspace/author.rs`](src/workspace/author.rs), [`src/doc/assess.rs`](src/doc/assess.rs), [`assets/assess`](assets/assess), [`src/assesstest.rs`](src/assesstest.rs) | das Format einer Aufgabe, das Bewerten ihrer Kriterien, die Prüfung `reaches`, das Panel mit Punkten, Zeit und Abgeben, der Bereich zum Erstellen mit seinen Rückgängig-Schritten, die drei Aufgaben, ihr Selbsttest (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)) |
 | WLAN | [`crates/jfn_model/wlan.rs`](crates/jfn_model/wlan.rs), [`crates/jfn_sim/wlan.rs`](crates/jfn_sim/wlan.rs), [`wlankey.rs`](crates/jfn_sim/wlankey.rs), [`wlantrace.rs`](crates/jfn_sim/wlantrace.rs), [`cli/wlan.rs`](crates/jfn_sim/cli/wlan.rs), [`src/doc/wlan.rs`](src/doc/wlan.rs), [`src/workspace/canvas/wlan.rs`](src/workspace/canvas/wlan.rs), [`src/workspace/inspector/wlan.rs`](src/workspace/inspector/wlan.rs), [`src/wlantest.rs`](src/wlantest.rs), [`lib/netpkt/eapol.rs`](../../lib/netpkt/eapol.rs), [`lib/crypto`](../../lib/crypto/lib.rs) (`sha1.rs`, `keywrap.rs`, `cmac.rs`) | die WLAN-Einstellungen im Projekt, Stationen und Access Points im Simulator mit Funk, Schlüsseln und Notizen, `iw` und `show dot11`, die Einstellungen als Rückgängig-Schritte, Funklinien, Reichweiten und Balken, der Inspektor, der Selbsttest, EAPOL Byte für Byte und die Kryptografie von WPA2 und WPA3 (siehe [WLAN](#wlan)) |
+| Dateien, TFTP und FTP | [`crates/jfn_model/files.rs`](crates/jfn_model/files.rs), [`crates/jfn_sim/files.rs`](crates/jfn_sim/files.rs), [`tftpd.rs`](crates/jfn_sim/tftpd.rs), [`tftpc.rs`](crates/jfn_sim/tftpc.rs), [`ftpd.rs`](crates/jfn_sim/ftpd.rs), [`ftpc.rs`](crates/jfn_sim/ftpc.rs), [`xfertrace.rs`](crates/jfn_sim/xfertrace.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`src/workspace/devwin/files.rs`](src/workspace/devwin/files.rs), [`src/filestest.rs`](src/filestest.rs), [`lib/netpkt/tftp.rs`](../../lib/netpkt/tftp.rs), [`lib/netpkt/ftp.rs`](../../lib/netpkt/ftp.rs) | die Dateien eines Geräts im Projekt und im Simulator, TFTP- und FTP-Server und ihre Clients an beiden Befehlszeilen, die Notizen, die Befehle für Dateien, der Reiter Dateien, der Selbsttest, TFTP und FTP Byte für Byte (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)) |
 
 ### Gerätekatalog
 
@@ -380,6 +395,8 @@ Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinst
   und Ports auflöst; Seiten über HTTP laden und zeigen ist Meilenstein B1 (siehe
   [Fahrplan](#fahrplan)). Eine Konsole erscheint an einer Stelle: Zeigt das Gerätefenster sie,
   verweist der Tab dorthin. Offen sind höchstens zwei Gerätefenster und drei Konsolenfenster.
+  Der Reiter Dateien zeigt die Dateien des Geräts mit Import und Export (siehe
+  [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
 - **Protokoll** ([`src/workspace/logview.rs`](src/workspace/logview.rs)): die Log-Zeilen aller
   Geräte als `Report::Log` – Syslog-Meldungen ihrer Dienste (dhclient, dhcpd, NTP …), die
   IOS-artigen Meldungen `%LINK`, `%LINEPROTO` und `%SYS` mit der Schwere aus ihrem Code und mit
@@ -414,6 +431,20 @@ Programm beim Öffnen alles. Ein Labor hat dazu den Abschnitt `lab` mit seiner A
       "cable": "copper", "kbps": 1000000, "delay_ns": 50 }
   ]
 }
+```
+
+Die Dateien eines Geräts stehen in `files`, ein Eintrag je Datei oder selbst angelegtem
+Verzeichnis, nach Pfad geordnet: Text als `text`, alles andere als `base64`, die Zeit in
+Sekunden seit 1970 nach der Uhr des Geräts als `mtime` (siehe
+[Dateien, TFTP und FTP](#dateien-tftp-und-ftp)). Ein Gerät ohne `files` hat nur seine
+Verzeichnisse und sein Systemabbild.
+
+```json
+"files": [
+  { "path": "/srv/ftp/upload", "dir": true },
+  { "path": "/srv/tftp/r1-config", "text": "hostname R1\n!\nend\n", "mtime": 1767225605 },
+  { "path": "/srv/tftp/logo.bin", "base64": "iVBORw0KGgo=" }
+]
 ```
 
 ### Simulator
@@ -992,6 +1023,10 @@ IOS-artige Befehlszeile:
   demselben Prompt `(config-router)#`, `show ip bgp [A.B.C.D|summary|neighbors [X [routes|
   advertised-routes]]]`, `show ip route bgp`, `clear ip bgp *|X [soft [in|out]]`, `debug ip bgp
   [events|updates]` (siehe [Routing mit BGP](#routing-mit-bgp)).
+- Dateien ([`cli/files.rs`](crates/jfn_sim/cli/files.rs)): `dir [flash:|nvram:]`, `show
+  flash:`, `more DATEI`, `delete [/force] DATEI`, `copy QUELLE ZIEL` zwischen
+  `running-config`, `startup-config`, `flash:`, `tftp:` und `ftp:`, `ip ftp username|password`
+  (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
 
 Hosts und Server haben eine Linux-Shell (`root@PC1:~#`): `ip addr|link|route|neigh` mit den
 Ausgaben und Fehlermeldungen von iproute2, `ping` wie iputils (bis Strg+C oder `-c`; `-i`,
@@ -1015,6 +1050,8 @@ bestimmten Dienst; ihre Texte sind eigene Worte. Die Skripte eines Hosts zeigt u
 Spanning Tree stellen `spanning-tree …`, `show spanning-tree`, `debug spanning-tree events`
 und `clear spanning-tree detected-protocols` ein und zeigen ihn (siehe
 [Spanning Tree](#spanning-tree)).
+Dateien zeigen und ändern `ls`, `cat`, `cp`, `rm`, `mkdir`, `rmdir`, `touch` und `echo … >`,
+übertragen `tftp` und `curl ftp://` (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
 
 Namen löst die Shell über den Resolver des Geräts auf (`ping server.lab`, `traceroute
 server.lab`, auch kurz mit der Suchdomäne): die erste Zeile nennt wie getaddrinfo das Ende der
@@ -1226,6 +1263,17 @@ neighbors`, der Weg von PC-A zu PC-B über ISP2. Dann fehlt das Kabel CA–ISP2:
 sofort (Fast External Fallover), der Weg führt über ISP1 und AS 300 (`traceroute`), und ISP2
 findet CAs Netz über AS 300; mit dem Kabel kommt die Sitzung zurück, was ISP2 noch über AS 300
 kannte, fällt bei CA als Schleife weg (65010 im AS-Pfad), und der kurze Weg gilt wieder.
+
+Ein Szenario zeigt Dateien, TFTP und FTP (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
+`backup.scn` auf `fixtures/backup.jfnet`: R1, R2 und R3 sichern ihre Konfiguration per TFTP auf
+SRV1 (`copy running-config tftp:` mit den Fragen nach Host und Datei, die URL in einer Zeile,
+R3 seine Startkonfiguration über ein Kabel, das 30 % der Rahmen verliert: Blöcke und ACKs gehen
+noch einmal); R1 bekommt einen falschen Namen und holt die Sicherung zurück, auch als
+Startkonfiguration; `copy running-config flash:`, `dir`, `delete` mit Rückfrage und `show
+flash:`; eine fehlende Datei auf dem Server. PC1 lädt als anna per FTP hoch, listet und lädt
+herunter, scheitert mit einem falschen Passwort, holt anonym `pub/readme.txt` und mit `tftp`
+eine Sicherung; 24 Erwartungen. FTP läuft dort in Schritten von 2 s, weil `run until idle` bis
+zum Leerlauf-Timeout des Servers (300 s) liefe.
 
 ### Skripte in Hosts
 
@@ -2141,6 +2189,89 @@ Für Programme: `Action::Bgp { dev, set: BgpSet }` (`Process`, `RouterId`, `LogC
 Szenario `bgp_isp.scn` (siehe [Szenarien](#szenarien-scn)) und das Fensterskript
 `bgp_console.uis`.
 
+### Dateien, TFTP und FTP
+
+Jedes Gerät hat Dateien ([`crates/jfn_model/files.rs`](crates/jfn_model/files.rs)), die mit dem
+Projekt gespeichert werden und die der Simulator mit ihm abgleicht wie die Startkonfiguration:
+was eine Konsole oder ein Dienst schreibt, kommt als `Report::Files` an die Oberfläche und wird
+ein Rückgängig-Schritt; Rückgängig und Wiederholen ändern die Dateien auch im laufenden Gerät
+(`Action::Files`, ohne Neustart). Wie viel Platz ein Gerät hat, sagt sein Modell
+(`capacity_of`: 256 MiB beim Router, 128 MiB beim Switch, 512 GiB beim PC, 2 TiB beim Server …);
+was nicht mehr passt, wird ganz abgelehnt.
+
+- **IOS-artige Geräte:** `flash:` mit flachen Namen und dem Systemabbild, das `show version`
+  nennt (`jf-r4.bin` mit 40 MiB beim JF-R4: es belegt Platz, hat aber keinen Inhalt und lässt
+  sich weder löschen noch exportieren), und `nvram:startup-config`, das die Startkonfiguration
+  selbst ist und keine Datei daneben.
+- **Linux-Hosts:** `/`, `/etc`, `/home`, `/home/user`, `/root` (das `~` des Prompts), `/srv`,
+  `/srv/ftp`, `/srv/tftp`, `/tmp`, `/var` und `/var/log` gibt es von Anfang an; die Dateien in
+  `/etc`, die die Shell kennt (`resolv.conf`, `hosts`, `hostname`), entstehen weiter aus dem
+  Zustand des Geräts.
+- **IOS-artige Befehle** ([`cli/files.rs`](crates/jfn_sim/cli/files.rs)): `dir [flash:|nvram:]`,
+  `show flash:`, `more DATEI`, `delete [/force] DATEI` (fragt nach), `copy QUELLE ZIEL` mit
+  `running-config`, `startup-config`, `flash:NAME`, `tftp://HOST/NAME`,
+  `ftp://[BENUTZER[:PASSWORT]@]HOST/NAME` und den kurzen Formen `flash:`, `tftp:` und `ftp:`,
+  nach denen die Konsole Host und Namen erfragt (in Klammern die Vorgabe: der zuletzt genutzte
+  Host, für eine Konfiguration `HOSTNAME-config`), `ip ftp username|password` für die
+  Anmeldung beim FTP-Server (in der Running-Config). Eine Konfiguration nach `running-config`
+  wird eingespielt, als wäre sie getippt: sie ergänzt und ändert, was sie nennt, wie beim
+  Vorbild, und meldet sich mit `%SYS-5-CONFIG_I`; eine nach `startup-config` wird die
+  Startkonfiguration (ein Rückgängig-Schritt wie `copy run start`); eine Datei in `flash:` wird
+  erst nach „y“ ersetzt. Die Fragen, der Fortschritt (`#` je Block, `.` je Timeout) und das
+  Ergebnis (`Done: … bytes in … ms`) sind eigene Worte, Fehler kurze Zeilen wie `%Error opening
+  tftp://10.0.0.10/nope (File not found)`. Strg+Umschalt+6 bricht eine Übertragung ab.
+- **Shell:** `ls [-l] [-a]`, `cat`, `cp`, `rm [-f] [-r]`, `mkdir [-p]`, `rmdir`, `touch`, `echo
+  … > DATEI` und `>> DATEI` mit den Meldungen von coreutils und bash, `tftp -g|-p [-l DATEI] [-r
+  DATEI] [-b GRÖSSE] HOST [PORT]` in der Art von busybox und `curl` mit `ftp://` (`-u`, `-T`,
+  `-o`, `-O`, `-l`, `-P`, `--disable-epsv`, `-v` mit jedem Befehl und jeder Antwort, die
+  Exit-Codes von curl wie 67 für eine abgelehnte Anmeldung oder 78 für eine fehlende Datei).
+- **TFTP-Server** (Dienst `tftp-server`, [`tftpd.rs`](crates/jfn_sim/tftpd.rs)): UDP-Port 69,
+  die Dateien unter `root` (`/srv/tftp`, auf IOS-artigen Geräten `flash:`), nur zum Lesen oder
+  mit `writable` auch zum Schreiben, `overwrite`, `quota_kb`. Jede Übertragung bekommt einen
+  eigenen Port; die Blöcke gehen im Gleichschritt mit ihren ACKs, ein fehlendes ACK holt den
+  Block nach `timeout_ms` (1 s) noch einmal, nach `retries` (5) gibt der Server auf, ein
+  doppeltes ACK schickt nichts doppelt, das letzte ACK bleibt eine Weile bereit. Die Fehler 1
+  bis 6 und 8 (eine fehlende Datei, kein Zugriff, kein Platz, ein fremdes Paket, ein
+  unbekannter Port, eine vorhandene Datei, eine abgelehnte Option), die Optionen `blksize`,
+  `timeout` und `tsize` (abschaltbar mit `options`), `netascii`. Lesen und Schreiben kosten
+  Zeit auf der Disk des Geräts.
+- **FTP-Server** (Dienst `ftp-server`, [`ftpd.rs`](crates/jfn_sim/ftpd.rs)): TCP-Port 21 in der
+  Art von vsftpd: Benutzer mit Passwort und Heimatverzeichnis, in das sie eingeschlossen sind
+  (`users`), anonym mit `anonymous` (Schreiben mit `anon_write`); ein falsches Passwort wird
+  nach `fail_delay_ms` abgelehnt, nach `max_fails` endet die Verbindung. Passiv (PASV, EPSV)
+  und aktiv (PORT, EPRT von Port 20, abschaltbar mit `active`), dazu USER, PASS, LIST, NLST,
+  RETR, STOR, APPE, DELE, MKD, RMD, CWD, CDUP, PWD, TYPE, SIZE, MDTM, SYST, FEAT, NOOP, ABOR und
+  QUIT; ein Leerlauf-Timeout (`idle_ms`, 300 s), eine Quote (`quota_kb`). Die Antworten haben
+  die Codes und Formate der RFCs, ihre Texte sind eigene Worte.
+- **Im Fenster:** der Reiter Dateien des Gerätefensters
+  ([`devwin/files.rs`](src/workspace/devwin/files.rs)) listet die Dateien mit Größe und Zeit,
+  zeigt den freien Platz und den Text der gewählten Datei, löscht als Rückgängig-Schritt,
+  exportiert eine Datei auf den Rechner und importiert eine in das gewählte Verzeichnis. Die
+  Server stehen im Reiter Dienste mit Statuszeile und Zahlen, ihre Einstellungen als JSON. Der
+  Paket-Tab zerlegt TFTP und die Steuerverbindung von FTP Feld für Feld.
+- **Notizen und Probleme:** jede Anfrage, Wiederholung, Zeitüberschreitung, jeder Fehler und
+  jedes Ende als Notiz (`Note::Xfer`) und als Log-Zeile (`tftpd`, `ftpd`); die Probleme-Liste
+  nennt einen Server, dessen Verzeichnis fehlt.
+
+Entscheidungen: Eine Konfiguration, die nach `running-config` kopiert wird, startet nichts neu
+(Interfaces bleiben, wie sie sind; was sie nicht nennt, bleibt stehen). Das Systemabbild ist
+nur ein Eintrag mit Größe; gebootet wird es nicht. Die Daten einer passiven FTP-Verbindung
+laufen über einen beliebigen Port und erscheinen im Paket-Tab als TCP. Bei einem Ausfall
+während einer Übertragung bleibt nichts Halbes liegen: die Datei landet erst mit ihrem letzten
+Block. Unter Linux überträgt `curl` per FTP; ein eigenes `ftp`-Programm gibt es nicht.
+
+Noch offen: Unterverzeichnisse in `flash:`, `cd` und `mv` in der Shell, der IOS-Befehl
+`tftp-server`, die Notizen des Desktops (`notizen.txt`) als Datei, und die weiteren Dienste von
+X1: SNMP, AAA mit RADIUS, Mail.
+
+Für Programme: `Action::Files { dev, files }`, `Report::Files { dev, at, path, files }`,
+`Engine::files(dev)`, `Engine::file_store(dev)`, für Dienste `OsApi::file_read`, `file_write`,
+`file_append`, `file_remove`, `file_list`, `file_stat`, die Notizen `Note::Xfer(XNote)`.
+Geprüft wird in der Selbsttest-Gruppe `files` ([`src/filestest.rs`](src/filestest.rs)), TFTP
+und FTP Byte für Byte in den coretest-Gruppen `tftp` und `ftp`, dazu das Szenario `backup.scn`
+und die Fensterskripte `files_window.uis`, `files_services.uis`, `files_console.uis` und
+`files_shots.uis`.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -2208,7 +2339,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · physische Ansicht, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · physische Ansicht, Zurückspulen mit Keyframes, Gruppen · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; SNMP, AAA mit RADIUS, Mail) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

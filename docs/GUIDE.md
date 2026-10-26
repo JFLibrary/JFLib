@@ -2077,6 +2077,29 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
       stream.drain(..n);
   }
   ```
+
+  File transfer: `tftp` has the packets of RFC 1350 with the option extension of RFC 2347 --
+  `TftpView` reads one (opcode, file, mode and options of RRQ / WRQ / OACK as NUL-terminated
+  fields with their offsets, block and data, error code and message; `Bad` says what is
+  wrong), `Packet` writes and reads them (`Rrq`, `Wrq`, `Data`, `Ack`, `Error`, `Oack`;
+  `opt("blksize")` ignores case, `error_of(code)` takes the RFC's text), `to_netascii` /
+  `from_netascii` convert line ends, and `looks_like` tells a packet of a running transfer by
+  its shape, as a transfer leaves port 69 at once (RFC 1350 4). `ftp` has the control
+  connection of RFC 959: `Command::parse` / `to_line`, `Reply` with the multi-line form of 4.2
+  (`to_bytes`, `is_preliminary` / `is_ok` / `is_intermediate`), `Lines` and `ReplyReader` for
+  bytes in any pieces, `host_port` / `fmt_host_port` (PORT's argument and the six numbers of a
+  227 reply wherever they stand), `eprt` / `fmt_eprt` and `epsv_port` / `fmt_epsv` of RFC 2428.
+  `decode::layers` shows every TFTP field (also between two ports above 1023) and each FTP line
+  with its command or code (`P_FTP`, `Proto::Ftp`, `Proto::FtpData` for port 20);
+  `decode::info` sums them up ("Data Packet, Block: 3 (last)", "Request: USER anna").
+
+  ```rust
+  let rrq = tftp::Packet::Rrq { file: "r1-config".into(), mode: "octet".into(), opts: vec![("blksize".into(), "1428".into())] };
+  let ack = tftp::Packet::parse(payload)?;             // Packet::Ack { block: 1 }
+  let mut replies = ftp::ReplyReader::new();
+  for r in replies.push(&bytes) { /* r.code, r.text() */ }
+  let (_, port) = ftp::host_port("Passive mode on (10,0,0,9,117,49).").unwrap_or_default();
+  ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
   nonces use `plat::random_bytes`.

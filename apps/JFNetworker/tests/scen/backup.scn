@@ -1,0 +1,94 @@
+# Sicherung per TFTP und FTP: R1, R2 und R3 sichern ihre Konfiguration auf SRV1 (TFTP), R3 über
+# ein Kabel mit Verlust; R1 verliert seinen Namen und holt die Sicherung zurück, auch als
+# Startkonfiguration; flash: mit dir, delete und show flash:; PC1 lädt per FTP hoch und herunter
+# (anna, anonym), ein falsches Passwort, fehlende Dateien bei TFTP; FTP läuft in Schritten von 2 s
+# (nach "run until idle" liefe die Uhr bis zum Leerlauf-Timeout des Servers, 300 s)
+R1: enable
+R1: copy running-config tftp:
+R1: 10.0.0.10
+R1: r1-config
+run until idle
+expect R1 output contains "Done: 529 bytes in 1000 ms"
+R2: enable
+R2: configure terminal
+R2: interface Gi0/0/1
+R2: description Uplink zum Labor
+R2: end
+R2: copy running-config tftp://10.0.0.10/r2-config
+run until idle
+expect R2 output contains "Done: 559 bytes"
+# R3 sichert erst seine Startkonfiguration, dann per TFTP; auf dem Kabel von SRV1 geht ein Teil
+# der Rahmen verloren
+R3: enable
+R3: write memory
+impair SRV1 eth0 loss 30%
+R3: copy startup-config tftp:
+R3: 10.0.0.10
+R3: r3-config
+run until idle
+impair SRV1 eth0 loss 0%
+expect R3 output contains "Done: "
+expect SRV1 svc tftp metric done == 3
+SRV1: ls -l /srv/tftp
+expect SRV1 output contains "r3-config"
+SRV1: cat /srv/tftp/r2-config
+expect SRV1 output contains " description Uplink zum Labor"
+# R1 bekommt einen falschen Namen; die Sicherung bringt den richtigen zurück
+R1: configure terminal
+R1: hostname Kaputt
+R1: end
+Kaputt: copy tftp: running-config
+Kaputt: 10.0.0.10
+Kaputt: r1-config
+Kaputt: running-config
+run until idle
+expect R1 output contains "%SYS-5-CONFIG_I: configuration changed from tftp://10.0.0.10/r1-config"
+R1: copy tftp://10.0.0.10/r1-config startup-config
+R1: startup-config
+run until idle
+expect R1 output contains "Saved as the startup configuration."
+R1: show startup-config
+expect R1 output contains "hostname R1"
+# flash:
+R1: copy running-config flash:r1.cfg
+R1: dir flash:
+expect R1 output contains "r1.cfg"
+R1: delete flash:r1.cfg
+R1: r1.cfg
+R1: y
+R1: show flash:
+expect R1 output not contains "r1.cfg"
+R1: copy tftp://10.0.0.10/nope flash:
+R1: nope
+run until idle
+expect R1 output contains "%Error opening tftp://10.0.0.10/nope (File not found)"
+# FTP: anna lädt hoch, listet, lädt herunter; ein falsches Passwort; anonym aus /pub
+PC1: echo Messwerte 1 2 3 > werte.txt
+PC1: curl -v -T werte.txt ftp://anna:geheim@10.0.0.10/
+run 2s
+expect PC1 output contains "< 226 File stored."
+PC1: curl -u anna:geheim ftp://10.0.0.10/
+run 2s
+expect PC1 output contains "werte.txt"
+PC1: curl -u anna:geheim ftp://10.0.0.10/werte.txt -o kopie.txt
+run 2s
+PC1: cat kopie.txt
+expect PC1 output contains "Messwerte 1 2 3"
+PC1: curl -u anna:falsch ftp://10.0.0.10/
+run 2s
+expect PC1 output contains "curl: (67) Access denied: 530"
+PC1: curl ftp://10.0.0.10/pub/readme.txt
+run 2s
+expect PC1 output contains "Willkommen auf SRV1."
+PC1: tftp -g -r r2-config 10.0.0.10
+run 2s
+PC1: ls
+expect PC1 output contains "r2-config"
+PC1: tftp -g -r nope 10.0.0.10
+run 2s
+expect PC1 output contains "tftp: server error: (1) File not found"
+expect SRV1 svc ftp metric failed_logins == 1
+expect SRV1 svc ftp metric uploads == 1
+expect SRV1 svc tftp metric errors == 2
+expect hops tftp >= 20
+expect hops ftp >= 20

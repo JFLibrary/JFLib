@@ -1114,6 +1114,11 @@ Fensterrand hinaus.
   ROUTE-REFRESH, die Prüfungen von RFC 4271 6.1 bis 6.3 mit Code und Subcode der NOTIFICATION,
   Dissektor mit jeder Nachricht eines Segments; Gruppe `bgp`), im Einsatz in den Routern,
   L3-Switches und der Firewall von JFNetworker.
+  Seit X1a auch TFTP und FTP ([`netpkt/tftp.rs`](../lib/netpkt/tftp.rs): RRQ, WRQ, DATA, ACK,
+  ERROR und OACK nach RFC 1350 und 2347 mit Optionen, netascii, die Form eines Pakets nach dem
+  Portwechsel; [`netpkt/ftp.rs`](../lib/netpkt/ftp.rs): Befehle, Antworten auch über mehrere
+  Zeilen, PORT, 227, EPRT und 229 nach RFC 959 und 2428; Dissektor; Gruppen `tftp` und `ftp`),
+  im Einsatz in den Dateidiensten von JFNetworker.
 - **P2** · *erledigt* · Style `netlab` ([`styles/netlab`](../styles/netlab)) für JFNetworker:
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene

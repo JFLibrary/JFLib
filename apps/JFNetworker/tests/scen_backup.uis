@@ -1,0 +1,9 @@
+#!args apps/JFNetworker/tests/fixtures/backup.jfnet --scenario apps/JFNetworker/tests/scen/backup.scn --golden apps/JFNetworker/tests/scen/backup.report
+# golden scenario: configuration backups over TFTP and file transfers over FTP. R1, R2 and R3
+# copy their configurations to SRV1's TFTP server (R3 over a cable that loses frames: blocks
+# and ACKs go again), R1 gets a wrong name and merges its backup back, also as its startup
+# configuration; flash: with copy, dir, delete and show flash:; a missing file; PC1 uploads,
+# lists and downloads over FTP as anna, is refused with a wrong password, fetches a file
+# anonymously and a configuration with tftp. The GUI program runs tests/scen/backup.scn on
+# tests/fixtures/backup.jfnet without a window and ends with the report, which must equal
+# tests/scen/backup.report byte for byte on every target (the script itself is not run)

@@ -34,6 +34,12 @@
 // with a NOTIFICATION is a problem with that code; a segment that does not start with the marker
 // is the rest of a message of an earlier one (bgp.rs; AS numbers of 2 or 4 octets as
 // bgp::as_path_4 guesses).
+// TFTP (port 69, and the DATA, ACK, ERROR and OACK packets of a transfer between two ports
+// above 1023 by their shape: RFC 1350 moves a transfer to new ports) shows its opcode, file,
+// mode, options, block, data and error (tftp.rs).  FTP (TCP port 21) shows each command line
+// with its verb and argument and each reply line with its code; FTP-DATA (port 20, the active
+// data connections) its bytes; passive data connections run between two free ports and show
+// as TCP data (ftp.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -58,6 +64,8 @@ use crate::rip::{self, RipView};
 use crate::icmpv6::{self, Icmp6View, NdMsg, NdOpt};
 use crate::ospf;
 use crate::bgp;
+use crate::tftp;
+use crate::ftp;
 
 pub const P_ETH: u32 = 1 << 0;
 pub const P_VLAN: u32 = 1 << 1;
@@ -87,6 +95,8 @@ pub const P_DHCPV6: u32 = 1 << 24;
 pub const P_EAPOL: u32 = 1 << 25;
 /// BGP (TCP port 179); a bit far from the next free ones, which other protocols take in order
 pub const P_BGP: u32 = 1 << 30;
+/// FTP's control connection and its active data connections (FTP-DATA)
+pub const P_FTP: u32 = 1 << 26;
 pub const P_DATA: u32 = 1 << 31;
 
 /// a protocol layer
@@ -120,6 +130,10 @@ pub enum Proto {
     Data,
     Eapol,
     Bgp,
+    /// FTP's control connection (port 21)
+    Ftp,
+    /// an active FTP data connection (port 20)
+    FtpData,
 }
 
 impl Proto {
@@ -153,6 +167,8 @@ impl Proto {
             Proto::Data => "Data",
             Proto::Eapol => "EAPOL",
             Proto::Bgp => "BGP",
+            Proto::Ftp => "FTP",
+            Proto::FtpData => "FTP-DATA",
         }
     }
     pub fn bit(self) -> u32 {
@@ -185,6 +201,7 @@ impl Proto {
             Proto::Data => P_DATA,
             Proto::Eapol => P_EAPOL,
             Proto::Bgp => P_BGP,
+            Proto::Ftp | Proto::FtpData => P_FTP,
         }
     }
 }
@@ -245,6 +262,8 @@ fn tcp_app(sp: u16, dp: u16) -> Option<Proto> {
             22 => Proto::Ssh,
             53 => Proto::Dns,
             bgp::PORT => Proto::Bgp,
+            ftp::PORT_FTP => Proto::Ftp,
+            ftp::PORT_FTP_DATA => Proto::FtpData,
             _ => return None,
         })
     };
@@ -371,7 +390,9 @@ fn transport(s: &mut Stack, proto: u8, p: &[u8], off: usize) {
             s.push(Proto::Udp, off, udp::UDP_HDR);
             let pl = u.payload().len();
             if pl > 0 {
-                let app = udp_app(u.src_port(), u.dst_port()).unwrap_or(Proto::Data);
+                // a running TFTP transfer has left port 69: its packets by their shape
+                let (sp, dp) = (u.src_port(), u.dst_port());
+                let app = udp_app(sp, dp).or_else(|| (sp > 1023 && dp > 1023 && tftp::looks_like(u.payload())).then_some(Proto::Tftp)).unwrap_or(Proto::Data);
                 s.push(app, off + udp::UDP_HDR, pl);
             }
         }
@@ -542,6 +563,8 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Ospf => Some(ospf_layer(frame, off, len)),
             Proto::Eapol => Some(eapol_layer(frame, off, len)),
             Proto::Bgp => Some(bgp_layer(frame, off, len)),
+            Proto::Tftp => Some(tftp_layer(frame, off, len)),
+            Proto::Ftp => Some(ftp_layer(frame, off, len, ftp_response(&st, frame))),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -862,6 +885,7 @@ fn payload_layer(p: Proto, off: usize, len: usize) -> B {
         Proto::Lldp => String::from("Link Layer Discovery Protocol"),
         Proto::Igmp => String::from("Internet Group Management Protocol"),
         Proto::Icmpv6 => String::from("Internet Control Message Protocol v6"),
+        Proto::FtpData => String::from("FTP Data"),
         other => String::from(other.name()),
     };
     let mut b = B::new(p, off, len, title);
@@ -997,6 +1021,9 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Ospf => ospf_info(b),
         Proto::Eapol => Some(eapol_info(b)),
         Proto::Bgp => Some(bgp_info(b)),
+        Proto::Tftp => Some(tftp_info(b)),
+        Proto::Ftp => Some(ftp_info(b, ftp_response(st, frame))),
+        Proto::FtpData => Some(format!("FTP Data: {} bytes", b.len())),
         _ => None,
     }
 }
@@ -2588,4 +2615,142 @@ fn bgp_info(b: &[u8]) -> String {
         }
     }
     parts.join(", ")
+}
+
+// ---------------------------------------------------------------- TFTP and FTP
+
+/// what a TFTP field holds, for the dissector's problems
+fn tftp_bad(e: tftp::Bad) -> &'static str {
+    match e {
+        tftp::Bad::Short => "shorter than its TFTP header",
+        tftp::Bad::Opcode(_) => "an opcode TFTP does not define",
+        tftp::Bad::Unterminated => "a string field without its terminating zero",
+        tftp::Bad::OddOptions => "an option without a value",
+    }
+}
+
+fn tftp_layer(frame: &[u8], off: usize, len: usize) -> B {
+    let b = &frame[off..off + len];
+    let v = match tftp::TftpView::parse(b) {
+        Ok(v) => v,
+        Err(e) => {
+            let mut l = payload_layer(Proto::Tftp, off, len);
+            if b.len() >= 2 {
+                l.f("Opcode", off, 2, format!("{} ({})", tftp::op_name(be16(b, 0)), be16(b, 0)));
+            }
+            l.bad(String::from(tftp_bad(e)));
+            return l;
+        }
+    };
+    let op = v.opcode();
+    let mut l = B::new(Proto::Tftp, off, len, format!("Trivial File Transfer Protocol, {}", tftp::op_name(op)));
+    l.f("Opcode", off, 2, format!("{} ({})", tftp::op_name(op), op));
+    let opts = |l: &mut B, f: &[tftp::Span]| {
+        for c in f.chunks(2) {
+            if let [k, val] = c {
+                l.f("Option", off + k.0, val.0 + val.1 + 1 - k.0, format!("{} = {}", v.text(*k), v.text(*val)));
+            }
+        }
+    };
+    match op {
+        tftp::OP_RRQ | tftp::OP_WRQ => {
+            let f = v.fields();
+            if let [file, mode, ..] = f[..] {
+                l.f(if op == tftp::OP_RRQ { "Source File" } else { "Destination File" }, off + file.0, file.1 + 1, v.text(file));
+                let m = v.text(mode);
+                l.f("Type", off + mode.0, mode.1 + 1, m.clone());
+                if !tftp::mode_known(&m) {
+                    l.bad(format!("unknown transfer mode \"{}\"", m));
+                }
+                opts(&mut l, &f[2..]);
+            }
+        }
+        tftp::OP_DATA => {
+            l.f("Block", off + 2, 2, format!("{}", v.block()));
+            let n = v.data().len();
+            l.f("Data", off + tftp::TFTP_HDR, n, format!("{} bytes", n));
+        }
+        tftp::OP_ACK => l.f("Block", off + 2, 2, format!("{}", v.block())),
+        tftp::OP_ERROR => {
+            let c = v.error_code();
+            l.f("Error Code", off + 2, 2, format!("{} ({})", tftp::error_name(c), c));
+            l.f("Error Message", off + tftp::TFTP_HDR, len - tftp::TFTP_HDR, v.error_msg());
+            if c > tftp::ERR_OPTION {
+                l.bad(format!("an error code TFTP does not define ({})", c));
+            }
+        }
+        _ => opts(&mut l, &v.fields()),
+    }
+    l
+}
+
+/// "Read Request, File: r1-config, Transfer type: octet", "Data Packet, Block: 1 (last)",
+/// "Error Code, Code: File not found, Message: ..."
+fn tftp_info(b: &[u8]) -> String {
+    let Ok(p) = tftp::Packet::parse(b) else {
+        return String::from("TFTP");
+    };
+    let opts = |o: &[(String, String)]| -> String { o.iter().map(|(k, v)| format!(", {}={}", k, v)).collect() };
+    match &p {
+        tftp::Packet::Rrq { file, mode, opts: o } | tftp::Packet::Wrq { file, mode, opts: o } => format!("{}, File: {}, Transfer type: {}{}", tftp::op_name(p.opcode()), file, mode, opts(o)),
+        tftp::Packet::Data { block, data } => format!("Data Packet, Block: {}{}", block, if data.len() < tftp::BLOCK { " (last)" } else { "" }),
+        tftp::Packet::Ack { block } => format!("Acknowledgement, Block: {}", block),
+        tftp::Packet::Error { code, msg } => format!("Error Code, Code: {}, Message: {}", tftp::error_name(*code), msg),
+        tftp::Packet::Oack { opts: o } => format!("Option Acknowledgement{}", opts(o)),
+    }
+}
+
+/// the segment of an FTP control connection comes from the server
+fn ftp_response(st: &Stack, frame: &[u8]) -> bool {
+    match st.find(Proto::Tcp).and_then(|(o, _)| TcpView::parse(&frame[o..])) {
+        Some(t) => t.src_port() == ftp::PORT_FTP && t.dst_port() != ftp::PORT_FTP,
+        None => false,
+    }
+}
+
+fn ftp_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Ftp, off, len, String::from("File Transfer Protocol (FTP)"));
+    let mut p = 0;
+    while p < b.len() {
+        let Some(i) = b[p..].iter().position(|&c| c == b'\n') else {
+            l.f("Continuation", off + p, b.len() - p, format!("{} bytes", b.len() - p));
+            break;
+        };
+        let end = p + i + 1;
+        let e = if i > 0 && b[p + i - 1] == b'\r' { p + i - 1 } else { p + i };
+        let line = String::from_utf8_lossy(&b[p..e]).into_owned();
+        if response {
+            l.f("Response", off + p, end - p, line.clone());
+            let d = line.as_bytes();
+            if d.len() >= 3 && d[..3].iter().all(|c| c.is_ascii_digit()) {
+                l.f("Response code", off + p, 3, String::from(&line[..3]));
+                if line.len() > 4 {
+                    l.f("Response arg", off + p + 4, e - p - 4, String::from(&line[4..]));
+                }
+            }
+        } else {
+            l.f("Request", off + p, end - p, line.clone());
+            if let Some(c) = ftp::Command::parse(&line) {
+                let vl = line.trim_start().split(' ').next().map_or(0, str::len);
+                let lead = line.len() - line.trim_start().len();
+                l.f("Request command", off + p + lead, vl, c.verb.clone());
+                if !c.arg.is_empty() {
+                    l.f("Request arg", off + p + lead + vl + 1, e - (p + lead + vl + 1), c.arg.clone());
+                }
+                if !ftp::verb_known(&c.verb) {
+                    l.bad(format!("a command FTP does not define: {}", c.verb));
+                }
+            }
+        }
+        p = end;
+    }
+    l
+}
+
+/// "Request: USER anna", "Response: 230 Logged in." (the first line of the segment)
+fn ftp_info(b: &[u8], response: bool) -> String {
+    let e = b.iter().position(|&c| c == b'\n').unwrap_or(b.len());
+    let line = String::from_utf8_lossy(&b[..e]);
+    format!("{}: {}", if response { "Response" } else { "Request" }, line.trim_end())
 }

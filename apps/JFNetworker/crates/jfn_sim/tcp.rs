@@ -1899,6 +1899,11 @@ impl Tcb {
                 self.mark_retx(self.snd_max);
                 let n = self.retransmit_head(cx);
                 self.snd_nxt = self.snd_una.wrapping_add(n);
+                // the head may reach past what went out before (bytes Nagle held back): they
+                // are sent now, so an ACK of them is no ACK of something not sent
+                if seq_gt(self.snd_nxt, self.snd_max) {
+                    self.snd_max = self.snd_nxt;
+                }
                 self.t_rto = Some(cx.now + self.rto);
             }
             _ => {}

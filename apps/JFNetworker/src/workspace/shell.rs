@@ -115,6 +115,7 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     crate::doc::autosave::frame(n, ui);
     sim::pdu::dialog(n, ui);
     sim::pdu::file_dialog(n, ui);
+    crate::workspace::devwin::files::dialog(n, ui);
     crate::workspace::task::dialog(n, ui);
     crate::workspace::assess::dialog(n, ui);
     n.sim_timer(ui);

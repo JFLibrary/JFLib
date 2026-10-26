@@ -16,7 +16,9 @@
 //                                                 (ospf.rs: Note::is_ospf), and IPv6's layer 3
 //                                                 (trace6.rs: Note::V6); WLAN's layer 2
 //                                                 (wlantrace.rs: Note::Wlan); BGP's layer 7,
-//                                                 as TCP carries it (bgptrace.rs: Note::Bgp)
+//                                                 as TCP carries it (bgptrace.rs: Note::Bgp);
+//                                                 TFTP's and FTP's layer 7 (xfertrace.rs:
+//                                                 Note::Xfer)
 //   fmt_ns(ns)                                    "1,250 s", "3,200 ms", "450 µs" (in a Msg:
 //                                                 msg::dur, which follows the language)
 //   Trace::event(seq) / events_after(seq)         decisions by their consecutive number
@@ -459,6 +461,9 @@ pub enum Note {
     /// BGP (bgp.rs, bgptrace.rs): sessions, connections, messages, the decision process and
     /// what it originates (layer 7)
     Bgp(crate::bgptrace::BNote),
+    /// file transfers (tftpd.rs, tftpc.rs, ftpd.rs, ftpc.rs; xfertrace.rs): requests, blocks,
+    /// logins, data connections, errors (layer 7)
+    Xfer(crate::xfertrace::XNote),
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -581,6 +586,7 @@ impl Note {
             Note::V6(_) => 3,
             n if n.is_ospf() => 3,
             Note::Bgp(_) => 7,
+            Note::Xfer(_) => 7,
             _ => 2,
         }
     }
@@ -721,6 +727,7 @@ impl Note {
         ) || matches!(self, Note::V6(n) if n.is_drop())
             || matches!(self, Note::Wlan(n) if n.is_drop())
             || matches!(self, Note::Bgp(n) if n.is_drop())
+            || matches!(self, Note::Xfer(n) if n.is_drop())
     }
     /// a TCP decision (tcp.rs)
     pub fn is_tcp(&self) -> bool {
@@ -1154,6 +1161,7 @@ impl Note {
             Note::TcpPtb { mss } => msg!("Packet Too Big: kleinere Segmente, MSS {}.", mss),
             Note::Wlan(n) => n.message(port),
             Note::Bgp(n) => n.message(),
+            Note::Xfer(n) => n.message(),
         }
     }
 }
@@ -1621,6 +1629,7 @@ impl Note {
             n if n.is_ospf() => P_IPV4 | netpkt::decode::P_OSPF,
             Note::Wlan(n) => n.mask(),
             Note::Bgp(n) => n.mask(),
+            Note::Xfer(n) => n.mask(),
             _ => 0,
         }
     }

@@ -45,6 +45,10 @@
 //             capabilities, UPDATE with its path attributes, NOTIFICATION, KEEPALIVE,
 //             ROUTE-REFRESH), BgpErr (the NOTIFICATION a receiver sends)   (RFC 4271, 5492,
 //             6793, 2918, 1997, 4486)
+//   tftp      TftpView, Packet (RRQ, WRQ, DATA, ACK, ERROR, OACK) with their options, error
+//             codes, netascii, looks_like (a transfer away from port 69)  (RFC 1350, 2347-2349)
+//   ftp       Command, Reply (multi-line), Lines, ReplyReader, host_port (PORT, 227), eprt,
+//             epsv_port (229), the reply texts as the server's own words  (RFC 959, 2428, 2389)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -79,6 +83,8 @@ pub mod ospf;
 pub mod addrsel;
 pub mod eapol;
 pub mod bgp;
+pub mod tftp;
+pub mod ftp;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

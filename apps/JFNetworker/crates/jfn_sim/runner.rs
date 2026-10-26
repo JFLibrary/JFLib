@@ -149,6 +149,16 @@ fn drain(d: &mut Inline, r: &mut Rep) {
             Report::CliState { .. } => {}
             // the console shows its messages already; service logs are not part of a report
             Report::Log { .. } => {}
+            Report::Files { dev, at, path, files } => {
+                let n = r.name(dev);
+                let t = at;
+                let text = match files.iter().find(|f| f.path == path) {
+                    Some(f) if f.dir => format!("{}: Verzeichnis {} angelegt", n, path),
+                    Some(f) => format!("{}: {} gespeichert ({} Bytes)", n, path, f.data.len()),
+                    None => format!("{}: {} gelöscht", n, path),
+                };
+                r.line(t, "--", &text);
+            }
         }
     }
 }

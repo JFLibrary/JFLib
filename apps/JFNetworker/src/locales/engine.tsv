@@ -1073,3 +1073,33 @@ NOTIFICATION {}/{} empfangen: {}	NOTIFICATION {}/{} received: {}
 der Nachbar hat die TCP-Verbindung geschlossen	the neighbour closed the TCP connection
 TCP: {}	TCP: {}
 das Interface zum Nachbarn ist ausgefallen	the interface towards the neighbour went down
+# X1a: files on devices, TFTP and FTP (files.rs, tftpd.rs, ftpd.rs, xfertrace.rs)
+Dienst {} auf {}: das Verzeichnis {} gibt es nicht.	Service {} on {}: the directory {} does not exist.
+„root“ ist kein Verzeichnis.	“root” is not a directory.
+Ein Benutzer braucht „name“ ohne Leerzeichen.	A user needs a “name” without spaces.
+{}: das Verzeichnis fehlt	{}: the directory is missing
+Port {}, {}: {} Sitzungen, {} Anmeldungen, {} abgelehnt, {} Downloads, {} Uploads	Port {}, {}: {} sessions, {} logins, {} refused, {} downloads, {} uploads
+lesen und schreiben	read and write
+nur lesen	read only
+{} ({}): {} Übertragungen, {} Bytes gesendet, {} empfangen	{} ({}): {} transfers, {} bytes sent, {} received
+TFTP: Leseanfrage für {} von {}, Blöcke zu {} Byte.	TFTP: read request for {} from {}, blocks of {} bytes.
+TFTP: Schreibanfrage für {} von {}, Blöcke zu {} Byte.	TFTP: write request for {} from {}, blocks of {} bytes.
+TFTP: {} abgelehnt, Fehler {} ({}).	TFTP: {} refused, error {} ({}).
+TFTP: Optionen vereinbart: {}.	TFTP: options agreed: {}.
+TFTP: keine Antwort auf Block {}: noch einmal gesendet (Versuch {}).	TFTP: no answer to block {}: sent again (attempt {}).
+TFTP: doppelte Bestätigung von Block {} ignoriert (kein zweites Senden).	TFTP: duplicate acknowledgment of block {} ignored (nothing is sent twice).
+TFTP: Block {} kam noch einmal: wieder bestätigt.	TFTP: block {} came again: acknowledged again.
+TFTP: Paket von {} Port {} gehört zu keiner Übertragung: Fehler 5.	TFTP: packet from {} port {} belongs to no transfer: error 5.
+TFTP: keine Antwort mehr, die Übertragung von {} endet bei Block {}.	TFTP: no more answers, the transfer of {} ends at block {}.
+TFTP: die Gegenseite meldet Fehler {} ({}): die Übertragung endet.	TFTP: the other side reports error {} ({}): the transfer ends.
+TFTP: {} gesendet, {} Bytes.	TFTP: {} sent, {} bytes.
+TFTP: {} empfangen, {} Bytes.	TFTP: {} received, {} bytes.
+TFTP: fragt {} nach {}.	TFTP: asks {} for {}.
+TFTP: will {} an {} senden.	TFTP: wants to send {} to {}.
+FTP: {} ist angemeldet.	FTP: {} is logged in.
+FTP: Anmeldung von {} abgelehnt.	FTP: login of {} refused.
+FTP: passive Datenverbindung auf Port {} angeboten.	FTP: passive data connection offered on port {}.
+FTP: aktive Datenverbindung zu {} Port {}.	FTP: active data connection to {} port {}.
+FTP: {} abgelehnt ({}).	FTP: {} refused ({}).
+FTP: {} fertig, {} Bytes.	FTP: {} done, {} bytes.
+FTP: {} passt nicht: Kontingent oder Speicher erschöpft.	FTP: {} does not fit: quota or space used up.

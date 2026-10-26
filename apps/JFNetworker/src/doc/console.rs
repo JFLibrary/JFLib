@@ -6,7 +6,8 @@
 //   pump(n)                          the simulator's reports: console output, prompts, saved
 //                                    configurations (an undo step that keeps the running
 //                                    device), new host names (a rename), log lines (the
-//                                    Protokoll panel), power going off and on
+//                                    Protokoll panel), power going off and on, changed files
+//                                    (an undo step the engine has already: Report::Files)
 //   open(n, ui, dev) -> Result       the device's console as the shown tab of the Terminal
 //                                    panel (or its window to the front), with the keyboard
 //   close / float / dock / tile      a tab goes, into a window of its own, back, every console
@@ -239,6 +240,7 @@ fn pump_paged(n: &mut Net, paged: Option<u32>) -> String {
             Report::Startup { dev, text } => saved(n, dev, text),
             Report::Hostname { dev, name } => renamed(n, dev, &name),
             Report::Log { dev, at, sev, tag, text } => n.log.push(dev, at, sev, tag, text),
+            Report::Files { dev, path, files, .. } => files_changed(n, dev, &path, files),
         }
     }
     if paging && let Some(c) = paged.and_then(|d| n.cons.by_dev.get_mut(&d)) {
@@ -268,6 +270,16 @@ fn saved(n: &mut Net, dev: u32, text: String) {
     let Some(name) = n.doc.proj.device(dev).map(|d| d.name.clone()) else { return };
     let label = format!("Konfiguration von {} sichern", name);
     if let Some(e) = edits::device_edit(&n.doc.proj, dev, &label, |x| x.startup_config = text) {
+        n.doc.apply_kept(e, dev);
+    }
+}
+
+// a transfer or a command line changed the device's files: the project keeps them (one undo
+// step the engine has already; undo and redo hand the other records back: Sim::keep)
+fn files_changed(n: &mut Net, dev: u32, path: &str, files: Vec<jfn_model::files::File>) {
+    let Some(name) = n.doc.proj.device(dev).map(|d| d.name.clone()) else { return };
+    let label = format!("Datei {} auf {}", path, name);
+    if let Some(e) = edits::device_edit(&n.doc.proj, dev, &label, |x| x.files = files) {
         n.doc.apply_kept(e, dev);
     }
 }

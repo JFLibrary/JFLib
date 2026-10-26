@@ -60,6 +60,9 @@
 //                             getaddrinfo: A, AAAA or both as the device can use them, in the
 //                             order of RFC 6724 (resolver.rs)
 //   Engine::udp6_input        from l3v6.rs: the socket for a UDP datagram over IPv6
+//   Os::files                 the device's files (jfn_model::files::Store: flash: and nvram: of
+//                             IOS-like devices, the Linux tree of hosts); files.rs reads and
+//                             writes them for services (OsApi::file_*) and the command lines
 //
 // Everything a service sees goes through its node's inbox, which a node timer (SLOT_OS)
 // empties at the same virtual time: a service never runs inside another one's call, and a
@@ -501,6 +504,8 @@ pub struct Os {
     pub tcp: crate::tcp::TcpStack,
     /// the disk: access times and capacity for services that store data (disk.rs)
     pub disk: crate::disk::Disk,
+    /// the device's files: they stay through power off (files.rs)
+    pub files: jfn_model::files::Store,
 }
 
 impl Os {
@@ -525,6 +530,7 @@ impl Os {
             ephemeral: if ios { (49152, 65535) } else { (32768, 60999) },
             tcp: crate::tcp::TcpStack::new(ios),
             disk: crate::disk::Disk::default(),
+            files: jfn_model::files::Store::for_model(model),
         }
     }
     /// a service by name

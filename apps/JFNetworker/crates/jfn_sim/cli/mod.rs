@@ -55,6 +55,9 @@
 //   bgp      BGP at the IOS-like command line: "router bgp ASN" (its own tree mode behind
 //            "(config-router)#"), show ip bgp [summary|neighbors], the B routes of show ip
 //            route, debug ip bgp [events|updates], clear ip bgp, the running configuration
+//   files    the files of a device: dir, show flash:, more, delete, copy with its questions,
+//            ip ftp username / password (IOS-like); ls, cat, rm, cp, mkdir, rmdir, touch, echo
+//            > FILE, tftp (Linux); curl ftp:// is ftpc.rs
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -99,6 +102,7 @@ pub mod ospf;
 pub mod names;
 pub mod wlan;
 pub mod bgp;
+pub mod files;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -222,6 +226,8 @@ pub enum AskKind {
     Ping6Out { dst: netpkt::Ipv6, count: u32, bytes: u16, timeout: Ns },
     /// "clear ip ospf process"
     ClearOspf,
+    /// a question of copy or delete (files.rs: CliDev::files holds the dialog)
+    Files,
 }
 
 /// a console command that runs over virtual time
@@ -274,6 +280,8 @@ pub struct CliDev {
     pub ospf_debug: u8,
     /// what "debug ip bgp" shows (cli/bgp.rs DB_*; none: everything)
     pub bgp_debug: u8,
+    /// copy's dialog, the last host, the FTP login (files.rs)
+    pub files: files::FilesCli,
 }
 
 impl CliDev {
@@ -298,6 +306,7 @@ impl CliDev {
             acl: String::new(),
             ospf_debug: 0,
             bgp_debug: 0,
+            files: files::FilesCli::default(),
         }
     }
 }

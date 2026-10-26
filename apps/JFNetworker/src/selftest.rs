@@ -32,6 +32,8 @@
 // doc/wlan.rs).
 // bgptest.rs: BGP-4 on routers, L3 switches and the firewall (group bgp: jfn_sim::bgp, bgptrace,
 // cli/bgp.rs).
+// filestest.rs: files on devices, TFTP and FTP (group files: jfn_model::files, jfn_sim::files,
+// tftpd, tftpc, ftpd, ftpc, cli/files.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -91,9 +93,11 @@ mod assesstest;
 mod wlantest;
 #[path = "bgptest.rs"]
 mod bgptest;
+#[path = "filestest.rs"]
+mod filestest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 34] = [
+    let groups: [(&'static str, fn(&mut T)); 35] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -128,6 +132,7 @@ pub fn run() -> i32 {
         ("assess", assesstest::run),
         ("wlan", wlantest::run),
         ("bgp", bgptest::run),
+        ("files", filestest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

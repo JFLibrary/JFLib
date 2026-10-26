@@ -26,6 +26,9 @@
 // NAME" look the name up.
 // BGP (cli/bgp.rs): "router bgp ASN" is a tree mode of its own behind "(config-router)#", as
 // OSPF's.
+// Files (cli/files.rs): dir, show flash:, more, delete, copy between running-config,
+// startup-config, flash:, tftp: and ftp: with questions for what is missing, ip ftp
+// username / password.
 
 use alloc::format;
 use alloc::string::String;
@@ -206,6 +209,13 @@ pub enum K {
     ShowBgpNbr,
     ClearBgp,
     DebugBgp,
+    // files (cli/files.rs)
+    Dir,
+    ShowFlash,
+    More,
+    Delete,
+    Copy,
+    IpFtp,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -556,6 +566,8 @@ fn build(caps: u32) -> Tree<K> {
     }
     // ---- BGP with its own router mode (cli/bgp.rs)
     super::bgp::build_bgp(&mut t, [user, prv, conf], router);
+    // ---- files: flash, nvram, copy to and from servers (cli/files.rs)
+    super::files::build_files(&mut t, [user, prv, conf]);
     t
 }
 
@@ -1091,6 +1103,7 @@ impl Engine {
             | K::ShowBgpNbr
             | K::ClearBgp
             | K::DebugBgp => self.ios_bgp(ni, p),
+            K::Dir | K::ShowFlash | K::More | K::Delete | K::Copy | K::IpFtp => self.ios_files(ni, p),
         }
     }
 
@@ -1107,6 +1120,7 @@ impl Engine {
             }
             AskKind::Ping6Out { dst, count, bytes, timeout } => self.ios_ping6_answer(ni, dst, count, bytes, timeout, line),
             AskKind::ClearOspf => self.ios_ospf_clear(ni, line),
+            AskKind::Files => self.files_answer(ni, line),
         }
     }
 

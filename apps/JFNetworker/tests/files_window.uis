@@ -1,0 +1,82 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/backup.jfnet
+# the Dateien tab of the device windows (workspace/devwin/files.rs) on fixtures/backup.jfnet:
+# SRV1's files from the project (directories, readme.txt with its text), Exportieren … into a
+# file of the computer, Löschen as an undo step and back, Importieren … into the chosen
+# directory (the simulator has it at once: ls in the CLI tab), a file the shell writes comes
+# into the project; R1's flash: with the system image (shown, neither deleted nor exported) and
+# nvram:startup-config with the startup configuration.
+# Ids: the window 26624; Dateien: the grid 61712, Löschen 61697, Importieren … 61698,
+# Exportieren … 61699, the text 61700; the name box of the file dialog 1441804; SRV1's console
+# 25088 (its input line 25089).
+size 1280 900
+theme light
+dblclick listitem:"SRV1" shift
+expect window 26624 open
+click tab:"Dateien"
+expect text:"Festplatte · 2047 GiB von 2048 GiB frei (1 Datei)" exists
+expect text:"/srv/ftp/anna" exists
+expect text:"/srv/ftp/pub" exists
+expect text:"/srv/ftp/pub/readme.txt" exists
+expect #61699 disabled
+expect #61697 disabled
+click text:"/srv/ftp/pub/readme.txt"
+expect #61699 enabled
+expect #61697 enabled
+expect #61700 text "Willkommen auf SRV1.\nDie Sicherungen der Router liegen per TFTP in /srv/tftp.\n"
+shot build/jfnetworker/files_window.png window 26624
+# export: the save dialog, then the file on the computer
+click #61699
+expect dialog:"Speichern unter" exists
+click #1441804
+key ctrl+a
+type "build/jfnetworker/readme_export.txt"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+# delete: one undo step
+click #61697
+expect text:"/srv/ftp/pub/readme.txt" missing
+expect text:"Festplatte · 2048 GiB von 2048 GiB frei (0 Dateien)" exists
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+expect text:"/srv/ftp/pub/readme.txt" exists
+# import into the chosen directory
+click text:"/srv/ftp/pub"
+click #61698
+expect dialog:"Öffnen" exists
+click #1441804
+key ctrl+a
+type "build/jfnetworker/readme_export.txt"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect text:"/srv/ftp/pub/readme_export.txt" exists
+expect text:"Festplatte · 2047 GiB von 2048 GiB frei (2 Dateien)" exists
+# the simulator has it: SRV1's shell
+click tab:"CLI"
+click #25089
+type "ls /srv/ftp/pub\n"
+expect text:"readme.txt  readme_export.txt" exists
+# what the shell writes comes into the project
+type "echo hallo > /tmp/notiz\n"
+click tab:"Dateien"
+expect text:"/tmp/notiz" exists
+click text:"/tmp/notiz"
+expect #61700 text "hallo\n"
+close window 26624
+expect window 26624 closed
+# R1: flash: with the system image, nvram: with the startup configuration
+dblclick listitem:"R1" shift
+expect window 26624 open
+click tab:"Dateien"
+expect text:"flash: · 215 MiB von 256 MiB frei (2 Dateien)" exists
+expect text:"flash:/jf-r4.bin" exists
+expect text:"nvram:/startup-config" exists
+click text:"flash:/jf-r4.bin"
+expect text:"Das Systemabbild des Geräts (40 MiB); es belegt Platz, hat im Simulator aber keinen Inhalt." exists
+expect #61697 disabled
+expect #61699 disabled
+click text:"nvram:/startup-config"
+expect #61700 text "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.0.1 255.255.255.0\n no shutdown\n!\nend\n"
+shot build/jfnetworker/files_router.png window 26624
+close window 26624
+expect_nowarn

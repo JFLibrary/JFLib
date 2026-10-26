@@ -61,6 +61,8 @@
 //                                                      and access points look again); power,
 //                                                      ports, cables and devices that come and go
 //                                                      tell WLAN too
+//   Files                                              a device's files as the project has them
+//                                                      (files.rs: load, undo; no report back)
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -250,6 +252,8 @@ pub enum Action {
     Scale { dip_per_m: u32 },
     /// a change of BGP's configuration, or "clear ip bgp" (bgp.rs)
     Bgp { dev: u32, set: crate::bgp::BgpSet },
+    /// a device's files as the project has them (files.rs): the store takes them as they are
+    Files { dev: u32, files: Vec<jfn_model::files::File> },
 }
 
 /// why an action was refused (German text through Display)
@@ -621,6 +625,8 @@ impl Engine {
             Action::Wlan { dev, wlan } => self.wlan_set(dev, wlan),
             Action::Scale { dip_per_m } => self.wlan_set_scale(dip_per_m),
             Action::Bgp { dev, set } => self.bgp_apply(dev, set),
+            // the files of a device (files.rs)
+            Action::Files { dev, files } => self.files_set(dev, &files),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }
@@ -873,6 +879,10 @@ impl Engine {
         self.nodes.push(Some(node));
         let ni = self.nodes.len() - 1;
         self.dev_idx.insert(d.id, ni);
+        // its files (files.rs), before the services that serve them
+        if let Some(os) = self.os_mut(ni) {
+            os.files.load(&d.files);
+        }
         // the services of the project start when the engine runs (a bad one is left out)
         for s in &d.services {
             let _ = self.service_def(d.id, s);

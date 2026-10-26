@@ -1012,3 +1012,26 @@ Eine ganze Zahl von 1 bis 1000.	A whole number from 1 to 1000.
 Ein Meter sind {} Einheiten der Zeichenfläche (bei 100 % Pixel); danach richten sich die Reichweiten im WLAN.	One meter is {} units of the canvas (pixels at 100%); the WLAN ranges follow it.
 Anmelden	Join
 Abmelden	Leave
+
+# X1a: the Dateien tab of the device windows (workspace/devwin/files.rs), the new services
+Geändert	Modified
+{} von {} frei ({} Dateien)	{} of {} free ({} files)
+{} von {} frei (1 Datei)	{} of {} free (1 file)
+Festplatte	Disk
+Importieren …	Import …
+Eine Datei des Computers auf das Gerät kopieren (in das gewählte Verzeichnis).	Copy a file of the computer onto the device (into the chosen directory).
+Exportieren …	Export …
+Auf {} liegt noch nichts. Dateien kommen per TFTP, FTP, über die Befehlszeile oder mit Importieren.	There is nothing on {} yet. Files come by TFTP, FTP, the command line or Import.
+Ein Verzeichnis.	A directory.
+Das Systemabbild des Geräts ({}); es belegt Platz, hat im Simulator aber keinen Inhalt.	The device's system image ({}); it takes space but has no content in the simulator.
+Binärdaten, {}.	Binary data, {}.
+„{}“ wurde nicht geschrieben.	“{}” was not written.
+„{}“ kommt nicht auf das Gerät: {}.	“{}” does not go onto the device: {}.
+„{}“ ließ sich nicht lesen.	“{}” could not be read.
+kein Platz mehr	no space left
+das Verzeichnis fehlt	the directory is missing
+dort liegt ein Verzeichnis	a directory is in the way
+der Name geht nicht	the name does not work
+das Gerät nimmt sie nicht	the device does not take it
+TFTP-Server	TFTP server
+FTP-Server	FTP server
