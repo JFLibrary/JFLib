@@ -1,6 +1,6 @@
 // devwin -- the device windows (a double click with Shift, the context menu, the inspector):
 // a tool window per device with the tabs Übersicht, Schnittstellen, Konfiguration, Dienste,
-// CLI and, for hosts, Desktop
+// CLI and, for hosts, Desktop; Dateien for devices with files
 //
 //   DevWins::new()          none open
 //   open(n, ui, dev)        the device's window (one that is open comes to the front; at most
@@ -16,6 +16,8 @@
 //   desktop.rs   Desktop of hosts: IP-Konfiguration, Eingabeaufforderung, Texteditor, Browser
 //   scripts.rs   Skripte of hosts: the device's scripts, a code editor with diagnostics, run,
 //                stop, apply, their output and errors (ids ID_SCRIPTS0 + 0x400 k ..)
+//   files.rs     Dateien: the device's files (flash:, nvram:, the Linux tree) with their text,
+//                delete, import, export (ids ID_FILES0 + 0x180 k ..)
 //
 // Übersicht shows model, ports, power and state; Schnittstellen every interface as the
 // simulator runs it (the inspector's rows, with frame counters); CLI the device's console --
@@ -29,6 +31,7 @@ pub(crate) mod desktop;
 pub(crate) mod services;
 pub(crate) mod svcedit;
 pub(crate) mod scripts;
+pub(crate) mod files;
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -56,6 +59,7 @@ pub(crate) enum Tab {
     Cli,
     Desktop,
     Scripts,
+    Files,
 }
 
 impl Tab {
@@ -69,6 +73,7 @@ impl Tab {
             Tab::Cli => "CLI",
             Tab::Desktop => "Desktop",
             Tab::Scripts => "Skripte",
+            Tab::Files => "Dateien",
         })
     }
 }
@@ -91,6 +96,9 @@ fn tabs_of(n: &Net, dev: u32) -> Vec<Tab> {
     if scripts::has_tab(&n.doc.proj, dev) {
         v.push(Tab::Scripts);
     }
+    if files::has_tab(&n.doc.proj, dev) {
+        v.push(Tab::Files);
+    }
     v
 }
 
@@ -107,6 +115,8 @@ pub(crate) struct DevWin {
     age: u32,
     /// the Skripte tab
     pub scr: scripts::Pane,
+    /// the Dateien tab's grid
+    pub files: GridState,
 }
 
 pub(crate) struct DevWins {
@@ -116,11 +126,13 @@ pub(crate) struct DevWins {
     pub svc: svcedit::SvcEdit,
     /// the scripts being edited, of every window (they outlive a closed window)
     pub drafts: scripts::Drafts,
+    /// the Dateien tab's file dialog
+    pub files: files::FilesUi,
 }
 
 impl DevWins {
     pub(crate) fn new() -> DevWins {
-        DevWins { wins: (0..DEVWINS).map(|_| None).collect(), clock: 0, svc: svcedit::SvcEdit::new(), drafts: scripts::Drafts::new() }
+        DevWins { wins: (0..DEVWINS).map(|_| None).collect(), clock: 0, svc: svcedit::SvcEdit::new(), drafts: scripts::Drafts::new(), files: files::FilesUi::new() }
     }
 
     /// device window k (for the tabs' modules)
@@ -164,6 +176,7 @@ pub(crate) fn open(n: &mut Net, ui: &mut Ui, dev: u32) {
         desk: desktop::Desk::new(),
         age: w.clock,
         scr: scripts::Pane::new(dev),
+        files: GridState::default(),
     });
     ui.window_activate(base(k));
     ui.repass();
@@ -245,6 +258,7 @@ fn window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
         }
         Tab::Desktop => desktop::tab(n, ui, k, id + 0x80, dev),
         Tab::Scripts => scripts::tab(n, ui, k, ID_SCRIPTS0 + 0x400 * k as u32, dev),
+        Tab::Files => files::tab(n, ui, k, dev),
     }
     ui.box_end();
 }

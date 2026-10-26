@@ -40,6 +40,12 @@
 //                     "time_ms": 50, ...} (mq.rs)
 //     script          {"source": "net.udp(7, fn(s, m) { s.send(m.from, m.port, m.data) })",
 //                     "ns_per_op": 5, "limits": {"fuel": 10000000, ...}, ...} (scriptsvc.rs)
+//     tftp-server     {"root": "/srv/tftp", "writable": false, "overwrite": true, "port": 69,
+//                     "timeout_ms": 1000, "retries": 5, "options": true, "quota_kb": 0}
+//                     (tftpd.rs)
+//     ftp-server      {"root": "/srv/ftp", "anonymous": true, "anon_write": false, "users":
+//                     [{"name": "anna", "password": "geheim", "home": "/srv/ftp/anna", "write":
+//                     true}], "active": true, "quota_kb": 0, ...} (ftpd.rs)
 //
 //   HttpLoadSet / HttpServerSet    change a running load generator or web server in place
 //   ScriptSource / RenameService   a script's new definition, keeping its disk and numbers
@@ -205,6 +211,8 @@ impl Engine {
             "cache" => crate::cache::from_def_msg(c).map_err(|w| bad(kind, w))?,
             "mq" | "worker" => crate::mq::from_def_msg(kind, c).map_err(|w| bad(kind, w))?,
             "script" => crate::scriptsvc::from_def_msg(c).map_err(|w| bad(kind, w))?,
+            "tftp-server" => Box::new(crate::tftpd::TftpServer::from_config(c, ios).map_err(|w| bad(kind, w))?),
+            "ftp-server" => Box::new(crate::ftpd::FtpServer::from_config(c).map_err(|w| bad(kind, w))?),
             k => return Err(ActErr::Refused(msg!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k))),
         };
         let name = if def.name.is_empty() { def.kind.clone() } else { def.name.clone() };

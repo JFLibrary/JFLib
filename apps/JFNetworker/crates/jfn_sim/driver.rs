@@ -234,6 +234,9 @@ pub enum Report {
     /// IOS console messages (%LINK, %LINEPROTO, %SYS) and debugging output; `sev` 0
     /// (emergency) .. 7 (debugging), `tag` the program or the message code
     Log { dev: u32, at: Ns, sev: u8, tag: alloc::string::String, text: alloc::string::String },
+    /// a device's files changed (a transfer, a command line): the path and every record now,
+    /// for the project (files.rs)
+    Files { dev: u32, at: Ns, path: alloc::string::String, files: alloc::vec::Vec<jfn_model::files::File> },
 }
 
 impl Inline {

@@ -17,6 +17,8 @@
 //   dig, host, nslookup (names.rs: their own questions to a name server)
 //   iw dev [IF info|link|scan|connect SSID [psk PASS]|disconnect|station dump] (cli/wlan.rs:
 //   WLAN; wlan0 shows in ip link as any port, NO-CARRIER until the handshake is done)
+//   ls, cat FILE, rm, cp, mkdir, rmdir, touch, echo ... > FILE, tftp -g|-p (files.rs: the
+//   device's files); curl ftp://... (ftpc.rs)
 //
 // Objects and commands of ip take any prefix, the first one of iproute2's order winning ("ip
 // a" is address, "ip r" route, "ip n" neighbour); output and error messages are those of
@@ -139,11 +141,15 @@ impl Engine {
             "dhclient" => self.sh_dhclient(ni, &args),
             "cat" => self.sh_cat(ni, &args),
             "iw" => self.sh_iw(ni, &args),
-            "echo" => {
-                let t = format!("{}\n", args.join(" "));
-                self.out(ni, &t);
-                Ok(())
-            }
+            // with "> FILE" into a file (files.rs)
+            "echo" => self.sh_echo(ni, &args),
+            "ls" => self.sh_ls(ni, &args),
+            "rm" => self.sh_rm(ni, &args),
+            "cp" => self.sh_cp(ni, &args),
+            "mkdir" => self.sh_mkdir(ni, &args),
+            "rmdir" => self.sh_rmdir(ni, &args),
+            "touch" => self.sh_touch(ni, &args),
+            "tftp" => self.sh_tftp(ni, &args),
             "clear" => {
                 self.out(ni, "\x1b[H\x1b[2J");
                 Ok(())
@@ -159,13 +165,14 @@ impl Engine {
         let w = words(line);
         let partial = !line.is_empty() && !line.ends_with(char::is_whitespace);
         let (list, done): (&[&str], usize) = match w.len() {
-            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "top", "traceroute", "workerctl"], 0),
+            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch"], 0),
             2 if partial && w[0] == "ip" => (&["address", "link", "neighbour", "route"], 1),
             3 if partial && w[0] == "ip" => (&["add", "del", "flush", "get", "set", "show"], 2),
             _ => return (None, Vec::new()),
         };
         let last = &w[done];
-        let choices: Vec<String> = list.iter().filter(|c| c.starts_with(last.as_str())).map(|c| String::from(*c)).collect();
+        let mut choices: Vec<String> = list.iter().filter(|c| c.starts_with(last.as_str())).map(|c| String::from(*c)).collect();
+        choices.sort();
         let head_len = line.rfind(last.as_str()).unwrap_or(0);
         let out = if choices.len() == 1 { Some(format!("{}{} ", &line[..head_len], choices[0])) } else { None };
         (out, choices)

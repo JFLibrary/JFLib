@@ -42,6 +42,8 @@ fn kind_name(kind: &str) -> &str {
         "worker" => "Worker",
         "rip" => "Routing (RIP)",
         "ospf" => "Routing (OSPF)",
+        "tftp-server" => "TFTP-Server",
+        "ftp-server" => "FTP-Server",
         _ => return kind,
     })
 }

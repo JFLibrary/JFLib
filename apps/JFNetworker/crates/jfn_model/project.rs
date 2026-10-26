@@ -47,6 +47,11 @@
 //            "wpa2-personal", "passphrase": "geheim123", "vlan": 0, "guest": false,
 //            "isolate": false}], "join": null}
 //   "wlan": {"nets": [], "join": {"ssid": "Büro", "passphrase": "geheim123"}}
+//
+// Files (files.rs): a device's "files" are its flash: and nvram: (IOS-like) or its Linux files
+// and the directories made on it, a record each ([] without): {"path": "flash:/r1-config",
+// "text": "..."}, {"path": "/srv/tftp/a.bin", "base64": "..."}, {"path": "/srv/ftp/in", "dir":
+// true}; the simulator works on them and reports changes, which the app takes as steps
 
 use alloc::format;
 use alloc::string::String;
@@ -123,6 +128,9 @@ record! {
         /// the WLAN settings: the networks of an access point, the one a station joins
         /// (wlan.rs; None: none)
         pub wlan: Option<crate::wlan::Wlan>,
+        /// its files: flash: and nvram: of IOS-like devices, the files and directories of a
+        /// Linux host (files.rs; empty: none)
+        pub files: Vec<crate::files::File>,
     }
 }
 

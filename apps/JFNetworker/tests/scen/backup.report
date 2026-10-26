@@ -1,0 +1,267 @@
+# JFNetworker-Szenario backup.scn: „Sicherung per TFTP und FTP“, 6 Geräte, 5 Verbindungen, Seed 11
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/10 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/10 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/11 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/11 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  R3      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R3      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  R1      R1>enable
+   0.000000000  R1      R1#copy running-config tftp:
+   0.000000000  R1      Host of the server []? 10.0.0.10
+   0.000000000  R1      File on the server [r1-config]? r1-config
+   0.000000000  --      run until idle
+   0.000000000  R1      Sending 529 bytes to tftp://10.0.0.10/r1-config ...
+   1.000255236  --      SRV1: /srv/tftp/r1-config gespeichert (529 Bytes)
+   1.000256680  R1      .##
+   1.000256680  R1      Done: 529 bytes in 1000 ms (529 bytes/s)
+   3.000255236  ok      expect R1 output contains "Done: 529 bytes in 1000 ms"
+   3.000255236  R2      R2>enable
+   3.000255236  R2      R2#configure terminal
+   3.000255236  R2      Configuration mode: one command per line; end or Ctrl+Z leaves it.
+   3.000255236  R2      R2(config)#interface Gi0/0/1
+   3.000255236  R2      R2(config-if)#description Uplink zum Labor
+   3.000255236  R2      R2(config-if)#end
+   3.000255236  R2      *Mar  1 00:00:03.000: %SYS-5-CONFIG_I: configuration changed at the console
+   3.000255236  R2      R2#copy running-config tftp://10.0.0.10/r2-config
+   3.000255236  --      run until idle
+   3.000255236  R2      Sending 559 bytes to tftp://10.0.0.10/r2-config ...
+   4.000510952  --      SRV1: /srv/tftp/r2-config gespeichert (559 Bytes)
+   4.000512396  R2      .##
+   4.000512396  R2      Done: 559 bytes in 1000 ms (559 bytes/s)
+   6.000510952  ok      expect R2 output contains "Done: 559 bytes"
+   6.000510952  R3      R3>enable
+   6.000510952  R3      R3#write memory
+   6.000510952  R3      Saving the configuration ...
+   6.000510952  R3      [OK]
+   6.000510952  --      R3: startup-config gespeichert
+   6.000510952  --      impair SRV1 eth0 loss 300000ppm
+   6.000510952  R3      R3#copy startup-config tftp:
+   6.000510952  R3      Host of the server []? 10.0.0.10
+   6.000510952  R3      File on the server [r3-config]? r3-config
+   6.000510952  --      run until idle
+   6.000510952  R3      Sending 529 bytes to tftp://10.0.0.10/r3-config ...
+  12.000766188  --      SRV1: /srv/tftp/r3-config gespeichert (529 Bytes)
+  12.000767632  R3      ....##..
+  12.000767632  R3      Done: 529 bytes in 6000 ms (88 bytes/s)
+  14.000766188  --      impair SRV1 eth0 loss 0ppm
+  14.000766188  ok      expect R3 output contains "Done: "
+  14.000766188  ok      expect SRV1 svc tftp metric done == 3 (3)
+  14.000766188  SRV1    root@SRV1:~# ls -l /srv/tftp
+  14.000766188  SRV1    total 12
+  14.000766188  SRV1    -rw-r--r-- 1 root root   529 Jan  1 00:00 r1-config
+  14.000766188  SRV1    -rw-r--r-- 1 root root   559 Jan  1 00:00 r2-config
+  14.000766188  SRV1    -rw-r--r-- 1 root root   529 Jan  1 00:00 r3-config
+  14.000766188  ok      expect SRV1 output contains "r3-config"
+  14.000766188  SRV1    root@SRV1:~# cat /srv/tftp/r2-config
+  14.000766188  SRV1    !
+  14.000766188  SRV1    version 1.0
+  14.000766188  SRV1    !
+  14.000766188  SRV1    hostname R2
+  14.000766188  SRV1    !
+  14.000766188  SRV1    interface GigabitEthernet0/0/0
+  14.000766188  SRV1     ip address 10.0.0.2 255.255.255.0
+  14.000766188  SRV1    !
+  14.000766188  SRV1    interface GigabitEthernet0/0/1
+  14.000766188  SRV1     description Uplink zum Labor
+  14.000766188  SRV1     no ip address
+  14.000766188  SRV1     shutdown
+  14.000766188  SRV1    !
+  14.000766188  SRV1    interface GigabitEthernet0/0/2
+  14.000766188  SRV1     no ip address
+  14.000766188  SRV1     shutdown
+  14.000766188  SRV1    !
+  14.000766188  SRV1    interface GigabitEthernet0/0/3
+  14.000766188  SRV1     no ip address
+  14.000766188  SRV1     shutdown
+  14.000766188  SRV1    !
+  14.000766188  SRV1    interface TenGigabitEthernet0/1/0
+  14.000766188  SRV1     no ip address
+  14.000766188  SRV1     shutdown
+  14.000766188  SRV1    !
+  14.000766188  SRV1    interface TenGigabitEthernet0/1/1
+  14.000766188  SRV1     no ip address
+  14.000766188  SRV1     shutdown
+  14.000766188  SRV1    !
+  14.000766188  SRV1    interface Serial0/2/0
+  14.000766188  SRV1     no ip address
+  14.000766188  SRV1     shutdown
+  14.000766188  SRV1    !
+  14.000766188  SRV1    interface Serial0/2/1
+  14.000766188  SRV1     no ip address
+  14.000766188  SRV1     shutdown
+  14.000766188  SRV1    !
+  14.000766188  SRV1    line con 0
+  14.000766188  SRV1    line vty 0 4
+  14.000766188  SRV1     login
+  14.000766188  SRV1    !
+  14.000766188  SRV1    end
+  14.000766188  ok      expect SRV1 output contains " description Uplink zum Labor"
+  14.000766188  R1      R1#configure terminal
+  14.000766188  R1      Configuration mode: one command per line; end or Ctrl+Z leaves it.
+  14.000766188  R1      R1(config)#hostname Kaputt
+  14.000766188  --      R1 heißt jetzt Kaputt
+  14.000766188  R1      Kaputt(config)#end
+  14.000766188  R1      *Mar  1 00:00:14.000: %SYS-5-CONFIG_I: configuration changed at the console
+  14.000766188  R1      Kaputt#copy tftp: running-config
+  14.000766188  R1      Host of the server [10.0.0.10]? 10.0.0.10
+  14.000766188  R1      File on the server []? r1-config
+  14.000766188  R1      Copy into [running-config]? running-config
+  14.000766188  --      run until idle
+  14.000766188  R1      Fetching tftp://10.0.0.10/r1-config ...
+  14.000899980  R1      ##
+  14.000899980  R1      Done: 529 bytes in 0 ms (529000 bytes/s)
+  15.000898488  --      R1 heißt jetzt R1
+  14.000899980  R1      *Mar  1 00:00:14.000: %SYS-5-CONFIG_I: configuration changed from tftp://10.0.0.10/r1-config
+  15.000898488  ok      expect R1 output contains "%SYS-5-CONFIG_I: configuration changed from tftp://10.0.0.10/r1-config"
+  15.000898488  R1      R1#copy tftp://10.0.0.10/r1-config startup-config
+  15.000898488  R1      Copy into [startup-config]? startup-config
+  15.000898488  --      run until idle
+  15.000898488  R1      Fetching tftp://10.0.0.10/r1-config ...
+  15.001032280  R1      ##
+  15.001032280  R1      Done: 529 bytes in 0 ms (529000 bytes/s)
+  15.001032280  R1      Saved as the startup configuration.
+  16.001030788  --      R1: startup-config gespeichert
+  16.001030788  ok      expect R1 output contains "Saved as the startup configuration."
+  16.001030788  R1      R1#show startup-config
+  16.001030788  R1      ! startup configuration, 529 bytes
+  16.001030788  R1      !
+  16.001030788  R1      version 1.0
+  16.001030788  R1      !
+  16.001030788  R1      hostname R1
+  16.001030788  R1      !
+  16.001030788  R1      interface GigabitEthernet0/0/0
+  16.001030788  R1       ip address 10.0.0.1 255.255.255.0
+  16.001030788  R1      !
+  16.001030788  R1      interface GigabitEthernet0/0/1
+  16.001030788  R1       no ip address
+  16.001030788  R1       shutdown
+  16.001030788  R1      !
+  16.001030788  R1      interface GigabitEthernet0/0/2
+  16.001030788  R1       no ip address
+  16.001030788  R1       shutdown
+  16.001030788  R1      !
+  16.001030788  R1      interface GigabitEthernet0/0/3
+  16.001030788  R1       no ip address
+  16.001030788  R1       shutdown
+  16.001030788  R1      !
+  16.001030788  R1      interface TenGigabitEthernet0/1/0
+  16.001030788  R1       no ip address
+  16.001030788  R1       shutdown
+  16.001030788  R1      !
+  16.001030788  R1      interface TenGigabitEthernet0/1/1
+  16.001030788  R1       no ip address
+  16.001030788  R1       shutdown
+  16.001030788  R1      !
+  16.001030788  R1      interface Serial0/2/0
+  16.001030788  R1       no ip address
+  16.001030788  R1       shutdown
+  16.001030788  R1      !
+  16.001030788  R1      interface Serial0/2/1
+  16.001030788  R1       no ip address
+  16.001030788  R1       shutdown
+  16.001030788  R1      !
+  16.001030788  R1      line con 0
+  16.001030788  R1      line vty 0 4
+  16.001030788  R1       login
+  16.001030788  R1      !
+  16.001030788  R1      end
+  16.001030788  ok      expect R1 output contains "hostname R1"
+  16.001030788  R1      R1#copy running-config flash:r1.cfg
+  16.001030788  --      R1: flash:/r1.cfg gespeichert (529 Bytes)
+  16.001030788  R1      529 bytes copied to flash:/r1.cfg
+  16.001030788  R1      R1#dir flash:
+  16.001030788  R1      Directory of flash:/
+  16.001030788  R1      
+  16.001030788  R1          1  -rw-    42262528  Jan 1 2026 00:00:00 +00:00      jf-r4.bin
+  16.001030788  R1          2  -rw-         529  Jan 1 2026 00:00:14 +00:00      r1.cfg
+  16.001030788  R1      
+  16.001030788  R1      268435456 bytes total (226172399 bytes free)
+  16.001030788  ok      expect R1 output contains "r1.cfg"
+  16.001030788  R1      R1#delete flash:r1.cfg
+  16.001030788  R1      File to delete [r1.cfg]? r1.cfg
+  16.001030788  R1      Delete flash:/r1.cfg for good? [y/n] y
+  16.001030788  --      R1: flash:/r1.cfg gelöscht
+  16.001030788  R1      R1#show flash:
+  16.001030788  R1      -#- --length-- ---------date/time--------- path
+  16.001030788  R1        1   42262528 Jan 1 2026 00:00:00 +00:00  jf-r4.bin
+  16.001030788  R1      
+  16.001030788  R1      226172928 bytes available (42262528 bytes used)
+  16.001030788  ok      expect R1 output not contains "r1.cfg"
+  16.001030788  R1      R1#copy tftp://10.0.0.10/nope flash:
+  16.001030788  R1      Name in flash: [nope]? nope
+  16.001030788  --      run until idle
+  16.001030788  R1      Fetching tftp://10.0.0.10/nope ...
+  16.001033692  R1      
+  16.001033692  R1      %Error opening tftp://10.0.0.10/nope (File not found)
+  17.001030788  ok      expect R1 output contains "%Error opening tftp://10.0.0.10/nope (File not found)"
+  17.001030788  PC1     root@PC1:~# echo Messwerte 1 2 3 > werte.txt
+  17.001030788  --      PC1: /root/werte.txt gespeichert (16 Bytes)
+  17.001030788  PC1     root@PC1:~# curl -v -T werte.txt ftp://anna:geheim@10.0.0.10/
+  17.001030788  --      run 2s
+  17.001030788  PC1     *   Trying 10.0.0.10:21...
+  17.001036564  PC1     * Connected to 10.0.0.10 (10.0.0.10) port 21
+  17.001039916  PC1     < 220 JFNetworker FTP server ready.
+  17.001039916  PC1     > USER anna
+  17.001044500  PC1     < 331 Password, please.
+  17.001044500  PC1     > PASS geheim
+  17.001047660  PC1     < 230 Logged in.
+  17.001047660  PC1     > PWD
+  17.001051012  PC1     < 257 "/" is the current directory.
+  17.001051012  PC1     > EPSV
+  17.001054492  PC1     < 229 Extended passive mode on (|||43532|).
+  17.001054492  PC1     * Connecting to 10.0.0.10 (10.0.0.10) port 43532
+  17.001054492  PC1     > TYPE I
+  17.001058420  PC1     < 200 Binary mode (type I).
+  17.001058420  PC1     > STOR werte.txt
+  17.001061788  PC1     < 150 Ready for werte.txt.
+  17.001184064  --      SRV1: /srv/ftp/anna/werte.txt gespeichert (16 Bytes)
+  17.041064868  PC1     < 226 File stored.
+  17.041064868  PC1     > QUIT
+  17.041068556  PC1     < 221 Goodbye.
+  17.041068556  PC1     * Connection #0 to host 10.0.0.10 left intact
+  19.001030788  ok      expect PC1 output contains "< 226 File stored."
+  19.001030788  PC1     root@PC1:~# curl -u anna:geheim ftp://10.0.0.10/
+  19.001030788  --      run 2s
+  19.041065972  PC1     -rw-r--r--    1 ftp      ftp            16 Jan 01 00:00 werte.txt
+  21.001030788  ok      expect PC1 output contains "werte.txt"
+  21.001030788  PC1     root@PC1:~# curl -u anna:geheim ftp://10.0.0.10/werte.txt -o kopie.txt
+  21.001030788  --      run 2s
+  21.041069244  --      PC1: /root/kopie.txt gespeichert (16 Bytes)
+  23.001030788  PC1     root@PC1:~# cat kopie.txt
+  23.001030788  PC1     Messwerte 1 2 3
+  23.001030788  ok      expect PC1 output contains "Messwerte 1 2 3"
+  23.001030788  PC1     root@PC1:~# curl -u anna:falsch ftp://10.0.0.10/
+  23.001030788  --      run 2s
+  24.001045060  PC1     curl: (67) Access denied: 530
+  25.001030788  ok      expect PC1 output contains "curl: (67) Access denied: 530"
+  25.001030788  PC1     root@PC1:~# curl ftp://10.0.0.10/pub/readme.txt
+  25.001030788  --      run 2s
+  25.041073076  PC1     Willkommen auf SRV1.
+  25.041073076  PC1     Die Sicherungen der Router liegen per TFTP in /srv/tftp.
+  27.001030788  ok      expect PC1 output contains "Willkommen auf SRV1."
+  27.001030788  PC1     root@PC1:~# tftp -g -r r2-config 10.0.0.10
+  27.001030788  --      run 2s
+  27.001165060  --      PC1: /root/r2-config gespeichert (559 Bytes)
+  29.001030788  PC1     root@PC1:~# ls
+  29.001030788  PC1     kopie.txt  r2-config  werte.txt
+  29.001030788  ok      expect PC1 output contains "r2-config"
+  29.001030788  PC1     root@PC1:~# tftp -g -r nope 10.0.0.10
+  29.001030788  --      run 2s
+  29.001033692  PC1     tftp: server error: (1) File not found
+  31.001030788  ok      expect PC1 output contains "tftp: server error: (1) File not found"
+  31.001030788  ok      expect SRV1 svc ftp metric failed_logins == 1 (1)
+  31.001030788  ok      expect SRV1 svc ftp metric uploads == 1 (1)
+  31.001030788  ok      expect SRV1 svc tftp metric errors == 2 (2)
+  31.001030788  ok      expect hops tftp >= 20 (88)
+  31.001030788  ok      expect hops ftp >= 20 (150)
+# 24 von 24 Erwartungen erfüllt

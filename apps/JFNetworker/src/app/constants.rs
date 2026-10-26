@@ -459,3 +459,12 @@ pub(crate) const ID_WL_JOIN_LEAVE: u32 = 0xF514;
 /// the project's scale (world units per metre) and its button
 pub(crate) const ID_WL_SCALE: u32 = 0xF520;
 pub(crate) const ID_WL_SCALE_APPLY: u32 = 0xF521;
+// ---- X1a: files on devices, TFTP and FTP (commands 550 .. 589, widgets 0xF100 .. 0xF3FF)
+/// the answers of the Dateien tab's file dialog (workspace/devwin/files.rs)
+pub(crate) const CMD_FILES_IMPORT_DONE: u32 = 550;
+pub(crate) const CMD_FILES_EXPORT_DONE: u32 = 551;
+/// the Dateien tab of device window k: ID_FILES0 + 0x180 k (+ 1 .. 4 its buttons and the text,
+/// + 0x10 the grid with its rows)
+pub(crate) const ID_FILES0: u32 = 0xF100;
+/// its file dialog: a block of its own like ID_PCAP_DLG (.. + 0x3FFF)
+pub(crate) const ID_FILES_DLG: u32 = 0x0016_0000;

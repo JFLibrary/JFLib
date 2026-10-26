@@ -145,6 +145,8 @@ impl Engine {
         }
         // static names and name servers (cli/names.rs)
         s.push_str(&self.ios_names_config(ni));
+        // the FTP client's login (cli/files.rs)
+        s.push_str(&self.ios_files_config(ni));
         if let Some(st) = &n.ip {
             let default = n.model.has(F_ROUTER) && (!n.model.has(F_BRIDGE) || n.model.has(F_HOST));
             if st.forwarding != default {

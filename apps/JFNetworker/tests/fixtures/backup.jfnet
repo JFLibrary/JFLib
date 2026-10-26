@@ -1,0 +1,244 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Sicherung per TFTP und FTP",
+  "description": "R1, R2 und R3 sichern ihre Konfiguration per TFTP auf SRV1, PC1 lädt Dateien per FTP hoch und herunter.",
+  "seed": 11,
+  "next_id": 12,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.0.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "R2",
+      "model": "jf-r4",
+      "x": 160,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.0.2 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "R3",
+      "model": "jf-r4",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R3\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.0.3 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 160,
+      "y": 140,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 80,
+      "y": 280,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.0.10/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "tftp-server",
+          "name": "tftp",
+          "disabled": false,
+          "config": {
+            "root": "/srv/tftp",
+            "writable": true
+          }
+        },
+        {
+          "kind": "ftp-server",
+          "name": "ftp",
+          "disabled": false,
+          "config": {
+            "anonymous": true,
+            "users": [
+              {
+                "name": "anna",
+                "password": "geheim",
+                "home": "/srv/ftp/anna",
+                "write": true
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/srv/ftp/anna",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/srv/ftp/pub",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/srv/ftp/pub/readme.txt",
+          "text": "Willkommen auf SRV1.\nDie Sicherungen der Router liegen per TFTP in /srv/tftp.\n",
+          "mtime": 1767225600
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "PC1",
+      "model": "pc",
+      "x": 240,
+      "y": 280,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.20/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    }
+  ],
+  "links": [
+    {
+      "id": 7,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 3,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/10"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 4,
+        "port": "GigabitEthernet1/0/11"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 160,
+    "cy": 140,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null,
+  "dip_per_m": 0
+}

@@ -28,7 +28,9 @@
 //                                 of its services run and its scripts without a restart (a
 //                                 saved configuration, a switched service, the script editor's
 //                                 steps; also their undo): keep_steps(dev, old, new, has)
-//                                 makes the Actions, a script's new source keeps its disk
+//                                 makes the Actions, a script's new source keeps its disk;
+//                                 its files too (Action::Files, also in sync: files never
+//                                 restart a device)
 //   mode() / view_at() / view_time() / with_engine(f)   the simulation mode: the driver's
 //                                 mode, the moment the view shows, a change of the engine
 //                                 that is no command (PDUs: a ping job, a service, a lookup)
@@ -70,11 +72,13 @@ struct MDev {
     /// WLAN: its settings and position (no restart for either)
     wlan: Option<jfn_model::Wlan>,
     pos: (i32, i32),
+    /// its files (no restart either)
+    files: Vec<jfn_model::files::File>,
 }
 
 impl MDev {
     fn of(d: &Device) -> MDev {
-        MDev { name: d.name.clone(), model: d.model.clone(), off: d.off, startup: d.startup_config.clone(), services: d.services.clone(), wlan: d.wlan.clone(), pos: (d.x, d.y) }
+        MDev { name: d.name.clone(), model: d.model.clone(), off: d.off, startup: d.startup_config.clone(), services: d.services.clone(), wlan: d.wlan.clone(), pos: (d.x, d.y), files: d.files.clone() }
     }
 
     /// the device must start again: another model, configuration or services
@@ -348,6 +352,10 @@ impl Sim {
             }
             if m.pos != (d.x, d.y) && self.act(Action::Move { dev: d.id, x: d.x, y: d.y }).is_ok() {
                 now.pos = (d.x, d.y);
+            }
+            // files: the store takes the project's (no restart)
+            if m.files != d.files && self.act(Action::Files { dev: d.id, files: d.files.clone() }).is_ok() {
+                now.files = d.files.clone();
             }
             self.devs.insert(d.id, now);
         }
@@ -627,8 +635,12 @@ impl Sim {
         if m.startup != d.startup_config {
             let _ = self.act(Action::Startup { dev: d.id, text: d.startup_config.clone() });
         }
+        // the files as the project has them now (a transfer's step, its undo)
+        if m.files != d.files {
+            let _ = self.act(Action::Files { dev: d.id, files: d.files.clone() });
+        }
         let services = if steps.is_some() { d.services.clone() } else { m.services.clone() };
-        self.devs.insert(d.id, MDev { startup: d.startup_config.clone(), services, ..m });
+        self.devs.insert(d.id, MDev { startup: d.startup_config.clone(), services, files: d.files.clone(), ..m });
     }
 }
 

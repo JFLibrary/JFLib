@@ -52,6 +52,9 @@
 //            to a name server); ip host, ipv6 host, ip name-server and ping by name on IOS
 //   wlan     WLAN: iw in the shell (dev, info, link, scan, connect, disconnect, station dump),
 //            show dot11 associations on the IOS-like access point
+//   files    the files of a device: dir, show flash:, more, delete, copy with its questions,
+//            ip ftp username / password (IOS-like); ls, cat, rm, cp, mkdir, rmdir, touch, echo
+//            > FILE, tftp (Linux); curl ftp:// is ftpc.rs
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -95,6 +98,7 @@ pub mod print6;
 pub mod ospf;
 pub mod names;
 pub mod wlan;
+pub mod files;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -214,6 +218,8 @@ pub enum AskKind {
     Ping6Out { dst: netpkt::Ipv6, count: u32, bytes: u16, timeout: Ns },
     /// "clear ip ospf process"
     ClearOspf,
+    /// a question of copy or delete (files.rs: CliDev::files holds the dialog)
+    Files,
 }
 
 /// a console command that runs over virtual time
@@ -264,6 +270,8 @@ pub struct CliDev {
     pub acl: String,
     /// what "debug ip ospf" shows (cli/ospf.rs DO_*; none: everything)
     pub ospf_debug: u8,
+    /// copy's dialog, the last host, the FTP login (files.rs)
+    pub files: files::FilesCli,
 }
 
 impl CliDev {
@@ -287,6 +295,7 @@ impl CliDev {
             booting: false,
             acl: String::new(),
             ospf_debug: 0,
+            files: files::FilesCli::default(),
         }
     }
 }

@@ -21,6 +21,8 @@
 //                       them in range on the station's bands (warning)
 //   WlanPassphrase      a station's passphrase is not the one of its network, or it has none
 //   WlanBadNet          a network an access point cannot offer (jfn_model::wlan::check_net)
+//   FilesDirMissing     the root directory of a TFTP or FTP server (or a user's home) is not
+//                       on the device (files.rs)
 //
 // Problem::text is German; Problem::msg is the same as a template with arguments for the app's
 // catalogue (jfn_model::msg).
@@ -88,6 +90,8 @@ pub enum ProblemKind {
     WlanPassphrase,
     /// a network an access point cannot offer (SSID, channel, 6 GHz without WPA3, passphrase)
     WlanBadNet,
+    /// a TFTP or FTP server whose directory is missing
+    FilesDirMissing,
 }
 
 /// a problem of the set-up
@@ -238,6 +242,7 @@ impl Engine {
         self.loops(&tags, &mut out);
         self.dup_ip6s(&mut out);
         self.wlan_problems(&mut out);
+        self.file_problems(&mut out);
         out.sort_by(|a, b| (a.severity, a.dev, a.port, a.kind, &a.text).cmp(&(b.severity, b.dev, b.port, b.kind, &b.text)));
         out
     }

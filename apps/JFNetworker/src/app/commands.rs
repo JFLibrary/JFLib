@@ -453,6 +453,8 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         }
         // WLAN: the ranges of every access point on the canvas (canvas/wlan.rs)
         CMD_WLAN_RANGES => n.canvas.wl.ranges = !n.canvas.wl.ranges,
+        // the files of a device: the import's and export's file dialog (devwin/files.rs)
+        CMD_FILES_IMPORT_DONE | CMD_FILES_EXPORT_DONE => return crate::workspace::devwin::files::command(n, ui, id),
         _ => return false,
     }
     ui.repass();

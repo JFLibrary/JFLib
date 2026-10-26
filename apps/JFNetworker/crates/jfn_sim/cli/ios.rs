@@ -24,6 +24,9 @@
 // there too, and "Output Interface: " of a link-local ping is one more question of the console.
 // Names (cli/names.rs): "ip host", "ipv6 host", "ip name-server"; "ping NAME" and "ping ipv6
 // NAME" look the name up.
+// Files (cli/files.rs): dir, show flash:, more, delete, copy between running-config,
+// startup-config, flash:, tftp: and ftp: with questions for what is missing, ip ftp
+// username / password.
 
 use alloc::format;
 use alloc::string::String;
@@ -190,6 +193,13 @@ pub enum K {
     NameServer,
     // WLAN on access points (cli/wlan.rs)
     ShowDot11,
+    // files (cli/files.rs)
+    Dir,
+    ShowFlash,
+    More,
+    Delete,
+    Copy,
+    IpFtp,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -537,6 +547,8 @@ fn build(caps: u32) -> Tree<K> {
     if caps & CAP_AP != 0 {
         super::wlan::build_wlan(&mut t, [user, prv]);
     }
+    // ---- files: flash, nvram, copy to and from servers (cli/files.rs)
+    super::files::build_files(&mut t, [user, prv, conf]);
     t
 }
 
@@ -1056,6 +1068,7 @@ impl Engine {
             | K::ClearOspf => self.ios_ospf(ni, p),
             K::IpHost | K::Ipv6Host | K::NameServer => self.ios_names(ni, p),
             K::ShowDot11 => self.ios_dot11(ni, p),
+            K::Dir | K::ShowFlash | K::More | K::Delete | K::Copy | K::IpFtp => self.ios_files(ni, p),
         }
     }
 
@@ -1072,6 +1085,7 @@ impl Engine {
             }
             AskKind::Ping6Out { dst, count, bytes, timeout } => self.ios_ping6_answer(ni, dst, count, bytes, timeout, line),
             AskKind::ClearOspf => self.ios_ospf_clear(ni, line),
+            AskKind::Files => self.files_answer(ni, line),
         }
     }
 

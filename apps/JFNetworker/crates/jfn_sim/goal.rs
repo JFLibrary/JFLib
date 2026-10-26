@@ -151,6 +151,8 @@ pub(crate) fn proto_bit(p: &str) -> Option<u32> {
         "stp" => decode::P_STP,
         "rip" => decode::P_RIP,
         "ospf" => decode::P_OSPF,
+        "tftp" => decode::P_TFTP,
+        "ftp" => decode::P_FTP,
         _ => return None,
     })
 }
