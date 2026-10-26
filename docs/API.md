@@ -9258,12 +9258,21 @@ ERR_LIMIT: i32 = -15
   - `opac: u8` -- layer opacity 0..255
   - `blend: u8` -- layer blend mode
 
+- **`fn try_zeroed(n: usize) -> Option<Vec<u8>>`**
+  n zeroed bytes | None when the memory is not there (instead of an abort). A probe
+  reservation first, then vec![0; n]: that is alloc_zeroed, whose fresh pages need no
+  clearing pass.
+
 **`impl Surface`**
 
 - **`fn new(w: i32, h: i32, fmt: u8) -> Surface`**
   zeroed pixels, stride 64-byte aligned; sides outside 0..65536 give an empty surface
   (surf_alloc fails). Byte lengths beyond the target's addressable allocation size
   also give an empty surface, before allocating pixels.
+- **`fn try_new(w: i32, h: i32, fmt: u8) -> Option<Surface>`**
+  like `new`, but None (instead of an empty surface or an abort) when the size is
+  invalid or the memory is not there (try_zeroed). For sizes that come from a file or
+  from the user.
 - **`fn new_a8_packed(w: i32, h: i32) -> Surface`**
   a tightly packed A8 surface (glyph masks: stride = w)
 - **`fn resize(&mut self, w: i32, h: i32)`**
@@ -12758,7 +12767,7 @@ ops -- whole-image operations on 32-bit surfaces (PARGB / ARGB / XRGB)  [src/img
                                                (the bands of rstest's rt_bands)
 
 Results keep the source format; the Err value is ERR_FAIL (-1, the assembly's -1) when a
-surface size is out of range.  Rows are 4 bytes per pixel (blit_copy, scale, skew and the
+surface size is out of range or its memory is not there.  Rows are 4 bytes per pixel (blit_copy, scale, skew and the
 flips copy whole pixels).
 ```
 
@@ -16218,6 +16227,12 @@ FO_RW: u32 = 2  // open or create (contents kept), read + write
 
 - **`fn arg_value(name: &str) -> Option<String>`**
   the argument after `name` on the command line (argument 0, the program, is skipped)  [arg_value]
+
+```rust
+/// the library's options that take a value (`--size 800x600`): a program whose plain
+/// arguments are files skips the value after these
+VALUE_OPTS: &[&str] = &[ "--size", "--scale", "--auto-close", "--anim", "--them ...
+```
 
 - **`fn crash_hook(f: Option<CrashHook>)`**
   f(&CrashInfo) runs in the crash handler, after the stderr line, before exit code 3; also
@@ -21846,7 +21861,13 @@ REQUEST_REOPEN: u32 = 20
 /// (browser) sound output (audio.rs, web_audio.rs, web/audio.js): five u32, op (1 open, 2 close,
 /// 3 play, 4 pause, 5 flush), stream id, rate, channels, latency frames; no completion
 REQUEST_AUDIO: u32 = 14
+/// (browser) the app holds unsaved work (one byte, 1 / 0): the page asks before the tab is
+/// closed or reloaded (loader.js beforeunload)
+REQUEST_UNSAVED: u32 = 22
 ```
+
+- **`fn set_unsaved(on: bool)`**
+  set_unsaved(on) -- tell the page whether closing the tab would lose unsaved work
 
 - **`enum RequestStatus`**
   Completion state of one browser operation; durable and exported are distinct outcomes.
