@@ -540,6 +540,10 @@ impl Ui {
                         self.uiw_close_request(win); // App::command(UIC_WINCLOSE, id)
                     } else if !self.call_cmd(app, UIC_CLOSE, 0) {
                         self.quit = true; // the app keeps the window open when handled
+                    } else {
+                        // kept open: what the app opened ("save changes?") shows in the next
+                        // frame, not only after the next input or timer
+                        self.need = true;
                     }
                     continue;
                 }

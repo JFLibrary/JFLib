@@ -73,6 +73,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** X11 and Wayland no longer lose input when one socket read brings more than about 85 key presses (a burst of synthetic keys, a client flooding input, also while the backend waits for a reply): plat's 256-event ring has an overflow queue that keeps the order (up to 65536 events; plat::evq_dropped counts what is lost beyond)
 - **ui:** The code editor stays fast on very long lines: a line of 100 000 characters or a 1 MB single-line file (minified JSON / JS, long log lines) types, moves the caret, selects, scrolls sideways and finds in about a millisecond per pass instead of up to a second (7000 characters) or minutes (100 000): only the part of a line in view is drawn, the columns and tokens of long lines are kept and worked again near an edit only, bracket matching tokenizes a line once; text::segment's grapheme and word functions look only near the place instead of from the line start (they made every column lookup quadratic)
 - **plat:** UI Automation's LocalizedControlType of dialogs, switches and headings and AT-SPI2's GetLocalizedRoleName follow the UI language (the library's nine languages) instead of German and English strings: plat::a11y::ROLE_TEXTS / role_name / set_translator, ui hands the bridges i18n::tr
+- **ui:** Closing the main window with its title bar button or Alt+F4 while the app keeps it open ("save changes?") shows what the app opened at once; before, it appeared only with the next input or timer
 
 ## [0.1.0] - 2026-10-20
 
