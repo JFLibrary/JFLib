@@ -165,7 +165,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Toasts, spinners, progress](#toasts-spinners-progress): `toast`, `toast_dismiss`, `toast_clear`, `toasts`, `toast_host`, `spinner`, `progress_indeterminate`
 - [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`
 - [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`
-- [Windows](#windows): `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_rect`, `window_state`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
+- [Windows](#windows): `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
 - [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`
 - [File dialog](#file-dialog): `filedlg`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
@@ -3342,6 +3342,7 @@ App-facing:
   window_rect(id) -> Option<WinRect>   current placement (None = unknown window)
   window_state(id) -> UWS_*            UWS_OPEN | UWS_VISIBLE | UWS_ACTIVE | UWS_MINIMIZED
   window_activate(id)                  give it the keyboard (raises it)
+  window_snap(id, area, dist)          its edges snap to the area's while the user moves it
   window_destroy(id)                   free its state and buffers (created again when shown)
   window_current() -> id               id of the window being built (0 = main)
   window_modal() -> id                 id of the topmost modal window or 0
@@ -3389,6 +3390,14 @@ Shared<T> (Rc<Cell<T>>) and the record keeps a clone of it.
 - **`fn window_place(&mut self, id: u32, rect: &WinRect)`**
   ui_window_place(id, &rect): set the window's placement (copied into its WINRECT;
   applied when it is built next).  id 0: the main window (headless: its size)
+- **`fn window_snap(&mut self, id: u32, area: [i32; 4], dist: i32)`**
+  ui_window_snap(id, area, dist): while the user moves window id, its outer edges snap
+  to the edges of `area` (x, y, w, h in DIP of the owner's client area, like its
+  WINRECT) once they are at most `dist` DIP away -- both axes at a corner; dist 0 turns
+  it off.  Live where the platform lets the UI see the move (Windows: WM_MOVING) and for
+  scripts (movewin); a window manager that moves the windows itself (X11, Wayland) and
+  the browser do not snap.  Call it in every frame the area may change (after the
+  window's first window_begin).
 - **`fn window_rect(&self, id: u32) -> Option<WinRect>`**
   ui_window_rect(id) -> the window's placement (None = unknown window)
 - **`fn window_state(&mut self, id: u32) -> u32`**
@@ -3692,6 +3701,7 @@ Windows (ID = the app's window id, 0 / main = the main window):
                                 (keys: the window keys go to now -- a tool window borrows them
                                 from its owner after F6 / Ctrl+F6 or a click on a widget)
   close window ID   movewin ID X Y   resizewin ID W H   activate ID
+                                (movewin: the user's drag, snapped like window_snap says)
   scale P [window ID]           dpi of the main window (default) or of one window
   shot F.png [window ID|desktop] [X Y W H]   one window, or all visible windows on the
                                 virtual desktop; a crop rectangle in DIP
@@ -20239,6 +20249,8 @@ wait, presentation, cursors                                     [src/plat/win/wi
                                     window's own on Windows)
   win_hit_hook(f)                   f(w, x, y) -> HB_* flags of the UI at a client point
                                     (WM_NCHITTEST, WM_MOUSEACTIVATE)
+  win_move_hook(f)                  f(w, &mut [x, y, w, h]) may snap the client rectangle
+                                    (screen px) the user drags window w to (WM_MOVING)
   wait(deadline_us) -> queued events   0 = poll, u64::MAX = forever, else plat::time_us()
   set_refresh(f)                    f() redraws during the modal move / size loop
   win_test_send(w, msg, wp, lp)     (test aid) SendMessageW to window w (input, hit test,
@@ -20268,6 +20280,10 @@ callbacks (refresh, hit hook) never hold a reference across a Win32 call.
 
 - **`fn win_hit_hook(f: Option<fn(i32, i32, i32) -> u32>)`**
   f(w, x, y) -> HB_\* flags at a client point (None = no hit tests)
+
+- **`fn win_move_hook(f: Option<fn(i32, &mut [i32; 4])>)`**
+  f(w, &mut [x, y, w, h]) -> the client rectangle (screen px) the user drags window w to, as
+  the UI wants it (snapped); called inside the modal move loop (None = no hook)
 
 - **`fn set_refresh(f: Option<fn()>)`**
   f() redraws during the modal move / size loop
@@ -21263,6 +21279,9 @@ BK_X11: u32 = 2
 
 - **`fn win_hit_hook(f: Option<fn(i32, i32, i32) -> u32>)`**
   stored only: the Linux backends need no hit tests
+
+- **`fn win_move_hook(_f: Option<fn(i32, &mut [i32; 4])>)`**
+  none: the window manager or compositor moves the windows and does not ask (no snapping)
 
 - **`fn set_refresh(f: Option<fn()>)`**
 
@@ -22371,6 +22390,9 @@ and popups are composited into the canvas buffer.
 
 - **`fn win_hit_hook(_hook: Option<fn(i32, i32, i32) -> u32>)`**
   Hit testing remains inside the shared UI; no OS nonclient callback is installed.
+
+- **`fn win_move_hook(_hook: Option<fn(i32, &mut [i32; 4])>)`**
+  Dragged library surfaces are not snapped in the browser yet.
 
 - **`fn set_refresh(_callback: Option<fn()>)`**
   Native modal resize callbacks are unnecessary for host-stepped browser rendering.

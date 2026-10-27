@@ -61,6 +61,7 @@
 //                                 (keys: the window keys go to now -- a tool window borrows them
 //                                 from its owner after F6 / Ctrl+F6 or a click on a widget)
 //   close window ID   movewin ID X Y   resizewin ID W H   activate ID
+//                                 (movewin: the user's drag, snapped like window_snap says)
 //   scale P [window ID]           dpi of the main window (default) or of one window
 //   shot F.png [window ID|desktop] [X Y W H]   one window, or all visible windows on the
 //                                 virtual desktop; a crop rectangle in DIP
@@ -796,6 +797,8 @@ impl Ui {
                 } else {
                     let (x, r) = parse_int(r);
                     let (y, _) = parse_int(r);
+                    // the user's drag ends where the platform's move hook snaps it to
+                    let (x, y) = self.uiw_snap_dip(i as u32, x, y);
                     self.uiw_user_rect(i as u32, x, y, 0, 0);
                     self.run_passes(app);
                 }

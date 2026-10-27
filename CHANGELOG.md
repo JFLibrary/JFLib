@@ -50,6 +50,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** Destination address selection after RFC 6724 (netpkt::addrsel: scope, precedence and label of the default policy table, Dest and sort with rules 1, 2, 3, 5, 6, 8, 9 and 10, the order getaddrinfo tries the addresses of a name in)
 - **crypto:** SHA-1 (crypto::sha1, Sha1, hmac_sha1; for protocols defined with it, broken for collisions), PBKDF2 over any hash (pbkdf2::<H>, pbkdf2_sha1), the AES key wrap of RFC 3394 (aes_wrap / aes_unwrap with its integrity check) and AES-CMAC of RFC 4493 (cmac_aes): what WPA2 and WPA3 need
 - **netpkt:** EAPOL of IEEE 802.1X-2004 (netpkt::eapol: EapolView, the EAPOL-Key body of the 4-way handshake with its Key Information bits, which of the four messages a frame is, the MIC field and what it covers, RSN elements, GTK and IGTK KDEs, key data padding; eth::ET_EAPOL) and its dissection (decode::layers: every field, the Key Information bits by name, the RSN element and KDEs of plain key data; decode::info: "Key (Message 2 of 4)")
+- **ui:** ui.window_snap(id, area, dist): a tool window's edges snap to the edges of an area of its owner (corners on both axes) while the user drags it -- live on Windows (plat::win_move_hook, WM_MOVING) and in test scripts (movewin)
 
 ### Changed
 

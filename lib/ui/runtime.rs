@@ -1173,6 +1173,7 @@ fn window_main(ui: &mut Ui, app: &mut dyn App, w: i32, h: i32) -> i32 {
         return 0;
     }
     plat::win_hit_hook(Some(super::win::uiw_hit_pw)); // non-client hit tests ask the UI
+    plat::win_move_hook(Some(super::win::uiw_moving_pw)); // user moves snap (window_snap)
     plat::drag_hook(Some(super::win::uiw_drag_pw)); // so do drags of other programs (dnd.rs)
     plat::set_min_size(ui.desc.min_w as i32, ui.desc.min_h as i32);
     // AF_SAVE_STATE / jfgui_STATE: the placement of the last run (winstate.rs); --size wins

@@ -408,6 +408,8 @@ pub fn win_set_cursor(_id: i32, shape: u32) {
 }
 /// Hit testing remains inside the shared UI; no OS nonclient callback is installed.
 pub fn win_hit_hook(_hook: Option<fn(i32, i32, i32) -> u32>) {}
+/// Dragged library surfaces are not snapped in the browser yet.
+pub fn win_move_hook(_hook: Option<fn(i32, &mut [i32; 4])>) {}
 /// Native modal resize callbacks are unnecessary for host-stepped browser rendering.
 pub fn set_refresh(_callback: Option<fn()>) {}
 /// Custom native cursor handles are unavailable; use the shared system-shape cursor mapping.

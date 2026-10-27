@@ -286,6 +286,9 @@ pub fn win_hit_hook(f: Option<fn(i32, i32, i32) -> u32>) {
     DISP.lock().hit = f;
 }
 
+/// none: the window manager or compositor moves the windows and does not ask (no snapping)
+pub fn win_move_hook(_f: Option<fn(i32, &mut [i32; 4])>) {}
+
 pub fn set_refresh(f: Option<fn()>) {
     let mut d = DISP.lock();
     d.refresh = f;

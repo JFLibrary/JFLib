@@ -9,6 +9,7 @@
 //   window_rect(id) -> Option<WinRect>   current placement (None = unknown window)
 //   window_state(id) -> UWS_*            UWS_OPEN | UWS_VISIBLE | UWS_ACTIVE | UWS_MINIMIZED
 //   window_activate(id)                  give it the keyboard (raises it)
+//   window_snap(id, area, dist)          its edges snap to the area's while the user moves it
 //   window_destroy(id)                   free its state and buffers (created again when shown)
 //   window_current() -> id               id of the window being built (0 = main)
 //   window_modal() -> id                 id of the topmost modal window or 0
@@ -152,6 +153,8 @@ pub(crate) struct Rec {
     pub(crate) sy: i32,
     /// the title copy (a change is passed on to the platform)
     pub(crate) title: String,
+    /// window_snap: area x, y, w, h (DIP of the owner's client area), distance (DIP; 0 = off)
+    pub(crate) snap: [i32; 5],
 }
 
 impl Default for Rec {
@@ -175,6 +178,7 @@ impl Default for Rec {
             sx: 0,
             sy: 0,
             title: String::new(),
+            snap: [0; 5],
         }
     }
 }
@@ -311,6 +315,9 @@ struct Published {
     zones: [Vec<super::dnd::Zone>; WIN_MAX],
     accept: u32,
     own: u32,
+    /// window_snap for the move hook (uiw_moving_pw): owner index, area x, y, w, h (px from
+    /// the owner's platform client origin), distance (px; 0 = off)
+    snap: [[i32; 6]; WIN_MAX],
 }
 
 static PUBLISHED: SpinLock<Published> = SpinLock::new(Published {
@@ -322,6 +329,7 @@ static PUBLISHED: SpinLock<Published> = SpinLock::new(Published {
     zones: [const { Vec::new() }; WIN_MAX],
     accept: plat::DT_FILES,
     own: 0,
+    snap: [[0; 6]; WIN_MAX],
 });
 
 /// uiw_hit_pw(pw, x, y) -> HB_* flags at a client point (px) of platform window pw in the
@@ -372,6 +380,56 @@ pub(crate) fn uiw_publish_dnd(accept: u32, own: u32) {
     let mut p = PUBLISHED.lock();
     p.accept = accept;
     p.own = own;
+}
+
+/// uiw_moving_pw(pw, &rect): (the platform's move hook, inside its modal move loop) the user
+/// drags platform window pw to rect (x, y, w, h of its client area, screen px): x, y snap to
+/// the area window_snap gave
+pub(crate) fn uiw_moving_pw(pw: i32, r: &mut [i32; 4]) {
+    if !(0..WIN_MAX as i32).contains(&pw) {
+        return;
+    }
+    let (s, opw) = {
+        let p = PUBLISHED.lock();
+        let i = p.p2u[pw as usize];
+        if i == 0xFF {
+            return;
+        }
+        let s = p.snap[i as usize];
+        if s[5] == 0 {
+            return;
+        }
+        (s, p.p2u.iter().position(|&u| u as i32 == s[0]))
+    };
+    let Some(o) = opw.and_then(|o| plat::win_get_rect(o as i32)) else { return };
+    let a = [o[0] + s[1], o[1] + s[2], s[3], s[4]];
+    (r[0], r[1]) = snap_to(r[0], r[1], r[2], r[3], a, s[5]);
+}
+
+/// snap_to(x, y, w, h, area, dist) -> (x, y): a rectangle at x, y moved so that its edges sit
+/// on the area's edges they are at most dist away from (left / right, top / bottom: the
+/// nearer one); an axis snaps only while the rectangle overlaps the area (with dist) on the
+/// other axis.  Any one unit.
+fn snap_to(x: i32, y: i32, w: i32, h: i32, a: [i32; 4], d: i32) -> (i32, i32) {
+    let axis = |p: i32, s: i32, lo: i32, len: i32| {
+        let near = (p - lo).abs(); // leading edge to the area's start
+        let far = (p + s - lo - len).abs(); // trailing edge to its end
+        if near <= d && near <= far {
+            lo
+        } else if far <= d {
+            lo + len - s
+        } else {
+            p
+        }
+    };
+    let mut r = (x, y);
+    if y < a[1] + a[3] + d && y + h > a[1] - d {
+        r.0 = axis(x, w, a[0], a[2]);
+    }
+    if x < a[0] + a[2] + d && x + w > a[0] - d {
+        r.1 = axis(y, h, a[1], a[3]);
+    }
+    r
 }
 
 /// dip2px_at(dip, dpi) -> round(dip * dpi / 96)
@@ -1693,6 +1751,52 @@ impl Ui {
         self.invalidate();
     }
 
+    /// ui_window_snap(id, area, dist): while the user moves window id, its outer edges snap
+    /// to the edges of `area` (x, y, w, h in DIP of the owner's client area, like its
+    /// WINRECT) once they are at most `dist` DIP away -- both axes at a corner; dist 0 turns
+    /// it off.  Live where the platform lets the UI see the move (Windows: WM_MOVING) and for
+    /// scripts (movewin); a window manager that moves the windows itself (X11, Wayland) and
+    /// the browser do not snap.  Call it in every frame the area may change (after the
+    /// window's first window_begin).
+    pub fn window_snap(&mut self, id: u32, area: [i32; 4], dist: i32) {
+        let i = self.uiw_index(id);
+        if i <= 0 {
+            return;
+        }
+        let iu = i as usize;
+        let s = [area[0], area[1], area[2], area[3], dist.max(0)];
+        self.m.win.recs[iu].snap = s;
+        if self.headless {
+            return;
+        }
+        // px from the owner's platform client origin: below a library title bar of the owner
+        // (uiw_owner_origin)
+        let owner = self.m.win.recs[iu].owner;
+        let dpi = self.win_dpi(owner);
+        let mut p = [0; 6];
+        if s[4] != 0 && dpi >= 24 {
+            let tb = if owner != 0 { dip2px_at(self.m.win.recs[(owner as usize) & (WIN_MAX - 1)].tbh, dpi) } else { 0 };
+            p = [owner as i32, dip2px_at(s[0], dpi), tb + dip2px_at(s[1], dpi), dip2px_at(s[2], dpi), dip2px_at(s[3], dpi), dip2px_at(s[4], dpi)];
+        }
+        PUBLISHED.lock().snap[iu] = p;
+    }
+
+    /// uiw_snap_dip(i, x, y) -> (x, y): a user move of window i to x, y (DIP of the owner)
+    /// snapped like the platform's move hook does it (window_snap; scripts: movewin)
+    pub(crate) fn uiw_snap_dip(&self, i: u32, x: i32, y: i32) -> (i32, i32) {
+        let iu = (i as usize) & (WIN_MAX - 1);
+        let r = &self.m.win.recs[iu];
+        let s = r.snap;
+        if s[4] == 0 {
+            return (x, y);
+        }
+        // the outer size: the framebuffer (title bar, border), before it exists the WINRECT
+        let rc = r.rect.get();
+        let (fb, dpi) = (self.win_fb(i), self.win_dpi(i));
+        let (w, h) = if fb.w > 0 && dpi >= 24 { (px2dip_at(fb.w, dpi), px2dip_at(fb.h, dpi)) } else { (rc.w, rc.h + r.tbh) };
+        snap_to(x, y, w, h, [s[0], s[1], s[2], s[3]], s[4])
+    }
+
     /// ui_window_rect(id) -> the window's placement (None = unknown window)
     pub fn window_rect(&self, id: u32) -> Option<WinRect> {
         let i = self.uiw_index(id);
@@ -1760,6 +1864,9 @@ impl Ui {
         }
         self.m.win.used &= !(1 << i);
         self.m.win.recs[iu] = Rec::default();
+        if !self.headless {
+            PUBLISHED.lock().snap[iu] = [0; 6];
+        }
         self.uiw_modal_update();
         self.publish_state();
     }

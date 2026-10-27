@@ -1,7 +1,8 @@
 # wnd_dock.uis -- the tool window layout (wnd_dock.s): automatic places in the canvas area,
 # windows moved inside the main window keep their distance from the nearest edges on resizes,
 # windows dragged out stay put, very small / low main windows hide Verlauf / Ebenen and lay the
-# Werkzeuge out in two rows, a closed window comes back at its place.
+# Werkzeuge out in two rows, a closed window comes back at its place; a dragged window snaps to
+# the edges and corners of the canvas area (16 DIP).
 # Window ids: Werkzeuge 24577, Verlauf 24578, Ebenen 24579, Farben 24580.
 size 1280 800
 theme light
@@ -39,14 +40,31 @@ size 900 800
 sync
 sync
 expect window 24579 rect 500 300 208 240
-# ---- moved to the lower half: anchored to the bottom (30 DIP above it), a lower main window
+# ---- moved to the lower half: anchored to the bottom (60 DIP above it), a lower main window
 # takes it along
-movewin 24579 500 500
+movewin 24579 500 470
 sync
 size 900 640
 sync
 sync
-expect window 24579 rect 500 340 208 240
+expect window 24579 rect 500 310 208 240
+# ---- snapping: 12 / 13 DIP from the top right corner of the canvas area (8 DIP inside) -> in
+# it, and anchored there like the default places
+movewin 24579 670 150
+sync
+expect window 24579 rect 682 137 208 240
+size 1000 700
+sync
+sync
+expect window 24579 rect 782 137 208 240
+# the bottom left corner (bottom edge 10 DIP below the area, left edge 12 DIP right of it)
+movewin 24579 20 400
+sync
+expect window 24579 rect 8 390 208 240
+# farther than 16 DIP from every edge: where it was dropped
+movewin 24579 40 300
+sync
+expect window 24579 rect 40 300 208 240
 # ---- closed and opened again: the same place
 close window 24577
 expect window 24577 closed
