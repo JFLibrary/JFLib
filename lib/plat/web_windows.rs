@@ -1,5 +1,10 @@
 // Library windows and popups composited into one browser canvas. Every surface is drawn
 // by the existing software renderer; the browser host receives pixels, not another UI.
+// The windows keep their pixels as R, G, B, A rows (the order of the browser's ImageData and
+// Android's Bitmap): the frames' B, G, R, x is swapped once, while copying the dirty
+// rectangles in, and the host copies rows without touching pixels.  One window over the
+// whole canvas without popups is the canvas itself (no composition); otherwise the windows
+// and popups are composited into the canvas buffer.
 
 use crate::*;
 use alloc::{string::String, vec::Vec};
@@ -13,7 +18,7 @@ struct Window {
     shown: bool,
     enabled: bool,
     state: u32,
-    pixels: Vec<u8>,
+    pixels: Vec<u8>, // R, G, B, A rows of width * 4 bytes
     width: i32,
     height: i32,
 }
@@ -34,7 +39,8 @@ struct Display {
     popups: [Option<Popup>; PPW_MAX as usize],
     dirty: bool,
     damage: Vec<[i32; 4]>,
-    composite: Vec<u8>,
+    composite: Vec<u8>, // the canvas (R, G, B, A rows) when more than one surface shows
+    composed: bool,     // it holds the last composition (the single-window path skips it)
     cursor: u32,
     pointer: (i32, i32),
     drag: Option<(i32, i32, i32, [i32; 4], u32)>,
@@ -50,6 +56,7 @@ static DISPLAY: SpinLock<Display> = SpinLock::new(Display {
     dirty: false,
     damage: Vec::new(),
     composite: Vec::new(),
+    composed: false,
     cursor: CUR_ARROW,
     pointer: (0, 0),
     drag: None,
@@ -298,13 +305,29 @@ fn frame_size(frame: &Frame<'_>) -> Option<(usize, usize)> {
     }
     Some((row, len))
 }
+/// B, G, R, x pixels -> R, G, B, 255 (equal lengths): whole words (a byte swap and a rotation,
+/// which the compiler turns into vector shuffles) where both are 4-byte aligned
+fn to_rgba(dst: &mut [u8], src: &[u8]) {
+    // SAFETY: u32 is plain data; align_to only reinterprets the aligned middle parts.
+    let ((dp, dm, _), (sp, sm, _)) = unsafe { (dst.align_to_mut::<u32>(), src.align_to::<u32>()) };
+    if dp.is_empty() && sp.is_empty() && dm.len() == sm.len() && dm.len() * 4 == src.len() {
+        for (d, s) in dm.iter_mut().zip(sm) {
+            *d = (u32::from_le(*s).swap_bytes().rotate_right(8) | 0xFF00_0000).to_le();
+        }
+        return;
+    }
+    for (d, s) in dst.chunks_exact_mut(4).zip(src.chunks_exact(4)) {
+        d.copy_from_slice(&[s[2], s[1], s[0], 255]);
+    }
+}
 fn pixels(frame: &Frame<'_>) -> Option<Vec<u8>> {
     let (row, len) = frame_size(frame)?;
     let mut bytes = Vec::new();
     bytes.try_reserve_exact(len).ok()?;
+    bytes.resize(len, 0);
     for y in 0..frame.h as usize {
         let start = y.checked_mul(frame.stride as usize)?;
-        bytes.extend_from_slice(frame.px.get(start..start + row)?);
+        to_rgba(&mut bytes[y * row..y * row + row], frame.px.get(start..start + row)?);
     }
     Some(bytes)
 }
@@ -335,8 +358,14 @@ fn damage(display: &mut Display, rect: [i32; 4]) {
     if display.damage.len() >= 32 { display.dirty = true; }
     else { display.damage.push(rect); }
 }
-/// Copy an existing software-renderer frame into its composited browser surface.
+/// Copy the dirty rectangles of a software-renderer frame into the window's surface (R, G,
+/// B, A); the next flush shows them.
 pub fn win_present(id: i32, frame: &Frame<'_>, rects: Option<&[[i32; 4]]>) {
+    let t0 = time_us();
+    present_to(id, frame, rects);
+    present_account(t0, true);
+}
+fn present_to(id: i32, frame: &Frame<'_>, rects: Option<&[[i32; 4]]>) {
     let Some((row, len)) = frame_size(frame) else { return; };
     let mut display = DISPLAY.lock();
     if let Some(window) = window_mut(&mut display, id) {
@@ -353,7 +382,7 @@ pub fn win_present(id: i32, frame: &Frame<'_>, rects: Option<&[[i32; 4]]>) {
             for yy in y..y + h {
                 let src = yy as usize * frame.stride as usize + x as usize * 4;
                 let dst = yy as usize * row + x as usize * 4;
-                window.pixels[dst..dst + w as usize * 4].copy_from_slice(&frame.px[src..src + w as usize * 4]);
+                to_rgba(&mut window.pixels[dst..dst + w as usize * 4], &frame.px[src..src + w as usize * 4]);
             }
             changed.push([window.rect[0].saturating_add(x), window.rect[1].saturating_add(y), w, h]);
         }
@@ -453,25 +482,58 @@ fn overlay(
     }
 }
 pub(super) fn flush() {
-    let result = {
-        let mut d = DISPLAY.lock();
-        if !d.dirty && d.damage.is_empty() {
-            return;
+    let t0 = time_us();
+    flush_to();
+    present_account(t0, false);
+}
+fn flush_to() {
+    let mut d = DISPLAY.lock();
+    if !d.dirty && d.damage.is_empty() {
+        return;
+    }
+    let (width, height) = (d.width, d.height);
+    let Some(length) = (width as usize)
+        .checked_mul(height as usize)
+        .and_then(|v| v.checked_mul(4))
+        .filter(|&v| v <= 256 << 20)
+    else {
+        return;
+    };
+    // one window over the whole canvas and no popup: its pixels are the canvas
+    let mut shown = d.windows.iter().enumerate().filter(|(_, w)| w.as_ref().is_some_and(|w| w.shown));
+    let single = match (shown.next(), shown.next()) {
+        (Some((0, Some(w))), None) => {
+            w.rect == [0, 0, width, height] && w.width == width && w.height == height && w.pixels.len() == length
         }
-        let (width, height) = (d.width, d.height);
-        let Some(length) = (width as usize)
-            .checked_mul(height as usize)
-            .and_then(|v| v.checked_mul(4))
-            .filter(|&v| v <= 256 << 20)
-        else {
-            return;
-        };
+        _ => false,
+    } && d.popups.iter().all(Option::is_none);
+    if single {
+        let mut rects = core::mem::take(&mut d.damage);
+        if d.dirty {
+            rects.clear();
+            rects.push([0, 0, width, height]);
+        }
+        d.dirty = false;
+        d.composed = false; // the next composition draws everything
+        let Some(w) = window_mut(&mut d, 0) else { return };
+        let px = core::mem::take(&mut w.pixels);
+        drop(d);
+        super::present_bytes(&px, width, height, width * 4, &rects);
+        let mut d = DISPLAY.lock();
+        if let Some(w) = window_mut(&mut d, 0) {
+            w.pixels = px;
+        }
+        rects.clear();
+        d.damage = rects;
+        return;
+    }
+    let result = {
         let mut output = core::mem::take(&mut d.composite);
         if output.try_reserve(length.saturating_sub(output.len())).is_err() {
             d.composite = output;
             return;
         }
-        if output.len() != length { d.dirty = true; }
+        if output.len() != length || !d.composed { d.dirty = true; }
         output.resize(length, 255);
         let mut rects = core::mem::take(&mut d.damage);
         if d.dirty { rects.clear(); rects.push([0, 0, width, height]); }
@@ -511,8 +573,10 @@ pub(super) fn flush() {
           }
         }
         d.dirty = false;
+        d.composed = true;
         (output, width, height, rects)
     };
+    drop(d);
     super::present_bytes(&result.0, result.1, result.2, result.1 * 4, &result.3);
     let mut d = DISPLAY.lock();
     d.composite = result.0;

@@ -27,4 +27,6 @@
         android:targetPackage="org.jflib.gallery" android:functionalTest="true" />
     <instrumentation android:name="org.jflib.gallery.GallerySecretsInstrumentation"
         android:targetPackage="org.jflib.gallery" android:functionalTest="true" />
+    <instrumentation android:name="org.jflib.gallery.GalleryPresentInstrumentation"
+        android:targetPackage="org.jflib.gallery" android:functionalTest="true" />
 </manifest>

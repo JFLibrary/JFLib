@@ -8,6 +8,12 @@
 //   linuxtest --test show [--hold MS]            test pattern (for window captures)
 //   linuxtest --test anim [--hold MS] [--save F] [--minimize] [--after MS]  continuous
 //                                                partial presents, then keep the window
+//   linuxtest --test pbench [--frames N] [--gap MS] [--fast]  present cost (present_time) per
+//                                                frame: whole, two boxes, a quarter, 40 rects
+//   linuxtest --test pcheck                      the presented pixels (read back from the window)
+//                                                equal the framebuffer after partial presents,
+//                                                frames back to back, hide + show, minimize,
+//                                                WM_PAINT (Windows), a new size
 //   linuxtest --shot x.png --test cursors [--out F]  fallback cursor images as a PNG
 //   linuxtest --test protoerr                    provoke wl_display.error (expect exit 1)
 //   linuxtest --shot x.png --test synth          synthetic pointer/keyboard events -> E_*
@@ -45,7 +51,6 @@ extern crate alloc;
 
 use alloc::format;
 use alloc::string::String;
-#[cfg(target_os = "linux")]
 use alloc::vec::Vec;
 
 use base::Args;
@@ -273,6 +278,8 @@ fn linuxtest() -> i32 {
         Some("clip") => Some(test_clip),
         Some("show") => Some(test_show),
         Some("anim") => Some(test_anim),
+        Some("pbench") => Some(test_pbench),
+        Some("pcheck") => Some(test_pcheck),
         Some("grab") => Some(test_grab),
         #[cfg(target_os = "linux")]
         Some("x11synth") => Some(t_x11::test_x11synth),
@@ -436,6 +443,242 @@ fn test_anim(t: &mut Lt) {
     plat::write_file(save, &png);
     let after = t.arg_int("--after", 2000); // keep the window (for captures)
     t.pump(after as u32, E_CLOSE);
+}
+
+/// what presenting costs at the window's size (plat::present_time): --frames N (60) frames,
+/// --gap MS (16) apart (--fast: back to back), of each kind: the whole frame, two 60 x 60 boxes (an
+/// animation), a quarter of the window, 40 small rectangles
+fn test_pbench(t: &mut Lt) {
+    let n = t.arg_int("--frames", 60).max(1) as u32;
+    let gap = if t.args.flag("--fast") { 0 } else { t.arg_int("--gap", 16).max(0) as u64 * 1000 };
+    t.redraw();
+    settle(400);
+    let (w, h) = (t.fb.w, t.fb.h);
+    out(&format!("pbench: window {w} x {h} px, dpi {}\n", plat::dpi()));
+    let mut dc = Dc::new(w, h);
+    for kind in ["full", "boxes", "quarter", "rects40"] {
+        let (n0, us0) = plat::present_time();
+        let t0 = plat::time_us();
+        let mut next = t0;
+        let mut rects: Vec<[i32; 4]> = Vec::new();
+        for i in 0..n as i32 {
+            rects.clear();
+            match kind {
+                "full" => rects.push([0, 0, w, h]),
+                "boxes" => {
+                    let x = 20 + (i * 7) % (w - 100).max(1);
+                    rects.push([x, 220.min(h - 61).max(0), 60, 60]);
+                    rects.push([x + 3, 220.min(h - 61).max(0), 60, 60]);
+                }
+                "quarter" => rects.push([w / 4, h / 4, w / 2, h / 2]),
+                _ => {
+                    for k in 0..40 {
+                        rects.push([(k * 97 + i * 13) % (w - 40).max(1), (k * 53 + i * 7) % (h - 20).max(1), 40, 20]);
+                    }
+                }
+            }
+            let fb = &mut t.fb;
+            dc.begin(fb);
+            dc.set_color((i as u32).wrapping_mul(0x0001_0307) | 0xFF40_4040);
+            for r in &rects {
+                dc.fill(fb, r[0], r[1], r[2], r[3]);
+            }
+            dc.end();
+            if kind == "full" {
+                t.present(None);
+            } else {
+                t.present(Some(&rects));
+            }
+            next += gap;
+            pump_until(next);
+        }
+        settle(200); // the presents waiting for the compositor
+        let (n1, us1) = plat::present_time();
+        let wall = plat::time_us() - t0;
+        out(&format!("pbench {kind}: {w} x {h} px, {} frames, {} us per frame (wall {} ms)\n", n1 - n0,
+                     (us1 - us0) / (n1 - n0).max(1), wall / 1000));
+    }
+    // Windows: half the window moved by 40 rows inside the window (BitBlt) against presenting
+    // the same rows again
+    #[cfg(windows)]
+    {
+        let (y, rows) = (h / 4, h / 2);
+        let mut blit = 0i64;
+        for i in 0..n as i32 {
+            blit += plat::win_test(plat::WT_SCROLL, 0, [y, rows, if i % 2 == 0 { -40 } else { 40 }, 0]).max(0);
+            pump_until(plat::time_us() + gap);
+        }
+        let (n0, us0) = plat::present_time();
+        for i in 0..n {
+            boxes(t, &[[0, y, w, rows]], 0x0030_3030 + i);
+            pump_until(plat::time_us() + gap);
+        }
+        let (n1, us1) = plat::present_time();
+        out(&format!("pbench scroll: {w} x {rows} px moved inside the window {} us, presented again {} us per frame\n",
+                     blit / n as i64, (us1 - us0) / (n1 - n0).max(1)));
+    }
+}
+
+/// what the main window shows as (w, h, rows of w * 4 bytes B, G, R, x): Windows the window's
+/// DC, X11 GetImage of the window, Wayland the last committed buffer (None while damage waits)
+fn shown() -> Option<(i32, i32, Vec<u8>)> {
+    #[cfg(windows)]
+    {
+        plat::win_test_image(0)
+    }
+    #[cfg(target_os = "linux")]
+    {
+        if plat::disp_backend() == 1 {
+            return plat::wl_test_presented(0);
+        }
+        let (w, h) = plat::window_size();
+        plat::x11t::image_of(0, [0, 0, w, h]).ok().map(|s| (s.w, s.h, s.px))
+    }
+}
+
+/// pump until the window shows the framebuffer (at most 2 s; 6 s after a new size: XWayland
+/// refuses GetImage while the compositor resizes the window) -> check
+fn check_shown(t: &mut Lt, name: &str) {
+    let end = plat::time_us() + if name.contains("new size") { 6_000_000 } else { 2_000_000 };
+    let mut last = String::from("nothing shown");
+    loop {
+        settle(30);
+        if let Some((w, h, px)) = shown() {
+            let fb = &t.fb;
+            if (w, h) != (fb.w, fb.h) {
+                last = format!("shows {w} x {h}, the frame is {} x {}", fb.w, fb.h);
+            } else {
+                let (mut n, mut at) = (0usize, (0, 0));
+                for y in 0..h as usize {
+                    for x in 0..w as usize {
+                        let (a, b) = ((y * w as usize + x) * 4, y * fb.stride as usize + x * 4);
+                        if px[a..a + 3] != fb.px[b..b + 3] {
+                            if n == 0 {
+                                at = (x, y);
+                            }
+                            n += 1;
+                        }
+                    }
+                }
+                if n == 0 {
+                    t.check(true, name);
+                    return;
+                }
+                last = format!("{n} pixels differ, the first at {}, {}", at.0, at.1);
+            }
+        }
+        if plat::time_us() >= end {
+            t.check(false, name);
+            out(&format!("     ({last})\n"));
+            return;
+        }
+    }
+}
+
+/// draw boxes of colour c into the framebuffer and present only them (x, y, w, h)
+fn boxes(t: &mut Lt, rs: &[[i32; 4]], c: u32) {
+    let fb = &mut t.fb;
+    let mut dc = Dc::new(fb.w, fb.h);
+    dc.begin(fb);
+    for (k, r) in rs.iter().enumerate() {
+        dc.set_color(c.wrapping_add(k as u32 * 0x0001_0203) | 0xFF00_0000);
+        dc.fill(fb, r[0], r[1], r[2], r[3]);
+    }
+    dc.end();
+    t.present(Some(rs));
+}
+
+/// the presented pixels against the framebuffer: whole frames, moving boxes, frames back to
+/// back (the X11 segments / Wayland buffers busy: the staging image), many rectangles (more
+/// than the pending list and a region hold), a whole frame again at the same size, hide +
+/// show, minimized, a repaint by the system (Windows WM_PAINT), a new size
+fn test_pcheck(t: &mut Lt) {
+    if t.headless {
+        t.check(false, "pcheck needs a window (run without --shot)");
+        return;
+    }
+    t.redraw();
+    check_shown(t, "pcheck: the whole frame");
+    for i in 0..20 {
+        let x = 20 + i * 9;
+        boxes(t, &[[x, 220, 60, 60], [x + 200, 120, 30, 90]], 0x0020_4060 + i as u32 * 0x0003_0507);
+        settle(16);
+    }
+    check_shown(t, "pcheck: moving boxes, 16 ms apart");
+    for i in 0..12 {
+        boxes(t, &[[(i * 37) % 500, (i * 23) % 300, 120, 70], [5, 5, 30 + i, 20]], 0x0050_1020 + i as u32 * 0x0007_0301);
+    }
+    check_shown(t, "pcheck: frames back to back");
+    let (w, h) = (t.fb.w, t.fb.h);
+    for i in 0..8 {
+        let rs: Vec<[i32; 4]> =
+            (0..40).map(|k| [(k * 97 + i * 13) % (w - 40).max(1), (k * 53 + i * 7) % (h - 20).max(1), 40, 20]).collect();
+        boxes(t, &rs, 0x0010_7030 + i as u32 * 0x0001_0101);
+        settle(5);
+    }
+    check_shown(t, "pcheck: 40 rectangles a frame");
+    let rs: Vec<[i32; 4]> = (0..300).map(|k| [(k * 31) % (w - 8).max(1), (k * 17) % (h - 8).max(1), 7, 7]).collect();
+    boxes(t, &rs, 0x0090_2010);
+    boxes(t, &rs[..150], 0x0010_9020);
+    check_shown(t, "pcheck: 300 rectangles in a frame");
+    {
+        // a whole frame again at the same size (rects None: a theme switch, a window shown again)
+        let fb = &mut t.fb;
+        let mut dc = Dc::new(fb.w, fb.h);
+        dc.begin(fb);
+        dc.clear(fb, 0xFF40_3020);
+        dc.set_color(0xFF20_A040);
+        dc.fill(fb, 30, 30, fb.w / 2, fb.h / 3);
+        dc.end();
+        t.present(None);
+    }
+    check_shown(t, "pcheck: a whole frame again (same size)");
+    plat::win_show(0, plat::PWS_HIDE);
+    settle(400);
+    boxes(t, &[[50, 50, 100, 100]], 0x0030_3090); // while hidden
+    plat::win_show(0, plat::PWS_SHOW);
+    settle(800);
+    check_shown(t, "pcheck: hidden, presented, shown again");
+    #[cfg(windows)]
+    {
+        boxes(t, &[[0, 0, 80, 40]], 0x0060_6000);
+        plat::win_test(plat::WT_REDRAW, 0, [0; 4]); // WM_PAINT from the kept copy
+        check_shown(t, "pcheck: WM_PAINT repaints the presented pixels");
+    }
+    plat::window_cmd(plat::WCMD_MINIMIZE);
+    settle(600);
+    boxes(t, &[[100, 60, 200, 100]], 0x0070_2050); // while minimized
+    settle(1300); // (Wayland: the frame callback does not come, the safety deadline does)
+    if plat::window_state() & plat::WST_MINIMIZED != 0 || cfg!(windows) {
+        plat::window_cmd(plat::WCMD_RESTORE);
+        settle(800);
+    }
+    check_shown(t, "pcheck: presented while minimized");
+    let (w0, h0) = plat::window_size();
+    plat::win_set_rect(0, plat::PW_KEEP, plat::PW_KEEP, w0 + 37, h0 + 23);
+    settle(500);
+    let (w1, h1) = plat::window_size();
+    t.fb.resize(w1, h1);
+    t.redraw();
+    boxes(t, &[[w1 - 50, h1 - 30, 50, 30]], 0x0040_8080);
+    check_shown(t, &format!("pcheck: a new size ({w0} x {h0} -> {w1} x {h1})"));
+    plat::win_set_rect(0, plat::PW_KEEP, plat::PW_KEEP, w0, h0);
+    settle(300);
+}
+
+/// pump the OS (events dropped) until the deadline
+fn pump_until(deadline: u64) {
+    loop {
+        plat::wait(deadline);
+        while plat::evq_pop().is_some() {}
+        if plat::time_us() >= deadline {
+            return;
+        }
+    }
+}
+
+fn settle(ms: u64) {
+    pump_until(plat::time_us() + ms * 1000);
 }
 
 // ---------------------------------------------------------------- clipboard

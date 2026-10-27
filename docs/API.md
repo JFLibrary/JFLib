@@ -17,7 +17,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [gfx](#gfx) -- surfaces, the draw context, blend kernels, paths, strokes, masks, gradients
   <br>[lib.rs](#gfx-crate-root) · [blend.rs](#gfxblendrs) · [blendmode.rs](#gfxblendmoders) · [dash.rs](#gfxdashrs) · [flood.rs](#gfxfloodrs) · [gradient.rs](#gfxgradientrs) · [path.rs](#gfxpathrs) · [panel.rs](#gfxpanelrs) · [pathdata.rs](#gfxpathdatars) · [raster.rs](#gfxrasterrs) · [shapes.rs](#gfxshapesrs) · [straight.rs](#gfxstraightrs) · [stroke.rs](#gfxstrokers) · [tmask.rs](#gfxtmaskrs) · [xform.rs](#gfxxformrs)
 - [text](#text) -- fonts (SGF1, TrueType, CFF, COLR), glyph cache, text runs
-  <br>[lib.rs](#text-crate-root) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs)
+  <br>[lib.rs](#text-crate-root) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs)
 - [spell](#spell) -- spell checking: Hunspell dictionaries, the system's checker, a personal word list
   <br>[lib.rs](#spell-crate-root) · [hyphen.rs](#spellhyphenrs) · [speller.rs](#spellspellerrs) · [token.rs](#spelltokenrs)
 - [img_core](#img_core) -- image I/O dispatch, records, metadata, colour, resampling, image operations
@@ -3532,7 +3532,9 @@ cmd_shadow, render_all, render_popup(dx, dy).
 
 Every record keeps the byte size the asm gives it (cmd_alloc rounds to 8): a layer holds
 at most its capacity (CAPS_MAIN / CAPS_SMALL), further commands are dropped as in the asm.
-The dirty regions (dirty.rs) hash every record's content (cmd_hash) and its box (cmd_bbox).
+The dirty regions (dirty.rs) hash every record's content (cmd_parts: without its position,
+which is mixed in separately, so scrollcopy.rs can hash it relative to a scrolled content)
+and its box (cmd_bbox).
 ```
 
 - **`struct Gfx<'a>`**
@@ -3703,6 +3705,8 @@ Windows (ID = the app's window id, 0 / main = the main window):
   expect sound KIND|none        the last sound ui.beep / ui.dialog_sound asked for since the
                                 last check (default, information, warning, error, question,
                                 notify; headless runs play none)
+  expect scrollcopy [N]|none    at least N (default 1) frames / no frame moved pixels by a
+                                scroll copy since the last check (scrollcopy.rs)
   expect_warn / expect_nowarn   a UIWARN was / was not printed since the last check (a
                                 script also warns about a widget id used twice in a pass)
 (K1) Files and clipboard, drag and drop:
@@ -4098,7 +4102,9 @@ dirty -- dirty regions: only redraw and present what changed        [src/ui/ui_d
 
 A command's hash covers all of its content (colours, coordinates, text, a custom draw
 function's identity and version) and the clip it is drawn in, so any visible change
-marks its cells.
+marks its cells.  The same pass fills the content grids of the scroll views
+(scrollcopy.rs): dirty cells whose pixels a scrolled view still shows elsewhere are copied
+there before the rectangles are drawn.
 ```
 
 **`impl Ui`**
@@ -8006,6 +8012,63 @@ Unavailable.
 - **`fn screen_error(&self) -> Option<ScreenError>`**
   why the last pick or picture failed (None: it worked or was not asked for)
 
+#### `ui/scrollcopy.rs`
+
+Source: [`lib/ui/scrollcopy.rs`](../lib/ui/scrollcopy.rs)
+
+```text
+scrollcopy -- scroll copies: when only a scroll view's content moved, the pixels that stay
+valid are moved inside the framebuffer; the band that came into view and whatever really
+changed are drawn again
+
+  scroll_copy_begin(id, ox, oy)   the commands recorded until scroll_copy_end are the content
+                                  of scroll view `id` and move with it; (ox, oy) = window px
+                                  of the content's origin (its place minus the scroll offset).
+                                  Call right after the view's clip.  Scroll views, lists, data
+                                  views, vlist, document, code and multi-line text views do.
+  scroll_copy_end()
+  (dirty.rs) Pass: the content grids of a frame while dirty_compute hashes the commands;
+  sc_plan: the window cells a copy can make valid; sc_want: copy or draw; sc_copy: the copy
+  scopy_present(n) (render_live): the moved cells join the presented rectangles
+  scopy_done() (render_live, after drawing): the frame's cost for sc_want
+
+A view whose origin moved (its clip staying) in the last RECENT frames gets a grid of 32 x 32 px cells aligned
+at its content's origin, over its clip.  A cell's hash mixes, in drawing order, every content
+command touching it (hash and box relative to the origin, so a moved command keeps them) and
+every other command over the view that is flat there (a fill covering the cell's visible
+part: window background, cards; an opaque one forgets what was below).  Anything else over
+the cell (text or shapes of other layers, scroll bars, popups, the uneven edge of a fill) and
+content whose pixels may change when it moves (the rasterizer works in absolute f32
+coordinates: rounded corners, circles, lines; custom drawings, icons painted by the style or
+an icon hook, very large or left-cut text) marks the cell bad.  When the origin moved by
+(dx, dy) since the last frame and the view's clip stayed, a cell with its old hash that is
+bad in neither frame shows the same pixels moved by (dx, dy): the dirty window cells covered
+by such cells may be copied instead of drawn -- byte-identical to a full redraw
+(--verify-dirty checks it).
+
+A copy reads and writes a cell's pixels: filling a flat cell again is cheaper, drawing text
+or icons is not, and every rectangle left to draw replays the commands.  So only cells with
+detail are copied, small gaps between drawn cells are drawn too, a copy must take over a
+quarter of what would be drawn, and per view the measured cost of frames that copied and of
+frames that drew decides (the other way is tried again every EXPLORE frames; the first
+frames try both); a view that moved IDLE_MAX frames in a row with grids but without copying
+gets none for SKIP frames.  Frames checked by --verify-dirty always copy when they can (and
+never skip).  No copy: a horizontal move in a mirrored window, the inspector, pending canvas
+damage, a full redraw.  `expect scrollcopy` (auto.rs) counts the frames that copied,
+jfgui_DEBUG=1 prints them.
+```
+
+**`impl Ui`**
+
+- **`fn scroll_copy_begin(&mut self, id: u32, ox: i64, oy: i64)`**
+  ui_scroll_copy_begin(id, ox, oy): the commands recorded until scroll_copy_end are the
+  content of scroll view `id`; (ox, oy) = the window px of the content's origin (its
+  position minus the scroll offset).  Call right after the view's clip.  When only the
+  origin moved between two frames, pixels still shown may be moved in the framebuffer
+  instead of drawn again (content that does not move with the origin is simply drawn).
+- **`fn scroll_copy_end(&mut self)`**
+  ui_scroll_copy_end: the end of the content of scroll_copy_begin
+
 #### `ui/symbol.rs`
 
 Source: [`lib/ui/symbol.rs`](../lib/ui/symbol.rs)
@@ -9149,6 +9212,9 @@ gfx -- surfaces and the draw context (clip, origin, colour), fills, blits  [src/
   Dc::new(w, h) / dc.begin(&sf) / dc.end()      the draw context of a target; begin saves
                                      clip, origin and opacity and resets them for another
                                      target, end restores them (gfx_begin / gfx_end)
+  dc.begin_rows(&sf, row0, h)        sf holds rows row0 .. row0 + sf.h of a target h rows
+                                     high (a row band drawn on a thread of its own): the
+                                     coordinates stay the target's, only the pixel rows move
   dc: set_color(argb), set_opacity(op), clip_push(x, y, w, h) / clip_pop(), origin(x, y),
       translate(dx, dy), fill / clear / hline / vline / frame / blit / blit_scaled (sf, ...)
   path (Path, 24.8 and float API), raster (Raster), stroke (Path::stroke), shapes (Shapes),
@@ -9230,6 +9296,9 @@ ERR_LIMIT: i32 = -15
   - `pcol: [u32; 4]` -- premultiplied B, G, R, A
   - `pcol32: u32`
   - `ia: u32` -- 255 - premultiplied alpha
+  - `row0: i32` -- the target row in the surface's first row (begin_rows: a band of a taller target);
+    0 otherwise.  The fills and blits here, the rasterizer (paths, shapes, panels) and the
+    text engine's glyph blits honour it; other row writers (tmask, gradient, flood) expect 0.
 
 **`impl Dc`**
 
@@ -9238,6 +9307,10 @@ ERR_LIMIT: i32 = -15
 - **`fn begin(&mut self, sf: &Surface)`**
   draw into another target: clip, origin and opacity of the current one are saved; the
   clip becomes the whole new target, the origin 0  [gfx_begin]
+- **`fn begin_rows(&mut self, sf: &Surface, row0: i32, h: i32)`**
+  begin for a band: sf holds rows row0 .. row0 + sf.h of a target h rows high.  Drawing
+  keeps the target's coordinates (clip, origin, paths, glyph positions), so a band gets
+  the bytes the whole target would get there; the clip starts as the band's rows.
 - **`fn end(&mut self)`**
   back to the previous target with its clip, origin and opacity  [gfx_end]
 - **`fn set_color(&mut self, argb: u32)`**
@@ -9277,6 +9350,8 @@ blend -- pixel row kernels (premultiplied 0xAARRGGBB, bytes B G R A)   [src/gfx/
   mask_over(row, mask, pcol)       the colour through an 8-bit coverage row
   blit_over(dst, src, opacity)     premultiplied src over dst (x opacity 0..255)
   a8_over(dst, cov, alpha)         8-bit target: c = cov * alpha / 255, dst = c + dst * (255 - c) / 255
+  copy_stream(dst, src) / stream_fence()   a row copy past the caches (simd; row bands
+                                   drawn on worker threads go back to the framebuffer so)
 
 "over": dst = src + dst * (255 - src_alpha) / 255 with exact rounding (div255) and the
 saturation of the SSE2 kernels (packuswb).  fill_over, mask_over and a8_over are SIMD
@@ -9284,6 +9359,8 @@ kernels (simd::Kernel; their fast paths are exact shortcuts, so SSE2 and AVX2 ag
 blit_over is the assembly's SSE2 loop on pixel pairs, because its pair skip (both
 transparent: dst kept) is visible for invalid premultiplied input.
 ```
+
+Re-exports: `simd::{copy_stream, stream_fence}`
 
 - **`fn fill_solid(row: &mut [u8], c: u32)`**
   k_fill_solid: store one colour into every pixel of the row
@@ -9593,6 +9670,8 @@ halo from drawing two antialiased shapes on top of the same boundary pixel.
   Rounded panel in 24.8 pixels, with an inside border. Fill and stroke are
   straight ARGB. Honors draw origin, clipping and opacity, on PARGB and A8.
   Temporary mask storage is bounded to two 64-row bands of the visible area.
+  The bands start at the panel's first row whatever the clip, so a row gets the
+  same coverage when the clip cuts the panel (dirty rectangles, row bands).
 
 ### `gfx/pathdata.rs`
 
@@ -10019,6 +10098,8 @@ colour glyphs), the glyph cache and text runs                        [src/text/*
                                  on opaque targets (lcd.rs); NONE (default): greyscale
   set_fallback_fonts / set_system_fallback / fallback_for   characters the font lacks come
                                  from other fonts (fallback.rs; also when shaping)
+  record_n / record_icon / glyphs   glyphs placed now, blended later from the glyph cache by
+                                 any thread (record.rs: GlyphRec, GlyphView)
 
 Pen positions are 24.8 fixed point; glyphs are placed on quarter pixels and their
 coverage masks are cached per (font, glyph, size, phase, greyscale / subpixel).  Colour
@@ -10759,6 +10840,65 @@ F_INV30: f32 = 0.033333335
 - **`fn cubic(path: &mut Path, p: [f32; 8])`**
   flatten the cubic {p0, c1, c2, p3} (device px; p0 is the current point) into the path,
   the subdivision of path_cubic (tolerance 0.2 px)  [ol_cubic]
+
+### `text/record.rs`
+
+Source: [`lib/text/record.rs`](../lib/text/record.rs)
+
+```text
+record -- glyphs placed now and blended later from the glyph cache, by any thread (the row
+bands of ui's render_par.rs)
+
+  GlyphRec::default() / rec.begin(&text)   an empty record, bound to the cache as it is now
+  text.record_n(&mut rec, dc, sf, x, y, s, len) -> placed   draw_n's glyphs appended to rec
+       instead of blended (dc and sf as draw_n would get them; dc's colour is recorded with
+       every glyph): layout, shaping, fallback fonts and rasterizing the masks into the cache
+       happen now.  false: a glyph cannot come from the cache (too large: a filled path; a
+       colour bitmap above the cache's limit) -- that text must be drawn with draw_n
+  text.record_icon(&mut rec, dc, sf, cp, x, y, size_fx) -> placed   the same for icon_draw
+  rec.len()                          glyphs so far (a text's range: len before .. after)
+  rec.valid(&text)                   the cache was not flushed since begin (the keys hold)
+  text.glyphs() -> GlyphView         the cache read-only, Send + Sync
+  view.draw(&rec, from, to, dc, sf)  blend glyphs from .. to in their colours inside dc's
+                                     clip (dc.row0 honoured): the bytes draw_n gives there
+
+A glyph is its cache key, pen x and baseline (absolute target pixels), its box (cheap
+culling against the clip), the colour and how it is blended (mask, colour bitmap, subpixel
+mask with a copy of the colour's coverage adjustment).  Masks depend only on the key, so
+blending them later, clipped, gives the pixels of drawing them now.
+```
+
+- **`struct GlyphRec`**
+  glyphs placed by record_n / record_icon, blended later by GlyphView::draw
+
+**`impl GlyphRec`**
+
+- **`fn begin(&mut self, t: &Text)`**
+  empty, bound to the glyph cache as it is now
+- **`fn len(&self) -> usize`**
+  glyphs recorded so far
+- **`fn is_empty(&self) -> bool`**
+- **`fn valid(&self, t: &Text) -> bool`**
+  the glyph cache was not flushed since begin: every recorded key is still there
+
+**`impl Text`**
+
+- **`fn record_n(&mut self, rec: &mut GlyphRec, dc: &mut Dc, sf: &mut Surface, x: i32, y: i32, s: &[u8], len: usize) -> bool`**
+  draw_n's glyphs appended to rec instead of blended (record.rs); false: one of them
+  cannot be blended from the cache, draw that text with draw_n
+- **`fn record_icon(&mut self, rec: &mut GlyphRec, dc: &mut Dc, sf: &mut Surface, cp: u32, x: i32, y: i32, size_fx: i32) -> bool`**
+  icon_draw's glyph appended to rec (record_n)
+- **`fn glyphs(&self) -> GlyphView<'_>`**
+  the glyph cache read-only, for blending recorded glyphs on other threads
+
+- **`struct GlyphView<'a>`**
+  the glyph cache read-only (Text::glyphs): blends recorded glyphs, from any thread
+
+**`impl GlyphView<'_>`**
+
+- **`fn draw(&self, rec: &GlyphRec, from: usize, to: usize, dc: &mut Dc, sf: &mut Surface)`**
+  blend the glyphs from .. to of rec in their colours inside dc's clip (rec.valid must
+  hold: a missing mask is skipped)
 
 ### `text/rendering.rs`
 
@@ -20088,7 +20228,9 @@ wait, presentation, cursors                                     [src/plat/win/wi
   win_size(w) -> (w, h)             win_dpi(w) -> 96 = 100 %
   win_set_min_size(w, w_dip, h_dip) (also before the window exists)
   win_present(w, frame, rects)      rects x, y, w, h; None = all.  The window keeps a copy
-                                    of the presented pixels: WM_PAINT repaints from it.
+                                    of the presented pixels (a DIB section the rectangles
+                                    are copied into and BitBlt from): WM_PAINT repaints from
+                                    it.
   win_set_cursor(w, shape)          CUR_* or a custom cursor CUR_USER0..CUR_TABLE-1
   cursor_create(px, w, h, hot_x, hot_y, dpi) -> CUR_USER0 + k / -1   a cursor from
                                     premultiplied ARGB pixels (rows of w * 4 bytes,
@@ -20140,7 +20282,8 @@ callbacks (refresh, hit hook) never hold a reference across a Win32 call.
 
 - **`fn win_present(w: i32, f: &Frame, rects: Option<&[[i32; 4]]>)`**
   show the frame's dirty rectangles (x, y, w, h; None = the whole frame); the window keeps a
-  copy of the pixels (WM_PAINT repaints from it)  [plat_win_present]
+  copy of the pixels (WM_PAINT repaints from it; jfgui_WINPRESENT=dibits: a plain buffer and
+  SetDIBitsToDevice instead of the DIB section)  [plat_win_present]
 
 - **`fn win_destroy(w: i32)`**
   close the window (w = 0: ends the message loop)  [plat_win_destroy]
@@ -20459,6 +20602,10 @@ and poke our own windows only (no input is injected into the system)
     WT_POST_CHARS a burst: a[0] WM_CHAR messages posted to window w, the characters a[1],
                   a[1] + 1, ... a[1] + a[2] - 1 by turns (as an input method commits a long
                   text) -> the number posted
+    WT_SCROLL     move the client rows a[0] .. a[0] + a[1] by a[2] rows inside the window
+                  (BitBlt from its DC to itself, GdiFlush; what a scroll could cost without
+                  sending the pixels again) -> microseconds taken
+  win_test_image(w) -> (w, h, px)   the client area as the window shows it (BitBlt from its DC)
   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms by a timer of the
                   UI thread: name None = Cancel, Some(name) = the name typed + OK
 ```
@@ -20478,10 +20625,16 @@ WT_ACTIVE: u32 = 11
 WT_CLIP_ACCESS: u32 = 12
 WT_POPUP_SEND: u32 = 13
 WT_POST_CHARS: u32 = 14
+WT_SCROLL: u32 = 15
 ```
 
 - **`fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64`**
   see the file header
+
+- **`fn win_test_image(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)>`**
+  (test aid) what window w shows: its client area read back from the window's DC (BitBlt into
+  a DIB section; under DWM the window's own surface, also where other windows cover it) ->
+  (w, h, rows of w \* 4 bytes B, G, R, x)
 
 - **`fn file_dialog_autoclose(ms: u32, name: Option<&str>)`**
   (test aid) close the next file_dialog after ms: Cancel (name None) or name + OK
@@ -21103,6 +21256,8 @@ BK_X11: u32 = 2
 - **`fn win_set_min_size(w: i32, w_dip: i32, h_dip: i32)`**
 
 - **`fn win_present(w: i32, f: &Frame, rects: Option<&[[i32; 4]]>)`**
+  show the frame's dirty rectangles (x, y, w, h; None = all) in window w; pixels outside
+  them must be what the last present of w showed (linux_x11_present.rs, linux_wl_present.rs)
 
 - **`fn win_set_cursor(w: i32, shape: u32)`**
 
@@ -21240,6 +21395,10 @@ UI thread calls in; wake() from other threads goes through the eventfd of linux_
   a wl_display.sync round trip: the events that arrive before its answer are dispatched
   first (linuxtest --test burst: a burst of keys while it waits) -> 0 ok / -1 timeout
 
+- **`fn wl_test_presented(w: i32) -> Option<(i32, i32, Vec<u8>)>`**
+  the pixels of window w's last committed buffer -- what the compositor shows -- as (w, h,
+  rows of w \* 4 bytes B, G, R, x); None while damage waits (linuxtest --test pcheck)
+
 - **`fn wl_test_protoerr()`**
   attach a buffer id that does not exist to the main window's surface: the compositor
   answers with wl_display.error, which ends the process (linuxtest --test protoerr)
@@ -21365,10 +21524,11 @@ bug and panics.  Files:
   linux_x11_screen.rs   the monitor list, global shortcuts (GrabKey), GetImage of the root,
                         the colour pick (pointer grab), RandR change events
 
-Deviation from the assembly (the Rust API hands the frame over only for the call):
-presented pixels are copied into a per-window shadow image (the damaged rectangles), and
-popups keep a copy of their pixels; repaints (Expose, after a map, the PutImage fallback)
-read these copies where the assembly re-read the caller's framebuffer.
+Deviation from the assembly (the Rust API hands the frame over only for the call): the
+MIT-SHM segments are whole frames brought up to date from the caller's frame (what each
+lacks, linux_x11_present.rs), so repaints (Expose, after a map) read the segment of the
+last put; the PutImage fallback keeps a shadow image of the frame, and popups keep a copy
+of their pixels -- where the assembly re-read the caller's framebuffer.
 ```
 
 - **`fn x11_connect() -> Option<Box<dyn Display>>`**
@@ -21986,6 +22146,10 @@ REQUEST_UNSAVED: u32 = 22
 - **`extern "C" fn jfgui_start(width: i32, height: i32, dpi: i32, args_len: u32) -> i32`**
   Start once. Inbox contains newline-separated arguments, excluding the synthetic program name.
 
+- **`extern "C" fn jfgui_present_us() -> f64`**
+  Microseconds spent presenting so far (present_time: the windows' copies, the composition,
+  the hand-over to the host); for measurements.
+
 - **`extern "C" fn jfgui_tick(time_ms: u32)`**
   Advance the owned runtime and cooperative jobs, then submit the composed framebuffer.
 
@@ -22143,6 +22307,11 @@ Source: [`lib/plat/web_windows.rs`](../lib/plat/web_windows.rs)
 ```text
 Library windows and popups composited into one browser canvas. Every surface is drawn
 by the existing software renderer; the browser host receives pixels, not another UI.
+The windows keep their pixels as R, G, B, A rows (the order of the browser's ImageData and
+Android's Bitmap): the frames' B, G, R, x is swapped once, while copying the dirty
+rectangles in, and the host copies rows without touching pixels.  One window over the
+whole canvas without popups is the canvas itself (no composition); otherwise the windows
+and popups are composited into the canvas buffer.
 ```
 
 - **`fn win_create( title: &str, width: i32, height: i32, _flags: u32, _owner: i32, x: i32, y: i32, ) -> i32`**
@@ -22194,7 +22363,8 @@ by the existing software renderer; the browser host receives pixels, not another
   Minimum drag-resize dimensions in DIP.
 
 - **`fn win_present(id: i32, frame: &Frame<'_>, rects: Option<&[[i32; 4]]>)`**
-  Copy an existing software-renderer frame into its composited browser surface.
+  Copy the dirty rectangles of a software-renderer frame into the window's surface (R, G,
+  B, A); the next flush shows them.
 
 - **`fn win_set_cursor(_id: i32, shape: u32)`**
   Request one of the shared browser pointer shapes.
@@ -22860,9 +23030,16 @@ pwin0 -- the single-window platform API on top of the window-indexed win_* funct
   dpi() -> i32   set_title(utf8)   present(frame, rects)     window 0
   set_cursor(shape)  window_state() -> WST_*  window_cmd(cmd)  begin_move()
   begin_resize(edges)              the current window
+  present_time() -> (frames, us)   what showing frames cost so far (every window)
 
 The OS layers (win_api.rs; linux_disp.rs -> Wayland / X11) implement the win_* calls.
 ```
+
+- **`fn present_time() -> (u64, u64)`**
+  (frames handed to win_present, microseconds spent in the platform's present paths) since
+  the start, all windows together: win_present itself plus the work it defers (X11: a
+  segment that frees up, Wayland: the frame callback, the browser and Android: the
+  composition and the hand-over to the host).  For measurements (linuxtest --test pbench).
 
 - **`fn win_use(w: i32)`**
   the window the single-window per-window calls refer to (-1 = none)
@@ -22889,7 +23066,9 @@ The OS layers (win_api.rs; linux_disp.rs -> Wayland / X11) implement the win_* c
 - **`fn set_title(title: &str)`**
 
 - **`fn present(f: &Frame, rects: Option<&[[i32; 4]]>)`**
-  show dirty rectangles (None = everything) of the main window's framebuffer
+  show dirty rectangles (None = everything) of the main window's framebuffer; its pixels
+  outside them must be what the last present showed (the backends keep whole frames up to
+  date from it)
 
 - **`fn set_cursor(shape: u32)`**
   CUR_\* pointer shape of the current window

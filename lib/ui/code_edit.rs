@@ -850,6 +850,11 @@ impl Ui {
             self.draw_rect(inner[0], ty, gw, inner[1] + inner[3] - ty);
         }
         self.ltr_begin(inner[0], inner[2]);
+        // the lines move with the position (scrollcopy.rs)
+        let copy = total_h > th || hbar;
+        if copy {
+            self.scroll_copy_begin(id, (tx - v.sx) as i64, (ty - v.sy) as i64);
+        }
         let (sa, sb) = doc.selection().range();
         let sel_col = if focused { theme.sel } else { theme.sel_inactive };
         let ital = |k: u8| theme.italic >> k & 1 != 0;
@@ -1073,6 +1078,9 @@ impl Ui {
                 self.draw_rect(cx_px, cy_px, self.dp(2).max(1), m.lh);
             }
             self.ime_pos(cx_px, cy_px, m.lh);
+        }
+        if copy {
+            self.scroll_copy_end();
         }
         self.ltr_end();
         self.clip_pop();

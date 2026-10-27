@@ -143,6 +143,8 @@ mod perm;
 mod popup;
 // the app's recent files and the system's (ui.recent_add / recent_files)
 mod recent;
+// large redraws on several threads: row bands of the dirty rectangles (render_live's hook)
+mod render_par;
 mod ribbon;
 mod settings_page;
 mod shell;
@@ -153,6 +155,8 @@ mod rtl;
 mod runtime;
 // the monitors, global shortcuts, the colour pick, pictures of the screen (plat::screen, hotkey)
 mod screen;
+// scroll copies: a scrolled view's still valid pixels are moved instead of drawn (scrollcopy.rs)
+mod scrollcopy;
 mod stock;
 mod style;
 mod symbol;
@@ -332,6 +336,8 @@ pub struct WinParts {
     pub(crate) chrome: chrome::W,
     /// right-to-left: the regions that keep their LTR content (rtl.rs)
     pub(crate) rtl: rtl::W,
+    /// the scroll views of the pass, their content grids of the last frame (scrollcopy.rs)
+    pub(crate) scopy: scrollcopy::W,
 }
 
 impl WinParts {
@@ -347,6 +353,7 @@ impl WinParts {
             list: Default::default(),
             chrome: Default::default(),
             rtl: Default::default(),
+            scopy: Default::default(),
         }
     }
 }
@@ -388,6 +395,10 @@ pub(crate) struct Mods {
     pub(crate) sound: sound::S,
     /// (ROADMAP §3) the colour pick, the last picture, dropped shortcuts (screen.rs)
     pub(crate) screen: screen::S,
+    /// the scroll copies since the last `expect scrollcopy` (scrollcopy.rs)
+    pub(crate) scopy: scrollcopy::S,
+    /// (ROADMAP §8) the band buffers and glyph record of multi-threaded renders (render_par.rs)
+    pub(crate) rpar: render_par::S,
 }
 
 /// the UI context: everything ASMLIB keeps in g_* variables

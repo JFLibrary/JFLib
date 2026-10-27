@@ -1,0 +1,24 @@
+#!args --verify-dirty
+# scroll copies (lib/ui/scrollcopy.rs) in the data views: when only a view's content moved, the
+# pixels still shown are moved in the framebuffer and the rest is drawn; every frame is compared
+# with a full redraw (--verify-dirty), `expect scrollcopy N` counts the frames that copied.  A
+# script renders after each input event and a view gets its content grid once it moves, so the
+# second frame that moves it copies.  The side panel (a scroll view with cards, a tree, meters;
+# it scrolls by 96 DIP in a low window), by the wheel and frame by frame while it scrolls
+# smoothly (bench anim: every frame checked after its timed render)
+size 1440 560
+wait 50
+move 1200,400
+wait 50
+wheel 1200,400 -120
+wait 300
+wheel 1200,400 -120
+wait 300
+wheel 1200,400 -120
+wait 300
+move 1200,410
+expect #30610 value 96
+expect scrollcopy 1
+wheel 1200,410 240
+bench 12 anim
+expect_nowarn

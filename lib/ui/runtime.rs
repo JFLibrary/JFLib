@@ -888,14 +888,20 @@ impl Ui {
         if ins {
             n = self.ins_render_begin(n); // the inspector's overlay (inspect.rs)
         }
-        self.wp.rt.present_n = n;
+        self.wp.rt.present_n = self.scopy_present(n); // + the cells a scroll copy moved (scrollcopy.rs)
         if self.ui_debug {
             plat::write_stderr(alloc::format!("render: {} dirty rects (-1 = full)\n", n).as_bytes());
         }
-        if n == 0 {
+        if self.wp.rt.present_n == 0 {
             return; // nothing changed
         }
         self.dc.begin(&self.wp.rt.fb);
+        // the text font the passes left set stays set (the replay sets each text's font,
+        // custom draws their own; what stays must not depend on the dirty part or on threads)
+        let font = self.text.get_font();
+        if self.render_par(n) {
+            n = 0; // drawn on several threads (render_par.rs)
+        }
         if n < 0 {
             self.render_all_to(false);
         } else {
@@ -910,6 +916,7 @@ impl Ui {
             }
         }
         self.dc.end();
+        self.scopy_done(); // the frame's cost (scrollcopy.rs)
         if ins {
             self.ins_render_end(); // the inspector's overlay on top (inspect.rs)
         }
@@ -917,6 +924,7 @@ impl Ui {
         if self.verify_dirty {
             self.verify_dirty();
         }
+        self.text.set_font(font.0, font.1);
     }
 
     /// ui_present: show what render changed in the live window

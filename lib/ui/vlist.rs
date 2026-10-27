@@ -488,6 +488,8 @@ struct Open {
     layer: u32,
     // the row to reveal was built: its final top and height
     shown: Option<(i32, i32)>,
+    // the rows are a scroll copy region (scrollcopy.rs)
+    copy: bool,
 }
 
 /// shared state (Ui::m.vlist): the open lists
@@ -567,6 +569,11 @@ impl Ui {
             end += 1;
         }
         self.clip_push(r[0], r[1], r[2], r[3]);
+        // the rows move with the position (scrollcopy.rs)
+        let copy = s.rows.total() > view as i64;
+        if copy {
+            self.scroll_copy_begin(id, r[0] as i64, r[1] as i64 - s.rows.pos());
+        }
         let c = &self.wp.ctx;
         let (hit0, layer) = (c.hits[c.hit_cur].len(), c.cmd_layer_ui);
         let rw = (r[2] - sbw).max(1);
@@ -590,6 +597,7 @@ impl Ui {
             hit0,
             layer,
             shown: None,
+            copy,
         });
         (first, end)
     }
@@ -743,6 +751,9 @@ impl Ui {
         let Some(mut o) = self.m.vlist.open.pop() else {
             return 0;
         };
+        if o.copy {
+            self.scroll_copy_end();
+        }
         self.clip_pop();
         let r = o.rect;
         let view = r[3].max(1);

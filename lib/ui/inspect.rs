@@ -1067,11 +1067,11 @@ impl Ui {
         let sf = if shadow { &mut wp.rt.shadow } else { &mut wp.rt.fb };
         dc.begin(sf);
         match clip {
-            None => render_layer(&ov, dc, sf, text, icon_hook, icon_style),
+            None => render_layer(&ov, 0, dc, sf, text, icon_hook, icon_style),
             Some(rs) => {
                 for r in rs {
                     dc.clip_push(r[0], r[1], r[2], r[3]);
-                    render_layer(&ov, dc, sf, text, icon_hook, icon_style);
+                    render_layer(&ov, 0, dc, sf, text, icon_hook, icon_style);
                     dc.clip_pop();
                 }
             }

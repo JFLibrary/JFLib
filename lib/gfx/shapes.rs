@@ -27,10 +27,19 @@ impl Shapes<'_> {
             self.dc.fill(self.sf, x, y, w, h);
             return;
         }
-        self.path.begin(self.dc);
-        self.path.rrect_fx(x << 8, y << 8, w << 8, h << 8, r << 8);
-        self.band(x, y, w, r, 0);
-        self.band(x, y + h - r, w, r, 0);
+        // the path only when a corner band is inside the clip (row bands, dirty rectangles)
+        let top = self.dc.clip_rect(x, y, w, r).is_some();
+        let bottom = self.dc.clip_rect(x, y + h - r, w, r).is_some();
+        if top || bottom {
+            self.path.begin(self.dc);
+            self.path.rrect_fx(x << 8, y << 8, w << 8, h << 8, r << 8);
+            if top {
+                self.band(x, y, w, r, 0);
+            }
+            if bottom {
+                self.band(x, y + h - r, w, r, 0);
+            }
+        }
         let mh = h - r - r;
         if mh > 0 {
             self.dc.fill(self.sf, x, y + r, w, mh);
@@ -62,14 +71,23 @@ impl Shapes<'_> {
             self.dc.fill(self.sf, x + w - t, y + t, t, h - t - t);
             return;
         }
-        // even-odd ring: outer rrect r, inner rrect max(r - t, 0)
-        self.path.begin(self.dc);
-        self.path.rrect_fx(x << 8, y << 8, w << 8, h << 8, r << 8);
-        let ir = (r - t).max(0);
-        self.path.rrect_fx((x + t) << 8, (y + t) << 8, (w - t - t) << 8, (h - t - t) << 8, ir << 8);
+        // even-odd ring: outer rrect r, inner rrect max(r - t, 0) (only when a corner band is
+        // inside the clip)
         let band = r.max(t);
-        self.band(x, y, w, band, 1);
-        self.band(x, y + h - band, w, band, 1);
+        let top = self.dc.clip_rect(x, y, w, band).is_some();
+        let bottom = self.dc.clip_rect(x, y + h - band, w, band).is_some();
+        if top || bottom {
+            self.path.begin(self.dc);
+            self.path.rrect_fx(x << 8, y << 8, w << 8, h << 8, r << 8);
+            let ir = (r - t).max(0);
+            self.path.rrect_fx((x + t) << 8, (y + t) << 8, (w - t - t) << 8, (h - t - t) << 8, ir << 8);
+            if top {
+                self.band(x, y, w, band, 1);
+            }
+            if bottom {
+                self.band(x, y + h - band, w, band, 1);
+            }
+        }
         let sh = h - band - band;
         if sh <= 0 {
             return;

@@ -892,6 +892,11 @@ impl Ui {
         let inset = if presentation.is_some() { 0 } else { hair };
         self.draw_clip(x0, r[1].wrapping_add(inset), tw, r[3].wrapping_sub(inset).wrapping_sub(inset));
         self.ltr_begin(x0, tw); // right-to-left: the text keeps its order
+        // the lines move with the position (scrollcopy.rs)
+        let copy = ch > vh || self.m.edit.tb_flags & TB_WRAP == 0;
+        if copy {
+            self.scroll_copy_begin(id, x0.wrapping_sub(sx) as i64, top.wrapping_sub(sy) as i64);
+        }
         let tcol = presentation.map_or_else(|| self.color(if disabled { T_TEXT_DISABLED } else { T_TEXT }), |p| p.color);
         let scol = self.color(T_ON_ACCENT); // selected text colour
         let bx = x0.wrapping_sub(sx); // x of a line's first character
@@ -961,6 +966,9 @@ impl Ui {
                 self.draw_rect(x, ly, hair, lh);
             }
             self.ime_pos(x, ly, lh);
+        }
+        if copy {
+            self.scroll_copy_end();
         }
         self.ltr_end();
         self.draw_unclip();

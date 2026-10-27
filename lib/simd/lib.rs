@@ -10,6 +10,9 @@
 //   dispatch(k)      runs k with Avx2 when rt::cpu reports CPU_AVX2, else with Sse2
 //   dispatch_sse2(k) always Sse2 (tests)
 //   has_avx2()
+//   copy_stream(dst, src) / stream_fence()   a copy whose stores bypass the caches (x86-64:
+//                    movntdq), for big results another thread reads later; the fence makes
+//                    them visible (the copying thread calls it before handing dst on)
 //
 // Pixel helpers work on "pixel lanes": the 4 bytes of a pixel zero-extended to 4 u16 lanes,
 // PX = 2 (SSE2) / 4 (AVX2) pixels per register, pixels 2k and 2k + 1 in 128-bit lane k.
@@ -45,6 +48,56 @@ pub use rt::cpu::CPU_AVX2;
 #[inline]
 pub fn has_avx2() -> bool {
     rt::cpu::features() & CPU_AVX2 != 0
+}
+
+/// copy src into dst (the shorter length) with non-temporal stores where the target has them
+/// (x86-64: the 16-byte aligned part of dst): dst is neither read first nor pulled into the
+/// caches, which keep what the thread works on.  stream_fence() before dst is handed on.
+#[cfg(target_arch = "x86_64")]
+pub fn copy_stream(dst: &mut [u8], src: &[u8]) {
+    use core::arch::x86_64::{__m128i, _mm_loadu_si128, _mm_stream_si128};
+    let n = dst.len().min(src.len());
+    let (dst, src) = (&mut dst[..n], &src[..n]);
+    let head = (dst.as_ptr() as usize).wrapping_neg() & 15;
+    if n < head + 64 {
+        dst.copy_from_slice(src);
+        return;
+    }
+    dst[..head].copy_from_slice(&src[..head]);
+    let body = (n - head) & !63;
+    let (d, s) = (&mut dst[head..head + body], &src[head..head + body]);
+    let mut i = 0;
+    while i < body {
+        // SAFETY: i + 64 <= body: 64 readable bytes of s and 64 writable bytes of d at i; d's
+        // start is 16-byte aligned (head), so every store address is (movntdq's alignment).
+        unsafe {
+            let (sp, dp) = (s.as_ptr().add(i) as *const __m128i, d.as_mut_ptr().add(i) as *mut __m128i);
+            let (a, b, c, e) = (_mm_loadu_si128(sp), _mm_loadu_si128(sp.add(1)), _mm_loadu_si128(sp.add(2)), _mm_loadu_si128(sp.add(3)));
+            _mm_stream_si128(dp, a);
+            _mm_stream_si128(dp.add(1), b);
+            _mm_stream_si128(dp.add(2), c);
+            _mm_stream_si128(dp.add(3), e);
+        }
+        i += 64;
+    }
+    dst[head + body..].copy_from_slice(&src[head + body..]);
+}
+
+/// copy_stream without streaming stores (other targets)
+#[cfg(not(target_arch = "x86_64"))]
+pub fn copy_stream(dst: &mut [u8], src: &[u8]) {
+    let n = dst.len().min(src.len());
+    dst[..n].copy_from_slice(&src[..n]);
+}
+
+/// the streaming stores of this thread become visible to others (sfence)
+#[inline]
+pub fn stream_fence() {
+    // SAFETY: sfence is part of the x86-64 baseline (SSE); it only orders stores.
+    #[cfg(target_arch = "x86_64")]
+    unsafe {
+        core::arch::x86_64::_mm_sfence()
+    };
 }
 
 /// a computation written once for every instruction set

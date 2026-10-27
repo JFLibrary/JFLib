@@ -74,6 +74,8 @@
 //   expect sound KIND|none        the last sound ui.beep / ui.dialog_sound asked for since the
 //                                 last check (default, information, warning, error, question,
 //                                 notify; headless runs play none)
+//   expect scrollcopy [N]|none    at least N (default 1) frames / no frame moved pixels by a
+//                                 scroll copy since the last check (scrollcopy.rs)
 //   expect_warn / expect_nowarn   a UIWARN was / was not printed since the last check (a
 //                                 script also warns about a widget id used twice in a pass)
 // (K1) Files and clipboard, drag and drop:
@@ -1676,6 +1678,18 @@ impl Ui {
             let name = got.map_or("none", plat::audio::sound_name);
             if !want.starts_with(name.as_bytes()) || (want.len() > name.len() && want[name.len()] > b' ') {
                 self.fail(alloc::format!("sound {name}").as_bytes());
+            }
+            return;
+        }
+        if let Some(r) = word_eq(a, "scrollcopy") {
+            // frames that moved pixels by a scroll copy since the last check: at least N
+            // (default 1), or none (scrollcopy.rs)
+            let want = skip_ws(r);
+            let got = core::mem::take(&mut self.m.scopy.frames);
+            self.m.scopy.cells = 0;
+            let ok = if word_eq(want, "none").is_some() { got == 0 } else { got as i32 >= parse_int(want).0.max(1) };
+            if !ok {
+                self.fail(alloc::format!("scroll copies: {got}").as_bytes());
             }
             return;
         }

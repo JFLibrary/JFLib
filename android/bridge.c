@@ -111,8 +111,9 @@ static uint32_t time_ms(void) {
     return (uint32_t)(now - epoch_ms);
 }
 
+/* order 1: R, G, B, A rows (the Bitmap's own order: copied row by row), else B, G, R, x */
 void jfgui_host_present(const uint8_t *source, size_t length, int32_t width, int32_t height,
-                         int32_t stride, const int32_t (*rects)[4], size_t count) {
+                         int32_t stride, const int32_t (*rects)[4], size_t count, uint32_t order) {
     if (!target_bitmap || !source || !rects || !count || count > 128
         || width <= 0 || height <= 0 || width > 4096 || height > 4096
         || stride < width * 4 || (size_t)stride * (size_t)height > length
@@ -136,6 +137,10 @@ void jfgui_host_present(const uint8_t *source, size_t length, int32_t width, int
         for (int y = top; y < end_y; ++y) {
             const uint8_t *s = source + (size_t)y * (size_t)stride + (size_t)left * 4;
             uint8_t *d = pixels + (size_t)y * target_info.stride + (size_t)left * 4;
+            if (order == 1) {
+                memcpy(d, s, (size_t)(end_x - left) * 4);
+                continue;
+            }
             for (int x = left; x < end_x; ++x) {
                 d[0] = s[2]; d[1] = s[1]; d[2] = s[0]; d[3] = 255;
                 d += 4; s += 4;

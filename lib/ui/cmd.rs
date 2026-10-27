@@ -19,10 +19,13 @@
 //
 // Every record keeps the byte size the asm gives it (cmd_alloc rounds to 8): a layer holds
 // at most its capacity (CAPS_MAIN / CAPS_SMALL), further commands are dropped as in the asm.
-// The dirty regions (dirty.rs) hash every record's content (cmd_hash) and its box (cmd_bbox).
+// The dirty regions (dirty.rs) hash every record's content (cmd_parts: without its position,
+// which is mixed in separately, so scrollcopy.rs can hash it relative to a scrolled content)
+// and its box (cmd_bbox).
 
 use alloc::rc::Rc;
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use super::consts::*;
 use super::Ui;
@@ -152,10 +155,28 @@ impl Fnv {
     }
 }
 
-/// hash of a record's content in the asm's record layout (header: type, flags, size,
-/// colour; then the fields; text bytes; pointers by identity) -- any visible change of a
+/// hash of a record's content (cmd_parts, its anchor mixed in) -- any visible change of a
 /// command changes it
 pub(crate) fn cmd_hash(c: &Cmd) -> u64 {
+    let (body, x, y, _) = cmd_parts(c);
+    pos_mix(body, x as i64, y as i64)
+}
+
+/// pos_mix(body, x, y): a record's hash at a position (its anchor, or the anchor relative to
+/// a scrolled content's origin: scrollcopy.rs)
+#[inline]
+pub(crate) fn pos_mix(body: u64, x: i64, y: i64) -> u64 {
+    const K: u64 = 0x9E37_79B9_7F4A_7C15;
+    let h = (body ^ x as u64).wrapping_mul(K);
+    let h = (h.rotate_left(29) ^ y as u64).wrapping_mul(K);
+    h ^ h >> 31
+}
+
+/// cmd_parts -> (the hash of a record's content without its position, anchor x, anchor y,
+/// 8 when the anchor is 24.8 else 0): the asm's record layout (header: type, flags, size,
+/// colour; then the fields; text bytes; pointers by identity), a line's end relative to its
+/// start.  A record moved by whole pixels keeps its body.
+pub(crate) fn cmd_parts(c: &Cmd) -> (u64, i32, i32, u32) {
     let mut h = Fnv::new();
     let size = c.size();
     let head = |h: &mut Fnv, t: u8, argb: u32| {
@@ -163,89 +184,101 @@ pub(crate) fn cmd_hash(c: &Cmd) -> u64 {
         h.bytes(&(size as u16).to_le_bytes());
         h.u32(argb);
     };
-    match c {
+    let (x, y, sh) = match *c {
         Cmd::Rect { x, y, w, h: hh, c } => {
-            head(&mut h, 1, *c);
-            for v in [*x, *y, *w, *hh] {
+            head(&mut h, 1, c);
+            for v in [w, hh] {
                 h.i32(v);
             }
+            (x, y, 0)
         }
         Cmd::RRect { x, y, w, h: hh, r, t, fill, stroke, stroke2 } => {
-            head(&mut h, 2, *fill);
-            for v in [*x, *y, *w, *hh] {
+            head(&mut h, 2, fill);
+            for v in [w, hh] {
                 h.i32(v);
             }
             h.bytes(&r.to_le_bytes());
             h.bytes(&t.to_le_bytes());
-            h.u32(*stroke);
-            h.u32(*stroke2);
+            h.u32(stroke);
+            h.u32(stroke2);
+            (x, y, 0)
         }
         Cmd::PanelFx { x, y, w, h: hh, r, t, fill, stroke } => {
-            head(&mut h, 12, *fill);
-            for v in [*x, *y, *w, *hh, *r, *t] { h.i32(v); }
-            h.u32(*stroke);
+            head(&mut h, 12, fill);
+            for v in [w, hh, r, t] {
+                h.i32(v);
+            }
+            h.u32(stroke);
+            (x, y, 8)
         }
-        Cmd::Text { x, y, font, size: sz, c, maxw, s } => {
-            head(&mut h, 3, *c);
-            h.i32(*x);
-            h.i32(*y);
+        Cmd::Text { x, y, font, size: sz, c, maxw, ref s } => {
+            head(&mut h, 3, c);
             h.bytes(&font.to_le_bytes());
             h.bytes(&(s.len() as u16).to_le_bytes());
-            h.i32(*sz);
-            h.i32(*maxw);
+            h.i32(sz);
+            h.i32(maxw);
             h.bytes(s);
+            (x, y, 0)
         }
         Cmd::Icon { x, y, cp, size: sz, c } => {
-            head(&mut h, 4, *c);
-            h.i32(*x);
-            h.i32(*y);
-            h.u32(*cp);
-            h.i32(*sz);
+            head(&mut h, 4, c);
+            h.u32(cp);
+            h.i32(sz);
+            (x, y, 0)
         }
-        Cmd::Image { x, y, w, h: hh, sf, ver } => {
+        Cmd::Image { x, y, w, h: hh, ref sf, ver } => {
             head(&mut h, 5, 0);
-            for v in [*x, *y, *w, *hh] {
+            for v in [w, hh] {
                 h.i32(v);
             }
             h.u64(Rc::as_ptr(sf) as usize as u64);
-            h.u32(*ver);
+            h.u32(ver);
+            (x, y, 0)
         }
         Cmd::Clip { x, y, w, h: hh } => {
             head(&mut h, 6, 0);
-            for v in [*x, *y, *w, *hh] {
+            for v in [w, hh] {
                 h.i32(v);
             }
+            (x, y, 0)
         }
-        Cmd::Unclip => head(&mut h, 7, 0),
+        Cmd::Unclip => {
+            head(&mut h, 7, 0);
+            (0, 0, 0)
+        }
         Cmd::Circle { x, y, r, t, c } => {
-            head(&mut h, 8, *c);
-            for v in [*x, *y, *r, *t] {
+            head(&mut h, 8, c);
+            for v in [r, t] {
                 h.i32(v);
             }
+            (x, y, 8)
         }
         Cmd::Line { x0, y0, x1, y1, w, c } => {
-            head(&mut h, 9, *c);
-            for v in [*x0, *y0, *x1, *y1, *w] {
+            head(&mut h, 9, c);
+            for v in [x1.wrapping_sub(x0), y1.wrapping_sub(y0), w] {
                 h.i32(v);
             }
+            (x0, y0, 8)
         }
-        Cmd::Custom { x, y, w, h: hh, f, user, ver } => {
+        Cmd::Custom { x, y, w, h: hh, ref f, user, ver } => {
             head(&mut h, 10, 0);
-            for v in [*x, *y, *w, *hh] {
+            for v in [w, hh] {
                 h.i32(v);
             }
             h.u64(f.as_ref().map_or(0, |f| Rc::as_ptr(f) as *const () as usize as u64));
-            h.u64(*user as u64);
-            h.u32(*ver);
+            h.u64(user as u64);
+            h.u32(ver);
+            (x, y, 0)
         }
         Cmd::Shadow { x, y, w, h: hh, r, depth, c } => {
-            head(&mut h, 11, *c);
-            for v in [*x, *y, *w, *hh, *r, *depth] {
+            head(&mut h, 11, c);
+            for v in [w, hh, r, depth] {
                 h.i32(v);
             }
+            (x, y, 0)
         }
-    }
-    h.0
+    };
+    (h.0, x, y, sh)
 }
 
 /// cmd_bbox -> the command's box x0, y0, x1, y1 (px, exclusive), None when it has no area
@@ -295,6 +328,11 @@ pub(crate) fn cmd_bbox(c: &Cmd) -> Option<[i32; 4]> {
     })
 }
 
+/// an icon was drawn by an icon hook or the style's own painter (vector paths): such icons
+/// may not keep their pixels when moved, so scroll copies redraw them (scrollcopy.rs; set
+/// at render time, never cleared)
+pub(crate) static ICON_PAINTED: AtomicBool = AtomicBool::new(false);
+
 /// cmd_visible: the command's box touches the current gfx clip (no box: always)
 fn cmd_visible(c: &Cmd, dc: &Dc) -> bool {
     let Some(b) = cmd_bbox(c) else { return true };
@@ -302,12 +340,15 @@ fn cmd_visible(c: &Cmd, dc: &Dc) -> bool {
     !(b[0] >= k[2] || b[2] <= k[0] || b[1] >= k[3] || b[3] <= k[1])
 }
 
-/// cmd_render_layer: replay one layer into the current gfx target
-pub(crate) fn render_layer(list: &[Cmd], dc: &mut Dc, sf: &mut Surface, text: &mut Text, hook: &Option<IconHook>,
+/// cmd_render_layer: replay one layer into the current gfx target; the drawing commands
+/// before index `from` are skipped (their clip records still count: render_par.rs draws the
+/// part before a custom draw on other threads)
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn render_layer(list: &[Cmd], from: usize, dc: &mut Dc, sf: &mut Surface, text: &mut Text, hook: &Option<IconHook>,
                           icon_style: (&dyn crate::Style, u32, bool, u32, u32)) {
     let mut depth = 0; // clip depth opened by this layer
-    for c in list {
-        if !matches!(c, Cmd::Clip { .. } | Cmd::Unclip) && !cmd_visible(c, dc) {
+    for (i, c) in list.iter().enumerate() {
+        if !matches!(c, Cmd::Clip { .. } | Cmd::Unclip) && (i < from || !cmd_visible(c, dc)) {
             continue;
         }
         match c {
@@ -320,27 +361,8 @@ pub(crate) fn render_layer(list: &[Cmd], dc: &mut Dc, sf: &mut Surface, text: &m
                 dc.fill(sf, x, y, w, h);
             }
             &Cmd::RRect { x, y, w, h, r, t, fill, stroke, stroke2 } => {
-                let (r, t) = (r as i32, t as i32);
                 let mut sh = Shapes { dc: &mut *dc, sf: &mut *sf, path: &mut text.path, ras: &mut text.ras };
-                if fill & 0xFF00_0000 != 0 {
-                    sh.dc.set_color(fill);
-                    sh.fill_rrect(x, y, w, h, r);
-                }
-                if t == 0 {
-                    continue;
-                }
-                if stroke & 0xFF00_0000 != 0 {
-                    sh.dc.set_color(stroke);
-                    sh.stroke_rrect(x, y, w, h, r, t);
-                }
-                // different bottom edge colour: overdraw the lower corner band of the border
-                if stroke2 != stroke && stroke2 & 0xFF00_0000 != 0 {
-                    sh.dc.set_color(stroke2);
-                    let band = r.max(t);
-                    sh.dc.clip_push(x, y.wrapping_add(h).wrapping_sub(band), w, band);
-                    sh.stroke_rrect(x, y, w, h, r, t);
-                    sh.dc.clip_pop();
-                }
+                draw_rrect(&mut sh, [x, y, w, h], r as i32, t as i32, fill, stroke, stroke2);
             }
             Cmd::Text { x, y, font, size, c, maxw, s } => {
                 dc.set_color(*c);
@@ -359,6 +381,7 @@ pub(crate) fn render_layer(list: &[Cmd], dc: &mut Dc, sf: &mut Surface, text: &m
                     let (tx, ty) = (x.wrapping_add(dc.ox), y.wrapping_add(dc.oy));
                     let mut g = Gfx { dc: &mut *dc, sf: &mut *sf, text: &mut *text };
                     if f(&mut g, cp, tx, ty, size, c) {
+                        ICON_PAINTED.store(true, Ordering::Relaxed);
                         continue;
                     }
                 }
@@ -366,6 +389,7 @@ pub(crate) fn render_layer(list: &[Cmd], dc: &mut Dc, sf: &mut Surface, text: &m
                 let (tx, ty) = (x.wrapping_add(dc.ox), y.wrapping_add(dc.oy));
                 let mut g = Gfx { dc: &mut *dc, sf: &mut *sf, text: &mut *text };
                 if style.paint_icon(&mut g, cp, tx, ty, size, c, accent, dark, c == disabled, dpi) {
+                    ICON_PAINTED.store(true, Ordering::Relaxed);
                     continue;
                 }
                 dc.set_color(c);
@@ -408,28 +432,58 @@ pub(crate) fn render_layer(list: &[Cmd], dc: &mut Dc, sf: &mut Surface, text: &m
                 dc.clip_pop();
             }
             &Cmd::Shadow { x, y, w, h, r, depth: d, c } => {
-                // soft shadow: `depth` expanding rounded rectangles with fading alpha,
-                // offset downwards by depth / 3
-                if d <= 0 {
-                    continue;
-                }
-                let base = c >> 24;
-                let down = (d as u32 / 3) as i32;
-                let mut i = d;
-                while i != 0 {
-                    // alpha_i = base * (depth - i + 1) / (depth * 2)
-                    let a = base.wrapping_mul((d - i + 1) as u32) / ((d + d) as u32);
-                    let mut sh = Shapes { dc: &mut *dc, sf: &mut *sf, path: &mut text.path, ras: &mut text.ras };
-                    sh.dc.set_color((c & 0xFF_FFFF) | a << 24);
-                    sh.fill_rrect(x - i, y - i + down, w + i * 2, h + i * 2, r + i);
-                    i -= 1;
-                }
+                let mut sh = Shapes { dc: &mut *dc, sf: &mut *sf, path: &mut text.path, ras: &mut text.ras };
+                draw_shadow(&mut sh, [x, y, w, h], r, d, c);
             }
         }
     }
     while depth > 0 {
         dc.clip_pop();
         depth -= 1;
+    }
+}
+
+/// a Cmd::RRect: fill (alpha 0 = none), border t px in `stroke`, its bottom band in `stroke2`
+/// (render_layer and the row bands of render_par.rs)
+pub(crate) fn draw_rrect(sh: &mut Shapes, b: [i32; 4], r: i32, t: i32, fill: u32, stroke: u32, stroke2: u32) {
+    let [x, y, w, h] = b;
+    if fill & 0xFF00_0000 != 0 {
+        sh.dc.set_color(fill);
+        sh.fill_rrect(x, y, w, h, r);
+    }
+    if t == 0 {
+        return;
+    }
+    if stroke & 0xFF00_0000 != 0 {
+        sh.dc.set_color(stroke);
+        sh.stroke_rrect(x, y, w, h, r, t);
+    }
+    // different bottom edge colour: overdraw the lower corner band of the border
+    if stroke2 != stroke && stroke2 & 0xFF00_0000 != 0 {
+        sh.dc.set_color(stroke2);
+        let band = r.max(t);
+        sh.dc.clip_push(x, y.wrapping_add(h).wrapping_sub(band), w, band);
+        sh.stroke_rrect(x, y, w, h, r, t);
+        sh.dc.clip_pop();
+    }
+}
+
+/// a Cmd::Shadow: `depth` expanding rounded rectangles with fading alpha, offset downwards by
+/// depth / 3
+pub(crate) fn draw_shadow(sh: &mut Shapes, b: [i32; 4], r: i32, d: i32, c: u32) {
+    let [x, y, w, h] = b;
+    if d <= 0 {
+        return;
+    }
+    let base = c >> 24;
+    let down = (d as u32 / 3) as i32;
+    let mut i = d;
+    while i != 0 {
+        // alpha_i = base * (depth - i + 1) / (depth * 2)
+        let a = base.wrapping_mul((d - i + 1) as u32) / ((d + d) as u32);
+        sh.dc.set_color((c & 0xFF_FFFF) | a << 24);
+        sh.fill_rrect(x - i, y - i + down, w + i * 2, h + i * 2, r + i);
+        i -= 1;
     }
 }
 
@@ -476,6 +530,7 @@ impl Ui {
         w.layer = 0;
         w.dcol = 0xFF00_0000;
         self.wp.rtl.reset();
+        self.wp.scopy.reset(); // the scroll views recorded (scrollcopy.rs)
     }
 
     /// cmd_layer(l) -> previous layer
@@ -627,11 +682,17 @@ impl Ui {
     /// cmd_render_all: replay every layer of the live window into the current gfx target
     /// (sf = the target the dc began)
     pub(crate) fn render_all_to(&mut self, shadow: bool) {
+        self.render_from(shadow, 0, 0);
+    }
+
+    /// render_all_to from command `from` of layer `layer` on (the earlier commands drawn
+    /// already; their clip records still count)
+    pub(crate) fn render_from(&mut self, shadow: bool, layer: usize, from: usize) {
         let icon_style = (self.style, self.color(T_ACCENT), self.theme_dark, self.color(T_TEXT_DISABLED), self.wp.rt.dpi as u32);
         let Ui { wp, dc, text, icon_hook, .. } = self;
         let sf = if shadow { &mut wp.rt.shadow } else { &mut wp.rt.fb };
-        for l in wp.cmd.layers.iter() {
-            render_layer(l, dc, sf, text, icon_hook, icon_style);
+        for (k, l) in wp.cmd.layers.iter().enumerate().skip(layer) {
+            render_layer(l, if k == layer { from } else { 0 }, dc, sf, text, icon_hook, icon_style);
         }
     }
 
@@ -644,8 +705,8 @@ impl Ui {
         let layers = &mut wp.cmd.layers;
         translate(&mut layers[L_POPUP as usize], dx, dy);
         translate(&mut layers[L_TIP as usize], dx, dy);
-        render_layer(&layers[L_POPUP as usize], dc, sf, text, icon_hook, icon_style);
-        render_layer(&layers[L_TIP as usize], dc, sf, text, icon_hook, icon_style);
+        render_layer(&layers[L_POPUP as usize], 0, dc, sf, text, icon_hook, icon_style);
+        render_layer(&layers[L_TIP as usize], 0, dc, sf, text, icon_hook, icon_style);
         translate(&mut layers[L_POPUP as usize], -dx, -dy);
         translate(&mut layers[L_TIP as usize], -dx, -dy);
     }

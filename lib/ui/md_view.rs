@@ -1297,6 +1297,11 @@ impl Ui {
         }
         self.clip_push(vx, vy, vw, vh);
         self.ltr_begin(vx, vw);
+        // the blocks move with the position (scrollcopy.rs)
+        let copy = st.rows.total() > view_h as i64;
+        if copy {
+            self.scroll_copy_begin(id, vx as i64, vy as i64 - st.rows.pos());
+        }
         let bgc = self.md_bg(frame);
         let mut links: Vec<Link> = Vec::new();
         let mut hover: Option<usize> = None;
@@ -1315,6 +1320,9 @@ impl Ui {
                     st_.focus_ring(self, [lr[0] - self.dp(1), lr[1], lr[2] + self.dp(2), lr[3]], 2);
                 }
             }
+        }
+        if copy {
+            self.scroll_copy_end();
         }
         self.ltr_end();
         // links: a hand over them, a record each

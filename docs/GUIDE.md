@@ -496,6 +496,19 @@ if self.tab == 0 {
 * `tabs(id, &mut sel, names)`, `expander_begin(id, header, &mut open)` (non-zero: emit the
   content) / `expander_end()`, `scrollbar(id, &mut pos, content, view, vertical)` for custom
   canvases.
+* Only what changed is drawn (dirty regions: every command is hashed into 32 × 32 px cells and
+  compared with the last frame). When a scroll view's content only moved, the pixels it still
+  shows are **copied** in the framebuffer and just the band that came into view (and what
+  really changed) is drawn -- byte for byte what a full redraw gives. Scroll views, lists,
+  data views, `vlist`, the document and code views and multi-line text boxes do this. A
+  widget of your own that scrolls its content by drawing it at `origin - offset` can join in:
+  call `ui.scroll_copy_begin(id, ox, oy)` right after its `clip_push` (`ox`, `oy`: window px
+  of the content's origin, i.e. its place minus the scroll offset; `i64` for long contents)
+  and `ui.scroll_copy_end()` before the `clip_pop`. Content that does not move with the
+  origin (a sticky header) is simply drawn again; text, icons and images are copied, rounded
+  corners, circles, lines and `Draw` objects are drawn again (the rasterizer works in absolute
+  coordinates). Whether a frame copies is measured per view: copying costs memory bandwidth, so
+  flat content (cards, backgrounds) is cheaper to fill again.
 
 **Images, custom drawing, canvases**
 
@@ -517,8 +530,10 @@ if self.tab == 0 {
 * `canvas(id, Some(draw), user, version)` is a custom area with full pointer input. The draw
   object implements `ui::Draw` and runs at render time with the clip set to the widget; it gets
   a `Gfx` (the draw context `dc`, the target surface `sf`, the text engine; `g.shapes()` for
-  anti-aliased rounded rectangles, circles and lines). Share the data it draws through `Rc` /
-  `RefCell` / `Cell`:
+  anti-aliased rounded rectangles, circles and lines). It always runs on the UI thread (large
+  redraws draw the other commands on several threads, section 9), and the clip may be only a
+  part of the widget (a dirty rectangle, a row band): draw the same pixels whatever the clip.
+  Share the data it draws through `Rc` / `RefCell` / `Cell`:
 
   ```rust
   struct Board {
@@ -1134,6 +1149,15 @@ fn brighten(sf: &mut gfx::Surface, add: u8) {
 
 * `parallel_for(count, &f)` runs `f(index, job)` on the workers and the calling thread; nested
   loops are fine; `job.cancel()` skips the remaining items -> `Err(Cancelled)`.
+* The renderer uses the pool too: a redraw of about 3 million pixels or more (1.5 times
+  1920 x 1080), in a framebuffer of more than 16 MB (4K, 8K) of 750 000 pixels or more, is
+  cut into row bands that the workers draw into buffers of their own (`ui/render_par.rs`),
+  with the bytes one thread draws. Texts and font icons are placed on the UI thread first
+  (`Text::record_n`, the glyph masks go into the cache), the workers blend them read-only
+  (`text::GlyphView`). Canvases (`Draw`), icons an icon hook or the style paints and glyphs
+  too large for the cache are drawn on the UI thread: the workers draw their bands up to the
+  first of them, the UI thread the rest. Without workers (the browser without shared memory,
+  Android) everything stays on one thread; `jfgui_RENDER_PAR=0` turns it off (section 12).
 * Background work: `plat::Job` -- `set(count, f)` with a `'static + Send + Sync` closure (share
   data through `alloc::sync::Arc`), `start()`, `done()`, `wait()`, `cancel()`,
   `items_done()`. When it finishes the pool calls `plat::wake()`, which arrives as
@@ -1391,7 +1415,10 @@ if (desc.render)(&args, &mut dst) == 0 {
   `--log-events`, `--auto-close MS`, `--threads N`, `--simd sse2` (no AVX2 paths), `--inspect`
   (the live inspector, §30). Environment: `jfgui_DEBUG=1` (layout / render trace), `jfgui_CSD=1`,
   `jfgui_FILEDLG=builtin`, `jfgui_THEME`, `jfgui_SCALE` (Linux), `jfgui_BACKEND`,
-  `jfgui_INSPECT=1` (the inspector's hot keys Ctrl+Shift+I / F12 work).
+  `jfgui_INSPECT=1` (the inspector's hot keys Ctrl+Shift+I / F12 work), `jfgui_RENDER_PAR=0`
+  (every render on one thread), `=1` (row bands for every render, whatever its size), `=2`
+  (every render both ways, a `UIWARN` when a byte differs: run the scripts with it after a
+  change to the renderer or a `Draw`).
 * **Never start an app without `--shot`, `--script` or `--auto-close`**: a plain start opens a
   real window on the user's desktop. PaintCraft saves its settings when a real window closes:
   every real-window run needs `--config build/<name>/cfg` (the capture tools set
@@ -1438,6 +1465,7 @@ in DIP):
 | `close window ID`, `movewin ID X Y`, `resizewin ID W H`, `activate ID` | the user moves / closes windows |
 | `sync [MS]` | wait until no background job is pending (`sync_hook_set`) |
 | `expect_warn`, `expect_nowarn` | a `UIWARN` was / was not printed since the last check |
+| `expect scrollcopy [N]\|none` | at least N (default 1) / no rendered frames moved pixels by a scroll copy since the last check (§5; frames checked by `--verify-dirty` copy whenever they can, `jfgui_DEBUG=1` prints each copy) |
 | `expect sound KIND\|none` | the last sound `ui.beep` / `ui.dialog_sound` asked for since the last check (`default`, `information`, `warning`, `error`, `question`, `notify`; headless runs play nothing, §33) |
 | `drop X Y FILE...` | files dropped at (X, Y) of the scoped window (onto a drop target, else `UIC_DROP`) |
 | `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back |
@@ -1497,12 +1525,35 @@ python build_rs.py i18n [APP]       # the catalogues: missing, untranslated, unu
 ```
 
 * Run new scripts with `--verify-dirty` too (`build_rs.py test` does not add it): it reports
-  missed pixels with their bounding box.
+  missed pixels with their bounding box. Checked frames also take every scroll copy they can
+  (§5), so a script that scrolls tests those; it renders after each input event (a view copies
+  from the second frame that moves it) and `bench N anim` renders the frames of smooth scrolling.
 * **Frame times**: the moving forms of `bench` measure with the real clock; `--verify-dirty`
   compares each frame after the timed part, untimed. The median and up to three runs ride out
   a machine that builds other things meanwhile; give a frame budget as the limit (33000 for 30
   fps) rather than today's times. Example: `apps/JFNetworker/tests/perf.uis` (500 devices, 800
   cables, 300 frames moving, pan, zoom and a drag at 1920 x 1080).
+* **Presenting** (`plat::win_present(w, frame, rects)`, `bench` leaves it out): the frame's
+  dirty rectangles are copied once toward the screen, straight from the framebuffer. Windows:
+  into the window's kept copy, a DIB section, then BitBlt (batched, `GdiFlush`); WM_PAINT
+  repaints its area from that copy. X11: into one of the window's two MIT-SHM segments, each a
+  whole frame that knows where it is stale (the segment of the last put first), then
+  ShmPutImage of the rectangles; Expose reads the segment of the last put. Wayland: into a free
+  wl_shm buffer that waits for its commit (the frame callback). Only with every segment / buffer
+  busy does the damage wait in a staging image. Browser and Android: the B, G, R, x of the
+  frame becomes the window's R, G, B, A copy while it is copied in; one window over the whole
+  canvas without popups is the canvas itself (no composition), and the host copies rows into
+  one buffer per frame (the page's ImageData, Android's Bitmap). Pixels outside the rectangles
+  must be what the last present of that window showed (the UI's dirty rectangles cover every
+  change; `--verify-dirty` checks it). `plat::present_time()` sums the time spent there;
+  `linuxtest --test pbench [--size WxH] [--gap MS]` prints it per frame (the whole frame, two
+  boxes, a quarter, 40 rectangles) on Windows, X11 and Wayland; `linuxtest --test pcheck` reads
+  the presented pixels back (the window's DC, GetImage, the committed wl_shm buffer) after
+  partial presents, frames back to back, hide + show, minimize, WM_PAINT and a new size (Linux:
+  `jfgui_BACKEND=x11|wayland`, `jfgui_X11SHM=fd|sysv|off`). `node tools/tests/web_present.mjs
+  BUILD [--base OLD]` measures the browser worker and compares canvas and framebuffer in
+  Chromium and Firefox; `GalleryPresentInstrumentation` (`apps/androidGallery`) measures
+  Android's frames and compares partial frames with a full one.
 * **Parity** (apps that also exist in `legacy/`): `python tools/parity.py app NAME` runs the
   shot matrix (light / dark × 100 / 150 %, with dumps) and every script on the assembly
   reference and the Rust build and compares pixels, dumps, stdout and exit codes;

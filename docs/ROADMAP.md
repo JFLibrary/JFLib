@@ -1218,6 +1218,130 @@ Fensterrand hinaus.
 
 - **P2** · *fehlt* · GPU-Rendering (D3D11 / Vulkan / OpenGL / WebGPU); heute rechnet alles
   die CPU.
+- **P2** · *erledigt* (2026-10-22) · Stufe 0 des GPU-Plans, Teil 1: Scroll-Kopie
+  (`lib/ui/scrollcopy.rs`). Hat sich in einer Scroll-Ansicht nur der Inhalt verschoben, werden
+  die noch sichtbaren Pixel im Framebuffer verschoben (Zeilen per `copy_within`, Reihenfolge
+  gegen Überlappung) und nur der neu sichtbare Streifen und echte Änderungen gezeichnet --
+  bytegleich zum vollen Neuzeichnen (`--verify-dirty`).
+  - Jede Ansicht, deren Ursprung sich in den letzten 60 Frames bei gleichem Clip bewegt hat,
+    bekommt beim Hashen der Dirty-Zellen ein Raster aus 32-px-Zellen am Inhaltsursprung:
+    Inhaltsbefehle zählen mit Hash und Box relativ zum Ursprung, andere Befehle über der
+    Ansicht nur dort, wo sie flach sind (Fensterhintergrund, Karten; deckende setzen die Zelle
+    zurück). Neu gezeichnet wird, was sich beim Verschieben ändern kann (der Rasterizer rechnet
+    in absoluten f32-Koordinaten: runde Ecken, Kreise, Linien; `Draw`-Objekte, vom Stil oder
+    Icon-Hook gemalte Icons, Schrift über 128 px oder links vom Fenster), und alles, was andere
+    Ebenen darüberlegen (Scrollbalken, Popups, Tooltips, Fokusrahmen).
+  - Mitmachende Ansichten: `scroll_begin`, Listen, Grids, Bäume, Hex-Ansicht, `vlist`,
+    Markdown-Ansicht, Code-Editor, mehrzeilige Textfelder; eigene Widgets über
+    `ui.scroll_copy_begin(id, ox, oy)` / `scroll_copy_end()`. Haken in `render_live`: drei Zeilen
+    (die verschobenen Zellen werden mitpräsentiert, die Kosten des Frames gemessen).
+  - Eine Kopie liest und schreibt die Zelle (bei 4K etwa 0,4 µs je 32er-Zelle), flache Flächen
+    neu zu füllen ist kaum teurer: kopiert werden nur Zellen mit Text, Icons, Bildern; je
+    Ansicht entscheiden gemessene Frame-Kosten (kopieren gegen zeichnen, alle 16 Frames erneut
+    probiert); eine Ansicht, die vier bewegte Frames lang nicht kopiert, bekommt 60 Frames kein
+    Raster. Mit `--verify-dirty` kopiert jeder Frame, der kann.
+  - Keine Kopie: waagrechte Bewegung im gespiegelten Fenster, offener Inspektor, ausstehender
+    Canvas-Schaden, voller Redraw (Größe, DPI, Theme); seitenweise Sprünge (PgDn) lassen nichts
+    zu kopieren; der Code-Editor zeichnet waagrecht nur die sichtbaren Spalten, also neu.
+  - Messung (Windows-Dev-Build, `bench 20`, Median aus fünf abwechselnden Läufen, µs vorher →
+    nachher): Code-Editor Rad 1134 → 833 (1920×1080) und 3327 → 1917 (3840×2160),
+    Strg+Unten 1051 → 670 und 3483 → 1627; Markdown Rad 1617 → 1442 und 3960 → 3605, Unten
+    2883 → 2577 und 5245 → 4854; vlist-Rad 1626 → 1373 (1080p), bei 4K gleich; Galerie-Seite
+    und Daten-Galerie unverändert im Rauschen (flache Widgets: die Messung wählt das
+    Neuzeichnen). Die Läufe streuen auf der belasteten Maschine um ±15 %.
+  - Getestet: neue Skripte `gallery/scrollcopy.uis`, `gallery/scrollcopy_rtl.uis`,
+    `mdviewtest/doc_scrollcopy.uis`, `editortest/code_scrollcopy.uis`,
+    `datagallery/scrollcopy.uis` (Rad, Tasten, Scrollbalken-Daumen, flüssiges Scrollen per
+    `bench N anim`, 150 %, RTL, Inspektor ohne Kopie; `expect scrollcopy [N]|none`); alle
+    Skripte von gallery, datagallery, mdviewtest, editortest, uitest und JFNetworker zusätzlich
+    mit erzwungenem `--verify-dirty` ohne Abweichung; alle Shots dieser vier Apps bytegleich
+    (außer dem Inspektor-Shot, der die von der Binär-Adresse abgeleitete Menüleisten-Id zeigt).
+  - Offen: die Kopie auch in der Present-Schicht (ScrollWindowEx / XCopyArea, eigener Teil);
+    paralleles Zeichnen der Rechtecke macht Neuzeichnen billiger -- die gemessene Wahl passt
+    sich an, die Kopie selbst läuft auf einem Kern; Ansichten mit `Draw`-Objekten (Terminal,
+    Bildbetrachter) kopieren nicht.
+- **P2** · *erledigt* (2026-10-22) · Große Neuzeichnungen auf mehreren Threads (Stufe 0 des
+  GPU-Plans, Teil 2; [`ui/render_par.rs`](../lib/ui/render_par.rs)): ab etwa drei Millionen
+  schmutzigen Pixeln (1,5-mal Full HD; in einem Framebuffer über 16 MB wie 4K ab 750 000)
+  zerlegt `render_live` die schmutzigen Rechtecke in Zeilenbänder (etwa 256 KiB
+  Framebuffer, mindestens vier je Thread), die der Worker-Pool in eigene Puffer zeichnet
+  (`Dc::begin_rows`: die Koordinaten bleiben die des Fensters, also rechnen Pfade, Rasterizer
+  und Glyphen wie auf einem Thread) und ab 4 MiB Framebuffer am Cache vorbei zurückkopiert
+  (`gfx::blend::copy_stream`, `movntdq`). Jedes Band bekommt nur seine Befehle, jeder Befehl
+  trägt seinen Clip mit. Texte und Font-Icons setzt der UI-Thread vorher (`Text::record_n` /
+  `record_icon`: Shaping, Fallback-Schriften, Masken in den Glyph-Cache), die Worker mischen
+  sie lesend aus dem Cache (`text::GlyphView`). Eigene `Draw`-Objekte, Icons aus Icon-Hook
+  oder Stil und Glyphen über der Cache-Grenze zeichnet der UI-Thread: die Worker zeichnen ein
+  solches Band bis zum ersten davon, der UI-Thread den Rest (`render_from`); die API bleibt
+  unverändert (`Rc`, `Draw` ohne `Send`). Die Bytes sind die der Ein-Thread-Schleife
+  (Abdeckung des Rasterizers je Pixel unabhängig vom Clip, `panel_fx` beginnt seine
+  Maskenbänder jetzt an der Platte); `jfgui_RENDER_PAR=0` schaltet ab, `=1` erzwingt die
+  Bänder, `=2` zeichnet jedes Bild auf beide Arten und warnt bei einem abweichenden Byte
+  (alle Skripte von gallery, uitest, datagallery, editortest, mdviewtest, PaintCraft,
+  Kritzel und JFNetworker damit ohne Abweichung). Nach dem Zeichnen gilt wieder die Schrift
+  der Durchläufe. Im Browser ohne Shared Memory und auf Android (kein Pool) bleibt alles auf
+  einem Thread. Gemessen (`bench 30`, volle Neuzeichnung, Ryzen 5 3600, 6 Kerne / 12
+  Threads, gallery, datagallery, editortest, PaintCraft, Kritzel, mdviewtest): 2560 x 1440
+  1,3- bis 2,9-mal, 4K 2,3- bis 5,4-mal (4,7 .. 11,9 ms auf 1,8 .. 3,2 ms), 8K 1,8- bis
+  4,7-mal so schnell (21 .. 35 ms auf 6,9 .. 11,6 ms); Mausrad in 4K (gallery, editortest,
+  mdviewtest) 2,6- bis 2,8-mal; Full HD bleibt auf einem Thread. 4K und 8K begrenzt der
+  Speicherdurchsatz, gallery in 8K zusätzlich seine `Draw`-Objekte auf dem UI-Thread. Es
+  fehlen: eigene `Draw`-Objekte auf Workern (Leinwände von PaintCraft und Kritzel, Charts,
+  Diagramme, der Farbwähler; dafür bräuchte `Draw` eine Variante ohne `&mut Text`) und Icons
+  der Stile netlab, jfoffice und backupcraft bleiben auf dem UI-Thread.
+- **P2** · *erledigt* (2026-10-22) · GPU-Plan Stufe 0, Teil 3: weniger Kopien zwischen dem
+  fertigen Bild und dem Bildschirm ([GUIDE §12](GUIDE.md) „Presenting“). Die Änderungsrechtecke
+  gehen einmal aus dem Framebuffer zum Bildschirm; Pixel außerhalb müssen sein, was das letzte
+  Present zeigte (die Dirty-Rechtecke der UI decken jede Änderung).
+  - X11: die zwei MIT-SHM-Segmente sind ganze Bilder, die wissen, wo sie veraltet sind
+    (`lib/plat/linux_damage.rs`), und bekommen genau das aus dem Framebuffer – bevorzugt das
+    Segment des letzten Puts. Das Schattenbild entfällt (vorher Framebuffer → Schatten →
+    Segment); nur wenn beide Segmente belegt sind, wartet der Schaden in einem Zwischenbild.
+    Expose und das Neuzeichnen nach dem Mappen lesen das Segment des letzten Puts.
+    PutImage-Modus unverändert.
+  - Wayland: ein freier wl_shm-Puffer bekommt das Bild direkt (Pufferalter: der eigene Schaden
+    plus der seit seiner letzten Verwendung) und wartet auf seinen Commit (Frame-Callback);
+    die Kopie des Fensters entfällt, ein Zwischenbild nur, wenn alle drei Puffer belegt sind.
+    Nach dem Ausblenden kommt das letzte Bild aus dem zuletzt committeten Puffer.
+  - Windows: die Kopie für WM_PAINT ist eine DIB-Section (BitBlt statt SetDIBitsToDevice,
+    GdiFlush, WM_PAINT malt nur seinen Bereich; `jfgui_WINPRESENT=dibits` nimmt den alten
+    Weg). Die Kopie selbst bleibt: sie ist 35–70 % eines ganzen Bildes, entfällt aber erst,
+    wenn der Framebuffer selbst in einer Section liegt (rt-Allokator) und nie gezeichnet wird,
+    während Nachrichten laufen. Für Scrollen gemessen (`WT_SCROLL`): die halbe Fensterfläche
+    per BitBlt im Fenster zu verschieben kostet 60–70 µs statt ~830 µs für neues Zeigen
+    (1920 × 530 px), 0,3 statt 1,5 ms bei 3840 × 530.
+  - Browser und Android: die Fensterpixel liegen als R, G, B, A vor (getauscht beim Kopieren in
+    Rust statt pro Rechteck in JS bzw. C), ein einzelnes Fenster ohne Popup ist die Leinwand
+    selbst (keine Komposition), der Worker packt die Rechtecke eines Bildes in einen Puffer aus
+    einem Pool, Android kopiert Zeilen ins Bitmap (`memcpy`).
+  - Gemessen (`plat::present_time`; `linuxtest --test pbench`, `tools/tests/web_present.mjs`,
+    `GalleryPresentInstrumentation`), Mediane pro Bild, vorher → nachher: X11 (WSLg) 1920 × 1080
+    Viertel 0,54 → 0,27 ms, 40 Rechtecke 1,14 → 0,13 ms, zwei Kästchen 48 → 44 µs; 3840 × 2160
+    Viertel 2,05 → 0,93 ms, 40 Rechtecke 5,7 → 0,27 ms. Ganze Bilder (`None`) kopierte der alte
+    X11-Weg bei gleicher Größe gar nicht ins Schattenbild (ein Fehler: ein volles Neuzeichnen –
+    Themenwechsel, Fenster wieder gezeigt – erschien nur, wo spätere Teilbilder kopierten); jetzt
+    kommen sie an (1920 × 1080 0,94 ms; 3840 × 2160 13 ms, wenn der Server nicht nachkommt und
+    jedes Bild über das Zwischenbild geht). Wayland (WSLg) 1920 × 1080 ganz 1,77 → 0,98 ms,
+    Viertel 0,96 → 0,30 ms, 40 Rechtecke 2,62 → 0,18 ms; 3840 × 2160 ganz 12,9 → 5,3 ms, Viertel
+    2,56 → 1,0 ms, 40 Rechtecke 8,2 → 0,26 ms. Browser-Worker (gallery) ganz 10,0 → 4,6 ms
+    (1920 × 1080) und 51 → 17 ms (3840 × 2160), Hover 91 → 43 µs, offenes Menü (komponiert)
+    130 → 100 µs. Android-Emulator (Bitmap 823 × 1635) ganzes Bild 4,0–4,9 → 0,8–1,5 ms.
+    Windows (hier höchstens 3840 × 1061: zwei 1080p-Monitore) unverändert: ganz 1,76 / 3,8 ms,
+    40 Rechtecke 0,80 → 0,68 ms; davon ist das Kopieren in die WM_PAINT-Kopie 0,63 ms bzw.
+    1,8–2,7 ms.
+  - Geprüft: `linuxtest --test pcheck` (Fensterinhalt zurückgelesen: Windows-DC, GetImage,
+    der committete wl_shm-Puffer; Teilbilder, Bilder ohne Pause, viele Rechtecke, ein ganzes Bild
+    bei gleicher Größe, Aus-/Einblenden, minimiert, WM_PAINT, neue Größe) auf Windows, X11 (fd,
+    SysV, PutImage) und Wayland; Browser: Leinwand gleich Framebuffer in Chromium und Firefox
+    (100/200 %), dieselben Pixel wie vorher, Teilbilder gleich Vollkomposition; Android:
+    dieselbe Bitmap wie vorher, `GalleryInstrumentation` (78), `GalleryA11yInstrumentation`
+    (31), `android_files.py`.
+  - Es fehlen: der Framebuffer in einer Section (Windows ohne Kopie), Scrollen per BitBlt /
+    ScrollDC im Fenster und in der Kopie, DwmFlush-Taktung (nicht eingebaut: kein messbares
+    Reißen, würde den UI-Thread pro Bild bis zu einem Refresh blockieren), `ImageBitmap` /
+    `OffscreenCanvas` im Browser; Androids Renderskala (≤ 2/density, ≤ 2048 px) ließe sich
+    vom Present her lockern (ein ganzes Bild in nativer Auflösung ~1,7 ms), begrenzt ist
+    jetzt das Rechnen des Bildes.
 
 ## 9. Plattformen
 

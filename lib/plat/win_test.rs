@@ -23,6 +23,10 @@
 //     WT_POST_CHARS a burst: a[0] WM_CHAR messages posted to window w, the characters a[1],
 //                   a[1] + 1, ... a[1] + a[2] - 1 by turns (as an input method commits a long
 //                   text) -> the number posted
+//     WT_SCROLL     move the client rows a[0] .. a[0] + a[1] by a[2] rows inside the window
+//                   (BitBlt from its DC to itself, GdiFlush; what a scroll could cost without
+//                   sending the pixels again) -> microseconds taken
+//   win_test_image(w) -> (w, h, px)   the client area as the window shows it (BitBlt from its DC)
 //   file_dialog_autoclose(ms, name)   the next file_dialog is closed after ms by a timer of the
 //                   UI thread: name None = Cancel, Some(name) = the name typed + OK
 
@@ -76,6 +80,7 @@ pub const WT_ACTIVE: u32 = 11;
 pub const WT_CLIP_ACCESS: u32 = 12;
 pub const WT_POPUP_SEND: u32 = 13;
 pub const WT_POST_CHARS: u32 = 14;
+pub const WT_SCROLL: u32 = 15;
 
 const RDW_INVALIDATE: u32 = 1;
 const RDW_UPDATENOW: u32 = 0x100;
@@ -177,6 +182,17 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
                     WT_VISIBLE => (IsWindowVisible(h) != 0) as i64,
                     WT_ENABLED => (IsWindowEnabled(h) != 0) as i64,
                     WT_ACTIVE => (GetActiveWindow() == h) as i64,
+                    WT_SCROLL => {
+                        let mut rc = Rect::default();
+                        super::GetClientRect(h, &mut rc);
+                        let dc = GetDC(h);
+                        let t0 = crate::time_us();
+                        super::BitBlt(dc, 0, a[0] + a[2], rc.r - rc.l, a[1], dc, 0, a[0], super::SRCCOPY);
+                        super::GdiFlush();
+                        let t = crate::time_us() - t0;
+                        ReleaseDC(h, dc);
+                        t as i64
+                    }
                     WT_POST_CHARS => {
                         let (n, c0, k) = (a[0].max(0), a[1].max(0) as usize, a[2].max(1));
                         (0..n).take_while(|i| PostMessageW(h, WM_CHAR, c0 + (i % k) as usize, 1) != 0).count() as i64
@@ -185,6 +201,48 @@ pub fn win_test(op: u32, w: i32, a: [i32; 4]) -> i64 {
                 }
             }
         }
+    }
+}
+
+/// (test aid) what window w shows: its client area read back from the window's DC (BitBlt into
+/// a DIB section; under DWM the window's own surface, also where other windows cover it) ->
+/// (w, h, rows of w * 4 bytes B, G, R, x)
+pub fn win_test_image(w: i32) -> Option<(i32, i32, alloc::vec::Vec<u8>)> {
+    let r = rec(w)?;
+    let h = r.hwnd.get();
+    let mut rc = Rect::default();
+    // SAFETY: our window; a valid out-parameter.
+    unsafe { super::GetClientRect(h, &mut rc) };
+    let (cw, ch) = (rc.r - rc.l, rc.b - rc.t);
+    if cw <= 0 || ch <= 0 {
+        return None;
+    }
+    let bmi = super::BitmapInfoHeader { size: 40, w: cw, h: -ch, planes: 1, bits: 32, ..Default::default() };
+    let mut bits: *mut u8 = core::ptr::null_mut();
+    // SAFETY: a memory DC and a DIB section of cw x ch 32-bit pixels, the window's DC; all made
+    // here are freed again, the window's DC released.
+    unsafe {
+        let mdc = super::CreateCompatibleDC(0);
+        let bmp = if mdc != 0 { super::CreateDIBSection(mdc, &bmi, 0, &mut bits, 0, 0) } else { 0 };
+        let mut out = None;
+        if bmp != 0 && !bits.is_null() {
+            let old = super::SelectObject(mdc, bmp);
+            let dc = GetDC(h);
+            let ok = super::BitBlt(mdc, 0, 0, cw, ch, dc, 0, 0, super::SRCCOPY) != 0;
+            ReleaseDC(h, dc);
+            super::GdiFlush();
+            if ok {
+                out = Some((cw, ch, core::slice::from_raw_parts(bits, (cw * ch * 4) as usize).to_vec()));
+            }
+            super::SelectObject(mdc, old);
+        }
+        if bmp != 0 {
+            super::DeleteObject(bmp);
+        }
+        if mdc != 0 {
+            super::DeleteDC(mdc);
+        }
+        out
     }
 }
 

@@ -27,15 +27,17 @@
 //   linux_x11_screen.rs   the monitor list, global shortcuts (GrabKey), GetImage of the root,
 //                         the colour pick (pointer grab), RandR change events
 //
-// Deviation from the assembly (the Rust API hands the frame over only for the call):
-// presented pixels are copied into a per-window shadow image (the damaged rectangles), and
-// popups keep a copy of their pixels; repaints (Expose, after a map, the PutImage fallback)
-// read these copies where the assembly re-read the caller's framebuffer.
+// Deviation from the assembly (the Rust API hands the frame over only for the call): the
+// MIT-SHM segments are whole frames brought up to date from the caller's frame (what each
+// lacks, linux_x11_present.rs), so repaints (Expose, after a map) read the segment of the
+// last put; the PutImage fallback keeps a shadow image of the frame, and popups keep a copy
+// of their pixels -- where the assembly re-read the caller's framebuffer.
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::cell::RefCell;
 
+use crate::linux_damage::Reg;
 use crate::{CUR_COUNT, CUR_USER_MAX, Display, Frame, PW_MAX, PPW_MAX};
 
 #[path = "linux_x11_clip.rs"]
@@ -311,15 +313,19 @@ struct Seg {
     cap: usize,    // bytes
     mem: *mut u8,  // our mapping
     t0: u64,       // time of the last put
+    cw: i32,       // the size of the frame it holds (rows of cw * 4 bytes; 0: none)
+    ch: i32,
 }
 
-const SEG0: Seg = Seg { seg: 0, busy: false, shmid: 0, cap: 0, mem: core::ptr::null_mut(), t0: 0 };
+const SEG0: Seg = Seg { seg: 0, busy: false, shmid: 0, cap: 0, mem: core::ptr::null_mut(), t0: 0, cw: 0, ch: 0 };
 const PR_MAX: usize = 16; // pending rectangles
 
 /// the presentation state of one window  [x11_present.s XP_*]
 struct Xp {
-    sh: Vec<u8>,          // shadow image of the presented frame (w * 4 bytes per row)
-    sw: i32,              // its size (sfok: a frame was presented)
+    sh: Vec<u8>,          // MIT-SHM: the staging image (damage waiting for a free segment);
+                          // PutImage: the shadow image of the presented frame (sw * 4 bytes a row)
+    stg: Reg,             // where the staging image holds frame pixels no segment has yet
+    sw: i32,              // the frame size (sfok: a frame was presented)
     shh: i32,
     sfok: bool,
     pend: bool,           // damage waits
@@ -327,6 +333,8 @@ struct Xp {
     bx: [i32; 4],         // bounding box (x0, y0, x1, y1)
     pr: Vec<[i32; 4]>,    // pending boxes
     slots: [Seg; 2],
+    st: [Reg; 2],         // per segment: where it differs from the latest frame
+    newest: usize,        // the segment of the last put (2: none)
     rpt: u64,             // time of the next full repaint (0 none)
     rptn: i32,            // repaints left
 }
@@ -581,6 +589,7 @@ impl X11 {
             tooltype: 0,
             xp: core::array::from_fn(|_| Xp {
                 sh: Vec::new(),
+                stg: Reg::new(),
                 sw: 0,
                 shh: 0,
                 sfok: false,
@@ -589,6 +598,8 @@ impl X11 {
                 bx: [0; 4],
                 pr: Vec::new(),
                 slots: [SEG0; 2],
+                st: [Reg::new(), Reg::new()],
+                newest: 2,
                 rpt: 0,
                 rptn: 0,
             }),
