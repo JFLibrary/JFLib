@@ -1,0 +1,62 @@
+#!args --page form --verify-dirty
+# a form in html_view (--page form), by the mouse: a click into a text field gives it the
+# focus (typed text goes there), clicks toggle the check box and choose a radio, the drop-down
+# list opens over the page and a click chooses; the buttons send the form (each with its own
+# name and value) or reset it; the wheel over a field scrolls the page.  The records: text
+# boxes, lists, check boxes, radios and buttons with the names of their labels, the password
+# as dots; shots light, dark, high contrast
+size 1000 720
+theme light
+expect textbox:"Hallo" exists
+shot build/mdviewtest/form_light.png
+theme dark
+shot build/mdviewtest/form_dark.png
+click "Hoher Kontrast"
+shot build/mdviewtest/form_hc.png
+click "Hoher Kontrast"
+theme light
+click 175,122
+expect text:"Fokus: user" exists
+type "max"
+expect textbox:"max" focused
+click 200,170
+type "pw"
+expect textbox:"●●" focused
+click checkbox:"Angemeldet bleiben"
+expect checkbox:"Angemeldet bleiben" checked
+expect checkbox:"Angemeldet bleiben" focused
+click radio:"Blau"
+expect radio:"Blau" checked
+expect radio:"Rot" unchecked
+click combo:"Österreich"
+expect combo:"Österreich" open
+shot build/mdviewtest/form_list.png
+click "Deutschland"
+expect combo:"Deutschland" exists
+expect text:"Feld: land" exists
+# the text area: Enter starts a line (it sends nothing)
+click 150,390
+key ctrl+a
+type "Zeile 1"
+key enter
+expect text:"Senden: -" exists
+key backspace
+expect textbox:"Zeile 1" focused
+click button:"Speichern"
+expect text:"Senden: post /login user=max&pw=pw&keep=ja&farbe=blau&land=de&text=Zeile 1&ort=&token=abc123&aktion=Speichern" exists
+shot build/mdviewtest/form_sent.png
+click button:"Senden"
+expect text:"Senden: post /login user=max&pw=pw&keep=ja&farbe=blau&land=de&text=Zeile 1&ort=&token=abc123&aktion=senden" exists
+click button:"Zurücksetzen"
+expect textbox:"Hallo" exists
+expect textbox:"max" missing
+expect checkbox:"Angemeldet bleiben" unchecked
+expect radio:"Rot" checked
+expect combo:"Österreich" exists
+# the wheel over a field scrolls the page (a lower window)
+size 1000 500
+expect "Formular" value 0
+wheel 175,122 -120
+wait 500
+expect "Formular" value 48
+expect_nowarn

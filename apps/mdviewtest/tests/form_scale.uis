@@ -1,0 +1,34 @@
+#!args --page form --text-scale 150 --verify-dirty
+# a form at 150 % text: the fields and their rows grow with the text (the layout is cached per
+# text scale), nothing overlaps; the keyboard and the drop-down list work as at 100 %
+size 1000 720
+theme light
+expect checkbox:"Angemeldet bleiben" unchecked
+shot build/mdviewtest/form_150.png
+click 600,520
+key tab
+type "groß"
+expect textbox:"groß" focused
+key tab
+key tab
+key space
+expect checkbox:"Angemeldet bleiben" checked
+key tab
+key down
+expect radio:"Grün" checked
+key tab
+key alt+down
+expect combo:"Österreich" open
+shot build/mdviewtest/form_150_list.png
+key down
+key enter
+expect combo:"Schweiz" exists
+key shift+tab
+key shift+tab
+key shift+tab
+key shift+tab
+expect textbox:"groß" focused
+key enter
+expect text:"Senden: post /login user=groß&pw=&keep=ja&farbe=gruen&land=ch&text=Hallo&ort=&token=abc123&aktion=senden" exists
+shot build/mdviewtest/form_150_sent.png
+expect_nowarn

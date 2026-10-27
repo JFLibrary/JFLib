@@ -1508,12 +1508,13 @@ rich_html -- RichDoc as HTML and back
   (crate) clip_html(paras, font, size) the clipboard's HTML: to_html plus the fragment as
                                    JSON in a comment (<!--jfrich ...-->), so a paste into a
                                    richtext keeps every attribute exactly
-  (crate) html_read(s) -> (paras, HExt)   the same reader for the Markdown / HTML viewer
+  (crate) html_read(s) -> HRead   the same reader for the Markdown / HTML viewer
                                    (md_doc.rs): the paragraphs and, by paragraph, what a
-                                   viewer shows besides them -- rules, images (U+FFFC in the
-                                   text), preformatted blocks and their language, the heading
-                                   level, the quotation depth, table rows and their cells, the
-                                   numbers of list items
+                                   viewer shows besides them -- rules, images and form fields
+                                   (U+FFFC in the text), preformatted blocks and their
+                                   language, the heading level, the quotation depth, table
+                                   rows and their cells, the numbers of list items, task
+                                   boxes; the forms and their fields (md_doc.rs "Forms")
 
 Whitespace outside <pre> / white-space:pre* collapses as in browsers; a paragraph is a
 block or the text between two <br>.  Nesting is capped (NEST_MAX open blocks, formats and
@@ -6313,6 +6314,11 @@ links) or from HTML (the reader of the rich-text editor, rich_html.rs)
   doc.plain() / doc.to_html()          everything as text (list markers, cells by tabs) / HTML
   doc.plain_range(a, b) / html_range(a, b)   a part: TextPos { line: block, byte }
   doc.link_spots()                     every link in reading order (block, bytes, link)
+  doc.forms() / fields() / field_spots()   the forms of HTML, their fields (MdSpan::field - 1;
+                                       hidden ones have no character; their first values:
+                                       md_view keeps the current ones) and where the visible
+                                       ones stand in reading order; field.caption(): a
+                                       button's caption
   doc.truncated()                      a limit cut the input
 
 The model: a block is a paragraph, a heading (level 1..6), a code block (its text, the
@@ -6332,6 +6338,16 @@ images (inline, full / collapsed / shortcut references, titles), autolinks (<...
 http:// https:// www.), hard breaks (two spaces, backslash) and soft breaks, a little inline
 HTML (br, b / strong, i / em, s / del, u / ins, code / kbd, a href, img).  Other tags are
 dropped, their text stays.  Tabs expand to 4 columns.
+
+Forms (HTML, also in Markdown's HTML blocks): <form action method> (forms do not nest),
+<input> of type text (and the other text types: email, search, url, tel, number ...),
+password, checkbox, radio, hidden, submit, image (a submit button), reset and button,
+<textarea> (its text read raw, one leading line end dropped), <select> with <option value
+selected> (one choice), <button type> (its text the caption), <label> (around a field or
+for= its id: the field's name; aria-label wins, title is the last resort) and form= (a field
+outside its form).  A field is one U+FFFC in the text with a span of its own (MdSpan::field);
+a disabled check box at the start of a list item is that item's task box (as Markdown's
+"[x]" is written out by html_range).
 ```
 
 ```rust
@@ -6369,6 +6385,27 @@ MA_LEFT: u8 = 1
 MA_CENTER: u8 = 2
 /// right (end)
 MA_RIGHT: u8 = 3
+/// MdField::kind: a one-line text field (<input> of type text, email, search, url, tel,
+/// number and every type not named below)
+MF_TEXT: u8 = 0
+/// a password field (its text never leaves the view but in the form's data)
+MF_PASSWORD: u8 = 1
+/// a check box
+MF_CHECKBOX: u8 = 2
+/// a radio button: one of the radios of its form with its name
+MF_RADIO: u8 = 3
+/// a hidden field (no character in the text)
+MF_HIDDEN: u8 = 4
+/// a text area (<textarea>: several lines)
+MF_TEXTAREA: u8 = 5
+/// a drop-down list (<select>)
+MF_SELECT: u8 = 6
+/// a submit button (<button>, <input type=submit> / image)
+MF_SUBMIT: u8 = 7
+/// a reset button: the form's fields get their first values back
+MF_RESET: u8 = 8
+/// a button without an action of its own (<button type=button>, <input type=button>)
+MF_BUTTON: u8 = 9
 ```
 
 - **`struct MdSpan`**
@@ -6380,6 +6417,7 @@ MA_RIGHT: u8 = 3
   - `image: u32` -- an image (the text is U+FFFC): index + 1 into MdDoc::images (0: none)
   - `color: u32` -- HTML colours 0xAARRGGBB (0: the theme's)
   - `bg: u32`
+  - `field: u32` -- a form field (the text is U+FFFC): index + 1 into MdDoc::fields (0: none)
 
 - **`struct MdBlock`**
   a block of the document (see the module header)
@@ -6422,6 +6460,51 @@ MA_RIGHT: u8 = 3
   - `b: u32`
   - `link: u32`
 
+- **`struct MdForm`**
+  a form of HTML
+  - `action: String` -- where its data goes (as written: the app resolves it) and how ("get" / "post": lower
+    case, "get" when not given)
+  - `method: String`
+  - `id: String`
+  - `name: String`
+
+- **`struct MdOption`**
+  a choice of a drop-down list: the value sent, the text shown
+  - `value: String`
+  - `label: String`
+
+- **`struct MdField`**
+  a field of a form (its first value: the view keeps the current one, MdViewState)
+  - `kind: u8` -- MF_\*
+  - `form: u32` -- its form: index + 1 into MdDoc::forms (0: none -- it sends nothing)
+  - `name: String`
+  - `id: String`
+  - `value: String` -- text fields: the text; check boxes, radios, buttons: the value sent ("on" for check
+    boxes and radios without one)
+  - `label: String` -- the name screen readers say (aria-label, the &lt;label>, title); buttons: the caption
+  - `placeholder: String`
+  - `checked: bool` -- check boxes and radios: checked at first
+  - `options: Vec<MdOption>` -- drop-down lists: the choices, the one chosen at first (-1: none)
+  - `selected: i32`
+  - `size: u32` -- text fields: the width in characters (size; text areas: cols; 0: the default), text
+    areas: the lines (rows)
+  - `rows: u32`
+  - `maxlength: u32` -- at most this many characters (0: no limit)
+  - `disabled: bool`
+  - `readonly: bool`
+
+**`impl MdField`**
+
+- **`fn caption(&self) -> &str`**
+  a button's caption: its own, else "Senden" / "Zurücksetzen" (submit / reset, in the UI
+  language); "" for the other kinds
+
+- **`struct MdFieldSpot`**
+  a visible field in reading order: block, byte of its U+FFFC, the field (index + 1)
+  - `block: usize`
+  - `a: u32`
+  - `field: u32`
+
 - **`struct MdDoc`**
   the document (see the module header)
 
@@ -6432,7 +6515,7 @@ MA_RIGHT: u8 = 3
 - **`fn html(s: &str) -> MdDoc`**
   a document from HTML: what the rich-text editor reads (paragraphs, headings h1 .. h6,
   lists, block quotes, formats, links, colours) and rules, images, preformatted blocks
-  (&lt;pre>&lt;code class="language-x">) and tables
+  (&lt;pre>&lt;code class="language-x">), tables and forms (see the module header)
 - **`fn blocks(&self) -> &[MdBlock]`**
   the blocks in reading order
 - **`fn links(&self) -> &[String]`**
@@ -6445,6 +6528,12 @@ MA_RIGHT: u8 = 3
   the tables (MdBlock::table)
 - **`fn link_spots(&self) -> &[MdLinkSpot]`**
   every link in reading order (adjacent spans of one link joined)
+- **`fn forms(&self) -> &[MdForm]`**
+  the forms (MdField::form - 1)
+- **`fn fields(&self) -> &[MdField]`**
+  the fields of the forms in document order (MdSpan::field - 1)
+- **`fn field_spots(&self) -> &[MdFieldSpot]`**
+  every visible field in reading order
 - **`fn truncated(&self) -> bool`**
   a limit cut the input (size, blocks)
 - **`fn end(&self) -> TextPos`**
@@ -6455,11 +6544,13 @@ MA_RIGHT: u8 = 3
   the whole document as HTML
 - **`fn plain_range(&self, a: TextPos, b: TextPos) -> String`**
   the text of a .. b: blocks on lines of their own (a blank line before paragraphs),
-  list markers ("- ", "1. ", "[x] "), cells by tabs, images as their alt texts
+  list markers ("- ", "1. ", "[x] "), cells by tabs, images as their alt texts, buttons
+  as their captions (the other fields: nothing)
 - **`fn html_range(&self, a: TextPos, b: TextPos) -> String`**
   the HTML of a .. b: h1 .. h6, p, ul / ol / li (task items with a disabled check box),
   blockquote, pre / code (class language-x), hr, table / tr / th / td (align), strong,
-  em, del, u, code, a href, img src alt, colours as span styles
+  em, del, u, code, a href, img src alt, colours as span styles; of forms only the
+  buttons' captions (as text)
 
 #### `ui/md_view.rs`
 
@@ -6474,16 +6565,44 @@ md_view -- ui.markdown_view / ui.html_view: a read-only document view over an Md
   ui.html_view(id, &mut MdViewState, html, MV_*) -> MdEv        HTML (the rich-text reader)
   ui.doc_view(id, &mut MdViewState, MV_*) -> MdEv                the document set before
        (st.set_markdown / set_html / set_doc)
-  MdEv { ev, link, hover }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was activated); link: the
-       activated link's target (a click on it, Enter on the focused one); hover: the target
-       of the link under the pointer.  The view fills the place it gets (natural 480 x 320
-       DIP; next_size(-1, -1) fills).
+  MdEv { ev, link, hover, field, submit }   ev: EV_FOCUS, EV_HOVER, EV_ACT (a link was
+       activated); link: the activated link's target (a click on it, Enter on the focused
+       one); hover: the target of the link under the pointer; field: a form field the user
+       changed (typed, toggled, chose) or a button without a submit / reset action he pressed;
+       submit: a form was sent (MdSubmit: the form, its action and method, the name / value
+       pairs, the button).  The view fills the place it gets (natural 480 x 320 DIP;
+       next_size(-1, -1) fills).
   MdViewState::new() / base (where relative image paths start, e.g. "app://help/") / label
        (the name for screen readers; "" = "Dokument") / doc() / selection() /
        set_selection(sel) / select_all() / selected_text() / selected_html() /
        scroll_to_block(i) / scroll_to_end() (the end, also while the document grows: chat
        output; scrolling to the end of a long document does the same until the user scrolls
        away) / first_visible() -> (block, px above the view) / focused_link()
+  Images from the app: st.images = MI_LOCAL (default: VFS names and paths, other addresses
+       show their alt text), MI_ASK (as MI_LOCAL; http:, https: and data: addresses are asked
+       from the app) or MI_APP (every image is asked: nothing is read by the view -- pages
+       from the network).  st.image_requests() -> the addresses the view waits for (each
+       once; relative ones after base, the rest as written); st.set_image(addr, Some(bytes) |
+       None) answers (decoded at once by the image decoders: SVG or img_core; None or bytes
+       it cannot decode: the alt text) -- in a frame before the view, or the app asks for one
+       (invalidate) when the bytes come outside.  Until then a frame with the alt text stands
+       in (at the width / height the HTML gives, else the frame's size); the image's block is
+       laid out again when its bytes come, the view stays where it is.
+  Forms (HTML: md_doc.rs "Forms"): the fields are the library's widgets in the text flow --
+       text boxes (password fields: dots, nothing to copy or read out), text areas, check
+       boxes, radios, drop-down lists, buttons -- with the style's look, high contrast, text
+       scale and mirroring.  Their values live in the state: field_text(i) / field_checked(i)
+       / field_selected(i), set_field_text / set_field_checked / set_field_selected,
+       form_data(form, button) (the pairs a browser sends), reset_form(form),
+       focused_field(); a new document starts with its first values.  Keys: Tab / Shift+Tab
+       go through links and fields in reading order (a group of radios is one stop: the
+       checked one; Up / Down and Left / Right -- as the radios lie in their paragraph --
+       choose inside it), Space toggles, Enter in a text field, check
+       box or radio sends its form (with its first submit button, none when that is
+       disabled), Enter / Space on a button presses it, Esc in a text field returns to the
+       view, PgUp / PgDn that a field does not take scroll the view.  The fields follow the
+       window's mirroring (as every widget), not the direction of their paragraph.  A
+       document without fields reads as before.
   Flags: MV_NO_FRAME (no card, a smaller padding), MV_OPEN_LINKS (an activated link is also
        opened with open_url: its scheme rules and the app's policy apply; never without the
        user's click or Enter), MV_RTL / MV_LTR (the document's direction; default: that of
@@ -6505,17 +6624,21 @@ what is shown.
 Mouse: a drag selects (the view scrolls at its edges), Shift+click extends, a double click
 selects a word; a click on a link activates it.  Keys (focused): Up / Down scroll by a line,
 PgUp / PgDn and Space / Shift+Space by a view, Home / End to the ends, Tab / Shift+Tab
-through the links (the focused one is framed and scrolled into view; past the last one the
-focus moves on), Enter activates the focused link, Esc drops it, Ctrl+A selects all,
+through the links and fields (the focused link is framed, a field gets the focus; scrolled
+into view; past the last one the focus moves on), Enter activates the focused link, Esc
+drops it, Ctrl+A selects all,
 Ctrl+C / Ctrl+Insert copy the selection as text (list markers, cells by tabs) and HTML.
 Images: names of the VFS ("app://", "data://" ...) and paths (relative ones after base) are
-read on first view and kept in the state; http(s) addresses are never fetched (the alt text
-shows in a frame instead).
+read on first view and kept in the state; http(s) addresses are never fetched by the view
+(MI_LOCAL: the alt text shows in a frame instead; MI_ASK / MI_APP: the app fetches them).
 Records: K_BOX id (label: the label, value: the scroll position in DIP); per visible block
 K_HEADING (value: the level), K_TEXT (paragraphs, code, table cells), K_LISTITEM (the first
 block of a list item, value: its number), K_CHECKBOX (a task's box, checked), K_LINK per
-link, K_IMAGE (label: the alt text) per image.  Ids: id (focus, keys), part_id(id, 1) the
-scroll bar.
+link, K_IMAGE (label: the alt text) per image; per visible field the widget's record
+(K_TEXTBOX, K_CHECKBOX, K_RADIO, K_COMBO, K_BUTTON: label the field's name -- its <label>,
+aria-label, title, placeholder -- or a button's caption; text boxes and lists take it from a
+K_TEXT record without area along their top edge).  Ids: id (focus, keys), part_id(id, 1)
+the scroll bar, md_field_id(id, i) the fields.
 ```
 
 ```rust
@@ -6527,6 +6650,12 @@ MV_OPEN_LINKS: u32 = 2
 MV_RTL: u32 = 4
 /// the document runs left to right (also in a mirrored window)
 MV_LTR: u32 = 8
+/// MdViewState::images: VFS names and paths are read, other addresses show their alt text
+MI_LOCAL: u8 = 0
+/// as MI_LOCAL, but http:, https: and data: addresses are asked from the app
+MI_ASK: u8 = 1
+/// every image is asked from the app (the view reads no file)
+MI_APP: u8 = 2
 ```
 
 - **`struct MdEv`**
@@ -6534,11 +6663,26 @@ MV_LTR: u32 = 8
   - `ev: u32` -- EV_FOCUS, EV_HOVER, EV_ACT (a link was activated)
   - `link: Option<String>` -- the target of the link activated this frame
   - `hover: Option<String>` -- the target of the link under the pointer
+  - `field: Option<usize>` -- a field the user changed this frame, or a button (MF_BUTTON) he pressed (index of
+    doc().fields())
+  - `submit: Option<MdSubmit>` -- a form sent this frame (Enter in a field, a submit button)
+
+- **`struct MdSubmit`**
+  a form being sent: what a browser would send (MdViewState::form_data)
+  - `form: usize` -- the form (index of doc().forms()), its action (as written) and method ("get" / "post")
+  - `action: String`
+  - `method: String`
+  - `fields: Vec<(String, String)>` -- the name / value pairs in document order
+  - `button: Option<usize>` -- the submit button that sent it (None: Enter in a form without one)
+
+- **`fn md_field_id(id: u32, i: usize) -> u32`**
+  the widget id of field i of the view `id` (the drop-down lists' rows take ids of their own)
 
 - **`struct MdViewState`**
   the state of a document view (see the module header)
   - `base: String` -- where relative image paths start ("app://help/"; "" = as given)
   - `label: String` -- the name for screen readers ("" = "Dokument")
+  - `images: u8` -- where the images come from: MI_LOCAL (default), MI_ASK, MI_APP (see the module header)
 
 **`impl MdViewState`**
 
@@ -6570,6 +6714,33 @@ MV_LTR: u32 = 8
   the first visible block and how many px of it are above the view
 - **`fn focused_link(&self) -> Option<usize>`**
   the link focused with Tab (an index of doc().link_spots())
+- **`fn image_requests(&mut self) -> Vec<String>`**
+  the image addresses the view waits for since the last call (MI_ASK / MI_APP; each one
+  once): the app fetches them and answers with set_image
+- **`fn set_image(&mut self, addr: &str, data: Option<&[u8]>) -> bool`**
+  the bytes of an image address (None: it could not be had): decoded now, shown from the
+  next frame on (the alt text when they are no picture) -> an image of the document waited
+  for it.  An address not asked yet is kept for the images that need it later.
+- **`fn field_text(&self, i: usize) -> &str`**
+  field i's text (text fields, text areas, hidden fields; "" for the other kinds)
+- **`fn field_checked(&self, i: usize) -> bool`**
+  field i is checked (check boxes, radios)
+- **`fn field_selected(&self, i: usize) -> i32`**
+  the option chosen in field i (drop-down lists; -1: none)
+- **`fn set_field_text(&mut self, i: usize, s: &str)`**
+  set field i's text (text fields, text areas, hidden fields)
+- **`fn set_field_checked(&mut self, i: usize, on: bool)`**
+  check field i or not (a radio: the others of its group go off)
+- **`fn set_field_selected(&mut self, i: usize, k: i32)`**
+  choose option k of field i (a drop-down list; -1: none)
+- **`fn form_data(&self, form: usize, button: Option<usize>) -> Vec<(String, String)>`**
+  the name / value pairs form `form` sends with the submit button `button` (as browsers
+  build them: fields with a name that are not disabled; check boxes and radios when
+  checked; a list's chosen value; of the buttons only `button`)
+- **`fn reset_form(&mut self, form: usize)`**
+  the fields of form `form` get their first values back
+- **`fn focused_field(&self) -> Option<usize>`**
+  the field with the keyboard focus (an index of doc().fields())
 
 **`impl Ui`**
 
