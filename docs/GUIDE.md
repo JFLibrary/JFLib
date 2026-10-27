@@ -1480,6 +1480,7 @@ in DIP):
 | `clip data FORMAT F [FORMAT F ...]` | publish one to four representations together; formats: `text`, `html`, `rtf`, `docx`; opt-in Rust extension |
 | `clip save F text\|html\|rtf\|docx`, `clip expect html\|rtf\|docx\|text-only` | save exact bytes or check rich-format availability; `text-only` also checks absence of rich representations |
 | `inspect on\|off\|arm\|pick\|select S\|...`, `inspect expect open\|idle\|same\|selected S\|selector "s"\|...` | the live inspector headless: open it, pick, select, check the overlay, the selector and that a closed inspector changes nothing (§30) |
+| `inspect set KEY VALUE`, `inspect reset [KEY]`, `inspect undo\|redo\|save PATH\|list`, `inspect do click\|drag DX DY\|value N\|type "s"\|cmd ID`, `inspect expect changes N\|value KEY "s"\|list "s"\|...` | editing in the inspector (development builds): theme tokens, accent, radius, spacing, height, text sizes, font, mode, style, language, scales; undo / redo / reset, the theme file, the change list; the selected widget operated (§30) |
 
 **Selectors** `S`: `#123` (widget id), `"Label"`, `kind:"Label"` (`button:"OK"`, `dialog:"Öffnen"`,
 `text:"Klicks: 2"`), `X,Y` (a point in DIP). A label must match exactly one widget (plain text is
@@ -3335,7 +3336,8 @@ A running app can be looked into without changing it: the inspector shows which 
 where, with which id, label, value and state, how the layout boxes nest, the Tab order, what
 the last frames repainted, and the frame's cost. It is part of `ui` (`lib/ui/inspect.rs`)
 and off by default; closed it costs nothing (the runtime tests one flag; nothing is recorded or
-drawn, the frames are byte for byte those of an app without it).
+drawn, the frames are byte for byte those of an app without it). In a development build it
+also edits the app's look and operates its widgets ("Editing in the inspector" below).
 
 * **Turning it on**: `--inspect` opens it at the start; `jfgui_INSPECT=1` only arms it (its
   hot keys work), `jfgui_INSPECT=open` opens it too. In code: `ui.inspect_enable(true)` (arm),
@@ -3389,7 +3391,7 @@ inspect expect idle                  # and did no work since it closed
 ```
 
 The script commands: `inspect on|off|toggle|arm|disarm`, `inspect pick`, `inspect select
-S|none`, `inspect option outlines|order|dirty on|off`, `inspect tab widgets|frame|colors`,
+S|none`, `inspect option outlines|order|dirty on|off`, `inspect tab widgets|frame|colors|look`,
 `inspect copy`, `inspect snap`, `inspect expect open|closed|pick on|off|flash on|off|idle|same|
 excluded|selected S|none|hover S|none|selector "s"|copied "s"` (`excluded`: no record of the
 inspector's window in the tree). The inspector's window has the id 2147422208 (`expect window
@@ -3443,6 +3445,68 @@ structure is prescribed:
   a stand-in program -- the suite runs this part; a temporary app built, recorded, replayed,
   diverged and failed headless on Windows and Linux; the window loop on a Windows desktop of
   its own, never on the user's screen).
+
+### Editing in the inspector (development builds)
+
+In a development build (`build_rs.py`'s default; it passes `--cfg jfgui_dev`, a `--release`
+build keeps the inspector read-only) the inspector also changes the running app's look -- only
+through what exists already ([`ui/inspect_edit.rs`](../lib/ui/inspect_edit.rs)). Nothing in the
+app changes for it: no API to call, no state structure. The app's own values (a slider's, a
+check box's, a text box's) are never written; the inspector gives input instead.
+
+* **Farben** is editable: select a token in the list, type `#RRGGBB` / `#AARRGGBB` into its box
+  (Enter) or open the colour picker beside it. The colours of the mode in use change (light,
+  dark or high contrast); `T_ACCENT`'s row sets the accent the style derives its ramp from.
+* **Darstellung** (a fourth tab): the style (the styles the app links, §34), light / dark /
+  high contrast, the accent, the language (the columns of the app's catalogue, else German and
+  English; the library's texts follow at once, the inspector's too), the main window's scale
+  (its dpi; the window keeps its size in pixels, like a browser's zoom) and the text scale;
+  corner radius, spacing, control height; the font family (a font file or an installed family)
+  and the sizes of the text styles. Theme values go through the app theme (`ui.set_theme` over
+  the app's own theme, or none), the rest through `theme_set` / `set_contrast`, `set_style`,
+  `i18n::set_language_code`, `set_text_scale`.
+* Every changed value is marked (its name in the accent colour, "geändert" in the list), has
+  its own reset button and is listed under **Änderungen** (old → new). **Alles zurücksetzen**,
+  undo and redo (the bar, Ctrl+Z / Ctrl+Y in the tool window; the moves of one drag of a slider
+  or the colour picker are one step: `History` with `Snapshot` steps). Changes hold for the
+  running session -- also when the inspector is closed -- until they are taken over:
+* **Als Theme speichern** writes the app theme in use, changes included, as a theme file
+  (default `config://themes/inspector.theme`; a font file is written relative to the theme
+  file); **Liste kopieren** copies "Das hast du geändert": the changed theme keys as lines of a
+  theme file, the rest (style, mode, language, scales) as lines of code, all of it usable as a
+  theme file. Layout and texts are changed in the code.
+* **Bedienen** (Widgets tab, below the properties) operates the selected widget through
+  synthetic input, as a script does: a click, a drag by dx / dy from its centre, a slider's
+  value (the way a screen reader sets it: the widget takes it as input), text typed into a text
+  box (a click, Ctrl+A, the text), a command (`cmd ID`). The matching script line is shown.
+* The tool window itself is built in the style's own look: the app theme and an edited text
+  scale do not reach it, so it stays usable whatever is edited (style, mode and language do).
+
+```
+# apps/gallery/tests/inspect_edit.uis (excerpt)
+inspect on
+inspect set token bg #E0F0E0           # the colours in use (light)
+expect token bg #E0F0E0
+inspect set radius 8                   # DIP, or 150%
+inspect expect changes 2
+inspect expect value radius "8 DIP"
+inspect undo                           # the radius again as before
+inspect save build/insp/edit.theme     # the app theme with the changes
+inspect list                           # "Das hast du geändert" to the clipboard
+inspect reset                          # every change back
+inspect select #140
+inspect do value 75                    # a slider's value; also click, drag DX DY, type "s", cmd ID
+```
+
+Script commands (KEY = `token NAME` | `accent` | `radius` | `spacing` | `height` | `size STYLE` |
+`font` | `mode` | `style` | `lang` | `scale` | `textscale`): `inspect set KEY VALUE` (`token bg
+#RRGGBB`, `radius 8|150%|none`, `spacing 110`, `height 36`, `size body 15`, `font FILE|FAMILY|
+none`, `mode light|dark|contrast`, `style kde`, `lang en`, `scale 150`, `textscale 130`),
+`inspect reset [KEY]`, `inspect undo|redo`, `inspect save PATH`, `inspect list`, `inspect do
+click|drag DX DY|value N|type "s"|cmd ID [ARG]`, `inspect expect changes N|list "s"|value KEY
+"s"|undo on|off|redo on|off|message "s"|none`. Tests: `apps/gallery/tests/inspect_edit.uis`,
+`inspect_edit_rtl.uis` (mirrored, 150 %), `apps/themedemo/tests/inspect_edit.uis` (the linked
+styles, edits over an app theme).
 
 ## 31. SVG images and the image viewer
 

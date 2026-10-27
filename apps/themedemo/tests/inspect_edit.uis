@@ -1,0 +1,69 @@
+# the live inspector's editing over an app theme (ui/inspect_edit.rs, ROADMAP §11): the styles
+# linked into the app (by script and through the tab "Darstellung"), undone; a token and the
+# corners over Ozean (the theme keeps its name and its other keys), saved as a theme file and
+# read back; the style and light / dark as lines of code in the change list; everything reset
+# gives Ozean as it was.  The inspector's window is 2147422208; 0x07FD0021 its style list
+size 980 760
+theme light
+wait 500
+theme file app://themes/ocean.theme
+expect theme "Ozean"
+inspect on
+inspect expect changes 0
+# ---- the linked styles
+inspect set style classic
+expect style classic
+inspect expect value style "classic"
+inspect tab look
+window 2147422208
+click #0x07FD0021
+click "kde"
+window any
+expect style kde
+inspect expect changes 1
+shot build/insp/demo_kde.png
+shot build/insp/demo_kde_tool.png window 2147422208
+inspect undo
+expect style classic
+inspect undo
+expect style winui
+inspect expect changes 0
+inspect expect redo on
+# ---- over Ozean: a token and the corners; the theme keeps its name and its other keys
+inspect set token bg #E8F0FF
+expect token bg #E8F0FF
+expect token text #0B2A33
+expect theme "Ozean"
+expect "Ozean" checked
+inspect expect redo off
+inspect set radius 2
+inspect expect list "radius=2"
+inspect save build/insp/demo.theme
+inspect expect message "Gespeichert: build/insp/demo.theme"
+shot build/insp/demo_edit.png
+# the style and dark: lines of code in the change list
+inspect set style macos
+expect style macos
+inspect set mode dark
+expect token bg #0E1E24
+inspect expect list "#   ui.set_style(\"macos\");"
+inspect expect list "#   ui.theme_set(1);"
+inspect expect list "bg=#E8F0FF"
+inspect expect changes 4
+# ---- everything back: Ozean as the app set it
+inspect reset
+inspect expect changes 0
+expect theme "Ozean"
+expect style winui
+expect token bg #EAF3F5
+expect "Schaltfläche" rect * * * 36
+# the saved file: Ozean with the edits
+theme file build/insp/demo.theme
+expect theme error none
+expect theme "Ozean"
+expect token bg #E8F0FF
+expect token text #0B2A33
+expect "Schaltfläche" rect * * * 36
+theme none
+inspect off
+expect_nowarn

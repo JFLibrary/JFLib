@@ -2,10 +2,10 @@
 // the session's input recorded, replayed after a restart, the state outside the app carried
 // over, the watcher's requests and a failed build shown in the inspector
 //
-// Only in development builds of the desktop targets (build_rs.py gives `ui` --cfg jfgui_dev;
-// never with --release, for the browser or Android) and only when the watcher set
-// jfgui_HOTRELOAD=DIR.  Otherwise the runtime's hooks test a flag that is constant false:
-// nothing is recorded, read or drawn.
+// Only in development builds of the desktop targets (build_rs.py gives `ui` --cfg jfgui_dev in
+// every development build, never with --release; the browser and Android leave it out) and
+// only when the watcher set jfgui_HOTRELOAD=DIR.  Otherwise the runtime's hooks test a flag
+// that is constant false: nothing is recorded, read or drawn.
 //
 // DIR, the session (shared with the watcher):
 //   events.log   the session's input, appended by every run (records below); a start replays
@@ -56,7 +56,7 @@ use plat::Event;
 pub(crate) const HR_EXIT_DIVERGED: i32 = 3;
 
 // development builds of the desktop targets (--cfg jfgui_dev); elsewhere the hooks fold away
-const DEV: bool = cfg!(jfgui_dev);
+const DEV: bool = cfg!(all(jfgui_dev, not(any(target_arch = "wasm32", target_os = "android"))));
 
 const PH_OFF: u8 = 0;
 const PH_REPLAY: u8 = 1; // from the start until the log was replayed

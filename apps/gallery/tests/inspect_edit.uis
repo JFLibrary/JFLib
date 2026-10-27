@@ -1,0 +1,241 @@
+# the live inspector's editing (ui/inspect_edit.rs, ROADMAP §11 stages 2 and 3; development
+# builds): theme colours, accent, corners, spacing, control height, text sizes and font, scale,
+# text scale, light / dark / high contrast, language -- by script and through the tool window;
+# undo, redo, reset; the changes saved as a theme file and read back, copied as a list; with
+# every change reset and the inspector closed the app renders as before.  The selected widget
+# operated through synthetic input (click, drag, value, typed text, cmd).  The inspector's
+# window is 2147422208 (0x7FFF1000); ids in it: 0x07FD0010 the token's hex box, 0x07FD0012 its
+# picker (spectrum 0x27FD0012, hue 0x17FD0012), 0x07FD0026 the radius slider, 0x07FD0028 the
+# control height, 0x07FD0031 / 32 body.size / body_strong.size, 0x07FD0022 the mode,
+# 0x07FD0101 the radius' reset, 0x07FD0802 the spacing's reset in the change list
+theme light
+move 700,300
+wait 300
+inspect snap
+inspect on
+inspect expect changes 0
+inspect expect undo off
+inspect expect redo off
+inspect expect list "Das hast du geändert"
+# ---- a colour token by script: the colours in use (light)
+inspect set token bg #E0F0E0
+expect token bg #E0F0E0
+inspect expect changes 1
+inspect expect value token bg "#E0F0E0"
+inspect expect list "bg=#E0F0E0"
+inspect expect undo on
+# ---- the tab "Farben": a row of the list, its hex box (Enter takes it)
+inspect tab colors
+window 2147422208
+click text:"T_CARD"
+click #0x07FD0010
+key ctrl+a
+type "#FFF8E0\n"
+window any
+expect token card #FFF8E0
+inspect expect changes 2
+shot build/insp/edit_colors.png window 2147422208
+# the picker: one drag over its spectrum is one step (undone at once)
+window 2147422208
+click button:"Farbwähler"
+drag #0x27FD0012 #0x17FD0012
+window any
+expect token card #000000
+inspect expect changes 2
+inspect undo
+expect token card #FFF8E0
+# its reset button: the style's colour again
+window 2147422208
+click button:"Zurücksetzen: T_CARD (Hell)"
+window any
+expect token card #B3FFFFFF
+inspect expect changes 1
+# undo and redo through the bar and with Ctrl+Z / Ctrl+Y (the tool window has the keys)
+window 2147422208
+click button:"Rückgängig"
+window any
+expect token card #FFF8E0
+window 2147422208
+click button:"Wiederholen"
+expect token card #B3FFFFFF
+key ctrl+z
+expect token card #FFF8E0
+key ctrl+y
+expect token card #B3FFFFFF
+window any
+# ---- T_ACCENT's row edits the accent the style derives its ramp from
+inspect set token accent #6B4FBB
+inspect expect value accent "#6B4FBB"
+inspect expect list "accent=#6B4FBB"
+inspect reset accent
+inspect expect value accent "#005FB8"
+# ---- the tab "Darstellung" through its controls: corners (the row's reset, Ctrl+Z), a text
+# size (further down: the wheel over the view, its smooth scrolling), the mode, the control
+# height
+inspect tab look
+window 2147422208
+click #0x07FD0026
+key right
+window any
+inspect expect value radius "17 DIP"
+inspect expect list "radius=17"
+window 2147422208
+click #0x07FD0101
+window any
+inspect expect value radius "vom Stil"
+window 2147422208
+key ctrl+z
+window any
+inspect expect value radius "17 DIP"
+window 2147422208
+wheel #0x07FD0026 -600
+wait 500
+click #0x07FD0031
+key ctrl+a
+type "16\n"
+window any
+inspect expect value size body "16 DIP"
+window 2147422208
+wheel #0x07FD0031 600
+wait 500
+click #0x07FD0022
+click "Dunkel"
+window any
+inspect expect value mode "Dunkel"
+expect token bg #202020
+inspect expect changes 4
+window 2147422208
+click #0x07FD0022
+click "Hell"
+window any
+inspect expect value mode "Hell"
+expect token bg #E0F0E0
+inspect expect changes 3
+window 2147422208
+click #0x07FD0028
+key ctrl+a
+type "40\n"
+window any
+expect #100 rect * * * 40
+inspect expect value height "40 DIP"
+shot build/insp/edit_look.png window 2147422208
+shot build/insp/edit_main.png
+# ---- by script: spacing, font (a file; one that cannot be loaded changes nothing), high
+# contrast, language (the library's texts in English, the inspector's too), text scale, scale
+inspect set spacing 150
+inspect expect value spacing "150 %"
+inspect set font styles/jfoffice/assets/Inter-Regular.ttf
+inspect expect value font "styles/jfoffice/assets/Inter-Regular.ttf"
+inspect expect message none
+inspect set font build/insp/no-such-font.ttf
+inspect expect message "build/insp/no-such-font.ttf"
+inspect expect value font "styles/jfoffice/assets/Inter-Regular.ttf"
+inspect expect changes 6
+inspect set mode contrast
+inspect expect value mode "Hoher Kontrast"
+inspect set mode light
+inspect expect value mode "Hell"
+inspect set lang en
+inspect expect value lang "English (en)"
+expect tab:"Appearance" exists
+expect button:"Reset all" exists
+shot build/insp/edit_en.png window 2147422208
+inspect undo
+expect tab:"Darstellung" exists
+inspect set textscale 130
+inspect expect value textscale "130 %"
+inspect set scale 150
+inspect expect value scale "150 %"
+expect #100 rect * * * 52
+shot build/insp/edit_scale.png
+inspect expect changes 8
+# one change reset in the change list (at the end of the tab)
+window 2147422208
+wheel #0x07FD0026 -9600
+wait 800
+shot build/insp/edit_changes.png window 2147422208
+click #0x07FD0802
+window any
+inspect expect value spacing "100 %"
+inspect expect changes 7
+# ---- take over: the change list, a theme file (written and read back)
+clip clear
+inspect list
+inspect expect copied "# Das hast du geändert\n# Theme-Datei:\n[light]\nbg=#E0F0E0\n[metrics]\nradius=17\ncontrol_height=40\n[text]\nfamily=styles/jfoffice/assets/Inter-Regular.ttf\nbody.size=16\n# Im Code:\n#   --scale 150\n#   ui.set_text_scale(130);\n"
+clip clear
+window 2147422208
+click button:"Liste kopieren"
+window any
+inspect expect copied "# Das hast du geändert\n# Theme-Datei:\n[light]\nbg=#E0F0E0\n[metrics]\nradius=17\ncontrol_height=40\n[text]\nfamily=styles/jfoffice/assets/Inter-Regular.ttf\nbody.size=16\n# Im Code:\n#   --scale 150\n#   ui.set_text_scale(130);\n"
+inspect expect message "Kopiert"
+inspect save build/insp/edit.theme
+inspect expect message "Gespeichert: build/insp/edit.theme"
+window 2147422208
+click button:"Als Theme speichern"
+window any
+inspect expect message "Gespeichert: mem://inspector/inspector.theme"
+# every change back at once: the style's look; the saved files give the theme again
+window 2147422208
+click button:"Alles zurücksetzen"
+window any
+inspect expect changes 0
+expect theme none
+expect token bg #F3F3F3
+inspect expect value scale "100 %"
+inspect expect value textscale "100 %"
+theme file build/insp/edit.theme
+expect token bg #E0F0E0
+expect #100 rect * * * 40
+theme none
+theme file mem://inspector/inspector.theme
+expect token bg #E0F0E0
+expect #100 rect * * * 40
+theme none
+expect theme error none
+# ... and back once more: undo the reset, redo it
+inspect undo
+inspect expect changes 7
+expect token bg #E0F0E0
+inspect redo
+inspect expect changes 0
+expect theme none
+# ---- closed: the app renders byte for byte as before, the inspector does no work
+inspect off
+move 700,300
+wait 300
+inspect expect same
+inspect expect idle
+# ---- the selected widget operated: a slider's value (as a screen reader sets it), a click,
+# typed text, a drag, a command
+inspect on
+inspect select #140
+inspect do value 75
+expect #140 value 75
+expect text:"Wert: 75 %   Klicks: 0" exists
+inspect select button:"Standard"
+inspect do click
+expect text:"Wert: 75 %   Klicks: 1" exists
+window 2147422208
+click button:"Bedienen"
+click button:"Klicken"
+window any
+expect text:"Wert: 75 %   Klicks: 2" exists
+inspect expect changes 0
+inspect select #700
+inspect do type "hallo"
+expect #700 text "hallo"
+inspect select #140
+inspect do drag -50 0
+expect #140 value 22
+window 2147422208
+click button:"Bedienen"
+click button:"Ziehen"
+window any
+expect #140 value 22
+inspect do cmd 150
+expect token bg #202020
+inspect do cmd 150
+expect token bg #F3F3F3
+shot build/insp/edit_ops.png window 2147422208
+inspect off
+expect_nowarn

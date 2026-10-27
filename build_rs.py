@@ -56,7 +56,9 @@ for --release, build/<profile>/<target> for --profile (so the variants never reb
 other).  The assembly reference builds into legacy/build (legacy/build.py).
 
 Development builds (default): incremental, 16 codegen units, opt-level 2 for the compute
-crates (gfx, text, simd, fx, img_*) and 1 for the rest (quick rebuilds).  --release:
+crates (gfx, text, simd, fx, img_*) and 1 for the rest (quick rebuilds), --cfg jfgui_dev for ui
+(what only a development build has: the live inspector's editing, ui/inspect_edit.rs; hot
+reload, ui/hotreload.rs).  --release:
 opt-level 2, one codegen unit, fat LTO (as fast as opt-level 3 and 6-10 % smaller,
 rewrite/REPORT.md section 2; R13 measured with 3).  A crate is rebuilt only when
 its sources, its dependencies or the flags changed (hash stamps in <out>/<target>/.stamp).
@@ -833,8 +835,10 @@ class Builder:
             # development: compute crates optimised (pixels, codecs stay fast in tests), the
             # rest quick to compile
             f += ["-C", f"opt-level={2 if compute_crate(name) else 1}", "-C", "codegen-units=16"]
-            if name == "ui" and self.target in ("win", "linux"):
-                f += ["--cfg", "jfgui_dev"]     # hot reload (`watch`, lib/ui/hotreload.rs): never in --release
+            # what only a development build has (never --release): the inspector's editing
+            # (ui/inspect_edit.rs), hot reload (ui/hotreload.rs, `watch`; desktop targets only)
+            if name == "ui":
+                f += ["--cfg", "jfgui_dev"]
         if self.target == "web" and self.web_mode != "scalar":
             f += ["-C", "target-feature=+simd128" + (",+atomics,+bulk-memory" if self.web_mode == "threads" else "")]
         if self.target == "web" and self.web_mode == "threads":

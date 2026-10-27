@@ -97,9 +97,15 @@
 //   agent on|off   agent call ACTION [JSON]   agent expect ok|error CODE
 // The live inspector (inspect.rs):
 //   inspect on|off|toggle|arm|disarm|pick|copy|snap   inspect select S|none
-//   inspect option outlines|order|dirty on|off   inspect tab widgets|frame|colors
+//   inspect option outlines|order|dirty on|off   inspect tab widgets|frame|colors|look
 //   inspect expect open|closed|pick on|off|flash on|off|idle|same|excluded|selected S|
 //                  hover S|selector "s"|copied "s"
+//   ... editing in it (development builds, inspect_edit.rs; KEY = token NAME | accent |
+//   radius | spacing | height | size STYLE | font | mode | style | lang | scale | textscale):
+//   inspect set KEY VALUE   inspect reset [KEY]   inspect undo|redo   inspect save PATH
+//   inspect list (copy the change list)   inspect do click|drag DX DY|value N|type "s"|cmd ID
+//   [ARG] (the selected widget)   inspect expect changes N|list "s"|value KEY "s"|undo on|off|
+//   redo on|off|message "s"|none
 // Selectors S:  #123  (widget id)   "Label"   kind:"Label"   X,Y  (a point in DIP)
 // A label must match exactly one widget (plain text is ignored when a control with the
 // same label exists; matches in several windows: the topmost window, then the topmost

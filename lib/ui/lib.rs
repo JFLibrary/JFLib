@@ -136,6 +136,12 @@ pub mod i18n;
 mod ids;
 // the live inspector: overlay and tool window (--inspect, F12 / Ctrl+Shift+I)
 mod inspect;
+// ... its editing: development builds only (build_rs.py --cfg jfgui_dev), --release reads only
+#[cfg(jfgui_dev)]
+mod inspect_edit;
+#[cfg(not(jfgui_dev))]
+#[path = "inspect_edit_off.rs"]
+mod inspect_edit;
 // keyboard navigation: focus groups, panes and windows (F6), splitters (F8), the menu key
 mod kbnav;
 pub use ids::{ID_HASH_BASE, wid, wid_path};
@@ -391,6 +397,8 @@ pub(crate) struct Mods {
     pub(crate) ins: inspect::S,
     /// (ROADMAP §11) hot reload: the session's record and replay (hotreload.rs)
     pub(crate) hr: hotreload::S,
+    /// (ROADMAP §11) the inspector's editing: the changes, their history (inspect_edit.rs)
+    pub(crate) ied: inspect_edit::S,
     /// (ROADMAP §6) ui.svg's draw objects, the faces of SVG text (imgview.rs)
     pub(crate) svg: imgview::S,
     /// (ROADMAP §4) hyphenation: languages, dictionaries (hyph.rs)
