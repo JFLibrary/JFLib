@@ -1,0 +1,22 @@
+# -e CODE: a one-liner; the arguments after it are config.args
+args: -e "print(1 + 2, \"zwei\".upper())"
+--- stdout
+3 ZWEI
+===
+args: -e "print(config.args, config.script)" a b
+--- stdout
+["a", "b"] -e
+===
+args: -e "let a = [1, 2]; print(a[5])"
+exit: 1
+--- stderr
+-e:1:24: Fehler: Index 5 liegt außerhalb der Liste (Länge 2)
+    let a = [1, 2]; print(a[5])
+                           ^
+  im Hauptprogramm (1:24)
+===
+args: -e
+exit: 2
+--- stderr
+jfs: -e braucht einen Wert
+(jfs --help zeigt die Optionen)

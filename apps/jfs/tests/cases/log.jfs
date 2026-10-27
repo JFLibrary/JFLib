@@ -1,0 +1,10 @@
+// log.jfs -- print goes to stdout, log to stderr
+print("one")
+log("two", 2, [3])
+log.info("info")
+log.debug("debug")
+log.warn("warn")
+log.error({code: 5})
+let f = log
+f("log as a value")
+print("three")

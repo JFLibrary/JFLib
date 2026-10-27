@@ -1,0 +1,22 @@
+// timers.jfs -- timer.after, timer.every and timer.cancel; with --virtual-time every now() is exact
+print("start", now())
+timer.after(30, fn() { print("after 30 at", now()) })
+timer.after(10, fn() {
+  print("after 10 at", now())
+  timer.after(5, fn() { print("nested at", now()) })
+})
+timer.after(10, fn() { print("second after 10 at", now()) })
+let n = 0
+let id = timer.every(7, fn() {
+  n += 1
+  print("every #${n} at", now())
+  if n == 3 {
+    print("cancel:", timer.cancel(id))
+  }
+})
+let gone = timer.after(20, fn() { print("never") })
+print("cancel before:", timer.cancel(gone), "again:", timer.cancel(gone))
+timer.after(0.5, fn() { print("half a millisecond:", now()) })
+try { timer.after(-1, fn() { }) } catch e { print("error:", e) }
+try { timer.every(5, "no function") } catch e { print("error:", e) }
+print("top level done at", now())

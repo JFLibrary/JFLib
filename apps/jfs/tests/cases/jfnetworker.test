@@ -1,0 +1,15 @@
+# net, dns, http and metrics belong to JFNetworker: they compile, and calling them throws a
+# catchable error; uncaught it ends the program
+args: {dir}/jfnetworker.jfs
+exit: 1
+--- stdout
+caught: net.listen gibt es nur in JFNetworker, nicht im Runner jfs
+caught: net.udp gibt es nur in JFNetworker, nicht im Runner jfs
+caught: dns.resolve gibt es nur in JFNetworker, nicht im Runner jfs
+caught: http.request gibt es nur in JFNetworker, nicht im Runner jfs
+caught: metrics.inc gibt es nur in JFNetworker, nicht im Runner jfs
+--- stderr
+{dir}/jfnetworker.jfs:7:6: Fehler: http.serve gibt es nur in JFNetworker, nicht im Runner jfs
+    http.serve(8080, fn(req, res) { return "hello" })
+         ^
+  im Hauptprogramm (7:6)

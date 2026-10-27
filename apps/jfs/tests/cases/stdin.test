@@ -1,0 +1,19 @@
+# - : the script from standard input, then its arguments
+args: - eins
+--- stdin
+// a script on standard input
+let words = ["jfs", "reads", "stdin"]
+print(words.join(" "), config.args)
+--- stdout
+jfs reads stdin ["eins"]
+===
+# its messages name <stdin>
+args: -
+exit: 1
+--- stdin
+print(1)
+print(nope)
+--- stderr
+<stdin>:2:7: Fehler: Unbekannter Name nope
+    print(nope)
+          ^^^^

@@ -1,0 +1,45 @@
+# --disk FILE: disk.put stores JSON values in FILE (one key per line, sorted) ...
+args: --disk {tmp}/disk.json {dir}/disk_put.jfs
+--- stdout
+puts issued
+error: disk.put: der Schlüssel muss ein Text sein
+error: disk.get: der Rückruf muss eine Funktion sein: fn(err, ..)
+error: json.encode: Funktionen lassen sich nicht als JSON darstellen
+put user:2, err: nil
+--- file {tmp}/disk.json
+{
+  "count": 2.5,
+  "text": "Grüße \"aus\" jfs\n",
+  "user:1": {"name":"Anna","age":31},
+  "user:2": {"name":"Ben","tags":["a","b"]}
+}
+===
+# ... and the next run reads them back (callbacks in the order of the requests)
+args: --disk {tmp}/disk.json {dir}/disk_get.jfs
+--- stdout
+requests issued
+user:1 Anna 31 err: nil
+missing nil
+count 2.5 float
+scan user:1 Anna
+scan user:2 Ben
+deleted user:1: true
+text "Grüße \"aus\" jfs\n"
+deleted again: false
+--- file {tmp}/disk.json
+{
+  "count": 2.5,
+  "text": "Grüße \"aus\" jfs\n",
+  "user:2": {"name":"Ben","tags":["a","b"]}
+}
+===
+# without --disk the values live in memory
+args: -e "disk.put(\"k\", [1]); disk.get(\"k\", fn(err, v) { print(\"in memory:\", v) })"
+--- stdout
+in memory: [1]
+===
+# a file that is no JSON object: a wrong command line
+args: --disk {dir}/hello.jfs -e "print(1)"
+exit: 2
+--- stderr
+jfs: --disk {dir}/hello.jfs: json.decode: Hier fehlt ein Wert (Zeile 1, Spalte 1)

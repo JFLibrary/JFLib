@@ -1,0 +1,9 @@
+// disk_put.jfs -- disk.put with and without a callback; callbacks run after the current code
+disk.put("user:1", {name: "Anna", age: 31})
+disk.put("user:2", {name: "Ben", tags: ["a", "b"]}, fn(err) { print("put user:2, err:", err) })
+disk.put("count", 2.5)
+disk.put("text", "Grüße \"aus\" jfs\n")
+print("puts issued")
+try { disk.put(1, 2) } catch e { print("error:", e) }
+try { disk.get("x") } catch e { print("error:", e) }
+try { disk.put("bad", fn() { }) } catch e { print("error:", e) }

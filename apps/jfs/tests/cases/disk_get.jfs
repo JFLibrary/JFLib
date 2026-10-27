@@ -1,0 +1,15 @@
+// disk_get.jfs -- reads back what disk_put.jfs stored (--disk FILE), deletes and scans
+disk.get("user:1", fn(err, u) { print("user:1", u.name, u.age, "err:", err) })
+disk.get("missing", fn(err, v) { print("missing", v) })
+disk.get("count", fn(err, v) { print("count", v, type(v)) })
+disk.scan("user:", fn(err, items) {
+  for k, v in items {
+    print("scan", k, v.name)
+  }
+})
+disk.delete("user:1", fn(err, had) {
+  print("deleted user:1:", had)
+  disk.delete("user:1", fn(err, had) { print("deleted again:", had) })
+})
+disk.get("text", fn(err, t) { print("text", json.encode(t)) })
+print("requests issued")
