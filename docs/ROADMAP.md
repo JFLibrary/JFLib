@@ -1682,8 +1682,8 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   Auswahl; es stiehlt keinen Fokus. Skriptbefehle `inspect …` (u. a. `expect same` / `idle`
   für „aus ändert nichts“), Tests `apps/gallery/tests/inspect.uis` und `inspect_rtl.uis`
   (Windows und Linux, auch mit `--verify-dirty`). Es fehlt: Bearbeiten im Inspektor (nächster
-  Eintrag) und Hot-Reload.
-- **P2** · *fehlt* · Hot-Reload und beschreibbarer Inspektor („Live-Edit“, wie das F12-Menü
+  Eintrag); Hot-Reload: Stufe 1 des nächsten Eintrags erledigt (2026-10-26).
+- **P2** · *teilweise* · Hot-Reload und beschreibbarer Inspektor („Live-Edit“, wie das F12-Menü
   eines Browsers), als Debug-Variante. Festgelegt am 2026-10-25: (a) Eine Art Hot-Reload: Code
   ändern, die laufende App zeigt die Änderung; die Elemente bleiben gebauter Rust-Code, nichts
   wird zur Laufzeit beschrieben oder interpretiert. (b) Nur als Debug-Variante und nur wenn
@@ -1713,3 +1713,26 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   ändert kein Bild (`inspect expect same` / `idle`); Änderungen im Inspektor gelten nur für die
   laufende Sitzung, bis man sie übernimmt. Tests: Skriptbefehle `inspect set …` /
   `inspect reset`, `apps/gallery/tests/inspect*.uis`.
+  Stufe 1 erledigt (2026-10-26, [GUIDE.md §30](GUIDE.md) „Hot reload“, `tools/hotreload.py`,
+  `lib/ui/hotreload.rs`): `build_rs.py watch NAME [--target win|linux] [-- ARGS]` beobachtet die
+  Quellen der App und aller Bibliotheks- und Stil-Crates, die sie linkt (Änderungszeiten per
+  `os.scandir` je Ordner abgefragt; `lib/plat/watch.rs` ist Rust und passt nicht in das
+  Python-Werkzeug), baut beim Speichern den Entwicklungs-Build und startet die App als Kopie
+  `NAME.hot[.exe]` in ihrer Sitzung `build/<t>/hot/NAME` neu. Nur im Entwicklungs-Build für Windows
+  und Linux (`--cfg jfgui_dev` für `ui`) und nur mit `jfgui_HOTRELOAD`: die App zeichnet ihre
+  Eingaben auf (die Felder von `--log-events` mit Zeit, dazu Fenstergröße und dpi, `UIC_ACTIVE`
+  und die Antworten der Zwischenablage); der nächste Start spielt sie vor dem ersten Warten ab
+  (virtuelle Uhr: Timer zu ihren Fristen, Animationen springen), Zwischenablage, Dateidialoge,
+  Töne und andere Programme des Systems bleiben dabei unberührt. Prüfung: jedes Drücken, Rad,
+  Loslassen, jede Taste und jeder Text muss dasselbe Widget erreichen wie bei der Aufnahme, sonst
+  „diverged“, Exit-Code 3 und frischer Start; Eingaben von außen (Ablegen aus anderen Programmen,
+  der Dateidialog des Systems, Ziehen hinaus) machen das Protokoll unabspielbar. Daneben bleiben
+  Fensterposition und -größe (`window.ini` über `jfgui_STATE`), Stil, Textskalierung und der
+  Inspektor mit Reiter, Optionen und Auswahl (Skript-Selektor) erhalten (`carry.ini`), auch bei
+  frischem Start. Schlägt der Bau fehl, läuft die alte Fassung weiter und der Fehler steht oben im
+  Inspektor („Bau fehlgeschlagen“), der sich dafür öffnet. Tests: `tools/tests/test_hotreload.py`
+  (der Beobachter mit einem Ersatzprogramm, läuft in der Suite; eine vorübergehende App gebaut,
+  aufgezeichnet, abgespielt, abgewichen, Bau gescheitert, headless auf Windows und Linux; die
+  Fensterschleife unter Windows auf einem eigenen Desktop, nie auf dem Bildschirm). Grenze: was das
+  Abspielen nicht kennt (Dateien, Netz, Zeitpunkte von Hintergrundaufgaben, Agenten-Aktionen, die
+  echte Uhr), kann nach dem Neustart abweichen.

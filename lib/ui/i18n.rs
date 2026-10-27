@@ -644,6 +644,19 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Zeichenbefehle", "Draw commands", "Commandes de dessin", "Comandos de dibujo", "Comandi di disegno", "Tekenopdrachten", "Polecenia rysowania", "أوامر الرسم", "פקודות ציור"],
     ["Glyphen-Cache", "Glyph cache", "Cache des glyphes", "Caché de glifos", "Cache dei glifi", "Glyphcache", "Pamięć podręczna glifów", "ذاكرة الحروف المؤقتة", "מטמון גליפים"],
     ["Hauptfenster", "Main window", "Fenêtre principale", "Ventana principal", "Finestra principale", "Hoofdvenster", "Okno główne", "النافذة الرئيسية", "חלון ראשי"],
+    // (ROADMAP §11) hot reload: a failed build in the inspector (hotreload.rs)
+    ["Bau fehlgeschlagen", "Build failed", "Échec de la compilation", "Error de compilación", "Compilazione non riuscita", "Build mislukt", "Kompilacja nie powiodła się", "فشل البناء", "הבנייה נכשלה"],
+    [
+        "Die laufende Fassung bleibt.",
+        "The running version stays.",
+        "La version en cours reste active.",
+        "La versión en ejecución se mantiene.",
+        "La versione in esecuzione resta attiva.",
+        "De draaiende versie blijft actief.",
+        "Działająca wersja pozostaje.",
+        "تبقى النسخة الجارية قيد التشغيل.",
+        "הגרסה הפועלת נשארת.",
+    ],
     // (ROADMAP §6) the image viewer (imgview.rs): the accessible name of ui.image_view
     ["Bild", "Image", "Image", "Imagen", "Immagine", "Afbeelding", "Obraz", "صورة", "תמונה"],
     // (L5) the line chart (chart.rs): its empty state and the words of its summary
