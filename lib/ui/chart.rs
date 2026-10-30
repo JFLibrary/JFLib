@@ -1407,7 +1407,9 @@ impl Ui {
     }
 
     /// ui_sparkline(id, values, color): area + line over the values (min .. max scaled)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn sparkline(&mut self, id: u32, values: &[f32], color: u32) {
+        let _src = self.src_scope();
         let r = self.place(self.dp(120), self.dp(32));
         let line = self.chart_color(color, 0);
         let area = (line & 0x00FF_FFFF) | 0x2E00_0000;
@@ -1439,7 +1441,9 @@ impl Ui {
     }
 
     /// ui_bar_chart(id, labels, series, stacked) -> the hovered column (-1 = none)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn bar_chart(&mut self, id: u32, labels: &[&str], series: &[BarSeries], stacked: bool) -> i32 {
+        let _src = self.src_scope();
         let r = self.place(self.dp(360), self.dp(180));
         let n = labels.len();
         // the largest column (stacked: the sums)
@@ -1555,7 +1559,9 @@ impl Ui {
     /// ui_donut(id, slices, center, sub): ring of slices (fractions of their sum) with a
     /// centre text (TS_SUBTITLE; TS_BODY_STRONG where that is wider than the hole) and a
     /// caption below it (left out where the hole is too low for both)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn donut(&mut self, id: u32, slices: &[DonutSlice], center: &str, sub: &str) {
+        let _src = self.src_scope();
         let s = self.dp(160);
         let r = self.place(s, s);
         let d = r[2].min(r[3]);
@@ -1632,7 +1638,9 @@ impl Ui {
 
     /// ui_legend(items): a colour dot and a label per item (colour 0 = palette by index),
     /// laid out in a wrapping row; an item wider than the row has its label cut with "…"
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn legend(&mut self, items: &[(&str, u32)]) {
+        let _src = self.src_scope();
         self.legend_marks(items, &[], 0);
     }
 
@@ -1861,7 +1869,9 @@ impl Ui {
     /// ui_line_chart(id, chart) -> the hovered series and the x it snapped to: series over
     /// time (or plain numbers) with axes, grid, legend, markers, thresholds and a hover card
     /// (see the module header of chart.rs)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn line_chart(&mut self, id: u32, c: &LineChart) -> Option<(usize, f64)> {
+        let _src = self.src_scope();
         let hc = self.high_contrast;
         let sep = self.m.value.decimal_sep;
         let lh = self.ts_line(TS_CAPTION);

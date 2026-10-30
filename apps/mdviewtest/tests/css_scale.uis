@@ -1,0 +1,12 @@
+#!args --page css --text-scale 150 --verify-dirty
+# the page with a style sheet at 150 % text: margins and padding grow with the text (the
+# layout is cached per text scale), borders keep their width, nothing overlaps
+size 1000 720
+theme light
+expect heading:"Gestaltete Seite" exists
+expect text:"Unsichtbar." missing
+shot build/mdviewtest/css_150.png
+key tab
+key pgdn
+shot build/mdviewtest/css_150_end.png
+expect_nowarn

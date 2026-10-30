@@ -645,7 +645,9 @@ impl Ui {
     }
 
     /// ui_richtext(id, doc, RT_*) -> EV_* (see the module header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn richtext(&mut self, id: u32, doc: &mut RichDoc, flags: u32) -> u32 {
+        let _src = self.src_scope();
         let ro = flags & RT_READONLY != 0;
         let stflags = self.take_flags();
         let r = self.place(self.dp(NAT_W), self.dp(NAT_H));
@@ -1237,7 +1239,9 @@ impl Ui {
     /// open the link flyout of richtext `id` (as Ctrl+K does): the url of the link at the
     /// caret or "https://"; OK sets it on the selection (without one: inserts it as linked
     /// text), "Entfernen" removes the link
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn richtext_link_dialog(&mut self, id: u32, doc: &RichDoc) {
+        let _src = self.src_scope();
         let mut v = self.m.rich.views.remove(&id).unwrap_or_default();
         self.rt_link_open(id, doc, &mut v);
         self.m.rich.views.insert(id, v);
@@ -1339,7 +1343,9 @@ impl Ui {
 
     /// ui_richtext_toolbar(id, editor, doc, RTB_*) -> EV_ACT when it changed doc (see the
     /// module header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn richtext_toolbar(&mut self, id: u32, editor: u32, doc: &mut RichDoc, groups: u32) -> u32 {
+        let _src = self.src_scope();
         let rev = doc.revision();
         let fmt = doc.current_fmt();
         let para = doc.current_para().clone();

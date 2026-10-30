@@ -892,7 +892,9 @@ impl Ui {
     /// dock_begin(id, &mut st, panels): open the dock area (always pair with dock_end; fill it
     /// with dock_next).  It takes the next place of the box (the whole rest when no size was
     /// set); panels: every panel the app has, each frame (titles and icons may change).
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn dock_begin(&mut self, id: u32, st: &mut DockState, panels: &[DockPanel]) {
+        let _src = self.src_scope();
         let mut rt = self.dk_take(id);
         let cur = &mut self.m.dock.cur;
         cur.retain(|&c| c != id); // (a dock_end the app left out)
@@ -946,7 +948,9 @@ impl Ui {
 
     /// dock_next(&mut st) -> the next place to fill (None: done): DOCK_CENTER, then the id of
     /// a shown panel; its content goes into a vertical box (it clips) until the next call
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn dock_next(&mut self, st: &mut DockState) -> Option<u32> {
+        let _src = self.src_scope();
         let id = *self.m.dock.cur.last()?;
         let mut rt = self.dk_take(id);
         self.dk_close(&mut rt);
@@ -985,7 +989,9 @@ impl Ui {
     }
 
     /// dock_end(&mut st) -> the user changed the layout in this pass (store st.save() then)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn dock_end(&mut self, st: &mut DockState) -> bool {
+        let _src = self.src_scope();
         let Some(id) = self.m.dock.cur.pop() else { return false };
         let mut rt = self.dk_take(id);
         self.dk_close(&mut rt);

@@ -1,0 +1,112 @@
+# the live inspector's sources (ui/inspect_src.rs, ROADMAP §11 stage 4; development builds): the
+# file and line where the app called the selected widget -- for a composite widget (number box,
+# combo box, the rows of a menu or a list, a dialog's buttons) the app's call, not the library's
+# inner one; the copy; "Im Editor öffnen" with the editor the script sets (never the user's): a
+# dry run builds the command line, a real start runs a harmless system program (whoami) on its
+# own.  Closed the inspector stores nothing and changes no pixel.
+theme light
+size 1000 1450
+move 700,300
+wait 300
+inspect snap
+# ---- closed and armed: no source is stored
+inspect expect idle
+inspect arm
+inspect expect idle
+# ---- open: every record of the page has a source in the gallery (no widget call of the
+# library is left unmarked), then some widget kinds one by one
+inspect on
+inspect expect sources "apps/gallery/"
+inspect select button:"Standard"
+inspect expect source "apps/gallery/main.rs:"
+inspect select checkbox:"Option A"
+inspect expect source "apps/gallery/main.rs:"
+inspect select #140
+inspect expect source "apps/gallery/main.rs:"
+inspect select #700
+inspect expect source "apps/gallery/sec_edit.rs:"
+# a number box: its inner text box reports the app's number_box call
+inspect select #702
+inspect expect source "apps/gallery/sec_edit.rs:"
+inspect select #8001
+inspect expect source "apps/gallery/sec_popup.rs:"
+# the rows of a list (list_item in the app's loop)
+inspect select listitem:"Eintrag 1"
+inspect expect source "apps/gallery/sec_list.rs:"
+inspect select none
+inspect expect source none
+# ---- closed again: the main window renders byte for byte as before, nothing is stored
+inspect off
+move 700,300
+wait 300
+inspect expect same
+inspect expect idle
+inspect on
+# an open menu: its rows are the app's menubar call
+click "Datei"
+inspect expect sources "apps/gallery/"
+inspect select menuitem:"Speichern unter…"
+inspect expect source "apps/gallery/sec_popup.rs:"
+click "Datei"
+# a combo box's open list
+click #8001
+inspect expect sources "apps/gallery/"
+key esc
+# a content dialog: dialog_buttons builds the buttons inside the library
+click "Dialog"
+click "Dialog öffnen"
+expect "Änderungen speichern?" open
+inspect expect sources "apps/gallery/"
+inspect select button:"Abbrechen"
+inspect expect source "apps/gallery/sec_win.rs:"
+key esc
+expect "Änderungen speichern?" missing
+# a widget of a tool window
+click "Werkzeugfenster"
+expect window 7600 open
+inspect expect sources "apps/gallery/"
+inspect select #7601
+inspect expect source "apps/gallery/sec_win.rs:"
+close window 7600
+# ---- the copy: "apps/gallery/main.rs:LINE" to the clipboard
+inspect select #140
+clip clear
+click button:"Quelle kopieren"
+inspect expect note "Kopiert"
+clip expect text
+shot build/insp/source.png window 2147422208
+# ---- "Im Editor öffnen": a script starts no editor it did not set
+inspect expect opened none
+inspect editor none
+click button:"Im Editor öffnen"
+inspect expect note "Kein Editor gefunden"
+inspect expect opened none
+# the editor's command line: {file} (absolute: below the repository), {line}, {col}
+inspect editor "stub-editor --line {line} {file}"
+inspect open dry
+inspect expect opened "stub-editor --line "
+inspect expect note "Geöffnet mit stub-editor --line "
+inspect editor "stub-editor -g {file}:{line}:{col}"
+inspect open dry
+inspect expect opened "main.rs:"
+# without {file} the file comes last; a word in quotes keeps its blanks
+inspect editor "'stub editor' --wait"
+inspect open dry
+inspect expect opened "\"stub editor\" --wait "
+# a program that does not exist: the start fails, the note says so
+inspect editor "jfgui-no-such-editor {file}"
+click button:"Im Editor öffnen"
+inspect expect note "Start fehlgeschlagen: jfgui-no-such-editor"
+inspect expect opened none
+# a real start: a harmless program of the system, on its own (nothing waits for it)
+inspect editor "whoami"
+inspect open
+inspect expect opened "whoami "
+inspect editor none
+# another selection: the note goes
+inspect select #700
+inspect expect note none
+shot build/insp/source_open.png window 2147422208
+inspect off
+inspect expect idle
+expect_nowarn

@@ -175,7 +175,9 @@ impl Cells {
 impl Ui {
     /// ui_hex_view(id, &mut st, data, marks) -> HexEv: bytes as hex and ASCII rows with
     /// marked ranges, a selection and a caret (see the module header of hexview.rs)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn hex_view(&mut self, id: u32, st: &mut HexState, data: &[u8], marks: &[HexMark]) -> HexEv {
+        let _src = self.src_scope();
         let mut out = HexEv::default();
         let len = data.len().min(u32::MAX as usize) as u32;
         // the font: the system's monospace at the size of body text, else the UI font

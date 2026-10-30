@@ -389,7 +389,9 @@ impl Ui {
 
     /// ui_timeline(id, &mut st, span, tracks) -> EV_*: a time axis, a lane of event ticks per
     /// track and a playhead (st.t) to seek with (see the module header of timeline.rs)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn timeline(&mut self, id: u32, st: &mut TimelineState, span: (f64, f64), tracks: &[TlTrack]) -> u32 {
+        let _src = self.src_scope();
         let n = tracks.len() as i32;
         let line = self.ts_line(TS_CAPTION);
         let axis_h = line + self.dp(10);

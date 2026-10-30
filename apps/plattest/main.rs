@@ -32,7 +32,11 @@
 //   plattest --test spawn                  (t_spawn.rs) spawn_self: a second plattest (--test
 //                                          spawned --marker FILE) writes FILE, waited for up to
 //                                          10 s (not in "all")
-//   plattest --test window                 (Rust only, t_window.rs, Windows) a real-window smoke
+//   plattest --test launch                 (t_spawn.rs) process::launch: a second plattest
+//                                          (--test launched --marker FILE WORDS...) writes its
+//                                          words to FILE, each as it was given; find; a
+//                                          missing program
+//   plattest --test window                (Rust only, t_window.rs, Windows) a real-window smoke
 //                                          test of the platform layer; the window closes itself
 //   plattest --test policy                 (t_policy.rs) the app's permissions: path rules,
 //                                          patterns, then a manifest installed in this
@@ -324,6 +328,8 @@ fn plattest() -> i32 {
         Some("dnd-x11") => t_dnd::t_dnd_x11,           // Linux: XDND against tools/platshared/dnd_x11.py
         Some("spawn") => t_spawn::t_spawn,       // plat-win
         Some("spawned") => t_spawn::t_spawned,   // plat-win
+        Some("launch") => t_spawn::t_launch,     // process::launch: a program on its own
+        Some("launched") => t_spawn::t_launched, // its program: writes its words
         Some("print") => t_print::t_print,             // plat-shared
         Some("printlayout") => t_print::t_printlayout, // plat-shared
         Some("printjob") => t_print::t_printjob,       // plat-shared

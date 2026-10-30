@@ -145,7 +145,9 @@ impl RibbonLayout {
 impl Ui {
     /// Start a style-sized ribbon (110 DIP by default). Pair with `ribbon_end`.
     /// All groups remain keyboard reachable; a scroll strip is the final fallback.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_begin(&mut self, id: u32, groups: &[RibbonGroup<'_>]) -> RibbonLayout {
+        let _src = self.src_scope();
         let m = self.style.ribbon_metrics();
         let py = if m.inset_y > 0 {
             m.inset_y as u32
@@ -166,12 +168,14 @@ impl Ui {
 
     /// Begin a group's controls when visible, or render its overflow button.
     /// Only call `ribbon_group_end` when this returns `Some`.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_group_begin(
         &mut self,
         layout: &RibbonLayout,
         index: usize,
         group: &RibbonGroup<'_>,
     ) -> Option<RibbonGroupMode> {
+        let _src = self.src_scope();
         let width = layout.group_width(index)?;
         let m = self.style.ribbon_metrics();
         let gap = if m.collapse_groups { 4 } else { 0 };
@@ -229,7 +233,9 @@ impl Ui {
     /// Finish controls and draw the inline group caption; closes overflow when appropriate.
     /// Flyouts already have their named opener, so no trailing caption is painted
     /// over a nested action menu emitted while building their controls.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_group_end(&mut self, mode: RibbonGroupMode, label: &str) {
+        let _src = self.src_scope();
         self.box_end();
         match mode {
             RibbonGroupMode::Inline(_) => {
@@ -245,6 +251,7 @@ impl Ui {
     /// `id` is an additional unique widget ID; `action_label` is its full semantic name.
     /// Activation is returned to the app, which opens its existing dialog. Disabled
     /// launchers retain their label and cannot be invoked through keyboard or agents.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_group_end_launcher(
         &mut self,
         mode: RibbonGroupMode,
@@ -253,6 +260,7 @@ impl Ui {
         action_label: &str,
         flags: u32,
     ) -> u32 {
+        let _src = self.src_scope();
         self.box_end();
         let caption = self.style.ribbon_metrics().caption_height;
         self.next_size(-1, caption);
@@ -275,7 +283,9 @@ impl Ui {
     }
 
     /// Finish the ribbon begun with `ribbon_begin`.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_end(&mut self) {
+        let _src = self.src_scope();
         let id = self.box_id();
         let m = self.style.ribbon_metrics();
         let py = if m.inset_y > 0 {
@@ -352,7 +362,9 @@ impl Ui {
 
     /// Compact ribbon action with clipped drawing, native focus and a full tooltip.
     /// `ST_ICON_ONLY`, `ST_LARGE`, `ST_CHECKED` and `ST_DISABLED` are supported.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_button(&mut self, id: u32, label: &str, icon: u32, flags: u32) -> u32 {
+        let _src = self.src_scope();
         let flags = flags | self.take_flags() | ST_SUBTLE | ST_COMPACT;
         let st = self.style;
         let mut sp = Sp {
@@ -388,14 +400,18 @@ impl Ui {
     /// Large ribbon action: the style draws its icon above a visible caption.
     /// It is one normal focusable, inspectable button. Use `next_size` to override
     /// its natural style size; checked/disabled flags keep their ordinary meaning.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_large_button(&mut self, id: u32, label: &str, icon: u32, flags: u32) -> u32 {
+        let _src = self.src_scope();
         let flags = flags | self.take_flags();
         self.ribbon_button(id, label, icon, (flags | ST_LARGE) & !ST_ICON_ONLY)
     }
 
     /// Ribbon-styled menu opener. `id` is also the popup identifier. Its natural
     /// dimensions, icon, menu indicator and enabled state come from the style.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_menu_button(&mut self, id: u32, label: &str, icon: u32, flags: u32) -> u32 {
+        let _src = self.src_scope();
         let flags = flags | self.take_flags();
         let ev = self.ribbon_button(id, label, icon, flags | ST_MENU);
         if flags & ST_DISABLED == 0 && (ev & EV_ACT != 0 || ev & EV_FOCUS != 0 && self.open_key()) {
@@ -418,6 +434,7 @@ impl Ui {
     /// Large split action with an icon hit area above its menu caption. Both
     /// parts remain independently focusable and discoverable through semantics.
     /// Pair the `menu_id` with a normal flyout. Alt+Down/F4 opens the caption menu.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_stacked_split_button(
         &mut self,
         id: u32,
@@ -427,6 +444,7 @@ impl Ui {
         icon: u32,
         flags: u32,
     ) -> u32 {
+        let _src = self.src_scope();
         let flags = flags | self.take_flags() | ST_LARGE | ST_COMPACT | ST_SUBTLE | ST_MENU;
         let st = self.style;
         let mut sp = Sp {
@@ -491,6 +509,7 @@ impl Ui {
     /// Returns primary EV_* flags plus EV_OPEN while the dropdown popup is open.
     /// Tab reaches both parts; Enter/Space activate the focused part. Alt+Down or
     /// unbound F4 on the main part forwards to the existing dropdown keyboard path.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_split_button(
         &mut self,
         id: u32,
@@ -500,6 +519,7 @@ impl Ui {
         icon: u32,
         flags: u32,
     ) -> u32 {
+        let _src = self.src_scope();
         let flags = flags | self.take_flags();
         let st = self.style;
         let mut sp = Sp {
@@ -540,7 +560,9 @@ impl Ui {
     /// Begin an inset horizontal gallery on an input-colored surface. The caller
     /// supplies its size and tiles; finish with `box_end`. The whole frame is painted
     /// before applying the three-DIP tile inset, including in dark themes.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_gallery_begin(&mut self, id: u32) {
+        let _src = self.src_scope();
         self.box_begin(id, BOX_H | BOX_FIXED | pad(3), 2);
         let r = self.box_rect();
         let inset = self.dp(3);
@@ -551,6 +573,7 @@ impl Ui {
 
     /// Typography preview tile for a style gallery; selection is exposed semantically.
     /// `typography` is a `TS_*` style; use `next_size` to set a compact gallery width.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_tile(
         &mut self,
         id: u32,
@@ -559,19 +582,24 @@ impl Ui {
         typography: u32,
         selected: bool,
     ) -> u32 {
+        let _src = self.src_scope();
         self.ribbon_font_tile(id, label, preview, typography, selected, None)
     }
 
     /// A gallery tile with an optional document font, 24.8-DIP size and ARGB ink.
     /// The surrounding control follows the application theme; the sample stays document-colored.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_font_tile(&mut self, id: u32, label: &str, preview: &str, typography: u32,
         selected: bool, face: Option<(u32, i32, u32)>) -> u32 {
+        let _src = self.src_scope();
         self.ribbon_sample_tile(id, label, preview, typography, selected, face.map(|(font, size, color)|
             RibbonSample { font, size, color, highlight: None, baseline_shift: 0, underline: false, strike: false }))
     }
     /// Style-gallery tile with explicit highlight, baseline and text decorations.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_sample_tile(&mut self, id: u32, label: &str, preview: &str, typography: u32,
         selected: bool, sample: Option<RibbonSample>) -> u32 {
+        let _src = self.src_scope();
         let flags = self.take_flags() | ST_SUBTLE | if selected { ST_CHECKED } else { 0 };
         let r = self.place(self.dp(106), self.dp(62));
         let ev = self.behave(

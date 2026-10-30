@@ -10,11 +10,17 @@
 // linear time; the list's heights (Fenwick sums, positions, insertions above the anchor); the
 // view's accessibility tree in a headless runtime (headings with their level); forms (fields,
 // labels, choices, task boxes of list items, the values in the state, the data a form sends,
-// reset) and in a headless runtime the fields' records and the images the app supplies.
+// reset) and in a headless runtime the fields' records and the images the app supplies; the
+// element tree of HTML documents (md_dom.rs: how HTML becomes elements, selectors, the
+// elements of blocks and fields), its changes (in place and all again giving the same blocks,
+// also for 300 random changes), the view across changes (the fields' values, the focus, the
+// place, the selection) and their cost (changes in place, deep trees, many siblings and ids,
+// long selectors within time limits); the style sheets (the cascade, inheritance, boxes, what
+// is left out, physical sides in a right-to-left document, adversarial sheets).
 // Prints FAIL lines and a summary; the exit code is the number of failures.
 
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
 use ui::*;
@@ -604,9 +610,498 @@ fn form_view(t: &mut T) {
     t.eq(io.borrow().asked.len(), 4, "nothing asked twice (http: and https: are two addresses)");
 }
 
+// the element tree of an HTML document (md_dom.rs): how HTML becomes elements, queries by
+// selectors, what the blocks know of their elements
+fn dom(t: &mut T) {
+    t.group = "dom";
+    let d = MdDoc::html(concat!(
+        "<html><head><title>T &amp; t</title><style>p { color: red }</style></head><body>",
+        "<h1 id=top class=\"title big\">Titel</h1><div id=main><p class=note>Eins <b>fett</b></p><p>Zwei<p>Drei</div>",
+        "<ul id=list><li>a<li>b <i>c</i></ul><table><tr><td>x<td>y<tr><td>z</table><p>a</b>b</p><select><option>o<option>p</select>",
+        "<!-- weg --></body></html>"
+    ));
+    let txt = |v: Vec<MdNode>| v.iter().map(|&n| d.text_of(n)).collect::<Vec<_>>();
+    t.eq(d.tag(d.root()), "#document", "the root");
+    let top = d.by_id("top").unwrap_or_default();
+    t.eq(d.tag(top), "h1", "by id");
+    t.check(d.has_class(top, "big") && !d.has_class(top, "bi") && d.attr(top, "CLASS") == Some("title big"), "classes and attributes");
+    t.eq(txt(d.select("#main > p")), alloc::vec![String::from("Eins fett"), String::from("Zwei"), String::from("Drei")], "a <p> ends at the next one");
+    t.eq(txt(d.select("li")), alloc::vec![String::from("a"), String::from("b c")], "<li> ends at the next one");
+    t.eq(txt(d.select("tr")), alloc::vec![String::from("xy"), String::from("z")], "rows and cells end at their like");
+    t.eq(txt(d.select("option")), alloc::vec![String::from("o"), String::from("p")], "options");
+    t.eq(d.select(".note b").len(), 1, "descendant");
+    t.eq((d.select("div > b").len(), d.select("div > p > b").len(), d.select("body p b").len()), (0, 1, 1), "child");
+    t.eq(d.select("h1, p").iter().map(|&n| d.tag(n)).collect::<Vec<_>>(), alloc::vec!["h1", "p", "p", "p", "p"], "a list in document order");
+    t.eq((d.select("[class~=big]").len(), d.select("[id^=ma]").len(), d.select("p[class]").len(), d.select("*").len() > 20), (1, 1, 1, true), "attributes, *");
+    t.eq((d.select("p:first-child").len(), d.select("h1 + div").len(), d.select("p,").len(), d.select("").len()), (0, 0, 0, 0), "unsupported: nothing");
+    t.eq(d.select_first("p").map(|n| d.text_of(n)), Some(String::from("Eins fett")), "select_first");
+    t.check(d.matches(top, "body > .title#top") && !d.matches(top, "div h1"), "matches");
+    t.eq(d.select_in(d.by_id("main").unwrap_or_default(), "b").len(), 1, "select_in");
+    let title = d.select_first("title").unwrap_or_default();
+    t.eq(d.text_of(title), String::from("T & t"), "the title: raw text, decoded");
+    t.eq(d.text_of(d.select_first("style").unwrap_or_default()), String::from("p { color: red }"), "a style element: raw");
+    t.check(!d.plain().contains("T & t") && !d.plain().contains("color"), "the head is not shown");
+    t.eq(d.select("p").iter().map(|&n| d.text_of(n)).last(), Some(String::from("ab")), "a stray inline end tag is dropped");
+    t.eq(d.inner_html(d.by_id("list").unwrap_or_default()), String::from("<li>a</li><li>b <i>c</i></li>"), "inner_html");
+    t.eq(d.children(top).len(), 1, "children");
+    t.eq(d.parent(top).map(|p| d.tag(p).to_string()), Some(String::from("body")), "parent");
+    let ps = d.select("#main > p");
+    t.check(ps.len() == 3 && d.next_sibling(ps[0]) == Some(ps[1]) && d.prev_sibling(ps[1]) == Some(ps[0]), "siblings");
+    // the blocks name their elements
+    let b = d.blocks().iter().find(|b| b.text == "Zwei").map(|b| b.node);
+    t.eq(b, ps.get(1).copied(), "a block's element");
+    t.eq(d.blocks().iter().find(|b| b.text.starts_with('x')).map(|b| d.tag(b.node).to_string()), Some(String::from("tr")), "a row's element");
+    let f = MdDoc::html("<form id=f><input id=i name=a><select id=s><option>x</select></form>");
+    t.eq(f.fields().iter().map(|x| f.attr(x.node, "id").unwrap_or("").to_string()).collect::<Vec<_>>(), alloc::vec![String::from("i"), String::from("s")], "a field's element");
+    t.eq(f.field_of(f.by_id("s").unwrap_or_default()), Some(1), "field_of");
+    t.eq(f.forms().first().map(|x| x.node), f.by_id("f"), "a form's element");
+    // hidden elements are not shown
+    let h = MdDoc::html("<p>a</p><p hidden>b</p><p style=\"color:red; display: none\">c</p><div style=\"display:block\">d</div>");
+    t.eq(texts(&h), alloc::vec![String::from("a"), String::from("d")], "hidden, display:none");
+    // Markdown documents have no elements
+    let mut m = md("# x");
+    t.check(m.root().is_none() && m.select("h1").is_empty() && m.create_element("p").is_none(), "Markdown: no elements");
+}
+
+// a document's blocks as a full derivation from its tree gives them (an empty element added at
+// the end and freed again: every block again)
+fn rederived(d: &MdDoc) -> MdDoc {
+    let mut c = d.clone();
+    let root = c.root();
+    let e = c.create_element("span");
+    c.insert(root, None, e);
+    c.update();
+    c.free(e);
+    c.update();
+    c
+}
+
+// changes of the elements and the blocks that follow
+fn dom_changes(t: &mut T) {
+    t.group = "dom changes";
+    let mut d = MdDoc::html("<h1>A</h1><p id=s>Stand: <b>0</b> <span class=x>!</span></p><p>B</p><ul id=l><li>1</li></ul>");
+    let b0 = d.blocks().to_vec();
+    let s = d.by_id("s").unwrap_or_default();
+    let bold = d.select_first("#s b").unwrap_or_default();
+    t.check(d.set_text(bold, "1") && d.changed(), "changed");
+    t.check(!d.blocks()[1].text.contains('1'), "the blocks follow at update");
+    t.check(d.update() && !d.changed() && !d.update(), "update");
+    t.eq(markup(&d, 1), String::from("Stand: <b>1</b> !"), "the text in place");
+    t.check(d.blocks()[0] == b0[0] && d.blocks()[2] == b0[2], "the other blocks are the same");
+    t.eq(d.blocks().to_vec(), rederived(&d).blocks().to_vec(), "in place = every block again");
+    // classes and attributes of inline elements (in place), of a block (all again)
+    let x = d.select_first(".x").unwrap_or_default();
+    d.set_attr(x, "style", "color:#ff0000");
+    d.update();
+    t.eq(d.blocks()[1].spans.last().map(|s| s.color), Some(0xFFFF_0000), "an inline element's style");
+    t.check(d.add_class(s, "neu") && d.has_class(s, "neu") && d.attr(s, "class") == Some("neu"), "add_class");
+    t.check(!d.toggle_class(s, "neu") && d.attr(s, "class") == Some(""), "toggle_class");
+    d.set_attr(s, "style", "text-align:center");
+    d.update();
+    t.eq(d.blocks()[1].align, 1, "a block's own attribute");
+    t.check(d.remove_attr(s, "style") && !d.remove_attr(s, "style"), "remove_attr");
+    d.update();
+    t.eq(d.blocks()[1].align, 0, "removed");
+    // structure
+    let l = d.by_id("l").unwrap_or_default();
+    let li = d.create_element("li");
+    let tx = d.create_text("0");
+    t.check(!d.attached(li) && d.alive(li) && d.insert(li, None, tx), "a new element is not in the document");
+    let first = d.children(l).first().copied();
+    t.check(d.insert(l, first, li) && d.attached(tx), "insert before");
+    d.update();
+    t.eq(texts(&d), alloc::vec![String::from("A"), String::from("Stand: 1 !"), String::from("B"), String::from("0"), String::from("1")], "a list item at the top");
+    t.eq(d.blocks().iter().map(|b| b.marker).collect::<Vec<_>>(), alloc::vec![MK_NONE, MK_NONE, MK_NONE, MK_BULLET, MK_BULLET], "its marker");
+    t.check(d.remove(li) && d.alive(li) && !d.attached(li) && !d.remove(li), "remove keeps the node");
+    d.update();
+    t.eq(texts(&d).len(), 4, "removed");
+    t.check(d.insert(l, None, li), "inserted again");
+    d.update();
+    t.eq(texts(&d).last().cloned(), Some(String::from("0")), "at the end");
+    t.check(d.free(li) && !d.alive(li) && !d.alive(tx) && !d.free(li), "free");
+    let nw = d.create_element("p");
+    t.check(!d.alive(li) && d.alive(nw) && nw != li, "a freed slot gives a new handle");
+    t.check(!d.insert(li, None, nw) && !d.insert(nw, None, d.root()) && !d.insert(s, Some(l), nw), "no insert into a freed node, of the root, before no child");
+    let p = d.create_element("p");
+    let q = d.create_element("p");
+    d.insert(p, None, q);
+    t.check(!d.insert(q, None, p) && !d.insert(p, None, p), "no cycles");
+    t.check(d.create_element("a b").is_none() && d.create_element("1x").is_none() && !d.set_attr(s, "a=b", "x"), "names that are none");
+    // hidden and shown again
+    d.set_attr(s, "hidden", "");
+    d.update();
+    t.check(!texts(&d).iter().any(|x| x.starts_with("Stand")), "hidden");
+    d.remove_attr(s, "hidden");
+    d.update();
+    t.check(texts(&d).iter().any(|x| x.starts_with("Stand")), "shown again");
+    // inner HTML
+    let h = d.select_first("h1").unwrap_or_default();
+    t.check(d.set_inner_html(h, "X <i>y</i><img src=a.png alt=A>"), "set_inner_html");
+    d.update();
+    t.eq(markup(&d, 0), String::from("X <i>y</i>![A](a.png)"), "its blocks");
+    t.eq(d.inner_html(h), String::from("X <i>y</i><img src=\"a.png\" alt=\"A\">"), "its HTML");
+    // a field's element: the set's identity across renumbering
+    let mut f = MdDoc::html("<form><input id=a name=a><input id=b name=b></form>");
+    let nb = f.by_id("b").unwrap_or_default();
+    let n = f.create_element("input");
+    f.set_attr(n, "name", "z");
+    let fa = f.by_id("a");
+    let form = f.select_first("form").unwrap_or_default();
+    f.insert(form, fa, n);
+    f.update();
+    t.eq(f.fields().iter().map(|x| x.name.as_str()).collect::<Vec<_>>(), alloc::vec!["z", "a", "b"], "a field inserted");
+    t.eq(f.field_of(nb), Some(2), "the field of an element after it");
+    // random changes: in place and all again give the same blocks
+    let mut rng = Lcg(0xD0D0);
+    let mut d = MdDoc::html(&format!(
+        "<style>.a b {{ color: #ff0000 }} p.a {{ font-style: italic }} .b, .a > span {{ text-decoration: underline }} div {{ border: 1px solid }}</style>{}",
+        rep("<p class=a>x <b>y</b> <i class=b>z</i></p><div><p>p <span>q</span></p></div><ul><li>l <em>m</em></li></ul>", 8)
+    ));
+    let mut ok = true;
+    let mut fast = 0;
+    for round in 0..300 {
+        let els = d.select("*");
+        let texts_: Vec<MdNode> = d.select("p, li, b, i, span, em").into_iter().flat_map(|e| d.children(e)).filter(|&c| d.is_text(c)).collect();
+        if els.is_empty() || texts_.is_empty() {
+            break;
+        }
+        let e = els[rng.next() as usize % els.len()];
+        match rng.next() % 8 {
+            0 | 1 | 2 => {
+                let x = texts_[rng.next() as usize % texts_.len()];
+                d.set_text(x, &format!("t{}", round));
+            }
+            3 => {
+                d.set_attr(e, "style", if round % 2 == 0 { "color:red" } else { "font-weight:bold" });
+            }
+            4 => {
+                d.toggle_class(e, "a");
+            }
+            5 => {
+                let s = d.create_element(if round % 3 == 0 { "b" } else { "span" });
+                let tx = d.create_text("n");
+                d.insert(s, None, tx);
+                if d.tag(e) != "#document" {
+                    d.insert(e, None, s);
+                }
+            }
+            6 if d.tag(e) != "body" && d.tag(e) != "html" => {
+                d.free(e);
+            }
+            _ => {
+                let p = d.create_element("p");
+                let tx = d.create_text("neu");
+                d.insert(p, None, tx);
+                let root = d.root();
+                d.insert(root, None, p);
+            }
+        }
+        let before = d.clone();
+        d.update();
+        if d.blocks().len() == before.blocks().len() {
+            fast += 1;
+        }
+        ok &= d.blocks() == rederived(&d).blocks();
+    }
+    t.check(ok, "300 random changes: in place = every block again");
+    t.check(fast > 100, &format!("most changes in place ({})", fast));
+}
+
+// the view keeps its place, selection, focus and the fields' values across changes
+fn dom_view(t: &mut T) {
+    t.group = "dom view";
+    // the fields' values in the state
+    let mut st = MdViewState::new();
+    st.set_html("<form><p id=z><input id=a name=a value=1> <input type=checkbox id=c name=c> <input id=v name=v value=v></p></form><p>nach</p>");
+    st.set_field_text(0, "neu");
+    st.set_field_checked(1, true);
+    let d = st.doc_mut();
+    let z = d.by_id("z").unwrap_or_default();
+    let n = d.create_element("input");
+    d.set_attr(n, "name", "x");
+    d.set_attr(n, "value", "erst");
+    let first = d.children(z).first().copied();
+    d.insert(z, first, n);
+    let v = d.by_id("v").unwrap_or_default();
+    d.set_attr(v, "value", "w");
+    let a = d.by_id("a").unwrap_or_default();
+    d.set_attr(a, "value", "2");
+    t.check(st.update(), "update");
+    t.eq((st.field_text(0), st.field_text(1), st.field_checked(2), st.field_text(3)), ("erst", "neu", true, "w"), "the user's values stay, the others follow the document");
+    st.reset_form(0);
+    t.eq(st.field_text(1), "2", "reset: the document's value");
+    // a new document starts afresh
+    st.set_html("<form><input name=a value=q></form>");
+    t.eq(st.field_text(0), "q", "a new document");
+    // in a headless runtime: the focus, the place in the document, the selection
+    use alloc::rc::Rc;
+    use core::cell::RefCell;
+    struct View(Rc<RefCell<MdViewState>>, Rc<RefCell<u32>>);
+    impl App for View {
+        fn frame(&mut self, ui: &mut Ui) {
+            let f = core::mem::take(&mut *self.1.borrow_mut());
+            if f != 0 {
+                ui.focus(f);
+            }
+            ui.next_size(-1, -1);
+            ui.doc_view(1, &mut self.0.borrow_mut(), MV_NO_FRAME);
+        }
+    }
+    const D: AppDesc = AppDesc { title: "dom", w: 480, h: 320, ..AppDesc::NONE };
+    let mut page = String::from("<h1>Kopf</h1><form><p id=z><input id=a name=a></p></form><ul id=l><li>eins</li></ul><div id=k>");
+    for i in 0..60 {
+        page.push_str(&format!("<p>Absatz {} mit etwas Text.</p>", i));
+    }
+    page.push_str("</div>");
+    let st = Rc::new(RefCell::new(MdViewState::new()));
+    st.borrow_mut().set_html(&page);
+    let foc = Rc::new(RefCell::new(0u32));
+    let Ok(mut rt) = ui::Runtime::new(&D, View(st.clone(), foc.clone()), &style::STYLE) else {
+        t.check(false, "the view starts headless");
+        return;
+    };
+    let mut now = 50;
+    let mut frame = |rt: &mut ui::Runtime| {
+        rt.command(1, 0);
+        now += 50;
+        rt.step(now, &[]);
+    };
+    frame(&mut rt);
+    // the focused field: its widget moves when fields come before it, the view when it goes
+    *foc.borrow_mut() = md_field_id(1, 0);
+    frame(&mut rt);
+    t.eq(rt.ui().focused(), md_field_id(1, 0), "a field focused");
+    {
+        let mut s = st.borrow_mut();
+        let d = s.doc_mut();
+        let z = d.by_id("z").unwrap_or_default();
+        let n = d.create_element("input");
+        let first = d.children(z).first().copied();
+        d.insert(z, first, n);
+    }
+    frame(&mut rt);
+    t.eq((rt.ui().focused(), st.borrow().focused_field()), (md_field_id(1, 1), Some(1)), "the focus moves with its field");
+    {
+        let mut s = st.borrow_mut();
+        let d = s.doc_mut();
+        let a = d.by_id("a").unwrap_or_default();
+        d.free(a);
+    }
+    frame(&mut rt);
+    t.eq(rt.ui().focused(), 1, "its field gone: the view");
+    // the place in the document and the selection: blocks inserted above, one changed above
+    let k30 = st.borrow().doc().blocks().iter().position(|b| b.text.starts_with("Absatz 30")).unwrap_or(0);
+    st.borrow_mut().scroll_to_block(k30);
+    frame(&mut rt);
+    st.borrow_mut().set_selection(TextSel::new(TextPos::new(k30 + 2, 0), TextPos::new(k30 + 2, 9)));
+    let (top, off) = st.borrow().first_visible();
+    let node = st.borrow().doc().blocks()[top].node;
+    t.eq(st.borrow().selected_text(), String::from("Absatz 32"), "a selection");
+    {
+        let mut s = st.borrow_mut();
+        let d = s.doc_mut();
+        let k = d.by_id("k").unwrap_or_default();
+        for i in 0..3 {
+            let p = d.create_element("p");
+            let tx = d.create_text(&format!("Neu {}", i));
+            d.insert(p, None, tx);
+            let first = d.children(k).first().copied();
+            d.insert(k, first, p);
+        }
+        let h = d.select_first("h1").unwrap_or_default();
+        d.set_text(h, "Ein viel längerer Kopf, der in dieser schmalen Ansicht über mehrere Zeilen umbricht");
+    }
+    frame(&mut rt);
+    let s = st.borrow();
+    let (top2, off2) = s.first_visible();
+    t.eq((top2, off2, s.doc().blocks()[top2].node), (top + 3, off, node), "the view stays on its block");
+    t.eq((s.selected_text(), s.selection().anchor.line), (String::from("Absatz 32"), k30 + 5), "the selection stays on its text");
+}
+
+// the cost of changes: in place proportional to the paragraph, all again linear, adversarial
+// trees and selectors capped
+fn dom_cost(t: &mut T) {
+    t.group = "dom cost";
+    let big = format!("<p id=s>Stand <b>0</b></p>{}", rep("<p>Ein Absatz mit <b>fettem</b> Text und <i>mehr</i>.</p>", 20_000));
+    let t0 = plat::time_us();
+    let mut d = MdDoc::html(&big);
+    let parse = (plat::time_us() - t0) / 1000;
+    let b = d.select_first("#s b").unwrap_or_default();
+    // (2000 updates of every block would take minutes)
+    let t0 = plat::time_us();
+    for i in 0..2000 {
+        d.set_text(b, &format!("{}", i));
+        d.update();
+    }
+    let dt = (plat::time_us() - t0) / 1000;
+    t.check(dt <= 1000, &format!("2000 changes in place of a document of 20 000 blocks: {} ms", dt));
+    t.eq(d.blocks()[0].text.as_str(), "Stand 1999", "the last one");
+    // a structural change: every block again, linear (about a parse of the page)
+    let t0 = plat::time_us();
+    for i in 0..5 {
+        let p = d.create_element("p");
+        let tx = d.create_text(&format!("n{}", i));
+        d.insert(p, None, tx);
+        let root = d.root();
+        d.insert(root, None, p);
+        d.update();
+    }
+    let dt = (plat::time_us() - t0) / 1000;
+    t.check(dt / 5 <= parse * 3 + 50, &format!("5 structural changes of 20 000 blocks: {} ms (a parse: {} ms)", dt, parse));
+    let lim = 2500;
+    timed(t, "deep tree", lim, &|| {
+        let mut d = MdDoc::html(&format!("{}x", rep("<div><span>", 100_000)));
+        let n = d.select("div span div span div").len();
+        let x = d.select_first("span").unwrap_or_default();
+        d.set_text(x, "y");
+        d.update();
+        n + d.blocks().len()
+    });
+    timed(t, "many siblings", lim, &|| {
+        let d = MdDoc::html(&rep("<i class=a>x</i>", 200_000));
+        d.select(".a").len() + d.select("i.b").len()
+    });
+    timed(t, "a long selector on a deep tree", lim, &|| {
+        let d = MdDoc::html(&format!("{}x", rep("<b>", 300)));
+        d.select("b b b b b b b b b b b b b b b i").len() + d.select("b > b > b > b > b > b > b b > b > b > i").len()
+    });
+    timed(t, "many ids", lim, &|| {
+        let mut d = MdDoc::html(&(0..50_000).map(|i| format!("<p id=x{}>t</p>", i)).collect::<String>());
+        let mut n = 0;
+        for i in (0..50_000).step_by(7) {
+            if let Some(p) = d.by_id(&format!("x{}", i)) {
+                d.set_text(p, "u");
+                n += 1;
+            }
+        }
+        d.update();
+        n
+    });
+    timed(t, "inner HTML", lim, &|| {
+        let mut d = MdDoc::html("<div id=d></div>");
+        let x = d.by_id("d").unwrap_or_default();
+        d.set_inner_html(x, &rep("<p><b>a</b><li>b<td>c", 30_000));
+        d.update();
+        d.blocks().len()
+    });
+}
+
+// the style sheets (rich_html.rs): the cascade by specificity and order, !important and the
+// style attribute, the text's properties inherited, the boxes of block elements, what is left
+// out; changes of classes and sheets; the cost on adversarial sheets
+fn css(t: &mut T) {
+    t.group = "css";
+    let col = |d: &MdDoc, k: usize| d.blocks().get(k).and_then(|b| b.spans.first()).map_or(0, |s| s.color & 0xFF_FFFF);
+    let d = MdDoc::html(concat!(
+        "<style>p { color: #010101 } .a { color: #020202 } #x { color: #030303 } p.a { color: #040404 } div p { color: #050505 }",
+        " div > .b { color: #060606 } .c { color: #070707 !important } [data-k=v] { color: #080808 }</style>",
+        "<p>tag</p><p class=a>class</p><p id=x class=a>id</p><div><p>descendant</p><p class=b>child</p></div>",
+        "<p class=c style=\"color:#090909\">important</p><p class=a style=\"color:#0a0a0a\">attribute</p><p data-k=v>attr</p>"
+    ));
+    t.eq(
+        (0..8).map(|k| col(&d, k)).collect::<Vec<_>>(),
+        alloc::vec![0x010101, 0x040404, 0x030303, 0x050505, 0x060606, 0x070707, 0x0a0a0a, 0x080808],
+        "specificity, !important, the style attribute"
+    );
+    let d = MdDoc::html("<style>.a { color: #111111 } .a { color: #222222 }</style><p class=a>x</p><style>p { font-weight: bold } .a { color: #333333 }</style>");
+    t.eq((col(&d, 0), markup(&d, 0)), (0x333333, String::from("<b>x</b>")), "the later of two rules alike, the sheets in order");
+    let d = MdDoc::html(concat!(
+        "<style>div { color: #123456; font-style: italic } .n { color: #654321; font-style: normal } section { text-align: center }</style>",
+        "<div><p>a <b>b</b></p><p class=n>c</p></div><section><p>z</p></section>"
+    ));
+    t.eq((col(&d, 0), markup(&d, 0), col(&d, 1), markup(&d, 1)), (0x123456, String::from("<i>a </i><b><i>b</i></b>"), 0x654321, String::from("c")), "inherited, a child's own wins");
+    t.eq(d.blocks().get(2).map_or(9, |b| b.align), 1, "text-align inherited");
+    let d = MdDoc::html(concat!(
+        "<style>/* p { color: #ff0000 } */ @media print { p { color: #ff0000 } } @import url(x.css); p:hover { color: #00ff00 }",
+        " h1 + p { color: #0000ff } p { foo: bar; color: #0c0c0c; ; } p { color }</style><style media=print>p { color: #ff0000 }</style><h1>h</h1><p>x</p>"
+    ));
+    t.eq(col(&d, 1), 0x0c0c0c, "comments, at-rules, unknown selectors and properties left out");
+    let d = MdDoc::html("<style>.r { color: #aa0000 } a.g { color: #00aa00 }</style><p class=r>t <a href=u>l</a> <a class=g href=v>g</a></p>");
+    t.eq(d.blocks().first().map(|b| b.spans.iter().map(|s| (s.link != 0, s.color & 0xFF_FFFF)).collect::<Vec<_>>()), Some(alloc::vec![(false, 0xaa0000), (true, 0), (false, 0xaa0000), (true, 0x00aa00)]), "links: their own colour, not the one around them");
+    let mut d = MdDoc::html("<style>.zu { display: none } .zu.auf { display: block }</style><p>a</p><p class=zu id=z>b</p>");
+    t.eq(texts(&d), alloc::vec![String::from("a")], "display:none from a rule");
+    let z = d.by_id("z").unwrap_or_default();
+    d.add_class(z, "auf");
+    d.update();
+    t.eq(texts(&d), alloc::vec![String::from("a"), String::from("b")], "a class shows it");
+    let s = d.select_first("style").unwrap_or_default();
+    d.set_text(s, "p { color: #0d0d0d }");
+    d.update();
+    t.eq((col(&d, 0), col(&d, 1)), (0x0d0d0d, 0x0d0d0d), "a sheet changed");
+    // boxes
+    let d = MdDoc::html(concat!(
+        "<style>.k { margin: 4px 8px; padding: 2px 3px 4px 5px; border: 2px solid #ff0000; background: #eeeeee } .k p { border-left: 3px dashed blue }",
+        " .o { border-width: 1px } .e { margin: 1em 0 0 } ul { background: #ffffee } li { padding-left: 4pt }</style>",
+        "<div class=k><p>a</p><p>b</p></div><p class=o>c</p><p class=e>d</p><ul><li>e</li></ul>"
+    ));
+    let bx = d.boxes().to_vec();
+    t.eq(bx.len(), 6, "boxes of the elements whose style gives one");
+    let k = bx.first().cloned().unwrap_or_default();
+    t.eq((k.margin, k.padding, k.border, k.border_color, k.bg, k.mset), ([4, 8, 4, 8], [2, 3, 4, 5], [2; 4], [0xFFFF_0000; 4], 0xFFEE_EEEE, 15), "margin, padding, border, background");
+    t.eq(bx.get(1).map(|b| (b.border, b.border_color[3])), Some(([0, 0, 0, 3], 0xFF00_00FF)), "border-left");
+    t.eq(d.blocks().iter().map(|b| b.boxes.clone()).collect::<Vec<_>>(), alloc::vec![alloc::vec![0, 1], alloc::vec![0, 2], alloc::vec![], alloc::vec![3], alloc::vec![4, 5]], "the boxes around the blocks");
+    t.eq(bx.get(3).map(|b| (b.margin, b.mset)), Some(([14, 0, 0, 0], 15)), "em");
+    t.eq(bx.get(4).map(|b| (b.depth, b.bg)), Some((0, 0xFFFF_FFEE)), "a list's box");
+    t.eq(bx.get(5).map(|b| (b.depth, b.padding)), Some((1, [0, 0, 0, 5])), "an item's box inside its list");
+    t.check(bx.iter().map(|b| b.node).collect::<Vec<_>>() == d.select(".k, .k p, .e, ul, li"), "a box's element");
+    // pages without sheets: style attributes as before; the rich-text reader takes no sheet
+    let d = MdDoc::html("<p style=\"color:#0e0e0e\">x <span style=\"background-color:#ffff00\">y</span></p>");
+    t.eq((col(&d, 0), d.boxes().len(), d.blocks().first().map(|b| b.spans.last().map(|s| s.bg))), (0x0e0e0e, 0, Some(Some(0xFFFF_FF00))), "style attributes");
+    let r = RichDoc::from_html("<style>p { color: #ff0000 }</style><p style=\"background:#ffff00\">x</p>");
+    t.eq(r.paras().first().and_then(|p| p.runs().next().map(|(_, f)| (f.color, f.bg))), Some((0, 0xFFFF_FF00)), "the rich-text reader: no sheets, a block's background on its text");
+    // in the view: the text inside a box after its margin, border and padding; left and right
+    // stay where they are in a right-to-left document
+    struct View(MdViewState, &'static str);
+    impl App for View {
+        fn frame(&mut self, ui: &mut Ui) {
+            ui.next_size(-1, -1);
+            ui.html_view(1, &mut self.0, self.1, MV_NO_FRAME);
+        }
+    }
+    const D: AppDesc = AppDesc { title: "css", w: 480, h: 320, ..AppDesc::NONE };
+    let rect = |page: &'static str, name: &str| -> [i32; 4] {
+        let Ok(rt) = ui::Runtime::new(&D, View(MdViewState::new(), page), &style::STYLE) else { return [0; 4] };
+        let tree = rt.ui().a11y_tree();
+        tree.wins.first().and_then(|w| w.nodes.iter().find(|n| n.name == name).map(|n| n.rect)).unwrap_or([0; 4])
+    };
+    let plain = rect("<p>Hallo Welt</p>", "Hallo Welt");
+    let ltr = rect("<style>p { margin-left: 40px; border-left: 2px solid; padding-left: 8px }</style><p>Hallo Welt</p>", "Hallo Welt");
+    let rtl = rect("<style>p { margin-left: 40px; border-left: 2px solid; padding-left: 8px }</style><p>שלום עולם</p>", "שלום עולם");
+    t.eq((ltr[0] - plain[0], ltr[2] - plain[2]), (50, -50), "margin, border and padding before the text");
+    t.eq((rtl[0], rtl[2]), (ltr[0], ltr[2]), "the left side also in a right-to-left document");
+    // the cost: many rules (by class) on many elements, universal rules capped
+    timed(t, "4000 rules by class, 20 000 elements", 2500, &|| {
+        let mut s = String::from("<style>");
+        for i in 0..4000 {
+            s.push_str(&format!(".c{} p {{ color: #{:06x} }} ", i, i));
+        }
+        s.push_str("</style>");
+        for i in 0..20_000 {
+            s.push_str(&format!("<div class=c{}><p>x</p></div>", i % 5000));
+        }
+        MdDoc::html(&s).blocks().len()
+    });
+    timed(t, "universal rules on a deep tree", 2500, &|| {
+        let mut s = String::from("<style>");
+        for i in 0..2000 {
+            s.push_str(&format!("div div div div * {{ margin-left: {}px }} ", i % 7));
+        }
+        s.push_str("</style>");
+        s.push_str(&rep("<div>", 200));
+        s.push_str(&rep("<p>x</p>", 20_000));
+        MdDoc::html(&s).blocks().len()
+    });
+    timed(t, "a huge sheet", 2500, &|| MdDoc::html(&format!("<style>{}</style><p>x</p>", rep("p{color:red}a{", 100_000))).blocks().len());
+}
+
 pub fn run() -> i32 {
     let mut t = T { group: "", ok: 0, failed: 0 };
     let t0 = plat::time_us();
+    dom(&mut t);
+    dom_changes(&mut t);
+    dom_view(&mut t);
+    dom_cost(&mut t);
+    css(&mut t);
     a11y(&mut t);
     forms(&mut t);
     form_view(&mut t);

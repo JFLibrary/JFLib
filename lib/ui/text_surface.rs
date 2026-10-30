@@ -34,6 +34,7 @@ impl Ui {
     /// needs a caret stop. Text changes report EV_ACT and request a fresh layout on the next
     /// pass. Invalid ranges reject the call without consuming input. The caller owns scroll
     /// positioning and document history. Ordinary textboxes are unaffected.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn textbox_surface(
         &mut self,
         id: u32,
@@ -41,6 +42,7 @@ impl Ui {
         cap_flags: u32,
         lines: &[TextSurfaceLine],
     ) -> u32 {
+        let _src = self.src_scope();
         self.m.edit.surface_change = None;
         self.m.edit.surface_start = None;
         if lines.is_empty()

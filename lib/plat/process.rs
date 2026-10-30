@@ -1,5 +1,7 @@
 // Native child processes for tools and application helpers; no assembly counterpart.
 // run_elevated / elevated: a program with administrator or root rights (a service install).
+// launch: a program on its own that outlives this one (the inspector's editor); find: the file
+// a program name stands for.
 use alloc::string::String;
 #[cfg(windows)]
 #[path = "process_win.rs"]
@@ -53,6 +55,33 @@ pub fn exec(program: &str, args: &[&str], env: &[(&str, Option<&str>)]) -> u32 {
         return if cfg!(windows) { 5 } else { 13 };
     }
     native::exec(program, args, env)
+}
+
+/// Start a program on its own and do not wait for it: no pipes, none of this process's handles
+/// (Linux: its standard handles on /dev/null), and it is not ended with this process
+/// (Windows: no console window, outside this process's job when the job lets it go; Linux:
+/// adopted by init in a session of its own) -- an editor, a viewer.  The manifest's `process`
+/// rules apply as for Command::spawn (refused: 5 on Windows, 13 = EACCES on Linux); a program
+/// that cannot be started gives its error number (2: not found).
+pub fn launch(program: &str, args: &[&str]) -> Result<(), u32> {
+    if program.is_empty() || program.contains('\0') || args.iter().any(|a| a.contains('\0')) {
+        return Err(22);
+    }
+    if !crate::policy::process_allowed(program) {
+        return Err(if cfg!(windows) { 5 } else { 13 });
+    }
+    native::launch(program, args)
+}
+
+/// The file a program name stands for, as Command::spawn and launch look it up (Windows: the
+/// program's folder, the system folders, then PATH, never the current folder; ".exe" added to a
+/// name without one; Linux: the first executable file in PATH).  None for a path or no such
+/// program.
+pub fn find(name: &str) -> Option<String> {
+    if name.is_empty() || name.contains(['/', '\\', '\0']) {
+        return None;
+    }
+    native::find(name)
 }
 
 impl Command<'_> {

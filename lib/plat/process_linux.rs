@@ -183,6 +183,66 @@ pub(super) fn exec(program: &str, args: &[&str], env: &[(&str, Option<&str>)]) -
     unsafe { syscall6(13, 13, ign.as_ptr() as usize, 0, 8, 0, 0); }
     (-r) as u32
 }
+/// The file of a program name as resolve finds it.
+pub(super) fn find(name: &str) -> Option<String> { resolve(name).ok() }
+/// A program on its own (process::launch): forked twice -- the middle process starts a session
+/// and ends at once, so init adopts the program and no signal to this process group reaches
+/// it; standard handles on /dev/null, signals as spawn leaves them.  The exec's error number
+/// comes back through a pipe that a successful exec closes.
+pub(super) fn launch(program: &str, args: &[&str]) -> Result<(), u32> {
+    let path = resolve(program)?;
+    let exe = z(&path); let null = z("/dev/null");
+    let strs: Vec<Vec<u8>> = core::iter::once(program).chain(args.iter().copied()).map(z).collect();
+    let mut argv: Vec<usize> = strs.iter().map(|s| s.as_ptr() as usize).collect(); argv.push(0);
+    let envs = environment(&[]);
+    let mut envp: Vec<usize> = envs.iter().map(|s| s.as_ptr() as usize).collect(); envp.push(0);
+    let (failr, failw) = pipe()?;
+    let (dfl, nomask) = ([0usize; 4], [0u64; 1]); // SIG_DFL, the empty signal set (made before the fork)
+    // SAFETY: both forked processes use only syscalls and the buffers made before the fork until
+    // exec / exit.
+    let pid = unsafe {
+        let pid = syscall3(57, 0, 0, 0);
+        if pid == 0 {
+            let mut failure = syscall3(112, 0, 0, 0); // setsid: no terminal, no group of ours
+            if failure >= 0 {
+                let grand = syscall3(57, 0, 0, 0);
+                if grand == 0 {
+                    let fd = syscall3(2, null.as_ptr() as usize, 2, 0); // open("/dev/null", O_RDWR)
+                    if fd >= 0 {
+                        for dst in 0..3 { syscall3(33, fd as usize, dst, 0); }
+                        if fd > 2 { syscall3(3, fd as usize, 0, 0); }
+                    }
+                    syscall3(436, 3, 0xFFFF_FFFF, 4); // close_range(3, ~0, CLOSE_RANGE_CLOEXEC)
+                    syscall6(13, 13, dfl.as_ptr() as usize, 0, 8, 0, 0); // rt_sigaction(SIGPIPE, SIG_DFL)
+                    syscall6(14, 2, nomask.as_ptr() as usize, 0, 8, 0, 0); // rt_sigprocmask(SIG_SETMASK, {})
+                    failure = syscall3(59, exe.as_ptr() as usize, argv.as_ptr() as usize, envp.as_ptr() as usize);
+                    let code = (-failure) as u32;
+                    syscall3(1, failw.0 as usize, &code as *const u32 as usize, 4);
+                    syscall3(231, 127, 0, 0);
+                    loop { core::hint::spin_loop(); }
+                }
+                failure = grand.min(0);
+            }
+            if failure < 0 {
+                let code = (-failure) as u32;
+                syscall3(1, failw.0 as usize, &code as *const u32 as usize, 4);
+            }
+            syscall3(231, 0, 0, 0);
+            loop { core::hint::spin_loop(); }
+        }
+        pid
+    };
+    if pid < 0 { return Err((-pid) as u32); }
+    drop(failw);
+    let mut status = 0i32;
+    // SAFETY: reap the middle process (it ends at once), retry EINTR.
+    while unsafe { syscall6(61, pid as usize, &mut status as *mut i32 as usize, 0, 0, 0, 0) } == -4 {}
+    let mut error = 0u32;
+    // SAFETY: a successful exec closes the error pipe; a failure writes exactly one u32.
+    let n = loop { let r = unsafe { syscall3(0, failr.0 as usize, &mut error as *mut u32 as usize, 4) }; if r != -4 { break r; } };
+    if n != 0 { return Err(if error == 0 { 5 } else { error }); }
+    Ok(())
+}
 /// as root: the program itself; otherwise pkexec (polkit asks for the password)
 pub(super) fn run_elevated(program: &str, args: &[&str]) -> Result<i32, String> {
     let mut all: Vec<&str> = Vec::new();

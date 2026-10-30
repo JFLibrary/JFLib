@@ -501,7 +501,9 @@ pub(crate) struct S {
 impl Ui {
     /// ui_vlist_begin(id, &mut st, count) -> (first, end): the rows to emit (see the module
     /// header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn vlist_begin(&mut self, id: u32, st: &mut VListState, count: usize) -> (usize, usize) {
+        let _src = self.src_scope();
         let mut s = core::mem::take(st);
         let r = self.place(self.dp(NAT_W), self.dp(NAT_H));
         let sbw = self.style.scrollbar_thickness(self);
@@ -659,7 +661,9 @@ impl Ui {
     }
 
     /// ui_vlist_item_begin(i) -> EV_*: row i (see the module header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn vlist_item_begin(&mut self, i: usize) -> u32 {
+        let _src = self.src_scope();
         let Some(mut o) = self.m.vlist.open.pop() else {
             self.warn("ui_vlist_item_begin outside a vlist");
             return 0;
@@ -716,7 +720,9 @@ impl Ui {
     }
 
     /// ui_vlist_item_end: the row's height is measured
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn vlist_item_end(&mut self) {
+        let _src = self.src_scope();
         self.box_end();
         let Some(mut o) = self.m.vlist.open.pop() else {
             return;
@@ -747,7 +753,9 @@ impl Ui {
     }
 
     /// ui_vlist_end(&mut st) -> EV_* (see the module header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn vlist_end(&mut self, st: &mut VListState) -> u32 {
+        let _src = self.src_scope();
         let Some(mut o) = self.m.vlist.open.pop() else {
             return 0;
         };

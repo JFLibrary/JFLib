@@ -327,7 +327,9 @@ impl Ui {
     }
 
     /// one line of text in font id `font` at size_pt points (the body text colour)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn text_in_font(&mut self, font: u32, size_pt: f64, s: &str) {
+        let _src = self.src_scope();
         let s = super::basic::cstr(s);
         let dpi = self.wp.rt.dpi as f64;
         let px = (size_pt * 4.0 / 3.0 * dpi / 96.0 * 256.0).clamp(256.0, 2048.0 * 256.0) as i32;
@@ -426,7 +428,9 @@ impl Ui {
     }
 
     /// the font picker (see the module header) -> EV_ACT when sel changed
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn font_picker(&mut self, id: u32, sel: &mut FontSel) -> u32 {
+        let _src = self.src_scope();
         let mut p = self.m.fonts.picks.remove(&id).unwrap_or_default();
         self.id_push(id);
         let mut out = 0;
@@ -466,7 +470,9 @@ impl Ui {
     }
 
     /// the font dialog (see the module header) -> EV_ACT when OK took the choice
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn font_dialog(&mut self, id: u32, open: &Shared<i32>, sel: &mut FontSel) -> u32 {
+        let _src = self.src_scope();
         let mut p = self.m.fonts.picks.remove(&id).unwrap_or_default();
         let rect = p.rect.get_or_insert_with(|| Shared::new(WinRect::new(0, 0, 600, 0, 0))).clone();
         let mut out = 0;

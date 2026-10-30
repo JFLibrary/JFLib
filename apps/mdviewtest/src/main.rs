@@ -31,6 +31,23 @@
 // the image addresses the view asked for ("Bilder: ..."); "Bilder liefern" answers them (two
 // from app://logo.svg and raster.png, the third fails), "Hoher Kontrast" and "Rechts nach
 // links" as on the tabs.
+//
+//   build/win/mdviewtest.exe --page dom --script apps/mdviewtest/tests/dom_steps.uis
+//
+// --page dom: an HTML page the app changes step by step through the document's elements (as a
+// page script would: MdViewState::doc_mut, md_dom.rs) -- F5 or "Schritt" takes the next step:
+// the counter in "#stand b" (every step), a list item inserted, a text field inserted before
+// the focused one, the note hidden, the link's address and text, a list item removed and the
+// heading's text, three paragraphs inserted above the view, the heading's HTML.  Below it: the
+// step, the focused field, the selection's length, the last form sent.
+//
+//   build/win/mdviewtest.exe --page css --script apps/mdviewtest/tests/css_shots.uis
+//
+// --page css: an HTML page with a style sheet (rich_html.rs): a head bar, cards with border,
+// padding and background, a note with a coloured border on the left, a list with a background,
+// a dark box, a table with a border and a tinted head row, rules by tag, class, id, descendant
+// and child, a hidden paragraph, a form in a card; below it the last link activated and the
+// last form sent.
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -63,6 +80,9 @@ const ID_INSERT: u32 = wid("insert");
 const ID_JUMP: u32 = wid("jump");
 const ID_FORM: u32 = wid("form");
 const ID_SUPPLY: u32 = wid("supply");
+const ID_DOM: u32 = wid("dom");
+const ID_CSS: u32 = wid("css");
+const ID_STEP: u32 = wid("step");
 // the list and its rows: ID_LIST + 1 + i
 const ID_LIST: u32 = 0x0100_0000;
 const ROWS: u32 = 100_000;
@@ -206,6 +226,58 @@ Hallo</textarea></p>
 <img src="https://example.org/fehlt.png" alt="Fehlt"> und lokal <img src="logo.svg" alt="Logo lokal" width="48"></p>
 "#;
 
+/// a page with a style sheet (--page css)
+pub(crate) const SAMPLE_CSS: &str = r#"<style>
+h1 { color: #0b3d91; border-bottom: 3px solid #0b3d91; padding-bottom: 4px }
+.kopf { background: #0b3d91; color: #ffffff; padding: 6px 12px; margin-bottom: 4px }
+.kopf a { color: #ffd166 }
+.karte { border: 1px solid #b8c4d2; background: #f4f7fb; padding: 8px 14px; margin: 4px 0 }
+.karte p { margin: 2px 0 }
+.hinweis { border-left: 4px solid #e09f3e; background: #fff4e0; padding: 4px 10px }
+#wichtig { color: #b00020; font-weight: bold }
+ul.menu { background: #e8eef6; padding: 4px 8px }
+ul.menu > li { color: #0b3d91 }
+.dunkel { background: #222831; color: #eeeeee; padding: 6px 10px }
+.dunkel .hell { color: #ffd166; font-style: italic }
+table.daten { border: 2px solid #8899aa }
+tr.kopfzeile { background: #dde6f0 }
+.rechts { text-align: right }
+.versteckt { display: none }
+</style>
+<div class="kopf"><p>Netzwerk-Labor · <a href="https://example.org/start">Start</a></p></div>
+<h1>Gestaltete Seite</h1>
+<div class="karte"><p>Eine Karte mit Rahmen, Innenabstand und Hintergrund.</p><p id="wichtig">Ein wichtiger Satz in Rot.</p><p>Ein <a href="https://example.org/karte">Link</a> in der Karte.</p></div>
+<div class="hinweis"><p>Ein Hinweis mit einem farbigen Rand links.</p></div>
+<ul class="menu"><li>Router</li><li>Switch</li><li>Server</li></ul>
+<div class="dunkel"><p>Ein dunkler Kasten mit <span class="hell">hellem</span> Text.</p></div>
+<table class="daten"><tr class="kopfzeile"><th>Gerät</th><th>Adresse</th></tr><tr><td>R1</td><td>10.0.0.1</td></tr></table>
+<p class="rechts">Rechts ausgerichtet.</p>
+<p class="versteckt">Unsichtbar.</p>
+<div class="karte"><form action="/los"><p><label for="q">Suche</label> <input id="q" name="q" size="16"> <button>Los</button></p></form></div>
+"#;
+
+/// the page the app changes step by step (--page dom; the paragraphs of #kasten: dom_html)
+pub(crate) const SAMPLE_DOM: &str = r#"<h2 id="kopf">Seite mit Skript</h2>
+<p id="stand">Stand: <b>0</b> Schritte</p>
+<ul id="liste"><li>Erster Eintrag</li><li class="zwei">Zweiter Eintrag</li></ul>
+<form action="/suche"><p id="zeile"><label for="name">Name</label> <input id="name" name="name" size="16">
+<label><input type="checkbox" name="merken"> Merken</label></p></form>
+<p id="hinweis">Ein Hinweis, der beim vierten Schritt verschwindet.</p>
+<p><a id="link" href="https://example.org/eins">Erster Link</a></p>
+<div id="kasten"></div>
+"#;
+
+/// the page of --page dom: SAMPLE_DOM with 30 paragraphs in #kasten
+pub(crate) fn dom_html() -> String {
+    let mut s = String::from(SAMPLE_DOM);
+    let mut ps = String::new();
+    for k in 1..=30 {
+        ps.push_str(&format!("<p>Absatz {}: {}.</p>\n", k, row_text(k)));
+    }
+    s = s.replace("<div id=\"kasten\"></div>", &format!("<div id=\"kasten\">\n{}</div>", ps));
+    s
+}
+
 // the text of row key k: 2 .. 33 words
 fn row_text(k: u32) -> String {
     const W: [&str; 8] = ["Zeilen", "haben", "verschiedene", "Höhen", "in", "einer", "virtuellen", "Liste"];
@@ -275,6 +347,13 @@ struct MdTest {
     sent: String,
     asked: Vec<String>,
     waiting: Vec<String>,
+    // --page dom: the page, the steps taken
+    page_dom: bool,
+    dom: MdViewState,
+    step: u32,
+    // --page css: the page with a style sheet
+    page_css: bool,
+    css: MdViewState,
 }
 
 impl MdTest {
@@ -290,6 +369,15 @@ impl MdTest {
         form.base = String::from("app://");
         form.label = String::from("Formular");
         form.images = MI_ASK;
+        let page_dom = plat::arg_value("--page").as_deref() == Some("dom");
+        let mut dom = MdViewState::new();
+        dom.label = String::from("Skript");
+        if page_dom {
+            dom.set_html(&dom_html());
+        }
+        let page_css = plat::arg_value("--page").as_deref() == Some("css");
+        let mut css = MdViewState::new();
+        css.label = String::from("Gestaltet");
         MdTest {
             tab: 0,
             hc: 0,
@@ -313,7 +401,150 @@ impl MdTest {
             sent: String::new(),
             asked: Vec::new(),
             waiting: Vec::new(),
+            page_dom,
+            dom,
+            step: 0,
+            page_css,
+            css,
         }
+    }
+
+    // --page css: the styled page, what it reported
+    fn css_page(&mut self, ui: &mut Ui) {
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        ui.spacer(-1);
+        ui.next_flags(ST_NOFOCUS);
+        if ui.checkbox(ID_HC, "Hoher Kontrast", &mut self.hc) & EV_ACT != 0 {
+            ui.set_contrast(Some(self.hc != 0));
+        }
+        ui.next_flags(ST_NOFOCUS);
+        if ui.checkbox(ID_RTL, "Rechts nach links", &mut self.rtl) & EV_ACT != 0 {
+            ui.set_rtl(Some(self.rtl != 0));
+        }
+        ui.box_end();
+        ui.next_size(-1, -1);
+        let ev = ui.html_view(ID_CSS, &mut self.css, SAMPLE_CSS, 0);
+        if let Some(l) = ev.link {
+            self.link = l;
+        }
+        if let Some(s) = ev.submit {
+            let pairs: Vec<String> = s.fields.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
+            self.sent = format!("{} {} {}", s.method, s.action, pairs.join("&"));
+        }
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        ui.text(TS_BODY, &format!("Link: {}", if self.link.is_empty() { "-" } else { &self.link }));
+        ui.text(TS_BODY, &format!("Senden: {}", if self.sent.is_empty() { "-" } else { &self.sent }));
+        ui.box_end();
+    }
+
+    // --page dom: the next step, done through the document's elements as a page script would
+    fn dom_step(&mut self) {
+        self.step += 1;
+        let k = self.step;
+        let d = self.dom.doc_mut();
+        // every step: the counter (a change inside one paragraph: that block alone again)
+        if let Some(b) = d.select_first("#stand b") {
+            d.set_text(b, &format!("{}", k));
+        }
+        match k {
+            2 => {
+                // a list item at the top of the list
+                if let Some(l) = d.by_id("liste") {
+                    let li = d.create_element("li");
+                    let t = d.create_text("Neuer Eintrag");
+                    d.insert(li, None, t);
+                    let first = d.children(l).into_iter().find(|&c| d.tag(c) == "li");
+                    d.insert(l, first, li);
+                }
+            }
+            3 => {
+                // a text field before the first one (the fields are numbered anew)
+                if let Some(z) = d.by_id("zeile") {
+                    let f = d.create_element("input");
+                    d.set_attr(f, "name", "vorname");
+                    d.set_attr(f, "placeholder", "Vorname");
+                    d.set_attr(f, "size", "10");
+                    let first = d.children(z).first().copied();
+                    d.insert(z, first, f);
+                    let sp = d.create_text(" ");
+                    d.insert(z, first, sp);
+                }
+            }
+            4 => {
+                if let Some(h) = d.by_id("hinweis") {
+                    d.set_attr(h, "hidden", "");
+                }
+            }
+            5 => {
+                if let Some(a) = d.by_id("link") {
+                    d.set_attr(a, "href", "https://example.org/zwei");
+                    d.set_text(a, "Zweiter Link");
+                    d.add_class(a, "neu");
+                }
+            }
+            6 => {
+                if let Some(li) = d.select_first("#liste > li.zwei") {
+                    d.free(li);
+                }
+                if let Some(h) = d.by_id("kopf") {
+                    d.set_text(h, "Seite geändert");
+                }
+            }
+            7 => {
+                // three paragraphs at the top of the box (above the place the view shows)
+                if let Some(b) = d.by_id("kasten") {
+                    for i in (1..=3).rev() {
+                        let p = d.create_element("p");
+                        let t = d.create_text(&format!("Eingefügt {}", i));
+                        d.insert(p, None, t);
+                        let first = d.children(b).first().copied();
+                        d.insert(b, first, p);
+                    }
+                }
+            }
+            8 => {
+                if let Some(h) = d.by_id("kopf") {
+                    d.set_inner_html(h, "Seite <i>fertig</i>");
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // --page dom: the page, the step button, what the page reported
+    fn dom_page(&mut self, ui: &mut Ui) {
+        // (F5 before the view: the focused field keeps the focus)
+        if ui.key(VK_F5) {
+            self.dom_step();
+        }
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        if ui.button(ID_STEP, "Schritt") & EV_ACT != 0 {
+            self.dom_step();
+        }
+        ui.spacer(-1);
+        ui.next_flags(ST_NOFOCUS);
+        if ui.checkbox(ID_HC, "Hoher Kontrast", &mut self.hc) & EV_ACT != 0 {
+            ui.set_contrast(Some(self.hc != 0));
+        }
+        ui.next_flags(ST_NOFOCUS);
+        if ui.checkbox(ID_RTL, "Rechts nach links", &mut self.rtl) & EV_ACT != 0 {
+            ui.set_rtl(Some(self.rtl != 0));
+        }
+        ui.box_end();
+        ui.next_size(-1, -1);
+        let ev = ui.doc_view(ID_DOM, &mut self.dom, 0);
+        if let Some(s) = ev.submit {
+            let pairs: Vec<String> = s.fields.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
+            self.sent = format!("{} {} {}", s.method, s.action, pairs.join("&"));
+        }
+        let st = &self.dom;
+        let focus = st.focused_field().and_then(|i| st.doc().fields().get(i)).map_or(String::from("-"), |f| f.name.clone());
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        ui.text(TS_BODY, &format!("Schritt: {}", self.step));
+        ui.text(TS_BODY, &format!("Fokus: {}", focus));
+        ui.text(TS_BODY, &format!("Auswahl: {} Zeichen", st.selected_text().chars().count()));
+        ui.box_end();
+        ui.text(TS_CAPTION | TX_WRAP, &format!("Senden: {}", if self.sent.is_empty() { "-" } else { &self.sent }));
     }
 
     // --page form: the form page, what it reported, the app as the image source
@@ -458,6 +689,16 @@ impl App for MdTest {
         ui.box_begin(0, BOX_V | pad(12), 8);
         if self.page_form {
             self.form_page(ui);
+            ui.box_end();
+            return;
+        }
+        if self.page_dom {
+            self.dom_page(ui);
+            ui.box_end();
+            return;
+        }
+        if self.page_css {
+            self.css_page(ui);
             ui.box_end();
             return;
         }

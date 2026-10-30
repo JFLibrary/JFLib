@@ -27,7 +27,8 @@
 //     it; Esc ends the pick)
 // The inspector's own window is left out of the tree, the overlay and the pick.
 // Development builds edit in it (inspect_edit.rs): the tab "Farben" is editable, the tab
-// "Darstellung" and the widget operations below the properties are added.
+// "Darstellung" and the widget operations below the properties are added; and they show where
+// the app called the selected widget, with "Im Editor öffnen" (inspect_src.rs).
 //
 // Script commands (auto.rs `inspect ...`, sc_inspect):
 //   inspect on|off|toggle      open / close (on arms it)     inspect arm|disarm   hot keys
@@ -41,7 +42,9 @@
 // idle: the inspector did no work since it closed (or since the last idle check); same: the main
 // window renders byte for byte as at `inspect snap`; excluded: the tree holds no record of the
 // inspector's own window.  Editing (development builds): inspect set|reset|undo|redo|save|list|
-// do ..., inspect expect changes|list|value|undo|redo|message (inspect_edit.rs).
+// do ..., inspect expect changes|list|value|undo|redo|message (inspect_edit.rs); the sources:
+// inspect editor "C"|none, inspect open [dry], inspect expect source|sources|opened|note
+// (inspect_src.rs).
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -95,9 +98,13 @@ const FLASH_MAX: usize = 96;
 use super::theme::TOKEN_NAMES;
 const LAYER_NAMES: [&str; L_COUNT] = ["base", "dialog", "popup", "tip"];
 
+/// where a widget was called: the file and line rustc gives #[track_caller] (inspect_src.rs;
+/// development builds only, a --release build has none)
+pub(crate) type Src = &'static core::panic::Location<'static>;
+
 /// a layout box begun or ended in a pass (box_begin / box_end while the inspector is open):
 /// its window, the number of semantic records before it, id, rectangle (window px, mirrored
-/// right-to-left like the records), layer
+/// right-to-left like the records), layer, the call of its box_begin
 #[derive(Clone, Copy)]
 pub(crate) struct BoxEv {
     win: u8,
@@ -106,6 +113,7 @@ pub(crate) struct BoxEv {
     at: u32,
     id: u32,
     rect: [i32; 4],
+    src: Option<Src>,
 }
 
 // what a node of the tree stands for
@@ -114,7 +122,7 @@ const N_BOX: u8 = 1;
 const N_WIN: u8 = 2;
 
 /// a node of the widget tree: its record (boxes and windows as K_BOX records), depth, a key
-/// that stays the same from pass to pass, whether deeper nodes follow
+/// that stays the same from pass to pass, whether deeper nodes follow, its source
 struct Node {
     rec: Sem,
     what: u8,
@@ -123,6 +131,7 @@ struct Node {
     depth: u16,
     key: u64,
     kids: bool,
+    src: Option<Src>,
 }
 
 /// statistics: the last run_passes, the last render of each window (app windows)
@@ -159,6 +168,8 @@ pub(crate) struct S {
     /// the selected node (0 = none) and its record in the last pass
     sel: u64,
     pub(crate) sel_rec: Option<Sem>,
+    /// ... where the app called it (development builds, inspect_src.rs)
+    pub(crate) sel_src: Option<Src>,
     /// passes that still scroll the selected row into view (the view's height may change
     /// with the properties shown below it)
     reveal: u8,
@@ -204,6 +215,7 @@ impl Default for S {
             up_eat: 0,
             sel: 0,
             sel_rec: None,
+            sel_src: None,
             reveal: 0,
             tree: TreeState::default(),
             collapsed: BTreeSet::new(),
@@ -392,6 +404,7 @@ impl Ui {
                 v.clear();
             }
             s.work_mark = s.work;
+            self.src_clear(); // the records' sources (inspect_src.rs)
             // the overlay's pixels: every window is drawn again from its commands
             self.dirty_force_full();
             for r in self.m.win.recs.iter_mut() {
@@ -518,13 +531,14 @@ impl Ui {
     /// (layout.rs box_begin, while open) a box of the live window begins at r (px)
     pub(crate) fn ins_box(&mut self, id: u32, r: [i32; 4]) {
         let rect = self.phys_rect(r);
-        let e = BoxEv { win: self.uiw_cur as u8, begin: true, layer: self.wp.ctx.cmd_layer_ui as u8, at: self.sems.len() as u32, id, rect };
+        let (layer, at, src) = (self.wp.ctx.cmd_layer_ui as u8, self.sems.len() as u32, self.src_cur());
+        let e = BoxEv { win: self.uiw_cur as u8, begin: true, layer, at, id, rect, src };
         self.m.ins.boxes.push(e);
     }
 
     /// (layout.rs box_end, while open) the live window's innermost box ends
     pub(crate) fn ins_box_end(&mut self) {
-        let e = BoxEv { win: self.uiw_cur as u8, begin: false, layer: 0, at: self.sems.len() as u32, id: 0, rect: [0; 4] };
+        let e = BoxEv { win: self.uiw_cur as u8, begin: false, layer: 0, at: self.sems.len() as u32, id: 0, rect: [0; 4], src: None };
         self.m.ins.boxes.push(e);
     }
 
@@ -571,7 +585,7 @@ impl Ui {
                 let fb = self.win_fb(w);
                 let title = if w == 0 { String::from(tr("Hauptfenster")) } else { String::from(self.uiw_title(w)) };
                 let rec = Sem { kind: K_BOX, rect: [0, 0, fb.w, fb.h], label: Some(title), win: w as u8, id: self.uiw_rec_id(w), ..Sem::default() };
-                out.push(Node { rec, what: N_WIN, sem: usize::MAX, depth: 0, key: wkey, kids: false });
+                out.push(Node { rec, what: N_WIN, sem: usize::MAX, depth: 0, key: wkey, kids: false, src: None });
             }
             let evs: Vec<BoxEv> = self.m.ins.boxes.iter().filter(|e| e.win as u32 == w).copied().collect();
             let mut ei = 0;
@@ -586,7 +600,7 @@ impl Ui {
                         let depth = base + stack.len() as u16;
                         let key = ordinal(&mut seen, mix(mix(2, w as u64), e.id as u64));
                         let rec = Sem { id: e.id, kind: K_BOX, rect: e.rect, layer: e.layer, win: w as u8, ..Sem::default() };
-                        out.push(Node { rec, what: N_BOX, sem: usize::MAX, depth, key, kids: false });
+                        out.push(Node { rec, what: N_BOX, sem: usize::MAX, depth, key, kids: false, src: e.src });
                         stack.push((out.len() - 1, false));
                     } else if let Some((i, used)) = stack.pop() {
                         if !used {
@@ -615,7 +629,7 @@ impl Ui {
                     mix(mix(4, parent), hash_str(r.label.as_deref().unwrap_or("")) ^ r.kind as u64)
                 };
                 let key = ordinal(&mut seen, b);
-                out.push(Node { rec: r.clone(), what: N_WIDGET, sem: k, depth, key, kids: false });
+                out.push(Node { rec: r.clone(), what: N_WIDGET, sem: k, depth, key, kids: false, src: self.src_of(k) });
             }
             while let Some((i, used)) = stack.pop() {
                 if !used {
@@ -650,6 +664,7 @@ impl Ui {
     fn ins_select(&mut self, nodes: &[Node], i: usize) {
         self.m.ins.sel = nodes[i].key;
         self.m.ins.sel_rec = Some(nodes[i].rec.clone());
+        self.m.ins.sel_src = nodes[i].src;
         let mut d = nodes[i].depth;
         for n in nodes[..i].iter().rev() {
             if d == 0 {
@@ -707,7 +722,9 @@ impl Ui {
             }
         }
         let sel = self.m.ins.sel;
-        self.m.ins.sel_rec = nodes.iter().find(|n| sel != 0 && n.key == sel).map(|n| n.rec.clone());
+        let n = nodes.iter().find(|n| sel != 0 && n.key == sel);
+        self.m.ins.sel_rec = n.map(|n| n.rec.clone());
+        self.m.ins.sel_src = n.and_then(|n| n.src);
         if self.m.ins.rect.get().flags & WRF_POS == 0 {
             self.ins_place();
         }
@@ -870,7 +887,9 @@ impl Ui {
         if ev.sel_changed {
             if let Some(k) = st.cur {
                 self.m.ins.sel = k;
-                self.m.ins.sel_rec = nodes.iter().find(|n| n.key == k).map(|n| n.rec.clone());
+                let n = nodes.iter().find(|n| n.key == k);
+                self.m.ins.sel_rec = n.map(|n| n.rec.clone());
+                self.m.ins.sel_src = n.and_then(|n| n.src);
             }
         }
         self.m.ins.tree = st;
@@ -917,6 +936,10 @@ impl Ui {
             self.ins_copy();
         }
         self.box_end();
+        if super::inspect_src::SRC {
+            let src = self.m.ins.sel_src;
+            self.isrc_props(src); // where the app called it, "Im Editor öffnen" (inspect_src.rs)
+        }
         self.ied_operate(&r); // click, drag, set, type, cmd (inspect_edit.rs)
     }
 
@@ -1217,7 +1240,7 @@ impl Ui {
 
     /// `inspect ...` (auto.rs; see the module header)
     pub(crate) fn sc_inspect(&mut self, app: &mut dyn App, a: &[u8]) {
-        const BAD: &[u8] = b"inspect on|off|toggle|arm|disarm|pick|select S|option outlines|order|dirty on|off|tab widgets|frame|colors|look|copy|snap|expect ...|set|reset|undo|redo|save|list|do ...";
+        const BAD: &[u8] = b"inspect on|off|toggle|arm|disarm|pick|select S|option outlines|order|dirty on|off|tab widgets|frame|colors|look|copy|snap|expect ...|set|reset|undo|redo|save|list|do ...|editor \"C\"|open [dry]";
         let w = |n: &str| word_eq(a, n).is_some();
         if w("on") || w("off") || w("toggle") {
             let on = if w("toggle") { !self.m.ins.on } else { w("on") };
@@ -1239,6 +1262,7 @@ impl Ui {
             if word_eq(r, "none").is_some() {
                 self.m.ins.sel = 0;
                 self.m.ins.sel_rec = None;
+                self.m.ins.sel_src = None;
             } else {
                 let Some(k) = self.ins_resolve(r) else { return };
                 let nodes = self.ins_tree();
@@ -1290,8 +1314,9 @@ impl Ui {
             self.m.ins.snap = Some((fb.w, fb.h, fb.px.clone()));
         } else if let Some(r) = word_eq(a, "expect") {
             self.sc_inspect_expect(skip_ws(r));
-        } else if !self.ied_script(app, a) {
-            // (set, reset, undo, redo, save, list, do: inspect_edit.rs)
+        } else if !self.isrc_script(app, a) && !self.ied_script(app, a) {
+            // (editor, open: inspect_src.rs; set, reset, undo, redo, save, list, do:
+            // inspect_edit.rs)
             self.fail(BAD);
         }
     }
@@ -1338,8 +1363,9 @@ impl Ui {
         } else if w("idle") {
             let d = self.m.ins.work.wrapping_sub(self.m.ins.work_mark);
             self.m.ins.work_mark = self.m.ins.work;
-            if d != 0 || !self.m.ins.boxes.is_empty() || self.m.ins.ov.iter().any(|v| !v.is_empty()) {
-                self.fail(format!("the inspector worked {} times, {} boxes recorded", d, self.m.ins.boxes.len()).as_bytes());
+            let (b, s) = (self.m.ins.boxes.len(), self.src_count());
+            if d != 0 || b != 0 || s != 0 || self.m.ins.ov.iter().any(|v| !v.is_empty()) {
+                self.fail(format!("the inspector worked {} times, {} boxes, {} sources recorded", d, b, s).as_bytes());
             }
         } else if w("same") {
             self.render();
@@ -1418,9 +1444,10 @@ impl Ui {
             if have != want {
                 self.fail(format!("the clipboard holds {:?}", String::from_utf8_lossy(&have)).as_bytes());
             }
-        } else if !self.ied_expect(a) {
-            // (changes, list, undo, redo, message: inspect_edit.rs)
-            self.fail(b"inspect expect open|closed|pick on|off|flash on|off|idle|same|excluded|selected S|hover S|selector \"s\"|copied \"s\"");
+        } else if !self.isrc_expect(a) && !self.ied_expect(a) {
+            // (source, opened, note: inspect_src.rs; changes, list, undo, redo, message:
+            // inspect_edit.rs)
+            self.fail(b"inspect expect open|closed|pick on|off|flash on|off|idle|same|excluded|selected S|hover S|selector \"s\"|copied \"s\"|source \"s\"|sources \"s\"|opened \"s\"|note \"s\"");
         }
     }
 

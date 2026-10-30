@@ -609,13 +609,17 @@ impl Ui {
     }
 
     /// ui_code_editor(id, doc, hl, CE_*) -> EV_* (see the module header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn code_editor(&mut self, id: u32, doc: &mut CodeDoc, h: &Highlighter, flags: u32) -> u32 {
+        let _src = self.src_scope();
         self.code_editor_with(id, doc, h, None, flags)
     }
 
     /// code_editor with a language's services (completion, hover, signature help; see the
     /// module header and code_assist.rs)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn code_editor_with(&mut self, id: u32, doc: &mut CodeDoc, h: &Highlighter, mut assist: Option<&mut dyn CodeAssist>, flags: u32) -> u32 {
+        let _src = self.src_scope();
         let ro = flags & CE_READONLY != 0;
         let stflags = self.take_flags();
         let r = self.place(self.dp(NAT_W), self.dp(NAT_H));

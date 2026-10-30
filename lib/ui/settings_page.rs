@@ -32,7 +32,9 @@ const CONTROL_W: i32 = 200; // text boxes (DIP)
 
 impl Ui {
     /// the settings page of the schema of `s` (see the module header) -> a value changed
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn settings_page(&mut self, id: u32, s: &mut Settings) -> bool {
+        let _src = self.src_scope();
         let schema = s.schema();
         let shown = |i: usize| schema.keys[i].flags & KF_HIDDEN == 0;
         let mut secs: Vec<&'static str> = schema.sections.iter().map(|x| x.0).collect();

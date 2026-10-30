@@ -1322,7 +1322,7 @@ Fensterrand hinaus.
   (`Action::ScriptDebug`; die Oberfläche kommt mit IDE1). Tests: `coretest --only scriptmod`,
   die Fälle von `jfs` (Module, `--test`, `--debug`) und die Selbsttest-Gruppe `scriptmod` von
   JFNetworker.
-- **P3** · *teilweise* · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
+- **P3** · *erledigt* (2026-10-30) · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
   der Browser selbst mit den Meilensteinen B1 bis B4 steht im App-README unter „Fahrplan“).
   Der Browser zeigt Seiten mit `ui.html_view` (`md_doc`, `md_view`, `rich_html`) statt mit einer
   eigenen Engine. Dafür braucht die Library: (1) *erledigt* (2026-10-26) Bilder aus anderen
@@ -1348,15 +1348,56 @@ Fensterrand hinaus.
   `forms`, `form view`) und `--page form` (`form_keys.uis`, `form_mouse.uis`,
   `form_images.uis`, `form_scale.uis`, `form_rtl.uis`; Windows und Linux). Offen: die Felder
   folgen der Spiegelung des Fensters, nicht der Richtung ihres Absatzes; keine Datei-Felder,
-  keine Mehrfachauswahl. (3) *fehlt* Ein veränderbares Dokument (für B3, Seitenskripte):
-  Elemente in `md_doc` über id, Klasse oder Tag finden, Text, Attribute und Klassen ändern,
-  Elemente einfügen und entfernen, danach neu setzen, ohne Bildlauf und Auswahl zu verlieren.
-  (4) *fehlt* Später eine CSS-Teilmenge in `rich_html` (für B4): `<style>` mit
-  Selektoren nach Tag, Klasse und id, die Eigenschaften, die heute aus `style=` gelesen werden,
-  dazu Abstände und Rahmen. In `lib/script` nur `compile_with` (siehe den Runner), damit der
-  Browser-Host seine eigenen Globals (`document`, `fetch` …) prüfen lässt. Bewusst nicht: eine
-  vollständige HTML/CSS-Engine (Box-Modell, Floats, Flexbox, Grid) und JavaScript. Tests:
-  coretest für Dokument-Änderungen, `.uis`-Skripte mit einem Formular (Windows und Linux).
+  keine Mehrfachauswahl. (3) *erledigt* (2026-10-30) Ein veränderbares Dokument (für B3,
+  Seitenskripte): ein HTML-Dokument behält seinen Elementbaum ([`md_dom.rs`](../lib/ui/md_dom.rs);
+  Leerelemente, Rohtext, `<p>`/`<li>`/`<td>`/`<tr>`/`<option>` wie im Browser geschlossen, Tiefe
+  und Knoten begrenzt); `MdNode`-Handles bleiben über Änderungen gleich (`raw()`/`from_raw` für
+  die Objekte eines Skript-Hosts). Suchen: `by_id` (Index), `select`/`select_first`/`select_in`/
+  `matches` mit Tag, `*`, `#id`, `.klasse`, `[attr]`, `[attr=v]` (auch `~= |= ^= $= *=`),
+  Nachfahren- und Kind-Kombinator, Listen mit Komma (Pseudoklassen und Geschwister-Kombinatoren
+  treffen nichts); `parent`/`children`/Geschwister, `tag`, `attr`/`attrs`/`has_class`,
+  `text_of`, `inner_html`. Ändern: `set_text`, `set_attr`/`remove_attr`, `add_class`/
+  `remove_class`/`toggle_class`, `create_element`/`create_text`, `insert(parent, before, n)`,
+  `remove` (bleibt erhalten), `free`, `set_inner_html`; `hidden` und `display:none` blenden aus.
+  `MdDoc::update()` leitet die Blöcke neu ab: eine Änderung innerhalb eines Blockelements, das
+  allein einen Absatz formatierten Texts zeigt, nur diesen Block (O(Absatz)), jede andere alle
+  (linear, etwa ein neues Parsen, ohne Layout). Die Ansicht (`MdViewState::doc_mut`, `update`,
+  sonst jeder Frame) behält Layouts und Höhen der übrigen Blöcke, den Bildlauf (am Block
+  verankert), Auswahl und fokussierten Link, die Werte der Formularfelder über ihre Elemente
+  (vom Nutzer oder der App gesetzte bleiben, die anderen folgen dem Dokument) und den Fokus
+  eines Felds, vor dem Felder kommen oder gehen; `MdBlock`/`MdField`/`MdForm::node`,
+  `field_of`. Getestet mit `mdviewtest --test unit` (Gruppen `dom`, `dom changes` mit 300
+  zufälligen Änderungen, `dom view`, `dom cost`) und `--page dom` (`dom_steps.uis`, Windows und
+  Linux). Offen: strukturelle Änderungen (Einfügen, Entfernen) leiten das ganze Dokument neu ab
+  statt nur den betroffenen Container; Element unter einer Textposition (Klick-Ereignisse) gibt
+  es nur blockweise (`MdBlock::node`).
+  (4) *erledigt* (2026-10-30) Eine CSS-Teilmenge in `rich_html` (für B4): `<style>`-Elemente
+  (media screen/all) und `style=`; Selektoren wie in (3) (Tag, `*`, `#id`, `.klasse`,
+  Attribute, Nachfahre, Kind, Listen); Kaskade nach Spezifität und Reihenfolge, dann
+  `style=`, `!important` darüber, je Eigenschaft die letzte; Regeln nach id, Klasse oder Tag
+  ihres Subjekts indiziert, Abgleich mit Budget proportional zu Seite und Stylesheets. Vererbt
+  werden die Texteigenschaften wie bisher (`color`, `font-weight`, `font-style`,
+  `text-decoration`, `text-align`, `white-space: pre`; `font-size` gelesen, nicht gezeigt);
+  Links behalten ihre Linkfarbe, außer eine Regel für sie gibt eine. Blockelemente (auch
+  `ul`/`ol`/`nav`/`form`/`body`) bekommen Kästen (`MdBox`, `MdDoc::boxes`, `MdBlock::boxes`):
+  `margin`, `padding`, `border` (Breite, sichtbarer Stil durchgezogen, Farbe; Kurzformen, je
+  Seite, `-width`/`-style`/`-color`) und Hintergrund um ihre Blöcke, an ihrem Platz zwischen
+  den Einzügen von Zitaten und Listen; ein von CSS gegebener Rand oben/unten ersetzt den
+  Abstand zwischen Blöcken; auf einem Hintergrund liest sich Text ohne eigene Farbe (Felder
+  bekommen den Themenhintergrund), hoher Kontrast lässt Seitenfarben und Hintergründe weg und
+  zeichnet Rahmen in Textfarbe, links/rechts bleiben physisch auch in rechts-nach-links
+  Dokumenten; `display:none` blendet aus. Unbekannte Eigenschaften, At-Regeln, Pseudoklassen und
+  Geschwister-Kombinatoren werden ignoriert; `RichDoc::from_html` liest weiter keine
+  Stylesheets. Seiten ohne `<style>` bleiben gleich (alle bisherigen Shots byteweise gleich).
+  Getestet mit `mdviewtest --test unit` (Gruppe `css`: Spezifität, Reihenfolge, `!important`,
+  Vererbung, Kästen, Ignoriertes, physische Seiten in rechts-nach-links, Kosten; die 300
+  zufälligen Änderungen von (3) mit Stylesheet) und `--page css` (`css_shots.uis` hell, dunkel,
+  hoher Kontrast, gespiegelt; `css_scale.uis` 150 %; Windows und Linux). In `lib/script` nur
+  `compile_with` (siehe den Runner), damit der Browser-Host seine eigenen Globals (`document`,
+  `fetch` …) prüfen lässt. Bewusst nicht: eine vollständige HTML/CSS-Engine (Box-Modell mit
+  Breiten und Höhen, Floats, Flexbox, Grid, Positionierung) und JavaScript. Offen: Schriftgrößen
+  und -familien aus CSS in der Ansicht, Hintergründe einzelner Tabellenzellen, zusammenfallende
+  Ränder, `@media`; im dunklen Thema bleiben Textfarben der Seite, wie sie sind.
 - **P3** · *erledigt* · Befehlsbäume für Konsolen (seit 2026-10-19, für JFNetworker):
   [`base/cmdtree.rs`](../lib/base/cmdtree.rs) mit IOS-Abkürzungen (`sh ip int br`), `?`-Hilfe
   im IOS-Layout, Tab, Modi mit Prompt, `no`-Form, typisierten Parametern (Zahl mit Bereich,
@@ -1843,7 +1884,7 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   `actions/upload-pages-artifact` mit `build/site` und `actions/deploy-pages`; in den
   Repository-Einstellungen Pages mit der Quelle „GitHub Actions“), ein `gh-pages`-Zweig oder ein
   beliebiger statischer Host; dazu wahlweise eine eigene Domain und eine Fassung pro Release.
-- **P3** · *teilweise* · Hot-Reload, Live-Inspector bzw. Debug-Overlay (`--dump` als Basis).
+- **P3** · *erledigt* · Hot-Reload, Live-Inspector bzw. Debug-Overlay (`--dump` als Basis).
   Live-Inspector erledigt (2026-10-20, [GUIDE.md §30](GUIDE.md), `lib/ui/inspect.rs`): aus
   ohne Kosten und ohne Einfluss auf die Bilder (byteweise gleich), an mit `--inspect`,
   `jfgui_INSPECT=1` (nur Tastenkürzel) oder `ui.inspect_enable` / `ui.inspect_show`, umgeschaltet
@@ -1861,8 +1902,9 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   Auswahl; es stiehlt keinen Fokus. Skriptbefehle `inspect …` (u. a. `expect same` / `idle`
   für „aus ändert nichts“), Tests `apps/gallery/tests/inspect.uis` und `inspect_rtl.uis`
   (Windows und Linux, auch mit `--verify-dirty`). Bearbeiten im Inspektor und
-  Hot-Reload: Stufen 1 bis 3 des nächsten Eintrags erledigt (2026-10-26).
-- **P2** · *teilweise* · Hot-Reload und beschreibbarer Inspektor („Live-Edit“, wie das F12-Menü
+  Hot-Reload: Stufen 1 bis 3 des nächsten Eintrags erledigt (2026-10-26), Stufe 4 (Quelltext
+  öffnen) am 2026-10-30.
+- **P2** · *erledigt* · Hot-Reload und beschreibbarer Inspektor („Live-Edit“, wie das F12-Menü
   eines Browsers), als Debug-Variante. Festgelegt am 2026-10-25: (a) Eine Art Hot-Reload: Code
   ändern, die laufende App zeigt die Änderung; die Elemente bleiben gebauter Rust-Code, nichts
   wird zur Laufzeit beschrieben oder interpretiert. (b) Nur als Debug-Variante und nur wenn
@@ -1934,4 +1976,30 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   redo|save|list|do …`, `inspect expect changes|value|list|undo|redo|message`; Tests
   `apps/gallery/tests/inspect_edit.uis`, `inspect_edit_rtl.uis` (gespiegelt, 150 %),
   `apps/themedemo/tests/inspect_edit.uis` (die gelinkten Stile, Änderungen über einem
-  App-Theme), Windows und Linux, auch mit `--verify-dirty`. Offen: Stufe 4 (Quelltext öffnen).
+  App-Theme), Windows und Linux, auch mit `--verify-dirty`.
+  Stufe 4 *erledigt* (2026-10-30, [`ui/inspect_src.rs`](../lib/ui/inspect_src.rs),
+  [GUIDE.md §30](GUIDE.md) „Sources“): nur im Entwicklungs-Build. Die öffentlichen
+  Widget-Aufrufe der Bibliothek (158, von `ui.button`, `ui.textbox`, `ui.slider`, `ui.combobox`,
+  `ui.list_item`, `ui.box_begin` bis `ui.dialog_buttons`, dazu `ui.sem`) tragen
+  `#[cfg_attr(jfgui_dev, track_caller)]` und öffnen als erste Anweisung einen Bereich, der bei
+  offenem Inspektor den gerade gebauten Aufruf setzt (`Location::caller()`); ein Aufruf aus der
+  Bibliothek selbst behält den umgebenden der App, so melden zusammengesetzte Widgets
+  (Zahlenfeld, Kombinationsfeld, Menü- und Listenzeilen, Dialogknöpfe) die Zeile der App. Aus
+  kostet es einen Flag-Test je Aufruf, nichts wird gespeichert (`inspect expect same` / `idle`
+  halten); `--release` hat weder `#[track_caller]` noch Bereiche (`inspect_src_off.rs`). Tab
+  „Widgets“: „Quelle: apps/x/main.rs:123“ (relativ zum Repository, wie rustc den Pfad bekommt)
+  mit Kopieren und „Im Editor öffnen“: `jfgui_EDITOR` (`{file}`, `{line}`, `{col}`), sonst
+  `VISUAL` / `EDITOR` (bekannte Editoren mit Zeile), sonst gefunden: CLion, VS Code; die Datei
+  absolut unter `jfgui_SRC`, dem Ordner über `build/` oder dem Arbeitsordner. Gestartet wird
+  über das neue `plat::process::launch` (eigenständig, ohne Pipes, überlebt die App und den
+  Neustart durch Hot-Reload), geprüft wie `Command::spawn` vom Manifest der App
+  (`process`-Regel, `ask process` fragt, danach noch einmal öffnen): Entscheidung für die
+  Entwicklungszeit, keine Ausnahme für den Inspektor, eine Ablehnung steht mit dem
+  Programmnamen unter der Quelle, Kopieren bleibt. Skripte starten nie den Editor des Nutzers, nur einen mit `inspect editor` gesetzten.
+  Skriptbefehle `inspect editor|open [dry]`, `inspect expect source|sources|opened|note`
+  (`sources`: jeder Eintrag der App-Fenster hat eine Quelle in der App, kein Widget-Aufruf der
+  Bibliothek ist unmarkiert; so auch für datagallery, docktest, diagramtest, editortest,
+  termtest, officeicontest, themedemo, uitest und BackupCraft geprüft); Tests
+  `apps/gallery/tests/inspect_source.uis`, `apps/audiotest/tests/inspect_perm.uis` (Manifest
+  ohne `process`: abgelehnt), `apps/plattest/tests/launch.uis`, Windows und Linux, auch mit
+  `--verify-dirty`.

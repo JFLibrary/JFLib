@@ -1,0 +1,78 @@
+#!args --page dom --verify-dirty
+# a page the app changes step by step through the document's elements (--page dom, F5: as a page
+# script would, MdViewState::doc_mut): the counter changes in place, a list item comes at the
+# top, a text field comes before the focused one (the fields are numbered anew: the focus, the
+# typed text and the checked box stay), the note is hidden, the link gets another address and
+# text, a list item goes and the heading changes, three paragraphs come above the place the view
+# shows (it stays where it is, the selection too), the heading gets HTML; then the form sends
+# what the user typed
+size 1000 720
+theme light
+expect heading:"Seite mit Skript" exists
+expect text:"Stand: 0 Schritte" exists
+expect listitem:"Erster Eintrag" rect 29 136 930 20
+expect checkbox:"Merken" unchecked
+expect link:"Erster Link" exists
+# into the name field, the box checked
+click 143,210
+type "anna"
+click checkbox:"Merken"
+click 143,210
+key end
+expect textbox:"anna" focused
+# 1: the counter (its block alone again)
+key f5
+expect text:"Schritt: 1" exists
+expect text:"Stand: 1 Schritte" exists
+expect textbox:"anna" focused
+# 2: a list item at the top: the rest moves down, the field keeps its text and the focus
+key f5
+expect listitem:"Neuer Eintrag" rect 29 136 930 20
+expect listitem:"Erster Eintrag" rect 29 160 930 20
+expect textbox:"anna" focused
+expect checkbox:"Merken" checked
+# 3: a text field before the focused one
+key f5
+expect textbox:"anna" rect 173 218 147 32
+expect textbox:"anna" focused
+expect checkbox:"Merken" checked
+expect text:"Fokus: name" exists
+type "-lena"
+expect textbox:"anna-lena" focused
+shot build/mdviewtest/dom_steps.png
+# 4: the note hidden; 5: the link; 6: a list item goes, the heading's text
+key f5
+expect text:"Ein Hinweis, der beim vierten Schritt verschwindet." missing
+key f5
+expect link:"Zweiter Link" exists
+expect link:"Erster Link" missing
+key f5
+expect listitem:"Zweiter Eintrag" missing
+expect heading:"Seite geändert" exists
+expect textbox:"anna-lena" exists
+expect checkbox:"Merken" checked
+# 7: paragraphs above the view: it stays where it is, the selection too
+key esc
+key pgdn
+expect "Skript" value 562
+dblclick 50,204
+expect text:"Auswahl: 6 Zeichen" exists
+expect text:"Absatz 13: einer Zeilen Höhen." rect 29 194 930 20
+key f5
+expect text:"Absatz 13: einer Zeilen Höhen." rect 29 194 930 20
+expect text:"Auswahl: 6 Zeichen" exists
+expect "Skript" value 634
+shot build/mdviewtest/dom_scrolled.png
+# 8: the heading's HTML
+key home
+key f5
+expect heading:"Seite fertig" exists
+expect text:"Schritt: 8" exists
+# the form sends what the user typed (the new field: empty)
+click textbox:"anna-lena"
+key enter
+expect text:"Senden: get /suche vorname=&name=anna-lena&merken=on" exists
+theme dark
+shot build/mdviewtest/dom_dark.png
+theme light
+expect_nowarn

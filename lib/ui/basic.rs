@@ -121,7 +121,9 @@ impl Ui {
     // ------------------------------------------------------------------ text
 
     /// ui_text(style, s): a text in a text style (TS_* | TX_*)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn text(&mut self, style: u32, s: &str) {
+        let _src = self.src_scope();
         let s = cstr(s);
         if style & TX_WRAP != 0 {
             self.text_wrap(style, s); // (U2) wrapped text: own function
@@ -159,7 +161,9 @@ impl Ui {
     /// A section title: `text(style, s)` that screen readers know as a heading of `level`
     /// (1 the top level ..= 9; record K_HEADING, value: the level) -- their heading navigation
     /// finds it.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn heading(&mut self, level: u32, style: u32, s: &str) {
+        let _src = self.src_scope();
         let n = self.sems.len();
         self.text(style, s);
         if let Some(r) = self.sems.get_mut(n) {
@@ -405,14 +409,18 @@ impl Ui {
     }
 
     /// ui_button(id, label) -> EV_* (EV_ACT on click)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn button(&mut self, id: u32, label: &str) -> u32 {
+        let _src = self.src_scope();
         self.btn_core(id, Some(label), 0)
     }
 
     /// A focusable text action with explicit TS_*/TX_* typography and horizontal inset
     /// in DIP. Uses the style's button surface and ordinary button semantics. Long labels
     /// are ellipsized visually; accessibility and agent inspection retain the full label.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn label_button(&mut self, id: u32, label: &str, typography: u32, inset: i32) -> u32 {
+        let _src = self.src_scope();
         let label = cstr(label);
         let flags = self.take_flags();
         self.take_icon();
@@ -455,7 +463,9 @@ impl Ui {
     /// A hyperlink-style text action: accent-coloured text (T_ACCENT_TEXT), underlined while
     /// the pointer is over it, hand cursor, focus ring, no button surface.  TS_*/TX_*
     /// typography as in text(); a narrower slot than the text ellipsizes it.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn link(&mut self, id: u32, label: &str, typography: u32) -> u32 {
+        let _src = self.src_scope();
         let label = cstr(label);
         let flags = self.take_flags();
         self.take_icon();
@@ -487,12 +497,16 @@ impl Ui {
     }
 
     /// ui_accent_button(id, label) -> EV_*: the accent (primary) button
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn accent_button(&mut self, id: u32, label: &str) -> u32 {
+        let _src = self.src_scope();
         self.btn_core(id, Some(label), ST_ACCENT)
     }
 
     /// ui_icon_button(id, icon, label) -> EV_*: subtle toolbar button
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn icon_button(&mut self, id: u32, icon: u32, label: &str) -> u32 {
+        let _src = self.src_scope();
         self.next_icon(icon);
         self.btn_icon(id, Some(label), ST_SUBTLE | ST_ICON_ONLY)
     }
@@ -508,7 +522,9 @@ impl Ui {
     }
 
     /// ui_toggle_button(id, label, &mut v) -> EV_*: checked look while v != 0; toggles v
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn toggle_button(&mut self, id: u32, label: &str, v: &mut i32) -> u32 {
+        let _src = self.src_scope();
         let ev = self.btn_core(id, Some(label), if *v != 0 { ST_CHECKED } else { 0 });
         if ev & EV_ACT != 0 {
             *v = (*v ^ 1) & 1;
@@ -519,7 +535,9 @@ impl Ui {
 
     /// ui_tool_button(id, icon, label, &mut sel, mine) -> EV_*: subtle icon button, checked
     /// when sel == mine; the tool buttons of one variable are one Tab stop (arrows inside)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn tool_button(&mut self, id: u32, icon: u32, label: &str, sel: &mut i32, mine: i32) -> u32 {
+        let _src = self.src_scope();
         self.kb_auto_group(&*sel as *const i32 as usize, mine);
         self.next_icon(icon);
         let mut f = ST_SUBTLE | ST_ICON_ONLY;
@@ -538,7 +556,9 @@ impl Ui {
 
     /// ui_checkbox(id, label, &mut v) -> EV_*: v 0, 1, 2 = indeterminate (Space toggles,
     /// Enter is the dialog's)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn checkbox(&mut self, id: u32, label: &str, v: &mut i32) -> u32 {
+        let _src = self.src_scope();
         let label = cstr(label);
         let f = self.take_flags();
         let st = self.style;
@@ -567,7 +587,9 @@ impl Ui {
 
     /// ui_radio(id, label, &mut v, mine) -> EV_*: v = mine when clicked; the radios of one
     /// variable are one Tab stop, the arrows select inside (kbnav.rs)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn radio(&mut self, id: u32, label: &str, v: &mut i32, mine: i32) -> u32 {
+        let _src = self.src_scope();
         let label = cstr(label);
         let f = self.take_flags();
         let st = self.style;
@@ -599,7 +621,9 @@ impl Ui {
     }
 
     /// ui_switch(id, label, &mut v) -> EV_*: toggle switch
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn switch(&mut self, id: u32, label: &str, v: &mut i32) -> u32 {
+        let _src = self.src_scope();
         let label = cstr(label);
         let f = self.take_flags();
         let st = self.style;
@@ -633,7 +657,9 @@ impl Ui {
 
     /// ui_slider(id, &mut v, &range) -> EV_*: EV_ACT while the value changes, EV_COMMIT on
     /// release
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn slider(&mut self, id: u32, v: &mut i32, rg: &Range) -> u32 {
+        let _src = self.src_scope();
         let old = *v;
         let f = self.take_flags();
         let vert = (rg.flags & RG_VERT) as i32;
@@ -719,7 +745,9 @@ impl Ui {
     // ------------------------------------------------------------------ progress, separator, icon, image
 
     /// ui_progress(id, v, max): progress bar
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn progress(&mut self, id: u32, v: i32, max: i32) {
+        let _src = self.src_scope();
         let st = self.style;
         let mut sp = Sp::default();
         let (w, h) = st.progress_size(self, &mut sp);
@@ -733,7 +761,9 @@ impl Ui {
     }
 
     /// ui_separator: divider across the current box (the style draws it)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn separator(&mut self) {
+        let _src = self.src_scope();
         let st = self.style;
         let mut sp = Sp::default();
         let t = st.separator_size(self, &mut sp); // thickness incl. margins
@@ -752,7 +782,9 @@ impl Ui {
     }
 
     /// ui_icon(cp, size_dip): an icon in the text colour
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn icon(&mut self, cp: u32, size: i32) {
+        let _src = self.src_scope();
         let s = self.dp(size);
         let r = self.place(s, s);
         let c = self.color(if self.wp.ctx.disabled_depth != 0 { T_TEXT_DISABLED } else { T_TEXT });
@@ -764,7 +796,9 @@ impl Ui {
 
     /// ui_image(id, sf, ver) -> EV_* (clickable when id != 0): a surface at its natural size
     /// (or next_size); ver stands for its SF_AUX version
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn image(&mut self, id: u32, sf: &Rc<Surface>, ver: u32) -> u32 {
+        let _src = self.src_scope();
         let r = self.place(sf.w, sf.h);
         self.draw_image(sf, ver, r[0], r[1], r[2], r[3]);
         if id == 0 {
@@ -778,7 +812,9 @@ impl Ui {
     /// ui_canvas(id, draw, user, version) -> &UiInput: a custom area.  The hit box wants
     /// every pointer move; the cursor comes from next_flags bits 12..15 (CUR_* <<
     /// HB_CURSOR_SHIFT), default crosshair.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn canvas(&mut self, id: u32, draw: Option<DrawRef>, user: usize, version: u32) -> &UiInput {
+        let _src = self.src_scope();
         let f = self.take_flags();
         let r = self.place(0, 0);
         let mut cur = f & (15 << HB_CURSOR_SHIFT);

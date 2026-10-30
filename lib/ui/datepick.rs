@@ -57,7 +57,9 @@ pub fn weekday(y: i32, m: u32, d: u32) -> u32 {
 
 impl Ui {
     /// ui_time_box(id, &mut hour, &mut minute) -> EV_* (EV_ACT changed)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn time_box(&mut self, id: u32, hour: &mut i32, minute: &mut i32) -> u32 {
+        let _src = self.src_scope();
         let (h0, m0) = (*hour, *minute);
         self.box_begin(0, BOX_H | BOX_XCENTER, 4);
         self.next_size(64, 0);
@@ -72,7 +74,9 @@ impl Ui {
 
     /// ui_weekday_toggles(id, &mut mask) -> EV_* (EV_ACT changed); bit 0 = Monday.  The
     /// buttons wrap where the row has less room than the seven of them (a narrow card)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn weekday_toggles(&mut self, id: u32, mask: &mut u32) -> u32 {
+        let _src = self.src_scope();
         let old = *mask;
         self.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP, 4);
         for d in 0..7u32 {
@@ -89,7 +93,9 @@ impl Ui {
     }
 
     /// ui_date_picker(id, &mut y, &mut m, &mut d) -> EV_* (EV_ACT when a day was picked)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn date_picker(&mut self, id: u32, y: &mut i32, m: &mut u32, d: &mut u32) -> u32 {
+        let _src = self.src_scope();
         // the date in the user's format; the week starts on the locale's first day
         let label = i18n::fmt_date(&datetime::Civil { year: *y, month: *m as u8, day: *d as u8, ..Default::default() }, i18n::DATE_SHORT);
         let fw = i18n::locale().first_weekday();

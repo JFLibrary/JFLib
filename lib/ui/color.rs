@@ -274,7 +274,9 @@ impl Ui {
     /// ui_swatch(id, argb, selected) -> EV_*: the swatches of one box are one Tab stop (the
     /// selected one; arrows move inside, Space / Enter act, the menu key is a right click);
     /// next_flags(ST_NOFOCUS): a picture only, no Tab stop
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn swatch(&mut self, id: u32, argb: u32, selected: bool) -> u32 {
+        let _src = self.src_scope();
         let f = self.take_flags();
         let st = self.style;
         let mut sp = Sp::default();
@@ -304,7 +306,9 @@ impl Ui {
     // ------------------------------------------------------------------ colour picker
 
     /// ui_color_picker(id, &mut argb) -> EV_*
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn color_picker(&mut self, id: u32, argb: &mut u32) -> u32 {
+        let _src = self.src_scope();
         self.color_picker_ex(id, argb, 0)
     }
 
@@ -335,7 +339,9 @@ impl Ui {
     }
 
     /// ui_color_picker_ex(id, &mut argb, flags) -> EV_* (CP_ALPHA, CP_FIELDS, CP_PIPETTE)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn color_picker_ex(&mut self, id: u32, argb: &mut u32, flags: u32) -> u32 {
+        let _src = self.src_scope();
         let mut ev = 0;
         let old = *argb;
         // a colour the pipette picked for this picker (screen.rs)
@@ -745,7 +751,9 @@ impl Ui {
 
     /// ui_color_wheel(id, &mut color, flags) -> EV_*: color = [argb], or [h, s, v] with
     /// CW_HSV
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn color_wheel(&mut self, id: u32, color: &mut [u32], flags: u32) -> u32 {
+        let _src = self.src_scope();
         let hsv = flags & CW_HSV != 0;
         let mut keych = false;
         // the colour as hue / saturation / value
