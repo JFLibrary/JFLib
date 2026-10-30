@@ -48,6 +48,8 @@
 // accounting, the telnet client).
 // shelltest.rs: the shell with folders, the classic tools and processes (group shell:
 // jfn_sim::cli::sh, shrun, coreutils, man, the flash: directories of cli/files.rs).
+// scriptmodtest.rs: scripts that import the device's files and the debugger of a script service
+// (group scriptmod: jfn_sim::scriptsvc's loader and DebugOp, script's modules and debug.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -123,9 +125,11 @@ mod snmptest;
 mod aaatest;
 #[path = "shelltest.rs"]
 mod shelltest;
+#[path = "scriptmodtest.rs"]
+mod scriptmodtest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 42] = [
+    let groups: [(&'static str, fn(&mut T)); 43] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -168,6 +172,7 @@ pub fn run() -> i32 {
         ("snmp", snmptest::run),
         ("aaa", aaatest::run),
         ("shell", shelltest::run),
+        ("scriptmod", scriptmodtest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

@@ -8,14 +8,19 @@
 //                                       the warnings on stdout; exit code 1 when one is an error
 //   jfs --selftest DIR                  the example cases DIR/*.test (selftest.rs; build_rs.py
 //                                       test runs apps/jfs/tests/cases through tests/cases.uis)
+//   jfs [OPTIONS] --test FILE.jfs ...   the test_* functions of the files (testrun.rs)
+//   jfs [OPTIONS] --debug FILE.jfs [ARGS ...] | -e CODE   the script in the console debugger
+//                                       (debugger.rs: commands on standard input)
 //   options: --virtual-time, --until MS, --seed N, --disk FILE, -c / --config K=V or JSON,
 //   --env NAME, --fuel N, --heap N, --depth N, --stack N (usage() has the details); every
-//   option comes before the script, everything after it belongs to the script
+//   option comes before the script, everything after it belongs to the script (with --test:
+//   every argument is a file of tests)
 //
 // The script runs in the console host of host.rs: print -> stdout, log -> stderr, now, rand,
 // config, timer (an event loop on the real clock or a virtual one), disk (in a JSON file or in
-// memory); net, dns, http and metrics belong to JFNetworker and throw a catchable error.  The
-// script gets no other access to files or the network.  Names are checked against the host's
+// memory), import (modules from the file system, relative to the importing file); net, dns,
+// http and metrics belong to JFNetworker and throw a catchable error.  The script gets no other
+// access to files or the network.  Names are checked against the host's
 // before the run (script::compile_with: a typing error is an error, not a warning).  An error
 // of the compiler or an uncaught one of the run goes to stderr with file, line and column, the
 // source line and the calls: exit code 1; a wrong command line: 2.
@@ -31,9 +36,12 @@ extern crate alloc;
 
 mod host;
 mod selftest;
+mod debugger;
+mod testrun;
 
 use alloc::format;
 use alloc::string::String;
+use alloc::vec;
 use alloc::vec::Vec;
 
 use script::{Diagnostic, Limits};
@@ -42,6 +50,7 @@ use script::{Diagnostic, Limits};
 const APP_VERSION: &str = rt::app_version!();
 
 /// where the script comes from
+#[derive(Clone)]
 pub enum Source {
     File(String),
     Stdin,
@@ -49,8 +58,13 @@ pub enum Source {
 }
 
 /// what the command line asks for
+#[derive(Clone)]
 pub struct Opts {
     pub check: bool,
+    /// --test: the arguments are files of tests
+    pub test: bool,
+    /// --debug
+    pub debug: bool,
     pub virtual_time: bool,
     /// --until in nanoseconds of the clock
     pub until: Option<u64>,
@@ -86,8 +100,16 @@ const USAGE: &str = concat!(
     "        jfs [OPTIONEN] - [ARGUMENTE ...]       (das Skript von der Standardeingabe)\n",
     "Führt ein Skript der Sprache von JFNetworker (.jfs) aus; die Argumente stehen in config.args.\n",
     "\n",
+    "        jfs [OPTIONEN] --test DATEI.jfs ...    (die Funktionen test_* der Dateien)\n",
+    "        jfs [OPTIONEN] --debug DATEI.jfs [ARGUMENTE ...]\n",
+    "\n",
     "Optionen (vor dem Skript):\n",
     "  --check              nur prüfen: Fehler und Warnungen mit Zeile und Spalte auf stdout\n",
+    "  --test               jede Funktion test_* in einer frischen VM ausführen, mit der\n",
+    "                       virtuellen Uhr (höchstens 60 s, sonst --until); Bericht und Exit-Code\n",
+    "                       1, wenn ein Test fehlschlägt\n",
+    "  --debug              im Debugger ausführen: Befehle von der Standardeingabe (help zeigt\n",
+    "                       sie), Haltepunkte, Schritte, Variablen\n",
     "  --virtual-time       virtuelle Uhr: Timer laufen ohne Warten, now() beginnt bei 0\n",
     "  --until MS           die Ereignisschleife endet, wenn die Uhr MS Millisekunden erreicht\n",
     "  --seed N             rand() mit festem Startwert (sonst zufällig)\n",
@@ -102,7 +124,8 @@ const USAGE: &str = concat!(
     "  -h, --help           diese Hilfe\n",
     "  -V, --version        die Version\n",
     "Umgebung: JFS_CONFIG ist ein JSON-Objekt, auf das --config aufsetzt.\n",
-    "Im Skript: print, log (stderr), now, rand, config, timer, disk und die Standardbibliothek;\n",
+    "Im Skript: print, log (stderr), now, rand, config, timer, disk, import (Dateien relativ zum\n",
+    "Skript), assert, assert_eq und die Standardbibliothek;\n",
     "net, dns, http und metrics gibt es nur in JFNetworker (ein fangbarer Fehler).\n",
     "Exit-Code: 0 fertig, 1 Fehler im Skript, 2 falscher Aufruf.\n",
 );
@@ -126,6 +149,8 @@ fn run() -> i32 {
     let argv: Vec<String> = plat::args().into_iter().skip(1).collect();
     let mut o = Opts {
         check: false,
+        test: false,
+        debug: false,
         virtual_time: false,
         until: None,
         seed: None,
@@ -195,6 +220,14 @@ fn run() -> i32 {
                 o.check = true;
                 Ok(())
             }
+            "--test" => {
+                o.test = true;
+                Ok(())
+            }
+            "--debug" => {
+                o.debug = true;
+                Ok(())
+            }
             "--virtual-time" => {
                 o.virtual_time = true;
                 Ok(())
@@ -243,6 +276,17 @@ fn run() -> i32 {
         return bad("es fehlt das Skript: eine Datei, -e CODE oder - für die Standardeingabe");
     };
     o.args = argv[i..].to_vec();
+    if o.test {
+        let Source::File(first) = source else {
+            return bad("--test braucht Dateien mit Tests");
+        };
+        let mut files = vec![first];
+        files.append(&mut o.args);
+        return testrun::run(&files, &o);
+    }
+    if o.debug && matches!(source, Source::Stdin) {
+        return bad("--debug liest seine Befehle von der Standardeingabe: das Skript muss eine Datei oder -e CODE sein");
+    }
     o.source = source;
     let (name, src) = match load(&o.source) {
         Ok(x) => x,
@@ -266,11 +310,20 @@ fn run() -> i32 {
             return 1;
         }
     };
-    host::run(&prog, &o, &name, &src)
+    let dbg = if o.debug {
+        let mut d = debugger::Debugger::new(&name, &src);
+        if !d.prelude() {
+            return 0;
+        }
+        Some(d)
+    } else {
+        None
+    };
+    host::run(&prog, &o, &name, &src, dbg)
 }
 
 /// the script's name for messages and its text
-fn load(s: &Source) -> Result<(String, String), String> {
+pub fn load(s: &Source) -> Result<(String, String), String> {
     let (name, bytes) = match s {
         Source::Code(c) => return Ok((String::from("-e"), c.clone())),
         Source::File(f) => match plat::read_file(f) {

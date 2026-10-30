@@ -1,0 +1,6 @@
+// an error in a module's function: the message names the module's file
+let m = import("mod/fail.jfs")
+fn run() {
+  return m.ratio(1, 0)
+}
+print(run())

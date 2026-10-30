@@ -168,7 +168,7 @@ impl<'a> Parser<'a> {
         if self.after_prev() {
             let p = self.prev();
             let col = p.col + self.text(p).chars().count() as u32;
-            self.diags.push(Diagnostic { line: p.line, col, end_col: col + 1, error: true, msg: msg.into() });
+            self.diags.push(Diagnostic { line: p.line, col, end_col: col + 1, error: true, msg: msg.into(), file: String::new() });
         } else {
             self.error(span(self.peek()), msg);
         }

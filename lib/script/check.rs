@@ -75,7 +75,7 @@ fn distance(a: &str, b: &str) -> usize {
 impl<'a> Resolver<'a> {
     fn report(&mut self, sp: Span, len: usize, error: bool, msg: String) {
         let end_col = sp.col + (len as u32).max(1);
-        self.out.push(Diagnostic { line: sp.line, col: sp.col, end_col, error, msg });
+        self.out.push(Diagnostic { line: sp.line, col: sp.col, end_col, error, msg, file: String::new() });
     }
 
     fn name_error(&mut self, n: &Name, msg: String) {

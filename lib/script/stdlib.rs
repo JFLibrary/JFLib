@@ -10,7 +10,7 @@
 //   spend / cap         fuel by the work; a text that is built must stay below the heap limit
 //
 // The functions are in strlib.rs, listlib.rs, jsonlib.rs and here (int, float, bytes, map,
-// math).  Fuel, on top of the 1 of the call: 1 per new object (str, bytes, list, map), 1 per
+// math, and assert / assert_eq for tests: jfs --test).  Fuel, on top of the 1 of the call: 1 per new object (str, bytes, list, map), 1 per
 // 64 bytes of text read or written, 1 per 8 list values and 1 per 4 map entries copied or
 // visited, 1 per comparison of a sort, 2 for sqrt, 4 for exp log log2 log10 sin cos, 8 for
 // pow, plus what callbacks cost.  Long operations pay as they go (spend), so the fuel limit
@@ -92,10 +92,17 @@ table! {
     }
 }
 
-/// the library function of a host name ("str.split", "math.sqrt"; "bytes" alone)
+/// the library function of a host name ("str.split", "math.sqrt"; "bytes", "assert" and
+/// "assert_eq" alone)
 pub(crate) fn find(name: &str) -> Option<LibFn> {
     if name == "bytes" {
         return Some(bytes_new);
+    }
+    if name == "assert" {
+        return Some(assert_fn);
+    }
+    if name == "assert_eq" {
+        return Some(assert_eq_fn);
     }
     let (ty, f) = name.split_once('.')?;
     lookup(ty, f)
@@ -727,4 +734,61 @@ fn math_is_finite(_: &mut Vm, _: &mut dyn Host, a: &[Value]) -> Result<Value, Ex
         Value::Float(x) => x.to_bits() & 0x7FF0_0000_0000_0000 != 0x7FF0_0000_0000_0000,
         _ => true,
     }))
+}
+
+// ---- tests (jfs --test)
+
+/// assert(cond, msg): throws "Annahme verletzt: msg" when cond is falsy
+fn assert_fn(vm: &mut Vm, _: &mut dyn Host, a: &[Value]) -> Result<Value, Exc> {
+    if arg(a, 0).truthy() {
+        return Ok(Value::Nil);
+    }
+    match arg(a, 1) {
+        Value::Nil => err(String::from("Annahme verletzt")),
+        m => err(format!("Annahme verletzt: {}", vm.display(m))),
+    }
+}
+
+/// assert_eq(a, b, msg): throws "msg: erwartet B, ist A" (values as in a list) unless a and b
+/// are equal -- numbers and texts as ==, lists and maps by their content (unlike ==; maps in
+/// any order), 64 levels deep
+fn assert_eq_fn(vm: &mut Vm, _: &mut dyn Host, a: &[Value]) -> Result<Value, Exc> {
+    let (x, y) = (arg(a, 0), arg(a, 1));
+    let mut seen = 0u64;
+    let same = deep_eq(vm, x, y, 0, &mut seen);
+    spend(vm, seen / 8)?;
+    if same {
+        return Ok(Value::Nil);
+    }
+    let what = format!("erwartet {}, ist {}", vm.repr(y), vm.repr(x));
+    spend(vm, what.len() as u64 / 64)?;
+    match arg(a, 2) {
+        Value::Nil => err(format!("assert_eq: {}", what)),
+        m => err(format!("{}: {}", vm.display(m), what)),
+    }
+}
+
+fn deep_eq(vm: &Vm, a: Value, b: Value, depth: u32, seen: &mut u64) -> bool {
+    *seen += 1;
+    if vm.same(a, b) {
+        return true;
+    }
+    if depth >= 64 {
+        return false;
+    }
+    match (a, b) {
+        (Value::List(x), Value::List(y)) => {
+            let (p, q) = (vm.heap.list(x), vm.heap.list(y));
+            p.len() == q.len() && p.iter().zip(q.iter()).all(|(u, v)| deep_eq(vm, *u, *v, depth + 1, seen))
+        }
+        (Value::Map(x), Value::Map(y)) => {
+            let (p, q) = (vm.heap.map(x), vm.heap.map(y));
+            p.live == q.live
+                && p.iter().all(|e| {
+                    let i = vm.heap.key(e.key).and_then(|k| vm.heap.map_find(y, k));
+                    i.is_some_and(|i| deep_eq(vm, e.val, q.entries[i].val, depth + 1, seen))
+                })
+        }
+        _ => false,
+    }
 }

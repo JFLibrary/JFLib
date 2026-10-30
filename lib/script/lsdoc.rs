@@ -41,6 +41,10 @@ pub(crate) const DOCS: &[Doc] = &[
     d("int", "", "x", "Eine ganze Zahl: schneidet einen float ab, liest Text wie \"42\" oder \"0x1F\"."),
     d("float", "", "x", "Der Wert als Gleitkommazahl (auch aus Text)."),
     d("bytes", "", "x, ..", "Neue Bytes: leer, aus Text (UTF-8), aus einer Liste von Zahlen oder aus einzelnen Zahlen."),
+    // modules and tests (module.rs, stdlib.rs)
+    d("import", "", "path", "Lädt eine andere Datei einmal und gibt ihre obersten fns und lets als Map; Namen mit _ bleiben privat."),
+    d("assert", "", "cond, msg", "Wirft einen Fehler mit msg, wenn cond nicht wahr ist."),
+    d("assert_eq", "", "a, b, msg", "Wirft einen Fehler, wenn a und b verschieden sind; Listen und Maps zählen nach ihrem Inhalt."),
     // str
     d("str.len", "s", "", "Die Zahl der Zeichen."),
     d("str.slice", "s", "start, end", "Der Teil von start bis vor end (Zeichen); negative Werte zählen vom Ende."),

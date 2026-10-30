@@ -9,10 +9,12 @@
 // The group mail checks netpkt::smtp, netpkt::pop3 and netpkt::imf (mailt.rs).
 // The group scriptls checks script's language services and formatter (scriptlst.rs).
 // The group pattern checks base::pattern: wildcards and regular expressions (patternt.rs).
+// The group scriptmod checks script's modules, debugger and test functions (scriptmodt.rs).
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app coretest
 //   build/win/coretest.exe [--only NAME] [--bench] [--vectors FILE]  (FILE: tools/crypto_check.py)
+//   build/win/coretest.exe --bench vm   the script VM's benchmark alone (scriptmodt.rs)
 //   build/win/coretest.exe --math FILE  (FILE: tools/script_math_check.py)
 //   (build_rs.py test runs it through tests/all.uis; --script is ignored)
 #![no_std]
@@ -61,6 +63,7 @@ mod snmpt;
 mod radiust;
 mod scriptlst;
 mod patternt;
+mod scriptmodt;
 
 /// the result collector of a check group
 pub struct T {
@@ -97,8 +100,13 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--math") {
         return scriptlibt::math_file(&f);
     }
+    if plat::arg_value("--bench").as_deref() == Some("vm") {
+        scriptmodt::bench();
+        return 0;
+    }
     if args.iter().any(|a| a == "--bench") {
         crypto::bench();
+        scriptmodt::bench();
         return 0;
     }
     if let Some(op) = plat::arg_value("--lz4") {
@@ -134,7 +142,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 37] = [
+    let groups: [(&'static str, fn(&mut T)); 38] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -172,6 +180,7 @@ fn run() -> i32 {
         ("radius", radiust::run),
         ("scriptls", scriptlst::run),
         ("pattern", patternt::run),
+        ("scriptmod", scriptmodt::run),
     ];
     let mut failed = 0;
     let mut total = 0;

@@ -437,6 +437,11 @@ fn jfs_t(t: &mut T) {
     t.eq("jfs | grep", o, s("2\n"));
     let _ = cli(&mut e, PC1, &["jfs later.jfs > later.log"], SEC);
     t.eq("jfs > FILE", sh(&mut e, "cat later.log"), s("erst\nspäter\n"));
+    // a process's relative imports start in its file's directory, not in the working directory
+    let _ = sh(&mut e, "mkdir lib; echo 'fn twice(x) { return x * 2 }' > lib/util.jfs");
+    let _ = sh(&mut e, "echo 'let u = import(\"lib/util.jfs\"); print(u.twice(21))' > main.jfs; cd ~");
+    t.eq("imports beside the script", cli(&mut e, PC1, &["jfs app/main.jfs"], MS), s("42\n"));
+    let _ = sh(&mut e, "cd app");
     // the network from a process: a request to the web server
     let _ = sh(&mut e, "echo 'http.request(\"http://10.0.0.10/\", fn(err, r) { print(r.status, r.body) })' > get.jfs");
     t.eq("http from a process", cli(&mut e, PC1, &["jfs get.jfs"], SEC), s("200 Hallo von SRV1\n\n"));

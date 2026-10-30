@@ -1234,7 +1234,7 @@ impl Engine {
         let mut conf = agent_core::jmap::empty_object();
         conf.insert("args", agent_core::jmap::Value::Array(list));
         conf.insert("file", agent_core::jmap::Value::string(&abs));
-        let svc = match ScriptService::new(source, ScriptCfg::default(), &conf) {
+        let svc = match ScriptService::new_file(&abs, source, ScriptCfg::default(), &conf) {
             Ok(s) => s,
             Err(diags) => {
                 let mut s = String::new();

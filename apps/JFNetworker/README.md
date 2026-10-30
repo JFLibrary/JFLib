@@ -1558,6 +1558,38 @@ Antwortzeiten auf die Nanosekunde aus dem Fuel, Timer, UDP, TCP, HTTP, DNS, Disk
 Endlosschleife, Grenzen, Fehler, `script`, `top`, Determinismus, ein neuer Quelltext, der Disk,
 Zahlen und Fehler behält, Umbenennen im Lauf) und im Golden-Szenario oben.
 
+**Module aus den Dateien des Geräts** (SK7): `let util = import("/home/user/lib/util.jfs")`
+liest eine Datei des Geräts (die Dateien des Reiters Dateien; ein relativer Pfad gilt ab der
+Datei, die importiert, im Quelltext des Dienstes ab `/root` wie in der Shell, in einem Prozess
+`jfs DATEI` ab dem Ordner von DATEI) und gibt ihre
+obersten `fn`s und `let`s als Map; Namen mit `_` bleiben im Modul. Jedes Modul läuft einmal je
+Start des Dienstes, im Rückruf, der es zuerst importiert, mit dessen Rechenzeit; das Lesen
+kostet die Zeit der Disk des Geräts (`"disk": {...}`), in der das Programm wartet. Fehler eines
+Moduls nennen seine Datei: `ScriptErr::file`, die Statuszeile („… in /home/user/lib/util.jfs,
+Zeile 7, Spalte 12: …“), `script errors`, die Zeile im Log und der Text der Notiz; eine fehlende
+Datei, ein Zyklus und ein Modul, das sich nicht übersetzen lässt, sind fangbare Fehler.
+
+**Der Debugger eines Skripts** (die Stellen, an die die IDE andockt; noch ohne Oberfläche):
+`Action::ScriptDebug { dev, svc, op }` mit `DebugOp::Pause` (anhalten an der nächsten
+Anweisung, im laufenden Rückruf oder im nächsten), `Continue`, `Step(Into | Over | Out)`,
+`Break { file, line, cond }` (`file` leer: der Quelltext des Dienstes, sonst der Pfad eines
+importierten Moduls; `cond` ein Ausdruck in jfs), `Unbreak` und `ClearBreaks`. Haltepunkte gehören
+zum Dienst und gelten für jeden Start. `ScriptService::paused` sagt, wo der Rückruf hält,
+`debug_vm` gibt die VM für Aufrufliste, Variablen und Werte, `debug_eval` wertet einen Ausdruck
+auf einer Kopie der VM aus, `ScriptView::paused` und die Statuszeile („angehalten in Zeile 3,
+Spalte 3“) zeigen es. Angehalten wird in virtueller Zeit: die Simulation läuft weiter, die CPU
+des Skripts ist frei (keine Rechenzeit), Ereignisse warten in der Warteschlange wie hinter einer
+belegten CPU (ist sie voll, gehen Datagramme verloren und Anfragen bekommen 503), TCP-Daten
+bleiben im Socket, fällige Timer stehen an und kommen verspätet (`every` überspringt verpasste
+Runden), was der Rückruf vor dem Halt nach außen tat, geschieht zu seiner Zeit. Weiter geht es
+im Augenblick von `Continue` oder `Step`: dort beginnt die restliche Rechenzeit des Rückrufs.
+Stoppen, Strom aus und ein neuer Quelltext beenden einen Halt mit dem Programm. Geprüft wird das
+in der Selbsttest-Gruppe `scriptmod` ([`src/scriptmodtest.rs`](src/scriptmodtest.rs): Module
+mit absolutem und relativem Pfad, die Zeit der Disk, eine fehlende Datei, ein Zyklus, ein Fehler
+im Modul in Fehler, Log und Status, ein angehaltenes Skript mit verspäteten Timer-Runden, ein
+Schritt und ein Ausdruck im Halt, ein Haltepunkt mit Bedingung, Ablehnungen, Determinismus
+zweimal und mit einem Klon im Halt).
+
 ### Skript-Editor
 
 Die Skripte eines Hosts bearbeitet der Reiter **Skripte** seines Gerätefensters (Kontextmenü
@@ -2576,7 +2608,8 @@ Dateien mit Punkt nur, wenn der Anfang einen Punkt hat, Leerzeichen in Namen mit
 im Terminal ([`cli/shrun.rs`](crates/jfn_sim/cli/shrun.rs) `JfsProc`): derselbe `ScriptService`
 mit demselben Host wie ein Dienst (net, http, dns, timer, disk, metrics, `log` ins Journal des
 Geräts), `print` schreibt ins Terminal (und in Pipes und Umleitungen), `config.args` hält die
-Argumente, `config.file` den Pfad. Das Programm endet, wenn nichts mehr zu tun ist (kein Timer,
+Argumente, `config.file` den Pfad; `import("lib/util.jfs")` gilt ab dem Ordner der Datei
+(`ScriptService::new_file`). Das Programm endet, wenn nichts mehr zu tun ist (kein Timer,
 Socket, Server, keine offene Anfrage; Status 0), nach einem Fehler (`DATEI:ZEILE:SPALTE: Fehler:
 …` auf stderr, Status 1) oder mit Strg+C (130); ein Übersetzungsfehler meldet sich wie beim Runner
 `jfs`. `BEFEHL &` läuft im Hintergrund: sofort `[N] PID`, die Ausgabe kommt ins Terminal, wann

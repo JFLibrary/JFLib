@@ -1330,3 +1330,9 @@ Telnet: {} Port {} nicht erreicht ({}).	Telnet: {} port {} not reached ({}).
 Ein Client braucht ein „secret“.	A client needs a “secret”.
 Ports {} / {}, {} Clients, {} Benutzer: {} angenommen, {} abgelehnt	Ports {} / {}, {} clients, {} users: {} accepted, {} rejected
 {} Anfragen, {} angenommen, {} abgelehnt, {} Zeitüberschreitungen	{} requests, {} accepted, {} rejected, {} timeouts
+angehalten in Zeile {}, Spalte {}	paused in line {}, column {}
+angehalten in {}, Zeile {}, Spalte {}	paused in {}, line {}, column {}
+beendet nach einem Fehler in {}, Zeile {}, Spalte {}: {}	ended after an error in {}, line {}, column {}: {}
+läuft: Rückrufe {}, CPU-Zeit {}, Fehler {}, zuletzt in {}, Zeile {}, Spalte {}: {}	running: callbacks {}, CPU time {}, errors {}, the last in {}, line {}, column {}: {}
+Bedingung: {}	Condition: {}
+Das Skript läuft nicht.	The script is not running.
