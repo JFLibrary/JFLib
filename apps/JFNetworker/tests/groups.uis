@@ -1,0 +1,160 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/groups.jfnet
+# groups of the canvas (G1, workspace/canvas/groups.rs, inspector/group.rs): Ctrl+G groups the
+# selected servers (the group selected, its frame around them), undo and redo, F2 renames it in
+# place (a name taken is refused), its button collapses it into a cluster at the middle of its
+# members (their two cables to SW1 one line "2 Kabel", the cable between them hidden), a double
+# click expands it, a drag of the title moves the members by grid steps (one undo step), the
+# inspector (name, colour, state, Zuklappen, the members), a group of the switch and the
+# servers' group (nested), collapsed it hides both, Ctrl+Shift+G ungroups (the members
+# selected), Entf on a group keeps its members, the marquee and Ctrl+A.
+# World (0, 0) shows at 550,240 (100 %): SRV1 [200, 0], SRV2 [320, 0]; the servers' frame is
+# [190, -40, 204, 120], its button at 922,200 (22 x 22).  Ids: the inspector's name 65536,
+# colour 65544, Zuklappen 65552, Gruppierung aufheben 65553, members 65568 + i; the rename box
+# 12305.
+theme light
+expect text:"5 Geräte · 5 Kabel" exists
+# Ctrl+G: the two servers into a new group
+click listitem:"SRV1"
+drag listitem:"SRV2" listitem:"SRV2" 1 shift
+expect text:"2 ausgewählt" exists
+key ctrl+g
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte" selected
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte" rect 740 200 204 22
+expect text:"1 ausgewählt" exists
+expect text:"Gruppe „Gruppe 1“" exists
+expect #65536 text "Gruppe 1"
+expect text:"aufgeklappt" exists
+expect text:"oben, in keiner Gruppe" exists
+expect listitem:"SRV1" exists
+shot build/jfnetworker/groups_new.png
+# undo and redo
+key ctrl+z
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte" missing
+expect text:"5 Geräte · 5 Kabel" exists
+key ctrl+y
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte" exists
+# F2 renames it in place
+click listitem:"Gruppe „Gruppe 1“, 2 Geräte"
+key f2
+expect #12305 text "Gruppe 1"
+key ctrl+a
+type "Serverraum"
+key enter
+expect #12305 missing
+expect listitem:"Gruppe „Serverraum“, 2 Geräte" exists
+expect #65536 text "Serverraum"
+key ctrl+z
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte" exists
+key ctrl+y
+expect listitem:"Gruppe „Serverraum“, 2 Geräte" exists
+# its button collapses it: the cluster at the middle, one line for both cables to SW1
+click 933,211
+expect listitem:"Gruppe „Serverraum“, 2 Geräte, zugeklappt" rect 810 240 64 48
+expect listitem:"Gruppe „Serverraum“, 2 Geräte, zugeklappt" selected
+expect listitem:"SRV1" missing
+expect listitem:"SRV2" missing
+expect listitem:"2 Kabel Serverraum – SW1, Kupfer, gerade, aktiv" exists
+expect listitem:"Kabel SRV1 eth1 – SRV2 eth1, Kupfer, gekreuzt, aktiv" missing
+expect text:"zugeklappt" exists
+expect text:"5 Geräte · 5 Kabel" exists
+shot build/jfnetworker/groups_collapsed.png
+key ctrl+z
+expect listitem:"SRV1" exists
+key ctrl+y
+expect listitem:"SRV1" missing
+# a double click expands it
+wait 600
+dblclick listitem:"Gruppe „Serverraum“, 2 Geräte, zugeklappt"
+expect listitem:"Gruppe „Serverraum“, 2 Geräte" selected
+expect listitem:"SRV1" rect 750 240 64 48
+expect listitem:"Kabel SRV1 eth1 – SRV2 eth1, Kupfer, gekreuzt, aktiv" exists
+# a drag of the title moves its members by grid steps, one undo step
+wait 600
+drag listitem:"Gruppe „Serverraum“, 2 Geräte" 882,231
+expect listitem:"SRV1" rect 790 260 64 48
+expect listitem:"SRV2" rect 910 260 64 48
+expect listitem:"Gruppe „Serverraum“, 2 Geräte" rect 780 220 204 22
+key ctrl+z
+expect listitem:"SRV1" rect 750 240 64 48
+expect listitem:"SRV2" rect 870 240 64 48
+# the inspector: its colour, Zuklappen and Aufklappen
+click listitem:"Gruppe „Serverraum“, 2 Geräte"
+expect #65544 value 1
+focus #65544
+key down
+expect #65544 value 2
+expect #65544 text "Grün"
+key ctrl+z
+expect #65544 value 1
+click #65552
+expect listitem:"Gruppe „Serverraum“, 2 Geräte, zugeklappt" exists
+expect #65552 text "Aufklappen"
+click #65552
+expect listitem:"Gruppe „Serverraum“, 2 Geräte" exists
+expect #65568 text "SRV1"
+expect #65569 text "SRV2"
+# a marquee around the frame takes it, its servers and their cable
+click 400,520
+drag 720,170 960,330
+expect text:"4 ausgewählt" exists
+expect listitem:"Gruppe „Serverraum“, 2 Geräte" selected
+expect listitem:"SRV2" selected
+# Ctrl+A: what the canvas shows (the frame, five devices, five cables)
+click 400,520
+key ctrl+a
+expect text:"11 ausgewählt" exists
+click 400,520
+# nested: the switch and the servers' group into a group, collapsed it hides both
+click listitem:"SW1"
+drag listitem:"Gruppe „Serverraum“, 2 Geräte" listitem:"Gruppe „Serverraum“, 2 Geräte" 1 shift
+key ctrl+g
+expect listitem:"Gruppe „Gruppe 1“, 3 Geräte" selected
+expect text:"Inhalt" exists
+expect text:"3 Geräte, 1 Gruppe" exists
+wait 600
+click listitem:"Gruppe „Serverraum“, 2 Geräte"
+expect text:"in der Gruppe „Gruppe 1“" exists
+click listitem:"Gruppe „Gruppe 1“, 3 Geräte"
+cmd 592
+expect listitem:"Gruppe „Gruppe 1“, 3 Geräte, zugeklappt" exists
+expect listitem:"Gruppe „Serverraum“, 2 Geräte" missing
+expect listitem:"SW1" missing
+expect listitem:"Kabel PC1 eth0 – SW1 Gi1/0/1, Kupfer, gerade, aktiv" exists
+shot build/jfnetworker/groups_nested.png
+# Ctrl+Shift+G: the group goes, its members (the switch, the servers' group) are selected
+key ctrl+shift+g
+expect listitem:"Gruppe „Gruppe 1“, 3 Geräte, zugeklappt" missing
+expect listitem:"SW1" selected
+expect listitem:"Gruppe „Serverraum“, 2 Geräte" selected
+expect text:"2 ausgewählt" exists
+key ctrl+z
+expect listitem:"Gruppe „Gruppe 1“, 3 Geräte, zugeklappt" exists
+key ctrl+y
+expect listitem:"Gruppe „Gruppe 1“, 3 Geräte, zugeklappt" missing
+# Entf on a group: it goes, its members stay
+click listitem:"Gruppe „Serverraum“, 2 Geräte"
+key delete
+expect listitem:"Gruppe „Serverraum“, 2 Geräte" missing
+expect listitem:"SRV1" exists
+expect text:"5 Geräte · 5 Kabel" exists
+key ctrl+z
+expect listitem:"Gruppe „Serverraum“, 2 Geräte" exists
+# a name taken: refused in the inspector
+click listitem:"PC1"
+drag listitem:"PC2" listitem:"PC2" 1 shift
+cmd 590
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte" selected
+click #65536
+key ctrl+a
+type "serverraum\n"
+expect text:"Eine Gruppe „serverraum“ gibt es schon." exists
+key esc
+expect #65536 text "Gruppe 1"
+# a member in the inspector: chosen, it shows (its collapsed group opens first)
+click listitem:"Gruppe „Serverraum“, 2 Geräte"
+click #65552
+expect listitem:"SRV2" missing
+click #65569
+expect listitem:"SRV2" selected
+expect listitem:"Gruppe „Serverraum“, 2 Geräte" exists
+expect_nowarn

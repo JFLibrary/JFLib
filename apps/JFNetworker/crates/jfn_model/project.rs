@@ -61,6 +61,13 @@
 // none of these: every device stands in the default room, every cable gets its automatic
 // length (7 m between two devices in one room without a spot, 4 m to one on the ceiling, 3 m
 // to the cloud), nothing else changes.
+//
+// Groups and the background (G1): the project's "groups" (group.rs: named frames around
+// devices, notes and groups, each collapsible into one cluster symbol; [] without) and
+// "background" (background.rs: a picture under the canvas, the file's bytes as base64 with its
+// place, scale, opacity and lock; null without).  Both are view data the simulator never sees;
+// a group's id comes from the same counter as devices, links and notes.  Older files have
+// neither and look as before.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -227,6 +234,10 @@ record! {
         /// the places of the physical view: sites, buildings, floors, rooms, racks, desks
         /// (phys.rs; empty: the default room alone)
         pub places: Vec<crate::phys::Place>,
+        /// the groups of the logical canvas (group.rs; empty: none)
+        pub groups: Vec<crate::group::Group>,
+        /// the picture under the logical canvas (background.rs; None: none)
+        pub background: Option<crate::background::Background>,
     }
 }
 
@@ -394,14 +405,15 @@ impl Project {
         }
         v
     }
-    /// the largest id of any device, link or note
+    /// the largest id of any device, link, note or group
     pub fn max_id(&self) -> u32 {
         let d = self.devices.iter().map(|d| d.id).max().unwrap_or(0);
         let l = self.links.iter().map(|l| l.id).max().unwrap_or(0);
         let n = self.notes.iter().map(|n| n.id).max().unwrap_or(0);
-        d.max(l).max(n)
+        let g = self.groups.iter().map(|g| g.id).max().unwrap_or(0);
+        d.max(l).max(n).max(g)
     }
-    fn alloc_id(&mut self) -> u32 {
+    pub(crate) fn alloc_id(&mut self) -> u32 {
         let id = self.next_id.max(self.max_id() + 1).max(1);
         self.next_id = id + 1;
         id
@@ -684,6 +696,10 @@ impl Project {
         for (error, dev, m) in crate::phys::issues(self) {
             v.push(Issue::new(error, dev, None, m));
         }
+        // the groups of the canvas (group.rs)
+        for (error, m) in crate::group::issues(self) {
+            v.push(Issue::new(error, None, None, m));
+        }
         v
     }
 
@@ -706,6 +722,8 @@ impl Project {
             return Err(LoadErr::new(0, msg!("Die Datei hat die Version {}; dieses Programm liest Version 1 bis {}.", p.version, VERSION)));
         }
         p.next_id = p.next_id.max(p.max_id() + 1);
+        // groups as they resolve: no ids that are gone, no member twice, no cycles (group.rs)
+        crate::group::normalize(&mut p);
         Ok(p)
     }
 }

@@ -1147,3 +1147,21 @@ Optik {} an {} passt nicht zur Optik {} am anderen Ende; die Leitung bleibt aus.
 Kabel zu lang: {} m, erlaubt {} m ({} zwischen {} und {}); die Leitung bleibt aus.	Cable too long: {} m, {} m allowed ({} between {} and {}); the link stays down.
 Optiken passen nicht: {} an {}, {} an {}; die Leitung bleibt aus.	Optics do not fit: {} at {}, {} at {}; the link stays down.
 {} zwischen {} und {} passt nicht zur Optik {} (SR braucht Multimode, LR Singlemode); die Leitung bleibt aus.	{} between {} and {} does not fit the optics {} (SR needs multimode, LR single-mode); the link stays down.
+Das ist kein Bild in PNG, JPEG, BMP oder GIF.	This is no PNG, JPEG, BMP or GIF image.
+Das Bild ist zu groß: {} MB; ins Projekt passen höchstens 8 MB.	The image is too large: {} MB; a project takes 8 MB at most.
+Das Bild ist zu groß: {} × {} Pixel; höchstens {} Pixel je Seite und 32 Megapixel.	The image is too large: {} × {} pixels; {} pixels per side and 32 megapixels at most.
+Das Bild lässt sich nicht lesen.	The image cannot be read.
+Grau	Gray
+Blau	Blue
+Grün	Green
+Ocker	Ocher
+Ziegelrot	Brick red
+Violett	Violet
+Nichts zum Gruppieren: Geräte, Notizen oder Gruppen auswählen.	Nothing to group: select devices, notes or groups.
+Die Gruppe {} gibt es nicht.	There is no group {}.
+„{}“ taugt nicht als Name einer Gruppe: 1 bis 64 Zeichen.	“{}” is no name for a group: 1 to 64 characters.
+Eine Gruppe „{}“ gibt es schon.	There is a group “{}” already.
+Die Nummer {} der Gruppe „{}“ ist schon vergeben.	The number {} of the group “{}” is taken already.
+Der Name der Gruppe „{}“ ist leer oder doppelt.	The name of the group “{}” is empty or used twice.
+„{}“ gehört zu mehr als einer Gruppe; es zählt die erste.	“{}” belongs to more than one group; the first one counts.
+Die Gruppe „{}“ liegt in sich selbst.	The group “{}” lies within itself.

@@ -20,11 +20,16 @@
 //
 // The physical view (P1): a place selected there (and nothing else) shows here
 // (workspace/phys/props.rs); devices and cables get their physical part last.
+//
+// group.rs (G1): a group (name, colour, state, members, Zuklappen, Gruppierung aufheben), the
+// background picture (canvas/backdrop.rs's card, also on the project's page), "Gruppieren"
+// with several things.
 
 mod cable;
 pub(crate) mod device;
 pub(crate) mod faults;
 pub(crate) mod wlan;
+pub(crate) mod group;
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -97,6 +102,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     let place = n.phys.sel_place.filter(|_| n.phys.on && sel.is_empty());
     match canvas::single_item(n) {
         None if place.is_some() => crate::workspace::phys::props::place(n, ui, place.unwrap_or_default()),
+        // a group, the background picture (G1)
+        None if group::shows(n) => group::frame(n, ui),
         Some(Item::Device(id)) => device::frame(n, ui, id),
         Some(Item::Link(id)) => cable::frame(n, ui, id),
         Some(Item::Note(id)) => note(n, ui, id),
@@ -200,6 +207,8 @@ fn several(n: &mut Net, ui: &mut Ui, sel: &[u32]) {
     let p = &n.doc.proj;
     let links: Vec<u32> = sel.iter().copied().filter(|&id| p.link(id).is_some()).collect();
     faults::several(n, ui, &devs, &links);
+    // Gruppieren (G1, group.rs)
+    group::several(n, ui);
 }
 
 fn project(n: &mut Net, ui: &mut Ui) {
@@ -260,4 +269,6 @@ fn project(n: &mut Net, ui: &mut Ui) {
     if p.devices.iter().any(|d| p.model_of(d.id).is_some_and(|m| jfn_model::wlan::role(m) != jfn_model::wlan::Role::None)) {
         wlan::project(n, ui);
     }
+    // the background picture (G1: canvas/backdrop.rs)
+    crate::workspace::canvas::backdrop::project(n, ui);
 }

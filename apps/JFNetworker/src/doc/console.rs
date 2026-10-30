@@ -316,6 +316,10 @@ fn renamed(n: &mut Net, dev: u32, name: &str) {
 /// the console of device `dev` as the shown tab of the Terminal panel (its own window comes
 /// to the front), with the keyboard -> Err: why there is none
 pub(crate) fn open(n: &mut Net, ui: &mut Ui, dev: u32) -> Result<(), String> {
+    // a member of a collapsed group: its groups open first (G1)
+    if n.doc.proj.device(dev).is_some() && has_cli(&n.doc.proj, dev) {
+        crate::workspace::canvas::groups::reveal(n, dev);
+    }
     let Some(d) = n.doc.proj.device(dev) else { return Err(tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()])) };
     if !has_cli(&n.doc.proj, dev) {
         return Err(tf("{} hat keine Befehlszeile.", &[&d.name]));

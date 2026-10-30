@@ -26,6 +26,20 @@
 //   dg_hairline(g, vp, pts, argb)   a route as 1 px anti-aliased lines: far cheaper than
 //                                   dg_stroke_edge for many thin edges (DgFrame::moving)
 //   DgFrame::find(margin, edges)    the nodes or edges near the clip (the spatial buckets)
+//   dg_toggle_rect(node, bar)       the world box of a DN_TOGGLE node's collapse button
+//   DgPaint::paint_under(g, f)      (optional) what lies under the grid: a backdrop image
+//
+// Frames and groups (additive flags, G1 of JFNetworker): a DN_FRAME node is a labelled frame
+// around other nodes (the app computes its box from theirs and puts it before them, so they lie
+// on top).  It is hit on its title bar -- the top DiagramState::frame_bar world units -- and on
+// its border (4 DIP) only: its inside stays the background (marquees start there, members are
+// clicked through it); its overview box is an outline, its record (diagram_sems) covers the
+// title bar.  DN_TOGGLE gives a node a collapse button at the right end of its title bar (a
+// frame) or in its top right corner: a click there reports DEv::Toggle (no selection change).
+// DN_STEP nodes move by whole grid steps instead of snapping their corner, so the members a
+// frame or a cluster stands for stay on the grid.  A selected DN_RESIZE node shows a handle at
+// its bottom right corner; dragging it reports DEv::Resize with the new box (Esc: back).
+// DN_OUTLINE draws a node as an outline in the overview (a backdrop, an area).
 //
 // Model (DModel, borrowed every frame): nodes with a world rectangle and a range of ports,
 // ports at a position relative to their node's top left corner, edges from key a to key b
@@ -35,9 +49,10 @@
 // changes: the key maps, the routes and the spatial buckets (256 world units) are rebuilt
 // then.  World units are DIP at zoom 1.
 //
-// Input: the hit test prefers the handles of selected edges (waypoints, then the middles of
-// their stretches), then the ports of the node under the pointer, the topmost node, the
-// nearest edge (max(5 DIP, half the edge width + 3 DIP)), the background.  A press + drag
+// Input: the hit test prefers the resize handles of selected DN_RESIZE nodes, the handles of
+// selected edges (waypoints, then the middles of their stretches), then the ports of the node
+// under the pointer, the topmost node (a DN_TOGGLE node's button first), the nearest edge
+// (max(5 DIP, half the edge width + 3 DIP)), the background.  A press + drag
 // (4 DIP) on a selected node moves the selection (snapped to the grid, Alt: free), from a
 // port connects, on a handle moves or inserts a waypoint, on the background draws a marquee
 // (Shift adds, Ctrl toggles); middle drag, Space + drag and DG_PAN pan; the wheel scrolls
@@ -87,6 +102,11 @@ pub const DR_ORTHO: u8 = 2; // horizontal and vertical stretches (L / Z shapes)
 /// node flags (DNode::flags)
 pub const DN_LOCKED: u32 = 1; // never moved by the widget
 pub const DN_NOSELECT: u32 = 2; // decoration: never hit nor selected
+pub const DN_FRAME: u32 = 4; // a frame around other nodes: hit on its title bar and border only
+pub const DN_TOGGLE: u32 = 8; // a collapse button (DEv::Toggle), see dg_toggle_rect
+pub const DN_STEP: u32 = 16; // moves by whole grid steps (its corner keeps its offset to the grid)
+pub const DN_RESIZE: u32 = 32; // selected: a handle at the bottom right corner resizes it
+pub const DN_OUTLINE: u32 = 64; // an outline in the overview (DN_FRAME nodes are always)
 /// port flags (DPort::flags)
 pub const DPT_HIDDEN: u32 = 1; // neither shown nor hit
 pub const DPT_USED: u32 = 2; // shown filled (connected)
@@ -273,6 +293,10 @@ pub enum DHit {
     Waypoint(u64, u32),
     /// the handle in the middle of stretch idx of a selected edge (a drag inserts waypoint idx)
     Mid(u64, u32),
+    /// the collapse button of a DN_TOGGLE node
+    Toggle(u64),
+    /// the resize handle of a selected DN_RESIZE node
+    Resize(u64),
 }
 
 impl DHit {
@@ -280,7 +304,7 @@ impl DHit {
     pub fn key(&self) -> u64 {
         match *self {
             DHit::None => 0,
-            DHit::Node(k) | DHit::Port(k) | DHit::Waypoint(k, _) | DHit::Mid(k, _) => k,
+            DHit::Node(k) | DHit::Port(k) | DHit::Waypoint(k, _) | DHit::Mid(k, _) | DHit::Toggle(k) | DHit::Resize(k) => k,
             DHit::Edge { key, .. } => key,
         }
     }
@@ -320,6 +344,11 @@ pub enum DEv {
     Click { at: [f32; 2] },
     /// zoom or centre changed
     ViewChanged,
+    /// a click on the collapse button of a DN_TOGGLE node
+    Toggle(u64),
+    /// the resize handle of a DN_RESIZE node was dragged: its new box x, y, w, h (world, the
+    /// top left corner stays; at least 8 units); done = released (Esc: the box it had)
+    Resize { key: u64, rect: [f32; 4], done: bool },
 }
 
 // ------------------------------------------------------------------ geometry for painting
@@ -406,6 +435,8 @@ impl DgFrame<'_> {
 /// runs once per dirty rectangle, so skip what DgFrame::visible / route_visible reject
 pub trait DgPaint {
     fn paint(&self, g: &mut Gfx, f: &DgFrame);
+    /// what lies under the grid (a backdrop image), painted before it; nothing by default
+    fn paint_under(&self, _g: &mut Gfx, _f: &DgFrame) {}
 }
 
 // ------------------------------------------------------------------ state
@@ -420,7 +451,10 @@ enum Gesture {
     /// ignore the pointer until the left button is up
     Hold,
     Pan { btn: u32, px: [i32; 2], cx: f64, cy: f64 },
-    Move { keys: Vec<u64>, start: [f32; 2], anchor: [f32; 2], sent: [f32; 2] },
+    /// step: the anchor is a DN_STEP node (the move snaps to whole grid steps)
+    Move { keys: Vec<u64>, start: [f32; 2], anchor: [f32; 2], sent: [f32; 2], step: bool },
+    /// the resize handle of node key: its box at the start, where the drag started, sent at all
+    Resize { key: u64, orig: [f32; 4], start: [f32; 2], at: [f32; 4], started: bool },
     Marquee { start: [f32; 2], cur: [f32; 2], mods: u32, base: BTreeSet<u64> },
     /// armed: started by a click, a second click ends it
     Connect { from: u64, quick: bool, armed: bool, at: [f32; 2], over: u64 },
@@ -462,6 +496,9 @@ pub struct DiagramState {
     pub tab_edges: bool,
     /// the canvas' name for screen readers (its K_CANVAS record; empty: none)
     pub name: String,
+    /// the height of a DN_FRAME node's title bar in world units (its hit area, its record, the
+    /// side of its DN_TOGGLE button)
+    pub frame_bar: f32,
     fit_req: bool,
     pending_sel: bool,
     g: Gesture,
@@ -499,6 +536,7 @@ impl DiagramState {
             test_keys: 0,
             tab_edges: false,
             name: String::new(),
+            frame_bar: 24.0,
             fit_req: true,
             pending_sel: false,
             g: Gesture::Idle,
@@ -583,6 +621,17 @@ impl DiagramState {
             return DHit::None;
         }
         let w = |dip: i32| dp_at(dip, dpi) as f32 / s; // DIP -> world units
+        // the resize handles of selected DN_RESIZE nodes
+        if tool == DG_SELECT {
+            let hr = w(6);
+            for &k in &self.sel {
+                let Some(n) = self.node(m, k).filter(|n| n.flags & DN_RESIZE != 0) else { continue };
+                let c = [n.rect[0] + n.rect[2], n.rect[1] + n.rect[3]];
+                if fabs(p[0] - c[0]) <= hr && fabs(p[1] - c[1]) <= hr {
+                    return DHit::Resize(k);
+                }
+            }
+        }
         // the handles of selected edges: waypoints first, then the middles
         if tool == DG_SELECT {
             let hr = w(6);
@@ -642,9 +691,24 @@ impl DiagramState {
                     return DHit::Port(k);
                 }
             }
-            if within(0.0) {
-                return DHit::Node(n.key);
+            if n.flags & DN_FRAME != 0 {
+                // a frame: its title bar and its border; the inside belongs to what lies there
+                let (b, bar) = (w(4), self.frame_bar.min(r[3]));
+                let on_bar = within(0.0) && p[1] < r[1] + bar;
+                let inner = p[0] >= r[0] + b && p[1] >= r[1] + b && p[0] < r[0] + r[2] - b && p[1] < r[1] + r[3] - b;
+                if !on_bar && !(within(b) && !inner) {
+                    continue;
+                }
+            } else if !within(0.0) {
+                continue;
             }
+            if n.flags & DN_TOGGLE != 0 && tool == DG_SELECT {
+                let t = dg_toggle_rect(n, self.frame_bar);
+                if p[0] >= t[0] && p[1] >= t[1] && p[0] < t[0] + t[2] && p[1] < t[1] + t[3] {
+                    return DHit::Toggle(n.key);
+                }
+            }
+            return DHit::Node(n.key);
         }
         // the nearest edge
         if tool == DG_SELECT {
@@ -675,6 +739,7 @@ impl DiagramState {
             Gesture::Pan { .. } => return CUR_HAND,
             Gesture::Move { .. } | Gesture::Waypoint { .. } => return CUR_MOVE,
             Gesture::Connect { .. } => return CUR_CROSS,
+            Gesture::Resize { .. } => return CUR_SIZE_NWSE,
             _ => {}
         }
         if space || tool == DG_PAN {
@@ -682,6 +747,8 @@ impl DiagramState {
         }
         match (tool, self.hover) {
             (DG_PLACE, _) => CUR_CROSS,
+            (_, DHit::Toggle(_)) => CUR_ARROW,
+            (_, DHit::Resize(_)) => CUR_SIZE_NWSE,
             (_, DHit::Port(_)) => CUR_CROSS,
             (DG_CONNECT, DHit::Node(_)) => CUR_CROSS,
             (_, DHit::Waypoint(..) | DHit::Mid(..)) => CUR_MOVE,
@@ -751,7 +818,8 @@ impl DiagramState {
                     out.push(DEv::WaypointDelete { edge: e, idx: k });
                     return Gesture::Hold;
                 }
-                DHit::None | DHit::Mid(..) => {}
+                // buttons and handles take every click as one of their own
+                DHit::None | DHit::Mid(..) | DHit::Toggle(_) | DHit::Resize(_) => {}
                 h => {
                     out.push(DEv::Activate(h));
                     return Gesture::Hold;
@@ -851,6 +919,7 @@ impl DiagramState {
                         }
                         out.push(DEv::Click { at });
                     }
+                    DHit::Toggle(k) => out.push(DEv::Toggle(k)),
                     _ => {}
                 }
                 Gesture::Idle
@@ -873,8 +942,13 @@ impl DiagramState {
                     let Some(&first) = keys.first() else { return Gesture::Hold };
                     let a = if movable(k) { k } else { first };
                     let anchor = self.node(m, a).map_or([0.0; 2], |n| [n.rect[0], n.rect[1]]);
-                    Gesture::Move { keys, start: at, anchor, sent: [0.0; 2] }
+                    let step = self.node(m, a).is_some_and(|n| n.flags & DN_STEP != 0);
+                    Gesture::Move { keys, start: at, anchor, sent: [0.0; 2], step }
                 }
+                DHit::Resize(k) => match self.node(m, k) {
+                    Some(n) => Gesture::Resize { key: k, orig: n.rect, start: at, at: n.rect, started: false },
+                    None => Gesture::Hold,
+                },
                 DHit::Port(k) => Gesture::Connect { from: k, quick: true, armed: false, at, over: 0 },
                 DHit::Waypoint(e, idx) => {
                     let orig = self.waypoint(m, e, idx).unwrap_or(at);
@@ -925,9 +999,11 @@ impl DiagramState {
                     Gesture::Idle
                 }
             }
-            Gesture::Move { keys, start, anchor, sent } => {
+            Gesture::Move { keys, start, anchor, sent, step } => {
                 let raw = [i.p[0] - start[0], i.p[1] - start[1]];
-                let tot = if self.snaps(i.mods) {
+                let tot = if self.snaps(i.mods) && step {
+                    [snapv(raw[0], self.grid), snapv(raw[1], self.grid)]
+                } else if self.snaps(i.mods) {
                     [snapv(anchor[0] + raw[0], self.grid) - anchor[0], snapv(anchor[1] + raw[1], self.grid) - anchor[1]]
                 } else {
                     raw
@@ -937,7 +1013,15 @@ impl DiagramState {
                 if d != [0.0, 0.0] || done {
                     out.push(DEv::Move { keys: keys.clone(), d, total: tot, done });
                 }
-                if done { Gesture::Idle } else { Gesture::Move { keys, start, anchor, sent: tot } }
+                if done { Gesture::Idle } else { Gesture::Move { keys, start, anchor, sent: tot, step } }
+            }
+            Gesture::Resize { key, orig, start, at, started } => {
+                let rect = [orig[0], orig[1], (orig[2] + i.p[0] - start[0]).max(8.0), (orig[3] + i.p[1] - start[1]).max(8.0)];
+                let done = !held(BTN_LEFT);
+                if rect != at || done {
+                    out.push(DEv::Resize { key, rect, done });
+                }
+                if done { Gesture::Idle } else { Gesture::Resize { key, orig, start, at: rect, started: started || rect != orig } }
             }
             Gesture::Marquee { start, mods, base, .. } => {
                 let cur = i.p;
@@ -1027,6 +1111,12 @@ impl DiagramState {
                 }
                 Gesture::Hold
             }
+            Gesture::Resize { key, orig, started, .. } => {
+                if started {
+                    out.push(DEv::Resize { key, rect: orig, done: true });
+                }
+                Gesture::Hold
+            }
             Gesture::Marquee { base, .. } => {
                 if self.sel != base {
                     self.sel = base;
@@ -1050,8 +1140,10 @@ impl DiagramState {
         true
     }
 
-    // a right click / the context key on `hit` (selects an unselected node or edge first)
+    // a right click / the context key on `hit` (selects an unselected node or edge first; a
+    // collapse button counts as its node)
     fn context(&mut self, hit: DHit, at: [i32; 2], out: &mut Vec<DEv>) {
+        let hit = if let DHit::Toggle(k) = hit { DHit::Node(k) } else { hit };
         if let DHit::Node(k) | DHit::Edge { key: k, .. } = hit {
             if !self.sel.contains(&k) {
                 self.sel.clear();
@@ -1559,6 +1651,15 @@ pub fn dg_point_at(pts: &[[f32; 2]], f: f32) -> [f32; 2] {
     pts[pts.len() - 1]
 }
 
+/// the world box x, y, w, h of a DN_TOGGLE node's collapse button: the square of the title bar's
+/// height `bar` at its right end (a DN_FRAME node), else a square of that side (at most the
+/// node's) in the top right corner; apps paint the button there
+pub fn dg_toggle_rect(n: &DNode, bar: f32) -> [f32; 4] {
+    let r = n.rect;
+    let s = if n.flags & DN_FRAME != 0 { bar.min(r[3]) } else { bar.min(r[2]).min(r[3]) };
+    [r[0] + r[2] - s, r[1], s, s]
+}
+
 /// the route of edge i of m (world polyline) into out, without a DiagramState (ports and
 /// nodes are looked up linearly; DiagramState::route has them indexed)
 pub fn dg_edge_points(m: &DModel, i: usize, out: &mut Vec<[f32; 2]>) {
@@ -1785,38 +1886,48 @@ impl Draw for Wrap {
 }
 
 impl Wrap {
-    // background, grid and the app's paint in r (the clip says what needs pixels)
+    // background, the app's paint under the grid, grid and the app's paint in r (the clip says
+    // what needs pixels)
     fn paint_all(&self, g: &mut Gfx, r: [i32; 4]) {
         let k = g.dc.clip;
         let bg = canvas_bg(&self.theme);
         g.dc.set_color(bg);
         g.dc.fill(g.sf, r[0], r[1], r[2], r[3]);
+        let a = self.vp.to_world(k[0] as f32, k[1] as f32);
+        let b = self.vp.to_world(k[2] as f32, k[3] as f32);
+        let f = DgFrame { vp: self.vp, clip: [a[0], a[1], b[0], b[1]], geo: &self.geo, theme: &self.theme, bg, fonts: self.fonts, dark: self.dark, moving: self.moving };
+        // what lies under the grid (a backdrop image)
+        if let Some(p) = &self.paint {
+            p.paint_under(g, &f);
+        }
         if self.grid > 0.0 {
             let div = self.theme[(T_DIVIDER / 4) as usize];
             let minor = over(bg, (div & 0x00FF_FFFF) | ((div >> 25) << 24));
             dg_paint_grid(g, &self.vp, self.grid, minor, over(bg, div));
         }
         if let Some(p) = &self.paint {
-            let a = self.vp.to_world(k[0] as f32, k[1] as f32);
-            let b = self.vp.to_world(k[2] as f32, k[3] as f32);
-            let f = DgFrame { vp: self.vp, clip: [a[0], a[1], b[0], b[1]], geo: &self.geo, theme: &self.theme, bg, fonts: self.fonts, dark: self.dark, moving: self.moving };
             p.paint(g, &f);
         }
     }
 }
 
-// the overview: node rectangles (absolute px) in two colours
+// the overview: node rectangles (absolute px) in two colours, filled or (frames, outlines) as
+// a 1 px frame
 struct Mini {
-    rects: Vec<([i32; 4], bool)>,
+    rects: Vec<([i32; 4], bool, bool)>,
     node: u32,
     sel: u32,
 }
 
 impl Draw for Mini {
     fn draw(&self, g: &mut Gfx, _r: [i32; 4]) {
-        for (r, s) in &self.rects {
+        for (r, s, outline) in &self.rects {
             g.dc.set_color(if *s { self.sel } else { self.node });
-            g.dc.fill(g.sf, r[0], r[1], r[2], r[3]);
+            if *outline {
+                g.dc.frame(g.sf, r[0], r[1], r[2], r[3]);
+            } else {
+                g.dc.fill(g.sf, r[0], r[1], r[2], r[3]);
+            }
         }
     }
 }
@@ -1997,7 +2108,7 @@ impl Ui {
         if wheel {
             self.animating = true;
         }
-        let moving = wheel || matches!(st.g, Gesture::Pan { .. } | Gesture::Move { .. } | Gesture::Waypoint { .. });
+        let moving = wheel || matches!(st.g, Gesture::Pan { .. } | Gesture::Move { .. } | Gesture::Waypoint { .. } | Gesture::Resize { .. });
         let (h, obj) = self.dg_paint_obj(st, m, paint, ver, moving);
         self.cmd_custom(r[0], r[1], r[2], r[3], Some(obj), 0, h as u32);
         let ring = self.wp.ctx.focus == id && self.wp.ctx.focus_visible;
@@ -2299,7 +2410,7 @@ impl Ui {
         }
         // nodes: selection frames, the hovered node, the focus ring
         let hov_node = match st.hover {
-            DHit::Node(k) => k,
+            DHit::Node(k) | DHit::Toggle(k) => k,
             DHit::Port(k) => st.node_index(k).and_then(|i| m.nodes.get(i as usize)).map_or(0, |n| n.key),
             _ => 0,
         };
@@ -2318,6 +2429,18 @@ impl Ui {
                 let g = pad + t2 + self.dp(1);
                 self.cmd_rrect(q[0] - g, q[1] - g, q[2] + g * 2, q[3] + g * 2, rad + t2, t2, 0, fo, fo);
                 self.cmd_rrect(q[0] - g + t2, q[1] - g + t2, q[2] + (g - t2) * 2, q[3] + (g - t2) * 2, rad, hair, 0, fi, fi);
+            }
+            // the hovered collapse button (the app paints the button itself)
+            if st.hover == DHit::Toggle(n.key) && matches!(st.g, Gesture::Idle | Gesture::Press { .. }) {
+                let b = ipx(vp.rect_to_screen(dg_toggle_rect(n, st.frame_bar)));
+                let c = self.color(T_SUBTLE_HOVER);
+                self.cmd_rrect(b[0] + hair, b[1] + hair, b[2] - hair * 2, b[3] - hair * 2, self.dp(3), hair, c, accent, accent);
+            }
+            // the resize handle of a selected DN_RESIZE node
+            if n.flags & DN_RESIZE != 0 && tool == DG_SELECT && st.sel.contains(&n.key) {
+                let h = if st.hover == DHit::Resize(n.key) { self.dp(5) + hair } else { self.dp(5) };
+                let (x, y) = (q[0] + q[2] - h, q[1] + q[3] - h);
+                self.cmd_rrect(x, y, h * 2, h * 2, self.dp(2), hair, accent, bg, bg);
             }
         }
         // the canvas' own focus ring while no node (or edge) has the focus
@@ -2477,7 +2600,7 @@ impl Ui {
                 for n in m.nodes {
                     let a = map([n.rect[0], n.rect[1]]);
                     let q = [fl(a[0]), fl(a[1]), fl(n.rect[2] * k).max(1), fl(n.rect[3] * k).max(1)];
-                    rects.push((q, st.sel.contains(&n.key)));
+                    rects.push((q, st.sel.contains(&n.key), n.flags & (DN_FRAME | DN_OUTLINE) != 0));
                 }
                 let d: DrawRef = Rc::new(Mini { rects, node: node_c, sel: sel_c });
                 st.mini_obj = Some((hash, d.clone()));
@@ -2506,13 +2629,15 @@ impl Ui {
         let r = st.vp.rect;
         let focused = self.wp.ctx.focus == id;
         let hov = match st.hover {
-            DHit::Node(k) => k,
+            DHit::Node(k) | DHit::Toggle(k) => k,
             _ => 0,
         };
         let vis = core::mem::take(&mut st.visible);
         for &i in &vis {
             let Some(n) = m.nodes.get(i as usize) else { continue };
-            let q = ipx(st.vp.rect_to_screen(n.rect));
+            // a frame's record is its title bar (where it is hit)
+            let nr = if n.flags & DN_FRAME != 0 { [n.rect[0], n.rect[1], n.rect[2], st.frame_bar.min(n.rect[3])] } else { n.rect };
+            let q = ipx(st.vp.rect_to_screen(nr));
             let (x0, y0) = (q[0].max(r[0]), q[1].max(r[1]));
             let (x1, y1) = ((q[0] + q[2]).min(r[0] + r[2]), (q[1] + q[3]).min(r[1] + r[3]));
             if x1 <= x0 || y1 <= y0 {

@@ -225,8 +225,9 @@ pub(crate) fn hover_x(n: &mut Net, ui: &mut Ui) {
         return;
     }
     let st = &n.canvas.st;
+    // (a line of several cables of a cluster has no ×, G1)
     let under = match st.hover {
-        DHit::Edge { key, .. } if !st.sel.contains(&key) => Some(key as u32),
+        DHit::Edge { key, .. } if !st.sel.contains(&key) && !super::groups::is_agg(key) => Some(key as u32),
         _ => None,
     };
     // the × of the last frame stays while the pointer is near it (on its way from the cable to
@@ -290,7 +291,7 @@ pub(crate) fn leds_on_top(n: &Net, ui: &mut Ui) {
     if st.vp.zoom < 0.5 {
         return;
     }
-    let mut keys: Vec<u64> = st.sel.iter().copied().filter(|&k| n.doc.proj.link(k as u32).is_some()).collect();
+    let mut keys: Vec<u64> = st.sel.iter().copied().filter(|&k| (k >> 32 == 0 && n.doc.proj.link(k as u32).is_some()) || super::groups::is_agg(k)).collect();
     if let DHit::Edge { key, .. } = st.hover {
         keys.push(key);
     }
@@ -320,7 +321,8 @@ pub(crate) fn leds_on_top(n: &Net, ui: &mut Ui) {
             continue;
         }
         let len = dg_length(&rt.pts);
-        let leds = n.doc.sim.led(k as u32).unwrap_or([Led::NoPower; 2]);
+        // (a line of a cluster: the worst of its cables', G1)
+        let leds = n.canvas.scene.line_leds(k, &n.doc.sim.leds).unwrap_or([Led::NoPower; 2]);
         let rev: Vec<[f32; 2]> = rt.pts.iter().rev().copied().collect();
         for (i, pts) in [rt.pts.as_slice(), rev.as_slice()].into_iter().enumerate() {
             let (c, _) = super::paint::led_at(pts, len);
@@ -346,7 +348,7 @@ pub(crate) fn plus_handles(n: &Net, ui: &mut Ui) {
     ui.clip_push(r[0], r[1], r[2], r[3]);
     ui.draw_color(accent);
     for &k in &st.sel {
-        if n.doc.proj.link(k as u32).is_none() {
+        if k >> 32 != 0 || n.doc.proj.link(k as u32).is_none() {
             continue;
         }
         let Some(rt) = st.route(k) else { continue };
@@ -395,6 +397,11 @@ pub(crate) fn ends_text(p: &Project, l: &jfn_model::Link) -> String {
 pub(crate) fn tooltip(c: &super::Canvas, doc: &crate::doc::Doc, ui: &mut Ui) {
     let p = &doc.proj;
     match c.st.hover {
+        // a line of several cables of a cluster: their ends (G1)
+        DHit::Edge { key, .. } if super::groups::is_agg(key) => match super::groups::line_tooltip(doc, &c.scene, key) {
+            Some(text) => ui.tooltip_part(&text, key),
+            None => ui.tooltip_part("", 0),
+        },
         DHit::Edge { key, .. } => {
             let Some(l) = p.link(key as u32) else { return ui.tooltip_part("", 0) };
             let sim = &doc.sim;

@@ -1,0 +1,178 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Gruppen",
+  "description": "Zwei PCs und zwei Server an SW1; die Server haben ein Kabel unter sich mit verschiedenen Masken (G1).",
+  "seed": 7,
+  "next_id": 11,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": -160,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.11/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "PC2",
+      "model": "pc",
+      "x": -40,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.0.12/24 dev eth0\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 80,
+      "y": 160,
+      "off": false,
+      "startup_config": "",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 200,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.0.21/24 dev eth0\nip addr add 10.1.0.1/30 dev eth1\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 5,
+      "name": "SRV2",
+      "model": "server-1u",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SRV2\nip addr add 10.0.0.22/24 dev eth0\nip addr add 10.1.0.2/24 dev eth1\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 6,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 4,
+        "port": "eth1"
+      },
+      "b": {
+        "dev": 5,
+        "port": "eth1"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 10000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 80,
+    "cy": 80,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

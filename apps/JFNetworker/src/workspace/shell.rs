@@ -302,12 +302,17 @@ fn problems(n: &mut Net, ui: &mut Ui) {
     }
 }
 
-// select what a finding is about; centre: the view moves to the device
+// select what a finding is about; centre: the view moves to the device (a member of a
+// collapsed group: its groups open first; else the cluster that hides it is selected, G1)
 fn show(n: &mut Net, r: &Finding, centre: bool) {
+    if let Some(d) = r.dev.filter(|_| centre) {
+        canvas::groups::reveal(n, d);
+    }
+    let hidden = n.canvas.scene.hidden.clone();
     let st = &mut n.canvas.st;
     st.sel.clear();
     for id in r.dev.iter().chain(r.link.iter()).chain(r.others.iter()) {
-        st.sel.insert(*id as u64);
+        st.sel.insert(if centre { *id } else { hidden.get(id).copied().unwrap_or(*id) } as u64);
     }
     if let Some(d) = r.dev {
         st.focus = d as u64;

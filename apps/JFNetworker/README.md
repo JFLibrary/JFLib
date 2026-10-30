@@ -120,6 +120,12 @@ Queues, Lastgeneratoren, eigene Skripte).
   hineingezogen, jedes Kabel bekommt eine Länge (automatisch aus den Orten oder von Hand) mit der
   Grenze seines Mediums nach IEEE 802.3, ein zu langes kommt nicht hoch und ist überall zu sehen
   (siehe [Physische Ansicht](#physische-ansicht)).
+- **Gruppen und Hintergrundbild (G1):** Geräte, Notizen und Gruppen auf der logischen
+  Zeichenfläche zu Gruppen zusammenfassen (Strg+G), verschachtelt; aufgeklappt ein beschrifteter
+  Rahmen, zugeklappt ein Cluster-Symbol mit Zahl, Befunden und Dienst-Pillen, an dem die Kabel
+  nach draußen als eine Linie je Gegenstelle und Art enden; ziehen, umbenennen, auflösen, alles
+  rückgängig; darunter ein Hintergrundbild (ein Grundriss), in der Projektdatei eingebettet,
+  verschiebbar, skalierbar, sperrbar (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild)).
 
 ## Bedienung
 
@@ -253,6 +259,11 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `phys_rack.uis` | Geräte aufstellen: SRV1 im Rack von der Tastatur zehn Höheneinheiten höher (mit Rückgängig), die Höheneinheit im Inspektor (eine über dem Rack abgelehnt), aus dem Rack über die Liste der Orte, aus der Ablage ins Rack gezogen (die unterste freie Einheit), auf die Einheiten von R1 gezogen (abgelehnt), PC4 auf ein Rack (abgelehnt: kein Rack-Gerät) und an einen Platz im Labor, die Höhe des Racks im Inspektor (zu niedrig für seine Geräte abgelehnt) |
 | `phys_length.uis` | ein zu langes Kabel, gezeigt und behoben: das Problem, das Kabel „unten“ auf der Zeichenfläche, Länge, Grenze und Ablehnung im Inspektor, das markierte Kabel in der physischen Ansicht, 90 m von Hand (oben), 132 m (unten), Automatisch und Rückgängig, eine Länge, die keine Zahl ist, PC4 über den Inspektor in Büro 1 (23 m, oben) |
 | `phys_shots.uis` | die Bilder der physischen Ansicht (Serverraum mit dem markierten Kabel und seinem Inspektor, die Vorderseite von Rack 1, das Erdgeschoss von Haus A, der Campus) hell und dunkel mit 100 und 150 % (`build/jfnetworker/phys_*.png`) |
+| `model.uis`, Gruppe `groups` | Gruppen und Hintergrundbild (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild)): die äußersten des Gewählten in die innerste gemeinsame Gruppe, Verschachteln, ein Gerät je Ebene, leer gewordene Gruppen, Nummern, die fehlen (und mit Rückgängig wiederkommen), Zyklen, doppelte Mitglieder, Namen, Aufheben, was ein Zuklappen versteckt; die Datei (Gruppen und die Bytes des Bilds unverändert, ältere Dateien ohne beides, alle Fixtures, Labore und Aufgaben ohne); das Bild (Formate, Grenzen, das Fixture dekodiert, eingepasst); die Rückgängig-Schritte (die Bytes geteilt); die Szene der Zeichenfläche (Rahmen, Cluster in der Mitte, eine Linie je Gegenstelle und Art mit den schlechtesten LEDs, ein einzelnes Kabel behält seine Kennung, Kabel innen ausgeblendet, verschachtelt, was Ziehen bewegt, Aufklappen eines versteckten Geräts); 3:1 der Farbrollen; der Simulator mit und ohne Gruppen und Bild gleich (`lan_router`) |
+| `groups.uis` | Gruppen im Fenster auf `fixtures/groups.jfnet`: Strg+G, Rückgängig und Wiederholen, F2, Zuklappen mit dem Knopf (die Linie „2 Kabel“, das Kabel zwischen den Servern ausgeblendet), Doppelklick, Ziehen am Titel um Rasterschritte, der Inspektor (Farbe, Zuklappen, Mitglieder), Gummiband, Strg+A, verschachtelt und zugeklappt, Strg+Umschalt+G, Entf auf einer Gruppe, ein vergebener Name |
+| `groups_bg.uis` | das Hintergrundbild: `fixtures/bg_plan.png` über den Dateidialog, eingepasst und gewählt, Rückgängig, Ziehen, der Griff, die Felder (eine Ablehnung), Sperren (Klick und Gummiband darüber), Ansicht › … sperren, anpassen, entfernen, gespeichert und wieder geöffnet, eine Datei, die kein Bild ist |
+| `groups_sim.uis` | zugeklappte Mitglieder: das Abzeichen ihrer Befunde, im Simulationsmodus die Kopien einer Flut auf der Linie in den Cluster, die Konsole eines versteckten Geräts, ein Befund in Probleme (ein Klick wählt den Cluster, ein Doppelklick klappt auf) |
+| `groups_shots.uis` | die Bilder (gesperrtes Hintergrundbild, eine Gruppe auf, eine zu; verschachtelt mit gewähltem Bild) hell und dunkel mit 100 und 150 % (`build/jfnetworker/groups_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -269,6 +280,9 @@ Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp
 `rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
 für WLAN `crypto` und `netpkt`, für BGP `bgp`, für Dateien `tftp` und `ftp`), die
 Skriptsprache die Gruppe `script`.
+Für Gruppen und Hintergrundbild: `groups.jfnet` (zwei PCs und zwei Server an SW1, die Server mit
+einem Kabel unter sich, dessen Masken nicht passen) und `bg_plan.png` (ein Grundriss,
+160 × 120); die Rahmen des Diagramm-Widgets prüft `apps/diagramtest/tests/frames.uis`.
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -322,6 +336,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Physische Ansicht | [`crates/jfn_model/phys.rs`](crates/jfn_model/phys.rs), [`crates/jfn_sim/phys.rs`](crates/jfn_sim/phys.rs), [`src/workspace/phys/`](src/workspace/phys/mod.rs) (`scene.rs`, `paint.rs`, `props.rs`), [`src/doc/phys.rs`](src/doc/phys.rs), [`src/phystest.rs`](src/phystest.rs) | die Orte, wo die Geräte stehen, Kabellängen und die Grenzen der Medien (Modell), Kabel, die zu lang sind oder deren Optiken nicht passen, im Simulator mit Notizen, Protokollzeilen und Problemen, die Ansicht mit ihren Plänen und dem Inspektor, die Änderungen als Rückgängig-Schritte, ihr Selbsttest (siehe [Physische Ansicht](#physische-ansicht)) |
 | WLAN | [`crates/jfn_model/wlan.rs`](crates/jfn_model/wlan.rs), [`crates/jfn_sim/wlan.rs`](crates/jfn_sim/wlan.rs), [`wlankey.rs`](crates/jfn_sim/wlankey.rs), [`wlantrace.rs`](crates/jfn_sim/wlantrace.rs), [`cli/wlan.rs`](crates/jfn_sim/cli/wlan.rs), [`src/doc/wlan.rs`](src/doc/wlan.rs), [`src/workspace/canvas/wlan.rs`](src/workspace/canvas/wlan.rs), [`src/workspace/inspector/wlan.rs`](src/workspace/inspector/wlan.rs), [`src/wlantest.rs`](src/wlantest.rs), [`lib/netpkt/eapol.rs`](../../lib/netpkt/eapol.rs), [`lib/crypto`](../../lib/crypto/lib.rs) (`sha1.rs`, `keywrap.rs`, `cmac.rs`) | die WLAN-Einstellungen im Projekt, Stationen und Access Points im Simulator mit Funk, Schlüsseln und Notizen, `iw` und `show dot11`, die Einstellungen als Rückgängig-Schritte, Funklinien, Reichweiten und Balken, der Inspektor, der Selbsttest, EAPOL Byte für Byte und die Kryptografie von WPA2 und WPA3 (siehe [WLAN](#wlan)) |
 | Dateien, TFTP und FTP | [`crates/jfn_model/files.rs`](crates/jfn_model/files.rs), [`crates/jfn_sim/files.rs`](crates/jfn_sim/files.rs), [`tftpd.rs`](crates/jfn_sim/tftpd.rs), [`tftpc.rs`](crates/jfn_sim/tftpc.rs), [`ftpd.rs`](crates/jfn_sim/ftpd.rs), [`ftpc.rs`](crates/jfn_sim/ftpc.rs), [`xfertrace.rs`](crates/jfn_sim/xfertrace.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`src/workspace/devwin/files.rs`](src/workspace/devwin/files.rs), [`src/filestest.rs`](src/filestest.rs), [`lib/netpkt/tftp.rs`](../../lib/netpkt/tftp.rs), [`lib/netpkt/ftp.rs`](../../lib/netpkt/ftp.rs) | die Dateien eines Geräts im Projekt und im Simulator, TFTP- und FTP-Server und ihre Clients an beiden Befehlszeilen, die Notizen, die Befehle für Dateien, der Reiter Dateien, der Selbsttest, TFTP und FTP Byte für Byte (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)) |
+| Gruppen und Hintergrundbild | [`crates/jfn_model/group.rs`](crates/jfn_model/group.rs), [`background.rs`](crates/jfn_model/background.rs), [`src/workspace/canvas/groups.rs`](src/workspace/canvas/groups.rs), [`backdrop.rs`](src/workspace/canvas/backdrop.rs), [`src/workspace/inspector/group.rs`](src/workspace/inspector/group.rs), [`src/doc/groups.rs`](src/doc/groups.rs), [`src/groupstest.rs`](src/groupstest.rs) | die Gruppen der logischen Zeichenfläche und ihr Hintergrundbild: Modell und Datei, die Szene mit Rahmen, Clustern und ihren Linien, das Zeichnen, der Inspektor, die Rückgängig-Schritte, ihr Selbsttest (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild)) |
 | Zurückspulen | [`crates/jfn_sim/keyframe.rs`](crates/jfn_sim/keyframe.rs), [`crates/jfn_sim/driver.rs`](crates/jfn_sim/driver.rs), [`src/doc/sim.rs`](src/doc/sim.rs), [`src/workspace/sim/mod.rs`](src/workspace/sim/mod.rs), [`src/keyframetest.rs`](src/keyframetest.rs) | Keyframes in einer Speichergrenze, die Eingaben dazwischen, die Wiederholung bis zu einem Zeitpunkt und ihre Prüfsummen, das Fortsetzen von dort (Simulator); der Zustand von damals im Fenster, Konsolen in der Vergangenheit, „Von hier fortsetzen“ mit Rückfrage; ihr Selbsttest (siehe [Zurückspulen](#zurückspulen)) |
 
 ### Gerätekatalog
@@ -442,6 +457,8 @@ Programm beim Öffnen alles. Ein Labor hat dazu den Abschnitt `lab` mit seiner A
 Ansicht (siehe [Physische Ansicht](#physische-ansicht)) bringt `places` (die Orte), `phys` und
 `optics` je Gerät, `len_m` je Kabel und im Layout `phys` und `phys_at` (die gezeigte Ansicht
 und ihr Ort) mit; ältere Dateien haben nichts davon und laufen wie bisher.
+Gruppen und Hintergrundbild (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild))
+stehen in `groups` (`[]` ohne) und `background` (`null` ohne); auch sie fehlen älteren Dateien.
 
 ```json
 {
@@ -2510,6 +2527,104 @@ Für Programme: `jfn_model::phys` (`Tree`, `length`, `delay_ns`, `reach`, `link_
 `phys` ([`src/phystest.rs`](src/phystest.rs)), mit `scen_phys_lengths.uis` und den
 Fensterskripten `phys_view.uis`, `phys_rack.uis`, `phys_length.uis` und `phys_shots.uis`.
 
+### Gruppen und Hintergrundbild
+
+Auf der logischen Zeichenfläche lassen sich Geräte, Notizen und Gruppen zu **Gruppen**
+zusammenfassen, und unter allem kann ein **Hintergrundbild** liegen, etwa ein Grundriss
+([`jfn_model/group.rs`](crates/jfn_model/group.rs),
+[`background.rs`](crates/jfn_model/background.rs),
+[`src/workspace/canvas/groups.rs`](src/workspace/canvas/groups.rs),
+[`backdrop.rs`](src/workspace/canvas/backdrop.rs), [`src/doc/groups.rs`](src/doc/groups.rs),
+[`inspector/group.rs`](src/workspace/inspector/group.rs)). Beides sind Ansichtsdaten: Der
+Simulator sieht sie nie, Keyframes und alle Golden-Berichte bleiben, wie sie sind.
+
+- **Gruppieren** (Bearbeiten › Gruppieren, Strg+G; im Inspektor bei mehreren gewählten
+  Dingen): Die gewählten Geräte, Notizen und Gruppen kommen in eine neue Gruppe („Gruppe 1“, die
+  Farbrollen reihum), und zwar die äußersten (ein Mitglied einer mitgewählten Gruppe bleibt
+  darin) in die innerste Gruppe, die sie alle enthält, an die Stelle des ersten. Gruppen dürfen
+  verschachtelt sein; jedes Ding gehört höchstens einer Gruppe direkt an, Zyklen gibt es nicht,
+  eine Gruppe, die dabei leer wird, verschwindet. **Gruppierung aufheben** (Strg+Umschalt+G)
+  löst die gewählten Gruppen auf, ihre Mitglieder nehmen ihren Platz ein und sind gewählt; Entf
+  auf einer Gruppe tut dasselbe (Geräte löscht Entf auf den Geräten).
+- **Aufgeklappt** ist eine Gruppe ein beschrifteter Rahmen um ihre Mitglieder, mit Platz für
+  ihre Namen und Dienst-Pillen: oben eine Titelleiste mit Name, Anzahl und dem Knopf „−“ zum
+  Zuklappen, in einer gedämpften Farbrolle (Grau, Blau, Grün, Ocker, Ziegelrot, Violett; mit
+  3:1 gegen die Fläche in beiden Themes, nie die Farbe allein: Name und Rahmen tragen sie),
+  getönt, sodass Raster und Hintergrundbild durchscheinen. Getroffen wird der Rahmen nur an
+  Titelleiste und Rand: Ein Klick ins Innere ist Hintergrund (das Gummiband beginnt dort),
+  Mitglieder klickt man durch ihn hindurch.
+- **Zugeklappt** ist sie ein Cluster-Symbol in der Mitte ihrer Mitglieder: Karten hintereinander
+  mit dem Symbol der häufigsten Geräteart, darunter ihr Name, in der Ecke die Zahl ihrer Geräte,
+  links oben die Zahl der Befunde ihrer Mitglieder aus Probleme („! 2“, bernstein, rot bei
+  Fehlern), entlang der Oberkante die Dienst-Pillen ihrer Geräte. Kabel zwischen drinnen und
+  draußen enden am Cluster: eine Linie je Gegenstelle und Kabelart, bei mehreren mit ihrer Zahl
+  („2×“) und den LEDs des schlechtesten; ein einzelnes Kabel bleibt es selbst (Inspektor,
+  Wegpunkte). Kabel innerhalb sind ausgeblendet. Ein Doppelklick oder Eingabe klappt die Gruppe
+  auf, an Ort und Stelle (entschieden gegen eine eigene Ansicht mit Brotkrumen: Die Kabel
+  bleiben, wo sie sind, und es gibt nichts, wohin man zurück müsste).
+- **Bearbeiten:** Ziehen am Titel oder am Cluster verschiebt alle Mitglieder um ganze
+  Rasterschritte, sie bleiben auf dem Raster; F2 oder ein Doppelklick auf den Titel benennt um
+  (1 bis 64 Zeichen, eindeutig). Der Inspektor zeigt Name, Zustand, wo sie liegt, ihren Inhalt,
+  die Farbe, Zuklappen / Aufklappen, Gruppierung aufheben und die Mitglieder (ein Klick wählt
+  eines und zeigt es). Jede Änderung ist ein Rückgängig-Schritt, auch das Zu- und Aufklappen.
+- **Versteckte Mitglieder:** Gerätefenster, Konsole und ein Doppelklick in Probleme oder im
+  Protokoll klappen die Gruppen um ein verstecktes Gerät zuerst auf (ein Schritt); ein einfacher
+  Klick auf einen Befund wählt den Cluster. Eine offene Konsole arbeitet weiter, während ihr
+  Gerät versteckt ist. Im Simulationsmodus laufen Pakete entlang der Linie in einen zugeklappten
+  Cluster hinein; was darin läuft, zeigt die Fläche nicht. „Nur Auswahl“ zählt die Geräte einer
+  gewählten Gruppe mit.
+- **Tastatur und Screenreader:** Rahmen und Cluster sind Einträge („Gruppe „Serverraum“,
+  5 Geräte“, „…, zugeklappt“, eine Linie „2 Kabel Serverraum – SW1, Kupfer, gerade, aktiv“),
+  Tab läuft über sie, Strg+A, Gummiband, Minimap (Rahmen als Umriss) und Alles zeigen schließen
+  sie ein.
+
+**Hintergrundbild** (Ansicht › Hintergrundbild …, oder im Inspektor des Projekts): PNG, JPEG,
+BMP oder GIF (die Formate, die jedes Fenster dekodiert; WebP bräuchte einen eigenen Codec) bis
+8 MiB, 8192 Pixel je Seite und 32 Megapixel; größere Bilder werden mit ihrer Größe abgelehnt,
+statt sie ungefragt zu verkleinern. Das Bild kommt in die Mitte der Ansicht, auf neun Zehntel von
+ihr eingepasst, mit 60 % Deckkraft, ungesperrt und gewählt. Ungesperrt verschiebt Ziehen es wie
+eine Notiz, sein Griff unten rechts skaliert es (das Seitenverhältnis bleibt); der Inspektor
+stellt Links, Oben (in Einheiten der Fläche), Maßstab und Deckkraft ein und hat „An Ansicht
+anpassen“, „Ersetzen …“ und „Entfernen“. **Sperren** (Ansicht › Hintergrundbild sperren) macht es
+unwählbar: Ein Klick darauf ist Hintergrund, das Gummiband geht darüber. Gezeichnet wird es unter
+dem Raster in die statische Fläche der Zeichenfläche: eine Kopie von höchstens 4096 Pixeln je
+Seite mit Mip-Stufen, für jeden Zoom einmal bilinear skaliert und behalten (während einer Geste
+ungefiltert aus der passenden Stufe), im dunklen Theme mit 60 % seiner Deckkraft, damit ein
+weißer Plan nicht blendet.
+
+**In der Datei:** `groups` hält je Gruppe ihre Nummer (vom Zähler der Geräte, Kabel und Notizen),
+Namen, Farbrolle, Mitglieder (Geräte, Notizen, Gruppen) und ob sie zugeklappt ist; ein Mitglied,
+das in keiner Gruppe steht, liegt oben. `background` hält die Datei des Bilds unverändert (Format
+und Name, die Bytes als Base64), so bleibt eine `.jfnet` eine Datei, die automatische Sicherung,
+Wiederherstellung und Rückgängig ganz tragen (Rückgängig-Schritte teilen die Bytes).
+
+```json
+"groups": [
+  { "id": 12, "name": "Serverraum", "color": "blue", "members": [3, 4, 13], "collapsed": true },
+  { "id": 13, "name": "Rack 2", "color": "green", "members": [6, 7], "collapsed": false }
+],
+"background": { "format": "png", "name": "plan.png", "w": 1200, "h": 800, "x": -600, "y": -400,
+  "scale_pm": 1000, "opacity": 60, "locked": true, "base64": "iVBORw0KGgo…" }
+```
+
+Beim Lesen fallen Mitglieder weg, die es nicht gibt, ein Mitglied zweier Gruppen gehört der
+ersten, Zyklen werden gebrochen, Gruppen ohne Gerät oder Notiz fallen weg (die Prüfung des
+Projekts meldet solche Dateien). Im Fenster bleibt die Nummer eines gelöschten Geräts in seiner
+Gruppe stehen, damit Rückgängig es dorthin zurückbringt.
+
+Noch offen: ein Hintergrundbild je Ort der physischen Ansicht, Gruppen in der physischen Ansicht,
+eine Suche auf der Zeichenfläche (es gibt keine; Tab, die Einträge und der Inspektor der Gruppen
+finden ihre Mitglieder).
+
+Für Programme: `jfn_model::group` (`Group`, `GroupColor`, `Groups::of` mit `parent`, `chain`,
+`members`, `leaves`, `hidden_by`, `rep`; `group`, `ungroup`, `rename`, `set_collapsed`,
+`set_color`, `normalize`, `issues`), `jfn_model::background` (`Background`, `sniff`, `BgErr`, die
+Grenzen) und im Diagramm-Widget der Library die Knoten-Flags `DN_FRAME`, `DN_TOGGLE`, `DN_STEP`,
+`DN_RESIZE`, `DN_OUTLINE` mit `DEv::Toggle`, `DEv::Resize`, `dg_toggle_rect` und
+`DgPaint::paint_under` (docs/GUIDE.md). Geprüft wird das in der Selbsttest-Gruppe `groups`
+([`src/groupstest.rs`](src/groupstest.rs)), mit den Fensterskripten `groups.uis`,
+`groups_bg.uis`, `groups_sim.uis`, `groups_shots.uis` und `apps/diagramtest/tests/frames.uis`.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -2577,7 +2692,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · Gruppen · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; SNMP, AAA mit RADIUS, Mail) |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; SNMP, AAA mit RADIUS, Mail) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
