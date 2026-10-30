@@ -60,6 +60,9 @@
 //            > FILE, tftp (Linux); curl ftp:// is ftpc.rs
 //   mail     mail on the shell: curl smtp:// and pop3://, mail (one message from a pipe, -H the
 //            E-Mail program's inbox)
+//   snmp     SNMP: "snmp-server ..." (the agent of IOS-like devices), show snmp [community], debug
+//            snmp packets, the running configuration; snmpget, snmpgetnext, snmpwalk,
+//            snmpbulkwalk and snmpset on the shell (console programs)
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -106,6 +109,7 @@ pub mod wlan;
 pub mod bgp;
 pub mod files;
 pub mod mail;
+pub mod snmp;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -123,6 +127,8 @@ pub const D_ND: u32 = 0x1000;
 pub const D_OSPF: u32 = 0x400;
 /// "debug ip bgp [events|updates]" (which of them: CliDev::bgp_debug)
 pub const D_BGP: u32 = 0x8000;
+/// "debug snmp packets" (cli/snmp.rs)
+pub const D_SNMP: u32 = 0x40000;
 
 /// the routing process a "(config-router)#" console sets up
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -338,6 +344,7 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
         Note::V6(_) => c.debug > 0,
         n if n.is_ospf() => c.debug > 0,
         Note::Bgp(_) => c.debug > 0,
+        Note::Snmp(_) => c.debug > 0,
         _ => false,
     }
 }

@@ -133,6 +133,14 @@ Queues, Lastgeneratoren, eigene Skripte).
   nach draußen als eine Linie je Gegenstelle und Art enden; ziehen, umbenennen, auflösen, alles
   rückgängig; darunter ein Hintergrundbild (ein Grundriss), in der Projektdatei eingebettet,
   verschiebbar, skalierbar, sperrbar (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild)).
+- **SNMP (X1b):** ein SNMP-Agent mit den Versionen 1 und 2c auf den IOS-artigen Geräten
+  (`snmp-server community`, `location`, `contact`, `host`, `enable traps`, `show snmp`, `debug
+  snmp packets`) und als Dienst `snmpd` auf den Linux-Hosts; die MIB rechnet er bei jeder Anfrage
+  aus dem Zustand des Geräts (system, Interfaces mit 64-Bit-Zählern, Adressen, Routen, die Zähler
+  von SNMP), mit einer Community `rw` setzt er Kontakt, Standort, Namen und `ifAdminStatus`, er
+  meldet coldStart, linkDown, linkUp und authenticationFailure als Traps oder Informs an den
+  Dienst `snmptrapd`; in der Shell `snmpget`, `snmpgetnext`, `snmpwalk`, `snmpbulkwalk` und
+  `snmpset`, im Desktop ein MIB-Browser (siehe [SNMP](#snmp)).
 
 ## Bedienung
 
@@ -275,6 +283,11 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `groups_bg.uis` | das Hintergrundbild: `fixtures/bg_plan.png` über den Dateidialog, eingepasst und gewählt, Rückgängig, Ziehen, der Griff, die Felder (eine Ablehnung), Sperren (Klick und Gummiband darüber), Ansicht › … sperren, anpassen, entfernen, gespeichert und wieder geöffnet, eine Datei, die kein Bild ist |
 | `groups_sim.uis` | zugeklappte Mitglieder: das Abzeichen ihrer Befunde, im Simulationsmodus die Kopien einer Flut auf der Linie in den Cluster, die Konsole eines versteckten Geräts, ein Befund in Probleme (ein Klick wählt den Cluster, ein Doppelklick klappt auf) |
 | `groups_shots.uis` | die Bilder (gesperrtes Hintergrundbild, eine Gruppe auf, eine zu; verschachtelt mit gewähltem Bild) hell und dunkel mit 100 und 150 % (`build/jfnetworker/groups_*.png`) |
+| `model.uis`, Gruppe `snmp` | SNMP (siehe [SNMP](#snmp)): die Gruppe system per Get auf die Nanosekunde, Walks über `ifTable` und `ifXTable` mit den Zählern der Ports bis zur Anfrage, die Reihenfolge über die Tabellen hinweg, GetBulk mit Non-Repeaters, Wiederholungen und der Größengrenze, Set von sysLocation, sysName und `ifAdminStatus` (der Port geht herunter, die Running-Config zeigt es, das Projekt erst nach `copy run start`), was eine Community nur zum Lesen nicht darf, eine falsche Community und eine Zugriffsliste (keine Antwort, der Zähler, die Konsolenzeile, authenticationFailure), die Fehler der Version 1 gegen die von 2c (RFC 3584), tooBig, linkDown- und linkUp-Traps in `snmptrapd` mit seiner Datei, ein Inform über ein Kabel mit Verlust, bis es bestätigt ist, coldStart eines Linux-Agenten beim Start, seine Einstellungen und Ablehnungen, die IOS-artigen Befehle mit ihrer Running-Config gelesen wieder dieselbe, `show snmp`, `debug snmp packets`, die Probleme-Liste, die Zerlegung einer aufgezeichneten Nachricht, Determinismus |
+| `snmp_services.uis` | die SNMP-Dienste im Reiter Dienste (`fixtures/snmp_monitor.jfnet`): der Trap-Empfänger von MON mit dem coldStart von PC1 in seiner Statuszeile, seine Einstellungen als JSON (eine Community mit Leerzeichen abgelehnt, dann eine andere Logdatei), der Agent von PC1 (ein Inform der Version 1 abgelehnt, ein neuer Standort, den MON mit `snmpget` liest), Rückgängig bringt die alten Einstellungen zurück |
+| `snmp_console.uis` | SNMP an den Konsolen: `snmpwalk` der Gruppe system von R1 auf MON, Tab ergänzt die Werkzeuge, R1 ändert seinen Standort mit `snmp-server location` und MON sieht ihn, `show snmp`; SW1 schaltet einen Port ab, sein linkDown-Trap landet bei `snmptrapd` auf MON (die Logdatei in `/var/log`, die Zeile im Protokoll) |
+| `snmp_mib.uis` | der MIB-Browser im Desktop von MON: der Baum von mib-2, die Karte eines Objekts (Name, OID, Syntax, Zugriff), Get von sysName an R1, Walk von system, Set von sysLocation mit der Community, die R1s Zugriffsliste MON erlaubt, `ifTable` mit der Tastatur geöffnet und GetNext von `ifDescr.2`; jede Anfrage läuft als Befehl in MONs Konsole unter dem Baum |
+| `snmp_shots.uis` | die Bilder von SNMP (MONs Konsole nach einem Walk, der MIB-Browser nach einem Get, der Trap-Empfänger im Reiter Dienste, die Ereignisse mit dem Chip SNMP) hell und dunkel mit 100 und 150 % (`build/jfnetworker/snmp_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -286,10 +299,12 @@ Szenario `wlan_office.scn` und die WLAN-Fensterskripte), `backup.jfnet` (drei Ro
 TFTP- und FTP-Server, PC1; das Szenario `backup.scn` und die Fensterskripte `files_*.uis`),
 `phys_campus.jfnet` (die physische Ansicht: zwei Häuser, Serverraum mit zwei Racks, Büros auf
 zwei Etagen, ein Labor 180 m entfernt, dessen PC4 mit 208 m Kupfer an SW1 hängt;
-`phys_lengths.scn` und die `phys_*.uis`) und die Netze der Golden-Szenarien. Die
+`phys_lengths.scn` und die `phys_*.uis`), `snmp_monitor.jfnet` (MON mit `snmptrapd`, R1, SW1
+und R2 mit SNMP-Agenten, PC1 mit `snmpd`; `snmp_monitor.scn` und die `snmp_*.uis`) und die Netze
+der Golden-Szenarien. Die
 Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`,
 `rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
-für WLAN `crypto` und `netpkt`, für BGP `bgp`, für Dateien `tftp` und `ftp`), die
+für WLAN `crypto` und `netpkt`, für BGP `bgp`, für Dateien `tftp` und `ftp`, für SNMP `snmp`), die
 Skriptsprache die Gruppe `script`.
 Für Mail: `mail_domains.jfnet` (a.lab und b.lab mit je einem Mailserver und einem PC hinter R1,
 DNS1 mit ihren MX-Einträgen; das Szenario `mail_domains.scn` und die Fensterskripte
@@ -352,6 +367,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Dateien, TFTP und FTP | [`crates/jfn_model/files.rs`](crates/jfn_model/files.rs), [`crates/jfn_sim/files.rs`](crates/jfn_sim/files.rs), [`tftpd.rs`](crates/jfn_sim/tftpd.rs), [`tftpc.rs`](crates/jfn_sim/tftpc.rs), [`ftpd.rs`](crates/jfn_sim/ftpd.rs), [`ftpc.rs`](crates/jfn_sim/ftpc.rs), [`xfertrace.rs`](crates/jfn_sim/xfertrace.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`src/workspace/devwin/files.rs`](src/workspace/devwin/files.rs), [`src/filestest.rs`](src/filestest.rs), [`lib/netpkt/tftp.rs`](../../lib/netpkt/tftp.rs), [`lib/netpkt/ftp.rs`](../../lib/netpkt/ftp.rs) | die Dateien eines Geräts im Projekt und im Simulator, TFTP- und FTP-Server und ihre Clients an beiden Befehlszeilen, die Notizen, die Befehle für Dateien, der Reiter Dateien, der Selbsttest, TFTP und FTP Byte für Byte (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)) |
 | Gruppen und Hintergrundbild | [`crates/jfn_model/group.rs`](crates/jfn_model/group.rs), [`background.rs`](crates/jfn_model/background.rs), [`src/workspace/canvas/groups.rs`](src/workspace/canvas/groups.rs), [`backdrop.rs`](src/workspace/canvas/backdrop.rs), [`src/workspace/inspector/group.rs`](src/workspace/inspector/group.rs), [`src/doc/groups.rs`](src/doc/groups.rs), [`src/groupstest.rs`](src/groupstest.rs) | die Gruppen der logischen Zeichenfläche und ihr Hintergrundbild: Modell und Datei, die Szene mit Rahmen, Clustern und ihren Linien, das Zeichnen, der Inspektor, die Rückgängig-Schritte, ihr Selbsttest (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild)) |
 | Zurückspulen | [`crates/jfn_sim/keyframe.rs`](crates/jfn_sim/keyframe.rs), [`crates/jfn_sim/driver.rs`](crates/jfn_sim/driver.rs), [`src/doc/sim.rs`](src/doc/sim.rs), [`src/workspace/sim/mod.rs`](src/workspace/sim/mod.rs), [`src/keyframetest.rs`](src/keyframetest.rs) | Keyframes in einer Speichergrenze, die Eingaben dazwischen, die Wiederholung bis zu einem Zeitpunkt und ihre Prüfsummen, das Fortsetzen von dort (Simulator); der Zustand von damals im Fenster, Konsolen in der Vergangenheit, „Von hier fortsetzen“ mit Rückfrage; ihr Selbsttest (siehe [Zurückspulen](#zurückspulen)) |
+| SNMP | [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`snmpmib.rs`](crates/jfn_sim/snmpmib.rs), [`snmptrapd.rs`](crates/jfn_sim/snmptrapd.rs), [`snmptrace.rs`](crates/jfn_sim/snmptrace.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmptest.rs`](src/snmptest.rs), [`lib/netpkt/ber.rs`](../../lib/netpkt/ber.rs), [`lib/netpkt/snmp.rs`](../../lib/netpkt/snmp.rs), [`lib/netpkt/mib.rs`](../../lib/netpkt/mib.rs) | der Agent mit seiner Sicht auf das Gerät, der Trap-Empfänger, die Notizen, die IOS-artigen Befehle und die Werkzeuge der Shell, der MIB-Browser, der Selbsttest, BER, die Nachrichten von SNMPv1 und v2c und die kleine MIB (Library; siehe [SNMP](#snmp)) |
 
 ### Gerätekatalog
 
@@ -1160,6 +1176,11 @@ IOS-artige Befehlszeile:
   flash:`, `more DATEI`, `delete [/force] DATEI`, `copy QUELLE ZIEL` zwischen
   `running-config`, `startup-config`, `flash:`, `tftp:` und `ftp:`, `ip ftp username|password`
   (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
+- SNMP ([`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs)): `snmp-server community NAME [ro|rw
+  [ACL]]`, `snmp-server location|contact TEXT`, `snmp-server host ADRESSE [traps|informs]
+  [version 1|2c] COMMUNITY`, `snmp-server enable traps [snmp [authentication] [linkdown]
+  [linkup] [coldstart]]`, `no snmp-server`, `show snmp [community]`, `debug snmp packets`
+  (siehe [SNMP](#snmp)).
 
 Hosts und Server haben eine Linux-Shell (`root@PC1:~#`): `ip addr|link|route|neigh` mit den
 Ausgaben und Fehlermeldungen von iproute2, `ping` wie iputils (bis Strg+C oder `-c`; `-i`,
@@ -1188,6 +1209,8 @@ Dateien zeigen und ändern `ls`, `cat`, `cp`, `rm`, `mkdir`, `rmdir`, `touch` un
 Mail schicken `mail` und `curl smtp://`, `curl pop3://` holt sie ab (siehe
 [Mail](#mail-smtp-und-pop3)); `echo "nameserver ADRESSE" > /etc/resolv.conf` stellt den
 Namensserver von Hand ein.
+Agenten fragen und ändern `snmpget`, `snmpgetnext`, `snmpwalk`, `snmpbulkwalk` und `snmpset`
+(siehe [SNMP](#snmp)).
 
 Namen löst die Shell über den Resolver des Geräts auf (`ping server.lab`, `traceroute
 server.lab`, auch kurz mit der Suchdomäne): die erste Zeile nennt wie getaddrinfo das Ende der
@@ -2745,6 +2768,99 @@ Grenzen) und im Diagramm-Widget der Library die Knoten-Flags `DN_FRAME`, `DN_TOG
 ([`src/groupstest.rs`](src/groupstest.rs)), mit den Fensterskripten `groups.uis`,
 `groups_bg.uis`, `groups_sim.uis`, `groups_shots.uis` und `apps/diagramtest/tests/frames.uis`.
 
+### SNMP
+
+Router, Switches, die Firewall und die anderen IOS-artigen Geräte bekommen mit `snmp-server`
+einen SNMP-Agenten, Linux-Hosts mit dem Dienst `snmpd`; beide sprechen SNMPv1 (RFC 1157) und
+SNMPv2c (RFC 1901, RFC 3416) über UDP-Port 161 ([`snmpd.rs`](crates/jfn_sim/snmpd.rs),
+[`snmpmib.rs`](crates/jfn_sim/snmpmib.rs)). Ohne Konfiguration gibt es keinen Agenten; ältere
+Projekte laufen wie bisher.
+
+- **IOS-artige Befehle** ([`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs)): `snmp-server community
+  NAME [ro|rw [ACL]]` (eine Standardliste mit Nummer 1–99 oder 1300–1999 oder mit Namen),
+  `snmp-server location|contact TEXT`, `snmp-server host ADRESSE [traps|informs] [version 1|2c]
+  COMMUNITY`, `snmp-server enable traps [snmp [authentication] [linkdown] [linkup]
+  [coldstart]]` (ohne Wörter alle vier), die `no`-Formen und `no snmp-server`; alles steht in
+  der Running-Config. `show snmp` zeigt Zähler, Kontakt, Standort und Empfänger, `show snmp
+  community` die Communities mit ihrem Zugriff, `debug snmp packets` jede Anfrage, Antwort und
+  Meldung des Agenten als Konsolenzeile; diese Texte sind eigene Worte.
+- **Linux-Hosts:** der Dienst `snmpd` mit Einstellungen als JSON (`communities` mit `name`,
+  `access` `ro` oder `rw` und `source`, dem Netz, für das sie gilt; `location`, `contact`,
+  `sinks` mit `host`, `type` `trap` oder `inform`, `version`, `community` und `port`; `notify`
+  aus `coldstart`, `linkdown`, `linkup` und `authentication`, ohne nur coldStart; `port`,
+  `inform_timeout_ms`, `inform_retries`).
+- **Die MIB** rechnet der Agent bei jeder Anfrage aus dem Zustand des Geräts: die Gruppe system
+  (sysDescr in eigenen Worten wie `show version`, sysObjectID unter der Enterprise-Nummer 32473
+  für Dokumentation aus RFC 5612 mit einer Nummer je Modell, sysUpTime seit dem Start des
+  Agenten, Kontakt, Name, Standort, sysServices), `ifNumber`, `ifTable` und `ifXTable` mit
+  `ifName`, `ifAlias` aus der Beschreibung, `ifHighSpeed` und den 64-Bit-Zählern der Ports
+  (Unicast, Multicast und Broadcast getrennt), `ipForwarding`, `ipDefaultTTL`, `ipAddrTable`,
+  `ipCidrRouteTable` (die Routen, die das Gerät gerade benutzt) und die Zähler der Gruppe snmp.
+  Die Interfaces zählen auf IOS-artigen Geräten die Ports der Reihe nach (ohne Konsole und USB),
+  danach Subinterfaces, Loopbacks und VLAN-Interfaces; unter Linux wie `ip link`. GetNext und
+  GetBulk folgen der Reihenfolge der OIDs über alle Tabellen hinweg.
+- **Anfragen** nach RFC 3416 und RFC 3584: Get, GetNext, GetBulk (Non-Repeaters,
+  Max-Repetitions, früher Schluss am Ende der Sicht, höchstens 1472 Byte) und Set; in Version 2c
+  noSuchObject, noSuchInstance und endOfMibView in der Bindung, in Version 1 noSuchName mit
+  Index (GetNext überspringt dort Counter64), tooBig in beiden. Set prüft erst alle Bindungen
+  (notWritable, wrongType, wrongLength, wrongValue, noCreation; in Version 1 noSuchName und
+  badValue) und ändert alle oder keine. Schreiben lassen sich sysContact, sysLocation, sysName
+  (benennt das Gerät um wie `hostname`), `ifAdminStatus` (wie `shutdown` und `no shutdown`),
+  `ifAlias` und `snmpEnableAuthenTraps`, auf IOS-artigen Geräten in die Running-Config, ins
+  Projekt erst mit `copy run start`.
+- **Ablehnen:** eine unbekannte Community oder ein Absender, den die Zugriffsliste
+  (IOS-artig) oder `source` (Linux) nicht zulässt, bekommt keine Antwort; das zählt als
+  snmpInBadCommunityNames, schreibt `%SNMP-3-AUTHFAIL` auf die Konsole (unter Linux eine
+  Log-Zeile von `snmpd`) und meldet authenticationFailure, wenn das eingeschaltet ist. Set mit
+  einer Community nur zum Lesen bekommt noAccess (Version 1: noSuchName).
+- **Meldungen:** coldStart beim Start des Agenten, linkDown und linkUp mit ifIndex,
+  ifAdminStatus und ifOperStatus, wenn ein Port seinen Link verliert oder bekommt, und
+  authenticationFailure; als Trap der Version 1 (Enterprise sysObjectID, Agent-Adresse,
+  generic und specific trap) oder als SNMPv2-Trap oder Inform der Version 2c, von einem eigenen
+  Port. Ein Inform geht wieder, bis seine Antwort kommt (IOS-artig nach 15 s bis zu dreimal,
+  Linux nach 1 s bis zu fünfmal). Das IOS-artige ARP verliert eine Meldung, deren nächster Hop
+  noch keinen Eintrag hat, wie den ersten Ping; ein Inform kommt deshalb später an.
+- **Manager in der Shell:** `snmpget`, `snmpgetnext`, `snmpwalk`, `snmpbulkwalk` und `snmpset`
+  mit `-v 1|2c` (ohne: 2c), `-c COMMUNITY`, `-r` (5), `-t` (1 s), `-On`, `-Oq`, `-Ov`, `-Os`,
+  `-Cr N` und `-Cn N`; Namen wie `sysName.0`, `IF-MIB::ifDescr` oder Ziffern
+  (`.1.3.6.1.2.1.1.5.0`), bei `snmpset` die Typen `i u t a o s x d n` und `=` für den der MIB.
+  Die Ausgaben haben die Form von net-snmp (`SNMPv2-MIB::sysName.0 = STRING: R1`), Hilfe und
+  Fehler sind eigene Worte. `snmpwalk` fragt ohne Wurzel mib-2 ab.
+- **Trap-Empfänger:** der Dienst `snmptrapd` ([`snmptrapd.rs`](crates/jfn_sim/snmptrapd.rs))
+  auf UDP-Port 162 nimmt Traps beider Versionen und Informs (die er bestätigt), filtert nach
+  `communities` (leer: alle) und schreibt jede Meldung als Zeile ins Protokoll (Quelle
+  `snmptrapd`), in seine Logdatei (`log`, ohne: `/var/log/snmptrapd.log`, in der Form von
+  net-snmp; als Datei des Geräts ein Rückgängig-Schritt wie jede geschriebene Datei) und in seine
+  Statuszeile.
+- **Im Fenster:** beide Dienste stehen im Reiter Dienste mit Statuszeile, Zahlen und den
+  Einstellungen als JSON. Der Desktop eines Hosts hat einen MIB-Browser
+  ([`devwin/mib.rs`](src/workspace/devwin/mib.rs)): der Baum der eingebauten MIB, zu einem Objekt
+  Name, OID, Syntax und Zugriff; Get, GetNext, Walk und Set laufen als Befehle in der Konsole
+  des Geräts darunter. Der Paket-Tab zerlegt SNMP Feld für Feld mit den Namen der Objekte, die
+  Ereignisse haben einen eigenen Chip „SNMP“ in gedecktem Oliv.
+- **Notizen und Probleme:** jede Anfrage, Antwort, Ablehnung, Änderung und Meldung als Notiz
+  (`Note::Snmp`); die Probleme-Liste warnt vor einem Empfänger, zu dem es keine Route gibt, und
+  vor einer Community `rw` ohne Zugriffsliste oder `source`.
+
+Entscheidungen: Der Agent hält keine Kopie der MIB; jede Anfrage sieht das Gerät, wie es gerade
+ist. Die Routen stehen in `ipCidrRouteTable` (RFC 2096), nicht in der neueren
+`inetCidrRouteTable`. Was ein Link beim Start des Geräts tut, meldet der Agent nicht (der
+coldStart sagt es schon). Ein Absender, den die Zugriffsliste abweist, zählt wie eine unbekannte
+Community. Unter Linux gilt ein Set, solange der Dienst läuft; die Einstellungen ändert es nicht.
+sysObjectID nennt nie die Nummer eines Herstellers.
+
+Noch offen: SNMPv3, `snmp-server inform retries|timeout`, `show snmp host`, Meldungen über
+IPv6, Tabellen über die Ressourcen der Hosts, ein Agent für den MIB-Browser ohne die Konsole.
+
+Für Programme: `Action::Snmp { dev, set }` mit `SnmpSet`, `Engine::snmp_agent(dev)`,
+`snmp_running(dev)`, `snmp_view(dev)`, `snmp_traps(dev)`, `SnmpAgent`, `SnmpCfg`, `Community`,
+`TrapHost`, `TrapReceiver`, `TrapRow`, `SnmpView`, `IfRow`, `Note::Snmp(SNote)`,
+`ProblemKind::SnmpTrapHost` und `SnmpOpenRw`; in der Library `netpkt::ber`, `netpkt::snmp` und
+`netpkt::mib`. Geprüft wird in der Selbsttest-Gruppe `snmp`
+([`src/snmptest.rs`](src/snmptest.rs)), BER und SNMP Byte für Byte in der coretest-Gruppe
+`snmp`, dazu das Szenario `snmp_monitor.scn` und die Fensterskripte `snmp_services.uis`,
+`snmp_console.uis`, `snmp_mib.uis` und `snmp_shots.uis`.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -2812,7 +2928,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; SNMP, AAA mit RADIUS) |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; AAA mit RADIUS) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

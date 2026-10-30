@@ -3,7 +3,8 @@
 // base::metrics, base::cmdtree, base::hashring, base::lru, agent_core::jmap, script, its VM and
 // its standard library, the BPDUs of netpkt::stp, ICMPv6 and Neighbor Discovery of
 // netpkt::icmpv6, the address selection of netpkt::addrsel, the BGP messages of netpkt::bgp,
-// TFTP and FTP of netpkt::tftp and netpkt::ftp): known-answer vectors, round trips, edge cases.
+// TFTP and FTP of netpkt::tftp and netpkt::ftp, BER, SNMP and the MIB of netpkt::ber, snmp and
+// mib): known-answer vectors, round trips, edge cases.
 // The group mail checks netpkt::smtp, netpkt::pop3 and netpkt::imf (mailt.rs).
 // Console program; exit code 1 when a check fails.
 //
@@ -53,6 +54,7 @@ mod bgpt;
 mod tftpt;
 mod ftpt;
 mod mailt;
+mod snmpt;
 
 /// the result collector of a check group
 pub struct T {
@@ -126,7 +128,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 33] = [
+    let groups: [(&'static str, fn(&mut T)); 34] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -160,6 +162,7 @@ fn run() -> i32 {
         ("tftp", tftpt::run),
         ("ftp", ftpt::run),
         ("mail", mailt::run),
+        ("snmp", snmpt::run),
     ];
     let mut failed = 0;
     let mut total = 0;

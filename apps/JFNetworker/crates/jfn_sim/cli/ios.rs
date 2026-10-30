@@ -29,6 +29,8 @@
 // Files (cli/files.rs): dir, show flash:, more, delete, copy between running-config,
 // startup-config, flash:, tftp: and ftp: with questions for what is missing, ip ftp
 // username / password.
+// SNMP (cli/snmp.rs): snmp-server community, location, contact, host, enable traps and "no
+// snmp-server"; show snmp [community]; debug snmp packets.
 
 use alloc::format;
 use alloc::string::String;
@@ -216,6 +218,15 @@ pub enum K {
     Delete,
     Copy,
     IpFtp,
+    // SNMP (cli/snmp.rs)
+    SnmpOff,
+    SnmpCommunity,
+    SnmpLocation,
+    SnmpContact,
+    SnmpHost,
+    SnmpTraps,
+    ShowSnmp,
+    DebugSnmp,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -568,6 +579,8 @@ fn build(caps: u32) -> Tree<K> {
     super::bgp::build_bgp(&mut t, [user, prv, conf], router);
     // ---- files: flash, nvram, copy to and from servers (cli/files.rs)
     super::files::build_files(&mut t, [user, prv, conf]);
+    // ---- the SNMP agent (cli/snmp.rs)
+    super::snmp::build_snmp(&mut t, [user, prv, conf]);
     t
 }
 
@@ -860,7 +873,7 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF | super::D_BGP
+                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF | super::D_BGP | super::D_SNMP
                 } else if p.has("icmp") {
                     D_ICMP
                 } else if p.has("rip") {
@@ -1104,6 +1117,7 @@ impl Engine {
             | K::ClearBgp
             | K::DebugBgp => self.ios_bgp(ni, p),
             K::Dir | K::ShowFlash | K::More | K::Delete | K::Copy | K::IpFtp => self.ios_files(ni, p),
+            K::SnmpOff | K::SnmpCommunity | K::SnmpLocation | K::SnmpContact | K::SnmpHost | K::SnmpTraps | K::ShowSnmp | K::DebugSnmp => self.ios_snmp(ni, p),
         }
     }
 

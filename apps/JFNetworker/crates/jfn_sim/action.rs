@@ -72,6 +72,10 @@
 //                                                      message or fetches the new ones of its
 //                                                      account (mailc.rs: a job of its own,
 //                                                      after the ones before it)
+//   Snmp                                               the SNMP agent of an IOS-like device:
+//                                                      communities, location, contact,
+//                                                      receivers, notifications, "no snmp-server"
+//                                                      (snmpd.rs)
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -271,6 +275,8 @@ pub enum Action {
     MailSend { dev: u32, draft: crate::mailc::MailDraft },
     /// the E-Mail program fetches the new messages of its account (POP3)
     MailFetch { dev: u32 },
+    /// a change of an IOS-like device's SNMP agent ("snmp-server ...": snmpd.rs)
+    Snmp { dev: u32, set: crate::snmpd::SnmpSet },
 }
 
 /// why an action was refused (German text through Display)
@@ -655,6 +661,8 @@ impl Engine {
             // the E-Mail program (mailc.rs)
             Action::MailSend { dev, draft } => self.mail_job(dev, crate::mailc::MailJob::Send(draft)),
             Action::MailFetch { dev } => self.mail_job(dev, crate::mailc::MailJob::Fetch),
+            // the SNMP agent of IOS-like devices (snmpd.rs)
+            Action::Snmp { dev, set } => self.snmp_apply(dev, set),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }

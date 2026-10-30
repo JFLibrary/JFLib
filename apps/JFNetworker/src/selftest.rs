@@ -42,6 +42,7 @@
 // the static name servers of /etc/resolv.conf).
 // groupstest.rs: groups and the background picture of the canvas (group groups: jfn_model::group
 // and background, doc/groups.rs, the scene of canvas/paint.rs with frames, clusters and lines).
+// snmptest.rs: SNMP (group snmp: jfn_sim::snmpd, snmpmib, snmptrapd, snmptrace, cli/snmp.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -111,9 +112,11 @@ mod phystest;
 mod mailtest;
 #[path = "groupstest.rs"]
 mod groupstest;
+#[path = "snmptest.rs"]
+mod snmptest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 39] = [
+    let groups: [(&'static str, fn(&mut T)); 40] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -153,6 +156,7 @@ pub fn run() -> i32 {
         ("phys", phystest::run),
         ("mail", mailtest::run),
         ("groups", groupstest::run),
+        ("snmp", snmptest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

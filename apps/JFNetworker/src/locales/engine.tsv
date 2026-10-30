@@ -1255,3 +1255,46 @@ Die Nummer {} der Gruppe „{}“ ist schon vergeben.	The number {} of the group
 Der Name der Gruppe „{}“ ist leer oder doppelt.	The name of the group “{}” is empty or used twice.
 „{}“ gehört zu mehr als einer Gruppe; es zählt die erste.	“{}” belongs to more than one group; the first one counts.
 Die Gruppe „{}“ liegt in sich selbst.	The group “{}” lies within itself.
+
+# jfn_sim: SNMP (snmpd.rs, snmptrapd.rs, snmptrace.rs)
+Eine Community braucht „name“ ohne Leerzeichen.	A community needs a “name” without spaces.
+„{}“ ist kein Zugriff (ro oder rw).	“{}” is no access (ro or rw).
+„{}“ ist kein Netz wie 10.0.0.0/24.	“{}” is no network like 10.0.0.0/24.
+„{}“ ist keine Art (trap oder inform).	“{}” is no kind (trap or inform).
+Version „{}“ gibt es hier nicht (1 oder 2c).	There is no version “{}” here (1 or 2c).
+Informs gibt es erst ab Version 2c.	Informs need version 2c.
+„{}“ ist keine Meldung (coldstart, linkdown, linkup, authentication).	“{}” is no notification (coldstart, linkdown, linkup, authentication).
+Port {} ist belegt: der Agent antwortet nicht	Port {} is in use: the agent does not answer
+ohne Community: beantwortet nichts, {} Meldungen gesendet	no community: answers nothing, {} notifications sent
+{} Anfragen beantwortet, {} abgelehnt, {} Meldungen gesendet	{} requests answered, {} refused, {} notifications sent
+Den SNMP-Agenten eines Linux-Hosts stellt der Dienst snmpd ein.	The SNMP agent of a Linux host is set up by the service snmpd.
+Die Community „{}“ gibt es nicht.	There is no community “{}”.
+{} ist kein Empfänger von Meldungen.	{} is no receiver of notifications.
+{} schickt SNMP-Meldungen an {}, hat aber keinen Weg dorthin.	{} sends SNMP notifications to {} but has no route there.
+Auf {} darf jeder mit der Community „{}“ schreiben: eine Zugriffsliste fehlt.	On {} anyone may write with the community “{}”: an access list is missing.
+SNMP: {} von {} (Community „{}“, Kennung {}, {} Variablen).	SNMP: {} from {} (community “{}”, id {}, {} variables).
+SNMP: Antwort an {} (Kennung {}, {} Variablen).	SNMP: response to {} (id {}, {} variables).
+SNMP: Antwort an {} mit dem Fehler {} bei Variable {} (Kennung {}).	SNMP: response to {} with the error {} at variable {} (id {}).
+SNMP: unbekannte Community „{}“ von {}: keine Antwort.	SNMP: unknown community “{}” from {}: no response.
+SNMP: {} darf die Community „{}“ nicht nutzen ({}): keine Antwort.	SNMP: {} may not use the community “{}” ({}): no response.
+SNMP: Version {} von {} versteht der Agent nicht: verworfen.	SNMP: the agent does not speak version {} from {}: dropped.
+SNMP: Nachricht von {} nicht lesbar: verworfen.	SNMP: unreadable message from {}: dropped.
+SNMP: Set von {} mit der Community „{}“, die nur lesen darf: abgelehnt.	SNMP: Set from {} with the community “{}”, which may only read: refused.
+SNMP: {} ist jetzt {}.	SNMP: {} is now {}.
+SNMP: Trap {} an {} (Version {}).	SNMP: trap {} to {} (version {}).
+SNMP: Inform {} an {} (Version {}), wartet auf Bestätigung.	SNMP: inform {} to {} (version {}), waiting for its acknowledgement.
+SNMP: keine Bestätigung des Informs {} von {}: noch einmal gesendet (Versuch {}).	SNMP: no acknowledgement of the inform {} from {}: sent again (attempt {}).
+SNMP: {} hat den Inform {} bestätigt.	SNMP: {} acknowledged the inform {}.
+SNMP: der Inform {} an {} blieb unbestätigt: aufgegeben.	SNMP: the inform {} to {} was never acknowledged: given up.
+SNMP: kein Weg zum Empfänger {}: die Meldung geht verloren.	SNMP: no route to the receiver {}: the notification is lost.
+SNMP: Trap {} von {} empfangen.	SNMP: trap {} received from {}.
+SNMP: Inform {} von {} empfangen und bestätigt.	SNMP: inform {} received from {} and acknowledged.
+SNMP: Meldung von {} mit der unbekannten Community „{}“ verworfen.	SNMP: notification from {} with the unknown community “{}” dropped.
+SNMP: {} an {} (Kennung {}).	SNMP: {} to {} (id {}).
+SNMP: keine Antwort von {}: noch einmal gefragt (Versuch {}).	SNMP: no response from {}: asked again (attempt {}).
+SNMP: {} antwortet nicht: aufgegeben.	SNMP: {} does not answer: given up.
+Eine Community ist ein Wort ohne Leerzeichen.	A community is a word without spaces.
+„log“ ist der Pfad einer Datei.	“log” is the path of a file.
+Port {} ist belegt: keine Meldungen	Port {} is in use: no notifications
+{} Traps und {} Informs empfangen; zuletzt {} von {}	{} traps and {} informs received; the last one {} from {}
+wartet auf Meldungen an Port {}	waiting for notifications on port {}

@@ -1,0 +1,62 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/snmp_monitor.jfnet
+# the MIB-Browser in MON's Desktop (devwin/mib.rs) on fixtures/snmp_monitor.jfnet: the tile, the
+# tree of mib-2 with system open, an object's card (name, OID, syntax, access), Get of sysName
+# against R1, Walk of system, Set of sysLocation with the community R1's access list lets MON
+# use, ifTable opened from the keyboard and GetNext of ifDescr.2; every request runs as a
+# command in MON's console below the tree.
+# Ids: the window 26624; the MIB-Browser 69632: agent 69633, community 69634, Get 69638,
+# GetNext 69639, Walk 69640, the value 69642, Set 69643, the instance 69637, the tree 69888.
+size 1280 900
+theme light
+dblclick listitem:"MON" shift
+expect window 26624 open
+click tab:"Desktop"
+click button:"MIB-Browser"
+expect text:"Links ein Objekt wählen; Get, GetNext, Walk und Set laufen als Befehle in der Eingabeaufforderung des Geräts." exists
+click #69633
+type "10.0.10.1"
+click listitem:"sysName"
+expect text:"SNMPv2-MIB::sysName" exists
+expect text:".1.3.6.1.2.1.1.5" exists
+expect text:"Einzelwert · DisplayString · lesen und schreiben" exists
+expect #69637 text "0"
+click #69638
+wait 1000
+expect text:"root@MON:~# snmpget -v2c -c public 10.0.10.1 SNMPv2-MIB::sysName.0" exists
+expect text:"SNMPv2-MIB::sysName.0 = STRING: R1" exists
+# a walk of the system group
+click listitem:"system"
+expect #69638 disabled
+click #69640
+wait 2000
+expect text:"SNMPv2-MIB::sysServices.0 = INTEGER: 4" exists
+# Set: the community "private", which R1 lets MON use
+click #69634
+key ctrl+a
+type "private"
+click listitem:"sysLocation"
+click #69642
+type "Halle 7"
+click #69643
+wait 1000
+expect text:"SNMPv2-MIB::sysLocation.0 = STRING: Halle 7" exists
+shot build/jfnetworker/snmp_mib.png window 26624
+# system closed, interfaces opened from the keyboard, GetNext of ifDescr.2
+click listitem:"system"
+key left
+expect listitem:"sysName" missing
+click listitem:"interfaces"
+key right
+click listitem:"ifTable"
+key right
+click listitem:"ifEntry"
+key right
+click listitem:"ifDescr"
+expect #69637 text "1"
+click #69637
+key ctrl+a
+type "2"
+click #69639
+wait 1000
+expect text:"IF-MIB::ifDescr.3 = STRING: GigabitEthernet0/0/2" exists
+expect_nowarn

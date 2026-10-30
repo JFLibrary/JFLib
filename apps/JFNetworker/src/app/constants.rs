@@ -211,10 +211,12 @@ pub(crate) const ID_TB_TEMPO: u32 = 0x8001;
 pub(crate) const ID_SIM_LIVE: u32 = 0x8008;
 /// the dock panel of the user's PDUs (right, below Eigenschaften)
 pub(crate) const P_PDUS: u32 = 8;
-/// Ereignisse: the protocol chips (+ k), "Nur Auswahl", the split, the timeline; the grid
-/// last (its rows + 1 + i go past the range, up to the trace's 400 000 events)
+/// Ereignisse: the protocol chips (+ k for the first ten, ID_EV_CHIP10 + k - 10 for the six
+/// after them), "Nur Auswahl", the split, the timeline; the grid last (its rows + 1 + i go past
+/// the range, up to the trace's 400 000 events)
 pub(crate) const ID_EV_CHIP0: u32 = 0x8010;
 pub(crate) const ID_EV_ONLY_SEL: u32 = 0x801A;
+pub(crate) const ID_EV_CHIP10: u32 = 0x801B;
 pub(crate) const ID_EV_TL_SPLIT: u32 = 0x8021;
 pub(crate) const ID_EV_TIMELINE: u32 = 0x8028;
 pub(crate) const ID_EV_GRID: u32 = 0x9800;
@@ -572,3 +574,11 @@ pub(crate) const ID_BG_FIT: u32 = 0x0001_0106;
 pub(crate) const ID_BG_REPLACE: u32 = 0x0001_0107;
 pub(crate) const ID_BG_REMOVE: u32 = 0x0001_0108;
 pub(crate) const ID_BG_ADD: u32 = 0x0001_0109;
+
+// ---- X1b: SNMP (commands 620 .. 639, widgets 0x0001_1000 .. 0x0001_1FFF, timers 0x194 .. 0x197;
+// none of the commands and timers is used yet)
+/// the MIB-Browser in the Desktop of device window k: ID_MIB0 + 0x400 k (+ 1 .. 3 agent,
+/// community, version, + 4 the card of the chosen object, + 5 its instance, + 6 .. 8 Get,
+/// GetNext, Walk, + 9 .. 11 the type, the value, Set; + 0x100 the tree with its rows; + 0x3F0 its
+/// tile on the desktop)
+pub(crate) const ID_MIB0: u32 = 0x0001_1000;

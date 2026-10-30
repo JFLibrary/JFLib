@@ -12,9 +12,12 @@
 //                           HTTP it says what it would load
 //     E-Mail                an account, the inbox and the messages sent, writing, answering,
 //                           sending and fetching (email.rs)
+//     MIB-Browser           the objects of the built-in MIB as a tree, Get, GetNext, Walk and
+//                           Set against an agent: net-snmp's commands on the console (mib.rs)
 //
 // Ids: id + 1 .. + 4 the tiles, + 5 back, + 6 the tile of E-Mail, + 0x10 the IP configuration,
-// + 0x20 the editor, + 0x30 the browser; E-Mail has ID_MAIL0 + 0x400 k of its own.
+// + 0x20 the editor, + 0x30 the browser; E-Mail has ID_MAIL0 + 0x400 k of its own, the
+// MIB-Browser's tile and widgets have a block of their own (ID_MIB0).
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -37,15 +40,17 @@ pub(crate) enum App {
     Editor,
     Browser,
     Mail,
+    Mib,
 }
 
 // i18n
-const APPS: [(App, &str, &str); 5] = [
+const APPS: [(App, &str, &str); 6] = [
     (App::IpConfig, "IP-Konfiguration", "Adresse, Maske und Gateway oder DHCP"),
     (App::Prompt, "Eingabeaufforderung", "Die Shell des Geräts"),
     (App::Editor, "Texteditor", "Notizen zum Gerät"),
     (App::Browser, "Webbrowser", "Seiten als Text"),
     (App::Mail, "E-Mail", "Nachrichten senden und abrufen"),
+    (App::Mib, "MIB-Browser", "SNMP-Objekte eines Agenten lesen und setzen"),
 ];
 
 /// the desktop's state
@@ -70,6 +75,8 @@ pub(crate) struct Desk {
     page: Vec<String>,
     // E-Mail
     pub mail: super::email::MailUi,
+    // MIB-Browser (mib.rs)
+    pub mib: super::mib::MibState,
 }
 
 impl Desk {
@@ -89,6 +96,7 @@ impl Desk {
             url: String::from("http://"),
             page: Vec::new(),
             mail: super::email::MailUi::new(),
+            mib: super::mib::MibState::new(),
         }
     }
 }
@@ -129,6 +137,7 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         App::Editor => editor(n, ui, k, id + 0x20, dev),
         App::Browser => browser(n, ui, k, id + 0x30, dev),
         App::Mail => super::email::program(n, ui, k, crate::app::constants::ID_MAIL0 + 0x400 * k as u32, dev),
+        App::Mib => super::mib::browser(n, ui, k, dev),
         App::Home => {}
     }
 }
@@ -144,13 +153,21 @@ fn home(n: &mut Net, ui: &mut Ui, k: usize, id: u32) {
             App::Prompt => JN_TERMINAL,
             App::Editor => IC_DOCUMENT,
             App::Mail => IC_MAIL,
+            App::Mib => IC_BULLETED_LIST,
             _ => IC_GLOBE,
+        };
+        // the tiles after the first four: + 6 on (+ 5 is the way back); the MIB-Browser's tile
+        // has an id of its own block
+        let tid = if *app == App::Mib {
+            crate::app::constants::ID_MIB0 + 0x400 * k as u32 + 0x3F0
+        } else if i < 4 {
+            id + 1 + i as u32
+        } else {
+            id + 2 + i as u32
         };
         ui.next_size(150, 96);
         ui.next_icon(icon);
         ui.next_flags(ST_LARGE);
-        // the tiles after the first four: + 6 on (+ 5 is the way back)
-        let tid = if i < 4 { id + 1 + i as u32 } else { id + 2 + i as u32 };
         if ui.button(tid, t(label)) & EV_ACT != 0 {
             chosen = Some(*app);
         }

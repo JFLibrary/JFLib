@@ -1,0 +1,201 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Überwachung per SNMP",
+  "description": "MON fragt R1, SW1, R2 und PC1 per SNMP ab und sammelt ihre Traps und Informs mit snmptrapd.",
+  "seed": 23,
+  "next_id": 10,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "MON",
+      "model": "server-1u",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname MON\nip addr add 10.0.10.50/24 dev eth0\nip route add default via 10.0.10.1\n",
+      "services": [
+        {
+          "kind": "snmptrapd",
+          "name": "traps",
+          "disabled": false,
+          "config": {
+            "communities": [
+              "public"
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 200,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n description zum Monitoring\n ip address 10.0.10.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\naccess-list 10 permit host 10.0.10.50\n!\nsnmp-server community public RO\nsnmp-server community private RW 10\nsnmp-server location Technikraum\nsnmp-server contact netz@lab.example\nsnmp-server enable traps snmp authentication linkdown linkup coldstart\nsnmp-server host 10.0.10.50 version 2c public\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 400,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW1\n!\ninterface Vlan1\n ip address 10.0.1.10 255.255.255.0\n no shutdown\n!\nip route 0.0.0.0 0.0.0.0 10.0.1.1\n!\nsnmp-server community public RO\nsnmp-server location Technikraum, Rack 1\nsnmp-server enable traps snmp linkdown linkup\nsnmp-server host 10.0.10.50 version 2c public\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "R2",
+      "model": "jf-r4",
+      "x": 600,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R2\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.2 255.255.255.0\n no shutdown\n!\nip route 0.0.0.0 0.0.0.0 10.0.1.1\n!\nsnmp-server community public RO\nsnmp-server enable traps snmp linkdown linkup coldstart\nsnmp-server host 10.0.10.50 informs version 2c public\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "PC1",
+      "model": "pc",
+      "x": 400,
+      "y": 200,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.1.20/24 dev eth0\nip route add default via 10.0.1.1\n",
+      "services": [
+        {
+          "kind": "snmpd",
+          "name": "snmpd",
+          "disabled": false,
+          "config": {
+            "communities": [
+              {
+                "name": "public",
+                "access": "ro"
+              }
+            ],
+            "location": "Büro 1",
+            "sinks": [
+              {
+                "host": "10.0.10.50",
+                "community": "public"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    }
+  ],
+  "links": [
+    {
+      "id": 6,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "cable": "copper-cross",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 300,
+    "cy": 100,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null,
+  "dip_per_m": 0
+}

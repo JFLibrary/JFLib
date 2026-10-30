@@ -145,6 +145,14 @@
 //            AUTH on port 587): local mailboxes, relaying by MX with a queue, retries and
 //            bounces; "smtp-server"
 //   pop3d    the POP3 server (RFC 1939 with UIDL, TOP and CAPA); "pop3-server"
+//   snmpd    the SNMP agent (SNMPv1 and v2c): "snmpd" on Linux hosts, "snmp-server ..." on IOS-like
+//            devices (SnmpSet, Action::Snmp); Get, GetNext, GetBulk and Set over the device's
+//            state, notifications as traps and informs (coldStart, linkDown, linkUp,
+//            authenticationFailure)
+//   snmpmib  what the agent serves: a view of the device made for each request (system,
+//            interfaces, ifXTable, addresses, routes, the snmp group) in the order of SNMP
+//   snmptrapd the receiver of notifications on Linux hosts: logs them, acknowledges informs
+//   snmptrace SNote: the decisions of SNMP as notes (Note::Snmp) with their German sentences
 //
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
@@ -234,6 +242,10 @@ pub mod mailbox;
 pub mod mailc;
 pub mod smtpd;
 pub mod pop3d;
+pub mod snmptrace;
+pub mod snmpmib;
+pub mod snmpd;
+pub mod snmptrapd;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -301,3 +313,7 @@ pub use mailtrace::MNote;
 pub use mailc::{Account, MailClient, MailClientView, MailDraft, MailEntry, MailJob, MailOutcome};
 pub use smtpd::{MailUser, SmtpServer};
 pub use pop3d::Pop3Server;
+pub use snmptrace::SNote;
+pub use snmpmib::{IfRow, View as SnmpView};
+pub use snmpd::{Community, SnmpAgent, SnmpCfg, SnmpSet, TrapHost};
+pub use snmptrapd::{TrapReceiver, TrapRow};

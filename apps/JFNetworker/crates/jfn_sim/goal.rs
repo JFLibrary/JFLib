@@ -162,6 +162,7 @@ pub(crate) fn proto_bit(p: &str) -> Option<u32> {
         "tftp" => decode::P_TFTP,
         "ftp" => decode::P_FTP,
         "smtp" | "pop3" | "mail" => decode::P_MAIL,
+        "snmp" => decode::P_SNMP,
         _ => return None,
     })
 }

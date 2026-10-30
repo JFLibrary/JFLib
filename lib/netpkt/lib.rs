@@ -59,6 +59,14 @@
 //             Mailbox (addresses with display names), Date, Message-ID, encoded words,
 //             quoted-printable, base64, multipart parts, Draft (a plain-text message in UTF-8)
 //                                                                (RFC 5322, 2045-2047, 3464)
+//   ber       ASN.1 BER as SNMP uses it: Oid (dotted, lexicographic order), Value (the SMI's
+//             types and the exceptions of SNMPv2), Reader / Writer, strict lengths  (X.690, RFC 3417)
+//   snmp      SNMPv1 and v2c messages: community, the PDUs Get, GetNext, GetBulk, Set, Response,
+//             the v1 Trap, SNMPv2-Trap, Inform and Report; error statuses and their v1 mapping,
+//             the objects of notifications                       (RFC 1157, 1901, 3416, 3584)
+//   mib       the objects of SNMPv2-MIB, IF-MIB, IP-MIB and IP-FORWARD-MIB an agent of the
+//             simulator serves: names, OIDs, syntax, access, lookup by name, values as net-snmp's
+//             tools print them                                   (RFC 3418, 2863, 4293, 2096)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -98,6 +106,9 @@ pub mod ftp;
 pub mod smtp;
 pub mod pop3;
 pub mod imf;
+pub mod ber;
+pub mod snmp;
+pub mod mib;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

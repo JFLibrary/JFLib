@@ -1119,6 +1119,12 @@ Fensterrand hinaus.
   Portwechsel; [`netpkt/ftp.rs`](../lib/netpkt/ftp.rs): Befehle, Antworten auch über mehrere
   Zeilen, PORT, 227, EPRT und 229 nach RFC 959 und 2428; Dissektor; Gruppen `tftp` und `ftp`),
   im Einsatz in den Dateidiensten von JFNetworker.
+  Seit X1b auch SNMP ([`netpkt/ber.rs`](../lib/netpkt/ber.rs): BER nach RFC 3417 mit den Typen
+  von SNMPv2-SMI und den drei Ausnahmen; [`netpkt/snmp.rs`](../lib/netpkt/snmp.rs): die
+  Nachrichten von SNMPv1 und v2c, Fehler und Traps beider Versionen nach RFC 3584;
+  [`netpkt/mib.rs`](../lib/netpkt/mib.rs): eine kleine eingebaute MIB mit Namen, Syntax und
+  Zugriff; Dissektor; Gruppe `snmp`), im Einsatz in den SNMP-Agenten und Werkzeugen von
+  JFNetworker.
 - **P2** · *erledigt* · Style `netlab` ([`styles/netlab`](../styles/netlab)) für JFNetworker:
   nüchterne graue Flächen, 1-DIP-Rahmen, kleine Radien, Auswahl als Akzent-Tönung mit Rahmen,
   klassische Dock-Register, kompakt (28-DIP-Controls, 22-DIP-Grid-Zeilen), Inter und eigene
