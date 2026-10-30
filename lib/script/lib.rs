@@ -25,6 +25,10 @@
 //   library()                    the standard library every host gets (stdlib.rs: str, list,
 //                                map, bytes, math, json, int / float.parse; math.rs: exp, log,
 //                                pow, sin, cos .. in software), found by name before the host
+//   ls::index(src) / definition / references / rename / complete / hover / signature /
+//   folding / symbols            language services for editors (ls.rs: symbols with their
+//                                positions and scopes, also on code that does not parse)
+//   fmt::format(src)             the formatter (fmt.rs): Result<String, syntax errors>
 //
 // The language: small, dynamically typed, JS/Lua-like.  Values: nil, bool, int (i64), float
 // (f64), str (immutable UTF-8), bytes, list, map (insertion ordered; keys str, int, bool),
@@ -58,6 +62,11 @@ mod stdlib;
 mod strlib;
 mod listlib;
 mod jsonlib;
+// (SK6) language services for editors (ls.rs, the library's descriptions in lsdoc.rs) and the
+// formatter (fmt.rs)
+pub mod ls;
+mod lsdoc;
+pub mod fmt;
 
 use alloc::format;
 use alloc::string::String;
