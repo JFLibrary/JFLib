@@ -1,0 +1,116 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/lan_router.jfnet
+# rewinding with keyframes (K1: jfn_sim::keyframe, doc/sim.rs, workspace/sim): R1's console in
+# real time -- a ping learns PC2's MAC at 1,178 s, a static route and Gi0/0/0 shut down at
+# about 3,7 s, up again at about 5,7 s.  Then the simulation mode looks back: a step back lands
+# on the last echo reply at 3,178 008 078 s (ARP learned, no static route yet; the ping still
+# runs then, a line in the past gives it up on its copy); at 0,5 s "show arp" knows only R1's own
+# addresses and "show ip route" no static route; a line in the past changes nothing (no
+# configuration mode); at 4,5 s the cable PC1 – R1 is down (its LEDs and its entry), the route
+# is there and Gi0/0/0's network is not; "Zurück zu live"; "Von hier fortsetzen" at 4,5 s asks,
+# then the run goes on from there: the cable stays down (the "no shutdown" after it is gone),
+# the console says where it went on and answers live again.  Shots: build/jfnetworker/rewind_*.
+# Ids: 126 clears the console, 422 shows a moment (ms), 420 is "Von hier fortsetzen …".
+size 1280 900
+theme light
+drag 630,671 630,380 8
+dblclick listitem:"R1"
+expect tab:"R1" selected
+type "enable\n"
+wait 1000
+type "ping 10.0.2.10\n"
+wait 2500
+expect text:".!!!!" exists
+type "conf t\n"
+type "ip route 10.9.0.0 255.255.0.0 10.0.2.10\n"
+type "interface gi0/0/0\n"
+type "shutdown\n"
+type "end\n"
+wait 2000
+expect listitem:"Kabel PC1 eth0 – R1 Gi0/0/0, Kupfer, gekreuzt, unten" exists
+type "conf t\n"
+type "interface gi0/0/0\n"
+type "no shutdown\n"
+type "end\n"
+wait 500
+expect listitem:"Kabel PC1 eth0 – R1 Gi0/0/0, Kupfer, gekreuzt, aktiv" exists
+# a step back: the last echo reply; R1 knows PC2's MAC, the static route comes later
+click tab:"Simulation"
+wait 200
+key shift+f7
+wait 1200
+expect text:"Ansicht bei t = 3,178 008 078 s" exists
+expect text:"Zustand von damals" exists
+expect button:"Von hier fortsetzen …" enabled
+key ctrl+3
+wait 100
+cmd 126
+type "show arp\n"
+expect text:"--- Zustand bei t = 3,178 008 078 s: nur Anzeige, nichts wird geändert ---" exists
+expect text:"Internet  10.0.2.10               0   024a.0000.0301  ARPA   GigabitEthernet0/0/1" exists
+type "show ip route\n"
+expect text:"C        10.0.1.0/24 is directly connected, GigabitEthernet0/0/0" exists
+expect text:"S        10.9.0.0/16 [1/0] via 10.0.2.10" missing
+shot build/jfnetworker/rewind_back.png
+# 0,5 s: before the ping, only R1's own addresses
+cmd 422 500
+wait 100
+expect text:"Ansicht bei t = 0,500 000 000 s" exists
+key ctrl+3
+cmd 126
+type "show arp\n"
+expect text:"--- Zustand bei t = 0,500 000 000 s: nur Anzeige, nichts wird geändert ---" exists
+expect text:"Internet  10.0.2.1                -   024a.0000.0202  ARPA   GigabitEthernet0/0/1" exists
+expect text:"Internet  10.0.2.10               0   024a.0000.0301  ARPA   GigabitEthernet0/0/1" missing
+# a line in the past runs on a copy: no configuration mode
+type "conf t\n"
+expect text:"R1(config)#" missing
+# 4,5 s: Gi0/0/0 shut down, the static route there
+cmd 422 4500
+wait 100
+expect text:"Ansicht bei t = 4,500 000 000 s" exists
+expect listitem:"Kabel PC1 eth0 – R1 Gi0/0/0, Kupfer, gekreuzt, unten" exists
+expect listitem:"Kabel R1 Gi0/0/1 – PC2 eth0, Kupfer, gekreuzt, aktiv" exists
+key ctrl+3
+cmd 126
+type "show ip route\n"
+expect text:"S        10.9.0.0/16 [1/0] via 10.0.2.10" exists
+expect text:"C        10.0.1.0/24 is directly connected, GigabitEthernet0/0/0" missing
+expect text:"C        10.0.2.0/24 is directly connected, GigabitEthernet0/0/1" exists
+shot build/jfnetworker/rewind_down.png
+# back to live: the cable is up again
+click button:"Zurück zu live"
+wait 100
+expect text:"Ansicht bei t = 4,500 000 000 s" missing
+expect listitem:"Kabel PC1 eth0 – R1 Gi0/0/0, Kupfer, gekreuzt, aktiv" exists
+# "Von hier fortsetzen" at 4,5 s: the question, cancelled, then answered
+cmd 422 4500
+wait 100
+click button:"Von hier fortsetzen …"
+wait 100
+expect dialog:"Von hier fortsetzen?" exists
+shot build/jfnetworker/rewind_ask.png
+click button:"Abbrechen"
+wait 100
+expect dialog:"Von hier fortsetzen?" missing
+expect text:"Ansicht bei t = 4,500 000 000 s" exists
+click button:"Von hier fortsetzen …"
+wait 100
+click button:"Fortsetzen"
+wait 100
+expect text:"Ansicht bei t = 4,500 000 000 s" missing
+expect text:"t = 4,500 000 000 s" exists
+expect listitem:"Kabel PC1 eth0 – R1 Gi0/0/0, Kupfer, gekreuzt, unten" exists
+key ctrl+3
+expect text:"--- fortgesetzt bei t = 4,500 000 000 s: was danach kam, ist verworfen ---" exists
+# the console answers live again: Gi0/0/0 is still shut down, no shutdown brings it up
+cmd 126
+type "show ip interface brief\n"
+expect text:"GigabitEthernet0/0/0   10.0.1.1        YES NVRAM  administratively down down" exists
+type "conf t\n"
+expect text:"R1(config)#" exists
+type "interface gi0/0/0\n"
+type "no shutdown\n"
+type "end\n"
+wait 100
+expect listitem:"Kabel PC1 eth0 – R1 Gi0/0/0, Kupfer, gekreuzt, aktiv" exists
+shot build/jfnetworker/rewind_resumed.png

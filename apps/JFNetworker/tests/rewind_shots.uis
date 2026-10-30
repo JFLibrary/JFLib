@@ -1,0 +1,58 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/lan_router.jfnet
+# the shot matrix of rewinding (K1): the view at 4,5 s with the cable PC1 – R1 down then, the
+# hint with "Von hier fortsetzen" and R1's console answering "show ip route" from that moment;
+# the question before going on from there -- each light and dark at 100 and 150 %
+# (build/jfnetworker/rewind_<view>_<theme>_<scale>.png)
+size 1280 900
+theme light
+drag 630,671 630,380 8
+dblclick listitem:"R1"
+type "enable\n"
+wait 1000
+type "ping 10.0.2.10\n"
+wait 2500
+type "conf t\n"
+type "ip route 10.9.0.0 255.255.0.0 10.0.2.10\n"
+type "interface gi0/0/0\n"
+type "shutdown\n"
+type "end\n"
+wait 2000
+type "conf t\n"
+type "interface gi0/0/0\n"
+type "no shutdown\n"
+type "end\n"
+wait 500
+click tab:"Simulation"
+wait 200
+cmd 422 4500
+wait 100
+key ctrl+3
+cmd 126
+type "show ip route\n"
+expect text:"S        10.9.0.0/16 [1/0] via 10.0.2.10" exists
+# ---- the past: hint, LEDs of then, the console of then
+move 640,860
+shot build/jfnetworker/rewind_past_light_100.png
+theme dark
+shot build/jfnetworker/rewind_past_dark_100.png
+scale 150
+move 960,1290
+shot build/jfnetworker/rewind_past_dark_150.png
+theme light
+shot build/jfnetworker/rewind_past_light_150.png
+scale 100
+# ---- the question
+click button:"Von hier fortsetzen …"
+wait 100
+expect dialog:"Von hier fortsetzen?" exists
+shot build/jfnetworker/rewind_ask_light_100.png
+theme dark
+shot build/jfnetworker/rewind_ask_dark_100.png
+scale 150
+shot build/jfnetworker/rewind_ask_dark_150.png
+theme light
+shot build/jfnetworker/rewind_ask_light_150.png
+scale 100
+click button:"Abbrechen"
+wait 100
+expect dialog:"Von hier fortsetzen?" missing

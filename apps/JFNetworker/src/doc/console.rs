@@ -6,7 +6,8 @@
 //   pump(n)                          the simulator's reports: console output, prompts, saved
 //                                    configurations (an undo step that keeps the running
 //                                    device), new host names (a rename), log lines (the
-//                                    Protokoll panel), power going off and on
+//                                    Protokoll panel), power going off and on, changed files
+//                                    (an undo step the engine has already: Report::Files)
 //   open(n, ui, dev) -> Result       the device's console as the shown tab of the Terminal
 //                                    panel (or its window to the front), with the keyboard
 //   close / float / dock / tile      a tab goes, into a window of its own, back, every console
@@ -20,6 +21,7 @@
 //                                    startup configuration, one undo step
 //   save_running(n, dev)             the running configuration becomes the startup one (IOS:
 //                                    "copy running-config startup-config" on the console)
+//   resumed(n, t)                    "Von hier fortsetzen" at moment t: every console says so
 //
 // The engine prints without prompt and echo (ui::term adds them); the prompt and the busy
 // state come from the engine whenever a console is drawn.  IOS-like consoles take `?`
@@ -29,6 +31,13 @@
 // the terminal ended the line itself); Ctrl+Z leaves the configuration modes ("end"), Ctrl+L
 // clears a shell.  A console is drawn in one place at a time: a device window that shows it
 // first, then its own window, then its tab (workspace/terminal.rs).
+//
+// While the view stands in the past (K1) a console answers from the devices' state at that
+// moment: its prompt, `?` and Tab come from it, and a line runs on a copy of it that goes
+// afterwards (Sim::past_line; a command that ran then is given up on the copy first) -- show
+// commands give the tables of then, nothing changes (a configuration command or a ping has no
+// effect); a dim line says so once per moment.  Ctrl+C and Ctrl+Z do nothing there.  "Von hier
+// fortsetzen" makes the moment the present again.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -66,6 +75,8 @@ pub(crate) struct Console {
     /// the next output's leading "\n" ends a line the terminal ended already (Ctrl+C while
     /// a question waited)
     skip_nl: bool,
+    /// the moment in the past it last said it answers from (K1)
+    past_note: Option<jfn_sim::Ns>,
 }
 
 /// a console in the Terminal panel
@@ -144,7 +155,7 @@ impl Consoles {
             term.pager_text = String::from(" --More-- ");
             term.page_len = TERM_LENGTH - 1;
             let power = p.device(dev).is_some_and(|d| !d.off);
-            Console { term, ios: ios_of(p, dev), slot: None, nopage: false, power, skip_nl: false }
+            Console { term, ios: ios_of(p, dev), slot: None, nopage: false, power, skip_nl: false, past_note: None }
         })
     }
 
@@ -239,6 +250,7 @@ fn pump_paged(n: &mut Net, paged: Option<u32>) -> String {
             Report::Startup { dev, text } => saved(n, dev, text),
             Report::Hostname { dev, name } => renamed(n, dev, &name),
             Report::Log { dev, at, sev, tag, text } => n.log.push(dev, at, sev, tag, text),
+            Report::Files { dev, path, files, .. } => files_changed(n, dev, &path, files),
         }
     }
     if paging && let Some(c) = paged.and_then(|d| n.cons.by_dev.get_mut(&d)) {
@@ -268,6 +280,16 @@ fn saved(n: &mut Net, dev: u32, text: String) {
     let Some(name) = n.doc.proj.device(dev).map(|d| d.name.clone()) else { return };
     let label = format!("Konfiguration von {} sichern", name);
     if let Some(e) = edits::device_edit(&n.doc.proj, dev, &label, |x| x.startup_config = text) {
+        n.doc.apply_kept(e, dev);
+    }
+}
+
+// a transfer or a command line changed the device's files: the project keeps them (one undo
+// step the engine has already; undo and redo hand the other records back: Sim::keep)
+fn files_changed(n: &mut Net, dev: u32, path: &str, files: Vec<jfn_model::files::File>) {
+    let Some(name) = n.doc.proj.device(dev).map(|d| d.name.clone()) else { return };
+    let label = format!("Datei {} auf {}", path, name);
+    if let Some(e) = edits::device_edit(&n.doc.proj, dev, &label, |x| x.files = files) {
         n.doc.apply_kept(e, dev);
     }
 }
@@ -393,8 +415,10 @@ pub(crate) fn view(n: &mut Net, ui: &mut Ui, dev: u32) {
     let Some(d) = n.doc.proj.device(dev) else { return };
     let (on, name) = (!d.off, d.name.clone());
     let (prompt, busy) = {
-        let e = n.doc.sim.engine();
-        if on { (e.cli_prompt(dev), e.cli_busy(dev)) } else { (String::new(), false) }
+        let e = n.doc.sim.state();
+        // in the past a line always runs (on a copy, Sim::past_line)
+        let busy = e.cli_busy(dev) && n.doc.sim.past().is_none();
+        if on { (e.cli_prompt(dev), busy) } else { (String::new(), false) }
     };
     let id = n.cons.id(&n.doc.proj, dev);
     if !on {
@@ -443,6 +467,10 @@ fn event(n: &mut Net, dev: u32, ev: TermEv) {
 // Enter: the engine runs the line; on IOS its output pages
 fn submit(n: &mut Net, dev: u32, line: &str) {
     pump(n);
+    if n.doc.sim.past().is_some() {
+        past_submit(n, dev, line);
+        return;
+    }
     let r = n.doc.sim.send(Cmd::Cli { dev, line: String::from(line) });
     if let Err(e) = r {
         n.cons.get(&n.doc.proj, dev).term.write_str(&format!("% {}\n", e));
@@ -461,10 +489,37 @@ fn submit(n: &mut Net, dev: u32, line: &str) {
     }
 }
 
+// in the past (K1): the line runs on a copy of the state shown, its output follows (paged on
+// IOS); a dim line says once per moment where the answers come from
+fn past_submit(n: &mut Net, dev: u32, line: &str) {
+    let Some(at) = n.doc.sim.past() else { return };
+    let out = n.doc.sim.past_line(dev, line);
+    let c = n.cons.get(&n.doc.proj, dev);
+    if c.past_note != Some(at) {
+        c.past_note = Some(at);
+        let secs = crate::workspace::sim::secs(at);
+        c.term.write_str(&format!("\x1b[2m--- {} ---\x1b[0m\n", tf("Zustand bei t = {} s: nur Anzeige, nichts wird geändert", &[&secs])));
+    }
+    match out {
+        Some(Ok(text)) => {
+            let page = c.ios && !c.nopage;
+            if page {
+                c.term.pager(true);
+            }
+            c.term.write_str(&text);
+            if page {
+                c.term.pager(false);
+            }
+        }
+        Some(Err(e)) => c.term.write_str(&format!("% {}\n", e)),
+        None => {}
+    }
+}
+
 // `?` (IOS): the help of the engine's command tree; the line stays
 fn help(n: &mut Net, dev: u32, line: &str) {
     pump(n);
-    let text = n.doc.sim.engine().cli_help(dev, line);
+    let text = n.doc.sim.state().cli_help(dev, line);
     let c = n.cons.get(&n.doc.proj, dev);
     let page = c.ios && !c.nopage;
     if page {
@@ -484,7 +539,7 @@ fn complete(n: &mut Net, dev: u32, line: &str, caret: usize) {
         caret -= 1;
     }
     let (head, tail) = line.split_at(caret);
-    let (new, choices) = n.doc.sim.engine().cli_complete(dev, head);
+    let (new, choices) = n.doc.sim.state().cli_complete(dev, head);
     let c = n.cons.get(&n.doc.proj, dev);
     match new {
         Some(s) => c.term.complete_reply(&format!("{}{}", s, tail), &[] as &[&str]),
@@ -498,8 +553,12 @@ fn complete(n: &mut Net, dev: u32, line: &str, caret: usize) {
     }
 }
 
-// Ctrl+C / Ctrl+Shift+6: a running command stops, a waiting question is given up
+// Ctrl+C / Ctrl+Shift+6: a running command stops, a waiting question is given up (not in the
+// past)
 fn interrupt(n: &mut Net, dev: u32) {
+    if n.doc.sim.past().is_some() {
+        return;
+    }
     let (busy, asked) = {
         let e = n.doc.sim.engine();
         (e.cli_busy(dev), e.node(dev).is_some_and(|x| x.cli.ask.is_some()))
@@ -519,7 +578,7 @@ fn interrupt(n: &mut Net, dev: u32) {
 fn chord(n: &mut Net, dev: u32, k: u32) {
     let ios = n.cons.by_dev.get(&dev).is_some_and(|c| c.ios);
     match k & 0xFFFF {
-        0x5A if ios => {
+        0x5A if ios && n.doc.sim.past().is_none() => {
             let (config, busy, prompt) = {
                 let e = n.doc.sim.engine();
                 let config = e.node(dev).is_some_and(|x| !matches!(x.cli.mode, Mode::User | Mode::Priv | Mode::Out));
@@ -694,4 +753,15 @@ pub(crate) fn save_running(n: &mut Net, dev: u32) -> Result<(), String> {
     let text = n.doc.sim.engine().running_config(dev);
     saved(n, dev, text);
     Ok(())
+}
+
+/// "Von hier fortsetzen" at moment `t` (K1): every console says where the run goes on (what
+/// they show above it happened after that moment and is gone)
+pub(crate) fn resumed(n: &mut Net, t: jfn_sim::Ns) {
+    let secs = crate::workspace::sim::secs(t);
+    let line = format!("\x1b[2m--- {} ---\x1b[0m\n", tf("fortgesetzt bei t = {} s: was danach kam, ist verworfen", &[&secs]));
+    for c in n.cons.by_dev.values_mut() {
+        c.past_note = None;
+        c.term.write_str(&line);
+    }
 }

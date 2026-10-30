@@ -7,6 +7,8 @@
 //                                 takes IOS abbreviations ("gi1/0/1")
 //   Model::summary()              "24× 1G PoE+, 4× 10G SFP+, Konsole" (summary_msg: as a Msg)
 //   speed_str(kbps)               "1G", "2.5G", "100M", "2 Mbit/s" (speed_msg: as a Msg)
+//   Optic / form(m) / rack_units(m)   the transceiver of an optics cage (PortSpec::optic), how
+//                                 a model stands in the physical view, its height in a rack (P1)
 //
 // The German names the app translates (its catalogue src/locales/engine.tsv): Category::title,
 // Media::name, a model's name and title (the tables marked "i18n" for tools/i18n_check.py).
@@ -237,6 +239,9 @@ pub struct PortSpec {
     pub kbps: u32,
     pub mdix: bool,
     pub poe: Poe,
+    /// the transceiver in an optics cage (None: no cage); a device may plug in another one
+    /// (Device::optics, P1)
+    pub optic: Option<Optic>,
 }
 
 /// a device model
@@ -270,7 +275,8 @@ impl Model {
         for g in self.groups {
             for i in 0..g.count {
                 let name = if g.first == NONUM { String::from(g.prefix) } else { format!("{}{}", g.prefix, g.first + i) };
-                v.push(PortSpec { name, index: v.len() as u16, media: g.media, kbps: g.kbps, mdix: g.mdix, poe: g.poe });
+                let optic = if g.media.is_optical() { Some(Optic::Sr) } else { None };
+                v.push(PortSpec { name, index: v.len() as u16, media: g.media, kbps: g.kbps, mdix: g.mdix, poe: g.poe, optic });
             }
         }
         v
@@ -776,4 +782,95 @@ pub fn default_model(kind: DeviceKind) -> Option<&'static Model> {
 /// the models of a palette group
 pub fn in_category(c: Category) -> impl Iterator<Item = &'static Model> {
     CATALOG.iter().filter(move |m| m.category == c)
+}
+
+// ---------------------------------------------------------------- the physical side (P1)
+//
+// Optic: the transceiver in an SFP / SFP+ / SFP28 / QSFP28 cage.  Every cage comes with a
+// short-reach multimode one (SR: 850 nm, SX at 1G, SR4 at 100G); a device may take a long-reach
+// single-mode one instead (LR: 1310 nm, LX at 1G, LR4 at 100G; Device::optics).  The optics of
+// both ends and the fibre between them must match (phys.rs: reach, the simulator's link state).
+// Form and rack_units: how a model stands in the physical view (phys.rs) -- in a rack with its
+// height in rack units, on a desk, carried around, on the ceiling or a wall, on the floor beside
+// a desk (a tower), or nowhere at all (the provider's cloud).
+
+wire_enum! {
+    /// the transceiver of an optics cage
+    pub enum Optic {
+        Sr = "sr",
+        Lr = "lr",
+    }
+}
+
+impl Optic {
+    /// "SR", "LR"
+    pub fn short(self) -> &'static str {
+        match self {
+            Optic::Sr => "SR",
+            Optic::Lr => "LR",
+        }
+    }
+    /// the German name (the app translates it)
+    pub fn title(self) -> &'static str {
+        // i18n
+        match self {
+            Optic::Sr => "SR, Multimode (kurze Strecken)",
+            Optic::Lr => "LR, Singlemode (bis 10 km)",
+        }
+    }
+}
+
+/// how a device stands in the physical view
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Form {
+    /// mounted in a rack (Model's rack_units high); it may stand on a desk or the floor too
+    Rack,
+    /// stands on a desk or table
+    Desktop,
+    /// carried around (laptop, smartphone, tablet): on a desk or anywhere in a room
+    Handheld,
+    /// on the ceiling or a wall (access point, camera, sensor)
+    Ceiling,
+    /// stands on the floor (a tower server)
+    Tower,
+    /// no physical place (the provider's network)
+    Virtual,
+}
+
+impl Form {
+    /// the German name (the app translates it)
+    pub fn title(self) -> &'static str {
+        // i18n
+        match self {
+            Form::Rack => "Rack-Gerät",
+            Form::Desktop => "Tischgerät",
+            Form::Handheld => "Mobilgerät",
+            Form::Ceiling => "Decken- oder Wandgerät",
+            Form::Tower => "Standgerät",
+            Form::Virtual => "ohne Ort",
+        }
+    }
+}
+
+/// the form of a model
+pub fn form(m: &Model) -> Form {
+    match m.kind {
+        DeviceKind::Pc | DeviceKind::Printer | DeviceKind::IpPhone | DeviceKind::SmartTv | DeviceKind::HomeRouter | DeviceKind::Modem | DeviceKind::Hub => Form::Desktop,
+        DeviceKind::Laptop | DeviceKind::Smartphone | DeviceKind::Tablet => Form::Handheld,
+        DeviceKind::AccessPoint | DeviceKind::IotCamera | DeviceKind::IotSensor => Form::Ceiling,
+        DeviceKind::Server if m.id == "server-tower" => Form::Tower,
+        DeviceKind::Cloud | DeviceKind::Note => Form::Virtual,
+        _ => Form::Rack,
+    }
+}
+
+/// the height of a rack device in rack units (1 U = 44.45 mm); 0 for other forms
+pub fn rack_units(m: &Model) -> u8 {
+    if form(m) != Form::Rack {
+        return 0;
+    }
+    match m.id {
+        "jf-r8" | "database" | "container-host" => 2,
+        _ => 1,
+    }
 }

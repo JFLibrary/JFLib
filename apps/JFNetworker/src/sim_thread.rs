@@ -220,7 +220,7 @@ fn run(sh: &Shared, c: Cmd) {
         let mut sim = sh.sim.lock();
         let (hops, before, budget) = (sim.eng.trace.next_hop_id(), sim.eng.events_done(), sim.budget);
         let out = match target {
-            Some(t) => sim.eng.run_until(t, budget),
+            Some(t) => sim.run_until(t, budget),
             None => sim.eng.run_idle(budget),
         };
         let (n, new) = ((sim.eng.events_done() - before) as usize, sim.eng.trace.next_hop_id() != hops);

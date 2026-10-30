@@ -52,6 +52,12 @@
 //            to a name server); ip host, ipv6 host, ip name-server and ping by name on IOS
 //   wlan     WLAN: iw in the shell (dev, info, link, scan, connect, disconnect, station dump),
 //            show dot11 associations on the IOS-like access point
+//   bgp      BGP at the IOS-like command line: "router bgp ASN" (its own tree mode behind
+//            "(config-router)#"), show ip bgp [summary|neighbors], the B routes of show ip
+//            route, debug ip bgp [events|updates], clear ip bgp, the running configuration
+//   files    the files of a device: dir, show flash:, more, delete, copy with its questions,
+//            ip ftp username / password (IOS-like); ls, cat, rm, cp, mkdir, rmdir, touch, echo
+//            > FILE, tftp (Linux); curl ftp:// is ftpc.rs
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -95,6 +101,8 @@ pub mod print6;
 pub mod ospf;
 pub mod names;
 pub mod wlan;
+pub mod bgp;
+pub mod files;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -110,6 +118,8 @@ pub const D_ICMP6: u32 = 0x800;
 pub const D_ND: u32 = 0x1000;
 /// "debug ip ospf adj|events|hello" (which of them: CliDev::ospf_debug)
 pub const D_OSPF: u32 = 0x400;
+/// "debug ip bgp [events|updates]" (which of them: CliDev::bgp_debug)
+pub const D_BGP: u32 = 0x8000;
 
 /// the routing process a "(config-router)#" console sets up
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -118,6 +128,8 @@ pub enum Proc {
     Rip,
     /// "router ospf N"
     Ospf(u16),
+    /// "router bgp ASN"
+    Bgp(u32),
 }
 
 /// where an IOS console is
@@ -214,6 +226,8 @@ pub enum AskKind {
     Ping6Out { dst: netpkt::Ipv6, count: u32, bytes: u16, timeout: Ns },
     /// "clear ip ospf process"
     ClearOspf,
+    /// a question of copy or delete (files.rs: CliDev::files holds the dialog)
+    Files,
 }
 
 /// a console command that runs over virtual time
@@ -264,6 +278,10 @@ pub struct CliDev {
     pub acl: String,
     /// what "debug ip ospf" shows (cli/ospf.rs DO_*; none: everything)
     pub ospf_debug: u8,
+    /// what "debug ip bgp" shows (cli/bgp.rs DB_*; none: everything)
+    pub bgp_debug: u8,
+    /// copy's dialog, the last host, the FTP login (files.rs)
+    pub files: files::FilesCli,
 }
 
 impl CliDev {
@@ -287,6 +305,8 @@ impl CliDev {
             booting: false,
             acl: String::new(),
             ospf_debug: 0,
+            bgp_debug: 0,
+            files: files::FilesCli::default(),
         }
     }
 }
@@ -314,6 +334,7 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
         n if n.is_nat() => c.debug > 0,
         Note::V6(_) => c.debug > 0,
         n if n.is_ospf() => c.debug > 0,
+        Note::Bgp(_) => c.debug > 0,
         _ => false,
     }
 }

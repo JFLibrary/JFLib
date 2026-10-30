@@ -24,6 +24,11 @@
 // there too, and "Output Interface: " of a link-local ping is one more question of the console.
 // Names (cli/names.rs): "ip host", "ipv6 host", "ip name-server"; "ping NAME" and "ping ipv6
 // NAME" look the name up.
+// BGP (cli/bgp.rs): "router bgp ASN" is a tree mode of its own behind "(config-router)#", as
+// OSPF's.
+// Files (cli/files.rs): dir, show flash:, more, delete, copy between running-config,
+// startup-config, flash:, tftp: and ftp: with questions for what is missing, ip ftp
+// username / password.
 
 use alloc::format;
 use alloc::string::String;
@@ -190,6 +195,27 @@ pub enum K {
     NameServer,
     // WLAN on access points (cli/wlan.rs)
     ShowDot11,
+    // BGP (cli/bgp.rs)
+    RouterBgp,
+    BgpRouterId,
+    BgpLog,
+    BgpLocalPref,
+    BgpTimers,
+    BgpNetwork,
+    BgpRedist,
+    BgpNbr,
+    ShowBgp,
+    ShowBgpSum,
+    ShowBgpNbr,
+    ClearBgp,
+    DebugBgp,
+    // files (cli/files.rs)
+    Dir,
+    ShowFlash,
+    More,
+    Delete,
+    Copy,
+    IpFtp,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -230,6 +256,7 @@ fn tree_mode(t: &Tree<K>, m: Mode) -> ModeId {
         Mode::AclStd | Mode::AclExt => t.find_mode(prompt_suffix(m)).unwrap_or(CONF),
         // OSPF's router mode shares the prompt with RIP's: the tree knows it by its key
         Mode::Router(super::Proc::Ospf(_)) => t.find_mode(super::ospf::MODE_KEY).unwrap_or(CONF),
+        Mode::Router(super::Proc::Bgp(_)) => t.find_mode(super::bgp::MODE_KEY).unwrap_or(CONF),
         _ => mode_id(m),
     }
 }
@@ -537,6 +564,10 @@ fn build(caps: u32) -> Tree<K> {
     if caps & CAP_AP != 0 {
         super::wlan::build_wlan(&mut t, [user, prv]);
     }
+    // ---- BGP with its own router mode (cli/bgp.rs)
+    super::bgp::build_bgp(&mut t, [user, prv, conf], router);
+    // ---- files: flash, nvram, copy to and from servers (cli/files.rs)
+    super::files::build_files(&mut t, [user, prv, conf]);
     t
 }
 
@@ -829,7 +860,7 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF
+                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF | super::D_BGP
                 } else if p.has("icmp") {
                     D_ICMP
                 } else if p.has("rip") {
@@ -891,6 +922,9 @@ impl Engine {
                     let _ = self.apply(Action::Rip { dev, set: crate::rip::RipSet::Process(false) });
                     if let Some(pid) = self.ospf_of(ni).filter(|o| o.cfg.on).map(|o| o.cfg.pid) {
                         let _ = self.apply(Action::Ospf { dev, set: crate::ospf::OspfSet::Process { pid, on: false } });
+                    }
+                    if let Some(asn) = self.bgp_of(ni).filter(|b| b.cfg.on).map(|b| b.cfg.asn) {
+                        let _ = self.apply(Action::Bgp { dev, set: crate::bgp::BgpSet::Process { asn, on: false } });
                     }
                 }
                 Ok(())
@@ -1056,6 +1090,20 @@ impl Engine {
             | K::ClearOspf => self.ios_ospf(ni, p),
             K::IpHost | K::Ipv6Host | K::NameServer => self.ios_names(ni, p),
             K::ShowDot11 => self.ios_dot11(ni, p),
+            K::RouterBgp
+            | K::BgpRouterId
+            | K::BgpLog
+            | K::BgpLocalPref
+            | K::BgpTimers
+            | K::BgpNetwork
+            | K::BgpRedist
+            | K::BgpNbr
+            | K::ShowBgp
+            | K::ShowBgpSum
+            | K::ShowBgpNbr
+            | K::ClearBgp
+            | K::DebugBgp => self.ios_bgp(ni, p),
+            K::Dir | K::ShowFlash | K::More | K::Delete | K::Copy | K::IpFtp => self.ios_files(ni, p),
         }
     }
 
@@ -1072,6 +1120,7 @@ impl Engine {
             }
             AskKind::Ping6Out { dst, count, bytes, timeout } => self.ios_ping6_answer(ni, dst, count, bytes, timeout, line),
             AskKind::ClearOspf => self.ios_ospf_clear(ni, line),
+            AskKind::Files => self.files_answer(ni, line),
         }
     }
 

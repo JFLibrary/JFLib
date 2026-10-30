@@ -677,11 +677,14 @@ impl Engine {
                     text.push_str(&h);
                     text.push('\n');
                 }
-                other => {
-                    let e = format!("cat: {}: No such file or directory\n", other);
-                    text.push_str(&e);
-                    err.get_or_insert(String::from(e.trim_end()));
-                }
+                // the device's files (files.rs)
+                other => match self.cat_file(ni, other) {
+                    Ok(t) => text.push_str(&t),
+                    Err(e) => {
+                        text.push_str(&e);
+                        err.get_or_insert(String::from(e.trim_end()));
+                    }
+                },
             }
         }
         self.out(ni, &text);
@@ -692,7 +695,7 @@ impl Engine {
     }
 
     /// /etc/resolv.conf as dhclient-script (from DHCP) or by hand it would be
-    fn resolv_text(&self, ni: usize) -> String {
+    pub(super) fn resolv_text(&self, ni: usize) -> String {
         let Some(os) = self.os(ni) else {
             return String::new();
         };
@@ -725,7 +728,7 @@ impl Engine {
     }
 
     /// /etc/hosts: localhost, the device's own name, the static entries
-    fn hosts_text(&self, ni: usize) -> String {
+    pub(super) fn hosts_text(&self, ni: usize) -> String {
         let mut s = format!("127.0.0.1\tlocalhost\n127.0.1.1\t{}\n", self.host(ni));
         if let Some(os) = self.os(ni) {
             for (h, a) in &os.hosts {

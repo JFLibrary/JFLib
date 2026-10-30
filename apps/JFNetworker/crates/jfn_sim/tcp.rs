@@ -22,6 +22,10 @@
 //   Engine::tcp_conns / tcp_conn / tcp_stats   what ss and "show tcp brief" show
 //   TcpEnd::text / RstWhy::text   German reasons (the app translates them: engine.tsv);
 //                                 refusals of listen and connect are a Msg (jfn_model::msg)
+//   SockOpts::ttl                 the TTL of a connection's IPv4 segments (0: the system's;
+//                                 BGP: 1 towards an external neighbour, bgp.rs); a connection
+//                                 from a given source address: Engine::tcp_connect_src (BGP's
+//                                 update-source)
 //
 // The system decides the numbers (TcpCfg).  Linux: ISNs and ports come from the device's
 // random numbers, connect takes ports from 32768-60999 (even ones first), the MSS is the MTU
@@ -399,6 +403,8 @@ pub struct SockOpts {
     /// SO_RCVBUF / SO_SNDBUF in bytes of data (0: the system's)
     pub rcvbuf: u32,
     pub sndbuf: u32,
+    /// IP_TTL: the TTL of its IPv4 segments (0: the system's)
+    pub ttl: u8,
 }
 
 /// the counters of a connection
@@ -1893,6 +1899,11 @@ impl Tcb {
                 self.mark_retx(self.snd_max);
                 let n = self.retransmit_head(cx);
                 self.snd_nxt = self.snd_una.wrapping_add(n);
+                // the head may reach past what went out before (bytes Nagle held back): they
+                // are sent now, so an ACK of them is no ACK of something not sent
+                if seq_gt(self.snd_nxt, self.snd_max) {
+                    self.snd_max = self.snd_nxt;
+                }
                 self.t_rto = Some(cx.now + self.rto);
             }
             _ => {}
@@ -2362,10 +2373,11 @@ impl Engine {
         };
         let df = self.tcp(ni).is_some_and(|t| t.cfg.df);
         let ios = self.os(ni).is_some_and(|o| o.ios);
+        let own_ttl = self.tcp(ni).and_then(|t| t.conns.get(&id)).map(|c| c.opts.ttl).unwrap_or(0);
         let Some(st) = self.stack_mut(ni) else {
             return;
         };
-        let ttl = st.ttl;
+        let ttl = if own_ttl != 0 { own_ttl } else { st.ttl };
         let id = if df { s.ip_id } else { st.next_id() };
         let local = st.is_mine(rip) || (rip.is_loopback() && !ios);
         let mut p = Pkt::new(HEADROOM, &s.data);
@@ -2729,6 +2741,13 @@ impl Engine {
 
     /// an active open from `sport` (0: an ephemeral port) to an IPv4 or IPv6 address
     pub(crate) fn tcp_connect(&mut self, ni: usize, owner: u32, sport: u16, dst: IpAddr, dport: u16, opts: SockOpts, cause: Option<HopId>) -> Result<u32, Msg> {
+        self.tcp_connect_src(ni, owner, None, sport, dst, dport, opts, cause)
+    }
+
+    /// the same from a source address of the device (None: the one of the way out); the
+    /// destination still needs a route
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn tcp_connect_src(&mut self, ni: usize, owner: u32, from: Option<IpAddr>, sport: u16, dst: IpAddr, dport: u16, opts: SockOpts, cause: Option<HopId>) -> Result<u32, Msg> {
         let bad = match dst {
             IpAddr::V4(d) => d.is_unspecified() || d.is_broadcast() || d.is_multicast(),
             IpAddr::V6(d) => d.is_unspecified() || d.is_multicast() || d.to_ipv4_mapped().is_some(),
@@ -2740,6 +2759,7 @@ impl Engine {
             });
         }
         let src = self.source_ip(ni, dst).ok_or_else(|| msg!("Das Netz ist nicht erreichbar."))?;
+        let src = from.unwrap_or(src);
         let sport = if sport == 0 {
             self.tcp_port(ni, src, dst, dport).ok_or_else(|| msg!("Keine freien Ports."))?
         } else {
@@ -3009,5 +3029,17 @@ impl Engine {
     /// the TCP values of a device's system
     pub fn tcp_cfg(&self, dev: u32) -> Option<TcpCfg> {
         Some(self.tcp(self.node_index(dev)?)?.cfg)
+    }
+}
+
+// ---------------------------------------------------------------- keyframes (keyframe.rs)
+
+impl TcpStack {
+    /// the bytes its connections and listeners hold: their state, what waits to be sent or
+    /// read, segments out of order, packets to itself (keyframe::footprint, an estimate)
+    pub(crate) fn footprint(&self) -> usize {
+        let conns: usize = self.conns.values().map(|c| core::mem::size_of::<Tcb>() + 48 + c.sbuf.len() + c.rbuf.len() + c.ooo.iter().map(|o| o.1.len() + 32).sum::<usize>()).sum();
+        let lst: usize = self.listeners.values().map(|l| core::mem::size_of::<Listener>() + 48 + l.queue.len() * 4).sum();
+        conns + lst + self.tuples.len() * 80 + self.loopq.iter().map(|p| p.len() + 24).sum::<usize>()
     }
 }

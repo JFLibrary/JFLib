@@ -459,3 +459,71 @@ pub(crate) const ID_WL_JOIN_LEAVE: u32 = 0xF514;
 /// the project's scale (world units per metre) and its button
 pub(crate) const ID_WL_SCALE: u32 = 0xF520;
 pub(crate) const ID_WL_SCALE_APPLY: u32 = 0xF521;
+// ---- X1a: files on devices, TFTP and FTP (commands 550 .. 589, widgets 0xF100 .. 0xF3FF)
+/// the answers of the Dateien tab's file dialog (workspace/devwin/files.rs)
+pub(crate) const CMD_FILES_IMPORT_DONE: u32 = 550;
+pub(crate) const CMD_FILES_EXPORT_DONE: u32 = 551;
+/// the Dateien tab of device window k: ID_FILES0 + 0x180 k (+ 1 .. 4 its buttons and the text,
+/// + 0x10 the grid with its rows)
+pub(crate) const ID_FILES0: u32 = 0xF100;
+/// its file dialog: a block of its own like ID_PCAP_DLG (.. + 0x3FFF)
+pub(crate) const ID_FILES_DLG: u32 = 0x0016_0000;
+
+// ---- K1: rewinding with keyframes (commands 420 .. 449, widgets 0xEC00 .. 0xEFFF, timers
+// 0x174 .. 0x177)
+/// "Von hier fortsetzen" (the hint above the canvas, Simulation): its question first
+pub(crate) const CMD_SIM_RESUME: u32 = 420;
+/// the question's answer: the state shown becomes the present
+pub(crate) const CMD_SIM_RESUME_GO: u32 = 421;
+/// the view at a moment of the recording, arg: ms of virtual time (scripts; CMD_SIM_SEEK takes
+/// ns up to 4,29 s)
+pub(crate) const CMD_SIM_SEEK_MS: u32 = 422;
+/// the question "Von hier fortsetzen?"
+pub(crate) const ID_SIM_RESUME_ASK: u32 = 0xEC00;
+
+// ---- P1: the physical view (commands 380 .. 419, widgets 0xE000 .. 0xEBFF, timers 0x170 ..
+// 0x173 unused, no dock panel: P_PHYS = 14 stays free)
+/// Ansicht › Logische Ansicht (Ctrl+Shift+L) / Physische Ansicht (Ctrl+Shift+P)
+pub(crate) const CMD_VIEW_LOGICAL: u32 = 380;
+pub(crate) const CMD_VIEW_PHYS: u32 = 381;
+/// the physical view: one level up (Backspace), back (Shift+Backspace), open the selected place, rename
+/// it, remove it; add a place of kind workspace::phys::KINDS[k] to the place shown (+ k)
+pub(crate) const CMD_PHYS_UP: u32 = 382;
+pub(crate) const CMD_PHYS_BACK: u32 = 383;
+pub(crate) const CMD_PHYS_OPEN: u32 = 384;
+pub(crate) const CMD_PHYS_RENAME: u32 = 385;
+pub(crate) const CMD_PHYS_REMOVE: u32 = 386;
+pub(crate) const CMD_PHYS_ADD0: u32 = 387;
+/// the toolbar's switch Logisch | Physisch (+ 1 + i: its segments)
+pub(crate) const ID_TB_VIEW: u32 = 0xE000;
+/// the physical view: the plan (ui::diagram), back, up, rename and remove the selected place,
+/// the breadcrumbs (+ 1 + i), the buttons that add a place (+ k), the rename flyout (a popup
+/// id) and its widgets
+pub(crate) const ID_PH_CANVAS: u32 = 0xE010;
+pub(crate) const ID_PH_BACK: u32 = 0xE011;
+pub(crate) const ID_PH_UP: u32 = 0xE012;
+pub(crate) const ID_PH_RENAME: u32 = 0xE013;
+pub(crate) const ID_PH_REMOVE: u32 = 0xE014;
+pub(crate) const ID_PH_CRUMB: u32 = 0xE020;
+pub(crate) const ID_PH_ADD0: u32 = 0xE030;
+pub(crate) const ID_PH_FLY: u32 = 0xE040;
+pub(crate) const ID_PH_FLY_BOX: u32 = 0xE041;
+pub(crate) const ID_PH_FLY_OK: u32 = 0xE042;
+pub(crate) const ID_PH_FLY_CANCEL: u32 = 0xE043;
+/// the inspector (workspace/phys/props.rs): a place's name, its fields (+ k: east, south,
+/// width, depth, rack units, storey), Setzen, Öffnen, Entfernen; a device's place, its rack
+/// unit and Setzen, Im Plan zeigen; a cable's length by hand, Länge setzen, Automatisch; the
+/// optic of cage i (+ i, at most 64)
+pub(crate) const ID_PHY_NAME: u32 = 0xE050;
+pub(crate) const ID_PHY_FIELD0: u32 = 0xE058;
+pub(crate) const ID_PHY_SET: u32 = 0xE05F;
+pub(crate) const ID_PHY_OPEN: u32 = 0xE060;
+pub(crate) const ID_PHY_REMOVE: u32 = 0xE061;
+pub(crate) const ID_PHY_PLACE: u32 = 0xE068;
+pub(crate) const ID_PHY_UNIT: u32 = 0xE069;
+pub(crate) const ID_PHY_UNIT_SET: u32 = 0xE06A;
+pub(crate) const ID_PHY_SHOW: u32 = 0xE06B;
+pub(crate) const ID_PHY_LEN: u32 = 0xE070;
+pub(crate) const ID_PHY_LEN_SET: u32 = 0xE071;
+pub(crate) const ID_PHY_LEN_AUTO: u32 = 0xE072;
+pub(crate) const ID_PHY_OPTIC0: u32 = 0xE080;

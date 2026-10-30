@@ -1,0 +1,61 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/backup.jfnet
+# a configuration backup at R1's console in the Terminal panel (fixtures/backup.jfnet):
+# copy running-config tftp: with its two questions (the host, the file with the default
+# r1-config), the progress and the result in our own words; the file lands on SRV1 as an undo
+# step of the project (SRV1's Dateien tab and shell have it); a wrong name merged back from the
+# backup (copy tftp: running-config, the last host as the default); a copy into flash: and
+# dir; undo takes the copy from flash: again (the simulator follows: dir), SRV1 keeps its.
+# Ids: R1's console 25088 (its input line 25089); the device window 26624.
+size 1280 900
+theme light
+drag 630,671 630,380 8
+dblclick listitem:"R1"
+expect tab:"R1" selected
+expect #25089 focused
+type "enable\n"
+type "copy running-config tftp:\n"
+expect text:"R1#copy running-config tftp:" exists
+type "10.0.0.10\n"
+expect text:"Host of the server []? 10.0.0.10" exists
+type "\n"
+wait 2000
+expect text:"Sending 529 bytes to tftp://10.0.0.10/r1-config ..." exists
+expect text:".##" exists
+expect text:"Done: 529 bytes in 1000 ms (529 bytes/s)" exists
+shot build/jfnetworker/files_console.png
+# the project has the file now: SRV1's Dateien tab
+dblclick listitem:"SRV1" shift
+expect window 26624 open
+click tab:"Dateien"
+expect text:"/srv/tftp/r1-config" exists
+close window 26624
+# a wrong name, then the backup merged back
+click #25089
+type "configure terminal\n"
+type "hostname Kaputt\n"
+type "end\n"
+expect listitem:"Kaputt" exists
+type "copy tftp: running-config\n"
+type "\n"
+type "r1-config\n"
+type "\n"
+wait 1000
+expect text:"Done: 529 bytes in 0 ms (529000 bytes/s)" exists
+expect listitem:"R1" exists
+# flash: the backup as a file, dir
+type "copy running-config flash:backup.cfg\n"
+expect text:"529 bytes copied to flash:/backup.cfg" exists
+type "dir\n"
+expect text:"268435456 bytes total (226172399 bytes free)" exists
+# undo: the copy into flash: goes (the simulator follows), the backup on SRV1 stays
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+click #25089
+type "dir\n"
+expect text:"268435456 bytes total (226172928 bytes free)" exists
+dblclick listitem:"SRV1"
+expect tab:"SRV1" selected
+type "ls /srv/tftp\n"
+expect text:"r1-config" exists
+expect_nowarn

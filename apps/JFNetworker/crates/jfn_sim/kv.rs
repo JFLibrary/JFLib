@@ -1174,6 +1174,10 @@ impl Service for KvNode {
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
     }
+    fn footprint(&self) -> usize {
+        // the stored keys and values, the members, the operations in flight
+        4096 + self.data.iter().map(|(k, e)| size_of(k, e) as usize + 48).sum::<usize>() + (self.members.len() + self.ops.len() + self.ios.len()) * 128
+    }
 }
 
 /// addresses from a JSON list

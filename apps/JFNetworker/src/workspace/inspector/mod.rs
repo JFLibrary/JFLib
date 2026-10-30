@@ -17,6 +17,9 @@
 // wlan.rs: the WLAN part of access points (their networks) and stations (the network they
 // join, where they stand in the simulator) and the scale on the project's page (shown once the
 // project has a device with a radio).
+//
+// The physical view (P1): a place selected there (and nothing else) shows here
+// (workspace/phys/props.rs); devices and cables get their physical part last.
 
 mod cable;
 pub(crate) mod device;
@@ -90,7 +93,10 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.scroll_begin(ID_INSPECTOR, SC_V | pad(12));
     ui.box_begin(0, BOX_V, 10);
     let sel = n.canvas.selected();
+    // a place of the physical view (workspace/phys/props.rs)
+    let place = n.phys.sel_place.filter(|_| n.phys.on && sel.is_empty());
     match canvas::single_item(n) {
+        None if place.is_some() => crate::workspace::phys::props::place(n, ui, place.unwrap_or_default()),
         Some(Item::Device(id)) => device::frame(n, ui, id),
         Some(Item::Link(id)) => cable::frame(n, ui, id),
         Some(Item::Note(id)) => note(n, ui, id),

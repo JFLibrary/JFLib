@@ -142,7 +142,7 @@ pub(crate) fn device(n: &mut Net, ui: &mut Ui, id: u32) {
         .map(|s| (s.name.clone(), tf("{} {}", &[crate::workspace::metrics::kind_name(s.kind), &s.name]), s.running))
         .collect();
     let disk = eng.disk_of(id).is_some();
-    let powered = !d.off && n.doc.sim.view.devices.iter().find(|x| x.dev == id).is_none_or(|x| x.power);
+    let powered = !d.off && n.doc.sim.live_view().devices.iter().find(|x| x.dev == id).is_none_or(|x| x.power);
     ui.box_begin(0, BOX_V | BOX_CARD | pad(10), 8);
     head(n, ui, t("Fehler einspielen"));
     // power

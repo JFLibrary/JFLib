@@ -35,6 +35,8 @@
 // assess.rs: the steps of making an assessment (A1): the lab with its assessment into the
 // project, the start network in place of the network.
 // wlan.rs: the WLAN settings of devices and the scale of the canvas as steps.
+// phys.rs: the physical view's edits (places, where devices stand, cable lengths, optics) as
+// steps (P1).
 
 pub(crate) mod autosave;
 pub(crate) mod config;
@@ -46,6 +48,7 @@ pub(crate) mod sim;
 pub(crate) mod scripts;
 pub(crate) mod assess;
 pub(crate) mod wlan;
+pub(crate) mod phys;
 
 use alloc::boxed::Box;
 use alloc::string::String;

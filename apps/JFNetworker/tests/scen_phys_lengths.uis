@@ -1,0 +1,8 @@
+#!args apps/JFNetworker/tests/fixtures/phys_campus.jfnet --scenario apps/JFNetworker/tests/scen/phys_lengths.scn --golden apps/JFNetworker/tests/scen/phys_lengths.report
+# golden scenario of the physical view (P1): the automatic lengths of the campus (a patch cable
+# in a rack, a desk to the server room, the fibre between the houses), PC4's copper cable of
+# 208 m down ("show interfaces", "ip link"), up in Büro 1 (23 m, a ping), 132 m by hand down
+# with its log line, automatic again, SW2 to another rack unit.  The GUI program runs
+# tests/scen/phys_lengths.scn on tests/fixtures/phys_campus.jfnet without a window and ends with
+# the report, which must equal tests/scen/phys_lengths.report byte for byte on every target (the
+# script itself is not run)

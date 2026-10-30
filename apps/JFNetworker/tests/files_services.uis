@@ -1,0 +1,74 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/backup.jfnet
+# the TFTP and the FTP server in SRV1's device window (Dienste, svcedit.rs) on
+# fixtures/backup.jfnet: their cards with kind, state and status line, the settings as JSON:
+# the TFTP server read-only with a quota (the status says so), a port the simulator refuses;
+# the FTP server: a user without a name refused, then anonymous off and a user whose home is
+# missing (the problems list names it), undo brings the old settings back; a backup from R1's
+# console lands only in the writable server (the TFTP server refuses it while read-only).
+# Ids: the window 26624; Dienste: the settings buttons 51200 (tftp) and 51201 (ftp), the
+# editor 51456, Übernehmen 51472, Abbrechen 51473.
+size 1280 900
+theme light
+dblclick listitem:"SRV1" shift
+expect window 26624 open
+click tab:"Dienste"
+expect text:"TFTP-Server · tftp" exists
+expect text:"FTP-Server · ftp" exists
+expect text:"/srv/tftp (lesen und schreiben): 0 Übertragungen, 0 Bytes gesendet, 0 empfangen" exists
+expect text:"Port 21, /srv/ftp: 0 Sitzungen, 0 Anmeldungen, 0 abgelehnt, 0 Downloads, 0 Uploads" exists
+# ---- the TFTP server: read-only with a quota
+click #51200
+expect text:"Die Einstellungen von tftp als JSON. Übernehmen prüft sie und startet SRV1 mit ihnen neu." exists
+focus #51456
+key ctrl+a
+type "{\"root\": \"/srv/tftp\", \"writable\": false, \"quota_kb\": 64}"
+click #51472
+expect #51456 missing
+expect text:"/srv/tftp (nur lesen): 0 Übertragungen, 0 Bytes gesendet, 0 empfangen" exists
+shot build/jfnetworker/files_services.png window 26624
+# a port the simulator refuses
+click #51200
+focus #51456
+key ctrl+a
+type "{\"port\": 0}"
+click #51472
+expect text:"Dienst tftp-server: Port 0 gibt es nicht." exists
+click #51473
+expect #51456 missing
+# ---- the FTP server: a user without a name, then a home that is missing
+click #51201
+expect text:"Die Einstellungen von ftp als JSON. Übernehmen prüft sie und startet SRV1 mit ihnen neu." exists
+focus #51456
+key ctrl+a
+type "{\"users\": [{\"password\": \"x\"}]}"
+click #51472
+expect text:"Dienst ftp-server: Ein Benutzer braucht „name“ ohne Leerzeichen." exists
+focus #51456
+key ctrl+a
+type "{\"anonymous\": false, \"users\": [{\"name\": \"anna\", \"password\": \"geheim\", \"home\": \"/srv/ftp/anna\"}, "
+type "{\"name\": \"bob\", \"password\": \"x\", \"home\": \"/home/bob\"}]}"
+click #51472
+expect #51456 missing
+close window 26624
+click tab:"Probleme"
+expect text:"Dienst ftp auf SRV1: das Verzeichnis /home/bob gibt es nicht." exists
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+expect text:"Dienst ftp auf SRV1: das Verzeichnis /home/bob gibt es nicht." missing
+# ---- a backup to the read-only server is refused
+dblclick listitem:"R1"
+expect tab:"R1" selected
+type "enable\n"
+type "copy running-config tftp://10.0.0.10/r1-config\n"
+wait 3000
+expect text:"%Error writing tftp://10.0.0.10/r1-config (Access violation)" exists
+# the old settings back (undo): the backup lands
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+dblclick listitem:"R1"
+type "copy running-config tftp://10.0.0.10/r1-config\n"
+wait 3000
+expect text:"Done: 529 bytes in 0 ms (529000 bytes/s)" exists
+expect_nowarn

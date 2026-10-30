@@ -1,0 +1,68 @@
+CA: enable
+CA: debug ip bgp events
+run 3s
+expect CA output contains "BGP: neighbour 10.1.1.2 went from OpenConfirm to Established"
+expect CA output contains "BGP: two connections with 10.2.1.2: keeping the one opened by this router"
+CA: undebug all
+# AS 300 inside: iBGP zwischen den Loopbacks, sobald OSPF sie kennt
+TR1: enable
+TR1: debug ip bgp events
+run 17s
+expect TR1 output contains "BGP: opening a connection to 3.3.3.2 from 3.3.3.1"
+TR1: undebug all
+# bis alle Wege überall sind: neue Wege gehen höchstens alle 30 s an externe Nachbarn
+run 100s
+TR1: show ip bgp summary
+expect TR1 output contains "3.3.3.2         4          300"
+TR1: show ip bgp
+expect TR1 output contains " *>i 192.168.20.0     3.3.3.2                       100      0 200 65020 ?"
+TR2: enable
+TR2: show ip bgp neighbors 3.3.3.1
+CA: show ip bgp
+expect CA output contains " *>  192.168.20.0     10.2.1.2"
+CA: show ip route bgp
+expect CA route 192.168.20.0/24 via 10.2.1.2
+ISP2: enable
+ISP2: show ip bgp
+expect ISP2 output contains " r>  10.2.2.0/30      10.2.2.2"
+CB: enable
+CB: show ip bgp summary
+CB: show running-config
+expect CB output contains "router bgp 65020\n redistribute connected\n neighbor 10.2.2.1 remote-as 200\n!"
+PC-A: ping -c 3 192.168.20.10
+run 10s
+expect PC-A output contains "3 packets transmitted, 2 received"
+PC-A: traceroute -n 192.168.20.10
+run 10s
+expect PC-A output contains " 2  10.2.1.2"
+# CA verliert das Kabel zu ISP2: die Sitzung endet sofort, der Weg führt über ISP1 und AS 300
+CA: debug ip bgp
+link down CA Gi0/0/1
+run 1s
+expect CA output contains "BGP: the session with 10.2.1.2 ended: the interface went down"
+CA: undebug all
+CA: show ip bgp
+expect CA route 192.168.20.0/24 via 10.1.1.2
+PC-A: traceroute -n 192.168.20.10
+run 10s
+expect PC-A output contains " 2  10.1.1.2"
+expect PC-A output contains " 3  10.13.1.2"
+# ISP2 findet CAs Netz über AS 300
+run 40s
+ISP2: show ip bgp
+expect ISP2 route 192.168.10.0/24 via 10.23.1.1
+PC-B: ping -c 2 192.168.10.10
+run 3s
+expect PC-B output contains "2 received"
+# das Kabel kommt zurück: was ISP2 noch über AS 300 kennt, hat 65010 im Pfad und fällt bei CA weg
+CA: debug ip bgp updates
+link up CA Gi0/0/1
+run 5s
+expect CA output contains "BGP: dropped 192.168.10.0/24 from 10.2.1.2: own AS 65010 in the path"
+CA: undebug all
+run 60s
+CA: show ip bgp summary
+expect CA route 192.168.20.0/24 via 10.2.1.2
+expect ISP2 route 192.168.10.0/24 via 10.2.1.1
+expect CA svc bgp metric established == 2
+expect hops bgp >= 100

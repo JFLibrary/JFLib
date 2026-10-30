@@ -1,0 +1,41 @@
+# Die physische Ansicht (P1): Kabellängen aus den Orten, ihre Grenzen und was geschieht, wenn
+# ein Kabel zu lang ist.  PC4 steht im Labor von Haus B, 180 m von SW1 im Serverraum von Haus
+# A: sein Kupferkabel ist 208 m lang und bleibt aus; im Büro 1 sind es 23 m.
+run 2s
+expect cable SW1 Gi1/0/1 length 1
+expect cable SW1 Gi1/0/3 length 16
+expect cable SW1 Te1/1/1 length 203
+expect cable SW1 Te1/1/1 up
+expect cable SW1 Gi1/0/5 length 208
+expect cable SW1 Gi1/0/5 down
+SW1: enable
+SW1: show interfaces GigabitEthernet1/0/5
+expect SW1 output contains "Cable is 208 m long, 1000BASE-T allows 100 m: no link"
+PC4: ip link
+expect PC4 output contains "eth0: <NO-CARRIER,BROADCAST,MULTICAST,UP>"
+# ins Büro 1: das Kabel ist kurz genug
+place PC4 "Büro 1"
+run 3s
+expect cable SW1 Gi1/0/5 length 23
+expect cable SW1 Gi1/0/5 up
+expect SW1 output contains "%LINK-3-UPDOWN: GigabitEthernet1/0/5 is up"
+PC4: ping -c 2 10.0.0.11
+run until idle
+expect PC4 output contains "2 packets transmitted, 2 received, 0% packet loss"
+# von Hand länger als erlaubt, dann wieder automatisch
+cable SW1 Gi1/0/5 length 132
+run 1s
+expect cable SW1 Gi1/0/5 down
+expect SW1 output contains "%PHY-4-CABLE_LENGTH: GigabitEthernet1/0/5: the cable is 132 m long, 1000BASE-T allows 100 m; the link stays down"
+cable SW1 Gi1/0/5 length auto
+run 3s
+expect cable SW1 Gi1/0/5 length <= 100
+expect cable SW1 Gi1/0/5 up
+# SW2 in eine andere Höheneinheit seines Racks: die Glasfaser bleibt gleich lang
+place SW2 "Rack B1" 5
+run 1s
+expect cable SW1 Te1/1/1 length 203
+expect cable SW1 Te1/1/1 up
+SW1: ping 10.0.0.3
+run until idle
+expect SW1 output contains "!!!!"

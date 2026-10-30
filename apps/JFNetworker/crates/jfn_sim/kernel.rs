@@ -92,6 +92,8 @@ pub struct Engine {
     pub(crate) series: crate::series::Sampler,
     /// WLAN: positions, settings, stations and associations (wlan.rs)
     pub(crate) wlan: crate::wlan::WlanState,
+    /// the cables' lengths and the ones too long or with optics that do not fit (phys.rs)
+    pub(crate) phys: crate::phys::PhysState,
 }
 
 impl Engine {
@@ -116,6 +118,7 @@ impl Engine {
             faults: crate::fault::Faults::default(),
             series: crate::series::Sampler::default(),
             wlan: crate::wlan::WlanState::default(),
+            phys: crate::phys::PhysState::default(),
         }
     }
     /// the virtual time
@@ -289,5 +292,25 @@ impl Engine {
     }
     pub fn link_rt(&self, id: u32) -> Option<&LinkRt> {
         self.links.get(*self.link_idx.get(&id)?)?.as_ref()
+    }
+}
+
+// ---------------------------------------------------------------- keyframes (keyframe.rs)
+
+impl Engine {
+    /// the clock and the event queue as text (keyframe::digest)
+    pub(crate) fn queue_text(&self, w: &mut dyn core::fmt::Write) -> core::fmt::Result {
+        write!(w, "now {} seq {} done {} heap {:?} slab {:?} free {:?}", self.now, self.seq, self.events_done, self.heap, self.slab, self.free)
+    }
+    /// entries of the event queue and slots of its slab (keyframe::footprint)
+    pub(crate) fn queue_len(&self) -> (usize, usize) {
+        (self.heap.len(), self.slab.len())
+    }
+}
+
+impl Engine {
+    /// the cable with this project id carries traffic now (link_up of its slot)
+    pub fn link_idx_up(&self, link: u32) -> bool {
+        self.link_idx.get(&link).is_some_and(|&li| self.link_up(li))
     }
 }
