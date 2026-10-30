@@ -13,15 +13,24 @@
 //   resolve(conf, family, lang, weight, italic) -> (face, FS_SYN_*, family)   the first installed
 //        of the FontConf's candidates (generic families, substitutes, the language's choices;
 //        fontconf.rs), else sans-serif's; load_resolved(text, conf, ...) -> (font id, family)
+//        (a variable face: its instance for weight / italic, load_var)
 //   clear()                         forget the scan result (the cache stays)
-//   family_count(), family_name(i), family_faces(i) -> &[FdFace]   families sorted
-//        case-insensitively
+//   family_count(), family_name(i), family_faces(i) -> &[FdFace], family_range(i)   families
+//        sorted case-insensitively
 //   face_count(), face(i)           every face, family order
 //   find(family, weight, italic) -> (face index, FS_SYN_* flags to add)   family = legacy
 //        family name (FN_FAMILY, like GDI), else a typographic family; closest weight,
 //        italic before upright; synthetic bold / italic asked when the family lacks them
-//   load(text, family, weight, italic) -> font id / ERR_*   find + load_file (+ style);
-//        each (face, style) is loaded once until the next scan
+//   load(text, family, weight, italic) -> font id / ERR_*   find + load_file (+ style; a
+//        variable face: load_var); each (face, style) is loaded once until the next scan
+//   variations(face) -> Option<&FdVar>   a variable face's axes and named instances (fvar,
+//        names from its name table; read from the file on first use, kept until the next scan)
+//   var_values(face, weight, italic, size_pt, axes) -> (values, FS_SYN_* still needed)   the
+//        axis values of a choice: the axes named, else weight -> wght, italic -> ital = 1 or
+//        slnt = its most slanted value, the size in points -> opsz (clamped to each axis);
+//        synthetic bold / italic only where no axis gives them
+//   load_var(text, face, syn, weight, italic, size_pt, axes) -> font id / ERR_*   load_face +
+//        Text::vary at var_values (a face that is not variable: load_face)
 //   save_cache(path) / load_cache(path) -> 0 / -1
 //
 // Families group faces by the legacy family name (name ID 1); names prefer German, then
@@ -37,6 +46,7 @@ use alloc::vec::Vec;
 use crate::font::{FN_FAMILY, FN_FULL, FN_STYLE, FN_TYPO_FAMILY, FS_SYN_BOLD, FS_SYN_ITALIC};
 use crate::fontconf::{is_generic, FontConf};
 use crate::ttf::{sfnt_name, Tb, ERR_FAIL, NAME_CAP};
+use crate::var::{Var, VarAxis, VarInstance};
 use crate::Text;
 
 pub const FDB_RESCAN: u32 = 1;
@@ -72,6 +82,7 @@ const T_CFF: u32 = 0x4346_4620;
 const T_COLR: u32 = 0x434F_4C52;
 const T_CBDT: u32 = 0x4342_4454;
 const T_FVAR: u32 = 0x6676_6172;
+const FVAR_MAX: u32 = 1 << 20;
 static NAME_WANT: [u32; 4] = [FN_FAMILY, FN_STYLE, FN_FULL, FN_TYPO_FAMILY];
 
 /// a face of the database (FDFACE)
@@ -85,6 +96,15 @@ pub struct FdFace {
     pub face: u32,       // face index inside the file (TTC / OTC)
     pub weight: u16,     // usWeightClass
     pub flags: u16,      // FDFF_*
+}
+
+/// the variations of an installed variable face (FontDb::variations)
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FdVar {
+    /// fvar's axes (names from the face's name table)
+    pub axes: Vec<VarAxis>,
+    /// its named instances
+    pub instances: Vec<VarInstance>,
 }
 
 // file record {path, size, first face, faces}
@@ -131,9 +151,56 @@ pub struct FontDb {
     faces: Vec<FdFace>,
     fam: Vec<Family>,
     loaded: Vec<(usize, u32, i32)>, // (face, synthetic flags, font id)
+    vars: Vec<(usize, Option<FdVar>)>, // (face, its variations): read on first use
     cache: Option<Cache>,
     use_cache: bool,
     visited: Vec<(u64, u64)>,
+}
+
+// fvar (and the name table for its names) of face `face` in a file
+fn read_var(path: &str, face: u32) -> Option<FdVar> {
+    let f = plat::File::open(path, plat::FO_READ)?;
+    let mut h = [0u8; 16];
+    if read_at(&f, 0, &mut h) < 12 {
+        return None;
+    }
+    let dir = if be32(&h, 0) == TAG_TTCF {
+        let mut o = [0u8; 4];
+        if read_at(&f, 12 + face as u64 * 4, &mut o) != 4 {
+            return None;
+        }
+        be32(&o, 0) as u64
+    } else {
+        0
+    };
+    let mut d = [0u8; 12];
+    if read_at(&f, dir, &mut d) != 12 {
+        return None;
+    }
+    let nt = be16(&d, 4).min(NT_MAX);
+    let mut recs = alloc::vec![0u8; (nt * 16) as usize];
+    if read_at(&f, dir + 12, &mut recs) != (nt * 16) as i64 {
+        return None;
+    }
+    let (mut fvar, mut name) = ((0u32, 0u32), (0u32, 0u32));
+    for i in 0..nt as usize {
+        let r = &recs[i * 16..];
+        match be32(r, 0) {
+            T_FVAR => fvar = (be32(r, 8), be32(r, 12)),
+            T_NAME => name = (be32(r, 8), be32(r, 12)),
+            _ => {}
+        }
+    }
+    let table = |(o, l): (u32, u32), max: u32| -> Vec<u8> {
+        let mut b = alloc::vec![0u8; l.min(max) as usize];
+        let n = read_at(&f, o as u64, &mut b);
+        b.truncate(n.max(0) as usize);
+        b
+    };
+    let fv = table(fvar, FVAR_MAX);
+    let nm = table(name, NAME_MAX);
+    let v = Var::parse(Tb(&fv), Tb(&[]), Tb(&[]), Tb(&[]), Tb(&[]), Tb(&[]), Tb(&nm))?;
+    Some(FdVar { axes: v.axes, instances: v.instances })
 }
 
 /// FNV-1a 64 (hash_fnv64, seed 0 = the offset basis)
@@ -215,6 +282,7 @@ impl FontDb {
         self.faces = Vec::new();
         self.fam = Vec::new();
         self.loaded.clear();
+        self.vars.clear();
     }
 
     pub fn family_count(&self) -> usize {
@@ -226,6 +294,14 @@ impl FontDb {
         match self.fam.get(i) {
             Some(f) => &self.faces[f.first as usize].family,
             None => "",
+        }
+    }
+
+    /// the indices (face(i), variations(i)) of family i's faces (empty when out of range)
+    pub fn family_range(&self, i: usize) -> core::ops::Range<usize> {
+        match self.fam.get(i) {
+            Some(f) => f.first as usize..(f.first + f.n) as usize,
+            None => 0..0,
         }
     }
 
@@ -662,7 +738,7 @@ impl FontDb {
     /// resolve and load -> (font id / ERR_*, the family found)
     pub fn load_resolved(&mut self, text: &mut Text, conf: &FontConf, family: &str, lang: &str, weight: u32, italic: bool) -> (i32, String) {
         match self.resolve(conf, family, lang, weight, italic) {
-            Some((fi, syn, fam)) => (self.load_face(text, fi, syn), fam),
+            Some((fi, syn, fam)) => (self.load_var(text, fi, syn, weight, italic, None, &[]), fam),
             None => (ERR_FAIL, String::new()),
         }
     }
@@ -670,7 +746,7 @@ impl FontDb {
     /// fontdb_load(text, family, weight, italic) -> font id / ERR_*
     pub fn load(&mut self, text: &mut Text, family: &str, weight: u32, italic: bool) -> i32 {
         let Some((fi, syn)) = self.find(family, weight, italic) else { return ERR_FAIL };
-        self.load_face(text, fi, syn)
+        self.load_var(text, fi, syn, weight, italic, None, &[])
     }
 
     /// load face fi with the synthetic styles syn (FS_SYN_*) -> font id / ERR_*; each (face,
@@ -700,6 +776,96 @@ impl FontDb {
             self.loaded.push((fi, syn, id));
         }
         id
+    }
+
+    // ------------------------------------------------------------------ variable faces
+
+    /// the axes and named instances of face i (None: not a variable face, or its file cannot
+    /// be read); read from the file on first use
+    pub fn variations(&mut self, i: usize) -> Option<&FdVar> {
+        let f = self.faces.get(i)?;
+        if f.flags & FDFF_VAR == 0 {
+            return None;
+        }
+        let k = match self.vars.iter().position(|v| v.0 == i) {
+            Some(k) => k,
+            None => {
+                let v = read_var(&f.path, f.face);
+                self.vars.push((i, v));
+                self.vars.len() - 1
+            }
+        };
+        self.vars[k].1.as_ref()
+    }
+
+    /// the axis values of a choice on variable face i (see the module header) -> (one value
+    /// per axis, the FS_SYN_* flags still needed); None: not a variable face
+    pub fn var_values(&mut self, i: usize, weight: u32, italic: bool, size_pt: Option<f32>, axes: &[([u8; 4], f32)]) -> Option<(Vec<f32>, u32)> {
+        let face_weight = self.faces.get(i)?.weight as u32;
+        let face_italic = self.faces.get(i)?.flags & (FDFF_ITALIC | FDFF_OBLIQUE) != 0;
+        let v = self.variations(i)?;
+        let w = if weight == 0 { 400 } else { weight.min(1000) };
+        let mut vals: Vec<f32> = v.axes.iter().map(|a| a.def).collect();
+        let mut syn = 0;
+        let find = |t: &[u8; 4]| v.axes.iter().position(|a| &a.tag == t);
+        // weight: the wght axis, else a synthetic bold like find()
+        match find(b"wght") {
+            Some(k) => {
+                let a = &v.axes[k];
+                vals[k] = (w as f32).clamp(a.min, a.max);
+                if w >= 600 && a.max < 600.0 {
+                    syn |= FS_SYN_BOLD;
+                }
+            }
+            None if w >= 600 && face_weight < 600 => syn |= FS_SYN_BOLD,
+            None => {}
+        }
+        // italic: ital = 1, else the most slanted slnt, else a synthetic italic
+        if italic && !face_italic {
+            match (find(b"ital"), find(b"slnt")) {
+                (Some(k), _) if v.axes[k].max >= 1.0 => vals[k] = 1.0,
+                (_, Some(k)) if v.axes[k].min < 0.0 => vals[k] = v.axes[k].min,
+                _ => syn |= FS_SYN_ITALIC,
+            }
+        }
+        // the optical size follows the size
+        if let (Some(k), Some(pt)) = (find(b"opsz"), size_pt) {
+            vals[k] = pt.clamp(v.axes[k].min, v.axes[k].max);
+        }
+        // the axes named win
+        for &(t, x) in axes {
+            if let Some(k) = find(&t) {
+                vals[k] = if x.is_nan() { v.axes[k].def } else { x.clamp(v.axes[k].min, v.axes[k].max) };
+                if &t == b"wght" {
+                    syn &= !FS_SYN_BOLD;
+                }
+                if &t == b"ital" || &t == b"slnt" {
+                    syn &= !FS_SYN_ITALIC;
+                }
+            }
+        }
+        Some((vals, syn))
+    }
+
+    /// load variable face fi at the axis values of a choice (var_values) with the synthetic
+    /// styles syn asks for that no axis gives -> font id / ERR_*; a face that is not
+    /// variable: load_face(fi, syn)
+    #[allow(clippy::too_many_arguments)]
+    pub fn load_var(&mut self, text: &mut Text, fi: usize, syn: u32, weight: u32, italic: bool, size_pt: Option<f32>, axes: &[([u8; 4], f32)]) -> i32 {
+        let Some((vals, vsyn)) = self.var_values(fi, weight, italic, size_pt, axes) else { return self.load_face(text, fi, syn) };
+        // the synthetic styles the variable face still needs (find asked for them without
+        // knowing the axes)
+        let syn = (syn & !(FS_SYN_BOLD | FS_SYN_ITALIC)) | vsyn;
+        let id = self.load_face(text, fi, 0);
+        if id < 0 {
+            return id;
+        }
+        let tags: Vec<([u8; 4], f32)> = match self.variations(fi) {
+            Some(v) => v.axes.iter().zip(&vals).map(|(a, &x)| (a.tag, x)).collect(),
+            None => Vec::new(),
+        };
+        let id = text.vary(id as u32, &tags);
+        if id < 0 || syn == 0 { id } else { text.style(id as u32, syn) }
     }
 
     // ------------------------------------------------------------------ cache

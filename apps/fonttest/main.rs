@@ -3,7 +3,14 @@
 // and output as the assembly version, so tools/font_check.py and the scripts run unchanged.
 //                                                                  [apps/fonttest/src/main.s]
 //
-//   --dump FILE [FACE]                 names, metrics, flags, glyph count
+//   --dump FILE [FACE]                 names, metrics, flags, glyph count; a variable font's
+//                                      axes, named instances, values and normalized coordinates
+//   --axes TAG=V,..  / --instance N    (with --dump, --outline(s), --kern, --render, --advances)
+//                                      the variable font's instance at these axis values /
+//                                      its named instance N (text::Text::vary, vary_named)
+//   --advances FILE FACE TEXT [OUT]    per character "C cp gid adv kern" (kern: with the next
+//                                      character), then "W plain shaped" (font units: the
+//                                      unshaped run and the HarfRust-shaped run at upem px)
 //   --outline FILE FACE CP             contours of one glyph (u CP, or gGID for a glyph id)
 //   --outlines FILE FACE LIST OUT      batch: LIST lines "u CP" / "g GID" -> OUT records
 //                                      "G key gid adv n xmin ymin xmax ymax" + "P tag x y"
@@ -22,7 +29,8 @@
 //                                      everything; must not crash
 //   --bench FILE FACE                  outline extraction and rasterization speed
 //   --selftest                         known-answer checks on the synthetic fixtures in
-//                                      apps/fonttest/tests/fixtures (tests/selftest.uis)
+//                                      apps/fonttest/tests/fixtures and tests/varfont (variable
+//                                      fonts: tools/var_fixtures.py) (tests/selftest.uis)
 //   --scan [OUT] [--cache F] [--rescan] fontdb scan: families and faces
 //   --find FAMILY WEIGHT ITALIC        fontdb find
 //   --conf FAMILY [LANG]               fontconf: the system's rules (files read), the
@@ -41,9 +49,9 @@ use gfx::{Dc, Surface, FMT_A8, FMT_PARGB, FMT_XRGB};
 use rt::fx::cvt;
 use text::fontconf::{is_generic, FontConf};
 use text::fontdb::{FontDb, FDB_RESCAN};
-use text::{GcRef, Text, FM_FLAGS, FMF_ITALIC, FMF_SYN, FN_FAMILY, FN_FULL, FN_STYLE, FN_TYPO_FAMILY,
-           FN_TYPO_STYLE, FONT_ICON, FONT_REG, FS_SHARP, FS_SYN_BOLD, FS_SYN_ITALIC, SUBPIXEL_BGR, SUBPIXEL_NONE,
-           SUBPIXEL_RGB, SUBPIXEL_VBGR, SUBPIXEL_VRGB};
+use text::{GcRef, Text, FM_FLAGS, FMF_BOLD, FMF_ITALIC, FMF_OBLIQUE, FMF_SYN, FMF_VAR, FN_FAMILY, FN_FULL, FN_STYLE,
+           FN_TYPO_FAMILY, FN_TYPO_STYLE, FONT_ICON, FONT_REG, FS_SHARP, FS_SYN_BOLD, FS_SYN_ITALIC, SUBPIXEL_BGR,
+           SUBPIXEL_NONE, SUBPIXEL_RGB, SUBPIXEL_VBGR, SUBPIXEL_VRGB};
 use ui::Style;
 
 ui::main!(fonttest());
@@ -133,6 +141,27 @@ fn num_parse(s: &[u8]) -> (i32, usize) {
     parse_int(s)
 }
 
+// "wght=600,wdth=75.5" -> [(tag, value)]
+fn parse_axes(spec: &str) -> Vec<([u8; 4], f32)> {
+    let mut out = Vec::new();
+    for item in spec.split(',') {
+        let Some((t, v)) = item.split_once('=') else { continue };
+        let t = t.trim().as_bytes();
+        let mut tag = [b' '; 4];
+        for (k, &c) in t.iter().take(4).enumerate() {
+            tag[k] = c;
+        }
+        if let Ok(v) = v.trim().parse::<f32>() {
+            out.push((tag, v));
+        }
+    }
+    out
+}
+
+fn tag_str(t: [u8; 4]) -> String {
+    String::from_utf8_lossy(&t).into_owned()
+}
+
 // the lines of a file (split at LF, cut at the first NUL)
 fn read_lines(path: &str) -> Option<Vec<Vec<u8>>> {
     let mut d = plat::read_file(path)?;
@@ -154,7 +183,7 @@ fn fonttest() -> i32 {
     let t = Text::new(st.fonts(), st.font_names());
     let mut ft = Ft { t, db: FontDb::new(), a: plat::args(), ob: Vec::new(), key: String::new(), st_fail: 0 };
     let modes = ["--selftest", "--dump", "--outlines", "--outline", "--kern", "--render", "--cmpsgf", "--fuzz",
-                 "--bench", "--scan", "--find", "--conf"];
+                 "--bench", "--scan", "--find", "--conf", "--advances"];
     for m in modes {
         let i = ft.arg_index(m);
         if i < 0 {
@@ -173,6 +202,7 @@ fn fonttest() -> i32 {
             "--bench" => ft.cmd_bench(i),
             "--scan" => ft.cmd_scan(i),
             "--conf" => ft.cmd_conf(i),
+            "--advances" => ft.cmd_advances(i),
             _ => ft.cmd_find(i),
         };
     }
@@ -213,7 +243,7 @@ impl Ft {
         }
     }
 
-    // font id / ERR_* for path ("@N" = embedded font N)
+    // font id / ERR_* for path ("@N" = embedded font N); --axes / --instance: that instance
     fn load_font(&mut self, path: &str, face: i32) -> i32 {
         if let Some(n) = path.strip_prefix('@') {
             return parse_int(n.as_bytes()).0;
@@ -221,8 +251,18 @@ impl Ft {
         let id = self.t.load_file(path, face as u32);
         if id < 0 {
             plat::write_stderr(format!("error: cannot load {path} ({id})\n").as_bytes());
+            return id;
         }
-        id
+        if let Some(n) = self.arg_value("--instance") {
+            return self.t.vary_named(id as u32, parse_int(n.as_bytes()).0 as usize);
+        }
+        match self.arg_value("--axes") {
+            Some(spec) => {
+                let vals = parse_axes(&spec);
+                self.t.vary(id as u32, &vals)
+            }
+            None => id,
+        }
     }
 
     fn ob(&mut self, s: &str) {
@@ -279,8 +319,55 @@ impl Ft {
         let g = self.t.glyph(f, 'A' as u32);
         let adv = self.t.adv(f, g);
         self.ob(&format!("'A' -> glyph {g} adv {adv}\n"));
+        // a variable font: axes, named instances, this instance's values and coordinates
+        for a in self.t.var_axes(f) {
+            let s = format!("axis {} {} {} {} {}{}\n", tag_str(a.tag), a.min, a.def, a.max, a.name, if a.hidden { " (hidden)" } else { "" });
+            self.ob(&s);
+        }
+        for (k, ins) in self.t.var_instances(f).iter().enumerate() {
+            let c: Vec<String> = ins.coords.iter().map(|v| format!("{v}")).collect();
+            let s = format!("instance {k} {} [{}]\n", ins.name, c.join(" "));
+            self.ob(&s);
+        }
+        let vals = self.t.var_values(f);
+        if !vals.is_empty() {
+            let v: Vec<String> = vals.iter().map(|v| format!("{v}")).collect();
+            let c: Vec<String> = self.t.var_coords(f).iter().map(|v| format!("{v}")).collect();
+            self.ob(&format!("values {}\ncoords {}\n", v.join(" "), c.join(" ")));
+        }
         self.ob_flush("");
         0
+    }
+
+    // ------------------------------------------------------------------ --advances
+
+    fn cmd_advances(&mut self, ai: usize) -> i32 {
+        let face = self.arg_num(ai + 2, 0);
+        let path = self.arg_at(ai + 1);
+        let id = self.load_font(&path, face);
+        if id < 0 {
+            return 1;
+        }
+        let f = id as u32;
+        let text = self.arg_at(ai + 3);
+        let cps: Vec<u32> = text.chars().map(|c| c as u32).collect();
+        for (k, &cp) in cps.iter().enumerate() {
+            let g = self.t.glyph(f, cp);
+            let kn = cps.get(k + 1).map_or(0, |&c2| self.t.kern(f, g, self.t.glyph(f, c2)));
+            let s = format!("C {cp} {g} {} {kn}\n", self.t.adv(f, g));
+            self.ob(&s);
+        }
+        // whole runs at upem px: 24.8 values of font units
+        let upem = self.t.upem(f);
+        self.t.set_font(f, upem << 8);
+        let plain = self.t.measure(&text);
+        self.t.set_shaping(true);
+        let shaped = self.t.measure(&text);
+        self.t.set_shaping(false);
+        self.ob(&format!("W {} {}\n", plain as f32 / 256.0, shaped as f32 / 256.0));
+        let o = self.arg_at(ai + 4);
+        let o = if o.starts_with("--") { String::new() } else { o };
+        self.ob_flush(&o)
     }
 
     // ------------------------------------------------------------------ outlines
@@ -956,6 +1043,211 @@ impl Ft {
         }
     }
 
+    // the mask of glyph g of font at 24 px (empty: none)
+    fn st_mask(&mut self, font: u32, g: u32) -> Vec<u8> {
+        match self.t.gc_get(font, g, 24 << 8, 0) {
+            GcRef::Entry(e) => {
+                let mut v = alloc::vec![e.w as u8, e.h as u8];
+                v.extend_from_slice(&e.px);
+                v
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    // variable fonts: instances of tests/varfont/*.ttf against expected.txt (tools/
+    // var_fixtures.py), the API, one glyph cache entry per instance, shaping at the instance,
+    // the work budget, truncated and corrupted files at an instance
+    fn st_var(&mut self) {
+        const VF: &str = "apps/fonttest/tests/varfont/";
+        let cases = [("jfvar.ttf", "wght=900"), ("jfvar.ttf", "wght=650"), ("jfvar.ttf", "wght=100,wdth=75"),
+                     ("jfvar.ttf", "wdth=87.5,slnt=-6,TEST=10"), ("jfvar.ttf", "wght=250,wdth=50,slnt=-12"),
+                     ("jfvar-phantom.ttf", "wght=800"), ("jfvar-phantom.ttf", "wght=300"),
+                     ("jfvar-phantom.ttf", "wght=600,opsz=30")];
+        self.ob.clear();
+        for (file, spec) in cases {
+            let base = self.t.load_file(&format!("{VF}{file}"), 0);
+            if base < 0 {
+                self.st_check(false, &format!("selftest: cannot load {file}\n"));
+                continue;
+            }
+            let f = self.t.vary(base as u32, &parse_axes(spec)) as u32;
+            let c: Vec<String> = self.t.var_coords(f).iter().map(|v| format!("{v}")).collect();
+            self.ob(&format!("var {file} {spec} coords {}\n", c.join(" ")));
+            let n = self.t.metrics(f).map_or(0, |m| m.nglyphs);
+            for g in 0..n.max(0) as u32 {
+                self.key = format!("g{g}");
+                self.put_outline(f, g);
+            }
+            if file == "jfvar.ttf" {
+                let m = self.t.metrics(f).unwrap_or_default();
+                self.ob(&format!("metrics asc {} typo {} xh {} ul {}\n", m.asc, m.typo_asc, m.xh, m.ul_thick));
+            }
+            self.t.unload(base as u32);
+            self.st_check(!self.t.valid(f), "selftest: an instance survived unloading its font\n");
+        }
+        match plat::read_file(&format!("{VF}expected.txt")) {
+            Some(mut e) => {
+                e.retain(|&c| c != b'\r');
+                if e != self.ob {
+                    self.st_fail += 1;
+                    out("selftest: variable fonts differ from varfont/expected.txt (actual output follows)\n");
+                    self.ob_flush("");
+                }
+            }
+            None => self.st_check(false, "selftest: varfont/expected.txt missing\n"),
+        }
+        self.ob.clear();
+        // ---- the API on jfvar.ttf
+        let base = self.t.load_file(&format!("{VF}jfvar.ttf"), 0);
+        if base < 0 {
+            return;
+        }
+        let b = base as u32;
+        let axes = self.t.var_axes(b);
+        let desc: Vec<String> = axes.iter().map(|a| format!("{} {} {} {} {} {}", tag_str(a.tag), a.min, a.def, a.max, a.hidden, a.name)).collect();
+        let want = ["wght 100 400 900 false Strichstärke", "wdth 50 100 100 false Breite", "slnt -12 0 0 false Slant",
+                    "TEST 0 0 10 true Test axis"];
+        self.st_check(desc == want, &format!("selftest: var_axes {desc:?}\n"));
+        let ins: Vec<String> = self.t.var_instances(b).iter().map(|i| format!("{} {:?}", i.name, i.coords)).collect();
+        let want = ["Dünn [100.0, 100.0, 0.0, 0.0]", "Standard [400.0, 100.0, 0.0, 0.0]", "Fett [700.0, 100.0, 0.0, 0.0]",
+                    "Condensed Black [900.0, 75.0, 0.0, 0.0]", "Kursiv [400.0, 100.0, -12.0, 0.0]"];
+        self.st_check(ins == want, &format!("selftest: var_instances {ins:?}\n"));
+        let flags = self.t.metric(b, FM_FLAGS);
+        self.st_check(flags & FMF_VAR != 0 && self.t.var_values(b) == [400.0, 100.0, 0.0, 0.0], "selftest: the variable font itself\n");
+        // the same coordinates: the same id; the defaults: the font itself; clamped values
+        let i1 = self.t.vary(b, &[(*b"wght", 650.0)]);
+        let i2 = self.t.vary(b, &[(*b"wght", 650.0), (*b"XXXX", 3.0)]);
+        let i0 = self.t.vary(b, &[(*b"wght", 400.0)]);
+        let i3 = self.t.vary(i1 as u32, &[(*b"wdth", 10.0)]);
+        self.st_check(i1 > b as i32 && i1 == i2 && i0 == base, &format!("selftest: vary ids {i1} {i2} {i0}\n"));
+        let v3 = self.t.var_values(i3 as u32);
+        self.st_check(v3 == [650.0, 50.0, 0.0, 0.0] && self.t.var_coords(i3 as u32) == [4096, -16384, 0, 0],
+                      &format!("selftest: vary keeps the instance's values, clamps {v3:?}\n"));
+        // named instances: weight and slope in the metrics
+        let fett = self.t.vary_named(b, 2);
+        let m = self.t.metrics(fett as u32).unwrap_or_default();
+        self.st_check(m.weight == 700 && m.flags & FMF_BOLD != 0, &format!("selftest: vary_named Fett weight {}\n", m.weight));
+        let kursiv = self.t.vary_named(b, 4);
+        let fl = self.t.metric(kursiv as u32, FM_FLAGS);
+        self.st_check(fl & FMF_OBLIQUE != 0 && fl & FMF_BOLD == 0, "selftest: vary_named Kursiv is oblique\n");
+        let none = self.t.vary_named(b, 5);
+        self.st_check(none < 0, "selftest: vary_named beyond the instances\n");
+        // synthetic styles carry over to the instance of a styled font
+        let syn = self.t.style(i1 as u32, FS_SYN_ITALIC) as u32;
+        let i4 = self.t.vary(syn, &[(*b"wght", 900.0)]);
+        let fl = self.t.metric(i4 as u32, FM_FLAGS);
+        self.st_check(fl & (FMF_SYN | FMF_ITALIC) == FMF_SYN | FMF_ITALIC && self.t.var_values(i4 as u32)[0] == 900.0,
+                      "selftest: vary on a synthetic italic\n");
+        // one glyph cache entry per instance; the instance's outline is not the base's
+        let a = self.t.glyph(b, 'A' as u32);
+        let m0 = self.st_mask(b, a);
+        let m1 = self.st_mask(i1 as u32, a);
+        let m3 = self.st_mask(i3 as u32, a);
+        let again = self.st_mask(b, a);
+        self.st_check(!m0.is_empty() && m0 != m1 && m1 != m3 && m0 == again, "selftest: glyph masks of instances\n");
+        // HarfRust shapes at the instance's coordinates: the same width as the plain run (HVAR)
+        self.t.set_font(i1 as u32, 1000 << 8);
+        let plain = self.t.measure("A B.A VO");
+        self.t.set_shaping(true);
+        let shaped = self.t.measure("A B.A VO");
+        self.t.set_font(b, 1000 << 8);
+        let shaped0 = self.t.measure("A B.A VO");
+        self.t.set_shaping(false);
+        self.st_check(plain == shaped && plain == 5216 << 8 && shaped0 == 5000 << 8,
+                      &format!("selftest: shaped instance {} / {} / {}\n", plain >> 8, shaped >> 8, shaped0 >> 8));
+        // not a variable font: vary gives the font itself
+        let mini = self.t.load_file("apps/fonttest/tests/fixtures/mini.ttf", 0);
+        if mini >= 0 {
+            let v = self.t.vary(mini as u32, &[(*b"wght", 700.0)]);
+            self.st_check(v == mini && self.t.var_axes(mini as u32).is_empty(), "selftest: vary on a static font\n");
+            self.t.unload(mini as u32);
+        }
+        self.t.unload(b);
+        self.st_check(!self.t.valid(i1 as u32) && !self.t.valid(i4 as u32), "selftest: instances survived unload\n");
+        // ---- FontDb on tests/varfont: the faces' variations, weight / italic / size on the axes
+        let mut db = FontDb::new();
+        let nf = db.scan_dirs(&[VF], FDB_RESCAN);
+        let var = db.find("jfgui Var", 400, false).map(|f| f.0);
+        let ph = db.find("jfgui Var Phantom", 400, false).map(|f| f.0);
+        self.st_check(nf == 2 && var.is_some() && ph.is_some(), &format!("selftest: fontdb varfont faces {nf}\n"));
+        if let (Some(v), Some(ph)) = (var, ph) {
+            let n = db.variations(v).map_or(0, |x| x.axes.len() * 10 + x.instances.len());
+            self.st_check(n == 45, &format!("selftest: fontdb variations {n}\n"));
+            // bold italic: wght 700, the most slanted slnt, no synthetic style
+            let r = db.var_values(v, 700, true, Some(20.0), &[]);
+            self.st_check(r == Some((alloc::vec![700.0, 100.0, -12.0, 0.0], 0)), &format!("selftest: var_values bold italic {r:?}\n"));
+            // the axes named win; opsz follows the size (clamped)
+            let r = db.var_values(ph, 950, false, Some(60.0), &[(*b"wght", 300.0)]);
+            self.st_check(r == Some((alloc::vec![300.0, 48.0], 0)), &format!("selftest: var_values named, opsz {r:?}\n"));
+            let r = db.var_values(ph, 400, true, Some(9.0), &[]);
+            self.st_check(r.as_ref().map(|x| x.1) == Some(FS_SYN_ITALIC), &format!("selftest: var_values synthetic italic {r:?}\n"));
+            // load: the instance instead of a synthetic bold
+            let id = db.load(&mut self.t, "jfgui Var", 700, false);
+            let m = self.t.metrics(id.max(0) as u32).unwrap_or_default();
+            self.st_check(id >= 0 && m.weight == 700 && m.flags & FMF_SYN == 0, &format!("selftest: fontdb load variable bold {id} {}\n", m.weight));
+            let id2 = db.load_var(&mut self.t, ph, 0, 400, false, Some(30.0), &[]);
+            self.st_check(self.t.var_values(id2.max(0) as u32) == [400.0, 30.0], "selftest: load_var opsz from the size\n");
+        }
+        // ---- more work than the budget: the glyph is empty at an instance, intact at the default
+        let bud = self.t.load_file(&format!("{VF}budget.bin"), 0);
+        if bud >= 0 {
+            let inst = self.t.vary(bud as u32, &[(*b"wght", 900.0)]) as u32;
+            let big0 = self.t.glyph_box(bud as u32, 1).is_some();
+            let big1 = self.t.glyph_box(inst, 1).is_none();
+            let small = self.t.glyph_box(inst, 0) == Some([10, 0, 510, 500]);
+            self.st_check(big0 && big1 && small, &format!("selftest: gvar work budget {big0} {big1} {small}\n"));
+            self.t.unload(bud as u32);
+        } else {
+            self.st_check(false, "selftest: cannot load budget.bin\n");
+        }
+        // ---- truncated and corrupted variable fonts at an instance: no crash
+        let axes = [(*b"wght", 777.0), (*b"wdth", 61.0), (*b"slnt", -3.3), (*b"TEST", 2.2)];
+        for f in ["jfvar.ttf", "jfvar-phantom.ttf"] {
+            let Some(d) = plat::read_file(&format!("{VF}{f}")) else { continue };
+            let mut n = 12;
+            while n < d.len() {
+                self.st_var_walk(&d[..n], &axes);
+                n += 5;
+            }
+            // flipped bytes (a fixed pseudo-random sequence)
+            let mut r = 0x2545_F491u32;
+            for _ in 0..400 {
+                let mut c = d.clone();
+                for _ in 0..4 {
+                    r ^= r << 13;
+                    r ^= r >> 17;
+                    r ^= r << 5;
+                    let k = (r as usize) % c.len();
+                    c[k] ^= (r >> 24) as u8 | 1;
+                }
+                self.st_var_walk(&c, &axes);
+            }
+        }
+    }
+
+    // load data, take an instance and walk its glyphs, advances, kerning and metrics
+    fn st_var_walk(&mut self, d: &[u8], axes: &[([u8; 4], f32)]) {
+        let id = self.t.load_mem(d, 0);
+        if id < 0 {
+            return;
+        }
+        let f = self.t.vary(id as u32, axes);
+        if f >= 0 {
+            let f = f as u32;
+            for g in 0..10 {
+                self.t.glyph_box(f, g);
+                self.t.adv(f, g);
+                self.t.kern(f, g, 2);
+            }
+            self.t.metrics(f);
+            for k in 0..6 {
+                self.t.vary_named(id as u32, k);
+            }
+        }
+        self.t.unload(id as u32);
+    }
+
     fn cmd_selftest(&mut self) -> i32 {
         const FX: &str = "apps/fonttest/tests/fixtures/";
         let cps_tt = [0x41, 0x56, 0x4F, 0xC4, 0x53, 0x43, 0x20, 0x42, 0x1F600];
@@ -1044,6 +1336,8 @@ impl Ft {
         self.st_fallback();
         // ---- subpixel smoothing (text/lcd.rs), the soft hyphen
         self.st_subpixel();
+        // ---- variable fonts (tests/varfont)
+        self.st_var();
         // ---- truncated fixtures must not crash
         for f in ["mini.ttf", "mini.otf", "mini.ttc", "cbdt.ttf", "mac.ttf", "cid.otf"] {
             self.st_fuzz(&format!("{FX}{f}"));

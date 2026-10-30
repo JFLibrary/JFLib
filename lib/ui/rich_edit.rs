@@ -347,7 +347,7 @@ impl Ui {
             } else if family.eq_ignore_ascii_case("monospace") {
                 let (f, _) = self.mono_font(11.0);
                 return syn(self, f, want);
-            } else if let Some(f) = self.font_load(&FontSel { family: String::from(family), weight: if bold { 700 } else { 400 }, italic, size: 11.0 }) {
+            } else if let Some(f) = self.font_load(&FontSel { family: String::from(family), weight: if bold { 700 } else { 400 }, italic, size: 11.0, axes: Vec::new() }) {
                 return f;
             }
         }

@@ -18,23 +18,35 @@
 // glyph), cmap (formats 0, 4, 6, 12, 13; (3,10) > (0,x) fmt 12 > (3,1) > (0,x) > (3,0)
 // symbol > (1,0) Mac Roman), OS/2, post, name, kern (version 0 and Apple version 1, format
 // 0), GPOS pair adjustment (lookup type 2 formats 1 and 2, extension type 9; x advance of
-// the first glyph; 'kern' feature of the DFLT and latn default language systems).  Variable
-// fonts: the default instance.  Every offset is checked against its table and the file;
-// malformed glyphs come out empty.  Like GDI / FreeType: glyf outlines are shifted by hmtx
-// lsb - xMin; symbol fonts ((3,0) cmap) also map U+0000..U+00FF and the Windows-1252
-// characters to U+F000 + code page byte; a CFF FontMatrix that is not exactly 1/unitsPerEm
-// scales the outline.
+// the first glyph; 'kern' feature of the DFLT and latn default language systems).  Every
+// offset is checked against its table and the file; malformed glyphs come out empty.  Like
+// GDI / FreeType: glyf outlines are shifted by hmtx lsb - xMin; symbol fonts ((3,0) cmap)
+// also map U+0000..U+00FF and the Windows-1252 characters to U+F000 + code page byte; a CFF
+// FontMatrix that is not exactly 1/unitsPerEm scales the outline.
+//
+// Variable fonts (var.rs): fvar / avar / gvar / HVAR / MVAR / GDEF's store are read at open
+// (var); the plain calls give the default instance, the *_var calls an instance at
+// normalized coordinates (registry.rs: VarFont):
+//   prep_var(g, coords, serial, ol)    the outline with gvar deltas (simple glyphs: points with
+//        IUP; composites: the component offsets), shifted by its varied phantom point pp1
+//   adv_var(g, coords)                 hmtx + HVAR; without HVAR: hmtx + the phantom points'
+//        deltas (adv_table: every glyph at once)
+//   kern_var(g1, g2, coords)           GPOS pair values + their VariationIndex deltas (GDEF)
+//   metrics_var(coords, wght, ol)      FONTMETRICS + header with MVAR deltas (hasc / hdsc /
+//        hlgp on hhea and OS/2, hcla, hcld, xhgt, cpht, undo, unds, stro, strs)
+// CFF2 outlines are not supported (no usable outlines: ERR_UNSUPPORTED).
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use gfx::path::Path;
-use rt::fx::sqrt;
+use rt::fx::{floor_i, sqrt};
 
 use crate::cff::Cff;
 use crate::colr;
 use crate::font::*;
 use crate::outline::{Outline, OLT_ON};
+use crate::var::{tag_u32, Var, VAR_BUDGET};
 
 pub const ERR_FAIL: i32 = -1;
 pub const ERR_TRUNC: i32 = -1;
@@ -78,7 +90,12 @@ pub const TT_CPAL: usize = 14;
 pub const TT_CBDT: usize = 15;
 pub const TT_CBLC: usize = 16;
 pub const TT_FVAR: usize = 17;
-pub const TT_COUNT: usize = 20;
+pub const TT_AVAR: usize = 20;
+pub const TT_GVAR: usize = 21;
+pub const TT_HVAR: usize = 22;
+pub const TT_MVAR: usize = 23;
+pub const TT_GDEF: usize = 24;
+pub const TT_COUNT: usize = 25;
 
 pub const TFK_TTF: u32 = 1;
 pub const TFK_CFF: u32 = 2;
@@ -93,7 +110,8 @@ pub const TFF_MACCMAP: u32 = 32;
 static TT_TAGS: [u32; TT_COUNT] = [
     0x6865_6164, 0x6868_6561, 0x686D_7478, 0x6D61_7870, 0x6C6F_6361, 0x676C_7966, 0x636D_6170,
     0x4F53_2F32, 0x706F_7374, 0x6E61_6D65, 0x6B65_726E, 0x4750_4F53, 0x4346_4620, 0x434F_4C52,
-    0x4350_414C, 0x4342_4454, 0x4342_4C43, 0x6676_6172, 0x4346_4632, 0x7668_6561,
+    0x4350_414C, 0x4342_4454, 0x4342_4C43, 0x6676_6172, 0x4346_4632, 0x7668_6561, 0x6176_6172,
+    0x6776_6172, 0x4856_4152, 0x4D56_4152, 0x4744_4546,
 ];
 static NAME_IDS: [u32; 5] = [FN_FAMILY, FN_STYLE, FN_FULL, FN_TYPO_FAMILY, FN_TYPO_STYLE];
 const F_INV16384: f32 = 0.000_061_035_156_25;
@@ -306,13 +324,37 @@ pub fn sfnt_name(tb: Tb, id: u32, cap: usize) -> Vec<u8> {
     out
 }
 
-// glyf decoding state shared by the recursion (g_tt_budget, g_tt_xmin, g_tt_rg, g_tt_hasx)
-struct GlyfSt {
+// glyf decoding state shared by the recursion (g_tt_budget, g_tt_xmin, g_tt_rg, g_tt_hasx);
+// variations: the normalized coordinates (empty: the default instance), the deltas of the
+// metrics glyph's phantom points pp1.x / pp2.x, the gvar work budget
+struct GlyfSt<'a> {
     budget: i32,
     xmin: i32,
     rg: u32,
     hasx: bool,
+    coords: &'a [i16],
+    pp: (f32, f32),
+    vbudget: u32,
 }
+
+impl GlyfSt<'_> {
+    fn new(coords: &[i16]) -> GlyfSt<'_> {
+        GlyfSt { budget: GLYF_BUDGET, xmin: 0, rg: 0, hasx: false, coords, pp: (0.0, 0.0), vbudget: VAR_BUDGET }
+    }
+}
+
+// MVAR tags
+const MV_HASC: u32 = tag_u32(*b"hasc");
+const MV_HDSC: u32 = tag_u32(*b"hdsc");
+const MV_HLGP: u32 = tag_u32(*b"hlgp");
+const MV_HCLA: u32 = tag_u32(*b"hcla");
+const MV_HCLD: u32 = tag_u32(*b"hcld");
+const MV_XHGT: u32 = tag_u32(*b"xhgt");
+const MV_CPHT: u32 = tag_u32(*b"cpht");
+const MV_UNDO: u32 = tag_u32(*b"undo");
+const MV_UNDS: u32 = tag_u32(*b"unds");
+const MV_STRO: u32 = tag_u32(*b"stro");
+const MV_STRS: u32 = tag_u32(*b"strs");
 
 /// a runtime font context (TrueType or CFF outlines)
 pub struct TtFont {
@@ -336,6 +378,8 @@ pub struct TtFont {
     cff: Option<Box<Cff>>,
     pub cpal: u32,
     pub cpaln: u32,
+    /// the variation tables (var.rs; None: not a variable font)
+    pub(crate) var: Option<Box<Var>>,
 }
 
 impl TtFont {
@@ -399,6 +443,7 @@ impl TtFont {
             cff: None,
             cpal: 0,
             cpaln: 0,
+            var: None,
         });
         // ---- table records (the first record of a tag wins)
         for i in 0..ntab {
@@ -427,7 +472,6 @@ impl TtFont {
             return Err(ERR_HDR);
         }
         f.upem = upem;
-        let mac_style = be16(&data, h + 44);
         if be16(&data, h + 50) as u16 != 0 {
             f.flags |= TFF_LOCA_LONG;
         }
@@ -465,7 +509,13 @@ impl TtFont {
         f.kern_setup();
         f.gpos_setup();
         colr::open(&mut f);
-        f.metrics_setup(mac_style, ol);
+        if f.tab[TT_FVAR].1 != 0 {
+            let v = Var::parse(f.tb(TT_FVAR), f.tb(TT_AVAR), f.tb(TT_GVAR), f.tb(TT_HVAR), f.tb(TT_MVAR), f.tb(TT_GDEF), f.tb(TT_NAME));
+            f.var = v.map(Box::new);
+        }
+        let (m, h) = f.metrics_calc(&[], None, ol);
+        f.fm = m;
+        f.hdr = h;
         Ok(f)
     }
 
@@ -1000,17 +1050,27 @@ impl TtFont {
 
     // ------------------------------------------------------------------ metrics
 
-    // FONTMETRICS and the SGF1-style header  [tt_metrics_setup]
-    fn metrics_setup(&mut self, mac_style: u32, ol: &mut Outline) {
+    // FONTMETRICS and the SGF1-style header at normalized coordinates (empty: the default
+    // instance; MVAR deltas on the values read from the tables, glyph-derived heights from the
+    // varied outlines); wght: the instance's weight axis value  [tt_metrics_setup]
+    fn metrics_calc(&self, coords: &[i16], wght: Option<f32>, ol: &mut Outline) -> (Metrics, Hdr) {
+        let mac_style = self.tb(TT_HEAD).u16(44) as u32;
+        // a rounded MVAR delta (0 at the default instance)
+        let mv = |tag: u32| -> i32 {
+            match (&self.var, coords.is_empty()) {
+                (Some(v), false) => floor_i(v.mvar_delta(self.tb(TT_MVAR), tag, coords) + 0.5),
+                _ => 0,
+            }
+        };
         let mut m = Metrics { upem: self.upem as i32, nglyphs: self.nglyphs as i32, ..Default::default() };
         // hhea (defaults 0.8 / -0.2 em)
         m.asc = (self.upem * 4 / 5) as i32;
         m.desc = m.asc - self.upem as i32;
         let t = self.tb(TT_HHEA);
         if t.len() >= 36 {
-            m.asc = t.u16(4) as i16 as i32;
-            m.desc = t.u16(6) as i16 as i32;
-            m.gap = t.u16(8) as i16 as i32;
+            m.asc = (t.u16(4) as i16 as i32).wrapping_add(mv(MV_HASC));
+            m.desc = (t.u16(6) as i16 as i32).wrapping_add(mv(MV_HDSC));
+            m.gap = (t.u16(8) as i16 as i32).wrapping_add(mv(MV_HLGP));
             m.advmax = t.u16(10);
         }
         // OS/2 defaults from hhea / head
@@ -1044,8 +1104,8 @@ impl TtFont {
             }
             m.weight = w as i32;
             m.width = t.u16(6);
-            m.st_thick = t.u16(26) as i16 as i32;
-            m.st_pos = t.u16(28) as i16 as i32;
+            m.st_thick = (t.u16(26) as i16 as i32).wrapping_add(mv(MV_STRS));
+            m.st_pos = (t.u16(28) as i16 as i32).wrapping_add(mv(MV_STRO));
             let s = t.u16(62);
             if s & 1 != 0 {
                 fl |= FMF_ITALIC;
@@ -1060,21 +1120,25 @@ impl TtFont {
                 fl |= FMF_TYPO;
             }
             if t.len() >= 78 {
-                m.typo_asc = t.u16(68) as i16 as i32;
-                m.typo_desc = t.u16(70) as i16 as i32;
-                m.typo_gap = t.u16(72) as i16 as i32;
-                m.win_asc = t.u16(74);
-                m.win_desc = t.u16(76);
+                m.typo_asc = (t.u16(68) as i16 as i32).wrapping_add(mv(MV_HASC));
+                m.typo_desc = (t.u16(70) as i16 as i32).wrapping_add(mv(MV_HDSC));
+                m.typo_gap = (t.u16(72) as i16 as i32).wrapping_add(mv(MV_HLGP));
+                m.win_asc = t.u16(74).wrapping_add(mv(MV_HCLA));
+                m.win_desc = t.u16(76).wrapping_add(mv(MV_HCLD));
             }
             if t.len() >= 90 && t.u16(0) >= 2 {
-                m.xh = t.u16(86) as i16 as i32;
-                m.caph = t.u16(88) as i16 as i32;
+                m.xh = (t.u16(86) as i16 as i32).wrapping_add(mv(MV_XHGT));
+                m.caph = (t.u16(88) as i16 as i32).wrapping_add(mv(MV_CPHT));
             }
+        }
+        // a variable font's instance: the weight axis says how heavy it is
+        if let Some(w) = wght {
+            m.weight = floor_i(w + 0.5).clamp(1, 1000);
         }
         let t = self.tb(TT_POST);
         if t.len() >= 16 {
-            m.ul_pos = t.u16(8) as i16 as i32;
-            m.ul_thick = t.u16(10) as i16 as i32;
+            m.ul_pos = (t.u16(8) as i16 as i32).wrapping_add(mv(MV_UNDO));
+            m.ul_thick = (t.u16(10) as i16 as i32).wrapping_add(mv(MV_UNDS));
             if t.u32(12) as u32 != 0 {
                 fl |= FMF_MONO;
             }
@@ -1098,14 +1162,13 @@ impl TtFont {
             fl |= FMF_KERN;
         }
         m.flags = fl;
-        self.fm = m;
         // x-height / cap height from 'x' / 'H' when OS/2 has none (not for symbol fonts)
         if fl & FMF_SYMBOL == 0 {
             if m.xh <= 0 {
-                m.xh = self.glyph_ymax('x' as u32, ol);
+                m.xh = self.glyph_ymax('x' as u32, coords, ol);
             }
             if m.caph <= 0 {
-                m.caph = self.glyph_ymax('H' as u32, ol);
+                m.caph = self.glyph_ymax('H' as u32, coords, ol);
             }
         }
         // underline / strikeout defaults
@@ -1129,7 +1192,6 @@ impl TtFont {
             }
             m.st_pos = c.wrapping_add(m.st_thick) >> 1;
         }
-        self.fm = m;
         // SGF1-compatible header (i16 fields clamped)
         let mut flags = SGH_RUNTIME;
         if self.flags & TFF_COLR != 0 {
@@ -1139,7 +1201,7 @@ impl TtFont {
             flags |= SGH_CBDT;
         }
         let c16 = |v: i32| v.clamp(-32768, 32767);
-        self.hdr = Hdr {
+        let hdr = Hdr {
             flags,
             upem: self.upem as i32,
             asc: c16(m.asc),
@@ -1152,15 +1214,24 @@ impl TtFont {
             nglyphs: self.nglyphs & 0xFFFF,
             baseid: 0,
         };
+        (m, hdr)
+    }
+
+    /// FONTMETRICS and the header of the instance at coords (MVAR; weight from the wght
+    /// value)
+    pub(crate) fn metrics_var(&self, coords: &[i16], wght: Option<f32>, ol: &mut Outline) -> (Metrics, Hdr) {
+        self.metrics_calc(coords, wght, ol)
     }
 
     // yMax of the glyph for cp (0 when missing / empty)  [tt_glyph_ymax]
-    fn glyph_ymax(&self, cp: u32, ol: &mut Outline) -> i32 {
+    fn glyph_ymax(&self, cp: u32, coords: &[i16], ol: &mut Outline) -> i32 {
         let g = self.glyph(cp);
         if g == 0 {
             return 0;
         }
-        self.bbox(g, ol).map_or(0, |b| b[3])
+        // (an instance's heights: owner 0, so no font takes the varied outline for its own)
+        let ok = if coords.is_empty() { self.prep(g, ol) } else { self.prep_var(g, coords, 0, ol) };
+        if ok { ol.bbox().map_or(0, |b| b[3]) } else { 0 }
     }
 
     // ------------------------------------------------------------------ outlines
@@ -1168,6 +1239,17 @@ impl TtFont {
     /// the outline of glyph into the buffer (owner set either way): true = not empty
     /// [ttf_prep]
     pub fn prep(&self, glyph: u32, ol: &mut Outline) -> bool {
+        self.prep_at(glyph, &[], self.serial, ol)
+    }
+
+    /// prep at normalized coordinates (gvar; CFF outlines stay the default's), the buffer's
+    /// owner serial (an instance's own)
+    pub(crate) fn prep_var(&self, glyph: u32, coords: &[i16], serial: u64, ol: &mut Outline) -> bool {
+        let coords = if self.var.as_ref().is_some_and(|v| v.has_gvar()) { coords } else { &[] };
+        self.prep_at(glyph, coords, serial, ol)
+    }
+
+    fn prep_at(&self, glyph: u32, coords: &[i16], serial: u64, ol: &mut Outline) -> bool {
         ol.reset();
         let ok = if self.kind == TFK_CFF {
             match &self.cff {
@@ -1175,14 +1257,22 @@ impl TtFont {
                 None => false,
             }
         } else {
-            let mut st = GlyfSt { budget: GLYF_BUDGET, xmin: 0, rg: 0, hasx: false };
+            let mut st = GlyfSt::new(coords);
             let ok = self.glyf_decode(glyph, 0, ol, &mut st);
             if ok && st.hasx {
                 // the origin is at xMin - lsb (hmtx): shift like the TrueType rasterizers do
+                // (an instance: at its varied phantom point pp1, like HarfBuzz)
                 if let Some(lsb) = self.lsb(st.rg) {
                     let d = lsb.wrapping_sub(st.xmin);
-                    if d != 0 {
-                        ol.translate(0, d as f32, 0.0);
+                    if coords.is_empty() {
+                        if d != 0 {
+                            ol.translate(0, d as f32, 0.0);
+                        }
+                    } else {
+                        let df = d as f32 - st.pp.0;
+                        if df != 0.0 {
+                            ol.translate(0, df, 0.0);
+                        }
                     }
                 }
             }
@@ -1190,11 +1280,90 @@ impl TtFont {
         };
         if !ok || ol.err {
             ol.reset();
-            ol.owner_set(self.serial, glyph);
+            ol.owner_set(serial, glyph);
             return false;
         }
-        ol.owner_set(self.serial, glyph);
+        ol.owner_set(serial, glyph);
         ol.npts() != 0
+    }
+
+    /// advance at normalized coordinates: hmtx + HVAR; without HVAR hmtx + the deltas of the
+    /// phantom points (see adv_table), else the default's
+    pub(crate) fn adv_var(&self, g: u32, coords: &[i16]) -> i32 {
+        let a = self.adv(g);
+        match &self.var {
+            Some(v) if !coords.is_empty() => match v.hvar_delta(self.tb(TT_HVAR), g, coords) {
+                Some(d) => a.wrapping_add(floor_i(d + 0.5)).max(0),
+                None => a,
+            },
+            _ => a,
+        }
+    }
+
+    /// the advances of every glyph at coords when they come from gvar's phantom points (no
+    /// HVAR): hmtx + round(pp2.x - pp1.x deltas) of the glyph (USE_MY_METRICS: of that
+    /// component); empty when HVAR has them or nothing varies
+    pub(crate) fn adv_table(&self, coords: &[i16], ol: &mut Outline) -> Vec<i32> {
+        let Some(v) = &self.var else { return Vec::new() };
+        if v.has_hvar() || !v.has_gvar() || self.kind != TFK_TTF || coords.iter().all(|&c| c == 0) {
+            return Vec::new();
+        }
+        let mut out = Vec::with_capacity(self.nglyphs as usize);
+        for g in 0..self.nglyphs {
+            ol.reset();
+            let mut st = GlyfSt::new(coords);
+            let a = if self.glyf_decode(g, 0, ol, &mut st) {
+                self.adv(st.rg).wrapping_add(floor_i(st.pp.1 - st.pp.0 + 0.5)).max(0)
+            } else {
+                self.adv(g)
+            };
+            out.push(a);
+        }
+        ol.reset();
+        out
+    }
+
+    /// kern at normalized coordinates: GPOS pair values with their VariationIndex deltas
+    /// (GDEF's store); 'kern' tables do not vary
+    pub(crate) fn kern_var(&self, g1: u32, g2: u32, coords: &[i16]) -> i32 {
+        let Some(v) = &self.var else { return self.kern(g1, g2) };
+        if self.gpossub.is_empty() || coords.is_empty() {
+            return self.kern(g1, g2);
+        }
+        let tb = self.tb(TT_GPOS);
+        let gdef = self.tb(TT_GDEF);
+        let mut sum = 0i32;
+        let mut done = u32::MAX;
+        for &(sub, ord) in &self.gpossub {
+            if ord == done {
+                continue;
+            }
+            if let Some((rec, vf1, base)) = gp_value(tb, sub, g1, g2) {
+                let mut val = 0i32;
+                if vf1 & 4 != 0 {
+                    let x = tb.u16(rec.wrapping_add(popcnt8(vf1 & 3) * 2));
+                    if x >= 0 {
+                        val = x as u16 as i16 as i32;
+                    }
+                }
+                // xAdvDevice: a VariationIndex {outer, inner, 0x8000}
+                if vf1 & 0x40 != 0 {
+                    let dev = tb.u16(rec.wrapping_add(popcnt8(vf1 & 0x3F) * 2));
+                    if dev > 0 {
+                        let d = base.wrapping_add(dev as u32);
+                        if tb.u16(d.wrapping_add(4)) == 0x8000 {
+                            let (o, i) = (tb.u16(d), tb.u16(d.wrapping_add(2)));
+                            if o >= 0 && i >= 0 {
+                                val = val.wrapping_add(floor_i(v.gdef_delta(gdef, o as u32, i as u32, coords) + 0.5));
+                            }
+                        }
+                    }
+                }
+                sum = sum.wrapping_add(val);
+                done = ord;
+            }
+        }
+        sum
     }
 
     // left side bearing (hmtx)  [tt_lsb]
@@ -1222,10 +1391,31 @@ impl TtFont {
         }
     }
 
-    // glyf_decode(glyph, depth): false = malformed (points appended)
+    // the gvar deltas of glyph at st.coords added to out (outline points / components, then
+    // the 4 phantom points)
+    fn gvar_pts(&self, glyph: u32, st: &mut GlyfSt, orig: &[(f32, f32)], ends: &[usize], out: &mut [(f32, f32)]) -> bool {
+        match &self.var {
+            Some(v) => v.gvar_deltas(self.tb(TT_GVAR), glyph, st.coords, orig, ends, out, &mut st.vbudget),
+            None => true,
+        }
+    }
+
+    // the phantom point deltas (pp1.x, pp2.x) of a glyph without outline; None: broken data
+    fn gvar_phantom(&self, glyph: u32, st: &mut GlyfSt) -> Option<(f32, f32)> {
+        let mut out = [(0.0f32, 0.0f32); 4];
+        if !self.gvar_pts(glyph, st, &[], &[], &mut out) {
+            return None;
+        }
+        Some((out[0].0, out[1].0))
+    }
+
+    // glyf_decode(glyph, depth): false = malformed (points appended).  At an instance
+    // (st.coords) the gvar deltas move the points, the component offsets and the phantom
+    // points (st.pp of the metrics glyph)
     fn glyf_decode(&self, glyph: u32, depth: u32, ol: &mut Outline, st: &mut GlyfSt) -> bool {
         let mut my_rg = glyph; // metrics glyph (USE_MY_METRICS may change it)
         let mut my_xmin = 0i32;
+        let mut my_pp = (0.0f32, 0.0f32);
         if depth > GLYF_DEPTH {
             return false;
         }
@@ -1233,14 +1423,16 @@ impl TtFont {
         if st.budget < 0 {
             return false;
         }
-        let ok = |st: &mut GlyfSt, xmin: i32, rg: u32| {
+        let ok = |st: &mut GlyfSt, xmin: i32, rg: u32, pp: (f32, f32)| {
             st.xmin = xmin;
             st.rg = rg;
+            st.pp = pp;
             st.hasx = true;
             true
         };
+        let var = !st.coords.is_empty();
         if glyph >= self.nglyphs {
-            return ok(st, my_xmin, my_rg);
+            return ok(st, my_xmin, my_rg, my_pp);
         }
         let d = &self.data;
         // ---- loca
@@ -1248,27 +1440,31 @@ impl TtFont {
         let (start, end);
         if self.flags & TFF_LOCA_LONG != 0 {
             if glyph as u64 * 4 + 8 > lcl as u64 {
-                return ok(st, my_xmin, my_rg); // beyond loca: empty
+                return ok(st, my_xmin, my_rg, my_pp); // beyond loca: empty
             }
             let p = loca as usize + glyph as usize * 4;
             start = be32(d, p);
             end = be32(d, p + 4);
         } else {
             if glyph as u64 * 2 + 4 > lcl as u64 {
-                return ok(st, my_xmin, my_rg);
+                return ok(st, my_xmin, my_rg, my_pp);
             }
             let p = loca as usize + glyph as usize * 2;
             start = be16(d, p) * 2;
             end = be16(d, p + 2) * 2;
         }
-        if end <= start {
-            return ok(st, my_xmin, my_rg); // empty glyph
+        if end <= start || (end <= self.tab[TT_GLYF].1 && end - start < 10) {
+            // empty glyph (a space varies its advance through the phantom points)
+            if var {
+                match self.gvar_phantom(glyph, st) {
+                    Some(pp) => my_pp = pp,
+                    None => return false,
+                }
+            }
+            return ok(st, my_xmin, my_rg, my_pp);
         }
         if end > self.tab[TT_GLYF].1 {
             return false;
-        }
-        if end - start < 10 {
-            return ok(st, my_xmin, my_rg);
         }
         let gl = self.tab[TT_GLYF].0 as usize;
         let p = gl + start as usize;
@@ -1276,7 +1472,13 @@ impl TtFont {
         my_xmin = be16(d, p + 2) as u16 as i16 as i32; // phantom point pp1 = xMin - lsb
         let nc = be16(d, p) as u16 as i16 as i32;
         if nc == 0 {
-            return ok(st, my_xmin, my_rg);
+            if var {
+                match self.gvar_phantom(glyph, st) {
+                    Some(pp) => my_pp = pp,
+                    None => return false,
+                }
+            }
+            return ok(st, my_xmin, my_rg, my_pp);
         }
         if nc > 0 {
             // ---- simple glyph
@@ -1362,6 +1564,7 @@ impl TtFont {
                 ol.tags[base + i] &= OLT_ON;
             }
             let mut prev = -1i32;
+            let mut ends: Vec<usize> = Vec::new();
             for c in 0..nc {
                 let e = be16(d, p + 10 + c * 2) as i32;
                 if e as usize >= npts || e < prev {
@@ -1374,12 +1577,60 @@ impl TtFont {
                 if !ol.contour(base as u32 + e as u32) {
                     return false;
                 }
+                if var {
+                    ends.push(e as usize);
+                }
             }
-            return ok(st, my_xmin, my_rg);
+            if var {
+                // the points' deltas (IUP from the default coordinates), the phantom points'
+                let orig: Vec<(f32, f32)> = ol.pts[base..base + npts].to_vec();
+                let mut dl = alloc::vec![(0.0f32, 0.0f32); npts + 4];
+                if !self.gvar_pts(glyph, st, &orig, &ends, &mut dl) {
+                    return false;
+                }
+                for (pt, dv) in ol.pts[base..base + npts].iter_mut().zip(&dl) {
+                    pt.0 += dv.0;
+                    pt.1 += dv.1;
+                }
+                my_pp = (dl[npts].0, dl[npts + 1].0);
+            }
+            return ok(st, my_xmin, my_rg, my_pp);
         }
         // ---- composite glyph
         let mut q = p + 10;
         let cbase = ol.npts() as u32; // first point of this composite
+        // an instance: one delta per component (its offset), then the phantom points
+        let mut cd: Vec<(f32, f32)> = Vec::new();
+        if var {
+            let mut r = q;
+            let mut n = 0usize;
+            loop {
+                if r + 4 > pend {
+                    return false;
+                }
+                let fl = be16(d, r);
+                r += 4 + if fl & 1 != 0 { 4 } else { 2 };
+                r += if fl & 8 != 0 {
+                    2
+                } else if fl & 0x40 != 0 {
+                    4
+                } else if fl & 0x80 != 0 {
+                    8
+                } else {
+                    0
+                };
+                n += 1;
+                if fl & 0x20 == 0 {
+                    break;
+                }
+            }
+            cd = alloc::vec![(0.0f32, 0.0f32); n + 4];
+            if !self.gvar_pts(glyph, st, &[], &[], &mut cd) {
+                return false;
+            }
+            my_pp = (cd[n].0, cd[n + 1].0);
+        }
+        let mut k = 0usize;
         loop {
             if q + 4 > pend {
                 return false;
@@ -1452,6 +1703,7 @@ impl TtFont {
                 // USE_MY_METRICS: the component's phantom points
                 my_xmin = st.xmin;
                 my_rg = st.rg;
+                my_pp = st.pp;
             }
             if hasmat {
                 ol.transform(from, ma, mb, mc, md);
@@ -1459,6 +1711,11 @@ impl TtFont {
             if flags & 2 != 0 {
                 let mut dx = a1 as f32;
                 let mut dy = a2 as f32;
+                if let Some(v) = cd.get(k) {
+                    // the instance's offset (gvar), scaled below like the stored one
+                    dx += v.0;
+                    dy += v.1;
+                }
                 if hasmat && flags & 0x800 != 0 && flags & 0x1000 == 0 {
                     // SCALED_COMPONENT_OFFSET: scale the offset by the column lengths
                     dx = dx * sqrt(ma * ma + mb * mb);
@@ -1476,11 +1733,12 @@ impl TtFont {
                     ol.translate(from, xa - xb, ya - yb);
                 }
             }
+            k += 1;
             if flags & 0x20 == 0 {
                 break;
             }
         }
-        ok(st, my_xmin, my_rg)
+        ok(st, my_xmin, my_rg, my_pp)
     }
 }
 
@@ -1661,13 +1919,24 @@ fn gp_class(tb: Tb, off: u32, g: u32) -> u32 {
 
 // x advance adjustment of the first glyph: Some(v) when the subtable applies  [gp_pair]
 fn gp_pair(tb: Tb, sub: u32, g1: u32, g2: u32) -> Option<i32> {
+    let (value, vf1, _) = gp_value(tb, sub, g1, g2)?;
+    if vf1 & 4 == 0 {
+        return Some(0);
+    }
+    let v = tb.u16((popcnt8(vf1 & 3) * 2).wrapping_add(value));
+    if v < 0 { Some(0) } else { Some(v as u16 as i16 as i32) }
+}
+
+// the first glyph's value record of a pair adjustment subtable that applies: (its offset,
+// valueFormat1, the table its device offsets start from: the PairSet of format 1, else the
+// subtable)
+fn gp_value(tb: Tb, sub: u32, g1: u32, g2: u32) -> Option<(u32, u32, u32)> {
     let vf1 = tb.u16(sub.wrapping_add(4));
     if vf1 < 0 {
         return None;
     }
     let vf1 = vf1 as u32;
     let vf1_size = popcnt8(vf1) * 2;
-    let xadv: i32 = if vf1 & 4 != 0 { (popcnt8(vf1 & 3) * 2) as i32 } else { -1 };
     let vf2 = tb.u16(sub.wrapping_add(6));
     if vf2 < 0 {
         return None;
@@ -1681,6 +1950,7 @@ fn gp_pair(tb: Tb, sub: u32, g1: u32, g2: u32) -> Option<i32> {
     if cov < 0 {
         return None;
     }
+    let mut base = sub;
     let value = match tb.u16(sub) {
         2 => {
             // class pair matrix
@@ -1714,6 +1984,7 @@ fn gp_pair(tb: Tb, sub: u32, g1: u32, g2: u32) -> Option<i32> {
                 return None;
             }
             let ps = (pso as u32).wrapping_add(sub);
+            base = ps;
             let n = tb.u16(ps);
             if n <= 0 {
                 return None;
@@ -1741,9 +2012,5 @@ fn gp_pair(tb: Tb, sub: u32, g1: u32, g2: u32) -> Option<i32> {
         }
         _ => return None,
     };
-    if xadv < 0 {
-        return Some(0);
-    }
-    let v = tb.u16((xadv as u32).wrapping_add(value));
-    if v < 0 { Some(0) } else { Some(v as u16 as i16 as i32) }
+    Some((value, vf1, base))
 }

@@ -24,6 +24,10 @@
 //                                  from other fonts (fallback.rs; also when shaping)
 //   record_n / record_icon / glyphs   glyphs placed now, blended later from the glyph cache by
 //                                  any thread (record.rs: GlyphRec, GlyphView)
+//   var_axes / var_instances / var_values / vary / vary_named   variable fonts: their axes,
+//                                  named instances and instances at axis values (registry.rs,
+//                                  var.rs: gvar, avar, HVAR, MVAR; shaping at the same
+//                                  coordinates)
 //
 // Pen positions are 24.8 fixed point; glyphs are placed on quarter pixels and their
 // coverage masks are cached per (font, glyph, size, phase, greyscale / subpixel).  Colour
@@ -54,6 +58,7 @@ pub mod segment;
 mod segment_data;
 pub mod ttf;
 mod shaping;
+pub mod var;
 
 use alloc::vec::Vec;
 
@@ -68,6 +73,7 @@ pub use lcd::{SUBPIXEL_BGR, SUBPIXEL_NONE, SUBPIXEL_RGB, SUBPIXEL_VBGR, SUBPIXEL
 pub use record::{GlyphRec, GlyphView};
 pub use registry::{FONT_EMBEDDED, FONT_MAX_IDS};
 pub use rendering::FontRaster;
+pub use var::{VarAxis, VarInstance};
 
 use colr::LAYER_FG;
 use outline::Outline;

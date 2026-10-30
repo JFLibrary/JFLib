@@ -19,11 +19,11 @@ impl Text {
         if self.fb.app != fonts { self.fallback_app(fonts); }
         let ids:Vec<_>=self.shaping.fallbacks.iter().map(|v|v.0).collect();
         if ids==fonts { return; }
-        self.shaping.fallbacks=fonts.iter().take(16).filter_map(|&id| self.shape_face(id).and_then(|f|text_shape::Engine::new(&f.data,f.face_index)).map(|e|(id,e))).collect();
+        self.shaping.fallbacks=fonts.iter().take(16).filter_map(|&id| self.shape_engine(id).map(|e|(id,e))).collect();
         self.shaping.size=0;
     }
     fn shape_face(&self, mut font: u32) -> Option<&crate::ttf::TtFont> {
-        for _ in 0..16 { match self.face(font)? { Face::Tt(tt) => return Some(tt), Face::Syn(s) => font=s.base, _ => return None } }
+        for _ in 0..16 { match self.face(font)? { Face::Tt(tt) => return Some(tt), Face::Syn(s) => font=s.base, Face::Var(v) => font=v.base, _ => return None } }
         None
     }
     pub(crate) fn shape_line(&mut self, bytes: &[u8], limit: Option<usize>) -> bool {
@@ -32,9 +32,10 @@ impl Text {
         let n=bytes[..n].iter().position(|b| *b==0 || *b==b'\n').unwrap_or(n);
         let Ok(text)=core::str::from_utf8(&bytes[..n]) else { return false; };
         let render_font=if self.shape_face(self.font).is_some() { self.font } else { match self.shaping.fallbacks.first() { Some(v)=>v.0,None=>return false } };
-        let Some(face)=self.shape_face(render_font) else { return false; };
-        if self.shaping.serial!=face.serial || self.shaping.engine.is_none() {
-            let serial=face.serial; let engine=text_shape::Engine::new(&face.data,face.face_index);
+        if self.shape_face(render_font).is_none() { return false; }
+        let serial=self.shape_serial(render_font); // an instance of a variable font: its own engine
+        if self.shaping.serial!=serial || self.shaping.engine.is_none() {
+            let engine=self.shape_engine(render_font);
             self.shaping.engine=engine; self.shaping.serial=serial; self.shaping.text.clear(); self.shaping.size=0;
         }
         if self.shaping.engine.is_none() { return false; }
@@ -86,7 +87,7 @@ impl Text {
         }
         for id in need {
             if self.shaping.fallbacks.len() >= 16 { break; }
-            let engine = self.shape_face(id).and_then(|f| text_shape::Engine::new(&f.data, f.face_index));
+            let engine = self.shape_engine(id);
             if let Some(e) = engine { self.shaping.fallbacks.push((id, e)); self.shaping.size = 0; }
         }
     }

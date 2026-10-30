@@ -1,0 +1,70 @@
+#!args --font-dirs "apps/fonttest/tests/varfont" --fontconf apps/fontpicktest/tests/fonts.conf
+# variable fonts in the font dialog (wid("dialog") = 184878562; the fonts of
+# tools/var_fixtures.py): the named instances are the styles (German names where the font has
+# them), every axis that is not hidden gets its name, a slider and a number box, the preview
+# follows; OK writes the weight, the slope and the axis values the choice names
+theme light
+click "Schriftart…"
+expect window 184878562 open
+type "jfgui var"
+expect "Dünn" exists
+expect "Condensed Black" exists
+expect "Strichstärke" exists
+expect "Breite" exists
+expect "Slant" exists
+expect "Test axis" missing
+# the choice (400, upright) is the named instance "Standard"
+expect #259148013 selected
+click "Fett"
+expect #178140836 value 700
+expect #249397451 text "700"
+shot build/fontpick_var_light.png window 184878562
+theme dark
+shot build/fontpick_var_dark.png window 184878562
+theme light
+# a width no named instance has
+focus #224381726
+key ctrl+a
+type "75\n"
+expect #154319853 value 75
+click "OK"
+expect window 184878562 closed
+expect text:"Auswahl: jfgui Var 700 normal 11 wdth=75" exists
+expect text:"Geladen: jfgui Var" exists
+shot build/fontpick_var_main.png
+# Kursiv: italic takes the slant axis' most slanted value (no axis value needed; a slider's
+# value counts its decimals: -12.0 -> -120)
+click "Schriftart…"
+expect #154319853 value 75
+click "Kursiv"
+expect #139347205 value -120
+expect #154319853 value 100
+click "OK"
+expect text:"Auswahl: jfgui Var 400 kursiv 11" exists
+# the weight slider dragged to its left end
+click "Schriftart…"
+window 184878562
+drag #178140836 100,409
+window any
+expect #178140836 value 100
+click "OK"
+expect text:"Auswahl: jfgui Var 100 kursiv 11" exists
+# opsz follows the size ("Automatisch") until a value or a named instance sets it
+click "Schriftart…"
+type "phantom"
+expect "Display Bold" exists
+expect "Optical size" exists
+expect "Automatisch" checked
+expect #224381726 text "11,0"
+click "14"
+expect #224381726 text "14,0"
+click "Display"
+expect "Automatisch" unchecked
+expect #224381726 text "48,0"
+shot build/fontpick_var_opsz.png window 184878562
+click "Automatisch"
+expect #224381726 text "14,0"
+click "Display Bold"
+click "OK"
+expect text:"Auswahl: jfgui Var Phantom 800 normal 14 opsz=48" exists
+expect_nowarn

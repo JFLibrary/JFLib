@@ -1,7 +1,7 @@
 // fontpicktest -- the system's fonts in the UI: generic families and substitutes
 // (text::fontconf), loading a choice (ui.font_load), the font picker and the font dialog
 // (ui/fontpick.rs), the system's font smoothing and its subpixel order; for tests/picker.uis,
-// dialog.uis, aa.uis, subpixel_*.uis
+// dialog.uis, aa.uis, subpixel_*.uis, var_dialog*.uis (variable fonts: named instances, axes)
 //
 //   build/win/fontpicktest.exe --script apps/fontpicktest/tests/picker.uis
 //   build/win/fontpicktest.exe        (a window on the system's fonts)
@@ -51,7 +51,12 @@ impl Fonts {
 }
 
 fn describe(s: &FontSel) -> String {
-    format!("{} {} {} {}", s.family, s.weight, if s.italic { "kursiv" } else { "normal" }, s.size)
+    let mut d = format!("{} {} {} {}", s.family, s.weight, if s.italic { "kursiv" } else { "normal" }, s.size);
+    // a variable family's axis values (tag=value)
+    for (t, v) in &s.axes {
+        d.push_str(&format!(" {}={}", String::from_utf8_lossy(t).trim_end(), v));
+    }
+    d
 }
 
 impl App for Fonts {

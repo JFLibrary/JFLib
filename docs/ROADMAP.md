@@ -596,7 +596,41 @@ Seit 2026-10-17 auch Glyph-Fallback und IME unter X11.
   `spelltest/tests/hyphen*.uis`. Es fehlen: libhyphens nicht-standardmäßige Trennung mit
   Ersetzung (Zucker → Zuk-ker, v. a. hu_HU: solche Stellen trennen nicht), Trennung im Layout von
   jfWord (`doc_layout`), Blocksatz-Abwägung (heute: die letzte passende Trennstelle).
-- **P3** · *fehlt* · Achsen variabler Fonts in der UI.
+- **P3** · *erledigt* (2026-10-30) · Achsen variabler Fonts in der UI
+  ([`text/var.rs`](../lib/text/var.rs), [`ui/fontpick.rs`](../lib/ui/fontpick.rs)): `fvar`
+  (Achsen, benannte Instanzen, Namen aus der name-Tabelle, versteckte Achsen), `avar`
+  (Segmentkarten, in 16.16 wie HarfBuzz und FreeType), `gvar` für TrueType-Konturen (eingebettete
+  und geteilte Peak-Tupel, Zwischenbereiche, geteilte und eigene gepackte Punktnummern, gepackte
+  Deltas mit Null-, Byte-, Wort- und Long-Läufen, IUP für nicht genannte Punkte, Phantompunkte für
+  Ursprung und Vorschub, Komponenten-Offsets mit USE_MY_METRICS und SCALED_COMPONENT_OFFSET),
+  Vorschübe aus `HVAR` (mit und ohne Zuordnung) bzw. den Phantompunkten, `MVAR` (hasc, hdsc,
+  hlgp, hcla, hcld, xhgt, cpht, undo, unds, stro, strs), GPOS-Unterschneidung mit
+  VariationIndex-Deltas aus `GDEF`. `Text::vary(font, &[(tag, wert)])` / `vary_named` leiten eine
+  Instanz als eigene Font-ID ab (eigene Glyph-Cache-Einträge und Metriken; HarfRust formt an
+  denselben normalisierten Koordinaten, also mit GSUB-/GPOS-Variationen und denselben
+  Vorschüben), dazu `var_axes`, `var_instances`, `var_values`, `var_coords`; für installierte
+  Schriften `FontDb::variations`, `var_values`, `load_var` (auch `load` / `load_resolved` nehmen
+  bei einer variablen Schrift die Instanz statt synthetischem Fett). `FontSel` hat das neue Feld
+  `axes` (`FontSel::new` und `Default` bleiben): Gewicht → `wght`, kursiv → `ital` bzw. das
+  schrägste `slnt`, Größe in Punkt → `opsz`, genannte Achsen gewinnen. Schriftdialog: die
+  benannten Instanzen sind die Schnitte, je sichtbarer Achse Name, Schieberegler und Zahlenfeld
+  (Bereich aus der Schrift), `opsz` mit „Automatisch“; die Aufklappliste bleibt Familie und
+  Größe. Theme-Dateien: `family.axes = wdth=87.5, opsz=12`; eine variable Schriftdatei bekommt
+  ihre 600 / 700 aus `wght` statt synthetischem Fett. Geprüft gegen HarfBuzz 14.3.1 und FreeType
+  2.14.3 aus dem Flatpak-SDK 26.08 in WSL (`tools/var_check.py`: `hb_font_draw_glyph`,
+  `FT_Load_Glyph` mit NO_SCALE, `hb_shape`): Bahnschrift, Segoe UI Variable, Cascadia Code, Sitka, Ubuntu Sans Mono und die zwei
+  eigenen Testschriften an 33 Instanzen, alle Glyphen – normalisierte Koordinaten gleich,
+  Konturen höchstens 0,0007 Einheiten neben HarfBuzz (FreeType rundet die Deltas ganzzahlig:
+  höchstens 1,5), Vorschübe glyphengleich mit HarfBuzz, geformte Breiten gleich `hb_shape`, auch
+  ohne Formung mit der GPOS-Unterschneidung. Bei Standardwerten bleibt alles wie vorher (Shots
+  byteweise gleich). Tests: `fonttest --selftest` mit `tools/var_fixtures.py` (zwei synthetische
+  variable Schriften und ihre unabhängig berechneten Erwartungswerte, API, ein Glyph-Cache-Eintrag
+  je Instanz, Arbeitsbudget gegen absichtlich teure gvar-Daten, abgeschnittene und verfälschte
+  Dateien), `fontpicktest/tests/var_dialog.uis` (hell und dunkel), `uitest --only themes`. Es
+  fehlen: CFF2-Konturen (solche Schriften laden weiterhin nicht), avar 2 über die Segmentkarten
+  hinaus, VVAR und vertikale Metriken, Variationen in COLRv1; `opsz` einer Theme-Schrift folgt
+  11 pt (eine Font-ID für alle Textgrößen), `ui.font_load` hält nur die Instanzen der letzten 64
+  variablen Auswahlen.
 
 ## 5. Internationalisierung
 

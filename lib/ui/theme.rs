@@ -495,18 +495,19 @@ impl Ui {
         if th.family.is_empty() {
             return Ok([FONT_REG, FONT_SEMI, FONT_BOLD]);
         }
-        let reg = self.theme_font(&th.family, 400)?;
+        let ax = &th.family_axes;
+        let reg = self.theme_font(&th.family, 400, ax)?;
         let face = |ui: &mut Ui, own: &str, other: &str, weight: u32| -> Result<u32, ThemeError> {
             if !own.is_empty() {
-                ui.theme_font(own, weight)
+                ui.theme_font(own, weight, ax)
             } else if !other.is_empty() {
-                ui.theme_font(other, weight)
-            } else if app::is_file(&th.family) {
-                // a file without its bold faces: a synthetic bold
+                ui.theme_font(other, weight, ax)
+            } else if app::is_file(&th.family) && !ui.text.var_axes(reg).iter().any(|a| &a.tag == b"wght") {
+                // a file without its bold faces (and no weight axis): a synthetic bold
                 let id = ui.text.style(reg, text::FS_SYN_BOLD);
                 if id < 0 { Err(ThemeError::general(app::E_FONT, &th.family)) } else { Ok(id as u32) }
             } else {
-                ui.theme_font(&th.family, weight)
+                ui.theme_font(&th.family, weight, ax)
             }
         };
         let semi = face(self, &th.family_semibold, &th.family_bold, 600)?;
@@ -514,22 +515,35 @@ impl Ui {
         Ok([reg, semi, bold])
     }
 
-    // one face: a font file (VFS path) or an installed family (ui.font_load)
-    fn theme_font(&mut self, spec: &str, weight: u32) -> Result<u32, ThemeError> {
+    // one face: a font file (VFS path) or an installed family (ui.font_load); a variable one
+    // at the weight and the theme's axis values
+    fn theme_font(&mut self, spec: &str, weight: u32, axes: &[([u8; 4], f32)]) -> Result<u32, ThemeError> {
         let err = || ThemeError::general(app::E_FONT, spec);
         if !app::is_file(spec) {
-            return self.font_load(&FontSel { family: String::from(spec), weight, italic: false, size: 11.0 }).ok_or_else(err);
+            let sel = FontSel { family: String::from(spec), weight, italic: false, size: 11.0, axes: axes.to_vec() };
+            return self.font_load(&sel).ok_or_else(err);
         }
-        if let Some(&(_, id)) = self.look.files.iter().find(|f| f.0 == spec) {
+        let id = match self.look.files.iter().find(|f| f.0 == spec) {
+            Some(&(_, id)) => id,
+            None => {
+                let data = plat::read_file(spec).ok_or_else(err)?;
+                let id = self.text.load_mem(&data, 0);
+                if id < 0 {
+                    return Err(err());
+                }
+                self.look.files.push((String::from(spec), id as u32));
+                id as u32
+            }
+        };
+        if self.text.var_axes(id).is_empty() {
             return Ok(id);
         }
-        let data = plat::read_file(spec).ok_or_else(err)?;
-        let id = self.text.load_mem(&data, 0);
-        if id < 0 {
-            return Err(err());
+        let mut vals = axes.to_vec();
+        if !vals.iter().any(|a| &a.0 == b"wght") {
+            vals.push((*b"wght", weight as f32));
         }
-        self.look.files.push((String::from(spec), id as u32));
-        Ok(id as u32)
+        let v = self.text.vary(id, &vals);
+        if v < 0 { Err(err()) } else { Ok(v as u32) }
     }
 
     // the theme or the style changed: tokens again, everything laid out and drawn again

@@ -11,6 +11,15 @@
 //        glyph cache is flushed; the id may be reused later
 //   count(), valid(id), hdr(font) (font_data), glyph(font, cp), has, adv, kern, kern_table,
 //   upem, metrics, metric, is_color, name, layers, glyph_box, glyph_path
+// Variable fonts (var.rs):
+//   var_axes(font) / var_instances(font)   fvar's axes and named instances (empty: not variable)
+//   var_values(font) -> user values per axis (an instance's, else the defaults)
+//   vary(font, &[(tag, value)]) -> id / ERR_*   an instance (VarFont: the base font at
+//        normalized coordinates; own id, serial and metrics, so glyph cache entries, outline
+//        buffer and shaping engines never mix instances); axes not named keep font's values;
+//        all-default coordinates give the variable font itself; the same coordinates the same
+//        id; synthetic styles of font carry over; unload(base) unloads its instances
+//   vary_named(font, i) -> id / ERR_*    named instance i
 //
 // Font ids 0..3 are the embedded fonts (never reused).  An unknown or unloaded id behaves
 // like font 0.
@@ -24,6 +33,7 @@ use crate::colr;
 use crate::font::*;
 use crate::outline::{Zones, F_INV30, F_TAN12};
 use crate::ttf::{self, TtFont, ERR_FAIL, ERR_IO, ERR_LIMIT, FILE_MAX};
+use crate::var::{VarAxis, VarInstance};
 use crate::Text;
 
 pub const FONT_EMBEDDED: u32 = 4; // ids below this are the embedded fonts (never unloaded)
@@ -39,11 +49,25 @@ pub struct SynFont {
     pub serial: u64,
 }
 
+/// an instance of a variable font (vary): the base font's tables at normalized coordinates
+pub(crate) struct VarFont {
+    pub hdr: Hdr,
+    pub fm: Metrics,
+    pub base: u32,
+    /// user values per axis and the normalized F2Dot14 coordinates (avar applied)
+    pub user: Vec<f32>,
+    pub coords: Vec<i16>,
+    pub serial: u64,
+    /// every glyph's advance when gvar's phantom points give it (no HVAR); else empty
+    pub adv: Vec<i32>,
+}
+
 pub(crate) enum Face {
     Free,
     Sgf(Font),
     Tt(Box<TtFont>),
     Syn(Box<SynFont>),
+    Var(Box<VarFont>),
 }
 
 pub(crate) struct Slot {
@@ -111,6 +135,7 @@ impl Text {
             let g = match face {
                 Face::Tt(t) => t.glyph(cp),
                 Face::Syn(s) => self.glyph(s.base, cp),
+                Face::Var(v) => self.glyph(v.base, cp),
                 _ => 0,
             };
             fmap.push(g as u16);
@@ -122,7 +147,11 @@ impl Text {
     fn add_rt(&mut self, face: Face) -> i32 {
         let fmap = self.fast_map(&face);
         let Some(i) = self.slot_alloc() else { return ERR_LIMIT };
-        let raster = match &face { Face::Syn(s) => self.font_raster(s.base), _ => crate::FontRaster::Legacy };
+        let raster = match &face {
+            Face::Syn(s) => self.font_raster(s.base),
+            Face::Var(v) => self.font_raster(v.base),
+            _ => crate::FontRaster::Legacy,
+        };
         self.slots[i] = Slot { face, raster, fmap };
         i as i32
     }
@@ -145,6 +174,22 @@ impl Text {
             self.slots[i] = Slot { face, raster: crate::FontRaster::Legacy, fmap };
         }
         self.names = names;
+        // instances of the embedded ones: the same axis values on the new base (none: its
+        // default)
+        for i in FONT_EMBEDDED as usize..self.slots.len() {
+            let (base, user) = match &self.slots[i].face {
+                Face::Var(v) if v.base < FONT_EMBEDDED => (v.base, v.user.clone()),
+                _ => continue,
+            };
+            let serial = self.next_serial();
+            let Some((hdr, fm, coords, adv)) = self.var_build(base, &user) else { continue };
+            if let Face::Var(v) = &mut self.slots[i].face {
+                (v.hdr, v.fm, v.coords, v.adv, v.serial) = (hdr, fm, coords, adv, serial);
+            }
+            let fmap = self.fast_map(&self.slots[i].face);
+            self.slots[i].fmap = fmap;
+            self.slots[i].raster = self.font_raster(base);
+        }
         // the derived fonts of the embedded ones: header, metrics and glyph table of the new base
         for i in FONT_EMBEDDED as usize..self.slots.len() {
             let (base, syn) = match &self.slots[i].face {
@@ -218,6 +263,7 @@ impl Text {
             let dep = match &self.slots[j].face {
                 Face::Tt(t) => t.hdr.baseid == id + 1,
                 Face::Syn(s) => s.hdr.baseid == id + 1,
+                Face::Var(v) => v.hdr.baseid == id + 1,
                 _ => false,
             };
             if dep {
@@ -253,6 +299,7 @@ impl Text {
             Some(Face::Sgf(f)) => f.hdr(),
             Some(Face::Tt(t)) => t.hdr,
             Some(Face::Syn(s)) => s.hdr,
+            Some(Face::Var(v)) => v.hdr,
             _ => Hdr::default(),
         }
     }
@@ -276,6 +323,7 @@ impl Text {
             Some(Face::Sgf(f)) => f.glyph(cp),
             Some(Face::Tt(t)) => t.glyph(cp),
             Some(Face::Syn(s)) => self.glyph(s.base, cp),
+            Some(Face::Var(v)) => self.glyph(v.base, cp),
             _ => 0,
         }
     }
@@ -286,6 +334,7 @@ impl Text {
             Some(Face::Sgf(f)) => f.lookup(cp).is_some(),
             Some(Face::Tt(t)) => t.has(cp),
             Some(Face::Syn(s)) => self.has(s.base, cp),
+            Some(Face::Var(v)) => self.has(v.base, cp),
             _ => false,
         }
     }
@@ -299,6 +348,11 @@ impl Text {
                 let a = self.adv(s.base, g);
                 if s.syn & FS_SYN_BOLD != 0 { a.wrapping_add(cvt(s.strength)) } else { a }
             }
+            Some(Face::Var(v)) => match (v.adv.get(g as usize), self.face(v.base)) {
+                (Some(&a), _) => a,
+                (None, Some(Face::Tt(t))) => t.adv_var(g, &v.coords),
+                _ => 0,
+            },
             _ => 0,
         }
     }
@@ -309,6 +363,10 @@ impl Text {
             Some(Face::Sgf(f)) => f.kern(g1, g2),
             Some(Face::Tt(t)) => t.kern(g1, g2),
             Some(Face::Syn(s)) => self.kern(s.base, g1, g2),
+            Some(Face::Var(v)) => match self.face(v.base) {
+                Some(Face::Tt(t)) => t.kern_var(g1, g2, &v.coords),
+                _ => 0,
+            },
             _ => 0,
         }
     }
@@ -317,6 +375,7 @@ impl Text {
     pub fn kern_table(&self, font: u32, g1: u32, g2: u32) -> i32 {
         match self.face(font) {
             Some(Face::Tt(t)) => t.kern_table(g1, g2),
+            Some(Face::Var(v)) => self.kern_table(v.base, g1, g2),
             Some(_) => self.kern(font, g1, g2),
             None => 0,
         }
@@ -334,6 +393,7 @@ impl Text {
         match self.face(font) {
             Some(Face::Tt(t)) if t.hdr.flags & SGH_COLR != 0 => colr::layers(t, g, cap, out),
             Some(Face::Syn(s)) if s.hdr.flags & SGH_COLR != 0 => self.layers(s.base, g, cap, out),
+            Some(Face::Var(v)) if v.hdr.flags & SGH_COLR != 0 => self.layers(v.base, g, cap, out),
             _ => {}
         }
     }
@@ -363,6 +423,7 @@ impl Text {
             }
             Face::Tt(t) => t.name(which),
             Face::Syn(s) => self.name(s.base, which),
+            Face::Var(v) => self.name(v.base, which),
             Face::Free => b"",
         }
     }
@@ -373,6 +434,7 @@ impl Text {
         match &self.slots[i].face {
             Face::Tt(t) => Some(t.fm),
             Face::Syn(s) => Some(s.fm),
+            Face::Var(v) => Some(v.fm),
             Face::Sgf(f) => {
                 let mut m = Metrics {
                     upem: f.upem,
@@ -427,6 +489,9 @@ impl Text {
             Face::Sgf(f) => f.glyph_box(g),
             Face::Tt(t) => t.bbox(g, &mut self.ol),
             Face::Syn(_) => self.syn_box(i, g),
+            Face::Var(_) => {
+                if self.var_prep(i, g) { self.ol.bbox() } else { None }
+            }
             Face::Free => None,
         }
     }
@@ -442,6 +507,15 @@ impl Text {
             }
             Face::Tt(t) => t.path(g, &mut self.ol, &mut self.path, &self.gp),
             Face::Syn(_) => self.syn_path(i, g),
+            Face::Var(v) => {
+                let serial = v.serial;
+                if !self.ol.owner_is(serial, g) {
+                    self.var_prep(i, g);
+                }
+                if self.ol.npts() != 0 {
+                    self.ol.emit(&mut self.path, &self.gp, None);
+                }
+            }
             Face::Free => {}
         }
     }
@@ -454,12 +528,202 @@ impl Text {
             Face::Syn(s) => {
                 let base = s.base;
                 match self.face(base) {
-                    Some(Face::Tt(_)) | Some(Face::Syn(_)) => self.op_bitmap(base, g, size_fx),
+                    Some(Face::Tt(_)) | Some(Face::Syn(_)) | Some(Face::Var(_)) => self.op_bitmap(base, g, size_fx),
                     _ => None,
                 }
             }
+            Face::Var(v) => {
+                let base = v.base;
+                self.op_bitmap(base, g, size_fx)
+            }
             _ => None,
         }
+    }
+
+    // ------------------------------------------------------------------ variable fonts
+
+    // the variable font under font: (its id, the instance's user values or None for the
+    // defaults, the synthetic style flags on top)
+    fn var_root(&self, font: u32) -> Option<(u32, Option<&[f32]>, u32)> {
+        let (mut f, mut syn) = (font, 0);
+        if let Some(Face::Syn(s)) = self.face(f) {
+            syn = s.syn;
+            f = s.base;
+        }
+        let i = self.slot_idx(f)?;
+        match &self.slots[i].face {
+            Face::Var(v) => Some((v.base, Some(&v.user), syn)),
+            Face::Tt(t) if t.var.is_some() => Some((i as u32, None, syn)),
+            _ => None,
+        }
+    }
+
+    fn var_tt(&self, base: u32) -> Option<&TtFont> {
+        match self.face(base) {
+            Some(Face::Tt(t)) => Some(t),
+            _ => None,
+        }
+    }
+
+    /// the variation axes of a font (fvar; empty: not a variable font); instances and the
+    /// fonts derived from them report their variable font's
+    pub fn var_axes(&self, font: u32) -> Vec<VarAxis> {
+        self.var_root(font).and_then(|(b, _, _)| self.var_tt(b)).and_then(|t| t.var.as_ref()).map_or(Vec::new(), |v| v.axes.clone())
+    }
+
+    /// the named instances of a variable font (fvar; empty: none or not variable)
+    pub fn var_instances(&self, font: u32) -> Vec<VarInstance> {
+        self.var_root(font).and_then(|(b, _, _)| self.var_tt(b)).and_then(|t| t.var.as_ref()).map_or(Vec::new(), |v| v.instances.clone())
+    }
+
+    /// the axis values of a font in user units, one per axis of var_axes (an instance's own,
+    /// else the defaults)
+    pub fn var_values(&self, font: u32) -> Vec<f32> {
+        match self.var_root(font) {
+            Some((_, Some(u), _)) => u.to_vec(),
+            Some(_) => self.var_axes(font).iter().map(|a| a.def).collect(),
+            None => Vec::new(),
+        }
+    }
+
+    /// the normalized coordinates of an instance: F2Dot14 bits per axis with avar applied
+    /// (what HarfBuzz's hb_font_get_var_coords_normalized reports); empty for a variable font
+    /// itself (its default instance) and for fonts that are not variable
+    pub fn var_coords(&self, font: u32) -> Vec<i16> {
+        let mut f = font;
+        if let Some(Face::Syn(s)) = self.face(f) {
+            f = s.base;
+        }
+        match self.face(f) {
+            Some(Face::Var(v)) => v.coords.clone(),
+            _ => Vec::new(),
+        }
+    }
+
+    /// an instance of a variable font with axis values in user units (tag, value): axes not
+    /// named keep font's values (an instance's, else the defaults); values are clamped to their
+    /// axis, unknown tags ignored -> font id / ERR_*.  All-default coordinates give the variable
+    /// font itself, the same coordinates the same id; synthetic styles of font (style) carry
+    /// over; a font that is not variable gives itself.  Each instance has its own glyph cache
+    /// entries and metrics (MVAR); unloading the variable font unloads its instances.
+    pub fn vary(&mut self, font: u32, values: &[([u8; 4], f32)]) -> i32 {
+        if !self.valid(font) {
+            return ERR_FAIL;
+        }
+        let Some((base, cur, syn)) = self.var_root(font) else { return font as i32 };
+        let axes = self.var_axes(base);
+        let mut user: Vec<f32> = match cur {
+            Some(u) => u.to_vec(),
+            None => axes.iter().map(|a| a.def).collect(),
+        };
+        for &(tag, v) in values {
+            if let Some(k) = axes.iter().position(|a| a.tag == tag) {
+                user[k] = if v.is_nan() { axes[k].def } else { v.clamp(axes[k].min, axes[k].max) };
+            }
+        }
+        let id = self.var_instance(base, &user);
+        if id < 0 || syn == 0 { id } else { self.style(id as u32, syn) }
+    }
+
+    /// named instance i of a variable font (var_instances) -> id / ERR_* (ERR_FAIL: no such
+    /// instance)
+    pub fn vary_named(&mut self, font: u32, i: usize) -> i32 {
+        let ins = self.var_instances(font);
+        let Some(inst) = ins.get(i) else { return ERR_FAIL };
+        let axes = self.var_axes(font);
+        let vals: Vec<([u8; 4], f32)> = axes.iter().zip(&inst.coords).map(|(a, &c)| (a.tag, c)).collect();
+        self.vary(font, &vals)
+    }
+
+    // the instance of variable font base at user values (all-default: base itself)
+    fn var_instance(&mut self, base: u32, user: &[f32]) -> i32 {
+        let Some(coords) = self.var_tt(base).and_then(|t| t.var.as_ref()).map(|v| v.normalize(user)) else { return base as i32 };
+        if coords.iter().all(|&c| c == 0) {
+            return base as i32;
+        }
+        for i in FONT_EMBEDDED as usize..self.slots.len() {
+            if let Face::Var(v) = &self.slots[i].face
+                && v.base == base
+                && v.coords == coords
+            {
+                return i as i32;
+            }
+        }
+        let Some((hdr, fm, coords, adv)) = self.var_build(base, user) else { return ERR_FAIL };
+        let serial = self.next_serial();
+        self.add_rt(Face::Var(Box::new(VarFont { hdr, fm, base, user: user.to_vec(), coords, serial, adv })))
+    }
+
+    // header, metrics, coordinates and phantom-point advances of base's instance at user
+    // values (weight, italic and oblique flags from wght / ital / slnt when the font has them)
+    fn var_build(&mut self, base: u32, user: &[f32]) -> Option<(Hdr, Metrics, Vec<i16>, Vec<i32>)> {
+        let bi = self.slot_idx(base)?;
+        let Face::Tt(t) = &self.slots[bi].face else { return None };
+        let v = t.var.as_ref();
+        let coords = v.map_or(Vec::new(), |v| v.normalize(user));
+        let axes: &[VarAxis] = v.map_or(&[], |v| &v.axes);
+        let val = |tag: &[u8; 4]| axes.iter().position(|a| &a.tag == tag).and_then(|k| user.get(k).copied());
+        let (wght, ital, slnt) = (val(b"wght"), val(b"ital"), val(b"slnt"));
+        let (mut hdr, mut fm) = {
+            let (m, h) = t.metrics_var(&coords, wght, &mut self.ol);
+            (h, m)
+        };
+        let adv = t.adv_table(&coords, &mut self.ol);
+        hdr.baseid = base + 1;
+        if let Some(w) = wght {
+            fm.flags = (fm.flags & !FMF_BOLD) | if w >= 600.0 { FMF_BOLD } else { 0 };
+        }
+        if let Some(i) = ital {
+            fm.flags = (fm.flags & !FMF_ITALIC) | if i >= 0.5 { FMF_ITALIC } else { 0 };
+        }
+        if let Some(s) = slnt {
+            fm.flags = (fm.flags & !FMF_OBLIQUE) | if s != 0.0 { FMF_OBLIQUE } else { 0 };
+        }
+        Some((hdr, fm, coords, adv))
+    }
+
+    // the outline of the instance in slot i into the buffer (owner: the instance)
+    fn var_prep(&mut self, i: usize, g: u32) -> bool {
+        let Face::Var(v) = &self.slots[i].face else { return false };
+        let Some(bi) = self.slot_idx(v.base) else { return false };
+        let (Face::Var(v), Face::Tt(t)) = (&self.slots[i].face, &self.slots[bi].face) else { return false };
+        t.prep_var(g, &v.coords, v.serial, &mut self.ol)
+    }
+
+    // (shaping.rs) a HarfRust engine for font: the font file at the instance's coordinates
+    // (synthetic styles shape like their base)
+    pub(crate) fn shape_engine(&self, mut font: u32) -> Option<text_shape::Engine> {
+        let mut coords: &[i16] = &[];
+        for _ in 0..16 {
+            match self.face(font)? {
+                Face::Tt(t) => {
+                    let e = text_shape::Engine::new(&t.data, t.face_index)?;
+                    return Some(if coords.is_empty() { e } else { e.with_coords(coords) });
+                }
+                Face::Syn(s) => font = s.base,
+                Face::Var(v) => {
+                    if coords.is_empty() {
+                        coords = &v.coords;
+                    }
+                    font = v.base;
+                }
+                _ => return None,
+            }
+        }
+        None
+    }
+
+    // (shaping.rs) the serial that names font's shaping engine (an instance's own)
+    pub(crate) fn shape_serial(&self, mut font: u32) -> u64 {
+        for _ in 0..16 {
+            match self.face(font) {
+                Some(Face::Tt(t)) => return t.serial,
+                Some(Face::Var(v)) => return v.serial,
+                Some(Face::Syn(s)) => font = s.base,
+                _ => return 0,
+            }
+        }
+        0
     }
 
     // ------------------------------------------------------------------ synthetic styles
@@ -530,6 +794,7 @@ impl Text {
                     true
                 }
                 Face::Tt(t) => t.bbox(g, &mut self.ol).is_some(),
+                Face::Var(_) => self.var_prep(bi, g),
                 _ => false,
             },
         };
