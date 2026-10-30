@@ -63,11 +63,11 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
   <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
-  <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs)
+  <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
   <br>[lib.rs](#datetime-crate-root) · [cron.rs](#datetimecronrs) · [tz.rs](#datetimetzrs)
 - [script](#script) -- the JFNetworker scripting language (.jfs): lexer, parser, editor diagnostics, compiler, a VM with fuel and a garbage collector, the standard library (str, list, map, bytes, math, json), float arithmetic and math in software
-  <br>[lib.rs](#script-crate-root) · [ast.rs](#scriptastrs) · [check.rs](#scriptcheckrs) · [lex.rs](#scriptlexrs) · [parse.rs](#scriptparsers) · [code.rs](#scriptcoders) · [heap.rs](#scriptheaprs) · [num.rs](#scriptnumrs) · [math.rs](#scriptmathrs) · [vm.rs](#scriptvmrs)
+  <br>[lib.rs](#script-crate-root) · [ast.rs](#scriptastrs) · [check.rs](#scriptcheckrs) · [lex.rs](#scriptlexrs) · [parse.rs](#scriptparsers) · [code.rs](#scriptcoders) · [heap.rs](#scriptheaprs) · [num.rs](#scriptnumrs) · [math.rs](#scriptmathrs) · [vm.rs](#scriptvmrs) · [ls.rs](#scriptlsrs) · [fmt.rs](#scriptfmtrs) · [module.rs](#scriptmodulers) · [debug.rs](#scriptdebugrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
   <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs)
 - [compress](#compress) -- LZ4 block and frame, xxHash32, codec ids
@@ -156,7 +156,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Widgets](#widgets): `hair`, `focus_ring_draw`, `text`, `heading`, `button`, `label_button`, `link`, `accent_button`, `icon_button`, `toggle_button`, `tool_button`, `checkbox`, `radio`, `switch`, `slider`, `progress`, `separator`, `icon`, `image`, `canvas`
 - [Popups, menus, command table, tooltips](#popups-menus-command-table-tooltips): `popup_is_open`, `popup_count`, `popup_open`, `popup_close`, `flyout_begin`, `popup_ext`, `popup_rect`, `flyout_end`, `cmd_find`, `cmd_state`, `cmd_flags`, `cmd_label`, `accel_text`, `accel_order_set`, `cmd_button`, `menu_item`, `menu_cmd`, `menu_sep`, `menu_list`, `menubar`, `menu_popup`, `context_menu`, `context_target`, `dropdown_button`, `split_button`, `combobox`, `tooltip`, `tooltip_part`
 - [Text boxes and the clipboard](#text-boxes-and-the-clipboard): `textbox_selection`, `textbox_select`, `textbox`, `textbox_icon`, `textbox_presented`, `ime_pos`, `clip_set_many`, `clip_set`, `clip_get`, `open_folder`, `open_url`, `number_box`, `number_box_f`, `nb_live`, `nb_live_f`, `spell_enable`, `spell_language`, `spell_sources`, `spell_set`, `spell_suggest_async`, `spell_state`, `speller`, `spell_errors`
-- [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_editor`
+- [Rich-text and code editors](#rich-text-and-code-editors): `richtext`, `richtext_link`, `richtext_link_dialog`, `richtext_toolbar`, `code_theme`, `code_theme_set`, `code_font_size`, `code_find`, `code_status`, `code_diag`, `code_events`, `code_popup_item`, `code_editor`, `code_editor_with`
 - [Lists, scrolling, tabs, expanders](#lists-scrolling-tabs-expanders): `scroll_begin`, `scroll_end`, `scroll_to`, `scroll_pos`, `scroll_extent`, `scrollbar`, `list_begin`, `list_item`, `list_item_begin`, `list_sel`, `list_item_end`, `list_end`, `tabs_scrolling`, `tabs`, `expander_begin`, `expander_end`
 - [Data views: grid, tree, badges, meters](#data-views-grid-tree-badges-meters): `grid_begin`, `grid_row`, `grid_cell`, `grid_text`, `grid_text_ts`, `grid_end`, `tree`, `badge`, `status_dot`, `meter`
 - [Shell parts: navigation, command bar, splitter, breadcrumb, wizard steps](#shell-parts-navigation-command-bar-splitter-breadcrumb-wizard-steps): `nav_begin`, `nav_toggle`, `nav_section`, `nav_item`, `nav_footer`, `nav_end`, `command_bar`, `split_begin`, `split_next`, `split_end`, `breadcrumb`, `segmented`, `wizard_steps`, `page_header`, `key_value`, `empty_state`
@@ -165,7 +165,7 @@ hclip_text_* / open_folder / open_url (ui-edit).
 - [Toasts, spinners, progress](#toasts-spinners-progress): `toast`, `toast_dismiss`, `toast_clear`, `toasts`, `toast_host`, `spinner`, `progress_indeterminate`
 - [Date and time input](#date-and-time-input): `time_box`, `weekday_toggles`, `date_picker`
 - [Values and colours](#values-and-colours): `cmd_track`, `decimal_sep`, `set_decimal_sep`, `fmt_f64`, `parse_f64`, `slider_f`, `track_slider`, `prop_slider`, `prop_slider_f`, `angle`, `pan`, `swatch`, `color_picker`, `color_picker_ex`, `color_wheel`
-- [Windows](#windows): `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
+- [Windows](#windows): `window_begin`, `window_end`, `sync_hook_set`, `window_place`, `window_snap`, `window_rect`, `window_state`, `window_fullscreen`, `window_activate`, `window_destroy`, `window_current`, `window_modal`, `window_pw`
 - [Chrome: title bar, dialogs, info and status bars](#chrome-title-bar-dialogs-info-and-status-bars): `dialog_begin`, `dialog_buttons`, `dialog_end`, `infobar`, `statusbar_begin`, `statusbar_end`, `titlebar_begin`, `titlebar_begin_opt`, `titlebar_begin_overlay`, `titlebar_end`
 - [File dialog](#file-dialog): `filedlg`
 - [Drawing commands](#drawing-commands): `cmd_layer`, `draw_color`, `draw_color_get`, `draw_rect`, `draw_rrect`, `draw_frame`, `cmd_rrect`, `cmd_panel_fx`, `draw_text`, `cmd_text`, `emit_text`, `draw_icon`, `draw_circle`, `draw_line`, `draw_image`, `draw_clip`, `draw_unclip`, `icon_hook`, `cmd_custom`, `cmd_shadow`
@@ -1653,6 +1653,16 @@ the indentation settings and the edits of a code editor
     set_diagnostics(&[Diag]) / clear_diagnostics() / diagnostics() -> Vec<Diag> /
     diagnostic(i) / diagnostic_count() / diagnostic_counts() -> [errors, warnings, infos] /
     diagnostics_at(pos) (most severe first) / next_diagnostic(pos, back) (wrapping)
+  breakpoints and a debugger's current line (the gutter column of CE_BREAKPOINTS; lines
+    from 0): set_breakpoints(&[(line, BP_ON | BP_DISABLED | BP_COND)]) / breakpoints() /
+    breakpoint(line) / set_exec_line(Some(line)) / exec_line()
+  folding (ranges from a language's services; lines from 0): set_fold_ranges(&[(first,
+    last)]) / fold_ranges() / fold_at(line) / set_folded(line, on) / toggle_fold(line) /
+    fold_all(on) / fold_around(line) / is_hidden(line) / reveal(line) / visible_lines() /
+    row_of_line(line) / line_of_row(row) / visible_line(line, down)
+  several changes as one undo step: apply_edits(&[TextEdit], label) (a rename's edits),
+    replace_text(text, label) (a formatter's result: only the lines that differ change, the
+    caret keeps its place among the non-blank characters)
 
 An edit replaces a range of whole lines (LineEdit: old and new lines, the selection before
 and after); each change is also kept in a short journal (changes_since) that the editor's
@@ -1665,7 +1675,9 @@ the first to the last difference.  Text before a change keeps its positions, tex
 shifts; a diagnostic whose text was replaced shrinks to what is left of it and is dropped
 when nothing is (one that marks a point stays at the change).  Typed text at a diagnostic's
 edge stays outside it.  So squiggles stay under their words while the user types, until
-the next check replaces them.
+the next check replaces them.  Breakpoints, the execution line and folding ranges follow
+the same way by their lines (a line counts as the point at its start); an edit inside the
+hidden lines of a folded range unfolds it.  None of them is part of the undo history.
 ```
 
 ```rust
@@ -1711,6 +1723,25 @@ DIAG_INFO: u8 = 2
   a part of one line: line:col .. line:end_col
 - **`fn span(line: usize, col: usize, end_line: usize, end_col: usize, severity: u8, msg: &str) -> Diag`**
   line:col .. end_line:end_col
+
+```rust
+/// a breakpoint's look (CodeDoc::set_breakpoints): set
+BP_ON: u8 = 0
+/// a breakpoint that is there but off (a ring)
+BP_DISABLED: u8 = 1
+/// a breakpoint with a condition (a bar across it)
+BP_COND: u8 = 2
+```
+
+- **`struct TextEdit`**
+  a change of a CodeDoc's text: a .. b becomes text (CodeDoc::apply_edits)
+  - `a: TextPos`
+  - `b: TextPos`
+  - `text: String`
+
+**`impl TextEdit`**
+
+- **`fn new(a: TextPos, b: TextPos, text: &str) -> TextEdit`**
 
 - **`struct CodeDoc`**
   the document of ui.code_editor (see the module header)
@@ -1836,6 +1867,61 @@ DIAG_INFO: u8 = 2
 - **`fn next_diagnostic(&self, p: TextPos, back: bool) -> Option<TextPos>`**
   the start of the first diagnostic after p (back: the last one before p), round the end
   of the text; None without diagnostics
+- **`fn set_breakpoints(&mut self, bps: &[(usize, u8)])`**
+  the breakpoints: (line from 0, BP_\*), drawn in the gutter column of CE_BREAKPOINTS (the
+  app keeps the real ones: a click there is CodeEv::Breakpoint); they follow the edits
+  with their lines until the next call
+- **`fn breakpoints(&self) -> &[(usize, u8)]`**
+  the breakpoints where they are now, by line
+- **`fn breakpoint(&self, line: usize) -> Option<u8>`**
+  the breakpoint of a line
+- **`fn set_exec_line(&mut self, line: Option<usize>)`**
+  the line a debugger stopped at (None: none), drawn marked with an arrow in the
+  breakpoints' column; it follows the edits
+- **`fn exec_line(&self) -> Option<usize>`**
+  the line of set_exec_line where it is now
+- **`fn set_fold_ranges(&mut self, ranges: &[(usize, usize)])`**
+  the folding ranges (first, last) with lines from 0 (a language's services give them):
+  line first stays, first + 1 ..= last fold away.  A range that starts on the line of a
+  folded one stays folded; ranges follow the edits, and an edit inside the hidden lines
+  of a folded range unfolds it
+- **`fn fold_count(&self) -> usize`**
+  the number of folding ranges
+- **`fn fold_ranges(&self) -> Vec<(usize, usize, bool)>`**
+  the folding ranges where they are now: (first, last, folded)
+- **`fn fold_at(&self, line: usize) -> Option<(usize, bool)>`**
+  the range that starts at line: (last, folded)
+- **`fn set_folded(&mut self, line: usize, folded: bool) -> bool`**
+  fold (folded) or unfold the range that starts at line -> changed
+- **`fn toggle_fold(&mut self, line: usize) -> bool`**
+  fold or unfold the range that starts at line -> changed
+- **`fn fold_all(&mut self, folded: bool)`**
+  every range folded (true) or unfolded
+- **`fn fold_around(&self, line: usize) -> Option<(usize, usize)>`**
+  the innermost range that holds line (its first line counts): (first, last)
+- **`fn is_hidden(&self, line: usize) -> bool`**
+  line is hidden in a folded range
+- **`fn reveal(&mut self, line: usize) -> bool`**
+  unfold every range that hides line -> changed
+- **`fn visible_lines(&self) -> usize`**
+  the lines that are not hidden
+- **`fn row_of_line(&self, line: usize) -> usize`**
+  the visible row of a line (counting only lines that are not hidden; a hidden line:
+  the row of its fold's first line)
+- **`fn line_of_row(&self, row: usize) -> usize`**
+  the line of a visible row
+- **`fn visible_line(&self, line: usize, down: bool) -> usize`**
+  the nearest line that is not hidden from line on, downwards (down) or upwards
+- **`fn apply_edits(&mut self, edits: &[TextEdit], label: &str) -> bool`**
+  several changes as one undo step named `label`: the edits (positions in the text before
+  any of them, in any order, not overlapping) replace their parts; the selection follows
+  the text (inside a replaced part: to its new end) -> false when nothing changed or two
+  edits overlap.  Rename and format of a language service go through here
+- **`fn replace_text(&mut self, text: &str, label: &str) -> bool`**
+  the whole text becomes `text` as one undo step; only the lines that differ change (the
+  diagnostics, breakpoints and folds of the others stay), and the caret keeps its place
+  among the characters that are no blanks (so after a formatter it stays at its token)
+  -> changed
 
 #### `ui/highlight.rs`
 
@@ -1856,7 +1942,8 @@ lib/script) and the colours of the tokens
   h.tokens(text) -> Vec<Vec<Token>>   every line of a text (tests)
   CodeTheme::light() / dark() / high_contrast(&HcColors), ui.code_theme()   the colours of
                                       the tokens and the editor (gutter, current line,
-                                      selection, bracket match, find matches, diagnostics)
+                                      selection, bracket match, find matches, diagnostics,
+                                      breakpoints, a debugger's current line)
 
 A grammar is a list of rules tried in order at every position: line comments, blocks (from
 open to close, nested or not, optionally only at a line start: Markdown fences), strings
@@ -2021,6 +2108,10 @@ SY_COUNT: usize = 17
   - `bold: u32`
   - `italic: u32`
   - `diag: [u32; 3]` -- the wavy underlines and gutter markers of errors, warnings and infos (DIAG_\* order)
+  - `breakpoint: u32` -- breakpoints in the gutter
+  - `exec_line: u32` -- the background of a debugger's current line (the editor's background: a frame in
+    exec_mark instead) and its arrow in the gutter
+  - `exec_mark: u32`
 
 **`impl CodeTheme`**
 
@@ -2061,12 +2152,24 @@ highlighting (highlight.rs)
        + 3 .. 13 the find bar).
        CE_READONLY: select, copy and find only; CE_NO_GUTTER: no line numbers;
        CE_NO_FRAME: no box; CE_NO_FIND: no find bar; CE_NO_LINE: no current-line highlight;
-       CE_MARKS: the gutter keeps its column of diagnostic markers while there are none
+       CE_MARKS: the gutter keeps its column of diagnostic markers while there are none;
+       CE_BREAKPOINTS: a column for breakpoints at the gutter's left (also there while the
+       document has breakpoints or an execution line); CE_FOLDS: the folding column stays
+       while the document has no folding ranges
+  ui.code_editor_with(id, &mut doc, &hl, Some(&mut assist), CE_*)   the same with a
+       language's services (code_assist.rs: completion popup, hover tooltips, signature
+       help); ids id + 14 (the completion list) and id + 15 are the editor's too
+  ui.code_events(id) -> Vec<CodeEv>   what the user asked for in the editor's last pass:
+       Definition(pos) (Ctrl+click, F12), Rename(pos) (F2), Format (Shift+Alt+F),
+       Breakpoint(line) (a click in the breakpoints' column); the app answers (a jump,
+       CodeDoc::apply_edits / replace_text as one undo step, set_breakpoints);
+       ui.code_popup_item(id) the completion item the list has chosen (None: closed)
   ui.code_find(id, query, replace)   open the find bar (replace: with the replace row) with
        a query; the editor selects the first match from the caret on
   ui.code_status(id) -> CodeStatus   line and column of the caret (from 1), the matches
        and the current one, the lines tokenized in the last frame, the document's
-       diagnostics per severity and the severity of the one at the caret
+       diagnostics per severity and the severity of the one at the caret, the completion
+       list's items and choice, whether signature help is open, the lines folded away
   ui.code_diag(id) -> Option<Diag>   the (most severe) diagnostic at the caret, its message
   ui.code_theme_set(Some(theme))     the colours of every code editor (None: code_theme())
   ui.code_font_size(pt)              the size of the code editors' font (default 10 pt)
@@ -2097,6 +2200,20 @@ click a word, a click or drag in the gutter selects lines, the wheel (Shift: sid
 Accessibility: a K_TEXTBOX record with the text (beyond 64 KB: the visible lines) and the
 caret / anchor as byte offsets into it, ime_pos for IME and magnifiers, the edit state of
 the text boxes while focused (ed_hold).
+
+Language services (code_editor_with; code_assist.rs has the popups): Ctrl+Space opens the
+completion list (typing a word or a trigger character opens it too), Ctrl+Shift+Space
+signature help, the pointer resting on a word shows the assist's hover text (after the
+diagnostics there), F12 / Ctrl+click, F2 and Shift+Alt+F are CodeEv.  The gutter from the
+left: breakpoints (CE_BREAKPOINTS: a filled circle, a ring when disabled, a bar across it
+with a condition; the execution line an arrow there and a marked background), diagnostic
+markers, line numbers, folding (a chevron on the first line of each of the document's
+folding ranges: a click folds / unfolds; Ctrl+Shift+[ / ] at the caret's line).  Folded
+lines are left out of the view (rows count only the visible lines), the caret skips them
+(Up / Down / Left / Right / PgUp / PgDn), find steps over their matches, a "⋯" box after a
+folded line unfolds it on a click, and an edit inside them or the caret landing there (an
+app's set_selection, undo) unfolds them.  Without folds a row is a line, so 100 000 lines
+stay as fast as before.
 ```
 
 ```rust
@@ -2112,6 +2229,10 @@ CE_NO_FIND: u32 = 8
 CE_NO_LINE: u32 = 16
 /// the gutter keeps its column of diagnostic markers while the document has none
 CE_MARKS: u32 = 32
+/// the gutter's column of breakpoints (a click there: CodeEv::Breakpoint)
+CE_BREAKPOINTS: u32 = 64
+/// the gutter keeps its folding column while the document has no folding ranges
+CE_FOLDS: u32 = 128
 ```
 
 - **`struct CodeStatus`**
@@ -2126,6 +2247,10 @@ CE_MARKS: u32 = 32
   - `diags: [usize; 3]` -- the document's diagnostics: errors, warnings, infos (DIAG_\* order)
   - `diag: Option<u8>` -- the severity (DIAG_\*) of the most severe diagnostic at the caret (ui.code_diag: the
     diagnostic with its message)
+  - `popup: usize` -- the items the completion list shows (0: closed) and the chosen one (from 0)
+  - `popup_sel: usize`
+  - `sig: bool` -- signature help is open
+  - `hidden: usize` -- the lines folded away
 
 **`impl Ui`**
 
@@ -2142,8 +2267,16 @@ CE_MARKS: u32 = 32
 - **`fn code_diag(&self, id: u32) -> Option<Diag>`**
   the most severe diagnostic at the caret of code editor id in its last frame (its
   message for a status bar)
+- **`fn code_events(&self, id: u32) -> Vec<CodeEv>`**
+  what the user asked of code editor id in its last pass (go to definition, rename,
+  format, a breakpoint's click)
+- **`fn code_popup_item(&self, id: u32) -> Option<CompItem>`**
+  the item the completion list of code editor id has chosen (None: closed)
 - **`fn code_editor(&mut self, id: u32, doc: &mut CodeDoc, h: &Highlighter, flags: u32) -> u32`**
   ui_code_editor(id, doc, hl, CE_\*) -> EV_\* (see the module header)
+- **`fn code_editor_with(&mut self, id: u32, doc: &mut CodeDoc, h: &Highlighter, mut assist: Option<&mut dyn CodeAssist>, flags: u32) -> u32`**
+  code_editor with a language's services (completion, hover, signature help; see the
+  module header and code_assist.rs)
 
 ### Lists, scrolling, tabs, expanders
 
@@ -3343,7 +3476,10 @@ App-facing:
   window_end()
   window_place(id, &rect)              move / resize (copied into the window's WINRECT)
   window_rect(id) -> Option<WinRect>   current placement (None = unknown window)
-  window_state(id) -> UWS_*            UWS_OPEN | UWS_VISIBLE | UWS_ACTIVE | UWS_MINIMIZED
+  window_state(id) -> UWS_*            UWS_OPEN | UWS_VISIBLE | UWS_ACTIVE | UWS_MINIMIZED |
+                                       UWS_FULLSCREEN
+  window_fullscreen(id, on)            (L7) over the whole monitor without a frame, or back;
+                                       UIC_FULLSCREEN when the platform or the user changes it
   window_activate(id)                  give it the keyboard (raises it)
   window_snap(id, area, dist)          its edges snap to the area's while the user moves it
   window_destroy(id)                   free its state and buffers (created again when shown)
@@ -3404,7 +3540,21 @@ Shared<T> (Rc<Cell<T>>) and the record keeps a clone of it.
 - **`fn window_rect(&self, id: u32) -> Option<WinRect>`**
   ui_window_rect(id) -> the window's placement (None = unknown window)
 - **`fn window_state(&mut self, id: u32) -> u32`**
-  ui_window_state(id) -> UWS_OPEN | UWS_VISIBLE | UWS_ACTIVE | UWS_MINIMIZED (0 unknown)
+  ui_window_state(id) -> UWS_OPEN | UWS_VISIBLE | UWS_ACTIVE | UWS_MINIMIZED |
+  UWS_FULLSCREEN (0 unknown)
+- **`fn window_fullscreen(&mut self, id: u32, on: bool)`**
+  (L7) window_fullscreen(id, on): show the window (0 = the main window, else the app's
+  window id) over its whole monitor without a frame, or back to its place and frame as
+  before.  window_state reports UWS_FULLSCREEN at once; the platform follows after the
+  frame: Windows a borderless window over the window's monitor (the old placement and
+  style come back), X11 \_NET_WM_STATE_FULLSCREEN, Wayland xdg_toplevel set_fullscreen /
+  unset_fullscreen, the browser its Fullscreen API (only from the user's gesture: a key or
+  a click that just happened).  A tool window drops its library title bar and border
+  meanwhile.  When the platform or the user leaves (or enters) full screen by itself (Esc
+  in the browser, the window manager), the state follows and UIC_FULLSCREEN arrives (arg
+  = the window's id).  Headless runs only record it (scripts: \\`expect window ID
+  fullscreen\\`, \\`system fullscreen off\\`).  Nothing happens on Android and for Wayland tool
+  windows drawn inside their owner (WST_CHILD).  F11 is the app's key for it (GUIDE).
 - **`fn window_activate(&mut self, id: u32)`**
   ui_window_activate(id): give the window the keyboard and put it on top
 - **`fn window_destroy(&mut self, id: u32)`**
@@ -3698,11 +3848,15 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
   quit
   system focus in|out | suspend | resume | session-end | settings theme|locale|contrast|fonts|N
                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...)
+  system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
+                      takes it out of full screen by itself: UIC_FULLSCREEN (default main)
 Windows (ID = the app's window id, 0 / main = the main window):
   window ID|main|any            selectors only look into that window (default any)
-  expect window ID open|closed|visible|active|modal|keys   expect window ID rect X Y W H
+  expect window ID open|closed|visible|active|modal|keys|fullscreen|windowed
+                                expect window ID rect X Y W H
                                 (keys: the window keys go to now -- a tool window borrows them
-                                from its owner after F6 / Ctrl+F6 or a click on a widget)
+                                from its owner after F6 / Ctrl+F6 or a click on a widget;
+                                fullscreen / windowed: window_fullscreen's state, L7)
   close window ID   movewin ID X Y   resizewin ID W H   activate ID
                                 (movewin: the user's drag, snapped like window_snap says)
   scale P [window ID]           dpi of the main window (default) or of one window
@@ -4302,6 +4456,27 @@ the widget families are being ported; a finished style overrides every function.
     fills), ev EV_HOVER while the pointer is over it
   - `fn dock_preview(&self, ui: &mut Ui, sp: &Sp)`
     where the dragged panel would go (rect), value 1 = a floating window there
+  - `fn desk_bg(&self, ui: &mut Ui, sp: &Sp)`
+    (L7) the background of a window area (desk.rs; rect = the area)
+  - `fn desk_window(&self, ui: &mut Ui, sp: &Sp)`
+    a window inside an area: shadow, surface and frame (rect = the window), value 1 = the
+    active window, flags 1 = maximised (it fills the area: no shadow, square)
+  - `fn desk_titlebar(&self, ui: &mut Ui, sp: &Sp)`
+    its title bar (rect = the bar over the whole width, the buttons are drawn after it):
+    value 1 = active, icon, label = the title; s[0], s[1] = x and width of the icon and title
+    (px)
+  - `fn desk_button(&self, ui: &mut Ui, sp: &Sp)`
+    a button of its title bar: ev, flags HB_MIN / HB_MAX / HB_CLOSE, icon IC_CHROME_\*,
+    value 1 = the window is active; default: the style's caption_button
+  - `fn desk_snap(&self, ui: &mut Ui, sp: &Sp)`
+    where a dragged window snaps when it is released now (rect), value 1 = maximised
+  - `fn taskbar(&self, ui: &mut Ui, sp: &Sp)`
+    the bar behind a taskbar (rect)
+  - `fn taskbar_button_size(&self, ui: &mut Ui, sp: &mut Sp) -> (i32, i32)`
+    a window's button in a taskbar: label, icon, ev, value 1 = the active window, value2 1 =
+    minimised, flags DTB_ICONS (icons only); size -> (w, h), the core takes w (a button is
+    as high as the bar)
+  - `fn taskbar_button(&self, ui: &mut Ui, sp: &Sp)`
 
 - **`trait StyleBasic`**
   buttons, check boxes, radios, switches, sliders, progress, separators  (basic.s)
@@ -4468,9 +4643,11 @@ Source: [`lib/ui/stock.rs`](../lib/ui/stock.rs)
 stock -- the default painters of the data views and the app shell parts: drawn from the
 theme tokens only, so every style shows grids, trees, badges, meters, charts, navigation
 panes, command bars, splitters, breadcrumbs, segmented controls, wizard steps, toasts,
-spinners and calendars.  A style that wants its own look returns its StyleData /
-StyleShell from Style::data / Style::shell and overrides the methods it likes; the others
-keep these painters (call them from the override to extend them).
+spinners, calendars, dock areas, the windows of a window area and taskbars (desk.rs; high
+contrast: no shadows, 2 px frames, the active window in the accent).  A style that wants
+its own look returns its StyleData / StyleShell from Style::data / Style::shell and
+overrides the methods it likes; the others keep these painters (call them from the
+override to extend them).
 
   kind_colors(ui, BADGE_*) -> (text, fill, solid)   the colours of a status kind
   Stock                                             the stock StyleData + StyleShell
@@ -5100,6 +5277,10 @@ SPELL_OFF: u32 = 0  // spell_enable(false), or no TB_SPELL box asked yet
 SPELL_LOADING: u32 = 1  // its dictionary is being read (window mode)
 SPELL_READY: u32 = 2  // checking (the marks are up to date or follow on the timer)
 SPELL_NONE: u32 = 3  // no checker for the language
+// (L7) full screen (win.rs window_fullscreen): window_state's bit, the event when the platform
+// or the user changed it
+UWS_FULLSCREEN: u32 = 16
+UIC_FULLSCREEN: u32 = 0x7FFF_001A  // arg = window id (0 main): the platform or the user left (or entered) full screen
 ```
 
 ### Key codes
@@ -5935,9 +6116,11 @@ kinds (K_*), states from SS_* (a check box with value 2 is mixed), a heading's l
 value (K_HEADING: Node::value, clamped to 1 ..= 9).  Left out: title bars, empty texts,
 records without area, boxes without a label (a box with tab records inside is the tab
 strip).  Containers are lists, dialogs, titled boxes and tab strips: a node's parent is the
-smallest one on its layer whose rectangle holds the node's centre.  Menu bar entries next to
-each other get a menu bar; the rows of a popup (menus, drop-downs) a menu or list that hangs
-below the open record that opened it.  Names: the label; text boxes, drop-downs (their label
+smallest one on its layer whose rectangle holds the node's centre -- inside a scoped record
+(SEM_SCOPE: a window of a window area, desk.rs) only one it holds, else itself, and scoped
+records hold nothing by their place (overlapping windows are siblings).  Menu bar entries
+next to each other get a menu bar; the rows of a popup (menus, drop-downs) a menu or list that
+hangs below the open record that opened it.  Names: the label; text boxes, drop-downs (their label
 is the text / the choice), sliders, progress bars and lists without one take the text or
 heading record right before them (to the left, or above and aligned).  The focus of a list
 or tab strip is passed on to its selected row / tab.
@@ -8872,6 +9055,310 @@ WF_MODAL) are kept; sections of windows that did not run this time stay in the f
 - **`fn state_load(&mut self, ini: &Ini)`**
   read the placements of state_save back (the main window now, the tool windows when
   window_begin meets them)
+
+#### `ui/desk.rs`
+
+Source: [`lib/ui/desk.rs`](../lib/ui/desk.rs)
+
+```text
+desk -- windows inside an area of a window: the app's programs in windows of their own
+(title bar with icon, title and buttons, moving, resizing at every edge and corner,
+maximising, minimising, z-order, snapping, keyboard, screen readers) and a taskbar; the
+state is the app's DeskState
+
+  desk_begin(id, &mut st, wins)     the area takes the next place (without next_size it fills
+                                    the box); wins describe every open window each frame, in
+                                    the order of the taskbar (DeskWin: key != 0, title, icon,
+                                    DWF_* flags, minimum and first size)
+  desk_next(&mut st) -> Some(key)   the next window to fill, from the bottom of the z-order to
+                                    the top (minimised ones are left out): emit its content (a
+                                    vertical box that clips) and call it again until None
+  desk_end(&mut st) -> Vec<DeskEv>  what the user did: close requests (the app takes the
+                                    window out of its list, or asks first), activation, moves,
+                                    resizes, state changes (also those of the taskbar)
+  desk_taskbar_begin(id)            a taskbar of desk `id`: a row with the style's surface;
+  desk_taskbar_end()                the app's own items (a start button, a clock) go before
+                                    and after desk_taskbar.  Between desk_begin and desk_end
+                                    without next_size / next_rect it takes the strip the
+                                    area keeps free (DeskState::set_reserve)
+  desk_taskbar(id, &mut st, flags)  a button per window of desk `id` (icon, title; the
+                                    active one pressed): a click activates, a second click
+                                    minimises, a right click (menu key, Shift+F10) opens
+                                    Wiederherstellen / Minimieren / Maximieren / Schließen;
+                                    what does not fit goes into a "Weitere Fenster" menu at
+                                    the end; DTB_ICONS: icons only
+  DeskState                         plain data: the windows' places, the z-order, maximised /
+                                    minimised / snapped, the active one -- save() -> text,
+                                    load(text), activate / minimize / maximize / restore /
+                                    toggle_max / snap / cycle / set_rect / forget, order /
+                                    active / state / rect / contains, set_reserve
+
+The windows: a press anywhere on one brings it to the front and makes it active (drawn as
+active, its content gets the keys).  The title bar moves it (a maximised or snapped one comes
+back to its size under the pointer); while it is dragged its edges stick to the area's edges,
+and with the pointer at the area's left or right edge it snaps to that half, at the top edge
+it maximises (a preview shows where).  Every edge and corner resizes it down to its minimum
+size; a double click on the title bar maximises or restores it; the icon and a right click on
+the title bar open its menu.  Esc cancels a drag.  The area keeps every window reachable: when it shrinks, at least
+KEEP DIP of a window and its whole title bar stay inside (shown there, the place in the state
+stays).  Maximised windows fill the area minus the reserved strip (a taskbar inside it); new
+windows are cascaded from the top left.  Places are logical (DIP from the area's start
+corner): a mirrored (RTL) window shows them mirrored, the title bar's buttons at the left.
+Keyboard (while the focus is inside the area, or nowhere): Alt+F6 / Alt+Shift+F6 the next /
+previous window (the active one goes to the back), Alt+F10 maximises / restores the active
+one, Alt+F9 minimises it, Alt+- opens its menu.  Tab never enters the windows behind the
+active one (their widgets are no Tab stops); each window is an F6 pane, and a focus that
+arrives in a window behind (F6, a screen reader, focus(id)) brings it to the front.  The
+active window gets the keyboard focus back where it was (else its first Tab stop).
+Screen readers: each shown window is a dialog record named by its title (" (maximiert)"
+after it when it is), the active one selected; its title bar, buttons and content are inside
+it, whatever the windows above cover.  The taskbar is a group "Taskleiste" with a button per
+window (" (minimiert)" after a minimised one's title, the active one pressed).
+Structural changes (buttons, menus, keys) are applied at desk_end, followed by another pass;
+drags change the place at once.  Widget ids are parts of the area id (pid).
+```
+
+```rust
+/// DeskWin flags: no close button (the app closes the window itself)
+DWF_NOCLOSE: u32 = 1
+/// no minimise button (and no minimising by keys or the taskbar)
+DWF_NOMIN: u32 = 2
+/// no maximise button (no double click, no snapping to the top edge)
+DWF_NOMAX: u32 = 4
+/// a fixed size: no resize grips, no maximising, no snapping to a half
+DWF_FIXED: u32 = 8
+/// a new window starts maximised (an IDE)
+DWF_MAXIMIZED: u32 = 16
+/// no taskbar button
+DWF_NOTASK: u32 = 32
+/// DeskState::state: maximised (with DW_MIN: it comes back maximised)
+DW_MAX: u32 = 1
+/// minimised (hidden until restored)
+DW_MIN: u32 = 2
+/// snapped to the start (left) / end (right) half of the area (mirrored windows show it the
+/// other way round)
+DW_LEFT: u32 = 4
+DW_RIGHT: u32 = 8
+/// desk_taskbar flags: icons only
+DTB_ICONS: u32 = 1
+```
+
+- **`struct DeskWin<'a>`**
+  a window as the app describes it to desk_begin every frame
+  - `key: u32` -- != 0 and stable (the saved state refers to it)
+  - `title: &'a str` -- shown in its title bar, its taskbar button and to screen readers
+  - `icon: u32` -- IC_\* of its title bar and taskbar button (0 = none)
+  - `flags: u32` -- DWF_\*
+  - `min: [i32; 2]` -- the smallest content size (DIP, without the title bar; 0 = the library's)
+  - `size: [i32; 2]` -- the size a new window gets (DIP, without the title bar; 0 = the library's)
+
+**`impl<'a> DeskWin<'a>`**
+
+- **`const fn new(key: u32, title: &'a str, icon: u32) -> DeskWin<'a>`**
+  a window with the library's sizes and every button
+- **`const fn flags(mut self, f: u32) -> DeskWin<'a>`**
+  add DWF_\* flags
+- **`const fn min(mut self, w: i32, h: i32) -> DeskWin<'a>`**
+  the smallest content size (DIP)
+- **`const fn size(mut self, w: i32, h: i32) -> DeskWin<'a>`**
+  the content size of a new window (DIP); DWF_FIXED windows keep it
+
+- **`enum DeskEv`**
+  what desk_end reports
+  - `Close(u32)` -- the user wants to close the window (close button, menu, taskbar): take it out of the
+    list of windows (DeskState keeps its place until forget), or ask first
+  - `Activate(u32)` -- it became the active window
+  - `Move(u32)` -- the user moved it (a drag ended)
+  - `Resize(u32)` -- the user resized it
+  - `State(u32)` -- minimised, maximised, restored or snapped (DeskState::state)
+
+- **`struct DeskState`**
+  the windows of an area: kept by the app and passed to desk_begin / desk_next / desk_end /
+  desk_taskbar.  Plain data: save() / load() turn it into a few lines of text (`desk 1`, then
+  `win KEY X Y W H STATE` from the bottom of the z-order to the top -- x, y from the area's
+  start corner, outer size, all DIP; STATE the DW_\* bits -- and `active KEY`; unknown lines
+  are skipped).  The reserved strip is no part of it.
+
+**`impl DeskState`**
+
+- **`fn new() -> DeskState`**
+  no windows: every window goes cascaded to the front in its first frame
+- **`fn reset(&mut self)`**
+  forget every window: each goes to its first place in the next frame
+- **`fn set_reserve(&mut self, insets: [i32; 4])`**
+  the strip the area keeps free for a taskbar inside it (DIP: start, top, end, bottom):
+  maximised and snapped windows leave it out, the title bars stay above it; not saved
+- **`fn reserve(&self) -> [i32; 4]`**
+  the reserved strip (set_reserve)
+- **`fn contains(&self, key: u32) -> bool`**
+  the state knows the window
+- **`fn order(&self) -> Vec<u32>`**
+  the windows from the bottom of the z-order to the top (minimised ones too)
+- **`fn active(&self) -> u32`**
+  the active window (0: none)
+- **`fn state(&self, key: u32) -> u32`**
+  DW_\* bits of the window (0: a normal window, or an unknown one)
+- **`fn rect(&self, key: u32) -> Option<[i32; 4]>`**
+  the normal place of the window: x, y from the area's start corner, outer width and
+  height (DIP) -- what it comes back to from maximised, snapped or minimised
+- **`fn set_rect(&mut self, key: u32, r: [i32; 4])`**
+  set the normal place of a window (DIP; see rect); a maximised or snapped one shows it
+  once restored
+- **`fn activate(&mut self, key: u32)`**
+  bring the window to the front and make it active (a minimised one comes back)
+- **`fn minimize(&mut self, key: u32)`**
+  minimise the window (it keeps its place in the z-order; the topmost other one becomes
+  active)
+- **`fn maximize(&mut self, key: u32)`**
+  maximise the window (and activate it)
+- **`fn restore(&mut self, key: u32)`**
+  a minimised window comes back (as it was: maximised stays maximised); else a maximised
+  or snapped one goes back to its normal place; it becomes active
+- **`fn toggle_max(&mut self, key: u32)`**
+  maximise the window, or restore a maximised (or snapped) one
+- **`fn snap(&mut self, key: u32, half: u32)`**
+  snap the window to the start (DW_LEFT) or end (DW_RIGHT) half of the area, 0: back to
+  its normal place
+- **`fn cycle(&mut self, forward: bool) -> Option<u32>`**
+  the next window (forward: the active one goes to the back and the one below it comes to
+  the front; back: the one at the back comes to the front) among the windows that are not
+  minimised -> the window now active
+- **`fn forget(&mut self, key: u32)`**
+  forget a window (a closed one: it comes back cascaded)
+- **`fn save(&self) -> String`**
+  the state as text (see DeskState)
+- **`fn load(text: &str) -> Option<DeskState>`**
+  a state saved with save -> None when the text is no desk state (version 1)
+
+**`impl Ui`**
+
+- **`fn desk_begin(&mut self, id: u32, st: &mut DeskState, wins: &[DeskWin])`**
+  desk_begin(id, &mut st, wins): open the window area (always pair with desk_end; fill it
+  with desk_next).  It takes the next place of the box (the whole rest when no size was
+  set); wins: every open window, each frame (titles and icons may change), in the order
+  the taskbar shows them.
+- **`fn desk_next(&mut self, st: &mut DeskState) -> Option<u32>`**
+  desk_next(&mut st) -> the next window to fill (None: done), from the back to the
+  front; its content goes into a vertical box (it clips) until the next call
+- **`fn desk_end(&mut self, st: &mut DeskState) -> Vec<DeskEv>`**
+  desk_end(&mut st) -> what the user did in this pass (and the taskbar since the last
+  desk_end): close requests, activation, moves, resizes, state changes
+- **`fn desk_taskbar_begin(&mut self, id: u32)`**
+  desk_taskbar_begin(id): open a taskbar for desk `id` (always pair with
+  desk_taskbar_end): a row with the style's taskbar surface; the app's items and
+  desk_taskbar go inside.  Inside desk_begin .. desk_end without next_size / next_rect it
+  takes the area's reserved strip (DeskState::set_reserve: the bottom one, else the top
+  one), else the next place, TASK_H DIP high unless next_size says otherwise.
+- **`fn desk_taskbar_end(&mut self)`**
+  desk_taskbar_end
+- **`fn desk_taskbar(&mut self, id: u32, st: &mut DeskState, flags: u32)`**
+  desk_taskbar(id, &mut st, flags): the buttons of desk `id`'s windows (DTB_\*), in the
+  order of desk_begin's list; without a size they take the room the row leaves.  Their
+  changes apply at once; desk_end reports them.
+
+#### `ui/code_assist.rs`
+
+Source: [`lib/ui/code_assist.rs`](../lib/ui/code_assist.rs)
+
+```text
+code_assist -- what a language gives ui.code_editor beyond highlighting: completion, hover
+texts and signature help (CodeAssist, through ui.code_editor_with), the requests of the
+editor that the app answers (CodeEv, ui.code_events), and the popups that show them
+
+  trait CodeAssist        complete(doc, at, explicit) -> Option<CompList>   the items for
+                          the word at the caret (explicit: Ctrl+Space; else typing a word or
+                          a trigger character of triggers(), "." by default)
+                          hover(doc, at) -> Option<String>   the text of a tooltip over the
+                          word at a position (lines by '\n'; long ones are wrapped)
+                          signature(doc, at) -> Option<SigHelp>   inside a call's parentheses
+                          Every method has a default that offers nothing.
+  CompItem { label, detail, doc, kind: CI_*, insert }   an item: what the list shows, a short
+                          line beside it (a signature), a description (shown under the list
+                          for the selected item), its kind (a letter in a badge), the text
+                          it inserts ("": the label)
+  CompList { start, items }   the items replace the word from start to the end of the word
+                          at the caret
+  SigHelp { label, params, active, doc }   "split(sep, n)", the byte ranges of the
+                          parameters in it, the one at the caret (drawn bold), a description
+  CodeEv                  Definition(pos) (Ctrl+click, F12), Rename(pos) (F2), Format
+                          (Shift+Alt+F), Breakpoint(line) (a click in the breakpoints' column)
+
+The completion popup opens while a word is typed (once per word: a word without items keeps
+it closed until it ends), after a trigger character and on Ctrl+Space; it filters as one
+types (the items whose label starts with the typed part, ignoring case, those that match
+the case first, otherwise in the order of the assist).  Up / Down / PgUp / PgDn choose, Enter
+or Tab insert (the word from the list's start to the end of the word at the caret becomes
+the item's text, one undo step, the caret after it; Enter after a word typed out in full
+closes the list and breaks the line), Esc closes, a click on an item inserts
+it; leaving the word, a character that is no part of a word, a click elsewhere or the focus
+leaving close it.  At most POP_ROWS rows show, the wheel scrolls them.  Signature help opens
+when ( or , is typed and on Ctrl+Shift+Space, follows the caret and closes outside a call or
+on Esc.  Both are drawn on the popup layer below / above the caret line within the window,
+in the code theme's colours (high contrast too), and recorded for screen readers: the list
+as a K_LIST (id + 14) with a K_LISTITEM per visible row (the chosen one SS_SELECTED, label
+and detail), signature help as a K_TEXT.
+```
+
+```rust
+/// completion item kinds: plain text
+CI_TEXT: u8 = 0
+CI_KEYWORD: u8 = 1
+/// a variable (let, loop, catch)
+CI_VARIABLE: u8 = 2
+CI_PARAM: u8 = 3
+CI_FUNCTION: u8 = 4
+CI_METHOD: u8 = 5
+/// a module or namespace
+CI_MODULE: u8 = 6
+CI_CONSTANT: u8 = 7
+CI_FIELD: u8 = 8
+/// a value of the host (a configuration)
+CI_VALUE: u8 = 9
+/// the rows the completion popup shows at most
+POP_ROWS: usize = 10
+```
+
+- **`struct CompItem`**
+  a completion item (see the module header)
+  - `label: String`
+  - `detail: String`
+  - `doc: String`
+  - `kind: u8`
+  - `insert: String` -- the text it inserts ("": the label)
+
+**`impl CompItem`**
+
+- **`fn new(label: &str, kind: u8, detail: &str) -> CompItem`**
+
+- **`struct CompList`**
+  what complete() offers: the items replace the word from start on
+  - `start: TextPos`
+  - `items: Vec<CompItem>`
+
+- **`struct SigHelp`**
+  signature help inside a call
+  - `label: String` -- "split(sep, n)"
+  - `params: Vec<(usize, usize)>` -- the bytes of each parameter in label
+  - `active: usize` -- the parameter at the caret (params.len(): none)
+  - `doc: String`
+
+- **`trait CodeAssist`**
+  a language's services for ui.code_editor_with (see the module header)
+  - `fn complete(&mut self, doc: &CodeDoc, at: TextPos, explicit: bool) -> Option<CompList>`
+    the items for the word at the caret `at` (explicit: Ctrl+Space)
+  - `fn hover(&mut self, doc: &CodeDoc, at: TextPos) -> Option<String>`
+    the tooltip text for the word at `at`
+  - `fn signature(&mut self, doc: &CodeDoc, at: TextPos) -> Option<SigHelp>`
+    signature help at the caret
+  - `fn triggers(&self) -> &str`
+    characters after which completion opens
+
+- **`enum CodeEv`**
+  what the user asked of a code editor in its last pass (ui.code_events)
+  - `Definition(TextPos)` -- go to the definition of the word at the position (Ctrl+click, F12)
+  - `Rename(TextPos)` -- rename the word at the position (F2)
+  - `Format` -- format the document (Shift+Alt+F)
+  - `Breakpoint(usize)` -- a click in the breakpoints' column of line (from 0)
 
 ## agent_core
 
@@ -20825,6 +21312,10 @@ wait, presentation, cursors                                     [src/plat/win/wi
   win_work_area(w) -> [x, y, w, h]  work area of the window's monitor
   win_set_title(w, utf8)            win_state(w) -> WST_* (WST_ACTIVE: the app is active)
   win_cmd(w, WCMD_*)                win_begin_move(w)  win_begin_resize(w, edges)
+                                    (L7) WCMD_FULLSCREEN: without caption and border over the
+                                    window's monitor (WS_POPUP; the placement and the styles
+                                    are kept), WCMD_WINDOWED (or MAXIMIZE / RESTORE): back as
+                                    it was; win_state says WST_FULLSCREEN meanwhile
   win_size(w) -> (w, h)             win_dpi(w) -> 96 = 100 %
   win_set_min_size(w, w_dip, h_dip) (also before the window exists)
   win_present(w, frame, rects)      rects x, y, w, h; None = all.  The window keeps a copy
@@ -20918,7 +21409,8 @@ callbacks (refresh, hit hook) never hold a reference across a Win32 call.
   WST_\* bits (WST_ACTIVE: one of the app's windows is active)
 
 - **`fn win_cmd(w: i32, cmd: u32)`**
-  WCMD_MINIMIZE / MAXIMIZE / RESTORE / CLOSE (asks, like the system menu does)
+  WCMD_MINIMIZE / MAXIMIZE / RESTORE / CLOSE (asks, like the system menu does) / FULLSCREEN /
+  WINDOWED
 
 - **`fn win_begin_move(w: i32)`**
   let the system move the window (call on a button press)
@@ -22982,6 +23474,10 @@ Android's Bitmap): the frames' B, G, R, x is swapped once, while copying the dir
 rectangles in, and the host copies rows without touching pixels.  One window over the
 whole canvas without popups is the canvas itself (no composition); otherwise the windows
 and popups are composited into the canvas buffer.
+(L7) Full screen: window 0 asks the page for the browser's Fullscreen API (REQUEST_FULLSCREEN;
+it shows WST_FULLSCREEN at once, the page's answer jfgui_fullscreen confirms it or takes it
+back: refused without the user's gesture, left with Esc); a tool window covers the canvas
+(its place comes back after).  Android: nothing.
 ```
 
 - **`fn win_create( title: &str, width: i32, height: i32, _flags: u32, _owner: i32, x: i32, y: i32, ) -> i32`**
@@ -23016,6 +23512,17 @@ and popups are composited into the canvas buffer.
 
 - **`fn win_cmd(id: i32, command: u32)`**
   Apply library-window commands; close is delivered to the normal app close workflow.
+
+```rust
+/// (L7) (browser) ask the page to show the canvas in full screen (one byte, 1 on / 0 off): the
+/// Fullscreen API from the user's gesture; the page answers with jfgui_fullscreen
+REQUEST_FULLSCREEN: u32 = 23
+```
+
+- **`extern "C" fn jfgui_fullscreen(on: u32) -> u32`**
+  (L7) the page's full screen of the canvas (1 in full screen, 0 not: left, refused): window
+  0's WST_FULLSCREEN follows, an E_RESIZE lets the UI look (UIC_FULLSCREEN on a change of its
+  own)
 
 - **`fn win_begin_move(id: i32)`**
   Begin a pointer-driven move of a non-main library window.
@@ -23561,6 +24068,13 @@ HB_MIN: u32 = 64  // caption buttons (snap layouts, ...)
 HB_MAX: u32 = 128
 HB_CLOSE: u32 = 256
 HB_CURSOR_SHIFT: u32 = 12
+```
+
+*(L7) full screen: win_cmd commands; win_state reports WST_FULLSCREEN*
+
+```rust
+WCMD_FULLSCREEN: u32 = 5  // the window covers its monitor without a frame
+WCMD_WINDOWED: u32 = 6  // back to the place and frame it had before
 ```
 
 ### `plat/evq.rs`
@@ -24273,6 +24787,8 @@ base -- portable basics above the runtime and the platform     [src/core/str.s, 
   cmdtree: Tree / Parsed / Help -- IOS-like command trees (abbreviations, ?, Tab, "no", modes)
   hashring: Ring / hash64 -- consistent hashing with virtual nodes (shards, sticky balancing)
   lru:  Lru -- a map that forgets the least recently used entries (count and weight limits)
+  pattern: glob / has_glob -- shell wildcards; Regex -- POSIX basic and extended regular
+        expressions without back-references (a Pike VM: no exponential cases)
 
 Strings and formatting are Rust's own (str, String, format!); the thread pool, cpu
 features and files are in plat (they need unsafe).
@@ -25179,6 +25695,83 @@ limits hold.  Costs are O(log n) per call.
 - **`fn iter(&self) -> impl Iterator<Item = (&K, &V)>`**
   the entries in key order (no use counted)
 
+### `base/pattern.rs`
+
+Source: [`lib/base/pattern.rs`](../lib/base/pattern.rs)
+
+```text
+pattern -- shell wildcards and a small engine for regular expressions (the shells of
+JFNetworker's hosts: globs, find -name, grep)
+
+  glob(pat, s) -> bool          fnmatch(3) without flags: * any run of characters, ? one,
+                                [abc] [a-z] [!x] [^x] [[:digit:]] one of a set, \x the
+                                character x; '/' and a leading '.' are ordinary characters
+                                here (a caller matches path components one by one and hides
+                                dot files itself)
+  has_glob(s) -> bool           s holds an unescaped *, ? or [ (a word to expand)
+  Regex::new(pat, Syntax::Basic | Syntax::Extended, icase) -> Result<Regex, ReErr>
+  Regex::is_match(s)            the expression matches somewhere in s
+  Regex::find(s) / find_at(s, from) -> Option<(start, end)>   byte offsets of the leftmost
+                                match, the longest one starting there (POSIX)
+  ReErr::text()                 the error in GNU grep's words ("Unmatched ( or \(")
+
+The expressions are POSIX's basic (BRE) and extended (ERE) syntax without back-references
+and collating elements: characters, ".", bracket expressions with ranges, negation and the
+classes [:alpha:] [:digit:] [:alnum:] [:upper:] [:lower:] [:space:] [:blank:] [:punct:]
+[:xdigit:] [:print:] [:graph:] [:cntrl:]; the anchors ^ and $; the repetitions *, and in
+ERE + ? {m} {m,} {m,n} (BRE: \+ \? \{m,n\} as GNU takes them); groups ( ) and alternatives |
+(BRE: \( \) \|); GNU's \w \W \s \S and the word edges \< \> \b \B.  As GNU does, a
+repetition with nothing before it is an ordinary character, an ERE "{" that starts no
+interval too, and BRE takes ^ and $ as anchors only at the ends of the expression or of a
+group.  Matching runs a Pike VM over the characters: time grows with the text times the
+program, never exponentially; a repetition counts to 255 at most and a program has at most
+20000 steps (ReErr::TooBig beyond).  Case-insensitive matching compares simple lowercase
+forms.
+```
+
+- **`fn glob(pat: &str, s: &str) -> bool`**
+  the wildcard pattern matches all of s (fnmatch without flags)
+
+- **`fn has_glob(s: &str) -> bool`**
+  the word holds an unescaped wildcard (\*, ? or [)
+
+- **`enum Syntax`**
+  which syntax an expression is written in
+  - `Basic` -- POSIX basic (grep): \\( \\) \\{ \\} \\| \\+ \\? are the operators
+  - `Extended` -- POSIX extended (grep -E, egrep)
+
+- **`enum ReErr`**
+  why an expression does not compile
+  - `Paren` -- an open group without its end
+  - `CloseParen` -- a group's end without its start
+  - `Bracket` -- a bracket expression without its ']'
+  - `Range` -- a range whose end comes before its start
+  - `Class` -- [:name:] with a name that is no class
+  - `Backslash` -- a '\\' at the end
+  - `Brace` -- \\{ without \\}
+  - `BraceContent` -- what is between { and } is no interval
+  - `Repeat` -- a repetition of something that cannot repeat
+  - `TooBig` -- the program would be too long
+
+**`impl ReErr`**
+
+- **`fn text(self) -> &'static str`**
+  GNU grep's message
+
+- **`struct Regex`**
+  a compiled regular expression
+
+**`impl Regex`**
+
+- **`fn new(pat: &str, syntax: Syntax, icase: bool) -> Result<Regex, ReErr>`**
+  compiles an expression; `icase`: upper and lower case are the same
+- **`fn is_match(&self, s: &str) -> bool`**
+  the expression matches somewhere in s
+- **`fn find(&self, s: &str) -> Option<(usize, usize)>`**
+  the leftmost match (the longest of those starting there): byte offsets
+- **`fn find_at(&self, s: &str, from: usize) -> Option<(usize, usize)>`**
+  as find, starting the search at byte `from` (the edges still see the text before it)
+
 ## datetime
 
 *timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules* -- crate root [`lib/datetime/lib.rs`](../lib/datetime/lib.rs)
@@ -25438,7 +26031,19 @@ diagnostics, compiler, VM with fuel and a garbage collector
   library()                    the standard library every host gets (stdlib.rs: str, list,
                                map, bytes, math, json, int / float.parse; math.rs: exp, log,
                                pow, sin, cos .. in software), found by name before the host
+  ls::index(src) / definition / references / rename / complete / hover / signature /
+  folding / symbols            language services for editors (ls.rs: symbols with their
+                               positions and scopes, also on code that does not parse)
+  fmt::format(src)             the formatter (fmt.rs): Result<String, syntax errors>
+  import(path)                 modules (module.rs): another file's top-level names as a map,
+                               read through Host::load, run once per VM
+  debugger (debug.rs)          Vm::set_breakpoint, request_pause, step(Step), run() ->
+                               Status::Paused(Pause), frames, locals, upvalues,
+                               frame_globals, eval; Program::line_table / break_lines
+  assert(c, msg), assert_eq(a, b, msg)   tests (stdlib.rs; the runner's jfs --test)
 
+Files: Diagnostic::file, Error::file and TraceLine::file name the file of a position (the
+name given to parse / compile_named / compile_with, or a module's path).
 The language: small, dynamically typed, JS/Lua-like.  Values: nil, bool, int (i64), float
 (f64), str (immutable UTF-8), bytes, list, map (insertion ordered; keys str, int, bool),
 fn (closures).  Statements: let x = e, fn name(a, b) { }, if c { } else if c { } else { },
@@ -25458,12 +26063,14 @@ The messages are German.  The scope rules are in ast.rs.
 
 - **`struct Diagnostic`**
   a message for the editor: position (1-based; columns count characters, end_col is
-  exclusive and on the same line), error or warning, German text
+  exclusive and on the same line), error or warning, German text; file: the name given to
+  parse / compile_named / compile_with ("" from check)
   - `line: u32`
   - `col: u32`
   - `end_col: u32`
   - `error: bool`
   - `msg: String`
+  - `file: String`
 
 ```rust
 /// the names a script may use without declaring them: the host API of the simulator and the
@@ -25865,12 +26472,25 @@ code -- the bytecode of compiled scripts: instructions, functions, the compiled 
             the enclosing closure).
   Proto     a function: code, the line and column of every instruction, the exception
             table (try ranges with their handler and stack height), the upvalue sources,
-            the most stack it needs
+            the most stack it needs; for the debugger the statements' first instructions
+            with their lines, the named locals with their slots and ranges, the upvalues'
+            names and the module (unit) it belongs to
   Program   what compile() returns: functions (0 is the top-level code), constants, the
             names of the globals and of the host names the script uses; cheap to clone
             (shared), Send + Sync
   disasm()  the code as text, for tests and debugging
+  line_table() / break_lines() / functions()   the line table: every instruction's
+            function, line and column (the file is Program::name) and whether a statement
+            starts there; the lines a breakpoint can stop at; the functions' names
 ```
+
+- **`struct LineEntry`**
+  where an instruction is in the source (Program::line_table); the file is Program::name
+  - `func: u32` -- the function (0: the top-level code; Program::functions has the names)
+  - `pc: u32` -- the instruction's index in its function
+  - `line: u32`
+  - `col: u32`
+  - `stmt: bool` -- a statement starts here: stepping stops here, and a breakpoint of the line
 
 - **`struct Program`**
   a compiled script (see compile()); clones share the code
@@ -25885,6 +26505,14 @@ code -- the bytecode of compiled scripts: instructions, functions, the compiled 
   the names the script takes from the host (print, http.serve, config ..)
 - **`fn instructions(&self) -> usize`**
   the number of instructions of all functions
+- **`fn line_table(&self) -> Vec<LineEntry>`**
+  every instruction of every function in order, with its line and column
+- **`fn break_lines(&self) -> Vec<u32>`**
+  the lines where a statement starts, sorted: a breakpoint stops there (one on another
+  line at the next of these)
+- **`fn functions(&self) -> Vec<&str>`**
+  the functions' names by their number in line_table ("" for the top-level code, "fn"
+  for anonymous ones)
 - **`fn disasm(&self) -> String`**
   the code as text: per function a header, then "pc line:col instruction"
 
@@ -26099,6 +26727,15 @@ mark-and-sweep collector, the host interface
                                                          value here
   vm.output() / take_output()                            what print() wrote
   vm.resume(host, fuel)                                  the same as run(), after Yielded
+                                                         or Paused
+  Status::Paused(p)                                      a breakpoint, a step or a pause
+                                                         request stopped the run before
+                                                         its fuel was used (debug.rs);
+                                                         run() again goes on
+  Host::load(cx, path)                                   the host's files for import
+                                                         (module.rs; default: none)
+  vm.modules()                                           the program's name, the modules'
+                                                         paths
 
 Fuel is virtual CPU time: one unit per instruction, more for instructions that copy (string
 and list concatenation, literals, iterating a map), plus what natives charge.  run(host,
@@ -26140,6 +26777,13 @@ run(), when an allocation crosses the threshold (twice the live bytes after the 
 collection, at least 256 KiB, at most the heap limit).  Values the host keeps between runs
 must be pinned (pin / unpin) or be reachable from the script.  Values the host passes in
 are checked (valid()): a stale value of a freed object gives an error or None, not a crash.
+
+Modules (module.rs): import(path) links a module's code into the VM's own (`code` starts as
+the program's and grows with each module; `units` are the program and its modules with
+their files and globals) and runs its top-level code as a frame of the importing invocation.
+Errors and traces name the file of every position.  The debugger (debug.rs) costs nothing
+while it has no breakpoint, step or pause request: run() uses exec as it is; with one, run()
+drives exec one instruction at a time (exec_debug) and checks between them where to stop.
 ```
 
 - **`struct Limits`**
@@ -26164,7 +26808,9 @@ are checked (valid()): a stale value of a freed object gives an error or None, n
 
 - **`struct TraceLine`**
   a function and the position it was at when the error happened
-  - `func: String` -- "" for the top-level code, "fn" for an anonymous function
+  - `func: String` -- "" for top-level code (the program's, or a module's while import runs it: the
+    outermost line is the program's), "fn" for an anonymous function
+  - `file: String` -- the file of the position: Program::name, or a module's normalised path
   - `line: u32`
   - `col: u32`
 
@@ -26172,6 +26818,7 @@ are checked (valid()): a stale value of a freed object gives an error or None, n
   why an invocation ended without a result
   - `kind: ErrorKind`
   - `msg: String` -- German text; for an uncaught throw the thrown value as text
+  - `file: String` -- the file of the position (Program::name or a module's path; "" when not in the script)
   - `line: u32` -- where it happened (0 when not in the script)
   - `col: u32`
   - `trace: Vec<TraceLine>` -- the calls, innermost first
@@ -26181,6 +26828,7 @@ are checked (valid()): a stale value of a freed object gives an error or None, n
   - `Done(Value)` -- the invocation returned this value (valid until the next run)
   - `Yielded` -- fuel used up, or a native asked to yield; run() again continues
   - `Error(Error)`
+  - `Paused(Pause)` -- the debugger stopped the run (debug.rs): where and why; run() again continues
 
 - **`enum Fail`**
   why a native function returned no value
@@ -26199,6 +26847,12 @@ are checked (valid()): a stale value of a freed object gives an error or None, n
     whether `name` ("log", "http", "http.serve") may be read as a value (a native function
     value), as in `let f = log` or `list.each(log)`; reading an unknown name throws
     "Unbekannter Name".  Calls do not ask.
+  - `fn load(&mut self, cx: &mut Cx, path: &str) -> Result<String, String>`
+    the source of a module for import (module.rs): `path` is normalised ("/" between the
+    parts, no "." or ".."), relative ones are relative to what the host calls its working
+    directory; Err with the German reason ("die Datei gibt es nicht").  The VM compiles and
+    caches it; the time a read takes can be charged with cx.charge.  Without this method a
+    host has no modules.
 
 - **`struct Pin(u32)`**
   a value the host keeps alive (see Vm::pin)
@@ -26220,8 +26874,8 @@ are checked (valid()): a stale value of a freed object gives an error or None, n
 - **`fn run(&mut self, host: &mut dyn Host, fuel: u64) -> Status`**
   run the pending invocation with up to `fuel` fuel (see the module comment)
 - **`fn resume(&mut self, host: &mut dyn Host, fuel: u64) -> Status`**
-  continue an invocation after Status::Yielded: the same as run(), named for readers of
-  host code
+  continue an invocation after Status::Yielded or Status::Paused: the same as run(),
+  named for readers of host code
 - **`fn cancel(&mut self)`**
   drop the pending invocation (a yielded callback of a device that was switched off, say);
   globals keep what it changed so far
@@ -26236,10 +26890,12 @@ are checked (valid()): a stale value of a freed object gives an error or None, n
 - **`fn take_output(&mut self) -> String`**
   what print() wrote, emptying the buffer
 - **`fn global(&self, name: &str) -> Option<Value>`**
-  a global of the script, or the value the host gave a host name
+  a global of the script (not of its modules), or the value the host gave a host name
 - **`fn set_global(&mut self, name: &str, v: Value) -> bool`**
   set a global of the script, or give a name the script takes from the host a value (a
-  map for config, say); false when the script uses no such name
+  map for config, say); false when the script uses no such name.  The value of a host
+  name holds for the modules the script imports too, also for one the script itself does
+  not use (false then, the value is kept).
 - **`fn valid(&self, v: Value) -> bool`**
   whether a value belongs to this VM and is alive: a value of an object the collector
   freed (not pinned between runs), of another VM, or a cell is not
@@ -26378,6 +27034,459 @@ are checked (valid()): a stale value of a freed object gives an error or None, n
   the pinned value
 - **`fn unpin(&mut self, p: Pin)`**
   let the collector have the value again
+
+### `script/ls.rs`
+
+Source: [`lib/script/ls.rs`](../lib/script/ls.rs)
+
+```text
+ls -- language services for editors: the symbols of a script with their positions, go to
+definition, references, rename, completion, hover, signature help, folding ranges and the
+symbols of an outline.  Generic (no editor types); everything works on code that does not
+parse (parse_partial: what parsed) and never fails.
+
+  index(src) -> Index              every declaration (Symbol: name, kind, where it is
+                                   declared and visible, parameters, doc comment, the fn it
+                                   is in, an import path) and every use of a name (Use: its
+                                   span and the symbol it means, None for a name of the host
+                                   or the library, or an unknown one), by the scope rules of
+                                   ast.rs; idx.at(pos) the symbol at a position
+  definition(src, pos, &cx) -> Option<Location>   where the name at pos is declared; a member
+                                   of a module (m.f with let m = import("x.jfs")) in the
+                                   other file, through cx.load
+  references(src, pos) -> Vec<Span>   the declaration and every use of the symbol at pos,
+                                   in source order
+  rename(src, pos, new) -> Result<Vec<Edit>, String>   the edits that rename the symbol at
+                                   pos; refused (German reason): a keyword, no valid name, a
+                                   name that clashes (declared in the same scope, or a use
+                                   that would then mean another declaration), code that does
+                                   not parse, no symbol of this script at pos
+  complete(src, pos, &cx) -> Completion   the items for the word at pos (from its start to
+                                   pos as the prefix): the names in scope, the host's
+                                   globals (cx.host), the built-ins and the library's
+                                   modules, keywords where a statement may start; after a dot
+                                   the members of what is before it: the methods of str /
+                                   list / map / bytes (all four when its type is not known
+                                   from a literal), the functions of a library module, the
+                                   host's dotted names, the top-level names of an imported
+                                   module.  Ranked: the exact prefix first, then by kind
+                                   (locals, the script's globals, the host, the library,
+                                   keywords), then by name.  Nothing in comments and strings
+  hover(src, pos, &cx) -> Option<Hover>   kind, signature ("fn greet(name)") and the doc
+                                   comment, or the description of a library or host name
+  signature(src, pos, &cx) -> Option<Signature>   inside the parentheses of a call: the
+                                   function's label, the parameters' ranges in it, the one
+                                   at pos (commas counted)
+  folding(src) -> Vec<Fold>        blocks, /* */ comments and runs of // lines, lists, maps
+                                   and calls over several lines: the first line stays, the
+                                   rest up to `end` folds (a closing line of its own stays)
+  symbols(src) -> Vec<DocSymbol>   the outline: top-level fns (with the fns declared inside
+                                   them as children) and lets in source order
+  CompleteCx { host, load }        the host's globals (HostItem: "net.listen", parameters,
+                                   a short description) and the reader of imported files
+  apply(src, &edits) -> String     the source with edits; is_name(s) a valid new name;
+                                   library_doc(name) the parameters and description of a
+                                   built-in or library name (lsdoc.rs)
+
+Doc comments: the `///` lines right above a fn or let (no blank line between) belong to it;
+their text without the slashes and one blank is the doc.  Positions: bytes into src (a
+position at the end of a word belongs to the word); spans as ast::Span (lines and columns
+from 1, columns in characters).
+```
+
+- **`enum SymKind`**
+  what a symbol is
+  - `Global` -- a top-level let (a global of the script)
+  - `Fn` -- a fn declaration (any level)
+  - `Local` -- a let inside a block
+  - `Param` -- a parameter of a fn or a fn literal
+  - `Loop` -- a for variable
+  - `Catch` -- the variable of a catch
+
+**`impl SymKind`**
+
+- **`fn word(self) -> &'static str`**
+  the German word for a hover ("Funktion", "lokale Variable" ..)
+
+- **`struct Symbol`**
+  a declaration (see the module comment)
+  - `name: String`
+  - `kind: SymKind`
+  - `span: Span` -- the name where it is declared
+  - `decl: Span` -- the whole declaration: the let statement, the fn up to its `}`, the parameter, the loop
+  - `scope: (u32, u32)` -- the bytes where the name is visible (a top-level let: the whole script; functions read
+    it later, top-level code from `from` on)
+  - `from: u32`
+  - `params: Vec<String>` -- the parameters of a fn, also of a let bound to fn(..) { }
+  - `doc: String` -- the doc comment (see the module comment)
+  - `parent: Option<usize>` -- the symbol of the fn (or the let of a fn literal) it is declared in
+  - `import: Option<String>` -- let m = import("path"): the path
+  - `ty: &'static str` -- the type of a let's value when a literal or a known call tells it: "str", "list",
+    "map", "bytes", "fn" ("": not known)
+
+- **`struct Use`**
+  a name that is read or written
+  - `span: Span`
+  - `sym: Option<usize>` -- the symbol (None: a name of the host or the library, or unknown)
+  - `write: bool` -- an assignment to it
+
+- **`struct Index`**
+  the symbols and uses of a source
+  - `symbols: Vec<Symbol>`
+  - `uses: Vec<Use>` -- by position
+
+**`impl Index`**
+
+- **`fn at(&self, pos: u32) -> Option<usize>`**
+  the symbol whose declared name or one of whose uses is at byte pos (a position at a
+  name's end counts)
+- **`fn use_at(&self, pos: u32) -> Option<&Use>`**
+  the use at byte pos
+- **`fn resolve(&self, name: &str, at: u32) -> Option<usize>`**
+  the symbol a name at byte `at` means by the visible ranges (for a name in a statement
+  that did not parse, which has no Use): the innermost one of that name
+
+- **`struct Location`**
+  a place: a span in this source (path None) or in an imported file
+  - `path: Option<String>`
+  - `span: Span`
+
+- **`struct Edit`**
+  a change of the source: bytes start..end become text
+  - `start: u32`
+  - `end: u32`
+  - `text: String`
+
+- **`struct HostItem<'a>`**
+  a name the host gives scripts (for completion and hover)
+  - `name: &'a str` -- "log", "net.listen", "config"
+  - `params: Option<&'a str>` -- the parameters of a function ("port, handlers"); None: a value or a namespace
+  - `doc: &'a str` -- a short description (German)
+
+- **`struct CompleteCx<'a>`**
+  what the services know beyond the source
+  - `host: &'a [HostItem<'a>]` -- the host's globals
+  - `load: Option<&'a dyn Fn(&str) -> Option<String>>` -- the text of an imported file by the path written in import("…") (None: not there)
+
+- **`enum ItemKind`**
+  the kind of a completion item
+  - `Variable` -- a let, a for or catch variable
+  - `Param`
+  - `Function` -- a fn of the script, a built-in, a function of the library or the host
+  - `Method` -- a method of str / list / map / bytes
+  - `Module` -- a library module, a host namespace, an imported module
+  - `Constant` -- math.pi, int.max
+  - `Value` -- a value of the host (config)
+  - `Keyword`
+
+- **`struct Item`**
+  a completion item
+  - `label: String`
+  - `kind: ItemKind`
+  - `detail: String` -- a short line beside it: "fn greet(name)", "s.split(sep, n)", "net.listen(port, handlers)"
+  - `doc: String` -- the description (doc comment, library or host text)
+
+- **`struct Completion`**
+  what complete() offers: the items replace bytes start..end (the word at pos)
+  - `start: u32`
+  - `end: u32`
+  - `items: Vec<Item>`
+
+- **`struct Hover`**
+  what hover() tells of a name
+  - `span: Span` -- the name it is about
+  - `sig: String` -- "fn greet(name)", "let hits", "s.split(sep, n)"
+  - `kind: String` -- "Funktion", "Parameter von greet", "Standardbibliothek" ..
+  - `doc: String`
+
+**`impl Hover`**
+
+- **`fn text(&self) -> String`**
+  signature, kind and doc on lines of their own (the empty ones left out)
+
+- **`struct Signature`**
+  signature help inside a call
+  - `label: String` -- "greet(name, greeting)", "s.split(sep, n)"
+  - `params: Vec<(u32, u32)>` -- the bytes of each parameter in label
+  - `active: usize` -- the parameter at the position (params.len(): none of them)
+  - `doc: String`
+
+- **`enum FoldKind`**
+  what a folding range holds
+  - `Block`
+  - `Comment`
+  - `Literal` -- a list, map or argument list
+
+- **`struct Fold`**
+  a folding range: line stays visible, line + 1 ..= end fold (lines from 1)
+  - `line: u32`
+  - `end: u32`
+  - `kind: FoldKind`
+
+- **`struct DocSymbol`**
+  an entry of the outline
+  - `name: String`
+  - `kind: SymKind` -- Fn or Global
+  - `detail: String` -- "fn greet(name)", "let hits"
+  - `span: Span` -- the name
+  - `range: Span` -- the whole declaration
+  - `children: Vec<DocSymbol>`
+
+- **`fn library_doc(name: &str) -> Option<(Option<&'static str>, &'static str)>`**
+  the parameters (None: a constant) and the description of a built-in or library name
+  ("print", "str.split", "math.pi")
+
+- **`fn is_name(s: &str) -> bool`**
+  a valid name that is no keyword
+
+- **`fn index(src: &str) -> Index`**
+  see the module comment
+
+- **`fn definition(src: &str, pos: u32, cx: &CompleteCx) -> Option<Location>`**
+  see the module comment
+
+- **`fn references(src: &str, pos: u32) -> Vec<Span>`**
+  see the module comment
+
+- **`fn rename(src: &str, pos: u32, new: &str) -> Result<Vec<Edit>, String>`**
+  see the module comment
+
+- **`fn apply(src: &str, edits: &[Edit]) -> String`**
+  the source with edits applied (sorted, not overlapping)
+
+- **`fn complete(src: &str, pos: u32, cx: &CompleteCx) -> Completion`**
+  see the module comment
+
+- **`fn hover(src: &str, pos: u32, cx: &CompleteCx) -> Option<Hover>`**
+  see the module comment
+
+- **`fn signature(src: &str, pos: u32, cx: &CompleteCx) -> Option<Signature>`**
+  see the module comment
+
+- **`fn folding(src: &str) -> Vec<Fold>`**
+  see the module comment
+
+- **`fn symbols(src: &str) -> Vec<DocSymbol>`**
+  see the module comment
+
+### `script/fmt.rs`
+
+Source: [`lib/script/fmt.rs`](../lib/script/fmt.rs)
+
+```text
+fmt -- the formatter of .jfs scripts
+
+  format(src) -> Result<String, Vec<Diagnostic>>   the script laid out anew, two blanks per
+                               level; the syntax errors when it does not parse (it is left
+                               as it is then)
+  format_with(src, unit)       the same with another unit of indentation ("    ", "\t")
+
+The layout: one statement per line (`;` between statements becomes a line break, the
+statements of a one-line block get lines of their own, `}` a line of its own; an empty
+block stays `{}`), the `{` of a block on the line of what it belongs to, `else` and `catch`
+after the `}` before them; indentation by the open brackets (one level per line that leaves
+brackets open, a closing bracket at a line's start back at the level of the line that
+opened it) and one more level for a line that continues a statement (`.map(f)`, `&& b`,
+the value after `=`).  Blanks: around binary operators and `=`, after `,` and the `:` of a
+map, between words; none inside ( ) [ ] and map braces, around `.` and `..`, after a unary
+operator, before the ( of a call and the [ of an index.  Inside expressions the line
+breaks of the source stay (they are where the author broke a long list or chain).
+Comments stay where they are: a comment after code on its line one blank after it, a
+comment on its own line at the level of the code around it, /* */ over several lines as
+written; blank lines stay, at most one in a row (none at the start of a block or the file,
+none before a `}`).  Strings and numbers keep their text.  The result ends with a line
+break when the source did.  Inside ${..} of a string nothing is broken into lines.
+Safety: the formatted source is parsed again and its tree compared with the original's
+(ast::Program::sexpr); a difference is an error instead of a changed program, so the
+compiled code of the result always equals the original's.  format is idempotent.
+```
+
+- **`fn format(src: &str) -> Result<String, Vec<Diagnostic>>`**
+  see the module comment
+
+- **`fn format_with(src: &str, unit: &str) -> Result<String, Vec<Diagnostic>>`**
+  see the module comment
+
+### `script/module.rs`
+
+Source: [`lib/script/module.rs`](../lib/script/module.rs)
+
+```text
+module -- import(path): the modules of a script, read through the host
+
+  let m = import("lib/util.jfs")   the module's top-level names (fns and lets; a name that
+                                   starts with _ stays private) as a map, with the values
+                                   they have when the module's code has run
+  Host::load(cx, path)             the host's files: the source of a normalised path, or the
+                                   German reason (vm.rs; the runner reads the file system,
+                                   JFNetworker the device's files)
+  norm_path(from, path)            `path` resolved against the file `from` and normalised
+
+A module runs once per VM.  The first import of a path compiles the file the way the
+program was compiled (compile_named, or compile_with with the same host names), links its
+code behind the VM's own -- functions, constants and globals get the places after the ones
+there, host names are shared by name (so config holds for every module) -- and runs its
+top-level code as a frame of the importing invocation: with its fuel, limits, heap and
+output, so it yields, pauses and steps like any call, and its errors name its file.  When
+that code ends (its last Return becomes Op::EndModule, so exec's Return knows nothing of
+modules), import gives the map and keeps it; a later import of the same normalised
+path gives the same map at once.  The map is a snapshot: the module's functions see its
+globals as they change, the map's entries do not (export a function to read a changing
+value).  The program itself can be imported once its top-level code has run.
+
+Errors (each a str the script can catch):
+  "Zyklischer Import: a.jfs → b.jfs → a.jfs"   a module whose top-level code still runs
+  "Modul lib/x.jfs: die Datei gibt es nicht"   the host's reason
+  "lib/x.jfs:3:5: Hier fehlt …"                it does not compile; uncaught, the invocation
+                                               ends with the module's file, line and column
+A module whose top-level code throws (or is cut off) is forgotten: the next import runs it
+again.  At most MAX_UNITS modules per VM.
+
+Paths: "/" separates the parts (a "\" counts as one), "." and ".." are resolved; a path that
+does not start with "/" or a drive ("C:/") is relative to the directory of the importing
+file, and a file without a directory ("-e", an inline script) passes it on as it is: the
+host reads it relative to its working directory.  Fuel: 1 per 64 bytes of source on top of
+the call, then the module's code as it runs.
+```
+
+**`impl Vm`**
+
+- **`fn modules(&self) -> Vec<String>`**
+  the files of the VM: the program's name, then the modules' paths in the order they
+  were imported (one that failed and was imported again once per try)
+
+### `script/debug.rs`
+
+Source: [`lib/script/debug.rs`](../lib/script/debug.rs)
+
+```text
+debug -- the debugger interface of the VM (no UI): breakpoints, steps, pauses, the call
+stack, locals, upvalues and globals, read-only expressions in a frame
+
+  vm.set_breakpoint(file, line, cond) -> Ok(id)   stops before the first statement of `line`
+                      (or of the next line that has one) in a file: Program::name or a
+                      module's path (normalised as import does; a module that is not loaded
+                      yet gets it when it is).  cond: a jfs expression evaluated in the frame
+                      there, the stop happens when it is true; one that fails stops too, with
+                      Pause::error.  A syntax error in cond is the Err
+  vm.remove_breakpoint(id) / clear_breakpoints() / breakpoints()   with each one's hits and
+                      the line it is bound to
+  vm.request_pause()  stop at the next statement (of the running invocation or the next one)
+  vm.step(Step::Into | Over | Out)   how the next run() goes on: to the next statement
+                      (into calls), to the next statement of this function or of a caller,
+                      back into the caller
+  vm.run(..) -> Status::Paused(Pause { reason, file, line, col, breakpoint, error })
+                      stopped before that statement; run() again goes on from there
+  vm.paused()         the pause the invocation waits in (None once it runs again)
+  vm.frames()         the calls, innermost first: function ("" top-level code), file, line,
+                      column
+  vm.locals(i) / upvalues(i) / frame_globals(i)   (name, value) of frame i (0: innermost):
+                      the locals visible there, the variables its closure captured, the
+                      globals of its file (the private _ ones too); globals_of(file)
+  vm.eval(i, expr)    a read-only expression in frame i: literals, names (locals, upvalues,
+                      globals, host values), operators, fields, indexes and len, str, type,
+                      int, float -- no other calls, no functions, no assignment; fuel and
+                      output stay as they are.  The value lives until the next run
+  vm.repr(v) / preview(v, max) / children(v)   for a variables view: the text as inside a
+                      list (strings quoted), at most max characters ("…" at the cut); the
+                      items of a list ("0", ..) or the entries of a map (key text, value)
+  check_expr(src)     whether src is one expression (a condition before it is set)
+  vm.debugging()      whether run() goes one instruction at a time now (below)
+
+Stops happen at statement starts (Program::line_table: the first statement of a line, a for
+loop's head each round, a while loop's condition each round) and, while stepping, at the
+first instruction after a return from the function the step began in (also when an
+exception leaves it).  Over and Out step over what a call does, breakpoints in it still
+stop.  A pause ends the step; a step also ends with its invocation.  Code that a native runs
+through Cx::call (a callback of list.map or list.sort) never stops: the native is in the
+middle of its work.
+
+Cost: without breakpoints, step or pause request (or after clear_breakpoints) the VM runs
+exactly as without a debugger: run() uses exec, whose instruction loop knows nothing of it.
+With one, run() uses exec_debug, which runs exec one instruction at a time and asks
+dbg_stop before each (a lookup of the statement start and of the breakpoints of its line):
+about four times slower, but nothing of it changes fuel, results, output or the collector,
+so a run that pauses and goes on equals one that does not.
+```
+
+- **`enum Step`**
+  how run() goes on from a pause (Vm::step)
+  - `Into` -- to the next statement, into calls
+  - `Over` -- to the next statement of this function (or of a caller after it returns)
+  - `Out` -- back into the caller
+
+- **`enum PauseReason`**
+  why the debugger stopped a run
+  - `Breakpoint`
+  - `Step`
+  - `Pause` -- Vm::request_pause
+
+- **`struct Pause`**
+  where and why a run stopped (Status::Paused)
+  - `reason: PauseReason`
+  - `file: String`
+  - `line: u32`
+  - `col: u32`
+  - `breakpoint: Option<u32>` -- the breakpoint's id
+  - `error: Option<String>` -- the condition of the breakpoint failed: why (German)
+
+- **`struct Breakpoint`**
+  a breakpoint as Vm::breakpoints shows it
+  - `id: u32`
+  - `file: String` -- normalised as import does
+  - `line: u32` -- the line it was set on
+  - `cond: Option<String>`
+  - `hits: u32` -- how often it stopped
+  - `at: Option<u32>` -- the line it stops at in the loaded file (None: not loaded, or no statement from `line`
+    on)
+
+- **`struct FrameInfo`**
+  a call on the stack (Vm::frames)
+  - `func: String` -- "" for top-level code (the program's or a module's), "fn" for an anonymous function
+  - `file: String`
+  - `line: u32`
+  - `col: u32`
+
+- **`fn check_expr(src: &str) -> Result<(), String>`**
+  whether src is one expression, as a breakpoint's condition and Vm::eval take it; Err: why
+  not (German)
+
+**`impl Vm`**
+
+- **`fn set_breakpoint(&mut self, file: &str, line: u32, cond: Option<&str>) -> Result<u32, String>`**
+  see the module comment
+- **`fn remove_breakpoint(&mut self, id: u32) -> bool`**
+  false when there is no such breakpoint
+- **`fn clear_breakpoints(&mut self)`**
+- **`fn breakpoints(&self) -> Vec<Breakpoint>`**
+- **`fn request_pause(&mut self)`**
+  stop at the next statement
+- **`fn step(&mut self, kind: Step)`**
+  how the next run() goes on (from a pause; without one Into stops at the next statement)
+- **`fn paused(&self) -> Option<&Pause>`**
+  the pause the pending invocation waits in
+- **`fn debugging(&self) -> bool`**
+  whether a breakpoint, a step or a pause request makes run() go one instruction at a
+  time (exec_debug)
+- **`fn frames(&self) -> Vec<FrameInfo>`**
+  the calls of the pending invocation, innermost first
+- **`fn locals(&self, frame: usize) -> Vec<(String, Value)>`**
+  the locals visible in frame i (an inner one hides an outer one of the same name)
+- **`fn upvalues(&self, frame: usize) -> Vec<(String, Value)>`**
+  the variables the closure of frame i captured
+- **`fn frame_globals(&self, frame: usize) -> Vec<(String, Value)>`**
+  the globals of the file of frame i
+- **`fn globals_of(&self, file: &str) -> Vec<(String, Value)>`**
+  the globals of a loaded file (the program's name or a module's path)
+- **`fn repr(&self, v: Value) -> String`**
+  a value as inside a list: strings quoted
+- **`fn preview(&self, v: Value, max: usize) -> String`**
+  repr() with at most max characters ("…" at the end when it is cut)
+- **`fn children(&self, v: Value) -> Vec<(String, Value)>`**
+  the items of a list ("0", "1" ..) or the entries of a map (the key as text: a str as it
+  is, others as repr); nothing for other values
+- **`fn eval(&mut self, frame: usize, expr: &str) -> Result<Value, String>`**
+  see the module comment
 
 ## crypto
 
