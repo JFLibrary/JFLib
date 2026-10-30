@@ -24,12 +24,14 @@
 //   ui.code_events(id) -> Vec<CodeEv>   what the user asked for in the editor's last pass:
 //        Definition(pos) (Ctrl+click, F12), Rename(pos) (F2), Format (Shift+Alt+F),
 //        Breakpoint(line) (a click in the breakpoints' column); the app answers (a jump,
-//        CodeDoc::apply_edits / replace_text as one undo step, set_breakpoints)
+//        CodeDoc::apply_edits / replace_text as one undo step, set_breakpoints);
+//        ui.code_popup_item(id) the completion item the list has chosen (None: closed)
 //   ui.code_find(id, query, replace)   open the find bar (replace: with the replace row) with
 //        a query; the editor selects the first match from the caret on
 //   ui.code_status(id) -> CodeStatus   line and column of the caret (from 1), the matches
 //        and the current one, the lines tokenized in the last frame, the document's
-//        diagnostics per severity and the severity of the one at the caret
+//        diagnostics per severity and the severity of the one at the caret, the completion
+//        list's items and choice, whether signature help is open, the lines folded away
 //   ui.code_diag(id) -> Option<Diag>   the (most severe) diagnostic at the caret, its message
 //   ui.code_theme_set(Some(theme))     the colours of every code editor (None: code_theme())
 //   ui.code_font_size(pt)              the size of the code editors' font (default 10 pt)
