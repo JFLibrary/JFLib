@@ -1,0 +1,367 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Mail zwischen zwei Domänen",
+  "description": "a.lab und b.lab mit je einem Mailserver (SMTP und POP3) und einem PC, DNS1 kennt die MX-Einträge beider Domänen.",
+  "seed": 23,
+  "next_id": 16,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 240,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.1.1 255.255.255.0\n no shutdown\n!\ninterface GigabitEthernet0/0/1\n ip address 10.0.2.1 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 80,
+      "y": 140,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "SW2",
+      "model": "jf-s24p",
+      "x": 400,
+      "y": 140,
+      "off": false,
+      "startup_config": "hostname SW2\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "MAILA",
+      "model": "server-1u",
+      "x": 0,
+      "y": 280,
+      "off": false,
+      "startup_config": "hostname MAILA\nip addr add 10.0.1.25/24 dev eth0\nip route add default via 10.0.1.1\necho \"nameserver 10.0.1.53\" > /etc/resolv.conf\n",
+      "services": [
+        {
+          "kind": "smtp-server",
+          "name": "smtp",
+          "disabled": false,
+          "config": {
+            "hostname": "mail.a.lab",
+            "domains": [
+              "a.lab"
+            ],
+            "users": [
+              {
+                "name": "anna",
+                "password": "geheim"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "pop3-server",
+          "name": "pop3",
+          "disabled": false,
+          "config": {
+            "users": [
+              {
+                "name": "anna",
+                "password": "geheim"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "DNS1",
+      "model": "server-1u",
+      "x": 80,
+      "y": 400,
+      "off": false,
+      "startup_config": "hostname DNS1\nip addr add 10.0.1.53/24 dev eth0\nip route add default via 10.0.1.1\n",
+      "services": [
+        {
+          "kind": "dns-server",
+          "name": "dns",
+          "disabled": false,
+          "config": {
+            "zones": [
+              {
+                "origin": "a.lab",
+                "records": [
+                  "@ MX 10 mail",
+                  "mail A 10.0.1.25",
+                  "pc1 A 10.0.1.10"
+                ]
+              },
+              {
+                "origin": "b.lab",
+                "records": [
+                  "@ MX 10 mail",
+                  "mail A 10.0.2.25",
+                  "pc2 A 10.0.2.10"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 6,
+      "name": "PC1",
+      "model": "pc",
+      "x": 160,
+      "y": 280,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.1.10/24 dev eth0\nip route add default via 10.0.1.1\necho \"nameserver 10.0.1.53\" > /etc/resolv.conf\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/root/Mail",
+          "dir": true,
+          "mtime": 1767225600
+        },
+        {
+          "path": "/root/Mail/account",
+          "text": "# E-Mail: the account of the program on the desktop\nname = Anna Muster\naddress = anna@a.lab\nsmtp = mail.a.lab\nsmtp_port = 25\npop3 = mail.a.lab\npop3_port = 110\nuser = anna\npassword = geheim\nkeep = no\n",
+          "mtime": 1767225600
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "MAILB",
+      "model": "server-1u",
+      "x": 320,
+      "y": 280,
+      "off": false,
+      "startup_config": "hostname MAILB\nip addr add 10.0.2.25/24 dev eth0\nip route add default via 10.0.2.1\necho \"nameserver 10.0.1.53\" > /etc/resolv.conf\n",
+      "services": [
+        {
+          "kind": "smtp-server",
+          "name": "smtp",
+          "disabled": false,
+          "config": {
+            "hostname": "mail.b.lab",
+            "domains": [
+              "b.lab"
+            ],
+            "users": [
+              {
+                "name": "bob",
+                "password": "geheim"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "pop3-server",
+          "name": "pop3",
+          "disabled": false,
+          "config": {
+            "users": [
+              {
+                "name": "bob",
+                "password": "geheim"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 8,
+      "name": "PC2",
+      "model": "pc",
+      "x": 480,
+      "y": 280,
+      "off": false,
+      "startup_config": "hostname PC2\nip addr add 10.0.2.10/24 dev eth0\nip route add default via 10.0.2.1\necho \"nameserver 10.0.1.53\" > /etc/resolv.conf\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    }
+  ],
+  "links": [
+    {
+      "id": 9,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 10,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/1"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 11,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 12,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 13,
+      "a": {
+        "dev": 6,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 14,
+      "a": {
+        "dev": 7,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 15,
+      "a": {
+        "dev": 8,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 240,
+    "cy": 200,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null,
+  "dip_per_m": 0
+}

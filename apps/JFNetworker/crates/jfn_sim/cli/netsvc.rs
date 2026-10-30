@@ -17,6 +17,11 @@
 //                                        before "end"
 //   Engine::sh_dhclient(ni, args)        dhclient [-v] [-r] [IF]
 //   Engine::sh_cat(ni, args)             cat /etc/resolv.conf | /etc/hosts | /etc/hostname
+//   Engine::resolv_write(ni, text, append)   echo "nameserver A" > /etc/resolv.conf (>> adds):
+//                                        the static name servers and search domains of a Linux
+//                                        device (nameserver, search, domain lines; Action::
+//                                        NameServers / Resolver); resolv_config(ni) writes them
+//                                        back as such lines for the device's configuration
 //   Engine::cli_log_seen(ni)             a line went into the device's log (os.rs): a waiting
 //                                        dhclient looks at it
 //
@@ -692,6 +697,55 @@ impl Engine {
             Some(e) => Err(e),
             None => Ok(()),
         }
+    }
+
+    /// echo ... > /etc/resolv.conf: the static settings of the resolver ("nameserver ADDR",
+    /// "search D ..", "domain D"); with `append` the name servers come after those set, else
+    /// they replace them; other lines are left out
+    pub(crate) fn resolv_write(&mut self, ni: usize, text: &str, append: bool) -> Result<(), String> {
+        let dev = self.dev_of(ni);
+        let (mut servers, mut search): (Vec<netpkt::IpAddr>, Option<Vec<String>>) = (Vec::new(), None);
+        if append && let Some(os) = self.os(ni) {
+            servers = os.resolver.statics.servers.clone();
+        }
+        for l in text.lines() {
+            let w: Vec<&str> = l.split_whitespace().collect();
+            match w.as_slice() {
+                ["nameserver", a, ..] => match netpkt::IpAddr::parse(a) {
+                    Some(x) if !servers.contains(&x) => servers.push(x),
+                    Some(_) => {}
+                    None => return self.sh_err(ni, &format!("jfn-sh: /etc/resolv.conf: {} is no address\n", a)),
+                },
+                ["search", ds @ ..] if !ds.is_empty() => search = Some(ds.iter().map(|d| String::from(*d)).collect()),
+                ["domain", d] if search.is_none() => search = Some(alloc::vec![String::from(*d)]),
+                _ => {}
+            }
+        }
+        if !append || !servers.is_empty() {
+            let _ = self.apply(Action::NameServers { dev, servers });
+        }
+        if let Some(s) = search {
+            let _ = self.apply(Action::Resolver { dev, servers: None, search: Some(s) });
+        } else if !append {
+            let _ = self.apply(Action::Resolver { dev, servers: None, search: Some(Vec::new()) });
+        }
+        Ok(())
+    }
+
+    /// the static settings of the resolver as the lines that make them (linux_config)
+    pub(crate) fn resolv_config(&self, ni: usize) -> String {
+        let Some(os) = self.os(ni) else { return String::new() };
+        let c = &os.resolver.statics;
+        let mut s = String::new();
+        let mut first = true;
+        for a in &c.servers {
+            s.push_str(&format!("echo \"nameserver {}\" {} /etc/resolv.conf\n", a, if first { ">" } else { ">>" }));
+            first = false;
+        }
+        if !c.search.is_empty() {
+            s.push_str(&format!("echo \"search {}\" {} /etc/resolv.conf\n", c.search.join(" "), if first { ">" } else { ">>" }));
+        }
+        s
     }
 
     /// /etc/resolv.conf as dhclient-script (from DHCP) or by hand it would be

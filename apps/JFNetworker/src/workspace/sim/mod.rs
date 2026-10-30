@@ -87,7 +87,7 @@ pub(crate) struct Cat {
     pub argb: u32,
 }
 
-pub(crate) const CATS: [Cat; 9] = [
+pub(crate) const CATS: [Cat; 10] = [
     Cat { name: "ICMP", bits: P_ICMP | P_ICMPV6, argb: 0xFF3F_8A52 },
     Cat { name: "ARP", bits: P_ARP, argb: 0xFFAA_7414 },
     Cat { name: "DNS", bits: P_DNS, argb: 0xFF7A_5C99 },
@@ -97,6 +97,8 @@ pub(crate) const CATS: [Cat; 9] = [
     Cat { name: "STP", bits: P_STP, argb: 0xFF7A_818A },
     Cat { name: "OSPF/RIP", bits: P_OSPF | P_RIP | P_BGP, argb: 0xFF8C_6A4F },
     Cat { name: "Andere", bits: P_ETH | P_VLAN | P_LLC | P_IPV4 | P_IPV6 | P_IGMP | P_LLDP | P_DATA, argb: 0xFF6A_737D },
+    // SMTP and POP3 (X1c): a muted berry red, apart from DNS's violet and ARP's amber
+    Cat { name: "Mail", bits: P_MAIL, argb: 0xFF9B_4D69 },
 ];
 /// the category "Andere"
 pub(crate) const CAT_OTHER: usize = 8;
@@ -104,13 +106,13 @@ pub(crate) const CAT_OTHER: usize = 8;
 /// the category of a frame or decision: its top protocol's (an ICMP error quoting a UDP packet
 /// is ICMP)
 pub(crate) fn cat_of(mask: u32) -> usize {
-    const ORDER: [usize; 8] = [0, 1, 5, 2, 7, 6, 3, 4];
+    const ORDER: [usize; 9] = [0, 1, 5, 2, 7, 6, 9, 3, 4];
     ORDER.iter().copied().find(|&k| mask & CATS[k].bits != 0).unwrap_or(CAT_OTHER)
 }
 
 /// the colour of a category (lighter in the dark theme), opaque
 pub(crate) fn cat_color(k: usize, dark: bool) -> u32 {
-    let c = CATS[k.min(CAT_OTHER)].argb;
+    let c = CATS[k.min(CATS.len() - 1)].argb;
     if dark { color_mix(c, 0xFFFF_FFFF, 72) } else { c }
 }
 

@@ -2161,6 +2161,42 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   for r in replies.push(&bytes) { /* r.code, r.text() */ }
   let (_, port) = ftp::host_port("Passive mode on (10,0,0,9,117,49).").unwrap_or_default();
   ```
+
+  Mail: `smtp` has the commands and replies of RFC 5321 -- `Command::parse` / `to_line`,
+  `parse_path` / `fmt_path` for `MAIL FROM:<a@b> SIZE=345` and `RCPT TO:<..>` (the null reverse
+  path is an empty address), `Reply` with the multi-line form (`Reply::enh(550, "5.1.1", ..)`
+  puts the enhanced status code of RFC 3463 before the text, `status()` reads it back,
+  `is_positive` / `is_intermediate` / `is_transient` / `is_permanent`), `ReplyReader` for a
+  server's bytes in any pieces, `Ehlo::of_reply` with `has("PIPELINING")`, `size_limit()` and
+  `auth("PLAIN")`; `Stream` is the server's side: `line()` while commands come (pipelined ones
+  in their order), `begin_data(max)` after 354, `data()` once the line with the dot came (the
+  dots undone, more than `max` counted but not kept); `stuff` writes the bytes after DATA, and
+  `auth_plain` / `plain_of` and `LOGIN_USER` / `LOGIN_PASS` serve AUTH (RFC 4954, 4616). `pop3`
+  has RFC 1939: `Command`, `Response` (`ok` / `err`, `with_body` for a multi-line one, its lines
+  dot-stuffed by `to_bytes`), `multi_line(&cmd)` (LIST and UIDL without an argument, RETR, TOP,
+  CAPA) and `Reader`, which the client tells for each command whether a body may follow. `imf`
+  is the message of RFC 5322 with the MIME a plain text needs: `Message::parse` (CRLF or LF,
+  folded fields unfolded) with `get` / `set` / `prepend` and `to_bytes` (folded at 78 columns),
+  `subject()`, `from()`, `to()`, `date()`, `text()` (quoted-printable, base64, the charset and the
+  first text part of a multipart undone); `Mailbox` with display names (quoted, or encoded words
+  of RFC 2047), `parse_list`, `addr_ok`; `date` / `parse_date`, `message_id`, `qp_encode` /
+  `qp_decode`, `b64_encode` / `b64_decode`, `split_multipart`; `Draft::to_bytes(eight_bit)`
+  writes a text in UTF-8 as 7bit, 8bit or quoted-printable. `decode::layers` shows each SMTP line
+  with its command, code and enhanced code and the lines of a message after DATA, each POP3 line
+  with its command or status indicator (`P_MAIL`, `Proto::Smtp` for ports 25 and 587,
+  `Proto::Pop3` for 110); `decode::info` sums them up ("C: EHLO pc1", "S: +OK 2 messages",
+  "C: DATA fragment, 345 bytes").
+
+  ```rust
+  let mut rd = smtp::ReplyReader::new();
+  for r in rd.push(&bytes) { /* r.code, r.status(): Some("5.1.1") */ }
+  let mut st = smtp::Stream::new();
+  st.push(&bytes);
+  while let Some(line) = st.line() { /* a command; after DATA: st.begin_data(max) */ }
+  if let Some(d) = st.data() { /* d.body (CRLF, unstuffed), d.size, d.over */ }
+  let msg = imf::Draft { from, to, subject, date, id, text, ..Default::default() }.to_bytes(true);
+  let wire = smtp::stuff(&msg);                            // the bytes after 354
+  ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
   nonces use `plat::random_bytes`.

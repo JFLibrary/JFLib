@@ -1142,3 +1142,55 @@ Die Etagen übereinander; ein Doppelklick öffnet eine Etage.	The floors on top 
 Ziehen verschiebt Räume und Geräte in einen anderen Raum; ein Doppelklick öffnet einen Raum.	Drag to move rooms, and devices into another room; a double click opens a room.
 Ziehen stellt Geräte an einen Platz, auf einen Tisch, in ein Rack oder zurück in die Ablage; ein Doppelklick öffnet ein Rack.	Drag devices to a spot, onto a desk, into a rack or back to the tray; a double click opens a rack.
 Ziehen steckt Geräte in andere Höheneinheiten, nach rechts aus dem Rack.	Drag devices to other rack units, to the right out of the rack.
+# X1c: mail (devwin/email.rs: the E-Mail program on the Desktop; the kinds of the services; the
+# protocol category Mail of the simulation mode)
+E-Mail	E-mail
+Nachrichten senden und abrufen	Send and fetch messages
+Posteingang	Inbox
+Abrufen	Fetch
+Neue Nachrichten per POP3 vom Server holen	Fetch new messages from the server over POP3
+Verfassen	Write
+Antworten	Reply
+Konto …	Account …
+Keine Nachrichten	No messages
+Abrufen holt die Nachrichten des Kontos vom POP3-Server.	Fetch gets the account's messages from the POP3 server.
+Nichts gesendet	Nothing sent
+Verfassen schreibt eine neue Nachricht.	Write starts a new message.
+An	To
+Betreff	Subject
+Datum	Date
+(ohne Betreff)	(no subject)
+Cc	Cc
+Eine Nachricht wählen, um sie zu lesen.	Choose a message to read it.
+{}: läuft …	{}: running …
+{}: noch nicht	{}: not yet
+bob@b.lab, Name <adresse@domäne>	bob@b.lab, Name <address@domain>
+Der Text der Nachricht	The text of the message
+Benutzer	User
+E-Mail-Adresse	E-mail address
+POP3-Port	POP3 port
+POP3-Server	POP3 server
+Passwort	Password
+SMTP-Port	SMTP port
+SMTP-Server	SMTP server
+25 (587 mit Anmeldung)	25 (587 with a login)
+Noch kein Konto: die Angaben des Mailservers eintragen, dann Speichern.	No account yet: enter the mail server's details, then Save.
+Nachrichten auf dem Server lassen	Leave messages on the server
+Das Konto liegt als /root/Mail/account auf dem Gerät; empfangene Nachrichten in /root/Mail/inbox, gesendete in /root/Mail/sent.	The account is the file /root/Mail/account of the device; messages received are in /root/Mail/inbox, messages sent in /root/Mail/sent.
+Am {} schrieb {}:	On {}, {} wrote:
+„{}“ ist keine E-Mail-Adresse.	“{}” is not an e-mail address.
+Das Konto braucht einen SMTP- und einen POP3-Server.	The account needs an SMTP and a POP3 server.
+Ein Port ist eine Zahl von 1 bis 65535.	A port is a number from 1 to 65535.
+Das Konto passt nicht mehr auf das Gerät.	The account no longer fits on the device.
+Mailserver (SMTP)	Mail server (SMTP)
+Postfach (POP3)	Mailbox (POP3)
+Mail	Mail
+Empfangen/s	Received/s
+Weitergeleitet/s	Relayed/s
+Unzustellbar/s	Undeliverable/s
+Zurückgestellt/s	Deferred/s
+Relay abgelehnt/s	Relays refused/s
+Abgeholt/s	Fetched/s
+Abgelehnte Anmeldungen/s	Logins refused/s
+Gelöscht/s	Deleted/s
+Anmeldungen/s	Logins/s

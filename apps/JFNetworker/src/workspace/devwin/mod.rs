@@ -18,6 +18,8 @@
 //                stop, apply, their output and errors (ids ID_SCRIPTS0 + 0x400 k ..)
 //   files.rs     Dateien: the device's files (flash:, nvram:, the Linux tree) with their text,
 //                delete, import, export (ids ID_FILES0 + 0x180 k ..)
+//   email.rs     the E-Mail program of the Desktop: account, inbox, sent, write, answer, send,
+//                fetch (ids ID_MAIL0 + 0x400 k ..)
 //
 // Übersicht shows model, ports, power and state; Schnittstellen every interface as the
 // simulator runs it (the inspector's rows, with frame counters); CLI the device's console --
@@ -32,6 +34,7 @@ pub(crate) mod services;
 pub(crate) mod svcedit;
 pub(crate) mod scripts;
 pub(crate) mod files;
+pub(crate) mod email;
 
 use alloc::format;
 use alloc::string::{String, ToString};

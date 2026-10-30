@@ -966,6 +966,8 @@ impl Engine {
                 Ok(())
             }
             Some((f, _)) if f.is_empty() => self.sh_err(ni, "jfn-sh: syntax error near unexpected token `newline'\n"),
+            // the resolver's settings (netsvc.rs)
+            Some((f, append)) if self.store(ni).and_then(|s| s.norm(&f).ok()).is_some_and(|p| p == "/etc/resolv.conf") => self.resolv_write(ni, &text, append),
             Some((f, append)) => match self.file_put(ni, &f, text.as_bytes(), append) {
                 Ok(_) => Ok(()),
                 Err(e) => self.sh_err(ni, &format!("jfn-sh: {}: {}\n", f, e.errno_text())),
