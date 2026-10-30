@@ -61,7 +61,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -81,7 +81,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
   <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
-  <br>[lib.rs](#update-crate-root) · [apply.rs](#updateapplyrs) · [fetch.rs](#updatefetchrs) · [manifest.rs](#updatemanifestrs)
+  <br>[lib.rs](#update-crate-root) · [appimage.rs](#updateappimagers) · [apply.rs](#updateapplyrs) · [fetch.rs](#updatefetchrs) · [manifest.rs](#updatemanifestrs)
 - [archive](#archive) -- bounded ZIP32 containers (stored and DEFLATE)
   <br>[lib.rs](#archive-crate-root)
 - [doc_core](#doc_core) -- structured documents, sources, citations and undo/redo
@@ -16570,7 +16570,11 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
   power:   inhibit(reason, INHIBIT_SUSPEND | INHIBIT_IDLE) -> Option<Inhibit> (no standby /
            screen saver while the guard lives), inhibited()              (power.rs)
   autostart: autostart_set(on, args) / autostart_get() / autostart_entry() (Run key, XDG
-           autostart, Background portal; needs `autostart` in the manifest) (autostart.rs)
+           autostart, Background portal, MSIX StartupTask; needs `autostart` in the manifest)
+           (autostart.rs)
+  pkg:     packaged() (MSIX, Flatpak, AppImage, Snap or a plain program), msix_updates (App
+           Installer), FlatpakMonitor / flatpak_spawn_latest (the Flatpak portal),
+           restart_appimage                                                   (pkg.rs)
   taskbar: taskbar_progress / taskbar_badge / taskbar_tasks (the taskbar button: progress,
            overlay / count, jump list; ITaskbarList3, Unity LauncherEntry), app_user_model_id
            / set_app_user_model_id (Windows: the app's explicit id)        (taskbar.rs)
@@ -17493,7 +17497,8 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
                         at run time nothing changes: the system's list is always allowed
                         for files the app may read (recent.rs)
 A PATTERN is an absolute path (X:/.. and //server/share/.. count on Windows only, /.. on
-Linux only), or starts with $CONFIG $TEMP $HOME $EXE $FONTS, the app's own folders
+Linux only), or starts with $CONFIG $TEMP $HOME $EXE $FONTS, $APPIMAGE (the folder of the
+running AppImage file: lib/update replaces it there; no value elsewhere), the app's own folders
 $APPCONFIG $APPDATA $APPCACHE $APPLOG (vfs::app_dir) or the user's folders $DESKTOP
 $DOCUMENTS $DOWNLOADS $PICTURES $MUSIC $VIDEOS (user_dir; a variable without a value
 drops the pattern); '*' / '?' match inside one segment, a '**' segment any number of
@@ -18610,8 +18615,9 @@ Windows (win_autostart.rs): the value <app id> = "exe" args of
 HKCU\Software\Microsoft\Windows\CurrentVersion\Run (arguments quoted with the Microsoft
 rules).  The Task Manager's switch (Explorer\StartupApproved\Run, an odd first byte = off)
 counts for autostart_get; autostart_set(true) clears it (the user asked in the app), false
-removes both; in an MSIX package (HKCU virtualized) Unavailable: the package's StartupTask
-is switched in Settings.  Linux (linux_autostart.rs): $XDG_CONFIG_HOME/autostart/<desktop id>.desktop
+removes both; in an MSIX package (HKCU virtualized) the package's StartupTask instead,
+switched through WinRT (TaskId "Autostart"; it takes no arguments, a task the user switched
+off in Settings stays off: Dismissed).  Linux (linux_autostart.rs): $XDG_CONFIG_HOME/autostart/<desktop id>.desktop
 (XDG autostart; Hidden=true or X-GNOME-Autostart-enabled=false count as off), Exec quoted
 as the Desktop Entry spec wants, $APPIMAGE instead of the executable when set.  In Flatpak
 the Background portal (RequestBackground with autostart and the command line): the desktop
@@ -18628,8 +18634,8 @@ AUTOSTART_WAIT_MS: i32 = 120_000
 
 - **`enum AutostartError`**
   why autostart_set failed
-  - `Unavailable` -- not possible here (web, Android, no session bus for the portal, an MSIX package: its
-    StartupTask instead)
+  - `Unavailable` -- not possible here (web, Android, no session bus for the portal, an MSIX package without
+    a StartupTask)
   - `Denied` -- the app's permissions lack `autostart`
   - `Dismissed` -- the user (or the desktop) refused it, or did not answer in time (the portal)
   - `Invalid` -- an argument with NUL, or a command line beyond the system's limit
@@ -18643,6 +18649,116 @@ AUTOSTART_WAIT_MS: i32 = 120_000
 
 - **`fn autostart_entry() -> Option<String>`**
   the command the app's entry starts, None without one
+
+### `plat/pkg.rs`
+
+Source: [`lib/plat/pkg.rs`](../lib/plat/pkg.rs)
+
+```text
+pkg -- the package the running program comes from, and what its package system offers for
+updates (lib/update builds on it; docs/UPDATES.md "Packages")
+
+  packaged() -> Packaged          Msix(full name) (GetCurrentPackageFullName), Flatpak(app id)
+                                  (/.flatpak-info; $FLATPAK_ID), AppImage(file) ($APPIMAGE, an
+                                  absolute path), Snap ($SNAP), else Plain
+  msix_updates() -> Result<MsixUpdates, String>   (Windows, in an MSIX package) the App
+                                  Installer file the package came from (Package
+                                  .GetAppInstallerInfo: its address) and, with one, whether it
+                                  offers a newer version (Package.CheckUpdateAvailabilityAsync);
+                                  WinRT through raw COM (win_winrt.rs)
+  FlatpakMonitor                  (Linux, in a Flatpak) the portal's update monitor
+                                  (linux_flatpak.rs): create(), poll(ms) -> UpdateAvailable,
+                                  update(progress, cancel) -> the newest version installed
+  flatpak_spawn_latest(args)      (Linux) the app's newest installed version started with args
+                                  (the portal's Spawn, LATEST_VERSION) -> its pid
+  restart_appimage(args) -> i32   (Linux) the AppImage file started again with args (its
+                                  runtime unpacks the image that is now there): 0 / -1
+
+Elsewhere (web, Android) packaged() is Plain and the rest answers "not available".
+```
+
+- **`enum Packaged`**
+  where the running program comes from
+  - `Plain` -- a program file of its own: a setup, a .deb or .rpm, a portable copy
+  - `AppImage(String)` -- an AppImage: the .AppImage file (the program runs from a copy its runtime unpacked)
+  - `Flatpak(String)` -- a Flatpak: the app id (the program's folder is the read-only /app)
+  - `Msix(String)` -- an MSIX package: its full name (the install folder is read-only)
+  - `Snap` -- a Snap (snapd updates it)
+
+- **`fn packaged() -> Packaged`**
+  the package the running program comes from
+
+- **`struct MsixUpdates`**
+  what App Installer knows about the running MSIX package (msix_updates)
+  - `appinstaller: String` -- the address of the .appinstaller file the package was installed from ("": none -- the
+    Store, Add-AppxPackage, a developer registration)
+  - `availability: u32` -- Package.CheckUpdateAvailabilityAsync with an .appinstaller: 0 unknown, 1 no updates,
+    2 available, 3 required, 4 error; without one 0
+
+- **`fn msix_updates() -> Result<MsixUpdates, String>`**
+  the App Installer file of the running MSIX package and whether it offers an update
+  (Windows 10 1809 and later) -> Err: not in a package, or WinRT failed (its HRESULT)
+
+- **`struct FlatpakUpdate`**
+  UpdateAvailable of the Flatpak portal: the commits of the running, the installed and the
+  remote version (an installed one newer than the running one: restart to use it)
+  - `running: String`
+  - `local: String`
+  - `remote: String`
+
+- **`struct FlatpakMonitor`**
+  (not Linux) there is no Flatpak portal: create() fails
+
+**`impl FlatpakMonitor`**
+
+- **`fn create() -> Result<FlatpakMonitor, String>`**
+- **`fn poll(&mut self, _ms: i32) -> Option<FlatpakUpdate>`**
+- **`fn update(&mut self, _progress: &mut dyn FnMut(u32, u32, u32), _cancel: &dyn Fn() -> bool) -> Result<(), String>`**
+
+- **`fn flatpak_spawn_latest(args: &[&str]) -> Result<u32, String>`**
+  start this app's newest installed Flatpak version with args (the portal's Spawn with
+  LATEST_VERSION; the same program inside it) -> its pid
+
+- **`fn restart_appimage(args: &[&str]) -> i32`**
+  start the running AppImage's file ($APPIMAGE) again with args: its runtime unpacks the
+  image the file holds now (after an update) and runs it -> 0, -1 when not an AppImage or no
+  process could be started
+
+### `plat/linux_flatpak.rs` (Linux)
+
+Source: [`lib/plat/linux_flatpak.rs`](../lib/plat/linux_flatpak.rs)
+
+```text
+linux_flatpak -- (pkg.rs) the updates of a Flatpak app through org.freedesktop.portal.Flatpak
+
+  FlatpakMonitor::create()   CreateUpdateMonitor({handle_token}) on the session bus; the
+                             handle /org/freedesktop/portal/Flatpak/update_monitor/SENDER/TOKEN
+                             is known before the call, so the signals are matched first
+  poll(ms)                   the newest UpdateAvailable({running-commit, local-commit,
+                             remote-commit}) that arrived within ms
+  update(progress, cancel)   Update("", {}) and its Progress signals ({n_ops, op, progress,
+                             status: 0 running, 1 nothing to do, 2 done, 3 failed; error,
+                             error_message}) until the end
+  drop                       Close()
+  spawn_latest(args)         Spawn(cwd, argv, {}, {}, LATEST_VERSION, {}): the app's newest
+                             installed version with the same program and these arguments
+
+The portal (flatpak-portal, outside the sandbox) checks the app's remote every few minutes
+(its --poll-timeout, 300 s by default) while a monitor exists; Update only installs a
+version that asks for no more permissions than the running one.
+```
+
+- **`struct FlatpakMonitor`**
+  the update monitor of this app (pkg::FlatpakMonitor)
+
+**`impl FlatpakMonitor`**
+
+- **`fn create() -> Result<FlatpakMonitor, String>`**
+- **`fn poll(&mut self, ms: i32) -> Option<FlatpakUpdate>`**
+  the newest UpdateAvailable within ms (0: only what has arrived)
+- **`fn update(&mut self, progress: &mut dyn FnMut(u32, u32, u32), cancel: &dyn Fn() -> bool) -> Result<(), String>`**
+  install the update: progress(op, n_ops, percent) for every Progress signal, cancel()
+  asked between them (the portal's transaction itself cannot be stopped: Err after it)
 
 ### `plat/taskbar.rs`
 
@@ -32645,6 +32761,23 @@ back a version that does not start
                                start_download() (a background thread, plat::wake() when
                                done), status() (phase, progress, error), cancel(), staged()
   state(&cfg), newer(a, b), target(), Manifest::parse, verify
+  install(&cfg) -> Packaged     how the program is installed (plat::pkg::packaged; cfg.exe
+                               set: Plain), which decides what an update is:
+    Plain     exe / bundle / package entries of update.json (below)
+    AppImage  the "appimage" entry: the .AppImage file ($APPIMAGE) is replaced as a whole
+              (copied next to it, checked, renamed over it; the old file is the backup, the
+              trial and the rollback as for an exe; restarted through the AppImage); a folder
+              the user cannot write: check() fails with Error::ReadOnly.  A signed AppImage
+              (.sha256_sig / .sig_key, appimagetool --sign) only takes an update signed by a
+              key of its own key block (appimage.rs, pgp.rs)
+    Flatpak   no update.json: the portal's update monitor (plat::pkg::FlatpakMonitor) --
+              check() reports what it found (Kind::Flatpak), download() installs it
+              (Update, Progress), apply() starts the newest version (Spawn) and ends this
+              one; without the portal: Check::Managed(Manager::Flatpak, None)
+    Msix      Check::Managed: App Installer (an .appinstaller: updated at the next start,
+              with whether it knows of a newer version) or whoever installed the package
+    Snap      Check::Managed(Manager::Snap, None)
+  appimage_signature(path)     the embedded signature of an AppImage file (Signed)
 
 The channel: update.json (UTF-8 JSON) and update.json.sig beside it (the Base64 Ed25519
 signature over the exact bytes of update.json); tools/update_manifest.py writes both:
@@ -32654,8 +32787,9 @@ signature over the exact bytes of update.json); tools/update_manifest.py writes 
               "size": 123456, "sha256": "<64 hex digits>"}, ...]}
 kind "exe" replaces the program file, "bundle" is a JFA1 bundle of files relative to the
 program's folder (the program and its modules), "package" an installer (.deb, setup) that
-is only downloaded and checked (Updater::staged).  A relative url is resolved against the
-address update.json came from; redirects are followed (at most 5).
+is only downloaded and checked (Updater::staged), "appimage" a whole AppImage (only for a
+program running as one; entries of unknown kinds are left out).  A relative url is resolved
+against the address update.json came from; redirects are followed (at most 5).
 
 Checks: the signature against cfg.keys; "app" must be cfg.app; "expires" (unix seconds) not
 passed; a version older than one a signed manifest named before is refused (replay); only a
@@ -32669,10 +32803,13 @@ cfg.dir holds state (stage, version, from, starts, bad, seen), lock, partial/<sh
 interrupted download, continued with a Range request), staged/ (update.json, its signature
 and the file) and backup/ (the replaced files of the last update).  Putting an update in
 place writes the program's folder: in an app with a PERMISSIONS manifest that needs
-fs.write $EXE/**; a folder of the system (/usr/lib, Program Files) needs a "package" update.
+fs.write $EXE/** (an AppImage: fs.write $APPIMAGE/**); a folder of the system (/usr/lib,
+Program Files) needs a "package" update.
 ```
 
 ### `update` crate root
+
+Re-exports: `plat::pkg::Packaged`
 
 - **`struct Config`**
   what the updater needs to know about the app
@@ -32715,6 +32852,9 @@ fs.write $EXE/**; a folder of the system (/usr/lib, Program Files) needs a "pack
   - `Nothing` -- nothing to download or to apply
   - `Unsupported(String)` -- a package that is not put in place by the updater
   - `Io(String)` -- files could not be read or written
+  - `ReadOnly(String)` -- the AppImage lies in a folder the user cannot write (the folder): it is not replaced
+  - `Rejected(String)` -- the downloaded package is not taken: not an AppImage, or its signature does not follow
+    the running one's (why)
 
 - **`struct Offer`**
   a newer version the channel offers
@@ -32728,9 +32868,20 @@ fs.write $EXE/**; a folder of the system (/usr/lib, Program Files) needs a "pack
 - **`enum Check`**
   the answer of a check
   - `UpToDate` -- no newer version (or only one that was rolled back)
-  - `NoPackage(String)` -- a newer version without a package for this system (its version); also when it has only
-    an exe or bundle package and the program runs as an AppImage, Flatpak or Snap
+  - `NoPackage(String)` -- a newer version without a package for this system and installation (its version): an
+    AppImage takes only "appimage" entries, a plain program none of them
   - `Available(Offer)` -- a newer version to download
+  - `Managed(Manager, Option<bool>)` -- this installation is updated by its package system, not through update.json: who, and
+    whether it knows of a newer version (None: it does not say)
+
+- **`enum Manager`**
+  who updates an installation that lib/update does not update itself (Check::Managed)
+  - `AppInstaller` -- App Installer: the MSIX package came from an .appinstaller file and is updated as that
+    file says (tools/pkg_msix.py: at the next start)
+  - `Msix` -- an MSIX package without an .appinstaller (the Store, Add-AppxPackage): updated by
+    whoever installed it
+  - `Flatpak` -- Flatpak (flatpak update, a software centre): the portal's update monitor is missing
+  - `Snap` -- snapd
 
 - **`enum Startup`**
   what startup() did
@@ -32793,7 +32944,12 @@ fs.write $EXE/**; a folder of the system (/usr/lib, Program Files) needs a "pack
   installed from there by the app or the user)
 - **`fn apply(&self) -> Result<Startup, Error>`**
   put the downloaded update in place now and restart into it (with cfg.restart the
-  process ends here)
+  process ends here); a Flatpak: start the newest installed version (the portal's Spawn)
+  and end this one
+
+- **`fn install(cfg: &Config) -> Packaged`**
+  how the running program is installed, which decides what an update is (cfg.exe set:
+  Plain -- an explicit program file)
 
 - **`fn startup(cfg: &Config) -> Startup`**
   at the start of the program, before its UI: a staged update is put in place and the
@@ -32804,6 +32960,35 @@ fs.write $EXE/**; a folder of the system (/usr/lib, Program Files) needs a "pack
 - **`fn healthy(cfg: &Config) -> bool`**
   the health marker: the new version on trial works.  Call it once the app is up (after its
   first frame, for example); true when it ended a trial.  Cheap when no trial runs.
+
+### `update/appimage.rs`
+
+Source: [`lib/update/appimage.rs`](../lib/update/appimage.rs)
+
+```text
+appimage -- an AppImage file as an update: the type-2 header, its embedded signature (the
+sections .sha256_sig and .sig_key appimagetool --sign writes) and whether a new file may
+follow the running one
+
+  is_type2(path) -> bool             ELF with "AI\x02" at byte 8
+  signature(path) -> Result<Signed, String>   No (no or empty sections), By(the signing key
+                                     of the embedded key block, its fingerprints), Err: a
+                                     signature that does not check
+  follows(old, new) -> Result<(), String>   the rule of an update: a signed AppImage only
+                                     takes one signed by a key of its own key block
+
+The signed text is the SHA-256 of the whole file, with the bytes of both sections taken as
+zeros, as 64 lower-case hex digits (appimagetool's digest; AppImageUpdate's validate checks
+the same).  The armored signature and key stand NUL-padded in their sections.
+```
+
+- **`enum Signed`**
+  what an AppImage's signature sections say
+  - `No` -- not signed (no sections, or empty ones)
+  - `By { signer: [u8; 20], keys: Vec<[u8; 20]> }` -- signed by `signer` (a key of the embedded block, whose fingerprints are `keys`)
+
+- **`fn signature(path: &str) -> Result<Signed, String>`**
+  the embedded signature of the AppImage at path
 
 ### `update/apply.rs`
 
@@ -32821,6 +33006,10 @@ Every file of an update is written next to its target as NAME.jfupd-new; the old
 copied to backup/files/ (backup/list: "R path" replaced, "N path" new), renamed away
 (NAME.jfupd-old-<n>: Windows can rename a running exe, not replace it) and the new file takes
 its name.  Leftover .jfupd-* files are removed at a later start, once no process uses them.
+An AppImage update has one file, the .AppImage itself ($APPIMAGE): copied (and hashed on the
+way) from staged/ as NAME.jfupd-new, checked as an AppImage whose signature follows the
+running one's (appimage.rs), renamed over the old file (atomic on Linux); the old file is
+the backup.  Large files are copied in pieces, never read whole.
 ```
 
 - **`enum Stage`**
@@ -32870,7 +33059,9 @@ Source: [`lib/update/manifest.rs`](../lib/update/manifest.rs)
 manifest -- update.json: parse, check the signature, pick the package of this system,
 compare versions
 
-  Manifest::parse(bytes) -> Result<Manifest, String>   (no signature check)
+  Manifest::parse(bytes) -> Result<Manifest, String>   (no signature check; entries of a
+                                          kind this version does not know are left out)
+  Manifest::package_for(target, appimage) the entry for this system and installation
   verify(bytes, sig_text, keys) -> bool   the Base64 Ed25519 signature of update.json.sig
   target() -> "windows-x86_64" | "linux-x86_64" | "linux-aarch64" | ...
   newer(a, b) -> bool                     "1.10.0" > "1.9.2", "2.0.0" > "2.0.0-rc1"
@@ -32888,11 +33079,15 @@ MAX_SIG: usize = 4096
   - `Exe` -- the program file itself
   - `Bundle` -- a JFA1 bundle (tools/assetpack.py) of files relative to the program's folder
   - `Package` -- an installer (.deb, setup): downloaded and checked, installed by the app or the user
+  - `AppImage` -- a whole AppImage: replaces the running AppImage's file ($APPIMAGE); only offered to a
+    program that runs as an AppImage, which is offered nothing else
+  - `Flatpak` -- an update of a Flatpak from its repository, through the Flatpak portal (never in a
+    manifest: Offer::kind of a Flatpak)
 
 **`impl Kind`**
 
 - **`fn name(self) -> &'static str`**
-  "exe", "bundle" or "package"
+  "exe", "bundle", "package", "appimage" or "flatpak"
 - **`fn parse(s: &str) -> Option<Kind>`**
   the kind of a name (name())
 
@@ -32920,6 +33115,9 @@ MAX_SIG: usize = 4096
   it is malformed
 - **`fn package(&self, target: &str) -> Option<&Package>`**
   the package for a target (the first one)
+- **`fn package_for(&self, target: &str, appimage: bool) -> Option<&Package>`**
+  the package for a target and the way the program is installed: the first "appimage"
+  entry for an AppImage (appimage = true), else the first entry of another kind
 
 - **`fn verify(bytes: &[u8], sig_text: &[u8], keys: &[[u8; 32]]) -> bool`**
   whether sig_text (update.json.sig: the Base64 Ed25519 signature, blanks around it ignored)

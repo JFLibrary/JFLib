@@ -439,7 +439,7 @@ PERM_KEYS_AGENT = ("agent.confirm", "agent.deny")                  # agent actio
 PERM_KEYS_SANDBOX = ("sandbox",)                                   # OS sandbox: "sandbox [strict]"
 PERM_KEYS_PACKAGE = ("recent",)                                    # only the packages read it (Flatpak)
 PERM_ASKABLE = PERM_KEYS_ARGS + PERM_KEYS_FLAG[1:]                  # "ask KEY ARGS [\"reason\"]"
-PERM_VARS = ("CONFIG", "TEMP", "HOME", "EXE", "FONTS", "APPCONFIG", "APPDATA", "APPCACHE", "APPLOG",
+PERM_VARS = ("CONFIG", "TEMP", "HOME", "EXE", "APPIMAGE", "FONTS", "APPCONFIG", "APPDATA", "APPCACHE", "APPLOG",
              "DESKTOP", "DOCUMENTS", "DOWNLOADS", "PICTURES", "MUSIC", "VIDEOS")
 
 

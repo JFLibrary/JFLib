@@ -6,8 +6,13 @@
 //                   byte)
 //   entry()         the Run value
 //   In an MSIX package (a package identity, GetCurrentPackageFullName) HKCU is virtualized:
-//   the Run value would reach no one.  There set() is Unavailable, get() false, entry() None;
-//   the package's StartupTask (tools/pkg_msix.py) is switched on in Settings -> Apps -> Startup.
+//   the Run value would reach no one.  There the package's StartupTask (TaskId "Autostart",
+//   written by tools/pkg_msix.py) is switched through WinRT (win_winrt.rs, on an MTA thread):
+//   StartupTask.GetAsync, then RequestEnableAsync (its new state: Enabled / EnabledByPolicy,
+//   else Dismissed -- the user switched it off in Settings -> Apps -> Startup, or a policy
+//   did) or Disable(); get() = State Enabled / EnabledByPolicy (kept for a second); entry() =
+//   the program (a StartupTask takes no arguments: args are not passed); a manifest without
+//   the task: Unavailable.
 //   (crate) quote_arg(arg, &mut out)   one argument with the Microsoft rules (CommandLineToArgvW:
 //                   quotes when needed, n backslashes before a quote doubled + 1); also the
 //                   arguments of the taskbar's tasks (win_taskbar.rs)
@@ -15,8 +20,10 @@
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicU64, Ordering};
 
 use super::AutostartError;
+use crate::win_winrt::{self, Guid, Obj};
 
 #[link(name = "advapi32", kind = "raw-dylib")]
 unsafe extern "system" {
@@ -116,7 +123,8 @@ pub(crate) fn packaged() -> bool {
 
 pub fn set(on: bool, args: &[&str]) -> Result<(), AutostartError> {
     if packaged() {
-        return Err(AutostartError::Unavailable);
+        STATE_AT.store(0, Ordering::SeqCst);
+        return crate::win_winrt::mta(move || task_set(on)).unwrap_or_else(|| Err(AutostartError::Failed(String::from("no thread for WinRT"))));
     }
     let name = crate::vfs::app_id();
     if !on {
@@ -141,7 +149,17 @@ pub fn set(on: bool, args: &[&str]) -> Result<(), AutostartError> {
 
 pub fn get() -> bool {
     if packaged() {
-        return false;
+        // the answer of the last second (a settings page may ask every frame; each answer
+        // costs a thread and a WinRT call): bit 0 the state, the rest the time in ms + 1
+        let now = crate::time_us() / 1000 + 1;
+        let at = STATE_AT.load(Ordering::SeqCst);
+        if at != 0 && now.saturating_sub(at >> 1) < STATE_CACHE_MS {
+            return at & 1 != 0;
+        }
+        let on = crate::win_winrt::mta(|| task().and_then(|t| t.get_i32(ST_STATE)).is_ok_and(|s| s == ENABLED || s == ENABLED_BY_POLICY))
+            .unwrap_or(false);
+        STATE_AT.store(now << 1 | on as u64, Ordering::SeqCst);
+        return on;
     }
     let name = crate::vfs::app_id();
     if reg_get(RUN, &name).is_none() {
@@ -153,9 +171,82 @@ pub fn get() -> bool {
 
 pub fn entry() -> Option<String> {
     if packaged() {
-        return None;
+        // the task starts the package's program, without arguments
+        let exists = crate::win_winrt::mta(|| task().is_ok()).unwrap_or(false);
+        return exists.then(|| crate::current_exe().map(|e| command_line(&e.replace('/', "\\"), &[]))).flatten();
     }
     let (_, d) = reg_get(RUN, &crate::vfs::app_id())?;
     let w: Vec<u16> = d.chunks_exact(2).map(|c| u16::from_le_bytes([c[0], c[1]])).take_while(|&c| c != 0).collect();
     Some(String::from_utf16_lossy(&w))
+}
+
+// ---------------------------------------------------------------- the StartupTask (MSIX)
+
+/// the TaskId tools/pkg_msix.py writes into the AppxManifest
+const TASK_ID: &str = "Autostart";
+static IID_ISTARTUPTASKSTATICS: Guid = Guid(0xEE5B_60BD, 0xA148, 0x41A7, [0xB2, 0x6E, 0xE8, 0xB8, 0x8A, 0x1E, 0x62, 0xF8]);
+// IStartupTaskStatics.GetAsync; IStartupTask.RequestEnableAsync / Disable / State;
+// IAsyncOperation<T>.GetResults
+const SS_GETASYNC: usize = 7;
+const ST_REQUESTENABLE: usize = 6;
+const ST_DISABLE: usize = 7;
+const ST_STATE: usize = 8;
+const OP_RESULTS: usize = 8;
+// StartupTaskState
+const DISABLED_BY_USER: i32 = 1;
+const ENABLED: i32 = 2;
+const DISABLED_BY_POLICY: i32 = 3;
+const ENABLED_BY_POLICY: i32 = 4;
+// how long GetAsync / Disable may take (RequestEnableAsync: AUTOSTART_WAIT_MS)
+const TASK_MS: u32 = 15_000;
+// get(): the task's state is asked again after this (set() forgets it)
+const STATE_CACHE_MS: u64 = 1000;
+static STATE_AT: AtomicU64 = AtomicU64::new(0);
+// the manifest has no such task: HRESULT_FROM_WIN32(ERROR_NOT_FOUND), E_INVALIDARG
+const E_NOT_FOUND: i32 = 0x8007_0490u32 as i32;
+const E_INVALIDARG: i32 = 0x8007_0057u32 as i32;
+
+fn task_error(hr: i32) -> AutostartError {
+    if hr == E_NOT_FOUND || hr == E_INVALIDARG {
+        AutostartError::Unavailable
+    } else {
+        AutostartError::Failed(format!("StartupTask: 0x{:08X}", hr as u32))
+    }
+}
+
+/// StartupTask.GetAsync("Autostart") (on an MTA thread: win_winrt::mta)
+fn task() -> Result<Obj, i32> {
+    let statics = win_winrt::factory("Windows.ApplicationModel.StartupTask", &IID_ISTARTUPTASKSTATICS)?;
+    let id = win_winrt::HStr::new(TASK_ID).ok_or(win_winrt::E_FAIL)?;
+    let mut op = 0usize;
+    // SAFETY: GetAsync(this, HSTRING taskId, out IAsyncOperation<StartupTask>).
+    let hr = unsafe {
+        let f: unsafe extern "system" fn(usize, isize, *mut usize) -> i32 = core::mem::transmute(statics.vfn(SS_GETASYNC));
+        f(statics.ptr(), id.raw(), &mut op)
+    };
+    if hr < 0 {
+        return Err(hr);
+    }
+    let op = Obj::own(op).ok_or(win_winrt::E_FAIL)?;
+    win_winrt::wait(&op, TASK_MS)?;
+    op.get_obj(OP_RESULTS)
+}
+
+/// switch the task (on an MTA thread)
+fn task_set(on: bool) -> Result<(), AutostartError> {
+    let t = task().map_err(task_error)?;
+    if !on {
+        return t.call0(ST_DISABLE).map_err(task_error);
+    }
+    match t.get_i32(ST_STATE).map_err(task_error)? {
+        ENABLED | ENABLED_BY_POLICY => return Ok(()),
+        DISABLED_BY_USER | DISABLED_BY_POLICY => return Err(AutostartError::Dismissed),
+        _ => {}
+    }
+    let op = t.get_obj(ST_REQUESTENABLE).map_err(task_error)?;
+    win_winrt::wait(&op, super::AUTOSTART_WAIT_MS as u32).map_err(|hr| if hr == win_winrt::E_TIMEOUT { AutostartError::Dismissed } else { task_error(hr) })?;
+    match op.get_i32(OP_RESULTS).map_err(task_error)? {
+        ENABLED | ENABLED_BY_POLICY => Ok(()),
+        _ => Err(AutostartError::Dismissed),
+    }
 }

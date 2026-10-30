@@ -63,6 +63,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** PERMISSIONS: the line recent gives a Flatpak the host's list of recent files (--filesystem=xdg-data/recently-used.xbel from tools/pkg_linux.py); nothing changes at run time
 - **text:** Variable fonts: fvar axes and named instances, avar, gvar deltas on TrueType outlines (IUP, phantom points, composites), advances from HVAR or the phantom points, MVAR metrics and GPOS kerning deltas; Text::vary / vary_named derive an instance with a font id of its own (glyph cache entries, metrics, HarfRust shaping at its normalized coordinates), var_axes, var_instances, var_values, var_coords; FontDb::variations / var_values / load_var for installed variable faces (load and load_resolved map weight and italic onto wght, ital and slnt). Outlines, advances and coordinates match HarfBuzz 14; CFF2 outlines are not supported
 - **ui:** Variable fonts in the UI: FontSel.axes (weight -> wght, italic -> ital / slnt, the size -> opsz unless set), the font dialog lists a variable family's named instances as styles and gives every axis a slider with a number box (opsz with Automatisch), theme files take family.axes = TAG=VALUE, ... and a variable font file's wght for its semibold and bold faces
+- **update:** Updates and signatures for the other package formats: lib/update follows the way a program is installed (update::install, plat::pkg::packaged) -- an AppImage replaces its .AppImage file with the channel's new appimage entry (trial, rollback, restart through the file; a read-only folder is Error::ReadOnly), a Flatpak checks, installs and starts the new version through the Flatpak portal's update monitor (Kind::Flatpak), an MSIX package or a Snap answers Check::Managed (App Installer, the Store, snapd); package.py signs AppImages as appimagetool --sign does (.sha256_sig / .sig_key, GPG) and lib/update checks that signature against the running AppImage's key (update::appimage_signature; OpenPGP RSA, ECDSA, Ed25519 with lib/crypto), signs the Flatpak repository and bundle (the bundle carries the key and the remote: flatpak_repo_url=), writes the MSIX .appinstaller (appinstaller_url=, OnLaunch) and an execution alias (msix_alias=); the PERMISSIONS variable $APPIMAGE
 
 ### Changed
 
@@ -78,6 +79,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** netpkt::decode::Proto has the new variant Bgp (bit P_BGP, TCP port 179); a match over every protocol needs an arm for it
 - **base:** base::metrics::Window makes its slots with the first value (a window that never got one holds no memory, so an engine with a resolver window per device copies fast); Window::bytes() tells the heap memory a window holds
 - **plat:** plat::assoc::reg_entries takes the program's AppUserModelID as a sixth argument ("" = none) and names it in each ProgID
+- **update:** A manifest entry of a kind lib/update does not know is left out instead of refusing the whole update.json, so later kinds do not break older programs
+- **plat:** plat::autostart_set / autostart_get / autostart_entry switch an MSIX package's StartupTask through WinRT (StartupTask.GetAsync, RequestEnableAsync, Disable, State over raw COM on an MTA thread) instead of answering Unavailable
 
 ### Fixed
 

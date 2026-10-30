@@ -95,7 +95,8 @@
 //                         at run time nothing changes: the system's list is always allowed
 //                         for files the app may read (recent.rs)
 // A PATTERN is an absolute path (X:/.. and //server/share/.. count on Windows only, /.. on
-// Linux only), or starts with $CONFIG $TEMP $HOME $EXE $FONTS, the app's own folders
+// Linux only), or starts with $CONFIG $TEMP $HOME $EXE $FONTS, $APPIMAGE (the folder of the
+// running AppImage file: lib/update replaces it there; no value elsewhere), the app's own folders
 // $APPCONFIG $APPDATA $APPCACHE $APPLOG (vfs::app_dir) or the user's folders $DESKTOP
 // $DOCUMENTS $DOWNLOADS $PICTURES $MUSIC $VIDEOS (user_dir; a variable without a value
 // drops the pattern); '*' / '?' match inside one segment, a '**' segment any number of
@@ -1665,6 +1666,7 @@ fn pattern(a: &str, plugin: Option<&str>) -> Result<Vec<Vec<String>>, String> {
             "TEMP" => crate::temp_dir().into_iter().collect(),
             "HOME" => crate::home().into_iter().collect(),
             "EXE" => exe_dir().into_iter().collect(),
+            "APPIMAGE" => appimage_dir().into_iter().collect(),
             "FONTS" => font_dirs(),
             "APPCONFIG" => crate::vfs::app_dir(crate::vfs::APP_CONFIG).into_iter().collect(),
             "APPDATA" => crate::vfs::app_dir(crate::vfs::APP_DATA).into_iter().collect(),
@@ -1676,7 +1678,7 @@ fn pattern(a: &str, plugin: Option<&str>) -> Result<Vec<Vec<String>>, String> {
                 Some(k) => crate::user_dir(k as u32).into_iter().collect(),
                 None => {
                     return Err(alloc::format!(
-                        "unknown variable ${} (CONFIG, TEMP, HOME, EXE, FONTS, APPCONFIG, APPDATA, APPCACHE, APPLOG, {}{})",
+                        "unknown variable ${} (CONFIG, TEMP, HOME, EXE, APPIMAGE, FONTS, APPCONFIG, APPDATA, APPCACHE, APPLOG, {}{})",
                         other,
                         USER_VARS.join(", "),
                         if plugin.is_some() { ", PLUGIN" } else { "" }
@@ -1850,6 +1852,15 @@ fn exe_dir() -> Option<String> {
 #[cfg(not(any(windows, target_os = "linux")))]
 fn exe_dir() -> Option<String> {
     None
+}
+
+// the folder of the running AppImage file ($APPIMAGE; the program itself runs from the copy its
+// runtime unpacked, $EXE)
+fn appimage_dir() -> Option<String> {
+    match crate::pkg::packaged() {
+        crate::pkg::Packaged::AppImage(p) => p.rfind('/').filter(|&k| k > 0).map(|k| String::from(&p[..k])),
+        _ => None,
+    }
 }
 
 // ---------------------------------------------------------------- the network

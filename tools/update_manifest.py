@@ -4,7 +4,7 @@
                                                          public key for update::Config
     python tools/update_manifest.py pubkey [--key FILE]  the public key of a signing key
     python tools/update_manifest.py sign --app ID --version V --out DIR
-            --file TARGET=PATH[,kind=exe|bundle|package][,name=NAME] ...
+            --file TARGET=PATH[,kind=exe|bundle|package|appimage][,name=NAME] ...
             [--notes TEXT] [--expires-days N] [--base-url URL] [--key FILE]
                                                          copies the files into DIR and writes
                                                          DIR/update.json + update.json.sig
@@ -18,7 +18,9 @@ it can ship code to every installation.
 TARGET is "windows-x86_64", "linux-x86_64", "linux-aarch64", ... (update::target()); kind
 "exe" (default) replaces the program file, "bundle" is a JFA1 bundle of files relative to the
 program's folder (tools/assetpack.py pack_files), "package" an installer the app hands to the
-user.  With --base-url the manifest names absolute addresses, otherwise the file names
+user, "appimage" a whole AppImage that replaces the running AppImage's file (only a program
+running as an AppImage takes it, and nothing else; a channel may hold a "package" and an
+"appimage" for the same target).  With --base-url the manifest names absolute addresses, otherwise the file names
 (relative to update.json).
 
 Ed25519 (RFC 8032) is implemented here in plain Python: the standard library has none, and
@@ -36,6 +38,7 @@ import time
 from pathlib import Path
 
 KEY_TAG = "JFUPDKEY1"
+KINDS = ("exe", "bundle", "package", "appimage")
 
 # ---------------------------------------------------------------- Ed25519 (RFC 8032)
 # Written from the algorithm of RFC 8032 section 5.1 (key expansion 5.1.5, signing 5.1.6, the
@@ -226,8 +229,8 @@ def write_channel(out, app, version, files, seed, notes="", expires_days=0, base
     out.mkdir(parents=True, exist_ok=True)
     entries = []
     for target, kind, path, name in files:
-        if kind not in ("exe", "bundle", "package"):
-            raise SystemExit(f"update_manifest: unknown kind {kind!r} (exe, bundle, package)")
+        if kind not in KINDS:
+            raise SystemExit(f"update_manifest: unknown kind {kind!r} ({', '.join(KINDS)})")
         dest = out / name
         if Path(path).resolve() != dest.resolve():
             shutil.copyfile(path, dest)

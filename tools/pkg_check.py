@@ -2,18 +2,25 @@
 
     python tools/pkg_check.py --quick [--runtime FILE]     (build_rs.py test runs this)
     python tools/pkg_check.py [--app template] [--out DIR] [--keep]
+    python tools/pkg_check.py --install                    (installs test packages, see below)
 
   --quick: nothing is built
     meta      a fixture app (file types, URL schemes, every PERMISSIONS key, characters that need
               escaping): the .desktop entry, the AppStream metainfo, the Flatpak finish-args and
-              manifest, the RPM .spec, the AppxManifest.xml (fields and mappings)
+              manifest, the RPM .spec, the AppxManifest.xml (fields and mappings, the StartupTask
+              id plat asks for, the execution alias), the .appinstaller; the update channel with
+              an AppImage entry (package.update_channel)
     missing   every format without its tools: skipped, the tool named, the rest written
     apps      every apps/*/PACKAGE: .desktop, metainfo (validators), AppxManifest (MakeAppx pack
               with a stand-in program)
     notices   THIRD_PARTY_NOTICES.md names every file of licenses/; the shipped notices hold it,
               licenses/ and text_shape's, and per style those of the styles whose files it embeds
-    elf       pkg_linux.runtime_image on a small ELF file: "AI\\x02", .upd_info found by name,
-              the image still starts at the end of the ELF data, a second write in place
+    elf       pkg_linux.runtime_image on a small ELF file: "AI\\x02", .upd_info, .sha256_sig and
+              .sig_key found by name, the image still starts at the end of the ELF data, a second
+              write in place; appimage_digest does not see the signature sections
+    sign      (Linux / WSL with gpg) a throwaway key in /tmp; an AppImage signed the way
+              package.py does (codesign.gpg_detach_sign through linux_task.py), gpgv checks the
+              embedded signature over a digest computed on its own; a changed byte fails
     validate  (Linux / WSL) desktop-file-validate, appstreamcli validate --no-net, sh -n on the
               .spec scriptlets; (Windows) MakeAppx pack of the fixture package (schema check)
     runtime   (--runtime FILE, else build/linux/appimagert when it is there) SquashFS images
@@ -32,6 +39,17 @@
               this run (openssl, never installed) signs a copy, signtool verify reads it (the
               root is untrusted: expected)
     aab       what an Android App Bundle would need (bundletool, aapt2, java): only reported
+  --install: the packages installed for a moment, where that needs no administrator and no
+  changed system setting (each part SKIPs with the reason otherwise; everything is removed after):
+    flatpak   (WSL) updatetest as a Flatpak in a GPG-signed repository (pkg_linux.make_flatpak,
+              versions 1.0.0 and 2.0.0), the signed bundle of 1.0.0 installed with flatpak --user
+              into a temporary HOME (the runtime from the real user installation, read-only), run
+              in a private session bus with flatpak-portal --poll-timeout=2: the portal reports
+              the update, Update installs 2.0.0, Spawn starts it (updatetest --test flatpak)
+    msix      (Windows, developer mode already on) updatetest's package folder (pkg_msix.layout
+              with an execution alias) registered with Add-AppxPackage -Register, started through
+              the alias: package identity, Check::Managed, the StartupTask on and off
+              (updatetest --test msix); then Remove-AppxPackage
 
 Work files: build/pkg_check/ (the packages: --out, default build/pkg_check/dist; removed with the
 rest unless --keep).  Prints PASS / FAIL / SKIP; exit code 1 on failures.  Nothing is installed:
@@ -238,6 +256,11 @@ def inside_appimage(app, scripts):
         check(f"usr/share/metainfo/{aid}.appdata.xml" in t and f"usr/share/applications/{aid}.desktop" in t
               and f"usr/share/icons/hicolor/256x256/apps/{aid}.png" in t, "appimage: metainfo, .desktop and icons below usr/share")
         inside_validate([os.path.join(root, desk[0]), os.path.join(root, f"usr/share/metainfo/{aid}.appdata.xml")] if desk else [])
+        data = open(app, "rb").read()
+        sig = elf_section(data, ".sha256_sig")
+        r = subprocess.run([app, "--appimage-signature"], capture_output=True, text=True)
+        check(sig is not None and r.returncode == 0 and r.stdout.strip() == data[sig[0]:sig[0] + sig[1]].rstrip(b"\0").decode().strip(),
+              "appimage: --appimage-signature prints .sha256_sig")
         if shutil.which("unsquashfs"):
             off = subprocess.run([app, "--appimage-offset"], capture_output=True, text=True).stdout.strip()
             r = subprocess.run(["unsquashfs", "-o", off, "-l", app], capture_output=True, text=True)
@@ -276,6 +299,162 @@ def inside_flatpak(src, aid, root, scripts):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+def elf_section(data, name):
+    """(file offset, size) of a section of an ELF64 file, None without it (the Linux side's own
+    reading, independent of pkg_linux)"""
+    shoff = struct.unpack_from("<Q", data, 0x28)[0]
+    shsize, shnum, shstrndx = struct.unpack_from("<HHH", data, 0x3A)
+    head = [struct.unpack_from("<IIQQQQ", data, shoff + i * shsize) for i in range(shnum)]
+    names = data[head[shstrndx][4]:head[shstrndx][4] + head[shstrndx][5]]
+    for n, _, _, _, off, size in head:
+        if names[n:names.index(b"\0", n)] == name.encode():
+            return off, size
+    return None
+
+
+def inside_gpgkey(home):
+    """a throwaway GnuPG home with an Ed25519 signing key (no passphrase): INFO fpr=..."""
+    os.makedirs(home, mode=0o700)
+    base = ["gpg", "--homedir", home, "--batch", "--yes", "--quiet"]
+    subprocess.run(base + ["--passphrase", "", "--quick-gen-key", "pkg_check <pkg_check@localhost>", "ed25519", "sign", "never"],
+                   check=True, capture_output=True)
+    out = subprocess.run(base + ["--list-keys", "--with-colons"], check=True, capture_output=True, text=True).stdout
+    print("INFO fpr=" + next(ln.split(":")[9] for ln in out.splitlines() if ln.startswith("fpr:")))
+
+
+def gpg_drop(home):
+    """end the key's gpg-agent and remove the home"""
+    subprocess.run(["gpgconf", "--homedir", home, "--kill", "gpg-agent"], capture_output=True)
+    shutil.rmtree(home, ignore_errors=True)
+
+
+def inside_appimagesig(path, home):
+    """gpgv checks the AppImage's .sha256_sig against the key in .sig_key over appimagetool's
+    digest (computed here); a changed byte fails"""
+    tmp = tempfile.mkdtemp(prefix="jfgui-pkgcheck-")
+    try:
+        data = open(path, "rb").read()
+        sig, key = elf_section(data, ".sha256_sig"), elf_section(data, ".sig_key")
+        if not check(sig and key and sig[1] == 1024 and key[1] == 8192, "sign: the runtime has .sha256_sig (1024) and .sig_key (8192)"):
+            return
+
+        def digest(b):
+            z = bytearray(b)
+            for off, size in (sig, key):
+                z[off:off + size] = bytes(size)
+            return hashlib.sha256(z).hexdigest()
+        sig_text = data[sig[0]:sig[0] + sig[1]].rstrip(b"\0")
+        key_text = data[key[0]:key[0] + key[1]].rstrip(b"\0")
+        check(sig_text.startswith(b"-----BEGIN PGP SIGNATURE-----") and key_text.startswith(b"-----BEGIN PGP PUBLIC KEY BLOCK-----"),
+              "sign: an armored signature and key in the sections (NUL-padded)")
+        open(f"{tmp}/key.asc", "wb").write(key_text)
+        open(f"{tmp}/sig.asc", "wb").write(sig_text)
+        subprocess.run(["gpg", "--batch", "--yes", "--dearmor", "-o", f"{tmp}/key.gpg", f"{tmp}/key.asc"], check=True, capture_output=True)
+        open(f"{tmp}/digest", "w").write(digest(data))
+        r = subprocess.run(["gpgv", "--keyring", f"{tmp}/key.gpg", f"{tmp}/sig.asc", f"{tmp}/digest"], capture_output=True, text=True)
+        check(r.returncode == 0, "sign: gpgv accepts the embedded signature over the digest with the embedded key"
+              + (f" -- {r.stderr.strip()}" if r.returncode else ""))
+        bad = bytearray(data)
+        bad[-10] ^= 1
+        open(f"{tmp}/digest", "w").write(digest(bad))
+        r = subprocess.run(["gpgv", "--keyring", f"{tmp}/key.gpg", f"{tmp}/sig.asc", f"{tmp}/digest"], capture_output=True, text=True)
+        check(r.returncode != 0, "sign: a byte changed after signing: gpgv refuses")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+        if home != "-":                                     # "-": the key is the caller's
+            gpg_drop(home)
+
+
+def ours(home):
+    """the pids of processes whose environment has HOME=home (started by this check)"""
+    out = []
+    for pid in filter(str.isdigit, os.listdir("/proc")):
+        try:
+            if f"HOME={home}".encode() in open(f"/proc/{pid}/environ", "rb").read().split(b"\0"):
+                out.append(int(pid))
+        except OSError:
+            pass
+    return out
+
+
+def inside_flatpak_update(bundle, aid, real_dir, v2):
+    """the bundle (version 1.0.0) installed with flatpak --user into a temporary HOME, run in a
+    private session bus with flatpak-portal polling every 2 s: updatetest --test flatpak finds
+    the update, installs it and starts the newest version (v2: its commit), which logs its
+    start; everything started here is ended, the HOME removed"""
+    tmp = tempfile.mkdtemp(prefix="jfgui-pkgcheck-flatpak-")
+    home = f"{tmp}/home"
+    try:
+        os.makedirs(home)
+        os.makedirs(f"{tmp}/run", mode=0o700)
+        env = dict(os.environ, HOME=home, XDG_RUNTIME_DIR=f"{tmp}/run", FLATPAK_SYSTEM_DIR=real_dir,
+                   XDG_DATA_HOME=f"{home}/.local/share", XDG_CONFIG_HOME=f"{home}/.config", XDG_CACHE_HOME=f"{home}/.cache")
+        for k in ("DBUS_SESSION_BUS_ADDRESS", "FLATPAK_USER_DIR"):
+            env.pop(k, None)
+        # the portal asks the user once whether the app may update itself (a dialog of the
+        # desktop) and keeps the answer in the permission store: granted there beforehand
+        script = f"""
+gdbus call --session --dest org.freedesktop.impl.portal.PermissionStore --object-path /org/freedesktop/impl/portal/PermissionStore \\
+  --method org.freedesktop.impl.portal.PermissionStore.SetPermission flatpak true updates {aid} "['yes']" >{tmp}/permission.log 2>&1
+echo "permission=$?"
+/usr/libexec/flatpak-portal --replace --poll-timeout=2 --no-idle-exit >{tmp}/portal.log 2>&1 &
+portal=$!
+sleep 1
+flatpak --user install -y --noninteractive --bundle {shlex_quote(bundle)} >{tmp}/install.log 2>&1
+echo "install=$?"
+flatpak --user remotes --show-details >{tmp}/remotes.log 2>&1
+timeout 180 flatpak run {aid} --test flatpak >{tmp}/run1.log 2>&1
+echo "run=$?"
+for i in $(seq 1 120); do
+  log=$(find {home}/.var/app/{aid} -name flatpak.log 2>/dev/null | head -n1)
+  [ -n "$log" ] && grep -q "^uptodate " "$log" && break
+  sleep 1
+done
+echo "log=$log"
+flatpak --user info {aid} >{tmp}/info.log 2>&1
+kill $portal 2>/dev/null
+wait $portal 2>/dev/null
+"""
+        r = subprocess.run(["dbus-run-session", "--", "bash", "-c", script], env=env, capture_output=True, text=True, timeout=900)
+        vals = dict(ln.split("=", 1) for ln in r.stdout.splitlines() if "=" in ln)
+        read = lambda n: open(f"{tmp}/{n}", errors="replace").read() if os.path.exists(f"{tmp}/{n}") else ""  # noqa: E731
+        check(vals.get("install") == "0", "flatpak: the signed bundle installs with flatpak --user (a temporary HOME)"
+              + ("" if vals.get("install") == "0" else f" -- {read('install.log').strip()[-600:]}"))
+        check(vals.get("permission") == "0", "flatpak: the update permission granted in the permission store"
+              + ("" if vals.get("permission") == "0" else f" -- {read('permission.log').strip()[-300:]}"))
+        remotes = read("remotes.log")
+        origin = [ln.split("\t") for ln in remotes.splitlines() if ln.split("\t")[0].endswith("-origin")]
+        check(origin and origin[0][2].endswith("/flatpak/repo") and "no-gpg-verify" not in origin[0][7],
+              f"flatpak: the bundle set up its remote, GPG-verified ({origin[0][:3] + origin[0][7:8] if origin else remotes.strip()[-300:]})")
+        log = open(vals["log"], errors="replace").read() if vals.get("log") else ""
+        print("INFO flatpak log: " + " | ".join(log.splitlines()))
+        lines = log.splitlines()
+        check(any(ln.startswith('run 1.0.0 Flatpak("' + aid + '")') for ln in lines), "flatpak: 1.0.0 runs as a Flatpak (update::install)")
+        check(any(ln.startswith("available ") and " kind flatpak " in ln for ln in lines), "flatpak: the portal's monitor reports the update (Check::Available, Kind::Flatpak)")
+        check(any(ln.startswith("installed ") and ln.endswith("progress 100/100") for ln in lines), "flatpak: download() installs it through the portal (Update, Progress)")
+        check(any(ln.startswith('run 2.0.0 Flatpak("') for ln in lines) and "uptodate 2.0.0" in lines,
+              "flatpak: apply() starts the newest version (Spawn, LATEST_VERSION), which finds nothing newer"
+              + ("" if "uptodate 2.0.0" in lines else f" -- run: {read('run1.log').strip()[-500:]} portal: {read('portal.log').strip()[-300:]}"))
+        info = read("info.log")
+        check(v2 and v2[:12] in info, f"flatpak: the installation is at the new commit ({v2[:12]})")
+    finally:
+        left = ours(home)
+        for pid in left:
+            try:
+                os.kill(pid, 9)
+            except OSError:
+                pass
+        if left:
+            print(f"INFO flatpak: ended {len(left)} process(es) of the test HOME")
+        subprocess.run(["chmod", "-R", "u+w", tmp], capture_output=True)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def shlex_quote(s):
+    import shlex
+    return shlex.quote(s)
+
+
 def inside_main(args):
     action = args[0]
     if action == "runtime":
@@ -286,6 +465,14 @@ def inside_main(args):
         inside_appimage(args[1], args[2:])
     elif action == "flatpak":
         inside_flatpak(args[1], args[2], args[3], args[4:])
+    elif action == "gpgkey":
+        inside_gpgkey(args[1])
+    elif action == "gpgdrop":
+        gpg_drop(args[1])
+    elif action == "appimagesig":
+        inside_appimagesig(args[1], args[2])
+    elif action == "flatpakupdate":
+        inside_flatpak_update(*args[1:])
     return 1 if FAILS else 0
 
 
@@ -321,6 +508,7 @@ FIX_META = {"display": 'Prüf & "Fixture"', "version": "1.2.3-beta", "publisher"
             "filetypes": "fxd|application/x-jf-fixture|Fixture-Dokument|own; png,apng|image/png|PNG-Bild",
             "schemes": "jffix", "styles": "winui kde", "default_win": "winui", "default_linux": "kde",
             "homepage": "https://example.org/fixture", "flatpak_args": "--talk-name=org.kde.StatusNotifierWatcher",
+            "appinstaller_url": "https://example.org/fixture/msix/", "msix_alias": "jf-fixture.exe",
             "unit_jf-fixture-daemon": "Fixture-Dienst|jf-fixture-daemon run"}
 FIX_PERMS = [("fs.read", ["$PICTURES/**", "/opt/fixture/data/*.bin"]),
              ("fs.write", ["$DOCUMENTS/Fixture/**", "$CONFIG/Fixture/**", "$TEMP/fx-*/**", "C:/Fixture/**", "$HOME/.fixture/**"]),
@@ -446,9 +634,16 @@ def meta_checks(d):
           and '<Capability Name="internetClient"/>' in xml and '<Capability Name="privateNetworkClientServer"/>' in xml
           and '<rescap:Capability Name="runFullTrust"/>' in xml and 'DisplayName="Prüf &amp; &quot;Fixture&quot;"' in xml,
           "msix: AppxManifest: identity, version a.b.c.0, file types, protocol, StartupTask, capabilities, escaping")
+    task = re.search(r'const TASK_ID: &str = "([^"]+)"', (ROOT / "lib/plat/win_autostart.rs").read_text(encoding="utf-8"))
+    check(task and task.group(1) == pkg_msix.STARTUP_TASK_ID and f'TaskId="{pkg_msix.STARTUP_TASK_ID}"' in xml,
+          "msix: the StartupTask's TaskId is the one plat's autostart_set asks for (win_autostart.rs TASK_ID)")
+    check('<desktop:ExecutionAlias Alias="jf-fixture.exe"/>' in xml and 'Category="windows.appExecutionAlias"' in xml
+          and 'IgnorableNamespaces="uap uap3 desktop rescap"' in xml, "msix: the execution alias (PACKAGE msix_alias=)")
+    t_appinstaller(job)
     job_none = fixture_job(d, perms=[("fs.user", [])])
     xml2 = pkg_msix.appx_manifest(job_none, "winui")
     check("StartupTask" not in xml2 and "internetClient" not in xml2, "msix: without autostart / net rules: no StartupTask, no capabilities")
+    t_update_channel(d)
     caps, cnotes = pkg_msix.capabilities([("fs.user", []), ("audio.output", [])])
     check(caps == [] and any(n.startswith("audio.output") for n in cnotes), "msix: audio.output needs no capability (noted)")
     for bad_meta, what in (({"schemes": "https"}, "a reserved scheme"), ({"version": "70000.1"}, "a version part > 65535"),
@@ -462,6 +657,59 @@ def meta_checks(d):
         except SystemExit:
             pass
     return job, out
+
+
+def t_appinstaller(job):
+    """the .appinstaller of the fixture: namespace, identity, addresses, UpdateSettings"""
+    import xml.etree.ElementTree as ET
+    text = pkg_msix.appinstaller(job, job.dist / "Fixture-1.2.3-x64.msix")
+    ns = {"a": pkg_msix.APPINSTALLER_NS}
+    root = ET.fromstring(text.encode("utf-8"))
+    main = root.find("a:MainPackage", ns)
+    onlaunch = root.find("a:UpdateSettings/a:OnLaunch", ns)
+    check(root.tag == f"{{{pkg_msix.APPINSTALLER_NS}}}AppInstaller" and root.get("Version") == "1.2.3.0"
+          and root.get("Uri") == "https://example.org/fixture/msix/Fixture.appinstaller"
+          and main is not None and main.get("Name") == "org.jflib.Fixture" and main.get("Publisher") == "CN=JFLib Test"
+          and main.get("Version") == "1.2.3.0" and main.get("ProcessorArchitecture") == "x64"
+          and main.get("Uri") == "https://example.org/fixture/msix/Fixture-1.2.3-x64.msix"
+          and onlaunch is not None and onlaunch.get("HoursBetweenUpdateChecks") == "0" and onlaunch.get("ShowPrompt") == "true"
+          and root.find("a:UpdateSettings/a:AutomaticBackgroundTask", ns) is not None,
+          "msix: .appinstaller: identity, addresses, UpdateSettings OnLaunch (every start, a prompt) and background checks")
+    for bad, what in (({"appinstaller_url": "ftp://x"}, "an address that is not http(s)"), ({"appinstaller_hours": "300"}, "hours > 255")):
+        try:
+            j = fixture_job(job.work.parent)
+            j.meta.update(bad)
+            pkg_msix.appinstaller(j, j.dist / "x.msix")
+            check(False, f"msix: .appinstaller: {what} is refused")
+        except SystemExit:
+            pass
+    j = fixture_job(job.work.parent)
+    j.meta.pop("appinstaller_url")
+    with contextlib.redirect_stdout(io.StringIO()):
+        none = pkg_msix.write_appinstaller(j, j.dist / "x.msix")
+    check(none is None and any("appinstaller_url" in t for _, t in j.notes), "msix: without appinstaller_url no .appinstaller, a note")
+
+
+def t_update_channel(d):
+    """package.update_channel with an AppImage: kind appimage beside the .deb, signed"""
+    import package
+    import update_manifest
+    out = d / "channel"
+    key = d / "test.updkey"
+    key.unlink(missing_ok=True)
+    pub = update_manifest.keygen(key)
+    deb, ai = d / "jf-fixture_1.2.3_amd64.deb", d / "Fixture-1.2.3-kde-x86_64.AppImage"
+    deb.write_bytes(b"!<arch>\n" + b"d" * 100)
+    ai.write_bytes(b"\x7fELF" + b"a" * 100)
+    signing = package.Signing(False, False)
+    with contextlib.redirect_stdout(io.StringIO()):
+        package.update_channel("Fixture", FIX_META, ["kde"], d.relative_to(ROOT) / "nowork", out.relative_to(ROOT), deb, "",
+                               str(key), signing, "rs", {"kde": ai})
+    m = json.loads((out / "kde" / "update.json").read_bytes())
+    kinds = sorted((f["target"], f["kind"], f["url"]) for f in m["files"])
+    check(kinds == [("linux-x86_64", "appimage", ai.name), ("linux-x86_64", "package", deb.name)]
+          and not update_manifest.check_channel(out / "kde", pub),
+          "update: the channel of a style lists its .deb (package) and AppImage (appimage), signed")
 
 
 def t_missing(d):
@@ -487,8 +735,8 @@ def t_missing(d):
           "missing tools: AppDir, .spec, Flatpak manifest and the MSIX folder are still written")
 
 
-def t_elf():
-    """runtime_image on a small ELF64 file"""
+def tiny_elf():
+    """a small ELF64 file: .text and the section names"""
     names = b"\0.text\0.shstrtab\0"
     text = b"\xc3" * 16
     shoff = 64 + len(text) + len(names)
@@ -501,7 +749,12 @@ def t_elf():
     sh = bytes(64)
     sh += struct.pack("<IIQQQQIIQQ", 1, 1, 6, 0, 64, len(text), 0, 0, 16, 0)
     sh += struct.pack("<IIQQQQIIQQ", 7, 3, 0, 0, 64 + len(text), len(names), 0, 0, 1, 0)
-    elf = body + sh
+    return body + sh
+
+
+def t_elf():
+    """runtime_image on a small ELF64 file"""
+    elf = tiny_elf()
     check(pkg_linux.elf_end(elf) == len(elf), "elf: elf_end of a plain file is its size")
     rt = pkg_linux.runtime_image(elf, "zsync|https://example.org/app.zsync")
     sec = pkg_linux.elf_sections(rt)
@@ -512,6 +765,54 @@ def t_elf():
     rt2 = pkg_linux.runtime_image(rt, "gh-releases-zsync|a|b|latest|x.zsync")
     off2, _ = pkg_linux.elf_sections(rt2)[".upd_info"]
     check(len(rt2) == len(rt) and rt2[off2:off2 + 9] == b"gh-releas" and rt2[off2 + 37] == 0, "elf: a second write goes into the same section")
+    check(sec.get(".sha256_sig", (0, 0))[1] == 1024 and sec.get(".sig_key", (0, 0))[1] == 8192
+          and not any(rt[o:o + n].strip(b"\0") for o, n in (sec[".sha256_sig"], sec[".sig_key"])),
+          "elf: .sha256_sig (1024) and .sig_key (8192) added, empty (appimagetool's layout)")
+    image = rt + b"hsqs" + bytes(range(256)) * 4
+    signed = pkg_linux.appimage_embed(image, "-----BEGIN PGP SIGNATURE-----\nx\n", "-----BEGIN PGP PUBLIC KEY BLOCK-----\ny\n")
+    so, _ = sec[".sha256_sig"]
+    check(signed[so:so + 29] == b"-----BEGIN PGP SIGNATURE-----" and len(signed) == len(image)
+          and pkg_linux.appimage_digest(signed) == pkg_linux.appimage_digest(image) != hashlib.sha256(signed).hexdigest(),
+          "elf: the digest skips the signature sections (embedding does not change it)")
+    try:
+        pkg_linux.appimage_embed(image, "s" * 1024, "k")
+        check(False, "elf: a signature longer than its section is refused")
+    except SystemExit:
+        pass
+
+
+def t_sign(d):
+    """an AppImage signed as package.py signs it (a throwaway key in Linux / WSL), checked
+    there by gpgv"""
+    probe = pkg_linux.probe()
+    if probe.get("error"):
+        return skip("sign", f"Linux / WSL: {probe['error'][:200]}")
+    from tools.host_exec import run_linux
+    import codesign
+    home = f"/tmp/jfgui-pkgcheck-gpg-{os.getpid()}-{base64.b16encode(os.urandom(4)).decode().lower()}"
+    r = run_linux(["python3", lp(Path(__file__)), "--inside-linux", "gpgkey", home])
+    fpr = next((ln[9:] for ln in r.stdout.splitlines() if ln.startswith("INFO fpr=")), "")
+    if r.returncode or not fpr:
+        run_linux(["python3", lp(Path(__file__)), "--inside-linux", "gpgdrop", home])
+        return skip("sign", f"no throwaway GPG key in Linux / WSL ({(r.stdout + r.stderr).strip()[-200:]})")
+    f = d / "signed.AppImage"
+    f.write_bytes(pkg_linux.runtime_image(tiny_elf()) + b"hsqs" + os.urandom(3000))
+    saved = {k: os.environ.get(k) for k in ("jfgui_GPG_HOME", "jfgui_GPG_KEY", "jfgui_GPG_PASSPHRASE")}
+    os.environ.update(jfgui_GPG_HOME=home, jfgui_GPG_KEY=fpr)
+    os.environ.pop("jfgui_GPG_PASSPHRASE", None)
+    try:
+        before = pkg_linux.appimage_digest(f.read_bytes())
+        pkg_linux.sign_appimage(f, codesign.gpg_detach_sign)
+        check(pkg_linux.appimage_digest(f.read_bytes()) == before, "sign: package.py's signing (codesign.gpg_detach_sign) leaves the digest")
+    except (RuntimeError, SystemExit) as e:
+        check(False, f"sign: package.py's signing -- {e}")
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    run_inside("appimagesig", lp(f), home)
 
 
 def makeappx_pack(job, d):
@@ -618,6 +919,11 @@ def t_packages(app, out, skip_build):
         check(b[:4] == b"\x7fELF" and b[8:11] == b"AI\x02" and b[end:end + 4] == b"hsqs" and ".upd_info" in pkg_linux.elf_sections(b),
               f"appimage {s}: ELF with AI\\x02, .upd_info, SquashFS right after the ELF data")
         run_inside("appimage", lp(f), *[lp(x) for x in scripts])
+        sig = pkg_linux.elf_sections(b).get(".sha256_sig")
+        if sig and b[sig[0]:sig[0] + sig[1]].strip(b"\0"):
+            run_inside("appimagesig", lp(f), "-")           # package.py signed it (jfgui_GPG_KEY)
+        else:
+            skip(f"appimage {s}: signature", "not signed (jfgui_GPG_KEY not set)")
 
     # RPM
     spec = dist / "rpm" / "SPECS" / f"{pkg}.spec"
@@ -760,6 +1066,118 @@ def test_cert(d, name, subject, pw):
     return pfx
 
 
+def t_install_flatpak(d):
+    """updatetest as a Flatpak (1.0.0 and 2.0.0 in a GPG-signed repository), the bundle of 1.0.0
+    installed and updated through the portal (inside_flatpak_update)"""
+    probe = pkg_linux.probe()
+    if probe.get("error") or not probe.get("flatpak-builder"):
+        return skip("install flatpak", "flatpak-builder or Linux / WSL missing")
+    exe = ROOT / "build" / "linux" / "updatetest"
+    if not exe.exists():
+        return skip("install flatpak", "build/linux/updatetest not built (python build_rs.py app updatetest --target linux)")
+    from tools.host_exec import run_linux
+    home = f"/tmp/jfgui-pkgcheck-gpg-{os.getpid()}"
+    r = run_linux(["python3", lp(Path(__file__)), "--inside-linux", "gpgkey", home])
+    fpr = next((ln[9:] for ln in r.stdout.splitlines() if ln.startswith("INFO fpr=")), "")
+    if not fpr:
+        run_linux(["python3", lp(Path(__file__)), "--inside-linux", "gpgdrop", home])
+        return skip("install flatpak", "no throwaway GPG key")
+    w = d / "flatpak-update"
+    shutil.rmtree(w, ignore_errors=True)
+    (w / "bin").mkdir(parents=True)
+    saved = {k: os.environ.get(k) for k in ("jfgui_GPG_HOME", "jfgui_GPG_KEY", "jfgui_GPG_PASSPHRASE")}
+    os.environ.update(jfgui_GPG_HOME=home, jfgui_GPG_KEY=fpr)
+    os.environ.pop("jfgui_GPG_PASSPHRASE", None)
+    commits = []
+    try:
+        meta = {"display": "updatetest", "summary": "lib/update test", "description": "Tests of lib/update.", "publisher": "JFLib",
+                "app_id": "org.jflib.updatetest", "deb_name": "updatetest", "categories": "Development;", "homepage": "https://example.org",
+                "flatpak_repo_url": "file://" + lp(w / "dist" / "flatpak" / "repo")}
+        for v, marker in (("1.0.0", b""), ("2.0.0", b"#JFUPDTEST 2.0.0 ok#")):
+            prog = w / "bin" / f"updatetest-{v}"
+            prog.write_bytes(exe.read_bytes() + marker)
+            job = pkgmeta.Job(app="updatetest", meta=dict(meta, version=v), styles=["default"], root=ROOT, dist=w / "dist", work=w / "work",
+                              impl="rs", pkg="updatetest", version=v, exe={"default": {"linux": prog}}, extra={"linux": [], "win": []},
+                              bins={"linux": [], "win": []}, cross={"linux": [], "win": []}, notices={}, units=[], runtime=None,
+                              appimage_runtime=None)
+            pkgmeta._warned.add("updatetest")
+            with contextlib.redirect_stdout(io.StringIO()):
+                out = pkg_linux.make_flatpak(job)
+            if not check(out is not None and out.exists() and job.signed, f"install flatpak: {v} built, exported into the signed repository"
+                         + ("" if out else f" -- {job.skipped}")):
+                return
+            shutil.copyfile(out, w / f"updatetest-{v}.flatpak")
+            heads = sorted((w / "dist" / "flatpak" / "repo" / "refs" / "heads").rglob("*"))
+            commits.append(next((h.read_text().strip() for h in heads if h.is_file()), ""))
+        check((w / "dist" / "flatpak" / "org.jflib.updatetest.gpg").exists() and (w / "dist" / "flatpak" / "org.jflib.updatetest.flatpakrepo").exists(),
+              "install flatpak: the public key and a .flatpakrepo beside the repository")
+        real = run_linux(["sh", "-c", "echo $HOME/.local/share/flatpak"]).stdout.strip()
+        run_inside("flatpakupdate", lp(w / "updatetest-1.0.0.flatpak"), "org.jflib.updatetest", real, commits[-1], timeout=1200)
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+        run_linux(["python3", lp(Path(__file__)), "--inside-linux", "gpgdrop", home])
+
+
+def t_install_msix(d):
+    """updatetest's package folder registered (developer mode, already on), run through its
+    execution alias (updatetest --test msix), removed again"""
+    if os.name != "nt":
+        return skip("install msix", "Windows only")
+    import winreg
+    try:
+        k = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock")
+        dev = winreg.QueryValueEx(k, "AllowDevelopmentWithoutDevLicense")[0] == 1
+    except OSError:
+        dev = False
+    if not dev:
+        return skip("install msix", "developer mode is off: registering needs it or a trusted certificate (not changed here)")
+    exe = ROOT / "build" / "win" / "updatetest.exe"
+    if not exe.exists():
+        return skip("install msix", "build/win/updatetest.exe not built (python build_rs.py app updatetest)")
+    alias = "jfgui-updatetest-msix.exe"
+    meta = {"display": "updatetest", "summary": "lib/update test", "publisher": "JFLib", "version": "1.0.0",
+            "app_id": "org.jflib.updatetest", "msix_alias": alias}
+    job = pkgmeta.Job(app="updatetest", meta=meta, styles=["winui"], root=ROOT, dist=d, work=d, impl="rs", pkg="updatetest",
+                      version="1.0.0", exe={"winui": {"win": exe}}, extra={"win": [], "linux": []}, bins={"win": [], "linux": []},
+                      cross={}, notices={}, units=[])
+    lay = d / "msix-install"
+    pkgmeta._warned.add("updatetest")
+    with contextlib.redirect_stdout(io.StringIO()):
+        pkg_msix.layout(job, "winui", lay)
+
+    def ps(cmd):
+        return subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", cmd], capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+    remove = "Get-AppxPackage -Name org.jflib.updatetest | Remove-AppxPackage"
+    ps(remove)                                                # left over from an aborted run
+    r = ps(f"Add-AppxPackage -Register '{lay / 'AppxManifest.xml'}'")
+    if not check(r.returncode == 0, "install msix: Add-AppxPackage -Register of the package folder (developer mode)"
+                 + ("" if r.returncode == 0 else f" -- {(r.stdout + r.stderr).strip()[-600:]}")):
+        return
+    try:
+        cmd = Path(os.environ["LOCALAPPDATA"]) / "Microsoft" / "WindowsApps" / alias
+        r = subprocess.run([str(cmd), "--test", "msix"], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=180, stdin=subprocess.DEVNULL)
+        lines = r.stdout.splitlines()
+        for ln in lines:
+            if ln.startswith("FAIL "):
+                FAILS.append(ln[5:])
+                print(ln)
+            elif ln.startswith("PASS ") and not QUIET:
+                print(ln)
+        check(r.returncode == 0 and any(ln.startswith("PASS msix:") for ln in lines),
+              f"install msix: updatetest --test msix inside the package (exit {r.returncode})"
+              + ("" if r.returncode == 0 else f" -- {r.stderr.strip()[-600:]}"))
+    finally:
+        r = ps(remove + "; if (Get-AppxPackage -Name org.jflib.updatetest) { exit 1 }")
+        check(r.returncode == 0, "install msix: the package is removed again")
+        shutil.rmtree(lay, ignore_errors=True)
+
+
 def t_aab():
     """what tools/android.py would need for an Android App Bundle (only reported)"""
     import android
@@ -809,6 +1227,8 @@ def main():
     ap.add_argument("--no-build", action="store_true", help="check the packages already in --out")
     ap.add_argument("--keep", action="store_true", help="keep build/pkg_check")
     ap.add_argument("--summary", action="store_true", help="print only FAIL / SKIP lines and the result")
+    ap.add_argument("--install", action="store_true", help="also install test packages for a moment (Flatpak in a temporary "
+                                                           "HOME, MSIX by registration in developer mode) and update them")
     a = ap.parse_args()
     QUIET = a.summary
     meta_dir = WORK / "meta"
@@ -817,6 +1237,7 @@ def main():
     job, files = t_meta(meta_dir)
     t_missing(meta_dir)
     t_elf()
+    t_sign(meta_dir)
     t_validate(job, files, meta_dir)
     t_apps(meta_dir)
     t_notices()
@@ -827,6 +1248,9 @@ def main():
         skip("runtime", f"{rt.relative_to(ROOT) if rt.is_relative_to(ROOT) else rt} not built (python build_rs.py app appimagert --target linux)")
     if not a.quick:
         t_packages(a.app, a.out, a.no_build)
+    if a.install:
+        t_install_flatpak(meta_dir)
+        t_install_msix(meta_dir)
     if not a.keep:
         shutil.rmtree(meta_dir, ignore_errors=True)
         for p in (WORK / "cert", WORK / "msix-unpack"):

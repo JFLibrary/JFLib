@@ -18,6 +18,8 @@
 //   --appimage-extract-and-run ARGS..    the same as without it (this runtime always extracts)
 //   --appimage-offset                    where the image starts in the file
 //   --appimage-updateinformation         the update information (.upd_info)
+//   --appimage-signature                 the embedded GPG signature (.sha256_sig, written by
+//                                        tools/pkg_linux.py as appimagetool --sign does)
 //   --appimage-portable-home / -config   make NAME.AppImage.home / .config next to the file:
 //                                        HOME / XDG_CONFIG_HOME of the app while it exists
 //   --appimage-version, --appimage-help
@@ -82,8 +84,9 @@ fn run() -> i32 {
             plat::write_stdout(format!("{offset}\n").as_bytes());
             0
         }
-        "--appimage-updateinformation" | "--appimage-updateinfo" => {
-            let info = section(&file, &sections, ".upd_info").unwrap_or_default();
+        "--appimage-updateinformation" | "--appimage-updateinfo" | "--appimage-signature" => {
+            let name = if opt == "--appimage-signature" { ".sha256_sig" } else { ".upd_info" };
+            let info = section(&file, &sections, name).unwrap_or_default();
             let n = info.iter().position(|&b| b == 0).unwrap_or(info.len());
             plat::write_stdout(&info[..n]);
             plat::write_stdout(b"\n");
@@ -125,6 +128,7 @@ $XDG_CACHE_HOME/appimage-run und startet AppRun (kein FUSE nötig).
   --appimage-extract-and-run ...    wie ein normaler Start
   --appimage-offset                 Beginn des Abbilds in der Datei
   --appimage-updateinformation      Update-Information (.upd_info)
+  --appimage-signature              die GPG-Signatur (.sha256_sig; appimagetool --sign)
   --appimage-portable-home          DATEI.home anlegen (HOME des Programms)
   --appimage-portable-config        DATEI.config anlegen (XDG_CONFIG_HOME des Programms)
   --appimage-version, --appimage-help\n";

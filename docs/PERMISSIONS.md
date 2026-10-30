@@ -95,8 +95,10 @@ sandbox                               # let the OS enforce the manifest too (OS 
 ### Patterns
 
 - A pattern is an absolute path or starts with a variable: `$CONFIG` (`config_dir()`),
-  `$TEMP` (`temp_dir()`), `$HOME`, `$EXE` (the folder of the executable), `$FONTS` (every
-  system font folder), the app's own folders `$APPCONFIG`, `$APPDATA`, `$APPCACHE` and
+  `$TEMP` (`temp_dir()`), `$HOME`, `$EXE` (the folder of the executable), `$APPIMAGE` (the
+  folder of the running AppImage file: an AppImage's program runs from the copy its runtime
+  unpacked, which is `$EXE`; `lib/update` replaces the file in this folder; no value outside
+  an AppImage), `$FONTS` (every system font folder), the app's own folders `$APPCONFIG`, `$APPDATA`, `$APPCACHE` and
   `$APPLOG` (`config://`, `data://`, `cache://`, `logs://`; [VFS.md](VFS.md)), or the user's
   folders `$DESKTOP`, `$DOCUMENTS`, `$DOWNLOADS`, `$PICTURES`, `$MUSIC` and `$VIDEOS`
   (`plat::user_dir`: the Known Folders on Windows, the XDG user dirs on Linux, also when the
@@ -521,6 +523,7 @@ In addition:
   the channel's host (and the host of absolute file addresses and redirects) needs a
   `net.connect` rule. Putting an update in place writes the program's folder: add
   `fs.write $EXE/**`, or the update stays downloaded and `startup()` reports the missing rule.
+  An AppImage replaces its `.AppImage` file instead: `fs.write $APPIMAGE/**`.
 - **Android.** The APK installs the manifest like a desktop program, but `plat` runs on the
   host adapter of the browser there (`web.rs`, `web_files.rs`): the files are the adapter's
   virtual files (`/config`, `/data`, `/cache`, `/tmp`, `/documents`, `/imports`), checked with

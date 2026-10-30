@@ -25,7 +25,8 @@ docs/PACKAGING.md):
   build/dist/flatpak/<app id>.json    the flatpak-builder manifest (finish-args from PERMISSIONS)
                                       + files/; build/dist/<app id>.flatpak by flatpak-builder
   build/dist/<App>-<ver>-x64.msix     MakeAppx of the default Windows style (AppxManifest.xml:
-                                      file types, URL schemes, StartupTask), signed like the setup
+                                      file types, URL schemes, StartupTask), signed like the setup;
+                                      build/dist/<App>.appinstaller with PACKAGE appinstaller_url=
 A missing tool skips that package and says what it wrote instead; --no-win / --no-deb drop
 every Windows / Linux format.
 
@@ -33,10 +34,12 @@ Signing (tools/codesign.py, docs/PACKAGING.md "Signing"): with a certificate in 
 (jfgui_SIGN_PFX + jfgui_SIGN_PFX_PASS or jfgui_SIGN_THUMBPRINT, optional jfgui_SIGN_TIMESTAMP)
 signtool signs every Windows program variant, its modules and the finished setup (Authenticode;
 the setup finds its payload before the signature).  --repo DIR writes a flat apt repository with
-the .deb, signed with jfgui_GPG_KEY (InRelease, Release.gpg, repo.gpg).  --update DIR writes a
-signed update channel per style for lib/update (DIR/<style>/update.json + .sig; the key from
---update-key, jfgui_UPDATE_KEY_FILE or jfgui_UPDATE_KEY).  A missing tool or key skips that
-signature and says so; --sign makes it an error.
+the .deb, signed with jfgui_GPG_KEY (InRelease, Release.gpg, repo.gpg); the same key signs the
+AppImages (.sha256_sig / .sig_key, as appimagetool --sign) and the Flatpak repository and bundle.
+--update DIR writes a signed update channel per style for lib/update (DIR/<style>/update.json +
+.sig; the program, the .deb and the AppImage of the style; the key from --update-key,
+jfgui_UPDATE_KEY_FILE or jfgui_UPDATE_KEY).  A missing tool or key skips that signature and
+says so; --sign makes it an error.
 
 --impl rs (the default) packages the Rust build: every variant is built by one
 `build_rs.py app NAME --target both --style S1,S2,.. --profile size` (one shared output folder
@@ -453,10 +456,11 @@ def sign_variants(app, styles, work, signing, impl):
     signing.windows([f for f in files if f.exists()])
 
 
-def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signing, impl):
+def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signing, impl, appimages=None):
     """--update OUT: a signed channel per style (OUT/<style>/update.json + .sig, lib/update):
     Windows the program (kind exe) or, with modules / further programs, a bundle of the program
-    folder (kind bundle); Linux the .deb (kind package: the package manager installs it)"""
+    folder (kind bundle); Linux the .deb (kind package: the package manager installs it) and the
+    style's AppImage (kind appimage: an AppImage replaces its own file; appimages {style: path})"""
     seed = update_manifest.load_key(key_file)
     if seed is None:
         signing.skip("Update-Kanal: kein Signierschlüssel (--update-key DATEI, jfgui_UPDATE_KEY_FILE oder jfgui_UPDATE_KEY; "
@@ -479,6 +483,8 @@ def update_channel(app, meta, styles, work, out, deb, base_url, key_file, signin
                 files.append(("windows-x86_64", "exe", win / f"{app}.exe", f"{app}-{version}-{s}.exe"))
         if deb:
             files.append(("linux-x86_64", "package", deb, Path(deb).name))
+        if (appimages or {}).get(s):
+            files.append(("linux-x86_64", "appimage", appimages[s], Path(appimages[s]).name))
         if not files:
             continue
         m = update_manifest.write_channel(ROOT / out / s, app_id, version, files, seed, notes=meta.get("update_notes", ""),
@@ -530,6 +536,7 @@ def main():
             print(f"[{s}] build")
             build_variant(a.app, s, work / s, targets)
     job = make_job(a.app, meta, styles, dist, work, a.impl, rsout, targets)
+    job.signing = signing             # AppImage and Flatpak signatures go into the report
     if "appimage" in formats and not (a.appimage_runtime or os.environ.get("jfgui_APPIMAGE_RUNTIME")):
         job.runtime = build_runtime(rsout, a.profile)
     job.appimage_runtime = a.appimage_runtime
@@ -549,15 +556,16 @@ def main():
                 signing.skip(why)
             else:
                 signing.done.append(f"apt-Repository {a.repo} (InRelease, Release.gpg, repo.gpg)")
+    appimages = {}
     if "appimage" in formats:
         for s in styles:
-            pkg_linux.make_appimage(job, s)
+            appimages[s] = pkg_linux.make_appimage(job, s)
     if "rpm" in formats:
         pkg_linux.make_rpm(job)
     if "flatpak" in formats:
         pkg_linux.make_flatpak(job)
     if a.update:
-        update_channel(a.app, meta, styles, work, a.update, deb, a.update_url, a.update_key, signing, a.impl)
+        update_channel(a.app, meta, styles, work, a.update, deb, a.update_url, a.update_key, signing, a.impl, appimages)
     if set(formats) - {"setup", "deb"}:
         job.report()
     signing.report()
