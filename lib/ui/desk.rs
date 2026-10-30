@@ -758,6 +758,9 @@ impl Ui {
         self.dw_sync_active(&mut rt, st, false);
         rt.shown_prev = core::mem::take(&mut rt.shown);
         rt.order = st.wins.iter().filter(|w| !w.min && rt.present(w.key)).map(|w| w.key).collect();
+        // (the focus memory of windows that went away)
+        let infos = &rt.infos;
+        rt.wfocus.retain(|e| infos.iter().any(|i| i.key == e.0));
         rt.next = 0;
         rt.open = 0;
         rt.focus_here = false;

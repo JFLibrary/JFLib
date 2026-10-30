@@ -68,4 +68,13 @@ expect menuitem:"Fenster 6" exists
 click menuitem:"Fenster 6"
 expect button:"Fenster 6" checked
 expect button:"Fenster 8" missing
+# icons only (DTB_ICONS): every window fits again
+click button:"Nur Symbole"
+expect button:"Weitere Fenster" missing
+expect button:"Fenster 8" rect * 518 40 32
+shot build/desktest/taskbar_icons.png
+# a window that starts maximised (DWF_MAXIMIZED: an IDE)
+key ctrl+shift+n
+expect dialog:"Fenster 9 (maximiert)" rect 0 48 960 466
+expect button:"Fenster 9" checked
 expect_nowarn

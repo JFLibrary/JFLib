@@ -18,9 +18,11 @@
 // value (K_HEADING: Node::value, clamped to 1 ..= 9).  Left out: title bars, empty texts,
 // records without area, boxes without a label (a box with tab records inside is the tab
 // strip).  Containers are lists, dialogs, titled boxes and tab strips: a node's parent is the
-// smallest one on its layer whose rectangle holds the node's centre.  Menu bar entries next to
-// each other get a menu bar; the rows of a popup (menus, drop-downs) a menu or list that hangs
-// below the open record that opened it.  Names: the label; text boxes, drop-downs (their label
+// smallest one on its layer whose rectangle holds the node's centre -- inside a scoped record
+// (SEM_SCOPE: a window of a window area, desk.rs) only one it holds, else itself, and scoped
+// records hold nothing by their place (overlapping windows are siblings).  Menu bar entries
+// next to each other get a menu bar; the rows of a popup (menus, drop-downs) a menu or list that
+// hangs below the open record that opened it.  Names: the label; text boxes, drop-downs (their label
 // is the text / the choice), sliders, progress bars and lists without one take the text or
 // heading record right before them (to the left, or above and aligned).  The focus of a list
 // or tab strip is passed on to its selected row / tab.

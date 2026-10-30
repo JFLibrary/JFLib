@@ -14,11 +14,13 @@
 // The tool row: Neues Fenster (a window "Fenster N" with a button), Speichern (the state into
 // memory, with --state also into the file), Laden, Zurücksetzen, Vollbild (the main window,
 // also F11), Werkzeug (a tool window, id 601, shows / hides), Werkzeug-Vollbild, Baum (the
-// screen readers' tree of the windows into a status line).  The area keeps a 40 DIP strip at
+// screen readers' tree of the windows into a status line), Nur Symbole (the taskbar shows icons
+// only: DTB_ICONS).  The area keeps a 40 DIP strip at
 // its bottom for the taskbar (Start, a button per window, a clock).  Its windows: Editor (a
 // text box and Übernehmen), Rechner (fixed size, no maximising: digits and a display), Notizen
 // (at least 240 x 120: a check box), Protokoll (the last events); closing one takes it out of
-// the list (and the state).  Ctrl+N opens a new window.  The status lines:
+// the list (and the state).  Ctrl+N opens a new window, Ctrl+Shift+N one that starts
+// maximised (DWF_MAXIMIZED).  The status lines:
 //   Z: Editor, Rechner=x, [Protokoll]     the z-order from the back, [the active one]; =x
 //                                         maximised, =m minimised, =l / =r a half
 //   Aktiv: Protokoll 40,30 420x300        the active window's normal place (DIP)
@@ -50,6 +52,7 @@ const ID_FULL: u32 = 105;
 const ID_TOOLWIN: u32 = 106;
 const ID_TOOLFULL: u32 = 107;
 const ID_TREE: u32 = 108;
+const ID_ICONS: u32 = 109;
 const ID_START: u32 = 110;
 const ID_EDIT: u32 = 201;
 const ID_APPLY: u32 = 202;
@@ -67,10 +70,12 @@ const K_EXTRA: u32 = 10; // the new windows: 10, 11, ..
 const CMD_FULL: u32 = 1;
 const CMD_NEW: u32 = 2;
 const CMD_TREE: u32 = 3;
-static CMDS: [Command; 3] = [
+const CMD_NEW_MAX: u32 = 4;
+static CMDS: [Command; 4] = [
     Command::new(CMD_FULL, "Vollbild", 0, 0, VK_F11, 0),
     Command::new(CMD_NEW, "Neues Fenster", 0, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_TREE, "Baum", 0, 0, 0, 0),
+    Command::new(CMD_NEW_MAX, "Neues maximiertes Fenster", 0, MOD_CTRL | MOD_SHIFT, b'N' as u32, 0),
 ];
 
 const DESC: AppDesc = AppDesc { title: "jfgui Fenster", flags: AF_RESIZABLE, w: 960, h: 640, cmds: &CMDS, ..AppDesc::NONE };
@@ -80,6 +85,10 @@ struct Desk {
     /// the open windows in the taskbar's order
     open: Vec<u32>,
     next_extra: u32,
+    /// the new windows that start maximised (Ctrl+Shift+N: DWF_MAXIMIZED)
+    maxed: Vec<u32>,
+    /// the taskbar shows icons only (DTB_ICONS)
+    icons: i32,
     saved: String,
     file: Option<String>,
     text: String,
@@ -107,6 +116,8 @@ impl Default for Desk {
             desk,
             open: alloc::vec![K_EDITOR, K_CALC, K_NOTES, K_LOG],
             next_extra: K_EXTRA,
+            maxed: Vec::new(),
+            icons: 0,
             saved: String::new(),
             file: None,
             text: String::from("Hallo"),
@@ -325,6 +336,7 @@ impl App for Desk {
         if ui.button(ID_TREE, "Baum") & EV_ACT != 0 {
             ui.cmd_run(CMD_TREE, 0);
         }
+        ui.toggle_button(ID_ICONS, "Nur Symbole", &mut self.icons);
         ui.box_end();
         // the window area with its taskbar
         let titles: Vec<(u32, String)> = self.open.iter().map(|&k| (k, title(k))).collect();
@@ -335,6 +347,7 @@ impl App for Desk {
                 K_CALC => DeskWin::new(*k, t, IC_CALCULATOR).flags(DWF_FIXED).size(220, 210),
                 K_NOTES => DeskWin::new(*k, t, IC_DOCUMENT).min(240, 120).size(300, 160),
                 K_LOG => DeskWin::new(*k, t, IC_HISTORY).size(320, 200),
+                _ if self.maxed.contains(k) => DeskWin::new(*k, t, IC_GRID).flags(DWF_MAXIMIZED).size(260, 140),
                 _ => DeskWin::new(*k, t, IC_GRID).size(260, 140),
             })
             .collect();
@@ -348,7 +361,7 @@ impl App for Desk {
         if ui.button(ID_START, "Start") & EV_ACT != 0 {
             self.log(String::from("Start"));
         }
-        ui.desk_taskbar(ID_DESK, &mut self.desk, 0);
+        ui.desk_taskbar(ID_DESK, &mut self.desk, if self.icons != 0 { DTB_ICONS } else { 0 });
         ui.text(TS_CAPTION, "12:00");
         ui.desk_taskbar_end();
         for ev in ui.desk_end(&mut self.desk) {
@@ -409,9 +422,12 @@ impl App for Desk {
                 let on = ui.window_state(0) & UWS_FULLSCREEN == 0;
                 ui.window_fullscreen(0, on);
             }
-            CMD_NEW => {
+            CMD_NEW | CMD_NEW_MAX => {
                 let k = self.next_extra;
                 self.next_extra += 1;
+                if id == CMD_NEW_MAX {
+                    self.maxed.push(k);
+                }
                 self.open.push(k);
             }
             CMD_TREE => self.tree = self.tree(ui),
