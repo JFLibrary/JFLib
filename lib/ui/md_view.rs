@@ -1098,13 +1098,17 @@ fn box_x(cx: i32, cw: i32, x: i32, w: i32, rtl: bool) -> i32 {
 
 impl Ui {
     /// ui_markdown_view(id, &mut st, text, MV_*) -> MdEv (see the module header of md_view.rs)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn markdown_view(&mut self, id: u32, st: &mut MdViewState, text: &str, flags: u32) -> MdEv {
+        let _src = self.src_scope();
         st.set_markdown(text);
         self.doc_view(id, st, flags)
     }
 
     /// ui_html_view(id, &mut st, html, MV_*) -> MdEv: the HTML counterpart of markdown_view
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn html_view(&mut self, id: u32, st: &mut MdViewState, html: &str, flags: u32) -> MdEv {
+        let _src = self.src_scope();
         st.set_html(html);
         self.doc_view(id, st, flags)
     }
@@ -1885,7 +1889,9 @@ impl Ui {
     // ------------------------------------------------------------------ the widget
 
     /// ui_doc_view(id, &mut st, MV_*) -> MdEv: the document set in st (see the module header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn doc_view(&mut self, id: u32, st: &mut MdViewState, flags: u32) -> MdEv {
+        let _src = self.src_scope();
         let mut out = MdEv::default();
         let stflags = self.take_flags();
         let r = self.place(self.dp(NAT_W), self.dp(NAT_H));

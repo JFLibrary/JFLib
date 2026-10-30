@@ -1,0 +1,21 @@
+#!args --verify-dirty
+# the live inspector's sources for the viewer (ui/inspect_src.rs; development builds): the
+# records of ui.markdown_view and ui.html_view (headings, list items, links, the view's box)
+# have the app's call as their source, not a line of lib/ui/md_view.rs
+size 1000 720
+theme light
+wait 300
+inspect expect idle
+inspect on
+inspect expect sources "apps/mdviewtest/"
+inspect select "Hilfe"
+inspect expect source "apps/mdviewtest/src/main.rs:"
+inspect off
+click "HTML"
+expect heading:"HTML-Betrachter" value 1
+inspect on
+inspect expect sources "apps/mdviewtest/"
+inspect select heading:"HTML-Betrachter"
+inspect expect source "apps/mdviewtest/src/main.rs:"
+inspect off
+inspect expect idle

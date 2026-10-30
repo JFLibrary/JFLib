@@ -1922,6 +1922,4 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   termtest, officeicontest, themedemo, uitest und BackupCraft geprüft); Tests
   `apps/gallery/tests/inspect_source.uis`, `apps/audiotest/tests/inspect_perm.uis` (Manifest
   ohne `process`: abgelehnt), `apps/plattest/tests/launch.uis`, Windows und Linux, auch mit
-  `--verify-dirty`. Noch nicht markiert: `ui.markdown_view`, `ui.html_view` und `ui.doc_view`
-  (`ui/md_view.rs`, zur selben Zeit anderweitig in Arbeit) zeigen eine Zeile in
-  `lib/ui/md_view.rs` statt des Aufrufs der App.
+  `--verify-dirty`.

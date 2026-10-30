@@ -3812,8 +3812,7 @@ of the app's call that built the selected widget (or layout box), e.g.
   `dialog_buttons` -- reports the app's line, not the library's inner one. A widget built by the
   library with no app call around it (the runtime's own chrome, the inspector's window) shows
   the library's call; a widget an app builds from drawing calls and `ui.sem` shows its
-  `ui.sem` line. (Not marked yet: `ui.markdown_view`, `ui.html_view`, `ui.doc_view`; their
-  records show a line of `lib/ui/md_view.rs`.)
+  `ui.sem` line.
 * **What it costs**: closed (the default) every scope tests one flag and nothing is stored or
   drawn (`inspect expect same` / `idle` hold); a `--release` build has no `#[track_caller]` and
   empty scopes (`ui/inspect_src_off.rs`): the same code as without the feature. The path is the
