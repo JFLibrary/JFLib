@@ -301,12 +301,14 @@ impl Wl {
         }
         // with a buffer scale (no viewporter) the buffer's size must be a multiple of it: the
         // frame padded with transparent pixels
-        let bs = if q.frac { 1 } else { q.scale.max(1) };
-        let (w, h) = ((cw + bs - 1) / bs * bs, (ch + bs - 1) / bs * bs);
+        let bs = if q.frac { 1 } else { q.scale.max(1) } as u64;
+        let pad = |c: i32| (c as u64 + bs - 1) / bs * bs; // (in u64: no wrap near i32::MAX)
+        let (w, h) = (pad(cw), pad(ch));
         // two buffers of w x h in one pool, offsets int32 (wl_shm): below 2 GiB
-        if w as u64 * h as u64 * 8 > i32::MAX as u64 {
+        if w.checked_mul(h).and_then(|n| n.checked_mul(8)).map_or(true, |n| n > i32::MAX as u64) {
             return;
         }
+        let (w, h) = (w as i32, h as i32); // (below 2^28 each now)
         // buffers of this size in a pool large enough for two
         if (q.bw != w || q.bh != h || q.buf[0] == 0) && !self.wq_buffers(k, w, h) {
             return;
