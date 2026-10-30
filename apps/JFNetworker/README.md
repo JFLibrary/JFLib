@@ -120,6 +120,33 @@ Queues, Lastgeneratoren, eigene Skripte).
   hineingezogen, jedes Kabel bekommt eine Länge (automatisch aus den Orten oder von Hand) mit der
   Grenze seines Mediums nach IEEE 802.3, ein zu langes kommt nicht hoch und ist überall zu sehen
   (siehe [Physische Ansicht](#physische-ansicht)).
+- **Mail (X1c):** Mailserver mit SMTP (RFC 5321 mit SIZE, 8BITMIME, PIPELINING, erweiterten
+  Statuscodes und AUTH auf dem Submission-Port 587) und POP3 (RFC 1939 mit UIDL und TOP):
+  Postfächer für die Benutzer der eigenen Domänen in den Dateien des Geräts, Weiterleiten an
+  andere Domänen über ihre MX-Einträge mit Warteschlange, Wiederholungen und
+  Unzustellbarkeitsnachricht, Relay-Regeln mit einem Schalter „offener Relay“ zum Lernen; das
+  Programm E-Mail im Desktop (Konto, Posteingang, Verfassen, Antworten, Senden, Abrufen), in der
+  Shell `curl smtp://`, `curl pop3://` und `mail` (siehe [Mail](#mail-smtp-und-pop3)).
+- **Gruppen und Hintergrundbild (G1):** Geräte, Notizen und Gruppen auf der logischen
+  Zeichenfläche zu Gruppen zusammenfassen (Strg+G), verschachtelt; aufgeklappt ein beschrifteter
+  Rahmen, zugeklappt ein Cluster-Symbol mit Zahl, Befunden und Dienst-Pillen, an dem die Kabel
+  nach draußen als eine Linie je Gegenstelle und Art enden; ziehen, umbenennen, auflösen, alles
+  rückgängig; darunter ein Hintergrundbild (ein Grundriss), in der Projektdatei eingebettet,
+  verschiebbar, skalierbar, sperrbar (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild)).
+- **SNMP (X1b):** ein SNMP-Agent mit den Versionen 1 und 2c auf den IOS-artigen Geräten
+  (`snmp-server community`, `location`, `contact`, `host`, `enable traps`, `show snmp`, `debug
+  snmp packets`) und als Dienst `snmpd` auf den Linux-Hosts; die MIB rechnet er bei jeder Anfrage
+  aus dem Zustand des Geräts (system, Interfaces mit 64-Bit-Zählern, Adressen, Routen, die Zähler
+  von SNMP), mit einer Community `rw` setzt er Kontakt, Standort, Namen und `ifAdminStatus`, er
+  meldet coldStart, linkDown, linkUp und authenticationFailure als Traps oder Informs an den
+  Dienst `snmptrapd`; in der Shell `snmpget`, `snmpgetnext`, `snmpwalk`, `snmpbulkwalk` und
+  `snmpset`, im Desktop ein MIB-Browser (siehe [SNMP](#snmp)).
+- **Logins, Telnet und AAA (X1d):** Anmeldung an den IOS-artigen Geräten mit `enable secret`,
+  `username … secret`, Passwörtern auf den Leitungen und Rechtestufen, das Passwort beim
+  Tippen unsichtbar; AAA mit RADIUS (`aaa new-model`, `radius server`, Anmeldung, `enable`,
+  Rechte und Accounting; die lokalen Benutzer nur, wenn kein Server antwortet), der Dienst
+  `radius-server` auf den Hosts, `telnet` als Client an beiden Konsolen (siehe
+  [Logins, Telnet und AAA mit RADIUS](#logins-telnet-und-aaa-mit-radius)).
 
 ## Bedienung
 
@@ -253,6 +280,25 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `phys_rack.uis` | Geräte aufstellen: SRV1 im Rack von der Tastatur zehn Höheneinheiten höher (mit Rückgängig), die Höheneinheit im Inspektor (eine über dem Rack abgelehnt), aus dem Rack über die Liste der Orte, aus der Ablage ins Rack gezogen (die unterste freie Einheit), auf die Einheiten von R1 gezogen (abgelehnt), PC4 auf ein Rack (abgelehnt: kein Rack-Gerät) und an einen Platz im Labor, die Höhe des Racks im Inspektor (zu niedrig für seine Geräte abgelehnt) |
 | `phys_length.uis` | ein zu langes Kabel, gezeigt und behoben: das Problem, das Kabel „unten“ auf der Zeichenfläche, Länge, Grenze und Ablehnung im Inspektor, das markierte Kabel in der physischen Ansicht, 90 m von Hand (oben), 132 m (unten), Automatisch und Rückgängig, eine Länge, die keine Zahl ist, PC4 über den Inspektor in Büro 1 (23 m, oben) |
 | `phys_shots.uis` | die Bilder der physischen Ansicht (Serverraum mit dem markierten Kabel und seinem Inspektor, die Vorderseite von Rack 1, das Erdgeschoss von Haus A, der Campus) hell und dunkel mit 100 und 150 % (`build/jfnetworker/phys_*.png`) |
+| `model.uis`, Gruppe `mail` | Mail (siehe [Mail](#mail-smtp-und-pop3)): der Namensserver aus `/etc/resolv.conf` (auch in der Konfiguration), eine Zustellung ins eigene Postfach auf die Nanosekunde (Received, Return-Path, die Notizen), das Weiterleiten über den MX von b.lab mit PIPELINING und zwei Received-Zeilen (R1 verliert den ersten SYN), Unzustellbares für einen unbekannten Benutzer, eine Domäne, die das DNS nicht kennt, und einen MX ohne Adresse, Wiederholungen bei ausgeschaltetem MAILB (der erste Versuch scheitert nach 3 s, der nächste kommt 10 s später, dann wartet der Server 20 s) und das Aufgeben nach 60 s, das Abrufen des Programms E-Mail mit UIDL und DELE (und mit `keep` nur einmal), Senden über 587 mit AUTH und einer Kopie in Gesendet, `curl pop3://` mit LIST, RETR, UIDL, TOP und DELE, falsche Passwörter bei POP3 und AUTH, die Größe (SIZE und nach dem Punkt), abgelehnte Relays und der offene Relay, die Probleme, `mail -H`, die Projektdatei mit den Postfächern und zwei gleiche Läufe |
+| `mail_services.uis` | SMTP- und POP3-Server im Reiter Dienste von MAILA (`fixtures/mail_domains.jfnet`): Karten mit Statuszeile, Einstellungen als JSON (eine abgelehnte Domäne, ein offener Relay in der Statuszeile und in der Probleme-Liste, ein Benutzer ohne Namen, einer ohne Postfach), Rückgängig; eine Nachricht aus PC1s Konsole zählt auf der Karte und legt das Postfach im Reiter Dateien an |
+| `mail_client.uis` | das Programm E-Mail: PC2 ohne Konto beginnt mit dem Formular, Bobs Konto (587 mit Anmeldung) als Rückgängig-Schritt, eine Nachricht an Anna (Statuszeile, Gesendet); Anna ruft ab, liest und antwortet (Empfänger, „Re: “, der Text zitiert); Bob ruft die Antwort ab, Rückgängig und Wiederholen des Abrufs, Löschen |
+| `mail_shots.uis` | die Bilder von Mail (eine abgerufene Nachricht im Programm E-Mail, eine Antwort, das Konto, die Einstellungen des SMTP-Servers) hell und dunkel mit 100 und 150 % (`build/jfnetworker/mail_*.png`) |
+| `model.uis`, Gruppe `groups` | Gruppen und Hintergrundbild (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild)): die äußersten des Gewählten in die innerste gemeinsame Gruppe, Verschachteln, ein Gerät je Ebene, leer gewordene Gruppen, Nummern, die fehlen (und mit Rückgängig wiederkommen), Zyklen, doppelte Mitglieder, Namen, Aufheben, was ein Zuklappen versteckt; die Datei (Gruppen und die Bytes des Bilds unverändert, ältere Dateien ohne beides, alle Fixtures, Labore und Aufgaben ohne); das Bild (Formate, Grenzen, das Fixture dekodiert, eingepasst); die Rückgängig-Schritte (die Bytes geteilt); die Szene der Zeichenfläche (Rahmen, Cluster in der Mitte, eine Linie je Gegenstelle und Art mit den schlechtesten LEDs, ein einzelnes Kabel behält seine Kennung, Kabel innen ausgeblendet, verschachtelt, was Ziehen bewegt, Aufklappen eines versteckten Geräts); 3:1 der Farbrollen; der Simulator mit und ohne Gruppen und Bild gleich (`lan_router`) |
+| `groups.uis` | Gruppen im Fenster auf `fixtures/groups.jfnet`: Strg+G, Rückgängig und Wiederholen, F2, Zuklappen mit dem Knopf (die Linie „2 Kabel“, das Kabel zwischen den Servern ausgeblendet), Doppelklick, Ziehen am Titel um Rasterschritte, der Inspektor (Farbe, Zuklappen, Mitglieder), Gummiband, Strg+A, verschachtelt und zugeklappt, Strg+Umschalt+G, Entf auf einer Gruppe, ein vergebener Name |
+| `groups_bg.uis` | das Hintergrundbild: `fixtures/bg_plan.png` über den Dateidialog, eingepasst und gewählt, Rückgängig, Ziehen, der Griff, die Felder (eine Ablehnung), Sperren (Klick und Gummiband darüber), Ansicht › … sperren, anpassen, entfernen, gespeichert und wieder geöffnet, eine Datei, die kein Bild ist |
+| `groups_sim.uis` | zugeklappte Mitglieder: das Abzeichen ihrer Befunde, im Simulationsmodus die Kopien einer Flut auf der Linie in den Cluster, die Konsole eines versteckten Geräts, ein Befund in Probleme (ein Klick wählt den Cluster, ein Doppelklick klappt auf) |
+| `groups_shots.uis` | die Bilder (gesperrtes Hintergrundbild, eine Gruppe auf, eine zu; verschachtelt mit gewähltem Bild) hell und dunkel mit 100 und 150 % (`build/jfnetworker/groups_*.png`) |
+| `model.uis`, Gruppe `snmp` | SNMP (siehe [SNMP](#snmp)): die Gruppe system per Get auf die Nanosekunde, Walks über `ifTable` und `ifXTable` mit den Zählern der Ports bis zur Anfrage, die Reihenfolge über die Tabellen hinweg, GetBulk mit Non-Repeaters, Wiederholungen und der Größengrenze, Set von sysLocation, sysName und `ifAdminStatus` (der Port geht herunter, die Running-Config zeigt es, das Projekt erst nach `copy run start`), was eine Community nur zum Lesen nicht darf, eine falsche Community und eine Zugriffsliste (keine Antwort, der Zähler, die Konsolenzeile, authenticationFailure), die Fehler der Version 1 gegen die von 2c (RFC 3584), tooBig, linkDown- und linkUp-Traps in `snmptrapd` mit seiner Datei, ein Inform über ein Kabel mit Verlust, bis es bestätigt ist, coldStart eines Linux-Agenten beim Start, seine Einstellungen und Ablehnungen, die IOS-artigen Befehle mit ihrer Running-Config gelesen wieder dieselbe, `show snmp`, `debug snmp packets`, die Probleme-Liste, die Zerlegung einer aufgezeichneten Nachricht, Determinismus |
+| `snmp_services.uis` | die SNMP-Dienste im Reiter Dienste (`fixtures/snmp_monitor.jfnet`): der Trap-Empfänger von MON mit dem coldStart von PC1 in seiner Statuszeile, seine Einstellungen als JSON (eine Community mit Leerzeichen abgelehnt, dann eine andere Logdatei), der Agent von PC1 (ein Inform der Version 1 abgelehnt, ein neuer Standort, den MON mit `snmpget` liest), Rückgängig bringt die alten Einstellungen zurück |
+| `snmp_console.uis` | SNMP an den Konsolen: `snmpwalk` der Gruppe system von R1 auf MON, Tab ergänzt die Werkzeuge, R1 ändert seinen Standort mit `snmp-server location` und MON sieht ihn, `show snmp`; SW1 schaltet einen Port ab, sein linkDown-Trap landet bei `snmptrapd` auf MON (die Logdatei in `/var/log`, die Zeile im Protokoll) |
+| `snmp_mib.uis` | der MIB-Browser im Desktop von MON: der Baum von mib-2, die Karte eines Objekts (Name, OID, Syntax, Zugriff), Get von sysName an R1, Walk von system, Set von sysLocation mit der Community, die R1s Zugriffsliste MON erlaubt, `ifTable` mit der Tastatur geöffnet und GetNext von `ifDescr.2`; jede Anfrage läuft als Befehl in MONs Konsole unter dem Baum |
+| `snmp_shots.uis` | die Bilder von SNMP (MONs Konsole nach einem Walk, der MIB-Browser nach einem Get, der Trap-Empfänger im Reiter Dienste, die Ereignisse mit dem Chip SNMP) hell und dunkel mit 100 und 150 % (`build/jfnetworker/snmp_*.png`) |
+| `model.uis`, Gruppe `aaa` | Logins, AAA und RADIUS (siehe [Logins, Telnet und AAA mit RADIUS](#logins-telnet-und-aaa-mit-radius)): die Anmeldung an der Konsole, `enable` und die Rechtestufen, die gespeicherten Geheimnisse, RADIUS mit Annahme, Ablehnung und Rückfall auf die lokalen Benutzer, Accounting, der Telnet-Client |
+| `login_console.uis` | eine Anmeldung an der Konsole von R1 (`login local` mit Banner, `fixtures/aaa_login.jfnet`): das Passwort ohne Echo, ein falsches abgewiesen, der Benutzer mit Stufe 15 gleich bei „R1#“ |
+| `telnet_session.uis` | der Telnet-Client in einem Terminal-Tab: eine abgewiesene Verbindung, dann eine Sitzung zu einem Listener auf SRV1, Strg+Umschalt+6 beendet sie |
+| `aaa_services.uis` | der RADIUS-Server im Reiter Dienste von SRV1: Karte mit Statuszeile, die Einstellungen als JSON (ein zweiter Benutzer, ein Client ohne Secret abgewiesen) |
+| `aaa_shots.uis` | die Bilder (eine Konsole gesperrt bei der Anmeldung, der RADIUS-Server im Reiter Dienste) hell und dunkel mit 100 und 150 % (`build/jfnetworker/aaa_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -264,11 +310,24 @@ Szenario `wlan_office.scn` und die WLAN-Fensterskripte), `backup.jfnet` (drei Ro
 TFTP- und FTP-Server, PC1; das Szenario `backup.scn` und die Fensterskripte `files_*.uis`),
 `phys_campus.jfnet` (die physische Ansicht: zwei Häuser, Serverraum mit zwei Racks, Büros auf
 zwei Etagen, ein Labor 180 m entfernt, dessen PC4 mit 208 m Kupfer an SW1 hängt;
-`phys_lengths.scn` und die `phys_*.uis`) und die Netze der Golden-Szenarien. Die
+`phys_lengths.scn` und die `phys_*.uis`), `snmp_monitor.jfnet` (MON mit `snmptrapd`, R1, SW1
+und R2 mit SNMP-Agenten, PC1 mit `snmpd`; `snmp_monitor.scn` und die `snmp_*.uis`) und die Netze
+der Golden-Szenarien. Die
 Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`,
 `rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
-für WLAN `crypto` und `netpkt`, für BGP `bgp`, für Dateien `tftp` und `ftp`), die
+für WLAN `crypto` und `netpkt`, für BGP `bgp`, für Dateien `tftp` und `ftp`, für SNMP `snmp`), die
 Skriptsprache die Gruppe `script`.
+Für Mail: `mail_domains.jfnet` (a.lab und b.lab mit je einem Mailserver und einem PC hinter R1,
+DNS1 mit ihren MX-Einträgen; das Szenario `mail_domains.scn` und die Fensterskripte
+`mail_*.uis`), die coretest-Gruppe `mail` (SMTP, POP3 und Nachrichten Byte für Byte).
+Für Gruppen und Hintergrundbild: `groups.jfnet` (zwei PCs und zwei Server an SW1, die Server mit
+einem Kabel unter sich, dessen Masken nicht passen) und `bg_plan.png` (ein Grundriss,
+160 × 120); die Rahmen des Diagramm-Widgets prüft `apps/diagramtest/tests/frames.uis`.
+Für Logins und AAA: `aaa_radius.jfnet` (R1 und R2 melden ihre Konsolen über den RADIUS-Server
+von SRV1 an; das Szenario `aaa_radius.scn`) und `aaa_login.jfnet` (R1 mit `login local` und
+Banner, SRV1 mit `radius-server`, PC1; die Fensterskripte `login_console.uis`,
+`telnet_session.uis`, `aaa_services.uis` und `aaa_shots.uis`), die coretest-Gruppe `radius`
+(RADIUS und Telnet Byte für Byte, MD5 und HMAC-MD5 in `crypto`).
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -322,7 +381,9 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Physische Ansicht | [`crates/jfn_model/phys.rs`](crates/jfn_model/phys.rs), [`crates/jfn_sim/phys.rs`](crates/jfn_sim/phys.rs), [`src/workspace/phys/`](src/workspace/phys/mod.rs) (`scene.rs`, `paint.rs`, `props.rs`), [`src/doc/phys.rs`](src/doc/phys.rs), [`src/phystest.rs`](src/phystest.rs) | die Orte, wo die Geräte stehen, Kabellängen und die Grenzen der Medien (Modell), Kabel, die zu lang sind oder deren Optiken nicht passen, im Simulator mit Notizen, Protokollzeilen und Problemen, die Ansicht mit ihren Plänen und dem Inspektor, die Änderungen als Rückgängig-Schritte, ihr Selbsttest (siehe [Physische Ansicht](#physische-ansicht)) |
 | WLAN | [`crates/jfn_model/wlan.rs`](crates/jfn_model/wlan.rs), [`crates/jfn_sim/wlan.rs`](crates/jfn_sim/wlan.rs), [`wlankey.rs`](crates/jfn_sim/wlankey.rs), [`wlantrace.rs`](crates/jfn_sim/wlantrace.rs), [`cli/wlan.rs`](crates/jfn_sim/cli/wlan.rs), [`src/doc/wlan.rs`](src/doc/wlan.rs), [`src/workspace/canvas/wlan.rs`](src/workspace/canvas/wlan.rs), [`src/workspace/inspector/wlan.rs`](src/workspace/inspector/wlan.rs), [`src/wlantest.rs`](src/wlantest.rs), [`lib/netpkt/eapol.rs`](../../lib/netpkt/eapol.rs), [`lib/crypto`](../../lib/crypto/lib.rs) (`sha1.rs`, `keywrap.rs`, `cmac.rs`) | die WLAN-Einstellungen im Projekt, Stationen und Access Points im Simulator mit Funk, Schlüsseln und Notizen, `iw` und `show dot11`, die Einstellungen als Rückgängig-Schritte, Funklinien, Reichweiten und Balken, der Inspektor, der Selbsttest, EAPOL Byte für Byte und die Kryptografie von WPA2 und WPA3 (siehe [WLAN](#wlan)) |
 | Dateien, TFTP und FTP | [`crates/jfn_model/files.rs`](crates/jfn_model/files.rs), [`crates/jfn_sim/files.rs`](crates/jfn_sim/files.rs), [`tftpd.rs`](crates/jfn_sim/tftpd.rs), [`tftpc.rs`](crates/jfn_sim/tftpc.rs), [`ftpd.rs`](crates/jfn_sim/ftpd.rs), [`ftpc.rs`](crates/jfn_sim/ftpc.rs), [`xfertrace.rs`](crates/jfn_sim/xfertrace.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`src/workspace/devwin/files.rs`](src/workspace/devwin/files.rs), [`src/filestest.rs`](src/filestest.rs), [`lib/netpkt/tftp.rs`](../../lib/netpkt/tftp.rs), [`lib/netpkt/ftp.rs`](../../lib/netpkt/ftp.rs) | die Dateien eines Geräts im Projekt und im Simulator, TFTP- und FTP-Server und ihre Clients an beiden Befehlszeilen, die Notizen, die Befehle für Dateien, der Reiter Dateien, der Selbsttest, TFTP und FTP Byte für Byte (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)) |
+| Gruppen und Hintergrundbild | [`crates/jfn_model/group.rs`](crates/jfn_model/group.rs), [`background.rs`](crates/jfn_model/background.rs), [`src/workspace/canvas/groups.rs`](src/workspace/canvas/groups.rs), [`backdrop.rs`](src/workspace/canvas/backdrop.rs), [`src/workspace/inspector/group.rs`](src/workspace/inspector/group.rs), [`src/doc/groups.rs`](src/doc/groups.rs), [`src/groupstest.rs`](src/groupstest.rs) | die Gruppen der logischen Zeichenfläche und ihr Hintergrundbild: Modell und Datei, die Szene mit Rahmen, Clustern und ihren Linien, das Zeichnen, der Inspektor, die Rückgängig-Schritte, ihr Selbsttest (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild)) |
 | Zurückspulen | [`crates/jfn_sim/keyframe.rs`](crates/jfn_sim/keyframe.rs), [`crates/jfn_sim/driver.rs`](crates/jfn_sim/driver.rs), [`src/doc/sim.rs`](src/doc/sim.rs), [`src/workspace/sim/mod.rs`](src/workspace/sim/mod.rs), [`src/keyframetest.rs`](src/keyframetest.rs) | Keyframes in einer Speichergrenze, die Eingaben dazwischen, die Wiederholung bis zu einem Zeitpunkt und ihre Prüfsummen, das Fortsetzen von dort (Simulator); der Zustand von damals im Fenster, Konsolen in der Vergangenheit, „Von hier fortsetzen“ mit Rückfrage; ihr Selbsttest (siehe [Zurückspulen](#zurückspulen)) |
+| SNMP | [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`snmpmib.rs`](crates/jfn_sim/snmpmib.rs), [`snmptrapd.rs`](crates/jfn_sim/snmptrapd.rs), [`snmptrace.rs`](crates/jfn_sim/snmptrace.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmptest.rs`](src/snmptest.rs), [`lib/netpkt/ber.rs`](../../lib/netpkt/ber.rs), [`lib/netpkt/snmp.rs`](../../lib/netpkt/snmp.rs), [`lib/netpkt/mib.rs`](../../lib/netpkt/mib.rs) | der Agent mit seiner Sicht auf das Gerät, der Trap-Empfänger, die Notizen, die IOS-artigen Befehle und die Werkzeuge der Shell, der MIB-Browser, der Selbsttest, BER, die Nachrichten von SNMPv1 und v2c und die kleine MIB (Library; siehe [SNMP](#snmp)) |
 
 ### Gerätekatalog
 
@@ -442,6 +503,8 @@ Programm beim Öffnen alles. Ein Labor hat dazu den Abschnitt `lab` mit seiner A
 Ansicht (siehe [Physische Ansicht](#physische-ansicht)) bringt `places` (die Orte), `phys` und
 `optics` je Gerät, `len_m` je Kabel und im Layout `phys` und `phys_at` (die gezeigte Ansicht
 und ihr Ort) mit; ältere Dateien haben nichts davon und laufen wie bisher.
+Gruppen und Hintergrundbild (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild))
+stehen in `groups` (`[]` ohne) und `background` (`null` ohne); auch sie fehlen älteren Dateien.
 
 ```json
 {
@@ -1129,6 +1192,11 @@ IOS-artige Befehlszeile:
   flash:`, `more DATEI`, `delete [/force] DATEI`, `copy QUELLE ZIEL` zwischen
   `running-config`, `startup-config`, `flash:`, `tftp:` und `ftp:`, `ip ftp username|password`
   (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
+- SNMP ([`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs)): `snmp-server community NAME [ro|rw
+  [ACL]]`, `snmp-server location|contact TEXT`, `snmp-server host ADRESSE [traps|informs]
+  [version 1|2c] COMMUNITY`, `snmp-server enable traps [snmp [authentication] [linkdown]
+  [linkup] [coldstart]]`, `no snmp-server`, `show snmp [community]`, `debug snmp packets`
+  (siehe [SNMP](#snmp)).
 
 Hosts und Server haben eine Linux-Shell (`root@PC1:~#`): `ip addr|link|route|neigh` mit den
 Ausgaben und Fehlermeldungen von iproute2, `ping` wie iputils (bis Strg+C oder `-c`; `-i`,
@@ -1154,6 +1222,11 @@ und `clear spanning-tree detected-protocols` ein und zeigen ihn (siehe
 [Spanning Tree](#spanning-tree)).
 Dateien zeigen und ändern `ls`, `cat`, `cp`, `rm`, `mkdir`, `rmdir`, `touch` und `echo … >`,
 übertragen `tftp` und `curl ftp://` (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
+Mail schicken `mail` und `curl smtp://`, `curl pop3://` holt sie ab (siehe
+[Mail](#mail-smtp-und-pop3)); `echo "nameserver ADRESSE" > /etc/resolv.conf` stellt den
+Namensserver von Hand ein.
+Agenten fragen und ändern `snmpget`, `snmpgetnext`, `snmpwalk`, `snmpbulkwalk` und `snmpset`
+(siehe [SNMP](#snmp)).
 
 Namen löst die Shell über den Resolver des Geräts auf (`ping server.lab`, `traceroute
 server.lab`, auch kurz mit der Suchdomäne): die erste Zeile nennt wie getaddrinfo das Ende der
@@ -1381,6 +1454,20 @@ flash:`; eine fehlende Datei auf dem Server. PC1 lädt als anna per FTP hoch, li
 herunter, scheitert mit einem falschen Passwort, holt anonym `pub/readme.txt` und mit `tftp`
 eine Sicherung; 24 Erwartungen. FTP läuft dort in Schritten von 2 s, weil `run until idle` bis
 zum Leerlauf-Timeout des Servers (300 s) liefe.
+
+Ein Szenario zeigt Mail (siehe [Mail](#mail-smtp-und-pop3)). `mail_domains.scn` auf
+`fixtures/mail_domains.jfnet`: Anna (PC1, a.lab) schreibt Bob mit `curl -v smtp://` über MAILA,
+der den MX von b.lab bei DNS1 nachschlägt und die Nachricht an MAILB weitergibt (R1 verliert den
+ersten SYN, während er nach MAILB fragt: sie ist nach gut 1 s da); Bob listet sie, holt sie mit
+`curl -v pop3://` (seine erste DNS-Frage verliert R1 ebenso, der Resolver fragt nach 5 s noch
+einmal) und löscht sie; eine Nachricht an einen unbekannten Benutzer von b.lab (`echo … |
+mail`) kommt als Unzustellbarkeitsnachricht zu Anna zurück, die sie abholt; 14 Erwartungen.
+
+Ein Szenario zeigt AAA mit RADIUS (siehe
+[Logins, Telnet und AAA mit RADIUS](#logins-telnet-und-aaa-mit-radius)). `aaa_radius.scn` auf
+`fixtures/aaa_radius.jfnet`: R1 und R2 melden ihre Konsolen über den RADIUS-Server von SRV1 an
+(Benutzer admin mit Stufe 15), R2 scheitert mit einem falschen Passwort, und nachdem SRV1
+ausgeschaltet ist, fällt R1 auf seinen lokalen Benutzer zurück; 7 Erwartungen.
 
 ### Skripte in Hosts
 
@@ -2369,7 +2456,7 @@ Block. Unter Linux überträgt `curl` per FTP; ein eigenes `ftp`-Programm gibt e
 
 Noch offen: Unterverzeichnisse in `flash:`, `cd` und `mv` in der Shell, der IOS-Befehl
 `tftp-server`, die Notizen des Desktops (`notizen.txt`) als Datei, und die weiteren Dienste von
-X1: SNMP, AAA mit RADIUS, Mail.
+X1: SNMP und Mail (AAA mit RADIUS ist fertig, siehe unten).
 
 Für Programme: `Action::Files { dev, files }`, `Report::Files { dev, at, path, files }`,
 `Engine::files(dev)`, `Engine::file_store(dev)`, für Dienste `OsApi::file_read`, `file_write`,
@@ -2378,6 +2465,76 @@ Geprüft wird in der Selbsttest-Gruppe `files` ([`src/filestest.rs`](src/fileste
 und FTP Byte für Byte in den coretest-Gruppen `tftp` und `ftp`, dazu das Szenario `backup.scn`
 und die Fensterskripte `files_window.uis`, `files_services.uis`, `files_console.uis` und
 `files_shots.uis`.
+
+### Logins, Telnet und AAA mit RADIUS
+
+IOS-artige Geräte kennen jetzt Passwörter. Bis hierher fragte nichts danach; eine
+Konfiguration ohne `login`-Zeilen, `aaa new-model` oder Benutzer öffnet ihre Konsole
+weiterhin genau wie bisher.
+
+- **Lokale Anmeldungen** ([`crates/jfn_sim/auth.rs`](crates/jfn_sim/auth.rs),
+  [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs)): `enable secret` und `enable password` (auch
+  `level N`), `username NAME [privilege N] secret|password …`, auf den Leitungen `password`,
+  `login`, `login local`, `exec-timeout`, `banner motd`, `service password-encryption`;
+  Rechtestufen 1 und 15 mit `enable`/`disable`. Die Konsole (Terminal-Tab und Gerätefenster)
+  zeigt `Username:` und `Password:` und tippt das Passwort ohne Echo (drei Versuche, eigene
+  Worte bei Fehlern). `show users`, `show aaa servers`, `show radius statistics`.
+- **Gespeicherte Geheimnisse mit Typnummer in der Running-Config:** `enable secret` und
+  `username … secret` werden mit PBKDF2-SHA-256 gehasht (Salz aus dem Zufallsstrom des
+  Geräts, 1000 Runden), angezeigt als `8 $8$<salt>$<hash>` (eigene Base64). Ein `password`
+  bleibt lesbar (Typ 0), es sei denn, `service password-encryption` schreibt es als Typ 7 um
+  (eine umkehrbare, eigene Verschleierung, kein Herstellerverfahren). Eine gespeicherte
+  Konfiguration bootet gleich (die Hashes bleiben, nichts wird neu gehasht).
+- **Telnet** ([`lib/netpkt/telnet.rs`](../../lib/netpkt/telnet.rs),
+  [`telnetd.rs`](crates/jfn_sim/telnetd.rs)): der NVT-Codec (Befehle, Optionsaushandlung
+  RFC 854/855/857/858, IAC-Escaping, ein Leser für Bytes in Stücken) mit Zerlegung im
+  Paket-Tab (Port 23); der Client `telnet HOST [PORT]` auf der IOS-artigen Konsole und in der
+  Linux-Shell verbindet sich, gibt die Gegenseite aus und meldet `% Connection refused by
+  remote host` und ähnliche `%`-Zeilen; die Flucht ist Strg+Umschalt+6.
+- **AAA mit RADIUS** ([`aaa.rs`](crates/jfn_sim/aaa.rs),
+  [`radiusd.rs`](crates/jfn_sim/radiusd.rs)): `aaa new-model`, `radius server NAME` mit
+  `address ipv4 ADDR [auth-port P] [acct-port P]`, `key`, `timeout`, `retransmit` (und das
+  ältere `radius-server host ADDR key SECRET`), `aaa group server radius NAME`,
+  `aaa authentication login {default|LISTE} METHODE…` (group radius | group NAME | local |
+  line | enable | none), `aaa authentication enable`, `aaa authorization exec` (die
+  Rechtestufe aus der Antwort), `aaa accounting exec default start-stop group radius`,
+  `login authentication LISTE` auf einer Leitung, `test aaa group radius USER PASS legacy`.
+  Die nächste Methode wird nur versucht, wenn ein Server nicht antwortet (nach seinen
+  Wiederholungen), nie nach einem Reject. Die NAS-Seite ist der verborgene Dienst
+  `radius-nas` (eigener Socket und Timer), das Verstecken des User-Password nach RFC 2865
+  §5.2, der Request- und Response-Authenticator und der Message-Authenticator nach RFC 3579,
+  MD5 und HMAC-MD5 aus `lib/crypto`.
+- **RADIUS-Server auf Hosts** (Dienst `radius-server`, UDP 1812 / 1813): Clients (Adresse
+  oder Präfix und ein gemeinsames Geheimnis), Benutzer (Passwort, Rechtestufe für die
+  Antwort, optionaler Text), Accounting in die Dateien des Geräts
+  (`/var/log/radius/accounting`); ein unbekannter Client oder ein falscher
+  Message-Authenticator wird still verworfen (mit Log-Zeile), wie RFC 2865 es verlangt. Die
+  Einstellungen stehen als JSON im Dienste-Editor und im Inspektor.
+- **Debug und Notizen:** `debug aaa authentication`, `debug radius`; jede Anmeldung,
+  Ablehnung, Anfrage, Antwort, Zeitüberschreitung, jeder Rückfall und jedes
+  Accounting-Paket sind eine Notiz (`Note::Aaa`, [`aaatrace.rs`](crates/jfn_sim/aaatrace.rs))
+  und eine Log-Zeile. Die Probleme-Liste bleibt dafür noch offen.
+
+Entscheidungen: Die Rechtestufe kommt bei RADIUS aus der Antwort (Service-Type
+Administrative-User → 15, sonst 1, oder ein eigenes Vendor-Attribut `priv-lvl=N`), wenn
+`aaa authorization exec` sie anfordert, sonst 1. Ein einstelliges Zahlenpasswort gibt man
+als `password 0 ZIFFER` ein (eine führende Ziffer ist sonst eine Typnummer, wie beim
+Vorbild).
+
+Noch offen: der **vty-Telnet-Server** auf IOS-artigen Geräten (`line vty … transport input`,
+eine CLI-Sitzung je vty-Leitung, das Sitzungslimit und der Leerlauf-Timeout). Der NVT-Codec,
+der Client und der ganze Login-/AAA-Unterbau stehen; der Server braucht eine eigene
+CLI-Sitzung neben der einen Konsole je Gerät und folgt als Nächstes. Dadurch melden sich die
+Golden-Szenarien an den **Konsolen** an, nicht per Telnet an einer vty-Leitung. Ebenfalls
+offen: 802.1X und WPA-Enterprise (spätere Meilensteine).
+
+Für Programme: `Engine::cli_secret(dev)` (das Passwort ohne Echo), die CLI-Zustände in
+`CliDev` (`auth`, `aaa`, `gate`, `priv_level`), `netpkt::telnet`, `netpkt::radius`,
+`crypto::{md5, hmac_md5}`. Geprüft wird in der Selbsttest-Gruppe `aaa`
+([`src/aaatest.rs`](src/aaatest.rs)), Telnet und RADIUS Byte für Byte in der coretest-Gruppe
+`radius` (MD5 und HMAC-MD5 in `crypto`), dazu das Szenario `aaa_radius.scn` und die
+Fensterskripte `login_console.uis`, `telnet_session.uis`, `aaa_services.uis` und
+`aaa_shots.uis`.
 
 ### Physische Ansicht
 
@@ -2510,6 +2667,292 @@ Für Programme: `jfn_model::phys` (`Tree`, `length`, `delay_ns`, `reach`, `link_
 `phys` ([`src/phystest.rs`](src/phystest.rs)), mit `scen_phys_lengths.uis` und den
 Fensterskripten `phys_view.uis`, `phys_rack.uis`, `phys_length.uis` und `phys_shots.uis`.
 
+### Mail (SMTP und POP3)
+
+Mailserver sind Dienste wie die anderen ([`smtpd.rs`](crates/jfn_sim/smtpd.rs),
+[`pop3d.rs`](crates/jfn_sim/pop3d.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs),
+[`mailbox.rs`](crates/jfn_sim/mailbox.rs)); die Nachrichten liegen in den Dateien der Geräte
+und werden mit dem Projekt gespeichert. Die Bytes baut und liest der Codec der Library
+([`netpkt::smtp`](../../lib/netpkt/smtp.rs), [`pop3`](../../lib/netpkt/pop3.rs),
+[`imf`](../../lib/netpkt/imf.rs)); der Paket-Tab zeigt jede Zeile beider Protokolle mit Befehl,
+Code und erweitertem Statuscode, der Simulationsmodus hat für sie die Kategorie „Mail“ in einem
+gedämpften Beerenrot (3:1 gegen die Fläche in beiden Themes und im Hochkontrast).
+
+- **SMTP-Server** (Dienst `smtp-server`): Port 25 und der Submission-Port 587 (RFC 6409), EHLO
+  mit SIZE, 8BITMIME, PIPELINING und ENHANCEDSTATUSCODES, auf 587 AUTH PLAIN und LOGIN (RFC
+  4954) mit den Benutzern des Dienstes; ohne Anmeldung nimmt 587 kein MAIL an (530). Er nimmt
+  Mail für seine Domänen (`domains`) an, wenn es den Benutzer gibt (`users`; `postmaster` immer,
+  sonst 550 5.1.1), und Mail an andere Domänen nur von Clients, die weiterleiten lassen dürfen:
+  aus `networks` (ohne Angabe die Netze seiner Interfaces), angemeldet, oder mit `open_relay`
+  von jedem (sonst 554 5.7.1; der Schalter ist zum Lernen da und steht als Problem in der
+  Liste). `max_size_kb` begrenzt die Größe (ein zu großes SIZE schon bei MAIL, sonst nach dem
+  Punkt: 552 5.3.4). Jede Nachricht bekommt eine Received-Zeile und kommt nach dem Schreiben
+  auf die Disk des Geräts in die Warteschlange; 250 nennt ihre Nummer.
+- **Zustellen:** in ein Postfach des Geräts nach einem zweiten Schreiben (Maildir:
+  `/var/mail/BENUTZER/new/SEKUNDEN.MµsQn.GERÄT` mit `Return-Path` oben und den Zeilenenden von
+  Unix; die Verzeichnisse entstehen mit der ersten Nachricht); an andere Domänen über deren
+  MX-Einträge, die der Resolver des Geräts findet (ohne MX die Domäne selbst), die Adressen
+  jedes Mailservers der Reihe nach mit `connect_timeout_ms` (30 s) und PIPELINING, wenn der
+  nächste Server es anbietet. 2xx ist zugestellt; 5xx oder eine Domäne, die das DNS nicht
+  kennt, ist endgültig; alles andere (keine Verbindung, 4xx, ein DNS ohne Antwort) wird
+  zurückgestellt: der nächste Versuch nach `retry_ms` (60 s), dann jeweils doppelt so spät bis
+  `retry_max_ms`, nach `give_up_ms` (10 min) wird aufgegeben (RFC 5321 nennt mindestens 30 min
+  und 4 bis 5 Tage; hier verkürzt und einstellbar). Ein MX, der auf den Server selbst zeigt,
+  ist eine Schleife. Wer abgewiesen oder aufgegeben wurde, steht in einer
+  Unzustellbarkeitsnachricht an den Absender (multipart/report nach RFC 3464 mit Text,
+  `Final-Recipient`, `Status`, `Remote-MTA`, `Diagnostic-Code` und dem Kopf der Nachricht) von
+  `MAILER-DAEMON` mit leerem Absender; scheitert sie selbst, wird sie verworfen. Die
+  Warteschlange lebt im Speicher des Dienstes und geht mit dem Strom verloren.
+- **POP3-Server** (Dienst `pop3-server`, Port 110): Benutzer mit Passwort (`users`), USER und
+  PASS (ein falsches Passwort nach `fail_delay_ms`, nach `max_fails` ist Schluss), STAT, LIST,
+  UIDL (der eindeutige Name der Datei), RETR und TOP nach der Lesezeit der Disk, DELE, RSET,
+  NOOP, CAPA und QUIT, das erst dann die markierten Nachrichten löscht (ein Rückgängig-Schritt
+  des Projekts); ein Postfach hält nur eine Sitzung (`[IN-USE]`).
+- **E-Mail im Desktop** ([`devwin/email.rs`](src/workspace/devwin/email.rs)): das Konto (Name,
+  Adresse, SMTP-Server und Port, POP3-Server und Port, Benutzer, Passwort, Nachrichten auf dem
+  Server lassen) liegt als `/root/Mail/account` auf dem Gerät; Posteingang (`/root/Mail/inbox`)
+  und Gesendet (`/root/Mail/sent`) mit Absender, Betreff und Datum, die gewählte Nachricht
+  darunter; Verfassen (An, Cc, Betreff, Text), Antworten („Re: “, an den Absender, der Text
+  zitiert), Löschen, Senden und Abrufen. Senden und Abrufen gehen als `Action::MailSend` /
+  `MailFetch` an den Simulator (so spielt das Zurückspulen sie nach), der ein Programm des
+  Geräts damit beauftragt; abgerufen wird, was die UIDL noch nicht kannte (`/root/Mail/.uidl`).
+  Zwei Zeilen sagen, was das letzte Senden und Abrufen ergab.
+- **Shell:** `curl smtp://SERVER[:PORT][/HELO] --mail-from A --mail-rcpt B -T DATEI [-u
+  BENUTZER:PASSWORT] [-v]` und `curl pop3://SERVER[/N] -u BENUTZER:PASSWORT [-X BEFEHL] [-o
+  DATEI] [-v]` mit den Schritten, Meldungen und Exit-Codes von curl; `mail` einmalig: `echo
+  TEXT | mail -s BETREFF [-c ADRESSE] [-r ABSENDER] EMPFÄNGER` übergibt eine Nachricht an den
+  SMTP-Server des Kontos (oder an einen auf dem Gerät selbst), `mail -H` listet den
+  Posteingang. Ein Mailprogramm in der Konsole (lesen, antworten) gibt es nicht, das macht
+  E-Mail im Desktop. Server und Hosts mit fester Adresse bekommen ihren Namensserver mit `echo
+  "nameserver ADRESSE" > /etc/resolv.conf` (`>>` für weitere Zeilen, auch `search`); so
+  schreibt ihn auch ihre Konfiguration.
+- **Notizen und Probleme:** Sitzungen, Anmeldungen, Absender und Empfänger, abgelehnte Befehle
+  und Relays, die Warteschlange, Zustellungen, MX-Einträge, Weitergaben, Zurückstellungen mit
+  dem nächsten Versuch und Unzustellbares als Notiz (`Note::Mail`) und Log-Zeile (`smtpd`,
+  `pop3d`, `e-mail`); die Probleme-Liste nennt einen MX-Eintrag ohne Adresse (oder ohne
+  SMTP-Server dort), einen offenen Relay und einen POP3-Benutzer, dessen Mail nie ankommen kann.
+- **Zahlen:** der SMTP-Server zählt `sessions`, `active`, `logins`, `failed_logins`, `received`,
+  `delivered`, `relayed`, `deferred`, `bounced`, `relay_denied`, `rejected`, `too_big`, `queued`
+  und `bytes_received`, der POP3-Server `sessions`, `active`, `logins`, `failed_logins`,
+  `retrieved`, `deleted` und `bytes_sent` (für `expect … svc NAME metric …` und den Bereich
+  Metriken, der für beide eigene Diagramme hat).
+
+Ein Mailserver in der Projektdatei:
+
+```json
+{"kind": "smtp-server", "name": "smtp", "config": {"hostname": "mail.a.lab", "domains": ["a.lab"],
+ "users": [{"name": "anna", "password": "geheim"}], "networks": ["10.0.1.0/24"]}},
+{"kind": "pop3-server", "name": "pop3", "config": {"users": [{"name": "anna", "password": "geheim"}]}}
+```
+
+Entscheidungen: Maildir statt mbox, weil jede Nachricht eine Datei im Reiter Dateien ist, UIDL
+ihr Name und DELE das Entfernen einer Datei. Die Antworten der Server, ihre Begrüßung, die
+Unzustellbarkeitsnachricht und die Log-Zeilen sind eigene Worte auf Englisch wie bei den
+anderen Servern; Codes und Formate folgen den RFCs. `mail` ist einmalig gehalten. Weder
+STARTTLS noch IMAP.
+
+Noch offen: IMAP, STARTTLS und SMTPS, Weiterleitungen und Aliase außer postmaster, eine
+Warteschlange auf der Disk, die einen Neustart übersteht, Anhänge im Programm E-Mail, SPF und
+DKIM.
+
+Für Programme: `Action::MailSend { dev, draft: MailDraft }`, `Action::MailFetch { dev }`,
+`Engine::mail_client(dev)`, `jfn_sim::mailc` (`Account`, `folder`, `read_mail`, `INBOX`,
+`SENT`, `ACCOUNT`), `Note::Mail(MNote)`, `ProblemKind::MailMxNowhere`, `MailOpenRelay` und
+`MailNoMailbox`. Geprüft wird in der Selbsttest-Gruppe `mail` ([`src/mailtest.rs`](src/mailtest.rs)),
+in der coretest-Gruppe `mail` (die Codecs Byte für Byte), mit `scen_mail_domains.uis` und den
+Fensterskripten `mail_services.uis`, `mail_client.uis` und `mail_shots.uis`.
+
+### Gruppen und Hintergrundbild
+
+Auf der logischen Zeichenfläche lassen sich Geräte, Notizen und Gruppen zu **Gruppen**
+zusammenfassen, und unter allem kann ein **Hintergrundbild** liegen, etwa ein Grundriss
+([`jfn_model/group.rs`](crates/jfn_model/group.rs),
+[`background.rs`](crates/jfn_model/background.rs),
+[`src/workspace/canvas/groups.rs`](src/workspace/canvas/groups.rs),
+[`backdrop.rs`](src/workspace/canvas/backdrop.rs), [`src/doc/groups.rs`](src/doc/groups.rs),
+[`inspector/group.rs`](src/workspace/inspector/group.rs)). Beides sind Ansichtsdaten: Der
+Simulator sieht sie nie, Keyframes und alle Golden-Berichte bleiben, wie sie sind.
+
+- **Gruppieren** (Bearbeiten › Gruppieren, Strg+G; im Inspektor bei mehreren gewählten
+  Dingen): Die gewählten Geräte, Notizen und Gruppen kommen in eine neue Gruppe („Gruppe 1“, die
+  Farbrollen reihum), und zwar die äußersten (ein Mitglied einer mitgewählten Gruppe bleibt
+  darin) in die innerste Gruppe, die sie alle enthält, an die Stelle des ersten. Gruppen dürfen
+  verschachtelt sein; jedes Ding gehört höchstens einer Gruppe direkt an, Zyklen gibt es nicht,
+  eine Gruppe, die dabei leer wird, verschwindet. **Gruppierung aufheben** (Strg+Umschalt+G)
+  löst die gewählten Gruppen auf, ihre Mitglieder nehmen ihren Platz ein und sind gewählt; Entf
+  auf einer Gruppe tut dasselbe (Geräte löscht Entf auf den Geräten).
+- **Aufgeklappt** ist eine Gruppe ein beschrifteter Rahmen um ihre Mitglieder, mit Platz für
+  ihre Namen und Dienst-Pillen: oben eine Titelleiste mit Name, Anzahl und dem Knopf „−“ zum
+  Zuklappen, in einer gedämpften Farbrolle (Grau, Blau, Grün, Ocker, Ziegelrot, Violett; mit
+  3:1 gegen die Fläche in beiden Themes, nie die Farbe allein: Name und Rahmen tragen sie),
+  getönt, sodass Raster und Hintergrundbild durchscheinen. Getroffen wird der Rahmen nur an
+  Titelleiste und Rand: Ein Klick ins Innere ist Hintergrund (das Gummiband beginnt dort),
+  Mitglieder klickt man durch ihn hindurch.
+- **Zugeklappt** ist sie ein Cluster-Symbol in der Mitte ihrer Mitglieder: Karten hintereinander
+  mit dem Symbol der häufigsten Geräteart, darunter ihr Name, in der Ecke die Zahl ihrer Geräte,
+  links oben die Zahl der Befunde ihrer Mitglieder aus Probleme („! 2“, bernstein, rot bei
+  Fehlern), entlang der Oberkante die Dienst-Pillen ihrer Geräte. Kabel zwischen drinnen und
+  draußen enden am Cluster: eine Linie je Gegenstelle und Kabelart, bei mehreren mit ihrer Zahl
+  („2×“) und den LEDs des schlechtesten; ein einzelnes Kabel bleibt es selbst (Inspektor,
+  Wegpunkte). Kabel innerhalb sind ausgeblendet. Ein Doppelklick oder Eingabe klappt die Gruppe
+  auf, an Ort und Stelle (entschieden gegen eine eigene Ansicht mit Brotkrumen: Die Kabel
+  bleiben, wo sie sind, und es gibt nichts, wohin man zurück müsste).
+- **Bearbeiten:** Ziehen am Titel oder am Cluster verschiebt alle Mitglieder um ganze
+  Rasterschritte, sie bleiben auf dem Raster; F2 oder ein Doppelklick auf den Titel benennt um
+  (1 bis 64 Zeichen, eindeutig). Der Inspektor zeigt Name, Zustand, wo sie liegt, ihren Inhalt,
+  die Farbe, Zuklappen / Aufklappen, Gruppierung aufheben und die Mitglieder (ein Klick wählt
+  eines und zeigt es). Jede Änderung ist ein Rückgängig-Schritt, auch das Zu- und Aufklappen.
+- **Versteckte Mitglieder:** Gerätefenster, Konsole und ein Doppelklick in Probleme oder im
+  Protokoll klappen die Gruppen um ein verstecktes Gerät zuerst auf (ein Schritt); ein einfacher
+  Klick auf einen Befund wählt den Cluster. Eine offene Konsole arbeitet weiter, während ihr
+  Gerät versteckt ist. Im Simulationsmodus laufen Pakete entlang der Linie in einen zugeklappten
+  Cluster hinein; was darin läuft, zeigt die Fläche nicht. „Nur Auswahl“ zählt die Geräte einer
+  gewählten Gruppe mit.
+- **Tastatur und Screenreader:** Rahmen und Cluster sind Einträge („Gruppe „Serverraum“,
+  5 Geräte“, „…, zugeklappt“, eine Linie „2 Kabel Serverraum – SW1, Kupfer, gerade, aktiv“),
+  Tab läuft über sie, Strg+A, Gummiband, Minimap (Rahmen als Umriss) und Alles zeigen schließen
+  sie ein.
+
+**Hintergrundbild** (Ansicht › Hintergrundbild …, oder im Inspektor des Projekts): PNG, JPEG,
+BMP oder GIF (die Formate, die jedes Fenster dekodiert; WebP bräuchte einen eigenen Codec) bis
+8 MiB, 8192 Pixel je Seite und 32 Megapixel; größere Bilder werden mit ihrer Größe abgelehnt,
+statt sie ungefragt zu verkleinern. Das Bild kommt in die Mitte der Ansicht, auf neun Zehntel von
+ihr eingepasst, mit 60 % Deckkraft, ungesperrt und gewählt. Ungesperrt verschiebt Ziehen es wie
+eine Notiz, sein Griff unten rechts skaliert es (das Seitenverhältnis bleibt); der Inspektor
+stellt Links, Oben (in Einheiten der Fläche), Maßstab und Deckkraft ein und hat „An Ansicht
+anpassen“, „Ersetzen …“ und „Entfernen“. **Sperren** (Ansicht › Hintergrundbild sperren) macht es
+unwählbar: Ein Klick darauf ist Hintergrund, das Gummiband geht darüber. Gezeichnet wird es unter
+dem Raster in die statische Fläche der Zeichenfläche: eine Kopie von höchstens 4096 Pixeln je
+Seite mit Mip-Stufen, für jeden Zoom einmal bilinear skaliert und behalten (während einer Geste
+ungefiltert aus der passenden Stufe), im dunklen Theme mit 60 % seiner Deckkraft, damit ein
+weißer Plan nicht blendet.
+
+**In der Datei:** `groups` hält je Gruppe ihre Nummer (vom Zähler der Geräte, Kabel und Notizen),
+Namen, Farbrolle, Mitglieder (Geräte, Notizen, Gruppen) und ob sie zugeklappt ist; ein Mitglied,
+das in keiner Gruppe steht, liegt oben. `background` hält die Datei des Bilds unverändert (Format
+und Name, die Bytes als Base64), so bleibt eine `.jfnet` eine Datei, die automatische Sicherung,
+Wiederherstellung und Rückgängig ganz tragen (Rückgängig-Schritte teilen die Bytes).
+
+```json
+"groups": [
+  { "id": 12, "name": "Serverraum", "color": "blue", "members": [3, 4, 13], "collapsed": true },
+  { "id": 13, "name": "Rack 2", "color": "green", "members": [6, 7], "collapsed": false }
+],
+"background": { "format": "png", "name": "plan.png", "w": 1200, "h": 800, "x": -600, "y": -400,
+  "scale_pm": 1000, "opacity": 60, "locked": true, "base64": "iVBORw0KGgo…" }
+```
+
+Beim Lesen fallen Mitglieder weg, die es nicht gibt, ein Mitglied zweier Gruppen gehört der
+ersten, Zyklen werden gebrochen, Gruppen ohne Gerät oder Notiz fallen weg (die Prüfung des
+Projekts meldet solche Dateien). Im Fenster bleibt die Nummer eines gelöschten Geräts in seiner
+Gruppe stehen, damit Rückgängig es dorthin zurückbringt.
+
+Noch offen: ein Hintergrundbild je Ort der physischen Ansicht, Gruppen in der physischen Ansicht,
+eine Suche auf der Zeichenfläche (es gibt keine; Tab, die Einträge und der Inspektor der Gruppen
+finden ihre Mitglieder).
+
+Für Programme: `jfn_model::group` (`Group`, `GroupColor`, `Groups::of` mit `parent`, `chain`,
+`members`, `leaves`, `hidden_by`, `rep`; `group`, `ungroup`, `rename`, `set_collapsed`,
+`set_color`, `normalize`, `issues`), `jfn_model::background` (`Background`, `sniff`, `BgErr`, die
+Grenzen) und im Diagramm-Widget der Library die Knoten-Flags `DN_FRAME`, `DN_TOGGLE`, `DN_STEP`,
+`DN_RESIZE`, `DN_OUTLINE` mit `DEv::Toggle`, `DEv::Resize`, `dg_toggle_rect` und
+`DgPaint::paint_under` (docs/GUIDE.md). Geprüft wird das in der Selbsttest-Gruppe `groups`
+([`src/groupstest.rs`](src/groupstest.rs)), mit den Fensterskripten `groups.uis`,
+`groups_bg.uis`, `groups_sim.uis`, `groups_shots.uis` und `apps/diagramtest/tests/frames.uis`.
+
+### SNMP
+
+Router, Switches, die Firewall und die anderen IOS-artigen Geräte bekommen mit `snmp-server`
+einen SNMP-Agenten, Linux-Hosts mit dem Dienst `snmpd`; beide sprechen SNMPv1 (RFC 1157) und
+SNMPv2c (RFC 1901, RFC 3416) über UDP-Port 161 ([`snmpd.rs`](crates/jfn_sim/snmpd.rs),
+[`snmpmib.rs`](crates/jfn_sim/snmpmib.rs)). Ohne Konfiguration gibt es keinen Agenten; ältere
+Projekte laufen wie bisher.
+
+- **IOS-artige Befehle** ([`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs)): `snmp-server community
+  NAME [ro|rw [ACL]]` (eine Standardliste mit Nummer 1–99 oder 1300–1999 oder mit Namen),
+  `snmp-server location|contact TEXT`, `snmp-server host ADRESSE [traps|informs] [version 1|2c]
+  COMMUNITY`, `snmp-server enable traps [snmp [authentication] [linkdown] [linkup]
+  [coldstart]]` (ohne Wörter alle vier), die `no`-Formen und `no snmp-server`; alles steht in
+  der Running-Config. `show snmp` zeigt Zähler, Kontakt, Standort und Empfänger, `show snmp
+  community` die Communities mit ihrem Zugriff, `debug snmp packets` jede Anfrage, Antwort und
+  Meldung des Agenten als Konsolenzeile; diese Texte sind eigene Worte.
+- **Linux-Hosts:** der Dienst `snmpd` mit Einstellungen als JSON (`communities` mit `name`,
+  `access` `ro` oder `rw` und `source`, dem Netz, für das sie gilt; `location`, `contact`,
+  `sinks` mit `host`, `type` `trap` oder `inform`, `version`, `community` und `port`; `notify`
+  aus `coldstart`, `linkdown`, `linkup` und `authentication`, ohne nur coldStart; `port`,
+  `inform_timeout_ms`, `inform_retries`).
+- **Die MIB** rechnet der Agent bei jeder Anfrage aus dem Zustand des Geräts: die Gruppe system
+  (sysDescr in eigenen Worten wie `show version`, sysObjectID unter der Enterprise-Nummer 32473
+  für Dokumentation aus RFC 5612 mit einer Nummer je Modell, sysUpTime seit dem Start des
+  Agenten, Kontakt, Name, Standort, sysServices), `ifNumber`, `ifTable` und `ifXTable` mit
+  `ifName`, `ifAlias` aus der Beschreibung, `ifHighSpeed` und den 64-Bit-Zählern der Ports
+  (Unicast, Multicast und Broadcast getrennt), `ipForwarding`, `ipDefaultTTL`, `ipAddrTable`,
+  `ipCidrRouteTable` (die Routen, die das Gerät gerade benutzt) und die Zähler der Gruppe snmp.
+  Die Interfaces zählen auf IOS-artigen Geräten die Ports der Reihe nach (ohne Konsole und USB),
+  danach Subinterfaces, Loopbacks und VLAN-Interfaces; unter Linux wie `ip link`. GetNext und
+  GetBulk folgen der Reihenfolge der OIDs über alle Tabellen hinweg.
+- **Anfragen** nach RFC 3416 und RFC 3584: Get, GetNext, GetBulk (Non-Repeaters,
+  Max-Repetitions, früher Schluss am Ende der Sicht, höchstens 1472 Byte) und Set; in Version 2c
+  noSuchObject, noSuchInstance und endOfMibView in der Bindung, in Version 1 noSuchName mit
+  Index (GetNext überspringt dort Counter64), tooBig in beiden. Set prüft erst alle Bindungen
+  (notWritable, wrongType, wrongLength, wrongValue, noCreation; in Version 1 noSuchName und
+  badValue) und ändert alle oder keine. Schreiben lassen sich sysContact, sysLocation, sysName
+  (benennt das Gerät um wie `hostname`), `ifAdminStatus` (wie `shutdown` und `no shutdown`),
+  `ifAlias` und `snmpEnableAuthenTraps`, auf IOS-artigen Geräten in die Running-Config, ins
+  Projekt erst mit `copy run start`.
+- **Ablehnen:** eine unbekannte Community oder ein Absender, den die Zugriffsliste
+  (IOS-artig) oder `source` (Linux) nicht zulässt, bekommt keine Antwort; das zählt als
+  snmpInBadCommunityNames, schreibt `%SNMP-3-AUTHFAIL` auf die Konsole (unter Linux eine
+  Log-Zeile von `snmpd`) und meldet authenticationFailure, wenn das eingeschaltet ist. Set mit
+  einer Community nur zum Lesen bekommt noAccess (Version 1: noSuchName).
+- **Meldungen:** coldStart beim Start des Agenten, linkDown und linkUp mit ifIndex,
+  ifAdminStatus und ifOperStatus, wenn ein Port seinen Link verliert oder bekommt, und
+  authenticationFailure; als Trap der Version 1 (Enterprise sysObjectID, Agent-Adresse,
+  generic und specific trap) oder als SNMPv2-Trap oder Inform der Version 2c, von einem eigenen
+  Port. Ein Inform geht wieder, bis seine Antwort kommt (IOS-artig nach 15 s bis zu dreimal,
+  Linux nach 1 s bis zu fünfmal). Das IOS-artige ARP verliert eine Meldung, deren nächster Hop
+  noch keinen Eintrag hat, wie den ersten Ping; ein Inform kommt deshalb später an.
+- **Manager in der Shell:** `snmpget`, `snmpgetnext`, `snmpwalk`, `snmpbulkwalk` und `snmpset`
+  mit `-v 1|2c` (ohne: 2c), `-c COMMUNITY`, `-r` (5), `-t` (1 s), `-On`, `-Oq`, `-Ov`, `-Os`,
+  `-Cr N` und `-Cn N`; Namen wie `sysName.0`, `IF-MIB::ifDescr` oder Ziffern
+  (`.1.3.6.1.2.1.1.5.0`), bei `snmpset` die Typen `i u t a o s x d n` und `=` für den der MIB.
+  Die Ausgaben haben die Form von net-snmp (`SNMPv2-MIB::sysName.0 = STRING: R1`), Hilfe und
+  Fehler sind eigene Worte. `snmpwalk` fragt ohne Wurzel mib-2 ab.
+- **Trap-Empfänger:** der Dienst `snmptrapd` ([`snmptrapd.rs`](crates/jfn_sim/snmptrapd.rs))
+  auf UDP-Port 162 nimmt Traps beider Versionen und Informs (die er bestätigt), filtert nach
+  `communities` (leer: alle) und schreibt jede Meldung als Zeile ins Protokoll (Quelle
+  `snmptrapd`), in seine Logdatei (`log`, ohne: `/var/log/snmptrapd.log`, in der Form von
+  net-snmp; als Datei des Geräts ein Rückgängig-Schritt wie jede geschriebene Datei) und in seine
+  Statuszeile.
+- **Im Fenster:** beide Dienste stehen im Reiter Dienste mit Statuszeile, Zahlen und den
+  Einstellungen als JSON. Der Desktop eines Hosts hat einen MIB-Browser
+  ([`devwin/mib.rs`](src/workspace/devwin/mib.rs)): der Baum der eingebauten MIB, zu einem Objekt
+  Name, OID, Syntax und Zugriff; Get, GetNext, Walk und Set laufen als Befehle in der Konsole
+  des Geräts darunter. Der Paket-Tab zerlegt SNMP Feld für Feld mit den Namen der Objekte, die
+  Ereignisse haben einen eigenen Chip „SNMP“ in gedecktem Oliv.
+- **Notizen und Probleme:** jede Anfrage, Antwort, Ablehnung, Änderung und Meldung als Notiz
+  (`Note::Snmp`); die Probleme-Liste warnt vor einem Empfänger, zu dem es keine Route gibt, und
+  vor einer Community `rw` ohne Zugriffsliste oder `source`.
+
+Entscheidungen: Der Agent hält keine Kopie der MIB; jede Anfrage sieht das Gerät, wie es gerade
+ist. Die Routen stehen in `ipCidrRouteTable` (RFC 2096), nicht in der neueren
+`inetCidrRouteTable`. Was ein Link beim Start des Geräts tut, meldet der Agent nicht (der
+coldStart sagt es schon). Ein Absender, den die Zugriffsliste abweist, zählt wie eine unbekannte
+Community. Unter Linux gilt ein Set, solange der Dienst läuft; die Einstellungen ändert es nicht.
+sysObjectID nennt nie die Nummer eines Herstellers.
+
+Noch offen: SNMPv3, `snmp-server inform retries|timeout`, `show snmp host`, Meldungen über
+IPv6, Tabellen über die Ressourcen der Hosts, ein Agent für den MIB-Browser ohne die Konsole.
+
+Für Programme: `Action::Snmp { dev, set }` mit `SnmpSet`, `Engine::snmp_agent(dev)`,
+`snmp_running(dev)`, `snmp_view(dev)`, `snmp_traps(dev)`, `SnmpAgent`, `SnmpCfg`, `Community`,
+`TrapHost`, `TrapReceiver`, `TrapRow`, `SnmpView`, `IfRow`, `Note::Snmp(SNote)`,
+`ProblemKind::SnmpTrapHost` und `SnmpOpenRw`; in der Library `netpkt::ber`, `netpkt::snmp` und
+`netpkt::mib`. Geprüft wird in der Selbsttest-Gruppe `snmp`
+([`src/snmptest.rs`](src/snmptest.rs)), BER und SNMP Byte für Byte in der coretest-Gruppe
+`snmp`, dazu das Szenario `snmp_monitor.scn` und die Fensterskripte `snmp_services.uis`,
+`snmp_console.uis`, `snmp_mib.uis` und `snmp_shots.uis`.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -2577,7 +3020,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · Gruppen · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; SNMP, AAA mit RADIUS, Mail) |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; Telnet-Server auf den vty-Leitungen) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

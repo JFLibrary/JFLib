@@ -1,0 +1,67 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/mail_domains.jfnet
+# the shot matrix of mail (X1c): PC1's E-Mail program with a fetched message open, an answer
+# being written and the account's form, MAILA's Dienste tab with the SMTP server's settings, each
+# light and dark at 100 and 150 % (build/jfnetworker/mail_<view>_<theme>_<scale>.png)
+# Ids: the window 26624; E-Mail: Abrufen 73729, Antworten 73731, Konto 73733; Dienste: the SMTP
+# server's settings 51200.
+size 1280 900
+theme light
+# ---- a message for Anna, from her own console
+dblclick listitem:"PC1"
+expect tab:"PC1" selected
+type "echo Hallo Anna, das ist ein Test. | mail -s \"Erster Test\" anna@a.lab\n"
+wait 2000
+dblclick listitem:"PC1" shift
+expect window 26624 open
+click tab:"Desktop"
+click button:"E-Mail"
+click #73729
+wait 2000
+expect text:"Abrufen: Eine neue Nachricht von mail.a.lab abgerufen." exists
+click text:"Erster Test"
+shot build/jfnetworker/mail_read_light_100.png window 26624
+theme dark
+shot build/jfnetworker/mail_read_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/mail_read_dark_150.png window 26624
+theme light
+shot build/jfnetworker/mail_read_light_150.png window 26624
+scale 100 window 26624
+# ---- the answer
+click #73731
+expect #73762 text "Re: Erster Test"
+shot build/jfnetworker/mail_compose_light_100.png window 26624
+theme dark
+shot build/jfnetworker/mail_compose_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/mail_compose_dark_150.png window 26624
+theme light
+shot build/jfnetworker/mail_compose_light_150.png window 26624
+scale 100 window 26624
+# ---- the account
+click #73733
+expect #73745 text "anna@a.lab"
+shot build/jfnetworker/mail_account_light_100.png window 26624
+theme dark
+shot build/jfnetworker/mail_account_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/mail_account_dark_150.png window 26624
+theme light
+shot build/jfnetworker/mail_account_light_150.png window 26624
+scale 100 window 26624
+close window 26624
+# ---- MAILA's SMTP server
+dblclick listitem:"MAILA" shift
+expect window 26624 open
+click tab:"Dienste"
+click #51200
+expect text:"Die Einstellungen von smtp als JSON. Übernehmen prüft sie und startet MAILA mit ihnen neu." exists
+shot build/jfnetworker/mail_services_light_100.png window 26624
+theme dark
+shot build/jfnetworker/mail_services_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/mail_services_dark_150.png window 26624
+theme light
+shot build/jfnetworker/mail_services_light_150.png window 26624
+scale 100 window 26624
+expect_nowarn

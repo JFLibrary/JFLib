@@ -1,0 +1,147 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Login und RADIUS",
+  "description": "Ein Router mit Konsolen-Login und ein RADIUS-Server.",
+  "seed": 7,
+  "next_id": 7,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\nenable secret s3cret\nusername admin privilege 15 secret adminpw\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.0.1 255.255.255.0\n no shutdown\n!\nbanner motd #Nur fuer befugte Nutzer.#\n!\nline con 0\n login local\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 160,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.0.10/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "radius-server",
+          "name": "radius",
+          "disabled": false,
+          "config": {
+            "clients": [
+              {
+                "address": "10.0.0.0/24",
+                "secret": "testing123"
+              }
+            ],
+            "users": [
+              {
+                "name": "admin",
+                "password": "adminpw",
+                "privilege": 15,
+                "reply": "Willkommen."
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "PC1",
+      "model": "pc",
+      "x": 320,
+      "y": 140,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.20/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ]
+}

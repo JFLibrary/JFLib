@@ -1,0 +1,65 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/snmp_monitor.jfnet
+# the shot matrix of SNMP (X1b): MON's console after a walk of R1's interfaces, the MIB-Browser in
+# MON's Desktop after a Get, MON's Dienste tab with the trap receiver, and the simulation mode's
+# event list with the SNMP chip in its own colour, each light and dark at 100 and 150 %
+# (build/jfnetworker/snmp_<view>_<theme>_<scale>.png)
+size 1280 900
+theme light
+drag 630,671 630,380 8
+# ---- the console: a walk of the interfaces' names and states
+dblclick listitem:"MON"
+type "snmpwalk -v2c -c public -Os 10.0.10.1 ifOperStatus\n"
+wait 2000
+expect text:"ifOperStatus.8 = INTEGER: down(2)" exists
+shot build/jfnetworker/snmp_console_light_100.png
+theme dark
+shot build/jfnetworker/snmp_console_dark_100.png
+scale 150
+shot build/jfnetworker/snmp_console_dark_150.png
+theme light
+shot build/jfnetworker/snmp_console_light_150.png
+scale 100
+# ---- the MIB-Browser after a Get of sysDescr
+dblclick listitem:"MON" shift
+expect window 26624 open
+click tab:"Desktop"
+click button:"MIB-Browser"
+click #69633
+type "10.0.10.1"
+click listitem:"sysDescr"
+click #69638
+wait 1000
+expect text:"SNMPv2-MIB::sysDescr.0 = STRING: JFNetworker device software 1.0 for the JF-R4 (Edge-Router 4× 1G, 2× 10G SFP+, 2× Seriell)" exists
+shot build/jfnetworker/snmp_mib_light_100.png window 26624
+theme dark
+shot build/jfnetworker/snmp_mib_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/snmp_mib_dark_150.png window 26624
+theme light
+shot build/jfnetworker/snmp_mib_light_150.png window 26624
+scale 100 window 26624
+# ---- the trap receiver in the Dienste tab
+click tab:"Dienste"
+expect text:"SNMP-Trap-Empfänger · traps" exists
+shot build/jfnetworker/snmp_services_light_100.png window 26624
+theme dark
+shot build/jfnetworker/snmp_services_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/snmp_services_dark_150.png window 26624
+theme light
+shot build/jfnetworker/snmp_services_light_150.png window 26624
+scale 100 window 26624
+close window 26624
+# ---- the simulation mode: SNMP in its own colour among the protocols
+click tab:"Simulation"
+wait 200
+expect button:"SNMP" exists
+shot build/jfnetworker/snmp_events_light_100.png
+theme dark
+shot build/jfnetworker/snmp_events_dark_100.png
+scale 150
+shot build/jfnetworker/snmp_events_dark_150.png
+theme light
+shot build/jfnetworker/snmp_events_light_150.png
+scale 100
+expect_nowarn

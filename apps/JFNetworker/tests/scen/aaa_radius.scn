@@ -1,0 +1,35 @@
+# AAA mit RADIUS: zwei Router (R1, R2) melden ihre Konsolen-Logins per RADIUS an SRV1 an
+# (Benutzer admin, Passwort adminpw, Rechte 15), mit lokalem Ersatz. admin meldet sich an R1
+# an; an R2 wird ein falsches Passwort abgewiesen, dann das richtige angenommen; zuletzt wird
+# SRV1 ausgeschaltet und R1 fällt auf das lokale Passwort zurück. Jede Konsole ist beim Start
+# gesperrt (Username:), das Passwort wird ohne Echo getippt.
+run 1s
+# R1: admin über RADIUS, Rechte 15 (der Prompt wird zu "R1#")
+R1: admin
+R1: adminpw
+run 2s
+expect SRV1 svc radius metric requests == 1
+expect SRV1 svc radius metric accepts == 1
+R1: show aaa servers
+expect R1 output contains "RADIUS server 1 (10.0.0.10): auth port 1812, acct port 1813"
+# R2: ein falsches Passwort wird abgewiesen (kein Ersatz nach einem Reject)
+R2: admin
+R2: nope
+run 2s
+expect R2 output contains "% Access denied"
+expect SRV1 svc radius metric rejects == 1
+# R2: das richtige Passwort
+R2: admin
+R2: adminpw
+run 2s
+expect SRV1 svc radius metric accepts == 2
+# SRV1 aus: R1 meldet sich ab, der neue Login fällt nach der Zeitüberschreitung auf lokal zurück
+R1: exit
+power off SRV1
+R1: admin
+R1: adminpw
+run 5s
+# lokal angemeldet (der Ersatz griff): der Prompt im Bericht ist "R1>", der Server zählte
+# keinen weiteren Login (er war aus)
+R1: show aaa servers
+expect SRV1 svc radius metric accepts == 2

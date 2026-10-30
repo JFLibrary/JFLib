@@ -1,0 +1,35 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/aaa_login.jfnet
+# the RADIUS server in SRV1's device window (Dienste, svcedit.rs): its card with kind, state
+# and status line, the settings as JSON; adding a user and seeing the status change; a client
+# without a secret refused by the simulator, then cancelled.
+# Ids: the window 26624; Dienste: the settings button 51200, the editor 51456, Übernehmen
+# 51472, Abbrechen 51473.
+size 1280 900
+theme light
+dblclick listitem:"SRV1" shift
+expect window 26624 open
+click tab:"Dienste"
+expect text:"RADIUS-Server · radius" exists
+expect text:"Ports 1812 / 1813, 1 Clients, 1 Benutzer: 0 angenommen, 0 abgelehnt" exists
+# the settings as JSON: add a second user
+click #51200
+expect text:"Die Einstellungen von radius als JSON. Übernehmen prüft sie und startet SRV1 mit ihnen neu." exists
+focus #51456
+key ctrl+a
+type "{\"clients\": [{\"address\": \"10.0.0.0/24\", \"secret\": \"testing123\"}], "
+type "\"users\": [{\"name\": \"admin\", \"password\": \"adminpw\", \"privilege\": 15}, "
+type "{\"name\": \"gast\", \"password\": \"x\", \"privilege\": 1}]}"
+click #51472
+expect #51456 missing
+expect text:"Ports 1812 / 1813, 1 Clients, 2 Benutzer: 0 angenommen, 0 abgelehnt" exists
+shot build/jfnetworker/aaa_services.png window 26624
+# a client without a secret is refused by the simulator
+click #51200
+focus #51456
+key ctrl+a
+type "{\"clients\": [{\"address\": \"10.0.0.0/24\"}]}"
+click #51472
+expect text:"Dienst radius-server: Ein Client braucht ein „secret“." exists
+click #51473
+expect #51456 missing
+expect_nowarn

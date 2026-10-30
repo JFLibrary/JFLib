@@ -128,6 +128,12 @@ impl Engine {
                 if d & super::D_NAT != 0 {
                     s.push_str("Debug output for NAT: on\n");
                 }
+                if d & super::D_AAA != 0 {
+                    s.push_str("Debug output for AAA authentication: on\n");
+                }
+                if d & super::D_RADIUS != 0 {
+                    s.push_str("Debug output for RADIUS: on\n");
+                }
                 s.push_str(&Self::ios_debug6_lines(d));
                 if d & super::D_OSPF != 0 {
                     let k = match self.cdev(ni).map(|c| c.ospf_debug).unwrap_or(0) {
@@ -150,6 +156,9 @@ impl Engine {
                             s.push_str(&format!("Debug output for BGP {}: on\n", what));
                         }
                     }
+                }
+                if d & super::D_SNMP != 0 {
+                    s.push_str("Debug output for SNMP packets: on\n");
                 }
                 s
             }
@@ -175,6 +184,8 @@ impl Engine {
         s.push_str(&self.ios_names_config(ni));
         // the FTP client's login (cli/files.rs)
         s.push_str(&self.ios_files_config(ni));
+        // logins, AAA and RADIUS (cli/aaa.rs)
+        s.push_str(&self.ios_aaa_config(ni));
         if let Some(st) = &n.ip {
             let default = n.model.has(F_ROUTER) && (!n.model.has(F_BRIDGE) || n.model.has(F_HOST));
             if st.forwarding != default {
@@ -274,6 +285,8 @@ impl Engine {
         s.push_str(&self.ios_ip6_route_config(ni));
         // the access lists: named ones, then the numbered lines (cli/acl.rs)
         s.push_str(&self.ios_acl_config(ni));
+        // the SNMP agent (cli/snmp.rs)
+        s.push_str(&self.ios_snmp_config(ni));
         for l in &cfg.lines {
             s.push_str(&format!("line {}\n", l.name));
             for o in &l.opts {

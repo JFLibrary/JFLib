@@ -68,6 +68,14 @@
 //                                                      do not fit keep a cable down); Connect
 //                                                      takes Link::len_m as the cable's length
 //                                                      (0: unknown), AddDevice the device's optics
+//   MailSend / MailFetch                               the E-Mail program of a host sends a
+//                                                      message or fetches the new ones of its
+//                                                      account (mailc.rs: a job of its own,
+//                                                      after the ones before it)
+//   Snmp                                               the SNMP agent of an IOS-like device:
+//                                                      communities, location, contact,
+//                                                      receivers, notifications, "no snmp-server"
+//                                                      (snmpd.rs)
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -263,6 +271,12 @@ pub enum Action {
     CableLen { link: u32, len_m: u32 },
     /// the transceiver in a port's optics cage (phys.rs)
     Optic { dev: u32, port: String, optic: jfn_model::catalog::Optic },
+    /// the E-Mail program of a device sends a message (mailc.rs)
+    MailSend { dev: u32, draft: crate::mailc::MailDraft },
+    /// the E-Mail program fetches the new messages of its account (POP3)
+    MailFetch { dev: u32 },
+    /// a change of an IOS-like device's SNMP agent ("snmp-server ...": snmpd.rs)
+    Snmp { dev: u32, set: crate::snmpd::SnmpSet },
 }
 
 /// why an action was refused (German text through Display)
@@ -644,6 +658,11 @@ impl Engine {
             // the physical layer (phys.rs)
             Action::CableLen { link, len_m } => self.set_cable_len(link, len_m),
             Action::Optic { dev, port, optic } => self.set_optic(dev, &port, optic),
+            // the E-Mail program (mailc.rs)
+            Action::MailSend { dev, draft } => self.mail_job(dev, crate::mailc::MailJob::Send(draft)),
+            Action::MailFetch { dev } => self.mail_job(dev, crate::mailc::MailJob::Fetch),
+            // the SNMP agent of IOS-like devices (snmpd.rs)
+            Action::Snmp { dev, set } => self.snmp_apply(dev, set),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }

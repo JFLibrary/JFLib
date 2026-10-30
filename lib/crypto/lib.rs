@@ -25,6 +25,8 @@
 //             only for protocols defined with SHA-1 (WPA2-Personal)          (FIPS 180-4)
 //   keywrap   aes_wrap / aes_unwrap: the AES key wrap                         (RFC 3394)
 //   cmac      cmac_aes: AES-CMAC                                              (RFC 4493)
+//   md5       Md5, md5(data), md5_parts(parts); with hmac_md5 in hmac: only for protocols
+//             defined with MD5 (RADIUS); broken for collisions                 (RFC 1321, 2104)
 //
 // No randomness here: callers pass random bytes in (plat::fill_random), so everything is
 // deterministic and testable.  Secret-dependent work avoids branches and table lookups
@@ -57,6 +59,7 @@ pub mod x25519;
 pub mod sha1;
 pub mod keywrap;
 pub mod cmac;
+pub mod md5;
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -68,6 +71,8 @@ pub use sha1::{sha1, Sha1};
 pub use hmac::{hmac_sha1, pbkdf2, pbkdf2_sha1};
 pub use keywrap::{aes_unwrap, aes_wrap};
 pub use cmac::cmac_aes;
+pub use md5::{md5, md5_parts, Md5};
+pub use hmac::hmac_md5;
 
 /// a hash function for Hmac / HKDF / PBKDF2
 pub trait Hash: Clone {

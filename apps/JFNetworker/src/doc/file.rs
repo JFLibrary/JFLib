@@ -31,6 +31,8 @@ use crate::app::Net;
 
 /// the file type of the dialogs (German; shown through t())
 const EXT: &str = "jfnet=JFNetworker-Projekt";
+/// the file types of a background picture (G1)
+const IMG_EXT: &str = "png;jpg;jpeg;bmp;gif=Bild (PNG, JPEG, BMP, GIF)";
 
 /// what follows the question about unsaved changes (or the save it asked for)
 #[derive(Clone, Debug, PartialEq)]
@@ -50,6 +52,8 @@ pub(crate) struct Files {
     pub fd_save: bool,
     /// the dialog was opened and has not answered yet
     pub fd_active: bool,
+    /// it opens a background picture (G1, canvas/backdrop.rs: CMD_BG_CHOSEN), not a project
+    pub fd_image: bool,
     pub fd_path: String,
     pub ask_open: Shared<i32>,
     pub after: Option<After>,
@@ -65,6 +69,7 @@ impl Files {
             fd_open: Shared::new(0),
             fd_save: false,
             fd_active: false,
+            fd_image: false,
             fd_path: String::new(),
             ask_open: Shared::new(0),
             after: None,
@@ -107,7 +112,7 @@ pub(crate) fn write(path: &str, p: &Project) -> bool {
 /// where a file dialog starts: the open file, else the last file's folder, else
 /// Dokumente/JFNetworker (made when missing); headless runs: the working folder, so scripts
 /// can type relative names
-fn start_path(n: &Net, ui: &Ui, name: Option<&str>) -> String {
+pub(crate) fn start_path(n: &Net, ui: &Ui, name: Option<&str>) -> String {
     if let Some(p) = &n.doc.path {
         return p.clone();
     }
@@ -325,13 +330,20 @@ pub(crate) fn answer(n: &mut Net, ui: &mut Ui, keep: bool) {
 pub(crate) fn dialogs(n: &mut Net, ui: &mut Ui) {
     let open = n.file.fd_open.clone();
     let flags = if n.file.fd_save { FD_SAVE } else { FD_OPEN };
-    let ev = ui.filedlg(ID_FILEDLG, flags, &open, &mut n.file.fd_path, 1040, &[t(EXT)]);
+    // a background picture (G1): the formats every window decodes
+    let exts: &[&str] = if n.file.fd_image { &[t(IMG_EXT)] } else { &[t(EXT)] };
+    let ev = ui.filedlg(ID_FILEDLG, flags, &open, &mut n.file.fd_path, 1040, exts);
     if ev & EV_ACT != 0 {
         n.file.fd_active = false;
-        ui.cmd_run(CMD_FILE_DONE, n.file.fd_save as u32);
+        if core::mem::take(&mut n.file.fd_image) {
+            ui.cmd_run(CMD_BG_CHOSEN, 0);
+        } else {
+            ui.cmd_run(CMD_FILE_DONE, n.file.fd_save as u32);
+        }
     } else if n.file.fd_active && open.get() == 0 {
         // cancelled: nothing waits for it any more
         n.file.fd_active = false;
+        n.file.fd_image = false;
         n.file.after = None;
     }
     let ask = n.file.ask_open.clone();

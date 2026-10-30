@@ -316,6 +316,10 @@ fn renamed(n: &mut Net, dev: u32, name: &str) {
 /// the console of device `dev` as the shown tab of the Terminal panel (its own window comes
 /// to the front), with the keyboard -> Err: why there is none
 pub(crate) fn open(n: &mut Net, ui: &mut Ui, dev: u32) -> Result<(), String> {
+    // a member of a collapsed group: its groups open first (G1)
+    if n.doc.proj.device(dev).is_some() && has_cli(&n.doc.proj, dev) {
+        crate::workspace::canvas::groups::reveal(n, dev);
+    }
     let Some(d) = n.doc.proj.device(dev) else { return Err(tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()])) };
     if !has_cli(&n.doc.proj, dev) {
         return Err(tf("{} hat keine Befehlszeile.", &[&d.name]));
@@ -414,11 +418,13 @@ pub(crate) fn tile(n: &mut Net, ui: &mut Ui) {
 pub(crate) fn view(n: &mut Net, ui: &mut Ui, dev: u32) {
     let Some(d) = n.doc.proj.device(dev) else { return };
     let (on, name) = (!d.off, d.name.clone());
-    let (prompt, busy) = {
+    let (prompt, busy, secret) = {
         let e = n.doc.sim.state();
         // in the past a line always runs (on a copy, Sim::past_line)
         let busy = e.cli_busy(dev) && n.doc.sim.past().is_none();
-        if on { (e.cli_prompt(dev), busy) } else { (String::new(), false) }
+        // a login gate that waits for a password: the input line hides what is typed
+        let secret = on && e.cli_secret(dev) && n.doc.sim.past().is_none();
+        if on { (e.cli_prompt(dev), busy, secret) } else { (String::new(), false, false) }
     };
     let id = n.cons.id(&n.doc.proj, dev);
     if !on {
@@ -438,7 +444,7 @@ pub(crate) fn view(n: &mut Net, ui: &mut Ui, dev: u32) {
     }
     let c = n.cons.get(&n.doc.proj, dev);
     c.term.set_prompt(&prompt);
-    c.term.set_mode(if busy { TM_BUSY } else { TM_LINE });
+    c.term.set_mode(if secret { TM_SECRET } else if busy { TM_BUSY } else { TM_LINE });
     let mut flags = if c.ios { TF_QHELP | TF_CTRL_SHIFT6 } else { 0 };
     if !on {
         flags |= TF_NO_INPUT;

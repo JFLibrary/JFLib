@@ -1,0 +1,36 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/aaa_login.jfnet
+# the shot matrix of X1d: a locked console at the login prompt and the RADIUS server's Dienste
+# tab, each light and dark at 100 and 150 %
+# (build/jfnetworker/aaa_<view>_<theme>_<scale>.png).
+size 1280 900
+theme light
+wait 600
+# ---- a console locked at the login (R1 has "login local")
+drag 630,671 630,380 8
+dblclick listitem:"R1"
+expect tab:"R1" selected
+expect text:"Username: " exists
+move 640,790
+shot build/jfnetworker/aaa_login_light_100.png
+theme dark
+shot build/jfnetworker/aaa_login_dark_100.png
+scale 150
+move 960,1185
+shot build/jfnetworker/aaa_login_dark_150.png
+theme light
+shot build/jfnetworker/aaa_login_light_150.png
+scale 100
+# ---- the RADIUS server in SRV1's device window (Dienste)
+dblclick listitem:"SRV1" shift
+expect window 26624 open
+click tab:"Dienste"
+expect text:"RADIUS-Server · radius" exists
+shot build/jfnetworker/aaa_radiusd_light_100.png window 26624
+theme dark
+shot build/jfnetworker/aaa_radiusd_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/aaa_radiusd_dark_150.png window 26624
+theme light
+shot build/jfnetworker/aaa_radiusd_light_150.png window 26624
+scale 100 window 26624
+expect_nowarn

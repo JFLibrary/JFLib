@@ -37,6 +37,8 @@
 // wlan.rs: the WLAN settings of devices and the scale of the canvas as steps.
 // phys.rs: the physical view's edits (places, where devices stand, cable lengths, optics) as
 // steps (P1).
+// groups.rs: the groups of the canvas and its background picture as steps (G1); view data the
+// simulator never sees.
 
 pub(crate) mod autosave;
 pub(crate) mod config;
@@ -49,6 +51,7 @@ pub(crate) mod scripts;
 pub(crate) mod assess;
 pub(crate) mod wlan;
 pub(crate) mod phys;
+pub(crate) mod groups;
 
 use alloc::boxed::Box;
 use alloc::string::String;

@@ -12,7 +12,8 @@
 //                             (series.rs)
 //   SvcEvent                  Udp(Dgram) | Timer(key) | EchoReply | ArpConflict |
 //                             Resolved(lookup) | Link | Ctl; Ip(IpPkt) for a protocol a service
-//                             takes without a transport header (OSPF: ospf.rs)
+//                             takes without a transport header (OSPF: ospf.rs); Port (a port's
+//                             link, for the SNMP agent alone: snmpd.rs)
 //   OsApi                     what a running service may do: bind / bind_raw / close, send /
 //                             send_from / send_raw, timers (four keys per service), notes,
 //                             the log, interfaces, addresses and routes, resolver settings
@@ -257,6 +258,9 @@ pub enum SvcEvent {
     /// an ICMP or ICMPv6 error about a datagram of a connected UDP socket (udp_connect) to its
     /// peer: Refused for port unreachable (ECONNREFUSED), else Unreachable
     UdpError { port: u16, peer: (IpAddr, u16), err: crate::tcp::TcpEnd, hop: HopId },
+    /// a port's link came up or went down, every port and bridge members too (only the SNMP
+    /// agent hears it: linkDown, linkUp, ifLastChange; snmpd.rs)
+    Port { port: u16, up: bool },
 }
 
 /// what the console gives a program the shell started
@@ -1581,6 +1585,12 @@ impl OsApi<'_> {
     /// the service's id (ss -p shows it as the process id)
     pub fn svc_id(&self) -> u32 {
         self.id
+    }
+    /// the NAS reports a RADIUS login's outcome to the login gate (cli/aaa.rs); `how` is the
+    /// method that decided it, for the login note ("RADIUS", "lokal", ...)
+    pub fn aaa_result(&mut self, via: crate::aaa::Requester, outcome: crate::aaa::AuthResult, how: &'static str) {
+        let ni = self.ni;
+        self.eng.aaa_result(ni, via, outcome, how);
     }
     /// the service's name on the device
     pub fn svc_name(&self) -> String {

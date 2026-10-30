@@ -69,7 +69,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [script](#script) -- the JFNetworker scripting language (.jfs): lexer, parser, editor diagnostics, compiler, a VM with fuel and a garbage collector, the standard library (str, list, map, bytes, math, json), float arithmetic and math in software
   <br>[lib.rs](#script-crate-root) · [ast.rs](#scriptastrs) · [check.rs](#scriptcheckrs) · [lex.rs](#scriptlexrs) · [parse.rs](#scriptparsers) · [code.rs](#scriptcoders) · [heap.rs](#scriptheaprs) · [num.rs](#scriptnumrs) · [math.rs](#scriptmathrs) · [vm.rs](#scriptvmrs)
 - [crypto](#crypto) -- hashes, MACs, KDFs, Argon2id, AEAD, X25519, Ed25519, sealed boxes (no randomness inside)
-  <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs)
+  <br>[lib.rs](#crypto-crate-root) · [aead.rs](#cryptoaeadrs) · [aes.rs](#cryptoaesrs) · [argon2.rs](#cryptoargon2rs) · [b64.rs](#cryptob64rs) · [blake2b.rs](#cryptoblake2brs) · [blake3.rs](#cryptoblake3rs) · [bn.rs](#cryptobnrs) · [chacha.rs](#cryptochachars) · [ecdsa.rs](#cryptoecdsars) · [ed25519.rs](#cryptoed25519rs) · [gcm.rs](#cryptogcmrs) · [hmac.rs](#cryptohmacrs) · [p256.rs](#cryptop256rs) · [poly1305.rs](#cryptopoly1305rs) · [rsa.rs](#cryptorsars) · [sealbox.rs](#cryptosealboxrs) · [sha2.rs](#cryptosha2rs) · [x25519.rs](#cryptox25519rs) · [sha1.rs](#cryptosha1rs) · [keywrap.rs](#cryptokeywraprs) · [cmac.rs](#cryptocmacrs) · [md5.rs](#cryptomd5rs)
 - [compress](#compress) -- LZ4 block and frame, xxHash32, codec ids
   <br>[lib.rs](#compress-crate-root) · [lz4.rs](#compresslz4rs) · [xxh.rs](#compressxxhrs) · [zstd/mod.rs](#compresszstdmodrs) · [zstd/dec.rs](#compresszstddecrs) · [zstd/enc.rs](#compresszstdencrs)
 - [datastore](#datastore) -- an embedded journal database: JSON collections, transactions, snapshots, crash recovery
@@ -77,7 +77,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
   <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [x509.rs](#netiox509rs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, a dissector, pcapng
-  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs)
+  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs)
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
   <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
@@ -6053,6 +6053,20 @@ did as DEv events.
   dg_hairline(g, vp, pts, argb)   a route as 1 px anti-aliased lines: far cheaper than
                                   dg_stroke_edge for many thin edges (DgFrame::moving)
   DgFrame::find(margin, edges)    the nodes or edges near the clip (the spatial buckets)
+  dg_toggle_rect(node, bar)       the world box of a DN_TOGGLE node's collapse button
+  DgPaint::paint_under(g, f)      (optional) what lies under the grid: a backdrop image
+
+Frames and groups (additive flags, G1 of JFNetworker): a DN_FRAME node is a labelled frame
+around other nodes (the app computes its box from theirs and puts it before them, so they lie
+on top).  It is hit on its title bar -- the top DiagramState::frame_bar world units -- and on
+its border (4 DIP) only: its inside stays the background (marquees start there, members are
+clicked through it); its overview box is an outline, its record (diagram_sems) covers the
+title bar.  DN_TOGGLE gives a node a collapse button at the right end of its title bar (a
+frame) or in its top right corner: a click there reports DEv::Toggle (no selection change).
+DN_STEP nodes move by whole grid steps instead of snapping their corner, so the members a
+frame or a cluster stands for stay on the grid.  A selected DN_RESIZE node shows a handle at
+its bottom right corner; dragging it reports DEv::Resize with the new box (Esc: back).
+DN_OUTLINE draws a node as an outline in the overview (a backdrop, an area).
 
 Model (DModel, borrowed every frame): nodes with a world rectangle and a range of ports,
 ports at a position relative to their node's top left corner, edges from key a to key b
@@ -6062,9 +6076,10 @@ nodes, ports and edges; later nodes lie on top.  ver changes whenever the geomet
 changes: the key maps, the routes and the spatial buckets (256 world units) are rebuilt
 then.  World units are DIP at zoom 1.
 
-Input: the hit test prefers the handles of selected edges (waypoints, then the middles of
-their stretches), then the ports of the node under the pointer, the topmost node, the
-nearest edge (max(5 DIP, half the edge width + 3 DIP)), the background.  A press + drag
+Input: the hit test prefers the resize handles of selected DN_RESIZE nodes, the handles of
+selected edges (waypoints, then the middles of their stretches), then the ports of the node
+under the pointer, the topmost node (a DN_TOGGLE node's button first), the nearest edge
+(max(5 DIP, half the edge width + 3 DIP)), the background.  A press + drag
 (4 DIP) on a selected node moves the selection (snapped to the grid, Alt: free), from a
 port connects, on a handle moves or inserts a waypoint, on the background draws a marquee
 (Shift adds, Ctrl toggles); middle drag, Space + drag and DG_PAN pan; the wheel scrolls
@@ -6099,6 +6114,11 @@ DR_ORTHO: u8 = 2  // horizontal and vertical stretches (L / Z shapes)
 /// node flags (DNode::flags)
 DN_LOCKED: u32 = 1  // never moved by the widget
 DN_NOSELECT: u32 = 2  // decoration: never hit nor selected
+DN_FRAME: u32 = 4  // a frame around other nodes: hit on its title bar and border only
+DN_TOGGLE: u32 = 8  // a collapse button (DEv::Toggle), see dg_toggle_rect
+DN_STEP: u32 = 16  // moves by whole grid steps (its corner keeps its offset to the grid)
+DN_RESIZE: u32 = 32  // selected: a handle at the bottom right corner resizes it
+DN_OUTLINE: u32 = 64  // an outline in the overview (DN_FRAME nodes are always)
 /// port flags (DPort::flags)
 DPT_HIDDEN: u32 = 1  // neither shown nor hit
 DPT_USED: u32 = 2  // shown filled (connected)
@@ -6173,6 +6193,8 @@ DPT_USED: u32 = 2  // shown filled (connected)
     start, then the waypoints), t = 0..1 along it
   - `Waypoint(u64, u32)` -- the handle of waypoint idx of a selected edge
   - `Mid(u64, u32)` -- the handle in the middle of stretch idx of a selected edge (a drag inserts waypoint idx)
+  - `Toggle(u64)` -- the collapse button of a DN_TOGGLE node
+  - `Resize(u64)` -- the resize handle of a selected DN_RESIZE node
 
 **`impl DHit`**
 
@@ -6195,6 +6217,9 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `Delete` -- Del with a selection: delete st.sel
   - `Click { at: [f32; 2] }` -- a click on the background, or anywhere with DG_PLACE (snapped then); world units
   - `ViewChanged` -- zoom or centre changed
+  - `Toggle(u64)` -- a click on the collapse button of a DN_TOGGLE node
+  - `Resize { key: u64, rect: [f32; 4], done: bool }` -- the resize handle of a DN_RESIZE node was dragged: its new box x, y, w, h (world, the
+    top left corner stays; at least 8 units); done = released (Esc: the box it had)
 
 - **`struct DgRoute`**
   an edge's route in world units: the polyline, the indices of its defining points (a, the
@@ -6242,6 +6267,8 @@ DPT_USED: u32 = 2  // shown filled (connected)
   the app's painting of a diagram (render time): nodes, edges (DgFrame::geo), labels; it
   runs once per dirty rectangle, so skip what DgFrame::visible / route_visible reject
   - `fn paint(&self, g: &mut Gfx, f: &DgFrame)`
+  - `fn paint_under(&self, _g: &mut Gfx, _f: &DgFrame)`
+    what lies under the grid (a backdrop image), painted before it; nothing by default
 
 - **`struct DiagramState`**
   the widget's state, kept by the app: the view, the selection (node and edge keys), the
@@ -6257,6 +6284,8 @@ DPT_USED: u32 = 2  // shown filled (connected)
   - `tab_edges: bool` -- Tab / Shift+Tab also walk the edges (after the nodes, in model order): the focused
     edge is selected, Enter activates it, the menu key asks for its context menu
   - `name: String` -- the canvas' name for screen readers (its K_CANVAS record; empty: none)
+  - `frame_bar: f32` -- the height of a DN_FRAME node's title bar in world units (its hit area, its record, the
+    side of its DN_TOGGLE button)
 
 **`impl DiagramState`**
 
@@ -6286,6 +6315,11 @@ DPT_USED: u32 = 2  // shown filled (connected)
 
 - **`fn dg_point_at(pts: &[[f32; 2]], f: f32) -> [f32; 2]`**
   the point at fraction f (0..1) of a polyline's length (a packet travelling along an edge)
+
+- **`fn dg_toggle_rect(n: &DNode, bar: f32) -> [f32; 4]`**
+  the world box x, y, w, h of a DN_TOGGLE node's collapse button: the square of the title bar's
+  height `bar` at its right end (a DN_FRAME node), else a square of that side (at most the
+  node's) in the top right corner; apps paint the button there
 
 - **`fn dg_edge_points(m: &DModel, i: usize, out: &mut Vec<[f32; 2]>)`**
   the route of edge i of m (world polyline) into out, without a DiagramState (ports and
@@ -26401,6 +26435,8 @@ crypto -- the primitives BackupCraft (and anything else) builds on, in plain Rus
             only for protocols defined with SHA-1 (WPA2-Personal)          (FIPS 180-4)
   keywrap   aes_wrap / aes_unwrap: the AES key wrap                         (RFC 3394)
   cmac      cmac_aes: AES-CMAC                                              (RFC 4493)
+  md5       Md5, md5(data), md5_parts(parts); with hmac_md5 in hmac: only for protocols
+            defined with MD5 (RADIUS); broken for collisions                 (RFC 1321, 2104)
 
 No randomness here: callers pass random bytes in (plat::fill_random), so everything is
 deterministic and testable.  Secret-dependent work avoids branches and table lookups
@@ -26833,7 +26869,9 @@ Source: [`lib/crypto/hmac.rs`](../lib/crypto/hmac.rs)
 
 ```text
 hmac -- HMAC (RFC 2104) over any Hash, HKDF (RFC 5869), PBKDF2 (RFC 8018); HMAC-SHA1 and
-PBKDF2-HMAC-SHA1 only for protocols defined with them (WPA2-Personal: its PMK, PRF and MIC)
+PBKDF2-HMAC-SHA1 only for protocols defined with them (WPA2-Personal: its PMK, PRF and MIC);
+HMAC-MD5 (RFC 2104 with MD5, the vectors of RFC 2202) likewise (RADIUS: the
+Message-Authenticator of RFC 3579)
 ```
 
 - **`struct Hmac<H: Hash>`**
@@ -26875,6 +26913,9 @@ PBKDF2-HMAC-SHA1 only for protocols defined with them (WPA2-Personal: its PMK, P
 
 - **`fn pbkdf2_sha1(password: &[u8], salt: &[u8], iterations: u32, out: &mut [u8])`**
   PBKDF2-HMAC-SHA1 (the PMK of WPA2-Personal: passphrase, SSID, 4096 rounds, 32 bytes)
+
+- **`fn hmac_md5(key: &[u8], data: &[u8]) -> [u8; 16]`**
+  HMAC-MD5 of a message (protocols defined with it only: RADIUS' Message-Authenticator)
 
 ### `crypto/p256.rs`
 
@@ -27103,6 +27144,38 @@ block cipher, as the MIC of WPA3-Personal's 4-way handshake (AKM 8) and of 802.1
 
 - **`fn cmac_aes(key: &[u8], data: &[u8]) -> Option<[u8; 16]>`**
   the CMAC of `data` under `key`
+
+### `crypto/md5.rs`
+
+Source: [`lib/crypto/md5.rs`](../lib/crypto/md5.rs)
+
+```text
+md5 -- MD5 (RFC 1321), streaming and one-shot: only for protocols that are defined with it
+(RADIUS: the authenticators and the hiding of User-Password of RFC 2865, HMAC-MD5 for the
+Message-Authenticator of RFC 3579); it is broken for collisions, so new designs take SHA-256
+
+  Md5::new() / update(data) / finalize() -> [u8; 16]
+  md5(data)            one byte string
+  md5_parts(parts)     the concatenation of several, without copying them together (what
+                       RADIUS hashes: code, identifier, length, authenticator, attributes,
+                       secret)
+```
+
+- **`struct Md5`**
+  MD5
+
+**`impl Md5`**
+
+- **`const fn new() -> Md5`**
+- **`fn update(&mut self, mut data: &[u8])`**
+- **`fn finalize(mut self) -> [u8; 16]`**
+  the digest: the padding of RFC 1321 3.1, the bit length little-endian (3.2)
+
+- **`fn md5(data: &[u8]) -> [u8; 16]`**
+  MD5 of a byte string
+
+- **`fn md5_parts(parts: &[&[u8]]) -> [u8; 16]`**
+  MD5 of the concatenation of `parts`
 
 ## compress
 
@@ -28546,6 +28619,31 @@ on every target (simulators, packet tools, tests).
             codes, netascii, looks_like (a transfer away from port 69)  (RFC 1350, 2347-2349)
   ftp       Command, Reply (multi-line), Lines, ReplyReader, host_port (PORT, 227), eprt,
             epsv_port (229), the reply texts as the server's own words  (RFC 959, 2428, 2389)
+  smtp      Command, Path (MAIL FROM / RCPT TO with parameters), Reply (multi-line, enhanced
+            status codes), ReplyReader, Ehlo (keywords: SIZE, 8BITMIME, PIPELINING, AUTH),
+            Stream (the server's commands and DATA with dot-stuffing), stuff, AUTH PLAIN and
+            LOGIN, received            (RFC 5321, 1870, 6152, 2920, 2034, 3463, 4954, 4616)
+  pop3      Command, Response (+OK / -ERR, multi-line with dot-stuffing), multi_line, Reader
+            (the responses of a server in pieces)                    (RFC 1939, 2449)
+  imf       Internet messages: Message (header fields folded and unfolded, the body as text),
+            Mailbox (addresses with display names), Date, Message-ID, encoded words,
+            quoted-printable, base64, multipart parts, Draft (a plain-text message in UTF-8)
+                                                               (RFC 5322, 2045-2047, 3464)
+  ber       ASN.1 BER as SNMP uses it: Oid (dotted, lexicographic order), Value (the SMI's
+            types and the exceptions of SNMPv2), Reader / Writer, strict lengths  (X.690, RFC 3417)
+  snmp      SNMPv1 and v2c messages: community, the PDUs Get, GetNext, GetBulk, Set, Response,
+            the v1 Trap, SNMPv2-Trap, Inform and Report; error statuses and their v1 mapping,
+            the objects of notifications                       (RFC 1157, 1901, 3416, 3584)
+  mib       the objects of SNMPv2-MIB, IF-MIB, IP-MIB and IP-FORWARD-MIB an agent of the
+            simulator serves: names, OIDs, syntax, access, lookup by name, values as net-snmp's
+            tools print them                                   (RFC 3418, 2863, 4293, 2096)
+  telnet    NVT commands, option negotiation without loops (Options: the Q method), IAC
+            escaping, NVT line ends, Reader for bytes in pieces, parse (RFC 854, 855, 857,
+            858, 1143)
+  radius    RadiusView, Packet, Attr: authentication and accounting with every attribute of
+            RFC 2865 / 2866 by number and name (vendor-specific ones as bytes), the hiding of
+            User-Password, Request / Response Authenticators, the Message-Authenticator; the
+            caller lends MD5 and HMAC-MD5 (crypto)                 (RFC 2865, 2866, 3579)
 
 Views (XxxView::parse) check lengths once and then read fields without copying; records
 (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -28916,6 +29014,22 @@ mode, options, block, data and error (tftp.rs).  FTP (TCP port 21) shows each co
 with its verb and argument and each reply line with its code; FTP-DATA (port 20, the active
 data connections) its bytes; passive data connections run between two free ports and show
 as TCP data (ftp.rs).
+SMTP (TCP ports 25 and 587) shows each command line with its verb and parameter, each reply
+line with its code and enhanced status code, and the lines of a message after DATA as such
+(the line with the dot ends it); POP3 (port 110) each command with its parameters, the status
+indicator and description of a response, the lines of a multi-line one.  Both share the bit
+P_MAIL (smtp.rs, pop3.rs).
+SNMP (UDP ports 161 and 162) shows version, community, the PDU with request id, error status and
+index (non-repeaters and max-repetitions of a GetBulk; enterprise, agent address, generic and
+specific trap and time stamp of a v1 Trap) and each variable binding with the name of a known
+object and its value as net-snmp prints it; BER that does not hold is a problem at its place
+(snmp.rs, ber.rs, mib.rs).
+RADIUS (UDP ports 1812 and 1813, the old 1645 and 1646) shows its code, identifier, length and
+authenticator and every attribute by name with its value (named values of the integers, a
+Vendor-Specific attribute's vendor, a hidden User-Password as hidden), with what a receiver
+discards: a Length that does not fit, attributes that do not end at it (radius.rs).  Telnet
+(TCP port 23) shows each command and negotiation ("Will Echo", "Interrupt Process") and the
+data as text; a command cut off at the end of a segment is a problem (telnet.rs).
 ```
 
 ```rust
@@ -28950,6 +29064,12 @@ P_BGP: u32 = 1 << 30
 /// FTP's control connection and its active data connections (FTP-DATA)
 P_FTP: u32 = 1 << 26
 P_DATA: u32 = 1 << 31
+/// mail: SMTP (TCP ports 25 and 587) and POP3 (port 110)
+P_MAIL: u32 = 1 << 28
+/// RADIUS (UDP ports 1812, 1813, 1645, 1646)
+P_RADIUS: u32 = 1 << 27
+/// Telnet (TCP port 23)
+P_TELNET: u32 = 1 << 29
 ```
 
 - **`enum Proto`**
@@ -28984,6 +29104,10 @@ P_DATA: u32 = 1 << 31
   - `Bgp`
   - `Ftp` -- FTP's control connection (port 21)
   - `FtpData` -- an active FTP data connection (port 20)
+  - `Smtp` -- SMTP (ports 25 and 587)
+  - `Pop3` -- POP3 (port 110)
+  - `Radius` -- RADIUS authentication and accounting
+  - `Telnet` -- Telnet (port 23)
 
 **`impl Proto`**
 
@@ -32374,6 +32498,1533 @@ PORT_FTP_DATA: u16 = 20
 
 - **`fn fmt_epsv(port: u16) -> String`**
   "(|||port|)" for a 229 reply
+
+### `netpkt/smtp.rs`
+
+Source: [`lib/netpkt/smtp.rs`](../lib/netpkt/smtp.rs)
+
+```text
+smtp -- the Simple Mail Transfer Protocol (RFC 5321) with the service extensions of EHLO that
+JFNetworker's servers speak: SIZE (RFC 1870), 8BITMIME (RFC 6152), PIPELINING (RFC 2920),
+ENHANCEDSTATUSCODES (RFC 2034 with the codes of RFC 3463) and AUTH with PLAIN and LOGIN
+(RFC 4954, 4616); no STARTTLS
+
+  Command { verb, arg }     Command::parse(line) (the verb in capitals, the argument as
+                            typed), Command::new(verb, arg), to_line() ("EHLO pc1\r\n")
+  Path { addr, params }     parse_path(arg, "FROM" | "TO"): the address of MAIL FROM:<..> or
+                            RCPT TO:<..> (empty for the null reverse path "<>") and the
+                            parameters after it (SIZE=1234, BODY=8BITMIME); fmt_path
+  Reply { code, lines }     Reply::new(code, text), Reply::enh(code, "2.1.0", text) (the
+                            enhanced code before the text), to_bytes(): "250 text" or the
+                            multi-line form "250-first" ... "250 last" of 4.2.1; text(),
+                            status() (the enhanced code), is_positive / is_intermediate /
+                            is_transient / is_permanent
+  ReplyReader               the replies of a server from its bytes in any pieces
+  Ehlo { domain, keywords } of_reply(&Reply): what a 250 to EHLO offers; has("PIPELINING"),
+                            param("SIZE") -> "10240000", size_limit()
+  Stream                    the server's side of a connection: push(bytes), line() while
+                            commands come, begin_data(max) after 354, data() until the line
+                            with the dot (dot-stuffing undone; beyond max the bytes are
+                            counted but not kept)
+  stuff(message)            the bytes after DATA: CRLF line ends, a dot doubled at the start
+                            of a line (4.5.2), ".\r\n" at the end
+  auth_plain(user, pass) / plain_of(b64)   the initial response of AUTH PLAIN and back
+  LOGIN_USER / LOGIN_PASS   the base64 challenges of AUTH LOGIN ("Username:", "Password:")
+  received(...)             the value of a Received field (4.4)
+  PORT_SMTP (25), PORT_SUBMISSION (587, RFC 6409), verb_known
+
+Lines end in CRLF; a server here also takes a lone LF.  Reply texts are the server's own
+words: clients go by the codes (and the enhanced codes when ENHANCEDSTATUSCODES was offered).
+```
+
+```rust
+PORT_SMTP: u16 = 25
+/// message submission (RFC 6409): clients hand in their mail here, after AUTH
+PORT_SUBMISSION: u16 = 587
+/// the base64 challenges of AUTH LOGIN: "Username:" and "Password:"
+LOGIN_USER: &str = "VXNlcm5hbWU6"
+LOGIN_PASS: &str = "UGFzc3dvcmQ6"
+```
+
+- **`fn verb_known(v: &str) -> bool`**
+  the commands of RFC 5321 and the extensions a dissector names
+
+- **`struct Command`**
+  a command line of a client
+  - `verb: String` -- in capitals
+  - `arg: String` -- everything after the first space
+
+**`impl Command`**
+
+- **`fn new(verb: &str, arg: &str) -> Command`**
+- **`fn parse(line: &str) -> Option<Command>`**
+  a line without its line end; None for an empty one
+- **`fn to_line(&self) -> String`**
+  the line on the wire, CRLF included
+
+- **`struct Path`**
+  the address and parameters of MAIL FROM or RCPT TO
+  - `addr: String` -- without the angle brackets; empty: the null reverse path "&lt;>"
+  - `params: Vec<(String, String)>` -- "SIZE=1234" -> ("SIZE", "1234"), "BODY=8BITMIME"; keywords in capitals
+
+**`impl Path`**
+
+- **`fn param(&self, k: &str) -> Option<&str>`**
+  a parameter's value
+- **`fn size(&self) -> Option<u64>`**
+  SIZE=n
+
+- **`fn parse_path(arg: &str, key: &str) -> Option<Path>`**
+  "FROM:&lt;anna@a.lab> SIZE=345" (the argument of MAIL; `key` "FROM", for RCPT "TO"): None when
+  the keyword, the colon or the brackets are missing (a source route "&lt;@a,@b:c@d>" keeps its
+  mailbox, 4.1.2)
+
+- **`fn fmt_path(key: &str, addr: &str, params: &[(&str, &str)]) -> String`**
+  "FROM:&lt;addr> SIZE=n" with the parameters given
+
+- **`struct Reply`**
+  a reply of a server
+  - `code: u16`
+  - `lines: Vec<String>` -- the text of each line (without the code)
+
+**`impl Reply`**
+
+- **`fn new(code: u16, text: &str) -> Reply`**
+- **`fn enh(code: u16, status: &str, text: &str) -> Reply`**
+  a reply whose lines start with an enhanced status code ("2.1.0 Sender fine")
+- **`fn text(&self) -> &str`**
+  the text of the first line (with its enhanced code)
+- **`fn joined(&self) -> String`**
+  all lines as one text ("a b c")
+- **`fn status(&self) -> Option<&str>`**
+  the enhanced status code at the start of the first line ("5.1.1")
+- **`fn is_positive(&self) -> bool`**
+  2yz: done
+- **`fn is_intermediate(&self) -> bool`**
+  3yz: go on (354 after DATA, 334 in AUTH)
+- **`fn is_transient(&self) -> bool`**
+  4yz: try again later
+- **`fn is_permanent(&self) -> bool`**
+  5yz: will not work
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  "code text" lines as they travel (4.2.1)
+- **`fn line(&self) -> String`**
+  "550 5.1.1 text" as one line (logs, bounces)
+
+- **`struct ReplyReader`**
+  the replies of a server, as its bytes arrive
+
+**`impl ReplyReader`**
+
+- **`fn new() -> ReplyReader`**
+- **`fn push(&mut self, b: &[u8]) -> Vec<Reply>`**
+  the replies that are complete now; a line that is no reply line is skipped
+
+- **`struct Ehlo`**
+  what a server offers in its answer to EHLO (4.1.1.1)
+  - `domain: String` -- the name it gives for itself
+  - `keywords: Vec<String>` -- "SIZE 10240000", "8BITMIME", "AUTH PLAIN LOGIN" ...
+
+**`impl Ehlo`**
+
+- **`fn of_reply(r: &Reply) -> Ehlo`**
+  the 250 reply to EHLO: its first line names the server, every further line is a
+  keyword with its parameters
+- **`fn has(&self, kw: &str) -> bool`**
+  the server offers the keyword
+- **`fn param(&self, kw: &str) -> Option<&str>`**
+  the parameters after a keyword ("SIZE" -> "10240000", "AUTH" -> "PLAIN LOGIN")
+- **`fn size_limit(&self) -> Option<u64>`**
+  the size limit SIZE names (0: none given)
+- **`fn auth(&self, mech: &str) -> bool`**
+  AUTH offers this mechanism
+- **`fn to_reply(&self, greeting: &str) -> Reply`**
+  the reply a server sends: its name and greeting, then the keywords
+
+- **`struct Data`**
+  a message after DATA
+  - `body: Vec<u8>` -- the message with CRLF line ends, dot-stuffing undone (empty when it was too big)
+  - `size: u64` -- its size in bytes, also when it was too big
+  - `over: bool` -- more than the limit came
+
+- **`struct Stream`**
+  the server's side of a connection: command lines, then the message after 354
+
+**`impl Stream`**
+
+- **`fn new() -> Stream`**
+- **`fn push(&mut self, b: &[u8])`**
+- **`fn pending(&self) -> usize`**
+  bytes not taken yet
+- **`fn in_data(&self) -> bool`**
+  a message is being read
+- **`fn line(&mut self) -> Option<String>`**
+  the next command line (its line end removed); None until a line is complete or while a
+  message is read
+- **`fn begin_data(&mut self, max: u64)`**
+  the message starts after the 354; more than `max` bytes are counted, not kept (0: no
+  limit)
+- **`fn data(&mut self) -> Option<Data>`**
+  the message once its line with the dot came (the bytes after it stay for the next
+  commands); None while it goes on
+
+- **`fn stuff(message: &[u8]) -> Vec<u8>`**
+  the bytes after DATA: CRLF line ends, a dot doubled at the start of a line, the line with
+  the dot at the end (4.5.2)
+
+- **`fn auth_plain(user: &str, pass: &str) -> String`**
+  the initial response of AUTH PLAIN (RFC 4616): base64 of "\\0user\\0password"
+
+- **`fn plain_of(b64: &str) -> Option<(String, String)>`**
+  the user and password of an AUTH PLAIN response (the authorization identity ignored)
+
+- **`fn received(helo: &str, peer: &str, by: &str, with: &str, id: &str, rcpt: Option<&str>, date: &str) -> String`**
+  the value of a Received field (4.4): "from HELO (NAME [ADDR]) by HOST with PROTO id ID for
+  &lt;RCPT>; DATE"
+
+### `netpkt/pop3.rs`
+
+Source: [`lib/netpkt/pop3.rs`](../lib/netpkt/pop3.rs)
+
+```text
+pop3 -- the Post Office Protocol version 3 (RFC 1939) with its optional commands UIDL, TOP
+and USER / PASS, and CAPA of RFC 2449: command lines, the status line +OK / -ERR, multi-line
+responses with their dot-stuffing
+
+  Command { verb, args }    Command::parse(line) (the verb in capitals), Command::new(verb,
+                            args), to_line() ("RETR 1\r\n")
+  Response { ok, text, body }   Response::ok(text) / err(text), with_body(bytes) (a multi-
+                            line response: the lines of the bytes follow the status line,
+                            each with a leading dot doubled, then the line with the dot);
+                            to_bytes()
+  multi_line(&Command)      a +OK to it carries a body: LIST and UIDL without an argument,
+                            RETR, TOP, CAPA
+  Reader                    the responses of a server from its bytes in any pieces; the
+                            client says for each command it sent whether a body may follow
+                            (expect(multi)); Reader::new() waits for the greeting first
+  PORT_POP3 (110), verb_known
+
+A body travels with CRLF line ends; Response::body holds it with the dots undone and CRLF
+after every line (the message as the server stored it).  The text after +OK and -ERR is the
+server's own words; RFC 2449's codes in brackets ("-ERR [AUTH] ...") stay part of it.
+```
+
+```rust
+PORT_POP3: u16 = 110
+```
+
+- **`fn verb_known(v: &str) -> bool`**
+  the commands of RFC 1939 and 2449 (and those of later RFCs a dissector names)
+
+- **`struct Command`**
+  a command line of a client
+  - `verb: String` -- in capitals
+  - `args: Vec<String>` -- the words after it (PASS keeps the rest of the line as one argument: a password may
+    hold spaces)
+
+**`impl Command`**
+
+- **`fn new(verb: &str, args: &[&str]) -> Command`**
+- **`fn parse(line: &str) -> Option<Command>`**
+  a line without its line end; None for an empty one
+- **`fn to_line(&self) -> String`**
+  the line on the wire, CRLF included
+- **`fn num(&self, k: usize) -> Option<u32>`**
+  argument k as a number (a message number)
+
+- **`fn multi_line(c: &Command) -> bool`**
+  a +OK to this command is followed by lines and the line with the dot (RFC 1939 3)
+
+- **`struct Response`**
+  a response of a server
+  - `ok: bool` -- +OK (else -ERR)
+  - `text: String` -- the text after the status indicator
+  - `body: Option<Vec<u8>>` -- the lines of a multi-line response, CRLF after each, dots undone
+
+**`impl Response`**
+
+- **`fn ok(text: &str) -> Response`**
+- **`fn err(text: &str) -> Response`**
+- **`fn with_body(mut self, body: &[u8]) -> Response`**
+  the same response with lines after it
+- **`fn status_line(&self) -> String`**
+  the status line ("+OK text") without the line end
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the bytes on the wire: the status line, the body lines with dot-stuffing and ".\\r\\n"
+
+- **`fn stuffed(body: &[u8]) -> Vec<u8>`**
+  a body as it travels: CRLF line ends, a line that starts with a dot gets another one, then
+  ".\\r\\n"
+
+- **`struct Reader`**
+  the responses of a server, as its bytes arrive
+
+**`impl Reader`**
+
+- **`fn new() -> Reader`**
+  a reader that waits for the greeting first (a single line)
+- **`fn expect(&mut self, multi: bool)`**
+  the next response (after the greeting, which is single-line) answers a command whose
+  +OK carries a body when `multi`
+- **`fn push(&mut self, b: &[u8]) -> Vec<Response>`**
+  bytes of the server: the responses complete now
+
+### `netpkt/imf.rs`
+
+Source: [`lib/netpkt/imf.rs`](../lib/netpkt/imf.rs)
+
+```text
+imf -- Internet messages (RFC 5322) with the part of MIME (RFC 2045, 2046, 2047) that plain
+text mail needs: header fields with folding, addresses with display names, the Date form,
+Message-ID, a text/plain body in UTF-8 as 7bit, 8bit or quoted-printable, multipart bodies
+(a bounce's multipart/report of RFC 3464 and 6522) and base64
+
+  Field { name, value }        one header field; the value unfolded (fold() writes it again)
+  Message { fields, body }     parse(bytes) (CRLF or LF; the header ends at the first empty
+                               line), get(name) / get_all / set / add / prepend / remove,
+                               to_bytes() (CRLF, every field folded at 78 columns), text()
+                               (the body as text: transfer encoding, charset and multipart
+                               undone), subject() / from() / to() / cc() / date()
+  Mailbox { name, addr }       parse_mailbox("Anna Muster <anna@a.lab>"), parse_list("a@x, B
+                               <b@y>"), to_header() (a display name quoted or as an encoded
+                               word); addr_ok(addr), split_addr(addr) -> (local, domain),
+                               split_list(text): the parts between the commas, as typed
+  params(value)                "text/plain; charset=UTF-8" -> ("text/plain", [("charset",
+                               "UTF-8")]); param(value, name)
+  date(unix) / parse_date(text) the Date form of 3.3 ("Thu, 01 Jan 2026 00:00:05 +0000"),
+                               read back to seconds since 1970 (UTC, any zone it names)
+  message_id(left, domain)     "<left@domain>"
+  encode_word / decode_words   RFC 2047 encoded words (UTF-8, Q and B; ISO-8859-1 read too)
+  qp_encode / qp_decode        quoted-printable of RFC 2045 6.7 (soft line breaks at 76)
+  b64_encode / b64_lines / b64_decode   base64 of RFC 4648 (MIME lines of 76, padding)
+  Draft { from, to, cc, subject, date, id, in_reply_to, references, text }
+                               to_bytes(eight_bit): the message a mail program sends
+                               (MIME-Version 1.0, text/plain in UTF-8; 7bit for ASCII, 8bit
+                               when the server takes 8BITMIME, else quoted-printable)
+  fold(name, value)            "Name: value\r\n" with continuation lines that start with a
+                               space (2.2.3)
+
+Lines of a header field are at most 78 characters where there is whitespace to break at
+(2.1.1); a word longer than that stays whole.  Display names and subjects with characters
+outside ASCII travel as encoded words, so a header stays 7-bit.  Addresses are not
+normalised: the local part keeps its case, the domain is compared without it by the callers.
+This is no full MIME implementation: nested multiparts are searched for their first text
+part, other parts (attachments) are named but not decoded.
+```
+
+- **`struct Field`**
+  a header field
+  - `name: String`
+  - `value: String` -- unfolded, without the space after the colon
+
+- **`struct Message`**
+  a message: its header fields in order and the body bytes
+  - `fields: Vec<Field>`
+  - `body: Vec<u8>`
+
+**`impl Message`**
+
+- **`fn new() -> Message`**
+- **`fn parse(b: &[u8]) -> Message`**
+  a message as it travels or lies in a mailbox: header lines (folded lines unfolded),
+  the empty line, the body; a line without a colon in the header is left out
+- **`fn get(&self, name: &str) -> Option<&str>`**
+  the first field of a name (any case)
+- **`fn get_all<'a>(&'a self, name: &'a str) -> impl Iterator<Item = &'a str> + 'a`**
+  every field of a name, in order
+- **`fn set(&mut self, name: &str, value: &str)`**
+  replaces the first field of a name (or adds it at the end)
+- **`fn add(&mut self, name: &str, value: &str)`**
+- **`fn prepend(&mut self, name: &str, value: &str)`**
+  a field at the top (trace fields: Received, Return-Path)
+- **`fn remove(&mut self, name: &str)`**
+- **`fn header_bytes(&self) -> Vec<u8>`**
+  the header as it travels (CRLF, folded), without the empty line
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  header, empty line, body (the body as it is)
+- **`fn subject(&self) -> String`**
+  the subject with its encoded words decoded
+- **`fn from(&self) -> Option<Mailbox>`**
+  the first mailbox of From
+- **`fn to(&self) -> Vec<Mailbox>`**
+- **`fn cc(&self) -> Vec<Mailbox>`**
+- **`fn date(&self) -> Option<i64>`**
+  the Date field in seconds since 1970
+- **`fn text(&self) -> String`**
+  the body as text (line ends "\\n"): the first text/plain part of a multipart, its
+  transfer encoding and charset undone
+
+- **`fn split_multipart(text: &[u8], boundary: &str) -> Vec<Vec<u8>>`**
+  the parts of a multipart body between its boundary lines (RFC 2046 5.1.1)
+
+- **`fn fold(name: &str, value: &str) -> String`**
+  "Name: value\\r\\n" folded at whitespace so that no line is longer than 78 characters where
+  that is possible
+
+- **`fn unfold(s: &str) -> String`**
+  removes the line ends of folded lines (CRLF or LF before whitespace)
+
+- **`fn params(value: &str) -> (String, Vec<(String, String)>)`**
+  the value and parameters of a field like Content-Type: ("text/plain", [("charset",
+  "UTF-8")]); names in lower case, quotes removed
+
+- **`fn param(value: &str, name: &str) -> Option<String>`**
+  one parameter of such a field
+
+- **`fn split_list(s: &str) -> Vec<&str>`**
+  the parts of an address list between its commas (not those inside quotes, angle brackets
+  or comments), as typed
+
+- **`struct Mailbox`**
+  an address with its display name (empty when there is none)
+  - `name: String`
+  - `addr: String`
+
+**`impl Mailbox`**
+
+- **`fn new(name: &str, addr: &str) -> Mailbox`**
+- **`fn to_header(&self) -> String`**
+  as a header writes it: "addr", "Name &lt;addr>", "\\"Muster, Anna\\" &lt;addr>" or an encoded
+  word for a name outside ASCII
+- **`fn shown(&self) -> &str`**
+  the name when there is one, else the address
+
+- **`fn parse_mailbox(s: &str) -> Option<Mailbox>`**
+  a mailbox: "Anna &lt;anna@a.lab>", "\\"Muster, Anna\\" &lt;anna@a.lab>", "anna@a.lab", "anna@a.lab
+  (Anna)"; None when no address can be read
+
+- **`fn parse_list(s: &str) -> Vec<Mailbox>`**
+  the mailboxes of an address list ("a@x, B &lt;b@y>"; a group "Team: a@x, b@y;" gives its
+  members, "undisclosed-recipients:;" none)
+
+- **`fn addr_ok(a: &str) -> bool`**
+  the address has the form local@domain: a dot-atom or a quoted local part, a domain of
+  labels (letters, digits, hyphens) or an address literal in brackets
+
+- **`fn split_addr(a: &str) -> Option<(&str, &str)>`**
+  (local part, domain) at the last '@'
+
+- **`fn date(unix: i64) -> String`**
+  "Thu, 01 Jan 2026 00:00:05 +0000" of seconds since 1970 (UTC)
+
+- **`fn parse_date(s: &str) -> Option<i64>`**
+  the seconds since 1970 of a Date field: the day of the week is optional, the zone may be
+  +hhmm / -hhmm or one of the obsolete names (UT, GMT, Z, EST ...)
+
+- **`fn message_id(left: &str, domain: &str) -> String`**
+  a Message-ID: "&lt;left@domain>"
+
+- **`fn encode_word(text: &str) -> String`**
+  text for a header: as it is in ASCII, else encoded words "=?UTF-8?Q?...?=" of at most 75
+  characters each (separated by a space, a character never split)
+
+- **`fn decode_words(s: &str) -> String`**
+  a header value with its encoded words decoded (whitespace between two encoded words goes)
+
+- **`fn qp_encode(text: &[u8]) -> Vec<u8>`**
+  quoted-printable (RFC 2045 6.7): lines end in CRLF, a line longer than 76 breaks softly
+  ("=" at its end), "=", control and 8-bit bytes as "=XX", spaces at a line end too
+
+- **`fn qp_decode(b: &[u8]) -> Vec<u8>`**
+  undoes quoted-printable: "=XX" bytes, soft line breaks, whitespace at line ends
+
+- **`fn b64_encode(data: &[u8]) -> String`**
+  base64 with padding, one line
+
+- **`fn b64_lines(data: &[u8]) -> String`**
+  base64 in MIME lines of 76 characters with CRLF
+
+- **`fn b64_decode(s: &[u8]) -> Option<Vec<u8>>`**
+  base64 back to bytes; whitespace and line ends are skipped, None for other characters
+
+- **`struct Draft`**
+  what a mail program puts into a new message
+  - `from: Mailbox`
+  - `to: Vec<Mailbox>`
+  - `cc: Vec<Mailbox>`
+  - `subject: String`
+  - `date: i64` -- seconds since 1970
+  - `id: String` -- the Message-ID with its angle brackets
+  - `in_reply_to: String` -- the Message-ID of the message answered (empty: none)
+  - `references: String` -- the References of a reply: the ids before, separated by spaces
+  - `text: String` -- the text with "\\n" line ends
+
+**`impl Draft`**
+
+- **`fn to_bytes(&self, eight_bit: bool) -> Vec<u8>`**
+  the message (CRLF): 7bit when the text is ASCII, else 8bit when the server takes
+  8BITMIME, else quoted-printable; lines over 998 bytes always go quoted-printable
+
+- **`fn crlf(b: &[u8]) -> Vec<u8>`**
+  text with "\\n" (or CRLF) line ends as CRLF lines
+
+- **`fn lf(b: &[u8]) -> Vec<u8>`**
+  CRLF line ends as "\\n" (a mailbox file keeps its messages that way)
+
+### `netpkt/ber.rs`
+
+Source: [`lib/netpkt/ber.rs`](../lib/netpkt/ber.rs)
+
+```text
+ber -- the Basic Encoding Rules of ASN.1 (X.690) as SNMP uses them (RFC 3417 section 8): the
+universal types INTEGER, OCTET STRING, NULL, OBJECT IDENTIFIER and SEQUENCE, the application
+types of the SMI (RFC 2578: IpAddress, Counter32, Gauge32, TimeTicks, Opaque, Counter64) and
+the exceptions of SNMPv2 (RFC 3416: noSuchObject, noSuchInstance, endOfMibView)
+
+  Oid                   an OBJECT IDENTIFIER as its arcs: parse("1.3.6.1.2.1.1.5.0") (a
+                        leading dot is allowed), Display (dotted), Ord (the lexicographic
+                        order of SNMP: a prefix before what it starts), starts_with, child,
+                        encode() / decode(contents)
+  Value                 what a variable binding holds: Int, Str, Null, Oid, Ip, Counter32,
+                        Gauge32, TimeTicks, Opaque, Counter64, NoSuchObject, NoSuchInstance,
+                        EndOfMibView; tag(), type_name(), is_exception()
+  Tlv                   one element: its tag, where it starts, the length of its header and
+                        its contents (offsets in the buffer the Reader walks)
+  Reader                walks a buffer: peek(), tlv(), int(), uint(tag, max), octets(), null(),
+                        oid(), value(), seq(tag) (a Reader over the contents), done()
+  Writer                builds a message: int, uint, octets, null, oid, value, begin(tag) /
+                        end() around the elements of a SEQUENCE or a PDU (the length goes in at
+                        end()); into_vec()
+  tlv(tag, contents)    one element as bytes
+  Bad                   why bytes are not BER as SNMP wants it
+
+Strict about lengths: every length must fit in what is left of its buffer and of the element
+around it.  The indefinite form (0x80) is refused, a long form of more than four octets too
+(RFC 3417 allows more length octets than needed, so 0x81 0x05 is read as 5); a tag of more than
+one octet (low bits 31) is refused.  An INTEGER has 1 to 8 content octets, an unsigned value 9
+when the first is 0x00; Counter32, Gauge32 and TimeTicks fit 32 bits (RFC 2578: 0 ..
+4294967295), an Integer32 in a variable binding fits i32; NULL and the exceptions have no
+contents; an IpAddress has four octets.  An OBJECT IDENTIFIER has at least one content octet,
+each subidentifier in its shortest form (no leading 0x80, X.690 8.19.2), at most 2^32 - 1 and
+ended (its last octet below 0x80), at most 128 subidentifiers (RFC 2578 3.5).  A simple type in
+its constructed form (0x24 for an OCTET STRING) is no tag SNMP knows.  Writers always use the
+shortest form of lengths and integers.
+```
+
+```rust
+T_INTEGER: u8 = 0x02
+T_OCTETS: u8 = 0x04
+T_NULL: u8 = 0x05
+T_OID: u8 = 0x06
+T_SEQUENCE: u8 = 0x30
+/// application types of the SMI (RFC 2578 7.1)
+T_IPADDRESS: u8 = 0x40
+T_COUNTER32: u8 = 0x41
+T_GAUGE32: u8 = 0x42
+T_TIMETICKS: u8 = 0x43
+T_OPAQUE: u8 = 0x44
+T_COUNTER64: u8 = 0x46
+/// the exceptions of a variable binding in a Response (RFC 3416 3)
+T_NO_SUCH_OBJECT: u8 = 0x80
+T_NO_SUCH_INSTANCE: u8 = 0x81
+T_END_OF_MIB_VIEW: u8 = 0x82
+/// the most subidentifiers an OBJECT IDENTIFIER of the SMI has
+OID_MAX: usize = 128
+```
+
+- **`enum Bad`**
+  why bytes are no BER element as SNMP wants it
+  - `Truncated` -- the buffer ends inside a header or before the contents it announces
+  - `Indefinite` -- the indefinite length form (forbidden by RFC 3417)
+  - `Length` -- a long length form of more than four octets
+  - `Tag(u8)` -- a tag of more than one octet, or one that does not belong here
+  - `IntSize` -- an INTEGER without contents or with more octets than fit
+  - `Range` -- a value outside its type's range (a negative counter, more than 32 bits)
+  - `Size` -- NULL or an exception with contents, an IpAddress that is not four octets
+  - `Oid` -- an OBJECT IDENTIFIER that is empty, not in its shortest form, too big or unended
+  - `Trailing` -- bytes after the last element of a SEQUENCE or the message
+
+**`impl Bad`**
+
+- **`fn text(self) -> &'static str`**
+  what is wrong, for a dissector
+
+- **`struct Oid(pub Vec<u32>)`**
+  an OBJECT IDENTIFIER: its arcs ("1.3.6.1.2.1.1.5.0")
+
+**`impl Oid`**
+
+- **`fn new(arcs: &[u32]) -> Oid`**
+- **`fn parse(s: &str) -> Option<Oid>`**
+  dotted decimal, a leading dot allowed; at least two arcs, the first 0, 1 or 2, the
+  second below 40 under 0 and 1
+- **`fn arcs(&self) -> &[u32]`**
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn starts_with(&self, prefix: &[u32]) -> bool`**
+  this OID begins with `prefix` (or is it)
+- **`fn child(&self, more: &[u32]) -> Oid`**
+  this OID with more arcs after it
+- **`fn encode(&self) -> Vec<u8>`**
+  the contents octets of its encoding (X.690 8.19): the first two arcs as 40 X + Y, then
+  each arc in base 128 with the high bit on all octets but its last (one arc: X.0)
+- **`fn decode(c: &[u8]) -> Result<Oid, Bad>`**
+  the OID of contents octets
+
+- **`enum Value`**
+  the value of a variable binding
+  - `Int(i64)` -- INTEGER (Integer32 in a variable binding)
+  - `Str(Vec<u8>)` -- OCTET STRING
+  - `Null`
+  - `Oid(Oid)`
+  - `Ip(Ipv4)`
+  - `Counter32(u32)`
+  - `Gauge32(u32)`
+  - `TimeTicks(u32)`
+  - `Opaque(Vec<u8>)`
+  - `Counter64(u64)`
+  - `NoSuchObject`
+  - `NoSuchInstance`
+  - `EndOfMibView`
+
+**`impl Value`**
+
+- **`fn text(s: &str) -> Value`**
+  a text as an OCTET STRING
+- **`fn tag(&self) -> u8`**
+- **`fn type_name(&self) -> &'static str`**
+  the name of its type as the SMI and RFC 3416 write it
+- **`fn is_exception(&self) -> bool`**
+  one of the three exceptions of a Response
+- **`fn contents(&self) -> Vec<u8>`**
+  the contents octets of its encoding
+- **`fn read(t: &Tlv, b: &[u8]) -> Result<Value, Bad>`**
+  the value of an element read (the contents of `t` in `b`)
+
+- **`fn type_name(tag: u8) -> &'static str`**
+  the name of a type of a variable binding (by its tag)
+
+- **`fn int_bytes(v: i64) -> Vec<u8>`**
+  the shortest two's complement of `v` (one to eight octets)
+
+- **`fn uint_bytes(v: u64) -> Vec<u8>`**
+  the shortest encoding of an unsigned value as an INTEGER's contents (a 0x00 before a first
+  octet with its high bit set)
+
+- **`fn int_of(c: &[u8]) -> Result<i64, Bad>`**
+  the contents of an INTEGER as a signed value
+
+- **`fn uint_of(c: &[u8], max: u64) -> Result<u64, Bad>`**
+  the contents of an unsigned type (at most `max`; 9 octets only with a leading 0x00)
+
+- **`struct Tlv`**
+  one element: tag, offset of its first octet, header length, contents length
+  - `tag: u8`
+  - `off: usize`
+  - `hdr: usize`
+  - `len: usize`
+
+**`impl Tlv`**
+
+- **`fn body(&self) -> usize`**
+  where its contents start
+- **`fn end(&self) -> usize`**
+  where it ends
+- **`fn contents<'a>(&self, b: &'a [u8]) -> &'a [u8]`**
+  its contents in the buffer it was read from
+- **`fn constructed(&self) -> bool`**
+  a constructed element (a SEQUENCE or a PDU)
+
+- **`fn header(b: &[u8], off: usize, end: usize) -> Result<Tlv, Bad>`**
+  the header of the element at `off` of `b`, which must end by `end`
+
+- **`struct Reader<'a>`**
+  a walk over the elements of a buffer (or of one constructed element's contents)
+
+**`impl<'a> Reader<'a>`**
+
+- **`fn new(b: &'a [u8]) -> Reader<'a>`**
+  over the whole buffer
+- **`fn buf(&self) -> &'a [u8]`**
+  the buffer it reads (offsets of Tlv are in it)
+- **`fn pos(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+  nothing is left
+- **`fn done(&self) -> Result<(), Bad>`**
+  Err(Trailing) while bytes are left
+- **`fn peek(&self) -> Result<Tlv, Bad>`**
+  the header of the next element without taking it
+- **`fn tlv(&mut self) -> Result<Tlv, Bad>`**
+  the next element
+- **`fn expect(&mut self, tag: u8) -> Result<Tlv, Bad>`**
+  the next element, which must have tag `tag`
+- **`fn seq(&mut self, tag: u8) -> Result<Reader<'a>, Bad>`**
+  a constructed element of tag `tag`: a reader over its contents
+- **`fn inside(&self, t: &Tlv) -> Reader<'a>`**
+  the contents of a constructed element as a reader (any tag)
+- **`fn int(&mut self) -> Result<i64, Bad>`**
+  an INTEGER
+- **`fn int32(&mut self) -> Result<i32, Bad>`**
+  an INTEGER that fits i32 (request ids, error status and index)
+- **`fn uint(&mut self, tag: u8, max: u64) -> Result<u64, Bad>`**
+  an unsigned value of tag `tag` up to `max`
+- **`fn octets(&mut self) -> Result<&'a [u8], Bad>`**
+  an OCTET STRING
+- **`fn null(&mut self) -> Result<(), Bad>`**
+- **`fn oid(&mut self) -> Result<Oid, Bad>`**
+- **`fn value(&mut self) -> Result<Value, Bad>`**
+  a value of a variable binding (any of its types)
+
+- **`fn length_bytes(n: usize) -> Vec<u8>`**
+  the length octets of `n` in their shortest form
+
+- **`fn tlv(tag: u8, contents: &[u8]) -> Vec<u8>`**
+  one element as bytes
+
+- **`struct Writer`**
+  builds BER: elements one after the other, constructed ones between begin and end
+
+**`impl Writer`**
+
+- **`fn new() -> Writer`**
+- **`fn int(&mut self, v: i64)`**
+- **`fn uint(&mut self, tag: u8, v: u64)`**
+  an unsigned value under its application tag (Counter32, Gauge32, TimeTicks, Counter64)
+- **`fn octets(&mut self, b: &[u8])`**
+- **`fn null(&mut self)`**
+- **`fn oid(&mut self, o: &Oid)`**
+- **`fn value(&mut self, v: &Value)`**
+- **`fn raw(&mut self, b: &[u8])`**
+  bytes that are BER already
+- **`fn begin(&mut self, tag: u8)`**
+  opens a constructed element (SEQUENCE 0x30, a PDU 0xA0 ...)
+- **`fn end(&mut self)`**
+  closes the element begin() opened last: its length goes in after its tag
+- **`fn into_vec(mut self) -> Vec<u8>`**
+  the bytes (every element begin() opened is closed first)
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+
+- **`fn printable(b: &[u8]) -> Option<String>`**
+  an OCTET STRING as text when every octet is printable ASCII (tab and line ends allowed)
+
+### `netpkt/snmp.rs`
+
+Source: [`lib/netpkt/snmp.rs`](../lib/netpkt/snmp.rs)
+
+```text
+snmp -- SNMP messages of version 1 (RFC 1157) and version 2c (RFC 1901, RFC 3416): the
+community, the PDUs GetRequest, GetNextRequest, GetBulkRequest, SetRequest, Response, the
+Trap of version 1, SNMPv2-Trap, InformRequest and Report with their variable bindings; the
+error statuses and their mapping to version 1 (RFC 3584); the objects every notification names
+
+  Version                 V1 (0) | V2c (1); other numbers (SNMPv3's 3) are no message here
+  Kind                    Get | GetNext | Response | Set | TrapV1 | GetBulk | Inform | TrapV2 |
+                          Report: tag() (0xA0 ..), of_tag(), name(), in_v1()
+  VarBind { oid, value }  VarBind::null(oid): a name to ask for
+  Pdu { kind, request_id, error_status, error_index, varbinds }   a GetBulkRequest keeps
+                          non-repeaters and max-repetitions in the two error fields
+                          (Pdu::bulk, non_repeaters(), max_repetitions())
+  TrapV1 { enterprise, agent_addr, generic, specific, timestamp, varbinds }
+  Body                    Pdu(Pdu) | Trap(TrapV1)
+  Message { version, community, body }: parse(b) / to_bytes() / pdu() / kind()
+  E_* (0 .. 18), error_name(status), v1_error(status)   RFC 3416 3; RFC 3584 4.4
+  G_* (0 .. 6), generic_name(g), trap_oid(generic, enterprise, specific)   RFC 3584 3.1
+  SYS_UPTIME_0, SNMP_TRAP_OID_0, SNMP_TRAP_ENTERPRISE_0, SNMP_TRAPS, COLD_START, WARM_START,
+  LINK_DOWN, LINK_UP, AUTH_FAILURE, IF_INDEX, IF_ADMIN_STATUS, IF_OPER_STATUS (RFC 3418, 2863)
+  PORT (161, the agent), PORT_TRAP (162, the notification receiver)
+
+parse refuses what an SNMP entity counts as an ASN.1 parse error (snmpInASNParseErrs): BER that
+is not well-formed (ber.rs), elements missing or in the wrong order, bytes after the message, a
+PDU tag the message's version does not have (GetBulk, Inform, SNMPv2-Trap and Report in
+version 1, the v1 Trap in 2c), and in version 1 the types it has not (Counter64, the
+exceptions).  A version other than 0 and 1 is Bad::Version (snmpInBadVersions).  Error
+status and index are read as they are; what they mean is the receiver's business.
+```
+
+```rust
+/// the agent's UDP port
+PORT: u16 = 161
+/// the port notifications go to
+PORT_TRAP: u16 = 162
+```
+
+- **`enum Version`**
+  the version of a community-based message
+  - `V1`
+  - `V2c`
+
+**`impl Version`**
+
+- **`fn number(self) -> i64`**
+  the value of the version field (0 and 1)
+- **`fn of_number(n: i64) -> Option<Version>`**
+- **`fn word(self) -> &'static str`**
+  "1", "2c" as the tools take it after -v
+- **`fn parse(s: &str) -> Option<Version>`**
+
+- **`enum Kind`**
+  the kind of a PDU (its context tag)
+  - `Get`
+  - `GetNext`
+  - `Response`
+  - `Set`
+  - `TrapV1`
+  - `GetBulk`
+  - `Inform`
+  - `TrapV2`
+  - `Report`
+
+**`impl Kind`**
+
+- **`fn tag(self) -> u8`**
+- **`fn of_tag(t: u8) -> Option<Kind>`**
+- **`fn name(self) -> &'static str`**
+  its name in RFC 3416 (version 1 calls the Response GetResponse)
+- **`fn in_v1(self) -> bool`**
+  version 1 has it (RFC 1157: get, get-next, get-response, set, trap)
+- **`fn in_v2c(self) -> bool`**
+  version 2c has it (every one but the v1 Trap)
+
+- **`struct VarBind`**
+  a variable binding: a name and its value
+  - `oid: Oid`
+  - `value: Value`
+
+**`impl VarBind`**
+
+- **`fn new(oid: Oid, value: Value) -> VarBind`**
+- **`fn null(oid: Oid) -> VarBind`**
+  a name with NULL as its value: what a request asks for
+
+- **`struct Pdu`**
+  a PDU with request id, error status and index (GetBulk: non-repeaters and max-repetitions)
+  - `kind: Kind`
+  - `request_id: i32`
+  - `error_status: i32`
+  - `error_index: i32`
+  - `varbinds: Vec<VarBind>`
+
+**`impl Pdu`**
+
+- **`fn new(kind: Kind, request_id: i32, varbinds: Vec<VarBind>) -> Pdu`**
+  a request (or notification) without an error
+- **`fn bulk(request_id: i32, non_repeaters: i32, max_repetitions: i32, varbinds: Vec<VarBind>) -> Pdu`**
+  a GetBulkRequest
+- **`fn non_repeaters(&self) -> usize`**
+  GetBulk: the first N bindings are asked once (RFC 3416 4.2.3: negative counts as 0)
+- **`fn max_repetitions(&self) -> usize`**
+  GetBulk: how often the others repeat
+
+- **`struct TrapV1`**
+  the Trap of version 1 (RFC 1157 4.1.6)
+  - `enterprise: Oid` -- the type of object that sends it (sysObjectID)
+  - `agent_addr: Ipv4`
+  - `generic: i32`
+  - `specific: i32`
+  - `timestamp: u32` -- sysUpTime when it was sent
+  - `varbinds: Vec<VarBind>`
+
+- **`enum Body`**
+  what a message carries
+  - `Pdu(Pdu)`
+  - `Trap(TrapV1)`
+
+- **`struct Message`**
+  a community-based message
+  - `version: Version`
+  - `community: Vec<u8>`
+  - `body: Body`
+
+- **`enum Bad`**
+  why bytes are no SNMP message of version 1 or 2c
+  - `Ber(ber::Bad)` -- not well-formed BER, or an element missing or out of place
+  - `Version(i64)` -- a version this module does not speak (SNMPv3 is 3)
+  - `Pdu(u8)` -- a PDU tag that is none, or one the message's version does not have
+  - `V1Type(u8)` -- a type version 1 does not have (Counter64, an exception)
+
+**`impl Bad`**
+
+- **`fn text(self) -> String`**
+  what is wrong, for a dissector
+
+**`impl Message`**
+
+- **`fn new(version: Version, community: &str, pdu: Pdu) -> Message`**
+  a message of one PDU
+- **`fn parse(b: &[u8]) -> Result<Message, Bad>`**
+  bytes as a message
+- **`fn to_bytes(&self) -> Vec<u8>`**
+- **`fn pdu(&self) -> Option<&Pdu>`**
+  the PDU (None for a v1 Trap)
+- **`fn kind(&self) -> Kind`**
+- **`fn community_text(&self) -> String`**
+  the community as text (bytes that are no UTF-8 replaced)
+- **`fn varbinds(&self) -> &[VarBind]`**
+  the variable bindings of the PDU or the trap
+
+*errors*
+
+```rust
+E_NO_ERROR: i32 = 0
+E_TOO_BIG: i32 = 1
+E_NO_SUCH_NAME: i32 = 2
+E_BAD_VALUE: i32 = 3
+E_READ_ONLY: i32 = 4
+E_GEN_ERR: i32 = 5
+E_NO_ACCESS: i32 = 6
+E_WRONG_TYPE: i32 = 7
+E_WRONG_LENGTH: i32 = 8
+E_WRONG_ENCODING: i32 = 9
+E_WRONG_VALUE: i32 = 10
+E_NO_CREATION: i32 = 11
+E_INCONSISTENT_VALUE: i32 = 12
+E_RESOURCE_UNAVAILABLE: i32 = 13
+E_COMMIT_FAILED: i32 = 14
+E_UNDO_FAILED: i32 = 15
+E_AUTHORIZATION_ERROR: i32 = 16
+E_NOT_WRITABLE: i32 = 17
+E_INCONSISTENT_NAME: i32 = 18
+```
+
+- **`fn error_name(e: i32) -> &'static str`**
+  the name of an error status (RFC 3416 3)
+
+- **`fn v1_error(e: i32) -> i32`**
+  the status a version-1 response carries for an error of RFC 3416 (RFC 3584 4.4)
+
+*notifications*
+
+```rust
+G_COLD_START: i32 = 0
+G_WARM_START: i32 = 1
+G_LINK_DOWN: i32 = 2
+G_LINK_UP: i32 = 3
+G_AUTH_FAILURE: i32 = 4
+G_EGP_NEIGHBOR_LOSS: i32 = 5
+G_ENTERPRISE: i32 = 6
+```
+
+- **`fn generic_name(g: i32) -> &'static str`**
+  the name of a generic trap of version 1
+
+```rust
+/// sysUpTime.0, the first binding of every SNMPv2 notification
+SYS_UPTIME_0: [u32; 9] = [1, 3, 6, 1, 2, 1, 1, 3, 0]
+/// snmpTrapOID.0, the second one: which notification it is
+SNMP_TRAP_OID_0: [u32; 11] = [1, 3, 6, 1, 6, 3, 1, 1, 4, 1, 0]
+/// snmpTrapEnterprise.0 (RFC 3584 3.1)
+SNMP_TRAP_ENTERPRISE_0: [u32; 11] = [1, 3, 6, 1, 6, 3, 1, 1, 4, 3, 0]
+/// snmpTraps: the generic notifications are its children (coldStart .1 .. egpNeighborLoss .6)
+SNMP_TRAPS: [u32; 9] = [1, 3, 6, 1, 6, 3, 1, 1, 5]
+COLD_START: [u32; 10] = [1, 3, 6, 1, 6, 3, 1, 1, 5, 1]
+WARM_START: [u32; 10] = [1, 3, 6, 1, 6, 3, 1, 1, 5, 2]
+LINK_DOWN: [u32; 10] = [1, 3, 6, 1, 6, 3, 1, 1, 5, 3]
+LINK_UP: [u32; 10] = [1, 3, 6, 1, 6, 3, 1, 1, 5, 4]
+AUTH_FAILURE: [u32; 10] = [1, 3, 6, 1, 6, 3, 1, 1, 5, 5]
+/// the columns of ifTable a linkDown or linkUp names (IF-MIB, RFC 2863)
+IF_INDEX: [u32; 10] = [1, 3, 6, 1, 2, 1, 2, 2, 1, 1]
+IF_ADMIN_STATUS: [u32; 10] = [1, 3, 6, 1, 2, 1, 2, 2, 1, 7]
+IF_OPER_STATUS: [u32; 10] = [1, 3, 6, 1, 2, 1, 2, 2, 1, 8]
+```
+
+- **`fn trap_oid(generic: i32, enterprise: &Oid, specific: i32) -> Oid`**
+  the SNMPv2 notification of a version-1 trap (RFC 3584 3.1): snmpTraps.(generic + 1) for the
+  generic ones, else enterprise.0.specific
+
+- **`fn generic_of(trap: &Oid) -> Option<i32>`**
+  the generic trap of an SNMPv2 notification (RFC 3584 3.2): Some(0 .. 5) for the generic
+  ones, None for an enterprise-specific one
+
+- **`fn find<'a>(vbs: &'a [VarBind], oid: &[u32]) -> Option<&'a Value>`**
+  the value of the binding named `oid` (the first one)
+
+- **`fn notification(vbs: &[VarBind]) -> Option<&Oid>`**
+  the notification an SNMPv2-Trap or InformRequest carries (snmpTrapOID.0, the second binding)
+
+### `netpkt/mib.rs`
+
+Source: [`lib/netpkt/mib.rs`](../lib/netpkt/mib.rs)
+
+```text
+mib -- a small built-in MIB: the objects of SNMPv2-MIB (system, snmp, the notifications of
+RFC 3418), IF-MIB (interfaces, ifTable, ifXTable, linkDown and linkUp of RFC 2863), IP-MIB
+(ipForwarding, ipDefaultTTL, ipAddrTable) and IP-FORWARD-MIB (ipCidrRouteTable of RFC 2096)
+with the nodes of SNMPv2-SMI above them: names, OIDs, syntax, access, the names of enumerated
+values; for the tools of a shell and for dissectors
+
+  OBJECTS                    every object in OID order (Obj: module, name, oid, kind, syntax,
+                             access, enums)
+  find(oid) / by_name(name)  an object exactly
+  object_of(oid)             the object an OID names or is an instance of, with the arcs of the
+                             instance (sysName.0: sysName and [0])
+  name_of(oid, numeric)      "SNMPv2-MIB::sysName.0", "IF-MIB::ifDescr.2",
+                             "SNMPv2-SMI::enterprises.32473.1.4"; numeric: ".1.3.6.1.2.1.1.5.0"
+  lookup(text)               an OID from what a user types: "SNMPv2-MIB::sysName.0",
+                             "sysName.0", "ifTable", "iso.3.6.1", "1.3.6.1.2.1.1.5.0" or with a
+                             leading dot
+  show(oid, value, numeric)  the value as the tools of net-snmp print it after "=": "STRING:
+                             R1", "INTEGER: up(1)", "Timeticks: (500) 0:00:05.00", "OID:
+                             IF-MIB::linkDown" (the exceptions in our own words)
+  bare(oid, value)           the same without the type (snmpget -Oq): "R1", "up"
+  ticks_text(t)              "(500) 0:00:05.00", "(8640000) 1 day, 0:00:00.00"
+  children(oid)              the objects one level below a node (a tree of the MIB)
+
+Names and syntax follow the MIB modules; the table has only what JFNetworker's agent serves
+and what names it, no descriptions (the RFCs have them).  The access is the agent's: objects
+a module allows to write but the agent does not (ipForwarding, ipDefaultTTL,
+ifLinkUpDownTrapEnable, ifPromiscuousMode) are read-only here.  A name the table does not know
+is written with the arcs below the nearest one it knows, as net-snmp does ("iso.2.999").
+```
+
+- **`enum ObjKind`**
+  what an object is
+  - `Node` -- a node of the tree (system, ifMIB, enterprises)
+  - `Scalar` -- a scalar: its instance is .0
+  - `Table`
+  - `Entry` -- the row of a table
+  - `Column` -- a column: its instances are the indexes of the rows
+  - `Notification` -- a notification (a value of snmpTrapOID.0)
+
+- **`enum Syntax`**
+  the syntax of a scalar or a column
+  - `None`
+  - `Integer`
+  - `DisplayString` -- text up to 255 octets (RFC 2579)
+  - `PhysAddress` -- octets shown as hex digits with colons (RFC 2579)
+  - `Octets`
+  - `Oid`
+  - `IpAddress`
+  - `Counter32`
+  - `Gauge32`
+  - `TimeTicks`
+  - `Counter64`
+
+**`impl Syntax`**
+
+- **`fn tag(self) -> u8`**
+  the BER tag of its values
+- **`fn name(self) -> &'static str`**
+  the name the MIB module gives it
+
+- **`enum Access`**
+  who may do what with an object
+  - `NotAccessible`
+  - `ReadOnly`
+  - `ReadWrite`
+  - `Notify` -- only in notifications (snmpTrapOID)
+
+**`impl Access`**
+
+- **`fn name(self) -> &'static str`**
+
+- **`struct Obj`**
+  an object of the MIB
+  - `module: &'static str`
+  - `name: &'static str`
+  - `oid: &'static [u32]`
+  - `kind: ObjKind`
+  - `syntax: Syntax`
+  - `access: Access`
+  - `enums: &'static [(i64, &'static str)]` -- the names of an INTEGER's values ("up" for 1)
+
+```rust
+/// the objects in OID order
+OBJECTS: &[Obj] = &[ node(SMI, "zeroDotZero", &[0, 0]), node(SMI, "iso", &[ ...
+```
+
+- **`fn find(oid: &[u32]) -> Option<&'static Obj>`**
+  an object by its OID exactly
+
+- **`fn by_name(name: &str) -> Option<&'static Obj>`**
+  an object by its name (case matters, as in the MIB modules)
+
+- **`fn object_of(oid: &[u32]) -> Option<(&'static Obj, &[u32])>`**
+  the longest object the OID starts with, and the arcs after it
+
+- **`fn column_of(oid: &[u32]) -> Option<&'static Obj>`**
+  the scalar or column an OID is an instance of (sysName.0, ifDescr.2)
+
+- **`fn name_of(oid: &[u32], numeric: bool) -> String`**
+  a name as net-snmp's tools write it: MODULE::name and the arcs after it; numeric: the arcs
+  with a leading dot
+
+- **`fn short_name(oid: &[u32]) -> String`**
+  the name without the module ("sysName.0"; snmpget -Os)
+
+- **`fn lookup(text: &str) -> Option<Oid>`**
+  an OID from what a user types: MODULE::name.arcs, name.arcs, dotted arcs (a leading dot
+  allowed); None for a name the table does not know or arcs that are no numbers
+
+- **`fn children(oid: &[u32]) -> Vec<&'static Obj>`**
+  the objects one level below `oid` (the children of a node, the columns of an entry), in OID
+  order; an object whose parent the table lacks hangs below its nearest ancestor
+
+- **`fn ticks_text(t: u32) -> String`**
+  "(500) 0:00:05.00", "(8640000) 1 day, 0:00:00.00" as net-snmp writes TimeTicks
+
+- **`fn show(oid: &[u32], v: &Value, numeric: bool) -> String`**
+  the value after "=" as net-snmp's tools print it; the object named by `oid` gives the form
+  of strings and the names of integers; `numeric` writes OIDs as numbers
+
+- **`fn bare(oid: &[u32], v: &Value, numeric: bool) -> String`**
+  the value alone (snmpget -Oqv): the name of an enumerated value, a text without quotes
+
+### `netpkt/telnet.rs`
+
+Source: [`lib/netpkt/telnet.rs`](../lib/netpkt/telnet.rs)
+
+```text
+telnet -- the bytes of the Telnet protocol (TCP port 23, RFC 854): commands after IAC, option
+negotiation (RFC 855) without loops (the Q method of RFC 1143), ECHO (RFC 857) and
+SUPPRESS-GO-AHEAD (RFC 858), IAC escaping, the line ends of the network virtual terminal, a
+reader for bytes that arrive in pieces
+
+  IAC, DONT, DO, WONT, WILL, SB, GA, EL, EC, AYT, AO, IP, BRK, DM, NOP, SE, EOR   commands
+  OPT_* (BINARY 0, ECHO 1, SGA 3, STATUS 5, TM 6, TTYPE 24, EOR 25, NAWS 31, TSPEED 32,
+  LFLOW 33, LINEMODE 34, XDISPLOC 35, ENVIRON 36, NEW_ENVIRON 39)            options
+  cmd_name(c), opt_name(o)        "Do", "Will", "Interrupt Process" ...; "Echo",
+                                  "Suppress Go Ahead" ... (as capture tools name them)
+  escape(data)                    IAC doubled (the bytes of a data stream)
+  to_nvt(text)                    "\n" as CR LF, a lone CR as CR NUL, IAC doubled
+  cmd(c) / opt(verb, o)           the bytes IAC c, IAC verb o
+  Item                            Data(bytes) | Cmd(c) | Opt { verb, opt } | Sub { opt, data }
+                                  | Partial(bytes) (a sequence cut off at the end, parse only)
+  Reader::new(nvt) / push(piece)  the items of a stream; a sequence split between two pieces
+                                  waits for the next one; nvt: CR LF becomes "\n" and CR NUL
+                                  "\r" in the data
+  parse(b)                        the items of one buffer with their offsets and lengths,
+                                  the data as it is (a dissector)
+  Options::new(us, him)           the state of every option on both sides (RFC 1143: No, Yes,
+                                  WantNo, WantYes): received(verb, o) gives the answer to send,
+                                  if any (a request is accepted when its bit is in `us` for
+                                  what this side does, `him` for what the peer does; every
+                                  other option is refused), enable_us / disable_us /
+                                  enable_him / disable_him ask for a change, us(o) / him(o)
+                                  tell what is in effect
+
+A data byte 255 travels as IAC IAC.  An answer is only sent for a request that would change
+something, so two sides that both follow these rules never negotiate in a circle.
+```
+
+```rust
+/// interpret as command
+IAC: u8 = 255
+DONT: u8 = 254
+DO: u8 = 253
+WONT: u8 = 252
+WILL: u8 = 251
+/// subnegotiation begins (ends with IAC SE)
+SB: u8 = 250
+/// go ahead
+GA: u8 = 249
+/// erase line, erase character, are you there, abort output, interrupt process, break
+EL: u8 = 248
+EC: u8 = 247
+AYT: u8 = 246
+AO: u8 = 245
+IP: u8 = 244
+BRK: u8 = 243
+/// data mark (the end of urgent data)
+DM: u8 = 242
+NOP: u8 = 241
+/// subnegotiation end
+SE: u8 = 240
+/// end of record (RFC 885)
+EOR: u8 = 239
+OPT_BINARY: u8 = 0
+OPT_ECHO: u8 = 1
+OPT_SGA: u8 = 3
+OPT_STATUS: u8 = 5
+OPT_TM: u8 = 6
+OPT_TTYPE: u8 = 24
+OPT_EOR: u8 = 25
+OPT_NAWS: u8 = 31
+OPT_TSPEED: u8 = 32
+OPT_LFLOW: u8 = 33
+OPT_LINEMODE: u8 = 34
+OPT_XDISPLOC: u8 = 35
+OPT_ENVIRON: u8 = 36
+OPT_NEW_ENVIRON: u8 = 39
+/// the well-known port
+PORT: u16 = 23
+```
+
+- **`fn cmd_name(c: u8) -> &'static str`**
+  the name of a command byte
+
+- **`fn opt_name(o: u8) -> String`**
+  the name of an option
+
+- **`fn escape(data: &[u8]) -> Vec<u8>`**
+  data with every IAC doubled
+
+- **`fn to_nvt(text: &[u8]) -> Vec<u8>`**
+  text for the network virtual terminal: "\\n" becomes CR LF, a lone CR becomes CR NUL, an IAC
+  is doubled
+
+- **`fn cmd(c: u8) -> [u8; 2]`**
+  IAC c (GA, IP, AYT ...)
+
+- **`fn opt(verb: u8, o: u8) -> [u8; 3]`**
+  IAC verb option (WILL, WONT, DO, DONT)
+
+- **`enum Item`**
+  a piece of a Telnet stream
+  - `Data(Vec<u8>)` -- data bytes (IAC IAC already one byte)
+  - `Cmd(u8)` -- a command without an option (GA, IP, AYT, NOP ...)
+  - `Opt { verb: u8, opt: u8 }` -- a negotiation: WILL, WONT, DO or DONT and the option
+  - `Sub { opt: u8, data: Vec<u8> }` -- a subnegotiation: IAC SB opt data IAC SE
+  - `Partial(Vec<u8>)` -- the start of a sequence cut off at the end of the buffer (parse only)
+
+**`impl Item`**
+
+- **`fn describe(&self) -> String`**
+  "Do Echo", "Interrupt Process", "Suboption Terminal Type" (a negotiation or a command)
+
+- **`struct Reader`**
+  reads a Telnet stream that arrives in pieces
+
+**`impl Reader`**
+
+- **`fn new(nvt: bool) -> Reader`**
+  nvt: CR LF becomes "\\n" and CR NUL "\\r" (a lone CR stays one)
+- **`fn push(&mut self, piece: &[u8]) -> Vec<Item>`**
+  the items of the next piece; what ends inside a sequence waits for the next piece
+
+- **`fn parse(b: &[u8]) -> Vec<(usize, usize, Item)>`**
+  the items of one buffer with their offset and length, the data as it is
+
+- **`enum Q`**
+  the state of one side of an option (RFC 1143)
+  - `No`
+  - `Yes`
+  - `WantNo` -- we asked to switch it off and wait for the answer
+  - `WantYes` -- we asked to switch it on and wait for the answer
+
+- **`struct Options`**
+  the options of one end of a connection: what this side does (us) and what the peer does
+  (him)
+  - `allow_us: u64` -- the options this side agrees to do / lets the peer do (bit o for option o &lt; 64)
+  - `allow_him: u64`
+
+**`impl Options`**
+
+- **`fn new(us: &[u8], him: &[u8]) -> Options`**
+  what this side agrees to do (`us`) and to let the peer do (`him`); the others are refused
+- **`fn us(&self, o: u8) -> bool`**
+  this side does option o
+- **`fn him(&self, o: u8) -> bool`**
+  the peer does option o
+- **`fn state(&self, o: u8) -> (Q, Q)`**
+  the state of both sides (us, him)
+- **`fn received(&mut self, verb: u8, o: u8) -> Option<[u8; 3]>`**
+  a negotiation from the peer: the answer to send, if any (RFC 1143 2.6, 2.7)
+- **`fn enable_us(&mut self, o: u8) -> Option<[u8; 3]>`**
+  this side offers to do option o (WILL), unless it does or asked already
+- **`fn disable_us(&mut self, o: u8) -> Option<[u8; 3]>`**
+  this side stops doing option o (WONT)
+- **`fn enable_him(&mut self, o: u8) -> Option<[u8; 3]>`**
+  this side asks the peer to do option o (DO)
+- **`fn disable_him(&mut self, o: u8) -> Option<[u8; 3]>`**
+  this side asks the peer to stop option o (DONT)
+
+### `netpkt/radius.rs`
+
+Source: [`lib/netpkt/radius.rs`](../lib/netpkt/radius.rs)
+
+```text
+radius -- RADIUS packets: authentication (RFC 2865), accounting (RFC 2866) and the
+Message-Authenticator (RFC 3579 3.2): codes, attributes by number and name, the hiding of
+User-Password (RFC 2865 5.2) both ways, the Request and Response Authenticators.  No digest
+is computed here (netpkt has no cryptography): the caller lends MD5 and HMAC-MD5, as
+crypto::md5_parts and crypto::hmac_md5 are
+
+  PORT_AUTH 1812, PORT_ACCT 1813, PORT_AUTH_OLD 1645, PORT_ACCT_OLD 1646 (old servers);
+  is_port(p)
+  ACCESS_REQUEST 1, ACCESS_ACCEPT 2, ACCESS_REJECT 3, ACCOUNTING_REQUEST 4,
+  ACCOUNTING_RESPONSE 5, ACCESS_CHALLENGE 11, STATUS_SERVER 12, STATUS_CLIENT 13; code_name
+  A_* the attributes of RFC 2865 (1 .. 39, 60 .. 63), RFC 2866 (40 .. 51) and RFC 3579 (79
+  EAP-Message, 80 Message-Authenticator); attr_name, attr_kind (Kind), value_name (the named
+  values of Service-Type, Framed-Protocol, Login-Service, NAS-Port-Type, Acct-Status-Type,
+  Acct-Authentic, Acct-Terminate-Cause, Termination-Action) and the values themselves
+  (SERVICE_*, PORT_TYPE_*, ACCT_*, TERM_*)
+  RadiusView::parse(b)            code, identifier, length, authenticator and the attributes
+                                  with their offsets (attrs()); Bad says why bytes are none
+  Packet { code, id, auth, attrs }    read(view) / parse(b) / to_bytes; attr / all / text /
+                                  int / addr of an attribute type
+  Attr { typ, value }             Attr::text / int / addr / bytes, Attr::vsa(vendor, data) and
+                                  vendor() (Vendor-Specific: the vendor's number and its data
+                                  kept as bytes)
+  hide_password(pw, secret, auth, md5) / reveal_password(hidden, secret, auth, md5)
+  response_auth(b, req_auth, secret, md5)   the Response Authenticator of a written answer;
+                                  set_response_auth / check_response_auth
+  accounting_auth(b, secret, md5) the Request Authenticator of an Accounting-Request
+                                  (RFC 2866 3); set_accounting_auth / check_accounting_auth
+  message_auth(b, auth, secret, hmac)   the Message-Authenticator over a packet (its field
+                                  counted as zero, `auth` in the authenticator field: the
+                                  packet's own for a request, the request's for an answer);
+                                  set_message_auth / check_message_auth (None: there is none)
+
+RFC 2865 3: a packet is 20 to 4096 bytes; octets beyond its Length field are padding, a
+packet shorter than its Length is discarded, and so is one whose attributes do not end
+exactly at Length.  Attribute values are at most 253 bytes.  A Message-Authenticator is
+added as 16 zero bytes (Attr::message_auth()) and filled in last but before the Response
+Authenticator, which covers it.
+```
+
+- **`type Md5Fn = fn(&[&[u8]]) -> [u8; 16]`**
+  MD5 of the concatenation of the parts (what the caller lends: crypto::md5_parts)
+
+- **`type HmacMd5Fn = fn(&[u8], &[u8]) -> [u8; 16]`**
+  HMAC-MD5 with a key over data (crypto::hmac_md5)
+
+```rust
+PORT_AUTH: u16 = 1812
+PORT_ACCT: u16 = 1813
+/// the ports servers used before RFC 2865 (Cisco IOS still sends from them)
+PORT_AUTH_OLD: u16 = 1645
+PORT_ACCT_OLD: u16 = 1646
+```
+
+- **`fn is_port(p: u16) -> bool`**
+  a port RADIUS uses
+
+```rust
+ACCESS_REQUEST: u8 = 1
+ACCESS_ACCEPT: u8 = 2
+ACCESS_REJECT: u8 = 3
+ACCOUNTING_REQUEST: u8 = 4
+ACCOUNTING_RESPONSE: u8 = 5
+ACCESS_CHALLENGE: u8 = 11
+/// experimental (RFC 2865 3, RFC 5997)
+STATUS_SERVER: u8 = 12
+STATUS_CLIENT: u8 = 13
+/// code, identifier, length, authenticator
+HDR: usize = 20
+/// the largest packet (RFC 2865 3)
+MAX: usize = 4096
+/// the longest attribute value
+VALUE_MAX: usize = 253
+```
+
+- **`fn code_name(c: u8) -> &'static str`**
+  the name of a code
+
+```rust
+// the attributes of RFC 2865 5
+A_USER_NAME: u8 = 1
+A_USER_PASSWORD: u8 = 2
+A_CHAP_PASSWORD: u8 = 3
+A_NAS_IP_ADDRESS: u8 = 4
+A_NAS_PORT: u8 = 5
+A_SERVICE_TYPE: u8 = 6
+A_FRAMED_PROTOCOL: u8 = 7
+A_FRAMED_IP_ADDRESS: u8 = 8
+A_FRAMED_IP_NETMASK: u8 = 9
+A_FRAMED_ROUTING: u8 = 10
+A_FILTER_ID: u8 = 11
+A_FRAMED_MTU: u8 = 12
+A_FRAMED_COMPRESSION: u8 = 13
+A_LOGIN_IP_HOST: u8 = 14
+A_LOGIN_SERVICE: u8 = 15
+A_LOGIN_TCP_PORT: u8 = 16
+A_REPLY_MESSAGE: u8 = 18
+A_CALLBACK_NUMBER: u8 = 19
+A_CALLBACK_ID: u8 = 20
+A_FRAMED_ROUTE: u8 = 22
+A_FRAMED_IPX_NETWORK: u8 = 23
+A_STATE: u8 = 24
+A_CLASS: u8 = 25
+A_VENDOR_SPECIFIC: u8 = 26
+A_SESSION_TIMEOUT: u8 = 27
+A_IDLE_TIMEOUT: u8 = 28
+A_TERMINATION_ACTION: u8 = 29
+A_CALLED_STATION_ID: u8 = 30
+A_CALLING_STATION_ID: u8 = 31
+A_NAS_IDENTIFIER: u8 = 32
+A_PROXY_STATE: u8 = 33
+A_LOGIN_LAT_SERVICE: u8 = 34
+A_LOGIN_LAT_NODE: u8 = 35
+A_LOGIN_LAT_GROUP: u8 = 36
+A_FRAMED_APPLETALK_LINK: u8 = 37
+A_FRAMED_APPLETALK_NETWORK: u8 = 38
+A_FRAMED_APPLETALK_ZONE: u8 = 39
+// RFC 2866 5
+A_ACCT_STATUS_TYPE: u8 = 40
+A_ACCT_DELAY_TIME: u8 = 41
+A_ACCT_INPUT_OCTETS: u8 = 42
+A_ACCT_OUTPUT_OCTETS: u8 = 43
+A_ACCT_SESSION_ID: u8 = 44
+A_ACCT_AUTHENTIC: u8 = 45
+A_ACCT_SESSION_TIME: u8 = 46
+A_ACCT_INPUT_PACKETS: u8 = 47
+A_ACCT_OUTPUT_PACKETS: u8 = 48
+A_ACCT_TERMINATE_CAUSE: u8 = 49
+A_ACCT_MULTI_SESSION_ID: u8 = 50
+A_ACCT_LINK_COUNT: u8 = 51
+// RFC 2865 5 again
+A_CHAP_CHALLENGE: u8 = 60
+A_NAS_PORT_TYPE: u8 = 61
+A_PORT_LIMIT: u8 = 62
+A_LOGIN_LAT_PORT: u8 = 63
+// RFC 3579
+A_EAP_MESSAGE: u8 = 79
+A_MESSAGE_AUTHENTICATOR: u8 = 80
+/// Service-Type (RFC 2865 5.6)
+SERVICE_LOGIN: u32 = 1
+SERVICE_FRAMED: u32 = 2
+SERVICE_CALLBACK_LOGIN: u32 = 3
+SERVICE_CALLBACK_FRAMED: u32 = 4
+SERVICE_OUTBOUND: u32 = 5
+SERVICE_ADMINISTRATIVE: u32 = 6
+SERVICE_NAS_PROMPT: u32 = 7
+SERVICE_AUTHENTICATE_ONLY: u32 = 8
+/// NAS-Port-Type (RFC 2865 5.41)
+PORT_TYPE_ASYNC: u32 = 0
+PORT_TYPE_VIRTUAL: u32 = 5
+PORT_TYPE_ETHERNET: u32 = 15
+/// Acct-Status-Type (RFC 2866 5.1)
+ACCT_START: u32 = 1
+ACCT_STOP: u32 = 2
+ACCT_INTERIM: u32 = 3
+ACCT_ON: u32 = 7
+ACCT_OFF: u32 = 8
+/// Acct-Authentic (RFC 2866 5.6)
+AUTHENTIC_RADIUS: u32 = 1
+AUTHENTIC_LOCAL: u32 = 2
+AUTHENTIC_REMOTE: u32 = 3
+/// Acct-Terminate-Cause (RFC 2866 5.10)
+TERM_USER_REQUEST: u32 = 1
+TERM_LOST_CARRIER: u32 = 2
+TERM_LOST_SERVICE: u32 = 3
+TERM_IDLE_TIMEOUT: u32 = 4
+TERM_SESSION_TIMEOUT: u32 = 5
+TERM_ADMIN_RESET: u32 = 6
+TERM_ADMIN_REBOOT: u32 = 7
+TERM_NAS_ERROR: u32 = 9
+TERM_NAS_REQUEST: u32 = 10
+TERM_NAS_REBOOT: u32 = 11
+```
+
+- **`fn attr_name(t: u8) -> String`**
+  the name of an attribute type
+
+- **`enum Kind`**
+  what the value of an attribute is (RFC 2865 5: text, string, address, integer, time)
+  - `Text` -- UTF-8 text
+  - `String` -- bytes
+  - `Address` -- an IPv4 address (4 bytes)
+  - `Integer` -- a 32-bit number (some with named values)
+  - `Time` -- seconds since 1970 (32 bits)
+  - `Hidden` -- User-Password: hidden with the shared secret
+  - `Vendor` -- a vendor's number and its data
+  - `Unknown` -- unknown types: bytes
+
+- **`fn attr_kind(t: u8) -> Kind`**
+  the kind of an attribute's value
+
+- **`fn value_name(t: u8, v: u32) -> Option<&'static str>`**
+  the name of a value of an integer attribute that has named values
+
+- **`enum Bad`**
+  why bytes are no RADIUS packet (a receiver discards them silently)
+  - `Short` -- shorter than the header, or than the Length field says
+  - `Length(u16)` -- a Length field below 20 or above 4096
+  - `Attr(usize)` -- an attribute with a length below 2, or one that does not end inside the packet
+
+- **`struct Attr`**
+  an attribute
+  - `typ: u8`
+  - `value: Vec<u8>`
+
+**`impl Attr`**
+
+- **`fn bytes(typ: u8, value: &[u8]) -> Attr`**
+- **`fn text(typ: u8, s: &str) -> Attr`**
+- **`fn int(typ: u8, v: u32) -> Attr`**
+- **`fn addr(typ: u8, a: Ipv4) -> Attr`**
+- **`fn vsa(vendor: u32, data: &[u8]) -> Attr`**
+  a Vendor-Specific attribute: the vendor's SMI number and its data, kept as bytes
+- **`fn message_auth() -> Attr`**
+  a Message-Authenticator to be filled in (set_message_auth)
+- **`fn vendor(&self) -> Option<(u32, &[u8])>`**
+  the vendor and its data of a Vendor-Specific attribute
+- **`fn as_int(&self) -> Option<u32>`**
+  the value as a number (4 bytes)
+- **`fn as_addr(&self) -> Option<Ipv4>`**
+  the value as an address (4 bytes)
+- **`fn as_text(&self) -> String`**
+  the value as text (bytes that are no UTF-8 are replaced)
+
+- **`struct RadiusView<'a>`**
+  a RADIUS packet, checked once
+
+**`impl<'a> RadiusView<'a>`**
+
+- **`fn parse(b: &'a [u8]) -> Result<RadiusView<'a>, Bad>`**
+  the packet at the start of `b` (bytes after its Length are padding)
+- **`fn code(&self) -> u8`**
+- **`fn id(&self) -> u8`**
+- **`fn length(&self) -> u16`**
+- **`fn authenticator(&self) -> [u8; 16]`**
+- **`fn bytes(&self) -> &'a [u8]`**
+  the packet's bytes (up to Length)
+- **`fn attrs(&self) -> Vec<(usize, u8, &'a [u8])>`**
+  every attribute: its offset in the packet, its type and its value
+
+- **`struct Packet`**
+  a RADIUS packet as a record
+  - `code: u8`
+  - `id: u8`
+  - `auth: [u8; 16]` -- the Request or Response Authenticator
+  - `attrs: Vec<Attr>`
+
+**`impl Packet`**
+
+- **`fn new(code: u8, id: u8, auth: [u8; 16]) -> Packet`**
+- **`fn read(v: &RadiusView) -> Packet`**
+- **`fn parse(b: &[u8]) -> Result<Packet, Bad>`**
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the bytes (an attribute value longer than 253 bytes is cut; the whole is at most 4096)
+- **`fn push(&mut self, a: Attr) -> &mut Packet`**
+- **`fn attr(&self, t: u8) -> Option<&Attr>`**
+  the first attribute of a type
+- **`fn all(&self, t: u8) -> Vec<&Attr>`**
+  every attribute of a type
+- **`fn text(&self, t: u8) -> Option<String>`**
+- **`fn int(&self, t: u8) -> Option<u32>`**
+- **`fn addr(&self, t: u8) -> Option<Ipv4>`**
+
+- **`fn hide_password(pw: &[u8], secret: &[u8], auth: &[u8; 16], md5: Md5Fn) -> Vec<u8>`**
+  User-Password hidden: padded with zeros to a multiple of 16 (at most 128 bytes), each block
+  XORed with MD5(secret + the previous block of the result; the Request Authenticator first)
+
+- **`fn reveal_password(hidden: &[u8], secret: &[u8], auth: &[u8; 16], md5: Md5Fn) -> Option<Vec<u8>>`**
+  the password of a hidden User-Password (its padding zeros removed); None when the length is
+  no multiple of 16 between 16 and 128
+
+- **`fn response_auth(b: &[u8], req_auth: &[u8; 16], secret: &[u8], md5: Md5Fn) -> [u8; 16]`**
+  the Response Authenticator of a written answer to a request with `req_auth`
+
+- **`fn set_response_auth(b: &mut [u8], req_auth: &[u8; 16], secret: &[u8], md5: Md5Fn)`**
+  writes the Response Authenticator into an answer (after a Message-Authenticator)
+
+- **`fn check_response_auth(b: &[u8], req_auth: &[u8; 16], secret: &[u8], md5: Md5Fn) -> bool`**
+  the answer's Response Authenticator is right for the request
+
+- **`fn accounting_auth(b: &[u8], secret: &[u8], md5: Md5Fn) -> [u8; 16]`**
+  the Request Authenticator of an Accounting-Request (RFC 2866 3: over 16 zero bytes)
+
+- **`fn set_accounting_auth(b: &mut [u8], secret: &[u8], md5: Md5Fn)`**
+  writes the Request Authenticator into an Accounting-Request
+
+- **`fn check_accounting_auth(b: &[u8], secret: &[u8], md5: Md5Fn) -> bool`**
+  an Accounting-Request's Request Authenticator fits the secret
+
+- **`fn message_auth(b: &[u8], auth: &[u8; 16], secret: &[u8], hmac: HmacMd5Fn) -> [u8; 16]`**
+  HMAC-MD5 with the secret over the packet with `auth` in its authenticator field and the
+  Message-Authenticator counted as 16 zero bytes (RFC 3579 3.2)
+
+- **`fn set_message_auth(b: &mut [u8], auth: Option<&[u8; 16]>, secret: &[u8], hmac: HmacMd5Fn) -> bool`**
+  fills in the Message-Authenticator of a written packet (`auth`: None for a request, which
+  covers its own authenticator; the request's for an answer); false when there is none
+
+- **`fn check_message_auth(b: &[u8], auth: Option<&[u8; 16]>, secret: &[u8], hmac: HmacMd5Fn) -> Option<bool>`**
+  the Message-Authenticator of a packet fits the secret (None: the packet has none)
+
+- **`fn value_text(t: u8, v: &[u8]) -> String`**
+  the value of an attribute as a dissector shows it (a hidden password stays hidden)
 
 ## cas
 

@@ -29,6 +29,10 @@
 // Zurück Shift+Backspace, Öffnen, the places to add, Ort umbenennen, Ort entfernen) and the
 // context menus of a place and of the plan's background; while the view is shown, zoom, Alles
 // zeigen, Löschen, Umbenennen, Alles auswählen and Ctrl+9 act on it (phys::command first).
+// Groups (G1, canvas/groups.rs): Bearbeiten › Gruppieren (Ctrl+G), Gruppierung aufheben
+// (Ctrl+Shift+G), Gruppe zuklappen / aufklappen, the context menu of a group; the background
+// picture (canvas/backdrop.rs): Ansicht › Hintergrundbild …, … sperren, … an Ansicht anpassen,
+// Hintergrund entfernen, the context menu of the picture.
 
 use jfn_model::CableKind;
 use ui::*;
@@ -40,7 +44,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 100] = [
+pub(crate) static CMDS: [Command; 108] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -141,6 +145,14 @@ pub(crate) static CMDS: [Command; 100] = [
     Command::new(CMD_PHYS_ADD0 + 3, "&Raum hinzufügen", IC_ADD, 0, 0, CF_DISABLED),
     Command::new(CMD_PHYS_ADD0 + 4, "R&ack hinzufügen", IC_ADD, 0, 0, CF_DISABLED),
     Command::new(CMD_PHYS_ADD0 + 5, "T&isch hinzufügen", IC_ADD, 0, 0, CF_DISABLED),
+    Command::new(CMD_GROUP, "&Gruppieren", IC_LAYERS, MOD_CTRL, b'G' as u32, CF_DISABLED),
+    Command::new(CMD_UNGROUP, "Gruppierung au&fheben", 0, MOD_CTRL | MOD_SHIFT, b'G' as u32, CF_DISABLED),
+    Command::new(CMD_GROUP_COLLAPSE, "Gruppe &zuklappen", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_GROUP_EXPAND, "Gruppe auf&klappen", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_BG_OPEN, "H&intergrundbild …", IC_IMAGE, 0, 0, 0),
+    Command::new(CMD_BG_LOCK, "Hintergrundbild &sperren", IC_LOCK, 0, 0, CF_DISABLED),
+    Command::new(CMD_BG_FIT, "Hintergrundbild an &Ansicht anpassen", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_BG_REMOVE, "Hintergrund ent&fernen", 0, 0, 0, CF_DISABLED),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -166,7 +178,7 @@ static M_FILE: [Mi; 11] = [
 ];
 static M_EXPORT: [Mi; 1] = [Mi::Cmd(CMD_EXPORT_PCAP)];
 static M_RECENT: [Mi; 1] = [Mi::List(CMD_RECENT0, RECENT_MAX as u16, "Keine Dateien")];
-static M_EDIT: [Mi; 7] = [
+static M_EDIT: [Mi; 12] = [
     Mi::Cmd(CMD_UNDO),
     Mi::Cmd(CMD_REDO),
     Mi::Sep,
@@ -174,8 +186,13 @@ static M_EDIT: [Mi; 7] = [
     Mi::Cmd(CMD_SELECT_ALL),
     Mi::Sep,
     Mi::Cmd(CMD_RENAME),
+    Mi::Sep,
+    Mi::Cmd(CMD_GROUP),
+    Mi::Cmd(CMD_UNGROUP),
+    Mi::Cmd(CMD_GROUP_COLLAPSE),
+    Mi::Cmd(CMD_GROUP_EXPAND),
 ];
-static M_VIEW: [Mi; 15] = [
+static M_VIEW: [Mi; 20] = [
     Mi::Cmd(CMD_ZOOM_IN),
     Mi::Cmd(CMD_ZOOM_OUT),
     Mi::Cmd(CMD_ZOOM_100),
@@ -191,6 +208,11 @@ static M_VIEW: [Mi; 15] = [
     Mi::Cmd(CMD_VIEW_LOGICAL),
     Mi::Cmd(CMD_VIEW_PHYS),
     Mi::Sub("P&hysischer Plan", &M_PHYS),
+    Mi::Sep,
+    Mi::Cmd(CMD_BG_OPEN),
+    Mi::Cmd(CMD_BG_LOCK),
+    Mi::Cmd(CMD_BG_FIT),
+    Mi::Cmd(CMD_BG_REMOVE),
 ];
 /// the physical view's places (workspace/phys)
 static M_PHYS: [Mi; 13] = [
@@ -308,6 +330,20 @@ pub(crate) static M_CABLE: [Mi; 7] = [
     Mi::Sep,
     Mi::Cmd(CMD_DISCONNECT),
 ];
+/// the context menu of a group (G1: its frame or cluster)
+pub(crate) static M_GROUP: [Mi; 9] = [
+    Mi::Cmd(CMD_GROUP_COLLAPSE),
+    Mi::Cmd(CMD_GROUP_EXPAND),
+    Mi::Sep,
+    Mi::Cmd(CMD_RENAME),
+    Mi::Cmd(CMD_UNGROUP),
+    Mi::Sep,
+    Mi::Cmd(CMD_GROUP),
+    Mi::Sep,
+    Mi::Cmd(CMD_SELECT_ALL),
+];
+/// the context menu of the background picture (G1, while it is not locked)
+pub(crate) static M_BACKDROP: [Mi; 5] = [Mi::Cmd(CMD_BG_LOCK), Mi::Cmd(CMD_BG_FIT), Mi::Cmd(CMD_BG_OPEN), Mi::Sep, Mi::Cmd(CMD_BG_REMOVE)];
 static M_CABLE_KIND: [Mi; 10] = [
     Mi::Cmd(CMD_CABLE0),
     Mi::Sep,
@@ -356,6 +392,9 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     crate::workspace::assess::states(n, ui);
     crate::workspace::author::states(n, ui);
     crate::workspace::phys::states(n, ui);
+    // groups and the background picture (G1)
+    canvas::groups::states(n, ui);
+    canvas::backdrop::states(n, ui);
 }
 
 // Ctrl+1 .. 8: the panel shows; the keyboard goes into it -- the device search, the shown
@@ -517,6 +556,9 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_WLAN_RANGES => n.canvas.wl.ranges = !n.canvas.wl.ranges,
         // the files of a device: the import's and export's file dialog (devwin/files.rs)
         CMD_FILES_IMPORT_DONE | CMD_FILES_EXPORT_DONE => return crate::workspace::devwin::files::command(n, ui, id),
+        // groups and the background picture of the canvas (G1)
+        CMD_GROUP..=CMD_GROUP_EXPAND => return canvas::groups::command(n, ui, id),
+        CMD_BG_OPEN..=CMD_BG_CHOSEN => return canvas::backdrop::command(n, ui, id),
         _ => return false,
     }
     ui.repass();

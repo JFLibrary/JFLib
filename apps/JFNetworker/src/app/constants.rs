@@ -211,10 +211,12 @@ pub(crate) const ID_TB_TEMPO: u32 = 0x8001;
 pub(crate) const ID_SIM_LIVE: u32 = 0x8008;
 /// the dock panel of the user's PDUs (right, below Eigenschaften)
 pub(crate) const P_PDUS: u32 = 8;
-/// Ereignisse: the protocol chips (+ k), "Nur Auswahl", the split, the timeline; the grid
-/// last (its rows + 1 + i go past the range, up to the trace's 400 000 events)
+/// Ereignisse: the protocol chips (+ k for the first ten, ID_EV_CHIP10 + k - 10 for the six
+/// after them), "Nur Auswahl", the split, the timeline; the grid last (its rows + 1 + i go past
+/// the range, up to the trace's 400 000 events)
 pub(crate) const ID_EV_CHIP0: u32 = 0x8010;
 pub(crate) const ID_EV_ONLY_SEL: u32 = 0x801A;
+pub(crate) const ID_EV_CHIP10: u32 = 0x801B;
 pub(crate) const ID_EV_TL_SPLIT: u32 = 0x8021;
 pub(crate) const ID_EV_TIMELINE: u32 = 0x8028;
 pub(crate) const ID_EV_GRID: u32 = 0x9800;
@@ -527,3 +529,56 @@ pub(crate) const ID_PHY_LEN: u32 = 0xE070;
 pub(crate) const ID_PHY_LEN_SET: u32 = 0xE071;
 pub(crate) const ID_PHY_LEN_AUTO: u32 = 0xE072;
 pub(crate) const ID_PHY_OPTIC0: u32 = 0xE080;
+
+// ---- X1c: mail (widgets 0x0001_2000 .. 0x0001_2FFF; commands 640 .. 669 and timers 0x198 ..
+// 0x19B are reserved, none used yet)
+/// the E-Mail program on the Desktop of device window k: ID_MAIL0 + 0x400 k .. + 0x3FF
+/// (devwin/email.rs)
+pub(crate) const ID_MAIL0: u32 = 0x0001_2000;
+
+// ---- G1: groups and the background picture of the canvas (commands 590 .. 619, widgets
+// 0x0001_0000 .. 0x0001_0FFF, timers 0x190 .. 0x193 unused, no dock panel: 16 stays free)
+/// Bearbeiten › Gruppieren (Ctrl+G), Gruppierung aufheben (Ctrl+Shift+G), the selected groups
+/// collapsed or expanded
+pub(crate) const CMD_GROUP: u32 = 590;
+pub(crate) const CMD_UNGROUP: u32 = 591;
+pub(crate) const CMD_GROUP_COLLAPSE: u32 = 592;
+pub(crate) const CMD_GROUP_EXPAND: u32 = 593;
+/// Ansicht › Hintergrundbild … (the file dialog), Hintergrundbild sperren, Hintergrund
+/// entfernen, Hintergrundbild an Ansicht anpassen; the dialog chose a picture (queued)
+pub(crate) const CMD_BG_OPEN: u32 = 594;
+pub(crate) const CMD_BG_LOCK: u32 = 595;
+pub(crate) const CMD_BG_REMOVE: u32 = 596;
+pub(crate) const CMD_BG_FIT: u32 = 597;
+pub(crate) const CMD_BG_CHOSEN: u32 = 598;
+/// the inspector of a group: its name, Umbenennen, its colour (a combo box: + 1 .. 7 are its
+/// own), Zuklappen / Aufklappen, Gruppierung aufheben; "Gruppieren" with several things; its
+/// members (+ i, at most GROUP_MEMBERS)
+pub(crate) const ID_GRP_NAME: u32 = 0x0001_0000;
+pub(crate) const ID_GRP_RENAME: u32 = 0x0001_0001;
+pub(crate) const ID_GRP_COLOR: u32 = 0x0001_0008;
+pub(crate) const ID_GRP_COLLAPSE: u32 = 0x0001_0010;
+pub(crate) const ID_GRP_UNGROUP: u32 = 0x0001_0011;
+pub(crate) const ID_GRP_GROUP: u32 = 0x0001_0012;
+pub(crate) const ID_GRP_MEMBER0: u32 = 0x0001_0020;
+pub(crate) const GROUP_MEMBERS: usize = 200;
+/// the picture's card in the inspector: left, top, scale, opacity, Setzen, Sperren, An Ansicht
+/// anpassen, Ersetzen …, Entfernen; "Hintergrundbild …" on the project's page
+pub(crate) const ID_BG_X: u32 = 0x0001_0100;
+pub(crate) const ID_BG_Y: u32 = 0x0001_0101;
+pub(crate) const ID_BG_SCALE: u32 = 0x0001_0102;
+pub(crate) const ID_BG_OPACITY: u32 = 0x0001_0103;
+pub(crate) const ID_BG_SET: u32 = 0x0001_0104;
+pub(crate) const ID_BG_LOCK: u32 = 0x0001_0105;
+pub(crate) const ID_BG_FIT: u32 = 0x0001_0106;
+pub(crate) const ID_BG_REPLACE: u32 = 0x0001_0107;
+pub(crate) const ID_BG_REMOVE: u32 = 0x0001_0108;
+pub(crate) const ID_BG_ADD: u32 = 0x0001_0109;
+
+// ---- X1b: SNMP (commands 620 .. 639, widgets 0x0001_1000 .. 0x0001_1FFF, timers 0x194 .. 0x197;
+// none of the commands and timers is used yet)
+/// the MIB-Browser in the Desktop of device window k: ID_MIB0 + 0x400 k (+ 1 .. 3 agent,
+/// community, version, + 4 the card of the chosen object, + 5 its instance, + 6 .. 8 Get,
+/// GetNext, Walk, + 9 .. 11 the type, the value, Set; + 0x100 the tree with its rows; + 0x3F0 its
+/// tile on the desktop)
+pub(crate) const ID_MIB0: u32 = 0x0001_1000;

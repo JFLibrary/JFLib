@@ -1965,6 +1965,8 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   (`sha1`, `Sha1`, `hmac_sha1`; broken for collisions, new designs take SHA-256), PBKDF2 over
   any hash (`pbkdf2::<H>`, `pbkdf2_sha1`), the AES key wrap of RFC 3394 (`aes_wrap` /
   `aes_unwrap`, which checks the integrity value) and AES-CMAC of RFC 4493 (`cmac_aes`).
+  For protocols defined with MD5 (RADIUS): MD5 (`md5`, `Md5`, `md5_parts`) and HMAC-MD5
+  (`hmac_md5`); broken for collisions, so new designs take SHA-256 (RFC 1321, 2104).
 * `compress` -- LZ4 and zstd (`compress::zstd::compress(data, level)` / `decompress`; levels
   1 to 19, single-segment frames with checksums); `Codec` picks one by name.
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
@@ -2198,6 +2200,96 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   let mut replies = ftp::ReplyReader::new();
   for r in replies.push(&bytes) { /* r.code, r.text() */ }
   let (_, port) = ftp::host_port("Passive mode on (10,0,0,9,117,49).").unwrap_or_default();
+  ```
+
+  Mail: `smtp` has the commands and replies of RFC 5321 -- `Command::parse` / `to_line`,
+  `parse_path` / `fmt_path` for `MAIL FROM:<a@b> SIZE=345` and `RCPT TO:<..>` (the null reverse
+  path is an empty address), `Reply` with the multi-line form (`Reply::enh(550, "5.1.1", ..)`
+  puts the enhanced status code of RFC 3463 before the text, `status()` reads it back,
+  `is_positive` / `is_intermediate` / `is_transient` / `is_permanent`), `ReplyReader` for a
+  server's bytes in any pieces, `Ehlo::of_reply` with `has("PIPELINING")`, `size_limit()` and
+  `auth("PLAIN")`; `Stream` is the server's side: `line()` while commands come (pipelined ones
+  in their order), `begin_data(max)` after 354, `data()` once the line with the dot came (the
+  dots undone, more than `max` counted but not kept); `stuff` writes the bytes after DATA, and
+  `auth_plain` / `plain_of` and `LOGIN_USER` / `LOGIN_PASS` serve AUTH (RFC 4954, 4616). `pop3`
+  has RFC 1939: `Command`, `Response` (`ok` / `err`, `with_body` for a multi-line one, its lines
+  dot-stuffed by `to_bytes`), `multi_line(&cmd)` (LIST and UIDL without an argument, RETR, TOP,
+  CAPA) and `Reader`, which the client tells for each command whether a body may follow. `imf`
+  is the message of RFC 5322 with the MIME a plain text needs: `Message::parse` (CRLF or LF,
+  folded fields unfolded) with `get` / `set` / `prepend` and `to_bytes` (folded at 78 columns),
+  `subject()`, `from()`, `to()`, `date()`, `text()` (quoted-printable, base64, the charset and the
+  first text part of a multipart undone); `Mailbox` with display names (quoted, or encoded words
+  of RFC 2047), `parse_list`, `addr_ok`; `date` / `parse_date`, `message_id`, `qp_encode` /
+  `qp_decode`, `b64_encode` / `b64_decode`, `split_multipart`; `Draft::to_bytes(eight_bit)`
+  writes a text in UTF-8 as 7bit, 8bit or quoted-printable. `decode::layers` shows each SMTP line
+  with its command, code and enhanced code and the lines of a message after DATA, each POP3 line
+  with its command or status indicator (`P_MAIL`, `Proto::Smtp` for ports 25 and 587,
+  `Proto::Pop3` for 110); `decode::info` sums them up ("C: EHLO pc1", "S: +OK 2 messages",
+  "C: DATA fragment, 345 bytes").
+
+  ```rust
+  let mut rd = smtp::ReplyReader::new();
+  for r in rd.push(&bytes) { /* r.code, r.status(): Some("5.1.1") */ }
+  let mut st = smtp::Stream::new();
+  st.push(&bytes);
+  while let Some(line) = st.line() { /* a command; after DATA: st.begin_data(max) */ }
+  if let Some(d) = st.data() { /* d.body (CRLF, unstuffed), d.size, d.over */ }
+  let msg = imf::Draft { from, to, subject, date, id, text, ..Default::default() }.to_bytes(true);
+  let wire = smtp::stuff(&msg);                            // the bytes after 354
+  ```
+
+  SNMP: `ber` reads and writes the Basic Encoding Rules as SNMP uses them (RFC 3417 8: definite
+  lengths only, the simple types and SEQUENCE) -- `Reader` (`seq`, `int`, `uint`, `octets`,
+  `null`, `oid`, `value`), `Writer` (`begin(tag)` / `end()` around a SEQUENCE), `Oid` (`parse`,
+  `starts_with`, `child`; its order is SNMP's lexicographic one) and `Value` with every type of
+  SNMPv2-SMI and the exceptions noSuchObject, noSuchInstance and endOfMibView; what it refuses
+  comes back as `ber::Bad` (an indefinite length, an INTEGER without contents or beyond 64 bits,
+  a value outside its type's range, an OID not in its shortest form, of more than 128 arcs or
+  with an arc above 2^32 - 1, bytes after the end); writers use the shortest forms. `snmp` has
+  the messages of SNMPv1 (RFC 1157) and SNMPv2c (RFC 1901, RFC 3416): `Message::new(version,
+  community, pdu)`, `parse` and `to_bytes`, `Pdu` for Get, GetNext, GetBulk (`Pdu::bulk` with
+  non-repeaters and max-repetitions), Set, Response, SNMPv2-Trap, Inform and Report, `TrapV1`
+  for the trap of version 1, the error statuses with `error_name` and `v1_error` (RFC 3584
+  4.4), the generic traps with `trap_oid` / `generic_of` between version 1 traps and
+  notification OIDs (RFC 3584 3.1) and the OIDs every notification carries (`SYS_UPTIME_0`,
+  `SNMP_TRAP_OID_0`, ...). `mib` is a small MIB built in: the objects of SNMPv2-MIB (system,
+  snmp, the notifications), IF-MIB (ifTable, ifXTable, linkDown, linkUp), IP-MIB (ipAddrTable)
+  and IP-FORWARD-MIB (ipCidrRouteTable) with syntax, access and the names of enumerations;
+  `lookup` reads "sysName.0", "IF-MIB::ifDescr.2" or dotted numbers, `name_of` writes
+  "SNMPv2-MIB::sysName.0", `show` a binding as net-snmp prints it ("IF-MIB::ifOperStatus.3 =
+  INTEGER: up(1)") and `children` gives the objects below a node (a tree of the MIB).
+  `decode::layers` shows every field of a message to or from port 161 or 162 with the names of
+  its objects and a BER error as a problem at its place, `decode::info` sums it up
+  ("GetRequest 4660: SNMPv2-MIB::sysName.0"); its bit is `decode::P_SNMP`.
+
+  ```rust
+  let oid = mib::lookup("sysName.0").unwrap_or_default();
+  let get = snmp::Message::new(snmp::Version::V2c, "public", snmp::Pdu::new(snmp::Kind::Get, 4660, vec![snmp::VarBind::null(oid)]));
+  let answer = snmp::Message::parse(&payload)?;               // Err(snmp::Bad) for what is no SNMP
+  let lines: Vec<String> = answer.varbinds().iter().map(|vb| mib::show(vb.oid.arcs(), &vb.value, false)).collect();
+  let mut w = ber::Writer::new();
+  w.begin(ber::T_SEQUENCE); w.int(5); w.octets(b"public"); w.end();
+  ```
+
+  Remote access: `telnet` has the NVT protocol of RFC 854 -- the commands after `IAC`, the
+  options `OPT_*` (`ECHO`, `SGA`, ...), `escape` and `to_nvt` for a data stream, a `Reader`
+  that turns bytes arriving in pieces into `Item`s (data, a command, a negotiation, a
+  subnegotiation), `parse` for one buffer, and `Options` (the loop-free Q method of RFC 1143:
+  `received` gives the answer to send, `enable_us` / `enable_him` ask for a change).  `radius`
+  has the RADIUS packets of RFC 2865 / 2866 -- `RadiusView` and `Packet` with every attribute
+  by number and name (`A_*`, `attr_name`, `value_name`; vendor-specific ones kept as bytes),
+  `hide_password` / `reveal_password` (the User-Password hiding of 5.2), the Request and
+  Response Authenticators (`accounting_auth`, `response_auth`) and the Message-Authenticator
+  of RFC 3579; the caller lends MD5 and HMAC-MD5 (`crypto::md5_parts`, `crypto::hmac_md5`).
+  `decode::layers` and `decode::info` dissect both (ports 23, 1812 / 1813 / 1645 / 1646;
+  `P_TELNET`, `P_RADIUS`; a hidden password stays hidden).
+
+  ```rust
+  let mut r = telnet::Reader::new(true);
+  for item in r.push(&bytes) { /* Item::Data / Opt / Cmd / Sub */ }
+  let hidden = radius::hide_password(b"secret", key, &auth, crypto::md5_parts);
+  let mut p = radius::Packet::new(radius::ACCESS_REQUEST, id, auth);
+  p.push(radius::Attr::text(radius::A_USER_NAME, "admin"));
   ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
@@ -2806,6 +2898,27 @@ for ev in evs {
   stroke edges with `dg_hairline` (1 px anti-aliased lines, a fraction of `dg_stroke_edge`'s
   cost); the canvas is painted in full detail once the gesture ends. JFNetworker's
   `tests/perf.uis` holds 500 devices and 800 cables this way.
+* **Frames, groups and a backdrop** (node flags, additive): a `DN_FRAME` node is a labelled
+  frame around other nodes. The app computes its box from its members' (with room for their
+  labels and a title bar) and puts it before them in `nodes`, so they lie on top. It is hit on
+  its title bar (the top `st.frame_bar` world units, 24 by default) and on its 4 DIP border
+  only: its inside stays the background (a marquee starts there, members are clicked through
+  it), the overview draws it as an outline and `diagram_sems` gives it a record over its title
+  bar. `DN_TOGGLE` adds a collapse button, the box `dg_toggle_rect(node, st.frame_bar)` (the
+  right end of a frame's title bar, else the node's top right corner): a click there reports
+  `DEv::Toggle(key)` and leaves the selection alone, a right click there is one on the node.
+  For a collapsed group the app hides the members (their nodes and the edges between them),
+  shows one node in their place and draws the edges to the outside to it. `DN_STEP` nodes move
+  by whole grid steps instead of snapping their corner, so the members such a frame or cluster
+  stands for (each snapped on its own) stay on the grid. A selected `DN_RESIZE` node shows a
+  handle at its bottom right corner; dragging it reports `DEv::Resize { key, rect, done }` with
+  the new box (the top left corner stays, at least 8 units; Esc sends the old box with `done`).
+  `DN_OUTLINE` draws a node as an outline in the overview (an area, a backdrop).
+  `DgPaint::paint_under(g, f)` (nothing by default) paints what lies under the grid into the
+  backing store, a backdrop image say; draw it cached per zoom, since it runs with every
+  repaint of the store. `apps/diagramtest --frames` shows all of it (a frame around four nodes
+  that collapses into one, an area that resizes; `tests/frames.uis`), JFNetworker's groups and
+  background picture use it (`src/workspace/canvas/groups.rs`, `backdrop.rs`).
 
 ## 23. Consoles: `ui.terminal`
 

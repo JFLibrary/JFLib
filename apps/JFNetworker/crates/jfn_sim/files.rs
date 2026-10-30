@@ -153,4 +153,8 @@ impl OsApi<'_> {
     pub fn file_remove(&mut self, path: &str) -> Result<String, FsErr> {
         self.eng.file_del(self.ni, path, false)
     }
+    /// makes a directory (with its parents); the project hears of it
+    pub fn file_mkdir(&mut self, path: &str, parents: bool) -> Result<String, FsErr> {
+        self.eng.file_mkdir(self.ni, path, parents)
+    }
 }

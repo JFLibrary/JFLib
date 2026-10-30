@@ -49,6 +49,31 @@
 //             codes, netascii, looks_like (a transfer away from port 69)  (RFC 1350, 2347-2349)
 //   ftp       Command, Reply (multi-line), Lines, ReplyReader, host_port (PORT, 227), eprt,
 //             epsv_port (229), the reply texts as the server's own words  (RFC 959, 2428, 2389)
+//   smtp      Command, Path (MAIL FROM / RCPT TO with parameters), Reply (multi-line, enhanced
+//             status codes), ReplyReader, Ehlo (keywords: SIZE, 8BITMIME, PIPELINING, AUTH),
+//             Stream (the server's commands and DATA with dot-stuffing), stuff, AUTH PLAIN and
+//             LOGIN, received            (RFC 5321, 1870, 6152, 2920, 2034, 3463, 4954, 4616)
+//   pop3      Command, Response (+OK / -ERR, multi-line with dot-stuffing), multi_line, Reader
+//             (the responses of a server in pieces)                    (RFC 1939, 2449)
+//   imf       Internet messages: Message (header fields folded and unfolded, the body as text),
+//             Mailbox (addresses with display names), Date, Message-ID, encoded words,
+//             quoted-printable, base64, multipart parts, Draft (a plain-text message in UTF-8)
+//                                                                (RFC 5322, 2045-2047, 3464)
+//   ber       ASN.1 BER as SNMP uses it: Oid (dotted, lexicographic order), Value (the SMI's
+//             types and the exceptions of SNMPv2), Reader / Writer, strict lengths  (X.690, RFC 3417)
+//   snmp      SNMPv1 and v2c messages: community, the PDUs Get, GetNext, GetBulk, Set, Response,
+//             the v1 Trap, SNMPv2-Trap, Inform and Report; error statuses and their v1 mapping,
+//             the objects of notifications                       (RFC 1157, 1901, 3416, 3584)
+//   mib       the objects of SNMPv2-MIB, IF-MIB, IP-MIB and IP-FORWARD-MIB an agent of the
+//             simulator serves: names, OIDs, syntax, access, lookup by name, values as net-snmp's
+//             tools print them                                   (RFC 3418, 2863, 4293, 2096)
+//   telnet    NVT commands, option negotiation without loops (Options: the Q method), IAC
+//             escaping, NVT line ends, Reader for bytes in pieces, parse (RFC 854, 855, 857,
+//             858, 1143)
+//   radius    RadiusView, Packet, Attr: authentication and accounting with every attribute of
+//             RFC 2865 / 2866 by number and name (vendor-specific ones as bytes), the hiding of
+//             User-Password, Request / Response Authenticators, the Message-Authenticator; the
+//             caller lends MD5 and HMAC-MD5 (crypto)                 (RFC 2865, 2866, 3579)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -85,6 +110,14 @@ pub mod eapol;
 pub mod bgp;
 pub mod tftp;
 pub mod ftp;
+pub mod smtp;
+pub mod pop3;
+pub mod imf;
+pub mod ber;
+pub mod snmp;
+pub mod mib;
+pub mod telnet;
+pub mod radius;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

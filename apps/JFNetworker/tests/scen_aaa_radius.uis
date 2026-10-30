@@ -1,0 +1,7 @@
+#!args apps/JFNetworker/tests/fixtures/aaa_radius.jfnet --scenario apps/JFNetworker/tests/scen/aaa_radius.scn --golden apps/JFNetworker/tests/scen/aaa_radius.report
+# golden scenario: logins over AAA with RADIUS. R1 and R2 authenticate their console logins
+# against SRV1's RADIUS server (user admin, privilege 15); R2 refuses a wrong password, and
+# after SRV1 is switched off R1 falls back to the local password. The GUI program runs
+# tests/scen/aaa_radius.scn on tests/fixtures/aaa_radius.jfnet without a window and ends with
+# the report, which must equal tests/scen/aaa_radius.report byte for byte on every target (CR
+# LF there counts as LF; the script itself is not run).

@@ -1,0 +1,139 @@
+# JFNetworker-Szenario snmp_monitor.scn: „Überwachung per SNMP“, 5 Geräte, 4 Verbindungen, Seed 23
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Vlan1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Vlan1 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  MON     root@MON:~# snmpget -v2c -c public 10.0.10.1 sysName.0 sysDescr.0 sysUpTime.0 sysLocation.0
+   0.000000000  --      run 2s
+   0.000004118  MON     SNMPv2-MIB::sysName.0 = STRING: R1
+   0.000004118  MON     SNMPv2-MIB::sysDescr.0 = STRING: JFNetworker device software 1.0 for the JF-R4 (Edge-Router 4× 1G, 2× 10G SFP+, 2× Seriell)
+   0.000004118  MON     SNMPv2-MIB::sysUpTime.0 = Timeticks: (0) 0:00:00.00
+   0.000004118  MON     SNMPv2-MIB::sysLocation.0 = STRING: Technikraum
+   0.000006278  --      MON: /var/log/snmptrapd.log gespeichert (181 Bytes)
+   2.000000000  ok      expect MON output contains "SNMPv2-MIB::sysName.0 = STRING: R1"
+   2.000000000  MON     root@MON:~# snmpwalk -v2c -c public 10.0.1.10 IF-MIB::ifOperStatus
+   2.000000000  --      run 3s
+   3.000003752  MON     IF-MIB::ifOperStatus.1 = INTEGER: up(1)
+   3.000007520  MON     IF-MIB::ifOperStatus.2 = INTEGER: up(1)
+   3.000011288  MON     IF-MIB::ifOperStatus.3 = INTEGER: up(1)
+   3.000015056  MON     IF-MIB::ifOperStatus.4 = INTEGER: down(2)
+   3.000018824  MON     IF-MIB::ifOperStatus.5 = INTEGER: down(2)
+   3.000022592  MON     IF-MIB::ifOperStatus.6 = INTEGER: down(2)
+   3.000026360  MON     IF-MIB::ifOperStatus.7 = INTEGER: down(2)
+   3.000030128  MON     IF-MIB::ifOperStatus.8 = INTEGER: down(2)
+   3.000033896  MON     IF-MIB::ifOperStatus.9 = INTEGER: down(2)
+   3.000037664  MON     IF-MIB::ifOperStatus.10 = INTEGER: down(2)
+   3.000041432  MON     IF-MIB::ifOperStatus.11 = INTEGER: down(2)
+   3.000045200  MON     IF-MIB::ifOperStatus.12 = INTEGER: down(2)
+   3.000048968  MON     IF-MIB::ifOperStatus.13 = INTEGER: down(2)
+   3.000052736  MON     IF-MIB::ifOperStatus.14 = INTEGER: down(2)
+   3.000056504  MON     IF-MIB::ifOperStatus.15 = INTEGER: down(2)
+   3.000060272  MON     IF-MIB::ifOperStatus.16 = INTEGER: down(2)
+   3.000064040  MON     IF-MIB::ifOperStatus.17 = INTEGER: down(2)
+   3.000067808  MON     IF-MIB::ifOperStatus.18 = INTEGER: down(2)
+   3.000071576  MON     IF-MIB::ifOperStatus.19 = INTEGER: down(2)
+   3.000075344  MON     IF-MIB::ifOperStatus.20 = INTEGER: down(2)
+   3.000079112  MON     IF-MIB::ifOperStatus.21 = INTEGER: down(2)
+   3.000082880  MON     IF-MIB::ifOperStatus.22 = INTEGER: down(2)
+   3.000086648  MON     IF-MIB::ifOperStatus.23 = INTEGER: down(2)
+   3.000090416  MON     IF-MIB::ifOperStatus.24 = INTEGER: down(2)
+   3.000094184  MON     IF-MIB::ifOperStatus.25 = INTEGER: down(2)
+   3.000097952  MON     IF-MIB::ifOperStatus.26 = INTEGER: down(2)
+   3.000101720  MON     IF-MIB::ifOperStatus.27 = INTEGER: down(2)
+   3.000105488  MON     IF-MIB::ifOperStatus.28 = INTEGER: down(2)
+   3.000109256  MON     IF-MIB::ifOperStatus.29 = INTEGER: up(1)
+   5.000000000  ok      expect MON output contains "IF-MIB::ifOperStatus.3 = INTEGER: up(1)"
+   5.000000000  MON     root@MON:~# snmpbulkwalk -v2c -c public 10.0.1.2 ifName
+   5.000000000  --      run 3s
+   5.000010812  MON     IF-MIB::ifName.1 = STRING: Gi0/0/0
+   5.000010812  MON     IF-MIB::ifName.2 = STRING: Gi0/0/1
+   5.000010812  MON     IF-MIB::ifName.3 = STRING: Gi0/0/2
+   5.000010812  MON     IF-MIB::ifName.4 = STRING: Gi0/0/3
+   5.000010812  MON     IF-MIB::ifName.5 = STRING: Te0/1/0
+   5.000010812  MON     IF-MIB::ifName.6 = STRING: Te0/1/1
+   5.000010812  MON     IF-MIB::ifName.7 = STRING: Se0/2/0
+   5.000010812  MON     IF-MIB::ifName.8 = STRING: Se0/2/1
+   8.000000000  ok      expect MON output contains "IF-MIB::ifName.1 = STRING: Gi0/0/0"
+   8.000000000  MON     root@MON:~# snmpwalk -v1 -c public 10.0.10.1 ipAddrTable
+   8.000000000  --      run 3s
+   8.000001908  MON     IP-MIB::ipAdEntAddr.10.0.1.1 = IpAddress: 10.0.1.1
+   8.000003864  MON     IP-MIB::ipAdEntAddr.10.0.10.1 = IpAddress: 10.0.10.1
+   8.000005796  MON     IP-MIB::ipAdEntIfIndex.10.0.1.1 = INTEGER: 2
+   8.000007728  MON     IP-MIB::ipAdEntIfIndex.10.0.10.1 = INTEGER: 1
+   8.000009684  MON     IP-MIB::ipAdEntNetMask.10.0.1.1 = IpAddress: 255.255.255.0
+   8.000011640  MON     IP-MIB::ipAdEntNetMask.10.0.10.1 = IpAddress: 255.255.255.0
+   8.000013572  MON     IP-MIB::ipAdEntBcastAddr.10.0.1.1 = INTEGER: 1
+   8.000015504  MON     IP-MIB::ipAdEntBcastAddr.10.0.10.1 = INTEGER: 1
+   8.000017444  MON     IP-MIB::ipAdEntReasmMaxSize.10.0.1.1 = INTEGER: 18024
+   8.000019384  MON     IP-MIB::ipAdEntReasmMaxSize.10.0.10.1 = INTEGER: 18024
+  11.000000000  ok      expect MON output contains "IP-MIB::ipAdEntIfIndex.10.0.1.1 = INTEGER: 2"
+  11.000000000  MON     root@MON:~# snmpset -v2c -c private 10.0.10.1 sysLocation.0 s "Serverraum 2"
+  11.000000000  --      run 2s
+  11.000002052  MON     SNMPv2-MIB::sysLocation.0 = STRING: Serverraum 2
+  13.000000000  ok      expect MON output contains "SNMPv2-MIB::sysLocation.0 = STRING: Serverraum 2"
+  13.000000000  R1      R1>enable
+  13.000000000  R1      R1#show snmp
+  13.000000000  R1      SNMP agent of R1 (versions 1 and 2c, UDP port 161), up for 0:00:13.00
+  13.000000000  R1      Contact:  netz@lab.example
+  13.000000000  R1      Location: Serverraum 2
+  13.000000000  R1      Received 13 messages
+  13.000000000  R1        0 with a version it does not speak, 0 with an unknown community or from a sender kept out,
+  13.000000000  R1        0 not allowed for their community, 0 unreadable
+  13.000000000  R1        1 Get, 11 GetNext, 1 Set; 15 objects read, 1 changed
+  13.000000000  R1      Sent 14 messages
+  13.000000000  R1        13 responses, 0 with tooBig (more than 1472 bytes), 0 noSuchName, 0 badValue, 0 genErr
+  13.000000000  R1        1 notifications: 1 traps, 0 informs (0 acknowledged, 0 given up, 0 waiting)
+  13.000000000  R1      Notifications: authentication linkdown linkup coldstart
+  13.000000000  R1        to 10.0.10.50 port 162: traps, version 2c, community public
+  13.000000000  ok      expect R1 output contains "Location: Serverraum 2"
+  13.000000000  MON     root@MON:~# snmpget -v2c -c falsch -r 1 10.0.10.1 sysName.0
+  13.000000000  --      run 3s
+  13.000000922  R1      *Mar  1 00:00:13.000: %SNMP-3-AUTHFAIL: refused a request from 10.0.10.50: unknown community
+  13.000002060  --      MON: /var/log/snmptrapd.log gespeichert (377 Bytes)
+  14.000000922  R1      *Mar  1 00:00:14.000: %SNMP-3-AUTHFAIL: refused a request from 10.0.10.50: unknown community
+  14.000002060  --      MON: /var/log/snmptrapd.log gespeichert (573 Bytes)
+  15.000000000  MON     snmpget: 10.0.10.1 did not answer (2 tries of 1 s each)
+  15.000003390  --      MON: /var/log/snmptrapd.log gespeichert (752 Bytes)
+  16.000000000  ok      expect MON output contains "10.0.10.1 did not answer (2 tries of 1 s each)"
+  16.000000000  --      link down SW1 Gi1/0/3
+  16.000000000  SW1     *Mar  1 00:00:16.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is down
+  16.000000000  SW1     *Mar  1 00:00:16.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is down
+  16.000000000  --      run 2s
+  16.000003092  --      MON: /var/log/snmptrapd.log gespeichert (1045 Bytes)
+  18.000000000  --      link up SW1 Gi1/0/3
+  18.000000000  SW1     *Mar  1 00:00:18.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+  18.000000000  SW1     *Mar  1 00:00:18.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+  18.000000000  --      run 2s
+  18.000003092  --      MON: /var/log/snmptrapd.log gespeichert (1334 Bytes)
+  20.000000000  MON     root@MON:~# cat /var/log/snmptrapd.log
+  20.000000000  MON     2026-01-01 00:00:01 10.0.1.20 [UDP: [10.0.1.20]:55137->[10.0.10.50]:162]:
+  20.000000000  MON     SNMPv2-MIB::sysUpTime.0 = Timeticks: (0) 0:00:00.00	SNMPv2-MIB::snmpTrapOID.0 = OID: SNMPv2-MIB::coldStart
+  20.000000000  MON     2026-01-01 00:00:14 10.0.10.1 [UDP: [10.0.10.1]:55578->[10.0.10.50]:162]:
+  20.000000000  MON     SNMPv2-MIB::sysUpTime.0 = Timeticks: (1300) 0:00:13.00	SNMPv2-MIB::snmpTrapOID.0 = OID: SNMPv2-MIB::authenticationFailure
+  20.000000000  MON     2026-01-01 00:00:15 10.0.10.1 [UDP: [10.0.10.1]:55578->[10.0.10.50]:162]:
+  20.000000000  MON     SNMPv2-MIB::sysUpTime.0 = Timeticks: (1400) 0:00:14.00	SNMPv2-MIB::snmpTrapOID.0 = OID: SNMPv2-MIB::authenticationFailure
+  20.000000000  MON     2026-01-01 00:00:16 10.0.1.2 [UDP: [10.0.1.2]:50510->[10.0.10.50]:162]:
+  20.000000000  MON     SNMPv2-MIB::sysUpTime.0 = Timeticks: (0) 0:00:00.00	SNMPv2-MIB::snmpTrapOID.0 = OID: SNMPv2-MIB::coldStart
+  20.000000000  MON     2026-01-01 00:00:17 10.0.1.10 [UDP: [10.0.1.10]:51501->[10.0.10.50]:162]:
+  20.000000000  MON     SNMPv2-MIB::sysUpTime.0 = Timeticks: (1600) 0:00:16.00	SNMPv2-MIB::snmpTrapOID.0 = OID: IF-MIB::linkDown	IF-MIB::ifIndex.3 = INTEGER: 3	IF-MIB::ifAdminStatus.3 = INTEGER: up(1)	IF-MIB::ifOperStatus.3 = INTEGER: down(2)
+  20.000000000  MON     2026-01-01 00:00:19 10.0.1.10 [UDP: [10.0.1.10]:51501->[10.0.10.50]:162]:
+  20.000000000  MON     SNMPv2-MIB::sysUpTime.0 = Timeticks: (1800) 0:00:18.00	SNMPv2-MIB::snmpTrapOID.0 = OID: IF-MIB::linkUp	IF-MIB::ifIndex.3 = INTEGER: 3	IF-MIB::ifAdminStatus.3 = INTEGER: up(1)	IF-MIB::ifOperStatus.3 = INTEGER: up(1)
+  20.000000000  ok      expect MON output contains "OID: IF-MIB::linkDown"
+  20.000000000  ok      expect MON output contains "OID: IF-MIB::linkUp"
+  20.000000000  ok      expect MON output contains "OID: SNMPv2-MIB::authenticationFailure"
+  20.000000000  ok      expect MON svc traps metric traps == 5 (5)
+  20.000000000  ok      expect MON svc traps metric informs == 1 (1)
+  20.000000000  ok      expect R2 svc snmp metric informs_acked == 1 (1)
+  20.000000000  ok      expect R1 svc snmp metric refused == 2 (2)
+  20.000000000  ok      expect hops snmp >= 40 (170)
+# 15 von 15 Erwartungen erfüllt

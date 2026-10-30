@@ -23,9 +23,15 @@
 // the pills of the devices' services, mini sparklines from 75 %, devices a fault switched off.
 // wlan.rs draws WLAN: the associations of the simulator as radio lines, the ranges of access
 // points, signal bars; a drag of a device with a radio tells the simulator at once.
+// groups.rs (G1): the groups' frames and clusters, the lines of a collapsed group's cables,
+// Gruppieren / Gruppierung aufheben / zuklappen / aufklappen; a drag of a frame or cluster
+// moves everything below it, Delete on a group ungroups it (its members stay), F2 renames it.
+// backdrop.rs (G1): the background picture under the grid, its drag and handle while unlocked.
 
+pub(crate) mod backdrop;
 pub(crate) mod cables;
 pub(crate) mod connect;
+pub(crate) mod groups;
 pub(crate) mod lab;
 pub(crate) mod paint;
 pub(crate) mod tools;
@@ -48,10 +54,12 @@ use crate::workspace::icons::{tint_of, Symbols};
 use paint::{Scene, DEV_H, DEV_W};
 use tools::Tool;
 
-/// the rename flyout: a device's name or a note's text
+/// the rename flyout: a device's name, a note's text or a group's name
 pub(crate) struct Rename {
     pub id: u32,
     pub note: bool,
+    /// a group's name (G1)
+    pub group: bool,
     pub text: String,
     /// why the last name was refused
     pub err: String,
@@ -88,6 +96,12 @@ pub(crate) struct Canvas {
     pub lab: lab::Lab,
     /// WLAN: the toggle of the ranges (wlan.rs)
     pub wl: wlan::Wl,
+    /// the findings of the clusters' members (groups.rs)
+    pub grp: groups::Grp,
+    /// the background picture decoded and scaled (backdrop.rs); its place at the start of a
+    /// drag or resize
+    pub bd: backdrop::Backdrop,
+    pub bg_drag: Option<[i64; 5]>,
 }
 
 impl Canvas {
@@ -107,6 +121,9 @@ impl Canvas {
             kb_from: None,
             lab: lab::Lab::default(),
             wl: wlan::Wl::default(),
+            grp: groups::Grp::default(),
+            bd: backdrop::Backdrop::default(),
+            bg_drag: None,
         }
     }
 
@@ -122,6 +139,8 @@ impl Canvas {
         self.x_link = None;
         self.kb_from = None;
         self.lab = lab::Lab::default();
+        self.grp = groups::Grp::default();
+        self.bg_drag = None;
         let l = &p.layout;
         self.view = Some(if l.zoom_pm > 0 { View::At(l.zoom_pm as f32 / 1000.0, l.cx as f64, l.cy as f64) } else { View::Fit });
     }
@@ -140,19 +159,32 @@ impl Canvas {
         self.st.focus = id as u64;
     }
 
-    /// the selected ids in order
+    /// the selected ids in order: devices, cables, notes and groups (a line of a cluster: its
+    /// cables; the background picture has none)
     pub(crate) fn selected(&self) -> Vec<u32> {
-        self.st.sel.iter().map(|&k| k as u32).collect()
+        let mut v: Vec<u32> = Vec::new();
+        for &k in &self.st.sel {
+            if groups::is_agg(k) {
+                v.extend(self.scene.line_links(k));
+            } else if k >> 32 == 0 {
+                v.push(k as u32);
+            }
+        }
+        v
     }
 
-    /// open the flyout for a device's name or a note's text
+    /// open the flyout for a device's name, a note's text or a group's name
     pub(crate) fn open_rename(&mut self, p: &Project, id: u32) {
-        let (note, text) = match edits::item(p, id) {
-            Some(edits::Item::Device(_)) => (false, p.device(id).map(|d| d.name.clone()).unwrap_or_default()),
-            Some(edits::Item::Note(_)) => (true, p.note(id).map(|n| n.text.clone()).unwrap_or_default()),
-            Some(edits::Item::Link(_)) | None => return,
+        let (note, group, text) = match edits::item(p, id) {
+            Some(edits::Item::Device(_)) => (false, false, p.device(id).map(|d| d.name.clone()).unwrap_or_default()),
+            Some(edits::Item::Note(_)) => (true, false, p.note(id).map(|n| n.text.clone()).unwrap_or_default()),
+            Some(edits::Item::Link(_)) => return,
+            None => match p.groups.iter().find(|g| g.id == id) {
+                Some(g) => (false, true, g.name.clone()),
+                None => return,
+            },
         };
-        self.rename = Some(Rename { id, note, text, err: String::new(), opened: false, select: true });
+        self.rename = Some(Rename { id, note, group, text, err: String::new(), opened: false, select: true });
     }
 }
 
@@ -173,6 +205,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     // the project's grid step, else the one of the settings
     n.canvas.st.grid = if g == 0 { n.prefs.grid_step.clamp(4, 200) as f32 } else { g.clamp(4, 200) as f32 };
     n.canvas.st.snap = n.prefs.snap;
+    // the title bar of a group's frame (groups.rs)
+    n.canvas.st.frame_bar = groups::FRAME_BAR;
     // Tab walks the devices and notes, then the cables; screen readers call the canvas this
     n.canvas.st.tab_edges = true;
     if n.canvas.st.name != t("Topologie") {
@@ -189,7 +223,11 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     // language (the placeholder of an empty note) and the services and power the simulator
     // has (the pills, devices a fault switched off: lab.rs)
     lab::update(n);
+    // the findings of the clusters' members, the background picture decoded (G1)
+    groups::update(n);
+    backdrop::update(n);
     let ver = n.syms.key() ^ if n.prefs.grid { 0 } else { 0x8000_0000 } ^ if crate::app::tr::en() { 0x4000_0000 } else { 0 } ^ n.doc.sim.led_key.rotate_left(7) ^ n.canvas.lab.key().rotate_left(13) ^ wlan::key(n).rotate_left(19);
+    let ver = ver ^ n.canvas.grp.key().rotate_left(23) ^ n.canvas.bd.key().rotate_left(29);
     let tool = n.canvas.tool.dg();
     let dragging = n.palette.dragging;
     ui.next_size(-1, -1);
@@ -231,7 +269,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
         let sc = &c.scene;
         ui.diagram_sems(ID_CANVAS, &mut c.st, &m, &|k| sc.label(k));
         // the cables as well (screen readers, scripts: listitem:"Kabel PC1 eth0 – SW1 …")
-        ui.diagram_edge_sems(ID_CANVAS, &mut c.st, &m, &|k| cables::sem_label(doc, k));
+        // (a line of several cables of a cluster: "3 Kabel PC1 – Serverraum, …", groups.rs)
+        ui.diagram_edge_sems(ID_CANVAS, &mut c.st, &m, &|k| if groups::is_agg(k) { groups::line_label(doc, sc, k).unwrap_or_default() } else { cables::sem_label(doc, k) });
         (evs, dropped, preview)
     };
     if let Some((model, x, y, click)) = preview {
@@ -347,6 +386,11 @@ fn event(n: &mut Net, ui: &mut Ui, ev: DEv) {
                 _ => {}
             }
         }
+        // a group (G1): a cluster expands, a frame's title renames it; its button collapses it
+        DEv::Activate(DHit::Node(k)) if groups::is_group(n, k) => groups::activate(n, ui, k as u32),
+        DEv::Toggle(k) if groups::is_group(n, k) => groups::toggle(n, ui, k as u32),
+        // the background picture's handle
+        DEv::Resize { key, rect, done } if key == paint::BG_KEY => backdrop::resize(n, rect, done),
         // Enter (or a double click) on a device: with Verbinden it is an end of the cable, with
         // the PDU tool the source or destination; else its console (Shift: its device window),
         // a note: its text
@@ -363,6 +407,8 @@ fn event(n: &mut Net, ui: &mut Ui, ev: DEv) {
         DEv::Context(hit, _) => {
             let menu: &'static [Mi] = match hit {
                 DHit::Edge { .. } | DHit::Waypoint(..) | DHit::Mid(..) => &M_CABLE,
+                DHit::Node(k) if groups::is_group(n, k) => &crate::app::commands::M_GROUP,
+                DHit::Node(k) if k == paint::BG_KEY => &crate::app::commands::M_BACKDROP,
                 DHit::Node(k) if n.doc.proj.device(k as u32).is_some() => &M_DEVICE,
                 DHit::Port(k) => {
                     // a port dot: its device
@@ -378,8 +424,9 @@ fn event(n: &mut Net, ui: &mut Ui, ev: DEv) {
         DEv::ConnectDrag { from, over, .. } => connect::drag(n, from, over),
         DEv::Connect { from, to, quick } => connect::finish(n, ui, from, to, quick),
         DEv::ConnectCancel => n.canvas.conn = None,
-        DEv::Waypoint { edge, idx, at, insert, done } => cables::waypoint(n, edge, idx, at, insert, done),
-        DEv::WaypointDelete { edge, idx } => cables::waypoint_delete(n, edge, idx),
+        // (a line of several cables of a cluster has no waypoints of its own)
+        DEv::Waypoint { edge, idx, at, insert, done } if !groups::is_agg(edge) => cables::waypoint(n, edge, idx, at, insert, done),
+        DEv::WaypointDelete { edge, idx } if !groups::is_agg(edge) => cables::waypoint_delete(n, edge, idx),
         _ => {}
     }
 }
@@ -391,12 +438,13 @@ fn rnd(v: f32) -> i32 {
     if (t as f32) > f { t - 1 } else { t }
 }
 
-/// a drag (or an arrow key) moves devices and notes: live in the project, one undo step at
-/// its end
+/// a drag (or an arrow key) moves devices and notes -- a group's frame or cluster everything
+/// below it, the background picture itself (G1) --: live in the project, one undo step at its
+/// end
 fn move_items(n: &mut Net, keys: &[u64], total: [f32; 2], done: bool) {
     let from = match n.canvas.drag.take() {
         Some(f) => f,
-        None => keys.iter().filter_map(|&k| edits::pos(&n.doc.proj, k as u32).map(|p| (k as u32, p))).collect(),
+        None => groups::move_set(n, keys).into_iter().filter_map(|id| edits::pos(&n.doc.proj, id).map(|p| (id, p))).collect(),
     };
     let d = [rnd(total[0]), rnd(total[1])];
     for &(id, p) in &from {
@@ -405,35 +453,72 @@ fn move_items(n: &mut Net, keys: &[u64], total: [f32; 2], done: bool) {
     n.doc.touch();
     // WLAN follows the drag live (doc/sim.rs)
     n.doc.sim.moved(&n.doc.proj);
+    let bg = keys.contains(&paint::BG_KEY);
     if done {
+        // the picture moves in the same step
+        if bg {
+            n.doc.hist.group_begin("Verschieben");
+        }
         if let Some(e) = edits::moves(&n.doc.proj, &from) {
             n.doc.record(e);
         }
+        if bg {
+            backdrop::drag(n, d, true);
+            n.doc.hist.group_end();
+        }
     } else {
+        if bg {
+            backdrop::drag(n, d, false);
+        }
         n.canvas.drag = Some(from);
     }
 }
 
-/// delete the selected devices (with their links) and notes
+/// delete the selected devices (with their links) and notes; a selected group goes, its
+/// members stay (G1: one step with the rest)
 pub(crate) fn delete_selection(n: &mut Net, ui: &mut Ui) {
     let ids = n.canvas.selected();
+    let gids = groups::selected_groups(n);
+    if !gids.is_empty() {
+        n.doc.hist.group_begin("Löschen");
+    }
     if let Some(e) = edits::delete(&n.doc.proj, &ids) {
         n.doc.apply(e);
+    }
+    if !gids.is_empty() {
+        let _ = crate::doc::groups::step(&mut n.doc, "Gruppe auflösen", |p| {
+            for &g in &gids {
+                if p.groups.iter().any(|x| x.id == g) {
+                    jfn_model::group::ungroup(p, g)?;
+                }
+            }
+            Ok(())
+        });
+        n.doc.hist.group_end();
     }
     n.canvas.st.sel.clear();
     n.canvas.st.focus = 0;
     ui.repass();
 }
 
-/// the ids of every device, cable and note
+/// the ids of every device, cable, note and group
 pub(crate) fn ids(p: &Project) -> BTreeSet<u32> {
-    p.devices.iter().map(|d| d.id).chain(p.links.iter().map(|l| l.id)).chain(p.notes.iter().map(|o| o.id)).collect()
+    p.devices.iter().map(|d| d.id).chain(p.links.iter().map(|l| l.id)).chain(p.notes.iter().map(|o| o.id)).chain(p.groups.iter().map(|g| g.id)).collect()
 }
 
-/// select every device, cable and note
+/// select every device, cable and note; with groups or an unlocked background picture
+/// (G1) what the canvas shows: frames, clusters, the lines of clusters, the picture (as Ctrl+A
+/// on the canvas)
 pub(crate) fn select_all(n: &mut Net, ui: &mut Ui) {
     let st = &mut n.canvas.st;
     st.sel.clear();
+    let sc = &n.canvas.scene;
+    if !sc.gs.is_empty() || sc.rect(paint::BG_KEY).is_some() {
+        st.sel.extend(sc.nodes.iter().map(|x| x.key));
+        st.sel.extend(sc.edges.iter().map(|e| e.key));
+        ui.repass();
+        return;
+    }
     for d in &n.doc.proj.devices {
         st.sel.insert(d.id as u64);
     }
@@ -460,21 +545,34 @@ pub(crate) fn zoom(n: &mut Net, ui: &mut Ui, k: i32) {
     ui.repass();
 }
 
-/// the selected device or note, when exactly one is selected (what F2 renames)
+/// the selected device, note or group, when exactly one is selected (what F2 renames)
 pub(crate) fn single(n: &Net) -> Option<u32> {
+    if let Some(g) = single_group(n) {
+        return Some(g);
+    }
     match single_item(n)? {
         edits::Item::Device(id) | edits::Item::Note(id) => Some(id),
         edits::Item::Link(_) => None,
     }
 }
 
-/// the selected device, note or cable, when exactly one is selected
+/// the selected device, note or cable, when exactly one is selected (a line of a cluster that
+/// carries several cables is several)
 pub(crate) fn single_item(n: &Net) -> Option<edits::Item> {
     if n.canvas.st.sel.len() != 1 {
         return None;
     }
-    let id = *n.canvas.st.sel.iter().next()? as u32;
-    edits::item(&n.doc.proj, id)
+    let ids = n.canvas.selected();
+    if ids.len() != 1 {
+        return None;
+    }
+    edits::item(&n.doc.proj, ids[0])
+}
+
+/// the selected group, when exactly one thing is selected and it is a group (G1)
+pub(crate) fn single_group(n: &Net) -> Option<u32> {
+    let g = groups::selected_groups(n);
+    if n.canvas.st.sel.len() == 1 && g.len() == 1 { Some(g[0]) } else { None }
 }
 
 /// F2: rename the selected device (or edit the selected note)
@@ -500,14 +598,15 @@ fn rename_flyout(n: &mut Net, ui: &mut Ui) {
             gone = true; // Esc, a click elsewhere
         }
     }
-    if gone || n.canvas.rename.as_ref().is_some_and(|r| edits::item(&n.doc.proj, r.id).is_none()) {
+    if gone || n.canvas.rename.as_ref().is_some_and(|r| edits::item(&n.doc.proj, r.id).is_none() && !(r.group && n.canvas.scene.gs.has(r.id))) {
         if ui.popup_is_open(ID_RENAME) {
             ui.popup_close();
         }
         n.canvas.rename = None;
     }
-    // the anchor: the item's box on the screen, kept inside the canvas
-    if let Some(rect) = n.canvas.rename.as_ref().and_then(|r| n.canvas.scene.rect(r.id as u64)) {
+    // the anchor: the item's box on the screen (a frame's title bar), kept inside the canvas
+    let bar = |r: [f32; 4]| [r[0], r[1], r[2], r[3].min(groups::FRAME_BAR)];
+    if let Some(rect) = n.canvas.rename.as_ref().and_then(|r| n.canvas.scene.rect(r.id as u64).map(|x| if r.group && n.canvas.scene.frames.iter().any(|f| f.id == r.id) { bar(x) } else { x })) {
         let vp = &n.canvas.st.vp;
         let q = vp.rect_to_screen(rect);
         let c = vp.rect;
@@ -521,7 +620,7 @@ fn rename_flyout(n: &mut Net, ui: &mut Ui) {
     if ui.flyout_begin(ID_RENAME, FL_BELOW) {
         if let Some(r) = &mut n.canvas.rename {
             ui.box_begin(0, BOX_V | pad(8), 6);
-            ui.text(TS_BODY_STRONG, t(if r.note { "Notiz" } else { "Gerätename" }));
+            ui.text(TS_BODY_STRONG, t(if r.note { "Notiz" } else if r.group { "Name der Gruppe" } else { "Gerätename" }));
             // Esc gives up (the text box would only drop the focus)
             if ui.focused() == ID_RENAME_BOX && ui.capture_shortcut(VK_ESCAPE, 0) {
                 act = 2;
@@ -544,6 +643,9 @@ fn rename_flyout(n: &mut Net, ui: &mut Ui) {
             }
             if !r.err.is_empty() {
                 crate::workspace::error_text(ui, &r.err, 240);
+            } else if r.group {
+                ui.next_size(240, 0);
+                ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("1 bis 64 Zeichen, nicht der Name einer anderen Gruppe"));
             } else if !r.note {
                 ui.next_size(240, 0);
                 ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Buchstaben, Ziffern und Bindestriche, vorn ein Buchstabe"));
@@ -573,7 +675,17 @@ fn rename_flyout(n: &mut Net, ui: &mut Ui) {
 fn commit_rename(n: &mut Net, ui: &mut Ui) {
     let Some(r) = &mut n.canvas.rename else { return };
     let id = r.id;
-    if r.note {
+    if r.group {
+        // a group's name (G1): 1 to 64 characters, unique
+        let text = r.text.clone();
+        if let Err(e) = crate::doc::groups::step(&mut n.doc, "Gruppe umbenennen", |p| jfn_model::group::rename(p, id, &text)) {
+            if let Some(r) = &mut n.canvas.rename {
+                r.err = crate::app::tr::msg(&e.msg());
+            }
+            ui.repass();
+            return;
+        }
+    } else if r.note {
         let text = String::from(r.text.trim_end());
         if let Some(e) = edits::note_text(&n.doc.proj, id, &text) {
             n.doc.apply(e);

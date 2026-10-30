@@ -1,6 +1,9 @@
 // hmac -- HMAC (RFC 2104) over any Hash, HKDF (RFC 5869), PBKDF2 (RFC 8018); HMAC-SHA1 and
-// PBKDF2-HMAC-SHA1 only for protocols defined with them (WPA2-Personal: its PMK, PRF and MIC)
+// PBKDF2-HMAC-SHA1 only for protocols defined with them (WPA2-Personal: its PMK, PRF and MIC);
+// HMAC-MD5 (RFC 2104 with MD5, the vectors of RFC 2202) likewise (RADIUS: the
+// Message-Authenticator of RFC 3579)
 
+use crate::md5::Md5;
 use crate::sha1::Sha1;
 use crate::sha2::{Sha256, Sha512};
 use crate::{zeroize, Hash};
@@ -173,4 +176,13 @@ pub fn pbkdf2<H: Hash>(password: &[u8], salt: &[u8], iterations: u32, out: &mut 
 /// PBKDF2-HMAC-SHA1 (the PMK of WPA2-Personal: passphrase, SSID, 4096 rounds, 32 bytes)
 pub fn pbkdf2_sha1(password: &[u8], salt: &[u8], iterations: u32, out: &mut [u8]) {
     pbkdf2::<Sha1>(password, salt, iterations, out);
+}
+
+/// HMAC-MD5 of a message (protocols defined with it only: RADIUS' Message-Authenticator)
+pub fn hmac_md5(key: &[u8], data: &[u8]) -> [u8; 16] {
+    let mut m = Hmac::<Md5>::new(key);
+    m.update(data);
+    let mut out = [0u8; 16];
+    m.finish_into(&mut out);
+    out
 }

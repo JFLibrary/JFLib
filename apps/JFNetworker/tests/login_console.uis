@@ -1,0 +1,31 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/aaa_login.jfnet
+# a console login with a hidden password (cli/aaa.rs, doc/console.rs): R1 has "line con 0 /
+# login local" with a banner, so its console opens locked at "Username:".  The password is
+# typed without echo (the input line is in TM_SECRET, so nothing of it appears in the
+# scrollback); a wrong password is refused with our own words and the login starts again; the
+# privilege-15 user comes straight into the enabled level ("R1#").
+# Ids: R1's console 25088 (its input line 25089); the dock is dragged up first.
+size 1280 900
+theme light
+drag 630,671 630,380 8
+dblclick listitem:"R1"
+expect tab:"R1" selected
+expect #25089 focused
+# the banner and the login prompt
+expect text:"Nur fuer befugte Nutzer." exists
+expect text:"Username: " exists
+# a wrong password: refused, the login begins again
+type "admin\n"
+expect text:"Password: " exists
+type "falsch\n"
+expect text:"% Access denied" exists
+expect text:"Username: " exists
+# the right credentials of the privilege-15 user
+type "admin\n"
+type "adminpw\n"
+expect text:"R1#" exists
+# neither password was echoed into the scrollback
+expect text:"adminpw" missing
+expect text:"falsch" missing
+shot build/jfnetworker/login_console.png
+expect_nowarn
