@@ -177,10 +177,15 @@ class Gpg:
         self.home = Path(home)
         self.home.mkdir(mode=0o700, parents=True)
         self.base = ["gpg", "--homedir", str(self.home), "--batch", "--yes", "--quiet"]
-        subprocess.run(self.base + ["--passphrase", "", "--quick-gen-key", f"Updatetest {name} <{name}@localhost>", algo, "sign", "never"],
-                       check=True, capture_output=True)
-        out = subprocess.run(self.base + ["--list-keys", "--with-colons"], check=True, capture_output=True, text=True).stdout
-        self.fpr = next(ln.split(":")[9] for ln in out.splitlines() if ln.startswith("fpr:"))
+        try:
+            subprocess.run(self.base + ["--passphrase", "", "--quick-gen-key", f"Updatetest {name} <{name}@localhost>", algo, "sign", "never"],
+                           check=True, capture_output=True, timeout=120)
+            out = subprocess.run(self.base + ["--list-keys", "--with-colons"], check=True, capture_output=True, text=True).stdout
+            self.fpr = next(ln.split(":")[9] for ln in out.splitlines() if ln.startswith("fpr:"))
+        except (subprocess.SubprocessError, StopIteration) as e:
+            self.close()                    # the agent this home started (it outlives a crash)
+            err = (getattr(e, "stderr", b"") or b"").decode("utf-8", "replace").strip()[-300:]
+            raise OSError(f"gpg --quick-gen-key {algo}: {e} {err}") from None
 
     def sign(self, data):
         f = self.home / "digest"

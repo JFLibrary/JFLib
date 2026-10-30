@@ -135,7 +135,7 @@ fn start_server(t: &mut T, dir: &str) -> Option<Server> {
         }
     };
     let port_file = format!("{}/port.txt", srv);
-    for _ in 0..400 {
+    for _ in 0..1200 {
         if let Some(port) = read_text(&port_file).filter(|p| !p.is_empty()) {
             let key = read_text(&format!("{}/pubkey.txt", srv)).unwrap_or_default();
             t.check(key.len() == 64, "update: the test server is up and gave its public key");
@@ -150,7 +150,7 @@ fn start_server(t: &mut T, dir: &str) -> Option<Server> {
         }
         plat::sleep_ms(50);
     }
-    t.check(false, "update: the test server did not start within 20 s");
+    t.check(false, "update: the test server did not start within 60 s (its GPG keys and AppImages on Linux)");
     None
 }
 
