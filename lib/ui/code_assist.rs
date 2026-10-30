@@ -25,7 +25,8 @@
 // types (the items whose label starts with the typed part, ignoring case, those that match
 // the case first, otherwise in the order of the assist).  Up / Down / PgUp / PgDn choose, Enter
 // or Tab insert (the word from the list's start to the end of the word at the caret becomes
-// the item's text, one undo step, the caret after it), Esc closes, a click on an item inserts
+// the item's text, one undo step, the caret after it; Enter after a word typed out in full
+// closes the list and breaks the line), Esc closes, a click on an item inserts
 // it; leaving the word, a character that is no part of a word, a click elsewhere or the focus
 // leaving close it.  At most POP_ROWS rows show, the wheel scrolls them.  Signature help opens
 // when ( or , is typed and on Ctrl+Shift+Space, follows the caret and closes outside a call or
@@ -235,6 +236,15 @@ impl Pop {
             self.top = self.sel + 1 - POP_ROWS;
         }
         self.top = self.top.min(self.shown.len().saturating_sub(POP_ROWS));
+    }
+
+    /// the typed part is the chosen item's text already
+    pub(crate) fn typed_whole(&self) -> bool {
+        let it = self.shown.get(self.sel).and_then(|&i| self.items.get(i));
+        match (it, self.typed.as_deref()) {
+            (Some(it), Some(t)) => t == if it.insert.is_empty() { it.label.as_str() } else { it.insert.as_str() },
+            _ => false,
+        }
     }
 
     /// move the choice by delta rows (clamped)

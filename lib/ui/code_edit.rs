@@ -217,6 +217,8 @@ struct View {
     sig: Sig,
     hov: Hov,
     events: Vec<CodeEv>,
+    // the caret into view in this pass (a popup opened by a key)
+    show_caret: bool,
 }
 
 /// shared state (Ui::m.code)
@@ -946,7 +948,7 @@ impl Ui {
         }
         let caret = doc.clamp(doc.selection().caret);
         let ccol = v.long.col(doc, caret.line, caret.byte, tw) as i32;
-        if (focused || v.find.open) && (doc.selection() != v.last_sel || doc.revision() != v.last_rev) {
+        if (focused || v.find.open) && (doc.selection() != v.last_sel || doc.revision() != v.last_rev || core::mem::take(&mut v.show_caret)) {
             let cy = doc.row_of_line(caret.line) as i32 * m.lh;
             if cy < v.sy {
                 v.sy = cy;
@@ -1555,6 +1557,11 @@ impl Ui {
                 VK_DOWN if !shift => v.pop.step(1),
                 VK_PRIOR if !shift => v.pop.step(-page),
                 VK_NEXT if !shift => v.pop.step(page),
+                // (Enter after a word typed out in full: the line break, not the item)
+                VK_RETURN if !shift && v.pop.typed_whole() => {
+                    v.pop.close();
+                    return false;
+                }
                 VK_RETURN | VK_TAB if !shift && !ro => {
                     v.pop.accept(doc);
                     v.prefx = -1;
@@ -1575,6 +1582,7 @@ impl Ui {
         match vk {
             VK_SPACE if ctrl && !alt => {
                 let Some(a) = assist else { return false };
+                v.show_caret = true;
                 if shift {
                     v.sig.key = (doc.revision(), caret);
                     v.sig.help = a.signature(doc, caret);
