@@ -1,9 +1,11 @@
 // stock -- the default painters of the data views and the app shell parts: drawn from the
 // theme tokens only, so every style shows grids, trees, badges, meters, charts, navigation
 // panes, command bars, splitters, breadcrumbs, segmented controls, wizard steps, toasts,
-// spinners and calendars.  A style that wants its own look returns its StyleData /
-// StyleShell from Style::data / Style::shell and overrides the methods it likes; the others
-// keep these painters (call them from the override to extend them).
+// spinners, calendars, dock areas, the windows of a window area and taskbars (desk.rs; high
+// contrast: no shadows, 2 px frames, the active window in the accent).  A style that wants
+// its own look returns its StyleData / StyleShell from Style::data / Style::shell and
+// overrides the methods it likes; the others keep these painters (call them from the
+// override to extend them).
 //
 //   kind_colors(ui, BADGE_*) -> (text, fill, solid)   the colours of a status kind
 //   Stock                                             the stock StyleData + StyleShell
@@ -13,7 +15,7 @@ use alloc::string::String;
 use crate::consts::*;
 use crate::keys::*;
 use crate::theme::color_mix;
-use crate::{Sp, StyleData, StyleShell, Ui, DOCK_MK_BOTTOM, DOCK_MK_LEFT, DOCK_MK_RIGHT, DOCK_MK_TOP};
+use crate::{Sp, StyleData, StyleShell, Ui, DOCK_MK_BOTTOM, DOCK_MK_LEFT, DOCK_MK_RIGHT, DOCK_MK_TOP, DTB_ICONS};
 
 /// the stock data-view and shell painters (Style::data / Style::shell default)
 pub struct Stock;
@@ -704,6 +706,176 @@ pub(crate) fn dock_preview(ui: &mut Ui, sp: &Sp) {
     let tint = (c & 0x00FF_FFFF) | if sp.value != 0 { 0x1800_0000 } else { 0x3000_0000 };
     let (t, rad) = (ui.dp(2), ui.dp(4));
     ui.cmd_rrect(r[0], r[1], r[2], r[3], rad, t, tint, c, c);
+}
+
+// ------------------------------------------------------------------ window areas (desk.rs)
+
+// the window colour, opaque
+fn bg_opaque(ui: &Ui) -> u32 {
+    ui.color(T_BG) | 0xFF00_0000
+}
+
+// a token as it shows over the window colour (translucent layer tokens), opaque
+fn over_bg(ui: &Ui, tok: u32) -> u32 {
+    let c = ui.color(tok);
+    color_mix(bg_opaque(ui), c | 0xFF00_0000, (c >> 24) as i32)
+}
+
+// the radius of a window in an area (DIP); its title bar keeps the top corners
+const DESK_R: i32 = 6;
+
+pub(crate) fn desk_bg(ui: &mut Ui, sp: &Sp) {
+    let r = sp.rect();
+    // the window colour a little towards the text (high contrast: the window colour)
+    let c = if ui.high_contrast() { bg_opaque(ui) } else { color_mix(bg_opaque(ui), ui.color(T_TEXT) | 0xFF00_0000, if ui.theme_dark() { 14 } else { 22 }) };
+    fill(ui, r[0], r[1], r[2], r[3], 0, c);
+}
+
+pub(crate) fn desk_window(ui: &mut Ui, sp: &Sp) {
+    let r = sp.rect();
+    let (act, max, hc) = (sp.value != 0, sp.flags & 1 != 0, ui.high_contrast());
+    let rad = if max { 0 } else { ui.dp(DESK_R) };
+    if !max && !hc {
+        ui.draw_color(ui.color(T_SHADOW));
+        ui.cmd_shadow(r[0], r[1] + ui.dp(2), r[2], r[3], rad, ui.dp(if act { 12 } else { 6 }));
+    }
+    let bg = bg_opaque(ui);
+    let stroke = if hc {
+        ui.color(if act { T_ACCENT } else { T_TEXT })
+    } else if act {
+        color_mix(ui.color(T_CTRL_STROKE) | 0xFF00_0000, ui.color(T_ACCENT) | 0xFF00_0000, 140)
+    } else {
+        over_bg(ui, T_CTRL_STROKE)
+    };
+    let t = if max { 0 } else if hc { ui.dp(2) } else { ui.hair() };
+    ui.cmd_rrect(r[0], r[1], r[2], r[3], rad, t, bg, stroke, stroke);
+}
+
+pub(crate) fn desk_titlebar(ui: &mut Ui, sp: &Sp) {
+    let r = sp.rect();
+    let (act, hc) = (sp.value != 0, ui.high_contrast());
+    // the active one: a light accent tint (high contrast: the accent), the inactive one the
+    // window colour
+    let fillc = if hc && act {
+        ui.color(T_ACCENT) | 0xFF00_0000
+    } else if act {
+        color_mix(bg_opaque(ui), ui.color(T_ACCENT) | 0xFF00_0000, if ui.theme_dark() { 40 } else { 26 })
+    } else {
+        0
+    };
+    if fillc != 0 && r[2] > 0 && r[3] > 0 {
+        // rounded at the top like the window, square at the bottom
+        let rad = (ui.dp(DESK_R) - ui.hair()).max(0).min(r[3] / 2);
+        ui.cmd_rrect(r[0], r[1], r[2], r[3], rad, 0, fillc, 0, 0);
+        ui.draw_color(fillc);
+        ui.draw_rect(r[0], r[1] + rad, r[2], r[3] - rad);
+    }
+    let h = ui.hair();
+    let line = over_bg(ui, T_DIVIDER);
+    ui.draw_color(line);
+    ui.draw_rect(r[0], r[1] + r[3] - h, r[2], h);
+    let fg = ui.color(if hc && act {
+        T_ON_ACCENT
+    } else if act {
+        T_TEXT
+    } else {
+        T_TEXT3
+    });
+    let (mut x, mut w) = (sp.s[0], sp.s[1]);
+    let px = ui.dp(16);
+    if sp.icon != 0 && w > px {
+        icon_in(ui, sp.icon, [x, r[1], px, r[3]], px, fg);
+        x += px + ui.dp(8);
+        w -= px + ui.dp(8);
+    }
+    let ts = {
+        let st = ui.style;
+        let v = st.metric(SM_TB_TITLE_TS) as u32;
+        if v != 0 { v } else { TS_BODY }
+    };
+    let title = sp.label.unwrap_or("");
+    if w > 0 && !title.is_empty() {
+        text_at(ui, ts, x, r, title, fg, w);
+    }
+}
+
+pub(crate) fn desk_snap(ui: &mut Ui, sp: &Sp) {
+    let m = ui.dp(4);
+    let mut q = *sp;
+    q.place([sp.x + m, sp.y + m, sp.w - m * 2, sp.h - m * 2]);
+    q.value = 0;
+    dock_preview(ui, &q);
+}
+
+pub(crate) fn taskbar(ui: &mut Ui, sp: &Sp) {
+    let r = sp.rect();
+    let c = over_bg(ui, T_LAYER);
+    fill(ui, r[0], r[1], r[2], r[3], 0, c);
+    let h = ui.hair();
+    let c = over_bg(ui, T_LAYER_STROKE);
+    ui.draw_color(c);
+    ui.draw_rect(r[0], r[1], r[2], h);
+}
+
+pub(crate) fn taskbar_button_size(ui: &mut Ui, sp: &mut Sp) -> (i32, i32) {
+    if sp.flags & DTB_ICONS != 0 {
+        return (ui.dp(40), ui.dp(32));
+    }
+    ui.ts_font(TS_BODY);
+    let tw = ui.text.width(sp.label.unwrap_or(""));
+    let icon = if sp.icon != 0 { 16 + 8 } else { 0 };
+    (ui.dp(10 + icon + 12) + tw, ui.dp(32))
+}
+
+pub(crate) fn taskbar_button(ui: &mut Ui, sp: &Sp) {
+    let r = sp.rect();
+    let (on, min, hc) = (sp.value != 0, sp.value2 != 0, ui.high_contrast());
+    let rad = ui.dp(4);
+    let bg = if hc && on {
+        ui.color(T_ACCENT)
+    } else if sp.ev & EV_HELD != 0 {
+        ui.color(T_SUBTLE_PRESSED)
+    } else if sp.ev & EV_HOVER != 0 || on {
+        ui.color(T_SUBTLE_HOVER)
+    } else {
+        0
+    };
+    fill(ui, r[0], r[1], r[2], r[3], rad, bg);
+    if hc && !on {
+        frame(ui, r[0], r[1], r[2], r[3], rad, ui.hair(), ui.color(T_TEXT));
+    }
+    let fg = ui.color(if hc && on {
+        T_ON_ACCENT
+    } else if min {
+        T_TEXT3
+    } else {
+        T_TEXT
+    });
+    let px = ui.dp(16);
+    let icons = sp.flags & DTB_ICONS != 0;
+    let mut tx = r[0] + ui.dp(10);
+    if sp.icon != 0 {
+        if icons {
+            icon_in(ui, sp.icon, r, px, fg);
+        } else {
+            icon_in(ui, sp.icon, [tx, r[1], px, r[3]], px, fg);
+            tx += px + ui.dp(8);
+        }
+    }
+    if !icons {
+        let avail = (r[0] + r[2] - ui.dp(8) - tx).max(1);
+        let label = sp.label.unwrap_or("");
+        ui.ts_font(TS_BODY);
+        let s = if ui.text.width(label) > avail { ui.ellipsize(label.as_bytes(), avail).0 } else { String::from(label) };
+        if sp.icon == 0 || s != "…" {
+            text_at(ui, TS_BODY, tx, r, &s, fg, avail);
+        }
+    }
+    // a bar along the bottom: the accent under the active window, short and quiet under the
+    // others
+    let t = ui.dp(3);
+    let (bw, c) = if on { (ui.dp(16), ui.color(if hc { T_ON_ACCENT } else { T_ACCENT })) } else { (ui.dp(6), ui.color(T_TEXT3)) };
+    fill(ui, r[0] + ((r[2] - bw) >> 1), r[1] + r[3] - t - ui.dp(1), bw, t, t >> 1, c);
 }
 
 /// (sin, cos) of an angle in radians (single precision, enough for drawing)

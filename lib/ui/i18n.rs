@@ -796,6 +796,14 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Schrift nicht ladbar: {}", "Font cannot be loaded: {}", "Police impossible à charger\u{A0}: {}",
      "No se puede cargar la fuente: {}", "Impossibile caricare il carattere: {}", "Lettertype kan niet worden geladen: {}",
      "Nie można wczytać czcionki: {}", "تعذر تحميل الخط: {}", "לא ניתן לטעון את הגופן: {}"],
+    // (L7) windows inside an area (desk.rs): their buttons and menus, the taskbar
+    ["Minimieren", "Minimize", "Réduire", "Minimizar", "Riduci a icona", "Minimaliseren", "Minimalizuj", "تصغير", "מזעור"],
+    ["Maximieren", "Maximize", "Agrandir", "Maximizar", "Ingrandisci", "Maximaliseren", "Maksymalizuj", "تكبير", "הגדלה"],
+    ["Wiederherstellen", "Restore", "Restaurer", "Restaurar", "Ripristina", "Herstellen", "Przywróć", "استعادة", "שחזור"],
+    ["minimiert", "minimized", "réduite", "minimizada", "ridotta a icona", "geminimaliseerd", "zminimalizowane", "مصغّرة", "ממוזער"],
+    ["maximiert", "maximized", "agrandie", "maximizada", "ingrandita", "gemaximaliseerd", "zmaksymalizowane", "مكبّرة", "מוגדל"],
+    ["Taskleiste", "Taskbar", "Barre des tâches", "Barra de tareas", "Barra delle applicazioni", "Taakbalk", "Pasek zadań", "شريط المهام", "שורת המשימות"],
+    ["Weitere Fenster", "More windows", "Plus de fenêtres", "Más ventanas", "Altre finestre", "Meer vensters", "Więcej okien", "مزيد من النوافذ", "חלונות נוספים"],
 ];
 
 /// a library text in the current language: the UI language when the library has it
