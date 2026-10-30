@@ -1,16 +1,22 @@
 // fontpick -- the system's fonts in the UI: the font database and its rules, loading a
 // choice, text in such a font, a font picker and a font dialog
 //
-//   FontSel { family, weight, italic, size }   a choice: a family (also a generic one:
+//   FontSel { family, weight, italic, size, axes }   a choice: a family (also a generic one:
 //                                    "sans-serif", "serif", "monospace" ...), 100..900, italic,
-//                                    the size in points
+//                                    the size in points, axis values of a variable family
+//                                    (FontSel::new: none; axis / set_axis)
 //   ui.fonts() -> &FontDb            the installed fonts, scanned on first use (cache
 //                                    cache://fontdb.fdb; jfgui_FONTDIRS: these folders, no cache)
 //   ui.font_conf() -> &FontConf      generic families, substitutes, the languages' fonts
 //                                    (text::fontconf: a light fontconfig)
 //   ui.font_load(&sel) -> Option<u32>   resolve (FontDb::resolve in the UI language) and load
 //                                    into ui.text: a font id for set_font / cmd_text; each
-//                                    family / weight / italic once
+//                                    family / weight / italic once.  A variable face: its
+//                                    instance (FontDb::load_var): weight -> wght, italic -> ital
+//                                    / slnt, the size -> opsz, the axes named win; the instances
+//                                    of the VAR_KEEP most recent such choices and the app
+//                                    theme's faces stay loaded (older ones are unloaded, their
+//                                    ids may be reused)
 //   ui.font_resolved(&sel) -> String the installed family font_load takes ("" none)
 //   ui.font_register(family, weight, italic, font)   a font of the app's own (load_mem) under
 //                                    a family name for font_load; font_registered() lists them
@@ -22,14 +28,18 @@
 //   ui.font_dialog(id, &open, &mut sel) -> EV   a modal dialog window "Schriftart": search,
 //                                    families, the family's styles, sizes, a preview in the
 //                                    font, OK / Abbrechen; works on a copy of sel and writes it
-//                                    back on OK (EV_ACT); closing clears open
+//                                    back on OK (EV_ACT); closing clears open.  A variable
+//                                    family lists its named instances as styles and gets a
+//                                    slider and a number box per axis (fvar's range and name;
+//                                    hidden axes not), opsz with "Automatisch" (follows the size)
 //   font_language() -> String        the language the fonts follow: the user's tag of the UI
 //                                    language (ja-JP, zh-Hant-TW), else its code
 //
 // The runtime hands font_language() to the system fallback (text::fallback, again when the
 // UI language changes), so missing Han characters take the forms of the language.  Ids:
 // the scope of the widget's id, then "family", "search", "list", "styles", "size",
-// "sizes" (ids.rs).
+// "sizes", the axes' "axis" scope with per axis id_n(k) (slider), id_n(k + 100) (number
+// box), "opsz_auto" (ids.rs).
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -37,7 +47,8 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use text::fontconf::FontConf;
-use text::fontdb::{FontDb, FDFF_ITALIC, FDFF_OBLIQUE};
+use text::fontdb::{FontDb, FDFF_ITALIC, FDFF_OBLIQUE, FDFF_VAR};
+use text::VarAxis;
 
 use super::consts::*;
 use super::value::RangeF;
@@ -49,6 +60,8 @@ const SEARCH_CAP: u32 = 128;
 const SIZES: [f64; 16] = [8.0, 9.0, 10.0, 11.0, 12.0, 14.0, 16.0, 18.0, 20.0, 22.0, 24.0, 28.0, 36.0, 48.0, 72.0, 96.0];
 const RANGE_PT: RangeF = RangeF::new(1.0, 1638.0, 1.0, 1, 0);
 const SAMPLE: &str = "AaBbYyZz 0123456789";
+/// the instances of variable choices font_load keeps loaded
+const VAR_KEEP: usize = 64;
 
 /// a font choice (see the module header)
 #[derive(Clone, Debug, PartialEq)]
@@ -58,12 +71,30 @@ pub struct FontSel {
     pub italic: bool,
     /// points
     pub size: f64,
+    /// axis values of a variable family in user units by tag (`(*b"wdth", 87.5)`); the axes
+    /// not named follow weight (wght), italic (ital, slnt) and size (opsz), else their
+    /// defaults; families that are not variable ignore them
+    pub axes: Vec<([u8; 4], f32)>,
 }
 
 impl FontSel {
-    /// regular, upright
+    /// regular, upright, no axis values
     pub fn new(family: &str, size: f64) -> FontSel {
-        FontSel { family: String::from(family), weight: 400, italic: false, size }
+        FontSel { family: String::from(family), weight: 400, italic: false, size, axes: Vec::new() }
+    }
+
+    /// the value `axes` names for a tag (None: the tag follows weight / italic / size or its
+    /// default)
+    pub fn axis(&self, tag: [u8; 4]) -> Option<f32> {
+        self.axes.iter().find(|a| a.0 == tag).map(|a| a.1)
+    }
+
+    /// name an axis value (replacing the tag's); NaN takes the tag out again
+    pub fn set_axis(&mut self, tag: [u8; 4], v: f32) {
+        self.axes.retain(|a| a.0 != tag);
+        if !v.is_nan() {
+            self.axes.push((tag, v));
+        }
     }
 }
 
@@ -72,6 +103,19 @@ impl Default for FontSel {
         FontSel::new("sans-serif", 11.0)
     }
 }
+
+// a style of the dialog's list: a face, or a named instance of a variable face (face index,
+// label, weight, italic, the axis values it names)
+struct StyleRow {
+    face: i32,
+    name: String,
+    weight: u32,
+    italic: bool,
+    axes: Vec<([u8; 4], f32)>,
+}
+
+// a variable choice of font_entry: family, weight, italic, size bits, axes (tag, value bits)
+type VarKey = (String, u32, bool, u64, Vec<([u8; 4], u32)>);
 
 // the state of one picker / dialog between frames
 #[derive(Default)]
@@ -93,6 +137,8 @@ pub(crate) struct S {
     db: Option<FontDb>,
     conf: Option<FontConf>,
     loaded: BTreeMap<(String, u32, bool), (i32, String)>,
+    /// choices on variable faces, oldest first: (key, font id, family)
+    vloaded: Vec<(VarKey, i32, String)>,
     picks: BTreeMap<u32, Pick>,
     /// the UI language the fallback follows (i18n::language() + 1; 0: not set yet)
     lang_n: u32,
@@ -107,6 +153,41 @@ pub fn font_language() -> String {
         .into_iter()
         .find(|u| u.split(['-', '_']).next().is_some_and(|p| p.eq_ignore_ascii_case(&code)))
         .unwrap_or(code)
+}
+
+// the values of named axes as a key (f32 bits)
+fn var_key(sel: &FontSel) -> VarKey {
+    let mut axes: Vec<([u8; 4], u32)> = sel.axes.iter().map(|a| (a.0, a.1.to_bits())).collect();
+    axes.sort_unstable();
+    (sel.family.to_lowercase(), sel.weight, sel.italic, sel.size.to_bits(), axes)
+}
+
+// the axis values a style row names: those that the mapping of weight / italic does not give
+// (wght never: the weight; opsz only when the instances differ in it, else it follows the size)
+fn row_axes(axes: &[VarAxis], coords: &[f32], italic: bool, opsz_named: bool) -> Vec<([u8; 4], f32)> {
+    let has_ital = axes.iter().any(|a| &a.tag == b"ital" && a.max >= 1.0);
+    let mut out = Vec::new();
+    for (a, &v) in axes.iter().zip(coords) {
+        let mapped = match &a.tag {
+            b"wght" => continue,
+            b"opsz" if !opsz_named => continue,
+            b"opsz" => f32::NAN,
+            b"ital" if italic && a.max >= 1.0 => 1.0,
+            b"slnt" if italic && !has_ital && a.min < 0.0 => a.min,
+            _ => a.def,
+        };
+        if !(mapped - v).abs().le(&0.001) {
+            out.push((a.tag, v));
+        }
+    }
+    out
+}
+
+// the slider range of an axis: whole steps for wide ranges, tenths / hundredths for narrow
+fn axis_range(a: &VarAxis) -> RangeF {
+    let span = (a.max - a.min) as f64;
+    let (step, dec) = if span >= 50.0 { (1.0, 0) } else if span >= 2.0 { (0.1, 1) } else { (0.01, 2) };
+    RangeF::new(a.min as f64, a.max as f64, step, dec, 0)
 }
 
 fn has_ci(hay: &str, needle: &str) -> bool {
@@ -151,22 +232,57 @@ impl Ui {
         self.m.fonts.conf.get_or_insert_with(FontConf::system)
     }
 
-    // (font_load, font_resolved) the font of a choice: (id, family), loaded once
+    // (font_load, font_resolved) the font of a choice: (id, family), loaded once; a variable
+    // face's instance for weight, italic, size and axes (the VAR_KEEP most recent kept)
     fn font_entry(&mut self, sel: &FontSel) -> (i32, String) {
         let key = (sel.family.to_lowercase(), sel.weight, sel.italic);
-        if let Some((id, fam)) = self.m.fonts.loaded.get(&key) {
-            if *id >= 0 && self.text.valid(*id as u32) {
-                return (*id, fam.clone());
+        if let Some((id, fam)) = self.m.fonts.loaded.get(&key).cloned()
+            && id >= 0
+            && self.text.valid(id as u32)
+        {
+            // a static face, or the app's own font (a variable one varies with the axes)
+            if sel.axes.is_empty() || self.text.var_axes(id as u32).is_empty() {
+                return (id, fam);
             }
+            let v = self.text.vary(id as u32, &sel.axes);
+            return (if v >= 0 { v } else { id }, fam);
+        }
+        let vk = var_key(sel);
+        if let Some(e) = self.m.fonts.vloaded.iter().find(|e| e.0 == vk)
+            && e.1 >= 0
+            && self.text.valid(e.1 as u32)
+        {
+            return (e.1, e.2.clone());
         }
         self.fonts_db();
         self.font_conf();
         let lang = font_language();
         let s = &mut self.m.fonts;
         let (Some(db), Some(conf)) = (s.db.as_mut(), s.conf.as_ref()) else { return (-1, String::new()) };
-        let r = db.load_resolved(&mut self.text, conf, &sel.family, &lang, sel.weight, sel.italic);
-        s.loaded.insert(key, r.clone());
-        r
+        let Some((fi, syn, fam)) = db.resolve(conf, &sel.family, &lang, sel.weight, sel.italic) else {
+            s.loaded.insert(key, (-1, String::new()));
+            return (-1, String::new());
+        };
+        if db.face(fi).is_none_or(|f| f.flags & FDFF_VAR == 0) {
+            let id = db.load_face(&mut self.text, fi, syn);
+            s.loaded.insert(key, (id, fam.clone()));
+            return (id, fam);
+        }
+        let id = db.load_var(&mut self.text, fi, syn, sel.weight, sel.italic, Some(sel.size as f32), &sel.axes);
+        s.vloaded.retain(|e| e.0 != vk);
+        s.vloaded.push((vk, id, fam.clone()));
+        if s.vloaded.len() > VAR_KEEP {
+            // the oldest choice: its instance goes unless another choice or the app theme's
+            // faces still have it
+            let (_, old, _) = s.vloaded.remove(0);
+            let used = s.vloaded.iter().any(|e| e.1 == old)
+                || s.loaded.values().any(|e| e.0 == old)
+                || self.look.fonts.contains(&(old as u32));
+            if old >= 0 && !used && !self.text.var_coords(old as u32).is_empty() {
+                self.text.unload(old as u32);
+            }
+        }
+        (id, fam)
     }
 
     /// the font of a choice loaded into ui.text -> its id (None: no installed font fits)
@@ -330,6 +446,9 @@ impl Ui {
             }
         }
         if self.flyout_begin(bid, FL_BELOW | FL_MINW) && self.font_family_list(&mut p, 260, 320, true) {
+            if !sel.family.eq_ignore_ascii_case(&p.work.family) {
+                sel.axes.clear(); // the axis values of the old family
+            }
             sel.family = p.work.family.clone();
             out |= EV_ACT;
         }
@@ -373,39 +492,37 @@ impl Ui {
             self.next_size(-1, 0);
             self.box_begin(0, BOX_V, 6);
             self.text(TS_BODY_STRONG, super::i18n::tr("Schriftart"));
+            let fam0 = p.work.family.clone();
             if self.font_family_list(&mut p, -1, 220, false) {
                 p.style = -1;
+                if !fam0.eq_ignore_ascii_case(&p.work.family) {
+                    p.work.axes.clear(); // the axis values of the old family
+                }
             }
             self.box_end();
-            // the family's styles (the four synthetic ones for a family that is not installed)
+            // the family's styles (the four synthetic ones for a family that is not installed;
+            // a variable face's named instances)
             self.next_size(150, 0);
             self.box_begin(0, BOX_V, 6);
             self.text(TS_BODY_STRONG, super::i18n::tr("Schriftschnitt"));
             let fi = self.font_family_index(&p.work.family);
-            let styles: Vec<(String, u32, bool)> = if fi >= 0 {
-                let db = self.fonts_db();
-                db.family_faces(fi as usize)
-                    .iter()
-                    .map(|f| {
-                        let it = f.flags & (FDFF_ITALIC | FDFF_OBLIQUE) != 0;
-                        let name = if f.style.is_empty() { String::from(style_label(f.weight as u32, it)) } else { f.style.clone() };
-                        (name, f.weight as u32, it)
-                    })
-                    .collect()
-            } else {
-                [(400, false), (400, true), (700, false), (700, true)].iter().map(|&(w, it)| (String::from(style_label(w, it)), w, it)).collect()
-            };
-            if p.style < 0 {
+            let styles = self.font_styles(fi);
+            let var = styles.iter().any(|r| r.face >= 0 && !r.axes.is_empty())
+                || self.font_var_face(&p.work).is_some();
+            if var {
+                // any axis value is a choice: a style is selected when it is exactly that
+                p.style = self.font_style_match(&p.work, &styles);
+            } else if p.style < 0 {
                 // the face closest to the choice
                 p.style = styles
                     .iter()
                     .enumerate()
-                    .min_by_key(|(_, s)| (s.2 != p.work.italic) as i32 * 10000 + (s.1 as i32 - p.work.weight as i32).abs())
+                    .min_by_key(|(_, s)| (s.italic != p.work.italic) as i32 * 10000 + (s.weight as i32 - p.work.weight as i32).abs())
                     .map_or(-1, |(k, _)| k as i32);
                 // the choice snaps to that face (what the list shows is what OK takes)
                 if let Some(st) = styles.get(p.style.max(0) as usize).filter(|_| p.style >= 0) {
-                    p.work.weight = st.1;
-                    p.work.italic = st.2;
+                    p.work.weight = st.weight;
+                    p.work.italic = st.italic;
                 }
             }
             let sid = self.id("styles");
@@ -414,13 +531,15 @@ impl Ui {
             self.next_size(-1, 258);
             let (first, end) = self.list_begin(sid, &mut ssel, n, ROW_H);
             for row in first..end.min(n) {
-                self.list_item(row, &styles[row as usize].0);
+                self.list_item(row, &styles[row as usize].name);
             }
             self.list_end(&mut ssel);
             if ssel != p.style && (0..n).contains(&ssel) {
                 p.style = ssel;
-                p.work.weight = styles[ssel as usize].1;
-                p.work.italic = styles[ssel as usize].2;
+                let st = &styles[ssel as usize];
+                p.work.weight = st.weight;
+                p.work.italic = st.italic;
+                p.work.axes = st.axes.clone();
             }
             self.box_end();
             // sizes
@@ -447,6 +566,10 @@ impl Ui {
             }
             self.box_end();
             self.box_end();
+            // a variable family's axes
+            if var {
+                self.font_axes(&mut p.work);
+            }
             // preview
             self.text(TS_BODY_STRONG, super::i18n::tr("Vorschau"));
             self.next_size(-1, 96);
@@ -473,5 +596,138 @@ impl Ui {
         self.id_pop();
         self.m.fonts.picks.insert(id, p);
         out
+    }
+
+    // the dialog's styles of family fi: each face, a variable face's named instances (-1: the
+    // four synthetic styles of a family that is not installed)
+    fn font_styles(&mut self, fi: i32) -> Vec<StyleRow> {
+        if fi < 0 {
+            return [(400, false), (400, true), (700, false), (700, true)]
+                .iter()
+                .map(|&(w, it)| StyleRow { face: -1, name: String::from(style_label(w, it)), weight: w, italic: it, axes: Vec::new() })
+                .collect();
+        }
+        let db = self.fonts_db();
+        let mut rows = Vec::new();
+        for k in db.family_range(fi as usize) {
+            let Some(f) = db.face(k) else { continue };
+            let (fw, it, style) = (f.weight as u32, f.flags & (FDFF_ITALIC | FDFF_OBLIQUE) != 0, f.style.clone());
+            let name = if style.is_empty() { String::from(style_label(fw, it)) } else { style };
+            match db.variations(k) {
+                Some(v) if !v.instances.is_empty() => {
+                    // opsz is part of a named instance when the instances differ in it
+                    let ko = v.axes.iter().position(|a| &a.tag == b"opsz");
+                    let opsz_named = ko.is_some_and(|ko| v.instances.iter().any(|i| i.coords.get(ko) != v.instances[0].coords.get(ko)));
+                    for ins in &v.instances {
+                        let val = |tag: &[u8; 4]| v.axes.iter().position(|a| &a.tag == tag).and_then(|i| ins.coords.get(i).copied());
+                        let weight = val(b"wght").map_or(fw, |w| (w + 0.5).clamp(1.0, 1000.0) as u32);
+                        let italic = it || val(b"ital").is_some_and(|x| x >= 0.5) || val(b"slnt").is_some_and(|x| x < 0.0);
+                        let label = if ins.name.is_empty() { String::from(style_label(weight, italic)) } else { ins.name.clone() };
+                        let axes = row_axes(&v.axes, &ins.coords, italic, opsz_named);
+                        rows.push(StyleRow { face: k as i32, name: label, weight, italic, axes });
+                    }
+                }
+                _ => rows.push(StyleRow { face: k as i32, name, weight: fw, italic: it, axes: Vec::new() }),
+            }
+        }
+        rows
+    }
+
+    // the variable face a choice takes (its index), None: not a variable face
+    fn font_var_face(&mut self, sel: &FontSel) -> Option<usize> {
+        let db = self.fonts_db();
+        let (fi, _) = db.find(&sel.family, sel.weight, sel.italic)?;
+        (db.face(fi)?.flags & FDFF_VAR != 0).then_some(fi)
+    }
+
+    // the style row that is exactly the choice (-1: none)
+    fn font_style_match(&mut self, sel: &FontSel, rows: &[StyleRow]) -> i32 {
+        let face = self.font_var_face(sel).map_or(-1, |f| f as i32);
+        let size = Some(sel.size as f32);
+        let db = self.fonts_db();
+        let cur = if face >= 0 { db.var_values(face as usize, sel.weight, sel.italic, size, &sel.axes).map(|v| v.0) } else { None };
+        for (k, r) in rows.iter().enumerate() {
+            let same = match &cur {
+                Some(c) if r.face == face => {
+                    db.var_values(face as usize, r.weight, r.italic, size, &r.axes).is_some_and(|v| v.0.iter().zip(c).all(|(a, b)| (a - b).abs() < 0.01))
+                }
+                Some(_) => false,
+                None => r.weight == sel.weight && r.italic == sel.italic,
+            };
+            if same {
+                return k as i32;
+            }
+        }
+        -1
+    }
+
+    // the dialog's axes of a variable choice: per axis its name, a slider and a number box
+    // (fvar's range); opsz with "Automatisch" (it follows the size)
+    fn font_axes(&mut self, w: &mut FontSel) {
+        let Some(face) = self.font_var_face(w) else { return };
+        let size = Some(w.size as f32);
+        let db = self.fonts_db();
+        let Some(v) = db.variations(face).cloned() else { return };
+        let Some((vals, _)) = db.var_values(face, w.weight, w.italic, size, &w.axes) else { return };
+        self.text(TS_BODY_STRONG, super::i18n::tr("Achsen"));
+        self.id_push_str("axis");
+        self.gridbox_begin(0, &[0, -1, 80, 0], 0, 8);
+        let mut changed: Option<(usize, f32)> = None;
+        for (k, a) in v.axes.iter().enumerate() {
+            if a.hidden {
+                continue;
+            }
+            let rf = axis_range(a);
+            self.text(TS_BODY, &a.name);
+            let mut x = vals[k] as f64;
+            self.next_size(-1, 0);
+            if self.slider_f(self.id_n(k as u32), &mut x, &rf) & EV_ACT != 0 {
+                changed = Some((k, x as f32));
+            }
+            let mut y = vals[k] as f64;
+            self.next_size(-1, 0);
+            if self.number_box_f(self.id_n(k as u32 + 100), &mut y, &rf) & EV_ACT != 0 && y != vals[k] as f64 {
+                changed = Some((k, y as f32));
+            }
+            if &a.tag == b"opsz" {
+                let mut auto = w.axis(*b"opsz").is_none() as i32;
+                if self.checkbox(self.id("opsz_auto"), super::i18n::tr("Automatisch"), &mut auto) & EV_ACT != 0 {
+                    w.set_axis(*b"opsz", if auto != 0 { f32::NAN } else { vals[k] });
+                }
+            } else {
+                self.text(TS_BODY, "");
+            }
+        }
+        self.gridbox_end();
+        self.id_pop();
+        let Some((k, x)) = changed else { return };
+        let a = &v.axes[k];
+        let x = x.clamp(a.min, a.max);
+        match &a.tag {
+            b"wght" => {
+                w.weight = (x + 0.5).clamp(1.0, 1000.0) as u32;
+                w.set_axis(a.tag, if (x - w.weight as f32).abs() < 0.001 { f32::NAN } else { x });
+            }
+            b"opsz" => w.set_axis(a.tag, x),
+            t => {
+                if t == b"ital" {
+                    w.italic = x >= 0.5;
+                } else if t == b"slnt" && !v.axes.iter().any(|b| &b.tag == b"ital") {
+                    w.italic = x < 0.0;
+                }
+                w.set_axis(a.tag, x);
+                // a value the mapping of weight / italic gives needs no entry
+                let face2 = self.font_var_face(w);
+                let db = self.fonts_db();
+                let mut bare = w.clone();
+                bare.set_axis(a.tag, f32::NAN);
+                if let Some(f2) = face2
+                    && let Some((m, _)) = db.var_values(f2, bare.weight, bare.italic, Some(bare.size as f32), &bare.axes)
+                    && (m[k] - x).abs() < 0.001
+                {
+                    w.set_axis(a.tag, f32::NAN);
+                }
+            }
+        }
     }
 }

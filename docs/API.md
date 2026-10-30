@@ -17,7 +17,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [gfx](#gfx) -- surfaces, the draw context, blend kernels, paths, strokes, masks, gradients
   <br>[lib.rs](#gfx-crate-root) · [blend.rs](#gfxblendrs) · [blendmode.rs](#gfxblendmoders) · [dash.rs](#gfxdashrs) · [flood.rs](#gfxfloodrs) · [gradient.rs](#gfxgradientrs) · [path.rs](#gfxpathrs) · [panel.rs](#gfxpanelrs) · [pathdata.rs](#gfxpathdatars) · [raster.rs](#gfxrasterrs) · [shapes.rs](#gfxshapesrs) · [straight.rs](#gfxstraightrs) · [stroke.rs](#gfxstrokers) · [tmask.rs](#gfxtmaskrs) · [xform.rs](#gfxxformrs)
 - [text](#text) -- fonts (SGF1, TrueType, CFF, COLR), glyph cache, text runs
-  <br>[lib.rs](#text-crate-root) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs)
+  <br>[lib.rs](#text-crate-root) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs) · [var.rs](#textvarrs)
 - [spell](#spell) -- spell checking: Hunspell dictionaries, the system's checker, a personal word list
   <br>[lib.rs](#spell-crate-root) · [hyphen.rs](#spellhyphenrs) · [speller.rs](#spellspellerrs) · [token.rs](#spelltokenrs)
 - [img_core](#img_core) -- image I/O dispatch, records, metadata, colour, resampling, image operations
@@ -6937,16 +6937,22 @@ Source: [`lib/ui/fontpick.rs`](../lib/ui/fontpick.rs)
 fontpick -- the system's fonts in the UI: the font database and its rules, loading a
 choice, text in such a font, a font picker and a font dialog
 
-  FontSel { family, weight, italic, size }   a choice: a family (also a generic one:
+  FontSel { family, weight, italic, size, axes }   a choice: a family (also a generic one:
                                    "sans-serif", "serif", "monospace" ...), 100..900, italic,
-                                   the size in points
+                                   the size in points, axis values of a variable family
+                                   (FontSel::new: none; axis / set_axis)
   ui.fonts() -> &FontDb            the installed fonts, scanned on first use (cache
                                    cache://fontdb.fdb; jfgui_FONTDIRS: these folders, no cache)
   ui.font_conf() -> &FontConf      generic families, substitutes, the languages' fonts
                                    (text::fontconf: a light fontconfig)
   ui.font_load(&sel) -> Option<u32>   resolve (FontDb::resolve in the UI language) and load
                                    into ui.text: a font id for set_font / cmd_text; each
-                                   family / weight / italic once
+                                   family / weight / italic once.  A variable face: its
+                                   instance (FontDb::load_var): weight -> wght, italic -> ital
+                                   / slnt, the size -> opsz, the axes named win; the instances
+                                   of the VAR_KEEP most recent such choices and the app
+                                   theme's faces stay loaded (older ones are unloaded, their
+                                   ids may be reused)
   ui.font_resolved(&sel) -> String the installed family font_load takes ("" none)
   ui.font_register(family, weight, italic, font)   a font of the app's own (load_mem) under
                                    a family name for font_load; font_registered() lists them
@@ -6958,14 +6964,18 @@ choice, text in such a font, a font picker and a font dialog
   ui.font_dialog(id, &open, &mut sel) -> EV   a modal dialog window "Schriftart": search,
                                    families, the family's styles, sizes, a preview in the
                                    font, OK / Abbrechen; works on a copy of sel and writes it
-                                   back on OK (EV_ACT); closing clears open
+                                   back on OK (EV_ACT); closing clears open.  A variable
+                                   family lists its named instances as styles and gets a
+                                   slider and a number box per axis (fvar's range and name;
+                                   hidden axes not), opsz with "Automatisch" (follows the size)
   font_language() -> String        the language the fonts follow: the user's tag of the UI
                                    language (ja-JP, zh-Hant-TW), else its code
 
 The runtime hands font_language() to the system fallback (text::fallback, again when the
 UI language changes), so missing Han characters take the forms of the language.  Ids:
 the scope of the widget's id, then "family", "search", "list", "styles", "size",
-"sizes" (ids.rs).
+"sizes", the axes' "axis" scope with per axis id_n(k) (slider), id_n(k + 100) (number
+box), "opsz_auto" (ids.rs).
 ```
 
 - **`struct FontSel`**
@@ -6974,11 +6984,19 @@ the scope of the widget's id, then "family", "search", "list", "styles", "size",
   - `weight: u32`
   - `italic: bool`
   - `size: f64` -- points
+  - `axes: Vec<([u8; 4], f32)>` -- axis values of a variable family in user units by tag (`(*b"wdth", 87.5)`); the axes
+    not named follow weight (wght), italic (ital, slnt) and size (opsz), else their
+    defaults; families that are not variable ignore them
 
 **`impl FontSel`**
 
 - **`fn new(family: &str, size: f64) -> FontSel`**
-  regular, upright
+  regular, upright, no axis values
+- **`fn axis(&self, tag: [u8; 4]) -> Option<f32>`**
+  the value `axes` names for a tag (None: the tag follows weight / italic / size or its
+  default)
+- **`fn set_axis(&mut self, tag: [u8; 4], v: f32)`**
+  name an axis value (replacing the tag's); NaN takes the tag out again
 
 - **`fn font_language() -> String`**
   the language the fonts follow: the user's tag of the UI language, else its code
@@ -8611,9 +8629,12 @@ The format is INI (base::ini):
               control_height = DIP      buttons, text boxes, combo boxes, drop-down and split
                                         buttons (not compact or large ones)
   [text]      family = FILE | installed family   (family.semibold, family.bold: their faces;
-              else from the family: a file gets a synthetic bold); STYLE.size = DIP (24.8),
-              STYLE.line = DIP, STYLE.weight = regular | semibold | bold | 100..900 for STYLE
-              in caption, body, body_strong, subtitle, title, title_large, display
+              else from the family: a file gets a synthetic bold, a variable one its wght);
+              family.axes = TAG=VALUE, ...   axis values of a variable family (wdth=87.5,
+              opsz=12; weights still come from the faces' 400 / 600 / 700, opsz else 11 pt);
+              STYLE.size = DIP (24.8), STYLE.line = DIP, STYLE.weight = regular | semibold |
+              bold | 100..900 for STYLE in caption, body, body_strong, subtitle, title,
+              title_large, display
 Errors name the line (in the UI language): an unknown section or key, a line without '=',
 a key before the first section or twice in one section, a value out of range.  A theme is
 applied whole or not at all (Ui::set_theme).
@@ -8661,6 +8682,7 @@ TS_NAMES: [&str; TS_COUNT as usize] = ["caption", "body", "body_strong", "subtit
   - `family: String` -- "" = the style's faces; a font file (VFS path) or an installed family
   - `family_semibold: String`
   - `family_bold: String`
+  - `family_axes: Vec<([u8; 4], f32)>` -- axis values of a variable family (tag, user units); empty: its defaults
 
 - **`struct ThemeError`**
   why a theme could not be read or applied: the line of the file (0: not a line) and the
@@ -10326,6 +10348,10 @@ colour glyphs), the glyph cache and text runs                        [src/text/*
                                  from other fonts (fallback.rs; also when shaping)
   record_n / record_icon / glyphs   glyphs placed now, blended later from the glyph cache by
                                  any thread (record.rs: GlyphRec, GlyphView)
+  var_axes / var_instances / var_values / vary / vary_named   variable fonts: their axes,
+                                 named instances and instances at axis values (registry.rs,
+                                 var.rs: gvar, avar, HVAR, MVAR; shaping at the same
+                                 coordinates)
 
 Pen positions are 24.8 fixed point; glyphs are placed on quarter pixels and their
 coverage masks are cached per (font, glyph, size, phase, greyscale / subpixel).  Colour
@@ -10777,15 +10803,24 @@ match styles, cache the result                                      [src/text/fo
   resolve(conf, family, lang, weight, italic) -> (face, FS_SYN_*, family)   the first installed
        of the FontConf's candidates (generic families, substitutes, the language's choices;
        fontconf.rs), else sans-serif's; load_resolved(text, conf, ...) -> (font id, family)
+       (a variable face: its instance for weight / italic, load_var)
   clear()                         forget the scan result (the cache stays)
-  family_count(), family_name(i), family_faces(i) -> &[FdFace]   families sorted
-       case-insensitively
+  family_count(), family_name(i), family_faces(i) -> &[FdFace], family_range(i)   families
+       sorted case-insensitively
   face_count(), face(i)           every face, family order
   find(family, weight, italic) -> (face index, FS_SYN_* flags to add)   family = legacy
        family name (FN_FAMILY, like GDI), else a typographic family; closest weight,
        italic before upright; synthetic bold / italic asked when the family lacks them
-  load(text, family, weight, italic) -> font id / ERR_*   find + load_file (+ style);
-       each (face, style) is loaded once until the next scan
+  load(text, family, weight, italic) -> font id / ERR_*   find + load_file (+ style; a
+       variable face: load_var); each (face, style) is loaded once until the next scan
+  variations(face) -> Option<&FdVar>   a variable face's axes and named instances (fvar,
+       names from its name table; read from the file on first use, kept until the next scan)
+  var_values(face, weight, italic, size_pt, axes) -> (values, FS_SYN_* still needed)   the
+       axis values of a choice: the axes named, else weight -> wght, italic -> ital = 1 or
+       slnt = its most slanted value, the size in points -> opsz (clamped to each axis);
+       synthetic bold / italic only where no axis gives them
+  load_var(text, face, syn, weight, italic, size_pt, axes) -> font id / ERR_*   load_face +
+       Text::vary at var_values (a face that is not variable: load_face)
   save_cache(path) / load_cache(path) -> 0 / -1
 
 Families group faces by the legacy family name (name ID 1); names prefer German, then
@@ -10818,6 +10853,11 @@ FDFF_SYMBOL: u16 = 64
   - `weight: u16` -- usWeightClass
   - `flags: u16` -- FDFF_\*
 
+- **`struct FdVar`**
+  the variations of an installed variable face (FontDb::variations)
+  - `axes: Vec<VarAxis>` -- fvar's axes (names from the face's name table)
+  - `instances: Vec<VarInstance>` -- its named instances
+
 - **`struct FontDb`**
 
 - **`fn fnv64(d: &[u8]) -> u64`**
@@ -10831,6 +10871,8 @@ FDFF_SYMBOL: u16 = 64
 - **`fn family_count(&self) -> usize`**
 - **`fn family_name(&self, i: usize) -> &str`**
   the family's name ("" when i is out of range)
+- **`fn family_range(&self, i: usize) -> core::ops::Range<usize>`**
+  the indices (face(i), variations(i)) of family i's faces (empty when out of range)
 - **`fn family_faces(&self, i: usize) -> &[FdFace]`**
   the faces of family i (empty when out of range)
 - **`fn face_count(&self) -> usize`**
@@ -10852,6 +10894,16 @@ FDFF_SYMBOL: u16 = 64
 - **`fn load_face(&mut self, text: &mut Text, fi: usize, syn: u32) -> i32`**
   load face fi with the synthetic styles syn (FS_SYN_\*) -> font id / ERR_\*; each (face,
   style) once until the next scan
+- **`fn variations(&mut self, i: usize) -> Option<&FdVar>`**
+  the axes and named instances of face i (None: not a variable face, or its file cannot
+  be read); read from the file on first use
+- **`fn var_values(&mut self, i: usize, weight: u32, italic: bool, size_pt: Option<f32>, axes: &[([u8; 4], f32)]) -> Option<(Vec<f32>, u32)>`**
+  the axis values of a choice on variable face i (see the module header) -> (one value
+  per axis, the FS_SYN_\* flags still needed); None: not a variable face
+- **`fn load_var(&mut self, text: &mut Text, fi: usize, syn: u32, weight: u32, italic: bool, size_pt: Option<f32>, axes: &[([u8; 4], f32)]) -> i32`**
+  load variable face fi at the axis values of a choice (var_values) with the synthetic
+  styles syn asks for that no axis gives -> font id / ERR_\*; a face that is not
+  variable: load_face(fi, syn)
 - **`fn save_cache(&self, path: &str) -> i32`**
   fontdb_save_cache(path) -> 0 / -1
 - **`fn load_cache(&mut self, path: &str) -> i32`**
@@ -11166,6 +11218,15 @@ fonts of font_style (synthetic bold / italic / sharp)       [src/text/font.s, ou
        glyph cache is flushed; the id may be reused later
   count(), valid(id), hdr(font) (font_data), glyph(font, cp), has, adv, kern, kern_table,
   upem, metrics, metric, is_color, name, layers, glyph_box, glyph_path
+Variable fonts (var.rs):
+  var_axes(font) / var_instances(font)   fvar's axes and named instances (empty: not variable)
+  var_values(font) -> user values per axis (an instance's, else the defaults)
+  vary(font, &[(tag, value)]) -> id / ERR_*   an instance (VarFont: the base font at
+       normalized coordinates; own id, serial and metrics, so glyph cache entries, outline
+       buffer and shaping engines never mix instances); axes not named keep font's values;
+       all-default coordinates give the variable font itself; the same coordinates the same
+       id; synthetic styles of font carry over; unload(base) unloads its instances
+  vary_named(font, i) -> id / ERR_*    named instance i
 
 Font ids 0..3 are the embedded fonts (never reused).  An unknown or unloaded id behaves
 like font 0.
@@ -11235,6 +11296,28 @@ FONT_MAX_IDS: u32 = 4096  // registry capacity
 - **`fn glyph_path(&mut self, font: u32, g: u32)`**
   glyph_path(font, glyph): append the outline to the path, transformed by gp (origin
   x / y in float pixels, sx / sy float pixels per unit)
+- **`fn var_axes(&self, font: u32) -> Vec<VarAxis>`**
+  the variation axes of a font (fvar; empty: not a variable font); instances and the
+  fonts derived from them report their variable font's
+- **`fn var_instances(&self, font: u32) -> Vec<VarInstance>`**
+  the named instances of a variable font (fvar; empty: none or not variable)
+- **`fn var_values(&self, font: u32) -> Vec<f32>`**
+  the axis values of a font in user units, one per axis of var_axes (an instance's own,
+  else the defaults)
+- **`fn var_coords(&self, font: u32) -> Vec<i16>`**
+  the normalized coordinates of an instance: F2Dot14 bits per axis with avar applied
+  (what HarfBuzz's hb_font_get_var_coords_normalized reports); empty for a variable font
+  itself (its default instance) and for fonts that are not variable
+- **`fn vary(&mut self, font: u32, values: &[([u8; 4], f32)]) -> i32`**
+  an instance of a variable font with axis values in user units (tag, value): axes not
+  named keep font's values (an instance's, else the defaults); values are clamped to their
+  axis, unknown tags ignored -> font id / ERR_\*.  All-default coordinates give the variable
+  font itself, the same coordinates the same id; synthetic styles of font (style) carry
+  over; a font that is not variable gives itself.  Each instance has its own glyph cache
+  entries and metrics (MVAR); unloading the variable font unloads its instances.
+- **`fn vary_named(&mut self, font: u32, i: usize) -> i32`**
+  named instance i of a variable font (var_instances) -> id / ERR_\* (ERR_FAIL: no such
+  instance)
 - **`fn style(&mut self, font: u32, flags: u32) -> i32`**
   font_style(font, FS_\*) -> id / ERR_\*
 
@@ -11378,12 +11461,23 @@ Tables: head, hhea, hmtx, maxp, loca, glyf (simple + composite: offsets, scale, 
 glyph), cmap (formats 0, 4, 6, 12, 13; (3,10) > (0,x) fmt 12 > (3,1) > (0,x) > (3,0)
 symbol > (1,0) Mac Roman), OS/2, post, name, kern (version 0 and Apple version 1, format
 0), GPOS pair adjustment (lookup type 2 formats 1 and 2, extension type 9; x advance of
-the first glyph; 'kern' feature of the DFLT and latn default language systems).  Variable
-fonts: the default instance.  Every offset is checked against its table and the file;
-malformed glyphs come out empty.  Like GDI / FreeType: glyf outlines are shifted by hmtx
-lsb - xMin; symbol fonts ((3,0) cmap) also map U+0000..U+00FF and the Windows-1252
-characters to U+F000 + code page byte; a CFF FontMatrix that is not exactly 1/unitsPerEm
-scales the outline.
+the first glyph; 'kern' feature of the DFLT and latn default language systems).  Every
+offset is checked against its table and the file; malformed glyphs come out empty.  Like
+GDI / FreeType: glyf outlines are shifted by hmtx lsb - xMin; symbol fonts ((3,0) cmap)
+also map U+0000..U+00FF and the Windows-1252 characters to U+F000 + code page byte; a CFF
+FontMatrix that is not exactly 1/unitsPerEm scales the outline.
+
+Variable fonts (var.rs): fvar / avar / gvar / HVAR / MVAR / GDEF's store are read at open
+(var); the plain calls give the default instance, the *_var calls an instance at
+normalized coordinates (registry.rs: VarFont):
+  prep_var(g, coords, serial, ol)    the outline with gvar deltas (simple glyphs: points with
+       IUP; composites: the component offsets), shifted by its varied phantom point pp1
+  adv_var(g, coords)                 hmtx + HVAR; without HVAR: hmtx + the phantom points'
+       deltas (adv_table: every glyph at once)
+  kern_var(g1, g2, coords)           GPOS pair values + their VariationIndex deltas (GDEF)
+  metrics_var(coords, wght, ol)      FONTMETRICS + header with MVAR deltas (hasc / hdsc /
+       hlgp on hhea and OS/2, hcla, hcld, xhgt, cpht, undo, unds, stro, strs)
+CFF2 outlines are not supported (no usable outlines: ERR_UNSUPPORTED).
 ```
 
 ```rust
@@ -11415,7 +11509,12 @@ TT_CPAL: usize = 14
 TT_CBDT: usize = 15
 TT_CBLC: usize = 16
 TT_FVAR: usize = 17
-TT_COUNT: usize = 20
+TT_AVAR: usize = 20
+TT_GVAR: usize = 21
+TT_HVAR: usize = 22
+TT_MVAR: usize = 23
+TT_GDEF: usize = 24
+TT_COUNT: usize = 25
 TFK_TTF: u32 = 1
 TFK_CFF: u32 = 2
 TFF_LOCA_LONG: u32 = 2
@@ -11500,6 +11599,60 @@ Source: [`lib/text/shaping.rs`](../lib/text/shaping.rs)
 - **`fn selection_spans(&mut self, text: &[u8], start: usize, end: usize) -> Vec<(i32,i32)>`**
   Visual spans for a logical UTF-8 selection. Mixed bidi text may require
   disjoint rectangles; the two endpoint carets alone are not sufficient.
+
+### `text/var.rs`
+
+Source: [`lib/text/var.rs`](../lib/text/var.rs)
+
+```text
+var -- OpenType font variations: fvar (axes, named instances), avar (segment maps), gvar
+(TrueType point deltas), HVAR (advance deltas), MVAR (font-wide metrics) and the item
+variation store HVAR, MVAR and GDEF share
+
+  VarAxis { tag, min, def, max, hidden, name }, VarInstance { name, coords }   what fvar
+       says, in user units; names from the name table (an axis without one: its tag)
+  Var::parse(tables) -> Option<Var>  a font's fvar, avar, gvar, HVAR, MVAR, GDEF store
+  normalize(user) -> coords          F2Dot14 per axis: clamped to the axis, -1 .. 0 .. 1
+       around the default in 16.16, avar in 16.16, then 2.14 (rounded like HarfBuzz and
+       FreeType: floor(x + 0.5))
+  gvar_deltas(gvar, glyph, coords, orig, ends, out, budget)   the deltas of a glyph's points
+       and of its 4 phantom points, added to out: embedded and shared peak tuples,
+       intermediate regions, shared and private packed point numbers, packed deltas (zero
+       runs, bytes, words, longs), IUP for the outline points a tuple leaves out
+  hvar_delta(hvar, glyph, coords)    the advance delta (HVAR, with or without its mapping)
+  mvar_delta(mvar, tag, coords)      a font-wide metric's delta (MVAR)
+  gdef_delta(gdef, outer, inner, coords)   a GPOS VariationIndex delta (GDEF's store)
+
+Every offset is checked against its table (gvar data against the glyph's own range).
+Broken gvar data of a glyph: false (the glyph comes out empty, like broken glyf data);
+broken HVAR / MVAR / store data: no delta.  Bounded work: a glyph whose tuples x points
+exceed VAR_BUDGET counts as broken; a store row whose regions x axes exceed IVS_WORK has
+no delta.  Not supported: avar version 2 beyond its segment maps, CFF2 outlines (such
+fonts do not load), VVAR (no vertical layout).
+```
+
+```rust
+/// axes and named instances read at most
+AXES_MAX: usize = 64
+INSTANCES_MAX: usize = 1024
+```
+
+- **`struct VarAxis`**
+  an axis of a variable font (fvar) in user units (min &lt;= def &lt;= max)
+  - `tag: [u8; 4]` -- `wght`, `wdth`, `slnt`, `ital`, `opsz` or one of the font's own
+  - `min: f32` -- the smallest value
+  - `def: f32` -- the default (the font's own outlines)
+  - `max: f32` -- the largest value
+  - `hidden: bool` -- the font asks user interfaces not to show it (HIDDEN_AXIS)
+  - `name: String` -- the name table's name (UTF-8; the tag when there is none)
+
+- **`struct VarInstance`**
+  a named instance of a variable font (fvar)
+  - `name: String` -- its subfamily name ("SemiLight Condensed"; "" when the name table has none)
+  - `coords: Vec<f32>` -- user coordinates, one per axis
+
+- **`const fn tag_u32(t: [u8; 4]) -> u32`**
+  a 4-byte tag as the u32 of the font file
 
 ## spell
 

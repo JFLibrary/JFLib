@@ -1395,14 +1395,15 @@ if (desc.render)(&args, &mut dst) == 0 {
   fonts of the UI language come before the list, so Han characters take the forms of ja,
   zh-Hans or zh-Hant.
 * System fonts for your own text: a `FontSel` names a family (also a generic one:
-  `sans-serif`, `serif`, `monospace`, `cursive`, `system-ui`, `emoji`, `math`), a weight, italic
-  and a size in points. `ui.font_load(&sel)` resolves it like fontconfig -- generic names,
+  `sans-serif`, `serif`, `monospace`, `cursive`, `system-ui`, `emoji`, `math`), a weight, italic,
+  a size in points and axis values of a variable family (`axes`, below; `FontSel::new` names
+  none). `ui.font_load(&sel)` resolves it like fontconfig -- generic names,
   substitutes (Arial ↔ Liberation Sans, Helvetica → Arial), the language's fonts; on Linux
   from `/etc/fonts`, elsewhere from built-in tables (`text::fontconf::FontConf`) -- and gives
   a font id; `ui.font_resolved(&sel)` names the family it found; `ui.text_in_font(id, pt, s)`
   draws a line in it. `ui.font_picker(id, &mut sel)` is a compact family drop-down with search
   plus a size box; `ui.font_dialog(id, &open, &mut sel)` the full dialog (search, families,
-  the family's styles, sizes, preview; OK writes `sel`). `jfgui_FONTDIRS` / `jfgui_FONTCONF`
+  the family's styles, sizes, a variable family's axes, preview; OK writes `sel`). `jfgui_FONTDIRS` / `jfgui_FONTCONF`
   replace the system's folders and rules (tests).
 
   ```rust
@@ -1410,6 +1411,37 @@ if (desc.render)(&args, &mut dst) == 0 {
   if let Some(f) = ui.font_load(&self.font) {
       ui.text_in_font(f, self.font.size, "Beispieltext");
   }
+  ```
+* Variable fonts (one file, axes such as weight `wght`, width `wdth`, slant `slnt`, italic
+  `ital`, optical size `opsz` or the font's own): a `FontSel` on a variable family needs
+  nothing more -- the weight goes to `wght`, italic to `ital` (else the most slanted `slnt`),
+  the size in points to `opsz`; `sel.axes` names other values (`sel.set_axis(*b"wdth", 75.0)`,
+  `sel.axis(tag)`), and what it names wins. The font dialog lists a variable family's named
+  instances as its styles and gives every axis that is not hidden a slider with a number box
+  (range and name from the font; `opsz` with "Automatisch": it follows the size); the
+  drop-down picker stays family and size. In the text engine: `ui.text.var_axes(id)` (tag,
+  min, default, max, hidden, name), `var_instances(id)`, `vary(id, &[(tag, value)])` -> an
+  instance with a font id of its own (its glyph cache entries, metrics with MVAR, shaping at
+  its coordinates; the same values give the same id, the defaults the font itself, synthetic
+  styles carry over, unloading the font unloads its instances), `vary_named(id, i)`,
+  `var_values(id)` (user units) and `var_coords(id)` (normalized F2Dot14, as HarfBuzz reports
+  them). `FontDb::variations(face)` gives the axes and instances of an installed face. What
+  varies: TrueType outlines (gvar), advances (HVAR, else the phantom points), kerning (GPOS
+  variation deltas), avar, the metrics of MVAR; the coordinates, outlines and advances match
+  HarfBuzz. Not supported: CFF2 outlines (such fonts do not load), avar 2 beyond its segment
+  maps, VVAR. `font_load` keeps the instances of its 64 most recent variable choices; older
+  ones are unloaded again (ask `font_load` each frame instead of keeping its ids).
+
+  ```rust
+  let mut sel = FontSel::new("Bahnschrift", 12.0);
+  sel.weight = 600;                      // wght 600, no synthetic bold
+  sel.set_axis(*b"wdth", 80.0);          // condensed
+  if let Some(f) = ui.font_load(&sel) {
+      ui.text_in_font(f, sel.size, "Variabel");
+  }
+  // a font of the app's own
+  let id = ui.text.load_mem(include_bytes!("../assets/MyFont-VF.ttf"), 0) as u32;
+  let heavy = ui.text.vary(id, &[(*b"wght", 800.0), (*b"opsz", 24.0)]);
   ```
 * Input methods (composition of CJK and other scripts) reach the text box as preedit and
   commit (`E_PREEDIT` / `E_IME_COMMIT`): Windows IMM, Wayland text-input-v3, X11 IBus (and
@@ -4072,8 +4104,10 @@ subtitle.weight = bold
   (`spacing`), the height of standard buttons, text boxes, combo boxes, drop-down and split
   buttons (`control_height`; it grows with a text scale above 100 %), size, line height and
   weight of each text style and a font family (a font file next to the theme, a VFS path, or an
-  installed family). Light / dark / system and high contrast stay the app's and the user's
-  choice: the theme has colours for each.
+  installed family) with axis values when it is variable (`family.axes = wdth=87.5, opsz=12`;
+  the 400 / 600 / 700 faces come from its `wght`, also for a file instead of a synthetic bold;
+  `opsz` else follows 11 pt). Light / dark / system and high contrast stay the app's and the
+  user's choice: the theme has colours for each.
 * **Errors** name the line and come in the UI language (`ThemeError { line, msg }`); a broken
   file or a missing font leaves the previous theme as it was. Without a theme the rendering is
   the style's to the pixel.

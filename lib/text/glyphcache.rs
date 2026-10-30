@@ -262,7 +262,7 @@ impl Text {
             return None;
         }
         match self.face(font)? {
-            Face::Tt(_) | Face::Syn(_) => {}
+            Face::Tt(_) | Face::Syn(_) | Face::Var(_) => {}
             _ => return None,
         }
         if self.hdr(font).flags & SGH_CBDT == 0 {

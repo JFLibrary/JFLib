@@ -5,6 +5,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use harfrust::{Buffer, Direction, Font, ShaperFont};
+use harfrust::font::NormalizedCoord;
 use unicode_bidi::BidiInfo;
 use unicode_script::{Script, UnicodeScript};
 
@@ -18,6 +19,12 @@ pub struct Glyph {
 pub struct Engine { font: Font }
 impl Engine {
     pub fn new(data: &[u8], face: u32) -> Option<Self> { Some(Self { font: Font::new(data.to_vec(), face)? }) }
+    /// The same font at normalized variation coordinates (F2Dot14 bits, avar applied, one per
+    /// fvar axis): GSUB / GPOS variations, HVAR / gvar advances. The data is shared.
+    pub fn with_coords(&self, coords: &[i16]) -> Self {
+        let coords = coords.iter().map(|&c| NormalizedCoord::from_bits(c));
+        Self { font: self.font.instance_builder().normalized_coords(coords).build() }
+    }
     /// One line, split into directional and script runs. Shaping itself handles
     /// ligatures, combining marks, Arabic joining and Indic reordering.
     pub fn shape(&self, text: &str) -> Option<Vec<Glyph>> {

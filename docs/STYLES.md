@@ -120,12 +120,14 @@ subtitle.weight = bold                  ; regular, semibold, bold or 100 .. 900
 | `[metrics]` | `radius = N` (0 .. 64 DIP) or `radius = P%` (0 .. 400) | every rounded corner that is not a pill becomes N DIP (or the style's radius times P %); square corners stay square, pills and circles stay pills (`cmd_rrect`, `cmd_shadow`) |
 | | `spacing = P%` (25 .. 400) | the padding and gaps of `box_begin` and `gridbox_begin` |
 | | `control_height = N` (12 .. 96 DIP) | the height of standard buttons, single-line text boxes, combo boxes, drop-down and split buttons (not `ST_COMPACT` / `ST_LARGE` ones; icon-only buttons stay square); it grows with a text scale above 100 % like the parts around one line of text |
-| `[text]` | `family`, `family.semibold`, `family.bold` | a font file (`.ttf` / `.otf` / `.ttc`, a path with `/` or a scheme; relative to the theme file) or an installed family (resolved like `ui.font_load`). Without the semibold / bold faces a file gets a synthetic bold, a family its own weights |
+| `[text]` | `family`, `family.semibold`, `family.bold` | a font file (`.ttf` / `.otf` / `.ttc`, a path with `/` or a scheme; relative to the theme file) or an installed family (resolved like `ui.font_load`). Without the semibold / bold faces a file gets a synthetic bold (a variable file its `wght` 600 / 700), a family its own weights (a variable family its `wght`) |
+| | `family.axes = TAG=VALUE, ...` | axis values of a variable family or file in user units (`wdth=87.5, opsz=12`; `TAG VALUE` and quoted tags too); axes not named keep their defaults, the weights come from the faces, `opsz` follows 11 pt |
 | | `STYLE.size`, `STYLE.line`, `STYLE.weight` for `caption`, `body`, `body_strong`, `subtitle`, `title`, `title_large`, `display` | the text styles `TS_*`: size 4 .. 200 DIP, line height 4 .. 300 DIP (without one the style's line height grows with the size), weight |
 
 **Errors** (`ThemeError { line, msg }`): an unknown section or key, a line without `=`, a key
 before the first section or twice in one section, a colour or number out of its form or range,
-a file that cannot be read, a font that cannot be loaded. The message names the line and is in
+axis values that are not `TAG=VALUE` pairs, a file that cannot be read, a font that cannot be
+loaded. The message names the line and is in
 the UI language (library texts, `i18n.rs`); nothing is half applied, the previous theme stays.
 
 **How the styles read it.** No style needed a change: a style already takes every colour from
