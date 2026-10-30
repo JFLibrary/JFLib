@@ -142,6 +142,12 @@ mod inspect_edit;
 #[cfg(not(jfgui_dev))]
 #[path = "inspect_edit_off.rs"]
 mod inspect_edit;
+// ... the sources of the widgets (#[track_caller] on the widget calls): development builds only
+#[cfg(jfgui_dev)]
+mod inspect_src;
+#[cfg(not(jfgui_dev))]
+#[path = "inspect_src_off.rs"]
+mod inspect_src;
 // keyboard navigation: focus groups, panes and windows (F6), splitters (F8), the menu key
 mod kbnav;
 pub use ids::{ID_HASH_BASE, wid, wid_path};
@@ -399,6 +405,9 @@ pub(crate) struct Mods {
     pub(crate) hr: hotreload::S,
     /// (ROADMAP §11) the inspector's editing: the changes, their history (inspect_edit.rs)
     pub(crate) ied: inspect_edit::S,
+    /// (ROADMAP §11) the inspector's sources: the call being built, the records' sources
+    /// (inspect_src.rs)
+    pub(crate) isrc: inspect_src::S,
     /// (ROADMAP §6) ui.svg's draw objects, the faces of SVG text (imgview.rs)
     pub(crate) svg: imgview::S,
     /// (ROADMAP §4) hyphenation: languages, dictionaries (hyph.rs)

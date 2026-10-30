@@ -477,14 +477,18 @@ impl Ui {
     }
 
     /// ui_textbox(id, placeholder, buf, cap_flags) -> EV_* (see the module header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn textbox(&mut self, id: u32, placeholder: Option<&str>, buf: &mut String, cap_flags: u32) -> u32 {
+        let _src = self.src_scope();
         self.textbox_icon(id, 0, placeholder, buf, cap_flags)
     }
 
     /// Single-line text input with a leading semantic icon. The icon reserves its own
     /// inset, so pointer selection, caret scrolling and IME share the visible text origin.
     /// Multiline inputs ignore the icon and retain their ordinary presentation.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn textbox_icon(&mut self, id: u32, icon: u32, placeholder: Option<&str>, buf: &mut String, cap_flags: u32) -> u32 {
+        let _src = self.src_scope();
         self.m.edit.tb_natw = TB_NAT_W;
         let mut b = core::mem::take(buf).into_bytes();
         let ev = self.tb_core(id, placeholder, &mut b, cap_flags, icon);
@@ -496,7 +500,9 @@ impl Ui {
     /// Uses zero text insets and the supplied font, line metrics and colors. The supplied
     /// presentation applies only to this call; ordinary textboxes keep their default style.
     /// `TB_MULTI` is implicit; other capacity and textbox flags retain their usual meaning.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn textbox_presented(&mut self, id: u32, placeholder: Option<&str>, buf: &mut String, cap_flags: u32, mut presentation: TextboxPresentation) -> u32 {
+        let _src = self.src_scope();
         presentation.size = presentation.size.clamp(256, 512 * 256);
         presentation.line_height = presentation.line_height.clamp(1, 2048);
         presentation.baseline = presentation.baseline.clamp(0, presentation.line_height);
@@ -2110,7 +2116,9 @@ impl Ui {
     // ------------------------------------------------------------------ number box
 
     /// ui_number_box(id, &mut v, &range) -> EV_* (see the module header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn number_box(&mut self, id: u32, v: &mut i32, rg: &Range) -> u32 {
+        let _src = self.src_scope();
         self.nb_pend_store(id, Some(&mut *v), None, Some(rg), None);
         let entry = *v;
         let mut deferred = 0;
@@ -2198,7 +2206,9 @@ impl Ui {
     }
 
     /// ui_number_box_f(id, &mut v, &range_f) -> EV_* (U1; see the module header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn number_box_f(&mut self, id: u32, v: &mut f64, rf: &RangeF) -> u32 {
+        let _src = self.src_scope();
         self.nb_pend_store(id, None, Some(&mut *v), None, Some(rf));
         let entry = v.to_bits();
         let mut deferred = 0;
@@ -2272,7 +2282,9 @@ impl Ui {
     /// nb_live(id, &mut v) -> true when number box `id` is being edited and the text typed
     /// so far is a number different from v: the value (clamped to the range) is stored
     /// without reformatting the text -- property rows preview while the user types
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn nb_live(&mut self, id: u32, v: &mut i32) -> bool {
+        let _src = self.src_scope();
         let e = &self.m.edit;
         if id == 0 || e.nb_id != id || e.ed_id != id || e.nb_kind != 0 {
             return false;
@@ -2286,7 +2298,9 @@ impl Ui {
     }
 
     /// nb_live_f(id, &mut v) -> nb_live of an f64 number box (fixed to its RangeF)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn nb_live_f(&mut self, id: u32, v: &mut f64) -> bool {
+        let _src = self.src_scope();
         let e = &self.m.edit;
         if id == 0 || e.nb_id != id || e.ed_id != id || e.nb_kind != 1 {
             return false;

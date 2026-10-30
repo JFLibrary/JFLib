@@ -189,6 +189,8 @@ fn installed(t: &mut T) {
     let cmd = plat::process::Command { program: "plattest-other-program", args: &[], cwd: None, env: &[] };
     let e = cmd.spawn().err();
     t.check(e == Some(if cfg!(windows) { 5 } else { 13 }), "policy: a process outside the rules is refused");
+    let e = plat::process::launch("plattest-other-program", &[]).err();
+    t.check(e == Some(if cfg!(windows) { 5 } else { 13 }), "policy: process::launch outside the rules is refused");
     t.check(policy::process_allowed("plattest-no-such-program"), "policy: a listed program name");
     t.check(policy::url_allowed("https://example.org") && policy::url_allowed("mailto:a@b"), "policy: listed URL schemes");
     t.expect_i(plat::open_url("ftp://example.org") as i64, -1, "policy: open_url of another scheme refused");

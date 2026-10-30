@@ -196,7 +196,9 @@ impl Ui {
     // ------------------------------------------------------------------ grid
 
     /// ui_grid_begin(id, &mut st, cols, keys) -> (first, end): the rows to emit
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn grid_begin(&mut self, id: u32, st: &mut GridState, cols: &[GridCol], keys: &[u64]) -> (i32, i32) {
+        let _src = self.src_scope();
         let sd = self.style.data();
         let (hh, rh, pad) = sd.grid_metrics(self);
         let (hh, rh, pad) = (self.dp(hh), self.dp(rh).max(1), self.dp(pad));
@@ -409,7 +411,9 @@ impl Ui {
     }
 
     /// ui_grid_row(&mut st, i) -> EV_* of row i (EV_ACT clicked)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn grid_row(&mut self, st: &mut GridState, i: i32) -> u32 {
+        let _src = self.src_scope();
         let f = &st.f;
         let (id, rh) = (f.id, f.row_h);
         let d = i - f.next;
@@ -488,7 +492,9 @@ impl Ui {
 
     /// ui_grid_cell(&st, c): the next widget is placed into column c of the current row
     /// (inset by the cell padding, full row height)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn grid_cell(&mut self, st: &GridState, c: usize) {
+        let _src = self.src_scope();
         let r = st.f.row_rect;
         let Some(&(cx, cw, _)) = st.f.cols.get(c) else { return };
         let pad = st.f.pad;
@@ -498,12 +504,16 @@ impl Ui {
     }
 
     /// ui_grid_text(&st, c, s): body text in column c (cut with "…", the column's alignment)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn grid_text(&mut self, st: &GridState, c: usize, s: &str) {
+        let _src = self.src_scope();
         self.grid_text_ts(st, c, TS_BODY, s);
     }
 
     /// ui_grid_text_ts(&st, c, ts, s): text in column c with a text style (TS_* | TX_*)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn grid_text_ts(&mut self, st: &GridState, c: usize, ts: u32, s: &str) {
+        let _src = self.src_scope();
         let f = st.f.cols.get(c).map_or(0, |c| c.2);
         let mut style = ts | TX_ELLIPSIS;
         if f & GC_RIGHT != 0 {
@@ -516,7 +526,9 @@ impl Ui {
     }
 
     /// ui_grid_end(&mut st) -> GridEv
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn grid_end(&mut self, st: &mut GridState) -> GridEv {
+        let _src = self.src_scope();
         let n = st.f.keys.len() as i32;
         let d = n - st.f.next;
         if d > 0 {
@@ -547,7 +559,9 @@ impl Ui {
 
     /// ui_tree(id, &mut st, rows, row_h) -> TreeEv: the visible rows of a tree (row_h DIP,
     /// 0 = the grid row height)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn tree(&mut self, id: u32, st: &mut TreeState, rows: &[TreeRow], row_h: i32) -> TreeEv {
+        let _src = self.src_scope();
         let sd = self.style.data();
         let rh = self.dp(if row_h > 0 { row_h } else { sd.grid_metrics(self).1 }).max(1);
         let mut out = TreeEv::default();
@@ -760,7 +774,9 @@ impl Ui {
 
     /// ui_badge(kind, label): a status pill (BADGE_*; next_icon puts an icon before the text);
     /// placed narrower than the pill (a grid cell), the label is cut with "…"
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn badge(&mut self, kind: u32, label: &str) {
+        let _src = self.src_scope();
         let label = crate::basic::cstr(label);
         let icon = self.take_icon();
         self.take_flags();
@@ -797,7 +813,9 @@ impl Ui {
     }
 
     /// ui_status_dot(kind): a 10 DIP status dot (BADGE_*)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn status_dot(&mut self, kind: u32) {
+        let _src = self.src_scope();
         let s = self.dp(10);
         let r = self.place(s, s);
         let sd = self.style.data();
@@ -807,7 +825,9 @@ impl Ui {
     }
 
     /// ui_meter(id, v, max, kind): a capacity bar (natural 120 x 8 DIP; next_size)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn meter(&mut self, id: u32, v: i64, max: i64, kind: u32) {
+        let _src = self.src_scope();
         let r = self.place(self.dp(120), self.dp(8));
         // scale 64-bit values (bytes) into the i32 of the record
         let (mut a, mut b) = (v.max(0), max.max(0));

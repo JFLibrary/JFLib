@@ -626,7 +626,9 @@ impl Ui {
     // ------------------------------------------------------------------ slider_f
 
     /// ui_slider_f(id, &mut v, &rf) -> EV_*
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn slider_f(&mut self, id: u32, v: &mut f64, rf: &RangeF) -> u32 {
+        let _src = self.src_scope();
         let old = v.to_bits();
         let stflags = self.take_flags();
         let rgf = rf.flags;
@@ -679,7 +681,9 @@ impl Ui {
 
     /// ui_track_slider(id, &mut v, &rg, track) -> EV_*: i32 slider with a gradient track
     /// (None = the standard look)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn track_slider(&mut self, id: u32, v: &mut i32, rg: &Range, track: Option<&Track>) -> u32 {
+        let _src = self.src_scope();
         let old = *v;
         let stflags = self.take_flags();
         let rgf = rg.flags;
@@ -773,7 +777,9 @@ impl Ui {
 
     /// ui_prop_slider(id, label, &mut v, &rg, default) -> EV_* (default NO_DEFAULT: no reset
     /// button)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn prop_slider(&mut self, id: u32, label: &str, v: &mut i32, rg: &Range, default: i32) -> u32 {
+        let _src = self.src_scope();
         let l = self.prop_begin(label);
         let mut ev = self.slider(id, v, rg);
         self.set_last_label(l);
@@ -800,7 +806,9 @@ impl Ui {
 
     /// ui_prop_slider_f(id, label, &mut v, &rf, default) -> EV_* (default None: no reset
     /// button)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn prop_slider_f(&mut self, id: u32, label: &str, v: &mut f64, rf: &RangeF, default: Option<f64>) -> u32 {
+        let _src = self.src_scope();
         let l = self.prop_begin(label);
         let mut ev = self.slider_f(id, v, rf);
         self.set_last_label(l);
@@ -829,7 +837,9 @@ impl Ui {
     // ------------------------------------------------------------------ angle dial
 
     /// ui_angle(id, &mut deg, flags) -> EV_*
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn angle(&mut self, id: u32, deg: &mut f64, flags: u32) -> u32 {
+        let _src = self.src_scope();
         let old = deg.to_bits();
         let mut keych = false;
         let stflags = self.take_flags();
@@ -899,7 +909,9 @@ impl Ui {
     /// ui_pan(id, &mut x, &mut y, thumb, ver, flags) -> EV_* (thumb: a surface or None; ver
     /// stands for its version, as in draw_image)
     #[allow(clippy::too_many_arguments)]
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn pan(&mut self, id: u32, x: &mut f64, y: &mut f64, thumb: Option<&Rc<Surface>>, ver: u32, flags: u32) -> u32 {
+        let _src = self.src_scope();
         let (ox, oy) = (x.to_bits(), y.to_bits());
         let mut keych = false;
         let stflags = self.take_flags();

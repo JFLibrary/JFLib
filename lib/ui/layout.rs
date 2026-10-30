@@ -507,7 +507,9 @@ impl Ui {
     }
 
     /// ui_box_begin(id, flags, gap): open a container (id 0 = automatic)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn box_begin(&mut self, id: u32, flags: u32, gap: i32) {
+        let _src = self.src_scope();
         let id = if id != 0 {
             id
         } else {
@@ -587,7 +589,9 @@ impl Ui {
     }
 
     /// ui_box_end: store the measured natural size, correct the parent's totals
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn box_end(&mut self) {
+        let _src = self.src_scope();
         if self.wp.lay.boxes.len() <= 1 {
             return; // never pop the root here
         }

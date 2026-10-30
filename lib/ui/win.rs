@@ -741,7 +741,9 @@ impl Ui {
     /// ui_window_begin(id, title, open, flags, rect) -> true: the window is shown, emit its
     /// content now (window_end always follows).  open None = always open; rect None: the
     /// library keeps the placement.  The owner is the window being built.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn window_begin(&mut self, id: u32, title: &str, open: Option<&Shared<i32>>, flags: u32, rect: Option<&Shared<WinRect>>) -> bool {
+        let _src = self.src_scope();
         let mut flags = flags;
         let sp = self.m.win.sp;
         if sp as usize >= WSTACK_MAX {
@@ -902,7 +904,9 @@ impl Ui {
     }
 
     /// ui_window_end: close window_begin (also when it returned false)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn window_end(&mut self) {
+        let _src = self.src_scope();
         if self.m.win.over != 0 {
             self.m.win.over -= 1;
             return;

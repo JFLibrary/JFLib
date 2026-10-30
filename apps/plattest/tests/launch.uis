@@ -1,0 +1,4 @@
+#!args --test launch
+# (Rust only) plattest --test launch: plat::process::launch starts a second plattest on its own
+# (--test launched), which writes the words it got to a file in build/plattest; process::find.
+# The whole test runs before the UI starts and ends the process with the number of failures.

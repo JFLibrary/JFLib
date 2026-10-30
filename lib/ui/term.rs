@@ -1264,7 +1264,9 @@ impl Ui {
     }
 
     /// ui_terminal(id, st, flags) -> events: the console (see the module header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn terminal(&mut self, id: u32, st: &mut TermState, flags: u32) -> Vec<TermEv> {
+        let _src = self.src_scope();
         let flags = flags | st.flags;
         let mut evs = Vec::new();
         let sid = id.wrapping_add(1); // the input line

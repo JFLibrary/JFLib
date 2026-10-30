@@ -158,7 +158,9 @@ fn sizes(specs: &[i32], nat: &[i32], avail: i32, gap: i32, dpi: i32) -> Vec<i32>
 
 impl Ui {
     /// gridbox_begin(id, cols, flags, gap): open a grid (see the module comment)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn gridbox_begin(&mut self, id: u32, cols: &[i32], flags: u32, gap: i32) {
+        let _src = self.src_scope();
         // the grid's box: vertical, its natural size from gridbox_end; the alignment bits are ours
         self.box_begin(id, BOX_V | (flags & !0x3F), 0);
         let id = self.box_id();
@@ -359,7 +361,9 @@ impl Ui {
     }
 
     /// gridbox_end: store the measured sizes (another pass when they changed), close the box
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn gridbox_end(&mut self) {
+        let _src = self.src_scope();
         let Some(mut r) = self.wp.lay.grid.runs.pop() else {
             self.warn("gridbox_end without gridbox_begin");
             return;

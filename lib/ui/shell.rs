@@ -93,7 +93,9 @@ impl Ui {
     // ------------------------------------------------------------------ navigation pane
 
     /// ui_nav_begin(id, &mut nav): open the pane (always call nav_end)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn nav_begin(&mut self, id: u32, nav: &mut NavState) {
+        let _src = self.src_scope();
         self.box_begin(id, BOX_V | BOX_CLIP | BOX_BLOCK, 0);
         let r = self.box_rect();
         let sh = self.style.shell();
@@ -110,7 +112,9 @@ impl Ui {
     }
 
     /// ui_nav_toggle(id, label): the menu button of the pane (toggles compact)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn nav_toggle(&mut self, id: u32, label: &str, nav: &mut NavState) -> u32 {
+        let _src = self.src_scope();
         self.next_icon(IC_MENU);
         self.next_flags(ST_SUBTLE | ST_ICON_ONLY);
         self.next_size(40, 36);
@@ -123,7 +127,9 @@ impl Ui {
     }
 
     /// ui_nav_section(label): a group caption (a divider when the pane is compact)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn nav_section(&mut self, label: &str) {
+        let _src = self.src_scope();
         let f = self.nav_top();
         let sh = self.style.shell();
         let mut sp = Sp { flags: if f.compact { NAV_COMPACT } else { 0 }, label: Some(label), ..Sp::default() };
@@ -137,7 +143,9 @@ impl Ui {
     }
 
     /// ui_nav_item(id, icon, label, selected, badge) -> EV_* (EV_ACT clicked)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn nav_item(&mut self, id: u32, icon: u32, label: &str, selected: bool, badge: Option<&str>) -> u32 {
+        let _src = self.src_scope();
         let f = self.nav_top();
         let flags = self.take_flags();
         let sh = self.style.shell();
@@ -168,7 +176,9 @@ impl Ui {
     }
 
     /// ui_nav_footer: end the scrolling item list; the items after it stay at the bottom
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn nav_footer(&mut self) {
+        let _src = self.src_scope();
         let Some(f) = self.m.shell.nav.last_mut() else { return };
         if f.scrolled {
             f.scrolled = false;
@@ -178,7 +188,9 @@ impl Ui {
     }
 
     /// ui_nav_end
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn nav_end(&mut self) {
+        let _src = self.src_scope();
         let Some(f) = self.m.shell.nav.pop() else { return };
         if f.scrolled {
             self.scroll_end();
@@ -191,7 +203,9 @@ impl Ui {
     // ------------------------------------------------------------------ command bar
 
     /// ui_command_bar(id, items) -> the id of the item clicked in this pass
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn command_bar(&mut self, id: u32, items: &[CmdItem]) -> Option<u32> {
+        let _src = self.src_scope();
         self.box_begin(id, BOX_H | BOX_XCENTER, 4);
         let r = self.box_rect();
         let sh = self.style.shell();
@@ -281,7 +295,9 @@ impl Ui {
 
     /// ui_split_begin(id, pos, vertical): two panes, the first `pos` DIP wide (vertical:
     /// high); emit the first pane, split_next, the second pane, split_end
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn split_begin(&mut self, id: u32, pos: i32, vertical: bool) {
+        let _src = self.src_scope();
         // the split and its first pane get their size from outside, never from the content
         self.box_begin(part(id, 0), BOX_FIXED | if vertical { BOX_V } else { BOX_H }, 0);
         let rect = self.box_rect();
@@ -302,7 +318,9 @@ impl Ui {
     }
 
     /// ui_split_next: the grip, then the second pane
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn split_next(&mut self) {
+        let _src = self.src_scope();
         let Some(mut f) = self.m.shell.split.pop() else { return };
         self.focus_pane_end();
         self.box_end();
@@ -357,7 +375,9 @@ impl Ui {
 
     /// ui_split_end(&mut pos) -> the grip moved (pos updated, DIP; the mouse or the keyboard:
     /// F8 focuses the grip, arrows move it)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn split_end(&mut self, pos: &mut i32) -> bool {
+        let _src = self.src_scope();
         let Some(f) = self.m.shell.split.pop() else { return false };
         self.focus_pane_end();
         self.box_end();
@@ -372,7 +392,9 @@ impl Ui {
 
     /// ui_breadcrumb(id, parts) -> the index of a clicked part (the last one is the current
     /// page and not a link)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn breadcrumb(&mut self, id: u32, parts: &[&str]) -> Option<usize> {
+        let _src = self.src_scope();
         self.box_begin(0, BOX_H | BOX_XCENTER, 2);
         let mut out = None;
         let n = parts.len();
@@ -399,7 +421,9 @@ impl Ui {
     // ------------------------------------------------------------------ segmented control
 
     /// ui_segmented(id, &mut sel, items) -> EV_* (EV_ACT when sel changed)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn segmented(&mut self, id: u32, sel: &mut i32, items: &[&str]) -> u32 {
+        let _src = self.src_scope();
         let flags = self.take_flags();
         let old = *sel;
         let pad = self.dp(14);
@@ -476,7 +500,9 @@ impl Ui {
 
     /// ui_wizard_steps(id, steps, current, states) -> a step to go back to (clicked);
     /// states: WS_* per step (missing: done before the current, todo after it)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn wizard_steps(&mut self, id: u32, steps: &[&str], current: usize, states: &[i32]) -> Option<usize> {
+        let _src = self.src_scope();
         let mut out = None;
         let sh = self.style.shell();
         let h = self.dp(48);
@@ -518,7 +544,9 @@ impl Ui {
 
     /// ui_page_header(title, subtitle): a page title (TS_TITLE) with an optional secondary
     /// line under it
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn page_header(&mut self, title: &str, subtitle: &str) {
+        let _src = self.src_scope();
         self.box_begin(0, BOX_V, 2);
         self.text(TS_TITLE, title);
         if !subtitle.is_empty() {
@@ -529,7 +557,9 @@ impl Ui {
 
     /// ui_key_value(key, value, key_width): a "label: value" row (TS_BODY, the key in the
     /// secondary colour, key_width DIP)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn key_value(&mut self, key: &str, value: &str, key_width: i32) {
+        let _src = self.src_scope();
         self.box_begin(0, BOX_H | BOX_XCENTER, 12);
         self.next_size(key_width, 0);
         self.text(TS_BODY | TX_SECONDARY | TX_ELLIPSIS, key);
@@ -540,7 +570,9 @@ impl Ui {
 
     /// ui_empty_state(icon, title, text): a centred hint for an empty view (icon 0 = none);
     /// the text wraps at 360 DIP, or at the enclosing box's width when that is narrower
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn empty_state(&mut self, icon: u32, title: &str, text: &str) {
+        let _src = self.src_scope();
         // the text wraps at 360 DIP, narrower in a narrow panel (the enclosing box's width)
         let avail = self.px2dip(self.box_rect()[2]);
         self.box_begin(0, BOX_V | BOX_CENTER | BOX_XCENTER, 8);

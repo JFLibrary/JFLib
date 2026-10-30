@@ -1048,6 +1048,7 @@ impl Ui {
 
     /// ui_sem(kind, id, label, value) -> the record (rect = last_rect, state from the last
     /// behave); the label is copied
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn sem(&mut self, kind: u16, id: u32, label: Option<&str>, value: i32) -> &mut Sem {
         if self.sems.len() >= SEMS_MAX {
             self.limit_hit(LIM_SEMS);
@@ -1080,6 +1081,7 @@ impl Ui {
         }
         self.sems.push(r);
         let n = self.sems.len();
+        self.src_sem(n - 1); // the inspector's source of the record (inspect_src.rs)
         &mut self.sems[n - 1]
     }
 
@@ -1149,6 +1151,7 @@ impl Ui {
         if self.m.ins.on {
             self.m.ins.boxes.clear(); // the inspector's boxes of this pass (inspect.rs)
         }
+        self.src_clear(); // ... and the records' sources (inspect_src.rs)
         self.rtl_update();
         self.ids_frame_begin();
         self.fonts_frame(); // the fallback follows the UI language
