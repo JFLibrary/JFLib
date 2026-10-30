@@ -204,6 +204,8 @@ async function screens() {
 screen.addEventListener?.("change",screens);
 new ResizeObserver(resize).observe(canvas);
 window.addEventListener("resize",resize);
+// (L7) full screen entered or left (Esc, the browser's own controls): the app's state follows
+document.addEventListener("fullscreenchange",()=>{if(started)send({type:"fullscreen",on:!!document.fullscreenElement});});
 async function importFiles(files) {
   for(const file of files) {
     const path="/imports/"+file.name.replace(/[\\/\0]/g,"_");
@@ -280,6 +282,11 @@ async function service(m) {
     else if(m.kind===8) document.title=value();
     // unsaved work (plat::set_unsaved): leaving the page asks first
     else if(m.kind===22) unsaved=data[0]===1;
+    // (L7) full screen of the page (lib/plat/web_windows.rs): the answer comes with fullscreenchange / -error
+    else if(m.kind===23) {
+      if(data[0]===1 && !document.fullscreenElement) {if(!viewport.requestFullscreen) send({type:"fullscreen",on:false}); else viewport.requestFullscreen().catch(()=>send({type:"fullscreen",on:!!document.fullscreenElement}));}
+      else if(data[0]!==1 && document.fullscreenElement) document.exitFullscreen?.().catch(()=>{});
+    }
     else if(m.kind===9) {const url=new URL(value());if(!["https:","http:","mailto:"].includes(url.protocol))throw new Error("URL nicht unterstützt");if(!window.open(url.href,"_blank","noopener,noreferrer"))complete(m.id,-1);else complete(m.id,2);}
     else if(m.kind===10) {const on=data[0]===1;if(on!==enabled)activate(on);}
     // a change of the secret store (secrets.js): encrypted and committed in order

@@ -29,6 +29,9 @@
 //   win_get_rect -> None (unknown on Wayland), a child window's rectangle in its owner
 //   win_work_area -> None
 //   win_set_title  win_state -> WST_*  win_cmd  win_begin_move  win_begin_resize
+//        (L7) win_cmd WCMD_FULLSCREEN / WCMD_WINDOWED: xdg_toplevel set_fullscreen (the
+//        compositor picks the output) / unset_fullscreen; the configure's states tell
+//        WST_FULLSCREEN (a change of it comes with an E_RESIZE); child windows: nothing
 //   win_size -> (w, h)  win_dpi  win_set_min_size (also before the window exists)
 //   wait(deadline_us) -> queued events (0 = poll without blocking, u64::MAX = forever,
 //        otherwise an absolute time_us() value)
@@ -52,6 +55,7 @@ use crate::{
     PWS_SHOWNA, PW_KEEP, PW_MAX, PW_NOOWNER, WCMD_CLOSE, WCMD_MAXIMIZE, WCMD_MINIMIZE, WCMD_RESTORE, WST_ACTIVE,
     WST_CHILD, WST_CSD, WST_FULLSCREEN, WST_MAXIMIZED, WST_MINIMIZED, WST_TILED,
 };
+use crate::{WCMD_FULLSCREEN, WCMD_WINDOWED};
 
 pub(crate) const OUT_MAX: usize = 8;
 const POLL_MAX: usize = 20; // wayland fd + clipboard transfers (16 writers, the drop) + the wake eventfd
@@ -773,6 +777,12 @@ impl Wl {
                     self.w.send(top, &TOPLEVEL_UNSET_MAXIMIZED, &[]);
                 }
             }
+            WCMD_FULLSCREEN => {
+                self.w.send(top, &TOPLEVEL_SET_FULLSCREEN, &[A::O(0)]);
+            }
+            WCMD_WINDOWED => {
+                self.w.send(top, &TOPLEVEL_UNSET_FULLSCREEN, &[]);
+            }
             _ => return,
         }
         self.w.flush();
@@ -1261,6 +1271,7 @@ pub(crate) fn wlh_xdg_configure(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
     }
     let r = &mut wl.win[i];
     r.state = new;
+    let (pw0, ph0) = (r.pw, r.ph);
     let (mut w, mut h) = (r.pend_w, r.pend_h);
     if w <= 0 || h <= 0 {
         // no size suggested: back to the normal size when leaving a maximized (or tiled /
@@ -1282,6 +1293,12 @@ pub(crate) fn wlh_xdg_configure(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
     // shown again, a dialog the compositor made smaller) is reported like any other (E_RESIZE)
     r.configured = true;
     wl.set_phys(i);
+    // (L7) full screen came or went at the same size: the UI looks at the state after a resize
+    if (old ^ new) & WST_FULLSCREEN != 0 && (wl.win[i].pw, wl.win[i].ph) == (pw0, ph0) {
+        let (pw, ph) = (wl.win[i].pw, wl.win[i].ph);
+        wl.inp.evwin = i as i32;
+        wl.push(E_RESIZE, 0, pw, ph, 0);
+    }
 }
 
 /// the user asked to close the window  [wlh_top_close]

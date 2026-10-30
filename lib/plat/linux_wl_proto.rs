@@ -96,6 +96,7 @@ pub(crate) const TOPLEVEL_SET_MAX_SIZE: Req = rq(7, "set_max_size:ii");
 pub(crate) const TOPLEVEL_SET_MIN_SIZE: Req = rq(8, "set_min_size:ii");
 pub(crate) const TOPLEVEL_SET_MAXIMIZED: Req = rq(9, "set_maximized:");
 pub(crate) const TOPLEVEL_UNSET_MAXIMIZED: Req = rq(10, "unset_maximized:");
+pub(crate) const TOPLEVEL_SET_FULLSCREEN: Req = rq(11, "set_fullscreen:?o"); // (L7)
 pub(crate) const TOPLEVEL_UNSET_FULLSCREEN: Req = rq(12, "unset_fullscreen:");
 pub(crate) const TOPLEVEL_SET_MINIMIZED: Req = rq(13, "set_minimized:");
 pub(crate) const DDM_CREATE_DATA_SOURCE: Req = rq(0, "create_data_source:n");

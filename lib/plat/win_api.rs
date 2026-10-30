@@ -17,6 +17,10 @@
 //   win_work_area(w) -> [x, y, w, h]  work area of the window's monitor
 //   win_set_title(w, utf8)            win_state(w) -> WST_* (WST_ACTIVE: the app is active)
 //   win_cmd(w, WCMD_*)                win_begin_move(w)  win_begin_resize(w, edges)
+//                                     (L7) WCMD_FULLSCREEN: without caption and border over the
+//                                     window's monitor (WS_POPUP; the placement and the styles
+//                                     are kept), WCMD_WINDOWED (or MAXIMIZE / RESTORE): back as
+//                                     it was; win_state says WST_FULLSCREEN meanwhile
 //   win_size(w) -> (w, h)             win_dpi(w) -> 96 = 100 %
 //   win_set_min_size(w, w_dip, h_dip) (also before the window exists)
 //   win_present(w, frame, rects)      rects x, y, w, h; None = all.  The window keeps a copy
@@ -69,6 +73,7 @@ use crate::{
     PWF_TOOL, PWS_SHOWNA, WCMD_CLOSE, WCMD_MAXIMIZE, WCMD_MINIMIZE, WST_ACTIVE, WST_MAXIMIZED, WST_MINIMIZED, evq_count,
     evq_push,
 };
+use crate::{WCMD_FULLSCREEN, WCMD_WINDOWED, WST_FULLSCREEN};
 
 #[path = "win_clip.rs"]
 mod clip;
@@ -194,6 +199,21 @@ struct TrackMouse {
     hover: u32,
 }
 
+// (L7) WINDOWPLACEMENT: kept while a window is in full screen
+#[repr(C)]
+#[derive(Clone, Copy)]
+struct Placement {
+    length: u32,
+    flags: u32,
+    show: u32,
+    min_pos: Point,
+    max_pos: Point,
+    normal: Rect,
+}
+
+const PLACEMENT0: Placement =
+    Placement { length: 0, flags: 0, show: 0, min_pos: Point { x: 0, y: 0 }, max_pos: Point { x: 0, y: 0 }, normal: Rect { l: 0, t: 0, r: 0, b: 0 } };
+
 #[repr(C)]
 #[derive(Default)]
 struct MonitorInfo {
@@ -239,6 +259,8 @@ unsafe extern "system" {
     fn SendMessageW(h: isize, m: u32, wp: usize, lp: isize) -> isize;
     fn GetWindowLongPtrW(h: isize, i: i32) -> isize;
     fn SetWindowLongPtrW(h: isize, i: i32, v: isize) -> isize;
+    fn GetWindowPlacement(h: isize, p: *mut Placement) -> i32;
+    fn SetWindowPlacement(h: isize, p: *const Placement) -> i32;
     fn LoadCursorW(inst: isize, name: usize) -> isize;
     fn LoadIconW(inst: isize, name: usize) -> isize;
     fn SetCursor(c: isize) -> isize;
@@ -399,6 +421,9 @@ const WS_EX_TOOLWINDOW: u32 = 0x0000_0080;
 const WS_EX_NOACTIVATE: u32 = 0x0800_0000;
 const WS_EX_ACCEPTFILES: u32 = 0x0000_0010;
 const GWLP_USERDATA: i32 = -21;
+const GWL_STYLE: i32 = -16;
+const WS_MINMAXBOX: u32 = 0x0003_0000; // WS_MINIMIZEBOX | WS_MAXIMIZEBOX
+const SWP_NOOWNERZORDER: u32 = 0x0200;
 const MA_ACTIVATE: isize = 1;
 const MA_NOACTIVATE: isize = 3;
 const MONITOR_NEAREST: u32 = 2;
@@ -487,6 +512,9 @@ struct Ww {
     kbits: Cell<usize>,      // the section's pixels
     kbuf: Cell<Vec<u8>>,     // the copy when no section can be made (SetDIBitsToDevice)
     kdim: Cell<(i32, i32)>,  // its width, height
+    fs: Cell<bool>,          // (L7) in full screen: the style and placement to go back to
+    fs_style: Cell<isize>,
+    fs_place: Cell<Placement>,
 }
 
 impl Ww {
@@ -518,6 +546,9 @@ impl Ww {
             kbits: Cell::new(0),
             kbuf: Cell::new(Vec::new()),
             kdim: Cell::new((0, 0)),
+            fs: Cell::new(false),
+            fs_style: Cell::new(0),
+            fs_place: Cell::new(PLACEMENT0),
         }
     }
 
@@ -542,6 +573,7 @@ impl Ww {
         self.selfp.set(SELF_NONE);
         self.req.set([0; 4]);
         self.movepend.set(false);
+        self.fs.set(false);
         self.kept_free();
     }
 }
@@ -1420,7 +1452,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             def(); // standard borders ...
             let mut t = top; // ... but no caption
             // SAFETY: our window.
-            if unsafe { IsZoomed(hwnd) } != 0 {
+            if unsafe { IsZoomed(hwnd) } != 0 && !r.fs.get() {
                 // maximized windows hang over the screen edge by the frame size
                 t += unsafe { GetSystemMetrics(SM_CYFRAME) + GetSystemMetrics(SM_CXPADDEDBORDER) };
             }
@@ -1438,7 +1470,7 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             let (x, y) = nc_client_pos(hwnd, lp);
             // top resize band (resizable windows, not when maximized)
             // SAFETY: our window.
-            if r.flags.get() & (WWF_TOP | PWF_RESIZABLE) != 0 && unsafe { IsZoomed(hwnd) } == 0 {
+            if r.flags.get() & (WWF_TOP | PWF_RESIZABLE) != 0 && unsafe { IsZoomed(hwnd) } == 0 && !r.fs.get() {
                 let band = (r.dpi.get() + 12) >> 4; // about 6 px at 100 %
                 if y < band {
                     if x < band * 2 {
@@ -2012,10 +2044,14 @@ pub fn win_state(w: i32) -> u32 {
     if st().app_active.get() {
         v |= WST_ACTIVE;
     }
+    if r.fs.get() {
+        v = (v | WST_FULLSCREEN) & !WST_MAXIMIZED;
+    }
     v
 }
 
-/// WCMD_MINIMIZE / MAXIMIZE / RESTORE / CLOSE (asks, like the system menu does)
+/// WCMD_MINIMIZE / MAXIMIZE / RESTORE / CLOSE (asks, like the system menu does) / FULLSCREEN /
+/// WINDOWED
 pub fn win_cmd(w: i32, cmd: u32) {
     let Some(r) = rec(w) else { return };
     let h = r.hwnd.get();
@@ -2029,12 +2065,61 @@ pub fn win_cmd(w: i32, cmd: u32) {
                 ShowWindow(h, SW_MINIMIZE);
             }
             WCMD_MAXIMIZE => {
+                fs_leave(r);
                 ShowWindow(h, SW_MAXIMIZE);
             }
+            WCMD_FULLSCREEN => fs_enter(r),
+            WCMD_WINDOWED => fs_leave(r),
+            _ if r.fs.get() && IsIconic(h) == 0 => fs_leave(r),
             _ => {
                 ShowWindow(h, SW_RESTORE);
             }
         }
+    }
+}
+
+// (L7) fs_enter(r): the window without caption and border over its monitor (Raymond Chen's
+// way: WS_POPUP, the placement kept for fs_leave); the resize comes as E_RESIZE
+fn fs_enter(r: &Ww) {
+    if r.fs.get() {
+        return;
+    }
+    let h = r.hwnd.get();
+    let mut wp = Placement { length: core::mem::size_of::<Placement>() as u32, ..PLACEMENT0 };
+    // SAFETY: our window; WINDOWPLACEMENT / MONITORINFO with their sizes set.
+    unsafe {
+        if GetWindowPlacement(h, &mut wp) == 0 {
+            return;
+        }
+        let m = MonitorFromWindow(h, MONITOR_NEAREST);
+        let mut mi = MonitorInfo { size: 40, ..Default::default() };
+        if m == 0 || GetMonitorInfoW(m, &mut mi) == 0 {
+            return;
+        }
+        let style = GetWindowLongPtrW(h, GWL_STYLE);
+        r.fs_style.set(style);
+        r.fs_place.set(wp);
+        r.fs.set(true);
+        let bare = (style as u32 & !(WS_CAPTION | WS_THICKFRAME | WS_SYSMENU | WS_MINMAXBOX)) | WS_POPUP;
+        SetWindowLongPtrW(h, GWL_STYLE, bare as isize);
+        let mr = mi.monitor;
+        SetWindowPos(h, 0, mr.l, mr.t, mr.r - mr.l, mr.b - mr.t, SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+    }
+}
+
+// (L7) fs_leave(r): back to the style and the placement from before fs_enter
+fn fs_leave(r: &Ww) {
+    if !r.fs.get() {
+        return;
+    }
+    r.fs.set(false);
+    let h = r.hwnd.get();
+    let wp = r.fs_place.get();
+    // SAFETY: our window; the placement GetWindowPlacement gave.
+    unsafe {
+        SetWindowLongPtrW(h, GWL_STYLE, r.fs_style.get());
+        SetWindowPlacement(h, &wp);
+        SetWindowPos(h, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
     }
 }
 

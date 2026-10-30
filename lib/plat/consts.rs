@@ -148,3 +148,7 @@ pub const HB_MIN: u32 = 64; // caption buttons (snap layouts, ...)
 pub const HB_MAX: u32 = 128;
 pub const HB_CLOSE: u32 = 256;
 pub const HB_CURSOR_SHIFT: u32 = 12;
+
+// ---- (L7) full screen: win_cmd commands; win_state reports WST_FULLSCREEN
+pub const WCMD_FULLSCREEN: u32 = 5; // the window covers its monitor without a frame
+pub const WCMD_WINDOWED: u32 = 6; // back to the place and frame it had before
