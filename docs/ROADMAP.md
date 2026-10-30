@@ -247,23 +247,44 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   Pool-Thread), ein asynchrones `dir_list` / `stat`; unter Android und im Browser ohne Shared
   Memory laufen die Jobs ohne Threads zwischen den Frames.
 - **P3** · *teilweise* · „Zuletzt verwendet“ auf OS-Ebene ([`plat/recent.rs`](../lib/plat/recent.rs),
-  seit 2026-10-19, GUIDE §21): `plat::recent_add(path)`, `recent_list(max)`, `recent_remove`,
-  `recent_clear`; in der UI `ui.recent_add(path)` mit der eigenen Liste der App
-  (`ui.recent_files()`, `config://recent.list`, höchstens `RECENT_KEEP`). Windows:
-  `SHAddToRecentDocs` (Explorer: Start/Schnellzugriff, Recent-Ordner), Rücklesen über
-  `IApplicationDocumentLists`, Entfernen über `IApplicationDestinations`; `ui.taskbar_tasks`
-  behält die Kategorie „Zuletzt verwendet“ (`AppendKnownCategory`). Linux:
-  `~/.local/share/recently-used.xbel` im freedesktop-Format (GTK/KDE: MIME-Typ, Eintrag der App
-  mit `exec` und `count`), unter Sperre geändert und atomar ersetzt, fremde Lesezeichen
-  bleiben Byte für Byte. Nur Dateien, die die App lesen darf (`fs.read` / `fs.user`);
-  Headless-Läufe schreiben nichts ins System; `jfgui_RECENT=DATEI` lenkt auf eine xbel-Datei
-  um (alle OS, Tests). Getestet mit `plattest --test recent` (xbel, GLib-Datei, Manifest) und
-  von Hand `--test recent-win`. Es fehlen: Windows ordnete die Datei auf dem Testrechner
-  (Windows 11 26200) nicht der Jump List von plattest zu (auch mit Fenster, expliziter
-  AppUserModelID und `AppUserModelID` im ProgID) – `recent_list` bleibt dort leer, die eigene
-  Liste der App ist die verlässliche; Explorer behält entfernte Einträge (der Nutzer entfernt
-  sie dort); keine explizite AppUserModelID für JFLib-Apps; Flatpak sieht die Liste des Hosts
-  nur mit `--filesystem=xdg-data/recently-used.xbel`; Web und Android.
+  seit 2026-10-19, erweitert 2026-10-30, GUIDE §21): `plat::recent_add(path)`, `recent_list(max)`,
+  `recent_remove`, `recent_clear`; in der UI `ui.recent_add(path)` mit der eigenen Liste der App
+  (`ui.recent_files()`, `config://recent.list`, höchstens `RECENT_KEEP`) und `ui.recent_open(path)`
+  (`Ready`, `Asking` mit `UIC_RECENT` / `ui.recent_reopened()`, `Missing`). Windows:
+  `SHAddToRecentDocs` (Explorer: Start/Schnellzugriff, Recent-Ordner; mit expliziter
+  AppUserModelID `SHARD_APPIDINFO`), Rücklesen über `IApplicationDocumentLists`, Entfernen über
+  `IApplicationDestinations` (beide mit `SetAppID`); `ui.taskbar_tasks` behält die Kategorie
+  „Zuletzt verwendet“ (`AppendKnownCategory`). Explizite AppUserModelID (seit 2026-10-30): die
+  `app_id` aus `PACKAGE`, gesetzt von `ui::main!` vor dem ersten Fenster, sobald das Setup das
+  Programm installiert hat (`app_id=` in `install.ini`) oder `--register` es registriert hat
+  (`config://assoc.list`); das Setup schreibt sie in seine Verknüpfungen
+  (`System.AppUserModel.ID`), in die ProgIDs (`AppUserModelID`) und in Taskleisten-Pins älterer
+  Versionen (`plat::inst::pins_set_app_id`), `package.py` trägt sie ins Setup-Manifest ein;
+  Builds aus `build/`, Apps ohne `PACKAGE` und MSIX bleiben bei der abgeleiteten ID,
+  `jfgui_AUMID` für Tests. Linux: `~/.local/share/recently-used.xbel` im freedesktop-Format
+  (GTK/KDE: MIME-Typ, Eintrag der App mit `exec` und `count`), unter Sperre geändert und atomar
+  ersetzt, fremde Lesezeichen bleiben Byte für Byte; Flatpak: die Zeile `recent` in
+  `PERMISSIONS` gibt dem Paket `--filesystem=xdg-data/recently-used.xbel` (`tools/pkg_linux.py`).
+  Browser: die Liste der App übersteht Neuladen (auch geleert: eine leere Datei, der Speicher
+  kennt kein Löschen); Chromium öffnet Einträge über die Handles wieder (beim Start eingelesen
+  oder `recent_open` fragt aus der Geste nach der Berechtigung), Firefox/Safari nur die Liste.
+  Android: die Liste übersteht Neustarts, die Freigaben der gewählten Dokumente bleiben
+  (`takePersistableUriPermission`) und werden zurückgegeben, wenn ein Dokument die Liste
+  verlässt (verdrängt, entfernt, geleert; Ordner-Freigaben bleiben). Nur Dateien, die die App
+  lesen darf (`fs.read` / `fs.user`); Headless-Läufe schreiben nichts ins System;
+  `jfgui_RECENT=DATEI` lenkt auf eine xbel-Datei um (alle OS, Tests). Getestet mit
+  `plattest --test recent` (xbel, GLib-Datei, Manifest; Windows: die ID, Verknüpfungen und Pins
+  in einem Testordner, ProgID), von Hand `--test recent-win` (ohne Fenster), `files_web.mjs`
+  (Chromium, Firefox) und `android_files.py` (Emulator, API 35). Befund Windows 11 25H2 (26200):
+  `SHAddToRecentDocs` legt die Jump List der ID an (abgeleitete wie explizite ID: die Datei in
+  `AutomaticDestinations` entsteht), lässt sie aber leer – auch mit registriertem Typ samt
+  `AppUserModelID` im ProgID, Standard der Endung, Startmenü-Verknüpfung mit der ID und COM auf
+  dem Thread; die Datei landet in Explorers eigenen Listen. Es fehlen: Einträge in der Jump List
+  der App (eine eigene Kategorie aus der Liste der App über `ICustomDestinationList::AppendCategory`
+  mit `IShellLink`-Einträgen hinge nicht an Windows' Zuordnung); Explorer behält entfernte
+  Einträge (Start/Schnellzugriff, der Nutzer entfernt sie dort); Toasts mit expliziter ID
+  ohne Startmenü-Verknüpfung (`--register`) nicht am Bildschirm geprüft; Firefox öffnet nur, was
+  die App selbst gespeichert hat.
 
 ## 3. Desktop-Integration
 
@@ -372,7 +393,9 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   Probelauf (`plattest --test taskbar`, `apps/traydemo`), ein echtes Fenster mit allen
   Zuständen, Badge und Sprungliste (`plattest --test taskbar-win`, von Hand), die Signale
   gegen einen Fake-Bus und einen echten dbus-daemon. Seit 2026-10-19 behält die Sprungliste die
-  Kategorie „Zuletzt verwendet“ (§2). Es fehlen: eigene Kategorien in der Sprungliste
+  Kategorie „Zuletzt verwendet“ (§2); seit 2026-10-30 gehören Knopf, Sprungliste und Pins eines
+  installierten oder registrierten Programms zur expliziten AppUserModelID aus `PACKAGE` (§2,
+  GUIDE §21). Es fehlen: eigene Kategorien in der Sprungliste
   (`AppendCategory`), Vorschau-Schaltflächen
   (`ThumbBarAddButtons`), Quicklists über dbusmenu unter Linux.
 - **P3** · *erledigt* · Monitore, globale Tastenkürzel, Farbe vom Bildschirm, Bildschirmfotos
@@ -596,7 +619,41 @@ Seit 2026-10-17 auch Glyph-Fallback und IME unter X11.
   `spelltest/tests/hyphen*.uis`. Es fehlen: libhyphens nicht-standardmäßige Trennung mit
   Ersetzung (Zucker → Zuk-ker, v. a. hu_HU: solche Stellen trennen nicht), Trennung im Layout von
   jfWord (`doc_layout`), Blocksatz-Abwägung (heute: die letzte passende Trennstelle).
-- **P3** · *fehlt* · Achsen variabler Fonts in der UI.
+- **P3** · *erledigt* (2026-10-30) · Achsen variabler Fonts in der UI
+  ([`text/var.rs`](../lib/text/var.rs), [`ui/fontpick.rs`](../lib/ui/fontpick.rs)): `fvar`
+  (Achsen, benannte Instanzen, Namen aus der name-Tabelle, versteckte Achsen), `avar`
+  (Segmentkarten, in 16.16 wie HarfBuzz und FreeType), `gvar` für TrueType-Konturen (eingebettete
+  und geteilte Peak-Tupel, Zwischenbereiche, geteilte und eigene gepackte Punktnummern, gepackte
+  Deltas mit Null-, Byte-, Wort- und Long-Läufen, IUP für nicht genannte Punkte, Phantompunkte für
+  Ursprung und Vorschub, Komponenten-Offsets mit USE_MY_METRICS und SCALED_COMPONENT_OFFSET),
+  Vorschübe aus `HVAR` (mit und ohne Zuordnung) bzw. den Phantompunkten, `MVAR` (hasc, hdsc,
+  hlgp, hcla, hcld, xhgt, cpht, undo, unds, stro, strs), GPOS-Unterschneidung mit
+  VariationIndex-Deltas aus `GDEF`. `Text::vary(font, &[(tag, wert)])` / `vary_named` leiten eine
+  Instanz als eigene Font-ID ab (eigene Glyph-Cache-Einträge und Metriken; HarfRust formt an
+  denselben normalisierten Koordinaten, also mit GSUB-/GPOS-Variationen und denselben
+  Vorschüben), dazu `var_axes`, `var_instances`, `var_values`, `var_coords`; für installierte
+  Schriften `FontDb::variations`, `var_values`, `load_var` (auch `load` / `load_resolved` nehmen
+  bei einer variablen Schrift die Instanz statt synthetischem Fett). `FontSel` hat das neue Feld
+  `axes` (`FontSel::new` und `Default` bleiben): Gewicht → `wght`, kursiv → `ital` bzw. das
+  schrägste `slnt`, Größe in Punkt → `opsz`, genannte Achsen gewinnen. Schriftdialog: die
+  benannten Instanzen sind die Schnitte, je sichtbarer Achse Name, Schieberegler und Zahlenfeld
+  (Bereich aus der Schrift), `opsz` mit „Automatisch“; die Aufklappliste bleibt Familie und
+  Größe. Theme-Dateien: `family.axes = wdth=87.5, opsz=12`; eine variable Schriftdatei bekommt
+  ihre 600 / 700 aus `wght` statt synthetischem Fett. Geprüft gegen HarfBuzz 14.3.1 und FreeType
+  2.14.3 aus dem Flatpak-SDK 26.08 in WSL (`tools/var_check.py`: `hb_font_draw_glyph`,
+  `FT_Load_Glyph` mit NO_SCALE, `hb_shape`): Bahnschrift, Segoe UI Variable, Cascadia Code, Sitka, Ubuntu Sans Mono und die zwei
+  eigenen Testschriften an 33 Instanzen, alle Glyphen – normalisierte Koordinaten gleich,
+  Konturen höchstens 0,0007 Einheiten neben HarfBuzz (FreeType rundet die Deltas ganzzahlig:
+  höchstens 1,5), Vorschübe glyphengleich mit HarfBuzz, geformte Breiten gleich `hb_shape`, auch
+  ohne Formung mit der GPOS-Unterschneidung. Bei Standardwerten bleibt alles wie vorher (Shots
+  byteweise gleich). Tests: `fonttest --selftest` mit `tools/var_fixtures.py` (zwei synthetische
+  variable Schriften und ihre unabhängig berechneten Erwartungswerte, API, ein Glyph-Cache-Eintrag
+  je Instanz, Arbeitsbudget gegen absichtlich teure gvar-Daten, abgeschnittene und verfälschte
+  Dateien), `fontpicktest/tests/var_dialog.uis` (hell und dunkel), `uitest --only themes`. Es
+  fehlen: CFF2-Konturen (solche Schriften laden weiterhin nicht), avar 2 über die Segmentkarten
+  hinaus, VVAR und vertikale Metriken, Variationen in COLRv1; `opsz` einer Theme-Schrift folgt
+  11 pt (eine Font-ID für alle Textgrößen), `ui.font_load` hält nur die Instanzen der letzten 64
+  variablen Auswahlen.
 
 ## 5. Internationalisierung
 
@@ -1460,11 +1517,36 @@ im Framework und die Code-Signierung, seit 2026-10-18 AppImage, Flatpak, MSIX un
   `autostart_set` jetzt `Unavailable` (HKCU ist dort virtualisiert). Geprüft mit
   [`tools/pkg_check.py`](../tools/pkg_check.py) (die Suite ruft `--quick`): Validatoren
   (desktop-file-validate, appstreamcli, MakeAppx), Runtime gegen mksquashfs-Abbilder, Template als
-  AppImage und im Flatpak-Sandkasten gestartet, MSIX mit Test-Zertifikat signiert. Es fehlen
-  noch: ein gebautes RPM (rpmbuild fehlt im Testsystem: nur .spec und Tarball), AAB für Google
-  Play (bundletool fehlt; die Schritte stehen in PACKAGING.md), StartupTask aus der App (WinRT),
-  Updates über `lib/update` für AppImage, Flatpak und MSIX, Signaturen für AppImage, RPM und
-  Flatpak, eine Installation der Pakete im Test; später Notarisierung für macOS.
+  AppImage und im Flatpak-Sandkasten gestartet, MSIX mit Test-Zertifikat signiert.
+  Seit 2026-10-30 ([UPDATES.md](UPDATES.md) „Packages“): **Updates über `lib/update`** je nach
+  Installationsart (`update::install` = `plat::pkg::packaged()`): ein AppImage ersetzt seine
+  `.AppImage`-Datei durch den `appimage`-Eintrag des Kanals (neben ihr kopiert, geprüft,
+  atomar umbenannt; Probelauf, Rollback, Neustart über die Datei), ein schreibgeschützter
+  Ordner meldet `Error::ReadOnly`; ein Flatpak prüft und installiert über das Flatpak-Portal
+  (UpdateMonitor über den eigenen D-Bus-Client, `Update` mit Fortschritt, `Spawn` der neuen
+  Version), ohne Portal `Check::Managed(Flatpak)`; MSIX erkennt die Paketidentität und meldet
+  über WinRT (rohes COM, `Package.GetAppInstallerInfo` / `CheckUpdateAvailabilityAsync`)
+  `Check::Managed(AppInstaller | Msix)`, `package.py` schreibt die `.appinstaller`-Datei
+  (UpdateSettings OnLaunch, Hintergrundprüfung; PACKAGE `appinstaller_url=`). **Signaturen**:
+  AppImages mit GPG in `.sha256_sig` / `.sig_key` wie `appimagetool --sign` (die Runtime hat
+  die Abschnitte), `lib/update` prüft sie mit lib/crypto (OpenPGP v4: RSA, ECDSA, Ed25519) und
+  nimmt bei einem signierten AppImage nur Updates mit einem Schlüssel aus dessen Block;
+  Flatpak-Repository (`flatpak/repo`, bleibt zwischen Läufen) und Bundle GPG-signiert, das
+  Bundle mit Schlüssel und Remote (`flatpak_repo_url=`), dazu `.gpg` und `.flatpakrepo`.
+  **StartupTask aus der App**: `autostart_set` / `autostart_get` schalten im MSIX-Paket die
+  StartupTask über WinRT (`GetAsync`, `RequestEnableAsync`, `Disable`, `State`; MTA-Thread);
+  `msix_alias=` gibt dem Paket einen Ausführungsalias. **Installation im Test**
+  (`pkg_check.py --install`): updatetest als Flatpak aus signiertem Repository mit
+  `flatpak --user` in ein temporäres HOME installiert und über das Portal auf 2.0.0
+  aktualisiert; als MSIX im (schon aktiven) Entwicklermodus registriert, StartupTask an und
+  aus, wieder entfernt; `updatetest --test apply` aktualisiert ein echtes AppImage
+  (appimagert) selbst und rollt zurück; `pkg_check --quick` prüft die AppImage-Signatur mit
+  gpgv (Wegwerf-Schlüssel). Es fehlen noch: ein gebautes und signiertes RPM (rpmbuild und
+  rpmsign fehlen im Testsystem: nur .spec und Tarball), AAB für Google Play (bundletool fehlt;
+  die Schritte stehen in PACKAGING.md), die Installation eines signierten `.msix` (braucht ein
+  vertrauenswürdiges Zertifikat) und ein Update über App Installer von einem Webserver,
+  Rollback eines Flatpak-Updates aus der App (nur `flatpak update --commit=`), Delta-Updates
+  für AppImages (zsync); später Notarisierung für macOS.
 - **P2** · *erledigt* · Versionsverwaltung (2026-10-20, [VERSIONING.md](VERSIONING.md)): die
   Library hat eine Version (`lib/VERSION`, `ui::VERSION`), jede App ihre eigene (`version=` in
   `PACKAGE`, im Code `rt::app_version!()`, auch für `update::Config`); SemVer-Regeln,

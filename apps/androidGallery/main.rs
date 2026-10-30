@@ -107,5 +107,13 @@ impl App for Gallery {
         ui.box_end();
         ui.scroll_end();
     }
+    fn command(&mut self, ui: &mut Ui, id: u32, arg: u32) -> bool {
+        // a file of the recent list the browser asked about after a reload (ui.recent_open)
+        if id == UIC_RECENT {
+            self.files.reopened(ui, arg == 1);
+            return true;
+        }
+        false
+    }
 }
 ui::main!(ui::launch(&DESC, Gallery::default(), &style::STYLE));

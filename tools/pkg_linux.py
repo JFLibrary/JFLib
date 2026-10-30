@@ -7,18 +7,29 @@ Linux or WSL (tools/linux_task.py); a missing tool skips that step and says what
                                further programs and notices) as SquashFS (mksquashfs -comp zstd)
                                behind the runtime apps/appimagert (or another runtime file:
                                --appimage-runtime / jfgui_APPIMAGE_RUNTIME); appimagetool in
-                               PATH makes the image instead (with the same runtime)
+                               PATH makes the image instead (with the same runtime); signed
+                               (sign_appimage) when jfgui_GPG_KEY is set
   make_rpm(job)                <dist>/rpm/<pkg>.spec + SOURCES/<pkg>-<version>-root.tar.gz, and
                                the .rpm by rpmbuild when it is installed
   make_flatpak(job)            <dist>/flatpak/<app id>.json + files/: the manifest, finish-args
                                from apps/NAME/PERMISSIONS; <dist>/<app id>.flatpak (a bundle)
-                               by flatpak-builder when it and the runtime are installed
+                               by flatpak-builder when it and the runtime are installed, exported
+                               into the repository <dist>/flatpak/repo (each run adds a commit);
+                               with jfgui_GPG_KEY the repository and the bundle are GPG-signed
+                               and the bundle carries the key (and PACKAGE flatpak_repo_url=:
+                               the remote its installation updates from)
   finish_args(perms, extra)    the sandbox holes of a PERMISSIONS manifest -> (args, notes)
   runtime_image(elf, info)     a runtime file made an AppImage runtime: the magic "AI\\x02" at
-                               byte 8, the section .upd_info (1024 bytes) with info
+                               byte 8, the sections .upd_info (1024 bytes) with info,
+                               .sha256_sig (1024) and .sig_key (8192) for the signature
+  appimage_digest(data)        appimagetool's digest of an AppImage: SHA-256 with .sha256_sig and
+                               .sig_key read as zeros, 64 lower-case hex digits (what is signed)
+  appimage_embed(data, sig, key)   the armored signature and public key into those sections
+  sign_appimage(path, sign)    digest, sign(text) -> (signature, key), embed (appimagetool --sign)
   elf_end(b)                   where an ELF file's data ends (an AppImage's image starts there)
   probe()                      which Linux tools are there (one call into Linux / WSL)
 """
+import hashlib
 import io
 import json
 import os
@@ -42,6 +53,9 @@ FLATPAK_RUNTIME = "org.freedesktop.Platform"
 FLATPAK_SDK = "org.freedesktop.Sdk"
 FLATPAK_VERSION = "26.08"
 UPD_INFO_SIZE = 1024
+# the sections of a type-2 runtime: name, size (the runtime of AppImage/type2-runtime has them)
+RUNTIME_SECTIONS = ((".upd_info", UPD_INFO_SIZE), (".sha256_sig", 1024), (".sig_key", 8192))
+SIGNATURE_SECTIONS = (".sha256_sig", ".sig_key")
 
 _probe = None
 
@@ -144,10 +158,43 @@ def elf_sections(b):
     return out
 
 
+def add_sections(b, new):
+    """an ELF64 file with the sections new ([(name, size)], zero-filled, not loaded) added at
+    the end, before a new section table (the old one must end the file)"""
+    shoff = struct.unpack_from("<Q", b, 0x28)[0]
+    shsize, shnum, shstrndx = struct.unpack_from("<HHH", b, 0x3A)
+    if shoff + shsize * shnum != len(b):
+        raise SystemExit("AppImage-Runtime: die Abschnittstabelle steht nicht am Dateiende")
+    heads = [bytearray(b[shoff + i * shsize:shoff + (i + 1) * shsize]) for i in range(shnum)]
+    noff, nsize = struct.unpack_from("<QQ", heads[shstrndx], 24)
+    names = bytearray(b[noff:noff + nsize])
+    out = bytearray(b[:shoff])
+    added = []
+    for name, size in new:
+        out += b"\0" * (-len(out) % 8)
+        added.append((len(names), len(out), size))
+        names += name.encode("ascii") + b"\0"
+        out += bytes(size)
+    names_at = len(out)
+    out += names
+    out += b"\0" * (-len(out) % 8)
+    struct.pack_into("<QQ", heads[shstrndx], 24, names_at, len(names))
+    new_shoff = len(out)
+    for h in heads:
+        out += h
+    for name_at, at, size in added:
+        # Elf64_Shdr: name, SHT_PROGBITS, no flags (not loaded), addr 0, offset, size, link, info, align 1
+        out += struct.pack("<IIQQQQIIQQ", name_at, 1, 0, 0, at, size, 0, 0, 1, 0).ljust(shsize, b"\0")
+    struct.pack_into("<Q", out, 0x28, new_shoff)
+    struct.pack_into("<H", out, 0x3C, shnum + len(added))
+    return out
+
+
 def runtime_image(elf, info=""):
     """the runtime as an AppImage runtime: "AI\\x02" at byte 8 (e_ident padding, ignored by the
-    kernel) and a section .upd_info of 1024 bytes with the update information (added at the
-    end: the image still starts at elf_end)"""
+    kernel), the section .upd_info of 1024 bytes with the update information, and .sha256_sig
+    (1024) and .sig_key (8192) for the signature, zero until sign_appimage fills them (missing
+    sections are added at the end: the image still starts at elf_end)"""
     data = info.encode("utf-8")
     if len(data) >= UPD_INFO_SIZE:
         raise SystemExit(f"appimage_update: longer than {UPD_INFO_SIZE - 1} bytes")
@@ -156,33 +203,52 @@ def runtime_image(elf, info=""):
         raise SystemExit("AppImage-Runtime: Daten hinter dem ELF-Ende (das Abbild würde falsch gefunden)")
     b[8:11] = b"AI\x02"
     sec = elf_sections(b)
-    if ".upd_info" in sec:
-        off, size = sec[".upd_info"]
-        b[off:off + size] = data.ljust(size, b"\0")[:size]
-        return bytes(b)
-    shoff = struct.unpack_from("<Q", b, 0x28)[0]
-    shsize, shnum, shstrndx = struct.unpack_from("<HHH", b, 0x3A)
-    if shoff + shsize * shnum != len(b):
-        raise SystemExit("AppImage-Runtime: die Abschnittstabelle steht nicht am Dateiende")
-    heads = [bytearray(b[shoff + i * shsize:shoff + (i + 1) * shsize]) for i in range(shnum)]
-    noff, nsize = struct.unpack_from("<QQ", heads[shstrndx], 24)
-    names = bytes(b[noff:noff + nsize])
-    out = bytearray(b[:shoff])
-    out += b"\0" * (-len(out) % 8)
-    upd = len(out)
-    out += data.ljust(UPD_INFO_SIZE, b"\0")
-    names_at = len(out)
-    out += names + b".upd_info\0"
-    out += b"\0" * (-len(out) % 8)
-    struct.pack_into("<QQ", heads[shstrndx], 24, names_at, len(names) + 10)
-    new_shoff = len(out)
-    for h in heads:
-        out += h
-    # Elf64_Shdr: name, SHT_PROGBITS, no flags (not loaded), addr 0, offset, size, link, info, align 1
-    out += struct.pack("<IIQQQQIIQQ", len(names), 1, 0, 0, upd, UPD_INFO_SIZE, 0, 0, 1, 0).ljust(shsize, b"\0")
-    struct.pack_into("<Q", out, 0x28, new_shoff)
-    struct.pack_into("<H", out, 0x3C, shnum + 1)
-    return bytes(out)
+    missing = [(n, size) for n, size in RUNTIME_SECTIONS if n not in sec]
+    if missing:
+        b = add_sections(b, missing)
+        sec = elf_sections(b)
+    off, size = sec[".upd_info"]
+    b[off:off + size] = data.ljust(size, b"\0")[:size]
+    for n in SIGNATURE_SECTIONS:
+        off, size = sec[n]
+        b[off:off + size] = bytes(size)
+    return bytes(b)
+
+
+def appimage_digest(data):
+    """appimagetool's digest of an AppImage (what --sign signs and AppImageUpdate's validate
+    checks): SHA-256 of the file with the bytes of .sha256_sig and .sig_key read as zeros, as
+    64 lower-case hex digits"""
+    sec = elf_sections(data)
+    b = bytearray(data)
+    for n in SIGNATURE_SECTIONS:
+        if n not in sec:
+            raise SystemExit(f"AppImage: der Abschnitt {n} fehlt (eine Runtime ohne Signaturplatz)")
+        off, size = sec[n]
+        b[off:off + size] = bytes(size)
+    return hashlib.sha256(b).hexdigest()
+
+
+def appimage_embed(data, sig, key):
+    """the ASCII-armored detached signature and public key into .sha256_sig / .sig_key
+    (NUL-padded, as appimagetool writes them)"""
+    sec = elf_sections(data)
+    b = bytearray(data)
+    for n, text in zip(SIGNATURE_SECTIONS, (sig, key)):
+        off, size = sec[n]
+        raw = text.encode("ascii")
+        if len(raw) >= size:
+            raise SystemExit(f"AppImage: {n} fasst {size - 1} Bytes, die Signatur / der Schlüssel hat {len(raw)}")
+        b[off:off + size] = raw.ljust(size, b"\0")
+    return bytes(b)
+
+
+def sign_appimage(path, sign):
+    """sign the AppImage at path as appimagetool --sign does: sign(digest text) -> (armored
+    signature, armored public key), both embedded"""
+    data = Path(path).read_bytes()
+    sig, key = sign(appimage_digest(data).encode("ascii"))
+    Path(path).write_bytes(appimage_embed(data, sig, key))
 
 
 def metainfo_note(job, fmt):
@@ -233,8 +299,20 @@ def make_appimage(job, style):
     print(f"[linux] AppImage {style}")
     linux_task("appimage", linux_path(work / "AppDir"), linux_path(rt), linux_path(out),
                *[f"{k}={v}" for k, v in links.items()])
+    appimage_signature(job, out)
     job.made("appimage", out)
     return out
+
+
+def appimage_signature(job, out):
+    """the AppImage's GPG signature (.sha256_sig, .sig_key: appimagetool --sign) with
+    jfgui_GPG_KEY in Linux / WSL; without the key a note (signing: job.sign_skip)"""
+    import codesign
+    key = os.environ.get("jfgui_GPG_KEY", "")
+    if not key:
+        return job.sign_skip(f"AppImage {out.name}: unsigniert (jfgui_GPG_KEY setzen: GPG-Signatur in .sha256_sig / .sig_key)")
+    sign_appimage(out, codesign.gpg_detach_sign)
+    job.sign_done(f"AppImage (GPG {key[-16:]}): {out.name}")
 
 
 # ---------------------------------------------------------------- RPM
@@ -379,6 +457,7 @@ FS_XDG = {"$HOME": "home", "$DESKTOP": "xdg-desktop", "$DOCUMENTS": "xdg-documen
           "$PICTURES": "xdg-pictures", "$MUSIC": "xdg-music", "$VIDEOS": "xdg-videos"}
 # folders that lie inside the sandbox (or are private there): no hole needed
 FS_INSIDE = {"$CONFIG": "config_dir() ist im Sandkasten ~/.var/app/ID/config",
+             "$APPIMAGE": "kein AppImage im Flatpak",
              "$APPCONFIG": "config:// liegt in ~/.var/app/ID", "$APPDATA": "data:// liegt in ~/.var/app/ID",
              "$APPCACHE": "cache:// liegt in ~/.var/app/ID", "$APPLOG": "logs:// liegt in ~/.var/app/ID",
              "$TEMP": "/tmp ist im Sandkasten privat", "$EXE": "/app ist lesbar",
@@ -419,7 +498,9 @@ def finish_args(perms, extra=()):
     file dialog, open_url, open_folder, printing and autostart go through portals and need
     nothing; fs.* rules become --filesystem (fs.read :ro), secrets the Secret Service on the
     session bus, net.* the network, audio.output the sound server (--socket=pulseaudio, which
-    also allows recording: only apps that play sound get it)"""
+    also allows recording: only apps that play sound get it), recent the host's list of recent
+    files (--filesystem=xdg-data/recently-used.xbel: plat::recent_add reaches the desktop's
+    list; the file lists every program's recent files)"""
     args = ["--share=ipc", "--socket=wayland", "--socket=fallback-x11"]
     notes = []
     if perms is None:
@@ -456,6 +537,11 @@ def finish_args(perms, extra=()):
             notes.append("fs.user: Dateien über die Portale (Dateidialog, Dokument-Portal für „Öffnen mit“)")
         elif key in ("url", "print", "autostart", "input.global", "screen.capture"):
             notes.append(f"{key}: über das Portal, kein Loch nötig")
+        elif key == "recent":
+            if "--filesystem=xdg-data/recently-used.xbel" not in args:
+                args.append("--filesystem=xdg-data/recently-used.xbel")
+                notes.append("recent: --filesystem=xdg-data/recently-used.xbel (die Liste des Hosts mit den "
+                             "zuletzt verwendeten Dateien aller Programme)")
         elif key == "sandbox":
             notes.append("sandbox: zusätzlich zur Flatpak der In-Process-Sandkasten "
                          "(Landlock + seccomp) im Prozess (docs/PERMISSIONS.md „OS sandbox“)")
@@ -534,6 +620,21 @@ def make_flatpak(job):
         return job.skip("flatpak", "Runtime fehlt: " + ", ".join(missing).replace("/", "//")
                         + f" (flatpak install --user flathub …: Download); nur das Manifest geschrieben")
     out = job.dist / f"{aid}.flatpak"
-    linux_task("flatpak", linux_path(d), aid, linux_path(out))
+    repo = d / "repo"
+    key = os.environ.get("jfgui_GPG_KEY", "")
+    url = job.meta.get("flatpak_repo_url", "")
+    import codesign
+    # "-" for an empty value: wsl.exe would drop an empty argument
+    r = codesign.run_gpg_task(["flatpak", linux_path(d), aid, linux_path(out), linux_path(repo), key or "-", url or "-"])
+    if r.returncode:
+        raise RuntimeError(f"flatpak: {(r.stdout + r.stderr).strip()[-3000:]}")
+    if key:
+        job.sign_done(f"Flatpak (GPG {key[-16:]}): Repository {repo.relative_to(job.root).as_posix()} und {out.name}"
+                      + ("" if url else " (ohne flatpak_repo_url: der Installation fehlt die Quelle für Updates)"))
+    else:
+        job.sign_skip(f"Flatpak {out.name}: unsigniert (jfgui_GPG_KEY setzen: signiertes Repository und Bundle)")
+    if not url:
+        job.note("flatpak", "PACKAGE flatpak_repo_url= fehlt: das Bundle nennt kein Repository, eine Installation "
+                            "daraus bekommt keine Updates (flatpak remote-add, lib/update meldet Flatpak)")
     job.made("flatpak", out)
     return out

@@ -9,14 +9,22 @@
 // copied to backup/files/ (backup/list: "R path" replaced, "N path" new), renamed away
 // (NAME.jfupd-old-<n>: Windows can rename a running exe, not replace it) and the new file takes
 // its name.  Leftover .jfupd-* files are removed at a later start, once no process uses them.
+// An AppImage update has one file, the .AppImage itself ($APPIMAGE): copied (and hashed on the
+// way) from staged/ as NAME.jfupd-new, checked as an AppImage whose signature follows the
+// running one's (appimage.rs), renamed over the old file (atomic on Linux); the old file is
+// the backup.  Large files are copied in pieces, never read whole.
 
 use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, Ordering::SeqCst};
 
-use crate::manifest::{self, Kind, Manifest};
-use crate::{Config, Error};
+use plat::pkg::Packaged;
+
+use crate::manifest::{self, Kind, Manifest, Package};
+use crate::{install, Config, Error};
+
+const CHUNK: usize = 1 << 16;
 
 /// where an update stands
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -154,33 +162,51 @@ pub(crate) fn remove_tree(p: &str) {
     plat::delete(p);
 }
 
-/// the running program came out of a package that updates itself as a whole -- an AppImage
-/// (the exe is a copy extracted into a cache: writing it leaves the .AppImage file old), a
-/// Flatpak or a Snap (read-only folders) -> its name; None: cfg.exe names the program, or it
-/// is an ordinary file.  exe and bundle updates are not offered there (Check::NoPackage)
-pub(crate) fn sealed(cfg: &Config) -> Option<&'static str> {
-    if !cfg.exe.is_empty() {
-        return None;
-    }
-    let set = |v: &str| plat::env(v).is_some_and(|x| !x.is_empty());
-    if set("APPIMAGE") {
-        Some("AppImage")
-    } else if set("FLATPAK_ID") || plat::env("container").as_deref() == Some("flatpak") {
-        Some("Flatpak")
-    } else if set("SNAP") {
-        Some("Snap")
-    } else {
-        None
+/// the name of a way of installing that updates itself as a whole (not by exe / bundle files)
+pub(crate) fn sealed_name(p: &Packaged) -> &'static str {
+    match p {
+        Packaged::Plain => "",
+        Packaged::AppImage(_) => "AppImage",
+        Packaged::Flatpak(_) => "Flatpak",
+        Packaged::Msix(_) => "MSIX-Paket",
+        Packaged::Snap => "Snap",
     }
 }
 
-/// the program file: cfg.exe or the running exe (Linux: without " (deleted)")
+/// the program file: cfg.exe, the running AppImage's file, or the running exe (Linux: without
+/// " (deleted)")
 pub(crate) fn program(cfg: &Config) -> Option<String> {
     if !cfg.exe.is_empty() {
         return Some(cfg.exe.clone());
     }
+    if let Packaged::AppImage(p) = install(cfg) {
+        return Some(p);
+    }
     let p = plat::current_exe()?;
     Some(String::from(p.strip_suffix(" (deleted)").unwrap_or(&p)))
+}
+
+// the rule of PERMISSIONS that lets an update write the program's folder
+fn rule(cfg: &Config) -> &'static str {
+    if matches!(install(cfg), Packaged::AppImage(_)) { "fs.write $APPIMAGE/**" } else { "fs.write $EXE/**" }
+}
+
+/// whether the AppImage file can be replaced: its folder takes a new file -> Error::ReadOnly
+/// (the folder cannot be written: not worked around) or Error::Io (refused by PERMISSIONS)
+pub(crate) fn replaceable(cfg: &Config, target: &str) -> Result<(), Error> {
+    let (dir, name) = split_dir(target);
+    if !plat::policy::fs_allowed(target, plat::policy::FS_WRITE) {
+        return Err(not_writable(cfg, target));
+    }
+    let probe = aside(&format!("{}/{}", dir, name), "probe");
+    match plat::File::create_new(&probe) {
+        Some(f) => {
+            drop(f);
+            plat::delete(&probe);
+            Ok(())
+        }
+        None => Err(Error::ReadOnly(String::from(dir))),
+    }
 }
 
 fn split_dir(p: &str) -> (&str, &str) {
@@ -204,9 +230,9 @@ fn rel_ok(rel: &str) -> bool {
         && rel.split('/').all(|s| !s.is_empty() && s != "." && s != "..")
 }
 
-/// the staged update, checked again: signature, app, version, size and SHA-256 -> its
-/// manifest, package kind and bytes
-pub(crate) fn load_staged(cfg: &Config, st: &State) -> Result<(Manifest, Kind, Vec<u8>), Error> {
+/// the staged manifest, checked again: signature, app, version, expiry, replay -> it and the
+/// package of this system and installation
+fn staged_manifest(cfg: &Config, st: &State) -> Result<(Manifest, Package), Error> {
     let read = |n: &str| plat::read_file(&path(cfg, &format!("staged/{}", n)));
     let (Some(m), Some(sig)) = (read("update.json"), read("update.json.sig")) else {
         return Err(Error::Io(String::from("das bereitgestellte Update fehlt")));
@@ -215,7 +241,7 @@ pub(crate) fn load_staged(cfg: &Config, st: &State) -> Result<(Manifest, Kind, V
         return Err(Error::Signature);
     }
     let man = Manifest::parse(&m).map_err(Error::Manifest)?;
-    let pkg = man.package(&cfg.target).ok_or(Error::Nothing)?;
+    let pkg = man.package_for(&cfg.target, Kind::parse(&st.kind) == Some(Kind::AppImage)).cloned().ok_or(Error::Nothing)?;
     if man.expires != 0 && crate::now_secs() > man.expires {
         return Err(Error::Expired);
     }
@@ -225,18 +251,62 @@ pub(crate) fn load_staged(cfg: &Config, st: &State) -> Result<(Manifest, Kind, V
     if !manifest::newer(&man.version, &cfg.version) {
         return Err(Error::Manifest(String::from("das bereitgestellte Update ist nicht neuer als die laufende Version")));
     }
-    if man.app != cfg.app || man.version != st.version {
+    if man.app != cfg.app || man.version != st.version || pkg.kind.name() != st.kind {
         return Err(Error::Manifest(String::from("das bereitgestellte Update passt nicht zum Zustand")));
     }
-    let data = read(&st.file).ok_or_else(|| Error::Io(String::from("die bereitgestellte Datei fehlt")))?;
+    Ok((man, pkg))
+}
+
+/// the size and SHA-256 of a file, read in pieces (None: unreadable)
+fn file_sha256(p: &str) -> Option<(u64, [u8; 32])> {
+    let f = plat::File::open(p, plat::FO_READ)?;
+    let mut h = crypto::Sha256::new();
+    let mut buf = alloc::vec![0u8; CHUNK];
+    let mut off = 0u64;
+    loop {
+        let n = f.read_at(off, &mut buf)?;
+        if n == 0 {
+            return Some((off, h.finalize()));
+        }
+        h.update(&buf[..n]);
+        off += n as u64;
+    }
+}
+
+/// the staged update, checked again: the manifest (staged_manifest), the file's size and
+/// SHA-256 (read in pieces) -> the manifest, the package and the file's path
+pub(crate) fn staged_ok(cfg: &Config, st: &State) -> Result<(Manifest, Package, String), Error> {
+    let (man, pkg) = staged_manifest(cfg, st)?;
+    let file = path(cfg, &format!("staged/{}", st.file));
+    let (size, hash) = file_sha256(&file).ok_or_else(|| Error::Io(String::from("die bereitgestellte Datei fehlt")))?;
+    if size != pkg.size {
+        return Err(Error::Size { expected: pkg.size, got: size });
+    }
+    if !crypto::ct_eq(&hash, &pkg.sha256) {
+        return Err(Error::Hash);
+    }
+    Ok((man, pkg, file))
+}
+
+/// the staged update's bytes (an exe or a bundle: small), checked again as staged_ok does, on
+/// the very bytes that are put in place
+fn staged_bytes(cfg: &Config, st: &State) -> Result<(Package, Vec<u8>), Error> {
+    let (_, pkg) = staged_manifest(cfg, st)?;
+    let data = plat::read_file(&path(cfg, &format!("staged/{}", st.file))).ok_or_else(|| Error::Io(String::from("die bereitgestellte Datei fehlt")))?;
     if data.len() as u64 != pkg.size {
         return Err(Error::Size { expected: pkg.size, got: data.len() as u64 });
     }
     if !crypto::ct_eq(&crypto::sha256(&data), &pkg.sha256) {
         return Err(Error::Hash);
     }
-    let kind = pkg.kind;
-    Ok((man, kind, data))
+    Ok((pkg, data))
+}
+
+// where the bytes of a new file come from
+enum Src {
+    Bytes(Vec<u8>),
+    /// a file, copied in pieces; with the SHA-256 it must have (checked while copying)
+    File(String, Option<[u8; 32]>),
 }
 
 // the files an update writes into the program's folder: (relative path, bytes)
@@ -258,7 +328,7 @@ fn update_files(kind: Kind, exe_name: &str, data: Vec<u8>) -> Result<Vec<(String
             }
             Ok(out)
         }
-        Kind::Package => Err(Error::Unsupported(String::from("ein Installationspaket wird nicht von selbst eingespielt (Updater::staged)"))),
+        _ => Err(Error::Unsupported(String::from("ein Installationspaket wird nicht von selbst eingespielt (Updater::staged)"))),
     }
 }
 
@@ -269,20 +339,54 @@ fn aside(target: &str, what: &str) -> String {
     format!("{}.jfupd-{}-{:x}{:x}", target, what, plat::time_us(), SEQ.fetch_add(1, SeqCst))
 }
 
-fn not_writable(p: &str) -> Error {
-    Error::Io(format!(
-        "{} kann nicht geschrieben werden (Rechte des Programmordners; in PERMISSIONS: fs.write $EXE/**)",
-        p
-    ))
+fn not_writable(cfg: &Config, p: &str) -> Error {
+    Error::Io(format!("{} kann nicht geschrieben werden (Rechte des Programmordners; in PERMISSIONS: {})", p, rule(cfg)))
 }
 
-// write data as target: NAME.jfupd-new first, then the old file renamed away and the new one
-// renamed into its place
-fn swap(target: &str, data: &[u8]) -> Result<(), Error> {
+// copy the file src into f (from offset 0) in pieces -> its SHA-256 (None: a read or a write
+// failed)
+fn copy_into(src: &str, f: &plat::File) -> Option<[u8; 32]> {
+    let from = plat::File::open(src, plat::FO_READ)?;
+    let mut h = crypto::Sha256::new();
+    let mut buf = alloc::vec![0u8; CHUNK];
+    let mut off = 0u64;
+    loop {
+        let n = from.read_at(off, &mut buf)?;
+        if n == 0 {
+            return Some(h.finalize());
+        }
+        h.update(&buf[..n]);
+        if !crate::fetch::write_all(f, off, &buf[..n]) {
+            return None;
+        }
+        off += n as u64;
+    }
+}
+
+// a copy of src at dst (its folder made first) -> whether it worked
+fn copy_file(src: &str, dst: &str) -> bool {
+    let (dir, _) = split_dir(dst);
+    if plat::file_exists(dir) != 2 && !plat::mkdir(dir) {
+        return false;
+    }
+    plat::delete(dst);
+    let Some(f) = plat::File::open(dst, plat::FO_WRITE) else { return false };
+    let ok = copy_into(src, &f).is_some() && f.sync();
+    drop(f);
+    if !ok {
+        plat::delete(dst);
+    }
+    ok
+}
+
+// write src as target: NAME.jfupd-new first, then the old file renamed away and the new one
+// renamed into its place; an AppImage (appimage = true) is checked as the follower of the
+// running one before it takes the place
+fn swap(cfg: &Config, target: &str, src: &Src, appimage: bool) -> Result<(), Error> {
     let new = format!("{}.jfupd-new", target);
     let (dir, _) = split_dir(target);
     if plat::file_exists(dir) != 2 && !plat::mkdir(dir) {
-        return Err(not_writable(target));
+        return Err(not_writable(cfg, target));
     }
     // never write through a name that already exists (a leftover or a planted link)
     plat::delete(&new);
@@ -290,6 +394,7 @@ fn swap(target: &str, data: &[u8]) -> Result<(), Error> {
     let file = plat::File::create_new(&new);
     #[cfg(not(any(windows, target_os = "linux")))]
     let file = plat::File::open(&new, plat::FO_RW);
+    let mut wrong: Option<Error> = None;
     let written = file.is_some_and(|f| {
         // the old file's permissions (a new file: executable, like a program), before the data
         #[cfg(target_os = "linux")]
@@ -297,30 +402,51 @@ fn swap(target: &str, data: &[u8]) -> Result<(), Error> {
             let mode = plat::fs::stat(target).map_or(0o755, |m| m.mode & 0o7777);
             plat::fs::set_mode(&new, mode);
         }
-        crate::fetch::write_all(&f, 0, data) && f.sync()
+        let ok = match src {
+            Src::Bytes(data) => crate::fetch::write_all(&f, 0, data),
+            Src::File(p, want) => match copy_into(p, &f) {
+                Some(h) if want.is_some_and(|w| !crypto::ct_eq(&h, &w)) => {
+                    wrong = Some(Error::Hash);
+                    false
+                }
+                Some(_) => true,
+                None => false,
+            },
+        };
+        ok && f.sync()
     });
+    if let Some(e) = wrong {
+        plat::delete(&new);
+        return Err(e);
+    }
     if !written {
         plat::delete(&new);
-        return Err(not_writable(target));
+        return Err(not_writable(cfg, target));
+    }
+    if appimage {
+        if let Err(why) = crate::appimage::follows(target, &new) {
+            plat::delete(&new);
+            return Err(Error::Rejected(why));
+        }
     }
     let exists = plat::file_exists(target) == 1;
     if cfg!(windows) && exists {
         let old = aside(target, "old");
         if !plat::rename(target, &old) {
             plat::delete(&new);
-            return Err(not_writable(target));
+            return Err(not_writable(cfg, target));
         }
         if !plat::rename(&new, target) {
             plat::rename(&old, target);
             plat::delete(&new);
-            return Err(not_writable(target));
+            return Err(not_writable(cfg, target));
         }
         plat::fs::sync_dir(dir);
         return Ok(());
     }
     if !plat::rename(&new, target) {
         plat::delete(&new);
-        return Err(not_writable(target));
+        return Err(not_writable(cfg, target));
     }
     plat::fs::sync_dir(dir);
     Ok(())
@@ -337,30 +463,44 @@ fn retire(target: &str) {
 
 /// put the staged update in place (the lock is held) -> Ok: stage Trial
 pub(crate) fn apply_staged(cfg: &Config, st: &mut State) -> Result<(), Error> {
-    let staged = load_staged(cfg, st);
-    let (_, kind, data) = match staged {
-        Ok(x) => x,
-        Err(e) => {
-            // a damaged or foreign staged update is dropped, so it does not block every start
-            drop_staged(cfg, st);
-            return Err(e);
-        }
-    };
-    if kind == Kind::Package {
-        return Err(Error::Unsupported(String::from("ein Installationspaket wird nicht von selbst eingespielt (Updater::staged)")));
-    }
-    if let Some(pkg) = sealed(cfg) {
-        // dropped: it would be tried (hashed, backed up) at every start
+    let inst = install(cfg);
+    let kind = Kind::parse(&st.kind);
+    // dropped when it can never apply here: it would be tried (hashed, backed up) at every start
+    let refuse = |st: &mut State, why: String| {
         drop_staged(cfg, st);
-        return Err(Error::Unsupported(format!("das Programm läuft als {}; es wird über dieses Paket aktualisiert", pkg)));
+        Err(Error::Unsupported(why))
+    };
+    match (kind, &inst) {
+        (Some(Kind::Package), _) => {
+            return Err(Error::Unsupported(String::from("ein Installationspaket wird nicht von selbst eingespielt (Updater::staged)")));
+        }
+        (Some(Kind::AppImage), Packaged::AppImage(_)) | (Some(Kind::Exe | Kind::Bundle), Packaged::Plain) => {}
+        (Some(Kind::AppImage), _) => return refuse(st, String::from("ein AppImage-Update, aber das Programm läuft nicht als AppImage")),
+        (Some(Kind::Exe | Kind::Bundle), other) => {
+            return refuse(st, format!("das Programm läuft als {}; es wird über dieses Paket aktualisiert", sealed_name(other)));
+        }
+        _ => return refuse(st, format!("unbekannte Art „{}“", st.kind)),
     }
+    let appimage = kind == Some(Kind::AppImage);
     let exe = program(cfg).ok_or_else(|| Error::Io(String::from("der Programmpfad ist unbekannt")))?;
     let (dir, exe_name) = split_dir(&exe);
-    let files = match update_files(kind, exe_name, data) {
-        Ok(f) => f,
-        Err(e) => {
-            drop_staged(cfg, st);
-            return Err(e);
+    let files: Vec<(String, Src)> = if appimage {
+        match staged_ok(cfg, st) {
+            Ok((_, pkg, file)) => alloc::vec![(String::from(exe_name), Src::File(file, Some(pkg.sha256)))],
+            Err(e) => {
+                // a damaged or foreign staged update is dropped, so it does not block every start
+                drop_staged(cfg, st);
+                return Err(e);
+            }
+        }
+    } else {
+        let made = staged_bytes(cfg, st).and_then(|(pkg, data)| update_files(pkg.kind, exe_name, data));
+        match made {
+            Ok(f) => f.into_iter().map(|(r, b)| (r, Src::Bytes(b))).collect(),
+            Err(e) => {
+                drop_staged(cfg, st);
+                return Err(e);
+            }
         }
     };
     // the backup of every file the update touches
@@ -371,9 +511,8 @@ pub(crate) fn apply_staged(cfg: &Config, st: &mut State) -> Result<(), Error> {
     for (rel, _) in &files {
         let target = format!("{}/{}", dir, rel);
         if plat::file_exists(&target) == 1 {
-            let old = plat::read_file(&target).ok_or_else(|| Error::Io(format!("{} kann nicht gelesen werden", target)))?;
-            if !write(&format!("{}/files/{}", fresh, rel), &old) {
-                return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
+            if !copy_file(&target, &format!("{}/files/{}", fresh, rel)) {
+                return Err(Error::Io(format!("die Sicherung von {} in {} kann nicht geschrieben werden", target, backup)));
             }
             list.push_str(&format!("R {}\n", rel));
         } else {
@@ -389,9 +528,12 @@ pub(crate) fn apply_staged(cfg: &Config, st: &mut State) -> Result<(), Error> {
         return Err(Error::Io(format!("die Sicherung in {} kann nicht geschrieben werden", backup)));
     }
     // the new files; on a failure the old ones come back
-    for (i, (rel, bytes)) in files.iter().enumerate() {
-        if let Err(e) = swap(&format!("{}/{}", dir, rel), bytes) {
+    for (i, (rel, src)) in files.iter().enumerate() {
+        if let Err(e) = swap(cfg, &format!("{}/{}", dir, rel), src, appimage) {
             restore(cfg, dir, Some(&files[..i].iter().map(|(r, _)| r.as_str()).collect::<Vec<_>>()));
+            if matches!(e, Error::Rejected(_) | Error::Hash) {
+                drop_staged(cfg, st); // it would be refused at every start
+            }
             return Err(e);
         }
     }
@@ -413,10 +555,10 @@ fn restore(cfg: &Config, dir: &str, only: Option<&[&str]>) -> bool {
         }
         let target = format!("{}/{}", dir, rel);
         match op {
-            "R" => match plat::read_file(&format!("{}/files/{}", backup, rel)) {
-                Some(old) => ok &= swap(&target, &old).is_ok(),
-                None => ok = false,
-            },
+            "R" => {
+                let old = format!("{}/files/{}", backup, rel);
+                ok &= plat::file_exists(&old) == 1 && swap(cfg, &target, &Src::File(old, None), false).is_ok();
+            }
             "N" => retire(&target),
             _ => {}
         }
@@ -470,10 +612,14 @@ pub(crate) fn cleanup(cfg: &Config) {
             }
         }
     }
+    // the folder of an AppImage holds other files: only those of its own name
+    let own = matches!(install(cfg), Packaged::AppImage(_)).then(|| format!("{}.jfupd-", split_dir(&exe).1));
     for d in dirs {
         let mut old = Vec::new();
         plat::dir_list(&d, &mut |n, is_dir, _| {
-            if !is_dir && (n.contains(".jfupd-old-") || n.contains(".jfupd-bad-") || n.ends_with(".jfupd-new")) {
+            if !is_dir && own.as_deref().is_none_or(|o| n.starts_with(o))
+                && (n.contains(".jfupd-old-") || n.contains(".jfupd-bad-") || n.contains(".jfupd-probe-") || n.ends_with(".jfupd-new"))
+            {
                 old.push(n.to_string());
             }
         });

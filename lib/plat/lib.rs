@@ -36,9 +36,14 @@
 //   power:   inhibit(reason, INHIBIT_SUSPEND | INHIBIT_IDLE) -> Option<Inhibit> (no standby /
 //            screen saver while the guard lives), inhibited()              (power.rs)
 //   autostart: autostart_set(on, args) / autostart_get() / autostart_entry() (Run key, XDG
-//            autostart, Background portal; needs `autostart` in the manifest) (autostart.rs)
+//            autostart, Background portal, MSIX StartupTask; needs `autostart` in the manifest)
+//            (autostart.rs)
+//   pkg:     packaged() (MSIX, Flatpak, AppImage, Snap or a plain program), msix_updates (App
+//            Installer), FlatpakMonitor / flatpak_spawn_latest (the Flatpak portal),
+//            restart_appimage                                                   (pkg.rs)
 //   taskbar: taskbar_progress / taskbar_badge / taskbar_tasks (the taskbar button: progress,
-//            overlay / count, jump list; ITaskbarList3, Unity LauncherEntry) (taskbar.rs)
+//            overlay / count, jump list; ITaskbarList3, Unity LauncherEntry), app_user_model_id
+//            / set_app_user_model_id (Windows: the app's explicit id)        (taskbar.rs)
 //   assoc:   assoc_register / assoc_conflicts / assoc_unregister: the app's PACKAGE file types
 //            and URL schemes for this program without a setup (HKCU\Software\Classes; .desktop,
 //            shared-mime-info, mimeapps.list), file_uri_path                    (assoc.rs)
@@ -150,8 +155,15 @@ pub mod tray;
 /// Keeping the computer awake: no standby, no screen saver while a guard lives.
 pub mod power;
 pub use power::{INHIBIT_IDLE, INHIBIT_SUSPEND, Inhibit, inhibit, inhibited};
-/// Starting the app when the user logs in (Run key, XDG autostart, Background portal).
+/// Starting the app when the user logs in (Run key, XDG autostart, Background portal, an MSIX
+/// package's StartupTask).
 pub mod autostart;
+/// The package the program runs from (MSIX, Flatpak, AppImage, Snap) and what its package
+/// system offers for updates (App Installer, the Flatpak portal).
+pub mod pkg;
+// the few WinRT calls (StartupTask, Package) through raw COM
+#[cfg(windows)]
+mod win_winrt;
 pub use autostart::{AUTOSTART_WAIT_MS, AutostartError, autostart_entry, autostart_get, autostart_set};
 /// The app's taskbar / dock button: progress, a badge, the jump list's tasks.
 pub mod taskbar;

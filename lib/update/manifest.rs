@@ -1,7 +1,9 @@
 // manifest -- update.json: parse, check the signature, pick the package of this system,
 // compare versions
 //
-//   Manifest::parse(bytes) -> Result<Manifest, String>   (no signature check)
+//   Manifest::parse(bytes) -> Result<Manifest, String>   (no signature check; entries of a
+//                                           kind this version does not know are left out)
+//   Manifest::package_for(target, appimage) the entry for this system and installation
 //   verify(bytes, sig_text, keys) -> bool   the Base64 Ed25519 signature of update.json.sig
 //   target() -> "windows-x86_64" | "linux-x86_64" | "linux-aarch64" | ...
 //   newer(a, b) -> bool                     "1.10.0" > "1.9.2", "2.0.0" > "2.0.0-rc1"
@@ -26,15 +28,23 @@ pub enum Kind {
     Bundle,
     /// an installer (.deb, setup): downloaded and checked, installed by the app or the user
     Package,
+    /// a whole AppImage: replaces the running AppImage's file ($APPIMAGE); only offered to a
+    /// program that runs as an AppImage, which is offered nothing else
+    AppImage,
+    /// an update of a Flatpak from its repository, through the Flatpak portal (never in a
+    /// manifest: Offer::kind of a Flatpak)
+    Flatpak,
 }
 
 impl Kind {
-    /// "exe", "bundle" or "package"
+    /// "exe", "bundle", "package", "appimage" or "flatpak"
     pub fn name(self) -> &'static str {
         match self {
             Kind::Exe => "exe",
             Kind::Bundle => "bundle",
             Kind::Package => "package",
+            Kind::AppImage => "appimage",
+            Kind::Flatpak => "flatpak",
         }
     }
 
@@ -44,6 +54,8 @@ impl Kind {
             "exe" => Some(Kind::Exe),
             "bundle" => Some(Kind::Bundle),
             "package" => Some(Kind::Package),
+            "appimage" => Some(Kind::AppImage),
+            "flatpak" => Some(Kind::Flatpak),
             _ => None,
         }
     }
@@ -98,7 +110,9 @@ impl Manifest {
         let list = v.get("files").and_then(Value::as_array).ok_or("\"files\" fehlt")?;
         let mut files = Vec::with_capacity(list.len());
         for (i, f) in list.iter().enumerate() {
-            files.push(package(f).map_err(|e| format!("files[{}]: {}", i, e))?);
+            if let Some(p) = package(f).map_err(|e| format!("files[{}]: {}", i, e))? {
+                files.push(p);
+            }
         }
         Ok(Manifest { app, version, date, expires, notes, files })
     }
@@ -107,17 +121,29 @@ impl Manifest {
     pub fn package(&self, target: &str) -> Option<&Package> {
         self.files.iter().find(|p| p.target == target)
     }
+
+    /// the package for a target and the way the program is installed: the first "appimage"
+    /// entry for an AppImage (appimage = true), else the first entry of another kind
+    pub fn package_for(&self, target: &str, appimage: bool) -> Option<&Package> {
+        self.files.iter().find(|p| p.target == target && (p.kind == Kind::AppImage) == appimage)
+    }
 }
 
-fn package(f: &Value) -> Result<Package, String> {
+// one entry of "files" (None: a kind this version does not know -- a newer channel's entry
+// for other installations, left out)
+fn package(f: &Value) -> Result<Option<Package>, String> {
     let text = |k: &str| f.get(k).and_then(Value::as_str);
     let target = text("target").filter(|s| !s.is_empty()).ok_or("\"target\" fehlt")?;
-    let kind = Kind::parse(text("kind").unwrap_or("exe")).ok_or("unbekannte Art (\"kind\": exe, bundle, package)")?;
+    let kind_name = text("kind").unwrap_or("exe");
+    if kind_name.is_empty() || !kind_name.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-') {
+        return Err(String::from("ungültige Art (\"kind\": exe, bundle, package, appimage)"));
+    }
+    let Some(kind) = Kind::parse(kind_name).filter(|k| *k != Kind::Flatpak) else { return Ok(None) };
     let url = text("url").filter(|s| !s.is_empty() && !s.chars().any(|c| c.is_control() || c == ' ')).ok_or("\"url\" fehlt")?;
     let size = f.get("size").and_then(Value::as_u64).ok_or("\"size\" fehlt")?;
     let hash = text("sha256").and_then(crypto::unhex).and_then(|b| <[u8; 32]>::try_from(b.as_slice()).ok());
     let sha256 = hash.ok_or("\"sha256\" fehlt oder hat nicht 64 Hex-Zeichen")?;
-    Ok(Package { target: String::from(target), kind, url: String::from(url), size, sha256 })
+    Ok(Some(Package { target: String::from(target), kind, url: String::from(url), size, sha256 }))
 }
 
 // a version: digits, letters, '.', '-', '+' (no separators of the state file)

@@ -6,6 +6,7 @@
 //                     app_uri = application://<desktop id>.desktop (linux_desk.rs)
 //   tasks(..)         false: Linux docks take quick lists from the .desktop file's Actions
 //   supported()       a session bus is announced
+//   set_app_id(..)    false: the desktop knows the app by its .desktop id (linux_desk.rs)
 //
 // The signals go out on a session-bus connection kept open (linux_desk.rs Link): docks forget
 // an entry's state when its sender goes away.  A dock that starts later may ask
@@ -68,4 +69,12 @@ pub fn tasks(_tasks: &[JumpTask]) -> bool {
 
 pub fn supported() -> bool {
     session_available()
+}
+
+pub fn set_app_id(_id: &str) -> bool {
+    false
+}
+
+pub fn app_id() -> Option<String> {
+    None
 }

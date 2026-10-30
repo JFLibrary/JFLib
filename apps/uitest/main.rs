@@ -292,8 +292,8 @@ fn themes(t: &mut T) {
     t.eq("token unknown", token_index("bgcolor"), None);
     let text = "# a theme\n[theme]\nname = Probe\n[colors]\nbg = #102030\ncrit = #ABC\n[light]\naccent = #0F7B8A\ntext = #80112233\n\
                 [dark]\nbg = #000000\n[contrast]\naccent = #00E5FF\n[metrics]\nradius = 150%\nspacing = 90%\ncontrol_height = 30\n\
-                [text]\nfamily = fonts/x.ttf\nfamily.bold = fonts/x-bold.ttf\nbody.size = 14.5\nbody.line = 21\ntitle.weight = semibold\n\
-                caption.weight = 300\n";
+                [text]\nfamily = fonts/x.ttf\nfamily.bold = fonts/x-bold.ttf\nfamily.axes = wdth=87.5, \"opsz\" 12, GRAD -50\n\
+                body.size = 14.5\nbody.line = 21\ntitle.weight = semibold\ncaption.weight = 300\n";
     let th = Theme::from_ini(text);
     t.check("parsed", th.is_ok());
     let th = th.unwrap_or_default();
@@ -308,6 +308,8 @@ fn themes(t: &mut T) {
     t.eq("body", (th.text[1].size_fx, th.text[1].line), (Some(14 * 256 + 128), Some(21)));
     t.eq("weights", (th.text[4].weight, th.text[0].weight), (Some(600), Some(300)));
     t.eq("family", (th.family.as_str(), th.family_semibold.as_str(), th.family_bold.as_str()), ("fonts/x.ttf", "", "fonts/x-bold.ttf"));
+    t.eq("family axes", th.family_axes.clone(), alloc::vec![(*b"wdth", 87.5), (*b"opsz", 12.0), (*b"GRAD", -50.0)]);
+    t.check("to_ini: axes", th.to_ini().contains("family.axes=wdth=87.5, opsz=12, GRAD=-50"));
     // the text form reads back to the same theme
     let back = Theme::from_ini(&th.to_ini());
     t.check("to_ini round trip", back.as_ref() == Ok(&th));
@@ -325,6 +327,10 @@ fn themes(t: &mut T) {
     t.eq("radius range", err("[metrics]\nradius = 500%\n"), (2, String::from("Zeile 2: „500%“ ist keine Zahl von 0 bis 400")));
     t.eq("weight", err("[text]\nbody.weight = fett\n"), (2, String::from("Zeile 2: „fett“ ist keine Schriftstärke (regular, semibold, bold, 100 bis 900)")));
     t.eq("text style", err("[text]\nheading.size = 12\n"), (2, String::from("Zeile 2: unbekannter Schlüssel „heading.size“ in [text]")));
+    t.eq("axes", err("[text]\nfamily.axes = wdth=schmal\n"),
+         (2, String::from("Zeile 2: „wdth=schmal“ sind keine Achsenwerte (wght=650, wdth=87.5 …)")));
+    t.eq("axis tag", err("[text]\nfamily.axes = width=80\n"),
+         (2, String::from("Zeile 2: „width=80“ sind keine Achsenwerte (wght=650, wdth=87.5 …)")));
     t.eq("unreadable", Theme::load("mem://uitest/fehlt.theme").err().map(|e| (e.line, e.msg)),
          Some((0, String::from("Theme-Datei nicht lesbar: mem://uitest/fehlt.theme"))));
     // a file: relative font files are found next to it

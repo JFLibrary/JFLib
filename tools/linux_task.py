@@ -16,7 +16,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--watch-stdin', action='store_true')
     p.add_argument('--cwd')
-    p.add_argument('action', choices=['run', 'deb', 'repo', 'probe', 'appimage', 'rpm', 'flatpak'])
+    p.add_argument('action', choices=['run', 'deb', 'repo', 'probe', 'appimage', 'rpm', 'flatpak', 'gpgsign'])
     p.add_argument('args', nargs=argparse.REMAINDER)
     a = p.parse_args()
     if a.cwd:
@@ -51,7 +51,9 @@ def main():
     if a.action == 'rpm':
         return rpm(Path(a.args[0]), Path(a.args[1]), Path(a.args[2]))
     if a.action == 'flatpak':
-        return flatpak(Path(a.args[0]), a.args[1], Path(a.args[2]))
+        return flatpak(Path(a.args[0]), a.args[1], Path(a.args[2]), *a.args[3:])
+    if a.action == 'gpgsign':
+        return gpgsign(Path(a.args[0]), a.args[1])
     tree, destination = map(Path, a.args)
     with tempfile.TemporaryDirectory(prefix='jfgui-deb-') as tmp:
         package = Path(tmp) / 'pkg'
@@ -143,17 +145,83 @@ def rpm(spec, source, outdir):
     return 0
 
 
-def flatpak(src, app_id, bundle):
+def gpg_base():
+    """gpg in batch mode with jfgui_GPG_HOME"""
+    gpg = ['gpg', '--batch', '--yes']
+    if os.environ.get('jfgui_GPG_HOME'):
+        gpg += ['--homedir', os.environ['jfgui_GPG_HOME']]
+    return gpg
+
+
+def gpgsign(path, key):
+    """an armored detached signature of path by key and the armored public key, as one JSON
+    line {"sig": ..., "key": ...} (pkg_linux.sign_appimage)"""
+    gpg = gpg_base()
+    pw = os.environ.get('jfgui_GPG_PASSPHRASE')
+    sign = gpg + ['--local-user', key, '--armor', '--detach-sign', '--output', '-']
+    if pw:
+        sign += ['--pinentry-mode', 'loopback', '--passphrase-fd', '0']
+    sign.append(str(path))
+    sig = subprocess.run(sign, input=pw.encode() if pw else None, check=True, capture_output=True).stdout
+    pub = subprocess.run(gpg + ['--armor', '--export', key], check=True, capture_output=True).stdout
+    if not pub:
+        print(f'gpgsign: gpg has no public key {key}', file=sys.stderr)
+        return 1
+    print(json.dumps({'sig': sig.decode('ascii'), 'key': pub.decode('ascii')}))
+    return 0
+
+
+def writable_tree(root):
+    """every file and folder below root writable by the owner (an ostree repository has
+    read-only objects; copies of it must be replaceable on the Windows side)"""
+    for entry in [root, *root.rglob('*')]:
+        if not entry.is_symlink():
+            entry.chmod(entry.stat().st_mode | 0o200)
+
+
+def flatpak(src, app_id, bundle, repo='', key='', url=''):
     """flatpak-builder on the manifest src/<app_id>.json (copied into the Linux file system),
-    exported into a temporary repository, then a single-file bundle"""
+    exported into the repository repo (copied in and back: each build adds a commit; a fresh
+    one without repo), its summary updated, then a single-file bundle.  key (jfgui_GPG_HOME):
+    the commits, the summary and the bundle GPG-signed, the bundle carries the public key
+    (repo/../<app_id>.gpg) and url (the remote of an installation from it: --repo-url), and a
+    <app_id>.flatpakrepo for flatpak remote-add is written next to the repository ("-": none)"""
+    repo, key, url = ('' if v == '-' else v for v in (repo, key, url))
+    home = os.environ.get('jfgui_GPG_HOME')
+    sign = [f'--gpg-sign={key}'] + ([f'--gpg-homedir={home}'] if home else []) if key else []
     with tempfile.TemporaryDirectory(prefix='jfgui-flatpak-') as tmp:
         work = Path(tmp)
-        shutil.copytree(src, work / 'src')
+        shutil.copytree(src, work / 'src', ignore=lambda d, names: ['repo'] if Path(d) == Path(src) else [])
+        if repo and Path(repo).is_dir():
+            shutil.copytree(repo, work / 'repo', symlinks=True)
         subprocess.run(['flatpak-builder', '--disable-rofiles-fuse', '--force-clean', '--disable-updates',
-                        f'--state-dir={work / "state"}', f'--repo={work / "repo"}', str(work / 'build'),
+                        f'--state-dir={work / "state"}', f'--repo={work / "repo"}', *sign, str(work / 'build'),
                         str(work / 'src' / f'{app_id}.json')], check=True)
-        subprocess.run(['flatpak', 'build-bundle', str(work / 'repo'), str(work / 'out.flatpak'), app_id], check=True)
+        subprocess.run(['flatpak', 'build-update-repo', *sign, str(work / 'repo')], check=True)
+        extra = []
+        if key:
+            pub = subprocess.run(gpg_base() + ['--export', key], check=True, capture_output=True).stdout
+            if not pub:
+                print(f'flatpak: gpg has no public key {key}', file=sys.stderr)
+                return 1
+            (work / 'key.gpg').write_bytes(pub)
+            extra.append(f'--gpg-keys={work / "key.gpg"}')
+        if url:
+            extra.append(f'--repo-url={url}')
+        subprocess.run(['flatpak', 'build-bundle', *sign, *extra, str(work / 'repo'), str(work / 'out.flatpak'), app_id], check=True)
         shutil.copyfile(work / 'out.flatpak', bundle)
+        if repo:
+            writable_tree(work / 'repo')
+            if Path(repo).exists():
+                writable_tree(Path(repo))
+                shutil.rmtree(repo)
+            shutil.copytree(work / 'repo', repo, symlinks=True)
+            if key:
+                shutil.copyfile(work / 'key.gpg', Path(repo).parent / f'{app_id}.gpg')
+                if url:
+                    import base64
+                    (Path(repo).parent / f'{app_id}.flatpakrepo').write_text(
+                        f'[Flatpak Repo]\nTitle={app_id}\nUrl={url}\nGPGKey={base64.b64encode(pub).decode()}\n', encoding='utf-8')
     return 0
 
 

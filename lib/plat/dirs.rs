@@ -75,7 +75,7 @@ pub fn log_dir() -> Option<String> {
 }
 
 #[cfg(windows)]
-pub(crate) use win::{KF_PROGRAMS, known_folder};
+pub(crate) use win::{KF_PROGRAMS, KF_USER_PINNED, known_folder};
 
 #[cfg(windows)]
 mod win {
@@ -94,9 +94,12 @@ mod win {
 
     /// known_folder: the start menu's "Programs" (the setup's shortcuts)
     pub(crate) const KF_PROGRAMS: usize = 6;
+    /// known_folder: the user's pinned items (the taskbar's pins: TaskBar, ImplicitAppShortcuts)
+    pub(crate) const KF_USER_PINNED: usize = 7;
 
-    // FOLDERID_Desktop, _Documents, _Downloads, _Pictures, _Music, _Videos (DIR_* order), _Programs
-    static FIDS: [Guid; 7] = [
+    // FOLDERID_Desktop, _Documents, _Downloads, _Pictures, _Music, _Videos (DIR_* order), _Programs,
+    // _UserPinned
+    static FIDS: [Guid; 8] = [
         Guid(0xB4BF_CC3A, 0xDB2C, 0x424C, [0xB0, 0x29, 0x7F, 0xE9, 0x9A, 0x87, 0xC6, 0x41]),
         Guid(0xFDD3_9AD0, 0x238F, 0x46AF, [0xAD, 0xB4, 0x6C, 0x85, 0x48, 0x03, 0x69, 0xC7]),
         Guid(0x374D_E290, 0x123F, 0x4565, [0x91, 0x64, 0x39, 0xC4, 0x92, 0x5E, 0x46, 0x7B]),
@@ -104,6 +107,7 @@ mod win {
         Guid(0x4BD8_D571, 0x6D19, 0x48D3, [0xBE, 0x97, 0x42, 0x22, 0x20, 0x08, 0x0E, 0x43]),
         Guid(0x1898_9B1D, 0x99B5, 0x455B, [0x84, 0x1C, 0xAB, 0x7C, 0x74, 0xE4, 0xDD, 0xFC]),
         Guid(0xA77F_5D77, 0x2E2B, 0x44C3, [0xA6, 0xA2, 0xAB, 0xA6, 0x01, 0x05, 0x4A, 0x51]),
+        Guid(0x9E39_95AB, 0x1F9C, 0x4F13, [0xB8, 0x27, 0x48, 0xB2, 0x4B, 0x6C, 0x71, 0x74]),
     ];
     // KF_FLAG_DONT_VERIFY: the configured path, also when the folder is missing
     const KF_FLAG_DONT_VERIFY: u32 = 0x4000;
@@ -126,7 +130,7 @@ mod win {
         p
     }
 
-    /// the folder k (DIR_* or KF_PROGRAMS) as the shell returns it (backslashes)
+    /// the folder k (DIR_*, KF_PROGRAMS or KF_USER_PINNED) as the shell returns it (backslashes)
     pub(crate) fn known_folder(k: usize) -> Option<String> {
         let fid = FIDS.get(k)?;
         let get = proc_of(&SHGET, b"shell32.dll\0", b"SHGetKnownFolderPath\0");

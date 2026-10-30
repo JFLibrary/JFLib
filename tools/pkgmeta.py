@@ -167,14 +167,16 @@ class Job:
     exe {style: {target: Path}}, extra {target: [(name, Path)]} (modules and further programs
     next to the program), bins {target: [name]} (the further programs), cross {package target:
     [(name, bytes)]} (the other system's agents), notices {relative Path: source}, units [(name,
-    text)]; perms (default: permissions(app)); runtime / appimage_runtime (AppImage).  made /
-    skip / note collect the report."""
+    text)]; perms (default: permissions(app)); runtime / appimage_runtime (AppImage); signing
+    (package.py's Signing, optional).  made / skip / note collect the report, sign_done /
+    sign_skip the signatures."""
 
     def __init__(self, **kw):
         self.__dict__.update(kw)
         if "perms" not in kw:
             self.perms = permissions(self.app)
         self.done, self.skipped, self.notes = [], [], []
+        self.signed, self.unsigned = [], []         # without a Signing (sign_done / sign_skip)
 
     def default_style(self, target):
         """PACKAGE default_win / default_linux when it is built, else the first style"""
@@ -193,6 +195,22 @@ class Job:
     def note(self, fmt, text):
         self.notes.append((fmt, text))
         print(f"  [{fmt}] {text}")
+
+    def sign_done(self, what):
+        """a signature made (package.py's Signing report when job.signing is set)"""
+        signing = getattr(self, "signing", None)
+        if signing is not None:
+            signing.done.append(what)
+        else:
+            self.signed.append(what)
+
+    def sign_skip(self, why):
+        """a signature not made (Signing.skip: an error with --sign)"""
+        signing = getattr(self, "signing", None)
+        if signing is not None:
+            signing.skip(why)
+        else:
+            self.unsigned.append(why)
 
     def report(self):
         print("[formats] gebaut: " + (", ".join(f"{f} ({p.name})" for f, p in self.done) if self.done else "nichts"))

@@ -3,7 +3,9 @@
 //   recent_add(path) -> bool        a file the user opened or saved.  Windows:
 //                                   SHAddToRecentDocs (Explorer's recent files; the app's jump
 //                                   list shows it under "Recent" when the app is a registered
-//                                   handler of the type: the setup, assoc_register, MSIX).
+//                                   handler of the type: the setup, assoc_register, MSIX; with
+//                                   the process's explicit AppUserModelID, taskbar.rs, the
+//                                   item is given to that id: SHARD_APPIDINFO).
 //                                   Linux: a bookmark in $XDG_DATA_HOME/recently-used.xbel (the
 //                                   freedesktop format GTK and KDE read: href, added / modified /
 //                                   visited, the MIME type, this app's entry with exec and count)
@@ -19,6 +21,9 @@
 //   recent_os(on)                   (ui::main!) off in headless runs (--script, --shot, the
 //                                   agent protocols): add / remove / clear leave the system's
 //                                   list alone and return false
+//   recent_list_of(id, max) / recent_remove_of(id, path)   (Windows, tests) the jump list of
+//                                   another AppUserModelID (Explorer's own recent files:
+//                                   Microsoft.Windows.Explorer)
 //
 // The path must be readable under the app's permissions (fs.read / fs.user, policy.rs; else
 // "PERMDENY fs.read" and false) and be an OS file (a folder mount's file counts as its OS path;
@@ -116,6 +121,26 @@ pub fn recent_clear() -> bool {
         Target::Off => false,
         Target::Xbel(f) => xbel_remove(&f, None),
         Target::Native => native::clear(),
+    }
+}
+
+/// (Windows, tests) the recent files of the jump list of AppUserModelID id
+#[cfg(windows)]
+#[doc(hidden)]
+pub fn recent_list_of(id: &str, max: usize) -> Vec<String> {
+    let mut v = native::list_of(id, max);
+    v.truncate(max);
+    v
+}
+
+/// (Windows, tests) a file out of the jump list of AppUserModelID id (Explorer's own:
+/// Microsoft.Windows.Explorer)
+#[cfg(windows)]
+#[doc(hidden)]
+pub fn recent_remove_of(id: &str, path: &str) -> bool {
+    match crate::vfs::os_path(path).and_then(|p| crate::policy::normalize(&p)) {
+        Some(os) => native::remove_of(id, &os),
+        None => false,
     }
 }
 

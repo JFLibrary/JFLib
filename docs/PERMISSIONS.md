@@ -90,12 +90,15 @@ sandbox                               # let the OS enforce the manifest too (OS 
 | `agent.confirm` | action names (`*`, `?`) | external control runs these actions after the user's confirmation |
 | `agent.deny` | action names (`*`, `?`) | external control may not run these actions |
 | `sandbox` | nothing or `strict` | have the OS enforce the manifest as defence in depth ([OS sandbox](#os-sandbox)); `strict` refuses to start without it |
+| `recent` | – | a Flatpak reaches the host's list of recent files: the package gets `--filesystem=xdg-data/recently-used.xbel` ([Flatpak](#flatpak)); that file lists the recent files of every program. Nothing changes at run time: the system's list is always allowed for files the app may read (below); it cannot be asked for |
 
 ### Patterns
 
 - A pattern is an absolute path or starts with a variable: `$CONFIG` (`config_dir()`),
-  `$TEMP` (`temp_dir()`), `$HOME`, `$EXE` (the folder of the executable), `$FONTS` (every
-  system font folder), the app's own folders `$APPCONFIG`, `$APPDATA`, `$APPCACHE` and
+  `$TEMP` (`temp_dir()`), `$HOME`, `$EXE` (the folder of the executable), `$APPIMAGE` (the
+  folder of the running AppImage file: an AppImage's program runs from the copy its runtime
+  unpacked, which is `$EXE`; `lib/update` replaces the file in this folder; no value outside
+  an AppImage), `$FONTS` (every system font folder), the app's own folders `$APPCONFIG`, `$APPDATA`, `$APPCACHE` and
   `$APPLOG` (`config://`, `data://`, `cache://`, `logs://`; [VFS.md](VFS.md)), or the user's
   folders `$DESKTOP`, `$DOCUMENTS`, `$DOWNLOADS`, `$PICTURES`, `$MUSIC` and `$VIDEOS`
   (`plat::user_dir`: the Known Folders on Windows, the XDG user dirs on Linux, also when the
@@ -175,7 +178,7 @@ net.connect backup.example.org:8443
   recycle bin, `~/.local/share/Trash`, `.Trash-$uid`). `trash` checks the item as a write.
 - The system's list of recent files (`plat::recent_add`: Windows' recent items,
   `~/.local/share/recently-used.xbel`) for a file the app may read; the file is checked as a
-  read.
+  read. A Flatpak reaches the host's list only with the line `recent`.
 - Registering the app's file types and URL schemes (`--register`, `plat::assoc`): only what
   `PACKAGE` declares, in the user's part of the system (`HKCU\Software\Classes`,
   `~/.local/share/applications`, `~/.local/share/mime`, `~/.config/mimeapps.list`), and only
@@ -466,8 +469,8 @@ from the manifest, as defence in depth:
 `tools/pkg_linux.py` derives the Flatpak finish-args from the manifest and is already as narrow
 as it allows: Wayland with X11 as fallback and IPC, the network only with a `net.*` rule, the
 Secret Service only with `secrets`, `--filesystem` holes only for the folders of `fs.*` rules
-(`fs.read` as `:ro`), and portals (file dialog, `open_url`, printing, autostart, the documents
-portal for `fs.user`) instead of holes. Inside the Flatpak the kernel enforces those; the
+(`fs.read` as `:ro`), the host's `recently-used.xbel` only with `recent`, and portals (file
+dialog, `open_url`, printing, autostart, the documents portal for `fs.user`) instead of holes. Inside the Flatpak the kernel enforces those; the
 in-process OS sandbox above stacks on top when the manifest also has a `sandbox` line.
 
 ## Refusals
@@ -520,6 +523,7 @@ In addition:
   the channel's host (and the host of absolute file addresses and redirects) needs a
   `net.connect` rule. Putting an update in place writes the program's folder: add
   `fs.write $EXE/**`, or the update stays downloaded and `startup()` reports the missing rule.
+  An AppImage replaces its `.AppImage` file instead: `fs.write $APPIMAGE/**`.
 - **Android.** The APK installs the manifest like a desktop program, but `plat` runs on the
   host adapter of the browser there (`web.rs`, `web_files.rs`): the files are the adapter's
   virtual files (`/config`, `/data`, `/cache`, `/tmp`, `/documents`, `/imports`), checked with

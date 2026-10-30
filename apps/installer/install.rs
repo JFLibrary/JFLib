@@ -10,13 +10,15 @@
 //
 // install.ini (key=value): app, display, style, desktop, start (shortcut paths or empty),
 // reg (1 / 0), files (further files relative to the folder, ';'-separated, '\'), assoc (what
-// the file types and URL schemes added, assoc.rs)
+// the file types and URL schemes added, assoc.rs), app_id (the program's AppUserModelID: the
+// shortcuts, the pins and the ProgIDs carry it, and the program runs under it when it finds
+// this line beside itself, lib/plat/assoc.rs app_id_boot)
 
 use alloc::format;
 use alloc::string::String;
 
 use crate::payload::{PK_FILE, STY_MAX, kv_get, parent_dir, path_cap, pl_inflate};
-use crate::shell::{Reg, sh_assoc_remove, sh_assoc_set, sh_folder, sh_link, sh_reg_delete, sh_run};
+use crate::shell::{Reg, sh_assoc_remove, sh_assoc_set, sh_folder, sh_link, sh_pins, sh_reg_delete, sh_run};
 use crate::{Inst, PATH_CAP, str_cap};
 
 const IN_FILES_CAP: usize = 4096; // in_files: "a;b;c" of the uninstaller
@@ -116,13 +118,15 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     if st.opt_start != 0 {
         st.lnk_start = in_link(st, 1, &lnk);
     }
+    // the taskbar's pins of an earlier version: the program's new id (else two buttons)
+    sh_pins(&st.exepath, &st.appid);
     if st.opt_reg != 0 {
         in_regentry(st);
     }
     // file types and URL schemes (PACKAGE filetypes= / schemes=)
     let types = crate::assoc::parse_types(&st.types);
     let schemes = crate::assoc::parse_schemes(&st.schemes);
-    let plan = crate::assoc::plan(&st.app, &st.disp, &st.exepath, &types, &schemes);
+    let plan = crate::assoc::plan(&st.app, &st.disp, &st.exepath, &types, &schemes, &st.appid);
     sh_assoc_set(&plan.set);
     in_ini(&mut initxt, "app", &st.app);
     in_ini(&mut initxt, "display", &st.disp);
@@ -133,6 +137,9 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
     in_ini(&mut initxt, "reg", if st.opt_reg != 0 { "1" } else { "0" });
     in_ini(&mut initxt, "files", &files);
     in_ini(&mut initxt, "assoc", &plan.remove);
+    if !st.appid.is_empty() {
+        in_ini(&mut initxt, "app_id", &st.appid);
+    }
     plat::write_file(&in_path(st, "install.ini"), initxt.as_bytes());
     Ok(())
 }
@@ -141,7 +148,7 @@ pub(crate) fn inst_run(st: &mut Inst) -> Result<(), ()> {
 fn in_link(st: &Inst, which: u32, lnk: &str) -> String {
     let Some(dir) = sh_folder(which) else { return String::new() };
     let path = path_cap(&format!("{dir}\\{lnk}"));
-    if sh_link(&path, &st.exepath, &st.dir, &st.disp) { path } else { String::new() }
+    if sh_link(&path, &st.exepath, &st.dir, &st.disp, &st.appid) { path } else { String::new() }
 }
 
 /// the "installed apps" entry  [in_regentry]

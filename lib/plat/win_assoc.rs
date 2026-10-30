@@ -339,7 +339,7 @@ fn label(root: &str) -> String {
 
 /// the decisions of a registration: (root, Some(conflict) | None) and (.ext key, conflict)
 fn plan(pkg: &Package, exe: &str, v: &View) -> (Vec<RegValue>, Vec<(String, Option<Conflict>)>, Vec<(String, Conflict)>) {
-    let entries = reg_entries(&pkg.app, &pkg.display, exe, &pkg.types, &pkg.schemes);
+    let entries = reg_entries(&pkg.app, &pkg.display, exe, &pkg.types, &pkg.schemes, &pkg.app_id);
     let cmd = command(exe);
     let mut roots: Vec<(String, Option<Conflict>)> = Vec::new();
     let mut defaults: Vec<(String, Conflict)> = Vec::new();

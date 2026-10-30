@@ -9,7 +9,9 @@ the transport.
 | --- | --- |
 | Check, download, status, the manifest | [`lib/update/lib.rs`](../lib/update/lib.rs), [`manifest.rs`](../lib/update/manifest.rs), [`fetch.rs`](../lib/update/fetch.rs) |
 | State, putting in place, trial, rollback | [`lib/update/apply.rs`](../lib/update/apply.rs) |
-| Restarting the program file at its path | `plat::restart_self` |
+| AppImage files and their GPG signature | [`appimage.rs`](../lib/update/appimage.rs), [`pgp.rs`](../lib/update/pgp.rs) |
+| The way the program is installed, the package systems' updates | `plat::pkg` ([`pkg.rs`](../lib/plat/pkg.rs): MSIX through WinRT, the Flatpak portal) |
+| Restarting the program file at its path | `plat::restart_self`, `plat::pkg::restart_appimage` |
 | Streaming downloads | `netio::Client::get_to`, `netio::http::Reader::body_to` |
 | Keys, writing and signing a channel | [`tools/update_manifest.py`](../tools/update_manifest.py), `tools/package.py --update` |
 | Tests | [`apps/updatetest`](../apps/updatetest/main.rs) against [`tools/update_server.py`](../tools/update_server.py) |
@@ -86,6 +88,13 @@ Two files at the channel's address, written by `tools/update_manifest.py` (or
 | `exe` | yes: replaces the program file | a single-file program |
 | `bundle` | yes: every file of a JFA1 bundle (`tools/assetpack.py`) goes to its path relative to the program's folder | the program with its modules (`jxlenc.dll`) or further programs (`BINS`) |
 | `package` | no: downloaded and checked, `Updater::staged()` names the file | an installer or a `.deb` the user or the package manager installs (programs in `/usr/lib` or `Program Files` cannot replace themselves) |
+| `appimage` | yes: replaces the running AppImage's file | an AppImage of the style ("Packages" below); only a program that runs as an AppImage takes it, and it takes nothing else |
+
+A channel may list several entries for one target: a program running as an AppImage picks the
+first `appimage` entry of its target, every other program the first entry of another kind (so
+one channel serves the `.deb` and the AppImage of a style).  An entry of a kind this version
+does not know is left out, so a later kind does not break older programs (versions before
+2026-10-30 refused the whole manifest).
 
 `url` is relative to the address `update.json` came from, or absolute. Redirects are
 followed (at most five), so a "latest" address that redirects to a versioned folder works.
@@ -150,17 +159,94 @@ rule, nothing is written and the update stays staged. Programs in folders of the
 (`/usr/lib/<deb>` of the `.deb`, `Program Files`) cannot be written by the user either: use
 `package` updates there. The per-user Windows setup of `tools/package.py`
 (`%LOCALAPPDATA%\Programs\<app>`) is writable, so `exe` and `bundle` updates work there.
-AppImage, Flatpak and MSIX packages are not updated this way: their program folders are an
-extracted copy, the Flatpak repository's or a read-only package folder
-([PACKAGING.md](PACKAGING.md) "Other formats"). On Linux the updater sees it (`$APPIMAGE`,
-`$FLATPAK_ID`, `$SNAP`, with `Config::exe` empty): `check()` answers `Check::NoPackage` for an
-`exe` or `bundle` package there, and an update staged before is dropped at the next start
-(`Startup::Failed(Error::Unsupported(..))`, once).
+An AppImage writes the folder of its `.AppImage` file instead: `fs.write $APPIMAGE/**`.
 
 ```text
 net.connect updates.example.org:443   # the channel (and the host of absolute file URLs)
 fs.write $EXE/**                      # putting updates in place
+fs.write $APPIMAGE/**                 # ... as an AppImage
 ```
+
+## Packages: AppImage, Flatpak, MSIX, Snap
+
+The same calls (`check`, `download`, `apply`, `startup`, `healthy`) follow the way the program
+is installed: `update::install(&cfg)` returns `plat::pkg::packaged()` (`Plain` when
+`Config::exe` names a program file):
+
+| `Packaged` | What an update is | Signature | Rollback |
+| --- | --- | --- | --- |
+| `Plain` | `exe`, `bundle`, `package` (above) | `update.json` (Ed25519) | trial, backup |
+| `AppImage(file)` | the channel's `appimage` entry replaces `file` ($APPIMAGE) | `update.json` (Ed25519, SHA-256 of the file) and the AppImage's own GPG signature | trial, backup |
+| `Flatpak(id)` | the app's Flatpak repository, through the Flatpak portal (`Kind::Flatpak`) | the repository's GPG key (Flatpak checks it) | none by the app (`flatpak update --commit=` by the user) |
+| `Msix(name)` | `Check::Managed(Manager::AppInstaller, ..)` or `Manager::Msix` | the package's signature (Windows checks it) | none by the app |
+| `Snap` | `Check::Managed(Manager::Snap, None)` | snapd | snapd |
+
+**AppImage.**  The program runs from a copy the runtime unpacked, so an `exe` update would
+change nothing that lasts; the `.AppImage` file is replaced as a whole:
+
+1. `check()` takes the first `appimage` entry for the target (none: `Check::NoPackage`) and
+   probes the file's folder: a folder the user cannot write is `Err(Error::ReadOnly(folder))` --
+   reported, not worked around (copy the AppImage somewhere writable, or download it by hand).
+2. `download()` stages the file as for every kind (size, SHA-256, `Range`), read and hashed in
+   pieces.
+3. The next `startup()` (or `apply()`) copies it as `NAME.jfupd-new` next to the AppImage
+   (hashed again on the way), checks that it is an AppImage of type 2 whose signature follows
+   the running one (below), keeps the old file in `backup/`, renames the new file over the old
+   one (atomic: a crash leaves the old or the new file, never half of one) and starts the
+   `.AppImage` again (`plat::pkg::restart_appimage`: its runtime unpacks the new image).  Trial,
+   `healthy()` and the rollback are those of an `exe`.
+
+The AppImage's signature: `tools/package.py` signs AppImages as `appimagetool --sign` does
+(an ASCII-armored detached GPG signature of the file's SHA-256 -- taken with the two sections
+as zeros -- in `.sha256_sig`, the armored public key in `.sig_key`; [PACKAGING.md](PACKAGING.md)
+"AppImage").  The updater checks it with lib/crypto (OpenPGP v4: RSA, ECDSA P-256 / P-384,
+Ed25519; `pgp.rs`): a signed AppImage only takes an update signed by a key of its own key
+block; an unsigned one takes a signed or an unsigned update (the signed manifest decides); a
+signature that does not check, a new file without one, another key or a file that is no
+AppImage is `Startup::Failed(Error::Rejected(why))`, and the staged update is dropped.
+`update::appimage_signature(path)` reads it (`Signed::No`, `Signed::By { signer, keys }`, or
+why it fails), for an About dialog for example.
+
+**Flatpak.**  The sandbox's `/app` is read-only and belongs to Flatpak; updates come from the
+repository the app was installed from (a bundle of `tools/package.py` names it:
+`flatpak_repo_url=`).  The updater uses the Flatpak portal's update monitor
+(`org.freedesktop.portal.Flatpak.CreateUpdateMonitor`, over plat's own D-Bus client):
+
+* `check()` makes the monitor on its first call and keeps it; the portal looks at the remote
+  every few minutes (flatpak-portal `--poll-timeout`, 300 s by default) and reports
+  `UpdateAvailable`, which `check()` answers as `Check::Available(Offer { kind: Kind::Flatpak,
+  version: <the first 12 hex digits of the new commit>, .. })` -- the first check after the start
+  usually says `UpToDate`; check again later (a timer, `start_check()`).  An update installed
+  meanwhile by `flatpak update` is `staged: true`.
+* `download()` calls the monitor's `Update`: Flatpak installs the new commit (checked against
+  the repository's GPG key); `status().done` / `total` follow its `Progress` (0..100).  The
+  portal asks the user once whether the app may update itself (the desktop's dialog; the
+  answer stays in the permission store, Settings -> Privacy), and it refuses a version that
+  asks for more permissions than the running one (`Error::Unsupported("Flatpak: ..")`).
+* `apply()` starts the newest installed version (`Spawn` with `LATEST_VERSION`, the same
+  program and arguments) and ends this process (`Config::restart = false`: it returns
+  `Startup::Applied`).  `startup()` and `healthy()` do nothing: there is no trial and no
+  rollback by the app.
+* Without a session bus or the portal (an old Flatpak): `Check::Managed(Manager::Flatpak,
+  None)` -- `flatpak update` or a software centre updates it.
+
+**MSIX.**  The package folder is read-only; Windows installs new versions.  `check()` asks the
+package through WinRT (`Package.Current.GetAppInstallerInfo`, `CheckUpdateAvailabilityAsync`;
+raw COM in `plat::pkg`, no projection):
+
+* installed from an `.appinstaller` file (`tools/package.py` writes it with PACKAGE
+  `appinstaller_url=`): `Check::Managed(Manager::AppInstaller, Some(true))` when App Installer
+  knows a newer version, `Some(false)` when not, `None` when it cannot tell.  App Installer
+  installs it at the next start (`OnLaunch`, with a prompt) or in the background; the app has
+  nothing to do but tell the user to restart.
+* otherwise (the Store, `Add-AppxPackage`, a developer registration):
+  `Check::Managed(Manager::Msix, None)`.
+
+Installing a new version from inside the app (`PackageManager.AddPackageByAppInstallerFileAsync`)
+is not done: App Installer does the same at the next start, with its own checks and prompt.
+
+An update staged before the program came into a package (a `.deb` that became a Flatpak, say)
+is dropped at the next start (`Startup::Failed(Error::Unsupported(..))`, once).
 
 ## Publishing
 
@@ -199,6 +285,19 @@ write permission. `apply.uis` installs a copy of the test program in a scratch f
 update itself to 2.0.0 (restart, healthy), then to a 3.0.0 that fails its first start and is
 rolled back to 2.0.0 by the next start -- real processes on Windows and Linux.
 
+On Linux both also cover AppImages: the server signs fake AppImages with throwaway GPG keys
+(Ed25519, RSA, ECDSA; a temporary `GNUPGHOME`, its agent ended before it serves) and
+`update.uis` checks the signatures, the choice between `.deb` and AppImage, replacing the
+`.AppImage` file with trial and rollback, the refused cases (another key, unsigned after
+signed, a changed byte, no AppImage) and a read-only folder; `apply.uis` builds real AppImages
+of the test program (the runtime `apps/appimagert`, mksquashfs) and lets the installed one
+update itself through its file, then roll back.  Flatpak and Snap without a portal answer
+`Managed`.  The package systems themselves: `python tools/pkg_check.py --quick --install`
+installs the test program as a Flatpak (a GPG-signed repository and bundle, `flatpak --user`
+in a temporary `HOME`, a private session bus with flatpak-portal) and lets it find, install
+and start 2.0.0 through the portal, and registers it as an MSIX package (developer mode) to
+switch its StartupTask and see `Check::Managed` ([PACKAGING.md](PACKAGING.md), "Checks").
+
 ## Limits
 
 * Delta updates are not supported: the whole file is downloaded.
@@ -206,6 +305,13 @@ rolled back to 2.0.0 by the next start -- real processes on Windows and Linux.
   back automatically (no watchdog process).
 * `exe` and `bundle` updates need a writable program folder; `package` updates leave the
   installation to the user (no elevation, no `apt` call).
+* An AppImage is replaced as a whole (no zsync deltas, no AppImageUpdate); its signature is
+  checked against the running file's key block, not against a key built into the app (the
+  signed manifest is that).  OpenPGP keys other than RSA, ECDSA P-256 / P-384 and Ed25519 (and
+  v5 / v6 keys) are refused.
+* Flatpak: the portal reports updates minutes after the start (its poll interval), there is no
+  trial or rollback by the app, and the version shown is a commit.  MSIX: the app only reports
+  App Installer's state; it does not install a new version itself.
 * Single-instance apps should call `apply()` (or restart) only when they are about to end:
   the new process starts right away.
 * Web and Android builds update through their stores and servers; the crate is for Windows and

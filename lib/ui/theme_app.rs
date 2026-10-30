@@ -19,9 +19,12 @@
 //               control_height = DIP      buttons, text boxes, combo boxes, drop-down and split
 //                                         buttons (not compact or large ones)
 //   [text]      family = FILE | installed family   (family.semibold, family.bold: their faces;
-//               else from the family: a file gets a synthetic bold); STYLE.size = DIP (24.8),
-//               STYLE.line = DIP, STYLE.weight = regular | semibold | bold | 100..900 for STYLE
-//               in caption, body, body_strong, subtitle, title, title_large, display
+//               else from the family: a file gets a synthetic bold, a variable one its wght);
+//               family.axes = TAG=VALUE, ...   axis values of a variable family (wdth=87.5,
+//               opsz=12; weights still come from the faces' 400 / 600 / 700, opsz else 11 pt);
+//               STYLE.size = DIP (24.8), STYLE.line = DIP, STYLE.weight = regular | semibold |
+//               bold | 100..900 for STYLE in caption, body, body_strong, subtitle, title,
+//               title_large, display
 // Errors name the line (in the UI language): an unknown section or key, a line without '=',
 // a key before the first section or twice in one section, a value out of range.  A theme is
 // applied whole or not at all (Ui::set_theme).
@@ -101,6 +104,8 @@ pub struct Theme {
     pub family: String,
     pub family_semibold: String,
     pub family_bold: String,
+    /// axis values of a variable family (tag, user units); empty: its defaults
+    pub family_axes: Vec<([u8; 4], f32)>,
 }
 
 impl Default for Theme {
@@ -116,6 +121,7 @@ impl Default for Theme {
             family: String::new(),
             family_semibold: String::new(),
             family_bold: String::new(),
+            family_axes: Vec::new(),
         }
     }
 }
@@ -158,6 +164,7 @@ const E_OUTSIDE: &str = "Zeile {}: „{}“ steht vor dem ersten Abschnitt";
 const E_COLOR: &str = "Zeile {}: „{}“ ist keine Farbe (#RRGGBB oder #AARRGGBB)";
 const E_NUMBER: &str = "Zeile {}: „{}“ ist keine Zahl von {} bis {}";
 const E_WEIGHT: &str = "Zeile {}: „{}“ ist keine Schriftstärke (regular, semibold, bold, 100 bis 900)";
+const E_AXES: &str = "Zeile {}: „{}“ sind keine Achsenwerte (wght=650, wdth=87.5 …)";
 pub(crate) const E_READ: &str = "Theme-Datei nicht lesbar: {}";
 pub(crate) const E_FONT: &str = "Schrift nicht ladbar: {}";
 
@@ -210,6 +217,37 @@ fn parse_weight(v: &str) -> Option<u16> {
         "bold" => Some(700),
         _ => v.parse::<u16>().ok().filter(|w| (100..=900).contains(w)),
     }
+}
+
+// "wdth=87.5, opsz=12" (also "wdth 87.5", tags of 1..4 characters, quoted or not) ->
+// [(tag, value)]; None: not that form
+pub(crate) fn parse_axes(v: &str) -> Option<Vec<([u8; 4], f32)>> {
+    let mut out = Vec::new();
+    for item in v.split(',') {
+        let item = item.trim();
+        if item.is_empty() {
+            continue;
+        }
+        let (t, x) = item.split_once(['=', ' '])?;
+        let t = t.trim().trim_matches(['"', '\'']);
+        let x = x.trim();
+        let (val, used) = f64_parse(x.as_bytes());
+        if t.is_empty() || t.len() > 4 || !t.bytes().all(|c| (0x21..0x7F).contains(&c)) || used == 0 || used != x.len() {
+            return None;
+        }
+        let mut tag = [b' '; 4];
+        tag[..t.len()].copy_from_slice(t.as_bytes());
+        out.push((tag, val as f32));
+    }
+    (!out.is_empty()).then_some(out)
+}
+
+fn axes_text(axes: &[([u8; 4], f32)]) -> String {
+    let items: Vec<String> = axes
+        .iter()
+        .map(|(t, v)| format!("{}={}", String::from_utf8_lossy(t).trim_end(), base::num::f64_format(*v as f64)))
+        .collect();
+    items.join(", ")
 }
 
 fn weight_text(w: u16) -> String {
@@ -302,6 +340,7 @@ impl Theme {
                     "family" => self.family = String::from(v),
                     "family.semibold" => self.family_semibold = String::from(v),
                     "family.bold" => self.family_bold = String::from(v),
+                    "family.axes" => self.family_axes = parse_axes(v).ok_or_else(|| ThemeError::at(line, E_AXES, &[v]))?,
                     _ => {
                         let (ts, what) = low.split_once('.').ok_or_else(unknown)?;
                         let i = TS_NAMES.iter().position(|n| *n == ts).ok_or_else(unknown)?;
@@ -380,6 +419,9 @@ impl Theme {
             if !v.is_empty() {
                 ini.set("text", k, v);
             }
+        }
+        if !self.family_axes.is_empty() {
+            ini.set("text", "family.axes", &axes_text(&self.family_axes));
         }
         for (i, t) in self.text.iter().enumerate() {
             if let Some(s) = t.size_fx {

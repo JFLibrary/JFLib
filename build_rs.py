@@ -437,8 +437,9 @@ PERM_KEYS_ARGS = ("fs.read", "fs.write", "process", "plugins", "url", "net.conne
 PERM_KEYS_FLAG = ("fs.user", "print", "secrets", "autostart", "audio.output", "input.global", "screen.capture")
 PERM_KEYS_AGENT = ("agent.confirm", "agent.deny")                  # agent actions: confirmed / refused
 PERM_KEYS_SANDBOX = ("sandbox",)                                   # OS sandbox: "sandbox [strict]"
+PERM_KEYS_PACKAGE = ("recent",)                                    # only the packages read it (Flatpak)
 PERM_ASKABLE = PERM_KEYS_ARGS + PERM_KEYS_FLAG[1:]                  # "ask KEY ARGS [\"reason\"]"
-PERM_VARS = ("CONFIG", "TEMP", "HOME", "EXE", "FONTS", "APPCONFIG", "APPDATA", "APPCACHE", "APPLOG",
+PERM_VARS = ("CONFIG", "TEMP", "HOME", "EXE", "APPIMAGE", "FONTS", "APPCONFIG", "APPDATA", "APPCACHE", "APPLOG",
              "DESKTOP", "DOCUMENTS", "DOWNLOADS", "PICTURES", "MUSIC", "VIDEOS")
 
 
@@ -550,6 +551,9 @@ def perm_check(text, where):
         elif key in PERM_KEYS_SANDBOX:
             if args not in ([], ["strict"]):
                 raise BuildError(f"{where}:{i}: sandbox takes nothing or 'strict'")
+        elif key in PERM_KEYS_PACKAGE:
+            if args:
+                raise BuildError(f"{where}:{i}: {key} takes no arguments")
         elif key in PERM_KEYS_FLAG:
             if args:
                 raise BuildError(f"{where}:{i}: {key} takes no arguments")
@@ -569,7 +573,7 @@ def perm_check(text, where):
                     raise BuildError(f"{where}:{i}: {err}")
         else:
             raise BuildError(f"{where}:{i}: unknown permission {key} "
-                             f"({', '.join(PERM_KEYS_ARGS[:2] + PERM_KEYS_FLAG[:1] + PERM_KEYS_ARGS[2:] + PERM_KEYS_FLAG[1:] + PERM_KEYS_SANDBOX + ('ask',) + PERM_KEYS_AGENT)})")
+                             f"({', '.join(PERM_KEYS_ARGS[:2] + PERM_KEYS_FLAG[:1] + PERM_KEYS_ARGS[2:] + PERM_KEYS_FLAG[1:] + PERM_KEYS_SANDBOX + PERM_KEYS_PACKAGE + ('ask',) + PERM_KEYS_AGENT)})")
 
 
 # manifests and the error perm_check must give (None: valid); `check` runs them, so the build's
@@ -578,6 +582,9 @@ PERM_CASES = [
     ('ask fs.read $DOCUMENTS/** "Briefe # öffnen"  # a comment\nask net.connect *:443\nask print\n'
      'agent.confirm doc.* ui.type\nagent.deny *.wipe', None),
     ("ask fs.user", "fs.user cannot be asked for"),
+    ("fs.user\nrecent", None),
+    ("recent all", "recent takes no arguments"),
+    ("ask recent", "recent cannot be asked for"),
     ("print\nask", ":2: ask needs a permission"),
     ('fs.read /x "why"', "a reason belongs to an ask line"),
     ('ask url mailto "open', "no closing quote"),

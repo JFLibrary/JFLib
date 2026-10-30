@@ -44,6 +44,14 @@ pub fn t_dirs(t: &mut T) {
     }
     let log = vfs::app_dir(APP_LOG).unwrap_or_default();
     t.check(policy::pattern_matches("$APPLOG/*.log", &format!("{log}/plattest.log")), "dirs: $APPLOG is app_dir(APP_LOG)");
+    // $APPIMAGE: the folder of the running AppImage file (Linux), no value elsewhere
+    t.check(!policy::pattern_matches("$APPIMAGE/**", "/opt/apps/x.AppImage"), "dirs: $APPIMAGE has no value outside an AppImage");
+    if cfg!(target_os = "linux") {
+        plat::setenv("APPIMAGE", Some("/opt/apps/Plattest.AppImage"));
+        t.check(policy::pattern_matches("$APPIMAGE/*.AppImage*", "/opt/apps/Plattest.AppImage.jfupd-new")
+            && !policy::pattern_matches("$APPIMAGE/**", "/opt/other/x"), "dirs: $APPIMAGE is the folder of $APPIMAGE");
+        plat::setenv("APPIMAGE", None);
+    }
     t.check(policy::install("fs.read $NOPE/x").is_err(), "dirs: an unknown variable is still refused");
     installed(t, &base);
 }

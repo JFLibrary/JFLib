@@ -13,6 +13,16 @@
 //   taskbar_badge_shown(count) -> bool   that badge (with its icon) is up already (ui skips
 //                                    drawing it again)
 //   taskbar_supported() -> bool      whether this system shows any of it
+//   app_user_model_id() -> Option<id>   (Windows) the explicit AppUserModelID the process runs
+//                                    under: the taskbar button and its pins, the jump list, the
+//                                    recent files and the notifications all go by it.  ui::main!
+//                                    sets PACKAGE's app id once the setup installed the program
+//                                    or --register registered it (assoc::app_id_boot); None:
+//                                    Windows derives an id from the program's path
+//   set_app_user_model_id(id) -> bool   (Windows) run under id from now on: before the first
+//                                    window.  false elsewhere, in an MSIX package (the
+//                                    package's id counts) and for an id Windows refuses (more
+//                                    than 128 characters, blanks)
 //
 // The calls keep the state and return whether the system took it (Windows: also before the
 // window has its button -- it is applied when the button appears).  Setting what is already
@@ -215,6 +225,22 @@ pub fn taskbar_supported() -> bool {
     crate::tray::dry_run() || native::supported()
 }
 
+/// (Windows) the process's explicit AppUserModelID (what the shell holds:
+/// GetCurrentProcessExplicitAppUserModelID); None: the one Windows derives from the program's
+/// path (other systems: always None)
+pub fn app_user_model_id() -> Option<String> {
+    native::app_id()
+}
+
+/// (Windows) run the process under the AppUserModelID id: before its first window -> false
+/// elsewhere, in an MSIX package and for an id Windows refuses
+pub fn set_app_user_model_id(id: &str) -> bool {
+    if id.is_empty() || id.chars().count() > 128 || id.chars().any(|c| c.is_whitespace() || c.is_control()) {
+        return false;
+    }
+    native::set_app_id(id)
+}
+
 /// (win_api.rs) a message of the main window: "TaskbarButtonCreated" applies the state again
 #[cfg(windows)]
 pub(crate) fn window_message(msg: u32) {
@@ -243,5 +269,11 @@ mod native {
     }
     pub fn supported() -> bool {
         false
+    }
+    pub fn set_app_id(_id: &str) -> bool {
+        false
+    }
+    pub fn app_id() -> Option<alloc::string::String> {
+        None
     }
 }

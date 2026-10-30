@@ -17,7 +17,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [gfx](#gfx) -- surfaces, the draw context, blend kernels, paths, strokes, masks, gradients
   <br>[lib.rs](#gfx-crate-root) · [blend.rs](#gfxblendrs) · [blendmode.rs](#gfxblendmoders) · [dash.rs](#gfxdashrs) · [flood.rs](#gfxfloodrs) · [gradient.rs](#gfxgradientrs) · [path.rs](#gfxpathrs) · [panel.rs](#gfxpanelrs) · [pathdata.rs](#gfxpathdatars) · [raster.rs](#gfxrasterrs) · [shapes.rs](#gfxshapesrs) · [straight.rs](#gfxstraightrs) · [stroke.rs](#gfxstrokers) · [tmask.rs](#gfxtmaskrs) · [xform.rs](#gfxxformrs)
 - [text](#text) -- fonts (SGF1, TrueType, CFF, COLR), glyph cache, text runs
-  <br>[lib.rs](#text-crate-root) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs)
+  <br>[lib.rs](#text-crate-root) · [cff.rs](#textcffrs) · [colr.rs](#textcolrrs) · [fallback.rs](#textfallbackrs) · [font.rs](#textfontrs) · [fontconf.rs](#textfontconfrs) · [fontdb.rs](#textfontdbrs) · [glyphcache.rs](#textglyphcachers) · [lcd.rs](#textlcdrs) · [outline.rs](#textoutliners) · [record.rs](#textrecordrs) · [rendering.rs](#textrenderingrs) · [registry.rs](#textregistryrs) · [segment.rs](#textsegmentrs) · [ttf.rs](#textttfrs) · [shaping.rs](#textshapingrs) · [var.rs](#textvarrs)
 - [spell](#spell) -- spell checking: Hunspell dictionaries, the system's checker, a personal word list
   <br>[lib.rs](#spell-crate-root) · [hyphen.rs](#spellhyphenrs) · [speller.rs](#spellspellerrs) · [token.rs](#spelltokenrs)
 - [img_core](#img_core) -- image I/O dispatch, records, metadata, colour, resampling, image operations
@@ -61,7 +61,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -81,7 +81,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
   <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
-  <br>[lib.rs](#update-crate-root) · [apply.rs](#updateapplyrs) · [fetch.rs](#updatefetchrs) · [manifest.rs](#updatemanifestrs)
+  <br>[lib.rs](#update-crate-root) · [appimage.rs](#updateappimagers) · [apply.rs](#updateapplyrs) · [fetch.rs](#updatefetchrs) · [manifest.rs](#updatemanifestrs)
 - [archive](#archive) -- bounded ZIP32 containers (stored and DEFLATE)
   <br>[lib.rs](#archive-crate-root)
 - [doc_core](#doc_core) -- structured documents, sources, citations and undo/redo
@@ -4722,6 +4722,7 @@ UIC_HOTKEY: u32 = 0x7FFF_0015  // arg = id: a global shortcut was pressed (hotke
 UIC_HOTKEY_LOST: u32 = 0x7FFF_0016  // arg = id: the desktop dropped the shortcut (hotkey_error tells why)
 UIC_PICK: u32 = 0x7FFF_0017  // arg 1: a colour was picked (picked_color), 0: cancelled / failed (pick_color)
 UIC_SCREENSHOT: u32 = 0x7FFF_0018  // arg 1: the picture is there (screenshot_take), 0: failed (screen_error)
+UIC_RECENT: u32 = 0x7FFF_0019  // arg 1: the file of recent_open is readable now (recent_reopened), 0: refused or gone
 TRAY_ACTIVATE: u32 = 1  // UIC_TRAY: the symbol was clicked
 TRAY_SECONDARY: u32 = 2  // UIC_TRAY: double click (Windows) / middle click (Linux)
 ```
@@ -6001,7 +6002,10 @@ the program: exit code 0 done, 1 failed, 2 not possible here or nothing declared
   desk_boot(package) -> Option<exit code>   (main!) keep the built-in PACKAGE text
                         (plat::assoc::package_set), run a switch; headless runs (--shot,
                         --script, the agent protocols) leave the system's list of recent files
-                        alone (plat::recent::recent_os(false); jfgui_RECENT still redirects it)
+                        alone (plat::recent::recent_os(false); jfgui_RECENT still redirects it).
+                        Without a switch, Windows: the app id as the explicit AppUserModelID
+                        once the setup installed the program or --register registered it
+                        (plat::assoc::app_id_boot), before the first window
   assoc_switch(pkg, switch) -> Option<(exit code, text)>   one switch for pkg (None: no switch)
 ```
 
@@ -6967,16 +6971,22 @@ Source: [`lib/ui/fontpick.rs`](../lib/ui/fontpick.rs)
 fontpick -- the system's fonts in the UI: the font database and its rules, loading a
 choice, text in such a font, a font picker and a font dialog
 
-  FontSel { family, weight, italic, size }   a choice: a family (also a generic one:
+  FontSel { family, weight, italic, size, axes }   a choice: a family (also a generic one:
                                    "sans-serif", "serif", "monospace" ...), 100..900, italic,
-                                   the size in points
+                                   the size in points, axis values of a variable family
+                                   (FontSel::new: none; axis / set_axis)
   ui.fonts() -> &FontDb            the installed fonts, scanned on first use (cache
                                    cache://fontdb.fdb; jfgui_FONTDIRS: these folders, no cache)
   ui.font_conf() -> &FontConf      generic families, substitutes, the languages' fonts
                                    (text::fontconf: a light fontconfig)
   ui.font_load(&sel) -> Option<u32>   resolve (FontDb::resolve in the UI language) and load
                                    into ui.text: a font id for set_font / cmd_text; each
-                                   family / weight / italic once
+                                   family / weight / italic once.  A variable face: its
+                                   instance (FontDb::load_var): weight -> wght, italic -> ital
+                                   / slnt, the size -> opsz, the axes named win; the instances
+                                   of the VAR_KEEP most recent such choices and the app
+                                   theme's faces stay loaded (older ones are unloaded, their
+                                   ids may be reused)
   ui.font_resolved(&sel) -> String the installed family font_load takes ("" none)
   ui.font_register(family, weight, italic, font)   a font of the app's own (load_mem) under
                                    a family name for font_load; font_registered() lists them
@@ -6988,14 +6998,18 @@ choice, text in such a font, a font picker and a font dialog
   ui.font_dialog(id, &open, &mut sel) -> EV   a modal dialog window "Schriftart": search,
                                    families, the family's styles, sizes, a preview in the
                                    font, OK / Abbrechen; works on a copy of sel and writes it
-                                   back on OK (EV_ACT); closing clears open
+                                   back on OK (EV_ACT); closing clears open.  A variable
+                                   family lists its named instances as styles and gets a
+                                   slider and a number box per axis (fvar's range and name;
+                                   hidden axes not), opsz with "Automatisch" (follows the size)
   font_language() -> String        the language the fonts follow: the user's tag of the UI
                                    language (ja-JP, zh-Hant-TW), else its code
 
 The runtime hands font_language() to the system fallback (text::fallback, again when the
 UI language changes), so missing Han characters take the forms of the language.  Ids:
 the scope of the widget's id, then "family", "search", "list", "styles", "size",
-"sizes" (ids.rs).
+"sizes", the axes' "axis" scope with per axis id_n(k) (slider), id_n(k + 100) (number
+box), "opsz_auto" (ids.rs).
 ```
 
 - **`struct FontSel`**
@@ -7004,11 +7018,19 @@ the scope of the widget's id, then "family", "search", "list", "styles", "size",
   - `weight: u32`
   - `italic: bool`
   - `size: f64` -- points
+  - `axes: Vec<([u8; 4], f32)>` -- axis values of a variable family in user units by tag (`(*b"wdth", 87.5)`); the axes
+    not named follow weight (wght), italic (ital, slnt) and size (opsz), else their
+    defaults; families that are not variable ignore them
 
 **`impl FontSel`**
 
 - **`fn new(family: &str, size: f64) -> FontSel`**
-  regular, upright
+  regular, upright, no axis values
+- **`fn axis(&self, tag: [u8; 4]) -> Option<f32>`**
+  the value `axes` names for a tag (None: the tag follows weight / italic / size or its
+  default)
+- **`fn set_axis(&mut self, tag: [u8; 4], v: f32)`**
+  name an axis value (replacing the tag's); NaN takes the tag out again
 
 - **`fn font_language() -> String`**
   the language the fonts follow: the user's tag of the UI language, else its code
@@ -7892,17 +7914,34 @@ recent -- the app's list of recent files ("Zuletzt geöffnet") and the system's 
                            permissions)
   recent_files() -> [path] the app's list, newest first (a file may be gone meanwhile: the
                            app tells the user and calls recent_remove)
+  recent_open(path) -> RecentOpen   a file of the list about to be opened (call it from the
+                           user's click or key): Ready (read it now), Asking (the browser asks
+                           for the permission again: App::command(UIC_RECENT, 1 readable /
+                           0 refused or gone) follows, recent_reopened() names the file) or
+                           Missing
+  recent_reopened() -> Option<path>   the file UIC_RECENT answered for (once)
   recent_remove(path)      out of both lists
   recent_clear()           both lists emptied (the system's: this app's entries)
 
 The app's list is config://recent.list (one path per line, newest first), read on first use
-and kept in memory (the browser: persisted in its storage).  OS paths are kept absolute
-("C:/x/a.png", "/home/u/a.png"; a folder mount's file as its OS path), so another spelling of
-the same file is no new entry, and as plat::persistent_name gives them (a Flatpak's file from
-the documents portal as its lasting document: one of the portal's file dialog opens again
-after a restart without a new dialog).  Headless runs (--shot, --script, agents) never touch
-the file and leave the system's list alone (the list lives in memory there; jfgui_RECENT
-redirects the system's list, plat/recent.rs).
+and kept in memory.  OS paths are kept absolute ("C:/x/a.png", "/home/u/a.png"; a folder
+mount's file as its OS path), so another spelling of the same file is no new entry, and as
+plat::persistent_name gives them (a Flatpak's file from the documents portal as its lasting
+document: one of the portal's file dialog opens again after a restart without a new
+dialog).  Headless runs (--shot, --script, agents) never touch the file and leave the
+system's list alone (the list lives in memory there; jfgui_RECENT redirects the system's
+list, plat/recent.rs).
+
+The browser: the list is persisted in the origin's storage with every change (an emptied
+list as an empty file: the storage keeps no deletions), so a reload starts with it.  A file
+of the user's own (/handles/ID/NAME, Chromium's pickers) is read in at the start while the
+browser still grants it; else recent_open asks through plat::web::reopen (the browser wants
+the user's gesture).  Firefox and Safari have no such handles: the list stays, its files open
+when the app kept them in the storage itself (plat::web::persist).
+Android: the list is a file of the app's internal storage; the picker's grants are lasting
+(takePersistableUriPermission), and a single document's grant is given up when its entry
+leaves the list (pushed out, removed, cleared: Android keeps at most 128 / 512 of them); a
+folder's grant stays, the app may use the folder for more.
 ```
 
 ```rust
@@ -7910,10 +7949,22 @@ redirects the system's list, plat/recent.rs).
 RECENT_KEEP: usize = 20
 ```
 
+- **`enum RecentOpen`**
+  what recent_open found for a file of the list
+  - `Ready` -- the file can be read now
+  - `Asking` -- the browser asks the user for the permission again (a file of the user's own after a
+    reload): App::command(UIC_RECENT, 1 readable now / 0 refused or gone) follows
+  - `Missing` -- gone or out of reach: the app tells the user and may call recent_remove
+
 **`impl Ui`**
 
 - **`fn recent_add(&mut self, path: &str)`**
   a file the user opened or saved: first in the app's recent files and in the system's
+- **`fn recent_open(&mut self, path: &str) -> RecentOpen`**
+  a file of the recent list about to be opened (from the user's click or key): Ready,
+  Asking (the browser asks for the permission; UIC_RECENT follows) or Missing
+- **`fn recent_reopened(&mut self) -> Option<String>`**
+  the file UIC_RECENT answered for, once
 - **`fn recent_files(&self) -> Vec<String>`**
   the app's recent files, newest first
 - **`fn recent_remove(&mut self, path: &str)`**
@@ -8612,9 +8663,12 @@ The format is INI (base::ini):
               control_height = DIP      buttons, text boxes, combo boxes, drop-down and split
                                         buttons (not compact or large ones)
   [text]      family = FILE | installed family   (family.semibold, family.bold: their faces;
-              else from the family: a file gets a synthetic bold); STYLE.size = DIP (24.8),
-              STYLE.line = DIP, STYLE.weight = regular | semibold | bold | 100..900 for STYLE
-              in caption, body, body_strong, subtitle, title, title_large, display
+              else from the family: a file gets a synthetic bold, a variable one its wght);
+              family.axes = TAG=VALUE, ...   axis values of a variable family (wdth=87.5,
+              opsz=12; weights still come from the faces' 400 / 600 / 700, opsz else 11 pt);
+              STYLE.size = DIP (24.8), STYLE.line = DIP, STYLE.weight = regular | semibold |
+              bold | 100..900 for STYLE in caption, body, body_strong, subtitle, title,
+              title_large, display
 Errors name the line (in the UI language): an unknown section or key, a line without '=',
 a key before the first section or twice in one section, a value out of range.  A theme is
 applied whole or not at all (Ui::set_theme).
@@ -8662,6 +8716,7 @@ TS_NAMES: [&str; TS_COUNT as usize] = ["caption", "body", "body_strong", "subtit
   - `family: String` -- "" = the style's faces; a font file (VFS path) or an installed family
   - `family_semibold: String`
   - `family_bold: String`
+  - `family_axes: Vec<([u8; 4], f32)>` -- axis values of a variable family (tag, user units); empty: its defaults
 
 - **`struct ThemeError`**
   why a theme could not be read or applied: the line of the file (0: not a line) and the
@@ -10327,6 +10382,10 @@ colour glyphs), the glyph cache and text runs                        [src/text/*
                                  from other fonts (fallback.rs; also when shaping)
   record_n / record_icon / glyphs   glyphs placed now, blended later from the glyph cache by
                                  any thread (record.rs: GlyphRec, GlyphView)
+  var_axes / var_instances / var_values / vary / vary_named   variable fonts: their axes,
+                                 named instances and instances at axis values (registry.rs,
+                                 var.rs: gvar, avar, HVAR, MVAR; shaping at the same
+                                 coordinates)
 
 Pen positions are 24.8 fixed point; glyphs are placed on quarter pixels and their
 coverage masks are cached per (font, glyph, size, phase, greyscale / subpixel).  Colour
@@ -10778,15 +10837,24 @@ match styles, cache the result                                      [src/text/fo
   resolve(conf, family, lang, weight, italic) -> (face, FS_SYN_*, family)   the first installed
        of the FontConf's candidates (generic families, substitutes, the language's choices;
        fontconf.rs), else sans-serif's; load_resolved(text, conf, ...) -> (font id, family)
+       (a variable face: its instance for weight / italic, load_var)
   clear()                         forget the scan result (the cache stays)
-  family_count(), family_name(i), family_faces(i) -> &[FdFace]   families sorted
-       case-insensitively
+  family_count(), family_name(i), family_faces(i) -> &[FdFace], family_range(i)   families
+       sorted case-insensitively
   face_count(), face(i)           every face, family order
   find(family, weight, italic) -> (face index, FS_SYN_* flags to add)   family = legacy
        family name (FN_FAMILY, like GDI), else a typographic family; closest weight,
        italic before upright; synthetic bold / italic asked when the family lacks them
-  load(text, family, weight, italic) -> font id / ERR_*   find + load_file (+ style);
-       each (face, style) is loaded once until the next scan
+  load(text, family, weight, italic) -> font id / ERR_*   find + load_file (+ style; a
+       variable face: load_var); each (face, style) is loaded once until the next scan
+  variations(face) -> Option<&FdVar>   a variable face's axes and named instances (fvar,
+       names from its name table; read from the file on first use, kept until the next scan)
+  var_values(face, weight, italic, size_pt, axes) -> (values, FS_SYN_* still needed)   the
+       axis values of a choice: the axes named, else weight -> wght, italic -> ital = 1 or
+       slnt = its most slanted value, the size in points -> opsz (clamped to each axis);
+       synthetic bold / italic only where no axis gives them
+  load_var(text, face, syn, weight, italic, size_pt, axes) -> font id / ERR_*   load_face +
+       Text::vary at var_values (a face that is not variable: load_face)
   save_cache(path) / load_cache(path) -> 0 / -1
 
 Families group faces by the legacy family name (name ID 1); names prefer German, then
@@ -10819,6 +10887,11 @@ FDFF_SYMBOL: u16 = 64
   - `weight: u16` -- usWeightClass
   - `flags: u16` -- FDFF_\*
 
+- **`struct FdVar`**
+  the variations of an installed variable face (FontDb::variations)
+  - `axes: Vec<VarAxis>` -- fvar's axes (names from the face's name table)
+  - `instances: Vec<VarInstance>` -- its named instances
+
 - **`struct FontDb`**
 
 - **`fn fnv64(d: &[u8]) -> u64`**
@@ -10832,6 +10905,8 @@ FDFF_SYMBOL: u16 = 64
 - **`fn family_count(&self) -> usize`**
 - **`fn family_name(&self, i: usize) -> &str`**
   the family's name ("" when i is out of range)
+- **`fn family_range(&self, i: usize) -> core::ops::Range<usize>`**
+  the indices (face(i), variations(i)) of family i's faces (empty when out of range)
 - **`fn family_faces(&self, i: usize) -> &[FdFace]`**
   the faces of family i (empty when out of range)
 - **`fn face_count(&self) -> usize`**
@@ -10853,6 +10928,16 @@ FDFF_SYMBOL: u16 = 64
 - **`fn load_face(&mut self, text: &mut Text, fi: usize, syn: u32) -> i32`**
   load face fi with the synthetic styles syn (FS_SYN_\*) -> font id / ERR_\*; each (face,
   style) once until the next scan
+- **`fn variations(&mut self, i: usize) -> Option<&FdVar>`**
+  the axes and named instances of face i (None: not a variable face, or its file cannot
+  be read); read from the file on first use
+- **`fn var_values(&mut self, i: usize, weight: u32, italic: bool, size_pt: Option<f32>, axes: &[([u8; 4], f32)]) -> Option<(Vec<f32>, u32)>`**
+  the axis values of a choice on variable face i (see the module header) -> (one value
+  per axis, the FS_SYN_\* flags still needed); None: not a variable face
+- **`fn load_var(&mut self, text: &mut Text, fi: usize, syn: u32, weight: u32, italic: bool, size_pt: Option<f32>, axes: &[([u8; 4], f32)]) -> i32`**
+  load variable face fi at the axis values of a choice (var_values) with the synthetic
+  styles syn asks for that no axis gives -> font id / ERR_\*; a face that is not
+  variable: load_face(fi, syn)
 - **`fn save_cache(&self, path: &str) -> i32`**
   fontdb_save_cache(path) -> 0 / -1
 - **`fn load_cache(&mut self, path: &str) -> i32`**
@@ -11167,6 +11252,15 @@ fonts of font_style (synthetic bold / italic / sharp)       [src/text/font.s, ou
        glyph cache is flushed; the id may be reused later
   count(), valid(id), hdr(font) (font_data), glyph(font, cp), has, adv, kern, kern_table,
   upem, metrics, metric, is_color, name, layers, glyph_box, glyph_path
+Variable fonts (var.rs):
+  var_axes(font) / var_instances(font)   fvar's axes and named instances (empty: not variable)
+  var_values(font) -> user values per axis (an instance's, else the defaults)
+  vary(font, &[(tag, value)]) -> id / ERR_*   an instance (VarFont: the base font at
+       normalized coordinates; own id, serial and metrics, so glyph cache entries, outline
+       buffer and shaping engines never mix instances); axes not named keep font's values;
+       all-default coordinates give the variable font itself; the same coordinates the same
+       id; synthetic styles of font carry over; unload(base) unloads its instances
+  vary_named(font, i) -> id / ERR_*    named instance i
 
 Font ids 0..3 are the embedded fonts (never reused).  An unknown or unloaded id behaves
 like font 0.
@@ -11236,6 +11330,28 @@ FONT_MAX_IDS: u32 = 4096  // registry capacity
 - **`fn glyph_path(&mut self, font: u32, g: u32)`**
   glyph_path(font, glyph): append the outline to the path, transformed by gp (origin
   x / y in float pixels, sx / sy float pixels per unit)
+- **`fn var_axes(&self, font: u32) -> Vec<VarAxis>`**
+  the variation axes of a font (fvar; empty: not a variable font); instances and the
+  fonts derived from them report their variable font's
+- **`fn var_instances(&self, font: u32) -> Vec<VarInstance>`**
+  the named instances of a variable font (fvar; empty: none or not variable)
+- **`fn var_values(&self, font: u32) -> Vec<f32>`**
+  the axis values of a font in user units, one per axis of var_axes (an instance's own,
+  else the defaults)
+- **`fn var_coords(&self, font: u32) -> Vec<i16>`**
+  the normalized coordinates of an instance: F2Dot14 bits per axis with avar applied
+  (what HarfBuzz's hb_font_get_var_coords_normalized reports); empty for a variable font
+  itself (its default instance) and for fonts that are not variable
+- **`fn vary(&mut self, font: u32, values: &[([u8; 4], f32)]) -> i32`**
+  an instance of a variable font with axis values in user units (tag, value): axes not
+  named keep font's values (an instance's, else the defaults); values are clamped to their
+  axis, unknown tags ignored -> font id / ERR_\*.  All-default coordinates give the variable
+  font itself, the same coordinates the same id; synthetic styles of font (style) carry
+  over; a font that is not variable gives itself.  Each instance has its own glyph cache
+  entries and metrics (MVAR); unloading the variable font unloads its instances.
+- **`fn vary_named(&mut self, font: u32, i: usize) -> i32`**
+  named instance i of a variable font (var_instances) -> id / ERR_\* (ERR_FAIL: no such
+  instance)
 - **`fn style(&mut self, font: u32, flags: u32) -> i32`**
   font_style(font, FS_\*) -> id / ERR_\*
 
@@ -11379,12 +11495,23 @@ Tables: head, hhea, hmtx, maxp, loca, glyf (simple + composite: offsets, scale, 
 glyph), cmap (formats 0, 4, 6, 12, 13; (3,10) > (0,x) fmt 12 > (3,1) > (0,x) > (3,0)
 symbol > (1,0) Mac Roman), OS/2, post, name, kern (version 0 and Apple version 1, format
 0), GPOS pair adjustment (lookup type 2 formats 1 and 2, extension type 9; x advance of
-the first glyph; 'kern' feature of the DFLT and latn default language systems).  Variable
-fonts: the default instance.  Every offset is checked against its table and the file;
-malformed glyphs come out empty.  Like GDI / FreeType: glyf outlines are shifted by hmtx
-lsb - xMin; symbol fonts ((3,0) cmap) also map U+0000..U+00FF and the Windows-1252
-characters to U+F000 + code page byte; a CFF FontMatrix that is not exactly 1/unitsPerEm
-scales the outline.
+the first glyph; 'kern' feature of the DFLT and latn default language systems).  Every
+offset is checked against its table and the file; malformed glyphs come out empty.  Like
+GDI / FreeType: glyf outlines are shifted by hmtx lsb - xMin; symbol fonts ((3,0) cmap)
+also map U+0000..U+00FF and the Windows-1252 characters to U+F000 + code page byte; a CFF
+FontMatrix that is not exactly 1/unitsPerEm scales the outline.
+
+Variable fonts (var.rs): fvar / avar / gvar / HVAR / MVAR / GDEF's store are read at open
+(var); the plain calls give the default instance, the *_var calls an instance at
+normalized coordinates (registry.rs: VarFont):
+  prep_var(g, coords, serial, ol)    the outline with gvar deltas (simple glyphs: points with
+       IUP; composites: the component offsets), shifted by its varied phantom point pp1
+  adv_var(g, coords)                 hmtx + HVAR; without HVAR: hmtx + the phantom points'
+       deltas (adv_table: every glyph at once)
+  kern_var(g1, g2, coords)           GPOS pair values + their VariationIndex deltas (GDEF)
+  metrics_var(coords, wght, ol)      FONTMETRICS + header with MVAR deltas (hasc / hdsc /
+       hlgp on hhea and OS/2, hcla, hcld, xhgt, cpht, undo, unds, stro, strs)
+CFF2 outlines are not supported (no usable outlines: ERR_UNSUPPORTED).
 ```
 
 ```rust
@@ -11416,7 +11543,12 @@ TT_CPAL: usize = 14
 TT_CBDT: usize = 15
 TT_CBLC: usize = 16
 TT_FVAR: usize = 17
-TT_COUNT: usize = 20
+TT_AVAR: usize = 20
+TT_GVAR: usize = 21
+TT_HVAR: usize = 22
+TT_MVAR: usize = 23
+TT_GDEF: usize = 24
+TT_COUNT: usize = 25
 TFK_TTF: u32 = 1
 TFK_CFF: u32 = 2
 TFF_LOCA_LONG: u32 = 2
@@ -11501,6 +11633,60 @@ Source: [`lib/text/shaping.rs`](../lib/text/shaping.rs)
 - **`fn selection_spans(&mut self, text: &[u8], start: usize, end: usize) -> Vec<(i32,i32)>`**
   Visual spans for a logical UTF-8 selection. Mixed bidi text may require
   disjoint rectangles; the two endpoint carets alone are not sufficient.
+
+### `text/var.rs`
+
+Source: [`lib/text/var.rs`](../lib/text/var.rs)
+
+```text
+var -- OpenType font variations: fvar (axes, named instances), avar (segment maps), gvar
+(TrueType point deltas), HVAR (advance deltas), MVAR (font-wide metrics) and the item
+variation store HVAR, MVAR and GDEF share
+
+  VarAxis { tag, min, def, max, hidden, name }, VarInstance { name, coords }   what fvar
+       says, in user units; names from the name table (an axis without one: its tag)
+  Var::parse(tables) -> Option<Var>  a font's fvar, avar, gvar, HVAR, MVAR, GDEF store
+  normalize(user) -> coords          F2Dot14 per axis: clamped to the axis, -1 .. 0 .. 1
+       around the default in 16.16, avar in 16.16, then 2.14 (rounded like HarfBuzz and
+       FreeType: floor(x + 0.5))
+  gvar_deltas(gvar, glyph, coords, orig, ends, out, budget)   the deltas of a glyph's points
+       and of its 4 phantom points, added to out: embedded and shared peak tuples,
+       intermediate regions, shared and private packed point numbers, packed deltas (zero
+       runs, bytes, words, longs), IUP for the outline points a tuple leaves out
+  hvar_delta(hvar, glyph, coords)    the advance delta (HVAR, with or without its mapping)
+  mvar_delta(mvar, tag, coords)      a font-wide metric's delta (MVAR)
+  gdef_delta(gdef, outer, inner, coords)   a GPOS VariationIndex delta (GDEF's store)
+
+Every offset is checked against its table (gvar data against the glyph's own range).
+Broken gvar data of a glyph: false (the glyph comes out empty, like broken glyf data);
+broken HVAR / MVAR / store data: no delta.  Bounded work: a glyph whose tuples x points
+exceed VAR_BUDGET counts as broken; a store row whose regions x axes exceed IVS_WORK has
+no delta.  Not supported: avar version 2 beyond its segment maps, CFF2 outlines (such
+fonts do not load), VVAR (no vertical layout).
+```
+
+```rust
+/// axes and named instances read at most
+AXES_MAX: usize = 64
+INSTANCES_MAX: usize = 1024
+```
+
+- **`struct VarAxis`**
+  an axis of a variable font (fvar) in user units (min &lt;= def &lt;= max)
+  - `tag: [u8; 4]` -- `wght`, `wdth`, `slnt`, `ital`, `opsz` or one of the font's own
+  - `min: f32` -- the smallest value
+  - `def: f32` -- the default (the font's own outlines)
+  - `max: f32` -- the largest value
+  - `hidden: bool` -- the font asks user interfaces not to show it (HIDDEN_AXIS)
+  - `name: String` -- the name table's name (UTF-8; the tag when there is none)
+
+- **`struct VarInstance`**
+  a named instance of a variable font (fvar)
+  - `name: String` -- its subfamily name ("SemiLight Condensed"; "" when the name table has none)
+  - `coords: Vec<f32>` -- user coordinates, one per axis
+
+- **`const fn tag_u32(t: [u8; 4]) -> u32`**
+  a 4-byte tag as the u32 of the font file
 
 ## spell
 
@@ -16418,9 +16604,14 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
   power:   inhibit(reason, INHIBIT_SUSPEND | INHIBIT_IDLE) -> Option<Inhibit> (no standby /
            screen saver while the guard lives), inhibited()              (power.rs)
   autostart: autostart_set(on, args) / autostart_get() / autostart_entry() (Run key, XDG
-           autostart, Background portal; needs `autostart` in the manifest) (autostart.rs)
+           autostart, Background portal, MSIX StartupTask; needs `autostart` in the manifest)
+           (autostart.rs)
+  pkg:     packaged() (MSIX, Flatpak, AppImage, Snap or a plain program), msix_updates (App
+           Installer), FlatpakMonitor / flatpak_spawn_latest (the Flatpak portal),
+           restart_appimage                                                   (pkg.rs)
   taskbar: taskbar_progress / taskbar_badge / taskbar_tasks (the taskbar button: progress,
-           overlay / count, jump list; ITaskbarList3, Unity LauncherEntry) (taskbar.rs)
+           overlay / count, jump list; ITaskbarList3, Unity LauncherEntry), app_user_model_id
+           / set_app_user_model_id (Windows: the app's explicit id)        (taskbar.rs)
   assoc:   assoc_register / assoc_conflicts / assoc_unregister: the app's PACKAGE file types
            and URL schemes for this program without a setup (HKCU\Software\Classes; .desktop,
            shared-mime-info, mimeapps.list), file_uri_path                    (assoc.rs)
@@ -17335,8 +17526,13 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
   sandbox [strict]      ask the OS to enforce the manifest as well (Landlock + seccomp on
                         Linux, process mitigation policies on Windows; sandbox.rs); `strict`
                         refuses to start when the OS cannot enforce it
+  recent                the host's list of recent files for a Flatpak (tools/pkg_linux.py:
+                        --filesystem=xdg-data/recently-used.xbel, the list of every program);
+                        at run time nothing changes: the system's list is always allowed
+                        for files the app may read (recent.rs)
 A PATTERN is an absolute path (X:/.. and //server/share/.. count on Windows only, /.. on
-Linux only), or starts with $CONFIG $TEMP $HOME $EXE $FONTS, the app's own folders
+Linux only), or starts with $CONFIG $TEMP $HOME $EXE $FONTS, $APPIMAGE (the folder of the
+running AppImage file: lib/update replaces it there; no value elsewhere), the app's own folders
 $APPCONFIG $APPDATA $APPCACHE $APPLOG (vfs::app_dir) or the user's folders $DESKTOP
 $DOCUMENTS $DOWNLOADS $PICTURES $MUSIC $VIDEOS (user_dir; a variable without a value
 drops the pattern); '*' / '?' match inside one segment, a '**' segment any number of
@@ -18453,8 +18649,9 @@ Windows (win_autostart.rs): the value <app id> = "exe" args of
 HKCU\Software\Microsoft\Windows\CurrentVersion\Run (arguments quoted with the Microsoft
 rules).  The Task Manager's switch (Explorer\StartupApproved\Run, an odd first byte = off)
 counts for autostart_get; autostart_set(true) clears it (the user asked in the app), false
-removes both; in an MSIX package (HKCU virtualized) Unavailable: the package's StartupTask
-is switched in Settings.  Linux (linux_autostart.rs): $XDG_CONFIG_HOME/autostart/<desktop id>.desktop
+removes both; in an MSIX package (HKCU virtualized) the package's StartupTask instead,
+switched through WinRT (TaskId "Autostart"; it takes no arguments, a task the user switched
+off in Settings stays off: Dismissed).  Linux (linux_autostart.rs): $XDG_CONFIG_HOME/autostart/<desktop id>.desktop
 (XDG autostart; Hidden=true or X-GNOME-Autostart-enabled=false count as off), Exec quoted
 as the Desktop Entry spec wants, $APPIMAGE instead of the executable when set.  In Flatpak
 the Background portal (RequestBackground with autostart and the command line): the desktop
@@ -18471,8 +18668,8 @@ AUTOSTART_WAIT_MS: i32 = 120_000
 
 - **`enum AutostartError`**
   why autostart_set failed
-  - `Unavailable` -- not possible here (web, Android, no session bus for the portal, an MSIX package: its
-    StartupTask instead)
+  - `Unavailable` -- not possible here (web, Android, no session bus for the portal, an MSIX package without
+    a StartupTask)
   - `Denied` -- the app's permissions lack `autostart`
   - `Dismissed` -- the user (or the desktop) refused it, or did not answer in time (the portal)
   - `Invalid` -- an argument with NUL, or a command line beyond the system's limit
@@ -18486,6 +18683,116 @@ AUTOSTART_WAIT_MS: i32 = 120_000
 
 - **`fn autostart_entry() -> Option<String>`**
   the command the app's entry starts, None without one
+
+### `plat/pkg.rs`
+
+Source: [`lib/plat/pkg.rs`](../lib/plat/pkg.rs)
+
+```text
+pkg -- the package the running program comes from, and what its package system offers for
+updates (lib/update builds on it; docs/UPDATES.md "Packages")
+
+  packaged() -> Packaged          Msix(full name) (GetCurrentPackageFullName), Flatpak(app id)
+                                  (/.flatpak-info; $FLATPAK_ID), AppImage(file) ($APPIMAGE, an
+                                  absolute path), Snap ($SNAP), else Plain
+  msix_updates() -> Result<MsixUpdates, String>   (Windows, in an MSIX package) the App
+                                  Installer file the package came from (Package
+                                  .GetAppInstallerInfo: its address) and, with one, whether it
+                                  offers a newer version (Package.CheckUpdateAvailabilityAsync);
+                                  WinRT through raw COM (win_winrt.rs)
+  FlatpakMonitor                  (Linux, in a Flatpak) the portal's update monitor
+                                  (linux_flatpak.rs): create(), poll(ms) -> UpdateAvailable,
+                                  update(progress, cancel) -> the newest version installed
+  flatpak_spawn_latest(args)      (Linux) the app's newest installed version started with args
+                                  (the portal's Spawn, LATEST_VERSION) -> its pid
+  restart_appimage(args) -> i32   (Linux) the AppImage file started again with args (its
+                                  runtime unpacks the image that is now there): 0 / -1
+
+Elsewhere (web, Android) packaged() is Plain and the rest answers "not available".
+```
+
+- **`enum Packaged`**
+  where the running program comes from
+  - `Plain` -- a program file of its own: a setup, a .deb or .rpm, a portable copy
+  - `AppImage(String)` -- an AppImage: the .AppImage file (the program runs from a copy its runtime unpacked)
+  - `Flatpak(String)` -- a Flatpak: the app id (the program's folder is the read-only /app)
+  - `Msix(String)` -- an MSIX package: its full name (the install folder is read-only)
+  - `Snap` -- a Snap (snapd updates it)
+
+- **`fn packaged() -> Packaged`**
+  the package the running program comes from
+
+- **`struct MsixUpdates`**
+  what App Installer knows about the running MSIX package (msix_updates)
+  - `appinstaller: String` -- the address of the .appinstaller file the package was installed from ("": none -- the
+    Store, Add-AppxPackage, a developer registration)
+  - `availability: u32` -- Package.CheckUpdateAvailabilityAsync with an .appinstaller: 0 unknown, 1 no updates,
+    2 available, 3 required, 4 error; without one 0
+
+- **`fn msix_updates() -> Result<MsixUpdates, String>`**
+  the App Installer file of the running MSIX package and whether it offers an update
+  (Windows 10 1809 and later) -> Err: not in a package, or WinRT failed (its HRESULT)
+
+- **`struct FlatpakUpdate`**
+  UpdateAvailable of the Flatpak portal: the commits of the running, the installed and the
+  remote version (an installed one newer than the running one: restart to use it)
+  - `running: String`
+  - `local: String`
+  - `remote: String`
+
+- **`struct FlatpakMonitor`**
+  (not Linux) there is no Flatpak portal: create() fails
+
+**`impl FlatpakMonitor`**
+
+- **`fn create() -> Result<FlatpakMonitor, String>`**
+- **`fn poll(&mut self, _ms: i32) -> Option<FlatpakUpdate>`**
+- **`fn update(&mut self, _progress: &mut dyn FnMut(u32, u32, u32), _cancel: &dyn Fn() -> bool) -> Result<(), String>`**
+
+- **`fn flatpak_spawn_latest(args: &[&str]) -> Result<u32, String>`**
+  start this app's newest installed Flatpak version with args (the portal's Spawn with
+  LATEST_VERSION; the same program inside it) -> its pid
+
+- **`fn restart_appimage(args: &[&str]) -> i32`**
+  start the running AppImage's file ($APPIMAGE) again with args: its runtime unpacks the
+  image the file holds now (after an update) and runs it -> 0, -1 when not an AppImage or no
+  process could be started
+
+### `plat/linux_flatpak.rs` (Linux)
+
+Source: [`lib/plat/linux_flatpak.rs`](../lib/plat/linux_flatpak.rs)
+
+```text
+linux_flatpak -- (pkg.rs) the updates of a Flatpak app through org.freedesktop.portal.Flatpak
+
+  FlatpakMonitor::create()   CreateUpdateMonitor({handle_token}) on the session bus; the
+                             handle /org/freedesktop/portal/Flatpak/update_monitor/SENDER/TOKEN
+                             is known before the call, so the signals are matched first
+  poll(ms)                   the newest UpdateAvailable({running-commit, local-commit,
+                             remote-commit}) that arrived within ms
+  update(progress, cancel)   Update("", {}) and its Progress signals ({n_ops, op, progress,
+                             status: 0 running, 1 nothing to do, 2 done, 3 failed; error,
+                             error_message}) until the end
+  drop                       Close()
+  spawn_latest(args)         Spawn(cwd, argv, {}, {}, LATEST_VERSION, {}): the app's newest
+                             installed version with the same program and these arguments
+
+The portal (flatpak-portal, outside the sandbox) checks the app's remote every few minutes
+(its --poll-timeout, 300 s by default) while a monitor exists; Update only installs a
+version that asks for no more permissions than the running one.
+```
+
+- **`struct FlatpakMonitor`**
+  the update monitor of this app (pkg::FlatpakMonitor)
+
+**`impl FlatpakMonitor`**
+
+- **`fn create() -> Result<FlatpakMonitor, String>`**
+- **`fn poll(&mut self, ms: i32) -> Option<FlatpakUpdate>`**
+  the newest UpdateAvailable within ms (0: only what has arrived)
+- **`fn update(&mut self, progress: &mut dyn FnMut(u32, u32, u32), cancel: &dyn Fn() -> bool) -> Result<(), String>`**
+  install the update: progress(op, n_ops, percent) for every Progress signal, cancel()
+  asked between them (the portal's transaction itself cannot be stopped: Err after it)
 
 ### `plat/taskbar.rs`
 
@@ -18507,6 +18814,16 @@ taskbar -- the app's button in the taskbar or dock: progress, a badge, the jump 
   taskbar_badge_shown(count) -> bool   that badge (with its icon) is up already (ui skips
                                    drawing it again)
   taskbar_supported() -> bool      whether this system shows any of it
+  app_user_model_id() -> Option<id>   (Windows) the explicit AppUserModelID the process runs
+                                   under: the taskbar button and its pins, the jump list, the
+                                   recent files and the notifications all go by it.  ui::main!
+                                   sets PACKAGE's app id once the setup installed the program
+                                   or --register registered it (assoc::app_id_boot); None:
+                                   Windows derives an id from the program's path
+  set_app_user_model_id(id) -> bool   (Windows) run under id from now on: before the first
+                                   window.  false elsewhere, in an MSIX package (the
+                                   package's id counts) and for an id Windows refuses (more
+                                   than 128 characters, blanks)
 
 The calls keep the state and return whether the system took it (Windows: also before the
 window has its button -- it is applied when the button appears).  Setting what is already
@@ -18566,6 +18883,15 @@ file's Actions).  Web and Android: nothing (false).
 - **`fn taskbar_supported() -> bool`**
   whether this system shows the taskbar progress and badge
 
+- **`fn app_user_model_id() -> Option<String>`**
+  (Windows) the process's explicit AppUserModelID (what the shell holds:
+  GetCurrentProcessExplicitAppUserModelID); None: the one Windows derives from the program's
+  path (other systems: always None)
+
+- **`fn set_app_user_model_id(id: &str) -> bool`**
+  (Windows) run the process under the AppUserModelID id: before its first window -> false
+  elsewhere, in an MSIX package and for an id Windows refuses
+
 ### `plat/assoc.rs`
 
 Source: [`lib/plat/assoc.rs`](../lib/plat/assoc.rs)
@@ -18584,8 +18910,16 @@ setup (apps/installer), the .deb, MSIX and Flatpak declare them themselves (docs
                                       extension gets the app under "Open with"; "own" types
                                       also open with it by default
   parse_schemes(text) -> [scheme]     "scheme scheme ..." (';', ',' or blanks)
-  reg_entries(app, display, exe, types, schemes) -> [RegValue]   the values below
+  reg_entries(app, display, exe, types, schemes, app_id) -> [RegValue]   the values below
                                       HKCU\Software\Classes the setup and assoc_register write
+                                      (app_id: the program's AppUserModelID in its ProgIDs,
+                                      "" = none)
+  app_id_boot() -> Option<id>         (ui::main!, Windows) PACKAGE's app id as the process's
+                                      explicit AppUserModelID (taskbar.rs) once the setup
+                                      installed this program (install.ini beside it names the
+                                      id) or --register registered it (the record names it);
+                                      jfgui_AUMID=ID gives one, jfgui_AUMID=off none.  Every
+                                      other program keeps the id Windows derives from its path
   assoc_conflicts(&Package) -> Result<[Conflict], AssocError>   the defaults of other
                                       programs a registration would replace
   assoc_register(&Package, take) -> Result<Registered, AssocError>   register this program;
@@ -18604,10 +18938,11 @@ The record (config://assoc.list) lists every key, value and file the registratio
 what it replaced; unregistering removes those (a value only while it still holds what was
 written) and puts back what was there.  Windows (win_assoc.rs): the setup's entries below
 HKCU\Software\Classes -- the ProgID <app>.<ext> (description, DefaultIcon, shell\open\command
-= "<exe>" "%1"), .<ext>\OpenWithProgids, for own types the default and Content Type of
-.<ext>, a scheme's key (URL:<display>, URL Protocol) -- then SHChangeNotify.  A default of
-another program is the extension's default value (HKCU or HKLM) or a key of the same name
-with another command; the user's own choice in Windows' dialog (UserChoice, hashed) is never
+= "<exe>" "%1", AppUserModelID = the app id: what Windows asks of a handler with an explicit
+id for the recent files of the type), .<ext>\OpenWithProgids, for own types the default and
+Content Type of .<ext>, a scheme's key (URL:<display>, URL Protocol) -- then SHChangeNotify.
+A default of another program is the extension's default value (HKCU or HKLM) or a key of the
+same name with another command; the user's own choice in Windows' dialog (UserChoice, hashed) is never
 changed (Conflict::fixed).  Linux (linux_assoc.rs): $XDG_DATA_HOME/applications/<app_id>.desktop
 (Exec with %U for schemes, else %F; MimeType=), own types as shared-mime-info XML in
 $XDG_DATA_HOME/mime/packages/<app_id>.xml, the defaults of own types and schemes in
@@ -18698,9 +19033,11 @@ RV_SHARED: u8 = 1
 RV_DEFAULT: u8 = 2
 ```
 
-- **`fn reg_entries(app: &str, display: &str, exe: &str, types: &[FileType], schemes: &[String]) -> Vec<RegValue>`**
+- **`fn reg_entries(app: &str, display: &str, exe: &str, types: &[FileType], schemes: &[String], app_id: &str) -> Vec<RegValue>`**
   the HKCU values of the file types and schemes for the program exe (backslashes): the setup's
-  and assoc_register's
+  and assoc_register's.  app_id: the AppUserModelID the program runs under ("" = none, Windows
+  derives one): each ProgID names it (AppUserModelID), as Windows wants for the recent files
+  of an explicit id
 
 - **`fn assoc_conflicts(pkg: &Package) -> Result<Vec<Conflict>, AssocError>`**
   the defaults of other programs a registration of pkg would replace (nothing is written)
@@ -18714,6 +19051,12 @@ RV_DEFAULT: u8 = 2
 
 - **`fn assoc_registered() -> Option<String>`**
   the program a registration of this app starts (the record), None without one
+
+- **`fn app_id_boot() -> Option<String>`**
+  (ui::main!) Windows: PACKAGE's app id as the process's explicit AppUserModelID when this
+  program was installed by the setup (install.ini beside it names the id) or registered with
+  --register (the record names this program); jfgui_AUMID=ID gives one, =off none -> the id
+  set.  Other programs (and other systems) keep the id the system derives
 
 - **`fn file_uri_path(arg: &str) -> Option<String>`**
   a local file:// URI as a path ("file:///home/a%20b.txt" -> "/home/a b.txt", Windows
@@ -18737,7 +19080,9 @@ recent -- the system's list of recently used files
   recent_add(path) -> bool        a file the user opened or saved.  Windows:
                                   SHAddToRecentDocs (Explorer's recent files; the app's jump
                                   list shows it under "Recent" when the app is a registered
-                                  handler of the type: the setup, assoc_register, MSIX).
+                                  handler of the type: the setup, assoc_register, MSIX; with
+                                  the process's explicit AppUserModelID, taskbar.rs, the
+                                  item is given to that id: SHARD_APPIDINFO).
                                   Linux: a bookmark in $XDG_DATA_HOME/recently-used.xbel (the
                                   freedesktop format GTK and KDE read: href, added / modified /
                                   visited, the MIME type, this app's entry with exec and count)
@@ -18753,6 +19098,9 @@ recent -- the system's list of recently used files
   recent_os(on)                   (ui::main!) off in headless runs (--script, --shot, the
                                   agent protocols): add / remove / clear leave the system's
                                   list alone and return false
+  recent_list_of(id, max) / recent_remove_of(id, path)   (Windows, tests) the jump list of
+                                  another AppUserModelID (Explorer's own recent files:
+                                  Microsoft.Windows.Explorer)
 
 The path must be readable under the app's permissions (fs.read / fs.user, policy.rs; else
 "PERMDENY fs.read" and false) and be an OS file (a folder mount's file counts as its OS path;
@@ -18781,6 +19129,13 @@ then.  Web and Android: false / empty.
 
 - **`fn recent_clear() -> bool`**
   forget every recent file of this app
+
+- **`fn recent_list_of(id: &str, max: usize) -> Vec<String>`** *(Windows)*
+  (Windows, tests) the recent files of the jump list of AppUserModelID id
+
+- **`fn recent_remove_of(id: &str, path: &str) -> bool`** *(Windows)*
+  (Windows, tests) a file out of the jump list of AppUserModelID id (Explorer's own:
+  Microsoft.Windows.Explorer)
 
 ### `plat/audio.rs`
 
@@ -20905,6 +21260,19 @@ apps" entry, starting a command line             (r12-inst)  [apps/installer/src
                                   dirs.rs)
   shell_link(lnk, target, dir, desc) -> bool   a shortcut file lnk -> target (working
                                   folder dir, icon 0 of the target, comment desc)  [sh_link]
+  shell_link_id(lnk, target, dir, desc, app_id) -> bool   the same with the AppUserModelID
+                                  app_id ("" = none) as the link's System.AppUserModel.ID
+                                  (the program's explicit id, taskbar.rs: its button, jump
+                                  list and notifications then belong to the link)
+  link_read(lnk) -> Some((target, app_id))   a shortcut's target and System.AppUserModel.ID
+                                  ("" = none)
+  link_set_app_id(lnk, app_id) -> bool   that id written into an existing shortcut
+  pins_set_app_id(dir, exe, app_id) -> usize   the shortcuts in dir and its folders that start
+                                  exe and carry no id get app_id (pins made before the
+                                  program ran under its id no longer match its button);
+                                  Explorer is told of each (SHChangeNotify)
+  pinned_dir() -> Some(path)      the user's pinned items (FOLDERID_UserPinned: TaskBar,
+                                  ImplicitAppShortcuts)
   reg_create(subkey) -> Some(RegKey)   HKCU\subkey opened for writing (created when missing);
                                   RegKey::set_sz / set_dword, closed when dropped
   reg_delete(subkey) -> bool      RegDeleteKeyW(HKCU, subkey)
@@ -20936,6 +21304,23 @@ PATH_CAP: usize = 520
 
 - **`fn shell_link(lnk: &str, target: &str, dir: &str, desc: &str) -> bool`**
   a shortcut lnk -> target (working folder dir, icon 0 of the target, comment desc)  [sh_link]
+
+- **`fn shell_link_id(lnk: &str, target: &str, dir: &str, desc: &str, app_id: &str) -> bool`**
+  a shortcut as shell_link, with the AppUserModelID app_id ("" = none)
+
+- **`fn link_read(lnk: &str) -> Option<(String, String)>`**
+  a shortcut's target (backslashes) and its System.AppUserModel.ID ("" = none)
+
+- **`fn link_set_app_id(lnk: &str, app_id: &str) -> bool`**
+  the AppUserModelID app_id written into the existing shortcut lnk
+
+- **`fn pinned_dir() -> Option<String>`**
+  the user's pinned items (FOLDERID_UserPinned; backslashes)
+
+- **`fn pins_set_app_id(dir: &str, exe: &str, app_id: &str) -> usize`**
+  the shortcuts in dir and in its folders (two levels: TaskBar, ImplicitAppShortcuts/&lt;hash>
+  below pinned_dir()) that start exe and carry no AppUserModelID get app_id -> how many were
+  changed
 
 - **`struct RegKey(isize)`**
   an open registry key (closed when dropped)
@@ -34027,6 +34412,23 @@ back a version that does not start
                                start_download() (a background thread, plat::wake() when
                                done), status() (phase, progress, error), cancel(), staged()
   state(&cfg), newer(a, b), target(), Manifest::parse, verify
+  install(&cfg) -> Packaged     how the program is installed (plat::pkg::packaged; cfg.exe
+                               set: Plain), which decides what an update is:
+    Plain     exe / bundle / package entries of update.json (below)
+    AppImage  the "appimage" entry: the .AppImage file ($APPIMAGE) is replaced as a whole
+              (copied next to it, checked, renamed over it; the old file is the backup, the
+              trial and the rollback as for an exe; restarted through the AppImage); a folder
+              the user cannot write: check() fails with Error::ReadOnly.  A signed AppImage
+              (.sha256_sig / .sig_key, appimagetool --sign) only takes an update signed by a
+              key of its own key block (appimage.rs, pgp.rs)
+    Flatpak   no update.json: the portal's update monitor (plat::pkg::FlatpakMonitor) --
+              check() reports what it found (Kind::Flatpak), download() installs it
+              (Update, Progress), apply() starts the newest version (Spawn) and ends this
+              one; without the portal: Check::Managed(Manager::Flatpak, None)
+    Msix      Check::Managed: App Installer (an .appinstaller: updated at the next start,
+              with whether it knows of a newer version) or whoever installed the package
+    Snap      Check::Managed(Manager::Snap, None)
+  appimage_signature(path)     the embedded signature of an AppImage file (Signed)
 
 The channel: update.json (UTF-8 JSON) and update.json.sig beside it (the Base64 Ed25519
 signature over the exact bytes of update.json); tools/update_manifest.py writes both:
@@ -34036,8 +34438,9 @@ signature over the exact bytes of update.json); tools/update_manifest.py writes 
               "size": 123456, "sha256": "<64 hex digits>"}, ...]}
 kind "exe" replaces the program file, "bundle" is a JFA1 bundle of files relative to the
 program's folder (the program and its modules), "package" an installer (.deb, setup) that
-is only downloaded and checked (Updater::staged).  A relative url is resolved against the
-address update.json came from; redirects are followed (at most 5).
+is only downloaded and checked (Updater::staged), "appimage" a whole AppImage (only for a
+program running as one; entries of unknown kinds are left out).  A relative url is resolved
+against the address update.json came from; redirects are followed (at most 5).
 
 Checks: the signature against cfg.keys; "app" must be cfg.app; "expires" (unix seconds) not
 passed; a version older than one a signed manifest named before is refused (replay); only a
@@ -34051,10 +34454,13 @@ cfg.dir holds state (stage, version, from, starts, bad, seen), lock, partial/<sh
 interrupted download, continued with a Range request), staged/ (update.json, its signature
 and the file) and backup/ (the replaced files of the last update).  Putting an update in
 place writes the program's folder: in an app with a PERMISSIONS manifest that needs
-fs.write $EXE/**; a folder of the system (/usr/lib, Program Files) needs a "package" update.
+fs.write $EXE/** (an AppImage: fs.write $APPIMAGE/**); a folder of the system (/usr/lib,
+Program Files) needs a "package" update.
 ```
 
 ### `update` crate root
+
+Re-exports: `plat::pkg::Packaged`
 
 - **`struct Config`**
   what the updater needs to know about the app
@@ -34097,6 +34503,9 @@ fs.write $EXE/**; a folder of the system (/usr/lib, Program Files) needs a "pack
   - `Nothing` -- nothing to download or to apply
   - `Unsupported(String)` -- a package that is not put in place by the updater
   - `Io(String)` -- files could not be read or written
+  - `ReadOnly(String)` -- the AppImage lies in a folder the user cannot write (the folder): it is not replaced
+  - `Rejected(String)` -- the downloaded package is not taken: not an AppImage, or its signature does not follow
+    the running one's (why)
 
 - **`struct Offer`**
   a newer version the channel offers
@@ -34110,9 +34519,20 @@ fs.write $EXE/**; a folder of the system (/usr/lib, Program Files) needs a "pack
 - **`enum Check`**
   the answer of a check
   - `UpToDate` -- no newer version (or only one that was rolled back)
-  - `NoPackage(String)` -- a newer version without a package for this system (its version); also when it has only
-    an exe or bundle package and the program runs as an AppImage, Flatpak or Snap
+  - `NoPackage(String)` -- a newer version without a package for this system and installation (its version): an
+    AppImage takes only "appimage" entries, a plain program none of them
   - `Available(Offer)` -- a newer version to download
+  - `Managed(Manager, Option<bool>)` -- this installation is updated by its package system, not through update.json: who, and
+    whether it knows of a newer version (None: it does not say)
+
+- **`enum Manager`**
+  who updates an installation that lib/update does not update itself (Check::Managed)
+  - `AppInstaller` -- App Installer: the MSIX package came from an .appinstaller file and is updated as that
+    file says (tools/pkg_msix.py: at the next start)
+  - `Msix` -- an MSIX package without an .appinstaller (the Store, Add-AppxPackage): updated by
+    whoever installed it
+  - `Flatpak` -- Flatpak (flatpak update, a software centre): the portal's update monitor is missing
+  - `Snap` -- snapd
 
 - **`enum Startup`**
   what startup() did
@@ -34175,7 +34595,12 @@ fs.write $EXE/**; a folder of the system (/usr/lib, Program Files) needs a "pack
   installed from there by the app or the user)
 - **`fn apply(&self) -> Result<Startup, Error>`**
   put the downloaded update in place now and restart into it (with cfg.restart the
-  process ends here)
+  process ends here); a Flatpak: start the newest installed version (the portal's Spawn)
+  and end this one
+
+- **`fn install(cfg: &Config) -> Packaged`**
+  how the running program is installed, which decides what an update is (cfg.exe set:
+  Plain -- an explicit program file)
 
 - **`fn startup(cfg: &Config) -> Startup`**
   at the start of the program, before its UI: a staged update is put in place and the
@@ -34186,6 +34611,35 @@ fs.write $EXE/**; a folder of the system (/usr/lib, Program Files) needs a "pack
 - **`fn healthy(cfg: &Config) -> bool`**
   the health marker: the new version on trial works.  Call it once the app is up (after its
   first frame, for example); true when it ended a trial.  Cheap when no trial runs.
+
+### `update/appimage.rs`
+
+Source: [`lib/update/appimage.rs`](../lib/update/appimage.rs)
+
+```text
+appimage -- an AppImage file as an update: the type-2 header, its embedded signature (the
+sections .sha256_sig and .sig_key appimagetool --sign writes) and whether a new file may
+follow the running one
+
+  is_type2(path) -> bool             ELF with "AI\x02" at byte 8
+  signature(path) -> Result<Signed, String>   No (no or empty sections), By(the signing key
+                                     of the embedded key block, its fingerprints), Err: a
+                                     signature that does not check
+  follows(old, new) -> Result<(), String>   the rule of an update: a signed AppImage only
+                                     takes one signed by a key of its own key block
+
+The signed text is the SHA-256 of the whole file, with the bytes of both sections taken as
+zeros, as 64 lower-case hex digits (appimagetool's digest; AppImageUpdate's validate checks
+the same).  The armored signature and key stand NUL-padded in their sections.
+```
+
+- **`enum Signed`**
+  what an AppImage's signature sections say
+  - `No` -- not signed (no sections, or empty ones)
+  - `By { signer: [u8; 20], keys: Vec<[u8; 20]> }` -- signed by `signer` (a key of the embedded block, whose fingerprints are `keys`)
+
+- **`fn signature(path: &str) -> Result<Signed, String>`**
+  the embedded signature of the AppImage at path
 
 ### `update/apply.rs`
 
@@ -34203,6 +34657,10 @@ Every file of an update is written next to its target as NAME.jfupd-new; the old
 copied to backup/files/ (backup/list: "R path" replaced, "N path" new), renamed away
 (NAME.jfupd-old-<n>: Windows can rename a running exe, not replace it) and the new file takes
 its name.  Leftover .jfupd-* files are removed at a later start, once no process uses them.
+An AppImage update has one file, the .AppImage itself ($APPIMAGE): copied (and hashed on the
+way) from staged/ as NAME.jfupd-new, checked as an AppImage whose signature follows the
+running one's (appimage.rs), renamed over the old file (atomic on Linux); the old file is
+the backup.  Large files are copied in pieces, never read whole.
 ```
 
 - **`enum Stage`**
@@ -34252,7 +34710,9 @@ Source: [`lib/update/manifest.rs`](../lib/update/manifest.rs)
 manifest -- update.json: parse, check the signature, pick the package of this system,
 compare versions
 
-  Manifest::parse(bytes) -> Result<Manifest, String>   (no signature check)
+  Manifest::parse(bytes) -> Result<Manifest, String>   (no signature check; entries of a
+                                          kind this version does not know are left out)
+  Manifest::package_for(target, appimage) the entry for this system and installation
   verify(bytes, sig_text, keys) -> bool   the Base64 Ed25519 signature of update.json.sig
   target() -> "windows-x86_64" | "linux-x86_64" | "linux-aarch64" | ...
   newer(a, b) -> bool                     "1.10.0" > "1.9.2", "2.0.0" > "2.0.0-rc1"
@@ -34270,11 +34730,15 @@ MAX_SIG: usize = 4096
   - `Exe` -- the program file itself
   - `Bundle` -- a JFA1 bundle (tools/assetpack.py) of files relative to the program's folder
   - `Package` -- an installer (.deb, setup): downloaded and checked, installed by the app or the user
+  - `AppImage` -- a whole AppImage: replaces the running AppImage's file ($APPIMAGE); only offered to a
+    program that runs as an AppImage, which is offered nothing else
+  - `Flatpak` -- an update of a Flatpak from its repository, through the Flatpak portal (never in a
+    manifest: Offer::kind of a Flatpak)
 
 **`impl Kind`**
 
 - **`fn name(self) -> &'static str`**
-  "exe", "bundle" or "package"
+  "exe", "bundle", "package", "appimage" or "flatpak"
 - **`fn parse(s: &str) -> Option<Kind>`**
   the kind of a name (name())
 
@@ -34302,6 +34766,9 @@ MAX_SIG: usize = 4096
   it is malformed
 - **`fn package(&self, target: &str) -> Option<&Package>`**
   the package for a target (the first one)
+- **`fn package_for(&self, target: &str, appimage: bool) -> Option<&Package>`**
+  the package for a target and the way the program is installed: the first "appimage"
+  entry for an AppImage (appimage = true), else the first entry of another kind
 
 - **`fn verify(bytes: &[u8], sig_text: &[u8], keys: &[[u8; 32]]) -> bool`**
   whether sig_text (update.json.sig: the Base64 Ed25519 signature, blanks around it ignored)

@@ -6,6 +6,9 @@
   pe_signature(path) -> (offset, size) | None    the certificate table of a signed PE file
   apt_repo(debs, out)             a flat apt repository: Packages(.gz), Release, InRelease,
                                   Release.gpg, the public key as <out>/repo.gpg (in Linux/WSL)
+  gpg_detach_sign(data)           an armored detached signature of data and the armored public
+                                  key (the AppImage signature; in Linux/WSL)
+  run_gpg_task(args)              a tools/linux_task.py action with the GPG settings (Flatpak)
 
 Configuration (environment; nothing of it belongs in the repository):
   jfgui_SIGN_PFX / jfgui_SIGN_PFX_PASS   a code-signing certificate with its key (.pfx) and its
@@ -15,9 +18,13 @@ Configuration (environment; nothing of it belongs in the repository):
   jfgui_SIGN_TIMESTAMP                   an RFC 3161 time-stamp server (recommended: without a
                                          time stamp the signature ends with the certificate)
   jfgui_SIGNTOOL                         signtool.exe (default: PATH, else the newest Windows Kit)
-  jfgui_GPG_KEY                          the key id / fingerprint that signs the apt repository
+  jfgui_GPG_KEY                          the key id / fingerprint that signs the apt repository,
+                                         the AppImages (.sha256_sig) and the Flatpak repository
+                                         and bundle
   jfgui_GPG_HOME                         its GnuPG home in Linux (default ~/.gnupg)
-  jfgui_GPG_PASSPHRASE                   its passphrase (batch signing; else gpg-agent asks)
+  jfgui_GPG_PASSPHRASE                   its passphrase (batch signing; else gpg-agent asks;
+                                         flatpak signs through gpg-agent only: a key with a
+                                         passphrase needs it cached there)
 """
 import os
 import shutil
@@ -129,23 +136,52 @@ def apt_repo(debs, out, origin="JFLib"):
     for d in debs:
         shutil.copyfile(d, out / "pool" / Path(d).name)
     key = os.environ.get("jfgui_GPG_KEY", "")
-    args = ["python3", linux_path(ROOT / "tools" / "linux_task.py"), "repo", linux_path(out), origin, key]
-    env = None
-    home = os.environ.get("jfgui_GPG_HOME")
-    passphrase = os.environ.get("jfgui_GPG_PASSPHRASE")
-    if home or passphrase:
-        env = dict(os.environ)
-        names = []
-        if home:
-            env["jfgui_GPG_HOME"] = home
-            names.append("jfgui_GPG_HOME")
-        if passphrase:
-            names.append("jfgui_GPG_PASSPHRASE")
-        if os.name == "nt":           # hand them through WSL
-            env["WSLENV"] = ":".join([*names, *filter(None, [os.environ.get("WSLENV")])])
-    r = run_linux(args, env=env)
+    r = run_gpg_task(["repo", linux_path(out), origin, key])
     if r.returncode:
         raise RuntimeError(f"apt repository: {r.stdout}{r.stderr}")
     if not key:
         return "apt-Repository: unsigniert (jfgui_GPG_KEY setzen: Schlüssel-ID für InRelease / Release.gpg)"
     return None
+
+
+def gpg_env():
+    """the environment of a Linux task that signs with GPG: jfgui_GPG_HOME and
+    jfgui_GPG_PASSPHRASE handed through WSL (None: nothing to hand)"""
+    home = os.environ.get("jfgui_GPG_HOME")
+    passphrase = os.environ.get("jfgui_GPG_PASSPHRASE")
+    if not (home or passphrase):
+        return None
+    env = dict(os.environ)
+    names = []
+    for n, v in (("jfgui_GPG_HOME", home), ("jfgui_GPG_PASSPHRASE", passphrase)):
+        if v:
+            env.pop(n.upper(), None)          # os.environ on Windows has upper-case names
+            env[n] = v                        # WSL hands them over as named here
+            names.append(n)
+    if os.name == "nt":
+        env["WSLENV"] = ":".join([*names, *filter(None, [os.environ.get("WSLENV")])])
+    return env
+
+
+def run_gpg_task(args, timeout=1800):
+    """python3 tools/linux_task.py ARGS in Linux / WSL with the GPG settings (gpg_env)"""
+    return run_linux(["python3", linux_path(ROOT / "tools" / "linux_task.py"), *map(str, args)], env=gpg_env(), timeout=timeout)
+
+
+def gpg_detach_sign(data):
+    """an ASCII-armored detached signature of data by jfgui_GPG_KEY and the key's armored public
+    part (the AppImage signature, pkg_linux.sign_appimage) -> (signature, key)"""
+    import json
+    import tempfile
+    key = os.environ.get("jfgui_GPG_KEY", "")
+    if not key:
+        raise RuntimeError("jfgui_GPG_KEY ist nicht gesetzt")
+    (ROOT / "build").mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="gpgsign-", dir=ROOT / "build") as tmp:
+        f = Path(tmp) / "digest"
+        f.write_bytes(data)
+        r = run_gpg_task(["gpgsign", linux_path(f), key])
+    if r.returncode:
+        raise RuntimeError(f"gpg: {(r.stdout + r.stderr).strip()[-2000:]}")
+    out = json.loads(r.stdout.strip().splitlines()[-1])
+    return out["sig"], out["key"]
