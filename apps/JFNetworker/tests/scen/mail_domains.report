@@ -1,0 +1,162 @@
+# JFNetworker-Szenario mail_domains.scn: „Mail zwischen zwei Domänen“, 8 Geräte, 7 Verbindungen, Seed 23
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/4 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/4 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  PC1     root@PC1:~# echo "From: Anna Muster <anna@a.lab>" > brief.txt
+   0.000000000  --      PC1: /root/brief.txt gespeichert (31 Bytes)
+   0.000000000  PC1     root@PC1:~# echo "To: Bob <bob@b.lab>" >> brief.txt
+   0.000000000  --      PC1: /root/brief.txt gespeichert (51 Bytes)
+   0.000000000  PC1     root@PC1:~# echo "Subject: Gruss aus a.lab" >> brief.txt
+   0.000000000  --      PC1: /root/brief.txt gespeichert (76 Bytes)
+   0.000000000  PC1     root@PC1:~# echo >> brief.txt
+   0.000000000  --      PC1: /root/brief.txt gespeichert (77 Bytes)
+   0.000000000  PC1     root@PC1:~# echo "Hallo Bob, wie geht es dir?" >> brief.txt
+   0.000000000  --      PC1: /root/brief.txt gespeichert (105 Bytes)
+   0.000000000  PC1     root@PC1:~# curl -v smtp://mail.a.lab --mail-from anna@a.lab --mail-rcpt bob@b.lab -T brief.txt
+   0.000000000  --      run 2s
+   0.000006352  PC1     *   Trying 10.0.1.25:25...
+   0.000012128  PC1     * Connected to mail.a.lab (10.0.1.25) port 25
+   0.000015512  PC1     < 220 mail.a.lab ESMTP ready for mail
+   0.000015512  PC1     > EHLO PC1
+   0.000021360  PC1     < 250-mail.a.lab welcomes PC1
+   0.000021360  PC1     < 250-SIZE 10485760
+   0.000021360  PC1     < 250-8BITMIME
+   0.000021360  PC1     < 250-PIPELINING
+   0.000021360  PC1     < 250 ENHANCEDSTATUSCODES
+   0.000021360  PC1     > MAIL FROM:<anna@a.lab> SIZE=110
+   0.000024968  PC1     < 250 2.1.0 Sender noted
+   0.000024968  PC1     > RCPT TO:<bob@b.lab>
+   0.000028432  PC1     < 250 2.1.5 Recipient noted
+   0.000028432  PC1     > DATA
+   0.000032216  PC1     < 354 Go ahead, end the message with a line holding only a dot
+   0.000157232  PC1     < 250 2.0.0 Queued as 835341E53D
+   0.000157232  PC1     > QUIT
+   0.000160728  PC1     < 221 2.0.0 mail.a.lab closes the connection
+   0.000160728  PC1     * Closing connection to mail.a.lab
+   1.040457996  --      MAILB: /var/mail/bob/new/1767225599.M624430Q1.mailb gespeichert (382 Bytes)
+   2.000000000  ok      expect PC1 output contains "< 250 2.0.0 Queued as "
+   2.000000000  ok      expect MAILA svc smtp metric relayed == 1 (1)
+   2.000000000  ok      expect MAILB svc smtp metric delivered == 1 (1)
+   2.000000000  MAILB   root@MAILB:~# ls /var/mail/bob/new
+   2.000000000  MAILB   1767225599.M624430Q1.mailb
+   2.000000000  PC2     root@PC2:~# curl -u bob:geheim pop3://mail.b.lab/
+   2.000000000  --      run 7s
+   7.000034544  PC2     1 392
+   9.000000000  PC2     root@PC2:~# curl -v -u bob:geheim pop3://mail.b.lab/1
+   9.000000000  --      run 2s
+   9.000000000  PC2     *   Trying 10.0.2.25:110...
+   9.000002888  PC2     * Connected to mail.b.lab (10.0.2.25) port 110
+   9.000005936  PC2     < +OK POP3 ready
+   9.000005936  PC2     > CAPA
+   9.000011512  PC2     < +OK What this server can do:
+   9.000011512  PC2     < USER
+   9.000011512  PC2     < UIDL
+   9.000011512  PC2     < TOP
+   9.000011512  PC2     < PIPELINING
+   9.000011512  PC2     < RESP-CODES
+   9.000011512  PC2     < AUTH-RESP-CODE
+   9.000011512  PC2     > USER bob
+   9.000014880  PC2     < +OK Now the password with PASS
+   9.000014880  PC2     > PASS geheim
+   9.000018408  PC2     < +OK Logged in, 1 message (392 octets)
+   9.000018408  PC2     > RETR 1
+   9.000147920  PC2     < +OK 392 octets follow
+   9.000147920  PC2     > QUIT
+   9.000150920  PC2     < +OK Goodbye
+   9.000150920  PC2     Return-Path: <anna@a.lab>
+   9.000150920  PC2     Received: from mail.a.lab ([10.0.1.25]) by mail.b.lab with ESMTP id 0DB5D936D5
+   9.000150920  PC2      for <bob@b.lab>; Wed, 31 Dec 2025 23:59:59 +0000
+   9.000150920  PC2     Received: from PC1 ([10.0.1.10]) by mail.a.lab with ESMTP id 835341E53D for
+   9.000150920  PC2      <bob@b.lab>; Wed, 31 Dec 2025 23:59:58 +0000
+   9.000150920  PC2     From: Anna Muster <anna@a.lab>
+   9.000150920  PC2     To: Bob <bob@b.lab>
+   9.000150920  PC2     Subject: Gruss aus a.lab
+   9.000150920  PC2     
+   9.000150920  PC2     Hallo Bob, wie geht es dir?
+   9.000150920  PC2     * Closing connection to mail.b.lab
+  11.000000000  ok      expect PC2 output contains "Subject: Gruss aus a.lab"
+  11.000000000  ok      expect PC2 output contains "Received: from mail.a.lab ([10.0.1.25]) by mail.b.lab with ESMTP id "
+  11.000000000  ok      expect PC2 output contains "Hallo Bob, wie geht es dir?"
+  11.000000000  PC2     root@PC2:~# curl -u bob:geheim -X "DELE 1" pop3://mail.b.lab/
+  11.000000000  --      run 2s
+  11.000143236  --      MAILB: /var/mail/bob/new/1767225599.M624430Q1.mailb gelöscht
+  13.000000000  ok      expect MAILB svc pop3 metric deleted == 1 (1)
+  13.000000000  PC1     root@PC1:~# echo "Bist du da?" | mail -s "Hallo Carl" carl@b.lab
+  13.000000000  --      run 5s
+  13.040336532  --      MAILA: /var/mail/anna/new/1767225611.M339216Q1.maila gespeichert (1586 Bytes)
+  18.000000000  ok      expect MAILA svc smtp metric bounced == 1 (1)
+  18.000000000  ok      expect MAILB svc smtp metric rejected == 2 (2)
+  18.000000000  PC1     root@PC1:~# curl -u anna:geheim pop3://mail.a.lab/1
+  18.000000000  --      run 2s
+  18.000170552  PC1     Return-Path: <>
+  18.000170552  PC1     From: Mail delivery <MAILER-DAEMON@mail.a.lab>
+  18.000170552  PC1     To: <anna@a.lab>
+  18.000170552  PC1     Subject: Undelivered mail: Hallo Carl
+  18.000170552  PC1     Date: Thu, 01 Jan 2026 00:00:11 +0000
+  18.000170552  PC1     Message-ID: <7C16BFE3A9.1767225611.bounce@mail.a.lab>
+  18.000170552  PC1     Auto-Submitted: auto-replied
+  18.000170552  PC1     MIME-Version: 1.0
+  18.000170552  PC1     Content-Type: multipart/report; report-type=delivery-status;
+  18.000170552  PC1      boundary="7C16BFE3A9.1767225611/mail.a.lab"
+  18.000170552  PC1     
+  18.000170552  PC1     This is a delivery status notification in MIME format (RFC 3464).
+  18.000170552  PC1     
+  18.000170552  PC1     --7C16BFE3A9.1767225611/mail.a.lab
+  18.000170552  PC1     Content-Type: text/plain; charset=us-ascii
+  18.000170552  PC1     Content-Description: Notification
+  18.000170552  PC1     
+  18.000170552  PC1     The mail server mail.a.lab could not deliver your message to
+  18.000170552  PC1     the recipients below; it will not try again.
+  18.000170552  PC1     
+  18.000170552  PC1     <carl@b.lab>: mail.b.lab said: 550 5.1.1 <carl@b.lab>: no such user here
+  18.000170552  PC1     
+  18.000170552  PC1     --7C16BFE3A9.1767225611/mail.a.lab
+  18.000170552  PC1     Content-Type: message/delivery-status
+  18.000170552  PC1     Content-Description: Delivery report
+  18.000170552  PC1     
+  18.000170552  PC1     Reporting-MTA: dns; mail.a.lab
+  18.000170552  PC1     Arrival-Date: Thu, 01 Jan 2026 00:00:11 +0000
+  18.000170552  PC1     
+  18.000170552  PC1     Final-Recipient: rfc822; carl@b.lab
+  18.000170552  PC1     Action: failed
+  18.000170552  PC1     Status: 5.1.1
+  18.000170552  PC1     Remote-MTA: dns; mail.b.lab
+  18.000170552  PC1     Diagnostic-Code: smtp; 550 5.1.1 <carl@b.lab>: no such user here
+  18.000170552  PC1     
+  18.000170552  PC1     --7C16BFE3A9.1767225611/mail.a.lab
+  18.000170552  PC1     Content-Type: text/rfc822-headers
+  18.000170552  PC1     Content-Description: Header of the message
+  18.000170552  PC1     
+  18.000170552  PC1     Received: from PC1 ([10.0.1.10]) by mail.a.lab with ESMTP id 7C16BFE3A9 for
+  18.000170552  PC1      <carl@b.lab>; Thu, 01 Jan 2026 00:00:11 +0000
+  18.000170552  PC1     From: Anna Muster <anna@a.lab>
+  18.000170552  PC1     To: carl@b.lab
+  18.000170552  PC1     Subject: Hallo Carl
+  18.000170552  PC1     Date: Thu, 01 Jan 2026 00:00:13 +0000
+  18.000170552  PC1     Message-ID: <1767225613.1F7E2A24.mail@a.lab>
+  18.000170552  PC1     MIME-Version: 1.0
+  18.000170552  PC1     Content-Type: text/plain; charset=UTF-8
+  18.000170552  PC1     Content-Transfer-Encoding: 7bit
+  18.000170552  PC1     
+  18.000170552  PC1     --7C16BFE3A9.1767225611/mail.a.lab--
+  20.000000000  ok      expect PC1 output contains "Subject: Undelivered mail: Hallo Carl"
+  20.000000000  ok      expect PC1 output contains "Final-Recipient: rfc822; carl@b.lab"
+  20.000000000  ok      expect PC1 output contains "Status: 5.1.1"
+  20.000000000  ok      expect PC1 output contains "Diagnostic-Code: smtp; 550 5.1.1 <carl@b.lab>: no such user here"
+  20.000000000  ok      expect hops smtp >= 30 (214)
+# 14 von 14 Erwartungen erfüllt

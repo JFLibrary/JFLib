@@ -3,6 +3,8 @@
 // RSA and ECDSA signatures made by OpenSSL through Python's cryptography) and round trips
 // wpa(): what WPA2 and WPA3 build on -- SHA-1 (FIPS 180-4), HMAC-SHA1 (RFC 2202), PBKDF2-HMAC-SHA1
 // (RFC 6070, the PSKs of IEEE 802.11 J.4), the AES key wrap (RFC 3394) and AES-CMAC (RFC 4493)
+// md5(): what RADIUS builds on -- MD5 (the test suite of RFC 1321 A.5, streaming in pieces) and
+// HMAC-MD5 (RFC 2104, the seven cases of RFC 2202)
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -34,6 +36,7 @@ pub fn run(t: &mut T) {
     misc(t);
     web_pki(t);
     wpa(t);
+    md5(t);
 }
 
 /// the inverse cipher: FIPS 197 C.1 / C.3 backwards, then random blocks and keys both ways
@@ -614,4 +617,57 @@ fn wpa(t: &mut T) {
         t.eq(&alloc::format!("aes-cmac rfc4493 {} bytes", n), crypto::cmac_aes(&k, &m[..n]).map(|c| hex(&c)), Some(String::from(want)));
     }
     t.check("aes-cmac wants a 128-bit key", crypto::cmac_aes(&k[..15], b"x").is_none());
+}
+
+/// the primitives of RADIUS: MD5 (RFC 1321) and HMAC-MD5 (RFC 2104 / 2202)
+fn md5(t: &mut T) {
+    // RFC 1321 A.5
+    let suite: [(&str, &str); 7] = [
+        ("", "d41d8cd98f00b204e9800998ecf8427e"),
+        ("a", "0cc175b9c0f1b6a831c399e269772661"),
+        ("abc", "900150983cd24fb0d6963f7d28e17f72"),
+        ("message digest", "f96b697d7cb7938d525a2f31aaf161d0"),
+        ("abcdefghijklmnopqrstuvwxyz", "c3fcd3d76192e4007dfb496cca67e13b"),
+        ("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", "d174ab98d277d9f5a5611c2c9f419d9f"),
+        ("12345678901234567890123456789012345678901234567890123456789012345678901234567890", "57edf4a22be3c955ac49da2e2107b67a"),
+    ];
+    for (m, want) in suite {
+        t.eq(&alloc::format!("md5 rfc1321 \"{}\"", m), hex(&crypto::md5(m.as_bytes())), String::from(want));
+    }
+    // streaming in odd pieces equals one shot (block boundaries, the 56-byte padding edge)
+    let data: Vec<u8> = (0..300u32).map(|i| (i * 13 + 7) as u8).collect();
+    for n in [0usize, 55, 56, 57, 63, 64, 65, 119, 120, 300] {
+        let mut s = crypto::Md5::new();
+        for c in data[..n].chunks(5) {
+            s.update(c);
+        }
+        t.eq(&alloc::format!("md5 pieces {}", n), s.finalize(), crypto::md5(&data[..n]));
+    }
+    t.eq("md5 parts", crypto::md5_parts(&[b"message", b" ", b"digest"]), crypto::md5(b"message digest"));
+    let mut s = crypto::Md5::new();
+    let chunk = [b'a'; 1000];
+    for _ in 0..1000 {
+        s.update(&chunk);
+    }
+    t.eq("md5 million a", hex(&s.finalize()), String::from("7707d6ae4e027c70eea2a935c2296f21"));
+    // RFC 2202 2: the seven test cases of HMAC-MD5 (case 1 is also the example of RFC 2104)
+    let cases: [(Vec<u8>, Vec<u8>, &str); 7] = [
+        (alloc::vec![0x0b; 16], b"Hi There".to_vec(), "9294727a3638bb1c13f48ef8158bfc9d"),
+        (b"Jefe".to_vec(), b"what do ya want for nothing?".to_vec(), "750c783e6ab0b503eaa86e310a5db738"),
+        (alloc::vec![0xaa; 16], alloc::vec![0xdd; 50], "56be34521d144c88dbb8c733f0e8b3f6"),
+        ((1..=25u8).collect(), alloc::vec![0xcd; 50], "697eaf0aca3a3aea3a75164746ffaa79"),
+        (alloc::vec![0x0c; 16], b"Test With Truncation".to_vec(), "56461ef2342edc00f9bab995690efd4c"),
+        (alloc::vec![0xaa; 80], b"Test Using Larger Than Block-Size Key - Hash Key First".to_vec(), "6b1ab7fe4bd7bf8f0b62e6ce61b9d0cd"),
+        (alloc::vec![0xaa; 80], b"Test Using Larger Than Block-Size Key and Larger Than One Block-Size Data".to_vec(), "6f630fad67cda0ee1fb1f562db3aa53e"),
+    ];
+    for (i, (k, d, want)) in cases.iter().enumerate() {
+        t.eq(&alloc::format!("hmac-md5 rfc2202 {}", i + 1), hex(&crypto::hmac_md5(k, d)), String::from(*want));
+    }
+    // the generic HMAC over Md5 is the same
+    let mut m = crypto::Hmac::<crypto::Md5>::new(b"Jefe");
+    m.update(b"what do ya ");
+    m.update(b"want for nothing?");
+    let mut out = [0u8; 16];
+    m.finish_into(&mut out);
+    t.eq("hmac-md5 in pieces", out, crypto::hmac_md5(b"Jefe", b"what do ya want for nothing?"));
 }

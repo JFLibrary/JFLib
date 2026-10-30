@@ -136,7 +136,36 @@
 //   phys     the physical layer (P1): cable lengths against the reach of their media, the
 //            optics of fibres; Action::CableLen / Optic, cable_phys, PhysNote (Note::Phys),
 //            the problems CableTooLong and OpticMismatch
+//   mailtrace MNote: the decisions of mail as notes (Note::Mail) with their German sentences
+//   mailbox  the mailboxes of the mail servers in the device's files: a Maildir per user
+//   mailc    the clients of mail: the SMTP conversation, connections by name, the E-Mail
+//            program's POP3 session, its account and folders (Action::MailSend / MailFetch,
+//            Engine::mail_client)
+//   smtpd    the SMTP server (RFC 5321 with SIZE, 8BITMIME, PIPELINING, enhanced status codes,
+//            AUTH on port 587): local mailboxes, relaying by MX with a queue, retries and
+//            bounces; "smtp-server"
+//   pop3d    the POP3 server (RFC 1939 with UIDL, TOP and CAPA); "pop3-server"
+//   snmpd    the SNMP agent (SNMPv1 and v2c): "snmpd" on Linux hosts, "snmp-server ..." on IOS-like
+//            devices (SnmpSet, Action::Snmp); Get, GetNext, GetBulk and Set over the device's
+//            state, notifications as traps and informs (coldStart, linkDown, linkUp,
+//            authenticationFailure)
+//   snmpmib  what the agent serves: a view of the device made for each request (system,
+//            interfaces, ifXTable, addresses, routes, the snmp group) in the order of SNMP
+//   snmptrapd the receiver of notifications on Linux hosts: logs them, acknowledges informs
+//   snmptrace SNote: the decisions of SNMP as notes (Note::Snmp) with their German sentences
 //
+//   auth     the stored secrets and local users of an IOS-like device (Secret, UserAcct,
+//            LocalAuth): plain, reversible and PBKDF2-SHA-256 passwords, enable secret and
+//            password, usernames (X1d)
+//   aaa      authentication, authorization and accounting: methods, RADIUS servers and
+//            groups, method lists; the console and vty login sessions (X1d)
+//   aaatrace ANote: logins, AAA, RADIUS and the vty telnet sessions as notes (Note::Aaa)
+//   radiusd  the RADIUS server on hosts ("radius-server", UDP 1812 / 1813) and the NAS side
+//            of an IOS-like device (the internal service "radius-nas"): Access-Request,
+//            retransmission, the next server, the hiding of User-Password, accounting (X1d)
+//   telnetd  the telnet client of the consoles ("telnet HOST [PORT]", the NVT codec of
+//            netpkt::telnet, client-side negotiation, the "%" lines of a refusal or a close);
+//            the vty telnet server is open (it needs a CLI session per vty line) (X1d)
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
 // device has it; dig, host and nslookup are console programs too (cli/names.rs).
@@ -220,6 +249,20 @@ pub mod ftpd;
 pub mod ftpc;
 pub mod keyframe;
 pub mod phys;
+pub mod mailtrace;
+pub mod mailbox;
+pub mod mailc;
+pub mod smtpd;
+pub mod pop3d;
+pub mod snmptrace;
+pub mod snmpmib;
+pub mod snmpd;
+pub mod snmptrapd;
+pub mod auth;
+pub mod aaa;
+pub mod aaatrace;
+pub mod radiusd;
+pub mod telnetd;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -283,3 +326,16 @@ pub use ftpd::{FtpServer, FtpUser};
 pub use ftpc::FtpProgram;
 pub use keyframe::{Budget, Footprint, InKind, Input, Past, Pos, Restore, Rewind, Target};
 pub use phys::{CablePhys, PhysFault, PhysNote};
+pub use mailtrace::MNote;
+pub use mailc::{Account, MailClient, MailClientView, MailDraft, MailEntry, MailJob, MailOutcome};
+pub use smtpd::{MailUser, SmtpServer};
+pub use pop3d::Pop3Server;
+pub use snmptrace::SNote;
+pub use snmpmib::{IfRow, View as SnmpView};
+pub use snmpd::{Community, SnmpAgent, SnmpCfg, SnmpSet, TrapHost};
+pub use snmptrapd::{TrapReceiver, TrapRow};
+pub use auth::{LocalAuth, Secret, UserAcct};
+pub use aaa::{Aaa, AuthResult, Method, MethodList, RadiusServer, ServerGroup};
+pub use aaatrace::ANote;
+pub use radiusd::{NasService, RadiusServerSvc};
+pub use telnetd::TelnetClient;

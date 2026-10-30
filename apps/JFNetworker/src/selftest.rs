@@ -38,6 +38,14 @@
 // recording, doc/sim.rs's state in the past, "Von hier fortsetzen").
 // phystest.rs: the physical view (group phys: jfn_model::phys, the forms and optics of the
 // catalogue, jfn_sim::phys, doc/phys.rs, the scenario steps place / cable and expect cable).
+// mailtest.rs: mail (group mail: jfn_sim::smtpd, pop3d, mailc, mailbox, mailtrace, cli/mail.rs,
+// the static name servers of /etc/resolv.conf).
+// groupstest.rs: groups and the background picture of the canvas (group groups: jfn_model::group
+// and background, doc/groups.rs, the scene of canvas/paint.rs with frames, clusters and lines).
+// snmptest.rs: SNMP (group snmp: jfn_sim::snmpd, snmpmib, snmptrapd, snmptrace, cli/snmp.rs).
+// aaatest.rs: logins, AAA and RADIUS (group aaa: jfn_sim::auth, aaa, aaatrace, radiusd, telnetd,
+// cli/aaa.rs; the console login, enable, privilege levels, RADIUS accept / reject / fallback,
+// accounting, the telnet client).
 
 use alloc::format;
 use alloc::string::String;
@@ -103,9 +111,17 @@ mod filestest;
 mod keyframetest;
 #[path = "phystest.rs"]
 mod phystest;
+#[path = "mailtest.rs"]
+mod mailtest;
+#[path = "groupstest.rs"]
+mod groupstest;
+#[path = "snmptest.rs"]
+mod snmptest;
+#[path = "aaatest.rs"]
+mod aaatest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 37] = [
+    let groups: [(&'static str, fn(&mut T)); 41] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -143,6 +159,10 @@ pub fn run() -> i32 {
         ("files", filestest::run),
         ("keyframes", keyframetest::run),
         ("phys", phystest::run),
+        ("mail", mailtest::run),
+        ("groups", groupstest::run),
+        ("snmp", snmptest::run),
+        ("aaa", aaatest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

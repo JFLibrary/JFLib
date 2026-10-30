@@ -508,6 +508,8 @@ fn node_bytes(n: &crate::node::Node, f: &mut Footprint) {
     // the command line with its configuration text and settings
     let cfg = &n.cli.cfg;
     b += size_of::<crate::cli::CliDev>() + 256 + cfg.startup.len() + (cfg.methods.len() + cfg.descr.len()) * 64 + n.cli.queue.iter().map(|l| l.len() + 24).sum::<usize>();
+    // the login, AAA and RADIUS configuration, the banner, a pending login gate (X1d)
+    b += cfg.auth.footprint() + cfg.aaa.footprint() + cfg.motd.len() + n.cli.gate.as_ref().map_or(0, |g| g.user.len() + g.methods.len() * 16 + 48);
     if let Some(br) = &n.bridge {
         b += size_of::<crate::bridge::Bridge>() + br.ports.len() * size_of::<BridgePort>() + br.fdb.len() * (size_of::<FdbEntry>() + 40) + br.vlans.len() * 64 + 512;
     }

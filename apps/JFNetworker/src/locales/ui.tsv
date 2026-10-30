@@ -1044,6 +1044,7 @@ der Name geht nicht	the name does not work
 das Gerät nimmt sie nicht	the device does not take it
 TFTP-Server	TFTP server
 FTP-Server	FTP server
+RADIUS-Server	RADIUS server
 
 # P1: the physical view (workspace/phys, doc/phys.rs, app/commands.rs)
 &Logische Ansicht	&Logical view
@@ -1142,3 +1143,140 @@ Die Etagen übereinander; ein Doppelklick öffnet eine Etage.	The floors on top 
 Ziehen verschiebt Räume und Geräte in einen anderen Raum; ein Doppelklick öffnet einen Raum.	Drag to move rooms, and devices into another room; a double click opens a room.
 Ziehen stellt Geräte an einen Platz, auf einen Tisch, in ein Rack oder zurück in die Ablage; ein Doppelklick öffnet ein Rack.	Drag devices to a spot, onto a desk, into a rack or back to the tray; a double click opens a rack.
 Ziehen steckt Geräte in andere Höheneinheiten, nach rechts aus dem Rack.	Drag devices to other rack units, to the right out of the rack.
+# X1c: mail (devwin/email.rs: the E-Mail program on the Desktop; the kinds of the services; the
+# protocol category Mail of the simulation mode)
+E-Mail	E-mail
+Nachrichten senden und abrufen	Send and fetch messages
+Posteingang	Inbox
+Abrufen	Fetch
+Neue Nachrichten per POP3 vom Server holen	Fetch new messages from the server over POP3
+Verfassen	Write
+Antworten	Reply
+Konto …	Account …
+Keine Nachrichten	No messages
+Abrufen holt die Nachrichten des Kontos vom POP3-Server.	Fetch gets the account's messages from the POP3 server.
+Nichts gesendet	Nothing sent
+Verfassen schreibt eine neue Nachricht.	Write starts a new message.
+An	To
+Betreff	Subject
+Datum	Date
+(ohne Betreff)	(no subject)
+Cc	Cc
+Eine Nachricht wählen, um sie zu lesen.	Choose a message to read it.
+{}: läuft …	{}: running …
+{}: noch nicht	{}: not yet
+bob@b.lab, Name <adresse@domäne>	bob@b.lab, Name <address@domain>
+Der Text der Nachricht	The text of the message
+Benutzer	User
+E-Mail-Adresse	E-mail address
+POP3-Port	POP3 port
+POP3-Server	POP3 server
+Passwort	Password
+SMTP-Port	SMTP port
+SMTP-Server	SMTP server
+25 (587 mit Anmeldung)	25 (587 with a login)
+Noch kein Konto: die Angaben des Mailservers eintragen, dann Speichern.	No account yet: enter the mail server's details, then Save.
+Nachrichten auf dem Server lassen	Leave messages on the server
+Das Konto liegt als /root/Mail/account auf dem Gerät; empfangene Nachrichten in /root/Mail/inbox, gesendete in /root/Mail/sent.	The account is the file /root/Mail/account of the device; messages received are in /root/Mail/inbox, messages sent in /root/Mail/sent.
+Am {} schrieb {}:	On {}, {} wrote:
+„{}“ ist keine E-Mail-Adresse.	“{}” is not an e-mail address.
+Das Konto braucht einen SMTP- und einen POP3-Server.	The account needs an SMTP and a POP3 server.
+Ein Port ist eine Zahl von 1 bis 65535.	A port is a number from 1 to 65535.
+Das Konto passt nicht mehr auf das Gerät.	The account no longer fits on the device.
+Mailserver (SMTP)	Mail server (SMTP)
+Postfach (POP3)	Mailbox (POP3)
+Mail	Mail
+Empfangen/s	Received/s
+Weitergeleitet/s	Relayed/s
+Unzustellbar/s	Undeliverable/s
+Zurückgestellt/s	Deferred/s
+Relay abgelehnt/s	Relays refused/s
+Abgeholt/s	Fetched/s
+Abgelehnte Anmeldungen/s	Logins refused/s
+Gelöscht/s	Deleted/s
+Anmeldungen/s	Logins/s
+
+# G1: groups and the background picture of the canvas (canvas/groups.rs, canvas/backdrop.rs, inspector/group.rs, doc/groups.rs, app/commands.rs)
+&Gruppieren	&Group
+Gruppierung au&fheben	Ungrou&p
+Gruppe &zuklappen	&Collapse group
+Gruppe auf&klappen	E&xpand group
+H&intergrundbild …	&Background picture …
+Hintergrundbild &sperren	Loc&k background picture
+Hintergrundbild an &Ansicht anpassen	Fit background to the &view
+Hintergrund ent&fernen	R&emove background
+Gruppe	Group
+Nicht gruppiert	Not grouped
+png;jpg;jpeg;bmp;gif=Bild (PNG, JPEG, BMP, GIF)	png;jpg;jpeg;bmp;gif=Image (PNG, JPEG, BMP, GIF)
+„{}“ ist kein Hintergrundbild	“{}” is no background picture
+{} × {} Pixel, {}, {} KB	{} × {} pixels, {}, {} KB
+Hintergrundbild	Background picture
+lässt sich nicht anzeigen	cannot be shown
+Links	Left
+Oben	Top
+Maßstab (%)	Scale (%)
+Deckkraft (%)	Opacity (%)
+Links und Oben in Einheiten der Fläche, Maßstab 1 bis 10 000 %, Deckkraft 5 bis 100 %.	Left and top in units of the canvas, scale 1 to 10,000 %, opacity 5 to 100 %.
+Sperren	Lock
+Gesperrt lässt es sich auf der Zeichenfläche weder wählen noch ziehen; ungesperrt verschiebt Ziehen es, der Griff unten rechts skaliert es.	Locked, it can be neither selected nor dragged on the canvas; unlocked, a drag moves it and the handle at the bottom right scales it.
+An Ansicht anpassen	Fit to view
+Ersetzen …	Replace …
+Hintergrundbild …	Background picture …
+{}, 1 Notiz	{}, 1 note
+{}, {} Notizen	{}, {} notes
+Gruppe „{}“, {}	Group “{}”, {}
+Gruppe „{}“, {}, zugeklappt	Group “{}”, {}, collapsed
+{} Kabel {} – {}, {}, {}	{} cables {} – {}, {}, {}
+1 bis 64 Zeichen, nicht der Name einer anderen Gruppe	1 to 64 characters, not the name of another group
+Gruppe „{}“	Group “{}”
+Name der Gruppe	Group name
+zugeklappt	collapsed
+aufgeklappt	expanded
+Liegt	Lies
+in der Gruppe „{}“	in the group “{}”
+oben, in keiner Gruppe	at the top, in no group
+{}, 1 Gruppe	{}, 1 group
+{}, {} Gruppen	{}, {} groups
+Farbe	Color
+Zuklappen	Collapse
+Aufklappen	Expand
+Gruppierung aufheben	Ungroup
+Mitglieder	Members
+Wählen und zeigen	Select and show
+Ziehen am Titel oder am Symbol verschiebt die Gruppe mit allem darin; Entf löst sie auf, ihre Geräte bleiben. Doppelklick auf das Symbol klappt sie auf.	Dragging the title or the symbol moves the group with everything in it; Del dissolves it, its devices stay. A double click on the symbol expands it.
+Gruppen	Groups
+Gruppieren	Group
+Die gewählten Geräte, Notizen und Gruppen in eine neue Gruppe (Strg+G)	The selected devices, notes and groups into a new group (Ctrl+G)
+Bild	Image
+
+# X1b: SNMP (the Dienste tab, the protocols of the simulation mode, the MIB-Browser: devwin/mib.rs)
+SNMP-Agent	SNMP agent
+SNMP-Trap-Empfänger	SNMP trap receiver
+SNMP	SNMP
+MIB-Browser	MIB browser
+SNMP-Objekte eines Agenten lesen und setzen	Read and set the SNMP objects of an agent
+wie die MIB	as the MIB says
+Text (s)	text (s)
+Zahl (i)	integer (i)
+Zahl ohne Vorzeichen (u)	unsigned integer (u)
+IPv4-Adresse (a)	IPv4 address (a)
+Objektkennung (o)	object identifier (o)
+Bytes hexadezimal (x)	bytes in hex (x)
+Agent	Agent
+z. B. 10.0.0.1	e.g. 10.0.0.1
+Community	Community
+Version	Version
+Links ein Objekt wählen; Get, GetNext, Walk und Set laufen als Befehle in der Eingabeaufforderung des Geräts.	Choose an object on the left; Get, GetNext, Walk and Set run as commands in the device's command prompt.
+nicht lesbar	not readable
+Einzelwert	scalar
+Spalte einer Tabelle	column of a table
+Tabelle	table
+Zeile einer Tabelle	row of a table
+Instanz	Instance
+Get	Get
+GetNext	GetNext
+Walk	Walk
+der neue Wert	the new value
+Set	Set
+Agent und Community ohne Leerzeichen angeben.	Give the agent and the community without spaces.
+Die Antworten in der Eingabeaufforderung von {}	The answers in the command prompt of {}

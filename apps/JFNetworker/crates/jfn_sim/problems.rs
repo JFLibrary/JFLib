@@ -30,6 +30,14 @@
 //                       on the device (files.rs)
 //   CableTooLong        a cable longer than its medium allows at its speed (phys.rs, P1)
 //   OpticMismatch       the optics of a fibre's ends do not fit each other or the fibre
+//   MailMxNowhere       an MX record whose host has no address in any zone (error), or no SMTP
+//                       server runs at its address (warning; smtpd.rs)
+//   MailOpenRelay       an SMTP server that relays for every sender ("open_relay", warning)
+//   MailNoMailbox       a POP3 user without a mailbox whom no SMTP server of the device takes
+//                       mail for (warning)
+//   SnmpTrapHost        an SNMP agent sends notifications to an address it has no route to
+//                       (warning; snmpd.rs)
+//   SnmpOpenRw          a community that may write and that every sender may use (warning)
 //
 // Problem::text is German; Problem::msg is the same as a template with arguments for the app's
 // catalogue (jfn_model::msg).
@@ -107,6 +115,16 @@ pub enum ProblemKind {
     CableTooLong,
     /// a fibre whose optics do not fit each other or the fibre (phys.rs)
     OpticMismatch,
+    /// an MX record whose host has no address, or no SMTP server there (smtpd.rs)
+    MailMxNowhere,
+    /// an SMTP server that relays for everybody
+    MailOpenRelay,
+    /// a POP3 user whose mail cannot arrive
+    MailNoMailbox,
+    /// an SNMP agent's receiver of notifications without a route (snmpd.rs)
+    SnmpTrapHost,
+    /// a read-write community without an access list or network
+    SnmpOpenRw,
 }
 
 /// a problem of the set-up
@@ -260,6 +278,8 @@ impl Engine {
         self.bgp_problems(&mut out);
         self.file_problems(&mut out);
         self.phys_problems(&mut out);
+        self.mail_problems(&mut out);
+        self.snmp_problems(&mut out);
         out.sort_by(|a, b| (a.severity, a.dev, a.port, a.kind, &a.text).cmp(&(b.severity, b.dev, b.port, b.kind, &b.text)));
         out
     }

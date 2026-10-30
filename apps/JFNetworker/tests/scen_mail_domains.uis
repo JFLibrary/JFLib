@@ -1,0 +1,8 @@
+#!args apps/JFNetworker/tests/fixtures/mail_domains.jfnet --scenario apps/JFNetworker/tests/scen/mail_domains.scn --golden apps/JFNetworker/tests/scen/mail_domains.report
+# golden scenario: mail between two domains. Anna on PC1 (a.lab) writes to Bob (b.lab) with
+# curl smtp:// through MAILA, which looks up the MX of b.lab at DNS1 and hands the message to
+# MAILB; Bob lists, fetches (curl -v) and deletes it over POP3; a message to an unknown user of
+# b.lab (mail with a pipe) comes back to Anna as a bounce, which she fetches. The GUI program
+# runs tests/scen/mail_domains.scn on tests/fixtures/mail_domains.jfnet without a window and
+# ends with the report, which must equal tests/scen/mail_domains.report byte for byte on every
+# target (the script itself is not run)

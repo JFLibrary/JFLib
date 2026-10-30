@@ -46,6 +46,22 @@
 //     ftp-server      {"root": "/srv/ftp", "anonymous": true, "anon_write": false, "users":
 //                     [{"name": "anna", "password": "geheim", "home": "/srv/ftp/anna", "write":
 //                     true}], "active": true, "quota_kb": 0, ...} (ftpd.rs)
+//     smtp-server     {"domains": ["a.lab"], "users": [{"name": "anna", "password": "geheim"}],
+//                     "networks": ["10.0.1.0/24"], "open_relay": false, "submission": true,
+//                     "max_size_kb": 10240, "retry_ms": 60000, "give_up_ms": 600000, ...}
+//                     (smtpd.rs)
+//     pop3-server     {"users": [{"name": "anna", "password": "geheim"}], "mailbox": "/var/mail",
+//                     "fail_delay_ms": 1000, ...} (pop3d.rs)
+//     snmpd           {"port": 161, "communities": [{"name": "public", "access": "ro", "source":
+//                     "10.0.0.0/24"}], "location": "...", "contact": "...", "sinks": [{"host":
+//                     "10.0.0.50", "type": "trap", "version": "2c", "community": "public"}],
+//                     "notify": ["coldstart", "linkdown", "linkup", "authentication"]} (snmpd.rs)
+//     snmptrapd       {"port": 162, "communities": ["public"], "log": "/var/log/snmptrapd.log",
+//                     "keep": 100} (snmptrapd.rs)
+//     radius-server   {"auth_port": 1812, "acct_port": 1813, "clients": [{"address":
+//                     "10.0.0.0/24", "secret": "geheim"}], "users": [{"name": "admin",
+//                     "password": "...", "privilege": 15, "reply": "..."}], "acct_log":
+//                     "/var/log/radius/accounting"} (radiusd.rs)
 //
 //   HttpLoadSet / HttpServerSet    change a running load generator or web server in place
 //   ScriptSource / RenameService   a script's new definition, keeping its disk and numbers
@@ -213,6 +229,11 @@ impl Engine {
             "script" => crate::scriptsvc::from_def_msg(c).map_err(|w| bad(kind, w))?,
             "tftp-server" => Box::new(crate::tftpd::TftpServer::from_config(c, ios).map_err(|w| bad(kind, w))?),
             "ftp-server" => Box::new(crate::ftpd::FtpServer::from_config(c).map_err(|w| bad(kind, w))?),
+            "smtp-server" => Box::new(crate::smtpd::SmtpServer::from_config(c).map_err(|w| bad(kind, w))?),
+            "pop3-server" => Box::new(crate::pop3d::Pop3Server::from_config(c).map_err(|w| bad(kind, w))?),
+            "snmpd" => Box::new(crate::snmpd::SnmpAgent::from_config(c, ios).map_err(|w| bad(kind, w))?),
+            "snmptrapd" => Box::new(crate::snmptrapd::TrapReceiver::from_config(c).map_err(|w| bad(kind, w))?),
+            "radius-server" => Box::new(crate::radiusd::RadiusServerSvc::from_config(c).map_err(|w| bad(kind, w))?),
             k => return Err(ActErr::Refused(msg!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k))),
         };
         let name = if def.name.is_empty() { def.kind.clone() } else { def.name.clone() };

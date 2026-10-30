@@ -1,0 +1,100 @@
+#!args --verify-dirty --frames
+# frames, collapse buttons, grid steps and resize handles (ui/diagram.rs, the flags DN_FRAME,
+# DN_TOGGLE, DN_STEP, DN_RESIZE, DN_OUTLINE; JFNetworker's groups and background picture): the
+# frame G1 around N8, N9, N14, N15 is hit on its title bar and border only (its record is the
+# title bar; inside, a click is the background and a marquee starts), its members are clicked
+# through it, a drag of its title moves it by whole grid steps, its button collapses it into
+# the cluster "G1 (4)" (a double click opens it again, the app's), Ctrl+A and Tab take it; the
+# area under N25 and N26 is selected where they are not, its handle resizes it, Esc puts the
+# size back.  The first view fits the frame and the area too: world (x, y) shows at
+# (x + 62, y + 76); the frame is [192, 120, 288, 216], the area [32, 472, 304, 104].
+theme light
+expect text:"Gruppe: aufgeklappt" exists
+expect listitem:"G1" rect 254 196 288 24
+expect listitem:"Fläche" exists
+# the title bar selects the frame
+click listitem:"G1"
+expect listitem:"G1" selected
+expect text:"Auswahl: 1" exists
+expect text:"Rahmen: 192,120 288x216" exists
+# inside: the background
+click 390,330
+expect text:"Auswahl: 0" exists
+# a member through the frame
+click listitem:"N8"
+expect listitem:"N8" selected
+expect text:"Auswahl: 1" exists
+expect text:"Position: 208,160" exists
+# its border (4 DIP)
+click 256,376
+expect listitem:"G1" selected
+expect text:"Auswahl: 1" exists
+# a marquee inside it takes the members fully inside, not the frame
+drag 264,232 532,312
+expect text:"Auswahl: 2" exists
+expect listitem:"N8" selected
+expect listitem:"N9" selected
+# a drag of the title moves the frame by whole grid steps: (40, 26) -> (48, 32)
+click 60,700
+wait 600
+drag listitem:"G1" 438,234
+expect text:"Ereignis: Verschoben: 1" exists
+expect listitem:"N8" rect 318 268 96 48
+expect listitem:"G1" rect 302 228 288 24
+expect text:"Rahmen: 240,152 288x216" exists
+# the context menu of its button is the frame's
+rclick 578,240
+expect text:"Ereignis: Kontext: G1" exists
+expect listitem:"G1" selected
+# its button collapses it: the cluster at the middle of its members, edges end there
+move 578,240
+shot build/diagramtest/frames_hover.png
+click 578,240
+expect text:"Gruppe: zugeklappt" exists
+expect text:"Ereignis: Umgeschaltet: G1 (4)" exists
+expect listitem:"N8" missing
+expect listitem:"G1 (4)" rect 398 324 96 48
+expect text:"Auswahl: 1" exists
+shot build/diagramtest/frames_collapsed.png
+# a drag of the cluster moves its members by grid steps as well: (32, 36) -> (32, 32)
+wait 600
+drag listitem:"G1 (4)" 478,384
+expect listitem:"G1 (4)" rect 430 356 96 48
+# a double click opens it again (the app)
+wait 600
+dblclick listitem:"G1 (4)"
+expect text:"Gruppe: aufgeklappt" exists
+expect listitem:"N8" rect 350 300 96 48
+# the area: selected where no node is
+click 238,644
+expect listitem:"Fläche" selected
+expect text:"Fläche: 32,472 304x104" exists
+# its handle resizes it
+drag 398,652 458,684
+expect text:"Ereignis: Größe: 364x136" exists
+expect text:"Fläche: 32,472 364x136" exists
+shot build/diagramtest/frames_area.png
+# Esc during a resize puts the size back
+down 458,684
+move 488,704
+expect text:"Fläche: 32,472 394x156" exists
+key esc
+up
+expect text:"Fläche: 32,472 364x136" exists
+# Ctrl+A takes the area and the frame too (30 nodes, 21 edges, 2)
+key ctrl+a
+expect text:"Auswahl: 53" exists
+key esc
+# Tab walks the area, the frame, then the nodes (the area has the focus since its click)
+click 60,700
+expect text:"Fokus: Fläche" exists
+key tab
+expect text:"Fokus: G1" exists
+key tab
+expect text:"Fokus: N1" exists
+key shift+tab
+expect text:"Fokus: G1" exists
+shot build/diagramtest/frames.png
+theme dark
+shot build/diagramtest/frames_dark.png
+expect_nowarn

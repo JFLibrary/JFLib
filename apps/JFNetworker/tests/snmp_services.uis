@@ -1,0 +1,69 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/snmp_monitor.jfnet
+# the SNMP services in the device windows (Dienste, svcedit.rs) on fixtures/snmp_monitor.jfnet:
+# MON's trap receiver with the coldStart of PC1 in its status line, its settings as JSON (a
+# community with a space refused, then another log file: MON starts again, the receiver waits);
+# PC1's agent: an inform of version 1 refused, then a new location without receivers (a logged
+# notification would be an undo step of MON's file on top); MON's console asks for the
+# location, undo brings the old settings back (PC1 starts again with them).
+# Ids: the window 26624; Dienste: the settings button of the first service 51200, the editor
+# 51456, Übernehmen 51472.
+size 1280 900
+theme light
+drag 630,671 630,380 8
+wait 500
+dblclick listitem:"MON" shift
+expect window 26624 open
+click tab:"Dienste"
+expect text:"SNMP-Trap-Empfänger · traps" exists
+expect text:"1 Traps und 0 Informs empfangen; zuletzt SNMPv2-MIB::coldStart von 10.0.1.20" exists
+expect text:"traps 1 · informs 0 · refused 0 · logged 1" exists
+# ---- the receiver's settings
+click #51200
+expect text:"Die Einstellungen von traps als JSON. Übernehmen prüft sie und startet MON mit ihnen neu." exists
+focus #51456
+key ctrl+a
+type "{\"communities\": [\"a b\"]}"
+click #51472
+expect text:"Dienst snmptrapd: Eine Community ist ein Wort ohne Leerzeichen." exists
+focus #51456
+key ctrl+a
+type "{\"communities\": [\"public\"], \"log\": \"/var/log/traps.log\"}"
+click #51472
+expect #51456 missing
+expect text:"wartet auf Meldungen an Port 162" exists
+shot build/jfnetworker/snmp_services.png window 26624
+close window 26624
+# ---- PC1's agent
+dblclick listitem:"PC1" shift
+expect window 26624 open
+click tab:"Dienste"
+expect text:"SNMP-Agent · snmpd" exists
+click #51200
+focus #51456
+key ctrl+a
+type "{\"communities\": [{\"name\": \"public\"}], \"sinks\": [{\"host\": \"10.0.10.50\", \"type\": \"inform\", \"version\": \"1\"}]}"
+click #51472
+expect text:"Dienst snmpd: Informs gibt es erst ab Version 2c." exists
+focus #51456
+key ctrl+a
+type "{\"communities\": [{\"name\": \"public\"}], \"location\": \"Lager\"}"
+click #51472
+expect #51456 missing
+wait 1000
+expect text:"0 Anfragen beantwortet, 0 abgelehnt, 0 Meldungen gesendet" exists
+close window 26624
+# ---- MON asks PC1 for its location
+dblclick listitem:"MON"
+expect tab:"MON" selected
+type "snmpget -v2c -c public 10.0.1.20 sysLocation.0\n"
+wait 2000
+expect text:"SNMPv2-MIB::sysLocation.0 = STRING: Lager" exists
+# undo: PC1 starts again with its old settings
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+dblclick listitem:"MON"
+type "snmpget -v2c -c public 10.0.1.20 sysLocation.0\n"
+wait 2000
+expect text:"SNMPv2-MIB::sysLocation.0 = STRING: Büro 1" exists
+expect_nowarn

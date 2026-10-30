@@ -175,6 +175,19 @@ static G_OTHER: [Group; 4] = [
     Group { title: "Warteschlange", show: Show::Num, names: &["queued", "inflight", "active"] },
 ];
 
+// i18n: title
+static G_SMTP: [Group; 3] = [
+    Group { title: "Durchsatz", show: Show::Num, names: &["received", "delivered", "relayed"] },
+    Group { title: "Fehler|Diagramm", show: Show::Num, names: &["bounced", "deferred", "relay_denied", "rejected"] },
+    Group { title: "Warteschlange", show: Show::Num, names: &["queued", "active"] },
+];
+// i18n: title
+static G_POP3: [Group; 3] = [
+    Group { title: "Durchsatz", show: Show::Num, names: &["retrieved", "deleted", "logins"] },
+    Group { title: "Fehler|Diagramm", show: Show::Num, names: &["failed_logins"] },
+    Group { title: "In Arbeit", show: Show::Num, names: &["active"] },
+];
+
 /// the charts of a kind of service
 pub(crate) fn groups(kind: &str) -> &'static [Group] {
     match kind {
@@ -188,6 +201,8 @@ pub(crate) fn groups(kind: &str) -> &'static [Group] {
         "dns-server" => &G_DNS,
         "dhcp-server" => &G_DHCP,
         "script" => &G_SCRIPT,
+        "smtp-server" => &G_SMTP,
+        "pop3-server" => &G_POP3,
         _ => &G_OTHER,
     }
 }
@@ -200,7 +215,7 @@ struct Lbl {
 
 /// the series of the charts in words (rates per second end in "/s")
 // i18n: label
-static LABELS: [Lbl; 60] = [
+static LABELS: [Lbl; 69] = [
     Lbl { key: "requests", label: "Anfragen/s" },
     Lbl { key: "responses", label: "Antworten/s" },
     Lbl { key: "connections", label: "Verbindungen/s" },
@@ -261,6 +276,15 @@ static LABELS: [Lbl; 60] = [
     Lbl { key: "conflicts", label: "Konflikte/s" },
     Lbl { key: "leases", label: "Leases" },
     Lbl { key: "calls", label: "Rückrufe/s" },
+    Lbl { key: "received", label: "Empfangen/s" },
+    Lbl { key: "relayed", label: "Weitergeleitet/s" },
+    Lbl { key: "bounced", label: "Unzustellbar/s" },
+    Lbl { key: "deferred", label: "Zurückgestellt/s" },
+    Lbl { key: "relay_denied", label: "Relay abgelehnt/s" },
+    Lbl { key: "retrieved", label: "Abgeholt/s" },
+    Lbl { key: "failed_logins", label: "Abgelehnte Anmeldungen/s" },
+    Lbl { key: "deleted", label: "Gelöscht/s" },
+    Lbl { key: "logins", label: "Anmeldungen/s" },
 ];
 
 /// a series' name in the window: "Anfragen/s" for requests, "p99" for p99_us (the language);
@@ -299,6 +323,9 @@ pub(crate) fn kind_name(kind: &str) -> &str {
         "ospf" => t("Routing (OSPF)"),
         "tftp-server" => t("TFTP-Server"),
         "ftp-server" => t("FTP-Server"),
+        "smtp-server" => t("Mailserver (SMTP)"),
+        "pop3-server" => t("Postfach (POP3)"),
+        "radius-server" => t("RADIUS-Server"),
         _ => kind,
     }
 }

@@ -1147,3 +1147,186 @@ Optik {} an {} passt nicht zur Optik {} am anderen Ende; die Leitung bleibt aus.
 Kabel zu lang: {} m, erlaubt {} m ({} zwischen {} und {}); die Leitung bleibt aus.	Cable too long: {} m, {} m allowed ({} between {} and {}); the link stays down.
 Optiken passen nicht: {} an {}, {} an {}; die Leitung bleibt aus.	Optics do not fit: {} at {}, {} at {}; the link stays down.
 {} zwischen {} und {} passt nicht zur Optik {} (SR braucht Multimode, LR Singlemode); die Leitung bleibt aus.	{} between {} and {} does not fit the optics {} (SR needs multimode, LR single-mode); the link stays down.
+# X1c: mail (mailtrace.rs, mailc.rs, smtpd.rs, pop3d.rs)
+den Namen {} kennt das DNS nicht	the DNS does not know the name {}
+{} ist nicht aufzulösen: {}	{} cannot be resolved: {}
+keine Verbindung zu {}: {}	no connection to {}: {}
+{} antwortet nicht	{} does not answer
+Nicht gesendet: das Konto nennt keine Adresse oder keinen SMTP-Server.	Not sent: the account names no address or no SMTP server.
+Nicht gesendet: {} ist keine E-Mail-Adresse.	Not sent: {} is not an e-mail address.
+Nicht gesendet: kein Empfänger.	Not sent: no recipient.
+Nicht abgerufen: das Konto nennt keinen POP3-Server oder keinen Benutzer.	Not fetched: the account names no POP3 server or no user.
+Nicht abgerufen: {}.	Not fetched: {}.
+Nicht gesendet: {}.	Not sent: {}.
+Gesendet an {} über {}.	Sent to {} through {}.
+Gesendet über {}, abgelehnt: {}.	Sent through {}, refused: {}.
+Nicht gesendet: {} lehnt die Anmeldung ab ({}).	Not sent: {} refuses the login ({}).
+Nicht gesendet: {} nimmt keinen Empfänger an ({}).	Not sent: {} takes none of the recipients ({}).
+Nicht gesendet: {} lehnt {} ab ({}).	Not sent: {} refuses {} ({}).
+Nicht gesendet: die Verbindung zu {} brach ab.	Not sent: the connection to {} broke off.
+Nicht abgerufen: {} lehnt die Anmeldung ab (-ERR {}).	Not fetched: {} refuses the login (-ERR {}).
+Nicht abgerufen: {} lehnt {} ab (-ERR {}).	Not fetched: {} refuses {} (-ERR {}).
+Abruf von {} abgebrochen: die Verbindung brach ab ({} Nachrichten geholt).	Fetching from {} stopped: the connection broke off ({} messages fetched).
+Keine neuen Nachrichten auf {}.	No new messages on {}.
+Eine neue Nachricht von {} abgerufen.	One new message fetched from {}.
+{} neue Nachrichten von {} abgerufen.	{} new messages fetched from {}.
+{} gesendet, {} abgerufen, {} gescheitert	{} sent, {} fetched, {} failed
+Das Gerät ist ausgeschaltet.	The device is switched off.
+SMTP: {} verbindet sich (Port {}).	SMTP: {} connects (port {}).
+SMTP: der Client nennt sich {} (EHLO).	SMTP: the client calls itself {} (EHLO).
+SMTP: der Client nennt sich {} (HELO, ohne Erweiterungen).	SMTP: the client calls itself {} (HELO, without extensions).
+SMTP: {} ist angemeldet (AUTH).	SMTP: {} is logged in (AUTH).
+SMTP: Anmeldung von {} abgelehnt (AUTH).	SMTP: login of {} refused (AUTH).
+SMTP: Absender <{}> angenommen.	SMTP: sender <{}> taken.
+SMTP: Absender <{}> angenommen, angekündigt {} Bytes.	SMTP: sender <{}> taken, {} bytes announced.
+SMTP: Empfänger <{}> hat hier ein Postfach.	SMTP: recipient <{}> has a mailbox here.
+SMTP: Empfänger <{}> liegt woanders: wird weitergeleitet.	SMTP: recipient <{}> is elsewhere: the message is relayed.
+SMTP: {} abgelehnt ({}).	SMTP: {} refused ({}).
+SMTP: kein Relay für <{}>: {} darf nicht weiterleiten lassen.	SMTP: no relay for <{}>: {} may not have mail relayed.
+SMTP: Nachricht mit {} Bytes ist größer als erlaubt ({} Bytes).	SMTP: a message of {} bytes is bigger than allowed ({} bytes).
+SMTP: Nachricht {} in der Warteschlange: {} Empfänger, {} Bytes.	SMTP: message {} in the queue: {} recipients, {} bytes.
+Mail: {} an <{}> zugestellt: {}.	Mail: {} for <{}> delivered: {}.
+Mail: Mailserver von {}: {}.	Mail: the mail servers of {}: {}.
+Mail: {} an <{}> an {} übergeben ({}).	Mail: {} for <{}> handed to {} ({}).
+Mail: {} an <{}> zurückgestellt ({}), nächster Versuch in {}.	Mail: {} for <{}> deferred ({}), next attempt in {}.
+Mail: {} an <{}> nicht zustellbar ({}).	Mail: {} for <{}> cannot be delivered ({}).
+Mail: Unzustellbarkeitsnachricht zu {} geht an <{}>.	Mail: the bounce of {} goes to <{}>.
+Mail: Unzustellbarkeitsnachricht {} ist selbst nicht zustellbar: verworfen.	Mail: the bounce {} cannot be delivered either: dropped.
+POP3: {} verbindet sich.	POP3: {} connects.
+POP3: {} ist angemeldet, {} Nachrichten mit {} Bytes.	POP3: {} is logged in, {} messages with {} bytes.
+POP3: Anmeldung von {} abgelehnt.	POP3: login of {} refused.
+POP3: Nachricht {} gesendet, {} Bytes.	POP3: message {} sent, {} bytes.
+POP3: {} Nachrichten von {} gelöscht.	POP3: {} messages of {} deleted.
+POP3: {} abgelehnt.	POP3: {} refused.
+E-Mail: Nachricht an {} über {} gesendet.	E-Mail: message to {} sent through {}.
+E-Mail: eine neue Nachricht von {} abgerufen.	E-Mail: one new message fetched from {}.
+E-Mail: {} neue Nachrichten von {} abgerufen.	E-Mail: {} new messages fetched from {}.
+E-Mail: {}	E-Mail: {}
+„mailbox“ ist kein Verzeichnis.	“mailbox” is not a directory.
+Port {}, {} Benutzer: {} Sitzungen, {} Anmeldungen, {} abgelehnt, {} Nachrichten abgeholt, {} gelöscht	Port {}, {} users: {} sessions, {} logins, {} refused, {} messages fetched, {} deleted
+Ein Benutzer braucht „name“ ohne Leerzeichen, @ und /.	A user needs a “name” without spaces, @ and /.
+Den Benutzer {} gibt es zweimal.	The user {} is there twice.
+„{}“ taugt nicht als Name des Servers.	“{}” will not do as the server's name.
+„{}“ ist keine Domäne.	“{}” is not a domain.
+Den Benutzer {} für postmaster gibt es nicht.	There is no user {} for postmaster.
+„{}“ ist kein Netz.	“{}” is not a network.
+{} antwortet: {}	{} answers: {}
+<{}> hat hier kein Postfach	<{}> has no mailbox here
+das Postfach von <{}> nimmt die Nachricht nicht: {}	the mailbox of <{}> does not take the message: {}
+kein Versuch gelang	no attempt worked
+aufgegeben nach {}: {}	given up after {}: {}
+die Domäne {} nimmt keine Mail an (Null-MX)	the domain {} takes no mail (null MX)
+die Domäne {} gibt es nicht (DNS)	the domain {} does not exist (DNS)
+das DNS nennt die Mailserver von {} nicht: {}	the DNS does not name the mail servers of {}: {}
+Mail für {} käme zu diesem Server zurück ({})	mail for {} would come back to this server ({})
+der Mailserver {} von {} hat keine Adresse	the mail server {} of {} has no address
+das DNS nennt {} nicht: {}	the DNS does not name {}: {}
+die Mailserver von {} haben keine Adresse: {}	the mail servers of {} have no address: {}
+kein Mailserver von {} erreichbar	no mail server of {} can be reached
+keine Verbindung zu {} [{}]: {}	no connection to {} [{}]: {}
+die Verbindung zu {} [{}] brach ab	the connection to {} [{}] broke off
+{} [{}] antwortet nicht	{} [{}] does not answer
+{} schweigt zu lange	{} has been silent for too long
+Port {}, ohne Domäne: {} empfangen, {} weitergeleitet, {} unzustellbar, {} in der Warteschlange	Port {}, no domain: {} received, {} relayed, {} undeliverable, {} in the queue
+Port {}, ohne Domäne, offener Relay: {} empfangen, {} weitergeleitet, {} unzustellbar, {} in der Warteschlange	Port {}, no domain, open relay: {} received, {} relayed, {} undeliverable, {} in the queue
+Port {}, {}: {} empfangen, {} zugestellt, {} weitergeleitet, {} unzustellbar, {} in der Warteschlange	Port {}, {}: {} received, {} delivered, {} relayed, {} undeliverable, {} in the queue
+Port {}, {}, offener Relay: {} empfangen, {} zugestellt, {} weitergeleitet, {} unzustellbar, {} in der Warteschlange	Port {}, {}, open relay: {} received, {} delivered, {} relayed, {} undeliverable, {} in the queue
+Der MX-Eintrag von {} (Dienst {} auf {}) zeigt auf {}, das keine Adresse hat.	The MX record of {} (service {} on {}) points to {}, which has no address.
+Der MX-Eintrag von {} zeigt auf {} ({}), dort läuft kein SMTP-Server.	The MX record of {} points to {} ({}), where no SMTP server runs.
+Dienst {} auf {} ist ein offener Relay: er leitet Mail jedes Absenders weiter.	Service {} on {} is an open relay: it relays the mail of every sender.
+POP3-Benutzer {} auf {} hat kein Postfach, und kein SMTP-Server dort nimmt Mail für ihn an.	POP3 user {} on {} has no mailbox, and no SMTP server there takes mail for them.
+
+# G1: groups and the background picture (jfn_model group.rs, background.rs: the refusals of a picture, the findings of Project::check)
+Das ist kein Bild in PNG, JPEG, BMP oder GIF.	This is no PNG, JPEG, BMP or GIF image.
+Das Bild ist zu groß: {} MB; ins Projekt passen höchstens 8 MB.	The image is too large: {} MB; a project takes 8 MB at most.
+Das Bild ist zu groß: {} × {} Pixel; höchstens {} Pixel je Seite und 32 Megapixel.	The image is too large: {} × {} pixels; {} pixels per side and 32 megapixels at most.
+Das Bild lässt sich nicht lesen.	The image cannot be read.
+Grau	Gray
+Blau	Blue
+Grün	Green
+Ocker	Ocher
+Ziegelrot	Brick red
+Violett	Violet
+Nichts zum Gruppieren: Geräte, Notizen oder Gruppen auswählen.	Nothing to group: select devices, notes or groups.
+Die Gruppe {} gibt es nicht.	There is no group {}.
+„{}“ taugt nicht als Name einer Gruppe: 1 bis 64 Zeichen.	“{}” is no name for a group: 1 to 64 characters.
+Eine Gruppe „{}“ gibt es schon.	There is a group “{}” already.
+Die Nummer {} der Gruppe „{}“ ist schon vergeben.	The number {} of the group “{}” is taken already.
+Der Name der Gruppe „{}“ ist leer oder doppelt.	The name of the group “{}” is empty or used twice.
+„{}“ gehört zu mehr als einer Gruppe; es zählt die erste.	“{}” belongs to more than one group; the first one counts.
+Die Gruppe „{}“ liegt in sich selbst.	The group “{}” lies within itself.
+
+# jfn_sim: SNMP (snmpd.rs, snmptrapd.rs, snmptrace.rs)
+Eine Community braucht „name“ ohne Leerzeichen.	A community needs a “name” without spaces.
+„{}“ ist kein Zugriff (ro oder rw).	“{}” is no access (ro or rw).
+„{}“ ist kein Netz wie 10.0.0.0/24.	“{}” is no network like 10.0.0.0/24.
+„{}“ ist keine Art (trap oder inform).	“{}” is no kind (trap or inform).
+Version „{}“ gibt es hier nicht (1 oder 2c).	There is no version “{}” here (1 or 2c).
+Informs gibt es erst ab Version 2c.	Informs need version 2c.
+„{}“ ist keine Meldung (coldstart, linkdown, linkup, authentication).	“{}” is no notification (coldstart, linkdown, linkup, authentication).
+Port {} ist belegt: der Agent antwortet nicht	Port {} is in use: the agent does not answer
+ohne Community: beantwortet nichts, {} Meldungen gesendet	no community: answers nothing, {} notifications sent
+{} Anfragen beantwortet, {} abgelehnt, {} Meldungen gesendet	{} requests answered, {} refused, {} notifications sent
+Den SNMP-Agenten eines Linux-Hosts stellt der Dienst snmpd ein.	The SNMP agent of a Linux host is set up by the service snmpd.
+Die Community „{}“ gibt es nicht.	There is no community “{}”.
+{} ist kein Empfänger von Meldungen.	{} is no receiver of notifications.
+{} schickt SNMP-Meldungen an {}, hat aber keinen Weg dorthin.	{} sends SNMP notifications to {} but has no route there.
+Auf {} darf jeder mit der Community „{}“ schreiben: eine Zugriffsliste fehlt.	On {} anyone may write with the community “{}”: an access list is missing.
+SNMP: {} von {} (Community „{}“, Kennung {}, {} Variablen).	SNMP: {} from {} (community “{}”, id {}, {} variables).
+SNMP: Antwort an {} (Kennung {}, {} Variablen).	SNMP: response to {} (id {}, {} variables).
+SNMP: Antwort an {} mit dem Fehler {} bei Variable {} (Kennung {}).	SNMP: response to {} with the error {} at variable {} (id {}).
+SNMP: unbekannte Community „{}“ von {}: keine Antwort.	SNMP: unknown community “{}” from {}: no response.
+SNMP: {} darf die Community „{}“ nicht nutzen ({}): keine Antwort.	SNMP: {} may not use the community “{}” ({}): no response.
+SNMP: Version {} von {} versteht der Agent nicht: verworfen.	SNMP: the agent does not speak version {} from {}: dropped.
+SNMP: Nachricht von {} nicht lesbar: verworfen.	SNMP: unreadable message from {}: dropped.
+SNMP: Set von {} mit der Community „{}“, die nur lesen darf: abgelehnt.	SNMP: Set from {} with the community “{}”, which may only read: refused.
+SNMP: {} ist jetzt {}.	SNMP: {} is now {}.
+SNMP: Trap {} an {} (Version {}).	SNMP: trap {} to {} (version {}).
+SNMP: Inform {} an {} (Version {}), wartet auf Bestätigung.	SNMP: inform {} to {} (version {}), waiting for its acknowledgement.
+SNMP: keine Bestätigung des Informs {} von {}: noch einmal gesendet (Versuch {}).	SNMP: no acknowledgement of the inform {} from {}: sent again (attempt {}).
+SNMP: {} hat den Inform {} bestätigt.	SNMP: {} acknowledged the inform {}.
+SNMP: der Inform {} an {} blieb unbestätigt: aufgegeben.	SNMP: the inform {} to {} was never acknowledged: given up.
+SNMP: kein Weg zum Empfänger {}: die Meldung geht verloren.	SNMP: no route to the receiver {}: the notification is lost.
+SNMP: Trap {} von {} empfangen.	SNMP: trap {} received from {}.
+SNMP: Inform {} von {} empfangen und bestätigt.	SNMP: inform {} received from {} and acknowledged.
+SNMP: Meldung von {} mit der unbekannten Community „{}“ verworfen.	SNMP: notification from {} with the unknown community “{}” dropped.
+SNMP: {} an {} (Kennung {}).	SNMP: {} to {} (id {}).
+SNMP: keine Antwort von {}: noch einmal gefragt (Versuch {}).	SNMP: no response from {}: asked again (attempt {}).
+SNMP: {} antwortet nicht: aufgegeben.	SNMP: {} does not answer: given up.
+Eine Community ist ein Wort ohne Leerzeichen.	A community is a word without spaces.
+„log“ ist der Pfad einer Datei.	“log” is the path of a file.
+Port {} ist belegt: keine Meldungen	Port {} is in use: no notifications
+{} Traps und {} Informs empfangen; zuletzt {} von {}	{} traps and {} informs received; the last one {} from {}
+wartet auf Meldungen an Port {}	waiting for notifications on port {}
+
+# X1d: logins, AAA, RADIUS and telnet (auth.rs, aaa.rs, aaatrace.rs, radiusd.rs, telnetd.rs, cli/aaa.rs)
+vty {}	vty {}
+Anmeldung an der {} angenommen ({}, Rechte {}).	Login at the {} accepted ({}, privilege {}).
+Anmeldung von {} an der {} angenommen ({}, Rechte {}).	Login of {} at the {} accepted ({}, privilege {}).
+Falsches Passwort an der {}.	Wrong password at the {}.
+Falsches Passwort für {} an der {}.	Wrong password for {} at the {}.
+Anmeldung an der {} nach drei Versuchen abgelehnt.	Login at the {} refused after three tries.
+Wechsel auf Rechte {} angenommen.	Switch to privilege {} accepted.
+Falsches enable-Passwort für Rechte {}.	Wrong enable password for privilege {}.
+RADIUS: Access-Request für {} an {} (Versuch {}).	RADIUS: Access-Request for {} to {} (attempt {}).
+RADIUS: keine Antwort von {}, erneut gesendet (Versuch {}).	RADIUS: no answer from {}, sent again (attempt {}).
+RADIUS: Access-Accept für {} von {} (Rechte {}).	RADIUS: Access-Accept for {} from {} (privilege {}).
+RADIUS: Access-Accept für {} von {}.	RADIUS: Access-Accept for {} from {}.
+RADIUS: Access-Reject für {} von {}.	RADIUS: Access-Reject for {} from {}.
+RADIUS: Access-Challenge für {} von {}.	RADIUS: Access-Challenge for {} from {}.
+RADIUS: {} antwortet nicht.	RADIUS: {} does not answer.
+RADIUS: Antwort von {} verworfen ({}).	RADIUS: answer from {} dropped ({}).
+AAA: kein Server erreichbar, nächste Methode: {}.	AAA: no server reachable, next method: {}.
+AAA: keine Methode mehr übrig, Anmeldung abgelehnt.	AAA: no method left, login refused.
+RADIUS: Accounting-Start für {} an {}.	RADIUS: Accounting-Start for {} to {}.
+RADIUS: Accounting-Stop für {} an {}.	RADIUS: Accounting-Stop for {} to {}.
+Telnet: Sitzung von {} auf vty {}.	Telnet: session from {} on vty {}.
+Telnet: Verbindung von {} abgelehnt ({}).	Telnet: connection from {} refused ({}).
+Telnet: vty {} nach Leerlauf geschlossen.	Telnet: vty {} closed after idle.
+Telnet: vty {} geschlossen.	Telnet: vty {} closed.
+Telnet: verbunden mit {} Port {}.	Telnet: connected to {} port {}.
+Telnet: {} Port {} nicht erreicht ({}).	Telnet: {} port {} not reached ({}).
+„{}“ ist keine Adresse oder kein Präfix.	“{}” is not an address or a prefix.
+Ein Client braucht ein „secret“.	A client needs a “secret”.
+Ports {} / {}, {} Clients, {} Benutzer: {} angenommen, {} abgelehnt	Ports {} / {}, {} clients, {} users: {} accepted, {} rejected
+{} Anfragen, {} angenommen, {} abgelehnt, {} Zeitüberschreitungen	{} requests, {} accepted, {} rejected, {} timeouts

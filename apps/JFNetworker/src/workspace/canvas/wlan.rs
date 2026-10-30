@@ -46,9 +46,13 @@ pub(crate) struct Wl {
     pub ranges: bool,
 }
 
-/// the boxes of the devices by id
+/// the boxes of the devices by id (a member of a collapsed group: its cluster's, G1)
 fn rect_of(n: &Net, dev: u32) -> Option<[f32; 4]> {
-    n.doc.proj.device(dev).map(|d| [d.x as f32, d.y as f32, DEV_W, DEV_H])
+    let d = n.doc.proj.device(dev)?;
+    match n.canvas.scene.hidden.get(&dev) {
+        Some(&c) => n.canvas.scene.rect(c as u64),
+        None => Some([d.x as f32, d.y as f32, DEV_W, DEV_H]),
+    }
 }
 
 fn centre(r: [f32; 4]) -> [f32; 2] {
@@ -76,6 +80,10 @@ fn border(r: [f32; 4], to: [f32; 2]) -> [f32; 2] {
 /// the line of an association between the two boxes (world units)
 fn line(n: &Net, a: &AssocView) -> Option<[[f32; 2]; 2]> {
     let (rs, ra) = (rect_of(n, a.sta)?, rect_of(n, a.ap)?);
+    // both in one cluster: no line (G1)
+    if rs == ra {
+        return None;
+    }
     let (cs, ca) = (centre(rs), centre(ra));
     Some([border(rs, ca), border(ra, cs)])
 }
@@ -101,9 +109,11 @@ fn ap_bands(n: &Net, dev: u32) -> Vec<Band> {
 }
 
 /// the access points whose ranges show: all of them with the toggle, else the selected ones
+/// (not those a collapsed group hides, G1)
 fn shown(n: &Net) -> Vec<u32> {
     let all = n.canvas.wl.ranges;
-    n.doc.proj.devices.iter().filter(|d| all || n.canvas.st.sel.contains(&(d.id as u64))).filter(|d| !ap_bands(n, d.id).is_empty()).map(|d| d.id).collect()
+    let hidden = &n.canvas.scene.hidden;
+    n.doc.proj.devices.iter().filter(|d| all || n.canvas.st.sel.contains(&(d.id as u64))).filter(|d| !hidden.contains_key(&d.id) && !ap_bands(n, d.id).is_empty()).map(|d| d.id).collect()
 }
 
 /// part of the canvas' version

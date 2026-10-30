@@ -1,0 +1,104 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/mail_domains.jfnet
+# the E-Mail program on a host's Desktop (devwin/email.rs) on fixtures/mail_domains.jfnet: PC2
+# has no account, so the program starts with the form; Bob's account (submission port 587 with
+# his login) is saved as a step of the project; a new message to Anna is sent (the status line,
+# the folder Gesendet); on PC1 Anna fetches it (the status line, the inbox, the message), answers
+# it ("Re: ", to Bob, the text quoted) and sends; Bob fetches the answer; undo takes the fetched
+# message from PC2's inbox again; a message removed with Löschen.  PC2's clock is a little
+# behind (as every device clock at the start): Bob's message is dated 2025-12-31 23:59.
+# Ids (window 0): Abrufen 73729, Verfassen 73730, Antworten 73731, Löschen 73732, Konto 73733;
+# the account's name 73744, address 73745, SMTP server 73746 and port 73747, POP3 server 73748,
+# user 73750, password 73751, Speichern 73754; the new message's To 73760, Subject 73762, text
+# 73763, Senden 73764; the message shown 73776; the list 73984 (rows 73985 + i).
+size 1280 900
+theme light
+dblclick listitem:"PC2" shift
+expect window 26624 open
+click tab:"Desktop"
+click button:"E-Mail"
+expect text:"Noch kein Konto: die Angaben des Mailservers eintragen, dann Speichern." exists
+click #73744
+type "Bob"
+click #73745
+type "bob@b.lab"
+click #73746
+type "mail.b.lab"
+click #73747
+key ctrl+a
+type "587"
+click #73748
+type "mail.b.lab"
+click #73750
+type "bob"
+click #73751
+type "geheim"
+click #73754
+expect tab:"Posteingang (0)" exists
+expect text:"Senden: noch nicht" exists
+# a new message to Anna
+click #73730
+click #73760
+type "Anna <anna@a.lab>"
+click #73762
+type "Hallo Anna"
+click #73763
+type "Viele Grüße von Bob"
+# the first question of PC2 to DNS1 is lost while R1 asks for DNS1's MAC (IOS-like): the
+# resolver asks again after 5 s
+click #73764
+wait 8000
+expect text:"Senden: Gesendet an anna@a.lab über mail.b.lab." exists
+expect tab:"Gesendet (1)" exists
+expect text:"Hallo Anna" exists
+close window 26624
+# Anna fetches, reads and answers
+dblclick listitem:"PC1" shift
+expect window 26624 open
+click tab:"Desktop"
+click button:"E-Mail"
+expect tab:"Posteingang (0)" exists
+click #73729
+wait 3000
+expect text:"Abrufen: Eine neue Nachricht von mail.a.lab abgerufen." exists
+expect tab:"Posteingang (1)" exists
+click text:"Hallo Anna"
+expect #73776 text "Viele Grüße von Bob\n"
+expect text:"Bob <bob@b.lab>" exists
+shot build/jfnetworker/mail_client_read.png window 26624
+click #73731
+expect #73760 text "Bob <bob@b.lab>"
+expect #73762 text "Re: Hallo Anna"
+expect #73763 text "\n\nAm 2025-12-31 23:59 schrieb Bob:\n> Viele Grüße von Bob\n"
+click #73763
+key ctrl+home
+type "Danke, Bob!"
+click #73764
+wait 3000
+expect text:"Senden: Gesendet an bob@b.lab über mail.a.lab." exists
+close window 26624
+# Bob fetches the answer; undo takes it from his inbox again
+dblclick listitem:"PC2" shift
+expect window 26624 open
+click tab:"Desktop"
+click button:"E-Mail"
+click #73734
+click #73729
+wait 3000
+expect text:"Abrufen: Eine neue Nachricht von mail.b.lab abgerufen." exists
+expect text:"Re: Hallo Anna" exists
+click text:"Re: Hallo Anna"
+expect #73776 text "Danke, Bob!\n\nAm 2025-12-31 23:59 schrieb Bob:\n> Viele Grüße von Bob\n"
+expect text:"Anna Muster <anna@a.lab>" exists
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+expect tab:"Posteingang (0)" exists
+click menu:"Bearbeiten"
+click menuitem:"Wiederholen"
+move 640,300
+expect tab:"Posteingang (1)" exists
+# Löschen removes it (the first row of the list)
+click #73985
+click #73732
+expect tab:"Posteingang (0)" exists
+expect_nowarn

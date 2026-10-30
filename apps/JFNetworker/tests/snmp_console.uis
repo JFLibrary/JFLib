@@ -1,0 +1,55 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/snmp_monitor.jfnet
+# SNMP at the consoles of the Terminal panel (fixtures/snmp_monitor.jfnet): snmpwalk of R1's
+# system group on MON, Tab completes the tools, R1 changes its location with snmp-server and MON
+# sees it, show snmp on R1; SW1 shuts a port at its console: its linkDown trap reaches MON's
+# snmptrapd (the log file in /var/log, the line in the Protokoll panel).
+# Ids: MON's console 25088 (its input line 25089).
+size 1280 900
+theme light
+drag 630,671 630,380 8
+dblclick listitem:"MON"
+expect tab:"MON" selected
+expect #25089 focused
+type "snmpwalk -v2c -c public 10.0.10.1 system\n"
+wait 2000
+expect text:"SNMPv2-MIB::sysName.0 = STRING: R1" exists
+expect text:"SNMPv2-MIB::sysLocation.0 = STRING: Technikraum" exists
+expect text:"SNMPv2-MIB::sysServices.0 = INTEGER: 4" exists
+shot build/jfnetworker/snmp_console.png
+# Tab completes the name of a tool
+type "snmpbul"
+key tab
+type "-v2c -c public 10.0.1.2 ifName\n"
+wait 2000
+expect text:"IF-MIB::ifName.8 = STRING: Se0/2/1" exists
+# R1's location at its console
+dblclick listitem:"R1"
+expect tab:"R1" selected
+type "enable\n"
+type "configure terminal\n"
+type "snmp-server location Halle 3\n"
+type "end\n"
+type "show snmp\n"
+expect text:"Location: Halle 3" exists
+dblclick listitem:"MON"
+type "snmpget -v2c -c public -Ov 10.0.10.1 sysLocation.0\n"
+wait 2000
+expect text:"STRING: Halle 3" exists
+# SW1 shuts Gi1/0/3 (MON asks it first, so SW1 knows the way back)
+type "snmpget -v2c -c public 10.0.1.10 sysName.0\n"
+wait 2000
+expect text:"SNMPv2-MIB::sysName.0 = STRING: SW1" exists
+dblclick listitem:"SW1"
+expect tab:"SW1" selected
+type "enable\n"
+type "configure terminal\n"
+type "interface gi1/0/3\n"
+type "shutdown\n"
+type "end\n"
+wait 1000
+dblclick listitem:"MON"
+type "ls /var/log\n"
+expect text:"snmptrapd.log" exists
+click tab:"Protokoll"
+expect text:"linkDown trap from 10.0.1.10 (v2c, community public): IF-MIB::ifIndex.3 = INTEGER: 3, IF-MIB::ifAdminStatus.3 = INTEGER: down(2), IF-MIB::ifOperStatus.3 = INTEGER: down(2)" exists
+expect_nowarn

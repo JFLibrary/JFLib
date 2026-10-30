@@ -19,6 +19,10 @@
 //   WLAN; wlan0 shows in ip link as any port, NO-CARRIER until the handshake is done)
 //   ls, cat FILE, rm, cp, mkdir, rmdir, touch, echo ... > FILE, tftp -g|-p (files.rs: the
 //   device's files); curl ftp://... (ftpc.rs)
+//   mail [-s SUBJECT] [-c ADDR] [-r FROM] ADDR.. | -H, curl smtp://... and pop3://... (mail.rs);
+//   echo "nameserver ADDR" > /etc/resolv.conf (and >> for more lines, "search D"): the static
+//   name servers (netsvc.rs)
+//   snmpget, snmpgetnext, snmpwalk, snmpbulkwalk, snmpset (cli/snmp.rs: SNMP managers)
 //
 // Objects and commands of ip take any prefix, the first one of iproute2's order winning ("ip
 // a" is address, "ip r" route, "ip n" neighbour); output and error messages are those of
@@ -150,6 +154,14 @@ impl Engine {
             "rmdir" => self.sh_rmdir(ni, &args),
             "touch" => self.sh_touch(ni, &args),
             "tftp" => self.sh_tftp(ni, &args),
+            "mail" => self.sh_mail(ni, &args, None),
+            // SNMP managers (cli/snmp.rs)
+            "snmpget" => self.sh_snmp(ni, super::snmp::Prog::Get, &args),
+            "snmpgetnext" => self.sh_snmp(ni, super::snmp::Prog::GetNext, &args),
+            "snmpwalk" => self.sh_snmp(ni, super::snmp::Prog::Walk, &args),
+            "snmpbulkwalk" => self.sh_snmp(ni, super::snmp::Prog::BulkWalk, &args),
+            "snmpset" => self.sh_snmp(ni, super::snmp::Prog::Set, &args),
+            "telnet" => self.sh_telnet(ni, &args),
             "clear" => {
                 self.out(ni, "\x1b[H\x1b[2J");
                 Ok(())
@@ -165,7 +177,7 @@ impl Engine {
         let w = words(line);
         let partial = !line.is_empty() && !line.ends_with(char::is_whitespace);
         let (list, done): (&[&str], usize) = match w.len() {
-            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch"], 0),
+            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "telnet", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch", "mail", "snmpbulkwalk", "snmpget", "snmpgetnext", "snmpset", "snmpwalk"], 0),
             2 if partial && w[0] == "ip" => (&["address", "link", "neighbour", "route"], 1),
             3 if partial && w[0] == "ip" => (&["add", "del", "flush", "get", "set", "show"], 2),
             _ => return (None, Vec::new()),
@@ -954,6 +966,8 @@ impl Engine {
                 s.push_str(&format!("ip neigh add {} lladdr {} dev {}\n", ip, m, st.ifaces[*i as usize].name));
             }
         }
+        // the name servers set by hand (netsvc.rs: resolv_write)
+        s.push_str(&self.resolv_config(ni));
         // IPv6 (linux6.rs)
         s.push_str(&self.linux_config6(ni));
         s

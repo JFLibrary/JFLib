@@ -1,5 +1,6 @@
-// events -- the Ereignisse panel: the protocol chips and "Nur Auswahl", the timeline with one
-// lane per category and the playhead, the event list (#, Zeit, Von, Bei, Typ, Info)
+// events -- the Ereignisse panel: the protocol chips and "Nur Auswahl" (a row that wraps where
+// the panel is narrow), the timeline with one lane per category and the playhead, the event
+// list (#, Zeit, Von, Bei, Typ, Info)
 //
 //   Events              the grid's and the timeline's state; the recorded decisions in a
 //                       compact form, read on as the engine adds them; the shown ones and the
@@ -245,16 +246,22 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui) {
     ui.box_end();
 }
 
-// the chips of the categories, "Nur Auswahl", the count
+/// the id of category k's chip: the first ten before "Nur Auswahl", the others after it
+fn chip_id(k: usize) -> u32 {
+    if k < 10 { ID_EV_CHIP0 + k as u32 } else { ID_EV_CHIP10 + (k - 10) as u32 }
+}
+
+// the chips of the categories, "Nur Auswahl", the count; a row that does not fit the panel
+// wraps
 fn chips(n: &mut Net, ui: &mut Ui) {
     let h = hidden(n);
     let dark = ui.theme_dark();
-    ui.box_begin(0, BOX_H | BOX_XCENTER | pad(4), 4);
+    ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP | pad(4), 4);
     ui.text(TS_CAPTION | TX_SECONDARY, t("Protokolle"));
     for (k, c) in CATS.iter().enumerate() {
         let mut on = (h & 1 << k == 0) as i32;
         ui.next_flags(ST_COMPACT);
-        if ui.toggle_button(ID_EV_CHIP0 + k as u32, t(c.name), &mut on) & EV_ACT != 0 {
+        if ui.toggle_button(chip_id(k), t(c.name), &mut on) & EV_ACT != 0 {
             ui.cmd_run(CMD_SIM_CAT0 + k as u32, 0);
         }
         // the category's colour as a bar along the chip's bottom edge

@@ -162,12 +162,14 @@ fn help_and_tab(t: &mut T) {
     let _ = cli(&mut e, r1, "conf t");
     let ih = e.cli_help(r1, "interface ");
     t.check("interface types", ih.contains("  GigabitEthernet     Gigabit Ethernet port (1 Gbit/s)\n") && ih.contains("  Loopback            Virtual interface that is always up\n") && ih.contains("  Serial              Serial WAN port\n"));
-    t.check("no ?", e.cli_help(r1, "no ").contains("\n  hostname     Give the device a name\n"));
+    // X1d added several "no" forms (aaa, username, radius-server ...); the column is wider now
+    t.check("no ?", { let h = e.cli_help(r1, "no "); h.contains("hostname") && h.contains("Give the device a name") });
     t.check("do ?", e.cli_help(r1, "do sh").contains("show"));
     t.eq("? as a typed line", cli(&mut e, r1, "ip route ?"), String::from("  A.B.C.D  Destination network\n\n"));
     t.eq("tab", e.cli_complete(r1, "int").0, Some(String::from("interface ")));
     t.eq("tab type", e.cli_complete(r1, "interface gi").0, Some(String::from("interface GigabitEthernet")));
-    t.check("tab choices", e.cli_complete(r1, "e").0.is_none() && e.cli_complete(r1, "e").1 == ["end", "exit"]);
+    // X1d added "enable secret / password" in the global configuration
+    t.check("tab choices", e.cli_complete(r1, "e").0.is_none() && e.cli_complete(r1, "e").1 == ["enable", "end", "exit"]);
     t.eq("linux tab", e.cli_complete(1, "tracer").0, Some(String::from("traceroute ")));
 }
 

@@ -58,6 +58,11 @@
 //   files    the files of a device: dir, show flash:, more, delete, copy with its questions,
 //            ip ftp username / password (IOS-like); ls, cat, rm, cp, mkdir, rmdir, touch, echo
 //            > FILE, tftp (Linux); curl ftp:// is ftpc.rs
+//   mail     mail on the shell: curl smtp:// and pop3://, mail (one message from a pipe, -H the
+//            E-Mail program's inbox)
+//   snmp     SNMP: "snmp-server ..." (the agent of IOS-like devices), show snmp [community], debug
+//            snmp packets, the running configuration; snmpget, snmpgetnext, snmpwalk,
+//            snmpbulkwalk and snmpset on the shell (console programs)
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -103,6 +108,9 @@ pub mod names;
 pub mod wlan;
 pub mod bgp;
 pub mod files;
+pub mod mail;
+pub mod snmp;
+pub mod aaa;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -120,6 +128,11 @@ pub const D_ND: u32 = 0x1000;
 pub const D_OSPF: u32 = 0x400;
 /// "debug ip bgp [events|updates]" (which of them: CliDev::bgp_debug)
 pub const D_BGP: u32 = 0x8000;
+/// "debug snmp packets" (cli/snmp.rs)
+pub const D_SNMP: u32 = 0x40000;
+/// "debug aaa authentication", "debug radius" (cli/aaa.rs)
+pub const D_AAA: u32 = 0x100000;
+pub const D_RADIUS: u32 = 0x200000;
 
 /// the routing process a "(config-router)#" console sets up
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -151,6 +164,10 @@ pub enum Mode {
     /// "ip access-list standard|extended NAME": "(config-std-nacl)#", "(config-ext-nacl)#"
     AclStd,
     AclExt,
+    /// "aaa group server radius NAME": "(config-sg-radius)#" (cli/aaa.rs)
+    AaaGroup,
+    /// "radius server NAME": "(config-radius-server)#" (cli/aaa.rs)
+    RadiusSrv,
 }
 
 /// how an interface's address was set ("show ip interface brief", column Method)
@@ -195,6 +212,12 @@ pub struct DevCfg {
     pub boot_errors: Vec<BootErr>,
     /// DHCP pools without a network yet (the DHCP server takes them with "network")
     pub pools: Vec<(String, crate::dhcpd::PoolCfg)>,
+    /// the enable secret / password and the local users (cli/aaa.rs, auth.rs)
+    pub auth: crate::auth::LocalAuth,
+    /// AAA and the RADIUS servers (cli/aaa.rs, aaa.rs)
+    pub aaa: crate::aaa::Aaa,
+    /// "banner motd": the text shown before a login (empty: none)
+    pub motd: String,
 }
 
 impl Default for DevCfg {
@@ -208,6 +231,9 @@ impl Default for DevCfg {
             domain_lookup: true,
             boot_errors: Vec::new(),
             pools: Vec::new(),
+            auth: crate::auth::LocalAuth::default(),
+            aaa: crate::aaa::Aaa::default(),
+            motd: String::new(),
         }
     }
 }
@@ -282,6 +308,16 @@ pub struct CliDev {
     pub bgp_debug: u8,
     /// copy's dialog, the last host, the FTP login (files.rs)
     pub files: files::FilesCli,
+    /// the privilege level of the console session (1 user, 15 enabled); set at login and by
+    /// "enable" / "disable" (cli/aaa.rs)
+    pub priv_level: u8,
+    /// a login or an "enable" that waits for a password (cli/aaa.rs); overrides the prompt
+    pub gate: Option<aaa::Gate>,
+    /// the user logged in at the console (empty: none / a line password)
+    pub user: String,
+    /// the RADIUS group and server a config mode is editing (cli/aaa.rs)
+    pub sg_name: String,
+    pub rs_name: String,
 }
 
 impl CliDev {
@@ -307,6 +343,11 @@ impl CliDev {
             ospf_debug: 0,
             bgp_debug: 0,
             files: files::FilesCli::default(),
+            priv_level: 1,
+            gate: None,
+            user: String::new(),
+            sg_name: String::new(),
+            rs_name: String::new(),
         }
     }
 }
@@ -335,6 +376,7 @@ pub(crate) fn wants(c: &EngineCli, n: &Note) -> bool {
         Note::V6(_) => c.debug > 0,
         n if n.is_ospf() => c.debug > 0,
         Note::Bgp(_) => c.debug > 0,
+        Note::Snmp(_) => c.debug > 0,
         _ => false,
     }
 }
@@ -388,6 +430,9 @@ impl Engine {
         let Some(c) = self.cdev(ni) else {
             return String::new();
         };
+        if let Some(g) = &c.gate {
+            return g.prompt();
+        }
         if let Some(a) = &c.ask {
             return a.prompt.clone();
         }
@@ -434,7 +479,7 @@ impl Engine {
             return Ok(());
         }
         let ios = self.cdev(ni).is_some_and(|c| c.style == CliStyle::Ios);
-        if ios && line.ends_with('?') && self.cdev(ni).is_some_and(|c| c.ask.is_none() && c.mode != Mode::Out) {
+        if ios && line.ends_with('?') && self.cdev(ni).is_some_and(|c| c.ask.is_none() && c.gate.is_none() && c.mode != Mode::Out) {
             let h = self.ios_help(ni, &line[..line.len() - 1]);
             self.out(ni, &h);
             return Ok(());
@@ -449,6 +494,10 @@ impl Engine {
         let Some(c) = self.cdev(ni) else {
             return Ok(());
         };
+        if c.gate.is_some() {
+            self.gate_line(ni, line);
+            return Ok(());
+        }
         if let Some(a) = c.ask.clone() {
             if let Some(c) = self.cdev_mut(ni) {
                 c.ask = None;
@@ -491,6 +540,8 @@ impl Engine {
     /// the text of "?" typed after `line` (IOS; Linux shells have no such help)
     pub fn cli_help(&self, dev: u32, line: &str) -> String {
         match self.node_index(dev) {
+            // a login gate takes no help
+            Some(ni) if self.cdev(ni).is_some_and(|c| c.gate.is_some()) => String::new(),
             Some(ni) if self.cdev(ni).is_some_and(|c| c.style == CliStyle::Ios) => self.ios_help(ni, line),
             _ => String::new(),
         }
@@ -498,6 +549,9 @@ impl Engine {
 
     /// Tab: the completed line (None: nothing to complete) and what the last word may become
     pub fn cli_complete(&self, dev: u32, line: &str) -> (Option<String>, Vec<String>) {
+        if self.node_index(dev).and_then(|ni| self.cdev(ni)).is_some_and(|c| c.gate.is_some()) {
+            return (None, Vec::new());
+        }
         match self.node_index(dev) {
             Some(ni) => match self.cdev(ni).map(|c| c.style) {
                 Some(CliStyle::Ios) => self.ios_complete(ni, line),
@@ -512,9 +566,13 @@ impl Engine {
     pub fn cli_prompt(&self, dev: u32) -> String {
         self.node_index(dev).map(|ni| self.prompt_of(ni)).unwrap_or_default()
     }
-    /// a command runs (typed lines wait)
+    /// a command runs (typed lines wait); also while a login waits for the RADIUS server
     pub fn cli_busy(&self, dev: u32) -> bool {
-        self.node_index(dev).and_then(|ni| self.cdev(ni)).is_some_and(|c| c.job.is_some())
+        self.node_index(dev).and_then(|ni| self.cdev(ni)).is_some_and(|c| c.job.is_some() || c.gate.as_ref().is_some_and(|g| g.waiting))
+    }
+    /// the console waits for a line typed without echo (a password); the app hides it
+    pub fn cli_secret(&self, dev: u32) -> bool {
+        self.node_index(dev).and_then(|ni| self.cdev(ni)).is_some_and(|c| c.gate.as_ref().is_some_and(|g| g.secret()))
     }
     /// the running configuration (IOS: as "show running-config" lists it from "!" to "end";
     /// Linux: the shell commands that set the device up as it is)
@@ -589,6 +647,8 @@ impl Engine {
         self.stp_booted(ni);
         if style == CliStyle::Ios {
             self.ios_snap(ni);
+            // the console asks for a login when "line con 0" is configured for it (cli/aaa.rs)
+            self.console_login(ni);
         }
     }
 

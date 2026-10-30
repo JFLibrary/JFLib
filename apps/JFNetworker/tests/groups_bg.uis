@@ -1,0 +1,123 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/groups.jfnet
+# the background picture of the canvas (G1, workspace/canvas/backdrop.rs): Ansicht ›
+# Hintergrundbild … opens the file dialog, fixtures/bg_plan.png (160 x 120) comes in fitted into
+# the view and selected (one undo step), its card in the inspector; unlocked it moves like a note
+# and its handle scales it (the aspect stays), the fields set position, scale and opacity (a
+# refusal says why), Sperren makes it no node (a click there is the background, a marquee works
+# over it), Ansicht › Hintergrundbild sperren unlocks it again, An Ansicht anpassen, Hintergrund
+# entfernen (one step); saved and opened again it is the same picture; a file that is no picture
+# is refused with the reason.  World (0, 0) shows at 550,240; the picture comes in at
+# [-220, -145] with 375 %.  Ids: the file dialog's name 1048588; the card's left 65792, top
+# 65793, scale 65794, opacity 65795, Setzen 65796, Sperren 65797, An Ansicht anpassen 65798,
+# Entfernen 65800.
+theme light
+cmd 594
+expect dialog:"Öffnen" exists
+click #1048588
+key ctrl+a
+type "bg_plan.png"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect listitem:"Hintergrundbild" selected
+expect listitem:"Hintergrundbild" rect 330 95 600 450
+expect text:"bg_plan.png" exists
+expect text:"160 × 120 Pixel, PNG, 1 KB" exists
+expect #65792 text "-220"
+expect #65793 text "-145"
+expect #65794 text "375"
+expect #65795 text "60"
+shot build/jfnetworker/groups_bg_new.png
+# one undo step
+key ctrl+z
+expect listitem:"Hintergrundbild" missing
+key ctrl+y
+expect listitem:"Hintergrundbild" exists
+# a drag where no device is moves it (its corner snaps to the grid)
+click listitem:"Hintergrundbild"
+wait 600
+drag 400,450 440,490
+expect #65792 text "-180"
+expect #65793 text "-100"
+expect listitem:"PC1" rect 390 240 64 48
+key ctrl+z
+expect #65792 text "-220"
+# its handle at the bottom right scales it, the aspect stays
+drag 930,545 990,600
+expect #65794 text "412,5"
+expect listitem:"Hintergrundbild" rect 330 95 660 475
+key ctrl+z
+expect #65794 text "375"
+# the fields: opacity 30 %; a scale of 0 refused with the reason
+click #65795
+key ctrl+a
+type "30\n"
+expect #65795 text "30"
+click #65794
+key ctrl+a
+type "0\n"
+expect text:"Links und Oben in Einheiten der Fläche, Maßstab 1 bis 10 000 %, Deckkraft 5 bis 100 %." exists
+key ctrl+a
+type "200\n"
+expect #65794 text "200"
+expect listitem:"Hintergrundbild" rect 330 95 320 240
+shot build/jfnetworker/groups_bg_settings.png
+cmd 10
+cmd 10
+expect #65795 text "60"
+expect #65794 text "375"
+# Sperren: no longer a node; a click there is the background, a marquee works over it
+click #65797
+expect listitem:"Hintergrundbild" missing
+expect #65797 checked
+click 400,450
+expect text:"Nichts ausgewählt" exists
+drag 300,200 600,300
+expect text:"2 ausgewählt" exists
+expect listitem:"PC1" selected
+expect listitem:"PC2" selected
+# Ansicht › Hintergrundbild sperren unlocks it again
+cmd 595
+expect listitem:"Hintergrundbild" exists
+# An Ansicht anpassen after zooming out
+cmd 21
+cmd 597
+expect listitem:"Hintergrundbild" rect 330 95 600 450
+key ctrl+z
+cmd 22
+expect listitem:"Hintergrundbild" rect 330 95 600 450
+# Hintergrund entfernen, one step
+cmd 596
+expect listitem:"Hintergrundbild" missing
+key ctrl+z
+expect listitem:"Hintergrundbild" exists
+# saved and opened again: the same picture, unlocked where it was
+cmd 4
+expect dialog:"Speichern unter" exists
+click #1048588
+key ctrl+a
+type "../../../../build/jfnetworker/groups_bg.jfnet"
+click button:"Speichern"
+expect dialog:"Speichern unter" missing
+cmd 1
+expect listitem:"Hintergrundbild" missing
+cmd 2
+expect dialog:"Öffnen" exists
+click #1048588
+key ctrl+a
+type "build/jfnetworker/groups_bg.jfnet"
+click button:"Öffnen"
+expect dialog:"Öffnen" missing
+expect listitem:"Hintergrundbild" rect 330 95 600 450
+expect text:"5 Geräte · 5 Kabel" exists
+click listitem:"Hintergrundbild"
+expect text:"160 × 120 Pixel, PNG, 1 KB" exists
+# a file that is no picture: refused with the reason
+cmd 594
+click #1048588
+key ctrl+a
+type "groups_bg.jfnet"
+click button:"Öffnen"
+expect "„groups_bg.jfnet“ ist kein Hintergrundbild" exists
+shot build/jfnetworker/groups_bg_refused.png
+expect listitem:"Hintergrundbild" exists
+expect_nowarn
