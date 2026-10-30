@@ -51,6 +51,9 @@ pub trait Display: Send {
     fn win_cmd(&mut self, w: i32, cmd: u32);
     fn win_begin_move(&mut self, w: i32);
     fn win_begin_resize(&mut self, w: i32, edges: u32);
+    /// the window manager's window menu at x, y (px of the window) on a button press; default
+    /// none (X11)
+    fn win_show_menu(&mut self, _w: i32, _x: i32, _y: i32) {}
     fn win_size(&mut self, w: i32) -> (i32, i32);
     fn win_dpi(&mut self, w: i32) -> i32;
     fn win_set_min_size(&mut self, w: i32, w_dip: i32, h_dip: i32);
@@ -91,9 +94,11 @@ struct Disp {
     min0: (i32, i32),
     refresh: Option<fn()>,
     hit: Option<fn(i32, i32, i32) -> u32>,
+    mv: Option<fn(i32, &mut [i32; 4])>,
 }
 
-static DISP: SpinLock<Disp> = SpinLock::new(Disp { bk: None, kind: BK_NONE, min0: (0, 0), refresh: None, hit: None });
+static DISP: SpinLock<Disp> =
+    SpinLock::new(Disp { bk: None, kind: BK_NONE, min0: (0, 0), refresh: None, hit: None, mv: None });
 static WL_QUIET: AtomicBool = AtomicBool::new(false);
 
 /// 0 none, 1 Wayland, 2 X11
@@ -252,6 +257,12 @@ pub fn win_begin_resize(w: i32, edges: u32) {
     with(|b| b.win_begin_resize(w, edges));
 }
 
+/// the compositor's window menu (move, resize, always on top, ...) of window w at x, y (px of
+/// the window); call on the press of the right button over a library-drawn title bar
+pub fn win_show_menu(w: i32, x: i32, y: i32) {
+    with(|b| b.win_show_menu(w, x, y));
+}
+
 pub fn win_size(w: i32) -> (i32, i32) {
     with(|b| b.win_size(w)).unwrap_or((0, 0))
 }
@@ -281,9 +292,31 @@ pub fn win_set_cursor(w: i32, shape: u32) {
     with(|b| b.win_set_cursor(w, shape));
 }
 
-/// stored only: the Linux backends need no hit tests
+/// stored: the compositor needs no hit tests, the Wayland backend asks it for the click
+/// activation of child windows (disp_hit)
 pub fn win_hit_hook(f: Option<fn(i32, i32, i32) -> u32>) {
     DISP.lock().hit = f;
+}
+
+/// stored: the window manager or compositor moves toplevels and does not ask; the Wayland
+/// backend snaps the child windows it moves itself (disp_moving)
+pub fn win_move_hook(f: Option<fn(i32, &mut [i32; 4])>) {
+    DISP.lock().mv = f;
+}
+
+/// (backends) the UI's HB_* flags at a client point of window w (0 without a hook)
+pub(crate) fn disp_hit(w: i32, x: i32, y: i32) -> u32 {
+    let f = DISP.lock().hit;
+    f.map_or(0, |f| f(w, x, y))
+}
+
+/// (backends, a window moved by the library) the move hook may snap rect (x, y, w, h px;
+/// a child window's position relative to its owner)
+pub(crate) fn disp_moving(w: i32, rect: &mut [i32; 4]) {
+    let f = DISP.lock().mv;
+    if let Some(f) = f {
+        f(w, rect);
+    }
 }
 
 pub fn set_refresh(f: Option<fn()>) {
@@ -381,8 +414,10 @@ pub(crate) fn os_drag_start(data: crate::DragData) -> bool {
 // ---------------------------------------------------------------- process level (plat-x11 agent)
 // [src/plat/linux/plat_linux.s, x11_xi.s]
 
-/// 0 light, 1 dark, -1 unknown: jfgui_THEME=light|dark wins, else GTK_THEME "Name:dark"
-/// means dark  [plat_theme]
+/// 0 light, 1 dark, -1 unknown: jfgui_THEME=light|dark wins, then GTK_THEME "Name:dark" or
+/// "Name-dark", then the settings portal's answer at the last sys_settings (color-scheme;
+/// GNOME's "Default" is light; unknown before the first, e.g. in headless runs)
+/// [plat_theme]
 pub fn theme() -> i32 {
     if let Some(t) = crate::env("jfgui_THEME") {
         if t == "dark" {
@@ -392,10 +427,10 @@ pub fn theme() -> i32 {
             return 0;
         }
     }
-    match crate::env("GTK_THEME") {
-        Some(g) if g.ends_with(":dark") => 1,
-        _ => -1,
+    if crate::env("GTK_THEME").is_some_and(|g| crate::linux_settings::theme_is_dark(&g)) {
+        return 1;
     }
+    crate::linux_settings::portal_dark()
 }
 
 /// pens / pen tablets of the display backend (-1 = unknown or no display)  [plat_pen_devices]

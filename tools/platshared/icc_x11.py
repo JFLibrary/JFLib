@@ -23,12 +23,37 @@ def check(name, ok, info=""):
     fails += 0 if ok else 1
 
 
+def x11_cookie(n):
+    """the MIT-MAGIC-COOKIE-1 of display n in $XAUTHORITY (else ~/.Xauthority) -> (name, data);
+    (b"", b"") without one (Xvfb and WSLg take none, the Xwayland of KWin and mutter needs it)"""
+    try:
+        b = open(os.environ.get("XAUTHORITY") or os.path.expanduser("~/.Xauthority"), "rb").read()
+    except OSError:
+        return b"", b""
+    p = 0
+    while p + 2 <= len(b):
+        p += 2  # the family: every one (local, wild) is fine on the local socket
+        fields = []
+        for _ in range(4):  # address, display number, name, data
+            if p + 2 > len(b):
+                return b"", b""
+            k, = struct.unpack_from(">H", b, p)
+            fields.append(b[p + 2:p + 2 + k])
+            p += 2 + k
+        _, num, name, data = fields
+        if name == b"MIT-MAGIC-COOKIE-1" and num in (str(n).encode(), b""):
+            return name, data
+    return b"", b""
+
+
 class X:
     def __init__(self):
         n = os.environ.get("DISPLAY", ":0").split(":")[-1].split(".")[0]
         self.s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.s.connect(f"/tmp/.X11-unix/X{n}")
-        self.s.sendall(struct.pack("<BxHHHHxx", 0x6C, 11, 0, 0, 0))
+        name, data = x11_cookie(n)
+        pad = lambda b: b + b"\0" * (-len(b) % 4)
+        self.s.sendall(struct.pack("<BxHHHHxx", 0x6C, 11, 0, len(name), len(data)) + pad(name) + pad(data))
         hdr = self.read(8)
         if hdr[0] != 1:
             raise RuntimeError("X11 setup refused")

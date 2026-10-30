@@ -235,11 +235,21 @@ def parse(buf):
 HANDLE = "/org/freedesktop/portal/desktop/request/1_42/x"
 
 
-def serve(path, mode, log, raw):
-    """one client connection; log: SASL lines, members and facts; raw: every message (bytes)"""
+def listen_unix(path, backlog=1):
+    """a Unix socket listening at `path`; an already listening socket is returned as it is.  The
+    fake buses bind before their thread starts: a program started right after t.start() could
+    otherwise connect before the bind, find no bus and pass a "no service" check by accident"""
+    if isinstance(path, socket.socket):
+        return path
     srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
     srv.bind(path)
-    srv.listen(1)
+    srv.listen(backlog)
+    return srv
+
+
+def serve(path, mode, log, raw):
+    """one client connection; log: SASL lines, members and facts; raw: every message (bytes)"""
+    srv = listen_unix(path, 1)
     srv.settimeout(30)
     try:
         c, _ = srv.accept()
@@ -382,7 +392,7 @@ def run(cmd, mode, bus=True, env_extra=None, env_drop=(), wait=5):
     env.update(env_extra or {})
     t = None
     if bus:
-        t = threading.Thread(target=serve, args=(sock, mode, log, raw), daemon=True)
+        t = threading.Thread(target=serve, args=(listen_unix(sock, 1), mode, log, raw), daemon=True)
         t.start()
         while not os.path.exists(sock):
             pass
@@ -473,8 +483,10 @@ def suite_filedlg(rs):
         r, idx, *p = ln[0][9:].split(" ", 2)
         return int(r), int(idx), (p[0] if p else "")
 
-    flt_all = ("Alle unterstützten Dateien", [(0, "*.png"), (0, "*.jpg"), (0, "*.jpeg"), (0, "*.bmp")])
-    flt = [("PNG-Bild", [(0, "*.png")]), ("JPEG-Bild", [(0, "*.jpg"), (0, "*.jpeg")]), ("BMP-Datei", [(0, "*.bmp")])]
+    def g(ext):  # GTK globs are case-sensitive: plat sends every letter as [xX] (IMG_0001.JPG)
+        return (0, "*." + "".join(f"[{c}{c.upper()}]" if c.isalpha() else c for c in ext))
+    flt_all = ("Alle unterstützten Dateien", [g("png"), g("jpg"), g("jpeg"), g("bmp")])
+    flt = [("PNG-Bild", [g("png")]), ("JPEG-Bild", [g("jpg"), g("jpeg")]), ("BMP-Datei", [g("bmp")])]
     # open
     FD_URI[0] = "file://" + (folder + "/x y.jpeg").replace(" ", "%20").replace("ä", "%C3%A4")
     FD_FILTER[0] = flt[1]

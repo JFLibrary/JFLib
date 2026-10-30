@@ -466,10 +466,14 @@ fn canvas_area(p: &mut Kritzel, ui: &mut Ui) {
     let m = ui.dp(SLIDER_CARD_DIP);
     let rc = inp.rect;
     view::view_layout(p, ui, rc[0] + m, rc[1], rc[2] - m, rc[3]);
+    let doc_ver = doc::doc_version(&p.doc);
     tools::tool_input(p, ui, &inp);
-    // the canvas command was recorded with the old version: when the tool changed the
-    // image, the zoom or the scroll position, build the frame once more
-    if view::view_version(p) != ver {
+    // changed pixels (this pass's tool, commands since the last pass): only their part
+    view::view_damage(p, ui, rc);
+    // the widgets above were built before the tool changed the image (undo, layers) or the
+    // zoom / scroll position (the canvas command): build the frame once more -- the canvas
+    // keeps its version for pixel changes, so this pass does not redraw it all
+    if view::view_version(p) != ver || doc::doc_version(&p.doc) != doc_ver {
         ui.repass();
     }
     // overlays stay inside the canvas widget (not over the side panels)

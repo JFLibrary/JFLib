@@ -110,7 +110,8 @@ impl Ui {
         tray::notify_close(id);
     }
 
-    /// whether this system shows the symbol and notifications
+    /// whether this system shows the symbol (a notification area; GNOME: only with the
+    /// AppIndicator extension); notifications work without one
     pub fn tray_supported(&self) -> bool {
         tray::tray_supported()
     }

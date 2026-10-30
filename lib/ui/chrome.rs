@@ -477,6 +477,14 @@ impl Ui {
                 self.wp.ctx.active = 0;
                 self.wp.ctx.mbtn &= !(1 << BTN_LEFT);
             }
+            // Linux: a right press on the bar opens the window manager's window menu (the
+            // system menu of Windows' own caption)
+            #[cfg(target_os = "linux")]
+            if self.wp.ctx.ractive == TB_ID && self.wp.ctx.pressed & (1 << BTN_RIGHT) != 0 {
+                plat::window_menu(self.wp.ctx.mx, self.wp.ctx.my);
+                self.wp.ctx.ractive = 0;
+                self.wp.ctx.mbtn &= !(1 << BTN_RIGHT);
+            }
         }
         self.wp.ctx.last_state = 0;
         self.sem(K_TITLEBAR, TB_ID, title, 0);

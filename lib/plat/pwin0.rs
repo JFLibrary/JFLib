@@ -135,6 +135,13 @@ pub fn begin_resize(edges: u32) {
     win_begin_resize(win_current(), edges)
 }
 
+/// (Linux, a library-drawn title bar) the window manager's menu of the current window at
+/// x, y (px of the window), on a right-button press: move, resize, always on top, ...
+#[cfg(target_os = "linux")]
+pub fn window_menu(x: i32, y: i32) {
+    win_show_menu(win_current(), x, y)
+}
+
 /// wait(deadline) with a redraw closure for a modal move / size loop (Windows); the Linux
 /// backends have no modal loop: there it is wait()  [main agent]
 #[cfg(not(windows))]

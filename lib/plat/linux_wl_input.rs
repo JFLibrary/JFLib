@@ -20,8 +20,8 @@ use rt::os::{syscall6, SYS_MMAP, SYS_MUNMAP};
 
 use super::proto::*;
 use super::wire::{sys_close, Args, A};
-use super::xkb::{wl_mods, wl_mods_set, xkb_dump, xkb_is_modifier, xkb_key, xkb_mod_bit, xkb_parse, xkb_set_mods,
-                 xkb_use_fallback};
+use super::xkb::{wl_mods, wl_mods_set, xkb_dead_reset, xkb_dump, xkb_is_dead, xkb_is_modifier, xkb_key, xkb_key_typed,
+                 xkb_mod_bit, xkb_parse, xkb_set_mods, xkb_use_fallback};
 use super::Wl;
 use crate::{
     Event, BTN_LEFT, BTN_MIDDLE, BTN_RIGHT, BTN_X1, BTN_X2, E_DOWN, E_FOCUS_IN, E_FOCUS_OUT, E_KEY_DOWN, E_KEY_UP,
@@ -46,6 +46,7 @@ pub(crate) struct Input {
     btn_mask: u32,
     pub kb_focus: bool,
     pub kb_win: i32,  // window with the keyboard focus
+    pub kb_child: i32, // child window of kb_win that gets the keys (-1 = none; linux_wl_child.rs)
     pub evwin: i32,   // window of the event being pushed
     pub ptr_win: i32, // window under the pointer (-1 = none)
     pub off_x: i32,   // offset of the popup under the pointer in its owner (px, wl_popup)
@@ -77,6 +78,7 @@ impl Input {
             btn_mask: 0,
             kb_focus: false,
             kb_win: 0,
+            kb_child: -1,
             evwin: 0,
             ptr_win: -1,
             off_x: 0,
@@ -121,6 +123,17 @@ impl Wl {
         self.inp.btn_mask & 1 << BTN_LEFT != 0
     }
 
+    /// the held pointer buttons (BTN_* bits)
+    pub(crate) fn held_buttons(&self) -> u32 {
+        self.inp.btn_mask
+    }
+
+    /// fixed (24.8 logical) -> physical pixels at the scale of window w
+    pub(crate) fn ptr_px_of(&self, w: usize, fixed: i32) -> i32 {
+        let s = self.win[w & (PW_MAX - 1)].s120.max(1);
+        (fixed as i64 * s as i64 / 30720) as i32
+    }
+
     /// E_UP for every held button (at the last position)  [wl_release_buttons]
     pub(crate) fn release_buttons(&mut self) {
         self.ptr_evwin();
@@ -145,7 +158,7 @@ impl Wl {
         if now < self.inp.rep_next {
             return self.inp.rep_next;
         }
-        self.inp.evwin = self.inp.kb_win;
+        self.inp.evwin = self.kb_target();
         let (vk, text) = xkb_key(self.inp.rep_key - 1);
         if vk != 0 {
             self.push(E_KEY_DOWN, 0, 0, 0, vk | 0x8000_0000);
@@ -230,6 +243,9 @@ pub(crate) fn wlh_ptr_enter(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
 
 /// [wlh_ptr_leave]
 pub(crate) fn wlh_ptr_leave(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
+    if wl.drag.on && wl.drag.tool < 0 {
+        wl.child_drag_end(); // (the grab ended)
+    }
     if !wl.inp.ptr_in {
         return;
     }
@@ -244,6 +260,11 @@ pub(crate) fn wlh_ptr_leave(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
 pub(crate) fn wlh_ptr_motion(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
     wl.inp.mx = wl.ptr_px(a.i(1)) + wl.inp.off_x; // (U3) over a popup window
     wl.inp.my = wl.ptr_px(a.i(2)) + wl.inp.off_y;
+    if wl.drag.on && wl.drag.tool < 0 {
+        let (x, y) = (wl.inp.mx, wl.inp.my);
+        wl.child_drag_ptr_motion(x, y); // a child window moved / resized by the library: no E_MOVE
+        return;
+    }
     wl.ptr_evwin();
     let (x, y) = (wl.inp.mx, wl.inp.my);
     wl.push(E_MOVE, 0, x, y, 0);
@@ -254,12 +275,23 @@ pub(crate) fn wlh_ptr_button(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
     wl.inp.btn_serial = a.u(0);
     wl.inp.input_serial = a.u(0);
     let b = a.u(2).wrapping_sub(BTN_CODE_LEFT);
+    if wl.drag.on && wl.drag.tool < 0 {
+        // the release of a button that started the drag of a child window ends it
+        if a.u(3) == 0 && b <= 6 && wl.drag.btns & 1 << BTN_MAP[b as usize] != 0 {
+            wl.child_drag_end();
+        } else {
+            wl.drag.other = true; // (its frame is no motion)
+        }
+        return;
+    }
     if b > 6 {
         return;
     }
     let btn = BTN_MAP[b as usize];
     let typ = if a.u(3) != 0 {
         wl.inp.btn_mask |= 1 << btn;
+        let (w, x, y) = (wl.inp.ptr_win, wl.inp.mx, wl.inp.my);
+        wl.child_press(w, x, y); // the keyboard between a toplevel and its child windows
         E_DOWN
     } else {
         if wl.inp.btn_mask & 1 << btn == 0 {
@@ -305,8 +337,13 @@ pub(crate) fn wlh_ptr_value120(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
     wl.inp.ax_flags |= 1 << (ax + 2);
 }
 
-/// end of a pointer event group: flush the wheel  [wlh_ptr_frame]
+/// end of a pointer event group: the motion of a child window's drag, flush the wheel
+/// [wlh_ptr_frame]
 pub(crate) fn wlh_ptr_frame(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
+    if wl.drag.on && wl.drag.tool < 0 {
+        let wheel = wl.inp.ax_flags != 0 || wl.inp.ax_val != [0; 2];
+        wl.child_drag_frame(wheel);
+    }
     let mut d = [0i32; 2]; // dy, dx
     for ax in 0..2 {
         let f = wl.inp.ax_flags;
@@ -372,16 +409,17 @@ pub(crate) fn wlh_kb_enter(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
         return;
     }
     wl.inp.kb_win = w;
-    wl.inp.evwin = w;
+    wl.inp.evwin = wl.kb_target();
     wl.inp.kb_focus = true;
     wl.push(E_FOCUS_IN, 0, 0, 0, 0);
 }
 
 /// [wlh_kb_leave]
 pub(crate) fn wlh_kb_leave(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
+    xkb_dead_reset();
     wl.inp.kb_focus = false;
     wl.inp.rep_key = 0;
-    wl.inp.evwin = wl.inp.kb_win;
+    wl.inp.evwin = wl.kb_target();
     wl.push(E_FOCUS_OUT, 0, 0, 0, 0);
 }
 
@@ -402,20 +440,24 @@ pub(crate) fn wlh_kb_key(wl: &mut Wl, _id: u32, a: &Args, _u: u64) {
     if mb != 0 {
         wl_mods_set(if down { wl_mods() | mb } else { wl_mods() & !mb });
     }
-    wl.inp.evwin = wl.inp.kb_win;
-    let (vk, text) = xkb_key(key);
+    wl.inp.evwin = wl.kb_target();
     if down {
+        let dead = xkb_is_dead(key);
+        let (vk, text) = xkb_key_typed(key); // dead keys composed (´ e -> é)
         if vk != 0 {
             wl.push(E_KEY_DOWN, 0, 0, 0, vk);
         }
-        if text != 0 {
-            wl.push(E_TEXT, 0, 0, 0, text);
+        for t in text.into_iter().filter(|&t| t != 0) {
+            wl.push(E_TEXT, 0, 0, 0, t);
         }
-        if !xkb_is_modifier(key) && wl.inp.rep_rate > 0 {
+        if dead {
+            wl.inp.rep_key = 0; // a new key ends the repeat; a dead key does not repeat
+        } else if !xkb_is_modifier(key) && wl.inp.rep_rate > 0 {
             wl.inp.rep_key = key + 1;
             wl.inp.rep_next = crate::time_us() + (wl.inp.rep_delay as u32).wrapping_mul(1000) as u64;
         }
     } else {
+        let (vk, _) = xkb_key(key);
         if key + 1 == wl.inp.rep_key {
             wl.inp.rep_key = 0;
         }

@@ -30,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from icc_x11 import X  # noqa: E402
-from portal_bus import R, W, message, parse  # noqa: E402
+from portal_bus import R, W, listen_unix, message, parse  # noqa: E402
 
 CTX = "/org/freedesktop/IBus/InputContext_7"
 IC = "org.freedesktop.IBus.InputContext"
@@ -51,9 +51,7 @@ def ibus_text(s):
 
 
 def serve(path, rec, mode):
-    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    srv.bind(path)
-    srv.listen(1)
+    srv = listen_unix(path, 1)
     srv.settimeout(20)
     try:
         c, _ = srv.accept()
@@ -154,7 +152,7 @@ def run(exe, test, mode, rec):
         sock = os.path.join(d, "bus")
         t = None
         if mode != "unreachable":
-            t = threading.Thread(target=serve, args=(sock, rec, mode), daemon=True)
+            t = threading.Thread(target=serve, args=(listen_unix(sock, 1), rec, mode), daemon=True)
             t.start()
         env = dict(os.environ, DBUS_SESSION_BUS_ADDRESS=f"unix:path={sock}")
         env.pop("jfgui_IME", None)
@@ -199,9 +197,11 @@ def run_x11(exe, rec):
     """plattest --test ibus-x11 against the fake bus and synthetic X events -> its result"""
     with tempfile.TemporaryDirectory() as d:
         sock = os.path.join(d, "bus")
-        t = threading.Thread(target=serve, args=(sock, rec, "ok"), daemon=True)
+        t = threading.Thread(target=serve, args=(listen_unix(sock, 1), rec, "ok"), daemon=True)
         t.start()
-        env = dict(os.environ, DBUS_SESSION_BUS_ADDRESS=f"unix:path={sock}", jfgui_BACKEND="x11")
+        # jfgui_LIFE=0: the window starts the lifecycle thread, whose own session connection
+        # would otherwise take this one-connection bus before the input context's
+        env = dict(os.environ, DBUS_SESSION_BUS_ADDRESS=f"unix:path={sock}", jfgui_BACKEND="x11", jfgui_LIFE="0")
         env.pop("jfgui_IME", None)
         p = subprocess.Popen([str(exe), "--test", "ibus-x11"], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         out = []

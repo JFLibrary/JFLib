@@ -307,10 +307,17 @@ def crate_dir(root_file):
     return resolve_root(RS / root_file).parent
 
 
+# a path's first segment (NAME::) and extern crate NAME: whole identifiers, like \bNAME:: and
+# extern crate NAME\b per name -- one scan of the sources instead of one per name (all_libs ran
+# a regex per crate over every source set: half a minute per app build)
+CRATE_MENTION = re.compile(r"\b(\w+)::|extern crate (\w+)\b")
+
+
 def named_crates(root, names):
     """the crates of names that one project's source set mentions (NAME:: or extern crate NAME)"""
     src = "\n".join(f.read_text(encoding="utf-8") for f in project_sources(root))
-    return {c for c in names if re.search(rf"\b{c}::|extern crate {c}\b", src)}
+    found = {a or b for a, b in CRATE_MENTION.findall(src)}
+    return {c for c in names if c in found}
 
 
 def local_crates():

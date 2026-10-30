@@ -58,8 +58,8 @@ const O_PATH: usize = 0x20_0000;
 const O_CLOEXEC: usize = 0x8_0000;
 const MSG_NOSIGNAL: usize = 0x4000;
 
-const MB_CAP: usize = 8192; // body builder
-const MM_CAP: usize = 12288; // whole message
+const MB_CAP: usize = 32768; // body builder (file filters: every letter as [xX])
+const MM_CAP: usize = MB_CAP + 4096; // whole message
 const RB_CAP: usize = 65536; // receive buffer
 const URI_CAP: usize = 2048;
 const UID_CAP: usize = 16;
@@ -88,6 +88,10 @@ const S_BUS_PATH: &[u8] = b"/org/freedesktop/DBus";
 const S_HELLO: &[u8] = b"Hello";
 const S_ADDMATCH: &[u8] = b"AddMatch";
 const S_MATCH1: &[u8] = b"type='signal',interface='org.freedesktop.portal.Request',member='Response',path='";
+// the portal went away (crashed, restarted by an update): its Response never comes
+const S_MATCH_OWNER: &[u8] =
+    b"type='signal',sender='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.freedesktop.portal.Desktop'";
+const S_NAME_OWNER_CHANGED: &[u8] = b"NameOwnerChanged";
 const S_PORTAL_NAME: &[u8] = b"org.freedesktop.portal.Desktop";
 const S_PORTAL_PATH: &[u8] = b"/org/freedesktop/portal/desktop";
 const S_FILECHOOSER: &[u8] = b"org.freedesktop.portal.FileChooser";
@@ -955,6 +959,25 @@ impl Bus {
         self.add_match(2)
     }
 
+    /// AddMatch for the portal's end (a dialog waiting for its Response)
+    fn owner_match(&mut self, serial: u32) -> bool {
+        self.set_bus_call(S_ADDMATCH, Some(b"s"));
+        self.b_str(S_MATCH_OWNER);
+        self.msg_send(serial)
+    }
+
+    /// the message is NameOwnerChanged of the portal to nobody (it ended)
+    fn is_portal_gone(&mut self) -> bool {
+        if self.msg_type() != MSG_SIGNAL || !self.field_is(HF_MEMBER, S_NAME_OWNER_CHANGED) {
+            return false;
+        }
+        self.rd_body_begin();
+        let name = self.rd_str();
+        let _old = self.rd_str();
+        let new = self.rd_str();
+        name.as_deref() == Some(S_PORTAL_NAME) && new.is_some_and(|n| cstr(&n).is_empty())
+    }
+
     // ------------------------------------------------------------ FileChooser
 
     /// see the file header  [plat_file_dialog]
@@ -970,7 +993,7 @@ impl Bus {
     }
 
     fn file_dialog_call(&mut self, flags: u32, path: &mut String, exts: &[&[u8]]) -> (i32, u32) {
-        if !self.hello_match() {
+        if !self.hello_match() || !self.owner_match(9) {
             return (-1, 0);
         }
         // FileChooser.SaveFile / OpenFile
@@ -1087,8 +1110,19 @@ impl Bus {
                 let ext = ext_copy(&e[p..]);
                 self.b_align(8);
                 self.b_u32(0); // 0 = glob pattern
+                // GTK's file filters (GNOME's portal) match globs case-sensitively: every
+                // letter both ways ("*.[jJ][pP][gG]"), so IMG_0001.JPG shows too
                 let mut pat = copy_cap(b"*.", 128);
-                cat_cap(&mut pat, &ext, 128);
+                for &c in cstr(&ext) {
+                    if pat.len() + 4 >= 512 {
+                        break;
+                    }
+                    if c.is_ascii_alphabetic() {
+                        pat.extend_from_slice(&[b'[', c.to_ascii_lowercase(), c.to_ascii_uppercase(), b']']);
+                    } else {
+                        pat.push(c);
+                    }
+                }
                 self.b_str(&pat);
                 // the next extension of this entry ("a;b=...")
                 let mut k = p;
@@ -1192,6 +1226,10 @@ impl Bus {
                     let r = self.parse_response();
                     self.msg_consume();
                     return r;
+                }
+                if self.is_portal_gone() {
+                    self.msg_consume();
+                    return -1; // no answer will come
                 }
                 self.msg_consume();
                 continue;

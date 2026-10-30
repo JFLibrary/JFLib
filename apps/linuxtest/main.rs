@@ -273,6 +273,8 @@ fn linuxtest() -> i32 {
         Some("wlwin") => Some(t_wl::test_wlwin), // plat-wayland: no assembly counterpart
         #[cfg(target_os = "linux")]
         Some("wlclip") => Some(t_wl::test_wlclip), // plat-wayland: no assembly counterpart
+        #[cfg(target_os = "linux")]
+        Some("activate") => Some(t_wl::test_activate), // no assembly counterpart
         Some("window") => Some(test_window),
         #[cfg(target_os = "linux")]
         Some("clip") => Some(test_clip),

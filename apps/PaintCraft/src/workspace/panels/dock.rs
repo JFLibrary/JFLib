@@ -19,6 +19,9 @@
 //   DM_FREE    the user dragged it out of the main window (centre outside): it stays where it
 //              is on the screen (the library); on Windows kept inside the monitor's work area.
 // Docked windows (auto / anchor) never leave the main window's client area.
+// Snapping: while the user drags a tool window, its edges snap to the edges of the canvas area
+// (DK_M inside, where the automatic layout puts them) from DK_SNAP DIP away (ui.window_snap), so
+// it docks at an edge or in a corner and keeps that distance on resizes like the default places.
 // A user move is a WRF_CHANGED rect whose position differs from the one applied last by more
 // than DK_TOL DIP (the platform echoes our own moves, rounded).
 
@@ -31,6 +34,7 @@ const DK_M: i32 = 8; // margin from the edges (DIP)
 const DK_TOP_DEF: i32 = 132; // canvas top / status bar when the canvas is unknown
 const DK_SB_DEF: i32 = 32;
 const DK_TOL: i32 = 2;
+const DK_SNAP: i32 = 16; // edges snap to the canvas area's this close (DIP)
 const DK_TINY_W: i32 = 640; // canvas area below this: only Werkzeuge + Farben
 const DK_TINY_H: i32 = 360;
 const WT_V_W: i32 = 74; // Werkzeuge client size (wnd_tools.rs): 2 x 10 buttons
@@ -123,6 +127,9 @@ pub(crate) fn dock_frame(p: &mut Pn, ui: &mut Ui) {
     }
     let l = DK_M;
     let r = cw - DK_M;
+    for k in 0..WND_COUNT {
+        ui.window_snap(k as u32 + WINID_TOOLS, [l, t, r - l, b.wrapping_sub(t)], DK_SNAP);
+    }
     let tbh = ui.style.metric(SM_WIN_TBH_TOOL) + 2; // title bar + border
     // Werkzeuge in two rows when the vertical window does not fit the height
     let hgt = b.wrapping_sub(t);

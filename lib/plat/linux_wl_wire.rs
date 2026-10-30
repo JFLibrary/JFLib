@@ -23,7 +23,8 @@ use alloc::vec;
 use alloc::vec::Vec;
 use alloc::format;
 
-use rt::os::{syscall3, SYS_CLOSE, SYS_CONNECT, SYS_POLL, SYS_RECVMSG, SYS_SENDMSG, SYS_SOCKET};
+use rt::os::{syscall3, syscall6, SYS_CLOSE, SYS_CONNECT, SYS_POLL, SYS_RECVMSG, SYS_SENDMSG, SYS_SOCKET};
+const SYS_RECVFROM: usize = 45;
 
 use super::proto::{Iface, Req, DISPLAY_SYNC, IFACE_CB_SYNC, IFACE_WL_DISPLAY};
 use super::Wl;
@@ -467,7 +468,7 @@ impl Wire {
                 return 1;
             }
             if r < 0 {
-                fatal("connection lost while sending");
+                self.fatal_lost("connection lost while sending");
             }
             // the fds went with the first byte: close our copies
             for &fd in &self.out_fds {
@@ -477,6 +478,45 @@ impl Wire {
             self.out.drain(..r as usize);
         }
         0
+    }
+
+    /// the connection broke: the compositor's wl_display.error, when it sent one before it
+    /// closed the socket, says why (protocol error on iface#id, code: message); else msg
+    fn fatal_lost(&mut self, msg: &str) -> ! {
+        // what is still in the socket (without descriptors: the process ends)
+        let len = self.inb.len();
+        let room = WL_IN_CAP.saturating_sub(len);
+        if room > 0 {
+            self.inb.reserve(room);
+            // SAFETY: the vector has capacity for room more bytes behind len.
+            let r = unsafe { syscall6(SYS_RECVFROM, self.fd as usize, self.inb.as_mut_ptr().add(len) as usize, room, MSG_DONTWAIT, 0, 0) };
+            if r > 0 {
+                // SAFETY: the kernel wrote r bytes behind len.
+                unsafe { self.inb.set_len(len + r as usize) };
+            }
+        }
+        let b = &self.inb;
+        let mut o = 0;
+        while o + 8 <= b.len() {
+            let (obj, so) = (rd32(b, o), rd32(b, o + 4));
+            let size = (so >> 16) as usize;
+            if size < 8 {
+                break;
+            }
+            if obj == 1 && so & 0xFFFF == 0 && o + 20 <= b.len() {
+                let (eobj, code, n) = (rd32(b, o + 8), rd32(b, o + 12), rd32(b, o + 16) as usize);
+                let text = b.get(o + 20..o + 20 + n.saturating_sub(1)).unwrap_or(b"");
+                let name = self.obj_iface(eobj).map_or("?", |(i, _, _)| i.name);
+                let mut m = Vec::new();
+                m.extend_from_slice(format!("wayland: protocol error on {name}#{eobj}, code {code}: ").as_bytes());
+                m.extend_from_slice(text);
+                m.push(b'\n');
+                crate::write_stderr(&m);
+                crate::exit(1)
+            }
+            o += size;
+        }
+        fatal(msg)
     }
 
     /// flush everything, waiting for the socket (fatal after 5 s)  [wl_flush_wait]
@@ -521,10 +561,10 @@ impl Wire {
                 return 0;
             }
             if r < 0 {
-                fatal("connection lost while receiving");
+                self.fatal_lost("connection lost while receiving");
             }
             if r == 0 {
-                fatal("the compositor closed the connection");
+                self.fatal_lost("the compositor closed the connection");
             }
             if hdr.flags & MSG_CTRUNC != 0 {
                 fatal("file descriptor control data truncated");
@@ -664,8 +704,17 @@ impl Wire {
                     }
                 }
                 _ => {
-                    // 'a'
-                    t.extend_from_slice(format!("[{v} bytes]").as_bytes());
+                    // 'a': short arrays of u32 (toplevel states, pressed keys) by value
+                    if v % 4 == 0 && v <= 64 {
+                        t.push(b'[');
+                        for k in 0..v as usize / 4 {
+                            let s = if k == 0 { format!("{}", rd32(msg, c + 4 * k)) } else { format!(", {}", rd32(msg, c + 4 * k)) };
+                            t.extend_from_slice(s.as_bytes());
+                        }
+                        t.push(b']');
+                    } else {
+                        t.extend_from_slice(format!("[{v} bytes]").as_bytes());
+                    }
                     c += (v as usize + 3) & !3;
                 }
             }

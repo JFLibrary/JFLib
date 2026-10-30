@@ -193,7 +193,8 @@ pub struct Offer {
 pub enum Check {
     /// no newer version (or only one that was rolled back)
     UpToDate,
-    /// a newer version without a package for this system (its version)
+    /// a newer version without a package for this system (its version); also when it has only
+    /// an exe or bundle package and the program runs as an AppImage, Flatpak or Snap
     NoPackage(String),
     /// a newer version to download
     Available(Offer),
@@ -396,6 +397,10 @@ impl Updater {
         let Some(pkg) = m.package(&cfg.target).cloned() else {
             return Ok(Check::NoPackage(m.version));
         };
+        // an AppImage, Flatpak or Snap is updated as a whole package, not file by file
+        if pkg.kind != Kind::Package && apply::sealed(cfg).is_some() {
+            return Ok(Check::NoPackage(m.version));
+        }
         if pkg.size > cfg.max_size {
             return Err(Error::Manifest(format!("die Datei ist mit {} Bytes zu groß", pkg.size)));
         }

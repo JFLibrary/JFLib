@@ -787,6 +787,13 @@ ui.dialog_end(); // always
   Flags `WF_TOOL`, `WF_DIALOG` (+ `WF_MODAL`; `dialog_buttons` then make the footer),
   `WF_RESIZABLE`, `WF_NOCLOSE`, `WF_AUTOHEIGHT`, ...; the library writes the user's placement
   back into the `WinRect`. `window_place`, `window_state`, `window_activate`, `window_destroy`.
+  On Wayland a client cannot place its own toplevels (GNOME, KDE and WSLg centre an owned one on
+  its owner), so tool windows (`WF_TOOL` without `WF_DIALOG`) are child windows there: a
+  subsurface of the owner, placed where the `WinRect` says, kept inside the owner and moved,
+  minimized and stacked with it; the library moves and resizes them itself, and the keyboard
+  goes to one only after a click on a text box or `window_activate` -- as on Windows
+  (`plat::WST_CHILD`; `jfgui_WL_TOOLWIN=toplevel` keeps separate toplevels). Dialogs stay
+  toplevels and are centred by the compositor.
 * **One instance**: with `AF_SINGLE_INSTANCE` in the `AppDesc`, a later start of the app hands its
   working folder and command line to the running window and ends (`plat::instance`: a pipe /
   an abstract socket per user and app; only for real windows, not for `--shot` / `--script`).

@@ -35,13 +35,19 @@ fn nonblock(fd: &Fd) {
 pub struct Child {
     pid: i32, input: Option<Fd>, output: Fd, error: Fd, status: Option<i32>, reaped: bool,
 }
-// the file of a program: a path as it is, a name looked up in PATH (ENOENT when missing)
+// the file of a program: a path as it is, a name looked up in PATH -- the first executable
+// file, as execvp takes it (ENOENT when missing)
 fn resolve(program: &str) -> Result<String, u32> {
     if program.contains('/') { return Ok(String::from(program)); }
+    let executable = |p: &String| {
+        let c = z(p);
+        // SAFETY: access(path, X_OK) on a NUL-terminated path.
+        crate::file_exists_raw(p) == 1 && unsafe { syscall3(21, c.as_ptr() as usize, 1, 0) } == 0
+    };
     crate::env("PATH").unwrap_or_else(|| String::from("/usr/bin:/bin")).split(':')
         .filter(|p| !p.is_empty())
         .map(|p| format!("{}/{}", p, program))
-        .find(|p| crate::file_exists_raw(p) == 1).ok_or(2u32)
+        .find(executable).ok_or(2u32)
 }
 // this process's environment with the overrides, NUL-terminated entries
 fn environment(env: &[(&str, Option<&str>)]) -> Vec<Vec<u8>> {
@@ -62,6 +68,7 @@ pub(super) fn spawn(c: &Command<'_>) -> Result<Child, u32> {
     let mut envp: Vec<usize> = envs.iter().map(|s| s.as_ptr() as usize).collect(); envp.push(0);
     let (ir, iw) = pipe()?; let (or, ow) = pipe()?; let (er, ew) = pipe()?;
     let (failr, failw) = pipe()?;
+    let (dfl, nomask) = ([0usize; 4], [0u64; 1]); // SIG_DFL, the empty signal set (made before the fork)
     // SAFETY: fork child uses only syscalls and preallocated buffers until exec/exit.
     let pid = unsafe {
         let pid = syscall3(57, 0, 0, 0);
@@ -75,6 +82,12 @@ pub(super) fn spawn(c: &Command<'_>) -> Result<Child, u32> {
             if failure >= 0 { if let Some(d) = &dir { failure = syscall3(80, d.as_ptr() as usize, 0, 0); } }
             // close_range(3, ~0, CLOSE_RANGE_CLOEXEC): no other descriptor reaches the program (old kernels: ignored)
             if failure >= 0 { syscall3(436, 3, 0xFFFF_FFFF, 4); }
+            // SIGPIPE back to SIG_DFL and no blocked signals: an ignored or blocked signal
+            // would stay so in the program (a producer in `a | head` would not end)
+            if failure >= 0 {
+                syscall6(13, 13, dfl.as_ptr() as usize, 0, 8, 0, 0); // rt_sigaction(SIGPIPE, SIG_DFL)
+                syscall6(14, 2, nomask.as_ptr() as usize, 0, 8, 0, 0); // rt_sigprocmask(SIG_SETMASK, {})
+            }
             if failure >= 0 { failure = syscall3(59, exe.as_ptr() as usize, argv.as_ptr() as usize, envp.as_ptr() as usize); }
             let code = (-failure) as u32;
             syscall3(1, failw.0 as usize, &code as *const u32 as usize, 4);

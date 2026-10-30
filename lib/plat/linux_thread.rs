@@ -28,6 +28,10 @@ const EINTR: isize = 4;
 // CLONE_VM | FS | FILES | SIGHAND | THREAD | SYSVSEM | PARENT_SETTID | CHILD_CLEARTID
 const CLONE_THREAD_FLAGS: usize = 0x100 | 0x200 | 0x400 | 0x800 | 0x10000 | 0x40000 | 0x100000 | 0x200000;
 const GUARD_SIZE: usize = 4096;
+/// each thread's alternate signal stack (the crash handler runs on it: a stack overflow of the
+/// thread still gets its report), between two guard pages below the thread's stack
+const ALT_SIZE: usize = 65536;
+const SYS_SIGALTSTACK: usize = 131;
 const THREAD_STACK_DEF: usize = 0x10_0000; // 1 MB
 const THREAD_STACK_MAX: usize = 0x1000_0000; // 256 MB
 
@@ -74,8 +78,14 @@ unsafe extern "C" {
 }
 
 extern "C" fn thread_main(rec: *mut ThreadRec) -> ! {
-    // SAFETY: rec is the record thread_spawn wrote; its closure is taken over once.
-    let f = unsafe { Box::from_raw((*rec).start) };
+    // SAFETY: the alternate signal stack thread_spawn reserved in this thread's mapping (the
+    // kernel gives a new thread none); rec is the record thread_spawn wrote, its closure is
+    // taken over once.
+    let f = unsafe {
+        let ss = [(*rec).base + GUARD_SIZE, 0, ALT_SIZE];
+        syscall3(SYS_SIGALTSTACK, ss.as_ptr() as usize, 0, 0);
+        Box::from_raw((*rec).start)
+    };
     f();
     // SAFETY: ends this thread only (the kernel clears and wakes rec.tid).
     unsafe { syscall3(SYS_EXIT, 0, 0, 0) };
@@ -91,16 +101,18 @@ unsafe impl Send for Thread {}
 /// run f on a new thread with stack bytes of stack (0 = 1 MB)  [plat_thread_create]
 pub fn thread_spawn(stack: usize, f: Start) -> Option<Thread> {
     let size = if stack == 0 { THREAD_STACK_DEF } else { stack.min(THREAD_STACK_MAX) };
-    let size = ((size + 4095) & !4095) + GUARD_SIZE;
+    let size = ((size + 4095) & !4095) + 2 * GUARD_SIZE + ALT_SIZE;
     // SAFETY: a fresh anonymous mapping (PROT_READ | PROT_WRITE; MAP_PRIVATE | MAP_ANONYMOUS |
-    // MAP_NORESERVE | MAP_STACK); its lowest page becomes the guard.
+    // MAP_NORESERVE | MAP_STACK): from the bottom a guard page, the alternate signal stack,
+    // a guard page, the stack.
     unsafe {
         let base = syscall6(SYS_MMAP, 0, size, 3, 0x02 | 0x20 | 0x4000 | 0x20000, usize::MAX, 0);
         if base < 0 {
             return None;
         }
         let base = base as usize;
-        if syscall3(SYS_MPROTECT, base, GUARD_SIZE, 0) < 0 {
+        if syscall3(SYS_MPROTECT, base, GUARD_SIZE, 0) < 0
+            || syscall3(SYS_MPROTECT, base + GUARD_SIZE + ALT_SIZE, GUARD_SIZE, 0) < 0 {
             syscall3(SYS_MUNMAP, base, size, 0);
             return None;
         }
@@ -164,7 +176,7 @@ impl Sem {
         }
         // saturating: an i32 overflow would turn the count negative and block waiters for good
         let add = n.min(i32::MAX as u32) as i32;
-        let _ = self.0.count.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |c| Some(c.saturating_add(add)));
+        let _ = self.0.count.try_update(Ordering::SeqCst, Ordering::SeqCst, |c| Some(c.saturating_add(add)));
         if self.0.waiters.load(Ordering::SeqCst) != 0 {
             // SAFETY: the futex word lives as long as self.
             unsafe {
@@ -225,15 +237,18 @@ pub(crate) fn wake_fd() -> i32 {
     WAKE_FD.load(Ordering::SeqCst)
 }
 
-/// UI thread: reset the flag and the eventfd; the E_WAKE to deliver
+/// UI thread: reset the eventfd, then the flag (in this order: a wake() between the two is
+/// answered by the E_WAKE delivered now -- its work was queued before it; the other order
+/// could drain the write of a wake() that already set the flag again, and every later wake()
+/// would then find the flag set and stay silent); the E_WAKE to deliver
 pub(crate) fn wake_consume() -> Event {
-    WAKE_FLAG.store(0, Ordering::SeqCst);
     let fd = WAKE_FD.load(Ordering::SeqCst);
     if fd >= 0 {
         let mut v = 0u64;
         // SAFETY: non-blocking read of the 8-byte counter (EAGAIN is fine).
         unsafe { syscall3(SYS_READ, fd as usize, &mut v as *mut u64 as usize, 8) };
     }
+    WAKE_FLAG.store(0, Ordering::SeqCst);
     Event { typ: E_WAKE, ..Default::default() }
 }
 

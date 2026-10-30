@@ -154,6 +154,26 @@ pub(crate) fn remove_tree(p: &str) {
     plat::delete(p);
 }
 
+/// the running program came out of a package that updates itself as a whole -- an AppImage
+/// (the exe is a copy extracted into a cache: writing it leaves the .AppImage file old), a
+/// Flatpak or a Snap (read-only folders) -> its name; None: cfg.exe names the program, or it
+/// is an ordinary file.  exe and bundle updates are not offered there (Check::NoPackage)
+pub(crate) fn sealed(cfg: &Config) -> Option<&'static str> {
+    if !cfg.exe.is_empty() {
+        return None;
+    }
+    let set = |v: &str| plat::env(v).is_some_and(|x| !x.is_empty());
+    if set("APPIMAGE") {
+        Some("AppImage")
+    } else if set("FLATPAK_ID") || plat::env("container").as_deref() == Some("flatpak") {
+        Some("Flatpak")
+    } else if set("SNAP") {
+        Some("Snap")
+    } else {
+        None
+    }
+}
+
 /// the program file: cfg.exe or the running exe (Linux: without " (deleted)")
 pub(crate) fn program(cfg: &Config) -> Option<String> {
     if !cfg.exe.is_empty() {
@@ -328,6 +348,11 @@ pub(crate) fn apply_staged(cfg: &Config, st: &mut State) -> Result<(), Error> {
     };
     if kind == Kind::Package {
         return Err(Error::Unsupported(String::from("ein Installationspaket wird nicht von selbst eingespielt (Updater::staged)")));
+    }
+    if let Some(pkg) = sealed(cfg) {
+        // dropped: it would be tried (hashed, backed up) at every start
+        drop_staged(cfg, st);
+        return Err(Error::Unsupported(format!("das Programm läuft als {}; es wird über dieses Paket aktualisiert", pkg)));
     }
     let exe = program(cfg).ok_or_else(|| Error::Io(String::from("der Programmpfad ist unbekannt")))?;
     let (dir, exe_name) = split_dir(&exe);

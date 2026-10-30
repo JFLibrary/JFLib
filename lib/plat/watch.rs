@@ -252,6 +252,7 @@ mod imp {
     const SYS_CLOSE: usize = 3;
     const SYS_POLL: usize = 7;
     const SYS_INOTIFY_ADD_WATCH: usize = 254;
+    const SYS_INOTIFY_RM_WATCH: usize = 255;
     const SYS_INOTIFY_INIT1: usize = 294;
     const IN_NONBLOCK: usize = 0o4000;
     const IN_CLOEXEC: usize = 0o2000000;
@@ -363,6 +364,18 @@ mod imp {
                 let path = if name.is_empty() { dir.clone() } else { crate::fs::join(&dir, &name) };
                 if mask & IN_ISDIR != 0 && mask & (IN_CREATE | IN_MOVED_TO) != 0 {
                     add(&mut st, &path, sh);
+                }
+                if mask & IN_ISDIR != 0 && mask & IN_MOVED_FROM != 0 && !name.is_empty() {
+                    // a folder moved away (out of the tree, or renamed: IN_MOVED_TO watches it
+                    // again): its watches and those below it end, else their events would
+                    // name paths that no longer exist
+                    let pre = alloc::format!("{path}/");
+                    let gone: Vec<i32> = st.dirs.iter().filter(|(_, d)| **d == path || d.starts_with(&pre)).map(|(w, _)| *w).collect();
+                    for w in gone {
+                        st.dirs.remove(&w);
+                        // SAFETY: our inotify descriptor and one of its watches.
+                        unsafe { syscall3(SYS_INOTIFY_RM_WATCH, fd.0, w as usize, 0) };
+                    }
                 }
                 sh.push(path);
             }
