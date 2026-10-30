@@ -17,6 +17,15 @@
 //                                                          value here
 //   vm.output() / take_output()                            what print() wrote
 //   vm.resume(host, fuel)                                  the same as run(), after Yielded
+//                                                          or Paused
+//   Status::Paused(p)                                      a breakpoint, a step or a pause
+//                                                          request stopped the run before
+//                                                          its fuel was used (debug.rs);
+//                                                          run() again goes on
+//   Host::load(cx, path)                                   the host's files for import
+//                                                          (module.rs; default: none)
+//   vm.modules()                                           the program's name, the modules'
+//                                                          paths
 //
 // Fuel is virtual CPU time: one unit per instruction, more for instructions that copy (string
 // and list concatenation, literals, iterating a map), plus what natives charge.  run(host,
@@ -58,7 +67,15 @@
 // collection, at least 256 KiB, at most the heap limit).  Values the host keeps between runs
 // must be pinned (pin / unpin) or be reachable from the script.  Values the host passes in
 // are checked (valid()): a stale value of a freed object gives an error or None, not a crash.
+//
+// Modules (module.rs): import(path) links a module's code into the VM's own (`code` starts as
+// the program's and grows with each module; `units` are the program and its modules with
+// their files and globals) and runs its top-level code as a frame of the importing invocation.
+// Errors and traces name the file of every position.  The debugger (debug.rs) costs nothing
+// while it has no breakpoint, step or pause request: run() uses exec as it is; with one, run()
+// drives exec one instruction at a time (exec_debug) and checks between them where to stop.
 
+use alloc::boxed::Box;
 use alloc::format;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -67,7 +84,9 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 
 use crate::code::{Code, Const, Op, Program, Up};
+use crate::debug::{Dbg, Pause};
 use crate::heap::{self, Closure, Heap, Key, Map, Obj, Ref, StrObj, Value};
+use crate::module::{Unit, UnitState};
 use crate::{jsonlib, num, stdlib};
 
 /// the limits of a VM; crossing one ends the invocation (scripts cannot catch it)
@@ -116,8 +135,11 @@ pub enum ErrorKind {
 /// a function and the position it was at when the error happened
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TraceLine {
-    /// "" for the top-level code, "fn" for an anonymous function
+    /// "" for top-level code (the program's, or a module's while import runs it: the
+    /// outermost line is the program's), "fn" for an anonymous function
     pub func: String,
+    /// the file of the position: Program::name, or a module's normalised path
+    pub file: String,
     pub line: u32,
     pub col: u32,
 }
@@ -128,6 +150,8 @@ pub struct Error {
     pub kind: ErrorKind,
     /// German text; for an uncaught throw the thrown value as text
     pub msg: String,
+    /// the file of the position (Program::name or a module's path; "" when not in the script)
+    pub file: String,
     /// where it happened (0 when not in the script)
     pub line: u32,
     pub col: u32,
@@ -136,14 +160,17 @@ pub struct Error {
 }
 
 impl core::fmt::Display for Error {
-    /// "3:5: Fehler: Division durch 0", then a line per call: "  in teile (3:5)"
+    /// "3:5: Fehler: Division durch 0", then a line per call: "  in teile (3:5)"; a call in
+    /// another file than the error names it: "  in lade (lib/util.jfs:7:2)", "  im Modul (..)"
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "{}:{}: Fehler: {}", self.line, self.col, self.msg)?;
-        for t in &self.trace {
+        let last = self.trace.len().saturating_sub(1);
+        for (i, t) in self.trace.iter().enumerate() {
+            let at = if t.file == self.file { format!("{}:{}", t.line, t.col) } else { format!("{}:{}:{}", t.file, t.line, t.col) };
             if t.func.is_empty() {
-                write!(f, "\n  im Hauptprogramm ({}:{})", t.line, t.col)?;
+                write!(f, "\n  {} ({})", if i == last { "im Hauptprogramm" } else { "im Modul" }, at)?;
             } else {
-                write!(f, "\n  in {} ({}:{})", t.func, t.line, t.col)?;
+                write!(f, "\n  in {} ({})", t.func, at)?;
             }
         }
         Ok(())
@@ -158,6 +185,8 @@ pub enum Status {
     /// fuel used up, or a native asked to yield; run() again continues
     Yielded,
     Error(Error),
+    /// the debugger stopped the run (debug.rs): where and why; run() again continues
+    Paused(Pause),
 }
 
 /// why a native function returned no value
@@ -186,6 +215,16 @@ pub trait Host {
         let _ = name;
         false
     }
+
+    /// the source of a module for import (module.rs): `path` is normalised ("/" between the
+    /// parts, no "." or ".."), relative ones are relative to what the host calls its working
+    /// directory; Err with the German reason ("die Datei gibt es nicht").  The VM compiles and
+    /// caches it; the time a read takes can be charged with cx.charge.  Without this method a
+    /// host has no modules.
+    fn load(&mut self, cx: &mut Cx, path: &str) -> Result<String, String> {
+        let _ = (cx, path);
+        Err(String::from("hier lassen sich keine Module laden"))
+    }
 }
 
 /// no host functions
@@ -200,13 +239,26 @@ impl Host for () {
 pub struct Pin(u32);
 
 #[derive(Clone, Copy, Debug)]
-struct Frame {
-    proto: u32,
-    closure: Option<Ref>,
+pub(crate) struct Frame {
+    pub proto: u32,
+    /// None for top-level code (the program's, a module's)
+    pub closure: Option<Ref>,
     /// stack index of slot 0 (the first parameter); the callee sits below it
-    base: u32,
+    pub base: u32,
     /// the next instruction (pc - 1 is the current one, for callers the call)
-    pc: u32,
+    pub pc: u32,
+}
+
+/// what a call did (call_at, call_native, method)
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum Called {
+    /// a native ran: its value replaced the callee and the arguments
+    Native,
+    /// a frame was pushed
+    Frame,
+    /// a frame of code linked after the running exec took its code (import, a function of a
+    /// module imported in a callback): exec returns with relink set, its caller calls it again
+    NewCode,
 }
 
 pub(crate) enum Exc {
@@ -216,11 +268,11 @@ pub(crate) enum Exc {
     Fatal(ErrorKind, String),
 }
 
-fn msg<T>(s: String) -> Result<T, Exc> {
+pub(crate) fn msg<T>(s: String) -> Result<T, Exc> {
     Err(Exc::Msg(s))
 }
 
-fn internal<T>() -> Result<T, Exc> {
+pub(crate) fn internal<T>() -> Result<T, Exc> {
     Err(Exc::Fatal(ErrorKind::Internal, String::from("Interner Fehler der Skript-VM")))
 }
 
@@ -230,7 +282,7 @@ pub(crate) fn fuel_msg(limit: u64) -> String {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum Builtin {
+pub(crate) enum Builtin {
     Print,
     Len,
     Type,
@@ -239,9 +291,11 @@ enum Builtin {
     Float,
     /// a function of the standard library (stdlib.rs)
     Lib(stdlib::LibFn),
+    /// import(path) (module.rs): runs a module's code as a frame
+    Import,
 }
 
-fn builtin_of(name: &str) -> Option<Builtin> {
+pub(crate) fn builtin_of(name: &str) -> Option<Builtin> {
     Some(match name {
         "print" => Builtin::Print,
         "len" => Builtin::Len,
@@ -249,6 +303,7 @@ fn builtin_of(name: &str) -> Option<Builtin> {
         "str" => Builtin::Str,
         "int" => Builtin::Int,
         "float" => Builtin::Float,
+        "import" => Builtin::Import,
         _ => return stdlib::find(name).map(Builtin::Lib),
     })
 }
@@ -264,21 +319,25 @@ const MAX_NEST: u32 = 20;
 /// thread
 #[derive(Clone)]
 pub struct Vm {
+    /// the linked code: the program's, then the modules' (module.rs)
     pub(crate) code: Arc<Code>,
     pub(crate) lim: Limits,
     pub(crate) heap: Heap,
-    stack: Vec<Value>,
-    frames: Vec<Frame>,
-    globals: Vec<Value>,
-    /// values the host gave to host names (indexed like code.hosts)
-    hostv: Vec<Option<Value>>,
-    consts: Vec<Value>,
+    pub(crate) stack: Vec<Value>,
+    pub(crate) frames: Vec<Frame>,
+    /// the globals of the program, then those of each module
+    pub(crate) globals: Vec<Value>,
+    /// values the host gave to host names (indexed like code.hosts and natives)
+    pub(crate) hostv: Vec<Option<Value>>,
+    pub(crate) consts: Vec<Value>,
     /// the type names as permanent strings
     tnames: [Value; 9],
     /// heap objects below this index are the permanent constants
     permanent: u32,
+    /// constants below this index are the program's (permanent); the modules' are roots
+    pub(crate) kperm: u32,
     /// native function names (the program's host names first) and the built-in they are
-    natives: Vec<(Arc<str>, Option<Builtin>)>,
+    pub(crate) natives: Vec<(Arc<str>, Option<Builtin>)>,
     pins: Vec<Option<Value>>,
     pin_free: Vec<u32>,
     out: String,
@@ -287,7 +346,7 @@ pub struct Vm {
     pub(crate) used: u64,
     last: u64,
     pub(crate) running: bool,
-    in_native: bool,
+    pub(crate) in_native: bool,
     yield_req: bool,
     /// objects allocated by the native running now (and values it keeps while it calls back)
     pub(crate) nroots: Vec<Ref>,
@@ -303,8 +362,18 @@ pub struct Vm {
     /// the kind of a fatal error inside Cx::call, for the Fail::Fatal it becomes
     pub(crate) fatal_kind: Option<ErrorKind>,
     /// where an exception (Some) or a fatal error (None) left a callback of a native: the
-    /// trace from there, for the Error when nothing catches it further out
-    escaped: Option<(Option<Value>, Vec<TraceLine>)>,
+    /// trace from there, for the Error when nothing catches it further out; with a message
+    /// of its own for the Error (a module that does not compile)
+    pub(crate) escaped: Option<(Option<Value>, Vec<TraceLine>, Option<String>)>,
+    /// the program (0) and its modules
+    pub(crate) units: Vec<Unit>,
+    /// breakpoints, steps, pause requests (debug.rs)
+    pub(crate) dbg: Option<Box<Dbg>>,
+    /// exec ended because a native asked to yield (the debugger's single steps tell it apart)
+    pub(crate) native_yield: bool,
+    /// a frame of code the running exec does not hold yet was pushed (import, a function of
+    /// a module linked in a callback): exec returned Yielded for it, its caller calls it again
+    pub(crate) relink: bool,
 }
 
 const WRITE_CAP: usize = 4 << 20; // bytes of one value text (shared nodes print once per use)
@@ -326,9 +395,11 @@ impl Vm {
         let permanent = heap.objs.len() as u32;
         heap.bytes = 0;
         let natives = code.hosts.iter().map(|h| (Arc::from(h.name.as_str()), builtin_of(&h.name))).collect();
+        let unit = Unit { path: crate::module::norm_path("", &code.name), gbase: 0, gcount: code.globals.len() as u32, pbase: 0, state: UnitState::Ready, map: None };
         Vm {
             globals: vec![Value::Nil; code.globals.len()],
             hostv: vec![None; code.hosts.len()],
+            kperm: code.consts.len() as u32,
             code,
             lim: limits,
             heap,
@@ -356,6 +427,10 @@ impl Vm {
             nest: 0,
             fatal_kind: None,
             escaped: None,
+            units: vec![unit],
+            dbg: None,
+            native_yield: false,
+            relink: false,
         }
     }
 
@@ -392,7 +467,7 @@ impl Vm {
         let code = self.code.clone();
         if let Err(e) = self.push_frame(&code, r, 0, args.len()) {
             let err = match e {
-                Exc::Fatal(kind, m) => Error { kind, msg: m, line: 0, col: 0, trace: Vec::new() },
+                Exc::Fatal(kind, m) => Error { kind, msg: m, file: String::new(), line: 0, col: 0, trace: Vec::new() },
                 _ => usage(String::from("Aufruf nicht möglich")),
             };
             self.abort();
@@ -408,21 +483,28 @@ impl Vm {
         }
         self.used = 0;
         self.running = true;
-        let code = self.code.clone();
+        if let Some(d) = self.dbg.as_deref_mut() {
+            d.run_starts();
+        }
         if self.frames.len() == 1 && self.frames[0].closure.is_none() && self.frames[0].pc == 0 {
             // the top-level code: the stack check push_frame does for calls
-            if 1 + code.protos[0].max_stack as usize + 4 > self.lim.stack as usize {
-                let e = self.error_here(&code, ErrorKind::Stack, format!("Der Stapel ist voll (mehr als {} Werte)", self.lim.stack));
+            if 1 + self.code.protos[0].max_stack as usize + 4 > self.lim.stack as usize {
+                let e = self.error_here(ErrorKind::Stack, format!("Der Stapel ist voll (mehr als {} Werte)", self.lim.stack));
                 self.abort();
                 self.running = false;
                 return Status::Error(e);
             }
         }
+        // a breakpoint, a step or a pause request: one instruction at a time (debug.rs)
+        let debugging = self.dbg.as_ref().is_some_and(|d| d.active);
         let st = loop {
-            match self.exec(&code, host, fuel) {
+            let r = if debugging { self.exec_debug(host, fuel) } else { self.exec(host, fuel) };
+            match r {
+                // new code linked: exec again with it
+                Ok(Status::Yielded) if self.relink => {}
                 Ok(s) => break s,
                 Err(e) => {
-                    if let Err(err) = self.catch(&code, e) {
+                    if let Err(err) = self.catch(e) {
                         self.abort();
                         break Status::Error(err);
                     }
@@ -432,14 +514,25 @@ impl Vm {
         self.running = false;
         self.call_fuel += self.used;
         self.last = self.used;
-        if let Status::Done(v) = st {
-            self.result = v;
+        match st {
+            Status::Done(v) => {
+                self.result = v;
+                if let Some(d) = self.dbg.as_deref_mut() {
+                    d.invocation_ends();
+                }
+            }
+            Status::Error(_) => {
+                if let Some(d) = self.dbg.as_deref_mut() {
+                    d.invocation_ends();
+                }
+            }
+            _ => {}
         }
         st
     }
 
-    /// continue an invocation after Status::Yielded: the same as run(), named for readers of
-    /// host code
+    /// continue an invocation after Status::Yielded or Status::Paused: the same as run(),
+    /// named for readers of host code
     pub fn resume(&mut self, host: &mut dyn Host, fuel: u64) -> Status {
         self.run(host, fuel)
     }
@@ -475,9 +568,10 @@ impl Vm {
         core::mem::take(&mut self.out)
     }
 
-    /// a global of the script, or the value the host gave a host name
+    /// a global of the script (not of its modules), or the value the host gave a host name
     pub fn global(&self, name: &str) -> Option<Value> {
-        if let Some(i) = self.code.globals.iter().position(|g| g == name) {
+        let n = self.units[0].gcount as usize;
+        if let Some(i) = self.code.globals[..n].iter().position(|g| g == name) {
             return Some(self.globals[i]);
         }
         let i = self.code.hosts.iter().position(|h| h.name == name)?;
@@ -485,22 +579,30 @@ impl Vm {
     }
 
     /// set a global of the script, or give a name the script takes from the host a value (a
-    /// map for config, say); false when the script uses no such name
+    /// map for config, say); false when the script uses no such name.  The value of a host
+    /// name holds for the modules the script imports too, also for one the script itself does
+    /// not use (false then, the value is kept).
     pub fn set_global(&mut self, name: &str, v: Value) -> bool {
         if !self.valid(v) {
             return false;
         }
-        if let Some(i) = self.code.globals.iter().position(|g| g == name) {
+        let n = self.units[0].gcount as usize;
+        if let Some(i) = self.code.globals[..n].iter().position(|g| g == name) {
             self.globals[i] = v;
             return true;
         }
-        match self.code.hosts.iter().position(|h| h.name == name && h.dotted.is_none()) {
-            Some(i) => {
-                self.hostv[i] = Some(v);
-                true
+        let used = self.code.hosts.iter().position(|h| h.name == name && h.dotted.is_none());
+        let i = match used {
+            Some(i) => i,
+            None if name.contains('.') => return false,
+            None => {
+                // a name of the host for the modules: kept as a native's value
+                let Value::Native(i) = self.native(name) else { return false };
+                i as usize
             }
-            None => false,
-        }
+        };
+        self.hostv[i] = Some(v);
+        used.is_some()
     }
 
     // ---- values for hosts
@@ -677,6 +779,7 @@ impl Vm {
             return Value::Native(i as u32);
         }
         self.natives.push((Arc::from(name), builtin_of(name)));
+        self.hostv.resize(self.natives.len(), None);
         Value::Native(self.natives.len() as u32 - 1)
     }
 
@@ -768,7 +871,9 @@ impl Vm {
     pub fn collect(&mut self) {
         let mut gray: Vec<u32> = Vec::new();
         let roots = self.stack.iter().chain(self.globals.iter()).chain(self.hostv.iter().flatten()).chain(self.pins.iter().flatten());
-        for v in roots.chain(core::iter::once(&self.result)) {
+        // the modules' constants and maps
+        let modules = self.consts[self.kperm as usize..].iter().chain(self.units.iter().filter_map(|u| u.map.as_ref()));
+        for v in roots.chain(modules).chain(core::iter::once(&self.result)) {
             self.heap.mark(*v, &mut gray);
         }
         for r in &self.nroots {
@@ -830,7 +935,7 @@ impl Vm {
     // ---- errors
 
     fn abort(&mut self) {
-        self.frames.clear();
+        self.drop_frames(0);
         self.stack.clear();
         self.nroots.clear();
         self.in_native = false;
@@ -839,43 +944,59 @@ impl Vm {
         self.nest = 0;
         self.fatal_kind = None;
         self.escaped = None;
+        if let Some(d) = self.dbg.as_deref_mut() {
+            d.invocation_ends();
+        }
+    }
+
+    /// cut the frames down to `keep`: a module whose top-level code is cut off failed
+    /// (module.rs: the next import runs it again)
+    pub(crate) fn drop_frames(&mut self, keep: usize) {
+        for f in self.frames.iter().skip(keep) {
+            if f.closure.is_none() && f.proto != 0 {
+                let u = self.code.protos[f.proto as usize].unit as usize;
+                self.units[u].state = UnitState::Failed;
+            }
+        }
+        self.frames.truncate(keep);
     }
 
     /// the position in every frame, innermost first
-    fn trace(&self, code: &Code) -> Vec<TraceLine> {
+    pub(crate) fn trace(&self) -> Vec<TraceLine> {
         let mut trace = Vec::new();
         for f in self.frames.iter().rev() {
-            let p = &code.protos[f.proto as usize];
+            let p = &self.code.protos[f.proto as usize];
             let at = (f.pc as usize).saturating_sub(1).min(p.pos.len().saturating_sub(1));
             let (line, col) = p.pos.get(at).copied().unwrap_or((0, 0));
-            trace.push(TraceLine { func: p.name.clone(), line, col });
+            let file = self.units[p.unit as usize].path.clone();
+            trace.push(TraceLine { func: p.name.clone(), file, line, col });
         }
         trace
     }
 
     /// an Error at the current instruction, with the trace of all frames
-    fn error_here(&self, code: &Code, kind: ErrorKind, msg: String) -> Error {
-        let trace = self.trace(code);
-        let (line, col) = trace.first().map_or((0, 0), |t| (t.line, t.col));
-        Error { kind, msg, line, col, trace }
+    fn error_here(&self, kind: ErrorKind, msg: String) -> Error {
+        let trace = self.trace();
+        let (file, line, col) = trace.first().map_or((String::new(), 0, 0), |t| (t.file.clone(), t.line, t.col));
+        Error { kind, msg, file, line, col, trace }
     }
 
     /// the Error of an exception (Some) or a fatal error (None) nothing caught: where it left a
     /// callback when it came from one, else at the current instruction
-    fn located(&mut self, code: &Code, v: Option<Value>, kind: ErrorKind, msg: String) -> Error {
+    fn located(&mut self, v: Option<Value>, kind: ErrorKind, msg: String) -> Error {
         match self.escaped.take() {
-            Some((ev, trace)) if ev == v && !trace.is_empty() => {
-                let (line, col) = (trace[0].line, trace[0].col);
-                Error { kind, msg, line, col, trace }
+            Some((ev, trace, own)) if ev == v && !trace.is_empty() => {
+                let (file, line, col) = (trace[0].file.clone(), trace[0].line, trace[0].col);
+                Error { kind, msg: own.unwrap_or(msg), file, line, col, trace }
             }
-            _ => self.error_here(code, kind, msg),
+            _ => self.error_here(kind, msg),
         }
     }
 
     /// note where an exception or a fatal error leaves a callback (the innermost one wins)
-    fn escape(&mut self, code: &Code, v: Option<Value>) {
-        if !self.escaped.as_ref().is_some_and(|(ev, _)| *ev == v) {
-            self.escaped = Some((v, self.trace(code)));
+    fn escape(&mut self, v: Option<Value>) {
+        if !self.escaped.as_ref().is_some_and(|(ev, _, _)| *ev == v) {
+            self.escaped = Some((v, self.trace(), None));
         }
     }
 
@@ -890,13 +1011,13 @@ impl Vm {
 
     /// throw v to the innermost handler around the current instruction of a frame above the
     /// floor; false when there is none (the frames stay)
-    fn unwind(&mut self, code: &Code, v: Value) -> bool {
+    fn unwind(&mut self, v: Value) -> bool {
         for fi in (self.floor..self.frames.len()).rev() {
             let f = self.frames[fi];
             let at = f.pc.saturating_sub(1);
-            let p = &code.protos[f.proto as usize];
-            if let Some(h) = p.handlers.iter().find(|h| h.start <= at && at < h.end) {
-                self.frames.truncate(fi + 1);
+            let p = &self.code.protos[f.proto as usize];
+            if let Some(h) = p.handlers.iter().find(|h| h.start <= at && at < h.end).copied() {
+                self.drop_frames(fi + 1);
                 self.frames[fi].pc = h.target;
                 self.stack.truncate((f.base + h.height) as usize);
                 self.stack.push(v);
@@ -907,12 +1028,12 @@ impl Vm {
     }
 
     /// an exception of the invocation: caught by a handler, or the Error that ends it
-    fn catch(&mut self, code: &Code, e: Exc) -> Result<(), Error> {
+    fn catch(&mut self, e: Exc) -> Result<(), Error> {
         let v = match self.thrown(e) {
             Ok(v) => v,
-            Err((kind, m)) => return Err(self.located(code, None, kind, m)),
+            Err((kind, m)) => return Err(self.located(None, kind, m)),
         };
-        if self.unwind(code, v) {
+        if self.unwind(v) {
             self.escaped = None;
             return Ok(());
         }
@@ -920,7 +1041,7 @@ impl Vm {
             Value::Str(r) => String::from(heap::text(&self.heap, r)),
             _ => self.display(v),
         };
-        Err(self.located(code, Some(v), ErrorKind::Uncaught, m))
+        Err(self.located(Some(v), ErrorKind::Uncaught, m))
     }
 
     /// Cx::call: run f with args to its end inside a native; its result, or the exception it
@@ -933,7 +1054,6 @@ impl Vm {
         if !self.valid(f) || !args.iter().all(|a| self.valid(*a)) {
             return Err(Fail::Fatal(String::from("Ungültiger Wert für Cx::call")));
         }
-        let code = self.code.clone();
         let (fpos, entry) = (self.stack.len(), self.frames.len());
         self.stack.push(f);
         self.stack.extend_from_slice(args);
@@ -941,10 +1061,10 @@ impl Vm {
         self.floor = entry;
         self.in_native = false;
         self.nest += 1;
-        let r = self.nested_run(&code, host, f, fpos, args.len());
+        let r = self.nested_run(host, f, fpos, args.len());
         self.nest -= 1;
         (self.floor, self.in_native) = saved;
-        self.frames.truncate(entry);
+        self.drop_frames(entry);
         self.stack.truncate(fpos);
         // the native may allocate before it returns the value
         if let Ok(v) | Err(Fail::Throw(v)) = &r {
@@ -955,13 +1075,18 @@ impl Vm {
         r
     }
 
-    fn nested_run(&mut self, code: &Code, host: &mut dyn Host, f: Value, fpos: usize, argc: usize) -> Result<Value, Fail> {
+    fn nested_run(&mut self, host: &mut dyn Host, f: Value, fpos: usize, argc: usize) -> Result<Value, Fail> {
         let mut res: Result<Status, Exc> = match f {
-            Value::Func(r) => match self.push_frame(code, r, fpos, argc) {
-                Ok(()) => self.exec(code, host, u64::MAX),
+            Value::Func(r) => match self.push_frame(&self.code.clone(), r, fpos, argc) {
+                Ok(_) => self.exec(host, u64::MAX),
                 Err(e) => Err(e),
             },
-            Value::Native(i) => self.call_native(host, i, fpos + 1, fpos).map(|_| Status::Done(self.stack[fpos])),
+            Value::Native(i) => match self.call_native(host, i, fpos + 1, fpos) {
+                Ok(Called::Native) => Ok(Status::Done(self.stack[fpos])),
+                // import runs a module's code
+                Ok(_) => self.exec(host, u64::MAX),
+                Err(e) => Err(e),
+            },
             v => msg(format!("{} ist keine Funktion", v.type_name())),
         };
         let mut yielded = false;
@@ -971,10 +1096,14 @@ impl Vm {
                     self.yield_req |= yielded;
                     return Ok(v);
                 }
-                Ok(Status::Yielded) => {
+                Ok(Status::Yielded) if self.relink => {
+                    res = self.exec(host, u64::MAX);
+                    continue;
+                }
+                Ok(Status::Yielded | Status::Paused(_)) => {
                     // a native asked to yield: that happens after the outer call
                     yielded = true;
-                    res = self.exec(code, host, u64::MAX);
+                    res = self.exec(host, u64::MAX);
                     continue;
                 }
                 Ok(Status::Error(e)) => return Err(Fail::Fatal(e.msg)),
@@ -983,33 +1112,41 @@ impl Vm {
             match self.thrown(e) {
                 Err((kind, m)) => {
                     self.fatal_kind = Some(kind);
-                    self.escape(code, None);
+                    self.escape(None);
                     return Err(Fail::Fatal(m));
                 }
                 Ok(v) => {
-                    if !self.unwind(code, v) {
-                        self.escape(code, Some(v));
+                    if !self.unwind(v) {
+                        self.escape(Some(v));
                         return Err(Fail::Throw(v));
                     }
                     self.escaped = None;
                 }
             }
-            res = self.exec(code, host, u64::MAX);
+            res = self.exec(host, u64::MAX);
         }
     }
 
     // ---- calls
 
-    fn push_frame(&mut self, code: &Code, r: Ref, fpos: usize, argc: usize) -> Result<(), Exc> {
+    /// code: the code exec holds (a function of a module linked after it is in self.code:
+    /// NewCode)
+    fn push_frame(&mut self, code: &Code, r: Ref, fpos: usize, argc: usize) -> Result<Called, Exc> {
         let proto = self.heap.closure(r).proto;
-        let p = &code.protos[proto as usize];
+        let (params, need, called) = match code.protos.get(proto as usize) {
+            Some(p) => (p.params, p.max_stack, Called::Frame),
+            None => {
+                let p = &self.code.protos[proto as usize];
+                (p.params, p.max_stack, Called::NewCode)
+            }
+        };
         if self.frames.len() as u32 >= self.lim.depth {
             let m = format!("Zu viele Aufrufe ineinander (mehr als {}) – endet die Rekursion?", self.lim.depth);
             return Err(Exc::Fatal(ErrorKind::Depth, m));
         }
         let base = fpos + 1;
-        let want = p.params as usize;
-        if base + p.max_stack as usize + 4 > self.lim.stack as usize {
+        let want = params as usize;
+        if base + need as usize + 4 > self.lim.stack as usize {
             return Err(Exc::Fatal(ErrorKind::Stack, format!("Der Stapel ist voll (mehr als {} Werte)", self.lim.stack)));
         }
         if argc < want {
@@ -1018,34 +1155,35 @@ impl Vm {
             self.stack.truncate(base + want);
         }
         self.frames.push(Frame { proto, closure: Some(r), base: base as u32, pc: 0 });
-        Ok(())
+        Ok(called)
     }
 
-    /// call the value at stack[fpos] with the argc values above it: true when a frame was
-    /// pushed, false when a native ran (its result replaced callee and arguments)
-    fn call_at(&mut self, code: &Code, host: &mut dyn Host, fpos: usize, argc: usize) -> Result<bool, Exc> {
+    /// call the value at stack[fpos] with the argc values above it: a frame was pushed, or a
+    /// native ran (its result replaced callee and arguments)
+    fn call_at(&mut self, code: &Code, host: &mut dyn Host, fpos: usize, argc: usize) -> Result<Called, Exc> {
         match self.stack[fpos] {
-            Value::Func(r) => {
-                self.push_frame(code, r, fpos, argc)?;
-                Ok(true)
-            }
-            Value::Native(i) => {
-                self.call_native(host, i, fpos + 1, fpos)?;
-                Ok(false)
-            }
+            Value::Func(r) => self.push_frame(code, r, fpos, argc),
+            Value::Native(i) => self.call_native(host, i, fpos + 1, fpos),
             v => msg(format!("{} ist keine Funktion", v.type_name())),
         }
     }
 
     /// run native i with the stack values from `from` on; its result replaces the stack from
-    /// `to` on
-    fn call_native(&mut self, host: &mut dyn Host, i: u32, from: usize, to: usize) -> Result<(), Exc> {
+    /// `to` on.  NewCode when it pushed a frame instead (import runs a module's code; the
+    /// frame's value lands at `to`)
+    fn call_native(&mut self, host: &mut dyn Host, i: u32, from: usize, to: usize) -> Result<Called, Exc> {
         let (name, b) = self.natives[i as usize].clone();
         let mut args = core::mem::take(&mut self.scratch);
         args.clear();
         args.extend_from_slice(&self.stack[from..]);
         let r = match b {
             Some(Builtin::Lib(f)) => self.lib_call(host, f, &args),
+            Some(Builtin::Import) => {
+                let r = self.import(host, &args, to);
+                args.clear();
+                self.scratch = args;
+                return r.map(|pushed| if pushed { Called::NewCode } else { Called::Native });
+            }
             Some(b) => self.builtin(b, &args),
             None => self.host_call(host, &name, &args, None),
         };
@@ -1054,7 +1192,7 @@ impl Vm {
         let v = r?;
         self.stack.truncate(to);
         self.stack.push(v);
-        Ok(())
+        Ok(Called::Native)
     }
 
     fn host_call(&mut self, host: &mut dyn Host, name: &str, args: &[Value], method: Option<(&str, &str)>) -> Result<Value, Exc> {
@@ -1097,7 +1235,7 @@ impl Vm {
     }
 
     /// obj.name(args) with obj and the argc arguments on the stack (name: constant k)
-    fn method(&mut self, code: &Code, host: &mut dyn Host, k: u32, argc: usize) -> Result<bool, Exc> {
+    fn method(&mut self, code: &Code, host: &mut dyn Host, k: u32, argc: usize) -> Result<Called, Exc> {
         let opos = self.stack.len() - argc - 1;
         let obj = self.stack[opos];
         let Const::Str(name) = &code.consts[k as usize] else { return internal() };
@@ -1139,11 +1277,14 @@ impl Vm {
         };
         self.stack.truncate(opos);
         self.stack.push(v);
-        Ok(false)
+        Ok(Called::Native)
     }
 
     // ---- built-in functions
 
+    // (builtin, arith, compare, concat and get_index have one caller each, exec or
+    // call_native, and LLVM inlines them there: a second caller -- debug.rs's evaluator at
+    // first -- cost the VM about 10 % of its speed, inline(always) about 5 %)
     fn builtin(&mut self, b: Builtin, args: &[Value]) -> Result<Value, Exc> {
         let a = args.first().copied().unwrap_or(Value::Nil);
         match b {
@@ -1217,13 +1358,24 @@ impl Vm {
                 v => msg(format!("float(…) braucht eine Zahl oder einen Text, nicht {}", v.type_name())),
             },
             // call_native runs these with the host
-            Builtin::Lib(_) => internal(),
+            Builtin::Lib(_) | Builtin::Import => internal(),
         }
     }
 
     // ---- the instruction loop
 
-    fn exec(&mut self, code: &Code, host: &mut dyn Host, fuel: u64) -> Result<Status, Exc> {
+    /// the instructions of the pending invocation until `fuel` is used, it ends or a native
+    /// asks to yield (the debugger runs it one instruction at a time: debug.rs exec_debug)
+    pub(crate) fn exec(&mut self, host: &mut dyn Host, fuel: u64) -> Result<Status, Exc> {
+        // the code as it is now; a call that pushes a frame of code linked later (import here
+        // or in a callback of a native) sets relink, and exec returns Yielded with relink
+        // still set: its caller calls it again, with the new code (Yielded then is no yield)
+        let linked = self.code.clone();
+        self.relink = false;
+        self.exec_code(&linked, host, fuel)
+    }
+
+    fn exec_code(&mut self, code: &Code, host: &mut dyn Host, fuel: u64) -> Result<Status, Exc> {
         'frame: loop {
             let fi = self.frames.len() - 1;
             let fr = self.frames[fi];
@@ -1427,8 +1579,12 @@ impl Vm {
                         self.frames[fi].pc = pc as u32;
                         let fpos = self.stack.len() - argc as usize - 1;
                         match self.call_at(code, host, fpos, argc as usize) {
-                            Ok(true) => continue 'frame,
-                            Ok(false) => Ok(()),
+                            Ok(Called::Frame) => continue 'frame,
+                            Ok(Called::Native) => Ok(()),
+                            Ok(Called::NewCode) => {
+                                self.relink = true;
+                                return Ok(Status::Yielded);
+                            }
                             Err(e) => Err(e),
                         }
                     }
@@ -1440,19 +1596,27 @@ impl Vm {
                                 self.stack.insert(at, v);
                                 self.call_at(code, host, at, argc as usize)
                             }
-                            None => self.call_native(host, h, at, at).map(|_| false),
+                            None => self.call_native(host, h, at, at),
                         };
                         match r {
-                            Ok(true) => continue 'frame,
-                            Ok(false) => Ok(()),
+                            Ok(Called::Frame) => continue 'frame,
+                            Ok(Called::Native) => Ok(()),
+                            Ok(Called::NewCode) => {
+                                self.relink = true;
+                                return Ok(Status::Yielded);
+                            }
                             Err(e) => Err(e),
                         }
                     }
                     Op::CallMethod(k, argc) => {
                         self.frames[fi].pc = pc as u32;
                         match self.method(code, host, k, argc as usize) {
-                            Ok(true) => continue 'frame,
-                            Ok(false) => Ok(()),
+                            Ok(Called::Frame) => continue 'frame,
+                            Ok(Called::Native) => Ok(()),
+                            Ok(Called::NewCode) => {
+                                self.relink = true;
+                                return Ok(Status::Yielded);
+                            }
                             Err(e) => Err(e),
                         }
                     }
@@ -1465,13 +1629,17 @@ impl Vm {
                                     self.stack.insert(at, v);
                                     self.method(code, host, k, argc as usize)
                                 }
-                                None => self.call_native(host, h, at, at).map(|_| false),
+                                None => self.call_native(host, h, at, at),
                             },
                             None => internal(),
                         };
                         match r {
-                            Ok(true) => continue 'frame,
-                            Ok(false) => Ok(()),
+                            Ok(Called::Frame) => continue 'frame,
+                            Ok(Called::Native) => Ok(()),
+                            Ok(Called::NewCode) => {
+                                self.relink = true;
+                                return Ok(Status::Yielded);
+                            }
                             Err(e) => Err(e),
                         }
                     }
@@ -1479,6 +1647,24 @@ impl Vm {
                         let v = self.stack.pop().unwrap_or(Value::Nil);
                         let f = self.frames.pop().expect("frame");
                         self.stack.truncate(f.base as usize - 1);
+                        if self.frames.len() <= self.floor {
+                            return Ok(Status::Done(v));
+                        }
+                        self.stack.push(v);
+                        continue 'frame;
+                    }
+                    Op::EndModule => {
+                        // a module's top-level code ended: import gives its map
+                        self.stack.pop();
+                        let f = self.frames.pop().expect("frame");
+                        self.stack.truncate(f.base as usize - 1);
+                        let v = match self.module_done(f.proto) {
+                            Ok(m) => m,
+                            Err(e) => {
+                                self.stack.push(Value::Nil);
+                                return Err(e);
+                            }
+                        };
                         if self.frames.len() <= self.floor {
                             return Ok(Status::Done(v));
                         }
@@ -1520,6 +1706,7 @@ impl Vm {
                 }
                 if self.yield_req {
                     self.yield_req = false;
+                    self.native_yield = true;
                     self.frames[fi].pc = pc as u32;
                     return Ok(Status::Yielded);
                 }
@@ -1716,7 +1903,7 @@ impl Vm {
     }
 
     /// m[k] = v for a map m
-    fn set_key(&mut self, m: Value, k: Value, v: Value) -> Result<(), Exc> {
+    pub(crate) fn set_key(&mut self, m: Value, k: Value, v: Value) -> Result<(), Exc> {
         let Value::Map(r) = m else { return msg(format!("{} ist keine Map", m.type_name())) };
         if self.heap.key(k).is_none() {
             return key_error(k);
@@ -1973,7 +2160,7 @@ impl Vm {
 
 /// the context of a native function: values, allocation, fuel, yielding
 pub struct Cx<'a> {
-    vm: &'a mut Vm,
+    pub(crate) vm: &'a mut Vm,
 }
 
 impl Cx<'_> {
@@ -2189,7 +2376,7 @@ impl Cx<'_> {
 }
 
 fn usage(msg: String) -> Error {
-    Error { kind: ErrorKind::Usage, msg, line: 0, col: 0, trace: Vec::new() }
+    Error { kind: ErrorKind::Usage, msg, file: String::new(), line: 0, col: 0, trace: Vec::new() }
 }
 
 fn invalid() -> Error {
@@ -2198,9 +2385,9 @@ fn invalid() -> Error {
 
 fn plain(e: Exc) -> Error {
     match e {
-        Exc::Msg(m) => Error { kind: ErrorKind::Uncaught, msg: m, line: 0, col: 0, trace: Vec::new() },
+        Exc::Msg(m) => Error { kind: ErrorKind::Uncaught, msg: m, file: String::new(), line: 0, col: 0, trace: Vec::new() },
         Exc::Throw(_) => usage(String::from("Ausnahme")),
-        Exc::Fatal(kind, m) => Error { kind, msg: m, line: 0, col: 0, trace: Vec::new() },
+        Exc::Fatal(kind, m) => Error { kind, msg: m, file: String::new(), line: 0, col: 0, trace: Vec::new() },
     }
 }
 

@@ -295,6 +295,8 @@ fn runtime_marks(run_src: &str, doc: &CodeDoc, errs: &[ScriptErr]) -> Vec<Diag> 
     let run: Vec<&str> = run_src.lines().collect();
     let now = doc.lines();
     errs.iter()
+        // an error in a file the script imports has no place in this text
+        .filter(|e| e.file.is_empty())
         .filter_map(|e| {
             let line = map_line(&run, now, e.line as usize)?;
             let (a, b) = word_at(&now[line - 1], e.col as usize);

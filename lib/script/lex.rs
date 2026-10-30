@@ -183,7 +183,7 @@ impl Lexer<'_> {
     }
 
     fn error(&mut self, line: u32, col: u32, end_col: u32, msg: String) {
-        self.diags.push(Diagnostic { line, col, end_col: end_col.max(col + 1), error: true, msg });
+        self.diags.push(Diagnostic { line, col, end_col: end_col.max(col + 1), error: true, msg, file: String::new() });
     }
 
     /// strings still open at a line end or the end of the source

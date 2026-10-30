@@ -1,0 +1,2 @@
+// a cycle of imports is an error that names the chain
+import("mod/cyc_a.jfs")

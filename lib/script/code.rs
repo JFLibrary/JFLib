@@ -7,11 +7,16 @@
 //             the enclosing closure).
 //   Proto     a function: code, the line and column of every instruction, the exception
 //             table (try ranges with their handler and stack height), the upvalue sources,
-//             the most stack it needs
+//             the most stack it needs; for the debugger the statements' first instructions
+//             with their lines, the named locals with their slots and ranges, the upvalues'
+//             names and the module (unit) it belongs to
 //   Program   what compile() returns: functions (0 is the top-level code), constants, the
 //             names of the globals and of the host names the script uses; cheap to clone
 //             (shared), Send + Sync
 //   disasm()  the code as text, for tests and debugging
+//   line_table() / break_lines() / functions()   the line table: every instruction's
+//             function, line and column (the file is Program::name) and whether a statement
+//             starts there; the lines a breakpoint can stop at; the functions' names
 
 use alloc::format;
 use alloc::string::String;
@@ -122,6 +127,9 @@ pub(crate) enum Op {
     RangePrep(u32),
     /// +1: the next number of the range in slot b, or jump to the end
     RangeNext(u32, u32),
+    /// -1: the Return at the end of a module's top-level code (module.rs puts it there when
+    /// it links the module): import's call gets the module's map instead of the value
+    EndModule,
 }
 
 impl Op {
@@ -134,7 +142,7 @@ impl Op {
             Dup2 | IterNext2(..) => 2,
             Reserve(n) => n as i32,
             PopN(n) => -(n as i32),
-            Pop | SetLocal(_) | SetCell(_) | SetUp(_) | SetGlobal(_) | AssignHost(_) | JumpIfFalse(_) | Return | Throw
+            Pop | SetLocal(_) | SetCell(_) | SetUp(_) | SetGlobal(_) | AssignHost(_) | JumpIfFalse(_) | Return | EndModule | Throw
             | Add | Sub | Mul | Div | Rem | Eq | Ne | Lt | Le | Gt | Ge | And(_) | Or(_) | Coalesce(_) | GetIndex => -1,
             NewCell(_) | BoxLocal(_) | Neg | Not | Jump(_) | GetField(_) | IterPrep(_) | RangePrep(_) => 0,
             Concat(n) | MakeList(n) => 1 - n as i32,
@@ -165,6 +173,16 @@ pub(crate) enum Up {
     Up(u32),
 }
 
+/// a named local of a function: its slot and the instructions from..to (to exclusive) where
+/// it is visible (the debugger's locals)
+#[derive(Clone, Debug)]
+pub(crate) struct Var {
+    pub name: String,
+    pub slot: u32,
+    pub from: u32,
+    pub to: u32,
+}
+
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Proto {
     /// the name for stack traces ("" for the top-level code, "fn" for anonymous functions)
@@ -177,6 +195,22 @@ pub(crate) struct Proto {
     pub ups: Vec<Up>,
     /// the most slots the function uses (parameters, locals, temporaries)
     pub max_stack: u32,
+    /// (pc, line) of the statements' first instructions in code order -- only the first
+    /// statement of a line, and the head of a for loop (each round): where the debugger stops
+    pub stmts: Vec<(u32, u32)>,
+    /// the named locals in the order of their declaration
+    pub vars: Vec<Var>,
+    /// the names of the upvalues (as ups)
+    pub up_names: Vec<String>,
+    /// the module the function belongs to: 0 in a Program, the unit in a VM's linked code
+    pub unit: u32,
+}
+
+impl Proto {
+    /// the line of the statement that starts at pc
+    pub fn stmt_line(&self, pc: u32) -> Option<u32> {
+        self.stmts.binary_search_by_key(&pc, |s| s.0).ok().map(|i| self.stmts[i].1)
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -195,13 +229,29 @@ pub(crate) struct HostName {
     pub dotted: Option<(u32, u32)>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Code {
     pub name: String,
     pub protos: Vec<Proto>,
     pub consts: Vec<Const>,
     pub globals: Vec<String>,
     pub hosts: Vec<HostName>,
+    /// the host's names when compile_with made it (None: compile, compile_named); the
+    /// modules a script imports compile the same way
+    pub strict: Option<Vec<String>>,
+}
+
+/// where an instruction is in the source (Program::line_table); the file is Program::name
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct LineEntry {
+    /// the function (0: the top-level code; Program::functions has the names)
+    pub func: u32,
+    /// the instruction's index in its function
+    pub pc: u32,
+    pub line: u32,
+    pub col: u32,
+    /// a statement starts here: stepping stops here, and a breakpoint of the line
+    pub stmt: bool,
 }
 
 /// a compiled script (see compile()); clones share the code
@@ -229,6 +279,33 @@ impl Program {
     /// the number of instructions of all functions
     pub fn instructions(&self) -> usize {
         self.code.protos.iter().map(|p| p.code.len()).sum()
+    }
+
+    /// every instruction of every function in order, with its line and column
+    pub fn line_table(&self) -> Vec<LineEntry> {
+        let mut v = Vec::with_capacity(self.instructions());
+        for (f, p) in self.code.protos.iter().enumerate() {
+            for (pc, &(line, col)) in p.pos.iter().enumerate() {
+                let stmt = p.stmt_line(pc as u32).is_some();
+                v.push(LineEntry { func: f as u32, pc: pc as u32, line, col, stmt });
+            }
+        }
+        v
+    }
+
+    /// the lines where a statement starts, sorted: a breakpoint stops there (one on another
+    /// line at the next of these)
+    pub fn break_lines(&self) -> Vec<u32> {
+        let mut v: Vec<u32> = self.code.protos.iter().flat_map(|p| p.stmts.iter().map(|s| s.1)).collect();
+        v.sort_unstable();
+        v.dedup();
+        v
+    }
+
+    /// the functions' names by their number in line_table ("" for the top-level code, "fn"
+    /// for anonymous ones)
+    pub fn functions(&self) -> Vec<&str> {
+        self.code.protos.iter().map(|p| p.name.as_str()).collect()
     }
 
     /// the code as text: per function a header, then "pc line:col instruction"

@@ -18,6 +18,13 @@
 // table (protected range, handler, stack height); entries of inner trys come first.  Every
 // instruction gets the line and column of its source: operators the position of the operator,
 // fields and methods the position of the name, calls the start of the callee.
+//
+// For the debugger every function also gets its statement starts (the first instruction of
+// every statement but fn declarations, try and blocks, which have none of their own; of a
+// line only its first statement; for loops at their head, which runs each round, while loops
+// at their condition), its named locals with their slots and the instructions where they are
+// visible (a let from the instruction after its store to the end of its block, parameters
+// everywhere) and the names of its upvalues.
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::format;
@@ -26,7 +33,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::ast::*;
-use crate::code::{Code, Const, Handler, HostName, Op, Proto, Up};
+use crate::code::{Code, Const, Handler, HostName, Op, Proto, Up, Var};
 
 // ---- analysis
 
@@ -239,6 +246,8 @@ struct FnState {
     /// the height with temporaries, as the instructions so far leave it
     height: u32,
     loops: Vec<Loop>,
+    /// declaration -> its entry in p.vars
+    var_of: BTreeMap<u32, usize>,
 }
 
 struct Gen<'a> {
@@ -246,6 +255,8 @@ struct Gen<'a> {
     /// byte offset of every line start
     lines: Vec<u32>,
     an: Analysis,
+    /// declaration -> its name (the debugger's locals and upvalues)
+    names: BTreeMap<u32, String>,
     consts: Vec<Const>,
     kstr: BTreeMap<String, u32>,
     kint: BTreeMap<i64, u32>,
@@ -268,6 +279,7 @@ pub(crate) fn generate(prog: &Program, src: &str) -> Code {
         src,
         lines,
         an: analyze(prog),
+        names: BTreeMap::new(),
         consts: Vec::new(),
         kstr: BTreeMap::new(),
         kint: BTreeMap::new(),
@@ -279,12 +291,12 @@ pub(crate) fn generate(prog: &Program, src: &str) -> Code {
     };
     g.main(prog);
     let globals = core::mem::take(&mut g.an.globals);
-    Code { name: prog.name.clone(), protos: g.protos, consts: g.consts, globals, hosts: g.hosts }
+    Code { name: prog.name.clone(), protos: g.protos, consts: g.consts, globals, hosts: g.hosts, strict: None }
 }
 
 fn new_fn(name: String, params: u32) -> FnState {
     let p = Proto { name, params, ..Proto::default() };
-    FnState { p, slots: BTreeMap::new(), ups: Vec::new(), locals: 0, height: 0, loops: Vec::new() }
+    FnState { p, slots: BTreeMap::new(), ups: Vec::new(), locals: 0, height: 0, loops: Vec::new(), var_of: BTreeMap::new() }
 }
 
 impl Gen<'_> {
@@ -339,6 +351,38 @@ impl Gen<'_> {
 
     fn here(&mut self) -> u32 {
         self.f().p.code.len() as u32
+    }
+
+    /// a statement of `line` starts at the next instruction (the first of its line counts)
+    fn mark_stmt(&mut self, line: u32) {
+        let pc = self.here();
+        let p = &mut self.f().p;
+        if p.stmts.last().is_none_or(|s| s.1 != line && s.0 != pc) {
+            p.stmts.push((pc, line));
+        }
+    }
+
+    /// a named local of the function from the next instruction on (to: open until var_end)
+    fn var_start(&mut self, decl: u32) {
+        let from = self.here();
+        let f = self.fns.last_mut().expect("a function");
+        let (Some(&slot), Some(name)) = (f.slots.get(&decl), self.names.get(&decl)) else { return };
+        match f.var_of.get(&decl) {
+            Some(&i) => f.p.vars[i].from = from,
+            None => {
+                f.var_of.insert(decl, f.p.vars.len());
+                f.p.vars.push(Var { name: name.clone(), slot, from, to: u32::MAX });
+            }
+        }
+    }
+
+    /// the local's range ends before the next instruction
+    fn var_end(&mut self, decl: u32) {
+        let to = self.here();
+        let f = self.f();
+        if let Some(&i) = f.var_of.get(&decl) {
+            f.p.vars[i].to = to;
+        }
     }
 
     /// point the jump at `at` to the next instruction
@@ -442,9 +486,11 @@ impl Gen<'_> {
             Some(&s) => Up::Local(s),
             None => Up::Up(self.upvalue(fi - 1, decl)),
         };
+        let name = self.names.get(&decl).cloned().unwrap_or_default();
         let f = &mut self.fns[fi];
         f.ups.push(decl);
         f.p.ups.push(src);
+        f.p.up_names.push(name);
         f.ups.len() as u32 - 1
     }
 
@@ -529,6 +575,7 @@ impl Gen<'_> {
         let Some(n) = &f.name else { return };
         self.closure(f, n.text.clone());
         self.store_decl(n.span.start, at);
+        self.var_start(n.span.start);
     }
 
     /// compile a function; its closure on the stack
@@ -542,7 +589,9 @@ impl Gen<'_> {
     fn function(&mut self, f: &FnDef, name: String) -> u32 {
         self.fns.push(new_fn(name, f.params.len() as u32));
         for p in &f.params {
+            self.names.insert(p.span.start, p.text.clone());
             self.declare(p.span.start);
+            self.var_start(p.span.start);
         }
         let n = f.params.len() as u32;
         let st = self.f();
@@ -558,6 +607,9 @@ impl Gen<'_> {
         let end = f.body.span.end.saturating_sub(1);
         self.emit(Op::Nil, end);
         self.emit(Op::Return, end);
+        for p in &f.params {
+            self.var_end(p.span.start);
+        }
         let st = self.fns.pop().expect("function");
         self.protos.push(st.p);
         self.protos.len() as u32 - 1
@@ -571,6 +623,7 @@ impl Gen<'_> {
         for s in &b.stmts {
             if let StmtKind::Let { name, .. } | StmtKind::Fn(FnDef { name: Some(name), .. }) = &s.kind {
                 decls.push(name.span.start);
+                self.names.insert(name.span.start, name.text.clone());
             }
         }
         for &d in &decls {
@@ -596,6 +649,9 @@ impl Gen<'_> {
                 self.stmt(s);
             }
         }
+        for &d in &decls {
+            self.var_end(d);
+        }
         if n > 0 {
             self.emit(Op::PopN(n), b.span.end.saturating_sub(1));
         }
@@ -606,6 +662,9 @@ impl Gen<'_> {
 
     fn stmt(&mut self, s: &Stmt) {
         let at = s.span.start;
+        if !matches!(s.kind, StmtKind::Fn(_) | StmtKind::Block(_) | StmtKind::Try { .. } | StmtKind::If { .. } | StmtKind::For { .. }) {
+            self.mark_stmt(s.span.line);
+        }
         match &s.kind {
             StmtKind::Let { name, init } => {
                 match init {
@@ -615,6 +674,7 @@ impl Gen<'_> {
                     }
                 }
                 self.store_decl(name.span.start, at);
+                self.var_start(name.span.start);
             }
             StmtKind::Fn(_) => {}
             StmtKind::If { arms, els } => self.if_stmt(arms, els.as_ref()),
@@ -648,6 +708,7 @@ impl Gen<'_> {
     fn if_stmt(&mut self, arms: &[(Expr, Block)], els: Option<&Block>) {
         let mut ends = Vec::new();
         for (i, (c, b)) in arms.iter().enumerate() {
+            self.mark_stmt(c.span.line);
             self.expr(c);
             let j = self.emit(Op::JumpIfFalse(0), c.span.start);
             self.block(b);
@@ -698,10 +759,16 @@ impl Gen<'_> {
             }
         };
         self.f().locals = base + hidden;
+        self.names.insert(a.span.start, a.text.clone());
+        if let Some(b) = b {
+            self.names.insert(b.span.start, b.text.clone());
+        }
         let sa = self.declare(a.span.start);
         let sb = b.map(|b| self.declare(b.span.start));
         self.emit(Op::Reserve(1 + sb.is_some() as u32), a.span.start);
         let top = self.here();
+        let line = self.pos(at).0;
+        self.mark_stmt(line);
         let next = match (src, sb) {
             (ForSrc::Range(..), _) => Op::RangeNext(base, 0),
             (_, Some(_)) => Op::IterNext2(base, 0),
@@ -719,6 +786,10 @@ impl Gen<'_> {
                 }
             }
         }
+        self.var_start(a.span.start);
+        if let Some(b) = b {
+            self.var_start(b.span.start);
+        }
         let height = self.f().locals;
         self.f().loops.push(Loop { cont: top, height, breaks: Vec::new() });
         self.block(body);
@@ -727,6 +798,10 @@ impl Gen<'_> {
         let lp = self.f().loops.pop().expect("loop");
         for b in lp.breaks {
             self.patch(b);
+        }
+        self.var_end(a.span.start);
+        if let Some(b) = b {
+            self.var_end(b.span.start);
         }
         let n = self.f().locals - base;
         self.emit(Op::PopN(n), body.span.end.saturating_sub(1));
@@ -770,8 +845,13 @@ impl Gen<'_> {
             if self.captured(v.span.start) {
                 self.emit(Op::BoxLocal(h), v.span.start);
             }
+            self.names.insert(v.span.start, v.text.clone());
+            self.var_start(v.span.start);
         }
         self.block(catch);
+        if let Some(v) = var {
+            self.var_end(v.span.start);
+        }
         self.emit(Op::PopN(1), catch.span.end.saturating_sub(1));
         self.f().locals = h;
         self.patch(j);

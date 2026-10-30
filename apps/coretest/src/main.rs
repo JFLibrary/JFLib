@@ -6,11 +6,13 @@
 // TFTP and FTP of netpkt::tftp and netpkt::ftp, BER, SNMP and the MIB of netpkt::ber, snmp and
 // mib, RADIUS and Telnet of netpkt::radius and netpkt::telnet): known-answer vectors, round
 // trips, edge cases.
-// The group mail checks netpkt::smtp, netpkt::pop3 and netpkt::imf (mailt.rs).
+// The group mail checks netpkt::smtp, netpkt::pop3 and netpkt::imf (mailt.rs); scriptmod the
+// modules, the debugger and the test functions of script (scriptmodt.rs).
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app coretest
 //   build/win/coretest.exe [--only NAME] [--bench] [--vectors FILE]  (FILE: tools/crypto_check.py)
+//   build/win/coretest.exe --bench vm   the script VM's benchmark alone (scriptmodt.rs)
 //   build/win/coretest.exe --math FILE  (FILE: tools/script_math_check.py)
 //   (build_rs.py test runs it through tests/all.uis; --script is ignored)
 #![no_std]
@@ -57,6 +59,7 @@ mod ftpt;
 mod mailt;
 mod snmpt;
 mod radiust;
+mod scriptmodt;
 
 /// the result collector of a check group
 pub struct T {
@@ -93,8 +96,13 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--math") {
         return scriptlibt::math_file(&f);
     }
+    if plat::arg_value("--bench").as_deref() == Some("vm") {
+        scriptmodt::bench();
+        return 0;
+    }
     if args.iter().any(|a| a == "--bench") {
         crypto::bench();
+        scriptmodt::bench();
         return 0;
     }
     if let Some(op) = plat::arg_value("--lz4") {
@@ -130,7 +138,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 35] = [
+    let groups: [(&'static str, fn(&mut T)); 36] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -166,6 +174,7 @@ fn run() -> i32 {
         ("mail", mailt::run),
         ("snmp", snmpt::run),
         ("radius", radiust::run),
+        ("scriptmod", scriptmodt::run),
     ];
     let mut failed = 0;
     let mut total = 0;

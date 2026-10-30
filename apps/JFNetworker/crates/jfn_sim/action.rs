@@ -76,6 +76,9 @@
 //                                                      communities, location, contact,
 //                                                      receivers, notifications, "no snmp-server"
 //                                                      (snmpd.rs)
+//   ScriptDebug                                        the debugger of a script service: stop,
+//                                                      go on, steps, breakpoints in virtual time
+//                                                      (scriptsvc.rs, DebugOp)
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -277,6 +280,8 @@ pub enum Action {
     MailFetch { dev: u32 },
     /// a change of an IOS-like device's SNMP agent ("snmp-server ...": snmpd.rs)
     Snmp { dev: u32, set: crate::snmpd::SnmpSet },
+    /// the debugger of a script service: stop, go on, a step, breakpoints (scriptsvc.rs)
+    ScriptDebug { dev: u32, svc: String, op: crate::scriptsvc::DebugOp },
 }
 
 /// why an action was refused (German text through Display)
@@ -663,6 +668,8 @@ impl Engine {
             Action::MailFetch { dev } => self.mail_job(dev, crate::mailc::MailJob::Fetch),
             // the SNMP agent of IOS-like devices (snmpd.rs)
             Action::Snmp { dev, set } => self.snmp_apply(dev, set),
+            // the debugger of a script (scriptsvc.rs)
+            Action::ScriptDebug { dev, svc, op } => self.script_debug(dev, &svc, op),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }

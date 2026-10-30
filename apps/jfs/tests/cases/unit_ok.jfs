@@ -1,0 +1,23 @@
+// tests: the functions test_*; each runs in a fresh VM after the top-level code
+let util = import("mod/util.jfs")
+let calls = []
+fn test_greet() {
+  assert_eq(util.greet("jfs"), "Hallo, jfs!")
+}
+fn test_fresh_globals() {
+  calls.push(1)
+  assert_eq(len(calls), 1, "jeder Test beginnt neu")
+}
+fn test_fresh_again() {
+  calls.push(2)
+  assert_eq(calls, [2])
+}
+fn test_timer() {
+  timer.after(1000, fn() {
+    assert(now() >= 1000, "die virtuelle Uhr")
+  })
+}
+fn helper() {
+  return 1
+}
+let test_data = [1, 2]

@@ -21,11 +21,21 @@
 //                        keeps them in a JSON object in FILE (written after every
 //                        invocation that changed them), else they live in memory
 //   net, dns, http, metrics   JFNetworker's: a catchable error
+//   import(path)         a module from the file system (Host::load): a relative path is
+//                        relative to the importing file; only .jfs files (PERMISSIONS)
 //
 // The program ends when no timer and no callback is left (or the clock passes --until): exit
-// code 0; an uncaught error or a limit ends it at once with the message, line and column and
-// the calls on stderr: 1.  Limits::fuel holds per invocation (the top-level code, each
-// callback), as in JFNetworker.
+// code 0; an uncaught error or a limit ends it at once with the message, file, line and
+// column and the calls on stderr: 1 (a call in another file than the error's names its file).
+// Limits::fuel holds per invocation (the top-level code, each callback), as in JFNetworker.
+//
+//   run(prog, opts, name, src)        a script with its event loop -> the exit code
+//   run_test(prog, opts, name, test)  --test: a fresh VM, the top-level code, the function
+//                                     `test`, then the event loop on the virtual clock (at
+//                                     most --until, 60 s without it); the output is kept for
+//                                     the report of a failure
+//   with a Debugger (debugger.rs) in Console: its breakpoints go into the VM, every stop
+//   (Status::Paused) asks it how to go on
 
 use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
 use alloc::format;
@@ -37,6 +47,7 @@ use core::ops::Bound;
 use base::rng::Pcg32;
 use script::{num, Cx, Error, Fail, Host, Pin, Program, Status, Value, Vm};
 
+use crate::debugger::{Debugger, Go};
 use crate::{err, excerpt, out, Opts};
 
 /// nanoseconds
@@ -88,6 +99,14 @@ pub struct Console {
     dirty: bool,
     /// log lines not yet written
     logs: String,
+    /// the modules' sources by their path (the excerpts of errors, the debugger's listing)
+    pub sources: BTreeMap<String, String>,
+    /// --test: print and log go here instead of stdout and stderr
+    capture: Option<String>,
+    /// --debug
+    pub debugger: Option<Debugger>,
+    /// the debugger's quit: the program ends now
+    quit: bool,
 }
 
 /// milliseconds (int or float, at least 0) as nanoseconds
@@ -145,6 +164,10 @@ impl Console {
             store: BTreeMap::new(),
             dirty: false,
             logs: String::new(),
+            sources: BTreeMap::new(),
+            capture: None,
+            debugger: None,
+            quit: false,
         }
     }
 
@@ -262,19 +285,25 @@ impl Console {
         Ok(Value::Nil)
     }
 
-    /// write what print and log produced: stdout first
+    /// write what print and log produced: stdout first (--test: into the capture)
     fn flush(&mut self, vm: &mut Vm) {
         let o = vm.take_output();
+        let logs = core::mem::take(&mut self.logs);
+        if let Some(c) = self.capture.as_mut() {
+            c.push_str(&o);
+            c.push_str(&logs);
+            return;
+        }
         if !o.is_empty() {
             out(&o);
         }
-        if !self.logs.is_empty() {
-            err(&core::mem::take(&mut self.logs));
+        if !logs.is_empty() {
+            err(&logs);
         }
     }
 
     /// the store of --disk FILE (a missing file is an empty store)
-    fn load(&mut self, vm: &mut Vm, file: &str) -> Result<(), String> {
+    fn load_disk(&mut self, vm: &mut Vm, file: &str) -> Result<(), String> {
         if plat::file_exists(file) == 0 {
             return Ok(());
         }
@@ -337,6 +366,24 @@ impl Host for Console {
 
     fn knows(&self, name: &str) -> bool {
         FUNCS.contains(&name)
+    }
+
+    /// import(path): a file of the file system (relative paths from the working directory;
+    /// the VM made them relative to the importing file already)
+    fn load(&mut self, _: &mut Cx, path: &str) -> Result<String, String> {
+        // (PERMISSIONS lets the runner read .jfs files for a script, nothing else)
+        if !path.to_ascii_lowercase().ends_with(".jfs") {
+            return Err(String::from("ein Modul ist eine .jfs-Datei"));
+        }
+        let Some(bytes) = plat::read_file(path) else {
+            return Err(String::from(if plat::file_exists(path) == 0 { "die Datei gibt es nicht" } else { "die Datei lässt sich nicht lesen" }));
+        };
+        let Ok(text) = String::from_utf8(bytes) else {
+            return Err(String::from("die Datei ist kein UTF-8-Text"));
+        };
+        let text = text.strip_prefix('\u{feff}').map(String::from).unwrap_or(text);
+        self.sources.insert(String::from(path), text.clone());
+        Ok(text)
     }
 }
 
@@ -412,7 +459,8 @@ fn disk_args(vm: &mut Vm, res: DiskOut) -> Result<Vec<Value>, Error> {
     })
 }
 
-/// run the pending invocation to its end, writing the output as it goes
+/// run the pending invocation to its end, writing the output as it goes; a stop of the
+/// debugger asks it how to go on (quit: the invocation is dropped, Console::quit)
 fn drive(vm: &mut Vm, host: &mut Console) -> Result<(), Error> {
     loop {
         let st = vm.run(host, SLICE);
@@ -420,78 +468,94 @@ fn drive(vm: &mut Vm, host: &mut Console) -> Result<(), Error> {
         match st {
             Status::Done(_) => return Ok(()),
             Status::Yielded => {}
+            Status::Paused(p) => {
+                let Some(mut d) = host.debugger.take() else { continue };
+                let go = d.stopped(vm, host, &p);
+                host.debugger = Some(d);
+                if go == Go::Quit {
+                    vm.cancel();
+                    host.quit = true;
+                    return Ok(());
+                }
+            }
             Status::Error(e) => return Err(e),
         }
     }
 }
 
-/// an error of the run on stderr: "FILE:LINE:COL: Fehler: ...", the line, the calls
-fn report(e: &Error, name: &str, src: &str) {
-    let mut s = if e.line > 0 { format!("{}:{}:{}: Fehler: {}\n", name, e.line, e.col, e.msg) } else { format!("{}: Fehler: {}\n", name, e.msg) };
-    excerpt(&mut s, src, e.line, e.col, e.col + 1);
+/// the name of a file for messages: the script's as it was given, a module's path
+fn shown<'a>(file: &'a str, main: &str, name: &'a str) -> &'a str {
+    if file.is_empty() || file == main { name } else { file }
+}
+
+/// an error of the run as text: "FILE:LINE:COL: Fehler: ...", the line, the calls (a call in
+/// another file names it)
+pub fn report_text(e: &Error, vm: &Vm, host: &Console, name: &str, src: &str) -> String {
+    let main = vm.modules().first().cloned().unwrap_or_default();
+    let file = shown(&e.file, &main, name);
+    let text = if file == name { src } else { host.sources.get(&e.file).map_or("", |s| s.as_str()) };
+    let mut s = if e.line > 0 { format!("{}:{}:{}: Fehler: {}\n", file, e.line, e.col, e.msg) } else { format!("{}: Fehler: {}\n", file, e.msg) };
+    excerpt(&mut s, text, e.line, e.col, e.col + 1);
     // a recursion's frames once, with their count
     let mut i = 0;
     while i < e.trace.len() {
         let t = &e.trace[i];
         let n = e.trace[i..].iter().take_while(|x| *x == t).count();
+        let at = if t.file == e.file { format!("{}:{}", t.line, t.col) } else { format!("{}:{}:{}", shown(&t.file, &main, name), t.line, t.col) };
         if t.func.is_empty() {
-            s.push_str(&format!("  im Hauptprogramm ({}:{})\n", t.line, t.col));
+            let what = if i + n == e.trace.len() { "im Hauptprogramm" } else { "im Modul" };
+            s.push_str(&format!("  {} ({})\n", what, at));
         } else {
-            s.push_str(&format!("  in {} ({}:{})\n", t.func, t.line, t.col));
+            s.push_str(&format!("  in {} ({})\n", t.func, at));
         }
         if n > 1 {
             s.push_str(&format!("  … dieselbe Zeile noch {}-mal\n", n - 1));
         }
         i += n;
     }
-    err(&s);
+    s
 }
 
-/// run a compiled script with its timers and callbacks -> the exit code
-pub fn run(prog: &Program, o: &Opts, name: &str, src: &str) -> i32 {
+/// a VM for the program with the console host: the --disk store, config, the debugger's
+/// breakpoints
+fn setup(prog: &Program, o: &Opts, name: &str, host: &mut Console) -> Result<Vm, String> {
     let mut vm = Vm::new(prog, o.limits);
-    let mut host = Console::new(o);
     if let Some(f) = &o.disk {
-        if let Err(m) = host.load(&mut vm, f) {
-            err(&format!("jfs: {}\n", m));
-            return 2;
-        }
+        host.load_disk(&mut vm, f)?;
     }
-    match config(&mut vm, o, name) {
-        Ok(c) => {
-            vm.set_global("config", c);
-        }
-        Err(m) => {
-            err(&format!("jfs: {}\n", m));
-            return 2;
-        }
+    let c = config(&mut vm, o, name)?;
+    vm.set_global("config", c);
+    if let Some(d) = host.debugger.as_mut() {
+        d.attach(&mut vm);
     }
-    let mut r = drive(&mut vm, &mut host);
+    Ok(vm)
+}
+
+/// the event loop after the top-level code: disk callbacks, then timers in the order of their
+/// time, until none is left, the clock passes `until` or the debugger quits; a script error
+/// goes to `failed` and ends it, a disk error is the Err
+fn run_loop(vm: &mut Vm, host: &mut Console, o: &Opts, until: Option<u64>, failed: &mut Option<Error>) -> Result<(), String> {
     loop {
         if let (Some(f), true) = (&o.disk, host.dirty) {
-            if let Err(m) = host.save(f) {
-                err(&format!("jfs: {}\n", m));
-                return 1;
-            }
+            host.save(f)?;
         }
-        if let Err(e) = r {
-            report(&e, name, src);
-            return 1;
+        if host.quit || failed.is_some() {
+            return Ok(());
         }
         let (f, args) = if let Some((pin, res)) = host.ready.pop_front() {
             let f = vm.pinned(pin);
             vm.unpin(pin);
-            match disk_args(&mut vm, res) {
+            match disk_args(vm, res) {
                 Ok(a) => (f, a),
                 Err(e) => {
-                    r = Err(e);
+                    *failed = Some(e);
                     continue;
                 }
             }
         } else if let Some(&(at, id)) = host.due.first() {
-            if let Some(u) = o.until.filter(|u| at > *u) {
+            if let Some(u) = until.filter(|u| at > *u) {
                 host.wait(u);
-                break;
+                return Ok(());
             }
             host.wait(at);
             host.due.remove(&(at, id));
@@ -515,12 +579,107 @@ pub fn run(prog: &Program, o: &Opts, name: &str, src: &str) -> i32 {
             }
             (f, Vec::new())
         } else {
-            break;
+            return Ok(());
         };
-        r = match vm.call_value(f, &args) {
-            Ok(()) => drive(&mut vm, &mut host),
+        let r = match vm.call_value(f, &args) {
+            Ok(()) => drive(vm, host),
             Err(e) => Err(e),
         };
+        if let Err(e) = r {
+            *failed = Some(e);
+        }
+    }
+}
+
+/// run a compiled script with its timers and callbacks -> the exit code
+pub fn run(prog: &Program, o: &Opts, name: &str, src: &str, debugger: Option<Debugger>) -> i32 {
+    let mut host = Console::new(o);
+    host.debugger = debugger;
+    let mut vm = match setup(prog, o, name, &mut host) {
+        Ok(vm) => vm,
+        Err(m) => {
+            err(&format!("jfs: {}\n", m));
+            return 2;
+        }
+    };
+    let mut failed = None;
+    let r = match drive(&mut vm, &mut host) {
+        Ok(()) => run_loop(&mut vm, &mut host, o, o.until, &mut failed),
+        Err(e) => {
+            failed = Some(e);
+            // what the top-level code stored before its error
+            match (&o.disk, host.dirty) {
+                (Some(f), true) => host.save(f),
+                _ => Ok(()),
+            }
+        }
+    };
+    if let Err(m) = r {
+        err(&format!("jfs: {}\n", m));
+        return 1;
+    }
+    if let Some(e) = failed {
+        let text = report_text(&e, &vm, &host, name, src);
+        match host.debugger.as_mut() {
+            Some(d) => d.ended(Some(&text)),
+            None => err(&text),
+        }
+        return 1;
+    }
+    if let (Some(d), false) = (host.debugger.as_mut(), host.quit) {
+        d.ended(None);
     }
     0
+}
+
+/// why a test failed: where (file:line:col or the file), the message, what it printed
+pub struct TestFail {
+    pub at: String,
+    pub msg: String,
+    pub output: String,
+}
+
+/// --test: one test function in a fresh VM (see the module comment); Ok(false) when `test` is
+/// no function after the top-level code
+pub fn run_test(prog: &Program, o: &Opts, name: &str, test: &str) -> Result<bool, TestFail> {
+    let mut host = Console::new(o);
+    host.virt = true;
+    host.capture = Some(String::new());
+    let fail = |vm: &Vm, host: &mut Console, e: Error| {
+        let main = vm.modules().first().cloned().unwrap_or_default();
+        let file = shown(&e.file, &main, name);
+        let at = if e.line > 0 { format!("{}:{}:{}", file, e.line, e.col) } else { String::from(file) };
+        TestFail { at, msg: e.msg, output: host.capture.take().unwrap_or_default() }
+    };
+    let mut vm = Vm::new(prog, o.limits);
+    match config(&mut vm, o, name) {
+        Ok(c) => {
+            vm.set_global("config", c);
+        }
+        Err(m) => return Err(TestFail { at: String::from(name), msg: m, output: String::new() }),
+    }
+    if let Err(e) = drive(&mut vm, &mut host) {
+        return Err(fail(&vm, &mut host, e));
+    }
+    if !matches!(vm.global(test), Some(Value::Func(_))) {
+        return Ok(false);
+    }
+    if let Err(e) = vm.call(test, &[]) {
+        return Err(fail(&vm, &mut host, e));
+    }
+    let until = Some(o.until.unwrap_or(60_000 * MS));
+    // (no --disk in tests: the store is in memory)
+    let mut failed = match drive(&mut vm, &mut host) {
+        Ok(()) => None,
+        Err(e) => Some(e),
+    };
+    let quiet = Opts { disk: None, ..o.clone() };
+    let r = run_loop(&mut vm, &mut host, &quiet, until, &mut failed);
+    if let Some(e) = failed {
+        return Err(fail(&vm, &mut host, e));
+    }
+    if let Err(m) = r {
+        return Err(TestFail { at: String::from(name), msg: m, output: host.capture.take().unwrap_or_default() });
+    }
+    Ok(true)
 }
