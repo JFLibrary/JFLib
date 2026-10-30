@@ -6,10 +6,11 @@
 //                                                  (--state: loaded at the start, Speichern
 //                                                  writes it)
 //   build/win/desktest.exe --script apps/desktest/tests/move.uis
-//   build/win/desktest.exe --check-fullscreen      with a real window: the main window and
-//                                                  the tool window into full screen and back,
-//                                                  checked against the platform (a line per
-//                                                  check on stdout, exit code 1 on a failure)
+//   build/win/desktest.exe --check-fullscreen      with a real window: the main window, the
+//                                                  tool window and the maximised main window
+//                                                  into full screen and back, checked against
+//                                                  the platform (a line per check on stdout,
+//                                                  exit code 1 on a failure)
 //
 // The tool row: Neues Fenster (a window "Fenster N" with a button), Speichern (the state into
 // memory, with --state also into the file), Laden, Zurücksetzen, Vollbild (the main window,
@@ -106,6 +107,7 @@ struct Desk {
     check: u32,
     check_size: (i32, i32),
     check_fails: u32,
+    check_wait: u32,
 }
 
 impl Default for Desk {
@@ -133,6 +135,7 @@ impl Default for Desk {
             check: 0,
             check_size: (0, 0),
             check_fails: 0,
+            check_wait: 0,
         }
     }
 }
@@ -485,8 +488,9 @@ impl Desk {
                 if ui.window_state(ID_TOOL) & UWS_FULLSCREEN == 0 {
                     // refused at once: a tool window drawn inside its owner (Wayland)
                     say("skip tool: no full screen of its own here (a child window)");
-                    say(if self.check_fails == 0 { "passed" } else { "failed" });
-                    plat::exit((self.check_fails != 0) as i32);
+                    self.check = 6;
+                    self.tool_open.set(0);
+                    plat::win_cmd(0, plat::WCMD_MAXIMIZE);
                 }
             }
             5 => {
@@ -496,10 +500,40 @@ impl Desk {
                 ok(near(d, mon), &format!("tool: covers the monitor ({:?} px / {:?})", d, mon));
                 ui.window_fullscreen(ID_TOOL, false);
             }
-            _ => {
+            6 => {
                 let r = ui.window_rect(ID_TOOL).unwrap_or_default();
                 ok(ui.window_state(ID_TOOL) & UWS_FULLSCREEN == 0, "tool: windowed again");
                 ok(near((r.w, r.h), self.check_size), &format!("tool: its size back ({},{} / {:?} DIP)", r.w, r.h, self.check_size));
+                // a maximised main window: full screen and back to maximised
+                self.tool_open.set(0);
+                plat::win_cmd(0, plat::WCMD_MAXIMIZE);
+            }
+            7 => {
+                self.check_size = plat::win_size(0);
+                let max = plat::win_state(0) & plat::WST_MAXIMIZED != 0;
+                if (!max && self.check_wait < 5) || self.check_wait == 0 {
+                    // (a compositor may take its time: WSLg's host maximises after Weston said
+                    // so, and a request for full screen before that is lost)
+                    self.check_wait += 1;
+                    ui.timer(CHECK_TIMER, CHECK_MS);
+                    return;
+                }
+                say(&format!("maximised: {} {:?}", max, self.check_size));
+                ui.window_fullscreen(0, true);
+            }
+            8 => {
+                ok(plat_fs(0), "maximised main: plat WST_FULLSCREEN");
+                let s = plat::win_size(0);
+                ok(near(s, mon), &format!("maximised main: covers the monitor ({:?} / {:?})", s, mon));
+                ui.window_fullscreen(0, false);
+            }
+            _ => {
+                let st = plat::win_state(0);
+                ok(st & plat::WST_FULLSCREEN == 0, "maximised main: windowed again");
+                ok(st & plat::WST_MAXIMIZED != 0, "maximised main: maximised again");
+                let s = plat::win_size(0);
+                ok(near(s, self.check_size), &format!("maximised main: its size back ({:?} / {:?})", s, self.check_size));
+                ok(self.fs_events == 0, "no UIC_FULLSCREEN for the app's own changes");
                 say(if self.check_fails == 0 { "passed" } else { "failed" });
                 plat::exit((self.check_fails != 0) as i32);
             }

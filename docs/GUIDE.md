@@ -4351,9 +4351,11 @@ placement and style; X11 sets `_NET_WM_STATE_FULLSCREEN`, Wayland `xdg_toplevel.
 (the configure's states report it); the browser uses the Fullscreen API, which needs the user's
 gesture (a click or key that just happened -- otherwise the browser refuses and
 `UIC_FULLSCREEN` reports it). A tool window drops its library title bar and border meanwhile;
-Wayland tool windows drawn inside their owner (`WST_CHILD`) and Android do nothing. A library
-title bar of the main window (Wayland without decorations) goes; an app with
-`AF_CUSTOM_TITLEBAR` leaves its own out while `UWS_FULLSCREEN` is set.
+Wayland tool windows drawn inside their owner (`WST_CHILD`) and Android do nothing; a window
+manager that ignores the request without a word leaves `UWS_FULLSCREEN` as the app asked (seen
+with WSLg right after a maximise). A library title bar of the main window (Wayland without
+decorations) goes; an app with `AF_CUSTOM_TITLEBAR` leaves its own out while `UWS_FULLSCREEN`
+is set.
 
 * **F11 is the app's key** for it: bind it in the command table
   (`Command::new(CMD_FULL, "Vollbild", 0, 0, VK_F11, 0)`, then

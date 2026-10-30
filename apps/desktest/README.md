@@ -29,8 +29,8 @@ overflow), `shrink.uis` (a smaller area), `save.uis` (the state saved and loaded
 (the recorded state of the main and the tool window, `system fullscreen`), `rtl.uis` (a
 mirrored window), `a11y.uis` (the tree of the screen readers with overlapping windows) and
 `shots.uis` (light and dark at 100 and 150 %, WinUI and NetLab, high contrast). Headless runs
-only record full screen; `--check-fullscreen` puts the main window and the tool window into
-full screen and back with the real platform (Windows; X11 and Wayland under WSLg -- a Wayland
+only record full screen; `--check-fullscreen` puts the main window, the tool window and the
+maximised main window into full screen and back with the real platform (Windows; X11 and Wayland under WSLg -- a Wayland
 tool window drawn inside its owner has none of its own, `jfgui_WL_TOOLWIN=toplevel` checks a
 separate one), `tests/fullscreen_web.mjs` the browser's Fullscreen API (from a click, left by
 the browser, refused without a gesture).
