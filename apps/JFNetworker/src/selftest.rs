@@ -46,6 +46,8 @@
 // aaatest.rs: logins, AAA and RADIUS (group aaa: jfn_sim::auth, aaa, aaatrace, radiusd, telnetd,
 // cli/aaa.rs; the console login, enable, privilege levels, RADIUS accept / reject / fallback,
 // accounting, the telnet client).
+// shelltest.rs: the shell with folders, the classic tools and processes (group shell:
+// jfn_sim::cli::sh, shrun, coreutils, man, the flash: directories of cli/files.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -119,9 +121,11 @@ mod groupstest;
 mod snmptest;
 #[path = "aaatest.rs"]
 mod aaatest;
+#[path = "shelltest.rs"]
+mod shelltest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 41] = [
+    let groups: [(&'static str, fn(&mut T)); 42] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -163,6 +167,7 @@ pub fn run() -> i32 {
         ("groups", groupstest::run),
         ("snmp", snmptest::run),
         ("aaa", aaatest::run),
+        ("shell", shelltest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

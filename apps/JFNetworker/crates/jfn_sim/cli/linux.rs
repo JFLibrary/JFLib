@@ -23,6 +23,14 @@
 //   echo "nameserver ADDR" > /etc/resolv.conf (and >> for more lines, "search D"): the static
 //   name servers (netsvc.rs)
 //   snmpget, snmpgetnext, snmpwalk, snmpbulkwalk, snmpset (cli/snmp.rs: SNMP managers)
+//   cd, pwd, mv, head, tail, grep, find, wc, sort, uniq, cut, tree, du, df, less, more, file,
+//   stat, basename, dirname, date, seq, tee, test / [, xargs, env, export, unset, history,
+//   which, type, help, man (coreutils.rs, man.rs); jobs, fg, wait, kill, ps, sleep, jfs FILE
+//   (shrun.rs: processes)
+//
+// A line goes through the shell's grammar first (sh.rs, shrun.rs: pipes, redirections, lists,
+// quoting, globs, $VAR, &); linux_cmd gets the words of one command and dispatches them.  Paths
+// are relative to the session's working directory (Engine::sh_abs).
 //
 // Objects and commands of ip take any prefix, the first one of iproute2's order winning ("ip
 // a" is address, "ip r" route, "ip n" neighbour); output and error messages are those of
@@ -43,7 +51,7 @@ use crate::jobs::{PingOpts, TraceOpts};
 use crate::kernel::{Engine, Ns, MS, SEC};
 use crate::resolver::Family;
 
-/// the words of a shell line: spaces separate, '...' and "..." quote
+/// the words of a line for Tab: spaces separate, '...' and "..." quote
 fn words(line: &str) -> Vec<String> {
     let mut v = Vec::new();
     let mut cur = String::new();
@@ -98,27 +106,26 @@ const ROUTE_USAGE: &str = "Usage: ip route [show]\n       ip route add|del PREFI
 const NEIGH_USAGE: &str = "Usage: ip neigh [show]\n       ip neigh add ADDR lladdr MAC dev IF\n       ip neigh del ADDR dev IF\n       ip neigh flush all|dev IF\n";
 
 impl Engine {
+    /// an error of a command: its text to stderr, Err with its first line
     pub(super) fn sh_err(&mut self, ni: usize, text: &str) -> Result<(), String> {
-        self.out(ni, text);
+        self.err_out(ni, text);
         Err(String::from(text.lines().next().unwrap_or("")))
     }
 
-    /// a line typed into the shell
+    /// a line typed into the shell: the grammar of sh.rs, run by shrun.rs
     pub(crate) fn linux_line(&mut self, ni: usize, line: &str) -> Result<(), String> {
-        // "printf ... | nc host port" (tools.rs)
-        if let Some((left, right)) = super::tools::split_pipe(line) {
-            return self.sh_pipe(ni, left, right);
-        }
-        let mut w = words(line);
+        self.sh_line(ni, line)
+    }
+
+    /// one command with its words expanded (shrun.rs)
+    pub(crate) fn linux_cmd(&mut self, ni: usize, argv: &[String]) -> Result<(), String> {
+        let mut w = argv;
         if w.first().is_some_and(|x| x == "sudo") {
-            w.remove(0);
+            w = &w[1..];
         }
         let Some(cmd) = w.first().cloned() else {
             return Ok(());
         };
-        if cmd.starts_with('#') {
-            return Ok(());
-        }
         let args: Vec<&str> = w[1..].iter().map(String::as_str).collect();
         match cmd.as_str() {
             "ip" => self.sh_ip(ni, &args),
@@ -129,13 +136,16 @@ impl Engine {
             "hostname" => self.sh_hostname(ni, &args),
             "sysctl" => self.sh_sysctl(ni, &args),
             "curl" => self.sh_curl(ni, &args),
-            "nc" | "netcat" => self.sh_nc(ni, &args, None),
+            "nc" | "netcat" => {
+                let input = self.sh_take_stdin(ni);
+                self.sh_nc(ni, &args, input)
+            }
             "ss" => self.sh_ss(ni, &args),
             "top" => self.sh_top(ni, &args),
             "dig" => self.sh_dig(ni, &args),
             "host" => self.sh_host(ni, &args),
             "nslookup" => self.sh_nslookup(ni, &args),
-            "printf" => self.sh_printf(ni, line),
+            "printf" => self.sh_printf(ni, &args),
             "lbctl" => self.sh_lbctl(ni, &args),
             "kvctl" => self.sh_kvctl(ni, &args),
             "cachectl" => self.sh_cachectl(ni, &args),
@@ -154,7 +164,10 @@ impl Engine {
             "rmdir" => self.sh_rmdir(ni, &args),
             "touch" => self.sh_touch(ni, &args),
             "tftp" => self.sh_tftp(ni, &args),
-            "mail" => self.sh_mail(ni, &args, None),
+            "mail" => {
+                let input = self.sh_take_stdin(ni);
+                self.sh_mail(ni, &args, input)
+            }
             // SNMP managers (cli/snmp.rs)
             "snmpget" => self.sh_snmp(ni, super::snmp::Prog::Get, &args),
             "snmpgetnext" => self.sh_snmp(ni, super::snmp::Prog::GetNext, &args),
@@ -168,19 +181,72 @@ impl Engine {
             }
             "true" | "exit" | "logout" => Ok(()),
             "false" => Err(String::new()),
-            _ => self.sh_err(ni, &format!("{}: command not found\n", cmd)),
+            // the shell itself, files and text (coreutils.rs), processes (shrun.rs)
+            "cd" => self.sh_cd(ni, &args),
+            "pwd" => self.sh_pwd(ni),
+            "mv" => self.sh_mv(ni, &args),
+            "head" => self.sh_head_tail(ni, false, &args),
+            "tail" => self.sh_head_tail(ni, true, &args),
+            "grep" => self.sh_grep(ni, &args),
+            "egrep" => {
+                let mut a = alloc::vec!["-E"];
+                a.extend_from_slice(&args);
+                self.sh_grep(ni, &a)
+            }
+            "find" => self.sh_find(ni, &args),
+            "wc" => self.sh_wc(ni, &args),
+            "sort" => self.sh_sort(ni, &args),
+            "uniq" => self.sh_uniq(ni, &args),
+            "cut" => self.sh_cut(ni, &args),
+            "tree" => self.sh_tree(ni, &args),
+            "du" => self.sh_du(ni, &args),
+            "df" => self.sh_df(ni, &args),
+            "less" | "more" => self.sh_less(ni, &cmd, &args),
+            "history" => self.sh_history(ni, &args),
+            "env" | "printenv" => self.sh_env(ni, &args),
+            "export" => self.sh_export(ni, &args),
+            "unset" => self.sh_unset(ni, &args),
+            "which" => self.sh_which(ni, &args),
+            "type" => self.sh_type(ni, &args),
+            "help" => self.sh_help(ni, &args),
+            "man" => self.sh_man(ni, &args),
+            "file" => self.sh_file(ni, &args),
+            "stat" => self.sh_stat(ni, &args),
+            "basename" => self.sh_basename(ni, false, &args),
+            "dirname" => self.sh_basename(ni, true, &args),
+            "date" => self.sh_date(ni, &args),
+            "seq" => self.sh_seq(ni, &args),
+            "tee" => self.sh_tee(ni, &args),
+            "test" => self.sh_test(ni, false, &args),
+            "[" => self.sh_test(ni, true, &args),
+            "xargs" => self.sh_xargs(ni, &args),
+            "sleep" => self.sh_sleep(ni, &args),
+            "jfs" => self.sh_jfs(ni, &args),
+            "jobs" => self.sh_jobs(ni, &args),
+            "fg" => self.sh_fg(ni, &args, false),
+            "wait" => self.sh_fg(ni, &args, true),
+            "kill" => self.sh_kill(ni, &args),
+            "ps" => self.sh_ps(ni, &args),
+            _ => {
+                self.sh_set_code(ni, 127);
+                self.sh_err(ni, &format!("{}: command not found\n", cmd))
+            }
         }
     }
 
-    /// Tab: command names and the objects of ip
-    pub(crate) fn linux_complete(&self, _ni: usize, line: &str) -> (Option<String>, Vec<String>) {
+    /// Tab: command names, the objects of ip, paths (sh.rs)
+    pub(crate) fn linux_complete(&self, ni: usize, line: &str) -> (Option<String>, Vec<String>) {
+        const CMDS: &[&str] = &[
+            "cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "telnet", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch", "mail", "snmpbulkwalk", "snmpget", "snmpgetnext", "snmpset", "snmpwalk",
+            "cd", "pwd", "mv", "head", "tail", "grep", "find", "wc", "sort", "uniq", "cut", "tree", "du", "df", "less", "more", "history", "env", "export", "unset", "which", "type", "help", "man", "file", "stat", "basename", "dirname", "date", "seq", "tee", "test", "xargs", "sleep", "jfs", "jobs", "fg", "wait", "kill", "ps", "true", "false",
+        ];
         let w = words(line);
         let partial = !line.is_empty() && !line.ends_with(char::is_whitespace);
         let (list, done): (&[&str], usize) = match w.len() {
-            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "telnet", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch", "mail", "snmpbulkwalk", "snmpget", "snmpgetnext", "snmpset", "snmpwalk"], 0),
             2 if partial && w[0] == "ip" => (&["address", "link", "neighbour", "route"], 1),
             3 if partial && w[0] == "ip" => (&["add", "del", "flush", "get", "set", "show"], 2),
-            _ => return (None, Vec::new()),
+            // a command word, else a path (sh.rs)
+            _ => return self.sh_complete(ni, line, CMDS),
         };
         let last = &w[done];
         let mut choices: Vec<String> = list.iter().filter(|c| c.starts_with(last.as_str())).map(|c| String::from(*c)).collect();

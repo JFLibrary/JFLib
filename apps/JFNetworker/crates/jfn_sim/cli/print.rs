@@ -23,6 +23,8 @@
 //   Proc, Top        console programs (curl, nc) and top keep the console busy the same way
 //                    (cli/tools.rs): a program ends through OsApi::exit, top draws a screen
 //                    whenever the console wakes
+//   Sleep, Wait      the shell's sleep until its time, fg / wait until a background job ended
+//                    (cli/shrun.rs)
 //
 // Times are the engine's virtual round trips: IOS truncates them to milliseconds, iputils
 // prints microseconds.
@@ -135,6 +137,14 @@ pub enum JobOut {
     IwScan {
         until: Ns,
         port: u16,
+    },
+    /// the shell's sleep (cli/shrun.rs): it ends at `until`
+    Sleep {
+        until: Ns,
+    },
+    /// fg / wait: the console waits for background job `no` of the shell (cli/shrun.rs)
+    Wait {
+        no: u32,
     },
 }
 
@@ -614,6 +624,15 @@ impl Engine {
                 }
                 return;
             }
+            JobOut::Sleep { until } => {
+                if self.now >= until {
+                    self.cli_job_done(ni);
+                } else {
+                    self.cli_wake_at(ni, until);
+                }
+                return;
+            }
+            JobOut::Wait { .. } => return,
             _ => {}
         }
         let JobOut::IosPing { col, fake, count, timeout, .. } = &mut cj.out else {

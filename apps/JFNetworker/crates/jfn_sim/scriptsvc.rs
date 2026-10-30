@@ -28,6 +28,9 @@
 //                        refused (line and column), the old program goes on.  Replacing the
 //                        service with Action::Service instead gives a new one: its disk starts
 //                        empty.  Action::RenameService (os.rs) renames a script as it runs.
+//   ScriptService::idle_at()   when nothing is left to do: no callback, timer, socket, server,
+//                        request, lookup or disk access (`jfs FILE` of the shell ends then:
+//                        cli/shrun.rs runs the service as a console program)
 //
 // The host API (the names of script::GLOBALS; times in milliseconds, int or float):
 //   log(x, ..), log.debug|info|warn|error(..)   a line in the device's log, tagged with the
@@ -2560,5 +2563,30 @@ impl Engine {
             self.os_push(ni, Job::Start(id));
         }
         Ok(())
+    }
+}
+
+// ---------------------------------------------------------------- a script as a process
+
+impl ScriptService {
+    /// when nothing will be left to do: the top-level code ran, no callback runs or waits, the
+    /// script holds no timer, socket, server, request, lookup or disk access; Some(the end of
+    /// the CPU time it used last), None while something is pending (a process of the shell
+    /// ends then: cli/shrun.rs)
+    pub fn idle_at(&self) -> Option<Ns> {
+        let r = self.run.as_deref()?;
+        let idle = r.inv.is_none()
+            && r.queue.is_empty()
+            && r.effects.is_empty()
+            && r.timers.is_empty()
+            && r.conns.is_empty()
+            && r.listeners.is_empty()
+            && r.udps.is_empty()
+            && r.serve.is_none()
+            && r.open.is_empty()
+            && r.requests.is_empty()
+            && r.resolves.is_empty()
+            && r.disk.is_empty();
+        if idle { Some(r.busy_until) } else { None }
     }
 }

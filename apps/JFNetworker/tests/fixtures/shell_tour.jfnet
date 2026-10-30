@@ -1,0 +1,143 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Rundgang durch die Shell",
+  "description": "PC1 und SRV1 an SW1, R1 als Gateway; SRV1 hat einen Webserver. Für den Rundgang durch die Shell: Ordner, Werkzeuge, Pipes, Skripte als Prozesse, Jobs.",
+  "seed": 13,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.1/24 dev eth0\nip route add default via 10.0.0.254\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 2,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 240,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.0.10/24 dev eth0\nip route add default via 10.0.0.254\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "web",
+          "disabled": false,
+          "config": {
+            "workers": 4,
+            "time_ms": 2,
+            "routes": [
+              {
+                "path": "/",
+                "body": "Hallo von {host}\n"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": ""
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 0,
+      "y": 140,
+      "off": false,
+      "startup_config": "hostname SW1\n!\nend\n",
+      "services": [],
+      "comment": ""
+    },
+    {
+      "id": 4,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": -240,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.0.254 255.255.255.0\n no shutdown\n!\nend\n",
+      "services": [],
+      "comment": ""
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 2,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 4,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ],
+  "notes": [],
+  "layout": {
+    "zoom_pm": 1000,
+    "cx": 0,
+    "cy": 0,
+    "grid": 20,
+    "no_snap": false,
+    "filters": []
+  },
+  "lab": null
+}

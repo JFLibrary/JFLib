@@ -623,7 +623,8 @@ impl Engine {
             if rcpts.is_empty() {
                 return refuse(self, ni, "curl: (55) RCPT failed: no recipient given (--mail-rcpt)\n");
             }
-            let data = match self.store(ni).map(|s| s.read(&file).map(Vec::from)) {
+            // (local files are relative to the shell's working directory)
+            let data = match self.store(ni).map(|s| s.read(&self.sh_abs(ni, &file)).map(Vec::from)) {
                 Some(Ok(d)) => d,
                 _ => return refuse(self, ni, &format!("curl: Can't open '{}'!\ncurl: try 'curl --help' for more information\ncurl: (26) Failed to open/read local data from file/application\n", file)),
             };
@@ -641,12 +642,12 @@ impl Engine {
             None => format!("RETR {}", id),
         };
         if let Some(o) = &output {
-            let ok = self.store(ni).is_some_and(|s| s.norm(o).is_ok_and(|q| s.is_dir(&s.parent(&q)) && !s.is_dir(&q)));
+            let ok = self.store(ni).is_some_and(|s| s.norm(&self.sh_abs(ni, o)).is_ok_and(|q| s.is_dir(&s.parent(&q)) && !s.is_dir(&q)));
             if !ok {
                 return refuse(self, ni, &format!("curl: (23) Failed to open the file {}: No such file or directory\n", o));
             }
         }
-        let p = Pop3Program { dial, user: login, cmd, out: output.filter(|o| o != "-"), verbose, quiet, reader: pop3::Reader::new(), step: PStep::Greet, got: None, fail: None, started: 0, exit: None };
+        let p = Pop3Program { dial, user: login, cmd, out: output.filter(|o| o != "-").map(|o| self.sh_abs(ni, &o)), verbose, quiet, reader: pop3::Reader::new(), step: PStep::Greet, got: None, fail: None, started: 0, exit: None };
         self.run_program(ni, "curl", Box::new(p), false)
     }
 
