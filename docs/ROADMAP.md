@@ -1261,6 +1261,28 @@ Fensterrand hinaus.
   Grenzen, die Namen von JFNetworker, die Disk-Datei über zwei Läufe, `log`, `rand` mit
   Startwert; Windows und Linux. Export und Import als `.jfs`-Datei im Skript-Editor gehören zu
   JFNetworker (SK5 im App-README).
+- **P3** · *erledigt* · Module, Debugger und Tests für `jfs` (gewünscht am 2026-10-30, Phase 6
+  von JFNetworker, Meilenstein SK7; [GUIDE §29](GUIDE.md)): `let m = import("pfad.jfs")` ist
+  eine Funktion statt neuer Syntax und gibt die obersten Namen einer anderen Datei als Map
+  (Namen mit `_` bleiben privat); der Host liefert die Dateien (`Host::load`: der Runner aus
+  dem Dateisystem, nur `.jfs`-Dateien, JFNetworker die des Geräts). Ein Modul läuft einmal je
+  VM im Aufruf, der es importiert (dasselbe Fuel, dieselben Grenzen; es kann pausieren und
+  schrittweise laufen), relative Pfade gelten ab der importierenden Datei, Zyklen sind ein
+  Fehler mit der Kette, Fehler eines Moduls nennen dessen Datei, Zeile und Spalte
+  (`Diagnostic`, `Error` und `TraceLine` haben jetzt `file`; Meldungen einzelner Dateien bleiben
+  gleich). Debug-Schnittstelle der VM ohne Oberfläche (`script::debug`): Zeilentabelle,
+  Haltepunkte nach Datei und Zeile (auch mit Bedingung und in noch nicht geladenen Modulen),
+  Pause-Anforderung, Schritt hinein / über / heraus, `run` liefert `Status::Paused` auch mitten
+  im Fuel (pausiert und fortgesetzt gleich ununterbrochen), Aufrufliste, lokale Variablen,
+  Upvalues und Globale mit Text und Aufklappen von Listen und Maps, Ausdrücke im Rahmen; ohne
+  Haltepunkte so schnell wie vorher (`coretest --bench vm`: gleich schnell im Rauschen).
+  `assert` und `assert_eq` in der Standardbibliothek, `jfs --test DATEI…` führt die Funktionen
+  `test_*` je in einer frischen VM aus, `jfs --debug DATEI` ist ein kleiner Debugger auf der
+  Konsole. In JFNetworker importieren Skript-Dienste Dateien des Geräts (mit der Lesezeit der
+  Disk) und lassen sich in virtueller Zeit anhalten und schrittweise fortsetzen
+  (`Action::ScriptDebug`; die Oberfläche kommt mit IDE1). Tests: `coretest --only scriptmod`,
+  die Fälle von `jfs` (Module, `--test`, `--debug`) und die Selbsttest-Gruppe `scriptmod` von
+  JFNetworker.
 - **P3** · *teilweise* · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
   der Browser selbst mit den Meilensteinen B1 bis B4 steht im App-README unter „Fahrplan“).
   Der Browser zeigt Seiten mit `ui.html_view` (`md_doc`, `md_view`, `rich_html`) statt mit einer

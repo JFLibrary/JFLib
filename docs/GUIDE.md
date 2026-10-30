@@ -3614,6 +3614,98 @@ column, the source line and the calls; exit code 1 (2 for a wrong command line).
 are example scripts with their expected stdout, stderr, exit code and files
 (`apps/jfs/tests/cases/*.test`), run by `python build_rs.py test jfs` on Windows and Linux.
 
+**Modules** ([`module.rs`](../lib/script/module.rs)): `import(path)` is a function, not
+syntax. It gives the top-level names of another file as a map -- its `fn`s and `let`s, without
+the names that start with `_` -- with the values they have when the module's code has run:
+
+```js
+// lib/util.jfs
+let _calls = 0                          // private: not in the map
+fn shout(s) { _calls += 1; return s.upper() + "!" }
+fn calls() { return _calls }            // the module's functions see its globals as they change
+
+// main.jfs
+let util = import("lib/util.jfs")       // relative to this file
+print(util.shout("hallo"), util.calls())   // HALLO! 1
+```
+
+The host reads the files: `Host::load(cx, path) -> Result<String, String>` (the source, or the
+German reason; the default has no modules). The VM resolves a relative path against the
+importing file's directory, normalises it (`/` between the parts, a `\` counts as one, no `.`
+or `..`) and runs each path once per VM: the first import compiles the file the way the
+program was compiled (`compile_named`, or `compile_with` with the same host names), links its
+code behind the VM's own and runs its top-level code as a call inside the importing
+invocation, with the same fuel, limits, heap and output, so it yields, pauses and steps like
+any call; later imports give the same map. Errors are catchable strings: a cycle
+(`Zyklischer Import: a.jfs → b.jfs → a.jfs`), a missing file (`Modul lib/x.jfs: die Datei gibt
+es nicht`), a module that does not compile (`lib/x.jfs:3:9: Hier fehlt …`; uncaught, the
+`Error` has the module's file, line and column). A module whose top-level code throws is
+forgotten, the next import runs it again. From now on `Diagnostic`, `Error` and `TraceLine`
+carry a `file`; `Error`'s text names it only where a call is in another file than the error,
+so messages of single files stay as they were. The program's own host values (`config`) hold
+for its modules too. `script::check` stays per file: a module's members are dynamic.
+
+**The debug interface** ([`debug.rs`](../lib/script/debug.rs)) has no UI; the runner's
+`--debug` and JFNetworker's script services build on it. The compiler keeps a line table
+(`Program::line_table()`: every instruction's function, line, column and whether a statement
+starts there; `break_lines()` lists the lines a breakpoint can stop at), the locals of every
+function with the instructions where they are visible, and the names of upvalues.
+
+```rust
+use script::{PauseReason, Status, Step};
+
+vm.set_breakpoint("lib/util.jfs", 7, None)?;          // also before the module is loaded
+vm.set_breakpoint("main.jfs", 12, Some("n > 100"))?;  // a condition in jfs
+loop {
+    match vm.run(&mut host, 10_000) {
+        Status::Paused(p) => {                          // before the statement of p.line
+            for f in vm.frames() { show(&f.func, &f.file, f.line) }   // innermost first
+            for (name, v) in vm.locals(0) { show_var(&name, &vm.preview(v, 80)) }
+            let x = vm.eval(0, "n * 2 + len(items)");  // read-only, no calls, fuel unchanged
+            vm.step(Step::Over);                        // Into, Over, Out; or nothing: continue
+        }
+        Status::Yielded => {}
+        Status::Done(_) | Status::Error(_) => break,
+    }
+}
+vm.request_pause();                                     // stops at the next statement
+```
+
+* Stops: before a statement (the first one of a line; a `for` loop's head and a `while` loop's
+  condition each round) and, while stepping, at the first instruction after a return from the
+  function the step began in, also when an exception leaves it. `Into` stops at the next
+  statement anywhere, `Over` at the next one of this function or a caller, `Out` back in the
+  caller; breakpoints stop meanwhile. A breakpoint on a line without a statement stops at the
+  next line with one; one whose condition fails stops with `Pause::error`. A pause ends the
+  step, and so does the end of the invocation.
+* `run` returns `Status::Paused(Pause { reason, file, line, col, breakpoint, error })` also in
+  the middle of its fuel; the next `run` goes on from there, and a run that pauses equals one
+  that does not (result, output, fuel). Code a native runs through `Cx::call` (a callback of
+  `list.map` or `list.sort`) never stops: the native is in the middle of its work.
+* Inspecting: `frames()`, `locals(i)` (an inner variable hides an outer one), `upvalues(i)`,
+  `frame_globals(i)` and `globals_of(file)` (the private `_` ones too), `modules()`,
+  `repr(v)` / `preview(v, max)` / `children(v)` for a variables view that expands lists and
+  maps; `eval(i, expr)` knows literals, the names of the frame, operators, fields, indexes
+  and `len`, `str`, `type`, `int`, `float`. `script::debug::check_expr` checks a condition.
+* Cost: without a breakpoint, step or pause request the VM runs as without a debugger (`run`
+  uses the instruction loop as it is; `coretest --bench vm` measures it); with one, `run`
+  drives it one instruction at a time and checks the statement starts and breakpoints in
+  between, about four times slower.
+
+**Tests in jfs**: `assert(cond, msg)` throws `Annahme verletzt: msg` when `cond` is falsy;
+`assert_eq(a, b, msg)` compares numbers and texts as `==` does and lists and maps by their
+content (maps in any order) and throws `msg: erwartet B, ist A` with both values as in a list.
+`jfs --test FILE…` runs every top-level function `test_*` of the files in a fresh VM (the
+top-level code first, so each test has fresh globals and modules; then its timers on the
+virtual clock, at most 60 s or `--until`) and prints `ok` or `FEHLER` with file, line, column,
+message and what the test printed, then the count; exit code 1 when a test failed or there was
+none. `jfs --debug FILE` is a small console debugger on standard input (`break FILE:LINE [if
+COND]`, `run`, `step`, `next`, `finish`, `continue`, `print EXPR`, `bt`, `locals`, `quit`).
+Tests: `coretest --only scriptmod` (modules, the line table, breakpoints and every step kind
+through recursion, closures, `try` / `catch` and module boundaries, a pause in the middle of
+the fuel, paused runs equal to uninterrupted ones, the stack, `eval`, `assert`, the benchmark's
+programs with and without a debugger) and the runner's cases.
+
 ## 30. Live inspector
 
 A running app can be looked into without changing it: the inspector shows which widget is
