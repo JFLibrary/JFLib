@@ -1,0 +1,26 @@
+#!args --page form --verify-dirty
+# images the app supplies (--page form, MI_ASK): the view asks for the http(s) addresses of the
+# images in view, each once ("Bilder: ..."); until the bytes come a frame with the alt text
+# stands in (at the width / height the HTML gives); "Bilder liefern" answers -- two pictures
+# (an SVG, a PNG: the block is laid out again at their sizes), one failure (the alt text stays)
+# -- the image from app:// is read as before
+size 1000 720
+theme light
+expect text:"Bilder: http://example.org/logo.svg, https://example.org/raster.png, https://example.org/fehlt.png" exists
+expect image:"Logo aus dem Netz" rect 29 597 96 48
+expect image:"Logo lokal" rect 388 621 48 24
+click 600,330
+key end
+shot build/mdviewtest/images_wait.png
+click "Bilder liefern"
+expect image:"Logo aus dem Netz" rect * * 96 48
+expect image:"Raster aus dem Netz" rect * * 64 40
+expect image:"Fehlt" rect * * 47 28
+expect image:"Logo lokal" rect * * 48 24
+shot build/mdviewtest/images_done.png
+theme dark
+shot build/mdviewtest/images_done_dark.png
+theme light
+click "Bilder liefern"
+expect text:"Bilder: http://example.org/logo.svg, https://example.org/raster.png, https://example.org/fehlt.png" exists
+expect_nowarn

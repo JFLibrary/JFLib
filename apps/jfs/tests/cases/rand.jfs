@@ -1,0 +1,10 @@
+// rand.jfs -- rand() with --seed: the same numbers on every machine
+let dice = []
+for i in 0..8 {
+  dice.push(rand(6) + 1)
+}
+print("dice", dice)
+print("range", rand(10, 12), rand(-3, -3))
+let x = rand()
+print("float", x >= 0 && x < 1, type(x))
+try { rand(0) } catch e { print("error:", e) }

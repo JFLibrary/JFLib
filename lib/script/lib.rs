@@ -15,7 +15,9 @@
 //   outline(src)                 the top-level fns and lets with their lines
 //   compile(src) -> Result<Program, Vec<Diagnostic>>   bytecode (code.rs, compile.rs), or the
 //                                errors of parse() and check() (warnings do not stop it);
-//                                compile_named(name, src) names the file
+//                                compile_named(name, src) names the file; compile_with(name,
+//                                src, globals) for a host with other names (the standalone
+//                                runner apps/jfs): unknown names are errors there
 //   Vm::new(&program, limits)    a VM (vm.rs): run(host, fuel) -> Done | Yielded | Error,
 //                                call(name, args), call_value, global / set_global, pin,
 //                                output; Value (16 bytes, heap.rs), Host and Cx for native
@@ -198,10 +200,34 @@ pub fn compile(src: &str) -> Result<Program, Vec<Diagnostic>> {
 pub fn compile_named(name: &str, src: &str) -> Result<Program, Vec<Diagnostic>> {
     let (prog, mut d) = parse::parse_program(name, src);
     d.extend(check::resolve(&prog, GLOBALS));
+    finish(&prog, src, d)
+}
+
+/// compile_named() for a host with names of its own instead of GLOBALS: `globals` are the
+/// names it answers (Host::call, set_global; "log", "timer", "config"), the built-ins and the
+/// standard library are known without them.  Unlike compile(), a name that is neither
+/// declared nor known is an error ("Unbekannter Name prnt – meinst du print?"), so a typing
+/// error stops the script before it runs; the other warnings still do not
+pub fn compile_with(name: &str, src: &str, globals: &[&str]) -> Result<Program, Vec<Diagnostic>> {
+    let mut known: Vec<&str> = Vec::with_capacity(globals.len() + 16);
+    for n in library() {
+        let root = n.split('.').next().unwrap_or(n);
+        if !known.contains(&root) {
+            known.push(root);
+        }
+    }
+    known.extend_from_slice(globals);
+    let (prog, mut d) = parse::parse_program(name, src);
+    d.extend(check::resolve_strict(&prog, &known));
+    finish(&prog, src, d)
+}
+
+/// the program, or the errors among the diagnostics of parsing and resolving
+fn finish(prog: &ast::Program, src: &str, mut d: Vec<Diagnostic>) -> Result<Program, Vec<Diagnostic>> {
     d.retain(|x| x.error);
     if !d.is_empty() {
         d.sort_by_key(|x| (x.line, x.col));
         return Err(d);
     }
-    Ok(Program { code: Arc::new(compile::generate(&prog, src)) })
+    Ok(Program { code: Arc::new(compile::generate(prog, src)) })
 }

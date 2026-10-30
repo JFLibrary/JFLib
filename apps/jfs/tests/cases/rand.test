@@ -1,0 +1,14 @@
+# rand() with --seed: the same numbers in every run and on every machine
+args: --seed 7 {dir}/rand.jfs
+--- stdout
+dice [4, 5, 6, 6, 5, 5, 6, 6]
+range 11 -3
+float true float
+error: rand() gibt eine Zahl in [0, 1), rand(n) eine ganze Zahl von 0 bis n - 1, rand(a, b) eine von a bis b
+===
+args: --seed 7 {dir}/rand.jfs
+--- stdout
+dice [4, 5, 6, 6, 5, 5, 6, 6]
+range 11 -3
+float true float
+error: rand() gibt eine Zahl in [0, 1), rand(n) eine ganze Zahl von 0 bis n - 1, rand(a, b) eine von a bis b

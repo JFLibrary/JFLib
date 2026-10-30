@@ -1,0 +1,35 @@
+# an uncaught runtime error: what was printed before, then file:line:col, the source line and
+# the calls on stderr, exit code 1
+args: {dir}/error.jfs
+exit: 1
+--- stdout
+a 2
+caught: Division durch 0
+--- stderr
+{dir}/error.jfs:7:14: Fehler: Division durch 0
+      return sum / len(list)
+                 ^
+  in average (7:14)
+  in report (11:15)
+  im Hauptprogramm (20:1)
+===
+# errors of the compiler: nothing runs; an unknown name is an error (the host's names are known)
+args: {dir}/syntax.jfs
+exit: 1
+--- stderr
+{dir}/syntax.jfs:3:15: Fehler: Hier fehlt eine schließende Klammer )
+    let x = (1 + 2
+                  ^
+{dir}/syntax.jfs:4:1: Fehler: Unbekannter Name prnt – meinst du print?
+    prnt(x)
+    ^^^^
+===
+# a thrown value that is not a text
+args: -e "fn f() { throw {code: 42} }; f()"
+exit: 1
+--- stderr
+-e:1:10: Fehler: {code: 42}
+    fn f() { throw {code: 42} }; f()
+             ^
+  in f (1:10)
+  im Hauptprogramm (1:30)

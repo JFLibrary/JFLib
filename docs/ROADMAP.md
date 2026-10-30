@@ -1169,38 +1169,65 @@ Fensterrand hinaus.
   laufenden Programms mit Zeile und Spalte als Marken, F8), Übernehmen ist ein
   Rückgängig-Schritt, nach dem das laufende Skript Disk und Zahlen behält
   (`Action::ScriptSource`; App-README „Skript-Editor“).
-- **P3** · *fehlt* · Eigenständiger jfs-Runner mit Konsolenausgabe (gewünscht am 2026-10-25):
-  Skripte der Sprache aus `lib/script` auch außerhalb von JFNetworker ausführen, wie
-  `python datei.py`. Ein CLI-Programm `jfs` (eigene App `apps/jfs` mit `rt::main!` wie
-  `apps/permcli`, oder eine Zeile in einer `BINS`-Datei): `jfs DATEI.jfs [ARGS…]` übersetzt
-  und startet ein Skript, `jfs --check DATEI.jfs` meldet nur die Diagnosen von `check()` mit
-  Zeile und Spalte, `jfs -e "CODE"` und `-` (stdin) für Einzeiler; optional eine kleine REPL.
-  Ein Konsolen-Host (`impl Host`): `print` nach stdout (`plat::write_stdout`), `log` nach stderr,
-  `now` / `rand` über `plat`, `config` mit Kommandozeile und Umgebung, `timer` über eine
-  Ereignisschleife mit echter Uhr oder virtueller Uhr (`--virtual-time`, für reproduzierbare
-  Tests), `disk` in einer Datei (`--disk DATEI`, sonst im Speicher). Kein freier
-  Dateisystem- oder Netzzugriff aus Skripten (die Sprache bleibt eine Sandbox); `net`, `dns` und
-  `http` gehören JFNetworker und melden im Runner einen fangbaren Fehler. Grenzen per Flag
-  (`--fuel`, `--heap`, `--depth`, sonst `Limits::default()`). Fehler beim Übersetzen oder
-  Laufen erscheinen mit Meldung, Zeile:Spalte und Aufrufkette auf stderr, Exit-Code 1.
-  Sprache und VM bleiben unverändert; in `lib/script` höchstens `compile_with(name, src,
-  globals)`, damit unbekannte Namen gegen die Globals des jeweiligen Hosts geprüft werden (heute
-  nur Warnungen). Dasselbe Skript läuft in JFNetworker und im Runner, solange es nur die
-  Standardbibliothek, `print`, `log` und `timer` nutzt; Export und Import als `.jfs`-Datei im
-  Skript-Editor gehören zu JFNetworker (SK5 im App-README). Tests: Beispielskripte mit
-  erwarteter Ausgabe (stdout, stderr, Exit-Code) über `build_rs.py test`, Windows und Linux.
-- **P3** · *fehlt* · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
+- **P3** · *erledigt* · Eigenständiger jfs-Runner mit Konsolenausgabe (gewünscht am 2026-10-25,
+  seit 2026-10-26): [`apps/jfs`](../apps/jfs/README.md) führt Skripte der Sprache aus
+  `lib/script` außerhalb von JFNetworker aus, wie `python datei.py` (`rt::main!`, Windows und
+  Linux). `jfs DATEI.jfs [ARGS…]` übersetzt und startet ein Skript (die Argumente in
+  `config.args`), `jfs -e "CODE"` und `jfs -` (stdin) für Einzeiler, `jfs --check` gibt nur die
+  Diagnosen als `DATEI:ZEILE:SPALTE: Fehler: …` und Warnungen auf stdout aus (Exit-Code 1 bei
+  einem Fehler). Der Konsolen-Host beantwortet die Namen von `script::GLOBALS`: `print` nach
+  stdout, `log` / `log.debug|info|warn|error` nach stderr (ein Log beendet den Fuel-Abschnitt,
+  so bleibt die Reihenfolge zu stdout), `now` in Millisekunden seit dem Start, `rand` (PCG32,
+  `--seed N`), `config` aus `JFS_CONFIG` (JSON), `--config K=WERT` oder einem JSON-Objekt und
+  `--env NAME`, `timer.after/every/cancel` in einer Ereignisschleife mit echter Uhr oder
+  virtueller Uhr (`--virtual-time`; `--until MS` beendet sie), `disk.get/put/delete/scan` wie in
+  JFNetworker, im Speicher oder mit `--disk DATEI` als JSON-Objekt mit einem Schlüssel je
+  Zeile. `net`, `dns`, `http` und `metrics` werfen einen fangbaren Fehler; sonst hat ein Skript
+  keinen Zugriff auf Dateien, Programme oder das Netz. Grenzen per `--fuel` (0: keine),
+  `--heap` (auch `64k`, `16M`), `--depth`, `--stack`, sonst `Limits::default()`. Fehler beim
+  Übersetzen oder Laufen erscheinen auf stderr mit Datei, Zeile:Spalte, der Quellzeile mit
+  Marke und der Aufrufkette (Rekursionen zusammengefasst), Exit-Code 1; ein falscher Aufruf
+  ergibt 2. Sprache und VM sind unverändert; neu in `lib/script` ist nur
+  `compile_with(name, src, globals)`: Namen gegen die des Hosts (dazu Built-ins und
+  Standardbibliothek), ein unbekannter Name ist dort ein Fehler statt einer Warnung (getestet
+  in `coretest --only scriptvm`). Eine REPL gibt es nicht. Tests: `python build_rs.py test jfs`
+  startet `jfs --selftest apps/jfs/tests/cases`, 14 Fälle (`*.test`) mit Läufen von `jfs`
+  samt Argumenten, Umgebung und stdin und der erwarteten Ausgabe auf stdout und stderr, dem
+  Exit-Code und Dateiinhalten: Hallo Welt, Argumente und `config`, Timer mit virtueller und
+  echter Uhr, Fehler mit Zeile:Spalte und Aufrufkette, `--check`, `-e`, stdin, überschrittene
+  Grenzen, die Namen von JFNetworker, die Disk-Datei über zwei Läufe, `log`, `rand` mit
+  Startwert; Windows und Linux. Export und Import als `.jfs`-Datei im Skript-Editor gehören zu
+  JFNetworker (SK5 im App-README).
+- **P3** · *teilweise* · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
   der Browser selbst mit den Meilensteinen B1 bis B4 steht im App-README unter „Fahrplan“).
   Der Browser zeigt Seiten mit `ui.html_view` (`md_doc`, `md_view`, `rich_html`) statt mit einer
-  eigenen Engine. Dafür braucht die Library: (1) Bilder aus anderen Quellen: eine Rückfrage,
-  über die die App die Bytes einer Adresse liefert (für B1; heute nur VFS und lokale Pfade,
-  sonst der Alt-Text). (2) Formulare im Dokument (für B2): `<form>`, `<input>` (Text, Passwort,
-  Häkchen, Radio, versteckt), `<textarea>`, `<select>`, `<button>` als bedienbare Elemente im
-  Textfluss, ihre Werte im `MdViewState`, `MdEv` meldet Eingabe und Absenden mit den Feldern;
-  ohne Formular bleibt die Ansicht lesend wie heute. (3) Ein veränderbares Dokument (für B3,
-  Seitenskripte): Elemente in `md_doc` über id, Klasse oder Tag finden, Text, Attribute und
-  Klassen ändern, Elemente einfügen und entfernen, danach neu setzen, ohne Bildlauf und
-  Auswahl zu verlieren. (4) Später eine CSS-Teilmenge in `rich_html` (für B4): `<style>` mit
+  eigenen Engine. Dafür braucht die Library: (1) *erledigt* (2026-10-26) Bilder aus anderen
+  Quellen: `MdViewState::images` = `MI_ASK` (http:, https: und data: fragt die Ansicht bei der
+  App an, VFS und Pfade liest sie weiter selbst) oder `MI_APP` (jedes Bild kommt von der App,
+  die Ansicht liest keine Datei); `image_requests()` nennt jede Adresse der Bilder im Blick
+  einmal, `set_image(adresse, Some(bytes) | None)` antwortet (sofort dekodiert: SVG oder
+  img_core; Fehler: der Alt-Text); bis dahin steht ein Rahmen mit dem Alt-Text in der Größe aus
+  dem HTML, danach wird der Block neu gesetzt, ohne dass die Ansicht springt. (2) *erledigt*
+  (2026-10-26) Formulare im Dokument: `<form action method>`, `<input>` (Text und weitere
+  Texttypen, Passwort, Häkchen, Radio, versteckt, submit, image, reset, button),
+  `<textarea>`, `<select>`/`<option>`, `<button>`, `<label>` (umschließend oder `for=`),
+  `form=`; die Felder sind die Widgets der Library im Textfluss (Stil, hoher Kontrast,
+  Textgröße, gespiegeltes Fenster), `MdDoc::forms()` / `fields()` beschreiben sie, die Werte
+  liegen im `MdViewState` (`field_text` / `field_checked` / `field_selected`, Setter,
+  `form_data`, `reset_form`, `focused_field`); `MdEv::field` meldet Eingaben, `MdEv::submit`
+  das Absenden (`MdSubmit`: Formular, action, method, Name/Wert-Paare wie ein Browser, Knopf).
+  Tastatur: Tab/Umschalt+Tab durch Links und Felder in Lesereihenfolge (eine Radiogruppe ist
+  ein Halt, die Pfeile wählen), Leertaste schaltet, Eingabe sendet (mit dem ersten
+  Absendeknopf), Esc zurück in die Ansicht; Passwortfelder geben ihren Text weder an
+  Screenreader noch an die Zwischenablage; ohne Felder bleibt die Ansicht lesend wie zuvor
+  (alle bisherigen Shots byteweise gleich). Getestet mit `mdviewtest --test unit` (Gruppen
+  `forms`, `form view`) und `--page form` (`form_keys.uis`, `form_mouse.uis`,
+  `form_images.uis`, `form_scale.uis`, `form_rtl.uis`; Windows und Linux). Offen: die Felder
+  folgen der Spiegelung des Fensters, nicht der Richtung ihres Absatzes; keine Datei-Felder,
+  keine Mehrfachauswahl. (3) *fehlt* Ein veränderbares Dokument (für B3, Seitenskripte):
+  Elemente in `md_doc` über id, Klasse oder Tag finden, Text, Attribute und Klassen ändern,
+  Elemente einfügen und entfernen, danach neu setzen, ohne Bildlauf und Auswahl zu verlieren.
+  (4) *fehlt* Später eine CSS-Teilmenge in `rich_html` (für B4): `<style>` mit
   Selektoren nach Tag, Klasse und id, die Eigenschaften, die heute aus `style=` gelesen werden,
   dazu Abstände und Rahmen. In `lib/script` nur `compile_with` (siehe den Runner), damit der
   Browser-Host seine eigenen Globals (`document`, `fetch` …) prüfen lässt. Bewusst nicht: eine
@@ -1665,9 +1692,9 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   (der Klick erreicht die App nicht, Esc beendet). Das eigene Fenster fehlt in Baum, Overlay und
   Auswahl; es stiehlt keinen Fokus. Skriptbefehle `inspect …` (u. a. `expect same` / `idle`
   für „aus ändert nichts“), Tests `apps/gallery/tests/inspect.uis` und `inspect_rtl.uis`
-  (Windows und Linux, auch mit `--verify-dirty`). Es fehlt: Bearbeiten im Inspektor (nächster
-  Eintrag) und Hot-Reload.
-- **P2** · *fehlt* · Hot-Reload und beschreibbarer Inspektor („Live-Edit“, wie das F12-Menü
+  (Windows und Linux, auch mit `--verify-dirty`). Bearbeiten im Inspektor und
+  Hot-Reload: Stufen 1 bis 3 des nächsten Eintrags erledigt (2026-10-26).
+- **P2** · *teilweise* · Hot-Reload und beschreibbarer Inspektor („Live-Edit“, wie das F12-Menü
   eines Browsers), als Debug-Variante. Festgelegt am 2026-10-25: (a) Eine Art Hot-Reload: Code
   ändern, die laufende App zeigt die Änderung; die Elemente bleiben gebauter Rust-Code, nichts
   wird zur Laufzeit beschrieben oder interpretiert. (b) Nur als Debug-Variante und nur wenn
@@ -1697,3 +1724,46 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   ändert kein Bild (`inspect expect same` / `idle`); Änderungen im Inspektor gelten nur für die
   laufende Sitzung, bis man sie übernimmt. Tests: Skriptbefehle `inspect set …` /
   `inspect reset`, `apps/gallery/tests/inspect*.uis`.
+  Stufe 1 erledigt (2026-10-26, [GUIDE.md §30](GUIDE.md) „Hot reload“, `tools/hotreload.py`,
+  `lib/ui/hotreload.rs`): `build_rs.py watch NAME [--target win|linux] [-- ARGS]` beobachtet die
+  Quellen der App und aller Bibliotheks- und Stil-Crates, die sie linkt (Änderungszeiten per
+  `os.scandir` je Ordner abgefragt; `lib/plat/watch.rs` ist Rust und passt nicht in das
+  Python-Werkzeug), baut beim Speichern den Entwicklungs-Build und startet die App als Kopie
+  `NAME.hot[.exe]` in ihrer Sitzung `build/<t>/hot/NAME` neu. Nur im Entwicklungs-Build für Windows
+  und Linux (`--cfg jfgui_dev` für `ui`) und nur mit `jfgui_HOTRELOAD`: die App zeichnet ihre
+  Eingaben auf (die Felder von `--log-events` mit Zeit, dazu Fenstergröße und dpi, `UIC_ACTIVE`
+  und die Antworten der Zwischenablage); der nächste Start spielt sie vor dem ersten Warten ab
+  (virtuelle Uhr: Timer zu ihren Fristen, Animationen springen), Zwischenablage, Dateidialoge,
+  Töne und andere Programme des Systems bleiben dabei unberührt. Prüfung: jedes Drücken, Rad,
+  Loslassen, jede Taste und jeder Text muss dasselbe Widget erreichen wie bei der Aufnahme, sonst
+  „diverged“, Exit-Code 3 und frischer Start; Eingaben von außen (Ablegen aus anderen Programmen,
+  der Dateidialog des Systems, Ziehen hinaus) machen das Protokoll unabspielbar. Daneben bleiben
+  Fensterposition und -größe (`window.ini` über `jfgui_STATE`), Stil, Textskalierung und der
+  Inspektor mit Reiter, Optionen und Auswahl (Skript-Selektor) erhalten (`carry.ini`), auch bei
+  frischem Start. Schlägt der Bau fehl, läuft die alte Fassung weiter und der Fehler steht oben im
+  Inspektor („Bau fehlgeschlagen“), der sich dafür öffnet. Tests: `tools/tests/test_hotreload.py`
+  (der Beobachter mit einem Ersatzprogramm, läuft in der Suite; eine vorübergehende App gebaut,
+  aufgezeichnet, abgespielt, abgewichen, Bau gescheitert, headless auf Windows und Linux; die
+  Fensterschleife unter Windows auf einem eigenen Desktop, nie auf dem Bildschirm). Grenze: was das
+  Abspielen nicht kennt (Dateien, Netz, Zeitpunkte von Hintergrundaufgaben, Agenten-Aktionen, die
+  echte Uhr), kann nach dem Neustart abweichen.
+  Stufen 2 und 3 *erledigt* (2026-10-26, [`ui/inspect_edit.rs`](../lib/ui/inspect_edit.rs),
+  [GUIDE.md §30](GUIDE.md)): nur im Entwicklungs-Build (`build_rs.py` setzt dort
+  `--cfg jfgui_dev`; in `--release` bleibt der Inspektor nur lesend). Tab „Farben“ editierbar
+  (Hex-Feld und Farbwähler, die Farben des Modus in Gebrauch; die Zeile von `T_ACCENT` setzt den
+  Akzent, aus dem der Stil seine Abstufungen ableitet), neuer Tab „Darstellung“: Stil,
+  hell/dunkel/hoher Kontrast, Akzent, Sprache, Skalierung des Hauptfensters, Textskalierung,
+  Eckenradius, Abstände, Höhe der Steuerelemente, Schriftfamilie, Textgrößen; Theme-Werte über
+  `ui.set_theme` über dem App-Theme, der Rest über die vorhandenen Aufrufe. Geänderte Werte
+  markiert, einzeln zurücksetzbar, „Alles zurücksetzen“, Rückgängig/Wiederholen (Leiste,
+  Strg+Z/Strg+Y; `History` mit `Snapshot`-Schritten, ein Ziehen ist ein Schritt); das
+  Werkzeugfenster selbst bleibt im Aussehen des Stils, damit es bedienbar bleibt. „Bedienen“
+  (Tab „Widgets“): Klicken, Ziehen um dx/dy, Wert eines Schiebereglers (wie ein Screenreader
+  ihn setzt), Text tippen, `cmd ID` -- als synthetische Ereignisse in der Ereignisschlange, mit
+  der passenden Skriptzeile. Übernehmen: „Als Theme speichern“ (das App-Theme mit den
+  Änderungen; Schriftdateien relativ zur Theme-Datei), „Liste kopieren“ („Das hast du
+  geändert“: Theme-Zeilen, der Rest als Code-Zeilen). Skriptbefehle `inspect set|reset|undo|
+  redo|save|list|do …`, `inspect expect changes|value|list|undo|redo|message`; Tests
+  `apps/gallery/tests/inspect_edit.uis`, `inspect_edit_rtl.uis` (gespiegelt, 150 %),
+  `apps/themedemo/tests/inspect_edit.uis` (die gelinkten Stile, Änderungen über einem
+  App-Theme), Windows und Linux, auch mit `--verify-dirty`. Offen: Stufe 4 (Quelltext öffnen).

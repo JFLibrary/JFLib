@@ -1,0 +1,21 @@
+// error.jfs -- an uncaught error: message, line and column, the source line, the calls
+fn average(list) {
+  let sum = 0
+  for x in list {
+    sum += x
+  }
+  return sum / len(list)
+}
+
+fn report(name, values) {
+  print(name, average(values))
+}
+
+report("a", [1, 2, 3])
+try {
+  report("b", [])
+} catch e {
+  print("caught:", e)
+}
+report("c", [])
+print("not reached")

@@ -15,21 +15,24 @@
 //   (crate) clip_html(paras, font, size) the clipboard's HTML: to_html plus the fragment as
 //                                    JSON in a comment (<!--jfrich ...-->), so a paste into a
 //                                    richtext keeps every attribute exactly
-//   (crate) html_read(s) -> (paras, HExt)   the same reader for the Markdown / HTML viewer
+//   (crate) html_read(s) -> HRead   the same reader for the Markdown / HTML viewer
 //                                    (md_doc.rs): the paragraphs and, by paragraph, what a
-//                                    viewer shows besides them -- rules, images (U+FFFC in the
-//                                    text), preformatted blocks and their language, the heading
-//                                    level, the quotation depth, table rows and their cells, the
-//                                    numbers of list items
+//                                    viewer shows besides them -- rules, images and form fields
+//                                    (U+FFFC in the text), preformatted blocks and their
+//                                    language, the heading level, the quotation depth, table
+//                                    rows and their cells, the numbers of list items, task
+//                                    boxes; the forms and their fields (md_doc.rs "Forms")
 //
 // Whitespace outside <pre> / white-space:pre* collapses as in browsers; a paragraph is a
 // block or the text between two <br>.  Nesting is capped (NEST_MAX open blocks, formats and
 // lists: deeper tags count as text-level), so no input costs more than linear time.
 
+use alloc::collections::BTreeMap;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use crate::md_doc::{MdField, MdForm, MdOption, MF_BUTTON, MF_CHECKBOX, MF_HIDDEN, MF_PASSWORD, MF_RADIO, MF_RESET, MF_SELECT, MF_SUBMIT, MF_TEXT, MF_TEXTAREA};
 use crate::rich_doc::*;
 
 fn esc(s: &str, out: &mut String) {
@@ -255,21 +258,67 @@ fn embedded(s: &str) -> Option<RichDoc> {
 
 /// (md_doc.rs) the paragraphs of HTML and what a viewer shows besides them (see the module
 /// header)
-pub(crate) fn html_read(s: &str) -> (Vec<Para>, Vec<(usize, HExt)>) {
+pub(crate) fn html_read(s: &str) -> HRead {
     let mut r = Reader::new();
     r.ext = Some(Ext::default());
     r.run(s);
-    let ext = r.ext.take().map(|e| e.items).unwrap_or_default();
+    r.cap_end();
+    r.label_end();
+    let mut e = r.ext.take().unwrap_or_default();
+    // label for= and form= by id (the first element with it)
+    let mut ids: BTreeMap<String, usize> = BTreeMap::new();
+    for (i, f) in e.fields.iter().enumerate().rev() {
+        if !f.id.is_empty() {
+            ids.insert(f.id.clone(), i);
+        }
+    }
+    for (id, text) in core::mem::take(&mut e.labels) {
+        if let Some(f) = ids.get(&id).and_then(|&i| e.fields.get_mut(i)) {
+            if f.label.is_empty() && !matches!(f.kind, MF_SUBMIT | MF_RESET | MF_BUTTON) {
+                f.label = text;
+            }
+        }
+    }
+    ids.clear();
+    for (i, f) in e.forms.iter().enumerate().rev() {
+        if !f.id.is_empty() {
+            ids.insert(f.id.clone(), i);
+        }
+    }
+    for (k, id) in core::mem::take(&mut e.form_of) {
+        if let (Some(&i), Some(f)) = (ids.get(&id), e.fields.get_mut(k)) {
+            f.form = i as u32 + 1;
+        }
+    }
+    for (k, t) in core::mem::take(&mut e.titles) {
+        if let Some(f) = e.fields.get_mut(k).filter(|f| f.label.is_empty()) {
+            f.label = t;
+        }
+    }
     let mut paras = r.finish();
-    if paras.len() == 1 && paras[0].is_empty() && ext.is_empty() {
+    if paras.len() == 1 && paras[0].is_empty() && e.items.is_empty() {
         paras.clear();
     }
-    (paras, ext)
+    HRead { paras, ext: e.items, forms: e.forms, fields: e.fields }
+}
+
+/// what html_read returns: the paragraphs, the items by paragraph, the forms and fields
+/// (MdField::form: index + 1 into forms; HExt::Field::n: index into fields)
+pub(crate) struct HRead {
+    pub paras: Vec<Para>,
+    pub ext: Vec<(usize, HExt)>,
+    pub forms: Vec<MdForm>,
+    pub fields: Vec<MdField>,
 }
 
 /// what html_read reports about paragraph `at` (the index the item is filed under)
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum HExt {
+    /// a form field: U+FFFC at `byte` of the paragraph (None: a hidden one, no character);
+    /// fields[n]
+    Field { byte: Option<usize>, n: usize },
+    /// the paragraph is a task item: a disabled check box at its start (checked)
+    Task(bool),
     /// a horizontal rule before the paragraph
     Rule,
     /// an image: U+FFFC at `byte` of the paragraph (width / height: attributes, 0 none)
@@ -303,10 +352,55 @@ struct Ext {
     nums: Vec<u32>,
     // inside a table cell
     cell: bool,
+    // forms and their fields; the open form (index)
+    forms: Vec<MdForm>,
+    fields: Vec<MdField>,
+    form: Option<u32>,
+    // the open <label>: for=, its text, the field inside it
+    label: Option<(String, String, Option<usize>)>,
+    // labels for= an id, form= ids and titles of fields (resolved at the end)
+    labels: Vec<(String, String)>,
+    form_of: Vec<(usize, String)>,
+    titles: Vec<(usize, String)>,
+    // the field whose content is read: a <select>'s options or a <button>'s caption (raw,
+    // collapsed at its end); the option being read has a value attribute
+    cap: Option<usize>,
+    opt_val: bool,
+    // the <textarea> whose text is read raw
+    raw: Option<usize>,
 }
 
 // open blocks, formats and lists at most (deeper ones are not opened)
 const NEST_MAX: usize = 64;
+// forms, fields, choices of a list at most (more count as nothing)
+const FORMS_MAX: usize = 4096;
+const FIELDS_MAX: usize = 0xFFFE;
+const OPTIONS_MAX: usize = 4096;
+
+// the bytes of a label, caption or choice kept at most
+const CAP_TEXT: usize = 8192;
+
+// s + t, at most CAP_TEXT bytes (cut at a character)
+fn push_cap(s: &mut String, t: &str) {
+    let mut n = CAP_TEXT.saturating_sub(s.len()).min(t.len());
+    while !t.is_char_boundary(n) {
+        n -= 1;
+    }
+    s.push_str(&t[..n]);
+}
+
+// text with its runs of white space as one blank, none at the ends (a no-break space stays,
+// as a blank)
+fn collapse(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for w in s.split(|c: char| c.is_whitespace() && c != '\u{A0}').filter(|w| !w.is_empty()) {
+        if !out.is_empty() {
+            out.push(' ');
+        }
+        out.push_str(&w.replace('\u{A0}', " "));
+    }
+    out
+}
 
 // ------------------------------------------------------------------ the reader
 
@@ -736,6 +830,21 @@ impl Reader {
 
     fn text(&mut self, raw: &str) {
         let t = decode(raw);
+        // html_read: inside a <select> or <button> the text is the field's; the text of an open
+        // <label> names its field
+        if let Some(e) = self.ext.as_mut() {
+            if let Some(fd) = e.cap.and_then(|f| e.fields.get_mut(f)) {
+                if fd.kind != MF_SELECT {
+                    push_cap(&mut fd.label, &t);
+                } else if let Some(o) = fd.options.last_mut() {
+                    push_cap(&mut o.label, &t);
+                }
+                return;
+            }
+            if let Some(l) = e.label.as_mut() {
+                push_cap(&mut l.1, &t);
+            }
+        }
         if self.pre() {
             let f = self.fmt();
             let mut first = true;
@@ -854,7 +963,269 @@ impl Reader {
         self.ext.as_ref().is_some_and(|e| e.cell) && !matches!(tag, "tr" | "td" | "th" | "table" | "thead" | "tbody" | "tfoot")
     }
 
+    // html_read: a new field -- its U+FFFC (none for a hidden one) in the paragraph, the open
+    // form's, the open label's -> its index (None: FIELDS_MAX reached)
+    fn field_new(&mut self, mut fd: MdField, at: &[(String, String)]) -> Option<usize> {
+        let attr = |k: &str| at.iter().find(|a| a.0 == k).map(|a| a.1.as_str());
+        let n = self.ext.as_ref()?.fields.len();
+        if n >= FIELDS_MAX {
+            return None;
+        }
+        fd.name = String::from(attr("name").unwrap_or(""));
+        fd.id = String::from(attr("id").unwrap_or("").trim());
+        fd.disabled = attr("disabled").is_some();
+        fd.readonly = attr("readonly").is_some();
+        if !matches!(fd.kind, MF_SUBMIT | MF_RESET | MF_BUTTON) {
+            fd.label = collapse(attr("aria-label").unwrap_or(""));
+        }
+        let byte = if fd.kind == MF_HIDDEN {
+            None
+        } else {
+            let f = self.fmt();
+            let b = self.cur.len();
+            self.cur.push("\u{FFFC}", &f);
+            self.started = true;
+            self.space = false;
+            Some(b)
+        };
+        let para = self.out.len();
+        let e = self.ext.as_mut()?;
+        fd.form = e.form.map_or(0, |i| i + 1);
+        if let Some(id) = attr("form") {
+            e.form_of.push((n, String::from(id.trim())));
+        }
+        if let Some(t) = attr("title") {
+            e.titles.push((n, collapse(t)));
+        }
+        if let Some(l) = e.label.as_mut() {
+            if l.2.is_none() {
+                l.2 = Some(n);
+            }
+        }
+        e.fields.push(fd);
+        e.items.push((para, HExt::Field { byte, n }));
+        Some(n)
+    }
+
+    // html_read: the choice read last gets its text (collapsed) and, without a value
+    // attribute, that text as its value
+    fn option_end(fd: &mut MdField, had_value: bool) {
+        if let Some(o) = fd.options.last_mut() {
+            o.label = collapse(&o.label);
+            if !had_value {
+                o.value = o.label.clone();
+            }
+        }
+    }
+
+    // html_read: the end of a <select>'s or <button>'s content
+    fn cap_end(&mut self) {
+        let Some(e) = self.ext.as_mut() else { return };
+        let Some(f) = e.cap.take() else { return };
+        let had_value = e.opt_val;
+        let Some(fd) = e.fields.get_mut(f) else { return };
+        if fd.kind == MF_SELECT {
+            Self::option_end(fd, had_value);
+            if fd.selected < 0 && !fd.options.is_empty() {
+                fd.selected = 0;
+            }
+        } else {
+            fd.label = collapse(&fd.label);
+        }
+    }
+
+    // html_read: the end of a <label>: its text names the field inside it, or the one with the
+    // id of its for= (resolved at the end); an aria-label wins
+    fn label_end(&mut self) {
+        let Some(e) = self.ext.as_mut() else { return };
+        let Some((to, text, field)) = e.label.take() else { return };
+        let text = collapse(&text);
+        if text.is_empty() {
+            return;
+        }
+        if !to.is_empty() {
+            e.labels.push((to, text));
+        } else if let Some(fd) = field.and_then(|f| e.fields.get_mut(f)) {
+            if fd.label.is_empty() && !matches!(fd.kind, MF_SUBMIT | MF_RESET | MF_BUTTON) {
+                fd.label = text;
+            }
+        }
+    }
+
+    // html_read: a <textarea>'s text (raw; entities decoded, line ends as '\n', the first one
+    // dropped)
+    fn raw_text(&mut self, s: &str) {
+        let Some(e) = self.ext.as_mut() else { return };
+        let Some(fd) = e.raw.take().and_then(|f| e.fields.get_mut(f)) else { return };
+        let t = decode(s).replace("\r\n", "\n").replace('\r', "\n");
+        fd.value = String::from(t.strip_prefix('\n').unwrap_or(&t));
+    }
+
+    // html_read: forms and their fields (form, label, input, textarea, select / option,
+    // button) -> the tag was taken
+    fn form_open(&mut self, tag: &str, at: &[(String, String)]) -> bool {
+        let attr = |k: &str| at.iter().find(|a| a.0 == k).map(|a| a.1.as_str());
+        let num = |k: &str| attr(k).and_then(|v| v.trim().parse::<u32>().ok()).unwrap_or(0).min(100_000);
+        let started = self.started;
+        let Some(e) = self.ext.as_mut() else { return false };
+        // inside a <select> or <button>: choices, a picture's alt text; other tags count as
+        // nothing, a new field ends it
+        if let Some(fd) = e.cap.and_then(|f| e.fields.get_mut(f)) {
+            match tag {
+                "input" | "select" | "textarea" | "button" => {}
+                "option" if fd.kind == MF_SELECT => {
+                    if fd.options.len() < OPTIONS_MAX {
+                        Self::option_end(fd, e.opt_val);
+                        if attr("selected").is_some() {
+                            fd.selected = fd.options.len() as i32;
+                        }
+                        fd.options.push(MdOption { value: String::from(attr("value").unwrap_or("")), label: String::new() });
+                        e.opt_val = attr("value").is_some();
+                    }
+                    return true;
+                }
+                "img" if fd.kind != MF_SELECT => {
+                    push_cap(&mut fd.label, attr("alt").unwrap_or(""));
+                    return true;
+                }
+                _ => return true,
+            }
+            self.cap_end();
+        }
+        let Some(e) = self.ext.as_mut() else { return false };
+        let field = |kind: u8| MdField { kind, selected: -1, ..MdField::default() };
+        match tag {
+            "form" => {
+                // (forms do not nest: an inner one counts as nothing)
+                if e.form.is_none() && e.forms.len() < FORMS_MAX {
+                    let method = if attr("method").is_some_and(|m| m.trim().eq_ignore_ascii_case("post")) { "post" } else { "get" };
+                    e.forms.push(MdForm {
+                        action: String::from(attr("action").unwrap_or("").trim()),
+                        method: String::from(method),
+                        id: String::from(attr("id").unwrap_or("").trim()),
+                        name: String::from(attr("name").unwrap_or("")),
+                    });
+                    e.form = Some(e.forms.len() as u32 - 1);
+                    if !self.in_cell(tag) {
+                        self.flush(false);
+                    }
+                }
+            }
+            "label" => {
+                self.label_end();
+                if let Some(e) = self.ext.as_mut() {
+                    e.label = Some((String::from(attr("for").unwrap_or("").trim()), String::new(), None));
+                }
+            }
+            "input" => {
+                let ty = attr("type").unwrap_or("text").trim().to_ascii_lowercase();
+                let kind = match ty.as_str() {
+                    "password" => MF_PASSWORD,
+                    "checkbox" => MF_CHECKBOX,
+                    "radio" => MF_RADIO,
+                    "hidden" => MF_HIDDEN,
+                    "submit" | "image" => MF_SUBMIT,
+                    "reset" => MF_RESET,
+                    "button" => MF_BUTTON,
+                    _ => MF_TEXT,
+                };
+                let checked = attr("checked").is_some();
+                // a disabled check box at the start of a list item: the item's task box
+                if kind == MF_CHECKBOX && attr("disabled").is_some() && e.item.is_some() && !started {
+                    e.items.push((self.out.len(), HExt::Task(checked)));
+                    return true;
+                }
+                let value = attr("value");
+                let mut fd = field(kind);
+                fd.checked = checked;
+                fd.value = String::from(match kind {
+                    MF_CHECKBOX | MF_RADIO => value.unwrap_or("on"),
+                    _ => value.unwrap_or(""),
+                });
+                if kind == MF_TEXT || kind == MF_PASSWORD {
+                    fd.value.retain(|c| c != '\r' && c != '\n');
+                }
+                if matches!(kind, MF_SUBMIT | MF_RESET | MF_BUTTON) {
+                    fd.label = collapse(if ty == "image" { attr("alt").unwrap_or("") } else { value.unwrap_or("") });
+                }
+                fd.placeholder = collapse(attr("placeholder").unwrap_or(""));
+                fd.size = num("size");
+                fd.maxlength = num("maxlength");
+                self.field_new(fd, at);
+            }
+            "textarea" => {
+                let mut fd = field(MF_TEXTAREA);
+                fd.placeholder = collapse(attr("placeholder").unwrap_or(""));
+                fd.size = num("cols");
+                fd.rows = num("rows");
+                fd.maxlength = num("maxlength");
+                let n = self.field_new(fd, at);
+                if let Some(e) = self.ext.as_mut() {
+                    e.raw = n;
+                }
+                // (the text up to </textarea> is the field's: run reads it raw)
+                self.skip = Some(String::from("textarea"));
+            }
+            "select" | "button" => {
+                let kind = match (tag, attr("type").map(|t| t.trim().to_ascii_lowercase()).as_deref()) {
+                    ("select", _) => MF_SELECT,
+                    (_, Some("reset")) => MF_RESET,
+                    (_, Some("button")) => MF_BUTTON,
+                    _ => MF_SUBMIT,
+                };
+                let mut fd = field(kind);
+                if kind != MF_SELECT {
+                    fd.value = String::from(attr("value").unwrap_or(""));
+                }
+                let n = self.field_new(fd, at);
+                if let Some(e) = self.ext.as_mut() {
+                    e.cap = n;
+                    e.opt_val = false;
+                }
+            }
+            _ => return false,
+        }
+        true
+    }
+
+    // html_read: the end of a form, a label, a list or a button -> the tag was taken
+    fn form_close(&mut self, tag: &str) -> bool {
+        let Some(e) = self.ext.as_ref() else { return false };
+        if let Some(f) = e.cap {
+            let select = e.fields.get(f).is_some_and(|fd| fd.kind == MF_SELECT);
+            match tag {
+                "select" if select => {}
+                "button" if !select => {}
+                "form" => {}
+                // (end tags inside a <select> or <button> count as nothing)
+                _ => return true,
+            }
+            self.cap_end();
+            if tag != "form" {
+                return true;
+            }
+        }
+        match tag {
+            "label" => self.label_end(),
+            "form" => {
+                if self.ext.as_ref().is_some_and(|e| e.form.is_some()) {
+                    if !self.in_cell(tag) {
+                        self.flush(false);
+                    }
+                    if let Some(e) = self.ext.as_mut() {
+                        e.form = None;
+                    }
+                }
+            }
+            _ => return false,
+        }
+        true
+    }
+
     fn open(&mut self, tag: &str, at: &[(String, String)], selfclose: bool) {
+        if self.ext.is_some() && self.form_open(tag, at) {
+            return;
+        }
         if self.in_cell(tag) && (BLOCKS.contains(&tag) || matches!(tag, "br" | "hr" | "ul" | "ol")) {
             if !self.space && self.started {
                 self.text(" ");
@@ -957,6 +1328,9 @@ impl Reader {
     }
 
     fn close(&mut self, tag: &str) {
+        if self.ext.is_some() && self.form_close(tag) {
+            return;
+        }
         if let Some(i) = self.fmts.iter().rposition(|f| f.0 == tag) {
             self.fmts.truncate(i);
         }
@@ -1005,10 +1379,14 @@ impl Reader {
                 let close = format!("</{}", tag);
                 match find_ci(rest, &close) {
                     Some(i) => {
+                        self.raw_text(&rest[..i]);
                         rest = &rest[i..];
                         self.skip = None;
                     }
-                    None => return,
+                    None => {
+                        self.raw_text(rest);
+                        return;
+                    }
                 }
             }
             let Some(lt) = rest.find('<') else {

@@ -90,6 +90,13 @@ fn columns() -> Vec<String> {
     }
 }
 
+/// (inspect_edit.rs) the codes of the languages the UI can switch to: the columns of the app's
+/// catalogue, else German and English
+#[cfg(jfgui_dev)]
+pub(crate) fn language_codes() -> Vec<String> {
+    columns()
+}
+
 /// the code of the current UI language ("de", "en", "fr"; the catalogue's header, lower case)
 pub fn language_code() -> String {
     let cols = columns();
@@ -604,6 +611,8 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Standardschrift", "Default font", "Police par défaut", "Fuente predeterminada", "Carattere predefinito", "Standaardlettertype", "Domyślna czcionka", "الخط الافتراضي", "גופן ברירת מחדל"],
     // (ROADMAP §6) the Markdown / HTML viewer's name for screen readers (md_view.rs)
     ["Dokument", "Document", "Document", "Documento", "Documento", "Document", "Dokument", "مستند", "מסמך"],
+    // (ROADMAP §7) the caption of a form's submit button that has none (md_doc.rs)
+    ["Senden", "Submit", "Envoyer", "Enviar", "Invia", "Verzenden", "Wyślij", "إرسال", "שליחה"],
     // (ROADMAP §12) the live inspector's tool window (inspect.rs)
     ["Inspektor", "Inspector", "Inspecteur", "Inspector", "Ispettore", "Inspector", "Inspektor", "أداة الفحص", "כלי בדיקה"],
     ["Auswählen", "Pick", "Choisir", "Elegir", "Scegli", "Kiezen", "Wskaż", "انتقاء", "בחירה"],
@@ -642,6 +651,62 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Zeichenbefehle", "Draw commands", "Commandes de dessin", "Comandos de dibujo", "Comandi di disegno", "Tekenopdrachten", "Polecenia rysowania", "أوامر الرسم", "פקודות ציור"],
     ["Glyphen-Cache", "Glyph cache", "Cache des glyphes", "Caché de glifos", "Cache dei glifi", "Glyphcache", "Pamięć podręczna glifów", "ذاكرة الحروف المؤقتة", "מטמון גליפים"],
     ["Hauptfenster", "Main window", "Fenêtre principale", "Ventana principal", "Finestra principale", "Hoofdvenster", "Okno główne", "النافذة الرئيسية", "חלון ראשי"],
+    // (ROADMAP §11) hot reload: a failed build in the inspector (hotreload.rs)
+    ["Bau fehlgeschlagen", "Build failed", "Échec de la compilation", "Error de compilación", "Compilazione non riuscita", "Build mislukt", "Kompilacja nie powiodła się", "فشل البناء", "הבנייה נכשלה"],
+    [
+        "Die laufende Fassung bleibt.",
+        "The running version stays.",
+        "La version en cours reste active.",
+        "La versión en ejecución se mantiene.",
+        "La versione in esecuzione resta attiva.",
+        "De draaiende versie blijft actief.",
+        "Działająca wersja pozostaje.",
+        "تبقى النسخة الجارية قيد التشغيل.",
+        "הגרסה הפועלת נשארת.",
+    ],
+    // (ROADMAP §11) the inspector's editing (inspect_edit.rs, development builds)
+    ["Hell", "Light", "Clair", "Claro", "Chiaro", "Licht", "Jasny", "فاتح", "בהיר"],
+    ["Dunkel", "Dark", "Sombre", "Oscuro", "Scuro", "Donker", "Ciemny", "داكن", "כהה"],
+    ["Hoher Kontrast", "High contrast", "Contraste élevé", "Contraste alto", "Contrasto elevato", "Hoog contrast", "Wysoki kontrast", "تباين عالٍ", "ניגודיות גבוהה"],
+    ["Akzent", "Accent", "Accent", "Acento", "Accento", "Accent", "Akcent", "لون التمييز", "צבע הדגשה"],
+    ["Eckenradius", "Corner radius", "Rayon des coins", "Radio de las esquinas", "Raggio degli angoli", "Hoekradius", "Promień narożników", "نصف قطر الزوايا", "רדיוס פינות"],
+    ["Abstände", "Spacing", "Espacement", "Espaciado", "Spaziatura", "Afstand", "Odstępy", "التباعد", "ריווח"],
+    ["Steuerelementhöhe", "Control height", "Hauteur des contrôles", "Altura de los controles", "Altezza dei controlli", "Hoogte van besturingselementen", "Wysokość kontrolek", "ارتفاع عناصر التحكم", "גובה פקדים"],
+    ["Familie", "Family", "Famille", "Familia", "Famiglia", "Familie", "Rodzina", "العائلة", "משפחה"],
+    ["Modus", "Mode", "Mode", "Modo", "Modalità", "Modus", "Tryb", "الوضع", "מצב תצוגה"],
+    ["Stil", "Style", "Style", "Estilo", "Stile", "Stijl", "Styl", "النمط", "סגנון"],
+    ["Sprache", "Language", "Langue", "Idioma", "Lingua", "Taal", "Język", "اللغة", "שפה"],
+    ["Skalierung", "Scale", "Échelle", "Escala", "Scala", "Schaal", "Skala", "التحجيم", "קנה מידה"],
+    ["Textskalierung", "Text scale", "Échelle du texte", "Escala del texto", "Scala del testo", "Tekstschaal", "Skala tekstu", "تحجيم النص", "קנה מידה של טקסט"],
+    ["vom Stil", "from the style", "du style", "del estilo", "dello stile", "van de stijl", "ze stylu", "من النمط", "מהסגנון"],
+    ["Alles zurücksetzen", "Reset all", "Tout réinitialiser", "Restablecer todo", "Reimposta tutto", "Alles opnieuw instellen", "Resetuj wszystko", "إعادة تعيين الكل", "איפוס הכול"],
+    ["Gespeichert: {}", "Saved: {}", "Enregistré\u{A0}: {}", "Guardado: {}", "Salvato: {}", "Opgeslagen: {}", "Zapisano: {}", "تم الحفظ: {}", "נשמר: {}"],
+    ["Nicht gespeichert: {}", "Not saved: {}", "Non enregistré\u{A0}: {}", "No guardado: {}", "Non salvato: {}", "Niet opgeslagen: {}", "Nie zapisano: {}", "لم يُحفظ: {}", "לא נשמר: {}"],
+    ["Das hast du geändert", "What you changed", "Ce que vous avez modifié", "Lo que has cambiado", "Cosa hai modificato", "Wat je hebt gewijzigd", "Co zostało zmienione", "ما غيّرته", "מה ששינית"],
+    ["Theme-Datei", "Theme file", "Fichier de thème", "Archivo de tema", "File del tema", "Themabestand", "Plik motywu", "ملف السمة", "קובץ ערכת נושא"],
+    ["Im Code", "In the code", "Dans le code", "En el código", "Nel codice", "In de code", "W kodzie", "في الشيفرة", "בקוד"],
+    ["Kopiert", "Copied", "Copié", "Copiado", "Copiato", "Gekopieerd", "Skopiowano", "تم النسخ", "הועתק"],
+    ["Änderungen: {}", "Changes: {}", "Modifications\u{A0}: {}", "Cambios: {}", "Modifiche: {}", "Wijzigingen: {}", "Zmiany: {}", "التغييرات: {}", "שינויים: {}"],
+    ["Zurücksetzen: {}", "Reset: {}", "Réinitialiser\u{A0}: {}", "Restablecer: {}", "Reimposta: {}", "Opnieuw instellen: {}", "Resetuj: {}", "إعادة تعيين: {}", "איפוס: {}"],
+    ["Farbwähler", "Color picker", "Sélecteur de couleur", "Selector de color", "Selettore colore", "Kleurkiezer", "Selektor kolorów", "منتقي الألوان", "בורר צבעים"],
+    ["geändert", "changed", "modifié", "cambiado", "modificato", "gewijzigd", "zmieniono", "مُعدَّل", "שונה"],
+    ["Darstellung", "Appearance", "Apparence", "Apariencia", "Aspetto", "Weergave", "Wygląd", "المظهر", "מראה"],
+    ["Maße", "Metrics", "Dimensions", "Medidas", "Misure", "Afmetingen", "Wymiary", "الأبعاد", "מידות"],
+    ["Schrift", "Font", "Police", "Fuente", "Carattere", "Lettertype", "Czcionka", "الخط", "גופן"],
+    ["Änderungen", "Changes", "Modifications", "Cambios", "Modifiche", "Wijzigingen", "Zmiany", "التغييرات", "שינויים"],
+    ["Keine Änderungen", "No changes", "Aucune modification", "Sin cambios", "Nessuna modifica", "Geen wijzigingen", "Brak zmian", "لا توجد تغييرات", "אין שינויים"],
+    ["Pfad der Theme-Datei", "Path of the theme file", "Chemin du fichier de thème", "Ruta del archivo de tema", "Percorso del file del tema", "Pad van het themabestand", "Ścieżka pliku motywu", "مسار ملف السمة", "נתיב קובץ ערכת הנושא"],
+    ["Als Theme speichern", "Save as theme", "Enregistrer comme thème", "Guardar como tema", "Salva come tema", "Opslaan als thema", "Zapisz jako motyw", "حفظ كسمة", "שמירה כערכת נושא"],
+    ["Liste kopieren", "Copy list", "Copier la liste", "Copiar lista", "Copia elenco", "Lijst kopiëren", "Kopiuj listę", "نسخ القائمة", "העתקת הרשימה"],
+    ["Bedienen", "Operate", "Manipuler", "Manejar", "Azionare", "Bedienen", "Obsłuż", "تشغيل", "הפעלה"],
+    ["Skript: {}", "Script: {}", "Script\u{A0}: {}", "Script: {}", "Script: {}", "Script: {}", "Skrypt: {}", "البرنامج النصي: {}", "סקריפט: {}"],
+    ["Klicken", "Click", "Cliquer", "Hacer clic", "Fai clic", "Klikken", "Kliknij", "نقر", "לחיצה"],
+    ["Ziehen", "Drag", "Glisser", "Arrastrar", "Trascina", "Slepen", "Przeciągnij", "سحب", "גרירה"],
+    ["Setzen", "Set", "Définir", "Establecer", "Imposta", "Instellen", "Ustaw", "تعيين", "הגדרה"],
+    ["Text", "Text", "Texte", "Texto", "Testo", "Tekst", "Tekst", "النص", "טקסט"],
+    ["Tippen", "Type", "Saisir", "Escribir", "Digita", "Typen", "Wpisz", "كتابة", "הקלדה"],
+    ["Befehl", "Command", "Commande", "Comando", "Comando", "Opdracht", "Polecenie", "الأمر", "פקודה"],
+    ["Ausführen", "Run", "Exécuter", "Ejecutar", "Esegui", "Uitvoeren", "Uruchom", "تنفيذ", "הרצה"],
     // (ROADMAP §6) the image viewer (imgview.rs): the accessible name of ui.image_view
     ["Bild", "Image", "Image", "Imagen", "Immagine", "Afbeelding", "Obraz", "صورة", "תמונה"],
     // (L5) the line chart (chart.rs): its empty state and the words of its summary

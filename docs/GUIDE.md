@@ -161,6 +161,7 @@ depend on the host; never report a VFS write as durable before its completion ar
 python build_rs.py app NAME                    # build/win/NAME.exe and build/linux/NAME
 python build_rs.py app NAME --target win       # one target
 python build_rs.py run NAME -- --shot out.png  # build and start (Linux: --target linux, via WSL)
+python build_rs.py watch NAME                  # hot reload: build on save, restart in the session (section 30)
 python build_rs.py app NAME --style kde --out build/kde
 python build_rs.py app NAME --release          # opt-level 2 + LTO
 python build_rs.py app NAME --profile size     # smaller release variant (packages)
@@ -1425,7 +1426,8 @@ if (desc.render)(&args, &mut dst) == 0 {
   `jfgui_INSPECT=1` (the inspector's hot keys Ctrl+Shift+I / F12 work), `jfgui_RENDER_PAR=0`
   (every render on one thread), `=1` (row bands for every render, whatever its size), `=2`
   (every render both ways, a `UIWARN` when a byte differs: run the scripts with it after a
-  change to the renderer or a `Draw`).
+  change to the renderer or a `Draw`), `jfgui_HOTRELOAD=DIR` (hot reload's session, set by
+  `build_rs.py watch`; development builds, §30).
 * **Never start an app without `--shot`, `--script` or `--auto-close`**: a plain start opens a
   real window on the user's desktop. PaintCraft saves its settings when a real window closes:
   every real-window run needs `--config build/<name>/cfg` (the capture tools set
@@ -1485,6 +1487,7 @@ in DIP):
 | `clip data FORMAT F [FORMAT F ...]` | publish one to four representations together; formats: `text`, `html`, `rtf`, `docx`; opt-in Rust extension |
 | `clip save F text\|html\|rtf\|docx`, `clip expect html\|rtf\|docx\|text-only` | save exact bytes or check rich-format availability; `text-only` also checks absence of rich representations |
 | `inspect on\|off\|arm\|pick\|select S\|...`, `inspect expect open\|idle\|same\|selected S\|selector "s"\|...` | the live inspector headless: open it, pick, select, check the overlay, the selector and that a closed inspector changes nothing (§30) |
+| `inspect set KEY VALUE`, `inspect reset [KEY]`, `inspect undo\|redo\|save PATH\|list`, `inspect do click\|drag DX DY\|value N\|type "s"\|cmd ID`, `inspect expect changes N\|value KEY "s"\|list "s"\|...` | editing in the inspector (development builds): theme tokens, accent, radius, spacing, height, text sizes, font, mode, style, language, scales; undo / redo / reset, the theme file, the change list; the selected widget operated (§30) |
 
 **Selectors** `S`: `#123` (widget id), `"Label"`, `kind:"Label"` (`button:"OK"`, `dialog:"Öffnen"`,
 `text:"Klicks: 2"`), `X,Y` (a point in DIP). A label must match exactly one widget (plain text is
@@ -3361,13 +3364,43 @@ let shard = "user:42".hash() % 8                     // FNV-1a, stable everywher
   allocating. JSON needs up to about three times the heap limit as temporary memory for its
   syntax tree.
 
+**Hosts with names of their own**: `compile` checks names against `script::GLOBALS` (the host
+API of JFNetworker) and only warns about others. A host with another set passes its names to
+`script::compile_with(name, src, &["document", "fetch"])`: the built-ins and the standard
+library are known anyway, and a name that is neither declared nor known is an error with its
+line and column ("Unbekannter Name prnt – meinst du print?"), so a typing error stops the script
+before it runs. `check_with(src, globals)` gives the editor's diagnostics for such a host.
+
+**The runner `jfs`** ([`apps/jfs`](../apps/jfs/README.md)) runs scripts on the command line:
+
+```sh
+jfs hello.jfs Anna Ben                  # config.args = ["Anna", "Ben"]
+jfs -e "print([3, 1, 2].sort())"        # a one-liner; "-" reads the script from stdin
+jfs --check hello.jfs                   # only the diagnostics: hello.jfs:4:1: Fehler: …
+jfs --virtual-time --seed 7 sim.jfs     # timers without waiting, rand() reproducible
+jfs --disk store.json -c port=7000 --fuel 0 --heap 64M server.jfs
+```
+
+Its console host answers the names of `GLOBALS`: `print` to stdout, `log` to stderr, `now`,
+`rand`, `config` (from `JFS_CONFIG`, `--config K=V` and `--env NAME`), `timer` (an event loop on
+the real clock or with `--virtual-time` a virtual one; the program ends when no timer and no
+callback is left, or at `--until MS`) and `disk` (in memory, or in a JSON file with
+`--disk FILE`); `net`, `dns`, `http` and `metrics` throw a catchable error. So a script that
+uses only the standard library, `print`, `log` and `timer` runs the same in JFNetworker and in
+`jfs`. The limits come from `--fuel`, `--heap`, `--depth` and `--stack` (else
+`Limits::default()`). Errors of the compiler and of the run go to stderr with file, line,
+column, the source line and the calls; exit code 1 (2 for a wrong command line). Its tests
+are example scripts with their expected stdout, stderr, exit code and files
+(`apps/jfs/tests/cases/*.test`), run by `python build_rs.py test jfs` on Windows and Linux.
+
 ## 30. Live inspector
 
 A running app can be looked into without changing it: the inspector shows which widget is
 where, with which id, label, value and state, how the layout boxes nest, the Tab order, what
 the last frames repainted, and the frame's cost. It is part of `ui` (`lib/ui/inspect.rs`)
 and off by default; closed it costs nothing (the runtime tests one flag; nothing is recorded or
-drawn, the frames are byte for byte those of an app without it).
+drawn, the frames are byte for byte those of an app without it). In a development build it
+also edits the app's look and operates its widgets ("Editing in the inspector" below).
 
 * **Turning it on**: `--inspect` opens it at the start; `jfgui_INSPECT=1` only arms it (its
   hot keys work), `jfgui_INSPECT=open` opens it too. In code: `ui.inspect_enable(true)` (arm),
@@ -3421,11 +3454,122 @@ inspect expect idle                  # and did no work since it closed
 ```
 
 The script commands: `inspect on|off|toggle|arm|disarm`, `inspect pick`, `inspect select
-S|none`, `inspect option outlines|order|dirty on|off`, `inspect tab widgets|frame|colors`,
+S|none`, `inspect option outlines|order|dirty on|off`, `inspect tab widgets|frame|colors|look`,
 `inspect copy`, `inspect snap`, `inspect expect open|closed|pick on|off|flash on|off|idle|same|
 excluded|selected S|none|hover S|none|selector "s"|copied "s"` (`excluded`: no record of the
 inspector's window in the tree). The inspector's window has the id 2147422208 (`expect window
 2147422208 open`, `shot F window 2147422208`).
+
+### Hot reload: `build_rs.py watch`
+
+`python build_rs.py watch NAME [--target win|linux] [-- ARGS]` builds the app, starts it and
+watches its sources, its assets and build files and the sources of every library and style
+crate it links. When files were saved it builds again (a development build, incremental; never
+`--release`) and starts the app again in its *session*: the app is where it was, with the
+change in it. Nothing in the app changes for this -- the widgets stay compiled Rust, no state
+structure is prescribed:
+
+* **The app's state** comes back by replaying the session's input. A development build of `ui`
+  (`--cfg jfgui_dev`, `lib/ui/hotreload.rs`) started with `jfgui_HOTRELOAD=DIR` records every
+  platform event that reaches the app (pointer, wheel, keys, text, input-method commits, a
+  window's close button: the fields `--log-events` prints, with the time), the main window's
+  size and dpi, the app's keyboard state (`UIC_ACTIVE`) and what the app's clipboard reads
+  returned. The next start replays the log before its first wait: the clock goes from record
+  to record (timers fire at their deadlines, animations jump), every batch of events goes
+  through the normal event handling, so the new code builds the state from the same input.
+  The replay leaves the system's clipboard, file dialogs, sounds, URLs and drags to other
+  programs alone.
+* **Divergence**: every press, wheel turn, release, key and text event must reach the same
+  widget id as when it was recorded (the widget under the pointer, the pressed one, the
+  focused one). When the change moved widgets so that an event reaches another one, the start
+  reports `diverged: a press reached #40 instead of #20` and ends with exit code 3; `watch`
+  puts the log aside and starts the app afresh. Input a replay cannot repeat -- a drop or drag
+  of another program, the system's file dialog, a drag out of the app -- marks the log: the
+  next start is fresh as well.
+* **Kept besides the state**: the window's position and size (the session's `window.ini`
+  through `jfgui_STATE`; tool windows open again only when the replay opens them), the style,
+  the text scale and the inspector -- open, tab, options and its selection (by its script
+  selector) -- in `carry.ini`; a fresh start keeps them too.
+* **A failed build**: the old version keeps running; the error appears in the console and at
+  the top of the inspector ("Bau fehlgeschlagen"), which opens for it.
+* The session lives in `build/<target>/hot/NAME/` (`events.log`, `carry.ini`, `window.ini`,
+  `replay.txt` with the start's report, `build.txt`, the watcher's request `ctl`); the program
+  runs as a copy `build/<target>/NAME.hot[.exe]`, so the next build can write the exe. Asked
+  to end, the app ends as with `--auto-close` (placement, log and carried state written); one
+  that does not end within 5 s is killed. `watch` begins a new session; an app closed by the
+  user starts afresh after the next change; Ctrl+C ends `watch` and the app.
+* Off it costs nothing: without `jfgui_HOTRELOAD` the runtime's hooks test one flag, nothing
+  is recorded or read (the inspector's `expect same` / `idle` hold); in `--release` builds (and
+  for the browser and Android) the flag is a constant false and the hooks fold away.
+* What a replay does not know: files the app read or wrote, the network, the timing of
+  background tasks, agent actions, the real clock -- such parts of the state may differ after
+  a restart.
+* Tests: `python tools/tests/test_hotreload.py [--quick] [--target win|linux]` (the watcher with
+  a stand-in program -- the suite runs this part; a temporary app built, recorded, replayed,
+  diverged and failed headless on Windows and Linux; the window loop on a Windows desktop of
+  its own, never on the user's screen).
+
+### Editing in the inspector (development builds)
+
+In a development build (`build_rs.py`'s default; it passes `--cfg jfgui_dev`, a `--release`
+build keeps the inspector read-only) the inspector also changes the running app's look -- only
+through what exists already ([`ui/inspect_edit.rs`](../lib/ui/inspect_edit.rs)). Nothing in the
+app changes for it: no API to call, no state structure. The app's own values (a slider's, a
+check box's, a text box's) are never written; the inspector gives input instead.
+
+* **Farben** is editable: select a token in the list, type `#RRGGBB` / `#AARRGGBB` into its box
+  (Enter) or open the colour picker beside it. The colours of the mode in use change (light,
+  dark or high contrast); `T_ACCENT`'s row sets the accent the style derives its ramp from.
+* **Darstellung** (a fourth tab): the style (the styles the app links, §34), light / dark /
+  high contrast, the accent, the language (the columns of the app's catalogue, else German and
+  English; the library's texts follow at once, the inspector's too), the main window's scale
+  (its dpi; the window keeps its size in pixels, like a browser's zoom) and the text scale;
+  corner radius, spacing, control height; the font family (a font file or an installed family)
+  and the sizes of the text styles. Theme values go through the app theme (`ui.set_theme` over
+  the app's own theme, or none), the rest through `theme_set` / `set_contrast`, `set_style`,
+  `i18n::set_language_code`, `set_text_scale`.
+* Every changed value is marked (its name in the accent colour, "geändert" in the list), has
+  its own reset button and is listed under **Änderungen** (old → new). **Alles zurücksetzen**,
+  undo and redo (the bar, Ctrl+Z / Ctrl+Y in the tool window; the moves of one drag of a slider
+  or the colour picker are one step: `History` with `Snapshot` steps). Changes hold for the
+  running session -- also when the inspector is closed -- until they are taken over:
+* **Als Theme speichern** writes the app theme in use, changes included, as a theme file
+  (default `config://themes/inspector.theme`; a font file is written relative to the theme
+  file); **Liste kopieren** copies "Das hast du geändert": the changed theme keys as lines of a
+  theme file, the rest (style, mode, language, scales) as lines of code, all of it usable as a
+  theme file. Layout and texts are changed in the code.
+* **Bedienen** (Widgets tab, below the properties) operates the selected widget through
+  synthetic input, as a script does: a click, a drag by dx / dy from its centre, a slider's
+  value (the way a screen reader sets it: the widget takes it as input), text typed into a text
+  box (a click, Ctrl+A, the text), a command (`cmd ID`). The matching script line is shown.
+* The tool window itself is built in the style's own look: the app theme and an edited text
+  scale do not reach it, so it stays usable whatever is edited (style, mode and language do).
+
+```
+# apps/gallery/tests/inspect_edit.uis (excerpt)
+inspect on
+inspect set token bg #E0F0E0           # the colours in use (light)
+expect token bg #E0F0E0
+inspect set radius 8                   # DIP, or 150%
+inspect expect changes 2
+inspect expect value radius "8 DIP"
+inspect undo                           # the radius again as before
+inspect save build/insp/edit.theme     # the app theme with the changes
+inspect list                           # "Das hast du geändert" to the clipboard
+inspect reset                          # every change back
+inspect select #140
+inspect do value 75                    # a slider's value; also click, drag DX DY, type "s", cmd ID
+```
+
+Script commands (KEY = `token NAME` | `accent` | `radius` | `spacing` | `height` | `size STYLE` |
+`font` | `mode` | `style` | `lang` | `scale` | `textscale`): `inspect set KEY VALUE` (`token bg
+#RRGGBB`, `radius 8|150%|none`, `spacing 110`, `height 36`, `size body 15`, `font FILE|FAMILY|
+none`, `mode light|dark|contrast`, `style kde`, `lang en`, `scale 150`, `textscale 130`),
+`inspect reset [KEY]`, `inspect undo|redo`, `inspect save PATH`, `inspect list`, `inspect do
+click|drag DX DY|value N|type "s"|cmd ID [ARG]`, `inspect expect changes N|list "s"|value KEY
+"s"|undo on|off|redo on|off|message "s"|none`. Tests: `apps/gallery/tests/inspect_edit.uis`,
+`inspect_edit_rtl.uis` (mirrored, 150 %), `apps/themedemo/tests/inspect_edit.uis` (the linked
+styles, edits over an app theme).
 
 ## 31. SVG images and the image viewer
 
@@ -3512,8 +3656,9 @@ if ui.button(ID_ONE, "100 %") & EV_ACT != 0 { self.view.set_actual(); }
 
 ## 32. Markdown / HTML viewer and lists with rows of different heights
 
-**The document view** shows Markdown or HTML read-only: help pages, README-like content,
-release notes, chat output. [`MdDoc`](../lib/ui/md_doc.rs) is its model -- blocks of formatted
+**The document view** shows Markdown or HTML: help pages, README-like content, release notes,
+chat output, pages of a browser (read-only but for the fields of forms; images the app
+fetches). [`MdDoc`](../lib/ui/md_doc.rs) is its model -- blocks of formatted
 text -- read from Markdown (CommonMark with GitHub's tables, task lists, strikethrough and bare
 links) or from HTML (the reader of the rich-text editor, extended by rules, images,
 preformatted code and tables). [`ui.markdown_view` / `ui.html_view`](../lib/ui/md_view.rs)
@@ -3542,7 +3687,7 @@ self.status = ev.hover.unwrap_or_default();   // the link under the pointer
   HTML (`br`, `b`, `i`, `s`, `u`, `code`, `kbd`, `a href`, `img`). HTML: what
   `RichDoc::from_html` reads (headings h1 .. h6, paragraphs, lists, quotes, formats, colours,
   links) and `hr`, `img` (width / height), `pre` / `code class="language-x"`, tables (`th`,
-  `thead`, alignment).
+  `thead`, alignment), forms (below).
 * Layout: the blocks in a column; quotes indented with a bar, list markers in front (bullets by
   depth, numbers, task boxes), headings 2 / 1.5 / 1.25 / 1 / 0.875 / 0.85 times the body text
   (h1 / h2 underlined), code blocks in the monospace font with the code editor's highlighting
@@ -3561,8 +3706,9 @@ self.status = ev.hover.unwrap_or_default();   // the link under the pointer
   while the document grows -- chat output.
 * Mouse: drag selects (the view scrolls at its edges), Shift + press extends, a double click
   selects a word, a click on a link activates it. Keys: Up / Down scroll by a line, PgUp / PgDn
-  and Space / Shift+Space by a view, Home / End, Tab / Shift+Tab through the links (the focused
-  one is framed and scrolled into view; past the last one the focus moves on), Enter activates
+  and Space / Shift+Space by a view, Home / End, Tab / Shift+Tab through the links and fields
+  (the focused link is framed, a field gets the focus, scrolled into view; past the last one the
+  focus moves on), Enter activates
   the focused link, Esc drops it, Ctrl+A, Ctrl+C / Ctrl+Insert copy text (list markers, cells by
   tabs, images as their alt texts) and HTML. `MdViewState` also gives `selection()`,
   `selected_text()`, `selected_html()`, `select_all()`, `scroll_to_block(i)`.
@@ -3570,8 +3716,58 @@ self.status = ev.hover.unwrap_or_default();   // the link under the pointer
   also hands it to `open_url` (whose scheme rules and the app's `url` permission apply) -- only
   after the user's click or Enter, never by itself.
 * Images: names of the VFS (`app://`, `data://` ...) and paths -- relative ones after `st.base`
-  -- are read when first shown and kept in the state; `http(s)` and `data:` addresses are never
-  fetched (the alt text shows in a frame instead).
+  -- are read when first shown and kept in the state; the view never fetches `http(s)` and
+  `data:` addresses itself. By default (`st.images = MI_LOCAL`) they show their alt text in a
+  frame. With `MI_ASK` the app supplies them (VFS names and paths are still read), with
+  `MI_APP` the app supplies every image (the view reads no file: pages from the network).
+  The view asks once per address for the images it lays out; until the bytes come a frame with
+  the alt text stands in (at the width / height the HTML gives), then the block is laid out
+  again at the picture's size without moving the view:
+
+  ```rust
+  // state: st.images = MI_ASK (or MI_APP); per frame:
+  for (addr, bytes) in self.fetched.drain(..) {        // what the app's downloads brought
+      st.set_image(&addr, bytes.as_deref());           // None: failed -> the alt text stays
+  }
+  let ev = ui.html_view(ID_PAGE, &mut st, &self.html, 0);
+  for addr in st.image_requests() {                    // the addresses the view waits for
+      self.start_download(addr);                       // (each one once)
+  }
+  // bytes that come outside a frame: set_image, then ui.invalidate() for a frame
+  ```
+
+  `set_image` decodes at once with the library's decoders (SVG through `img_svg`, the rest
+  through `img_core`); bytes it cannot decode count as a failure.
+* Forms (HTML, also in Markdown's HTML blocks): `<form action method>`, `<input>` (text and
+  the other text types, `password`, `checkbox`, `radio`, `hidden`, `submit`, `image`, `reset`,
+  `button`), `<textarea>`, `<select>` / `<option>`, `<button>`, `<label>` (around a field or
+  `for=` its id) become fields in the text flow -- the library's own text boxes, check boxes,
+  radios, drop-down lists and buttons, so the style, high contrast, text scale, HiDPI and a
+  mirrored window apply. `doc.forms()` / `doc.fields()` hold what the page says (`MdForm`,
+  `MdField`: kind `MF_*`, name, first value, label, options, size ...); the current values live
+  in the state (`field_text(i)`, `field_checked(i)`, `field_selected(i)` and their setters). A
+  document without fields reads exactly as before.
+
+  ```rust
+  let ev = ui.html_view(ID_PAGE, &mut st, &self.html, 0);
+  if let Some(i) = ev.field { /* field i changed (or a plain button was pressed) */ }
+  if let Some(s) = ev.submit {                         // Enter in a field, a submit button
+      // s.action, s.method ("get" / "post"), s.fields: [(name, value)], s.button
+      self.navigate(&s.action, &s.method, &s.fields);
+  }
+  ```
+
+  Keys: Tab / Shift+Tab go through links and fields in reading order (a group of radios is one
+  stop: the checked one; the arrows choose inside it), Space toggles, Enter in a text field,
+  check box or radio sends the form with its first submit button (nothing when that is
+  disabled), Enter / Space press a button, Esc in a text field returns to the view, PgUp / PgDn
+  on a field scroll the view. `form_data(form, button)` gives the pairs a browser would send
+  (named, enabled fields; checked boxes and radios; a list's chosen value; only the submitting
+  button), `reset_form(form)` (also the reset button) the first values. Password fields show
+  dots, never copy, and give screen readers dots and the protected state. Each field has its
+  record (`K_TEXTBOX`, `K_CHECKBOX`, `K_RADIO`, `K_COMBO`, `K_BUTTON`) named by its `<label>`,
+  `aria-label`, `title` or placeholder; the widget ids are `md_field_id(view_id, i)`. Not
+  supported: JavaScript, CSS, file inputs (they are text fields), several choices in one list.
 * Accessibility: the view is a `K_BOX` (label `st.label`, default "Dokument"; value: the scroll
   position in DIP); per visible block a `K_HEADING` record (new kind; value: the level),
   `K_TEXT` (paragraphs, code, table cells), `K_LISTITEM` (value: the item's number),
@@ -3620,11 +3816,13 @@ self.vl.insert(0, n);
 * The document view scrolls its blocks with the same height cache (`Rows`).
 
 Tests: `apps/mdviewtest` (`--test unit`: the parser -- blocks, inline parts, HTML, text and HTML
-of ranges -- adversarial input with time limits, the list's height cache and the headings in
-the accessibility tree;
+of ranges, forms -- adversarial input with time limits, the list's height cache, the headings
+and the fields in the accessibility tree, images the app supplies;
 `doc_shots.uis` light / dark / high contrast / HTML / Hebrew, `doc_rtl.uis` (mirrored window),
 `doc_scale.uis` (150 % text), `doc_links.uis`, `doc_select.uis`, `doc_keys.uis` (also 50 000
-blocks), `vlist.uis` (100 000 rows); all with `--verify-dirty`).
+blocks), `vlist.uis` (100 000 rows); with `--page form` a form page: `form_keys.uis`,
+`form_mouse.uis`, `form_images.uis`, `form_scale.uis` (150 %), `form_rtl.uis`; all with
+`--verify-dirty`).
 
 ## 33. Sound: streams, short sounds, the system's sounds
 

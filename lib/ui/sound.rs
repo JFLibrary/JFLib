@@ -36,7 +36,7 @@ impl Ui {
             return false;
         }
         self.m.sound.last = Some(kind);
-        audio::set_dry_run(self.headless);
+        audio::set_dry_run(self.headless || self.hr_replaying()); // (hot reload's replay: silent)
         audio::sound(kind)
     }
 

@@ -1,0 +1,31 @@
+# config: JFS_CONFIG first, then every --config (K=V with V as JSON or else as text, or a JSON
+# object), the --env variables (unset ones are left out), the arguments and the script's name
+env: JFS_CONFIG={"port": 1, "mode": "env", "list": [1, 2]}
+env: JFS_TEST_GREETING=servus
+args: -c port=7000 --config '{"name": "x", "debug": true}' -c "text=hallo welt" --env JFS_TEST_GREETING --env JFS_TEST_MISSING {dir}/config.jfs eins "zwei drei"
+--- stdout
+port 7000 int
+mode env
+name x debug true
+text hallo welt
+list [1, 2]
+env {JFS_TEST_GREETING: "servus"}
+args ["eins", "zwei drei"] 2
+script true
+===
+# a --config that is neither K=V nor an object: a wrong command line
+args: --config nokey {dir}/config.jfs
+exit: 2
+--- stderr
+jfs: --config nokey: KEY=WERT oder ein JSON-Objekt erwartet
+===
+args: --config [1] {dir}/config.jfs
+exit: 2
+--- stderr
+jfs: --config [1]: KEY=WERT oder ein JSON-Objekt erwartet
+===
+env: JFS_CONFIG=[1, 2
+args: {dir}/config.jfs
+exit: 2
+--- stderr
+jfs: JFS_CONFIG: json.decode: Hier fehlt ein Komma oder eine schließende Klammer (Zeile 1, Spalte 6)

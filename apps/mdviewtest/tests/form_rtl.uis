@@ -1,0 +1,37 @@
+#!args --page form --verify-dirty
+# a form in a mirrored window ("Rechts nach links"): the page keeps the direction of its text
+# (German left to right, the Hebrew paragraph right to left), its fields are widgets of the
+# mirrored window (records physical, mirrored); clicks, typing, Tab and the buttons work as in a
+# left-to-right window
+size 1000 720
+theme light
+click "Rechts nach links"
+expect checkbox:"Angemeldet bleiben" rect 41 202 20 20
+expect button:"Senden" rect 41 490 69 32
+shot build/mdviewtest/form_rtl.png
+click 187,122
+type "rtl"
+expect textbox:"rtl" focused
+click checkbox:"Angemeldet bleiben"
+expect checkbox:"Angemeldet bleiben" checked
+click radio:"Blau"
+expect radio:"Blau" checked
+click 900,458
+type "עכו"
+expect textbox:"עכו" focused
+key shift+tab
+key shift+tab
+key shift+tab
+expect radio:"Blau" focused
+# (the arrows as the radios lie: left is the one before in this left-to-right paragraph)
+key left
+expect radio:"Grün" checked
+shot build/mdviewtest/form_rtl_typed.png
+click button:"Senden"
+expect text:"Senden: post /login user=rtl&pw=&keep=ja&farbe=gruen&land=at&text=Hallo&ort=עכו&token=abc123&aktion=senden" exists
+theme dark
+shot build/mdviewtest/form_rtl_dark.png
+theme light
+click "Rechts nach links"
+expect checkbox:"Angemeldet bleiben" rect 29 202 20 20
+expect_nowarn

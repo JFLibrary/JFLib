@@ -21,6 +21,16 @@
 // "Links öffnen" (MV_OPEN_LINKS) switch for every tab.  Code is set in DejaVu Sans Mono
 // (lib/doc_view/assets, licence: DejaVu-LICENSE.txt there), so the layout is the same on every
 // system; Hebrew and Arabic come from the system's fonts (set_system_fallback).
+//
+//   build/win/mdviewtest.exe --page form --script apps/mdviewtest/tests/form_keys.uis
+//
+// --page form: an HTML page with a form (text, password, check box, radios, a drop-down list, a
+// text area, a hidden field, a field in a Hebrew paragraph, submit, reset) and images from the
+// network (MI_ASK: the app supplies them; one more from app://).  Below it: the last field the
+// user changed ("Feld: name"), the last form sent ("Senden: method action name=value&..."),
+// the image addresses the view asked for ("Bilder: ..."); "Bilder liefern" answers them (two
+// from app://logo.svg and raster.png, the third fails), "Hoher Kontrast" and "Rechts nach
+// links" as on the tabs.
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -51,6 +61,8 @@ const ID_CLIP: u32 = wid("clip");
 const ID_LONG: u32 = wid("long");
 const ID_INSERT: u32 = wid("insert");
 const ID_JUMP: u32 = wid("jump");
+const ID_FORM: u32 = wid("form");
+const ID_SUPPLY: u32 = wid("supply");
 // the list and its rows: ID_LIST + 1 + i
 const ID_LIST: u32 = 0x0100_0000;
 const ROWS: u32 = 100_000;
@@ -170,6 +182,30 @@ pub(crate) const SAMPLE_HTML: &str = r#"<h1>HTML-Betrachter</h1>
 <p>Ende.</p>
 "#;
 
+/// the page with a form and images from the network (--page form)
+pub(crate) const SAMPLE_FORM: &str = r#"<h2>Anmeldung</h2>
+<form action="/login" method="post">
+<p><label for="user">Name</label> <input id="user" name="user" placeholder="Benutzername" size="24"></p>
+<p><label>Passwort <input type="password" name="pw"></label></p>
+<p><label><input type="checkbox" name="keep" value="ja"> Angemeldet bleiben</label></p>
+<p>Farbe: <label><input type="radio" name="farbe" value="rot" checked> Rot</label>
+<label><input type="radio" name="farbe" value="gruen"> Grün</label>
+<label><input type="radio" name="farbe" value="blau"> Blau</label></p>
+<p><label for="land">Land</label> <select id="land" name="land"><option value="de">Deutschland</option>
+<option value="at" selected>Österreich</option><option value="ch">Schweiz</option></select></p>
+<p><label for="text">Nachricht</label><br><textarea id="text" name="text" rows="3" cols="30">
+Hallo</textarea></p>
+<p><label for="ort">עיר</label> <input id="ort" name="ort" size="10"></p>
+<input type="hidden" name="token" value="abc123">
+<p><button type="submit" name="aktion" value="senden">Senden</button> <input type="submit" name="aktion" value="Speichern">
+<input type="reset" value="Zurücksetzen"> <a href="https://example.org/hilfe">Hilfe</a></p>
+</form>
+<h2>Bilder aus dem Netz</h2>
+<p><img src="http://example.org/logo.svg" alt="Logo aus dem Netz" width="96" height="48">
+<img src="https://example.org/raster.png" alt="Raster aus dem Netz">
+<img src="https://example.org/fehlt.png" alt="Fehlt"> und lokal <img src="logo.svg" alt="Logo lokal" width="48"></p>
+"#;
+
 // the text of row key k: 2 .. 33 words
 fn row_text(k: u32) -> String {
     const W: [&str; 8] = ["Zeilen", "haben", "verschiedene", "Höhen", "in", "einer", "virtuellen", "Liste"];
@@ -231,6 +267,14 @@ struct MdTest {
     rows: Vec<u32>,
     added: u32,
     opened: BTreeSet<u32>,
+    // --page form: the page, the last field changed, the last form sent, the image addresses
+    // asked for (and not answered yet)
+    page_form: bool,
+    form: MdViewState,
+    field: String,
+    sent: String,
+    asked: Vec<String>,
+    waiting: Vec<String>,
 }
 
 impl MdTest {
@@ -242,6 +286,10 @@ impl MdTest {
         html.base = String::from("app://");
         let mut he = MdViewState::new();
         he.label = String::from("עברית");
+        let mut form = MdViewState::new();
+        form.base = String::from("app://");
+        form.label = String::from("Formular");
+        form.images = MI_ASK;
         MdTest {
             tab: 0,
             hc: 0,
@@ -259,7 +307,56 @@ impl MdTest {
             rows: (0..ROWS).collect(),
             added: 0,
             opened: BTreeSet::new(),
+            page_form: plat::arg_value("--page").as_deref() == Some("form"),
+            form,
+            field: String::new(),
+            sent: String::new(),
+            asked: Vec::new(),
+            waiting: Vec::new(),
         }
+    }
+
+    // --page form: the form page, what it reported, the app as the image source
+    fn form_page(&mut self, ui: &mut Ui) {
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        if ui.button(ID_SUPPLY, "Bilder liefern") & EV_ACT != 0 {
+            // two from app://, the third one fails
+            for a in core::mem::take(&mut self.waiting) {
+                let file = a.rsplit('/').next().unwrap_or("");
+                let data = if file == "logo.svg" || file == "raster.png" { plat::read_file(&format!("app://{}", file)) } else { None };
+                self.form.set_image(&a, data.as_deref());
+            }
+        }
+        ui.spacer(-1);
+        ui.next_flags(ST_NOFOCUS);
+        if ui.checkbox(ID_HC, "Hoher Kontrast", &mut self.hc) & EV_ACT != 0 {
+            ui.set_contrast(Some(self.hc != 0));
+        }
+        ui.next_flags(ST_NOFOCUS);
+        if ui.checkbox(ID_RTL, "Rechts nach links", &mut self.rtl) & EV_ACT != 0 {
+            ui.set_rtl(Some(self.rtl != 0));
+        }
+        ui.box_end();
+        ui.next_size(-1, -1);
+        let ev = ui.html_view(ID_FORM, &mut self.form, SAMPLE_FORM, 0);
+        let name = |st: &MdViewState, i: Option<usize>| i.and_then(|i| st.doc().fields().get(i)).map_or(String::from("-"), |f| f.name.clone());
+        if ev.field.is_some() {
+            self.field = name(&self.form, ev.field);
+        }
+        if let Some(s) = ev.submit {
+            let pairs: Vec<String> = s.fields.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
+            self.sent = format!("{} {} {}", s.method, s.action, pairs.join("&"));
+        }
+        for a in self.form.image_requests() {
+            self.asked.push(a.clone());
+            self.waiting.push(a);
+        }
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        ui.text(TS_BODY, &format!("Feld: {}", if self.field.is_empty() { "-" } else { &self.field }));
+        ui.text(TS_BODY, &format!("Fokus: {}", name(&self.form, self.form.focused_field())));
+        ui.box_end();
+        ui.text(TS_CAPTION | TX_WRAP, &format!("Senden: {}", if self.sent.is_empty() { "-" } else { &self.sent }));
+        ui.text(TS_CAPTION | TX_WRAP, &format!("Bilder: {}", self.asked.join(", ")));
     }
 
     // which: 0 Markdown, 1 HTML, 2 Hebrew
@@ -359,6 +456,11 @@ impl App for MdTest {
     fn frame(&mut self, ui: &mut Ui) {
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | pad(12), 8);
+        if self.page_form {
+            self.form_page(ui);
+            ui.box_end();
+            return;
+        }
         ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
         ui.tabs(ID_TABS, &mut self.tab, &["Markdown", "HTML", "Hebräisch", "Liste"]);
         ui.spacer(-1);

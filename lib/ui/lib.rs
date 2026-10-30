@@ -89,11 +89,12 @@ mod rich_html;
 // (ROADMAP §6) the Markdown / HTML viewer: its document (md_doc.rs) and the view (md_view.rs)
 mod md_doc;
 pub use md_doc::{
-    MdBlock, MdDoc, MdImage, MdLinkSpot, MdSpan, MdTable, MA_CENTER, MA_LEFT, MA_NONE, MA_RIGHT, MB_CODE, MB_HEADING, MB_PARA, MB_ROW,
-    MB_RULE, MK_BULLET, MK_NONE, MK_NUMBER, MS_BOLD, MS_CODE, MS_ITALIC, MS_STRIKE, MS_UNDER,
+    MdBlock, MdDoc, MdField, MdFieldSpot, MdForm, MdImage, MdLinkSpot, MdOption, MdSpan, MdTable, MA_CENTER, MA_LEFT, MA_NONE, MA_RIGHT,
+    MB_CODE, MB_HEADING, MB_PARA, MB_ROW, MB_RULE, MF_BUTTON, MF_CHECKBOX, MF_HIDDEN, MF_PASSWORD, MF_RADIO, MF_RESET, MF_SELECT, MF_SUBMIT,
+    MF_TEXT, MF_TEXTAREA, MK_BULLET, MK_NONE, MK_NUMBER, MS_BOLD, MS_CODE, MS_ITALIC, MS_STRIKE, MS_UNDER,
 };
 mod md_view;
-pub use md_view::{MdEv, MdViewState, MV_LTR, MV_NO_FRAME, MV_OPEN_LINKS, MV_RTL};
+pub use md_view::{md_field_id, MdEv, MdSubmit, MdViewState, MI_APP, MI_ASK, MI_LOCAL, MV_LTR, MV_NO_FRAME, MV_OPEN_LINKS, MV_RTL};
 // (ROADMAP §6) lists whose rows have different heights (ui.vlist_begin)
 mod vlist;
 pub use vlist::VListState;
@@ -126,12 +127,21 @@ pub use imgview::{ImageViewState, SvgFonts, SvgText, ViewImage, IV_NO_BARS, IV_N
 pub use img_svg::Svg;
 mod history;
 pub use history::{Edit, History, Snapshot};
+// hot reload: the session's input recorded and replayed after a restart (build_rs.py watch;
+// development builds only)
+mod hotreload;
 // hyphenation of wrapped texts and text boxes (TX_HYPHENATE, TB_HYPHENATE)
 mod hyph;
 pub mod i18n;
 mod ids;
 // the live inspector: overlay and tool window (--inspect, F12 / Ctrl+Shift+I)
 mod inspect;
+// ... its editing: development builds only (build_rs.py --cfg jfgui_dev), --release reads only
+#[cfg(jfgui_dev)]
+mod inspect_edit;
+#[cfg(not(jfgui_dev))]
+#[path = "inspect_edit_off.rs"]
+mod inspect_edit;
 // keyboard navigation: focus groups, panes and windows (F6), splitters (F8), the menu key
 mod kbnav;
 pub use ids::{ID_HASH_BASE, wid, wid_path};
@@ -385,6 +395,10 @@ pub(crate) struct Mods {
     pub(crate) code: code_edit::S,
     /// (ROADMAP §12) the live inspector (inspect.rs)
     pub(crate) ins: inspect::S,
+    /// (ROADMAP §11) hot reload: the session's record and replay (hotreload.rs)
+    pub(crate) hr: hotreload::S,
+    /// (ROADMAP §11) the inspector's editing: the changes, their history (inspect_edit.rs)
+    pub(crate) ied: inspect_edit::S,
     /// (ROADMAP §6) ui.svg's draw objects, the faces of SVG text (imgview.rs)
     pub(crate) svg: imgview::S,
     /// (ROADMAP §4) hyphenation: languages, dictionaries (hyph.rs)

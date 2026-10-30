@@ -8,6 +8,8 @@
 //     warnings: a name that is neither declared nor in globals (with a suggestion for a
 //               typing error), a top-level let read by top-level code before it ran
 //   globals: the predeclared names (crate::GLOBALS for check())
+//   resolve_strict(&program, globals)   the same with unknown names as errors
+//               (crate::compile_with: the host says which names it has)
 
 use alloc::format;
 use alloc::string::String;
@@ -18,6 +20,8 @@ use crate::Diagnostic;
 
 struct Resolver<'a> {
     globals: &'a [&'a str],
+    /// an unknown name is an error (resolve_strict)
+    strict: bool,
     /// top-level lets and fns: name, the byte from which top-level code may read it, line
     top: Vec<(&'a str, u32, u32)>,
     /// the block scopes inside the top level, innermost last
@@ -29,7 +33,16 @@ struct Resolver<'a> {
 
 /// see the module comment
 pub fn resolve(prog: &Program, globals: &[&str]) -> Vec<Diagnostic> {
-    let mut r = Resolver { globals, top: Vec::new(), scopes: Vec::new(), fns: 0, loops: 0, out: Vec::new() };
+    run(prog, globals, false)
+}
+
+/// resolve() with unknown names as errors
+pub(crate) fn resolve_strict(prog: &Program, globals: &[&str]) -> Vec<Diagnostic> {
+    run(prog, globals, true)
+}
+
+fn run(prog: &Program, globals: &[&str], strict: bool) -> Vec<Diagnostic> {
+    let mut r = Resolver { globals, strict, top: Vec::new(), scopes: Vec::new(), fns: 0, loops: 0, out: Vec::new() };
     for s in &prog.body {
         match &s.kind {
             StmtKind::Let { name, .. } => r.declare_top(name, s.span.end),
@@ -134,7 +147,7 @@ impl<'a> Resolver<'a> {
         } else if assign {
             msg.push_str(&format!(" – eine neue Variable wird mit let {} = … angelegt", name));
         }
-        self.report(sp, name.chars().count(), false, msg);
+        self.report(sp, name.chars().count(), self.strict, msg);
     }
 
     fn block(&mut self, b: &'a Block) {

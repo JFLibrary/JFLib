@@ -1,0 +1,6 @@
+# jfs: what the program may do (docs/PERMISSIONS.md).  Scripts reach none of it: the language
+# has no access to files, programs or the network of its own; the runner reads the script and
+# the --disk file named on its command line.
+fs.user                              # the files named on the command line (script, --disk FILE)
+fs.write $TEMP/jfs-*/**              # --selftest: a scratch folder per run ({tmp} of the cases)
+process  $EXE/jfs $EXE/jfs.exe       # --selftest: starts itself for every case

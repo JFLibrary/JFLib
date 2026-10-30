@@ -1,0 +1,5 @@
+#!args --selftest apps/jfs/tests/cases
+# jfs is a console program: build_rs.py test starts it with the arguments of the first line (and
+# --script FILE, which it ignores).  --selftest runs every case of tests/cases/*.test: jfs started
+# anew with the case's arguments, environment and input, its stdout, stderr, exit code and files
+# compared with the expected ones (src/selftest.rs); exit code 1 when a case failed.

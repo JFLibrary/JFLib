@@ -1,0 +1,17 @@
+# a wrong command line: a message on stderr, exit code 2
+args: --bogus
+exit: 2
+--- stderr
+jfs: unbekannte Option --bogus
+(jfs --help zeigt die Optionen)
+===
+args: {dir}/missing.jfs
+exit: 2
+--- stderr
+jfs: {dir}/missing.jfs gibt es nicht
+===
+args: --check
+exit: 2
+--- stderr
+jfs: es fehlt das Skript: eine Datei, -e CODE oder - für die Standardeingabe
+(jfs --help zeigt die Optionen)

@@ -1,0 +1,6 @@
+// realtime.jfs -- timers on the real clock: they run in the order of their times, never early
+let t0 = now()
+for ms in [90, 30, 60] {
+  timer.after(ms, fn() { print("after", ms, "late enough:", now() - t0 >= ms) })
+}
+print("waiting")

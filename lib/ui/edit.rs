@@ -1927,7 +1927,8 @@ impl Ui {
     /// Validation precedes replacement; 0 means every representation was published.
     pub fn clip_set_many(&mut self, entries: &[(u32, &[u8])]) -> i32 {
         if !plat::clip_many_valid(entries) { return -1; }
-        if !self.headless { return if plat::clip_set_many(entries) { 0 } else { -1 }; }
+        // (hot reload's replay leaves the system's clipboard alone: hotreload.rs)
+        if !self.headless && !self.hr_replaying() { return if plat::clip_set_many(entries) { 0 } else { -1 }; }
         let rich: Vec<_> = entries.iter().filter(|e| e.0 != CLIP_TEXT).map(|e| (e.0, e.1.to_vec())).collect();
         let text = entries.iter().find(|e| e.0 == CLIP_TEXT).map(|e| e.1.to_vec());
         self.hclip_img_clear();
@@ -1940,7 +1941,7 @@ impl Ui {
     /// Replace the clipboard with one text, image or rich representation.
     pub fn clip_set(&mut self, fmt: u32, data: &[u8]) -> i32 {
         if matches!(fmt, CLIP_HTML | CLIP_RTF | CLIP_DOCX) { return self.clip_set_many(&[(fmt, data)]); }
-        if !self.headless {
+        if !self.headless && !self.hr_replaying() {
             return if plat::clip_set(fmt, data) { 0 } else { -1 };
         }
         if fmt != CLIP_TEXT {
@@ -1955,6 +1956,14 @@ impl Ui {
 
     /// ui_clip_get(fmt) -> the clipboard data (text: UTF-8) or None
     pub fn clip_get(&mut self, fmt: u32) -> Option<Vec<u8>> {
+        if self.hr_on() {
+            return self.hr_clip_get(fmt); // hot reload: the answer recorded / replayed (hotreload.rs)
+        }
+        self.clip_read(fmt)
+    }
+
+    /// clip_get without hot reload's record (the scripts' own checks of the clipboard)
+    pub(crate) fn clip_read(&mut self, fmt: u32) -> Option<Vec<u8>> {
         if !self.headless {
             return plat::clip_get(fmt);
         }
@@ -1974,7 +1983,7 @@ impl Ui {
     /// in the system file manager; headless runs start nothing: they print
     /// "ui_open_folder: PATH" and return 0
     pub fn open_folder(&mut self, path: &str) -> i32 {
-        if !self.headless {
+        if !self.headless && !self.hr_replaying() {
             return plat::open_folder(path);
         }
         plat::write_stdout(format!("ui_open_folder: {}\n", path).as_bytes());
@@ -1984,7 +1993,7 @@ impl Ui {
     /// ui_open_url(url) -> 0 / -1: a web page / mailto link in the default application;
     /// headless runs print "ui_open_url: URL" and return 0
     pub fn open_url(&mut self, url: &str) -> i32 {
-        if !self.headless {
+        if !self.headless && !self.hr_replaying() {
             return plat::open_url(url);
         }
         plat::write_stdout(format!("ui_open_url: {}\n", url).as_bytes());

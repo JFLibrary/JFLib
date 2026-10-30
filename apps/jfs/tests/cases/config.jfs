@@ -1,0 +1,9 @@
+// config.jfs -- what the command line and the environment put into config
+print("port", config.port, type(config.port))
+print("mode", config.mode)
+print("name", config.name, "debug", config.debug)
+print("text", config.text)
+print("list", config.list)
+print("env", config.env)
+print("args", config.args, len(config.args))
+print("script", config.script.ends_with("config.jfs"))

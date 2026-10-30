@@ -11,6 +11,10 @@ dependencies are built through Cargo and linked as static .rlib files.
   python build_rs.py all                                     libraries + every app
   python build_rs.py run NAME [--target win|linux] [-- ARGS] build and start (Linux: WSL)
   python build_rs.py run NAME --bin BIN [-- ARGS]            start one of the app's further executables (BINS)
+  python build_rs.py watch NAME [--target win|linux] [-- ARGS]   hot reload (tools/hotreload.py): build again when a
+                                                                source of the app or its crates is saved, start the
+                                                                app again in its session (input replayed, window,
+                                                                style, inspector kept); development builds only
   python build_rs.py test [--quick]                          lint, build, every apps/*/tests/*.uis (+ apps/*/tests),
                                                                 then parity with asm (not with --quick)
   python build_rs.py test NAME                               build one app and run its tests/*.uis
@@ -52,7 +56,9 @@ for --release, build/<profile>/<target> for --profile (so the variants never reb
 other).  The assembly reference builds into legacy/build (legacy/build.py).
 
 Development builds (default): incremental, 16 codegen units, opt-level 2 for the compute
-crates (gfx, text, simd, fx, img_*) and 1 for the rest (quick rebuilds).  --release:
+crates (gfx, text, simd, fx, img_*) and 1 for the rest (quick rebuilds), --cfg jfgui_dev for ui
+(what only a development build has: the live inspector's editing, ui/inspect_edit.rs; hot
+reload, ui/hotreload.rs).  --release:
 opt-level 2, one codegen unit, fat LTO (as fast as opt-level 3 and 6-10 % smaller,
 rewrite/REPORT.md section 2; R13 measured with 3).  A crate is rebuilt only when
 its sources, its dependencies or the flags changed (hash stamps in <out>/<target>/.stamp).
@@ -836,6 +842,10 @@ class Builder:
             # development: compute crates optimised (pixels, codecs stay fast in tests), the
             # rest quick to compile
             f += ["-C", f"opt-level={2 if compute_crate(name) else 1}", "-C", "codegen-units=16"]
+            # what only a development build has (never --release): the inspector's editing
+            # (ui/inspect_edit.rs), hot reload (ui/hotreload.rs, `watch`; desktop targets only)
+            if name == "ui":
+                f += ["--cfg", "jfgui_dev"]
         if self.target == "web" and self.web_mode != "scalar":
             f += ["-C", "target-feature=+simd128" + (",+atomics,+bulk-memory" if self.web_mode == "threads" else "")]
         if self.target == "web" and self.web_mode == "threads":
@@ -1379,6 +1389,12 @@ def run_tests(builders, out, quick):
     if r.returncode:
         fails.append("tools/tests/test_devkit.py")
         print("FAIL tools/tests/test_devkit.py\n" + (r.stdout + r.stderr).strip())
+    # hot reload's watcher with a stand-in program (the replay with a real app: without --quick, by hand)
+    r = subprocess.run([sys.executable, str(RS / "tools" / "tests" / "test_hotreload.py"), "--quick"], cwd=ROOT,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+    if r.returncode:
+        fails.append("tools/tests/test_hotreload.py --quick")
+        print("FAIL tools/tests/test_hotreload.py --quick\n" + (r.stdout + r.stderr).strip())
     # the package formats (docs/PACKAGING.md "Checks"): manifests, validators, the AppImage runtime
     rt = exes.get(("linux", "appimagert"))
     r = subprocess.run([sys.executable, str(RS / "tools" / "pkg_check.py"), "--quick", "--summary"]
@@ -2059,7 +2075,7 @@ def main():
         argv, extra = argv[:i], argv[i + 1:]
     ap = argparse.ArgumentParser()
     ap.add_argument("cmd", choices=["lib", "app", "all", "run", "test", "check", "ide", "plugin",
-                                    "new", "api-diff", "changelog", "release", "site", "i18n"])
+                                    "new", "api-diff", "changelog", "release", "site", "i18n", "watch"])
     ap.add_argument("name", nargs="?")
     ap.add_argument("--target", choices=["win", "linux", "both", "web", "all", "android"])
     ap.add_argument("--android-abi", choices=["arm64-v8a", "x86_64"], default="arm64-v8a",
@@ -2105,6 +2121,15 @@ def main():
         return subprocess.run([sys.executable, str(ROOT / "tools" / "i18n_check.py")] + ([a.name] if a.name else [])
                               + [f for f, on in (("--update", a.update), ("--check", a.check), ("--unused", a.unused)) if on],
                               cwd=ROOT).returncode
+    if a.cmd == "watch":                            # hot reload (tools/hotreload.py, lib/ui/hotreload.rs)
+        if not a.name:
+            print("watch: the app is missing (python build_rs.py watch NAME [--target win|linux] [-- ARGS])")
+            return 1
+        if a.release or a.profile or a.out or (a.target or "win") not in ("win", "linux"):
+            print("watch: development builds of win or linux only (no --release, --profile, --out)")
+            return 1
+        from tools import hotreload
+        return hotreload.watch(a.name, a.target or "win", a.style, extra)
     if a.cmd in ("new", "api-diff", "changelog", "release"):
         if a.cmd == "new" and not a.name:
             print("new: the name is missing (python build_rs.py new NAME [--kind window|console|tool|service])")

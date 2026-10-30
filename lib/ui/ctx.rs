@@ -591,6 +591,7 @@ impl Ui {
             plat::E_PREEDIT => 1,
             plat::E_IME_COMMIT => {
                 if let Some(text) = plat::ime_commit_take(ev.data) {
+                    self.hr_commit(&text); // (hotreload.rs) the commit's text into its record
                     for c in text.chars() {
                         self.text_push(c as u32);
                     }

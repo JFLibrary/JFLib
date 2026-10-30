@@ -405,6 +405,9 @@ impl Ui {
         if self.headless || plat::getenv("jfgui_FILEDLG").is_some_and(|v| v.as_bytes().first() == Some(&b'b')) {
             return -1; // "builtin"
         }
+        if self.hr_outside("the system's file dialog") {
+            return -1; // hot reload's replay: the own dialog (hotreload.rs)
+        }
         let r = plat::file_dialog(flags, path, exts).0;
         if r == 1 {
             *path = copy_cap(path, cap as usize);

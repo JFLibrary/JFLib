@@ -1,0 +1,18 @@
+# hello world: a script file, its arguments in config.args, the standard library
+args: {dir}/hello.jfs Anna Ben
+--- stdout
+Hallo, Anna!
+Hallo, Ben!
+1 + 2 + ... + 10 = 55
+{"name":"jfs","tags":["a","b"],"ratio":0.5}
+   3.142|0xff|ab   |
+GRÖSSE ["a", "b", "", "c"] [1, 2, 3]
+===
+# without arguments
+args: {dir}/hello.jfs
+--- stdout
+Hallo, Welt!
+1 + 2 + ... + 10 = 55
+{"name":"jfs","tags":["a","b"],"ratio":0.5}
+   3.142|0xff|ab   |
+GRÖSSE ["a", "b", "", "c"] [1, 2, 3]
