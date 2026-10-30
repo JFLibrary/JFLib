@@ -1,0 +1,141 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/scripts.jfnet
+# the language services of the Skripte tab (SK6: workspace/devwin/scriptls.rs on lib/script's
+# script::ls) on SRV1's zaehler: hover over a host name with its description, completion of a
+# host global after its namespace (the description under the list), signature help, go to the
+# declaration (F12, Ctrl+click), rename with the flyout of "Name umbenennen" (F2; one undo
+# step of the draft; a refusal), format (Shift+Alt+F; one undo step; a refusal with syntax
+# errors), the outline beside the editor (a click puts the caret on a name; Gliederung hides
+# it).  Ids: 26624 the device window, 53280 the editor, 81920 Name umbenennen (its name 81921),
+# 81924 Formatieren, 81925 Gliederung, the outline's rows 81985 + i.  The editor's lines are
+# 20 px from y 129 of the window, its text starts at x 325 (cells of 8 px)
+size 1280 900
+theme light
+wait 3500
+rclick listitem:"SRV1"
+move 700,300
+click menuitem:"Skripte …"
+expect window 26624 open
+wait 600
+# the outline: the top-level let
+expect listitem:"let n" exists
+# ---- hover: a host name and its short description
+click #53280
+key ctrl+home
+window 26624
+move 329,299
+wait 600
+expect text:"timer\nName des Hosts\nZeitgeber: after, every, cancel." exists
+move 700,600
+wait 600
+expect text:"timer\nName des Hosts\nZeitgeber: after, every, cancel." missing
+window any
+# ---- completion: a host global after its namespace, its description below the list; Tab
+focus #53280
+key ctrl+end
+type "\nmetrics.ob"
+expect listitem:"observe – metrics.observe(name, v)" exists
+expect text:"Ein Messwert für Quantile: NAME_p50, _p95, _p99 und _max über fünf Minuten." exists
+key tab
+expect text:"Zeile 17, Spalte 16" exists
+expect listitem:"observe – metrics.observe(name, v)" missing
+# signature help: the parameter at the caret
+type "("
+expect text:"metrics.observe(name, v) – name – Ein Messwert für Quantile: NAME_p50, _p95, _p99 und _max über fünf Minuten." exists
+type "\"x\", "
+expect text:"metrics.observe(name, v) – v – Ein Messwert für Quantile: NAME_p50, _p95, _p99 und _max über fünf Minuten." exists
+type "n)"
+expect text:"metrics.observe(name, v) – v – Ein Messwert für Quantile: NAME_p50, _p95, _p99 und _max über fünf Minuten." missing
+expect text:"geändert – Strg+S übernimmt, F8 springt zur nächsten Meldung" exists
+# ---- go to the declaration: F12 on n in line 10, Ctrl+click on n in line 11
+key ctrl+home
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key right
+key right
+expect text:"Zeile 10, Spalte 3" exists
+key f12
+expect text:"Zeile 2, Spalte 5" exists
+key ctrl+home
+window 26624
+drag 521,339 521,339 1 ctrl
+window any
+expect text:"Zeile 2, Spalte 5" exists
+# ---- rename n: the flyout with the name, Enter renames every place (one undo step)
+key f2
+expect #81921 focused
+expect #81921 text "n"
+key ctrl+a
+type "zahl\n"
+wait 200
+expect listitem:"let zahl" exists
+expect listitem:"let n" missing
+expect #53280 focused
+window 26624
+move 345,319
+wait 600
+expect text:"let zahl\nglobale Variable" exists
+move 700,600
+wait 600
+window any
+shot build/jfnetworker/script_ls_renamed.png window 26624
+key ctrl+z
+expect listitem:"let n" exists
+window 26624
+move 345,319
+wait 600
+expect text:"let n\nglobale Variable" exists
+move 700,600
+wait 600
+window any
+# a keyword is refused: the reason in the flyout, Abbrechen closes it
+key ctrl+home
+key down
+key end
+key f2
+key ctrl+a
+type "while\n"
+expect text:"while ist ein Schlüsselwort und kann kein Name sein" exists
+click #81923
+expect #81921 missing
+# ---- format: Shift+Alt+F lays the script out (one undo step); syntax errors refuse
+focus #53280
+key ctrl+end
+type "\nprint(n+1);print(2)"
+key shift+alt+f
+expect text:"Zeile 19, Spalte 9" exists
+key ctrl+z
+expect text:"Zeile 18, Spalte 20" exists
+key ctrl+end
+type "\nlet = 1"
+wait 300
+click #81924
+expect text:"Formatieren geht erst ohne Syntaxfehler (19:5: Nach let fehlt ein Name)" exists
+focus #53280
+key ctrl+z
+key ctrl+z
+wait 300
+# ---- the outline: a fn typed at the end shows up; a click puts the caret on its name
+key ctrl+end
+type "\nfn doppelt(k) {\nreturn k * 2\n}"
+expect listitem:"fn doppelt(k)" exists
+shot build/jfnetworker/script_ls_outline.png window 26624
+click listitem:"let n"
+wait 200
+expect text:"Zeile 2, Spalte 5" exists
+wait 600
+click listitem:"fn doppelt(k)"
+wait 200
+expect text:"Zeile 19, Spalte 4" exists
+# Gliederung hides it, and shows it again
+click #81925
+expect listitem:"fn doppelt(k)" missing
+click #81925
+expect listitem:"fn doppelt(k)" exists
+expect_nowarn

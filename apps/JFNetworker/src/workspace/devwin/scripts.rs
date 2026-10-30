@@ -32,11 +32,20 @@
 // line and column; a click puts the caret there); above it the key numbers (state, CPU over the
 // last seconds, queue, callbacks, errors, memory, what it has open).
 //
+// Language services (scriptls.rs, lib/script's script::ls): completion with the host's names
+// and their short descriptions (typing, a dot, Ctrl+Space), hover, signature help, folding;
+// F12 / Ctrl+click go to the declaration in the file, F2 or "Name umbenennen" renames every
+// place of a name (a flyout asks for the new one; a refusal says why), Shift+Alt+F or
+// "Formatieren" lays the script out anew -- both one undo step of the draft; the outline beside
+// the editor (while the tab is wide enough, "Gliederung" switches it) lists the fns and the
+// top-level lets, a click puts the caret there.  The breakpoints' column stays off.
+//
 // Ids from id: + 1 Neu (its menu + 2 + k), + 8 Umbenennen (its flyout: + 0xB the name, + 0xC OK,
 // + 0xD Abbrechen), + 9 Löschen, + 0x10 Ausführen, + 0x11 Stoppen, + 0x12 Neu starten, + 0x13
 // Verwerfen, + 0x14 Übernehmen, + 0x16 the outer split, + 0x18 the split of the editor, + 0x1A
 // Ausgabe | Fehler, + 0x20 the editor (.. + 0x2F), + 0x30 the output (.. + 0x37), + 0x40 the
-// errors (rows + 1 + i), + 0x100 the list (rows + 1 + i).
+// errors (rows + 1 + i), + 0x100 the list (rows + 1 + i); the language services' from
+// ID_SCRIPTLS0 + 0x100 k (constants.rs).
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -52,7 +61,7 @@ use crate::app::constants::*;
 use crate::app::tr::{t, tc, tf};
 use crate::app::Net;
 use crate::doc::scripts;
-use crate::workspace::devwin::{self, Tab};
+use crate::workspace::devwin::{self, scriptls, Tab};
 
 /// the check while typing: at most this often (ms)
 pub(crate) const CHECK_MS: u32 = 250;
@@ -80,6 +89,9 @@ pub(crate) struct Draft {
     out_run: u64,
     out_at: u64,
     out_any: bool,
+    /// the revision the folding ranges and the outline belong to, the outline
+    ls_rev: Option<u64>,
+    outline: Vec<scriptls::Entry>,
 }
 
 impl Draft {
@@ -98,6 +110,8 @@ impl Draft {
             out_run: u64::MAX,
             out_at: 0,
             out_any: false,
+            ls_rev: None,
+            outline: Vec::new(),
         }
     }
     /// the text differs from the project's source
@@ -151,11 +165,34 @@ pub(crate) struct Pane {
     /// caret goes to line / column (the editor scrolls to its caret while it is focused)
     focus_until: u32,
     goto: Option<(usize, usize)>,
+    /// the outline beside the editor (shown), its width (DIP)
+    outline: bool,
+    outline_w: i32,
+    /// the flyout of renaming a name in the script: its text, where the name is, a refusal
+    ren: Option<String>,
+    ren_at: TextPos,
+    ren_msg: Option<String>,
 }
 
 impl Pane {
     pub(crate) fn new(dev: u32) -> Pane {
-        Pane { dev, sel: None, split: 230, lower_h: 150, lower: 0, errs: -1, rename: None, msg: None, focus_until: 0, goto: None }
+        Pane {
+            dev,
+            sel: None,
+            split: 230,
+            lower_h: 150,
+            lower: 0,
+            errs: -1,
+            rename: None,
+            msg: None,
+            focus_until: 0,
+            goto: None,
+            outline: true,
+            outline_w: 190,
+            ren: None,
+            ren_at: TextPos::default(),
+            ren_msg: None,
+        }
     }
 }
 
@@ -677,21 +714,116 @@ fn code(n: &mut Net, ui: &mut Ui, k: usize, id: u32, key: &(u32, String), acts: 
     if ui.focused() == cid && ui.capture_shortcut(b'S' as u32, MOD_CTRL) {
         acts.push(Act::Apply);
     }
+    let lsid = ID_SCRIPTLS0 + 0x100 * k as u32;
+    let (show_outline, mut ow) = n.devwin.get(k).map_or((true, 190), |w| (w.scr.outline, w.scr.outline_w));
     let Some(dr) = n.devwin.drafts.map.get_mut(key) else { return };
+    // the folding ranges and the outline follow the text
+    if dr.ls_rev != Some(dr.doc.revision()) {
+        scriptls::folds(&mut dr.doc);
+        dr.outline = scriptls::outline(&dr.doc.text());
+        dr.ls_rev = Some(dr.doc.revision());
+    }
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 4);
+    // the editor with the language services, the outline beside it while there is room
     ui.next_size(-1, -1);
-    let ev = ui.code_editor(cid, &mut dr.doc, &Highlighter::jfs(), CE_MARKS);
+    ui.box_begin(0, BOX_V | BOX_FIXED, 0);
+    let total = ui.px2dip(ui.box_rect()[2]);
+    let outline = show_outline && total >= 560;
+    let mut pos = (total - ow - 6).max(240);
+    if outline {
+        ui.next_size(-1, -1);
+        ui.split_begin(lsid + 8, pos, false);
+    }
+    let mut assist = scriptls::Assist::new();
+    ui.next_size(-1, -1);
+    let ev = ui.code_editor_with(cid, &mut dr.doc, &Highlighter::jfs(), Some(&mut assist), CE_MARKS);
+    let events = ui.code_events(cid);
+    let mut goto: Option<(usize, usize)> = None;
+    if outline {
+        ui.split_next();
+        ui.next_size(-1, -1);
+        ui.box_begin(0, BOX_V | pad(2), 4);
+        ui.text(TS_CAPTION | TX_SECONDARY, t("Gliederung"));
+        if dr.outline.is_empty() {
+            ui.next_size(-1, 0);
+            ui.text(TS_CAPTION | TX_TERTIARY | TX_WRAP, t("Noch keine Funktionen und globalen Variablen."));
+            ui.spacer(-1);
+        } else {
+            // (the entry the caret is in is the chosen one)
+            let cl = dr.doc.selection().caret.line + 1;
+            let mut sel = dr.outline.iter().rposition(|e| e.line <= cl).map_or(-1, |i| i as i32);
+            ui.next_size(-1, -1);
+            let (first, end) = ui.list_begin(lsid + 0x40, &mut sel, dr.outline.len() as i32, 24);
+            for i in first..end {
+                let e = &dr.outline[i as usize];
+                ui.list_item(i, &format!("{}{}", "\u{2003}".repeat(e.level), e.text));
+            }
+            let (lev, s) = ui.list_end(&mut sel);
+            if lev & EV_ACT != 0
+                && let Some(e) = dr.outline.get(s.max(0) as usize)
+            {
+                goto = Some((e.line, e.col));
+            }
+        }
+        ui.box_end();
+        if ui.split_end(&mut pos) {
+            ow = (total - pos - 6).max(120);
+        }
+    }
+    ui.box_end();
+    // what the editor asked for: go to the definition, rename (the flyout), format
+    let mut msg_now: Option<String> = None;
+    let mut ren_open: Option<(String, TextPos)> = None;
+    let mut edited = false;
+    for e in events {
+        match e {
+            CodeEv::Definition(p) => {
+                if !scriptls::definition(&mut dr.doc, p) {
+                    msg_now = Some(String::from(t("Hier steht kein Name, der in diesem Skript deklariert ist.")));
+                }
+            }
+            CodeEv::Rename(p) => ren_open = Some((scriptls::name_at(&dr.doc, p), p)),
+            CodeEv::Format => {
+                let unit = dr.doc.indent_unit();
+                match scriptls::format(&mut dr.doc, &unit) {
+                    Ok(did) => edited |= did,
+                    Err(m) => msg_now = Some(tf("Formatieren geht erst ohne Syntaxfehler ({})", &[&m])),
+                }
+            }
+            CodeEv::Breakpoint(_) => {}
+        }
+    }
     let changed = dr.changed();
     let st = ui.code_status(cid);
     let at = ui.code_diag(cid);
-    if ev & EV_ACT != 0 {
+    if let Some(w) = n.devwin.get(k) {
+        w.scr.outline_w = ow;
+        if goto.is_some() {
+            w.scr.focus_until = ui.now().wrapping_add(100).max(1);
+            w.scr.goto = goto;
+        }
+        if let Some((name, p)) = ren_open {
+            w.scr.ren = Some(name);
+            w.scr.ren_at = p;
+            w.scr.ren_msg = None;
+            ui.popup_open(lsid);
+            ui.focus(lsid + 1);
+        }
+    }
+    if ev & EV_ACT != 0 || edited {
         // (the editor drew the marks as they were; they follow the edit until the check)
         check_soon(n, ui);
         // a refusal was about the text before
         if let Some(w) = n.devwin.get(k) {
             w.scr.msg = None;
         }
+        ui.repass();
+    }
+    if let Some(m) = msg_now
+        && let Some(w) = n.devwin.get(k)
+    {
+        w.scr.msg = Some(m);
     }
     let msg = n.devwin.get(k).and_then(|w| w.scr.msg.clone());
     ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
@@ -712,8 +844,107 @@ fn code(n: &mut Net, ui: &mut Ui, k: usize, id: u32, key: &(u32, String), acts: 
         (None, Some(x)) => ui.text(TS_CAPTION | TX_ELLIPSIS, &format!("{}:{}: {}", x.line, x.col, x.msg)),
         (None, None) => ui.text(TS_CAPTION | TX_TERTIARY | TX_ELLIPSIS, if changed { t("geändert – Strg+S übernimmt, F8 springt zur nächsten Meldung") } else { t("wie im Projekt") }),
     }
+    // the language services: Formatieren, Name umbenennen (F2 opens its flyout), Gliederung
+    ui.next_icon(IC_ALIGN_LEFT);
+    ui.next_flags(ST_COMPACT | ST_SUBTLE | ST_ICON_ONLY);
+    let fmt = ui.button(lsid + 4, t("Formatieren")) & EV_ACT != 0;
+    ui.tooltip(t("Formatieren (Umschalt+Alt+F): Einrückung, Leerzeichen, eine Anweisung je Zeile – ein Rückgängig-Schritt"));
+    ui.next_icon(IC_EDIT);
+    ui.next_flags(ST_COMPACT | ST_SUBTLE | ST_ICON_ONLY);
+    let rev = ui.dropdown_button(lsid, t("Name umbenennen"));
+    let ren = ls_rename_flyout(n, ui, k, key, lsid, rev);
+    ui.next_icon(IC_BULLETED_LIST);
+    ui.next_flags(ST_COMPACT | ST_SUBTLE | ST_ICON_ONLY | if show_outline { ST_CHECKED } else { 0 });
+    if ui.button(lsid + 5, t("Gliederung")) & EV_ACT != 0
+        && let Some(w) = n.devwin.get(k)
+    {
+        w.scr.outline = !w.scr.outline;
+        ui.repass();
+    }
+    ui.tooltip(t("Gliederung: die Funktionen und globalen Variablen neben dem Editor, ein Klick springt hin"));
     ui.box_end();
     ui.box_end();
+    // the buttons' work
+    let focus_until = ui.now().wrapping_add(100).max(1);
+    if fmt && let Some(dr) = n.devwin.drafts.map.get_mut(key) {
+        let unit = dr.doc.indent_unit();
+        let r = scriptls::format(&mut dr.doc, &unit);
+        if let Some(w) = n.devwin.get(k) {
+            w.scr.msg = r.err().map(|m| tf("Formatieren geht erst ohne Syntaxfehler ({})", &[&m]));
+            w.scr.focus_until = focus_until;
+        }
+        check_soon(n, ui);
+        ui.repass();
+    }
+    if let Some(to) = ren {
+        let at = n.devwin.get(k).map_or(TextPos::default(), |w| w.scr.ren_at);
+        let r = n.devwin.drafts.map.get_mut(key).map(|dr| scriptls::rename(&mut dr.doc, at, &to));
+        if let Some(w) = n.devwin.get(k) {
+            match r {
+                Some(Err(m)) => w.scr.ren_msg = Some(m),
+                _ => {
+                    w.scr.ren = None;
+                    w.scr.focus_until = focus_until;
+                    ui.popup_close();
+                }
+            }
+        }
+        check_soon(n, ui);
+        ui.repass();
+    }
+}
+
+// the flyout of Name umbenennen: the new name, a refusal, Umbenennen, Abbrechen -> the name to
+// rename to (Umbenennen or Enter)
+fn ls_rename_flyout(n: &mut Net, ui: &mut Ui, k: usize, key: &(u32, String), lsid: u32, ev: u32) -> Option<String> {
+    let caret = n.devwin.drafts.map.get(key).map(|dr| (scriptls::name_at(&dr.doc, dr.doc.selection().caret), dr.doc.selection().caret));
+    let Some(w) = n.devwin.get(k) else { return None };
+    let open = ev & EV_OPEN != 0;
+    if open && w.scr.ren.is_none() {
+        // (opened by a click: the name at the caret)
+        let (name, at) = caret.unwrap_or_default();
+        w.scr.ren = Some(name);
+        w.scr.ren_at = at;
+        w.scr.ren_msg = None;
+        ui.focus(lsid + 1);
+    } else if !open {
+        w.scr.ren = None;
+    }
+    let mut done = 0; // 1 Umbenennen, 2 Abbrechen
+    let refusal = w.scr.ren_msg.clone();
+    if ui.flyout_begin(lsid, FL_ALIGN_END)
+        && let Some(text) = w.scr.ren.as_mut()
+    {
+        ui.box_begin(0, BOX_V | pad(8), 6);
+        ui.text(TS_BODY_STRONG, t("Neuer Name (jede Stelle im Skript)"));
+        ui.next_size(240, 0);
+        let tev = ui.textbox(lsid + 1, None, text, 64);
+        if tev & EV_COMMIT != 0 && ui.focused() == lsid + 1 {
+            done = 1;
+        }
+        if let Some(m) = &refusal {
+            crate::workspace::error_text(ui, m, 240);
+        }
+        ui.box_begin(0, BOX_H | BOX_END, 8);
+        if ui.accent_button(lsid + 2, t("Umbenennen")) & EV_ACT != 0 {
+            done = 1;
+        }
+        if ui.button(lsid + 3, t("Abbrechen")) & EV_ACT != 0 {
+            done = 2;
+        }
+        ui.box_end();
+        ui.box_end();
+    }
+    ui.flyout_end();
+    match done {
+        1 => w.scr.ren.clone(),
+        2 => {
+            w.scr.ren = None;
+            ui.popup_close();
+            None
+        }
+        _ => None,
+    }
 }
 
 // below the editor: Ausgabe (a console without input) or Fehler (the current run's errors)

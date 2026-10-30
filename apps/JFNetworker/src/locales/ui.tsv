@@ -1280,3 +1280,42 @@ der neue Wert	the new value
 Set	Set
 Agent und Community ohne Leerzeichen angeben.	Give the agent and the community without spaces.
 Die Antworten in der Eingabeaufforderung von {}	The answers in the command prompt of {}
+Schreibt eine Zeile ins Protokoll des Geräts, mit dem Namen des Dienstes davor.	Writes a line to the device's log, with the service's name in front.
+Eine Zeile der Stufe debug ins Protokoll des Geräts.	A line of level debug in the device's log.
+Eine Zeile der Stufe info ins Protokoll des Geräts.	A line of level info in the device's log.
+Eine Warnung ins Protokoll des Geräts.	A warning in the device's log.
+Ein Fehler ins Protokoll des Geräts.	An error in the device's log.
+Die Zeit der Simulation in Millisekunden (float), samt der Rechenzeit bisher.	The simulation's time in milliseconds (float), the CPU time so far included.
+Eine Zufallszahl aus dem Strom des Dienstes: ohne Argument 0 bis unter 1, mit n 0 bis n-1, mit a, b a bis b.	A random number from the service's own stream: without an argument 0 to below 1, with n 0 to n-1, with a, b a to b.
+Die Einstellungen des Dienstes ohne den Quelltext, eine Map (z. B. config.port).	The service's settings without the source, a map (e.g. config.port).
+Zeitgeber: after, every, cancel.	Timers: after, every, cancel.
+Ruft f einmal nach ms Millisekunden auf; gibt eine Nummer für cancel zurück.	Calls f once after ms milliseconds; returns a number for cancel.
+Ruft f alle ms Millisekunden auf (mindestens alle 10 µs); gibt eine Nummer für cancel zurück.	Calls f every ms milliseconds (at most every 10 µs); returns a number for cancel.
+Hält einen Zeitgeber von after oder every an.	Stops a timer of after or every.
+TCP und UDP: listen, connect, udp.	TCP and UDP: listen, connect, udp.
+Wartet auf TCP-Verbindungen; handlers ist eine Map mit accept, data, close und binary.	Waits for TCP connections; handlers is a map with accept, data, close and binary.
+Baut eine TCP-Verbindung auf; handlers ist eine Map mit connect, data, close und binary.	Opens a TCP connection; handlers is a map with connect, data, close and binary.
+Öffnet einen UDP-Port (0: einen freien); f(sock, msg) für jedes Datagramm.	Opens a UDP port (0: a free one); f(sock, msg) for each datagram.
+Der Resolver des Geräts: resolve.	The device's resolver: resolve.
+Löst einen Namen über den Resolver des Geräts auf; f(err, addrs).	Resolves a name with the device's resolver; f(err, addrs).
+HTTP: serve, request.	HTTP: serve, request.
+Ein HTTP-Server (einmal je Skript); f(req, res), die Rückgabe oder res.send / res.json antwortet.	An HTTP server (once per script); f(req, res), its return value or res.send / res.json answers.
+Eine HTTP-Anfrage an url (oder eine Map mit url, method, headers, body, timeout_ms); f(err, resp).	An HTTP request to url (or a map with url, method, headers, body, timeout_ms); f(err, resp).
+JSON-Werte auf der Disk des Geräts: get, put, delete, scan; sie überstehen Neustarts.	JSON values on the device's disk: get, put, delete, scan; they outlive restarts.
+Liest den Wert zu key; f(err, value).	Reads the value of key; f(err, value).
+Schreibt value unter key; f(err).	Writes value under key; f(err).
+Löscht key; f(err, had).	Deletes key; f(err, had).
+Alle Einträge, deren Schlüssel mit prefix anfängt; f(err, items).	Every entry whose key starts with prefix; f(err, items).
+Kennzahlen des Dienstes: inc, gauge, observe.	The service's metrics: inc, gauge, observe.
+Zählt eine Kennzahl um n hoch (in der Zeitreihe eine Rate).	Counts a metric up by n (a rate in the time series).
+Setzt einen Messwert (in der Zeitreihe ein Stand).	Sets a reading (a level in the time series).
+Ein Messwert für Quantile: NAME_p50, _p95, _p99 und _max über fünf Minuten.	A reading for quantiles: NAME_p50, _p95, _p99 and _max over five minutes.
+Formatieren	Format
+Gliederung	Outline
+Noch keine Funktionen und globalen Variablen.	No functions and global variables yet.
+Hier steht kein Name, der in diesem Skript deklariert ist.	There is no name here that this script declares.
+Formatieren geht erst ohne Syntaxfehler ({})	Formatting needs a script without syntax errors ({})
+Formatieren (Umschalt+Alt+F): Einrückung, Leerzeichen, eine Anweisung je Zeile – ein Rückgängig-Schritt	Format (Shift+Alt+F): indentation, spaces, one statement per line – one undo step
+Name umbenennen	Rename name
+Gliederung: die Funktionen und globalen Variablen neben dem Editor, ein Klick springt hin	Outline: the functions and global variables beside the editor, a click jumps there
+Neuer Name (jede Stelle im Skript)	New name (every place in the script)
