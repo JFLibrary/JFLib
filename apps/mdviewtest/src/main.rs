@@ -40,6 +40,14 @@
 // the focused one, the note hidden, the link's address and text, a list item removed and the
 // heading's text, three paragraphs inserted above the view, the heading's HTML.  Below it: the
 // step, the focused field, the selection's length, the last form sent.
+//
+//   build/win/mdviewtest.exe --page css --script apps/mdviewtest/tests/css_shots.uis
+//
+// --page css: an HTML page with a style sheet (rich_html.rs): a head bar, cards with border,
+// padding and background, a note with a coloured border on the left, a list with a background,
+// a dark box, a table with a border and a tinted head row, rules by tag, class, id, descendant
+// and child, a hidden paragraph, a form in a card; below it the last link activated and the
+// last form sent.
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -73,6 +81,7 @@ const ID_JUMP: u32 = wid("jump");
 const ID_FORM: u32 = wid("form");
 const ID_SUPPLY: u32 = wid("supply");
 const ID_DOM: u32 = wid("dom");
+const ID_CSS: u32 = wid("css");
 const ID_STEP: u32 = wid("step");
 // the list and its rows: ID_LIST + 1 + i
 const ID_LIST: u32 = 0x0100_0000;
@@ -217,6 +226,36 @@ Hallo</textarea></p>
 <img src="https://example.org/fehlt.png" alt="Fehlt"> und lokal <img src="logo.svg" alt="Logo lokal" width="48"></p>
 "#;
 
+/// a page with a style sheet (--page css)
+pub(crate) const SAMPLE_CSS: &str = r#"<style>
+h1 { color: #0b3d91; border-bottom: 3px solid #0b3d91; padding-bottom: 4px }
+.kopf { background: #0b3d91; color: #ffffff; padding: 6px 12px; margin-bottom: 4px }
+.kopf a { color: #ffd166 }
+.karte { border: 1px solid #b8c4d2; background: #f4f7fb; padding: 8px 14px; margin: 4px 0 }
+.karte p { margin: 2px 0 }
+.hinweis { border-left: 4px solid #e09f3e; background: #fff4e0; padding: 4px 10px }
+#wichtig { color: #b00020; font-weight: bold }
+ul.menu { background: #e8eef6; padding: 4px 8px }
+ul.menu > li { color: #0b3d91 }
+.dunkel { background: #222831; color: #eeeeee; padding: 6px 10px }
+.dunkel .hell { color: #ffd166; font-style: italic }
+table.daten { border: 2px solid #8899aa }
+tr.kopfzeile { background: #dde6f0 }
+.rechts { text-align: right }
+.versteckt { display: none }
+</style>
+<div class="kopf"><p>Netzwerk-Labor · <a href="https://example.org/start">Start</a></p></div>
+<h1>Gestaltete Seite</h1>
+<div class="karte"><p>Eine Karte mit Rahmen, Innenabstand und Hintergrund.</p><p id="wichtig">Ein wichtiger Satz in Rot.</p><p>Ein <a href="https://example.org/karte">Link</a> in der Karte.</p></div>
+<div class="hinweis"><p>Ein Hinweis mit einem farbigen Rand links.</p></div>
+<ul class="menu"><li>Router</li><li>Switch</li><li>Server</li></ul>
+<div class="dunkel"><p>Ein dunkler Kasten mit <span class="hell">hellem</span> Text.</p></div>
+<table class="daten"><tr class="kopfzeile"><th>Gerät</th><th>Adresse</th></tr><tr><td>R1</td><td>10.0.0.1</td></tr></table>
+<p class="rechts">Rechts ausgerichtet.</p>
+<p class="versteckt">Unsichtbar.</p>
+<div class="karte"><form action="/los"><p><label for="q">Suche</label> <input id="q" name="q" size="16"> <button>Los</button></p></form></div>
+"#;
+
 /// the page the app changes step by step (--page dom; the paragraphs of #kasten: dom_html)
 pub(crate) const SAMPLE_DOM: &str = r#"<h2 id="kopf">Seite mit Skript</h2>
 <p id="stand">Stand: <b>0</b> Schritte</p>
@@ -312,6 +351,9 @@ struct MdTest {
     page_dom: bool,
     dom: MdViewState,
     step: u32,
+    // --page css: the page with a style sheet
+    page_css: bool,
+    css: MdViewState,
 }
 
 impl MdTest {
@@ -333,6 +375,9 @@ impl MdTest {
         if page_dom {
             dom.set_html(&dom_html());
         }
+        let page_css = plat::arg_value("--page").as_deref() == Some("css");
+        let mut css = MdViewState::new();
+        css.label = String::from("Gestaltet");
         MdTest {
             tab: 0,
             hc: 0,
@@ -359,7 +404,37 @@ impl MdTest {
             page_dom,
             dom,
             step: 0,
+            page_css,
+            css,
         }
+    }
+
+    // --page css: the styled page, what it reported
+    fn css_page(&mut self, ui: &mut Ui) {
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        ui.spacer(-1);
+        ui.next_flags(ST_NOFOCUS);
+        if ui.checkbox(ID_HC, "Hoher Kontrast", &mut self.hc) & EV_ACT != 0 {
+            ui.set_contrast(Some(self.hc != 0));
+        }
+        ui.next_flags(ST_NOFOCUS);
+        if ui.checkbox(ID_RTL, "Rechts nach links", &mut self.rtl) & EV_ACT != 0 {
+            ui.set_rtl(Some(self.rtl != 0));
+        }
+        ui.box_end();
+        ui.next_size(-1, -1);
+        let ev = ui.html_view(ID_CSS, &mut self.css, SAMPLE_CSS, 0);
+        if let Some(l) = ev.link {
+            self.link = l;
+        }
+        if let Some(s) = ev.submit {
+            let pairs: Vec<String> = s.fields.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
+            self.sent = format!("{} {} {}", s.method, s.action, pairs.join("&"));
+        }
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        ui.text(TS_BODY, &format!("Link: {}", if self.link.is_empty() { "-" } else { &self.link }));
+        ui.text(TS_BODY, &format!("Senden: {}", if self.sent.is_empty() { "-" } else { &self.sent }));
+        ui.box_end();
     }
 
     // --page dom: the next step, done through the document's elements as a page script would
@@ -619,6 +694,11 @@ impl App for MdTest {
         }
         if self.page_dom {
             self.dom_page(ui);
+            ui.box_end();
+            return;
+        }
+        if self.page_css {
+            self.css_page(ui);
             ui.box_end();
             return;
         }

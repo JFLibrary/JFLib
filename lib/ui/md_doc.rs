@@ -26,6 +26,9 @@
 //                                        layout); md_view.rs keeps its place, selection, focus,
 //                                        the fields' values and the layouts that still hold
 //   doc.field_of(n) -> the field of element n
+//   doc.boxes()                          the boxes of CSS (style sheets, rich_html.rs): a block
+//                                        element's margins, padding, borders and background
+//                                        around its blocks (MdBlock::boxes, outermost first)
 //
 // The model: a block is a paragraph, a heading (level 1..6), a code block (its text, the
 // language of the fence), a rule or a table row (cells: byte ranges of the text, '\t' between
@@ -57,6 +60,7 @@
 
 use alloc::collections::BTreeMap;
 use alloc::format;
+use alloc::rc::Rc;
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -65,7 +69,7 @@ use crate::ed_core::TextPos;
 use crate::i18n::tr;
 use crate::md_dom::{Dom, MdNode, NIL};
 use crate::rich_doc::*;
-use crate::rich_html::{attrs, dom_para, dom_read, entity, html_read, HExt, HRead};
+use crate::rich_html::{attrs, dom_para, dom_read, entity, html_read, HExt, HRead, Sheet};
 
 /// MdBlock::kind: a paragraph
 pub const MB_PARA: u8 = 0;
@@ -196,6 +200,29 @@ pub struct MdBlock {
     /// HTML: the element whose content it shows (the innermost block element: p, li, h1, the
     /// row of a cell ...; MdNode::NONE: none, Markdown)
     pub node: MdNode,
+    /// HTML: the boxes of CSS around it (indices of MdDoc::boxes, outermost first)
+    pub boxes: Vec<u32>,
+}
+
+/// a box of CSS around blocks: what a block element's style gives (MdBlock::boxes); lengths
+/// in px at 100 % text, the sides top, right, bottom, left
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct MdBox {
+    pub margin: [i16; 4],
+    pub padding: [i16; 4],
+    /// the borders' widths (a style none: 0; every visible style is drawn solid) and colours
+    /// (0xAARRGGBB; 0: the text's)
+    pub border: [u8; 4],
+    pub border_color: [u32; 4],
+    /// the background (0: none)
+    pub bg: u32,
+    /// the margins CSS gave (bit 1 << side): at the top and bottom they take the place of the
+    /// gap between blocks
+    pub mset: u8,
+    /// the block quotes and lists around its element (its place among their indents)
+    pub depth: u8,
+    /// its element
+    pub node: MdNode,
 }
 
 /// an image of the document
@@ -310,9 +337,13 @@ pub struct MdDoc {
     fields: Vec<MdField>,
     fspots: Vec<MdFieldSpot>,
     truncated: bool,
-    // an HTML document's element tree (md_dom.rs; none for Markdown), the input was cut, the
-    // changes of the blocks the view has not taken yet
+    // the boxes of CSS and the first and last block of each
+    boxes: Vec<MdBox>,
+    box_ends: Vec<(u32, u32)>,
+    // an HTML document's element tree (md_dom.rs; none for Markdown) and its style sheets, the
+    // input was cut, the changes of the blocks the view has not taken yet
     pub(crate) dom: Dom,
+    sheet: Rc<Sheet>,
     cut: bool,
     change: Option<DocChange>,
 }
@@ -1891,8 +1922,13 @@ fn html_blocks(h: HRead, doc: &mut MdDoc, quote: u8, list: u8, path: u32, first_
     let depth = (quote + list) as u32;
     // the HTML's own quotes inside the Markdown's containers, its lists inside them
     let path_of = |dq: u8| path | (((1u64 << dq.min(31)) - 1) << depth.min(31)) as u32;
-    let HRead { paras, ext, forms, fields, nodes, .. } = h;
+    let HRead { paras, ext, forms, fields, nodes, boxes, para_boxes, rule_boxes, .. } = h;
     let mut para_blk = vec![NIL; paras.len()];
+    // the boxes of CSS (their indices count from the ones before)
+    let box0 = doc.boxes.len() as u32;
+    doc.boxes.extend(boxes);
+    let chain = |v: Option<&Vec<u32>>| -> Vec<u32> { v.map_or(Vec::new(), |v| v.iter().map(|&b| b + box0).collect()) };
+    let mut rules = rule_boxes.iter().peekable();
     // the forms and fields (MdField::form and HExt::Field::n count from the ones before)
     let (form0, field0) = (doc.forms.len() as u32, doc.fields.len() as u32);
     let room = FIELDS_MAX.saturating_sub(doc.fields.len());
@@ -1916,16 +1952,22 @@ fn html_blocks(h: HRead, doc: &mut MdDoc, quote: u8, list: u8, path: u32, first_
     };
     for k in 0..=n {
         let items: Vec<&HExt> = by.get(&k).cloned().unwrap_or_default();
+        let mut rb = Vec::new();
+        while rules.peek().is_some_and(|r| r.0 <= k) {
+            if let Some(r) = rules.next() {
+                rb = chain(Some(&r.1));
+            }
+        }
         if items.iter().any(|e| matches!(e, HExt::Rule)) {
             let sp = space(&mut first, 2);
-            doc.push_block(MdBlock { kind: MB_RULE, quote, list, path, space: sp, ..MdBlock::default() });
+            doc.push_block(MdBlock { kind: MB_RULE, quote, list, path, space: sp, boxes: rb, ..MdBlock::default() });
             pre_open = None;
         }
         if k == n {
             break;
         }
         let p = &paras[k];
-        let mut b = MdBlock { quote, list, path, node: nodes.get(k).copied().unwrap_or_default(), ..MdBlock::default() };
+        let mut b = MdBlock { quote, list, path, node: nodes.get(k).copied().unwrap_or_default(), boxes: chain(para_boxes.get(k)), ..MdBlock::default() };
         // the images and fields of the paragraph by byte (their U+FFFC gets a span of its own):
         // byte, index + 1, a field
         let mut imgs: Vec<(usize, u32, bool)> = Vec::new();
@@ -2111,6 +2153,7 @@ fn alike(x: &MdBlock, y: &MdBlock) -> bool {
         && x.lang == y.lang
         && x.cells == y.cells
         && x.node == y.node
+        && x.boxes.len() == y.boxes.len()
         && x.spans.len() == y.spans.len()
         && x.spans.iter().zip(&y.spans).all(|(s, t)| {
             (s.a, s.b, s.style, s.color, s.bg) == (t.a, t.b, t.style, t.color, t.bg) && (s.link != 0) == (t.link != 0) && (s.image != 0) == (t.image != 0) && (s.field != 0) == (t.field != 0)
@@ -2241,7 +2284,8 @@ impl MdDoc {
     fn derive(&mut self) {
         let mut dom = core::mem::take(&mut self.dom);
         let mut d = MdDoc::default();
-        let mut h = dom_read(&dom, true);
+        let sheet = Rc::new(Sheet::of(&dom));
+        let mut h = dom_read(&dom, &sheet, true);
         let ranges = core::mem::take(&mut h.ranges);
         let para_blk = html_blocks(h, &mut d, 0, 0, 0, 0);
         d.finish();
@@ -2265,6 +2309,9 @@ impl MdDoc {
         self.forms = d.forms;
         self.fields = d.fields;
         self.fspots = d.fspots;
+        self.boxes = d.boxes;
+        self.box_ends = d.box_ends;
+        self.sheet = sheet;
         self.truncated = self.cut || d.truncated || dom.truncated;
         self.dom = dom;
     }
@@ -2317,7 +2364,7 @@ impl MdDoc {
             if !matches!(old.kind, MB_PARA | MB_HEADING) || old.spans.iter().any(|s| s.link != 0 || s.image != 0 || s.field != 0) {
                 return None;
             }
-            let p = dom_para(&self.dom, l)?;
+            let p = dom_para(&self.dom, &self.sheet, l)?;
             let mut nb = MdBlock { text: String::new(), spans: Vec::new(), node: self.dom.handle(l), ..old.clone() };
             let mut scratch = MdDoc::default();
             para_text(&p, &[], &mut scratch, &mut nb);
@@ -2344,20 +2391,33 @@ impl MdDoc {
         let old = core::mem::take(&mut self.blocks);
         let images = core::mem::take(&mut self.images);
         let spots = core::mem::take(&mut self.spots);
+        let old_boxes = core::mem::take(&mut self.boxes);
         self.derive();
         let new = &self.blocks;
         let (on, nn) = (old.len(), new.len());
+        // (the boxes around two blocks are the same)
+        let same = |x: &MdBlock, y: &MdBlock| x.boxes.len() == y.boxes.len() && x.boxes.iter().zip(&y.boxes).all(|(&i, &j)| old_boxes.get(i as usize) == self.boxes.get(j as usize));
         let mut a = 0;
-        while a < on && a < nn && old[a] == new[a] {
+        while a < on && a < nn && old[a] == new[a] && same(&old[a], &new[a]) {
             a += 1;
         }
         let mut s = 0;
         while s < on - a && s < nn - a && alike(&old[on - 1 - s], &new[nn - 1 - s]) {
             s += 1;
         }
-        let redo: Vec<usize> = (nn - s..nn).filter(|&j| old[j - nn + on] != new[j]).collect();
+        let redo: Vec<usize> = (nn - s..nn).filter(|&j| old[j - nn + on] != new[j] || !same(&old[j - nn + on], &new[j])).collect();
         let range = (a, on - a - s, nn - a - s);
         DocChange { range: (range.1 > 0 || range.2 > 0).then_some(range), redo, full: true, images, spots }
+    }
+
+    /// the boxes of CSS (MdBlock::boxes)
+    pub fn boxes(&self) -> &[MdBox] {
+        &self.boxes
+    }
+
+    // the first and last block of box i
+    pub(crate) fn box_ends(&self, i: u32) -> (usize, usize) {
+        self.box_ends.get(i as usize).map_or((0, 0), |e| (e.0 as usize, e.1 as usize))
     }
 
     /// the field whose element is n (an index of fields())
@@ -2376,10 +2436,19 @@ impl MdDoc {
         }
     }
 
-    // the links and fields in reading order
+    // the links and fields in reading order, the first and last block of every box
     fn finish(&mut self) {
         if let Some(b) = self.blocks.first_mut() {
             b.space = 0;
+        }
+        self.box_ends = vec![(u32::MAX, 0); self.boxes.len()];
+        for (k, b) in self.blocks.iter().enumerate() {
+            for &i in &b.boxes {
+                if let Some(e) = self.box_ends.get_mut(i as usize) {
+                    e.0 = e.0.min(k as u32);
+                    e.1 = e.1.max(k as u32);
+                }
+            }
         }
         self.spots.clear();
         self.fspots.clear();

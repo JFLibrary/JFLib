@@ -204,6 +204,7 @@ fn leaf_inside(t: &str) -> bool {
             | "footer" | "table" | "address" | "figure" | "center" | "thead" | "tbody" | "tfoot" | "td" | "th" | "caption" | "ul" | "ol" | "dl"
             | "br" | "hr" | "img" | "input" | "select" | "textarea" | "button" | "label" | "form" | "option" | "optgroup" | "a" | "script"
             | "style" | "head" | "title" | "template" | "noscript" | "svg" | "meta" | "link" | "html" | "body" | "xmp" | "listing" | "plaintext"
+            | "nav" | "main" | "aside" | "fieldset" | "legend" | "details" | "summary" | "dialog" | "hgroup" | "figcaption" | "menu" | "dir"
     )
 }
 
@@ -803,6 +804,41 @@ pub(crate) struct Compound {
 pub(crate) struct Sel {
     parts: Vec<Compound>,
     child: Vec<bool>,
+}
+
+/// Sel::key: what an element needs for the selector to match it at all
+pub(crate) enum SelKey<'a> {
+    Id(&'a str),
+    Class(&'a str),
+    Tag(&'a str),
+    Any,
+}
+
+impl Sel {
+    /// the specificity: ids, classes and attributes, tags (a byte each)
+    pub(crate) fn spec(&self) -> u32 {
+        let (mut ids, mut cls, mut tags) = (0u32, 0u32, 0u32);
+        for p in &self.parts {
+            ids += (!p.id.is_empty()) as u32;
+            cls += (p.classes.len() + p.attrs.len()) as u32;
+            tags += (!p.tag.is_empty()) as u32;
+        }
+        ids.min(255) << 16 | cls.min(255) << 8 | tags.min(255)
+    }
+
+    /// the subject's id, else its first class, else its tag (an index of rules)
+    pub(crate) fn key(&self) -> SelKey<'_> {
+        let s = &self.parts[0];
+        if !s.id.is_empty() {
+            SelKey::Id(&s.id)
+        } else if let Some(c) = s.classes.first() {
+            SelKey::Class(c)
+        } else if !s.tag.is_empty() {
+            SelKey::Tag(&s.tag)
+        } else {
+            SelKey::Any
+        }
+    }
 }
 
 fn ident_char(c: char) -> bool {

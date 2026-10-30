@@ -62,7 +62,13 @@
 // monospace font on a tinted box with the code editor's highlighting (Highlighter::for_name of
 // the fence's language, ui.code_theme colours), tables with column widths from their cells
 // (wrapped to fit the column), images at their size (DIP; wider than the column: scaled down;
-// SVGs through img_svg, sharp at every size), rules.  Text wraps at text::segment's line
+// SVGs through img_svg, sharp at every size), rules.  Boxes of CSS (MdDoc::boxes) at their
+// place among the indents: margins and padding (growing with the text), borders, a background
+// under their blocks; a margin CSS gives at a box's top or bottom takes the place of the gap
+// between blocks; on a background the text without a colour of its own takes one that reads on
+// it (fields there get the theme's background behind them); high contrast draws no
+// backgrounds and the borders in the text's colour; left and right stay where they are in a
+// right-to-left document.  Text wraps at text::segment's line
 // breaks (clusters inside a word too long).  A paragraph's direction comes from its first
 // strong character: Hebrew and Arabic run right to left (their runs shaped and reordered by
 // text_shape); indents and markers follow the document's direction.  Only the blocks in view
@@ -358,6 +364,21 @@ struct BLay {
     boxes: Vec<FBox>,
     // quote bars: x from the column's start
     bars: Vec<i32>,
+    // the boxes of CSS around it (outermost first), the x the list marker's gutter ends at
+    css: Vec<CssBox>,
+    mx: i32,
+}
+
+// a box of CSS at a block: the box (an index of MdDoc::boxes), its border's x and width from
+// the column's start, its y0 .. y1 from the block's top, its top / bottom border at this block
+struct CssBox {
+    b: u32,
+    x: i32,
+    w: i32,
+    y0: i32,
+    y1: i32,
+    first: bool,
+    last: bool,
 }
 
 // the faces: [monospace][bold | italic << 1], the body text size (24.8)
@@ -496,6 +517,17 @@ fn text_rtl(s: &str) -> Option<bool> {
 
 fn opaque(c: u32) -> u32 {
     if c >> 24 == 0 { c | 0xFF00_0000 } else { c }
+}
+
+// the text colours that read on a background of CSS (text, secondary text, links): dark on a
+// light one, light on a dark one
+fn on_bg(bg: u32) -> (u32, u32, u32) {
+    let (r, g, b) = ((bg >> 16) & 255, (bg >> 8) & 255, bg & 255);
+    if r * 2126 + g * 7152 + b * 722 > 255 * 5500 {
+        (0xFF1B_1B1B, 0xFF5C_5C5C, 0xFF0A_55B0)
+    } else {
+        (0xFFF2_F2F2, 0xFFBE_BEBE, 0xFF8A_B4F8)
+    }
 }
 
 impl MdViewState {
@@ -729,8 +761,11 @@ impl MdViewState {
             self.lc.lays.remove(&(a + nn));
             self.reguess = true;
         }
-        for k in &ch.redo {
-            self.lc.lays.remove(k);
+        for &k in &ch.redo {
+            // (and its neighbours: a box's margin there decides their gaps)
+            self.lc.lays.remove(&k);
+            self.lc.lays.remove(&k.wrapping_sub(1));
+            self.lc.lays.remove(&(k + 1));
         }
         if ch.full {
             // the pictures by address, the tables' columns again, the fields by element
@@ -1652,9 +1687,33 @@ impl Ui {
     fn md_block(&mut self, lc: &mut Cache, doc: &MdDoc, base: &str, k: usize, cw: i32, drtl: bool, fc: &Faces) -> BLay {
         let bl = &doc.blocks()[k];
         let depth = (bl.quote as usize + bl.list as usize).min(32);
-        let mut x = 0;
+        // the boxes of CSS at their place among the indents of quotes and lists: (box, its
+        // border's x, what it leaves at the end); left and right as on the screen (a right-to-left
+        // document's indents start on the right)
+        let css: Vec<(u32, &MdBox)> = bl.boxes.iter().filter_map(|&i| doc.boxes().get(i as usize).map(|b| (i, b))).collect();
+        let lr = |v: [i32; 4]| if drtl { (v[1], v[3]) } else { (v[3], v[1]) };
+        let mut geo: Vec<(u32, i32, i32)> = Vec::new();
+        let (mut x, mut right, mut bi, mut mx) = (0, 0, 0, 0);
         let mut bars = Vec::new();
-        for lv in 0..depth {
+        for lv in 0..=depth {
+            if lv == depth {
+                mx = x;
+            }
+            while bi < css.len() && (css[bi].1.depth as usize <= lv || lv == depth) {
+                let (i, b) = css[bi];
+                let (ms, me) = lr(b.margin.map(|v| self.dp_text(v as i32)));
+                let (ps, pe) = lr(b.padding.map(|v| self.dp_text(v as i32)));
+                let (bs, be) = lr(b.border.map(|v| self.dp(v as i32)));
+                x += ms;
+                right += me;
+                geo.push((i, x, right));
+                x += bs + ps;
+                right += be + pe;
+                bi += 1;
+            }
+            if lv == depth {
+                break;
+            }
             if bl.path >> lv & 1 != 0 {
                 bars.push(x + self.dp(2));
                 x += self.dp_text(QUOTE_W);
@@ -1662,7 +1721,7 @@ impl Ui {
                 x += self.dp_text(LIST_W);
             }
         }
-        let w = (cw - x).max(self.dp(48));
+        let w = (cw - x - right).max(self.dp(48));
         let mut gap = match bl.space {
             0 => 0,
             1 => self.dp_text(TIGHT_GAP),
@@ -1741,7 +1800,44 @@ impl Ui {
                 boxes.push(FBox { x, y: 0, w, flow });
             }
         }
-        BLay { h: gap + ch, gap, ch, x, w, boxes, bars }
+        if geo.is_empty() && (k == 0 || doc.blocks()[k - 1].boxes.is_empty()) {
+            return BLay { h: gap + ch, gap, ch, x, w, boxes, bars, css: Vec::new(), mx };
+        }
+        // a margin CSS gives at the top of a box starting here, or at the bottom of one that
+        // ended at the block before, takes the place of the gap
+        let starts = |i: u32| doc.box_ends(i).0 == k;
+        let ends = |i: u32| doc.box_ends(i).1 == k;
+        let own_mt = css.iter().any(|&(i, b)| starts(i) && b.mset & 1 != 0);
+        let prev_mb = k > 0 && doc.blocks()[k - 1].boxes.iter().any(|&i| doc.box_ends(i).1 == k - 1 && doc.boxes().get(i as usize).is_some_and(|b| b.mset & 4 != 0));
+        if own_mt || prev_mb {
+            gap = 0;
+        }
+        // the boxes' tops (the gap outside the ones starting here) and bottoms
+        let mut y = gap;
+        let mut out: Vec<CssBox> = Vec::with_capacity(geo.len());
+        for &(i, bx, br) in &geo {
+            let b = &doc.boxes()[i as usize];
+            let first = starts(i);
+            let y0 = if first { y + self.dp_text(b.margin[0] as i32) } else { 0 };
+            if first {
+                y = y0 + self.dp(b.border[0] as i32) + self.dp_text(b.padding[0] as i32);
+            }
+            out.push(CssBox { b: i, x: bx, w: (cw - bx - br).max(1), y0, y1: 0, first, last: ends(i) });
+        }
+        let top = y;
+        let mut yb = top + ch;
+        for g in out.iter_mut().rev() {
+            if g.last {
+                let b = &doc.boxes()[g.b as usize];
+                yb += self.dp_text(b.padding[2] as i32) + self.dp(b.border[2] as i32);
+                g.y1 = yb;
+                yb += self.dp_text(b.margin[2] as i32);
+            }
+        }
+        for g in out.iter_mut().filter(|g| !g.last) {
+            g.y1 = yb;
+        }
+        BLay { h: yb, gap: top, ch, x, w, boxes, bars, css: out, mx }
     }
 
     // a block's layout from the cache (laid out now if needed; its height goes to the rows)
@@ -1987,7 +2083,7 @@ impl Ui {
         }
         let bgc = self.md_bg(frame);
         let mut links: Vec<Link> = Vec::new();
-        let mut fields: Vec<(usize, [i32; 4])> = Vec::new();
+        let mut fields: Vec<(usize, [i32; 4], u32)> = Vec::new();
         let mut hover: Option<usize> = None;
         for &(k, y) in &vis {
             let lay = st.lc.lays.get(&k).cloned();
@@ -2416,7 +2512,7 @@ impl Ui {
     // form, the arrows choose a radio, Tab leaves a field for the next / previous link or field;
     // what the user did goes to `out`
     #[allow(clippy::too_many_arguments)]
-    fn md_fields(&mut self, st: &mut MdViewState, id: u32, drawn: &[(usize, [i32; 4])], off: bool, view_h: i32, cw: i32, drtl: bool, fc: &Faces, out: &mut MdEv) {
+    fn md_fields(&mut self, st: &mut MdViewState, id: u32, drawn: &[(usize, [i32; 4], u32)], off: bool, view_h: i32, cw: i32, drtl: bool, fc: &Faces, out: &mut MdEv) {
         let n = st.doc.fields().len();
         if n == 0 {
             return;
@@ -2426,7 +2522,11 @@ impl Ui {
         let mut submit: Option<MdSubmit> = None;
         let mut reset: Option<usize> = None;
         let mut moved: Option<usize> = None;
-        for &(f, r) in drawn {
+        for &(f, r, under) in drawn {
+            if under != 0 {
+                self.draw_color(under);
+                self.draw_rect(r[0], r[1], r[2], r[3]);
+            }
             let fid = md_field_id(id, f);
             let focused = self.wp.ctx.focus == fid;
             let h0 = self.wp.ctx.hits[self.wp.ctx.hit_cur].len();
@@ -2618,12 +2718,54 @@ impl Ui {
     #[allow(clippy::too_many_arguments)]
     // (rows outside vis: y0 .. y1 are skipped -- a block may be far taller than the view; the
     // fields go to `fields` with their logical rectangles: md_fields builds their widgets)
-    fn md_draw_block(&mut self, doc: &MdDoc, lc: &mut Cache, sel: TextSel, k: usize, lay: &BLay, cx: i32, top: i32, cw: i32, drtl: bool, focused: bool, bgc: u32, vis: (i32, i32), links: &mut Vec<Link>, fields: &mut Vec<(usize, [i32; 4])>) {
+    fn md_draw_block(&mut self, doc: &MdDoc, lc: &mut Cache, sel: TextSel, k: usize, lay: &BLay, cx: i32, top: i32, cw: i32, drtl: bool, focused: bool, bgc: u32, vis: (i32, i32), links: &mut Vec<Link>, fields: &mut Vec<(usize, [i32; 4], u32)>) {
         let hc = self.high_contrast;
         let bl = &doc.blocks()[k];
         let ctop = top + lay.gap;
-        let tcol = self.color(T_TEXT) | 0xFF00_0000;
-        let t2 = self.color(T_TEXT2) | 0xFF00_0000;
+        let mut tcol = self.color(T_TEXT) | 0xFF00_0000;
+        let mut t2 = self.color(T_TEXT2) | 0xFF00_0000;
+        let mut lcol = self.color(T_ACCENT_TEXT) | 0xFF00_0000;
+        let bgc0 = bgc;
+        let mut bgc = bgc;
+        // the boxes of CSS: backgrounds (not in high contrast), borders (high contrast: in the
+        // text's colour); on a background the text takes a colour that reads on it
+        for g in &lay.css {
+            let Some(b) = doc.boxes().get(g.b as usize) else { continue };
+            let (x, y0, hh) = (box_x(cx, cw, g.x, g.w, drtl), top + g.y0, g.y1 - g.y0);
+            if hh <= 0 {
+                continue;
+            }
+            if b.bg != 0 && !hc {
+                self.draw_color(b.bg);
+                self.draw_rect(x, y0, g.w, hh);
+                bgc = color_mix(bgc, b.bg | 0xFF00_0000, ((b.bg >> 24) as i32) + ((b.bg >> 31) as i32));
+            }
+            let bw = b.border.map(|v| self.dp(v as i32));
+            let col = |s: usize| if hc || b.border_color[s] == 0 { tcol } else { b.border_color[s] };
+            let edge = |ui: &mut Ui, s: usize, r: [i32; 4]| {
+                if bw[s] > 0 && r[3] > 0 {
+                    ui.draw_color(col(s));
+                    ui.draw_rect(r[0], r[1], r[2], r[3]);
+                }
+            };
+            edge(self, 3, [x, y0, bw[3], hh]);
+            edge(self, 1, [x + g.w - bw[1], y0, bw[1], hh]);
+            if g.first {
+                edge(self, 0, [x, y0, g.w, bw[0]]);
+            }
+            if g.last {
+                edge(self, 2, [x, top + g.y1 - bw[2], g.w, bw[2]]);
+            }
+        }
+        // (fields on a background lighter or darker than the theme's: the theme's below them)
+        let mut under = 0;
+        if bgc != bgc0 && !hc {
+            let theme_light = (tcol & 0xFF) < 0x80;
+            (tcol, t2, lcol) = on_bg(bgc);
+            if ((tcol & 0xFF) < 0x80) != theme_light {
+                under = bgc0;
+            }
+        }
         let div = if hc { tcol } else { color_mix(bgc, tcol, 48) };
         let tint = color_mix(bgc, tcol, if self.theme_dark { 22 } else { 14 });
         let hair = self.hair().max(1);
@@ -2668,7 +2810,8 @@ impl Ui {
                     self.draw_frame(x, ctop, fb.w + px * 2 + hair, lay.ch + hair, 0, hair);
                 }
             }
-            MB_HEADING if bl.level <= 2 => {
+            // (a heading whose CSS gives it a border below has no line of its own)
+            MB_HEADING if bl.level <= 2 && !lay.css.iter().any(|g| g.last && doc.boxes().get(g.b as usize).is_some_and(|b| b.node == bl.node && b.border[2] > 0)) => {
                 let fh = lay.boxes.first().map_or(0, |b| b.flow.h);
                 self.draw_color(div);
                 self.draw_rect(colx, ctop + fh + self.dp(6), lay.w, hair);
@@ -2715,7 +2858,6 @@ impl Ui {
         // the text
         let quote = bl.quote > 0;
         let theme = if bl.kind == MB_CODE { Some(self.code_theme()) } else { None };
-        let lcol = self.color(T_ACCENT_TEXT) | 0xFF00_0000;
         // the first row: the list marker's baseline and font
         let first_base: Option<(i32, i32, u32, i32, i32)> = lay.boxes.first().and_then(|fb| {
             let r = fb.flow.rows.first()?;
@@ -2743,12 +2885,12 @@ impl Ui {
                     } else if p.field != 0 {
                         // a field: its widget after the blocks, here (its row's gap above it)
                         let y = base - p.asc + self.dp(FIELD_GAP);
-                        fields.push((p.field as usize - 1, self.ltr_rect([x, y, p.w, p.ih])));
+                        fields.push((p.field as usize - 1, self.ltr_rect([x, y, p.w, p.ih]), under));
                     } else {
                         let link = p.link != 0;
                         let col = if let Some(t) = &theme {
                             t.tokens.get(p.syn.saturating_sub(1) as usize).copied().unwrap_or(tcol)
-                        } else if link {
+                        } else if link && (p.color == 0 || hc) {
                             lcol
                         } else if p.color != 0 && !hc {
                             opaque(p.color)
@@ -2827,7 +2969,7 @@ impl Ui {
                 (mf, ms, masc)
             };
             let gut = self.dp_text(LIST_W);
-            let gx = box_x(cx, cw, lay.x - gut, gut, drtl);
+            let gx = box_x(cx, cw, lay.mx - gut, gut, drtl);
             let mcol = if quote { t2 } else { tcol };
             let label = bl.text.chars().take(LABEL_MAX).collect::<String>();
             if bl.task != 0 {
@@ -2874,7 +3016,8 @@ impl Ui {
                 self.cmd_text(x, base, m.as_bytes(), mf, ms, mcol, 0);
             }
             // the list item's record
-            self.wp.ctx.last_rect = self.ltr_rect([box_x(cx, cw, lay.x - gut, lay.w + gut, drtl), ctop, lay.w + gut, lay.ch]);
+            let (lx, lw) = (lay.mx - gut, lay.x + lay.w - (lay.mx - gut));
+            self.wp.ctx.last_rect = self.ltr_rect([box_x(cx, cw, lx, lw, drtl), ctop, lw, lay.ch]);
             self.wp.ctx.last_state = 0;
             self.sem(K_LISTITEM, 0, Some(&label), bl.number as i32);
         }

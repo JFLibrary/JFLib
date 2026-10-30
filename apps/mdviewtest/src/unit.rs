@@ -15,7 +15,8 @@
 // elements of blocks and fields), its changes (in place and all again giving the same blocks,
 // also for 300 random changes), the view across changes (the fields' values, the focus, the
 // place, the selection) and their cost (changes in place, deep trees, many siblings and ids,
-// long selectors within time limits).
+// long selectors within time limits); the style sheets (the cascade, inheritance, boxes, what
+// is left out, physical sides in a right-to-left document, adversarial sheets).
 // Prints FAIL lines and a summary; the exit code is the number of failures.
 
 use alloc::format;
@@ -752,7 +753,10 @@ fn dom_changes(t: &mut T) {
     t.eq(f.field_of(nb), Some(2), "the field of an element after it");
     // random changes: in place and all again give the same blocks
     let mut rng = Lcg(0xD0D0);
-    let mut d = MdDoc::html(&rep("<p class=a>x <b>y</b> <i class=b>z</i></p><div><p>p <span>q</span></p></div><ul><li>l <em>m</em></li></ul>", 8));
+    let mut d = MdDoc::html(&format!(
+        "<style>.a b {{ color: #ff0000 }} p.a {{ font-style: italic }} .b, .a > span {{ text-decoration: underline }} div {{ border: 1px solid }}</style>{}",
+        rep("<p class=a>x <b>y</b> <i class=b>z</i></p><div><p>p <span>q</span></p></div><ul><li>l <em>m</em></li></ul>", 8)
+    ));
     let mut ok = true;
     let mut fast = 0;
     for round in 0..300 {
@@ -982,6 +986,114 @@ fn dom_cost(t: &mut T) {
     });
 }
 
+// the style sheets (rich_html.rs): the cascade by specificity and order, !important and the
+// style attribute, the text's properties inherited, the boxes of block elements, what is left
+// out; changes of classes and sheets; the cost on adversarial sheets
+fn css(t: &mut T) {
+    t.group = "css";
+    let col = |d: &MdDoc, k: usize| d.blocks().get(k).and_then(|b| b.spans.first()).map_or(0, |s| s.color & 0xFF_FFFF);
+    let d = MdDoc::html(concat!(
+        "<style>p { color: #010101 } .a { color: #020202 } #x { color: #030303 } p.a { color: #040404 } div p { color: #050505 }",
+        " div > .b { color: #060606 } .c { color: #070707 !important } [data-k=v] { color: #080808 }</style>",
+        "<p>tag</p><p class=a>class</p><p id=x class=a>id</p><div><p>descendant</p><p class=b>child</p></div>",
+        "<p class=c style=\"color:#090909\">important</p><p class=a style=\"color:#0a0a0a\">attribute</p><p data-k=v>attr</p>"
+    ));
+    t.eq(
+        (0..8).map(|k| col(&d, k)).collect::<Vec<_>>(),
+        alloc::vec![0x010101, 0x040404, 0x030303, 0x050505, 0x060606, 0x070707, 0x0a0a0a, 0x080808],
+        "specificity, !important, the style attribute"
+    );
+    let d = MdDoc::html("<style>.a { color: #111111 } .a { color: #222222 }</style><p class=a>x</p><style>p { font-weight: bold } .a { color: #333333 }</style>");
+    t.eq((col(&d, 0), markup(&d, 0)), (0x333333, String::from("<b>x</b>")), "the later of two rules alike, the sheets in order");
+    let d = MdDoc::html(concat!(
+        "<style>div { color: #123456; font-style: italic } .n { color: #654321; font-style: normal } section { text-align: center }</style>",
+        "<div><p>a <b>b</b></p><p class=n>c</p></div><section><p>z</p></section>"
+    ));
+    t.eq((col(&d, 0), markup(&d, 0), col(&d, 1), markup(&d, 1)), (0x123456, String::from("<i>a </i><b><i>b</i></b>"), 0x654321, String::from("c")), "inherited, a child's own wins");
+    t.eq(d.blocks().get(2).map_or(9, |b| b.align), 1, "text-align inherited");
+    let d = MdDoc::html(concat!(
+        "<style>/* p { color: #ff0000 } */ @media print { p { color: #ff0000 } } @import url(x.css); p:hover { color: #00ff00 }",
+        " h1 + p { color: #0000ff } p { foo: bar; color: #0c0c0c; ; } p { color }</style><style media=print>p { color: #ff0000 }</style><h1>h</h1><p>x</p>"
+    ));
+    t.eq(col(&d, 1), 0x0c0c0c, "comments, at-rules, unknown selectors and properties left out");
+    let d = MdDoc::html("<style>.r { color: #aa0000 } a.g { color: #00aa00 }</style><p class=r>t <a href=u>l</a> <a class=g href=v>g</a></p>");
+    t.eq(d.blocks().first().map(|b| b.spans.iter().map(|s| (s.link != 0, s.color & 0xFF_FFFF)).collect::<Vec<_>>()), Some(alloc::vec![(false, 0xaa0000), (true, 0), (false, 0xaa0000), (true, 0x00aa00)]), "links: their own colour, not the one around them");
+    let mut d = MdDoc::html("<style>.zu { display: none } .zu.auf { display: block }</style><p>a</p><p class=zu id=z>b</p>");
+    t.eq(texts(&d), alloc::vec![String::from("a")], "display:none from a rule");
+    let z = d.by_id("z").unwrap_or_default();
+    d.add_class(z, "auf");
+    d.update();
+    t.eq(texts(&d), alloc::vec![String::from("a"), String::from("b")], "a class shows it");
+    let s = d.select_first("style").unwrap_or_default();
+    d.set_text(s, "p { color: #0d0d0d }");
+    d.update();
+    t.eq((col(&d, 0), col(&d, 1)), (0x0d0d0d, 0x0d0d0d), "a sheet changed");
+    // boxes
+    let d = MdDoc::html(concat!(
+        "<style>.k { margin: 4px 8px; padding: 2px 3px 4px 5px; border: 2px solid #ff0000; background: #eeeeee } .k p { border-left: 3px dashed blue }",
+        " .o { border-width: 1px } .e { margin: 1em 0 0 } ul { background: #ffffee } li { padding-left: 4pt }</style>",
+        "<div class=k><p>a</p><p>b</p></div><p class=o>c</p><p class=e>d</p><ul><li>e</li></ul>"
+    ));
+    let bx = d.boxes().to_vec();
+    t.eq(bx.len(), 6, "boxes of the elements whose style gives one");
+    let k = bx.first().cloned().unwrap_or_default();
+    t.eq((k.margin, k.padding, k.border, k.border_color, k.bg, k.mset), ([4, 8, 4, 8], [2, 3, 4, 5], [2; 4], [0xFFFF_0000; 4], 0xFFEE_EEEE, 15), "margin, padding, border, background");
+    t.eq(bx.get(1).map(|b| (b.border, b.border_color[3])), Some(([0, 0, 0, 3], 0xFF00_00FF)), "border-left");
+    t.eq(d.blocks().iter().map(|b| b.boxes.clone()).collect::<Vec<_>>(), alloc::vec![alloc::vec![0, 1], alloc::vec![0, 2], alloc::vec![], alloc::vec![3], alloc::vec![4, 5]], "the boxes around the blocks");
+    t.eq(bx.get(3).map(|b| (b.margin, b.mset)), Some(([14, 0, 0, 0], 15)), "em");
+    t.eq(bx.get(4).map(|b| (b.depth, b.bg)), Some((0, 0xFFFF_FFEE)), "a list's box");
+    t.eq(bx.get(5).map(|b| (b.depth, b.padding)), Some((1, [0, 0, 0, 5])), "an item's box inside its list");
+    t.check(bx.iter().map(|b| b.node).collect::<Vec<_>>() == d.select(".k, .k p, .e, ul, li"), "a box's element");
+    // pages without sheets: style attributes as before; the rich-text reader takes no sheet
+    let d = MdDoc::html("<p style=\"color:#0e0e0e\">x <span style=\"background-color:#ffff00\">y</span></p>");
+    t.eq((col(&d, 0), d.boxes().len(), d.blocks().first().map(|b| b.spans.last().map(|s| s.bg))), (0x0e0e0e, 0, Some(Some(0xFFFF_FF00))), "style attributes");
+    let r = RichDoc::from_html("<style>p { color: #ff0000 }</style><p style=\"background:#ffff00\">x</p>");
+    t.eq(r.paras().first().and_then(|p| p.runs().next().map(|(_, f)| (f.color, f.bg))), Some((0, 0xFFFF_FF00)), "the rich-text reader: no sheets, a block's background on its text");
+    // in the view: the text inside a box after its margin, border and padding; left and right
+    // stay where they are in a right-to-left document
+    struct View(MdViewState, &'static str);
+    impl App for View {
+        fn frame(&mut self, ui: &mut Ui) {
+            ui.next_size(-1, -1);
+            ui.html_view(1, &mut self.0, self.1, MV_NO_FRAME);
+        }
+    }
+    const D: AppDesc = AppDesc { title: "css", w: 480, h: 320, ..AppDesc::NONE };
+    let rect = |page: &'static str, name: &str| -> [i32; 4] {
+        let Ok(rt) = ui::Runtime::new(&D, View(MdViewState::new(), page), &style::STYLE) else { return [0; 4] };
+        let tree = rt.ui().a11y_tree();
+        tree.wins.first().and_then(|w| w.nodes.iter().find(|n| n.name == name).map(|n| n.rect)).unwrap_or([0; 4])
+    };
+    let plain = rect("<p>Hallo Welt</p>", "Hallo Welt");
+    let ltr = rect("<style>p { margin-left: 40px; border-left: 2px solid; padding-left: 8px }</style><p>Hallo Welt</p>", "Hallo Welt");
+    let rtl = rect("<style>p { margin-left: 40px; border-left: 2px solid; padding-left: 8px }</style><p>שלום עולם</p>", "שלום עולם");
+    t.eq((ltr[0] - plain[0], ltr[2] - plain[2]), (50, -50), "margin, border and padding before the text");
+    t.eq((rtl[0], rtl[2]), (ltr[0], ltr[2]), "the left side also in a right-to-left document");
+    // the cost: many rules (by class) on many elements, universal rules capped
+    timed(t, "4000 rules by class, 20 000 elements", 2500, &|| {
+        let mut s = String::from("<style>");
+        for i in 0..4000 {
+            s.push_str(&format!(".c{} p {{ color: #{:06x} }} ", i, i));
+        }
+        s.push_str("</style>");
+        for i in 0..20_000 {
+            s.push_str(&format!("<div class=c{}><p>x</p></div>", i % 5000));
+        }
+        MdDoc::html(&s).blocks().len()
+    });
+    timed(t, "universal rules on a deep tree", 2500, &|| {
+        let mut s = String::from("<style>");
+        for i in 0..2000 {
+            s.push_str(&format!("div div div div * {{ margin-left: {}px }} ", i % 7));
+        }
+        s.push_str("</style>");
+        s.push_str(&rep("<div>", 200));
+        s.push_str(&rep("<p>x</p>", 20_000));
+        MdDoc::html(&s).blocks().len()
+    });
+    timed(t, "a huge sheet", 2500, &|| MdDoc::html(&format!("<style>{}</style><p>x</p>", rep("p{color:red}a{", 100_000))).blocks().len());
+}
+
 pub fn run() -> i32 {
     let mut t = T { group: "", ok: 0, failed: 0 };
     let t0 = plat::time_us();
@@ -989,6 +1101,7 @@ pub fn run() -> i32 {
     dom_changes(&mut t);
     dom_view(&mut t);
     dom_cost(&mut t);
+    css(&mut t);
     a11y(&mut t);
     forms(&mut t);
     form_view(&mut t);

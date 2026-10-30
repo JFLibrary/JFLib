@@ -89,7 +89,7 @@ mod rich_html;
 // (ROADMAP §6) the Markdown / HTML viewer: its document (md_doc.rs) and the view (md_view.rs)
 mod md_doc;
 pub use md_doc::{
-    MdBlock, MdDoc, MdField, MdFieldSpot, MdForm, MdImage, MdLinkSpot, MdOption, MdSpan, MdTable, MA_CENTER, MA_LEFT, MA_NONE, MA_RIGHT,
+    MdBlock, MdBox, MdDoc, MdField, MdFieldSpot, MdForm, MdImage, MdLinkSpot, MdOption, MdSpan, MdTable, MA_CENTER, MA_LEFT, MA_NONE, MA_RIGHT,
     MB_CODE, MB_HEADING, MB_PARA, MB_ROW, MB_RULE, MF_BUTTON, MF_CHECKBOX, MF_HIDDEN, MF_PASSWORD, MF_RADIO, MF_RESET, MF_SELECT, MF_SUBMIT,
     MF_TEXT, MF_TEXTAREA, MK_BULLET, MK_NONE, MK_NUMBER, MS_BOLD, MS_CODE, MS_ITALIC, MS_STRIKE, MS_UNDER,
 };

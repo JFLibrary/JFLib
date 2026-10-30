@@ -1524,6 +1524,21 @@ rich_html -- RichDoc as HTML and back
                                    its changes): the paragraphs, fields and forms know their
                                    elements; one block element's paragraph read again
 
+Style sheets (the viewer's reader only; RichDoc::from_html takes the style attributes as
+before): the <style> elements of the tree (media screen / all, type text/css) in document
+order give rules -- selectors of md_dom.rs (tag, *, #id, .class, [attr], descendant and
+child) with declarations; comments, at-rules and rules whose selector is not in the subset
+are left out.  An element's style is the cascade: the declarations of the rules that match
+by specificity and source order, its style attribute's, then the !important ones the same
+way (of each property the last).  The text's properties are inherited as the formats are
+(colour, weight, style, decoration, size, family, alignment); a link takes the link colour
+unless a rule for it gives one.  A block element (and ul, ol, nav, form ...) whose style
+gives margins, padding, borders (width, a visible style -- drawn solid -- and colour, per
+side) or a background gets a box (md_doc.rs MdBox; its background is the box's, not the
+text's).  display:none hides.  Rules are indexed by the id, class or tag their subject needs;
+matching has a budget proportional to the tree and the sheets (then no rule matches), at
+most RULES_MAX rules.
+
 Whitespace outside <pre> / white-space:pre* collapses as in browsers; a paragraph is a
 block or the text between two <br>.  Nesting is capped (NEST_MAX open blocks, formats and
 lists: deeper tags count as text-level), so no input costs more than linear time.
@@ -6358,6 +6373,9 @@ links) or from HTML (the reader of the rich-text editor, rich_html.rs)
                                        layout); md_view.rs keeps its place, selection, focus,
                                        the fields' values and the layouts that still hold
   doc.field_of(n) -> the field of element n
+  doc.boxes()                          the boxes of CSS (style sheets, rich_html.rs): a block
+                                       element's margins, padding, borders and background
+                                       around its blocks (MdBlock::boxes, outermost first)
 
 The model: a block is a paragraph, a heading (level 1..6), a code block (its text, the
 language of the fence), a rule or a table row (cells: byte ranges of the text, '\t' between
@@ -6480,6 +6498,21 @@ MF_BUTTON: u8 = 9
   - `align: u8` -- paragraphs: 0 start, 1 centre, 2 end (HTML)
   - `node: MdNode` -- HTML: the element whose content it shows (the innermost block element: p, li, h1, the
     row of a cell ...; MdNode::NONE: none, Markdown)
+  - `boxes: Vec<u32>` -- HTML: the boxes of CSS around it (indices of MdDoc::boxes, outermost first)
+
+- **`struct MdBox`**
+  a box of CSS around blocks: what a block element's style gives (MdBlock::boxes); lengths
+  in px at 100 % text, the sides top, right, bottom, left
+  - `margin: [i16; 4]`
+  - `padding: [i16; 4]`
+  - `border: [u8; 4]` -- the borders' widths (a style none: 0; every visible style is drawn solid) and colours
+    (0xAARRGGBB; 0: the text's)
+  - `border_color: [u32; 4]`
+  - `bg: u32` -- the background (0: none)
+  - `mset: u8` -- the margins CSS gave (bit 1 &lt;&lt; side): at the top and bottom they take the place of the
+    gap between blocks
+  - `depth: u8` -- the block quotes and lists around its element (its place among their indents)
+  - `node: MdNode` -- its element
 
 - **`struct MdImage`**
   an image of the document
@@ -6564,6 +6597,8 @@ MF_BUTTON: u8 = 9
   (md_dom.rs; the view does it every frame) -> there were changes.  In place when every
   change lies inside block elements that show one paragraph of plain formatted text by
   themselves (O(those paragraphs)), else all of them (linear in the document).
+- **`fn boxes(&self) -> &[MdBox]`**
+  the boxes of CSS (MdBlock::boxes)
 - **`fn field_of(&self, n: MdNode) -> Option<usize>`**
   the field whose element is n (an index of fields())
 - **`fn blocks(&self) -> &[MdBlock]`**
@@ -6806,7 +6841,13 @@ front (bullets by depth: disc, ring, square; numbers; task boxes), headings 2 / 
 monospace font on a tinted box with the code editor's highlighting (Highlighter::for_name of
 the fence's language, ui.code_theme colours), tables with column widths from their cells
 (wrapped to fit the column), images at their size (DIP; wider than the column: scaled down;
-SVGs through img_svg, sharp at every size), rules.  Text wraps at text::segment's line
+SVGs through img_svg, sharp at every size), rules.  Boxes of CSS (MdDoc::boxes) at their
+place among the indents: margins and padding (growing with the text), borders, a background
+under their blocks; a margin CSS gives at a box's top or bottom takes the place of the gap
+between blocks; on a background the text without a colour of its own takes one that reads on
+it (fields there get the theme's background behind them); high contrast draws no
+backgrounds and the borders in the text's colour; left and right stay where they are in a
+right-to-left document.  Text wraps at text::segment's line
 breaks (clusters inside a word too long).  A paragraph's direction comes from its first
 strong character: Hebrew and Arabic run right to left (their runs shaped and reordered by
 text_shape); indents and markers follow the document's direction.  Only the blocks in view

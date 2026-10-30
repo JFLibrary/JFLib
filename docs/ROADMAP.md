@@ -1255,7 +1255,7 @@ Fensterrand hinaus.
   Grenzen, die Namen von JFNetworker, die Disk-Datei über zwei Läufe, `log`, `rand` mit
   Startwert; Windows und Linux. Export und Import als `.jfs`-Datei im Skript-Editor gehören zu
   JFNetworker (SK5 im App-README).
-- **P3** · *teilweise* · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
+- **P3** · *erledigt* (2026-10-30) · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
   der Browser selbst mit den Meilensteinen B1 bis B4 steht im App-README unter „Fahrplan“).
   Der Browser zeigt Seiten mit `ui.html_view` (`md_doc`, `md_view`, `rich_html`) statt mit einer
   eigenen Engine. Dafür braucht die Library: (1) *erledigt* (2026-10-26) Bilder aus anderen
@@ -1304,12 +1304,33 @@ Fensterrand hinaus.
   Linux). Offen: strukturelle Änderungen (Einfügen, Entfernen) leiten das ganze Dokument neu ab
   statt nur den betroffenen Container; Element unter einer Textposition (Klick-Ereignisse) gibt
   es nur blockweise (`MdBlock::node`).
-  (4) *fehlt* Später eine CSS-Teilmenge in `rich_html` (für B4): `<style>` mit
-  Selektoren nach Tag, Klasse und id, die Eigenschaften, die heute aus `style=` gelesen werden,
-  dazu Abstände und Rahmen. In `lib/script` nur `compile_with` (siehe den Runner), damit der
-  Browser-Host seine eigenen Globals (`document`, `fetch` …) prüfen lässt. Bewusst nicht: eine
-  vollständige HTML/CSS-Engine (Box-Modell, Floats, Flexbox, Grid) und JavaScript. Tests:
-  coretest für Dokument-Änderungen, `.uis`-Skripte mit einem Formular (Windows und Linux).
+  (4) *erledigt* (2026-10-30) Eine CSS-Teilmenge in `rich_html` (für B4): `<style>`-Elemente
+  (media screen/all) und `style=`; Selektoren wie in (3) (Tag, `*`, `#id`, `.klasse`,
+  Attribute, Nachfahre, Kind, Listen); Kaskade nach Spezifität und Reihenfolge, dann
+  `style=`, `!important` darüber, je Eigenschaft die letzte; Regeln nach id, Klasse oder Tag
+  ihres Subjekts indiziert, Abgleich mit Budget proportional zu Seite und Stylesheets. Vererbt
+  werden die Texteigenschaften wie bisher (`color`, `font-weight`, `font-style`,
+  `text-decoration`, `text-align`, `white-space: pre`; `font-size` gelesen, nicht gezeigt);
+  Links behalten ihre Linkfarbe, außer eine Regel für sie gibt eine. Blockelemente (auch
+  `ul`/`ol`/`nav`/`form`/`body`) bekommen Kästen (`MdBox`, `MdDoc::boxes`, `MdBlock::boxes`):
+  `margin`, `padding`, `border` (Breite, sichtbarer Stil durchgezogen, Farbe; Kurzformen, je
+  Seite, `-width`/`-style`/`-color`) und Hintergrund um ihre Blöcke, an ihrem Platz zwischen
+  den Einzügen von Zitaten und Listen; ein von CSS gegebener Rand oben/unten ersetzt den
+  Abstand zwischen Blöcken; auf einem Hintergrund liest sich Text ohne eigene Farbe (Felder
+  bekommen den Themenhintergrund), hoher Kontrast lässt Seitenfarben und Hintergründe weg und
+  zeichnet Rahmen in Textfarbe, links/rechts bleiben physisch auch in rechts-nach-links
+  Dokumenten; `display:none` blendet aus. Unbekannte Eigenschaften, At-Regeln, Pseudoklassen und
+  Geschwister-Kombinatoren werden ignoriert; `RichDoc::from_html` liest weiter keine
+  Stylesheets. Seiten ohne `<style>` bleiben gleich (alle bisherigen Shots byteweise gleich).
+  Getestet mit `mdviewtest --test unit` (Gruppe `css`: Spezifität, Reihenfolge, `!important`,
+  Vererbung, Kästen, Ignoriertes, physische Seiten in rechts-nach-links, Kosten; die 300
+  zufälligen Änderungen von (3) mit Stylesheet) und `--page css` (`css_shots.uis` hell, dunkel,
+  hoher Kontrast, gespiegelt; `css_scale.uis` 150 %; Windows und Linux). In `lib/script` nur
+  `compile_with` (siehe den Runner), damit der Browser-Host seine eigenen Globals (`document`,
+  `fetch` …) prüfen lässt. Bewusst nicht: eine vollständige HTML/CSS-Engine (Box-Modell mit
+  Breiten und Höhen, Floats, Flexbox, Grid, Positionierung) und JavaScript. Offen: Schriftgrößen
+  und -familien aus CSS in der Ansicht, Hintergründe einzelner Tabellenzellen, zusammenfallende
+  Ränder, `@media`; im dunklen Thema bleiben Textfarben der Seite, wie sie sind.
 - **P3** · *erledigt* · Befehlsbäume für Konsolen (seit 2026-10-19, für JFNetworker):
   [`base/cmdtree.rs`](../lib/base/cmdtree.rs) mit IOS-Abkürzungen (`sh ip int br`), `?`-Hilfe
   im IOS-Layout, Tab, Modi mit Prompt, `no`-Form, typisierten Parametern (Zahl mit Bereich,
