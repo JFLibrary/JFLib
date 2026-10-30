@@ -141,6 +141,12 @@ Queues, Lastgeneratoren, eigene Skripte).
   meldet coldStart, linkDown, linkUp und authenticationFailure als Traps oder Informs an den
   Dienst `snmptrapd`; in der Shell `snmpget`, `snmpgetnext`, `snmpwalk`, `snmpbulkwalk` und
   `snmpset`, im Desktop ein MIB-Browser (siehe [SNMP](#snmp)).
+- **Logins, Telnet und AAA (X1d):** Anmeldung an den IOS-artigen Geräten mit `enable secret`,
+  `username … secret`, Passwörtern auf den Leitungen und Rechtestufen, das Passwort beim
+  Tippen unsichtbar; AAA mit RADIUS (`aaa new-model`, `radius server`, Anmeldung, `enable`,
+  Rechte und Accounting; die lokalen Benutzer nur, wenn kein Server antwortet), der Dienst
+  `radius-server` auf den Hosts, `telnet` als Client an beiden Konsolen (siehe
+  [Logins, Telnet und AAA mit RADIUS](#logins-telnet-und-aaa-mit-radius)).
 
 ## Bedienung
 
@@ -288,6 +294,11 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `snmp_console.uis` | SNMP an den Konsolen: `snmpwalk` der Gruppe system von R1 auf MON, Tab ergänzt die Werkzeuge, R1 ändert seinen Standort mit `snmp-server location` und MON sieht ihn, `show snmp`; SW1 schaltet einen Port ab, sein linkDown-Trap landet bei `snmptrapd` auf MON (die Logdatei in `/var/log`, die Zeile im Protokoll) |
 | `snmp_mib.uis` | der MIB-Browser im Desktop von MON: der Baum von mib-2, die Karte eines Objekts (Name, OID, Syntax, Zugriff), Get von sysName an R1, Walk von system, Set von sysLocation mit der Community, die R1s Zugriffsliste MON erlaubt, `ifTable` mit der Tastatur geöffnet und GetNext von `ifDescr.2`; jede Anfrage läuft als Befehl in MONs Konsole unter dem Baum |
 | `snmp_shots.uis` | die Bilder von SNMP (MONs Konsole nach einem Walk, der MIB-Browser nach einem Get, der Trap-Empfänger im Reiter Dienste, die Ereignisse mit dem Chip SNMP) hell und dunkel mit 100 und 150 % (`build/jfnetworker/snmp_*.png`) |
+| `model.uis`, Gruppe `aaa` | Logins, AAA und RADIUS (siehe [Logins, Telnet und AAA mit RADIUS](#logins-telnet-und-aaa-mit-radius)): die Anmeldung an der Konsole, `enable` und die Rechtestufen, die gespeicherten Geheimnisse, RADIUS mit Annahme, Ablehnung und Rückfall auf die lokalen Benutzer, Accounting, der Telnet-Client |
+| `login_console.uis` | eine Anmeldung an der Konsole von R1 (`login local` mit Banner, `fixtures/aaa_login.jfnet`): das Passwort ohne Echo, ein falsches abgewiesen, der Benutzer mit Stufe 15 gleich bei „R1#“ |
+| `telnet_session.uis` | der Telnet-Client in einem Terminal-Tab: eine abgewiesene Verbindung, dann eine Sitzung zu einem Listener auf SRV1, Strg+Umschalt+6 beendet sie |
+| `aaa_services.uis` | der RADIUS-Server im Reiter Dienste von SRV1: Karte mit Statuszeile, die Einstellungen als JSON (ein zweiter Benutzer, ein Client ohne Secret abgewiesen) |
+| `aaa_shots.uis` | die Bilder (eine Konsole gesperrt bei der Anmeldung, der RADIUS-Server im Reiter Dienste) hell und dunkel mit 100 und 150 % (`build/jfnetworker/aaa_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -312,6 +323,11 @@ DNS1 mit ihren MX-Einträgen; das Szenario `mail_domains.scn` und die Fensterskr
 Für Gruppen und Hintergrundbild: `groups.jfnet` (zwei PCs und zwei Server an SW1, die Server mit
 einem Kabel unter sich, dessen Masken nicht passen) und `bg_plan.png` (ein Grundriss,
 160 × 120); die Rahmen des Diagramm-Widgets prüft `apps/diagramtest/tests/frames.uis`.
+Für Logins und AAA: `aaa_radius.jfnet` (R1 und R2 melden ihre Konsolen über den RADIUS-Server
+von SRV1 an; das Szenario `aaa_radius.scn`) und `aaa_login.jfnet` (R1 mit `login local` und
+Banner, SRV1 mit `radius-server`, PC1; die Fensterskripte `login_console.uis`,
+`telnet_session.uis`, `aaa_services.uis` und `aaa_shots.uis`), die coretest-Gruppe `radius`
+(RADIUS und Telnet Byte für Byte, MD5 und HMAC-MD5 in `crypto`).
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -1446,6 +1462,12 @@ ersten SYN, während er nach MAILB fragt: sie ist nach gut 1 s da); Bob listet s
 `curl -v pop3://` (seine erste DNS-Frage verliert R1 ebenso, der Resolver fragt nach 5 s noch
 einmal) und löscht sie; eine Nachricht an einen unbekannten Benutzer von b.lab (`echo … |
 mail`) kommt als Unzustellbarkeitsnachricht zu Anna zurück, die sie abholt; 14 Erwartungen.
+
+Ein Szenario zeigt AAA mit RADIUS (siehe
+[Logins, Telnet und AAA mit RADIUS](#logins-telnet-und-aaa-mit-radius)). `aaa_radius.scn` auf
+`fixtures/aaa_radius.jfnet`: R1 und R2 melden ihre Konsolen über den RADIUS-Server von SRV1 an
+(Benutzer admin mit Stufe 15), R2 scheitert mit einem falschen Passwort, und nachdem SRV1
+ausgeschaltet ist, fällt R1 auf seinen lokalen Benutzer zurück; 7 Erwartungen.
 
 ### Skripte in Hosts
 
