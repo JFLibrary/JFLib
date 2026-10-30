@@ -284,7 +284,13 @@ pub fn send(app: &str, cwd: &str, args: &[String]) -> bool {
     }
     #[cfg(not(any(windows, target_os = "linux")))]
     {
-        let _ = (app, cwd, args, encode as fn(&str, &[String]) -> Option<Vec<u8>>, decode as fn(&[u8]) -> Option<Request>);
+        let _ = (
+            app,
+            cwd,
+            args,
+            encode as fn(&str, &[String], Option<&str>) -> Option<Vec<u8>>,
+            decode as fn(&[u8]) -> Option<(Request, Option<String>)>,
+        );
         false
     }
 }
