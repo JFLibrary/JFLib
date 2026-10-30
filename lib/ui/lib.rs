@@ -544,3 +544,13 @@ pub struct Ui {
     /// async tasks on the UI thread (tasks.rs: ui.spawn; run between passes)
     pub(crate) tasks: plat::task::Executor,
 }
+
+// (SK6) the code editor's language services: completion, hover texts, signature help and its
+// requests (code_assist.rs), breakpoints, the execution line and folding (code_doc.rs, code_edit.rs)
+mod code_assist;
+pub use code_assist::{
+    CodeAssist, CodeEv, CompItem, CompList, SigHelp, CI_CONSTANT, CI_FIELD, CI_FUNCTION, CI_KEYWORD, CI_METHOD, CI_MODULE, CI_PARAM, CI_TEXT,
+    CI_VALUE, CI_VARIABLE, POP_ROWS,
+};
+pub use code_doc::{TextEdit, BP_COND, BP_DISABLED, BP_ON};
+pub use code_edit::{CE_BREAKPOINTS, CE_FOLDS};

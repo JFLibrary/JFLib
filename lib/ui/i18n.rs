@@ -796,6 +796,9 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["Schrift nicht ladbar: {}", "Font cannot be loaded: {}", "Police impossible à charger\u{A0}: {}",
      "No se puede cargar la fuente: {}", "Impossibile caricare il carattere: {}", "Lettertype kan niet worden geladen: {}",
      "Nie można wczytać czcionki: {}", "تعذر تحميل الخط: {}", "לא ניתן לטעון את הגופן: {}"],
+    // (SK6) the code editor's completion list: its undo step and its name for screen readers
+    ["Vervollständigen", "Complete", "Compléter", "Completar", "Completa", "Aanvullen", "Uzupełnij", "إكمال", "השלמה"],
+    ["Vorschläge", "Suggestions", "Suggestions", "Sugerencias", "Suggerimenti", "Suggesties", "Podpowiedzi", "اقتراحات", "הצעות"],
 ];
 
 /// a library text in the current language: the UI language when the library has it
