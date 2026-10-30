@@ -4,7 +4,10 @@
 // ole32 / shell32 / advapi32 loaded with LoadLibraryA there).    [apps/installer/src/shell.s]
 //
 //   sh_folder(which) -> Some(dir)       0 = desktop, 1 = start menu programs
-//   sh_link(lnk, target, dir, desc) -> bool   create a shortcut file
+//   sh_link(lnk, target, dir, desc, app_id) -> bool   create a shortcut file (app_id: its
+//                                       System.AppUserModel.ID, "" = none)
+//   sh_pins(exe, app_id) -> usize       the user's taskbar pins of exe get app_id (pinned before
+//                                       the program ran under its id)
 //   Reg::begin(app) -> Some(Reg), sz(name, value), dword(name, value), end()
 //                                       write the uninstall key of the app
 //   sh_reg_delete(app) -> bool          remove it again
@@ -13,9 +16,9 @@
 //                                       registry values under HKCU, then SHChangeNotify
 //
 // Test mode: with the environment variable ASMINST_SHELL_DIR set, the desktop and the start
-// menu are <dir>\Desktop and <dir>\Programs and registry values go to <dir>\registry.txt
-// (the file types and schemes to <dir>\assoc.txt, "subkey|name=value" lines) -- a test never
-// touches the user's shell or registry.
+// menu are <dir>\Desktop and <dir>\Programs, the pins <dir>\Pinned, and registry values go to
+// <dir>\registry.txt (the file types and schemes to <dir>\assoc.txt, "subkey|name=value"
+// lines) -- a test never touches the user's shell or registry.
 
 use alloc::format;
 use alloc::string::String;
@@ -36,9 +39,25 @@ pub(crate) fn sh_folder(which: u32) -> Option<String> {
     plat::inst::known_folder(which)
 }
 
-/// a shortcut lnk -> target (working folder dir, icon 0 of the target, comment desc)  [sh_link]
-pub(crate) fn sh_link(lnk: &str, target: &str, dir: &str, desc: &str) -> bool {
-    plat::inst::shell_link(lnk, target, dir, desc)
+/// a shortcut lnk -> target (working folder dir, icon 0 of the target, comment desc, the
+/// AppUserModelID app_id)  [sh_link]
+pub(crate) fn sh_link(lnk: &str, target: &str, dir: &str, desc: &str, app_id: &str) -> bool {
+    plat::inst::shell_link_id(lnk, target, dir, desc, app_id)
+}
+
+/// the pins of the program exe without an id get app_id (test mode: <dir>\Pinned) -> how many
+pub(crate) fn sh_pins(exe: &str, app_id: &str) -> usize {
+    if app_id.is_empty() {
+        return 0;
+    }
+    let dir = match sh_testdir() {
+        Some(t) => t + "\\Pinned",
+        None => match plat::inst::pinned_dir() {
+            Some(d) => d,
+            None => return 0,
+        },
+    };
+    plat::inst::pins_set_app_id(&dir, exe, app_id)
 }
 
 /// w_key = "Software\Microsoft\Windows\CurrentVersion\Uninstall\" + app  [sh_regpath]

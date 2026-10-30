@@ -265,6 +265,9 @@ for (uri, read, write) in plat::web::content_grants() { /* the lasting grants */
 plat::web::content_release(&old_uri);                   // Android keeps at most 128 / 512
 ```
 
+The app's recent list (`ui.recent_add`) gives up the grant of a single document when its entry
+leaves the list (pushed out, `recent_remove`, `recent_clear`); a folder's grant stays.
+
 Without a manifest every granted document is reachable; with one, `content://` needs
 `fs.user` ([PERMISSIONS.md](PERMISSIONS.md)) -- Android itself lets the app open only what the
 user granted. `plat::content::ContentFs` takes any `DocHost`, so the name logic is tested on
@@ -329,14 +332,17 @@ Chromium has the File System Access API; the host ([`web/handles.js`](../web/han
   from the user's click or key (the browser wants a gesture), asks for the permission, reads
   the file in and completes (`Completed`, `Denied`, `Failed` for a file that is gone,
   `Unsupported` for an unknown path). Writing back asks for write permission the first time
-  (from the gesture that saved).
+  (from the gesture that saved). `ui.recent_open(path)` does this for an entry of the app's
+  recent list ([GUIDE.md](GUIDE.md) section 21): `Ready`, or `Asking` and then
+  `App::command(UIC_RECENT, 1 / 0)`.
 
 ```rust
-// a file of the recent list after a reload
-if plat::file_exists(&path) != 1 {
-    self.reopening = plat::web::reopen(&path);          // from the click on the entry
+// a file of the recent list after a reload, from the click on the entry
+match ui.recent_open(&path) {
+    RecentOpen::Ready => self.open(ui, &path),          // read in at the start
+    RecentOpen::Asking => {}                            // plat::web::reopen: UIC_RECENT follows
+    RecentOpen::Missing => ui.recent_remove(&path),
 }
-// later frames: request_status(id) == Some(Completed) -> plat::read_file(&path)
 plat::write_file(&path, &bytes);                        // written back into the user's file
 ```
 

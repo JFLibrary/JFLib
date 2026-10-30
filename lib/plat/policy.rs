@@ -90,6 +90,10 @@
 //   sandbox [strict]      ask the OS to enforce the manifest as well (Landlock + seccomp on
 //                         Linux, process mitigation policies on Windows; sandbox.rs); `strict`
 //                         refuses to start when the OS cannot enforce it
+//   recent                the host's list of recent files for a Flatpak (tools/pkg_linux.py:
+//                         --filesystem=xdg-data/recently-used.xbel, the list of every program);
+//                         at run time nothing changes: the system's list is always allowed
+//                         for files the app may read (recent.rs)
 // A PATTERN is an absolute path (X:/.. and //server/share/.. count on Windows only, /.. on
 // Linux only), or starts with $CONFIG $TEMP $HOME $EXE $FONTS, the app's own folders
 // $APPCONFIG $APPDATA $APPCACHE $APPLOG (vfs::app_dir) or the user's folders $DESKTOP
@@ -1588,6 +1592,14 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
                         return Err(at("a scheme has only letters, digits, '+', '-' and '.'"));
                     }
                     p.urls.push((a.to_ascii_lowercase(), ask));
+                }
+            }
+            "recent" => {
+                if plugin.is_some() {
+                    return Err(at("recent belongs to the app's manifest"));
+                }
+                if !args.is_empty() {
+                    return Err(at("takes no arguments"));
                 }
             }
             "sandbox" => {

@@ -96,6 +96,12 @@ in the winui style. The packaged setup is that exe with a payload and a trailer 
   `HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\<app>` (DisplayName, DisplayIcon,
   UninstallString, ...). ole32 / shell32 / advapi32 are loaded with `LoadLibraryA` inside
   `plat::inst` (the only place of the shell calls).
+* **The app's AppUserModelID**: the manifest carries `PACKAGE`'s `app_id`; the shortcuts get it
+  as `System.AppUserModel.ID`, the ProgIDs as `AppUserModelID`, and `install.ini` as `app_id=`
+  -- the installed program finds that line beside itself and runs under the id
+  ([GUIDE.md](GUIDE.md) section 21). The user's taskbar pins of the program without an id (made
+  with an earlier version) get it too (`User Pinned`; test mode: `DIR\Pinned`). A payload of an
+  older `package.py` has no `app_id`: then nothing changes.
 * `uninstall.exe --uninstall` removes everything listed in `install.ini`; a hidden `cmd`
   deletes `uninstall.exe` and the folder after the process ended.
 * Running the setup again installs another style over the old one (the app's settings stay).
@@ -109,8 +115,9 @@ in the winui style. The packaged setup is that exe with a payload and a trailer 
   Explorer. `install.ini` `assoc=` lists what was added (`T:` key trees, `V:` values), and
   `uninstall.exe` removes exactly that. In test mode the values go to
   `<ASMINST_SHELL_DIR>\assoc.txt` (`subkey|name=value` lines).
-* **Test mode**: with `ASMINST_SHELL_DIR=DIR` the desktop and the start menu are `DIR\Desktop`
-  and `DIR\Programs`, and the registry values go to `DIR\registry.txt` -- a test never touches
+* **Test mode**: with `ASMINST_SHELL_DIR=DIR` the desktop, the start menu and the taskbar pins
+  are `DIR\Desktop`, `DIR\Programs` and `DIR\Pinned`, and the registry values go to
+  `DIR\registry.txt` -- a test never touches
   the user's shell or registry. Always run the setup with `--script` (and `--dir` into a test
   folder):
 
@@ -354,14 +361,14 @@ own repositories and bundles.
 | `net.connect`, `net.listen` | `--share=network` |
 | `secrets` | `--talk-name=org.freedesktop.secrets` (the Secret Service; plat does not use the Secret portal) |
 | `audio.output` | `--socket=pulseaudio` (`plat::audio` speaks the PulseAudio protocol, also to pipewire-pulse; the socket allows recording too, so only apps that play sound list the right; noted) |
+| `recent` | `--filesystem=xdg-data/recently-used.xbel` (the host's list of recent files for `plat::recent_add` / `ui.recent_add`; it lists every program's recent files; noted) |
 | `fs.user`, `url`, `print`, `autostart` | none: the file dialog, OpenURI, Print and Background portals; files of "Open with" come through the document portal |
 | `process` | none: programs outside the sandbox are not reachable (`flatpak-spawn --host` would need `--talk-name=org.freedesktop.Flatpak`, a full escape: not granted; noted) |
 | no PERMISSIONS | `--share=network --filesystem=host --talk-name=org.freedesktop.secrets --socket=pulseaudio` (the app may do everything; noted) |
 
 `flatpak_args=` adds more, for example `--talk-name=org.kde.StatusNotifierWatcher` for the tray
-(`plat::tray`), `--talk-name=org.freedesktop.Notifications` or
-`--filesystem=xdg-data/recently-used.xbel` (the host's list of recent files for
-`plat::recent_add`; without it the list stays in the sandbox's own data folder).  The exported
+(`plat::tray`) or `--talk-name=org.freedesktop.Notifications`.  Without `recent` in
+`PERMISSIONS` the list of recent files stays in the sandbox's own data folder.  The exported
 `.desktop` file's `Exec` gets flatpak's file forwarding (`@@u %U @@`): opened files come as
 `file:///run/user/<uid>/doc/...` URIs that `plat` turns into paths and grants (`fs.user`).
 With `fs.user` every document of the portal's mount stays readable and writable without a

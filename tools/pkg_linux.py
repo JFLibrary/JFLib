@@ -419,7 +419,9 @@ def finish_args(perms, extra=()):
     file dialog, open_url, open_folder, printing and autostart go through portals and need
     nothing; fs.* rules become --filesystem (fs.read :ro), secrets the Secret Service on the
     session bus, net.* the network, audio.output the sound server (--socket=pulseaudio, which
-    also allows recording: only apps that play sound get it)"""
+    also allows recording: only apps that play sound get it), recent the host's list of recent
+    files (--filesystem=xdg-data/recently-used.xbel: plat::recent_add reaches the desktop's
+    list; the file lists every program's recent files)"""
     args = ["--share=ipc", "--socket=wayland", "--socket=fallback-x11"]
     notes = []
     if perms is None:
@@ -456,6 +458,11 @@ def finish_args(perms, extra=()):
             notes.append("fs.user: Dateien über die Portale (Dateidialog, Dokument-Portal für „Öffnen mit“)")
         elif key in ("url", "print", "autostart", "input.global", "screen.capture"):
             notes.append(f"{key}: über das Portal, kein Loch nötig")
+        elif key == "recent":
+            if "--filesystem=xdg-data/recently-used.xbel" not in args:
+                args.append("--filesystem=xdg-data/recently-used.xbel")
+                notes.append("recent: --filesystem=xdg-data/recently-used.xbel (die Liste des Hosts mit den "
+                             "zuletzt verwendeten Dateien aller Programme)")
         elif key == "sandbox":
             notes.append("sandbox: zusätzlich zur Flatpak der In-Process-Sandkasten "
                          "(Landlock + seccomp) im Prozess (docs/PERMISSIONS.md „OS sandbox“)")

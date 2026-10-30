@@ -134,6 +134,9 @@ pub(crate) struct Inst {
     pub(crate) schemes: String,
     /// uninstall: install.ini assoc= (what the file types and schemes added)
     pub(crate) assoc: String,
+    /// the manifest's app_id (PACKAGE, tools/pkgmeta.py): the program's AppUserModelID on its
+    /// shortcuts, pins and ProgIDs ("" = none: an older payload)
+    pub(crate) appid: String,
 }
 
 /// fmt_buf(g_buf, 256, f, a): f with its %s replaced by a, cut to 255 bytes

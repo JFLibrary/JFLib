@@ -402,6 +402,9 @@ def meta_checks(d):
     a4, n4 = pkg_linux.finish_args([("fs.user", []), ("audio.output", []), ("audio.output", [])])
     check(a4 == ["--share=ipc", "--socket=wayland", "--socket=fallback-x11", "--socket=pulseaudio"] and any(n.startswith("audio.output") for n in n4),
           "flatpak: audio.output: --socket=pulseaudio once, with a note")
+    a5, n5 = pkg_linux.finish_args([("fs.user", []), ("recent", []), ("recent", [])])
+    check(a5 == ["--share=ipc", "--socket=wayland", "--socket=fallback-x11", "--filesystem=xdg-data/recently-used.xbel"]
+          and any(n.startswith("recent") for n in n5), "flatpak: recent: the host's recently-used.xbel once, with a note")
     files = pkg_linux.flatpak_files(job)
     man, _ = pkg_linux.flatpak_manifest(job, files)
     check(man["id"] == "org.jflib.Fixture" and man["command"] == "jf-fixture" and man["runtime"] == "org.freedesktop.Platform"

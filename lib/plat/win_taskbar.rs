@@ -14,6 +14,9 @@
 //                     title as PKEY_Title through IPropertyStore), AddUserTasks, CommitList;
 //                     empty: DeleteList (the jump list file goes away)
 //   supported()       ITaskbarList3 can be made
+//   set_app_id(id) / app_id()   SetCurrentProcessExplicitAppUserModelID (not in an MSIX
+//                     package: its id counts) / GetCurrentProcessExplicitAppUserModelID; the
+//                     jump list is then the id's (ICustomDestinationList SetAppID, DeleteList(id))
 //
 // COM objects are used through their vtable slots (as win_inst.rs, win_uia.rs); every object
 // made here is released.
@@ -40,6 +43,17 @@ unsafe extern "system" {
 #[link(name = "kernel32", kind = "raw-dylib")]
 unsafe extern "system" {
     fn GetCurrentThreadId() -> u32;
+}
+
+#[link(name = "shell32", kind = "raw-dylib")]
+unsafe extern "system" {
+    fn SetCurrentProcessExplicitAppUserModelID(id: *const u16) -> i32;
+    fn GetCurrentProcessExplicitAppUserModelID(id: *mut *mut u16) -> i32;
+}
+
+#[link(name = "ole32", kind = "raw-dylib")]
+unsafe extern "system" {
+    fn CoTaskMemFree(p: *mut u16);
 }
 
 /// a COM GUID
@@ -92,6 +106,7 @@ const TB_HRINIT: usize = 3;
 const TB_SETPROGRESSVALUE: usize = 9;
 const TB_SETPROGRESSSTATE: usize = 10;
 const TB_SETOVERLAYICON: usize = 18;
+const DL_SETAPPID: usize = 3;
 const DL_BEGINLIST: usize = 4;
 const DL_APPENDKNOWNCATEGORY: usize = 6;
 const KDC_RECENT: i32 = 2;
@@ -284,6 +299,33 @@ pub fn supported() -> bool {
     taskbar() != 0
 }
 
+pub fn set_app_id(id: &str) -> bool {
+    if crate::autostart::native::packaged() {
+        return false;
+    }
+    let w = wide(id);
+    // SAFETY: a NUL-terminated id; the shell keeps its own copy.
+    unsafe { SetCurrentProcessExplicitAppUserModelID(w.as_ptr()) >= 0 }
+}
+
+pub fn app_id() -> Option<String> {
+    let mut p: *mut u16 = core::ptr::null_mut();
+    // SAFETY: the shell allocates the NUL-terminated id (CoTaskMemAlloc), freed here; without an
+    // explicit id it fails and leaves p null.
+    unsafe {
+        if GetCurrentProcessExplicitAppUserModelID(&mut p) < 0 || p.is_null() {
+            return None;
+        }
+        let mut n = 0;
+        while *p.add(n) != 0 {
+            n += 1;
+        }
+        let s = String::from_utf16_lossy(core::slice::from_raw_parts(p, n));
+        CoTaskMemFree(p);
+        Some(s)
+    }
+}
+
 pub fn window_message(msg: u32) {
     let m = BUTTON_MSG.load(Ordering::SeqCst);
     if m == 0 || msg != m {
@@ -350,12 +392,19 @@ pub fn tasks(tasks: &[JumpTask]) -> bool {
     if dl == 0 {
         return false;
     }
+    // the process's explicit id (else Windows' own for the program)
+    let id = super::app_user_model_id().map(|i| wide(&i));
+    let pid = id.as_ref().map_or(core::ptr::null(), |w| w.as_ptr());
     // SAFETY: the ICustomDestinationList / IObjectCollection methods through their documented
     // slots; every object made or returned here is released.
     unsafe {
+        if !pid.is_null() {
+            let set: unsafe extern "system" fn(usize, *const u16) -> i32 = core::mem::transmute(vfn(dl, DL_SETAPPID));
+            set(dl, pid);
+        }
         if tasks.is_empty() {
             let del: unsafe extern "system" fn(usize, *const u16) -> i32 = core::mem::transmute(vfn(dl, DL_DELETELIST));
-            let hr = del(dl, core::ptr::null());
+            let hr = del(dl, pid);
             release(dl);
             return hr >= 0;
         }

@@ -122,7 +122,7 @@ fn parts(t: &mut T) {
     t.check(types.len() == 2 && types[1].exts == ["jpg", "jpeg", "jpe"] && types[1].own && !types[0].own,
         "assoc: parse_types (bad entries dropped, extensions lower case without the dot)");
     t.check(parse_schemes("web+jf, JFTest;1bad ok") == ["web+jf", "jftest", "ok"], "assoc: parse_schemes");
-    let e = reg_entries("App", "My App", "C:\\a\\App.exe", &types, &[String::from("jfx")]);
+    let e = reg_entries("App", "My App", "C:\\a\\App.exe", &types, &[String::from("jfx")], "");
     t.check(e.len() == 20, "assoc: reg_entries: 20 values (ProgIDs, Open with, own defaults, the scheme)");
     let find = |k: &str, n: &str| e.iter().find(|v| v.key == k && v.name == n).map(|v| v.value.as_str());
     t.check(find("Software\\Classes\\App.png", "") == Some("PNG")

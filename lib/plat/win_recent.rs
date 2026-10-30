@@ -1,23 +1,25 @@
 // win_recent -- (recent.rs) the recent files of the shell and the app's jump list
 //
-//   add(path)         SHAddToRecentDocs(SHARD_PATHW) with COM set up: Explorer's recent files
-//                     (the Recent folder, Quick access / Home, Start's recommendations) and, when
-//                     Windows counts the app as a handler of the type, the "Recent" category of
-//                     its jump list
-//   list(max)         IApplicationDocumentLists::GetList(ADLT_RECENT): the app's jump list (its
-//                     AppUserModelID, here the one Windows derives from the program), IShellItem
-//                     (its file system path) or IShellLinkW (its target) per entry
+//   add(path)         SHAddToRecentDocs with COM set up: SHARD_APPIDINFO (an IShellItem of the
+//                     path and the process's explicit AppUserModelID, taskbar.rs) when it has
+//                     one, else SHARD_PATHW: Explorer's recent files (the Recent folder, Quick
+//                     access / Home, Start's recommendations) and, when Windows counts the app
+//                     as a handler of the type, the "Recent" category of its jump list
+//   list(max)         IApplicationDocumentLists::GetList(ADLT_RECENT): the app's jump list (the
+//                     explicit id through SetAppID, else the one Windows derives from the
+//                     program), IShellItem (its file system path) or IShellLinkW (its target)
+//                     per entry
 //   remove(path)      IApplicationDestinations::RemoveDestination(an IShellItem of the path);
 //                     a path that is not in the list counts as removed
 //   clear()           IApplicationDestinations::RemoveAllDestinations
+//   list_of(id, max) / remove_of(id, path)   the same for another id (tests: Explorer's own
+//                     list is Microsoft.Windows.Explorer)
 //
 // Explorer's own lists keep the file (the user removes it there).  Which app's jump list gets
-// the file is Windows' decision: on Windows 11 (26200) plattest's stayed empty although it was
-// the registered (also the default) handler -- with a window, with an explicit AppUserModelID
-// (SHARD_APPIDINFO + SetAppID) and with AppUserModelID in the ProgID; reading and removing
-// worked.  The app's own list (ui recent.rs) does not depend on it.  COM objects are used
-// through their vtable slots (as win_taskbar.rs); COM is set up on the calling thread for the
-// call (CoInitializeEx; an MTA thread stays one).
+// the file is Windows' decision (GUIDE.md section 21 has what was found on Windows 11 26200).
+// The app's own list (ui recent.rs) does not depend on it.  COM objects are used through their
+// vtable slots (as win_taskbar.rs); COM is set up on the calling thread for the call
+// (CoInitializeEx; an MTA thread stays one).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -53,6 +55,7 @@ static IID_SHELLLINKW: Guid = Guid(0x0002_14F9, 0, 0, [0xC0, 0, 0, 0, 0, 0, 0, 0
 const CLSCTX_INPROC_SERVER: u32 = 1;
 const COINIT_APARTMENTTHREADED: u32 = 2;
 const SHARD_PATHW: u32 = 3;
+const SHARD_APPIDINFO: u32 = 4;
 // HRESULT_FROM_WIN32(ERROR_NOT_FOUND)
 const E_NOT_FOUND: i32 = 0x8007_0490u32 as i32;
 const ADLT_RECENT: i32 = 0;
@@ -61,6 +64,8 @@ const MAX_PATH: usize = 260;
 // vtable slots
 const VT_QI: usize = 0;
 const VT_RELEASE: usize = 2;
+// SetAppID of IApplicationDocumentLists and IApplicationDestinations
+const VT_SETAPPID: usize = 3;
 const ADL_GETLIST: usize = 4;
 const AD_REMOVEDESTINATION: usize = 4;
 const AD_REMOVEALL: usize = 5;
@@ -101,8 +106,14 @@ unsafe fn query(obj: usize, iid: &Guid) -> usize {
     }
 }
 
-/// f with COM set up on this thread and a new object of clsid (0: none could be made)
-fn with_object<R>(clsid: &Guid, iid: &Guid, f: impl FnOnce(usize) -> R) -> R {
+/// the explicit id of the process (taskbar.rs) or of `of` (tests), NUL-terminated
+fn app_id(of: Option<&str>) -> Option<Vec<u16>> {
+    of.map(String::from).or_else(crate::taskbar::app_user_model_id).map(|i| wide(&i))
+}
+
+/// f with COM set up on this thread and a new object of clsid (0: none could be made); an
+/// IApplicationDocumentLists / IApplicationDestinations gets the explicit id first (SetAppID)
+fn with_object<R>(clsid: &Guid, iid: &Guid, id: Option<&[u16]>, f: impl FnOnce(usize) -> R) -> R {
     // SAFETY: CoInitializeEx(NULL, STA); S_OK / S_FALSE are paired with CoUninitialize,
     // RPC_E_CHANGED_MODE (an MTA thread) leaves COM as it is.
     let hr = unsafe { CoInitializeEx(0, COINIT_APARTMENTTHREADED) };
@@ -110,6 +121,13 @@ fn with_object<R>(clsid: &Guid, iid: &Guid, f: impl FnOnce(usize) -> R) -> R {
     // SAFETY: valid GUIDs and an out-pointer.
     if unsafe { CoCreateInstance(clsid, 0, CLSCTX_INPROC_SERVER, iid, &mut p) } < 0 {
         p = 0;
+    }
+    if let (Some(id), true) = (id, p != 0) {
+        // SAFETY: SetAppID(LPCWSTR) in slot 3 of both interfaces; a NUL-terminated id.
+        unsafe {
+            let set: unsafe extern "system" fn(usize, *const u16) -> i32 = core::mem::transmute(vfn(p, VT_SETAPPID));
+            set(p, id.as_ptr());
+        }
     }
     let r = f(p);
     if p != 0 {
@@ -128,13 +146,30 @@ pub fn target() -> Target {
     Target::Native
 }
 
+/// SHARDAPPIDINFO: the item and the AppUserModelID it belongs to
+#[repr(C)]
+struct AppIdInfo {
+    item: usize,
+    id: *const u16,
+}
+
 pub fn add(path: &str) -> bool {
     let w = wide(&path.replace('/', "\\"));
+    let id = app_id(None);
     // SAFETY: COM set up for the call (the jump list part of SHAddToRecentDocs needs it; the
-    // link in the recent folder is made without), SHARD_PATHW with a NUL-terminated wide path.
+    // link in the recent folder is made without); SHARD_APPIDINFO with an IShellItem of the
+    // path (released after the call) and a NUL-terminated id, else SHARD_PATHW with the path.
     unsafe {
         let hr = CoInitializeEx(0, COINIT_APARTMENTTHREADED);
-        SHAddToRecentDocs(SHARD_PATHW, w.as_ptr());
+        let mut item = 0usize;
+        match &id {
+            Some(i) if SHCreateItemFromParsingName(w.as_ptr(), 0, &IID_SHELLITEM, &mut item) >= 0 && item != 0 => {
+                let info = AppIdInfo { item, id: i.as_ptr() };
+                SHAddToRecentDocs(SHARD_APPIDINFO, &info as *const AppIdInfo as *const u16);
+                release(item);
+            }
+            _ => SHAddToRecentDocs(SHARD_PATHW, w.as_ptr()),
+        }
         if hr >= 0 {
             CoUninitialize();
         }
@@ -178,7 +213,16 @@ unsafe fn entry_path(obj: usize) -> Option<String> {
 }
 
 pub fn list(max: usize) -> Vec<String> {
-    with_object(&CLSID_APPDOCLISTS, &IID_APPDOCLISTS, |adl| {
+    list_in(None, max)
+}
+
+pub fn list_of(id: &str, max: usize) -> Vec<String> {
+    list_in(Some(id), max)
+}
+
+fn list_in(of: Option<&str>, max: usize) -> Vec<String> {
+    let id = app_id(of);
+    with_object(&CLSID_APPDOCLISTS, &IID_APPDOCLISTS, id.as_deref(), |adl| {
         let mut out = Vec::new();
         if adl == 0 {
             return out;
@@ -216,8 +260,17 @@ pub fn list(max: usize) -> Vec<String> {
 }
 
 pub fn remove(path: &str) -> bool {
+    remove_in(None, path)
+}
+
+pub fn remove_of(id: &str, path: &str) -> bool {
+    remove_in(Some(id), path)
+}
+
+fn remove_in(of: Option<&str>, path: &str) -> bool {
     let w = wide(&path.replace('/', "\\"));
-    with_object(&CLSID_APPDESTINATIONS, &IID_APPDESTINATIONS, |ad| {
+    let id = app_id(of);
+    with_object(&CLSID_APPDESTINATIONS, &IID_APPDESTINATIONS, id.as_deref(), |ad| {
         if ad == 0 {
             return false;
         }
@@ -237,7 +290,8 @@ pub fn remove(path: &str) -> bool {
 }
 
 pub fn clear() -> bool {
-    with_object(&CLSID_APPDESTINATIONS, &IID_APPDESTINATIONS, |ad| {
+    let id = app_id(None);
+    with_object(&CLSID_APPDESTINATIONS, &IID_APPDESTINATIONS, id.as_deref(), |ad| {
         if ad == 0 {
             return false;
         }

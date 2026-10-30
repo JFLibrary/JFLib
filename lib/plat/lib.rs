@@ -38,7 +38,8 @@
 //   autostart: autostart_set(on, args) / autostart_get() / autostart_entry() (Run key, XDG
 //            autostart, Background portal; needs `autostart` in the manifest) (autostart.rs)
 //   taskbar: taskbar_progress / taskbar_badge / taskbar_tasks (the taskbar button: progress,
-//            overlay / count, jump list; ITaskbarList3, Unity LauncherEntry) (taskbar.rs)
+//            overlay / count, jump list; ITaskbarList3, Unity LauncherEntry), app_user_model_id
+//            / set_app_user_model_id (Windows: the app's explicit id)        (taskbar.rs)
 //   assoc:   assoc_register / assoc_conflicts / assoc_unregister: the app's PACKAGE file types
 //            and URL schemes for this program without a setup (HKCU\Software\Classes; .desktop,
 //            shared-mime-info, mimeapps.list), file_uri_path                    (assoc.rs)

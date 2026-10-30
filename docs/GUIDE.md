@@ -215,6 +215,7 @@ and on Wayland compositors without server-side decorations the library draws a t
   | `UIC_HOTKEY`, `UIC_HOTKEY_LOST` | `arg` = id: a global shortcut was pressed anywhere / the desktop dropped it (`ui.hotkey_error(id)`; section 21) |
   | `UIC_PICK` | `arg` 1: the user picked a colour on the screen (`ui.picked_color()`), 0: cancelled or failed (`ui.screen_error()`) |
   | `UIC_SCREENSHOT` | `arg` 1: the picture of `ui.screenshot(..)` is there (`ui.screenshot_take()`), 0: failed |
+  | `UIC_RECENT` | `arg` 1: the file `ui.recent_open(..)` asked the browser about is readable now (`ui.recent_reopened()` names it), 0: refused or gone (section 21) |
 
 * `App::init(ui)` runs before the first frame (register codecs, read arguments, load
   settings); `false` ends the program with exit code 2.
@@ -820,7 +821,10 @@ ui.dialog_end(); // always
   Call `tray_set` again after `cmd_state` changes. `ui.bring_to_front()` restores the window. Windows uses
   `Shell_NotifyIconW` (the notification is the symbol's balloon, which Windows 10 / 11 show as a toast);
   Linux uses StatusNotifierItem + dbusmenu and `org.freedesktop.Notifications`. Headless runs only
-  print what they would show. `apps/traydemo` shows all of it.
+  print what they would show. `apps/traydemo` shows all of it. An installed app runs under its
+  explicit AppUserModelID (section 21, "The app's identity on Windows"): Windows files its
+  notifications under that id, and the setup's start menu shortcut carries it -- the shortcut
+  Windows wants for the notifications of an explicit id.
 * **Title bar**: `AF_CUSTOM_TITLEBAR` in the `AppDesc`, then as the first row of the main box
   (caption buttons, dragging, snap layouts on Windows, resize grips on Linux):
 
@@ -2457,6 +2461,30 @@ ui.taskbar_tasks(&[JumpTask {
   functions from the UI thread (`frame`, `command`). Headless runs only print what they
   would show (`taskbar: ...`).
 
+**The app's identity on Windows (AppUserModelID).** Windows groups taskbar buttons, keeps jump
+lists and recent files and files notifications under an AppUserModelID. Without one of its own
+a program gets an id Windows derives from its path (another folder, another id). An app with a
+`PACKAGE` runs under its `app_id` (`org.jflib.X`, `org.jfreund.X`, [PACKAGING.md](PACKAGING.md))
+as the explicit id -- set by `ui::main!` before the first window
+(`SetCurrentProcessExplicitAppUserModelID`, `plat::assoc::app_id_boot`) -- once the program is
+installed or registered:
+
+* the setup installed it: `install.ini` beside the program names the id (`app_id=`); the
+  setup's desktop and start menu shortcuts carry it (`System.AppUserModel.ID`,
+  `plat::inst::shell_link_id`), and so do its ProgIDs (`AppUserModelID`). Shortcuts the user
+  pinned to the taskbar from an earlier version (no id, the program as target) get the id when
+  the setup runs (`plat::inst::pins_set_app_id` in `User Pinned`), so they keep matching the
+  running program's button;
+* `--register` (or `plat::assoc::assoc_register`) registered it: the record
+  `config://assoc.list` names this program, the ProgIDs carry the id; from the next start on.
+
+Every other program -- a build started from `build/`, an app without `PACKAGE`, an MSIX
+package (its package id counts) -- keeps the id Windows derives, as before. `jfgui_AUMID=ID`
+sets an id, `jfgui_AUMID=off` none (tests). `plat::taskbar::app_user_model_id()` reads the
+process's explicit id; the jump list (`ui.taskbar_tasks`), `plat::recent_*` and
+`IApplicationDestinations` all use it (`SetAppID`), `plat::recent_add` gives the file to it
+(`SHARD_APPIDINFO`).
+
 **File types and URL schemes without a setup.** The setup, the `.deb`, MSIX and Flatpak
 register the `filetypes=` / `schemes=` of `apps/NAME/PACKAGE` themselves
 ([PACKAGING.md](PACKAGING.md)). A developer build or a portable copy registers itself: every
@@ -2505,22 +2533,54 @@ let done = plat::assoc::assoc_register(&pkg, &mut |c| self.user_said_yes(&c.what
 
 **Recent files.** `ui.recent_add(path)` after opening or saving a file keeps the app's own
 list (`ui.recent_files()`, newest first, at most `ui::RECENT_KEEP`, in `config://recent.list`;
-`recent_remove`, `recent_clear`) and tells the system:
+`recent_remove`, `recent_clear`) and tells the system. To open an entry, call
+`ui.recent_open(path)` from the user's click or key:
+
+```rust
+// the menu row of a recent file
+match ui.recent_open(&path) {
+    RecentOpen::Ready => self.open(ui, &path),               // read it now
+    RecentOpen::Asking => self.note = String::from("…"),     // the browser asks; UIC_RECENT follows
+    RecentOpen::Missing => {                                 // gone or out of reach
+        self.note = format!("{} ist nicht mehr da", plat::display_name(&path));
+        ui.recent_remove(&path);
+    }
+}
+// in command(): UIC_RECENT => if let Some(p) = ui.recent_reopened() { if arg == 1 { self.open(ui, &p) } }
+```
 
 * Windows: `SHAddToRecentDocs` -- Explorer's recent files (Home / Quick access, the Recent
-  folder, Start's recommendations) and, when Windows counts the app as a handler of the type
-  (setup, `--register`, MSIX), the "Recent" category of its jump list (`ui.taskbar_tasks`
-  keeps that category). `plat::recent_list(max)` reads the jump list back
-  (`IApplicationDocumentLists`); which app's jump list gets a file is Windows' decision, so the
+  folder, Start's recommendations) and, when Windows counts the app as a handler of the type,
+  the "Recent" category of its jump list (`ui.taskbar_tasks` keeps that category); with the
+  explicit AppUserModelID the item is given to that id (`SHARD_APPIDINFO`).
+  `plat::recent_list(max)` reads the jump list back (`IApplicationDocumentLists`). Found on
+  Windows 11 25H2 (26200, `plattest --test recent-win`): Windows makes the jump list of the id
+  (the derived one and the explicit one alike: its `AutomaticDestinations` file appears) but
+  keeps it empty -- also with the type registered for the program (its ProgID with
+  `AppUserModelID`, the default of the extension), with a start menu shortcut carrying the id
+  and with COM kept on the thread; the file lands in Explorer's own lists. Registering the
+  type is what Windows documents as the condition (the setup and `--register` do it, with the
+  id in the ProgID); whether the jump list then shows the file is Windows' decision, so the
   app's own list is the one to show in a menu.
 * Linux: a bookmark in `~/.local/share/recently-used.xbel` in the format GTK and KDE use
   (MIME type, the app's entry with its command and a count), changed under a lock and written
   atomically; other programs' bookmarks stay as they are. In a Flatpak the host's list needs
-  `flatpak_args=--filesystem=xdg-data/recently-used.xbel` in `PACKAGE`.
+  the line `recent` in `PERMISSIONS` (the package then gets
+  `--filesystem=xdg-data/recently-used.xbel`, [PERMISSIONS.md](PERMISSIONS.md); that file lists
+  every program's recent files); without it the list stays in the sandbox's own data folder.
+* The browser: the app's list lives in the origin's storage and survives reloads (an emptied
+  list too). In Chromium a file chosen in the system's picker (`/handles/ID/NAME`) is read in
+  at the start while the browser still grants it (`Ready`); otherwise `recent_open` asks for
+  the permission (`Asking`, then `UIC_RECENT`). Firefox and Safari keep the list only: its files
+  open when the app kept them in the storage itself (`plat::web::persist`), else `Missing`.
+* Android: the list is a file of the app's internal storage and survives restarts. The
+  picker's documents stay reachable (their grants are lasting); when a single document's entry
+  leaves the list (pushed out by newer files, `recent_remove`, `recent_clear`) its grant is
+  given up (Android keeps at most 128 / 512); a folder's grant stays.
 * `plat::recent_add` only takes files the app may read under its `PERMISSIONS` (else
-  `PERMDENY fs.read`). Headless runs (`--script`, `--shot`, agents) leave the system's list and
-  `config://recent.list` alone; `jfgui_RECENT=/path/x.xbel` redirects the system's list to a
-  file (every OS), `jfgui_RECENT=off` switches it off.
+  `PERMDENY fs.read`). Headless runs (`--script`, `--shot`, agents) leave the system's list,
+  the grants and `config://recent.list` alone; `jfgui_RECENT=/path/x.xbel` redirects the
+  system's list to a file (every OS), `jfgui_RECENT=off` switches it off.
 
 Testing: `plattest --test power` (real power requests on Windows), `--test autostart` (the
 real Run value, removed again; XDG autostart in a scratch folder), `--test taskbar` (the dry
@@ -2529,7 +2589,12 @@ run), `--test taskbar-win` (by hand: a window with every state), and
 LauncherEntry signals on a fake bus). `apps/traydemo` has buttons for all of it.
 `plattest --test assoc` registers a test package (Windows: test names in the real HKCU,
 removed again; Linux: scratch XDG folders, `desktop-file-validate`), `--test recent` the xbel
-list through `jfgui_RECENT`, `--test recent-win` (by hand) the real shell.
+list through `jfgui_RECENT` and, on Windows, the explicit id (shortcuts and pins in a scratch
+folder), `--test recent-win` (by hand, no window) the real shell and jump list with the
+derived and the explicit id. `apps/androidGallery/tests/files_web.mjs` checks the browser's
+list across reloads (Chromium: reopened with and without the permission; Firefox: the list
+only), `android_files.py` the list, `recent_open` and the released grants after a restart on
+an emulator.
 
 **Monitors.** `ui.monitors()` (or `plat::monitors()`) lists every monitor, the primary one
 first: `name`, `rect` and `work` (x, y, w, h without taskbars and panels), `dpi` (96 = 100 %),

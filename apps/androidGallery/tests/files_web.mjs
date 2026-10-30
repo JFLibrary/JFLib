@@ -5,8 +5,11 @@
 // open a file (imported, bound to /handles/ID/NAME, the handle in IndexedDB), save as a new file
 // and over the opened one (written back at once; the same path for the same file), a failed
 // write leaves the file as it was, a reload reads the remembered file again (permission still
-// granted: at the start; "prompt": reopen from the click, granted / denied). Firefox: no File
-// System Access API -- the library's own dialog over the virtual files, no handle database.
+// granted: at the start; "prompt": ui.recent_open asks from the click, UIC_RECENT granted /
+// denied), the recent list survives every reload. Firefox: no File System Access API -- the
+// library's own dialog over the virtual files, no handle database; the recent list survives a
+// reload (the file itself was not kept: "Nicht mehr da", it leaves the list), and the emptied
+// list stays empty after the next reload.
 // Playwright (tools/tests/playwright.mjs, PLAYWRIGHT_MODULE; Firefox from PLAYWRIGHT_BROWSERS_PATH).
 //   python build_rs.py app androidGallery --target web
 //   node apps/androidGallery/tests/files_web.mjs [build] [--engines=chromium,firefox] [--headed]
@@ -189,7 +192,8 @@ try {
         await open();
         await click('Zuletzt öffnen');
         const denied=await until(()=>text('Nicht wieder geöffnet'),'reopen denied');
-        ok(denied.includes('Denied') && denied.includes('brief.txt'),`a refused permission: ${denied}`);
+        ok(denied.includes('abgelehnt') && denied.includes('brief.txt'),`a refused permission: ${denied}`);
+        ok(await text('Zuletzt: ')!==null,'a refused permission keeps the list');
         await page.evaluate(()=>sessionStorage.removeItem('perm'));
 
         // a cancelled picker: nothing chosen
@@ -207,6 +211,17 @@ try {
         await click('Speichern');
         const saved=await until(()=>text('Gespeichert: Notiz.txt'),'saved in the own dialog');
         ok(saved==="Gespeichert: Notiz.txt",`${engine}: saved into the virtual files (${saved})`);
+        ok(await text('Zuletzt: Notiz.txt')!==null,`${engine}: the file is first in the recent list`);
+        // a reload: the list is kept in the browser's storage, the file itself was not
+        await open();
+        ok(await text('Zuletzt: Notiz.txt')!==null,`${engine}: the recent list survives the reload`);
+        await click('Zuletzt öffnen');
+        const gone=await until(()=>text('Nicht mehr da: ')||text('Wieder geöffnet: '),'the recent file tried');
+        ok(gone==='Nicht mehr da: Notiz.txt',`${engine}: a file the app did not keep is gone, said so (${gone})`);
+        await until(async()=>await text('Zuletzt: ')===null,'out of the list');
+        checks++;
+        await open();
+        ok(await text('Zuletzt: ')===null,`${engine}: the emptied list stays empty after a reload`);
         await click('Öffnen…');
         await until(async()=>await text('Öffnen')!==null && await el('Abbrechen').count()>0,'the own open dialog');
         await click('Abbrechen');

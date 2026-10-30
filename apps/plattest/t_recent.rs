@@ -8,14 +8,25 @@
 //                               a damaged file left alone, jfgui_RECENT=off, recent_os(false) (the
 //                               headless runs), well-formed XML (python's minidom when there);
 //                               Linux also the default $XDG_DATA_HOME/recently-used.xbel in a
-//                               scratch folder.  At the end a manifest in this process: a path
-//                               outside fs.read is refused (PERMDENY fs.read)
-//   plattest --test recent-win  (Windows, by hand) the real shell: plattest the registered and
-//                               default handler of a test type, a window on the taskbar,
-//                               SHAddToRecentDocs (the link in Explorer's recent folder), what the
-//                               jump list holds (printed), remove, clear; the test type
-//                               unregistered and the links removed.  Explorer's own list (Home /
-//                               Quick access) keeps the test file: remove it there by hand
+//                               scratch folder.  Windows: the explicit AppUserModelID (refused
+//                               ids, app_id_boot: jfgui_AUMID, PACKAGE without and with an
+//                               install.ini beside the program), shortcuts with the id
+//                               (shell_link_id, link_read, link_set_app_id), the pins of the
+//                               program without an id get it (pins_set_app_id in a scratch
+//                               folder: other programs' and other ids' links stay), the ProgID's
+//                               AppUserModelID (reg_entries).  At the end a manifest in this
+//                               process: a path outside fs.read is refused (PERMDENY fs.read)
+//   plattest --test recent-win  (Windows, by hand; no window) the real shell: a test type
+//                               registered for plattest, first with the id Windows derives
+//                               (SHARD_PATHW), then with the explicit id of a registration
+//                               (app_id_boot through the record, SHARD_APPIDINFO, AppUserModelID in
+//                               the ProgID): the link in Explorer's recent folder, the id's jump
+//                               list file (AutomaticDestinations/<CRC-64 of the id>), whether the
+//                               file got into it (printed: on Windows 11 26200 the list stays
+//                               empty, GUIDE.md section 21), remove, clear; the test type
+//                               unregistered, the links, the test's jump list files and its
+//                               entries in Explorer's jump list removed.  Explorer's Home (Quick
+//                               access) keeps the test files: remove them there by hand
 
 use alloc::format;
 use alloc::rc::Rc;
@@ -190,6 +201,9 @@ pub fn t_recent(t: &mut T) {
     plat::delete(&xbel);
     ui_list(t, &base, &[&a, &b, &c]);
 
+    #[cfg(windows)]
+    app_id(t, &base);
+
     // the permissions: only files the app may read
     plat::mkdir(&format!("{base}/in"));
     let inside = format!("{base}/in/ok.txt");
@@ -232,6 +246,9 @@ fn ui_list(t: &mut T, base: &str, files: &[&String; 3]) {
             ui.recent_add(c);
             ui.recent_remove(c);
             r.push((ui.recent_files().first() != Some(c), "recent: ui: removed"));
+            let gone = format!("{}/gone.txt", &a[..a.rfind('/').unwrap_or(0)]);
+            r.push((ui.recent_open(a) == ui::RecentOpen::Ready && ui.recent_open(&gone) == ui::RecentOpen::Missing
+                && ui.recent_reopened().is_none(), "recent: ui: recent_open: Ready for a file that is there, Missing for one that is gone"));
             r.push((plat::recent_list(100).contains(a) && !plat::recent_list(100).contains(c), "recent: ui: the system's list follows"));
             ui.recent_clear();
             r.push((ui.recent_files().is_empty() && plat::recent_list(100).is_empty(), "recent: ui: cleared, also in the system's list"));
@@ -254,16 +271,109 @@ fn ui_list(t: &mut T, base: &str, files: &[&String; 3]) {
     plat::setenv(crate::CFGVAR, saved.as_deref());
 }
 
+/// Windows: the explicit AppUserModelID, shortcuts and pins that carry it (scratch folders only)
+#[cfg(windows)]
+fn app_id(t: &mut T, base: &str) {
+    use plat::assoc::{Package, app_id_boot, package_set, parse_types, reg_entries};
+    use plat::inst::{link_read, link_set_app_id, pins_set_app_id, shell_link, shell_link_id};
+    use plat::taskbar::{app_user_model_id, set_app_user_model_id};
+    let long: String = core::iter::repeat_n('x', 129).collect();
+    t.check(!set_app_user_model_id("") && !set_app_user_model_id("a b") && !set_app_user_model_id(&long), "recent: aumid: empty, blank, too long refused");
+    let saved_cfg = plat::env(crate::CFGVAR);
+    plat::setenv(crate::CFGVAR, Some(&format!("{base}/idcfg"))); // no assoc record of plattest
+    plat::setenv("jfgui_AUMID", None);
+    t.check(app_id_boot().is_none() && app_user_model_id().is_none(), "recent: aumid: no PACKAGE: Windows' own id");
+    package_set(Some("display=Plattest\napp_id=org.jflib.plattest.Recent\n"));
+    t.check(app_id_boot().is_none() && app_user_model_id().is_none(), "recent: aumid: PACKAGE, not installed, not registered: Windows' own id");
+    let exe = plat::current_exe().unwrap_or_default().replace('/', "\\");
+    let ini = format!("{}\\install.ini", &exe[..exe.rfind('\\').unwrap_or(0)]);
+    if plat::file_exists(&ini) == 0 {
+        plat::write_file(&ini, b"app=plattest\r\napp_id=org.jflib.plattest.Other\r\n");
+        t.check(app_id_boot().is_none(), "recent: aumid: install.ini of another id: none");
+        plat::write_file(&ini, b"app=plattest\r\ndisplay=Plattest\r\napp_id=org.jflib.plattest.Recent\r\n");
+        let got = app_id_boot();
+        plat::delete(&ini);
+        t.check(got.as_deref() == Some("org.jflib.plattest.Recent") && app_user_model_id() == got,
+            &format!("recent: aumid: installed (install.ini beside the program): the app id ({got:?}, the shell: {:?})", app_user_model_id()));
+    } else {
+        t.info("  (an install.ini beside plattest: the installed case is not checked)\n");
+    }
+    plat::setenv("jfgui_AUMID", Some("off"));
+    t.check(app_id_boot().is_none(), "recent: aumid: jfgui_AUMID=off: none");
+    plat::setenv("jfgui_AUMID", Some("org.jflib.plattest.Env"));
+    t.check(app_id_boot().as_deref() == Some("org.jflib.plattest.Env") && app_user_model_id().as_deref() == Some("org.jflib.plattest.Env"),
+        "recent: aumid: jfgui_AUMID=ID");
+    plat::setenv("jfgui_AUMID", None);
+    package_set(None);
+    plat::setenv(crate::CFGVAR, saved_cfg.as_deref());
+
+    // shortcuts with the id; the pins of this program without one get it
+    let dir = base.replace('/', "\\");
+    let lnk = format!("{dir}\\with-id.lnk");
+    t.check(shell_link_id(&lnk, &exe, &dir, "Test", "org.jflib.plattest.Link"), "recent: aumid: shortcut with an id written");
+    let back = link_read(&lnk);
+    t.check(back.as_ref().is_some_and(|(p, i)| p.eq_ignore_ascii_case(&exe) && i == "org.jflib.plattest.Link"), &format!("recent: aumid: its target and id read back ({back:?})"));
+    let plain = format!("{dir}\\plain.lnk");
+    t.check(shell_link(&plain, &exe, &dir, "Test") && link_read(&plain).is_some_and(|(_, i)| i.is_empty()), "recent: aumid: shortcut without an id");
+    t.check(link_set_app_id(&plain, "org.jflib.plattest.Set") && link_read(&plain).is_some_and(|(_, i)| i == "org.jflib.plattest.Set"), "recent: aumid: id written into a shortcut");
+    t.check(link_read(&format!("{dir}\\missing.lnk")).is_none(), "recent: aumid: no shortcut: None");
+    let pins = format!("{dir}\\Pinned");
+    let deep = format!("{pins}\\ImplicitAppShortcuts\\0123abcd");
+    plat::mkdir(&format!("{pins}\\TaskBar"));
+    plat::mkdir(&deep);
+    let other = plat::env("SystemRoot").map(|r| format!("{r}\\notepad.exe")).unwrap_or_else(|| String::from("C:\\Windows\\notepad.exe"));
+    let made = shell_link(&format!("{pins}\\TaskBar\\Plattest.lnk"), &exe, &dir, "")
+        && shell_link(&format!("{deep}\\Plattest.lnk"), &exe, &dir, "")
+        && shell_link(&format!("{pins}\\TaskBar\\Notepad.lnk"), &other, "", "")
+        && shell_link_id(&format!("{pins}\\TaskBar\\Mine.lnk"), &exe, &dir, "", "org.jflib.plattest.Kept");
+    t.check(made, "recent: aumid: pins in a scratch folder");
+    let n = pins_set_app_id(&pins, &exe, "org.jflib.plattest.Pin");
+    let id_of = |p: &str| link_read(&format!("{pins}\\{p}")).map(|(_, i)| i).unwrap_or_else(|| String::from("?"));
+    let ids = [id_of("TaskBar\\Plattest.lnk"), id_of("ImplicitAppShortcuts\\0123abcd\\Plattest.lnk"), id_of("TaskBar\\Notepad.lnk"), id_of("TaskBar\\Mine.lnk")];
+    t.check(n == 2 && ids[0] == "org.jflib.plattest.Pin" && ids[1] == "org.jflib.plattest.Pin" && ids[2].is_empty() && ids[3] == "org.jflib.plattest.Kept",
+        &format!("recent: aumid: the program's pins without an id got it, others stay ({n}: {ids:?})"));
+    t.check(pins_set_app_id(&pins, &exe, "org.jflib.plattest.Pin") == 0, "recent: aumid: pins set again: nothing to do");
+    let user = plat::inst::pinned_dir();
+    t.check(user.as_deref().is_some_and(|d| d.ends_with("\\User Pinned")), &format!("recent: aumid: the user's pinned items ({user:?}; not changed)"));
+
+    // the ProgIDs name the id
+    let types = parse_types("jflid|application/x-jflid|JFL-Id|own");
+    let e = reg_entries("App", "My App", "C:\\a\\App.exe", &types, &[String::from("jflid")], "org.jflib.App");
+    let id_val = e.iter().filter(|v| v.name == "AppUserModelID").map(|v| (v.key.as_str(), v.value.as_str(), v.root.as_str())).collect::<Vec<_>>();
+    t.check(id_val == [("Software\\Classes\\App.jflid", "org.jflib.App", "Software\\Classes\\App.jflid")], &format!("recent: aumid: the ProgID's AppUserModelID ({id_val:?})"));
+    t.check(!reg_entries("App", "My App", "C:\\a\\App.exe", &types, &[], "").iter().any(|v| v.name == "AppUserModelID"), "recent: aumid: no id, no AppUserModelID");
+    let _ = Package::default();
+}
+
 #[cfg(not(windows))]
 pub fn t_recent_win(_: &mut T) {
     plat::write_stderr(b"plattest: --test recent-win is Windows only\n");
     plat::exit(2);
 }
 
+/// the jump list file of an AppUserModelID (a derived one is the program's path): the CRC-64
+/// (reflected, polynomial 0x92C64265D32139A4, start all ones) of the id in upper case as UTF-16
+#[cfg(windows)]
+fn dest_name(id: &str) -> String {
+    let mut c = u64::MAX;
+    for u in id.to_uppercase().encode_utf16() {
+        for b in u.to_le_bytes() {
+            c ^= b as u64;
+            for _ in 0..8 {
+                c = if c & 1 != 0 { (c >> 1) ^ 0x92C6_4265_D321_39A4 } else { c >> 1 };
+            }
+        }
+    }
+    format!("{c:016x}.automaticDestinations-ms")
+}
+
 #[cfg(windows)]
 pub fn t_recent_win(t: &mut T) {
-    use plat::assoc::{Package, assoc_register, assoc_unregister};
-    use plat::{PW_DEFAULT, PW_NOOWNER, PWF_RESIZABLE, PWF_SYSFRAME, PWS_SHOW, evq_pop, time_us, wait, win_create, win_destroy, win_show};
+    use plat::assoc::{Package, app_id_boot, assoc_register, assoc_unregister, hkcu_get, package_set};
+    use plat::recent::recent_remove_of;
+    use plat::{evq_pop, time_us, wait};
+    const EXPLORER: &str = "Microsoft.Windows.Explorer";
+    const ID: &str = "org.jflib.plattest.RecentTest";
     let pump = |ms: u64| {
         let dl = time_us() + ms * 1000;
         while time_us() < dl {
@@ -271,48 +381,103 @@ pub fn t_recent_win(t: &mut T) {
             while evq_pop().is_some() {}
         }
     };
-    let real_appdata = plat::env("APPDATA").unwrap_or_default();
+    t.check(dest_name(EXPLORER) == "f01b4d95cf55d32a.automaticDestinations-ms", "recent-win: the jump list file of an id (Explorer's)");
+    let real_appdata = plat::env("APPDATA").unwrap_or_default().replace('\\', "/");
     let base = scratch(t, "recent-win");
+    // how long the jump list is watched for the file (ms)
+    let wait_ms = plat::env("PLATTEST_RECENT_WAIT").and_then(|w| w.parse::<u64>().ok()).unwrap_or(2000);
     plat::setenv("APPDATA", Some(&format!("{base}/config")));
     plat::setenv("jfgui_RECENT", None);
-    // plattest the registered and default handler of a test type, with a window on the taskbar
-    let pkg = Package::parse("display=JFLib Recent Test\nfiletypes=jflrecent|application/x-jflib-recent|JFLib-Recent-Test|own\n");
-    t.check(assoc_register(&pkg, &mut |_| false).is_ok(), "recent-win: test type .jflrecent registered for plattest");
-    t.check(win_create("plattest recent", 360, 120, PWF_RESIZABLE | PWF_SYSFRAME, PW_NOOWNER, PW_DEFAULT, PW_DEFAULT) == 0, "recent-win: the main window");
-    win_show(0, PWS_SHOW);
-    pump(1000);
-    let name = format!("recent-{:x}.jflrecent", plat::time_us() & 0xFF_FFFF);
-    let file = format!("{base}/{name}");
-    plat::write_file(&file, b"x");
+    plat::setenv("jfgui_AUMID", None);
     let recent = format!("{real_appdata}/Microsoft/Windows/Recent");
-    let lnk = format!("{recent}/{name}.lnk");
-    t.check(recent_add(&file), "recent-win: SHAddToRecentDocs");
-    let mut made = false;
-    for _ in 0..100 {
-        made = plat::file_exists(&lnk) == 1;
-        if made {
-            break;
+    let dests = format!("{recent}/AutomaticDestinations");
+    let exe = plat::current_exe().unwrap_or_default().replace('/', "\\");
+    let mut links: Vec<String> = Vec::new();
+    // the jump list files of the two ids (the derived one is the program's path): the test's
+    // when they were not there before
+    let ours: Vec<String> = [dest_name(&exe), dest_name(ID)].into_iter().filter(|n| plat::file_exists(&format!("{dests}/{n}")) == 0).collect();
+    let text = format!("display=JFLib Recent Test\napp_id={ID}\nfiletypes=jflrecent|application/x-jflib-recent|JFLib-Recent-Test|own\n");
+    let progid = "Software\\Classes\\plattest.jflrecent";
+
+    // 1. the id Windows derives from the program: SHARD_PATHW, no AppUserModelID in the ProgID
+    let mut pkg = Package::parse(&text);
+    pkg.app_id = String::new();
+    t.check(assoc_register(&pkg, &mut |_| false).is_ok() && hkcu_get(progid, Some("AppUserModelID")).is_none(),
+        "recent-win: derived id: test type .jflrecent registered for plattest (no AppUserModelID)");
+    for (phase, explicit) in [("derived id", false), ("explicit id", true)] {
+        if explicit {
+            // 2. a registration with the app id: the ProgID names it, the program runs under it
+            let pkg = Package::parse(&text);
+            t.check(assoc_register(&pkg, &mut |_| false).is_ok() && hkcu_get(progid, Some("AppUserModelID")).as_deref() == Some(ID),
+                "recent-win: explicit id: registered again, the ProgID's AppUserModelID is the app id");
+            package_set(Some(&text));
+            let got = app_id_boot();
+            t.check(got.as_deref() == Some(ID) && plat::taskbar::app_user_model_id().as_deref() == Some(ID),
+                &format!("recent-win: explicit id: the record names plattest: it runs under the app id ({got:?})"));
+        } else {
+            t.check(plat::taskbar::app_user_model_id().is_none(), "recent-win: derived id: no explicit id");
         }
-        pump(50);
+        let dest = format!("{dests}/{}", dest_name(if explicit { ID } else { &exe }));
+        let name = format!("recent-{}-{:x}.jflrecent", if explicit { "id" } else { "derived" }, plat::time_us() & 0xFF_FFFF);
+        let file = format!("{base}/{name}");
+        plat::write_file(&file, b"x");
+        let lnk = format!("{recent}/{name}.lnk");
+        links.push(lnk.clone());
+        let marker: Vec<u8> = name.encode_utf16().flat_map(|c| c.to_le_bytes()).collect();
+        t.check(recent_add(&file), &format!("recent-win: {phase}: SHAddToRecentDocs"));
+        let mut made = false;
+        for _ in 0..100 {
+            made = plat::file_exists(&lnk) == 1;
+            if made {
+                break;
+            }
+            pump(50);
+        }
+        t.check(made, &format!("recent-win: {phase}: the link in Explorer's recent folder"));
+        // the jump list of the id: Windows makes its file; whether the file gets in is printed
+        let end = time_us() + wait_ms * 1000;
+        let (mut mine, mut holds, mut size);
+        loop {
+            let data = plat::read_file(&dest);
+            holds = data.as_ref().is_some_and(|d| d.windows(marker.len()).any(|w| w == marker.as_slice()));
+            size = data.map(|d| d.len());
+            mine = recent_list(100).iter().any(|x| x.eq_ignore_ascii_case(&file));
+            if mine || time_us() >= end {
+                break;
+            }
+            pump(250);
+        }
+        t.check(size.is_some(), &format!("recent-win: {phase}: SHAddToRecentDocs gave the item to the id's jump list ({})", &dest[dests.len() + 1..]));
+        t.info(&format!("  {phase}: the jump list file: {size:?} bytes, holds the file: {holds}; recent_list has it: {mine}{}\n",
+            if mine { "" } else { " (Windows keeps the list empty)" }));
+        t.check(recent_remove(&file) && !recent_list(100).iter().any(|x| x.eq_ignore_ascii_case(&file)), &format!("recent-win: {phase}: removed from the jump list"));
+        if mine {
+            t.check(recent_add(&file), &format!("recent-win: {phase}: added again"));
+            pump(1000);
+            let back = recent_list(100).iter().any(|x| x.eq_ignore_ascii_case(&file));
+            t.check(back, &format!("recent-win: {phase}: in the jump list again"));
+        }
+        t.check(recent_clear() && recent_list(100).is_empty(), &format!("recent-win: {phase}: jump list cleared"));
+        // Explorer keeps the file in its own list: out of its jump list while it exists
+        t.check(recent_remove_of(EXPLORER, &file), &format!("recent-win: {phase}: the test file out of Explorer's jump list"));
     }
-    t.check(made, "recent-win: the link in Explorer's recent folder");
-    pump(1000);
-    let list = recent_list(100);
-    let mine = list.iter().any(|x| x.eq_ignore_ascii_case(&file));
-    t.info(&format!("  the jump list's recent items: {} ({})\n", list.len(),
-        if mine { "the test file is there" } else { "Windows did not give the file to plattest's jump list" }));
-    t.check(recent_remove(&file) && !recent_list(100).iter().any(|x| x.eq_ignore_ascii_case(&file)), "recent-win: removed from the jump list");
-    t.check(recent_clear() && recent_list(100).is_empty(), "recent-win: jump list cleared");
-    win_destroy(0);
-    pump(200);
-    t.check(assoc_unregister() == Ok(true), "recent-win: test type unregistered");
-    let folder = base.rsplit('/').next().unwrap_or("");
-    for l in [lnk, format!("{recent}/{folder}.lnk")] {
-        if plat::file_exists(&l) == 1 {
-            t.check(plat::delete(&l), &format!("recent-win: {} removed", &l[recent.len() + 1..]));
+    t.check(recent_remove_of(EXPLORER, &base), "recent-win: the test folder out of Explorer's jump list");
+    package_set(None);
+    t.check(assoc_unregister() == Ok(true) && hkcu_get(progid, None).is_none(), "recent-win: test type unregistered");
+    let folder = String::from(base.rsplit('/').next().unwrap_or(""));
+    links.push(format!("{recent}/{folder}.lnk"));
+    for l in &links {
+        if plat::file_exists(l) == 1 {
+            t.check(plat::delete(l), &format!("recent-win: {} removed", &l[recent.len() + 1..]));
         }
     }
-    t.info(&format!("  Explorer's recent files (Home / Quick access) keep {name}: remove it there (\"Aus Liste entfernen\")\n"));
+    for f in &ours {
+        let path = format!("{dests}/{f}");
+        if plat::file_exists(&path) == 1 {
+            t.check(plat::delete(&path), &format!("recent-win: AutomaticDestinations/{f} (the test's) removed"));
+        }
+    }
+    t.info(&format!("  Explorer's Home (Quick access) may still list {folder}/recent-*.jflrecent: remove them there\n"));
     plat::setenv("APPDATA", Some(&real_appdata));
     crate::rm_tree(&base);
 }

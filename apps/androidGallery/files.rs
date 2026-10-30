@@ -1,8 +1,9 @@
 // "04 Dateien & Zwischenablage": the system's picker (open / save as / folder: Android's
 // Storage Access Framework, content:// names; the browser's File System Access pickers,
 // /handles/ paths written back to the user's file), the last file of the recent list opened
-// again (the browser: reopen after a reload), a note kept in config:// across restarts, a
-// start counter in data://, copy and paste through the system clipboard.
+// again (ui.recent_open: the browser asks for the permission after a reload, UIC_RECENT; a
+// file that is gone is said so and leaves the list), a note kept in config:// across restarts,
+// a start counter in data://, copy and paste through the system clipboard.
 // With jfgui_SELFTEST=phase1 / phase2 (the start intent's extras of
 // android/tests/GalleryFilesInstrumentation.java) the app checks its files, the documents the
 // picker hands out and the clipboard, and writes data://selftest.txt ("ok NAME" / "FAIL NAME:
@@ -30,16 +31,13 @@ pub struct Files {
     chosen: String,
     info: String,
     test: Option<SelfTest>,
-    // (browser) a file of the recent list read again: the request and its path
-    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
-    reopening: Option<(u32, String)>,
 }
 
 impl Default for Files {
     fn default() -> Self {
         Self {
             loaded: false, note: String::new(), saved: String::new(), starts: 0, open: Shared::new(0),
-            mode: FD_OPEN, path: String::new(), chosen: String::new(), info: String::new(), test: None, reopening: None,
+            mode: FD_OPEN, path: String::new(), chosen: String::new(), info: String::new(), test: None,
         }
     }
 }
@@ -82,35 +80,27 @@ impl Files {
         };
     }
 
-    // the first file of the recent list again (the browser: after a reload read through reopen)
+    // the first file of the recent list again (the browser: after a reload it may ask first)
     fn reopen(&mut self, ui: &mut Ui, path: &str) {
-        #[cfg(target_arch = "wasm32")]
-        if plat::file_exists(path) != 1 {
-            self.reopening = plat::web::reopen(path).map(|id| (id, String::from(path)));
-            self.info = String::from(if self.reopening.is_some() { "Wird wieder geöffnet …" } else { "Nicht wieder zu öffnen" });
-            return;
+        match ui.recent_open(path) {
+            RecentOpen::Ready => self.open_path(ui, path, "Wieder geöffnet"),
+            RecentOpen::Asking => self.info = String::from("Wird wieder geöffnet …"),
+            RecentOpen::Missing => {
+                self.info = format!("Nicht mehr da: {}", plat::display_name(path));
+                ui.recent_remove(path);
+            }
         }
-        self.open_path(ui, path, "Wieder geöffnet");
     }
 
-    // (browser) the answer of reopen
-    fn poll_reopen(&mut self, ui: &mut Ui) {
-        #[cfg(target_arch = "wasm32")]
-        if let Some((id, path)) = self.reopening.clone() {
-            let st = plat::web::request_status(id);
-            if st == Some(plat::web::RequestStatus::Pending) {
-                return;
-            }
-            plat::web::forget_request(id);
-            self.reopening = None;
-            if st == Some(plat::web::RequestStatus::Completed) {
-                self.open_path(ui, &path, "Wieder geöffnet");
-            } else {
-                self.info = format!("Nicht wieder geöffnet ({st:?}): {}", plat::display_name(&path));
-            }
-            ui.invalidate();
+    // the browser's answer (UIC_RECENT, main.rs): read now or refused
+    pub fn reopened(&mut self, ui: &mut Ui, ok: bool) {
+        let Some(path) = ui.recent_reopened() else { return };
+        if ok {
+            self.open_path(ui, &path, "Wieder geöffnet");
+        } else {
+            self.info = format!("Nicht wieder geöffnet (abgelehnt oder nicht mehr da): {}", plat::display_name(&path));
         }
-        let _ = ui;
+        ui.invalidate();
     }
 
     // the note and the start counter, once (not in headless script runs: no files of the user)
@@ -135,7 +125,6 @@ impl Files {
         if let Some(t) = &mut self.test {
             t.step(ui);
         }
-        self.poll_reopen(ui);
         ui.box_begin(0, BOX_V | BOX_CARD | PAD_16, 10);
         ui.heading(2, TS_SUBTITLE, "04  Dateien & Zwischenablage");
         ui.box_begin(0, BOX_H | BOX_WRAP, 8);
@@ -344,6 +333,14 @@ impl SelfTest {
                 }
             }
             4 => {
+                // the documents into the app's recent list (kept across the restart, phase 2)
+                for d in [self.doc.clone(), self.saved.clone()] {
+                    if !d.is_empty() {
+                        ui.recent_add(&d);
+                    }
+                }
+                let list = ui.recent_files();
+                self.check(list.len() == 2 && list[0] == self.saved && list[1] == self.doc, "recent: the documents in the app's list", || format!("{list:?}"));
                 let uris = format!("{}\n{}\n{}\n", self.tree, self.doc, self.saved);
                 self.check(plat::write_file("config://selftest/uris.txt", uris.as_bytes()), "uris kept", String::new);
                 self.grants(&[self.tree.clone(), self.doc.clone(), self.saved.clone()]);
@@ -586,12 +583,42 @@ impl SelfTest {
             self.eq("restart: the interrupted write finished from the journal", text_of(&u[2]), FULL);
             self.check(journal_count() == 0, "restart: no journal copy left", || format!("{}", journal_count()));
             self.grants(&u);
-            #[cfg(target_os = "android")]
-            {
-                self.check(plat::web::content_release(&u[2]), "release grant", String::new);
-                self.check(!plat::web::content_grants().iter().any(|(x, _, _)| *x == u[2]), "grant released", String::new);
-            }
+            self.recent_checks(ui, &u);
         }
         let _ = ui;
+    }
+
+    // (Android) the lasting grant of x is still there
+    fn granted(x: &str) -> bool {
+        #[cfg(target_os = "android")]
+        let g = plat::web::content_grants().iter().any(|(g, _, _)| g == x);
+        #[cfg(not(target_os = "android"))]
+        let g = !x.is_empty();
+        g
+    }
+
+    // after the restart: the app's recent list, its documents open; a document that leaves the
+    // list gives up its lasting grant, the folder's stays
+    fn recent_checks(&mut self, ui: &mut Ui, u: &[String]) {
+        let list = ui.recent_files();
+        self.check(list.len() == 2 && list[0] == u[2] && list[1] == u[1], "restart: the app's recent list kept", || format!("{list:?}"));
+        let r = ui.recent_open(&u[1]);
+        self.check(r == RecentOpen::Ready, "restart: a recent document opens (recent_open)", || format!("{r:?}"));
+        // removed: its grant is given up
+        ui.recent_remove(&u[2]);
+        self.check(!ui.recent_files().contains(&u[2]) && !Self::granted(&u[2]), "recent: removed: the grant released", String::new);
+        // pushed out by newer files: the same
+        for k in 0..RECENT_KEEP {
+            let f = format!("data://selftest/neu{k}.txt");
+            plat::write_file(&f, b"x");
+            ui.recent_add(&f);
+        }
+        let list = ui.recent_files();
+        self.check(list.len() == RECENT_KEEP && !list.contains(&u[1]) && !Self::granted(&u[1]), "recent: pushed out: the grant released", || format!("{} entries", list.len()));
+        self.check(Self::granted(&u[0]), "recent: the folder's grant stays", String::new);
+        let r = ui.recent_open(&u[1]);
+        self.check(r == RecentOpen::Missing, "recent: the released document is out of reach (recent_open)", || format!("{r:?}"));
+        ui.recent_clear();
+        self.check(ui.recent_files().is_empty() && Self::granted(&u[0]), "recent: cleared (the folder's grant stays)", String::new);
     }
 }
