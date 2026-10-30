@@ -467,6 +467,14 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_SIM_ONLY_SEL => {
             n.sim.only_sel = !n.sim.only_sel;
             n.sim.sel_devs = crate::workspace::canvas::cables::sel_devices(n);
+            // a selected group stands for its devices (G1)
+            for g in crate::workspace::canvas::groups::selected_groups(n) {
+                for d in n.canvas.scene.gs.devices(&n.doc.proj, g) {
+                    if !n.sim.sel_devs.contains(&d) {
+                        n.sim.sel_devs.push(d);
+                    }
+                }
+            }
         }
         CMD_TOOL_PDU => {
             n.sim.pdu.src = None;

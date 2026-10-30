@@ -2732,6 +2732,27 @@ for ev in evs {
   stroke edges with `dg_hairline` (1 px anti-aliased lines, a fraction of `dg_stroke_edge`'s
   cost); the canvas is painted in full detail once the gesture ends. JFNetworker's
   `tests/perf.uis` holds 500 devices and 800 cables this way.
+* **Frames, groups and a backdrop** (node flags, additive): a `DN_FRAME` node is a labelled
+  frame around other nodes. The app computes its box from its members' (with room for their
+  labels and a title bar) and puts it before them in `nodes`, so they lie on top. It is hit on
+  its title bar (the top `st.frame_bar` world units, 24 by default) and on its 4 DIP border
+  only: its inside stays the background (a marquee starts there, members are clicked through
+  it), the overview draws it as an outline and `diagram_sems` gives it a record over its title
+  bar. `DN_TOGGLE` adds a collapse button, the box `dg_toggle_rect(node, st.frame_bar)` (the
+  right end of a frame's title bar, else the node's top right corner): a click there reports
+  `DEv::Toggle(key)` and leaves the selection alone, a right click there is one on the node.
+  For a collapsed group the app hides the members (their nodes and the edges between them),
+  shows one node in their place and draws the edges to the outside to it. `DN_STEP` nodes move
+  by whole grid steps instead of snapping their corner, so the members such a frame or cluster
+  stands for (each snapped on its own) stay on the grid. A selected `DN_RESIZE` node shows a
+  handle at its bottom right corner; dragging it reports `DEv::Resize { key, rect, done }` with
+  the new box (the top left corner stays, at least 8 units; Esc sends the old box with `done`).
+  `DN_OUTLINE` draws a node as an outline in the overview (an area, a backdrop).
+  `DgPaint::paint_under(g, f)` (nothing by default) paints what lies under the grid into the
+  backing store, a backdrop image say; draw it cached per zoom, since it runs with every
+  repaint of the store. `apps/diagramtest --frames` shows all of it (a frame around four nodes
+  that collapses into one, an area that resizes; `tests/frames.uis`), JFNetworker's groups and
+  background picture use it (`src/workspace/canvas/groups.rs`, `backdrop.rs`).
 
 ## 23. Consoles: `ui.terminal`
 

@@ -204,10 +204,12 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
     // a double click: the device on the canvas
     let picked = if ev.ev & EV_DOUBLE != 0 { shown.get(ev.row.max(0) as usize).map(|&i| rows[i].dev) } else { None };
     if let Some(dev) = picked {
-        n.canvas.select_only(dev);
-        if let Some(d) = n.doc.proj.device(dev) {
-            n.canvas.st.vp.cx = d.x as f64 + 32.0;
-            n.canvas.st.vp.cy = d.y as f64 + 24.0;
+        // selected and in the middle of the view (a member of a collapsed group: its groups
+        // open first, G1)
+        if n.doc.proj.device(dev).is_some() {
+            crate::workspace::canvas::groups::show(n, dev);
+        } else {
+            n.canvas.select_only(dev);
         }
         ui.repass();
     }

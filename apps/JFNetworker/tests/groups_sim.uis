@@ -1,0 +1,64 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/groups.jfnet
+# the members of a collapsed group (G1): the cluster's badge counts its members' findings (the
+# fixture's servers differ in the mask of their cable); in the simulation mode SW1 floods PC1's
+# ARP request and the copies to SRV1 and SRV2 run along the cluster's line "2 Kabel" into it,
+# side by side; a console opened before keeps working while its device is hidden; a click on a
+# finding selects the cluster that hides its device, a double click opens the group (one undo
+# step) and selects the device in the middle of the view.  Ids: SRV1's console 25088 (input
+# 25089); the frames on the canvas 37888 + their number; 176 shows a moment (ns).
+theme light
+# SRV1's console first
+dblclick listitem:"SRV1"
+expect tab:"SRV1" selected
+expect #25089 focused
+# the servers' group, collapsed: the badge of the mask mismatch on their cable
+wait 600
+click listitem:"SRV1"
+drag listitem:"SRV2" listitem:"SRV2" 1 shift
+key ctrl+g
+click 933,211
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte, zugeklappt" exists
+expect listitem:"SRV1" missing
+shot build/jfnetworker/groups_badge.png
+# a packet into the collapsed group
+click tab:"Simulation"
+wait 200
+key p
+click listitem:"PC1"
+wait 600
+click listitem:"PC2"
+key esc
+key f7
+wait 1200
+expect text:"t = 0,666 000 722 s" exists
+expect #37890 exists
+expect #37891 rect 681 344 16 12
+expect #37892 rect 681 344 16 12
+key f7
+wait 1200
+cmd 176 666001083
+wait 100
+expect text:"Ansicht bei t = 0,666 001 083 s" exists
+expect #37891 rect 744 316 16 12
+expect #37892 rect 744 316 16 12
+expect #37890 rect 594 316 16 12
+shot build/jfnetworker/groups_sim.png
+click tab:"Echtzeit"
+wait 200
+# the console of a hidden member keeps working
+click tab:"Terminal"
+click #25089
+type "ip -4 addr show eth0\n"
+expect text:"    inet 10.0.0.21/24 brd 10.0.0.255 scope global eth0" exists
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte, zugeklappt" exists
+# a finding of a hidden member: a click selects its cluster, a double click opens the group
+click tab:"Probleme"
+click text:"SRV2: Netzmaske passt nicht: eth1 hat 10.1.0.2/24, SRV1 (eth1) im selben Netz /30."
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte, zugeklappt" selected
+wait 600
+dblclick text:"SRV2: Netzmaske passt nicht: eth1 hat 10.1.0.2/24, SRV1 (eth1) im selben Netz /30."
+expect listitem:"SRV2" selected
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte" exists
+cmd 10
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte, zugeklappt" exists
+expect_nowarn

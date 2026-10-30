@@ -1194,3 +1194,56 @@ Abgeholt/s	Fetched/s
 Abgelehnte Anmeldungen/s	Logins refused/s
 Gelöscht/s	Deleted/s
 Anmeldungen/s	Logins/s
+
+# G1: groups and the background picture of the canvas (canvas/groups.rs, canvas/backdrop.rs, inspector/group.rs, doc/groups.rs, app/commands.rs)
+&Gruppieren	&Group
+Gruppierung au&fheben	Ungrou&p
+Gruppe &zuklappen	&Collapse group
+Gruppe auf&klappen	E&xpand group
+H&intergrundbild …	&Background picture …
+Hintergrundbild &sperren	Loc&k background picture
+Hintergrundbild an &Ansicht anpassen	Fit background to the &view
+Hintergrund ent&fernen	R&emove background
+Gruppe	Group
+Nicht gruppiert	Not grouped
+png;jpg;jpeg;bmp;gif=Bild (PNG, JPEG, BMP, GIF)	png;jpg;jpeg;bmp;gif=Image (PNG, JPEG, BMP, GIF)
+„{}“ ist kein Hintergrundbild	“{}” is no background picture
+{} × {} Pixel, {}, {} KB	{} × {} pixels, {}, {} KB
+Hintergrundbild	Background picture
+lässt sich nicht anzeigen	cannot be shown
+Links	Left
+Oben	Top
+Maßstab (%)	Scale (%)
+Deckkraft (%)	Opacity (%)
+Links und Oben in Einheiten der Fläche, Maßstab 1 bis 10 000 %, Deckkraft 5 bis 100 %.	Left and top in units of the canvas, scale 1 to 10,000 %, opacity 5 to 100 %.
+Sperren	Lock
+Gesperrt lässt es sich auf der Zeichenfläche weder wählen noch ziehen; ungesperrt verschiebt Ziehen es, der Griff unten rechts skaliert es.	Locked, it can be neither selected nor dragged on the canvas; unlocked, a drag moves it and the handle at the bottom right scales it.
+An Ansicht anpassen	Fit to view
+Ersetzen …	Replace …
+Hintergrundbild …	Background picture …
+{}, 1 Notiz	{}, 1 note
+{}, {} Notizen	{}, {} notes
+Gruppe „{}“, {}	Group “{}”, {}
+Gruppe „{}“, {}, zugeklappt	Group “{}”, {}, collapsed
+{} Kabel {} – {}, {}, {}	{} cables {} – {}, {}, {}
+1 bis 64 Zeichen, nicht der Name einer anderen Gruppe	1 to 64 characters, not the name of another group
+Gruppe „{}“	Group “{}”
+Name der Gruppe	Group name
+zugeklappt	collapsed
+aufgeklappt	expanded
+Liegt	Lies
+in der Gruppe „{}“	in the group “{}”
+oben, in keiner Gruppe	at the top, in no group
+{}, 1 Gruppe	{}, 1 group
+{}, {} Gruppen	{}, {} groups
+Farbe	Color
+Zuklappen	Collapse
+Aufklappen	Expand
+Gruppierung aufheben	Ungroup
+Mitglieder	Members
+Wählen und zeigen	Select and show
+Ziehen am Titel oder am Symbol verschiebt die Gruppe mit allem darin; Entf löst sie auf, ihre Geräte bleiben. Doppelklick auf das Symbol klappt sie auf.	Dragging the title or the symbol moves the group with everything in it; Del dissolves it, its devices stay. A double click on the symbol expands it.
+Gruppen	Groups
+Gruppieren	Group
+Die gewählten Geräte, Notizen und Gruppen in eine neue Gruppe (Strg+G)	The selected devices, notes and groups into a new group (Ctrl+G)
+Bild	Image

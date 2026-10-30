@@ -1,0 +1,55 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/groups.jfnet
+# the shot matrix of groups and the background picture (G1): the floor plan under the canvas
+# (locked), the PCs' group expanded and the servers' group collapsed (its line "2 Kabel", its
+# badge), then the switch and the servers' group in an expanded group with the picture selected
+# (its handle); each light and dark at 100 and 150 %
+# (build/jfnetworker/groups_<view>_<theme>_<scale>.png)
+size 1280 900
+theme light
+cmd 594
+click #1048588
+key ctrl+a
+type "bg_plan.png"
+click button:"Öffnen"
+expect listitem:"Hintergrundbild" exists
+cmd 595
+expect listitem:"Hintergrundbild" missing
+click listitem:"PC1"
+drag listitem:"PC2" listitem:"PC2" 1 shift
+key ctrl+g
+expect listitem:"Gruppe „Gruppe 1“, 2 Geräte" exists
+wait 600
+click listitem:"SRV1"
+drag listitem:"SRV2" listitem:"SRV2" 1 shift
+key ctrl+g
+cmd 592
+expect listitem:"Gruppe „Gruppe 2“, 2 Geräte, zugeklappt" selected
+wait 100
+# ---- the PCs' group expanded, the servers' collapsed
+shot build/jfnetworker/groups_view_light_100.png
+theme dark
+shot build/jfnetworker/groups_view_dark_100.png
+scale 150
+shot build/jfnetworker/groups_view_dark_150.png
+theme light
+shot build/jfnetworker/groups_view_light_150.png
+scale 100
+# ---- nested: the switch and the servers' group in an expanded group, the picture selected
+wait 600
+click listitem:"SW1"
+drag listitem:"Gruppe „Gruppe 2“, 2 Geräte, zugeklappt" listitem:"Gruppe „Gruppe 2“, 2 Geräte, zugeklappt" 1 shift
+key ctrl+g
+expect listitem:"Gruppe „Gruppe 3“, 3 Geräte" exists
+cmd 595
+click 340,580
+expect listitem:"Hintergrundbild" selected
+wait 100
+shot build/jfnetworker/groups_nested_light_100.png
+theme dark
+shot build/jfnetworker/groups_nested_dark_100.png
+scale 150
+shot build/jfnetworker/groups_nested_dark_150.png
+theme light
+shot build/jfnetworker/groups_nested_light_150.png
+scale 100
+expect_nowarn

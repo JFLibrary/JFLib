@@ -27,6 +27,11 @@
 //   phys      Place, PlaceKind, Spot, Tree (P1): the places of the physical view -- sites,
 //             buildings, floors, rooms, racks, desks --, where the devices stand, the length of
 //             every cable (by hand or automatic) and the reach of its medium (IEEE 802.3)
+//   group     Group, GroupColor, Groups (G1): the groups of the logical canvas -- named frames
+//             around devices, notes and groups, collapsible into one cluster symbol -- resolved
+//             (parents, members, what a collapsed group hides), group / ungroup / rename
+//   background  Background (G1): the picture under the logical canvas, the file's bytes kept as
+//             they were, its place, scale, opacity and lock; the limits; sniff
 //
 // Device identity is the project's numeric id; ports are referenced by their full interface
 // name ("GigabitEthernet1/0/1", "eth0"), so files stay readable.
@@ -46,6 +51,8 @@ pub mod lab;
 pub mod wlan;
 pub mod files;
 pub mod phys;
+pub mod group;
+pub mod background;
 
 pub use cable::{cable_fits, cable_kind, CableKind, Why};
 pub use catalog::{catalog, model, Category, CliStyle, DeviceKind, Media, Model, PortSpec};
@@ -57,3 +64,5 @@ pub use lab::{Assess, Compare, Feedback, Item, ItemKind, Target};
 pub use wlan::{Band, Security, Wlan, WlanJoin, WlanNet};
 pub use catalog::{Form, Optic};
 pub use phys::{Len, Place, PlaceKind, Reach, Spot, Tree};
+pub use group::{Group, GroupColor, GroupErr, Groups};
+pub use background::{Background, BgErr};

@@ -324,9 +324,15 @@ fn frames(n: &Net, ui: &mut Ui) -> (Vec<Hit>, usize) {
     let g = (w + ui.dp(8)) as f32;
     let (x0, y0, x1, y1) = (r[0] as f32 - g, r[1] as f32 - g, (r[0] + r[2]) as f32 + g, (r[1] + r[3]) as f32 + g);
     for it in items {
-        // a cable's route, or the radio line of a WLAN association (canvas/wlan.rs)
+        // a cable's route (into a collapsed group: its cluster's line, G1; inside one: none),
+        // or the radio line of a WLAN association (canvas/wlan.rs)
         let wl;
-        let pts: &[[f32; 2]] = match st.route(it.link as u64) {
+        let (line, rev) = match n.canvas.scene.line_of(it.link) {
+            Some(x) => x,
+            None if n.doc.proj.link(it.link).is_some() => continue,
+            None => (it.link as u64, false),
+        };
+        let pts: &[[f32; 2]] = match st.route(line) {
             Some(rt) => &rt.pts,
             None => match crate::workspace::canvas::wlan::route(n, it.link) {
                 Some(p) => {
@@ -339,7 +345,7 @@ fn frames(n: &Net, ui: &mut Ui) -> (Vec<Hit>, usize) {
         if pts.len() < 2 {
             continue;
         }
-        let f = if it.dir == 0 { it.pos } else { 1.0 - it.pos };
+        let f = if (it.dir == 0) != rev { it.pos } else { 1.0 - it.pos };
         let p = vp.to_screen(dg_point_at(pts, f));
         if p[0] < x0 || p[0] > x1 || p[1] < y0 || p[1] > y1 {
             continue;
@@ -399,10 +405,14 @@ fn crosses(n: &Net, ui: &mut Ui) {
                     Some(l) => l.a.dev == h.from.0,
                     None => n.doc.sim.wlan.iter().find(|a| a.id == h.link).is_none_or(|a| a.sta == h.from.0),
                 };
-                let pts = st.route(h.link as u64).map(|rt| rt.pts.clone()).or_else(|| crate::workspace::canvas::wlan::route(n, h.link));
+                // (a cable into a collapsed group: its cluster's line, G1)
+                let (line, rev) = n.canvas.scene.line_of(h.link).unwrap_or((h.link as u64, false));
+                let forward = forward != rev;
+                let pts = st.route(line).map(|rt| rt.pts.clone()).or_else(|| crate::workspace::canvas::wlan::route(n, h.link));
                 pts.filter(|p| p.len() >= 2).map(|p| dg_point_at(&p, if forward { 0.85 } else { 0.15 }))
             }
-            _ => n.doc.proj.device(d.dev).map(|x| [x.x as f32 + DEV_W - 6.0, x.y as f32 + 6.0]),
+            // at the device, or the cluster that hides it (G1)
+            _ => n.canvas.scene.vis_rect(d.dev).filter(|_| n.doc.proj.device(d.dev).is_some()).map(|r| [r[0] + DEV_W - 6.0, r[1] + 6.0]),
         };
         let Some(w) = at else { continue };
         let p = vp.to_screen(w);
@@ -421,7 +431,9 @@ fn pdu_source(n: &Net, ui: &mut Ui) {
     }
     let Some(d) = n.sim.pdu.src.and_then(|d| n.doc.proj.device(d)) else { return };
     let vp = n.canvas.st.vp;
-    let q = vp.rect_to_screen([d.x as f32, d.y as f32, DEV_W, DEV_H]);
+    // (at the cluster that hides it, G1)
+    let r = n.canvas.scene.vis_rect(d.id).unwrap_or([d.x as f32, d.y as f32, DEV_W, DEV_H]);
+    let q = vp.rect_to_screen(r);
     let g = ui.dp(4) as f32;
     let accent = ui.color(T_ACCENT) | 0xFF00_0000;
     let hair = ui.hair();

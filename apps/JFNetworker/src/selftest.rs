@@ -40,6 +40,8 @@
 // catalogue, jfn_sim::phys, doc/phys.rs, the scenario steps place / cable and expect cable).
 // mailtest.rs: mail (group mail: jfn_sim::smtpd, pop3d, mailc, mailbox, mailtrace, cli/mail.rs,
 // the static name servers of /etc/resolv.conf).
+// groupstest.rs: groups and the background picture of the canvas (group groups: jfn_model::group
+// and background, doc/groups.rs, the scene of canvas/paint.rs with frames, clusters and lines).
 
 use alloc::format;
 use alloc::string::String;
@@ -107,9 +109,11 @@ mod keyframetest;
 mod phystest;
 #[path = "mailtest.rs"]
 mod mailtest;
+#[path = "groupstest.rs"]
+mod groupstest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 38] = [
+    let groups: [(&'static str, fn(&mut T)); 39] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -148,6 +152,7 @@ pub fn run() -> i32 {
         ("keyframes", keyframetest::run),
         ("phys", phystest::run),
         ("mail", mailtest::run),
+        ("groups", groupstest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

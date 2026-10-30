@@ -59,6 +59,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **ui:** ui.window_snap(id, area, dist): a tool window's edges snap to the edges of an area of its owner (corners on both axes) while the user drags it -- live on Windows (plat::win_move_hook, WM_MOVING) and in test scripts (movewin)
 - **plat:** Linux (Wayland): a right press on a library-drawn title bar opens the compositor's window menu (move, resize, always on top, workspaces) as GNOME's and KDE's own windows do; plat::win_show_menu / window_menu (Linux)
 - **netpkt:** Mail (netpkt::smtp: commands, MAIL FROM / RCPT TO paths with their parameters, replies with the multi-line form and enhanced status codes of RFC 3463, a reader for bytes in pieces, EHLO keywords with SIZE, 8BITMIME, PIPELINING and AUTH, the server's stream of commands and DATA with dot-stuffing both ways, AUTH PLAIN and LOGIN of RFC 4954; netpkt::pop3: commands, +OK / -ERR, multi-line responses with dot-stuffing, which commands have one, a reader with the client's expectations (RFC 1939, 2449); netpkt::imf: messages of RFC 5322 with folded fields, addresses with display names and groups, the Date form both ways, Message-ID, encoded words of RFC 2047, quoted-printable, base64, multipart parts and a plain-text draft in UTF-8 as 7bit, 8bit or quoted-printable) and their dissection (decode::layers: each SMTP line with its command, code and enhanced code, the lines of a message after DATA, each POP3 line; decode::info: C: EHLO pc1, S: +OK 2 messages)
+- **ui:** Frames, collapsible groups and a backdrop in ui.diagram: the node flags DN_FRAME (a labelled frame around other nodes, hit on its title bar of DiagramState::frame_bar and its border only, its inside the background; an outline in the overview, a screen-reader record over its title bar), DN_TOGGLE (a collapse button, dg_toggle_rect, DEv::Toggle), DN_STEP (moves by whole grid steps), DN_RESIZE (a handle at the bottom right of a selected node, DEv::Resize) and DN_OUTLINE (an outline in the overview), and DgPaint::paint_under for what lies under the grid in the backing store; diagramtest --frames (tests/frames.uis)
 
 ### Changed
 
@@ -74,6 +75,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **netpkt:** netpkt::decode::Proto has the new variant Bgp (bit P_BGP, TCP port 179); a match over every protocol needs an arm for it
 - **base:** base::metrics::Window makes its slots with the first value (a window that never got one holds no memory, so an engine with a resolver window per device copies fast); Window::bytes() tells the heap memory a window holds
 - **netpkt:** netpkt::decode::Proto has the new variants Smtp (TCP ports 25 and 587) and Pop3 (port 110), both with the bit P_MAIL (1 << 28); a match over every protocol needs arms for them
+- **ui:** ui::DEv has the new variants Toggle (a collapse button of a DN_TOGGLE node) and Resize (the handle of a DN_RESIZE node), ui::DHit Toggle and Resize; a match over every event or hit needs arms for them
 
 ### Fixed
 

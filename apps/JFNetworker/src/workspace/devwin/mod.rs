@@ -155,6 +155,8 @@ pub(crate) fn open(n: &mut Net, ui: &mut Ui, dev: u32) {
     if n.doc.proj.device(dev).is_none() {
         return;
     }
+    // a member of a collapsed group: its groups open first (G1)
+    crate::workspace::canvas::groups::reveal(n, dev);
     let w = &mut n.devwin;
     w.clock += 1;
     if let Some(k) = w.wins.iter().position(|x| x.as_ref().is_some_and(|x| x.dev == dev && x.open.get() != 0)) {

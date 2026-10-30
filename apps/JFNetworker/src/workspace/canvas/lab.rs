@@ -168,8 +168,15 @@ pub(crate) fn update(n: &mut Net) {
 /// right corner, half above it; `off`: the device has no power.  Returns the px box x0, y0,
 /// x1, y1 they cover (none: q's top left corner twice)
 pub(crate) fn paint_pills(g: &mut Gfx, f: &DgFrame, lab: &Lab, dev: u32, q: [i32; 4], off: bool, measure: bool) -> [i32; 4] {
+    match lab.pills.get(&dev) {
+        Some(v) => paint_pill_list(g, f, v, q, off, measure),
+        None => [q[0], q[1], q[0], q[1]],
+    }
+}
+
+/// paint_pills for a list of pills (a cluster's: the services of its devices, G1)
+pub(crate) fn paint_pill_list(g: &mut Gfx, f: &DgFrame, v: &[(u8, bool)], q: [i32; 4], off: bool, measure: bool) -> [i32; 4] {
     let none = [q[0], q[1], q[0], q[1]];
-    let Some(v) = lab.pills.get(&dev) else { return none };
     if v.is_empty() {
         return none;
     }
