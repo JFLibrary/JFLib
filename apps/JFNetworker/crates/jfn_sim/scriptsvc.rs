@@ -28,6 +28,11 @@
 //                        refused (line and column), the old program goes on.  Replacing the
 //                        service with Action::Service instead gives a new one: its disk starts
 //                        empty.  Action::RenameService (os.rs) renames a script as it runs.
+//   ScriptService::idle_at()   when nothing is left to do: no callback, timer, socket, server,
+//                        request, lookup or disk access (`jfs FILE` of the shell ends then:
+//                        cli/shrun.rs runs the service as a console program)
+//   ScriptService::new_file(path, source, cfg, &config)   the program of the device's file
+//                        `path`: its relative imports start in the file's directory (`jfs FILE`)
 //
 // The host API (the names of script::GLOBALS; times in milliseconds, int or float):
 //   log(x, ..), log.debug|info|warn|error(..)   a line in the device's log, tagged with the
@@ -89,6 +94,23 @@
 //
 // Metrics: the script's own first, then calls, errors, fuel, busy_us, queued, max_queued,
 // dropped, rejected, timers, conns, heap_kb.
+//
+// Modules: import("/home/user/lib/util.jfs") reads a file of the device (Host::load: the
+// store's path rules, a relative path from /root as for the shell; the read takes the disk's
+// time, OsApi::disk_read, which counts as CPU time of the callback).  Its errors name the file
+// (ScriptErr::file, the log line, the status; the note's text starts with it).
+//
+// The debugger (the points the IDE attaches to): Action::ScriptDebug { dev, svc, op } with
+// DebugOp Pause, Continue, Step(Into | Over | Out), Break { file, line, cond }, Unbreak,
+// ClearBreaks; ScriptService::paused / debug_vm / debug_eval / breaks, ScriptView::paused.
+// Breakpoints belong to the service and hold for every run.  A stop keeps the callback on the
+// CPU without running it: virtual time goes on, the CPU is idle (no busy time), events wait in
+// the queue as behind a busy CPU (a full queue drops datagrams and answers requests 503), TCP
+// data waits in its socket, timers that fall due are queued and run late (every skips the
+// rounds it missed, as after a busy CPU), effects the callback made before the stop happen at
+// their moments.  Continue or a step goes on at the moment of the operation: the rest of the
+// callback's CPU time starts there.  Stopping, power off or a new source end a stop with the
+// program.
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
@@ -102,11 +124,12 @@ use core::any::Any;
 use agent_core::jmap::Value as Json;
 use base::metrics::Window;
 use base::rng::Pcg32;
+use jfn_model::files::FsErr;
 use jfn_model::msg;
 use jfn_model::msg::{dur, Msg};
 use netpkt::syslog::{SEV_DEBUG, SEV_ERR, SEV_INFO, SEV_WARNING};
 use netpkt::{IpAddr, Ipv4};
-use script::{num, Cx, ErrorKind, Fail, Limits, Pin, Program, Ref, Status, TraceLine, Value, Vm};
+use script::{num, Cx, ErrorKind, Fail, Limits, Pause, Pin, Program, Ref, Status, Step, TraceLine, Value, Vm};
 
 use crate::http::{Agent, Done, Reply, Req, ReqIn, Resp, Serve, ServeCfg, Url, Wheel};
 use crate::kernel::{Engine, Ns, MS, SEC, US};
@@ -180,6 +203,9 @@ pub struct ScriptErr {
     /// the virtual time, CPU time included
     pub at: Ns,
     pub kind: ErrorKind,
+    /// the file of the position: "" for the service's own source, else the path of a file of
+    /// the device it imports
+    pub file: String,
     /// the position (0 when it was not in the script)
     pub line: u32,
     pub col: u32,
@@ -221,6 +247,25 @@ pub struct ScriptView {
     pub metrics: Vec<(&'static str, i64)>,
     /// how often it started (a new run: run_errors and run_output begin again)
     pub runs: u64,
+    /// the debugger stopped the callback on the CPU (ScriptService::paused says where)
+    pub paused: bool,
+}
+
+/// what the debugger does with a script (Action::ScriptDebug, ScriptService::debug)
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DebugOp {
+    /// stop at the next statement: of the callback on the CPU, else of the next one
+    Pause,
+    /// a stopped callback goes on
+    Continue,
+    /// a stopped callback goes on by a step (Into, Over, Out); without a stop Into stops at
+    /// the next statement
+    Step(Step),
+    /// a breakpoint: "" for the service's own source, else the path of a file of the device
+    /// it imports; cond: a jfs expression (script::debug)
+    Break { file: String, line: u32, cond: Option<String> },
+    Unbreak { file: String, line: u32 },
+    ClearBreaks,
 }
 
 // ---------------------------------------------------------------- the record
@@ -315,6 +360,8 @@ struct Book {
     runs: u64,
     out_mark: u64,
     err_mark: u64,
+    /// the debugger's breakpoints (file, line, condition): every run of the program gets them
+    breaks: Vec<(String, u32, Option<String>)>,
 }
 
 impl Book {
@@ -588,6 +635,8 @@ struct Run {
     resolves: BTreeMap<u64, Pin>,
     by_lookup: BTreeMap<u32, u64>,
     disk: BTreeMap<u64, DiskOp>,
+    /// the debugger stopped the callback on the CPU (Status::Paused): the moment of its CPU time
+    paused: Option<Ns>,
 }
 
 /// a script as a service
@@ -1309,6 +1358,22 @@ impl script::Host for Api<'_, '_> {
     fn knows(&self, name: &str) -> bool {
         FUNCS.contains(&name)
     }
+    /// import(path): a file of the device; the program waits for the disk's read (CPU time of
+    /// the callback)
+    fn load(&mut self, cx: &mut Cx, path: &str) -> Result<String, String> {
+        let why = |e: FsErr| match e {
+            FsErr::NotFound | FsErr::NotDir => String::from("die Datei gibt es nicht"),
+            FsErr::IsDir => String::from("das ist ein Verzeichnis"),
+            FsErr::BadName => String::from("der Pfad ist ungültig"),
+            e => String::from(e.errno_text()),
+        };
+        let p = self.os.file_norm(path).map_err(why)?;
+        let data = self.os.file_read(&p).map_err(why)?;
+        let now = self.os.now();
+        let wait = self.os.disk_read(data.len() as u64).saturating_sub(now);
+        cx.charge(wait.saturating_mul(1000) / self.def.cfg.ps_per_op.max(1));
+        String::from_utf8(data).map_err(|_| String::from("die Datei ist kein UTF-8-Text"))
+    }
 }
 
 // ---------------------------------------------------------------- the program between runs
@@ -1343,6 +1408,7 @@ impl Run {
             resolves: BTreeMap::new(),
             by_lookup: BTreeMap::new(),
             disk: BTreeMap::new(),
+            paused: None,
         }
     }
 
@@ -1506,7 +1572,7 @@ impl Run {
             if self.flush(book, def, os) {
                 return true;
             }
-            if self.halting || os.now() < self.busy_until {
+            if self.halting || self.paused.is_some() || os.now() < self.busy_until {
                 return false;
             }
             if self.inv.is_some() {
@@ -2064,6 +2130,7 @@ impl Run {
         let at = inv.start.saturating_add(cpu(vm.call_fuel(), def.cfg.ps_per_op));
         let end = match st {
             Status::Yielded => at.max(from + 1),
+            Status::Paused(_) => at.max(from),
             _ => at.max(inv.start + 1).max(from),
         };
         book.stats.fuel += vm.last_fuel();
@@ -2077,6 +2144,8 @@ impl Run {
         self.vm = Some(vm);
         match st {
             Status::Yielded => {}
+            // the CPU stops at the debugger's stop until DebugOp::Continue or Step
+            Status::Paused(_) => self.paused = Some(end),
             Status::Done(_) => {
                 self.inv = None;
                 book.stats.calls += 1;
@@ -2133,13 +2202,31 @@ impl Run {
         }
     }
 
+    /// the callback the debugger stopped goes on now: its CPU time continues from here
+    fn resume(&mut self, os: &OsApi) {
+        let Some(p) = self.paused.take() else {
+            return;
+        };
+        let now = os.now();
+        if let Some(inv) = self.inv.as_mut() {
+            inv.start = inv.start.saturating_add(now.saturating_sub(p));
+        }
+        self.busy_until = self.busy_until.max(now);
+    }
+
     /// an error of a callback (or of what was to start one): kept, logged and noted at its
     /// moment; `end`: the script ends then
     fn fail(&mut self, book: &mut Book, e: script::Error, during: &'static str, at: Ns, cause: Option<HopId>, end: bool) {
-        let err = ScriptErr { at, kind: e.kind, line: e.line, col: e.col, msg: e.msg, trace: e.trace, during };
-        let text = if err.line > 0 { format!("Fehler in Zeile {}, Spalte {} ({}): {}", err.line, err.col, during, err.msg) } else { format!("Fehler ({}): {}", during, err.msg) };
+        let err = ScriptErr { at, kind: e.kind, file: e.file, line: e.line, col: e.col, msg: e.msg, trace: e.trace, during };
+        let text = match (err.line > 0, err.file.is_empty()) {
+            (true, true) => format!("Fehler in Zeile {}, Spalte {} ({}): {}", err.line, err.col, during, err.msg),
+            (true, false) => format!("Fehler in {}, Zeile {}, Spalte {} ({}): {}", err.file, err.line, err.col, during, err.msg),
+            _ => format!("Fehler ({}): {}", during, err.msg),
+        };
+        // an error in a module names its file
+        let note = if err.file.is_empty() { err.msg.clone() } else { format!("{}: {}", err.file, err.msg) };
         self.effects.push_back((at, cause, Effect::Log(SEV_ERR, text)));
-        self.effects.push_back((at, cause, Effect::Note(Note::ScriptError { svc: book.name.clone(), line: err.line, col: err.col, msg: err.msg.clone() })));
+        self.effects.push_back((at, cause, Effect::Note(Note::ScriptError { svc: book.name.clone(), line: err.line, col: err.col, msg: note })));
         book.stats.errors += 1;
         if book.errors.len() >= ERRORS_KEEP {
             book.errors.pop_front();
@@ -2175,6 +2262,7 @@ impl ScriptService {
             runs: 0,
             out_mark: 0,
             err_mark: 0,
+            breaks: Vec::new(),
         };
         ScriptService { def: Arc::new(def), run: None, book, seen: 0 }
     }
@@ -2183,6 +2271,14 @@ impl ScriptService {
     /// the compiler's errors when it has some
     pub fn new(source: &str, cfg: ScriptCfg, config: &Json) -> Result<ScriptService, Vec<script::Diagnostic>> {
         let prog = script::compile(source)?;
+        let conf = agent_core::json::stringify(config).unwrap_or_else(|_| String::from("{}"));
+        Ok(ScriptService::from_parts(String::from(source), prog, cfg, conf, None))
+    }
+
+    /// new() for the device's file `path` (absolute): its relative imports start in the file's
+    /// directory (the shell's `jfs FILE`)
+    pub fn new_file(path: &str, source: &str, cfg: ScriptCfg, config: &Json) -> Result<ScriptService, Vec<script::Diagnostic>> {
+        let prog = script::compile_named(path, source)?;
         let conf = agent_core::json::stringify(config).unwrap_or_else(|_| String::from("{}"));
         Ok(ScriptService::from_parts(String::from(source), prog, cfg, conf, None))
     }
@@ -2269,7 +2365,83 @@ impl ScriptService {
             lines: self.def.source.lines().count(),
             metrics: self.own_metrics(now).into_iter().map(|m| (m.name, m.value)).collect(),
             runs: self.book.runs,
+            paused: run.is_some_and(|r| r.paused.is_some()),
         }
+    }
+
+    // ---- the debugger (the IDE's points; Action::ScriptDebug)
+
+    /// the stop the callback on the CPU waits in
+    pub fn paused(&self) -> Option<Pause> {
+        let run = self.run.as_deref().filter(|r| r.paused.is_some())?;
+        run.vm.as_ref()?.paused().cloned()
+    }
+    /// the running program's VM, for the stack, the variables and the values of a stop
+    /// (Vm::frames, locals, upvalues, frame_globals, repr, children)
+    pub fn debug_vm(&self) -> Option<&Vm> {
+        self.run.as_deref()?.vm.as_ref()
+    }
+    /// a read-only expression in frame `frame` of the stop (0: innermost), as text; on a copy
+    /// of the VM, so the program stays as it is
+    pub fn debug_eval(&self, frame: usize, expr: &str) -> Result<String, String> {
+        let mut vm = self.debug_vm().ok_or_else(|| String::from("Das Skript läuft nicht"))?.clone();
+        let v = vm.eval(frame, expr)?;
+        Ok(vm.repr(v))
+    }
+    /// the breakpoints (file, line, condition) every run gets
+    pub fn breaks(&self) -> &[(String, u32, Option<String>)] {
+        &self.book.breaks
+    }
+
+    /// the breakpoints of the record into the running VM
+    fn apply_breaks(&mut self) {
+        let Some(vm) = self.run.as_deref_mut().and_then(|r| r.vm.as_mut()) else {
+            return;
+        };
+        vm.clear_breakpoints();
+        for (file, line, cond) in &self.book.breaks {
+            let _ = vm.set_breakpoint(file, *line, cond.as_deref());
+        }
+    }
+
+    /// an operation of the debugger, in virtual time: see DebugOp
+    pub fn debug(&mut self, op: DebugOp, os: &mut OsApi) -> Result<(), Msg> {
+        let running = self.run.as_deref().is_some_and(|r| r.vm.is_some());
+        match op {
+            DebugOp::Break { file, line, cond } => {
+                if let Some(c) = &cond {
+                    script::debug::check_expr(c).map_err(|m| msg!("Bedingung: {}", m))?;
+                }
+                self.book.breaks.retain(|b| !(b.0 == file && b.1 == line));
+                self.book.breaks.push((file, line, cond));
+                self.apply_breaks();
+            }
+            DebugOp::Unbreak { file, line } => {
+                self.book.breaks.retain(|b| !(b.0 == file && b.1 == line));
+                self.apply_breaks();
+            }
+            DebugOp::ClearBreaks => {
+                self.book.breaks.clear();
+                self.apply_breaks();
+            }
+            DebugOp::Pause | DebugOp::Continue | DebugOp::Step(_) if !running => return Err(msg!("Das Skript läuft nicht.")),
+            DebugOp::Pause => {
+                if let Some(vm) = self.run.as_deref_mut().and_then(|r| r.vm.as_mut()) {
+                    vm.request_pause();
+                }
+            }
+            DebugOp::Continue | DebugOp::Step(_) => {
+                let Some(run) = self.run.as_deref_mut() else {
+                    return Ok(());
+                };
+                if let (DebugOp::Step(k), Some(vm)) = (op, run.vm.as_mut()) {
+                    vm.step(k);
+                }
+                run.resume(os);
+            }
+        }
+        self.settle(os);
+        Ok(())
     }
 
     fn own_metrics(&self, now: Ns) -> Vec<Metric> {
@@ -2339,6 +2511,7 @@ impl Service for ScriptService {
         run.busy_until = now;
         run.queue.push_back((Pending::Top, None));
         self.run = Some(Box::new(run));
+        self.apply_breaks();
         self.settle(os);
     }
     fn on(&mut self, ev: SvcEvent, os: &mut OsApi) {
@@ -2362,7 +2535,8 @@ impl Service for ScriptService {
     fn footprint(&self) -> usize {
         // the program's heap and stacks, its pending work (the code is shared)
         let vm = self.run.as_ref().and_then(|r| r.vm.as_ref()).map_or(0, |v| v.heap_bytes() as usize + 4096);
-        4096 + vm + self.run.as_ref().map_or(0, |r| (r.queue.len() + r.effects.len()) * 256)
+        let breaks: usize = self.book.breaks.iter().map(|b| 48 + b.0.len() + b.2.as_ref().map_or(0, |c| c.len())).sum();
+        4096 + vm + breaks + self.run.as_ref().map_or(0, |r| (r.queue.len() + r.effects.len()) * 256)
     }
     fn metrics(&self) -> Vec<Metric> {
         self.metrics_at(self.seen)
@@ -2415,11 +2589,25 @@ impl Service for ScriptService {
     }
     fn status_msg(&self) -> Msg {
         let s = &self.book.stats;
+        if let Some(p) = self.paused() {
+            return if p.file.is_empty() { msg!("angehalten in Zeile {}, Spalte {}", p.line, p.col) } else { msg!("angehalten in {}, Zeile {}, Spalte {}", p.file, p.line, p.col) };
+        }
         match (self.book.state, self.book.errors.back()) {
+            (ScriptState::Failed, Some(e)) if !e.file.is_empty() => msg!("beendet nach einem Fehler in {}, Zeile {}, Spalte {}: {}", e.file.clone(), e.line, e.col, e.msg.clone()),
             (ScriptState::Failed, Some(e)) => msg!("beendet nach einem Fehler in Zeile {}, Spalte {}: {}", e.line, e.col, e.msg.clone()),
             (ScriptState::Failed, None) => msg!("beendet nach einem Fehler"),
             (ScriptState::Stopped, _) => msg!("gestoppt"),
             (ScriptState::Running, None) => msg!("läuft: Rückrufe {}, CPU-Zeit {}", s.calls, dur(s.busy_ns as i64)),
+            (ScriptState::Running, Some(e)) if !e.file.is_empty() => msg!(
+                "läuft: Rückrufe {}, CPU-Zeit {}, Fehler {}, zuletzt in {}, Zeile {}, Spalte {}: {}",
+                s.calls,
+                dur(s.busy_ns as i64),
+                s.errors,
+                e.file.clone(),
+                e.line,
+                e.col,
+                e.msg.clone()
+            ),
             (ScriptState::Running, Some(e)) => {
                 msg!("läuft: Rückrufe {}, CPU-Zeit {}, Fehler {}, zuletzt in Zeile {}, Spalte {}: {}", s.calls, dur(s.busy_ns as i64), s.errors, e.line, e.col, e.msg.clone())
             }
@@ -2560,5 +2748,48 @@ impl Engine {
             self.os_push(ni, Job::Start(id));
         }
         Ok(())
+    }
+
+    /// Action::ScriptDebug: the debugger of script `name` (ScriptService::debug)
+    pub(crate) fn script_debug(&mut self, dev: u32, name: &str, op: DebugOp) -> Result<(), ActErr> {
+        let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
+        let os = self.os(ni).ok_or(ActErr::NoIp(dev))?;
+        let slot = os.svc(name).filter(|s| !s.console).ok_or_else(|| ActErr::Refused(msg!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
+        let id = slot.id;
+        if !slot.svc.as_ref().is_some_and(|s| s.as_any().downcast_ref::<ScriptService>().is_some()) {
+            return Err(ActErr::Refused(msg!("Der Dienst \u{201e}{}\u{201c} ist kein Skript.", name)));
+        }
+        let mut r = Ok(());
+        self.svc_call(ni, id, None, |s, api| {
+            if let Some(x) = s.as_any_mut().downcast_mut::<ScriptService>() {
+                r = x.debug(op, api);
+            }
+        });
+        r.map_err(ActErr::Refused)
+    }
+}
+
+// ---------------------------------------------------------------- a script as a process
+
+impl ScriptService {
+    /// when nothing will be left to do: the top-level code ran, no callback runs or waits, the
+    /// script holds no timer, socket, server, request, lookup or disk access; Some(the end of
+    /// the CPU time it used last), None while something is pending (a process of the shell
+    /// ends then: cli/shrun.rs)
+    pub fn idle_at(&self) -> Option<Ns> {
+        let r = self.run.as_deref()?;
+        let idle = r.inv.is_none()
+            && r.queue.is_empty()
+            && r.effects.is_empty()
+            && r.timers.is_empty()
+            && r.conns.is_empty()
+            && r.listeners.is_empty()
+            && r.udps.is_empty()
+            && r.serve.is_none()
+            && r.open.is_empty()
+            && r.requests.is_empty()
+            && r.resolves.is_empty()
+            && r.disk.is_empty();
+        if idle { Some(r.busy_until) } else { None }
     }
 }

@@ -4,7 +4,9 @@
 // block indent, closers, comments, moving lines, find / replace, columns, the change journal,
 // undo merging), its diagnostics (positions in characters, clamping, counts, at / next, how
 // they follow typing, Enter, deletes, points, block indent, comments, moved lines, undo,
-// replace_all; 100 000 lines), what the code editor keeps of long lines through edits
+// replace_all; 100 000 lines), breakpoints, the execution line and folding ranges (how they
+// follow edits, rows and lines, edits inside unfold), several edits and a whole new text as
+// one undo step (group ide), what the code editor keeps of long lines through edits
 // (ui::code_long_check) and the grammars (Rust, JSON, INI, TOML, Markdown, JFS: tokens
 // and the states across lines; JFS also token by token against lib/script's tokens() on two
 // samples) plus a timing of 100 000 lines.  Prints FAIL lines and a summary; the exit code is
@@ -745,6 +747,81 @@ fn long(t: &mut T) {
     }
 }
 
+// (SK6) breakpoints, the execution line and folding ranges follow the edits; folding maps rows
+// and lines; several edits and a whole new text are one undo step each
+fn ide(t: &mut T) {
+    t.group = "ide";
+    let text = "fn a() {\n  x()\n  y()\n}\nfn b() {\n  z()\n}\nend()";
+    let mut d = CodeDoc::from_text(text);
+    // breakpoints: by line, clamped, following Enter above and a deleted line
+    d.set_breakpoints(&[(5, BP_ON), (1, BP_COND), (1, BP_ON), (99, BP_ON), (2, BP_DISABLED)]);
+    t.eq(d.breakpoints().to_vec(), alloc::vec![(1, BP_COND), (2, BP_DISABLED), (5, BP_ON)], "bp set");
+    d.set_selection(TextSel::at(p(0, 0)));
+    d.newline("{");
+    t.eq(d.breakpoints().to_vec(), alloc::vec![(2, BP_COND), (3, BP_DISABLED), (6, BP_ON)], "bp follow enter");
+    d.undo();
+    t.eq(d.breakpoints().to_vec(), alloc::vec![(1, BP_COND), (2, BP_DISABLED), (5, BP_ON)], "bp follow undo");
+    d.delete(p(1, 0), p(2, 0));
+    t.eq(d.breakpoints().to_vec(), alloc::vec![(1, BP_COND), (4, BP_ON)], "bp follow delete");
+    t.eq(d.breakpoint(1), Some(BP_COND), "bp at");
+    d.undo();
+    d.set_exec_line(Some(5));
+    d.set_selection(TextSel::at(p(4, 0)));
+    d.newline("{");
+    t.eq(d.exec_line(), Some(6), "exec follows");
+    d.undo();
+    // folding: ranges, rows and lines, visible lines
+    d.set_fold_ranges(&[(4, 5), (0, 2), (7, 7), (9, 12)]);
+    t.eq(d.fold_ranges(), alloc::vec![(0, 2, false), (4, 5, false)], "fold set");
+    t.check(d.set_folded(0, true), "fold");
+    t.eq((d.is_hidden(0), d.is_hidden(1), d.is_hidden(2), d.is_hidden(3)), (false, true, true, false), "fold hidden");
+    t.eq(d.visible_lines(), 6, "fold visible");
+    t.eq((d.row_of_line(0), d.row_of_line(3), d.row_of_line(2), d.line_of_row(1), d.line_of_row(5)), (0, 1, 0, 3, 7), "fold rows");
+    t.eq((d.visible_line(1, true), d.visible_line(2, false), d.visible_line(3, true)), (3, 0, 3), "fold visible line");
+    d.toggle_fold(4);
+    t.eq((d.visible_lines(), d.line_of_row(3), d.row_of_line(7)), (5, 6, 4), "fold two");
+    // a range that starts where a folded one did stays folded
+    d.set_fold_ranges(&[(0, 3), (4, 5)]);
+    t.eq(d.fold_ranges(), alloc::vec![(0, 3, true), (4, 5, true)], "fold kept");
+    d.set_fold_ranges(&[(0, 2), (4, 5)]);
+    // an edit on the first line keeps it, one inside opens it; ranges follow
+    d.set_selection(TextSel::at(p(0, 2)));
+    d.type_text("x", "}");
+    t.eq(d.fold_at(0), Some((2, true)), "fold edit head");
+    d.replace(p(1, 2), p(1, 3), "q");
+    t.eq(d.fold_at(0), Some((2, false)), "fold edit inside");
+    d.set_selection(TextSel::at(p(3, 0)));
+    d.newline("{");
+    t.eq(d.fold_at(5), Some((6, true)), "fold moves");
+    t.check(d.reveal(6) && !d.is_hidden(6), "fold reveal");
+    d.fold_all(true);
+    t.eq(d.fold_ranges().iter().filter(|r| r.2).count(), 2, "fold all");
+    // several edits as one step: positions of the text before, the caret inside one
+    let mut e = CodeDoc::from_text("let a = 1\nprint(a, a)\n");
+    e.set_selection(TextSel::at(p(1, 7)));
+    let edits = [TextEdit::new(p(1, 9), p(1, 10), "bb"), TextEdit::new(p(0, 4), p(0, 5), "bb"), TextEdit::new(p(1, 6), p(1, 7), "bb")];
+    t.check(e.apply_edits(&edits, "Umbenennen"), "edits applied");
+    t.eq(e.text(), String::from("let bb = 1\nprint(bb, bb)\n"), "edits text");
+    t.eq(e.selection().caret, p(1, 8), "edits caret");
+    t.eq(e.undo_label(), Some("Umbenennen"), "edits label");
+    e.undo();
+    t.eq(e.text(), String::from("let a = 1\nprint(a, a)\n"), "edits one undo");
+    t.check(!e.apply_edits(&[TextEdit::new(p(0, 0), p(0, 3), "x"), TextEdit::new(p(0, 2), p(0, 4), "y")], "x"), "edits overlap");
+    t.check(e.apply_edits(&[TextEdit::new(p(0, 9), p(1, 0), " +\n  "), TextEdit::new(p(1, 0), p(1, 0), "")], "x"), "edits over lines");
+    t.eq(e.text(), String::from("let a = 1 +\n  print(a, a)\n"), "edits over lines text");
+    // a whole new text: only the lines that differ, the caret at its token
+    let mut f = CodeDoc::from_text("fn f(){\nreturn  a+b\n}\nlet z = 1");
+    f.set_breakpoints(&[(3, BP_ON)]);
+    f.set_selection(TextSel::at(p(1, 9)));
+    t.check(f.replace_text("fn f() {\n  return a + b\n}\nlet z = 1", "Formatieren"), "replace text");
+    t.eq(f.selection().caret, p(1, 10), "replace caret by ink");
+    t.eq(f.breakpoints().to_vec(), alloc::vec![(3, BP_ON)], "replace keeps others");
+    t.eq(f.undo_label(), Some("Formatieren"), "replace label");
+    t.check(!f.replace_text("fn f() {\n  return a + b\n}\nlet z = 1", "x"), "replace same");
+    f.undo();
+    t.eq(f.text(), String::from("fn f(){\nreturn  a+b\n}\nlet z = 1"), "replace one undo");
+}
+
 pub fn run() -> i32 {
     let mut t = T { group: "", ok: 0, failed: 0 };
     rich(&mut t);
@@ -753,6 +830,7 @@ pub fn run() -> i32 {
     diags(&mut t);
     grammars(&mut t);
     jfs(&mut t);
+    ide(&mut t);
     out(&format!("model: {} checks, {} failed\n", t.ok + t.failed, t.failed));
     t.failed as i32
 }

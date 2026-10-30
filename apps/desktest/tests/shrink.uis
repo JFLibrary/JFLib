@@ -1,0 +1,24 @@
+#!args --verify-dirty
+# the area shrinks (ui/desk.rs): every window stays reachable (its title bar and 64 DIP of it
+# inside the area), maximised and snapped ones follow the area; grown again, the windows are
+# back at their places (the state kept them)
+theme light
+drag titlebar:"Protokoll" 840,240
+expect text:"Aktiv: Protokoll 740,175 320x232" exists
+expect dialog:"Protokoll" rect 740 223 320 232
+click button:"Maximieren: Notizen"
+expect dialog:"Notizen (maximiert)" rect 0 48 960 466
+shot build/desktest/shrink_before.png
+size 600 400
+shot build/desktest/shrink.png
+# the Protokoll keeps 64 DIP inside at the right, its title bar above the taskbar's strip
+expect dialog:"Protokoll" rect 536 * 320 232
+expect dialog:"Notizen (maximiert)" rect 0 * 600 *
+expect text:"Z: Editor, Rechner, Protokoll, [Notizen=x]" exists
+# a drag moves it from where it shows
+click button:"Wiederherstellen: Notizen"
+size 960 640
+expect dialog:"Protokoll" rect 740 223 320 232
+expect dialog:"Notizen" rect 70 118 300 192
+expect text:"Aktiv: Notizen 70,70 300x192" exists
+expect_nowarn

@@ -1,0 +1,51 @@
+#!args --verify-dirty
+# full screen (ui.window_fullscreen, win.rs): F11 (the app's key) switches the main window,
+# window_state reports it at once (headless runs only record it); when the platform or the user
+# leaves (or enters) it, the state follows and UIC_FULLSCREEN arrives; a tool window the same
+theme light
+expect window main windowed
+expect text:"Vollbild: Haupt aus | Werkzeug aus | Meldungen 0" exists
+key f11
+expect window main fullscreen
+expect button:"Vollbild" checked
+expect text:"Vollbild: Haupt an | Werkzeug aus | Meldungen 0" exists
+key f11
+expect window main windowed
+click button:"Vollbild"
+expect window main fullscreen
+# the platform (the user) leaves full screen: the state follows, the app hears it
+system fullscreen off
+expect window main windowed
+expect button:"Vollbild" unchecked
+expect text:"Vollbild: Haupt aus | Werkzeug aus | Meldungen 1" exists
+expect text:"Vollbild Haupt: aus" exists
+system fullscreen on
+expect window main fullscreen
+expect text:"Vollbild: Haupt an | Werkzeug aus | Meldungen 2" exists
+key f11
+expect window main windowed
+expect text:"Vollbild: Haupt aus | Werkzeug aus | Meldungen 2" exists
+# a tool window
+click button:"Werkzeug"
+expect window 601 open
+expect window 601 windowed
+click button:"Werkzeug-Vollbild"
+expect window 601 fullscreen
+expect window main windowed
+expect text:"Vollbild: Haupt aus | Werkzeug an | Meldungen 2" exists
+shot build/desktest/fullscreen_tool.png desktop
+system fullscreen off 601
+expect window 601 windowed
+expect text:"Vollbild: Haupt aus | Werkzeug aus | Meldungen 3" exists
+expect text:"Vollbild Werkzeug: aus" exists
+# from inside the tool window
+window 601
+click button:"Vollbild umschalten"
+window main
+expect window 601 fullscreen
+window 601
+click button:"Vollbild umschalten"
+window main
+expect window 601 windowed
+expect text:"Vollbild: Haupt aus | Werkzeug aus | Meldungen 3" exists
+expect_nowarn

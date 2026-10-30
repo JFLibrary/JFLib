@@ -264,6 +264,44 @@ pub trait StyleShell {
     fn dock_preview(&self, ui: &mut Ui, sp: &Sp) {
         crate::stock::dock_preview(ui, sp)
     }
+    /// (L7) the background of a window area (desk.rs; rect = the area)
+    fn desk_bg(&self, ui: &mut Ui, sp: &Sp) {
+        crate::stock::desk_bg(ui, sp)
+    }
+    /// a window inside an area: shadow, surface and frame (rect = the window), value 1 = the
+    /// active window, flags 1 = maximised (it fills the area: no shadow, square)
+    fn desk_window(&self, ui: &mut Ui, sp: &Sp) {
+        crate::stock::desk_window(ui, sp)
+    }
+    /// its title bar (rect = the bar over the whole width, the buttons are drawn after it):
+    /// value 1 = active, icon, label = the title; s[0], s[1] = x and width of the icon and title
+    /// (px)
+    fn desk_titlebar(&self, ui: &mut Ui, sp: &Sp) {
+        crate::stock::desk_titlebar(ui, sp)
+    }
+    /// a button of its title bar: ev, flags HB_MIN / HB_MAX / HB_CLOSE, icon IC_CHROME_*,
+    /// value 1 = the window is active; default: the style's caption_button
+    fn desk_button(&self, ui: &mut Ui, sp: &Sp) {
+        let st = ui.style;
+        st.caption_button(ui, sp)
+    }
+    /// where a dragged window snaps when it is released now (rect), value 1 = maximised
+    fn desk_snap(&self, ui: &mut Ui, sp: &Sp) {
+        crate::stock::desk_snap(ui, sp)
+    }
+    /// the bar behind a taskbar (rect)
+    fn taskbar(&self, ui: &mut Ui, sp: &Sp) {
+        crate::stock::taskbar(ui, sp)
+    }
+    /// a window's button in a taskbar: label, icon, ev, value 1 = the active window, value2 1 =
+    /// minimised, flags DTB_ICONS (icons only); size -> (w, h), the core takes w (a button is
+    /// as high as the bar)
+    fn taskbar_button_size(&self, ui: &mut Ui, sp: &mut Sp) -> (i32, i32) {
+        crate::stock::taskbar_button_size(ui, sp)
+    }
+    fn taskbar_button(&self, ui: &mut Ui, sp: &Sp) {
+        crate::stock::taskbar_button(ui, sp)
+    }
 }
 
 /// buttons, check boxes, radios, switches, sliders, progress, separators  (basic.s)

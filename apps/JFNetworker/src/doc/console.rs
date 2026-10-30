@@ -27,7 +27,8 @@
 // state come from the engine whenever a console is drawn.  IOS-like consoles take `?`
 // (Engine::cli_help) and Ctrl+Shift+6 and page what a command prints with --More-- (24 lines
 // a screen as "terminal length 24"; "terminal length N" changes it, 0 turns it off); Tab completes from the engine's command trees, a Linux shell lists
-// several choices.  Ctrl+C reaches the engine while a command runs or a question waits (else
+// several choices and completes paths.  A Linux shell's less, more and man page what they
+// print the same way (Engine::cli_pager).  Ctrl+C reaches the engine while a command runs or a question waits (else
 // the terminal ended the line itself); Ctrl+Z leaves the configuration modes ("end"), Ctrl+L
 // clears a shell.  A console is drawn in one place at a time: a device window that shows it
 // first, then its own window, then its tab (workspace/terminal.rs).
@@ -482,7 +483,7 @@ fn submit(n: &mut Net, dev: u32, line: &str) {
         n.cons.get(&n.doc.proj, dev).term.write_str(&format!("% {}\n", e));
         return;
     }
-    let page = n.cons.by_dev.get(&dev).is_some_and(|c| c.ios && !c.nopage);
+    let page = n.cons.by_dev.get(&dev).is_some_and(|c| c.ios && !c.nopage) || n.doc.sim.engine().cli_pager(dev);
     let out = pump_paged(n, if page { Some(dev) } else { None });
     // "terminal length N" (the device took it): N lines a page (the last one --More--), 0 none
     if let Some(len) = term_length(line)

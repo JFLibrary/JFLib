@@ -18,9 +18,11 @@
 // value (K_HEADING: Node::value, clamped to 1 ..= 9).  Left out: title bars, empty texts,
 // records without area, boxes without a label (a box with tab records inside is the tab
 // strip).  Containers are lists, dialogs, titled boxes and tab strips: a node's parent is the
-// smallest one on its layer whose rectangle holds the node's centre.  Menu bar entries next to
-// each other get a menu bar; the rows of a popup (menus, drop-downs) a menu or list that hangs
-// below the open record that opened it.  Names: the label; text boxes, drop-downs (their label
+// smallest one on its layer whose rectangle holds the node's centre -- inside a scoped record
+// (SEM_SCOPE: a window of a window area, desk.rs) only one it holds, else itself, and scoped
+// records hold nothing by their place (overlapping windows are siblings).  Menu bar entries
+// next to each other get a menu bar; the rows of a popup (menus, drop-downs) a menu or list that
+// hangs below the open record that opened it.  Names: the label; text boxes, drop-downs (their label
 // is the text / the choice), sliders, progress bars and lists without one take the text or
 // heading record right before them (to the left, or above and aligned).  The focus of a list
 // or tab strip is passed on to its selected row / tab.
@@ -33,6 +35,11 @@ use plat::a11y::{self as ax, Act, Node, Role, Snapshot, WinTree, NONE};
 
 use super::consts::*;
 use super::{Sem, Ui};
+
+/// Sem::min of a record that holds the next Sem::max records of its window by their order, not
+/// by their place (a window inside a window area, desk.rs: its content stays inside it where the
+/// windows overlap)
+pub(crate) const SEM_SCOPE: i32 = 0x5C09_E000;
 
 // synthetic containers: keys outside the widget ids (bit 63, kind in bits 40..)
 const SYN: u64 = 1 << 63;
@@ -71,6 +78,10 @@ struct Cand {
     parent: usize,
     /// members of a synthetic container (their parent is fixed)
     fixed: bool,
+    /// the innermost scoped record (SEM_SCOPE) on its layer that holds it (usize::MAX: none)
+    scope: usize,
+    /// it is a scoped record itself (it holds only what its scope says)
+    scoped: bool,
 }
 
 fn centre(r: &[i32; 4]) -> (i32, i32) {
@@ -167,7 +178,12 @@ impl Ui {
         let recs: Vec<&Sem> = self.sems.iter().filter(|s| s.win as u32 == i).collect();
         let mut cands: Vec<Cand> = Vec::new();
         let mut occ: BTreeMap<u32, u32> = BTreeMap::new();
+        // the scoped records open at a record: (the last record they hold, their candidate)
+        let mut scopes: Vec<(usize, usize)> = Vec::new();
         for (k, s) in recs.iter().enumerate() {
+            while scopes.last().is_some_and(|e| e.0 < k) {
+                scopes.pop();
+            }
             let n = occ.entry(s.id).or_insert(0);
             *n += 1;
             let key = (*n as u64) << 32 | s.id as u64;
@@ -178,7 +194,12 @@ impl Ui {
             let nd = self.a11y_node(s, role, key, &recs, k);
             let container = matches!(role, Role::List | Role::Dialog | Role::Group | Role::TabList);
             let pos = cands.len();
-            cands.push(Cand { nd, layer: s.layer, pos, container, parent: usize::MAX, fixed: false });
+            let scope = scopes.iter().rev().find(|e| cands[e.1].layer == s.layer).map_or(usize::MAX, |e| e.1);
+            let scoped = container && s.min == SEM_SCOPE;
+            cands.push(Cand { nd, layer: s.layer, pos, container, parent: usize::MAX, fixed: false, scope, scoped });
+            if scoped && s.max > 0 {
+                scopes.push((k + s.max as usize, pos));
+            }
         }
         self.a11y_groups(&mut cands);
         // parents: the smallest container on the same layer around the centre
@@ -192,9 +213,15 @@ impl Ui {
             let a = area(&cands[c].nd.rect);
             let mut best = usize::MAX;
             let mut best_area = i64::MAX;
+            let scope = cands[c].scope;
             for &p in &conts {
                 let q = &cands[p];
                 if p == c || q.layer != cands[c].layer || !holds(&q.nd.rect, x, y) {
+                    continue;
+                }
+                // inside a scoped record only what it holds (or itself) can be the parent; a
+                // scoped record holds nothing by its place (overlapping windows are siblings)
+                if (q.scope != scope || q.scoped) && p != scope {
                     continue;
                 }
                 // tab strips hold tabs only
@@ -210,6 +237,10 @@ impl Ui {
                     best = p;
                     best_area = qa;
                 }
+            }
+            // nothing inside a scoped record around it: the scoped record itself
+            if best == usize::MAX && scope != usize::MAX {
+                best = scope;
             }
             cands[c].parent = best;
         }
@@ -435,6 +466,8 @@ impl Ui {
                 container: false,
                 parent: usize::MAX,
                 fixed: false,
+                scope: cands[members[0]].scope,
+                scoped: false,
             };
             if role != Role::MenuBar {
                 g.nd.state = ax::S_EXPANDED;

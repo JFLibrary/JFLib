@@ -1,0 +1,10 @@
+// for the console debugger (debug.test)
+let util = import("mod/util.jfs")
+fn fact(n) {
+  if n <= 1 {
+    return 1
+  }
+  return n * fact(n - 1)
+}
+let r = fact(3)
+print(r, util.twice(4))

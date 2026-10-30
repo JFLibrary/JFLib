@@ -1,0 +1,52 @@
+#!args --verify-dirty
+# resizing at every edge and corner (ui/desk.rs): the grips lie mostly outside the frame (4
+# DIP out, 2 in; 12 DIP squares at the corners), the minimum size holds, the dragged edges stay
+# inside the area, a fixed-size window has no grips
+theme light
+expect dialog:"Protokoll" rect 98 146 320 232
+# the right edge (x 418): 100 wider
+drag 419,262 519,262
+expect dialog:"Protokoll" rect 98 146 420 232
+expect text:"Aktiv: Protokoll 98,98 420x232" exists
+expect text:"Ereignisse: Schließen 0 | Aktiv 1 | Bewegt 0 | Größe 1 | Zustand 0 | Klicks 0" exists
+# the bottom edge (y 378): 50 higher
+drag 258,379 258,429
+expect text:"Aktiv: Protokoll 98,98 420x282" exists
+# the left edge (x 98): 40 to the left
+drag 97,262 57,262
+expect text:"Aktiv: Protokoll 58,98 460x282" exists
+# the top edge (y 146): 20 up
+drag 300,144 300,124
+expect text:"Aktiv: Protokoll 58,78 460x302" exists
+# the corners: top left, top right, bottom left, bottom right
+drag 57,125 37,115
+expect text:"Aktiv: Protokoll 38,68 480x312" exists
+drag 518,115 538,105
+expect text:"Aktiv: Protokoll 38,58 500x322" exists
+drag 37,428 57,438
+expect text:"Aktiv: Protokoll 58,58 480x332" exists
+drag 538,438 518,418
+expect text:"Aktiv: Protokoll 58,58 460x312" exists
+expect dialog:"Protokoll" rect 58 106 460 312
+expect text:"Ereignisse: Schließen 0 | Aktiv 1 | Bewegt 0 | Größe 8 | Zustand 0 | Klicks 0" exists
+shot build/desktest/resize.png
+# the minimum size: the Notizen keep 240 x 120 DIP of content (+ the 32 DIP title bar)
+click button:"Notizen"
+expect text:"Aktiv: Notizen 70,70 300x192" exists
+drag 371,214 100,214
+expect text:"Aktiv: Notizen 70,70 240x192" exists
+drag 190,311 190,150
+expect text:"Aktiv: Notizen 70,70 240x152" exists
+# the left edge pushed past the minimum: the right edge stays
+drag 69,214 169,214
+expect text:"Aktiv: Notizen 70,70 240x152" exists
+# the bottom edge pulled past the taskbar's strip: it stops at the area's work part (466)
+drag 190,271 190,630
+expect text:"Aktiv: Notizen 70,70 240x396" exists
+# a fixed-size window (the Rechner) has no grips: a drag at its edge (inside: 260) does not
+# resize it
+click button:"Rechner"
+drag 260,200 300,200
+expect dialog:"Rechner" rect 42 90 220 242
+expect text:"Aktiv: Rechner 42,42 220x242" exists
+expect_nowarn

@@ -1,0 +1,23 @@
+#!args --verify-dirty
+# the state is plain data (ui/desk.rs DeskState::save / load): the places, the z-order,
+# maximised and minimised, the active window come back; Zurücksetzen cascades the windows anew
+theme light
+drag titlebar:"Protokoll" 600,240
+click button:"Maximieren: Notizen"
+click button:"Minimieren: Notizen"
+click button:"Editor"
+expect text:"Z: Rechner, Protokoll, Notizen=m, [Editor]" exists
+click button:"Speichern"
+expect text:"Gespeichert: desk 1 | win 2 42 42 220 242 0 | win 4 500 175 320 232 0 | win 3 70 70 300 192 3 | win 1 14 14 380 212 0 | active 1" exists
+# everything back to the first places
+click button:"Zurücksetzen"
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll]" exists
+expect text:"Aktiv: Protokoll 98,98 320x232" exists
+# loaded: as saved (the line of the saved text makes the area 18 DIP lower)
+click button:"Laden"
+expect text:"Z: Rechner, Protokoll, Notizen=m, [Editor]" exists
+expect dialog:"Protokoll" rect 500 223 320 232
+expect button:"Notizen (minimiert)" exists
+click button:"Notizen (minimiert)"
+expect dialog:"Notizen (maximiert)" rect 0 48 960 448
+expect_nowarn

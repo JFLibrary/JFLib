@@ -10,8 +10,11 @@
 //                                        or Linux paths, the system image of an IOS-like device
 //   load(&[File]) / records()            from the project and back (in path order)
 //   norm(path) -> canonical path         "flash:/x" ("flash:x", "x" on IOS), "/srv/tftp/x"
-//                                        (relative to /root on Linux; "." and ".." resolved)
+//                                        (relative to /root on Linux; "." and ".." resolved;
+//                                        the shells resolve their own working directory first)
 //   stat / read / write / append / remove / mkdir / rmdir / remove_tree / list
+//   rename(from, to)                     a file or a directory with all in it to another path
+//                                        (mv, IOS-like rename): the times stay
 //   used / free / under(dir)             bytes stored (the image included), what is left, the
 //                                        bytes of the files below a directory (quotas)
 //   capacity_of(model) / image_of(model) the size limit and the system image of a model
@@ -27,10 +30,11 @@
 // is kept as "text", everything else as "base64" (RFC 4648).  A device without files has an
 // empty store, so projects from before keep working.
 //
-// Paths: an IOS-like device has the file systems flash: and nvram: with flat names (nvram:'s
-// startup-config is the device's startup configuration, which the command line shows there; it
-// is no file of the store); its system image ("jf-r4.bin", the name show version gives) is in
-// flash: as a read-only entry of the model's size that takes space but holds no bytes.  A
+// Paths: an IOS-like device has the file systems flash: and nvram: (nvram:'s startup-config is
+// the device's startup configuration, which the command line shows there; it is no file of the
+// store); flash: has directories ("flash:/backups/r1.cfg": mkdir, rmdir, rename), nvram: none.
+// The system image ("jf-r4.bin", the name show version gives) is in flash:/ as a read-only
+// entry of the model's size that takes space but holds no bytes.  A
 // Linux host has the directories /, /etc, /home, /home/user, /root, /srv, /srv/ftp, /srv/tftp,
 // /tmp, /var and /var/log from the start (they cannot be removed); the files of /etc the shell
 // knows (resolv.conf, hosts, hostname) are made from the device's state, not stored.  Names
@@ -279,11 +283,19 @@ impl Store {
             let Some(fs) = IOS_FS.iter().find(|x| x.eq_ignore_ascii_case(fs)) else {
                 return Err(FsErr::NotFound);
             };
-            let name = rest.trim_start_matches('/');
-            if name.contains(['/', ':']) || name.contains(char::is_whitespace) || name.len() > NAME_MAX {
-                return Err(FsErr::BadName);
+            // directories of flash: ("flash:/a/b"); "." and ".." as on Linux
+            let mut parts: Vec<&str> = Vec::new();
+            for c in rest.split('/') {
+                match c {
+                    "" | "." => {}
+                    ".." => {
+                        parts.pop();
+                    }
+                    c if c.contains(':') || c.contains(char::is_whitespace) || c.len() > NAME_MAX => return Err(FsErr::BadName),
+                    c => parts.push(c),
+                }
             }
-            return Ok(format!("{}/{}", fs, name));
+            return Ok(format!("{}/{}", fs, parts.join("/")));
         }
         let mut parts: Vec<&str> = Vec::new();
         let full = if path.starts_with('/') { String::from(path) } else { format!("/root/{}", path) };
@@ -302,9 +314,10 @@ impl Store {
     /// the directory a canonical path is in ("flash:/" for "flash:/x", "/srv" for "/srv/tftp")
     pub fn parent(&self, p: &str) -> String {
         if self.ios {
-            return match p.find(":/") {
-                Some(i) => String::from(&p[..i + 2]),
-                None => String::from(p),
+            let Some(root) = p.find(":/").map(|i| i + 2) else { return String::from(p) };
+            return match p[root..].rfind('/') {
+                Some(j) => String::from(&p[..root + j]),
+                None => String::from(&p[..root]),
             };
         }
         match p.rfind('/') {
@@ -315,7 +328,7 @@ impl Store {
     /// the last part of a canonical path
     pub fn name_of<'a>(&self, p: &'a str) -> &'a str {
         if self.ios {
-            return p.split_once(":/").map_or(p, |(_, n)| n);
+            return p.split_once(":/").map_or(p, |(_, n)| n.rsplit('/').next().unwrap_or(n));
         }
         p.rsplit('/').next().unwrap_or(p)
     }
@@ -473,11 +486,11 @@ impl Store {
             None => Err(FsErr::NotFound),
         }
     }
-    /// makes a directory (Linux; `parents` as mkdir -p: the missing ones on the way too, and
-    /// no error when it is there)
+    /// makes a directory (Linux, and flash: of IOS-like devices; `parents` as mkdir -p: the
+    /// missing ones on the way too, and no error when it is there)
     pub fn mkdir(&mut self, path: &str, mtime: i64, parents: bool) -> Result<(), FsErr> {
         let p = self.norm(path)?;
-        if self.ios {
+        if self.ios && !p.starts_with("flash:") {
             return Err(FsErr::ReadOnly);
         }
         if let Some(s) = self.stat(&p) {
@@ -524,6 +537,47 @@ impl Store {
         let gone: Vec<String> = self.files.keys().filter(|k| self.within(k, &p)).cloned().collect();
         for k in gone {
             self.files.remove(&k);
+        }
+        self.ver = self.ver.wrapping_add(1);
+        Ok(())
+    }
+    /// moves a file or a directory with everything in it to another path (rename(2)): a file
+    /// replaces a file there, a directory an empty directory; the parent of the new path must
+    /// be a directory; the times stay.  Nothing moves into itself (a directory below its own
+    /// path: BadName), the system's directories and the image do not move (ReadOnly), nor
+    /// does anything between flash: and nvram:.
+    pub fn rename(&mut self, from: &str, to: &str) -> Result<(), FsErr> {
+        let a = self.norm(from)?;
+        let b = self.norm(to)?;
+        if self.builtin_dir(&a) || self.is_image(&a) || self.builtin_dir(&b) || self.is_image(&b) {
+            return Err(if self.exists(&a) { FsErr::ReadOnly } else { FsErr::NotFound });
+        }
+        let Some(dir) = self.files.get(&a).map(|e| e.dir) else { return Err(FsErr::NotFound) };
+        if a == b {
+            return Ok(());
+        }
+        if self.ios && a.split(':').next() != b.split(':').next() {
+            return Err(FsErr::ReadOnly);
+        }
+        if self.within(&b, &a) {
+            return Err(FsErr::BadName);
+        }
+        if !self.parent_ok(&b) {
+            return Err(if self.exists(&self.parent(&b)) { FsErr::NotDir } else { FsErr::NotFound });
+        }
+        match self.files.get(&b).map(|e| e.dir) {
+            Some(true) if !dir => return Err(FsErr::IsDir),
+            Some(false) if dir => return Err(FsErr::NotDir),
+            Some(true) if self.files.keys().any(|k| k != &b && self.within(k, &b)) => return Err(FsErr::NotEmpty),
+            _ => {}
+        }
+        self.files.remove(&b);
+        let moved: Vec<String> = self.files.keys().filter(|k| self.within(k, &a)).cloned().collect();
+        for k in moved {
+            if let Some(e) = self.files.remove(&k) {
+                let rest = &k[a.len()..];
+                self.files.insert(format!("{}{}", b, rest), e);
+            }
         }
         self.ver = self.ver.wrapping_add(1);
         Ok(())

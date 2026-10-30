@@ -339,3 +339,4 @@ pub use aaa::{Aaa, AuthResult, Method, MethodList, RadiusServer, ServerGroup};
 pub use aaatrace::ANote;
 pub use radiusd::{NasService, RadiusServerSvc};
 pub use telnetd::TelnetClient;
+pub use scriptsvc::DebugOp;

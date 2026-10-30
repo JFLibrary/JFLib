@@ -49,7 +49,9 @@ fn per_op(ps: u64) -> String {
 
 /// "0,512 s  Zeile 3, Spalte 5 (data): Division durch 0"
 fn err_line(e: &ScriptErr) -> String {
-    if e.line > 0 {
+    if e.line > 0 && !e.file.is_empty() {
+        format!("{}  {}, Zeile {}, Spalte {} ({}): {}", fmt_ns(e.at as i64), e.file, e.line, e.col, e.during, e.msg)
+    } else if e.line > 0 {
         format!("{}  Zeile {}, Spalte {} ({}): {}", fmt_ns(e.at as i64), e.line, e.col, e.during, e.msg)
     } else {
         format!("{}  ({}): {}", fmt_ns(e.at as i64), e.during, e.msg)
@@ -58,7 +60,7 @@ fn err_line(e: &ScriptErr) -> String {
 
 impl Engine {
     fn script_err(&mut self, ni: usize, text: &str) -> Result<(), String> {
-        self.out(ni, text);
+        self.err_out(ni, text);
         Err(String::from(text.lines().next().unwrap_or("")))
     }
 
@@ -136,7 +138,11 @@ impl Engine {
                                 "fn" => String::from("in einer Funktion ohne Namen"),
                                 f => format!("in {}", f),
                             };
-                            s.push_str(&format!("           {} ({}:{})\n", f, t.line, t.col));
+                            if t.file.is_empty() {
+                                s.push_str(&format!("           {} ({}:{})\n", f, t.line, t.col));
+                            } else {
+                                s.push_str(&format!("           {} ({}:{}:{})\n", f, t.file, t.line, t.col));
+                            }
                         }
                     }
                     s

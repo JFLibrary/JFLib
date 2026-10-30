@@ -564,3 +564,7 @@ pub const SPELL_OFF: u32 = 0; // spell_enable(false), or no TB_SPELL box asked y
 pub const SPELL_LOADING: u32 = 1; // its dictionary is being read (window mode)
 pub const SPELL_READY: u32 = 2; // checking (the marks are up to date or follow on the timer)
 pub const SPELL_NONE: u32 = 3; // no checker for the language
+// (L7) full screen (win.rs window_fullscreen): window_state's bit, the event when the platform
+// or the user changed it
+pub const UWS_FULLSCREEN: u32 = 16;
+pub const UIC_FULLSCREEN: u32 = 0x7FFF_001A; // arg = window id (0 main): the platform or the user left (or entered) full screen

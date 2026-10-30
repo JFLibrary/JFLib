@@ -1,0 +1,2 @@
+// a module that does not compile: its file, line and column
+import("mod/broken.jfs")

@@ -2314,6 +2314,15 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
 * `base::lru::Lru` -- a map that forgets the least recently used entries: limits on the number
   of entries and on their weight (bytes), `insert` returns what had to go, `get` counts as a
   use and `peek` does not. Ordered maps only, so it is deterministic.
+* `base::pattern` -- patterns of shells and grep: `glob(pat, name)` is fnmatch without flags (`*`,
+  `?`, `[a-z]`, `[!x]`, `[[:digit:]]`, `\x`; callers match a path component by component and
+  hide dot files themselves), `has_glob(word)` says whether a word needs expanding;
+  `Regex::new(pat, Syntax::Basic | Syntax::Extended, icase)` compiles POSIX's BRE or ERE without
+  back-references (classes, anchors, `* + ? {m,n}`, groups, alternatives, GNU's `\w \s \< \> \b`)
+  and `find` / `find_at` give the leftmost-longest match as byte offsets. It runs a Pike VM, so
+  `(a|a)*b` against a long text costs linear time instead of exponential; a refused pattern
+  says why with `ReErr::text()` in GNU grep's words (JFNetworker's shell, `apps/coretest`
+  group `pattern`).
 * `agent_core::jmap` -- typed JSON for protocols and files: `record! { pub struct P { pub a:
   String, pub n: u32 } }` declares the struct with `to_json` / `from_json`, `wire_enum!` an
   enum carried as a string; missing or mistyped members read as their defaults, unknown ones
@@ -3381,6 +3390,84 @@ if let Some(d) = ui.code_diag(ID_CODE) { self.status = format!("{}:{}: {}", d.li
   `Rule::Interp { open, close, start }`. `editortest --test model` compares it token by token
   with `script::tokens`.
 
+**Language services, breakpoints and folding.** A language plugs into the editor with a
+[`CodeAssist`](../lib/ui/code_assist.rs) (like `Highlighter` for colours): completion items,
+hover texts and signature help; every method has a default that offers nothing. What needs the
+app -- go to a definition, rename, format, toggle a breakpoint -- comes back as events.
+
+```rust
+struct Jfs;                                   // lib/script's services for .jfs
+impl CodeAssist for Jfs {
+    fn complete(&mut self, doc: &CodeDoc, at: TextPos, _explicit: bool) -> Option<CompList> {
+        let c = script::ls::complete(&doc.text(), doc.flat(at) as u32, &script::ls::CompleteCx::default());
+        let items = c.items.into_iter()
+            .map(|i| CompItem { label: i.label, detail: i.detail, doc: i.doc, kind: CI_FUNCTION, insert: String::new() })
+            .collect();
+        Some(CompList { start: doc.unflat(c.start as usize), items })
+    }
+    fn hover(&mut self, doc: &CodeDoc, at: TextPos) -> Option<String> {
+        script::ls::hover(&doc.text(), doc.flat(at) as u32, &script::ls::CompleteCx::default()).map(|h| h.text())
+    }
+}
+
+// in frame: folding ranges from the language after a change, then the editor with the services
+if self.folds_rev != Some(self.code.revision()) {
+    let f: Vec<(usize, usize)> = script::ls::folding(&self.code.text()).iter()
+        .map(|x| (x.line as usize - 1, x.end as usize - 1)).collect();
+    self.code.set_fold_ranges(&f);            // lines from 0: first stays, first + 1 ..= last fold
+    self.folds_rev = Some(self.code.revision());
+}
+ui.next_size(-1, -1);
+ui.code_editor_with(ID_CODE, &mut self.code, &Highlighter::jfs(), Some(&mut Jfs), CE_BREAKPOINTS);
+for e in ui.code_events(ID_CODE) {
+    match e {
+        CodeEv::Definition(p) => self.jump_to_definition(p),          // Ctrl+click, F12
+        CodeEv::Rename(p) => self.ask_new_name(p),                   // F2
+        CodeEv::Format => {                                           // Shift+Alt+F
+            if let Ok(f) = script::fmt::format(&self.code.text()) {
+                self.code.replace_text(&f, "Formatieren");           // one undo step
+            }
+        }
+        CodeEv::Breakpoint(line) => self.toggle_breakpoint(line),     // a click in the column
+    }
+}
+// a rename's edits as one undo step
+let edits: Vec<TextEdit> = script::ls::rename(&text, pos, "count")?.iter()
+    .map(|e| TextEdit::new(doc.unflat(e.start as usize), doc.unflat(e.end as usize), &e.text)).collect();
+doc.apply_edits(&edits, "Umbenennen");
+```
+
+* The completion list opens while a word is typed (once per word: one without items keeps it
+  closed until the word ends), after a character of `triggers()` (`.`) and on Ctrl+Space; it
+  filters as one types (the labels that start with the typed part, matching case first), Up /
+  Down / PgUp / PgDn choose, Enter / Tab / a click insert (the word from `CompList::start` to the
+  end of the word at the caret becomes the item, one undo step; Enter after a word typed out in
+  full just breaks the line), Esc closes. A row shows a badge for the kind (`CI_FUNCTION`,
+  `CI_METHOD`, `CI_VARIABLE`, `CI_KEYWORD` ..: a letter in the token colour of the kind), the
+  label in the code font and the detail; the chosen item's `doc` stands under the rows.
+  `ui.code_popup_item(id)` and `CodeStatus::popup` tell what it shows.
+* Hover: the pointer resting on a word asks `hover` once per word and revision; the text (lines
+  by `\n`, wrapped at 72 characters) follows the diagnostics in the editor's tooltip. Signature
+  help opens when `(` or `,` is typed and on Ctrl+Shift+Space, follows the caret (the active
+  parameter bold and underlined) and closes outside a call or on Esc. The popups are drawn on
+  the popup layer inside the window in the code theme's colours (high contrast too) and are
+  records for screen readers (`K_LIST` id + 14 with a `K_LISTITEM` per visible row, the chosen
+  one selected; `K_TEXT` "label – parameter – doc"); scripts find rows as
+  `listitem:"split – s.split(sep, n)"`.
+* Breakpoints belong to the app: a click in the column of `CE_BREAKPOINTS` is
+  `CodeEv::Breakpoint(line)`, `doc.set_breakpoints(&[(line, BP_ON | BP_DISABLED | BP_COND)])`
+  draws them (a filled circle, a ring, a bar across), `doc.set_exec_line(Some(line))` marks a
+  debugger's line (an arrow and `CodeTheme::exec_line`); both follow edits like diagnostics.
+* Folding: ranges from the language (`set_fold_ranges`; one that starts where a folded one did
+  stays folded), a chevron per range in a column after the numbers (`CE_FOLDS` keeps it), a
+  click or Ctrl+Shift+[ / ] folds and unfolds, `fold_all`. Folded lines are out of the view,
+  the caret's moves and find's steps; a "..." box after the line unfolds it; an edit inside or
+  the caret put there by the app (`set_selection`, undo) unfolds, folding around the caret
+  moves it to the range's first line. Without ranges a row is a line: 100 000 lines stay as
+  fast as before (`tests/code_ide.uis` benches 80 000 lines with 10 000 folded functions).
+* Tests: `apps/editortest/tests/code_assist.uis` and `code_ide.uis` (`cmd 906` switches lib/script's
+  services on for JFS), `--test model` group `ide`.
+
 ## 29. Scripts: `script` (compiler and VM)
 
 [`lib/script`](../lib/script/lib.rs) runs JFNetworker's `.jfs` scripts: `compile` turns the
@@ -3615,6 +3702,158 @@ uses only the standard library, `print`, `log` and `timer` runs the same in JFNe
 column, the source line and the calls; exit code 1 (2 for a wrong command line). Its tests
 are example scripts with their expected stdout, stderr, exit code and files
 (`apps/jfs/tests/cases/*.test`), run by `python build_rs.py test jfs` on Windows and Linux.
+
+**Language services and the formatter** ([`script::ls`](../lib/script/ls.rs),
+[`script::fmt`](../lib/script/fmt.rs)) are what an editor or IDE needs, without editor types:
+positions are bytes into the source, results carry `Span`s (lines and columns from 1). They
+work on code that does not parse (what `parse_partial` made of it), so completion and hover
+keep working while a line is half typed.
+
+```rust
+use script::ls::{self, CompleteCx, HostItem};
+
+// the host's names with a short description (JFNetworker: workspace/devwin/scriptls.rs)
+let host = [
+    HostItem { name: "net.listen", params: Some("port, handlers"), doc: "Wartet auf TCP-Verbindungen" },
+    HostItem { name: "config", params: None, doc: "Die Einstellungen des Dienstes" },
+];
+let load = |path: &str| fs_read(path);                  // the text of import("path"), if any
+let cx = CompleteCx { host: &host, load: Some(&load) };
+
+let c = ls::complete(src, caret, &cx);                   // items for src[c.start..c.end]
+for i in &c.items { show(&i.label, i.kind, &i.detail, &i.doc); }
+let h = ls::hover(src, at, &cx);                         // "fn greet(name)\nFunktion\n<doc>"
+let s = ls::signature(src, caret, &cx);                  // "greet(name, greeting)", active 1
+let d = ls::definition(src, at, &cx);                    // Location { path: None, span }
+let r = ls::references(src, at);                         // the declaration and every use
+let e = ls::rename(src, at, "count")?;                   // Vec<Edit> or a German reason
+let new_src = ls::apply(src, &e);
+let folds = ls::folding(src);                            // Fold { line, end, kind }
+let outline = ls::symbols(src);                          // fns (nested ones as children), lets
+let tidy = script::fmt::format(src)?;                    // or the syntax errors
+```
+
+* The index (`ls::index`) follows the scope rules of `ast.rs`: top-level `let` and `fn` are the
+  script's globals (visible in every function, in top-level code after the `let` ran), a block's
+  `fn`s in the whole block, a `let` from the next statement on, parameters around the body, `for`
+  and `catch` variables around their block; an inner declaration shadows. `Index::at(pos)` is
+  the symbol of a name, `Index::resolve(name, pos)` the one a name would mean there.
+* Doc comments are the `///` lines right above a `fn` or `let`. Hover shows the signature
+  (`fn greet(name)`, `let f = fn(a, b)`, `let m = import("x.jfs")`), the kind ("Parameter von
+  greet", "lokale Variable in handle") and the doc; for the library and the host their
+  description (`ls::library_doc(name)` has the library's, German, our own words).
+* Completion ranks the exact-case prefix first, then by kind: names in scope (locals before
+  the script's globals), the host's names, the built-ins and library modules, keywords (the
+  statement keywords only where a statement may start, `else` / `catch` after a `}`, `in` after
+  `for x`). After a dot: the members of a host namespace or a library module, the top-level
+  names of an imported module (through `CompleteCx::load`), the methods of `str` / `list` /
+  `map` / `bytes` when a literal or a known call tells the type (`let s = "a"`, `.split(..)`),
+  else of all four (a method on several types lists their signatures). Nothing in comments and
+  strings; in `${..}` as in code.
+* `rename` refuses keywords, invalid names, a name declared in the same scope, a rename that
+  would change what any name means (it resolves the renamed source again and compares), and
+  code with syntax errors (statements that did not parse would be missed).
+* `fmt::format` (two blanks per level; `format_with(src, "    ")`): one statement per line, the
+  `{` of a block on its line, `else` / `catch` after the `}`, indentation by the open brackets
+  plus one level for a continued statement, blanks around operators and after `,` and `:`,
+  none inside brackets; the line breaks inside expressions, comments and up to one blank line
+  stay. It refuses code with syntax errors, and it checks that the tree of its result equals
+  the original's (`Program::sexpr`) -- so the compiled program is the same. Idempotent.
+* Tests: `coretest --only scriptls` (definitions and references with shadowing, closures, loops;
+  rename and its refusals; completion in scope, after a dot, of an import and on broken code;
+  hover; signature help; folding; the outline; the formatter on every syntax form, idempotent,
+  the same code).
+**Modules** ([`module.rs`](../lib/script/module.rs)): `import(path)` is a function, not
+syntax. It gives the top-level names of another file as a map -- its `fn`s and `let`s, without
+the names that start with `_` -- with the values they have when the module's code has run:
+
+```js
+// lib/util.jfs
+let _calls = 0                          // private: not in the map
+fn shout(s) { _calls += 1; return s.upper() + "!" }
+fn calls() { return _calls }            // the module's functions see its globals as they change
+
+// main.jfs
+let util = import("lib/util.jfs")       // relative to this file
+print(util.shout("hallo"), util.calls())   // HALLO! 1
+```
+
+The host reads the files: `Host::load(cx, path) -> Result<String, String>` (the source, or the
+German reason; the default has no modules). The VM resolves a relative path against the
+importing file's directory, normalises it (`/` between the parts, a `\` counts as one, no `.`
+or `..`) and runs each path once per VM: the first import compiles the file the way the
+program was compiled (`compile_named`, or `compile_with` with the same host names), links its
+code behind the VM's own and runs its top-level code as a call inside the importing
+invocation, with the same fuel, limits, heap and output, so it yields, pauses and steps like
+any call; later imports give the same map. Errors are catchable strings: a cycle
+(`Zyklischer Import: a.jfs → b.jfs → a.jfs`), a missing file (`Modul lib/x.jfs: die Datei gibt
+es nicht`), a module that does not compile (`lib/x.jfs:3:9: Hier fehlt …`; uncaught, the
+`Error` has the module's file, line and column). A module whose top-level code throws is
+forgotten, the next import runs it again. From now on `Diagnostic`, `Error` and `TraceLine`
+carry a `file`; `Error`'s text names it only where a call is in another file than the error,
+so messages of single files stay as they were. The program's own host values (`config`) hold
+for its modules too. `script::check` stays per file: a module's members are dynamic.
+
+**The debug interface** ([`debug.rs`](../lib/script/debug.rs)) has no UI; the runner's
+`--debug` and JFNetworker's script services build on it. The compiler keeps a line table
+(`Program::line_table()`: every instruction's function, line, column and whether a statement
+starts there; `break_lines()` lists the lines a breakpoint can stop at), the locals of every
+function with the instructions where they are visible, and the names of upvalues.
+
+```rust
+use script::{PauseReason, Status, Step};
+
+vm.set_breakpoint("lib/util.jfs", 7, None)?;          // also before the module is loaded
+vm.set_breakpoint("main.jfs", 12, Some("n > 100"))?;  // a condition in jfs
+loop {
+    match vm.run(&mut host, 10_000) {
+        Status::Paused(p) => {                          // before the statement of p.line
+            for f in vm.frames() { show(&f.func, &f.file, f.line) }   // innermost first
+            for (name, v) in vm.locals(0) { show_var(&name, &vm.preview(v, 80)) }
+            let x = vm.eval(0, "n * 2 + len(items)");  // read-only, no calls, fuel unchanged
+            vm.step(Step::Over);                        // Into, Over, Out; or nothing: continue
+        }
+        Status::Yielded => {}
+        Status::Done(_) | Status::Error(_) => break,
+    }
+}
+vm.request_pause();                                     // stops at the next statement
+```
+
+* Stops: before a statement (the first one of a line; a `for` loop's head and a `while` loop's
+  condition each round) and, while stepping, at the first instruction after a return from the
+  function the step began in, also when an exception leaves it. `Into` stops at the next
+  statement anywhere, `Over` at the next one of this function or a caller, `Out` back in the
+  caller; breakpoints stop meanwhile. A breakpoint on a line without a statement stops at the
+  next line with one; one whose condition fails stops with `Pause::error`. A pause ends the
+  step, and so does the end of the invocation.
+* `run` returns `Status::Paused(Pause { reason, file, line, col, breakpoint, error })` also in
+  the middle of its fuel; the next `run` goes on from there, and a run that pauses equals one
+  that does not (result, output, fuel). Code a native runs through `Cx::call` (a callback of
+  `list.map` or `list.sort`) never stops: the native is in the middle of its work.
+* Inspecting: `frames()`, `locals(i)` (an inner variable hides an outer one), `upvalues(i)`,
+  `frame_globals(i)` and `globals_of(file)` (the private `_` ones too), `modules()`,
+  `repr(v)` / `preview(v, max)` / `children(v)` for a variables view that expands lists and
+  maps; `eval(i, expr)` knows literals, the names of the frame, operators, fields, indexes
+  and `len`, `str`, `type`, `int`, `float`. `script::debug::check_expr` checks a condition.
+* Cost: without a breakpoint, step or pause request the VM runs as without a debugger (`run`
+  uses the instruction loop as it is; `coretest --bench vm` measures it); with one, `run`
+  drives it one instruction at a time and checks the statement starts and breakpoints in
+  between, about four times slower.
+
+**Tests in jfs**: `assert(cond, msg)` throws `Annahme verletzt: msg` when `cond` is falsy;
+`assert_eq(a, b, msg)` compares numbers and texts as `==` does and lists and maps by their
+content (maps in any order) and throws `msg: erwartet B, ist A` with both values as in a list.
+`jfs --test FILE…` runs every top-level function `test_*` of the files in a fresh VM (the
+top-level code first, so each test has fresh globals and modules; then its timers on the
+virtual clock, at most 60 s or `--until`) and prints `ok` or `FEHLER` with file, line, column,
+message and what the test printed, then the count; exit code 1 when a test failed or there was
+none. `jfs --debug FILE` is a small console debugger on standard input (`break FILE:LINE [if
+COND]`, `run`, `step`, `next`, `finish`, `continue`, `print EXPR`, `bt`, `locals`, `quit`).
+Tests: `coretest --only scriptmod` (modules, the line table, breakpoints and every step kind
+through recursion, closures, `try` / `catch` and module boundaries, a pause in the middle of
+the fuel, paused runs equal to uninterrupted ones, the stack, `eval`, `assert`, the benchmark's
+programs with and without a debugger) and the runner's cases.
 
 ## 30. Live inspector
 
@@ -4399,3 +4638,118 @@ linked styles with and without a theme, broken files, the editor, save and load)
 sample themes and a font family from files over the gallery; they hold in the builds of every
 style), `uitest --only themes` (the format, the errors with their lines, the text form,
 `Ini::items`).
+
+## 35. Windows inside an area, a taskbar and full screen
+
+An app that hosts programs of its own -- a small desktop inside a window, an IDE with editor
+windows -- gives them windows inside an area of its window ([`ui/desk.rs`](../lib/ui/desk.rs)):
+a title bar with icon, title and buttons, moving, resizing at every edge and corner, maximising,
+minimising, the z-order, snapping, keys and screen readers. Like the docking area (§15) the
+library draws the windows and the app fills them; their state is the app's `DeskState`.
+
+```rust
+// state: desk: DeskState (DeskState::new(), desk.set_reserve([0, 0, 0, 40]) for a taskbar
+// inside the area), progs: Vec<Prog> (the open programs with their key, title and icon)
+let wins: Vec<DeskWin> = self.progs.iter().map(|p| DeskWin::new(p.key, &p.title, p.icon).min(240, 120)).collect();
+ui.next_size(SIZE_FILL, SIZE_FILL);
+ui.desk_begin(ID_DESK, &mut self.desk, &wins);
+while let Some(key) = ui.desk_next(&mut self.desk) {
+    // the window's content: a vertical box that clips, emitted from the back to the front
+    if let Some(p) = self.progs.iter_mut().find(|p| p.key == key) {
+        p.draw(ui);
+    }
+}
+ui.desk_taskbar_begin(ID_DESK); // takes the reserved strip at the area's bottom
+ui.button(ID_START, "Start"); // the app's own items before ...
+ui.desk_taskbar(ID_DESK, &mut self.desk, 0);
+ui.text(TS_CAPTION, &self.clock); // ... and after the window buttons
+ui.desk_taskbar_end();
+for ev in ui.desk_end(&mut self.desk) {
+    if let DeskEv::Close(key) = ev {
+        self.progs.retain(|p| p.key != key); // or ask "save changes?" first
+        self.desk.forget(key);
+    }
+}
+```
+
+* `DeskWin::new(key, title, icon)` describes a window each frame (the keys are the app's,
+  stable, != 0), `.flags(DWF_*)`: `DWF_NOCLOSE`, `DWF_NOMIN`, `DWF_NOMAX`, `DWF_FIXED` (no
+  resizing, no maximising, no halves), `DWF_MAXIMIZED` (a new window starts maximised: an IDE),
+  `DWF_NOTASK` (no taskbar button); `.min(w, h)` the smallest content, `.size(w, h)` the first
+  one (DIP, without the title bar). A key the state does not know yet is new: it is cascaded
+  from the top left, comes to the front and becomes active. To bring an open window forward
+  call `desk.activate(key)`.
+* `desk_next` yields the windows from the back to the front (minimised ones are left out), so
+  the topmost is drawn last and takes the pointer; a press anywhere on a window brings it to
+  the front. The title bar moves a window (a maximised or snapped one comes back to its size
+  under the pointer), its edges stick to the area's, with the pointer at the area's left or
+  right edge it fills that half, at the top edge the whole area (a preview shows where); the
+  grips (4 DIP outside the frame, 12 DIP squares at the corners) resize it down to its
+  minimum; a double click on the title bar maximises or restores it; the icon and a right
+  click on the title bar open its menu (Wiederherstellen, Minimieren, Maximieren, Schließen).
+  Esc cancels a drag. Maximised windows fill the area minus the reserved strip; when the area
+  shrinks, every window keeps its title bar and 64 DIP inside (its place in the state stays).
+* `desk_end` returns `DeskEv::Close` (the close button, the menu, the taskbar: the app decides),
+  `Activate`, `Move` and `Resize` (when the user let go), `State` (minimised, maximised,
+  restored, snapped); the taskbar's events come with the next `desk_end`.
+* `DeskState` is plain data: `save()` (`desk 1`, `win KEY X Y W H STATE` from the back to the
+  front, `active KEY`) and `load(text)` for the session, `reset`, `activate` / `minimize` /
+  `maximize` / `restore` / `toggle_max` / `snap(key, DW_LEFT | DW_RIGHT | 0)` / `cycle` /
+  `set_rect` / `forget`, `order` / `active` / `state` (`DW_MAX`, `DW_MIN`, `DW_LEFT`,
+  `DW_RIGHT`) / `rect` / `contains`, `set_reserve` (not saved). Places are logical (DIP from
+  the area's start corner): a mirrored window (RTL) shows them mirrored, with the title bar's
+  buttons at the left.
+* The taskbar: a button per window in the order of the `DeskWin` list (icon and title, the
+  active one pressed, minimised ones dimmed); a click activates, a second one minimises, a
+  minimised window comes back as it was; a right click or the menu key open its menu; the
+  buttons are one Tab stop (the arrows move inside); what does not fit goes into a "Weitere
+  Fenster" menu at the end, the active window always stays in the row. `DTB_ICONS` shows icons
+  only. A start menu, a clock or a tray are the app's own items around `desk_taskbar`.
+* Keys while the focus is inside the area (or nowhere): Alt+F6 / Alt+Shift+F6 the next /
+  previous window (the active one goes to the back), Alt+F10 maximises / restores the active
+  one, Alt+F9 minimises it, Alt+- opens its menu. None of them clashes with the code editor or
+  the text boxes; on GNOME the shell may keep Alt+F6 and Alt+F10 for itself, so an app that
+  wants other keys binds `DeskState::cycle` / `toggle_max` / `minimize` to its own commands.
+  The active window's content gets the keys: activation puts the focus back on the widget
+  focused there last (else its first Tab stop), Tab never enters the windows behind it (their
+  widgets are no Tab stops), each window is an F6 pane, and a focus that arrives in a window
+  behind (F6, a screen reader, `focus(id)`) brings it to the front.
+* Screen readers: each shown window is a dialog named by its title (" (maximiert)" after it),
+  the active one selected; its title bar's buttons ("Minimieren: Editor" ...) and its content
+  hang inside it in the tree, also where a window above covers them (the records are scoped by
+  their order, `a11y.rs`). Minimised windows are named in the taskbar (" (minimiert)").
+* Dirty regions: a moved window redraws only the cells it left and the ones it covers.
+  Painters: `StyleShell::desk_bg`, `desk_window`, `desk_titlebar`, `desk_button` (the style's
+  caption buttons by default), `desk_snap`, `taskbar`, `taskbar_button_size` /
+  `taskbar_button`; the stock ones use the theme tokens (high contrast: no shadows, 2 px frames,
+  the active window in the accent), NetLab has its own; sizes come from the style's
+  `SM_WIN_TBH_DIALOG`, `SM_CAP_W_TOOL`, `SM_WC_TITLE_PAD`, `SM_GRIP_CORNER` and `SM_CAP_LEFT`.
+
+**Full screen**: `ui.window_fullscreen(id, on)` puts a window (0 = the main window, else a
+tool window's id) over its whole monitor without a frame, or back to its place and frame;
+`window_state(id) & UWS_FULLSCREEN` says it at once. When the platform or the user leaves (or
+enters) full screen by itself, the state follows and `App::command(UIC_FULLSCREEN, id)`
+arrives. Windows makes the window a borderless popup over its monitor and restores its
+placement and style; X11 sets `_NET_WM_STATE_FULLSCREEN`, Wayland `xdg_toplevel.set_fullscreen`
+(the configure's states report it); the browser uses the Fullscreen API, which needs the user's
+gesture (a click or key that just happened -- otherwise the browser refuses and
+`UIC_FULLSCREEN` reports it). A tool window drops its library title bar and border meanwhile;
+Wayland tool windows drawn inside their owner (`WST_CHILD`) and Android do nothing; a window
+manager that ignores the request without a word leaves `UWS_FULLSCREEN` as the app asked (seen
+with WSLg right after a maximise). A library title bar of the main window (Wayland without
+decorations) goes; an app with `AF_CUSTOM_TITLEBAR` leaves its own out while `UWS_FULLSCREEN`
+is set.
+
+* **F11 is the app's key** for it: bind it in the command table
+  (`Command::new(CMD_FULL, "Vollbild", 0, 0, VK_F11, 0)`, then
+  `ui.window_fullscreen(0, ui.window_state(0) & UWS_FULLSCREEN == 0)` in `App::command`); the
+  library binds no key, and Esc stays the app's too (leave full screen with it only where
+  nothing else wants Esc).
+* Headless runs record the state: scripts `expect window main fullscreen` / `windowed`
+  (also `expect window ID ...`), `system fullscreen off [ID]` / `on` (the platform changed it:
+  `UIC_FULLSCREEN`).
+
+Tests: `apps/desktest` (`tests/move.uis`, `resize.uis`, `maxmin.uis`, `keys.uis`, `snap.uis`,
+`taskbar.uis`, `shrink.uis`, `save.uis`, `fullscreen.uis`, `rtl.uis`, `a11y.uis`, `shots.uis`,
+all with `--verify-dirty`); `desktest --check-fullscreen` checks the platform with real
+windows (Windows, X11, Wayland), `tests/fullscreen_web.mjs` the browser's Fullscreen API.

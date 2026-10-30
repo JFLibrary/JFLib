@@ -1,0 +1,101 @@
+# --debug: breakpoints (also in a module before it is loaded), the calls, locals, expressions,
+# finish, next, continue and step across files; the commands come from standard input
+args: --debug {dir}/dbg.jfs
+--- stdin
+break 5
+break mod/util.jfs:9
+breaks
+run
+bt
+locals
+print n * 10 + len([1])
+print fact(1)
+finish
+locals
+next
+next
+continue
+step
+step
+--- stdout
+jfs-Debugger: {dir}/dbg.jfs (help zeigt die Befehle, run startet das Programm)
+(jfs) Haltepunkt 1: {dir}/dbg.jfs:5
+(jfs) Haltepunkt 2: {dir}/mod/util.jfs:9
+(jfs) 1: {dir}/dbg.jfs:5
+2: {dir}/mod/util.jfs:9
+(jfs) base.jfs läuft einmal
+Halt in {dir}/dbg.jfs:5 (Haltepunkt 1)
+    5 |     return 1
+(jfs) #0 fact ({dir}/dbg.jfs:5)
+#1 fact ({dir}/dbg.jfs:7)
+#2 fact ({dir}/dbg.jfs:7)
+#3 Hauptprogramm ({dir}/dbg.jfs:9)
+(jfs) n = 1
+(jfs) = 11
+(jfs) Fehler: Im Ausdruck gehen keine Aufrufe außer len, str, type, int und float
+(jfs) Halt in {dir}/dbg.jfs:7 (Schritt)
+    7 |   return n * fact(n - 1)
+(jfs) n = 2
+(jfs) Halt in {dir}/dbg.jfs:7 (Schritt)
+    7 |   return n * fact(n - 1)
+(jfs) Halt in {dir}/dbg.jfs:9 (Schritt)
+    9 | let r = fact(3)
+(jfs) Halt in {dir}/mod/util.jfs:9 (Haltepunkt 2)
+    9 |   return x * count
+(jfs) Halt in {dir}/dbg.jfs:10 (Schritt)
+   10 | print(r, util.twice(4))
+(jfs) 6 8
+Das Programm ist zu Ende.
+===
+# before run only breakpoints; a wrong breakpoint, a condition; quit ends at once
+args: --debug {dir}/dbg.jfs
+--- stdin
+print 1
+break x
+break 7 if n ==
+break 7 if n == 2
+run
+locals
+continue
+--- stdout
+jfs-Debugger: {dir}/dbg.jfs (help zeigt die Befehle, run startet das Programm)
+(jfs) print geht erst, wenn das Programm läuft (run startet es)
+(jfs) break braucht DATEI:ZEILE oder ZEILE, nicht „x“
+(jfs) Bedingung: Hier fehlt ein Ausdruck
+(jfs) Haltepunkt 1: {dir}/dbg.jfs:7
+(jfs) base.jfs läuft einmal
+Halt in {dir}/dbg.jfs:7 (Haltepunkt 1)
+    7 |   return n * fact(n - 1)
+(jfs) n = 2
+(jfs) 6 8
+Das Programm ist zu Ende.
+===
+# quit while stopped: the program ends, exit code 0
+args: --debug {dir}/dbg.jfs
+--- stdin
+break 10
+run
+quit
+--- stdout
+jfs-Debugger: {dir}/dbg.jfs (help zeigt die Befehle, run startet das Programm)
+(jfs) Haltepunkt 1: {dir}/dbg.jfs:10
+(jfs) base.jfs läuft einmal
+Halt in {dir}/dbg.jfs:10 (Haltepunkt 1)
+   10 | print(r, util.twice(4))
+(jfs) Das Programm endet auf Wunsch.
+===
+# an error while debugging: the report as without the debugger, exit code 1
+args: --debug {dir}/moderr.jfs
+exit: 1
+--- stdin
+run
+--- stdout
+jfs-Debugger: {dir}/moderr.jfs (help zeigt die Befehle, run startet das Programm)
+(jfs) Das Programm endet mit einem Fehler.
+--- stderr
+{dir}/mod/fail.jfs:2:12: Fehler: Division durch 0
+      return a / b
+               ^
+  in ratio (2:12)
+  in run ({dir}/moderr.jfs:4:12)
+  im Hauptprogramm ({dir}/moderr.jfs:6:7)

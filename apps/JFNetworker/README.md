@@ -48,7 +48,9 @@ Queues, Lastgeneratoren, eigene Skripte).
 - **Skript-Editor (U7):** der Reiter Skripte im Gerätefenster eines Hosts: Code-Editor mit
   Prüfung beim Tippen und den Fehlern des laufenden Programms an ihrer Zeile, Ausführen,
   Stoppen, Übernehmen als Rückgängig-Schritt (das Skript behält Disk und Zahlen), Ausgabe und
-  Fehler des Laufs, Vorlagen (siehe [Skript-Editor](#skript-editor)).
+  Fehler des Laufs, Vorlagen; seit SK6 mit Vervollständigung, Hover, Signaturhilfe, Sprung zur
+  Deklaration, Umbenennen, Formatieren, Falten und Gliederung (siehe
+  [Skript-Editor](#skript-editor)).
 - **Spanning Tree (R4):** STP (IEEE 802.1D) und RSTP (802.1w) auf den IOS-artigen Switches, je
   Switch eingeschaltet: Wahl der Root-Bridge, Rollen und Zustände, Proposal und Agreement,
   Edge-Ports, BPDU Guard, `show spanning-tree`, bernsteinfarbene LEDs an blockierten Ports
@@ -147,6 +149,16 @@ Queues, Lastgeneratoren, eigene Skripte).
   Rechte und Accounting; die lokalen Benutzer nur, wenn kein Server antwortet), der Dienst
   `radius-server` auf den Hosts, `telnet` als Client an beiden Konsolen (siehe
   [Logins, Telnet und AAA mit RADIUS](#logins-telnet-und-aaa-mit-radius)).
+- **Shell mit Ordnern und Prozessen (V1):** ein Arbeitsverzeichnis mit `cd` und `pwd`, die
+  klassischen Werkzeuge (`grep`, `find`, `sort`, `tree`, `less`, `man` und viele mehr), Pipes,
+  Umleitungen, Listen, Variablen und Platzhalter für jeden Befehl, Tab für Pfade; Skripte laufen
+  mit `jfs DATEI` als Prozesse, auch im Hintergrund (`&`, `jobs`, `ps`, `kill`); Ordner in
+  `flash:` der IOS-artigen Geräte (siehe
+  [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)).
+- **Module, Debugger und Tests für Skripte (SK7):** ein Skript lädt mit `import("pfad.jfs")`
+  Dateien des Geräts; ein Skript-Dienst lässt sich in virtueller Zeit anhalten und schrittweise
+  ausführen, mit Haltepunkten, Aufrufliste und Variablen (die Schnittstelle für die kommende
+  IDE); `assert` und `assert_eq` für Tests (siehe [Skripte in Hosts](#skripte-in-hosts)).
 
 ## Bedienung
 
@@ -237,6 +249,8 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `script_editor.uis` | den Skript-Editor (siehe [Skript-Editor](#skript-editor)) auf `fixtures/scripts.jfnet`: der Reiter aus dem Kontextmenü, die Liste mit Zustand und Fehlern, der Laufzeitfehler in Zeile 13 als Marke und in der Fehlerliste (ein Klick setzt die Schreibmarke), die Ausgabe live, Tippen mit Prüfung nach einem Augenblick, F8 und Umschalt+F8, Strg+S lehnt einen Fehler ab und übernimmt, was sich übersetzen lässt (das Skript startet mit seiner Disk neu: „Start 2“), Rückgängig und Wiederholen („Start 3“, „Start 4“), Stoppen, Ausführen, Neu starten, Verwerfen, eine Vorlage (ihr Fehler: Port 7 ist belegt), Umbenennen, Löschen und Rückgängig, der Reiter Dienste |
 | `script_editor_en.uis` | den Skript-Editor auf Englisch: Kontextmenü, Reiter, Liste, Statuszeile, Meldungen, Ausgabe und Fehler, eine Vorlage auf PC1 mit englischen Kommentaren und Texten, die Tasten in der Übersicht (F1) |
 | `script_shots.uis` | die Bilder des Skript-Editors hell und dunkel mit 100 und 150 % (`build/jfnetworker/script_shots_*.png`) |
+| `script_ls.uis` | die Sprachdienste des Skript-Editors (SK6) auf `zaehler`: Hover über einem Namen des Simulators mit Beschreibung, die Vervollständigung von `metrics.ob` mit der Beschreibung unter der Liste, die Signaturhilfe und ihr Parameter, F12 und Strg+Klick zur Deklaration, Umbenennen über das Flyout (F2, ein Rückgängig-Schritt, die Ablehnung eines Schlüsselworts), Formatieren (Umschalt+Alt+F, ein Rückgängig-Schritt, die Ablehnung mit Syntaxfehler), die Gliederung (ein neues `fn`, ein Klick setzt die Schreibmarke, „Gliederung“ blendet sie aus) |
+| `script_ls_shots.uis` | die Bilder der Sprachdienste: die Vervollständigung von `net.`, die Signaturhilfe von `net.listen` hell und dunkel mit 100 und 150 %, das Flyout „Name umbenennen“ hell und dunkel (`build/jfnetworker/script_ls_*.png`) |
 | `model.uis`, Gruppe `scripted` | worauf der Skript-Editor baut: der Quelltext einer Definition als Zeilen oder Text und zurück, Namen, die Vorlagen (übersetzbar, Deutsch und Englisch), Übernehmen, Neu, Umbenennen und Löschen über die Rückgängig-Liste mit Disk und Zahlen des laufenden Skripts und ohne Neustart des Geräts, ein Skript, das der Simulator aus der Datei nicht nehmen konnte, `keep_steps`, die Marken auf bearbeitetem Text |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
@@ -299,6 +313,11 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `telnet_session.uis` | der Telnet-Client in einem Terminal-Tab: eine abgewiesene Verbindung, dann eine Sitzung zu einem Listener auf SRV1, Strg+Umschalt+6 beendet sie |
 | `aaa_services.uis` | der RADIUS-Server im Reiter Dienste von SRV1: Karte mit Statuszeile, die Einstellungen als JSON (ein zweiter Benutzer, ein Client ohne Secret abgewiesen) |
 | `aaa_shots.uis` | die Bilder (eine Konsole gesperrt bei der Anmeldung, der RADIUS-Server im Reiter Dienste) hell und dunkel mit 100 und 150 % (`build/jfnetworker/aaa_*.png`) |
+| `model.uis`, Gruppe `shell` | die Shell mit Ordnern, Werkzeugen und Prozessen (siehe [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)): Arbeitsverzeichnis und `cd` mit allen Sonderfällen, die Grammatik (Listen, `&&`, `\|\|`, `!`, Anführungszeichen, Variablen, `$?`, `!!`, Syntaxfehler), Umleitungen in jeder Form, Pipes auch hinter `ping`, `curl` und `nc`, Strg+C in einer Pipeline, Platzhalter, jedes Werkzeug mit seiner genauen Ausgabe, Tab für Pfade, `jfs` als Prozess (Ausgabe, Timer, Fehler, Strg+C, im Hintergrund), Jobs mit `jobs`, `fg`, `wait`, `kill`, `ps`, `sleep` und den Exit-Codes, Ordner in `flash:` von R1, ein Projekt mit Ordnern gespeichert und geladen, Ausschalten, Determinismus |
+| `scen_shell_tour.uis` | Golden-Szenario `shell_tour.scn`: ein Projektbaum auf PC1, ein Skript mit `echo` geschrieben und als Prozess in eine Logdatei gestartet, das Log mit `grep`, Pipes hinter `ping` und `curl`, Jobs mit `jobs`, `ps` und `kill`, Platzhalter, `find`, Umleitungen von stderr, Ordner in `flash:` von R1 |
+| `shell_terminal.uis` | PC1s Shell im Terminal-Panel: `mkdir`, `cd` (der Prompt zeigt `~/app`), Tab ergänzt einen Ordner mit `/`, eine Datei mit Leerzeichen, bei mehreren Treffern erst den gemeinsamen Teil und dann die Liste, eine Pipe, ein Skript als Prozess mit Strg+C beendet (`$?` 130), ein Job im Hintergrund mit `[1] PID` und seiner Fertig-Zeile, `less` mit --More-- |
+| `shell_shots.uis` | die Bilder der Shell (PC1 mit Ordnern, `tree`, einer Pipeline, `ps` und `ls -l`; R1 mit Ordnern in `flash:`) hell und dunkel mit 100 und 150 % (`build/jfnetworker/shell_*.png`) |
+| `model.uis`, Gruppe `scriptmod` | Module und Debugger der Skripte (siehe [Skripte in Hosts](#skripte-in-hosts)): Importe aus den Dateien des Geräts mit absolutem und relativem Pfad, die Zeit der Disk, eine fehlende Datei, ein Zyklus, ein Fehler im Modul in Fehler, Log und Status, ein angehaltener Dienst mit verspäteten Timer-Runden, Schritte, ein Ausdruck im Halt, ein Haltepunkt mit Bedingung, Determinismus |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -328,6 +347,9 @@ von SRV1 an; das Szenario `aaa_radius.scn`) und `aaa_login.jfnet` (R1 mit `login
 Banner, SRV1 mit `radius-server`, PC1; die Fensterskripte `login_console.uis`,
 `telnet_session.uis`, `aaa_services.uis` und `aaa_shots.uis`), die coretest-Gruppe `radius`
 (RADIUS und Telnet Byte für Byte, MD5 und HMAC-MD5 in `crypto`).
+Für die Shell: `shell_tour.jfnet` (PC1 und SRV1 mit einem Webserver an SW1, R1 als Gateway; das
+Szenario `shell_tour.scn`, die selftest-Gruppe `shell` und die Fensterskripte `shell_*.uis`),
+die coretest-Gruppe `pattern` (Platzhalter und reguläre Ausdrücke von `base::pattern`).
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -370,7 +392,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Tests | [`tests/`](tests) | Skripte, Fixtures (`fixtures/*.jfnet`), Szenarien mit Golden-Berichten (`scen/*.scn`, `scen/*.report`) |
 | Skripte | [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs), [`cli/scripts.rs`](crates/jfn_sim/cli/scripts.rs), [`src/scripttest.rs`](src/scripttest.rs) | Skripte als Dienste in den Hosts: Host-API, Anweisungen als Rechenzeit, der Befehl `script`, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Labore | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/goal.rs`](crates/jfn_sim/goal.rs), [`src/workspace/task.rs`](src/workspace/task.rs), [`src/workspace/devwin/svcedit.rs`](src/workspace/devwin/svcedit.rs), [`assets/labs`](assets/labs), [`src/tasktest.rs`](src/tasktest.rs) | die Aufgabe eines Labors in der Projektdatei, das Urteil über eine Erwartung (Runner und Labor) und die Ziele über einen Lauf, das Panel „Aufgabe“ mit der Liste der Labore, die Einstellungen der Dienste als JSON, die vier Labore, ihr Selbsttest (siehe [Labore und Aufgaben](#labore-und-aufgaben)) |
-| Skript-Editor | [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | der Reiter Skripte des Gerätefensters, die Skripte eines Geräts im Projekt mit Rückgängig und Vorlagen, ihr Selbsttest (siehe [Skript-Editor](#skript-editor)) |
+| Skript-Editor | [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/workspace/devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | der Reiter Skripte des Gerätefensters mit seinen Sprachdiensten, die Skripte eines Geräts im Projekt mit Rückgängig und Vorlagen, ihr Selbsttest (siehe [Skript-Editor](#skript-editor)) |
 | Spanning Tree | [`crates/jfn_sim/stp.rs`](crates/jfn_sim/stp.rs), [`stp98.rs`](crates/jfn_sim/stp98.rs), [`rstp.rs`](crates/jfn_sim/rstp.rs), [`cli/stp.rs`](crates/jfn_sim/cli/stp.rs), [`lib/netpkt/stp.rs`](../../lib/netpkt/stp.rs), [`src/stptest.rs`](src/stptest.rs) | STP (802.1D-1998) und RSTP (802.1D-2004) auf den Switches, Einstellungen und Befehle, BPDUs, ihr Selbsttest (siehe [Spanning Tree](#spanning-tree)) |
 | Routing | [`crates/jfn_sim/rip.rs`](crates/jfn_sim/rip.rs), [`cli/rip.rs`](crates/jfn_sim/cli/rip.rs), [`src/riptest.rs`](src/riptest.rs), [`lib/netpkt/rip.rs`](../../lib/netpkt/rip.rs) | RIP als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit RIP](#routing-mit-rip)) |
 | NAT und Zugriffslisten | [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs), [`nat.rs`](crates/jfn_sim/nat.rs), [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs), [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs), [`lib/netpkt/nat.rs`](../../lib/netpkt/nat.rs), [`src/nattest.rs`](src/nattest.rs) | Zugriffslisten und Adressübersetzung der IOS-artigen Geräte, ihre Befehle, das Umschreiben der Pakete mit ihren Prüfsummen (Library), ihr Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
@@ -384,6 +406,8 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Gruppen und Hintergrundbild | [`crates/jfn_model/group.rs`](crates/jfn_model/group.rs), [`background.rs`](crates/jfn_model/background.rs), [`src/workspace/canvas/groups.rs`](src/workspace/canvas/groups.rs), [`backdrop.rs`](src/workspace/canvas/backdrop.rs), [`src/workspace/inspector/group.rs`](src/workspace/inspector/group.rs), [`src/doc/groups.rs`](src/doc/groups.rs), [`src/groupstest.rs`](src/groupstest.rs) | die Gruppen der logischen Zeichenfläche und ihr Hintergrundbild: Modell und Datei, die Szene mit Rahmen, Clustern und ihren Linien, das Zeichnen, der Inspektor, die Rückgängig-Schritte, ihr Selbsttest (siehe [Gruppen und Hintergrundbild](#gruppen-und-hintergrundbild)) |
 | Zurückspulen | [`crates/jfn_sim/keyframe.rs`](crates/jfn_sim/keyframe.rs), [`crates/jfn_sim/driver.rs`](crates/jfn_sim/driver.rs), [`src/doc/sim.rs`](src/doc/sim.rs), [`src/workspace/sim/mod.rs`](src/workspace/sim/mod.rs), [`src/keyframetest.rs`](src/keyframetest.rs) | Keyframes in einer Speichergrenze, die Eingaben dazwischen, die Wiederholung bis zu einem Zeitpunkt und ihre Prüfsummen, das Fortsetzen von dort (Simulator); der Zustand von damals im Fenster, Konsolen in der Vergangenheit, „Von hier fortsetzen“ mit Rückfrage; ihr Selbsttest (siehe [Zurückspulen](#zurückspulen)) |
 | SNMP | [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`snmpmib.rs`](crates/jfn_sim/snmpmib.rs), [`snmptrapd.rs`](crates/jfn_sim/snmptrapd.rs), [`snmptrace.rs`](crates/jfn_sim/snmptrace.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmptest.rs`](src/snmptest.rs), [`lib/netpkt/ber.rs`](../../lib/netpkt/ber.rs), [`lib/netpkt/snmp.rs`](../../lib/netpkt/snmp.rs), [`lib/netpkt/mib.rs`](../../lib/netpkt/mib.rs) | der Agent mit seiner Sicht auf das Gerät, der Trap-Empfänger, die Notizen, die IOS-artigen Befehle und die Werkzeuge der Shell, der MIB-Browser, der Selbsttest, BER, die Nachrichten von SNMPv1 und v2c und die kleine MIB (Library; siehe [SNMP](#snmp)) |
+| Shell | [`crates/jfn_sim/cli/sh.rs`](crates/jfn_sim/cli/sh.rs), [`shrun.rs`](crates/jfn_sim/cli/shrun.rs), [`coreutils.rs`](crates/jfn_sim/cli/coreutils.rs), [`man.rs`](crates/jfn_sim/cli/man.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`lib/base/pattern.rs`](../../lib/base/pattern.rs), [`src/shelltest.rs`](src/shelltest.rs) | die Shell einer Sitzung (Arbeitsverzeichnis, Variablen, Verlauf, Jobs), ihre Grammatik, die Werkzeuge, Hilfe und Handbuchseiten, Prozesse mit `jfs`, Ordner in `flash:`, Platzhalter und reguläre Ausdrücke, ihr Selbsttest (siehe [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)) |
+| Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 
 ### Gerätekatalog
 
@@ -1222,6 +1246,9 @@ und `clear spanning-tree detected-protocols` ein und zeigen ihn (siehe
 [Spanning Tree](#spanning-tree)).
 Dateien zeigen und ändern `ls`, `cat`, `cp`, `rm`, `mkdir`, `rmdir`, `touch` und `echo … >`,
 übertragen `tftp` und `curl ftp://` (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
+Die Shell hat ein Arbeitsverzeichnis, Pipes und Umleitungen für jeden Befehl, Platzhalter, die
+klassischen Werkzeuge und Prozesse (siehe
+[Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)).
 Mail schicken `mail` und `curl smtp://`, `curl pop3://` holt sie ab (siehe
 [Mail](#mail-smtp-und-pop3)); `echo "nameserver ADRESSE" > /etc/resolv.conf` stellt den
 Namensserver von Hand ein.
@@ -1544,6 +1571,38 @@ Antwortzeiten auf die Nanosekunde aus dem Fuel, Timer, UDP, TCP, HTTP, DNS, Disk
 Endlosschleife, Grenzen, Fehler, `script`, `top`, Determinismus, ein neuer Quelltext, der Disk,
 Zahlen und Fehler behält, Umbenennen im Lauf) und im Golden-Szenario oben.
 
+**Module aus den Dateien des Geräts** (SK7): `let util = import("/home/user/lib/util.jfs")`
+liest eine Datei des Geräts (die Dateien des Reiters Dateien; ein relativer Pfad gilt ab der
+Datei, die importiert, im Quelltext des Dienstes ab `/root` wie in der Shell, in einem Prozess
+`jfs DATEI` ab dem Ordner von DATEI) und gibt ihre
+obersten `fn`s und `let`s als Map; Namen mit `_` bleiben im Modul. Jedes Modul läuft einmal je
+Start des Dienstes, im Rückruf, der es zuerst importiert, mit dessen Rechenzeit; das Lesen
+kostet die Zeit der Disk des Geräts (`"disk": {...}`), in der das Programm wartet. Fehler eines
+Moduls nennen seine Datei: `ScriptErr::file`, die Statuszeile („… in /home/user/lib/util.jfs,
+Zeile 7, Spalte 12: …“), `script errors`, die Zeile im Log und der Text der Notiz; eine fehlende
+Datei, ein Zyklus und ein Modul, das sich nicht übersetzen lässt, sind fangbare Fehler.
+
+**Der Debugger eines Skripts** (die Stellen, an die die IDE andockt; noch ohne Oberfläche):
+`Action::ScriptDebug { dev, svc, op }` mit `DebugOp::Pause` (anhalten an der nächsten
+Anweisung, im laufenden Rückruf oder im nächsten), `Continue`, `Step(Into | Over | Out)`,
+`Break { file, line, cond }` (`file` leer: der Quelltext des Dienstes, sonst der Pfad eines
+importierten Moduls; `cond` ein Ausdruck in jfs), `Unbreak` und `ClearBreaks`. Haltepunkte gehören
+zum Dienst und gelten für jeden Start. `ScriptService::paused` sagt, wo der Rückruf hält,
+`debug_vm` gibt die VM für Aufrufliste, Variablen und Werte, `debug_eval` wertet einen Ausdruck
+auf einer Kopie der VM aus, `ScriptView::paused` und die Statuszeile („angehalten in Zeile 3,
+Spalte 3“) zeigen es. Angehalten wird in virtueller Zeit: die Simulation läuft weiter, die CPU
+des Skripts ist frei (keine Rechenzeit), Ereignisse warten in der Warteschlange wie hinter einer
+belegten CPU (ist sie voll, gehen Datagramme verloren und Anfragen bekommen 503), TCP-Daten
+bleiben im Socket, fällige Timer stehen an und kommen verspätet (`every` überspringt verpasste
+Runden), was der Rückruf vor dem Halt nach außen tat, geschieht zu seiner Zeit. Weiter geht es
+im Augenblick von `Continue` oder `Step`: dort beginnt die restliche Rechenzeit des Rückrufs.
+Stoppen, Strom aus und ein neuer Quelltext beenden einen Halt mit dem Programm. Geprüft wird das
+in der Selbsttest-Gruppe `scriptmod` ([`src/scriptmodtest.rs`](src/scriptmodtest.rs): Module
+mit absolutem und relativem Pfad, die Zeit der Disk, eine fehlende Datei, ein Zyklus, ein Fehler
+im Modul in Fehler, Log und Status, ein angehaltenes Skript mit verspäteten Timer-Runden, ein
+Schritt und ein Ausdruck im Halt, ein Haltepunkt mit Bedingung, Ablehnungen, Determinismus
+zweimal und mit einem Klon im Halt).
+
 ### Skript-Editor
 
 Die Skripte eines Hosts bearbeitet der Reiter **Skripte** seines Gerätefensters (Kontextmenü
@@ -1570,6 +1629,23 @@ eines Hosts › „Skripte …“; [`devwin/scripts.rs`](src/workspace/devwin/sc
   den Wechsel zu einem anderen Skript und das Schließen des Fensters übersteht, bis er
   übernommen oder verworfen wird oder ein anderes Projekt kommt; ein unveränderter Entwurf
   folgt dem Projekt.
+- **Sprachdienste (SK6):** der Editor kennt die Sprache ([`devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs)
+  auf `script::ls` der Library). Beim Tippen eines Worts, nach einem Punkt und mit
+  Strg+Leertaste öffnet sich die Vervollständigung: die Namen im Gültigkeitsbereich, die Namen
+  des Simulators (`log`, `now`, `rand`, `config`, `timer`, `net`, `dns`, `http`, `disk`,
+  `metrics` mit ihren Funktionen) mit einer kurzen Beschreibung, die Standardbibliothek und die
+  Methoden von Texten, Listen, Maps und Bytes; Tab oder Eingabe setzt ein (ein
+  Rückgängig-Schritt). Der Zeiger auf einem Namen zeigt Art, Signatur und Doku-Kommentar (`///`
+  über einem `fn` oder `let`), in einem Aufruf zeigt die Signaturhilfe den Parameter an der
+  Schreibmarke. F12 oder Strg+Klick springen zur Deklaration in der Datei, F2 oder „Name
+  umbenennen“ benennt jede Stelle eines Namens auf einmal um (ein Flyout fragt nach dem neuen,
+  eine Ablehnung – Schlüsselwort, ungültiger oder schon vergebener Name, Syntaxfehler – steht
+  darin), Umschalt+Alt+F oder „Formatieren“ setzt das Skript neu (Einrückung, Leerzeichen, eine
+  Anweisung je Zeile; mit Syntaxfehlern abgelehnt) – beides ein Rückgängig-Schritt des
+  Entwurfs. Blöcke, mehrzeilige Kommentare und Listen lassen sich in der Leiste falten. Neben
+  dem Editor steht, wenn der Reiter breit genug ist, die Gliederung („Gliederung“ blendet sie
+  aus): die Funktionen (innere eingerückt) und die globalen Variablen, ein Klick setzt die
+  Schreibmarke auf den Namen. Die Spalte für Haltepunkte bleibt aus, bis es einen Debugger gibt.
 - **Übernehmen** (Strg+S im Editor): ein Quelltext, der sich übersetzen lässt, geht als ein
   Rückgängig-Schritt ins Projekt (die `source` der Dienstdefinition, als Liste von Zeilen oder
   als Text, wie sie war) und in das laufende Skript: es startet mit dem neuen Programm, Disk,
@@ -2393,7 +2469,8 @@ ein Rückgängig-Schritt; Rückgängig und Wiederholen ändern die Dateien auch 
 (`capacity_of`: 256 MiB beim Router, 128 MiB beim Switch, 512 GiB beim PC, 2 TiB beim Server …);
 was nicht mehr passt, wird ganz abgelehnt.
 
-- **IOS-artige Geräte:** `flash:` mit flachen Namen und dem Systemabbild, das `show version`
+- **IOS-artige Geräte:** `flash:` mit Ordnern (seit V1, siehe
+  [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)) und dem Systemabbild, das `show version`
   nennt (`jf-r4.bin` mit 40 MiB beim JF-R4: es belegt Platz, hat aber keinen Inhalt und lässt
   sich weder löschen noch exportieren), und `nvram:startup-config`, das die Startkonfiguration
   selbst ist und keine Datei daneben.
@@ -2465,6 +2542,107 @@ Geprüft wird in der Selbsttest-Gruppe `files` ([`src/filestest.rs`](src/fileste
 und FTP Byte für Byte in den coretest-Gruppen `tftp` und `ftp`, dazu das Szenario `backup.scn`
 und die Fensterskripte `files_window.uis`, `files_services.uis`, `files_console.uis` und
 `files_shots.uis`.
+
+### Die Shell: Ordner, Werkzeuge, Prozesse
+
+Die Shell der Hosts und Server (`jfn-sh`, [`cli/sh.rs`](crates/jfn_sim/cli/sh.rs),
+[`cli/shrun.rs`](crates/jfn_sim/cli/shrun.rs), [`cli/coreutils.rs`](crates/jfn_sim/cli/coreutils.rs))
+fühlt sich an wie die eines kleinen Linux-PCs. Alles, was zu einer Sitzung gehört –
+Arbeitsverzeichnis, Variablen, Verlauf, Jobs –, steht zusammen in `CliDev::sh`; ein Gerät, das
+ausgeschaltet wird, verliert es samt dem Befehl im Vordergrund und beginnt danach mit einer
+frischen Shell.
+
+**Ordner.** Jede Sitzung beginnt in `/root` (`~`, `$HOME`); der Prompt zeigt das Verzeichnis wie
+die Vorgabe von bash: `root@PC1:~# `, `root@PC1:~/app# `, `root@PC1:/srv/ftp# `. `cd` geht ohne
+Argument nach Hause, mit `-` zurück (und zeigt das Ziel), nimmt `..`, `~`, relative und absolute
+Pfade; Fehler sehen aus wie bei bash (`jfn-sh: cd: x: No such file or directory`, `… Not a
+directory`, `too many arguments`, `OLDPWD not set`). `pwd`, `$PWD` und `$OLDPWD` stimmen. Jeder
+Befehl mit Pfaden nimmt relative (auch `ls`, `cat`, `cp`, `rm`, `mkdir`, `touch`, `tftp -l`,
+`curl -o` und `-T`), die Meldungen nennen den Pfad wie getippt.
+
+**Die Grammatik** gilt für jeden Befehl:
+
+- Listen `;`, `&&`, `||` und `&` (im Hintergrund), Pipelines `|`, `!` vor einer Pipeline;
+- Umleitungen `>`, `>>`, `<`, `2>`, `2>>`, `2>&1`, `1>&2`, `&>`, `&>>` und `/dev/null`; die
+  Reihenfolge zählt wie bei bash (`> f 2>&1` gegen `2>&1 > f`). Eine Datei, die sich nicht
+  schreiben lässt, lehnt die Shell vor dem Befehl ab (`jfn-sh: /x/y: No such file or
+  directory`); geschrieben wird, wenn der Befehl endet – ein Schritt des Projekts wie jede
+  geänderte Datei, `/etc/resolv.conf` stellt wie bisher den Resolver ein;
+- Wörter: `'…'` wörtlich, `"…"` mit `$`-Ersetzung und `\` vor `$ " \`, `\` außerhalb von
+  Anführungszeichen, `#` am Wortanfang beginnt einen Kommentar;
+- Variablen: `NAME=WERT`, `NAME=WERT befehl` (nur für diesen Befehl), `$NAME`, `${NAME}`, `$?`,
+  `$$` (100, die Shell), `$!`, `$0`, `$#`, `~` und `~root`; unquotierte Ersetzungen werden an
+  Leerraum geteilt;
+- Platzhalter `*`, `?` und `[…]` (mit `!`/`^` und Klassen) über die Dateien des Geräts,
+  Komponente für Komponente, Dateien mit Punkt nur mit Punkt im Muster, sortiert nach Bytes wie
+  bash mit `LC_COLLATE=C`; ohne Treffer bleibt das Wort stehen;
+- `!!`, `!N` und `!-N` aus dem Verlauf (die Zeile wird gezeigt), `history [N] | -c`;
+- Exit-Codes wie bei den Vorbildern: 0, 1 bei einem Fehler, 2 bei falschem Aufruf, 127 für einen
+  unbekannten Befehl, `grep` 1 ohne Treffer, `ping` 1 ohne Antwort und 2 bei einem unbekannten
+  Namen, `curl` seine Codes, 130 nach Strg+C, 128 + Signal nach `kill`.
+
+Nicht dabei: Unterschalen `( )`, `$( )` und Backticks, Arithmetik, Funktionen, `if`, `for` und
+`while` – diese Zeichen sind gewöhnliche (`ss`-Filter mit Klammern gehen deshalb wie bisher).
+Pipes sammeln: die rechte Seite bekommt die Ausgabe der linken, wenn diese endet (ein `ping` links
+liefert also am Ende); ein Befehl, der über die Zeit läuft (`ping`, `curl`, `nc`, `dig`,
+`traceroute`, `tftp`, `snmpwalk`, `telnet`, `sleep`, `jfs` …), hält die Zeile an seinem Platz.
+Strg+C beendet ihn; der Rest seiner Pipeline filtert noch, was gesammelt war (`ping x | grep ttl`
+zeigt die Antworten), der Rest der Zeile entfällt, `$?` ist 130. Fehlermeldungen von `ls`, `cat`,
+`rm`, der Netzwerkprogramme bei ihrem Start, der Skripte und der Shell gehen nach stderr; was ein
+Programm später während seines Laufs meldet (eine Zeile von `ping`), steht in seiner Ausgabe.
+
+**Die Werkzeuge** verhalten sich, wo man es sieht, wie GNU coreutils, grep und findutils (die
+gebräuchlichen Optionen, Exit-Codes, die Form der Meldungen): `mv` (`-n`, in Ordner, Ordner mit
+Inhalt), `head` und `tail` (`-n N`, `-N`, `-n -N`, `-n +N`, `-c`), `grep` (`-i -v -n -c -l -r -E -F
+-w -x -o -q -H -h -e`, `egrep`), `find` (`-name`, `-iname`, `-type f|d`, `-maxdepth`,
+`-mindepth`; in Namensfolge, Dateien mit Punkt eingeschlossen), `wc` (`-l -w -c -m` mit den
+Spaltenbreiten von GNU), `sort` (`-r -n -u -f -k -t`, nach Bytes), `uniq` (`-c -d -u -i`), `cut`
+(`-d -f -c -s`), `tree` (`-a -d -L`), `du` (`-s -h -a -c`), `df` (`-h`: die Kapazität des
+Gerätemodells), `less` und `more` (die Konsole blättert mit --More--), `file`, `stat`,
+`basename`, `dirname`, `date` (die Uhr des Geräts in virtueller Zeit, `+FORMAT`), `sleep`, `seq`,
+`tee`, `test` / `[`, `xargs`, `env`, `export`, `unset`, `which`, `type`, `help` und `man`.
+`ls` zeigt Dateien mit Punkt nur mit `-a`/`-A` und schreibt in eine Pipe einen Namen je Zeile.
+`grep` versteht reguläre Ausdrücke nach POSIX ohne Rückverweise (`base::pattern`, eine Pike-VM
+ohne exponentielle Fälle): `. [abc] [^a-z] [[:digit:]] ^ $ *`, als BRE `\( \) \| \{m,n\} \+ \?`,
+mit `-E` dieselben ohne Backslash, dazu `\w \W \s \S \< \> \b \B`; die Fehlermeldungen lauten wie
+bei GNU grep. Lesen ohne Datei heißt: aus der Pipe oder von `<` – die Konsole ist kein Terminal,
+aus dem ein Programm lesen könnte. `help` listet alle Befehle mit einer Zeile, `man BEFEHL` zeigt
+eine kurze Seite (NAME, AUFRUF, BESCHREIBUNG, OPTIONEN, WO), `man sh` die Shell selbst, `BEFEHL
+--help` den Aufruf; diese Texte sind eigene deutsche Worte ([`cli/man.rs`](crates/jfn_sim/cli/man.rs)),
+`which` und `type` nennen Pfade wie `/usr/bin/grep` (die Shell kennt sie, im Dateibaum stehen
+sie nicht).
+
+**Tab** ergänzt Befehlswörter (die Liste von `linux.rs`), die Objekte von `ip` und sonst Pfade
+relativ zum Arbeitsverzeichnis (auch `~/`, `/`, `..`): ein Ordner bekommt ein `/`, eine Datei ein
+Leerzeichen, mehrere Treffer erst ihren gemeinsamen Anfang und mit dem nächsten Tab die Liste;
+Dateien mit Punkt nur, wenn der Anfang einen Punkt hat, Leerzeichen in Namen mit `\`.
+
+**Prozesse.** `jfs DATEI [ARGUMENTE]` startet ein Skript aus den Dateien des Geräts als Prozess
+im Terminal ([`cli/shrun.rs`](crates/jfn_sim/cli/shrun.rs) `JfsProc`): derselbe `ScriptService`
+mit demselben Host wie ein Dienst (net, http, dns, timer, disk, metrics, `log` ins Journal des
+Geräts), `print` schreibt ins Terminal (und in Pipes und Umleitungen), `config.args` hält die
+Argumente, `config.file` den Pfad; `import("lib/util.jfs")` gilt ab dem Ordner der Datei
+(`ScriptService::new_file`). Das Programm endet, wenn nichts mehr zu tun ist (kein Timer,
+Socket, Server, keine offene Anfrage; Status 0), nach einem Fehler (`DATEI:ZEILE:SPALTE: Fehler:
+…` auf stderr, Status 1) oder mit Strg+C (130); ein Übersetzungsfehler meldet sich wie beim Runner
+`jfs`. `BEFEHL &` läuft im Hintergrund: sofort `[N] PID`, die Ausgabe kommt ins Terminal, wann
+immer sie entsteht, und vor dem nächsten Prompt `[N]+  Done                    BEFEHL` (`Exit N`,
+`Terminated`, `Killed`) wie bei bash. `jobs [-l] [-p]` zeigt die Jobs, `fg [%N]` und `wait`
+warten auf einen (Strg+C beendet ihn), `kill [-SIGNAL] PID|%N` beendet ihn (TERM, KILL, INT, HUP; `kill -l`),
+`sleep` läuft als Job über die virtuelle Zeit. `ps` zeigt init (1), die Shell (100), die
+laufenden Dienste mit 100 + ihrer Nummer – dieselben PIDs wie `top` und `ss -p` – mit ihrer
+Rechenzeit und die Jobs; ein Job ohne eigenen Dienst bekommt eine Nummer aus demselben Vorrat.
+Dienste beendet `kill` nicht (`Operation not permitted`), sie haben ihre eigenen Befehle. Die
+Jobs gehören zum Zustand des Geräts (Keyframes zählen sie), laufen deterministisch und enden mit
+dem Strom.
+
+**IOS-artig** haben `flash:` jetzt Ordner: `mkdir`, `rmdir`, `rename QUELLE ZIEL` (auch in einen
+Ordner), `cd [ORDNER|..]` und `pwd` (`flash:/sicherung/`) mit einem Arbeitsverzeichnis je
+Sitzung; `dir` ohne Argument zeigt dieses (Ordner als `drw-`), bloße Namen in `copy`, `delete`,
+`more`, `dir` und in den Fragen von `copy` gelten darin, `flash:NAME` vom Anfang von `flash:`.
+Die Zeilen von `mkdir` und `rmdir` sind eigene Worte, die `%Error`-Zeilen folgen dem Vorbild.
+Ordner in `flash:` stehen im Projekt wie die der Hosts (`{"path": "flash:/sicherung", "dir":
+true}`).
 
 ### Logins, Telnet und AAA mit RADIUS
 
@@ -3020,8 +3198,9 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; Telnet-Server auf den vty-Leitungen) |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; der Telnet-Server auf den vty-Leitungen folgt mit X1e in Phase 6) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
+| 6 Virtueller Arbeitsplatz | L7 Fenster in einer Fläche, Taskleiste und Vollbild (Library) ✓ · SK6 Sprachdienste für jfs und IDE-Funktionen des Code-Editors ✓ · SK7 Module, Debug-Schnittstelle und Tests für jfs ✓ · V1 Shell mit Ordnern, klassischen Werkzeugen und Prozessen ✓ · X1e mehrere Befehlszeilen-Sitzungen je Gerät, Telnet-Server auf den vty-Leitungen · V2 Mini-Desktop: Programme in Fenstern, Taskleiste, Startmenü, Dateimanager, Systemmonitor · IDE1 IDE für jfs statt des Reiters Skripte: Explorer, Tabs, Debugger, Testlauf · A2 Software-Architektur: Dienste als Units, Bereitstellen auf Gruppen von Hosts, Lasttests, Beispiel-Labor |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,
 Banner und Versionsausgaben der IOS-artigen und der Linux-artigen Befehlszeile schreiben wir

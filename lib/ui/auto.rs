@@ -55,11 +55,15 @@
 //   quit
 //   system focus in|out | suspend | resume | session-end | settings theme|locale|contrast|fonts|N
 //                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...)
+//   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
+//                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
 // Windows (ID = the app's window id, 0 / main = the main window):
 //   window ID|main|any            selectors only look into that window (default any)
-//   expect window ID open|closed|visible|active|modal|keys   expect window ID rect X Y W H
+//   expect window ID open|closed|visible|active|modal|keys|fullscreen|windowed
+//                                 expect window ID rect X Y W H
 //                                 (keys: the window keys go to now -- a tool window borrows them
-//                                 from its owner after F6 / Ctrl+F6 or a click on a widget)
+//                                 from its owner after F6 / Ctrl+F6 or a click on a widget;
+//                                 fullscreen / windowed: window_fullscreen's state, L7)
 //   close window ID   movewin ID X Y   resizewin ID W H   activate ID
 //                                 (movewin: the user's drag, snapped like window_snap says)
 //   scale P [window ID]           dpi of the main window (default) or of one window
@@ -1173,9 +1177,29 @@ impl Ui {
     // inject(type, btn, x, y, data): queue one event (current mods) and process it; keys
     // and text go to the keyboard window, pointer events to the script's window
     // system focus in | out, suspend, resume, session-end, settings theme | locale | contrast |
-    // fonts | N: the lifecycle events of the platform (UIC_ACTIVE, UIC_SUSPEND, ...)
+    // fonts | N: the lifecycle events of the platform (UIC_ACTIVE, UIC_SUSPEND, ...);
+    // fullscreen on | off [ID | main]: the platform changed the window's full screen (L7)
     fn sc_system(&mut self, app: &mut dyn App, a: &[u8]) {
         let w = |n: &str| word_eq(a, n).is_some();
+        if w("fullscreen") {
+            let r = next_word(a);
+            let on = word_eq(r, "on").is_some();
+            if !on && word_eq(r, "off").is_none() {
+                self.fail(b"system fullscreen: on or off");
+                return;
+            }
+            let rest = next_word(r);
+            let i = if skip_ws(rest).is_empty() { 0 } else { self.window_arg(rest).0 };
+            if i < 0 {
+                self.fail(b"no such window");
+                return;
+            }
+            if self.m.win.recs[i as usize].fs != on {
+                self.uiw_fs_changed(i as u32, on);
+            }
+            self.run_passes(app);
+            return;
+        }
         let (typ, data) = if w("focus") {
             let r = next_word(a);
             (if word_eq(r, "out").is_some() { plat::E_FOCUS_OUT } else { plat::E_FOCUS_IN }, 0)
@@ -1214,7 +1238,7 @@ impl Ui {
             self.run_passes(app);
             return;
         } else {
-            self.fail(b"system: focus in|out, suspend, resume, session-end, settings WHAT, hotkey ID or pick RRGGBB|cancel");
+            self.fail(b"system: focus in|out, suspend, resume, session-end, settings WHAT, hotkey ID, pick RRGGBB|cancel or fullscreen on|off");
             return;
         };
         self.inject(app, typ, 0, 0, 0, data);
@@ -1915,11 +1939,12 @@ impl Ui {
         }
     }
 
-    // expect_window(p): "ID open|closed|visible|active|modal|keys" or "ID rect X Y W H"
+    // expect_window(p): "ID open|closed|visible|active|modal|keys|fullscreen|windowed" or "ID
+    // rect X Y W H"
     fn expect_window(&mut self, p: &[u8]) {
         let (i, r) = self.window_arg(p);
         let cond = skip_ws(r);
-        let mut st = 0u32; // bit 0 visible, 1 active, 2 modal, 3 gets the keys (kbnav.rs)
+        let mut st = 0u32; // bit 0 visible, 1 active, 2 modal, 3 gets the keys (kbnav.rs), 4 full screen
         if i >= 0 && self.uiw_drawable(i as u32) {
             st |= 1;
             if i as u32 == self.m.win.active {
@@ -1931,9 +1956,20 @@ impl Ui {
             if i as u32 == self.uiw_keys_window() {
                 st |= 8;
             }
+            if self.m.win.recs[i as usize].fs {
+                st |= 16;
+            }
         }
-        const STATES: [(&str, u32, bool); 6] =
-            [("open", 1, true), ("closed", 1, false), ("visible", 1, true), ("active", 2, true), ("modal", 4, true), ("keys", 8, true)];
+        const STATES: [(&str, u32, bool); 8] = [
+            ("open", 1, true),
+            ("closed", 1, false),
+            ("visible", 1, true),
+            ("active", 2, true),
+            ("modal", 4, true),
+            ("keys", 8, true),
+            ("fullscreen", 16, true),
+            ("windowed", 16, false),
+        ];
         for (n, mask, want) in STATES {
             if word_eq(cond, n).is_some() {
                 let set = st & mask != 0;

@@ -42,7 +42,11 @@
 //                             on the console: OsApi::print writes to it, OsApi::exit ends the
 //                             program, typed lines come as SvcEvent::Console; such services are
 //                             not in services(); Service::metrics_at gives numbers that depend
-//                             on the time (windows of the HTTP services)
+//                             on the time (windows of the HTTP services); print_err is its
+//                             stderr; a program of a background job writes where the job's
+//                             output goes (cli/shrun.rs)
+//   Os::take_id               a service id nobody gets: the PID of a background job that is no
+//                             service (cli/shrun.rs; services show as 100 + id)
 //   OsApi::halt / svc_name    a service ends itself (a script after an error: scriptsvc.rs);
 //                             its name on the device
 //   Engine::rename_service    Action::RenameService: a service goes on under another name
@@ -1569,9 +1573,11 @@ impl OsApi<'_> {
 // ---------------------------------------------------------------- console programs (cli/tools.rs)
 
 impl OsApi<'_> {
-    /// writes to the device's console (a program the shell started)
+    /// writes to the device's console (a program the shell started; its job's pipe or
+    /// redirection may take it: cli/shrun.rs)
     pub fn print(&mut self, text: &str) {
-        self.eng.out(self.ni, text);
+        let (ni, id) = (self.ni, self.id);
+        self.eng.prog_print(ni, id, text, false);
     }
     /// the program ends with an exit status: its service goes and the console takes lines
     /// again (at the same virtual time, after this call)
@@ -1580,7 +1586,7 @@ impl OsApi<'_> {
         if let Some(s) = self.eng.os_mut(ni).and_then(|os| os.svcs.iter_mut().find(|s| s.id == id)) {
             s.exit = Some(code);
         }
-        self.eng.cli_wake_at(ni, now);
+        self.eng.prog_wake(ni, id, now);
     }
     /// the service's id (ss -p shows it as the process id)
     pub fn svc_id(&self) -> u32 {
@@ -1642,5 +1648,24 @@ impl Engine {
     /// the console programs' and services' ids, names and kinds (top, ss -p)
     pub fn service_ids(&self, dev: u32) -> Vec<(u32, String, &'static str, bool)> {
         self.node_index(dev).and_then(|ni| self.os(ni)).map(|o| o.svcs.iter().map(|s| (s.id, s.name.clone(), s.kind, s.running)).collect()).unwrap_or_default()
+    }
+}
+
+// ---------------------------------------------------------------- the shell's processes (cli/shrun.rs)
+
+impl Os {
+    /// a service id that no service gets (the PID of a background job that runs no service)
+    pub(crate) fn take_id(&mut self) -> u32 {
+        let id = self.next_svc;
+        self.next_svc += 1;
+        id
+    }
+}
+
+impl OsApi<'_> {
+    /// writes to the console's stderr (a program the shell started: 2> takes it)
+    pub fn print_err(&mut self, text: &str) {
+        let (ni, id) = (self.ni, self.id);
+        self.eng.prog_print(ni, id, text, true);
     }
 }

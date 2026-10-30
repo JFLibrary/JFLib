@@ -1,0 +1,163 @@
+#!args --verify-dirty
+# the code editor's gutter for a debugger and folding (SK6, cmd 906: CE_BREAKPOINTS and the
+# folding ranges of lib/script on the JFS sample): a click in the breakpoints' column is
+# CodeEv::Breakpoint (the app toggles its set), the disabled and conditional looks (cmd 907 /
+# 908), the execution line (cmd 909); they follow Enter and undo.  Folding: a click on a
+# chevron, the caret steps over folded lines, find steps over their matches, the "..." box
+# unfolds, Ctrl+Shift+[ / ] at the caret, an edit inside (Alle ersetzen) unfolds, fold all /
+# unfold all (cmd 910 / 911); 80 000 lines with 10 000 folded functions stay fast (bench).
+# Shots light / dark at 100 and 150 %, high contrast.  Lines of 20 px from y 109; the
+# breakpoints at x 13..33, the chevrons at x 67..82, the text from x 88 (cells of 8 px)
+size 1000 680
+theme light
+click tab:"Code"
+click tab:"JFS"
+cmd 906
+wait 300
+# ---- breakpoints: the app's set, toggled by clicks in the column
+click 23,219
+expect text:"ev: bp 6" exists
+expect text:"bp: 6" exists
+wait 1000
+click 23,359
+expect text:"bp: 6,13" exists
+wait 1000
+click 23,219
+expect text:"bp: 13" exists
+expect text:"pos: 1:1" exists
+cmd 907 13
+expect text:"bp: 13d" exists
+cmd 908 6
+expect text:"bp: 6c,13d" exists
+wait 1000
+click 23,149
+expect text:"bp: 3,6c,13d" exists
+cmd 909 14
+expect text:"exec: 14" exists
+shot build/editortest/code_breakpoints_light.png
+theme dark
+shot build/editortest/code_breakpoints_dark.png
+theme light
+scale 150
+shot build/editortest/code_breakpoints_150.png
+scale 100
+click "Hoher Kontrast"
+shot build/editortest/code_breakpoints_hc.png
+click "Hoher Kontrast"
+# they follow the edits (Enter above them) and undo
+focus #3000
+key ctrl+home
+key enter
+expect text:"bp: 4,7c,14d" exists
+expect text:"exec: 15" exists
+key ctrl+z
+expect text:"bp: 3,6c,13d" exists
+expect text:"exec: 14" exists
+cmd 909 0
+expect text:"exec: -" exists
+# ---- folding: the chevron of line 12 (fn handle) folds 13 .. 19
+wait 1000
+click 74,339
+expect text:"hidden: 7" exists
+shot build/editortest/code_folded_light.png
+theme dark
+shot build/editortest/code_folded_dark.png
+theme light
+# the caret steps over the folded lines (Down, Up, Right at the end, Left at the start)
+focus #3000
+key ctrl+home
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+expect text:"pos: 12:1" exists
+key down
+expect text:"pos: 20:1" exists
+key up
+expect text:"pos: 12:1" exists
+key end
+key right
+expect text:"pos: 20:1" exists
+key left
+expect text:"pos: 12:17" exists
+# find steps over the matches in the folded lines
+key ctrl+f
+type "hits"
+expect text:"find: 5/5" exists
+expect text:"pos: 23:9" exists
+key enter
+expect text:"find: 1/5" exists
+key enter
+expect text:"find: 5/5" exists
+key shift+enter
+expect text:"find: 1/5" exists
+key esc
+expect text:"hidden: 7" exists
+# the "..." box after the folded line unfolds
+wait 1000
+click 230,339
+expect text:"hidden: 0" exists
+# Ctrl+Shift+[ folds the innermost range at the caret, Ctrl+Shift+] unfolds
+focus #3000
+key ctrl+home
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+key down
+expect text:"pos: 15:1" exists
+key ctrl+shift+[
+expect text:"hidden: 1" exists
+expect text:"pos: 14:45" exists
+key ctrl+shift+]
+expect text:"hidden: 0" exists
+# an edit inside the folded lines unfolds them (Alle ersetzen, one undo step)
+wait 1000
+click 74,339
+expect text:"hidden: 7" exists
+expect text:"pos: 12:17" exists
+focus #3000
+key ctrl+h
+type "hits"
+key tab
+type "count"
+click "Alle ersetzen"
+expect text:"hidden: 0" exists
+focus #3000
+key ctrl+z
+# fold all, unfold all
+cmd 910
+expect text:"hidden: 10" exists
+cmd 911
+expect text:"hidden: 0" exists
+# ---- a long file: 10 000 functions (80 003 lines), folded: the view and the caret stay fast
+cmd 912 10000
+expect text:"lines: 80003" exists
+cmd 910
+expect text:"hidden: 50000" exists
+focus #3000
+key ctrl+home
+bench 20 key down 20000
+bench 20 key pgdn 20000
+key ctrl+end
+expect text:"pos: 80003:1" exists
+cmd 911
+expect text:"hidden: 0" exists
+bench 20 key pgup 20000
+expect_nowarn

@@ -1,11 +1,15 @@
 // files -- the files of a device at the command lines (the store: files.rs, jfn_model::files)
 //
-//   IOS-like   dir [flash:|nvram:|FILE], show flash:, more FILE, delete [/force] FILE (asks
+//   IOS-like   dir [flash:|nvram:|DIR|FILE], show flash:, more FILE, delete [/force] FILE (asks
 //              first), copy SRC DST with the questions for what is missing, ip ftp username /
-//              password (the FTP client's login; in the running configuration)
-//   Linux      ls [-l] [-a] [PATH ...], cat FILE (the files of the store after the ones of /etc),
-//              rm [-f] [-r] FILE ..., cp SRC DST, mkdir [-p] DIR ..., rmdir DIR ..., touch FILE,
-//              echo ... > FILE / >> FILE, tftp (busybox-like: -g / -p, -l, -r, -b, HOST [PORT])
+//              password (the FTP client's login; in the running configuration); cd [DIR], pwd,
+//              mkdir DIR, rmdir DIR, rename SRC DST: the directories of flash:, a working
+//              directory per session (CliDev::sh.cwd, flash:/ at the start) that bare names
+//              are relative to ("flash:NAME" and "flash:/NAME" start at the root)
+//   Linux      ls [-l] [-a] [PATH ...], rm [-f] [-r] FILE ..., cp SRC DST, mkdir [-p] DIR ...,
+//              rmdir DIR ..., touch FILE, tftp (busybox-like: -g / -p, -l, -r, -b, HOST [PORT]);
+//              cat, echo ... > FILE and the other tools are coreutils.rs and the shell's
+//              redirections (shrun.rs)
 //
 // copy takes running-config, startup-config (nvram:startup-config), flash:NAME (a bare NAME is in
 // flash:), tftp://HOST/NAME, ftp://[USER[:PASS]@]HOST/NAME and the bare "flash:", "tftp:" and
@@ -17,8 +21,9 @@
 // exists in flash: is replaced only after "y".  Transfers run as console programs (tftpc.rs, ftpc.rs);
 // Ctrl+Shift+6 ends them.
 //
-// Paths of the shell are relative to /root (the prompt's ~).  The messages follow coreutils and
-// bash; tftp's usage is our own text.
+// Paths of the shell are relative to the session's working directory (/root, the prompt's ~, at
+// the start: Engine::sh_abs).  The messages follow coreutils and bash; tftp's usage, the lines
+// of mkdir / rmdir on IOS-like devices are our own text.
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -95,7 +100,17 @@ pub(super) fn build_files(t: &mut Tree<K>, m: [ModeId; 3]) {
         t.add(md, "show flash:", "Files in the flash memory and the space left", Some(K::ShowFlash), 0);
         t.add(md, "more", "Show what a file holds", None, 0);
         t.add(md, "more WORD=file", "flash:NAME, nvram:startup-config or system:running-config", Some(K::More), 0);
+        t.add(md, "cd", "Change the working directory (alone: the root of flash:)", Some(K::Cd), 0);
+        t.add(md, "cd WORD=dir", "A directory of flash: (.. one up)", Some(K::Cd), 0);
+        t.add(md, "pwd", "Show the working directory", Some(K::Pwd), 0);
     }
+    t.add(prv, "mkdir", "Make a directory in flash:", None, 0);
+    t.add(prv, "mkdir WORD=dir", "The new directory", Some(K::Mkdir), 0);
+    t.add(prv, "rmdir", "Remove an empty directory of flash:", None, 0);
+    t.add(prv, "rmdir WORD=dir", "The directory", Some(K::Rmdir), 0);
+    t.add(prv, "rename", "Give a file or a directory of flash: another name", None, 0);
+    t.add(prv, "rename WORD=src", "The file or directory", None, 0);
+    t.add(prv, "rename WORD=src WORD=dst", "Its new name or place", Some(K::Rename), 0);
     t.add(prv, "delete", "Remove a file from flash", None, 0);
     t.add(prv, "delete WORD=file", "The file (flash:NAME)", Some(K::Delete), 0);
     t.add(prv, "delete /force", "Without asking first", None, 0);
@@ -209,11 +224,54 @@ impl Engine {
         s
     }
 
+    /// the working directory of an IOS-like console ("flash:/", "flash:/backups")
+    fn ios_cwd(&self, ni: usize) -> String {
+        self.sh(ni).map_or(String::from("flash:/"), |s| s.cwd.clone())
+    }
+
+    /// a path typed at an IOS-like console: "fs:..." as it is, a bare one in the working
+    /// directory
+    fn ios_path(&self, ni: usize, typed: &str) -> String {
+        if typed.contains(':') {
+            return String::from(typed);
+        }
+        let cwd = self.ios_cwd(ni);
+        if typed.starts_with('/') {
+            return format!("{}:{}", cwd.split_once(':').map_or("flash", |x| x.0), typed);
+        }
+        format!("{}/{}", cwd.trim_end_matches('/'), typed)
+    }
+
+    /// a name of flash: as Loc::Flash keeps it (below flash:/), a bare one in the working
+    /// directory
+    fn ios_join(&self, ni: usize, typed: &str, name: String) -> String {
+        if typed.contains(':') {
+            return name;
+        }
+        let cwd = self.ios_cwd(ni);
+        let inside = cwd.strip_prefix("flash:/").unwrap_or("");
+        let joined = if inside.is_empty() { name } else { format!("{}/{}", inside, name) };
+        match self.store(ni).and_then(|s| s.norm(&joined).ok()) {
+            Some(p) => String::from(p.strip_prefix("flash:/").unwrap_or(&p)),
+            None => joined,
+        }
+    }
+
+    /// a place of copy, bare names in the working directory
+    fn ios_loc(&self, ni: usize, w: &str) -> Result<Loc, String> {
+        match loc_of(w)? {
+            Loc::Flash(Some(n)) => Ok(Loc::Flash(Some(self.ios_join(ni, w, n)))),
+            l => Ok(l),
+        }
+    }
+
     /// the commands of files
     pub(crate) fn ios_files(&mut self, ni: usize, p: &Parsed<K>) -> Result<(), String> {
         match p.cmd {
+            K::Cd | K::Pwd | K::Mkdir | K::Rmdir | K::Rename => self.ios_dirs(ni, p),
             K::Dir => {
-                let what = p.text("file").map(String::from).unwrap_or_else(|| if p.has("nvram:") { String::from("nvram:") } else { String::from("flash:") });
+                let what = p.text("file").map(String::from).unwrap_or_else(|| if p.has("nvram:") { String::from("nvram:") } else if p.has("flash:") { String::from("flash:") } else { self.ios_cwd(ni) });
+                let what = self.ios_path(ni, &what);
                 let text = self.ios_dir(ni, &what);
                 if text.starts_with('%') {
                     return self.ios_err(ni, &text);
@@ -239,7 +297,7 @@ impl Engine {
             K::Delete => {
                 let f = String::from(p.text("file").unwrap_or(""));
                 let force = p.has("/force");
-                let name = match loc_of(&f) {
+                let name = match self.ios_loc(ni, &f) {
                     Ok(Loc::Flash(Some(n))) => n,
                     _ => return self.ios_err(ni, &format!("%Error deleting {} (Invalid argument)\n", f)),
                 };
@@ -264,11 +322,11 @@ impl Engine {
                 if ends.len() != 2 {
                     return self.ios_err(ni, "% Incomplete command.\n");
                 }
-                let src = match loc_of(&ends[0]) {
+                let src = match self.ios_loc(ni, &ends[0]) {
                     Ok(l) => l,
                     Err(e) => return self.ios_err(ni, &e),
                 };
-                let dst = match loc_of(&ends[1]) {
+                let dst = match self.ios_loc(ni, &ends[1]) {
                     Ok(l) => l,
                     Err(e) => return self.ios_err(ni, &e),
                 };
@@ -321,20 +379,20 @@ impl Engine {
         if !lw.starts_with("flash:") && lw.contains(':') {
             return format!("%Error opening {} (No such file or directory)\n", what);
         }
-        let list = match st.norm(what) {
-            Ok(p) if p == "flash:/" => st.list(&p).unwrap_or_default(),
+        let (list, dir) = match st.norm(what) {
+            Ok(p) if st.is_dir(&p) => (st.list(&p).unwrap_or_default(), p),
             Ok(p) => match st.stat(&p) {
-                Some(s) => alloc::vec![(String::from(st.name_of(&p)), s)],
+                Some(s) => (alloc::vec![(String::from(st.name_of(&p)), s)], st.parent(&p)),
                 None => return format!("%Error opening {} (No such file or directory)\n", what),
             },
             Err(_) => return format!("%Error opening {} (No such file or directory)\n", what),
         };
-        let mut s = String::from("Directory of flash:/\n\n");
+        let mut s = format!("Directory of {}{}\n\n", dir, if dir.ends_with('/') { "" } else { "/" });
         if list.is_empty() {
             s.push_str("No files in directory\n");
         }
         for (i, (name, f)) in list.iter().enumerate() {
-            s.push_str(&format!("{:>5}  -rw- {:>11}  {:<30}  {}\n", i + 1, f.size, ios_date(f.mtime), name));
+            s.push_str(&format!("{:>5}  {} {:>11}  {:<30}  {}\n", i + 1, if f.dir { "drw-" } else { "-rw-" }, if f.dir { 0 } else { f.size }, ios_date(f.mtime), name));
         }
         s.push_str(&format!("\n{} bytes total ({} bytes free)\n", st.capacity, st.free()));
         s
@@ -351,9 +409,90 @@ impl Engine {
         s
     }
 
+    /// cd, pwd, mkdir, rmdir, rename: the directories of flash:
+    fn ios_dirs(&mut self, ni: usize, p: &Parsed<K>) -> Result<(), String> {
+        let canon = |e: &Engine, w: &str| -> Result<String, String> {
+            let path = e.ios_path(ni, w);
+            match e.store(ni).map(|s| s.norm(&path)) {
+                Some(Ok(c)) => Ok(c),
+                _ => Err(format!("%Error: {} is no path of flash:\n", w)),
+            }
+        };
+        match p.cmd {
+            K::Pwd => {
+                let c = self.ios_cwd(ni);
+                self.out(ni, &format!("{}{}\n", c, if c.ends_with('/') { "" } else { "/" }));
+                Ok(())
+            }
+            K::Cd => {
+                let to = match p.text("dir") {
+                    None => String::from("flash:/"),
+                    Some(w) => match canon(self, w) {
+                        Ok(c) => c,
+                        Err(e) => return self.ios_err(ni, &e),
+                    },
+                };
+                if !to.starts_with("flash:") {
+                    return self.ios_err(ni, &format!("%Error: {} has no directories to go to\n", to));
+                }
+                match self.store(ni).and_then(|s| s.stat(&to)) {
+                    Some(s) if s.dir => {}
+                    Some(_) => return self.ios_err(ni, &format!("%Error changing directory to {} (Not a directory)\n", to)),
+                    None => return self.ios_err(ni, &format!("%Error changing directory to {} (No such file or directory)\n", to)),
+                }
+                if let Some(s) = self.sh_mut(ni) {
+                    s.cwd = to;
+                }
+                Ok(())
+            }
+            K::Mkdir | K::Rmdir => {
+                let w = String::from(p.text("dir").unwrap_or(""));
+                let c = match canon(self, &w) {
+                    Ok(c) => c,
+                    Err(e) => return self.ios_err(ni, &e),
+                };
+                if p.cmd == K::Mkdir {
+                    match self.file_mkdir(ni, &c, false) {
+                        Ok(_) => {
+                            self.out(ni, &format!("Directory {} made.\n", c));
+                            Ok(())
+                        }
+                        Err(e) => self.ios_err(ni, &format!("%Error creating dir {} ({})\n", c, e.ios_text())),
+                    }
+                } else {
+                    match self.file_rmdir(ni, &c) {
+                        Ok(_) => {
+                            self.out(ni, &format!("Directory {} removed.\n", c));
+                            Ok(())
+                        }
+                        Err(e) => self.ios_err(ni, &format!("%Error removing dir {} ({})\n", c, e.ios_text())),
+                    }
+                }
+            }
+            _ => {
+                let (a, b) = (String::from(p.text("src").unwrap_or("")), String::from(p.text("dst").unwrap_or("")));
+                let (from, to) = match (canon(self, &a), canon(self, &b)) {
+                    (Ok(x), Ok(y)) => (x, y),
+                    (Err(e), _) | (_, Err(e)) => return self.ios_err(ni, &e),
+                };
+                // into a directory under the same name
+                let to = if self.store(ni).is_some_and(|s| s.is_dir(&to)) {
+                    let name = self.store(ni).map(|s| String::from(s.name_of(&from))).unwrap_or_default();
+                    format!("{}/{}", to.trim_end_matches('/'), name)
+                } else {
+                    to
+                };
+                match self.file_rename(ni, &from, &to) {
+                    Ok(()) => Ok(()),
+                    Err(e) => self.ios_err(ni, &format!("%Error renaming {} ({})\n", from, if e == FsErr::BadName { "Invalid argument" } else { e.ios_text() })),
+                }
+            }
+        }
+    }
+
     /// "more FILE": a text file, the startup or the running configuration
     fn ios_more(&self, ni: usize, f: &str) -> Result<String, String> {
-        match loc_of(f) {
+        match self.ios_loc(ni, f) {
             Ok(Loc::Running) => Ok(self.ios_config(ni)),
             Ok(Loc::Startup) => Ok(self.cdev(ni).map(|c| c.cfg.startup.clone()).unwrap_or_default()),
             Ok(Loc::Flash(Some(n))) => {
@@ -397,6 +536,17 @@ impl Engine {
         }
     }
 
+    /// the default name of a copy's destination: the source's name without its directories
+    fn dst_default(&self, ni: usize, src: &Loc) -> String {
+        match src {
+            Loc::Running | Loc::Startup => self.config_name(ni),
+            _ => {
+                let n = self.src_name(ni, src);
+                String::from(n.rsplit('/').next().unwrap_or(&n))
+            }
+        }
+    }
+
     /// asks the next question of a dialog, or runs it when nothing is missing
     fn files_ask(&mut self, ni: usize, mut d: Dialog) {
         let last = self.cdev(ni).map(|c| c.files.last_host.clone()).unwrap_or_default();
@@ -417,13 +567,13 @@ impl Engine {
                 },
                 Step::DstFile => match &d.dst {
                     Loc::Server { file: None, .. } => {
-                        let def = match d.src {
-                            Loc::Running | Loc::Startup => self.config_name(ni),
-                            _ => self.src_name(ni, &d.src),
-                        };
+                        let def = self.dst_default(ni, &d.src);
                         break format!("File on the server [{}]? ", def);
                     }
-                    Loc::Flash(None) => break format!("Name in flash: [{}]? ", self.src_name(ni, &d.src)),
+                    Loc::Flash(None) => {
+                        let n = self.src_name(ni, &d.src);
+                        break format!("Name in flash: [{}]? ", n.rsplit('/').next().unwrap_or(&n));
+                    }
                     _ => d.step = Step::Into,
                 },
                 Step::Into => match &d.dst {
@@ -477,21 +627,28 @@ impl Engine {
                 if a.is_empty() {
                     return self.out(ni, "%Error: a file name is needed\n");
                 }
+                let joined = self.ios_join(ni, a, String::from(a.trim_start_matches("flash:").trim_start_matches('/')));
                 match &mut d.src {
                     Loc::Server { file, .. } => *file = Some(String::from(a)),
-                    Loc::Flash(n) => *n = Some(String::from(a.trim_start_matches("flash:").trim_start_matches('/'))),
+                    Loc::Flash(n) => *n = Some(joined),
                     _ => {}
                 }
             }
             Step::DstFile => {
-                let def = match d.src {
-                    Loc::Running | Loc::Startup => self.config_name(ni),
-                    _ => self.src_name(ni, &d.src),
+                let def = match (&d.src, &d.dst) {
+                    (_, Loc::Server { .. }) => self.dst_default(ni, &d.src),
+                    (Loc::Running | Loc::Startup, _) => self.config_name(ni),
+                    _ => {
+                        let n = self.src_name(ni, &d.src);
+                        String::from(n.rsplit('/').next().unwrap_or(&n))
+                    }
                 };
                 let name = pick(a, &def).unwrap_or(def);
+                // a name in flash: (also the default) lands in the working directory
+                let joined = self.ios_join(ni, &name, String::from(name.trim_start_matches("flash:").trim_start_matches('/')));
                 match &mut d.dst {
                     Loc::Server { file, .. } => *file = Some(name),
-                    Loc::Flash(n) => *n = Some(String::from(name.trim_start_matches("flash:").trim_start_matches('/'))),
+                    Loc::Flash(n) => *n = Some(joined),
                     _ => {}
                 }
             }
@@ -512,7 +669,7 @@ impl Engine {
             }
             Step::DeleteName => {
                 if !a.is_empty() {
-                    let n = String::from(a.trim_start_matches("flash:").trim_start_matches('/'));
+                    let n = self.ios_join(ni, a, String::from(a.trim_start_matches("flash:").trim_start_matches('/')));
                     d.src = Loc::Flash(Some(n));
                 }
                 d.step = Step::DeleteSure;
@@ -704,7 +861,7 @@ impl Engine {
     }
 
     /// the entries of a directory for ls (the made files of /etc included)
-    fn ls_entries(&self, ni: usize, p: &str) -> Result<Vec<(String, Stat)>, FsErr> {
+    pub(crate) fn ls_entries(&self, ni: usize, p: &str) -> Result<Vec<(String, Stat)>, FsErr> {
         let st = self.store(ni).ok_or(FsErr::NotFound)?;
         let mut v = st.list(p)?;
         if p == "/etc" {
@@ -718,7 +875,7 @@ impl Engine {
     }
 
     /// the files of /etc the shell makes (netsvc.rs)
-    fn cat_etc(&self, ni: usize, p: &str) -> Option<String> {
+    pub(crate) fn cat_etc(&self, ni: usize, p: &str) -> Option<String> {
         match p {
             "/etc/resolv.conf" => Some(self.resolv_text(ni)),
             "/etc/hosts" => Some(self.hosts_text(ni)),
@@ -730,6 +887,8 @@ impl Engine {
     pub(crate) fn sh_ls(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
         let mut long = false;
         let mut all = false;
+        // -A: the dot files without . and ..
+        let mut almost = false;
         let mut paths: Vec<&str> = Vec::new();
         for a in args {
             match *a {
@@ -737,7 +896,8 @@ impl Engine {
                     for c in s[1..].chars() {
                         match c {
                             'l' => long = true,
-                            'a' | 'A' => all = true,
+                            'a' => all = true,
+                            'A' => almost = true,
                             'h' | '1' => {}
                             o => return self.sh_err(ni, &format!("ls: invalid option -- '{}'\n", o)),
                         }
@@ -754,11 +914,12 @@ impl Engine {
         let mut err: Option<String> = None;
         let several = paths.len() > 1;
         for (k, path) in paths.iter().enumerate() {
-            let p = match st.norm(path) {
+            let p = match st.norm(&self.sh_abs(ni, path)) {
                 Ok(p) => p,
                 Err(e) => {
                     let m = format!("ls: cannot access '{}': {}\n", path, e.errno_text());
-                    out.push_str(&m);
+                    self.out(ni, &core::mem::take(&mut out));
+                    self.err_out(ni, &m);
                     err.get_or_insert(m);
                     continue;
                 }
@@ -766,7 +927,8 @@ impl Engine {
             let etc = self.cat_etc(ni, &p).map(|t| Stat { size: t.len() as u64, mtime: 0, dir: false, builtin: true });
             let Some(s) = st.stat(&p).or(etc) else {
                 let m = format!("ls: cannot access '{}': No such file or directory\n", path);
-                out.push_str(&m);
+                self.out(ni, &core::mem::take(&mut out));
+                self.err_out(ni, &m);
                 err.get_or_insert(m);
                 continue;
             };
@@ -781,6 +943,10 @@ impl Engine {
                 out.push_str(&format!("{}:\n", path));
             }
             let mut v = self.ls_entries(ni, &p).unwrap_or_default();
+            // names that start with a dot only with -a / -A
+            if !all && !almost {
+                v.retain(|(n, _)| !n.starts_with('.'));
+            }
             if all {
                 let dot = Stat { size: 0, mtime: 0, dir: true, builtin: true };
                 v.insert(0, (String::from(".."), dot));
@@ -793,8 +959,9 @@ impl Engine {
                     out.push_str(&Engine::ls_line(n, s));
                 }
             } else if !v.is_empty() {
+                // a line on the terminal, a name a line into a pipe or a file
                 let names: Vec<&str> = v.iter().map(|(n, _)| n.as_str()).collect();
-                out.push_str(&names.join("  "));
+                out.push_str(&names.join(if self.sh_stdout_term(ni) { "  " } else { "\n" }));
                 out.push('\n');
             }
         }
@@ -805,14 +972,6 @@ impl Engine {
         }
     }
 
-    /// cat of a file of the store (sh_cat asks after the files of /etc)
-    pub(crate) fn cat_file(&self, ni: usize, path: &str) -> Result<String, String> {
-        let st = self.store(ni).ok_or_else(|| format!("cat: {}: No such file or directory\n", path))?;
-        match st.read(path) {
-            Ok(b) => Ok(String::from_utf8_lossy(b).into_owned()),
-            Err(e) => Err(format!("cat: {}: {}\n", path, e.errno_text())),
-        }
-    }
 
     pub(crate) fn sh_rm(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
         let mut force = false;
@@ -838,12 +997,13 @@ impl Engine {
         }
         let mut err = None;
         for f in files {
-            match self.file_del(ni, f, rec) {
+            let abs = self.sh_abs(ni, f);
+            match self.file_del(ni, &abs, rec) {
                 Ok(_) => {}
                 Err(FsErr::NotFound) if force => {}
                 Err(e) => {
                     let m = format!("rm: cannot remove '{}': {}\n", f, if e == FsErr::ReadOnly { "Permission denied" } else { e.errno_text() });
-                    self.out(ni, &m);
+                    self.err_out(ni, &m);
                     err.get_or_insert(m);
                 }
             }
@@ -860,13 +1020,15 @@ impl Engine {
             return self.sh_err(ni, if ops.is_empty() { "cp: missing file operand\n" } else { "cp: missing destination file operand\n" });
         }
         let Some(st) = self.store(ni).cloned() else { return self.sh_err(ni, "cp: no file system\n") };
-        let (src, dst) = (ops[0], ops[ops.len() - 1]);
+        let (src_t, dst_t) = (ops[0], ops[ops.len() - 1]);
+        let (src_a, dst_a) = (self.sh_abs(ni, src_t), self.sh_abs(ni, dst_t));
+        let (src, dst) = (src_a.as_str(), dst_a.as_str());
         let data = match self.cat_etc(ni, &st.norm(src).unwrap_or_default()) {
             Some(t) => t.into_bytes(),
             None => match st.read(src) {
                 Ok(b) => Vec::from(b),
-                Err(FsErr::IsDir) => return self.sh_err(ni, &format!("cp: -r not specified; omitting directory '{}'\n", src)),
-                Err(e) => return self.sh_err(ni, &format!("cp: cannot stat '{}': {}\n", src, e.errno_text())),
+                Err(FsErr::IsDir) => return self.sh_err(ni, &format!("cp: -r not specified; omitting directory '{}'\n", src_t)),
+                Err(e) => return self.sh_err(ni, &format!("cp: cannot stat '{}': {}\n", src_t, e.errno_text())),
             },
         };
         let target = if st.is_dir(dst) {
@@ -877,7 +1039,7 @@ impl Engine {
         };
         match self.file_put(ni, &target, &data, false) {
             Ok(_) => Ok(()),
-            Err(e) => self.sh_err(ni, &format!("cp: cannot create regular file '{}': {}\n", dst, e.errno_text())),
+            Err(e) => self.sh_err(ni, &format!("cp: cannot create regular file '{}': {}\n", dst_t, e.errno_text())),
         }
     }
 
@@ -889,9 +1051,10 @@ impl Engine {
         }
         let mut err = None;
         for d in dirs {
-            if let Err(e) = self.file_mkdir(ni, d, parents) {
+            let abs = self.sh_abs(ni, d);
+            if let Err(e) = self.file_mkdir(ni, &abs, parents) {
                 let m = format!("mkdir: cannot create directory '{}': {}\n", d, e.errno_text());
-                self.out(ni, &m);
+                self.err_out(ni, &m);
                 err.get_or_insert(m);
             }
         }
@@ -908,9 +1071,10 @@ impl Engine {
         }
         let mut err = None;
         for d in dirs {
-            if let Err(e) = self.file_rmdir(ni, d) {
+            let abs = self.sh_abs(ni, d);
+            if let Err(e) = self.file_rmdir(ni, &abs) {
                 let m = format!("rmdir: failed to remove '{}': {}\n", d, e.errno_text());
-                self.out(ni, &m);
+                self.err_out(ni, &m);
                 err.get_or_insert(m);
             }
         }
@@ -922,58 +1086,16 @@ impl Engine {
 
     pub(crate) fn sh_touch(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
         for f in args.iter().filter(|a| !a.starts_with('-')) {
-            let have = self.store(ni).and_then(|s| s.read(f).ok().map(Vec::from));
+            let abs = self.sh_abs(ni, f);
+            let have = self.store(ni).and_then(|s| s.read(&abs).ok().map(Vec::from));
             let data = have.unwrap_or_default();
-            if let Err(e) = self.file_put(ni, f, &data, false) {
+            if let Err(e) = self.file_put(ni, &abs, &data, false) {
                 return self.sh_err(ni, &format!("touch: cannot touch '{}': {}\n", f, e.errno_text()));
             }
         }
         Ok(())
     }
 
-    /// "echo WORDS > FILE" / ">> FILE": the words (with their line end) into a file
-    pub(crate) fn sh_echo(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
-        let mut words: Vec<&str> = Vec::new();
-        let mut target: Option<(String, bool)> = None;
-        let mut i = 0;
-        while i < args.len() {
-            let a = args[i];
-            if let Some(rest) = a.strip_prefix(">>").or_else(|| a.strip_prefix('>')) {
-                let append = a.starts_with(">>");
-                let f = if rest.is_empty() {
-                    i += 1;
-                    args.get(i).copied().unwrap_or("")
-                } else {
-                    rest
-                };
-                target = Some((String::from(f), append));
-            } else {
-                words.push(a);
-            }
-            i += 1;
-        }
-        let (newline, words) = match words.first() {
-            Some(&"-n") => (false, &words[1..]),
-            _ => (true, &words[..]),
-        };
-        let mut text = words.join(" ");
-        if newline {
-            text.push('\n');
-        }
-        match target {
-            None => {
-                self.out(ni, &text);
-                Ok(())
-            }
-            Some((f, _)) if f.is_empty() => self.sh_err(ni, "jfn-sh: syntax error near unexpected token `newline'\n"),
-            // the resolver's settings (netsvc.rs)
-            Some((f, append)) if self.store(ni).and_then(|s| s.norm(&f).ok()).is_some_and(|p| p == "/etc/resolv.conf") => self.resolv_write(ni, &text, append),
-            Some((f, append)) => match self.file_put(ni, &f, text.as_bytes(), append) {
-                Ok(_) => Ok(()),
-                Err(e) => self.sh_err(ni, &format!("jfn-sh: {}: {}\n", f, e.errno_text())),
-            },
-        }
-    }
 
     /// tftp -g|-p [-l LOCAL] [-r REMOTE] [-b SIZE] HOST [PORT] (busybox-like)
     pub(crate) fn sh_tftp(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
@@ -1023,18 +1145,20 @@ impl Engine {
                 Sink::Stdout
             } else {
                 // the local file must be writable before anything goes out
+                let abs = self.sh_abs(ni, &l);
                 let st = self.store(ni);
-                let ok = st.is_some_and(|s| s.norm(&l).is_ok_and(|p| s.is_dir(&s.parent(&p)) && !s.is_dir(&p)));
+                let ok = st.is_some_and(|s| s.norm(&abs).is_ok_and(|p| s.is_dir(&s.parent(&p)) && !s.is_dir(&p)));
                 if !ok {
-                    let why = if st.is_some_and(|s| s.is_dir(&l)) { "Is a directory" } else { "No such file or directory" };
+                    let why = if st.is_some_and(|s| s.is_dir(&abs)) { "Is a directory" } else { "No such file or directory" };
                     return self.sh_err(ni, &format!("tftp: can't open '{}': {}\n", l, why));
                 }
-                Sink::File(l)
+                Sink::File(abs)
             };
             TftpClient::get(host, &r, sink, Style::Linux)
         } else {
             let Some(l) = local.clone().or_else(|| remote.clone()) else { return self.sh_err(ni, USAGE) };
-            let data = match self.store(ni).map(|s| s.read(&l).map(Vec::from)) {
+            let abs = self.sh_abs(ni, &l);
+            let data = match self.store(ni).map(|s| s.read(&abs).map(Vec::from)) {
                 Some(Ok(d)) => d,
                 Some(Err(e)) => return self.sh_err(ni, &format!("tftp: can't open '{}': {}\n", l, e.errno_text())),
                 None => return self.sh_err(ni, "tftp: no file system\n"),

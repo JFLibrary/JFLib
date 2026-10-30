@@ -192,6 +192,12 @@ mod value;
 mod vicon;
 mod win;
 mod winstate;
+// (L7) windows inside an area of a window and a taskbar (desk.rs)
+mod desk;
+pub use desk::{
+    DeskEv, DeskState, DeskWin, DTB_ICONS, DWF_FIXED, DWF_MAXIMIZED, DWF_NOCLOSE, DWF_NOMAX, DWF_NOMIN, DWF_NOTASK, DW_LEFT, DW_MAX, DW_MIN,
+    DW_RIGHT,
+};
 
 use alloc::collections::{BTreeMap, VecDeque};
 use alloc::string::String;
@@ -428,6 +434,8 @@ pub(crate) struct Mods {
     pub(crate) scopy: scrollcopy::S,
     /// (ROADMAP §8) the band buffers and glyph record of multi-threaded renders (render_par.rs)
     pub(crate) rpar: render_par::S,
+    /// (L7) the window areas (desk.rs)
+    pub(crate) desk: desk::S,
 }
 
 /// the UI context: everything ASMLIB keeps in g_* variables
@@ -556,3 +564,13 @@ pub struct Ui {
     /// async tasks on the UI thread (tasks.rs: ui.spawn; run between passes)
     pub(crate) tasks: plat::task::Executor,
 }
+
+// (SK6) the code editor's language services: completion, hover texts, signature help and its
+// requests (code_assist.rs), breakpoints, the execution line and folding (code_doc.rs, code_edit.rs)
+mod code_assist;
+pub use code_assist::{
+    CodeAssist, CodeEv, CompItem, CompList, SigHelp, CI_CONSTANT, CI_FIELD, CI_FUNCTION, CI_KEYWORD, CI_METHOD, CI_MODULE, CI_PARAM, CI_TEXT,
+    CI_VALUE, CI_VARIABLE, POP_ROWS,
+};
+pub use code_doc::{TextEdit, BP_COND, BP_DISABLED, BP_ON};
+pub use code_edit::{CE_BREAKPOINTS, CE_FOLDS};

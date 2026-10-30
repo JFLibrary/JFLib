@@ -1,0 +1,23 @@
+#!args --verify-dirty
+# screen readers (ui/desk.rs, a11y.rs): each window is a dialog named by its title (and its
+# state), the active one selected; its title bar's buttons and its content hang inside it in the
+# tree, also where a smaller window above it covers them (here the Rechner covers the Editor's
+# Übernehmen); minimised windows are named in the taskbar
+theme light
+expect dialog:"Protokoll" selected
+expect dialog:"Editor" exists
+click button:"Baum"
+expect text:"Baum: Editor(5) Rechner(12) Notizen(5) Protokoll*(4) | Übernehmen→Editor 5→Rechner Wichtig→Notizen" exists
+# maximised: named so; the windows behind keep their content
+click button:"Maximieren: Protokoll"
+expect dialog:"Protokoll (maximiert)" selected
+click button:"Baum"
+expect text:"Baum: Editor(5) Rechner(12) Notizen(5) Protokoll (maximiert)*(5) | Übernehmen→Editor 5→Rechner Wichtig→Notizen" exists
+# minimised: gone from the tree, the taskbar names it
+click button:"Minimieren: Protokoll"
+expect dialog:"Protokoll (maximiert)" missing
+expect button:"Protokoll (minimiert)" exists
+expect dialog:"Notizen" selected
+click button:"Baum"
+expect text:"Baum: Editor(5) Rechner(12) Notizen*(5) | Übernehmen→Editor 5→Rechner Wichtig→Notizen" exists
+expect_nowarn

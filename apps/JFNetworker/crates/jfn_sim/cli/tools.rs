@@ -2,9 +2,10 @@
 // used most, its output and messages as curl 8 prints them on a terminal), nc (TCP and UDP
 // client, -l server, -z scan; OpenBSD netcat's messages), ss (TCP and UDP sockets with states,
 // timers and TCP internals in iproute2's layout), top (a slim overview of the services: state,
-// the CPU time of the web servers and the scripts, load average), printf and pipes into nc
-// ("printf 'GET / HTTP/1.0\r\n\r\n' | nc web 80"); on the IOS-like console "show tcp brief
-// [all]", "show tcp statistics" and "show control-plane host open-ports"
+// the CPU time of the web servers and the scripts, load average), echo and printf (their
+// bytes for the shell: coreutils.rs; "printf 'GET / HTTP/1.0\r\n\r\n' | nc web 80" goes through
+// the shell's pipes, nc and mail read what the pipe gives them); on the IOS-like console "show
+// tcp brief [all]", "show tcp statistics" and "show control-plane host open-ports"
 //
 // curl and nc are console programs: services the shell starts (OsApi::print, exit,
 // SvcEvent::Console); the console is busy while they run, typed lines go to nc, Ctrl+C ends
@@ -48,79 +49,7 @@ fn ep(a: IpAddr, p: u16) -> String {
 const K_OWN: u32 = 0;
 const K_HTTP: u32 = 1;
 
-// ---------------------------------------------------------------- words, echo, printf, pipes
-
-/// the byte index of a '|' outside quotes
-fn pipe_at(line: &str) -> Option<usize> {
-    let mut q: Option<char> = None;
-    let mut esc = false;
-    for (i, c) in line.char_indices() {
-        if esc {
-            esc = false;
-            continue;
-        }
-        match q {
-            Some(x) if c == x => q = None,
-            Some('"') if c == '\\' => esc = true,
-            Some(_) => {}
-            None if c == '\\' => esc = true,
-            None if c == '\'' || c == '"' => q = Some(c),
-            None if c == '|' => return Some(i),
-            None => {}
-        }
-    }
-    None
-}
-
-/// "left | right" (one pipe)
-pub(crate) fn split_pipe(line: &str) -> Option<(&str, &str)> {
-    let i = pipe_at(line)?;
-    Some((line[..i].trim(), line[i + 1..].trim()))
-}
-
-/// the words of a shell line: '...' as it is, "..." and bare words with \ escapes for " \ $
-fn sh_words(line: &str) -> Vec<String> {
-    let mut v = Vec::new();
-    let mut cur = String::new();
-    let mut any = false;
-    let mut q: Option<char> = None;
-    let mut it = line.chars().peekable();
-    while let Some(c) = it.next() {
-        match q {
-            Some('\'') if c == '\'' => q = None,
-            Some('\'') => cur.push(c),
-            Some(_) if c == '"' => q = None,
-            Some(_) if c == '\\' => match it.peek() {
-                Some(&n) if n == '"' || n == '\\' || n == '$' => {
-                    cur.push(n);
-                    it.next();
-                }
-                _ => cur.push('\\'),
-            },
-            Some(_) => cur.push(c),
-            None if c == '\'' || c == '"' => {
-                q = Some(c);
-                any = true;
-            }
-            None if c == '\\' => {
-                if let Some(n) = it.next() {
-                    cur.push(n);
-                }
-            }
-            None if c.is_whitespace() => {
-                if any || !cur.is_empty() {
-                    v.push(core::mem::take(&mut cur));
-                }
-                any = false;
-            }
-            None => cur.push(c),
-        }
-    }
-    if any || !cur.is_empty() {
-        v.push(cur);
-    }
-    v
-}
+// ---------------------------------------------------------------- echo, printf
 
 /// \n \r \t \\ \a \0NNN \xHH in a printf format or echo -e; `stop` is set by \c
 fn unescape(s: &str, out: &mut Vec<u8>, stop: &mut bool) {
@@ -177,7 +106,7 @@ fn unescape(s: &str, out: &mut Vec<u8>, stop: &mut bool) {
 }
 
 /// what echo writes: -n (no newline), -e (escapes), -E
-fn echo_bytes(args: &[String]) -> Vec<u8> {
+pub(super) fn echo_bytes(args: &[String]) -> Vec<u8> {
     let (mut nl, mut esc) = (true, false);
     let mut k = 0;
     while let Some(a) = args.get(k) {
@@ -210,7 +139,7 @@ fn echo_bytes(args: &[String]) -> Vec<u8> {
 
 /// what printf writes: the format with escapes and %s %d %c %x %%, reused while arguments are
 /// left (as the shell's printf)
-fn printf_bytes(args: &[String]) -> Result<Vec<u8>, String> {
+pub(super) fn printf_bytes(args: &[String]) -> Result<Vec<u8>, String> {
     let Some(fmt) = args.first() else {
         return Err(String::from("printf: usage: printf FORMAT [ARGUMENT]...\n"));
     };
@@ -220,12 +149,13 @@ fn printf_bytes(args: &[String]) -> Result<Vec<u8>, String> {
     loop {
         let b = fmt.as_bytes();
         let mut i = 0;
-        let mut lit = String::new();
+        // the literal bytes up to the next % (a format may hold any UTF-8)
+        let mut lit: Vec<u8> = Vec::new();
         let mut stop = false;
         let mut took = false;
         while i < b.len() {
             if b[i] == b'%' && i + 1 < b.len() {
-                unescape(&core::mem::take(&mut lit), &mut out, &mut stop);
+                unescape(&String::from_utf8_lossy(&core::mem::take(&mut lit)), &mut out, &mut stop);
                 if stop {
                     return Ok(out);
                 }
@@ -269,10 +199,10 @@ fn printf_bytes(args: &[String]) -> Result<Vec<u8>, String> {
                 i += 1;
                 continue;
             }
-            lit.push(b[i] as char);
+            lit.push(b[i]);
             i += 1;
         }
-        unescape(&lit, &mut out, &mut stop);
+        unescape(&String::from_utf8_lossy(&lit), &mut out, &mut stop);
         if stop || !took || used >= rest.len() {
             break;
         }
@@ -1911,7 +1841,7 @@ const SS_USAGE: &str = "Usage: ss [ OPTIONS ]\n       ss [ OPTIONS ] [ FILTER ]\
 
 impl Engine {
     fn tool_err(&mut self, ni: usize, text: &str) -> Result<(), String> {
-        self.out(ni, text);
+        self.err_out(ni, text);
         Err(String::from(text.lines().next().unwrap_or("")))
     }
 
@@ -1929,10 +1859,12 @@ impl Engine {
     /// the console woke for a program: when it ended, it goes and the console takes lines
     /// again
     pub(crate) fn proc_wake(&mut self, ni: usize, svc: u32) {
-        if self.console_exit(ni, svc).is_none() {
+        let Some(code) = self.console_exit(ni, svc) else {
             return;
-        }
+        };
         self.console_kill(ni, svc);
+        // its exit status is the shell's $? (cli/shrun.rs)
+        self.sh_set_code(ni, code);
         self.cli_job_done(ni);
     }
 
@@ -1980,47 +1912,6 @@ impl Engine {
                 self.run_program(ni, "nc", Box::new(Nc::new(o, input)), stdin)
             }
             Err((text, _)) => self.tool_err(ni, &text),
-        }
-    }
-
-    pub(crate) fn sh_printf(&mut self, ni: usize, line: &str) -> Result<(), String> {
-        let w = sh_words(line);
-        match printf_bytes(&w[1..]) {
-            Ok(d) => {
-                self.out(ni, &String::from_utf8_lossy(&d));
-                Ok(())
-            }
-            Err(e) => self.tool_err(ni, &e),
-        }
-    }
-
-    /// "LEFT | RIGHT": echo or printf into nc (or cat)
-    pub(crate) fn sh_pipe(&mut self, ni: usize, left: &str, right: &str) -> Result<(), String> {
-        let lw = sh_words(left);
-        let rw = sh_words(right);
-        let data = match lw.first().map(String::as_str) {
-            Some("echo") => echo_bytes(&lw[1..]),
-            Some("printf") => match printf_bytes(&lw[1..]) {
-                Ok(d) => d,
-                Err(e) => return self.tool_err(ni, &e),
-            },
-            _ => return self.tool_err(ni, "jfn-sh: a pipe here takes echo or printf on the left and nc, cat or mail on the right\n"),
-        };
-        match rw.first().map(String::as_str) {
-            Some("nc") | Some("netcat") => {
-                let args: Vec<&str> = rw[1..].iter().map(String::as_str).collect();
-                self.sh_nc(ni, &args, Some(data))
-            }
-            Some("cat") => {
-                self.out(ni, &String::from_utf8_lossy(&data));
-                Ok(())
-            }
-            // the text of a message (cli/mail.rs)
-            Some("mail") => {
-                let args: Vec<&str> = rw[1..].iter().map(String::as_str).collect();
-                self.sh_mail(ni, &args, Some(data))
-            }
-            _ => self.tool_err(ni, "jfn-sh: a pipe here takes echo or printf on the left and nc, cat or mail on the right\n"),
         }
     }
 

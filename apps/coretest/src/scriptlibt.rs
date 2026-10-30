@@ -24,7 +24,7 @@ fn exec(src: &str, lim: Limits, host: &mut dyn Host) -> (String, Result<String, 
         Ok(p) => p,
         Err(d) => {
             let msg = d.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("; ");
-            let e = script::Error { kind: ErrorKind::Usage, msg: format!("compile: {}", msg), line: 0, col: 0, trace: Vec::new() };
+            let e = script::Error { kind: ErrorKind::Usage, msg: format!("compile: {}", msg), file: String::new(), line: 0, col: 0, trace: Vec::new() };
             return (String::new(), Err(e), 0, 0);
         }
     };
@@ -32,7 +32,7 @@ fn exec(src: &str, lim: Limits, host: &mut dyn Host) -> (String, Result<String, 
     loop {
         match vm.run(host, u64::MAX) {
             Status::Done(v) => return (vm.take_output(), Ok(vm.display(v)), vm.call_fuel(), vm.collections()),
-            Status::Yielded => {}
+            Status::Yielded | Status::Paused(_) => {}
             Status::Error(e) => return (vm.take_output(), Err(e), vm.call_fuel(), vm.collections()),
         }
     }
@@ -617,7 +617,7 @@ fn sliced(prog: &script::Program, slice: u64) -> (String, u64, u32) {
     let mut vm = Vm::new(prog, Limits { heap: 16 << 10, ..Limits::default() });
     loop {
         match vm.run(&mut (), slice) {
-            Status::Yielded => {}
+            Status::Yielded | Status::Paused(_) => {}
             Status::Done(_) => return (vm.take_output(), vm.call_fuel(), vm.collections()),
             Status::Error(e) => return (format!("{}{}", vm.take_output(), e), vm.call_fuel(), vm.collections()),
         }

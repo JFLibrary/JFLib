@@ -640,7 +640,8 @@ impl Engine {
         let last = parts.pop().unwrap_or_default();
         p.dirs = parts.into_iter().filter(|d| !d.is_empty()).collect();
         if let Some(local) = upload {
-            let data = match self.store(ni).map(|s| s.read(&local).map(Vec::from)) {
+            // (local files are relative to the shell's working directory)
+            let data = match self.store(ni).map(|s| s.read(&self.sh_abs(ni, &local)).map(Vec::from)) {
                 Some(Ok(d)) => d,
                 _ => return refuse(self, ni, &format!("curl: Can't open '{}'!\ncurl: try 'curl --help' for more information\ncurl: (26) Failed to open/read local data from file/application\n", local)),
             };
@@ -653,11 +654,12 @@ impl Engine {
             p.want = Want::Get;
             let out = if remote_name { Some(last.clone()) } else { output.filter(|o| o != "-") };
             if let Some(o) = out {
-                let ok = self.store(ni).is_some_and(|s| s.norm(&o).is_ok_and(|q| s.is_dir(&s.parent(&q)) && !s.is_dir(&q)));
+                let abs = self.sh_abs(ni, &o);
+                let ok = self.store(ni).is_some_and(|s| s.norm(&abs).is_ok_and(|q| s.is_dir(&s.parent(&q)) && !s.is_dir(&q)));
                 if !ok {
                     return refuse(self, ni, &format!("curl: (23) Failed to open the file {}: No such file or directory\n", o));
                 }
-                p.sink = Sink::File(o);
+                p.sink = Sink::File(abs);
             }
         }
         self.run_program(ni, "curl", Box::new(p), false)

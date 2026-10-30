@@ -849,13 +849,30 @@ Fensterrand hinaus.
     Ende wartet), wird erst beim nächsten Scan der ganzen Zeile neu bewertet; Undo hält je
     Schritt die ganze alte und neue Zeile (bei 1 MB 2 MB je Schritt); der
     Barrierefreiheits-Text einer einzelnen Zeile über 64 KB bleibt leer.
+  * Sprachdienste und Debugger-Leiste (SK6, 2026-10-30): `ui.code_editor_with(…, Some(&mut
+    assist), …)` mit einem `CodeAssist` der Sprache ([`ui/code_assist.rs`](../lib/ui/code_assist.rs)):
+    Vervollständigungs-Popup (beim Tippen eines Worts, nach einem Auslösezeichen, Strg+Leertaste;
+    filtert beim Tippen, Hoch / Runter / Bild↑ / Bild↓ / Eingabe / Tab / Esc, Klick; Art-Abzeichen,
+    Detailspalte, Beschreibung des gewählten Eintrags; Einfügen als ein Undo-Schritt), Hover-Texte
+    unter den Diagnosen, Signaturhilfe über dem Caret – beide auf der Popup-Ebene in den Farben des
+    Code-Themas, als `K_LIST` / `K_LISTITEM` bzw. `K_TEXT` für Screenreader. Strg+Klick / F12, F2,
+    Umschalt+Alt+F und Klicks in die Haltepunkt-Spalte (`CE_BREAKPOINTS`) sind `CodeEv`
+    (`ui.code_events`). `CodeDoc` hält Haltepunkte (gesetzt, deaktiviert, mit Bedingung), die
+    Ausführungszeile und Faltbereiche, die den Änderungen folgen; gefaltete Zeilen fehlen in
+    Ansicht, Caret-Bewegung und Suche, Bearbeiten darin oder ein dorthin gesetzter Caret faltet
+    auf; `apply_edits` / `replace_text` sind je ein Undo-Schritt (Umbenennen, Formatieren). Ohne
+    Faltung ist eine Zeile eine Reihe – 100 000 Zeilen so schnell wie vorher; 80 000 Zeilen mit
+    10 000 gefalteten Funktionen: Tasten ≈ 0,2–0,4 ms je Frame. Getestet mit
+    `tests/code_assist.uis`, `tests/code_ide.uis` und `--test model` (Gruppe `ide`, jetzt 307
+    Prüfungen). Offen: Popups bleiben im Fenster (kein Popup-Fenster der Plattform), kein
+    Snippet-Einfügen mit Platzhaltern, keine Minikarte der Faltungen.
   * Getestet mit `apps/editortest` (13 Skripte mit `--verify-dirty`, Windows und Linux, und
     `--test model`: 168 Prüfungen der Modelle und Grammatiken).
   * Offen: kein bidirektionaler Text innerhalb eines Absatzes (wie bei den Textfeldern bleibt
     die Reihenfolge LTR); Android-IME (Komposition über `android_ime_*`) nicht angebunden –
     auf Android kommt nur getippter Text an; keine Rechtschreibprüfung, kein Kontextmenü, kein
     Ziehen von Text, keine Bilder / Tabellen im Rich-Text; RTF-Export fehlt (nur HTML / Text /
-    JSON); Code-Editor ohne Zeilenumbruch, Mehrfach-Cursor, Regex-Suche und Code-Faltung;
+    JSON); Code-Editor ohne Zeilenumbruch, Mehrfach-Cursor und Regex-Suche (Faltung seit SK6);
     der Barrierefreiheits-Text großer Dateien (> 64 KB) enthält nur die sichtbaren Zeilen.
 - **P2** · *erledigt* · Popups und Tooltips über den Fensterrand hinaus (2026-10-18; die Teile für
   Toolfenster seit U3): Flyouts, Menüs und Untermenüs, Kombolisten, der Kalender von
@@ -1021,6 +1038,28 @@ Fensterrand hinaus.
   „Live folgen“, Leerzustand, Zusammenfassung für Screenreader; hoher Kontrast mit Strichmustern,
   in RTL-Fenstern links → rechts. Getestet mit `datagallery/tests/linechart.uis`,
   `linechart_hc.uis` und `uitest --only chart`.
+- **P2** · *erledigt* · Fenster in einer Fläche, Taskleiste und Vollbild (L7, 2026-10-30, für den
+  Mini-Desktop von JFNetworker): [`ui/desk.rs`](../lib/ui/desk.rs) `desk_begin` /
+  `desk_next` / `desk_end` mit `DeskState` (reine Daten: Plätze, Z-Reihenfolge, maximiert,
+  minimiert, an Hälften eingerastet, das aktive Fenster; als Text gespeichert / geladen) --
+  Titelleiste mit Symbol, Titel und Knöpfen (einzeln abschaltbar, feste Größe), Ziehen an der
+  Titelleiste, Größe an allen Rändern und Ecken mit Mindestgrößen, Doppelklick maximiert,
+  Klick holt nach vorn, Einrasten an den Rändern und an der linken / rechten Hälfte mit
+  Vorschau, maximiert ohne den freigehaltenen Streifen einer Taskleiste, minimiert bis zur
+  Wiederherstellung, neue Fenster kaskadiert, beim Schrumpfen der Fläche erreichbar; Alt+F6 /
+  Alt+Umschalt+F6, Alt+F10, Alt+F9, Alt+- (Fenstermenü), der Fokus kehrt ins aktive Fenster
+  zurück, Tab erreicht die Fenster dahinter nicht; für Screenreader je Fenster ein Dialog
+  mit Titel und Zustand, der seinen Inhalt auch dort enthält, wo andere Fenster ihn verdecken;
+  nur geänderte Zellen werden neu gezeichnet; RTL gespiegelt, hoher Kontrast, Maler
+  `StyleShell::desk_*` (Standard aus den Tokens, NetLab eigen). Taskleiste
+  (`desk_taskbar_begin` / `desk_taskbar` / `desk_taskbar_end`): Knopf je Fenster, zweiter
+  Klick minimiert, Menü, „Weitere Fenster“ bei Überlauf, Platz für Start und Uhr der App.
+  Vollbild `ui.window_fullscreen` für Haupt- und Werkzeugfenster (`UWS_FULLSCREEN`,
+  `UIC_FULLSCREEN`): Windows (randlos über dem Monitor, Platzierung und Stil zurück), X11
+  (`_NET_WM_STATE_FULLSCREEN`), Wayland (`set_fullscreen`), Browser (Fullscreen API);
+  F11 bleibt der App. Getestet mit `apps/desktest` (12 Skripte mit `--verify-dirty`, Windows
+  und Linux), `desktest --check-fullscreen` mit echten Fenstern (Windows, X11 und Wayland unter
+  WSLg) und `tests/fullscreen_web.mjs` (Chromium, Firefox).
 
 ## 7. App-Framework und Architektur
 
@@ -1261,6 +1300,28 @@ Fensterrand hinaus.
   Grenzen, die Namen von JFNetworker, die Disk-Datei über zwei Läufe, `log`, `rand` mit
   Startwert; Windows und Linux. Export und Import als `.jfs`-Datei im Skript-Editor gehören zu
   JFNetworker (SK5 im App-README).
+- **P3** · *erledigt* · Module, Debugger und Tests für `jfs` (gewünscht am 2026-10-30, Phase 6
+  von JFNetworker, Meilenstein SK7; [GUIDE §29](GUIDE.md)): `let m = import("pfad.jfs")` ist
+  eine Funktion statt neuer Syntax und gibt die obersten Namen einer anderen Datei als Map
+  (Namen mit `_` bleiben privat); der Host liefert die Dateien (`Host::load`: der Runner aus
+  dem Dateisystem, nur `.jfs`-Dateien, JFNetworker die des Geräts). Ein Modul läuft einmal je
+  VM im Aufruf, der es importiert (dasselbe Fuel, dieselben Grenzen; es kann pausieren und
+  schrittweise laufen), relative Pfade gelten ab der importierenden Datei, Zyklen sind ein
+  Fehler mit der Kette, Fehler eines Moduls nennen dessen Datei, Zeile und Spalte
+  (`Diagnostic`, `Error` und `TraceLine` haben jetzt `file`; Meldungen einzelner Dateien bleiben
+  gleich). Debug-Schnittstelle der VM ohne Oberfläche (`script::debug`): Zeilentabelle,
+  Haltepunkte nach Datei und Zeile (auch mit Bedingung und in noch nicht geladenen Modulen),
+  Pause-Anforderung, Schritt hinein / über / heraus, `run` liefert `Status::Paused` auch mitten
+  im Fuel (pausiert und fortgesetzt gleich ununterbrochen), Aufrufliste, lokale Variablen,
+  Upvalues und Globale mit Text und Aufklappen von Listen und Maps, Ausdrücke im Rahmen; ohne
+  Haltepunkte so schnell wie vorher (`coretest --bench vm`: gleich schnell im Rauschen).
+  `assert` und `assert_eq` in der Standardbibliothek, `jfs --test DATEI…` führt die Funktionen
+  `test_*` je in einer frischen VM aus, `jfs --debug DATEI` ist ein kleiner Debugger auf der
+  Konsole. In JFNetworker importieren Skript-Dienste Dateien des Geräts (mit der Lesezeit der
+  Disk) und lassen sich in virtueller Zeit anhalten und schrittweise fortsetzen
+  (`Action::ScriptDebug`; die Oberfläche kommt mit IDE1). Tests: `coretest --only scriptmod`,
+  die Fälle von `jfs` (Module, `--test`, `--debug`) und die Selbsttest-Gruppe `scriptmod` von
+  JFNetworker.
 - **P3** · *erledigt* (2026-10-30) · Bausteine für den Webbrowser von JFNetworker (gewünscht am 2026-10-25;
   der Browser selbst mit den Meilensteinen B1 bis B4 steht im App-README unter „Fahrplan“).
   Der Browser zeigt Seiten mit `ui.html_view` (`md_doc`, `md_view`, `rich_html`) statt mit einer
@@ -1344,6 +1405,25 @@ Fensterrand hinaus.
   Fehlerposition für `% Invalid input detected at '^' marker.`; getestet mit der
   coretest-Gruppe `cmdtree`, im Einsatz in der IOS-Konsole von JFNetworker. Seit R1 findet
   `find_mode` einen Modus über seinen Prompt (die Modi der Zugriffslisten von JFNetworker).
+- **P3** · *erledigt* · Sprachdienste für jfs (SK6, 2026-10-30, für die IDE von JFNetworker):
+  [`script::ls`](../lib/script/ls.rs) indiziert die Deklarationen eines Skripts (globale und
+  lokale `let`, `fn` samt Parametern, Closures, Schleifen- und catch-Variablen) und jede
+  Verwendung nach den Gültigkeitsregeln von `ast.rs`, auch auf Code, der nicht parst
+  (`parse_partial`); darauf `definition` (in importierte Module über einen Lade-Callback des
+  Aufrufers, für `let m = import("…")` aus SK7), `references`, `rename` (verweigert
+  Schlüsselwörter, ungültige und kollidierende Namen – geprüft, indem der umbenannte Text neu
+  aufgelöst wird), `complete` (Namen im Gültigkeitsbereich, Globale des Hosts mit
+  Kurzbeschreibung, Built-ins und Module der Standardbibliothek, Methoden von str / list / map /
+  bytes nach dem Typ eines Literals, Schlüsselwörter am Anweisungsanfang; nach Art und Präfix
+  sortiert), `hover` (Art, Signatur, `///`-Doku-Kommentar; deutsche Beschreibungen jeder
+  Funktion der Standardbibliothek in [`lsdoc.rs`](../lib/script/lsdoc.rs)), `signature`,
+  `folding`, `symbols` (Gliederung). [`script::fmt`](../lib/script/fmt.rs) formatiert
+  (Einrückung nach Klammern, Leerzeichen um Operatoren, eine Anweisung je Zeile, Kommentare und
+  höchstens eine Leerzeile bleiben, idempotent), verweigert Code mit Syntaxfehlern und prüft,
+  dass der Baum des Ergebnisses dem des Originals gleicht – der übersetzte Code bleibt gleich.
+  Getestet mit der coretest-Gruppe `scriptls` (227 Prüfungen). Offen: keine Typinferenz über
+  Literale hinaus, Umbenennen nur ohne Syntaxfehler, der Formatierer bricht keine langen Zeilen
+  um.
 
 ## 8. Rendering
 

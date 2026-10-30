@@ -8,6 +8,8 @@
 //   Engine::cli_help(dev, line)        the text of "?" typed after `line` (IOS)
 //   Engine::cli_complete(dev, line)    Tab: the completed line and the choices
 //   Engine::cli_prompt(dev) / cli_busy(dev)
+//   Engine::cli_cwd(dev) / cli_pager(dev)   the session's working directory, the shell's wish
+//                                      to page its last output (cli/shrun.rs)
 //   Engine::running_config(dev)        IOS configuration, or shell commands for Linux devices
 //   Engine::startup_config(dev)        what the device boots with
 //   Engine::take_reports()             console output and state changes (driver::Report)
@@ -63,6 +65,13 @@
 //   snmp     SNMP: "snmp-server ..." (the agent of IOS-like devices), show snmp [community], debug
 //            snmp packets, the running configuration; snmpget, snmpgetnext, snmpwalk,
 //            snmpbulkwalk and snmpset on the shell (console programs)
+//   sh       the shell's session (CliDev::sh: working directory, variables, history, jobs), its
+//            grammar (pipes, redirections, lists, quoting, globs), paths and Tab of paths
+//   shrun    the shell runs a line: pipelines, redirections, && || ; &, background jobs, jobs,
+//            fg, wait, kill, ps, sleep, jfs FILE as a process; out() asks it where text goes
+//   coreutils  cd, pwd, mv, head, tail, grep, find, wc, sort, uniq, cut, tree, du, df, less,
+//            file, stat, date, seq, tee, test, xargs, env, export, history, which, type, help
+//   man      help, man PAGE and CMD --help in our own German words
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -111,6 +120,10 @@ pub mod files;
 pub mod mail;
 pub mod snmp;
 pub mod aaa;
+pub mod sh;
+pub mod shrun;
+pub mod coreutils;
+pub mod man;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -318,6 +331,9 @@ pub struct CliDev {
     /// the RADIUS group and server a config mode is editing (cli/aaa.rs)
     pub sg_name: String,
     pub rs_name: String,
+    /// the shell's session: working directory, variables, history, the line that runs, jobs
+    /// (cli/sh.rs, cli/shrun.rs; IOS-like devices keep their working directory of flash: here)
+    pub sh: sh::Shell,
 }
 
 impl CliDev {
@@ -348,6 +364,7 @@ impl CliDev {
             user: String::new(),
             sg_name: String::new(),
             rs_name: String::new(),
+            sh: sh::Shell::new(m.cli),
         }
     }
 }
@@ -362,6 +379,8 @@ pub struct EngineCli {
     pub(crate) trees: Vec<(u32, Arc<Tree<ios::K>>)>,
     /// console jobs: job -> node slot
     pub(crate) jobs: BTreeMap<JobId, usize>,
+    /// the background job of a shell the engine works on (node, job number; cli/shrun.rs)
+    pub(crate) sh_ctx: Option<(usize, u32)>,
 }
 
 /// does the command line want to see this decision?  (Link changes for the IOS logs, the
@@ -395,8 +414,17 @@ impl Engine {
         }
     }
 
-    /// console output of node `ni` now
+    /// console output of node `ni` now (a pipe or a redirection of the shell may take it:
+    /// cli/shrun.rs)
     pub(crate) fn out(&mut self, ni: usize, text: &str) {
+        if text.is_empty() || self.sh_sink(ni, text, false) {
+            return;
+        }
+        self.out_raw(ni, text);
+    }
+
+    /// console output straight to the terminal
+    pub(crate) fn out_raw(&mut self, ni: usize, text: &str) {
         if text.is_empty() {
             return;
         }
@@ -414,6 +442,10 @@ impl Engine {
 
     /// reports the prompt and busy state when they changed
     pub(crate) fn cli_state(&mut self, ni: usize) {
+        // (a background job's console job stands in CliDev::job only while it is worked on)
+        if self.sh_bg_ctx(ni).is_some() {
+            return;
+        }
         let dev = self.dev_of(ni);
         let now = (self.prompt_of(ni), self.cdev(ni).is_some_and(|c| c.job.is_some()));
         let Some(c) = self.cdev_mut(ni) else {
@@ -442,7 +474,7 @@ impl Engine {
                 Mode::Out => String::new(),
                 m => format!("{}{}", host, ios::prompt_suffix(m)),
             },
-            CliStyle::Linux => format!("root@{}:~# ", host),
+            CliStyle::Linux => format!("root@{}:{}# ", host, self.sh_prompt_dir(ni)),
             CliStyle::None => String::new(),
         }
     }
@@ -524,7 +556,10 @@ impl Engine {
             Some(j) => {
                 self.cancel_job(j.id);
                 self.cli.jobs.remove(&j.id);
+                let jj = j.clone();
                 self.job_interrupted(ni, j);
+                // the shell's line ends (cli/shrun.rs)
+                self.sh_interrupted(ni, Some(&jj));
             }
             None => {
                 let asked = self.cdev_mut(ni).and_then(|c| c.ask.take()).is_some();
@@ -636,6 +671,7 @@ impl Engine {
                 self.cancel_job(j.id);
                 self.cli.jobs.remove(&j.id);
             }
+            self.sh_abort(ni);
         }
         if let Some(c) = self.cdev_mut(ni) {
             c.booting = false;
@@ -656,6 +692,11 @@ impl Engine {
 
     /// the console goes on at `at` (a waiting line, a timer of a command)
     pub(crate) fn cli_wake_at(&mut self, ni: usize, at: Ns) {
+        // a background job of the shell wakes on its own (cli/shrun.rs)
+        if let Some(no) = self.sh_bg_ctx(ni) {
+            self.schedule(at, Ev::Cli { node: ni, epoch: shrun::BG_WAKE | no });
+            return;
+        }
         let Some(c) = self.cdev_mut(ni) else {
             return;
         };
@@ -665,6 +706,12 @@ impl Engine {
     }
 
     pub(crate) fn cli_wake(&mut self, ni: usize, epoch: u32) {
+        if epoch & shrun::BG_WAKE != 0 {
+            if self.nodes.get(ni).is_some_and(|n| n.as_ref().is_some_and(|n| n.power)) {
+                self.sh_bg_wake(ni, epoch & !shrun::BG_WAKE);
+            }
+            return;
+        }
         let live = match self.nodes.get(ni) {
             Some(Some(n)) => n.power && n.cli.epoch == epoch,
             _ => false,
@@ -690,7 +737,7 @@ impl Engine {
 
     /// after a command: the next waiting line, if any
     pub(crate) fn cli_next(&mut self, ni: usize) {
-        let more = self.cdev(ni).is_some_and(|c| c.job.is_none() && !c.queue.is_empty());
+        let more = self.cdev(ni).is_some_and(|c| c.job.is_none() && c.sh.fg.is_none() && !c.queue.is_empty());
         if more {
             let now = self.now;
             self.cli_wake_at(ni, now);
@@ -704,6 +751,11 @@ impl Engine {
         let Some(&ni) = self.cli.jobs.get(&id) else {
             return;
         };
+        // a background job's (cli/shrun.rs)
+        if let Some(no) = self.sh_bg_of_job(ni, id) {
+            self.sh_bg_event(ni, no, |e| e.job_progress(ni));
+            return;
+        }
         self.job_progress(ni);
     }
 
@@ -721,7 +773,15 @@ impl Engine {
     pub(crate) fn cli_job_done(&mut self, ni: usize) {
         if let Some(j) = self.cdev_mut(ni).and_then(|c| c.job.take()) {
             self.cli.jobs.remove(&j.id);
+            // its exit status for the shell's line (cli/shrun.rs)
+            self.sh_job_ended(ni, &j);
         }
+        // a background job goes on where the engine works on it (sh_bg_event)
+        if self.sh_bg_ctx(ni).is_some() {
+            return;
+        }
+        // the shell's line goes on with its next command
+        self.sh_go(ni);
         self.cli_state(ni);
         self.cli_next(ni);
     }

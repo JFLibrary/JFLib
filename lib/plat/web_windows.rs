@@ -5,6 +5,10 @@
 // rectangles in, and the host copies rows without touching pixels.  One window over the
 // whole canvas without popups is the canvas itself (no composition); otherwise the windows
 // and popups are composited into the canvas buffer.
+// (L7) Full screen: window 0 asks the page for the browser's Fullscreen API (REQUEST_FULLSCREEN;
+// it shows WST_FULLSCREEN at once, the page's answer jfgui_fullscreen confirms it or takes it
+// back: refused without the user's gesture, left with Esc); a tool window covers the canvas
+// (its place comes back after).  Android: nothing.
 
 use crate::*;
 use alloc::{string::String, vec::Vec};
@@ -21,6 +25,7 @@ struct Window {
     pixels: Vec<u8>, // R, G, B, A rows of width * 4 bytes
     width: i32,
     height: i32,
+    fs_rect: [i32; 4], // (L7) the place before full screen
 }
 struct Popup {
     owner: i32,
@@ -132,6 +137,7 @@ pub fn win_create(
         pixels: Vec::new(),
         width: 0,
         height: 0,
+        fs_rect: [0; 4],
     });
     display.dirty = true;
     drop(display);
@@ -232,6 +238,39 @@ pub fn win_cmd(id: i32, command: u32) {
         });
         return;
     }
+    // (L7) full screen: the canvas through the page's Fullscreen API, a tool window over the
+    // canvas (the browser only; nothing on Android)
+    if command == WCMD_FULLSCREEN || command == WCMD_WINDOWED {
+        if !cfg!(target_arch = "wasm32") {
+            return;
+        }
+        let on = command == WCMD_FULLSCREEN;
+        let mut d = DISPLAY.lock();
+        let size = (d.width, d.height);
+        let Some(w) = window_mut(&mut d, id) else { return };
+        if on == (w.state & WST_FULLSCREEN != 0) {
+            return;
+        }
+        if id == 0 {
+            w.state ^= WST_FULLSCREEN;
+            drop(d);
+            super::notice(REQUEST_FULLSCREEN, &[on as u8]);
+            return;
+        }
+        if on {
+            w.fs_rect = w.rect;
+            w.rect = [0, 0, size.0, size.1];
+            w.state |= WST_FULLSCREEN;
+        } else {
+            w.rect = w.fs_rect;
+            w.state &= !WST_FULLSCREEN;
+        }
+        let (cw, ch) = (w.rect[2], w.rect[3]);
+        d.dirty = true;
+        drop(d);
+        let _ = evq_push(Event { typ: E_RESIZE, win: id as u8, x: cw, y: ch, ..Event::default() });
+        return;
+    }
     let mut display = DISPLAY.lock();
     let size = (display.width, display.height);
     if let Some(window) = window_mut(&mut display, id) {
@@ -253,6 +292,29 @@ pub fn win_cmd(id: i32, command: u32) {
         display.dirty = true;
     }
 }
+/// (L7) (browser) ask the page to show the canvas in full screen (one byte, 1 on / 0 off): the
+/// Fullscreen API from the user's gesture; the page answers with jfgui_fullscreen
+pub const REQUEST_FULLSCREEN: u32 = 23;
+
+/// (L7) the page's full screen of the canvas (1 in full screen, 0 not: left, refused): window
+/// 0's WST_FULLSCREEN follows, an E_RESIZE lets the UI look (UIC_FULLSCREEN on a change of its
+/// own)
+#[cfg(target_arch = "wasm32")]
+#[unsafe(no_mangle)]
+pub extern "C" fn jfgui_fullscreen(on: u32) -> u32 {
+    let mut d = DISPLAY.lock();
+    let size = (d.width, d.height);
+    let Some(w) = window_mut(&mut d, 0) else { return 0 };
+    if on != 0 {
+        w.state |= WST_FULLSCREEN;
+    } else {
+        w.state &= !WST_FULLSCREEN;
+    }
+    drop(d);
+    let _ = evq_push(Event { typ: E_RESIZE, win: 0, x: size.0, y: size.1, ..Event::default() });
+    1
+}
+
 /// Begin a pointer-driven move of a non-main library window.
 pub fn win_begin_move(id: i32) {
     let mut d = DISPLAY.lock();

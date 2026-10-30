@@ -11,6 +11,8 @@
 //   cmdtree: Tree / Parsed / Help -- IOS-like command trees (abbreviations, ?, Tab, "no", modes)
 //   hashring: Ring / hash64 -- consistent hashing with virtual nodes (shards, sticky balancing)
 //   lru:  Lru -- a map that forgets the least recently used entries (count and weight limits)
+//   pattern: glob / has_glob -- shell wildcards; Regex -- POSIX basic and extended regular
+//         expressions without back-references (a Pike VM: no exponential cases)
 //
 // Strings and formatting are Rust's own (str, String, format!); the thread pool, cpu
 // features and files are in plat (they need unsafe).
@@ -32,6 +34,7 @@ pub mod metrics;
 pub mod cmdtree;
 pub mod hashring;
 pub mod lru;
+pub mod pattern;
 pub use ini::Ini;
 pub use settings::{Key, Schema, Settings};
 pub use num::{f64_format, f64_parse, parse_i64};

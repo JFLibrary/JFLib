@@ -25,7 +25,19 @@
 //   library()                    the standard library every host gets (stdlib.rs: str, list,
 //                                map, bytes, math, json, int / float.parse; math.rs: exp, log,
 //                                pow, sin, cos .. in software), found by name before the host
+//   ls::index(src) / definition / references / rename / complete / hover / signature /
+//   folding / symbols            language services for editors (ls.rs: symbols with their
+//                                positions and scopes, also on code that does not parse)
+//   fmt::format(src)             the formatter (fmt.rs): Result<String, syntax errors>
+//   import(path)                 modules (module.rs): another file's top-level names as a map,
+//                                read through Host::load, run once per VM
+//   debugger (debug.rs)          Vm::set_breakpoint, request_pause, step(Step), run() ->
+//                                Status::Paused(Pause), frames, locals, upvalues,
+//                                frame_globals, eval; Program::line_table / break_lines
+//   assert(c, msg), assert_eq(a, b, msg)   tests (stdlib.rs; the runner's jfs --test)
 //
+// Files: Diagnostic::file, Error::file and TraceLine::file name the file of a position (the
+// name given to parse / compile_named / compile_with, or a module's path).
 // The language: small, dynamically typed, JS/Lua-like.  Values: nil, bool, int (i64), float
 // (f64), str (immutable UTF-8), bytes, list, map (insertion ordered; keys str, int, bool),
 // fn (closures).  Statements: let x = e, fn name(a, b) { }, if c { } else if c { } else { },
@@ -58,6 +70,13 @@ mod stdlib;
 mod strlib;
 mod listlib;
 mod jsonlib;
+// (SK6) language services for editors (ls.rs, the library's descriptions in lsdoc.rs) and the
+// formatter (fmt.rs)
+pub mod ls;
+mod lsdoc;
+pub mod fmt;
+mod module;
+pub mod debug;
 
 use alloc::format;
 use alloc::string::String;
@@ -71,9 +90,12 @@ pub use parse::MAX_DEPTH;
 pub use code::Program;
 pub use heap::{Ref, Value};
 pub use vm::{Cx, Error, ErrorKind, Fail, Host, Limits, Pin, Status, TraceLine, Vm};
+pub use code::LineEntry;
+pub use debug::{Breakpoint, FrameInfo, Pause, PauseReason, Step};
 
 /// a message for the editor: position (1-based; columns count characters, end_col is
-/// exclusive and on the same line), error or warning, German text
+/// exclusive and on the same line), error or warning, German text; file: the name given to
+/// parse / compile_named / compile_with ("" from check)
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Diagnostic {
     pub line: u32,
@@ -81,6 +103,7 @@ pub struct Diagnostic {
     pub end_col: u32,
     pub error: bool,
     pub msg: String,
+    pub file: String,
 }
 
 impl core::fmt::Display for Diagnostic {
@@ -94,17 +117,18 @@ impl core::fmt::Display for Diagnostic {
 /// standard library (check warns about other unknown names)
 pub const GLOBALS: &[&str] = &[
     "print", "log", "len", "str", "int", "float", "type", "math", "json", "bytes", "now", "rand", "config", "timer", "net",
-    "dns", "http", "disk", "metrics", "list", "map",
+    "dns", "http", "disk", "metrics", "list", "map", "import", "assert", "assert_eq",
 ];
 
 /// the functions and constants of the standard library ("str.split", "math.pi", "bytes"),
 /// for completion in an editor; methods are listed under their type (s.split(",") is
 /// str.split(s, ","))
 pub fn library() -> Vec<&'static str> {
-    let mut v: Vec<&'static str> = Vec::with_capacity(stdlib::NAMES.len() + stdlib::CONSTANTS.len() + 7);
+    let mut v: Vec<&'static str> = Vec::with_capacity(stdlib::NAMES.len() + stdlib::CONSTANTS.len() + 10);
     v.extend_from_slice(&["print", "len", "type", "str", "int", "float", "bytes"]);
     v.extend_from_slice(stdlib::NAMES);
     v.extend_from_slice(stdlib::CONSTANTS);
+    v.extend_from_slice(&["import", "assert", "assert_eq"]);
     v
 }
 
@@ -112,18 +136,27 @@ pub fn library() -> Vec<&'static str> {
 pub(crate) fn diag(src: &str, sp: Span, error: bool, msg: String) -> Diagnostic {
     let s = src.get(sp.start as usize..sp.end as usize).unwrap_or("");
     let w = s.split('\n').next().unwrap_or("").chars().count() as u32;
-    Diagnostic { line: sp.line, col: sp.col, end_col: sp.col + w.max(1), error, msg }
+    Diagnostic { line: sp.line, col: sp.col, end_col: sp.col + w.max(1), error, msg, file: String::new() }
+}
+
+/// the diagnostics with the file they belong to
+fn named(name: &str, mut d: Vec<Diagnostic>) -> Vec<Diagnostic> {
+    for x in d.iter_mut() {
+        x.file = String::from(name);
+    }
+    d
 }
 
 /// the syntax tree of a script, or its syntax errors; name: a file name for later messages
 pub fn parse(name: &str, src: &str) -> Result<ast::Program, Vec<Diagnostic>> {
     let (prog, diags) = parse::parse_program(name, src);
-    if diags.is_empty() { Ok(prog) } else { Err(diags) }
+    if diags.is_empty() { Ok(prog) } else { Err(named(name, diags)) }
 }
 
 /// the tree of everything that parsed and the syntax errors (empty when parse() succeeds)
 pub fn parse_partial(name: &str, src: &str) -> (ast::Program, Vec<Diagnostic>) {
-    parse::parse_program(name, src)
+    let (prog, diags) = parse::parse_program(name, src);
+    (prog, named(name, diags))
 }
 
 /// syntax errors and the findings of resolve() with GLOBALS, sorted by position
@@ -200,7 +233,7 @@ pub fn compile(src: &str) -> Result<Program, Vec<Diagnostic>> {
 pub fn compile_named(name: &str, src: &str) -> Result<Program, Vec<Diagnostic>> {
     let (prog, mut d) = parse::parse_program(name, src);
     d.extend(check::resolve(&prog, GLOBALS));
-    finish(&prog, src, d)
+    finish(&prog, src, d, None)
 }
 
 /// compile_named() for a host with names of its own instead of GLOBALS: `globals` are the
@@ -219,15 +252,18 @@ pub fn compile_with(name: &str, src: &str, globals: &[&str]) -> Result<Program, 
     known.extend_from_slice(globals);
     let (prog, mut d) = parse::parse_program(name, src);
     d.extend(check::resolve_strict(&prog, &known));
-    finish(&prog, src, d)
+    finish(&prog, src, d, Some(globals.iter().map(|g| String::from(*g)).collect()))
 }
 
-/// the program, or the errors among the diagnostics of parsing and resolving
-fn finish(prog: &ast::Program, src: &str, mut d: Vec<Diagnostic>) -> Result<Program, Vec<Diagnostic>> {
+/// the program, or the errors among the diagnostics of parsing and resolving (with the file);
+/// strict: the host's names of compile_with, for the modules the program imports
+fn finish(prog: &ast::Program, src: &str, mut d: Vec<Diagnostic>, strict: Option<Vec<String>>) -> Result<Program, Vec<Diagnostic>> {
     d.retain(|x| x.error);
     if !d.is_empty() {
         d.sort_by_key(|x| (x.line, x.col));
-        return Err(d);
+        return Err(named(&prog.name, d));
     }
-    Ok(Program { code: Arc::new(compile::generate(prog, src)) })
+    let mut code = compile::generate(prog, src);
+    code.strict = strict;
+    Ok(Program { code: Arc::new(code) })
 }
