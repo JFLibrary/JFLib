@@ -15,6 +15,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 
 ### Added
 
+- **crypto:** MD5 (`md5`, `Md5`, `md5_parts`) and HMAC-MD5 (`hmac_md5`), for protocols defined with MD5 (RADIUS); documented as broken for collisions, as `sha1` is
+- **netpkt:** The Telnet protocol (`telnet`: the NVT commands and option negotiation of RFC 854 / 855 / 857 / 858, IAC escaping, a `Reader` for bytes in pieces, the loop-free `Options` of RFC 1143) and RADIUS (`radius`: authentication and accounting of RFC 2865 / 2866 with every attribute, the User-Password hiding, the Request / Response Authenticators and the Message-Authenticator of RFC 3579); `decode` dissects both (`P_TELNET`, `P_RADIUS`)
 - **ui:** Full keyboard operation: focus groups (the arrows inside toolbars, radio sets, swatches and button grids), F6 / Ctrl+F6 through panes, docked panels and tool windows, F8 for splitters, the menu key / Shift+F10 everywhere, Enter, Space and Ctrl+arrows in lists, grids and trees
 - **ui:** A rich-text editor (`ui.richtext`, a toolbar, HTML in and out) and a code editor (`ui.code_editor`) with syntax highlighting for Rust, JSON, INI, TOML and Markdown, find and replace, and files of 100 000 lines
 - **plat:** Android: the system's file picker (Storage Access Framework: `content://` names for every file function and stream, grants kept across restarts, folders), persistent app storage and the system clipboard

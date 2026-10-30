@@ -299,6 +299,7 @@ pub(crate) fn kind_name(kind: &str) -> &str {
         "ospf" => t("Routing (OSPF)"),
         "tftp-server" => t("TFTP-Server"),
         "ftp-server" => t("FTP-Server"),
+        "radius-server" => t("RADIUS-Server"),
         _ => kind,
     }
 }

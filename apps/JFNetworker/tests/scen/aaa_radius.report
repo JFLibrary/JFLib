@@ -1,0 +1,45 @@
+# JFNetworker-Szenario aaa_radius.scn: „AAA mit RADIUS“, 4 Geräte, 3 Verbindungen, Seed 7
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  --      run 1s
+   1.000000000  R1      Username: admin
+   1.000000000  R1      Password: adminpw
+   1.000000000  --      run 2s
+   3.000000000  ok      expect SRV1 svc radius metric requests == 1 (1)
+   3.000000000  ok      expect SRV1 svc radius metric accepts == 1 (1)
+   3.000000000  R1      R1#show aaa servers
+   3.000000000  R1      RADIUS server 1 (10.0.0.10): auth port 1812, acct port 1813, timeout 1 s, retransmit 1
+   3.000000000  ok      expect R1 output contains "RADIUS server 1 (10.0.0.10): auth port 1812, acct port 1813"
+   3.000000000  R2      Username: admin
+   3.000000000  R2      Password: nope
+   3.000000000  --      run 2s
+   4.000004632  R2      % Access denied
+   4.000004632  R2      
+   5.000000000  ok      expect R2 output contains "% Access denied"
+   5.000000000  ok      expect SRV1 svc radius metric rejects == 1 (1)
+   5.000000000  R2      Username: admin
+   5.000000000  R2      Password: adminpw
+   5.000000000  --      run 2s
+   7.000000000  ok      expect SRV1 svc radius metric accepts == 2 (2)
+   7.000000000  R1      R1#exit
+   7.000000000  R1      
+   7.000000000  R1      Console session closed.
+   7.000000000  R1      
+   7.000000000  --      power off SRV1
+   7.000000000  SW1     *Mar  1 00:00:07.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is down
+   7.000000000  SW1     *Mar  1 00:00:07.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is down
+   7.000000000  R1      Username: admin
+   7.000000000  R1      Password: adminpw
+   7.000000000  --      run 5s
+  12.000000000  R1      R1>show aaa servers
+  12.000000000  R1      RADIUS server 1 (10.0.0.10): auth port 1812, acct port 1813, timeout 1 s, retransmit 1
+  12.000000000  ok      expect SRV1 svc radius metric accepts == 2 (2)
+# 7 von 7 Erwartungen erfüllt

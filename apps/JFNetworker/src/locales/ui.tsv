@@ -1044,6 +1044,7 @@ der Name geht nicht	the name does not work
 das Gerät nimmt sie nicht	the device does not take it
 TFTP-Server	TFTP server
 FTP-Server	FTP server
+RADIUS-Server	RADIUS server
 
 # P1: the physical view (workspace/phys, doc/phys.rs, app/commands.rs)
 &Logische Ansicht	&Logical view

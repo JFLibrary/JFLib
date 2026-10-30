@@ -216,6 +216,32 @@ pub enum K {
     Delete,
     Copy,
     IpFtp,
+    // logins, AAA and RADIUS (cli/aaa.rs)
+    EnableSecret,
+    EnablePassword,
+    Username,
+    SvcPwEnc,
+    Banner,
+    AaaNewModel,
+    AaaAuthLogin,
+    AaaAuthEnable,
+    AaaAuthorExec,
+    AaaAcctExec,
+    AaaGroupCmd,
+    SgServer,
+    RadiusServerCmd,
+    RadiusHost,
+    RsAddress,
+    RsKey,
+    RsTimeout,
+    RsRetransmit,
+    LineLoginAuth,
+    ShowAaa,
+    ShowRadiusStats,
+    ShowUsers,
+    TestAaa,
+    // telnet client (telnetd.rs)
+    Telnet,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -245,7 +271,7 @@ fn mode_id(m: Mode) -> ModeId {
         Mode::DhcpPool => POOL,
         Mode::Router(_) => ROUTER,
         // modes of later parts are found by their prompt (tree_mode)
-        Mode::AclStd | Mode::AclExt => CONF,
+        Mode::AclStd | Mode::AclExt | Mode::AaaGroup | Mode::RadiusSrv => CONF,
     }
 }
 
@@ -253,7 +279,7 @@ fn mode_id(m: Mode) -> ModeId {
 /// (and later parts) add by their prompt, so their numbers may differ from tree to tree
 fn tree_mode(t: &Tree<K>, m: Mode) -> ModeId {
     match m {
-        Mode::AclStd | Mode::AclExt => t.find_mode(prompt_suffix(m)).unwrap_or(CONF),
+        Mode::AclStd | Mode::AclExt | Mode::AaaGroup | Mode::RadiusSrv => t.find_mode(prompt_suffix(m)).unwrap_or(CONF),
         // OSPF's router mode shares the prompt with RIP's: the tree knows it by its key
         Mode::Router(super::Proc::Ospf(_)) => t.find_mode(super::ospf::MODE_KEY).unwrap_or(CONF),
         Mode::Router(super::Proc::Bgp(_)) => t.find_mode(super::bgp::MODE_KEY).unwrap_or(CONF),
@@ -276,6 +302,8 @@ pub fn prompt_suffix(m: Mode) -> &'static str {
         Mode::Router(_) => "(config-router)#",
         Mode::AclStd => "(config-std-nacl)#",
         Mode::AclExt => "(config-ext-nacl)#",
+        Mode::AaaGroup => "(config-sg-radius)#",
+        Mode::RadiusSrv => "(config-radius-server)#",
     }
 }
 
@@ -568,6 +596,14 @@ fn build(caps: u32) -> Tree<K> {
     super::bgp::build_bgp(&mut t, [user, prv, conf], router);
     // ---- files: flash, nvram, copy to and from servers (cli/files.rs)
     super::files::build_files(&mut t, [user, prv, conf]);
+    // ---- logins, AAA and RADIUS (cli/aaa.rs)
+    super::aaa::build_aaa(&mut t, [user, prv, conf, line]);
+    // ---- the telnet client (telnetd.rs)
+    for m in [user, prv] {
+        t.add(m, "telnet", "Open a Telnet session to a host", None, 0);
+        t.add(m, "telnet WORD=host", "Address or name of the host", Some(K::Telnet), 0);
+        t.add(m, "telnet WORD=host <1-65535>=port", "The TCP port (23 if not given)", Some(K::Telnet), 0);
+    }
     t
 }
 
@@ -677,7 +713,7 @@ impl Engine {
     fn ios_mode(&self, ni: usize) -> Mode {
         self.cdev(ni).map(|c| c.mode).unwrap_or(Mode::User)
     }
-    fn set_mode(&mut self, ni: usize, m: Mode) {
+    pub(crate) fn set_mode(&mut self, ni: usize, m: Mode) {
         if let Some(c) = self.cdev_mut(ni) {
             c.mode = m;
             if !matches!(m, Mode::If | Mode::SubIf) {
@@ -742,7 +778,7 @@ impl Engine {
             Ok(p) => self.ios_do(ni, mode, &p, line),
             Err(err) => {
                 // a configuration submode falls back to the global configuration
-                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool | Mode::Router(_) | Mode::AclStd | Mode::AclExt) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
+                let up = if matches!(mode, Mode::If | Mode::SubIf | Mode::Vlan | Mode::Line | Mode::DhcpPool | Mode::Router(_) | Mode::AclStd | Mode::AclExt | Mode::AaaGroup | Mode::RadiusSrv) { tree.parse(CONF, line, &IosNames { e: self, ni }).ok() } else { None };
                 match up {
                     Some(p) => {
                         self.set_mode(ni, Mode::Config);
@@ -791,16 +827,21 @@ impl Engine {
     fn ios_do(&mut self, ni: usize, mode: Mode, p: &Parsed<K>, line: &str) -> Result<(), String> {
         let dev = self.dev_of(ni);
         match p.cmd {
-            K::Enable => {
-                self.set_mode(ni, Mode::Priv);
-                Ok(())
-            }
-            K::Disable => {
-                self.set_mode(ni, Mode::User);
-                Ok(())
-            }
+            K::Enable => self.enable_cmd(ni, p),
+            K::Disable => self.disable_cmd(ni, p),
             K::Exit => match mode {
                 Mode::User | Mode::Priv => {
+                    // a configured login re-locks the console (accounting stop first)
+                    if self.line_login_plan(ni, "con 0").is_some() {
+                        let user = self.cdev(ni).map(|c| c.user.clone()).unwrap_or_default();
+                        if !user.is_empty() {
+                            self.aaa_acct(ni, crate::aaa::Requester::Console, &user, false);
+                        }
+                        self.set_mode(ni, Mode::User);
+                        self.out(ni, "\nConsole session closed.\n\n");
+                        self.console_login(ni);
+                        return Ok(());
+                    }
                     let host = self.host(ni);
                     self.out(ni, &format!("\n{}: session closed.\n\nConsole ready, press Enter to log in.\n\n", host));
                     self.set_mode(ni, Mode::Out);
@@ -860,13 +901,17 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF | super::D_BGP
+                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF | super::D_BGP | super::D_AAA | super::D_RADIUS
                 } else if p.has("icmp") {
                     D_ICMP
                 } else if p.has("rip") {
                     D_RIP
                 } else if p.has("nat") {
                     super::D_NAT
+                } else if p.has("authentication") || p.has("aaa") {
+                    super::D_AAA
+                } else if p.has("radius") {
+                    super::D_RADIUS
                 } else {
                     D_ARP
                 };
@@ -886,6 +931,8 @@ impl Engine {
                     (o, _, D_ICMP) => format!("Debug output for ICMP: {}\n", if o { "off" } else { "on" }),
                     (o, _, D_RIP) => format!("Debug output for RIP: {}\n", if o { "off" } else { "on" }),
                     (o, _, super::D_NAT) => format!("Debug output for NAT: {}\n", if o { "off" } else { "on" }),
+                    (o, _, super::D_AAA) => format!("Debug output for AAA authentication: {}\n", if o { "off" } else { "on" }),
+                    (o, _, super::D_RADIUS) => format!("Debug output for RADIUS: {}\n", if o { "off" } else { "on" }),
                     (o, _, _) => format!("Debug output for ARP: {}\n", if o { "off" } else { "on" }),
                 };
                 self.out(ni, &text);
@@ -990,6 +1037,7 @@ impl Engine {
             K::LinePassword | K::LineLogin | K::LineLogging | K::LineTimeout => {
                 let (key, val) = match p.cmd {
                     K::LinePassword => ("password", format!("password {}", p.text("pw").unwrap_or(""))),
+                    K::LineLogin if p.has("local") => ("login", String::from("login local")),
                     K::LineLogin => ("login", String::from("login")),
                     K::LineLogging => ("logging synchronous", String::from("logging synchronous")),
                     _ => {
@@ -1104,6 +1152,30 @@ impl Engine {
             | K::ClearBgp
             | K::DebugBgp => self.ios_bgp(ni, p),
             K::Dir | K::ShowFlash | K::More | K::Delete | K::Copy | K::IpFtp => self.ios_files(ni, p),
+            K::EnableSecret
+            | K::EnablePassword
+            | K::Username
+            | K::SvcPwEnc
+            | K::Banner
+            | K::AaaNewModel
+            | K::AaaAuthLogin
+            | K::AaaAuthEnable
+            | K::AaaAuthorExec
+            | K::AaaAcctExec
+            | K::AaaGroupCmd
+            | K::SgServer
+            | K::RadiusServerCmd
+            | K::RadiusHost
+            | K::RsAddress
+            | K::RsKey
+            | K::RsTimeout
+            | K::RsRetransmit
+            | K::LineLoginAuth
+            | K::ShowAaa
+            | K::ShowRadiusStats
+            | K::ShowUsers
+            | K::TestAaa => self.ios_aaa(ni, p, line),
+            K::Telnet => self.ios_telnet(ni, p),
         }
     }
 

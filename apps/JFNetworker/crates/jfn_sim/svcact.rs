@@ -46,6 +46,10 @@
 //     ftp-server      {"root": "/srv/ftp", "anonymous": true, "anon_write": false, "users":
 //                     [{"name": "anna", "password": "geheim", "home": "/srv/ftp/anna", "write":
 //                     true}], "active": true, "quota_kb": 0, ...} (ftpd.rs)
+//     radius-server   {"auth_port": 1812, "acct_port": 1813, "clients": [{"address":
+//                     "10.0.0.0/24", "secret": "geheim"}], "users": [{"name": "admin",
+//                     "password": "...", "privilege": 15, "reply": "..."}], "acct_log":
+//                     "/var/log/radius/accounting"} (radiusd.rs)
 //
 //   HttpLoadSet / HttpServerSet    change a running load generator or web server in place
 //   ScriptSource / RenameService   a script's new definition, keeping its disk and numbers
@@ -213,6 +217,7 @@ impl Engine {
             "script" => crate::scriptsvc::from_def_msg(c).map_err(|w| bad(kind, w))?,
             "tftp-server" => Box::new(crate::tftpd::TftpServer::from_config(c, ios).map_err(|w| bad(kind, w))?),
             "ftp-server" => Box::new(crate::ftpd::FtpServer::from_config(c).map_err(|w| bad(kind, w))?),
+            "radius-server" => Box::new(crate::radiusd::RadiusServerSvc::from_config(c).map_err(|w| bad(kind, w))?),
             k => return Err(ActErr::Refused(msg!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k))),
         };
         let name = if def.name.is_empty() { def.kind.clone() } else { def.name.clone() };

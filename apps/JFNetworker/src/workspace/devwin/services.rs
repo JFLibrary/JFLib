@@ -44,6 +44,7 @@ fn kind_name(kind: &str) -> &str {
         "ospf" => "Routing (OSPF)",
         "tftp-server" => "TFTP-Server",
         "ftp-server" => "FTP-Server",
+        "radius-server" => "RADIUS-Server",
         _ => return kind,
     })
 }

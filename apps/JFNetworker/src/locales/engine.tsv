@@ -1147,3 +1147,33 @@ Optik {} an {} passt nicht zur Optik {} am anderen Ende; die Leitung bleibt aus.
 Kabel zu lang: {} m, erlaubt {} m ({} zwischen {} und {}); die Leitung bleibt aus.	Cable too long: {} m, {} m allowed ({} between {} and {}); the link stays down.
 Optiken passen nicht: {} an {}, {} an {}; die Leitung bleibt aus.	Optics do not fit: {} at {}, {} at {}; the link stays down.
 {} zwischen {} und {} passt nicht zur Optik {} (SR braucht Multimode, LR Singlemode); die Leitung bleibt aus.	{} between {} and {} does not fit the optics {} (SR needs multimode, LR single-mode); the link stays down.
+vty {}	vty {}
+Anmeldung an der {} angenommen ({}, Rechte {}).	Login at the {} accepted ({}, privilege {}).
+Anmeldung von {} an der {} angenommen ({}, Rechte {}).	Login of {} at the {} accepted ({}, privilege {}).
+Falsches Passwort an der {}.	Wrong password at the {}.
+Falsches Passwort für {} an der {}.	Wrong password for {} at the {}.
+Anmeldung an der {} nach drei Versuchen abgelehnt.	Login at the {} refused after three tries.
+Wechsel auf Rechte {} angenommen.	Switch to privilege {} accepted.
+Falsches enable-Passwort für Rechte {}.	Wrong enable password for privilege {}.
+RADIUS: Access-Request für {} an {} (Versuch {}).	RADIUS: Access-Request for {} to {} (attempt {}).
+RADIUS: keine Antwort von {}, erneut gesendet (Versuch {}).	RADIUS: no answer from {}, sent again (attempt {}).
+RADIUS: Access-Accept für {} von {} (Rechte {}).	RADIUS: Access-Accept for {} from {} (privilege {}).
+RADIUS: Access-Accept für {} von {}.	RADIUS: Access-Accept for {} from {}.
+RADIUS: Access-Reject für {} von {}.	RADIUS: Access-Reject for {} from {}.
+RADIUS: Access-Challenge für {} von {}.	RADIUS: Access-Challenge for {} from {}.
+RADIUS: {} antwortet nicht.	RADIUS: {} does not answer.
+RADIUS: Antwort von {} verworfen ({}).	RADIUS: answer from {} dropped ({}).
+AAA: kein Server erreichbar, nächste Methode: {}.	AAA: no server reachable, next method: {}.
+AAA: keine Methode mehr übrig, Anmeldung abgelehnt.	AAA: no method left, login refused.
+RADIUS: Accounting-Start für {} an {}.	RADIUS: Accounting-Start for {} to {}.
+RADIUS: Accounting-Stop für {} an {}.	RADIUS: Accounting-Stop for {} to {}.
+Telnet: Sitzung von {} auf vty {}.	Telnet: session from {} on vty {}.
+Telnet: Verbindung von {} abgelehnt ({}).	Telnet: connection from {} refused ({}).
+Telnet: vty {} nach Leerlauf geschlossen.	Telnet: vty {} closed after idle.
+Telnet: vty {} geschlossen.	Telnet: vty {} closed.
+Telnet: verbunden mit {} Port {}.	Telnet: connected to {} port {}.
+Telnet: {} Port {} nicht erreicht ({}).	Telnet: {} port {} not reached ({}).
+„{}“ ist keine Adresse oder kein Präfix.	“{}” is not an address or a prefix.
+Ein Client braucht ein „secret“.	A client needs a “secret”.
+Ports {} / {}, {} Clients, {} Benutzer: {} angenommen, {} abgelehnt	Ports {} / {}, {} clients, {} users: {} accepted, {} rejected
+{} Anfragen, {} angenommen, {} abgelehnt, {} Zeitüberschreitungen	{} requests, {} accepted, {} rejected, {} timeouts

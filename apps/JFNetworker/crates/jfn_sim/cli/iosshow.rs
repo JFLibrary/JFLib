@@ -128,6 +128,12 @@ impl Engine {
                 if d & super::D_NAT != 0 {
                     s.push_str("Debug output for NAT: on\n");
                 }
+                if d & super::D_AAA != 0 {
+                    s.push_str("Debug output for AAA authentication: on\n");
+                }
+                if d & super::D_RADIUS != 0 {
+                    s.push_str("Debug output for RADIUS: on\n");
+                }
                 s.push_str(&Self::ios_debug6_lines(d));
                 if d & super::D_OSPF != 0 {
                     let k = match self.cdev(ni).map(|c| c.ospf_debug).unwrap_or(0) {
@@ -175,6 +181,8 @@ impl Engine {
         s.push_str(&self.ios_names_config(ni));
         // the FTP client's login (cli/files.rs)
         s.push_str(&self.ios_files_config(ni));
+        // logins, AAA and RADIUS (cli/aaa.rs)
+        s.push_str(&self.ios_aaa_config(ni));
         if let Some(st) = &n.ip {
             let default = n.model.has(F_ROUTER) && (!n.model.has(F_BRIDGE) || n.model.has(F_HOST));
             if st.forwarding != default {

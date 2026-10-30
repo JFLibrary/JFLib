@@ -1,0 +1,35 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/aaa_login.jfnet
+# the telnet client in a terminal tab (telnetd.rs): first a refused connection (back to the
+# shell at once), then a session to a listener on SRV1 ("% Connected", a typed line goes over
+# the connection).  The escape is Ctrl+Shift+6.
+# Ids: PC1's console is opened first (25088, input 25089), SRV1's second (25096, input 25097);
+# the dock is dragged up.
+size 1280 900
+theme light
+wait 600
+drag 630,671 630,380 8
+# PC1: a connection to a closed port is refused, the shell comes back
+dblclick listitem:"PC1"
+expect tab:"PC1" selected
+expect #25089 focused
+type "telnet 10.0.0.10 9999\n"
+wait 1500
+expect text:"% Connection refused by remote host" exists
+expect text:"root@PC1:~# " exists
+# SRV1: a listener with nc
+dblclick listitem:"SRV1"
+expect tab:"SRV1" selected
+type "nc -l 2300\n"
+wait 600
+# PC1: a session to it
+click tab:"PC1"
+click #25089
+type "telnet 10.0.0.10 2300\n"
+wait 1500
+expect text:"% Connected. The escape is Ctrl+Shift+6." exists
+type "hallo-welt\n"
+wait 800
+shot build/jfnetworker/telnet_session.png
+# (the typed line reaching the listener byte for byte is checked in the selftest group aaa;
+# here the point is the session in the tab and the "%" lines)
+expect_nowarn
