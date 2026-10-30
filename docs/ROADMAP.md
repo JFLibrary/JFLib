@@ -1804,7 +1804,7 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   `actions/upload-pages-artifact` mit `build/site` und `actions/deploy-pages`; in den
   Repository-Einstellungen Pages mit der Quelle „GitHub Actions“), ein `gh-pages`-Zweig oder ein
   beliebiger statischer Host; dazu wahlweise eine eigene Domain und eine Fassung pro Release.
-- **P3** · *teilweise* · Hot-Reload, Live-Inspector bzw. Debug-Overlay (`--dump` als Basis).
+- **P3** · *erledigt* · Hot-Reload, Live-Inspector bzw. Debug-Overlay (`--dump` als Basis).
   Live-Inspector erledigt (2026-10-20, [GUIDE.md §30](GUIDE.md), `lib/ui/inspect.rs`): aus
   ohne Kosten und ohne Einfluss auf die Bilder (byteweise gleich), an mit `--inspect`,
   `jfgui_INSPECT=1` (nur Tastenkürzel) oder `ui.inspect_enable` / `ui.inspect_show`, umgeschaltet
