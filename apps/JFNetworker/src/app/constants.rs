@@ -527,3 +527,9 @@ pub(crate) const ID_PHY_LEN: u32 = 0xE070;
 pub(crate) const ID_PHY_LEN_SET: u32 = 0xE071;
 pub(crate) const ID_PHY_LEN_AUTO: u32 = 0xE072;
 pub(crate) const ID_PHY_OPTIC0: u32 = 0xE080;
+
+// ---- X1c: mail (widgets 0x0001_2000 .. 0x0001_2FFF; commands 640 .. 669 and timers 0x198 ..
+// 0x19B are reserved, none used yet)
+/// the E-Mail program on the Desktop of device window k: ID_MAIL0 + 0x400 k .. + 0x3FF
+/// (devwin/email.rs)
+pub(crate) const ID_MAIL0: u32 = 0x0001_2000;

@@ -1,0 +1,41 @@
+# Mail zwischen zwei Domänen: Anna (PC1, a.lab) schreibt Bob (b.lab) über ihren Mailserver MAILA,
+# der den MX von b.lab bei DNS1 nachschlägt und an MAILB weitergibt; Bob holt die Nachricht per
+# POP3 ab; eine Nachricht an einen unbekannten Empfänger kommt als Unzustellbarkeitsnachricht
+# zu Anna zurück
+PC1: echo "From: Anna Muster <anna@a.lab>" > brief.txt
+PC1: echo "To: Bob <bob@b.lab>" >> brief.txt
+PC1: echo "Subject: Gruss aus a.lab" >> brief.txt
+PC1: echo >> brief.txt
+PC1: echo "Hallo Bob, wie geht es dir?" >> brief.txt
+PC1: curl -v smtp://mail.a.lab --mail-from anna@a.lab --mail-rcpt bob@b.lab -T brief.txt
+run 2s
+expect PC1 output contains "< 250 2.0.0 Queued as "
+expect MAILA svc smtp metric relayed == 1
+expect MAILB svc smtp metric delivered == 1
+MAILB: ls /var/mail/bob/new
+# Bob holt ab: die Liste, dann die Nachricht; die erste DNS-Frage von PC2 geht verloren, während
+# R1 nach der MAC von DNS1 fragt (IOS-artig hält er das Paket nicht zurück), der Resolver fragt
+# nach 5 s noch einmal
+PC2: curl -u bob:geheim pop3://mail.b.lab/
+run 7s
+PC2: curl -v -u bob:geheim pop3://mail.b.lab/1
+run 2s
+expect PC2 output contains "Subject: Gruss aus a.lab"
+expect PC2 output contains "Received: from mail.a.lab ([10.0.1.25]) by mail.b.lab with ESMTP id "
+expect PC2 output contains "Hallo Bob, wie geht es dir?"
+PC2: curl -u bob:geheim -X "DELE 1" pop3://mail.b.lab/
+run 2s
+expect MAILB svc pop3 metric deleted == 1
+# ein unbekannter Empfänger: MAILB lehnt RCPT ab (und das DATA, das mit ihm kam: PIPELINING),
+# MAILA schickt Anna die Unzustellbarkeitsnachricht
+PC1: echo "Bist du da?" | mail -s "Hallo Carl" carl@b.lab
+run 5s
+expect MAILA svc smtp metric bounced == 1
+expect MAILB svc smtp metric rejected == 2
+PC1: curl -u anna:geheim pop3://mail.a.lab/1
+run 2s
+expect PC1 output contains "Subject: Undelivered mail: Hallo Carl"
+expect PC1 output contains "Final-Recipient: rfc822; carl@b.lab"
+expect PC1 output contains "Status: 5.1.1"
+expect PC1 output contains "Diagnostic-Code: smtp; 550 5.1.1 <carl@b.lab>: no such user here"
+expect hops smtp >= 30

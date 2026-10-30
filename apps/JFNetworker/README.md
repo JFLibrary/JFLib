@@ -120,6 +120,13 @@ Queues, Lastgeneratoren, eigene Skripte).
   hineingezogen, jedes Kabel bekommt eine Länge (automatisch aus den Orten oder von Hand) mit der
   Grenze seines Mediums nach IEEE 802.3, ein zu langes kommt nicht hoch und ist überall zu sehen
   (siehe [Physische Ansicht](#physische-ansicht)).
+- **Mail (X1c):** Mailserver mit SMTP (RFC 5321 mit SIZE, 8BITMIME, PIPELINING, erweiterten
+  Statuscodes und AUTH auf dem Submission-Port 587) und POP3 (RFC 1939 mit UIDL und TOP):
+  Postfächer für die Benutzer der eigenen Domänen in den Dateien des Geräts, Weiterleiten an
+  andere Domänen über ihre MX-Einträge mit Warteschlange, Wiederholungen und
+  Unzustellbarkeitsnachricht, Relay-Regeln mit einem Schalter „offener Relay“ zum Lernen; das
+  Programm E-Mail im Desktop (Konto, Posteingang, Verfassen, Antworten, Senden, Abrufen), in der
+  Shell `curl smtp://`, `curl pop3://` und `mail` (siehe [Mail](#mail-smtp-und-pop3)).
 
 ## Bedienung
 
@@ -253,6 +260,10 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `phys_rack.uis` | Geräte aufstellen: SRV1 im Rack von der Tastatur zehn Höheneinheiten höher (mit Rückgängig), die Höheneinheit im Inspektor (eine über dem Rack abgelehnt), aus dem Rack über die Liste der Orte, aus der Ablage ins Rack gezogen (die unterste freie Einheit), auf die Einheiten von R1 gezogen (abgelehnt), PC4 auf ein Rack (abgelehnt: kein Rack-Gerät) und an einen Platz im Labor, die Höhe des Racks im Inspektor (zu niedrig für seine Geräte abgelehnt) |
 | `phys_length.uis` | ein zu langes Kabel, gezeigt und behoben: das Problem, das Kabel „unten“ auf der Zeichenfläche, Länge, Grenze und Ablehnung im Inspektor, das markierte Kabel in der physischen Ansicht, 90 m von Hand (oben), 132 m (unten), Automatisch und Rückgängig, eine Länge, die keine Zahl ist, PC4 über den Inspektor in Büro 1 (23 m, oben) |
 | `phys_shots.uis` | die Bilder der physischen Ansicht (Serverraum mit dem markierten Kabel und seinem Inspektor, die Vorderseite von Rack 1, das Erdgeschoss von Haus A, der Campus) hell und dunkel mit 100 und 150 % (`build/jfnetworker/phys_*.png`) |
+| `model.uis`, Gruppe `mail` | Mail (siehe [Mail](#mail-smtp-und-pop3)): der Namensserver aus `/etc/resolv.conf` (auch in der Konfiguration), eine Zustellung ins eigene Postfach auf die Nanosekunde (Received, Return-Path, die Notizen), das Weiterleiten über den MX von b.lab mit PIPELINING und zwei Received-Zeilen (R1 verliert den ersten SYN), Unzustellbares für einen unbekannten Benutzer, eine Domäne, die das DNS nicht kennt, und einen MX ohne Adresse, Wiederholungen bei ausgeschaltetem MAILB (der erste Versuch scheitert nach 3 s, der nächste kommt 10 s später, dann wartet der Server 20 s) und das Aufgeben nach 60 s, das Abrufen des Programms E-Mail mit UIDL und DELE (und mit `keep` nur einmal), Senden über 587 mit AUTH und einer Kopie in Gesendet, `curl pop3://` mit LIST, RETR, UIDL, TOP und DELE, falsche Passwörter bei POP3 und AUTH, die Größe (SIZE und nach dem Punkt), abgelehnte Relays und der offene Relay, die Probleme, `mail -H`, die Projektdatei mit den Postfächern und zwei gleiche Läufe |
+| `mail_services.uis` | SMTP- und POP3-Server im Reiter Dienste von MAILA (`fixtures/mail_domains.jfnet`): Karten mit Statuszeile, Einstellungen als JSON (eine abgelehnte Domäne, ein offener Relay in der Statuszeile und in der Probleme-Liste, ein Benutzer ohne Namen, einer ohne Postfach), Rückgängig; eine Nachricht aus PC1s Konsole zählt auf der Karte und legt das Postfach im Reiter Dateien an |
+| `mail_client.uis` | das Programm E-Mail: PC2 ohne Konto beginnt mit dem Formular, Bobs Konto (587 mit Anmeldung) als Rückgängig-Schritt, eine Nachricht an Anna (Statuszeile, Gesendet); Anna ruft ab, liest und antwortet (Empfänger, „Re: “, der Text zitiert); Bob ruft die Antwort ab, Rückgängig und Wiederholen des Abrufs, Löschen |
+| `mail_shots.uis` | die Bilder von Mail (eine abgerufene Nachricht im Programm E-Mail, eine Antwort, das Konto, die Einstellungen des SMTP-Servers) hell und dunkel mit 100 und 150 % (`build/jfnetworker/mail_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -269,6 +280,9 @@ Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp
 `rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
 für WLAN `crypto` und `netpkt`, für BGP `bgp`, für Dateien `tftp` und `ftp`), die
 Skriptsprache die Gruppe `script`.
+Für Mail: `mail_domains.jfnet` (a.lab und b.lab mit je einem Mailserver und einem PC hinter R1,
+DNS1 mit ihren MX-Einträgen; das Szenario `mail_domains.scn` und die Fensterskripte
+`mail_*.uis`), die coretest-Gruppe `mail` (SMTP, POP3 und Nachrichten Byte für Byte).
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -1154,6 +1168,9 @@ und `clear spanning-tree detected-protocols` ein und zeigen ihn (siehe
 [Spanning Tree](#spanning-tree)).
 Dateien zeigen und ändern `ls`, `cat`, `cp`, `rm`, `mkdir`, `rmdir`, `touch` und `echo … >`,
 übertragen `tftp` und `curl ftp://` (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
+Mail schicken `mail` und `curl smtp://`, `curl pop3://` holt sie ab (siehe
+[Mail](#mail-smtp-und-pop3)); `echo "nameserver ADRESSE" > /etc/resolv.conf` stellt den
+Namensserver von Hand ein.
 
 Namen löst die Shell über den Resolver des Geräts auf (`ping server.lab`, `traceroute
 server.lab`, auch kurz mit der Suchdomäne): die erste Zeile nennt wie getaddrinfo das Ende der
@@ -1381,6 +1398,14 @@ flash:`; eine fehlende Datei auf dem Server. PC1 lädt als anna per FTP hoch, li
 herunter, scheitert mit einem falschen Passwort, holt anonym `pub/readme.txt` und mit `tftp`
 eine Sicherung; 24 Erwartungen. FTP läuft dort in Schritten von 2 s, weil `run until idle` bis
 zum Leerlauf-Timeout des Servers (300 s) liefe.
+
+Ein Szenario zeigt Mail (siehe [Mail](#mail-smtp-und-pop3)). `mail_domains.scn` auf
+`fixtures/mail_domains.jfnet`: Anna (PC1, a.lab) schreibt Bob mit `curl -v smtp://` über MAILA,
+der den MX von b.lab bei DNS1 nachschlägt und die Nachricht an MAILB weitergibt (R1 verliert den
+ersten SYN, während er nach MAILB fragt: sie ist nach gut 1 s da); Bob listet sie, holt sie mit
+`curl -v pop3://` (seine erste DNS-Frage verliert R1 ebenso, der Resolver fragt nach 5 s noch
+einmal) und löscht sie; eine Nachricht an einen unbekannten Benutzer von b.lab (`echo … |
+mail`) kommt als Unzustellbarkeitsnachricht zu Anna zurück, die sie abholt; 14 Erwartungen.
 
 ### Skripte in Hosts
 
@@ -2510,6 +2535,101 @@ Für Programme: `jfn_model::phys` (`Tree`, `length`, `delay_ns`, `reach`, `link_
 `phys` ([`src/phystest.rs`](src/phystest.rs)), mit `scen_phys_lengths.uis` und den
 Fensterskripten `phys_view.uis`, `phys_rack.uis`, `phys_length.uis` und `phys_shots.uis`.
 
+### Mail (SMTP und POP3)
+
+Mailserver sind Dienste wie die anderen ([`smtpd.rs`](crates/jfn_sim/smtpd.rs),
+[`pop3d.rs`](crates/jfn_sim/pop3d.rs), [`mailc.rs`](crates/jfn_sim/mailc.rs),
+[`mailbox.rs`](crates/jfn_sim/mailbox.rs)); die Nachrichten liegen in den Dateien der Geräte
+und werden mit dem Projekt gespeichert. Die Bytes baut und liest der Codec der Library
+([`netpkt::smtp`](../../lib/netpkt/smtp.rs), [`pop3`](../../lib/netpkt/pop3.rs),
+[`imf`](../../lib/netpkt/imf.rs)); der Paket-Tab zeigt jede Zeile beider Protokolle mit Befehl,
+Code und erweitertem Statuscode, der Simulationsmodus hat für sie die Kategorie „Mail“ in einem
+gedämpften Beerenrot (3:1 gegen die Fläche in beiden Themes und im Hochkontrast).
+
+- **SMTP-Server** (Dienst `smtp-server`): Port 25 und der Submission-Port 587 (RFC 6409), EHLO
+  mit SIZE, 8BITMIME, PIPELINING und ENHANCEDSTATUSCODES, auf 587 AUTH PLAIN und LOGIN (RFC
+  4954) mit den Benutzern des Dienstes; ohne Anmeldung nimmt 587 kein MAIL an (530). Er nimmt
+  Mail für seine Domänen (`domains`) an, wenn es den Benutzer gibt (`users`; `postmaster` immer,
+  sonst 550 5.1.1), und Mail an andere Domänen nur von Clients, die weiterleiten lassen dürfen:
+  aus `networks` (ohne Angabe die Netze seiner Interfaces), angemeldet, oder mit `open_relay`
+  von jedem (sonst 554 5.7.1; der Schalter ist zum Lernen da und steht als Problem in der
+  Liste). `max_size_kb` begrenzt die Größe (ein zu großes SIZE schon bei MAIL, sonst nach dem
+  Punkt: 552 5.3.4). Jede Nachricht bekommt eine Received-Zeile und kommt nach dem Schreiben
+  auf die Disk des Geräts in die Warteschlange; 250 nennt ihre Nummer.
+- **Zustellen:** in ein Postfach des Geräts nach einem zweiten Schreiben (Maildir:
+  `/var/mail/BENUTZER/new/SEKUNDEN.MµsQn.GERÄT` mit `Return-Path` oben und den Zeilenenden von
+  Unix; die Verzeichnisse entstehen mit der ersten Nachricht); an andere Domänen über deren
+  MX-Einträge, die der Resolver des Geräts findet (ohne MX die Domäne selbst), die Adressen
+  jedes Mailservers der Reihe nach mit `connect_timeout_ms` (30 s) und PIPELINING, wenn der
+  nächste Server es anbietet. 2xx ist zugestellt; 5xx oder eine Domäne, die das DNS nicht
+  kennt, ist endgültig; alles andere (keine Verbindung, 4xx, ein DNS ohne Antwort) wird
+  zurückgestellt: der nächste Versuch nach `retry_ms` (60 s), dann jeweils doppelt so spät bis
+  `retry_max_ms`, nach `give_up_ms` (10 min) wird aufgegeben (RFC 5321 nennt mindestens 30 min
+  und 4 bis 5 Tage; hier verkürzt und einstellbar). Ein MX, der auf den Server selbst zeigt,
+  ist eine Schleife. Wer abgewiesen oder aufgegeben wurde, steht in einer
+  Unzustellbarkeitsnachricht an den Absender (multipart/report nach RFC 3464 mit Text,
+  `Final-Recipient`, `Status`, `Remote-MTA`, `Diagnostic-Code` und dem Kopf der Nachricht) von
+  `MAILER-DAEMON` mit leerem Absender; scheitert sie selbst, wird sie verworfen. Die
+  Warteschlange lebt im Speicher des Dienstes und geht mit dem Strom verloren.
+- **POP3-Server** (Dienst `pop3-server`, Port 110): Benutzer mit Passwort (`users`), USER und
+  PASS (ein falsches Passwort nach `fail_delay_ms`, nach `max_fails` ist Schluss), STAT, LIST,
+  UIDL (der eindeutige Name der Datei), RETR und TOP nach der Lesezeit der Disk, DELE, RSET,
+  NOOP, CAPA und QUIT, das erst dann die markierten Nachrichten löscht (ein Rückgängig-Schritt
+  des Projekts); ein Postfach hält nur eine Sitzung (`[IN-USE]`).
+- **E-Mail im Desktop** ([`devwin/email.rs`](src/workspace/devwin/email.rs)): das Konto (Name,
+  Adresse, SMTP-Server und Port, POP3-Server und Port, Benutzer, Passwort, Nachrichten auf dem
+  Server lassen) liegt als `/root/Mail/account` auf dem Gerät; Posteingang (`/root/Mail/inbox`)
+  und Gesendet (`/root/Mail/sent`) mit Absender, Betreff und Datum, die gewählte Nachricht
+  darunter; Verfassen (An, Cc, Betreff, Text), Antworten („Re: “, an den Absender, der Text
+  zitiert), Löschen, Senden und Abrufen. Senden und Abrufen gehen als `Action::MailSend` /
+  `MailFetch` an den Simulator (so spielt das Zurückspulen sie nach), der ein Programm des
+  Geräts damit beauftragt; abgerufen wird, was die UIDL noch nicht kannte (`/root/Mail/.uidl`).
+  Zwei Zeilen sagen, was das letzte Senden und Abrufen ergab.
+- **Shell:** `curl smtp://SERVER[:PORT][/HELO] --mail-from A --mail-rcpt B -T DATEI [-u
+  BENUTZER:PASSWORT] [-v]` und `curl pop3://SERVER[/N] -u BENUTZER:PASSWORT [-X BEFEHL] [-o
+  DATEI] [-v]` mit den Schritten, Meldungen und Exit-Codes von curl; `mail` einmalig: `echo
+  TEXT | mail -s BETREFF [-c ADRESSE] [-r ABSENDER] EMPFÄNGER` übergibt eine Nachricht an den
+  SMTP-Server des Kontos (oder an einen auf dem Gerät selbst), `mail -H` listet den
+  Posteingang. Ein Mailprogramm in der Konsole (lesen, antworten) gibt es nicht, das macht
+  E-Mail im Desktop. Server und Hosts mit fester Adresse bekommen ihren Namensserver mit `echo
+  "nameserver ADRESSE" > /etc/resolv.conf` (`>>` für weitere Zeilen, auch `search`); so
+  schreibt ihn auch ihre Konfiguration.
+- **Notizen und Probleme:** Sitzungen, Anmeldungen, Absender und Empfänger, abgelehnte Befehle
+  und Relays, die Warteschlange, Zustellungen, MX-Einträge, Weitergaben, Zurückstellungen mit
+  dem nächsten Versuch und Unzustellbares als Notiz (`Note::Mail`) und Log-Zeile (`smtpd`,
+  `pop3d`, `e-mail`); die Probleme-Liste nennt einen MX-Eintrag ohne Adresse (oder ohne
+  SMTP-Server dort), einen offenen Relay und einen POP3-Benutzer, dessen Mail nie ankommen kann.
+- **Zahlen:** der SMTP-Server zählt `sessions`, `active`, `logins`, `failed_logins`, `received`,
+  `delivered`, `relayed`, `deferred`, `bounced`, `relay_denied`, `rejected`, `too_big`, `queued`
+  und `bytes_received`, der POP3-Server `sessions`, `active`, `logins`, `failed_logins`,
+  `retrieved`, `deleted` und `bytes_sent` (für `expect … svc NAME metric …` und den Bereich
+  Metriken, der für beide eigene Diagramme hat).
+
+Ein Mailserver in der Projektdatei:
+
+```json
+{"kind": "smtp-server", "name": "smtp", "config": {"hostname": "mail.a.lab", "domains": ["a.lab"],
+ "users": [{"name": "anna", "password": "geheim"}], "networks": ["10.0.1.0/24"]}},
+{"kind": "pop3-server", "name": "pop3", "config": {"users": [{"name": "anna", "password": "geheim"}]}}
+```
+
+Entscheidungen: Maildir statt mbox, weil jede Nachricht eine Datei im Reiter Dateien ist, UIDL
+ihr Name und DELE das Entfernen einer Datei. Die Antworten der Server, ihre Begrüßung, die
+Unzustellbarkeitsnachricht und die Log-Zeilen sind eigene Worte auf Englisch wie bei den
+anderen Servern; Codes und Formate folgen den RFCs. `mail` ist einmalig gehalten. Weder
+STARTTLS noch IMAP.
+
+Noch offen: IMAP, STARTTLS und SMTPS, Weiterleitungen und Aliase außer postmaster, eine
+Warteschlange auf der Disk, die einen Neustart übersteht, Anhänge im Programm E-Mail, SPF und
+DKIM.
+
+Für Programme: `Action::MailSend { dev, draft: MailDraft }`, `Action::MailFetch { dev }`,
+`Engine::mail_client(dev)`, `jfn_sim::mailc` (`Account`, `folder`, `read_mail`, `INBOX`,
+`SENT`, `ACCOUNT`), `Note::Mail(MNote)`, `ProblemKind::MailMxNowhere`, `MailOpenRelay` und
+`MailNoMailbox`. Geprüft wird in der Selbsttest-Gruppe `mail` ([`src/mailtest.rs`](src/mailtest.rs)),
+in der coretest-Gruppe `mail` (die Codecs Byte für Byte), mit `scen_mail_domains.uis` und den
+Fensterskripten `mail_services.uis`, `mail_client.uis` und `mail_shots.uis`.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -2577,7 +2697,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · Gruppen · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; SNMP, AAA mit RADIUS, Mail) |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · Gruppen · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; SNMP, AAA mit RADIUS) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

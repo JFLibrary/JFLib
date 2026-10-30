@@ -49,6 +49,16 @@
 //             codes, netascii, looks_like (a transfer away from port 69)  (RFC 1350, 2347-2349)
 //   ftp       Command, Reply (multi-line), Lines, ReplyReader, host_port (PORT, 227), eprt,
 //             epsv_port (229), the reply texts as the server's own words  (RFC 959, 2428, 2389)
+//   smtp      Command, Path (MAIL FROM / RCPT TO with parameters), Reply (multi-line, enhanced
+//             status codes), ReplyReader, Ehlo (keywords: SIZE, 8BITMIME, PIPELINING, AUTH),
+//             Stream (the server's commands and DATA with dot-stuffing), stuff, AUTH PLAIN and
+//             LOGIN, received            (RFC 5321, 1870, 6152, 2920, 2034, 3463, 4954, 4616)
+//   pop3      Command, Response (+OK / -ERR, multi-line with dot-stuffing), multi_line, Reader
+//             (the responses of a server in pieces)                    (RFC 1939, 2449)
+//   imf       Internet messages: Message (header fields folded and unfolded, the body as text),
+//             Mailbox (addresses with display names), Date, Message-ID, encoded words,
+//             quoted-printable, base64, multipart parts, Draft (a plain-text message in UTF-8)
+//                                                                (RFC 5322, 2045-2047, 3464)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -85,6 +95,9 @@ pub mod eapol;
 pub mod bgp;
 pub mod tftp;
 pub mod ftp;
+pub mod smtp;
+pub mod pop3;
+pub mod imf;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

@@ -1952,6 +1952,10 @@ impl Engine {
     }
 
     pub(crate) fn sh_curl(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
+        // smtp:// and pop3:// URLs (cli/mail.rs)
+        if args.iter().any(|a| a.get(..7).is_some_and(|p| p.eq_ignore_ascii_case("smtp://") || p.eq_ignore_ascii_case("pop3://"))) {
+            return self.sh_curl_mail(ni, args);
+        }
         // ftp:// URLs (ftpc.rs)
         if args.iter().any(|a| a.len() > 6 && a[..6].eq_ignore_ascii_case("ftp://")) {
             return self.sh_curl_ftp(ni, args);
@@ -2000,7 +2004,7 @@ impl Engine {
                 Ok(d) => d,
                 Err(e) => return self.tool_err(ni, &e),
             },
-            _ => return self.tool_err(ni, "jfn-sh: a pipe here takes echo or printf on the left and nc or cat on the right\n"),
+            _ => return self.tool_err(ni, "jfn-sh: a pipe here takes echo or printf on the left and nc, cat or mail on the right\n"),
         };
         match rw.first().map(String::as_str) {
             Some("nc") | Some("netcat") => {
@@ -2011,7 +2015,12 @@ impl Engine {
                 self.out(ni, &String::from_utf8_lossy(&data));
                 Ok(())
             }
-            _ => self.tool_err(ni, "jfn-sh: a pipe here takes echo or printf on the left and nc or cat on the right\n"),
+            // the text of a message (cli/mail.rs)
+            Some("mail") => {
+                let args: Vec<&str> = rw[1..].iter().map(String::as_str).collect();
+                self.sh_mail(ni, &args, Some(data))
+            }
+            _ => self.tool_err(ni, "jfn-sh: a pipe here takes echo or printf on the left and nc, cat or mail on the right\n"),
         }
     }
 

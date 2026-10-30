@@ -1,0 +1,76 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/mail_domains.jfnet
+# the SMTP and the POP3 server in MAILA's device window (Dienste, svcedit.rs) on
+# fixtures/mail_domains.jfnet: their cards with kind, state and status line; the SMTP server's
+# settings as JSON: a domain the simulator refuses, then an open relay (the status says so,
+# the problems list names it) and undo; the POP3 server's settings: a user without a name
+# refused, then a user whose mail cannot arrive (a problem) and undo; a message from PC1 counts
+# on the SMTP server's card.
+# Ids: the window 26624; Dienste: the settings buttons 51200 (smtp) and 51201 (pop3), the editor
+# 51456, Übernehmen 51472, Abbrechen 51473.
+size 1280 900
+theme light
+dblclick listitem:"MAILA" shift
+expect window 26624 open
+click tab:"Dienste"
+expect text:"Mailserver (SMTP) · smtp" exists
+expect text:"Postfach (POP3) · pop3" exists
+expect text:"Port 25, 587, a.lab: 0 empfangen, 0 zugestellt, 0 weitergeleitet, 0 unzustellbar, 0 in der Warteschlange" exists
+expect text:"Port 110, 1 Benutzer: 0 Sitzungen, 0 Anmeldungen, 0 abgelehnt, 0 Nachrichten abgeholt, 0 gelöscht" exists
+# ---- the SMTP server: a domain that is none, then an open relay
+click #51200
+expect text:"Die Einstellungen von smtp als JSON. Übernehmen prüft sie und startet MAILA mit ihnen neu." exists
+focus #51456
+key ctrl+a
+type "{\"domains\": [\"a lab\"]}"
+click #51472
+expect text:"Dienst smtp-server: „a lab“ ist keine Domäne." exists
+focus #51456
+key ctrl+a
+type "{\"hostname\": \"mail.a.lab\", \"domains\": [\"a.lab\"], \"users\": [{\"name\": \"anna\", \"password\": \"geheim\"}], \"open_relay\": true}"
+click #51472
+expect #51456 missing
+expect text:"Port 25, 587, a.lab, offener Relay: 0 empfangen, 0 zugestellt, 0 weitergeleitet, 0 unzustellbar, 0 in der Warteschlange" exists
+shot build/jfnetworker/mail_services.png window 26624
+close window 26624
+click tab:"Probleme"
+expect text:"Dienst smtp auf MAILA ist ein offener Relay: er leitet Mail jedes Absenders weiter." exists
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+expect text:"Dienst smtp auf MAILA ist ein offener Relay: er leitet Mail jedes Absenders weiter." missing
+# ---- the POP3 server: a user without a name, then one whose mail cannot arrive
+dblclick listitem:"MAILA" shift
+expect window 26624 open
+click tab:"Dienste"
+click #51201
+expect text:"Die Einstellungen von pop3 als JSON. Übernehmen prüft sie und startet MAILA mit ihnen neu." exists
+focus #51456
+key ctrl+a
+type "{\"users\": [{\"password\": \"x\"}]}"
+click #51472
+expect text:"Dienst pop3-server: Ein Benutzer braucht „name“ ohne Leerzeichen, @ und /." exists
+focus #51456
+key ctrl+a
+type "{\"users\": [{\"name\": \"anna\", \"password\": \"geheim\"}, {\"name\": \"eve\", \"password\": \"x\"}]}"
+click #51472
+expect #51456 missing
+expect text:"Port 110, 2 Benutzer: 0 Sitzungen, 0 Anmeldungen, 0 abgelehnt, 0 Nachrichten abgeholt, 0 gelöscht" exists
+close window 26624
+click tab:"Probleme"
+expect text:"POP3-Benutzer eve auf MAILA hat kein Postfach, und kein SMTP-Server dort nimmt Mail für ihn an." exists
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+expect text:"POP3-Benutzer eve auf MAILA hat kein Postfach, und kein SMTP-Server dort nimmt Mail für ihn an." missing
+# ---- a message from PC1 to anna: the card counts it
+dblclick listitem:"PC1"
+expect tab:"PC1" selected
+type "echo Hallo | mail -s Notiz anna@a.lab\n"
+wait 2000
+dblclick listitem:"MAILA" shift
+expect window 26624 open
+click tab:"Dienste"
+expect text:"Port 25, 587, a.lab: 1 empfangen, 1 zugestellt, 0 weitergeleitet, 0 unzustellbar, 0 in der Warteschlange" exists
+click tab:"Dateien"
+expect text:"/var/mail/anna/cur" exists
+expect_nowarn

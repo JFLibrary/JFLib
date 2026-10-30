@@ -136,6 +136,15 @@
 //   phys     the physical layer (P1): cable lengths against the reach of their media, the
 //            optics of fibres; Action::CableLen / Optic, cable_phys, PhysNote (Note::Phys),
 //            the problems CableTooLong and OpticMismatch
+//   mailtrace MNote: the decisions of mail as notes (Note::Mail) with their German sentences
+//   mailbox  the mailboxes of the mail servers in the device's files: a Maildir per user
+//   mailc    the clients of mail: the SMTP conversation, connections by name, the E-Mail
+//            program's POP3 session, its account and folders (Action::MailSend / MailFetch,
+//            Engine::mail_client)
+//   smtpd    the SMTP server (RFC 5321 with SIZE, 8BITMIME, PIPELINING, enhanced status codes,
+//            AUTH on port 587): local mailboxes, relaying by MX with a queue, retries and
+//            bounces; "smtp-server"
+//   pop3d    the POP3 server (RFC 1939 with UIDL, TOP and CAPA); "pop3-server"
 //
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
@@ -220,6 +229,11 @@ pub mod ftpd;
 pub mod ftpc;
 pub mod keyframe;
 pub mod phys;
+pub mod mailtrace;
+pub mod mailbox;
+pub mod mailc;
+pub mod smtpd;
+pub mod pop3d;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -283,3 +297,7 @@ pub use ftpd::{FtpServer, FtpUser};
 pub use ftpc::FtpProgram;
 pub use keyframe::{Budget, Footprint, InKind, Input, Past, Pos, Restore, Rewind, Target};
 pub use phys::{CablePhys, PhysFault, PhysNote};
+pub use mailtrace::MNote;
+pub use mailc::{Account, MailClient, MailClientView, MailDraft, MailEntry, MailJob, MailOutcome};
+pub use smtpd::{MailUser, SmtpServer};
+pub use pop3d::Pop3Server;

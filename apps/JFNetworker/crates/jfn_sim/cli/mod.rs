@@ -58,6 +58,8 @@
 //   files    the files of a device: dir, show flash:, more, delete, copy with its questions,
 //            ip ftp username / password (IOS-like); ls, cat, rm, cp, mkdir, rmdir, touch, echo
 //            > FILE, tftp (Linux); curl ftp:// is ftpc.rs
+//   mail     mail on the shell: curl smtp:// and pop3://, mail (one message from a pipe, -H the
+//            E-Mail program's inbox)
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -103,6 +105,7 @@ pub mod names;
 pub mod wlan;
 pub mod bgp;
 pub mod files;
+pub mod mail;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;

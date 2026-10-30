@@ -10,9 +10,11 @@
 //                           simulator has no file system yet)
 //     Webbrowser            an address line and the page as text; until the simulator speaks
 //                           HTTP it says what it would load
+//     E-Mail                an account, the inbox and the messages sent, writing, answering,
+//                           sending and fetching (email.rs)
 //
-// Ids: id + 1 .. + 4 the tiles, + 5 back, + 0x10 the IP configuration, + 0x20 the editor,
-// + 0x30 the browser.
+// Ids: id + 1 .. + 4 the tiles, + 5 back, + 6 the tile of E-Mail, + 0x10 the IP configuration,
+// + 0x20 the editor, + 0x30 the browser; E-Mail has ID_MAIL0 + 0x400 k of its own.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -34,14 +36,16 @@ pub(crate) enum App {
     Prompt,
     Editor,
     Browser,
+    Mail,
 }
 
 // i18n
-const APPS: [(App, &str, &str); 4] = [
+const APPS: [(App, &str, &str); 5] = [
     (App::IpConfig, "IP-Konfiguration", "Adresse, Maske und Gateway oder DHCP"),
     (App::Prompt, "Eingabeaufforderung", "Die Shell des Geräts"),
     (App::Editor, "Texteditor", "Notizen zum Gerät"),
     (App::Browser, "Webbrowser", "Seiten als Text"),
+    (App::Mail, "E-Mail", "Nachrichten senden und abrufen"),
 ];
 
 /// the desktop's state
@@ -64,6 +68,8 @@ pub(crate) struct Desk {
     // Webbrowser
     url: String,
     page: Vec<String>,
+    // E-Mail
+    pub mail: super::email::MailUi,
 }
 
 impl Desk {
@@ -82,6 +88,7 @@ impl Desk {
             text_src: None,
             url: String::from("http://"),
             page: Vec::new(),
+            mail: super::email::MailUi::new(),
         }
     }
 }
@@ -121,6 +128,7 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         }
         App::Editor => editor(n, ui, k, id + 0x20, dev),
         App::Browser => browser(n, ui, k, id + 0x30, dev),
+        App::Mail => super::email::program(n, ui, k, crate::app::constants::ID_MAIL0 + 0x400 * k as u32, dev),
         App::Home => {}
     }
 }
@@ -135,12 +143,15 @@ fn home(n: &mut Net, ui: &mut Ui, k: usize, id: u32) {
             App::IpConfig => IC_SETTINGS,
             App::Prompt => JN_TERMINAL,
             App::Editor => IC_DOCUMENT,
+            App::Mail => IC_MAIL,
             _ => IC_GLOBE,
         };
         ui.next_size(150, 96);
         ui.next_icon(icon);
         ui.next_flags(ST_LARGE);
-        if ui.button(id + 1 + i as u32, t(label)) & EV_ACT != 0 {
+        // the tiles after the first four: + 6 on (+ 5 is the way back)
+        let tid = if i < 4 { id + 1 + i as u32 } else { id + 2 + i as u32 };
+        if ui.button(tid, t(label)) & EV_ACT != 0 {
             chosen = Some(*app);
         }
         ui.tooltip(t(tip));

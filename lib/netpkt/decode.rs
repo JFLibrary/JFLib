@@ -40,6 +40,11 @@
 // with its verb and argument and each reply line with its code; FTP-DATA (port 20, the active
 // data connections) its bytes; passive data connections run between two free ports and show
 // as TCP data (ftp.rs).
+// SMTP (TCP ports 25 and 587) shows each command line with its verb and parameter, each reply
+// line with its code and enhanced status code, and the lines of a message after DATA as such
+// (the line with the dot ends it); POP3 (port 110) each command with its parameters, the status
+// indicator and description of a response, the lines of a multi-line one.  Both share the bit
+// P_MAIL (smtp.rs, pop3.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -66,6 +71,8 @@ use crate::ospf;
 use crate::bgp;
 use crate::tftp;
 use crate::ftp;
+use crate::smtp;
+use crate::pop3;
 
 pub const P_ETH: u32 = 1 << 0;
 pub const P_VLAN: u32 = 1 << 1;
@@ -98,6 +105,8 @@ pub const P_BGP: u32 = 1 << 30;
 /// FTP's control connection and its active data connections (FTP-DATA)
 pub const P_FTP: u32 = 1 << 26;
 pub const P_DATA: u32 = 1 << 31;
+/// mail: SMTP (TCP ports 25 and 587) and POP3 (port 110)
+pub const P_MAIL: u32 = 1 << 28;
 
 /// a protocol layer
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -134,6 +143,10 @@ pub enum Proto {
     Ftp,
     /// an active FTP data connection (port 20)
     FtpData,
+    /// SMTP (ports 25 and 587)
+    Smtp,
+    /// POP3 (port 110)
+    Pop3,
 }
 
 impl Proto {
@@ -169,6 +182,8 @@ impl Proto {
             Proto::Bgp => "BGP",
             Proto::Ftp => "FTP",
             Proto::FtpData => "FTP-DATA",
+            Proto::Smtp => "SMTP",
+            Proto::Pop3 => "POP3",
         }
     }
     pub fn bit(self) -> u32 {
@@ -202,6 +217,7 @@ impl Proto {
             Proto::Eapol => P_EAPOL,
             Proto::Bgp => P_BGP,
             Proto::Ftp | Proto::FtpData => P_FTP,
+            Proto::Smtp | Proto::Pop3 => P_MAIL,
         }
     }
 }
@@ -264,6 +280,8 @@ fn tcp_app(sp: u16, dp: u16) -> Option<Proto> {
             bgp::PORT => Proto::Bgp,
             ftp::PORT_FTP => Proto::Ftp,
             ftp::PORT_FTP_DATA => Proto::FtpData,
+            smtp::PORT_SMTP | smtp::PORT_SUBMISSION => Proto::Smtp,
+            pop3::PORT_POP3 => Proto::Pop3,
             _ => return None,
         })
     };
@@ -565,6 +583,8 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Bgp => Some(bgp_layer(frame, off, len)),
             Proto::Tftp => Some(tftp_layer(frame, off, len)),
             Proto::Ftp => Some(ftp_layer(frame, off, len, ftp_response(&st, frame))),
+            Proto::Smtp => Some(smtp_layer(frame, off, len, mail_response(&st, frame))),
+            Proto::Pop3 => Some(pop3_layer(frame, off, len, mail_response(&st, frame))),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -1024,6 +1044,8 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Tftp => Some(tftp_info(b)),
         Proto::Ftp => Some(ftp_info(b, ftp_response(st, frame))),
         Proto::FtpData => Some(format!("FTP Data: {} bytes", b.len())),
+        Proto::Smtp => Some(smtp_info(b, mail_response(st, frame))),
+        Proto::Pop3 => Some(pop3_info(b, mail_response(st, frame))),
         _ => None,
     }
 }
@@ -2753,4 +2775,166 @@ fn ftp_info(b: &[u8], response: bool) -> String {
     let e = b.iter().position(|&c| c == b'\n').unwrap_or(b.len());
     let line = String::from_utf8_lossy(&b[..e]);
     format!("{}: {}", if response { "Response" } else { "Request" }, line.trim_end())
+}
+
+// ---------------------------------------------------------------- mail: SMTP and POP3
+
+/// the segment of an SMTP or POP3 connection comes from the server (its well-known port is the
+/// source and not the destination)
+fn mail_response(st: &Stack, frame: &[u8]) -> bool {
+    let server = |p: u16| p == smtp::PORT_SMTP || p == smtp::PORT_SUBMISSION || p == pop3::PORT_POP3;
+    match st.find(Proto::Tcp).and_then(|(o, _)| TcpView::parse(&frame[o..])) {
+        Some(t) => server(t.src_port()) && !server(t.dst_port()),
+        None => false,
+    }
+}
+
+/// the lines of an application layer: (start, end without the line end, end with it)
+fn lines_of(b: &[u8]) -> Vec<(usize, usize, usize)> {
+    let mut v = Vec::new();
+    let mut p = 0;
+    while p < b.len() {
+        match b[p..].iter().position(|&c| c == b'\n') {
+            Some(i) => {
+                let end = p + i + 1;
+                let e = if i > 0 && b[p + i - 1] == b'\r' { p + i - 1 } else { p + i };
+                v.push((p, e, end));
+                p = end;
+            }
+            None => {
+                v.push((p, b.len(), b.len()));
+                break;
+            }
+        }
+    }
+    v
+}
+
+/// the request of a line: (verb, its length, where the parameter starts) when it starts with a
+/// command the protocol knows
+fn mail_verb(line: &str, known: fn(&str) -> bool) -> Option<(String, usize, usize)> {
+    let lead = line.len() - line.trim_start().len();
+    let w = line[lead..].split(' ').next()?;
+    if w.is_empty() || !known(w) {
+        return None;
+    }
+    Some((w.to_ascii_uppercase(), w.len(), lead + w.len() + 1))
+}
+
+fn smtp_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Smtp, off, len, String::from("Simple Mail Transfer Protocol"));
+    for (s, e, end) in lines_of(b) {
+        if end == b.len() && e == end && !b.ends_with(b"\n") {
+            l.f("Continuation", off + s, end - s, format!("{} bytes", end - s));
+            break;
+        }
+        let line = String::from_utf8_lossy(&b[s..e]).into_owned();
+        if e - s > 998 {
+            l.bad(String::from("a line longer than 1000 bytes (RFC 5321 4.5.3.1.6)"));
+        }
+        if response {
+            l.f("Response", off + s, end - s, line.clone());
+            let d = line.as_bytes();
+            if d.len() >= 3 && d[..3].iter().all(|c| c.is_ascii_digit()) && (d.len() == 3 || d[3] == b' ' || d[3] == b'-') {
+                l.f("Response code", off + s, 3, String::from(&line[..3]));
+                let rest = line.get(4..).unwrap_or("");
+                let r = smtp::Reply::new(0, rest);
+                let mut at = 4;
+                if let Some(st) = r.status() {
+                    l.f("Enhanced status code", off + s + 4, st.len(), String::from(st));
+                    at += st.len() + 1;
+                }
+                if line.len() > at {
+                    l.f("Response parameter", off + s + at, e - s - at, String::from(&line[at..]));
+                }
+            } else {
+                l.bad(String::from("a reply line without its code"));
+            }
+        } else if line == "." {
+            l.f("End of message", off + s, end - s, String::from("."));
+        } else if let Some((verb, vl, at)) = mail_verb(&line, smtp::verb_known) {
+            l.f("Command Line", off + s, end - s, line.clone());
+            let lead = line.len() - line.trim_start().len();
+            l.f("Command", off + s + lead, vl, verb);
+            if line.len() > at {
+                l.f("Request parameter", off + s + at, e - s - at, String::from(&line[at..]));
+            }
+        } else {
+            l.f("Message line", off + s, end - s, line.clone());
+        }
+    }
+    l
+}
+
+/// "C: EHLO pc1", "S: 250-mail.a.lab ...", "C: DATA fragment, 345 bytes" (a segment of the
+/// message after DATA)
+fn smtp_info(b: &[u8], response: bool) -> String {
+    let e = b.iter().position(|&c| c == b'\n').unwrap_or(b.len());
+    let line = String::from_utf8_lossy(&b[..e]);
+    let line = line.trim_end();
+    if response {
+        return format!("S: {}", line);
+    }
+    if mail_verb(line, smtp::verb_known).is_some() {
+        return format!("C: {}", line);
+    }
+    format!("C: DATA fragment, {} bytes", b.len())
+}
+
+fn pop3_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Pop3, off, len, String::from("Post Office Protocol"));
+    for (s, e, end) in lines_of(b) {
+        if end == b.len() && e == end && !b.ends_with(b"\n") {
+            l.f("Continuation", off + s, end - s, format!("{} bytes", end - s));
+            break;
+        }
+        let line = String::from_utf8_lossy(&b[s..e]).into_owned();
+        if response {
+            let ind = if line.starts_with("+OK") { Some("+OK") } else if line.starts_with("-ERR") { Some("-ERR") } else { None };
+            match ind {
+                Some(i) => {
+                    l.f("Response", off + s, end - s, line.clone());
+                    l.f("Response indicator", off + s, i.len(), String::from(i));
+                    if line.len() > i.len() + 1 {
+                        l.f("Response description", off + s + i.len() + 1, e - s - i.len() - 1, String::from(&line[i.len() + 1..]));
+                    }
+                }
+                None if line == "." => l.f("End of data", off + s, end - s, String::from(".")),
+                None => l.f("Data line", off + s, end - s, line.clone()),
+            }
+        } else {
+            l.f("Request", off + s, end - s, line.clone());
+            match mail_verb(&line, pop3::verb_known) {
+                Some((verb, vl, at)) => {
+                    let lead = line.len() - line.trim_start().len();
+                    l.f("Request command", off + s + lead, vl, verb);
+                    if line.len() > at {
+                        l.f("Request parameter", off + s + at, e - s - at, String::from(&line[at..]));
+                    }
+                }
+                None => {
+                    let w = line.trim_start().split(' ').next().unwrap_or("");
+                    l.bad(format!("a command POP3 does not define: {}", w));
+                }
+            }
+        }
+    }
+    l
+}
+
+/// "C: USER bob", "S: +OK 2 messages", "S: DATA fragment, 1200 bytes" (the rest of a
+/// multi-line response)
+fn pop3_info(b: &[u8], response: bool) -> String {
+    let e = b.iter().position(|&c| c == b'\n').unwrap_or(b.len());
+    let line = String::from_utf8_lossy(&b[..e]);
+    let line = line.trim_end();
+    if !response {
+        return format!("C: {}", line);
+    }
+    if line.starts_with("+OK") || line.starts_with("-ERR") {
+        return format!("S: {}", line);
+    }
+    format!("S: DATA fragment, {} bytes", b.len())
 }

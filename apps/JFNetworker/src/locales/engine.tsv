@@ -1147,3 +1147,91 @@ Optik {} an {} passt nicht zur Optik {} am anderen Ende; die Leitung bleibt aus.
 Kabel zu lang: {} m, erlaubt {} m ({} zwischen {} und {}); die Leitung bleibt aus.	Cable too long: {} m, {} m allowed ({} between {} and {}); the link stays down.
 Optiken passen nicht: {} an {}, {} an {}; die Leitung bleibt aus.	Optics do not fit: {} at {}, {} at {}; the link stays down.
 {} zwischen {} und {} passt nicht zur Optik {} (SR braucht Multimode, LR Singlemode); die Leitung bleibt aus.	{} between {} and {} does not fit the optics {} (SR needs multimode, LR single-mode); the link stays down.
+# X1c: mail (mailtrace.rs, mailc.rs, smtpd.rs, pop3d.rs)
+den Namen {} kennt das DNS nicht	the DNS does not know the name {}
+{} ist nicht aufzulösen: {}	{} cannot be resolved: {}
+keine Verbindung zu {}: {}	no connection to {}: {}
+{} antwortet nicht	{} does not answer
+Nicht gesendet: das Konto nennt keine Adresse oder keinen SMTP-Server.	Not sent: the account names no address or no SMTP server.
+Nicht gesendet: {} ist keine E-Mail-Adresse.	Not sent: {} is not an e-mail address.
+Nicht gesendet: kein Empfänger.	Not sent: no recipient.
+Nicht abgerufen: das Konto nennt keinen POP3-Server oder keinen Benutzer.	Not fetched: the account names no POP3 server or no user.
+Nicht abgerufen: {}.	Not fetched: {}.
+Nicht gesendet: {}.	Not sent: {}.
+Gesendet an {} über {}.	Sent to {} through {}.
+Gesendet über {}, abgelehnt: {}.	Sent through {}, refused: {}.
+Nicht gesendet: {} lehnt die Anmeldung ab ({}).	Not sent: {} refuses the login ({}).
+Nicht gesendet: {} nimmt keinen Empfänger an ({}).	Not sent: {} takes none of the recipients ({}).
+Nicht gesendet: {} lehnt {} ab ({}).	Not sent: {} refuses {} ({}).
+Nicht gesendet: die Verbindung zu {} brach ab.	Not sent: the connection to {} broke off.
+Nicht abgerufen: {} lehnt die Anmeldung ab (-ERR {}).	Not fetched: {} refuses the login (-ERR {}).
+Nicht abgerufen: {} lehnt {} ab (-ERR {}).	Not fetched: {} refuses {} (-ERR {}).
+Abruf von {} abgebrochen: die Verbindung brach ab ({} Nachrichten geholt).	Fetching from {} stopped: the connection broke off ({} messages fetched).
+Keine neuen Nachrichten auf {}.	No new messages on {}.
+Eine neue Nachricht von {} abgerufen.	One new message fetched from {}.
+{} neue Nachrichten von {} abgerufen.	{} new messages fetched from {}.
+{} gesendet, {} abgerufen, {} gescheitert	{} sent, {} fetched, {} failed
+Das Gerät ist ausgeschaltet.	The device is switched off.
+SMTP: {} verbindet sich (Port {}).	SMTP: {} connects (port {}).
+SMTP: der Client nennt sich {} (EHLO).	SMTP: the client calls itself {} (EHLO).
+SMTP: der Client nennt sich {} (HELO, ohne Erweiterungen).	SMTP: the client calls itself {} (HELO, without extensions).
+SMTP: {} ist angemeldet (AUTH).	SMTP: {} is logged in (AUTH).
+SMTP: Anmeldung von {} abgelehnt (AUTH).	SMTP: login of {} refused (AUTH).
+SMTP: Absender <{}> angenommen.	SMTP: sender <{}> taken.
+SMTP: Absender <{}> angenommen, angekündigt {} Bytes.	SMTP: sender <{}> taken, {} bytes announced.
+SMTP: Empfänger <{}> hat hier ein Postfach.	SMTP: recipient <{}> has a mailbox here.
+SMTP: Empfänger <{}> liegt woanders: wird weitergeleitet.	SMTP: recipient <{}> is elsewhere: the message is relayed.
+SMTP: {} abgelehnt ({}).	SMTP: {} refused ({}).
+SMTP: kein Relay für <{}>: {} darf nicht weiterleiten lassen.	SMTP: no relay for <{}>: {} may not have mail relayed.
+SMTP: Nachricht mit {} Bytes ist größer als erlaubt ({} Bytes).	SMTP: a message of {} bytes is bigger than allowed ({} bytes).
+SMTP: Nachricht {} in der Warteschlange: {} Empfänger, {} Bytes.	SMTP: message {} in the queue: {} recipients, {} bytes.
+Mail: {} an <{}> zugestellt: {}.	Mail: {} for <{}> delivered: {}.
+Mail: Mailserver von {}: {}.	Mail: the mail servers of {}: {}.
+Mail: {} an <{}> an {} übergeben ({}).	Mail: {} for <{}> handed to {} ({}).
+Mail: {} an <{}> zurückgestellt ({}), nächster Versuch in {}.	Mail: {} for <{}> deferred ({}), next attempt in {}.
+Mail: {} an <{}> nicht zustellbar ({}).	Mail: {} for <{}> cannot be delivered ({}).
+Mail: Unzustellbarkeitsnachricht zu {} geht an <{}>.	Mail: the bounce of {} goes to <{}>.
+Mail: Unzustellbarkeitsnachricht {} ist selbst nicht zustellbar: verworfen.	Mail: the bounce {} cannot be delivered either: dropped.
+POP3: {} verbindet sich.	POP3: {} connects.
+POP3: {} ist angemeldet, {} Nachrichten mit {} Bytes.	POP3: {} is logged in, {} messages with {} bytes.
+POP3: Anmeldung von {} abgelehnt.	POP3: login of {} refused.
+POP3: Nachricht {} gesendet, {} Bytes.	POP3: message {} sent, {} bytes.
+POP3: {} Nachrichten von {} gelöscht.	POP3: {} messages of {} deleted.
+POP3: {} abgelehnt.	POP3: {} refused.
+E-Mail: Nachricht an {} über {} gesendet.	E-Mail: message to {} sent through {}.
+E-Mail: eine neue Nachricht von {} abgerufen.	E-Mail: one new message fetched from {}.
+E-Mail: {} neue Nachrichten von {} abgerufen.	E-Mail: {} new messages fetched from {}.
+E-Mail: {}	E-Mail: {}
+„mailbox“ ist kein Verzeichnis.	“mailbox” is not a directory.
+Port {}, {} Benutzer: {} Sitzungen, {} Anmeldungen, {} abgelehnt, {} Nachrichten abgeholt, {} gelöscht	Port {}, {} users: {} sessions, {} logins, {} refused, {} messages fetched, {} deleted
+Ein Benutzer braucht „name“ ohne Leerzeichen, @ und /.	A user needs a “name” without spaces, @ and /.
+Den Benutzer {} gibt es zweimal.	The user {} is there twice.
+„{}“ taugt nicht als Name des Servers.	“{}” will not do as the server's name.
+„{}“ ist keine Domäne.	“{}” is not a domain.
+Den Benutzer {} für postmaster gibt es nicht.	There is no user {} for postmaster.
+„{}“ ist kein Netz.	“{}” is not a network.
+{} antwortet: {}	{} answers: {}
+<{}> hat hier kein Postfach	<{}> has no mailbox here
+das Postfach von <{}> nimmt die Nachricht nicht: {}	the mailbox of <{}> does not take the message: {}
+kein Versuch gelang	no attempt worked
+aufgegeben nach {}: {}	given up after {}: {}
+die Domäne {} nimmt keine Mail an (Null-MX)	the domain {} takes no mail (null MX)
+die Domäne {} gibt es nicht (DNS)	the domain {} does not exist (DNS)
+das DNS nennt die Mailserver von {} nicht: {}	the DNS does not name the mail servers of {}: {}
+Mail für {} käme zu diesem Server zurück ({})	mail for {} would come back to this server ({})
+der Mailserver {} von {} hat keine Adresse	the mail server {} of {} has no address
+das DNS nennt {} nicht: {}	the DNS does not name {}: {}
+die Mailserver von {} haben keine Adresse: {}	the mail servers of {} have no address: {}
+kein Mailserver von {} erreichbar	no mail server of {} can be reached
+keine Verbindung zu {} [{}]: {}	no connection to {} [{}]: {}
+die Verbindung zu {} [{}] brach ab	the connection to {} [{}] broke off
+{} [{}] antwortet nicht	{} [{}] does not answer
+{} schweigt zu lange	{} has been silent for too long
+Port {}, ohne Domäne: {} empfangen, {} weitergeleitet, {} unzustellbar, {} in der Warteschlange	Port {}, no domain: {} received, {} relayed, {} undeliverable, {} in the queue
+Port {}, ohne Domäne, offener Relay: {} empfangen, {} weitergeleitet, {} unzustellbar, {} in der Warteschlange	Port {}, no domain, open relay: {} received, {} relayed, {} undeliverable, {} in the queue
+Port {}, {}: {} empfangen, {} zugestellt, {} weitergeleitet, {} unzustellbar, {} in der Warteschlange	Port {}, {}: {} received, {} delivered, {} relayed, {} undeliverable, {} in the queue
+Port {}, {}, offener Relay: {} empfangen, {} zugestellt, {} weitergeleitet, {} unzustellbar, {} in der Warteschlange	Port {}, {}, open relay: {} received, {} delivered, {} relayed, {} undeliverable, {} in the queue
+Der MX-Eintrag von {} (Dienst {} auf {}) zeigt auf {}, das keine Adresse hat.	The MX record of {} (service {} on {}) points to {}, which has no address.
+Der MX-Eintrag von {} zeigt auf {} ({}), dort läuft kein SMTP-Server.	The MX record of {} points to {} ({}), where no SMTP server runs.
+Dienst {} auf {} ist ein offener Relay: er leitet Mail jedes Absenders weiter.	Service {} on {} is an open relay: it relays the mail of every sender.
+POP3-Benutzer {} auf {} hat kein Postfach, und kein SMTP-Server dort nimmt Mail für ihn an.	POP3 user {} on {} has no mailbox, and no SMTP server there takes mail for them.
