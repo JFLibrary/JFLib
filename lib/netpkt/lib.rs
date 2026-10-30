@@ -49,6 +49,13 @@
 //             codes, netascii, looks_like (a transfer away from port 69)  (RFC 1350, 2347-2349)
 //   ftp       Command, Reply (multi-line), Lines, ReplyReader, host_port (PORT, 227), eprt,
 //             epsv_port (229), the reply texts as the server's own words  (RFC 959, 2428, 2389)
+//   telnet    NVT commands, option negotiation without loops (Options: the Q method), IAC
+//             escaping, NVT line ends, Reader for bytes in pieces, parse (RFC 854, 855, 857,
+//             858, 1143)
+//   radius    RadiusView, Packet, Attr: authentication and accounting with every attribute of
+//             RFC 2865 / 2866 by number and name (vendor-specific ones as bytes), the hiding of
+//             User-Password, Request / Response Authenticators, the Message-Authenticator; the
+//             caller lends MD5 and HMAC-MD5 (crypto)                 (RFC 2865, 2866, 3579)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -85,6 +92,8 @@ pub mod eapol;
 pub mod bgp;
 pub mod tftp;
 pub mod ftp;
+pub mod telnet;
+pub mod radius;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

@@ -3,7 +3,8 @@
 // base::metrics, base::cmdtree, base::hashring, base::lru, agent_core::jmap, script, its VM and
 // its standard library, the BPDUs of netpkt::stp, ICMPv6 and Neighbor Discovery of
 // netpkt::icmpv6, the address selection of netpkt::addrsel, the BGP messages of netpkt::bgp,
-// TFTP and FTP of netpkt::tftp and netpkt::ftp): known-answer vectors, round trips, edge cases.
+// TFTP and FTP of netpkt::tftp and netpkt::ftp, RADIUS and Telnet of netpkt::radius and
+// netpkt::telnet): known-answer vectors, round trips, edge cases.
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app coretest
@@ -51,6 +52,7 @@ mod addrselt;
 mod bgpt;
 mod tftpt;
 mod ftpt;
+mod radiust;
 
 /// the result collector of a check group
 pub struct T {
@@ -124,7 +126,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 32] = [
+    let groups: [(&'static str, fn(&mut T)); 33] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -157,6 +159,7 @@ fn run() -> i32 {
         ("bgp", bgpt::run),
         ("tftp", tftpt::run),
         ("ftp", ftpt::run),
+        ("radius", radiust::run),
     ];
     let mut failed = 0;
     let mut total = 0;
