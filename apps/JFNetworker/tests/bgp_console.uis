@@ -1,0 +1,54 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/bgp_pair.jfnet
+# BGP in R1's IOS-like console (cli/bgp.rs): R2 runs BGP in AS 65002 from its startup
+# configuration and waits; R1 gets "router bgp 65001" with its mode "(config-router)#", `?` there
+# and after a neighbour's address, the refusal of a neighbour without remote-as, the neighbour
+# and a network typed in; the session comes up as soon as remote-as is in (the console says so),
+# then show ip bgp summary, show ip bgp with R2's network and show ip route bgp with its legend.
+# Ids: R1's console 25088 (its input line 25089).  The bottom dock is dragged up first, so the
+# console shows 26 rows; "Konsole leeren" empties it before each table.
+size 1280 900
+theme light
+drag 630,671 630,380 8
+dblclick listitem:"R1"
+expect tab:"R1" selected
+expect #25089 focused
+type "enable\n"
+type "terminal length 0\n"
+type "conf t\n"
+type "router bgp 65001\n"
+expect text:"R1(config-router)#" exists
+# `?`: the commands of the process, then what follows a neighbour's address
+type "?"
+expect text:"Commands for this BGP process:" exists
+expect text:"  neighbor      A neighbour and its settings" exists
+key ctrl+a
+key backspace
+type "neighbor 10.0.12.2 ?"
+expect text:"  remote-as      The neighbour's AS: the own one for iBGP, another for eBGP" exists
+expect text:"  update-source  Use the address of this interface for the session" exists
+key ctrl+a
+key backspace
+# an address that is no neighbour yet
+type "neighbor 10.0.12.2 next-hop-self\n"
+expect text:"% Specify remote-as or peer-group commands first" exists
+type "neighbor 10.0.12.2 remote-as 65002\n"
+type "network 1.1.1.1 mask 255.255.255.255\n"
+type "end\n"
+wait 2000
+expect text:"*Mar  1 00:00:00.178: %BGP-5-ADJCHANGE: neighbour 10.0.12.2 is up (AS 65002)" exists
+click button:"Konsole leeren"
+click #25089
+type "show ip bgp summary\n"
+expect text:"Router ID 1.1.1.1, local AS 65001" exists
+expect text:"Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd" exists
+click button:"Konsole leeren"
+click #25089
+type "show ip bgp\n"
+expect text:"     Network          Next Hop            Metric LocPrf Weight Path" exists
+expect text:" *>  1.1.1.1/32       0.0.0.0                  0         32768 i" exists
+expect text:" *>  2.2.2.2/32       10.0.12.2                0             0 65002 i" exists
+click button:"Konsole leeren"
+click #25089
+type "show ip route bgp\n"
+expect text:"       B - learned by BGP, * - default route" exists
+expect_nowarn

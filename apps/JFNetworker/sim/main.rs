@@ -5,6 +5,7 @@
 //   jfn-sim check PROJEKT
 //   jfn-sim decode HEX
 //   jfn-sim gen N [--out F]   a synthetic campus of N devices (jfn_model::synth)
+//   jfn-sim rewind P [S] [--traffic K]   keyframes of a run and restore times (K1)
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]

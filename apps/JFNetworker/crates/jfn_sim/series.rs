@@ -919,3 +919,14 @@ impl Engine {
         (cols.len(), values)
     }
 }
+
+// ---------------------------------------------------------------- keyframes (keyframe.rs)
+
+impl Sampler {
+    /// the bytes the kept samples hold: one moment per sample, a value per series and sample
+    /// (keyframe::footprint, an estimate)
+    pub(crate) fn footprint(&self) -> usize {
+        let rec = |r: &Rec| 96 + r.name.len() + r.ser.iter().map(|x| core::mem::size_of::<Ser>() + 16 + x.vals.len() * 8).sum::<usize>();
+        self.times.len() * 8 + self.svcs.values().flat_map(|v| v.iter()).map(rec).sum::<usize>() + self.links.values().map(rec).sum::<usize>()
+    }
+}

@@ -1,0 +1,117 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/phys_campus.jfnet
+# the physical view (P1, workspace/phys) on tests/fixtures/phys_campus.jfnet: the switch of the
+# toolbar, Ansicht › Logische / Physische Ansicht and their shortcuts; walking the places --
+# the default room first (the server room with its racks and the ways out to Büro 1, Haus B and
+# the first floor), up to the floor, the building, the campus and all sites, back, the
+# breadcrumbs, a double click on a room and on a way out; a place selected shows in the
+# inspector; Tab walks the plan from the keyboard and Enter opens a place.  Ids: 57345 / 57346
+# the switch's segments, 57360 the plan.
+size 1280 900
+theme light
+wait 500
+# the logical canvas first; the toolbar's switch
+expect "Logisch" selected
+expect listitem:"Rack Rack 1, 2 Geräte" missing
+click "Physisch"
+wait 100
+expect "Physisch" selected
+expect listitem:"Rack Rack 1, 2 Geräte" exists
+expect listitem:"Rack Rack 2, 1 Gerät" exists
+expect listitem:"Weg nach Raum Büro 1" exists
+expect listitem:"Weg nach Gebäude Haus B" exists
+expect listitem:"Weg nach Etage 1. OG" exists
+expect listitem:"Kabel R1 Gi0/0/0 – SW1 Gi1/0/1, 1 m, erlaubt 100 m (1000BASE-T)" missing
+expect listitem:"Kabel SRV1 eth0 – SW1 Gi1/0/2, 6 m, erlaubt 100 m (1000BASE-T)" exists
+expect listitem:"Kabel PC4 eth0 – SW1 Gi1/0/5, 208 m, erlaubt 100 m (1000BASE-T), zu lang" exists
+expect text:"Serverraum" exists
+expect button:"Rack hinzufügen" exists
+expect button:"Tisch hinzufügen" exists
+shot build/jfnetworker/phys_view_room.png
+# back to the logical view from the menu, the physical one with Ctrl+Shift+P
+click menu:"Ansicht"
+expect menuitem:"Physische Ansicht" checked
+click menuitem:"Logische Ansicht"
+wait 100
+expect listitem:"Rack Rack 1, 2 Geräte" missing
+expect listitem:"SW1" exists
+expect "Logisch" selected
+key ctrl+shift+p
+wait 100
+expect listitem:"Rack Rack 1, 2 Geräte" exists
+key ctrl+shift+l
+wait 100
+expect listitem:"SW1" exists
+cmd 381
+wait 100
+# up one level: the floor with its rooms; the server room stays selected
+click button:"Eine Ebene höher"
+wait 100
+expect listitem:"Raum Serverraum, 3 Geräte" selected
+expect listitem:"Raum Büro 1, 3 Geräte" exists
+expect listitem:"PC1, Tisch 1" missing
+expect listitem:"AP1, Büro 1 bei 5 m Ost, 4 m Süd" exists
+expect text:"Raum Serverraum" exists
+expect text:"8 × 6 m" exists
+expect listitem:"Weg nach Gebäude Haus B" exists
+expect listitem:"Weg nach Etage 1. OG" exists
+shot build/jfnetworker/phys_view_floor.png
+# the building: its floors on top of each other
+key backspace
+wait 100
+expect listitem:"Etage EG, 6 Geräte" selected
+expect listitem:"Etage 1. OG, 1 Gerät" exists
+expect listitem:"Weg nach Gebäude Haus B" exists
+# the campus: its buildings, the cables between them summed
+key backspace
+wait 100
+expect listitem:"Gebäude Haus A, 7 Geräte" selected
+expect listitem:"Gebäude Haus B, 2 Geräte" exists
+expect listitem:"Kabel zwischen Haus A und Haus B: 2 Kabel · 203–208 m · 1 zu lang oder falsch" exists
+shot build/jfnetworker/phys_view_site.png
+# every site
+key backspace
+wait 100
+expect listitem:"Standort Campus, 9 Geräte" selected
+expect button:"Eine Ebene höher" disabled
+expect button:"Standort hinzufügen" exists
+# back the way it came: the campus
+click button:"Zurück"
+wait 100
+expect listitem:"Gebäude Haus B, 2 Geräte" exists
+# into Haus B by a double click, then its floor and the lab
+dblclick listitem:"Gebäude Haus B, 2 Geräte"
+wait 100
+expect listitem:"Etage EG, 2 Geräte" exists
+dblclick listitem:"Etage EG, 2 Geräte"
+wait 100
+dblclick listitem:"Raum Labor, 2 Geräte"
+wait 100
+expect text:"Labor" exists
+expect listitem:"PC4, Labor (ohne Platz)" exists
+expect listitem:"Rack Rack B1, 1 Gerät" exists
+expect listitem:"Weg nach Gebäude Haus A" exists
+# the way out leads to Haus A
+dblclick listitem:"Weg nach Gebäude Haus A"
+wait 100
+expect listitem:"Etage EG, 6 Geräte" exists
+# the breadcrumbs: the campus
+click button:"Campus"
+wait 100
+expect listitem:"Gebäude Haus A, 7 Geräte" exists
+# from the keyboard: Ctrl+9 gives the plan the keyboard, Tab walks to Haus A, Enter opens it
+key ctrl+9
+expect #57360 focused
+key tab
+expect listitem:"Gebäude Haus A, 7 Geräte" focused
+key enter
+wait 100
+expect listitem:"Etage EG, 6 Geräte" exists
+# a click on a place shows it in the inspector
+click listitem:"Etage 1. OG, 1 Gerät"
+wait 100
+expect text:"Etage 1. OG" exists
+expect text:"Campus › Haus A › 1. OG" exists
+click button:"Öffnen"
+wait 100
+expect listitem:"PC3, Büro 2 bei 5 m Ost, 4 m Süd" exists
+shot build/jfnetworker/phys_view_upstairs.png

@@ -1,0 +1,47 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/backup.jfnet
+# the shot matrix of files, TFTP and FTP (X1a): SRV1's Dateien tab with readme.txt chosen, its
+# Dienste tab with the TFTP server's settings open, and R1's console after a backup to TFTP,
+# each light and dark at 100 and 150 % (build/jfnetworker/files_<view>_<theme>_<scale>.png)
+size 1280 900
+theme light
+drag 630,671 630,380 8
+# ---- the console: a backup to TFTP
+dblclick listitem:"R1"
+type "enable\n"
+type "copy running-config tftp://10.0.0.10/r1-config\n"
+wait 2000
+expect text:"Done: 529 bytes in 1000 ms (529 bytes/s)" exists
+shot build/jfnetworker/files_console_light_100.png
+theme dark
+shot build/jfnetworker/files_console_dark_100.png
+scale 150
+shot build/jfnetworker/files_console_dark_150.png
+theme light
+shot build/jfnetworker/files_console_light_150.png
+scale 100
+# ---- SRV1's files
+dblclick listitem:"SRV1" shift
+expect window 26624 open
+click tab:"Dateien"
+click text:"/srv/ftp/pub/readme.txt"
+shot build/jfnetworker/files_tab_light_100.png window 26624
+theme dark
+shot build/jfnetworker/files_tab_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/files_tab_dark_150.png window 26624
+theme light
+shot build/jfnetworker/files_tab_light_150.png window 26624
+scale 100 window 26624
+# ---- SRV1's services with the TFTP server's settings
+click tab:"Dienste"
+click #51200
+expect text:"Die Einstellungen von tftp als JSON. Übernehmen prüft sie und startet SRV1 mit ihnen neu." exists
+shot build/jfnetworker/files_services_light_100.png window 26624
+theme dark
+shot build/jfnetworker/files_services_dark_100.png window 26624
+scale 150 window 26624
+shot build/jfnetworker/files_services_dark_150.png window 26624
+theme light
+shot build/jfnetworker/files_services_light_150.png window 26624
+scale 100 window 26624
+expect_nowarn

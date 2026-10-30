@@ -92,7 +92,7 @@ fn ap(n: &mut Net, ui: &mut Ui, id: u32, m: &'static Model) {
     ui.text(TS_CAPTION | TX_SECONDARY | TX_WRAP, t("Die Netze dieses Access Points. Eine Station nimmt in ihrer Reichweite das beste Netz ihrer SSID."));
     let bands: Vec<Band> = Band::ALL.iter().copied().filter(|x| wlan::ap_bands(m) & x.bit() != 0).collect();
     let plain = !m.has(F_ROUTER);
-    let stations = n.doc.sim.engine().wlan_stations_of(id);
+    let stations = n.doc.sim.state().wlan_stations_of(id);
     let mut change: Option<(usize, WlanNet, &'static str)> = None;
     let mut remove: Option<usize> = None;
     for (k, net) in nets.iter().enumerate().take(NETS_MAX) {
@@ -313,7 +313,7 @@ fn station(n: &mut Net, ui: &mut Ui, id: u32) {
     }
     ui.text(TS_BODY_STRONG, t("WLAN"));
     // what the simulator does with it
-    let eng = n.doc.sim.engine();
+    let eng = n.doc.sim.state();
     let v = eng.wlan_station(id);
     rows_begin(ui);
     if let Some(v) = &v {
@@ -391,7 +391,7 @@ fn station(n: &mut Net, ui: &mut Ui, id: u32) {
         crate::workspace::error_text(ui, &e, 0);
     }
     // what a scan finds now
-    let found = n.doc.sim.engine().wlan_survey(id, None);
+    let found = n.doc.sim.state().wlan_survey(id, None);
     if !found.is_empty() {
         ui.text(TS_BODY | TX_SECONDARY, t("In Reichweite"));
         for x in found.iter().take(8) {

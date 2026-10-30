@@ -1,0 +1,395 @@
+# JFNetworker-Szenario bgp_isp.scn: „BGP: Kunden, Provider, Transit“, 8 Geräte, 8 Verbindungen, Seed 21
+   0.000000000  CA      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Loopback0 is up
+   0.000000000  CA      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Loopback0 is up
+   0.000000000  CA      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/2 is up
+   0.000000000  CA      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/2 is up
+   0.000000000  ISP1    *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Loopback0 is up
+   0.000000000  ISP1    *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Loopback0 is up
+   0.000000000  CA      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  CA      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  ISP1    *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  ISP1    *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  TR1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Loopback0 is up
+   0.000000000  TR1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Loopback0 is up
+   0.000000000  ISP1    *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  ISP1    *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  TR1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  TR1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  TR2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Loopback0 is up
+   0.000000000  TR2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Loopback0 is up
+   0.000000000  TR1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  TR1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  TR2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  TR2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  ISP2    *Mar  1 00:00:00.000: %LINK-3-UPDOWN: Loopback0 is up
+   0.000000000  ISP2    *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on Loopback0 is up
+   0.000000000  TR2     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  TR2     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  ISP2    *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  ISP2    *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  CA      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  CA      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  ISP2    *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+   0.000000000  ISP2    *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+   0.000000000  ISP2    *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/2 is up
+   0.000000000  ISP2    *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/2 is up
+   0.000000000  CB      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  CB      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  CB      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/2 is up
+   0.000000000  CB      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/2 is up
+   0.000000000  CA      CA>enable
+   0.000000000  CA      CA#debug ip bgp events
+   0.000000000  CA      Debug output for BGP events: on
+   0.000000000  --      run 3s
+   0.000000000  CA      *Mar  1 00:00:00.000: BGP: router ID 10.255.0.10
+   0.000000000  CA      *Mar  1 00:00:00.000: BGP: opening a connection to 10.1.1.2
+   0.000000000  CA      *Mar  1 00:00:00.000: BGP: opening a connection to 10.2.1.2
+   0.000000000  CA      *Mar  1 00:00:00.000: BGP: neighbour 10.1.1.2 went from Idle to Connect
+   0.000000000  CA      *Mar  1 00:00:00.000: BGP: neighbour 10.2.1.2 went from Idle to Connect
+   1.000001444  CA      *Mar  1 00:00:01.000: BGP: OPEN to 10.1.1.2: AS 65010, hold time 180, ID 10.255.0.10
+   1.000001444  CA      *Mar  1 00:00:01.000: BGP: neighbour 10.1.1.2 went from Connect to OpenSent
+   1.000001444  CA      *Mar  1 00:00:01.000: BGP: OPEN to 10.2.1.2: AS 65010, hold time 180, ID 10.255.0.10
+   1.000001444  CA      *Mar  1 00:00:01.000: BGP: neighbour 10.2.1.2 went from Connect to OpenSent
+   1.000002166  CA      *Mar  1 00:00:01.000: BGP: took a connection from 10.1.1.2 at 10.1.1.1
+   1.000002166  CA      *Mar  1 00:00:01.000: BGP: OPEN to 10.1.1.2: AS 65010, hold time 180, ID 10.255.0.10
+   1.000002166  CA      *Mar  1 00:00:01.000: BGP: took a connection from 10.2.1.2 at 10.2.1.1
+   1.000002166  CA      *Mar  1 00:00:01.000: BGP: OPEN to 10.2.1.2: AS 65010, hold time 180, ID 10.255.0.10
+   1.000003150  CA      *Mar  1 00:00:01.000: BGP: OPEN from 10.1.1.2: AS 100, hold time 180, ID 1.1.1.1
+   1.000003150  CA      *Mar  1 00:00:01.000: BGP: with 10.1.1.2: hold time 180, keepalive 60
+   1.000003150  CA      *Mar  1 00:00:01.000: BGP: neighbour 10.1.1.2 went from OpenSent to OpenConfirm
+   1.000003150  CA      *Mar  1 00:00:01.000: BGP: OPEN from 10.2.1.2: AS 200, hold time 180, ID 2.2.2.2
+   1.000003150  CA      *Mar  1 00:00:01.000: BGP: with 10.2.1.2: hold time 180, keepalive 60
+   1.000003150  CA      *Mar  1 00:00:01.000: BGP: neighbour 10.2.1.2 went from OpenSent to OpenConfirm
+   1.000004134  TR1     *Mar  1 00:00:01.000: %BGP-3-NOTIFICATION: sent to neighbour 10.13.1.1: 6/7 (Connection Collision Resolution)
+   1.000004134  ISP1    *Mar  1 00:00:01.000: %BGP-3-NOTIFICATION: sent to neighbour 10.1.1.1: 6/7 (Connection Collision Resolution)
+   1.000004134  ISP1    *Mar  1 00:00:01.000: %BGP-3-NOTIFICATION: sent to neighbour 10.13.1.2: 6/7 (Connection Collision Resolution)
+   1.000004134  CA      *Mar  1 00:00:01.000: BGP: OPEN from 10.1.1.2: AS 100, hold time 180, ID 1.1.1.1
+   1.000004134  CA      *Mar  1 00:00:01.000: BGP: two connections with 10.1.1.2: keeping the one opened by this router
+   1.000004134  CA      *Mar  1 00:00:01.000: BGP: NOTIFICATION to 10.1.1.2: 6/7 (Connection Collision Resolution)
+   1.000004134  CA      *Mar  1 00:00:01.000: %BGP-3-NOTIFICATION: sent to neighbour 10.1.1.2: 6/7 (Connection Collision Resolution)
+   1.000004134  CA      *Mar  1 00:00:01.000: BGP: with 10.1.1.2: hold time 180, keepalive 60
+   1.000004134  CA      *Mar  1 00:00:01.000: BGP: OPEN from 10.2.1.2: AS 200, hold time 180, ID 2.2.2.2
+   1.000004134  CA      *Mar  1 00:00:01.000: BGP: two connections with 10.2.1.2: keeping the one opened by this router
+   1.000004134  CA      *Mar  1 00:00:01.000: BGP: NOTIFICATION to 10.2.1.2: 6/7 (Connection Collision Resolution)
+   1.000004134  CA      *Mar  1 00:00:01.000: %BGP-3-NOTIFICATION: sent to neighbour 10.2.1.2: 6/7 (Connection Collision Resolution)
+   1.000004134  CA      *Mar  1 00:00:01.000: BGP: with 10.2.1.2: hold time 180, keepalive 60
+   1.000004134  CB      *Mar  1 00:00:01.000: %BGP-3-NOTIFICATION: sent to neighbour 10.2.2.1: 6/7 (Connection Collision Resolution)
+   1.000004134  TR2     *Mar  1 00:00:01.000: %BGP-3-NOTIFICATION: sent to neighbour 10.23.1.2: 6/7 (Connection Collision Resolution)
+   1.000004134  ISP2    *Mar  1 00:00:01.000: %BGP-3-NOTIFICATION: sent to neighbour 10.2.1.1: 6/7 (Connection Collision Resolution)
+   1.000004134  ISP2    *Mar  1 00:00:01.000: %BGP-3-NOTIFICATION: sent to neighbour 10.23.1.1: 6/7 (Connection Collision Resolution)
+   1.000004134  ISP2    *Mar  1 00:00:01.000: %BGP-3-NOTIFICATION: sent to neighbour 10.2.2.2: 6/7 (Connection Collision Resolution)
+   1.000004910  TR1     *Mar  1 00:00:01.000: %BGP-5-ADJCHANGE: neighbour 10.13.1.1 is up (AS 100)
+   1.000004910  CA      *Mar  1 00:00:01.000: BGP: neighbour 10.1.1.2 went from OpenConfirm to Established
+   1.000004910  CA      *Mar  1 00:00:01.000: %BGP-5-ADJCHANGE: neighbour 10.1.1.2 is up (AS 100)
+   1.000004910  CA      *Mar  1 00:00:01.000: BGP: neighbour 10.2.1.2 went from OpenConfirm to Established
+   1.000004910  CA      *Mar  1 00:00:01.000: %BGP-5-ADJCHANGE: neighbour 10.2.1.2 is up (AS 200)
+   1.000004910  CB      *Mar  1 00:00:01.000: %BGP-5-ADJCHANGE: neighbour 10.2.2.1 is up (AS 200)
+   1.000004910  TR2     *Mar  1 00:00:01.000: %BGP-5-ADJCHANGE: neighbour 10.23.1.2 is up (AS 200)
+   1.000007150  ISP1    *Mar  1 00:00:01.000: %BGP-5-ADJCHANGE: neighbour 10.1.1.1 is up (AS 65010)
+   1.000007150  ISP1    *Mar  1 00:00:01.000: %BGP-5-ADJCHANGE: neighbour 10.13.1.2 is up (AS 300)
+   1.000007150  ISP2    *Mar  1 00:00:01.000: %BGP-5-ADJCHANGE: neighbour 10.2.1.1 is up (AS 65010)
+   1.000007150  ISP2    *Mar  1 00:00:01.000: %BGP-5-ADJCHANGE: neighbour 10.23.1.1 is up (AS 300)
+   1.000007150  ISP2    *Mar  1 00:00:01.000: %BGP-5-ADJCHANGE: neighbour 10.2.2.2 is up (AS 65020)
+   3.000000000  ok      expect CA output contains "BGP: neighbour 10.1.1.2 went from OpenConfirm to Established"
+   3.000000000  ok      expect CA output contains "BGP: two connections with 10.2.1.2: keeping the one opened by this router"
+   3.000000000  CA      CA#undebug all
+   3.000000000  CA      Debug output: all off
+   3.000000000  TR1     TR1>enable
+   3.000000000  TR1     TR1#debug ip bgp events
+   3.000000000  TR1     Debug output for BGP events: on
+   3.000000000  --      run 17s
+  10.000006172  TR1     *Mar  1 00:00:10.000: %OSPF-5-ADJCHG: process 1, neighbour 3.3.3.2 on GigabitEthernet0/0/1: LOADING -> FULL (Loading Done)
+  10.000006222  TR2     *Mar  1 00:00:10.000: %OSPF-5-ADJCHG: process 1, neighbour 3.3.3.1 on GigabitEthernet0/0/1: LOADING -> FULL (Loading Done)
+  15.200007440  TR1     *Mar  1 00:00:15.200: BGP: opening a connection to 3.3.3.2 from 3.3.3.1
+  15.200007440  TR1     *Mar  1 00:00:15.200: BGP: neighbour 3.3.3.2 went from Active to Connect
+  16.200008884  TR1     *Mar  1 00:00:16.200: BGP: OPEN to 3.3.3.2: AS 300, hold time 180, ID 3.3.3.1
+  16.200008884  TR1     *Mar  1 00:00:16.200: BGP: neighbour 3.3.3.2 went from Connect to OpenSent
+  16.200009556  TR1     *Mar  1 00:00:16.200: BGP: took a connection from 3.3.3.2 at 3.3.3.1
+  16.200009556  TR1     *Mar  1 00:00:16.200: BGP: OPEN to 3.3.3.2: AS 300, hold time 180, ID 3.3.3.1
+  16.200010540  TR1     *Mar  1 00:00:16.200: BGP: OPEN from 3.3.3.2: AS 300, hold time 180, ID 3.3.3.2
+  16.200010540  TR1     *Mar  1 00:00:16.200: BGP: with 3.3.3.2: hold time 180, keepalive 60
+  16.200010540  TR1     *Mar  1 00:00:16.200: BGP: neighbour 3.3.3.2 went from OpenSent to OpenConfirm
+  16.200011524  TR1     *Mar  1 00:00:16.200: BGP: OPEN from 3.3.3.2: AS 300, hold time 180, ID 3.3.3.2
+  16.200011524  TR1     *Mar  1 00:00:16.200: BGP: two connections with 3.3.3.2: keeping the one opened by the neighbour
+  16.200011524  TR1     *Mar  1 00:00:16.200: BGP: NOTIFICATION to 3.3.3.2: 6/7 (Connection Collision Resolution)
+  16.200011524  TR1     *Mar  1 00:00:16.200: %BGP-3-NOTIFICATION: sent to neighbour 3.3.3.2: 6/7 (Connection Collision Resolution)
+  16.200011574  TR2     *Mar  1 00:00:16.200: %BGP-3-NOTIFICATION: sent to neighbour 3.3.3.1: 6/7 (Connection Collision Resolution)
+  16.200012350  TR2     *Mar  1 00:00:16.200: %BGP-5-ADJCHANGE: neighbour 3.3.3.1 is up (AS 300)
+  16.200014540  TR1     *Mar  1 00:00:16.200: BGP: neighbour 3.3.3.2 went from OpenConfirm to Established
+  16.200014540  TR1     *Mar  1 00:00:16.200: %BGP-5-ADJCHANGE: neighbour 3.3.3.2 is up (AS 300)
+  20.000000000  ok      expect TR1 output contains "BGP: opening a connection to 3.3.3.2 from 3.3.3.1"
+  20.000000000  TR1     TR1#undebug all
+  20.000000000  TR1     Debug output: all off
+  20.000000000  --      run 100s
+ 120.000000000  TR1     TR1#show ip bgp summary
+ 120.000000000  TR1     Router ID 3.3.3.1, local AS 300
+ 120.000000000  TR1     Table version 6; networks: 5, paths: 6
+ 120.000000000  TR1     
+ 120.000000000  TR1     Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+ 120.000000000  TR1     3.3.3.2         4          300       7       7        6    0    0 00:01:43        4
+ 120.000000000  TR1     10.13.1.1       4          100       6       8        6    0    0 00:01:58        2
+ 120.000000000  ok      expect TR1 output contains "3.3.3.2         4          300"
+ 120.000000000  TR1     TR1#show ip bgp
+ 120.000000000  TR1     BGP table version 6, router ID 3.3.3.1, local AS 300
+ 120.000000000  TR1     Status: * usable, > best, i from inside the AS, r not used: a better route of another source
+ 120.000000000  TR1     Origin: i IGP, e EGP, ? incomplete (redistributed)
+ 120.000000000  TR1     
+ 120.000000000  TR1          Network          Next Hop            Metric LocPrf Weight Path
+ 120.000000000  TR1      *>  1.1.1.1/32       10.13.1.1                0             0 100 i
+ 120.000000000  TR1      *>i 2.2.2.2/32       3.3.3.2                  0    100      0 200 i
+ 120.000000000  TR1      *>i 10.2.2.0/30      3.3.3.2                       100      0 200 65020 ?
+ 120.000000000  TR1      *>  192.168.10.0     10.13.1.1                              0 100 65010 i
+ 120.000000000  TR1      * i                  3.3.3.2                       100      0 200 65010 i
+ 120.000000000  TR1      *>i 192.168.20.0     3.3.3.2                       100      0 200 65020 ?
+ 120.000000000  ok      expect TR1 output contains " *>i 192.168.20.0     3.3.3.2                       100      0 200 65020 ?"
+ 120.000000000  TR2     TR2>enable
+ 120.000000000  TR2     TR2#show ip bgp neighbors 3.3.3.1
+ 120.000000000  TR2     BGP neighbour 3.3.3.1, AS 300, internal (iBGP)
+ 120.000000000  TR2       State Established for 00:01:43, BGP identifier 3.3.3.1
+ 120.000000000  TR2       Hold time 180 s, keepalive every 60 s (configured 180 / 60); next keepalive in 00:00:31, hold timer runs out in 00:02:31
+ 120.000000000  TR2       Both offered: IPv4 unicast, 4-octet AS numbers, route refresh
+ 120.000000000  TR2       Connection 3.3.3.2:50219 to 3.3.3.1:179, TTL 255, opened by this router
+ 120.000000000  TR2       Update source Loopback0
+ 120.000000000  TR2       Next hop to this neighbour: this router (next-hop-self)
+ 120.000000000  TR2       Messages            sent  received
+ 120.000000000  TR2         Opens                2         2
+ 120.000000000  TR2         Updates              3         2
+ 120.000000000  TR2         Keepalives           3         2
+ 120.000000000  TR2         Notifications        1         0
+ 120.000000000  TR2         Route refresh        0         0
+ 120.000000000  TR2         Total                9         6
+ 120.000000000  TR2       Networks: 2 taken from it, 4 sent to it
+ 120.000000000  TR2       New paths go to it at once
+ 120.000000000  TR2       Sessions: 1 up, 0 ended
+ 120.000000000  TR2       Last NOTIFICATION sent 00:01:43 ago: 6/7 (Connection Collision Resolution)
+ 120.000000000  TR2     
+ 120.000000000  CA      CA#show ip bgp
+ 120.000000000  CA      BGP table version 6, router ID 10.255.0.10, local AS 65010
+ 120.000000000  CA      Status: * usable, > best, i from inside the AS, r not used: a better route of another source
+ 120.000000000  CA      Origin: i IGP, e EGP, ? incomplete (redistributed)
+ 120.000000000  CA      
+ 120.000000000  CA           Network          Next Hop            Metric LocPrf Weight Path
+ 120.000000000  CA       *>  1.1.1.1/32       10.1.1.2                 0             0 100 i
+ 120.000000000  CA       *                    10.2.1.2                               0 200 300 100 i
+ 120.000000000  CA       *>  2.2.2.2/32       10.2.1.2                 0             0 200 i
+ 120.000000000  CA       *                    10.1.1.2                               0 100 300 200 i
+ 120.000000000  CA       *>  10.2.2.0/30      10.2.1.2                               0 200 65020 ?
+ 120.000000000  CA       *                    10.1.1.2                               0 100 300 200 65020 ?
+ 120.000000000  CA       *>  192.168.10.0     0.0.0.0                  0         32768 i
+ 120.000000000  CA       *>  192.168.20.0     10.2.1.2                               0 200 65020 ?
+ 120.000000000  CA       *                    10.1.1.2                               0 100 300 200 65020 ?
+ 120.000000000  ok      expect CA output contains " *>  192.168.20.0     10.2.1.2"
+ 120.000000000  CA      CA#show ip route bgp
+ 120.000000000  CA      Codes: C - connected network, L - address of this device, S - static route,
+ 120.000000000  CA             B - learned by BGP, * - default route
+ 120.000000000  CA      
+ 120.000000000  CA      Gateway of last resort is not set
+ 120.000000000  CA      
+ 120.000000000  CA            1.0.0.0/32 is subnetted, 1 subnets
+ 120.000000000  CA      B        1.1.1.1 [20/0] via 10.1.1.2, 00:01:58
+ 120.000000000  CA            2.0.0.0/32 is subnetted, 1 subnets
+ 120.000000000  CA      B        2.2.2.2 [20/0] via 10.2.1.2, 00:01:58
+ 120.000000000  CA            10.0.0.0/30 is subnetted, 1 subnets
+ 120.000000000  CA      B        10.2.2.0 [20/0] via 10.2.1.2, 00:01:28
+ 120.000000000  CA      B     192.168.20.0/24 [20/0] via 10.2.1.2, 00:01:28
+ 120.000000000  ok      expect CA route 192.168.20.0/24 via 10.2.1.2
+ 120.000000000  ISP2    ISP2>enable
+ 120.000000000  ISP2    ISP2#show ip bgp
+ 120.000000000  ISP2    BGP table version 6, router ID 2.2.2.2, local AS 200
+ 120.000000000  ISP2    Status: * usable, > best, i from inside the AS, r not used: a better route of another source
+ 120.000000000  ISP2    Origin: i IGP, e EGP, ? incomplete (redistributed)
+ 120.000000000  ISP2    
+ 120.000000000  ISP2         Network          Next Hop            Metric LocPrf Weight Path
+ 120.000000000  ISP2     *>  1.1.1.1/32       10.23.1.1                              0 300 100 i
+ 120.000000000  ISP2     *                    10.2.1.1                               0 65010 100 i
+ 120.000000000  ISP2     *>  2.2.2.2/32       0.0.0.0                  0         32768 i
+ 120.000000000  ISP2     r>  10.2.2.0/30      10.2.2.2                 0             0 65020 ?
+ 120.000000000  ISP2     *>  192.168.10.0     10.2.1.1                 0             0 65010 i
+ 120.000000000  ISP2     *>  192.168.20.0     10.2.2.2                 0             0 65020 ?
+ 120.000000000  ok      expect ISP2 output contains " r>  10.2.2.0/30      10.2.2.2"
+ 120.000000000  CB      CB>enable
+ 120.000000000  CB      CB#show ip bgp summary
+ 120.000000000  CB      Router ID 192.168.20.1, local AS 65020
+ 120.000000000  CB      Table version 6; networks: 5, paths: 5
+ 120.000000000  CB      
+ 120.000000000  CB      Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+ 120.000000000  CB      10.2.2.1        4          200       7       7        6    0    0 00:01:58        3
+ 120.000000000  CB      CB#show running-config
+ 120.000000000  CB      Collecting the configuration ...
+ 120.000000000  CB      
+ 120.000000000  CB      ! configuration in effect, 621 bytes
+ 120.000000000  CB      !
+ 120.000000000  CB      version 1.0
+ 120.000000000  CB      !
+ 120.000000000  CB      hostname CB
+ 120.000000000  CB      !
+ 120.000000000  CB      interface GigabitEthernet0/0/0
+ 120.000000000  CB       ip address 10.2.2.2 255.255.255.252
+ 120.000000000  CB      !
+ 120.000000000  CB      interface GigabitEthernet0/0/1
+ 120.000000000  CB       no ip address
+ 120.000000000  CB       shutdown
+ 120.000000000  CB      !
+ 120.000000000  CB      interface GigabitEthernet0/0/2
+ 120.000000000  CB       ip address 192.168.20.1 255.255.255.0
+ 120.000000000  CB      !
+ 120.000000000  CB      interface GigabitEthernet0/0/3
+ 120.000000000  CB       no ip address
+ 120.000000000  CB       shutdown
+ 120.000000000  CB      !
+ 120.000000000  CB      interface TenGigabitEthernet0/1/0
+ 120.000000000  CB       no ip address
+ 120.000000000  CB       shutdown
+ 120.000000000  CB      !
+ 120.000000000  CB      interface TenGigabitEthernet0/1/1
+ 120.000000000  CB       no ip address
+ 120.000000000  CB       shutdown
+ 120.000000000  CB      !
+ 120.000000000  CB      interface Serial0/2/0
+ 120.000000000  CB       no ip address
+ 120.000000000  CB       shutdown
+ 120.000000000  CB      !
+ 120.000000000  CB      interface Serial0/2/1
+ 120.000000000  CB       no ip address
+ 120.000000000  CB       shutdown
+ 120.000000000  CB      !
+ 120.000000000  CB      router bgp 65020
+ 120.000000000  CB       redistribute connected
+ 120.000000000  CB       neighbor 10.2.2.1 remote-as 200
+ 120.000000000  CB      !
+ 120.000000000  CB      line con 0
+ 120.000000000  CB      line vty 0 4
+ 120.000000000  CB       login
+ 120.000000000  CB      !
+ 120.000000000  CB      end
+ 120.000000000  ok      expect CB output contains "router bgp 65020\n redistribute connected\n neighbor 10.2.2.1 remote-as 200\n!"
+ 120.000000000  PC-A    root@PC-A:~# ping -c 3 192.168.20.10
+ 120.000000000  PC-A    PING 192.168.20.10 (192.168.20.10) 56(84) bytes of data.
+ 120.000000000  --      run 10s
+ 121.000008764  PC-A    64 bytes from 192.168.20.10: icmp_seq=2 ttl=61 time=0.008 ms
+ 122.000008208  PC-A    64 bytes from 192.168.20.10: icmp_seq=3 ttl=61 time=0.008 ms
+ 130.000000000  PC-A    
+ 130.000000000  PC-A    --- 192.168.20.10 ping statistics ---
+ 130.000000000  PC-A    3 packets transmitted, 2 received, 33.3333% packet loss, time 2000ms
+ 130.000000000  PC-A    rtt min/avg/max/mdev = 0.008/0.008/0.008/0.000 ms
+ 130.000000000  ok      expect PC-A output contains "3 packets transmitted, 2 received"
+ 130.000000000  PC-A    root@PC-A:~# traceroute -n 192.168.20.10
+ 130.000000000  PC-A    traceroute to 192.168.20.10 (192.168.20.10), 30 hops max, 60 byte packets
+ 130.000000000  --      run 10s
+ 130.000004908  PC-A     1  192.168.10.1  0.002 ms  0.002 ms  0.002 ms
+ 130.000014724  PC-A     2  10.2.1.2  0.003 ms  0.003 ms  0.003 ms
+ 130.000029448  PC-A     3  10.2.2.2  0.005 ms  0.005 ms  0.005 ms
+ 130.000052152  PC-A     4  192.168.20.10  0.008 ms  0.008 ms  0.008 ms
+ 140.000000000  ok      expect PC-A output contains " 2  10.2.1.2"
+ 140.000000000  CA      CA#debug ip bgp
+ 140.000000000  CA      Debug output for BGP: on
+ 140.000000000  --      link down CA Gi0/0/1
+ 140.000000000  CA      *Mar  1 00:02:20.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is down
+ 140.000000000  CA      *Mar  1 00:02:20.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is down
+ 140.000000000  ISP2    *Mar  1 00:02:20.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is down
+ 140.000000000  ISP2    *Mar  1 00:02:20.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is down
+ 140.000000000  --      run 1s
+ 140.000000000  CA      *Mar  1 00:02:20.000: BGP: the session with 10.2.1.2 ended: the interface went down
+ 140.000000000  CA      *Mar  1 00:02:20.000: BGP: neighbour 10.2.1.2 went from Established to Idle
+ 140.000000000  CA      *Mar  1 00:02:20.000: %BGP-5-ADJCHANGE: neighbour 10.2.1.2 is down: the interface went down
+ 140.000000000  CA      *Mar  1 00:02:20.000: BGP: neighbour 10.2.1.2 stays idle: not directly connected, no ebgp-multihop
+ 140.000000000  CA      *Mar  1 00:02:20.000: BGP: best path to 2.2.2.2/32 via 10.1.1.2 from 10.1.1.2 (the only path)
+ 140.000000000  CA      *Mar  1 00:02:20.000: BGP: best path to 10.2.2.0/30 via 10.1.1.2 from 10.1.1.2 (the only path)
+ 140.000000000  CA      *Mar  1 00:02:20.000: BGP: best path to 192.168.20.0/24 via 10.1.1.2 from 10.1.1.2 (the only path)
+ 140.000000000  CA      *Mar  1 00:02:20.000: BGP: UPDATE to 10.1.1.2: 0 networks, 3 withdrawn
+ 140.000000000  ISP2    *Mar  1 00:02:20.000: %BGP-5-ADJCHANGE: neighbour 10.2.1.1 is down: the interface went down
+ 141.000000000  ok      expect CA output contains "BGP: the session with 10.2.1.2 ended: the interface went down"
+ 141.000000000  CA      CA#undebug all
+ 141.000000000  CA      Debug output: all off
+ 141.000000000  CA      CA#show ip bgp
+ 141.000000000  CA      BGP table version 9, router ID 10.255.0.10, local AS 65010
+ 141.000000000  CA      Status: * usable, > best, i from inside the AS, r not used: a better route of another source
+ 141.000000000  CA      Origin: i IGP, e EGP, ? incomplete (redistributed)
+ 141.000000000  CA      
+ 141.000000000  CA           Network          Next Hop            Metric LocPrf Weight Path
+ 141.000000000  CA       *>  1.1.1.1/32       10.1.1.2                 0             0 100 i
+ 141.000000000  CA       *>  2.2.2.2/32       10.1.1.2                               0 100 300 200 i
+ 141.000000000  CA       *>  10.2.2.0/30      10.1.1.2                               0 100 300 200 65020 ?
+ 141.000000000  CA       *>  192.168.10.0     0.0.0.0                  0         32768 i
+ 141.000000000  CA       *>  192.168.20.0     10.1.1.2                               0 100 300 200 65020 ?
+ 141.000000000  ok      expect CA route 192.168.20.0/24 via 10.1.1.2
+ 141.000000000  PC-A    root@PC-A:~# traceroute -n 192.168.20.10
+ 141.000000000  PC-A    traceroute to 192.168.20.10 (192.168.20.10), 30 hops max, 60 byte packets
+ 141.000000000  --      run 10s
+ 141.000004908  PC-A     1  192.168.10.1  0.002 ms  0.002 ms  0.002 ms
+ 141.000014724  PC-A     2  10.1.1.2  0.003 ms  0.003 ms  0.003 ms
+ 141.000029448  PC-A     3  10.13.1.2  0.005 ms  0.005 ms  0.005 ms
+ 141.000049080  PC-A     4  10.33.0.2  0.007 ms  0.007 ms  0.007 ms
+ 141.000073620  PC-A     5  10.23.1.2  0.008 ms  0.008 ms  0.008 ms
+ 141.000103068  PC-A     6  10.2.2.2  0.010 ms  0.010 ms  0.010 ms
+ 141.000142800  PC-A     7  192.168.20.10  0.013 ms  0.013 ms  0.013 ms
+ 151.000000000  ok      expect PC-A output contains " 2  10.1.1.2"
+ 151.000000000  ok      expect PC-A output contains " 3  10.13.1.2"
+ 151.000000000  --      run 40s
+ 191.000000000  ISP2    ISP2#show ip bgp
+ 191.000000000  ISP2    BGP table version 8, router ID 2.2.2.2, local AS 200
+ 191.000000000  ISP2    Status: * usable, > best, i from inside the AS, r not used: a better route of another source
+ 191.000000000  ISP2    Origin: i IGP, e EGP, ? incomplete (redistributed)
+ 191.000000000  ISP2    
+ 191.000000000  ISP2         Network          Next Hop            Metric LocPrf Weight Path
+ 191.000000000  ISP2     *>  1.1.1.1/32       10.23.1.1                              0 300 100 i
+ 191.000000000  ISP2     *>  2.2.2.2/32       0.0.0.0                  0         32768 i
+ 191.000000000  ISP2     r>  10.2.2.0/30      10.2.2.2                 0             0 65020 ?
+ 191.000000000  ISP2     *>  192.168.10.0     10.23.1.1                              0 300 100 65010 i
+ 191.000000000  ISP2     *>  192.168.20.0     10.2.2.2                 0             0 65020 ?
+ 191.000000000  ok      expect ISP2 route 192.168.10.0/24 via 10.23.1.1
+ 191.000000000  PC-B    root@PC-B:~# ping -c 2 192.168.10.10
+ 191.000000000  PC-B    PING 192.168.10.10 (192.168.10.10) 56(84) bytes of data.
+ 191.000000000  --      run 3s
+ 191.000017252  PC-B    64 bytes from 192.168.10.10: icmp_seq=1 ttl=58 time=0.017 ms
+ 192.000014364  PC-B    64 bytes from 192.168.10.10: icmp_seq=2 ttl=58 time=0.014 ms
+ 192.000014364  PC-B    
+ 192.000014364  PC-B    --- 192.168.10.10 ping statistics ---
+ 192.000014364  PC-B    2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+ 192.000014364  PC-B    rtt min/avg/max/mdev = 0.014/0.015/0.017/0.001 ms
+ 194.000000000  ok      expect PC-B output contains "2 received"
+ 194.000000000  CA      CA#debug ip bgp updates
+ 194.000000000  CA      Debug output for BGP updates: on
+ 194.000000000  --      link up CA Gi0/0/1
+ 194.000000000  CA      *Mar  1 00:03:14.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+ 194.000000000  CA      *Mar  1 00:03:14.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+ 194.000000000  ISP2    *Mar  1 00:03:14.000: %LINK-3-UPDOWN: GigabitEthernet0/0/1 is up
+ 194.000000000  ISP2    *Mar  1 00:03:14.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/1 is up
+ 194.000000000  --      run 5s
+ 195.000004134  ISP2    *Mar  1 00:03:15.000: %BGP-3-NOTIFICATION: sent to neighbour 10.2.1.1: 6/7 (Connection Collision Resolution)
+ 195.000004134  CA      *Mar  1 00:03:15.000: %BGP-3-NOTIFICATION: sent to neighbour 10.2.1.2: 6/7 (Connection Collision Resolution)
+ 195.000004910  CA      *Mar  1 00:03:15.000: %BGP-5-ADJCHANGE: neighbour 10.2.1.2 is up (AS 200)
+ 195.000004910  CA      *Mar  1 00:03:15.000: BGP: UPDATE to 10.2.1.2: 1 networks, 0 withdrawn
+ 195.000004910  CA      *Mar  1 00:03:15.000: BGP: UPDATE to 10.2.1.2: 1 networks, 0 withdrawn
+ 195.000004910  CA      *Mar  1 00:03:15.000: BGP: UPDATE to 10.2.1.2: 2 networks, 0 withdrawn
+ 195.000004910  CA      *Mar  1 00:03:15.000: BGP: UPDATE to 10.2.1.2: 1 networks, 0 withdrawn
+ 195.000007150  ISP2    *Mar  1 00:03:15.000: %BGP-5-ADJCHANGE: neighbour 10.2.1.1 is up (AS 65010)
+ 195.000009462  CA      *Mar  1 00:03:15.000: BGP: UPDATE from 10.2.1.2: 1 networks, 0 withdrawn
+ 195.000010526  CA      *Mar  1 00:03:15.000: BGP: UPDATE from 10.2.1.2: 1 networks, 0 withdrawn
+ 195.000010526  CA      *Mar  1 00:03:15.000: BGP: best path to 2.2.2.2/32 via 10.2.1.2 from 10.2.1.2 (shorter AS path)
+ 195.000010526  CA      *Mar  1 00:03:15.000: BGP: UPDATE to 10.1.1.2: 1 networks, 0 withdrawn
+ 195.000010526  CA      *Mar  1 00:03:15.000: BGP: UPDATE to 10.2.1.2: 0 networks, 1 withdrawn
+ 195.000011598  CA      *Mar  1 00:03:15.000: BGP: UPDATE from 10.2.1.2: 2 networks, 0 withdrawn
+ 195.000011598  CA      *Mar  1 00:03:15.000: BGP: best path to 10.2.2.0/30 via 10.2.1.2 from 10.2.1.2 (shorter AS path)
+ 195.000011598  CA      *Mar  1 00:03:15.000: BGP: best path to 192.168.20.0/24 via 10.2.1.2 from 10.2.1.2 (shorter AS path)
+ 195.000011598  CA      *Mar  1 00:03:15.000: BGP: new paths for 10.1.1.2 wait 29999 ms
+ 195.000011598  CA      *Mar  1 00:03:15.000: BGP: UPDATE to 10.2.1.2: 0 networks, 2 withdrawn
+ 195.000012694  CA      *Mar  1 00:03:15.000: BGP: UPDATE from 10.2.1.2: 1 networks, 0 withdrawn
+ 195.000012694  CA      *Mar  1 00:03:15.000: BGP: dropped 192.168.10.0/24 from 10.2.1.2: own AS 65010 in the path
+ 195.000013534  CA      *Mar  1 00:03:15.000: BGP: UPDATE from 10.2.1.2: 0 networks, 1 withdrawn
+ 199.000000000  ok      expect CA output contains "BGP: dropped 192.168.10.0/24 from 10.2.1.2: own AS 65010 in the path"
+ 199.000000000  CA      CA#undebug all
+ 199.000000000  CA      Debug output: all off
+ 199.000000000  --      run 60s
+ 259.000000000  CA      CA#show ip bgp summary
+ 259.000000000  CA      Router ID 10.255.0.10, local AS 65010
+ 259.000000000  CA      Table version 12; networks: 5, paths: 9
+ 259.000000000  CA      
+ 259.000000000  CA      Neighbor        V           AS MsgRcvd MsgSent   TblVer  InQ OutQ Up/Down  State/PfxRcd
+ 259.000000000  CA      10.1.1.2        4          100       9      12       12    0    0 00:04:17        4
+ 259.000000000  CA      10.2.1.2        4          200      16      20       12    0    0 00:01:03        4
+ 259.000000000  ok      expect CA route 192.168.20.0/24 via 10.2.1.2
+ 259.000000000  ok      expect ISP2 route 192.168.10.0/24 via 10.2.1.1
+ 259.000000000  ok      expect CA svc bgp metric established == 2 (2)
+ 259.000000000  ok      expect hops bgp >= 100 (144)
+# 22 von 22 Erwartungen erfüllt

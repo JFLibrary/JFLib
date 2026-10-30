@@ -94,6 +94,32 @@ Queues, Lastgeneratoren, eigene Skripte).
   Projekts, Roaming beim Verschieben, Verbindungsverlust außer Reichweite; Funklinien,
   Reichweiten und Signalbalken auf der Zeichenfläche, die Einstellungen im Inspektor, `iw` in der
   Shell, `show dot11 associations` am Access Point (siehe [WLAN](#wlan)).
+- **Routing mit BGP (R6):** Router, L3-Switches und die Firewall sprechen BGP-4 nach RFC 4271
+  über TCP-Port 179 (4-Byte-AS-Nummern nach RFC 6793, Route Refresh nach RFC 2918): `router bgp
+  ASN` mit `bgp router-id`, `neighbor … remote-as|update-source|next-hop-self|ebgp-multihop|
+  shutdown|description|weight`, `network … mask …`, `redistribute connected|static|rip|ospf`,
+  `timers bgp`, `bgp default local-preference`; die Zustände von Idle bis Established mit
+  ConnectRetry, Hold- und Keepalive-Timer und Kollisionen, eBGP mit TTL 1 und iBGP zwischen
+  Loopbacks, die Entscheidung Schritt für Schritt, Schleifen im AS-Pfad, Fast External
+  Fallover; `show ip bgp [summary|neighbors]`, `show ip route bgp`, `clear ip bgp`, `debug ip
+  bgp` (siehe [Routing mit BGP](#routing-mit-bgp)).
+- **Dateien, TFTP und FTP (X1a):** jedes Gerät hat Dateien, die mit dem Projekt gespeichert
+  werden: `flash:` mit dem Systemabbild und `nvram:startup-config` auf den IOS-artigen Geräten,
+  ein kleiner Verzeichnisbaum auf den Linux-Hosts; ein TFTP- und ein FTP-Server als Dienste,
+  `copy running-config tftp:` und zurück, `copy … ftp:`, `dir`, `more`, `delete`, in der Shell
+  `ls`, `cat`, `cp`, `rm`, `mkdir`, `echo … >`, `tftp` und `curl ftp://`; der Reiter Dateien im
+  Gerätefenster mit Import und Export (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
+- **Zurückspulen (K1):** im Simulationsmodus zeigen die Geräte zu jedem Zeitpunkt der
+  Aufzeichnung ihren Zustand von damals – LEDs und Kabel, Inspektor, Gerätefenster, Metriken
+  und Konsolen, die `show`-Befehle aus diesem Zustand beantworten; der Simulator hält dafür
+  Keyframes in einer Speichergrenze und spielt den Rest exakt nach. „Von hier fortsetzen“ macht
+  einen solchen Zeitpunkt zur Gegenwart (siehe [Zurückspulen](#zurückspulen)).
+- **Physische Ansicht (P1):** neben der logischen Zeichenfläche die Orte des Projekts --
+  Standorte, Gebäude, Etagen, Räume, Racks und Tische -- als Hierarchie zum Durchwandern, ein
+  Raum als Grundriss, ein Rack von vorn mit den Geräten in ihren Höheneinheiten; Geräte werden
+  hineingezogen, jedes Kabel bekommt eine Länge (automatisch aus den Orten oder von Hand) mit der
+  Grenze seines Mediums nach IEEE 802.3, ein zu langes kommt nicht hoch und ist überall zu sehen
+  (siehe [Physische Ansicht](#physische-ansicht)).
 
 ## Bedienung
 
@@ -108,7 +134,8 @@ Queues, Lastgeneratoren, eigene Skripte).
   (Strg+3), mit Umschalt das Gerätefenster.
 - **Simulation:** F5 Simulationsmodus, Umschalt+F5 Echtzeit, F6 Abspielen/Anhalten, F7 Schritt
   vor, Umschalt+F7 zurück; das Werkzeug P sendet eine einfache PDU (Quelle, dann Ziel – auch mit
-  Tab und Eingabe).
+  Tab und Eingabe). In der Vergangenheit zeigen die Geräte ihren Zustand von damals, „Von hier
+  fortsetzen …“ (Simulation) macht dort weiter.
 - **Tastatur:** Strg+1 … 8 zeigen die Bereiche und geben ihnen die Tastatur, Strg+9 die
   Topologie; dort wählt Tab die Geräte und Notizen, dann die Kabel (Eingabe auf einem Kabel: seine
   Eigenschaften). Werkzeugleiste und Palette sind Fokusgruppen (ein Tab-Halt, Pfeiltasten
@@ -148,6 +175,7 @@ build/win/jfn-sim.exe run apps/JFNetworker/tests/fixtures/lab_shards.jfnet --sce
 build/win/jfn-sim.exe check apps/JFNetworker/tests/fixtures/lan_router.jfnet
 build/win/jfn-sim.exe decode "ff ff ff ff ff ff 02 4a 00 00 01 01 08 06 ..."
 build/win/jfn-sim.exe gen 500 --out build/campus.jfnet
+build/win/jfn-sim.exe rewind apps/JFNetworker/tests/fixtures/lab_window.jfnet 60   # Keyframes und Zeit zum Zurückspulen
 build/win/JFNetworker.exe apps/JFNetworker/tests/fixtures/two_pcs.jfnet --scenario apps/JFNetworker/tests/scen/two_pcs.scn
 python tools/i18n_check.py apps/JFNetworker crates            # jeder Text der Crates hat sein Englisch
 ```
@@ -210,6 +238,21 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `wlan_range.uis` | die Reichweiten: ein gewählter Access Point zeigt seine Kreise, Ansicht › WLAN-Reichweiten alle (auch mit Alt+A, W), die Kreise als Texteinträge, der Maßstab im Inspektor des Projekts mit Rückgängig und einer Ablehnung |
 | `wlan_drag.uis` | Laptop1 bei gehaltener Maustaste aus der Reichweite gezogen: „außer Reichweite“, nach sieben fehlenden Beacons getrennt, die Station sucht; Loslassen ist ein Rückgängig-Schritt, rückgängig gemacht meldet sie sich wieder bei AP1 an |
 | `wlan_shots.uis` | die Bilder von WLAN (Reichweiten, Funklinien, Signalbalken, Inspektor eines Access Points und einer Station) hell und dunkel mit 100 und 150 % (`build/jfnetworker/wlan_*.png`) |
+| `model.uis`, Gruppe `bgp` | BGP (siehe [Routing mit BGP](#routing-mit-bgp)): eine eBGP-Sitzung durch jeden Zustand auf die Nanosekunde (der erste SYN, den das IOS-artige ARP verliert, die Kollision der beiden Verbindungen, die der höheren BGP-ID bleibt), das OPEN auf dem Kabel (Version, AS, Haltezeit, ID, die drei Capabilities), TTL 1, Keepalives alle 60 s ab dem letzten UPDATE, `timers bgp 10 30` auf einer Seite (Haltezeit 30, Keepalive 10 auf beiden), iBGP zwischen Loopbacks mit `update-source` und TTL 255, ein Next Hop, den das IGP nicht kennt, bis `next-hop-self`, kein iBGP-Weg an einen anderen internen Nachbarn; jeder Schritt der Entscheidung (Gewicht, LOCAL_PREF, selbst erzeugt, AS-Pfad, ORIGIN, MED gleicher und verschiedener Nachbar-ASe, extern vor intern, IGP-Metrik über eine serielle Leitung, BGP-ID, Nachbaradresse); eine Schleife im AS-Pfad; ein falsches `remote-as` mit NOTIFICATION 2/2 auf dem Kabel, der Pause von 60 s und dem Problem, dann behoben; Ausfälle über den Hold Timer hinter einem Switch, über einen RST nach einem Neustart des Nachbarn und über Fast External Fallover; Redistribution mit MED, RIB-Failure (`r`), ein `network` ohne Route als Problem und mit Route nach der Mindestpause; die Befehlszeile (Modus, Hilfe, Tab, Fehlermeldungen, `show`, `clear ip bgp … soft in` mit ROUTE-REFRESH, `clear ip bgp *` mit Cease, `shutdown`, `no router bgp`, die Running-Config als Startkonfiguration, `% IP routing not enabled`); Texte auf Deutsch und Englisch; Determinismus |
+| `bgp_console.uis` | BGP an R1s Konsole (`fixtures/bgp_pair.jfnet`, R2 wartet schon): `router bgp` mit seinem Modus, `?` darin, Nachbar und Netz getippt, die Sitzung kommt (die Konsole meldet sie), `show ip bgp summary`, `show ip bgp` und `show ip route bgp` mit der Route von R2 |
+| `model.uis`, Gruppe `files` | Dateien, TFTP und FTP (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)): der Speicher (Pfade beider Arten, Verzeichnisse, das Systemabbild, Grenzen, die Einträge der Projektdatei mit Text und Base64), die Befehle (`dir`, `show flash:`, `more`, `delete`, `copy`; `ls`, `cat`, `echo > DATEI`, `cp`, `mkdir`, `rm`, `rmdir`, `touch`), eine Sicherung per TFTP und das Zurückholen auf die Nanosekunde, ein verlorenes ACK, eine fehlende Datei, ein Server nur zum Lesen, eine Quote, Optionen für die Blockgröße, FTP mit Anmeldung, Liste, Hoch- und Herunterladen passiv und aktiv, ein falsches Passwort, eine volle Quote, die Probleme-Liste, die Projektdatei hin und zurück, Determinismus |
+| `files_window.uis` | der Reiter Dateien auf `fixtures/backup.jfnet`: SRV1s Dateien aus dem Projekt mit Text, Exportieren … in eine Datei des Rechners, Löschen als Rückgängig-Schritt und zurück, Importieren … in das gewählte Verzeichnis (die Shell hat die Datei sofort), was die Shell schreibt, kommt ins Projekt; R1s `flash:` mit dem Systemabbild und `nvram:startup-config` |
+| `files_services.uis` | TFTP- und FTP-Server im Reiter Dienste: Karten mit Statuszeile, Einstellungen als JSON (nur lesend mit Quote, ein abgelehnter Port, ein Benutzer ohne Namen, ein fehlendes Heimatverzeichnis in der Probleme-Liste), Rückgängig; eine Sicherung landet nur beim schreibbaren Server |
+| `files_console.uis` | eine Sicherung an R1s Konsole: `copy running-config tftp:` mit Fragen, Fortschritt und Ergebnis, die Datei als Rückgängig-Schritt auf SRV1, ein falscher Name aus der Sicherung zurückgeholt, eine Kopie nach `flash:` mit `dir`, Rückgängig nimmt sie wieder weg |
+| `files_shots.uis` | die Bilder von Dateien, TFTP und FTP (Konsole nach einer Sicherung, der Reiter Dateien, die Einstellungen des TFTP-Servers) hell und dunkel mit 100 und 150 % (`build/jfnetworker/files_*.png`) |
+| `model.uis`, Gruppe `keyframes` | Zurückspulen (siehe [Zurückspulen](#zurückspulen)): der erste Keyframe beim Start und seine Größe, der Start und die Gegenwart wiederhergestellt (der Moment 0 mit seinen Ereignissen, ein Moment zwischen zwei Ereignissen), der Lauf bleibt unberührt; ein Campus in Echtzeit mit Konsolenzeilen, einem gezogenen und wieder gesteckten Kabel, einem Ping über `Inline::call` und Schritten des Simulationsmodus zwischen den Ereignissen eines Moments, an 13 Stellen wiederhergestellt und Byte für Byte gleich dem Lauf (der ganze Zustand und die Aufzeichnung der Wiederholung), auch sieben Sekunden vom ersten Keyframe aus; Leases, ARP-Tabellen und LEDs von damals gegen die heutigen; eine Wiederholung in Stücken mit wachsendem Fortschritt; die Speichergrenze nach Zahl (sechs Keyframes mit ihren Zeiten, der erste bleibt, die Abstände schrumpfen zur Gegenwart hin) und nach Bytes, zu knapp für zwei (der Start und die Eingaben davor gehen); die Eingaben mit ihren Zeiten (Uhr, Konsole, Abbruch, Aktion, Aufruf); „Von hier fortsetzen“ gegen einen Lauf, der nie weiterkam (Zustand, Aufzeichnung und Eingaben gleich); im Fenster: der gezeigte Zustand, LEDs von damals und von jetzt, Zeilen in der Vergangenheit ändern nichts, eine Bearbeitung holt in die Gegenwart, Fortsetzen mit einer späteren Änderung am Projekt, Rückgängig und Wiederholen danach, ein Zeitpunkt vor dem ersten Keyframe |
+| `rewind.uis` | Zurückspulen im Fenster (`fixtures/lan_router.jfnet`): R1 pingt, bekommt eine statische Route und schaltet Gi0/0/0 ab und wieder an; ein Schritt zurück zeigt die ARP-Tabelle mit PC2, aber die Route noch nicht (der Ping lief damals noch), bei 0,5 s nur die eigenen Adressen, eine Zeile in der Vergangenheit ändert nichts, bei 4,5 s das Kabel PC1 – R1 unten, die Route da und das Netz von Gi0/0/0 weg; „Zurück zu live“; „Von hier fortsetzen“ bei 4,5 s mit Rückfrage (abgebrochen, dann bestätigt): das Kabel bleibt unten, die Konsole sagt, wo es weitergeht, und antwortet wieder live |
+| `rewind_shots.uis` | die Bilder des Zurückspulens (die Ansicht bei 4,5 s mit Hinweis, LEDs und Konsole von damals; die Rückfrage) hell und dunkel mit 100 und 150 % (`build/jfnetworker/rewind_*.png`) |
+| `model.uis`, Gruppe `phys` | die physische Ansicht (siehe [Physische Ansicht](#physische-ansicht)): die Grenze jedes Mediums bei jeder Speed (Kupfer, SR und LR, Konsole, V.35, WAN und Funk ohne), Bauformen und Höhen der Modelle, Optiken und die Faser, die sie wählen, der Baum ohne Orte, ältere Projekte im Standardraum (sechs Fixtures: 7 m, zur Decke 4 m, zur Wolke 3 m, nichts über der Grenze, Verzögerungen wie bisher), die automatischen Längen des Campus auf den Meter (im Rack, auf dem Tisch, zwischen Räumen, Etagen und Häusern, an der Decke), ein Kabel über seiner Grenze an beiden Enden unten mit Notiz, Protokollzeilen, Problem, `show interfaces` und `ip link`, wieder oben, wenn es kürzer wird (ein anderer Raum, eine Länge von Hand, automatisch), Optiken, die nicht passen, die Laufzeit aus dem Plan, Orte hinzufügen, umbenennen, verschieben, vergrößern, entfernen und Geräte aufstellen als Rückgängig-Schritte, denen der Simulator folgt, die Ablehnungen, die Datei, die Wahl der Ansicht im Layout, die Syntax der Szenarien und ein Szenario zweimal (Determinismus) |
+| `phys_view.uis` | die physische Ansicht auf `fixtures/phys_campus.jfnet`: der Schalter der Werkzeugleiste, Ansicht › Logische / Physische Ansicht mit ihren Tastenkürzeln, durch die Orte (Serverraum, Etage, Gebäude, Campus, alle Standorte), Zurück, die Brotkrumen, Doppelklicks auf Orte und Wege, Tab und Eingabe, ein Ort im Inspektor |
+| `phys_rack.uis` | Geräte aufstellen: SRV1 im Rack von der Tastatur zehn Höheneinheiten höher (mit Rückgängig), die Höheneinheit im Inspektor (eine über dem Rack abgelehnt), aus dem Rack über die Liste der Orte, aus der Ablage ins Rack gezogen (die unterste freie Einheit), auf die Einheiten von R1 gezogen (abgelehnt), PC4 auf ein Rack (abgelehnt: kein Rack-Gerät) und an einen Platz im Labor, die Höhe des Racks im Inspektor (zu niedrig für seine Geräte abgelehnt) |
+| `phys_length.uis` | ein zu langes Kabel, gezeigt und behoben: das Problem, das Kabel „unten“ auf der Zeichenfläche, Länge, Grenze und Ablehnung im Inspektor, das markierte Kabel in der physischen Ansicht, 90 m von Hand (oben), 132 m (unten), Automatisch und Rückgängig, eine Länge, die keine Zahl ist, PC4 über den Inspektor in Büro 1 (23 m, oben) |
+| `phys_shots.uis` | die Bilder der physischen Ansicht (Serverraum mit dem markierten Kabel und seinem Inspektor, die Vorderseite von Rack 1, das Erdgeschoss von Haus A, der Campus) hell und dunkel mit 100 und 150 % (`build/jfnetworker/phys_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -217,10 +260,15 @@ Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder K
 Loadbalancer, zwei Webserver, drei KV-Knoten, Queue mit Worker, DNS, DHCP, ein Skript),
 `stp_triangle.jfnet` und `rstp_triangle.jfnet` (drei Switches im Dreieck mit STP bzw. RSTP),
 `wlan_office.jfnet` (zwei Access Points, ein Gastnetz, zwei Laptops und ein Smartphone; das
-Szenario `wlan_office.scn` und die WLAN-Fensterskripte) und die Netze der Golden-Szenarien. Die
+Szenario `wlan_office.scn` und die WLAN-Fensterskripte), `backup.jfnet` (drei Router, SRV1 mit
+TFTP- und FTP-Server, PC1; das Szenario `backup.scn` und die Fensterskripte `files_*.uis`),
+`phys_campus.jfnet` (die physische Ansicht: zwei Häuser, Serverraum mit zwei Racks, Büros auf
+zwei Etagen, ein Labor 180 m entfernt, dessen PC4 mit 208 m Kupfer an SW1 hängt;
+`phys_lengths.scn` und die `phys_*.uis`) und die Netze der Golden-Szenarien. Die
 Bausteine aus `lib/` prüft `coretest` (Gruppen `netpkt`, `dhcp`, `dnsmsg`, `ntp`, `httpmsg`,
 `rng`, `metrics`, `jmap`, `cmdtree`, `hashring`, `lru`, `stp`, `icmpv6`, `ospf`, `addrsel`,
-für WLAN `crypto` und `netpkt`), die Skriptsprache die Gruppe `script`.
+für WLAN `crypto` und `netpkt`, für BGP `bgp`, für Dateien `tftp` und `ftp`), die
+Skriptsprache die Gruppe `script`.
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -269,8 +317,12 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | NAT und Zugriffslisten | [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs), [`nat.rs`](crates/jfn_sim/nat.rs), [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs), [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs), [`lib/netpkt/nat.rs`](../../lib/netpkt/nat.rs), [`src/nattest.rs`](src/nattest.rs) | Zugriffslisten und Adressübersetzung der IOS-artigen Geräte, ihre Befehle, das Umschreiben der Pakete mit ihren Prüfsummen (Library), ihr Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
 | IPv6 | [`crates/jfn_sim/ip6.rs`](crates/jfn_sim/ip6.rs), [`nd.rs`](crates/jfn_sim/nd.rs), [`l3v6.rs`](crates/jfn_sim/l3v6.rs), [`jobs6.rs`](crates/jfn_sim/jobs6.rs), [`trace6.rs`](crates/jfn_sim/trace6.rs), [`cli/ip6.rs`](crates/jfn_sim/cli/ip6.rs), [`cli/linux6.rs`](crates/jfn_sim/cli/linux6.rs), [`cli/print6.rs`](crates/jfn_sim/cli/print6.rs), [`cli/names.rs`](crates/jfn_sim/cli/names.rs), [`lib/netpkt/icmpv6.rs`](../../lib/netpkt/icmpv6.rs), [`lib/netpkt/ipv6.rs`](../../lib/netpkt/ipv6.rs), [`lib/netpkt/addrsel.rs`](../../lib/netpkt/addrsel.rs), [`src/ipv6test.rs`](src/ipv6test.rs), [`src/ipv6tcptest.rs`](src/ipv6tcptest.rs) | der IPv6-Teil der Geräte (Adressen, Neighbor Cache, Router, Routen), Neighbor Discovery, DAD und SLAAC, Weiterleiten und ICMPv6, Ping und Traceroute, die Notizen, die Befehle beider Befehlszeilen, Namen an beiden Befehlszeilen (`dig`, `host`, `nslookup`, `ip host`, `ip name-server`), ICMPv6 und Neighbor Discovery Byte für Byte, die Fragmente und die Adressauswahl nach RFC 6724 (Library), die Selbsttests (siehe [IPv6](#ipv6)) |
 | OSPF | [`crates/jfn_sim/ospf.rs`](crates/jfn_sim/ospf.rs), [`cli/ospf.rs`](crates/jfn_sim/cli/ospf.rs), [`src/ospftest.rs`](src/ospftest.rs), [`lib/netpkt/ospf.rs`](../../lib/netpkt/ospf.rs) | OSPF als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Pakete und LSAs Byte für Byte (siehe [Routing mit OSPF](#routing-mit-ospf)) |
+| BGP | [`crates/jfn_sim/bgp.rs`](crates/jfn_sim/bgp.rs), [`bgptrace.rs`](crates/jfn_sim/bgptrace.rs), [`cli/bgp.rs`](crates/jfn_sim/cli/bgp.rs), [`src/bgptest.rs`](src/bgptest.rs), [`lib/netpkt/bgp.rs`](../../lib/netpkt/bgp.rs) | BGP als Dienst der Router, L3-Switches und der Firewall, seine Notizen, Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit BGP](#routing-mit-bgp)) |
 | Aufgaben mit Bewertung | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/assess.rs`](crates/jfn_sim/assess.rs), [`src/workspace/assess.rs`](src/workspace/assess.rs), [`src/workspace/author.rs`](src/workspace/author.rs), [`src/doc/assess.rs`](src/doc/assess.rs), [`assets/assess`](assets/assess), [`src/assesstest.rs`](src/assesstest.rs) | das Format einer Aufgabe, das Bewerten ihrer Kriterien, die Prüfung `reaches`, das Panel mit Punkten, Zeit und Abgeben, der Bereich zum Erstellen mit seinen Rückgängig-Schritten, die drei Aufgaben, ihr Selbsttest (siehe [Aufgaben mit Bewertung](#aufgaben-mit-bewertung)) |
+| Physische Ansicht | [`crates/jfn_model/phys.rs`](crates/jfn_model/phys.rs), [`crates/jfn_sim/phys.rs`](crates/jfn_sim/phys.rs), [`src/workspace/phys/`](src/workspace/phys/mod.rs) (`scene.rs`, `paint.rs`, `props.rs`), [`src/doc/phys.rs`](src/doc/phys.rs), [`src/phystest.rs`](src/phystest.rs) | die Orte, wo die Geräte stehen, Kabellängen und die Grenzen der Medien (Modell), Kabel, die zu lang sind oder deren Optiken nicht passen, im Simulator mit Notizen, Protokollzeilen und Problemen, die Ansicht mit ihren Plänen und dem Inspektor, die Änderungen als Rückgängig-Schritte, ihr Selbsttest (siehe [Physische Ansicht](#physische-ansicht)) |
 | WLAN | [`crates/jfn_model/wlan.rs`](crates/jfn_model/wlan.rs), [`crates/jfn_sim/wlan.rs`](crates/jfn_sim/wlan.rs), [`wlankey.rs`](crates/jfn_sim/wlankey.rs), [`wlantrace.rs`](crates/jfn_sim/wlantrace.rs), [`cli/wlan.rs`](crates/jfn_sim/cli/wlan.rs), [`src/doc/wlan.rs`](src/doc/wlan.rs), [`src/workspace/canvas/wlan.rs`](src/workspace/canvas/wlan.rs), [`src/workspace/inspector/wlan.rs`](src/workspace/inspector/wlan.rs), [`src/wlantest.rs`](src/wlantest.rs), [`lib/netpkt/eapol.rs`](../../lib/netpkt/eapol.rs), [`lib/crypto`](../../lib/crypto/lib.rs) (`sha1.rs`, `keywrap.rs`, `cmac.rs`) | die WLAN-Einstellungen im Projekt, Stationen und Access Points im Simulator mit Funk, Schlüsseln und Notizen, `iw` und `show dot11`, die Einstellungen als Rückgängig-Schritte, Funklinien, Reichweiten und Balken, der Inspektor, der Selbsttest, EAPOL Byte für Byte und die Kryptografie von WPA2 und WPA3 (siehe [WLAN](#wlan)) |
+| Dateien, TFTP und FTP | [`crates/jfn_model/files.rs`](crates/jfn_model/files.rs), [`crates/jfn_sim/files.rs`](crates/jfn_sim/files.rs), [`tftpd.rs`](crates/jfn_sim/tftpd.rs), [`tftpc.rs`](crates/jfn_sim/tftpc.rs), [`ftpd.rs`](crates/jfn_sim/ftpd.rs), [`ftpc.rs`](crates/jfn_sim/ftpc.rs), [`xfertrace.rs`](crates/jfn_sim/xfertrace.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`src/workspace/devwin/files.rs`](src/workspace/devwin/files.rs), [`src/filestest.rs`](src/filestest.rs), [`lib/netpkt/tftp.rs`](../../lib/netpkt/tftp.rs), [`lib/netpkt/ftp.rs`](../../lib/netpkt/ftp.rs) | die Dateien eines Geräts im Projekt und im Simulator, TFTP- und FTP-Server und ihre Clients an beiden Befehlszeilen, die Notizen, die Befehle für Dateien, der Reiter Dateien, der Selbsttest, TFTP und FTP Byte für Byte (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)) |
+| Zurückspulen | [`crates/jfn_sim/keyframe.rs`](crates/jfn_sim/keyframe.rs), [`crates/jfn_sim/driver.rs`](crates/jfn_sim/driver.rs), [`src/doc/sim.rs`](src/doc/sim.rs), [`src/workspace/sim/mod.rs`](src/workspace/sim/mod.rs), [`src/keyframetest.rs`](src/keyframetest.rs) | Keyframes in einer Speichergrenze, die Eingaben dazwischen, die Wiederholung bis zu einem Zeitpunkt und ihre Prüfsummen, das Fortsetzen von dort (Simulator); der Zustand von damals im Fenster, Konsolen in der Vergangenheit, „Von hier fortsetzen“ mit Rückfrage; ihr Selbsttest (siehe [Zurückspulen](#zurückspulen)) |
 
 ### Gerätekatalog
 
@@ -368,6 +420,8 @@ Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinst
   und Ports auflöst; Seiten über HTTP laden und zeigen ist Meilenstein B1 (siehe
   [Fahrplan](#fahrplan)). Eine Konsole erscheint an einer Stelle: Zeigt das Gerätefenster sie,
   verweist der Tab dorthin. Offen sind höchstens zwei Gerätefenster und drei Konsolenfenster.
+  Der Reiter Dateien zeigt die Dateien des Geräts mit Import und Export (siehe
+  [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
 - **Protokoll** ([`src/workspace/logview.rs`](src/workspace/logview.rs)): die Log-Zeilen aller
   Geräte als `Report::Log` – Syslog-Meldungen ihrer Dienste (dhclient, dhcpd, NTP …), die
   IOS-artigen Meldungen `%LINK`, `%LINEPROTO` und `%SYS` mit der Schwere aus ihrem Code und mit
@@ -384,7 +438,10 @@ Befehlszeile einspielt. Positionen sind Weltkoordinaten (DIP bei 100 %): bei Ger
 obere Ecke ihres 64 × 48 großen Symbols, bei Notizen die der Karte. `layout` hält die Ansicht
 beim Speichern (`zoom_pm` in Promille, Mitte `cx`, `cy`, Raster `grid`); fehlt sie, zeigt das
 Programm beim Öffnen alles. Ein Labor hat dazu den Abschnitt `lab` mit seiner Aufgabe (siehe
-[Labore und Aufgaben](#labore-und-aufgaben)), ein freies Projekt dort `null`.
+[Labore und Aufgaben](#labore-und-aufgaben)), ein freies Projekt dort `null`. Die physische
+Ansicht (siehe [Physische Ansicht](#physische-ansicht)) bringt `places` (die Orte), `phys` und
+`optics` je Gerät, `len_m` je Kabel und im Layout `phys` und `phys_at` (die gezeigte Ansicht
+und ihr Ort) mit; ältere Dateien haben nichts davon und laufen wie bisher.
 
 ```json
 {
@@ -402,6 +459,20 @@ Programm beim Öffnen alles. Ein Labor hat dazu den Abschnitt `lab` mit seiner A
       "cable": "copper", "kbps": 1000000, "delay_ns": 50 }
   ]
 }
+```
+
+Die Dateien eines Geräts stehen in `files`, ein Eintrag je Datei oder selbst angelegtem
+Verzeichnis, nach Pfad geordnet: Text als `text`, alles andere als `base64`, die Zeit in
+Sekunden seit 1970 nach der Uhr des Geräts als `mtime` (siehe
+[Dateien, TFTP und FTP](#dateien-tftp-und-ftp)). Ein Gerät ohne `files` hat nur seine
+Verzeichnisse und sein Systemabbild.
+
+```json
+"files": [
+  { "path": "/srv/ftp/upload", "dir": true },
+  { "path": "/srv/tftp/r1-config", "text": "hostname R1\n!\nend\n", "mtime": 1767225605 },
+  { "path": "/srv/tftp/logo.bin", "base64": "iVBORw0KGgo=" }
+]
 ```
 
 ### Simulator
@@ -521,8 +592,8 @@ Rolle, Zustand, Kosten, Port-ID, Edge, Link-Typ, Designated-Werten, Zählern) un
 Im Simulationsmodus läuft die Uhr nur auf Knopfdruck. Ein Schritt geht bis zum nächsten
 Frame, der auf ein Kabel geht, auf Wunsch nur für bestimmte Protokolle (ARP, ICMP, …) oder
 Geräte. „Schritt zurück“ wandert die Aufzeichnung entlang und zeigt Kabel, Ereignisse und
-Pakete zu diesem Zeitpunkt; die Geräte behalten dabei ihren heutigen Zustand (den Zustand von
-damals bringen Keyframes in Phase 4). Der nächste Schritt geht durch die Aufzeichnung wieder
+Pakete zu diesem Zeitpunkt, die Geräte zeigen ihren Zustand von damals (siehe
+[Zurückspulen](#zurückspulen)). Der nächste Schritt geht durch die Aufzeichnung wieder
 vor, „Zurück zu live“ springt sofort in die Gegenwart. Für die Oberfläche liefert der
 Simulator:
 
@@ -549,12 +620,12 @@ Simulator:
   Projekt). In Echtzeit läuft die Uhr mit dem Tempo, im Simulationsmodus geht jeder Schritt zum
   nächsten Zeitpunkt, an dem ein gezeigter Frame ein Gerät verlässt; Abspielen macht einen
   Schritt pro Sekunde bei 1×. Steht die Ansicht in der Vergangenheit, sagt ein Hinweis über der
-  Zeichenfläche „Ansicht bei t = …“ mit dem Knopf „Zurück zu live“. Die Statusleiste nennt
-  Modus, Uhr und Ereignisse.
+  Zeichenfläche „Ansicht bei t = …“ mit den Knöpfen „Von hier fortsetzen …“ und „Zurück zu
+  live“. Die Statusleiste nennt Modus, Uhr und Ereignisse.
 - **Pakete auf der Leinwand:** kleine Umschläge in gedämpften Farben je Protokoll (ICMP grün,
-  ARP bernstein, DNS violett, TCP/HTTP blau, UDP cyan, DHCP petrol, STP grau, OSPF/RIP braun,
-  Rest schiefergrau), unter 50 % Zoom Punkte, dort auf dem Kabel, wo der Frame zum gezeigten
-  Zeitpunkt ist. Ein Schritt bewegt sie vom alten zum neuen Zeitpunkt (Ankommende laufen in ihr
+  ARP bernstein, DNS violett, TCP/HTTP blau, UDP cyan, DHCP petrol, STP grau, OSPF/RIP braun
+  wie BGP, Rest schiefergrau), unter 50 % Zoom Punkte, dort auf dem Kabel, wo der Frame zum
+  gezeigten Zeitpunkt ist. Ein Schritt bewegt sie vom alten zum neuen Zeitpunkt (Ankommende laufen in ihr
   Ziel und verblassen, neue erscheinen am Absender); Verworfenes zeigt ein rotes ×, das danach
   ausblendet. Reduzierte Bewegung springt ohne Übergang. Ein Klick wählt den Frame und öffnet den
   Paket-Tab. Gezeichnet wird über der Leinwand; ihr eigenes Bild bleibt im Cache, ein
@@ -579,6 +650,80 @@ Simulator:
   periodisch.
 - **Export:** Datei › Exportieren › „Aufzeichnung als pcapng …“ schreibt alle aufgezeichneten
   Frames für Wireshark.
+
+### Zurückspulen
+
+Steht die Ansicht im Simulationsmodus in der Vergangenheit (Schritt zurück, Zeitleiste,
+Ereignisliste), zeigen die Geräte ihren Zustand von damals
+([`keyframe.rs`](crates/jfn_sim/keyframe.rs), [`src/doc/sim.rs`](src/doc/sim.rs)).
+
+- **Keyframes:** der Simulator merkt sich während des Laufs Schnappschüsse seines ganzen
+  Zustands. Ein Keyframe ist eine Kopie der Engine ohne ihre Aufzeichnung: was sich nie ändert,
+  teilen sich alle Kopien (die Bytes der Frames, die Modelle des Katalogs, die Befehlsbäume,
+  der übersetzte Code der Skripte); von der Aufzeichnung behält er nur die Zähler und die
+  Frames, die gerade auf einem Kabel sind. Was spätere Meilensteine an Diensten und Zustand
+  dazubringen, kopiert `Clone` ohne eigenen Code mit.
+- **Eingaben:** alles, was den Simulator von außen ändert, wird mit seiner Position
+  aufgezeichnet (virtuelle Zeit und Zahl der bis dahin gelaufenen Ereignisse): Aktionen
+  (Bearbeiten, Strom, Kabel, Fehler, Verschieben, Schritte eines Szenarios), Zeilen und
+  Abbrüche an den Konsolen, PDUs, Pings und Abfragen (`Inline::call`) und die Stellen, an denen
+  ein Lauf die Uhr anhält und die Zeitreihen eine Probe nehmen. Der Zustand zum Zeitpunkt t ist
+  der nächste Keyframe davor und die Wiederholung der Ereignisse und Eingaben bis t. Sie ist
+  exakt, weil der Simulator deterministisch ist: der Selbsttest vergleicht Zustand und
+  Aufzeichnung der Wiederholung Byte für Byte mit dem Lauf.
+- **Speichergrenze** (`Budget::default()`): Abstände zählen in Ereignissen, denn die kostet
+  eine Wiederholung (eine ruhige Minute ist sofort nachgespielt, ein Labor rechnet Tausende
+  Ereignisse pro Sekunde). Ein Keyframe nach 20 000 Ereignissen, in langen Läufen erst nach
+  1/64 der bisher gelaufenen (je länger der Lauf, desto seltener); zusammen höchstens 64 MiB
+  (geschätzt aus Tabellen, Puffern, Logs, Warteschlangen und Zeitreihen, `Service::footprint`
+  für die Dienste; `Footprint::of` nennt die Teile) und 256 Stück. Darüber fällt der Keyframe,
+  dessen Lücke im Verhältnis zu ihrem Alter am kleinsten wäre: die jüngste Vergangenheit bleibt
+  dicht, ältere Keyframes werden zuerst ausgedünnt, ihre Abstände wachsen mit dem Alter. Der
+  erste und der neueste bleiben; reicht der Platz nicht einmal für diese zwei, fällt der erste,
+  und für frühere Zeitpunkte zeigt das Fenster nur die Aufzeichnung (der Hinweis sagt es).
+- **Was die Vergangenheit zeigt:** LEDs und Zustand der Kabel auf der Zeichenfläche, den
+  Inspektor (Schnittstellen, Adressen, VLANs, WLAN), die Gerätefenster (Übersicht,
+  Schnittstellen, Konfiguration, Dienste, Desktop), Dienst-Pillen und Sparklines und im Bereich
+  Metriken Baum, Statuszeile und Disk (Diagramme und Kacheln enden ohnehin beim gezeigten
+  Zeitpunkt). Eine kurze Wiederholung läuft sofort (bis 50 000 Ereignisse), eine längere in
+  Stücken von 20 000 je Takt; dann zeigt der Hinweis „Zustand wird berechnet … n %“, und bis
+  dahin bleibt der vorige Zeitpunkt zu sehen. Geht die Ansicht vorwärts, rechnet der Simulator
+  vom gezeigten Zustand aus weiter statt vom Keyframe.
+- **Konsolen in der Vergangenheit:** Prompt, `?` und Tab kommen aus dem Zustand von damals; eine
+  Zeile läuft auf einer Kopie, die danach verworfen wird. `show ip route`, `show arp`, `show mac
+  address-table`, `ip neigh` … zeigen also die Tabellen von damals, Konfiguration und laufende
+  Befehle bleiben ohne Wirkung (eine graue Zeile sagt es einmal je Zeitpunkt); Strg+C und
+  Strg+Z tun dort nichts.
+- **Bearbeiten in der Vergangenheit:** jede Änderung, die zum Simulator geht (Bearbeiten,
+  Einstellungen, Formulare, Fehler, PDUs, Strom), holt die Ansicht zuerst in die Gegenwart;
+  das Verschieben von Geräten nicht.
+- **Von hier fortsetzen** (im Hinweis und im Menü Simulation, nach einer Rückfrage): der
+  gezeigte Zustand wird die Gegenwart. Die Aufzeichnung danach und alles, was danach von außen
+  kam (Konsolen, PDUs, Fehler), geht verloren; später gestartete PDUs gelten als
+  zurückgesetzt, Konsolen und Protokoll vermerken, wo es weitergeht. Das Projekt und seine
+  Rückgängig-Liste bleiben, wie sie sind: der Simulator bekommt den Stand des Projekts, den er
+  damals kannte, und folgt dann dem heutigen, Änderungen am Projekt nach dem Zeitpunkt gelten
+  also ab ihm. Rückgängig und Wiederholen arbeiten weiter auf dem Projekt; ein Fehler-Schritt,
+  dessen Fehler es nicht mehr gibt, findet nichts zu heilen, und erreichte Ziele eines Labors
+  bleiben erreicht.
+- `jfn-sim rewind PROJEKT [SEKUNDEN] [--traffic K]` lässt ein Projekt einmal ohne und einmal mit
+  Keyframes laufen und nennt Zahl und Größe der Keyframes und die Zeit, zehn Zeitpunkte
+  wiederherzustellen.
+
+Messwerte auf dem Entwicklungsrechner (Windows, `jfn-sim rewind`, mit anderen Builds
+parallel):
+
+| Projekt | Lauf | Keyframes | je Keyframe | Wiederherstellen (min / Median / max) |
+|---|---|---|---|---|
+| `campus.jfnet` (7 Geräte, ruhig) | 60 s, 286 Ereignisse | 1 | 140 KiB | 0,24 / 0,52 / 0,64 ms |
+| `lab_window.jfnet` (Labor: Cache, Loadbalancer, KV, Queue, Skript) | 60 s, 236 470 Ereignisse | 12 | 0,3–1,3 MiB, zusammen 10,6 MiB | 1,9 / 22 / 35 ms (bis 18 000 Ereignisse) |
+| `lab_shards.jfnet` (KV-Speicher unter Last) | 60 s, 125 415 Ereignisse | 7 | 0,25–1,1 MiB | 1,3 / 25 / 33 ms |
+| synthetischer Campus (`jfn-sim gen 500`, `--traffic 300`) | 10 s, 20 962 Ereignisse | 2 | 7,4–8,1 MiB | 2,0 / 2,3 / 3,1 ms |
+
+Mit und ohne Keyframes läuft der Simulator gleich schnell (im Rahmen der Messgenauigkeit, das
+Labor: 476 gegen 481 ms für 60 s). Von einem Keyframe aus kostet die Wiederholung im Labor rund
+2 µs je Ereignis; die Größe bestimmen vor allem die Zeitreihen, die TCP-Puffer, die
+Ereigniswarteschlange und die Tabellen der Geräte.
 
 ### Mitschnitt (pcapng)
 
@@ -976,6 +1121,14 @@ IOS-artige Befehlszeile:
   ospf network point-to-point|broadcast` und `ip ospf N area M` an Interfaces, `show ip ospf
   [neighbor|interface [brief|IF]|database]`, `show ip route ospf`, `debug ip ospf
   adj|events|hello`, `clear ip ospf process` (siehe [Routing mit OSPF](#routing-mit-ospf)).
+- BGP ([`cli/bgp.rs`](crates/jfn_sim/cli/bgp.rs)): `router bgp ASN` mit eigenem Modus hinter
+  demselben Prompt `(config-router)#`, `show ip bgp [A.B.C.D|summary|neighbors [X [routes|
+  advertised-routes]]]`, `show ip route bgp`, `clear ip bgp *|X [soft [in|out]]`, `debug ip bgp
+  [events|updates]` (siehe [Routing mit BGP](#routing-mit-bgp)).
+- Dateien ([`cli/files.rs`](crates/jfn_sim/cli/files.rs)): `dir [flash:|nvram:]`, `show
+  flash:`, `more DATEI`, `delete [/force] DATEI`, `copy QUELLE ZIEL` zwischen
+  `running-config`, `startup-config`, `flash:`, `tftp:` und `ftp:`, `ip ftp username|password`
+  (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
 
 Hosts und Server haben eine Linux-Shell (`root@PC1:~#`): `ip addr|link|route|neigh` mit den
 Ausgaben und Fehlermeldungen von iproute2, `ping` wie iputils (bis Strg+C oder `-c`; `-i`,
@@ -999,6 +1152,8 @@ bestimmten Dienst; ihre Texte sind eigene Worte. Die Skripte eines Hosts zeigt u
 Spanning Tree stellen `spanning-tree …`, `show spanning-tree`, `debug spanning-tree events`
 und `clear spanning-tree detected-protocols` ein und zeigen ihn (siehe
 [Spanning Tree](#spanning-tree)).
+Dateien zeigen und ändern `ls`, `cat`, `cp`, `rm`, `mkdir`, `rmdir`, `touch` und `echo … >`,
+übertragen `tftp` und `curl ftp://` (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
 
 Namen löst die Shell über den Resolver des Geräts auf (`ping server.lab`, `traceroute
 server.lab`, auch kurz mit der Suchdomäne): die erste Zeile nennt wie getaddrinfo das Ende der
@@ -1073,6 +1228,11 @@ selbst, steht „Fehler N behoben“ mit der Zeit dabei.
 `move GERÄT X Y` setzt ein Gerät an eine andere Stelle der Zeichenfläche (Weltkoordinaten der
 linken oberen Ecke), wie ein Verschieben im Fenster; für WLAN zählen Reichweite und Signal neu
 (siehe [WLAN](#wlan)).
+
+`place GERÄT ORT [HE]` stellt ein Gerät in einen anderen Raum, auf einen Tisch oder in ein Rack
+der physischen Ansicht, `cable GERÄT PORT length M` (oder `length auto`) gibt einem Kabel eine
+Länge von Hand; `expect cable GERÄT PORT length [VERGLEICH] M` und `expect cable GERÄT PORT up`
+(`down`) prüfen Länge und Zustand (siehe [Physische Ansicht](#physische-ansicht)).
 
 `expect … svc NAME metric WERT VERGLEICH ZAHL over 5s` (oder `… between 6s and 12s`) prüft
 statt des Werts von jetzt seine Zeitreihe
@@ -1197,6 +1357,30 @@ wieder. Laptop1 pingt SRV1 und geht dabei zu AP2: in der Mitte bleibt er, nahe A
 meldet er sich sofort wieder an. AP1 aus: Phone1 verliert das Gastnetz, wieder an: beide sind
 761 ms später zurück. Laptop2 gibt nach dem vierten Fehlschlag auf und kommt mit `iw dev wlan0
 connect Buero psk …` ins Netz; 22 Erwartungen.
+
+Ein Szenario zeigt BGP (siehe [Routing mit BGP](#routing-mit-bgp)). `bgp_isp.scn` auf
+`fixtures/bgp_isp.jfnet`: Kunde A (AS 65010, CA mit PC-A) hängt an zwei Providern (ISP1 in AS
+100, ISP2 in AS 200), Kunde B (AS 65020, CB mit PC-B, `redistribute connected`) nur an ISP2;
+die Provider verbindet der Transit-Provider AS 300 aus TR1 und TR2 mit iBGP zwischen ihren
+Loopbacks (OSPF darunter, `update-source`, `next-hop-self`). Alle Sitzungen kommen nach 1 s mit
+einer Kollision ihrer beiden Verbindungen, die iBGP-Sitzung, sobald OSPF die Loopbacks kennt;
+nach 120 s (neue Wege gehen höchstens alle 30 s an externe Nachbarn) kennt jeder jedes Netz:
+`show ip bgp` mit `>i` bei TR1 und `r` bei ISP2, `show ip bgp summary`, `show ip bgp
+neighbors`, der Weg von PC-A zu PC-B über ISP2. Dann fehlt das Kabel CA–ISP2: die Sitzung endet
+sofort (Fast External Fallover), der Weg führt über ISP1 und AS 300 (`traceroute`), und ISP2
+findet CAs Netz über AS 300; mit dem Kabel kommt die Sitzung zurück, was ISP2 noch über AS 300
+kannte, fällt bei CA als Schleife weg (65010 im AS-Pfad), und der kurze Weg gilt wieder.
+
+Ein Szenario zeigt Dateien, TFTP und FTP (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
+`backup.scn` auf `fixtures/backup.jfnet`: R1, R2 und R3 sichern ihre Konfiguration per TFTP auf
+SRV1 (`copy running-config tftp:` mit den Fragen nach Host und Datei, die URL in einer Zeile,
+R3 seine Startkonfiguration über ein Kabel, das 30 % der Rahmen verliert: Blöcke und ACKs gehen
+noch einmal); R1 bekommt einen falschen Namen und holt die Sicherung zurück, auch als
+Startkonfiguration; `copy running-config flash:`, `dir`, `delete` mit Rückfrage und `show
+flash:`; eine fehlende Datei auf dem Server. PC1 lädt als anna per FTP hoch, listet und lädt
+herunter, scheitert mit einem falschen Passwort, holt anonym `pub/readme.txt` und mit `tftp`
+eine Sicherung; 24 Erwartungen. FTP läuft dort in Schritten von 2 s, weil `run until idle` bis
+zum Leerlauf-Timeout des Servers (300 s) liefe.
 
 ### Skripte in Hosts
 
@@ -1987,6 +2171,345 @@ der Selbsttest-Gruppe `wlan` ([`src/wlantest.rs`](src/wlantest.rs)), SHA-1, PBKD
 CMAC in der coretest-Gruppe `crypto`, EAPOL in `netpkt`, dazu das Szenario `wlan_office.scn` und
 die Fensterskripte `wlan_inspector.uis`, `wlan_range.uis`, `wlan_drag.uis` und `wlan_shots.uis`.
 
+### Routing mit BGP
+
+Router, L3-Switches und die Firewall sprechen BGP-4 nach RFC 4271
+([`bgp.rs`](crates/jfn_sim/bgp.rs)), mit 4-Byte-AS-Nummern nach RFC 6793 und Route Refresh nach RFC 2918. BGP ist ein Dienst des
+Geräts („bgp“; im Gerätefenster unter Dienste mit Statuszeile und Zahlen: Nachbarn, davon
+Established, Netze, Wege, OPEN, UPDATE, KEEPALIVE und NOTIFICATION in beide Richtungen,
+Verbindungsversuche, abgewiesene Verbindungen, Sitzungsenden, verworfene Wege), den die
+Befehlszeile einrichtet. Seine Sitzungen laufen über TCP-Port 179 durch die Sockets des Geräts
+(der TCP von [TCP](#tcp)), auf virtueller Zeit; gleiche Projekte ergeben gleiche Läufe.
+
+- **Einrichten** ([`cli/bgp.rs`](crates/jfn_sim/cli/bgp.rs)): `router bgp ASN` (1 bis 4294967295)
+  öffnet einen eigenen Modus hinter demselben Prompt `(config-router)#` wie RIP und OSPF mit `bgp
+  router-id`, `bgp log-neighbor-changes` (an), `bgp default local-preference` (100), `timers bgp
+  KEEPALIVE HALTEZEIT` (60 180; gilt für neue Sitzungen), `network A.B.C.D [mask M]`
+  (Klassennetze ohne Maske), `redistribute connected|static|rip [metric N]` und `redistribute
+  ospf N [metric N]`, je Nachbar `neighbor X remote-as N` (das eigene AS: iBGP, ein anderes:
+  eBGP), `description`, `update-source IF`, `next-hop-self`, `ebgp-multihop [TTL]`, `shutdown`
+  und `weight`; `no neighbor X` nimmt ihn weg, die anderen Befehle eines Nachbarn brauchen
+  zuerst sein `remote-as` (`% Specify remote-as or peer-group commands first`). Ein L3-Switch
+  braucht `ip routing`, ein Gerät hat einen Prozess (`% BGP is already running; AS is …`), `no
+  ip routing` und `no router bgp ASN` nehmen ihn mit. Die Running-Config listet nach dem Block
+  von OSPF, was vom Vorgabewert abweicht, und kommt beim Start durch dieselbe Befehlszeile
+  zurück. Was die Konfiguration ändert, gilt sofort (IOS will dafür bei Gewicht,
+  `next-hop-self` und lokaler Präferenz ein `clear ip bgp … soft`); eine neue Router-ID, ein
+  anderes `remote-as` oder `update-source` beginnt die Sitzung neu.
+- **Sitzungen:** Jeder Nachbar durchläuft die Zustände des RFC: Idle, Connect (der eigene
+  Verbindungsversuch läuft), Active (er wartet auf den Nachbarn oder auf ConnectRetry, 120 s),
+  OpenSent, OpenConfirm, Established. Ein externer Nachbar beginnt nur, wenn seine Adresse in
+  einem angeschlossenen Netz liegt oder `ebgp-multihop` gesetzt ist (sonst bleibt er Idle: „nicht
+  direkt verbunden“), einer mit `update-source`, wenn das Interface eine Adresse hat. Die
+  Verbindung geht von der Adresse der `update-source` aus, sonst von der des Wegs hinaus, mit
+  TTL 1 zu externen Nachbarn (oder dem Wert von `ebgp-multihop`) und 255 im eigenen AS. Ohne
+  Route zum Nachbarn wartet er Active und versucht es sofort, wenn eine Route kommt (etwa wenn
+  OSPF die Loopbacks kennt). Verbindungen von Adressen, die kein Nachbar sind (oder einem
+  abgeschalteten), setzt BGP gleich nach dem Handshake zurück. Fangen beide Seiten zugleich an
+  – wie beim gemeinsamen Start nach 1 s, wenn der erste SYN am IOS-artigen ARP hängen blieb –,
+  bleibt nach RFC 4271 6.8 die Verbindung, die die Seite mit der höheren BGP-ID geöffnet hat; die
+  andere endet mit Cease / Connection Collision Resolution.
+- **OPEN:** Version 4, das AS (AS_TRANS über 65535, das echte in der Capability), Haltezeit,
+  Router-ID und die Capabilities IPv4 Unicast, Route Refresh und 4-Byte-AS. Abgelehnt wird mit
+  der NOTIFICATION des RFC: eine andere Version, ein AS, das nicht `remote-as` ist (2/2 Bad Peer
+  AS), die eigene Router-ID (2/3), eine Haltezeit von 1 oder 2 s (2/6), ein unbekannter
+  Parameter (2/4). Die Haltezeit ist die kleinere beider Seiten, das Keepalive-Intervall das
+  eingestellte, höchstens ein Drittel davon (`timers bgp 10 30` auf einer Seite: 30 und 10 auf
+  beiden). Was ankommt, startet den Hold Timer neu, jedes gesendete KEEPALIVE oder UPDATE den
+  Keepalive-Timer. Kein Timer wird zufällig verschoben (RFC 4271 10 schlägt es vor).
+- **Ende einer Sitzung:** eine NOTIFICATION (gesendet oder empfangen), eine zurückgesetzte, nicht
+  mehr beantwortete oder geschlossene TCP-Verbindung, der abgelaufene Hold Timer (NOTIFICATION
+  4/0). Die Wege des Nachbarn verschwinden sofort, er beginnt wieder – sofort nach einer Sitzung,
+  60 s später (Pause, unsere Wahl) nach einem abgelehnten OPEN, damit ein Nachbar mit falschem AS
+  nicht im Sekundentakt flattert. Fällt das Interface zu einem direkt verbundenen externen
+  Nachbarn aus, endet die Sitzung sofort (Fast External Fallover, wie IOS). `clear ip bgp`
+  schickt Cease / Administrative Reset, `neighbor … shutdown` Cease / Administrative Shutdown,
+  `no neighbor` Cease / Peer De-configured; `clear ip bgp X soft in` fragt mit ROUTE-REFRESH nach
+  den Wegen, `soft out` schickt die eigenen noch einmal, `soft` beides. Die Konsole meldet
+  `%BGP-5-ADJCHANGE` (mit `bgp log-neighbor-changes`) und jede NOTIFICATION
+  (`%BGP-3-NOTIFICATION`).
+- **UPDATE:** Die Prüfungen von RFC 4271 6.3 (Längen, Flags und Länge jedes Attributs, die
+  Pflichtattribute ORIGIN, AS_PATH und NEXT_HOP, ORIGIN-Werte, AS_PATH-Segmente, Präfixe) mit
+  ihrer NOTIFICATION; von einem externen Nachbarn muss das erste AS des Pfads seines sein
+  (Malformed AS_PATH, wie IOS' enforce-first-as). Wege mit dem eigenen AS im Pfad fallen weg
+  (Schleife), ebenso Wege, deren Next Hop eine eigene Adresse oder keine Unicast-Adresse ist;
+  LOCAL_PREF zählt nur von internen Nachbarn. Unbekannte optionale transitive Attribute gehen mit
+  dem Partial-Bit weiter, COMMUNITIES und AGGREGATOR wie empfangen.
+- **Eigene Wege:** `network` erzeugt ein Netz, solange der Routing-Table genau dieses Präfix aus
+  einer anderen Quelle hat (ORIGIN IGP, MED die Metrik dieser Route); `redistribute` nimmt die
+  Netze der Interfaces, die oben sind, oder die Routen der Quelle, die im Routing-Table gewinnen
+  (ORIGIN incomplete, MED ihre Metrik oder die angegebene). Eigene Wege haben Next Hop 0.0.0.0
+  (auf dem Kabel die Adresse der Sitzung), Gewicht 32768 und die eigene lokale Präferenz.
+- **Die Entscheidung:** Ein Weg zählt, wenn sein Next Hop über eine Route aufgelöst wird, die
+  nicht von BGP stammt (deren Interface und Metrik: die IGP-Metrik). Unter den Wegen eines
+  Präfixes behält jeder Schritt die besten, der Schritt, der einen übrig lässt, steht in der
+  Notiz und in `show ip bgp A.B.C.D`: 1. höchstes Gewicht (`neighbor … weight`, eigene 32768),
+  2. höchste LOCAL_PREF, 3. selbst erzeugt, 4. kürzester AS-Pfad (ein AS_SET zählt eins), 5.
+  niedrigster ORIGIN (IGP, EGP, incomplete), 6. niedrigste MED unter Wegen vom selben
+  Nachbar-AS (ohne MED: 0), 7. extern vor intern, 8. niedrigste IGP-Metrik zum Next Hop, 9.
+  niedrigste BGP-ID des Nachbarn, 10. niedrigste Nachbaradresse. Den Schritt „ältester externer
+  Weg“ von IOS gibt es nicht. Der beste Weg kommt mit Distanz 20 (extern) oder 200 (intern) und
+  seiner MED als Metrik ins RIB, mit seinem Next Hop, den die Weiterleitung über das IGP
+  auflöst (`show ip route bgp`: B). Hat eine andere Quelle das Präfix mit besserer Distanz,
+  zeigt `show ip bgp` ein `r`.
+- **Weitergeben:** Jeder Nachbar in Established bekommt den besten Weg jedes Präfixes, außer
+  dem, von dem er kam; was ein interner Nachbar brachte, geht nicht an andere interne (kein
+  Route Reflector). Externe Nachbarn bekommen das eigene AS vorn im Pfad, die Adresse der
+  Sitzung als Next Hop, keine LOCAL_PREF und eine MED nur für Wege aus dem eigenen AS; interne
+  den Next Hop des Wegs (mit `next-hop-self` und für eigene Wege die Adresse der Sitzung),
+  LOCAL_PREF und MED. Gleiche Attribute teilen sich ein UPDATE (bis 4096 Bytes). Rücknahmen
+  gehen sofort hinaus, neue Wege höchstens alle 30 s an einen externen Nachbarn
+  (MinRouteAdvertisementInterval wie IOS, je Nachbar statt je Präfix; intern ohne Pause), die
+  erste Tabelle nach Established sofort.
+- **Anzeigen:** `show ip bgp` (Tabellenversion, Router-ID, die Spalten Network, Next Hop, Metric,
+  LocPrf, Weight, Path mit `*`, `>`, `i`, `r`), `show ip bgp A.B.C.D` (die Wege eines Netzes mit
+  dem entscheidenden Schritt), `show ip bgp summary` (die Tabelle des Vorbilds mit Zuständen wie
+  `Idle (Admin)`), `show ip bgp neighbors [X [routes|advertised-routes]]`, `show ip route bgp`,
+  `show ip protocols`, `debug ip bgp [events|updates]` (in eigenen Worten).
+- **Ereignisse:** Jede Entscheidung – Router-ID, Zustände, Verbindungen (geöffnet, angenommen,
+  zurückgesetzt, gescheitert), OPEN und was es vereinbart, KEEPALIVE, UPDATE, ROUTE-REFRESH und
+  NOTIFICATION in beide Richtungen, Kollisionen, der Hold Timer, das Ende einer Sitzung mit
+  Grund, verworfene Wege, beste Wege mit ihrem Schritt, verlorene, eigene und die Pause vor neuen
+  Wegen – steht mit deutschem Text in der Ereignisliste und im Paket-Tab
+  ([`bgptrace.rs`](crates/jfn_sim/bgptrace.rs), englisch in `engine.tsv`). Der Simulationsmodus
+  zeigt BGP braun wie OSPF und RIP, der Paket-Tab zerlegt jede Nachricht eines Segments
+  ([`netpkt::bgp`](../../lib/netpkt/bgp.rs), [`decode.rs`](../../lib/netpkt/decode.rs)).
+- **Probleme:** ein Nachbar, der nicht Established wird, mit dem Grund, den die Konfiguration
+  beider Seiten verrät: nicht direkt verbunden ohne `ebgp-multihop`, keine Route, kein Gerät mit
+  der Adresse, dort kein BGP, das falsche AS, die Gegenseite kennt diesen Router nicht, die
+  Adressen von `update-source` passen auf keiner Seite; sonst die letzte NOTIFICATION. Dazu ein
+  `network` ohne seine Route (Warnung).
+
+Noch offen: Route-Maps, Präfix-Listen und andere Richtlinien (`neighbor … route-map`,
+`distribute-list`, `filter-list`, `prefix-list`; es gibt sie im Simulator noch nicht), eigene
+Communities, `aggregate-address`, Route Reflectors, Konföderationen, Peer-Gruppen,
+MD5-Authentifizierung, `maximum-prefix`, BGP über IPv6 und andere Adressfamilien, Graceful
+Restart, Dampening, Synchronisation und mehrere gleich gute Wege.
+
+Für Programme: `Action::Bgp { dev, set: BgpSet }` (`Process`, `RouterId`, `LogChanges`, `Timers`,
+`LocalPref`, `Network`, `Redistribute`, `RemoteAs`, `Descr`, `UpdateSource`, `NextHopSelf`,
+`Multihop`, `Shutdown`, `Weight`, `Clear`) und `Engine::bgp(dev)` mit `cfg`, `router_id()`,
+`peers()` / `peer(addr)` (Zustand, was vereinbart ist, Zähler, Adj-RIB-In und -Out),
+`loc_rib()` (Kandidaten, bester Weg, Schritt), `local()` und `version()`; die Notizen als
+`Note::Bgp(BNote)`. Geprüft wird BGP in der Selbsttest-Gruppe `bgp`
+([`src/bgptest.rs`](src/bgptest.rs)), die Nachrichten in der coretest-Gruppe `bgp`, dazu das
+Szenario `bgp_isp.scn` (siehe [Szenarien](#szenarien-scn)) und das Fensterskript
+`bgp_console.uis`.
+
+### Dateien, TFTP und FTP
+
+Jedes Gerät hat Dateien ([`crates/jfn_model/files.rs`](crates/jfn_model/files.rs)), die mit dem
+Projekt gespeichert werden und die der Simulator mit ihm abgleicht wie die Startkonfiguration:
+was eine Konsole oder ein Dienst schreibt, kommt als `Report::Files` an die Oberfläche und wird
+ein Rückgängig-Schritt; Rückgängig und Wiederholen ändern die Dateien auch im laufenden Gerät
+(`Action::Files`, ohne Neustart). Wie viel Platz ein Gerät hat, sagt sein Modell
+(`capacity_of`: 256 MiB beim Router, 128 MiB beim Switch, 512 GiB beim PC, 2 TiB beim Server …);
+was nicht mehr passt, wird ganz abgelehnt.
+
+- **IOS-artige Geräte:** `flash:` mit flachen Namen und dem Systemabbild, das `show version`
+  nennt (`jf-r4.bin` mit 40 MiB beim JF-R4: es belegt Platz, hat aber keinen Inhalt und lässt
+  sich weder löschen noch exportieren), und `nvram:startup-config`, das die Startkonfiguration
+  selbst ist und keine Datei daneben.
+- **Linux-Hosts:** `/`, `/etc`, `/home`, `/home/user`, `/root` (das `~` des Prompts), `/srv`,
+  `/srv/ftp`, `/srv/tftp`, `/tmp`, `/var` und `/var/log` gibt es von Anfang an; die Dateien in
+  `/etc`, die die Shell kennt (`resolv.conf`, `hosts`, `hostname`), entstehen weiter aus dem
+  Zustand des Geräts.
+- **IOS-artige Befehle** ([`cli/files.rs`](crates/jfn_sim/cli/files.rs)): `dir [flash:|nvram:]`,
+  `show flash:`, `more DATEI`, `delete [/force] DATEI` (fragt nach), `copy QUELLE ZIEL` mit
+  `running-config`, `startup-config`, `flash:NAME`, `tftp://HOST/NAME`,
+  `ftp://[BENUTZER[:PASSWORT]@]HOST/NAME` und den kurzen Formen `flash:`, `tftp:` und `ftp:`,
+  nach denen die Konsole Host und Namen erfragt (in Klammern die Vorgabe: der zuletzt genutzte
+  Host, für eine Konfiguration `HOSTNAME-config`), `ip ftp username|password` für die
+  Anmeldung beim FTP-Server (in der Running-Config). Eine Konfiguration nach `running-config`
+  wird eingespielt, als wäre sie getippt: sie ergänzt und ändert, was sie nennt, wie beim
+  Vorbild, und meldet sich mit `%SYS-5-CONFIG_I`; eine nach `startup-config` wird die
+  Startkonfiguration (ein Rückgängig-Schritt wie `copy run start`); eine Datei in `flash:` wird
+  erst nach „y“ ersetzt. Die Fragen, der Fortschritt (`#` je Block, `.` je Timeout) und das
+  Ergebnis (`Done: … bytes in … ms`) sind eigene Worte, Fehler kurze Zeilen wie `%Error opening
+  tftp://10.0.0.10/nope (File not found)`. Strg+Umschalt+6 bricht eine Übertragung ab.
+- **Shell:** `ls [-l] [-a]`, `cat`, `cp`, `rm [-f] [-r]`, `mkdir [-p]`, `rmdir`, `touch`, `echo
+  … > DATEI` und `>> DATEI` mit den Meldungen von coreutils und bash, `tftp -g|-p [-l DATEI] [-r
+  DATEI] [-b GRÖSSE] HOST [PORT]` in der Art von busybox und `curl` mit `ftp://` (`-u`, `-T`,
+  `-o`, `-O`, `-l`, `-P`, `--disable-epsv`, `-v` mit jedem Befehl und jeder Antwort, die
+  Exit-Codes von curl wie 67 für eine abgelehnte Anmeldung oder 78 für eine fehlende Datei).
+- **TFTP-Server** (Dienst `tftp-server`, [`tftpd.rs`](crates/jfn_sim/tftpd.rs)): UDP-Port 69,
+  die Dateien unter `root` (`/srv/tftp`, auf IOS-artigen Geräten `flash:`), nur zum Lesen oder
+  mit `writable` auch zum Schreiben, `overwrite`, `quota_kb`. Jede Übertragung bekommt einen
+  eigenen Port; die Blöcke gehen im Gleichschritt mit ihren ACKs, ein fehlendes ACK holt den
+  Block nach `timeout_ms` (1 s) noch einmal, nach `retries` (5) gibt der Server auf, ein
+  doppeltes ACK schickt nichts doppelt, das letzte ACK bleibt eine Weile bereit. Die Fehler 1
+  bis 6 und 8 (eine fehlende Datei, kein Zugriff, kein Platz, ein fremdes Paket, ein
+  unbekannter Port, eine vorhandene Datei, eine abgelehnte Option), die Optionen `blksize`,
+  `timeout` und `tsize` (abschaltbar mit `options`), `netascii`. Lesen und Schreiben kosten
+  Zeit auf der Disk des Geräts.
+- **FTP-Server** (Dienst `ftp-server`, [`ftpd.rs`](crates/jfn_sim/ftpd.rs)): TCP-Port 21 in der
+  Art von vsftpd: Benutzer mit Passwort und Heimatverzeichnis, in das sie eingeschlossen sind
+  (`users`), anonym mit `anonymous` (Schreiben mit `anon_write`); ein falsches Passwort wird
+  nach `fail_delay_ms` abgelehnt, nach `max_fails` endet die Verbindung. Passiv (PASV, EPSV)
+  und aktiv (PORT, EPRT von Port 20, abschaltbar mit `active`), dazu USER, PASS, LIST, NLST,
+  RETR, STOR, APPE, DELE, MKD, RMD, CWD, CDUP, PWD, TYPE, SIZE, MDTM, SYST, FEAT, NOOP, ABOR und
+  QUIT; ein Leerlauf-Timeout (`idle_ms`, 300 s), eine Quote (`quota_kb`). Die Antworten haben
+  die Codes und Formate der RFCs, ihre Texte sind eigene Worte.
+- **Im Fenster:** der Reiter Dateien des Gerätefensters
+  ([`devwin/files.rs`](src/workspace/devwin/files.rs)) listet die Dateien mit Größe und Zeit,
+  zeigt den freien Platz und den Text der gewählten Datei, löscht als Rückgängig-Schritt,
+  exportiert eine Datei auf den Rechner und importiert eine in das gewählte Verzeichnis. Die
+  Server stehen im Reiter Dienste mit Statuszeile und Zahlen, ihre Einstellungen als JSON. Der
+  Paket-Tab zerlegt TFTP und die Steuerverbindung von FTP Feld für Feld.
+- **Notizen und Probleme:** jede Anfrage, Wiederholung, Zeitüberschreitung, jeder Fehler und
+  jedes Ende als Notiz (`Note::Xfer`) und als Log-Zeile (`tftpd`, `ftpd`); die Probleme-Liste
+  nennt einen Server, dessen Verzeichnis fehlt.
+
+Entscheidungen: Eine Konfiguration, die nach `running-config` kopiert wird, startet nichts neu
+(Interfaces bleiben, wie sie sind; was sie nicht nennt, bleibt stehen). Das Systemabbild ist
+nur ein Eintrag mit Größe; gebootet wird es nicht. Die Daten einer passiven FTP-Verbindung
+laufen über einen beliebigen Port und erscheinen im Paket-Tab als TCP. Bei einem Ausfall
+während einer Übertragung bleibt nichts Halbes liegen: die Datei landet erst mit ihrem letzten
+Block. Unter Linux überträgt `curl` per FTP; ein eigenes `ftp`-Programm gibt es nicht.
+
+Noch offen: Unterverzeichnisse in `flash:`, `cd` und `mv` in der Shell, der IOS-Befehl
+`tftp-server`, die Notizen des Desktops (`notizen.txt`) als Datei, und die weiteren Dienste von
+X1: SNMP, AAA mit RADIUS, Mail.
+
+Für Programme: `Action::Files { dev, files }`, `Report::Files { dev, at, path, files }`,
+`Engine::files(dev)`, `Engine::file_store(dev)`, für Dienste `OsApi::file_read`, `file_write`,
+`file_append`, `file_remove`, `file_list`, `file_stat`, die Notizen `Note::Xfer(XNote)`.
+Geprüft wird in der Selbsttest-Gruppe `files` ([`src/filestest.rs`](src/filestest.rs)), TFTP
+und FTP Byte für Byte in den coretest-Gruppen `tftp` und `ftp`, dazu das Szenario `backup.scn`
+und die Fensterskripte `files_window.uis`, `files_services.uis`, `files_console.uis` und
+`files_shots.uis`.
+
+### Physische Ansicht
+
+Neben der logischen Zeichenfläche hat das Fenster eine zweite Ansicht: wo die Geräte stehen
+([`jfn_model/phys.rs`](crates/jfn_model/phys.rs), [`jfn_sim/phys.rs`](crates/jfn_sim/phys.rs),
+[`src/workspace/phys/`](src/workspace/phys/mod.rs), [`src/doc/phys.rs`](src/doc/phys.rs)).
+Umgeschaltet wird mit „Logisch | Physisch“ in der Werkzeugleiste oder über Ansicht › Logische
+Ansicht (Strg+Umschalt+L) und Physische Ansicht (Strg+Umschalt+P); die Wahl und der gezeigte
+Ort werden mit dem Layout gespeichert.
+
+- **Orte:** ein Baum aus Standorten (ein Campus, eine Stadt), Gebäuden, Etagen, Räumen und in
+  den Räumen Racks (Höhe in Höheneinheiten, ohne Angabe 42) und Tischen. Position (die linke
+  obere Ecke im übergeordneten Ort, nach Osten und Süden) und Größe stehen in Dezimetern; Etagen
+  liegen übereinander (ihre Nummer, 0 das Erdgeschoss) und haben den Grundriss ihres Gebäudes.
+  In der Datei `places`, zum Beispiel `{"id": 5, "kind": "rack", "name": "Rack 1", "parent": 4,
+  "x_dm": 10, "y_dm": 10, "w_dm": 6, "d_dm": 10, "units": 42}`; Orte zählen ihre Nummern
+  eigenständig, Geräte und Kabel behalten ihre.
+- **Geräte:** `phys` nennt den Raum, das Rack (mit der untersten Höheneinheit, die das Gerät
+  belegt) oder den Tisch, im Raum auch einen Platz (`"phys": {"place": 5, "unit": 20}`,
+  `{"place": 11, "x_dm": 50, "y_dm": 40, "placed": true}`). Jedes Modell hat eine Bauform:
+  Rack-Gerät (1 HE, Core-Router, DB-Shard und Container-Host 2 HE), Tischgerät, Mobilgerät,
+  Decken- oder Wandgerät (Access Point, Kamera, Sensor), Standgerät (Tower-Server) oder ohne Ort
+  (die Internet-Wolke); nur Rack-Geräte kommen in ein Rack.
+- **Ältere Projekte:** Ohne `places` gilt der Baum Standort › Gebäude › Erdgeschoss › Raum, alle
+  Geräte stehen ohne Platz in diesem Raum, jedes Kabel ist 7 m lang (zu einem Access Point oder
+  einer Kamera an der Decke 4 m, zur Wolke 3 m) und alles läuft wie bisher. Die erste Änderung in der physischen Ansicht speichert den Baum.
+- **Die Ansicht:** oben Zurück (Umschalt+Rücktaste), Eine Ebene höher (Rücktaste) und die
+  Brotkrumen „Alle Standorte › Campus › Haus A › EG › Serverraum“, rechts Ort umbenennen (F2)
+  und entfernen (Entf: seine Geräte kommen ohne Platz in den ersten Raum, der letzte Raum
+  bleibt), darunter die Orte, die hier dazukommen können. Alle Standorte und ein Standort sind
+  Karten, ein Gebäude zeigt seine Etagen übereinander, eine Etage ihren Grundriss mit Räumen,
+  Racks, Tischen und frei stehenden Geräten, ein Raum seinen Plan (Racks, Tische mit ihren
+  Geräten, Geräte an ihrem Platz, darunter die Ablage „Im Raum, ohne Platz“), ein Rack seine
+  Vorderseite mit den Höheneinheiten von 1 unten an und den Geräten in ihren Einschüben, rechts
+  daneben die Rack-Geräte des Raums, die in keinem Rack stecken. Doppelklick oder Eingabe öffnet
+  einen Ort; ein Kabel, dessen anderes Ende woanders liegt, führt zu einer Karte „→ Haus B“ am
+  rechten Rand, die dorthin führt. Zwischen Standorten, Gebäuden und Etagen stehen die Kabel
+  zusammengefasst („2 Kabel · 203–208 m · 1 zu lang oder falsch“), auf Plänen von Etagen und
+  Räumen einzeln mit ihrer Länge.
+- **Ziehen:** Orte verschieben sich auf ihrem Plan; Geräte gehen im Raum an einen Platz, auf
+  einen Tisch, in ein Rack (die unterste freie Höheneinheit) oder zurück in die Ablage, auf
+  einer Etage in einen anderen Raum, im Rack in andere Höheneinheiten oder nach rechts hinaus.
+  Jedes Ziehen ist ein Rückgängig-Schritt; eine Ablehnung (ein Tischgerät ins Rack, belegte
+  Einheiten) stellt alles zurück und sagt über dem Plan, warum. Die Kabel bleiben an ihren Ports,
+  ihre automatischen Längen folgen.
+- **Inspektor:** ein Ort mit Name, Lage, Größe, Höhe des Racks oder Nummer der Etage (Setzen
+  ist ein Schritt), Öffnen und Entfernen; ein Gerät zuletzt mit Ort und Platz, einer Liste aller
+  Räume, Racks und Tische zum Umstellen, der Höheneinheit, „Im Plan zeigen“ und der Optik jedes
+  Schachts; ein Kabel zuletzt mit seiner Länge (automatisch oder von Hand; „0“ oder Automatisch
+  macht sie wieder automatisch), der Grenze seines Mediums mit der Norm, von wo nach wo und der
+  Laufzeit aus der Länge.
+- **Tastatur und Screenreader:** wie auf der logischen Zeichenfläche (Strg+9, Tab über Orte,
+  Geräte und Wege, dann die Kabel, Pfeiltasten verschieben, Eingabe öffnet); die Einträge
+  heißen „Rack Rack 1, 2 Geräte“, „SW1, Rack 1, HE 20“, „Weg nach Gebäude Haus B“ und „Kabel PC4
+  eth0 – SW1 Gi1/0/5, 208 m, erlaubt 100 m (1000BASE-T), zu lang“.
+
+**Kabellänge:** von Hand (`len_m` des Kabels) oder automatisch aus den Orten beider Enden, in
+ganzen Metern aufgerundet. Ein Ende steht in der Mitte seines Racks, seines Tisches, seines
+Platzes oder (ohne Platz) seines Raums, in einer Höhe über seiner Etage: im Rack 0,1 m plus
+44,45 mm je Höheneinheit darunter, auf dem Tisch 0,75 m, an der Decke 2,8 m, sonst am Boden. Im
+selben Rack ist es ein Patchkabel von 0,5 m plus dem Höhenunterschied, auf demselben Tisch 2 m;
+sonst läuft das Kabel hinauf zu den Trassen unter der Decke (2,8 m), im rechten Winkel über die
+Pläne (|Δx| + |Δy| in den Koordinaten aller Standorte), 3,5 m je Etage (zwischen Gebäuden
+hinunter ins Erdgeschoss und wieder hinauf) und hinunter zum anderen Ende, dazu 10 % Reserve.
+Die Internet-Wolke hat keinen Ort (3 m), Funk keine Länge.
+
+**Grenzen** nach den Reichweiten-Tabellen von IEEE 802.3 (Kupfer als Cat6A, Multimode als OM3),
+für die Speed, mit der das Kabel läuft (die kleinere beider Ports und seiner Einstellung):
+
+| Medium | Speed | Norm | Grenze |
+|---|---|---|---|
+| Kupfer (gerade, gekreuzt) | 10M bis 10G | 10BASE-T, 100BASE-TX, 1000BASE-T, 2.5GBASE-T, 5GBASE-T, 10GBASE-T | 100 m |
+| Kupfer | 25G, 40G | 25GBASE-T, 40GBASE-T | 30 m |
+| Glasfaser, Multimode (SR-Optik) | 1G / 10G / 25G / 40G / 100G | 1000BASE-SX / 10GBASE-SR / 25GBASE-SR / 40GBASE-SR4 / 100GBASE-SR4 | 550 / 300 / 70 / 100 / 70 m |
+| Glasfaser, Singlemode (LR-Optik) | 1G / 10G bis 100G | 1000BASE-LX / 10GBASE-LR, 25GBASE-LR, 40GBASE-LR4, 100GBASE-LR4 | 5 km / 10 km |
+| Konsole | | RS-232 bei 9600 bit/s | 15 m |
+| Seriell | bis 2,4 / 4,8 / 9,6 / 19,2 / 38,4 / 64 kbit/s, darüber (T1, E1) | V.35, EIA-530 | 1250 / 625 / 312 / 156 / 78 / 51 m, 15 m |
+| WAN-Leitung, Funk | | | keine |
+
+**Optiken:** Jeder SFP-, SFP+-, SFP28- und QSFP28-Schacht hat ab Werk eine SR-Optik (Multimode,
+850 nm); im Inspektor lässt sich eine LR-Optik (Singlemode, 1310 nm) einsetzen (`optics` des
+Geräts, nur was abweicht). Ein automatisches Kabel folgt: LR an beiden Enden ist Singlemode,
+sonst Multimode. Optiken, die nicht zueinander oder zur Faser passen (SR an einem Ende, LR am
+anderen; eine von Hand gewählte Singlemode-Faser zwischen SR-Optiken), stecken zwar, die Leitung
+bleibt aber aus. Das ändert nur Projekte mit einer solchen Faser von Hand; die Fixtures, Labore
+und Aufgaben haben keine.
+
+**Zu lang:** Entscheidung: Ein Kabel über seiner Grenze kommt gar nicht hoch (statt mit
+Fehlern zu laufen), weil die Norm jenseits ihrer Reichweite nichts zusagt und ein klarer Zustand
+besser lehrt. Zu sehen ist es überall: beide LEDs rot, der Port unten (`show interfaces`:
+„down, line protocol is down“ und die Zeile „Cable is 208 m long, 1000BASE-T allows 100 m: no
+link“; unter Linux `NO-CARRIER` in `ip link`), eine Notiz an beiden Enden („Kabel an Gi1/0/5 zu
+lang: 208 m, erlaubt 100 m (1000BASE-T); die Leitung bleibt aus.“), eine Protokollzeile
+(IOS-artig `%PHY-4-CABLE_LENGTH: …`, unter Linux die des Kernels), das Problem „Kabel zu lang:
+208 m, erlaubt 100 m (1000BASE-T zwischen PC4 eth0 und SW1 Gi1/0/5); die Leitung bleibt aus.“
+und in der physischen Ansicht ein gestricheltes Kabel mit Warndreieck und „zu lang, erlaubt 100
+m“. Wird es kürzer (ein Gerät woanders, eine Länge von Hand), kommt es hoch wie ein
+eingestecktes Kabel. Optiken, die nicht passen, zeigen sich genauso (`%PHY-4-OPTICS`, das
+Problem „Optiken passen nicht: …“).
+
+**Laufzeit:** Ein Kupfer- oder Glasfaserkabel, dessen Verzögerung auf dem Vorgabewert seiner
+Art steht und dessen Länge aus dem Plan kommt (von Hand gesetzt oder beide Enden in der
+physischen Ansicht aufgestellt), läuft mit 5 ns je Meter; jedes andere behält seine
+Verzögerung. So bleiben ältere Projekte und alle Golden-Berichte unverändert.
+
+**WLAN** rechnet seine Reichweiten weiter mit den Abständen der logischen Zeichenfläche und dem
+Maßstab `dip_per_m` (siehe [WLAN](#wlan)); die Plätze der physischen Ansicht gehen dort noch
+nicht ein, weil frei stehende Geräte und solche auf Tischen sonst andere Signale bekämen als in
+älteren Projekten.
+
+**Szenarien:** `place GERÄT ORT [HE]` stellt ein Gerät in einen anderen Raum, auf einen Tisch
+oder in ein Rack (ohne HE die unterste freie), `cable GERÄT PORT length M` gibt dem Kabel am
+Port eine Länge von Hand (`length auto`: wieder automatisch); der Bericht nennt die Kabel mit
+ihren neuen Längen. `expect cable GERÄT PORT length [VERGLEICH] M` prüft die Länge, `expect
+cable GERÄT PORT up|down`, ob es trägt. Das Golden-Szenario `phys_lengths.scn` auf
+`fixtures/phys_campus.jfnet` prüft die Längen des Campus, PC4s Kabel von 208 m (unten, `show
+interfaces`, `ip link`), im Büro 1 23 m mit einem Ping, 132 m von Hand mit seiner
+Protokollzeile, wieder automatisch und SW2 in einer anderen Höheneinheit.
+
+Noch offen: Kabel mit Fehlern statt ganz aus, Medien-Konverter und Patchfelder, Trassen und
+Durchbrüche als eigene Wege, Kabel im Plan ziehen statt auf der logischen Fläche, die
+WLAN-Reichweite aus den Plätzen, neue Geräte aus der Palette direkt in den Plan.
+
+Für Programme: `jfn_model::phys` (`Tree`, `length`, `delay_ns`, `reach`, `link_reach`,
+`optic_fault`, `issues`, die Änderungen `add_place`, `rename_place`, `remove_place`,
+`set_place`, `place_device`, `set_len`, `set_optic`), `catalog::form`, `rack_units`, `Optic`,
+`Action::CableLen { link, len_m }`, `Action::Optic { dev, port, optic }`,
+`Engine::cable_phys(link)`, `link_idx_up(link)`, `Note::Phys(PhysNote)`,
+`ProblemKind::CableTooLong` und `OpticMismatch`. Geprüft wird das in der Selbsttest-Gruppe
+`phys` ([`src/phystest.rs`](src/phystest.rs)), mit `scen_phys_lengths.uis` und den
+Fensterskripten `phys_view.uis`, `phys_rack.uis`, `phys_length.uis` und `phys_shots.uis`.
+
 ## Performance
 
 Große Projekte bleiben flüssig: `tests/perf.uis` verlangt mit 500 Geräten, 800 Kabeln und 300
@@ -2054,7 +2577,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · physische Ansicht, Zurückspulen mit Keyframes, Gruppen, weitere Dienste |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · Gruppen · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; SNMP, AAA mit RADIUS, Mail) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

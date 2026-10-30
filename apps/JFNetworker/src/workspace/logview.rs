@@ -4,6 +4,7 @@
 //
 //   Log::new()                           empty (a new project)
 //   log.push(dev, at, sev, tag, text)    a line (beyond LOG_MAX the oldest go)
+//   log.drop_after(t)                    the lines after moment t go ("Von hier fortsetzen")
 //   panel(n, ui)                         the filters, "Leeren", the table (Zeit, Gerät,
 //                                        Schwere, Quelle, Meldung); with "Neueste zeigen" new
 //                                        lines scroll into view
@@ -93,6 +94,13 @@ impl Log {
     pub(crate) fn clear(&mut self) {
         self.rows.clear();
         self.grid = GridState::default();
+    }
+
+    /// the run goes on from moment `t` (K1): what was logged after it never happened
+    pub(crate) fn drop_after(&mut self, t: Ns) {
+        while self.rows.back().is_some_and(|r| r.at > t) {
+            self.rows.pop_back();
+        }
     }
 }
 

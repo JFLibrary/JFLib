@@ -113,6 +113,29 @@
 //   wlankey  the keys of WPA2-Personal and WPA3-Personal (PMK, PTK, MICs, the key wrap of the
 //            group key) and the EAPOL-Key messages of the 4-way handshake
 //   wlantrace WNote: the decisions of WLAN as notes (Note::Wlan) with their German sentences
+//   bgp      BGP-4 (RFC 4271, 4-octet AS numbers of RFC 6793) as the service "bgp" of IOS-like
+//            routers, L3 switches and the firewall: sessions over TCP port 179 with the state
+//            machine, its timers and collisions, eBGP and iBGP, Adj-RIBs-In, the decision
+//            process, Adj-RIBs-Out with MRAI, network statements and redistribution; its routes
+//            in the RIB with distance 20 / 200; BgpCfg / BgpSet (Action::Bgp)
+//   bgptrace BNote: the decisions of BGP as notes (Note::Bgp) with their German sentences
+//   files    the files of a device at run time (Os::files, jfn_model::files::Store): reads and
+//            writes of services and command lines, Report::Files keeps the project in step,
+//            Action::Files gives the project's records back (load, undo)
+//   xfertrace XNote: the decisions of TFTP and FTP as notes (Note::Xfer) with their German
+//            sentences
+//   tftpd    the TFTP server (RFC 1350, options of RFC 2347-2349): a port per transfer,
+//            lock-step with retransmission, errors, quota; "tftp-server"
+//   tftpc    the TFTP client of the consoles (busybox-like tftp, IOS-like copy ... tftp:)
+//   ftpd     the FTP server (RFC 959, EPSV / EPRT of RFC 2428): users, anonymous login,
+//            passive and active data connections, LIST, NLST, RETR, STOR ...; "ftp-server"
+//   ftpc     the FTP client of the consoles (curl with ftp:// URLs, IOS-like copy ... ftp:)
+//   keyframe rewinding (K1): keyframes of the whole engine within a memory budget and the inputs
+//            between them (Inline::rewind_on), a replay to any recorded moment (Restore), a
+//            past state that becomes the present (Inline::resume); footprint, digest
+//   phys     the physical layer (P1): cable lengths against the reach of their media, the
+//            optics of fibres; Action::CableLen / Optic, cable_phys, PhysNote (Note::Phys),
+//            the problems CableTooLong and OpticMismatch
 //
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
@@ -187,6 +210,16 @@ pub mod assess;
 pub mod wlan;
 pub mod wlankey;
 pub mod wlantrace;
+pub mod bgp;
+pub mod bgptrace;
+pub mod files;
+pub mod xfertrace;
+pub mod tftpd;
+pub mod tftpc;
+pub mod ftpd;
+pub mod ftpc;
+pub mod keyframe;
+pub mod phys;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -241,3 +274,12 @@ pub use os::{ANY, ANY4};
 pub use assess::{Cand, Graded, Grader, Lines, Score};
 pub use wlan::{AssocView, Bss, StaState, StaView};
 pub use wlantrace::WNote;
+pub use bgp::{Bgp, BgpCfg, BgpSet, DownWhy, DropWhy, How, IdleWhy, NbrCfg, RefuseWhy, Soft, Step};
+pub use bgptrace::BNote;
+pub use xfertrace::XNote;
+pub use tftpd::TftpServer;
+pub use tftpc::{Sink, Style, TftpClient};
+pub use ftpd::{FtpServer, FtpUser};
+pub use ftpc::FtpProgram;
+pub use keyframe::{Budget, Footprint, InKind, Input, Past, Pos, Restore, Rewind, Target};
+pub use phys::{CablePhys, PhysFault, PhysNote};

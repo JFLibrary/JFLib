@@ -21,6 +21,15 @@
 //                       them in range on the station's bands (warning)
 //   WlanPassphrase      a station's passphrase is not the one of its network, or it has none
 //   WlanBadNet          a network an access point cannot offer (jfn_model::wlan::check_net)
+//   BgpNeighbor         a configured BGP neighbour that does not come up: not directly
+//                       connected, unreachable, nobody has the address, no BGP there, the wrong
+//                       AS, it does not know this router, the addresses of update-source do not
+//                       fit, the last NOTIFICATION (bgp.rs)
+//   BgpNetwork          a network statement without the exact route in the RIB (warning)
+//   FilesDirMissing     the root directory of a TFTP or FTP server (or a user's home) is not
+//                       on the device (files.rs)
+//   CableTooLong        a cable longer than its medium allows at its speed (phys.rs, P1)
+//   OpticMismatch       the optics of a fibre's ends do not fit each other or the fibre
 //
 // Problem::text is German; Problem::msg is the same as a template with arguments for the app's
 // catalogue (jfn_model::msg).
@@ -88,6 +97,16 @@ pub enum ProblemKind {
     WlanPassphrase,
     /// a network an access point cannot offer (SSID, channel, 6 GHz without WPA3, passphrase)
     WlanBadNet,
+    /// a BGP neighbour that does not come up, and why
+    BgpNeighbor,
+    /// a BGP network statement without its route
+    BgpNetwork,
+    /// a TFTP or FTP server whose directory is missing
+    FilesDirMissing,
+    /// a cable longer than its medium allows (phys.rs)
+    CableTooLong,
+    /// a fibre whose optics do not fit each other or the fibre (phys.rs)
+    OpticMismatch,
 }
 
 /// a problem of the set-up
@@ -238,6 +257,9 @@ impl Engine {
         self.loops(&tags, &mut out);
         self.dup_ip6s(&mut out);
         self.wlan_problems(&mut out);
+        self.bgp_problems(&mut out);
+        self.file_problems(&mut out);
+        self.phys_problems(&mut out);
         out.sort_by(|a, b| (a.severity, a.dev, a.port, a.kind, &a.text).cmp(&(b.severity, b.dev, b.port, b.kind, &b.text)));
         out
     }

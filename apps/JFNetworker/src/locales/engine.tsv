@@ -991,3 +991,159 @@ WLAN: Frame von {} verworfen: der 4-Wege-Handshake ist noch nicht fertig.	WLAN: 
 WLAN: Frame an {} verworfen: keine solche Station.	WLAN: frame to {} dropped: no such station.
 WLAN: Frame an {} verworfen: Client-Isolation.	WLAN: frame to {} dropped: client isolation.
 WLAN: Frame an {} verworfen: das Gastnetz erreicht nur den Router.	WLAN: frame to {} dropped: the guest network reaches the router only.
+
+# jfn_sim: BGP (R6: bgp.rs, bgptrace.rs): its decisions (Note::Bgp), the reasons in them, the steps of the decision process, its status lines, refusals and problems
+abgeschaltet (neighbor shutdown)	shut down (neighbor shutdown)
+noch keine Router-ID	no router ID yet
+nicht direkt verbunden, ebgp-multihop fehlt	not directly connected, ebgp-multihop missing
+die update-source hat keine Adresse	the update-source has no address
+Pause nach einem Fehler	a pause after an error
+der einzige Weg	the only path
+höheres Gewicht	higher weight
+höhere LOCAL_PREF	higher LOCAL_PREF
+selbst erzeugt	originated here
+kürzerer AS-Pfad	shorter AS path
+niedrigerer ORIGIN	lower ORIGIN
+niedrigere MED	lower MED
+extern vor intern	external before internal
+kürzerer Weg zum Next Hop	nearer next hop
+niedrigere BGP-ID	lower BGP identifier
+niedrigere Nachbaradresse	lower neighbour address
+BGP ist nicht eingerichtet (kein router bgp).	BGP is not set up (no router bgp).
+BGP in AS {}, Router-ID {}: Nachbarn: {}, davon Established: {}; Netze: {}.	BGP in AS {}, router ID {}: neighbours: {}, Established: {}; networks: {}.
+BGP in AS {}: wartet auf eine Adresse für die Router-ID.	BGP in AS {}: waiting for an address to take the router ID from.
+BGP in AS {}: wartet auf das Gerät.	BGP in AS {}: waiting for the device.
+{} routet nicht: hier gibt es kein BGP.	{} does not route: there is no BGP here.
+Hier läuft schon BGP in AS {}: ein Gerät hat nur einen Prozess.	BGP in AS {} runs here already: a device has one process only.
+BGP in AS {} gibt es hier nicht.	There is no BGP in AS {} here.
+AS 0 gibt es nicht (1 bis 4294967295).	There is no AS 0 (1 to 4294967295).
+{} ist eine eigene Adresse und kein Nachbar.	{} is an address of this device, not a neighbour.
+{} in AS {} taugt nicht als Nachbar.	{} in AS {} cannot be a neighbour.
+{} ist kein Nachbar: zuerst neighbor {} remote-as.	{} is no neighbour: first neighbor {} remote-as.
+Eine Haltezeit von {} s geht nicht (0 oder 3 bis 65535).	A hold time of {} s is not possible (0 or 3 to 65535).
+{}: zu network {} fehlt die Route im Routing-Table: BGP kündigt das Netz nicht an.	{}: network {} has no route in the routing table: BGP does not advertise the network.
+{}: der externe BGP-Nachbar {} liegt in keinem angeschlossenen Netz; ohne ebgp-multihop beginnt keine Sitzung.	{}: the external BGP neighbour {} is in no connected network; without ebgp-multihop no session starts.
+{}: keine Route zum BGP-Nachbarn {}.	{}: no route to the BGP neighbour {}.
+{}: kein Gerät hat die Adresse des BGP-Nachbarn {}.	{}: no device has the address of the BGP neighbour {}.
+{}: auf {} ({}) läuft kein BGP.	{}: {} ({}) runs no BGP.
+{}: der Nachbar {} ({}) ist in AS {}, nicht in AS {} (neighbor {} remote-as).	{}: the neighbour {} ({}) is in AS {}, not in AS {} (neighbor {} remote-as).
+{}: {} hat keine Adresse von {} als BGP-Nachbarn eingerichtet.	{}: {} has no address of {} set up as a BGP neighbour.
+{}: {} erwartet diesen Router als {}, er verbindet sich aber von {}, und {} kommt von {} statt von {}: update-source passt nicht.	{}: {} expects this router as {}, but it connects from {}, and {} comes from {} instead of {}: the update-source does not fit.
+{}: die Sitzung mit {} kommt nicht zustande, zuletzt NOTIFICATION {}/{} gesendet ({}).	{}: the session with {} does not come up, the last NOTIFICATION {}/{} sent ({}).
+{}: die Sitzung mit {} kommt nicht zustande, zuletzt NOTIFICATION {}/{} empfangen ({}).	{}: the session with {} does not come up, the last NOTIFICATION {}/{} received ({}).
+BGP: der Prozess arbeitet mit der Router-ID {}.	BGP: the process works with the router ID {}.
+BGP: Nachbar {}: {} → {}.	BGP: neighbour {}: {} → {}.
+BGP: öffnet eine TCP-Verbindung zu {}, Port 179, von {}.	BGP: opens a TCP connection to {}, port 179, from {}.
+BGP: öffnet eine TCP-Verbindung zu {}, Port 179.	BGP: opens a TCP connection to {}, port 179.
+BGP: keine Route zu {}: keine Verbindung.	BGP: no route to {}: no connection.
+BGP: die Verbindung zu {} kam nicht zustande: {}.	BGP: the connection to {} did not come up: {}.
+BGP: Verbindung von {} an {} angenommen.	BGP: connection from {} to {} taken.
+BGP: Verbindung von {} zurückgesetzt: kein Nachbar mit dieser Adresse.	BGP: connection from {} reset: no neighbour with this address.
+BGP: Verbindung von {} zurückgesetzt: der Nachbar ist abgeschaltet (neighbor shutdown).	BGP: connection from {} reset: the neighbour is shut down (neighbor shutdown).
+BGP: Verbindung von {} zurückgesetzt: die Sitzung besteht schon.	BGP: connection from {} reset: the session is up already.
+BGP: Nachbar {} bleibt Idle: {}.	BGP: neighbour {} stays idle: {}.
+BGP: OPEN an {} (AS {}, Haltezeit {} s, BGP-ID {}).	BGP: OPEN to {} (AS {}, hold time {} s, BGP identifier {}).
+BGP: OPEN von {} (AS {}, Haltezeit {} s, BGP-ID {}).	BGP: OPEN from {} (AS {}, hold time {} s, BGP identifier {}).
+BGP: mit {} vereinbart: keine Haltezeit, keine Keepalives.	BGP: agreed with {}: no hold time, no keepalives.
+BGP: mit {} vereinbart: Haltezeit {} s, Keepalive alle {} s.	BGP: agreed with {}: hold time {} s, a keepalive every {} s.
+BGP: KEEPALIVE an {}.	BGP: KEEPALIVE to {}.
+BGP: KEEPALIVE von {}.	BGP: KEEPALIVE from {}.
+BGP: UPDATE an {}: Netze: {}, zurückgezogen: {}.	BGP: UPDATE to {}: networks: {}, withdrawn: {}.
+BGP: UPDATE von {}: Netze: {}, zurückgezogen: {}.	BGP: UPDATE from {}: networks: {}, withdrawn: {}.
+BGP: ROUTE-REFRESH an {}: er schickt seine Netze noch einmal.	BGP: ROUTE-REFRESH to {}: it sends its networks once more.
+BGP: ROUTE-REFRESH von {}: er bekommt alle Netze noch einmal.	BGP: ROUTE-REFRESH from {}: it gets every network once more.
+BGP: NOTIFICATION an {}: {}/{} ({}).	BGP: NOTIFICATION to {}: {}/{} ({}).
+BGP: NOTIFICATION von {}: {}/{} ({}).	BGP: NOTIFICATION from {}: {}/{} ({}).
+BGP: zwei Verbindungen mit {}: die eigene bleibt (höhere BGP-ID), die andere wird geschlossen.	BGP: two connections with {}: the own one stays (higher BGP identifier), the other is closed.
+BGP: zwei Verbindungen mit {}: die des Nachbarn bleibt (höhere BGP-ID), die eigene wird geschlossen.	BGP: two connections with {}: the neighbour's stays (higher BGP identifier), the own one is closed.
+BGP: von {} kam in der Haltezeit nichts: der Hold Timer ist abgelaufen.	BGP: nothing came from {} within the hold time: the hold timer expired.
+BGP: die Sitzung mit {} ist beendet ({}); seine Wege sind zurückgezogen.	BGP: the session with {} has ended ({}); its paths are withdrawn.
+BGP: {} von {} verworfen: das eigene AS {} steht im AS-Pfad (Schleife).	BGP: {} from {} dropped: the own AS {} is in the AS path (a loop).
+BGP: {} von {} verworfen: der Next Hop {} ist eine eigene Adresse.	BGP: {} from {} dropped: the next hop {} is an address of this device.
+BGP: {} von {} verworfen: {} taugt nicht als Next Hop.	BGP: {} from {} dropped: {} cannot be a next hop.
+BGP: bester Weg zu {} über {} (von {}): {}.	BGP: best path to {} via {} (from {}): {}.
+BGP: bester Weg zu {}: selbst erzeugt ({}).	BGP: best path to {}: originated here ({}).
+BGP: kein Weg mehr zu {}.	BGP: no path to {} any more.
+BGP: erzeugt {} selbst ({}).	BGP: originates {} ({}).
+BGP: erzeugt {} nicht mehr selbst.	BGP: originates {} no longer.
+BGP: neue Wege für {} warten noch {} (Mindestabstand zwischen Ankündigungen).	BGP: new paths for {} wait {} more (the minimum interval between advertisements).
+Hold Timer abgelaufen	hold timer expired
+NOTIFICATION {}/{} gesendet: {}	NOTIFICATION {}/{} sent: {}
+NOTIFICATION {}/{} empfangen: {}	NOTIFICATION {}/{} received: {}
+der Nachbar hat die TCP-Verbindung geschlossen	the neighbour closed the TCP connection
+TCP: {}	TCP: {}
+das Interface zum Nachbarn ist ausgefallen	the interface towards the neighbour went down
+# X1a: files on devices, TFTP and FTP (files.rs, tftpd.rs, ftpd.rs, xfertrace.rs)
+Dienst {} auf {}: das Verzeichnis {} gibt es nicht.	Service {} on {}: the directory {} does not exist.
+„root“ ist kein Verzeichnis.	“root” is not a directory.
+Ein Benutzer braucht „name“ ohne Leerzeichen.	A user needs a “name” without spaces.
+{}: das Verzeichnis fehlt	{}: the directory is missing
+Port {}, {}: {} Sitzungen, {} Anmeldungen, {} abgelehnt, {} Downloads, {} Uploads	Port {}, {}: {} sessions, {} logins, {} refused, {} downloads, {} uploads
+lesen und schreiben	read and write
+nur lesen	read only
+{} ({}): {} Übertragungen, {} Bytes gesendet, {} empfangen	{} ({}): {} transfers, {} bytes sent, {} received
+TFTP: Leseanfrage für {} von {}, Blöcke zu {} Byte.	TFTP: read request for {} from {}, blocks of {} bytes.
+TFTP: Schreibanfrage für {} von {}, Blöcke zu {} Byte.	TFTP: write request for {} from {}, blocks of {} bytes.
+TFTP: {} abgelehnt, Fehler {} ({}).	TFTP: {} refused, error {} ({}).
+TFTP: Optionen vereinbart: {}.	TFTP: options agreed: {}.
+TFTP: keine Antwort auf Block {}: noch einmal gesendet (Versuch {}).	TFTP: no answer to block {}: sent again (attempt {}).
+TFTP: doppelte Bestätigung von Block {} ignoriert (kein zweites Senden).	TFTP: duplicate acknowledgment of block {} ignored (nothing is sent twice).
+TFTP: Block {} kam noch einmal: wieder bestätigt.	TFTP: block {} came again: acknowledged again.
+TFTP: Paket von {} Port {} gehört zu keiner Übertragung: Fehler 5.	TFTP: packet from {} port {} belongs to no transfer: error 5.
+TFTP: keine Antwort mehr, die Übertragung von {} endet bei Block {}.	TFTP: no more answers, the transfer of {} ends at block {}.
+TFTP: die Gegenseite meldet Fehler {} ({}): die Übertragung endet.	TFTP: the other side reports error {} ({}): the transfer ends.
+TFTP: {} gesendet, {} Bytes.	TFTP: {} sent, {} bytes.
+TFTP: {} empfangen, {} Bytes.	TFTP: {} received, {} bytes.
+TFTP: fragt {} nach {}.	TFTP: asks {} for {}.
+TFTP: will {} an {} senden.	TFTP: wants to send {} to {}.
+FTP: {} ist angemeldet.	FTP: {} is logged in.
+FTP: Anmeldung von {} abgelehnt.	FTP: login of {} refused.
+FTP: passive Datenverbindung auf Port {} angeboten.	FTP: passive data connection offered on port {}.
+FTP: aktive Datenverbindung zu {} Port {}.	FTP: active data connection to {} port {}.
+FTP: {} abgelehnt ({}).	FTP: {} refused ({}).
+FTP: {} fertig, {} Bytes.	FTP: {} done, {} bytes.
+FTP: {} passt nicht: Kontingent oder Speicher erschöpft.	FTP: {} does not fit: quota or space used up.
+
+# P1: the physical view -- optics, forms, places, their refusals, cables too long (catalog.rs, phys.rs of jfn_model and jfn_sim, goal.rs)
+SR, Multimode (kurze Strecken)	SR, multimode (short reach)
+LR, Singlemode (bis 10 km)	LR, single-mode (up to 10 km)
+Rack-Gerät	Rack device
+Tischgerät	Desktop device
+Mobilgerät	Mobile device
+Decken- oder Wandgerät	Ceiling or wall device
+Standgerät	Floor-standing device
+ohne Ort	no place
+Standort	Site
+Gebäude	Building
+Etage	Floor
+Raum	Room
+Rack	Rack
+Tisch	Desk
+Die Ortsnummer {} kommt doppelt vor.	The place number {} appears twice.
+Der Ort „{}“ liegt in keinem passenden Ort.	The place “{}” lies in no fitting place.
+Der Plan hat keinen Raum: die Geräte haben keinen Ort.	The plan has no room: the devices have no place.
+{} steht an keinem gültigen Ort (Nummer {}); es zählt der erste Raum.	{} stands in no valid place (number {}); the first room counts.
+{} ist kein Rack-Gerät und steckt doch im Rack „{}“.	{} is no rack device but sits in the rack “{}”.
+{} belegt im Rack „{}“ Höheneinheiten, die nicht frei sind (ab HE {}).	{} takes rack units of the rack “{}” that are not free (from U {}).
+Den Ort {} gibt es nicht.	There is no place {}.
+Ein Ort der Art {} gehört nicht in einen Ort der Art {}.	A place of the kind {} does not belong in a place of the kind {}.
+„{}“ taugt nicht als Name: 1 bis 63 Zeichen.	“{}” is no name: 1 to 63 characters.
+Der letzte Raum bleibt: jedes Gerät braucht einen Ort.	The last room stays: every device needs a place.
+In einem Ort der Art {} stehen keine Geräte: in einen Raum, ein Rack oder auf einen Tisch.	No devices stand in a place of the kind {}: into a room, a rack or onto a desk.
+{} ist kein Rack-Gerät.	{} is no rack device.
+Im Rack „{}“ ist die Höheneinheit {} nicht frei.	In the rack “{}” the rack unit {} is not free.
+Im Rack „{}“ sind die Höheneinheiten {} bis {} nicht frei.	In the rack “{}” the rack units {} to {} are not free.
+Im Rack „{}“ ist kein Platz mehr.	The rack “{}” has no room left.
+Die Geräte im Rack brauchen mindestens {} Höheneinheiten.	The devices in the rack need at least {} rack units.
+Breite und Tiefe: 0,1 bis 10 000 m.	Width and depth: 0.1 to 10,000 m.
+{} m geht nicht: 0 (automatisch) bis 100 000 m.	{} m is not possible: 0 (automatic) to 100,000 m.
+{} hat keinen Schacht für eine Optik.	{} has no cage for optics.
+an dem Port steckt kein Kabel	no cable at the port
+die Leitung ist aktiv	the link is up
+die Leitung ist unten	the link is down
+Kabel an {} zu lang: {} m, erlaubt {} m ({}); die Leitung bleibt aus.	Cable at {} too long: {} m, {} m allowed ({}); the link stays down.
+Optik {} an {} passt nicht zur Optik {} am anderen Ende; die Leitung bleibt aus.	Optics {} at {} do not fit the optics {} at the far end; the link stays down.
+{} passt nicht zur Optik {} an {}; die Leitung bleibt aus.	{} does not fit the optics {} at {}; the link stays down.
+Kabel zu lang: {} m, erlaubt {} m ({} zwischen {} und {}); die Leitung bleibt aus.	Cable too long: {} m, {} m allowed ({} between {} and {}); the link stays down.
+Optiken passen nicht: {} an {}, {} an {}; die Leitung bleibt aus.	Optics do not fit: {} at {}, {} at {}; the link stays down.
+{} zwischen {} und {} passt nicht zur Optik {} (SR braucht Multimode, LR Singlemode); die Leitung bleibt aus.	{} between {} and {} does not fit the optics {} (SR needs multimode, LR single-mode); the link stays down.

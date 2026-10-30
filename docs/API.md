@@ -77,7 +77,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
   <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [x509.rs](#netiox509rs)
 - [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, a dissector, pcapng
-  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs)
+  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs)
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
   <br>[lib.rs](#cas-crate-root) · [chunker.rs](#caschunkerrs) · [pack.rs](#caspackrs) · [snapshot.rs](#cassnapshotrs)
 - [update](#update) -- signed app updates: check, download, apply at the next start, health marker, rollback
@@ -24340,7 +24340,10 @@ log-linear histograms and a sliding window of them (simulators, servers, benchma
                  p50 / p95 / p99 / count / sum / mean / min / max over the slots still in
                  the window at t / per_slot(t, pm) for charts / hist(t)
                  hist_between(from, to): the slots that start in [from, to) as one
-                 histogram (a time series: one point per interval, quantiles of any span)
+                 histogram (a time series: one point per interval, quantiles of any span);
+                 bytes(): the heap memory it holds -- its slots come with the first value,
+                 so a window that never got one costs nothing (a simulator keeps one per
+                 device and copies them often)
 
 Quantiles use the nearest rank (rank = ceil(pm * n / 1000)) and give the midpoint of that
 rank's bucket, clamped to the smallest and largest value seen (the first and the last rank
@@ -24416,6 +24419,8 @@ HIST_BITS: u8 = 5
   `slots` slots of `span` time units each (at least one of each)
 - **`fn with_bits(slots: usize, span: u64, bits: u8) -> Window`**
 - **`fn slots(&self) -> usize`**
+- **`fn bytes(&self) -> usize`**
+  the heap memory it holds: its slots and their histograms (none before the first value)
 - **`fn span(&self) -> u64`**
 - **`fn record(&mut self, t: u64, v: u64) -> bool`**
   counts `v` at time `t`; false when t lies before the window that ends at the newest
@@ -28124,6 +28129,14 @@ on every target (simulators, packet tools, tests).
   eapol     EapolView, Key: EAPOL-Key frames of the 4-way handshake (Key Information bits,
             replay counter, nonces, MIC field, key data), the RSN element, KDEs (GTK,
             IGTK); mic_input / set_mic for the caller's MIC (802.1X-2004, 802.11-2020 12.7)
+  bgp       BGP-4 messages: frame (a message out of a TCP stream), BgpView, Message (OPEN with
+            capabilities, UPDATE with its path attributes, NOTIFICATION, KEEPALIVE,
+            ROUTE-REFRESH), BgpErr (the NOTIFICATION a receiver sends)   (RFC 4271, 5492,
+            6793, 2918, 1997, 4486)
+  tftp      TftpView, Packet (RRQ, WRQ, DATA, ACK, ERROR, OACK) with their options, error
+            codes, netascii, looks_like (a transfer away from port 69)  (RFC 1350, 2347-2349)
+  ftp       Command, Reply (multi-line), Lines, ReplyReader, host_port (PORT, 227), eprt,
+            epsv_port (229), the reply texts as the server's own words  (RFC 959, 2428, 2389)
 
 Views (XxxView::parse) check lengths once and then read fields without copying; records
 (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -28482,6 +28495,18 @@ refuses: another version, a wrong packet or LSA checksum, bodies that do not fit
 EAPOL (ethertype 0x888E) shows its header and an EAPOL-Key body field by field: the Key
 Information bits, replay counter, nonce, MIC and the key data (the RSN element and, when it is
 not encrypted, the KDEs); the summary names the message of the 4-way handshake (eapol.rs).
+BGP (TCP port 179) shows every message a segment holds: the header, the fields of OPEN with each
+capability, UPDATE with each withdrawn route, path attribute (its flags and value) and NLRI,
+NOTIFICATION with the names of its code and subcode, ROUTE-REFRESH; what a receiver would answer
+with a NOTIFICATION is a problem with that code; a segment that does not start with the marker
+is the rest of a message of an earlier one (bgp.rs; AS numbers of 2 or 4 octets as
+bgp::as_path_4 guesses).
+TFTP (port 69, and the DATA, ACK, ERROR and OACK packets of a transfer between two ports
+above 1023 by their shape: RFC 1350 moves a transfer to new ports) shows its opcode, file,
+mode, options, block, data and error (tftp.rs).  FTP (TCP port 21) shows each command line
+with its verb and argument and each reply line with its code; FTP-DATA (port 20, the active
+data connections) its bytes; passive data connections run between two free ports and show
+as TCP data (ftp.rs).
 ```
 
 ```rust
@@ -28511,6 +28536,10 @@ P_SNMP: u32 = 1 << 22
 P_LLDP: u32 = 1 << 23
 P_DHCPV6: u32 = 1 << 24
 P_EAPOL: u32 = 1 << 25
+/// BGP (TCP port 179); a bit far from the next free ones, which other protocols take in order
+P_BGP: u32 = 1 << 30
+/// FTP's control connection and its active data connections (FTP-DATA)
+P_FTP: u32 = 1 << 26
 P_DATA: u32 = 1 << 31
 ```
 
@@ -28543,6 +28572,9 @@ P_DATA: u32 = 1 << 31
   - `Lldp`
   - `Data`
   - `Eapol`
+  - `Bgp`
+  - `Ftp` -- FTP's control connection (port 21)
+  - `FtpData` -- an active FTP data connection (port 20)
 
 **`impl Proto`**
 
@@ -31328,6 +31360,611 @@ KDE_IGTK: u8 = 9
 
 - **`fn pad_key_data(data: &[u8]) -> Vec<u8>`**
   key data padded for the key wrap: 0xdd and zeros up to a multiple of 8, at least 16 bytes
+
+### `netpkt/bgp.rs`
+
+Source: [`lib/netpkt/bgp.rs`](../lib/netpkt/bgp.rs)
+
+```text
+bgp -- BGP-4 messages byte for byte (RFC 4271): the 19-byte header with its marker, OPEN with
+its optional parameters and the capabilities of RFC 5492 (multiprotocol IPv4 unicast of RFC
+4760, route refresh of RFC 2918, 4-octet AS numbers of RFC 6793), UPDATE with withdrawn routes,
+path attributes and NLRI, NOTIFICATION with the codes and subcodes of RFC 4271 and the Cease
+subcodes of RFC 4486, KEEPALIVE and ROUTE-REFRESH; the checks of RFC 4271 6.1 to 6.3 as the
+NOTIFICATION a receiver sends
+
+  frame(stream)            the length of the first message of a TCP byte stream once it is
+                           complete (Ok(None): more bytes needed) after the header checks of
+                           6.1 (marker, length, type and the length of the type)
+  BgpView::parse(b)        one message: kind(), len(), body(), marker_ok(); None when the
+                           bytes are shorter than the header or than its length field
+  Message::read(b, as4)    a whole message as a record (Err: the BgpErr whose NOTIFICATION a
+                           receiver sends); to_bytes(as4) writes it with marker and length.
+                           `as4`: the session negotiated 4-octet AS numbers (AS_PATH and
+                           AGGREGATOR carry them)
+  Open { version, asn, hold, id, params }   `asn` as on the wire (AS_TRANS for a 4-octet AS);
+                           Open::new(asn, hold, id, caps) fills it in; caps(), as4(),
+                           peer_as(), has_cap(code)
+  OptParam::Caps(Vec<Cap>) / Other;  Cap::Mp { afi, safi }, RouteRefresh, As4(asn), Other
+  Update { withdrawn, attrs, nlri }; Attr { flags, val } with Attr::new(val) (the flags the
+                           RFCs give the type) and kind(); AttrVal::Origin, AsPath (segments),
+                           NextHop, Med, LocalPref, AtomicAggregate, Aggregator, Communities,
+                           As4Path, As4Aggregator, Other (unknown types byte for byte);
+                           Update::get(kind), origin(), as_path(), next_hop(), med(),
+                           local_pref(), communities()
+  Segment { set, asns }    an AS_SET or AS_SEQUENCE; path_len(segs) counts a set as one AS
+                           (9.1.2.2), path_text(segs) "65002 65003 {65010,65011}"
+  Notification { code, sub, data };  error_name(code, sub), code_name(code)
+  BgpErr { code, sub, data }   what a receiver refuses and the NOTIFICATION it sends for it;
+                           text() in English
+  prefix_len(p) / write_prefix / read_prefixes   NLRI: the length in bits, then the bytes needed
+  as_path_4(value)         a dissector's guess whether an AS_PATH carries 4-octet numbers
+  origin_code(o) / origin_name(o) / community_text(c) / afi_name / cap_name   for dissectors
+
+Constants: PORT (179), VERSION, HDR_LEN, MAX_LEN, MARKER, the minimum lengths OPEN_MIN,
+UPDATE_MIN, NOTIFICATION_MIN, ROUTE_REFRESH_LEN, the types T_*, OPT_CAPS, the capability codes
+CAP_*, AFI_IPV4 / SAFI_UNICAST, AS_TRANS, the attribute flags F_* and types A_*, ORIGIN_*,
+SEG_*, the error codes E_* with their subcodes (HE_*, OE_*, UE_*, CE_*).
+
+The codec reads and writes; what needs the session (the peer's AS, its BGP identifier against
+the own one, the hold time a speaker accepts, NEXT_HOP semantics, AS path loops, LOCAL_PREF
+from an internal peer) is the speaker's business.  Attributes keep their flags and order, so a
+message read and written again is the same bytes (the unused low four flag bits too); a
+malformed AS4_PATH or AS4_AGGREGATOR is kept as Other (RFC 6793 6: attribute discard).  RFC
+7606 (treat-as-withdraw) is not here: every error is a NOTIFICATION as RFC 4271 says.
+```
+
+```rust
+/// the TCP port of BGP
+PORT: u16 = 179
+/// BGP version 4
+VERSION: u8 = 4
+/// the header (marker, length, type) and the longest message (RFC 4271 4)
+HDR_LEN: usize = 19
+MAX_LEN: usize = 4096
+/// sixteen bytes of ones
+MARKER: [u8; 16] = [0xFF; 16]
+/// the shortest OPEN, UPDATE and NOTIFICATION, the length of ROUTE-REFRESH
+OPEN_MIN: usize = 29
+UPDATE_MIN: usize = 23
+NOTIFICATION_MIN: usize = 21
+ROUTE_REFRESH_LEN: usize = 23
+/// message types
+T_OPEN: u8 = 1
+T_UPDATE: u8 = 2
+T_NOTIFICATION: u8 = 3
+T_KEEPALIVE: u8 = 4
+T_ROUTE_REFRESH: u8 = 5
+/// the optional parameter that carries capabilities (RFC 5492)
+OPT_CAPS: u8 = 2
+/// capability codes: multiprotocol (RFC 4760), route refresh (RFC 2918), 4-octet AS (RFC 6793)
+CAP_MP: u8 = 1
+CAP_ROUTE_REFRESH: u8 = 2
+CAP_AS4: u8 = 65
+/// the address family and sub-family of IPv4 unicast
+AFI_IPV4: u16 = 1
+SAFI_UNICAST: u8 = 1
+/// the 2-octet AS a 4-octet one shows as to an old speaker (RFC 6793)
+AS_TRANS: u16 = 23456
+/// attribute flags
+F_OPTIONAL: u8 = 0x80
+F_TRANSITIVE: u8 = 0x40
+F_PARTIAL: u8 = 0x20
+F_EXTENDED: u8 = 0x10
+/// attribute types
+A_ORIGIN: u8 = 1
+A_AS_PATH: u8 = 2
+A_NEXT_HOP: u8 = 3
+A_MED: u8 = 4
+A_LOCAL_PREF: u8 = 5
+A_ATOMIC_AGGREGATE: u8 = 6
+A_AGGREGATOR: u8 = 7
+A_COMMUNITIES: u8 = 8
+A_AS4_PATH: u8 = 17
+A_AS4_AGGREGATOR: u8 = 18
+/// ORIGIN values
+ORIGIN_IGP: u8 = 0
+ORIGIN_EGP: u8 = 1
+ORIGIN_INCOMPLETE: u8 = 2
+/// AS_PATH segment types
+SEG_SET: u8 = 1
+SEG_SEQUENCE: u8 = 2
+/// error codes (RFC 4271 4.5)
+E_HEADER: u8 = 1
+E_OPEN: u8 = 2
+E_UPDATE: u8 = 3
+E_HOLD: u8 = 4
+E_FSM: u8 = 5
+E_CEASE: u8 = 6
+/// Message Header Error subcodes
+HE_SYNC: u8 = 1
+HE_LENGTH: u8 = 2
+HE_TYPE: u8 = 3
+/// OPEN Message Error subcodes (7: RFC 5492)
+OE_UNSPECIFIC: u8 = 0
+OE_VERSION: u8 = 1
+OE_PEER_AS: u8 = 2
+OE_ID: u8 = 3
+OE_OPT_PARAM: u8 = 4
+OE_HOLD: u8 = 6
+OE_CAPABILITY: u8 = 7
+/// UPDATE Message Error subcodes
+UE_ATTR_LIST: u8 = 1
+UE_UNRECOGNIZED: u8 = 2
+UE_MISSING: u8 = 3
+UE_FLAGS: u8 = 4
+UE_LENGTH: u8 = 5
+UE_ORIGIN: u8 = 6
+UE_NEXT_HOP: u8 = 8
+UE_OPTIONAL: u8 = 9
+UE_NETWORK: u8 = 10
+UE_AS_PATH: u8 = 11
+/// Cease subcodes (RFC 4486)
+CE_MAX_PREFIXES: u8 = 1
+CE_SHUTDOWN: u8 = 2
+CE_DECONFIGURED: u8 = 3
+CE_RESET: u8 = 4
+CE_REJECTED: u8 = 5
+CE_CONFIG: u8 = 6
+CE_COLLISION: u8 = 7
+CE_RESOURCES: u8 = 8
+```
+
+- **`struct BgpErr`**
+  what a receiver refuses: the code, subcode and data of the NOTIFICATION it sends
+  - `code: u8`
+  - `sub: u8`
+  - `data: Vec<u8>`
+
+**`impl BgpErr`**
+
+- **`fn new(code: u8, sub: u8, data: Vec<u8>) -> BgpErr`**
+- **`fn notification(&self) -> Notification`**
+  the NOTIFICATION for it
+- **`fn text(&self) -> String`**
+  "UPDATE Message Error / Missing Well-known Attribute"
+
+- **`fn code_name(code: u8) -> &'static str`**
+  the name of an error code (RFC 4271 4.5)
+
+- **`fn error_name(code: u8, sub: u8) -> &'static str`**
+  the name of a subcode ("Bad Peer AS"); the code's name where it has none
+
+- **`fn frame(b: &[u8]) -> Result<Option<usize>, BgpErr>`**
+  the length of the first message in a TCP byte stream once all of it is there (None: more
+  bytes needed); Err with the NOTIFICATION of 6.1 for a bad header
+
+- **`struct BgpView<'a>`**
+  one message: the header and as many bytes as its length says
+
+**`impl<'a> BgpView<'a>`**
+
+- **`fn parse(b: &'a [u8]) -> Option<BgpView<'a>>`**
+  None when the bytes are shorter than the header or than its length field (bytes after
+  the length are left out)
+- **`fn marker_ok(&self) -> bool`**
+- **`fn len(&self) -> usize`**
+- **`fn is_empty(&self) -> bool`**
+- **`fn kind(&self) -> u8`**
+- **`fn body(&self) -> &'a [u8]`**
+- **`fn bytes(&self) -> &'a [u8]`**
+
+- **`fn type_name(t: u8) -> &'static str`**
+  the name of a message type ("UPDATE")
+
+- **`fn prefix_len(p: &Prefix4) -> usize`**
+  the bytes a prefix takes in NLRI: its length, then the bytes that hold its bits
+
+- **`fn write_prefix(out: &mut Vec<u8>, p: &Prefix4)`**
+  appends a prefix as NLRI
+
+- **`fn read_prefixes(b: &[u8]) -> Result<Vec<Prefix4>, BgpErr>`**
+  the prefixes of a withdrawn-routes or NLRI field; Err(Invalid Network Field) for a length
+  above 32 or bytes that end early.  Bits after the length are dropped (the network form).
+
+- **`enum Cap`**
+  a capability (RFC 5492)
+  - `Mp { afi: u16, safi: u8 }` -- multiprotocol extensions (RFC 4760)
+  - `RouteRefresh` -- route refresh (RFC 2918)
+  - `As4(u32)` -- 4-octet AS numbers with the speaker's AS (RFC 6793)
+  - `Other { code: u8, data: Vec<u8> }` -- anything else, byte for byte
+
+**`impl Cap`**
+
+- **`fn code(&self) -> u8`**
+
+- **`fn cap_name(code: u8) -> &'static str`**
+  the name of a capability code
+
+- **`fn afi_name(afi: u16, safi: u8) -> String`**
+  the name of an address family ("IPv4")
+
+- **`enum OptParam`**
+  an optional parameter of an OPEN
+  - `Caps(Vec<Cap>)` -- capabilities (parameter type 2)
+  - `Other { kind: u8, data: Vec<u8> }` -- another type, byte for byte (a receiver refuses it: Unsupported Optional Parameter)
+
+- **`struct Open`**
+  an OPEN message (RFC 4271 4.2)
+  - `version: u8`
+  - `asn: u16` -- My Autonomous System as on the wire (AS_TRANS for a 4-octet AS)
+  - `hold: u16`
+  - `id: Ipv4`
+  - `params: Vec<OptParam>`
+
+**`impl Open`**
+
+- **`fn new(asn: u32, hold: u16, id: Ipv4, caps: Vec<Cap>) -> Open`**
+  version 4 from `asn` (AS_TRANS on the wire above 65535) with one parameter of
+  capabilities (none when `caps` is empty)
+- **`fn caps(&self) -> impl Iterator<Item = &Cap>`**
+  every capability, in order
+- **`fn has_cap(&self, code: u8) -> bool`**
+- **`fn as4(&self) -> Option<u32>`**
+  the AS of the 4-octet capability
+- **`fn peer_as(&self) -> u32`**
+  the speaker's AS: the 4-octet one where it sent the capability, else My Autonomous System
+- **`fn ipv4_unicast(&self) -> bool`**
+  it offers IPv4 unicast (multiprotocol), or names no family at all (then IPv4 unicast
+  alone, RFC 4760 8)
+- **`fn read(b: &[u8]) -> Result<Open, BgpErr>`**
+  the body of an OPEN (6.2): the version, the optional parameters as their lengths say
+  (else OPEN Message Error / Unspecific), known parameter types only, a hold time of 0 or
+  at least 3 s, a BGP identifier that is a unicast host address
+
+- **`struct Segment`**
+  an AS_SET or an AS_SEQUENCE
+  - `set: bool`
+  - `asns: Vec<u32>`
+
+**`impl Segment`**
+
+- **`fn seq(asns: Vec<u32>) -> Segment`**
+
+- **`fn path_len(segs: &[Segment]) -> usize`**
+  the length of an AS path for the decision process: an AS_SET counts as one AS (9.1.2.2)
+
+- **`fn path_text(segs: &[Segment]) -> String`**
+  "65002 65003 {65010,65011}"; "" for an empty path
+
+- **`fn origin_code(o: u8) -> &'static str`**
+  "i", "e", "?"
+
+- **`fn origin_name(o: u8) -> &'static str`**
+  "IGP", "EGP", "INCOMPLETE"
+
+- **`fn community_text(c: u32) -> String`**
+  a community as people write it: "65001:100", or the well-known names of RFC 1997
+
+- **`fn attr_name(t: u8) -> &'static str`**
+  the name of an attribute type ("AS_PATH")
+
+- **`enum AttrVal`**
+  the value of a path attribute
+  - `Origin(u8)`
+  - `AsPath(Vec<Segment>)`
+  - `NextHop(Ipv4)`
+  - `Med(u32)`
+  - `LocalPref(u32)`
+  - `AtomicAggregate`
+  - `Aggregator { asn: u32, id: Ipv4 }` -- the AS and BGP identifier of the speaker that aggregated
+  - `Communities(Vec<u32>)`
+  - `As4Path(Vec<Segment>)` -- the 4-octet path next to an AS_PATH of 2-octet numbers (RFC 6793)
+  - `As4Aggregator { asn: u32, id: Ipv4 }`
+  - `Other { kind: u8, data: Vec<u8> }` -- a type this codec does not know (or a malformed AS4 attribute), byte for byte
+
+- **`struct Attr`**
+  a path attribute with its flags (the extended length bit is set when the value needs it)
+  - `flags: u8`
+  - `val: AttrVal`
+
+- **`fn as_path_4(v: &[u8]) -> bool`**
+  a dissector's guess: the AS_PATH value reads as 4-octet numbers (a session between speakers
+  with the capability) and not as 2-octet ones, or as both and the 2-octet reading gives AS 0
+  (the high halves of 4-octet numbers)
+
+**`impl Attr`**
+
+- **`fn new(val: AttrVal) -> Attr`**
+  a known attribute with the flags its type has
+- **`fn kind(&self) -> u8`**
+- **`fn value(&self, as4: bool) -> Vec<u8>`**
+  the value bytes (`as4`: AS_PATH and AGGREGATOR with 4-octet numbers)
+- **`fn write(&self, out: &mut Vec<u8>, as4: bool)`**
+  appends flags, type, length (two bytes with the extended length bit) and value
+
+- **`struct Update`**
+  an UPDATE message (RFC 4271 4.3)
+  - `withdrawn: Vec<Prefix4>`
+  - `attrs: Vec<Attr>`
+  - `nlri: Vec<Prefix4>`
+
+**`impl Update`**
+
+- **`fn get(&self, kind: u8) -> Option<&AttrVal>`**
+  the attribute of a type
+- **`fn origin(&self) -> Option<u8>`**
+- **`fn as_path(&self) -> Option<&[Segment]>`**
+- **`fn as4_path(&self) -> Option<&[Segment]>`**
+- **`fn next_hop(&self) -> Option<Ipv4>`**
+- **`fn med(&self) -> Option<u32>`**
+- **`fn local_pref(&self) -> Option<u32>`**
+- **`fn communities(&self) -> Option<&[u32]>`**
+- **`fn wire_len(&self, as4: bool) -> usize`**
+  the bytes of the message this update makes (to keep it within MAX_LEN)
+- **`fn read(b: &[u8], as4: bool) -> Result<Update, BgpErr>`**
+  the body of an UPDATE (6.3): the lengths fit the message (else Malformed Attribute
+  List), the prefixes are valid (Invalid Network Field), the attributes as read_attrs says,
+  and NLRI come with ORIGIN, AS_PATH and NEXT_HOP (Missing Well-known Attribute, its type
+  as data)
+
+- **`struct Notification`**
+  a NOTIFICATION message (RFC 4271 4.5)
+  - `code: u8`
+  - `sub: u8`
+  - `data: Vec<u8>`
+
+**`impl Notification`**
+
+- **`fn new(code: u8, sub: u8) -> Notification`**
+- **`fn text(&self) -> String`**
+  "Cease / Administrative Reset"
+
+- **`enum Message`**
+  a BGP message
+  - `Open(Open)`
+  - `Update(Update)`
+  - `Notification(Notification)`
+  - `Keepalive`
+  - `RouteRefresh { afi: u16, safi: u8 }` -- a request to send the routes of a family again (RFC 2918)
+
+**`impl Message`**
+
+- **`fn kind(&self) -> u8`**
+- **`fn read(b: &[u8], as4: bool) -> Result<Message, BgpErr>`**
+  one whole message (the first of `b`; frame() says how long it is) with the checks of 6.1
+  to 6.3
+- **`fn to_bytes(&self, as4: bool) -> Vec<u8>`**
+  the message on the wire: marker, length, type, body
+
+### `netpkt/tftp.rs`
+
+Source: [`lib/netpkt/tftp.rs`](../lib/netpkt/tftp.rs)
+
+```text
+tftp -- Trivial File Transfer Protocol packets (UDP port 69, RFC 1350) with the option
+extension of RFC 2347 (OACK, error 8) and the options blksize (RFC 2348), timeout and tsize
+(RFC 2349)
+
+  TftpView::parse(b)        the opcode and the fields of each kind: file / mode / options
+                            (RRQ, WRQ, OACK as NUL-terminated strings with their offsets),
+                            block and data (DATA), block (ACK), code and message (ERROR)
+  Packet                    Rrq / Wrq { file, mode, opts } | Data { block, data } |
+                            Ack { block } | Error { code, msg } | Oack { opts }:
+                            read(view) / parse(b) / to_bytes / opcode / opt(name)
+  Packet::error_of(code)    an ERROR with the RFC's text of the code
+  OP_* (1 .. 6), ERR_* (0 .. 8), op_name, error_name, BLOCK (512), BLKSIZE_MIN / _MAX,
+  mode_known ("octet", "netascii", "mail"), to_netascii / from_netascii (RFC 764 line ends)
+  looks_like(b)             the shape of a packet of a running transfer (DATA, ACK, ERROR,
+                            OACK): RFC 1350 moves a transfer to new ports at once, so a
+                            dissector without state knows it only by its bytes
+
+A transfer is lock-step: every DATA block waits for its ACK, a block shorter than the block
+size ends it (an empty one when the size is a multiple), block numbers count from 1 and roll
+over after 65535.  Option names compare case-insensitively; values are decimal text.  Errors
+of parse name what is wrong for a dissector (Bad).
+```
+
+```rust
+OP_RRQ: u16 = 1
+OP_WRQ: u16 = 2
+OP_DATA: u16 = 3
+OP_ACK: u16 = 4
+OP_ERROR: u16 = 5
+/// option acknowledgment (RFC 2347)
+OP_OACK: u16 = 6
+/// opcode and block number (DATA, ACK) or error code (ERROR)
+TFTP_HDR: usize = 4
+/// data bytes in a block without the blksize option
+BLOCK: usize = 512
+/// the block sizes RFC 2348 allows
+BLKSIZE_MIN: u16 = 8
+BLKSIZE_MAX: u16 = 65464
+/// "Not defined, see error message (if any)."
+ERR_UNDEFINED: u16 = 0
+ERR_NOT_FOUND: u16 = 1
+ERR_ACCESS: u16 = 2
+ERR_DISK_FULL: u16 = 3
+ERR_ILLEGAL: u16 = 4
+ERR_UNKNOWN_TID: u16 = 5
+ERR_EXISTS: u16 = 6
+ERR_NO_USER: u16 = 7
+/// option negotiation failed (RFC 2347)
+ERR_OPTION: u16 = 8
+```
+
+- **`fn op_name(op: u16) -> &'static str`**
+  the name of an opcode as capture tools show it
+
+- **`fn error_name(code: u16) -> &'static str`**
+  the meaning of an error code (RFC 1350 appendix, RFC 2347)
+
+- **`fn mode_known(mode: &str) -> bool`**
+  a transfer mode RFC 1350 defines (case-insensitive)
+
+- **`fn to_netascii(data: &[u8]) -> Vec<u8>`**
+  bytes as netascii: LF becomes CR LF, a lone CR becomes CR NUL (RFC 764)
+
+- **`fn from_netascii(data: &[u8]) -> Vec<u8>`**
+  netascii back to bytes: CR LF is LF, CR NUL is CR
+
+- **`enum Bad`**
+  why bytes are no TFTP packet
+  - `Short` -- shorter than its opcode and fixed fields
+  - `Opcode(u16)` -- an opcode RFC 1350 and 2347 do not define
+  - `Unterminated` -- a string field without its NUL
+  - `OddOptions` -- an option name without a value
+
+- **`type Span = (usize, usize)`**
+  a NUL-terminated string field: its offset, its length without the NUL
+
+- **`struct TftpView<'a>`**
+  a received TFTP packet
+
+**`impl<'a> TftpView<'a>`**
+
+- **`fn parse(b: &'a [u8]) -> Result<TftpView<'a>, Bad>`**
+  at least an opcode RFC 1350 or 2347 defines and the fields its kind has
+- **`fn bytes(&self) -> &'a [u8]`**
+- **`fn opcode(&self) -> u16`**
+- **`fn block(&self) -> u16`**
+  the block number of DATA and ACK
+- **`fn data(&self) -> &'a [u8]`**
+  the data of a DATA packet
+- **`fn error_code(&self) -> u16`**
+  the code of an ERROR
+- **`fn error_msg(&self) -> String`**
+  the message of an ERROR (up to its NUL)
+- **`fn fields(&self) -> Vec<Span>`**
+  the string fields after the opcode (RRQ, WRQ: file, mode, then option pairs; OACK: the
+  pairs), offsets relative to the packet
+- **`fn text(&self, s: Span) -> String`**
+  a field as text
+
+- **`enum Packet`**
+  a TFTP packet to write (or one read)
+  - `Rrq { file: String, mode: String, opts: Vec<(String, String)> }`
+  - `Wrq { file: String, mode: String, opts: Vec<(String, String)> }`
+  - `Data { block: u16, data: Vec<u8> }`
+  - `Ack { block: u16 }`
+  - `Error { code: u16, msg: String }`
+  - `Oack { opts: Vec<(String, String)> }`
+
+**`impl Packet`**
+
+- **`fn read(v: &TftpView) -> Packet`**
+- **`fn parse(b: &[u8]) -> Result<Packet, Bad>`**
+  bytes as a packet
+- **`fn error_of(code: u16) -> Packet`**
+  an ERROR with the meaning of its code as the message
+- **`fn opcode(&self) -> u16`**
+- **`fn opt(&self, name: &str) -> Option<&str>`**
+  an option of a request or an OACK (the name ignores case)
+- **`fn to_bytes(&self) -> Vec<u8>`**
+
+- **`fn looks_like(b: &[u8]) -> bool`**
+  the bytes of a packet of a running transfer: a DATA block (at most BLKSIZE_MAX bytes), an
+  ACK of exactly four bytes, an ERROR with a known code and a printable message, an OACK of
+  option names and values
+
+### `netpkt/ftp.rs`
+
+Source: [`lib/netpkt/ftp.rs`](../lib/netpkt/ftp.rs)
+
+```text
+ftp -- the control connection of the File Transfer Protocol (TCP port 21, RFC 959): command
+lines, replies with their multi-line form, the host-port of PORT and of the 227 reply to PASV,
+EPRT and the 229 reply to EPSV (RFC 2428), FEAT's list (RFC 2389)
+
+  Command { verb, arg }     Command::parse(line) (the verb in capitals, the argument as
+                            typed), Command::new(verb, arg), to_line() ("USER anna\r\n")
+  Reply { code, lines }     to_bytes(): one line "220 text", or "211-first" ... "211 last"
+                            (the inner lines start with a space when they could look like
+                            the end); is_final / is_ok (1xx preliminary, 2xx done, 3xx more)
+  Lines                     cuts the bytes of a control connection into lines (CRLF, a lone
+                            LF too), in any pieces as they arrive
+  ReplyReader               the replies of a server from its bytes: push(bytes) -> Vec<Reply>
+                            (a multi-line reply ends with a line of the same code and a space)
+  host_port(text) / fmt_host_port(ip, port)   "h1,h2,h3,h4,p1,p2" (PORT's argument, 227's
+                            numbers: host_port finds them anywhere in a reply's text)
+  eprt(arg) / fmt_eprt(addr, port)            "|1|10.0.0.5|40001|", "|2|2001:db8::5|40001|"
+  epsv_port(text) / fmt_epsv(port)            the "(|||port|)" of a 229 reply
+  PORT_FTP (21), PORT_FTP_DATA (20), verb_known
+
+Lines are UTF-8 or ASCII; RFC 959 allows Telnet sequences, which nobody sends here.  The
+reply texts are the server's own words: clients go by the codes and the numbers of 227 and
+229 only.
+```
+
+```rust
+PORT_FTP: u16 = 21
+/// the server's port of active data connections
+PORT_FTP_DATA: u16 = 20
+```
+
+- **`fn verb_known(v: &str) -> bool`**
+  the commands of RFC 959, 2389, 2428 and 3659 a dissector names
+
+- **`struct Command`**
+  a command line of a client
+  - `verb: String` -- in capitals
+  - `arg: String` -- everything after the first space (may hold spaces: a file name)
+
+**`impl Command`**
+
+- **`fn new(verb: &str, arg: &str) -> Command`**
+- **`fn parse(line: &str) -> Option<Command>`**
+  a line without its line end; None for an empty one
+- **`fn to_line(&self) -> String`**
+  the line on the wire, CRLF included
+
+- **`struct Reply`**
+  a reply of a server
+  - `code: u16`
+  - `lines: Vec<String>` -- the text of each line (without the code of the first and the last)
+
+**`impl Reply`**
+
+- **`fn new(code: u16, text: &str) -> Reply`**
+- **`fn text(&self) -> &str`**
+  the text of the first line
+- **`fn is_preliminary(&self) -> bool`**
+  1xx: more replies follow for this command
+- **`fn is_ok(&self) -> bool`**
+  2xx: done
+- **`fn is_intermediate(&self) -> bool`**
+  3xx: the command waits for another (PASS after USER)
+- **`fn to_bytes(&self) -> Vec<u8>`**
+  the reply as bytes: "code text\\r\\n", or the multi-line form of RFC 959 4.2
+
+- **`struct Lines`**
+  cuts a byte stream into lines
+
+**`impl Lines`**
+
+- **`fn new() -> Lines`**
+- **`fn push(&mut self, b: &[u8]) -> Vec<String>`**
+  the complete lines in `b` and what came before it, without their line ends
+- **`fn pending(&self) -> usize`**
+  bytes waiting for their line end
+
+- **`struct ReplyReader`**
+  the replies of a server, as its bytes arrive
+
+**`impl ReplyReader`**
+
+- **`fn new() -> ReplyReader`**
+- **`fn push(&mut self, b: &[u8]) -> Vec<Reply>`**
+  the replies that are complete now; a line that is no reply is skipped
+
+- **`fn host_port(text: &str) -> Option<(Ipv4, u16)>`**
+  "h1,h2,h3,h4,p1,p2" anywhere in a text (PORT's argument; a 227 reply, where clients look
+  for the six numbers whatever the words around them)
+
+- **`fn fmt_host_port(ip: Ipv4, port: u16) -> String`**
+  the six numbers of an IPv4 address and a port
+
+- **`fn eprt(arg: &str) -> Option<(IpAddr, u16)>`**
+  EPRT's argument: a delimiter, the family (1 IPv4, 2 IPv6), the address and the port
+
+- **`fn fmt_eprt(addr: IpAddr, port: u16) -> String`**
+  EPRT's argument for an address and a port
+
+- **`fn epsv_port(text: &str) -> Option<u16>`**
+  the port of a 229 reply: "(|||port|)" in its text (any delimiter of RFC 2428)
+
+- **`fn fmt_epsv(port: u16) -> String`**
+  "(|||port|)" for a 229 reply
 
 ## cas
 

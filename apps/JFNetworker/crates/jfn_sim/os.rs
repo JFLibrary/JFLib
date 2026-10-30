@@ -30,7 +30,8 @@
 //   service::<T>(dev, name) / metric(dev, svc, name) / log_lines(dev) / clock(dev) /
 //   hosts(dev)
 //
-//   TCP sockets (tcp.rs)      OsApi::tcp_listen / tcp_accept / tcp_connect / tcp_send / tcp_recv /
+//   TCP sockets (tcp.rs)      OsApi::tcp_listen / tcp_accept / tcp_connect (tcp_connect_src from
+//                             an address of the device) / tcp_send / tcp_recv /
 //                             tcp_shutdown / tcp_close / tcp_abort / tcp_setopts / tcp_info; their
 //                             events: SvcEvent::TcpAccept, TcpConnected, TcpData, TcpWritable,
 //                             TcpEof, TcpClosed; bind_msg, tcp_listen_msg, tcp_connect_msg and
@@ -59,6 +60,9 @@
 //                             getaddrinfo: A, AAAA or both as the device can use them, in the
 //                             order of RFC 6724 (resolver.rs)
 //   Engine::udp6_input        from l3v6.rs: the socket for a UDP datagram over IPv6
+//   Os::files                 the device's files (jfn_model::files::Store: flash: and nvram: of
+//                             IOS-like devices, the Linux tree of hosts); files.rs reads and
+//                             writes them for services (OsApi::file_*) and the command lines
 //
 // Everything a service sees goes through its node's inbox, which a node timer (SLOT_OS)
 // empties at the same virtual time: a service never runs inside another one's call, and a
@@ -321,6 +325,11 @@ pub trait Service: Send {
     fn renamed(&mut self, name: &str) {
         let _ = name;
     }
+    /// the bytes it holds besides its own size (tables, buffers, stored data): what it adds to
+    /// a keyframe of the engine (keyframe.rs, the memory budget); the default guesses 1 KiB
+    fn footprint(&self) -> usize {
+        1024
+    }
 }
 
 impl Clone for Box<dyn Service> {
@@ -500,6 +509,8 @@ pub struct Os {
     pub tcp: crate::tcp::TcpStack,
     /// the disk: access times and capacity for services that store data (disk.rs)
     pub disk: crate::disk::Disk,
+    /// the device's files: they stay through power off (files.rs)
+    pub files: jfn_model::files::Store,
 }
 
 impl Os {
@@ -524,6 +535,7 @@ impl Os {
             ephemeral: if ios { (49152, 65535) } else { (32768, 60999) },
             tcp: crate::tcp::TcpStack::new(ios),
             disk: crate::disk::Disk::default(),
+            files: jfn_model::files::Store::for_model(model),
         }
     }
     /// a service by name
@@ -1510,6 +1522,14 @@ impl OsApi<'_> {
     /// tcp_connect_from(), the refusal as a message
     pub fn tcp_connect_from_msg(&mut self, sport: u16, dst: impl Into<IpAddr>, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
         self.eng.tcp_connect(self.ni, self.id, sport, dst.into(), dport, opts, self.cause)
+    }
+    /// a connection from an address of the device (bind to it, then connect; BGP's
+    /// update-source), from an ephemeral port
+    pub fn tcp_connect_src(&mut self, src: IpAddr, dst: impl Into<IpAddr>, dport: u16, opts: crate::tcp::SockOpts) -> Result<u32, Msg> {
+        if !self.is_mine(src) {
+            return Err(msg!("{} ist keine Adresse dieses Geräts.", src));
+        }
+        self.eng.tcp_connect_src(self.ni, self.id, Some(src), 0, dst.into(), dport, opts, self.cause)
     }
     /// queues bytes for sending: how many the send buffer took (TcpWritable follows when it
     /// has room again)

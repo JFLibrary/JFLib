@@ -19,6 +19,9 @@
 //
 // Access points and stations get their WLAN part after the interfaces (wlan.rs); the radio of an
 // access point that sends a network is "aktiv" without a cable.
+//
+// Last, the physical view's part (P1, workspace/phys/props.rs): where the device stands, a list
+// of places to move it to, its rack unit, the optic of each optics cage.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -167,7 +170,7 @@ pub(crate) fn if_rows(n: &Net, id: u32) -> Vec<IfRow> {
     let p = &n.doc.proj;
     let view = &n.doc.sim.view;
     let Some(dv) = view.devices.iter().find(|d| d.dev == id) else { return Vec::new() };
-    let bridge = n.doc.sim.engine().bridge(id);
+    let bridge = n.doc.sim.state().bridge(id);
     let ports = p.model_of(id).map(|m| m.ports()).unwrap_or_default();
     let mut out = Vec::new();
     for pv in &dv.ports {
@@ -310,6 +313,8 @@ pub(crate) fn frame(n: &mut Net, ui: &mut Ui, id: u32) {
     }
     // faults of the lab: power, a service, the disk (faults.rs)
     super::faults::device(n, ui, id);
+    // where it stands, its optics (the physical view, last: workspace/phys/props.rs)
+    crate::workspace::phys::props::device(n, ui, id);
 }
 
 // the name: Enter or the button applies, Esc puts it back
@@ -476,7 +481,7 @@ fn quick(n: &mut Net, ui: &mut Ui, id: u32, r: &IfRow) {
     }
     // the default gateway of a host
     if host && r.iface.is_some() {
-        let now = config::default_gateways(n.doc.sim.engine(), id).first().map(|g| g.to_string()).unwrap_or_default();
+        let now = config::default_gateways(n.doc.sim.state(), id).first().map(|g| g.to_string()).unwrap_or_default();
         let ins = &mut n.inspector;
         if ins.gw_src != (id, now.clone()) {
             ins.gw = now.clone();

@@ -3023,8 +3023,9 @@ impl Ospf {
             }
         }
         let ni = os.ni;
-        if let Some(st) = os.eng.stack_mut(ni) {
-            st.set_dynamic(RouteSrc::Ospf, v);
+        // BGP resolves next hops over them (bgp.rs)
+        if os.eng.stack_mut(ni).is_some_and(|st| st.set_dynamic(RouteSrc::Ospf, v)) {
+            os.eng.bgp_kick(ni);
         }
     }
 }

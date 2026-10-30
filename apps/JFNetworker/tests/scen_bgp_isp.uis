@@ -1,0 +1,15 @@
+#!args apps/JFNetworker/tests/fixtures/bgp_isp.jfnet --scenario apps/JFNetworker/tests/scen/bgp_isp.scn --golden apps/JFNetworker/tests/scen/bgp_isp.report
+# golden scenario: BGP between two customers with their own AS numbers (65010 at two providers,
+# 65020 at one), the providers AS 100 and AS 200 and the transit provider AS 300 of two routers
+# with iBGP between their loopbacks (OSPF below, update-source, next-hop-self): the sessions
+# with their collisions, the iBGP session once OSPF knows the loopbacks, the tables after 120 s
+# (MRAI), the way from PC-A to PC-B, a pulled cable CA-ISP2 (fast external fallover, the way
+# over ISP1 and AS 300, ISP2 finds CA's network over AS 300) and the cable back (a path with
+# 65010 in it dropped as a loop, the short way again).  The GUI program runs
+# tests/scen/bgp_isp.scn on tests/fixtures/bgp_isp.jfnet without a window and ends with the
+# report, which must equal tests/scen/bgp_isp.report byte for byte on every target (the script
+# itself is not run)
+# BGP zwischen Kunden, Providern und einem Transit-Provider: CA (AS 65010) hängt an ISP1 (AS 100)
+# und ISP2 (AS 200), CB (AS 65020) nur an ISP2, die Provider verbindet AS 300 aus TR1 und TR2
+# (iBGP zwischen den Loopbacks). Fehlt das Kabel CA-ISP2, endet die Sitzung sofort und der Weg
+# führt über ISP1 und AS 300; mit dem Kabel kommt der kurze Weg zurück.

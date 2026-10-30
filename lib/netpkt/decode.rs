@@ -28,6 +28,18 @@
 // EAPOL (ethertype 0x888E) shows its header and an EAPOL-Key body field by field: the Key
 // Information bits, replay counter, nonce, MIC and the key data (the RSN element and, when it is
 // not encrypted, the KDEs); the summary names the message of the 4-way handshake (eapol.rs).
+// BGP (TCP port 179) shows every message a segment holds: the header, the fields of OPEN with each
+// capability, UPDATE with each withdrawn route, path attribute (its flags and value) and NLRI,
+// NOTIFICATION with the names of its code and subcode, ROUTE-REFRESH; what a receiver would answer
+// with a NOTIFICATION is a problem with that code; a segment that does not start with the marker
+// is the rest of a message of an earlier one (bgp.rs; AS numbers of 2 or 4 octets as
+// bgp::as_path_4 guesses).
+// TFTP (port 69, and the DATA, ACK, ERROR and OACK packets of a transfer between two ports
+// above 1023 by their shape: RFC 1350 moves a transfer to new ports) shows its opcode, file,
+// mode, options, block, data and error (tftp.rs).  FTP (TCP port 21) shows each command line
+// with its verb and argument and each reply line with its code; FTP-DATA (port 20, the active
+// data connections) its bytes; passive data connections run between two free ports and show
+// as TCP data (ftp.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -51,6 +63,9 @@ use crate::http;
 use crate::rip::{self, RipView};
 use crate::icmpv6::{self, Icmp6View, NdMsg, NdOpt};
 use crate::ospf;
+use crate::bgp;
+use crate::tftp;
+use crate::ftp;
 
 pub const P_ETH: u32 = 1 << 0;
 pub const P_VLAN: u32 = 1 << 1;
@@ -78,6 +93,10 @@ pub const P_SNMP: u32 = 1 << 22;
 pub const P_LLDP: u32 = 1 << 23;
 pub const P_DHCPV6: u32 = 1 << 24;
 pub const P_EAPOL: u32 = 1 << 25;
+/// BGP (TCP port 179); a bit far from the next free ones, which other protocols take in order
+pub const P_BGP: u32 = 1 << 30;
+/// FTP's control connection and its active data connections (FTP-DATA)
+pub const P_FTP: u32 = 1 << 26;
 pub const P_DATA: u32 = 1 << 31;
 
 /// a protocol layer
@@ -110,6 +129,11 @@ pub enum Proto {
     Lldp,
     Data,
     Eapol,
+    Bgp,
+    /// FTP's control connection (port 21)
+    Ftp,
+    /// an active FTP data connection (port 20)
+    FtpData,
 }
 
 impl Proto {
@@ -142,6 +166,9 @@ impl Proto {
             Proto::Lldp => "LLDP",
             Proto::Data => "Data",
             Proto::Eapol => "EAPOL",
+            Proto::Bgp => "BGP",
+            Proto::Ftp => "FTP",
+            Proto::FtpData => "FTP-DATA",
         }
     }
     pub fn bit(self) -> u32 {
@@ -173,6 +200,8 @@ impl Proto {
             Proto::Lldp => P_LLDP,
             Proto::Data => P_DATA,
             Proto::Eapol => P_EAPOL,
+            Proto::Bgp => P_BGP,
+            Proto::Ftp | Proto::FtpData => P_FTP,
         }
     }
 }
@@ -232,6 +261,9 @@ fn tcp_app(sp: u16, dp: u16) -> Option<Proto> {
             443 | 8443 => Proto::Tls,
             22 => Proto::Ssh,
             53 => Proto::Dns,
+            bgp::PORT => Proto::Bgp,
+            ftp::PORT_FTP => Proto::Ftp,
+            ftp::PORT_FTP_DATA => Proto::FtpData,
             _ => return None,
         })
     };
@@ -358,7 +390,9 @@ fn transport(s: &mut Stack, proto: u8, p: &[u8], off: usize) {
             s.push(Proto::Udp, off, udp::UDP_HDR);
             let pl = u.payload().len();
             if pl > 0 {
-                let app = udp_app(u.src_port(), u.dst_port()).unwrap_or(Proto::Data);
+                // a running TFTP transfer has left port 69: its packets by their shape
+                let (sp, dp) = (u.src_port(), u.dst_port());
+                let app = udp_app(sp, dp).or_else(|| (sp > 1023 && dp > 1023 && tftp::looks_like(u.payload())).then_some(Proto::Tftp)).unwrap_or(Proto::Data);
                 s.push(app, off + udp::UDP_HDR, pl);
             }
         }
@@ -528,6 +562,9 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Icmpv6 => Some(icmpv6_layer(frame, off, len, net, hop6, frag6)),
             Proto::Ospf => Some(ospf_layer(frame, off, len)),
             Proto::Eapol => Some(eapol_layer(frame, off, len)),
+            Proto::Bgp => Some(bgp_layer(frame, off, len)),
+            Proto::Tftp => Some(tftp_layer(frame, off, len)),
+            Proto::Ftp => Some(ftp_layer(frame, off, len, ftp_response(&st, frame))),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -848,6 +885,7 @@ fn payload_layer(p: Proto, off: usize, len: usize) -> B {
         Proto::Lldp => String::from("Link Layer Discovery Protocol"),
         Proto::Igmp => String::from("Internet Group Management Protocol"),
         Proto::Icmpv6 => String::from("Internet Control Message Protocol v6"),
+        Proto::FtpData => String::from("FTP Data"),
         other => String::from(other.name()),
     };
     let mut b = B::new(p, off, len, title);
@@ -982,6 +1020,10 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Rip => rip_info(b),
         Proto::Ospf => ospf_info(b),
         Proto::Eapol => Some(eapol_info(b)),
+        Proto::Bgp => Some(bgp_info(b)),
+        Proto::Tftp => Some(tftp_info(b)),
+        Proto::Ftp => Some(ftp_info(b, ftp_response(st, frame))),
+        Proto::FtpData => Some(format!("FTP Data: {} bytes", b.len())),
         _ => None,
     }
 }
@@ -2301,4 +2343,414 @@ fn eapol_info(b: &[u8]) -> String {
         },
         None => String::from("Key"),
     }
+}
+
+// ---------------------------------------------------------------- BGP
+
+/// the attributes of an UPDATE as they lie: (offset, header length, value length, flags, type);
+/// stops where one does not fit
+fn bgp_attr_walk(b: &[u8]) -> Vec<(usize, usize, usize, u8, u8)> {
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i + 3 <= b.len() {
+        let (flags, kind) = (b[i], b[i + 1]);
+        let ext = flags & bgp::F_EXTENDED != 0;
+        let hl = if ext { 4 } else { 3 };
+        if i + hl > b.len() {
+            break;
+        }
+        let n = if ext { be16(b, i + 2) as usize } else { b[i + 2] as usize };
+        if i + hl + n > b.len() {
+            break;
+        }
+        out.push((i, hl, n, flags, kind));
+        i += hl + n;
+    }
+    out
+}
+
+/// "Optional, Transitive, Partial"; "Well-known, Transitive"
+fn bgp_flags_text(f: u8) -> String {
+    let mut v: Vec<&str> = alloc::vec![if f & bgp::F_OPTIONAL != 0 { "Optional" } else { "Well-known" }];
+    if f & bgp::F_TRANSITIVE != 0 {
+        v.push("Transitive");
+    }
+    if f & bgp::F_PARTIAL != 0 {
+        v.push("Partial");
+    }
+    if f & bgp::F_EXTENDED != 0 {
+        v.push("Extended Length");
+    }
+    v.join(", ")
+}
+
+fn bgp_attr_text(v: &bgp::AttrVal) -> String {
+    use crate::bgp::AttrVal;
+    match v {
+        AttrVal::Origin(o) => String::from(bgp::origin_name(*o)),
+        AttrVal::AsPath(s) | AttrVal::As4Path(s) => {
+            if s.is_empty() {
+                String::from("empty")
+            } else {
+                bgp::path_text(s)
+            }
+        }
+        AttrVal::NextHop(a) => format!("{}", a),
+        AttrVal::Med(m) | AttrVal::LocalPref(m) => format!("{}", m),
+        AttrVal::AtomicAggregate => String::from("set"),
+        AttrVal::Aggregator { asn, id } | AttrVal::As4Aggregator { asn, id } => format!("AS {}, {}", asn, id),
+        AttrVal::Communities(c) => {
+            let v: Vec<String> = c.iter().map(|x| bgp::community_text(*x)).collect();
+            v.join(" ")
+        }
+        AttrVal::Other { kind, data } => format!("type {}, {} bytes", kind, data.len()),
+    }
+}
+
+/// the fields of one message `m` (complete, at frame offset `o`); its kind's summary
+fn bgp_message(l: &mut B, m: &[u8], o: usize) {
+    let kind = m[18];
+    let marker = if m[..16] == bgp::MARKER { String::from("ffffffffffffffffffffffffffffffff") } else { String::from("not all ones [incorrect]") };
+    l.f("Marker", o, 16, marker);
+    l.f("Length", o + 16, 2, format!("{}", m.len()));
+    l.f("Type", o + 18, 1, format!("{} Message ({})", bgp::type_name(kind), kind));
+    let body = &m[bgp::HDR_LEN..];
+    let bo = o + bgp::HDR_LEN;
+    let as4 = match kind {
+        bgp::T_UPDATE => {
+            let wl = if body.len() >= 2 { be16(body, 0) as usize } else { 0 };
+            let ab = body.get(4 + wl..).unwrap_or(&[]);
+            let al = body.get(2 + wl..4 + wl).map(|x| be16(x, 0) as usize).unwrap_or(0);
+            let ab = ab.get(..al.min(ab.len())).unwrap_or(&[]);
+            bgp_attr_walk(ab).iter().find(|a| a.4 == bgp::A_AS_PATH).map(|a| bgp::as_path_4(&ab[a.0 + a.1..a.0 + a.1 + a.2])).unwrap_or(true)
+        }
+        _ => true,
+    };
+    if let Err(e) = bgp::Message::read(m, as4) {
+        l.bad(format!("{}: {} (the receiver answers with NOTIFICATION {}/{})", bgp::type_name(kind), e.text(), e.code, e.sub));
+    }
+    match kind {
+        bgp::T_OPEN if body.len() >= 10 => {
+            l.f("Version", bo, 1, format!("{}", body[0]));
+            let asn = be16(body, 1);
+            l.f("My AS", bo + 1, 2, if asn == bgp::AS_TRANS { format!("{} (AS_TRANS: the AS is in a capability)", asn) } else { format!("{}", asn) });
+            l.f("Hold Time", bo + 3, 2, format!("{} s", be16(body, 3)));
+            l.f("BGP Identifier", bo + 5, 4, format!("{}", Ipv4([body[5], body[6], body[7], body[8]])));
+            l.f("Optional Parameters Length", bo + 9, 1, format!("{}", body[9]));
+            let mut i = 10;
+            while i + 2 <= body.len() {
+                let (t, n) = (body[i], body[i + 1] as usize);
+                let Some(v) = body.get(i + 2..i + 2 + n) else {
+                    break;
+                };
+                if t != bgp::OPT_CAPS {
+                    l.f("Optional Parameter", bo + i, 2 + n, format!("type {}, {} bytes", t, n));
+                    i += 2 + n;
+                    continue;
+                }
+                let mut j = 0;
+                while j + 2 <= v.len() {
+                    let (c, k) = (v[j], v[j + 1] as usize);
+                    let Some(x) = v.get(j + 2..j + 2 + k) else {
+                        break;
+                    };
+                    let what = match (c, k) {
+                        (bgp::CAP_MP, 4) => format!("{}: {}", bgp::cap_name(c), bgp::afi_name(be16(x, 0), x[3])),
+                        (bgp::CAP_AS4, 4) => format!("{}: {}", bgp::cap_name(c), crate::be32(x, 0)),
+                        (_, 0) => format!("{} ({})", bgp::cap_name(c), c),
+                        _ => format!("{} ({}), {} bytes", bgp::cap_name(c), c, k),
+                    };
+                    l.f("Capability", bo + i + 2 + j, 2 + k, what);
+                    j += 2 + k;
+                }
+                i += 2 + n;
+            }
+        }
+        bgp::T_UPDATE if body.len() >= 4 => {
+            let wl = be16(body, 0) as usize;
+            l.f("Withdrawn Routes Length", bo, 2, format!("{}", wl));
+            let w = body.get(2..2 + wl).unwrap_or(&[]);
+            let mut i = 0;
+            while i < w.len() {
+                let n = 1 + (w[i] as usize).div_ceil(8);
+                match bgp::read_prefixes(&w[i..(i + n).min(w.len())]) {
+                    Ok(p) if !p.is_empty() => l.f("Withdrawn Route", bo + 2 + i, n.min(w.len() - i), format!("{}", p[0])),
+                    _ => {
+                        l.f("Withdrawn Route", bo + 2 + i, w.len() - i, String::from("invalid"));
+                        break;
+                    }
+                }
+                i += n;
+            }
+            let Some(al) = body.get(2 + wl..4 + wl).map(|x| be16(x, 0) as usize) else {
+                return;
+            };
+            l.f("Total Path Attribute Length", bo + 2 + wl, 2, format!("{}", al));
+            let ao = 4 + wl;
+            let ab = body.get(ao..(ao + al).min(body.len())).unwrap_or(&[]);
+            let parsed = bgp::Update::read(body, as4).ok();
+            for (k, &(i, hl, n, flags, t)) in bgp_attr_walk(ab).iter().enumerate() {
+                let val = match parsed.as_ref().and_then(|u| u.attrs.get(k)) {
+                    Some(a) => bgp_attr_text(&a.val),
+                    None => format!("{} bytes", n),
+                };
+                let name = match t {
+                    bgp::A_ORIGIN..=bgp::A_COMMUNITIES | bgp::A_AS4_PATH | bgp::A_AS4_AGGREGATOR => bgp::attr_name(t),
+                    _ => "Path Attribute",
+                };
+                l.f(name, bo + ao + i, hl + n, format!("{} [{}]", val, bgp_flags_text(flags)));
+            }
+            let nl = body.get(ao + al..).unwrap_or(&[]);
+            let mut i = 0;
+            while i < nl.len() {
+                let n = 1 + (nl[i] as usize).div_ceil(8);
+                match bgp::read_prefixes(&nl[i..(i + n).min(nl.len())]) {
+                    Ok(p) if !p.is_empty() => l.f("NLRI", bo + ao + al + i, n.min(nl.len() - i), format!("{}", p[0])),
+                    _ => {
+                        l.f("NLRI", bo + ao + al + i, nl.len() - i, String::from("invalid"));
+                        break;
+                    }
+                }
+                i += n;
+            }
+        }
+        bgp::T_NOTIFICATION if body.len() >= 2 => {
+            l.f("Error Code", bo, 1, format!("{} ({})", bgp::code_name(body[0]), body[0]));
+            l.f("Error Subcode", bo + 1, 1, format!("{} ({})", bgp::error_name(body[0], body[1]), body[1]));
+            if body.len() > 2 {
+                l.f("Data", bo + 2, body.len() - 2, hex_short(&body[2..]));
+            }
+        }
+        bgp::T_ROUTE_REFRESH if body.len() >= 4 => l.f("Address Family", bo, 4, bgp::afi_name(be16(body, 0), body[3])),
+        _ => {}
+    }
+}
+
+fn bgp_layer(frame: &[u8], off: usize, len: usize) -> B {
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Bgp, off, len, String::new());
+    let mut kinds: Vec<&str> = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        let rest = &b[i..];
+        if (rest.len() >= 16 && rest[..16] != bgp::MARKER) || (rest.len() < 16 && !bgp::MARKER.starts_with(rest)) {
+            // the rest of a message an earlier segment began
+            l.f("Continuation", off + i, rest.len(), format!("{} bytes of a message", rest.len()));
+            kinds.push("Continuation");
+            break;
+        }
+        match bgp::frame(rest) {
+            Ok(Some(n)) => {
+                bgp_message(&mut l, &rest[..n], off + i);
+                kinds.push(bgp::type_name(rest[18]));
+                i += n;
+            }
+            Ok(None) => {
+                l.f("Segment of a message", off + i, rest.len(), format!("{} bytes, the rest follows", rest.len()));
+                kinds.push("Segment");
+                break;
+            }
+            Err(e) => {
+                l.f("Data", off + i, rest.len(), format!("{} bytes", rest.len()));
+                l.bad(format!("{} (the receiver answers with NOTIFICATION {}/{})", e.text(), e.code, e.sub));
+                break;
+            }
+        }
+    }
+    let msgs: Vec<String> = kinds.iter().map(|k| format!("{} Message", k)).collect();
+    l.l.title = format!("Border Gateway Protocol - {}", msgs.join(", "));
+    l
+}
+
+/// one message in a few words ("UPDATE Message, 2 routes, 1 withdrawn")
+fn bgp_msg_info(m: &[u8]) -> String {
+    let as4 = true;
+    let kind = m[18];
+    let name = bgp::type_name(kind);
+    match bgp::Message::read(m, as4).or_else(|_| bgp::Message::read(m, false)) {
+        Ok(bgp::Message::Open(o)) => format!("OPEN Message, AS {}, hold time {}, ID {}", o.peer_as(), o.hold, o.id),
+        Ok(bgp::Message::Update(u)) => {
+            let mut s = String::from("UPDATE Message");
+            if !u.nlri.is_empty() {
+                s.push_str(&format!(", {} route{}", u.nlri.len(), if u.nlri.len() == 1 { "" } else { "s" }));
+            }
+            if !u.withdrawn.is_empty() {
+                s.push_str(&format!(", {} withdrawn", u.withdrawn.len()));
+            }
+            if u.nlri.is_empty() && u.withdrawn.is_empty() {
+                s.push_str(", nothing (End-of-RIB)");
+            }
+            s
+        }
+        Ok(bgp::Message::Notification(n)) => format!("NOTIFICATION Message, {}/{} {}", n.code, n.sub, bgp::error_name(n.code, n.sub)),
+        Ok(bgp::Message::Keepalive) => String::from("KEEPALIVE Message"),
+        Ok(bgp::Message::RouteRefresh { afi, safi }) => format!("ROUTE-REFRESH Message, {}", bgp::afi_name(afi, safi)),
+        Err(e) => format!("{} Message ({})", name, bgp::error_name(e.code, e.sub)),
+    }
+}
+
+/// the messages of a segment, one after the other
+fn bgp_info(b: &[u8]) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    let mut i = 0;
+    while i < b.len() {
+        let rest = &b[i..];
+        if rest.len() < 16 || rest[..16] != bgp::MARKER {
+            parts.push(String::from("Continuation"));
+            break;
+        }
+        match bgp::frame(rest) {
+            Ok(Some(n)) => {
+                parts.push(bgp_msg_info(&rest[..n]));
+                i += n;
+            }
+            Ok(None) => {
+                parts.push(String::from("Segment of a message"));
+                break;
+            }
+            Err(e) => {
+                parts.push(format!("Malformed ({})", bgp::error_name(e.code, e.sub)));
+                break;
+            }
+        }
+    }
+    parts.join(", ")
+}
+
+// ---------------------------------------------------------------- TFTP and FTP
+
+/// what a TFTP field holds, for the dissector's problems
+fn tftp_bad(e: tftp::Bad) -> &'static str {
+    match e {
+        tftp::Bad::Short => "shorter than its TFTP header",
+        tftp::Bad::Opcode(_) => "an opcode TFTP does not define",
+        tftp::Bad::Unterminated => "a string field without its terminating zero",
+        tftp::Bad::OddOptions => "an option without a value",
+    }
+}
+
+fn tftp_layer(frame: &[u8], off: usize, len: usize) -> B {
+    let b = &frame[off..off + len];
+    let v = match tftp::TftpView::parse(b) {
+        Ok(v) => v,
+        Err(e) => {
+            let mut l = payload_layer(Proto::Tftp, off, len);
+            if b.len() >= 2 {
+                l.f("Opcode", off, 2, format!("{} ({})", tftp::op_name(be16(b, 0)), be16(b, 0)));
+            }
+            l.bad(String::from(tftp_bad(e)));
+            return l;
+        }
+    };
+    let op = v.opcode();
+    let mut l = B::new(Proto::Tftp, off, len, format!("Trivial File Transfer Protocol, {}", tftp::op_name(op)));
+    l.f("Opcode", off, 2, format!("{} ({})", tftp::op_name(op), op));
+    let opts = |l: &mut B, f: &[tftp::Span]| {
+        for c in f.chunks(2) {
+            if let [k, val] = c {
+                l.f("Option", off + k.0, val.0 + val.1 + 1 - k.0, format!("{} = {}", v.text(*k), v.text(*val)));
+            }
+        }
+    };
+    match op {
+        tftp::OP_RRQ | tftp::OP_WRQ => {
+            let f = v.fields();
+            if let [file, mode, ..] = f[..] {
+                l.f(if op == tftp::OP_RRQ { "Source File" } else { "Destination File" }, off + file.0, file.1 + 1, v.text(file));
+                let m = v.text(mode);
+                l.f("Type", off + mode.0, mode.1 + 1, m.clone());
+                if !tftp::mode_known(&m) {
+                    l.bad(format!("unknown transfer mode \"{}\"", m));
+                }
+                opts(&mut l, &f[2..]);
+            }
+        }
+        tftp::OP_DATA => {
+            l.f("Block", off + 2, 2, format!("{}", v.block()));
+            let n = v.data().len();
+            l.f("Data", off + tftp::TFTP_HDR, n, format!("{} bytes", n));
+        }
+        tftp::OP_ACK => l.f("Block", off + 2, 2, format!("{}", v.block())),
+        tftp::OP_ERROR => {
+            let c = v.error_code();
+            l.f("Error Code", off + 2, 2, format!("{} ({})", tftp::error_name(c), c));
+            l.f("Error Message", off + tftp::TFTP_HDR, len - tftp::TFTP_HDR, v.error_msg());
+            if c > tftp::ERR_OPTION {
+                l.bad(format!("an error code TFTP does not define ({})", c));
+            }
+        }
+        _ => opts(&mut l, &v.fields()),
+    }
+    l
+}
+
+/// "Read Request, File: r1-config, Transfer type: octet", "Data Packet, Block: 1 (last)",
+/// "Error Code, Code: File not found, Message: ..."
+fn tftp_info(b: &[u8]) -> String {
+    let Ok(p) = tftp::Packet::parse(b) else {
+        return String::from("TFTP");
+    };
+    let opts = |o: &[(String, String)]| -> String { o.iter().map(|(k, v)| format!(", {}={}", k, v)).collect() };
+    match &p {
+        tftp::Packet::Rrq { file, mode, opts: o } | tftp::Packet::Wrq { file, mode, opts: o } => format!("{}, File: {}, Transfer type: {}{}", tftp::op_name(p.opcode()), file, mode, opts(o)),
+        tftp::Packet::Data { block, data } => format!("Data Packet, Block: {}{}", block, if data.len() < tftp::BLOCK { " (last)" } else { "" }),
+        tftp::Packet::Ack { block } => format!("Acknowledgement, Block: {}", block),
+        tftp::Packet::Error { code, msg } => format!("Error Code, Code: {}, Message: {}", tftp::error_name(*code), msg),
+        tftp::Packet::Oack { opts: o } => format!("Option Acknowledgement{}", opts(o)),
+    }
+}
+
+/// the segment of an FTP control connection comes from the server
+fn ftp_response(st: &Stack, frame: &[u8]) -> bool {
+    match st.find(Proto::Tcp).and_then(|(o, _)| TcpView::parse(&frame[o..])) {
+        Some(t) => t.src_port() == ftp::PORT_FTP && t.dst_port() != ftp::PORT_FTP,
+        None => false,
+    }
+}
+
+fn ftp_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Ftp, off, len, String::from("File Transfer Protocol (FTP)"));
+    let mut p = 0;
+    while p < b.len() {
+        let Some(i) = b[p..].iter().position(|&c| c == b'\n') else {
+            l.f("Continuation", off + p, b.len() - p, format!("{} bytes", b.len() - p));
+            break;
+        };
+        let end = p + i + 1;
+        let e = if i > 0 && b[p + i - 1] == b'\r' { p + i - 1 } else { p + i };
+        let line = String::from_utf8_lossy(&b[p..e]).into_owned();
+        if response {
+            l.f("Response", off + p, end - p, line.clone());
+            let d = line.as_bytes();
+            if d.len() >= 3 && d[..3].iter().all(|c| c.is_ascii_digit()) {
+                l.f("Response code", off + p, 3, String::from(&line[..3]));
+                if line.len() > 4 {
+                    l.f("Response arg", off + p + 4, e - p - 4, String::from(&line[4..]));
+                }
+            }
+        } else {
+            l.f("Request", off + p, end - p, line.clone());
+            if let Some(c) = ftp::Command::parse(&line) {
+                let vl = line.trim_start().split(' ').next().map_or(0, str::len);
+                let lead = line.len() - line.trim_start().len();
+                l.f("Request command", off + p + lead, vl, c.verb.clone());
+                if !c.arg.is_empty() {
+                    l.f("Request arg", off + p + lead + vl + 1, e - (p + lead + vl + 1), c.arg.clone());
+                }
+                if !ftp::verb_known(&c.verb) {
+                    l.bad(format!("a command FTP does not define: {}", c.verb));
+                }
+            }
+        }
+        p = end;
+    }
+    l
+}
+
+/// "Request: USER anna", "Response: 230 Logged in." (the first line of the segment)
+fn ftp_info(b: &[u8], response: bool) -> String {
+    let e = b.iter().position(|&c| c == b'\n').unwrap_or(b.len());
+    let line = String::from_utf8_lossy(&b[..e]);
+    format!("{}: {}", if response { "Response" } else { "Request" }, line.trim_end())
 }
