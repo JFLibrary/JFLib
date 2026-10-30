@@ -35,7 +35,14 @@ real mouse and keyboard stay untouched), captures it and measures idle CPU time.
   python tools/x11check.py popups [--backend x11|wayland] [--exe build/linux/gallery]
       (U3) the menu of the gallery's small tool window "Popups" (--popups-window) is an own
       window (X11 override-redirect / Wayland xdg_popup) below the button, reaching beyond
-      the tool window; a click on a row arrives as the tool window's press and closes it
+      the tool window; a click on a row arrives as the tool window's press and closes it.
+      The tool window: X11 an own RAIL window; Wayland a subsurface of the main window
+      (jfgui_WLDEBUG shows wl_subcompositor.get_subsurface, no RAIL window "Popups"; WSLg
+      shows it as a RAIL window "sub-surface" owned by the main window, else it is searched
+      on the screen in the main window) at the main window's origin + the app's (40, 60),
+      clicks relative to the main window; then once more as a toplevel (own RAIL window
+      "Popups") with jfgui_WL_TOOLWIN=toplevel.  The app runs with jfgui_FONT_RGBA=none:
+      grey text as in the headless reference
   python tools/x11check.py edges [--backend x11|wayland] [--exe build/linux/gallery]
       (ROADMAP 6) popups of the MAIN window (gallery --popup-edges, 600 x 360): the combo
       box's list (taller than the window) is an own window (X11 override-redirect / Wayland
@@ -1017,10 +1024,11 @@ def xprops(*titles):
         return {}
 
 
-def content_check(backend, title, cap, ref_png, what):
+def content_check(backend, title, cap, ref_png, what, tag=None):
     """the RAIL capture shows the window's framebuffer (reference: headless shot); X11:
     when WSLg shows the RAIL window black (seen now and then with a new window, while the
-    X window has the right pixels), the X window's own pixels (GetImage) decide"""
+    X window has the right pixels), the X window's own pixels (GetImage) decide (tag: the
+    check names' prefix, default backend)"""
     w, h, px = cap
     fw, fh, frgb = read_png(os.path.join(ROOT, ref_png))
     frac, off = compare_capture(w, h, px, fw, fh, frgb)
@@ -1040,7 +1048,7 @@ def content_check(backend, title, cap, ref_png, what):
             if xf >= 0.97:
                 frac, detail = xf, f"X GetImage {xf * 100:.2f} % equal; WSLg showed the RAIL window {detail}"
                 off = None
-    check(frac >= 0.97, f"{backend}: {what} shows its framebuffer", detail)
+    check(frac >= 0.97, f"{tag or backend}: {what} shows its framebuffer", detail)
     return off
 
 
@@ -1343,7 +1351,9 @@ def check_popups(a):
     not fit into it and appears as an own window (X11 override-redirect / Wayland
     xdg_popup, each a WSLg RAIL window) below the button; a click on a row reaches the
     tool window (its event log shows the press below the tool window's client area) and
-    closes the menu"""
+    closes the menu.  The tool window is an own RAIL window on X11; on Wayland it is a
+    subsurface of the main window (linux_wl_child.rs), placed and clicked relative to the
+    main window, and once more a toplevel with jfgui_WL_TOOLWIN=toplevel"""
     backend = a.backend
     print(f"--- popup windows on {backend}")
     exe = a.exe if a.exe and "gallery" in a.exe else a.bindir + "/gallery"
@@ -1358,24 +1368,84 @@ def check_popups(a):
     w_pop = first(recs, lambda r: r.get("window") == 7760, True)
     if not check(rc == 0 and all([menu, row, first_row, w_pop]), f"{backend}: headless reference run"):
         return
-    env = {"jfgui_WLDEBUG": "1"} if backend == "wayland" else {}
+    refs = (ref_png, menu, row, first_row, w_pop)
+    if backend == "wayland":
+        run_popups(a, exe, refs, "child")
+        run_popups(a, exe, refs, "toplevel")
+    else:
+        run_popups(a, exe, refs, "")
+
+
+def run_popups(a, exe, refs, toolwin):
+    """check_popups with one running gallery; toolwin (Wayland): "child" = the tool window
+    is a subsurface of the main window, "toplevel" = jfgui_WL_TOOLWIN=toplevel"""
+    backend = a.backend
+    ref_png, menu, row, first_row, w_pop = refs
+    tag = f"{backend} ({toolwin})" if toolwin else backend
+    name = f"{backend}_{toolwin}" if toolwin == "toplevel" else backend
+    # grey text as in the headless reference (the system's subpixel order would colour the edges)
+    env = {"jfgui_FONT_RGBA": "none"}
+    if backend == "wayland":
+        env["jfgui_WLDEBUG"] = "1"
+    if toolwin == "toplevel":
+        env["jfgui_WL_TOOLWIN"] = "toplevel"
     old_tool = {w[0] for w in wslcap.windows_with_title("Popups")}
+    old_sub = {w[0] for w in wslcap.windows_with_title("sub-surface")}
     app = App(exe, ["--size", "1000x800", "--anim", "off", "--theme", "light", "--log-events",
                     "--popups-window", "--auto-close", "90000"], backend,
-              "jfgui Galerie", env=env, log=f"build/x11check_popups_{backend}.log")
+              "jfgui Galerie", env=env, log=f"build/x11check_popups_{name}.log")
     try:
         hwnd = app.window()
-        tool = rail_by_title("Popups", old_tool, 10) if hwnd else None
-        if not check(tool is not None, f"{backend}: tool window \"Popups\" appears"):
-            return
-        time.sleep(1.5)
-        avoid_cursor(tool, "Popups", backend)
-        w, h, px, _ = wait_content(tool)
-        off = content_check(backend, "Popups", (w, h, px), ref_png, "tool window")
-        if off is None:
-            off = (margin_of(w, h, px), margin_of(w, h, px))
-        tr = wt.RECT()
-        user32.GetWindowRect(tool, ctypes.byref(tr))
+        if toolwin == "child":
+            # no toplevel "Popups": WSLg shows the subsurface as a RAIL window "sub-surface" owned
+            # by the main window (the main window's capture lacks it); its place and the clicks
+            # are relative to the main window
+            if not check(hwnd is not None, f"{tag}: the main window appears"):
+                return
+            sub = rail_by_title("sub-surface", old_sub, 10)
+            time.sleep(1.5)
+            avoid_cursor(hwnd, "jfgui Galerie", backend)
+            r = app.rect()
+            if sub and user32.GetWindow(sub, 4) == hwnd:
+                w, h, px, _ = wait_content(sub)
+                sr = wt.RECT()
+                user32.GetWindowRect(sub, ctypes.byref(sr))
+                so = content_check(backend, "Popups", (w, h, px), ref_png,
+                                   "tool window (RAIL window \"sub-surface\" of the main window)", tag)
+                off = (sr.left - r[0] + so[0], sr.top - r[1] + so[1]) if so else None
+            else:                               # drawn into the main window: search it on the screen
+                w, h, px, _ = wslcap.capture(hwnd, True)
+                off = content_check(backend, "Popups", (w, h, px), ref_png, "tool window inside the main window", tag)
+            if off is None:
+                wslcap.write_png(os.path.join(a.out_dir, f"x11check_popups_{name}_main.png"),
+                                 *wslcap.capture(hwnd, True)[:3])
+                return
+            want = tuple(w_pop["rect"][:2])
+            check(off == want, f"{tag}: the tool window at the main window's origin + {want}", str(off))
+            own = [x for x in wslcap.windows_with_title("Popups") if x[0] not in old_tool]
+            check(not own, f"{tag}: no toplevel (RAIL window \"Popups\")", str(own))
+            trace = [l for l in app.output().splitlines() if "get_subsurface" in l]
+            check(bool(trace), f"{tag}: wl_subcompositor.get_subsurface sent",
+                  trace[0].strip()[:100] if trace else "no trace")
+            tool = hwnd                         # clicks go to the main window
+            fw, fh, _ = read_png(os.path.join(ROOT, ref_png))
+            tr = wt.RECT(r[0] + off[0], r[1] + off[1], r[0] + off[0] + fw, r[1] + off[1] + fh)
+        else:
+            tool = rail_by_title("Popups", old_tool, 10) if hwnd else None
+            if not check(tool is not None, f"{tag}: tool window \"Popups\" appears"):
+                return
+            if toolwin == "toplevel":
+                trace = [l for l in app.output().splitlines() if "get_subsurface" in l]
+                check(not trace, f"{tag}: no wl_subcompositor.get_subsurface",
+                      trace[0].strip()[:100] if trace else "")
+            time.sleep(1.5)
+            avoid_cursor(tool, "Popups", backend)
+            w, h, px, _ = wait_content(tool)
+            off = content_check(backend, "Popups", (w, h, px), ref_png, "tool window", tag)
+            if off is None:
+                off = (margin_of(w, h, px), margin_of(w, h, px))
+            tr = wt.RECT()
+            user32.GetWindowRect(tool, ctypes.byref(tr))
         before = top_windows()
         mx = off[0] + menu["r"][0] + menu["r"][2] // 2
         my = off[1] + menu["r"][1] + menu["r"][3] // 2
@@ -1391,16 +1461,16 @@ def check_popups(a):
                 time.sleep(0.2)
             if popup:
                 break
-        if not check(popup is not None, f"{backend}: the menu appears as its own window"):
-            wslcap.write_png(os.path.join(a.out_dir, f"x11check_popups_{backend}_tool.png"),
+        if not check(popup is not None, f"{tag}: the menu appears as its own window"):
+            wslcap.write_png(os.path.join(a.out_dir, f"x11check_popups_{name}_tool.png"),
                              *wslcap.capture(tool, False)[:3])
             return
         ph, pr = popup
         print(f"RAIL: tool {(tr.left, tr.top, tr.right, tr.bottom)}, popup {pr}")
-        check(pr[3] > tr.bottom, f"{backend}: the menu reaches below the tool window", f"{pr[3]} > {tr.bottom}")
+        check(pr[3] > tr.bottom, f"{tag}: the menu reaches below the tool window", f"{pr[3]} > {tr.bottom}")
         time.sleep(1.0)
         pw, phh, ppx, _ = wait_content(ph)
-        wslcap.write_png(os.path.join(a.out_dir, f"x11check_popups_{backend}_menu.png"), pw, phh, ppx)
+        wslcap.write_png(os.path.join(a.out_dir, f"x11check_popups_{name}_menu.png"), pw, phh, ppx)
         # a click on the row "Spiegeln": its offset from the first row, measured in the capture
         pm = margin_of(pw, phh, ppx)
         rx = pm + (row["r"][0] - first_row["r"][0]) + row["r"][2] // 2
@@ -1414,12 +1484,12 @@ def check_popups(a):
             f = dict(kv.split("=") for kv in l.split()[1:] if "=" in kv)
             if f.get("win") != "0" and int(f.get("y", 0)) > w_pop["size"][1]:
                 below = True
-        check(below, f"{backend}: the press on the row arrived as an event of the tool window",
+        check(below, f"{tag}: the press on the row arrived as an event of the tool window",
               "; ".join(ev[-2:]))
         t = time.time() + 5
         while time.time() < t and user32.IsWindowVisible(ph):
             time.sleep(0.2)
-        check(not user32.IsWindowVisible(ph), f"{backend}: the click on the row closes the menu")
+        check(not user32.IsWindowVisible(ph), f"{tag}: the click on the row closes the menu")
     finally:
         app.kill()
 
