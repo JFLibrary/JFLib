@@ -48,6 +48,7 @@ fn kind_name(kind: &str) -> &str {
         "pop3-server" => "Postfach (POP3)",
         "snmpd" => "SNMP-Agent",
         "snmptrapd" => "SNMP-Trap-Empfänger",
+        "radius-server" => "RADIUS-Server",
         _ => return kind,
     })
 }

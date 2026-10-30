@@ -1298,3 +1298,35 @@ Eine Community ist ein Wort ohne Leerzeichen.	A community is a word without spac
 Port {} ist belegt: keine Meldungen	Port {} is in use: no notifications
 {} Traps und {} Informs empfangen; zuletzt {} von {}	{} traps and {} informs received; the last one {} from {}
 wartet auf Meldungen an Port {}	waiting for notifications on port {}
+
+# X1d: logins, AAA, RADIUS and telnet (auth.rs, aaa.rs, aaatrace.rs, radiusd.rs, telnetd.rs, cli/aaa.rs)
+vty {}	vty {}
+Anmeldung an der {} angenommen ({}, Rechte {}).	Login at the {} accepted ({}, privilege {}).
+Anmeldung von {} an der {} angenommen ({}, Rechte {}).	Login of {} at the {} accepted ({}, privilege {}).
+Falsches Passwort an der {}.	Wrong password at the {}.
+Falsches Passwort für {} an der {}.	Wrong password for {} at the {}.
+Anmeldung an der {} nach drei Versuchen abgelehnt.	Login at the {} refused after three tries.
+Wechsel auf Rechte {} angenommen.	Switch to privilege {} accepted.
+Falsches enable-Passwort für Rechte {}.	Wrong enable password for privilege {}.
+RADIUS: Access-Request für {} an {} (Versuch {}).	RADIUS: Access-Request for {} to {} (attempt {}).
+RADIUS: keine Antwort von {}, erneut gesendet (Versuch {}).	RADIUS: no answer from {}, sent again (attempt {}).
+RADIUS: Access-Accept für {} von {} (Rechte {}).	RADIUS: Access-Accept for {} from {} (privilege {}).
+RADIUS: Access-Accept für {} von {}.	RADIUS: Access-Accept for {} from {}.
+RADIUS: Access-Reject für {} von {}.	RADIUS: Access-Reject for {} from {}.
+RADIUS: Access-Challenge für {} von {}.	RADIUS: Access-Challenge for {} from {}.
+RADIUS: {} antwortet nicht.	RADIUS: {} does not answer.
+RADIUS: Antwort von {} verworfen ({}).	RADIUS: answer from {} dropped ({}).
+AAA: kein Server erreichbar, nächste Methode: {}.	AAA: no server reachable, next method: {}.
+AAA: keine Methode mehr übrig, Anmeldung abgelehnt.	AAA: no method left, login refused.
+RADIUS: Accounting-Start für {} an {}.	RADIUS: Accounting-Start for {} to {}.
+RADIUS: Accounting-Stop für {} an {}.	RADIUS: Accounting-Stop for {} to {}.
+Telnet: Sitzung von {} auf vty {}.	Telnet: session from {} on vty {}.
+Telnet: Verbindung von {} abgelehnt ({}).	Telnet: connection from {} refused ({}).
+Telnet: vty {} nach Leerlauf geschlossen.	Telnet: vty {} closed after idle.
+Telnet: vty {} geschlossen.	Telnet: vty {} closed.
+Telnet: verbunden mit {} Port {}.	Telnet: connected to {} port {}.
+Telnet: {} Port {} nicht erreicht ({}).	Telnet: {} port {} not reached ({}).
+„{}“ ist keine Adresse oder kein Präfix.	“{}” is not an address or a prefix.
+Ein Client braucht ein „secret“.	A client needs a “secret”.
+Ports {} / {}, {} Clients, {} Benutzer: {} angenommen, {} abgelehnt	Ports {} / {}, {} clients, {} users: {} accepted, {} rejected
+{} Anfragen, {} angenommen, {} abgelehnt, {} Zeitüberschreitungen	{} requests, {} accepted, {} rejected, {} timeouts

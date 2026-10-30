@@ -43,6 +43,9 @@
 // groupstest.rs: groups and the background picture of the canvas (group groups: jfn_model::group
 // and background, doc/groups.rs, the scene of canvas/paint.rs with frames, clusters and lines).
 // snmptest.rs: SNMP (group snmp: jfn_sim::snmpd, snmpmib, snmptrapd, snmptrace, cli/snmp.rs).
+// aaatest.rs: logins, AAA and RADIUS (group aaa: jfn_sim::auth, aaa, aaatrace, radiusd, telnetd,
+// cli/aaa.rs; the console login, enable, privilege levels, RADIUS accept / reject / fallback,
+// accounting, the telnet client).
 
 use alloc::format;
 use alloc::string::String;
@@ -114,9 +117,11 @@ mod mailtest;
 mod groupstest;
 #[path = "snmptest.rs"]
 mod snmptest;
+#[path = "aaatest.rs"]
+mod aaatest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 40] = [
+    let groups: [(&'static str, fn(&mut T)); 41] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -157,6 +162,7 @@ pub fn run() -> i32 {
         ("mail", mailtest::run),
         ("groups", groupstest::run),
         ("snmp", snmptest::run),
+        ("aaa", aaatest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

@@ -50,6 +50,12 @@
 // specific trap and time stamp of a v1 Trap) and each variable binding with the name of a known
 // object and its value as net-snmp prints it; BER that does not hold is a problem at its place
 // (snmp.rs, ber.rs, mib.rs).
+// RADIUS (UDP ports 1812 and 1813, the old 1645 and 1646) shows its code, identifier, length and
+// authenticator and every attribute by name with its value (named values of the integers, a
+// Vendor-Specific attribute's vendor, a hidden User-Password as hidden), with what a receiver
+// discards: a Length that does not fit, attributes that do not end at it (radius.rs).  Telnet
+// (TCP port 23) shows each command and negotiation ("Will Echo", "Interrupt Process") and the
+// data as text; a command cut off at the end of a segment is a problem (telnet.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -81,6 +87,8 @@ use crate::pop3;
 use crate::ber;
 use crate::mib;
 use crate::snmp;
+use crate::radius;
+use crate::telnet;
 
 pub const P_ETH: u32 = 1 << 0;
 pub const P_VLAN: u32 = 1 << 1;
@@ -115,6 +123,10 @@ pub const P_FTP: u32 = 1 << 26;
 pub const P_DATA: u32 = 1 << 31;
 /// mail: SMTP (TCP ports 25 and 587) and POP3 (port 110)
 pub const P_MAIL: u32 = 1 << 28;
+/// RADIUS (UDP ports 1812, 1813, 1645, 1646)
+pub const P_RADIUS: u32 = 1 << 27;
+/// Telnet (TCP port 23)
+pub const P_TELNET: u32 = 1 << 29;
 
 /// a protocol layer
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -155,6 +167,10 @@ pub enum Proto {
     Smtp,
     /// POP3 (port 110)
     Pop3,
+    /// RADIUS authentication and accounting
+    Radius,
+    /// Telnet (port 23)
+    Telnet,
 }
 
 impl Proto {
@@ -192,6 +208,8 @@ impl Proto {
             Proto::FtpData => "FTP-DATA",
             Proto::Smtp => "SMTP",
             Proto::Pop3 => "POP3",
+            Proto::Radius => "RADIUS",
+            Proto::Telnet => "Telnet",
         }
     }
     pub fn bit(self) -> u32 {
@@ -226,6 +244,8 @@ impl Proto {
             Proto::Bgp => P_BGP,
             Proto::Ftp | Proto::FtpData => P_FTP,
             Proto::Smtp | Proto::Pop3 => P_MAIL,
+            Proto::Radius => P_RADIUS,
+            Proto::Telnet => P_TELNET,
         }
     }
 }
@@ -272,6 +292,7 @@ fn udp_app(sp: u16, dp: u16) -> Option<Proto> {
             udp::PORT_RIP => Proto::Rip,
             udp::PORT_TFTP => Proto::Tftp,
             udp::PORT_SNMP | 162 => Proto::Snmp,
+            p if radius::is_port(p) => Proto::Radius,
             _ => return None,
         })
     };
@@ -290,6 +311,7 @@ fn tcp_app(sp: u16, dp: u16) -> Option<Proto> {
             ftp::PORT_FTP_DATA => Proto::FtpData,
             smtp::PORT_SMTP | smtp::PORT_SUBMISSION => Proto::Smtp,
             pop3::PORT_POP3 => Proto::Pop3,
+            telnet::PORT => Proto::Telnet,
             _ => return None,
         })
     };
@@ -594,6 +616,8 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Smtp => Some(smtp_layer(frame, off, len, mail_response(&st, frame))),
             Proto::Pop3 => Some(pop3_layer(frame, off, len, mail_response(&st, frame))),
             Proto::Snmp => Some(snmp_layer(frame, off, len)),
+            Proto::Radius => Some(radius_layer(frame, off, len)),
+            Proto::Telnet => Some(telnet_layer(frame, off, len)),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -1056,6 +1080,8 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Smtp => Some(smtp_info(b, mail_response(st, frame))),
         Proto::Pop3 => Some(pop3_info(b, mail_response(st, frame))),
         Proto::Snmp => Some(snmp_info(b)),
+        Proto::Radius => Some(radius_info(b)),
+        Proto::Telnet => Some(telnet_info(b)),
         _ => None,
     }
 }
@@ -3094,4 +3120,119 @@ fn snmp_info(b: &[u8]) -> String {
             k => format!("{} {}: {}", k.name(), p.request_id, first(&p.varbinds, false)),
         },
     }
+}
+
+// ---------------------------------------------------------------- RADIUS and Telnet
+
+/// why a receiver discards bytes as RADIUS
+fn radius_bad(e: radius::Bad) -> String {
+    match e {
+        radius::Bad::Short => String::from("shorter than its RADIUS header or its Length field"),
+        radius::Bad::Length(l) => format!("a Length of {} (20 to 4096 allowed)", l),
+        radius::Bad::Attr(at) => format!("an attribute at byte {} does not end inside the packet", at),
+    }
+}
+
+fn radius_layer(frame: &[u8], off: usize, len: usize) -> B {
+    let b = &frame[off..off + len];
+    let v = match radius::RadiusView::parse(b) {
+        Ok(v) => v,
+        Err(e) => {
+            let mut l = payload_layer(Proto::Radius, off, len);
+            l.l.title = String::from("RADIUS Protocol");
+            if let Some(&c) = b.first() {
+                l.f("Code", off, 1, format!("{} ({})", radius::code_name(c), c));
+            }
+            l.bad(radius_bad(e));
+            return l;
+        }
+    };
+    let mut l = B::new(Proto::Radius, off, len, format!("RADIUS Protocol, {} (id {})", radius::code_name(v.code()), v.id()));
+    l.f("Code", off, 1, format!("{} ({})", radius::code_name(v.code()), v.code()));
+    l.f("Packet identifier", off + 1, 1, format!("0x{:02x} ({})", v.id(), v.id()));
+    l.f("Length", off + 2, 2, format!("{}", v.length()));
+    let what = if matches!(v.code(), radius::ACCESS_REQUEST | radius::ACCOUNTING_REQUEST | radius::STATUS_SERVER) { "Request Authenticator" } else { "Response Authenticator" };
+    let mut a = String::new();
+    for x in v.authenticator() {
+        a.push_str(&format!("{:02x}", x));
+    }
+    l.f(what, off + 4, 16, a);
+    for (at, t, val) in v.attrs() {
+        l.f("Attribute", off + at, val.len() + 2, format!("{} ({}): {}", radius::attr_name(t), t, radius::value_text(t, val)));
+        if t == radius::A_MESSAGE_AUTHENTICATOR && val.len() != 16 {
+            l.bad(format!("a Message-Authenticator of {} bytes (16 are right)", val.len()));
+        }
+    }
+    if v.length() as usize > len {
+        l.bad(String::from("shorter than its Length field"));
+    } else if (v.length() as usize) < len {
+        let pad = len - v.length() as usize;
+        l.f("Padding", off + v.length() as usize, pad, format!("{} bytes", pad));
+    }
+    l
+}
+
+/// "Access-Request id=7 (admin)", "Accounting-Request id=9 (Start, admin)", "Access-Accept id=7"
+fn radius_info(b: &[u8]) -> String {
+    let Ok(p) = radius::Packet::parse(b) else {
+        return String::from("RADIUS (malformed)");
+    };
+    let mut s = format!("{} id={}", radius::code_name(p.code), p.id);
+    let user = p.text(radius::A_USER_NAME);
+    let status = p.int(radius::A_ACCT_STATUS_TYPE).and_then(|v| radius::value_name(radius::A_ACCT_STATUS_TYPE, v));
+    match (status, user) {
+        (Some(st), Some(u)) => s.push_str(&format!(" ({}, {})", st, u)),
+        (Some(st), None) => s.push_str(&format!(" ({})", st)),
+        (None, Some(u)) => s.push_str(&format!(" ({})", u)),
+        (None, None) => {}
+    }
+    s
+}
+
+/// Telnet data as a dissector shows it: CR, LF and other control bytes escaped
+fn telnet_text(d: &[u8], max: usize) -> String {
+    let mut s = String::new();
+    for (i, &c) in d.iter().enumerate() {
+        if i == max {
+            s.push_str("...");
+            break;
+        }
+        match c {
+            b'\r' => s.push_str("\\r"),
+            b'\n' => s.push_str("\\n"),
+            b'\t' => s.push_str("\\t"),
+            0x20..=0x7E => s.push(c as char),
+            _ => s.push_str(&format!("\\x{:02x}", c)),
+        }
+    }
+    s
+}
+
+fn telnet_layer(frame: &[u8], off: usize, len: usize) -> B {
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Telnet, off, len, String::from("Telnet"));
+    for (at, n, item) in telnet::parse(b) {
+        match &item {
+            telnet::Item::Data(d) => l.f("Data", off + at, n, telnet_text(d, 200)),
+            telnet::Item::Opt { .. } | telnet::Item::Cmd(_) => l.f("Command", off + at, n, item.describe()),
+            telnet::Item::Sub { .. } => l.f("Suboption", off + at, n, item.describe()),
+            telnet::Item::Partial(_) => {
+                l.f("Continuation", off + at, n, format!("{} bytes", n));
+                l.bad(String::from("a command cut off at the end of the segment"));
+            }
+        }
+    }
+    l
+}
+
+/// "Will Echo, Do Suppress Go Ahead", "\"R1>\"", "Interrupt Process"
+fn telnet_info(b: &[u8]) -> String {
+    let parts: Vec<String> = telnet::parse(b)
+        .into_iter()
+        .map(|(_, _, item)| match &item {
+            telnet::Item::Data(d) => format!("\"{}\"", telnet_text(d, 40)),
+            other => other.describe(),
+        })
+        .collect();
+    if parts.is_empty() { String::from("Telnet") } else { parts.join(", ") }
 }

@@ -1927,6 +1927,8 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   (`sha1`, `Sha1`, `hmac_sha1`; broken for collisions, new designs take SHA-256), PBKDF2 over
   any hash (`pbkdf2::<H>`, `pbkdf2_sha1`), the AES key wrap of RFC 3394 (`aes_wrap` /
   `aes_unwrap`, which checks the integrity value) and AES-CMAC of RFC 4493 (`cmac_aes`).
+  For protocols defined with MD5 (RADIUS): MD5 (`md5`, `Md5`, `md5_parts`) and HMAC-MD5
+  (`hmac_md5`); broken for collisions, so new designs take SHA-256 (RFC 1321, 2104).
 * `compress` -- LZ4 and zstd (`compress::zstd::compress(data, level)` / `decompress`; levels
   1 to 19, single-segment frames with checksums); `Codec` picks one by name.
 * `plat::watch::Watcher::new(&roots)` / `take(ms)` -- the changed paths below folders
@@ -2229,6 +2231,27 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   let lines: Vec<String> = answer.varbinds().iter().map(|vb| mib::show(vb.oid.arcs(), &vb.value, false)).collect();
   let mut w = ber::Writer::new();
   w.begin(ber::T_SEQUENCE); w.int(5); w.octets(b"public"); w.end();
+  ```
+
+  Remote access: `telnet` has the NVT protocol of RFC 854 -- the commands after `IAC`, the
+  options `OPT_*` (`ECHO`, `SGA`, ...), `escape` and `to_nvt` for a data stream, a `Reader`
+  that turns bytes arriving in pieces into `Item`s (data, a command, a negotiation, a
+  subnegotiation), `parse` for one buffer, and `Options` (the loop-free Q method of RFC 1143:
+  `received` gives the answer to send, `enable_us` / `enable_him` ask for a change).  `radius`
+  has the RADIUS packets of RFC 2865 / 2866 -- `RadiusView` and `Packet` with every attribute
+  by number and name (`A_*`, `attr_name`, `value_name`; vendor-specific ones kept as bytes),
+  `hide_password` / `reveal_password` (the User-Password hiding of 5.2), the Request and
+  Response Authenticators (`accounting_auth`, `response_auth`) and the Message-Authenticator
+  of RFC 3579; the caller lends MD5 and HMAC-MD5 (`crypto::md5_parts`, `crypto::hmac_md5`).
+  `decode::layers` and `decode::info` dissect both (ports 23, 1812 / 1813 / 1645 / 1646;
+  `P_TELNET`, `P_RADIUS`; a hidden password stays hidden).
+
+  ```rust
+  let mut r = telnet::Reader::new(true);
+  for item in r.push(&bytes) { /* Item::Data / Opt / Cmd / Sub */ }
+  let hidden = radius::hide_password(b"secret", key, &auth, crypto::md5_parts);
+  let mut p = radius::Packet::new(radius::ACCESS_REQUEST, id, auth);
+  p.push(radius::Attr::text(radius::A_USER_NAME, "admin"));
   ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and

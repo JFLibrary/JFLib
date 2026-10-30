@@ -1586,6 +1586,12 @@ impl OsApi<'_> {
     pub fn svc_id(&self) -> u32 {
         self.id
     }
+    /// the NAS reports a RADIUS login's outcome to the login gate (cli/aaa.rs); `how` is the
+    /// method that decided it, for the login note ("RADIUS", "lokal", ...)
+    pub fn aaa_result(&mut self, via: crate::aaa::Requester, outcome: crate::aaa::AuthResult, how: &'static str) {
+        let ni = self.ni;
+        self.eng.aaa_result(ni, via, outcome, how);
+    }
     /// the service's name on the device
     pub fn svc_name(&self) -> String {
         let id = self.id;

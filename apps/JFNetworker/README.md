@@ -2434,7 +2434,7 @@ Block. Unter Linux überträgt `curl` per FTP; ein eigenes `ftp`-Programm gibt e
 
 Noch offen: Unterverzeichnisse in `flash:`, `cd` und `mv` in der Shell, der IOS-Befehl
 `tftp-server`, die Notizen des Desktops (`notizen.txt`) als Datei, und die weiteren Dienste von
-X1: SNMP, AAA mit RADIUS, Mail.
+X1: SNMP und Mail (AAA mit RADIUS ist fertig, siehe unten).
 
 Für Programme: `Action::Files { dev, files }`, `Report::Files { dev, at, path, files }`,
 `Engine::files(dev)`, `Engine::file_store(dev)`, für Dienste `OsApi::file_read`, `file_write`,
@@ -2443,6 +2443,76 @@ Geprüft wird in der Selbsttest-Gruppe `files` ([`src/filestest.rs`](src/fileste
 und FTP Byte für Byte in den coretest-Gruppen `tftp` und `ftp`, dazu das Szenario `backup.scn`
 und die Fensterskripte `files_window.uis`, `files_services.uis`, `files_console.uis` und
 `files_shots.uis`.
+
+### Logins, Telnet und AAA mit RADIUS
+
+IOS-artige Geräte kennen jetzt Passwörter. Bis hierher fragte nichts danach; eine
+Konfiguration ohne `login`-Zeilen, `aaa new-model` oder Benutzer öffnet ihre Konsole
+weiterhin genau wie bisher.
+
+- **Lokale Anmeldungen** ([`crates/jfn_sim/auth.rs`](crates/jfn_sim/auth.rs),
+  [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs)): `enable secret` und `enable password` (auch
+  `level N`), `username NAME [privilege N] secret|password …`, auf den Leitungen `password`,
+  `login`, `login local`, `exec-timeout`, `banner motd`, `service password-encryption`;
+  Rechtestufen 1 und 15 mit `enable`/`disable`. Die Konsole (Terminal-Tab und Gerätefenster)
+  zeigt `Username:` und `Password:` und tippt das Passwort ohne Echo (drei Versuche, eigene
+  Worte bei Fehlern). `show users`, `show aaa servers`, `show radius statistics`.
+- **Gespeicherte Geheimnisse mit Typnummer in der Running-Config:** `enable secret` und
+  `username … secret` werden mit PBKDF2-SHA-256 gehasht (Salz aus dem Zufallsstrom des
+  Geräts, 1000 Runden), angezeigt als `8 $8$<salt>$<hash>` (eigene Base64). Ein `password`
+  bleibt lesbar (Typ 0), es sei denn, `service password-encryption` schreibt es als Typ 7 um
+  (eine umkehrbare, eigene Verschleierung, kein Herstellerverfahren). Eine gespeicherte
+  Konfiguration bootet gleich (die Hashes bleiben, nichts wird neu gehasht).
+- **Telnet** ([`lib/netpkt/telnet.rs`](../../lib/netpkt/telnet.rs),
+  [`telnetd.rs`](crates/jfn_sim/telnetd.rs)): der NVT-Codec (Befehle, Optionsaushandlung
+  RFC 854/855/857/858, IAC-Escaping, ein Leser für Bytes in Stücken) mit Zerlegung im
+  Paket-Tab (Port 23); der Client `telnet HOST [PORT]` auf der IOS-artigen Konsole und in der
+  Linux-Shell verbindet sich, gibt die Gegenseite aus und meldet `% Connection refused by
+  remote host` und ähnliche `%`-Zeilen; die Flucht ist Strg+Umschalt+6.
+- **AAA mit RADIUS** ([`aaa.rs`](crates/jfn_sim/aaa.rs),
+  [`radiusd.rs`](crates/jfn_sim/radiusd.rs)): `aaa new-model`, `radius server NAME` mit
+  `address ipv4 ADDR [auth-port P] [acct-port P]`, `key`, `timeout`, `retransmit` (und das
+  ältere `radius-server host ADDR key SECRET`), `aaa group server radius NAME`,
+  `aaa authentication login {default|LISTE} METHODE…` (group radius | group NAME | local |
+  line | enable | none), `aaa authentication enable`, `aaa authorization exec` (die
+  Rechtestufe aus der Antwort), `aaa accounting exec default start-stop group radius`,
+  `login authentication LISTE` auf einer Leitung, `test aaa group radius USER PASS legacy`.
+  Die nächste Methode wird nur versucht, wenn ein Server nicht antwortet (nach seinen
+  Wiederholungen), nie nach einem Reject. Die NAS-Seite ist der verborgene Dienst
+  `radius-nas` (eigener Socket und Timer), das Verstecken des User-Password nach RFC 2865
+  §5.2, der Request- und Response-Authenticator und der Message-Authenticator nach RFC 3579,
+  MD5 und HMAC-MD5 aus `lib/crypto`.
+- **RADIUS-Server auf Hosts** (Dienst `radius-server`, UDP 1812 / 1813): Clients (Adresse
+  oder Präfix und ein gemeinsames Geheimnis), Benutzer (Passwort, Rechtestufe für die
+  Antwort, optionaler Text), Accounting in die Dateien des Geräts
+  (`/var/log/radius/accounting`); ein unbekannter Client oder ein falscher
+  Message-Authenticator wird still verworfen (mit Log-Zeile), wie RFC 2865 es verlangt. Die
+  Einstellungen stehen als JSON im Dienste-Editor und im Inspektor.
+- **Debug und Notizen:** `debug aaa authentication`, `debug radius`; jede Anmeldung,
+  Ablehnung, Anfrage, Antwort, Zeitüberschreitung, jeder Rückfall und jedes
+  Accounting-Paket sind eine Notiz (`Note::Aaa`, [`aaatrace.rs`](crates/jfn_sim/aaatrace.rs))
+  und eine Log-Zeile. Die Probleme-Liste bleibt dafür noch offen.
+
+Entscheidungen: Die Rechtestufe kommt bei RADIUS aus der Antwort (Service-Type
+Administrative-User → 15, sonst 1, oder ein eigenes Vendor-Attribut `priv-lvl=N`), wenn
+`aaa authorization exec` sie anfordert, sonst 1. Ein einstelliges Zahlenpasswort gibt man
+als `password 0 ZIFFER` ein (eine führende Ziffer ist sonst eine Typnummer, wie beim
+Vorbild).
+
+Noch offen: der **vty-Telnet-Server** auf IOS-artigen Geräten (`line vty … transport input`,
+eine CLI-Sitzung je vty-Leitung, das Sitzungslimit und der Leerlauf-Timeout). Der NVT-Codec,
+der Client und der ganze Login-/AAA-Unterbau stehen; der Server braucht eine eigene
+CLI-Sitzung neben der einen Konsole je Gerät und folgt als Nächstes. Dadurch melden sich die
+Golden-Szenarien an den **Konsolen** an, nicht per Telnet an einer vty-Leitung. Ebenfalls
+offen: 802.1X und WPA-Enterprise (spätere Meilensteine).
+
+Für Programme: `Engine::cli_secret(dev)` (das Passwort ohne Echo), die CLI-Zustände in
+`CliDev` (`auth`, `aaa`, `gate`, `priv_level`), `netpkt::telnet`, `netpkt::radius`,
+`crypto::{md5, hmac_md5}`. Geprüft wird in der Selbsttest-Gruppe `aaa`
+([`src/aaatest.rs`](src/aaatest.rs)), Telnet und RADIUS Byte für Byte in der coretest-Gruppe
+`radius` (MD5 und HMAC-MD5 in `crypto`), dazu das Szenario `aaa_radius.scn` und die
+Fensterskripte `login_console.uis`, `telnet_session.uis`, `aaa_services.uis` und
+`aaa_shots.uis`.
 
 ### Physische Ansicht
 
@@ -2928,7 +2998,7 @@ Geste).
 | 1 Netzwerk-Kern | E1 Paket-Library ✓ · E2 Datenmodell ✓ · E3 Simulationskern mit Switching ✓ · S1 Style `netlab` ✓ · L1 Diagramm-, L2 Terminal-, L3 Symbol-Widget ✓ · L4 Zeitleiste und Hex-Ansicht ✓ · E4 IPv4, ARP, ICMP, Ping, Traceroute ✓ · E5 Befehlszeilen und Szenario-Runner ✓ · E6 UDP, DHCP, DNS, Syslog, NTP ✓ · E7 Simulationsmodus (Engine), Mitschnitte, Probleme ✓ · U1 Topologie-Editor ✓ · U2 Simulator im Editor, Verbinden, Kabel, Inspektor ✓ · U3 Konsolen, Gerätefenster, Protokoll ✓ · U4 Simulationsmodus im Fenster, PDUs ✓ · U5 Politur und Abnahme ✓ |
 | 2 parallele Stränge | T1 TCP ✓ · T2 HTTP, Lastgenerator, `curl`/`nc`/`ss` ✓ · Skriptsprache `lib/script` (SK1 Lexer und Parser ✓, SK2 Compiler und VM ✓, SK3 Standardbibliothek ✓) · R1 NAT/PAT und Zugriffslisten ✓, R2 RIP ✓, R3 OSPF ✓, R4 Spanning Tree (STP, RSTP) ✓, R5 IPv6 (R5a Kern, R5b UDP, TCP und Dienste) ✓ · L5 Liniendiagramm und L6 Code-Editor ✓ |
 | 3 Verteilte Systeme | D1 Loadbalancer, KV-Shards, Cache, Queue, Worker, Fehlerinjektion ✓ · SK4 Skripte in Hosts ✓ · D2 Metrik-Fenster und Zeitreihen ✓ · U6 Labor-Oberfläche (U6a Metriken, Dienst-Pillen, Sparklines, Fehler aus dem Inspektor; U6b Aufgaben und Labore) ✓ · U7 Skript-Editor ✓ |
-| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; AAA mit RADIUS) |
+| 4 Parität | W1 WLAN ✓ · A1 Aufgaben mit Bewertung ✓ · R6 BGP ✓ · K1 Zurückspulen mit Keyframes ✓ · P1 physische Ansicht ✓ · G1 Gruppen und Hintergrundbild ✓ · X1 weitere Dienste (X1a Dateien, TFTP und FTP ✓; X1b SNMP ✓; X1c Mail mit SMTP, POP3 und dem Programm E-Mail ✓; X1d Logins, Telnet-Client und AAA mit RADIUS ✓; Telnet-Server auf den vty-Leitungen) |
 | 5 Skripte und Web | SK5 `.jfs`-Dateien: Export und Import im Skript-Editor, außerhalb ausführbar mit dem Runner `jfs` der Library · B1 Webbrowser: Seiten über HTTP laden und mit `ui.html_view` zeigen, Links, Verlauf, Fehlerseiten · B2 Formulare (GET / POST) · B3 Seitenskripte `<script type="text/jfs">` mit Browser-Host (`document`, Ereignisse, `fetch`) · B4 CSS-Teilmenge, Cookies, simuliertes HTTPS, Entwickleransicht (Runner und Library-Bausteine: [ROADMAP](../../docs/ROADMAP.md) Abschnitt 7) |
 
 **Regel für E5 und alle späteren Befehlszeilen:** Hilfetexte (`?`, `help`), Statusmeldungen,

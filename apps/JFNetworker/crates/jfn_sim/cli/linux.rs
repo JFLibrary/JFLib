@@ -161,6 +161,7 @@ impl Engine {
             "snmpwalk" => self.sh_snmp(ni, super::snmp::Prog::Walk, &args),
             "snmpbulkwalk" => self.sh_snmp(ni, super::snmp::Prog::BulkWalk, &args),
             "snmpset" => self.sh_snmp(ni, super::snmp::Prog::Set, &args),
+            "telnet" => self.sh_telnet(ni, &args),
             "clear" => {
                 self.out(ni, "\x1b[H\x1b[2J");
                 Ok(())
@@ -176,7 +177,7 @@ impl Engine {
         let w = words(line);
         let partial = !line.is_empty() && !line.ends_with(char::is_whitespace);
         let (list, done): (&[&str], usize) = match w.len() {
-            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch", "mail", "snmpbulkwalk", "snmpget", "snmpgetnext", "snmpset", "snmpwalk"], 0),
+            1 if partial => (&["cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "telnet", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch", "mail", "snmpbulkwalk", "snmpget", "snmpgetnext", "snmpset", "snmpwalk"], 0),
             2 if partial && w[0] == "ip" => (&["address", "link", "neighbour", "route"], 1),
             3 if partial && w[0] == "ip" => (&["add", "del", "flush", "get", "set", "show"], 2),
             _ => return (None, Vec::new()),

@@ -115,6 +115,8 @@ pub fn port_name(port: u16) -> Option<&'static str> {
         PORT_RIP => "rip",
         PORT_DHCPV6_CLIENT => "dhcpv6-client",
         PORT_DHCPV6_SERVER => "dhcpv6-server",
+        crate::radius::PORT_AUTH => "radius",
+        crate::radius::PORT_ACCT => "radius-acct",
         _ => return None,
     })
 }

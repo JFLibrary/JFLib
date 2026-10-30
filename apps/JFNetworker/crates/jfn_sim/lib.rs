@@ -154,6 +154,18 @@
 //   snmptrapd the receiver of notifications on Linux hosts: logs them, acknowledges informs
 //   snmptrace SNote: the decisions of SNMP as notes (Note::Snmp) with their German sentences
 //
+//   auth     the stored secrets and local users of an IOS-like device (Secret, UserAcct,
+//            LocalAuth): plain, reversible and PBKDF2-SHA-256 passwords, enable secret and
+//            password, usernames (X1d)
+//   aaa      authentication, authorization and accounting: methods, RADIUS servers and
+//            groups, method lists; the console and vty login sessions (X1d)
+//   aaatrace ANote: logins, AAA, RADIUS and the vty telnet sessions as notes (Note::Aaa)
+//   radiusd  the RADIUS server on hosts ("radius-server", UDP 1812 / 1813) and the NAS side
+//            of an IOS-like device (the internal service "radius-nas"): Access-Request,
+//            retransmission, the next server, the hiding of User-Password, accounting (X1d)
+//   telnetd  the telnet client of the consoles ("telnet HOST [PORT]", the NVT codec of
+//            netpkt::telnet, client-side negotiation, the "%" lines of a refusal or a close);
+//            the vty telnet server is open (it needs a CLI session per vty line) (X1d)
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
 // device has it; dig, host and nslookup are console programs too (cli/names.rs).
@@ -246,6 +258,11 @@ pub mod snmptrace;
 pub mod snmpmib;
 pub mod snmpd;
 pub mod snmptrapd;
+pub mod auth;
+pub mod aaa;
+pub mod aaatrace;
+pub mod radiusd;
+pub mod telnetd;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -317,3 +334,8 @@ pub use snmptrace::SNote;
 pub use snmpmib::{IfRow, View as SnmpView};
 pub use snmpd::{Community, SnmpAgent, SnmpCfg, SnmpSet, TrapHost};
 pub use snmptrapd::{TrapReceiver, TrapRow};
+pub use auth::{LocalAuth, Secret, UserAcct};
+pub use aaa::{Aaa, AuthResult, Method, MethodList, RadiusServer, ServerGroup};
+pub use aaatrace::ANote;
+pub use radiusd::{NasService, RadiusServerSvc};
+pub use telnetd::TelnetClient;

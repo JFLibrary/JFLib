@@ -67,6 +67,13 @@
 //   mib       the objects of SNMPv2-MIB, IF-MIB, IP-MIB and IP-FORWARD-MIB an agent of the
 //             simulator serves: names, OIDs, syntax, access, lookup by name, values as net-snmp's
 //             tools print them                                   (RFC 3418, 2863, 4293, 2096)
+//   telnet    NVT commands, option negotiation without loops (Options: the Q method), IAC
+//             escaping, NVT line ends, Reader for bytes in pieces, parse (RFC 854, 855, 857,
+//             858, 1143)
+//   radius    RadiusView, Packet, Attr: authentication and accounting with every attribute of
+//             RFC 2865 / 2866 by number and name (vendor-specific ones as bytes), the hiding of
+//             User-Password, Request / Response Authenticators, the Message-Authenticator; the
+//             caller lends MD5 and HMAC-MD5 (crypto)                 (RFC 2865, 2866, 3579)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -109,6 +116,8 @@ pub mod imf;
 pub mod ber;
 pub mod snmp;
 pub mod mib;
+pub mod telnet;
+pub mod radius;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

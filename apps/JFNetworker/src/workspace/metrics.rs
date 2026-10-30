@@ -325,6 +325,7 @@ pub(crate) fn kind_name(kind: &str) -> &str {
         "ftp-server" => t("FTP-Server"),
         "smtp-server" => t("Mailserver (SMTP)"),
         "pop3-server" => t("Postfach (POP3)"),
+        "radius-server" => t("RADIUS-Server"),
         _ => kind,
     }
 }
