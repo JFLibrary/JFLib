@@ -217,6 +217,7 @@ def make_setup(app, meta, styles, dist, work, impl="asm", rsout=None, profile="s
         man.append(f"filetypes={meta['filetypes']}")
     if schemes(meta):
         man.append(f"schemes={' '.join(schemes(meta))}")
+    man.append(f"app_id={pkgmeta.app_id(meta, app)}")   # the AppUserModelID of shortcuts, pins, ProgIDs
     mtext = ("\n".join(man) + "\n").encode("utf-8")
     entries.append((PK_MANIFEST, PF_ZLIB, "manifest", "", zlib.compress(mtext, 9), len(mtext)))
     for s in styles:

@@ -8,6 +8,19 @@
 //                                   dirs.rs)
 //   shell_link(lnk, target, dir, desc) -> bool   a shortcut file lnk -> target (working
 //                                   folder dir, icon 0 of the target, comment desc)  [sh_link]
+//   shell_link_id(lnk, target, dir, desc, app_id) -> bool   the same with the AppUserModelID
+//                                   app_id ("" = none) as the link's System.AppUserModel.ID
+//                                   (the program's explicit id, taskbar.rs: its button, jump
+//                                   list and notifications then belong to the link)
+//   link_read(lnk) -> Some((target, app_id))   a shortcut's target and System.AppUserModel.ID
+//                                   ("" = none)
+//   link_set_app_id(lnk, app_id) -> bool   that id written into an existing shortcut
+//   pins_set_app_id(dir, exe, app_id) -> usize   the shortcuts in dir and its folders that start
+//                                   exe and carry no id get app_id (pins made before the
+//                                   program ran under its id no longer match its button);
+//                                   Explorer is told of each (SHChangeNotify)
+//   pinned_dir() -> Some(path)      the user's pinned items (FOLDERID_UserPinned: TaskBar,
+//                                   ImplicitAppShortcuts)
 //   reg_create(subkey) -> Some(RegKey)   HKCU\subkey opened for writing (created when missing);
 //                                   RegKey::set_sz / set_dword, closed when dropped
 //   reg_delete(subkey) -> bool      RegDeleteKeyW(HKCU, subkey)
@@ -24,6 +37,7 @@
 // test mode (ASMINST_SHELL_DIR) is the app's business: these functions always touch the real
 // shell / registry.
 
+use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
@@ -52,6 +66,25 @@ struct Guid(u32, u16, u16, [u8; 8]);
 static CLSID_SHELLLINK: Guid = Guid(0x0002_1401, 0, 0, [0xC0, 0, 0, 0, 0, 0, 0, 0x46]);
 static IID_SHELLLINKW: Guid = Guid(0x0002_14F9, 0, 0, [0xC0, 0, 0, 0, 0, 0, 0, 0x46]);
 static IID_PERSISTFILE: Guid = Guid(0x0000_010B, 0, 0, [0xC0, 0, 0, 0, 0, 0, 0, 0x46]);
+static IID_PROPERTYSTORE: Guid = Guid(0x886D_8EEB, 0x8CF2, 0x4446, [0x8D, 0x02, 0xCD, 0xBA, 0x1D, 0xBD, 0xCF, 0x99]);
+/// PKEY_AppUserModel_ID
+static PKEY_APPUSERMODEL_ID: PropKey = PropKey { fmtid: Guid(0x9F4C_2855, 0x9F79, 0x4B39, [0xA8, 0xD0, 0xE1, 0xD4, 0x2D, 0xE1, 0xD5, 0xF3]), pid: 5 };
+
+/// PROPERTYKEY
+#[repr(C)]
+struct PropKey {
+    fmtid: Guid,
+    pid: u32,
+}
+
+/// PROPVARIANT (x64, 24 bytes); a VT_LPWSTR in ptr
+#[repr(C)]
+struct PropVariant {
+    vt: u16,
+    reserved: [u16; 3],
+    ptr: *const u16,
+    pad: usize,
+}
 
 /// the capacity of the asm's path buffers: bytes of UTF-8 / wide chars (inst.inc PATH_CAP)
 pub const PATH_CAP: usize = 520;
@@ -67,11 +100,23 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 // IShellLinkW / IPersistFile vtable slots
 const VT_QI: usize = 0;
 const VT_RELEASE: usize = 2;
+const VT_SL_GETPATH: usize = 3;
 const VT_SL_SETDESC: usize = 7;
 const VT_SL_SETWDIR: usize = 9;
 const VT_SL_SETICON: usize = 17;
 const VT_SL_SETPATH: usize = 20;
+const VT_PF_LOAD: usize = 5;
 const VT_PF_SAVE: usize = 6;
+// IPropertyStore
+const VT_PS_GETVALUE: usize = 5;
+const VT_PS_SETVALUE: usize = 6;
+const VT_PS_COMMIT: usize = 7;
+const VT_LPWSTR: u16 = 31;
+const STGM_READ: u32 = 0;
+const STGM_READWRITE: u32 = 2;
+// SHChangeNotify: SHCNE_UPDATEITEM with a path (SHCNF_PATHW)
+const SHCNE_UPDATEITEM: i32 = 0x2000;
+const SHCNF_PATHW: u32 = 5;
 
 // the optional functions (0 = missing), resolved once
 const P_COINIT: usize = 0;
@@ -83,8 +128,9 @@ const P_REGDELETE: usize = 5;
 const P_REGTREE: usize = 6;
 const P_REGDELVAL: usize = 7;
 const P_CHANGENOTIFY: usize = 8;
+const P_PVCLEAR: usize = 9;
 static LOADED: AtomicU32 = AtomicU32::new(0); // 0 not loaded, 1 loading, 2 loaded (PROCS valid)
-static PROCS: [AtomicUsize; 9] = [const { AtomicUsize::new(0) }; 9];
+static PROCS: [AtomicUsize; 10] = [const { AtomicUsize::new(0) }; 10];
 
 /// resolve the optional APIs once and initialise COM  [sh_load]
 fn inst_load() {
@@ -104,6 +150,7 @@ fn inst_load() {
         set(P_REGTREE, b"advapi32.dll\0", b"RegDeleteTreeW\0");
         set(P_REGDELVAL, b"advapi32.dll\0", b"RegDeleteKeyValueW\0");
         set(P_CHANGENOTIFY, b"shell32.dll\0", b"SHChangeNotify\0");
+        set(P_PVCLEAR, b"ole32.dll\0", b"PropVariantClear\0");
         let p = PROCS[P_COINIT].load(Ordering::SeqCst);
         if p != 0 {
             // SAFETY: CoInitializeEx(LPVOID reserved, DWORD) -> HRESULT; S_FALSE / RPC_E_CHANGED_MODE
@@ -176,6 +223,42 @@ unsafe fn release(obj: usize) {
 
 /// a shortcut lnk -> target (working folder dir, icon 0 of the target, comment desc)  [sh_link]
 pub fn shell_link(lnk: &str, target: &str, dir: &str, desc: &str) -> bool {
+    shell_link_id(lnk, target, dir, desc, "")
+}
+
+/// IPropertyStore::SetValue(PKEY_AppUserModel_ID, id) + Commit on the link sl -> true when done
+///
+/// SAFETY: sl is a live IShellLinkW.
+unsafe fn set_link_id(sl: usize, id: &str) -> bool {
+    let w = wide_cap(id, 130);
+    unsafe {
+        let ps = query(sl, &IID_PROPERTYSTORE);
+        if ps == 0 {
+            return false;
+        }
+        let pv = PropVariant { vt: VT_LPWSTR, reserved: [0; 3], ptr: w.as_ptr(), pad: 0 };
+        let sv: unsafe extern "system" fn(usize, *const PropKey, *const PropVariant) -> i32 = core::mem::transmute(vfn(ps, VT_PS_SETVALUE));
+        let mut ok = sv(ps, &PKEY_APPUSERMODEL_ID, &pv) >= 0;
+        let commit: unsafe extern "system" fn(usize) -> i32 = core::mem::transmute(vfn(ps, VT_PS_COMMIT));
+        ok &= commit(ps) >= 0;
+        release(ps);
+        ok
+    }
+}
+
+/// IUnknown::QueryInterface (0: not supported)
+///
+/// SAFETY: obj is a live COM interface pointer.
+unsafe fn query(obj: usize, iid: &Guid) -> usize {
+    let mut p = 0usize;
+    unsafe {
+        let qi: unsafe extern "system" fn(usize, *const Guid, *mut usize) -> i32 = core::mem::transmute(vfn(obj, VT_QI));
+        if qi(obj, iid, &mut p) < 0 { 0 } else { p }
+    }
+}
+
+/// a shortcut as shell_link, with the AppUserModelID app_id ("" = none)
+pub fn shell_link_id(lnk: &str, target: &str, dir: &str, desc: &str, app_id: &str) -> bool {
     let create = proc_(P_COCREATE);
     if create == 0 {
         return false;
@@ -201,6 +284,10 @@ pub fn shell_link(lnk: &str, target: &str, dir: &str, desc: &str) -> bool {
         icon(sl, w_target.as_ptr(), 0);
         let set1: unsafe extern "system" fn(usize, *const u16) -> i32 = core::mem::transmute(vfn(sl, VT_SL_SETDESC));
         set1(sl, w_desc.as_ptr());
+        if !app_id.is_empty() && !set_link_id(sl, app_id) {
+            release(sl);
+            return false;
+        }
         let qi: unsafe extern "system" fn(usize, *const Guid, *mut usize) -> i32 = core::mem::transmute(vfn(sl, VT_QI));
         if qi(sl, &IID_PERSISTFILE, &mut pf) < 0 || pf == 0 {
             release(sl);
@@ -212,6 +299,147 @@ pub fn shell_link(lnk: &str, target: &str, dir: &str, desc: &str) -> bool {
         release(sl);
         hr >= 0
     }
+}
+
+/// a shortcut file loaded (STGM_READ / STGM_READWRITE) -> (IShellLinkW, IPersistFile), None
+/// when it is no shortcut
+fn link_load(lnk: &str, mode: u32) -> Option<(usize, usize)> {
+    let create = proc_(P_COCREATE);
+    if create == 0 {
+        return None;
+    }
+    let w_lnk = wide_cap(lnk, PATH_CAP);
+    let (mut sl, mut pf) = (0usize, 0usize);
+    // SAFETY: CoCreateInstance and IPersistFile::Load through their documented slots; a
+    // NUL-terminated path; both objects are released on failure.
+    unsafe {
+        let cc: unsafe extern "system" fn(*const Guid, usize, u32, *const Guid, *mut usize) -> i32 = core::mem::transmute(create);
+        if cc(&CLSID_SHELLLINK, 0, CLSCTX_INPROC, &IID_SHELLLINKW, &mut sl) < 0 || sl == 0 {
+            return None;
+        }
+        let qi: unsafe extern "system" fn(usize, *const Guid, *mut usize) -> i32 = core::mem::transmute(vfn(sl, VT_QI));
+        if qi(sl, &IID_PERSISTFILE, &mut pf) < 0 || pf == 0 {
+            release(sl);
+            return None;
+        }
+        let load: unsafe extern "system" fn(usize, *const u16, u32) -> i32 = core::mem::transmute(vfn(pf, VT_PF_LOAD));
+        if load(pf, w_lnk.as_ptr(), mode) < 0 {
+            release(pf);
+            release(sl);
+            return None;
+        }
+    }
+    Some((sl, pf))
+}
+
+/// a shortcut's target (backslashes) and its System.AppUserModel.ID ("" = none)
+pub fn link_read(lnk: &str) -> Option<(String, String)> {
+    let (sl, pf) = link_load(lnk, STGM_READ)?;
+    let mut target = String::new();
+    let mut id = String::new();
+    // SAFETY: IShellLinkW::GetPath into a buffer of PATH_CAP wide chars (no WIN32_FIND_DATA, flags
+    // 0); IPropertyStore::GetValue into a PROPVARIANT cleared with PropVariantClear; every object
+    // is released.
+    unsafe {
+        let mut buf = alloc::vec![0u16; PATH_CAP];
+        let get: unsafe extern "system" fn(usize, *mut u16, i32, usize, u32) -> i32 = core::mem::transmute(vfn(sl, VT_SL_GETPATH));
+        if get(sl, buf.as_mut_ptr(), PATH_CAP as i32, 0, 0) >= 0 {
+            target = utf8_cap(&buf, PATH_CAP);
+        }
+        let ps = query(sl, &IID_PROPERTYSTORE);
+        if ps != 0 {
+            let mut pv = PropVariant { vt: 0, reserved: [0; 3], ptr: core::ptr::null(), pad: 0 };
+            let gv: unsafe extern "system" fn(usize, *const PropKey, *mut PropVariant) -> i32 = core::mem::transmute(vfn(ps, VT_PS_GETVALUE));
+            if gv(ps, &PKEY_APPUSERMODEL_ID, &mut pv) >= 0 {
+                if pv.vt == VT_LPWSTR && !pv.ptr.is_null() {
+                    let mut n = 0;
+                    while *pv.ptr.add(n) != 0 && n < 256 {
+                        n += 1;
+                    }
+                    id = String::from_utf16_lossy(core::slice::from_raw_parts(pv.ptr, n));
+                }
+                let clear = proc_(P_PVCLEAR);
+                if clear != 0 {
+                    let f: unsafe extern "system" fn(*mut PropVariant) -> i32 = core::mem::transmute(clear);
+                    f(&mut pv);
+                }
+            }
+            release(ps);
+        }
+        release(pf);
+        release(sl);
+    }
+    Some((target, id))
+}
+
+/// the AppUserModelID app_id written into the existing shortcut lnk
+pub fn link_set_app_id(lnk: &str, app_id: &str) -> bool {
+    if app_id.is_empty() {
+        return false;
+    }
+    let Some((sl, pf)) = link_load(lnk, STGM_READWRITE) else { return false };
+    // SAFETY: the property store of the loaded link, then IPersistFile::Save(NULL, TRUE): the
+    // file it was loaded from; both objects are released.
+    unsafe {
+        let mut ok = set_link_id(sl, app_id);
+        if ok {
+            let save: unsafe extern "system" fn(usize, *const u16, i32) -> i32 = core::mem::transmute(vfn(pf, VT_PF_SAVE));
+            ok = save(pf, core::ptr::null(), 1) >= 0;
+        }
+        release(pf);
+        release(sl);
+        ok
+    }
+}
+
+/// the user's pinned items (FOLDERID_UserPinned; backslashes)
+pub fn pinned_dir() -> Option<String> {
+    crate::known_folder(crate::KF_USER_PINNED)
+}
+
+/// the shortcuts in dir and in its folders (two levels: TaskBar, ImplicitAppShortcuts/<hash>
+/// below pinned_dir()) that start exe and carry no AppUserModelID get app_id -> how many were
+/// changed
+pub fn pins_set_app_id(dir: &str, exe: &str, app_id: &str) -> usize {
+    if app_id.is_empty() {
+        return 0;
+    }
+    let exe = exe.replace('/', "\\");
+    let mut done = 0;
+    let mut dirs = alloc::vec![String::from(dir.trim_end_matches(['\\', '/']))];
+    let mut level = 0;
+    while !dirs.is_empty() && level < 3 {
+        let mut next = Vec::new();
+        for d in dirs {
+            let mut entries = Vec::new();
+            crate::dir_list_raw(&d, &mut |name, is_dir, _| entries.push((String::from(name), is_dir)));
+            for (name, is_dir) in entries {
+                let path = format!("{d}\\{name}");
+                if is_dir {
+                    next.push(path);
+                    continue;
+                }
+                if !name.to_ascii_lowercase().ends_with(".lnk") {
+                    continue;
+                }
+                let Some((target, id)) = link_read(&path) else { continue };
+                if !id.is_empty() || !target.eq_ignore_ascii_case(&exe) || !link_set_app_id(&path, app_id) {
+                    continue;
+                }
+                done += 1;
+                let p = proc_(P_CHANGENOTIFY);
+                if p != 0 {
+                    let w = wide_cap(&path, PATH_CAP);
+                    // SAFETY: SHChangeNotify(LONG, UINT, LPCVOID, LPCVOID) with one NUL-terminated path.
+                    let f: unsafe extern "system" fn(i32, u32, *const u16, usize) = unsafe { core::mem::transmute(p) };
+                    unsafe { f(SHCNE_UPDATEITEM, SHCNF_PATHW, w.as_ptr(), 0) };
+                }
+            }
+        }
+        dirs = next;
+        level += 1;
+    }
+    done
 }
 
 /// an open registry key (closed when dropped)

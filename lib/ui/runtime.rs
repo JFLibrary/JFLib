@@ -562,6 +562,7 @@ impl Ui {
                     self.open_poll();
                     self.tray_poll();
                     self.screen_poll(); // global shortcuts, picks, pictures (screen.rs)
+                    self.recent_poll(); // the browser's answer to a reopen (recent.rs)
                     self.a11y_poll(); // actions of screen readers (a11y.rs)
                     self.spell_poll(); // suggestions made on a worker (edit_spell.rs)
                     self.need = true;

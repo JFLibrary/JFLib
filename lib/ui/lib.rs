@@ -191,7 +191,7 @@ pub use keys::*;
 pub use layout::{dp_at, px2dip_at};
 pub use perm::boot;
 pub use assoc::{assoc_switch, desk_boot};
-pub use recent::RECENT_KEEP;
+pub use recent::{RECENT_KEEP, RecentOpen};
 // the library's version (lib/VERSION, docs/VERSIONING.md) and the app's own (apps/NAME/PACKAGE)
 pub use rt::{app_version, VERSION, VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH};
 // drag and drop (dnd.rs): what a drag carries, its kinds and effects
@@ -395,6 +395,8 @@ pub(crate) struct Mods {
     pub(crate) sound: sound::S,
     /// (ROADMAP §3) the colour pick, the last picture, dropped shortcuts (screen.rs)
     pub(crate) screen: screen::S,
+    /// (ROADMAP §2) the reopen of a recent file waiting for the browser (recent.rs)
+    pub(crate) recent: recent::S,
     /// the scroll copies since the last `expect scrollcopy` (scrollcopy.rs)
     pub(crate) scopy: scrollcopy::S,
     /// (ROADMAP §8) the band buffers and glyph record of multi-threaded renders (render_par.rs)

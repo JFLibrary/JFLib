@@ -4713,6 +4713,7 @@ UIC_HOTKEY: u32 = 0x7FFF_0015  // arg = id: a global shortcut was pressed (hotke
 UIC_HOTKEY_LOST: u32 = 0x7FFF_0016  // arg = id: the desktop dropped the shortcut (hotkey_error tells why)
 UIC_PICK: u32 = 0x7FFF_0017  // arg 1: a colour was picked (picked_color), 0: cancelled / failed (pick_color)
 UIC_SCREENSHOT: u32 = 0x7FFF_0018  // arg 1: the picture is there (screenshot_take), 0: failed (screen_error)
+UIC_RECENT: u32 = 0x7FFF_0019  // arg 1: the file of recent_open is readable now (recent_reopened), 0: refused or gone
 TRAY_ACTIVATE: u32 = 1  // UIC_TRAY: the symbol was clicked
 TRAY_SECONDARY: u32 = 2  // UIC_TRAY: double click (Windows) / middle click (Linux)
 ```
@@ -5992,7 +5993,10 @@ the program: exit code 0 done, 1 failed, 2 not possible here or nothing declared
   desk_boot(package) -> Option<exit code>   (main!) keep the built-in PACKAGE text
                         (plat::assoc::package_set), run a switch; headless runs (--shot,
                         --script, the agent protocols) leave the system's list of recent files
-                        alone (plat::recent::recent_os(false); jfgui_RECENT still redirects it)
+                        alone (plat::recent::recent_os(false); jfgui_RECENT still redirects it).
+                        Without a switch, Windows: the app id as the explicit AppUserModelID
+                        once the setup installed the program or --register registered it
+                        (plat::assoc::app_id_boot), before the first window
   assoc_switch(pkg, switch) -> Option<(exit code, text)>   one switch for pkg (None: no switch)
 ```
 
@@ -7676,17 +7680,34 @@ recent -- the app's list of recent files ("Zuletzt geöffnet") and the system's 
                            permissions)
   recent_files() -> [path] the app's list, newest first (a file may be gone meanwhile: the
                            app tells the user and calls recent_remove)
+  recent_open(path) -> RecentOpen   a file of the list about to be opened (call it from the
+                           user's click or key): Ready (read it now), Asking (the browser asks
+                           for the permission again: App::command(UIC_RECENT, 1 readable /
+                           0 refused or gone) follows, recent_reopened() names the file) or
+                           Missing
+  recent_reopened() -> Option<path>   the file UIC_RECENT answered for (once)
   recent_remove(path)      out of both lists
   recent_clear()           both lists emptied (the system's: this app's entries)
 
 The app's list is config://recent.list (one path per line, newest first), read on first use
-and kept in memory (the browser: persisted in its storage).  OS paths are kept absolute
-("C:/x/a.png", "/home/u/a.png"; a folder mount's file as its OS path), so another spelling of
-the same file is no new entry, and as plat::persistent_name gives them (a Flatpak's file from
-the documents portal as its lasting document: one of the portal's file dialog opens again
-after a restart without a new dialog).  Headless runs (--shot, --script, agents) never touch
-the file and leave the system's list alone (the list lives in memory there; jfgui_RECENT
-redirects the system's list, plat/recent.rs).
+and kept in memory.  OS paths are kept absolute ("C:/x/a.png", "/home/u/a.png"; a folder
+mount's file as its OS path), so another spelling of the same file is no new entry, and as
+plat::persistent_name gives them (a Flatpak's file from the documents portal as its lasting
+document: one of the portal's file dialog opens again after a restart without a new
+dialog).  Headless runs (--shot, --script, agents) never touch the file and leave the
+system's list alone (the list lives in memory there; jfgui_RECENT redirects the system's
+list, plat/recent.rs).
+
+The browser: the list is persisted in the origin's storage with every change (an emptied
+list as an empty file: the storage keeps no deletions), so a reload starts with it.  A file
+of the user's own (/handles/ID/NAME, Chromium's pickers) is read in at the start while the
+browser still grants it; else recent_open asks through plat::web::reopen (the browser wants
+the user's gesture).  Firefox and Safari have no such handles: the list stays, its files open
+when the app kept them in the storage itself (plat::web::persist).
+Android: the list is a file of the app's internal storage; the picker's grants are lasting
+(takePersistableUriPermission), and a single document's grant is given up when its entry
+leaves the list (pushed out, removed, cleared: Android keeps at most 128 / 512 of them); a
+folder's grant stays, the app may use the folder for more.
 ```
 
 ```rust
@@ -7694,10 +7715,22 @@ redirects the system's list, plat/recent.rs).
 RECENT_KEEP: usize = 20
 ```
 
+- **`enum RecentOpen`**
+  what recent_open found for a file of the list
+  - `Ready` -- the file can be read now
+  - `Asking` -- the browser asks the user for the permission again (a file of the user's own after a
+    reload): App::command(UIC_RECENT, 1 readable now / 0 refused or gone) follows
+  - `Missing` -- gone or out of reach: the app tells the user and may call recent_remove
+
 **`impl Ui`**
 
 - **`fn recent_add(&mut self, path: &str)`**
   a file the user opened or saved: first in the app's recent files and in the system's
+- **`fn recent_open(&mut self, path: &str) -> RecentOpen`**
+  a file of the recent list about to be opened (from the user's click or key): Ready,
+  Asking (the browser asks for the permission; UIC_RECENT follows) or Missing
+- **`fn recent_reopened(&mut self) -> Option<String>`**
+  the file UIC_RECENT answered for, once
 - **`fn recent_files(&self) -> Vec<String>`**
   the app's recent files, newest first
 - **`fn recent_remove(&mut self, path: &str)`**
@@ -16204,7 +16237,8 @@ plat -- the platform layer: one module per OS with the same functions  [src/plat
   autostart: autostart_set(on, args) / autostart_get() / autostart_entry() (Run key, XDG
            autostart, Background portal; needs `autostart` in the manifest) (autostart.rs)
   taskbar: taskbar_progress / taskbar_badge / taskbar_tasks (the taskbar button: progress,
-           overlay / count, jump list; ITaskbarList3, Unity LauncherEntry) (taskbar.rs)
+           overlay / count, jump list; ITaskbarList3, Unity LauncherEntry), app_user_model_id
+           / set_app_user_model_id (Windows: the app's explicit id)        (taskbar.rs)
   assoc:   assoc_register / assoc_conflicts / assoc_unregister: the app's PACKAGE file types
            and URL schemes for this program without a setup (HKCU\Software\Classes; .desktop,
            shared-mime-info, mimeapps.list), file_uri_path                    (assoc.rs)
@@ -17119,6 +17153,10 @@ Manifest: one rule per line, '#' starts a comment, a key may repeat:
   sandbox [strict]      ask the OS to enforce the manifest as well (Landlock + seccomp on
                         Linux, process mitigation policies on Windows; sandbox.rs); `strict`
                         refuses to start when the OS cannot enforce it
+  recent                the host's list of recent files for a Flatpak (tools/pkg_linux.py:
+                        --filesystem=xdg-data/recently-used.xbel, the list of every program);
+                        at run time nothing changes: the system's list is always allowed
+                        for files the app may read (recent.rs)
 A PATTERN is an absolute path (X:/.. and //server/share/.. count on Windows only, /.. on
 Linux only), or starts with $CONFIG $TEMP $HOME $EXE $FONTS, the app's own folders
 $APPCONFIG $APPDATA $APPCACHE $APPLOG (vfs::app_dir) or the user's folders $DESKTOP
@@ -18291,6 +18329,16 @@ taskbar -- the app's button in the taskbar or dock: progress, a badge, the jump 
   taskbar_badge_shown(count) -> bool   that badge (with its icon) is up already (ui skips
                                    drawing it again)
   taskbar_supported() -> bool      whether this system shows any of it
+  app_user_model_id() -> Option<id>   (Windows) the explicit AppUserModelID the process runs
+                                   under: the taskbar button and its pins, the jump list, the
+                                   recent files and the notifications all go by it.  ui::main!
+                                   sets PACKAGE's app id once the setup installed the program
+                                   or --register registered it (assoc::app_id_boot); None:
+                                   Windows derives an id from the program's path
+  set_app_user_model_id(id) -> bool   (Windows) run under id from now on: before the first
+                                   window.  false elsewhere, in an MSIX package (the
+                                   package's id counts) and for an id Windows refuses (more
+                                   than 128 characters, blanks)
 
 The calls keep the state and return whether the system took it (Windows: also before the
 window has its button -- it is applied when the button appears).  Setting what is already
@@ -18350,6 +18398,15 @@ file's Actions).  Web and Android: nothing (false).
 - **`fn taskbar_supported() -> bool`**
   whether this system shows the taskbar progress and badge
 
+- **`fn app_user_model_id() -> Option<String>`**
+  (Windows) the process's explicit AppUserModelID (what the shell holds:
+  GetCurrentProcessExplicitAppUserModelID); None: the one Windows derives from the program's
+  path (other systems: always None)
+
+- **`fn set_app_user_model_id(id: &str) -> bool`**
+  (Windows) run the process under the AppUserModelID id: before its first window -> false
+  elsewhere, in an MSIX package and for an id Windows refuses
+
 ### `plat/assoc.rs`
 
 Source: [`lib/plat/assoc.rs`](../lib/plat/assoc.rs)
@@ -18368,8 +18425,16 @@ setup (apps/installer), the .deb, MSIX and Flatpak declare them themselves (docs
                                       extension gets the app under "Open with"; "own" types
                                       also open with it by default
   parse_schemes(text) -> [scheme]     "scheme scheme ..." (';', ',' or blanks)
-  reg_entries(app, display, exe, types, schemes) -> [RegValue]   the values below
+  reg_entries(app, display, exe, types, schemes, app_id) -> [RegValue]   the values below
                                       HKCU\Software\Classes the setup and assoc_register write
+                                      (app_id: the program's AppUserModelID in its ProgIDs,
+                                      "" = none)
+  app_id_boot() -> Option<id>         (ui::main!, Windows) PACKAGE's app id as the process's
+                                      explicit AppUserModelID (taskbar.rs) once the setup
+                                      installed this program (install.ini beside it names the
+                                      id) or --register registered it (the record names it);
+                                      jfgui_AUMID=ID gives one, jfgui_AUMID=off none.  Every
+                                      other program keeps the id Windows derives from its path
   assoc_conflicts(&Package) -> Result<[Conflict], AssocError>   the defaults of other
                                       programs a registration would replace
   assoc_register(&Package, take) -> Result<Registered, AssocError>   register this program;
@@ -18388,10 +18453,11 @@ The record (config://assoc.list) lists every key, value and file the registratio
 what it replaced; unregistering removes those (a value only while it still holds what was
 written) and puts back what was there.  Windows (win_assoc.rs): the setup's entries below
 HKCU\Software\Classes -- the ProgID <app>.<ext> (description, DefaultIcon, shell\open\command
-= "<exe>" "%1"), .<ext>\OpenWithProgids, for own types the default and Content Type of
-.<ext>, a scheme's key (URL:<display>, URL Protocol) -- then SHChangeNotify.  A default of
-another program is the extension's default value (HKCU or HKLM) or a key of the same name
-with another command; the user's own choice in Windows' dialog (UserChoice, hashed) is never
+= "<exe>" "%1", AppUserModelID = the app id: what Windows asks of a handler with an explicit
+id for the recent files of the type), .<ext>\OpenWithProgids, for own types the default and
+Content Type of .<ext>, a scheme's key (URL:<display>, URL Protocol) -- then SHChangeNotify.
+A default of another program is the extension's default value (HKCU or HKLM) or a key of the
+same name with another command; the user's own choice in Windows' dialog (UserChoice, hashed) is never
 changed (Conflict::fixed).  Linux (linux_assoc.rs): $XDG_DATA_HOME/applications/<app_id>.desktop
 (Exec with %U for schemes, else %F; MimeType=), own types as shared-mime-info XML in
 $XDG_DATA_HOME/mime/packages/<app_id>.xml, the defaults of own types and schemes in
@@ -18482,9 +18548,11 @@ RV_SHARED: u8 = 1
 RV_DEFAULT: u8 = 2
 ```
 
-- **`fn reg_entries(app: &str, display: &str, exe: &str, types: &[FileType], schemes: &[String]) -> Vec<RegValue>`**
+- **`fn reg_entries(app: &str, display: &str, exe: &str, types: &[FileType], schemes: &[String], app_id: &str) -> Vec<RegValue>`**
   the HKCU values of the file types and schemes for the program exe (backslashes): the setup's
-  and assoc_register's
+  and assoc_register's.  app_id: the AppUserModelID the program runs under ("" = none, Windows
+  derives one): each ProgID names it (AppUserModelID), as Windows wants for the recent files
+  of an explicit id
 
 - **`fn assoc_conflicts(pkg: &Package) -> Result<Vec<Conflict>, AssocError>`**
   the defaults of other programs a registration of pkg would replace (nothing is written)
@@ -18498,6 +18566,12 @@ RV_DEFAULT: u8 = 2
 
 - **`fn assoc_registered() -> Option<String>`**
   the program a registration of this app starts (the record), None without one
+
+- **`fn app_id_boot() -> Option<String>`**
+  (ui::main!) Windows: PACKAGE's app id as the process's explicit AppUserModelID when this
+  program was installed by the setup (install.ini beside it names the id) or registered with
+  --register (the record names this program); jfgui_AUMID=ID gives one, =off none -> the id
+  set.  Other programs (and other systems) keep the id the system derives
 
 - **`fn file_uri_path(arg: &str) -> Option<String>`**
   a local file:// URI as a path ("file:///home/a%20b.txt" -> "/home/a b.txt", Windows
@@ -18521,7 +18595,9 @@ recent -- the system's list of recently used files
   recent_add(path) -> bool        a file the user opened or saved.  Windows:
                                   SHAddToRecentDocs (Explorer's recent files; the app's jump
                                   list shows it under "Recent" when the app is a registered
-                                  handler of the type: the setup, assoc_register, MSIX).
+                                  handler of the type: the setup, assoc_register, MSIX; with
+                                  the process's explicit AppUserModelID, taskbar.rs, the
+                                  item is given to that id: SHARD_APPIDINFO).
                                   Linux: a bookmark in $XDG_DATA_HOME/recently-used.xbel (the
                                   freedesktop format GTK and KDE read: href, added / modified /
                                   visited, the MIME type, this app's entry with exec and count)
@@ -18537,6 +18613,9 @@ recent -- the system's list of recently used files
   recent_os(on)                   (ui::main!) off in headless runs (--script, --shot, the
                                   agent protocols): add / remove / clear leave the system's
                                   list alone and return false
+  recent_list_of(id, max) / recent_remove_of(id, path)   (Windows, tests) the jump list of
+                                  another AppUserModelID (Explorer's own recent files:
+                                  Microsoft.Windows.Explorer)
 
 The path must be readable under the app's permissions (fs.read / fs.user, policy.rs; else
 "PERMDENY fs.read" and false) and be an OS file (a folder mount's file counts as its OS path;
@@ -18565,6 +18644,13 @@ then.  Web and Android: false / empty.
 
 - **`fn recent_clear() -> bool`**
   forget every recent file of this app
+
+- **`fn recent_list_of(id: &str, max: usize) -> Vec<String>`** *(Windows)*
+  (Windows, tests) the recent files of the jump list of AppUserModelID id
+
+- **`fn recent_remove_of(id: &str, path: &str) -> bool`** *(Windows)*
+  (Windows, tests) a file out of the jump list of AppUserModelID id (Explorer's own:
+  Microsoft.Windows.Explorer)
 
 ### `plat/audio.rs`
 
@@ -20689,6 +20775,19 @@ apps" entry, starting a command line             (r12-inst)  [apps/installer/src
                                   dirs.rs)
   shell_link(lnk, target, dir, desc) -> bool   a shortcut file lnk -> target (working
                                   folder dir, icon 0 of the target, comment desc)  [sh_link]
+  shell_link_id(lnk, target, dir, desc, app_id) -> bool   the same with the AppUserModelID
+                                  app_id ("" = none) as the link's System.AppUserModel.ID
+                                  (the program's explicit id, taskbar.rs: its button, jump
+                                  list and notifications then belong to the link)
+  link_read(lnk) -> Some((target, app_id))   a shortcut's target and System.AppUserModel.ID
+                                  ("" = none)
+  link_set_app_id(lnk, app_id) -> bool   that id written into an existing shortcut
+  pins_set_app_id(dir, exe, app_id) -> usize   the shortcuts in dir and its folders that start
+                                  exe and carry no id get app_id (pins made before the
+                                  program ran under its id no longer match its button);
+                                  Explorer is told of each (SHChangeNotify)
+  pinned_dir() -> Some(path)      the user's pinned items (FOLDERID_UserPinned: TaskBar,
+                                  ImplicitAppShortcuts)
   reg_create(subkey) -> Some(RegKey)   HKCU\subkey opened for writing (created when missing);
                                   RegKey::set_sz / set_dword, closed when dropped
   reg_delete(subkey) -> bool      RegDeleteKeyW(HKCU, subkey)
@@ -20720,6 +20819,23 @@ PATH_CAP: usize = 520
 
 - **`fn shell_link(lnk: &str, target: &str, dir: &str, desc: &str) -> bool`**
   a shortcut lnk -> target (working folder dir, icon 0 of the target, comment desc)  [sh_link]
+
+- **`fn shell_link_id(lnk: &str, target: &str, dir: &str, desc: &str, app_id: &str) -> bool`**
+  a shortcut as shell_link, with the AppUserModelID app_id ("" = none)
+
+- **`fn link_read(lnk: &str) -> Option<(String, String)>`**
+  a shortcut's target (backslashes) and its System.AppUserModel.ID ("" = none)
+
+- **`fn link_set_app_id(lnk: &str, app_id: &str) -> bool`**
+  the AppUserModelID app_id written into the existing shortcut lnk
+
+- **`fn pinned_dir() -> Option<String>`**
+  the user's pinned items (FOLDERID_UserPinned; backslashes)
+
+- **`fn pins_set_app_id(dir: &str, exe: &str, app_id: &str) -> usize`**
+  the shortcuts in dir and in its folders (two levels: TaskBar, ImplicitAppShortcuts/&lt;hash>
+  below pinned_dir()) that start exe and carry no AppUserModelID get app_id -> how many were
+  changed
 
 - **`struct RegKey(isize)`**
   an open registry key (closed when dropped)

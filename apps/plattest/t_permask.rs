@@ -26,7 +26,7 @@ pub fn t_permask(t: &mut T) {
 }
 
 fn syntax(t: &mut T) {
-    let bad: [(&str, &str); 11] = [
+    let bad: [(&str, &str); 13] = [
         ("ask fs.user", "PERMISSIONS:1: fs.user cannot be asked for"),
         ("print\nask", "PERMISSIONS:2: ask needs a permission"),
         ("fs.read /x \"why\"", "a reason belongs to an ask line"),
@@ -38,6 +38,8 @@ fn syntax(t: &mut T) {
         ("fs.read $PLUGIN/x", "$PLUGIN only in a plugin's manifest"),
         ("ask print \"a\u{7}b\"", "no control characters"),
         ("sandbox loose", "sandbox takes nothing or 'strict'"),
+        ("recent all", "takes no arguments"),
+        ("ask recent", "recent cannot be asked for"),
     ];
     for (text, want) in bad {
         match policy::check(text) {
@@ -57,6 +59,7 @@ fn syntax(t: &mut T) {
     t.check(r.is_err() && r.unwrap_err().contains("PERMISSIONS:7: a reason belongs"), "permask: a quote alone is a reason without a line");
     t.check(policy::check(&good[..good.len() - 3]).is_ok(), "permask: ask lines, reasons with '#', agent lines");
     t.check(policy::check("sandbox\nsandbox strict\n").is_ok(), "permask: the sandbox line (with 'strict')");
+    t.check(policy::check("fs.user\nrecent\n").is_ok(), "permask: the recent line (a Flatpak's host list)");
 }
 
 fn installed(t: &mut T) {

@@ -6,13 +6,14 @@
 //                                     extension gets the app in "Open with"; "own" types also
 //                                     open with it by default (their extension is the app's)
 //   parse_schemes(text) -> [scheme]   "scheme scheme ..." (';' or blanks)
-//   plan(app, display, exe, types, schemes) -> Plan { set: [(subkey, name, value)], remove }
+//   plan(app, display, exe, types, schemes, app_id) -> Plan { set: [(subkey, name, value)], remove }
 //                                     remove: "T:<subkey>" (the key with everything below) and
 //                                     "V:<subkey>|<name>" (one value), ';' separated
 //
 // The entries are plat::assoc::reg_entries -- the same ones a developer build writes with
 // --register (lib/plat/assoc.rs): Software\Classes\<app>.<ext> (the ProgID: description,
-// DefaultIcon, shell\open\command = "<exe>" "%1"), Software\Classes\.<ext>\OpenWithProgids\<ProgID>,
+// DefaultIcon, shell\open\command = "<exe>" "%1", AppUserModelID = the app id),
+// Software\Classes\.<ext>\OpenWithProgids\<ProgID>,
 // for "own" types also the default value and Content Type of Software\Classes\.<ext>; a scheme:
 // Software\Classes\<scheme> ("URL:<display>", URL Protocol, DefaultIcon, shell\open\command).
 
@@ -30,10 +31,10 @@ pub(crate) struct Plan {
 }
 
 /// the registry entries of the types and schemes for the program exe
-pub(crate) fn plan(app: &str, display: &str, exe: &str, types: &[FileType], schemes: &[String]) -> Plan {
+pub(crate) fn plan(app: &str, display: &str, exe: &str, types: &[FileType], schemes: &[String], app_id: &str) -> Plan {
     let mut set = Vec::new();
     let mut remove: Vec<String> = Vec::new();
-    for e in reg_entries(app, display, exe, types, schemes) {
+    for e in reg_entries(app, display, exe, types, schemes, app_id) {
         let item = if e.kind == RV_TREE { format!("T:{}", e.root) } else { format!("V:{}|{}", e.key, e.name) };
         if !remove.contains(&item) {
             remove.push(item);

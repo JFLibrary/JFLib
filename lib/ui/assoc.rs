@@ -13,7 +13,10 @@
 //   desk_boot(package) -> Option<exit code>   (main!) keep the built-in PACKAGE text
 //                         (plat::assoc::package_set), run a switch; headless runs (--shot,
 //                         --script, the agent protocols) leave the system's list of recent files
-//                         alone (plat::recent::recent_os(false); jfgui_RECENT still redirects it)
+//                         alone (plat::recent::recent_os(false); jfgui_RECENT still redirects it).
+//                         Without a switch, Windows: the app id as the explicit AppUserModelID
+//                         once the setup installed the program or --register registered it
+//                         (plat::assoc::app_id_boot), before the first window
 //   assoc_switch(pkg, switch) -> Option<(exit code, text)>   one switch for pkg (None: no switch)
 
 use alloc::format;
@@ -39,7 +42,10 @@ pub fn desk_boot(package: Option<&str>) -> Option<i32> {
     if headless {
         plat::recent::recent_os(false);
     }
-    let switch = ["--unregister", "--register-replace", "--register"].into_iter().find(|s| has(s))?;
+    let Some(switch) = ["--unregister", "--register-replace", "--register"].into_iter().find(|s| has(s)) else {
+        assoc::app_id_boot();
+        return None;
+    };
     let (code, text) = assoc_switch(&assoc::package(), switch)?;
     assoc::console_print(&text);
     Some(code)

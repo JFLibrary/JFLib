@@ -211,6 +211,7 @@ pub const UIC_HOTKEY: u32 = 0x7FFF_0015; // arg = id: a global shortcut was pres
 pub const UIC_HOTKEY_LOST: u32 = 0x7FFF_0016; // arg = id: the desktop dropped the shortcut (hotkey_error tells why)
 pub const UIC_PICK: u32 = 0x7FFF_0017; // arg 1: a colour was picked (picked_color), 0: cancelled / failed (pick_color)
 pub const UIC_SCREENSHOT: u32 = 0x7FFF_0018; // arg 1: the picture is there (screenshot_take), 0: failed (screen_error)
+pub const UIC_RECENT: u32 = 0x7FFF_0019; // arg 1: the file of recent_open is readable now (recent_reopened), 0: refused or gone
 pub const TRAY_ACTIVATE: u32 = 1; // UIC_TRAY: the symbol was clicked
 pub const TRAY_SECONDARY: u32 = 2; // UIC_TRAY: double click (Windows) / middle click (Linux)
 

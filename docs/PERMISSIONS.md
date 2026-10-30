@@ -90,6 +90,7 @@ sandbox                               # let the OS enforce the manifest too (OS 
 | `agent.confirm` | action names (`*`, `?`) | external control runs these actions after the user's confirmation |
 | `agent.deny` | action names (`*`, `?`) | external control may not run these actions |
 | `sandbox` | nothing or `strict` | have the OS enforce the manifest as defence in depth ([OS sandbox](#os-sandbox)); `strict` refuses to start without it |
+| `recent` | – | a Flatpak reaches the host's list of recent files: the package gets `--filesystem=xdg-data/recently-used.xbel` ([Flatpak](#flatpak)); that file lists the recent files of every program. Nothing changes at run time: the system's list is always allowed for files the app may read (below); it cannot be asked for |
 
 ### Patterns
 
@@ -175,7 +176,7 @@ net.connect backup.example.org:8443
   recycle bin, `~/.local/share/Trash`, `.Trash-$uid`). `trash` checks the item as a write.
 - The system's list of recent files (`plat::recent_add`: Windows' recent items,
   `~/.local/share/recently-used.xbel`) for a file the app may read; the file is checked as a
-  read.
+  read. A Flatpak reaches the host's list only with the line `recent`.
 - Registering the app's file types and URL schemes (`--register`, `plat::assoc`): only what
   `PACKAGE` declares, in the user's part of the system (`HKCU\Software\Classes`,
   `~/.local/share/applications`, `~/.local/share/mime`, `~/.config/mimeapps.list`), and only
@@ -466,8 +467,8 @@ from the manifest, as defence in depth:
 `tools/pkg_linux.py` derives the Flatpak finish-args from the manifest and is already as narrow
 as it allows: Wayland with X11 as fallback and IPC, the network only with a `net.*` rule, the
 Secret Service only with `secrets`, `--filesystem` holes only for the folders of `fs.*` rules
-(`fs.read` as `:ro`), and portals (file dialog, `open_url`, printing, autostart, the documents
-portal for `fs.user`) instead of holes. Inside the Flatpak the kernel enforces those; the
+(`fs.read` as `:ro`), the host's `recently-used.xbel` only with `recent`, and portals (file
+dialog, `open_url`, printing, autostart, the documents portal for `fs.user`) instead of holes. Inside the Flatpak the kernel enforces those; the
 in-process OS sandbox above stacks on top when the manifest also has a `sandbox` line.
 
 ## Refusals

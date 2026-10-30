@@ -11,8 +11,16 @@
 //                                       extension gets the app under "Open with"; "own" types
 //                                       also open with it by default
 //   parse_schemes(text) -> [scheme]     "scheme scheme ..." (';', ',' or blanks)
-//   reg_entries(app, display, exe, types, schemes) -> [RegValue]   the values below
+//   reg_entries(app, display, exe, types, schemes, app_id) -> [RegValue]   the values below
 //                                       HKCU\Software\Classes the setup and assoc_register write
+//                                       (app_id: the program's AppUserModelID in its ProgIDs,
+//                                       "" = none)
+//   app_id_boot() -> Option<id>         (ui::main!, Windows) PACKAGE's app id as the process's
+//                                       explicit AppUserModelID (taskbar.rs) once the setup
+//                                       installed this program (install.ini beside it names the
+//                                       id) or --register registered it (the record names it);
+//                                       jfgui_AUMID=ID gives one, jfgui_AUMID=off none.  Every
+//                                       other program keeps the id Windows derives from its path
 //   assoc_conflicts(&Package) -> Result<[Conflict], AssocError>   the defaults of other
 //                                       programs a registration would replace
 //   assoc_register(&Package, take) -> Result<Registered, AssocError>   register this program;
@@ -31,10 +39,11 @@
 // what it replaced; unregistering removes those (a value only while it still holds what was
 // written) and puts back what was there.  Windows (win_assoc.rs): the setup's entries below
 // HKCU\Software\Classes -- the ProgID <app>.<ext> (description, DefaultIcon, shell\open\command
-// = "<exe>" "%1"), .<ext>\OpenWithProgids, for own types the default and Content Type of
-// .<ext>, a scheme's key (URL:<display>, URL Protocol) -- then SHChangeNotify.  A default of
-// another program is the extension's default value (HKCU or HKLM) or a key of the same name
-// with another command; the user's own choice in Windows' dialog (UserChoice, hashed) is never
+// = "<exe>" "%1", AppUserModelID = the app id: what Windows asks of a handler with an explicit
+// id for the recent files of the type), .<ext>\OpenWithProgids, for own types the default and
+// Content Type of .<ext>, a scheme's key (URL:<display>, URL Protocol) -- then SHChangeNotify.
+// A default of another program is the extension's default value (HKCU or HKLM) or a key of the
+// same name with another command; the user's own choice in Windows' dialog (UserChoice, hashed) is never
 // changed (Conflict::fixed).  Linux (linux_assoc.rs): $XDG_DATA_HOME/applications/<app_id>.desktop
 // (Exec with %U for schemes, else %F; MimeType=), own types as shared-mime-info XML in
 // $XDG_DATA_HOME/mime/packages/<app_id>.xml, the defaults of own types and schemes in
@@ -231,8 +240,10 @@ pub const RV_SHARED: u8 = 1;
 pub const RV_DEFAULT: u8 = 2;
 
 /// the HKCU values of the file types and schemes for the program exe (backslashes): the setup's
-/// and assoc_register's
-pub fn reg_entries(app: &str, display: &str, exe: &str, types: &[FileType], schemes: &[String]) -> Vec<RegValue> {
+/// and assoc_register's.  app_id: the AppUserModelID the program runs under ("" = none, Windows
+/// derives one): each ProgID names it (AppUserModelID), as Windows wants for the recent files
+/// of an explicit id
+pub fn reg_entries(app: &str, display: &str, exe: &str, types: &[FileType], schemes: &[String], app_id: &str) -> Vec<RegValue> {
     let mut out = Vec::new();
     let mut put = |key: &str, name: &str, value: &str, root: &str, kind: u8| {
         out.push(RegValue { key: String::from(key), name: String::from(name), value: String::from(value), root: String::from(root), kind });
@@ -246,6 +257,9 @@ pub fn reg_entries(app: &str, display: &str, exe: &str, types: &[FileType], sche
         put(&key, "", &t.desc, &key, RV_TREE);
         put(&format!("{key}\\DefaultIcon"), "", &icon, &key, RV_TREE);
         put(&format!("{key}\\shell\\open\\command"), "", &cmd, &key, RV_TREE);
+        if !app_id.is_empty() {
+            put(&key, "AppUserModelID", app_id, &key, RV_TREE);
+        }
         for e in &t.exts {
             let ext = format!("{classes}\\.{e}");
             put(&format!("{ext}\\OpenWithProgids"), &progid, "", "", RV_SHARED);
@@ -418,6 +432,39 @@ pub fn assoc_unregister() -> Result<bool, AssocError> {
 /// the program a registration of this app starts (the record), None without one
 pub fn assoc_registered() -> Option<String> {
     record_read().map(|(exe, _)| exe)
+}
+
+/// (ui::main!) Windows: PACKAGE's app id as the process's explicit AppUserModelID when this
+/// program was installed by the setup (install.ini beside it names the id) or registered with
+/// --register (the record names this program); jfgui_AUMID=ID gives one, =off none -> the id
+/// set.  Other programs (and other systems) keep the id the system derives
+#[doc(hidden)]
+pub fn app_id_boot() -> Option<String> {
+    #[cfg(windows)]
+    {
+        let id = match crate::env("jfgui_AUMID").as_deref() {
+            Some("off") => return None,
+            Some(id) if !id.is_empty() => String::from(id),
+            _ => {
+                let pkg = PACKAGE.lock().clone()?;
+                let exe = program().ok()?;
+                let line = format!("app_id={}", pkg.app_id);
+                let installed = exe.rfind('\\')
+                    .and_then(|k| crate::read_file_raw(&format!("{}\\install.ini", &exe[..k])))
+                    .and_then(|d| String::from_utf8(d).ok())
+                    .is_some_and(|t| t.lines().any(|l| l.trim() == line));
+                let registered = assoc_registered().is_some_and(|p| p.replace('/', "\\").eq_ignore_ascii_case(&exe));
+                if !installed && !registered {
+                    return None;
+                }
+                pkg.app_id
+            }
+        };
+        if crate::taskbar::set_app_user_model_id(&id) {
+            return Some(id);
+        }
+    }
+    None
 }
 
 fn hexval(c: u8) -> Option<u8> {

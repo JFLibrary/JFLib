@@ -216,6 +216,7 @@ fn pl_parse(st: &mut Inst) -> Result<(), ()> {
     st.defsty = kv_get(&man, "default", 48).unwrap_or_default();
     st.types = kv_get(&man, "filetypes", 4096).unwrap_or_default();
     st.schemes = kv_get(&man, "schemes", 512).unwrap_or_default();
+    st.appid = kv_get(&man, "app_id", 128).filter(|a| a.bytes().all(|c| c.is_ascii_alphanumeric() || b"._".contains(&c))).unwrap_or_default();
     // descriptions: desc_<style id>
     for k in 0..st.sty.len() {
         let key = str_cap(&(String::from("desc_") + &st.ents[st.sty[k].ent].name), 64);

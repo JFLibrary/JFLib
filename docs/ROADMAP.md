@@ -247,23 +247,44 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   Pool-Thread), ein asynchrones `dir_list` / `stat`; unter Android und im Browser ohne Shared
   Memory laufen die Jobs ohne Threads zwischen den Frames.
 - **P3** · *teilweise* · „Zuletzt verwendet“ auf OS-Ebene ([`plat/recent.rs`](../lib/plat/recent.rs),
-  seit 2026-10-19, GUIDE §21): `plat::recent_add(path)`, `recent_list(max)`, `recent_remove`,
-  `recent_clear`; in der UI `ui.recent_add(path)` mit der eigenen Liste der App
-  (`ui.recent_files()`, `config://recent.list`, höchstens `RECENT_KEEP`). Windows:
-  `SHAddToRecentDocs` (Explorer: Start/Schnellzugriff, Recent-Ordner), Rücklesen über
-  `IApplicationDocumentLists`, Entfernen über `IApplicationDestinations`; `ui.taskbar_tasks`
-  behält die Kategorie „Zuletzt verwendet“ (`AppendKnownCategory`). Linux:
-  `~/.local/share/recently-used.xbel` im freedesktop-Format (GTK/KDE: MIME-Typ, Eintrag der App
-  mit `exec` und `count`), unter Sperre geändert und atomar ersetzt, fremde Lesezeichen
-  bleiben Byte für Byte. Nur Dateien, die die App lesen darf (`fs.read` / `fs.user`);
-  Headless-Läufe schreiben nichts ins System; `jfgui_RECENT=DATEI` lenkt auf eine xbel-Datei
-  um (alle OS, Tests). Getestet mit `plattest --test recent` (xbel, GLib-Datei, Manifest) und
-  von Hand `--test recent-win`. Es fehlen: Windows ordnete die Datei auf dem Testrechner
-  (Windows 11 26200) nicht der Jump List von plattest zu (auch mit Fenster, expliziter
-  AppUserModelID und `AppUserModelID` im ProgID) – `recent_list` bleibt dort leer, die eigene
-  Liste der App ist die verlässliche; Explorer behält entfernte Einträge (der Nutzer entfernt
-  sie dort); keine explizite AppUserModelID für JFLib-Apps; Flatpak sieht die Liste des Hosts
-  nur mit `--filesystem=xdg-data/recently-used.xbel`; Web und Android.
+  seit 2026-10-19, erweitert 2026-10-30, GUIDE §21): `plat::recent_add(path)`, `recent_list(max)`,
+  `recent_remove`, `recent_clear`; in der UI `ui.recent_add(path)` mit der eigenen Liste der App
+  (`ui.recent_files()`, `config://recent.list`, höchstens `RECENT_KEEP`) und `ui.recent_open(path)`
+  (`Ready`, `Asking` mit `UIC_RECENT` / `ui.recent_reopened()`, `Missing`). Windows:
+  `SHAddToRecentDocs` (Explorer: Start/Schnellzugriff, Recent-Ordner; mit expliziter
+  AppUserModelID `SHARD_APPIDINFO`), Rücklesen über `IApplicationDocumentLists`, Entfernen über
+  `IApplicationDestinations` (beide mit `SetAppID`); `ui.taskbar_tasks` behält die Kategorie
+  „Zuletzt verwendet“ (`AppendKnownCategory`). Explizite AppUserModelID (seit 2026-10-30): die
+  `app_id` aus `PACKAGE`, gesetzt von `ui::main!` vor dem ersten Fenster, sobald das Setup das
+  Programm installiert hat (`app_id=` in `install.ini`) oder `--register` es registriert hat
+  (`config://assoc.list`); das Setup schreibt sie in seine Verknüpfungen
+  (`System.AppUserModel.ID`), in die ProgIDs (`AppUserModelID`) und in Taskleisten-Pins älterer
+  Versionen (`plat::inst::pins_set_app_id`), `package.py` trägt sie ins Setup-Manifest ein;
+  Builds aus `build/`, Apps ohne `PACKAGE` und MSIX bleiben bei der abgeleiteten ID,
+  `jfgui_AUMID` für Tests. Linux: `~/.local/share/recently-used.xbel` im freedesktop-Format
+  (GTK/KDE: MIME-Typ, Eintrag der App mit `exec` und `count`), unter Sperre geändert und atomar
+  ersetzt, fremde Lesezeichen bleiben Byte für Byte; Flatpak: die Zeile `recent` in
+  `PERMISSIONS` gibt dem Paket `--filesystem=xdg-data/recently-used.xbel` (`tools/pkg_linux.py`).
+  Browser: die Liste der App übersteht Neuladen (auch geleert: eine leere Datei, der Speicher
+  kennt kein Löschen); Chromium öffnet Einträge über die Handles wieder (beim Start eingelesen
+  oder `recent_open` fragt aus der Geste nach der Berechtigung), Firefox/Safari nur die Liste.
+  Android: die Liste übersteht Neustarts, die Freigaben der gewählten Dokumente bleiben
+  (`takePersistableUriPermission`) und werden zurückgegeben, wenn ein Dokument die Liste
+  verlässt (verdrängt, entfernt, geleert; Ordner-Freigaben bleiben). Nur Dateien, die die App
+  lesen darf (`fs.read` / `fs.user`); Headless-Läufe schreiben nichts ins System;
+  `jfgui_RECENT=DATEI` lenkt auf eine xbel-Datei um (alle OS, Tests). Getestet mit
+  `plattest --test recent` (xbel, GLib-Datei, Manifest; Windows: die ID, Verknüpfungen und Pins
+  in einem Testordner, ProgID), von Hand `--test recent-win` (ohne Fenster), `files_web.mjs`
+  (Chromium, Firefox) und `android_files.py` (Emulator, API 35). Befund Windows 11 25H2 (26200):
+  `SHAddToRecentDocs` legt die Jump List der ID an (abgeleitete wie explizite ID: die Datei in
+  `AutomaticDestinations` entsteht), lässt sie aber leer – auch mit registriertem Typ samt
+  `AppUserModelID` im ProgID, Standard der Endung, Startmenü-Verknüpfung mit der ID und COM auf
+  dem Thread; die Datei landet in Explorers eigenen Listen. Es fehlen: Einträge in der Jump List
+  der App (eine eigene Kategorie aus der Liste der App über `ICustomDestinationList::AppendCategory`
+  mit `IShellLink`-Einträgen hinge nicht an Windows' Zuordnung); Explorer behält entfernte
+  Einträge (Start/Schnellzugriff, der Nutzer entfernt sie dort); Toasts mit expliziter ID
+  ohne Startmenü-Verknüpfung (`--register`) nicht am Bildschirm geprüft; Firefox öffnet nur, was
+  die App selbst gespeichert hat.
 
 ## 3. Desktop-Integration
 
@@ -372,7 +393,9 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   Probelauf (`plattest --test taskbar`, `apps/traydemo`), ein echtes Fenster mit allen
   Zuständen, Badge und Sprungliste (`plattest --test taskbar-win`, von Hand), die Signale
   gegen einen Fake-Bus und einen echten dbus-daemon. Seit 2026-10-19 behält die Sprungliste die
-  Kategorie „Zuletzt verwendet“ (§2). Es fehlen: eigene Kategorien in der Sprungliste
+  Kategorie „Zuletzt verwendet“ (§2); seit 2026-10-30 gehören Knopf, Sprungliste und Pins eines
+  installierten oder registrierten Programms zur expliziten AppUserModelID aus `PACKAGE` (§2,
+  GUIDE §21). Es fehlen: eigene Kategorien in der Sprungliste
   (`AppendCategory`), Vorschau-Schaltflächen
   (`ThumbBarAddButtons`), Quicklists über dbusmenu unter Linux.
 - **P3** · *erledigt* · Monitore, globale Tastenkürzel, Farbe vom Bildschirm, Bildschirmfotos
