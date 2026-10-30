@@ -18,6 +18,7 @@
 
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 
 use crate::linux_dbus::{Conn, F_NO_REPLY, Msg, T_CALL, Value};
 use crate::sync::Mutex;
@@ -174,10 +175,40 @@ pub(crate) fn portal_request(
     }
 }
 
-/// the portal's version of iface (Properties.Get "version"; 0 = no such portal)
-pub(crate) fn portal_version(c: &mut Conn, iface: &str) -> u32 {
+/// the portal's version of iface (Properties.Get "version"; 0 = no such portal), None when the
+/// portal did not answer (still starting: ask again later)
+pub(crate) fn portal_version_answer(c: &mut Conn, iface: &str) -> Option<u32> {
     let m = Msg::call(PORTAL, PORTAL_PATH, "org.freedesktop.DBus.Properties", "Get", alloc::vec![Value::str(iface), Value::str("version")]);
-    call(c, &m, 3000).and_then(|r| r.body.first().and_then(|v| v.as_u32())).unwrap_or(0)
+    let r = call(c, &m, 3000)?;
+    Some(r.body.first().and_then(|v| v.as_u32()).unwrap_or(0))
+}
+
+/// a portal's version, asked once -- a portal that did not answer (it may still be starting
+/// with the session) is asked again after 30 s; cell: version + 1 (0 = not known), retry: when
+/// to ask again (time_us)
+pub(crate) fn portal_version_cached(cell: &AtomicU32, retry: &AtomicU64, iface: &str) -> u32 {
+    let v = cell.load(Ordering::Relaxed);
+    if v != 0 {
+        return v - 1;
+    }
+    let now = crate::time_us();
+    if now < retry.load(Ordering::Relaxed) {
+        return 0;
+    }
+    match Conn::session().map(|mut c| portal_version_answer(&mut c, iface)) {
+        Some(Some(v)) => {
+            cell.store(v + 1, Ordering::Relaxed);
+            v
+        }
+        Some(None) => {
+            retry.store(now + 30_000_000, Ordering::Relaxed);
+            0
+        }
+        None => {
+            cell.store(1, Ordering::Relaxed); // no session bus: no portal
+            0
+        }
+    }
 }
 
 /// whether this process runs in a Flatpak sandbox

@@ -621,10 +621,18 @@ impl Ui {
         // the area the flyout may use (px, window coordinates): the window, or the screen for
         // popups that become their own OS windows (pp_bounds, U3, §6)
         let area = self.pp_bounds(fw, fh);
-        // taller than the area: it scrolls (U3)
+        // taller than the area: it scrolls (U3).  Where the screen is not known (Wayland) the
+        // area is wide, but no popup gets taller than the screen: a long list scrolls instead
+        // of hanging off it
+        let mut room = area[3] - area[1];
+        if fh > self.wp.rt.fb.h {
+            if let Some(h) = self.uiw_popup_screen_h() {
+                room = room.min(h);
+            }
+        }
         let mut scroll = false;
-        if fh > area[3] - area[1] {
-            fh = area[3] - area[1];
+        if fh > room {
+            fh = room;
             scroll = true;
         }
         // position (x, y) in px
@@ -695,7 +703,7 @@ impl Ui {
             PA_BELOW
         };
         let key = [x, y];
-        let (dx, dy) = self.pp_nudge(idx as u32, [x, y, fw, if scroll { area[3] - area[1] } else { fh }]);
+        let (dx, dy) = self.pp_nudge(idx as u32, [x, y, fw, fh]);
         x += dx;
         y += dy;
         let e = &mut self.wp.popup.pp[idx];
@@ -706,7 +714,7 @@ impl Ui {
         let xd = self.px2dip(x - br[0]);
         let yd = self.px2dip(y - br[1]);
         let wd = if forced != 0 { self.px2dip(forced) } else { 0 };
-        let hd = if scroll { self.px2dip(area[3] - area[1]) } else { 0 };
+        let hd = if scroll { self.px2dip(fh) } else { 0 };
         self.next_rect(xd, yd, wd, hd);
         // popup layer, clipping to the area, not disabled
         let layer = self.layer_set(L_POPUP);
@@ -737,7 +745,7 @@ impl Ui {
         // (U3) too tall: the surface at the height of the area, a scroll view with the
         // content box inside (the shadow stays outside the clip of the view)
         let e = &mut self.wp.popup.pp[idx];
-        e.rect = [x, y, fw, area[3] - area[1]];
+        e.rect = [x, y, fw, fh];
         e.nat = key;
         e.seen = frame;
         self.fl_surface(idx, boxid);

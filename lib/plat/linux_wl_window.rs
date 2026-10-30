@@ -7,12 +7,26 @@
 //        unless PWF_SYSFRAME gets a server-side one (xdg-decoration), xdg_dialog_v1.set_modal
 //        for PWF_MODAL when the compositor has xdg_wm_dialog_v1.  Created unmapped; x, y are
 //        ignored (Wayland clients can neither place their windows nor learn where they are).
-//   win_destroy(w)  win_show(w, mode)  (show = objects + the initial commit; the first
-//        configure is awaited asynchronously, presents wait for it; hide = the window's
-//        objects are destroyed: WSLg keeps the RAIL window of an unmapped toplevel, only a
-//        destroyed wl_surface removes it)   win_activate / win_enable: nothing
-//   win_set_rect(w, x, y, cw, ch)   size only (the position can not be set)
-//   win_get_rect / win_work_area -> None (unknown on Wayland)
+//        Tool windows (PWF_TOOL without PWF_DIALOG) are child windows instead (WLWF_CHILD,
+//        WST_CHILD): a wl_subsurface of the owner's surface (desynchronized), so they can be
+//        placed -- at a position relative to the owner (px, set_position in logical units,
+//        applied with a commit of the owner) -- and move, minimize and stack with it.  Toplevel
+//        tool windows were centred on the owner by every compositor (GNOME, KDE, WSLg).  They
+//        stay inside the owner (clamped; re-clamped when it shrinks), the library moves and
+//        resizes them itself (title bar / edge grips), the keyboard stays with the owner's
+//        toplevel and goes to the child while it is activated (a click on a text box,
+//        win_activate), as on Windows (linux_wl_child.rs).  jfgui_WL_TOOLWIN=toplevel keeps
+//        separate toplevels.
+//   win_destroy(w)  (the windows it owns are never shown again, as on Windows)
+//   win_show(w, mode)  (show = objects + the initial commit; the first configure is awaited
+//        asynchronously, presents wait for it; hide = the window's objects are destroyed:
+//        WSLg keeps the RAIL window of an unmapped toplevel, only a destroyed wl_surface
+//        removes it)   win_activate: which window gets the keys inside a toplevel (child
+//        windows), else nothing   win_enable: nothing
+//   win_set_rect(w, x, y, cw, ch)   size only (the position can not be set); a child
+//        window's position relative to its owner and its size on the pixel grid
+//   win_get_rect -> None (unknown on Wayland), a child window's rectangle in its owner
+//   win_work_area -> None
 //   win_set_title  win_state -> WST_*  win_cmd  win_begin_move  win_begin_resize
 //   win_size -> (w, h)  win_dpi  win_set_min_size (also before the window exists)
 //   wait(deadline_us) -> queued events (0 = poll without blocking, u64::MAX = forever,
@@ -33,17 +47,19 @@ use super::proto::*;
 use super::wire::{fatal, poll, Args, PollFd, A, EINTR, POLLERR, POLLHUP, POLLIN, POLLNVAL, POLLOUT};
 use super::Wl;
 use crate::{
-    E_CLOSE, E_DPI, E_RESIZE, PWF_MASK, PWF_MODAL, PWF_RESIZABLE, PWF_SYSFRAME, PWS_SHOWNA, PW_KEEP, PW_MAX,
-    PW_NOOWNER, WCMD_CLOSE, WCMD_MAXIMIZE, WCMD_MINIMIZE, WCMD_RESTORE, WST_ACTIVE, WST_CSD, WST_FULLSCREEN,
-    WST_MAXIMIZED, WST_MINIMIZED, WST_TILED,
+    E_CLOSE, E_DPI, E_RESIZE, PWF_DIALOG, PWF_MASK, PWF_MODAL, PWF_RESIZABLE, PWF_SYSFRAME, PWF_TOOL,
+    PWS_SHOWNA, PW_KEEP, PW_MAX, PW_NOOWNER, WCMD_CLOSE, WCMD_MAXIMIZE, WCMD_MINIMIZE, WCMD_RESTORE, WST_ACTIVE,
+    WST_CHILD, WST_CSD, WST_FULLSCREEN, WST_MAXIMIZED, WST_MINIMIZED, WST_TILED,
 };
 
 pub(crate) const OUT_MAX: usize = 8;
-const POLL_MAX: usize = 12; // wayland fd + clipboard transfers + the wake eventfd
+const POLL_MAX: usize = 20; // wayland fd + clipboard transfers (16 writers, the drop) + the wake eventfd
 const STATE_BIG: u32 = WST_MAXIMIZED | WST_FULLSCREEN | WST_TILED;
 const TITLE_MAX: usize = 256; // bytes per window incl. the NUL
 pub(crate) const WLWF_USED: u32 = 0x100;
 pub(crate) const WLWF_TOP: u32 = 0x200; // top-level window (no owner)
+pub(crate) const WLWF_CHILD: u32 = 0x400; // a subsurface of its owner (tool window)
+pub(crate) const WLWF_DEAD: u32 = 0x800; // its owner was destroyed: never shown again
 
 /// one wl_output
 #[derive(Clone, Copy, Default)]
@@ -87,6 +103,10 @@ pub(crate) struct Globals {
     pub decom: u32,
     pub dialogm: u32,
     pub tabm: u32,
+    pub subc: u32, // wl_subcompositor (child windows)
+    pub rpm: u32,  // zwp_relative_pointer_manager_v1 (child windows' drags)
+    pub toolwin_top: bool, // jfgui_WL_TOOLWIN=toplevel: tool windows are toplevels
+    pub zc: u32,           // stacking counter of the child windows
     pub xom: u32, // zxdg_output_manager_v1 (screen.rs monitors)
     pub scale_ovr: i32,
     pub refresh: Option<fn()>, // stored only: Wayland has no modal size loop
@@ -133,10 +153,17 @@ pub(crate) struct WinRec {
     pub cursor: u32, // CUR_*
     pub hidmin: bool, // hidden because its owner was minimized
     pub dialog: u32, // xdg_dialog_v1
+    // child windows (WLWF_CHILD)
+    pub sub: u32,    // wl_subsurface
+    pub cx: i32,     // position in the owner's surface (px of the owner)
+    pub cy: i32,
+    pub z: u32,      // stacking order among the owner's children (higher = above)
+    pub wm_caps: u32, // xdg_toplevel.wm_capabilities: bit 1 << n for capability n, bit 0 = sent
+    pub hidpar: bool, // shown, but its owner has no surface now (made when the owner is shown)
 }
 
 /// the globals we bind: name, interface, highest version we speak, lowest we accept
-static GLOBALS: [(&str, &Iface, u32, u32); 11] = [
+static GLOBALS: [(&str, &Iface, u32, u32); 13] = [
     ("wl_compositor", &IFACE_WL_COMPOSITOR, 6, 4),
     ("wl_shm", &IFACE_WL_SHM, 1, 1),
     ("wl_seat", &IFACE_WL_SEAT, 8, 1),
@@ -148,6 +175,8 @@ static GLOBALS: [(&str, &Iface, u32, u32); 11] = [
     ("zxdg_decoration_manager_v1", &IFACE_ZXDG_DM, 1, 1),
     ("xdg_wm_dialog_v1", &IFACE_XDG_WM_DIALOG, 1, 1),
     ("zwp_tablet_manager_v2", &IFACE_TABLET_MGR, 1, 1), // (PN1) linux_wl_tablet.rs
+    ("wl_subcompositor", &IFACE_WL_SUBCOMPOSITOR, 1, 1),  // child windows
+    ("zwp_relative_pointer_manager_v1", &IFACE_ZWP_RPM, 1, 1), // child windows' drags
 ];
 
 /// leading decimal integer (parse_int: blanks, sign)
@@ -192,6 +221,7 @@ impl Wl {
                 self.g.scale_ovr = s; // test aid: pretend outputs have this scale
             }
         }
+        self.g.toolwin_top = crate::env("jfgui_WL_TOOLWIN").is_some_and(|v| v.starts_with('t'));
         // disp.s probing: quiet unless jfgui_BACKEND forces Wayland
         self.w.quiet = crate::disp_wl_quiet();
         self.w.connect()
@@ -255,6 +285,9 @@ impl Wl {
         r.minw = minw;
         r.minh = minh;
         r.flags = (flags & PWF_MASK) | WLWF_USED | if owner == PW_NOOWNER { WLWF_TOP } else { 0 };
+        if owner != PW_NOOWNER && flags & (PWF_TOOL | PWF_DIALOG) == PWF_TOOL && self.g.subc != 0 && !self.g.toolwin_top {
+            r.flags |= WLWF_CHILD;
+        }
         r.owner = owner;
         r.lw = w_dip;
         r.lh = h_dip;
@@ -308,7 +341,7 @@ impl Wl {
     /// the protocol objects of a shown window: wl_surface (+ viewport, fractional scale),
     /// xdg_surface, xdg_toplevel (set_parent for owned windows, title, app id, size limits),
     /// decoration, xdg_dialog (not committed)  [wl_objects_create]
-    fn objects_create(&mut self, w: usize) {
+    pub(crate) fn objects_create(&mut self, w: usize) {
         let flags = self.win[w].flags;
         let wu = w as u64;
         let surf = self.w.send(self.g.comp, &COMPOSITOR_CREATE_SURFACE, &[A::N(&IFACE_WL_SURFACE)]);
@@ -320,6 +353,10 @@ impl Wl {
             let fs = self.w.send(self.g.fsm, &FSM_GET_FRACTIONAL_SCALE, &[A::N(&IFACE_WP_FS), A::O(surf)]);
             self.win[w].fs = fs;
             self.w.set_udata(fs, wu);
+        }
+        if flags & WLWF_CHILD != 0 {
+            self.child_objects_create(w); // a subsurface of the owner, no xdg roles
+            return;
         }
         let xs = self.w.send(self.g.xdg_wm, &WM_BASE_GET_XDG_SURFACE, &[A::N(&IFACE_XDG_SURFACE), A::O(surf)]);
         self.win[w].xsurf = xs;
@@ -363,10 +400,18 @@ impl Wl {
     /// the window disappears: its protocol objects are destroyed (on WSLg only a destroyed
     /// wl_surface removes the RAIL window: attach NULL + commit, or destroying the
     /// xdg_toplevel, leave it on the screen -- measured, WSLg 1.0.79)  [wl_objects_destroy]
-    fn objects_destroy(&mut self, w: usize) {
+    pub(crate) fn objects_destroy(&mut self, w: usize) {
         let r = self.win[w];
         if r.surf == 0 {
             return;
+        }
+        // its child windows go first (shown again with it: hidpar)
+        for c in 0..PW_MAX {
+            let cr = self.win[c];
+            if c != w && cr.flags & (WLWF_USED | WLWF_CHILD) == WLWF_USED | WLWF_CHILD && cr.owner == w as i32 && cr.surf != 0 {
+                self.objects_destroy(c);
+                self.win[c].hidpar = true;
+            }
         }
         if r.dialog != 0 {
             self.w.send(r.dialog, &DIALOG_DESTROY, &[]);
@@ -374,8 +419,16 @@ impl Wl {
         if r.deco != 0 {
             self.w.send(r.deco, &TD_DESTROY, &[]);
         }
-        self.w.send(r.top, &TOPLEVEL_DESTROY, &[]);
-        self.w.send(r.xsurf, &XDG_SURFACE_DESTROY, &[]);
+        if r.top != 0 {
+            self.w.send(r.top, &TOPLEVEL_DESTROY, &[]);
+        }
+        if r.xsurf != 0 {
+            self.w.send(r.xsurf, &XDG_SURFACE_DESTROY, &[]);
+        }
+        if r.sub != 0 {
+            self.w.send(r.sub, &SUBSURFACE_DESTROY, &[]);
+            self.child_unmapped(w);
+        }
         if r.fs != 0 {
             self.w.send(r.fs, &FS_DESTROY, &[]);
         }
@@ -391,6 +444,7 @@ impl Wl {
         r.fs = 0;
         r.deco = 0;
         r.dialog = 0;
+        r.sub = 0;
         r.shown = false;
         r.configured = false;
         r.mapped = false;
@@ -440,11 +494,12 @@ impl Wl {
 
     // ------------------------------------------------------------------ scale + size
 
-    /// logical -> physical pixels at window w's scale  [win_phys]
+    /// logical -> physical pixels at window w's scale (fractional: rounded up -- the buffer
+    /// holds the whole logical size, the viewport's source takes exactly that part)  [win_phys]
     pub(crate) fn phys(&self, logical: i32, w: usize) -> i32 {
         let r = &self.win[w & (PW_MAX - 1)];
         let v = logical.wrapping_mul(r.s120);
-        if r.frac { v.wrapping_add(60) / 120 } else { v / 120 }
+        if r.frac { v.wrapping_add(119) / 120 } else { v / 120 }
     }
 
     /// recompute the physical size; E_RESIZE when it changed  [win_set_phys]
@@ -462,6 +517,7 @@ impl Wl {
             self.inp.evwin = w as i32;
             self.push(E_RESIZE, 0, pw, ph, 0);
         }
+        self.children_clamp(w);
     }
 
     /// the outputs changed: every window picks its scale again  [wl_update_scale_all]
@@ -475,6 +531,7 @@ impl Wl {
     pub(crate) fn update_scale(&mut self, w: i32) {
         let i = slot(w);
         let r = self.win[i];
+        let old = r.s120;
         let (s, frac) = if r.frac_pref != 0 && r.vp != 0 {
             (r.frac_pref as i32, true)
         } else {
@@ -508,6 +565,7 @@ impl Wl {
         }
         self.inp.evwin = w;
         self.push(E_DPI, 0, 0, 0, dpi as u32);
+        self.children_rescale(i, old); // (before the new size clamps them)
         self.set_phys(i);
         if w == self.inp.ptr_win {
             self.cursor_apply();
@@ -524,6 +582,7 @@ impl Wl {
     /// destroy the window's objects and buffers, free its record  [wl_plat_win_destroy]
     pub(crate) fn win_destroy(&mut self, w: i32) {
         let Some(i) = self.rec(w) else { return };
+        self.owned_orphan(i); // (as on Windows, owned windows go with their owner)
         self.objects_destroy(i);
         self.present_free(i);
         self.w.flush();
@@ -540,10 +599,15 @@ impl Wl {
         let Some(i) = self.rec(w) else { return };
         self.win[i].hidmin = false;
         if mode == 0 {
+            self.win[i].hidpar = false;
             self.objects_destroy(i);
             return;
         }
-        if self.win[i].shown {
+        if self.win[i].shown || self.win[i].flags & WLWF_DEAD != 0 {
+            return;
+        }
+        if self.win[i].flags & WLWF_CHILD != 0 {
+            self.child_show(i);
             return;
         }
         if self.win[i].surf == 0 {
@@ -553,6 +617,7 @@ impl Wl {
         self.update_scale(w);
         let s = self.win[i].surf;
         self.w.send(s, &SURFACE_COMMIT, &[]);
+        self.children_show(i);
         self.w.flush();
     }
 
@@ -562,6 +627,9 @@ impl Wl {
         for i in 0..PW_MAX {
             if i == w || self.rec(i as i32).is_none() || self.win[i].owner != w as i32 {
                 continue;
+            }
+            if self.win[i].flags & WLWF_CHILD != 0 {
+                continue; // a subsurface disappears and comes back with its owner
             }
             if hide {
                 if self.win[i].shown {
@@ -577,15 +645,22 @@ impl Wl {
 
     /// the size (the position can not be set on Wayland); applied with the next present, not
     /// reported back  [wl_plat_win_set_rect]
-    pub(crate) fn win_set_rect(&mut self, w: i32, _x: i32, _y: i32, cw: i32, ch: i32) {
+    pub(crate) fn win_set_rect(&mut self, w: i32, x: i32, y: i32, cw: i32, ch: i32) {
         let Some(i) = self.rec(w) else { return };
+        if self.win[i].flags & WLWF_CHILD != 0 {
+            self.child_set_rect(i, x, y, cw, ch);
+            return;
+        }
         if self.win[i].state & STATE_BIG != 0 {
             return; // maximized: the compositor's size
         }
+        // (an integer buffer scale: the buffer is the logical size times it -- an odd size at
+        // scale 2 would never be presented; the UI takes the size it got with win_size)
+        let frac = self.win[i].frac;
         let mut changed = false;
         if cw != PW_KEEP {
-            self.win[i].pw = cw;
             let l = self.phys_logical(cw, i);
+            self.win[i].pw = if frac { cw } else { self.phys(l, i) };
             if l != self.win[i].lw {
                 self.win[i].lw = l;
                 self.win[i].normal_w = l;
@@ -593,8 +668,8 @@ impl Wl {
             }
         }
         if ch != PW_KEEP {
-            self.win[i].ph = ch;
             let l = self.phys_logical(ch, i);
+            self.win[i].ph = if frac { ch } else { self.phys(l, i) };
             if l != self.win[i].lh {
                 self.win[i].lh = l;
                 self.win[i].normal_h = l;
@@ -606,18 +681,27 @@ impl Wl {
         }
     }
 
-    /// logical size of px physical pixels at window w's scale  [phys_logical]
+    /// logical size of px physical pixels at window w's scale (fractional: rounded down, so
+    /// the buffer covers it and the viewport shows it pixel for pixel)  [phys_logical]
     fn phys_logical(&self, px: i32, w: usize) -> i32 {
-        let mut s = self.win[w & (PW_MAX - 1)].s120 as u32;
+        let r = &self.win[w & (PW_MAX - 1)];
+        let mut s = r.s120 as u32;
         if s == 0 {
             s = 120;
         }
-        ((px as u32).wrapping_mul(120).wrapping_add(s >> 1) / s) as i32
+        let round = if r.frac { 0 } else { s >> 1 };
+        ((px as u32).wrapping_mul(120).wrapping_add(round) / s) as i32
     }
 
-    /// the position is unknown on Wayland  [wl_plat_win_get_rect]
-    pub(crate) fn win_get_rect(&mut self, _w: i32) -> Option<[i32; 4]> {
-        None
+    /// the position is unknown on Wayland; a child window's relative to its owner (WST_CHILD)
+    /// [wl_plat_win_get_rect]
+    pub(crate) fn win_get_rect(&mut self, w: i32) -> Option<[i32; 4]> {
+        let i = self.rec(w)?;
+        let r = &self.win[i];
+        if r.flags & WLWF_CHILD == 0 {
+            return None;
+        }
+        Some([r.cx, r.cy, r.pw, r.ph])
     }
 
     /// unknown on Wayland (the assembly fills in the largest output mode and returns 0)
@@ -670,6 +754,9 @@ impl Wl {
         }
         match cmd {
             WCMD_MINIMIZE => {
+                if self.win[i].wm_caps & (1 | 1 << 4) == 1 {
+                    return; // the compositor cannot minimize (sway): nothing happens, nothing is hidden
+                }
                 self.w.send(top, &TOPLEVEL_SET_MINIMIZED, &[]);
                 self.win[i].state |= WST_MINIMIZED;
                 self.hide_owned(i, true);
@@ -696,6 +783,14 @@ impl Wl {
     /// [wl_plat_win_state]
     pub(crate) fn win_state(&self, w: i32) -> u32 {
         let r = &self.win[slot(w)];
+        if r.flags & (WLWF_USED | WLWF_CHILD) == WLWF_USED | WLWF_CHILD {
+            // a child window: its owner's (root's) minimized state, the app's activation
+            let mut s = WST_CHILD | WST_CSD | (self.win[self.root_of(slot(w))].state & WST_MINIMIZED);
+            if self.win.iter().any(|x| x.state & WST_ACTIVE != 0 && x.surf != 0) {
+                s |= WST_ACTIVE;
+            }
+            return s;
+        }
         let mut s = r.state & !WST_ACTIVE;
         if self.win.iter().any(|x| x.state & WST_ACTIVE != 0 && x.surf != 0) {
             s |= WST_ACTIVE;
@@ -709,6 +804,10 @@ impl Wl {
     /// let the compositor move the window (call on a button press)  [wl_plat_win_begin_move]
     pub(crate) fn win_begin_move(&mut self, w: i32) {
         let Some(i) = self.rec(w) else { return };
+        if self.win[i].flags & WLWF_CHILD != 0 {
+            self.child_drag_begin(i, 0);
+            return;
+        }
         let top = self.win[i].top;
         if top == 0 || self.g.seat == 0 {
             return;
@@ -726,12 +825,30 @@ impl Wl {
             return;
         }
         let Some(i) = self.rec(w) else { return };
+        if self.win[i].flags & WLWF_CHILD != 0 {
+            self.child_drag_begin(i, e);
+            return;
+        }
         let top = self.win[i].top;
         if top == 0 || self.g.seat == 0 {
             return;
         }
         self.w.send(top, &TOPLEVEL_RESIZE, &[A::O(self.g.seat), A::U(self.inp.btn_serial), A::U(e)]);
         self.release_buttons();
+        self.w.flush();
+    }
+
+    /// the compositor's window menu at x, y (px of the window; on a button press: its serial)
+    pub(crate) fn win_show_menu(&mut self, w: i32, x: i32, y: i32) {
+        let Some(i) = self.rec(w) else { return };
+        let top = self.win[i].top;
+        if top == 0 || self.g.seat == 0 {
+            return; // a child window has none
+        }
+        let s = self.win[i].s120.max(1);
+        let (lx, ly) = (x * 120 / s, y * 120 / s);
+        self.w.send(top, &TOPLEVEL_SHOW_WINDOW_MENU, &[A::O(self.g.seat), A::U(self.inp.btn_serial), A::I(lx), A::I(ly)]);
+        self.release_buttons(); // the menu has the pointer now
         self.w.flush();
     }
 
@@ -754,7 +871,9 @@ impl Wl {
     /// pump the compositor until an event is queued or the deadline passes -> queued
     /// events  [wl_plat_wait]
     pub(crate) fn wait(&mut self, deadline: u64) -> u32 {
-        if self.win[0].surf == 0 {
+        // (not connected yet; a hidden main window still waits: its owned windows, the
+        // clipboard and wake-ups are served)
+        if self.w.fd < 0 {
             return crate::evq_count();
         }
         let mut polled = false; // the socket was polled once
@@ -766,6 +885,10 @@ impl Wl {
             let p = self.present_service(now); // deferred frames -> next deadline
             if p < next {
                 next = p;
+            }
+            let c = self.clip_tick(now); // a stalled drop transfer gives up
+            if c < next {
+                next = c;
             }
             self.w.flush();
             let n = crate::evq_count();
@@ -908,7 +1031,7 @@ impl Wl {
 
     fn global_id(&self, gi: usize) -> u32 {
         let g = &self.g;
-        [g.comp, g.shm, g.seat, g.xdg_wm, g.ddm, g.vpr, g.fsm, g.csm, g.decom, g.dialogm, g.tabm][gi]
+        [g.comp, g.shm, g.seat, g.xdg_wm, g.ddm, g.vpr, g.fsm, g.csm, g.decom, g.dialogm, g.tabm, g.subc, g.rpm][gi]
     }
 
     fn set_global(&mut self, gi: usize, id: u32, v: u32) {
@@ -933,7 +1056,9 @@ impl Wl {
             7 => g.csm = id,
             8 => g.decom = id,
             9 => g.dialogm = id,
-            _ => g.tabm = id,
+            10 => g.tabm = id,
+            11 => g.subc = id,
+            _ => g.rpm = id,
         }
     }
 }
@@ -1104,6 +1229,19 @@ pub(crate) fn wlh_top_configure(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
     r.pend_state = st;
 }
 
+/// xdg_toplevel.wm_capabilities(array of u32): what the compositor offers (window_menu 1,
+/// maximize 2, fullscreen 3, minimize 4)
+pub(crate) fn wlh_top_caps(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
+    let mut caps = 1;
+    for s in a.arr(0).chunks_exact(4) {
+        let c = u32::from_le_bytes([s[0], s[1], s[2], s[3]]);
+        if (1..32).contains(&c) {
+            caps |= 1 << c;
+        }
+    }
+    wl.win[u as usize & (PW_MAX - 1)].wm_caps = caps;
+}
+
 /// xdg_surface.configure(serial): latch the state  [wlh_xdg_configure]
 pub(crate) fn wlh_xdg_configure(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
     let i = u as usize & (PW_MAX - 1);
@@ -1138,8 +1276,10 @@ pub(crate) fn wlh_xdg_configure(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
     }
     r.lw = w;
     r.lh = h;
+    // configured first: a size the first configure after a show brings (a maximized window
+    // shown again, a dialog the compositor made smaller) is reported like any other (E_RESIZE)
+    r.configured = true;
     wl.set_phys(i);
-    wl.win[i].configured = true;
 }
 
 /// the user asked to close the window  [wlh_top_close]

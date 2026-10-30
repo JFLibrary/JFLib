@@ -3,10 +3,13 @@
 //
 //   tray_set / tray_remove / notify / notify_close / supported   (tray.rs has the contract)
 //
-// The symbol is a StatusNotifierItem: the name org.kde.StatusNotifierItem-<pid>-1, the object
-// /StatusNotifierItem (properties Category, Id, Title, Status, IconName / IconPixmap, ToolTip,
-// ItemIsMenu, Menu; Activate -> Activate, SecondaryActivate -> SecondaryActivate), announced to
-// org.kde.StatusNotifierWatcher (again when the watcher starts anew).  Its menu is a
+// The symbol is a StatusNotifierItem: the name org.kde.StatusNotifierItem-<pid>-1 (when it is
+// taken -- in Flatpak the pid is the same for every app -- the connection's own name and the
+// object path), the object /StatusNotifierItem (properties Category, Id, Title, Status,
+// IconName / IconPixmap, ToolTip, ItemIsMenu, Menu; Activate -> Activate, SecondaryActivate ->
+// SecondaryActivate), announced to org.kde.StatusNotifierWatcher (again when the watcher
+// starts anew).  supported() is whether that watcher runs (KDE, Xfce, ...; GNOME only with the
+// AppIndicator extension): asked on the bus, kept up to date by the thread.  Its menu is a
 // com.canonical.dbusmenu at /MenuBar (GetLayout, GetGroupProperties, Event "clicked" ->
 // Menu(id), AboutToShow); every tray_set raises the layout revision.  tray_remove gives the
 // name back.  Notifications: org.freedesktop.Notifications.Notify with the action "default";
@@ -43,12 +46,15 @@ static OPS: SpinLock<Vec<Op>> = SpinLock::new(Vec::new());
 static WAKE: AtomicI32 = AtomicI32::new(-1);
 // 0 not started, 1 running, 2 no bus
 static STATE: AtomicU32 = AtomicU32::new(0);
+// the StatusNotifierWatcher runs: 1 yes, 0 no, -1 not known yet (the thread asks the bus at
+// its start and follows NameOwnerChanged)
+static WATCHER_UP: AtomicI32 = AtomicI32::new(-1);
 
-fn queue(op: Op) -> bool {
+// the thread runs (started now if not) -> false without a session bus
+fn ensure() -> bool {
     if STATE.load(Ordering::Acquire) == 2 || !session_available() {
         return false;
     }
-    OPS.lock().push(op);
     if STATE.compare_exchange(0, 1, Ordering::AcqRel, Ordering::Acquire).is_ok() {
         // SAFETY: eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK).
         let fd = unsafe { syscall6(290, 0, 0x80000 | 0x800, 0, 0, 0, 0) };
@@ -58,6 +64,14 @@ fn queue(op: Op) -> bool {
             return false;
         }
     }
+    true
+}
+
+fn queue(op: Op) -> bool {
+    if !ensure() {
+        return false;
+    }
+    OPS.lock().push(op);
     let fd = WAKE.load(Ordering::Acquire);
     if fd >= 0 {
         let one = 1u64;
@@ -67,8 +81,9 @@ fn queue(op: Op) -> bool {
     true
 }
 
+/// queued in any case (shown as soon as a watcher appears); true when it is shown now
 pub fn tray_set(t: &Tray) -> bool {
-    queue(Op::Set(t.clone()))
+    queue(Op::Set(t.clone())) && supported()
 }
 
 pub fn tray_remove() {
@@ -83,16 +98,37 @@ pub fn notify_close(id: u32) {
     queue(Op::Close(id));
 }
 
+/// a notification area shows the symbol: the StatusNotifierWatcher runs (the first call waits
+/// up to 1 s for the thread's answer from the bus; the thread follows its comings and goings)
 pub fn supported() -> bool {
-    STATE.load(Ordering::Acquire) != 2 && session_available()
+    if !ensure() {
+        return false;
+    }
+    for _ in 0..200 {
+        let up = WATCHER_UP.load(Ordering::Acquire);
+        if up >= 0 {
+            return up == 1;
+        }
+        if STATE.load(Ordering::Acquire) == 2 {
+            return false;
+        }
+        crate::sleep_ms(5);
+    }
+    false
 }
 
 // ---------------------------------------------------------------- the thread
 
 struct Item {
     tray: Option<Tray>,
-    /// the name is ours and the watcher knows it
+    /// the item is announced (its signals go out)
     named: bool,
+    /// the name service() is ours (else the item is known by the connection's name and path)
+    own_name: bool,
+    /// the RequestName call waiting for its answer (0 = none)
+    req: u32,
+    /// the NameHasOwner(watcher) call waiting for its answer (0 = none)
+    has: u32,
     revision: u32,
     /// dbusmenu id -> the row (ids from 1 in depth-first order)
     rows: Vec<(i32, TrayItem, Vec<i32>)>,
@@ -117,7 +153,12 @@ fn run() {
     let rule = |r: &str| Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "AddMatch", alloc::vec![Value::str(r)]);
     c.send(&rule("type='signal',interface='org.freedesktop.Notifications'"));
     c.send(&rule("type='signal',sender='org.freedesktop.DBus',member='NameOwnerChanged',arg0='org.kde.StatusNotifierWatcher'"));
-    let mut it = Item { tray: None, named: false, revision: 1, rows: Vec::new(), notes: BTreeMap::new(), note_srv: BTreeMap::new(), pending: BTreeMap::new(), clicked: Vec::new() };
+    // (after the match: a watcher that starts meanwhile is seen either way)
+    let has = c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "NameHasOwner", alloc::vec![Value::str(WATCHER)]));
+    if has.is_none() {
+        WATCHER_UP.store(0, Ordering::Release);
+    }
+    let mut it = Item { tray: None, named: false, own_name: false, req: 0, has: has.unwrap_or(0), revision: 1, rows: Vec::new(), notes: BTreeMap::new(), note_srv: BTreeMap::new(), pending: BTreeMap::new(), clicked: Vec::new() };
     loop {
         let ops = core::mem::take(&mut *OPS.lock());
         for op in ops {
@@ -161,19 +202,25 @@ fn apply(c: &mut Conn, it: &mut Item, op: Op) {
         Op::Remove => {
             it.tray = None;
             if it.named {
-                c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "ReleaseName", alloc::vec![Value::S(service())]));
+                if it.own_name {
+                    c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "ReleaseName", alloc::vec![Value::S(service())]));
+                } else {
+                    // (known by the connection's name: the watcher sees a Passive item)
+                    c.send(&Msg::signal(SNI_PATH, SNI_IFACE, "NewStatus", alloc::vec![Value::str("Passive")]));
+                }
                 it.named = false;
+                it.own_name = false;
             }
         }
         Op::Notify(id, n) => {
-            let mut hints = alloc::vec![("desktop-entry", Value::S(crate::vfs::app_id()))];
+            let mut hints = alloc::vec![("desktop-entry", Value::S(crate::linux_desk::desktop_id()))];
             if let Some(i) = &n.icon {
                 hints.push(("image-data", image_data(i)));
             }
             let body = alloc::vec![
                 Value::S(crate::vfs::app_id()),
                 Value::U(0),
-                Value::S(if n.icon.is_some() { String::new() } else { crate::vfs::app_id() }),
+                Value::S(if n.icon.is_some() { String::new() } else { crate::linux_desk::desktop_id() }),
                 Value::S(n.title),
                 Value::S(n.body),
                 Value::A(String::from("s"), alloc::vec![Value::str("default"), Value::str("Öffnen")]),
@@ -192,12 +239,22 @@ fn apply(c: &mut Conn, it: &mut Item, op: Op) {
     }
 }
 
-// take the name and tell the watcher about the item
+// take the name; its answer tells the watcher about the item (register)
 fn announce(c: &mut Conn, it: &mut Item) {
     let name = service();
-    c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "RequestName", alloc::vec![Value::S(name.clone()), Value::U(4)]));
-    c.send(&Msg::call(WATCHER, "/StatusNotifierWatcher", WATCHER, "RegisterStatusNotifierItem", alloc::vec![Value::S(name)]));
+    let r = c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "RequestName", alloc::vec![Value::S(name), Value::U(4)]));
+    it.req = r.unwrap_or(0);
     it.named = true;
+    if it.req == 0 {
+        register(c, it);
+    }
+}
+
+// RegisterStatusNotifierItem: by the name service() when it is ours, else by the object path
+// (the watcher takes the caller's own name with it)
+fn register(c: &mut Conn, it: &Item) {
+    let id = if it.own_name { service() } else { String::from(SNI_PATH) };
+    c.send(&Msg::call(WATCHER, "/StatusNotifierWatcher", WATCHER, "RegisterStatusNotifierItem", alloc::vec![Value::S(id)]));
 }
 
 // dbusmenu ids for the rows, depth first; each entry lists its children's ids
@@ -310,7 +367,7 @@ fn sni_property(it: &Item, name: &str) -> Option<Value> {
         "Title" => Value::S(if tooltip.is_empty() { crate::vfs::app_id() } else { tooltip.clone() }),
         "Status" => Value::str(if t.is_some() { "Active" } else { "Passive" }),
         "WindowId" => Value::I(0),
-        "IconName" => Value::S(if t.and_then(|t| t.icon.as_ref()).is_some() { String::new() } else { crate::vfs::app_id() }),
+        "IconName" => Value::S(if t.and_then(|t| t.icon.as_ref()).is_some() { String::new() } else { crate::linux_desk::desktop_id() }),
         "IconPixmap" => t.and_then(|t| t.icon.as_ref()).map_or_else(empty_pixmaps, icon_pixmaps),
         "OverlayIconName" | "AttentionIconName" | "AttentionMovieName" | "IconThemePath" => Value::str(""),
         "OverlayIconPixmap" | "AttentionIconPixmap" => empty_pixmaps(),
@@ -359,6 +416,19 @@ fn arg_s(m: &Msg, k: usize) -> &str {
 
 fn handle(c: &mut Conn, it: &mut Item, m: &Msg) {
     match m.typ {
+        T_RETURN | T_ERROR if it.has != 0 && m.reply_to == it.has => {
+            it.has = 0;
+            let up = m.typ == T_RETURN && matches!(m.body.first(), Some(Value::B(true)));
+            WATCHER_UP.store(up as i32, Ordering::Release);
+        }
+        T_RETURN | T_ERROR if it.req != 0 && m.reply_to == it.req => {
+            // RequestName: 1 primary owner, 4 already the owner
+            it.req = 0;
+            it.own_name = m.typ == T_RETURN && matches!(m.body.first().and_then(|v| v.as_u32()), Some(1 | 4));
+            if it.named {
+                register(c, it);
+            }
+        }
         T_RETURN | T_ERROR => {
             if let Some(id) = it.pending.remove(&m.reply_to) {
                 if let Some(srv) = m.body.first().and_then(|v| v.as_u32()).filter(|_| m.typ == T_RETURN) {
@@ -386,10 +456,16 @@ fn handle(c: &mut Conn, it: &mut Item, m: &Msg) {
                     }
                 }
             }
-            ("org.freedesktop.DBus", "NameOwnerChanged") => {
-                // the watcher started anew: announce the item again
-                if arg_s(m, 0) == WATCHER && !arg_s(m, 2).is_empty() && it.tray.is_some() {
-                    c.send(&Msg::call(WATCHER, "/StatusNotifierWatcher", WATCHER, "RegisterStatusNotifierItem", alloc::vec![Value::S(service())]));
+            ("org.freedesktop.DBus", "NameOwnerChanged") if arg_s(m, 0) == WATCHER => {
+                // the watcher came or went (supported()); started anew: announce the item again
+                let up = !arg_s(m, 2).is_empty();
+                WATCHER_UP.store(up as i32, Ordering::Release);
+                if up && it.tray.is_some() {
+                    if it.named && it.req == 0 {
+                        register(c, it);
+                    } else if !it.named {
+                        announce(c, it);
+                    }
                 }
             }
             _ => {}

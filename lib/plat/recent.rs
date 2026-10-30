@@ -404,6 +404,12 @@ xmlns:mime=\"http://www.freedesktop.org/standards/shared-mime-info\"\n>\n</xbel>
 
 /// change the file under its lock: f(text) -> Some(new text) to write it (None: unchanged)
 fn xbel_edit(file: &str, f: impl FnOnce(&str) -> Option<String>) -> bool {
+    // the folder first: without $XDG_RUNTIME_DIR (ssh, cron) the lock lies beside the file, and a
+    // new account may have no ~/.local/share yet
+    let dir = &file[..file.rfind(['/', '\\']).unwrap_or(0)];
+    if !dir.is_empty() && !crate::mkdir_raw(dir) {
+        return false;
+    }
     let Some(_lock) = lock(file) else { return false };
     let text = match crate::file_exists_raw(file) {
         0 => String::from(XBEL_EMPTY),
@@ -418,10 +424,7 @@ fn xbel_edit(file: &str, f: impl FnOnce(&str) -> Option<String>) -> bool {
         return false; // never replace a file we cannot read
     }
     match f(&text) {
-        Some(new) => {
-            let dir = &file[..file.rfind(['/', '\\']).unwrap_or(0)];
-            (dir.is_empty() || crate::mkdir_raw(dir)) && crate::write_file_raw(file, new.as_bytes())
-        }
+        Some(new) => crate::write_file_raw(file, new.as_bytes()),
         None => true,
     }
 }

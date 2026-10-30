@@ -144,7 +144,11 @@ pub fn test_x11synth(t: &mut Lt) {
     s.key(t, 29, 0, 'Z' as u32, 'z' as u32, "x11 key at US-Y = z, VK Z");
     s.key(t, 45, 0, 'K' as u32, 'k' as u32, "x11 single keysym k");
     s.key(t, 45, 1, 'K' as u32, 'K' as u32, "x11 single keysym k + Shift = K (core rule)");
-    s.key(t, 49, 0, 0xC0, '^' as u32, "x11 dead circumflex -> ^");
+    // dead keys are held back and composed with the next key (as on Windows)
+    s.key(t, 49, 0, 0xC0, 0, "x11 dead circumflex: held back");
+    s.key(t, 26, 0, 'E' as u32, 0xEA, "x11 dead circumflex + e = e-circumflex");
+    s.key(t, 49, 0, 0xC0, 0, "x11 dead circumflex again: held back");
+    s.key(t, 49, 0, 0xC0, '^' as u32, "x11 dead circumflex twice = ^");
     s.key(t, 49, 1, 0xC0, 0xB0, "x11 Shift+^ = degree");
     s.key(t, 79, 0x10, 0x67, '7' as u32, "x11 NumLock KP7 = 7, VK_NUMPAD7");
     s.key(t, 79, 0, 0x24, 0, "x11 KP7 without NumLock = VK_HOME");

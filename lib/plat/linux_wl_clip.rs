@@ -58,8 +58,9 @@ const MB_RTF_APP: u64 = 2048;
 const MB_URI: u64 = 64; // text/uri-list (K1)
 const SRC_ACTS_SHIFT: u32 = 40; // an offer's udata: the source's dnd actions above the MIME bits
 const MB_ANYTEXT: u64 = MB_UTF8 | MB_UTF8S | MB_TEXT | MB_STRING;
-const WR_MAX: usize = 8; // concurrent transfers to other clients
+const WR_MAX: usize = 16; // concurrent transfers to other clients (a clipboard manager takes every format at once)
 const READ_TIMEOUT: u64 = 3_000_000; // us
+const DND_IDLE_US: u64 = 10_000_000; // a drop source that sends nothing this long is given up
 const CLIP_MAX: usize = 1 << 29; // largest clipboard transfer we read (K1)
 const DND_MAX: usize = 1 << 20; // largest text/uri-list of a drop (K1)
 const DND_IMAGE_MAX: usize = 1 << 28; // largest image of a drop
@@ -135,6 +136,8 @@ pub(crate) struct Clip {
     dnd_queue: Vec<(u32, &'static [u8])>, // the kinds still to read: (DT_* kind, MIME type)
     dnd_kind: (u32, &'static [u8]), // the one being read
     dnd_rfd: i32, // its pipe (0 = none)
+    dnd_got: bool, // some data of the drop was taken
+    dnd_deadline: u64, // time_us when the drop transfer gives up (no data for DND_IDLE_US)
     // the app's drag (drag_start)
     ds: u32, // its wl_data_source (0 = none)
     ds_data: Vec<(&'static [u8], Vec<u8>)>,
@@ -322,8 +325,15 @@ impl Wl {
         }
     }
 
-    // the drop's reads are done: E_DROP, finish
+    // the drop's reads are done: E_DROP, finish -- or, when nothing could be taken (too
+    // large, empty), no drop: not finished, so a moving source keeps its data
     fn dnd_done(&mut self) {
+        if !self.clip.dnd_got {
+            self.inp.evwin = self.clip.dnd_xwin;
+            self.push(E_DRAG, 0, -1, -1, 0);
+            self.dnd_end(false);
+            return;
+        }
         crate::drop_set_effect(self.clip.dnd_xeffect);
         self.inp.evwin = self.clip.dnd_xwin;
         let (x, y, n) = (self.clip.dnd_xx, self.clip.dnd_xy, self.clip.dnd_xfiles);
@@ -368,8 +378,9 @@ impl Wl {
                 let (kind, mime) = self.clip.dnd_kind;
                 sys_close(self.clip.dnd_rfd);
                 self.clip.dnd_rfd = 0;
-                if data.len() <= limit {
+                if data.len() <= limit && !data.is_empty() {
                     self.dnd_take(kind, mime, &data);
+                    self.clip.dnd_got = true;
                 }
                 if !self.dnd_receive_next() {
                     self.dnd_done();
@@ -378,7 +389,23 @@ impl Wl {
             }
             // SAFETY: the kernel wrote r bytes behind len.
             unsafe { buf.set_len(len + r as usize) };
+            self.clip.dnd_deadline = crate::time_us() + DND_IDLE_US;
         }
+    }
+
+    /// (wait) a drop transfer whose source sends nothing gives up -> the next deadline
+    pub(crate) fn clip_tick(&mut self, now: u64) -> u64 {
+        if self.clip.dnd_rfd == 0 || self.clip.dnd_deadline == 0 {
+            return u64::MAX;
+        }
+        if now < self.clip.dnd_deadline {
+            return self.clip.dnd_deadline;
+        }
+        self.clip.dnd_deadline = 0;
+        self.inp.evwin = self.clip.dnd_xwin;
+        self.push(E_DRAG, 0, -1, -1, 0);
+        self.dnd_end(false); // (not finished: a moving source keeps its data)
+        u64::MAX
     }
 
     // ------------------------------------------------------------------ source (copy side)
@@ -618,12 +645,13 @@ impl Wl {
         let mut buf: Vec<u8> = vec![0; 65536];
         let mut len = 0usize;
         let rich = matches!(fmt, CLIP_HTML | CLIP_RTF | CLIP_DOCX);
-        let deadline = crate::time_us() + READ_TIMEOUT;
+        // 3 s without data (not 3 s in all: large data, made while it is read, takes longer)
+        let mut deadline = crate::time_us() + READ_TIMEOUT;
         loop {
             let now = crate::time_us();
             if now >= deadline {
                 if self.w.debug {
-                    crate::write_stderr(b"[wl] clipboard: no data within 3 s\n");
+                    crate::write_stderr(b"[wl] clipboard: no data for 3 s\n");
                 }
                 sys_close(p[0]);
                 return None;
@@ -668,6 +696,7 @@ impl Wl {
                 break;
             }
             len += r as usize;
+            deadline = crate::time_us() + READ_TIMEOUT;
             if rich && len > crate::CLIP_RICH_MAX {
                 sys_close(p[0]);
                 return None;
@@ -799,6 +828,8 @@ pub(crate) fn wlh_dd_drop(wl: &mut Wl, _id: u32, _a: &Args, _u: u64) {
         _ => e,
     };
     c.dnd_queue = queue;
+    c.dnd_got = false;
+    c.dnd_deadline = crate::time_us() + DND_IDLE_US;
     c.dnd_offer = 0; // leave must not destroy it
     if !wl.dnd_receive_next() {
         wl.dnd_end(false);

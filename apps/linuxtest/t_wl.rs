@@ -258,6 +258,11 @@ pub fn test_wlwin(t: &mut Lt) {
     pump_log(300);
     plat::popup(0, 0, Some([60, 50, 120, 80]), Some(&f));
     pump_log(1500);
+    // an odd pixel size (a tooltip, a menu): at an integer scale without a viewport the buffer
+    // would not be a multiple of it -- wl_surface.invalid_size ends the connection
+    let po = solid(121, 81, 0xFF30C0C0);
+    plat::popup(0, 0, Some([31, 41, 121, 81]), Some(&plat::Frame { px: &po, w: 121, h: 81, stride: 484 }));
+    pump_log(600);
     plat::popup(0, 0, None, None);
     pump_log(200);
     // a custom cursor (premultiplied ARGB, 32 x 32, hot spot 4, 4)

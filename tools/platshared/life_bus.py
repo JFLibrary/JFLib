@@ -14,7 +14,7 @@ import argparse, os, signal, socket, subprocess, sys, tempfile, threading, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from portal_bus import R, W, message, parse  # noqa: E402
+from portal_bus import R, W, listen_unix, message, parse  # noqa: E402
 
 fails = 0
 
@@ -28,9 +28,7 @@ def check(name, ok, info=""):
 
 def serve(path, rec, signals):
     """a bus that answers Hello / AddMatch and sends `signals` after the first AddMatch"""
-    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    srv.bind(path)
-    srv.listen(1)
+    srv = listen_unix(path, 1)
     srv.settimeout(20)
     try:
         c, _ = srv.accept()
@@ -97,8 +95,8 @@ def main():
                 (desk, sett, "SettingChanged", "ssv", ["org.gnome.desktop.interface", "text-scaling-factor", ("d", 1.25)])]
     with tempfile.TemporaryDirectory() as d:
         sp, ep = os.path.join(d, "system"), os.path.join(d, "session")
-        ts = [threading.Thread(target=serve, args=(sp, sysrec, sleep), daemon=True),
-              threading.Thread(target=serve, args=(ep, sesrec, settings), daemon=True)]
+        ts = [threading.Thread(target=serve, args=(listen_unix(sp, 1), sysrec, sleep), daemon=True),
+              threading.Thread(target=serve, args=(listen_unix(ep, 1), sesrec, settings), daemon=True)]
         for t in ts:
             t.start()
         env = dict(os.environ, DBUS_SYSTEM_BUS_ADDRESS=f"unix:path={sp}", DBUS_SESSION_BUS_ADDRESS=f"unix:path={ep}")

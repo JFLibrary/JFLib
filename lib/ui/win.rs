@@ -401,7 +401,9 @@ pub(crate) fn uiw_moving_pw(pw: i32, r: &mut [i32; 4]) {
         }
         (s, p.p2u.iter().position(|&u| u as i32 == s[0]))
     };
-    let Some(o) = opw.and_then(|o| plat::win_get_rect(o as i32)) else { return };
+    // the owner's client origin on the screen; unknown (Wayland): the platform moves a child
+    // window (WST_CHILD) and gives its position relative to the owner
+    let o = opw.and_then(|o| plat::win_get_rect(o as i32)).unwrap_or([0; 4]);
     let a = [o[0] + s[1], o[1] + s[2], s[3], s[4]];
     (r[0], r[1]) = snap_to(r[0], r[1], r[2], r[3], a, s[5]);
 }
@@ -431,6 +433,10 @@ fn snap_to(x: i32, y: i32, w: i32, h: i32, a: [i32; 4], d: i32) -> (i32, i32) {
     }
     r
 }
+
+/// (Wayland) the room (DIP) a popup taller than its window leaves on the screen for panels, docks
+/// and the top bar, which the platform does not tell (uiw_popup_screen_h)
+const POPUP_PANEL_ROOM: i32 = 96;
 
 /// dip2px_at(dip, dpi) -> round(dip * dpi / 96)
 fn dip2px_at(dip: i32, dpi: i32) -> i32 {
@@ -2010,7 +2016,8 @@ impl Ui {
     // uiw_owner_origin(i) -> screen position (px) of the client origin of the window's
     // owner as the UI sees it (below a library title bar); OS windows ask the platform,
     // headless runs use the last reported position.  origin_ok = false when the platform
-    // does not know it (Wayland; X11 before the window manager placed it)
+    // does not know it (Wayland; X11 before the window manager placed it).  A child window
+    // (WST_CHILD: a Wayland subsurface) is placed relative to its owner: origin 0, 0
     fn uiw_owner_origin(&mut self, i: u32) -> (i32, i32) {
         let owner = self.m.win.recs[(i as usize) & (WIN_MAX - 1)].owner;
         let ou = (owner as usize) & (WIN_MAX - 1);
@@ -2018,8 +2025,13 @@ impl Ui {
         self.m.win.origin_ok = true;
         if self.uiw_os() {
             self.m.win.origin_ok = false;
+            let own_pw = self.uiw_pw(i);
             let pw = self.uiw_pw(owner);
-            if pw >= 0 {
+            if own_pw >= 0 && plat::win_state(own_pw) & plat::WST_CHILD != 0 {
+                self.m.win.origin_ok = true;
+                x = 0;
+                y = 0;
+            } else if pw >= 0 {
                 if let Some(r) = plat::win_get_rect(pw) {
                     self.m.win.origin_ok = true;
                     x = r[0];
@@ -2343,6 +2355,23 @@ impl Ui {
         a[2] = a[2].max(self.wp.rt.fb.w);
         a[3] = a[3].max(self.wp.rt.fb.h);
         Some((a, known))
+    }
+
+    /// uiw_popup_screen_h -> the tallest popup (px of the live window) that leaves the window
+    /// where the platform does not tell where the window is (Wayland): the lowest output's
+    /// height less POPUP_PANEL_ROOM for panels (the compositor slides the popup on screen, so a
+    /// longer one scrolls), never less than the window; None where the area is known
+    pub(crate) fn uiw_popup_screen_h(&mut self) -> Option<i32> {
+        if !self.uiw_os() || self.uiw_cur as usize >= WIN_MAX {
+            return None;
+        }
+        let pw = self.uiw_pw(self.uiw_cur);
+        if pw < 0 || (plat::win_get_rect(pw).is_some() && plat::win_work_area(pw).is_some()) {
+            return None;
+        }
+        // monitor units are the compositor's logical units: DIP of the window's scale
+        let h = plat::monitors().iter().map(|m| m.work[3]).filter(|&h| h > 0).min()?;
+        Some(dip2px_at((h - POPUP_PANEL_ROOM).max(h / 2), self.wp.rt.dpi).max(self.wp.rt.fb.h))
     }
 
     /// uiw_popup_nudge(item, key) -> (dx, dy) px: how far the platform moved item `item` of the

@@ -557,16 +557,7 @@ fn dirs(src: u32) -> Vec<String> {
     match src {
         SRC_SYSTEM => {
             v = plat::spell::hunspell_dirs();
-            if cfg!(target_os = "linux") {
-                match plat::env("XDG_DATA_HOME").filter(|h| !h.is_empty()) {
-                    Some(h) => v.push(format!("{}/hyphen", h.trim_end_matches('/'))),
-                    None => v.extend(plat::env("HOME").map(|h| format!("{}/.local/share/hyphen", h.trim_end_matches('/')))),
-                }
-                let data = plat::env("XDG_DATA_DIRS").filter(|d| !d.is_empty()).unwrap_or_else(|| String::from("/usr/local/share:/usr/share"));
-                for d in data.split(':').filter(|d| !d.is_empty()) {
-                    v.push(format!("{}/hyphen", d.trim_end_matches('/')));
-                }
-            }
+            v.extend(plat::spell::hyphen_dirs());
             if cfg!(windows) {
                 for pf in ["ProgramFiles", "ProgramFiles(x86)"] {
                     let Some(p) = plat::env(pf) else { continue };

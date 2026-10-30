@@ -12,6 +12,7 @@
 // of wl_registry.bind).  Signature characters: i u f o n s a h, `?` = nullable prefix, N =
 // the bind new_id.  A destructor makes the object a zombie until wl_display.delete_id.
 
+use super::child::*;
 use super::clip::*;
 use super::input::*;
 use super::popup::*;
@@ -88,6 +89,7 @@ pub(crate) const TOPLEVEL_DESTROY: Req = rd(0, "destroy:");
 pub(crate) const TOPLEVEL_SET_PARENT: Req = rq(1, "set_parent:?o");
 pub(crate) const TOPLEVEL_SET_TITLE: Req = rq(2, "set_title:s");
 pub(crate) const TOPLEVEL_SET_APP_ID: Req = rq(3, "set_app_id:s");
+pub(crate) const TOPLEVEL_SHOW_WINDOW_MENU: Req = rq(4, "show_window_menu:ouii");
 pub(crate) const TOPLEVEL_MOVE: Req = rq(5, "move:ou");
 pub(crate) const TOPLEVEL_RESIZE: Req = rq(6, "resize:ouu");
 pub(crate) const TOPLEVEL_SET_MAX_SIZE: Req = rq(7, "set_max_size:ii");
@@ -108,8 +110,17 @@ pub(crate) const DATA_OFFER_FINISH: Req = rq(3, "finish:");
 pub(crate) const DATA_OFFER_SET_ACTIONS: Req = rq(4, "set_actions:uu");
 pub(crate) const DATA_SOURCE_SET_ACTIONS: Req = rq(2, "set_actions:u"); // the app's drag (dnd.rs)
 pub(crate) const DATA_DEVICE_START_DRAG: Req = rq(0, "start_drag:?oo?ou");
+// wl_subcompositor / wl_subsurface: tool windows drawn inside their owner (child windows)
+pub(crate) const SUBCOMPOSITOR_GET_SUBSURFACE: Req = rq(1, "get_subsurface:noo");
+pub(crate) const SUBSURFACE_DESTROY: Req = rd(0, "destroy:");
+pub(crate) const SUBSURFACE_SET_POSITION: Req = rq(1, "set_position:ii");
+pub(crate) const SUBSURFACE_PLACE_ABOVE: Req = rq(2, "place_above:o");
+pub(crate) const SUBSURFACE_SET_DESYNC: Req = rq(5, "set_desync:");
+pub(crate) const RPM_GET_RELATIVE_POINTER: Req = rq(1, "get_relative_pointer:no");
+pub(crate) const RP_DESTROY: Req = rd(0, "destroy:");
 pub(crate) const VIEWPORTER_GET_VIEWPORT: Req = rq(1, "get_viewport:no");
 pub(crate) const VIEWPORT_DESTROY: Req = rd(0, "destroy:");
+pub(crate) const VIEWPORT_SET_SOURCE: Req = rq(1, "set_source:ffff");
 pub(crate) const VIEWPORT_SET_DESTINATION: Req = rq(2, "set_destination:ii");
 pub(crate) const FSM_GET_FRACTIONAL_SCALE: Req = rq(1, "get_fractional_scale:no");
 pub(crate) const FS_DESTROY: Req = rd(0, "destroy:");
@@ -209,7 +220,7 @@ pub(crate) static IFACE_XDG_SURFACE: Iface = Iface { name: "xdg_surface", evs: &
 pub(crate) static IFACE_XDG_TOPLEVEL: Iface = Iface {
     name: "xdg_toplevel",
     evs: &[ev("configure:iia", wlh_top_configure), ev("close:", wlh_top_close), ig("configure_bounds:ii"),
-           ig("wm_capabilities:a")],
+           ev("wm_capabilities:a", wlh_top_caps)],
 };
 
 pub(crate) static IFACE_WL_DDM: Iface = Iface { name: "wl_data_device_manager", evs: &[] };
@@ -230,6 +241,20 @@ pub(crate) static IFACE_WL_DATA_SOURCE: Iface = Iface {
     evs: &[ig("target:?s"), ev("send:sh", wlh_src_send), ev("cancelled:", wlh_src_cancelled),
            ev("dnd_drop_performed:", wlh_src_dropped), ev("dnd_finished:", wlh_src_dnd_finished), ev("action:u", wlh_src_action)],
 };
+
+pub(crate) static IFACE_WL_SUBCOMPOSITOR: Iface = Iface { name: "wl_subcompositor", evs: &[] };
+
+pub(crate) static IFACE_WL_SUBSURFACE: Iface = Iface { name: "wl_subsurface", evs: &[] };
+
+/// the wl_display.sync after a child window's new position (linux_wl_child.rs)
+pub(crate) static IFACE_CB_DRAG: Iface = Iface { name: "wl_callback", evs: &[ev("done:u", wlh_drag_done)] };
+
+/// relative-pointer-unstable-v1: the pointer's motion during the first drags of child
+/// windows (linux_wl_child.rs: how the compositor reports positions during a grab)
+pub(crate) static IFACE_ZWP_RPM: Iface = Iface { name: "zwp_relative_pointer_manager_v1", evs: &[] };
+
+pub(crate) static IFACE_ZWP_RP: Iface =
+    Iface { name: "zwp_relative_pointer_v1", evs: &[ev("relative_motion:uuffff", wlh_rel_motion)] };
 
 pub(crate) static IFACE_WP_VIEWPORTER: Iface = Iface { name: "wp_viewporter", evs: &[] };
 

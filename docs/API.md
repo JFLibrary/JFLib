@@ -8561,7 +8561,8 @@ Events (E_WAKE): a chosen menu row runs App::command(id, 0) like a row of the wi
 - **`fn notify_close(&mut self, id: u32)`**
   take a notification away
 - **`fn tray_supported(&self) -> bool`**
-  whether this system shows the symbol and notifications
+  whether this system shows the symbol (a notification area; GNOME: only with the
+  AppIndicator extension); notifications work without one
 - **`fn bring_to_front(&mut self)`**
   restore the main window when it is minimised and activate it
 
@@ -17372,7 +17373,8 @@ STORE: &str = "config://permission-decisions.txt"
 
 - **`fn font_dirs() -> Vec<String>`**
   the system font folders in the order fontdb scans them: jfgui_FONTDIRS (';' separated,
-  on Linux also ':'), else the Windows / XDG folders
+  on Linux also ':'), else the Windows / XDG folders; on Linux then fontconfig's own folders
+  (fontconfig_dirs: NixOS, TeX fonts, a &lt;dir> of the user) and in Flatpak the host's fonts
 
 - **`fn net_connect_allowed(addr: &crate::net::SocketAddr) -> bool`**
   whether a TCP connection or a UDP datagram to addr is allowed: a net.connect rule with
@@ -18013,6 +18015,9 @@ spell -- the system's spell checker
   SysSpeller::open(tag) -> checker   language(), check(word), suggest(word, max)
   hunspell_dirs() -> folders       where Hunspell dictionaries live here (DICPATH, Linux:
                                    the XDG data folders); the spell crate reads them
+  hyphen_dirs() -> folders         where hyphenation patterns live here (Linux: hyphen in
+                                   the XDG data folders); spell::Hyphenator reads them
+  (both always readable for the app's permissions, policy.rs)
 
 Windows (win_spell.rs): ISpellCheckerFactory / ISpellChecker of the Spell Checking API
 (Windows 8 and later; the languages are the installed language packs).  COM on the calling
@@ -18032,6 +18037,12 @@ dictionaries are files the spell crate reads itself.
   (~/.local/share/hunspell) and hunspell, myspell, myspell/dicts below every XDG_DATA_DIRS
   folder (default /usr/local/share, /usr/share); Web / Android: none.  Always readable for
   the app's permissions (policy.rs), like the font folders.
+
+- **`fn hyphen_dirs() -> Vec<String>`**
+  the system's folders of hyphenation patterns (hyph_\*.dic, LibreOffice's format: Linux
+  $XDG_DATA_HOME/hyphen (~/.local/share/hyphen), then hyphen in each of $XDG_DATA_DIRS
+  (/usr/local/share, /usr/share) -- where the distributions' hyphen-\* packages put them);
+  empty elsewhere (Windows: spell::Hyphenator looks in LibreOffice's extensions itself)
 
 - **`fn sys_spell_find(lang: &str) -> Option<String>`**
   the tag of a language the system's checker knows (see the module header)
@@ -18065,7 +18076,10 @@ tray -- the app's symbol in the notification area (system tray) and system notif
                                  it reports NoteClicked
   notify_close(id)
   tray_take() -> Vec<TrayEvent>  what happened since the last call; every event calls wake()
-  tray_supported() -> bool       whether this system has a notification area / notifications
+  tray_supported() -> bool       whether this system shows the symbol: a notification area
+                                 (Linux: a StatusNotifierWatcher runs -- KDE, Xfce, ...; GNOME
+                                 only with the AppIndicator extension); notifications work
+                                 without one
   set_dry_run(on)                print instead of showing from now on (headless UI runs)
 
 Windows (win_tray.rs): Shell_NotifyIconW on a message-only window of the UI thread, the menu
@@ -18137,7 +18151,8 @@ TI_SEPARATOR: u32 = 4
   take a notification away
 
 - **`fn tray_supported() -> bool`**
-  whether the symbol and notifications can be shown here
+  whether the symbol can be shown here (a notification area; Linux: a StatusNotifierWatcher
+  runs -- GNOME needs the AppIndicator extension); notifications work without one
 
 ### `plat/power.rs`
 
@@ -19700,7 +19715,8 @@ Bounded control-channel IO primitives. Only explicitly enabled callers read stdi
   Diagnostics use `write_stderr`; protocol responses use `write_stdout`.
 
 - **`fn read_stdin(bytes: &mut [u8]) -> Result<usize, u32>`** *(Linux)*
-  Read bytes from the process standard input, retrying interrupted system calls.
+  Read bytes from the process standard input, retrying interrupted system calls and waiting
+  on a descriptor inherited non-blocking.
 
 ### `plat/control_ipc_win.rs` (Windows)
 
@@ -21204,6 +21220,9 @@ BK_X11: u32 = 2
   - `fn win_cmd(&mut self, w: i32, cmd: u32)`
   - `fn win_begin_move(&mut self, w: i32)`
   - `fn win_begin_resize(&mut self, w: i32, edges: u32)`
+  - `fn win_show_menu(&mut self, _w: i32, _x: i32, _y: i32)`
+    the window manager's window menu at x, y (px of the window) on a button press; default
+    none (X11)
   - `fn win_size(&mut self, w: i32) -> (i32, i32)`
   - `fn win_dpi(&mut self, w: i32) -> i32`
   - `fn win_set_min_size(&mut self, w: i32, w_dip: i32, h_dip: i32)`
@@ -21265,6 +21284,10 @@ BK_X11: u32 = 2
 
 - **`fn win_begin_resize(w: i32, edges: u32)`**
 
+- **`fn win_show_menu(w: i32, x: i32, y: i32)`**
+  the compositor's window menu (move, resize, always on top, ...) of window w at x, y (px of
+  the window); call on the press of the right button over a library-drawn title bar
+
 - **`fn win_size(w: i32) -> (i32, i32)`**
 
 - **`fn win_dpi(w: i32) -> i32`**
@@ -21278,10 +21301,12 @@ BK_X11: u32 = 2
 - **`fn win_set_cursor(w: i32, shape: u32)`**
 
 - **`fn win_hit_hook(f: Option<fn(i32, i32, i32) -> u32>)`**
-  stored only: the Linux backends need no hit tests
+  stored: the compositor needs no hit tests, the Wayland backend asks it for the click
+  activation of child windows (disp_hit)
 
-- **`fn win_move_hook(_f: Option<fn(i32, &mut [i32; 4])>)`**
-  none: the window manager or compositor moves the windows and does not ask (no snapping)
+- **`fn win_move_hook(f: Option<fn(i32, &mut [i32; 4])>)`**
+  stored: the window manager or compositor moves toplevels and does not ask; the Wayland
+  backend snaps the child windows it moves itself (disp_moving)
 
 - **`fn set_refresh(f: Option<fn()>)`**
 
@@ -21322,8 +21347,10 @@ BK_X11: u32 = 2
   Forward caret position to backends with text-input support.
 
 - **`fn theme() -> i32`**
-  0 light, 1 dark, -1 unknown: jfgui_THEME=light|dark wins, else GTK_THEME "Name:dark"
-  means dark  [plat_theme]
+  0 light, 1 dark, -1 unknown: jfgui_THEME=light|dark wins, then GTK_THEME "Name:dark" or
+  "Name-dark", then the settings portal's answer at the last sys_settings (color-scheme;
+  GNOME's "Default" is light; unknown before the first, e.g. in headless runs)
+  [plat_theme]
 
 - **`fn pen_devices() -> i32`**
   pens / pen tablets of the display backend (-1 = unknown or no display)  [plat_pen_devices]
@@ -21434,6 +21461,9 @@ backend fills the same table from the core keyboard mapping)        [src/plat/li
   xkb_use_fallback()                     built-in evdev -> US English table
   xkb_set_mods(depressed, latched, locked, group) -> MOD_* bits (also wl_mods())
   xkb_key(evdev) -> (VK, text codepoint)  for the current modifiers (text 0 = none)
+  xkb_key_typed(evdev) -> (VK, [text; 2]) a key press with the dead keys composed (below)
+  xkb_dead_reset()                       forget a pending dead key (focus change)
+  xkb_dead_keysym(spacing) -> X keysym   the dead keysym of a dead key's spacing character
   xkb_is_modifier(evdev) -> bool         the key is a modifier (never auto-repeats)
   xkb_mod_bit(evdev) -> MOD_* bit the key holds (Shift / Ctrl / Alt / Super / AltGr) or 0
   xkb_dump()                             print the parsed table to stdout (tests)
@@ -21451,8 +21481,12 @@ pair -> alphabetic).
 Level: ONE -> 1; KEYPAD -> (Shift ^ NumLock) ? 2 : 1;
        else s = Shift ^ (ALPHA && Caps && !Level3), level = (Level3 ? 3 : 1) + s.
 Text is produced for codepoints >= 0x20 (not 0x7F) unless Ctrl / Alt / Super is held
-without Level3 (AltGr may arrive as Ctrl + Mod5 from Windows hosts).  Dead keys produce
-their spacing character at once (no compose).  VK codes: layout-following for a-z / 0-9
+without Level3 (AltGr may arrive as Ctrl + Mod5 from Windows hosts).  Dead keys: xkb_key
+gives their spacing character; xkb_key_typed composes like Windows does -- a dead key is
+held back, the next letter becomes the accented one (´ e -> é, ^ o -> ô, ¨ u -> ü, ...),
+Space or the same dead key gives the spacing character, anything else both; a key without
+text (Backspace, Esc, a shortcut) drops it.  (An input method, IBus through text-input-v3,
+composes before the keys reach us.)  VK codes: layout-following for a-z / 0-9
 (level-1 symbol, like Win32) and for + , - . (VK_OEM_PLUS/COMMA/MINUS/PERIOD); otherwise
 by key position; keypad keys give navigation VKs while Num Lock is off.
 
@@ -21501,6 +21535,18 @@ KV_MODSHIFT: u32 = 24
 
 - **`fn xkb_key(evdev: u32) -> (u32, u32)`**
   evdev code -> (VK code, text codepoint (0 = none))  [xkb_key]
+
+- **`fn xkb_dead_reset()`**
+  forget a pending dead key (the keyboard focus changed)
+
+- **`fn xkb_key_typed(evdev: u32) -> (u32, [u32; 2])`**
+  a key press with the dead keys composed -> (VK, up to two codepoints, 0 = none)
+
+- **`fn xkb_is_dead(evdev: u32) -> bool`**
+  the key gives a dead key now (with the current modifiers)
+
+- **`fn xkb_dead_keysym(spacing: u32) -> u32`**
+  the X keysym of a dead key from its spacing character (0 = none)
 
 - **`fn xkb_vk_keys(vk: u32) -> alloc::vec::Vec<u32>`**
   the evdev codes of the keys that give vk without modifiers (keypad keys: with Num Lock on)
@@ -22839,6 +22885,9 @@ WST_ACTIVE: u32 = 4  // one of the APP's windows is active
 WST_TILED: u32 = 8
 WST_MINIMIZED: u32 = 16
 WST_CSD: u32 = 32  // no system frame: the app must draw its own title bar
+/// the window is drawn inside its owner (a Wayland subsurface): win_get_rect / win_set_rect /
+/// E_WINPOS use positions relative to the owner's surface origin (px), the owner carries it
+WST_CHILD: u32 = 64
 ```
 
 *clipboard formats*
@@ -23105,6 +23154,10 @@ The OS layers (win_api.rs; linux_disp.rs -> Wayland / X11) implement the win_* c
 
 - **`fn begin_resize(edges: u32)`**
   let the system resize the current window from an edge (EDGE_\* bits)
+
+- **`fn window_menu(x: i32, y: i32)`** *(Linux)*
+  (Linux, a library-drawn title bar) the window manager's menu of the current window at
+  x, y (px of the window), on a right-button press: move, resize, always on top, ...
 
 - **`fn wait_refresh(deadline_us: u64, _refresh: &mut dyn FnMut()) -> u32`**
   wait(deadline) with a redraw closure for a modal move / size loop (Windows); the Linux
@@ -31572,7 +31625,8 @@ fs.write $EXE/**; a folder of the system (/usr/lib, Program Files) needs a "pack
 - **`enum Check`**
   the answer of a check
   - `UpToDate` -- no newer version (or only one that was rolled back)
-  - `NoPackage(String)` -- a newer version without a package for this system (its version)
+  - `NoPackage(String)` -- a newer version without a package for this system (its version); also when it has only
+    an exe or bundle package and the program runs as an AppImage, Flatpak or Snap
   - `Available(Offer)` -- a newer version to download
 
 - **`enum Startup`**

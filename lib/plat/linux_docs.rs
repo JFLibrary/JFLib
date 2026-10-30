@@ -70,14 +70,15 @@ pub(crate) fn sandboxed(path: &str) -> bool {
     path.strip_prefix(base().as_str()).is_some_and(|r| r.starts_with('/')) && crate::linux_desk::in_flatpak()
 }
 
-// the portal's mount point (GetMountPoint -> ay), asked once
+// the portal's mount point (GetMountPoint -> ay), asked once (until it answers)
 fn mount(c: &mut Conn) -> Option<String> {
     let mut g = MOUNT.lock();
     if let Some(m) = g.as_ref() {
         return m.clone();
     }
-    let r = crate::linux_desk::call(c, &Msg::call(NAME, PATH, NAME, "GetMountPoint", Vec::new()), T_PORTAL);
-    let m = r.and_then(|r| match r.body.first() {
+    // no answer at all (the portal is still starting): not kept, asked again next time
+    let r = crate::linux_desk::call(c, &Msg::call(NAME, PATH, NAME, "GetMountPoint", Vec::new()), T_PORTAL)?;
+    let m = Some(r).and_then(|r| match r.body.first() {
         Some(Value::A(_, bytes)) => {
             let b: Vec<u8> = bytes.iter().filter_map(|v| if let Value::Y(c) = v { Some(*c) } else { None }).take_while(|&c| c != 0).collect();
             String::from_utf8(b).ok().filter(|s| s.starts_with('/'))

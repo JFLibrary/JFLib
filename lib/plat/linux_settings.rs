@@ -1,10 +1,12 @@
 // linux_settings -- the system settings from the settings portal (settings.rs)
 //
 //   sys_settings_os(&mut s)   org.freedesktop.portal.Settings.ReadAll over the session bus
-//                             (at most 300 ms; without the portal the defaults stay)
+//                             (without the portal the defaults stay)
 //
-//   org.freedesktop.appearance       color-scheme (1 dark, 2 light), accent-color ((ddd)
-//                                    0..1), contrast (1 high), reduced-motion (1)
+//   org.freedesktop.appearance       color-scheme (1 dark, 2 light, 0 no preference: light --
+//                                    GNOME's "Default" style -- unless the GTK theme is a
+//                                    dark one, e.g. Yaru-dark), accent-color ((ddd) 0..1),
+//                                    contrast (1 high), reduced-motion (1)
 //   org.gnome.desktop.interface      enable-animations, text-scaling-factor, cursor-blink,
 //                                    cursor-blink-time (a whole cycle), gtk-theme
 //                                    (HighContrast*), font-antialiasing (none / grayscale /
@@ -12,7 +14,11 @@
 //   org.gnome.desktop.a11y.interface high-contrast
 //   org.gnome.desktop.peripherals.mouse double-click
 //
-// jfgui_PORTAL_SETTINGS=0 skips the portal.  Font rendering the portal does not give comes from
+// Without color-scheme a GTK theme named *-dark means dark.  The answer is kept for
+// portal_dark() (plat::theme: the UI's "follow the system" choice; nothing before the first
+// read, so headless runs, which never read the portal, stay independent of the desktop).  The
+// portal gets up to 1 s the first time (it may still be starting), 300 ms later on;
+// jfgui_PORTAL_SETTINGS=0 skips it.  Font rendering the portal does not give comes from
 // fontconfig's conf.d (/etc/fonts/conf.d, $XDG_CONFIG_HOME/fontconfig/conf.d): the links
 // 10-hinting-{none,slight,medium,full}.conf, 10-sub-pixel-{rgb,bgr,vrgb,vbgr,none}.conf,
 // 10-no-sub-pixel.conf, 10-no-antialias.conf / 10-yes-antialias.conf (jfgui_FONTCONFIG_SETTINGS=0
@@ -20,6 +26,7 @@
 
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::sync::atomic::{AtomicI32, Ordering};
 
 use crate::SysSettings;
 use crate::linux_dbus::{Conn, Msg, Value};
@@ -27,9 +34,19 @@ use crate::linux_dbus::{Conn, Msg, Value};
 const NAMESPACES: [&str; 4] =
     ["org.freedesktop.appearance", "org.gnome.desktop.interface", "org.gnome.desktop.a11y.interface", "org.gnome.desktop.peripherals.mouse"];
 
+/// the system's light / dark choice from the last read: 1 dark, 0 light, -1 unknown, -2 not read
+static DARK: AtomicI32 = AtomicI32::new(-2);
+
+/// (plat::theme) 1 dark, 0 light, -1 unknown: the portal's answer of the last read of the
+/// system settings (-1 before the first)
+pub(crate) fn portal_dark() -> i32 {
+    DARK.load(Ordering::Relaxed).max(-1)
+}
+
 /// the portal's settings into s
 pub(crate) fn sys_settings_os(s: &mut SysSettings) {
     portal(s);
+    DARK.store(s.dark.map_or(-1, |d| d as i32), Ordering::Relaxed);
     if !crate::env("jfgui_FONTCONFIG_SETTINGS").is_some_and(|v| v.starts_with('0')) {
         fontconfig_links(s);
     }
@@ -84,17 +101,44 @@ fn portal(s: &mut SysSettings) {
         alloc::vec![Value::A(String::from("s"), ns)],
     );
     let Some(serial) = c.send(&call) else { return };
-    let Some(r) = c.wait_reply(serial, 300) else { return };
+    let first = DARK.load(Ordering::Relaxed) == -2;
+    let Some(r) = c.wait_reply(serial, if first { 1000 } else { 300 }) else { return };
     let Some(Value::A(_, spaces)) = r.body.first() else { return };
+    let (mut scheme, mut gtk_dark) = (None, false);
     for e in spaces {
         let Value::E(k, v) = e else { continue };
         let (Some(ns), Value::A(_, keys)) = (k.as_str(), &**v) else { continue };
         for kv in keys {
             let Value::E(key, val) = kv else { continue };
             if let Some(key) = key.as_str() {
-                apply(s, ns, key, unwrap(val));
+                let val = unwrap(val);
+                match (ns, key) {
+                    ("org.freedesktop.appearance", "color-scheme") => scheme = val.as_u32().or(scheme),
+                    ("org.gnome.desktop.interface", "gtk-theme") => gtk_dark = val.as_str().is_some_and(theme_is_dark),
+                    _ => {}
+                }
+                apply(s, ns, key, val);
             }
         }
+    }
+    dark_choice(s, scheme, gtk_dark);
+}
+
+/// a GTK theme name of a dark variant ("Yaru-dark", "Adwaita-dark", "Name:dark")
+pub(crate) fn theme_is_dark(t: &str) -> bool {
+    let l = t.to_ascii_lowercase();
+    l.ends_with("-dark") || l.ends_with(":dark")
+}
+
+/// light or dark from color-scheme (None: the portal has none) and the GTK theme: 0 (no
+/// preference) is light -- GNOME's "Default" style -- unless the theme is a dark one
+pub(crate) fn dark_choice(s: &mut SysSettings, scheme: Option<u32>, gtk_dark: bool) {
+    match scheme {
+        Some(1) => s.dark = Some(true),
+        Some(2) => s.dark = Some(false),
+        Some(_) => s.dark = Some(gtk_dark || s.dark == Some(true)),
+        None if gtk_dark => s.dark = Some(true),
+        None => {}
     }
 }
 

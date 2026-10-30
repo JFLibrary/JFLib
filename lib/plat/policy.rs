@@ -1447,8 +1447,12 @@ fn parse(text: &str, src: &str, plugin: Option<&str>) -> Result<Policy, String> 
             for d in font_dirs() {
                 add_dir_rule(&mut p.fs, &d, FS_READ);
             }
-            for d in crate::spell::hunspell_dirs() {
-                add_dir_rule(&mut p.fs, &d, FS_READ); // spell checking: the system's dictionaries
+            for d in crate::spell::hunspell_dirs().into_iter().chain(crate::spell::hyphen_dirs()) {
+                add_dir_rule(&mut p.fs, &d, FS_READ); // spell checking, hyphenation: the system's dictionaries
+            }
+            #[cfg(target_os = "linux")]
+            for d in fontconfig_files() {
+                add_dir_rule(&mut p.fs, &d, FS_READ); // fontconfig's aliases and language rules (fontconf.rs)
             }
             if let Some(e) = exe_dir() {
                 add_dir_rule(&mut p.fs, &e, FS_READ);
@@ -1694,7 +1698,8 @@ fn pattern(a: &str, plugin: Option<&str>) -> Result<Vec<Vec<String>>, String> {
 }
 
 /// the system font folders in the order fontdb scans them: jfgui_FONTDIRS (';' separated,
-/// on Linux also ':'), else the Windows / XDG folders
+/// on Linux also ':'), else the Windows / XDG folders; on Linux then fontconfig's own folders
+/// (fontconfig_dirs: NixOS, TeX fonts, a <dir> of the user) and in Flatpak the host's fonts
 pub fn font_dirs() -> Vec<String> {
     let mut v = Vec::new();
     if let Some(e) = crate::env("jfgui_FONTDIRS").filter(|e| !e.is_empty()) {
@@ -1713,8 +1718,114 @@ pub fn font_dirs() -> Vec<String> {
             None => v.extend(env("HOME", "/.local/share/fonts")),
         }
         v.extend(env("HOME", "/.fonts"));
+        #[cfg(target_os = "linux")]
+        for d in fontconfig_dirs() {
+            // a folder inside one already listed is scanned with it
+            if !v.iter().any(|x| d == *x || d.strip_prefix(x.as_str()).is_some_and(|r| r.starts_with('/'))) {
+                v.push(d);
+            }
+        }
     }
     v
+}
+
+/// (Linux) fontconfig's files the font code reads (fontconf.rs): its folder and the user's
+#[cfg(target_os = "linux")]
+fn fontconfig_files() -> Vec<String> {
+    let mut v = alloc::vec![String::from("/etc/fonts")];
+    match crate::env("XDG_CONFIG_HOME").filter(|s| s.starts_with('/')) {
+        Some(c) => v.push(alloc::format!("{}/fontconfig", c.trim_end_matches('/'))),
+        None => v.extend(crate::env("HOME").filter(|s| !s.is_empty()).map(|h| alloc::format!("{}/.config/fontconfig", h.trim_end_matches('/')))),
+    }
+    v
+}
+
+/// (Linux) the font folders fontconfig's files name (<dir>, <remap-dir>) in /etc/fonts/fonts.conf,
+/// /etc/fonts/conf.d and the user's fontconfig folder -- NixOS and Guix have no /usr/share/fonts,
+/// Debian's TeX fonts stay in /usr/share/texmf -- and in Flatpak the host's fonts the runtime
+/// mounts under /run/host (font-dirs.xml).  A light reading: comments dropped, prefix="xdg"
+/// ($XDG_DATA_HOME, else ~/.local/share), "~/", absolute paths; at most 128 files of 256 KiB
+#[cfg(target_os = "linux")]
+fn fontconfig_dirs() -> Vec<String> {
+    let confd = |files: &mut Vec<String>, dir: &str| {
+        let mut names = Vec::new();
+        crate::dir_list_raw(dir, &mut |n, is_dir, _| {
+            if !is_dir && n.ends_with(".conf") {
+                names.push(alloc::format!("{}/{}", dir, n));
+            }
+        });
+        names.sort();
+        files.extend(names);
+    };
+    let mut files: Vec<String> = alloc::vec![String::from("/etc/fonts/fonts.conf")];
+    confd(&mut files, "/etc/fonts/conf.d");
+    for c in fontconfig_files().into_iter().skip(1) {
+        files.push(alloc::format!("{}/fonts.conf", c));
+        confd(&mut files, &alloc::format!("{}/conf.d", c));
+    }
+    if crate::file_exists_raw("/.flatpak-info") == 1 {
+        files.push(String::from("/run/host/font-dirs.xml"));
+    }
+    let home = crate::env("HOME").filter(|h| h.starts_with('/'));
+    let data_home = crate::env("XDG_DATA_HOME").filter(|d| d.starts_with('/')).or_else(|| home.as_ref().map(|h| alloc::format!("{}/.local/share", h.trim_end_matches('/'))));
+    let mut out: Vec<String> = Vec::new();
+    for f in files.iter().take(128) {
+        let Some(data) = crate::read_file_raw(f) else { continue };
+        if data.len() > 256 << 10 {
+            continue;
+        }
+        let text = String::from_utf8_lossy(&data);
+        // without comments
+        let mut t = String::new();
+        let mut rest: &str = &text;
+        while let Some(a) = rest.find("<!--") {
+            t.push_str(&rest[..a]);
+            rest = rest[a..].find("-->").map_or("", |b| &rest[a + b + 3..]);
+        }
+        t.push_str(rest);
+        for tag in ["dir", "remap-dir"] {
+            let open = alloc::format!("<{}", tag);
+            let close = alloc::format!("</{}>", tag);
+            let mut at = 0;
+            while let Some(k) = t[at..].find(&open) {
+                let start = at + k + open.len();
+                at = start;
+                // <dir> or <dir attr...>, not <dirname>
+                if !t[start..].starts_with(['>', ' ', '\t', '\n', '\r']) {
+                    continue;
+                }
+                let Some(gt) = t[start..].find('>') else { break };
+                let attrs = &t[start..start + gt];
+                if attrs.ends_with('/') {
+                    continue;
+                }
+                let body = start + gt + 1;
+                let Some(end) = t[body..].find(&close) else { break };
+                let p = t[body..body + end].trim().replace("&amp;", "&");
+                at = body + end;
+                let path = if attrs.contains("prefix=\"xdg\"") {
+                    match &data_home {
+                        Some(d) => alloc::format!("{}/{}", d, p),
+                        None => continue,
+                    }
+                } else if let Some(r) = p.strip_prefix("~/") {
+                    match &home {
+                        Some(h) => alloc::format!("{}/{}", h.trim_end_matches('/'), r),
+                        None => continue,
+                    }
+                } else if p.starts_with('/') {
+                    p
+                } else {
+                    continue;
+                };
+                let path = String::from(path.trim_end_matches('/'));
+                if !path.is_empty() && !out.contains(&path) {
+                    out.push(path);
+                }
+            }
+        }
+    }
+    out
 }
 
 #[cfg(any(windows, target_os = "linux"))]

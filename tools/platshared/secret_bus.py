@@ -30,7 +30,7 @@ import argparse, hashlib, hmac, os, socket, subprocess, sys, tempfile, threading
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from portal_bus import R, W, message, parse  # noqa: E402
+from portal_bus import R, W, listen_unix, message, parse  # noqa: E402
 
 try:
     from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -252,9 +252,7 @@ class Store:
 
 
 def serve(sock, st):
-    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    srv.bind(sock)
-    srv.listen(8)
+    srv = listen_unix(sock, 8)
     srv.settimeout(0.3)
     while not st.stop:
         try:
@@ -356,7 +354,7 @@ def run(exe, mode):
     st = Store(mode)
     with tempfile.TemporaryDirectory() as d:
         sock = os.path.join(d, "bus")
-        t = threading.Thread(target=serve, args=(sock, st), daemon=True)
+        t = threading.Thread(target=serve, args=(listen_unix(sock, 8), st), daemon=True)
         t.start()
         env = dict(os.environ, DBUS_SESSION_BUS_ADDRESS=f"unix:path={sock}")
         try:

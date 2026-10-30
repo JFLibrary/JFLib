@@ -90,6 +90,7 @@ pub(crate) struct Wp {
     sent_gh: i32,
     sent_vw: i32,
     sent_vh: i32,
+    sent_src: [i32; 2], // viewport source size sent (24.8; -256 = unset: the whole buffer; 0 = none)
     slots: [Slot; SLOT_N],
     pools: [Pool; POOL_N],
     orph: [(u32, u32); ORPH_N],
@@ -223,7 +224,7 @@ impl Wl {
             .or_else(|| (0..SLOT_N).find(|&k| fits(k)))
             .or_else(|| (0..SLOT_N).find(|&k| !wp.slots[k].busy))?;
         // pool large enough?
-        let need = (w as u32).wrapping_mul(h as u32) as u64 * 4;
+        let need = w as u64 * h as u64 * 4;
         if (cur == 0 || need > self.wp[i].pools[cur as usize - 1].slot as u64) && !self.pool_grow(i, need, i != 0) {
             return None;
         }
@@ -314,6 +315,7 @@ impl Wl {
         wp.sent_scale = 0;
         wp.sent_vw = 0;
         wp.sent_vh = 0;
+        wp.sent_src = [0; 2];
     }
 
     /// (test aid) window w's last committed buffer: (w, h, rows of w * 4 bytes); None while
@@ -437,6 +439,11 @@ impl Wl {
             sb = min;
         }
         sb = (sb + 4095) & !4095;
+        // wl_shm pools and buffer offsets are int32: SLOT_N slots below 2 GiB (a frame of at
+        // most ~178 million pixels; larger ones stay unshown instead of overrunning the mapping)
+        if sb * SLOT_N as u64 > i32::MAX as u64 {
+            return false;
+        }
         let Some(k) = self.wp[i].pools.iter().position(|p| !p.used) else { return false };
         let len = (sb * SLOT_N as u64) as usize;
         self.wp[i].pools[k].len = len;
@@ -518,22 +525,24 @@ impl Wl {
         if matches {
             self.win[i].resize_pending = false;
         }
-        if self.win[i].ack_pending && (matches || r.flags & WLWF_TOP == 0) {
-            // a secondary window's size is ours: its configure is acknowledged anyway
+        if self.win[i].ack_pending && r.xsurf != 0 && (matches || r.flags & WLWF_TOP == 0 || !r.mapped) {
+            // a secondary window's size is ours: its configure is acknowledged anyway; so is
+            // the first configure of a toplevel (shown again: its last frame comes first, a
+            // buffer without an acknowledged configure ends the connection)
             self.win[i].ack_pending = false;
             self.w.send(r.xsurf, &XDG_SURFACE_ACK_CONFIGURE, &[A::U(r.ack_serial)]);
         }
-        // logical size of this buffer
+        // logical size of this buffer: the configured one (a toplevel's buffer holds it, rounded
+        // up), else as much as the buffer covers (a child window's or a buffer of another size)
         let (lw, lh) = if !r.frac {
             ((w as u32 / s as u32) as i32, (h as u32 / s as u32) as i32)
-        } else if matches {
+        } else if matches && r.flags & super::window::WLWF_CHILD == 0 {
             (r.lw, r.lh)
         } else {
-            let c = r.s120 as u32;
-            (((w as u32).wrapping_mul(120).wrapping_add(c >> 1) / c) as i32,
-             ((h as u32).wrapping_mul(120).wrapping_add(c >> 1) / c) as i32)
+            let c = r.s120.max(1) as u32;
+            (((w as u32).wrapping_mul(120) / c).max(1) as i32, ((h as u32).wrapping_mul(120) / c).max(1) as i32)
         };
-        if lw != self.wp[i].sent_gw || lh != self.wp[i].sent_gh {
+        if r.xsurf != 0 && (lw != self.wp[i].sent_gw || lh != self.wp[i].sent_gh) {
             self.wp[i].sent_gw = lw;
             self.wp[i].sent_gh = lh;
             self.w.send(r.xsurf, &XDG_SURFACE_SET_WINDOW_GEOMETRY, &[A::I(0), A::I(0), A::I(lw), A::I(lh)]);
@@ -547,6 +556,18 @@ impl Wl {
             self.wp[i].sent_vw = lw;
             self.wp[i].sent_vh = lh;
             self.w.send(r.vp, &VIEWPORT_SET_DESTINATION, &[A::I(lw), A::I(lh)]);
+        }
+        if r.frac && r.vp != 0 {
+            // the source: exactly the logical size in buffer pixels (scale x logical size is
+            // rarely whole: without it the compositor stretches the buffer by a fraction of a
+            // pixel, which blurs the window)
+            let src = viewport_src(lw, lh, r.s120, w, h);
+            let [sw, sh] = if src == [w * 256, h * 256] { [-256, -256] } else { src }; // -1: the whole buffer
+            if [sw, sh] != self.wp[i].sent_src {
+                self.wp[i].sent_src = [sw, sh];
+                let z = if sw < 0 { -256 } else { 0 };
+                self.w.send(r.vp, &VIEWPORT_SET_SOURCE, &[A::I(z), A::I(z), A::I(sw), A::I(sh)]);
+            }
         }
         let buf = self.wp[i].slots[k].buf;
         self.w.send(r.surf, &SURFACE_ATTACH, &[A::O(buf), A::I(0), A::I(0)]);
@@ -582,6 +603,13 @@ impl Wl {
         wp.bx[0] = 0;
         wp.bx[2] = 0;
     }
+}
+
+/// the viewport source (24.8 buffer pixels) that shows a logical lw x lh surface at scale s120
+/// pixel for pixel, cut to the w x h buffer
+pub(crate) fn viewport_src(lw: i32, lh: i32, s120: i32, w: i32, h: i32) -> [i32; 2] {
+    let f = |l: i32, max: i32| ((l as i64 * s120 as i64 * 256 / 120) as i32).clamp(256, max.max(1) * 256);
+    [f(lw, w), f(lh, h)]
 }
 
 // ------------------------------------------------------------------ handlers

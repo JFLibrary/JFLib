@@ -8,7 +8,10 @@
 //                                  it reports NoteClicked
 //   notify_close(id)
 //   tray_take() -> Vec<TrayEvent>  what happened since the last call; every event calls wake()
-//   tray_supported() -> bool       whether this system has a notification area / notifications
+//   tray_supported() -> bool       whether this system shows the symbol: a notification area
+//                                  (Linux: a StatusNotifierWatcher runs -- KDE, Xfce, ...; GNOME
+//                                  only with the AppIndicator extension); notifications work
+//                                  without one
 //   set_dry_run(on)                print instead of showing from now on (headless UI runs)
 //
 // Windows (win_tray.rs): Shell_NotifyIconW on a message-only window of the UI thread, the menu
@@ -193,7 +196,8 @@ pub fn notify_close(id: u32) {
     native::notify_close(id)
 }
 
-/// whether the symbol and notifications can be shown here
+/// whether the symbol can be shown here (a notification area; Linux: a StatusNotifierWatcher
+/// runs -- GNOME needs the AppIndicator extension); notifications work without one
 pub fn tray_supported() -> bool {
     dry_run() || native::supported()
 }
