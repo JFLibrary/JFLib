@@ -93,6 +93,9 @@ pub use md_doc::{
     MB_CODE, MB_HEADING, MB_PARA, MB_ROW, MB_RULE, MF_BUTTON, MF_CHECKBOX, MF_HIDDEN, MF_PASSWORD, MF_RADIO, MF_RESET, MF_SELECT, MF_SUBMIT,
     MF_TEXT, MF_TEXTAREA, MK_BULLET, MK_NONE, MK_NUMBER, MS_BOLD, MS_CODE, MS_ITALIC, MS_STRIKE, MS_UNDER,
 };
+// (ROADMAP §7) the element tree of an HTML document: queries and changes (md_dom.rs)
+mod md_dom;
+pub use md_dom::MdNode;
 mod md_view;
 pub use md_view::{md_field_id, MdEv, MdSubmit, MdViewState, MI_APP, MI_ASK, MI_LOCAL, MV_LTR, MV_NO_FRAME, MV_OPEN_LINKS, MV_RTL};
 // (ROADMAP §6) lists whose rows have different heights (ui.vlist_begin)

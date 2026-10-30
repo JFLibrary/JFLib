@@ -19,6 +19,12 @@
 //        scroll_to_block(i) / scroll_to_end() (the end, also while the document grows: chat
 //        output; scrolling to the end of a long document does the same until the user scrolls
 //        away) / first_visible() -> (block, px above the view) / focused_link()
+//   Changes of the document (HTML: its elements, md_dom.rs -- page scripts): st.doc_mut() ->
+//        &mut MdDoc; the view takes the changes every frame (st.update(): now): the blocks
+//        derived again (MdDoc::update), the layouts and heights of the blocks that stay kept,
+//        the view on the block it showed, the selection and the focused link with their blocks,
+//        the fields' values by their elements (what the user or the app gave a field stays;
+//        the others follow the document's values), a focused field's widget moved with it
 //   Images from the app: st.images = MI_LOCAL (default: VFS names and paths, other addresses
 //        show their alt text), MI_ASK (as MI_LOCAL; http:, https: and data: addresses are asked
 //        from the app) or MI_APP (every image is asked: nothing is read by the view -- pages
@@ -35,7 +41,8 @@
 //        scale and mirroring.  Their values live in the state: field_text(i) / field_checked(i)
 //        / field_selected(i), set_field_text / set_field_checked / set_field_selected,
 //        form_data(form, button) (the pairs a browser sends), reset_form(form),
-//        focused_field(); a new document starts with its first values.  Keys: Tab / Shift+Tab
+//        focused_field(); a new document starts with its first values (a changed one keeps
+//        them, above).  Keys: Tab / Shift+Tab
 //        go through links and fields in reading order (a group of radios is one stop: the
 //        checked one; Up / Down and Left / Right -- as the radios lie in their paragraph --
 //        choose inside it), Space toggles, Enter in a text field, check
@@ -101,6 +108,7 @@ use crate::imgview::SvgDraw;
 use crate::keys::*;
 use crate::list::{anim_decay, anim_steps};
 use crate::md_doc::*;
+use crate::md_dom::MdNode;
 use crate::theme::color_mix;
 use crate::value::part_id;
 use crate::vlist::Rows;
@@ -193,12 +201,17 @@ enum Req {
     Got(Img),
 }
 
-// the current value of a field: text (text fields, hidden ones), checked, the chosen option
+// the current value of a field: text (text fields, hidden ones), checked, the chosen option;
+// the field's kind and element, whether the user or the app changed it (dirty: changes of the
+// document keep it; else it follows the field's first value)
 #[derive(Clone, Default)]
 struct Val {
     text: String,
     on: bool,
     sel: i32,
+    kind: u8,
+    node: MdNode,
+    dirty: bool,
 }
 
 // a stop of Tab: a link spot, a field
@@ -444,6 +457,10 @@ pub struct MdViewState {
     // the pointer's y and the bar's position when the scroll bar last moved the view
     sb_y: i32,
     sb_pos: i32,
+    // after changes of the document: the focused field's old and new index (the widget's id
+    // moves with it), blocks without a height estimate
+    refocus: Option<(usize, Option<usize>)>,
+    reguess: bool,
 }
 
 impl Default for MdViewState {
@@ -511,12 +528,27 @@ impl MdViewState {
             reveal: None,
             sb_y: i32::MIN,
             sb_pos: 0,
+            refocus: None,
+            reguess: false,
         }
     }
 
     /// the document shown
     pub fn doc(&self) -> &MdDoc {
         &self.doc
+    }
+
+    /// the document to change (an HTML document's elements, md_dom.rs): the view takes the
+    /// changes at its next frame (or update()) and keeps its place, selection, focus and the
+    /// values the user gave the fields that stay
+    pub fn doc_mut(&mut self) -> &mut MdDoc {
+        &mut self.doc
+    }
+
+    /// take the document's changes now (MdDoc::update; the view does it every frame) -> there
+    /// were changes
+    pub fn update(&mut self) -> bool {
+        self.sync()
     }
 
     /// show Markdown (parsed now unless it is the text shown already)
@@ -547,6 +579,9 @@ impl MdViewState {
     // output), the selection and the layouts go
     fn set_doc_inner(&mut self, doc: MdDoc) {
         self.doc = doc;
+        self.doc.update();
+        self.doc.take_change();
+        self.refocus = None;
         self.sel = TextSel::default();
         self.link = None;
         self.press_link = None;
@@ -557,6 +592,21 @@ impl MdViewState {
         self.lc.scaled.clear();
         self.lc.svgs.clear();
         self.lc.imgs = alloc::vec![Img::Unread; self.doc.images().len()];
+        self.blocks_index();
+        // the app's images: the ones this document uses stay (asked or supplied)
+        if !self.lc.req.is_empty() {
+            let used: BTreeSet<String> = self.doc.images().iter().filter_map(|m| img_at(&m.src, &self.base, self.lc.mode).1).collect();
+            self.lc.req.retain(|a, _| used.contains(a));
+            self.lc.queue.retain(|a| used.contains(a));
+        }
+        self.fields_init(&[]);
+        self.ffocus = None;
+        self.sized = false;
+        self.auto_rtl = self.doc.blocks().iter().filter(|b| b.kind != MB_CODE).find_map(|b| text_rtl(&b.text));
+    }
+
+    // the rows of every table, the block of every image
+    fn blocks_index(&mut self) {
         self.lc.rows_of.clear();
         self.img_block = alloc::vec![0; self.doc.images().len()];
         for (k, b) in self.doc.blocks().iter().enumerate() {
@@ -569,14 +619,34 @@ impl MdViewState {
                 }
             }
         }
-        // the app's images: the ones this document uses stay (asked or supplied)
-        if !self.lc.req.is_empty() {
-            let used: BTreeSet<String> = self.doc.images().iter().filter_map(|m| img_at(&m.src, &self.base, self.lc.mode).1).collect();
-            self.lc.req.retain(|a, _| used.contains(a));
-            self.lc.queue.retain(|a| used.contains(a));
-        }
-        // the fields: their first values, the Tab stops, the radios' groups (form and name)
-        self.vals = self.doc.fields().iter().map(|f| Val { text: if f.kind == MF_CHECKBOX || f.kind == MF_RADIO { String::new() } else { f.value.clone() }, on: f.checked, sel: f.selected }).collect();
+    }
+
+    // the fields' values (first values; a field of `old` with the same element and kind that the
+    // user or the app changed keeps its value), the radios' groups (form and name), the Tab stops
+    fn fields_init(&mut self, old: &[Val]) {
+        let by: BTreeMap<MdNode, &Val> = old.iter().filter(|v| !v.node.is_none()).map(|v| (v.node, v)).collect();
+        self.vals = self
+            .doc
+            .fields()
+            .iter()
+            .map(|f| match by.get(&f.node) {
+                Some(v) if v.dirty && v.kind == f.kind => {
+                    let mut v = (*v).clone();
+                    if v.sel >= f.options.len() as i32 {
+                        v.sel = f.selected;
+                    }
+                    v
+                }
+                _ => Val {
+                    text: if f.kind == MF_CHECKBOX || f.kind == MF_RADIO { String::new() } else { f.value.clone() },
+                    on: f.checked,
+                    sel: f.selected,
+                    kind: f.kind,
+                    node: f.node,
+                    dirty: false,
+                },
+            })
+            .collect();
         let mut first: BTreeMap<(u32, &str), usize> = BTreeMap::new();
         self.group = alloc::vec![0; self.doc.fields().len()];
         for (i, f) in self.doc.fields().iter().enumerate() {
@@ -584,12 +654,20 @@ impl MdViewState {
                 self.group[i] = *first.entry((f.form, f.name.as_str())).or_insert(i) + 1;
             }
         }
-        // (one checked radio per group: the last one, as browsers parse it)
+        // (one checked radio per group: one the user chose, else the last one, as browsers
+        // parse it)
         let mut checked: BTreeMap<usize, usize> = BTreeMap::new();
         for i in 0..self.vals.len() {
             if self.vals[i].on && self.group[i] != 0 {
-                if let Some(p) = checked.insert(self.group[i], i) {
-                    self.vals[p].on = false;
+                match checked.get(&self.group[i]).copied() {
+                    Some(p) if self.vals[p].dirty && !self.vals[i].dirty => self.vals[i].on = false,
+                    Some(p) => {
+                        self.vals[p].on = false;
+                        checked.insert(self.group[i], i);
+                    }
+                    None => {
+                        checked.insert(self.group[i], i);
+                    }
                 }
             }
         }
@@ -606,9 +684,99 @@ impl MdViewState {
                 b += 1;
             }
         }
-        self.ffocus = None;
-        self.sized = false;
+    }
+
+    // the document's changes (MdDoc::update): the blocks that stay keep their layouts and
+    // heights, the view stays on the block it shows (scrolling is anchored there), the selection
+    // and the focused link move with their blocks, the fields keep the values the user gave them
+    // (by their elements) and the focus -> there were changes
+    fn sync(&mut self) -> bool {
+        self.doc.update();
+        let Some(ch) = self.doc.take_change() else { return false };
+        let n = self.doc.blocks().len();
+        // an old block -> the new one (inside the changed range: clamped into it)
+        let range = ch.range;
+        let map = |k: usize| -> (usize, bool) {
+            match range {
+                Some((a, o, nn)) if k >= a + o => (k - o + nn, false),
+                Some((a, o, nn)) if k >= a => (a + (k - a).min(nn.saturating_sub(1)), o != nn),
+                _ => (k, false),
+            }
+        };
+        if let Some((a, o, nn)) = range {
+            // heights: the new blocks get estimates (reguess), the anchor stays on its block
+            let (top, off) = (self.rows.top, self.rows.off);
+            if o != nn {
+                self.rows.remove(a, o);
+                self.rows.insert(a, nn);
+            } else {
+                for k in a..a + o {
+                    self.rows.forget(k);
+                }
+            }
+            self.rows.top = map(top).0.min(n.saturating_sub(1));
+            self.rows.off = off;
+            let lays = core::mem::take(&mut self.lc.lays);
+            for (k, l) in lays {
+                if k < a {
+                    self.lc.lays.insert(k, l);
+                } else if k >= a + o {
+                    self.lc.lays.insert(k - o + nn, l);
+                }
+            }
+            // (the blocks around the range: the boxes of their elements may end elsewhere now)
+            self.lc.lays.remove(&a.wrapping_sub(1));
+            self.lc.lays.remove(&(a + nn));
+            self.reguess = true;
+        }
+        for k in &ch.redo {
+            self.lc.lays.remove(k);
+        }
+        if ch.full {
+            // the pictures by address, the tables' columns again, the fields by element
+            let mut pics: BTreeMap<&str, Img> = BTreeMap::new();
+            for (m, img) in ch.images.iter().zip(self.lc.imgs.iter()) {
+                pics.entry(m.src.as_str()).or_insert_with(|| img.clone());
+            }
+            self.lc.imgs = self.doc.images().iter().map(|m| pics.get(m.src.as_str()).cloned().unwrap_or(Img::Unread)).collect();
+            self.lc.scaled.clear();
+            self.lc.svgs.clear();
+            self.lc.cols.clear();
+            let rows: Vec<usize> = self.lc.lays.keys().copied().filter(|&k| self.doc.blocks().get(k).is_some_and(|b| b.kind == MB_ROW)).collect();
+            for k in rows {
+                self.lc.lays.remove(&k);
+            }
+            self.blocks_index();
+            let old = core::mem::take(&mut self.vals);
+            let focus = self.ffocus.and_then(|i| old.get(i)).map(|v| v.node);
+            self.fields_init(&old);
+            if let Some(i) = self.ffocus {
+                let j = focus.and_then(|nd| self.doc.field_of(nd));
+                if j != Some(i) {
+                    self.refocus = Some((i, j));
+                    self.ffocus = j;
+                }
+            }
+            self.link = self.link.and_then(|k| {
+                let s = ch.spots.get(k)?;
+                let (b, moved) = map(s.block);
+                if moved {
+                    return None;
+                }
+                self.doc.link_spots().iter().position(|t| t.block == b && t.a == s.a && t.link != 0)
+            });
+            self.press_link = None;
+        }
+        // the selection, a word being dragged, a range to show
+        let mp = |p: TextPos| {
+            let (line, moved) = map(p.line);
+            TextPos::new(line, if moved { 0 } else { p.byte })
+        };
+        self.sel = TextSel::new(self.clamp(mp(self.sel.anchor)), self.clamp(mp(self.sel.caret)));
+        self.word = (self.clamp(mp(self.word.0)), self.clamp(mp(self.word.1)));
+        self.reveal = self.reveal.map(|(b, y0, y1)| (map(b).0, y0, y1));
         self.auto_rtl = self.doc.blocks().iter().filter(|b| b.kind != MB_CODE).find_map(|b| text_rtl(&b.text));
+        true
     }
 
     /// the selection (TextPos: block, byte of its text)
@@ -726,10 +894,12 @@ impl MdViewState {
         self.vals.get(i).map_or(-1, |v| v.sel)
     }
 
-    /// set field i's text (text fields, text areas, hidden fields)
+    /// set field i's text (text fields, text areas, hidden fields; changes of the document keep
+    /// it, as the user's input)
     pub fn set_field_text(&mut self, i: usize, s: &str) {
         if let Some(v) = self.vals.get_mut(i) {
             v.text = String::from(s);
+            v.dirty = true;
         }
     }
 
@@ -743,10 +913,12 @@ impl MdViewState {
             for (v, &h) in self.vals.iter_mut().zip(self.group.iter()) {
                 if h == g {
                     v.on = false;
+                    v.dirty = true;
                 }
             }
         }
         self.vals[i].on = on;
+        self.vals[i].dirty = true;
     }
 
     /// choose option k of field i (a drop-down list; -1: none)
@@ -754,6 +926,7 @@ impl MdViewState {
         let n = self.doc.fields().get(i).map_or(0, |f| f.options.len()) as i32;
         if let Some(v) = self.vals.get_mut(i) {
             v.sel = if k >= 0 && k < n { k } else { -1 };
+            v.dirty = true;
         }
     }
 
@@ -789,6 +962,7 @@ impl MdViewState {
                 }
                 v.on = f.checked;
                 v.sel = f.selected;
+                v.dirty = false;
             }
         }
     }
@@ -1645,6 +1819,17 @@ impl Ui {
             st.lc.scaled.clear();
             st.lc.svgs.clear();
         }
+        // the document's changes (its elements, md_dom.rs): a focused field's widget moves with
+        // its field
+        st.sync();
+        if let Some((old, new)) = st.refocus.take() {
+            let fid = md_field_id(id, old);
+            if self.wp.ctx.focus == fid {
+                let nid = new.map_or(id, |j| md_field_id(id, j));
+                self.wp.ctx.focus = nid;
+                self.tb_rekey(fid, nid);
+            }
+        }
         // the layouts belong to a width, dpi, text scale, direction and fonts
         let fc = self.md_faces();
         let key = (self.wp.rt.dpi, cw, self.layout_scale(), drtl, fc);
@@ -1660,7 +1845,12 @@ impl Ui {
             self.md_guess(st, cw, &fc);
             st.sized = true;
             st.rows.clamp(view_h);
+        } else if st.reguess {
+            // (blocks a change brought: estimates, the anchor where it is)
+            self.md_guess(st, cw, &fc);
+            st.rows.clamp(view_h);
         }
+        st.reguess = false;
         // behave: one box for the pointer and the focus
         self.wp.ctx.last_rect = r;
         // (a pass on every pointer move: the link under the pointer, MdEv::hover)
@@ -2275,6 +2465,7 @@ impl Ui {
                         self.textbox(fid, ph, &mut st.vals[f].text, cap | flags)
                     };
                     if ev & EV_ACT != 0 {
+                        st.vals[f].dirty = true;
                         // (maxlength counts characters)
                         let t = &mut st.vals[f].text;
                         if maxlength > 0 && t.chars().count() > maxlength {

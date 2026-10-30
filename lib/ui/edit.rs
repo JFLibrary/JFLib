@@ -1263,6 +1263,18 @@ impl Ui {
 
     // ------------------------------------------------------------------ focus and edit state
 
+    // (md_view.rs) a text box got another widget id (a field of a changed document): its edit
+    // state (caret, selection) goes with it
+    pub(crate) fn tb_rekey(&mut self, old: u32, new: u32) {
+        let e = &mut self.m.edit;
+        if e.ed_id == old {
+            e.ed_id = new;
+        }
+        if e.ed_blur == old {
+            e.ed_blur = new;
+        }
+    }
+
     // tb_focus() -> this box (tb_id) is the focused editor.  Loads the edit state when the
     // focus arrives, reports EV_COMMIT when it leaves.
     fn tb_focus(&mut self) -> bool {

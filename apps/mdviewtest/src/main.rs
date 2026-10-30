@@ -31,6 +31,15 @@
 // the image addresses the view asked for ("Bilder: ..."); "Bilder liefern" answers them (two
 // from app://logo.svg and raster.png, the third fails), "Hoher Kontrast" and "Rechts nach
 // links" as on the tabs.
+//
+//   build/win/mdviewtest.exe --page dom --script apps/mdviewtest/tests/dom_steps.uis
+//
+// --page dom: an HTML page the app changes step by step through the document's elements (as a
+// page script would: MdViewState::doc_mut, md_dom.rs) -- F5 or "Schritt" takes the next step:
+// the counter in "#stand b" (every step), a list item inserted, a text field inserted before
+// the focused one, the note hidden, the link's address and text, a list item removed and the
+// heading's text, three paragraphs inserted above the view, the heading's HTML.  Below it: the
+// step, the focused field, the selection's length, the last form sent.
 #![no_std]
 #![no_main]
 #![deny(unsafe_code)]
@@ -63,6 +72,8 @@ const ID_INSERT: u32 = wid("insert");
 const ID_JUMP: u32 = wid("jump");
 const ID_FORM: u32 = wid("form");
 const ID_SUPPLY: u32 = wid("supply");
+const ID_DOM: u32 = wid("dom");
+const ID_STEP: u32 = wid("step");
 // the list and its rows: ID_LIST + 1 + i
 const ID_LIST: u32 = 0x0100_0000;
 const ROWS: u32 = 100_000;
@@ -206,6 +217,28 @@ Hallo</textarea></p>
 <img src="https://example.org/fehlt.png" alt="Fehlt"> und lokal <img src="logo.svg" alt="Logo lokal" width="48"></p>
 "#;
 
+/// the page the app changes step by step (--page dom; the paragraphs of #kasten: dom_html)
+pub(crate) const SAMPLE_DOM: &str = r#"<h2 id="kopf">Seite mit Skript</h2>
+<p id="stand">Stand: <b>0</b> Schritte</p>
+<ul id="liste"><li>Erster Eintrag</li><li class="zwei">Zweiter Eintrag</li></ul>
+<form action="/suche"><p id="zeile"><label for="name">Name</label> <input id="name" name="name" size="16">
+<label><input type="checkbox" name="merken"> Merken</label></p></form>
+<p id="hinweis">Ein Hinweis, der beim vierten Schritt verschwindet.</p>
+<p><a id="link" href="https://example.org/eins">Erster Link</a></p>
+<div id="kasten"></div>
+"#;
+
+/// the page of --page dom: SAMPLE_DOM with 30 paragraphs in #kasten
+pub(crate) fn dom_html() -> String {
+    let mut s = String::from(SAMPLE_DOM);
+    let mut ps = String::new();
+    for k in 1..=30 {
+        ps.push_str(&format!("<p>Absatz {}: {}.</p>\n", k, row_text(k)));
+    }
+    s = s.replace("<div id=\"kasten\"></div>", &format!("<div id=\"kasten\">\n{}</div>", ps));
+    s
+}
+
 // the text of row key k: 2 .. 33 words
 fn row_text(k: u32) -> String {
     const W: [&str; 8] = ["Zeilen", "haben", "verschiedene", "Höhen", "in", "einer", "virtuellen", "Liste"];
@@ -275,6 +308,10 @@ struct MdTest {
     sent: String,
     asked: Vec<String>,
     waiting: Vec<String>,
+    // --page dom: the page, the steps taken
+    page_dom: bool,
+    dom: MdViewState,
+    step: u32,
 }
 
 impl MdTest {
@@ -290,6 +327,12 @@ impl MdTest {
         form.base = String::from("app://");
         form.label = String::from("Formular");
         form.images = MI_ASK;
+        let page_dom = plat::arg_value("--page").as_deref() == Some("dom");
+        let mut dom = MdViewState::new();
+        dom.label = String::from("Skript");
+        if page_dom {
+            dom.set_html(&dom_html());
+        }
         MdTest {
             tab: 0,
             hc: 0,
@@ -313,7 +356,120 @@ impl MdTest {
             sent: String::new(),
             asked: Vec::new(),
             waiting: Vec::new(),
+            page_dom,
+            dom,
+            step: 0,
         }
+    }
+
+    // --page dom: the next step, done through the document's elements as a page script would
+    fn dom_step(&mut self) {
+        self.step += 1;
+        let k = self.step;
+        let d = self.dom.doc_mut();
+        // every step: the counter (a change inside one paragraph: that block alone again)
+        if let Some(b) = d.select_first("#stand b") {
+            d.set_text(b, &format!("{}", k));
+        }
+        match k {
+            2 => {
+                // a list item at the top of the list
+                if let Some(l) = d.by_id("liste") {
+                    let li = d.create_element("li");
+                    let t = d.create_text("Neuer Eintrag");
+                    d.insert(li, None, t);
+                    let first = d.children(l).into_iter().find(|&c| d.tag(c) == "li");
+                    d.insert(l, first, li);
+                }
+            }
+            3 => {
+                // a text field before the first one (the fields are numbered anew)
+                if let Some(z) = d.by_id("zeile") {
+                    let f = d.create_element("input");
+                    d.set_attr(f, "name", "vorname");
+                    d.set_attr(f, "placeholder", "Vorname");
+                    d.set_attr(f, "size", "10");
+                    let first = d.children(z).first().copied();
+                    d.insert(z, first, f);
+                    let sp = d.create_text(" ");
+                    d.insert(z, first, sp);
+                }
+            }
+            4 => {
+                if let Some(h) = d.by_id("hinweis") {
+                    d.set_attr(h, "hidden", "");
+                }
+            }
+            5 => {
+                if let Some(a) = d.by_id("link") {
+                    d.set_attr(a, "href", "https://example.org/zwei");
+                    d.set_text(a, "Zweiter Link");
+                    d.add_class(a, "neu");
+                }
+            }
+            6 => {
+                if let Some(li) = d.select_first("#liste > li.zwei") {
+                    d.free(li);
+                }
+                if let Some(h) = d.by_id("kopf") {
+                    d.set_text(h, "Seite geändert");
+                }
+            }
+            7 => {
+                // three paragraphs at the top of the box (above the place the view shows)
+                if let Some(b) = d.by_id("kasten") {
+                    for i in (1..=3).rev() {
+                        let p = d.create_element("p");
+                        let t = d.create_text(&format!("Eingefügt {}", i));
+                        d.insert(p, None, t);
+                        let first = d.children(b).first().copied();
+                        d.insert(b, first, p);
+                    }
+                }
+            }
+            8 => {
+                if let Some(h) = d.by_id("kopf") {
+                    d.set_inner_html(h, "Seite <i>fertig</i>");
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // --page dom: the page, the step button, what the page reported
+    fn dom_page(&mut self, ui: &mut Ui) {
+        // (F5 before the view: the focused field keeps the focus)
+        if ui.key(VK_F5) {
+            self.dom_step();
+        }
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        if ui.button(ID_STEP, "Schritt") & EV_ACT != 0 {
+            self.dom_step();
+        }
+        ui.spacer(-1);
+        ui.next_flags(ST_NOFOCUS);
+        if ui.checkbox(ID_HC, "Hoher Kontrast", &mut self.hc) & EV_ACT != 0 {
+            ui.set_contrast(Some(self.hc != 0));
+        }
+        ui.next_flags(ST_NOFOCUS);
+        if ui.checkbox(ID_RTL, "Rechts nach links", &mut self.rtl) & EV_ACT != 0 {
+            ui.set_rtl(Some(self.rtl != 0));
+        }
+        ui.box_end();
+        ui.next_size(-1, -1);
+        let ev = ui.doc_view(ID_DOM, &mut self.dom, 0);
+        if let Some(s) = ev.submit {
+            let pairs: Vec<String> = s.fields.iter().map(|(n, v)| format!("{}={}", n, v)).collect();
+            self.sent = format!("{} {} {}", s.method, s.action, pairs.join("&"));
+        }
+        let st = &self.dom;
+        let focus = st.focused_field().and_then(|i| st.doc().fields().get(i)).map_or(String::from("-"), |f| f.name.clone());
+        ui.box_begin(0, BOX_H | BOX_XCENTER, 12);
+        ui.text(TS_BODY, &format!("Schritt: {}", self.step));
+        ui.text(TS_BODY, &format!("Fokus: {}", focus));
+        ui.text(TS_BODY, &format!("Auswahl: {} Zeichen", st.selected_text().chars().count()));
+        ui.box_end();
+        ui.text(TS_CAPTION | TX_WRAP, &format!("Senden: {}", if self.sent.is_empty() { "-" } else { &self.sent }));
     }
 
     // --page form: the form page, what it reported, the app as the image source
@@ -458,6 +614,11 @@ impl App for MdTest {
         ui.box_begin(0, BOX_V | pad(12), 8);
         if self.page_form {
             self.form_page(ui);
+            ui.box_end();
+            return;
+        }
+        if self.page_dom {
+            self.dom_page(ui);
             ui.box_end();
             return;
         }

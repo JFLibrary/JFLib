@@ -21,7 +21,13 @@
 //                                    (U+FFFC in the text), preformatted blocks and their
 //                                    language, the heading level, the quotation depth, table
 //                                    rows and their cells, the numbers of list items, task
-//                                    boxes; the forms and their fields (md_doc.rs "Forms")
+//                                    boxes; the forms and their fields (md_doc.rs "Forms").
+//                                    It reads the element tree of the HTML (md_dom.rs): the
+//                                    tags as the tree has them, elements with the hidden
+//                                    attribute or display:none left out
+//   (crate) dom_read(dom) / dom_para(dom, l)   the same for a tree of a document (MdDoc::html,
+//                                    its changes): the paragraphs, fields and forms know their
+//                                    elements; one block element's paragraph read again
 //
 // Whitespace outside <pre> / white-space:pre* collapses as in browsers; a paragraph is a
 // block or the text between two <br>.  Nesting is capped (NEST_MAX open blocks, formats and
@@ -33,6 +39,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::md_doc::{MdField, MdForm, MdOption, MF_BUTTON, MF_CHECKBOX, MF_HIDDEN, MF_PASSWORD, MF_RADIO, MF_RESET, MF_SELECT, MF_SUBMIT, MF_TEXT, MF_TEXTAREA};
+use crate::md_dom::{void, Dom, MdNode, K_ELEM, K_TEXT, NIL};
 use crate::rich_doc::*;
 
 fn esc(s: &str, out: &mut String) {
@@ -259,9 +266,15 @@ fn embedded(s: &str) -> Option<RichDoc> {
 /// (md_doc.rs) the paragraphs of HTML and what a viewer shows besides them (see the module
 /// header)
 pub(crate) fn html_read(s: &str) -> HRead {
+    dom_read(&Dom::parse(s), false)
+}
+
+/// (md_doc.rs) html_read of a document's tree (handles: the paragraphs, fields and forms name
+/// their elements, HRead::ranges the paragraphs of the block elements)
+pub(crate) fn dom_read(d: &Dom, handles: bool) -> HRead {
     let mut r = Reader::new();
     r.ext = Some(Ext::default());
-    r.run(s);
+    r.walk(d, 0, false, handles);
     r.cap_end();
     r.label_end();
     let mut e = r.ext.take().unwrap_or_default();
@@ -299,16 +312,70 @@ pub(crate) fn html_read(s: &str) -> HRead {
     if paras.len() == 1 && paras[0].is_empty() && e.items.is_empty() {
         paras.clear();
     }
-    HRead { paras, ext: e.items, forms: e.forms, fields: e.fields }
+    HRead { paras, ext: e.items, forms: e.forms, fields: e.fields, nodes: e.para_nodes, ranges: e.ranges }
+}
+
+/// (md_doc.rs) the paragraph block element l of a document's tree shows by itself, read again
+/// with the format its ancestors give it (None: it shows none or several)
+pub(crate) fn dom_para(d: &Dom, l: u32) -> Option<Para> {
+    let mut r = Reader::new();
+    r.ext = Some(Ext::default());
+    let mut chain = Vec::new();
+    let mut x = d.nodes[l as usize].parent;
+    while x != NIL {
+        chain.push(x);
+        x = d.nodes[x as usize].parent;
+    }
+    // (what the ancestors push on the reader's formats)
+    let mut f = Fmt::default();
+    for &a in chain.iter().rev() {
+        let n = &d.nodes[a as usize];
+        if n.kind == K_ELEM && pushes_fmt(&n.name) {
+            f = fmt_with(f, &n.name, &n.attrs);
+        }
+    }
+    r.fmts.push((String::from("#"), f));
+    r.walk(d, l, true, true);
+    if r.out.len() != 1 {
+        return None;
+    }
+    r.out.pop()
+}
+
+// an element that puts a format on the reader's stack (in a document's tree, outside cells,
+// select and button, at a depth below NEST_MAX)
+fn pushes_fmt(tag: &str) -> bool {
+    !matches!(
+        tag,
+        "ul" | "ol" | "form" | "label" | "textarea" | "select" | "button" | "br" | "img" | "hr" | "meta" | "link" | "input" | "script" | "style"
+            | "head" | "title" | "template" | "noscript" | "svg"
+    )
+}
+
+// display:none in a style attribute (the last display wins)
+fn display_none(style: &str) -> bool {
+    let mut none = false;
+    for decl in style.split(';') {
+        if let Some((p, v)) = decl.split_once(':') {
+            if p.trim().eq_ignore_ascii_case("display") {
+                none = v.trim().trim_end_matches("!important").trim().eq_ignore_ascii_case("none");
+            }
+        }
+    }
+    none
 }
 
 /// what html_read returns: the paragraphs, the items by paragraph, the forms and fields
-/// (MdField::form: index + 1 into forms; HExt::Field::n: index into fields)
+/// (MdField::form: index + 1 into forms; HExt::Field::n: index into fields); dom_read with
+/// handles: the element of every paragraph (the innermost block; the last one may be missing:
+/// none) and the paragraphs of the block elements (element, first, end)
 pub(crate) struct HRead {
     pub paras: Vec<Para>,
     pub ext: Vec<(usize, HExt)>,
     pub forms: Vec<MdForm>,
     pub fields: Vec<MdField>,
+    pub nodes: Vec<MdNode>,
+    pub ranges: Vec<(u32, u32, u32)>,
 }
 
 /// what html_read reports about paragraph `at` (the index the item is filed under)
@@ -368,6 +435,10 @@ struct Ext {
     opt_val: bool,
     // the <textarea> whose text is read raw
     raw: Option<usize>,
+    // dom_read with handles: the element of every paragraph, the paragraphs of the block
+    // elements (element, first, end)
+    para_nodes: Vec<MdNode>,
+    ranges: Vec<(u32, u32, u32)>,
 }
 
 // open blocks, formats and lists at most (deeper ones are not opened)
@@ -456,7 +527,7 @@ pub(crate) fn entity(name: &str) -> Option<char> {
 }
 
 // text with its entities decoded
-fn decode(s: &str) -> String {
+pub(crate) fn decode(s: &str) -> String {
     if !s.contains('&') {
         return String::from(s);
     }
@@ -619,13 +690,14 @@ fn css_color(v: &str) -> Option<u32> {
     Some(0xFF00_0000 | rgb)
 }
 
-// a block's attributes and text settings
+// a block's attributes and text settings (node: its element in a document's tree)
 #[derive(Clone)]
 struct Block {
     tag: String,
     align: u8,
     style: u8,
     pre: bool,
+    node: MdNode,
 }
 
 struct Reader {
@@ -644,6 +716,8 @@ struct Reader {
     skip: Option<String>,
     // html_read: what a viewer shows besides the paragraphs
     ext: Option<Ext>,
+    // dom_read: the element being opened
+    node: MdNode,
 }
 
 const BLOCKS: [&str; 22] = [
@@ -664,6 +738,62 @@ impl Reader {
             item: None,
             skip: None,
             ext: None,
+            node: MdNode::NONE,
+        }
+    }
+
+    // html_read: the elements of a tree in document order (below `top`, or `top` itself when
+    // `own`) as the stream of their tags; hidden ones (the hidden attribute, display:none) are
+    // left out, raw text is skipped but a text area's.  handles: paragraphs, fields and forms
+    // name their elements, the block elements' paragraphs are noted
+    fn walk(&mut self, d: &Dom, top: u32, own: bool, handles: bool) {
+        // (node, Some(paragraphs before its content): its end)
+        let mut st: Vec<(u32, Option<usize>)> = Vec::new();
+        let push_kids = |st: &mut Vec<(u32, Option<usize>)>, x: u32| {
+            let mut k = d.nodes[x as usize].last;
+            while k != NIL {
+                st.push((k, None));
+                k = d.nodes[k as usize].prev;
+            }
+        };
+        if own {
+            st.push((top, None));
+        } else {
+            push_kids(&mut st, top);
+        }
+        while let Some((x, end)) = st.pop() {
+            let n = &d.nodes[x as usize];
+            if let Some(p0) = end {
+                self.close(&n.name);
+                if handles && (BLOCKS.contains(&n.name.as_str())) {
+                    let p1 = self.out.len();
+                    if let Some(e) = self.ext.as_mut() {
+                        e.ranges.push((x, p0 as u32, p1 as u32));
+                    }
+                }
+                continue;
+            }
+            if n.kind == K_TEXT {
+                self.text_dec(&n.name);
+                continue;
+            }
+            if n.kind != K_ELEM || d.hidden_attr(x) || d.attr(x, "style").is_some_and(display_none) {
+                continue;
+            }
+            self.node = if handles { d.handle(x) } else { MdNode::NONE };
+            self.open(&n.name, &n.attrs, false);
+            if void(&n.name) {
+                continue;
+            }
+            if self.skip.is_some() {
+                // raw text: a text area's is its value, the rest is skipped
+                self.raw_text_dec(&d.text_of(x));
+                self.skip = None;
+                self.close(&n.name);
+                continue;
+            }
+            st.push((x, Some(self.out.len())));
+            push_kids(&mut st, x);
         }
     }
 
@@ -721,7 +851,9 @@ impl Reader {
         });
         let quote = self.blocks.iter().filter(|b| b.tag == "blockquote").count().min(255) as u8;
         let row = self.blocks.last().is_some_and(|b| b.tag == "tr");
+        let node = self.blocks.last().map_or(MdNode::NONE, |b| b.node);
         let Some(e) = self.ext.as_mut() else { return };
+        e.para_nodes.push(node);
         if pre {
             e.items.push((at, HExt::Pre { block: e.pre, lang: e.lang.clone() }));
         }
@@ -829,7 +961,11 @@ impl Reader {
     }
 
     fn text(&mut self, raw: &str) {
-        let t = decode(raw);
+        self.text_dec(&decode(raw));
+    }
+
+    // text with its entities decoded
+    fn text_dec(&mut self, t: &str) {
         // html_read: inside a <select> or <button> the text is the field's; the text of an open
         // <label> names its field
         if let Some(e) = self.ext.as_mut() {
@@ -880,82 +1016,7 @@ impl Reader {
 
     // the format an element's attributes give (on top of the current one)
     fn fmt_for(&self, tag: &str, at: &[(String, String)]) -> Fmt {
-        let mut f = self.fmt();
-        match tag {
-            "b" | "strong" => f.flags |= RF_BOLD,
-            "i" | "em" | "cite" | "var" | "dfn" => f.flags |= RF_ITALIC,
-            "u" | "ins" => f.flags |= RF_UNDER,
-            "s" | "strike" | "del" => f.flags |= RF_STRIKE,
-            "code" | "tt" | "kbd" | "samp" => f.font = String::from("monospace"),
-            "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "th" => {}
-            _ => {}
-        }
-        for (k, v) in at {
-            match k.as_str() {
-                "href" if tag == "a" => f.link = v.clone(),
-                "color" if tag == "font" => f.color = css_color(v).unwrap_or(f.color),
-                "face" if tag == "font" => f.font = family_of(v),
-                "size" if tag == "font" => {
-                    f.size = match v.trim() {
-                        "1" => 75,
-                        "2" => 100,
-                        "3" => 120,
-                        "4" => 135,
-                        "5" => 180,
-                        "6" => 240,
-                        "7" => 360,
-                        _ => f.size,
-                    }
-                }
-                "style" => {
-                    for decl in v.split(';') {
-                        let Some((p, val)) = decl.split_once(':') else { continue };
-                        let val = val.trim().trim_end_matches("!important").trim();
-                        match p.trim().to_ascii_lowercase().as_str() {
-                            "color" => f.color = css_color(val).unwrap_or(f.color),
-                            "background-color" | "background" => {
-                                if let Some(c) = val.split_whitespace().find_map(css_color) {
-                                    if c & 0xFF_FFFF != 0xFF_FFFF {
-                                        f.bg = c;
-                                    }
-                                }
-                            }
-                            "font-weight" => {
-                                let bold = matches!(val, "bold" | "bolder") || val.parse::<u32>().is_ok_and(|w| w >= 600);
-                                if bold {
-                                    f.flags |= RF_BOLD;
-                                } else if matches!(val, "normal" | "lighter") || val.parse::<u32>().is_ok_and(|w| w < 600) {
-                                    f.flags &= !RF_BOLD;
-                                }
-                            }
-                            "font-style" => {
-                                if val.starts_with("italic") || val.starts_with("oblique") {
-                                    f.flags |= RF_ITALIC;
-                                } else if val == "normal" {
-                                    f.flags &= !RF_ITALIC;
-                                }
-                            }
-                            "text-decoration" | "text-decoration-line" => {
-                                if val.contains("underline") {
-                                    f.flags |= RF_UNDER;
-                                }
-                                if val.contains("line-through") {
-                                    f.flags |= RF_STRIKE;
-                                }
-                                if val == "none" {
-                                    f.flags &= !(RF_UNDER | RF_STRIKE);
-                                }
-                            }
-                            "font-size" => f.size = css_size(val, f.size).unwrap_or(f.size),
-                            "font-family" => f.font = family_of(val),
-                            _ => {}
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-        f
+        fmt_with(self.fmt(), tag, at)
     }
 
     // html_read inside a table cell: blocks, lists and breaks are part of the cell's text
@@ -973,6 +1034,7 @@ impl Reader {
         }
         fd.name = String::from(attr("name").unwrap_or(""));
         fd.id = String::from(attr("id").unwrap_or("").trim());
+        fd.node = self.node;
         fd.disabled = attr("disabled").is_some();
         fd.readonly = attr("readonly").is_some();
         if !matches!(fd.kind, MF_SUBMIT | MF_RESET | MF_BUTTON) {
@@ -1055,9 +1117,16 @@ impl Reader {
     // html_read: a <textarea>'s text (raw; entities decoded, line ends as '\n', the first one
     // dropped)
     fn raw_text(&mut self, s: &str) {
+        if self.ext.as_ref().is_some_and(|e| e.raw.is_some()) {
+            self.raw_text_dec(&decode(s));
+        }
+    }
+
+    // the same with the entities decoded
+    fn raw_text_dec(&mut self, s: &str) {
         let Some(e) = self.ext.as_mut() else { return };
         let Some(fd) = e.raw.take().and_then(|f| e.fields.get_mut(f)) else { return };
-        let t = decode(s).replace("\r\n", "\n").replace('\r', "\n");
+        let t = s.replace("\r\n", "\n").replace('\r', "\n");
         fd.value = String::from(t.strip_prefix('\n').unwrap_or(&t));
     }
 
@@ -1104,6 +1173,7 @@ impl Reader {
                         method: String::from(method),
                         id: String::from(attr("id").unwrap_or("").trim()),
                         name: String::from(attr("name").unwrap_or("")),
+                        node: self.node,
                     });
                     e.form = Some(e.forms.len() as u32 - 1);
                     if !self.in_cell(tag) {
@@ -1305,7 +1375,7 @@ impl Reader {
             };
             let pre = tag == "pre"
                 || at.iter().any(|(k, v)| k == "style" && v.to_ascii_lowercase().replace(' ', "").contains("white-space:pre"));
-            self.blocks.push(Block { tag: String::from(tag), align, style, pre });
+            self.blocks.push(Block { tag: String::from(tag), align, style, pre, node: self.node });
             if tag == "li" {
                 let kind = self.lists.last().copied().unwrap_or(LS_BULLET);
                 self.item = Some((kind, (self.lists.len().max(1) - 1).min(LEVEL_MAX as usize) as u8));
@@ -1440,8 +1510,87 @@ impl Reader {
     }
 }
 
+// the format an element's attributes give on top of f
+fn fmt_with(mut f: Fmt, tag: &str, at: &[(String, String)]) -> Fmt {
+    match tag {
+        "b" | "strong" => f.flags |= RF_BOLD,
+        "i" | "em" | "cite" | "var" | "dfn" => f.flags |= RF_ITALIC,
+        "u" | "ins" => f.flags |= RF_UNDER,
+        "s" | "strike" | "del" => f.flags |= RF_STRIKE,
+        "code" | "tt" | "kbd" | "samp" => f.font = String::from("monospace"),
+        "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "th" => {}
+        _ => {}
+    }
+    for (k, v) in at {
+        match k.as_str() {
+            "href" if tag == "a" => f.link = v.clone(),
+            "color" if tag == "font" => f.color = css_color(v).unwrap_or(f.color),
+            "face" if tag == "font" => f.font = family_of(v),
+            "size" if tag == "font" => {
+                f.size = match v.trim() {
+                    "1" => 75,
+                    "2" => 100,
+                    "3" => 120,
+                    "4" => 135,
+                    "5" => 180,
+                    "6" => 240,
+                    "7" => 360,
+                    _ => f.size,
+                }
+            }
+            "style" => {
+                for decl in v.split(';') {
+                    let Some((p, val)) = decl.split_once(':') else { continue };
+                    let val = val.trim().trim_end_matches("!important").trim();
+                    match p.trim().to_ascii_lowercase().as_str() {
+                        "color" => f.color = css_color(val).unwrap_or(f.color),
+                        "background-color" | "background" => {
+                            if let Some(c) = val.split_whitespace().find_map(css_color) {
+                                if c & 0xFF_FFFF != 0xFF_FFFF {
+                                    f.bg = c;
+                                }
+                            }
+                        }
+                        "font-weight" => {
+                            let bold = matches!(val, "bold" | "bolder") || val.parse::<u32>().is_ok_and(|w| w >= 600);
+                            if bold {
+                                f.flags |= RF_BOLD;
+                            } else if matches!(val, "normal" | "lighter") || val.parse::<u32>().is_ok_and(|w| w < 600) {
+                                f.flags &= !RF_BOLD;
+                            }
+                        }
+                        "font-style" => {
+                            if val.starts_with("italic") || val.starts_with("oblique") {
+                                f.flags |= RF_ITALIC;
+                            } else if val == "normal" {
+                                f.flags &= !RF_ITALIC;
+                            }
+                        }
+                        "text-decoration" | "text-decoration-line" => {
+                            if val.contains("underline") {
+                                f.flags |= RF_UNDER;
+                            }
+                            if val.contains("line-through") {
+                                f.flags |= RF_STRIKE;
+                            }
+                            if val == "none" {
+                                f.flags &= !(RF_UNDER | RF_STRIKE);
+                            }
+                        }
+                        "font-size" => f.size = css_size(val, f.size).unwrap_or(f.size),
+                        "font-family" => f.font = family_of(val),
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    f
+}
+
 // the '>' that ends the tag at s[0] == '<' (quotes respected)
-fn tag_end(s: &str) -> Option<usize> {
+pub(crate) fn tag_end(s: &str) -> Option<usize> {
     let mut q = 0u8;
     for (i, b) in s.bytes().enumerate().skip(1) {
         if q != 0 {
@@ -1457,7 +1606,7 @@ fn tag_end(s: &str) -> Option<usize> {
     None
 }
 
-fn find_ci(hay: &str, needle: &str) -> Option<usize> {
+pub(crate) fn find_ci(hay: &str, needle: &str) -> Option<usize> {
     let h = hay.as_bytes();
     let n = needle.as_bytes();
     if n.len() > h.len() {

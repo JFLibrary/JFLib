@@ -1516,7 +1516,13 @@ rich_html -- RichDoc as HTML and back
                                    (U+FFFC in the text), preformatted blocks and their
                                    language, the heading level, the quotation depth, table
                                    rows and their cells, the numbers of list items, task
-                                   boxes; the forms and their fields (md_doc.rs "Forms")
+                                   boxes; the forms and their fields (md_doc.rs "Forms").
+                                   It reads the element tree of the HTML (md_dom.rs): the
+                                   tags as the tree has them, elements with the hidden
+                                   attribute or display:none left out
+  (crate) dom_read(dom) / dom_para(dom, l)   the same for a tree of a document (MdDoc::html,
+                                   its changes): the paragraphs, fields and forms know their
+                                   elements; one block element's paragraph read again
 
 Whitespace outside <pre> / white-space:pre* collapses as in browsers; a paragraph is a
 block or the text between two <br>.  Nesting is capped (NEST_MAX open blocks, formats and
@@ -6342,6 +6348,16 @@ links) or from HTML (the reader of the rich-text editor, rich_html.rs)
                                        ones stand in reading order; field.caption(): a
                                        button's caption
   doc.truncated()                      a limit cut the input
+  HTML documents keep their element tree (md_dom.rs: queries, changes of text, attributes,
+  classes and structure; MdNode handles that stay the same across changes); the blocks,
+  fields and forms name their elements (MdBlock::node, MdField::node, MdForm::node).
+  doc.update() -> the blocks were derived again after changes: in place when every change
+                                       lies inside block elements that show one paragraph of
+                                       text by themselves (no links, images, fields, blocks in
+                                       it: O(that paragraph)), else all of them (linear, no
+                                       layout); md_view.rs keeps its place, selection, focus,
+                                       the fields' values and the layouts that still hold
+  doc.field_of(n) -> the field of element n
 
 The model: a block is a paragraph, a heading (level 1..6), a code block (its text, the
 language of the fence), a rule or a table row (cells: byte ranges of the text, '\t' between
@@ -6462,6 +6478,8 @@ MF_BUTTON: u8 = 9
   - `table: u32` -- table rows: index into MdDoc::tables, a header row
   - `head: bool`
   - `align: u8` -- paragraphs: 0 start, 1 centre, 2 end (HTML)
+  - `node: MdNode` -- HTML: the element whose content it shows (the innermost block element: p, li, h1, the
+    row of a cell ...; MdNode::NONE: none, Markdown)
 
 - **`struct MdImage`**
   an image of the document
@@ -6489,6 +6507,7 @@ MF_BUTTON: u8 = 9
   - `method: String`
   - `id: String`
   - `name: String`
+  - `node: MdNode` -- its &lt;form> element (an HTML document)
 
 - **`struct MdOption`**
   a choice of a drop-down list: the value sent, the text shown
@@ -6514,6 +6533,8 @@ MF_BUTTON: u8 = 9
   - `maxlength: u32` -- at most this many characters (0: no limit)
   - `disabled: bool`
   - `readonly: bool`
+  - `node: MdNode` -- its element (&lt;input>, &lt;select> ... of an HTML document; the view keeps its value while
+    the element stays)
 
 **`impl MdField`**
 
@@ -6538,6 +6559,13 @@ MF_BUTTON: u8 = 9
   a document from HTML: what the rich-text editor reads (paragraphs, headings h1 .. h6,
   lists, block quotes, formats, links, colours) and rules, images, preformatted blocks
   (&lt;pre>&lt;code class="language-x">), tables and forms (see the module header)
+- **`fn update(&mut self) -> bool`**
+  derive the blocks (fields, forms, links ...) again after changes of the element tree
+  (md_dom.rs; the view does it every frame) -> there were changes.  In place when every
+  change lies inside block elements that show one paragraph of plain formatted text by
+  themselves (O(those paragraphs)), else all of them (linear in the document).
+- **`fn field_of(&self, n: MdNode) -> Option<usize>`**
+  the field whose element is n (an index of fields())
 - **`fn blocks(&self) -> &[MdBlock]`**
   the blocks in reading order
 - **`fn links(&self) -> &[String]`**
@@ -6574,6 +6602,141 @@ MF_BUTTON: u8 = 9
   em, del, u, code, a href, img src alt, colours as span styles; of forms only the
   buttons' captions (as text)
 
+#### `ui/md_dom.rs`
+
+Source: [`lib/ui/md_dom.rs`](../lib/ui/md_dom.rs)
+
+```text
+md_dom -- the elements of an HTML document of the viewer (MdDoc::html, md_doc.rs): a tree whose
+nodes keep their identity across changes, queries by simple selectors (also the selectors of
+the style sheets, rich_html.rs), changes of text, attributes, classes and structure; the
+blocks follow at MdDoc::update (md_view.rs does it every frame)
+
+  doc.root() -> MdNode                 the document: its children are the HTML's top level
+  doc.by_id(id) -> Option<MdNode>      the first element in the document with this id (an
+                                       index: O(log n))
+  doc.select(sel) / select_first(sel)  the elements of the document a selector list matches,
+                                       in document order
+  doc.select_in(n, sel) / matches(n, sel)   among n's descendants / n itself
+  doc.parent(n) / children(n) / next_sibling(n) / prev_sibling(n)
+  doc.tag(n) ("" for a text) / is_text(n) / alive(n) / attached(n) (in the document)
+  doc.attr(n, name) / attrs(n) / has_class(n, c) / text_of(n) (all its text, textContent) /
+  inner_html(n)
+  changes (true / a node: done; false / MdNode::NONE: a node that is gone, a Markdown
+  document, a name that is none, the cap of nodes):
+  doc.set_text(n, s) (an element's children become one text; they are freed) /
+  set_attr(n, name, value) / remove_attr(n, name) / add_class(n, c) / remove_class(n, c) /
+  toggle_class(n, c) -> on / create_element(tag) / create_text(s) (not in the document yet) /
+  insert(parent, before, n) (before: None = at the end; a node in the document moves) /
+  remove(n) (out of the document, kept: it may go in again) / free(n) (gone: its handles and
+  those of its descendants refer to nothing) / set_inner_html(n, html)
+  MdNode::raw() / MdNode::from_raw(v): a handle as a number (the objects of a script host)
+
+The tree: HTML read the way browsers do, simplified -- void elements (br, img, input ...),
+raw text (script, style, textarea, title, template, noscript, svg), a <p> closed by a block,
+<li> by <li>, <dd> / <dt>, <td> / <th>, <tr>, <option> by their like, <head> by the first
+element of the body; an end tag closes the elements above its own, but not across a table
+cell or a button, and an inline element's end tag does not close a block (it is dropped); a
+stray </p> is an empty paragraph; comments go.  Depth (DEPTH_MAX open elements: deeper ones
+stay empty, their content follows them) and nodes (NODES_MAX: the rest is cut, truncated)
+are capped, so parsing stays linear.
+
+Selectors: a list (a, b) of compounds -- a tag or *, #id, .class, [attr], [attr=v] (also ~=
+|= ^= $= *=, values in quotes or not) -- joined by descendant (blank) and child (>)
+combinators; tags and attribute names ignore case, ids, classes and values do not.  Anything
+else (pseudo-classes, sibling combinators, escapes) makes the selector match nothing.  A
+match costs O(depth x compounds) per element (each run of child combinators is matched at
+the nearest ancestor that takes it), a query at most a budget proportional to the tree.
+```
+
+- **`struct MdNode`**
+  a node of an HTML document's element tree (an element or a text): the same across changes
+  of the document; a freed node's handle refers to nothing (MdDoc::alive)
+
+**`impl MdNode`**
+
+- **`const NONE: MdNode = MdNode { i: 0, g: 0 }`**
+  no node
+- **`fn is_none(self) -> bool`**
+  it is MdNode::NONE
+- **`fn raw(self) -> u64`**
+  the handle as a number (0: none), e.g. for a script host's objects
+- **`fn from_raw(v: u64) -> MdNode`**
+  the handle of raw()
+
+**`impl MdDoc`**
+
+- **`fn root(&self) -> MdNode`**
+  the document's root (MdNode::NONE for a document from Markdown): its children are the
+  top level of the HTML
+- **`fn by_id(&self, id: &str) -> Option<MdNode>`**
+  the first element in the document with this id
+- **`fn select(&self, sel: &str) -> Vec<MdNode>`**
+  the elements of the document a selector list matches, in document order (see md_dom.rs;
+  a selector it does not support matches nothing)
+- **`fn select_first(&self, sel: &str) -> Option<MdNode>`**
+  the first element select(sel) would give
+- **`fn select_in(&self, n: MdNode, sel: &str) -> Vec<MdNode>`**
+  the elements below n a selector list matches, in document order
+- **`fn matches(&self, n: MdNode, sel: &str) -> bool`**
+  element n matches a selector list
+- **`fn parent(&self, n: MdNode) -> Option<MdNode>`**
+  n's parent (None: the root, a node out of the document, a node that is gone)
+- **`fn children(&self, n: MdNode) -> Vec<MdNode>`**
+  n's children (elements and texts) in order
+- **`fn next_sibling(&self, n: MdNode) -> Option<MdNode>`**
+  the node after n under the same parent
+- **`fn prev_sibling(&self, n: MdNode) -> Option<MdNode>`**
+  the node before n under the same parent
+- **`fn tag(&self, n: MdNode) -> &str`**
+  an element's tag in lower case ("" for a text, "#document" for the root)
+- **`fn is_text(&self, n: MdNode) -> bool`**
+  n is a text
+- **`fn alive(&self, n: MdNode) -> bool`**
+  n exists (it was not freed)
+- **`fn attached(&self, n: MdNode) -> bool`**
+  n is in the document
+- **`fn attr(&self, n: MdNode, name: &str) -> Option<&str>`**
+  an attribute of element n (names in lower case)
+- **`fn attrs(&self, n: MdNode) -> &[(String, String)]`**
+  the attributes of element n in order (names in lower case, values decoded)
+- **`fn has_class(&self, n: MdNode, c: &str) -> bool`**
+  element n has class c
+- **`fn text_of(&self, n: MdNode) -> String`**
+  all the text of n (a text: its own; an element: that of its descendants, as textContent)
+- **`fn inner_html(&self, n: MdNode) -> String`**
+  the HTML of n's children
+- **`fn changed(&self) -> bool`**
+  the tree changed since the blocks were derived (update() derives them)
+- **`fn set_text(&mut self, n: MdNode, s: &str) -> bool`**
+  set n's text: a text's own; an element's children (freed) become one text
+- **`fn set_attr(&mut self, n: MdNode, name: &str, value: &str) -> bool`**
+  set an attribute of element n (the name in lower case; "id" updates the index)
+- **`fn remove_attr(&mut self, n: MdNode, name: &str) -> bool`**
+  remove an attribute of element n -> it had one
+- **`fn add_class(&mut self, n: MdNode, c: &str) -> bool`**
+  add class c to element n
+- **`fn remove_class(&mut self, n: MdNode, c: &str) -> bool`**
+  remove class c from element n -> it had it
+- **`fn toggle_class(&mut self, n: MdNode, c: &str) -> bool`**
+  class c on element n off when it has it, else on -> on
+- **`fn create_element(&mut self, tag: &str) -> MdNode`**
+  a new element (not in the document: insert puts it there) -> MdNode::NONE: a Markdown
+  document, a tag that is none, the cap of nodes
+- **`fn create_text(&mut self, s: &str) -> MdNode`**
+  a new text (not in the document)
+- **`fn insert(&mut self, parent: MdNode, before: Option<MdNode>, n: MdNode) -> bool`**
+  put n under element `parent` before its child `before` (None: at the end); a node with a
+  parent moves -> false: a node that is gone, the root, n above parent, before no child of
+  parent
+- **`fn remove(&mut self, n: MdNode) -> bool`**
+  take n out of the document (it stays: insert may put it back; free drops it)
+- **`fn free(&mut self, n: MdNode) -> bool`**
+  drop n and its descendants (out of the document first): their handles refer to nothing
+- **`fn set_inner_html(&mut self, n: MdNode, html: &str) -> bool`**
+  element n's children (freed) become the nodes of an HTML text (raw text elements: the
+  text)
+
 #### `ui/md_view.rs`
 
 Source: [`lib/ui/md_view.rs`](../lib/ui/md_view.rs)
@@ -6600,6 +6763,12 @@ md_view -- ui.markdown_view / ui.html_view: a read-only document view over an Md
        scroll_to_block(i) / scroll_to_end() (the end, also while the document grows: chat
        output; scrolling to the end of a long document does the same until the user scrolls
        away) / first_visible() -> (block, px above the view) / focused_link()
+  Changes of the document (HTML: its elements, md_dom.rs -- page scripts): st.doc_mut() ->
+       &mut MdDoc; the view takes the changes every frame (st.update(): now): the blocks
+       derived again (MdDoc::update), the layouts and heights of the blocks that stay kept,
+       the view on the block it showed, the selection and the focused link with their blocks,
+       the fields' values by their elements (what the user or the app gave a field stays;
+       the others follow the document's values), a focused field's widget moved with it
   Images from the app: st.images = MI_LOCAL (default: VFS names and paths, other addresses
        show their alt text), MI_ASK (as MI_LOCAL; http:, https: and data: addresses are asked
        from the app) or MI_APP (every image is asked: nothing is read by the view -- pages
@@ -6616,7 +6785,8 @@ md_view -- ui.markdown_view / ui.html_view: a read-only document view over an Md
        scale and mirroring.  Their values live in the state: field_text(i) / field_checked(i)
        / field_selected(i), set_field_text / set_field_checked / set_field_selected,
        form_data(form, button) (the pairs a browser sends), reset_form(form),
-       focused_field(); a new document starts with its first values.  Keys: Tab / Shift+Tab
+       focused_field(); a new document starts with its first values (a changed one keeps
+       them, above).  Keys: Tab / Shift+Tab
        go through links and fields in reading order (a group of radios is one stop: the
        checked one; Up / Down and Left / Right -- as the radios lie in their paragraph --
        choose inside it), Space toggles, Enter in a text field, check
@@ -6712,6 +6882,13 @@ MI_APP: u8 = 2
   an empty document
 - **`fn doc(&self) -> &MdDoc`**
   the document shown
+- **`fn doc_mut(&mut self) -> &mut MdDoc`**
+  the document to change (an HTML document's elements, md_dom.rs): the view takes the
+  changes at its next frame (or update()) and keeps its place, selection, focus and the
+  values the user gave the fields that stay
+- **`fn update(&mut self) -> bool`**
+  take the document's changes now (MdDoc::update; the view does it every frame) -> there
+  were changes
 - **`fn set_markdown(&mut self, s: &str)`**
   show Markdown (parsed now unless it is the text shown already)
 - **`fn set_html(&mut self, s: &str)`**
@@ -6750,7 +6927,8 @@ MI_APP: u8 = 2
 - **`fn field_selected(&self, i: usize) -> i32`**
   the option chosen in field i (drop-down lists; -1: none)
 - **`fn set_field_text(&mut self, i: usize, s: &str)`**
-  set field i's text (text fields, text areas, hidden fields)
+  set field i's text (text fields, text areas, hidden fields; changes of the document keep
+  it, as the user's input)
 - **`fn set_field_checked(&mut self, i: usize, on: bool)`**
   check field i or not (a radio: the others of its group go off)
 - **`fn set_field_selected(&mut self, i: usize, k: i32)`**

@@ -1281,9 +1281,29 @@ Fensterrand hinaus.
   `forms`, `form view`) und `--page form` (`form_keys.uis`, `form_mouse.uis`,
   `form_images.uis`, `form_scale.uis`, `form_rtl.uis`; Windows und Linux). Offen: die Felder
   folgen der Spiegelung des Fensters, nicht der Richtung ihres Absatzes; keine Datei-Felder,
-  keine Mehrfachauswahl. (3) *fehlt* Ein veränderbares Dokument (für B3, Seitenskripte):
-  Elemente in `md_doc` über id, Klasse oder Tag finden, Text, Attribute und Klassen ändern,
-  Elemente einfügen und entfernen, danach neu setzen, ohne Bildlauf und Auswahl zu verlieren.
+  keine Mehrfachauswahl. (3) *erledigt* (2026-10-30) Ein veränderbares Dokument (für B3,
+  Seitenskripte): ein HTML-Dokument behält seinen Elementbaum ([`md_dom.rs`](../lib/ui/md_dom.rs);
+  Leerelemente, Rohtext, `<p>`/`<li>`/`<td>`/`<tr>`/`<option>` wie im Browser geschlossen, Tiefe
+  und Knoten begrenzt); `MdNode`-Handles bleiben über Änderungen gleich (`raw()`/`from_raw` für
+  die Objekte eines Skript-Hosts). Suchen: `by_id` (Index), `select`/`select_first`/`select_in`/
+  `matches` mit Tag, `*`, `#id`, `.klasse`, `[attr]`, `[attr=v]` (auch `~= |= ^= $= *=`),
+  Nachfahren- und Kind-Kombinator, Listen mit Komma (Pseudoklassen und Geschwister-Kombinatoren
+  treffen nichts); `parent`/`children`/Geschwister, `tag`, `attr`/`attrs`/`has_class`,
+  `text_of`, `inner_html`. Ändern: `set_text`, `set_attr`/`remove_attr`, `add_class`/
+  `remove_class`/`toggle_class`, `create_element`/`create_text`, `insert(parent, before, n)`,
+  `remove` (bleibt erhalten), `free`, `set_inner_html`; `hidden` und `display:none` blenden aus.
+  `MdDoc::update()` leitet die Blöcke neu ab: eine Änderung innerhalb eines Blockelements, das
+  allein einen Absatz formatierten Texts zeigt, nur diesen Block (O(Absatz)), jede andere alle
+  (linear, etwa ein neues Parsen, ohne Layout). Die Ansicht (`MdViewState::doc_mut`, `update`,
+  sonst jeder Frame) behält Layouts und Höhen der übrigen Blöcke, den Bildlauf (am Block
+  verankert), Auswahl und fokussierten Link, die Werte der Formularfelder über ihre Elemente
+  (vom Nutzer oder der App gesetzte bleiben, die anderen folgen dem Dokument) und den Fokus
+  eines Felds, vor dem Felder kommen oder gehen; `MdBlock`/`MdField`/`MdForm::node`,
+  `field_of`. Getestet mit `mdviewtest --test unit` (Gruppen `dom`, `dom changes` mit 300
+  zufälligen Änderungen, `dom view`, `dom cost`) und `--page dom` (`dom_steps.uis`, Windows und
+  Linux). Offen: strukturelle Änderungen (Einfügen, Entfernen) leiten das ganze Dokument neu ab
+  statt nur den betroffenen Container; Element unter einer Textposition (Klick-Ereignisse) gibt
+  es nur blockweise (`MdBlock::node`).
   (4) *fehlt* Später eine CSS-Teilmenge in `rich_html` (für B4): `<style>` mit
   Selektoren nach Tag, Klasse und id, die Eigenschaften, die heute aus `style=` gelesen werden,
   dazu Abstände und Rahmen. In `lib/script` nur `compile_with` (siehe den Runner), damit der
