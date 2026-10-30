@@ -1021,6 +1021,28 @@ Fensterrand hinaus.
   „Live folgen“, Leerzustand, Zusammenfassung für Screenreader; hoher Kontrast mit Strichmustern,
   in RTL-Fenstern links → rechts. Getestet mit `datagallery/tests/linechart.uis`,
   `linechart_hc.uis` und `uitest --only chart`.
+- **P2** · *erledigt* · Fenster in einer Fläche, Taskleiste und Vollbild (L7, 2026-10-30, für den
+  Mini-Desktop von JFNetworker): [`ui/desk.rs`](../lib/ui/desk.rs) `desk_begin` /
+  `desk_next` / `desk_end` mit `DeskState` (reine Daten: Plätze, Z-Reihenfolge, maximiert,
+  minimiert, an Hälften eingerastet, das aktive Fenster; als Text gespeichert / geladen) --
+  Titelleiste mit Symbol, Titel und Knöpfen (einzeln abschaltbar, feste Größe), Ziehen an der
+  Titelleiste, Größe an allen Rändern und Ecken mit Mindestgrößen, Doppelklick maximiert,
+  Klick holt nach vorn, Einrasten an den Rändern und an der linken / rechten Hälfte mit
+  Vorschau, maximiert ohne den freigehaltenen Streifen einer Taskleiste, minimiert bis zur
+  Wiederherstellung, neue Fenster kaskadiert, beim Schrumpfen der Fläche erreichbar; Alt+F6 /
+  Alt+Umschalt+F6, Alt+F10, Alt+F9, Alt+- (Fenstermenü), der Fokus kehrt ins aktive Fenster
+  zurück, Tab erreicht die Fenster dahinter nicht; für Screenreader je Fenster ein Dialog
+  mit Titel und Zustand, der seinen Inhalt auch dort enthält, wo andere Fenster ihn verdecken;
+  nur geänderte Zellen werden neu gezeichnet; RTL gespiegelt, hoher Kontrast, Maler
+  `StyleShell::desk_*` (Standard aus den Tokens, NetLab eigen). Taskleiste
+  (`desk_taskbar_begin` / `desk_taskbar` / `desk_taskbar_end`): Knopf je Fenster, zweiter
+  Klick minimiert, Menü, „Weitere Fenster“ bei Überlauf, Platz für Start und Uhr der App.
+  Vollbild `ui.window_fullscreen` für Haupt- und Werkzeugfenster (`UWS_FULLSCREEN`,
+  `UIC_FULLSCREEN`): Windows (randlos über dem Monitor, Platzierung und Stil zurück), X11
+  (`_NET_WM_STATE_FULLSCREEN`), Wayland (`set_fullscreen`), Browser (Fullscreen API);
+  F11 bleibt der App. Getestet mit `apps/desktest` (12 Skripte mit `--verify-dirty`, Windows
+  und Linux), `desktest --check-fullscreen` mit echten Fenstern (Windows, X11 und Wayland unter
+  WSLg) und `tests/fullscreen_web.mjs` (Chromium, Firefox).
 
 ## 7. App-Framework und Architektur
 

@@ -1,0 +1,78 @@
+#!args --verify-dirty
+# maximising, restoring, minimising and closing (ui/desk.rs): the title bar's buttons, a double
+# click on it, the keys (Alt+F10, Alt+F9, Alt+-), the window menu at the icon and on a right
+# click; maximised windows fill the area without the taskbar's strip, minimised ones are gone
+# until the taskbar brings them back, as they were
+theme light
+# the buttons
+click button:"Maximieren: Protokoll"
+expect dialog:"Protokoll (maximiert)" rect 0 48 960 466
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll=x]" exists
+expect button:"Wiederherstellen: Protokoll" exists
+expect button:"Maximieren: Protokoll" missing
+expect text:"Ereignisse: Schließen 0 | Aktiv 1 | Bewegt 0 | Größe 0 | Zustand 1 | Klicks 0" exists
+shot build/desktest/maximized.png
+click button:"Wiederherstellen: Protokoll"
+expect dialog:"Protokoll" rect 98 146 320 232
+expect text:"Aktiv: Protokoll 98,98 320x232" exists
+# a double click on the title bar
+dblclick titlebar:"Protokoll"
+expect dialog:"Protokoll (maximiert)" rect 0 48 960 466
+dblclick titlebar:"Protokoll"
+expect dialog:"Protokoll" rect 98 146 320 232
+# the keys: Alt+F10 maximises and restores the active window, Alt+F9 minimises it (the
+# topmost other one becomes active)
+key alt+f10
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll=x]" exists
+key alt+f10
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll]" exists
+key alt+f9
+expect text:"Z: Editor, Rechner, [Notizen], Protokoll=m" exists
+expect dialog:"Protokoll" missing
+expect button:"Protokoll (minimiert)" exists
+# the minimise button (the press on it brought the Notizen above the minimised Protokoll)
+click button:"Minimieren: Notizen"
+expect text:"Z: Editor, [Rechner], Protokoll=m, Notizen=m" exists
+# back from the taskbar, active
+click button:"Protokoll (minimiert)"
+expect text:"Z: Editor, Rechner, Notizen=m, [Protokoll]" exists
+expect dialog:"Protokoll" rect 98 146 320 232
+# maximised, minimised, back: maximised again
+key alt+f10
+key alt+f9
+expect text:"Z: Editor, [Rechner], Notizen=m, Protokoll=m" exists
+click button:"Protokoll (minimiert)"
+expect dialog:"Protokoll (maximiert)" rect 0 48 960 466
+expect text:"Z: Editor, Rechner, Notizen=m, [Protokoll=x]" exists
+# the menu at the icon (it hangs below it): Wiederherstellen while maximised
+click 20,64
+expect menuitem:"Wiederherstellen" enabled
+expect menuitem:"Maximieren" disabled
+shot build/desktest/menu.png
+click menuitem:"Wiederherstellen"
+expect text:"Z: Editor, Rechner, Notizen=m, [Protokoll]" exists
+# a right click on the title bar opens it at the pointer
+rclick titlebar:"Protokoll"
+expect menuitem:"Wiederherstellen" disabled
+click menuitem:"Minimieren"
+expect text:"Z: Editor, [Rechner], Notizen=m, Protokoll=m" exists
+# Alt+- opens the active window's menu with its first row focused; the Rechner has a fixed
+# size: no maximising, Alt+F10 does nothing
+key alt+-
+expect menuitem:"Maximieren" disabled
+expect menuitem:"Minimieren" focused
+key esc
+expect menuitem:"Minimieren" missing
+key alt+f10
+expect text:"Z: Editor, [Rechner], Notizen=m, Protokoll=m" exists
+expect dialog:"Rechner" rect 42 90 220 242
+# closing: the close button (the app takes the window out of its list), the menu
+click button:"Schließen: Rechner"
+expect text:"Z: [Editor], Notizen=m, Protokoll=m" exists
+expect button:"Rechner" missing
+key alt+-
+click menuitem:"Schließen"
+expect text:"Z: Notizen=m, Protokoll=m" exists
+expect text:"Aktiv: -" exists
+expect text:"Ereignisse: Schließen 2 | Aktiv 8 | Bewegt 0 | Größe 0 | Zustand 14 | Klicks 0" exists
+expect_nowarn

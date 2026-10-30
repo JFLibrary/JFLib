@@ -201,7 +201,7 @@ returns its own implementation (and overrides only the methods it cares about):
 | Trait | Content | Style file (backupcraft) |
 |---|---|---|
 | `StyleData` | grid metrics, header strip, header cells, rows; tree twisties; badges; status dots; meters; the chart palette | `data.rs` |
-| `StyleShell` | navigation pane, sections and items; command bar; splitter grip; breadcrumb separator; segmented control; wizard steps; toasts; spinner; indeterminate progress; calendar days; dock groups, tab strips, tabs, rails of collapsed sides, drop markers and the drop preview | `shell.rs` |
+| `StyleShell` | navigation pane, sections and items; command bar; splitter grip; breadcrumb separator; segmented control; wizard steps; toasts; spinner; indeterminate progress; calendar days; dock groups, tab strips, tabs, rails of collapsed sides, drop markers and the drop preview; the background, windows, title bars, buttons and snap preview of a window area, the taskbar and its buttons (`desk_*`, `taskbar*`) | `shell.rs` |
 
 ```rust
 impl Style for BackupCraft {

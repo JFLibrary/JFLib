@@ -1,0 +1,36 @@
+#!args --verify-dirty
+# shots for a look by eye: light and dark at 100 and 150 % in the default style (winui) and in
+# netlab, high contrast in both; a drag with the snap preview and the taskbar's menu
+theme light
+shot build/desktest/light.png
+scale 150
+shot build/desktest/light_150.png
+theme dark
+shot build/desktest/dark_150.png
+scale 100
+shot build/desktest/dark.png
+style netlab
+expect style netlab
+theme light
+shot build/desktest/netlab_light.png
+scale 150
+shot build/desktest/netlab_light_150.png
+theme dark
+shot build/desktest/netlab_dark_150.png
+scale 100
+shot build/desktest/netlab_dark.png
+theme contrast
+shot build/desktest/netlab_contrast.png
+style winui
+shot build/desktest/contrast.png
+theme light
+down titlebar:"Protokoll"
+move 300,300
+move 2,300
+shot build/desktest/snap.png
+up
+style netlab
+rclick button:"Editor"
+shot build/desktest/netlab_taskmenu.png
+key esc
+expect_nowarn

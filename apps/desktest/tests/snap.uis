@@ -1,0 +1,36 @@
+#!args --verify-dirty
+# snapping while a window is dragged (ui/desk.rs): with the pointer at the area's left or right
+# edge the window fills that half, at the top edge the whole area (a preview shows where while
+# it is held); dragged away it comes back to its normal size under the pointer; a fixed-size
+# window only moves
+theme light
+down titlebar:"Protokoll"
+move 300,200
+move 2,200
+shot build/desktest/snap_preview.png
+up
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll=l]" exists
+expect dialog:"Protokoll" rect 0 48 480 466
+# (the normal place stays what it was)
+expect text:"Aktiv: Protokoll 98,98 320x232" exists
+expect text:"Ereignisse: Schließen 0 | Aktiv 1 | Bewegt 0 | Größe 0 | Zustand 1 | Klicks 0" exists
+expect button:"Wiederherstellen: Protokoll" exists
+# from the left half to the right one
+drag titlebar:"Protokoll" 958,200
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll=r]" exists
+expect dialog:"Protokoll" rect 480 48 480 466
+# the top edge: maximised
+drag titlebar:"Protokoll" 500,49
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll=x]" exists
+expect dialog:"Protokoll (maximiert)" rect 0 48 960 466
+# dragged away: the normal size under the pointer (at the same share of the title bar), its
+# bottom edge sticks to the strip's
+drag titlebar:"Protokoll" 400,300
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll]" exists
+expect text:"Aktiv: Protokoll 260,234 320x232" exists
+expect text:"Ereignisse: Schließen 0 | Aktiv 1 | Bewegt 1 | Größe 0 | Zustand 4 | Klicks 0" exists
+# a fixed-size window does not snap to a half: it only moves (left of the area, 64 DIP stay)
+drag titlebar:"Rechner" 2,200
+expect text:"Z: Editor, Notizen, Protokoll, [Rechner]" exists
+expect text:"Aktiv: Rechner -68,135 220x242" exists
+expect_nowarn

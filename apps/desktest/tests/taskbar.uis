@@ -1,0 +1,71 @@
+#!args --verify-dirty
+# the taskbar (ui/desk.rs desk_taskbar): a click activates a window, a second one minimises
+# it, a click brings a minimised one back; the menu (right click, menu key); the buttons are
+# one Tab stop with the arrows inside; what does not fit goes into "Weitere Fenster" (the
+# active window stays in the row); the app's own items at the start and the end
+theme light
+expect button:"Start" exists
+expect text:"12:00" exists
+expect button:"Protokoll" checked
+expect button:"Editor" unchecked
+click button:"Editor"
+expect text:"Z: Rechner, Notizen, Protokoll, [Editor]" exists
+expect button:"Editor" checked
+# a second click minimises it, the next one brings it back
+click button:"Editor"
+expect text:"Z: Rechner, Notizen, [Protokoll], Editor=m" exists
+expect button:"Editor (minimiert)" exists
+expect dialog:"Editor" missing
+click button:"Editor (minimiert)"
+expect text:"Z: Rechner, Notizen, Protokoll, [Editor]" exists
+expect dialog:"Editor" exists
+# the menu: a right click
+rclick button:"Notizen"
+expect menuitem:"Wiederherstellen" disabled
+click menuitem:"Maximieren"
+expect text:"Z: Rechner, Protokoll, Editor, [Notizen=x]" exists
+rclick button:"Notizen"
+click menuitem:"Wiederherstellen"
+expect text:"Z: Rechner, Protokoll, Editor, [Notizen]" exists
+rclick button:"Rechner"
+expect menuitem:"Maximieren" disabled
+shot build/desktest/taskbar_menu.png
+key esc
+# the keyboard: the arrows move between the buttons, the menu key opens the menu (its first
+# row that acts focused; a minimised window keeps its place in the z-order), Enter
+# activates (the focus goes into the window)
+focus button:"Editor"
+key right
+expect button:"Rechner" focused
+key apps
+expect menuitem:"Minimieren" focused
+key enter
+expect text:"Z: Rechner=m, Protokoll, Editor, [Notizen]" exists
+focus button:"Protokoll"
+key enter
+expect text:"Z: Rechner=m, Editor, Notizen, [Protokoll]" exists
+# closing from the menu takes its button away
+rclick button:"Notizen"
+click menuitem:"Schließen"
+expect button:"Notizen" missing
+expect text:"Z: Rechner=m, Editor, [Protokoll]" exists
+expect text:"Ereignisse: Schließen 1 | Aktiv 6 | Bewegt 0 | Größe 0 | Zustand 5 | Klicks 0" exists
+# many windows: the rest goes into Weitere Fenster, the active (newest) one stays in the row
+key ctrl+n
+key ctrl+n
+key ctrl+n
+key ctrl+n
+key ctrl+n
+key ctrl+n
+key ctrl+n
+key ctrl+n
+expect button:"Weitere Fenster" exists
+expect button:"Fenster 8" checked
+expect button:"Fenster 7" missing
+shot build/desktest/taskbar_more.png
+click button:"Weitere Fenster"
+expect menuitem:"Fenster 6" exists
+click menuitem:"Fenster 6"
+expect button:"Fenster 6" checked
+expect button:"Fenster 8" missing
+expect_nowarn

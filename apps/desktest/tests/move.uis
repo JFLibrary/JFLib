@@ -1,0 +1,49 @@
+#!args --verify-dirty
+# moving windows by their title bars (ui/desk.rs): the place follows the pointer, a press
+# brings a window to the front, the edges stick to the area's, the title bar stays reachable,
+# Esc cancels a drag
+theme light
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll]" exists
+expect dialog:"Protokoll" rect 98 146 320 232
+expect dialog:"Protokoll" selected
+# the title bar's middle (198,163) to 400,270: the window follows by 202,107 (DIP from the
+# area's corner, which is 48 DIP below the window's top)
+drag titlebar:"Protokoll" 400,270
+expect dialog:"Protokoll" rect 300 253 320 232
+expect text:"Aktiv: Protokoll 300,205 320x232" exists
+expect text:"Ereignisse: Schließen 0 | Aktiv 1 | Bewegt 1 | Größe 0 | Zustand 0 | Klicks 0" exists
+# a window behind it: the press brings it to the front and activates it, the drag moves it
+drag titlebar:"Editor" 560,90
+expect text:"Z: Rechner, Notizen, Protokoll, [Editor]" exists
+expect text:"Aktiv: Editor 430,25 380x212" exists
+expect dialog:"Editor" selected
+expect dialog:"Protokoll" rect 300 253 320 232
+expect text:"Ereignisse: Schließen 0 | Aktiv 2 | Bewegt 2 | Größe 0 | Zustand 0 | Klicks 0" exists
+# a press on the visible part of a window behind (the Rechner's 1) brings it to the front, and
+# the click acts
+click 60,179
+expect text:"Z: Notizen, Protokoll, Editor, [Rechner]" exists
+expect text:"Anzeige: 1" exists
+# near the area's left edge the window's edge sticks to it (7 DIP away: at 0)
+drag titlebar:"Protokoll" 107,270
+expect text:"Aktiv: Protokoll 0,205 320x232" exists
+# dragged down past the area: the title bar stays above the taskbar's strip (466 - 32)
+drag titlebar:"Protokoll" 100,620
+expect text:"Aktiv: Protokoll 0,434 320x232" exists
+expect dialog:"Protokoll" rect 0 482 320 232
+drag titlebar:"Protokoll" 300,250
+expect text:"Aktiv: Protokoll 200,185 320x232" exists
+# Esc cancels a drag (here with the focus in the Editor's text box): the window goes back; on
+# the way its bottom edge stuck to the strip's (467 -> 466)
+down titlebar:"Editor"
+move 600,300
+move 650,320
+expect dialog:"Editor" rect 520 302 380 212
+key esc
+up
+expect dialog:"Editor" rect 430 73 380 212
+expect text:"Aktiv: Editor 430,25 380x212" exists
+expect text:"Z: Notizen, Rechner, Protokoll, [Editor]" exists
+expect text:"Ereignisse: Schließen 0 | Aktiv 5 | Bewegt 5 | Größe 0 | Zustand 0 | Klicks 0" exists
+shot build/desktest/move.png
+expect_nowarn
