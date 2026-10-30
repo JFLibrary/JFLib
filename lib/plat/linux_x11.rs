@@ -496,6 +496,7 @@ struct X11 {
     incr_chunk: u32,
     cb_sel: u32,
     cv_sel: u32, // the selection sel_convert waits for
+    cv_target: u32, // ... and the target (a late answer to an earlier, timed-out request is not it)
     // ---- XDND (linux_x11_dnd.rs): another program's drag over a window, the app's drag
     xd_atoms: [u32; dnd::D_COUNT],
     xd_bmp_atom: u32,
@@ -655,6 +656,7 @@ impl X11 {
             incr_chunk: 0,
             cb_sel: 0,
             cv_sel: 0,
+            cv_target: 0,
             xd_atoms: [0; dnd::D_COUNT],
             xd_bmp_atom: 0,
             xd_init: false,

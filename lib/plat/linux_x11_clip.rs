@@ -282,7 +282,9 @@ impl X11 {
         let Some(k) = self.xfers.iter().position(|x| x.req == 0) else { return false }; // too many at once
         let len = d.len() as u32;
         self.xfers[k] = Xfer { req, prop, typ, data: d, off: 0 };
-        self.select_events(req, XM_PROPERTY); // PropertyNotify of the requestor
+        if !self.is_our_window(req) {
+            self.select_events(req, XM_PROPERTY); // PropertyNotify of the requestor
+        } // (our own windows report it already: their event mask must stay as it is)
         let incr = self.atoms[A_INCR];
         self.change_prop32(req, prop, incr, &[len]); // INCR: lower bound of the size
         true
@@ -342,10 +344,15 @@ impl X11 {
         let req = self.xfers[k].req;
         self.xfers[k].req = 0;
         self.xfers[k].data = Vec::new();
-        if self.xfers.iter().any(|x| x.req == req) {
+        if self.xfers.iter().any(|x| x.req == req) || self.is_our_window(req) {
             return;
         }
         self.select_events(req, 0);
+    }
+
+    /// one of our windows (a drop or paste between our own windows)
+    fn is_our_window(&self, win: u32) -> bool {
+        win != 0 && self.xw.iter().any(|r| r.win == win)
     }
 
     /// x11_clip_property(ev): PropertyNotify(window, atom, time, state) of our paste property
@@ -353,12 +360,12 @@ impl X11 {
     /// chunk; an empty chunk ends the transfer)
     pub(super) fn clip_property(&mut self, b: &[u8]) {
         let (win, atom, state) = (rd32(b, 4), rd32(b, 8), b[16]);
-        if win == self.xw[0].win {
-            if atom == self.atoms[A_JFGUI_SEL] && state == 0 {
-                self.cb_newval = true;
-            }
+        if win == self.xw[0].win && atom == self.atoms[A_JFGUI_SEL] && state == 0 {
+            self.cb_newval = true;
             return;
         }
+        // Deleted: the requestor took a chunk (also our own window: a large drop between our
+        // windows)
         if state != 1 {
             return;
         }
@@ -382,8 +389,8 @@ impl X11 {
         if rd32(b, 8) != self.xw[0].win {
             return;
         }
-        if rd32(b, 12) != self.cv_sel {
-            return; // not the selection sel_convert waits for
+        if rd32(b, 12) != self.cv_sel || rd32(b, 16) != self.cv_target {
+            return; // not the selection / target sel_convert waits for
         }
         self.cb_prop = rd32(b, 20);
         self.cb_got = true;
@@ -443,6 +450,7 @@ impl X11 {
     pub(super) fn sel_convert(&mut self, sel: u32, target: u32, t: u32, limit: usize) -> Result<Vec<u8>, i32> {
         self.rb = Vec::new();
         self.cv_sel = sel;
+        self.cv_target = target;
         let (win0, prop) = (self.xw[0].win, self.atoms[A_JFGUI_SEL]);
         let (o, _) = self.req(XR_DELETE_PROPERTY, 12);
         wr32(&mut self.out, o, win0);

@@ -115,6 +115,8 @@ struct Ctx {
     path: String,
     win: u8,
     focused: bool,
+    /// the input context is gone (ibus restarted, another engine): made anew
+    stale: bool,
     /// Key request id of a ProcessKeyEvent serial
     keys: Vec<(u32, u32)>,
 }
@@ -128,18 +130,29 @@ fn run() {
         STATE.store(3, Ordering::Release);
         return;
     };
-    let create = Msg::call(PORTAL, "/org/freedesktop/IBus", "org.freedesktop.IBus.Portal", "CreateInputContext", alloc::vec![Value::str("jfgui")]);
-    let path = c.send(&create).and_then(|s| c.wait_reply(s, 3000)).and_then(|r| r.body.first().and_then(|v| v.as_str()).map(String::from));
-    let Some(path) = path else {
+    let Some(path) = create(&mut c) else {
         STATE.store(3, Ordering::Release);
         return;
     };
-    let rule = alloc::format!("type='signal',interface='{IC}',path='{path}'");
-    c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "AddMatch", alloc::vec![Value::S(rule)]));
-    c.send(&Msg::call(PORTAL, &path, IC, "SetCapabilities", alloc::vec![Value::U(CAPS)]));
     STATE.store(2, Ordering::Release);
-    let mut ctx = Ctx { path, win: 0, focused: false, keys: Vec::new() };
+    let mut ctx = Ctx { path, win: 0, focused: false, stale: false, keys: Vec::new() };
     loop {
+        if ctx.stale {
+            // the old context's errors answered its keys; a new one, focused as before
+            ctx.stale = false;
+            match create(&mut c) {
+                Some(p) => {
+                    ctx.path = p;
+                    if ctx.focused {
+                        c.send(&Msg::call(PORTAL, &ctx.path, IC, "FocusIn", Vec::new()));
+                    }
+                }
+                None => {
+                    STATE.store(3, Ordering::Release); // ibus is gone: keys go on without it
+                    return;
+                }
+            }
+        }
         let ops = core::mem::take(&mut *OPS.lock());
         for op in ops {
             apply(&mut c, &mut ctx, op);
@@ -162,6 +175,16 @@ fn run() {
         // SAFETY: drain the eventfd counter (nonblocking).
         unsafe { syscall6(0, wake as usize, &mut n as *mut u64 as usize, 8, 0, 0, 0) };
     }
+}
+
+// CreateInputContext, the match for its signals, its capabilities -> its path
+fn create(c: &mut Conn) -> Option<String> {
+    let create = Msg::call(PORTAL, "/org/freedesktop/IBus", "org.freedesktop.IBus.Portal", "CreateInputContext", alloc::vec![Value::str("jfgui")]);
+    let path = c.send(&create).and_then(|s| c.wait_reply(s, 3000)).and_then(|r| r.body.first().and_then(|v| v.as_str()).map(String::from))?;
+    let rule = alloc::format!("type='signal',interface='{IC}',path='{path}'");
+    c.send(&Msg::call("org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "AddMatch", alloc::vec![Value::S(rule)]));
+    c.send(&Msg::call(PORTAL, &path, IC, "SetCapabilities", alloc::vec![Value::U(CAPS)]));
+    Some(path)
 }
 
 fn apply(c: &mut Conn, ctx: &mut Ctx, op: Op) {
@@ -211,6 +234,11 @@ fn handle(ctx: &mut Ctx, m: &Msg) {
                 let (_, id) = ctx.keys.remove(k);
                 let took = m.typ == T_RETURN && matches!(m.body.first(), Some(Value::B(true)));
                 answer(id, took);
+                // the context or the portal went away (ibus restart): make a new one
+                if m.typ == T_ERROR && [".UnknownObject", ".UnknownMethod", ".ServiceUnknown"]
+                    .iter().any(|e| m.error.ends_with(e)) {
+                    ctx.stale = true;
+                }
             }
         }
         T_SIGNAL if m.iface == IC && m.path == ctx.path => match m.member.as_str() {

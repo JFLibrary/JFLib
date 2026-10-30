@@ -23,13 +23,21 @@ pub fn read_stdin(bytes: &mut [u8]) -> Result<usize, u32> {
     }
 }
 
-/// Read bytes from the process standard input, retrying interrupted system calls.
+/// Read bytes from the process standard input, retrying interrupted system calls and waiting
+/// on a descriptor inherited non-blocking.
 #[cfg(target_os = "linux")]
 pub fn read_stdin(bytes: &mut [u8]) -> Result<usize, u32> {
     loop {
         // SAFETY: fd 0, a live writable slice, read cannot exceed the passed length.
         let count = unsafe { rt::os::syscall3(0, 0, bytes.as_mut_ptr() as usize, bytes.len()) };
         if count == -4 { continue; }
+        if count == -11 {
+            // EAGAIN: stdin was inherited non-blocking -- wait for data instead of failing
+            let mut pfd = [0i32, 1]; // struct pollfd: fd 0, events POLLIN, revents 0
+            // SAFETY: one pollfd record, no timeout.
+            unsafe { rt::os::syscall3(7, pfd.as_mut_ptr() as usize, 1, usize::MAX) };
+            continue;
+        }
         return if count < 0 { Err((-count) as u32) } else { Ok(count as usize) };
     }
 }

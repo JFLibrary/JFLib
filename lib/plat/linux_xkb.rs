@@ -5,6 +5,9 @@
 //   xkb_use_fallback()                     built-in evdev -> US English table
 //   xkb_set_mods(depressed, latched, locked, group) -> MOD_* bits (also wl_mods())
 //   xkb_key(evdev) -> (VK, text codepoint)  for the current modifiers (text 0 = none)
+//   xkb_key_typed(evdev) -> (VK, [text; 2]) a key press with the dead keys composed (below)
+//   xkb_dead_reset()                       forget a pending dead key (focus change)
+//   xkb_dead_keysym(spacing) -> X keysym   the dead keysym of a dead key's spacing character
 //   xkb_is_modifier(evdev) -> bool         the key is a modifier (never auto-repeats)
 //   xkb_mod_bit(evdev) -> MOD_* bit the key holds (Shift / Ctrl / Alt / Super / AltGr) or 0
 //   xkb_dump()                             print the parsed table to stdout (tests)
@@ -22,8 +25,12 @@
 // Level: ONE -> 1; KEYPAD -> (Shift ^ NumLock) ? 2 : 1;
 //        else s = Shift ^ (ALPHA && Caps && !Level3), level = (Level3 ? 3 : 1) + s.
 // Text is produced for codepoints >= 0x20 (not 0x7F) unless Ctrl / Alt / Super is held
-// without Level3 (AltGr may arrive as Ctrl + Mod5 from Windows hosts).  Dead keys produce
-// their spacing character at once (no compose).  VK codes: layout-following for a-z / 0-9
+// without Level3 (AltGr may arrive as Ctrl + Mod5 from Windows hosts).  Dead keys: xkb_key
+// gives their spacing character; xkb_key_typed composes like Windows does -- a dead key is
+// held back, the next letter becomes the accented one (´ e -> é, ^ o -> ô, ¨ u -> ü, ...),
+// Space or the same dead key gives the spacing character, anything else both; a key without
+// text (Backspace, Esc, a shortcut) drops it.  (An input method, IBus through text-input-v3,
+// composes before the keys reach us.)  VK codes: layout-following for a-z / 0-9
 // (level-1 symbol, like Win32) and for + , - . (VK_OEM_PLUS/COMMA/MINUS/PERIOD); otherwise
 // by key position; keypad keys give navigation VKs while Num Lock is off.
 //
@@ -793,6 +800,31 @@ impl Xkb {
         }
     }
 
+    /// the symbol key evdev gives now is a dead key
+    fn key_dead(&self, evdev: u32) -> bool {
+        evdev < 256 && self.keys[evdev as usize].cp[self.level_of(evdev) as usize] & KV_DEAD != 0
+    }
+
+    fn level_of(&self, evdev: u32) -> u32 {
+        let r = &self.keys[evdev as usize];
+        let m = self.mods;
+        let f = r.flags;
+        if f & KF_ONE != 0 {
+            0
+        } else if f & KF_KEYPAD != 0 {
+            (m & REAL_SHIFT) ^ (m & self.m_num != 0) as u32
+        } else {
+            let mut s = m & REAL_SHIFT;
+            if f & KF_ALPHA != 0 && m & REAL_LOCK != 0 && m & self.m_l3 == 0 {
+                s ^= 1;
+            }
+            if m & self.m_l3 != 0 && r.nlev > 2 {
+                s += 2;
+            }
+            s
+        }
+    }
+
     /// evdev -> (VK, text) for the current modifiers
     fn key_of(&self, evdev: u32) -> (u32, u32) {
         if evdev >= 256 {
@@ -1014,6 +1046,88 @@ pub fn xkb_mod_bit(evdev: u32) -> u32 {
 pub fn xkb_key(evdev: u32) -> (u32, u32) {
     XKB.lock().key_of(evdev)
 }
+
+/// the dead key held back by xkb_key_typed (its spacing character, 0 = none)
+static DEAD: AtomicU32 = AtomicU32::new(0);
+
+/// forget a pending dead key (the keyboard focus changed)
+pub fn xkb_dead_reset() {
+    DEAD.store(0, Ordering::Relaxed);
+}
+
+/// a key press with the dead keys composed -> (VK, up to two codepoints, 0 = none)
+pub fn xkb_key_typed(evdev: u32) -> (u32, [u32; 2]) {
+    let (vk, text, dead) = {
+        let x = XKB.lock();
+        let (vk, text) = x.key_of(evdev);
+        (vk, text, text != 0 && x.key_dead(evdev))
+    };
+    if evdev < 256 && XKB.lock().keys[evdev as usize].md != 0 {
+        return (vk, [text, 0]); // a modifier (Shift for a capital) keeps the dead key
+    }
+    let pending = DEAD.swap(0, Ordering::Relaxed);
+    if dead {
+        if pending == 0 {
+            DEAD.store(text, Ordering::Relaxed); // held back
+            return (vk, [0, 0]);
+        }
+        if pending == text {
+            return (vk, [text, 0]); // the same dead key twice: its character
+        }
+        DEAD.store(text, Ordering::Relaxed);
+        return (vk, [pending, 0]);
+    }
+    if pending == 0 || text == 0 {
+        return (vk, [text, 0]); // (a key without text drops a pending dead key)
+    }
+    if text == 0x20 {
+        return (vk, [pending, 0]);
+    }
+    match dead_compose(pending, text) {
+        Some(c) => (vk, [c, 0]),
+        None => (vk, [pending, text]),
+    }
+}
+
+/// the key gives a dead key now (with the current modifiers)
+pub fn xkb_is_dead(evdev: u32) -> bool {
+    XKB.lock().key_dead(evdev)
+}
+
+/// the X keysym of a dead key from its spacing character (0 = none)
+pub fn xkb_dead_keysym(spacing: u32) -> u32 {
+    DEAD_KEYS.iter().map(|d| (d.0, d.1)).chain(DEAD_OTHER).find(|d| d.0 == spacing).map_or(0, |d| d.1)
+}
+
+/// the other dead keys of the keymap table (no composition of our own): spacing character,
+/// X keysym
+const DEAD_OTHER: [(u32, u32); 9] = [(0x2E, 0xFE60), (0x5F, 0xFE68), (0x37A, 0xFE5D), (0x2C0, 0xFE61), (0x31B, 0xFE62),
+                                     (0x2F, 0xFE63), (0x2C, 0xFE6E), (0xA4, 0xFE6F), (0x3BC, 0xFE8C)];
+
+/// dead key (spacing character) + base letter -> the precomposed letter
+fn dead_compose(dead: u32, base: u32) -> Option<u32> {
+    let (_, _, bases, out) = DEAD_KEYS.iter().find(|d| d.0 == dead)?;
+    let b = char::from_u32(base)?;
+    let i = bases.chars().position(|c| c == b)?;
+    out.chars().nth(i).map(|c| c as u32)
+}
+
+/// spacing character, X keysym, base letters, the composed letters (the same order)
+static DEAD_KEYS: [(u32, u32, &str, &str); 13] = [
+    (0xB4, 0xFE51, "aeiouyAEIOUYcCnNsSzZlLrRgw", "áéíóúýÁÉÍÓÚÝćĆńŃśŚźŹĺĹŕŔǵẃ"),
+    (0x60, 0xFE50, "aeiouAEIOUnNwy", "àèìòùÀÈÌÒÙǹǸẁỳ"),
+    (0x5E, 0xFE52, "aeiouAEIOUcgCGhHjJsSwWyYz", "âêîôûÂÊÎÔÛĉĝĈĜĥĤĵĴŝŜŵŴŷŶẑ"),
+    (0x7E, 0xFE53, "anoiuANOIUey", "ãñõĩũÃÑÕĨŨẽỹ"),
+    (0xAF, 0xFE54, "aeiouAEIOU", "āēīōūĀĒĪŌŪ"),
+    (0x2D8, 0xFE55, "aguAGU", "ăğŭĂĞŬ"),
+    (0x2D9, 0xFE56, "zegcZEGCI", "żėġċŻĖĠĊİ"),
+    (0xA8, 0xFE57, "aeiouyAEIOUY", "äëïöüÿÄËÏÖÜŸ"),
+    (0xB0, 0xFE58, "auAU", "åůÅŮ"),
+    (0x2DD, 0xFE59, "ouOU", "őűŐŰ"),
+    (0x2C7, 0xFE5A, "cdenrstzCDENRSTZ", "čďěňřšťžČĎĚŇŘŠŤŽ"),
+    (0xB8, 0xFE5B, "cCsStTgkKlLnNrR", "çÇşŞţŢģķĶļĻņŅŗŖ"),
+    (0x2DB, 0xFE5C, "aeiuAEIU", "ąęįųĄĘĮŲ"),
+];
 
 /// the evdev codes of the keys that give vk without modifiers (keypad keys: with Num Lock on)
 /// -- the keys a global shortcut grabs (linux_x11_screen.rs)

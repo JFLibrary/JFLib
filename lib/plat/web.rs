@@ -245,7 +245,7 @@ pub(crate) fn request(kind: u32, bytes: &[u8], file: Option<(String, u64)>) -> O
             pending.remove(oldest);
         }
         let id = NEXT_REQUEST
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1))
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1))
             .ok()?;
         pending.push(Request {
             id,
@@ -310,7 +310,7 @@ pub fn reopen(path: &str) -> Option<u32> {
 #[cfg(target_os = "android")]
 pub fn persist(path: &str) -> Option<u32> {
     let ok = files::sync_path(path);
-    let id = NEXT_REQUEST.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1)).ok()?;
+    let id = NEXT_REQUEST.try_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1)).ok()?;
     let mut pending = REQUESTS.lock();
     if pending.len() >= 256 {
         let oldest = pending.iter().position(|r| r.status != RequestStatus::Pending)?;
@@ -474,7 +474,7 @@ impl Sem {
     /// Try to take a unit; browser execution never blocks on another thread.
     pub fn wait(&self, _timeout: i32) -> bool {
         self.0
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_sub(1))
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_sub(1))
             .is_ok()
     }
 }

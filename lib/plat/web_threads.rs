@@ -116,7 +116,7 @@ impl Sem {
         loop {
             if self
                 .0
-                .fetch_update(Ordering::Acquire, Ordering::Relaxed, |n| n.checked_sub(1))
+                .try_update(Ordering::Acquire, Ordering::Relaxed, |n| n.checked_sub(1))
                 .is_ok()
             {
                 return true;

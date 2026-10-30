@@ -12,6 +12,12 @@ Symbolleisten, über der Statusleiste, 8 DIP Rand):
 | verankert (`DM_ANCHOR`) | vom Benutzer innerhalb des Hauptfensters verschoben: Abstand zur nächsten waagrechten und senkrechten Kante bleibt bei jeder Größenänderung |
 | frei (`DM_FREE`) | aus dem Hauptfenster herausgezogen (Mitte außerhalb): bleibt am Bildschirm stehen; unter Windows im Arbeitsbereich seines Monitors gehalten (z. B. Farben mit „Mehr >>“ am rechten Rand) |
 
+Einrasten: Beim Ziehen rasten die Kanten eines Werkzeugfensters ab 16 DIP Abstand an den Kanten
+der Canvas-Fläche ein (8 DIP Rand wie das automatische Layout, in den Ecken an beiden), über
+`ui.window_snap`; so verankert hält es diesen Abstand wie die automatischen Plätze. Live unter
+Windows (`WM_MOVING`); unter Linux bewegt der Fenstermanager die Fenster ohne Rückfrage, im Browser
+rasten sie noch nicht ein.
+
 Angedockte Fenster (automatisch / verankert) ragen nie über das Hauptfenster hinaus. Platzmangel:
 der Verlauf wird ausgeblendet, wenn er nicht über die Ebenen passt; ein sehr kleines Fenster
 (Arbeitsbereich < 640 × 360 DIP) zeigt nur Werkzeuge (links) und Farben (rechts); ist die Höhe

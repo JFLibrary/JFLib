@@ -17,13 +17,13 @@
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::AtomicU32;
 
 use rt::sync::SpinLock;
 
 use crate::hotkey::{self, Chord, HotkeyError, HotkeyEvent};
 use crate::linux_dbus::{Conn, Msg, T_SIGNAL, Value};
-use crate::linux_desk::{PORTAL, PortalError, in_flatpak, no_reply, portal_request, portal_version, result, token};
+use crate::linux_desk::{PORTAL, PortalError, in_flatpak, no_reply, portal_request, result, token};
 use crate::{BK_WAYLAND, BK_X11, disp_backend};
 
 const IFACE: &str = "org.freedesktop.portal.GlobalShortcuts";
@@ -39,17 +39,12 @@ fn portal_way() -> bool {
     in_flatpak() || disp_backend() == BK_WAYLAND || (disp_backend() != BK_X11 && crate::linux_dbus::session_available())
 }
 
-// the portal's version + 1 (0 = not asked yet)
+// the portal's version + 1 (0 = not known yet), when to ask again (a portal still starting)
 static VERSION: AtomicU32 = AtomicU32::new(0);
+static RETRY: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
 
 fn version() -> u32 {
-    let v = VERSION.load(Ordering::Relaxed);
-    if v != 0 {
-        return v - 1;
-    }
-    let v = Conn::session().map_or(0, |mut c| portal_version(&mut c, IFACE));
-    VERSION.store(v + 1, Ordering::Relaxed);
-    v
+    crate::linux_desk::portal_version_cached(&VERSION, &RETRY, IFACE)
 }
 
 pub fn available() -> bool {

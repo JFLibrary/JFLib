@@ -90,8 +90,17 @@ impl Wl {
         if k < TOOL_MAX && self.tab.tools[k].id != 0 { Some(k) } else { None }
     }
 
-    /// E_UP of a held tip (tool left / removed)  [tool_release]
-    fn tool_release(&mut self, k: usize) {
+    /// the tool whose tip is down on window w, with its position there (px): the pen that
+    /// pressed on a child window (linux_wl_child.rs)
+    pub(crate) fn tool_down_on(&self, w: usize) -> Option<(usize, i32, i32)> {
+        let k = self.tab.tools.iter().position(|t| t.id != 0 && t.btn != 0 && t.win == w as i32)?;
+        let t = self.tab.tools[k];
+        Some((k, self.tool_px(t.win, t.x) + t.offx, self.tool_px(t.win, t.y) + t.offy))
+    }
+
+    /// E_UP of a held tip (tool left / removed; a child window's drag takes the press)
+    /// [tool_release]
+    pub(crate) fn tool_release(&mut self, k: usize) {
         let t = self.tab.tools[k];
         if t.btn == 0 || t.win < 0 {
             return;
@@ -280,6 +289,19 @@ pub(crate) fn wlh_tool_frame(wl: &mut Wl, _id: u32, _a: &Args, u: u64) {
         }
     }
     let t = wl.tab.tools[k];
+    if wl.drag.on && wl.drag.tool == k as i32 {
+        // the pen moves / sizes a child window (linux_wl_child.rs): no E_MOVE, its up ends it
+        if f & FR_MOTION != 0 && t.win >= 0 {
+            let (x, y) = (wl.tool_px(t.win, t.x) + t.offx, wl.tool_px(t.win, t.y) + t.offy);
+            wl.child_drag_motion(t.win, x, y);
+        }
+        if f & (FR_UP | FR_OUT) != 0 {
+            wl.child_drag_end();
+        }
+        if f & FR_OUT == 0 {
+            return;
+        }
+    }
     if t.win < 0 {
         return;
     }

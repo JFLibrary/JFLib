@@ -160,7 +160,11 @@ mod imp {
                 continue; // EINTR
             }
             if r == -11 {
-                yield_now(); // EAGAIN on a non-blocking descriptor
+                // EAGAIN on a non-blocking descriptor (a pipe the reader does not empty): wait
+                // until it takes more instead of spinning on sched_yield
+                let mut pfd = [fd as i32, 4]; // struct pollfd: fd, events POLLOUT, revents 0
+                // SAFETY: one pollfd record, no timeout.
+                unsafe { syscall3(SYS_POLL, pfd.as_mut_ptr() as usize, 1, usize::MAX) };
                 continue;
             }
             if r <= 0 {

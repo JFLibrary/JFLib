@@ -367,7 +367,15 @@ impl X11 {
         if self.fd < 0 {
             return Err(ScreenError::Unavailable);
         }
-        let r = rect.unwrap_or([0, 0, self.scr_w as i32, self.scr_h as i32]);
+        let mut r = rect.unwrap_or([0, 0, self.scr_w as i32, self.scr_h as i32]);
+        // inside the root (GetImage outside it is a BadMatch)
+        let (sw, sh) = (self.scr_w as i32, self.scr_h as i32);
+        let (x0, y0) = (r[0].clamp(0, sw), r[1].clamp(0, sh));
+        let (x1, y1) = (r[0].saturating_add(r[2]).clamp(x0, sw), r[1].saturating_add(r[3]).clamp(y0, sh));
+        r = [x0, y0, x1 - x0, y1 - y0];
+        if r[2] <= 0 || r[3] <= 0 {
+            return Err(ScreenError::Failed(String::from("the rectangle lies outside the screen")));
+        }
         let root = self.root;
         let px = self.drawable_image(root, r)?;
         Ok(Shot { rect: r, w: r[2], h: r[3], px, file: None })
@@ -470,6 +478,14 @@ impl X11 {
             return false; // no server: linuxtest's synthetic events
         }
         if self.sc_rr_ev != 0 && (typ as u32 == self.sc_rr_ev || typ as u32 == self.sc_rr_ev + 1) {
+            if typ as u32 == self.sc_rr_ev && rd32(b, 12) == root {
+                // RRScreenChangeNotify: the root's new size (width / height at 24 / 26, before
+                // the rotation in byte 1: 90 / 270 degrees swap them, as Xlib does)
+                let (w, h) = (rd16(b, 24) as u32, rd16(b, 26) as u32);
+                if w > 0 && h > 0 {
+                    (self.scr_w, self.scr_h) = if b[1] & (2 | 8) != 0 { (h, w) } else { (w, h) };
+                }
+            }
             self.sc_changed = true;
             self.xm_valid = false; // monitor_rect asks again
             return true;
@@ -481,6 +497,9 @@ impl X11 {
         if !(XE_KEY_PRESS..=XE_BUTTON_RELEASE).contains(&typ) || rd32(b, 12) != root {
             return false;
         }
+        // the user's input: its time stamps the next selection claim / activation (an older
+        // one would be refused)
+        self.time = rd32(b, 4);
         let kc = b[1] as u32;
         if self.sc_pick.on {
             match typ {

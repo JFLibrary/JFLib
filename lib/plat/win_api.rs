@@ -31,6 +31,8 @@
 //                                     window's own on Windows)
 //   win_hit_hook(f)                   f(w, x, y) -> HB_* flags of the UI at a client point
 //                                     (WM_NCHITTEST, WM_MOUSEACTIVATE)
+//   win_move_hook(f)                  f(w, &mut [x, y, w, h]) may snap the client rectangle
+//                                     (screen px) the user drags window w to (WM_MOVING)
 //   wait(deadline_us) -> queued events   0 = poll, u64::MAX = forever, else plat::time_us()
 //   set_refresh(f)                    f() redraws during the modal move / size loop
 //   win_test_send(w, msg, wp, lp)     (test aid) SendMessageW to window w (input, hit test,
@@ -335,6 +337,7 @@ const WM_POINTERUPDATE: u32 = 0x0245;
 const WM_POINTERCAPTURECHANGED: u32 = 0x024C;
 const WM_ENTERSIZEMOVE: u32 = 0x0231;
 const WM_EXITSIZEMOVE: u32 = 0x0232;
+const WM_MOVING: u32 = 0x0216;
 const WM_DROPFILES: u32 = 0x0233;
 const WM_NCMOUSELEAVE: u32 = 0x02A2;
 const WM_MOUSELEAVE: u32 = 0x02A3;
@@ -549,6 +552,7 @@ struct St {
     refresh: Cell<Option<fn()>>,
     refresh_dyn: Cell<Option<*mut (dyn FnMut() + 'static)>>, // wait_refresh's closure while it runs
     hit: Cell<Option<fn(i32, i32, i32) -> u32>>,
+    moving: Cell<Option<fn(i32, &mut [i32; 4])>>,
     ev_win: Cell<i32>,    // window of the events being pushed
     creating: Cell<i32>,  // index + 1 of the window inside CreateWindowExW
     app_active: Cell<bool>,
@@ -571,6 +575,7 @@ static S: UiThread<St> = UiThread(St {
     refresh: Cell::new(None),
     refresh_dyn: Cell::new(None),
     hit: Cell::new(None),
+    moving: Cell::new(None),
     ev_win: Cell::new(0),
     creating: Cell::new(0),
     app_active: Cell::new(false),
@@ -1531,6 +1536,32 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
             s.in_sizemove.set(true);
             def()
         }
+        WM_MOVING => {
+            // the user drags the window: the move hook may snap it (lParam: the proposed
+            // window rectangle, screen px; the hook sees the client rectangle)
+            let Some(f) = s.moving.get() else { return def() };
+            let (mut wr, mut c, mut o) = (Rect::default(), Rect::default(), Point::default());
+            // SAFETY: our window, valid out-parameters.
+            unsafe {
+                GetWindowRect(hwnd, &mut wr);
+                GetClientRect(hwnd, &mut c);
+                ClientToScreen(hwnd, &mut o);
+            }
+            // SAFETY: WM_MOVING's lParam points to a RECT the system reads back.
+            let rc = unsafe { &mut *(lp as *mut Rect) };
+            let (x, y) = (rc.l + o.x - wr.l, rc.t + o.y - wr.t);
+            let mut q = [x, y, c.r, c.b];
+            f(w, &mut q);
+            let (dx, dy) = (q[0] - x, q[1] - y);
+            if dx | dy == 0 {
+                return def();
+            }
+            rc.l += dx;
+            rc.r += dx;
+            rc.t += dy;
+            rc.b += dy;
+            1
+        }
         WM_EXITSIZEMOVE => {
             s.in_sizemove.set(false);
             if r.movepend.get() {
@@ -1586,6 +1617,12 @@ fn nc_is_button(wp: usize) -> bool {
 /// f(w, x, y) -> HB_* flags at a client point (None = no hit tests)
 pub fn win_hit_hook(f: Option<fn(i32, i32, i32) -> u32>) {
     st().hit.set(f);
+}
+
+/// f(w, &mut [x, y, w, h]) -> the client rectangle (screen px) the user drags window w to, as
+/// the UI wants it (snapped); called inside the modal move loop (None = no hook)
+pub fn win_move_hook(f: Option<fn(i32, &mut [i32; 4])>) {
+    st().moving.set(f);
 }
 
 /// f() redraws during the modal move / size loop

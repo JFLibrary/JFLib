@@ -160,10 +160,14 @@ net.connect backup.example.org:8443
 
 ## What is always allowed
 
-- Reading the system font folders (`plat::policy::font_dirs`, the folders fontdb scans), the
-  Hunspell dictionary folders (`plat::spell::hunspell_dirs`: `DICPATH`, on Linux
-  `~/.local/share/hunspell` and `hunspell`, `myspell`, `myspell/dicts` below the XDG data
-  folders; the spell checking of `TB_SPELL`) and the executable's folder (assets, modules).
+- Reading the system font folders (`plat::policy::font_dirs`, the folders fontdb scans; on
+  Linux also the folders fontconfig's files name and, in Flatpak, the host's fonts under
+  `/run/host`), fontconfig's files (`/etc/fonts`, `~/.config/fontconfig`: aliases and the
+  fonts per language), the Hunspell dictionary folders (`plat::spell::hunspell_dirs`:
+  `DICPATH`, on Linux `~/.local/share/hunspell` and `hunspell`, `myspell`, `myspell/dicts`
+  below the XDG data folders; the spell checking of `TB_SPELL`), the hyphenation patterns
+  (`plat::spell::hyphen_dirs`: on Linux `hyphen` below the XDG data folders) and the
+  executable's folder (assets, modules).
 - Reading and writing the app's own folders (`config://`, `data://`, `cache://`, `logs://`,
   see [VFS.md](VFS.md)), and the bundled `app://` assets and `mem://`, which touch no OS
   files. The user's folders (`documents://` ...) are not included; they need rules.

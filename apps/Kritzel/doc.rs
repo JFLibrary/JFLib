@@ -7,6 +7,8 @@
 //   doc_cur(d) -> &mut Surface        current layer surface
 //   doc_mark(d, x0, y0, x1, y1)       pixels changed (doc coordinates, exclusive end)
 //   doc_mark_all(d)
+//   doc_damage_take(d) -> rect        the pixels marked since the last call (the canvas's
+//                                     screen damage, view.rs view_damage)
 //   doc_composite(d)                  brings the composite surface (d.comp) up to date
 //   doc_pick(d, x, y) -> u32          straight ARGB of the composite at x, y (0 outside)
 //   doc_opaque(d) -> bool             the composite has no transparency (no checker needed)
@@ -43,6 +45,9 @@ pub(crate) struct Doc {
     pub(crate) cur_layer: i32,
     version: u32,
     pub(crate) dirty_set: bool,
+    /// marked since the last doc_damage_take (x0, y0, x1, y1): redrawn on the screen
+    dmg: [i32; 4],
+    dmg_set: bool,
     modified: bool,
     /// 1 = the background layer may contain transparency
     pub(crate) bg_opaque: i32,
@@ -63,6 +68,8 @@ impl Default for Doc {
             cur_layer: 0,
             version: 0,
             dirty_set: false,
+            dmg: [0; 4],
+            dmg_set: false,
             modified: false,
             bg_opaque: 0,
         }
@@ -177,6 +184,16 @@ pub(crate) fn doc_mark(d: &mut Doc, x0: i32, y0: i32, x1: i32, y1: i32) {
     }
     d.version = d.version.wrapping_add(1);
     d.modified = true;
+    if d.dmg_set {
+        let r = &mut d.dmg;
+        r[0] = r[0].min(x0);
+        r[1] = r[1].min(y0);
+        r[2] = r[2].max(x1);
+        r[3] = r[3].max(y1);
+    } else {
+        d.dmg_set = true;
+        d.dmg = [x0, y0, x1, y1];
+    }
     if !d.dirty_set {
         d.dirty_set = true;
         d.dirty = [x0, y0, x1, y1];
@@ -187,6 +204,15 @@ pub(crate) fn doc_mark(d: &mut Doc, x0: i32, y0: i32, x1: i32, y1: i32) {
     r[1] = r[1].min(y0);
     r[2] = r[2].max(x1);
     r[3] = r[3].max(y1);
+}
+
+/// doc_damage_take() -- the union of the pixels marked since the last call (None: nothing)
+pub(crate) fn doc_damage_take(d: &mut Doc) -> Option<[i32; 4]> {
+    if !d.dmg_set {
+        return None;
+    }
+    d.dmg_set = false;
+    Some(d.dmg)
 }
 
 /// doc_composite() -- recomposites the dirty rectangle into d.comp

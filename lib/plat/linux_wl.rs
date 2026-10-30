@@ -21,6 +21,7 @@
 //   linux_wl_clip.rs     wl_data_device: clipboard both ways, drag and drop in and out
 //                                                                             [wl_clip.s]
 //   linux_wl_cursor.rs   cursor-shape protocol, own cursor images, custom cursors [wl_cursor.s]
+//   linux_wl_act.rs      xdg-activation: the launcher's token, raising and restoring windows
 //
 // State: the assembly's globals are one record (Wl) owned by this module, created on the
 // first use (the synthetic tests use it without a connection).  Every entry point (the
@@ -40,6 +41,11 @@ pub(crate) fn wl_monitors() -> Vec<crate::screen::Monitor> {
     with(|wl| wl.monitors())
 }
 
+#[path = "linux_wl_act.rs"]
+mod act;
+pub(crate) use act::act_provide;
+#[path = "linux_wl_child.rs"]
+mod child;
 #[path = "linux_wl_clip.rs"]
 mod clip;
 #[path = "linux_wl_cursor.rs"]
@@ -77,6 +83,8 @@ pub(crate) struct Wl {
     pub clip: clip::Clip,
     pub cur: cursor::Cursor,
     pub ime: ime::Ime,
+    pub drag: child::Drag, // a child window moved / resized by the library
+    pub act: act::Act,     // xdg-activation (linux_wl_act.rs)
 }
 
 impl Wl {
@@ -93,6 +101,8 @@ impl Wl {
             clip: clip::Clip::default(),
             cur: cursor::Cursor::default(),
             ime: Default::default(),
+            drag: Default::default(),
+            act: Default::default(),
         }
     }
 }
@@ -139,7 +149,9 @@ impl Display for WlBackend {
     fn win_show(&mut self, w: i32, mode: u32) {
         with(|wl| wl.win_show(w, mode))
     }
-    fn win_activate(&mut self, _w: i32) {}
+    fn win_activate(&mut self, w: i32) {
+        with(|wl| wl.win_activate(w))
+    }
     fn win_enable(&mut self, _w: i32, _on: bool) {}
     fn win_set_rect(&mut self, w: i32, x: i32, y: i32, cw: i32, ch: i32) {
         with(|wl| wl.win_set_rect(w, x, y, cw, ch))
@@ -164,6 +176,9 @@ impl Display for WlBackend {
     }
     fn win_begin_resize(&mut self, w: i32, edges: u32) {
         with(|wl| wl.win_begin_resize(w, edges))
+    }
+    fn win_show_menu(&mut self, w: i32, x: i32, y: i32) {
+        with(|wl| wl.win_show_menu(w, x, y))
     }
     fn win_size(&mut self, w: i32) -> (i32, i32) {
         with(|wl| wl.win_size(w))

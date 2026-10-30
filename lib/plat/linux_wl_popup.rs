@@ -4,7 +4,10 @@
 //        its anchor (owner px): the positioner below uses it; without it the anchor point is
 //        rect.x, rect.y (PA_FREE)
 //   Wl::popup(slot, owner, rect, frame)
-//        an xdg_popup of the owner's xdg_surface (logical = px / integer scale of the owner).
+//        an xdg_popup of the owner's xdg_surface (of its toplevel for a child window: the
+//        positions are moved by the child's offset).  Logical = px / the toplevel's scale:
+//        with a fractional scale (wp_fractional_scale) the buffer keeps the frame's pixels and a
+//        wp_viewport gives its logical size (integer scales: wl_surface.set_buffer_scale).
 //        Positioner: the anchor rectangle, anchor edge and gravity of the PA_* kind (below /
 //        above the anchor with the gap in the anchor rectangle, beside it, at a point), the
 //        offset to the UI's natural place, flips and slides (the compositor keeps it on the
@@ -53,7 +56,13 @@ pub(crate) struct Wq {
     popup: u32,
     owner: i32,    // owner platform window (-1 = hidden)
     rect: [i32; 4], // popup pixel 0, 0 = owner pixel dx, dy; size (px)
-    scale: i32,    // integer buffer scale (the owner's)
+    scale: i32,    // integer buffer scale (the toplevel's)
+    s120: i32,     // the toplevel's scale (120ths)
+    frac: bool,    // fractional: a viewport, no buffer scale
+    vp: u32,       // wp_viewport (fractional)
+    vdst: [i32; 2], // its destination size sent
+    vsrc: [i32; 2], // its source size sent (24.8)
+    off: [i32; 2], // the owner's offset in its toplevel (child windows; px)
     conf: bool,    // its first configure was acknowledged
     pool: u32,     // wl_shm_pool (0 = none)
     cap: u32,      // pool bytes (two buffers)
@@ -70,6 +79,35 @@ pub(crate) struct Wq {
     next: Option<([i32; 4], u32, [i32; 2])>, // popup_anchor of the next popup()
     placed: Option<[i32; 2]>,                 // where the configure put it (owner px)
     ptr: bool,                                // the pointer is on it (inp.off_x / off_y)
+}
+
+impl Wq {
+    /// px -> logical units of the toplevel (rounded)
+    fn lg(&self, v: i32) -> i32 {
+        if self.frac {
+            let s = self.s120.max(1) as i64;
+            let n = v as i64 * 120;
+            (if n >= 0 { (n + s / 2) / s } else { (n - s / 2) / s }) as i32
+        } else {
+            v.wrapping_div(self.scale.max(1))
+        }
+    }
+
+    /// a size in px -> the logical size it covers (fractional: rounded down, the viewport's
+    /// source shows it pixel for pixel)
+    fn lgs(&self, v: i32) -> i32 {
+        if self.frac { (v.max(0) as i64 * 120 / self.s120.max(1) as i64).max(1) as i32 } else { self.lg(v).max(1) }
+    }
+
+    /// logical units of the toplevel -> px
+    fn ph(&self, l: i32) -> i32 {
+        if self.frac {
+            let n = l as i64 * self.s120 as i64;
+            (if n >= 0 { (n + 60) / 120 } else { (n - 60) / 120 }) as i32
+        } else {
+            l.wrapping_mul(self.scale.max(1))
+        }
+    }
 }
 
 /// a copy of the frame
@@ -116,16 +154,22 @@ impl Wl {
         // the positioner: the UI's anchor, else the anchor point at rect.x, rect.y
         let (anchor, kind, nat) = next.unwrap_or(([rect[0], rect[1], 1, 1], 0, [rect[0], rect[1]]));
         let Some(o) = self.rec(owner) else { return };
-        if self.win[o].xsurf == 0 {
+        // the xdg_surface the popup hangs at: the owner's, a child window's toplevel's
+        let root = self.root_of(o);
+        if self.win[root].xsurf == 0 || self.win[o].surf == 0 {
             return; // the owner is not shown
         }
-        // integer scale of the owner
-        let mut s = ((self.win[o].s120 as u32).wrapping_add(60) / 120) as i32;
-        if s == 0 {
-            s = 1;
-        }
+        let (ox, oy) = self.child_offset(o);
+        // the toplevel's scale: fractional with a viewport, else an integer buffer scale
+        let rr = self.win[root];
+        let s120 = rr.s120.max(1);
+        // a viewport whenever there is one: also at an integer scale (a buffer scale would need
+        // sizes that are multiples of it -- else wl_surface.invalid_size ends the connection)
+        let frac = self.g.vpr != 0;
+        let s = if frac { 1 } else { ((s120 as u32).wrapping_add(60) / 120).max(1) as i32 };
         let q = &self.wq[k];
-        let same = q.surf != 0 && q.owner == owner && q.scale == s && q.rect[2] == rect[2] && q.rect[3] == rect[3];
+        let same = q.surf != 0 && q.owner == owner && q.scale == s && q.s120 == s120 && q.frac == frac
+            && q.off == [ox, oy] && q.rect[2] == rect[2] && q.rect[3] == rect[3];
         if same && q.anchor == anchor && q.kind == kind && q.nat == nat {
             // the same popup (the UI may have moved its content to where the compositor put it)
             if self.w.debug && rect != self.wq[k].rect {
@@ -148,12 +192,15 @@ impl Wl {
             let q = &mut self.wq[k];
             q.owner = owner;
             q.scale = s;
+            q.s120 = s120;
+            q.frac = frac;
+            q.off = [ox, oy];
             q.rect = rect;
             q.anchor = anchor;
             q.kind = kind;
             q.nat = nat;
             q.sf = f.map(keep);
-            self.wq_objects_create(k, o);
+            self.wq_objects_create(k, root);
         }
         self.w.flush();
     }
@@ -174,15 +221,29 @@ impl Wl {
         let pos = self.w.send(self.g.xdg_wm, &WM_BASE_CREATE_POSITIONER, &[A::N(&IFACE_XDG_POSITIONER)]);
         let s = self.wq[k].scale;
         let r = self.wq[k].rect;
-        let lg = |v: i32| v.wrapping_div(s);
-        let (ar, edge, grav, off, adj) = wq_place(&self.wq[k]);
+        let q = &self.wq[k];
+        let lg = |v: i32| q.lg(v);
+        let (ar, edge, grav, off, adj) = wq_place(q);
+        let [dx, dy] = q.off; // a child window's offset in its toplevel
+        let size = [q.lgs(r[2]), q.lgs(r[3])];
+        let mut arl = [lg(ar[0] + dx), lg(ar[1] + dy), lg(ar[2]).max(1), lg(ar[3]).max(1)];
+        {
+            // the anchor rectangle may not extend outside the toplevel's window geometry
+            // (xdg_positioner): a child larger than its owner, a widget at the edge with the
+            // gap of PA_BELOW / PA_ABOVE reach beyond it
+            let (gw, gh) = (self.win[owner].lw.max(1), self.win[owner].lh.max(1));
+            let x0 = arl[0].clamp(0, gw - 1);
+            let y0 = arl[1].clamp(0, gh - 1);
+            arl = [x0, y0, (arl[0] + arl[2]).clamp(x0 + 1, gw) - x0, (arl[1] + arl[3]).clamp(y0 + 1, gh) - y0];
+        }
+        let offl = [lg(off[0]), lg(off[1])];
         self.wq[k].placed = None;
-        self.w.send(pos, &POSITIONER_SET_SIZE, &[A::I(lg(r[2]).max(1)), A::I(lg(r[3]).max(1))]);
-        self.w.send(pos, &POSITIONER_SET_ANCHOR_RECT, &[A::I(lg(ar[0])), A::I(lg(ar[1])), A::I(lg(ar[2]).max(1)), A::I(lg(ar[3]).max(1))]);
+        self.w.send(pos, &POSITIONER_SET_SIZE, &[A::I(size[0]), A::I(size[1])]);
+        self.w.send(pos, &POSITIONER_SET_ANCHOR_RECT, &[A::I(arl[0]), A::I(arl[1]), A::I(arl[2]), A::I(arl[3])]);
         self.w.send(pos, &POSITIONER_SET_ANCHOR, &[A::U(edge)]);
         self.w.send(pos, &POSITIONER_SET_GRAVITY, &[A::U(grav)]);
         if off != [0, 0] {
-            self.w.send(pos, &POSITIONER_SET_OFFSET, &[A::I(lg(off[0])), A::I(lg(off[1]))]);
+            self.w.send(pos, &POSITIONER_SET_OFFSET, &[A::I(offl[0]), A::I(offl[1])]);
         }
         self.w.send(pos, &POSITIONER_SET_CONSTRAINT_ADJUSTMENT, &[A::U(adj)]);
         let parent = self.win[owner].xsurf;
@@ -190,7 +251,13 @@ impl Wl {
         self.wq[k].popup = p;
         self.w.set_udata(p, ku);
         self.w.send(pos, &POSITIONER_DESTROY, &[]);
-        if s as u32 > 1 {
+        self.wq[k].vdst = [0, 0];
+        self.wq[k].vsrc = [0, 0];
+        if self.wq[k].frac {
+            // the buffer keeps the frame's pixels, the viewport gives its logical size
+            let vp = self.w.send(self.g.vpr, &VIEWPORTER_GET_VIEWPORT, &[A::N(&IFACE_WP_VIEWPORT), A::O(surf)]);
+            self.wq[k].vp = vp;
+        } else if s as u32 > 1 {
             self.w.send(surf, &SURFACE_SET_BUFFER_SCALE, &[A::I(s)]);
         }
         self.w.send(surf, &SURFACE_COMMIT, &[]);
@@ -199,12 +266,15 @@ impl Wl {
     /// popup, xdg_surface, surface (the buffers stay for reuse)  [wq_objects_destroy]
     fn wq_objects_destroy(&mut self, k: usize) {
         let q = &self.wq[k];
-        let (p, x, s) = (q.popup, q.xsurf, q.surf);
+        let (p, x, s, vp) = (q.popup, q.xsurf, q.surf, q.vp);
         if p != 0 {
             self.w.send(p, &POPUP_DESTROY, &[]);
         }
         if x != 0 {
             self.w.send(x, &XDG_SURFACE_DESTROY, &[]);
+        }
+        if vp != 0 {
+            self.w.send(vp, &VIEWPORT_DESTROY, &[]);
         }
         if s != 0 {
             self.w.send(s, &SURFACE_DESTROY, &[]);
@@ -213,6 +283,7 @@ impl Wl {
         q.popup = 0;
         q.xsurf = 0;
         q.surf = 0;
+        q.vp = 0;
         q.conf = false;
     }
 
@@ -223,9 +294,17 @@ impl Wl {
         if q.surf == 0 {
             return;
         }
-        let w = q.rect[2].min(*sw);
-        let h = q.rect[3].min(*sh);
-        if w <= 0 || h <= 0 {
+        let cw = q.rect[2].min(*sw);
+        let ch = q.rect[3].min(*sh);
+        if cw <= 0 || ch <= 0 {
+            return;
+        }
+        // with a buffer scale (no viewporter) the buffer's size must be a multiple of it: the
+        // frame padded with transparent pixels
+        let bs = if q.frac { 1 } else { q.scale.max(1) };
+        let (w, h) = ((cw + bs - 1) / bs * bs, (ch + bs - 1) / bs * bs);
+        // two buffers of w x h in one pool, offsets int32 (wl_shm): below 2 GiB
+        if w as u64 * h as u64 * 8 > i32::MAX as u64 {
             return;
         }
         // buffers of this size in a pool large enough for two
@@ -242,17 +321,34 @@ impl Wl {
         };
         let Some((px, sw, _)) = q.sf.as_ref() else { return };
         let row = w as usize * 4;
-        let base = (w as u32).wrapping_mul(h as u32).wrapping_mul(4).wrapping_mul(b as u32) as usize;
+        let crow = cw as usize * 4;
+        let base = w as usize * h as usize * 4 * b;
         // SAFETY: the pool holds two w x h buffers from q.map (wq_buffers sized it).
         let dst = unsafe { core::slice::from_raw_parts_mut((q.map + base) as *mut u8, row * h as usize) };
-        for y in 0..h as usize {
+        if (w, h) != (cw, ch) {
+            dst.fill(0);
+        }
+        for y in 0..ch as usize {
             let s = y * *sw as usize * 4;
-            if let Some(src) = px.get(s..s + row) {
-                dst[y * row..(y + 1) * row].copy_from_slice(src);
+            if let Some(src) = px.get(s..s + crow) {
+                dst[y * row..y * row + crow].copy_from_slice(src);
             }
         }
         q.busy[b] = true;
         let (surf, buf) = (q.surf, q.buf[b]);
+        // the logical size the buffer covers, shown pixel for pixel (the source: exactly that)
+        let s = q.s120.max(1);
+        let dst = [q.lgs(w), q.lgs(h)];
+        if q.vp != 0 && dst != q.vdst {
+            let vp = q.vp;
+            q.vdst = dst;
+            let src = super::present::viewport_src(dst[0], dst[1], s, w, h);
+            if src != q.vsrc {
+                q.vsrc = src;
+                self.w.send(vp, &VIEWPORT_SET_SOURCE, &[A::I(0), A::I(0), A::I(src[0]), A::I(src[1])]);
+            }
+            self.w.send(vp, &VIEWPORT_SET_DESTINATION, &[A::I(dst[0]), A::I(dst[1])]);
+        }
         self.w.send(surf, &SURFACE_ATTACH, &[A::O(buf), A::I(0), A::I(0)]);
         self.w.send(surf, &SURFACE_DAMAGE_BUFFER, &[A::I(0), A::I(0), A::I(w), A::I(h)]);
         self.w.send(surf, &SURFACE_COMMIT, &[]);
@@ -271,7 +367,8 @@ impl Wl {
         }
         self.wq[k].bw = 0;
         self.wq[k].bh = 0;
-        let bytes = (w as u32).wrapping_mul(h as u32).wrapping_mul(8); // two buffers
+        // two buffers (wq_draw keeps them below 2 GiB: no overflow here)
+        let bytes = (w as u64 * h as u64 * 8).min(i32::MAX as u64) as u32;
         if bytes > self.wq[k].cap {
             // a larger pool (the old one is destroyed: its buffers are gone)
             let (pool, map, cap) = (self.wq[k].pool, self.wq[k].map, self.wq[k].cap);
@@ -281,7 +378,7 @@ impl Wl {
                 // SAFETY: the old pool's mapping.
                 unsafe { syscall6(SYS_MUNMAP, map, cap as usize, 0, 0, 0, 0) };
             }
-            let cap = bytes.wrapping_add(65535) & !65535;
+            let cap = ((bytes as u64 + 65535) & !65535) as u32;
             self.wq[k].cap = cap;
             match self.shm_pool_new(cap as usize) {
                 Some((p, m)) => {
@@ -296,7 +393,7 @@ impl Wl {
         }
         let pool = self.wq[k].pool;
         for i in 0..2u32 {
-            let off = (w as u32).wrapping_mul(h as u32).wrapping_mul(4).wrapping_mul(i);
+            let off = w as u32 * h as u32 * 4 * i;
             let b = self.w.send(pool, &SHM_POOL_CREATE_BUFFER,
                                 &[A::N(&IFACE_POP_BUFFER), A::I(off as i32), A::I(w), A::I(h), A::I(w * 4),
                                   A::U(SHM_XRGB)]);
@@ -384,12 +481,11 @@ pub(crate) fn wlh_pop_xdg_configure(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
 // where the positioner of wq_place puts the popup when nothing constrains it: its top-left in
 // logical coordinates (the anchor point of the edge, the gravity's corner, the offset)
 fn wq_unmoved(q: &Wq) -> [i32; 2] {
-    let s = q.scale.max(1);
-    let lg = |v: i32| v.wrapping_div(s);
+    let lg = |v: i32| q.lg(v);
     let (r, edge, grav, off, _) = wq_place(q);
     let (rw, rh) = (lg(r[2]).max(1), lg(r[3]).max(1));
-    let (w, h) = (lg(q.rect[2]).max(1), lg(q.rect[3]).max(1));
-    let (mut x, mut y) = (lg(r[0]), lg(r[1]));
+    let (w, h) = (q.lgs(q.rect[2]), q.lgs(q.rect[3]));
+    let (mut x, mut y) = (lg(r[0] + q.off[0]), lg(r[1] + q.off[1]));
     if matches!(edge, POS_TOP_RIGHT | POS_BOTTOM_RIGHT) {
         x += rw;
     }
@@ -411,10 +507,12 @@ fn wq_unmoved(q: &Wq) -> [i32; 2] {
 pub(crate) fn wlh_pop_configure(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
     let k = u as usize & (WQ_MAX - 1);
     let q = &mut wl.wq[k];
-    let s = q.scale.max(1);
     let p = [a.i(0), a.i(1)];
-    // where the positioner puts it without constraints (logical): the natural place
-    let placed = if p == wq_unmoved(q) { q.nat } else { [p[0].wrapping_mul(s), p[1].wrapping_mul(s)] };
+    // where the positioner puts it without constraints (logical): the natural place, else
+    // where it is in the owner (px; a child window's offset taken off).  With a fractional
+    // scale the natural place is only reachable to a pixel: the content follows the popup
+    let at = [q.ph(p[0]) - q.off[0], q.ph(p[1]) - q.off[1]];
+    let placed = if p == wq_unmoved(q) && (!q.frac || at == q.nat) { q.nat } else { at };
     let moved = q.placed != Some(placed) && placed != q.nat;
     q.placed = Some(placed);
     if moved && q.owner >= 0 {

@@ -15,12 +15,12 @@
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::sync::atomic::{AtomicU32, Ordering};
+use core::sync::atomic::AtomicU32;
 
 use rt::sync::SpinLock;
 
 use crate::linux_dbus::{Conn, Value};
-use crate::linux_desk::{PortalError, in_flatpak, portal_request, portal_version, result};
+use crate::linux_desk::{PortalError, in_flatpak, portal_request, result};
 use crate::screen::{Monitor, ScreenError, Shot, push_color, push_shot};
 use crate::{BK_WAYLAND, BK_X11, disp_backend};
 
@@ -60,17 +60,12 @@ pub fn monitors() -> Vec<Monitor> {
     }
 }
 
-// the Screenshot portal's version + 1 (0 = not asked yet)
+// the portal's version + 1 (0 = not known yet), when to ask again (a portal still starting)
 static VERSION: AtomicU32 = AtomicU32::new(0);
+static RETRY: core::sync::atomic::AtomicU64 = core::sync::atomic::AtomicU64::new(0);
 
 fn version() -> u32 {
-    let v = VERSION.load(Ordering::Relaxed);
-    if v != 0 {
-        return v - 1;
-    }
-    let v = Conn::session().map_or(0, |mut c| portal_version(&mut c, IFACE));
-    VERSION.store(v + 1, Ordering::Relaxed);
-    v
+    crate::linux_desk::portal_version_cached(&VERSION, &RETRY, IFACE)
 }
 
 pub fn pick_available() -> bool {

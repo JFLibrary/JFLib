@@ -7,10 +7,10 @@ expect window 24580 rect 92 410 272 320
 movewin 24577 300 200
 movewin 24578 40 40
 movewin 24579 500 300
-movewin 24580 20 20
+movewin 24580 60 20
 sync
 expect window 24577 rect 300 200 74 346
-expect window 24580 rect 20 20 272 320
+expect window 24580 rect 60 20 272 320
 cmd 704
 sync
 sync

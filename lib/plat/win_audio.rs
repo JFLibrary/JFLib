@@ -212,7 +212,7 @@ fn device_name(dev: usize) -> String {
         if f(store, &PKEY_FRIENDLY_NAME, &mut pv) >= 0 && pv.vt == VT_LPWSTR && pv.val != 0 {
             let p = pv.val as *const u16;
             let mut n = 0;
-            while *p.add(n) != 0 && n < 512 {
+            while n < 512 && *p.add(n) != 0 { // the limit first: no read past it
                 n += 1;
             }
             name = String::from_utf16_lossy(core::slice::from_raw_parts(p, n));
