@@ -1,0 +1,51 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/shell_tour.jfnet
+# the shot matrix of the shell (V1): PC1's terminal after a short session with folders (the
+# prompt with ~/projekt), tree, ls -l, a pipeline behind a ping and a background job with ps;
+# R1's console after mkdir, cd and dir in flash:; each light and dark at 100 and 150 %
+# (build/jfnetworker/shell_<view>_<theme>_<scale>.png)
+size 1280 900
+theme light
+drag 630,671 630,380 8
+# ---- PC1: folders, tree, a pipeline, a job
+dblclick listitem:"PC1"
+expect #25089 focused
+type "mkdir -p projekt/src projekt/logs; cd projekt\n"
+type "echo 'print(\"hallo ${config.args[0]}\")' > src/hallo.jfs\n"
+type "jfs src/hallo.jfs Welt > logs/lauf.log; cat logs/lauf.log\n"
+wait 300
+expect text:"hallo Welt" exists
+type "tree\n"
+expect text:"2 directories, 2 files" exists
+type "ping -c 2 10.0.0.10 | grep -c ttl\n"
+wait 2500
+expect text:"2" exists
+type "sleep 60 &\n"
+type "ps; ls -l logs\n"
+expect text:"  PID USER     TIME COMMAND" exists
+shot build/jfnetworker/shell_terminal_light_100.png
+theme dark
+shot build/jfnetworker/shell_terminal_dark_100.png
+scale 150
+shot build/jfnetworker/shell_terminal_dark_150.png
+theme light
+shot build/jfnetworker/shell_terminal_light_150.png
+scale 100
+# ---- R1: directories in flash:
+dblclick listitem:"R1"
+expect tab:"R1" selected
+type "enable\n"
+type "mkdir sicherung\n"
+type "cd sicherung\n"
+type "copy running-config r1.cfg\n"
+type "cd ..\n"
+type "dir\n"
+expect text:"Directory of flash:/" exists
+shot build/jfnetworker/shell_ios_light_100.png
+theme dark
+shot build/jfnetworker/shell_ios_dark_100.png
+scale 150
+shot build/jfnetworker/shell_ios_dark_150.png
+theme light
+shot build/jfnetworker/shell_ios_light_150.png
+scale 100
+expect_nowarn

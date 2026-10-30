@@ -253,6 +253,12 @@ pub enum K {
     TestAaa,
     // telnet client (telnetd.rs)
     Telnet,
+    // the directories of flash: (cli/files.rs)
+    Cd,
+    Pwd,
+    Mkdir,
+    Rmdir,
+    Rename,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -1164,7 +1170,7 @@ impl Engine {
             | K::ShowBgpNbr
             | K::ClearBgp
             | K::DebugBgp => self.ios_bgp(ni, p),
-            K::Dir | K::ShowFlash | K::More | K::Delete | K::Copy | K::IpFtp => self.ios_files(ni, p),
+            K::Dir | K::ShowFlash | K::More | K::Delete | K::Copy | K::IpFtp | K::Cd | K::Pwd | K::Mkdir | K::Rmdir | K::Rename => self.ios_files(ni, p),
             K::SnmpOff | K::SnmpCommunity | K::SnmpLocation | K::SnmpContact | K::SnmpHost | K::SnmpTraps | K::ShowSnmp | K::DebugSnmp => self.ios_snmp(ni, p),
             K::EnableSecret
             | K::EnablePassword

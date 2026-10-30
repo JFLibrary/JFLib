@@ -16,7 +16,8 @@
 //                                        lines of an interface; ios_ntp_config(ni) the NTP lines
 //                                        before "end"
 //   Engine::sh_dhclient(ni, args)        dhclient [-v] [-r] [IF]
-//   Engine::sh_cat(ni, args)             cat /etc/resolv.conf | /etc/hosts | /etc/hostname
+//   resolv_text / hosts_text             what cat /etc/resolv.conf and /etc/hosts show (the cat
+//                                        of the shell is coreutils.rs; files.rs cat_etc)
 //   Engine::resolv_write(ni, text, append)   echo "nameserver A" > /etc/resolv.conf (>> adds):
 //                                        the static name servers and search domains of a Linux
 //                                        device (nameserver, search, domain lines; Action::
@@ -667,36 +668,6 @@ impl Engine {
     /// long enough
     pub(crate) fn dhclient_timer(&mut self, ni: usize) {
         self.dhclient_progress(ni);
-    }
-
-    /// cat FILE ...: the files the resolver and the host name make
-    pub(crate) fn sh_cat(&mut self, ni: usize, args: &[&str]) -> Result<(), String> {
-        let mut text = String::new();
-        let mut err: Option<String> = None;
-        for f in args.iter().filter(|a| !a.starts_with('-')) {
-            match *f {
-                "/etc/resolv.conf" => text.push_str(&self.resolv_text(ni)),
-                "/etc/hosts" => text.push_str(&self.hosts_text(ni)),
-                "/etc/hostname" => {
-                    let h = self.host(ni);
-                    text.push_str(&h);
-                    text.push('\n');
-                }
-                // the device's files (files.rs)
-                other => match self.cat_file(ni, other) {
-                    Ok(t) => text.push_str(&t),
-                    Err(e) => {
-                        text.push_str(&e);
-                        err.get_or_insert(String::from(e.trim_end()));
-                    }
-                },
-            }
-        }
-        self.out(ni, &text);
-        match err {
-            Some(e) => Err(e),
-            None => Ok(()),
-        }
     }
 
     /// echo ... > /etc/resolv.conf: the static settings of the resolver ("nameserver ADDR",

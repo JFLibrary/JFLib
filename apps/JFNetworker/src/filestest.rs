@@ -167,13 +167,13 @@ fn store(t: &mut T) {
     let mut ios = Store::for_model(r4);
     t.eq("router flash", (ios.capacity, ios.image.clone()), (256 << 20, Some((s("jf-r4.bin"), (40 << 20) + (312 << 10)))));
     t.eq("ios paths", [ios.norm("r1.cfg"), ios.norm("flash:r1.cfg"), ios.norm("FLASH:/r1.cfg"), ios.norm("nvram:startup-config")], [Ok(s("flash:/r1.cfg")), Ok(s("flash:/r1.cfg")), Ok(s("flash:/r1.cfg")), Ok(s("nvram:/startup-config"))]);
-    t.eq("ios bad names", [ios.norm("flash:a/b"), ios.norm("disk0:x"), ios.norm("flash:a:b")], [Err(FsErr::BadName), Err(FsErr::NotFound), Err(FsErr::BadName)]);
+    t.eq("ios bad names", [ios.norm("flash:a b"), ios.norm("disk0:x"), ios.norm("flash:a:b")], [Err(FsErr::BadName), Err(FsErr::NotFound), Err(FsErr::BadName)]);
     t.check("ios write", ios.write("r1.cfg", b"hostname R1\n", 100).is_ok());
     let names: Vec<String> = ios.list("flash:").unwrap_or_default().into_iter().map(|(n, _)| n).collect();
     t.eq("image first", names, alloc::vec![s("jf-r4.bin"), s("r1.cfg")]);
     t.eq("image is read-only", (ios.read("jf-r4.bin").err(), ios.remove("flash:jf-r4.bin").err(), ios.write("jf-r4.bin", b"x", 0).err()), (Some(FsErr::ReadOnly), Some(FsErr::ReadOnly), Some(FsErr::ReadOnly)));
     t.eq("used with the image", ios.used(), (40 << 20) + (312 << 10) + 12);
-    t.eq("no directories on ios", ios.mkdir("flash:x", 0, false), Err(FsErr::ReadOnly));
+    t.eq("no directories in nvram:", ios.mkdir("nvram:x", 0, false), Err(FsErr::ReadOnly));
     let mut lx = Store::for_model(pc);
     t.eq("pc disk", (lx.capacity, lx.image.clone()), (512 << 30, None));
     t.eq("linux paths", [lx.norm("a.txt"), lx.norm("/srv//tftp/./x"), lx.norm("/srv/tftp/../ftp/y"), lx.norm("../../etc")], [Ok(s("/root/a.txt")), Ok(s("/srv/tftp/x")), Ok(s("/srv/ftp/y")), Ok(s("/etc"))]);
@@ -322,7 +322,7 @@ fn linux_cli(t: &mut T) {
     let o = cli(&mut e, PC1, &["tftp -g -r x -l /nowhere/x 10.0.0.10"], 0);
     t.eq("tftp checks the local file first", o, s("tftp: can't open '/nowhere/x': No such file or directory\n"));
     let (line, choices) = e.cli_complete(PC1, "t");
-    t.eq("tab", (line, choices), (None, alloc::vec![s("telnet"), s("tftp"), s("top"), s("touch"), s("traceroute")]));
+    t.eq("tab", (line, choices), (None, alloc::vec![s("tail"), s("tee"), s("telnet"), s("test"), s("tftp"), s("top"), s("touch"), s("traceroute"), s("tree"), s("true"), s("type")]));
     t.eq("files of the project", e.files(PC1).iter().map(|f| f.path.clone()).collect::<Vec<_>>(), alloc::vec![s("/root/leer"), s("/root/notiz.txt"), s("/tmp/h")]);
 }
 

@@ -58,7 +58,7 @@ fn err_line(e: &ScriptErr) -> String {
 
 impl Engine {
     fn script_err(&mut self, ni: usize, text: &str) -> Result<(), String> {
-        self.out(ni, text);
+        self.err_out(ni, text);
         Err(String::from(text.lines().next().unwrap_or("")))
     }
 

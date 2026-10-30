@@ -4,8 +4,9 @@
 //   Engine::files(dev) / file_store(dev)    the records / the store of a device
 //   Action::Files { dev, files }             the project's files of a device (load, undo): the
 //                                            store takes them without a report
-//   Engine::file_put / file_del / file_mkdir (crate)   changes from the command lines: each one
-//                                            reports Report::Files with the path and every record
+//   Engine::file_put / file_del / file_mkdir / file_rmdir / file_rename (crate)   changes from
+//                                            the command lines: each one reports Report::Files
+//                                            with the path and every record
 //   OsApi::file_read / file_write / file_append / file_remove / file_list / file_stat /
 //   file_norm / file_mtime                   the same for services (TFTP, FTP, later SNMP,
 //                                            AAA, mail); writes and removals report too
@@ -99,6 +100,15 @@ impl Engine {
         os.files.rmdir(&p)?;
         self.files_changed(ni, &p);
         Ok(p)
+    }
+    /// moves a file or a directory for a command line (mv, rename); the report names the new
+    /// path
+    pub(crate) fn file_rename(&mut self, ni: usize, from: &str, to: &str) -> Result<(), FsErr> {
+        let os = self.os_mut(ni).ok_or(FsErr::NotFound)?;
+        os.files.rename(from, to)?;
+        let p = os.files.norm(to)?;
+        self.files_changed(ni, &p);
+        Ok(())
     }
 }
 

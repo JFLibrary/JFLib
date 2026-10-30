@@ -7,6 +7,7 @@
 // mib, RADIUS and Telnet of netpkt::radius and netpkt::telnet): known-answer vectors, round
 // trips, edge cases.
 // The group mail checks netpkt::smtp, netpkt::pop3 and netpkt::imf (mailt.rs).
+// The group pattern checks base::pattern: wildcards and regular expressions (patternt.rs).
 // Console program; exit code 1 when a check fails.
 //
 //   python build_rs.py app coretest
@@ -57,6 +58,7 @@ mod ftpt;
 mod mailt;
 mod snmpt;
 mod radiust;
+mod patternt;
 
 /// the result collector of a check group
 pub struct T {
@@ -130,7 +132,7 @@ fn run() -> i32 {
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 35] = [
+    let groups: [(&'static str, fn(&mut T)); 36] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -166,6 +168,7 @@ fn run() -> i32 {
         ("mail", mailt::run),
         ("snmp", snmpt::run),
         ("radius", radiust::run),
+        ("pattern", patternt::run),
     ];
     let mut failed = 0;
     let mut total = 0;

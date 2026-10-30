@@ -402,6 +402,8 @@ impl Engine {
                 if !on {
                     self.end_jobs_of(ni);
                     self.stp_power(ni, false);
+                    // the shell loses its processes and starts afresh (cli/shrun.rs)
+                    self.sh_power_off(ni);
                 }
                 self.refresh_node_links(ni);
                 self.os_power(ni, on);

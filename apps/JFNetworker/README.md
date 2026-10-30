@@ -299,6 +299,10 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `telnet_session.uis` | der Telnet-Client in einem Terminal-Tab: eine abgewiesene Verbindung, dann eine Sitzung zu einem Listener auf SRV1, Strg+Umschalt+6 beendet sie |
 | `aaa_services.uis` | der RADIUS-Server im Reiter Dienste von SRV1: Karte mit Statuszeile, die Einstellungen als JSON (ein zweiter Benutzer, ein Client ohne Secret abgewiesen) |
 | `aaa_shots.uis` | die Bilder (eine Konsole gesperrt bei der Anmeldung, der RADIUS-Server im Reiter Dienste) hell und dunkel mit 100 und 150 % (`build/jfnetworker/aaa_*.png`) |
+| `model.uis`, Gruppe `shell` | die Shell mit Ordnern, Werkzeugen und Prozessen (siehe [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)): Arbeitsverzeichnis und `cd` mit allen Sonderfällen, die Grammatik (Listen, `&&`, `\|\|`, `!`, Anführungszeichen, Variablen, `$?`, `!!`, Syntaxfehler), Umleitungen in jeder Form, Pipes auch hinter `ping`, `curl` und `nc`, Strg+C in einer Pipeline, Platzhalter, jedes Werkzeug mit seiner genauen Ausgabe, Tab für Pfade, `jfs` als Prozess (Ausgabe, Timer, Fehler, Strg+C, im Hintergrund), Jobs mit `jobs`, `fg`, `wait`, `kill`, `ps`, `sleep` und den Exit-Codes, Ordner in `flash:` von R1, ein Projekt mit Ordnern gespeichert und geladen, Ausschalten, Determinismus |
+| `scen_shell_tour.uis` | Golden-Szenario `shell_tour.scn`: ein Projektbaum auf PC1, ein Skript mit `echo` geschrieben und als Prozess in eine Logdatei gestartet, das Log mit `grep`, Pipes hinter `ping` und `curl`, Jobs mit `jobs`, `ps` und `kill`, Platzhalter, `find`, Umleitungen von stderr, Ordner in `flash:` von R1 |
+| `shell_terminal.uis` | PC1s Shell im Terminal-Panel: `mkdir`, `cd` (der Prompt zeigt `~/app`), Tab ergänzt einen Ordner mit `/`, eine Datei mit Leerzeichen, bei mehreren Treffern erst den gemeinsamen Teil und dann die Liste, eine Pipe, ein Skript als Prozess mit Strg+C beendet (`$?` 130), ein Job im Hintergrund mit `[1] PID` und seiner Fertig-Zeile, `less` mit --More-- |
+| `shell_shots.uis` | die Bilder der Shell (PC1 mit Ordnern, `tree`, einer Pipeline, `ps` und `ls -l`; R1 mit Ordnern in `flash:`) hell und dunkel mit 100 und 150 % (`build/jfnetworker/shell_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -328,6 +332,9 @@ von SRV1 an; das Szenario `aaa_radius.scn`) und `aaa_login.jfnet` (R1 mit `login
 Banner, SRV1 mit `radius-server`, PC1; die Fensterskripte `login_console.uis`,
 `telnet_session.uis`, `aaa_services.uis` und `aaa_shots.uis`), die coretest-Gruppe `radius`
 (RADIUS und Telnet Byte für Byte, MD5 und HMAC-MD5 in `crypto`).
+Für die Shell: `shell_tour.jfnet` (PC1 und SRV1 mit einem Webserver an SW1, R1 als Gateway; das
+Szenario `shell_tour.scn`, die selftest-Gruppe `shell` und die Fensterskripte `shell_*.uis`),
+die coretest-Gruppe `pattern` (Platzhalter und reguläre Ausdrücke von `base::pattern`).
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -1222,6 +1229,9 @@ und `clear spanning-tree detected-protocols` ein und zeigen ihn (siehe
 [Spanning Tree](#spanning-tree)).
 Dateien zeigen und ändern `ls`, `cat`, `cp`, `rm`, `mkdir`, `rmdir`, `touch` und `echo … >`,
 übertragen `tftp` und `curl ftp://` (siehe [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
+Die Shell hat ein Arbeitsverzeichnis, Pipes und Umleitungen für jeden Befehl, Platzhalter, die
+klassischen Werkzeuge und Prozesse (siehe
+[Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)).
 Mail schicken `mail` und `curl smtp://`, `curl pop3://` holt sie ab (siehe
 [Mail](#mail-smtp-und-pop3)); `echo "nameserver ADRESSE" > /etc/resolv.conf` stellt den
 Namensserver von Hand ein.
@@ -2393,7 +2403,8 @@ ein Rückgängig-Schritt; Rückgängig und Wiederholen ändern die Dateien auch 
 (`capacity_of`: 256 MiB beim Router, 128 MiB beim Switch, 512 GiB beim PC, 2 TiB beim Server …);
 was nicht mehr passt, wird ganz abgelehnt.
 
-- **IOS-artige Geräte:** `flash:` mit flachen Namen und dem Systemabbild, das `show version`
+- **IOS-artige Geräte:** `flash:` mit Ordnern (seit V1, siehe
+  [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)) und dem Systemabbild, das `show version`
   nennt (`jf-r4.bin` mit 40 MiB beim JF-R4: es belegt Platz, hat aber keinen Inhalt und lässt
   sich weder löschen noch exportieren), und `nvram:startup-config`, das die Startkonfiguration
   selbst ist und keine Datei daneben.
@@ -2465,6 +2476,106 @@ Geprüft wird in der Selbsttest-Gruppe `files` ([`src/filestest.rs`](src/fileste
 und FTP Byte für Byte in den coretest-Gruppen `tftp` und `ftp`, dazu das Szenario `backup.scn`
 und die Fensterskripte `files_window.uis`, `files_services.uis`, `files_console.uis` und
 `files_shots.uis`.
+
+### Die Shell: Ordner, Werkzeuge, Prozesse
+
+Die Shell der Hosts und Server (`jfn-sh`, [`cli/sh.rs`](crates/jfn_sim/cli/sh.rs),
+[`cli/shrun.rs`](crates/jfn_sim/cli/shrun.rs), [`cli/coreutils.rs`](crates/jfn_sim/cli/coreutils.rs))
+fühlt sich an wie die eines kleinen Linux-PCs. Alles, was zu einer Sitzung gehört –
+Arbeitsverzeichnis, Variablen, Verlauf, Jobs –, steht zusammen in `CliDev::sh`; ein Gerät, das
+ausgeschaltet wird, verliert es samt dem Befehl im Vordergrund und beginnt danach mit einer
+frischen Shell.
+
+**Ordner.** Jede Sitzung beginnt in `/root` (`~`, `$HOME`); der Prompt zeigt das Verzeichnis wie
+die Vorgabe von bash: `root@PC1:~# `, `root@PC1:~/app# `, `root@PC1:/srv/ftp# `. `cd` geht ohne
+Argument nach Hause, mit `-` zurück (und zeigt das Ziel), nimmt `..`, `~`, relative und absolute
+Pfade; Fehler sehen aus wie bei bash (`jfn-sh: cd: x: No such file or directory`, `… Not a
+directory`, `too many arguments`, `OLDPWD not set`). `pwd`, `$PWD` und `$OLDPWD` stimmen. Jeder
+Befehl mit Pfaden nimmt relative (auch `ls`, `cat`, `cp`, `rm`, `mkdir`, `touch`, `tftp -l`,
+`curl -o` und `-T`), die Meldungen nennen den Pfad wie getippt.
+
+**Die Grammatik** gilt für jeden Befehl:
+
+- Listen `;`, `&&`, `||` und `&` (im Hintergrund), Pipelines `|`, `!` vor einer Pipeline;
+- Umleitungen `>`, `>>`, `<`, `2>`, `2>>`, `2>&1`, `1>&2`, `&>`, `&>>` und `/dev/null`; die
+  Reihenfolge zählt wie bei bash (`> f 2>&1` gegen `2>&1 > f`). Eine Datei, die sich nicht
+  schreiben lässt, lehnt die Shell vor dem Befehl ab (`jfn-sh: /x/y: No such file or
+  directory`); geschrieben wird, wenn der Befehl endet – ein Schritt des Projekts wie jede
+  geänderte Datei, `/etc/resolv.conf` stellt wie bisher den Resolver ein;
+- Wörter: `'…'` wörtlich, `"…"` mit `$`-Ersetzung und `\` vor `$ " \`, `\` außerhalb von
+  Anführungszeichen, `#` am Wortanfang beginnt einen Kommentar;
+- Variablen: `NAME=WERT`, `NAME=WERT befehl` (nur für diesen Befehl), `$NAME`, `${NAME}`, `$?`,
+  `$$` (100, die Shell), `$!`, `$0`, `$#`, `~` und `~root`; unquotierte Ersetzungen werden an
+  Leerraum geteilt;
+- Platzhalter `*`, `?` und `[…]` (mit `!`/`^` und Klassen) über die Dateien des Geräts,
+  Komponente für Komponente, Dateien mit Punkt nur mit Punkt im Muster, sortiert nach Bytes wie
+  bash mit `LC_COLLATE=C`; ohne Treffer bleibt das Wort stehen;
+- `!!`, `!N` und `!-N` aus dem Verlauf (die Zeile wird gezeigt), `history [N] | -c`;
+- Exit-Codes wie bei den Vorbildern: 0, 1 bei einem Fehler, 2 bei falschem Aufruf, 127 für einen
+  unbekannten Befehl, `grep` 1 ohne Treffer, `ping` 1 ohne Antwort und 2 bei einem unbekannten
+  Namen, `curl` seine Codes, 130 nach Strg+C, 128 + Signal nach `kill`.
+
+Nicht dabei: Unterschalen `( )`, `$( )` und Backticks, Arithmetik, Funktionen, `if`, `for` und
+`while` – diese Zeichen sind gewöhnliche (`ss`-Filter mit Klammern gehen deshalb wie bisher).
+Pipes sammeln: die rechte Seite bekommt die Ausgabe der linken, wenn diese endet (ein `ping` links
+liefert also am Ende); ein Befehl, der über die Zeit läuft (`ping`, `curl`, `nc`, `dig`,
+`traceroute`, `tftp`, `snmpwalk`, `telnet`, `sleep`, `jfs` …), hält die Zeile an seinem Platz.
+Strg+C beendet ihn; der Rest seiner Pipeline filtert noch, was gesammelt war (`ping x | grep ttl`
+zeigt die Antworten), der Rest der Zeile entfällt, `$?` ist 130. Fehlermeldungen von `ls`, `cat`,
+`rm`, der Netzwerkprogramme bei ihrem Start, der Skripte und der Shell gehen nach stderr; was ein
+Programm später während seines Laufs meldet (eine Zeile von `ping`), steht in seiner Ausgabe.
+
+**Die Werkzeuge** verhalten sich, wo man es sieht, wie GNU coreutils, grep und findutils (die
+gebräuchlichen Optionen, Exit-Codes, die Form der Meldungen): `mv` (`-n`, in Ordner, Ordner mit
+Inhalt), `head` und `tail` (`-n N`, `-N`, `-n -N`, `-n +N`, `-c`), `grep` (`-i -v -n -c -l -r -E -F
+-w -x -o -q -H -h -e`, `egrep`), `find` (`-name`, `-iname`, `-type f|d`, `-maxdepth`,
+`-mindepth`; in Namensfolge, Dateien mit Punkt eingeschlossen), `wc` (`-l -w -c -m` mit den
+Spaltenbreiten von GNU), `sort` (`-r -n -u -f -k -t`, nach Bytes), `uniq` (`-c -d -u -i`), `cut`
+(`-d -f -c -s`), `tree` (`-a -d -L`), `du` (`-s -h -a -c`), `df` (`-h`: die Kapazität des
+Gerätemodells), `less` und `more` (die Konsole blättert mit --More--), `file`, `stat`,
+`basename`, `dirname`, `date` (die Uhr des Geräts in virtueller Zeit, `+FORMAT`), `sleep`, `seq`,
+`tee`, `test` / `[`, `xargs`, `env`, `export`, `unset`, `which`, `type`, `help` und `man`.
+`ls` zeigt Dateien mit Punkt nur mit `-a`/`-A` und schreibt in eine Pipe einen Namen je Zeile.
+`grep` versteht reguläre Ausdrücke nach POSIX ohne Rückverweise (`base::pattern`, eine Pike-VM
+ohne exponentielle Fälle): `. [abc] [^a-z] [[:digit:]] ^ $ *`, als BRE `\( \) \| \{m,n\} \+ \?`,
+mit `-E` dieselben ohne Backslash, dazu `\w \W \s \S \< \> \b \B`; die Fehlermeldungen lauten wie
+bei GNU grep. Lesen ohne Datei heißt: aus der Pipe oder von `<` – die Konsole ist kein Terminal,
+aus dem ein Programm lesen könnte. `help` listet alle Befehle mit einer Zeile, `man BEFEHL` zeigt
+eine kurze Seite (NAME, AUFRUF, BESCHREIBUNG, OPTIONEN, WO), `man sh` die Shell selbst, `BEFEHL
+--help` den Aufruf; diese Texte sind eigene deutsche Worte ([`cli/man.rs`](crates/jfn_sim/cli/man.rs)),
+`which` und `type` nennen Pfade wie `/usr/bin/grep` (die Shell kennt sie, im Dateibaum stehen
+sie nicht).
+
+**Tab** ergänzt Befehlswörter (die Liste von `linux.rs`), die Objekte von `ip` und sonst Pfade
+relativ zum Arbeitsverzeichnis (auch `~/`, `/`, `..`): ein Ordner bekommt ein `/`, eine Datei ein
+Leerzeichen, mehrere Treffer erst ihren gemeinsamen Anfang und mit dem nächsten Tab die Liste;
+Dateien mit Punkt nur, wenn der Anfang einen Punkt hat, Leerzeichen in Namen mit `\`.
+
+**Prozesse.** `jfs DATEI [ARGUMENTE]` startet ein Skript aus den Dateien des Geräts als Prozess
+im Terminal ([`cli/shrun.rs`](crates/jfn_sim/cli/shrun.rs) `JfsProc`): derselbe `ScriptService`
+mit demselben Host wie ein Dienst (net, http, dns, timer, disk, metrics, `log` ins Journal des
+Geräts), `print` schreibt ins Terminal (und in Pipes und Umleitungen), `config.args` hält die
+Argumente, `config.file` den Pfad. Das Programm endet, wenn nichts mehr zu tun ist (kein Timer,
+Socket, Server, keine offene Anfrage; Status 0), nach einem Fehler (`DATEI:ZEILE:SPALTE: Fehler:
+…` auf stderr, Status 1) oder mit Strg+C (130); ein Übersetzungsfehler meldet sich wie beim Runner
+`jfs`. `BEFEHL &` läuft im Hintergrund: sofort `[N] PID`, die Ausgabe kommt ins Terminal, wann
+immer sie entsteht, und vor dem nächsten Prompt `[N]+  Done                    BEFEHL` (`Exit N`,
+`Terminated`, `Killed`) wie bei bash. `jobs [-l] [-p]` zeigt die Jobs, `fg [%N]` und `wait`
+warten auf einen (Strg+C beendet ihn), `kill [-SIGNAL] PID|%N` beendet ihn (TERM, KILL, INT, HUP; `kill -l`),
+`sleep` läuft als Job über die virtuelle Zeit. `ps` zeigt init (1), die Shell (100), die
+laufenden Dienste mit 100 + ihrer Nummer – dieselben PIDs wie `top` und `ss -p` – mit ihrer
+Rechenzeit und die Jobs; ein Job ohne eigenen Dienst bekommt eine Nummer aus demselben Vorrat.
+Dienste beendet `kill` nicht (`Operation not permitted`), sie haben ihre eigenen Befehle. Die
+Jobs gehören zum Zustand des Geräts (Keyframes zählen sie), laufen deterministisch und enden mit
+dem Strom.
+
+**IOS-artig** haben `flash:` jetzt Ordner: `mkdir`, `rmdir`, `rename QUELLE ZIEL` (auch in einen
+Ordner), `cd [ORDNER|..]` und `pwd` (`flash:/sicherung/`) mit einem Arbeitsverzeichnis je
+Sitzung; `dir` ohne Argument zeigt dieses (Ordner als `drw-`), bloße Namen in `copy`, `delete`,
+`more`, `dir` und in den Fragen von `copy` gelten darin, `flash:NAME` vom Anfang von `flash:`.
+Die Zeilen von `mkdir` und `rmdir` sind eigene Worte, die `%Error`-Zeilen folgen dem Vorbild.
+Ordner in `flash:` stehen im Projekt wie die der Hosts (`{"path": "flash:/sicherung", "dir":
+true}`).
 
 ### Logins, Telnet und AAA mit RADIUS
 

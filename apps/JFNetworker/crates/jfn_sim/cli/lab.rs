@@ -82,7 +82,7 @@ const WORKER_HELP: &str = "workerctl [status] [-s DIENST]   zeigt den Worker und
 
 impl Engine {
     fn lab_err(&mut self, ni: usize, text: &str) -> Result<(), String> {
-        self.out(ni, text);
+        self.err_out(ni, text);
         Err(String::from(text.lines().next().unwrap_or("")))
     }
 

@@ -2312,6 +2312,15 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
 * `base::lru::Lru` -- a map that forgets the least recently used entries: limits on the number
   of entries and on their weight (bytes), `insert` returns what had to go, `get` counts as a
   use and `peek` does not. Ordered maps only, so it is deterministic.
+* `base::pattern` -- patterns of shells and grep: `glob(pat, name)` is fnmatch without flags (`*`,
+  `?`, `[a-z]`, `[!x]`, `[[:digit:]]`, `\x`; callers match a path component by component and
+  hide dot files themselves), `has_glob(word)` says whether a word needs expanding;
+  `Regex::new(pat, Syntax::Basic | Syntax::Extended, icase)` compiles POSIX's BRE or ERE without
+  back-references (classes, anchors, `* + ? {m,n}`, groups, alternatives, GNU's `\w \s \< \> \b`)
+  and `find` / `find_at` give the leftmost-longest match as byte offsets. It runs a Pike VM, so
+  `(a|a)*b` against a long text costs linear time instead of exponential; a refused pattern
+  says why with `ReErr::text()` in GNU grep's words (JFNetworker's shell, `apps/coretest`
+  group `pattern`).
 * `agent_core::jmap` -- typed JSON for protocols and files: `record! { pub struct P { pub a:
   String, pub n: u32 } }` declares the struct with `to_json` / `from_json`, `wire_enum!` an
   enum carried as a string; missing or mistyped members read as their defaults, unknown ones
