@@ -849,13 +849,30 @@ Fensterrand hinaus.
     Ende wartet), wird erst beim nächsten Scan der ganzen Zeile neu bewertet; Undo hält je
     Schritt die ganze alte und neue Zeile (bei 1 MB 2 MB je Schritt); der
     Barrierefreiheits-Text einer einzelnen Zeile über 64 KB bleibt leer.
+  * Sprachdienste und Debugger-Leiste (SK6, 2026-10-30): `ui.code_editor_with(…, Some(&mut
+    assist), …)` mit einem `CodeAssist` der Sprache ([`ui/code_assist.rs`](../lib/ui/code_assist.rs)):
+    Vervollständigungs-Popup (beim Tippen eines Worts, nach einem Auslösezeichen, Strg+Leertaste;
+    filtert beim Tippen, Hoch / Runter / Bild↑ / Bild↓ / Eingabe / Tab / Esc, Klick; Art-Abzeichen,
+    Detailspalte, Beschreibung des gewählten Eintrags; Einfügen als ein Undo-Schritt), Hover-Texte
+    unter den Diagnosen, Signaturhilfe über dem Caret – beide auf der Popup-Ebene in den Farben des
+    Code-Themas, als `K_LIST` / `K_LISTITEM` bzw. `K_TEXT` für Screenreader. Strg+Klick / F12, F2,
+    Umschalt+Alt+F und Klicks in die Haltepunkt-Spalte (`CE_BREAKPOINTS`) sind `CodeEv`
+    (`ui.code_events`). `CodeDoc` hält Haltepunkte (gesetzt, deaktiviert, mit Bedingung), die
+    Ausführungszeile und Faltbereiche, die den Änderungen folgen; gefaltete Zeilen fehlen in
+    Ansicht, Caret-Bewegung und Suche, Bearbeiten darin oder ein dorthin gesetzter Caret faltet
+    auf; `apply_edits` / `replace_text` sind je ein Undo-Schritt (Umbenennen, Formatieren). Ohne
+    Faltung ist eine Zeile eine Reihe – 100 000 Zeilen so schnell wie vorher; 80 000 Zeilen mit
+    10 000 gefalteten Funktionen: Tasten ≈ 0,2–0,4 ms je Frame. Getestet mit
+    `tests/code_assist.uis`, `tests/code_ide.uis` und `--test model` (Gruppe `ide`, jetzt 307
+    Prüfungen). Offen: Popups bleiben im Fenster (kein Popup-Fenster der Plattform), kein
+    Snippet-Einfügen mit Platzhaltern, keine Minikarte der Faltungen.
   * Getestet mit `apps/editortest` (13 Skripte mit `--verify-dirty`, Windows und Linux, und
     `--test model`: 168 Prüfungen der Modelle und Grammatiken).
   * Offen: kein bidirektionaler Text innerhalb eines Absatzes (wie bei den Textfeldern bleibt
     die Reihenfolge LTR); Android-IME (Komposition über `android_ime_*`) nicht angebunden –
     auf Android kommt nur getippter Text an; keine Rechtschreibprüfung, kein Kontextmenü, kein
     Ziehen von Text, keine Bilder / Tabellen im Rich-Text; RTF-Export fehlt (nur HTML / Text /
-    JSON); Code-Editor ohne Zeilenumbruch, Mehrfach-Cursor, Regex-Suche und Code-Faltung;
+    JSON); Code-Editor ohne Zeilenumbruch, Mehrfach-Cursor und Regex-Suche (Faltung seit SK6);
     der Barrierefreiheits-Text großer Dateien (> 64 KB) enthält nur die sichtbaren Zeilen.
 - **P2** · *erledigt* · Popups und Tooltips über den Fensterrand hinaus (2026-10-18; die Teile für
   Toolfenster seit U3): Flyouts, Menüs und Untermenüs, Kombolisten, der Kalender von
@@ -1303,6 +1320,25 @@ Fensterrand hinaus.
   Fehlerposition für `% Invalid input detected at '^' marker.`; getestet mit der
   coretest-Gruppe `cmdtree`, im Einsatz in der IOS-Konsole von JFNetworker. Seit R1 findet
   `find_mode` einen Modus über seinen Prompt (die Modi der Zugriffslisten von JFNetworker).
+- **P3** · *erledigt* · Sprachdienste für jfs (SK6, 2026-10-30, für die IDE von JFNetworker):
+  [`script::ls`](../lib/script/ls.rs) indiziert die Deklarationen eines Skripts (globale und
+  lokale `let`, `fn` samt Parametern, Closures, Schleifen- und catch-Variablen) und jede
+  Verwendung nach den Gültigkeitsregeln von `ast.rs`, auch auf Code, der nicht parst
+  (`parse_partial`); darauf `definition` (in importierte Module über einen Lade-Callback des
+  Aufrufers, für `let m = import("…")` aus SK7), `references`, `rename` (verweigert
+  Schlüsselwörter, ungültige und kollidierende Namen – geprüft, indem der umbenannte Text neu
+  aufgelöst wird), `complete` (Namen im Gültigkeitsbereich, Globale des Hosts mit
+  Kurzbeschreibung, Built-ins und Module der Standardbibliothek, Methoden von str / list / map /
+  bytes nach dem Typ eines Literals, Schlüsselwörter am Anweisungsanfang; nach Art und Präfix
+  sortiert), `hover` (Art, Signatur, `///`-Doku-Kommentar; deutsche Beschreibungen jeder
+  Funktion der Standardbibliothek in [`lsdoc.rs`](../lib/script/lsdoc.rs)), `signature`,
+  `folding`, `symbols` (Gliederung). [`script::fmt`](../lib/script/fmt.rs) formatiert
+  (Einrückung nach Klammern, Leerzeichen um Operatoren, eine Anweisung je Zeile, Kommentare und
+  höchstens eine Leerzeile bleiben, idempotent), verweigert Code mit Syntaxfehlern und prüft,
+  dass der Baum des Ergebnisses dem des Originals gleicht – der übersetzte Code bleibt gleich.
+  Getestet mit der coretest-Gruppe `scriptls` (227 Prüfungen). Offen: keine Typinferenz über
+  Literale hinaus, Umbenennen nur ohne Syntaxfehler, der Formatierer bricht keine langen Zeilen
+  um.
 
 ## 8. Rendering
 

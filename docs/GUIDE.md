@@ -3379,6 +3379,84 @@ if let Some(d) = ui.code_diag(ID_CODE) { self.status = format!("{}:{}: {}", d.li
   `Rule::Interp { open, close, start }`. `editortest --test model` compares it token by token
   with `script::tokens`.
 
+**Language services, breakpoints and folding.** A language plugs into the editor with a
+[`CodeAssist`](../lib/ui/code_assist.rs) (like `Highlighter` for colours): completion items,
+hover texts and signature help; every method has a default that offers nothing. What needs the
+app -- go to a definition, rename, format, toggle a breakpoint -- comes back as events.
+
+```rust
+struct Jfs;                                   // lib/script's services for .jfs
+impl CodeAssist for Jfs {
+    fn complete(&mut self, doc: &CodeDoc, at: TextPos, _explicit: bool) -> Option<CompList> {
+        let c = script::ls::complete(&doc.text(), doc.flat(at) as u32, &script::ls::CompleteCx::default());
+        let items = c.items.into_iter()
+            .map(|i| CompItem { label: i.label, detail: i.detail, doc: i.doc, kind: CI_FUNCTION, insert: String::new() })
+            .collect();
+        Some(CompList { start: doc.unflat(c.start as usize), items })
+    }
+    fn hover(&mut self, doc: &CodeDoc, at: TextPos) -> Option<String> {
+        script::ls::hover(&doc.text(), doc.flat(at) as u32, &script::ls::CompleteCx::default()).map(|h| h.text())
+    }
+}
+
+// in frame: folding ranges from the language after a change, then the editor with the services
+if self.folds_rev != Some(self.code.revision()) {
+    let f: Vec<(usize, usize)> = script::ls::folding(&self.code.text()).iter()
+        .map(|x| (x.line as usize - 1, x.end as usize - 1)).collect();
+    self.code.set_fold_ranges(&f);            // lines from 0: first stays, first + 1 ..= last fold
+    self.folds_rev = Some(self.code.revision());
+}
+ui.next_size(-1, -1);
+ui.code_editor_with(ID_CODE, &mut self.code, &Highlighter::jfs(), Some(&mut Jfs), CE_BREAKPOINTS);
+for e in ui.code_events(ID_CODE) {
+    match e {
+        CodeEv::Definition(p) => self.jump_to_definition(p),          // Ctrl+click, F12
+        CodeEv::Rename(p) => self.ask_new_name(p),                   // F2
+        CodeEv::Format => {                                           // Shift+Alt+F
+            if let Ok(f) = script::fmt::format(&self.code.text()) {
+                self.code.replace_text(&f, "Formatieren");           // one undo step
+            }
+        }
+        CodeEv::Breakpoint(line) => self.toggle_breakpoint(line),     // a click in the column
+    }
+}
+// a rename's edits as one undo step
+let edits: Vec<TextEdit> = script::ls::rename(&text, pos, "count")?.iter()
+    .map(|e| TextEdit::new(doc.unflat(e.start as usize), doc.unflat(e.end as usize), &e.text)).collect();
+doc.apply_edits(&edits, "Umbenennen");
+```
+
+* The completion list opens while a word is typed (once per word: one without items keeps it
+  closed until the word ends), after a character of `triggers()` (`.`) and on Ctrl+Space; it
+  filters as one types (the labels that start with the typed part, matching case first), Up /
+  Down / PgUp / PgDn choose, Enter / Tab / a click insert (the word from `CompList::start` to the
+  end of the word at the caret becomes the item, one undo step; Enter after a word typed out in
+  full just breaks the line), Esc closes. A row shows a badge for the kind (`CI_FUNCTION`,
+  `CI_METHOD`, `CI_VARIABLE`, `CI_KEYWORD` ..: a letter in the token colour of the kind), the
+  label in the code font and the detail; the chosen item's `doc` stands under the rows.
+  `ui.code_popup_item(id)` and `CodeStatus::popup` tell what it shows.
+* Hover: the pointer resting on a word asks `hover` once per word and revision; the text (lines
+  by `\n`, wrapped at 72 characters) follows the diagnostics in the editor's tooltip. Signature
+  help opens when `(` or `,` is typed and on Ctrl+Shift+Space, follows the caret (the active
+  parameter bold and underlined) and closes outside a call or on Esc. The popups are drawn on
+  the popup layer inside the window in the code theme's colours (high contrast too) and are
+  records for screen readers (`K_LIST` id + 14 with a `K_LISTITEM` per visible row, the chosen
+  one selected; `K_TEXT` "label – parameter – doc"); scripts find rows as
+  `listitem:"split – s.split(sep, n)"`.
+* Breakpoints belong to the app: a click in the column of `CE_BREAKPOINTS` is
+  `CodeEv::Breakpoint(line)`, `doc.set_breakpoints(&[(line, BP_ON | BP_DISABLED | BP_COND)])`
+  draws them (a filled circle, a ring, a bar across), `doc.set_exec_line(Some(line))` marks a
+  debugger's line (an arrow and `CodeTheme::exec_line`); both follow edits like diagnostics.
+* Folding: ranges from the language (`set_fold_ranges`; one that starts where a folded one did
+  stays folded), a chevron per range in a column after the numbers (`CE_FOLDS` keeps it), a
+  click or Ctrl+Shift+[ / ] folds and unfolds, `fold_all`. Folded lines are out of the view,
+  the caret's moves and find's steps; a "..." box after the line unfolds it; an edit inside or
+  the caret put there by the app (`set_selection`, undo) unfolds, folding around the caret
+  moves it to the range's first line. Without ranges a row is a line: 100 000 lines stay as
+  fast as before (`tests/code_ide.uis` benches 80 000 lines with 10 000 folded functions).
+* Tests: `apps/editortest/tests/code_assist.uis` and `code_ide.uis` (`cmd 906` switches lib/script's
+  services on for JFS), `--test model` group `ide`.
+
 ## 29. Scripts: `script` (compiler and VM)
 
 [`lib/script`](../lib/script/lib.rs) runs JFNetworker's `.jfs` scripts: `compile` turns the
@@ -3613,6 +3691,67 @@ uses only the standard library, `print`, `log` and `timer` runs the same in JFNe
 column, the source line and the calls; exit code 1 (2 for a wrong command line). Its tests
 are example scripts with their expected stdout, stderr, exit code and files
 (`apps/jfs/tests/cases/*.test`), run by `python build_rs.py test jfs` on Windows and Linux.
+
+**Language services and the formatter** ([`script::ls`](../lib/script/ls.rs),
+[`script::fmt`](../lib/script/fmt.rs)) are what an editor or IDE needs, without editor types:
+positions are bytes into the source, results carry `Span`s (lines and columns from 1). They
+work on code that does not parse (what `parse_partial` made of it), so completion and hover
+keep working while a line is half typed.
+
+```rust
+use script::ls::{self, CompleteCx, HostItem};
+
+// the host's names with a short description (JFNetworker: workspace/devwin/scriptls.rs)
+let host = [
+    HostItem { name: "net.listen", params: Some("port, handlers"), doc: "Wartet auf TCP-Verbindungen" },
+    HostItem { name: "config", params: None, doc: "Die Einstellungen des Dienstes" },
+];
+let load = |path: &str| fs_read(path);                  // the text of import("path"), if any
+let cx = CompleteCx { host: &host, load: Some(&load) };
+
+let c = ls::complete(src, caret, &cx);                   // items for src[c.start..c.end]
+for i in &c.items { show(&i.label, i.kind, &i.detail, &i.doc); }
+let h = ls::hover(src, at, &cx);                         // "fn greet(name)\nFunktion\n<doc>"
+let s = ls::signature(src, caret, &cx);                  // "greet(name, greeting)", active 1
+let d = ls::definition(src, at, &cx);                    // Location { path: None, span }
+let r = ls::references(src, at);                         // the declaration and every use
+let e = ls::rename(src, at, "count")?;                   // Vec<Edit> or a German reason
+let new_src = ls::apply(src, &e);
+let folds = ls::folding(src);                            // Fold { line, end, kind }
+let outline = ls::symbols(src);                          // fns (nested ones as children), lets
+let tidy = script::fmt::format(src)?;                    // or the syntax errors
+```
+
+* The index (`ls::index`) follows the scope rules of `ast.rs`: top-level `let` and `fn` are the
+  script's globals (visible in every function, in top-level code after the `let` ran), a block's
+  `fn`s in the whole block, a `let` from the next statement on, parameters around the body, `for`
+  and `catch` variables around their block; an inner declaration shadows. `Index::at(pos)` is
+  the symbol of a name, `Index::resolve(name, pos)` the one a name would mean there.
+* Doc comments are the `///` lines right above a `fn` or `let`. Hover shows the signature
+  (`fn greet(name)`, `let f = fn(a, b)`, `let m = import("x.jfs")`), the kind ("Parameter von
+  greet", "lokale Variable in handle") and the doc; for the library and the host their
+  description (`ls::library_doc(name)` has the library's, German, our own words).
+* Completion ranks the exact-case prefix first, then by kind: names in scope (locals before
+  the script's globals), the host's names, the built-ins and library modules, keywords (the
+  statement keywords only where a statement may start, `else` / `catch` after a `}`, `in` after
+  `for x`). After a dot: the members of a host namespace or a library module, the top-level
+  names of an imported module (through `CompleteCx::load`), the methods of `str` / `list` /
+  `map` / `bytes` when a literal or a known call tells the type (`let s = "a"`, `.split(..)`),
+  else of all four (a method on several types lists their signatures). Nothing in comments and
+  strings; in `${..}` as in code.
+* `rename` refuses keywords, invalid names, a name declared in the same scope, a rename that
+  would change what any name means (it resolves the renamed source again and compares), and
+  code with syntax errors (statements that did not parse would be missed).
+* `fmt::format` (two blanks per level; `format_with(src, "    ")`): one statement per line, the
+  `{` of a block on its line, `else` / `catch` after the `}`, indentation by the open brackets
+  plus one level for a continued statement, blanks around operators and after `,` and `:`,
+  none inside brackets; the line breaks inside expressions, comments and up to one blank line
+  stay. It refuses code with syntax errors, and it checks that the tree of its result equals
+  the original's (`Program::sexpr`) -- so the compiled program is the same. Idempotent.
+* Tests: `coretest --only scriptls` (definitions and references with shadowing, closures, loops;
+  rename and its refusals; completion in scope, after a dot, of an import and on broken code;
+  hover; signature help; folding; the outline; the formatter on every syntax form, idempotent,
+  the same code).
 
 ## 30. Live inspector
 
