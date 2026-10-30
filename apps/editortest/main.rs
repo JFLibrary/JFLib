@@ -20,6 +20,18 @@
 // of "100 000 Zeilen" that calls compute(), `cmd 903` CE_MARKS on / off, `cmd 904 N` one line
 // of minified JSON of N bytes (default 100 000), `cmd 905 N` one line of Rust with umlauts, CJK
 // characters, emoji and tabs.
+// Language services (SK6; `cmd 906` on / off, off at the start so the other scripts keep their
+// layout): the editor gets lib/script's services for JFS through ui.code_editor_with (JfsAssist:
+// completion, hover, signature help), CE_BREAKPOINTS and the folding ranges of
+// script::ls::folding after every change; F12 / Ctrl+click, F2 (renames the name at the caret
+// to `neu` with script::ls::rename) and Shift+Alt+F (script::fmt::format_with) act on the
+// events of ui.code_events, a click in the breakpoints' column toggles a breakpoint.  An extra
+// status line tells what happened: `ev: def 5:4` (the last event), `bp: 6c,13d` (breakpoints,
+// c / d conditional / disabled), `exec: N`, `hidden: N` (folded lines), `pop: N:label` (the
+// completion list's items and the chosen one), `step: label` (the undo step).
+// `cmd 907 L` / `cmd 908 L` toggle the disabled / conditional look of the breakpoint on line L
+// (from 1), `cmd 909 L` the execution line (0: none), `cmd 910` / `cmd 911` fold / unfold all,
+// `cmd 912 N` a JFS file of N functions (folding and completion on a long file).
 // Fonts: DejaVu Sans Mono (the code editor, mono_font_set; also registered as a family) and
 // DejaVu Serif (registered for the rich text) from lib/doc_view/assets (licence:
 // DejaVu-LICENSE.txt there).
@@ -69,6 +81,13 @@ const CMD_BIG_DIAGS: u32 = 902;
 const CMD_MARKS: u32 = 903;
 const CMD_LONG_JSON: u32 = 904;
 const CMD_LONG_MIXED: u32 = 905;
+const CMD_LS: u32 = 906;
+const CMD_BP_DISABLED: u32 = 907;
+const CMD_BP_COND: u32 = 908;
+const CMD_EXEC: u32 = 909;
+const CMD_FOLD_ALL: u32 = 910;
+const CMD_UNFOLD_ALL: u32 = 911;
+const CMD_BIG_JFS: u32 = 912;
 
 const LANGS: [&str; 7] = ["Rust", "JSON", "INI", "TOML", "Markdown", "Text", "JFS"];
 const JFS: i32 = 6;
@@ -91,6 +110,55 @@ struct EdTest {
     // the diagnostics' status line: shown once the document was checked (the editor keeps
     // its height in the other tests)
     diag_row: bool,
+    // the language services (cmd 906), the last event, the breakpoints (line from 0, BP_*)
+    ls: bool,
+    last_ev: String,
+    bps: Vec<(usize, u8)>,
+    // the revision the folding ranges belong to
+    folds_rev: Option<(u64, usize)>,
+}
+
+/// lib/script's language services for JFS in the code editor
+struct JfsAssist;
+
+fn item_kind(k: script::ls::ItemKind) -> u8 {
+    use script::ls::ItemKind as K;
+    match k {
+        K::Variable => CI_VARIABLE,
+        K::Param => CI_PARAM,
+        K::Function => CI_FUNCTION,
+        K::Method => CI_METHOD,
+        K::Module => CI_MODULE,
+        K::Constant => CI_CONSTANT,
+        K::Value => CI_VALUE,
+        K::Keyword => CI_KEYWORD,
+    }
+}
+
+impl CodeAssist for JfsAssist {
+    fn complete(&mut self, doc: &CodeDoc, at: TextPos, _: bool) -> Option<CompList> {
+        let src = doc.text();
+        let c = script::ls::complete(&src, doc.flat(at) as u32, &script::ls::CompleteCx::default());
+        let items = c.items.into_iter().map(|i| CompItem { label: i.label, detail: i.detail, doc: i.doc, kind: item_kind(i.kind), insert: String::new() }).collect();
+        Some(CompList { start: doc.unflat(c.start as usize), items })
+    }
+    fn hover(&mut self, doc: &CodeDoc, at: TextPos) -> Option<String> {
+        script::ls::hover(&doc.text(), doc.flat(at) as u32, &script::ls::CompleteCx::default()).map(|h| h.text())
+    }
+    fn signature(&mut self, doc: &CodeDoc, at: TextPos) -> Option<SigHelp> {
+        let s = script::ls::signature(&doc.text(), doc.flat(at) as u32, &script::ls::CompleteCx::default())?;
+        Some(SigHelp { label: s.label, params: s.params.iter().map(|&(a, b)| (a as usize, b as usize)).collect(), active: s.active, doc: s.doc })
+    }
+}
+
+/// a JFS file of n functions that call each other (cmd 912)
+pub fn big_jfs(n: usize) -> CodeDoc {
+    let mut s = String::from("let total = 0\n");
+    for i in 0..n {
+        s.push_str(&format!("/// adds {}\nfn step_{:05}(x) {{\n  let y = x + {}\n  if y > 10 {{\n    total += y\n  }}\n  return y\n}}\n", i, i, i % 7));
+    }
+    s.push_str("print(step_00000(1))\n");
+    CodeDoc::from_text(&s)
 }
 
 /// the sample document of the rich text tab
@@ -457,7 +525,94 @@ impl EdTest {
             live: 0,
             marks: false,
             diag_row: false,
+            ls: false,
+            last_ev: String::from("-"),
+            bps: Vec::new(),
+            folds_rev: None,
         }
+    }
+
+    // the editor with lib/script's services (JFS and cmd 906): folding ranges after each
+    // change, the events of the last pass
+    fn code_ls(&mut self, ui: &mut Ui, hl: &Highlighter, flags: u32) -> u32 {
+        let key = (self.code.revision(), self.code.line_count());
+        if self.folds_rev != Some(key) {
+            let f: Vec<(usize, usize)> = script::ls::folding(&self.code.text()).iter().map(|x| (x.line as usize - 1, x.end as usize - 1)).collect();
+            self.code.set_fold_ranges(&f);
+            self.folds_rev = Some(key);
+        }
+        let ev = ui.code_editor_with(ID_CODE, &mut self.code, hl, Some(&mut JfsAssist), flags | CE_BREAKPOINTS);
+        for e in ui.code_events(ID_CODE) {
+            let src = self.code.text();
+            match e {
+                CodeEv::Definition(p) => {
+                    let to = script::ls::definition(&src, self.code.flat(p) as u32, &script::ls::CompleteCx::default());
+                    match to {
+                        Some(l) => {
+                            let at = self.code.unflat(l.span.start as usize);
+                            self.code.set_selection(TextSel::at(at));
+                            self.last_ev = format!("def {}:{}", l.span.line, l.span.col);
+                        }
+                        None => self.last_ev = String::from("def none"),
+                    }
+                }
+                CodeEv::Rename(p) => match script::ls::rename(&src, self.code.flat(p) as u32, "neu") {
+                    Ok(edits) => {
+                        let te: Vec<TextEdit> = edits.iter().map(|x| TextEdit::new(self.code.unflat(x.start as usize), self.code.unflat(x.end as usize), &x.text)).collect();
+                        self.code.apply_edits(&te, "Umbenennen");
+                        self.last_ev = format!("rename {}", te.len());
+                    }
+                    Err(m) => self.last_ev = format!("rename refused: {}", m),
+                },
+                CodeEv::Format => {
+                    let unit = self.code.indent_unit();
+                    match script::fmt::format_with(&src, &unit) {
+                        Ok(f) => {
+                            let did = self.code.replace_text(&f, "Formatieren");
+                            self.last_ev = format!("format {}", if did { "changed" } else { "same" });
+                        }
+                        Err(d) => self.last_ev = format!("format refused {}", d.len()),
+                    }
+                }
+                CodeEv::Breakpoint(l) => {
+                    match self.bps.iter().position(|b| b.0 == l) {
+                        Some(i) => {
+                            self.bps.remove(i);
+                        }
+                        None => self.bps.push((l, BP_ON)),
+                    }
+                    self.code.set_breakpoints(&self.bps);
+                    self.last_ev = format!("bp {}", l + 1);
+                }
+            }
+            ui.repass();
+        }
+        // (the breakpoints followed the edits)
+        self.bps = self.code.breakpoints().to_vec();
+        ev
+    }
+
+    // the language services' status line
+    fn ls_status(&self, ui: &mut Ui) {
+        let st = ui.code_status(ID_CODE);
+        let bps: Vec<String> = self.code.breakpoints().iter().map(|b| format!("{}{}", b.0 + 1, ["", "d", "c"][b.1.min(2) as usize])).collect();
+        let pop = match ui.code_popup_item(ID_CODE) {
+            Some(i) => format!("{}:{}", st.popup, i.label),
+            None => String::from("0"),
+        };
+        let parts = [
+            format!("ev: {}", self.last_ev),
+            format!("bp: {}", if bps.is_empty() { String::from("-") } else { bps.join(",") }),
+            format!("exec: {}", self.code.exec_line().map_or(String::from("-"), |l| format!("{}", l + 1))),
+            format!("hidden: {}", st.hidden),
+            format!("pop: {}", pop),
+            format!("step: {}", self.code.undo_label().unwrap_or("-")),
+        ];
+        ui.box_begin(0, BOX_H, 16);
+        for p in &parts {
+            ui.text(TS_CAPTION | TX_SECONDARY, p);
+        }
+        ui.box_end();
     }
 
     fn rich_tab(&mut self, ui: &mut Ui) {
@@ -518,6 +673,8 @@ impl EdTest {
             self.code.tab_width = if self.tabs8 != 0 { 8 } else { 4 };
             self.code.use_tabs = self.use_tabs != 0;
             self.diag_row = self.live != 0;
+            self.folds_rev = None;
+            self.bps.clear();
         }
         ui.spacer(-1);
         ui.next_flags(ST_NOFOCUS);
@@ -525,6 +682,7 @@ impl EdTest {
             self.lang = 0;
             self.code = big_code(100_000);
             self.diag_row = self.live != 0;
+            self.folds_rev = None;
         }
         if ui.checkbox(ID_TABS_W, "Tabweite 8", &mut self.tabs8) & EV_ACT != 0 {
             self.code.tab_width = if self.tabs8 != 0 { 8 } else { 4 };
@@ -545,7 +703,8 @@ impl EdTest {
         ui.next_size(-1, -1);
         let hl = highlighter(self.lang);
         let flags = if self.marks { CE_MARKS } else { 0 };
-        if ui.code_editor(ID_CODE, &mut self.code, &hl, flags) & EV_ACT != 0 && self.live != 0 {
+        let ev = if self.ls && self.lang == JFS { self.code_ls(ui, &hl, flags) } else { ui.code_editor(ID_CODE, &mut self.code, &hl, flags) };
+        if ev & EV_ACT != 0 && self.live != 0 {
             // (the editor drew the old ones in this pass)
             let d = check_code(&self.code, self.lang == JFS);
             self.code.set_diagnostics(&d);
@@ -567,6 +726,9 @@ impl EdTest {
             ui.text(TS_CAPTION | TX_SECONDARY, l);
         }
         ui.box_end();
+        if self.ls && self.lang == JFS {
+            self.ls_status(ui);
+        }
         // the diagnostics: counts, the one at the caret, where the first ones are now
         if !self.diag_row {
             return;
@@ -685,6 +847,47 @@ impl App for EdTest {
                 let n = if arg > 0 { arg as usize } else { 100_000 };
                 (self.lang, self.code) = if id == CMD_LONG_JSON { (1, long_json(n)) } else { (0, long_mixed(n)) };
                 self.diag_row = self.live != 0;
+                ui.repass();
+                true
+            }
+            CMD_LS => {
+                self.ls = !self.ls;
+                self.folds_rev = None;
+                if !self.ls {
+                    self.code.set_fold_ranges(&[]);
+                    self.code.set_breakpoints(&[]);
+                    self.code.set_exec_line(None);
+                    self.bps.clear();
+                }
+                ui.repass();
+                true
+            }
+            CMD_BP_DISABLED | CMD_BP_COND => {
+                let l = (arg as usize).saturating_sub(1);
+                let look = if id == CMD_BP_DISABLED { BP_DISABLED } else { BP_COND };
+                match self.bps.iter_mut().find(|b| b.0 == l) {
+                    Some(b) => b.1 = if b.1 == look { BP_ON } else { look },
+                    None => self.bps.push((l, look)),
+                }
+                self.code.set_breakpoints(&self.bps);
+                ui.repass();
+                true
+            }
+            CMD_EXEC => {
+                self.code.set_exec_line(if arg == 0 { None } else { Some(arg as usize - 1) });
+                ui.repass();
+                true
+            }
+            CMD_FOLD_ALL | CMD_UNFOLD_ALL => {
+                self.code.fold_all(id == CMD_FOLD_ALL);
+                ui.repass();
+                true
+            }
+            CMD_BIG_JFS => {
+                self.lang = JFS;
+                self.code = big_jfs(if arg > 0 { arg as usize } else { 10_000 });
+                self.folds_rev = None;
+                self.bps.clear();
                 ui.repass();
                 true
             }

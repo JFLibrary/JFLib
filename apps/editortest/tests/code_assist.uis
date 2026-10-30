@@ -1,0 +1,188 @@
+#!args --verify-dirty
+# the code editor's language services (SK6, ui.code_editor_with with lib/script's services for
+# JFS, cmd 906): the completion list (opened while typing a word, after a dot, by Ctrl+Space;
+# filtered as one types; Up / Down / PgUp / PgDn / Enter / Tab / Esc; a click on an item; the
+# insert one undo step), hover tooltips, signature help, Ctrl+click and F12 (CodeEv::Definition),
+# F2 (rename, one undo step), Shift+Alt+F (format, one undo step); shots light / dark at 100
+# and 150 %, high contrast.  Lines of 20 px from y 109; with the breakpoints' and the folding
+# column the text starts at x 88 (cells of 8 px)
+size 1000 680
+theme light
+click tab:"Code"
+click tab:"JFS"
+cmd 906
+wait 300
+expect text:"ev: -" exists
+expect text:"pop: 0" exists
+expect text:"step: -" exists
+# ---- hover: the pointer resting on a word shows its kind, signature and doc
+move 236,479
+wait 600
+expect text:"fn greet(name)\nFunktion" exists
+move 124,129
+wait 600
+expect text:"let hits\nglobale Variable" exists
+# a library function
+move 188,219
+wait 600
+expect text:"len(x)\neingebaut\nDie Länge: Zeichen eines str, Bytes von bytes, Einträge einer list oder\nmap." exists
+move 600,300
+wait 600
+expect text:"let hits\nglobale Variable" missing
+# ---- Ctrl+click and F12: the definition (the app moves the caret there)
+focus #3000
+drag 236,479 236,479 1 ctrl
+expect text:"ev: def 5:4" exists
+expect text:"pos: 5:4" exists
+key ctrl+end
+key up
+key up
+key home
+key right
+key right
+key right
+key right
+key right
+key right
+key right
+expect text:"pos: 24:8" exists
+key f12
+expect text:"pos: 5:4" exists
+# ---- rename (F2 renames to "neu"): one undo step
+key f2
+expect text:"ev: rename 3" exists
+expect text:"step: Umbenennen" exists
+key ctrl+home
+move 600,300
+wait 600
+move 236,479
+wait 600
+expect text:"fn neu(name)\nFunktion" exists
+shot build/editortest/code_rename.png
+move 600,300
+wait 600
+key ctrl+z
+expect text:"step: -" exists
+expect text:"rev: 2 undo: 0" exists
+# a comment is no name: the refusal
+key ctrl+home
+key f2
+expect text:"ev: rename refused: Hier steht kein Name, der in diesem Skript deklariert ist" exists
+# ---- format (Shift+Alt+F): one undo step, the caret stays at its token
+key ctrl+home
+key down
+key down
+key down
+key down
+key down
+key down
+key end
+expect text:"pos: 7:58" exists
+key shift+alt+f
+expect text:"ev: format changed" exists
+expect text:"step: Formatieren" exists
+expect text:"lines: 28" exists
+expect text:"pos: 7:56" exists
+shot build/editortest/code_format.png
+key shift+alt+f
+expect text:"ev: format same" exists
+key ctrl+z
+expect text:"lines: 26" exists
+expect text:"step: -" exists
+# ---- completion while typing a word: it filters, Enter inserts (one undo step)
+key ctrl+end
+type "gr"
+expect listitem:"greet – fn greet(name)" exists
+expect "greet – fn greet(name)" selected
+expect text:"pop: 1:greet" exists
+expect text:"step: Schreiben" exists
+type "x"
+expect text:"pop: 0" exists
+key backspace
+expect text:"pop: 0" exists
+key ctrl+space
+expect text:"pop: 1:greet" exists
+key enter
+expect text:"pos: 26:6" exists
+expect text:"pop: 0" exists
+expect text:"step: Vervollständigen" exists
+key ctrl+z
+expect text:"pos: 26:3" exists
+expect text:"step: Löschen" exists
+# after a dot: the methods of a list (names is one); Tab inserts
+key end
+key backspace
+key backspace
+type "names."
+expect listitem:"push – l.push(x, ..)" exists
+expect text:"pop: 14:contains" exists
+type "po"
+expect text:"pop: 1:pop" exists
+key tab
+expect text:"pos: 26:10" exists
+expect text:"pop: 0" exists
+expect text:"step: Vervollständigen" exists
+# ---- the keys of the list: Ctrl+Space on an empty word, Down / Up / PgDn / PgUp, Esc
+key enter
+key ctrl+space
+expect text:"pop: 28:greet" exists
+key down
+expect text:"pop: 28:handle" exists
+key pgdn
+expect text:"pop: 28:map" exists
+key pgup
+expect text:"pop: 28:handle" exists
+key up
+key up
+expect text:"pop: 28:greet" exists
+shot build/editortest/code_complete_light.png
+theme dark
+shot build/editortest/code_complete_dark.png
+click "Hoher Kontrast"
+focus #3000
+key ctrl+space
+shot build/editortest/code_complete_hc.png
+click "Hoher Kontrast"
+theme light
+scale 150
+focus #3000
+key ctrl+space
+shot build/editortest/code_complete_150.png
+scale 100
+focus #3000
+key ctrl+space
+key esc
+expect text:"pop: 0" exists
+# typing a word without items keeps the list closed until the word ends
+type "zz"
+expect text:"pop: 0" exists
+type " pr"
+expect text:"pop: 1:print" exists
+key esc
+# a click on an item inserts it
+key backspace
+key backspace
+type "h"
+expect text:"pop: 2:handle" exists
+click "hits – let hits"
+expect text:"pop: 0" exists
+expect text:"step: Vervollständigen" exists
+key backspace
+key backspace
+key backspace
+key backspace
+# ---- signature help: ( and , open it, it follows the parameter, ) closes it
+type "handle("
+expect text:"handle(req) – req" exists
+type "1"
+expect text:"handle(req) – req" exists
+type ")"
+expect text:"handle(req) – req" missing
+type " + math.pow(2, "
+expect text:"math.pow(x, y) – y – x hoch y." exists
+shot build/editortest/code_signature.png
+key esc
+expect text:"math.pow(x, y) – y – x hoch y." missing
+key ctrl+shift+space
+expect text:"math.pow(x, y) – y – x hoch y." exists
+expect_nowarn

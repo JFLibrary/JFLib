@@ -14,12 +14,24 @@
 //        + 3 .. 13 the find bar).
 //        CE_READONLY: select, copy and find only; CE_NO_GUTTER: no line numbers;
 //        CE_NO_FRAME: no box; CE_NO_FIND: no find bar; CE_NO_LINE: no current-line highlight;
-//        CE_MARKS: the gutter keeps its column of diagnostic markers while there are none
+//        CE_MARKS: the gutter keeps its column of diagnostic markers while there are none;
+//        CE_BREAKPOINTS: a column for breakpoints at the gutter's left (also there while the
+//        document has breakpoints or an execution line); CE_FOLDS: the folding column stays
+//        while the document has no folding ranges
+//   ui.code_editor_with(id, &mut doc, &hl, Some(&mut assist), CE_*)   the same with a
+//        language's services (code_assist.rs: completion popup, hover tooltips, signature
+//        help); ids id + 14 (the completion list) and id + 15 are the editor's too
+//   ui.code_events(id) -> Vec<CodeEv>   what the user asked for in the editor's last pass:
+//        Definition(pos) (Ctrl+click, F12), Rename(pos) (F2), Format (Shift+Alt+F),
+//        Breakpoint(line) (a click in the breakpoints' column); the app answers (a jump,
+//        CodeDoc::apply_edits / replace_text as one undo step, set_breakpoints);
+//        ui.code_popup_item(id) the completion item the list has chosen (None: closed)
 //   ui.code_find(id, query, replace)   open the find bar (replace: with the replace row) with
 //        a query; the editor selects the first match from the caret on
 //   ui.code_status(id) -> CodeStatus   line and column of the caret (from 1), the matches
 //        and the current one, the lines tokenized in the last frame, the document's
-//        diagnostics per severity and the severity of the one at the caret
+//        diagnostics per severity and the severity of the one at the caret, the completion
+//        list's items and choice, whether signature help is open, the lines folded away
 //   ui.code_diag(id) -> Option<Diag>   the (most severe) diagnostic at the caret, its message
 //   ui.code_theme_set(Some(theme))     the colours of every code editor (None: code_theme())
 //   ui.code_font_size(pt)              the size of the code editors' font (default 10 pt)
@@ -50,6 +62,20 @@
 // Accessibility: a K_TEXTBOX record with the text (beyond 64 KB: the visible lines) and the
 // caret / anchor as byte offsets into it, ime_pos for IME and magnifiers, the edit state of
 // the text boxes while focused (ed_hold).
+//
+// Language services (code_editor_with; code_assist.rs has the popups): Ctrl+Space opens the
+// completion list (typing a word or a trigger character opens it too), Ctrl+Shift+Space
+// signature help, the pointer resting on a word shows the assist's hover text (after the
+// diagnostics there), F12 / Ctrl+click, F2 and Shift+Alt+F are CodeEv.  The gutter from the
+// left: breakpoints (CE_BREAKPOINTS: a filled circle, a ring when disabled, a bar across it
+// with a condition; the execution line an arrow there and a marked background), diagnostic
+// markers, line numbers, folding (a chevron on the first line of each of the document's
+// folding ranges: a click folds / unfolds; Ctrl+Shift+[ / ] at the caret's line).  Folded
+// lines are left out of the view (rows count only the visible lines), the caret skips them
+// (Up / Down / Left / Right / PgUp / PgDn), find steps over their matches, a "⋯" box after a
+// folded line unfolds it on a click, and an edit inside them or the caret landing there (an
+// app's set_selection, undo) unfolds them.  Without folds a row is a line, so 100 000 lines
+// stay as fast as before.
 
 use alloc::collections::BTreeMap;
 use alloc::format;
@@ -62,6 +88,7 @@ use text::segment;
 use text::FS_SYN_ITALIC;
 
 use crate::cmd::{Draw, DrawRef, Gfx};
+use crate::code_assist::*;
 use crate::code_doc::*;
 use crate::code_long::{Longs, COL_LONG};
 use crate::consts::*;
@@ -83,6 +110,10 @@ pub const CE_NO_FIND: u32 = 8;
 pub const CE_NO_LINE: u32 = 16;
 /// the gutter keeps its column of diagnostic markers while the document has none
 pub const CE_MARKS: u32 = 32;
+/// the gutter's column of breakpoints (a click there: CodeEv::Breakpoint)
+pub const CE_BREAKPOINTS: u32 = 64;
+/// the gutter keeps its folding column while the document has no folding ranges
+pub const CE_FOLDS: u32 = 128;
 
 const NAT_W: i32 = 560;
 const NAT_H: i32 = 320;
@@ -109,6 +140,13 @@ pub struct CodeStatus {
     /// the severity (DIAG_*) of the most severe diagnostic at the caret (ui.code_diag: the
     /// diagnostic with its message)
     pub diag: Option<u8>,
+    /// the items the completion list shows (0: closed) and the chosen one (from 0)
+    pub popup: usize,
+    pub popup_sel: usize,
+    /// signature help is open
+    pub sig: bool,
+    /// the lines folded away
+    pub hidden: usize,
 }
 
 // the highlighting states: states[i] = the state line i starts in
@@ -176,6 +214,13 @@ struct View {
     caret_diag: Option<Diag>,
     // columns and tokens of long lines
     long: Longs,
+    // the language services' popups and hover text, the requests of the last pass
+    pop: Pop,
+    sig: Sig,
+    hov: Hov,
+    events: Vec<CodeEv>,
+    // the caret into view in this pass (a popup opened by a key)
+    show_caret: bool,
 }
 
 /// shared state (Ui::m.code)
@@ -263,11 +308,12 @@ impl EdView for CView<'_> {
         let col = ((x.max(0) + self.cw / 2) / self.cw.max(1)) as usize;
         self.long.byte(self.doc, line, col, self.tw)
     }
+    // (rows: the lines that are not folded away)
     fn row_y(&self, line: usize, _: usize) -> (i32, i32) {
-        (line as i32 * self.lh, self.lh)
+        (self.doc.row_of_line(line) as i32 * self.lh, self.lh)
     }
     fn row_at(&self, y: i32) -> (usize, usize) {
-        (((y.max(0) / self.lh.max(1)) as usize).min(self.doc.line_count() - 1), 0)
+        (self.doc.line_of_row((y.max(0) / self.lh.max(1)) as usize), 0)
     }
 }
 
@@ -315,6 +361,19 @@ impl Ui {
     /// message for a status bar)
     pub fn code_diag(&self, id: u32) -> Option<Diag> {
         self.m.code.views.get(&id).and_then(|v| v.caret_diag.clone())
+    }
+
+    /// what the user asked of code editor id in its last pass (go to definition, rename,
+    /// format, a breakpoint's click)
+    pub fn code_events(&self, id: u32) -> Vec<CodeEv> {
+        self.m.code.views.get(&id).map_or(Vec::new(), |v| v.events.clone())
+    }
+
+    /// the item the completion list of code editor id has chosen (None: closed)
+    pub fn code_popup_item(&self, id: u32) -> Option<CompItem> {
+        let v = self.m.code.views.get(&id)?;
+        let p = &v.pop;
+        p.shown.get(p.sel).and_then(|&i| p.items.get(i)).filter(|_| p.open).cloned()
     }
 
     // the monospace font: the cell a whole number of pixels wide (as the consoles)
@@ -551,6 +610,12 @@ impl Ui {
 
     /// ui_code_editor(id, doc, hl, CE_*) -> EV_* (see the module header)
     pub fn code_editor(&mut self, id: u32, doc: &mut CodeDoc, h: &Highlighter, flags: u32) -> u32 {
+        self.code_editor_with(id, doc, h, None, flags)
+    }
+
+    /// code_editor with a language's services (completion, hover, signature help; see the
+    /// module header and code_assist.rs)
+    pub fn code_editor_with(&mut self, id: u32, doc: &mut CodeDoc, h: &Highlighter, mut assist: Option<&mut dyn CodeAssist>, flags: u32) -> u32 {
         let ro = flags & CE_READONLY != 0;
         let stflags = self.take_flags();
         let r = self.place(self.dp(NAT_W), self.dp(NAT_H));
@@ -562,6 +627,7 @@ impl Ui {
         let mut v = self.m.code.views.remove(&id).unwrap_or_default();
         v.seen = self.frame;
         v.hl.count = 0;
+        v.events.clear();
         let view0 = (v.sx, v.sy);
         let rev0 = doc.revision();
         let sel0 = doc.selection();
@@ -583,10 +649,14 @@ impl Ui {
         let sbw = st.scrollbar_thickness(self);
         let n = doc.line_count();
         let digits = format!("{}", n).len().max(2) as i32;
-        // the gutter: the markers' column (while there are diagnostics), the line numbers
+        // the gutter: breakpoints, the markers' column (while there are diagnostics), the line
+        // numbers, folding
+        let bpw = if flags & CE_BREAKPOINTS != 0 || !doc.breakpoints().is_empty() || doc.exec_line().is_some() { m.lh } else { 0 };
         let mk = if flags & CE_MARKS != 0 || doc.diagnostic_count() > 0 { m.lh } else { 0 };
         let nums = flags & CE_NO_GUTTER == 0;
-        let gw = mk + if nums { digits * m.cw + self.dp(18) } else { 0 };
+        let numw = if nums { digits * m.cw + self.dp(18) } else { 0 };
+        let fw = if flags & CE_FOLDS != 0 || doc.fold_count() > 0 { (m.lh * 3 / 4).max(self.dp(12)) } else { 0 };
+        let gw = bpw + mk + numw + fw;
         let bar_h = if v.find.open { self.dp(if v.find.replace { 76 } else { 40 }) } else { 0 };
         let inner = [r[0] + hair, r[1] + hair, (r[2] - hair * 2).max(1), (r[3] - hair * 2).max(1)];
         let ty = inner[1] + bar_h;
@@ -599,15 +669,15 @@ impl Ui {
         let hbar = content_w > tw_px0;
         let th = (inner[1] + inner[3] - ty - if hbar { sbw } else { 0 }).max(m.lh);
         let tw_px = tw_px0;
-        let total_h = n as i32 * m.lh;
+        let total_h = doc.visible_lines() as i32 * m.lh;
         let page = th;
         // ---- behave
         let mut hb = HB_FOCUS | HB_TEXT | CUR_IBEAM << HB_CURSOR_SHIFT;
         if stflags & ST_DISABLED != 0 {
             hb |= HB_DISABLED;
         }
-        if doc.diagnostic_count() > 0 {
-            hb |= HB_MOVES; // (the tooltip follows the pointer from one diagnostic to the next)
+        if doc.diagnostic_count() > 0 || assist.is_some() {
+            hb |= HB_MOVES; // (the tooltip follows the pointer from one diagnostic or word to the next)
         }
         self.wp.ctx.last_rect = [inner[0], ty, inner[2], inner[1] + inner[3] - ty];
         let ev = self.behave(id, hb);
@@ -635,6 +705,10 @@ impl Ui {
             self.ed_drop(id);
             out |= EV_COMMIT;
         }
+        if !focused {
+            v.pop.close();
+            v.sig.open = false;
+        }
         // ---- pointer
         let (mx, my) = (self.rtl_map(self.wp.ctx.mx, inner[0], inner[2]), self.wp.ctx.my);
         let (cx, cy) = (mx - tx + v.sx, my - ty + v.sy);
@@ -644,9 +718,29 @@ impl Ui {
         if press && !disabled {
             let view = CView { doc: &*doc, cw: m.cw, lh: m.lh, tw, long: &v.long };
             let p = clamp_pos(&view, TextPos::new(view.row_at(cy).0, view.hit_x(view.row_at(cy).0, 0, cx)));
+            let row_line = view.row_at(cy).0;
             v.prefx = -1;
             v.t0 = self.now_ms;
-            if in_gutter {
+            v.pop.close();
+            v.sig.open = false;
+            // the folded marker after a line's end: unfold
+            let fold_box = doc.fold_at(row_line).is_some_and(|f| f.1) && {
+                let end = v.long.col(doc, row_line, doc.line(row_line).len(), tw) as i32 * m.cw;
+                cx >= end + m.cw / 2 && cx < end + m.cw * 4
+            };
+            if in_gutter && bpw > 0 && mx < inner[0] + bpw {
+                // the breakpoints' column: the app toggles
+                v.events.push(CodeEv::Breakpoint(row_line));
+                v.drag = 0;
+            } else if in_gutter && fw > 0 && mx >= inner[0] + gw - fw && doc.fold_at(row_line).is_some() {
+                doc.toggle_fold(row_line);
+                v.drag = 0;
+                self.repass();
+            } else if fold_box && !in_gutter {
+                doc.set_folded(row_line, false);
+                v.drag = 0;
+                self.repass();
+            } else if in_gutter {
                 let l = view.row_at(cy).0;
                 let e = if l + 1 < n { TextPos::new(l + 1, 0) } else { TextPos::new(l, doc.line(l).len()) };
                 v.word = (TextPos::new(l, 0), e);
@@ -669,6 +763,11 @@ impl Ui {
             } else {
                 doc.set_selection(TextSel::at(p));
                 v.drag = 1;
+                if self.mods & MOD_CTRL != 0 {
+                    // Ctrl+click: the definition of the word there
+                    v.events.push(CodeEv::Definition(p));
+                    v.drag = 0;
+                }
             }
         } else if ev & EV_HELD != 0 && v.drag != 0 {
             if my < ty {
@@ -721,9 +820,10 @@ impl Ui {
                     break;
                 }
                 let k = self.rtl_text_key(k0);
-                if self.ce_key(id, doc, &mut v, h, k, flags, &m) {
+                if Ui::ce_assist_key(doc, &mut v, assist.as_deref_mut(), k, ro, page / m.lh.max(1)) || self.ce_key(id, doc, &mut v, h, k, flags, &m) {
                     self.ed_key_take();
                     v.t0 = self.now_ms;
+                    self.repass();
                     continue;
                 }
                 let act = {
@@ -734,7 +834,18 @@ impl Ui {
                 self.ed_key_take();
                 v.t0 = self.now_ms;
                 match act {
-                    EdAct::Sel(s) => doc.set_selection(s),
+                    EdAct::Sel(s) => {
+                        // (the caret steps over folded lines)
+                        let c0 = doc.selection().caret;
+                        let s = if doc.hidden().is_empty() || !matches!(k & 0xFFFF, VK_UP | VK_DOWN | VK_LEFT | VK_RIGHT | VK_PRIOR | VK_NEXT) {
+                            s
+                        } else {
+                            let view = CView { doc: &*doc, cw: m.cw, lh: m.lh, tw, long: &v.long };
+                            let c = skip_hidden(&view, c0, s.caret, k & 0xFFFF, v.prefx);
+                            if s.anchor == s.caret { TextSel::at(c) } else { TextSel::new(s.anchor, c) }
+                        };
+                        doc.set_selection(s);
+                    }
                     EdAct::Del(a, b, _) if !ro => {
                         let back = k & 0xFFFF == VK_BACK;
                         let empty = doc.selection().is_empty();
@@ -770,8 +881,43 @@ impl Ui {
                     doc.type_text(&s, h.grammar().closers);
                     v.t0 = self.now_ms;
                     v.prefx = -1;
+                    if let Some(a) = assist.as_deref_mut() {
+                        Ui::ce_assist_typed(doc, &mut v, a, &s);
+                    }
                 }
             }
+        }
+        // the popups follow the caret and the text; a quiet word stays quiet while the caret
+        // is in it
+        if v.pop.open {
+            v.pop.filter(doc);
+        }
+        if let Some((l, a)) = v.pop.quiet {
+            let c = doc.clamp(doc.selection().caret);
+            if c.line != l || c.byte <= a || word_around(doc.line(l), c.byte).0 != a {
+                v.pop.quiet = None;
+            }
+        }
+        if let Some(a) = assist.as_deref_mut().filter(|_| v.sig.open) {
+            let key = (doc.revision(), doc.selection().caret);
+            if v.sig.key != key {
+                v.sig.key = key;
+                v.sig.help = a.signature(doc, key.1);
+                v.sig.open = v.sig.help.is_some();
+            }
+        }
+        // the caret never stays in folded lines: put there (an app's set_selection, undo, a
+        // jump), they unfold; folded around it (a click, the app), it goes to the fold's first
+        // line
+        let c = doc.clamp(doc.selection().caret);
+        if doc.is_hidden(c.line) {
+            if doc.selection() != v.last_sel || doc.revision() != v.last_rev {
+                doc.reveal(c.line);
+            } else {
+                let l = doc.visible_line(c.line, false);
+                doc.set_selection(TextSel::at(TextPos::new(l, doc.line(l).len())));
+            }
+            self.repass();
         }
         let changed = doc.revision() != rev0;
         if changed {
@@ -782,7 +928,7 @@ impl Ui {
             self.repass();
         }
         let n = doc.line_count();
-        let total_h = n as i32 * m.lh;
+        let total_h = doc.visible_lines() as i32 * m.lh;
         // ---- the find bar's matches
         if v.find.open {
             Ui::ce_find_update(&mut v.find, doc);
@@ -804,8 +950,8 @@ impl Ui {
         }
         let caret = doc.clamp(doc.selection().caret);
         let ccol = v.long.col(doc, caret.line, caret.byte, tw) as i32;
-        if (focused || v.find.open) && (doc.selection() != v.last_sel || doc.revision() != v.last_rev) {
-            let cy = caret.line as i32 * m.lh;
+        if (focused || v.find.open) && (doc.selection() != v.last_sel || doc.revision() != v.last_rev || core::mem::take(&mut v.show_caret)) {
+            let cy = doc.row_of_line(caret.line) as i32 * m.lh;
             if cy < v.sy {
                 v.sy = cy;
             }
@@ -824,9 +970,30 @@ impl Ui {
         v.last_rev = doc.revision();
         v.sy = v.sy.clamp(0, (total_h - th).max(0));
         v.sx = v.sx.clamp(0, (content_w - tw_px).max(0));
-        // ---- highlighting states up to the last visible line
-        let first = (v.sy / m.lh) as usize;
-        let last = (((v.sy + th) / m.lh) as usize + 1).min(n);
+        // ---- the rows in view (lines that are not folded away) and the lines they span;
+        // highlighting states up to the last of them
+        let first_row = (v.sy / m.lh) as usize;
+        let rows_n = doc.visible_lines();
+        let last_row = (((v.sy + th) / m.lh) as usize + 1).min(rows_n).max(first_row.min(rows_n));
+        let mut rows: Vec<usize> = Vec::with_capacity(last_row.saturating_sub(first_row));
+        if doc.hidden().is_empty() {
+            rows.extend(first_row..last_row);
+        } else if last_row > first_row {
+            let mut l = doc.line_of_row(first_row);
+            for _ in first_row..last_row {
+                rows.push(l);
+                l = doc.visible_line(l + 1, true);
+                if l <= *rows.last().unwrap_or(&0) {
+                    break;
+                }
+            }
+        }
+        let first = rows.first().copied().unwrap_or(0).min(n);
+        let last = rows.last().map_or(first, |&l| l + 1).min(n);
+        // the top of a row's line (a row of `rows`: k)
+        let sy0 = v.sy;
+        let lh0 = m.lh;
+        let row_y = move |k: usize| ty + (first_row + k) as i32 * lh0 - sy0;
         let mut toks = Vec::new();
         Ui::ce_hl_sync(&mut v.hl, doc, h);
         Ui::ce_hl_upto(&mut v.hl, doc, h, last, &mut toks, &v.long, first);
@@ -863,7 +1030,7 @@ impl Ui {
         let cols = (tw_px / m.cw.max(1)) as usize + 2;
         let tx0 = tx - v.sx;
         // the bytes of the visible lines in view (long lines: a few columns more on both sides;
-        // the rest of a line is not looked at)
+        // the rest of a line is not looked at), by line from `first` (hidden ones: none)
         let vis: Vec<(usize, usize)> = (first..last)
             .map(|l| {
                 let len = doc.line(l).len();
@@ -874,14 +1041,32 @@ impl Ui {
                 }
             })
             .collect();
-        // the line numbers
-        if nums {
-            for l in first..last {
-                let y = ty + l as i32 * m.lh - v.sy;
+        // the line of the execution: its background across the text
+        let exec = doc.exec_line();
+        // the line numbers, breakpoints, folding chevrons
+        let numx = inner[0] + bpw + mk + numw - self.dp(10);
+        for (k, &l) in rows.iter().enumerate() {
+            let y = row_y(k);
+            if nums {
                 let num = format!("{}", l + 1);
                 let nw = num.len() as i32 * m.cw;
                 let c = if l == caret.line { theme.gutter_cur } else { theme.gutter_fg };
-                self.ce_cells(&m, inner[0] + gw - self.dp(10) - nw, y + m.base, num.as_bytes(), c, false, false);
+                self.ce_cells(&m, numx - nw, y + m.base, num.as_bytes(), c, false, false);
+            }
+            if bpw > 0 {
+                if let Some(b) = doc.breakpoint(l) {
+                    self.ce_breakpoint(b, inner[0], y, bpw, m.lh, &theme);
+                }
+                if exec == Some(l) {
+                    self.ce_exec_mark(inner[0], y, bpw, m.lh, &theme);
+                }
+            }
+            if fw > 0 {
+                if let Some((_, folded)) = doc.fold_at(l) {
+                    let px = (fw * 3 / 4).max(8);
+                    self.draw_color(if l == caret.line { theme.gutter_cur } else { theme.gutter_fg });
+                    self.draw_icon(if folded { IC_CHEV_RIGHT_SMALL } else { IC_CHEV_DOWN_SMALL }, inner[0] + gw - fw + (fw - px) / 2, y + (m.lh - px) / 2, px << 8);
+                }
             }
         }
         // the diagnostics of the visible lines: per line the most severe one starting there
@@ -898,29 +1083,33 @@ impl Ui {
                 }
             }
             for (l, sev) in best {
-                let y = ty + l as i32 * m.lh - v.sy;
-                self.ce_marker(sev, inner[0], y, mk, m.lh, theme.diag[sev as usize]);
+                if doc.is_hidden(l) {
+                    continue;
+                }
+                let y = ty + doc.row_of_line(l) as i32 * m.lh - v.sy;
+                self.ce_marker(sev, inner[0] + bpw, y, mk, m.lh, theme.diag[sev as usize]);
             }
         }
         let mut waves: Vec<(u8, i32, i32, i32)> = Vec::new();
         for &i in &dvis {
             let d = &doc.marks()[i];
-            for l in d.a.line.max(first)..=d.b.line.min(last - 1) {
+            for l in d.a.line.max(first)..=d.b.line.min(last.max(1) - 1) {
                 let (b0, b1) = vis[l - first];
                 let (a, b) = (if d.a.line == l { d.a.byte } else { 0 }, if d.b.line == l { d.b.byte } else { usize::MAX });
-                if !touches(d, l) || b < b0 || a > b1 {
+                if !touches(d, l) || b < b0 || a > b1 || doc.is_hidden(l) {
                     continue;
                 }
                 let (c0, c1) = mark_cols(d, l, doc.line(l).len(), |b| v.long.col(doc, l, b, tw));
-                waves.push((d.sev, tx0 + c0 as i32 * m.cw, tx0 + c1 as i32 * m.cw, ty + l as i32 * m.lh - v.sy));
+                waves.push((d.sev, tx0 + c0 as i32 * m.cw, tx0 + c1 as i32 * m.cw, ty + doc.row_of_line(l) as i32 * m.lh - v.sy));
             }
         }
         // the diagnostics under the pointer (an underline, a marker)
         let mut hov: Vec<usize> = Vec::new();
+        let pointer_line = doc.line_of_row(((my - ty + v.sy).max(0) / m.lh.max(1)) as usize);
         if ev & EV_HOVER != 0 && v.drag == 0 && !dvis.is_empty() && my >= ty && my < ty + th {
-            let l = ((my - ty + v.sy) / m.lh.max(1)) as usize;
+            let l = pointer_line;
             let col = ((mx - tx0).max(0) / m.cw.max(1)) as usize;
-            let on_mark = mk > 0 && mx >= inner[0] && mx < inner[0] + mk;
+            let on_mark = mk > 0 && mx >= inner[0] + bpw && mx < inner[0] + bpw + mk;
             let on_text = mx >= tx && mx < tx + tw_px;
             hov = dvis
                 .iter()
@@ -941,11 +1130,19 @@ impl Ui {
         }
         let area = [tx - self.dp(6), ty, inner[0] + inner[2] - tx + self.dp(6), th];
         self.clip_push(area[0], area[1], area[2], area[3]);
-        for l in first..last {
-            let y = ty + l as i32 * m.lh - v.sy;
+        for (ri, &l) in rows.iter().enumerate() {
+            let y = row_y(ri);
             let t = doc.line(l);
-            // the current line, the selection, the find matches, the bracket pair
-            if l == caret.line && flags & CE_NO_LINE == 0 && (focused || v.find.open) && sa == sb {
+            // the execution line, the current line, the selection, the find matches, the
+            // bracket pair
+            if exec == Some(l) {
+                self.draw_color(theme.exec_line);
+                self.draw_rect(area[0], y, area[2], m.lh);
+                if theme.exec_line == theme.bg {
+                    self.draw_color(theme.exec_mark);
+                    self.draw_frame(area[0], y, area[2], m.lh, 0, hair);
+                }
+            } else if l == caret.line && flags & CE_NO_LINE == 0 && (focused || v.find.open) && sa == sb {
                 self.draw_color(theme.line_hl);
                 self.draw_rect(area[0], y, area[2], m.lh);
             }
@@ -1053,6 +1250,16 @@ impl Ui {
                     i = e;
                 }
             }
+            // a folded line: a box with "..." after its end (a click unfolds)
+            if doc.fold_at(l).is_some_and(|f| f.1) {
+                let end = v.long.col(doc, l, t.len(), tw) as i32 * m.cw;
+                let (bx, bw) = (tx0 + end + m.cw / 2, m.cw * 3);
+                self.draw_color(theme.line_hl);
+                self.draw_rrect(bx, y + hair, bw, m.lh - hair * 2, self.dp(3));
+                self.draw_color(theme.gutter_fg);
+                self.draw_frame(bx, y + hair, bw, m.lh - hair * 2, self.dp(3), hair);
+                self.ce_cells(&m, bx, y + m.base, b"...", theme.gutter_fg, false, false);
+            }
         }
         // the underlines: infos first, errors on top; only their visible part (whole waves)
         waves.sort_by_key(|w| core::cmp::Reverse(w.0));
@@ -1068,7 +1275,7 @@ impl Ui {
         self.clip_pop();
         // the caret
         let cx_px = tx0 + ccol * m.cw;
-        let cy_px = ty + caret.line as i32 * m.lh - v.sy;
+        let cy_px = ty + doc.row_of_line(caret.line) as i32 * m.lh - v.sy;
         if focused {
             let pe = self.ed_preedit();
             if !pe.text.is_empty() {
@@ -1137,15 +1344,46 @@ impl Ui {
             s.min = kind as i32;
         }
         v.label.4 = label;
+        // the word under the pointer: the assist's hover text (asked once per word and revision)
+        let mut hover_text: Option<String> = None;
+        let mut word_key = 0u64;
+        if let Some(a) = assist.as_deref_mut() {
+            if ev & EV_HOVER != 0 && v.drag == 0 && mx >= tx && mx < tx + tw_px && my >= ty && my < ty + th {
+                let l = pointer_line;
+                let col = ((mx - tx0).max(0) / m.cw.max(1)) as usize;
+                let b = v.long.floor(doc, l, col, tw).0;
+                let t = doc.line(l);
+                if t[b.min(t.len())..].chars().next().is_some_and(is_word) {
+                    let (wa, _) = word_around(t, b);
+                    let key = (doc.uid(), doc.revision(), l, wa);
+                    if v.hov.key != key {
+                        v.hov.key = key;
+                        v.hov.text = a.hover(doc, TextPos::new(l, b));
+                    }
+                    hover_text = v.hov.text.clone();
+                    word_key = ((l as u64 + 1) << 24) ^ (wa as u64 + 1);
+                }
+            }
+        }
         // the messages under the pointer: the tooltip of the record above (part: the first
-        // diagnostic, in the gutter or the text; only while the pointer is here, so the part
-        // tooltips of other widgets keep theirs)
-        if ev & EV_HOVER != 0 && !dvis.is_empty() {
-            if hov.is_empty() {
+        // diagnostic, in the gutter or the text, and the word; only while the pointer is here,
+        // so the part tooltips of other widgets keep theirs); the hover text below them
+        if ev & EV_HOVER != 0 && (!dvis.is_empty() || assist.is_some()) {
+            let mut text = if hov.is_empty() { String::new() } else { diag_text(doc, &hov) };
+            if let Some(s) = hover_text.as_deref().filter(|s| !s.is_empty()) {
+                if !text.is_empty() {
+                    text.push_str("\n\n");
+                }
+                text.push_str(&wrap(s, 72));
+            }
+            if text.is_empty() {
                 self.tooltip_part("", 0);
             } else {
-                let part = 1 + hov[0] as u64 + if mx < tx { 1 << 40 } else { 0 };
-                self.tooltip_part(&diag_text(doc, &hov), part);
+                // (another text, another part: a tooltip blocked by a press shows the new one)
+                let dpart = if hov.is_empty() { 0 } else { 1 + hov[0] as u64 + if mx < tx { 1 << 40 } else { 0 } };
+                let th = text.bytes().fold(0xCBF2_9CE4_8422_2325u64, |h, b| (h ^ b as u64).wrapping_mul(0x100_0000_01B3));
+                let part = dpart.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ word_key.wrapping_mul(0xC2B2_AE3D_27D4_EB4F) ^ th;
+                self.tooltip_part(&text, part.max(1));
             }
         }
         // the diagnostics at the caret: the status, a record at the caret's line (after the
@@ -1154,7 +1392,7 @@ impl Ui {
         v.caret_diag = at.first().map(|&i| doc.diag_of(&doc.marks()[i]));
         if !at.is_empty() {
             let state = self.wp.ctx.last_state;
-            let cy = (ty + caret.line as i32 * m.lh - v.sy).clamp(ty, (ty + th - m.lh).max(ty));
+            let cy = (ty + doc.row_of_line(caret.line) as i32 * m.lh - v.sy).clamp(ty, (ty + th - m.lh).max(ty));
             self.wp.ctx.last_rect = [inner[0], cy, inner[2], m.lh];
             self.wp.ctx.last_state = 0;
             self.sem(K_TEXT, 0, Some(&diag_text(doc, &at)), doc.marks()[at[0]].sev as i32);
@@ -1179,7 +1417,28 @@ impl Ui {
             lines: n,
             diags: doc.diagnostic_counts(),
             diag: at.first().map(|&i| doc.marks()[i].sev),
+            popup: if v.pop.open { v.pop.shown.len() } else { 0 },
+            popup_sel: v.pop.sel,
+            sig: v.sig.open,
+            hidden: n - doc.visible_lines(),
         };
+        // ---- the popups of the language services at the caret's line
+        if focused {
+            let cy = ty + doc.row_of_line(caret.line) as i32 * m.lh - v.sy;
+            let in_view = cy + m.lh > ty && cy < ty + th;
+            let pf = PopFont { font: m.font, size: m.size, cw: m.cw, lh: m.lh, base: m.base };
+            if v.pop.open && in_view {
+                let scol = v.long.col(doc, v.pop.start.line, v.pop.start.byte, tw) as i32;
+                if self.ca_complete_popup(id.wrapping_add(14), &mut v.pop, doc, tx0 + scol * m.cw, cy + m.lh, cy, &pf, &theme) {
+                    out |= EV_ACT;
+                    v.max_cols = line_sizes(doc);
+                    self.repass();
+                }
+            }
+            if let Some(sh) = v.sig.help.as_ref().filter(|_| v.sig.open && in_view) {
+                self.ca_signature_popup(sh, cx_px - m.cw * 2, cy, cy + m.lh, &pf, &theme);
+            }
+        }
         self.m.code.views.insert(id, v);
         let now = self.frame;
         if self.m.code.views.len() > 8 {
@@ -1254,6 +1513,146 @@ impl Ui {
         let px = (lh * 2 / 3).max(8);
         self.draw_color(color);
         self.draw_icon(cp, x + (cell - px) / 2, y + (lh - px) / 2, px << 8);
+    }
+
+    // a breakpoint in the gutter cell (x, y, w: cell, h: lh): a filled circle, a ring when
+    // disabled, a bar across it with a condition (shapes: high contrast tells them apart)
+    fn ce_breakpoint(&mut self, kind: u8, x: i32, y: i32, cell: i32, lh: i32, t: &CodeTheme) {
+        let r = (lh * 3 / 10).max(3);
+        let (cx, cy) = ((x + cell / 2) << 8, (y + lh / 2) << 8);
+        self.draw_color(t.breakpoint);
+        match kind {
+            BP_DISABLED => self.draw_circle(cx, cy, (r << 8) - 128, (self.dp(2).max(1) << 8) - 64),
+            _ => self.draw_circle(cx, cy, r << 8, 0),
+        }
+        if kind == BP_COND {
+            self.draw_color(t.bg);
+            let bh = self.dp(2).max(2);
+            self.draw_rect(x + cell / 2 - r + r / 3, y + lh / 2 - bh / 2, (r - r / 3) * 2, bh);
+        }
+    }
+
+    // the execution arrow in the gutter cell
+    fn ce_exec_mark(&mut self, x: i32, y: i32, cell: i32, lh: i32, t: &CodeTheme) {
+        let px = (lh * 3 / 4).max(8);
+        self.draw_color(t.exec_mark);
+        self.draw_icon(IC_CARET_RIGHT, x + (cell - px) / 2, y + (lh - px) / 2, px << 8);
+    }
+
+    // a key of the language services -> consumed: the completion list's keys while it is open,
+    // Ctrl+Space, Ctrl+Shift+Space, Esc for signature help, F12, F2, Shift+Alt+F, Ctrl+Shift+[
+    // and ] (fold / unfold at the caret's line); page: rows of a page
+    fn ce_assist_key(doc: &mut CodeDoc, v: &mut View, assist: Option<&mut (dyn CodeAssist + '_)>, k: u32, ro: bool, page: i32) -> bool {
+        let vk = k & 0xFFFF;
+        let mods = k >> 16;
+        if mods & MOD_ALTGR != 0 || mods & (MOD_CTRL | MOD_ALT) == MOD_CTRL | MOD_ALT {
+            return false;
+        }
+        let ctrl = mods & MOD_CTRL != 0;
+        let shift = mods & MOD_SHIFT != 0;
+        let alt = mods & MOD_ALT != 0;
+        let caret = doc.selection().caret;
+        if v.pop.open && !ctrl && !alt {
+            let page = (POP_ROWS as isize - 1).min(page.max(1) as isize);
+            match vk {
+                VK_UP if !shift => v.pop.step(-1),
+                VK_DOWN if !shift => v.pop.step(1),
+                VK_PRIOR if !shift => v.pop.step(-page),
+                VK_NEXT if !shift => v.pop.step(page),
+                // (Enter after a word typed out in full: the line break, not the item)
+                VK_RETURN if !shift && v.pop.typed_whole() => {
+                    v.pop.close();
+                    return false;
+                }
+                VK_RETURN | VK_TAB if !shift && !ro => {
+                    v.pop.accept(doc);
+                    v.prefx = -1;
+                }
+                VK_ESCAPE if !shift => {
+                    v.pop.close();
+                    let (a, _) = word_around(doc.line(caret.line), caret.byte);
+                    v.pop.quiet = Some((caret.line, a));
+                }
+                _ => return false,
+            }
+            return true;
+        }
+        if v.sig.open && vk == VK_ESCAPE && mods == 0 {
+            v.sig.open = false;
+            return true;
+        }
+        match vk {
+            VK_SPACE if ctrl && !alt => {
+                let Some(a) = assist else { return false };
+                v.show_caret = true;
+                if shift {
+                    v.sig.key = (doc.revision(), caret);
+                    v.sig.help = a.signature(doc, caret);
+                    v.sig.open = v.sig.help.is_some();
+                } else if !ro {
+                    v.pop.request(doc, a, true);
+                }
+                true
+            }
+            VK_F12 if mods == 0 => {
+                v.events.push(CodeEv::Definition(caret));
+                true
+            }
+            VK_F2 if mods == 0 && !ro => {
+                v.events.push(CodeEv::Rename(caret));
+                true
+            }
+            // Shift+Alt+F
+            0x46 if shift && alt && !ctrl && !ro => {
+                v.events.push(CodeEv::Format);
+                true
+            }
+            VK_OEM_4 | VK_OEM_6 if ctrl && shift && !alt => {
+                let l = doc.clamp(caret).line;
+                if vk == VK_OEM_4 {
+                    // the innermost open range around the caret
+                    let r = doc.fold_ranges().into_iter().filter(|r| r.0 <= l && l <= r.1 && !r.2).max_by_key(|r| r.0);
+                    if let Some(r) = r {
+                        doc.set_folded(r.0, true);
+                        doc.set_selection(TextSel::at(TextPos::new(r.0, doc.line(r.0).len())));
+                    }
+                } else if !doc.set_folded(l, false) {
+                    let r = doc.fold_ranges().into_iter().filter(|r| r.0 <= l && l <= r.1 && r.2).max_by_key(|r| r.0);
+                    if let Some(r) = r {
+                        doc.set_folded(r.0, false);
+                    }
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    // after typing s: the completion list opens (a word started, a trigger character) or
+    // closes (another character), signature help opens at ( and ,
+    fn ce_assist_typed(doc: &mut CodeDoc, v: &mut View, a: &mut (dyn CodeAssist + '_), s: &str) {
+        let Some(c) = s.chars().next_back() else { return };
+        let caret = doc.selection().caret;
+        if v.pop.open {
+            if !is_word(c) {
+                v.pop.close();
+                if a.triggers().contains(c) {
+                    v.pop.request(doc, a, false);
+                }
+            }
+        } else if a.triggers().contains(c) {
+            v.pop.request(doc, a, false);
+        } else if is_word(c) {
+            let (w0, _) = word_around(doc.line(caret.line), caret.byte);
+            if v.pop.quiet != Some((caret.line, w0)) {
+                v.pop.request(doc, a, false);
+            }
+        }
+        if c == '(' || c == ',' || (c == ')' && v.sig.open) {
+            v.sig.key = (doc.revision(), caret);
+            v.sig.help = a.signature(doc, caret);
+            v.sig.open = v.sig.help.is_some();
+        }
     }
 
     // a key of the editor itself -> consumed
@@ -1389,13 +1788,25 @@ impl Ui {
             v.find.current = None;
             return;
         }
-        let i = if back {
+        let mut i = if back {
             let k = ms.partition_point(|x| x.0 < sel.start());
             if k == 0 { ms.len() - 1 } else { k - 1 }
         } else {
             let k = ms.partition_point(|x| x.0 < sel.end() || (x.0 == sel.start() && x.1 == sel.end() && !sel.is_empty()));
             if k >= ms.len() { 0 } else { k }
         };
+        // (matches in folded lines are left out)
+        let n = ms.len();
+        for _ in 0..n {
+            if !doc.is_hidden(ms[i].0.line) {
+                break;
+            }
+            i = if back { (i + n - 1) % n } else { (i + 1) % n };
+        }
+        if doc.is_hidden(ms[i].0.line) {
+            v.find.current = None;
+            return;
+        }
         v.find.current = Some(i);
         doc.set_selection(TextSel::new(ms[i].0, ms[i].1));
         v.find.from = ms[i].0;
@@ -1444,7 +1855,10 @@ impl Ui {
             let from = v.find.from;
             let ms = &v.find.matches;
             let k = ms.partition_point(|x| x.0 < from);
-            v.find.current = if ms.is_empty() { None } else { Some(if k >= ms.len() { 0 } else { k }) };
+            // (the first one that is not folded away, round the end)
+            let n = ms.len();
+            let k = (0..n).map(|j| (k + j) % n).find(|&j| !doc.is_hidden(ms[j].0.line));
+            v.find.current = k;
             if let Some(i) = v.find.current {
                 doc.set_selection(TextSel::new(ms[i].0, ms[i].1));
             }
@@ -1531,6 +1945,22 @@ impl Ui {
                 doc.replace_all(&q, &rep, opts);
             }
         }
+    }
+}
+
+// a caret move (key vk) from c0 that ended in folded lines at c: on to the next line that is
+// not hidden, in the move's direction (Left / Right: that line's end / start; else the
+// preferred x)
+fn skip_hidden(view: &CView, c0: TextPos, c: TextPos, vk: u32, prefx: i32) -> TextPos {
+    let doc = view.doc;
+    if !doc.is_hidden(c.line) {
+        return c;
+    }
+    let l = doc.visible_line(c.line, c > c0);
+    match vk {
+        VK_LEFT => TextPos::new(l, doc.line(l).len()),
+        VK_RIGHT => TextPos::new(l, 0),
+        _ => TextPos::new(l, view.hit_x(l, 0, prefx.max(0))),
     }
 }
 

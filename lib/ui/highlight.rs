@@ -12,7 +12,8 @@
 //   h.tokens(text) -> Vec<Vec<Token>>   every line of a text (tests)
 //   CodeTheme::light() / dark() / high_contrast(&HcColors), ui.code_theme()   the colours of
 //                                       the tokens and the editor (gutter, current line,
-//                                       selection, bracket match, find matches, diagnostics)
+//                                       selection, bracket match, find matches, diagnostics,
+//                                       breakpoints, a debugger's current line)
 //
 // A grammar is a list of rules tried in order at every position: line comments, blocks (from
 // open to close, nested or not, optionally only at a line start: Markdown fences), strings
@@ -1101,6 +1102,12 @@ pub struct CodeTheme {
     pub italic: u32,
     /// the wavy underlines and gutter markers of errors, warnings and infos (DIAG_* order)
     pub diag: [u32; 3],
+    /// breakpoints in the gutter
+    pub breakpoint: u32,
+    /// the background of a debugger's current line (the editor's background: a frame in
+    /// exec_mark instead) and its arrow in the gutter
+    pub exec_line: u32,
+    pub exec_mark: u32,
 }
 
 const fn argb(rgb: u32) -> u32 {
@@ -1148,6 +1155,9 @@ impl CodeTheme {
             bold: 1 << SY_HEADING | 1 << SY_STRONG,
             italic: 1 << SY_COMMENT | 1 << SY_EMPH,
             diag: [argb(0xCF222E), argb(0x9A6700), argb(0x0969DA)],
+            breakpoint: argb(0xD1242F),
+            exec_line: argb(0xFFF1BF),
+            exec_mark: argb(0x9A6700),
         }
     }
 
@@ -1191,6 +1201,9 @@ impl CodeTheme {
             bold: 1 << SY_HEADING | 1 << SY_STRONG,
             italic: 1 << SY_COMMENT | 1 << SY_EMPH,
             diag: [argb(0xF85149), argb(0xD29922), argb(0x58A6FF)],
+            breakpoint: argb(0xF85149),
+            exec_line: argb(0x3B3520),
+            exec_mark: argb(0xE3B341),
         }
     }
 
@@ -1218,6 +1231,9 @@ impl CodeTheme {
             bold: 1 << SY_KEYWORD | 1 << SY_HEADING | 1 << SY_STRONG | 1 << SY_FUNC,
             italic: 1 << SY_COMMENT | 1 << SY_EMPH,
             diag: [fg, link, hi],
+            breakpoint: link,
+            exec_line: bg,
+            exec_mark: hi,
         }
     }
 }
@@ -1253,6 +1269,9 @@ impl crate::Ui {
         t.sel = color_mix(bg, self.color(T_ACCENT) | 0xFF00_0000, if self.theme_dark { 110 } else { 80 });
         t.sel_inactive = color_mix(bg, fg, if self.theme_dark { 40 } else { 30 });
         t.diag = [over(bg, self.color(T_CRIT)), over(bg, self.color(T_WARN)), over(bg, self.color(T_INFO))];
+        t.breakpoint = t.diag[0];
+        t.exec_mark = t.diag[1];
+        t.exec_line = color_mix(bg, t.diag[1], if self.theme_dark { 48 } else { 40 });
         t
     }
 }

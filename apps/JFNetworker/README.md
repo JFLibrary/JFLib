@@ -48,7 +48,9 @@ Queues, Lastgeneratoren, eigene Skripte).
 - **Skript-Editor (U7):** der Reiter Skripte im Gerätefenster eines Hosts: Code-Editor mit
   Prüfung beim Tippen und den Fehlern des laufenden Programms an ihrer Zeile, Ausführen,
   Stoppen, Übernehmen als Rückgängig-Schritt (das Skript behält Disk und Zahlen), Ausgabe und
-  Fehler des Laufs, Vorlagen (siehe [Skript-Editor](#skript-editor)).
+  Fehler des Laufs, Vorlagen; seit SK6 mit Vervollständigung, Hover, Signaturhilfe, Sprung zur
+  Deklaration, Umbenennen, Formatieren, Falten und Gliederung (siehe
+  [Skript-Editor](#skript-editor)).
 - **Spanning Tree (R4):** STP (IEEE 802.1D) und RSTP (802.1w) auf den IOS-artigen Switches, je
   Switch eingeschaltet: Wahl der Root-Bridge, Rollen und Zustände, Proposal und Agreement,
   Edge-Ports, BPDU Guard, `show spanning-tree`, bernsteinfarbene LEDs an blockierten Ports
@@ -237,6 +239,8 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `script_editor.uis` | den Skript-Editor (siehe [Skript-Editor](#skript-editor)) auf `fixtures/scripts.jfnet`: der Reiter aus dem Kontextmenü, die Liste mit Zustand und Fehlern, der Laufzeitfehler in Zeile 13 als Marke und in der Fehlerliste (ein Klick setzt die Schreibmarke), die Ausgabe live, Tippen mit Prüfung nach einem Augenblick, F8 und Umschalt+F8, Strg+S lehnt einen Fehler ab und übernimmt, was sich übersetzen lässt (das Skript startet mit seiner Disk neu: „Start 2“), Rückgängig und Wiederholen („Start 3“, „Start 4“), Stoppen, Ausführen, Neu starten, Verwerfen, eine Vorlage (ihr Fehler: Port 7 ist belegt), Umbenennen, Löschen und Rückgängig, der Reiter Dienste |
 | `script_editor_en.uis` | den Skript-Editor auf Englisch: Kontextmenü, Reiter, Liste, Statuszeile, Meldungen, Ausgabe und Fehler, eine Vorlage auf PC1 mit englischen Kommentaren und Texten, die Tasten in der Übersicht (F1) |
 | `script_shots.uis` | die Bilder des Skript-Editors hell und dunkel mit 100 und 150 % (`build/jfnetworker/script_shots_*.png`) |
+| `script_ls.uis` | die Sprachdienste des Skript-Editors (SK6) auf `zaehler`: Hover über einem Namen des Simulators mit Beschreibung, die Vervollständigung von `metrics.ob` mit der Beschreibung unter der Liste, die Signaturhilfe und ihr Parameter, F12 und Strg+Klick zur Deklaration, Umbenennen über das Flyout (F2, ein Rückgängig-Schritt, die Ablehnung eines Schlüsselworts), Formatieren (Umschalt+Alt+F, ein Rückgängig-Schritt, die Ablehnung mit Syntaxfehler), die Gliederung (ein neues `fn`, ein Klick setzt die Schreibmarke, „Gliederung“ blendet sie aus) |
+| `script_ls_shots.uis` | die Bilder der Sprachdienste: die Vervollständigung von `net.`, die Signaturhilfe von `net.listen` hell und dunkel mit 100 und 150 %, das Flyout „Name umbenennen“ hell und dunkel (`build/jfnetworker/script_ls_*.png`) |
 | `model.uis`, Gruppe `scripted` | worauf der Skript-Editor baut: der Quelltext einer Definition als Zeilen oder Text und zurück, Namen, die Vorlagen (übersetzbar, Deutsch und Englisch), Übernehmen, Neu, Umbenennen und Löschen über die Rückgängig-Liste mit Disk und Zahlen des laufenden Skripts und ohne Neustart des Geräts, ein Skript, das der Simulator aus der Datei nicht nehmen konnte, `keep_steps`, die Marken auf bearbeitetem Text |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
@@ -370,7 +374,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Tests | [`tests/`](tests) | Skripte, Fixtures (`fixtures/*.jfnet`), Szenarien mit Golden-Berichten (`scen/*.scn`, `scen/*.report`) |
 | Skripte | [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs), [`cli/scripts.rs`](crates/jfn_sim/cli/scripts.rs), [`src/scripttest.rs`](src/scripttest.rs) | Skripte als Dienste in den Hosts: Host-API, Anweisungen als Rechenzeit, der Befehl `script`, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Labore | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/goal.rs`](crates/jfn_sim/goal.rs), [`src/workspace/task.rs`](src/workspace/task.rs), [`src/workspace/devwin/svcedit.rs`](src/workspace/devwin/svcedit.rs), [`assets/labs`](assets/labs), [`src/tasktest.rs`](src/tasktest.rs) | die Aufgabe eines Labors in der Projektdatei, das Urteil über eine Erwartung (Runner und Labor) und die Ziele über einen Lauf, das Panel „Aufgabe“ mit der Liste der Labore, die Einstellungen der Dienste als JSON, die vier Labore, ihr Selbsttest (siehe [Labore und Aufgaben](#labore-und-aufgaben)) |
-| Skript-Editor | [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | der Reiter Skripte des Gerätefensters, die Skripte eines Geräts im Projekt mit Rückgängig und Vorlagen, ihr Selbsttest (siehe [Skript-Editor](#skript-editor)) |
+| Skript-Editor | [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/workspace/devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | der Reiter Skripte des Gerätefensters mit seinen Sprachdiensten, die Skripte eines Geräts im Projekt mit Rückgängig und Vorlagen, ihr Selbsttest (siehe [Skript-Editor](#skript-editor)) |
 | Spanning Tree | [`crates/jfn_sim/stp.rs`](crates/jfn_sim/stp.rs), [`stp98.rs`](crates/jfn_sim/stp98.rs), [`rstp.rs`](crates/jfn_sim/rstp.rs), [`cli/stp.rs`](crates/jfn_sim/cli/stp.rs), [`lib/netpkt/stp.rs`](../../lib/netpkt/stp.rs), [`src/stptest.rs`](src/stptest.rs) | STP (802.1D-1998) und RSTP (802.1D-2004) auf den Switches, Einstellungen und Befehle, BPDUs, ihr Selbsttest (siehe [Spanning Tree](#spanning-tree)) |
 | Routing | [`crates/jfn_sim/rip.rs`](crates/jfn_sim/rip.rs), [`cli/rip.rs`](crates/jfn_sim/cli/rip.rs), [`src/riptest.rs`](src/riptest.rs), [`lib/netpkt/rip.rs`](../../lib/netpkt/rip.rs) | RIP als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit RIP](#routing-mit-rip)) |
 | NAT und Zugriffslisten | [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs), [`nat.rs`](crates/jfn_sim/nat.rs), [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs), [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs), [`lib/netpkt/nat.rs`](../../lib/netpkt/nat.rs), [`src/nattest.rs`](src/nattest.rs) | Zugriffslisten und Adressübersetzung der IOS-artigen Geräte, ihre Befehle, das Umschreiben der Pakete mit ihren Prüfsummen (Library), ihr Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
@@ -1570,6 +1574,23 @@ eines Hosts › „Skripte …“; [`devwin/scripts.rs`](src/workspace/devwin/sc
   den Wechsel zu einem anderen Skript und das Schließen des Fensters übersteht, bis er
   übernommen oder verworfen wird oder ein anderes Projekt kommt; ein unveränderter Entwurf
   folgt dem Projekt.
+- **Sprachdienste (SK6):** der Editor kennt die Sprache ([`devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs)
+  auf `script::ls` der Library). Beim Tippen eines Worts, nach einem Punkt und mit
+  Strg+Leertaste öffnet sich die Vervollständigung: die Namen im Gültigkeitsbereich, die Namen
+  des Simulators (`log`, `now`, `rand`, `config`, `timer`, `net`, `dns`, `http`, `disk`,
+  `metrics` mit ihren Funktionen) mit einer kurzen Beschreibung, die Standardbibliothek und die
+  Methoden von Texten, Listen, Maps und Bytes; Tab oder Eingabe setzt ein (ein
+  Rückgängig-Schritt). Der Zeiger auf einem Namen zeigt Art, Signatur und Doku-Kommentar (`///`
+  über einem `fn` oder `let`), in einem Aufruf zeigt die Signaturhilfe den Parameter an der
+  Schreibmarke. F12 oder Strg+Klick springen zur Deklaration in der Datei, F2 oder „Name
+  umbenennen“ benennt jede Stelle eines Namens auf einmal um (ein Flyout fragt nach dem neuen,
+  eine Ablehnung – Schlüsselwort, ungültiger oder schon vergebener Name, Syntaxfehler – steht
+  darin), Umschalt+Alt+F oder „Formatieren“ setzt das Skript neu (Einrückung, Leerzeichen, eine
+  Anweisung je Zeile; mit Syntaxfehlern abgelehnt) – beides ein Rückgängig-Schritt des
+  Entwurfs. Blöcke, mehrzeilige Kommentare und Listen lassen sich in der Leiste falten. Neben
+  dem Editor steht, wenn der Reiter breit genug ist, die Gliederung („Gliederung“ blendet sie
+  aus): die Funktionen (innere eingerückt) und die globalen Variablen, ein Klick setzt die
+  Schreibmarke auf den Namen. Die Spalte für Haltepunkte bleibt aus, bis es einen Debugger gibt.
 - **Übernehmen** (Strg+S im Editor): ein Quelltext, der sich übersetzen lässt, geht als ein
   Rückgängig-Schritt ins Projekt (die `source` der Dienstdefinition, als Liste von Zeilen oder
   als Text, wie sie war) und in das laufende Skript: es startet mit dem neuen Programm, Disk,

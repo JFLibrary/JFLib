@@ -20,6 +20,16 @@
 //     set_diagnostics(&[Diag]) / clear_diagnostics() / diagnostics() -> Vec<Diag> /
 //     diagnostic(i) / diagnostic_count() / diagnostic_counts() -> [errors, warnings, infos] /
 //     diagnostics_at(pos) (most severe first) / next_diagnostic(pos, back) (wrapping)
+//   breakpoints and a debugger's current line (the gutter column of CE_BREAKPOINTS; lines
+//     from 0): set_breakpoints(&[(line, BP_ON | BP_DISABLED | BP_COND)]) / breakpoints() /
+//     breakpoint(line) / set_exec_line(Some(line)) / exec_line()
+//   folding (ranges from a language's services; lines from 0): set_fold_ranges(&[(first,
+//     last)]) / fold_ranges() / fold_at(line) / set_folded(line, on) / toggle_fold(line) /
+//     fold_all(on) / fold_around(line) / is_hidden(line) / reveal(line) / visible_lines() /
+//     row_of_line(line) / line_of_row(row) / visible_line(line, down)
+//   several changes as one undo step: apply_edits(&[TextEdit], label) (a rename's edits),
+//     replace_text(text, label) (a formatter's result: only the lines that differ change, the
+//     caret keeps its place among the non-blank characters)
 //
 // An edit replaces a range of whole lines (LineEdit: old and new lines, the selection before
 // and after); each change is also kept in a short journal (changes_since) that the editor's
@@ -32,7 +42,9 @@
 // shifts; a diagnostic whose text was replaced shrinks to what is left of it and is dropped
 // when nothing is (one that marks a point stays at the change).  Typed text at a diagnostic's
 // edge stays outside it.  So squiggles stay under their words while the user types, until
-// the next check replaces them.
+// the next check replaces them.  Breakpoints, the execution line and folding ranges follow
+// the same way by their lines (a line counts as the point at its start); an edit inside the
+// hidden lines of a folded range unfolds it.  None of them is part of the undo history.
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -115,8 +127,37 @@ pub(crate) struct Mark {
     pub(crate) msg: String,
 }
 
+/// a breakpoint's look (CodeDoc::set_breakpoints): set
+pub const BP_ON: u8 = 0;
+/// a breakpoint that is there but off (a ring)
+pub const BP_DISABLED: u8 = 1;
+/// a breakpoint with a condition (a bar across it)
+pub const BP_COND: u8 = 2;
+
+/// a change of a CodeDoc's text: a .. b becomes text (CodeDoc::apply_edits)
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct TextEdit {
+    pub a: TextPos,
+    pub b: TextPos,
+    pub text: String,
+}
+
+impl TextEdit {
+    pub fn new(a: TextPos, b: TextPos, text: &str) -> TextEdit {
+        TextEdit { a, b, text: String::from(text) }
+    }
+}
+
+// a folding range: line `first` stays, first + 1 ..= last hide while folded
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct FoldRange {
+    first: usize,
+    last: usize,
+    folded: bool,
+}
+
 /// the content an edit changes: the lines, the selection, the change journal and the
-/// diagnostics that follow the changes
+/// diagnostics, breakpoints, execution line and folding ranges that follow the changes
 pub(crate) struct CodeBody {
     lines: Vec<String>,
     sel: TextSel,
@@ -126,11 +167,18 @@ pub(crate) struct CodeBody {
     marks: Vec<Mark>,
     span: usize,
     counts: [usize; 3],
+    // (line, BP_*) by line; the line of the current execution
+    bps: Vec<(usize, u8)>,
+    exec: Option<usize>,
+    // by first line; the hidden lines of the folded ones (merged, inclusive), how many
+    folds: Vec<FoldRange>,
+    hidden: Vec<(usize, usize)>,
+    hidden_n: usize,
 }
 
 impl CodeBody {
     fn splice(&mut self, first: usize, old: usize, new: &[String]) {
-        if !self.marks.is_empty() {
+        if !self.marks.is_empty() || !self.bps.is_empty() || self.exec.is_some() || !self.folds.is_empty() {
             self.follow(first, old, new);
         }
         self.lines.splice(first..first + old, new.iter().cloned());
@@ -189,6 +237,54 @@ impl CodeBody {
             .collect();
         self.marks.sort_by(|x, y| (x.a, x.b).cmp(&(y.a, y.b)));
         self.recount();
+        // breakpoints, the execution line and the folds by their lines (a line as the point at
+        // its start: Enter at a line's start takes it down with its text)
+        let line_of = |l: usize| -> Option<usize> {
+            match &f {
+                Some(f) => Some(f.pos(first, c, TextPos::new(l, 0), AT_POINT).line),
+                None if l >= first + c => Some((l as isize + d) as usize),
+                None if l >= first => None,
+                None => Some(l),
+            }
+        };
+        if !self.bps.is_empty() {
+            let mut v: Vec<(usize, u8)> = self.bps.iter().filter_map(|&(l, k)| line_of(l).map(|l| (l, k))).collect();
+            v.sort_by_key(|x| x.0);
+            v.dedup_by_key(|x| x.0);
+            self.bps = v;
+        }
+        self.exec = self.exec.and_then(line_of);
+        if !self.folds.is_empty() {
+            // an edit in the hidden lines of a fold opens it
+            let folds = core::mem::take(&mut self.folds);
+            self.folds = folds
+                .into_iter()
+                .filter_map(|r| {
+                    let inside = first + c > r.first + 1 && first <= r.last;
+                    let (a, z) = (line_of(r.first)?, line_of(r.last)?);
+                    (z > a).then_some(FoldRange { first: a, last: z, folded: r.folded && !inside })
+                })
+                .collect();
+            self.folds.sort_by_key(|r| r.first);
+            self.folds.dedup_by_key(|r| r.first);
+            self.rehide();
+        }
+    }
+
+    // the hidden lines after the folds changed
+    fn rehide(&mut self) {
+        self.hidden.clear();
+        for r in self.folds.iter().filter(|r| r.folded) {
+            let (a, z) = (r.first + 1, r.last.min(self.lines.len().saturating_sub(1)));
+            if z < a {
+                continue;
+            }
+            match self.hidden.last_mut() {
+                Some(h) if a <= h.1 + 1 => h.1 = h.1.max(z),
+                _ => self.hidden.push((a, z)),
+            }
+        }
+        self.hidden_n = self.hidden.iter().map(|h| h.1 - h.0 + 1).sum();
     }
 
     // the counts and the longest span after the diagnostics changed
@@ -430,7 +526,20 @@ impl CodeDoc {
         }
         static NEXT: core::sync::atomic::AtomicU32 = core::sync::atomic::AtomicU32::new(1);
         let uid = NEXT.fetch_add(1, core::sync::atomic::Ordering::Relaxed);
-        let body = CodeBody { lines, sel: TextSel::default(), rev: 0, journal: Vec::new(), marks: Vec::new(), span: 0, counts: [0; 3] };
+        let body = CodeBody {
+            lines,
+            sel: TextSel::default(),
+            rev: 0,
+            journal: Vec::new(),
+            marks: Vec::new(),
+            span: 0,
+            counts: [0; 3],
+            bps: Vec::new(),
+            exec: None,
+            folds: Vec::new(),
+            hidden: Vec::new(),
+            hidden_n: 0,
+        };
         CodeDoc { body, hist: History::new(1000), uid, tab_width: 4, use_tabs: false }
     }
 
@@ -1096,6 +1205,304 @@ impl CodeDoc {
         } else {
             m.get(m.partition_point(|x| x.a <= p)).map_or(m[0].a, |x| x.a)
         })
+    }
+
+    // ------------------------------------------------------------------ breakpoints, execution, folds
+
+    /// the breakpoints: (line from 0, BP_*), drawn in the gutter column of CE_BREAKPOINTS (the
+    /// app keeps the real ones: a click there is CodeEv::Breakpoint); they follow the edits
+    /// with their lines until the next call
+    pub fn set_breakpoints(&mut self, bps: &[(usize, u8)]) {
+        let n = self.body.lines.len();
+        let mut v: Vec<(usize, u8)> = bps.iter().copied().filter(|b| b.0 < n).collect();
+        v.sort_by_key(|b| b.0);
+        v.dedup_by_key(|b| b.0);
+        self.body.bps = v;
+    }
+
+    /// the breakpoints where they are now, by line
+    pub fn breakpoints(&self) -> &[(usize, u8)] {
+        &self.body.bps
+    }
+
+    /// the breakpoint of a line
+    pub fn breakpoint(&self, line: usize) -> Option<u8> {
+        self.body.bps.binary_search_by_key(&line, |b| b.0).ok().map(|i| self.body.bps[i].1)
+    }
+
+    /// the line a debugger stopped at (None: none), drawn marked with an arrow in the
+    /// breakpoints' column; it follows the edits
+    pub fn set_exec_line(&mut self, line: Option<usize>) {
+        self.body.exec = line.filter(|&l| l < self.body.lines.len());
+    }
+
+    /// the line of set_exec_line where it is now
+    pub fn exec_line(&self) -> Option<usize> {
+        self.body.exec
+    }
+
+    /// the folding ranges (first, last) with lines from 0 (a language's services give them):
+    /// line first stays, first + 1 ..= last fold away.  A range that starts on the line of a
+    /// folded one stays folded; ranges follow the edits, and an edit inside the hidden lines
+    /// of a folded range unfolds it
+    pub fn set_fold_ranges(&mut self, ranges: &[(usize, usize)]) {
+        let n = self.body.lines.len();
+        let old = core::mem::take(&mut self.body.folds);
+        let mut v: Vec<FoldRange> = ranges
+            .iter()
+            .filter(|r| r.0 < r.1 && r.0 < n)
+            .map(|&(a, z)| FoldRange { first: a, last: z.min(n - 1), folded: old.iter().any(|o| o.first == a && o.folded) })
+            .filter(|r| r.last > r.first)
+            .collect();
+        v.sort_by_key(|r| r.first);
+        v.dedup_by_key(|r| r.first);
+        self.body.folds = v;
+        self.body.rehide();
+    }
+
+    /// the number of folding ranges
+    pub fn fold_count(&self) -> usize {
+        self.body.folds.len()
+    }
+
+    /// the folding ranges where they are now: (first, last, folded)
+    pub fn fold_ranges(&self) -> Vec<(usize, usize, bool)> {
+        self.body.folds.iter().map(|r| (r.first, r.last, r.folded)).collect()
+    }
+
+    /// the range that starts at line: (last, folded)
+    pub fn fold_at(&self, line: usize) -> Option<(usize, bool)> {
+        let f = &self.body.folds;
+        f.binary_search_by_key(&line, |r| r.first).ok().map(|i| (f[i].last, f[i].folded))
+    }
+
+    /// fold (folded) or unfold the range that starts at line -> changed
+    pub fn set_folded(&mut self, line: usize, folded: bool) -> bool {
+        let Ok(i) = self.body.folds.binary_search_by_key(&line, |r| r.first) else { return false };
+        if self.body.folds[i].folded == folded {
+            return false;
+        }
+        self.body.folds[i].folded = folded;
+        self.body.rehide();
+        true
+    }
+
+    /// fold or unfold the range that starts at line -> changed
+    pub fn toggle_fold(&mut self, line: usize) -> bool {
+        match self.fold_at(line) {
+            Some((_, f)) => self.set_folded(line, !f),
+            None => false,
+        }
+    }
+
+    /// every range folded (true) or unfolded
+    pub fn fold_all(&mut self, folded: bool) {
+        for r in self.body.folds.iter_mut() {
+            r.folded = folded;
+        }
+        self.body.rehide();
+    }
+
+    /// the innermost range that holds line (its first line counts): (first, last)
+    pub fn fold_around(&self, line: usize) -> Option<(usize, usize)> {
+        self.body.folds.iter().filter(|r| r.first <= line && line <= r.last).max_by_key(|r| r.first).map(|r| (r.first, r.last))
+    }
+
+    /// line is hidden in a folded range
+    pub fn is_hidden(&self, line: usize) -> bool {
+        let h = &self.body.hidden;
+        let k = h.partition_point(|x| x.1 < line);
+        h.get(k).is_some_and(|x| x.0 <= line)
+    }
+
+    /// unfold every range that hides line -> changed
+    pub fn reveal(&mut self, line: usize) -> bool {
+        if !self.is_hidden(line) {
+            return false;
+        }
+        for r in self.body.folds.iter_mut() {
+            if r.folded && r.first < line && line <= r.last {
+                r.folded = false;
+            }
+        }
+        self.body.rehide();
+        true
+    }
+
+    /// the lines that are not hidden
+    pub fn visible_lines(&self) -> usize {
+        self.body.lines.len() - self.body.hidden_n
+    }
+
+    /// the visible row of a line (counting only lines that are not hidden; a hidden line:
+    /// the row of its fold's first line)
+    pub fn row_of_line(&self, line: usize) -> usize {
+        let mut r = line;
+        for &(a, z) in &self.body.hidden {
+            if z < line {
+                r -= z - a + 1;
+            } else {
+                if a <= line {
+                    r -= line - a + 1;
+                }
+                break;
+            }
+        }
+        r
+    }
+
+    /// the line of a visible row
+    pub fn line_of_row(&self, row: usize) -> usize {
+        let mut l = row;
+        for &(a, z) in &self.body.hidden {
+            if a <= l {
+                l += z - a + 1;
+            } else {
+                break;
+            }
+        }
+        l.min(self.body.lines.len() - 1)
+    }
+
+    /// the nearest line that is not hidden from line on, downwards (down) or upwards
+    pub fn visible_line(&self, line: usize, down: bool) -> usize {
+        let h = &self.body.hidden;
+        let k = h.partition_point(|x| x.1 < line);
+        match h.get(k) {
+            Some(&(a, z)) if a <= line => {
+                if down && z + 1 < self.body.lines.len() {
+                    z + 1
+                } else {
+                    a - 1
+                }
+            }
+            _ => line,
+        }
+    }
+
+    // (code_edit.rs) the hidden lines: merged ranges (first, last), by line
+    pub(crate) fn hidden(&self) -> &[(usize, usize)] {
+        &self.body.hidden
+    }
+
+    // ------------------------------------------------------------------ several edits as one step
+
+    /// several changes as one undo step named `label`: the edits (positions in the text before
+    /// any of them, in any order, not overlapping) replace their parts; the selection follows
+    /// the text (inside a replaced part: to its new end) -> false when nothing changed or two
+    /// edits overlap.  Rename and format of a language service go through here
+    pub fn apply_edits(&mut self, edits: &[TextEdit], label: &str) -> bool {
+        let mut ed: Vec<TextEdit> = edits
+            .iter()
+            .map(|e| TextEdit { a: self.clamp(e.a.min(e.b)), b: self.clamp(e.a.max(e.b)), text: e.text.replace("\r\n", "\n").replace('\r', "\n") })
+            .collect();
+        ed.sort_by(|x, y| (x.a, x.b).cmp(&(y.a, y.b)));
+        if ed.is_empty() || ed.windows(2).any(|w| w[1].a < w[0].b) {
+            return false;
+        }
+        let first = ed[0].a.line;
+        let last = ed.iter().map(|e| e.b.line).max().unwrap_or(first);
+        let block = self.text_range(TextPos::new(first, 0), TextPos::new(last, self.body.lines[last].len()));
+        let base = self.flat(TextPos::new(first, 0));
+        let mut out = String::with_capacity(block.len() + 16);
+        let mut at = 0;
+        // (old start, old end, new end) of each edit, offsets in the block
+        let mut map: Vec<(usize, usize, usize)> = Vec::with_capacity(ed.len());
+        for e in &ed {
+            let (a, b) = (self.flat(e.a) - base, self.flat(e.b) - base);
+            out.push_str(&block[at..a]);
+            out.push_str(&e.text);
+            map.push((a, b, out.len()));
+            at = b;
+        }
+        out.push_str(&block[at..]);
+        let new: Vec<String> = out.split('\n').map(String::from).collect();
+        let dl = new.len() as isize - (last - first + 1) as isize;
+        let mv = |p: TextPos| -> TextPos {
+            if p.line < first {
+                return p;
+            }
+            if p.line > last {
+                return TextPos::new((p.line as isize + dl) as usize, p.byte);
+            }
+            let o = self.flat(p) - base;
+            let mut n = o;
+            for &(a, b, ne) in &map {
+                if o >= b {
+                    n = ne + (o - b);
+                } else {
+                    if o > a {
+                        n = ne;
+                    }
+                    break;
+                }
+            }
+            let line = out[..n].matches('\n').count();
+            let ls = out[..n].rfind('\n').map_or(0, |k| k + 1);
+            TextPos::new(first + line, n - ls)
+        };
+        let s = self.body.sel;
+        let sel = TextSel::new(mv(s.anchor), mv(s.caret));
+        self.edit(first, last - first + 1, new, sel, label, CK_NONE)
+    }
+
+    /// the whole text becomes `text` as one undo step; only the lines that differ change (the
+    /// diagnostics, breakpoints and folds of the others stay), and the caret keeps its place
+    /// among the characters that are no blanks (so after a formatter it stays at its token)
+    /// -> changed
+    pub fn replace_text(&mut self, text: &str, label: &str) -> bool {
+        let new: Vec<String> = lines_of(text).map(String::from).collect();
+        let old = &self.body.lines;
+        let pre = old.iter().zip(&new).take_while(|(a, b)| a == b).count();
+        if pre == old.len() && pre == new.len() {
+            return false;
+        }
+        let room = old.len().min(new.len()) - pre;
+        let post = old.iter().rev().zip(new.iter().rev()).take(room).take_while(|(a, b)| a == b).count();
+        let n_old = old.len() - pre - post;
+        let mid: Vec<String> = new[pre..new.len() - post].to_vec();
+        let mv = |p: TextPos| -> TextPos {
+            if p.line < pre {
+                return p;
+            }
+            if p.line >= pre + n_old {
+                return TextPos::new(p.line - n_old + mid.len(), p.byte);
+            }
+            // the same count of ink before it (no blanks, no `;`): right after the k-th one when
+            // it was right after one, else at the next one
+            let ink = |c: char| !c.is_whitespace() && c != ';';
+            let line = &old[p.line][..p.byte.min(old[p.line].len())];
+            let k: usize = old[pre..p.line].iter().map(|l| l.chars().filter(|&c| ink(c)).count()).sum::<usize>() + line.chars().filter(|&c| ink(c)).count();
+            let after = line.chars().next_back().is_some_and(ink);
+            let want = if after { k - 1 } else { k };
+            let mut seen = 0;
+            let mut end = TextPos::new(pre, 0);
+            for (i, l) in mid.iter().enumerate() {
+                for (b, c) in l.char_indices() {
+                    if !ink(c) {
+                        continue;
+                    }
+                    if seen == want {
+                        return TextPos::new(pre + i, if after { b + c.len_utf8() } else { b });
+                    }
+                    seen += 1;
+                    end = TextPos::new(pre + i, b + c.len_utf8());
+                }
+            }
+            end
+        };
+        let s = self.body.sel;
+        let clamp = |p: TextPos| -> TextPos {
+            let line = p.line.min(new.len() - 1);
+            let t = &new[line];
+            let mut b = p.byte.min(t.len());
+            while !t.is_char_boundary(b) {
+                b -= 1;
+            }
+            TextPos::new(line, b)
+        };
+        let sel = TextSel::new(clamp(mv(s.anchor)), clamp(mv(s.caret)));
+        self.edit(pre, n_old, mid, sel, label, CK_NONE)
     }
 
     // (code_edit.rs) the diagnostics by position

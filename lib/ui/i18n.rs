@@ -804,6 +804,9 @@ static LIB_TEXTS: &[[&str; 9]] = &[
     ["maximiert", "maximized", "agrandie", "maximizada", "ingrandita", "gemaximaliseerd", "zmaksymalizowane", "مكبّرة", "מוגדל"],
     ["Taskleiste", "Taskbar", "Barre des tâches", "Barra de tareas", "Barra delle applicazioni", "Taakbalk", "Pasek zadań", "شريط المهام", "שורת המשימות"],
     ["Weitere Fenster", "More windows", "Plus de fenêtres", "Más ventanas", "Altre finestre", "Meer vensters", "Więcej okien", "مزيد من النوافذ", "חלונות נוספים"],
+    // (SK6) the code editor's completion list: its undo step and its name for screen readers
+    ["Vervollständigen", "Complete", "Compléter", "Completar", "Completa", "Aanvullen", "Uzupełnij", "إكمال", "השלמה"],
+    ["Vorschläge", "Suggestions", "Suggestions", "Sugerencias", "Suggerimenti", "Suggesties", "Podpowiedzi", "اقتراحات", "הצעות"],
 ];
 
 /// a library text in the current language: the UI language when the library has it

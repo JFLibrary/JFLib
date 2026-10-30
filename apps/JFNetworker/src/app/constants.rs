@@ -582,3 +582,11 @@ pub(crate) const ID_BG_ADD: u32 = 0x0001_0109;
 /// GetNext, Walk, + 9 .. 11 the type, the value, Set; + 0x100 the tree with its rows; + 0x3F0 its
 /// tile on the desktop)
 pub(crate) const ID_MIB0: u32 = 0x0001_1000;
+
+// ---- SK6: language services in the Skripte tab (commands 700 .. 719, widgets 0x0001_4000 ..
+// 0x0001_47FF, timers 0x1A0 .. 0x1A3; none of the commands and timers is used yet)
+/// the language services of the Skripte tab in device window k: ID_SCRIPTLS0 + 0x100 k (+ 0
+/// Name umbenennen and its flyout, + 1 the new name, + 2 Umbenennen, + 3 Abbrechen, + 4
+/// Formatieren, + 5 Gliederung on / off, + 8 the split of the editor and the outline, + 0x40 the
+/// outline (rows + 1 + i))
+pub(crate) const ID_SCRIPTLS0: u32 = 0x0001_4000;
