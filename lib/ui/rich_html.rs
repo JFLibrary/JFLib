@@ -21,7 +21,28 @@
 //                                    (U+FFFC in the text), preformatted blocks and their
 //                                    language, the heading level, the quotation depth, table
 //                                    rows and their cells, the numbers of list items, task
-//                                    boxes; the forms and their fields (md_doc.rs "Forms")
+//                                    boxes; the forms and their fields (md_doc.rs "Forms").
+//                                    It reads the element tree of the HTML (md_dom.rs): the
+//                                    tags as the tree has them, elements with the hidden
+//                                    attribute or display:none left out
+//   (crate) dom_read(dom) / dom_para(dom, l)   the same for a tree of a document (MdDoc::html,
+//                                    its changes): the paragraphs, fields and forms know their
+//                                    elements; one block element's paragraph read again
+//
+// Style sheets (the viewer's reader only; RichDoc::from_html takes the style attributes as
+// before): the <style> elements of the tree (media screen / all, type text/css) in document
+// order give rules -- selectors of md_dom.rs (tag, *, #id, .class, [attr], descendant and
+// child) with declarations; comments, at-rules and rules whose selector is not in the subset
+// are left out.  An element's style is the cascade: the declarations of the rules that match
+// by specificity and source order, its style attribute's, then the !important ones the same
+// way (of each property the last).  The text's properties are inherited as the formats are
+// (colour, weight, style, decoration, size, family, alignment); a link takes the link colour
+// unless a rule for it gives one.  A block element (and ul, ol, nav, form ...) whose style
+// gives margins, padding, borders (width, a visible style -- drawn solid -- and colour, per
+// side) or a background gets a box (md_doc.rs MdBox; its background is the box's, not the
+// text's).  display:none hides.  Rules are indexed by the id, class or tag their subject needs;
+// matching has a budget proportional to the tree and the sheets (then no rule matches), at
+// most RULES_MAX rules.
 //
 // Whitespace outside <pre> / white-space:pre* collapses as in browsers; a paragraph is a
 // block or the text between two <br>.  Nesting is capped (NEST_MAX open blocks, formats and
@@ -32,7 +53,8 @@ use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::md_doc::{MdField, MdForm, MdOption, MF_BUTTON, MF_CHECKBOX, MF_HIDDEN, MF_PASSWORD, MF_RADIO, MF_RESET, MF_SELECT, MF_SUBMIT, MF_TEXT, MF_TEXTAREA};
+use crate::md_doc::{MdBox, MdField, MdForm, MdOption, MF_BUTTON, MF_CHECKBOX, MF_HIDDEN, MF_PASSWORD, MF_RADIO, MF_RESET, MF_SELECT, MF_SUBMIT, MF_TEXT, MF_TEXTAREA};
+use crate::md_dom::{parse_sels, sel_match, void, Dom, MdNode, Sel, SelKey, K_ELEM, K_TEXT, NIL};
 use crate::rich_doc::*;
 
 fn esc(s: &str, out: &mut String) {
@@ -259,9 +281,18 @@ fn embedded(s: &str) -> Option<RichDoc> {
 /// (md_doc.rs) the paragraphs of HTML and what a viewer shows besides them (see the module
 /// header)
 pub(crate) fn html_read(s: &str) -> HRead {
+    let d = Dom::parse(s);
+    let sheet = Sheet::of(&d);
+    dom_read(&d, &sheet, false)
+}
+
+/// (md_doc.rs) html_read of a document's tree with its style sheets (handles: the paragraphs,
+/// fields and forms name their elements, HRead::ranges the paragraphs of the block elements)
+pub(crate) fn dom_read(d: &Dom, sheet: &Sheet, handles: bool) -> HRead {
     let mut r = Reader::new();
     r.ext = Some(Ext::default());
-    r.run(s);
+    r.css = sheet.budget(d.nodes.len());
+    r.walk(d, 0, false, handles, sheet);
     r.cap_end();
     r.label_end();
     let mut e = r.ext.take().unwrap_or_default();
@@ -299,16 +330,87 @@ pub(crate) fn html_read(s: &str) -> HRead {
     if paras.len() == 1 && paras[0].is_empty() && e.items.is_empty() {
         paras.clear();
     }
-    HRead { paras, ext: e.items, forms: e.forms, fields: e.fields }
+    HRead {
+        paras,
+        ext: e.items,
+        forms: e.forms,
+        fields: e.fields,
+        nodes: e.para_nodes,
+        ranges: e.ranges,
+        boxes: e.boxes,
+        para_boxes: e.para_boxes,
+        rule_boxes: e.rule_boxes,
+    }
+}
+
+/// (md_doc.rs) the paragraph block element l of a document's tree shows by itself, read again
+/// with the format its ancestors give it (None: it shows none or several)
+pub(crate) fn dom_para(d: &Dom, sheet: &Sheet, l: u32) -> Option<Para> {
+    let mut r = Reader::new();
+    r.ext = Some(Ext::default());
+    r.css = sheet.budget(64);
+    let mut chain = Vec::new();
+    let mut x = d.nodes[l as usize].parent;
+    while x != NIL {
+        chain.push(x);
+        x = d.nodes[x as usize].parent;
+    }
+    // (what the ancestors push on the reader's formats)
+    let mut f = Fmt::default();
+    for &a in chain.iter().rev() {
+        let n = &d.nodes[a as usize];
+        if n.kind == K_ELEM && pushes_fmt(&n.name) {
+            let eff = sheet.attrs_of(d, a, &mut r.css);
+            f = fmt_with(f, &n.name, eff.as_deref().unwrap_or(&n.attrs), true);
+        }
+    }
+    r.fmts.push((String::from("#"), f));
+    r.walk(d, l, true, true, sheet);
+    if r.out.len() != 1 {
+        return None;
+    }
+    r.out.pop()
+}
+
+// an element that puts a format on the reader's stack (in a document's tree, outside cells,
+// select and button, at a depth below NEST_MAX)
+fn pushes_fmt(tag: &str) -> bool {
+    !matches!(
+        tag,
+        "ul" | "ol" | "form" | "label" | "textarea" | "select" | "button" | "br" | "img" | "hr" | "meta" | "link" | "input" | "script" | "style"
+            | "head" | "title" | "template" | "noscript" | "svg"
+    )
+}
+
+// display:none in a style attribute (the last display wins)
+fn display_none(style: &str) -> bool {
+    let mut none = false;
+    for decl in style.split(';') {
+        if let Some((p, v)) = decl.split_once(':') {
+            if p.trim().eq_ignore_ascii_case("display") {
+                none = v.trim().trim_end_matches("!important").trim().eq_ignore_ascii_case("none");
+            }
+        }
+    }
+    none
 }
 
 /// what html_read returns: the paragraphs, the items by paragraph, the forms and fields
-/// (MdField::form: index + 1 into forms; HExt::Field::n: index into fields)
+/// (MdField::form: index + 1 into forms; HExt::Field::n: index into fields); dom_read with
+/// handles: the element of every paragraph (the innermost block; the last one may be missing:
+/// none) and the paragraphs of the block elements (element, first, end); the boxes of CSS, the
+/// boxes around every paragraph (indices of boxes, outermost first; the last one may be
+/// missing) and around the rules before paragraphs
 pub(crate) struct HRead {
     pub paras: Vec<Para>,
     pub ext: Vec<(usize, HExt)>,
     pub forms: Vec<MdForm>,
     pub fields: Vec<MdField>,
+    pub nodes: Vec<MdNode>,
+    pub ranges: Vec<(u32, u32, u32)>,
+    pub boxes: Vec<MdBox>,
+    pub para_boxes: Vec<Vec<u32>>,
+    pub rule_boxes: Vec<(usize, Vec<u32>)>,
 }
 
 /// what html_read reports about paragraph `at` (the index the item is filed under)
@@ -368,6 +470,16 @@ struct Ext {
     opt_val: bool,
     // the <textarea> whose text is read raw
     raw: Option<usize>,
+    // dom_read with handles: the element of every paragraph, the paragraphs of the block
+    // elements (element, first, end)
+    para_nodes: Vec<MdNode>,
+    ranges: Vec<(u32, u32, u32)>,
+    // the boxes of CSS, the open ones (outermost first), the boxes around every paragraph and
+    // around the rules (by the paragraph they come before)
+    boxes: Vec<MdBox>,
+    open_boxes: Vec<u32>,
+    para_boxes: Vec<Vec<u32>>,
+    rule_boxes: Vec<(usize, Vec<u32>)>,
 }
 
 // open blocks, formats and lists at most (deeper ones are not opened)
@@ -456,7 +568,7 @@ pub(crate) fn entity(name: &str) -> Option<char> {
 }
 
 // text with its entities decoded
-fn decode(s: &str) -> String {
+pub(crate) fn decode(s: &str) -> String {
     if !s.contains('&') {
         return String::from(s);
     }
@@ -619,13 +731,14 @@ fn css_color(v: &str) -> Option<u32> {
     Some(0xFF00_0000 | rgb)
 }
 
-// a block's attributes and text settings
+// a block's attributes and text settings (node: its element in a document's tree)
 #[derive(Clone)]
 struct Block {
     tag: String,
     align: u8,
     style: u8,
     pre: bool,
+    node: MdNode,
 }
 
 struct Reader {
@@ -644,6 +757,9 @@ struct Reader {
     skip: Option<String>,
     // html_read: what a viewer shows besides the paragraphs
     ext: Option<Ext>,
+    // dom_read: the element being opened, what matching the style sheets' rules may still cost
+    node: MdNode,
+    css: usize,
 }
 
 const BLOCKS: [&str; 22] = [
@@ -664,6 +780,87 @@ impl Reader {
             item: None,
             skip: None,
             ext: None,
+            node: MdNode::NONE,
+            css: 0,
+        }
+    }
+
+    // html_read: the elements of a tree in document order (below `top`, or `top` itself when
+    // `own`) as the stream of their tags, each with the style the sheet's cascade gives it;
+    // hidden ones (the hidden attribute, display:none) are left out, raw text is skipped but a
+    // text area's; a box of CSS (MdBox) around the paragraphs of a block element whose style
+    // gives one.  handles: paragraphs, fields and forms name their elements, the block
+    // elements' paragraphs are noted
+    fn walk(&mut self, d: &Dom, top: u32, own: bool, handles: bool, sheet: &Sheet) {
+        // (node, Some(paragraphs before its content, a box opened): its end)
+        let mut st: Vec<(u32, Option<(usize, bool)>)> = Vec::new();
+        let push_kids = |st: &mut Vec<(u32, Option<(usize, bool)>)>, x: u32| {
+            let mut k = d.nodes[x as usize].last;
+            while k != NIL {
+                st.push((k, None));
+                k = d.nodes[k as usize].prev;
+            }
+        };
+        if own {
+            st.push((top, None));
+        } else {
+            push_kids(&mut st, top);
+        }
+        while let Some((x, end)) = st.pop() {
+            let n = &d.nodes[x as usize];
+            if let Some((p0, boxed)) = end {
+                self.close(&n.name);
+                if let Some(e) = self.ext.as_mut() {
+                    if boxed {
+                        e.open_boxes.pop();
+                    }
+                    if handles && BLOCKS.contains(&n.name.as_str()) {
+                        e.ranges.push((x, p0 as u32, self.out.len() as u32));
+                    }
+                }
+                continue;
+            }
+            if n.kind == K_TEXT {
+                self.text_dec(&n.name);
+                continue;
+            }
+            if n.kind != K_ELEM || d.hidden_attr(x) {
+                continue;
+            }
+            let eff = if sheet.is_empty() { None } else { sheet.attrs_of(d, x, &mut self.css) };
+            let at: &[(String, String)] = eff.as_deref().unwrap_or(&n.attrs);
+            let style = at.iter().find(|a| a.0 == "style").map(|a| a.1.as_str());
+            if style.is_some_and(display_none) {
+                continue;
+            }
+            self.node = if handles { d.handle(x) } else { MdNode::NONE };
+            // (a box's place among the quotes and lists: those around its element)
+            let depth = self.blocks.iter().filter(|b| b.tag == "blockquote").count() + self.lists.len();
+            self.open(&n.name, at, false);
+            if void(&n.name) {
+                continue;
+            }
+            if self.skip.is_some() {
+                // raw text: a text area's is its value, the rest is skipped
+                self.raw_text_dec(&d.text_of(x));
+                self.skip = None;
+                self.close(&n.name);
+                continue;
+            }
+            let mut boxed = false;
+            if let (Some(e), Some(s)) = (self.ext.as_mut(), style) {
+                if box_tag(&n.name) {
+                    if let Some(mut b) = box_of(s) {
+                        b.depth = depth.min(255) as u8;
+                        b.node = self.node;
+                        e.open_boxes.push(e.boxes.len() as u32);
+                        e.boxes.push(b);
+                        boxed = true;
+                    }
+                }
+            }
+            st.push((x, Some((self.out.len(), boxed))));
+            push_kids(&mut st, x);
         }
     }
 
@@ -721,7 +918,10 @@ impl Reader {
         });
         let quote = self.blocks.iter().filter(|b| b.tag == "blockquote").count().min(255) as u8;
         let row = self.blocks.last().is_some_and(|b| b.tag == "tr");
+        let node = self.blocks.last().map_or(MdNode::NONE, |b| b.node);
         let Some(e) = self.ext.as_mut() else { return };
+        e.para_nodes.push(node);
+        e.para_boxes.push(e.open_boxes.clone());
         if pre {
             e.items.push((at, HExt::Pre { block: e.pre, lang: e.lang.clone() }));
         }
@@ -829,7 +1029,11 @@ impl Reader {
     }
 
     fn text(&mut self, raw: &str) {
-        let t = decode(raw);
+        self.text_dec(&decode(raw));
+    }
+
+    // text with its entities decoded
+    fn text_dec(&mut self, t: &str) {
         // html_read: inside a <select> or <button> the text is the field's; the text of an open
         // <label> names its field
         if let Some(e) = self.ext.as_mut() {
@@ -880,82 +1084,7 @@ impl Reader {
 
     // the format an element's attributes give (on top of the current one)
     fn fmt_for(&self, tag: &str, at: &[(String, String)]) -> Fmt {
-        let mut f = self.fmt();
-        match tag {
-            "b" | "strong" => f.flags |= RF_BOLD,
-            "i" | "em" | "cite" | "var" | "dfn" => f.flags |= RF_ITALIC,
-            "u" | "ins" => f.flags |= RF_UNDER,
-            "s" | "strike" | "del" => f.flags |= RF_STRIKE,
-            "code" | "tt" | "kbd" | "samp" => f.font = String::from("monospace"),
-            "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "th" => {}
-            _ => {}
-        }
-        for (k, v) in at {
-            match k.as_str() {
-                "href" if tag == "a" => f.link = v.clone(),
-                "color" if tag == "font" => f.color = css_color(v).unwrap_or(f.color),
-                "face" if tag == "font" => f.font = family_of(v),
-                "size" if tag == "font" => {
-                    f.size = match v.trim() {
-                        "1" => 75,
-                        "2" => 100,
-                        "3" => 120,
-                        "4" => 135,
-                        "5" => 180,
-                        "6" => 240,
-                        "7" => 360,
-                        _ => f.size,
-                    }
-                }
-                "style" => {
-                    for decl in v.split(';') {
-                        let Some((p, val)) = decl.split_once(':') else { continue };
-                        let val = val.trim().trim_end_matches("!important").trim();
-                        match p.trim().to_ascii_lowercase().as_str() {
-                            "color" => f.color = css_color(val).unwrap_or(f.color),
-                            "background-color" | "background" => {
-                                if let Some(c) = val.split_whitespace().find_map(css_color) {
-                                    if c & 0xFF_FFFF != 0xFF_FFFF {
-                                        f.bg = c;
-                                    }
-                                }
-                            }
-                            "font-weight" => {
-                                let bold = matches!(val, "bold" | "bolder") || val.parse::<u32>().is_ok_and(|w| w >= 600);
-                                if bold {
-                                    f.flags |= RF_BOLD;
-                                } else if matches!(val, "normal" | "lighter") || val.parse::<u32>().is_ok_and(|w| w < 600) {
-                                    f.flags &= !RF_BOLD;
-                                }
-                            }
-                            "font-style" => {
-                                if val.starts_with("italic") || val.starts_with("oblique") {
-                                    f.flags |= RF_ITALIC;
-                                } else if val == "normal" {
-                                    f.flags &= !RF_ITALIC;
-                                }
-                            }
-                            "text-decoration" | "text-decoration-line" => {
-                                if val.contains("underline") {
-                                    f.flags |= RF_UNDER;
-                                }
-                                if val.contains("line-through") {
-                                    f.flags |= RF_STRIKE;
-                                }
-                                if val == "none" {
-                                    f.flags &= !(RF_UNDER | RF_STRIKE);
-                                }
-                            }
-                            "font-size" => f.size = css_size(val, f.size).unwrap_or(f.size),
-                            "font-family" => f.font = family_of(val),
-                            _ => {}
-                        }
-                    }
-                }
-                _ => {}
-            }
-        }
-        f
+        fmt_with(self.fmt(), tag, at, self.ext.is_some())
     }
 
     // html_read inside a table cell: blocks, lists and breaks are part of the cell's text
@@ -973,6 +1102,7 @@ impl Reader {
         }
         fd.name = String::from(attr("name").unwrap_or(""));
         fd.id = String::from(attr("id").unwrap_or("").trim());
+        fd.node = self.node;
         fd.disabled = attr("disabled").is_some();
         fd.readonly = attr("readonly").is_some();
         if !matches!(fd.kind, MF_SUBMIT | MF_RESET | MF_BUTTON) {
@@ -1055,9 +1185,16 @@ impl Reader {
     // html_read: a <textarea>'s text (raw; entities decoded, line ends as '\n', the first one
     // dropped)
     fn raw_text(&mut self, s: &str) {
+        if self.ext.as_ref().is_some_and(|e| e.raw.is_some()) {
+            self.raw_text_dec(&decode(s));
+        }
+    }
+
+    // the same with the entities decoded
+    fn raw_text_dec(&mut self, s: &str) {
         let Some(e) = self.ext.as_mut() else { return };
         let Some(fd) = e.raw.take().and_then(|f| e.fields.get_mut(f)) else { return };
-        let t = decode(s).replace("\r\n", "\n").replace('\r', "\n");
+        let t = s.replace("\r\n", "\n").replace('\r', "\n");
         fd.value = String::from(t.strip_prefix('\n').unwrap_or(&t));
     }
 
@@ -1104,6 +1241,7 @@ impl Reader {
                         method: String::from(method),
                         id: String::from(attr("id").unwrap_or("").trim()),
                         name: String::from(attr("name").unwrap_or("")),
+                        node: self.node,
                     });
                     e.form = Some(e.forms.len() as u32 - 1);
                     if !self.in_cell(tag) {
@@ -1248,6 +1386,7 @@ impl Reader {
                     self.flush(false);
                     if let Some(e) = self.ext.as_mut() {
                         e.items.push((self.out.len(), HExt::Rule));
+                        e.rule_boxes.push((self.out.len(), e.open_boxes.clone()));
                     }
                 } else if tag == "img" && self.ext.is_some() {
                     self.ext_open(tag, at);
@@ -1305,7 +1444,7 @@ impl Reader {
             };
             let pre = tag == "pre"
                 || at.iter().any(|(k, v)| k == "style" && v.to_ascii_lowercase().replace(' ', "").contains("white-space:pre"));
-            self.blocks.push(Block { tag: String::from(tag), align, style, pre });
+            self.blocks.push(Block { tag: String::from(tag), align, style, pre, node: self.node });
             if tag == "li" {
                 let kind = self.lists.last().copied().unwrap_or(LS_BULLET);
                 self.item = Some((kind, (self.lists.len().max(1) - 1).min(LEVEL_MAX as usize) as u8));
@@ -1440,8 +1579,554 @@ impl Reader {
     }
 }
 
+// ------------------------------------------------------------------ style sheets
+
+// rules of a document's style sheets, declarations of a rule at most (more are ignored)
+const RULES_MAX: usize = 4096;
+const DECLS_MAX: usize = 256;
+
+// a declaration: the property (lower case), its value, !important
+type Decl = (String, String, bool);
+
+// a rule: its selector, specificity and place, its declarations (an index of Sheet::decls)
+#[derive(Debug)]
+struct Rule {
+    sel: Sel,
+    spec: u32,
+    order: u32,
+    decls: u32,
+}
+
+/// the style sheets of a document (its <style> elements in document order; media other than
+/// screen / all and types other than text/css are left out): the rules by the id, class or
+/// tag their subject needs
+#[derive(Debug, Default)]
+pub(crate) struct Sheet {
+    rules: Vec<Rule>,
+    decls: Vec<Vec<Decl>>,
+    ids: BTreeMap<String, Vec<u32>>,
+    classes: BTreeMap<String, Vec<u32>>,
+    tags: BTreeMap<String, Vec<u32>>,
+    any: Vec<u32>,
+    // bytes of CSS read
+    size: usize,
+}
+
+impl Sheet {
+    /// the style sheets of a document's tree
+    pub(crate) fn of(d: &Dom) -> Sheet {
+        let mut s = Sheet::default();
+        if !d.is_html() {
+            return s;
+        }
+        for x in d.subtree(0) {
+            let n = &d.nodes[x as usize];
+            if n.kind != K_ELEM || n.name != "style" {
+                continue;
+            }
+            let media = d.attr(x, "media").unwrap_or("").to_ascii_lowercase();
+            let ty = d.attr(x, "type").unwrap_or("text/css").trim().to_ascii_lowercase();
+            if (!media.trim().is_empty() && !media.contains("screen") && !media.contains("all")) || (!ty.is_empty() && ty != "text/css") {
+                continue;
+            }
+            s.add(&d.text_of(x));
+        }
+        s
+    }
+
+    /// no rules
+    pub(crate) fn is_empty(&self) -> bool {
+        self.rules.is_empty()
+    }
+
+    /// what matching may cost in a document of n nodes (compounds compared)
+    pub(crate) fn budget(&self, n: usize) -> usize {
+        n.saturating_add(self.size).saturating_mul(64).saturating_add(1 << 20)
+    }
+
+    // the rules of a sheet's text (comments, at-rules and rules with selectors this subset does
+    // not take are left out)
+    fn add(&mut self, css: &str) {
+        self.size = self.size.saturating_add(css.len());
+        let s = strip_comments(css);
+        let b = s.as_bytes();
+        let mut i = 0;
+        while i < b.len() && self.rules.len() < RULES_MAX {
+            if b[i].is_ascii_whitespace() || b[i] == b';' || b[i] == b'}' {
+                i += 1;
+                continue;
+            }
+            if b[i] == b'@' {
+                // an at-rule: up to its ';' or the end of its block
+                i = skip_rule(b, i, true);
+                continue;
+            }
+            let Some(open) = s[i..].find('{').map(|k| i + k) else { break };
+            let end = skip_rule(b, open, false);
+            let sel = s[i..open].trim();
+            let body = &s[open + 1..end.saturating_sub(1).max(open + 1)];
+            i = end;
+            let Some(sels) = parse_sels(sel) else { continue };
+            let decls = parse_decls(body);
+            if decls.is_empty() {
+                continue;
+            }
+            let di = self.decls.len() as u32;
+            self.decls.push(decls);
+            for sel in sels {
+                if self.rules.len() >= RULES_MAX {
+                    break;
+                }
+                let r = self.rules.len() as u32;
+                match sel.key() {
+                    SelKey::Id(k) => self.ids.entry(String::from(k)).or_default().push(r),
+                    SelKey::Class(k) => self.classes.entry(String::from(k)).or_default().push(r),
+                    SelKey::Tag(k) => self.tags.entry(String::from(k)).or_default().push(r),
+                    SelKey::Any => self.any.push(r),
+                }
+                self.rules.push(Rule { spec: sel.spec(), sel, order: r, decls: di });
+            }
+        }
+    }
+
+    /// element i's attributes with its style as the cascade gives it: the declarations of the
+    /// rules that match by specificity and order, its style attribute's, then the !important
+    /// ones in the same order -> None: no rule matches (its own attributes stand)
+    pub(crate) fn attrs_of(&self, d: &Dom, i: u32, budget: &mut usize) -> Option<Vec<(String, String)>> {
+        if self.rules.is_empty() || *budget == 0 {
+            return None;
+        }
+        let mut hits: Vec<(u32, u32, u32)> = Vec::new();
+        let test = |list: &[u32], hits: &mut Vec<(u32, u32, u32)>, budget: &mut usize| {
+            for &r in list {
+                if *budget == 0 {
+                    break;
+                }
+                let rule = &self.rules[r as usize];
+                if sel_match(d, i, &rule.sel, budget) {
+                    hits.push((rule.spec, rule.order, rule.decls));
+                }
+            }
+        };
+        test(&self.any, &mut hits, budget);
+        if let Some(v) = d.attr(i, "id").and_then(|id| self.ids.get(id)) {
+            test(v, &mut hits, budget);
+        }
+        if let Some(c) = d.attr(i, "class") {
+            for w in c.split_ascii_whitespace() {
+                if let Some(v) = self.classes.get(w) {
+                    test(v, &mut hits, budget);
+                }
+            }
+        }
+        if let Some(v) = self.tags.get(&d.nodes[i as usize].name) {
+            test(v, &mut hits, budget);
+        }
+        if hits.is_empty() {
+            return None;
+        }
+        hits.sort_unstable();
+        hits.dedup();
+        let own = d.attr(i, "style").map(parse_decls).unwrap_or_default();
+        // the declarations in the cascade's order; of each property only its last one, where
+        // it stands (a shorthand and its parts keep their order)
+        let mut seq: Vec<(&str, &str)> = Vec::new();
+        for imp in [false, true] {
+            let rules = hits.iter().flat_map(|h| self.decls[h.2 as usize].iter());
+            for (p, v, im) in rules.chain(own.iter()) {
+                if *im == imp {
+                    seq.push((p, v));
+                }
+            }
+        }
+        let mut last: BTreeMap<&str, usize> = BTreeMap::new();
+        for (k, (p, _)) in seq.iter().enumerate() {
+            last.insert(p, k);
+        }
+        let mut css = String::new();
+        for (k, (p, v)) in seq.iter().enumerate() {
+            if last.get(p) == Some(&k) {
+                css.push_str(p);
+                css.push(':');
+                css.push_str(v);
+                css.push(';');
+            }
+        }
+        let mut at = d.nodes[i as usize].attrs.clone();
+        match at.iter_mut().find(|a| a.0 == "style") {
+            Some(a) => a.1 = css,
+            None => at.push((String::from("style"), css)),
+        }
+        Some(at)
+    }
+}
+
+// CSS without its comments
+fn strip_comments(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut rest = s;
+    while let Some(i) = rest.find("/*") {
+        out.push_str(&rest[..i]);
+        out.push(' ');
+        rest = rest[i + 2..].find("*/").map_or("", |j| &rest[i + 2 + j + 2..]);
+    }
+    out.push_str(rest);
+    out
+}
+
+// the end of a rule or at-rule at b[i] (at '{' for a rule): after its block (blocks inside
+// counted, quotes respected) or, for an at-rule without a block, after its ';'
+fn skip_rule(b: &[u8], mut i: usize, at: bool) -> usize {
+    let (mut depth, mut q) = (0usize, 0u8);
+    while i < b.len() {
+        let c = b[i];
+        i += 1;
+        if q != 0 {
+            if c == q {
+                q = 0;
+            }
+            continue;
+        }
+        match c {
+            b'"' | b'\'' => q = c,
+            b'{' => depth += 1,
+            b'}' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return i;
+                }
+            }
+            b';' if at && depth == 0 => return i,
+            _ => {}
+        }
+    }
+    i
+}
+
+// the declarations of a block or a style attribute (property: value [!important]; ...)
+fn parse_decls(body: &str) -> Vec<Decl> {
+    let mut out = Vec::new();
+    let b = body.as_bytes();
+    let (mut start, mut q, mut paren) = (0, 0u8, 0usize);
+    let push = |d: &str, out: &mut Vec<Decl>| {
+        let Some((p, v)) = d.split_once(':') else { return };
+        let p = p.trim().to_ascii_lowercase();
+        if p.is_empty() || !p.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-') || out.len() >= DECLS_MAX {
+            return;
+        }
+        let mut v = v.trim();
+        let mut imp = false;
+        if let Some(k) = v.rfind('!') {
+            if v[k + 1..].trim().eq_ignore_ascii_case("important") {
+                imp = true;
+                v = v[..k].trim();
+            }
+        }
+        if !v.is_empty() {
+            out.push((p, String::from(v), imp));
+        }
+    };
+    for (i, &c) in b.iter().enumerate() {
+        if q != 0 {
+            if c == q {
+                q = 0;
+            }
+            continue;
+        }
+        match c {
+            b'"' | b'\'' => q = c,
+            b'(' => paren += 1,
+            b')' => paren = paren.saturating_sub(1),
+            b';' if paren == 0 => {
+                push(&body[start..i], &mut out);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    push(&body[start..], &mut out);
+    out
+}
+
+/// an element whose CSS may give a box around its blocks (md_doc.rs MdBox)
+pub(crate) fn box_tag(t: &str) -> bool {
+    BLOCKS.contains(&t)
+        || matches!(t, "ul" | "ol" | "dl" | "nav" | "main" | "aside" | "form" | "fieldset" | "details" | "summary" | "body" | "figcaption" | "hgroup" | "dialog" | "menu")
+}
+
+// a CSS length in px at 100 % text (em, rem: 14 px, the body text; % and other units: none)
+fn css_len(v: &str) -> Option<i32> {
+    let v = v.trim().to_ascii_lowercase();
+    let num = |s: &str| s.trim().parse::<f32>().ok();
+    let px = if v == "0" || v == "auto" {
+        0.0
+    } else if let Some(n) = v.strip_suffix("px") {
+        num(n)?
+    } else if let Some(n) = v.strip_suffix("pt") {
+        num(n)? * 4.0 / 3.0
+    } else if let Some(n) = v.strip_suffix("rem").or_else(|| v.strip_suffix("em")) {
+        num(n)? * 14.0
+    } else {
+        match v.as_str() {
+            "thin" => 1.0,
+            "medium" => 3.0,
+            "thick" => 5.0,
+            _ => return None,
+        }
+    };
+    Some((px.clamp(-2000.0, 2000.0) + if px < 0.0 { -0.5 } else { 0.5 }) as i32)
+}
+
+// one to four values for the four sides (top, right, bottom, left)
+fn sides<T: Copy>(v: &[T]) -> Option<[T; 4]> {
+    match *v {
+        [a] => Some([a, a, a, a]),
+        [a, b] => Some([a, b, a, b]),
+        [a, b, c] => Some([a, b, c, b]),
+        [a, b, c, d] => Some([a, b, c, d]),
+        _ => None,
+    }
+}
+
+// a border style: visible (true: drawn solid), none / hidden (false)
+fn border_style(v: &str) -> Option<bool> {
+    match v.trim().to_ascii_lowercase().as_str() {
+        "solid" | "dashed" | "dotted" | "double" | "groove" | "ridge" | "inset" | "outset" => Some(true),
+        "none" | "hidden" => Some(false),
+        _ => None,
+    }
+}
+
+// the words of a value (blanks outside parentheses)
+fn words(v: &str) -> Vec<&str> {
+    let mut out = Vec::new();
+    let (mut start, mut paren) = (None, 0usize);
+    for (i, c) in v.char_indices() {
+        match c {
+            '(' => paren += 1,
+            ')' => paren = paren.saturating_sub(1),
+            _ => {}
+        }
+        if c.is_whitespace() && paren == 0 {
+            if let Some(s) = start.take() {
+                out.push(&v[s..i]);
+            }
+        } else if start.is_none() {
+            start = Some(i);
+        }
+    }
+    if let Some(s) = start {
+        out.push(&v[s..]);
+    }
+    out
+}
+
+/// the box an element's style gives (margins, padding, borders drawn solid, the background)
+/// -> None: none
+pub(crate) fn box_of(style: &str) -> Option<MdBox> {
+    let mut b = MdBox::default();
+    // per side: the border's width given, its style (None: not given), its colour
+    let mut bw: [Option<i32>; 4] = [None; 4];
+    let mut bs: [Option<bool>; 4] = [None; 4];
+    let mut bc = [0u32; 4];
+    let pick = |p: &str| match p {
+        "top" => Some(0),
+        "right" => Some(1),
+        "bottom" => Some(2),
+        "left" => Some(3),
+        _ => None,
+    };
+    for decl in style.split(';') {
+        let Some((p, v)) = decl.split_once(':') else { continue };
+        let p = p.trim().to_ascii_lowercase();
+        let v = v.trim();
+        let lens = || -> Option<[i32; 4]> { sides(&words(v).iter().map(|w| css_len(w)).collect::<Option<Vec<i32>>>()?) };
+        match p.as_str() {
+            "margin" => {
+                if let Some(s) = lens() {
+                    b.margin = s.map(|x| x.clamp(0, 1000) as i16);
+                    b.mset = 15;
+                }
+            }
+            "padding" => {
+                if let Some(s) = lens() {
+                    b.padding = s.map(|x| x.clamp(0, 1000) as i16);
+                }
+            }
+            "border-width" => {
+                if let Some(s) = lens() {
+                    bw = s.map(Some);
+                }
+            }
+            "border-style" => {
+                if let Some(s) = sides(&words(v).iter().map(|w| border_style(w)).collect::<Option<Vec<bool>>>().unwrap_or_default()) {
+                    bs = s.map(Some);
+                }
+            }
+            "border-color" => {
+                if let Some(s) = sides(&words(v).iter().map(|w| css_color(w)).collect::<Option<Vec<u32>>>().unwrap_or_default()) {
+                    bc = s;
+                }
+            }
+            "background" | "background-color" => {
+                if let Some(c) = words(v).into_iter().find_map(css_color) {
+                    b.bg = c;
+                } else if v.eq_ignore_ascii_case("none") || v.eq_ignore_ascii_case("transparent") {
+                    b.bg = 0;
+                }
+            }
+            _ => {
+                let rest = p.strip_prefix("margin-").or_else(|| p.strip_prefix("padding-"));
+                if let (Some(side), Some(n)) = (rest.and_then(pick), css_len(v)) {
+                    if p.starts_with('m') {
+                        b.margin[side] = n.clamp(0, 1000) as i16;
+                        b.mset |= 1 << side;
+                    } else {
+                        b.padding[side] = n.clamp(0, 1000) as i16;
+                    }
+                    continue;
+                }
+                // border, border-SIDE (width style colour in any order), border-SIDE-width / -style / -color
+                let Some(rest) = p.strip_prefix("border") else { continue };
+                let (which, part) = match rest.strip_prefix('-') {
+                    None if rest.is_empty() => ([true; 4], ""),
+                    Some(r) => match r.split_once('-') {
+                        Some((s, part)) => match pick(s) {
+                            Some(k) => (core::array::from_fn(|i| i == k), part),
+                            None => continue,
+                        },
+                        None => match pick(r) {
+                            Some(k) => (core::array::from_fn(|i| i == k), ""),
+                            None => continue,
+                        },
+                    },
+                    _ => continue,
+                };
+                for (k, on) in which.iter().enumerate() {
+                    if !on {
+                        continue;
+                    }
+                    match part {
+                        "width" => bw[k] = css_len(v).or(bw[k]),
+                        "style" => bs[k] = border_style(v).or(bs[k]),
+                        "color" => bc[k] = css_color(v).unwrap_or(bc[k]),
+                        "" => {
+                            // the shorthand resets what it does not give
+                            let (mut w, mut s, mut c) = (None, None, 0);
+                            for t in words(v) {
+                                if let Some(x) = border_style(t) {
+                                    s = Some(x);
+                                } else if let Some(x) = css_len(t) {
+                                    w = Some(x);
+                                } else if let Some(x) = css_color(t) {
+                                    c = x;
+                                }
+                            }
+                            bw[k] = w;
+                            bs[k] = Some(s.unwrap_or(false));
+                            bc[k] = c;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+    for k in 0..4 {
+        // (a border needs a style; without a width it is medium)
+        b.border[k] = if bs[k] == Some(true) { bw[k].unwrap_or(3).clamp(0, 100) as u8 } else { 0 };
+        b.border_color[k] = bc[k];
+    }
+    let any = b.margin.iter().any(|&x| x != 0) || b.padding.iter().any(|&x| x != 0) || b.border.iter().any(|&x| x != 0) || b.bg != 0 || b.mset != 0;
+    any.then_some(b)
+}
+
+// the format an element's attributes give on top of f (view: the viewer's reader -- a link
+// takes the link colour unless it has one of its own, a box's background is the box's)
+fn fmt_with(mut f: Fmt, tag: &str, at: &[(String, String)], view: bool) -> Fmt {
+    if view && tag == "a" && at.iter().any(|a| a.0 == "href") {
+        f.color = 0;
+    }
+    let boxed = view && box_tag(tag);
+    match tag {
+        "b" | "strong" => f.flags |= RF_BOLD,
+        "i" | "em" | "cite" | "var" | "dfn" => f.flags |= RF_ITALIC,
+        "u" | "ins" => f.flags |= RF_UNDER,
+        "s" | "strike" | "del" => f.flags |= RF_STRIKE,
+        "code" | "tt" | "kbd" | "samp" => f.font = String::from("monospace"),
+        "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "th" => {}
+        _ => {}
+    }
+    for (k, v) in at {
+        match k.as_str() {
+            "href" if tag == "a" => f.link = v.clone(),
+            "color" if tag == "font" => f.color = css_color(v).unwrap_or(f.color),
+            "face" if tag == "font" => f.font = family_of(v),
+            "size" if tag == "font" => {
+                f.size = match v.trim() {
+                    "1" => 75,
+                    "2" => 100,
+                    "3" => 120,
+                    "4" => 135,
+                    "5" => 180,
+                    "6" => 240,
+                    "7" => 360,
+                    _ => f.size,
+                }
+            }
+            "style" => {
+                for decl in v.split(';') {
+                    let Some((p, val)) = decl.split_once(':') else { continue };
+                    let val = val.trim().trim_end_matches("!important").trim();
+                    match p.trim().to_ascii_lowercase().as_str() {
+                        "color" => f.color = css_color(val).unwrap_or(f.color),
+                        "background-color" | "background" if !boxed => {
+                            if let Some(c) = val.split_whitespace().find_map(css_color) {
+                                if c & 0xFF_FFFF != 0xFF_FFFF {
+                                    f.bg = c;
+                                }
+                            }
+                        }
+                        "font-weight" => {
+                            let bold = matches!(val, "bold" | "bolder") || val.parse::<u32>().is_ok_and(|w| w >= 600);
+                            if bold {
+                                f.flags |= RF_BOLD;
+                            } else if matches!(val, "normal" | "lighter") || val.parse::<u32>().is_ok_and(|w| w < 600) {
+                                f.flags &= !RF_BOLD;
+                            }
+                        }
+                        "font-style" => {
+                            if val.starts_with("italic") || val.starts_with("oblique") {
+                                f.flags |= RF_ITALIC;
+                            } else if val == "normal" {
+                                f.flags &= !RF_ITALIC;
+                            }
+                        }
+                        "text-decoration" | "text-decoration-line" => {
+                            if val.contains("underline") {
+                                f.flags |= RF_UNDER;
+                            }
+                            if val.contains("line-through") {
+                                f.flags |= RF_STRIKE;
+                            }
+                            if val == "none" {
+                                f.flags &= !(RF_UNDER | RF_STRIKE);
+                            }
+                        }
+                        "font-size" => f.size = css_size(val, f.size).unwrap_or(f.size),
+                        "font-family" => f.font = family_of(val),
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    f
+}
+
 // the '>' that ends the tag at s[0] == '<' (quotes respected)
-fn tag_end(s: &str) -> Option<usize> {
+pub(crate) fn tag_end(s: &str) -> Option<usize> {
     let mut q = 0u8;
     for (i, b) in s.bytes().enumerate().skip(1) {
         if q != 0 {
@@ -1457,7 +2142,7 @@ fn tag_end(s: &str) -> Option<usize> {
     None
 }
 
-fn find_ci(hay: &str, needle: &str) -> Option<usize> {
+pub(crate) fn find_ci(hay: &str, needle: &str) -> Option<usize> {
     let h = hay.as_bytes();
     let n = needle.as_bytes();
     if n.len() > h.len() {

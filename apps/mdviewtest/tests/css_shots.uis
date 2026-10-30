@@ -1,0 +1,41 @@
+#!args --page css --verify-dirty
+# a page with a style sheet (--page css): rules by tag, class, id, descendant and child give
+# colours, weights, alignment and boxes -- margins, padding, borders, backgrounds -- to block
+# elements; the text inside a box starts after its border and padding, a margin CSS gives takes
+# the place of the gap between blocks, a hidden paragraph is not shown, links keep the colour
+# their own rule gives.  Shots light, dark (text without a colour of its own reads on a box's
+# background, fields there get the theme's background), high contrast (no backgrounds, borders
+# in the text's colour) and in a mirrored window (the page stays left to right)
+size 1000 720
+theme light
+expect heading:"Gestaltete Seite" rect 29 89 930 49
+expect text:"Eine Karte mit Rahmen, Innenabstand und Hintergrund." rect 44 160 900 20
+expect text:"Ein wichtiger Satz in Rot." rect 44 184 900 20
+expect text:"Ein Hinweis mit einem farbigen Rand links." rect 43 247 906 20
+expect listitem:"Router" rect 37 287 914 20
+expect text:"Ein dunkler Kasten mit hellem Text." rect 39 377 910 20
+expect text:"Unsichtbar." missing
+expect link:"Start" exists
+expect button:"Los" rect 236 532 43 32
+shot build/mdviewtest/css_light.png
+# a link and the form in a card
+click link:"Link"
+expect text:"Link: https://example.org/karte" exists
+click 150,548
+type "router"
+key enter
+expect text:"Senden: get /los q=router" exists
+theme dark
+shot build/mdviewtest/css_dark.png
+theme light
+click "Hoher Kontrast"
+shot build/mdviewtest/css_hc.png
+click "Hoher Kontrast"
+click "Rechts nach links"
+expect text:"Eine Karte mit Rahmen, Innenabstand und Hintergrund." rect 56 160 900 20
+shot build/mdviewtest/css_rtl.png
+theme dark
+shot build/mdviewtest/css_rtl_dark.png
+theme light
+click "Rechts nach links"
+expect_nowarn

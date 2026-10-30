@@ -4,5 +4,7 @@
 # malformed and adversarial input (nesting, runs of brackets, stars, backticks, tags, unclosed
 # constructs, mutations of the samples; each within a time limit), the Fenwick sums of 100 000
 # rows, the view's accessibility tree (headings with their level), forms (fields, labels,
-# choices, values, the data a form sends) and images the app supplies.  The whole test runs
-# before the UI starts; the exit code is the number of failures.
+# choices, values, the data a form sends) and images the app supplies, the element tree of HTML
+# documents and its changes (queries, in place and all again, the view's place, selection,
+# focus and field values kept, the cost) and the style sheets (the cascade, boxes).  The whole
+# test runs before the UI starts; the exit code is the number of failures.

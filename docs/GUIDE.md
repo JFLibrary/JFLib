@@ -3954,7 +3954,8 @@ if ui.button(ID_ONE, "100 %") & EV_ACT != 0 { self.view.set_actual(); }
 
 **The document view** shows Markdown or HTML: help pages, README-like content, release notes,
 chat output, pages of a browser (read-only but for the fields of forms; images the app
-fetches). [`MdDoc`](../lib/ui/md_doc.rs) is its model -- blocks of formatted
+fetches; HTML changed through its elements as page scripts do, styled by a subset of CSS).
+[`MdDoc`](../lib/ui/md_doc.rs) is its model -- blocks of formatted
 text -- read from Markdown (CommonMark with GitHub's tables, task lists, strikethrough and bare
 links) or from HTML (the reader of the rich-text editor, extended by rules, images,
 preformatted code and tables). [`ui.markdown_view` / `ui.html_view`](../lib/ui/md_view.rs)
@@ -4063,7 +4064,73 @@ self.status = ev.hover.unwrap_or_default();   // the link under the pointer
   dots, never copy, and give screen readers dots and the protected state. Each field has its
   record (`K_TEXTBOX`, `K_CHECKBOX`, `K_RADIO`, `K_COMBO`, `K_BUTTON`) named by its `<label>`,
   `aria-label`, `title` or placeholder; the widget ids are `md_field_id(view_id, i)`. Not
-  supported: JavaScript, CSS, file inputs (they are text fields), several choices in one list.
+  supported: JavaScript, file inputs (they are text fields), several choices in one list.
+* CSS (HTML, a subset; [`rich_html.rs`](../lib/ui/rich_html.rs) "Style sheets"): `<style>`
+  elements (media screen / all) and `style=` attributes. Selectors: tag, `*`, `#id`, `.class`,
+  `[attr]`, `[attr=v]` (also `~= |= ^= $= *=`), descendant and child combinators, lists; the
+  cascade takes specificity, then source order, then the `style` attribute, `!important` above
+  them. Properties: `color`, `background(-color)`, `font-weight`, `font-style`,
+  `text-decoration`, `text-align`, `white-space: pre`, `display: none` (and the `hidden`
+  attribute); the text's properties are inherited; a link keeps the link colour unless a rule
+  for it gives one. Block elements (`p`, `div`, `h1`, `li`, `table`, `tr` ..., also `ul`, `ol`,
+  `nav`, `form`, `body`) get boxes (`MdDoc::boxes()`, `MdBox`, `MdBlock::boxes`):
+  `margin`, `padding`, `border` (width -- px, pt, em, `thin` / `medium` / `thick` -- a visible
+  style drawn solid, colour; shorthands, per side and `-width` / `-style` / `-color`) and a
+  background around their blocks; margins and padding grow with the text scale, a margin CSS
+  gives at a box's top or bottom takes the place of the gap between blocks (`p { margin: 2px
+  0 }` sets paragraphs close). On a box's background, text without a colour of its own takes one
+  that reads on it, fields get the theme's background behind them; high contrast drops the
+  page's colours and backgrounds and draws borders in the text's colour; left and right stay
+  physical in a right-to-left document. Unknown properties, at-rules (`@media`, `@import`),
+  pseudo-classes and sibling combinators are left out; `font-size` is read but not shown, of
+  `font-family` only `monospace` (as code). Deliberately not: a box model of its own (widths,
+  heights, floats, flexbox, grid, positioning), collapsing margins, inline boxes. Rules are
+  indexed by the id, class or tag their subject needs; matching costs at most a budget
+  proportional to the page and its sheets. Changes of the elements (above) apply the sheets
+  again, also a changed `<style>`. The page's text colours stay as given in a dark theme.
+* Changing the document (HTML; what a page script does -- the script host itself is the app's):
+  an HTML document keeps its element tree ([`md_dom.rs`](../lib/ui/md_dom.rs)). `MdNode` handles
+  stay the same across changes (`raw()` / `MdNode::from_raw` turn them into numbers for a
+  script's objects); a freed node's handle refers to nothing.
+
+  ```rust
+  let d = st.doc_mut();                             // st: the view's MdViewState
+  if let Some(n) = d.select_first("#stand b") {     // tag, .class, #id, [attr=v], a b, a > b
+      d.set_text(n, "3");                           // in place: that paragraph alone again
+  }
+  if let Some(list) = d.by_id("liste") {
+      let li = d.create_element("li");
+      let t = d.create_text("Neuer Eintrag");
+      d.insert(li, None, t);
+      let first = d.children(list).first().copied();
+      d.insert(list, first, li);                    // before its first child (None: at the end)
+  }
+  for n in d.select("p.hinweis") { d.toggle_class(n, "neu"); }
+  // the view takes the changes at its next frame (st.update(): now)
+  ```
+
+  Queries: `root()`, `by_id(id)` (an index), `select(sel)` / `select_first` / `select_in(n,
+  sel)` / `matches(n, sel)` in document order, `parent` / `children` / `next_sibling` /
+  `prev_sibling`, `tag(n)` (`""` a text), `attr` / `attrs` / `has_class`, `text_of(n)` (as
+  textContent), `inner_html(n)`, `alive` / `attached`. Changes: `set_text`, `set_attr` /
+  `remove_attr`, `add_class` / `remove_class` / `toggle_class`, `create_element` / `create_text`
+  (not in the document yet), `insert(parent, before, n)` (moves an attached node), `remove(n)`
+  (out of the document, kept), `free(n)`, `set_inner_html(n, html)`. Selectors: compounds of a
+  tag or `*`, `#id`, `.class`, `[attr]`, `[attr=v]` (also `~= |= ^= $= *=`) joined by blanks
+  (descendant) and `>` (child), lists with commas; pseudo-classes and sibling combinators match
+  nothing. Elements with the `hidden` attribute or `display:none` are not shown.
+  The blocks follow at `MdDoc::update()` (the view calls it every frame): a change inside a
+  block element that shows one paragraph of formatted text by itself (text, inline elements,
+  their attributes and classes) redoes that block alone; any other derives all blocks again in
+  linear time (about a parse of the page; no layout). The view keeps the layouts and heights of
+  the blocks that stay, shows the block it showed (scrolling is anchored there), moves the
+  selection and the focused link with their blocks, and keeps the fields' values by their
+  elements: what the user typed, checked or chose (or the app set) stays, a field the user left
+  alone follows its document value; a focused field keeps the focus when fields come or go
+  before it. `MdBlock::node`, `MdField::node`, `MdForm::node` name the elements, `field_of(n)`
+  finds a field. A new document (`set_html` with another text) starts afresh. Markdown
+  documents have no elements. The tree is capped (256 open elements, 2^20 nodes), a query's work
+  is bounded by the tree's size.
 * Accessibility: the view is a `K_BOX` (label `st.label`, default "Dokument"; value: the scroll
   position in DIP); per visible block a `K_HEADING` record (new kind; value: the level),
   `K_TEXT` (paragraphs, code, table cells), `K_LISTITEM` (value: the item's number),
@@ -4113,11 +4180,14 @@ self.vl.insert(0, n);
 
 Tests: `apps/mdviewtest` (`--test unit`: the parser -- blocks, inline parts, HTML, text and HTML
 of ranges, forms -- adversarial input with time limits, the list's height cache, the headings
-and the fields in the accessibility tree, images the app supplies;
+and the fields in the accessibility tree, images the app supplies, the element tree and its
+changes (groups `dom`, `dom changes`, `dom view`, `dom cost`), the style sheets (`css`);
 `doc_shots.uis` light / dark / high contrast / HTML / Hebrew, `doc_rtl.uis` (mirrored window),
 `doc_scale.uis` (150 % text), `doc_links.uis`, `doc_select.uis`, `doc_keys.uis` (also 50 000
 blocks), `vlist.uis` (100 000 rows); with `--page form` a form page: `form_keys.uis`,
-`form_mouse.uis`, `form_images.uis`, `form_scale.uis` (150 %), `form_rtl.uis`; all with
+`form_mouse.uis`, `form_images.uis`, `form_scale.uis` (150 %), `form_rtl.uis`; with `--page dom`
+a page the app changes step by step: `dom_steps.uis`; with `--page css` a page with a style
+sheet: `css_shots.uis` (light, dark, high contrast, mirrored), `css_scale.uis` (150 %); all with
 `--verify-dirty`).
 
 ## 33. Sound: streams, short sounds, the system's sounds
