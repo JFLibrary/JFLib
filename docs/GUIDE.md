@@ -2158,6 +2158,39 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   for r in replies.push(&bytes) { /* r.code, r.text() */ }
   let (_, port) = ftp::host_port("Passive mode on (10,0,0,9,117,49).").unwrap_or_default();
   ```
+
+  SNMP: `ber` reads and writes the Basic Encoding Rules as SNMP uses them (RFC 3417 8: definite
+  lengths only, the simple types and SEQUENCE) -- `Reader` (`seq`, `int`, `uint`, `octets`,
+  `null`, `oid`, `value`), `Writer` (`begin(tag)` / `end()` around a SEQUENCE), `Oid` (`parse`,
+  `starts_with`, `child`; its order is SNMP's lexicographic one) and `Value` with every type of
+  SNMPv2-SMI and the exceptions noSuchObject, noSuchInstance and endOfMibView; what it refuses
+  comes back as `ber::Bad` (an indefinite length, an INTEGER without contents or beyond 64 bits,
+  a value outside its type's range, an OID not in its shortest form, of more than 128 arcs or
+  with an arc above 2^32 - 1, bytes after the end); writers use the shortest forms. `snmp` has
+  the messages of SNMPv1 (RFC 1157) and SNMPv2c (RFC 1901, RFC 3416): `Message::new(version,
+  community, pdu)`, `parse` and `to_bytes`, `Pdu` for Get, GetNext, GetBulk (`Pdu::bulk` with
+  non-repeaters and max-repetitions), Set, Response, SNMPv2-Trap, Inform and Report, `TrapV1`
+  for the trap of version 1, the error statuses with `error_name` and `v1_error` (RFC 3584
+  4.4), the generic traps with `trap_oid` / `generic_of` between version 1 traps and
+  notification OIDs (RFC 3584 3.1) and the OIDs every notification carries (`SYS_UPTIME_0`,
+  `SNMP_TRAP_OID_0`, ...). `mib` is a small MIB built in: the objects of SNMPv2-MIB (system,
+  snmp, the notifications), IF-MIB (ifTable, ifXTable, linkDown, linkUp), IP-MIB (ipAddrTable)
+  and IP-FORWARD-MIB (ipCidrRouteTable) with syntax, access and the names of enumerations;
+  `lookup` reads "sysName.0", "IF-MIB::ifDescr.2" or dotted numbers, `name_of` writes
+  "SNMPv2-MIB::sysName.0", `show` a binding as net-snmp prints it ("IF-MIB::ifOperStatus.3 =
+  INTEGER: up(1)") and `children` gives the objects below a node (a tree of the MIB).
+  `decode::layers` shows every field of a message to or from port 161 or 162 with the names of
+  its objects and a BER error as a problem at its place, `decode::info` sums it up
+  ("GetRequest 4660: SNMPv2-MIB::sysName.0"); its bit is `decode::P_SNMP`.
+
+  ```rust
+  let oid = mib::lookup("sysName.0").unwrap_or_default();
+  let get = snmp::Message::new(snmp::Version::V2c, "public", snmp::Pdu::new(snmp::Kind::Get, 4660, vec![snmp::VarBind::null(oid)]));
+  let answer = snmp::Message::parse(&payload)?;               // Err(snmp::Bad) for what is no SNMP
+  let lines: Vec<String> = answer.varbinds().iter().map(|vb| mib::show(vb.oid.arcs(), &vb.value, false)).collect();
+  let mut w = ber::Writer::new();
+  w.begin(ber::T_SEQUENCE); w.int(5); w.octets(b"public"); w.end();
+  ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
   nonces use `plat::random_bytes`.

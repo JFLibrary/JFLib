@@ -40,6 +40,11 @@
 // with its verb and argument and each reply line with its code; FTP-DATA (port 20, the active
 // data connections) its bytes; passive data connections run between two free ports and show
 // as TCP data (ftp.rs).
+// SNMP (UDP ports 161 and 162) shows version, community, the PDU with request id, error status and
+// index (non-repeaters and max-repetitions of a GetBulk; enterprise, agent address, generic and
+// specific trap and time stamp of a v1 Trap) and each variable binding with the name of a known
+// object and its value as net-snmp prints it; BER that does not hold is a problem at its place
+// (snmp.rs, ber.rs, mib.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -66,6 +71,9 @@ use crate::ospf;
 use crate::bgp;
 use crate::tftp;
 use crate::ftp;
+use crate::ber;
+use crate::mib;
+use crate::snmp;
 
 pub const P_ETH: u32 = 1 << 0;
 pub const P_VLAN: u32 = 1 << 1;
@@ -565,6 +573,7 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Bgp => Some(bgp_layer(frame, off, len)),
             Proto::Tftp => Some(tftp_layer(frame, off, len)),
             Proto::Ftp => Some(ftp_layer(frame, off, len, ftp_response(&st, frame))),
+            Proto::Snmp => Some(snmp_layer(frame, off, len)),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -1024,6 +1033,7 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Tftp => Some(tftp_info(b)),
         Proto::Ftp => Some(ftp_info(b, ftp_response(st, frame))),
         Proto::FtpData => Some(format!("FTP Data: {} bytes", b.len())),
+        Proto::Snmp => Some(snmp_info(b)),
         _ => None,
     }
 }
@@ -2753,4 +2763,151 @@ fn ftp_info(b: &[u8], response: bool) -> String {
     let e = b.iter().position(|&c| c == b'\n').unwrap_or(b.len());
     let line = String::from_utf8_lossy(&b[..e]);
     format!("{}: {}", if response { "Response" } else { "Request" }, line.trim_end())
+}
+
+// ---------------------------------------------------------------- SNMP
+
+/// "SNMPv2-MIB::sysName.0 (1.3.6.1.2.1.1.5.0)"
+fn snmp_name(o: &ber::Oid) -> String {
+    let n = mib::name_of(o.arcs(), false);
+    if n == format!("{}", o) { n } else { format!("{} ({})", n, o) }
+}
+
+fn snmp_layer(frame: &[u8], off: usize, len: usize) -> B {
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Snmp, off, len, String::from("Simple Network Management Protocol"));
+    if let Err(e) = snmp_fields(&mut l, b, off) {
+        l.bad(e.text());
+    }
+    l
+}
+
+/// the fields of a message in order; the first element that does not hold ends them
+fn snmp_fields(l: &mut B, b: &[u8], off: usize) -> Result<(), snmp::Bad> {
+    let mut top = ber::Reader::new(b);
+    let mut m = top.seq(ber::T_SEQUENCE)?;
+    let vt = m.peek()?;
+    let vn = m.int()?;
+    let version = snmp::Version::of_number(vn);
+    let vname = match version {
+        Some(v) => format!("v{} ({})", v.word(), vn),
+        None if vn == 3 => format!("v3 ({})", vn),
+        None => format!("{}", vn),
+    };
+    l.f("Version", off + vt.off, vt.hdr + vt.len, vname.clone());
+    let Some(version) = version else {
+        return Err(snmp::Bad::Version(vn));
+    };
+    let ct = m.peek()?;
+    let community = m.octets()?;
+    l.f("Community", off + ct.off, ct.hdr + ct.len, String::from_utf8_lossy(community).into_owned());
+    let pt = m.peek()?;
+    let Some(kind) = snmp::Kind::of_tag(pt.tag) else {
+        l.f("PDU", off + pt.off, pt.hdr, format!("unknown (0x{:02x})", pt.tag));
+        return Err(snmp::Bad::Pdu(pt.tag));
+    };
+    l.l.title = format!("Simple Network Management Protocol, {}, {}", vname.split(' ').next().unwrap_or(""), kind.name());
+    l.f("PDU", off + pt.off, pt.hdr, format!("{} (0x{:02x})", kind.name(), pt.tag));
+    let fits = if version == snmp::Version::V1 { kind.in_v1() } else { kind.in_v2c() };
+    if !fits {
+        return Err(snmp::Bad::Pdu(pt.tag));
+    }
+    let mut p = m.seq(pt.tag)?;
+    if kind == snmp::Kind::TrapV1 {
+        let t = p.peek()?;
+        let ent = p.oid()?;
+        l.f("Enterprise", off + t.off, t.hdr + t.len, snmp_name(&ent));
+        let t = p.expect(ber::T_IPADDRESS)?;
+        let a = t.contents(b);
+        if a.len() != 4 {
+            return Err(snmp::Bad::Ber(ber::Bad::Size));
+        }
+        l.f("Agent address", off + t.off, t.hdr + t.len, format!("{}", Ipv4([a[0], a[1], a[2], a[3]])));
+        let t = p.peek()?;
+        let g = p.int32()?;
+        l.f("Generic trap", off + t.off, t.hdr + t.len, format!("{} ({})", snmp::generic_name(g), g));
+        let t = p.peek()?;
+        let sp = p.int32()?;
+        l.f("Specific trap", off + t.off, t.hdr + t.len, format!("{}", sp));
+        let t = p.peek()?;
+        let ts = p.uint(ber::T_TIMETICKS, u32::MAX as u64)? as u32;
+        l.f("Time stamp", off + t.off, t.hdr + t.len, mib::ticks_text(ts));
+    } else {
+        let t = p.peek()?;
+        let id = p.int32()?;
+        l.f("Request ID", off + t.off, t.hdr + t.len, format!("{}", id));
+        let t = p.peek()?;
+        let es = p.int32()?;
+        let t2 = p.peek()?;
+        let ei = p.int32()?;
+        if kind == snmp::Kind::GetBulk {
+            l.f("Non-repeaters", off + t.off, t.hdr + t.len, format!("{}", es));
+            l.f("Max-repetitions", off + t2.off, t2.hdr + t2.len, format!("{}", ei));
+        } else {
+            l.f("Error status", off + t.off, t.hdr + t.len, format!("{} ({})", snmp::error_name(es), es));
+            l.f("Error index", off + t2.off, t2.hdr + t2.len, format!("{}", ei));
+            if !(0..=snmp::E_INCONSISTENT_NAME).contains(&es) {
+                l.bad(format!("an error status SNMP does not define ({})", es));
+            }
+        }
+    }
+    let lt = p.peek()?;
+    let mut list = p.seq(ber::T_SEQUENCE)?;
+    let at = l.l.fields.len();
+    let mut n = 0;
+    while !list.is_empty() {
+        let mut vb = list.seq(ber::T_SEQUENCE)?;
+        let ot = vb.peek()?;
+        let oid = vb.oid()?;
+        l.f("Object Name", off + ot.off, ot.hdr + ot.len, snmp_name(&oid));
+        let vt = vb.peek()?;
+        let value = vb.value()?;
+        l.f("Value", off + vt.off, vt.hdr + vt.len, mib::show(oid.arcs(), &value, false));
+        if version == snmp::Version::V1 && (matches!(value, ber::Value::Counter64(_)) || value.is_exception()) {
+            return Err(snmp::Bad::V1Type(vt.tag));
+        }
+        vb.done()?;
+        n += 1;
+    }
+    l.l.fields.insert(at, Field { name: "Variable bindings", value: format!("{} binding{}", n, if n == 1 { "" } else { "s" }), off: (off + lt.off) as u32, len: (lt.hdr + lt.len) as u32 });
+    p.done()?;
+    m.done()?;
+    top.done()?;
+    Ok(())
+}
+
+/// "GetRequest 1234: SNMPv2-MIB::sysName.0", "Response 1234: SNMPv2-MIB::sysName.0 = STRING: R1",
+/// "Response 1234: noSuchName (index 1)", "SNMPv2-Trap 7: IF-MIB::linkDown", "Trap (v1): linkDown"
+fn snmp_info(b: &[u8]) -> String {
+    let m = match snmp::Message::parse(b) {
+        Ok(m) => m,
+        Err(e) => return format!("SNMP (malformed: {})", e.text()),
+    };
+    let first = |vbs: &[snmp::VarBind], value: bool| -> String {
+        let Some(v) = vbs.first() else {
+            return String::new();
+        };
+        let mut s = mib::name_of(v.oid.arcs(), false);
+        if value {
+            s.push_str(" = ");
+            s.push_str(&mib::show(v.oid.arcs(), &v.value, false));
+        }
+        if vbs.len() > 1 {
+            s.push_str(&format!(" (+{})", vbs.len() - 1));
+        }
+        s
+    };
+    match &m.body {
+        snmp::Body::Trap(t) => format!("Trap (v1): {}, agent {}", snmp::generic_name(t.generic), t.agent_addr),
+        snmp::Body::Pdu(p) => match p.kind {
+            snmp::Kind::TrapV2 | snmp::Kind::Inform => {
+                let what = snmp::notification(&p.varbinds).map(|o| mib::name_of(o.arcs(), false)).unwrap_or_else(|| String::from("?"));
+                format!("{} {}: {}", p.kind.name(), p.request_id, what)
+            }
+            snmp::Kind::Response if p.error_status != 0 => format!("Response {}: {} (index {})", p.request_id, snmp::error_name(p.error_status), p.error_index),
+            snmp::Kind::Response | snmp::Kind::Set => format!("{} {}: {}", p.kind.name(), p.request_id, first(&p.varbinds, true)),
+            snmp::Kind::GetBulk => format!("GetBulkRequest {}: N={} M={} {}", p.request_id, p.non_repeaters(), p.max_repetitions(), first(&p.varbinds, false)),
+            k => format!("{} {}: {}", k.name(), p.request_id, first(&p.varbinds, false)),
+        },
+    }
 }
