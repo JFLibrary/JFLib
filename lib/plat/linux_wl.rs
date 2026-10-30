@@ -21,6 +21,7 @@
 //   linux_wl_clip.rs     wl_data_device: clipboard both ways, drag and drop in and out
 //                                                                             [wl_clip.s]
 //   linux_wl_cursor.rs   cursor-shape protocol, own cursor images, custom cursors [wl_cursor.s]
+//   linux_wl_act.rs      xdg-activation: the launcher's token, raising and restoring windows
 //
 // State: the assembly's globals are one record (Wl) owned by this module, created on the
 // first use (the synthetic tests use it without a connection).  Every entry point (the
@@ -40,6 +41,9 @@ pub(crate) fn wl_monitors() -> Vec<crate::screen::Monitor> {
     with(|wl| wl.monitors())
 }
 
+#[path = "linux_wl_act.rs"]
+mod act;
+pub(crate) use act::act_provide;
 #[path = "linux_wl_child.rs"]
 mod child;
 #[path = "linux_wl_clip.rs"]
@@ -80,6 +84,7 @@ pub(crate) struct Wl {
     pub cur: cursor::Cursor,
     pub ime: ime::Ime,
     pub drag: child::Drag, // a child window moved / resized by the library
+    pub act: act::Act,     // xdg-activation (linux_wl_act.rs)
 }
 
 impl Wl {
@@ -97,6 +102,7 @@ impl Wl {
             cur: cursor::Cursor::default(),
             ime: Default::default(),
             drag: Default::default(),
+            act: Default::default(),
         }
     }
 }

@@ -12,6 +12,11 @@
 //   wlwin     an owned tool window, a popup over the main window, a custom cursor
 //   wlclip    clipboard images: an image/png + image/bmp offer, an image/bmp-only offer
 //             (clip_bmp_fix), our own CLIP_IMAGE / CLIP_PNG selection
+//   activate  xdg-activation on a real compositor (KWin, mutter; sway cannot minimize): the
+//             main window minimized, win_activate brings it back with a token asked for with
+//             the keyboard focus's serial (granted while nobody used another window meanwhile);
+//             $XDG_ACTIVATION_TOKEN is gone from the environment (start it with one set: the
+//             compositor refuses a made-up token, then only that check is made)
 
 use alloc::format;
 use alloc::vec;
@@ -25,6 +30,29 @@ use plat::{
 use crate::{Lt, out};
 
 const VK_SHIFT: u32 = 0x10;
+
+/// xdg-activation: minimized, then brought back by win_activate
+pub fn test_activate(t: &mut Lt) {
+    if t.headless {
+        t.check(false, "activate needs a window (run without --shot)");
+        return;
+    }
+    t.check(plat::env("XDG_ACTIVATION_TOKEN").is_none(), "the launcher's token is out of the environment");
+    t.redraw();
+    if !t.pump(3000, E_FOCUS_IN) {
+        out("  (no keyboard focus: the compositor did not activate the window -- a made-up token, a locked screen)\n");
+        return;
+    }
+    plat::win_cmd(0, plat::WCMD_MINIMIZE);
+    let out_ok = t.pump(3000, E_FOCUS_OUT);
+    t.check(out_ok, "minimized: the focus leaves");
+    t.check(plat::win_state(0) & plat::WST_MINIMIZED != 0, "minimized: WST_MINIMIZED");
+    plat::win_activate(0);
+    let back = t.pump(3000, E_FOCUS_IN);
+    t.check(back, "win_activate: the window is back with the focus");
+    pump_log(300);
+    t.check(plat::win_state(0) & plat::WST_MINIMIZED == 0, "win_activate: no longer minimized");
+}
 
 /// every fallback cursor at S = 2 into a sheet PNG (--out FILE); red pixel = hot spot
 pub fn test_cursors(t: &mut Lt) {

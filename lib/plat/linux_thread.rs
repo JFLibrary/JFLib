@@ -176,7 +176,7 @@ impl Sem {
         }
         // saturating: an i32 overflow would turn the count negative and block waiters for good
         let add = n.min(i32::MAX as u32) as i32;
-        let _ = self.0.count.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |c| Some(c.saturating_add(add)));
+        let _ = self.0.count.try_update(Ordering::SeqCst, Ordering::SeqCst, |c| Some(c.saturating_add(add)));
         if self.0.waiters.load(Ordering::SeqCst) != 0 {
             // SAFETY: the futex word lives as long as self.
             unsafe {

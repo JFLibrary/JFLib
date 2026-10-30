@@ -7,13 +7,15 @@
 // taken -- in Flatpak the pid is the same for every app -- the connection's own name and the
 // object path), the object /StatusNotifierItem (properties Category, Id, Title, Status,
 // IconName / IconPixmap, ToolTip, ItemIsMenu, Menu; Activate -> Activate, SecondaryActivate ->
-// SecondaryActivate), announced to org.kde.StatusNotifierWatcher (again when the watcher
+// SecondaryActivate; KDE's ProvideXdgActivationToken before them -> the token for the window
+// the app raises, linux_wl_act.rs), announced to org.kde.StatusNotifierWatcher (again when the watcher
 // starts anew).  supported() is whether that watcher runs (KDE, Xfce, ...; GNOME only with the
 // AppIndicator extension): asked on the bus, kept up to date by the thread.  Its menu is a
 // com.canonical.dbusmenu at /MenuBar (GetLayout, GetGroupProperties, Event "clicked" ->
 // Menu(id), AboutToShow); every tray_set raises the layout revision.  tray_remove gives the
 // name back.  Notifications: org.freedesktop.Notifications.Notify with the action "default";
-// ActionInvoked -> NoteClicked, NotificationClosed -> NoteClosed (unless it was clicked).
+// ActionInvoked -> NoteClicked (the ActivationToken signal before it -> the token, as for the
+// symbol), NotificationClosed -> NoteClosed (unless it was clicked).
 // The UI thread hands its requests over in a queue and wakes the thread with an eventfd.
 
 use alloc::boxed::Box;
@@ -395,7 +397,7 @@ fn menu_property(name: &str) -> Option<Value> {
 
 fn introspection(path: &str) -> String {
     let body = match path {
-        SNI_PATH => "<interface name=\"org.kde.StatusNotifierItem\"><method name=\"Activate\"><arg type=\"i\" direction=\"in\"/><arg type=\"i\" direction=\"in\"/></method><method name=\"SecondaryActivate\"><arg type=\"i\" direction=\"in\"/><arg type=\"i\" direction=\"in\"/></method><method name=\"ContextMenu\"><arg type=\"i\" direction=\"in\"/><arg type=\"i\" direction=\"in\"/></method><method name=\"Scroll\"><arg type=\"i\" direction=\"in\"/><arg type=\"s\" direction=\"in\"/></method><signal name=\"NewIcon\"/><signal name=\"NewToolTip\"/><signal name=\"NewTitle\"/><signal name=\"NewStatus\"><arg type=\"s\"/></signal></interface>",
+        SNI_PATH => "<interface name=\"org.kde.StatusNotifierItem\"><method name=\"Activate\"><arg type=\"i\" direction=\"in\"/><arg type=\"i\" direction=\"in\"/></method><method name=\"SecondaryActivate\"><arg type=\"i\" direction=\"in\"/><arg type=\"i\" direction=\"in\"/></method><method name=\"ContextMenu\"><arg type=\"i\" direction=\"in\"/><arg type=\"i\" direction=\"in\"/></method><method name=\"Scroll\"><arg type=\"i\" direction=\"in\"/><arg type=\"s\" direction=\"in\"/></method><method name=\"ProvideXdgActivationToken\"><arg type=\"s\" direction=\"in\"/></method><signal name=\"NewIcon\"/><signal name=\"NewToolTip\"/><signal name=\"NewTitle\"/><signal name=\"NewStatus\"><arg type=\"s\"/></signal></interface>",
         MENU_PATH => "<interface name=\"com.canonical.dbusmenu\"><method name=\"GetLayout\"><arg type=\"i\" direction=\"in\"/><arg type=\"i\" direction=\"in\"/><arg type=\"as\" direction=\"in\"/><arg type=\"u\" direction=\"out\"/><arg type=\"(ia{sv}av)\" direction=\"out\"/></method><method name=\"Event\"><arg type=\"i\" direction=\"in\"/><arg type=\"s\" direction=\"in\"/><arg type=\"v\" direction=\"in\"/><arg type=\"u\" direction=\"in\"/></method><method name=\"AboutToShow\"><arg type=\"i\" direction=\"in\"/><arg type=\"b\" direction=\"out\"/></method><signal name=\"LayoutUpdated\"><arg type=\"u\"/><arg type=\"i\"/></signal></interface>",
         _ => "",
     };
@@ -438,6 +440,12 @@ fn handle(c: &mut Conn, it: &mut Item, m: &Msg) {
             }
         }
         T_SIGNAL => match (m.iface.as_str(), m.member.as_str()) {
+            (NOTES, "ActivationToken") => {
+                // (spec 1.2) before ActionInvoked: the window the app raises may come forward
+                if m.body.first().and_then(|v| v.as_u32()).is_some_and(|s| it.notes.contains_key(&s)) {
+                    crate::act_provide(arg_s(m, 1));
+                }
+            }
             (NOTES, "ActionInvoked") => {
                 if let Some(&id) = m.body.first().and_then(|v| v.as_u32()).and_then(|s| it.notes.get(&s)) {
                     it.clicked.push(id);
@@ -498,6 +506,10 @@ fn call(it: &Item, m: &Msg) -> Option<Vec<Value>> {
         }
         (SNI_PATH, SNI_IFACE, "SecondaryActivate") => {
             tray::push(TrayEvent::SecondaryActivate);
+            Some(Vec::new())
+        }
+        (SNI_PATH, SNI_IFACE, "ProvideXdgActivationToken") => {
+            crate::act_provide(arg_s(m, 0));
             Some(Vec::new())
         }
         (SNI_PATH, SNI_IFACE, "ContextMenu" | "Scroll") => Some(Vec::new()),

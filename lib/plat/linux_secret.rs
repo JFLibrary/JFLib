@@ -6,7 +6,13 @@
 //              private bytes, crypto::bn::Mont::pow_ct), the shared value as 128 bytes ->
 //              HKDF-SHA256 without salt and info -> the AES-128 key; values travel AES-CBC with
 //              PKCS #7 padding and a random IV.  "plain" only when the service answers
-//              NotSupported (as libsecret).
+//              NotSupported (as libsecret).  Services write these numbers differently: KDE's
+//              ksecretd (KWallet 6.24) sends its public value with a sign byte (129 bytes when
+//              the top bit is set), refuses ours when it is shorter than 128 bytes and hashes
+//              the shared value without leading zeros, libsecret / gnome-keyring pad it to 128
+//              bytes.  So the peer's value is read without leading zeros, our public value
+//              never starts with a zero byte (a new pair) and a shared value that does opens
+//              a new session: then every way of writing them is the same.
 //   set        ReadAlias("default") (missing: CreateCollection(label, "default") and its
 //              prompt), CreateItem(label, attributes, secret, replace) on that collection;
 //              IsLocked -> Unlock + prompt, then once more
@@ -145,58 +151,89 @@ impl Drop for Session {
     }
 }
 
-// (private, public) of a new Diffie-Hellman key pair
+// (private, public) of a new Diffie-Hellman key pair; the public value has 128 bytes and no
+// leading zero byte (written with or without them it is the same; ksecretd refuses less)
 fn dh_pair(m: &Mont) -> ([u8; 128], Vec<u8>) {
     let mut private = [0u8; 128];
-    crate::fill_random(&mut private);
-    let public = to_be(&m.pow_ct(&[2], &private), 128);
-    let skip = public.iter().position(|&b| b != 0).unwrap_or(127);
-    (private, public[skip..].to_vec())
+    loop {
+        crate::fill_random(&mut private);
+        let public = to_be(&m.pow_ct(&[2], &private), 128);
+        if public[0] != 0 {
+            return (private, public);
+        }
+    }
 }
 
-// the session's cipher from the service's public value (None: not in 2 .. p - 2)
-fn dh_key(m: &Mont, private: &[u8; 128], peer: &[u8]) -> Option<Aes> {
+/// why the service's public value gives no cipher
+enum DhErr {
+    /// not in 2 .. p - 2
+    Invalid,
+    /// the shared value starts with a zero byte: services hash it with or without it
+    LeadingZero,
+}
+
+// the session's cipher from the service's public value (leading zero bytes, ksecretd's sign
+// byte, are skipped)
+fn dh_key(m: &Mont, private: &[u8; 128], peer: &[u8]) -> Result<Aes, DhErr> {
+    let peer = &peer[peer.iter().position(|&b| b != 0).unwrap_or(peer.len())..];
     if peer.len() > 128 {
-        return None;
+        return Err(DhErr::Invalid);
     }
     let y = from_be(peer, 16);
     let mut top = from_be(&PRIME, 16);
     top[0] -= 1; // p - 1 (p is odd)
     if crypto::bn::cmp(&y, &[1]) != core::cmp::Ordering::Greater || crypto::bn::cmp(&y, &top) != core::cmp::Ordering::Less {
-        return None;
+        return Err(DhErr::Invalid);
     }
     let mut shared = to_be(&m.pow_ct(&y, private), 128);
+    if shared[0] == 0 {
+        crypto::zeroize(&mut shared);
+        return Err(DhErr::LeadingZero);
+    }
     let mut key = [0u8; 16];
     crypto::hkdf_sha256(&[], &shared, &[], &mut key);
     crypto::zeroize(&mut shared);
     let aes = Aes::new(&key);
     crypto::zeroize(&mut key);
-    aes
+    aes.ok_or(DhErr::Invalid)
 }
 
 fn open() -> Result<Session, SecretError> {
     let mut c = Conn::session().ok_or(SecretError::Unavailable)?;
     let m = Mont::new(&from_be(&PRIME, 16)).ok_or(SecretError::Invalid)?;
-    let (mut private, public) = dh_pair(&m);
-    let r = call(&mut c, DEST, ROOT, I_SERVICE, "OpenSession", vec![Value::str(ALGO), Value::var(bytes(&public))]);
-    let s = match r {
-        Ok(b) => {
-            let aes = b.first().and_then(as_bytes).and_then(|peer| dh_key(&m, &private, &peer));
-            crypto::zeroize(&mut private);
-            let s = Session { c, path: as_path(b.get(1)), aes };
-            if s.aes.is_none() {
-                return Err(SecretError::Failed(String::from("the Secret Service sent an invalid public key"))); // closes it
+    let mut tries = 0;
+    let s = loop {
+        let (mut private, public) = dh_pair(&m);
+        let r = call(&mut c, DEST, ROOT, I_SERVICE, "OpenSession", vec![Value::str(ALGO), Value::var(bytes(&public))]);
+        match r {
+            Ok(b) => {
+                let k = b.first().and_then(as_bytes).map_or(Err(DhErr::Invalid), |peer| dh_key(&m, &private, &peer));
+                crypto::zeroize(&mut private);
+                let path = as_path(b.get(1));
+                match k {
+                    Ok(aes) => break Session { c, path, aes: Some(aes) },
+                    // a shared value with a leading zero (1 in 256): close it, a new pair
+                    Err(DhErr::LeadingZero) if tries < 8 => {
+                        tries += 1;
+                        let mut close = Msg::call(DEST, &path, "org.freedesktop.Secret.Session", "Close", Vec::new());
+                        close.flags = F_NO_REPLY;
+                        c.send(&close);
+                    }
+                    Err(_) => {
+                        drop(Session { c, path, aes: None }); // closes it
+                        return Err(SecretError::Failed(String::from("the Secret Service sent an invalid public key")));
+                    }
+                }
             }
-            s
-        }
-        Err(e) if e == E_UNSUPPORTED => {
-            crypto::zeroize(&mut private);
-            let b = call(&mut c, DEST, ROOT, I_SERVICE, "OpenSession", vec![Value::str("plain"), Value::var(Value::str(""))]).map_err(|e| fail(&e))?;
-            Session { c, path: as_path(b.get(1)), aes: None }
-        }
-        Err(e) => {
-            crypto::zeroize(&mut private);
-            return Err(fail(&e));
+            Err(e) if e == E_UNSUPPORTED => {
+                crypto::zeroize(&mut private);
+                let b = call(&mut c, DEST, ROOT, I_SERVICE, "OpenSession", vec![Value::str("plain"), Value::var(Value::str(""))]).map_err(|e| fail(&e))?;
+                break Session { c, path: as_path(b.get(1)), aes: None };
+            }
+            Err(e) => {
+                crypto::zeroize(&mut private);
+                return Err(fail(&e));
+            }
         }
     };
     if s.path == "/" {

@@ -17970,8 +17970,11 @@ Channel (control_ipc_win.rs / control_ipc_linux.rs): Windows the pipe
 the first process that creates it is the instance; the starting process lets it take the
 foreground); Linux the abstract socket jfgui-instance-<uid>-<app>.  Both ends make sure the
 other runs as the same user.  Message: "JFI1", u32 length of the rest, u32 count, count x
-(u32 length, UTF-8): the working folder, then the arguments (without the program); answer
-"OK".  At most 1 MiB, 3 s per exchange.
+(u32 length, UTF-8): the working folder, then the arguments (without the program), on Linux
+then "XAT1", u32 length, the start's $XDG_ACTIVATION_TOKEN when it has one (the running
+instance's window comes forward with it on Wayland: linux_wl_act.rs; an instance of an older
+version refuses the block, then the request goes again without it); answer "OK".  At most
+1 MiB, 3 s per exchange.
 ```
 
 - **`enum Claim`**
@@ -21397,6 +21400,7 @@ The modules follow the assembly files:
   linux_wl_clip.rs     wl_data_device: clipboard both ways, drag and drop in and out
                                                                             [wl_clip.s]
   linux_wl_cursor.rs   cursor-shape protocol, own cursor images, custom cursors [wl_cursor.s]
+  linux_wl_act.rs      xdg-activation: the launcher's token, raising and restoring windows
 
 State: the assembly's globals are one record (Wl) owned by this module, created on the
 first use (the synthetic tests use it without a connection).  Every entry point (the

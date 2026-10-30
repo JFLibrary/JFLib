@@ -17,8 +17,11 @@
 // the first process that creates it is the instance; the starting process lets it take the
 // foreground); Linux the abstract socket jfgui-instance-<uid>-<app>.  Both ends make sure the
 // other runs as the same user.  Message: "JFI1", u32 length of the rest, u32 count, count x
-// (u32 length, UTF-8): the working folder, then the arguments (without the program); answer
-// "OK".  At most 1 MiB, 3 s per exchange.
+// (u32 length, UTF-8): the working folder, then the arguments (without the program), on Linux
+// then "XAT1", u32 length, the start's $XDG_ACTIVATION_TOKEN when it has one (the running
+// instance's window comes forward with it on Wayland: linux_wl_act.rs; an instance of an older
+// version refuses the block, then the request goes again without it); answer "OK".  At most
+// 1 MiB, 3 s per exchange.
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -46,6 +49,7 @@ pub struct Request {
 }
 
 const MAGIC: &[u8; 4] = b"JFI1";
+const TOKEN_TAG: &[u8; 4] = b"XAT1";
 const MSG_MAX: usize = 1 << 20;
 #[cfg(any(windows, target_os = "linux"))]
 const QUEUE_MAX: usize = 64;
@@ -83,12 +87,17 @@ pub fn take() -> Vec<Request> {
     core::mem::take(&mut *QUEUE.lock())
 }
 
-fn encode(cwd: &str, args: &[String]) -> Option<Vec<u8>> {
+fn encode(cwd: &str, args: &[String], token: Option<&str>) -> Option<Vec<u8>> {
     let mut body = Vec::new();
     body.extend_from_slice(&(args.len() as u32 + 1).to_le_bytes());
     for s in core::iter::once(cwd).chain(args.iter().map(|a| a.as_str())) {
         body.extend_from_slice(&u32::try_from(s.len()).ok()?.to_le_bytes());
         body.extend_from_slice(s.as_bytes());
+    }
+    if let Some(t) = token {
+        body.extend_from_slice(TOKEN_TAG);
+        body.extend_from_slice(&u32::try_from(t.len()).ok()?.to_le_bytes());
+        body.extend_from_slice(t.as_bytes());
     }
     if body.len() > MSG_MAX {
         return None;
@@ -100,7 +109,8 @@ fn encode(cwd: &str, args: &[String]) -> Option<Vec<u8>> {
     Some(out)
 }
 
-fn decode(body: &[u8]) -> Option<Request> {
+// -> the request and the start's activation token
+fn decode(body: &[u8]) -> Option<(Request, Option<String>)> {
     let rd = |p: usize| -> Option<usize> { Some(u32::from_le_bytes(body.get(p..p + 4)?.try_into().ok()?) as usize) };
     let count = rd(0)?;
     let mut p = 4;
@@ -111,11 +121,17 @@ fn decode(body: &[u8]) -> Option<Request> {
         items.push(String::from(s));
         p += 4 + n;
     }
+    let mut token = None;
+    if body.get(p..p + 4) == Some(&TOKEN_TAG[..]) {
+        let n = rd(p + 4)?;
+        token = Some(String::from(core::str::from_utf8(body.get(p + 8..p.checked_add(8 + n)?)?).ok()?));
+        p += 8 + n;
+    }
     if p != body.len() || items.is_empty() {
         return None;
     }
     let cwd = items.remove(0);
-    Some(Request { cwd, args: items })
+    Some((Request { cwd, args: items }, token))
 }
 
 // ---------------------------------------------------------------- native
@@ -174,7 +190,11 @@ mod native {
         if !read_exact(c, &mut body, end) {
             return false;
         }
-        let Some(req) = decode(&body) else { return false };
+        let Some((req, _token)) = decode(&body) else { return false };
+        #[cfg(target_os = "linux")]
+        if let Some(t) = &_token {
+            crate::act_provide(t); // before the UI brings its window forward
+        }
         {
             let mut q = QUEUE.lock();
             if q.len() == QUEUE_MAX {
@@ -209,7 +229,10 @@ mod native {
                 }
                 Ok(None) => {
                     let args: Vec<String> = crate::args().into_iter().skip(1).collect();
-                    if send(app, &crate::cwd(), &args) {
+                    let token = if cfg!(target_os = "linux") { crate::env("XDG_ACTIVATION_TOKEN") } else { None };
+                    let sent = |t: Option<&str>| encode(&crate::cwd(), &args, t).is_some_and(|m| send_msg(app, &m));
+                    // (an older instance refuses the token's block: again without it)
+                    if sent(token.as_deref()) || token.is_some() && sent(None) {
                         return Claim::Forwarded;
                     }
                     // the instance just ended (or does not answer): try to become it
@@ -221,10 +244,13 @@ mod native {
     }
 
     pub fn send(app: &str, cwd: &str, args: &[String]) -> bool {
+        encode(cwd, args, None).is_some_and(|m| send_msg(app, &m))
+    }
+
+    fn send_msg(app: &str, msg: &[u8]) -> bool {
         if !app_ok(app) {
             return false;
         }
-        let Some(msg) = encode(cwd, args) else { return false };
         let Ok(mut c) = inst_connect(app) else { return false };
         let end = deadline();
         let mut ok = [0u8; 2];

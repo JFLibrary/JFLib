@@ -590,8 +590,12 @@ impl Wl {
         self.wp[i].slots[k].busy = true;
         self.wp[i].newest = Some(k);
         self.wp[i].back = None;
+        let first = !self.win[i].mapped;
         self.win[i].mapped = true;
         self.present_drop(i);
+        if first {
+            self.act_mapped(i);
+        }
     }
 
     /// the pending damage is done (presented or dropped)

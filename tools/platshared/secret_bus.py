@@ -23,6 +23,11 @@ the fake accepts any number of them.  For every mode it starts plattest --test s
   nodefault no default alias: CreateCollection("Default keyring", "default") and its prompt,
             then CreateItem and Delete answer with prompts
   badkey    OpenSession answers the public key 1
+  ksecretd  the numbers as KDE's ksecretd (KWallet 6.24, QCA) writes them: its public value with
+            a sign byte (129 bytes, the top bit is always set here), client values shorter than
+            128 bytes refused, the shared value hashed without leading zeros -- the first
+            session's shared value starts with a zero byte, so plat must give it up (and every
+            other such one) and open another; then the round trip of dh
   none      the bus has no org.freedesktop.secrets: ServiceUnknown
 Exit code 0 = passed.
 """
@@ -37,7 +42,7 @@ try:
 except ImportError:
     Cipher = None
 
-MODES = ["dh", "plain", "locked", "dismiss", "nodefault", "badkey", "none"]
+MODES = ["dh", "plain", "locked", "dismiss", "nodefault", "badkey", "ksecretd", "none"]
 P = int("FFFFFFFFFFFFFFFFC90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B139B22514A0879"
         "8E3404DDEF9519B3CD3A431B302B0A6DF25F14374FE1356D6D51C245E485B576625E7EC6F44C42E9A637ED6B"
         "0BFF5CB6F406B7EDEE386BFB5A899FA5AE9F24117C4B1FE649286651ECE65381FFFFFFFFFFFFFFFF", 16)
@@ -63,9 +68,11 @@ def aes(key, iv, data, encrypt):
     return x.update(data) + x.finalize()
 
 
-def dh_key(shared):
-    """HKDF-SHA256 without salt and info of the 128-byte shared value -> 16 bytes"""
-    prk = hmac.new(b"\0" * 32, shared.to_bytes(128, "big"), hashlib.sha256).digest()
+def dh_key(shared, n=128):
+    """HKDF-SHA256 without salt and info of the shared value written in n bytes (None: without
+    leading zeros, as ksecretd) -> 16 bytes"""
+    raw = shared.to_bytes(n or (shared.bit_length() + 7) // 8, "big")
+    prk = hmac.new(b"\0" * 32, raw, hashlib.sha256).digest()
     return hmac.new(prk, b"\x01", hashlib.sha256).digest()[:16]
 
 
@@ -96,6 +103,9 @@ class Store:
         self.completed = []     # dismissed flags of the Completed signals
         self.matches = []
         self.threads = []
+        self.used = set()       # sessions a value travelled through (CreateItem, GetSecret)
+        self.zero_done = False  # ksecretd: the session with a leading zero was made
+        self.zero_sessions = []
         if mode != "nodefault":
             self.cols[LOGIN] = {"label": "Login", "locked": mode in ("locked", "dismiss")}
             self.alias["default"] = LOGIN
@@ -173,11 +183,25 @@ class Store:
             if vsig != "ay":
                 raise Fail("org.freedesktop.DBus.Error.InvalidArgs", vsig)
             client = int.from_bytes(bytes(vval), "big")
-            if not 1 < client < P - 1:
+            if not 1 < client < P - 1 or m == "ksecretd" and len(vval) < 128:
                 raise Fail("org.freedesktop.DBus.Error.InvalidArgs", "public key")
             if m == "badkey":
                 self.sessions[sp] = b"\0" * 16
                 return "vo", [("ay", b"\x01"), sp]
+            if m == "ksecretd":
+                # QCA's BigInteger::toArray: a sign byte when the top bit is set (always here);
+                # the first session's shared value starts with a zero byte
+                while True:
+                    priv = int.from_bytes(os.urandom(128), "big")
+                    mine, shared = pow(2, priv, P), pow(client, priv, P)
+                    if mine.bit_length() == 1024 and (self.zero_done or shared.bit_length() <= 1016):
+                        break
+                self.zero_done = True
+                if shared.bit_length() <= 1016:
+                    self.zero_sessions.append(sp)
+                self.sessions[sp] = dh_key(shared, None)
+                self.calls[-1] = (member, [algo, len(bytes(vval))])
+                return "vo", [("ay", b"\0" + mine.to_bytes(128, "big")), sp]
             priv = int.from_bytes(os.urandom(128), "big")
             mine = pow(2, priv, P)
             self.sessions[sp] = dh_key(pow(client, priv, P))
@@ -222,6 +246,7 @@ class Store:
             label = props.get("org.freedesktop.Secret.Item.Label", ("s", ""))[1]
             attrs = dict(props.get("org.freedesktop.Secret.Item.Attributes", ("a{ss}", {}))[1])
             plain, iv, wire, ctype = self.secret_in(sec)
+            self.used.add(sec[0])
             self.wire.append((plain, iv, wire, ctype, attrs, label, replace))
 
             def create():
@@ -237,6 +262,7 @@ class Store:
             if self.locked(path):
                 raise Fail("org.freedesktop.Secret.Error.IsLocked", path)
             if member == "GetSecret":
+                self.used.add(a[0])
                 return "(oayays)", [self.secret_out(a[0], path)]
             if member == "Delete":
                 def remove():
@@ -377,7 +403,7 @@ def run(exe, mode):
 def verify(mode, st):
     members = [c[0] for c in st.calls]
     opened = [c for c in st.calls if c[0] == "OpenSession"]
-    if mode in ("dh", "plain", "locked", "dismiss", "nodefault", "badkey"):
+    if mode in ("dh", "plain", "locked", "dismiss", "nodefault", "badkey", "ksecretd"):
         check(f"{mode}: every session closed again", set(st.sessions) <= st.closed, (len(st.sessions), len(st.closed)))
     if mode == "dh":
         check("dh: every session used dh-ietf1024 with a public key of at most 128 bytes",
@@ -423,6 +449,14 @@ def verify(mode, st):
         check("nodefault: its label", st.cols.get(NEWCOL, {}).get("label") == "Default keyring", st.cols)
         check("nodefault: prompts for the collection, items and Delete completed", len(st.completed) >= 4 and not any(st.completed), st.completed)
         check("nodefault: no item left", not st.items)
+    if mode == "ksecretd":
+        check("ksecretd: every public value of plat has 128 bytes", opened and all(c[1][1] == 128 for c in opened), opened[:3])
+        zs = st.zero_sessions
+        # (the first one is made so; a later one by chance, 1 in 256)
+        check("ksecretd: every session whose shared value starts with a zero byte was closed unused",
+              zs and all(z in st.closed and z not in st.used for z in zs), zs)
+        check("ksecretd: values went through the other sessions", st.wire and len(st.sessions) > 1)
+        check("ksecretd: no item left", not st.items)
     if mode == "badkey":
         check("badkey: OpenSession only, nothing stored", "OpenSession" in members and not st.wire and "CreateItem" not in members, members)
     if mode == "none":

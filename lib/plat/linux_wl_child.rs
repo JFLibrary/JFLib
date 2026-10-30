@@ -385,12 +385,15 @@ impl Wl {
     }
 
     /// (win_activate) a child window gets the keys of its root and goes on top of its
-    /// siblings; a toplevel takes them back from its children
+    /// siblings; a toplevel takes them back from its children and is activated
     pub(crate) fn win_activate(&mut self, w: i32) {
         if !self.is_child(w) {
             let c = self.inp.kb_child;
             if c >= 0 && self.rec(w).is_some() && self.root_of(c as usize) as i32 == w {
                 self.kb_child_set(-1);
+            }
+            if self.rec(w).is_some() {
+                self.act_request(w as usize); // raised and restored (linux_wl_act.rs)
             }
             return;
         }

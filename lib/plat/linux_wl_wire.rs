@@ -704,8 +704,17 @@ impl Wire {
                     }
                 }
                 _ => {
-                    // 'a'
-                    t.extend_from_slice(format!("[{v} bytes]").as_bytes());
+                    // 'a': short arrays of u32 (toplevel states, pressed keys) by value
+                    if v % 4 == 0 && v <= 64 {
+                        t.push(b'[');
+                        for k in 0..v as usize / 4 {
+                            let s = if k == 0 { format!("{}", rd32(msg, c + 4 * k)) } else { format!(", {}", rd32(msg, c + 4 * k)) };
+                            t.extend_from_slice(s.as_bytes());
+                        }
+                        t.push(b']');
+                    } else {
+                        t.extend_from_slice(format!("[{v} bytes]").as_bytes());
+                    }
                     c += (v as usize + 3) & !3;
                 }
             }

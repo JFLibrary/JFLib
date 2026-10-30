@@ -22,7 +22,8 @@
 //        asynchronously, presents wait for it; hide = the window's objects are destroyed:
 //        WSLg keeps the RAIL window of an unmapped toplevel, only a destroyed wl_surface
 //        removes it)   win_activate: which window gets the keys inside a toplevel (child
-//        windows), else nothing   win_enable: nothing
+//        windows); a toplevel is raised (and restored) through xdg-activation
+//        (linux_wl_act.rs)   win_enable: nothing
 //   win_set_rect(w, x, y, cw, ch)   size only (the position can not be set); a child
 //        window's position relative to its owner and its size on the pixel grid
 //   win_get_rect -> None (unknown on Wayland), a child window's rectangle in its owner
@@ -105,6 +106,7 @@ pub(crate) struct Globals {
     pub tabm: u32,
     pub subc: u32, // wl_subcompositor (child windows)
     pub rpm: u32,  // zwp_relative_pointer_manager_v1 (child windows' drags)
+    pub actm: u32, // xdg_activation_v1 (linux_wl_act.rs)
     pub toolwin_top: bool, // jfgui_WL_TOOLWIN=toplevel: tool windows are toplevels
     pub zc: u32,           // stacking counter of the child windows
     pub xom: u32, // zxdg_output_manager_v1 (screen.rs monitors)
@@ -163,7 +165,7 @@ pub(crate) struct WinRec {
 }
 
 /// the globals we bind: name, interface, highest version we speak, lowest we accept
-static GLOBALS: [(&str, &Iface, u32, u32); 13] = [
+static GLOBALS: [(&str, &Iface, u32, u32); 14] = [
     ("wl_compositor", &IFACE_WL_COMPOSITOR, 6, 4),
     ("wl_shm", &IFACE_WL_SHM, 1, 1),
     ("wl_seat", &IFACE_WL_SEAT, 8, 1),
@@ -177,6 +179,7 @@ static GLOBALS: [(&str, &Iface, u32, u32); 13] = [
     ("zwp_tablet_manager_v2", &IFACE_TABLET_MGR, 1, 1), // (PN1) linux_wl_tablet.rs
     ("wl_subcompositor", &IFACE_WL_SUBCOMPOSITOR, 1, 1),  // child windows
     ("zwp_relative_pointer_manager_v1", &IFACE_ZWP_RPM, 1, 1), // child windows' drags
+    ("xdg_activation_v1", &super::act::IFACE_XDG_ACTIVATION, 1, 1), // raising windows
 ];
 
 /// leading decimal integer (parse_int: blanks, sign)
@@ -222,6 +225,7 @@ impl Wl {
             }
         }
         self.g.toolwin_top = crate::env("jfgui_WL_TOOLWIN").is_some_and(|v| v.starts_with('t'));
+        self.act_start();
         // disp.s probing: quiet unless jfgui_BACKEND forces Wayland
         self.w.quiet = crate::disp_wl_quiet();
         self.w.connect()
@@ -373,11 +377,8 @@ impl Wl {
         self.w.send(top, &TOPLEVEL_SET_TITLE, &[A::S(Some(&title))]);
         self.g.titles[w] = title;
         // app id = basename of argv[0]
-        if let Some(a0) = crate::args().first() {
-            let id = match a0.rfind('/') {
-                Some(n) => &a0[n + 1..],
-                None => &a0[..],
-            };
+        let id = super::act::app_id();
+        if !id.is_empty() {
             self.w.send(top, &TOPLEVEL_SET_APP_ID, &[A::S(Some(id.as_bytes()))]);
         }
         self.size_limits(w as i32);
@@ -1031,7 +1032,7 @@ impl Wl {
 
     fn global_id(&self, gi: usize) -> u32 {
         let g = &self.g;
-        [g.comp, g.shm, g.seat, g.xdg_wm, g.ddm, g.vpr, g.fsm, g.csm, g.decom, g.dialogm, g.tabm, g.subc, g.rpm][gi]
+        [g.comp, g.shm, g.seat, g.xdg_wm, g.ddm, g.vpr, g.fsm, g.csm, g.decom, g.dialogm, g.tabm, g.subc, g.rpm, g.actm][gi]
     }
 
     fn set_global(&mut self, gi: usize, id: u32, v: u32) {
@@ -1058,7 +1059,8 @@ impl Wl {
             9 => g.dialogm = id,
             10 => g.tabm = id,
             11 => g.subc = id,
-            _ => g.rpm = id,
+            12 => g.rpm = id,
+            _ => g.actm = id,
         }
     }
 }

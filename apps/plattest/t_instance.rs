@@ -3,7 +3,8 @@
 //
 //   Request::paths, claim of a fresh app name (Primary), send from this process, a second
 //   process (spawn_self --test instance-client) that is Forwarded and whose arguments arrive
-//   here, and a second claim in this process (Forwarded to itself).
+//   here, and a second claim in this process (Forwarded to itself); on Linux once more with
+//   $XDG_ACTIVATION_TOKEN set (the token travels in a block of its own, not as an argument).
 //   plattest --test instance-client --inst NAME ...   that second process: exit code 0 when
 //   claim(NAME) was Forwarded
 
@@ -55,6 +56,13 @@ pub fn t_instance(t: &mut T) {
     // a second claim in this process reaches the first one
     t.check(instance::claim(&name) == Claim::Forwarded, "instance: a later claim is forwarded");
     t.check(next().is_some_and(|r| r.args == plat::args().into_iter().skip(1).collect::<Vec<_>>()), "instance: with this process's arguments");
+    #[cfg(target_os = "linux")]
+    {
+        plat::setenv("XDG_ACTIVATION_TOKEN", Some("plattest-token"));
+        t.check(instance::claim(&name) == Claim::Forwarded, "instance: forwarded with an activation token");
+        t.check(next().is_some_and(|r| r.args == plat::args().into_iter().skip(1).collect::<Vec<_>>()), "instance: ... the token is no argument");
+        plat::setenv("XDG_ACTIVATION_TOKEN", None);
+    }
 
     t.check(!instance::send(&format!("{name}-none"), "/", &s(&["x"])), "instance: no instance, no delivery");
 }
