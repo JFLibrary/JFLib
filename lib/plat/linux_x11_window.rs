@@ -11,7 +11,9 @@
 //        _MOTIF_WM_HINTS without decorations unless PWF_SYSFRAME.  Created unmapped.
 //   win_destroy / win_show / win_activate / win_set_rect / win_get_rect / win_work_area /
 //   win_set_title / win_state / win_cmd / moveresize / begin_resize / win_size /
-//   win_set_min_size (also before the window exists)
+//   win_set_min_size (also before the window exists); (L7) win_cmd WCMD_FULLSCREEN /
+//   WCMD_WINDOWED: _NET_WM_STATE_FULLSCREEN added / removed (a change of the state, also the
+//   window manager's own, is followed by an E_RESIZE so the UI sees it)
 //   wait(deadline_us) -> queued events   deadline 0 = poll without blocking, u64::MAX =
 //        wait forever, otherwise an absolute time_us() value
 //   event(packet)                   one X event (dispatch)
@@ -35,6 +37,7 @@ use crate::{
     PWF_MODAL, PWF_NOACTIVATE, PWF_RESIZABLE, PWF_SYSFRAME, PWF_TOOL, PWS_SHOWNA, WCMD_CLOSE, WCMD_MAXIMIZE,
     WCMD_MINIMIZE, WCMD_RESTORE, WST_ACTIVE, WST_FULLSCREEN, WST_MAXIMIZED, WST_MINIMIZED, WST_TILED,
 };
+use crate::{WCMD_FULLSCREEN, WCMD_WINDOWED};
 
 const TITLE_MAX: usize = 1024;
 const WANT_DPI: u32 = 2; // X11::want bits (global work)
@@ -615,6 +618,11 @@ impl X11 {
                 self.net_state(w, NET_STATE_REMOVE, v, h);
                 self.flush();
             }
+            WCMD_FULLSCREEN | WCMD_WINDOWED => {
+                let f = self.atoms[A_NET_WM_STATE_FULLSCREEN];
+                self.net_state(w, if cmd == WCMD_FULLSCREEN { NET_STATE_ADD } else { NET_STATE_REMOVE }, f, 0);
+                self.flush();
+            }
             _ => {}
         }
     }
@@ -763,9 +771,16 @@ impl X11 {
                 st |= WST_MINIMIZED;
             }
         }
+        let old = self.xw[i].state;
         self.xw[i].state = st;
         if self.debug {
             eprint(&format!("x11: window state {st:x}\n"));
+        }
+        // (L7) full screen came or went: the UI looks at the state after a resize
+        if (old ^ st) & WST_FULLSCREEN != 0 {
+            let (cw, ch) = (self.xw[i].w, self.xw[i].h);
+            self.evwin = w;
+            self.push(E_RESIZE, 0, cw, ch, 0);
         }
     }
 

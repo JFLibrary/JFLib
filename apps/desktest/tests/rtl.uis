@@ -1,0 +1,31 @@
+#!args --rtl --verify-dirty
+# a mirrored window (RTL): the area shows the logical places mirrored, the title bar's
+# buttons at the left, the icon and the title at the right; the script points at physical
+# places, the state stays logical
+theme light
+expect dialog:"Protokoll" rect 542 146 320 232
+expect button:"Schließen: Protokoll" rect 543 147 40 32
+expect button:"Minimieren: Protokoll" rect 623 147 40 32
+expect titlebar:"Protokoll" rect 663 147 198 32
+# dragged to the left on the screen: logically to the right
+drag titlebar:"Protokoll" 662,263
+expect text:"Aktiv: Protokoll 198,198 320x232" exists
+expect dialog:"Protokoll" rect 442 246 320 232
+# the screen's left edge is the logical end: the end half, shown at the left
+drag titlebar:"Protokoll" 2,300
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll=r]" exists
+expect dialog:"Protokoll" rect 0 48 480 466
+shot build/desktest/rtl_snap.png
+# a double click restores a snapped window (as the title bar's restore button does)
+dblclick titlebar:"Protokoll"
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll]" exists
+expect dialog:"Protokoll" rect 442 246 320 232
+# the logical right edge's grip is at the physical left (x 442): 40 wider
+drag 441,300 401,300
+expect text:"Aktiv: Protokoll 198,198 360x232" exists
+# the taskbar mirrored too
+expect button:"Start" rect 881 518 75 32
+click button:"Editor"
+expect text:"Z: Rechner, Notizen, Protokoll, [Editor]" exists
+shot build/desktest/rtl.png
+expect_nowarn

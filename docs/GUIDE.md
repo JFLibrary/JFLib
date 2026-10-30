@@ -4255,3 +4255,118 @@ linked styles with and without a theme, broken files, the editor, save and load)
 sample themes and a font family from files over the gallery; they hold in the builds of every
 style), `uitest --only themes` (the format, the errors with their lines, the text form,
 `Ini::items`).
+
+## 35. Windows inside an area, a taskbar and full screen
+
+An app that hosts programs of its own -- a small desktop inside a window, an IDE with editor
+windows -- gives them windows inside an area of its window ([`ui/desk.rs`](../lib/ui/desk.rs)):
+a title bar with icon, title and buttons, moving, resizing at every edge and corner, maximising,
+minimising, the z-order, snapping, keys and screen readers. Like the docking area (§15) the
+library draws the windows and the app fills them; their state is the app's `DeskState`.
+
+```rust
+// state: desk: DeskState (DeskState::new(), desk.set_reserve([0, 0, 0, 40]) for a taskbar
+// inside the area), progs: Vec<Prog> (the open programs with their key, title and icon)
+let wins: Vec<DeskWin> = self.progs.iter().map(|p| DeskWin::new(p.key, &p.title, p.icon).min(240, 120)).collect();
+ui.next_size(SIZE_FILL, SIZE_FILL);
+ui.desk_begin(ID_DESK, &mut self.desk, &wins);
+while let Some(key) = ui.desk_next(&mut self.desk) {
+    // the window's content: a vertical box that clips, emitted from the back to the front
+    if let Some(p) = self.progs.iter_mut().find(|p| p.key == key) {
+        p.draw(ui);
+    }
+}
+ui.desk_taskbar_begin(ID_DESK); // takes the reserved strip at the area's bottom
+ui.button(ID_START, "Start"); // the app's own items before ...
+ui.desk_taskbar(ID_DESK, &mut self.desk, 0);
+ui.text(TS_CAPTION, &self.clock); // ... and after the window buttons
+ui.desk_taskbar_end();
+for ev in ui.desk_end(&mut self.desk) {
+    if let DeskEv::Close(key) = ev {
+        self.progs.retain(|p| p.key != key); // or ask "save changes?" first
+        self.desk.forget(key);
+    }
+}
+```
+
+* `DeskWin::new(key, title, icon)` describes a window each frame (the keys are the app's,
+  stable, != 0), `.flags(DWF_*)`: `DWF_NOCLOSE`, `DWF_NOMIN`, `DWF_NOMAX`, `DWF_FIXED` (no
+  resizing, no maximising, no halves), `DWF_MAXIMIZED` (a new window starts maximised: an IDE),
+  `DWF_NOTASK` (no taskbar button); `.min(w, h)` the smallest content, `.size(w, h)` the first
+  one (DIP, without the title bar). A key the state does not know yet is new: it is cascaded
+  from the top left, comes to the front and becomes active. To bring an open window forward
+  call `desk.activate(key)`.
+* `desk_next` yields the windows from the back to the front (minimised ones are left out), so
+  the topmost is drawn last and takes the pointer; a press anywhere on a window brings it to
+  the front. The title bar moves a window (a maximised or snapped one comes back to its size
+  under the pointer), its edges stick to the area's, with the pointer at the area's left or
+  right edge it fills that half, at the top edge the whole area (a preview shows where); the
+  grips (4 DIP outside the frame, 12 DIP squares at the corners) resize it down to its
+  minimum; a double click on the title bar maximises or restores it; the icon and a right
+  click on the title bar open its menu (Wiederherstellen, Minimieren, Maximieren, Schließen).
+  Esc cancels a drag. Maximised windows fill the area minus the reserved strip; when the area
+  shrinks, every window keeps its title bar and 64 DIP inside (its place in the state stays).
+* `desk_end` returns `DeskEv::Close` (the close button, the menu, the taskbar: the app decides),
+  `Activate`, `Move` and `Resize` (when the user let go), `State` (minimised, maximised,
+  restored, snapped); the taskbar's events come with the next `desk_end`.
+* `DeskState` is plain data: `save()` (`desk 1`, `win KEY X Y W H STATE` from the back to the
+  front, `active KEY`) and `load(text)` for the session, `reset`, `activate` / `minimize` /
+  `maximize` / `restore` / `toggle_max` / `snap(key, DW_LEFT | DW_RIGHT | 0)` / `cycle` /
+  `set_rect` / `forget`, `order` / `active` / `state` (`DW_MAX`, `DW_MIN`, `DW_LEFT`,
+  `DW_RIGHT`) / `rect` / `contains`, `set_reserve` (not saved). Places are logical (DIP from
+  the area's start corner): a mirrored window (RTL) shows them mirrored, with the title bar's
+  buttons at the left.
+* The taskbar: a button per window in the order of the `DeskWin` list (icon and title, the
+  active one pressed, minimised ones dimmed); a click activates, a second one minimises, a
+  minimised window comes back as it was; a right click or the menu key open its menu; the
+  buttons are one Tab stop (the arrows move inside); what does not fit goes into a "Weitere
+  Fenster" menu at the end, the active window always stays in the row. `DTB_ICONS` shows icons
+  only. A start menu, a clock or a tray are the app's own items around `desk_taskbar`.
+* Keys while the focus is inside the area (or nowhere): Alt+F6 / Alt+Shift+F6 the next /
+  previous window (the active one goes to the back), Alt+F10 maximises / restores the active
+  one, Alt+F9 minimises it, Alt+- opens its menu. None of them clashes with the code editor or
+  the text boxes; on GNOME the shell may keep Alt+F6 and Alt+F10 for itself, so an app that
+  wants other keys binds `DeskState::cycle` / `toggle_max` / `minimize` to its own commands.
+  The active window's content gets the keys: activation puts the focus back on the widget
+  focused there last (else its first Tab stop), Tab never enters the windows behind it (their
+  widgets are no Tab stops), each window is an F6 pane, and a focus that arrives in a window
+  behind (F6, a screen reader, `focus(id)`) brings it to the front.
+* Screen readers: each shown window is a dialog named by its title (" (maximiert)" after it),
+  the active one selected; its title bar's buttons ("Minimieren: Editor" ...) and its content
+  hang inside it in the tree, also where a window above covers them (the records are scoped by
+  their order, `a11y.rs`). Minimised windows are named in the taskbar (" (minimiert)").
+* Dirty regions: a moved window redraws only the cells it left and the ones it covers.
+  Painters: `StyleShell::desk_bg`, `desk_window`, `desk_titlebar`, `desk_button` (the style's
+  caption buttons by default), `desk_snap`, `taskbar`, `taskbar_button_size` /
+  `taskbar_button`; the stock ones use the theme tokens (high contrast: no shadows, 2 px frames,
+  the active window in the accent), NetLab has its own; sizes come from the style's
+  `SM_WIN_TBH_DIALOG`, `SM_CAP_W_TOOL`, `SM_WC_TITLE_PAD`, `SM_GRIP_CORNER` and `SM_CAP_LEFT`.
+
+**Full screen**: `ui.window_fullscreen(id, on)` puts a window (0 = the main window, else a
+tool window's id) over its whole monitor without a frame, or back to its place and frame;
+`window_state(id) & UWS_FULLSCREEN` says it at once. When the platform or the user leaves (or
+enters) full screen by itself, the state follows and `App::command(UIC_FULLSCREEN, id)`
+arrives. Windows makes the window a borderless popup over its monitor and restores its
+placement and style; X11 sets `_NET_WM_STATE_FULLSCREEN`, Wayland `xdg_toplevel.set_fullscreen`
+(the configure's states report it); the browser uses the Fullscreen API, which needs the user's
+gesture (a click or key that just happened -- otherwise the browser refuses and
+`UIC_FULLSCREEN` reports it). A tool window drops its library title bar and border meanwhile;
+Wayland tool windows drawn inside their owner (`WST_CHILD`) and Android do nothing; a window
+manager that ignores the request without a word leaves `UWS_FULLSCREEN` as the app asked (seen
+with WSLg right after a maximise). A library title bar of the main window (Wayland without
+decorations) goes; an app with `AF_CUSTOM_TITLEBAR` leaves its own out while `UWS_FULLSCREEN`
+is set.
+
+* **F11 is the app's key** for it: bind it in the command table
+  (`Command::new(CMD_FULL, "Vollbild", 0, 0, VK_F11, 0)`, then
+  `ui.window_fullscreen(0, ui.window_state(0) & UWS_FULLSCREEN == 0)` in `App::command`); the
+  library binds no key, and Esc stays the app's too (leave full screen with it only where
+  nothing else wants Esc).
+* Headless runs record the state: scripts `expect window main fullscreen` / `windowed`
+  (also `expect window ID ...`), `system fullscreen off [ID]` / `on` (the platform changed it:
+  `UIC_FULLSCREEN`).
+
+Tests: `apps/desktest` (`tests/move.uis`, `resize.uis`, `maxmin.uis`, `keys.uis`, `snap.uis`,
+`taskbar.uis`, `shrink.uis`, `save.uis`, `fullscreen.uis`, `rtl.uis`, `a11y.uis`, `shots.uis`,
+all with `--verify-dirty`); `desktest --check-fullscreen` checks the platform with real
+windows (Windows, X11, Wayland), `tests/fullscreen_web.mjs` the browser's Fullscreen API.

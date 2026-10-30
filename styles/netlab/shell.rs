@@ -4,14 +4,17 @@
 // indeterminate bar; classic dock groups: square panels with a 1 DIP frame, a 26 DIP tab
 // strip in the window colour (SM_DOCK_HDR), the shown tab in the panel colour framed on three
 // sides (a 2 DIP accent edge on top while the group has the focus), square drop markers
-// without a shadow; splitter sashes with grip dots.  Wizard steps, breadcrumbs and the spinner
-// are the stock painters.
+// without a shadow; splitter sashes with grip dots; (L7) windows inside an area like its
+// dialogs (4 DIP corners, the soft shadow, a 1 DIP frame, the active one framed in the accent
+// with a 16 % accent title bar, the inactive ones on the panel colour) on a quiet grey-blue
+// background, a framed panel-coloured taskbar with classic framed task buttons (the active one
+// the selection).  Wizard steps, breadcrumbs and the spinner are the stock painters.
 
 use ui::consts::*;
 use ui::theme::color_mix;
-use ui::{kind_colors, Sp, Stock, StyleShell, Ui, DOCK_MK_BOTTOM, DOCK_MK_LEFT, DOCK_MK_RIGHT, DOCK_MK_TOP};
+use ui::{kind_colors, Sp, Stock, StyleShell, Ui, DOCK_MK_BOTTOM, DOCK_MK_LEFT, DOCK_MK_RIGHT, DOCK_MK_TOP, DTB_ICONS};
 
-use crate::common::{baseline, card, fill_rrect, framed, select_colors, shadow, text, R_CTRL, R_FLYOUT};
+use crate::common::{baseline, card, fill_rrect, framed, select_colors, shadow, text, R_CTRL, R_DIALOG, R_FLYOUT};
 
 pub(crate) struct Shell;
 pub(crate) static SHELL: Shell = Shell;
@@ -409,5 +412,127 @@ impl StyleShell for Shell {
         let tint = (c & 0x00FF_FFFF) | if sp.value != 0 { 0x1800_0000 } else { 0x2A00_0000 };
         let t = ui.dp(2);
         ui.cmd_rrect(r[0], r[1], r[2], r[3], 0, t, tint, c, c);
+    }
+    // ---- (L7) windows inside an area, the taskbar (ui/desk.rs)
+    fn desk_bg(&self, ui: &mut Ui, sp: &Sp) {
+        let r = sp.rect();
+        let bg = ui.color(T_BG) | 0xFF00_0000;
+        let c = if ui.high_contrast() { bg } else { color_mix(bg, ui.color(T_TEXT2) | 0xFF00_0000, if ui.theme_dark() { 22 } else { 40 }) };
+        fill_rrect(ui, r[0], r[1], r[2], r[3], 0, c);
+    }
+    fn desk_window(&self, ui: &mut Ui, sp: &Sp) {
+        if ui.high_contrast() {
+            return Stock.desk_window(ui, sp); // the stock look: system colours, 2 px frames
+        }
+        let r = sp.rect();
+        let (act, max) = (sp.value != 0, sp.flags & 1 != 0);
+        let rad = if max { 0 } else { ui.dp(R_DIALOG) };
+        if !max && !ui.high_contrast() {
+            shadow(ui, r, rad, ui.dp(if act { 10 } else { 5 }), 0x30, 0x60);
+        }
+        let f = ui.color(T_LAYER) | 0xFF00_0000;
+        let s = ui.color(if act { T_ACCENT } else { T_LAYER_STROKE });
+        if max {
+            fill_rrect(ui, r[0], r[1], r[2], r[3], 0, f);
+        } else {
+            framed(ui, r[0], r[1], r[2], r[3], rad, f, s);
+        }
+    }
+    fn desk_titlebar(&self, ui: &mut Ui, sp: &Sp) {
+        if ui.high_contrast() {
+            return Stock.desk_titlebar(ui, sp); // the stock look: system colours, 2 px frames
+        }
+        let r = sp.rect();
+        let act = sp.value != 0;
+        let h = ui.hair();
+        let base = ui.color(T_LAYER) | 0xFF00_0000;
+        let fillc = if act { select_colors(ui, base, false).0 } else { ui.color(T_BG) | 0xFF00_0000 };
+        let rad = (ui.dp(R_DIALOG) - h).max(0).min(r[3] / 2);
+        fill_rrect(ui, r[0], r[1], r[2], r[3], rad, fillc);
+        fill_rrect(ui, r[0], r[1] + rad, r[2], r[3] - rad, 0, fillc);
+        let line = ui.color(T_LAYER_STROKE);
+        ui.draw_color(line);
+        ui.draw_rect(r[0], r[1] + r[3] - h, r[2], h);
+        let fg = ui.color(if act { T_TEXT } else { T_TEXT2 });
+        let (mut x, mut w) = (sp.s[0], sp.s[1]);
+        let px = ui.dp(16);
+        if sp.icon != 0 && w > px {
+            icon_in(ui, sp.icon, [x, r[1], px, r[3]], px, fg);
+            x += px + ui.dp(6);
+            w -= px + ui.dp(6);
+        }
+        let title = sp.label.unwrap_or("");
+        if w > 0 && !title.is_empty() {
+            ui.ts_font(TS_BODY_STRONG);
+            let s = ellipsize(ui, title, w);
+            text_in(ui, TS_BODY_STRONG, x, r, &s, fg, w);
+        }
+    }
+    fn desk_snap(&self, ui: &mut Ui, sp: &Sp) {
+        let m = ui.dp(3);
+        let mut q = *sp;
+        q.place([sp.x + m, sp.y + m, sp.w - m * 2, sp.h - m * 2]);
+        q.value = 0;
+        self.dock_preview(ui, &q);
+    }
+    fn taskbar(&self, ui: &mut Ui, sp: &Sp) {
+        let r = sp.rect();
+        let c = ui.color(T_LAYER) | 0xFF00_0000;
+        fill_rrect(ui, r[0], r[1], r[2], r[3], 0, c);
+        let h = ui.hair();
+        let s = ui.color(T_LAYER_STROKE);
+        ui.draw_color(s);
+        ui.draw_rect(r[0], r[1], r[2], h);
+    }
+    fn taskbar_button_size(&self, ui: &mut Ui, sp: &mut Sp) -> (i32, i32) {
+        if sp.flags & DTB_ICONS != 0 {
+            return (ui.dp(34), ui.dp(28));
+        }
+        ui.ts_font(TS_BODY);
+        let tw = ui.text.width(sp.label.unwrap_or(""));
+        let icon = if sp.icon != 0 { 16 + 6 } else { 0 };
+        (ui.dp(8 + icon + 10) + tw, ui.dp(28))
+    }
+    fn taskbar_button(&self, ui: &mut Ui, sp: &Sp) {
+        if ui.high_contrast() {
+            return Stock.taskbar_button(ui, sp); // the stock look: system colours, 2 px frames
+        }
+        let r = sp.rect();
+        let (on, min) = (sp.value != 0, sp.value2 != 0);
+        let m = ui.dp(2);
+        let b = [r[0], r[1] + m, r[2], r[3] - m * 2];
+        let rad = ui.dp(R_CTRL);
+        let base = ui.color(T_CTRL) | 0xFF00_0000;
+        let hover = sp.ev & EV_HOVER != 0;
+        let (fillc, stroke) = if on {
+            select_colors(ui, ui.color(T_LAYER) | 0xFF00_0000, hover)
+        } else if sp.ev & EV_HELD != 0 {
+            (ui.color(T_CTRL_PRESSED) | 0xFF00_0000, ui.color(T_CTRL_STROKE))
+        } else if hover {
+            (ui.color(T_CTRL_HOVER) | 0xFF00_0000, ui.color(T_CTRL_STROKE))
+        } else {
+            (base, ui.color(T_CTRL_STROKE))
+        };
+        framed(ui, b[0], b[1], b[2], b[3], rad, fillc, stroke);
+        let fg = ui.color(if min { T_TEXT3 } else { T_TEXT });
+        let px = ui.dp(16);
+        if sp.flags & DTB_ICONS != 0 {
+            if sp.icon != 0 {
+                icon_in(ui, sp.icon, b, px, fg);
+            }
+            return;
+        }
+        let mut tx = b[0] + ui.dp(8);
+        if sp.icon != 0 {
+            icon_in(ui, sp.icon, [tx, b[1], px, b[3]], px, fg);
+            tx += px + ui.dp(6);
+        }
+        let avail = (b[0] + b[2] - ui.dp(6) - tx).max(1);
+        let label = sp.label.unwrap_or("");
+        ui.ts_font(TS_BODY);
+        let s = ellipsize(ui, label, avail);
+        if sp.icon == 0 || s != "…" {
+            text_in(ui, TS_BODY, tx, b, &s, fg, avail);
+        }
     }
 }

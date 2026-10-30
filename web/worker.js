@@ -169,6 +169,8 @@ function dispatch(m) {
     case "screens": if(wasm.jfgui_screens) {const data=encode.encode(String(m.text||""));inbox(data);wasm.jfgui_screens(data.length);input();} break;
     // the EyeDropper's answer to a colour pick (status 2: rgb picked)
     case "color": if(wasm.jfgui_color) wasm.jfgui_color(m.id>>>0,m.status|0,m.rgb>>>0); else wasm.jfgui_complete(m.id,-3); input(); break;
+    // (L7) the page's full screen of the canvas changed (or was refused): lib/plat/web_windows.rs
+    case "fullscreen": if(wasm.jfgui_fullscreen) {wasm.jfgui_fullscreen(+!!m.on);input();} break;
     case "closeSession": {
       if(typeof m.session!=="string" || m.session.length>128) throw new Error("Ungültige Agentensitzung.");
       const data=encode.encode(JSON.stringify({session:m.session,close:true}));

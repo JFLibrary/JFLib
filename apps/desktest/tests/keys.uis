@@ -1,0 +1,51 @@
+#!args --verify-dirty
+# the keyboard (ui/desk.rs): Alt+F6 / Alt+Shift+F6 go to the next / previous window (the active
+# one goes to the back), the active window's content gets the focus back where it was (else
+# its first Tab stop), Tab never enters the windows behind it, a focus arriving in a window
+# behind brings that one to the front; the keys work while the focus is inside the area
+theme light
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll]" exists
+key alt+f6
+expect text:"Z: Protokoll, Editor, Rechner, [Notizen]" exists
+expect #230 focused
+key alt+f6
+expect text:"Z: Notizen, Protokoll, Editor, [Rechner]" exists
+expect #211 focused
+key alt+f6
+expect text:"Z: Rechner, Notizen, Protokoll, [Editor]" exists
+expect #201 focused
+expect dialog:"Editor" selected
+# Tab: the Editor's two widgets, then the taskbar's Start -- not the digits of the Rechner
+# behind it
+key tab
+expect #202 focused
+key tab
+expect #110 focused
+key shift+tab
+expect #202 focused
+# back: the window at the back comes to the front, its focus where it was
+key alt+shift+f6
+expect text:"Z: Notizen, Protokoll, Editor, [Rechner]" exists
+expect #211 focused
+key alt+shift+f6
+expect text:"Z: Protokoll, Editor, Rechner, [Notizen]" exists
+expect #230 focused
+# the Editor's focus stayed on Übernehmen
+key alt+shift+f6
+expect text:"Z: Editor, Rechner, Notizen, [Protokoll]" exists
+key alt+shift+f6
+expect text:"Z: Rechner, Notizen, Protokoll, [Editor]" exists
+expect #202 focused
+# a focus arriving in a window behind (here the script's; F6 or a screen reader do the same)
+# brings that window to the front
+focus #215
+expect text:"Z: Notizen, Protokoll, Editor, [Rechner]" exists
+expect #215 focused
+key space
+expect text:"Anzeige: 5" exists
+# outside the area (the tool row) Alt+F6 is not the area's
+focus #101
+key alt+f6
+expect text:"Z: Notizen, Protokoll, Editor, [Rechner]" exists
+shot build/desktest/keys.png
+expect_nowarn

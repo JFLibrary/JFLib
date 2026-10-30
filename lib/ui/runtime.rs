@@ -841,11 +841,13 @@ impl Ui {
     }
 
     // csd_begin -> true when the library draws the title bar for the app: the window has no
-    // server-side decorations (WST_CSD) and the app has no AF_CUSTOM_TITLEBAR.  Then the
+    // server-side decorations (WST_CSD), the app has no AF_CUSTOM_TITLEBAR and the window is
+    // not in full screen.  Then the
     // frame is a column: title bar, the app's area (two boxes to close after App::frame).
     // jfgui_CSD=1 forces it (tests, headless shots).
     fn csd_begin(&mut self) -> bool {
-        if self.desc.flags & AF_CUSTOM_TITLEBAR != 0 {
+        // (L7) full screen: no title bar
+        if self.desc.flags & AF_CUSTOM_TITLEBAR != 0 || self.m.win.recs[0].fs {
             return false;
         }
         let forced = plat::getenv("jfgui_CSD").is_some_and(|v| v.as_bytes().first() == Some(&b'1'));

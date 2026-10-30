@@ -7,7 +7,10 @@
 //   window_end()
 //   window_place(id, &rect)              move / resize (copied into the window's WINRECT)
 //   window_rect(id) -> Option<WinRect>   current placement (None = unknown window)
-//   window_state(id) -> UWS_*            UWS_OPEN | UWS_VISIBLE | UWS_ACTIVE | UWS_MINIMIZED
+//   window_state(id) -> UWS_*            UWS_OPEN | UWS_VISIBLE | UWS_ACTIVE | UWS_MINIMIZED |
+//                                        UWS_FULLSCREEN
+//   window_fullscreen(id, on)            (L7) over the whole monitor without a frame, or back;
+//                                        UIC_FULLSCREEN when the platform or the user changes it
 //   window_activate(id)                  give it the keyboard (raises it)
 //   window_snap(id, area, dist)          its edges snap to the area's while the user moves it
 //   window_destroy(id)                   free its state and buffers (created again when shown)
@@ -89,6 +92,7 @@ const UWW_RECT: u32 = 4;
 const UWW_TITLE: u32 = 8;
 const UWW_ACTIVATE: u32 = 16;
 const UWW_CREATE: u32 = 64;
+const UWW_FS: u32 = 128; // (L7) full screen on / off (Rec::fs)
 
 /// a value the app shares with the library: the asm passes its address and the library
 /// keeps it (a window's `open` flag, its WINRECT, a content dialog's `open` flag)
@@ -155,6 +159,11 @@ pub(crate) struct Rec {
     pub(crate) title: String,
     /// window_snap: area x, y, w, h (DIP of the owner's client area), distance (DIP; 0 = off)
     pub(crate) snap: [i32; 5],
+    /// (L7) full screen: asked by the app or last reported by the platform (window_state
+    /// shows it); the platform's own state when it was last asked (a change of its own is
+    /// UIC_FULLSCREEN)
+    pub(crate) fs: bool,
+    pub(crate) fs_plat: bool,
 }
 
 impl Default for Rec {
@@ -179,6 +188,8 @@ impl Default for Rec {
             sy: 0,
             title: String::new(),
             snap: [0; 5],
+            fs: false,
+            fs_plat: false,
         }
     }
 }
@@ -667,7 +678,8 @@ impl Ui {
     /// windows with the library frame, 0 for the main window
     pub(crate) fn uiw_border(&mut self) -> i32 {
         let cur = self.uiw_cur;
-        if cur == 0 || self.m.win.recs[(cur as usize) & (WIN_MAX - 1)].flags & WF_SYSFRAME != 0 {
+        let r = &self.m.win.recs[(cur as usize) & (WIN_MAX - 1)];
+        if cur == 0 || r.flags & WF_SYSFRAME != 0 || r.fs {
             return 0;
         }
         self.hair()
@@ -798,7 +810,7 @@ impl Ui {
             flags &= !WF_SYSFRAME;
         }
         // title bar height (the style's, DIP)
-        let tbh = if flags & WF_SYSFRAME != 0 {
+        let tbh = if flags & WF_SYSFRAME != 0 || self.m.win.recs[iu].fs {
             0
         } else {
             let st = self.style;
@@ -1185,7 +1197,8 @@ impl Ui {
                     let (flags, owner) = (self.m.win.recs[iu].flags, self.m.win.recs[iu].owner);
                     self.uwp_create(i, flags, owner);
                 }
-                if want & UWW_RECT != 0 {
+                if want & UWW_RECT != 0 && !self.m.win.recs[iu].fs {
+                    // (a window in full screen keeps the monitor; its place comes back after)
                     let rc = self.m.win.recs[iu].rect.get();
                     self.uwp_rect(i, &rc);
                 }
@@ -1195,7 +1208,7 @@ impl Ui {
                 }
                 if want & UWW_SHOW != 0 {
                     // shown (and activated) after its first present: uiw_sync_show
-                    self.m.win.recs[iu].want |= want & (UWW_SHOW | UWW_ACTIVATE);
+                    self.m.win.recs[iu].want |= want & (UWW_SHOW | UWW_ACTIVATE | UWW_FS);
                     continue;
                 }
                 if want & UWW_HIDE != 0 {
@@ -1210,7 +1223,53 @@ impl Ui {
             if want & UWW_ACTIVATE != 0 {
                 self.uwp_activate(i);
             }
+            if want & UWW_FS != 0 {
+                self.uwp_fullscreen(i);
+            }
         }
+    }
+
+    // (L7) uwp_fullscreen(i): the platform window follows Rec::fs
+    fn uwp_fullscreen(&mut self, i: u32) {
+        let pw = self.uiw_pw(i);
+        if pw < 0 {
+            return;
+        }
+        let on = self.m.win.recs[(i as usize) & (WIN_MAX - 1)].fs;
+        plat::win_cmd(pw, if on { plat::WCMD_FULLSCREEN } else { plat::WCMD_WINDOWED });
+        // the platform's answer (Windows at once, the others with their next configure)
+        let now = plat::win_state(pw) & plat::WST_FULLSCREEN != 0;
+        self.m.win.recs[(i as usize) & (WIN_MAX - 1)].fs_plat = now;
+    }
+
+    /// (L7) uiw_fs_check(i): after a resize of window i: the platform's full-screen state
+    /// changed by itself (the browser's Esc, the window manager, the user): the window's state
+    /// follows and the app gets UIC_FULLSCREEN
+    pub(crate) fn uiw_fs_check(&mut self, i: u32) {
+        if !self.uiw_os() {
+            return;
+        }
+        let iu = (i as usize) & (WIN_MAX - 1);
+        let on = self.uiw_plat_state(i) & plat::WST_FULLSCREEN != 0;
+        if on == self.m.win.recs[iu].fs_plat {
+            return;
+        }
+        self.m.win.recs[iu].fs_plat = on;
+        if on != self.m.win.recs[iu].fs {
+            self.uiw_fs_changed(i, on);
+        }
+    }
+
+    /// (L7) uiw_fs_changed(i, on): window i is (no longer) in full screen without the app
+    /// asking (the platform, a script's `system fullscreen`): UIC_FULLSCREEN (arg = its id)
+    pub(crate) fn uiw_fs_changed(&mut self, i: u32, on: bool) {
+        let iu = (i as usize) & (WIN_MAX - 1);
+        let r = &mut self.m.win.recs[iu];
+        r.fs = on;
+        r.want &= !UWW_FS;
+        let id = r.id;
+        self.cmd_run(UIC_FULLSCREEN, id);
+        self.invalidate();
     }
 
     /// uiw_sync_show: after render: windows waiting to be shown appear (and are activated)
@@ -1626,6 +1685,7 @@ impl Ui {
         if i == 0 {
             self.ws_track(); // the normal size of the main window (winstate.rs)
         }
+        self.uiw_fs_check(i); // (L7) full screen left (or entered) by the platform
     }
 
     /// uiw_dpi(i, dpi): the window's dpi changed (E_DPI, script `scale`): full redraw; the
@@ -1812,7 +1872,8 @@ impl Ui {
         Some(self.m.win.recs[i as usize].rect.get())
     }
 
-    /// ui_window_state(id) -> UWS_OPEN | UWS_VISIBLE | UWS_ACTIVE | UWS_MINIMIZED (0 unknown)
+    /// ui_window_state(id) -> UWS_OPEN | UWS_VISIBLE | UWS_ACTIVE | UWS_MINIMIZED |
+    /// UWS_FULLSCREEN (0 unknown)
     pub fn window_state(&mut self, id: u32) -> u32 {
         let i = self.uiw_index(id);
         if i < 0 {
@@ -1834,7 +1895,42 @@ impl Ui {
         if self.uiw_plat_state(i) & plat::WST_MINIMIZED != 0 {
             s |= UWS_MINIMIZED;
         }
+        if self.m.win.recs[i as usize].fs {
+            s |= UWS_FULLSCREEN;
+        }
         s
+    }
+
+    /// (L7) window_fullscreen(id, on): show the window (0 = the main window, else the app's
+    /// window id) over its whole monitor without a frame, or back to its place and frame as
+    /// before.  window_state reports UWS_FULLSCREEN at once; the platform follows after the
+    /// frame: Windows a borderless window over the window's monitor (the old placement and
+    /// style come back), X11 _NET_WM_STATE_FULLSCREEN, Wayland xdg_toplevel set_fullscreen /
+    /// unset_fullscreen, the browser its Fullscreen API (only from the user's gesture: a key or
+    /// a click that just happened).  A tool window drops its library title bar and border
+    /// meanwhile.  When the platform or the user leaves (or enters) full screen by itself (Esc
+    /// in the browser, the window manager), the state follows and UIC_FULLSCREEN arrives (arg
+    /// = the window's id).  Headless runs only record it (scripts: `expect window ID
+    /// fullscreen`, `system fullscreen off`).  Nothing happens on Android and for Wayland tool
+    /// windows drawn inside their owner (WST_CHILD).  F11 is the app's key for it (GUIDE).
+    pub fn window_fullscreen(&mut self, id: u32, on: bool) {
+        let i = self.uiw_index(id);
+        if i < 0 {
+            return;
+        }
+        let iu = i as usize;
+        if self.m.win.recs[iu].fs == on {
+            return;
+        }
+        if on && self.uiw_os() && self.uiw_plat_state(i as u32) & plat::WST_CHILD != 0 {
+            return; // a subsurface of its owner: no full screen of its own
+        }
+        if cfg!(target_os = "android") {
+            return;
+        }
+        self.m.win.recs[iu].fs = on;
+        self.m.win.recs[iu].want |= UWW_FS;
+        self.invalidate();
     }
 
     /// ui_window_activate(id): give the window the keyboard and put it on top
