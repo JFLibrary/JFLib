@@ -88,7 +88,9 @@ impl Ui {
     // ------------------------------------------------------------------ content dialog
 
     /// ui_dialog_begin(id, title, open) -> true if the dialog is open
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn dialog_begin(&mut self, id: u32, title: &str, open: &Shared<i32>) -> bool {
+        let _src = self.src_scope();
         if self.wp.chrome.dlg_active {
             self.wp.chrome.dlg_nest += 1; // a dialog inside a dialog is not supported
             return false;
@@ -184,7 +186,9 @@ impl Ui {
     /// ui_dialog_buttons(primary, secondary, close) -> DLG_* (any result clears the open
     /// flag).  Inside a content dialog: its footer.  Otherwise, inside a WF_DIALOG window:
     /// a footer pinned to the window's bottom; a result clears the window's open flag.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn dialog_buttons(&mut self, primary: Option<&str>, secondary: Option<&str>, close: Option<&str>) -> u32 {
+        let _src = self.src_scope();
         if self.wp.chrome.dlg_active {
             let c = &mut self.wp.chrome;
             if c.dlg_nest != 0 || c.dlg_phase != 1 {
@@ -314,7 +318,9 @@ impl Ui {
     }
 
     /// ui_dialog_end
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn dialog_end(&mut self) {
+        let _src = self.src_scope();
         if self.wp.chrome.dlg_nest != 0 {
             self.wp.chrome.dlg_nest -= 1;
             return;
@@ -344,7 +350,9 @@ impl Ui {
     // ------------------------------------------------------------------ info bar
 
     /// ui_infobar(id, severity, title, msg) -> EV (EV_ACT when the close button was clicked)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn infobar(&mut self, id: u32, severity: u32, title: &str, msg: &str) -> u32 {
+        let _src = self.src_scope();
         let sev = severity & 3;
         let st = self.style;
         // measure (style)
@@ -402,7 +410,9 @@ impl Ui {
     // ------------------------------------------------------------------ status bar
 
     /// ui_statusbar_begin: a 32 DIP bar; call it last in a vertical layout (after a fill)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn statusbar_begin(&mut self) {
+        let _src = self.src_scope();
         let st = self.style;
         let h = st.metric(SM_SB_H); // height (DIP)
         self.next_size(0, h);
@@ -423,7 +433,9 @@ impl Ui {
     }
 
     /// ui_statusbar_end
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn statusbar_end(&mut self) {
+        let _src = self.src_scope();
         self.box_end();
         self.box_end();
     }
@@ -431,19 +443,25 @@ impl Ui {
     // ------------------------------------------------------------------ title bar
 
     /// ui_titlebar_begin(title, icon): a title bar row (icon 0 = none)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn titlebar_begin(&mut self, title: &str, icon: u32) {
+        let _src = self.src_scope();
         self.titlebar_begin_opt(Some(title), icon);
     }
 
     /// ui_titlebar_begin with title 0: no title text (the record has no label)  // pn-core
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn titlebar_begin_opt(&mut self, title: Option<&str>, icon: u32) {
+        let _src = self.src_scope();
         self.titlebar_begin_inner(title, icon, false);
     }
 
     /// Overlay native window controls and a drag region without painting a titlebar surface.
     /// Use `next_rect_px` to place it over the empty top edge of a file/start screen.
     /// The agent indicator remains visible beside the caption buttons when control is enabled.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn titlebar_begin_overlay(&mut self, title: Option<&str>, icon: u32) {
+        let _src = self.src_scope();
         self.titlebar_begin_inner(title, icon, true);
     }
 
@@ -522,7 +540,9 @@ impl Ui {
 
     /// ui_titlebar_end: caption buttons at the right end (unless the style puts them at the
     /// left: SM_CAP_LEFT)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn titlebar_end(&mut self) {
+        let _src = self.src_scope();
         let st = self.style;
         if self.wp.chrome.tb_overlay {
             self.spacer(-1);

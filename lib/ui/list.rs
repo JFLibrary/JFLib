@@ -542,13 +542,17 @@ impl Ui {
     }
 
     /// ui_scroll_begin(id, flags)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn scroll_begin(&mut self, id: u32, flags: u32) {
+        let _src = self.src_scope();
         self.scr_open(id, flags & !SCR_F_LIST, 0);
         self.scr_offset();
     }
 
     /// ui_scroll_end
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn scroll_end(&mut self) {
+        let _src = self.src_scope();
         self.scr_close();
     }
 
@@ -665,7 +669,9 @@ impl Ui {
     }
 
     /// ui_scrollbar(id, &mut pos, content, view, vertical) -> EV_*
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn scrollbar(&mut self, id: u32, pos: &mut i32, content: i32, view: i32, vertical: bool) -> u32 {
+        let _src = self.src_scope();
         let st = self.style;
         let t = st.scrollbar_thickness(self);
         if vertical {
@@ -884,7 +890,9 @@ impl Ui {
     }
 
     /// ui_list_begin(id, &mut sel, count, item_h | LF_*) -> (first, end): the rows to emit
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn list_begin(&mut self, id: u32, sel: &mut i32, count: i32, item_h: u32) -> (i32, i32) {
+        let _src = self.src_scope();
         let flags = item_h & 0xFFFF_0000; // (U1) LF_* flags
         let count = count.max(0);
         let ihd = (item_h & 0xFFFF) as i32;
@@ -994,14 +1002,18 @@ impl Ui {
     }
 
     /// ui_list_item(i, label) -> EV_*
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn list_item(&mut self, i: i32, label: &str) -> u32 {
+        let _src = self.src_scope();
         let ev = self.li_row(i, Some(super::basic::cstr(label)));
         self.m.kbnav.toggle = false; // (no check box in a text row)
         ev
     }
 
     /// ui_list_item_begin(i) -> EV_*: row i with a BOX_H (gap 8 DIP) for custom content
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn list_item_begin(&mut self, i: i32) -> u32 {
+        let _src = self.src_scope();
         let ev = self.li_row(i, None);
         let li = self.list_top();
         let id = self.wp.list.list[li].id;
@@ -1047,7 +1059,9 @@ impl Ui {
     }
 
     /// ui_list_item_end
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn list_item_end(&mut self) {
+        let _src = self.src_scope();
         self.box_end();
         let li = self.list_top();
         if core::mem::take(&mut self.wp.list.list[li].notab) {
@@ -1058,7 +1072,9 @@ impl Ui {
 
     /// ui_list_end(&mut sel) -> (EV_* (EV_ACT if sel changed, EV_DOUBLE), sel); EV_DRAG: a
     /// row was dropped, the second value is from | to << 16
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn list_end(&mut self, sel: &mut i32) -> (u32, i32) {
+        let _src = self.src_scope();
         if self.wp.list.list_sp == 0 {
             return (0, -1);
         }
@@ -1131,7 +1147,9 @@ impl Ui {
     /// Home/End on the strip retain ordinary tab semantics; changed selections
     /// and resized viewports reveal the selected tab. Internal IDs follow the
     /// usual `(id * 8 + part) | 0x80000000` convention (parts 1, 2, 3 and 7).
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn tabs_scrolling(&mut self, id: u32, sel: &mut i32, names: &[&str]) -> u32 {
+        let _src = self.src_scope();
         let flags = self.take_flags();
         let mut tw = Tw::default();
         let (sp, count, total) = self.tab_sizes(flags, names, &mut tw);
@@ -1187,7 +1205,9 @@ impl Ui {
     }
 
     /// ui_tabs(id, &mut sel, names) -> EV_* (EV_ACT when sel changed)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn tabs(&mut self, id: u32, sel: &mut i32, names: &[&str]) -> u32 {
+        let _src = self.src_scope();
         let old = *sel;
         let st = self.style;
         let flags = self.take_flags();
@@ -1335,7 +1355,9 @@ impl Ui {
     /// ui_expander_begin(id, header, &mut open) -> open: a card-like header (48 DIP) with a
     /// chevron; when open the content follows in a padded card below it (BOX_V, PAD_16, gap
     /// 8 DIP).  Always call expander_end.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn expander_begin(&mut self, id: u32, header: &str, open: &mut i32) -> i32 {
+        let _src = self.src_scope();
         let header = super::basic::cstr(header);
         // outer column
         self.box_begin(id.wrapping_mul(8).wrapping_add(1) | 0x8000_0000, BOX_V, 0);
@@ -1388,7 +1410,9 @@ impl Ui {
     }
 
     /// ui_expander_end
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn expander_end(&mut self) {
+        let _src = self.src_scope();
         let l = &mut self.wp.list;
         if l.exp_sp == 0 {
             return;

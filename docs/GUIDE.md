@@ -1463,7 +1463,8 @@ if (desc.render)(&args, &mut dst) == 0 {
   (every render on one thread), `=1` (row bands for every render, whatever its size), `=2`
   (every render both ways, a `UIWARN` when a byte differs: run the scripts with it after a
   change to the renderer or a `Draw`), `jfgui_HOTRELOAD=DIR` (hot reload's session, set by
-  `build_rs.py watch`; development builds, §30).
+  `build_rs.py watch`; development builds, §30), `jfgui_EDITOR` / `jfgui_SRC` (the inspector's
+  editor command and source folder; development builds, §30).
 * **Never start an app without `--shot`, `--script` or `--auto-close`**: a plain start opens a
   real window on the user's desktop. PaintCraft saves its settings when a real window closes:
   every real-window run needs `--config build/<name>/cfg` (the capture tools set
@@ -1524,6 +1525,7 @@ in DIP):
 | `clip save F text\|html\|rtf\|docx`, `clip expect html\|rtf\|docx\|text-only` | save exact bytes or check rich-format availability; `text-only` also checks absence of rich representations |
 | `inspect on\|off\|arm\|pick\|select S\|...`, `inspect expect open\|idle\|same\|selected S\|selector "s"\|...` | the live inspector headless: open it, pick, select, check the overlay, the selector and that a closed inspector changes nothing (§30) |
 | `inspect set KEY VALUE`, `inspect reset [KEY]`, `inspect undo\|redo\|save PATH\|list`, `inspect do click\|drag DX DY\|value N\|type "s"\|cmd ID`, `inspect expect changes N\|value KEY "s"\|list "s"\|...` | editing in the inspector (development builds): theme tokens, accent, radius, spacing, height, text sizes, font, mode, style, language, scales; undo / redo / reset, the theme file, the change list; the selected widget operated (§30) |
+| `inspect editor "COMMAND"\|none`, `inspect open [dry]`, `inspect expect source "PREFIX"\|none`, `inspect expect sources "PREFIX"`, `inspect expect opened "s"\|none`, `inspect expect note "s"\|none` | the selected widget's source in the inspector (development builds): the file and line of the app's call (prefix), "Im Editor öffnen" with the editor the script sets (`dry`: the command line built and the permission checked, nothing started; a script never starts the user's editor), the command line opened, the note below the source (§30) |
 
 **Selectors** `S`: `#123` (widget id), `"Label"`, `kind:"Label"` (`button:"OK"`, `dialog:"Öffnen"`,
 `text:"Klicks: 2"`), `X,Y` (a point in DIP). A label must match exactly one widget (plain text is
@@ -3508,7 +3510,8 @@ where, with which id, label, value and state, how the layout boxes nest, the Tab
 the last frames repainted, and the frame's cost. It is part of `ui` (`lib/ui/inspect.rs`)
 and off by default; closed it costs nothing (the runtime tests one flag; nothing is recorded or
 drawn, the frames are byte for byte those of an app without it). In a development build it
-also edits the app's look and operates its widgets ("Editing in the inspector" below).
+also edits the app's look and operates its widgets ("Editing in the inspector" below) and shows
+the file and line where the app called each widget, with "Im Editor öffnen" ("Sources" below).
 
 * **Turning it on**: `--inspect` opens it at the start; `jfgui_INSPECT=1` only arms it (its
   hot keys work), `jfgui_INSPECT=open` opens it too. In code: `ui.inspect_enable(true)` (arm),
@@ -3678,6 +3681,78 @@ click|drag DX DY|value N|type "s"|cmd ID [ARG]`, `inspect expect changes N|list 
 "s"|undo on|off|redo on|off|message "s"|none`. Tests: `apps/gallery/tests/inspect_edit.uis`,
 `inspect_edit_rtl.uis` (mirrored, 150 %), `apps/themedemo/tests/inspect_edit.uis` (the linked
 styles, edits over an app theme).
+
+### Sources: where the app called a widget (development builds)
+
+In a development build the Widgets tab shows, below the selector, **Quelle**: the file and line
+of the app's call that built the selected widget (or layout box), e.g.
+`apps/gallery/sec_edit.rs:66`, with a copy button and **Im Editor öffnen**
+([`ui/inspect_src.rs`](../lib/ui/inspect_src.rs)). Nothing in the app changes for it:
+
+* **How it is recorded**: the library's widget calls (`ui.button`, `ui.label_button`,
+  `ui.textbox`, `ui.slider`, `ui.combobox`, `ui.list_item`, `ui.box_begin`, `ui.dialog_buttons`,
+  `ui.sem` ... -- every public call that builds a widget or a container) carry
+  `#[cfg_attr(jfgui_dev, track_caller)]`; their first statement opens a scope that, while the
+  inspector is open, sets the call being built from `core::panic::Location::caller()`. A call
+  from inside the library keeps the app's call that encloses it, so a composite widget -- a
+  number box with its text box, a combo box, the rows of a menu bar or a list, the buttons of
+  `dialog_buttons` -- reports the app's line, not the library's inner one. A widget built by the
+  library with no app call around it (the runtime's own chrome, the inspector's window) shows
+  the library's call; a widget an app builds from drawing calls and `ui.sem` shows its
+  `ui.sem` line. (Not marked yet: `ui.markdown_view`, `ui.html_view`, `ui.doc_view`; their
+  records show a line of `lib/ui/md_view.rs`.)
+* **What it costs**: closed (the default) every scope tests one flag and nothing is stored or
+  drawn (`inspect expect same` / `idle` hold); a `--release` build has no `#[track_caller]` and
+  empty scopes (`ui/inspect_src_off.rs`): the same code as without the feature. The path is the
+  one rustc got: `build_rs.py` makes it relative to the repository (`--remap-path-prefix`).
+* **The editor** (the first that is set or found): `jfgui_EDITOR`, a command line with
+  `{file}`, `{line}` and `{col}` (`code -g {file}:{line}`, `"C:\Program Files\...\clion64.exe"
+  --line {line} {file}`; without `{file}` the file is appended; `"..."` / `'...'` keep blanks);
+  else `VISUAL`, then `EDITOR` (a known editor gets the line: `code` / `codium` `-g FILE:LINE`,
+  JetBrains IDEs `--line N FILE`, vi / vim / nano / emacs / gedit `+N FILE`, kate `-l N FILE`,
+  `subl FILE:LINE`, notepad++ `-nN FILE`); else what is found: CLion (`clion64.exe` in PATH,
+  the Toolbox's `%LOCALAPPDATA%\Programs\CLion`, `%ProgramFiles%\JetBrains\CLion *`; Linux:
+  `clion` / `clion.sh` in PATH, the Toolbox's script, the snap), then VS Code (`code.cmd` in
+  PATH and `Code.exe` beside its `bin`, the install folders; Linux: `code` in PATH). The file
+  is passed with its absolute path: below `jfgui_SRC`, else below the folder that holds the
+  program's `build` folder, else below the working folder. The editor starts on its own
+  (`plat::process::launch`: no pipes, it stays open when the app ends or hot reload restarts
+  it).
+* **Permissions**: starting the editor is the app starting a program, so the app's manifest
+  decides as for `Command::spawn` (a `process` rule that names the editor, an `ask process`
+  line that asks -- open again after the answer; an app without `PERMISSIONS` may). A refusal
+  names the program below the source ("Die App darf … nicht starten (PERMISSIONS: process)"),
+  and the source can still be copied. This is a deliberate choice: the inspector runs in the
+  app's process with the app's rights, and an exception for development builds would be one in
+  every development run of every app. To open sources from an app with a manifest, set
+  `jfgui_EDITOR` to a program name and add that name (`process code`, or `ask process code`),
+  or add the path the refusal names.
+* **Scripts never start the user's editor**: a headless run takes only an editor the script
+  set with `inspect editor "COMMAND"`.
+
+```
+# apps/gallery/tests/inspect_source.uis (excerpt)
+inspect on
+inspect select #702                           # a number box: the app's number_box call
+inspect expect source "apps/gallery/sec_edit.rs:"
+click button:"Quelle kopieren"                # "apps/gallery/sec_edit.rs:71" to the clipboard
+inspect editor "stub-editor --line {line} {file}"
+inspect open dry                              # built and checked, nothing started
+inspect expect opened "stub-editor --line "
+inspect editor "whoami"                       # a real start of a harmless program
+inspect open
+```
+
+Script commands: `inspect editor "COMMAND"|none` (the editor of this run: sets `jfgui_EDITOR`),
+`inspect open [dry]`, `inspect expect source "PREFIX"|none` (the selected widget's source starts
+with PREFIX), `inspect expect sources "PREFIX"` (every record of the app's windows: a library
+widget call left unmarked shows a line of `lib/ui` and fails it), `inspect expect opened
+"s"|none` (the last opening's command line contains s; taken by the check), `inspect expect
+note "s"|none` (the note below the source). Tests:
+`apps/gallery/tests/inspect_source.uis` (widget kinds, composite widgets, a menu, a dialog, a
+tool window, copy, the editor's command line, a missing and a real program, closed it stores
+nothing), `apps/audiotest/tests/inspect_perm.uis` (a manifest without `process`: refused),
+`apps/plattest/tests/launch.uis` (`plat::process::launch`: the words arrive as given).
 
 ## 31. SVG images and the image viewer
 

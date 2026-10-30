@@ -568,7 +568,9 @@ impl Ui {
     /// box with 4 DIP padding) until flyout_end, which is called in any case.  The flyout is
     /// anchored to the last placed widget (FL_POINT: to the pointer position where it
     /// opened) and kept inside the window.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn flyout_begin(&mut self, id: u32, flags: u32) -> bool {
+        let _src = self.src_scope();
         let sp_i = self.wp.popup.fl_sp as usize;
         if sp_i >= FLN_MAX {
             self.wp.popup.fl_over += 1;
@@ -853,7 +855,9 @@ impl Ui {
     }
 
     /// ui_flyout_end: close the content of flyout_begin (also when it returned false)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn flyout_end(&mut self) {
+        let _src = self.src_scope();
         let w = &mut self.wp.popup;
         if w.fl_over != 0 {
             w.fl_over -= 1;
@@ -1057,7 +1061,9 @@ impl Ui {
     /// ui_cmd_button(id, ST_*) -> EV_*: button for a command: icon and label from the table
     /// (ST_ICON_ONLY: icon only), tooltip "Label (Strg+S)", ST_DISABLED / ST_CHECKED from the
     /// command state; a click queues the command.  Hidden commands draw nothing.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn cmd_button(&mut self, id: u32, flags: u32) -> u32 {
+        let _src = self.src_scope();
         let Some(c) = self.cmd_find(id) else { return 0 };
         let cf = self.cmd_flags(id);
         if cf & CF_HIDDEN != 0 {
@@ -1177,7 +1183,9 @@ impl Ui {
 
     /// ui_menu_item(id, label) -> EV_*: menu row inside a flyout (next_icon; next_flags
     /// ST_DISABLED / ST_CHECKED); activation closes every popup
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn menu_item(&mut self, id: u32, label: &str) -> u32 {
+        let _src = self.src_scope();
         let f = self.take_flags();
         let mut mf = 0;
         if f & ST_DISABLED != 0 {
@@ -1195,12 +1203,16 @@ impl Ui {
     }
 
     /// ui_menu_cmd(cmd) -> EV_*: menu row for a command (widget id = command id)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn menu_cmd(&mut self, cmd: u32) -> u32 {
+        let _src = self.src_scope();
         self.mcmd(cmd, cmd)
     }
 
     /// ui_menu_sep -> 0: separator line across the flyout
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn menu_sep(&mut self) -> u32 {
+        let _src = self.src_scope();
         let st = self.style;
         let h = st.menu_sep_size(self);
         let r = self.place(0, h);
@@ -1212,7 +1224,9 @@ impl Ui {
 
     /// the rows of the Mi::List menus with this base id (row k: id base + k; the asm app's
     /// STRLIST buffer); the list ends at the first empty string
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn menu_list<T: AsRef<str>>(&mut self, base: u32, rows: &[T]) {
+        let _src = self.src_scope();
         let v: Vec<String> = rows.iter().map(|s| String::from(s.as_ref())).collect();
         let l = &mut self.m.popup.lists;
         match l.iter_mut().find(|e| e.0 == base) {
@@ -1445,7 +1459,9 @@ impl Ui {
     /// AppDesc::menubar).  WinUI MenuBar: subtle 32 DIP items, a flyout per menu.
     /// Keyboard: Alt (tap) or F10 enter / leave menu bar mode, Alt+mnemonic opens a menu,
     /// Left / Right move between the menus, Down / Enter open one, Esc steps back.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn menubar(&mut self, menubar: Option<&'static [Mi]>) -> u32 {
+        let _src = self.src_scope();
         let mb: &'static [Mi] = match menubar {
             Some(m) => m,
             None => self.desc.menubar,
@@ -1704,7 +1720,9 @@ impl Ui {
     /// ui_menu_popup(menu): open a menu at the pointer (the runtime draws it); for the
     /// menu key / Shift+F10 (an EV_RCLICK kbnav.rs gave the focused widget in this pass) at
     /// the widget's lower left corner with its first row focused
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn menu_popup(&mut self, menu: &'static [Mi]) {
+        let _src = self.src_scope();
         self.wp.popup.ctx_target = 0;
         if let Some(r) = self.kb_ctx_rect() {
             self.ctx_open(menu, r[0], r[1] + r[3], true);
@@ -1718,7 +1736,9 @@ impl Ui {
     /// right click (released over the widget), or with the menu key / Shift+F10 while the
     /// widget has the focus -- a list row: while the list has it and the row is selected --
     /// (then at its lower left corner, first row focused).
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn context_menu(&mut self, menu: &'static [Mi]) -> u32 {
+        let _src = self.src_scope();
         let (id, r) = self.last_widget();
         if id == 0 {
             return 0;
@@ -1759,7 +1779,9 @@ impl Ui {
     /// Enter / Space, Alt+Down or F4 opens it; the app draws the flyout with
     /// flyout_begin(id, ..) right after).  next_flags ST_SUBTLE: flat tool bar look,
     /// ST_ICON_ONLY: icon + chevron, the label as tooltip (U1)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn dropdown_button(&mut self, id: u32, label: &str) -> u32 {
+        let _src = self.src_scope();
         let flags = self.take_flags();
         let icon = self.take_icon();
         let st = self.style;
@@ -1805,7 +1827,9 @@ impl Ui {
     /// ui_split_button(id, label) -> EV_* of the main part | EV_OPEN while popup `id` is
     /// open.  The chevron part (widget id | 0x80000000; Alt+Down / F4 on the main part)
     /// opens it.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn split_button(&mut self, id: u32, label: &str) -> u32 {
+        let _src = self.src_scope();
         let flags = self.take_flags();
         let icon = self.take_icon();
         let st = self.style;
@@ -1866,7 +1890,9 @@ impl Ui {
     /// box with the selected row (accent pill) on it.  Keyboard: Up / Down change the
     /// selection, Enter / Space / Alt+Down / F4 open the list.  `list` is a STRLIST (it ends
     /// at the first empty string).
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn combobox(&mut self, id: u32, sel: &mut i32, list: &[&str]) -> u32 {
+        let _src = self.src_scope();
         let flags = self.take_flags();
         let mut changed = false;
         // rows and the widest text
@@ -1989,7 +2015,9 @@ impl Ui {
     /// ui_tooltip(s): post-modifier: show s as the tooltip of the last widget after 500 ms of
     /// hover (at once when another tooltip hid less than 300 ms ago); hidden on press, key or
     /// leave.  Icon-only buttons call it with their label.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn tooltip(&mut self, s: &str) {
+        let _src = self.src_scope();
         if self.wp.popup.tip_suppress {
             self.wp.popup.tip_suppress = false;
             return;
@@ -2001,7 +2029,9 @@ impl Ui {
     /// (an item on a canvas: a cable, a port).  The delay starts again when `part` changes (at
     /// once when a tooltip hid less than 300 ms ago, as between toolbar buttons); a press hides
     /// it until the pointer is over another part; part 0 shows nothing.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn tooltip_part(&mut self, s: &str, part: u64) {
+        let _src = self.src_scope();
         let (id, _) = self.last_widget();
         if id == 0 {
             return;

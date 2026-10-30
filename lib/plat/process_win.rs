@@ -197,6 +197,34 @@ fn resolve(program: &str) -> Result<Option<Vec<u16>>, u32> {
     }
     Err(2)
 }
+/// The file of a program name as resolve finds it.
+pub(super) fn find(name: &str) -> Option<String> {
+    let w = resolve(name).ok()??;
+    Some(crate::from_wide(&w[..w.len() - 1]))
+}
+/// A program on its own (process::launch): no pipes, no inherited handles, no console window,
+/// a process group of its own; first outside this process's job (CREATE_BREAKAWAY_FROM_JOB),
+/// which a job that keeps its children refuses (ERROR_ACCESS_DENIED): then inside it.
+pub(super) fn launch(program: &str, args: &[&str]) -> Result<(), u32> {
+    let application = resolve(program)?;
+    let app = application.as_ref().map_or(core::ptr::null(), |a| a.as_ptr());
+    let mut text = quote(program); for a in args { text.push(' '); text.push_str(&quote(a)); }
+    let si = StartupInfo { cb: 104, rest: [0; 25] };
+    let mut err = 5;
+    // CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP, with CREATE_BREAKAWAY_FROM_JOB first
+    for flags in [0x0900_0200u32, 0x0800_0200] {
+        let mut line: Vec<u16> = text.encode_utf16().chain(core::iter::once(0)).collect();
+        if line.len() > 32767 { return Err(206); }
+        let mut pi = [0isize; 3];
+        // SAFETY: live NUL-terminated strings, a zeroed STARTUPINFOW, no inherited handles; the
+        // handles of the new process and its thread are closed at once.
+        let ok = unsafe { CreateProcessW(app, line.as_mut_ptr(), 0, 0, 0, flags, 0, core::ptr::null(), &si, &mut pi) };
+        if ok != 0 { drop(Handle(pi[0])); drop(Handle(pi[1])); return Ok(()); }
+        err = error();
+        if err != 5 { break; }
+    }
+    Err(err)
+}
 /// Native child with captured output and a kill-on-close Windows job.
 pub struct Child { process: Handle, job: Handle, input: Option<Handle>, output: Handle, error: Handle }
 pub(super) fn spawn(c: &Command<'_>) -> Result<Child, u32> {

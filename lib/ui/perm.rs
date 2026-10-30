@@ -242,7 +242,9 @@ impl Ui {
 
     /// the permissions section of a settings page: the answers to the app's permission
     /// questions, each with a reset (module header) -> an answer was revoked
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn permissions_page(&mut self, id: u32) -> bool {
+        let _src = self.src_scope();
         let list = plat::policy::decisions();
         let mut changed = false;
         self.id_push(id);

@@ -3750,6 +3750,11 @@ The live inspector (inspect.rs):
   inspect list (copy the change list)   inspect do click|drag DX DY|value N|type "s"|cmd ID
   [ARG] (the selected widget)   inspect expect changes N|list "s"|value KEY "s"|undo on|off|
   redo on|off|message "s"|none
+  ... the sources (development builds, inspect_src.rs): inspect editor "COMMAND"|none (the
+  editor of this run; a script starts no other)   inspect open [dry] ("Im Editor öffnen";
+  dry: built and checked, nothing started)   inspect expect source "PREFIX"|none (the
+  selected widget's "file:line")   inspect expect sources "PREFIX" (every record of the
+  app's windows)   inspect expect opened "s"|none   inspect expect note "s"|none
 Selectors S:  #123  (widget id)   "Label"   kind:"Label"   X,Y  (a point in DIP)
 A label must match exactly one widget (plain text is ignored when a control with the
 same label exists; matches in several windows: the topmost window, then the topmost
@@ -7760,7 +7765,8 @@ recorded or drawn.  Open:
     it; Esc ends the pick)
 The inspector's own window is left out of the tree, the overlay and the pick.
 Development builds edit in it (inspect_edit.rs): the tab "Farben" is editable, the tab
-"Darstellung" and the widget operations below the properties are added.
+"Darstellung" and the widget operations below the properties are added; and they show where
+the app called the selected widget, with "Im Editor öffnen" (inspect_src.rs).
 
 Script commands (auto.rs `inspect ...`, sc_inspect):
   inspect on|off|toggle      open / close (on arms it)     inspect arm|disarm   hot keys
@@ -7774,7 +7780,9 @@ Script commands (auto.rs `inspect ...`, sc_inspect):
 idle: the inspector did no work since it closed (or since the last idle check); same: the main
 window renders byte for byte as at `inspect snap`; excluded: the tree holds no record of the
 inspector's own window.  Editing (development builds): inspect set|reset|undo|redo|save|list|
-do ..., inspect expect changes|list|value|undo|redo|message (inspect_edit.rs).
+do ..., inspect expect changes|list|value|undo|redo|message (inspect_edit.rs); the sources:
+inspect editor "C"|none, inspect open [dry], inspect expect source|sources|opened|note
+(inspect_src.rs).
 ```
 
 **`impl Ui`**
@@ -16726,6 +16734,8 @@ Source: [`lib/plat/process.rs`](../lib/plat/process.rs)
 ```text
 Native child processes for tools and application helpers; no assembly counterpart.
 run_elevated / elevated: a program with administrator or root rights (a service install).
+launch: a program on its own that outlives this one (the inspector's editor); find: the file
+a program name stands for.
 ```
 
 - **`struct Command<'a>`**
@@ -16751,6 +16761,20 @@ run_elevated / elevated: a program with administrator or root rights (a service 
   Returns only on failure: the error number (refused by the manifest: EACCES).  Windows has
   no such call: 50 (ERROR_NOT_SUPPORTED).  The AppImage runtime (apps/appimagert) starts the
   AppRun of the image with it.
+
+- **`fn launch(program: &str, args: &[&str]) -> Result<(), u32>`**
+  Start a program on its own and do not wait for it: no pipes, none of this process's handles
+  (Linux: its standard handles on /dev/null), and it is not ended with this process
+  (Windows: no console window, outside this process's job when the job lets it go; Linux:
+  adopted by init in a session of its own) -- an editor, a viewer.  The manifest's `process`
+  rules apply as for Command::spawn (refused: 5 on Windows, 13 = EACCES on Linux); a program
+  that cannot be started gives its error number (2: not found).
+
+- **`fn find(name: &str) -> Option<String>`**
+  The file a program name stands for, as Command::spawn and launch look it up (Windows: the
+  program's folder, the system folders, then PATH, never the current folder; ".exe" added to a
+  name without one; Linux: the first executable file in PATH).  None for a path or no such
+  program.
 
 **`impl Command<'_>`**
 

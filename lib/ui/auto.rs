@@ -107,6 +107,11 @@
 //   inspect list (copy the change list)   inspect do click|drag DX DY|value N|type "s"|cmd ID
 //   [ARG] (the selected widget)   inspect expect changes N|list "s"|value KEY "s"|undo on|off|
 //   redo on|off|message "s"|none
+//   ... the sources (development builds, inspect_src.rs): inspect editor "COMMAND"|none (the
+//   editor of this run; a script starts no other)   inspect open [dry] ("Im Editor öffnen";
+//   dry: built and checked, nothing started)   inspect expect source "PREFIX"|none (the
+//   selected widget's "file:line")   inspect expect sources "PREFIX" (every record of the
+//   app's windows)   inspect expect opened "s"|none   inspect expect note "s"|none
 // Selectors S:  #123  (widget id)   "Label"   kind:"Label"   X,Y  (a point in DIP)
 // A label must match exactly one widget (plain text is ignored when a control with the
 // same label exists; matches in several windows: the topmost window, then the topmost

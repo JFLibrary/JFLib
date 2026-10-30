@@ -75,7 +75,7 @@ sandbox                               # let the OS enforce the manifest too (OS 
 | `fs.read` | patterns | reading files and listing folders below the patterns; `plat::recent_add` takes only such files (and the user's, `fs.user`) |
 | `fs.write` | patterns | creating, writing, renaming, deleting and `plat::trash` below the patterns (includes reading) |
 | `fs.user` | – | the files of the file dialog, of drops and of the command line: read and write |
-| `process` | patterns or program names | `plat::process::Command::spawn` and `run_elevated`; a name without `/` matches a program looked up in `PATH` |
+| `process` | patterns or program names | `plat::process::Command::spawn`, `launch` and `run_elevated`; a name without `/` matches a program looked up in `PATH` (the live inspector's "Im Editor öffnen" in development builds starts the editor through `launch`: the same rule, no exception -- GUIDE.md §30) |
 | `url` | schemes or `*` | `plat::open_url` (`https`, `mailto`, ...) |
 | `plugins` | patterns | `plat::lib_open` (native plugin libraries) |
 | `print` | – | `plat::print` |

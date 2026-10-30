@@ -1,0 +1,18 @@
+# the live inspector's "Im Editor öffnen" under the app's manifest (ui/inspect_src.rs, ROADMAP §11
+# stage 4; development builds): audiotest's PERMISSIONS has no `process` rule, so the editor is
+# not started -- the inspector says so, the source can still be copied; the inspector makes no
+# exception to the manifest
+size 720 1000
+inspect on
+inspect select button:"Glocke (WAV)"
+inspect expect source "apps/audiotest/src/main.rs:"
+inspect editor "whoami"
+click button:"Im Editor öffnen"
+inspect expect note "(PERMISSIONS: process)"
+inspect expect opened none
+click button:"Quelle kopieren"
+inspect expect note "Kopiert"
+clip expect text
+inspect editor none
+inspect off
+inspect expect idle

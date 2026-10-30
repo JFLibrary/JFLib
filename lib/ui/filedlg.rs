@@ -291,7 +291,9 @@ impl S {
 impl Ui {
     /// ui_filedlg(id, flags, open, path, cap, exts) -> EV_ACT when confirmed
     #[allow(clippy::too_many_arguments)]
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn filedlg(&mut self, id: u32, flags: u32, open: &Shared<i32>, path: &mut String, cap: u32, exts: &[&str]) -> u32 {
+        let _src = self.src_scope();
         let mut result = 0;
         // first frame of an opening: load the start folder
         if open.get() != 0 && self.m.filedlg.id != id {

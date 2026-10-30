@@ -6,7 +6,9 @@ impl Ui {
     /// Focusable document/template preview card, naturally 150×194 DIP. The supplied
     /// drawing is inset into a white page; its document colors never follow the UI theme.
     /// Hover and selection use the style accent. The full label is exposed to agents.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn preview_card(&mut self, id: u32, label: &str, draw: Option<crate::DrawRef>, user: usize, version: u32) -> u32 {
+        let _src = self.src_scope();
         let flags = self.take_flags();
         let r = self.place(self.dp(150), self.dp(194));
         let ev = self.behave(id, HB_FOCUS | CUR_HAND << HB_CURSOR_SHIFT
@@ -52,6 +54,7 @@ impl Ui {
     /// `variant` selects one of seven sample arrangements (0..=6); larger values wrap.
     /// `next_flags(ST_DISABLED | ST_CHECKED)` controls behavior and selection, while
     /// the document sample remains fully readable. The caller applies its own theme on EV_ACT.
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn ribbon_theme_tile(
         &mut self,
         id: u32,
@@ -59,6 +62,7 @@ impl Ui {
         theme_color: u32,
         variant: u32,
     ) -> u32 {
+        let _src = self.src_scope();
         let flags = self.take_flags() | ST_SUBTLE;
         let selected = flags & ST_CHECKED != 0;
         let rect = self.place(self.dp(56), self.dp(66));

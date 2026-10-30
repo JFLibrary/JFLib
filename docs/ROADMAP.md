@@ -1775,8 +1775,9 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   Auswahl; es stiehlt keinen Fokus. Skriptbefehle `inspect …` (u. a. `expect same` / `idle`
   für „aus ändert nichts“), Tests `apps/gallery/tests/inspect.uis` und `inspect_rtl.uis`
   (Windows und Linux, auch mit `--verify-dirty`). Bearbeiten im Inspektor und
-  Hot-Reload: Stufen 1 bis 3 des nächsten Eintrags erledigt (2026-10-26).
-- **P2** · *teilweise* · Hot-Reload und beschreibbarer Inspektor („Live-Edit“, wie das F12-Menü
+  Hot-Reload: Stufen 1 bis 3 des nächsten Eintrags erledigt (2026-10-26), Stufe 4 (Quelltext
+  öffnen) am 2026-10-30.
+- **P2** · *erledigt* · Hot-Reload und beschreibbarer Inspektor („Live-Edit“, wie das F12-Menü
   eines Browsers), als Debug-Variante. Festgelegt am 2026-10-25: (a) Eine Art Hot-Reload: Code
   ändern, die laufende App zeigt die Änderung; die Elemente bleiben gebauter Rust-Code, nichts
   wird zur Laufzeit beschrieben oder interpretiert. (b) Nur als Debug-Variante und nur wenn
@@ -1848,4 +1849,32 @@ Widget-Verhalten ausführt ([GUIDE.md](GUIDE.md), Abschnitt 19).
   redo|save|list|do …`, `inspect expect changes|value|list|undo|redo|message`; Tests
   `apps/gallery/tests/inspect_edit.uis`, `inspect_edit_rtl.uis` (gespiegelt, 150 %),
   `apps/themedemo/tests/inspect_edit.uis` (die gelinkten Stile, Änderungen über einem
-  App-Theme), Windows und Linux, auch mit `--verify-dirty`. Offen: Stufe 4 (Quelltext öffnen).
+  App-Theme), Windows und Linux, auch mit `--verify-dirty`.
+  Stufe 4 *erledigt* (2026-10-30, [`ui/inspect_src.rs`](../lib/ui/inspect_src.rs),
+  [GUIDE.md §30](GUIDE.md) „Sources“): nur im Entwicklungs-Build. Die öffentlichen
+  Widget-Aufrufe der Bibliothek (158, von `ui.button`, `ui.textbox`, `ui.slider`, `ui.combobox`,
+  `ui.list_item`, `ui.box_begin` bis `ui.dialog_buttons`, dazu `ui.sem`) tragen
+  `#[cfg_attr(jfgui_dev, track_caller)]` und öffnen als erste Anweisung einen Bereich, der bei
+  offenem Inspektor den gerade gebauten Aufruf setzt (`Location::caller()`); ein Aufruf aus der
+  Bibliothek selbst behält den umgebenden der App, so melden zusammengesetzte Widgets
+  (Zahlenfeld, Kombinationsfeld, Menü- und Listenzeilen, Dialogknöpfe) die Zeile der App. Aus
+  kostet es einen Flag-Test je Aufruf, nichts wird gespeichert (`inspect expect same` / `idle`
+  halten); `--release` hat weder `#[track_caller]` noch Bereiche (`inspect_src_off.rs`). Tab
+  „Widgets“: „Quelle: apps/x/main.rs:123“ (relativ zum Repository, wie rustc den Pfad bekommt)
+  mit Kopieren und „Im Editor öffnen“: `jfgui_EDITOR` (`{file}`, `{line}`, `{col}`), sonst
+  `VISUAL` / `EDITOR` (bekannte Editoren mit Zeile), sonst gefunden: CLion, VS Code; die Datei
+  absolut unter `jfgui_SRC`, dem Ordner über `build/` oder dem Arbeitsordner. Gestartet wird
+  über das neue `plat::process::launch` (eigenständig, ohne Pipes, überlebt die App und den
+  Neustart durch Hot-Reload), geprüft wie `Command::spawn` vom Manifest der App
+  (`process`-Regel, `ask process` fragt, danach noch einmal öffnen): Entscheidung für die
+  Entwicklungszeit, keine Ausnahme für den Inspektor, eine Ablehnung steht mit dem
+  Programmnamen unter der Quelle, Kopieren bleibt. Skripte starten nie den Editor des Nutzers, nur einen mit `inspect editor` gesetzten.
+  Skriptbefehle `inspect editor|open [dry]`, `inspect expect source|sources|opened|note`
+  (`sources`: jeder Eintrag der App-Fenster hat eine Quelle in der App, kein Widget-Aufruf der
+  Bibliothek ist unmarkiert; so auch für datagallery, docktest, diagramtest, editortest,
+  termtest, officeicontest, themedemo, uitest und BackupCraft geprüft); Tests
+  `apps/gallery/tests/inspect_source.uis`, `apps/audiotest/tests/inspect_perm.uis` (Manifest
+  ohne `process`: abgelehnt), `apps/plattest/tests/launch.uis`, Windows und Linux, auch mit
+  `--verify-dirty`. Noch nicht markiert: `ui.markdown_view`, `ui.html_view` und `ui.doc_view`
+  (`ui/md_view.rs`, zur selben Zeit anderweitig in Arbeit) zeigen eine Zeile in
+  `lib/ui/md_view.rs` statt des Aufrufs der App.

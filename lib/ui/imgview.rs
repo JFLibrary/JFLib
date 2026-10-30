@@ -241,7 +241,9 @@ impl Ui {
     }
 
     /// ui_svg(id, doc, w, h) -> EV: an SVG at w x h DIP (see the module header of imgview.rs)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn svg(&mut self, id: u32, doc: &Rc<Svg>, w: i32, h: i32) -> u32 {
+        let _src = self.src_scope();
         let (iw, ih) = doc.size();
         let (w, h) = match (w > 0, h > 0) {
             (true, true) => (w as f64, h as f64),
@@ -633,7 +635,9 @@ impl Ui {
 
     /// ui_image_view(id, st, img, flags) -> EV: the image viewer (see the module header of
     /// imgview.rs)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn image_view(&mut self, id: u32, st: &mut ImageViewState, img: ViewImage, flags: u32) -> u32 {
+        let _src = self.src_scope();
         let _ = self.take_flags();
         if self.wp.lay.next_w == 0 && self.wp.lay.next_h == 0 && self.wp.lay.next_rect_set == 0 {
             self.next_size(-1, -1);

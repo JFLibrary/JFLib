@@ -1916,7 +1916,9 @@ fn node_sem_id(id: u32, key: u64) -> u32 {
 impl Ui {
     /// ui_diagram(id, st, m, tool, paint, ver) -> what the user did: the node / edge canvas
     /// in the next layout slot (see the file header)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn diagram(&mut self, id: u32, st: &mut DiagramState, m: &DModel, tool: u32, paint: Option<Rc<dyn DgPaint>>, ver: u32) -> Vec<DEv> {
+        let _src = self.src_scope();
         let mut out = Vec::new();
         let _ = self.take_flags();
         let r = self.place(0, 0);
@@ -2408,7 +2410,9 @@ impl Ui {
     /// ui_diagram_minimap(id, st, m) -> the view moved: an overview of the nodes and the
     /// shown part in the bottom right corner of the last diagram (nothing when the canvas is
     /// small); pressing or dragging there centres the view on that point
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn diagram_minimap(&mut self, id: u32, st: &mut DiagramState, m: &DModel) -> bool {
+        let _src = self.src_scope();
         let r = st.vp.rect;
         let (w, h, mg) = (self.dp(176), self.dp(112), self.dp(12));
         if r[2] < w + mg * 2 + self.dp(160) || r[3] < h + mg * 2 + self.dp(120) {
@@ -2502,7 +2506,9 @@ impl Ui {
     /// ui_diagram_sems(id, st, m, label): one K_LISTITEM record per node the last diagram
     /// call showed (label(key), value = the node's index, selected / focused / hover states),
     /// cut to the canvas; a screen reader's click on one selects it
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn diagram_sems(&mut self, id: u32, st: &mut DiagramState, m: &DModel, label: &dyn Fn(u64) -> String) {
+        let _src = self.src_scope();
         let r = st.vp.rect;
         let focused = self.wp.ctx.focus == id;
         let hov = match st.hover {
@@ -2551,7 +2557,9 @@ impl Ui {
     /// call showed (label(key); value = the edge's index; selected / focused / hover states),
     /// a small box around the middle of its route cut to the canvas, after the nodes' records;
     /// a screen reader's click on one selects the edge (and focuses it with tab_edges)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn diagram_edge_sems(&mut self, id: u32, st: &mut DiagramState, m: &DModel, label: &dyn Fn(u64) -> String) {
+        let _src = self.src_scope();
         let r = st.vp.rect;
         if r[2] <= 0 || r[3] <= 0 {
             return;

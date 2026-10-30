@@ -78,7 +78,9 @@ impl Ui {
     }
 
     /// ui_toast_host: draw the toasts (once per frame, after the content)
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn toast_host(&mut self) {
+        let _src = self.src_scope();
         let now = self.now_ms;
         // expire
         let before = self.m.notify.toasts.len();
@@ -169,7 +171,9 @@ impl Ui {
     }
 
     /// ui_spinner(id, size_dip): a turning ring
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn spinner(&mut self, id: u32, size: i32) {
+        let _src = self.src_scope();
         let s = self.dp(if size > 0 { size } else { 20 });
         let r = self.place(s, s);
         let phase = if self.anim_off { 0 } else { ((self.now_ms as u64 * 1024 / 900) & 1023) as i32 };
@@ -185,7 +189,9 @@ impl Ui {
     }
 
     /// ui_progress_indeterminate(id): a bar with a running segment
+    #[cfg_attr(jfgui_dev, track_caller)]
     pub fn progress_indeterminate(&mut self, id: u32) {
+        let _src = self.src_scope();
         let r = self.place(self.dp(200), self.dp(4));
         let phase = if self.anim_off { 300 } else { ((self.now_ms as u64 * 1024 / 1500) & 1023) as i32 };
         if !self.anim_off && self.anim_shown(r) {
