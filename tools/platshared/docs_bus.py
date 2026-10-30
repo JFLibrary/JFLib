@@ -33,7 +33,7 @@ import argparse, fcntl, os, shutil, signal, socket, struct, subprocess, sys, tem
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from portal_bus import R, W, message, parse  # noqa: E402
+from portal_bus import R, W, listen_unix, message, parse  # noqa: E402
 
 NAME = "org.freedesktop.portal.Documents"
 PATH = "/org/freedesktop/portal/documents"
@@ -140,9 +140,7 @@ def serve_one(c, mount, rec, lock):
 
 
 def serve(path, mount, rec, stop):
-    srv = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    srv.bind(path)
-    srv.listen(8)
+    srv = listen_unix(path, 8)
     srv.settimeout(0.2)
     lock = threading.Lock()
     while not stop.is_set():
@@ -168,7 +166,7 @@ def fake(exe):
         rec = {"connections": 0, "negotiated": 0, "mount": [], "add": [], "ids": {}}
         stop = threading.Event()
         sock = os.path.join(d, "bus")
-        t = threading.Thread(target=serve, args=(sock, mount, rec, stop), daemon=True)
+        t = threading.Thread(target=serve, args=(listen_unix(sock, 8), mount, rec, stop), daemon=True)
         t.start()
         r = plattest(exe, clean_env(DBUS_SESSION_BUS_ADDRESS=f"unix:path={sock}", XDG_RUNTIME_DIR=run), "--doc", doc)
         stop.set()

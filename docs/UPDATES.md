@@ -152,7 +152,10 @@ rule, nothing is written and the update stays staged. Programs in folders of the
 (`%LOCALAPPDATA%\Programs\<app>`) is writable, so `exe` and `bundle` updates work there.
 AppImage, Flatpak and MSIX packages are not updated this way: their program folders are an
 extracted copy, the Flatpak repository's or a read-only package folder
-([PACKAGING.md](PACKAGING.md) "Other formats").
+([PACKAGING.md](PACKAGING.md) "Other formats"). On Linux the updater sees it (`$APPIMAGE`,
+`$FLATPAK_ID`, `$SNAP`, with `Config::exe` empty): `check()` answers `Check::NoPackage` for an
+`exe` or `bundle` package there, and an update staged before is dropped at the next start
+(`Startup::Failed(Error::Unsupported(..))`, once).
 
 ```text
 net.connect updates.example.org:443   # the channel (and the host of absolute file URLs)

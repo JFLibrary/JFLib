@@ -3,8 +3,8 @@
 //
 //   linuxtest --shot x.png --test xkb --keymap F [--xkbdump]
 //   parse the keymap file (a German layout: tools/wlkeymap.py dumps the compositor's),
-//   translate keys with modifier states, check the MOD_* bits of the real modifiers and the
-//   built-in US fallback
+//   translate keys with modifier states, check the MOD_* bits of the real modifiers, the dead
+//   keys composed by xkb_key_typed and the built-in US fallback
 
 use alloc::format;
 
@@ -87,6 +87,41 @@ static MODS: &[(u32, u32, u8, &str)] = &[
     (0x85, 0x12, plat::MOD_ALTGR | plat::MOD_CTRL | plat::MOD_SHIFT | plat::MOD_CAPS | plat::MOD_NUM, "mods: combined"),
 ];
 
+/// key presses (evdev, depressed mods) typed in a row -> the text they give, name
+static TYPED: &[(&[(u32, u32)], &str, &str)] = &[
+    (&[(13, 0), (18, 0)], "\u{e9}", "de typed: dead acute + e = e-acute"),
+    (&[(13, 0), (42, 1), (18, 1)], "\u{c9}", "de typed: dead acute + Shift (held) + E = E-acute"),
+    (&[(41, 0), (24, 0)], "\u{f4}", "de typed: dead circumflex + o = o-circumflex"),
+    (&[(13, 1), (30, 0)], "\u{e0}", "de typed: Shift+dead acute (grave) + a = a-grave"),
+    (&[(41, 0), (57, 0)], "^", "de typed: dead circumflex + space = ^"),
+    (&[(13, 0), (13, 0)], "\u{b4}", "de typed: dead acute twice = acute"),
+    (&[(41, 0), (45, 0)], "^x", "de typed: dead circumflex + x = ^x (no composition)"),
+    (&[(41, 0), (14, 0), (18, 0)], "e", "de typed: dead circumflex, Backspace drops it"),
+    (&[(16, 0), (26, 0)], "q\u{fc}", "de typed: plain keys unchanged"),
+];
+
+/// type the keys of each TYPED row, compare the text  [xkb_key_typed]
+fn run_typed(t: &mut Lt) {
+    for &(keys, want, name) in TYPED {
+        plat::xkb_dead_reset();
+        let mut got = alloc::string::String::new();
+        for &(evdev, dep) in keys {
+            plat::xkb_set_mods(dep, 0, 0, 0);
+            for c in plat::xkb_key_typed(evdev).1 {
+                if let Some(ch) = char::from_u32(c).filter(|_| c != 0) {
+                    got.push(ch);
+                }
+            }
+        }
+        t.check(got == want, name);
+        if got != want {
+            out(&format!("     got {got:?}, expected {want:?}\n"));
+        }
+    }
+    plat::xkb_dead_reset();
+    plat::xkb_set_mods(0, 0, 0, 0);
+}
+
 /// set modifiers, translate, compare  [run_xkb_table]
 fn run_table(t: &mut Lt, tab: &[Xt]) {
     for &(evdev, dep, lock, cp, vk, name) in tab {
@@ -115,6 +150,7 @@ pub fn test_xkb(t: &mut Lt) {
         plat::xkb_dump();
     }
     run_table(t, DE);
+    run_typed(t);
     // modifier bits
     for &(dep, lock, want, name) in MODS {
         let m = plat::xkb_set_mods(dep, 0, lock, 0);

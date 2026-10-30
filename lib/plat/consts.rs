@@ -89,6 +89,9 @@ pub const WST_ACTIVE: u32 = 4; // one of the APP's windows is active
 pub const WST_TILED: u32 = 8;
 pub const WST_MINIMIZED: u32 = 16;
 pub const WST_CSD: u32 = 32; // no system frame: the app must draw its own title bar
+/// the window is drawn inside its owner (a Wayland subsurface): win_get_rect / win_set_rect /
+/// E_WINPOS use positions relative to the owner's surface origin (px), the owner carries it
+pub const WST_CHILD: u32 = 64;
 
 // ---- clipboard formats
 pub const CLIP_TEXT: u32 = 1; // UTF-8

@@ -203,7 +203,9 @@ impl X11 {
             wr32(b, o + 44, cmap);
         }
         self.win_set_title(idx as i32, title);
-        // WM_CLASS = basename(argv[0]) NUL "jfgui" NUL
+        // WM_CLASS = basename(argv[0]) NUL basename(argv[0]) NUL: the class too names the app (KDE
+        // groups and finds the .desktop file -- StartupWMClass -- by the class; one class for
+        // every jfgui app put them all into one group)
         let a0 = crate::args().into_iter().next();
         let base: Vec<u8> = match a0 {
             Some(a) => match a.as_bytes().iter().rposition(|&c| c == b'/') {
@@ -212,9 +214,11 @@ impl X11 {
             },
             None => b"jfgui".to_vec(),
         };
-        let mut class = base[..clip_len(&base, 100)].to_vec();
+        let name = &base[..clip_len(&base, 100)];
+        let mut class = name.to_vec();
         class.push(0);
-        class.extend_from_slice(b"jfgui\0");
+        class.extend_from_slice(name);
+        class.push(0);
         self.change_property(win, XA_WM_CLASS, XA_STRING, 8, 0, &class);
         self.dnd_window(win); // K1: XdndAware
         // WM_PROTOCOLS
@@ -462,7 +466,8 @@ impl X11 {
     pub(super) fn win_activate(&mut self, w: i32) {
         let Some(i) = self.rec(w) else { return };
         let r = self.xw[i];
-        if !r.mapped || r.flags & PWF_NOACTIVATE != 0 || r.focus {
+        // (shown, not mapped: a minimized window -- managers unmap iconic windows -- comes back)
+        if !r.shown || r.flags & PWF_NOACTIVATE != 0 || (r.focus && r.state & WST_MINIMIZED == 0) {
             return; // not shown / never focused / it has the focus already
         }
         let data = [1, self.time, self.focus_xid(), 0, 0];
@@ -593,6 +598,15 @@ impl X11 {
                 self.flush();
             }
             WCMD_RESTORE => {
+                if self.xw[i].state & WST_MINIMIZED != 0 {
+                    // minimized: back as it was (maximized stays maximized, as SW_RESTORE);
+                    // MapWindow takes an iconic window back to the normal state (ICCCM)
+                    let win = self.xw[i].win;
+                    let (o, _) = self.req(XR_MAP_WINDOW, 8);
+                    wr32(&mut self.out, o, win);
+                    self.flush();
+                    return;
+                }
                 if self.xw[i].state & WST_FULLSCREEN != 0 {
                     let f = self.atoms[A_NET_WM_STATE_FULLSCREEN];
                     self.net_state(w, NET_STATE_REMOVE, f, 0);
@@ -902,6 +916,9 @@ impl X11 {
             let r = self.popup_route(b);
             if r == -2 {
                 return;
+            }
+            if r < 0 && matches!(typ, XE_MOTION | XE_ENTER | XE_LEAVE) {
+                return; // a window that is gone (a hidden menu, a closed dialog): not window 0's
             }
             idx = r;
         }

@@ -122,7 +122,7 @@ unsafe fn take_string(p: *mut u16) -> String {
     }
     unsafe {
         let mut n = 0;
-        while *p.add(n) != 0 && n < 4096 {
+        while n < 4096 && *p.add(n) != 0 { // the limit first: no read past it
             n += 1;
         }
         let s = String::from_utf16_lossy(core::slice::from_raw_parts(p, n));

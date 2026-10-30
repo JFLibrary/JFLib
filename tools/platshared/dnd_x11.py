@@ -20,6 +20,9 @@ plattest checks its side (E_DRAG, E_DROP, the content, E_DRAG_END).  Exit 0 = pa
 import argparse, os, queue, select, socket, struct, subprocess, sys, threading, time
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from icc_x11 import x11_cookie  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 fails = 0
 
@@ -37,7 +40,9 @@ class X:
         n = os.environ.get("DISPLAY", ":0").split(":")[-1].split(".")[0]
         self.s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.s.connect(f"/tmp/.X11-unix/X{n}")
-        self.s.sendall(struct.pack("<BxHHHHxx", 0x6C, 11, 0, 0, 0))
+        name, data = x11_cookie(n)
+        pad = lambda b: b + b"\0" * (-len(b) % 4)
+        self.s.sendall(struct.pack("<BxHHHHxx", 0x6C, 11, 0, len(name), len(data)) + pad(name) + pad(data))
         hdr = self.read(8)
         if hdr[0] != 1:
             raise RuntimeError("X11 setup refused")

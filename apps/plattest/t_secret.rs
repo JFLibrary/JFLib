@@ -16,8 +16,9 @@
 //                                every call, each call unlocks it through a prompt; dismiss: the
 //                                user dismisses the prompts; nodefault: no default collection
 //                                (CreateCollection and its prompt), prompts for CreateItem and
-//                                Delete; badkey: an invalid public key; none: no Secret Service
-//                                on the bus
+//                                Delete; badkey: an invalid public key; ksecretd: the numbers
+//                                written as KDE's ksecretd does (sign byte, no leading zeros),
+//                                the round trip of dh; none: no Secret Service on the bus
 // data:// is mounted on the scratch folder first: the DPAPI files land there, and the checks
 // can see that nothing else was written.
 
@@ -199,7 +200,7 @@ pub fn t_secret_bus(t: &mut T) {
     let svc = "secret-bus";
     t.info(&format!("  mode {mode}\n"));
     match mode.as_str() {
-        "dh" | "plain" => {
+        "dh" | "plain" | "ksecretd" => {
             t.check(secret_available(), "secret-bus: secret_available");
             round_trip(t, svc, true);
         }

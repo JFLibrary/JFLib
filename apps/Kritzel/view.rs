@@ -9,7 +9,10 @@
 //   view_zoom_step(p, ui, dir, ax, ay)  next (+1) / previous (-1) zoom level
 //   view_fit(p, ui)                  zoom so the whole image fits
 //   view_scroll(v, dx, dy)           scroll by screen px
-//   view_version(p) -> hash of everything that changes the canvas pixels
+//   view_version(p) -> hash of the canvas placement (zoom, position, size)
+//   view_damage(p, ui, rc)           the document pixels changed since the last call are
+//                                    redrawn (ui.canvas_damage): a brush stroke redraws what
+//                                    it painted, not the whole window
 //   view_extent(p, ui) -> (content w, content h, view w, view h)
 //   view_draw_ref(p) -> the canvas draw object (view_draw: ui.canvas's draw callback)
 //   view_frame_end(p, ui)            lends the layers to the draw object (end of every pass
@@ -33,7 +36,7 @@ use gfx::Surface;
 use ui::*;
 
 use crate::consts::*;
-use crate::doc::{composite_into, doc_h, doc_opaque, doc_version, doc_w};
+use crate::doc::{composite_into, doc_damage_take, doc_h, doc_opaque, doc_w};
 use crate::Kritzel;
 
 const ZOOM_MIN: i32 = 125;
@@ -127,15 +130,39 @@ fn vl_axis(start: i32, len: i32, clen: i32, scroll: &mut i32, m: i32) -> i32 {
     start.wrapping_add(m).wrapping_sub(s)
 }
 
-/// view_version() -> hash of everything that changes the canvas pixels: document version,
-/// zoom and the canvas position (scrolling, centring)
+/// view_version() -> hash of the canvas placement: zoom and position (scrolling, centring);
+/// changed document pixels are damage (view_damage), not a new version -- a new version
+/// redraws the whole canvas widget, which during a stroke means most of the window
 pub(crate) fn view_version(p: &Kritzel) -> u32 {
     let v = &p.view;
-    let mut h = doc_version(&p.doc);
-    for x in [v.zoom, v.cx, v.cy, v.cw, v.ch] {
+    let mut h = 0x811C_9DC5u32;
+    for x in [v.zoom, v.cx, v.cy, v.cw, v.ch, doc_w(&p.doc), doc_h(&p.doc)] {
         h = h.wrapping_mul(0x0100_0193).wrapping_add(x as u32);
     }
     h
+}
+
+/// view_damage(rc) -- the document pixels marked since the last call: their part of the canvas
+/// widget (rc = its rectangle, px) is redrawn with the next render (ui.canvas_damage)
+pub(crate) fn view_damage(p: &mut Kritzel, ui: &mut Ui, rc: [i32; 4]) {
+    let Some([x0, y0, x1, y1]) = doc_damage_take(&mut p.doc) else { return };
+    let v = &p.view;
+    let (dw, dh) = (doc_w(&p.doc).max(1) as i64, doc_h(&p.doc).max(1) as i64);
+    // doc -> screen exactly as the blit maps it (gfx blit_scaled: screen px u shows doc px
+    // (u * step + step / 2) >> 16, step = doc / screen in 16.16): the first screen px of doc px
+    // x; a pixel more around for safety
+    let first = |x: i32, d: i64, s: i32| -> i64 {
+        if s as i64 == d || s <= 0 {
+            return x as i64; // unscaled
+        }
+        let step = ((d << 16) / s as i64).max(1);
+        (((x as i64) << 16) - step / 2 + step - 1).div_euclid(step)
+    };
+    let sx = |x: i32| v.cx as i64 + first(x, dw, v.cw);
+    let sy = |y: i32| v.cy as i64 + first(y, dh, v.ch);
+    let (a, b) = (sx(x0) as i32 - 2, sy(y0) as i32 - 2);
+    let (c, d) = (sx(x1) as i32 + 3, sy(y1) as i32 + 3);
+    ui.canvas_damage(ID_CANVAS, a - rc[0], b - rc[1], c - a, d - b);
 }
 
 /// view_extent() -> (content width, content height (canvas + margins, px), view w, view h)

@@ -721,6 +721,8 @@ mod lnx {
     const O_NOFOLLOW: usize = 0x20000;
     const O_NONBLOCK: usize = 0x800;
     const SYS_FCHMOD: usize = 91;
+    const SYS_FCHMODAT: usize = 268;
+    const O_PATH: usize = 0x20_0000;
     const SYS_WRITE: usize = 1;
     const SYS_CLOSE: usize = 3;
     const SYS_FSYNC: usize = 74;
@@ -922,6 +924,16 @@ mod lnx {
     pub fn set_mode(path: &str, mode: u32) -> bool {
         if !(crate::policy::fs_allowed(path, crate::policy::FS_WRITE)) {
             return false;
+        }
+        // O_PATH: also an entry the owner may not read (mode 000 / 0200), a socket or a device
+        // without opening it; changed through /proc/self/fd/N (fchmod refuses O_PATH)
+        if let Some(fd) = open(path, O_PATH | O_NOFOLLOW, 0) {
+            let link = z(&alloc::format!("/proc/self/fd/{}", fd.0));
+            // SAFETY: fchmodat on a NUL-terminated path.
+            let r = unsafe { syscall6(SYS_FCHMODAT, AT_FDCWD as usize, link.as_ptr() as usize, (mode & 0o7777) as usize, 0, 0, 0) };
+            if r != -2 {
+                return r >= 0; // (-ENOENT: no /proc)
+            }
         }
         match open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK, 0) {
             // SAFETY: an owned descriptor.

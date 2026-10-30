@@ -484,8 +484,10 @@ pub(crate) fn inst_connect(app: &str) -> Result<InstConn, i32> {
         if process == 0 {
             return Err(last_error());
         }
+        // only two SIDs read and equal count: a failure of both lookups is no proof of the
+        // same user
         // SAFETY: the own pseudo handle.
-        let same = process_sid(process).ok() == process_sid(unsafe { GetCurrentProcess() }).ok();
+        let same = matches!((process_sid(process), process_sid(unsafe { GetCurrentProcess() })), (Ok(a), Ok(b)) if a == b);
         close(process);
         if !same {
             return Err(5); // another user's pipe under this name

@@ -486,7 +486,10 @@ impl X11 {
         let (w, m) = ((kc >> 5) as usize, 1u32 << (kc & 31));
         // an input method (IBus) sees the key first while a text field has the focus
         let ime = self.ime_on && crate::ibus_ready();
-        let keyval = if text >= 0x20 && text < 0x100 {
+        let dead = text != 0 && crate::xkb_is_dead(ev);
+        let keyval = if dead {
+            crate::xkb_dead_keysym(text) // IBus composes dead keys itself
+        } else if text >= 0x20 && text < 0x100 {
             text
         } else if text > 0xFF {
             0x0100_0000 | text
@@ -504,14 +507,17 @@ impl X11 {
                 self.rep_merge = 0;
                 rep = 0x80000000;
             }
-            if ime && keyval != 0 && crate::ibus_key(keyval, ev, xstate) {
+            // (a held dead key does not repeat, not even into the input method)
+            if ime && keyval != 0 && !(rep != 0 && dead) && crate::ibus_key(keyval, ev, xstate) {
                 return; // its text comes as E_IME_COMMIT / E_PREEDIT
             }
             if vk != 0 {
                 self.push(E_KEY_DOWN, 0, 0, 0, vk | rep);
             }
-            if text != 0 {
-                self.push(E_TEXT, 0, 0, 0, text);
+            // dead keys composed (´ e -> é); a repeating dead key gives nothing
+            let typed = if rep != 0 && dead { [0, 0] } else { crate::xkb_key_typed(ev).1 };
+            for t in typed.into_iter().filter(|&t| t != 0) {
+                self.push(E_TEXT, 0, 0, 0, t);
             }
             return;
         }
@@ -593,6 +599,7 @@ impl X11 {
             self.xw[i].focus = false;
             self.held = [0; 8];
             self.rep_merge = 0;
+            crate::xkb_dead_reset(); // a dead key does not carry over to another window
             if self.ime_win as usize == i {
                 self.ime_off(); // back with the next frame after E_FOCUS_IN
             }
@@ -715,6 +722,9 @@ impl X11 {
         for bt in 1..=5u8 {
             if self.btn & 1 << bt != 0 {
                 self.btn &= !(1 << bt);
+                if bt == BTN_LEFT {
+                    self.dnd_release(); // (another client grabbed the pointer: our drag ends)
+                }
                 let (x, y) = (self.mx, self.my);
                 self.push(E_UP, bt, x, y, 0);
             }

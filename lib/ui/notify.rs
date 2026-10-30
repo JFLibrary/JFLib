@@ -160,12 +160,20 @@ impl Ui {
         self.layer_set(prev_layer);
     }
 
+    // a running animation asks for frames only while some of it shows: a spinner scrolled out
+    // of view kept the loop at 60 wake-ups a second (r: px; an empty rect, not laid out yet,
+    // counts as shown)
+    fn anim_shown(&self, r: [i32; 4]) -> bool {
+        let k = self.wp.ctx.uiclip;
+        r[2] <= 0 || r[3] <= 0 || (r[0] < k[2] && r[1] < k[3] && r[0] + r[2] > k[0] && r[1] + r[3] > k[1])
+    }
+
     /// ui_spinner(id, size_dip): a turning ring
     pub fn spinner(&mut self, id: u32, size: i32) {
         let s = self.dp(if size > 0 { size } else { 20 });
         let r = self.place(s, s);
         let phase = if self.anim_off { 0 } else { ((self.now_ms as u64 * 1024 / 900) & 1023) as i32 };
-        if !self.anim_off {
+        if !self.anim_off && self.anim_shown(r) {
             self.animating = true;
         }
         let sh = self.style.shell();
@@ -180,7 +188,7 @@ impl Ui {
     pub fn progress_indeterminate(&mut self, id: u32) {
         let r = self.place(self.dp(200), self.dp(4));
         let phase = if self.anim_off { 300 } else { ((self.now_ms as u64 * 1024 / 1500) & 1023) as i32 };
-        if !self.anim_off {
+        if !self.anim_off && self.anim_shown(r) {
             self.animating = true;
         }
         let sh = self.style.shell();

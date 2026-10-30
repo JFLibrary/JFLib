@@ -23,3 +23,4 @@ rust-project.json
 *.p12
 *.keystore
 *.jks
+/SECURITY_REVIEW_LIB.md

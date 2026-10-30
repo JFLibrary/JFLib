@@ -7,6 +7,9 @@
 //   SysSpeller::open(tag) -> checker   language(), check(word), suggest(word, max)
 //   hunspell_dirs() -> folders       where Hunspell dictionaries live here (DICPATH, Linux:
 //                                    the XDG data folders); the spell crate reads them
+//   hyphen_dirs() -> folders         where hyphenation patterns live here (Linux: hyphen in
+//                                    the XDG data folders); spell::Hyphenator reads them
+//   (both always readable for the app's permissions, policy.rs)
 //
 // Windows (win_spell.rs): ISpellCheckerFactory / ISpellChecker of the Spell Checking API
 // (Windows 8 and later; the languages are the installed language packs).  COM on the calling
@@ -57,6 +60,25 @@ pub fn hunspell_dirs() -> Vec<String> {
             v.push(alloc::format!("{}/hunspell", d));
             v.push(alloc::format!("{}/myspell", d));
             v.push(alloc::format!("{}/myspell/dicts", d));
+        }
+    }
+    v
+}
+
+/// the system's folders of hyphenation patterns (hyph_*.dic, LibreOffice's format: Linux
+/// $XDG_DATA_HOME/hyphen (~/.local/share/hyphen), then hyphen in each of $XDG_DATA_DIRS
+/// (/usr/local/share, /usr/share) -- where the distributions' hyphen-* packages put them);
+/// empty elsewhere (Windows: spell::Hyphenator looks in LibreOffice's extensions itself)
+pub fn hyphen_dirs() -> Vec<String> {
+    let mut v = Vec::new();
+    if cfg!(target_os = "linux") {
+        match crate::env("XDG_DATA_HOME").filter(|h| !h.is_empty()) {
+            Some(h) => v.push(alloc::format!("{}/hyphen", h.trim_end_matches('/'))),
+            None => v.extend(crate::env("HOME").map(|h| alloc::format!("{}/.local/share/hyphen", h.trim_end_matches('/')))),
+        }
+        let data = crate::env("XDG_DATA_DIRS").filter(|d| !d.is_empty()).unwrap_or_else(|| String::from("/usr/local/share:/usr/share"));
+        for d in data.split(':').filter(|d| !d.is_empty()) {
+            v.push(alloc::format!("{}/hyphen", d.trim_end_matches('/')));
         }
     }
     v

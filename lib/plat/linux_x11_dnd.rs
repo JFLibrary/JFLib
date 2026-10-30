@@ -44,6 +44,7 @@ use crate::{DE_ALL, DE_COPY, DE_LINK, DE_MOVE, DT_FILES, DT_HTML, DT_IMAGE, DT_T
 
 const XDND_VERSION: u32 = 5;
 const DROP_TIMEOUT: u64 = 10_000_000; // us without XdndFinished
+const STATUS_TIMEOUT: u64 = 2_000_000; // us after the release without the target's XdndStatus
 const TYPES_MAX: u32 = 64; // atoms of an XdndTypeList we read
 const FIND_DEPTH: usize = 16;
 pub(super) const D_AWARE: usize = 0;
@@ -122,6 +123,8 @@ pub(super) struct Source {
     release: bool,
     cancel: bool,
     dropped: u64,
+    /// when the button was released while a status was still awaited (time_us; 0 = not)
+    released_at: u64,
 }
 
 // %XX for every byte of a path that is not unreserved (or '/')
@@ -308,7 +311,13 @@ impl X11 {
 
     /// the next time dnd_deferred must run (u64::MAX: none)
     pub(super) fn dnd_next(&self) -> u64 {
-        if self.xs.on && self.xs.dropped != 0 { self.xs.dropped + DROP_TIMEOUT } else { u64::MAX }
+        if self.xs.on && self.xs.dropped != 0 {
+            self.xs.dropped + DROP_TIMEOUT
+        } else if self.xs.on && self.xs.released_at != 0 {
+            self.xs.released_at + STATUS_TIMEOUT
+        } else {
+            u64::MAX
+        }
     }
 
     // ------------------------------------------------------------------ target
@@ -372,8 +381,11 @@ impl X11 {
         let has = |s: &X11, a: u32| a != 0 && s.xd.types.contains(&a);
         crate::drop_reset();
         let mut files = 0;
+        // a source that does not answer (3 s) is not asked for its other types: every one
+        // would wait as long again
+        let mut dead = false;
         if types & (DT_FILES | DT_URL) != 0 && has(self, self.xd_atoms[D_URI]) {
-            if let Ok(d) = self.sel_convert(sel, self.xd_atoms[D_URI], time, crate::CLIP_RICH_MAX) {
+            if let Some(d) = self.xd_conv(sel, self.xd_atoms[D_URI], time, crate::CLIP_RICH_MAX, &mut dead) {
                 if types & DT_FILES != 0 {
                     files = crate::drop_uri_list(&d);
                 }
@@ -388,7 +400,7 @@ impl X11 {
                 if !has(self, t) {
                     continue;
                 }
-                if let Ok(d) = self.sel_convert(sel, t, time, crate::CLIP_RICH_MAX) {
+                if let Some(d) = self.xd_conv(sel, t, time, crate::CLIP_RICH_MAX, &mut dead) {
                     let d = if t == XA_STRING { super::clip::from_latin1(&d) } else { d };
                     crate::drop_set_text(&d);
                     break;
@@ -398,7 +410,7 @@ impl X11 {
         if types & DT_HTML != 0 {
             for t in [self.xd_atoms[D_HTML], self.xd_atoms[D_HTML8]] {
                 if has(self, t) {
-                    if let Ok(d) = self.sel_convert(sel, t, time, crate::CLIP_RICH_MAX) {
+                    if let Some(d) = self.xd_conv(sel, t, time, crate::CLIP_RICH_MAX, &mut dead) {
                         crate::drop_set_html(&html_bytes(&d));
                         break;
                     }
@@ -407,11 +419,13 @@ impl X11 {
         }
         if types & DT_IMAGE != 0 {
             let png = self.atoms[A_IMAGE_PNG];
-            let img = if has(self, png) { self.sel_convert(sel, png, time, super::clip::CLIP_MAX).ok() } else { None };
-            let img = img.or_else(|| {
+            let mut img = if has(self, png) { self.xd_conv(sel, png, time, super::clip::CLIP_MAX, &mut dead) } else { None };
+            if img.is_none() {
                 let bmp = self.xd_atoms[D_BMP];
-                if has(self, bmp) { self.sel_convert(sel, bmp, time, super::clip::CLIP_MAX).ok().and_then(|d| crate::clip_bmp_fix(&d)) } else { None }
-            });
+                if has(self, bmp) {
+                    img = self.xd_conv(sel, bmp, time, super::clip::CLIP_MAX, &mut dead).and_then(|d| crate::clip_bmp_fix(&d));
+                }
+            }
             if let Some(d) = img {
                 crate::drop_set_image(d);
             }
@@ -422,6 +436,21 @@ impl X11 {
         let act = self.effect_action(e);
         self.xd_send(src, src, fin, [ours, 1, act, 0, 0]);
         self.xd = Target::default();
+    }
+
+    /// one type of the drop's data (None: refused or not answered; dead: the source stopped
+    /// answering -- nothing more is asked)
+    fn xd_conv(&mut self, sel: u32, target: u32, time: u32, limit: usize, dead: &mut bool) -> Option<Vec<u8>> {
+        if *dead {
+            return None;
+        }
+        match self.sel_convert(sel, target, time, limit) {
+            Ok(d) => Some(d),
+            Err(e) => {
+                *dead |= e == -2;
+                None
+            }
+        }
     }
 
     // ------------------------------------------------------------------ source
@@ -582,7 +611,17 @@ impl X11 {
         }
         if self.xs.release {
             if self.xs.target != 0 && self.xs.waiting {
-                return; // its answer to the last position decides
+                // its answer to the last position decides -- unless it does not come (a hung
+                // target): then it is no drop
+                let now = crate::time_us();
+                if self.xs.released_at == 0 {
+                    self.xs.released_at = now.max(1);
+                }
+                if now < self.xs.released_at + STATUS_TIMEOUT {
+                    return;
+                }
+                self.xs.waiting = false;
+                self.xs.accept = false;
             }
             if self.xs.target != 0 && self.xs.accept {
                 let t = self.time;

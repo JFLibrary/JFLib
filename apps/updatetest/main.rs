@@ -4,7 +4,8 @@
 //                              redirect, a wrong signature, a manifest changed after signing,
 //                              a wrong hash, a download broken off half way and continued with
 //                              Range, an older version and a replayed manifest, another app's
-//                              manifest, an expired one, no package for this system, hosts the
+//                              manifest, an expired one, no package for this system (also
+//                              none for an exe running as an AppImage), hosts the
 //                              PERMISSIONS refuse (manifest and file), cancel in the background;
 //                              then applying exe and bundle updates to stand-in programs with
 //                              cfg.restart = false: trial, health marker, rollback, a package
@@ -295,6 +296,10 @@ fn t_update(t: &mut T) {
     t.check(matches!(Updater::new(config(&s, &dir, "otherapp", "1.0.0", "s-other")).check(), Err(Error::Manifest(_))), "update: another app's manifest: Error::Manifest");
     t.eq(Updater::new(config(&s, &dir, "expired", "1.0.0", "s-expired")).check(), Err(Error::Expired), "update: an expired manifest: Error::Expired");
     t.eq(Updater::new(config(&s, &dir, "noplatform", "1.0.0", "s-noplat")).check(), Ok(Check::NoPackage(String::from("2.0.0"))), "update: no package for this system: NoPackage");
+    // an AppImage (Flatpak, Snap) updates as a whole package: its extracted exe is no target
+    plat::setenv("APPIMAGE", Some("/opt/apps/updatetest.AppImage"));
+    t.eq(Updater::new(config(&s, &dir, "good", "1.0.0", "s-appimage")).check(), Ok(Check::NoPackage(String::from("2.0.0"))), "update: running as an AppImage: no exe update offered (NoPackage)");
+    plat::setenv("APPIMAGE", None);
 
     // hosts the PERMISSIONS refuse
     let port = s.base.rsplit(':').next().unwrap_or("");
