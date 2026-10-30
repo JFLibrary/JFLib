@@ -16,8 +16,9 @@
 // HKCU\Software\Microsoft\Windows\CurrentVersion\Run (arguments quoted with the Microsoft
 // rules).  The Task Manager's switch (Explorer\StartupApproved\Run, an odd first byte = off)
 // counts for autostart_get; autostart_set(true) clears it (the user asked in the app), false
-// removes both; in an MSIX package (HKCU virtualized) Unavailable: the package's StartupTask
-// is switched in Settings.  Linux (linux_autostart.rs): $XDG_CONFIG_HOME/autostart/<desktop id>.desktop
+// removes both; in an MSIX package (HKCU virtualized) the package's StartupTask instead,
+// switched through WinRT (TaskId "Autostart"; it takes no arguments, a task the user switched
+// off in Settings stays off: Dismissed).  Linux (linux_autostart.rs): $XDG_CONFIG_HOME/autostart/<desktop id>.desktop
 // (XDG autostart; Hidden=true or X-GNOME-Autostart-enabled=false count as off), Exec quoted
 // as the Desktop Entry spec wants, $APPIMAGE instead of the executable when set.  In Flatpak
 // the Background portal (RequestBackground with autostart and the command line): the desktop
@@ -34,8 +35,8 @@ pub const AUTOSTART_WAIT_MS: i32 = 120_000;
 /// why autostart_set failed
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AutostartError {
-    /// not possible here (web, Android, no session bus for the portal, an MSIX package: its
-    /// StartupTask instead)
+    /// not possible here (web, Android, no session bus for the portal, an MSIX package without
+    /// a StartupTask)
     Unavailable,
     /// the app's permissions lack `autostart`
     Denied,

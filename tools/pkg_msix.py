@@ -8,10 +8,17 @@ Publisher).
                              msix_publisher / jfgui_MSIX_PUBLISHER, version as a.b.c.0), the
                              visual elements, the file types (each extension once; MakeAppx
                              refuses reserved ones like .exe) and URL schemes of PACKAGE, a
-                             StartupTask when the app may start at login, capabilities
+                             StartupTask (TaskId "Autostart": plat's autostart_set switches it)
+                             when the app may start at login, an execution alias (PACKAGE
+                             msix_alias=), capabilities
+  appinstaller(job, msix)    <App>.appinstaller for App Installer (PACKAGE appinstaller_url=,
+                             the folder the .appinstaller and the .msix are published in): the
+                             package's identity and address, UpdateSettings OnLaunch (every
+                             start, PACKAGE appinstaller_hours=) with a prompt, background checks
   capabilities(perms)        the capabilities of a PERMISSIONS manifest (+ notes)
   find_makeappx()            MakeAppx.exe: jfgui_MAKEAPPX, PATH, the newest Windows Kit
-  make_msix(job, signing)    <dist>/<App>-<version>-x64.msix -> its path or None
+  make_msix(job, signing)    <dist>/<App>-<version>-x64.msix (+ <App>.appinstaller) -> its path
+                             or None
 """
 import os
 import re
@@ -24,6 +31,9 @@ from xml.sax.saxutils import escape, quoteattr
 from pkgmeta import app_id, filetypes, icon, lf, logo, schemes
 
 ROOT = Path(__file__).resolve().parent.parent
+# the StartupTask's id: lib/plat/win_autostart.rs asks StartupTask.GetAsync for it
+STARTUP_TASK_ID = "Autostart"
+APPINSTALLER_NS = "http://schemas.microsoft.com/appx/appinstaller/2018"
 LOGOS = {"StoreLogo.png": (50, 50), "Square44x44Logo.png": (44, 44), "Square150x150Logo.png": (150, 150),
          "Wide310x150Logo.png": (310, 150)}
 # URL schemes Windows keeps for itself (a package may not register them)
@@ -136,16 +146,27 @@ def appx_manifest(job, style):
     if startup_task(perms):
         ext.append(f'        <desktop:Extension Category="windows.startupTask" Executable={quoteattr(exe)} '
                    'EntryPoint="Windows.FullTrustApplication">\n'
-                   f'          <desktop:StartupTask TaskId="Autostart" Enabled="false" DisplayName="{display}"/>\n'
+                   f'          <desktop:StartupTask TaskId="{STARTUP_TASK_ID}" Enabled="false" DisplayName="{display}"/>\n'
                    "        </desktop:Extension>\n")
+    alias = meta.get("msix_alias", "")
+    if alias:
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,60}\.exe", alias):
+            raise SystemExit(f"MSIX: msix_alias {alias!r}: a file name ending in .exe")
+        ext.append(f'        <uap3:Extension Category="windows.appExecutionAlias" Executable={quoteattr(exe)} '
+                   'EntryPoint="Windows.FullTrustApplication">\n'
+                   "          <uap3:AppExecutionAlias>\n"
+                   f"            <desktop:ExecutionAlias Alias={quoteattr(alias)}/>\n"
+                   "          </uap3:AppExecutionAlias>\n"
+                   "        </uap3:Extension>\n")
     lang = meta.get("language", "de-DE")
     return ('<?xml version="1.0" encoding="utf-8"?>\n'
             f"<!-- written by tools/package.py from apps/{app}/PACKAGE (docs/PACKAGING.md \"MSIX\") -->\n"
             '<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"\n'
             '         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"\n'
+            '         xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"\n'
             '         xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"\n'
             '         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"\n'
-            '         IgnorableNamespaces="uap desktop rescap">\n'
+            '         IgnorableNamespaces="uap uap3 desktop rescap">\n'
             f"  <Identity Name={quoteattr(identity_name(meta, app))} Publisher={quoteattr(publisher(meta))}\n"
             f'            Version="{msix_version(meta.get("version", "0.1.0"))}" ProcessorArchitecture="x64"/>\n'
             "  <Properties>\n"
@@ -214,6 +235,50 @@ def make_msix(job, signing):
     else:
         job.note("msix", "unsigniert: Add-AppxPackage braucht eine vertrauenswürdige Signatur "
                          "(der Store nimmt das Paket unsigniert und signiert selbst)")
+    job.made("msix", out)
+    write_appinstaller(job, out)
+    return out
+
+
+def appinstaller_hours(meta):
+    """PACKAGE appinstaller_hours= (HoursBetweenUpdateChecks, 0..255; default 0: every start)"""
+    h = meta.get("appinstaller_hours", "0")
+    if not h.isdigit() or int(h) > 255:
+        raise SystemExit(f"PACKAGE appinstaller_hours {h!r}: 0..255")
+    return int(h)
+
+
+def appinstaller(job, msix):
+    """the .appinstaller of the package msix (PACKAGE appinstaller_url=: the folder both are
+    published in): App Installer installs the package from there and, as UpdateSettings say,
+    looks for a newer one at every start (OnLaunch; the user is asked, the start is not held
+    up) and in the background; a lower version is never installed over a higher one"""
+    meta = job.meta
+    base = meta.get("appinstaller_url", "").rstrip("/")
+    if not re.fullmatch(r"https?://[^\s\"<>]+", base):
+        raise SystemExit(f"PACKAGE appinstaller_url {base!r}: an http(s) address of a folder")
+    version = msix_version(meta.get("version", "0.1.0"))
+    name = f"{job.app}.appinstaller"
+    return ('<?xml version="1.0" encoding="utf-8"?>\n'
+            f"<!-- written by tools/package.py from apps/{job.app}/PACKAGE (docs/PACKAGING.md \"MSIX\") -->\n"
+            f'<AppInstaller xmlns="{APPINSTALLER_NS}" Version="{version}" Uri={quoteattr(base + "/" + name)}>\n'
+            f"  <MainPackage Name={quoteattr(identity_name(meta, job.app))} Publisher={quoteattr(publisher(meta))}\n"
+            f'               Version="{version}" ProcessorArchitecture="x64" Uri={quoteattr(base + "/" + Path(msix).name)}/>\n'
+            "  <UpdateSettings>\n"
+            f'    <OnLaunch HoursBetweenUpdateChecks="{appinstaller_hours(meta)}" ShowPrompt="true" UpdateBlocksActivation="false"/>\n'
+            "    <AutomaticBackgroundTask/>\n"
+            "  </UpdateSettings>\n"
+            "</AppInstaller>\n")
+
+
+def write_appinstaller(job, msix):
+    """<dist>/<App>.appinstaller when PACKAGE appinstaller_url= is set, else a note"""
+    if not job.meta.get("appinstaller_url"):
+        job.note("msix", "PACKAGE appinstaller_url= fehlt: keine .appinstaller-Datei (Updates über App Installer); "
+                         "lib/update meldet das Paket als von außen aktualisiert")
+        return None
+    out = job.dist / f"{job.app}.appinstaller"
+    out.write_bytes(lf(appinstaller(job, msix)))
     job.made("msix", out)
     return out
 

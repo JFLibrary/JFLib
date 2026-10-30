@@ -1416,11 +1416,36 @@ im Framework und die Code-Signierung, seit 2026-10-18 AppImage, Flatpak, MSIX un
   `autostart_set` jetzt `Unavailable` (HKCU ist dort virtualisiert). Geprüft mit
   [`tools/pkg_check.py`](../tools/pkg_check.py) (die Suite ruft `--quick`): Validatoren
   (desktop-file-validate, appstreamcli, MakeAppx), Runtime gegen mksquashfs-Abbilder, Template als
-  AppImage und im Flatpak-Sandkasten gestartet, MSIX mit Test-Zertifikat signiert. Es fehlen
-  noch: ein gebautes RPM (rpmbuild fehlt im Testsystem: nur .spec und Tarball), AAB für Google
-  Play (bundletool fehlt; die Schritte stehen in PACKAGING.md), StartupTask aus der App (WinRT),
-  Updates über `lib/update` für AppImage, Flatpak und MSIX, Signaturen für AppImage, RPM und
-  Flatpak, eine Installation der Pakete im Test; später Notarisierung für macOS.
+  AppImage und im Flatpak-Sandkasten gestartet, MSIX mit Test-Zertifikat signiert.
+  Seit 2026-10-30 ([UPDATES.md](UPDATES.md) „Packages“): **Updates über `lib/update`** je nach
+  Installationsart (`update::install` = `plat::pkg::packaged()`): ein AppImage ersetzt seine
+  `.AppImage`-Datei durch den `appimage`-Eintrag des Kanals (neben ihr kopiert, geprüft,
+  atomar umbenannt; Probelauf, Rollback, Neustart über die Datei), ein schreibgeschützter
+  Ordner meldet `Error::ReadOnly`; ein Flatpak prüft und installiert über das Flatpak-Portal
+  (UpdateMonitor über den eigenen D-Bus-Client, `Update` mit Fortschritt, `Spawn` der neuen
+  Version), ohne Portal `Check::Managed(Flatpak)`; MSIX erkennt die Paketidentität und meldet
+  über WinRT (rohes COM, `Package.GetAppInstallerInfo` / `CheckUpdateAvailabilityAsync`)
+  `Check::Managed(AppInstaller | Msix)`, `package.py` schreibt die `.appinstaller`-Datei
+  (UpdateSettings OnLaunch, Hintergrundprüfung; PACKAGE `appinstaller_url=`). **Signaturen**:
+  AppImages mit GPG in `.sha256_sig` / `.sig_key` wie `appimagetool --sign` (die Runtime hat
+  die Abschnitte), `lib/update` prüft sie mit lib/crypto (OpenPGP v4: RSA, ECDSA, Ed25519) und
+  nimmt bei einem signierten AppImage nur Updates mit einem Schlüssel aus dessen Block;
+  Flatpak-Repository (`flatpak/repo`, bleibt zwischen Läufen) und Bundle GPG-signiert, das
+  Bundle mit Schlüssel und Remote (`flatpak_repo_url=`), dazu `.gpg` und `.flatpakrepo`.
+  **StartupTask aus der App**: `autostart_set` / `autostart_get` schalten im MSIX-Paket die
+  StartupTask über WinRT (`GetAsync`, `RequestEnableAsync`, `Disable`, `State`; MTA-Thread);
+  `msix_alias=` gibt dem Paket einen Ausführungsalias. **Installation im Test**
+  (`pkg_check.py --install`): updatetest als Flatpak aus signiertem Repository mit
+  `flatpak --user` in ein temporäres HOME installiert und über das Portal auf 2.0.0
+  aktualisiert; als MSIX im (schon aktiven) Entwicklermodus registriert, StartupTask an und
+  aus, wieder entfernt; `updatetest --test apply` aktualisiert ein echtes AppImage
+  (appimagert) selbst und rollt zurück; `pkg_check --quick` prüft die AppImage-Signatur mit
+  gpgv (Wegwerf-Schlüssel). Es fehlen noch: ein gebautes und signiertes RPM (rpmbuild und
+  rpmsign fehlen im Testsystem: nur .spec und Tarball), AAB für Google Play (bundletool fehlt;
+  die Schritte stehen in PACKAGING.md), die Installation eines signierten `.msix` (braucht ein
+  vertrauenswürdiges Zertifikat) und ein Update über App Installer von einem Webserver,
+  Rollback eines Flatpak-Updates aus der App (nur `flatpak update --commit=`), Delta-Updates
+  für AppImages (zsync); später Notarisierung für macOS.
 - **P2** · *erledigt* · Versionsverwaltung (2026-10-20, [VERSIONING.md](VERSIONING.md)): die
   Library hat eine Version (`lib/VERSION`, `ui::VERSION`), jede App ihre eigene (`version=` in
   `PACKAGE`, im Code `rt::app_version!()`, auch für `update::Config`); SemVer-Regeln,

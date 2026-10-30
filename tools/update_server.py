@@ -1,6 +1,7 @@
 """update_server.py -- the update channels of `updatetest --test update / apply` (lib/update)
 
     python tools/update_server.py --dir DIR --exe PROGRAM --target windows-x86_64 [--app updatetest]
+                                  [--runtime APPIMAGERT]
 
 Starts an HTTP server on 127.0.0.1 (a free port) with signed channels made with
 tools/update_manifest.py and a key generated for this run, then writes DIR/pubkey.txt (the
@@ -18,15 +19,34 @@ Channels (/<name>/update.json, update.json.sig and the files):
   deniedfile  2.0.0, the file on download.invalid  redirect    302 to good (manifest and sig)
   bundle      2.0.0, kind bundle (two files)       package     2.0.0, kind package (setup)
   big         2.0.0, 4 MiB sent slowly (cancel)
+On Linux with gpg (a throwaway GNUPGHOME per key in DIR, its agent ended before serving) also
+the AppImage channels: fake AppImages (a small ELF made a type-2 runtime by
+pkg_linux.runtime_image, then the program as the "image"), signed as appimagetool --sign does
+(pkg_linux.sign_appimage) with key a (Ed25519), b (RSA) or c (ECDSA P-256):
+  appimage            2.0.0: a .deb (kind package) and the AppImage signed with a
+  appimage-bad        3.0.0 signed with a, its start fails      appimage-otherkey  signed with b
+  appimage-unsigned   2.0.0 unsigned                            appimage-notai     no AppImage
+  appimage-tampered   signed with a, a byte changed after signing (the manifest has its hash)
+  appimage-rsa        2.0.0 signed with b                       appimage-ecdsa     signed with c
+and DIR/appimage/: running-{a,b,c,unsigned}.AppImage (1.0.0, the "installed" files),
+update-a-2.0.0.AppImage, tampered.AppImage and fpr-{a,b,c}.txt (the fingerprints).  With
+--runtime (apps/appimagert) and mksquashfs also real AppImages of PROGRAM (an AppDir with
+AppRun -> the program, SquashFS zstd behind the runtime, signed with a): DIR/appimage/
+real-1.0.0.AppImage and the channels aiapply-good (2.0.0) and aiapply-bad (3.0.0, its start
+fails) for updatetest --test apply.
 GET /stats returns the requests so far as JSON ([path, Range header or ""]).
 
 The server ends when its standard input closes (the test's pipe) or after 10 minutes.
 """
 import argparse
 import hashlib
+import tempfile
 import json
 import os
+import shutil
 import socket
+import struct
+import subprocess
 import sys
 import threading
 import time
@@ -133,12 +153,139 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
+def tiny_elf():
+    """a small ELF64 file (a .text and the section names) to make a fake AppImage runtime of"""
+    names = b"\0.text\0.shstrtab\0"
+    text = b"\xc3" * 16
+    shoff = 64 + len(text) + len(names)
+    shoff += -shoff % 8
+    head = bytearray(64)
+    head[:16] = b"\x7fELF\x02\x01\x01" + b"\0" * 9
+    struct.pack_into("<HHIQQQIHHHHHH", head, 16, 2, 62, 1, 0, 0, shoff, 0, 64, 56, 0, 64, 3, 2)
+    body = bytes(head) + text + names
+    body += b"\0" * (shoff - len(body))
+    sh = bytes(64)
+    sh += struct.pack("<IIQQQQIIQQ", 1, 1, 6, 0, 64, len(text), 0, 0, 16, 0)
+    sh += struct.pack("<IIQQQQIIQQ", 7, 3, 0, 0, 64 + len(text), len(names), 0, 0, 1, 0)
+    return body + sh
+
+
+class Gpg:
+    """a throwaway GnuPG home with one key (algo: ed25519, rsa2048, nistp256)"""
+
+    def __init__(self, home, name, algo):
+        self.home = Path(home)
+        self.home.mkdir(mode=0o700, parents=True)
+        self.base = ["gpg", "--homedir", str(self.home), "--batch", "--yes", "--quiet"]
+        subprocess.run(self.base + ["--passphrase", "", "--quick-gen-key", f"Updatetest {name} <{name}@localhost>", algo, "sign", "never"],
+                       check=True, capture_output=True)
+        out = subprocess.run(self.base + ["--list-keys", "--with-colons"], check=True, capture_output=True, text=True).stdout
+        self.fpr = next(ln.split(":")[9] for ln in out.splitlines() if ln.startswith("fpr:"))
+
+    def sign(self, data):
+        f = self.home / "digest"
+        f.write_bytes(data)
+        sig = subprocess.run(self.base + ["--local-user", self.fpr, "--armor", "--detach-sign", "--output", "-", str(f)],
+                             check=True, capture_output=True).stdout.decode("ascii")
+        key = subprocess.run(self.base + ["--armor", "--export", self.fpr], check=True, capture_output=True).stdout.decode("ascii")
+        return sig, key
+
+    def close(self):
+        subprocess.run(["gpgconf", "--homedir", str(self.home), "--kill", "gpg-agent"], capture_output=True)
+
+
+def real_appimage(rt, program, version, gpg, mode="ok"):
+    """an AppImage of the test program: AppRun -> the program (marked), SquashFS behind rt, signed"""
+    import pkg_linux
+    with tempfile.TemporaryDirectory(prefix="updatetest-ai-") as tmp:
+        appdir = Path(tmp) / "AppDir"
+        appdir.mkdir()
+        (appdir / "updatetest").write_bytes(program(version, mode))
+        (appdir / "updatetest").chmod(0o755)
+        os.symlink("updatetest", appdir / "AppRun")
+        img = Path(tmp) / "image.squashfs"
+        subprocess.run(["mksquashfs", str(appdir), str(img), "-all-root", "-noappend", "-comp", "zstd", "-quiet", "-no-progress"],
+                       check=True, capture_output=True)
+        f = Path(tmp) / "out.AppImage"
+        f.write_bytes(rt + img.read_bytes())
+        pkg_linux.sign_appimage(f, gpg.sign)
+        return f.read_bytes()
+
+
+def appimage_channels(out, t, app, seed, program, runtime=None):
+    """the AppImage channels (Linux with gpg; see the module text); gpg or mksquashfs failing
+    twice: DIR/appimage/error.txt says why (the test reports it), the other channels stay"""
+    if not sys.platform.startswith("linux") or not shutil.which("gpg"):
+        return
+    why = ""
+    for _ in range(2):
+        try:
+            return make_appimage_channels(out, t, app, seed, program, runtime)
+        except (subprocess.CalledProcessError, OSError) as e:
+            why = f"{e} {(getattr(e, 'stderr', b'') or b'').decode('utf-8', 'replace').strip()[-400:]}"
+            for g in [out / "appimage", *out.glob("gnupg-*")]:
+                shutil.rmtree(g, ignore_errors=True)
+    (out / "appimage").mkdir(parents=True, exist_ok=True)
+    (out / "appimage" / "error.txt").write_text(why + "\n", encoding="utf-8")
+
+
+def make_appimage_channels(out, t, app, seed, program, runtime):
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import pkg_linux
+    d = out / "appimage"
+    d.mkdir(parents=True, exist_ok=True)
+    rt = pkg_linux.runtime_image(tiny_elf())
+    keys = {}
+    try:
+        for k, algo in (("a", "ed25519"), ("b", "rsa2048"), ("c", "nistp256")):
+            keys[k] = Gpg(out / f"gnupg-{k}", k, algo)
+            (d / f"fpr-{k}.txt").write_text(keys[k].fpr + "\n", encoding="ascii")
+
+        def appimage(version, key=None, mode="ok"):
+            f = d / "tmp.AppImage"
+            f.write_bytes(rt + program(version, mode))
+            if key:
+                pkg_linux.sign_appimage(f, keys[key].sign)
+            return f.read_bytes()
+        for k in ("a", "b", "c"):
+            (d / f"running-{k}.AppImage").write_bytes(appimage("1.0.0", k))
+        (d / "running-unsigned.AppImage").write_bytes(appimage("1.0.0"))
+        good = appimage("2.0.0", "a")
+        (d / "update-a-2.0.0.AppImage").write_bytes(good)
+        deb = b"!<arch>\ndebian-binary   " + b"0" * 2000
+        channel("appimage", app, "2.0.0", [(t, "package", "updatetest_2.0.0_amd64.deb", deb),
+                                           (t, "appimage", "updatetest-2.0.0-x86_64.AppImage", good)], seed)
+        channel("appimage-bad", app, "3.0.0", [(t, "appimage", "updatetest-3.0.0-x86_64.AppImage", appimage("3.0.0", "a", "crash"))], seed)
+        channel("appimage-otherkey", app, "2.0.0", [(t, "appimage", "updatetest-2.0.0-x86_64.AppImage", appimage("2.0.0", "b"))], seed)
+        channel("appimage-unsigned", app, "2.0.0", [(t, "appimage", "updatetest-2.0.0-x86_64.AppImage", appimage("2.0.0"))], seed)
+        tampered = bytearray(good)
+        tampered[len(rt) + 100] ^= 0x01
+        (d / "tampered.AppImage").write_bytes(bytes(tampered))
+        channel("appimage-tampered", app, "2.0.0", [(t, "appimage", "updatetest-2.0.0-x86_64.AppImage", bytes(tampered))], seed)
+        channel("appimage-notai", app, "2.0.0", [(t, "appimage", "updatetest-2.0.0-x86_64.AppImage", program("2.0.0"))], seed)
+        channel("appimage-rsa", app, "2.0.0", [(t, "appimage", "updatetest-2.0.0-x86_64.AppImage", appimage("2.0.0", "b"))], seed)
+        channel("appimage-ecdsa", app, "2.0.0", [(t, "appimage", "updatetest-2.0.0-x86_64.AppImage", appimage("2.0.0", "c"))], seed)
+        (d / "tmp.AppImage").unlink()
+        if runtime and Path(runtime).is_file() and shutil.which("mksquashfs"):
+            real = pkg_linux.runtime_image(Path(runtime).read_bytes())
+            (d / "real-1.0.0.AppImage").write_bytes(real_appimage(real, program, "1.0.0", keys["a"]))
+            good = real_appimage(real, program, "2.0.0", keys["a"])
+            (d / "real-2.0.0.AppImage").write_bytes(good)
+            channel("aiapply-good", app, "2.0.0", [(t, "appimage", "updatetest-2.0.0-x86_64.AppImage", good)], seed)
+            channel("aiapply-bad", app, "3.0.0", [(t, "appimage", "updatetest-3.0.0-x86_64.AppImage",
+                                                   real_appimage(real, program, "3.0.0", keys["a"], "crash"))], seed)
+    finally:
+        for g in keys.values():
+            g.close()
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dir", required=True)
     ap.add_argument("--exe", required=True)
     ap.add_argument("--target", required=True)
     ap.add_argument("--app", default="updatetest")
+    ap.add_argument("--runtime", help="the AppImage runtime (apps/appimagert) for real AppImages of PROGRAM")
     a = ap.parse_args()
     out = Path(a.dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -175,6 +322,7 @@ def main():
     channel("package", app, "2.0.0", [(t, "package", "updatetest-2.0.0-setup.exe", b"MZ setup 2.0.0" * 1000)], seed)
     channel("big", app, "2.0.0", [(t, "exe", "big-2.0.0.bin", os.urandom(4 << 20))], seed)
     SPECIAL["/big/big-2.0.0.bin"] = "slow"
+    appimage_channels(out, t, app, seed, program, a.runtime)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     (out / "pubkey.txt").write_text(um.public_key(seed).hex() + "\n", encoding="ascii")
     tmp = out / "port.tmp"

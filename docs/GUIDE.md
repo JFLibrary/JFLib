@@ -2159,6 +2159,13 @@ ui::main!({
   channel, `tools/package.py --update DIR` does it per style); the downloads go through the
   app's `net.connect` rules. Putting files in place needs a writable program folder
   (`fs.write $EXE/**` in `PERMISSIONS`); programs in system folders use `package` updates.
+* The same calls follow the way the program is installed (`update::install(&cfg)`, a
+  `plat::pkg::Packaged`): an AppImage replaces its `.AppImage` file with the channel's
+  `appimage` entry (trial and rollback as above; a signed AppImage only takes one signed with
+  the same key; a folder the user cannot write is `Error::ReadOnly`; `fs.write $APPIMAGE/**`),
+  a Flatpak checks and installs through the Flatpak portal (`Kind::Flatpak`; `apply()` starts
+  the new version), and an MSIX package or a Snap answers `Check::Managed(..)`: App Installer,
+  the Store or snapd update it ([UPDATES.md](UPDATES.md), "Packages").
 
 ## 19. Accessibility (screen readers)
 
@@ -2372,6 +2379,10 @@ switch counts) and `autostart_entry()` returns the command the entry starts. The
   two minutes): call it from a `plat::Job` there. A refusal is `AutostartError::Dismissed`.
 * The entry points at the executable that set it: after the program moved (a portable copy,
   an update into another folder), compare `autostart_entry()` and set it again.
+* In an MSIX package the switch is the package's StartupTask (`tools/package.py` declares it
+  when `PERMISSIONS` allows `autostart`): `autostart_set` enables it through WinRT
+  (`StartupTask.RequestEnableAsync`) or disables it; a task the user switched off in Settings ->
+  Apps -> Startup stays off (`Dismissed`). The task starts the program without arguments.
 
 **The taskbar button.**
 

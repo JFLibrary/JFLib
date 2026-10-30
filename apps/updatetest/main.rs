@@ -10,11 +10,23 @@
 //                              then applying exe and bundle updates to stand-in programs with
 //                              cfg.restart = false: trial, health marker, rollback, a package
 //                              update, a damaged staged file, a program folder without write
-//                              permission
+//                              permission; on Linux the AppImage updates (fake AppImages the
+//                              server signed with throwaway GPG keys: the type-2 signature,
+//                              replacing $APPIMAGE, trial and rollback, refused keys, a
+//                              read-only folder); Flatpak and Snap without a portal: Managed
 //   updatetest --test apply    the real thing: a copy of this program in a scratch folder
 //                              (version 1.0.0) puts the downloaded 2.0.0 in place, restarts into
 //                              it and 2.0.0 reports healthy; 3.0.0 fails its first start and the
-//                              next start rolls it back to 2.0.0
+//                              next start rolls it back to 2.0.0; on Linux with the AppImage
+//                              runtime built beside this program (appimagert) and mksquashfs the
+//                              same as an AppImage: the file replaced, the restart through it
+//   updatetest --test flatpak  (inside a Flatpak, tools/pkg_check.py --install) the portal's
+//                              update monitor: checks until it reports the newer commit, installs
+//                              it (Update) and starts it (Spawn, LATEST_VERSION); each run appends
+//                              to data://flatpak.log
+//   updatetest --test msix     (inside a registered MSIX package, pkg_check.py --install) the
+//                              package identity, Check::Managed, the StartupTask switched on and
+//                              off through autostart_set
 //   updatetest --child --state DIR --log FILE --url URL --pubkey HEX
 //                              (--test apply) the installed program: its version and mode come
 //                              from the marker the server appends to the payload
@@ -33,7 +45,7 @@ use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 
-use update::{Check, Config, Error, Kind, Phase, Stage, Startup, Updater};
+use update::{Check, Config, Error, Kind, Manager, Packaged, Phase, Stage, Startup, Updater};
 
 ui::main!(updatetest());
 
@@ -69,8 +81,10 @@ fn updatetest() -> i32 {
     match plat::arg_value("--test").as_deref() {
         Some("update") => t_update(&mut t),
         Some("apply") => t_apply(&mut t),
+        Some("flatpak") => return t_flatpak(),
+        Some("msix") => t_msix(&mut t),
         _ => {
-            plat::write_stderr(b"updatetest --test update|apply\n");
+            plat::write_stderr(b"updatetest --test update|apply|flatpak|msix\n");
             return 2;
         }
     }
@@ -106,7 +120,12 @@ fn start_server(t: &mut T, dir: &str) -> Option<Server> {
     let exe = plat::current_exe().unwrap_or_default();
     let srv = format!("{}/srv", dir);
     let py = plat::env("jfgui_PYTHON").unwrap_or_else(|| String::from(if cfg!(windows) { "python" } else { "python3" }));
-    let args = ["tools/update_server.py", "--dir", &srv, "--exe", &exe, "--target", update::target()];
+    // the AppImage runtime beside this program (build_rs.py builds every app into one folder)
+    let rt = format!("{}/appimagert", &exe[..exe.rfind('/').unwrap_or(0)]);
+    let mut args = alloc::vec!["tools/update_server.py", "--dir", &srv, "--exe", &exe, "--target", update::target()];
+    if cfg!(target_os = "linux") && plat::file_exists(&rt) == 1 {
+        args.extend(["--runtime", rt.as_str()]);
+    }
     let cmd = plat::process::Command { program: &py, args: &args, cwd: None, env: &[] };
     let mut child = match cmd.spawn() {
         Ok(c) => c,
@@ -210,7 +229,13 @@ fn t_update(t: &mut T) {
     t.check(man(ok).is_ok_and(|m| m.files[0].kind == Kind::Exe && m.files[0].size == 3 && m.expires == 0), "update: a minimal manifest (kind exe by default)");
     t.check(man(&ok.replace("\"format\":1", "\"format\":2")).is_err(), "update: another format is refused");
     t.check(man(&ok.replace("15ad", "15")).is_err(), "update: a short SHA-256 is refused");
-    t.check(man(&ok.replace("\"url\"", "\"kind\":\"zip\",\"url\"")).is_err(), "update: an unknown kind is refused");
+    t.check(man(&ok.replace("\"url\"", "\"kind\":\"zip\",\"url\"")).is_ok_and(|m| m.files.is_empty()), "update: an entry of an unknown kind is left out (a newer channel)");
+    t.check(man(&ok.replace("\"url\"", "\"kind\":\"Zip!\",\"url\"")).is_err(), "update: a malformed kind is refused");
+    let two = ok.replace("\"files\":[", "\"files\":[{\"target\":\"linux-x86_64\",\"kind\":\"appimage\",\"url\":\"a.AppImage\",\"size\":3,\"sha256\":\"ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\"},");
+    let m2 = man(&two);
+    t.check(m2.as_ref().is_ok_and(|m| m.package_for("linux-x86_64", true).is_some_and(|p| p.kind == Kind::AppImage)
+        && m.package_for("linux-x86_64", false).is_some_and(|p| p.kind == Kind::Exe)), "update: package_for picks the AppImage entry only for an AppImage");
+    t.check(man(&ok.replace("\"url\"", "\"kind\":\"flatpak\",\"url\"")).is_ok_and(|m| m.files.is_empty()), "update: a flatpak entry is left out (Flatpaks update from their repository)");
     t.check(man(&ok.replace("\"app\":\"a\"", "\"app\":\"a\",\"app\":\"b\"")).is_err(), "update: duplicate keys are refused");
     t.check(man(&ok.replace("1.2.0", "1.2 0")).is_err(), "update: an invalid version is refused");
 
@@ -296,10 +321,14 @@ fn t_update(t: &mut T) {
     t.check(matches!(Updater::new(config(&s, &dir, "otherapp", "1.0.0", "s-other")).check(), Err(Error::Manifest(_))), "update: another app's manifest: Error::Manifest");
     t.eq(Updater::new(config(&s, &dir, "expired", "1.0.0", "s-expired")).check(), Err(Error::Expired), "update: an expired manifest: Error::Expired");
     t.eq(Updater::new(config(&s, &dir, "noplatform", "1.0.0", "s-noplat")).check(), Ok(Check::NoPackage(String::from("2.0.0"))), "update: no package for this system: NoPackage");
-    // an AppImage (Flatpak, Snap) updates as a whole package: its extracted exe is no target
-    plat::setenv("APPIMAGE", Some("/opt/apps/updatetest.AppImage"));
-    t.eq(Updater::new(config(&s, &dir, "good", "1.0.0", "s-appimage")).check(), Ok(Check::NoPackage(String::from("2.0.0"))), "update: running as an AppImage: no exe update offered (NoPackage)");
-    plat::setenv("APPIMAGE", None);
+    // an AppImage updates as a whole file: its extracted exe is no target
+    #[cfg(target_os = "linux")]
+    {
+        plat::setenv("APPIMAGE", Some(&format!("{}/updatetest.AppImage", dir)));
+        t.eq(Updater::new(config(&s, &dir, "good", "1.0.0", "s-appimage")).check(), Ok(Check::NoPackage(String::from("2.0.0"))), "update: running as an AppImage: no exe update offered (NoPackage)");
+        plat::setenv("APPIMAGE", None);
+    }
+    t_managed(t, &s, &dir);
 
     // hosts the PERMISSIONS refuse
     let port = s.base.rsplit(':').next().unwrap_or("");
@@ -344,8 +373,202 @@ fn t_update(t: &mut T) {
     t.check(update::state(&c).stage == Stage::None, "update: ... nothing staged");
 
     t_stand_in(t, &s, &dir);
+    #[cfg(target_os = "linux")]
+    t_appimage(t, &s, &dir);
     drop(s);
     remove_tree(t, &dir);
+}
+
+// installations a package system updates: Flatpak without a portal (no session bus for the
+// test), Snap; on Windows outside a package: Plain
+fn t_managed(t: &mut T, s: &Server, dir: &str) {
+    let c = config(s, dir, "good", "1.0.0", "s-managed");
+    if cfg!(windows) {
+        t.eq(update::install(&c), Packaged::Plain, "managed: outside an MSIX package the program is Plain");
+        return;
+    }
+    let bus = plat::env("DBUS_SESSION_BUS_ADDRESS");
+    plat::setenv("DBUS_SESSION_BUS_ADDRESS", Some("unix:path=/nonexistent/updatetest-bus"));
+    plat::setenv("FLATPAK_ID", Some("org.jflib.updatetest"));
+    t.eq(update::install(&c), Packaged::Flatpak(String::from("org.jflib.updatetest")), "managed: $FLATPAK_ID: a Flatpak");
+    t.eq(Updater::new(c.clone()).check(), Ok(Check::Managed(Manager::Flatpak, None)), "managed: a Flatpak without the portal: Check::Managed(Flatpak)");
+    let mut own = c.clone();
+    own.exe = String::from("/opt/updatetest/updatetest");
+    t.eq(update::install(&own), Packaged::Plain, "managed: cfg.exe set: Plain (an explicit program file)");
+    plat::setenv("FLATPAK_ID", None);
+    plat::setenv("DBUS_SESSION_BUS_ADDRESS", bus.as_deref());
+    plat::setenv("SNAP", Some("/snap/updatetest/7"));
+    t.eq(Updater::new(c).check(), Ok(Check::Managed(Manager::Snap, None)), "managed: a Snap: Check::Managed(Snap)");
+    plat::setenv("SNAP", None);
+}
+
+// ---------------------------------------------------------------- AppImage (Linux)
+
+#[cfg(target_os = "linux")]
+fn t_appimage(t: &mut T, s: &Server, dir: &str) {
+    let src = format!("{}/srv/appimage", dir);
+    if let Some(why) = read_text(&format!("{}/error.txt", src)) {
+        t.check(false, &format!("appimage: the test server made no AppImages: {}", why));
+        return;
+    }
+    if plat::file_exists(&format!("{}/running-a.AppImage", src)) != 1 {
+        plat::write_stdout(b"SKIP appimage: the test server made no AppImages (gpg missing)\n");
+        return;
+    }
+    let fpr = |k: &str| read_text(&format!("{}/fpr-{}.txt", src, k)).unwrap_or_default();
+    let signer = |f: &str| match update::appimage_signature(&format!("{}/{}.AppImage", src, f)) {
+        Ok(update::Signed::By { signer, .. }) => Ok(signer.iter().map(|b| format!("{:02X}", b)).collect::<String>()),
+        Ok(update::Signed::No) => Ok(String::new()),
+        Err(e) => Err(e),
+    };
+    t.eq(signer("running-a"), Ok(fpr("a")), "appimage: a signature in .sha256_sig / .sig_key checks (Ed25519)");
+    t.eq(signer("running-b"), Ok(fpr("b")), "appimage: ... RSA");
+    t.eq(signer("running-c"), Ok(fpr("c")), "appimage: ... ECDSA P-256");
+    t.eq(signer("running-unsigned"), Ok(String::new()), "appimage: empty sections: unsigned");
+    t.check(signer("tampered").is_err(), "appimage: a byte changed after signing: the signature does not check");
+
+    // the "installed" AppImage: a copy of a running-*.AppImage in a folder of its own
+    let install = |name: &str, from: &str| -> String {
+        let d = format!("{}/ai-{}", dir, name);
+        plat::mkdir(&d);
+        let p = format!("{}/App.AppImage", d);
+        plat::write_file(&p, &plat::read_file(&format!("{}/{}.AppImage", src, from)).unwrap_or_default());
+        plat::fs::set_mode(&p, 0o755);
+        plat::setenv("APPIMAGE", Some(&p));
+        p
+    };
+    let plain = config(s, dir, "appimage", "1.0.0", "s-ai-plain");
+    t.check(matches!(Updater::new(plain).check(), Ok(Check::Available(o)) if o.kind == Kind::Package), "appimage: a plain program of the channel gets the .deb");
+    let p = install("good", "running-a");
+    let mut c = config(s, dir, "appimage", "1.0.0", "s-ai-good");
+    t.eq(update::install(&c), Packaged::AppImage(p.clone()), "appimage: install() names the AppImage file");
+    let u = Updater::new(c.clone());
+    t.check(matches!(u.check(), Ok(Check::Available(o)) if o.kind == Kind::AppImage && o.version == "2.0.0"), "appimage: the AppImage gets the AppImage entry (2.0.0)");
+    t.eq(u.download(), Ok(String::from("2.0.0")), "appimage: downloaded");
+    let old = plat::read_file(&p).unwrap_or_default();
+    let new = plat::read_file(&format!("{}/update-a-2.0.0.AppImage", src)).unwrap_or_default();
+    t.eq(update::startup(&c), Startup::Applied(String::from("2.0.0")), "appimage: startup replaces the AppImage file");
+    t.check(plat::read_file(&p) == Some(new.clone()) && plat::fs::stat(&p).is_some_and(|m| m.mode & 0o777 == 0o755), "appimage: the file is the new one, executable");
+    t.check(plat::read_file(&format!("{}/backup/files/App.AppImage", c.dir)) == Some(old.clone()), "appimage: the old file is the backup");
+    c.version = String::from("2.0.0");
+    t.eq(update::startup(&c), Startup::Trial(String::from("2.0.0")), "appimage: 2.0.0 starts on trial");
+    t.check(update::healthy(&c), "appimage: healthy()");
+    // 3.0.0 fails: rolled back to the 2.0.0 file
+    c.url = format!("{}/appimage-bad/update.json", s.base);
+    let u = Updater::new(c.clone());
+    t.check(matches!(u.check(), Ok(Check::Available(o)) if o.version == "3.0.0") && u.download().is_ok(), "appimage: 3.0.0 downloaded");
+    t.eq(update::startup(&c), Startup::Applied(String::from("3.0.0")), "appimage: 3.0.0 put in place");
+    c.version = String::from("3.0.0");
+    t.eq(update::startup(&c), Startup::Trial(String::from("3.0.0")), "appimage: 3.0.0 on trial (no healthy())");
+    t.eq(update::startup(&c), Startup::RollingBack(String::from("3.0.0")), "appimage: the next start rolls it back");
+    t.check(plat::read_file(&p) == Some(new.clone()), "appimage: the AppImage file is 2.0.0 again");
+    t.eq(files_like(&format!("{}/ai-good", dir), ".jfupd-"), Vec::<String>::new(), "appimage: nothing left next to the AppImage");
+
+    // refused: another key, unsigned after signed, a broken signature, no AppImage
+    for (chan, what) in [("appimage-otherkey", "signed with another key"), ("appimage-unsigned", "unsigned"),
+                         ("appimage-tampered", "a signature that does not check"), ("appimage-notai", "no AppImage")] {
+        let p = install(chan, "running-a");
+        let before = plat::read_file(&p);
+        let c = config(s, dir, chan, "1.0.0", &format!("s-{}", chan));
+        let u = Updater::new(c.clone());
+        t.check(matches!(u.check(), Ok(Check::Available(_))) && u.download().is_ok(), &format!("appimage: {}: downloaded (the manifest is fine)", chan));
+        let r = update::startup(&c);
+        t.check(matches!(r, Startup::Failed(Error::Rejected(_))), &format!("appimage: {} is refused ({:?})", what, r));
+        t.check(plat::read_file(&p) == before && files_like(&format!("{}/ai-{}", dir, chan), ".jfupd-").is_empty()
+                && update::state(&c).stage == Stage::None, &format!("appimage: {}: the file is unchanged, the update dropped", chan));
+    }
+    // accepted: a signed update over an unsigned file; RSA and ECDSA keys
+    for (chan, from, name) in [("appimage", "running-unsigned", "unsigned"), ("appimage-rsa", "running-b", "rsa"), ("appimage-ecdsa", "running-c", "ecdsa")] {
+        install(&format!("{}-{}", chan, name), from);
+        let c = config(s, dir, chan, "1.0.0", &format!("s-ok-{}", name));
+        let u = Updater::new(c.clone());
+        t.check(u.check().is_ok() && u.download().is_ok(), &format!("appimage: {} -> {}: downloaded", from, chan));
+        t.eq(update::startup(&c), Startup::Applied(String::from("2.0.0")), &format!("appimage: {} takes {}", from, chan));
+    }
+    // a folder the user cannot write: reported, nothing downloaded
+    let p = install("ro", "running-a");
+    let folder = String::from(&p[..p.rfind('/').unwrap_or(0)]);
+    plat::fs::set_mode(&folder, 0o555);
+    if plat::File::create_new(&format!("{}/probe", folder)).is_some() {
+        plat::delete(&format!("{}/probe", folder));
+        plat::write_stdout(b"SKIP appimage: a read-only folder (root writes anyway)\n");
+    } else {
+        t.eq(Updater::new(config(s, dir, "appimage", "1.0.0", "s-ai-ro")).check(), Err(Error::ReadOnly(folder.clone())), "appimage: a read-only folder: Error::ReadOnly");
+    }
+    plat::fs::set_mode(&folder, 0o755);
+    plat::setenv("APPIMAGE", None);
+}
+
+// ---------------------------------------------------------------- --test flatpak
+
+// inside the Flatpak: the portal's monitor reports the newer commit, Update installs it, Spawn
+// starts it; the new version (its marker says 2.0.0) logs its start and finds nothing newer
+fn t_flatpak() -> i32 {
+    let log = "data://flatpak.log";
+    let line = |s: &str| {
+        let mut b = plat::read_file(log).unwrap_or_default();
+        b.extend_from_slice(s.as_bytes());
+        b.push(b'\n');
+        plat::write_file(log, &b);
+        plat::write_stdout(format!("{}\n", s).as_bytes());
+    };
+    let (version, _) = marker_of(&plat::current_exe().unwrap_or_default());
+    let cfg = Config::new(APP, &version, "https://updates.invalid/update.json", &[]);
+    line(&format!("run {} {:?}", version, update::install(&cfg)));
+    let u = Updater::new(cfg);
+    let mut found = None;
+    for _ in 0..120 {
+        match u.check() {
+            Ok(Check::Available(o)) => {
+                found = Some(o);
+                break;
+            }
+            Ok(Check::UpToDate) if version != "1.0.0" => break,
+            Ok(Check::UpToDate) => {}
+            r => {
+                line(&format!("check {} {:?}", version, r));
+                return 1;
+            }
+        }
+        plat::sleep_ms(500);
+    }
+    let Some(o) = found else {
+        line(&format!("uptodate {}", version));
+        return 0;
+    };
+    line(&format!("available {} kind {} staged {}", o.version, o.kind.name(), o.staged));
+    match u.download() {
+        Ok(v) => line(&format!("installed {} progress {}/{}", v, u.status().done, u.status().total)),
+        Err(e) => {
+            line(&format!("download failed {}", e));
+            return 1;
+        }
+    }
+    line(&format!("restart {}", version));
+    match u.apply() {
+        Ok(s) => line(&format!("apply returned {:?}", s)),
+        Err(e) => line(&format!("apply failed {}", e)),
+    }
+    1
+}
+
+// ---------------------------------------------------------------- --test msix
+
+// inside a registered MSIX package (started through its execution alias)
+fn t_msix(t: &mut T) {
+    let cfg = Config::new(APP, "1.0.0", "https://updates.invalid/update.json", &[]);
+    let inst = update::install(&cfg);
+    t.check(matches!(&inst, Packaged::Msix(n) if n.starts_with("org.jflib.updatetest_")), &format!("msix: a package identity ({:?})", inst));
+    let r = Updater::new(cfg).check();
+    t.check(matches!(r, Ok(Check::Managed(Manager::Msix | Manager::AppInstaller, _))), &format!("msix: check() answers Managed ({:?})", r));
+    t.check(!plat::autostart_get(), "msix: the StartupTask starts switched off");
+    let on = plat::autostart_set(true, &["--ignored"]);
+    t.eq(on, Ok(()), "msix: autostart_set(true) enables the StartupTask (RequestEnableAsync)");
+    t.check(plat::autostart_get(), "msix: autostart_get() is true");
+    let e = plat::autostart_entry().unwrap_or_default();
+    t.check(e.to_ascii_lowercase().ends_with("updatetest.exe\""), &format!("msix: autostart_entry() names the program ({})", e));
+    t.eq(plat::autostart_set(false, &[]), Ok(()), "msix: autostart_set(false) disables it");
+    t.check(!plat::autostart_get(), "msix: autostart_get() is false again");
 }
 
 // applying to stand-in program files (cfg.restart = false: startup() returns instead of
@@ -513,9 +736,77 @@ fn t_apply(t: &mut T) {
     let st = update::state(&bad);
     t.check(st.stage == Stage::None && st.bad.iter().any(|b| b == "3.0.0"), "rollback: 3.0.0 recorded as bad");
     t.eq(Updater::new(bad).check(), Ok(Check::UpToDate), "rollback: 3.0.0 is not offered again");
+    #[cfg(target_os = "linux")]
+    t_apply_appimage(t, &s, &dir);
     drop(s);
     plat::sleep_ms(300); // the last processes end
     remove_tree(t, &dir);
+}
+
+// start prog (with env) as the installed program and wait until the log has the line want
+#[cfg(target_os = "linux")]
+fn run_installed(t: &mut T, prog: &str, args: &[&str], env: &[(&str, Option<&str>)], log: &str, what: &str, want: &str) -> bool {
+    let cmd = plat::process::Command { program: prog, args, cwd: None, env };
+    let mut child = match cmd.spawn() {
+        Ok(c) => c,
+        Err(e) => return t.check(false, &format!("{}: start {}: error {}", what, prog, e)),
+    };
+    let mut buf = [0u8; 4096];
+    for _ in 0..1200 {
+        while child.read_stdout(&mut buf).ok().flatten().is_some_and(|n| n > 0) {}
+        while child.read_stderr(&mut buf).ok().flatten().is_some_and(|n| n > 0) {}
+        if read_text(log).is_some_and(|l| l.lines().any(|x| x == want)) {
+            plat::sleep_ms(200);
+            return t.check(true, what);
+        }
+        plat::sleep_ms(50);
+    }
+    plat::write_stdout(format!("  log:\n{}\n", read_text(log).unwrap_or_default()).as_bytes());
+    t.check(false, &format!("{} (no \"{}\" within 60 s)", what, want))
+}
+
+// the same with a real AppImage: the runtime unpacks it, the update replaces the .AppImage
+// file, the restart goes through it (plat::pkg::restart_appimage)
+#[cfg(target_os = "linux")]
+fn t_apply_appimage(t: &mut T, s: &Server, dir: &str) {
+    let src = format!("{}/srv/appimage", dir);
+    if plat::file_exists(&format!("{}/real-1.0.0.AppImage", src)) != 1 {
+        plat::write_stdout(b"SKIP apply appimage: no AppImage runtime beside this program (appimagert), mksquashfs or gpg\n");
+        return;
+    }
+    let inst = format!("{}/ai-inst", dir);
+    let prog = format!("{}/updatetest.AppImage", inst);
+    let cache = format!("{}/ai-cache", dir);
+    plat::mkdir(&inst);
+    plat::write_file(&prog, &plat::read_file(&format!("{}/real-1.0.0.AppImage", src)).unwrap_or_default());
+    plat::fs::set_mode(&prog, 0o755);
+    let log = format!("{}/ai-log.txt", dir);
+    let state = format!("{}/ai-state", dir);
+    // downloaded as the AppImage would (the updater sees $APPIMAGE)
+    plat::setenv("APPIMAGE", Some(&prog));
+    let good = config(s, dir, "aiapply-good", "1.0.0", "ai-state");
+    let u = Updater::new(good.clone());
+    t.check(matches!(u.check(), Ok(Check::Available(o)) if o.kind == Kind::AppImage) && u.download().is_ok(), "apply appimage: 2.0.0 downloaded");
+    plat::setenv("APPIMAGE", None);
+    let args = ["--child", "--state", &state, "--log", &log, "--url", &good.url, "--pubkey", &s.key];
+    let env = [("XDG_CACHE_HOME", Some(cache.as_str()))];
+    if run_installed(t, &prog, &args, &env, &log, "apply appimage: 1.0.0 replaces its AppImage, restarts through it, 2.0.0 reports healthy", "healthy 2.0.0 true") {
+        let l = read_text(&log).unwrap_or_default();
+        t.check(l.contains("run 1.0.0") && l.contains("startup 2.0.0 trial 2.0.0") && !l.contains("startup 1.0.0"), "apply appimage: ... the log shows both starts");
+    }
+    let new = plat::read_file(&format!("{}/real-2.0.0.AppImage", src));
+    t.check(plat::read_file(&prog) == new, "apply appimage: the .AppImage file is the signed 2.0.0");
+    plat::setenv("APPIMAGE", Some(&prog));
+    let bad = config(s, dir, "aiapply-bad", "2.0.0", "ai-state");
+    let u = Updater::new(bad.clone());
+    t.check(matches!(u.check(), Ok(Check::Available(o)) if o.version == "3.0.0") && u.download().is_ok(), "apply appimage: 3.0.0 downloaded");
+    plat::setenv("APPIMAGE", None);
+    let args = ["--child", "--state", &state, "--log", &log, "--url", &bad.url, "--pubkey", &s.key];
+    run_installed(t, &prog, &args, &env, &log, "apply appimage: 2.0.0 puts 3.0.0 in place; 3.0.0 fails before healthy()", "crash 3.0.0");
+    if run_installed(t, &prog, &args, &env, &log, "apply appimage: the next start rolls back to the 2.0.0 AppImage and restarts it", "healthy 2.0.0 false") {
+        t.check(read_text(&log).unwrap_or_default().contains("startup 2.0.0 rolledback 3.0.0"), "apply appimage: ... 2.0.0 learns that 3.0.0 failed");
+    }
+    t.check(plat::read_file(&prog) == new, "apply appimage: the .AppImage file is 2.0.0 again");
 }
 
 // ---------------------------------------------------------------- --child

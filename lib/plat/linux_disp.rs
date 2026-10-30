@@ -470,6 +470,17 @@ pub fn restart_self(args: &[&str]) -> i32 {
     spawn_exe(&path, args)
 }
 
+/// like restart_self, but the program file at path (pkg::restart_appimage: the AppImage of
+/// this program, whose runtime unpacks and runs the image it holds now) -> 0 / -1
+pub(crate) fn spawn_file(path: &str, args: &[&str]) -> i32 {
+    if path.is_empty() || path.contains('\0') {
+        return -1;
+    }
+    let mut p = String::from(path).into_bytes();
+    p.push(0);
+    spawn_exe(&p, args)
+}
+
 // fork; the child execs exe (NUL-terminated) with argv[0], args and the environment
 fn spawn_exe(exe: &[u8], args: &[&str]) -> i32 {
     if args.len() >= SPAWN_ARGS {

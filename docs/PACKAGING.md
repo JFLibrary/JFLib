@@ -52,7 +52,7 @@ the same .deb layout.
 
 | File | Content |
 |---|---|
-| `apps/NAME/PACKAGE` | `key=value` lines: `display` (shown name), `version` (the app's own `MAJOR.MINOR.PATCH`: the build checks it and every program of the app reads it as `rt::app_version!()`, [VERSIONING.md](VERSIONING.md)), `publisher`, `summary` (one line, .deb / .desktop comment), `description` (one line), `generic` (.desktop GenericName), `categories` (.desktop), `deb_name`, `default_win` / `default_linux` (preselected style), `styles` (the variants, in order); optional `filetypes` and `schemes` (the file types and URL schemes the app opens, below); for `--update`: `update_app` (the manifest's app id, default the folder name), `update_notes`, `update_expires_days`; for the other formats (below): `app_id` (reverse DNS, default `org.jflib.<App>`: the library's own demo, test and template apps keep it; the author's apps set `org.jfreund.<App>`, e.g. PaintCraft and BackupCraft; an app of someone else sets a domain of its own), `homepage` (AppStream; Flathub wants it), `license` (SPDX, default `LicenseRef-proprietary`), `appimage_update`, `flatpak_runtime`, `flatpak_args`, `msix_name`, `msix_publisher`, `language` |
+| `apps/NAME/PACKAGE` | `key=value` lines: `display` (shown name), `version` (the app's own `MAJOR.MINOR.PATCH`: the build checks it and every program of the app reads it as `rt::app_version!()`, [VERSIONING.md](VERSIONING.md)), `publisher`, `summary` (one line, .deb / .desktop comment), `description` (one line), `generic` (.desktop GenericName), `categories` (.desktop), `deb_name`, `default_win` / `default_linux` (preselected style), `styles` (the variants, in order); optional `filetypes` and `schemes` (the file types and URL schemes the app opens, below); for `--update`: `update_app` (the manifest's app id, default the folder name), `update_notes`, `update_expires_days`; for the other formats (below): `app_id` (reverse DNS, default `org.jflib.<App>`: the library's own demo, test and template apps keep it; the author's apps set `org.jfreund.<App>`, e.g. PaintCraft and BackupCraft; an app of someone else sets a domain of its own), `homepage` (AppStream; Flathub wants it), `license` (SPDX, default `LicenseRef-proprietary`), `appimage_update`, `flatpak_runtime`, `flatpak_args`, `flatpak_repo_url` (the address of the Flatpak repository an installation updates from), `msix_name`, `msix_publisher`, `msix_alias` (an execution alias, `name.exe`), `appinstaller_url` (the folder the `.appinstaller` and the `.msix` are published in), `appinstaller_hours` (App Installer's `HoursBetweenUpdateChecks`, default 0: every start), `language` |
 | `apps/NAME/PERMISSIONS` | the app's permissions ([PERMISSIONS.md](PERMISSIONS.md)): the Flatpak finish-args, the MSIX capabilities and StartupTask follow them |
 | `apps/NAME/res/app.ico` | icon resource 1 of the Windows exe (`build_rs.py` compiles it with `llvm-rc` and links it: window, taskbar, Explorer, shortcuts) |
 | `apps/NAME/res/app_{48,128,256}.png` | Linux icons (hicolor theme); the MSIX logos are scaled from them. Missing sizes are scaled down from the largest; an app without any gets a plain placeholder (and a note) |
@@ -217,6 +217,9 @@ ignored by git. The code is in [`tools/codesign.py`](../tools/codesign.py).
 | Linux (apt repository) | `--repo DIR`: a flat repository (`pool/`, `Packages(.gz)`, `Release` by `apt-ftparchive`), `InRelease` and `Release.gpg` by gpg, the public key as `repo.gpg` | `jfgui_GPG_KEY` (key id or fingerprint), `jfgui_GPG_HOME` (GnuPG home in Linux / WSL), `jfgui_GPG_PASSPHRASE` (batch signing) | the repository is written unsigned, "jfgui_GPG_KEY setzen" |
 | Updates ([UPDATES.md](UPDATES.md)) | `--update DIR`: `update.json` + `update.json.sig` (Ed25519) per style | `--update-key FILE`, `jfgui_UPDATE_KEY_FILE` or `jfgui_UPDATE_KEY` (`python tools/update_manifest.py keygen FILE`) | no channel, "kein Signierschlüssel" |
 | MSIX | `signtool sign /fd SHA256` of the finished `.msix` (`AppxSignature.p7x`); the certificate's subject must be exactly the manifest's `Publisher` (signtool error 0x8007000B otherwise; `package.py` says so) | as Authenticode; the Publisher from `jfgui_MSIX_PUBLISHER` or PACKAGE `msix_publisher` | an unsigned package: fine for the Store (it signs), not installable with `Add-AppxPackage` |
+| AppImage | the type-2 signature as `appimagetool --sign` writes it: an armored detached GPG signature of the file's SHA-256 (the two sections taken as zeros, 64 hex digits) in `.sha256_sig`, the armored public key in `.sig_key` (gpg in Linux / WSL) | `jfgui_GPG_KEY`, `jfgui_GPG_HOME`, `jfgui_GPG_PASSPHRASE` (as the apt repository) | unsigned, "jfgui_GPG_KEY setzen" |
+| Flatpak | the commits and the summary of the repository `flatpak/repo` (flatpak-builder / `build-update-repo --gpg-sign`) and the bundle (`build-bundle --gpg-sign`), which carries the public key (`--gpg-keys`) and the repository's address (`--repo-url`, PACKAGE `flatpak_repo_url=`); the key as `flatpak/<app id>.gpg` and a `<app id>.flatpakrepo` beside it | `jfgui_GPG_KEY`, `jfgui_GPG_HOME` (flatpak signs through gpg-agent: a key with a passphrase must be unlocked there) | unsigned repository and bundle |
+| RPM | not signed: `rpmsign` (and rpmbuild) are missing in the test system | -- | -- |
 | Android | `build_rs.py app NAME --target android --release` signs with the release key (apksigner reads the passwords from the environment) | `jfgui_ANDROID_KEYSTORE`, `jfgui_ANDROID_KEYSTORE_PASS`, `jfgui_ANDROID_KEY_ALIAS`, optional `jfgui_ANDROID_KEY_PASS` | the build fails and names the variables; `jfgui_ANDROID_DEBUG_SIGN=1` signs a release build with the debug key (tests only). Debug builds keep the local debug key |
 
 A user adds the signed repository with:
@@ -261,8 +264,8 @@ and `[formats] Hinweis ...` lines.  Nothing is downloaded or installed.
 | --- | --- | --- | --- |
 | AppImage | `<App>-<ver>-<style>-x86_64.AppImage` | one file per style | `mksquashfs` (squashfs-tools; present), or `appimagetool` (missing) |
 | RPM | `rpm/SPECS/<deb>.spec`, `rpm/SOURCES/<deb>-<ver>-root.tar.gz`, `<deb>-<ver>-1.x86_64.rpm` | all, `update-alternatives` | `rpmbuild` (missing: only the .spec and its tarball) |
-| Flatpak | `flatpak/<app id>.json` + `flatpak/files/`, `<app id>.flatpak` (a bundle) | `default_linux` | `flatpak-builder`, the runtime and SDK (present: Platform / Sdk 26.08) |
-| MSIX | `<App>-<ver>-x64.msix` (folder: `<App>/msix/<style>/`) | `default_win` | `MakeAppx.exe` of the Windows SDK (present), signtool |
+| Flatpak | `flatpak/<app id>.json` + `flatpak/files/`, `<app id>.flatpak` (a bundle), the repository `flatpak/repo` (with a key also `flatpak/<app id>.gpg`, `.flatpakrepo`) | `default_linux` | `flatpak-builder`, the runtime and SDK (present: Platform / Sdk 26.08) |
+| MSIX | `<App>-<ver>-x64.msix` (folder: `<App>/msix/<style>/`), `<App>.appinstaller` (with `appinstaller_url=`) | `default_win` | `MakeAppx.exe` of the Windows SDK (present), signtool |
 
 What each format can and cannot do, compared with the setup and the .deb:
 
@@ -270,10 +273,10 @@ What each format can and cannot do, compared with the setup and the .deb:
 | --- | --- | --- | --- | --- | --- |
 | choice of style | at install time | one file per style | `update-alternatives --config` | `default_linux` only | `default_win` only |
 | file types, URL schemes | registered | in the `.desktop` file; registered by an integration tool (appimaged, AppImageLauncher) or the app's `--register` (the `.desktop` file then starts `$APPIMAGE`) | registered (`.desktop`, shared-mime-info; the system's file triggers) | exported `.desktop` and MIME package; files arrive through the document portal as `file://` URIs (`--file-forwarding`), which the app takes as paths | `windows.fileTypeAssociation`, `windows.protocol`; an `own` type is offered, never made the default (Windows asks the user); each extension once |
-| autostart (`plat::autostart_set`) | Run key / XDG autostart | XDG autostart with `$APPIMAGE` | XDG autostart | Background portal | `Unavailable` (HKCU is virtualized); the manifest's StartupTask, switched on in Settings -> Apps -> Startup |
-| `lib/update` ([UPDATES.md](UPDATES.md)) | exe, bundle, package | no (it would replace the extracted copy; the update information for AppImageUpdate is supported) | the channel lists only the .deb | no: updates come from the Flatpak repository | no (the install folder is read-only): Store or App Installer |
+| autostart (`plat::autostart_set`) | Run key / XDG autostart | XDG autostart with `$APPIMAGE` | XDG autostart | Background portal | the manifest's StartupTask, switched through WinRT (HKCU is virtualized; arguments are not passed) |
+| `lib/update` ([UPDATES.md](UPDATES.md) "Packages") | exe, bundle, package | the channel's `appimage` entry replaces the `.AppImage` file (trial, rollback; the GPG signature must follow the running file's key); also the update information for AppImageUpdate | the channel lists only the .deb | through the Flatpak portal (check, `Update`, `Spawn` of the new version) from the bundle's repository; without the portal "managed by Flatpak" | `Check::Managed`: App Installer (`.appinstaller`, at the next start) or the Store |
 | further programs (BINS) | next to the program, linked into `/usr/bin` | inside, AppRun starts the main program | `/usr/bin` links | in `/app/lib/<deb>/`, not in PATH | next to the program |
-| signing | Authenticode, apt repository | not signed (no `.sha256_sig`) | not signed (rpmsign) | the bundle is not signed (a repository's GPG key) | signtool (below) |
+| signing | Authenticode, apt repository | GPG in `.sha256_sig` / `.sig_key` (appimagetool's layout) | not signed (rpmsign missing) | GPG: repository and bundle | signtool (below) |
 
 ### AppImage
 
@@ -305,12 +308,24 @@ fragments, sparse blocks, extended inodes) and needs no FUSE:
   is its own name: JFLib uses it as the window class and the Wayland app id, and the `.desktop`
   files carry it as `StartupWMClass` (the desktop matches the window to the entry).
 * Options: `--appimage-extract [PATTERN]` (into `./squashfs-root`), `--appimage-extract-and-run`,
-  `--appimage-offset`, `--appimage-updateinformation`, `--appimage-portable-home` /
+  `--appimage-offset`, `--appimage-updateinformation`, `--appimage-signature` (the armored
+  signature of `.sha256_sig`), `--appimage-portable-home` /
   `-config` (`NAME.AppImage.home` / `.config`: `HOME` / `XDG_CONFIG_HOME` of the app),
   `--appimage-version`, `--appimage-help`; `--appimage-mount` is refused.  `TARGET_APPIMAGE=FILE`
   uses another file's image.
 * `--appimage-runtime FILE` or `jfgui_APPIMAGE_RUNTIME` packs another runtime (for example the
   upstream `runtime-x86_64`, which needs FUSE on the user's machine).
+
+**Signature.**  `pkg_linux.runtime_image` gives the runtime the sections of the upstream type-2
+runtime for it: `.sha256_sig` (1024 bytes) and `.sig_key` (8192 bytes), zero.  With
+`jfgui_GPG_KEY` (`jfgui_GPG_HOME`, `jfgui_GPG_PASSPHRASE`: as for the apt repository) the
+finished AppImage is signed as `appimagetool --sign` signs: the SHA-256 of the whole file with
+both sections read as zeros, as 64 lower-case hex digits, is signed by gpg in Linux / WSL
+(`linux_task.py gpgsign`: detached, armored), and the signature and the armored public key are
+written NUL-padded into the sections (`pkg_linux.sign_appimage`).  AppImageUpdate's `validate`
+and `lib/update` check it ([UPDATES.md](UPDATES.md) "Packages": an update must be signed with a
+key of the running AppImage's block); `gpgv` does too (`tools/pkg_check.py`).  Keep the key: a
+new key makes installed AppImages refuse the updates.
 
 ### RPM
 
@@ -326,7 +341,8 @@ Desktop database, icon cache and MIME database are left to the file triggers of 
 The Version takes `~` for `-` (`1.2.3-beta` -> `1.2.3~beta`).
 
 Not tested here: `rpmbuild` is not installed in the test system (Ubuntu, no root), so only the
-`.spec` and its tarball are written; `tools/pkg_check.py` compares `%files` with the tarball and
+`.spec` and its tarball are written, and no package is signed (`rpmsign --addsign` with a GPG
+key would follow rpmbuild; `rpmsign` is missing as well); `tools/pkg_check.py` compares `%files` with the tarball and
 runs `sh -n` on the scriptlets.  With rpmbuild (`dnf install rpm-build`):
 `rpmbuild -bb --define "_topdir $PWD" SPECS/<deb>.spec` in `build/dist/rpm`, or simply run
 `package.py --formats rpm` there.
@@ -341,6 +357,9 @@ prebuilt files in `flatpak/files/` (a `dir` source; the programs installed with 
 `org.freedesktop.Platform//26.08` (PACKAGE `flatpak_runtime=`), SDK to match; the static program
 uses nothing of it.  flatpak-builder exports the build into a temporary repository and
 `flatpak build-bundle` writes `<app id>.flatpak` (`flatpak install --user <file>` installs it).
+The export goes into the repository `flatpak/repo`, which stays: every run adds a commit (copied
+into the Linux file system for the build and back), so publishing it (or syncing it to the
+server) offers the new version to every installation.
 Flathub builds from sources and would need a manifest that builds JFLib itself; this one is for
 own repositories and bundles.
 
@@ -368,6 +387,18 @@ With `fs.user` every document of the portal's mount stays readable and writable 
 new grant, so a file the user chose in the portal's file dialog (a lasting document) opens
 again from `ui.recent_add`'s list after a restart; files of "Open with" are documents for the
 session only (flatpak forwards them so) and are gone after it ([VFS.md](VFS.md), "Flatpak").
+**Signing and updates.**  With `jfgui_GPG_KEY` the commits and the repository's summary are
+signed (`flatpak-builder --gpg-sign`, `flatpak build-update-repo --gpg-sign`), and so is the
+bundle (`build-bundle --gpg-sign`), which also carries the public key (`--gpg-keys`) and, with
+PACKAGE `flatpak_repo_url=` (the address the repository is published at), the remote: `flatpak
+install --user <bundle>` then makes a GPG-checked remote `<name>-origin` from which `flatpak
+update` and the app itself (lib/update through the Flatpak portal, [UPDATES.md](UPDATES.md)
+"Packages") take new versions.  Beside the repository `package.py` writes the public key
+(`<app id>.gpg`) and `<app id>.flatpakrepo` (`flatpak remote-add --user NAME
+<app id>.flatpakrepo`).  Without `flatpak_repo_url` the bundle names no remote (noted): an
+installation from it gets no updates.  flatpak signs through gpg-agent, so a key with a
+passphrase must be unlocked there (`jfgui_GPG_PASSPHRASE` is not handed to flatpak).
+
 `--register` is `Unavailable` inside the sandbox (the export registers).  Not covered: files dropped from
 other programs arrive as paths the sandbox may not see (no portal file transfer), and the
 library's own file dialog (used without a portal) sees only the sandbox.
@@ -392,14 +423,33 @@ package folder holds `<App>.exe` (signed like the setup's, when a certificate is
 further programs and notices; `MakeAppx pack` checks the manifest against the schema.
 
 In an MSIX package Windows virtualizes writes below HKCU and AppData: the app's `config://` and
-`data://` live in the package's private folder (removed with it), and `plat::autostart_set` is
-`Unavailable` (`win_autostart.rs` asks `GetCurrentPackageFullName`), and so is `--register`
-(`plat::assoc`): the manifest declares the types.  Switching the StartupTask
-from the app (WinRT `StartupTask.RequestEnableAsync`) is not implemented.  No `resources.pri`:
-the logos have no scale, `targetsize` or `altform-unplated` variants (Windows draws the small logo on a plate).
-Not tested here: installing the package (`Add-AppxPackage` needs a trusted certificate or
-developer mode; nothing is installed by the checks) and a Store submission (the Store takes the
-identity reserved in Partner Center: set `msix_name` and `msix_publisher` to it).
+`data://` live in the package's private folder (removed with it), and `--register`
+(`plat::assoc`) is `Unavailable`: the manifest declares the types.  `plat::autostart_set`
+switches the package's StartupTask (`TaskId="Autostart"`, `Enabled="false"` until the app asks)
+through WinRT -- `StartupTask.GetAsync`, `RequestEnableAsync` / `Disable`, `State`, by raw COM
+on an MTA thread (`win_winrt.rs`, `win_autostart.rs`); a task the user switched off in Settings
+-> Apps -> Startup stays off (`AutostartError::Dismissed`), and the task starts the program
+without arguments.  `msix_alias=` adds an execution alias (`uap3:AppExecutionAlias`): the
+program can be started by that name from a console, with arguments and the package identity.
+No `resources.pri`: the logos have no scale, `targetsize` or `altform-unplated` variants
+(Windows draws the small logo on a plate).
+
+**Updates through App Installer.**  With PACKAGE `appinstaller_url=` (the folder the files are
+published in, `https://...`) `package.py` writes `<App>.appinstaller`
+(`http://schemas.microsoft.com/appx/appinstaller/2018`): the package's identity and address,
+`UpdateSettings` with `OnLaunch` (`HoursBetweenUpdateChecks` from `appinstaller_hours`, default
+0: at every start; `ShowPrompt`, the start not held up) and `AutomaticBackgroundTask`.  Publish
+the new `.msix` and the new `.appinstaller` (its version is the package's) at that folder;
+users install from the `.appinstaller`, and App Installer brings the next version at a start.
+The app sees it through `lib/update`: `Check::Managed(Manager::AppInstaller, ..)`.  Without
+the URL there is no `.appinstaller` (noted).
+
+Tested here: the package folder registered with `Add-AppxPackage -Register` (developer mode,
+which is on in the test system and not changed by the check) and started through its alias
+(`pkg_check.py --install`: the StartupTask on and off, `Check::Managed`), then removed.  Not
+tested: installing a signed `.msix` (needs a trusted certificate), an update through App
+Installer from a web server, and a Store submission (the Store takes the identity reserved in
+Partner Center: set `msix_name` and `msix_publisher` to it).
 
 ### Android App Bundle (not built)
 
@@ -425,7 +475,11 @@ finish-args of every PERMISSIONS key, the `.spec` and its tarball, the AppxManif
 types, protocol, StartupTask and capabilities, escaping), every format with its tools taken away
 (skipped with what is missing, the AppDir / `.spec` / manifest / package folder still written),
 the `.desktop` entry, metainfo and AppxManifest of every `apps/*/PACKAGE` (validators, MakeAppx
-pack with a stand-in program; desktop-file-validate's hints are shown, not counted),
+pack with a stand-in program; desktop-file-validate's hints are shown, not counted), the
+`.appinstaller`, the execution alias and the StartupTask id plat asks for, an update channel
+with a `.deb` and an AppImage entry, the AppImage signature sections (`appimage_digest` does not
+see them) and an AppImage signed the way `package.py` signs (a throwaway key in a temporary
+`GNUPGHOME` in WSL, removed with its agent), checked by `gpgv` over a digest computed on its own,
 the shipped notices (`THIRD_PARTY_NOTICES.md` names every file of `licenses/`, each style
 carries the notices of the styles whose fonts or icons it embeds), `runtime_image` on a small
 ELF file,
@@ -444,7 +498,18 @@ the exported `.desktop`, and the scripts run in the build's sandbox (`flatpak bu
 package's files, its manifest read back, `MakeAppx unpack`, a signature with a certificate made
 for the run (the host's openssl when there is one: the WSL clock may run ahead of Windows' and
 make a fresh certificate "not yet valid"; never installed), `signtool verify` (the untrusted test
-root is expected), and a certificate of another subject refused with 0x8007000B.
+root is expected), and a certificate of another subject refused with 0x8007000B.  With
+`jfgui_GPG_KEY` set the AppImages are signed and `gpgv` checks each.
+
+With `--install` (by hand, a few minutes; with `--quick` only these) the packages are installed
+for a moment where that needs no administrator and changes no setting: `apps/updatetest` as a
+Flatpak (versions 1.0.0 and 2.0.0 exported into a repository signed with a throwaway key, the
+signed bundle of 1.0.0 installed with `flatpak --user` into a temporary `HOME` -- the runtime is
+taken read-only from the real user installation through `FLATPAK_SYSTEM_DIR` -- and run in a
+private session bus with `flatpak-portal --poll-timeout=2`: the portal reports the update, it is
+installed through the portal and 2.0.0 is started by it; the update permission is granted in
+that bus's permission store first, so no dialog appears) and as an MSIX package (registered in
+developer mode, when it is already on; else SKIP), then everything is removed.
 
 ## Third-party notices
 
