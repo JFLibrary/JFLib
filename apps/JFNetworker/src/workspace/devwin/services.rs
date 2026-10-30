@@ -44,6 +44,8 @@ fn kind_name(kind: &str) -> &str {
         "ospf" => "Routing (OSPF)",
         "tftp-server" => "TFTP-Server",
         "ftp-server" => "FTP-Server",
+        "snmpd" => "SNMP-Agent",
+        "snmptrapd" => "SNMP-Trap-Empfänger",
         _ => return kind,
     })
 }

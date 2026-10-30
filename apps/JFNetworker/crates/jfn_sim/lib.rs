@@ -136,6 +136,14 @@
 //   phys     the physical layer (P1): cable lengths against the reach of their media, the
 //            optics of fibres; Action::CableLen / Optic, cable_phys, PhysNote (Note::Phys),
 //            the problems CableTooLong and OpticMismatch
+//   snmpd    the SNMP agent (SNMPv1 and v2c): "snmpd" on Linux hosts, "snmp-server ..." on IOS-like
+//            devices (SnmpSet, Action::Snmp); Get, GetNext, GetBulk and Set over the device's
+//            state, notifications as traps and informs (coldStart, linkDown, linkUp,
+//            authenticationFailure)
+//   snmpmib  what the agent serves: a view of the device made for each request (system,
+//            interfaces, ifXTable, addresses, routes, the snmp group) in the order of SNMP
+//   snmptrapd the receiver of notifications on Linux hosts: logs them, acknowledges informs
+//   snmptrace SNote: the decisions of SNMP as notes (Note::Snmp) with their German sentences
 //
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
@@ -220,6 +228,10 @@ pub mod ftpd;
 pub mod ftpc;
 pub mod keyframe;
 pub mod phys;
+pub mod snmptrace;
+pub mod snmpmib;
+pub mod snmpd;
+pub mod snmptrapd;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -283,3 +295,7 @@ pub use ftpd::{FtpServer, FtpUser};
 pub use ftpc::FtpProgram;
 pub use keyframe::{Budget, Footprint, InKind, Input, Past, Pos, Restore, Rewind, Target};
 pub use phys::{CablePhys, PhysFault, PhysNote};
+pub use snmptrace::SNote;
+pub use snmpmib::{IfRow, View as SnmpView};
+pub use snmpd::{Community, SnmpAgent, SnmpCfg, SnmpSet, TrapHost};
+pub use snmptrapd::{TrapReceiver, TrapRow};

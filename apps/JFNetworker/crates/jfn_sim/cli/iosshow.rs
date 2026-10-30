@@ -151,6 +151,9 @@ impl Engine {
                         }
                     }
                 }
+                if d & super::D_SNMP != 0 {
+                    s.push_str("Debug output for SNMP packets: on\n");
+                }
                 s
             }
             K::ShowVersion => self.show_version(ni),
@@ -274,6 +277,8 @@ impl Engine {
         s.push_str(&self.ios_ip6_route_config(ni));
         // the access lists: named ones, then the numbered lines (cli/acl.rs)
         s.push_str(&self.ios_acl_config(ni));
+        // the SNMP agent (cli/snmp.rs)
+        s.push_str(&self.ios_snmp_config(ni));
         for l in &cfg.lines {
             s.push_str(&format!("line {}\n", l.name));
             for o in &l.opts {

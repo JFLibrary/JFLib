@@ -527,3 +527,11 @@ pub(crate) const ID_PHY_LEN: u32 = 0xE070;
 pub(crate) const ID_PHY_LEN_SET: u32 = 0xE071;
 pub(crate) const ID_PHY_LEN_AUTO: u32 = 0xE072;
 pub(crate) const ID_PHY_OPTIC0: u32 = 0xE080;
+
+// ---- X1b: SNMP (commands 620 .. 639, widgets 0x0001_1000 .. 0x0001_1FFF, timers 0x194 .. 0x197;
+// none of the commands and timers is used yet)
+/// the MIB-Browser in the Desktop of device window k: ID_MIB0 + 0x400 k (+ 1 .. 3 agent,
+/// community, version, + 4 the card of the chosen object, + 5 its instance, + 6 .. 8 Get,
+/// GetNext, Walk, + 9 .. 11 the type, the value, Set; + 0x100 the tree with its rows; + 0x3F0 its
+/// tile on the desktop)
+pub(crate) const ID_MIB0: u32 = 0x0001_1000;

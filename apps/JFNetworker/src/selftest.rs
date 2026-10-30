@@ -38,6 +38,7 @@
 // recording, doc/sim.rs's state in the past, "Von hier fortsetzen").
 // phystest.rs: the physical view (group phys: jfn_model::phys, the forms and optics of the
 // catalogue, jfn_sim::phys, doc/phys.rs, the scenario steps place / cable and expect cable).
+// snmptest.rs: SNMP (group snmp: jfn_sim::snmpd, snmpmib, snmptrapd, snmptrace, cli/snmp.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -103,9 +104,11 @@ mod filestest;
 mod keyframetest;
 #[path = "phystest.rs"]
 mod phystest;
+#[path = "snmptest.rs"]
+mod snmptest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 37] = [
+    let groups: [(&'static str, fn(&mut T)); 38] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -143,6 +146,7 @@ pub fn run() -> i32 {
         ("files", filestest::run),
         ("keyframes", keyframetest::run),
         ("phys", phystest::run),
+        ("snmp", snmptest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

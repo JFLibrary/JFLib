@@ -1,0 +1,41 @@
+# Überwachung per SNMP: MON fragt R1, SW1 und R2 ab (snmpget, snmpwalk, snmpbulkwalk, Version 1
+# und 2c), setzt den Standort von R1, eine falsche Community bleibt ohne Antwort und meldet sich
+# als authenticationFailure; ein Kabel an SW1 wird gezogen und wieder gesteckt: linkDown und linkUp
+# kommen in snmptrapd auf MON an. PC1 (Linux) meldet coldStart beim Start; R2 meldet sich per
+# Inform, das sein ARP verliert und nach 15 s noch einmal geht.
+MON: snmpget -v2c -c public 10.0.10.1 sysName.0 sysDescr.0 sysUpTime.0 sysLocation.0
+run 2s
+expect MON output contains "SNMPv2-MIB::sysName.0 = STRING: R1"
+MON: snmpwalk -v2c -c public 10.0.1.10 IF-MIB::ifOperStatus
+run 3s
+expect MON output contains "IF-MIB::ifOperStatus.3 = INTEGER: up(1)"
+MON: snmpbulkwalk -v2c -c public 10.0.1.2 ifName
+run 3s
+expect MON output contains "IF-MIB::ifName.1 = STRING: Gi0/0/0"
+MON: snmpwalk -v1 -c public 10.0.10.1 ipAddrTable
+run 3s
+expect MON output contains "IP-MIB::ipAdEntIfIndex.10.0.1.1 = INTEGER: 2"
+# R1 lässt nur MON mit "private" schreiben (Zugriffsliste 10)
+MON: snmpset -v2c -c private 10.0.10.1 sysLocation.0 s "Serverraum 2"
+run 2s
+expect MON output contains "SNMPv2-MIB::sysLocation.0 = STRING: Serverraum 2"
+R1: enable
+R1: show snmp
+expect R1 output contains "Location: Serverraum 2"
+MON: snmpget -v2c -c falsch -r 1 10.0.10.1 sysName.0
+run 3s
+expect MON output contains "10.0.10.1 did not answer (2 tries of 1 s each)"
+# das Kabel von PC1 wird gezogen und wieder gesteckt
+link down SW1 Gi1/0/3
+run 2s
+link up SW1 Gi1/0/3
+run 2s
+MON: cat /var/log/snmptrapd.log
+expect MON output contains "OID: IF-MIB::linkDown"
+expect MON output contains "OID: IF-MIB::linkUp"
+expect MON output contains "OID: SNMPv2-MIB::authenticationFailure"
+expect MON svc traps metric traps == 5
+expect MON svc traps metric informs == 1
+expect R2 svc snmp metric informs_acked == 1
+expect R1 svc snmp metric refused == 2
+expect hops snmp >= 40

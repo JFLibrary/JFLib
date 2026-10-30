@@ -30,6 +30,12 @@ pub struct PortCounters {
     pub tx_bytes: u64,
     /// frames dropped at this port (no link, queue full, refused)
     pub drops: u64,
+    /// of the frames: those to a multicast address (broadcast not counted) and to broadcast
+    /// (IF-MIB's counters: snmpmib.rs)
+    pub rx_mcast: u64,
+    pub rx_bcast: u64,
+    pub tx_mcast: u64,
+    pub tx_bcast: u64,
 }
 
 /// a port at run time

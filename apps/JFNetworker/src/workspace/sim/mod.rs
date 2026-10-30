@@ -87,16 +87,18 @@ pub(crate) struct Cat {
     pub argb: u32,
 }
 
-pub(crate) const CATS: [Cat; 9] = [
+pub(crate) const CATS: [Cat; 10] = [
     Cat { name: "ICMP", bits: P_ICMP | P_ICMPV6, argb: 0xFF3F_8A52 },
     Cat { name: "ARP", bits: P_ARP, argb: 0xFFAA_7414 },
     Cat { name: "DNS", bits: P_DNS, argb: 0xFF7A_5C99 },
     Cat { name: "TCP/HTTP", bits: P_TCP | P_HTTP | P_TLS | P_SSH, argb: 0xFF35_68A8 },
-    Cat { name: "UDP", bits: P_UDP | P_NTP | P_SYSLOG | P_TFTP | P_SNMP, argb: 0xFF2A_8AA6 },
+    Cat { name: "UDP", bits: P_UDP | P_NTP | P_SYSLOG | P_TFTP, argb: 0xFF2A_8AA6 },
     Cat { name: "DHCP", bits: P_DHCP | P_DHCPV6, argb: 0xFF2F_7D72 },
     Cat { name: "STP", bits: P_STP, argb: 0xFF7A_818A },
     Cat { name: "OSPF/RIP", bits: P_OSPF | P_RIP | P_BGP, argb: 0xFF8C_6A4F },
     Cat { name: "Andere", bits: P_ETH | P_VLAN | P_LLC | P_IPV4 | P_IPV6 | P_IGMP | P_LLDP | P_DATA, argb: 0xFF6A_737D },
+    // X1b: SNMP, a muted rose (after "Andere", so the numbers of the others stay)
+    Cat { name: "SNMP", bits: P_SNMP, argb: 0xFFA3_4D6D },
 ];
 /// the category "Andere"
 pub(crate) const CAT_OTHER: usize = 8;
@@ -104,13 +106,13 @@ pub(crate) const CAT_OTHER: usize = 8;
 /// the category of a frame or decision: its top protocol's (an ICMP error quoting a UDP packet
 /// is ICMP)
 pub(crate) fn cat_of(mask: u32) -> usize {
-    const ORDER: [usize; 8] = [0, 1, 5, 2, 7, 6, 3, 4];
+    const ORDER: [usize; 9] = [0, 1, 5, 2, 7, 6, 3, 9, 4];
     ORDER.iter().copied().find(|&k| mask & CATS[k].bits != 0).unwrap_or(CAT_OTHER)
 }
 
 /// the colour of a category (lighter in the dark theme), opaque
 pub(crate) fn cat_color(k: usize, dark: bool) -> u32 {
-    let c = CATS[k.min(CAT_OTHER)].argb;
+    let c = CATS[k.min(CATS.len() - 1)].argb;
     if dark { color_mix(c, 0xFFFF_FFFF, 72) } else { c }
 }
 

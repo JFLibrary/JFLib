@@ -248,6 +248,8 @@ impl Engine {
             n if n.is_ospf() && d & super::D_OSPF != 0 => text = self.ospf_debug(ni, n),
             // debug ip bgp (cli/bgp.rs)
             n @ Note::Bgp(_) if d & super::D_BGP != 0 => text = self.bgp_debug(ni, n),
+            // debug snmp packets (cli/snmp.rs)
+            n @ Note::Snmp(_) if d & super::D_SNMP != 0 => text = self.snmp_debug(n),
             _ => {}
         }
         if text.is_empty() {

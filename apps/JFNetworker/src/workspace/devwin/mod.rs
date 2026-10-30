@@ -7,7 +7,8 @@
 //                           DEVWINS, the oldest gives its place up)
 //   frame(n, ui)            the windows (after the main window's content)
 //   shows(n, dev)           the window that draws this device's console now (its CLI tab, the
-//                           desktop's prompt): the Terminal panel shows a note instead
+//                           desktop's prompt or MIB-Browser): the Terminal panel shows a note
+//                           instead
 //   open_on(n, ui, dev, tab)   the device's window on one of its tabs (CMD_SCRIPTS: Skripte)
 //
 //   config.rs    Konfiguration: forms that type command lines (doc/console.rs run_lines)
@@ -18,6 +19,8 @@
 //                stop, apply, their output and errors (ids ID_SCRIPTS0 + 0x400 k ..)
 //   files.rs     Dateien: the device's files (flash:, nvram:, the Linux tree) with their text,
 //                delete, import, export (ids ID_FILES0 + 0x180 k ..)
+//   mib.rs       the MIB-Browser of the Desktop: the MIB's objects, Get, GetNext, Walk and Set
+//                as commands on the console (ids ID_MIB0 + 0x400 k ..)
 //
 // Übersicht shows model, ports, power and state; Schnittstellen every interface as the
 // simulator runs it (the inspector's rows, with frame counters); CLI the device's console --
@@ -32,6 +35,7 @@ pub(crate) mod services;
 pub(crate) mod svcedit;
 pub(crate) mod scripts;
 pub(crate) mod files;
+pub(crate) mod mib;
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -197,7 +201,8 @@ pub(crate) fn open_on(n: &mut Net, ui: &mut Ui, dev: u32, tab: Tab) {
 pub(crate) fn shows(n: &Net, dev: u32) -> Option<u32> {
     n.devwin.wins.iter().enumerate().find_map(|(k, x)| {
         let x = x.as_ref()?;
-        let console = x.tab == Tab::Cli || (x.tab == Tab::Desktop && x.desk.app == desktop::App::Prompt);
+        // the desktop's prompt and the MIB-Browser (mib.rs) draw the console too
+        let console = x.tab == Tab::Cli || (x.tab == Tab::Desktop && matches!(x.desk.app, desktop::App::Prompt | desktop::App::Mib));
         (x.dev == dev && x.open.get() != 0 && console).then(|| base(k))
     })
 }

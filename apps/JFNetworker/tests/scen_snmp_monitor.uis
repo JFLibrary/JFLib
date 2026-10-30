@@ -1,0 +1,9 @@
+#!args apps/JFNetworker/tests/fixtures/snmp_monitor.jfnet --scenario apps/JFNetworker/tests/scen/snmp_monitor.scn --golden apps/JFNetworker/tests/scen/snmp_monitor.report
+# golden scenario: monitoring over SNMP. MON gets the system group of R1, walks the interfaces of
+# SW1 and the names of R2 (GetBulk), the addresses of R1 in version 1, sets R1's location with
+# the community its access list allows, is refused with a wrong community (no answer, two
+# authenticationFailure traps); a cable of SW1 is pulled and plugged again (linkDown, linkUp in
+# snmptrapd's log file); PC1's coldStart comes at boot, R2's inform after its retry at 15 s. The
+# GUI program runs tests/scen/snmp_monitor.scn on tests/fixtures/snmp_monitor.jfnet without a
+# window and ends with the report, which must equal tests/scen/snmp_monitor.report byte for byte
+# on every target (the script itself is not run)

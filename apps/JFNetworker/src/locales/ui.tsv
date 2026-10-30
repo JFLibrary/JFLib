@@ -1142,3 +1142,34 @@ Die Etagen übereinander; ein Doppelklick öffnet eine Etage.	The floors on top 
 Ziehen verschiebt Räume und Geräte in einen anderen Raum; ein Doppelklick öffnet einen Raum.	Drag to move rooms, and devices into another room; a double click opens a room.
 Ziehen stellt Geräte an einen Platz, auf einen Tisch, in ein Rack oder zurück in die Ablage; ein Doppelklick öffnet ein Rack.	Drag devices to a spot, onto a desk, into a rack or back to the tray; a double click opens a rack.
 Ziehen steckt Geräte in andere Höheneinheiten, nach rechts aus dem Rack.	Drag devices to other rack units, to the right out of the rack.
+# X1b: SNMP (the Dienste tab, the protocols of the simulation mode, the MIB-Browser: devwin/mib.rs)
+SNMP-Agent	SNMP agent
+SNMP-Trap-Empfänger	SNMP trap receiver
+SNMP	SNMP
+MIB-Browser	MIB browser
+SNMP-Objekte eines Agenten lesen und setzen	Read and set the SNMP objects of an agent
+wie die MIB	as the MIB says
+Text (s)	text (s)
+Zahl (i)	integer (i)
+Zahl ohne Vorzeichen (u)	unsigned integer (u)
+IPv4-Adresse (a)	IPv4 address (a)
+Objektkennung (o)	object identifier (o)
+Bytes hexadezimal (x)	bytes in hex (x)
+Agent	Agent
+z. B. 10.0.0.1	e.g. 10.0.0.1
+Community	Community
+Version	Version
+Links ein Objekt wählen; Get, GetNext, Walk und Set laufen als Befehle in der Eingabeaufforderung des Geräts.	Choose an object on the left; Get, GetNext, Walk and Set run as commands in the device's command prompt.
+nicht lesbar	not readable
+Einzelwert	scalar
+Spalte einer Tabelle	column of a table
+Tabelle	table
+Zeile einer Tabelle	row of a table
+Instanz	Instance
+Get	Get
+GetNext	GetNext
+Walk	Walk
+der neue Wert	the new value
+Set	Set
+Agent und Community ohne Leerzeichen angeben.	Give the agent and the community without spaces.
+Die Antworten in der Eingabeaufforderung von {}	The answers in the command prompt of {}

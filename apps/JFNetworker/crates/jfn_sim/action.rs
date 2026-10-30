@@ -68,6 +68,10 @@
 //                                                      do not fit keep a cable down); Connect
 //                                                      takes Link::len_m as the cable's length
 //                                                      (0: unknown), AddDevice the device's optics
+//   Snmp                                               the SNMP agent of an IOS-like device:
+//                                                      communities, location, contact,
+//                                                      receivers, notifications, "no snmp-server"
+//                                                      (snmpd.rs)
 //
 // A device that is switched off forgets what it learned (MAC table, ARP cache, fragments) and
 // its jobs end; its configuration stays.  Removing a device removes its cables; frames on them
@@ -263,6 +267,8 @@ pub enum Action {
     CableLen { link: u32, len_m: u32 },
     /// the transceiver in a port's optics cage (phys.rs)
     Optic { dev: u32, port: String, optic: jfn_model::catalog::Optic },
+    /// a change of an IOS-like device's SNMP agent ("snmp-server ...": snmpd.rs)
+    Snmp { dev: u32, set: crate::snmpd::SnmpSet },
 }
 
 /// why an action was refused (German text through Display)
@@ -644,6 +650,8 @@ impl Engine {
             // the physical layer (phys.rs)
             Action::CableLen { link, len_m } => self.set_cable_len(link, len_m),
             Action::Optic { dev, port, optic } => self.set_optic(dev, &port, optic),
+            // the SNMP agent of IOS-like devices (snmpd.rs)
+            Action::Snmp { dev, set } => self.snmp_apply(dev, set),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }

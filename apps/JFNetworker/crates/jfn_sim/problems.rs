@@ -30,6 +30,9 @@
 //                       on the device (files.rs)
 //   CableTooLong        a cable longer than its medium allows at its speed (phys.rs, P1)
 //   OpticMismatch       the optics of a fibre's ends do not fit each other or the fibre
+//   SnmpTrapHost        an SNMP agent sends notifications to an address it has no route to
+//                       (warning; snmpd.rs)
+//   SnmpOpenRw          a community that may write and that every sender may use (warning)
 //
 // Problem::text is German; Problem::msg is the same as a template with arguments for the app's
 // catalogue (jfn_model::msg).
@@ -107,6 +110,10 @@ pub enum ProblemKind {
     CableTooLong,
     /// a fibre whose optics do not fit each other or the fibre (phys.rs)
     OpticMismatch,
+    /// an SNMP agent's receiver of notifications without a route (snmpd.rs)
+    SnmpTrapHost,
+    /// a read-write community without an access list or network
+    SnmpOpenRw,
 }
 
 /// a problem of the set-up
@@ -260,6 +267,7 @@ impl Engine {
         self.bgp_problems(&mut out);
         self.file_problems(&mut out);
         self.phys_problems(&mut out);
+        self.snmp_problems(&mut out);
         out.sort_by(|a, b| (a.severity, a.dev, a.port, a.kind, &a.text).cmp(&(b.severity, b.dev, b.port, b.kind, &b.text)));
         out
     }

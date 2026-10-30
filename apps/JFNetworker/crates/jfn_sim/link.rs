@@ -99,6 +99,19 @@ impl LinkRt {
     }
 }
 
+/// counts a frame to the broadcast or a multicast address (its destination MAC; frames of a
+/// serial line count as neither)
+fn count_cast(frame: &[u8], serial: bool, mcast: &mut u64, bcast: &mut u64) {
+    if serial || frame.len() < 6 {
+        return;
+    }
+    if frame[..6] == [0xFF; 6] {
+        *bcast += 1;
+    } else if frame[0] & 1 != 0 {
+        *mcast += 1;
+    }
+}
+
 /// time on the wire of a frame of `len` bytes at `kbps`
 pub fn serialisation_ns(len: usize, kbps: u32, ethernet: bool) -> Ns {
     let wire = if ethernet { len.max(60) + 24 } else { len } as u128;
@@ -227,6 +240,10 @@ impl Engine {
         for (n, _) in ends {
             self.bgp_kick(n);
         }
+        // and the SNMP agents (linkDown, linkUp: snmpd.rs)
+        for (n, p) in ends {
+            self.snmp_link(n, p, up);
+        }
     }
 
     /// re-evaluates every link of a node
@@ -327,6 +344,7 @@ impl Engine {
             let c = &mut n.ports[from.1 as usize].counters;
             c.tx_frames += 1;
             c.tx_bytes += frame.len() as u64;
+            count_cast(&frame, serial, &mut c.tx_mcast, &mut c.tx_bcast);
         }
         let hop = self.trace.push_hop(Hop {
             id: 0,
@@ -377,6 +395,7 @@ impl Engine {
             return;
         };
         let assoc = crate::wlan::is_assoc_id(l.id);
+        let serial = l.cable == CableKind::Serial;
         let (ni, pi) = l.ends[1 - d as usize];
         if l.epoch != epoch || !up {
             self.trace.mark_lost(hop);
@@ -392,6 +411,7 @@ impl Engine {
         let c = &mut node.ports[pi as usize].counters;
         c.rx_frames += 1;
         c.rx_bytes += frame.len() as u64;
+        count_cast(&frame, serial, &mut c.rx_mcast, &mut c.rx_bcast);
         if assoc && self.wlan_rx(li, ni, pi, &frame, hop) {
             return;
         }

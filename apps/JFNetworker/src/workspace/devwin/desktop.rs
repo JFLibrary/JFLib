@@ -10,9 +10,11 @@
 //                           simulator has no file system yet)
 //     Webbrowser            an address line and the page as text; until the simulator speaks
 //                           HTTP it says what it would load
+//     MIB-Browser           the objects of the built-in MIB as a tree, Get, GetNext, Walk and
+//                           Set against an agent: net-snmp's commands on the console (mib.rs)
 //
 // Ids: id + 1 .. + 4 the tiles, + 5 back, + 0x10 the IP configuration, + 0x20 the editor,
-// + 0x30 the browser.
+// + 0x30 the browser; the MIB-Browser's tile and widgets have a block of their own (ID_MIB0).
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -34,14 +36,16 @@ pub(crate) enum App {
     Prompt,
     Editor,
     Browser,
+    Mib,
 }
 
 // i18n
-const APPS: [(App, &str, &str); 4] = [
+const APPS: [(App, &str, &str); 5] = [
     (App::IpConfig, "IP-Konfiguration", "Adresse, Maske und Gateway oder DHCP"),
     (App::Prompt, "Eingabeaufforderung", "Die Shell des Geräts"),
     (App::Editor, "Texteditor", "Notizen zum Gerät"),
     (App::Browser, "Webbrowser", "Seiten als Text"),
+    (App::Mib, "MIB-Browser", "SNMP-Objekte eines Agenten lesen und setzen"),
 ];
 
 /// the desktop's state
@@ -64,6 +68,8 @@ pub(crate) struct Desk {
     // Webbrowser
     url: String,
     page: Vec<String>,
+    // MIB-Browser (mib.rs)
+    pub mib: super::mib::MibState,
 }
 
 impl Desk {
@@ -82,6 +88,7 @@ impl Desk {
             text_src: None,
             url: String::from("http://"),
             page: Vec::new(),
+            mib: super::mib::MibState::new(),
         }
     }
 }
@@ -121,6 +128,7 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         }
         App::Editor => editor(n, ui, k, id + 0x20, dev),
         App::Browser => browser(n, ui, k, id + 0x30, dev),
+        App::Mib => super::mib::browser(n, ui, k, dev),
         App::Home => {}
     }
 }
@@ -135,12 +143,15 @@ fn home(n: &mut Net, ui: &mut Ui, k: usize, id: u32) {
             App::IpConfig => IC_SETTINGS,
             App::Prompt => JN_TERMINAL,
             App::Editor => IC_DOCUMENT,
+            App::Mib => IC_BULLETED_LIST,
             _ => IC_GLOBE,
         };
+        // the MIB-Browser's tile has an id of its own block (+ 5 is the way back)
+        let tid = if *app == App::Mib { crate::app::constants::ID_MIB0 + 0x400 * k as u32 + 0x3F0 } else { id + 1 + i as u32 };
         ui.next_size(150, 96);
         ui.next_icon(icon);
         ui.next_flags(ST_LARGE);
-        if ui.button(id + 1 + i as u32, t(label)) & EV_ACT != 0 {
+        if ui.button(tid, t(label)) & EV_ACT != 0 {
             chosen = Some(*app);
         }
         ui.tooltip(t(tip));
