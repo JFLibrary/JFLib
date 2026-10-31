@@ -590,3 +590,11 @@ pub(crate) const ID_MIB0: u32 = 0x0001_1000;
 /// Formatieren, + 5 Gliederung on / off, + 8 the split of the editor and the outline, + 0x40 the
 /// outline (rows + 1 + i))
 pub(crate) const ID_SCRIPTLS0: u32 = 0x0001_4000;
+
+// ---- X1e: command-line sessions (commands 820 .. 839, widgets 0x0001_A000 .. 0x0001_A7FF,
+// timers 0x1B4 .. 0x1B7; the timers are not used)
+/// "Neue Sitzung": a further session of the shown console's device as a tab of its own
+pub(crate) const CMD_TERM_SESSION: u32 = 820;
+/// the consoles of further sessions: slot k takes ID_SES0 + 8 k .. + 7 (+ 1: its input line)
+pub(crate) const ID_SES0: u32 = 0x0001_A000;
+pub(crate) const SES_SLOTS: u32 = 192;

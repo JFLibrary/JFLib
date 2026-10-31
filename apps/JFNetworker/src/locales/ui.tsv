@@ -1319,3 +1319,10 @@ Formatieren (Umschalt+Alt+F): Einrückung, Leerzeichen, eine Anweisung je Zeile 
 Name umbenennen	Rename name
 Gliederung: die Funktionen und globalen Variablen neben dem Editor, ein Klick springt hin	Outline: the functions and global variables beside the editor, a click jumps there
 Neuer Name (jede Stelle im Skript)	New name (every place in the script)
+
+# ---- X1e: command-line sessions (doc/console.rs, workspace/terminal.rs)
+Neue &Sitzung	New &session
+Sitzung beendet	Session ended
+Keine weitere Sitzung	No further session
+{} nimmt keine weitere Sitzung an: es hat keine Befehlszeile oder keinen Strom.	{} takes no further session: it has no command line or no power.
+Telnet-Server	Telnet server

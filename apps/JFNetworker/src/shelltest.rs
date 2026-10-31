@@ -484,10 +484,11 @@ fn jobs_t(t: &mut T) {
     // ps
     let ps = sh(&mut e, "ps");
     let lines: Vec<&str> = ps.lines().collect();
-    t.eq("ps head", lines.first().copied(), Some("  PID USER     TIME COMMAND"));
-    t.check("ps: init, the shell, the jobs, ps", lines.get(1) == Some(&"    1 root     0:00 init") && lines.get(2) == Some(&"  100 root     0:00 -sh") && lines.iter().any(|l| l.ends_with(" root     0:00 sleep 10")) && lines.iter().any(|l| l.ends_with(" root     0:00 sleep 20")) && lines.last().is_some_and(|l| l.ends_with(" ps")));
+    // X1e added the TTY column (cli/ses.rs: the console is tty1, services have none)
+    t.eq("ps head", lines.first().copied(), Some("  PID USER     TTY      TIME COMMAND"));
+    t.check("ps: init, the shell, the jobs, ps", lines.get(1) == Some(&"    1 root     ?        0:00 init") && lines.get(2) == Some(&"  100 root     tty1     0:00 -sh") && lines.iter().any(|l| l.ends_with(" root     tty1     0:00 sleep 10")) && lines.iter().any(|l| l.ends_with(" root     tty1     0:00 sleep 20")) && lines.last().is_some_and(|l| l.ends_with(" ps")));
     let srv = cli(&mut e, SRV1, &["ps"], 0);
-    t.check("ps of a server: its services", srv.contains("  101 root     0:00 web\n"));
+    t.check("ps of a server: its services", srv.contains("  101 root     ?        0:00 web\n"));
     t.eq("kill a service", cli(&mut e, SRV1, &["kill 101; echo $?"], 0), s("jfn-sh: kill: (101) - Operation not permitted\n1\n"));
     // kill
     t.eq("kill %1", sh(&mut e, "kill %1"), s("[1]-  Terminated              sleep 10\n"));

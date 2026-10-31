@@ -410,6 +410,8 @@ impl Engine {
                     // the shell loses its processes and starts afresh (cli/shrun.rs)
                     self.sh_power_off(ni);
                 }
+                // every session but the console ends; the console starts afresh (cli/ses.rs)
+                self.ses_power(ni, on);
                 self.refresh_node_links(ni);
                 self.os_power(ni, on);
                 self.ip6_kick(ni);

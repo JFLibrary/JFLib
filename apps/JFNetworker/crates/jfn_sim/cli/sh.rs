@@ -6,8 +6,8 @@
 //                                 start, flash:/ on IOS-like devices), the variables, the
 //                                 history, $?, the line that runs and the background jobs
 //                                 (shrun.rs), the notes ("[1]+  Done ...") for the next prompt.
-//                                 Everything of one shell is here, so a device can have several
-//                                 sessions later (X1e)
+//                                 Everything of one shell is here: every session of a device
+//                                 has its own (cli/ses.rs); prompt_dir: "~", "~/app"
 //   parse(line) -> Result<Vec<AndOr>, String>   the grammar below; Err: bash's message
 //   expand_history(line, history) -> Result<Option<String>, String>   !! and !N
 //   Engine::sh_abs(ni, path)      a path of the session made absolute (the store resolves .
@@ -170,6 +170,17 @@ impl Shell {
         match self.var("HOME") {
             "" => "/root",
             h => h,
+        }
+    }
+    /// the working directory as the prompt shows it: "~", "~/app", "/srv/ftp"
+    pub fn prompt_dir(&self) -> String {
+        let home = self.home();
+        if self.cwd == home {
+            String::from("~")
+        } else if let Some(rest) = self.cwd.strip_prefix(home).filter(|r| r.starts_with('/') && home != "/") {
+            format!("~{}", rest)
+        } else {
+            self.cwd.clone()
         }
     }
     /// what the session holds (keyframe.rs)
@@ -508,14 +519,9 @@ impl Engine {
 
     /// the working directory as the prompt shows it: "~", "~/app", "/srv/ftp"
     pub(crate) fn sh_prompt_dir(&self, ni: usize) -> String {
-        let Some(s) = self.sh(ni) else { return String::from("~") };
-        let home = s.home();
-        if s.cwd == home {
-            String::from("~")
-        } else if let Some(rest) = s.cwd.strip_prefix(home).filter(|r| r.starts_with('/') && home != "/") {
-            format!("~{}", rest)
-        } else {
-            s.cwd.clone()
+        match self.sh(ni) {
+            Some(s) => s.prompt_dir(),
+            None => String::from("~"),
         }
     }
 
@@ -524,7 +530,8 @@ impl Engine {
         let Some(s) = self.sh(ni) else { return String::new() };
         match name {
             "?" => format!("{}", s.status),
-            "$" => format!("{}", SHELL_PID),
+            // the shell of the session (cli/ses.rs; the console's is SHELL_PID)
+            "$" => format!("{}", self.ses_pid(ni)),
             "!" => s.last_bg.map(|p| format!("{}", p)).unwrap_or_default(),
             "0" => String::from("jfn-sh"),
             "#" => String::from("0"),

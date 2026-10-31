@@ -10,8 +10,9 @@
 //                                    (an undo step the engine has already: Report::Files)
 //   open(n, ui, dev) -> Result       the device's console as the shown tab of the Terminal
 //                                    panel (or its window to the front), with the keyboard
-//   close / float / dock / tile      a tab goes, into a window of its own, back, every console
-//                                    in a window side by side
+//   close_tab / float_tab / dock_tab / tile   a tab (device, session) goes (a further
+//                                    session ends with it), into a window of its own, back,
+//                                    every console in a window side by side
 //   view(n, ui, dev)                 the console of a device here (the panel, its window, a
 //                                    device window): it fills the place, its keys go to the
 //                                    engine
@@ -22,6 +23,26 @@
 //   save_running(n, dev)             the running configuration becomes the startup one (IOS:
 //                                    "copy running-config startup-config" on the console)
 //   resumed(n, t)                    "Von hier fortsetzen" at moment t: every console says so
+//
+//   open_session(n, dev) -> Option<u32>   a further session of the device (jfn_sim cli/ses.rs:
+//                                    a terminal of its own, IOS "tty N", Linux "pts/N"); None
+//                                    without a command line or power
+//   view_session(n, ui, dev, s)      session s here as view does it for the console (s = 0 is
+//                                    view); after the session ended its console says so and
+//                                    takes no input
+//   close_session(n, dev, s)         the session ends and its console goes
+//   new_tab(n, ui, dev)              "Neue Sitzung": a further session as a tab of the Terminal
+//                                    panel, titled "PC1 (2)"; closing the tab ends it
+//
+// The console of a device (session 0) is the one of the tabs, the device window's CLI tab and
+// the desktop; a further session has a console of its own (Consoles::sess), drawn where the
+// caller puts it (a tab of the Terminal panel, a desktop's terminal window, the IDE's terminal
+// pane).  The reports of further sessions (Report::SesOut / SesPrompt / SesClosed) reach their
+// consoles; their lines, `?`, Tab and Ctrl+C go to the engine's session forms (cli_ses_*).
+// Further sessions always talk to the present (a line returns the view to it).  While a
+// console's program reads typed lines (telnet, nc: Engine::cli_reads) its input line stays,
+// without a prompt of its own and without `?` help, and hides what is typed when the far end
+// asks for a password (Engine::cli_secret).
 //
 // The engine prints without prompt and echo (ui::term adds them); the prompt and the busy
 // state come from the engine whenever a console is drawn.  IOS-like consoles take `?`
@@ -78,11 +99,15 @@ pub(crate) struct Console {
     skip_nl: bool,
     /// the moment in the past it last said it answers from (K1)
     past_note: Option<jfn_sim::Ns>,
+    /// a further session's console: the session ended (cli/ses.rs)
+    pub closed: bool,
 }
 
 /// a console in the Terminal panel
 pub(crate) struct Tab {
     pub dev: u32,
+    /// the session it shows (0: the console; jfn_sim cli/ses.rs)
+    pub ses: u32,
     /// the title the user gave it (None: the device's name)
     pub title: Option<String>,
     /// in a window of its own: ID_TERM_WIN0 + 0x10 k
@@ -92,6 +117,7 @@ pub(crate) struct Tab {
 /// the rename flyout of a tab
 pub(crate) struct Rename {
     pub dev: u32,
+    pub ses: u32,
     pub text: String,
     pub opened: bool,
 }
@@ -109,6 +135,14 @@ pub(crate) struct Consoles {
     /// the windows of consoles: open flag and place
     pub wins: Vec<(Shared<i32>, Shared<WinRect>)>,
     pub rename: Option<Rename>,
+    /// the consoles of further sessions by (device, session) (jfn_sim cli/ses.rs)
+    pub sess: BTreeMap<(u32, u32), Console>,
+    /// the session of the shown tab (0: the console)
+    pub cur_ses: u32,
+    /// the keyboard goes to this session's console where it is drawn next
+    pub focus_ses: Option<(u32, u32)>,
+    /// session widget slot -> (device, session)
+    ses_slots: BTreeMap<u32, (u32, u32)>,
 }
 
 /// the device has a command line
@@ -146,18 +180,85 @@ fn term_length(line: &str) -> Option<u32> {
 impl Consoles {
     pub(crate) fn new() -> Consoles {
         let wins = (0..TERM_WINS).map(|_| (Shared::new(0), Shared::new(WinRect::new(0, 0, 640, 360, 0)))).collect();
-        Consoles { by_dev: BTreeMap::new(), tabs: Vec::new(), cur: None, focus: None, slots: BTreeMap::new(), wins, rename: None }
+        Consoles { by_dev: BTreeMap::new(), tabs: Vec::new(), cur: None, focus: None, slots: BTreeMap::new(), wins, rename: None, sess: BTreeMap::new(), cur_ses: 0, focus_ses: None, ses_slots: BTreeMap::new() }
+    }
+
+    // a new console of a device
+    fn make(p: &Project, dev: u32) -> Console {
+        let mut term = TermState::new(SCROLLBACK);
+        term.pager_text = String::from(" --More-- ");
+        term.page_len = TERM_LENGTH - 1;
+        let power = p.device(dev).is_some_and(|d| !d.off);
+        Console { term, ios: ios_of(p, dev), slot: None, nopage: false, power, skip_nl: false, past_note: None, closed: false }
     }
 
     /// a device's console (made when it is first needed)
     pub(crate) fn get(&mut self, p: &Project, dev: u32) -> &mut Console {
-        self.by_dev.entry(dev).or_insert_with(|| {
-            let mut term = TermState::new(SCROLLBACK);
-            term.pager_text = String::from(" --More-- ");
-            term.page_len = TERM_LENGTH - 1;
-            let power = p.device(dev).is_some_and(|d| !d.off);
-            Console { term, ios: ios_of(p, dev), slot: None, nopage: false, power, skip_nl: false, past_note: None }
-        })
+        self.by_dev.entry(dev).or_insert_with(|| Consoles::make(p, dev))
+    }
+
+    /// the console of session `s` of a device (0: get; made when it is first needed)
+    pub(crate) fn get_ses(&mut self, p: &Project, dev: u32, s: u32) -> &mut Console {
+        if s == 0 {
+            return self.get(p, dev);
+        }
+        self.sess.entry((dev, s)).or_insert_with(|| Consoles::make(p, dev))
+    }
+
+    /// the widget id of a further session's console (ID_SES0 + 8 slot; a free slot the first
+    /// time, else the one of a session that ended or has no tab)
+    pub(crate) fn ses_id(&mut self, p: &Project, dev: u32, s: u32) -> u32 {
+        if s == 0 {
+            return self.id(p, dev);
+        }
+        let have = self.get_ses(p, dev, s).slot;
+        let slot = match have {
+            Some(x) => x,
+            None => {
+                let free = (0..SES_SLOTS).find(|k| !self.ses_slots.contains_key(k));
+                let k = free.unwrap_or_else(|| {
+                    let tabs: Vec<(u32, u32)> = self.tabs.iter().map(|t| (t.dev, t.ses)).collect();
+                    let (&k, &old) = self.ses_slots.iter().find(|(_, key)| !tabs.contains(key) || self.sess.get(key).is_some_and(|c| c.closed)).unwrap_or((&0, &(0, 0)));
+                    if let Some(c) = self.sess.get_mut(&old) {
+                        c.slot = None;
+                    }
+                    k
+                });
+                self.ses_slots.insert(k, (dev, s));
+                if let Some(c) = self.sess.get_mut(&(dev, s)) {
+                    c.slot = Some(k);
+                }
+                k
+            }
+        };
+        ID_SES0 + 8 * slot
+    }
+
+    /// the tab of a session (0: the console's)
+    pub(crate) fn tab_of(&self, dev: u32, s: u32) -> Option<usize> {
+        self.tabs.iter().position(|t| t.dev == dev && t.ses == s)
+    }
+
+    /// the title of a session's tab: the user's, else "PC1" for the console and "PC1 (2)" for
+    /// a further session
+    pub(crate) fn title_of(&self, p: &Project, dev: u32, s: u32) -> String {
+        if s == 0 {
+            return self.title(p, dev);
+        }
+        match self.tab_of(dev, s).and_then(|i| self.tabs[i].title.clone()) {
+            Some(t) => t,
+            None => format!("{} ({})", p.device(dev).map_or_else(|| tf("Gerät {}", &[&dev.to_string()]), |d| d.name.clone()), s + 1),
+        }
+    }
+
+    /// the docked tabs as (device, session), in order
+    pub(crate) fn docked_keys(&self) -> Vec<(u32, u32)> {
+        self.tabs.iter().filter(|t| t.win.is_none()).map(|t| (t.dev, t.ses)).collect()
+    }
+
+    /// the (device, session) whose console window k shows
+    pub(crate) fn in_win_key(&self, k: usize) -> Option<(u32, u32)> {
+        self.tabs.iter().find(|t| t.win == Some(k)).map(|t| (t.dev, t.ses))
     }
 
     /// the widget id of a device's console (ID_TERM0 + 8 slot; a free slot the first time,
@@ -189,7 +290,7 @@ impl Consoles {
 
     /// the tab of a device's console
     pub(crate) fn tab(&self, dev: u32) -> Option<usize> {
-        self.tabs.iter().position(|t| t.dev == dev)
+        self.tab_of(dev, 0)
     }
 
     /// the title of a tab: the user's, else the device's name
@@ -218,50 +319,86 @@ pub(crate) fn pump(n: &mut Net) {
     pump_paged(n, None);
 }
 
-// ... with the output of device `paged` paged (IOS: what a command prints) -> that output
-fn pump_paged(n: &mut Net, paged: Option<u32>) -> String {
+// ... with the output of console `paged` (device, session) paged (IOS: what a command prints)
+// -> that output
+fn pump_paged(n: &mut Net, paged: Option<(u32, u32)>) -> String {
     let mut text = String::new();
     let mut paging = false;
     for r in n.doc.sim.take_reports() {
-        match r {
-            Report::CliOut { dev, bytes, .. } => {
-                let c = n.cons.get(&n.doc.proj, dev);
-                let mut b: &[u8] = &bytes;
-                if c.skip_nl {
-                    c.skip_nl = false;
-                    if b.first() == Some(&b'\n') {
-                        b = &b[1..];
-                    }
-                }
-                if paged == Some(dev) {
-                    if !paging {
-                        c.term.pager(true);
-                        paging = true;
-                    }
-                    text.push_str(&String::from_utf8_lossy(b));
-                }
-                c.term.write(b);
-            }
+        let (dev, ses, bytes) = match r {
+            Report::CliOut { dev, bytes, .. } => (dev, 0, bytes),
+            // a further session's output: only to a console that exists (cli/ses.rs)
+            Report::SesOut { dev, ses, bytes, .. } if n.cons.sess.contains_key(&(dev, ses)) => (dev, ses, bytes),
+            Report::SesOut { .. } => continue,
             Report::CliState { dev, prompt, busy } => {
                 if let Some(c) = n.cons.by_dev.get_mut(&dev) {
                     c.term.set_prompt(&prompt);
                     c.term.set_mode(if busy { TM_BUSY } else { TM_LINE });
                 }
+                continue;
             }
-            Report::Startup { dev, text } => saved(n, dev, text),
-            Report::Hostname { dev, name } => renamed(n, dev, &name),
-            Report::Log { dev, at, sev, tag, text } => n.log.push(dev, at, sev, tag, text),
-            Report::Files { dev, path, files, .. } => files_changed(n, dev, &path, files),
+            Report::SesPrompt { dev, ses, prompt, busy } => {
+                if let Some(c) = n.cons.sess.get_mut(&(dev, ses)) {
+                    c.term.set_prompt(&prompt);
+                    c.term.set_mode(if busy { TM_BUSY } else { TM_LINE });
+                }
+                continue;
+            }
+            Report::SesClosed { dev, ses } => {
+                if let Some(c) = n.cons.sess.get_mut(&(dev, ses))
+                    && !c.closed
+                {
+                    c.closed = true;
+                    c.term.write_str(&format!("\x1b[2m--- {} ---\x1b[0m\n", t("Sitzung beendet")));
+                }
+                continue;
+            }
+            Report::Startup { dev, text } => {
+                saved(n, dev, text);
+                continue;
+            }
+            Report::Hostname { dev, name } => {
+                renamed(n, dev, &name);
+                continue;
+            }
+            Report::Log { dev, at, sev, tag, text } => {
+                n.log.push(dev, at, sev, tag, text);
+                continue;
+            }
+            Report::Files { dev, path, files, .. } => {
+                files_changed(n, dev, &path, files);
+                continue;
+            }
+        };
+        let c = n.cons.get_ses(&n.doc.proj, dev, ses);
+        let mut b: &[u8] = &bytes;
+        if c.skip_nl {
+            c.skip_nl = false;
+            if b.first() == Some(&b'\n') {
+                b = &b[1..];
+            }
+        }
+        if paged == Some((dev, ses)) {
+            if !paging {
+                c.term.pager(true);
+                paging = true;
+            }
+            text.push_str(&String::from_utf8_lossy(b));
+        }
+        c.term.write(b);
+    }
+    if paging && let Some((d, s)) = paged {
+        let c = if s == 0 { n.cons.by_dev.get_mut(&d) } else { n.cons.sess.get_mut(&(d, s)) };
+        if let Some(c) = c {
+            c.term.pager(false);
         }
     }
-    if paging && let Some(c) = paged.and_then(|d| n.cons.by_dev.get_mut(&d)) {
-        c.term.pager(false);
-    }
     // the tabs of devices that are gone close (an undo brings the device, not its tab, back)
-    let gone: Vec<u32> = n.cons.tabs.iter().map(|t| t.dev).filter(|&d| n.doc.proj.device(d).is_none()).collect();
-    for d in gone {
-        close(n, d);
+    let gone: Vec<(u32, u32)> = n.cons.tabs.iter().map(|t| (t.dev, t.ses)).filter(|&(d, _)| n.doc.proj.device(d).is_none()).collect();
+    for (d, s) in gone {
+        close_tab(n, d, s);
     }
+    n.cons.sess.retain(|(d, _), _| n.doc.proj.device(*d).is_some());
     // power: a console says when its device went off or came back
     let p = &n.doc.proj;
     for (&dev, c) in n.cons.by_dev.iter_mut() {
@@ -327,13 +464,15 @@ pub(crate) fn open(n: &mut Net, ui: &mut Ui, dev: u32) -> Result<(), String> {
     }
     let cons = &mut n.cons;
     if cons.tab(dev).is_none() {
-        cons.tabs.push(Tab { dev, title: None, win: None });
+        cons.tabs.push(Tab { dev, ses: 0, title: None, win: None });
     }
     cons.focus = Some(dev);
+    cons.focus_ses = None;
     match cons.tab(dev).and_then(|i| cons.tabs[i].win) {
         Some(k) => ui.window_activate(ID_TERM_WIN0 + 0x10 * k as u32),
         None => {
             cons.cur = Some(dev);
+            cons.cur_ses = 0;
             n.shell.dock.show(P_TERMINAL);
         }
     }
@@ -341,58 +480,77 @@ pub(crate) fn open(n: &mut Net, ui: &mut Ui, dev: u32) -> Result<(), String> {
     Ok(())
 }
 
-/// the tab of a console goes (its scrollback stays for the next time)
-pub(crate) fn close(n: &mut Net, dev: u32) {
+/// the tab of a session goes (the console's scrollback stays; a further session ends)
+pub(crate) fn close_tab(n: &mut Net, dev: u32, s: u32) {
     let cons = &mut n.cons;
-    let Some(i) = cons.tab(dev) else { return };
+    let Some(i) = cons.tab_of(dev, s) else { return };
     let t = cons.tabs.remove(i);
     if let Some(k) = t.win {
         cons.wins[k].0.set(0);
     }
-    if cons.cur == Some(dev) {
+    if cons.cur == Some(dev) && cons.cur_ses == s {
         // the neighbour becomes the shown tab
-        let docked: Vec<(usize, u32)> = cons.tabs.iter().enumerate().filter(|(_, t)| t.win.is_none()).map(|(j, t)| (j, t.dev)).collect();
-        cons.cur = docked.iter().find(|(j, _)| *j >= i).or(docked.last()).map(|(_, d)| *d);
+        let docked: Vec<(usize, (u32, u32))> = cons.tabs.iter().enumerate().filter(|(_, t)| t.win.is_none()).map(|(j, t)| (j, (t.dev, t.ses))).collect();
+        let next = docked.iter().find(|(j, _)| *j >= i).or(docked.last()).map(|(_, k)| *k);
+        cons.cur = next.map(|k| k.0);
+        cons.cur_ses = next.map_or(0, |k| k.1);
     }
-    if cons.rename.as_ref().is_some_and(|r| r.dev == dev) {
+    if cons.rename.as_ref().is_some_and(|r| r.dev == dev && r.ses == s) {
         cons.rename = None;
+    }
+    if s != 0 {
+        close_session(n, dev, s);
     }
 }
 
-/// a console into a window of its own -> false when every console window is in use
-pub(crate) fn float(n: &mut Net, ui: &mut Ui, dev: u32) -> bool {
+/// a session's tab into a window of its own -> false when every console window is in use
+pub(crate) fn float_tab(n: &mut Net, ui: &mut Ui, dev: u32, s: u32) -> bool {
     let cons = &mut n.cons;
-    let Some(i) = cons.tab(dev) else { return false };
+    let Some(i) = cons.tab_of(dev, s) else { return false };
     if cons.tabs[i].win.is_some() {
         return true;
     }
     let Some(k) = (0..TERM_WINS).find(|&k| cons.in_win(k).is_none()) else { return false };
     cons.tabs[i].win = Some(k);
     cons.wins[k].0.set(1);
-    if cons.cur == Some(dev) {
-        cons.cur = cons.tabs.iter().find(|t| t.win.is_none()).map(|t| t.dev);
+    if cons.cur == Some(dev) && cons.cur_ses == s {
+        let next = cons.tabs.iter().find(|t| t.win.is_none()).map(|t| (t.dev, t.ses));
+        cons.cur = next.map(|k| k.0);
+        cons.cur_ses = next.map_or(0, |k| k.1);
     }
-    cons.focus = Some(dev);
+    focus_key(cons, dev, s);
     ui.repass();
     true
 }
 
-/// a console from its window back into the panel, as the shown tab
-pub(crate) fn dock(n: &mut Net, dev: u32) {
+/// a session's tab from its window back into the panel, as the shown tab
+pub(crate) fn dock_tab(n: &mut Net, dev: u32, s: u32) {
     let cons = &mut n.cons;
-    let Some(i) = cons.tab(dev) else { return };
+    let Some(i) = cons.tab_of(dev, s) else { return };
     if let Some(k) = cons.tabs[i].win.take() {
         cons.wins[k].0.set(0);
     }
     cons.cur = Some(dev);
+    cons.cur_ses = s;
     n.shell.dock.show(P_TERMINAL);
+}
+
+// the keyboard goes to session s's console of `dev` where it is drawn next
+fn focus_key(cons: &mut Consoles, dev: u32, s: u32) {
+    if s == 0 {
+        cons.focus = Some(dev);
+        cons.focus_ses = None;
+    } else {
+        cons.focus = None;
+        cons.focus_ses = Some((dev, s));
+    }
 }
 
 /// every open console in a window of its own (as many as there are windows), side by side
 /// over the lower half of the main window
 pub(crate) fn tile(n: &mut Net, ui: &mut Ui) {
-    for dev in n.cons.docked() {
-        if !float(n, ui, dev) {
+    for (dev, s) in n.cons.docked_keys() {
+        if !float_tab(n, ui, dev, s) {
             break;
         }
     }
@@ -419,13 +577,18 @@ pub(crate) fn tile(n: &mut Net, ui: &mut Ui) {
 pub(crate) fn view(n: &mut Net, ui: &mut Ui, dev: u32) {
     let Some(d) = n.doc.proj.device(dev) else { return };
     let (on, name) = (!d.off, d.name.clone());
-    let (prompt, busy, secret) = {
+    let (prompt, busy, secret, reads) = {
         let e = n.doc.sim.state();
+        let live = n.doc.sim.past().is_none();
+        // a program that reads typed lines (telnet, nc): the input line stays, without a prompt
+        let reads = on && live && e.cli_reads(dev);
         // in the past a line always runs (on a copy, Sim::past_line)
-        let busy = e.cli_busy(dev) && n.doc.sim.past().is_none();
-        // a login gate that waits for a password: the input line hides what is typed
-        let secret = on && e.cli_secret(dev) && n.doc.sim.past().is_none();
-        if on { (e.cli_prompt(dev), busy, secret) } else { (String::new(), false, false) }
+        let busy = e.cli_busy(dev) && live && !reads;
+        // a login gate (or a telnet session's far end) that waits for a password: the input
+        // line hides what is typed
+        let secret = on && e.cli_secret(dev) && live;
+        let prompt = if reads { String::new() } else { e.cli_prompt(dev) };
+        if on { (prompt, busy, secret, reads) } else { (String::new(), false, false, false) }
     };
     let id = n.cons.id(&n.doc.proj, dev);
     if !on {
@@ -447,6 +610,10 @@ pub(crate) fn view(n: &mut Net, ui: &mut Ui, dev: u32) {
     c.term.set_prompt(&prompt);
     c.term.set_mode(if secret { TM_SECRET } else if busy { TM_BUSY } else { TM_LINE });
     let mut flags = if c.ios { TF_QHELP | TF_CTRL_SHIFT6 } else { 0 };
+    if reads {
+        // `?` belongs to the far end then
+        flags &= !TF_QHELP;
+    }
     if !on {
         flags |= TF_NO_INPUT;
     }
@@ -484,7 +651,7 @@ fn submit(n: &mut Net, dev: u32, line: &str) {
         return;
     }
     let page = n.cons.by_dev.get(&dev).is_some_and(|c| c.ios && !c.nopage) || n.doc.sim.engine().cli_pager(dev);
-    let out = pump_paged(n, if page { Some(dev) } else { None });
+    let out = pump_paged(n, if page { Some((dev, 0)) } else { None });
     // "terminal length N" (the device took it): N lines a page (the last one --More--), 0 none
     if let Some(len) = term_length(line)
         && out.is_empty()
@@ -613,6 +780,194 @@ pub(crate) fn typed(n: &mut Net, dev: u32, line: &str) {
         n.cons.get(&n.doc.proj, dev).term.write_str(&format!("% {}\n", e));
     }
     pump(n);
+}
+
+// ---------------------------------------------------------------- further sessions (cli/ses.rs)
+
+/// a further session of device `dev` with a console of its own -> its id (None: the device has
+/// no command line or no power); the caller draws it (view_session) and ends it (close_session)
+pub(crate) fn open_session(n: &mut Net, dev: u32) -> Option<u32> {
+    if !has_cli(&n.doc.proj, dev) || n.doc.proj.device(dev).is_none_or(|d| d.off) {
+        return None;
+    }
+    pump(n);
+    let s = n.doc.sim.open_session(dev).ok()?;
+    n.cons.get_ses(&n.doc.proj, dev, s);
+    pump(n);
+    Some(s)
+}
+
+/// session `s` of device `dev` ends and its console goes (0: nothing, the console stays)
+pub(crate) fn close_session(n: &mut Net, dev: u32, s: u32) {
+    if s == 0 {
+        return;
+    }
+    let alive = !n.cons.sess.get(&(dev, s)).is_some_and(|c| c.closed);
+    if alive {
+        let _ = n.doc.sim.send(Cmd::SesClose { dev, ses: s });
+    }
+    pump(n);
+    n.cons.sess.remove(&(dev, s));
+    n.cons.ses_slots.retain(|_, k| *k != (dev, s));
+    if n.cons.focus_ses == Some((dev, s)) {
+        n.cons.focus_ses = None;
+    }
+}
+
+/// "Neue Sitzung": a further session of `dev` as a tab of the Terminal panel ("PC1 (2)"), shown
+/// and with the keyboard -> Err: why there is none
+pub(crate) fn new_tab(n: &mut Net, ui: &mut Ui, dev: u32) -> Result<u32, String> {
+    let Some(name) = n.doc.proj.device(dev).map(|d| d.name.clone()) else { return Err(tf("Das Gerät {} gibt es nicht.", &[&dev.to_string()])) };
+    let Some(s) = open_session(n, dev) else {
+        return Err(tf("{} nimmt keine weitere Sitzung an: es hat keine Befehlszeile oder keinen Strom.", &[&name]));
+    };
+    let cons = &mut n.cons;
+    cons.tabs.push(Tab { dev, ses: s, title: None, win: None });
+    cons.cur = Some(dev);
+    cons.cur_ses = s;
+    focus_key(cons, dev, s);
+    n.shell.dock.show(P_TERMINAL);
+    ui.repass();
+    Ok(s)
+}
+
+/// session `s` of device `dev` here, as view draws the console (s = 0 is view): prompt and busy
+/// state from the engine, its keys to the engine's session forms; a session that ended says so
+/// and takes no input
+pub(crate) fn view_session(n: &mut Net, ui: &mut Ui, dev: u32, s: u32) {
+    if s == 0 {
+        view(n, ui, dev);
+        return;
+    }
+    if n.doc.proj.device(dev).is_none() {
+        return;
+    }
+    let (prompt, busy, secret, reads, alive) = {
+        let e = n.doc.sim.engine();
+        let alive = e.cli_sessions(dev).iter().any(|x| x.id == s) && !n.cons.sess.get(&(dev, s)).is_some_and(|c| c.closed);
+        let reads = alive && e.cli_ses_reads(dev, s);
+        let busy = alive && e.cli_ses_busy(dev, s) && !reads;
+        let secret = alive && e.cli_ses_secret(dev, s);
+        let prompt = if alive && !reads { e.cli_ses_prompt(dev, s) } else { String::new() };
+        (prompt, busy, secret, reads, alive)
+    };
+    if !alive && let Some(c) = n.cons.sess.get_mut(&(dev, s))
+        && !c.closed
+    {
+        // it went while nobody pumped (the device was reloaded)
+        c.closed = true;
+        c.term.write_str(&format!("\x1b[2m--- {} ---\x1b[0m\n", t("Sitzung beendet")));
+    }
+    let id = n.cons.ses_id(&n.doc.proj, dev, s);
+    if n.cons.focus_ses == Some((dev, s)) {
+        n.cons.focus_ses = None;
+        ui.focus(id);
+    }
+    let c = n.cons.get_ses(&n.doc.proj, dev, s);
+    c.term.set_prompt(&prompt);
+    c.term.set_mode(if secret { TM_SECRET } else if busy { TM_BUSY } else { TM_LINE });
+    let mut flags = if c.ios && !reads { TF_QHELP | TF_CTRL_SHIFT6 } else if c.ios { TF_CTRL_SHIFT6 } else { 0 };
+    if !alive {
+        flags |= TF_NO_INPUT;
+    }
+    ui.next_size(-1, -1);
+    let evs = ui.terminal(id, &mut c.term, flags);
+    if !evs.is_empty() {
+        for ev in evs {
+            ses_event(n, dev, s, ev);
+        }
+        ui.repass();
+    }
+}
+
+fn ses_event(n: &mut Net, dev: u32, s: u32, ev: TermEv) {
+    match ev {
+        TermEv::Submit(line) => ses_submit(n, dev, s, &line),
+        TermEv::Help(line) => {
+            pump(n);
+            let text = n.doc.sim.live_mut().cli_ses_help(dev, s, &line);
+            let c = n.cons.get_ses(&n.doc.proj, dev, s);
+            let page = c.ios && !c.nopage;
+            if page {
+                c.term.pager(true);
+            }
+            c.term.write_str(&text);
+            if page {
+                c.term.pager(false);
+            }
+        }
+        TermEv::Complete { line, caret } => {
+            let mut caret = caret.min(line.len());
+            while !line.is_char_boundary(caret) {
+                caret -= 1;
+            }
+            let (head, tail) = line.split_at(caret);
+            let (new, choices) = n.doc.sim.live_mut().cli_ses_complete(dev, s, head);
+            let c = n.cons.get_ses(&n.doc.proj, dev, s);
+            reply_complete(c, &line, head, tail, new, &choices);
+        }
+        TermEv::Interrupt => {
+            let busy = n.doc.sim.engine().cli_ses_busy(dev, s);
+            if busy {
+                pump(n);
+                let _ = n.doc.sim.send(Cmd::SesInterrupt { dev, ses: s });
+                pump(n);
+            }
+        }
+        TermEv::Chord(k) => {
+            let ios = n.cons.sess.get(&(dev, s)).is_some_and(|c| c.ios);
+            match k & 0xFFFF {
+                0x5A if ios => {
+                    let (config, busy, prompt) = {
+                        let e = n.doc.sim.engine();
+                        (e.cli_ses_mode(dev, s).is_some_and(|m| !matches!(m, Mode::User | Mode::Priv | Mode::Out)), e.cli_ses_busy(dev, s), e.cli_ses_prompt(dev, s))
+                    };
+                    if config && !busy {
+                        pump(n);
+                        n.cons.get_ses(&n.doc.proj, dev, s).term.write_str(&format!("{}^Z\n", prompt));
+                        let _ = n.doc.sim.send(Cmd::SesLine { dev, ses: s, line: String::from("end") });
+                        pump(n);
+                    }
+                }
+                0x4C if !ios => n.cons.get_ses(&n.doc.proj, dev, s).term.write_str("\x1b[H\x1b[2J"),
+                _ => {}
+            }
+        }
+        _ => {}
+    }
+}
+
+// Enter in a further session: the engine runs the line; on IOS its output pages
+fn ses_submit(n: &mut Net, dev: u32, s: u32, line: &str) {
+    pump(n);
+    if let Err(e) = n.doc.sim.send(Cmd::SesLine { dev, ses: s, line: String::from(line) }) {
+        n.cons.get_ses(&n.doc.proj, dev, s).term.write_str(&format!("% {}\n", e));
+        return;
+    }
+    let page = n.cons.sess.get(&(dev, s)).is_some_and(|c| c.ios && !c.nopage) || n.doc.sim.engine().cli_ses_pager(dev, s);
+    let out = pump_paged(n, if page { Some((dev, s)) } else { None });
+    if let Some(len) = term_length(line)
+        && out.is_empty()
+        && let Some(c) = n.cons.sess.get_mut(&(dev, s))
+        && c.ios
+    {
+        c.nopage = len == 0;
+        c.term.page_len = (len.clamp(2, 512) - 1) as u16;
+    }
+}
+
+// the answer to Tab: the completed line, or (a shell) the choices below the line
+fn reply_complete(c: &mut Console, line: &str, head: &str, tail: &str, new: Option<String>, choices: &[String]) {
+    match new {
+        Some(x) => c.term.complete_reply(&format!("{}{}", x, tail), &[] as &[&str]),
+        None if !c.ios && choices.len() > 1 => {
+            let start = head.rfind(char::is_whitespace).map_or(0, |i| i + 1);
+            let common = common_prefix(choices);
+            let word = if common.len() > head.len() - start { common.as_str() } else { &head[start..] };
+            c.term.complete_reply(&format!("{}{}{}", &head[..start], word, tail), choices);
+        }
+        None => c.term.complete_reply(line, &[] as &[&str]),
+    }
 }
 
 // ---------------------------------------------------------------- forms

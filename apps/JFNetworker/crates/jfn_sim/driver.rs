@@ -5,6 +5,8 @@
 //   tick(wall_us) -> Tick                call from a timer; in realtime the virtual clock follows
 //                                        the wall clock times the speed
 //   view() / view_time()                 the moment the view shows (simulation mode)
+//   open_session(dev, wall_us)           Cmd::SesOpen -> the new session's id (cli/ses.rs: the
+//                                        Ses* commands and reports of further sessions)
 //
 // Modes: Paused (nothing moves), Realtime { speed_pm } (1000 = real time, 250 = quarter speed),
 // Simulation (only steps move: StepEvent, StepHop { mask } runs until the next frame whose
@@ -23,7 +25,7 @@
 //
 // Rewinding (K1, keyframe.rs): rewind_on(Budget) keeps keyframes of the engine and records
 // every input that changes it from outside -- Apply, Cli and Interrupt as they come through
-// send, call(what, f) for changes that are no command (pings, PDUs, lookups), the samples the
+// send (the sessions' SesOpen, SesClose, SesLine and SesInterrupt as calls), call(what, f) for changes that are no command (pings, PDUs, lookups), the samples the
 // clock takes in run_until (tick, RunFor; Inline::run_until for callers that drive the clock
 // themselves) -- so restore(t) / restore_pos(p) bring the state of any recorded moment back:
 // the nearest keyframe and a replay (Restore::run in slices).  resume(past) makes such a past
@@ -66,6 +68,16 @@ pub enum Cmd {
     /// the view goes to moment `t` of the recording (the present when `t` is now or later);
     /// the engine keeps its present state (restore gives the one of then)
     Seek(Ns),
+    /// a further local session of a device (cli/ses.rs: Engine::cli_open; the newest of
+    /// Engine::cli_sessions, or Inline::open_session gives its id)
+    SesOpen { dev: u32 },
+    /// session `ses` of a device ends (Engine::cli_close)
+    SesClose { dev: u32, ses: u32 },
+    /// a line typed in session `ses` (0: the console, as Cli); output comes as
+    /// Report::SesOut
+    SesLine { dev: u32, ses: u32, line: alloc::string::String },
+    /// Ctrl+C / Ctrl+Shift+6 in session `ses`
+    SesInterrupt { dev: u32, ses: u32 },
 }
 
 /// what a tick or command did
@@ -168,6 +180,14 @@ impl Inline {
             Cmd::Cli { dev, line } => self.eng.cli_line(dev, &line)?,
             Cmd::Interrupt { dev } => self.eng.cli_interrupt(dev)?,
             Cmd::Seek(t) => self.view = if t < self.eng.now() { Some(t) } else { None },
+            Cmd::SesOpen { dev } => {
+                if self.eng.cli_open(dev).is_none() {
+                    return Err(ActErr::Refused(jfn_model::msg!("Das Gerät {} nimmt keine weitere Sitzung an.", dev)));
+                }
+            }
+            Cmd::SesClose { dev, ses } => self.eng.cli_close(dev, ses),
+            Cmd::SesLine { dev, ses, line } => self.eng.cli_ses_line(dev, ses, &line)?,
+            Cmd::SesInterrupt { dev, ses } => self.eng.cli_ses_interrupt(dev, ses)?,
         }
         self.keyframe();
         if let Mode::Realtime { .. } = self.mode
@@ -251,12 +271,23 @@ pub enum Report {
     /// a device's files changed (a transfer, a command line): the path and every record now,
     /// for the project (files.rs)
     Files { dev: u32, at: Ns, path: alloc::string::String, files: alloc::vec::Vec<jfn_model::files::File> },
+    /// output of a local session other than the console (cli/ses.rs), as CliOut
+    SesOut { dev: u32, ses: u32, at: Ns, bytes: alloc::vec::Vec<u8> },
+    /// a local session's prompt changed, or a command started or ended, as CliState
+    SesPrompt { dev: u32, ses: u32, prompt: alloc::string::String, busy: bool },
+    /// a local session ended (exit, Engine::cli_close, the power went off)
+    SesClosed { dev: u32, ses: u32 },
 }
 
 impl Inline {
     /// what happened since the last call, in order
     pub fn reports(&mut self) -> alloc::vec::Vec<Report> {
         self.eng.take_reports()
+    }
+    /// Cmd::SesOpen -> the new session's id
+    pub fn open_session(&mut self, dev: u32, wall_us: u64) -> Result<u32, ActErr> {
+        self.send(Cmd::SesOpen { dev }, wall_us)?;
+        self.eng.cli_sessions(dev).iter().filter(|s| s.kind == crate::cli::ses::SesKind::Local).map(|s| s.id).max().ok_or(ActErr::UnknownDevice(dev))
     }
 }
 
@@ -361,6 +392,28 @@ impl Inline {
             Cmd::Apply(a) => InKind::Apply(a.clone()),
             Cmd::Cli { dev, line } => InKind::Cli { dev: *dev, line: line.clone() },
             Cmd::Interrupt { dev } => InKind::Interrupt { dev: *dev },
+            // the sessions' inputs replay as calls (cli/ses.rs)
+            Cmd::SesOpen { dev } => {
+                let dev = *dev;
+                InKind::Call {
+                    what: "cli_open",
+                    f: alloc::sync::Arc::new(move |e: &mut Engine| {
+                        let _ = e.cli_open(dev);
+                    }),
+                }
+            }
+            Cmd::SesClose { dev, ses } => {
+                let (dev, ses) = (*dev, *ses);
+                InKind::Call { what: "cli_close", f: alloc::sync::Arc::new(move |e: &mut Engine| e.cli_close(dev, ses)) }
+            }
+            Cmd::SesLine { dev, ses, line } => {
+                let (dev, ses, line) = (*dev, *ses, line.clone());
+                InKind::Call { what: "cli_ses_line", f: alloc::sync::Arc::new(move |e: &mut Engine| drop(e.cli_ses_line(dev, ses, &line))) }
+            }
+            Cmd::SesInterrupt { dev, ses } => {
+                let (dev, ses) = (*dev, *ses);
+                InKind::Call { what: "cli_ses_interrupt", f: alloc::sync::Arc::new(move |e: &mut Engine| drop(e.cli_ses_interrupt(dev, ses))) }
+            }
             _ => return,
         };
         rw.record(&self.eng, kind);

@@ -322,7 +322,8 @@ fn linux_cli(t: &mut T) {
     let o = cli(&mut e, PC1, &["tftp -g -r x -l /nowhere/x 10.0.0.10"], 0);
     t.eq("tftp checks the local file first", o, s("tftp: can't open '/nowhere/x': No such file or directory\n"));
     let (line, choices) = e.cli_complete(PC1, "t");
-    t.eq("tab", (line, choices), (None, alloc::vec![s("tail"), s("tee"), s("telnet"), s("test"), s("tftp"), s("top"), s("touch"), s("traceroute"), s("tree"), s("true"), s("type")]));
+    // (X1e added tty to the command words)
+    t.eq("tab", (line, choices), (None, alloc::vec![s("tail"), s("tee"), s("telnet"), s("test"), s("tftp"), s("top"), s("touch"), s("traceroute"), s("tree"), s("true"), s("tty"), s("type")]));
     t.eq("files of the project", e.files(PC1).iter().map(|f| f.path.clone()).collect::<Vec<_>>(), alloc::vec![s("/root/leer"), s("/root/notiz.txt"), s("/tmp/h")]);
 }
 

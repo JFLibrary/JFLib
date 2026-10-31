@@ -27,6 +27,7 @@
 //   stat, basename, dirname, date, seq, tee, test / [, xargs, env, export, unset, history,
 //   which, type, help, man (coreutils.rs, man.rs); jobs, fg, wait, kill, ps, sleep, jfs FILE
 //   (shrun.rs: processes)
+//   who, w, tty, exit / logout in a further session (telnetd.rs, cli/ses.rs: the sessions)
 //
 // A line goes through the shell's grammar first (sh.rs, shrun.rs: pipes, redirections, lists,
 // quoting, globs, $VAR, &); linux_cmd gets the words of one command and dispatches them.  Paths
@@ -126,6 +127,10 @@ impl Engine {
         let Some(cmd) = w.first().cloned() else {
             return Ok(());
         };
+        // exit / logout ends a further session (cli/ses.rs); the console's shell stays
+        if (cmd == "exit" || cmd == "logout") && self.ses_cur(ni) != 0 {
+            return self.sh_exit(ni);
+        }
         let args: Vec<&str> = w[1..].iter().map(String::as_str).collect();
         match cmd.as_str() {
             "ip" => self.sh_ip(ni, &args),
@@ -227,6 +232,10 @@ impl Engine {
             "wait" => self.sh_fg(ni, &args, true),
             "kill" => self.sh_kill(ni, &args),
             "ps" => self.sh_ps(ni, &args),
+            // the sessions (telnetd.rs, cli/ses.rs)
+            "who" => self.sh_who(ni, &args),
+            "w" => self.sh_w(ni, &args),
+            "tty" => self.sh_tty(ni, &args),
             _ => {
                 self.sh_set_code(ni, 127);
                 self.sh_err(ni, &format!("{}: command not found\n", cmd))
@@ -239,6 +248,7 @@ impl Engine {
         const CMDS: &[&str] = &[
             "cachectl", "cat", "clear", "curl", "dhclient", "dig", "echo", "host", "hostname", "ip", "iw", "kvctl", "lbctl", "mqctl", "nc", "nslookup", "ping", "printf", "script", "ss", "sysctl", "telnet", "top", "traceroute", "workerctl", "cp", "ls", "mkdir", "rm", "rmdir", "tftp", "touch", "mail", "snmpbulkwalk", "snmpget", "snmpgetnext", "snmpset", "snmpwalk",
             "cd", "pwd", "mv", "head", "tail", "grep", "find", "wc", "sort", "uniq", "cut", "tree", "du", "df", "less", "more", "history", "env", "export", "unset", "which", "type", "help", "man", "file", "stat", "basename", "dirname", "date", "seq", "tee", "test", "xargs", "sleep", "jfs", "jobs", "fg", "wait", "kill", "ps", "true", "false",
+            "who", "w", "tty",
         ];
         let w = words(line);
         let partial = !line.is_empty() && !line.ends_with(char::is_whitespace);

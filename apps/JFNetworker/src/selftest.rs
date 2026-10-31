@@ -50,6 +50,8 @@
 // jfn_sim::cli::sh, shrun, coreutils, man, the flash: directories of cli/files.rs).
 // scriptmodtest.rs: scripts that import the device's files and the debugger of a script service
 // (group scriptmod: jfn_sim::scriptsvc's loader and DebugOp, script's modules and debug.rs).
+// sessiontest.rs: command-line sessions and the telnet servers (group sessions: jfn_sim::cli::ses,
+// telnetd, the vty parts of cli/aaa.rs and cli/ios.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -127,9 +129,11 @@ mod aaatest;
 mod shelltest;
 #[path = "scriptmodtest.rs"]
 mod scriptmodtest;
+#[path = "sessiontest.rs"]
+mod sessiontest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 43] = [
+    let groups: [(&'static str, fn(&mut T)); 44] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -173,6 +177,7 @@ pub fn run() -> i32 {
         ("aaa", aaatest::run),
         ("shell", shelltest::run),
         ("scriptmod", scriptmodtest::run),
+        ("sessions", sessiontest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

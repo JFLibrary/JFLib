@@ -159,6 +159,12 @@ Queues, Lastgeneratoren, eigene Skripte).
   Dateien des Geräts; ein Skript-Dienst lässt sich in virtueller Zeit anhalten und schrittweise
   ausführen, mit Haltepunkten, Aufrufliste und Variablen (die Schnittstelle für die kommende
   IDE); `assert` und `assert_eq` für Tests (siehe [Skripte in Hosts](#skripte-in-hosts)).
+- **Sitzungen und Telnet-Server (X1e):** mehrere Befehlszeilen je Gerät mit eigenem Modus,
+  Verzeichnis und eigenen Jobs; „Neue Sitzung“ im Terminal-Panel; Telnet auf die
+  vty-Leitungen der IOS-artigen Geräte (`transport input`, Anmeldung über Passwort, lokale
+  Benutzer oder RADIUS, Sitzungslimit, Leerlaufzeit, `show users`, `clear line`, `terminal
+  monitor`) und `telnetd` auf Linux-Hosts (`who`, `w`, `tty`, `ps` mit TTY) (siehe
+  [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server)).
 
 ## Bedienung
 
@@ -318,6 +324,11 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `shell_terminal.uis` | PC1s Shell im Terminal-Panel: `mkdir`, `cd` (der Prompt zeigt `~/app`), Tab ergänzt einen Ordner mit `/`, eine Datei mit Leerzeichen, bei mehreren Treffern erst den gemeinsamen Teil und dann die Liste, eine Pipe, ein Skript als Prozess mit Strg+C beendet (`$?` 130), ein Job im Hintergrund mit `[1] PID` und seiner Fertig-Zeile, `less` mit --More-- |
 | `shell_shots.uis` | die Bilder der Shell (PC1 mit Ordnern, `tree`, einer Pipeline, `ps` und `ls -l`; R1 mit Ordnern in `flash:`) hell und dunkel mit 100 und 150 % (`build/jfnetworker/shell_*.png`) |
 | `model.uis`, Gruppe `scriptmod` | Module und Debugger der Skripte (siehe [Skripte in Hosts](#skripte-in-hosts)): Importe aus den Dateien des Geräts mit absolutem und relativem Pfad, die Zeit der Disk, eine fehlende Datei, ein Zyklus, ein Fehler im Modul in Fehler, Log und Status, ein angehaltener Dienst mit verspäteten Timer-Runden, Schritte, ein Ausdruck im Halt, ein Haltepunkt mit Bedingung, Determinismus |
+| `model.uis`, Gruppe `sessions` | Sitzungen und Telnet-Server (siehe [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server)): zwei lokale Sitzungen von PC1 neben der Konsole mit eigenem Verzeichnis, Variablen, Verlauf und Jobs, ihre Prompt-Meldungen; eine lokale Sitzung von R1 (`tty 1`) mit eigenem Modus, `?` und Tab darin, `%SYS-5-CONFIG_I` nennt sie; eine geschlossene Sitzung (ihr Ping endet, Zeilen abgelehnt, Nummern nicht wieder vergeben), `exit`; Strom aus beendet alle bis auf die Konsole; Telnet von PC1 zu R1 mit Leitungspasswort (verdeckt, ein falsches, `show users` und `show line` von beiden Seiten, `?` über Telnet, `exit`), ohne Passwort abgewiesen, mit `login local` (Rechte 15, drei Fehlversuche schließen), mit AAA und RADIUS; fünf vty-Leitungen, die sechste Verbindung abgewiesen, `clear line`; die Leerlaufzeit (30 s, 10 min als Vorgabe); `show users` mit Leerlauf; `terminal monitor`; `transport input none` und `access-class`; `telnetd` auf SRV1 mit Login, `who`, `w`, `tty`; die TTY-Spalte von `ps`; die Wiederholung der Sitzungsbefehle beim Zurückspulen; Determinismus |
+| `scen_sessions.uis` | Golden-Szenario `sessions.scn`: der Admin-PC per Telnet an R1 (Loopback eingerichtet, `show users`, R1s Konsole nennt die vty-Leitung) und an R2 (`login local`), die vergessene Sitzung endet nach der Leerlaufzeit |
+| `sessions_terminal.uis` | eine zweite Sitzung von ADMIN im Terminal-Panel („Neue Sitzung“, der Tab „ADMIN (2)“) mit eigenem Prompt und Verzeichnis, `tty`, `who` von der Konsole, Schließen des Tabs beendet sie |
+| `telnet_vty.uis` | Telnet von ADMINs Konsole zu R1 und zurück: das Passwort verdeckt, R1s Prompt in der Konsole, `show users`, `exit`, der Prompt der Shell wieder |
+| `sessions_shots.uis` | die Bilder der Sitzungen (ADMIN mit einer zweiten Sitzung, darin per Telnet an R1 mit `show users`) hell und dunkel mit 100 und 150 % (`build/jfnetworker/sessions_*.png`) |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -350,6 +361,9 @@ Banner, SRV1 mit `radius-server`, PC1; die Fensterskripte `login_console.uis`,
 Für die Shell: `shell_tour.jfnet` (PC1 und SRV1 mit einem Webserver an SW1, R1 als Gateway; das
 Szenario `shell_tour.scn`, die selftest-Gruppe `shell` und die Fensterskripte `shell_*.uis`),
 die coretest-Gruppe `pattern` (Platzhalter und reguläre Ausdrücke von `base::pattern`).
+Für die Sitzungen: `sessions.jfnet` (R1 mit Leitungspasswort, R2 mit `login local` und einer
+Minute Leerlaufzeit, ADMIN, SRV1 mit `telnetd` an SW1; das Szenario `sessions.scn` und die
+Fensterskripte `sessions_terminal.uis`, `telnet_vty.uis` und `sessions_shots.uis`).
 
 **Abnahme Phase 1: der Campus** (`tests/fixtures/campus.jfnet`). MLS1, ein L3-Switch, routet
 VLAN 10 (Staff, PC1 und PC2) und VLAN 20 (Students, PC3 und PC4) über seine VLAN-Interfaces und
@@ -408,6 +422,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | SNMP | [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`snmpmib.rs`](crates/jfn_sim/snmpmib.rs), [`snmptrapd.rs`](crates/jfn_sim/snmptrapd.rs), [`snmptrace.rs`](crates/jfn_sim/snmptrace.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmptest.rs`](src/snmptest.rs), [`lib/netpkt/ber.rs`](../../lib/netpkt/ber.rs), [`lib/netpkt/snmp.rs`](../../lib/netpkt/snmp.rs), [`lib/netpkt/mib.rs`](../../lib/netpkt/mib.rs) | der Agent mit seiner Sicht auf das Gerät, der Trap-Empfänger, die Notizen, die IOS-artigen Befehle und die Werkzeuge der Shell, der MIB-Browser, der Selbsttest, BER, die Nachrichten von SNMPv1 und v2c und die kleine MIB (Library; siehe [SNMP](#snmp)) |
 | Shell | [`crates/jfn_sim/cli/sh.rs`](crates/jfn_sim/cli/sh.rs), [`shrun.rs`](crates/jfn_sim/cli/shrun.rs), [`coreutils.rs`](crates/jfn_sim/cli/coreutils.rs), [`man.rs`](crates/jfn_sim/cli/man.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`lib/base/pattern.rs`](../../lib/base/pattern.rs), [`src/shelltest.rs`](src/shelltest.rs) | die Shell einer Sitzung (Arbeitsverzeichnis, Variablen, Verlauf, Jobs), ihre Grammatik, die Werkzeuge, Hilfe und Handbuchseiten, Prozesse mit `jfs`, Ordner in `flash:`, Platzhalter und reguläre Ausdrücke, ihr Selbsttest (siehe [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)) |
 | Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
+| Sitzungen und Telnet-Server | [`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs), [`telnetd.rs`](crates/jfn_sim/telnetd.rs), [`cli/aaa.rs`](crates/jfn_sim/cli/aaa.rs), [`src/doc/console.rs`](src/doc/console.rs), [`src/workspace/terminal.rs`](src/workspace/terminal.rs), [`src/sessiontest.rs`](src/sessiontest.rs) | mehrere Befehlszeilen je Gerät (Konsole, lokale Terminals, Telnet), der Telnet-Server der vty-Leitungen und `telnetd`, `show users`, `who`, die Sitzungen im Terminal-Panel |
 
 ### Gerätekatalog
 
@@ -470,7 +485,8 @@ Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinst
 - **Konsolen** (Terminal-Bereich; [`src/workspace/terminal.rs`](src/workspace/terminal.rs),
   [`src/doc/console.rs`](src/doc/console.rs)): Ein Doppelklick auf ein Gerät (auch Enter auf
   der Zeichenfläche, „Konsole öffnen“ im Kontextmenü oder im Inspektor) öffnet seine
-  Befehlszeile als Tab. Jedes Gerät hat genau eine Konsole mit 5000 Zeilen Rückblick, Verlauf
+  Befehlszeile als Tab. Jedes Gerät hat eine Konsole (dazu weitere Sitzungen: „Neue Sitzung“,
+  siehe [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server)) mit 5000 Zeilen Rückblick, Verlauf
   (↑/↓), Suche (Strg+F) und den Meldungen seit dem Start. Eine Zeile geht als `Cmd::Cli` an das
   Gerät, seine Ausgabe kommt als `Report::CliOut`; Prompt und Modus liefert das Gerät, ein
   laufender Befehl hält die Eingabe zurück (vorab Getipptes läuft danach). IOS-artig: `?` zeigt
@@ -2699,12 +2715,10 @@ Administrative-User → 15, sonst 1, oder ein eigenes Vendor-Attribut `priv-lvl=
 als `password 0 ZIFFER` ein (eine führende Ziffer ist sonst eine Typnummer, wie beim
 Vorbild).
 
-Noch offen: der **vty-Telnet-Server** auf IOS-artigen Geräten (`line vty … transport input`,
-eine CLI-Sitzung je vty-Leitung, das Sitzungslimit und der Leerlauf-Timeout). Der NVT-Codec,
-der Client und der ganze Login-/AAA-Unterbau stehen; der Server braucht eine eigene
-CLI-Sitzung neben der einen Konsole je Gerät und folgt als Nächstes. Dadurch melden sich die
-Golden-Szenarien an den **Konsolen** an, nicht per Telnet an einer vty-Leitung. Ebenfalls
-offen: 802.1X und WPA-Enterprise (spätere Meilensteine).
+Der **vty-Telnet-Server** (eine Sitzung je vty-Leitung, `transport input`, die Anmeldung der
+Leitung über dieses Gate und AAA, Sitzungslimit, Leerlaufzeit) kam mit X1e, siehe
+[Sitzungen und Telnet-Server](#sitzungen-und-telnet-server). Offen: 802.1X und WPA-Enterprise
+(spätere Meilensteine).
 
 Für Programme: `Engine::cli_secret(dev)` (das Passwort ohne Echo), die CLI-Zustände in
 `CliDev` (`auth`, `aaa`, `gate`, `priv_level`), `netpkt::telnet`, `netpkt::radius`,
@@ -3130,6 +3144,69 @@ Für Programme: `Action::Snmp { dev, set }` mit `SnmpSet`, `Engine::snmp_agent(d
 ([`src/snmptest.rs`](src/snmptest.rs)), BER und SNMP Byte für Byte in der coretest-Gruppe
 `snmp`, dazu das Szenario `snmp_monitor.scn` und die Fensterskripte `snmp_services.uis`,
 `snmp_console.uis`, `snmp_mib.uis` und `snmp_shots.uis`.
+
+### Sitzungen und Telnet-Server
+
+Ein Gerät hat jetzt mehrere Befehlszeilen: die Konsole (Sitzung 0, immer da), weitere Terminals
+der Oberfläche und Telnet-Sitzungen über das Netz. Jede Sitzung hat ihren eigenen Zustand: Modus
+und Kontext (Interfaces, VLANs, Leitungsblock, Pool, Zugriffsliste, RADIUS-Gruppe und -Server),
+den laufenden Befehl mit vorab Getipptem, eine offene Frage, Rechtestufe, Login-Gate und Benutzer,
+den Dialog von `copy` und die Shell mit Verzeichnis, Variablen, Verlauf und Hintergrund-Jobs.
+Pro Gerät bleiben die Konfiguration, die `debug`-Schalter und die Zustände, die die Meldungen
+vergleichen; Meldungen (`%LINK`, `%SYS`, Debug-Ausgabe) gehen immer an die Konsole und an jede
+Sitzung mit `terminal monitor`.
+
+- **Lokale Sitzungen** ([`crates/jfn_sim/cli/ses.rs`](crates/jfn_sim/cli/ses.rs)):
+  `Engine::cli_open(dev)` öffnet eine (Linux `pts/N`, IOS-artig `tty N`, die sich anmeldet, wie
+  `line con 0` es verlangt), `cli_close(dev, s)` beendet sie, `cli_sessions(dev)` listet alle.
+  Zeilen, `?`, Tab, Strg+C, Prompt, Verzeichnis und Blättern gibt es je Sitzung
+  (`cli_ses_line`, `cli_ses_help`, `cli_ses_complete`, `cli_ses_interrupt`, `cli_ses_prompt`,
+  `cli_ses_busy`, `cli_ses_secret`, `cli_ses_reads`, `cli_ses_cwd`, `cli_ses_pager`); die API
+  ohne `ses` ist die der Konsole wie bisher. Eingaben sind Befehle des Treibers (`Cmd::SesOpen`,
+  `SesClose`, `SesLine`, `SesInterrupt`), die das Zurückspulen wiederholt; Ausgaben kommen als
+  `Report::SesOut`, `SesPrompt` und `SesClosed`. `exit` beendet eine weitere Sitzung (die
+  Konsole bleibt), Ausschalten beendet alle bis auf die Konsole, die frisch beginnt.
+- **Terminal-Panel:** „Neue Sitzung“ (das Plus in der Leiste des gezeigten Tabs) öffnet eine
+  weitere Sitzung seines Geräts als eigenen Tab „PC1 (2)“; Schließen des Tabs beendet sie. Der
+  CLI-Reiter des Gerätefensters bleibt die Konsole. Für Desktop und IDE gibt es
+  `console::open_session(n, dev)`, `view_session(n, ui, dev, s)` und `close_session(n, dev, s)`.
+  Läuft in einer Konsole ein Programm, das Zeilen liest (`telnet`, `nc`), bleibt die
+  Eingabezeile ohne eigenen Prompt; fragt die Gegenseite nach einem Passwort, wird es verdeckt
+  getippt.
+- **vty-Leitungen** ([`crates/jfn_sim/telnetd.rs`](crates/jfn_sim/telnetd.rs)): jeder Block
+  `line vty A B` gibt die Leitungen A bis B (Vorgabe `vty 0 4`: fünf); eine Verbindung auf TCP 23
+  nimmt die niedrigste freie Leitung, deren `transport input` Telnet erlaubt (Vorgabe `all`,
+  wie die klassischen Übungen es erwarten; `ssh` allein oder `none` lehnen ab) und deren
+  `access-class LISTE in` die Quelle zulässt; sonst eine kurze Absage und Schluss. Angemeldet
+  wird wie an der Konsole: `password` mit `login`, `login local`, `login authentication LISTE`
+  über AAA und RADIUS, ohne `login` gar nicht; drei Fehlversuche schließen die Verbindung.
+  `exec-timeout M [S]` beendet eine Sitzung nach so langer Ruhe (Vorgabe 10 Minuten, `0 0` nie;
+  nicht, solange ein Befehl läuft). Der Server lauscht nur, solange eine Leitung jemanden
+  anmelden kann; die Vorgabe `line vty 0 4 / login` ohne Passwort lehnt Telnet sofort ab (IOS
+  sagte vorher „Password required, but none set“). `show users` (jede Leitung mit Benutzer,
+  Rechten, Leerlauf und Herkunft, die eigene mit `*`), `show line`, `clear line N | vty N |
+  console 0 | tty N`, `terminal [no] monitor`; `%SYS-5-CONFIG_I` nennt die Sitzung, von der die
+  Konfiguration kam. Der Server bietet `WILL SUPPRESS-GO-AHEAD` an und `WILL ECHO` nur, während
+  er ein Passwort erfragt (der Client hört dann mit dem Echo auf), wie Login-Programme es mit
+  einem zeilenweisen Client tun; Prompts und Ausgaben laufen als NVT-Text, `Interrupt Process`
+  bricht den laufenden Befehl ab.
+- **telnetd auf Linux-Hosts** (Dienst `telnetd`, `{"port": 23, "password": "…"}`): Anmeldung als
+  `root` mit dem Passwort des Dienstes, dann eine eigene Shell auf `pts/N`. `who`, `w` und `tty`
+  zeigen die Sitzungen; `ps` hat die Spalte `TTY` (`tty1` die Konsole, `pts/N`, `?` für init und
+  Dienste) und listet die Shells und Jobs jeder Sitzung.
+
+Entscheidungen: Eine weitere Sitzung eines IOS-artigen Geräts aus der Oberfläche ist eine
+Leitung `tty N` mit den Anmelderegeln von `line con 0` (wie ein zweites Terminal am
+Konsolenanschluss); die Nummern der Sitzungen werden nicht wieder vergeben. Weitere Sitzungen
+sprechen immer mit der Gegenwart (beim Zurückspulen antwortet nur die Konsole aus der
+Vergangenheit). Nicht nachgebildet: SSH, `aux`-Leitungen, die Zeichen-für-Zeichen-Bearbeitung
+von Telnet (unser Client schickt ganze Zeilen).
+
+Für Programme: `Engine::cli_open`, `cli_close`, `cli_sessions` (`SesView`, `SesKind`), die
+`cli_ses_*`-Formen und `cli_reads`, `Inline::open_session`, `TelnetServer`. Geprüft wird in der
+Selbsttest-Gruppe `sessions` ([`src/sessiontest.rs`](src/sessiontest.rs)), dazu das Szenario
+`sessions.scn` und die Fensterskripte `sessions_terminal.uis`, `telnet_vty.uis` und
+`sessions_shots.uis`.
 
 ## Performance
 

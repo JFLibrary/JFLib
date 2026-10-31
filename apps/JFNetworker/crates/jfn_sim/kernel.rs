@@ -52,6 +52,9 @@ pub(crate) enum Ev {
     Cli { node: usize, epoch: u32 },
     /// a fault with a duration heals (fault.rs); nothing when it was healed before
     Heal { id: u32 },
+    /// a command-line session other than the console goes on (cli/ses.rs): as Cli for that
+    /// session, or one of its own wake-ups (start, telnet input, idle timeout, end)
+    Ses { node: usize, ses: u32, epoch: u32 },
 }
 
 /// how a run ended
@@ -216,6 +219,7 @@ impl Engine {
             Ev::Job { job, epoch } => self.job_tick(job, epoch),
             Ev::Cli { node, epoch } => self.cli_wake(node, epoch),
             Ev::Heal { id } => self.fault_due(id),
+            Ev::Ses { node, ses, epoch } => self.ses_wake(node, ses, epoch),
         }
     }
 

@@ -62,6 +62,8 @@
 //                     "10.0.0.0/24", "secret": "geheim"}], "users": [{"name": "admin",
 //                     "password": "...", "privilege": 15, "reply": "..."}], "acct_log":
 //                     "/var/log/radius/accounting"} (radiusd.rs)
+//     telnetd         {"port": 23, "password": ""} (telnetd.rs: shell sessions over Telnet, the
+//                     login root with this password)
 //
 //   HttpLoadSet / HttpServerSet    change a running load generator or web server in place
 //   ScriptSource / RenameService   a script's new definition, keeping its disk and numbers
@@ -234,6 +236,8 @@ impl Engine {
             "snmpd" => Box::new(crate::snmpd::SnmpAgent::from_config(c, ios).map_err(|w| bad(kind, w))?),
             "snmptrapd" => Box::new(crate::snmptrapd::TrapReceiver::from_config(c).map_err(|w| bad(kind, w))?),
             "radius-server" => Box::new(crate::radiusd::RadiusServerSvc::from_config(c).map_err(|w| bad(kind, w))?),
+            "telnetd" if ios => return Err(bad(kind, msg!("IOS-artige Geräte nehmen Telnet auf ihren vty-Leitungen an (line vty)."))),
+            "telnetd" => Box::new(crate::telnetd::TelnetServer::from_config(c).map_err(|w| bad(kind, w))?),
             k => return Err(ActErr::Refused(msg!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k))),
         };
         let name = if def.name.is_empty() { def.kind.clone() } else { def.name.clone() };

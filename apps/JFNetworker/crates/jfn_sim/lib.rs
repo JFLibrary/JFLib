@@ -164,8 +164,13 @@
 //            of an IOS-like device (the internal service "radius-nas"): Access-Request,
 //            retransmission, the next server, the hiding of User-Password, accounting (X1d)
 //   telnetd  the telnet client of the consoles ("telnet HOST [PORT]", the NVT codec of
-//            netpkt::telnet, client-side negotiation, the "%" lines of a refusal or a close);
-//            the vty telnet server is open (it needs a CLI session per vty line) (X1d)
+//            netpkt::telnet, client-side negotiation, the "%" lines of a refusal or a close)
+//            (X1d); the servers: the vty lines of IOS-like devices (transport input,
+//            access-class, the login of the line, exec-timeout, show line, clear line) and
+//            "telnetd" on Linux hosts, a command-line session per connection (X1e)
+//   cli::ses the sessions of a command line: the console, local terminals (Engine::cli_open,
+//            the Terminal panel's further tabs) and telnet sessions; show users, who, w, tty,
+//            ps's TTY column; Report::SesOut / SesPrompt / SesClosed, Cmd::Ses* (X1e)
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
 // device has it; dig, host and nslookup are console programs too (cli/names.rs).
@@ -340,3 +345,5 @@ pub use aaatrace::ANote;
 pub use radiusd::{NasService, RadiusServerSvc};
 pub use telnetd::TelnetClient;
 pub use scriptsvc::DebugOp;
+pub use telnetd::TelnetServer;
+pub use cli::ses::{SesKind, SesView};

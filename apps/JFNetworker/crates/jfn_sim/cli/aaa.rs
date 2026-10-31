@@ -11,7 +11,12 @@
 //   build_aaa(tree, modes)        the commands in an IOS command tree (ios.rs)
 //   Engine::ios_aaa(ni, p, line)  the handlers of all the commands above
 //   Engine::console_login(ni)     starts the console login gate when the console line asks for
-//                                 it (called at boot and after a logout)
+//                                 it (called at boot and after a logout); line_login(ni, line,
+//                                 via) the same for the session in place (cli/ses.rs: a local
+//                                 session takes line con 0's rules, a vty session its vty line's,
+//                                 telnetd.rs); the NAS answers the session `via` names
+//   Engine::line_opts / line_login_plan / line_password   what a line says ("vty N": the
+//                                 blocks that hold line N, telnetd.rs vty_opts)
 //   Engine::gate_line(ni, line)   a line typed into the gate (cli/mod.rs routes it here)
 //   Engine::enable_cmd / disable_cmd   "enable [level]" / "disable [level]"
 //   Engine::aaa_result            the NAS reports a RADIUS login's outcome (radiusd.rs)
@@ -611,20 +616,29 @@ fn how_of(m: &Method) -> &'static str {
 }
 
 impl Engine {
+    /// the options of a line: "con 0" its block, "vty N" what the blocks that hold line N say
+    /// (telnetd.rs); None: there is no such line
+    pub(crate) fn line_opts(&self, ni: usize, line_name: &str) -> Option<Vec<String>> {
+        let c = self.cdev(ni)?;
+        if let Some(n) = line_name.strip_prefix("vty ").and_then(|n| n.trim().parse::<u16>().ok()) {
+            return crate::telnetd::vty_opts(&c.cfg.lines, n);
+        }
+        c.cfg.lines.iter().find(|l| l.name == line_name).map(|l| l.opts.clone())
+    }
+
     /// the login methods a line asks for (None: it opens without a login)
     pub(crate) fn line_login_plan(&self, ni: usize, line_name: &str) -> Option<Vec<Method>> {
-        let c = self.cdev(ni)?;
-        let line = c.cfg.lines.iter().find(|l| l.name == line_name)?;
-        let aaa = &c.cfg.aaa;
-        if let Some(opt) = line.opts.iter().find(|o| o.starts_with("login authentication ")) {
+        let opts = self.line_opts(ni, line_name)?;
+        let aaa = &self.cdev(ni)?.cfg.aaa;
+        if let Some(opt) = opts.iter().find(|o| o.starts_with("login authentication ")) {
             let name = opt.trim_start_matches("login authentication ").trim();
             let name = if name == "default" { "" } else { name };
             return Some(aaa.login_for(name).map(|l| l.methods.clone()).unwrap_or_default());
         }
-        if line.opts.iter().any(|o| o == "login local") {
+        if opts.iter().any(|o| o == "login local") {
             return Some(alloc::vec![Method::Local]);
         }
-        if line.opts.iter().any(|o| o == "login") {
+        if opts.iter().any(|o| o == "login") {
             if aaa.new_model {
                 return Some(aaa.login_for("").map(|l| l.methods.clone()).unwrap_or_else(|| alloc::vec![Method::Line]));
             }
@@ -633,26 +647,44 @@ impl Engine {
         None
     }
 
+    /// the line a requester logs in at
+    fn line_of(via: Requester) -> Option<String> {
+        match via {
+            Requester::Console | Requester::Local(_) => Some(String::from("con 0")),
+            Requester::Vty(n) => Some(format!("vty {}", n)),
+            Requester::Test => None,
+        }
+    }
+
     /// the password of a line (plain text in the line's "password" option), if any
-    fn line_password(&self, ni: usize, via: Requester) -> Option<Secret> {
-        let name = match via {
-            Requester::Console => String::from("con 0"),
-            Requester::Vty(_) => self.vty_line_name(ni, via),
-            Requester::Test => return None,
-        };
-        let c = self.cdev(ni)?;
-        let line = c.cfg.lines.iter().find(|l| l.name == name)?;
-        line.opts.iter().find_map(|o| o.strip_prefix("password ")).map(Secret::plain)
+    pub(crate) fn line_password(&self, ni: usize, via: Requester) -> Option<Secret> {
+        let opts = self.line_opts(ni, &Engine::line_of(via)?)?;
+        opts.iter().find_map(|o| o.strip_prefix("password ")).map(Secret::plain)
     }
 
     /// starts (or restarts) the console login gate when line con 0 asks for a login
     pub(crate) fn console_login(&mut self, ni: usize) {
-        let Some(methods) = self.line_login_plan(ni, "con 0") else {
+        self.line_login(ni, "con 0", Requester::Console);
+    }
+
+    /// starts (or restarts) the login gate of the session in place when its line asks for a
+    /// login (`via`: who the NAS answers); a vty line with "login" but no password refuses
+    pub(crate) fn line_login(&mut self, ni: usize, line: &str, via: Requester) {
+        let Some(methods) = self.line_login_plan(ni, line) else {
             if let Some(c) = self.cdev_mut(ni) {
                 c.gate = None;
             }
             return;
         };
+        if let Requester::Vty(_) = via
+            && methods == [Method::Line]
+            && self.line_password(ni, via).is_none()
+        {
+            self.out(ni, "% Password required, but none set\n");
+            let s = self.ses_cur(ni);
+            self.ses_end(ni, s);
+            return;
+        }
         let motd = self.cdev(ni).map(|c| c.cfg.motd.clone()).unwrap_or_default();
         if !motd.is_empty() {
             self.out(ni, &format!("{}\n", motd));
@@ -662,7 +694,37 @@ impl Engine {
             c.priv_level = 1;
             c.user.clear();
             c.mode = Mode::User;
-            c.gate = Some(Gate { kind, via: Requester::Console, tries: 0, user: String::new(), level: 0, methods, waiting: false });
+            c.gate = Some(Gate { kind, via, tries: 0, user: String::new(), level: 0, methods, waiting: false });
+        }
+    }
+
+    /// the requester of the session in place (cli/ses.rs: the console, a vty line, a local
+    /// session)
+    pub(crate) fn ses_req(&self, ni: usize) -> Requester {
+        match self.ses_here(ni) {
+            Some(i) if i.id == 0 => Requester::Console,
+            Some(i) if i.kind == super::ses::SesKind::Telnet => Requester::Vty(i.no),
+            Some(i) => Requester::Local(i.id),
+            None => Requester::Console,
+        }
+    }
+
+    /// the session a requester is (None: a test, or the session is gone)
+    fn req_ses(&self, ni: usize, via: Requester) -> Option<u32> {
+        let c = self.cdev(ni)?;
+        match via {
+            Requester::Console => Some(0),
+            Requester::Local(s) => c.ses(s).map(|i| i.id),
+            Requester::Vty(n) => c.sessions.iter().find(|i| i.kind == super::ses::SesKind::Telnet && i.no == n).map(|i| i.id),
+            Requester::Test => None,
+        }
+    }
+
+    /// where a requester logs in, for the notes
+    fn where_of(via: Requester) -> Where {
+        match via {
+            Requester::Vty(n) => Where::Vty(n),
+            _ => Where::Console,
         }
     }
 
@@ -750,55 +812,67 @@ impl Engine {
         self.cdev(ni).is_some_and(|c| c.cfg.aaa.author_exec.as_ref().is_some_and(|l| l.methods.iter().any(|m| matches!(m, Method::GroupRadius | Method::Group(_)))))
     }
 
+    // the gate of the requester's session waits for the NAS, or no more (cli/ses.rs: with that
+    // session in place)
     fn set_waiting(&mut self, ni: usize, via: Requester, on: bool) {
-        match via {
-            Requester::Console => {
-                if let Some(c) = self.cdev_mut(ni)
-                    && let Some(g) = c.gate.as_mut()
-                {
-                    g.waiting = on;
-                }
+        let Some(s) = self.req_ses(ni, via) else {
+            if via == Requester::Test {
+                self.cli_state(ni);
             }
-            Requester::Vty(l) => self.vty_set_waiting(ni, l, on),
-            Requester::Test => {}
-        }
-        self.cli_state(ni);
+            return;
+        };
+        self.in_ses(ni, s, |e| {
+            if let Some(c) = e.cdev_mut(ni)
+                && let Some(g) = c.gate.as_mut()
+            {
+                g.waiting = on;
+            }
+            e.cli_state(ni);
+        });
     }
 
     /// the NAS reports a RADIUS login's (or enable's) outcome; `how` named the method
     pub(crate) fn aaa_result(&mut self, ni: usize, via: Requester, outcome: AuthResult, how: &'static str) {
-        self.set_waiting(ni, via, false);
-        match via {
-            Requester::Console => {
-                let (user, is_enable, level) = match self.cdev(ni).and_then(|c| c.cli_gate_clone()) {
-                    Some(g) => (g.user.clone(), g.kind == GKind::Enable, g.level),
-                    None => return,
-                };
-                if is_enable {
-                    self.enable_apply(ni, level, outcome);
-                } else {
-                    self.login_apply(ni, via, user, outcome, how);
-                }
-            }
-            Requester::Vty(l) => self.vty_apply(ni, l, outcome),
-            Requester::Test => {
-                let msg = match outcome {
-                    AuthResult::Pass(l) => format!("User was authenticated (privilege {}).\n", l),
-                    AuthResult::Fail => String::from("User was rejected.\n"),
-                    _ => String::from("No RADIUS server answered.\n"),
-                };
-                self.out(ni, &msg);
-                self.cli_state(ni);
-            }
-        }
-    }
-
-    /// applies a console login's outcome
-    fn login_apply(&mut self, ni: usize, via: Requester, user: String, outcome: AuthResult, how: &str) {
-        if let Requester::Vty(l) = via {
-            self.vty_apply(ni, l, outcome);
+        if via == Requester::Test {
+            self.set_waiting(ni, via, false);
+            let msg = match outcome {
+                AuthResult::Pass(l) => format!("User was authenticated (privilege {}).\n", l),
+                AuthResult::Fail => String::from("User was rejected.\n"),
+                _ => String::from("No RADIUS server answered.\n"),
+            };
+            self.out(ni, &msg);
+            self.cli_state(ni);
             return;
         }
+        // the console, a vty line or a local session: with its session in place (a session
+        // that ended meanwhile hears nothing)
+        let Some(s) = self.req_ses(ni, via) else {
+            return;
+        };
+        self.in_ses(ni, s, |e| {
+            // the gate waits no more; what it decides reports the prompt (a telnet session
+            // writes it once, after the decision)
+            if let Some(g) = e.cdev_mut(ni).and_then(|c| c.gate.as_mut()) {
+                g.waiting = false;
+            }
+            let (user, is_enable, level) = match e.cdev(ni).and_then(|c| c.cli_gate_clone()) {
+                Some(g) => (g.user.clone(), g.kind == GKind::Enable, g.level),
+                None => {
+                    e.cli_state(ni);
+                    return;
+                }
+            };
+            if is_enable {
+                e.enable_apply(ni, level, outcome);
+            } else {
+                e.login_apply(ni, via, user, outcome, how);
+            }
+        });
+    }
+
+    /// applies a login's outcome to the session in place
+    fn login_apply(&mut self, ni: usize, via: Requester, user: String, outcome: AuthResult, how: &str) {
+        let at = Engine::where_of(via);
         match outcome {
             AuthResult::Pass(level) => {
                 if let Some(c) = self.cdev_mut(ni) {
@@ -807,30 +881,43 @@ impl Engine {
                     c.priv_level = level;
                     c.mode = if level >= 2 { Mode::Priv } else { Mode::User };
                 }
-                self.aaa_note(ni, ANote::LoginOk { at: Where::Console, user: user.clone(), how: String::from(how), level });
+                self.aaa_note(ni, ANote::LoginOk { at, user: user.clone(), how: String::from(how), level });
                 self.aaa_acct(ni, via, &user, true);
                 self.cli_state(ni);
             }
             AuthResult::Fail => {
-                self.aaa_note(ni, ANote::LoginBad { at: Where::Console, user });
-                self.console_retry(ni);
+                self.aaa_note(ni, ANote::LoginBad { at, user });
+                self.login_retry(ni, via);
             }
             _ => {
                 self.aaa_note(ni, ANote::NoMethod);
                 self.out(ni, "% Authentication failed: no server reachable and no fallback\n\n");
-                self.console_login(ni);
+                self.login_again(ni, via);
                 self.cli_state(ni);
             }
         }
     }
 
-    /// a wrong password at the console: a new try, or a fresh login after three
-    fn console_retry(&mut self, ni: usize) {
+    // a login that failed for good: the console and a local session ask again, a vty line
+    // closes its connection (telnetd.rs)
+    fn login_again(&mut self, ni: usize, via: Requester) {
+        match via {
+            Requester::Vty(n) => self.vty_close(ni, n, false),
+            v => {
+                if let Some(line) = Engine::line_of(v) {
+                    self.line_login(ni, &line, v);
+                }
+            }
+        }
+    }
+
+    /// a wrong password: a new try, or a fresh login after three (a vty line closes then)
+    fn login_retry(&mut self, ni: usize, via: Requester) {
         let tries = self.cdev(ni).and_then(|c| c.gate.as_ref()).map(|g| g.tries + 1).unwrap_or(3);
         if tries >= 3 {
-            self.aaa_note(ni, ANote::LoginDenied { at: Where::Console });
+            self.aaa_note(ni, ANote::LoginDenied { at: Engine::where_of(via) });
             self.out(ni, "% Access denied\n\n");
-            self.console_login(ni);
+            self.login_again(ni, via);
         } else {
             if let Some(c) = self.cdev_mut(ni)
                 && let Some(g) = c.gate.as_mut()
@@ -862,8 +949,10 @@ impl Engine {
             return Ok(());
         }
         let user = self.cdev(ni).map(|c| c.user.clone()).unwrap_or_default();
+        // the NAS answers the session that asked (cli/ses.rs)
+        let via = self.ses_req(ni);
         if let Some(c) = self.cdev_mut(ni) {
-            c.gate = Some(Gate { kind: GKind::Enable, via: Requester::Console, tries: 0, user, level, methods: Vec::new(), waiting: false });
+            c.gate = Some(Gate { kind: GKind::Enable, via, tries: 0, user, level, methods: Vec::new(), waiting: false });
         }
         Ok(())
     }
@@ -990,15 +1079,8 @@ impl Engine {
     // ---------------------------------------------------------------- show commands
 
     fn show_users(&self, ni: usize) -> String {
-        let mut s = String::from("    Line       User       Privilege\n");
-        let c = self.cdev(ni);
-        let user = c.map(|c| c.user.clone()).unwrap_or_default();
-        let level = c.map(|c| c.priv_level).unwrap_or(1);
-        let who = if user.is_empty() { String::from("-") } else { user };
-        s.push_str(&format!("*   con 0      {:<10} {}\n", who, level));
-        // vty sessions (telnetd.rs)
-        s.push_str(&self.vty_users_lines(ni));
-        s
+        // every session with its line, user, idle time and where it comes from (cli/ses.rs)
+        self.ios_users(ni)
     }
 
     fn show_aaa_servers(&self, ni: usize) -> String {
