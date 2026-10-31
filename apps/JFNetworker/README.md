@@ -3200,9 +3200,9 @@ Dialog mit seinem Titel.
   der die Notizen ein eigener Eintrag sind. Jede Speicherung ist ein Rückgängig-Schritt, den die
   Shell sofort sieht (`cat`).
 - **Systemmonitor** ([`sysmon.rs`](src/workspace/devwin/sysmon.rs)): die Prozesse, wie `ps` sie
-  zeigt (PID, Benutzer, CPU-Zeit, Befehl; `Engine::processes` in
+  zeigt (PID, Benutzer, TTY, CPU-Zeit, Befehl; `Engine::processes` in
   [`procs.rs`](crates/jfn_sim/procs.rs)) – „Beenden“ tippt `kill PID` ins Terminal, nur bei
-  Hintergrund-Jobs; die Dienste mit Art, Zustand und CPU-Zeit; Leistung: die CPU-Last der
+  Hintergrund-Jobs der Konsole (Jobs eines weiteren Terminals beendet dessen eigenes `kill`); die Dienste mit Art, Zustand und CPU-Zeit; Leistung: die CPU-Last der
   letzten Minute (`Engine::cpu_secs`, die vier CPUs von `top`) und der Speicher der Skripte (die
   Zeitreihe `heap_kb`) als kleine Diagramme.
 - **IP-Konfiguration** und **Webbrowser** ([`progs.rs`](src/workspace/devwin/progs.rs)),

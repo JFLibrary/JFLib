@@ -5,7 +5,7 @@
 //   program(n, ui, k, id, dev)      the window's content: the pages Prozesse, Dienste, Leistung
 //   cpu_percent(ns_per_sec)         a second's CPU time as a share of the device's CPUs (‰)
 //
-// Prozesse: what ps shows (Engine::processes, jfn_sim/procs.rs) -- PID, Benutzer, Terminal,
+// Prozesse: what ps shows (Engine::processes, jfn_sim/procs.rs) -- PID, Benutzer, TTY,
 // CPU-Zeit, Befehl; Beenden types "kill PID" on the device's console, as the desktop's other
 // programs type their commands (a recording replays it), and only for the background jobs the
 // console's kill ends (services have their own switches: the Dienste tab).  Dienste: the device's services
@@ -120,7 +120,7 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             let cols = [
                 GridCol::new(t("PID"), 56).flags(GC_NOSORT | GC_RIGHT),
                 GridCol::new(t("Benutzer"), 70).flags(GC_NOSORT),
-                GridCol::new(t("Terminal"), 70).flags(GC_NOSORT),
+                GridCol::new(t("TTY"), 64).flags(GC_NOSORT),
                 GridCol::new(t("CPU-Zeit"), 86).flags(GC_NOSORT | GC_RIGHT),
                 GridCol::new(t("Befehl"), 200).flags(GC_NOSORT | GC_FILL),
             ];

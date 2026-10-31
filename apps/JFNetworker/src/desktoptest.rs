@@ -75,7 +75,7 @@ fn procs_t(t: &mut T) {
     let ps = cli(&mut e, PC1, "ps", 0);
     let listed: Vec<(u32, String)> = ps.lines().skip(1).filter_map(|l| {
         let w: Vec<&str> = l.split_whitespace().collect();
-        Some((w.first()?.parse().ok()?, w[3..].join(" ")))
+        Some((w.first()?.parse().ok()?, w.get(4..)?.join(" ")))
     }).collect();
     let mut want: Vec<(u32, String)> = rows.iter().map(|p| (p.pid, p.cmd.clone())).collect();
     want.push((want.iter().map(|w| w.0).max().unwrap_or(100) + 1, s("ps")));
