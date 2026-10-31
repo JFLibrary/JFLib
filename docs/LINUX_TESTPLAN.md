@@ -79,9 +79,25 @@ dann, ohne dass die Library schuld ist.
 
 **Prüfen**
 
-- **CFF2**: Ist Noto CJK als variable Schrift installiert (`rpm -q
-  google-noto-sans-cjk-vf-fonts`), zeigt die Library vermutlich Kästchen. Dann CFF2 nachrüsten
-  (`lib/text/cff.rs`, `fontdb.rs`: Standardinstanz, Blend-Operanden ignorieren) und dort prüfen.
+- **CFF2** (seit 2026-11-01 gelesen, `lib/text/cff.rs`; bisher nur mit selbst erzeugten
+  Testschriften und gegen HarfBuzz/FreeType geprüft, mit keiner echten Schrift):
+  1. `rpm -q google-noto-sans-cjk-vf-fonts google-noto-serif-cjk-vf-fonts`, `rpm -ql
+     google-noto-sans-cjk-vf-fonts` (erwartet etwa
+     `/usr/share/fonts/google-noto-sans-cjk-vf-fonts/NotoSansCJK-VF.ttc`); Schnitte und
+     Familien zum Abgleich mit `fc-query DATEI`.
+  2. `build/linux/fonttest --scan`: die Noto-CJK-Schnitte mit den Flags `0xa8`
+     (CFF | CFF2 | VAR).
+  3. `build/linux/fonttest --dump DATEI SCHNITT`: Achse `wght` und die benannten Instanzen.
+  4. `build/linux/fonttest --render DATEI SCHNITT 40 "永中文日本語한국어" out.png`, einmal
+     ohne und einmal mit `--axes wght=900`; die PNGs ansehen.
+  5. `python3 tools/cff2_crosscheck.py font DATEI --face N --axes wght=700 --fonttest
+     build/linux/fonttest`: „0 differ“, kleine Distanz zu HarfBuzz.
+  6. `build/linux/fonttest --bench DATEI SCHNITT` (Geschwindigkeit).
+  7. Im Fenster: `fontpicktest`, im Dialog „Noto Sans CJK SC“ wählen und den Regler der
+     Strichstärke bewegen; CJK-Text in einem Textfeld der Galerie zeigt Zeichen statt
+     Kästchen (ein alter Schriften-Cache wird wegen der neuen Version neu eingelesen).
+     Speicher und erste Ladezeit beobachten: Jeder geladene Schnitt einer Collection liest
+     heute die ganze Datei.
 - **Eigene Titelleiste** (mutter kennt xdg-decoration nicht): GNOMEs `button-layout` und die
   Doppelklick-Aktion werden ignoriert; die oberen ~5 DIP der Knöpfe und eine Ecke von
   „Schließen“ starten ein Resize.
@@ -114,7 +130,8 @@ GNOME und KDE auf Fedora haben keine X11-Sitzung mehr; Xfce läuft auf X11.
 
 ## 5. Offen ohne passenden Rechner (mit Jakob abstimmen)
 
-- CFF2-Schriften werden nicht gelesen (siehe 3).
+- CFF2-Schriften: gelesen seit 2026-11-01, mit einer echten Schrift noch nicht geprüft
+  (siehe 3).
 - Die eigene Titelleiste zeigt immer alle Knöpfe (siehe 3).
 - Resize-Zone über den Titelleisten-Knöpfen (siehe 3).
 - DNS-Server auf IPv6-Link-Local-Adressen scheitern.
@@ -179,8 +196,7 @@ Xwayland, PulseAudio-Server von WSLg) oder gegen Fake-Busse lief.
 5. **Variable Schriften** (`build/linux/fontpicktest`, Schriftdialog): die variablen
    Systemschriften (GNOME: Cantarell bzw. Adwaita Sans, Noto als VF) zeigen ihre Achsen und
    benannten Instanzen, Text in einer Instanz sieht aus wie im Dialog. **CFF2**
-   (Noto CJK VF) erst mit dem Stand, der CFF2 liest (siehe 3): danach CJK-Text in der Galerie
-   ohne Kästchen.
+   (Noto CJK VF): die Schritte in Abschnitt 3.
 6. **Pakete** (PACKAGING.md „Other formats“; Fedora: `rpm-build`, `rpm-sign`):
    `python3 tools/package.py updatetest --formats rpm,flatpak,appimage` mit Signatur
    (`--sign`, Testschlüssel). Das RPM mit `sudo dnf install ./build/dist/…rpm` installieren,
