@@ -5,10 +5,10 @@
 //   program(n, ui, k, id, dev)      the window's content: the pages Prozesse, Dienste, Leistung
 //   cpu_percent(ns_per_sec)         a second's CPU time as a share of the device's CPUs (‰)
 //
-// Prozesse: what ps shows (Engine::processes, jfn_sim/procs.rs) -- PID, Benutzer, CPU-Zeit,
-// Befehl; Beenden types "kill PID" on the device's console, as the desktop's other programs type
-// their commands (a recording replays it), and only for the background jobs the shell's kill
-// ends (services have their own switches: the Dienste tab).  Dienste: the device's services
+// Prozesse: what ps shows (Engine::processes, jfn_sim/procs.rs) -- PID, Benutzer, Terminal,
+// CPU-Zeit, Befehl; Beenden types "kill PID" on the device's console, as the desktop's other
+// programs type their commands (a recording replays it), and only for the background jobs the
+// console's kill ends (services have their own switches: the Dienste tab).  Dienste: the device's services
 // (Engine::services) with their kind, state and, while they run, their CPU time.  Leistung:
 // the CPU load of the last minute (Engine::cpu_secs: the busy time of scripts, jfs processes and
 // web servers per second, out of the CPUs top counts) and the memory of the scripts' heaps (the
@@ -120,6 +120,7 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             let cols = [
                 GridCol::new(t("PID"), 56).flags(GC_NOSORT | GC_RIGHT),
                 GridCol::new(t("Benutzer"), 70).flags(GC_NOSORT),
+                GridCol::new(t("Terminal"), 70).flags(GC_NOSORT),
                 GridCol::new(t("CPU-Zeit"), 86).flags(GC_NOSORT | GC_RIGHT),
                 GridCol::new(t("Befehl"), 200).flags(GC_NOSORT | GC_FILL),
             ];
@@ -130,12 +131,13 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
                 ui.grid_row(&mut m.procs, i);
                 ui.grid_text(&m.procs, 0, &p.pid.to_string());
                 ui.grid_text(&m.procs, 1, &p.user);
-                ui.grid_text(&m.procs, 2, &cpu_text(p.cpu_ns));
+                ui.grid_text(&m.procs, 2, &p.tty);
+                ui.grid_text(&m.procs, 3, &cpu_text(p.cpu_ns));
                 let what = match p.kind {
                     ProcKind::Service if !p.killable => format!("{} ({})", p.cmd, t("Dienst")),
                     _ => p.cmd.clone(),
                 };
-                ui.grid_text(&m.procs, 3, &what);
+                ui.grid_text(&m.procs, 4, &what);
             }
             ui.grid_end(&mut m.procs);
         }

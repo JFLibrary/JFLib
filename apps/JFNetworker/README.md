@@ -332,6 +332,7 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `desk_programs.uis` | der Desktop von PC1 (siehe [Desktop der Hosts](#desktop-der-hosts)): das Gerätefenster öffnet auf ihm, Symbole (ein Klick wählt, Doppelklick, Eingabe und Pfeiltasten), das Startmenü mit seinen Gruppen, drei Programme in Fenstern, die Taskleiste (aktivieren, minimieren, zurückholen, ihr Menü schließt ein Fenster), Maximieren und Minimieren mit der Titelleiste, Verschieben, Alt+F6, F11 und Vollbild, das Terminal als Konsole des Geräts (der Terminal-Bereich verweist dorthin), der Desktop wie zuvor, nachdem das Gerätefenster zu und wieder offen war |
 | `desk_files.uis` | Texteditor und Dateimanager: die Notizen, ein Text mit „Speichern unter …“ als Datei, die die Shell mit `cat` liest; Neuer Ordner, Umbenennen, Kopieren und Einfügen in den neuen Ordner, Löschen mit Rückgängig und Wiederholen, die Kopie per Doppelklick im Texteditor, Eigenschaften |
 | `desk_monitor.uis` | Systemmonitor und Einstellungen: ein Job aus dem Terminal (`sleep 100 &`) unter den Prozessen, mit „Beenden“ (`kill` im Terminal) beendet, `init` nicht; die Dienste von SRV1 mit dem laufenden Webserver, CPU-Last und Speicher; Hintergrund, Symbolgröße und Uhr, dieselben Werte unter Werkzeuge › Einstellungen |
+| `desk_terminals.uis` | weitere Terminal-Fenster (V2 mit den Sitzungen von X1e): „Weiteres Terminal“ im Startmenü öffnet „Terminal (2)“ mit eigener Sitzung (eigener Prompt und Verzeichnis, `tty` `/dev/pts/0`, `ps` mit `tty1` und `pts/0`), die Konsole behält ihr Verzeichnis, `who` zählt beide; Schließen des Fensters beendet die Sitzung |
 | `desk_rtl.uis` | der Desktop in einem gespiegelten Fenster: Symbole rechts, Taskleiste und Titelleisten gespiegelt, wie gezeichnet bedienbar; Bilder hell und dunkel mit 150 % |
 | `desk_shots.uis` | die Bilder des Desktops (drei Fenster, das Startmenü) hell und dunkel mit 100 und 150 %, Hochkontrast, die Hintergründe Netz und Sand mit großen Symbolen (`build/jfnetworker/desk_*.png`) |
 | `model.uis`, Gruppe `desk` | worauf der Desktop baut: die Prozesse von `jfn_sim/procs.rs` gegen `ps` (ein Job mit PID und Befehl, `kill`, ein Dienst, der kein Job ist), die CPU-Zeit je Sekunde gegen die Zahlen des Webservers, freie Namen, Kopien eines Ordnerbaums und Verschieben im Dateimanager, welches Fenster die Konsole zeigt, der Kontrast der Beschriftungen auf jedem Hintergrund in beiden Themes |
@@ -3181,9 +3182,11 @@ Dialog mit seinem Titel.
   sich so zeigen. Ein neues Fenster öffnet rechts der Symbole so groß, wie Platz ist; E-Mail,
   MIB-Browser und IDE starten maximiert.
 - **Terminal:** die Konsole des Geräts – derselbe `TermState` wie im Reiter CLI und im
-  Terminal-Bereich, der dorthin verweist, solange das Fenster sie zeigt. Es gibt höchstens ein
-  Terminal-Fenster; die Sitzungen von X1e bekommt es über `Desk::term_sess` und
-  `desktop::terminal_window`.
+  Terminal-Bereich, der dorthin verweist, solange das Fenster sie zeigt. „Weiteres Terminal“ im
+  Startmenü öffnet ein weiteres Terminal-Fenster mit einer eigenen Befehlszeilen-Sitzung
+  (siehe [Sitzungen und Telnet-Server](#sitzungen-und-telnet-server): `pts/N` auf Linux-Hosts,
+  `tty N` IOS-artig), betitelt „Terminal (2)“; Schließen des Fensters beendet die Sitzung, nach
+  dem Ausschalten des Geräts sagt das Fenster, dass sie endete.
 - **Dateimanager** ([`filemgr.rs`](src/workspace/devwin/filemgr.rs)): die Ordner als Baum, die
   Einträge des Ordners mit Größe, Art und Zeit; Neuer Ordner, Umbenennen, Löschen, Kopieren,
   Ausschneiden, Einfügen (ein vergebener Name bekommt „(Kopie)“), Öffnen (ein Ordner, eine Datei

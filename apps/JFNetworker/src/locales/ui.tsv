@@ -1418,5 +1418,6 @@ das Programm eines Symbols öffnen	open an icon's program
 Neue &Sitzung	New &session
 Sitzung beendet	Session ended
 Keine weitere Sitzung	No further session
+Weiteres Terminal	Another terminal
 {} nimmt keine weitere Sitzung an: es hat keine Befehlszeile oder keinen Strom.	{} takes no further session: it has no command line or no power.
 Telnet-Server	Telnet server

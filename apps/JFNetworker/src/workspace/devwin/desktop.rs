@@ -15,9 +15,9 @@
 //                                     Terminal or the MIB-Browser, whichever is higher and not
 //                                     minimised (devwin::shows: the Terminal panel says so)
 //   console_or_note(n, ui, k, dev, p) the console in program p's window, or a note where it is
-//   terminal_window(n, ui, k, dev)    the Terminal's content: one function for X1e, which gives
-//                                     each Terminal window a session (Desk::term_sess; None: the
-//                                     device's console through console::view)
+//   terminal_window(n, ui, k, dev, s) a Terminal window's content: the device's console (None,
+//                                     the program Terminal) or a further session of its own
+//                                     (Some, "Weiteres Terminal": console::view_session)
 //   ide_window(n, ui, k, dev)         the IDE's content (IDE1 replaces the body with the IDE)
 //   open_with(n, k, dev, path)        a file of the device in its program: open_jfs for .jfs
 //                                     (the Texteditor now, the IDE after IDE1), else the editor
@@ -26,7 +26,10 @@
 // The programs (Prog): Terminal, Dateimanager (filemgr.rs), Texteditor (editor.rs),
 // IP-Konfiguration and Webbrowser (progs.rs), E-Mail (email.rs), MIB-Browser (mib.rs),
 // Systemmonitor (sysmon.rs), Einstellungen (here), IDE.  Each has one window (key: its index + 1)
-// with a first and a smallest size of its own; a new window opens right of the icons, cascaded,
+// with a first and a smallest size of its own.  The Terminal shows the device's console; "Weiteres
+// Terminal" in the start menu opens one more Terminal window with a command-line session of its
+// own (jfn_sim cli/ses.rs: Linux "pts/N", IOS-like "tty N"; key TERM_KEY0 + the session, title
+// "Terminal (2)"), closing the window ends the session.  A new window opens right of the icons, cascaded,
 // as large as fits (IDE, E-Mail and MIB-Browser start maximised, the device window being a small
 // screen).  The icons stand in columns from the top left: a click chooses one, a double click
 // or Enter opens it; they are one Tab stop (the arrows move between them, the choice follows)
@@ -59,6 +62,8 @@ use crate::workspace::icons::*;
 
 /// the taskbar's height (DIP), the strip the window area keeps free
 const TASK_H: i32 = 40;
+/// the window key of a further Terminal window: TERM_KEY0 + its session (the programs' are 1 ..)
+const TERM_KEY0: u32 = 0x100;
 
 /// the programs of the desktop
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -99,6 +104,10 @@ impl Prog {
     fn row(self) -> &'static (Prog, &'static str, &'static str, usize, [i32; 2], [i32; 2]) {
         &PROGS[self as usize]
     }
+    // the row of a window's key: its program's, the Terminal's for a further Terminal window
+    fn row_of(key: u32) -> &'static (Prog, &'static str, &'static str, usize, [i32; 2], [i32; 2]) {
+        Prog::of_key(key).unwrap_or(Prog::Terminal).row()
+    }
     /// its window's key in the DeskState (!= 0)
     pub(crate) fn key(self) -> u32 {
         self as u32 + 1
@@ -133,6 +142,12 @@ impl Prog {
     }
 }
 
+// a further Terminal window (session s) as desk_begin takes it
+fn term_win(s: u32, title: &str) -> DeskWin<'_> {
+    let r = Prog::Terminal.row();
+    DeskWin::new(TERM_KEY0 + s, title, Prog::Terminal.icon()).size(r.4[0], r.4[1]).min(r.5[0], r.5[1])
+}
+
 /// a device's desktop: the windows, the programs' states (the session's)
 pub(crate) struct Desk {
     pub dev: u32,
@@ -140,17 +155,17 @@ pub(crate) struct Desk {
     pub desk: DeskState,
     /// the open programs in the taskbar's order
     pub open: Vec<Prog>,
-    /// windows that still need their first place (beside the icons, as large as fits)
-    place: Vec<Prog>,
+    /// windows (keys) that still need their first place (beside the icons, as large as fits)
+    place: Vec<u32>,
     /// the icon chosen
     sel: Option<Prog>,
-    /// a window to bring to the front after the frame
-    raise: Option<Prog>,
+    /// a window (key) to bring to the front after the frame
+    raise: Option<u32>,
     /// the window that draws the device's console (this frame)
     pub console_at: Option<Prog>,
-    /// the Terminal window's session: None the device's console (X1e gives each Terminal
-    /// window one of its own)
-    pub term_sess: Option<u32>,
+    /// the sessions of the further Terminal windows (cli/ses.rs), in the taskbar's order after
+    /// the programs
+    pub terms: Vec<u32>,
     // the programs
     pub ip: super::progs::IpState,
     pub web: super::progs::WebState,
@@ -173,7 +188,7 @@ impl Desk {
             sel: None,
             raise: None,
             console_at: None,
-            term_sess: None,
+            terms: Vec::new(),
             ip: super::progs::IpState::new(),
             web: super::progs::WebState::new(),
             edit: super::editor::Editor::new(),
@@ -188,9 +203,19 @@ impl Desk {
     pub(crate) fn open_prog(&mut self, p: Prog) {
         if !self.open.contains(&p) {
             self.open.push(p);
-            self.place.push(p);
+            self.place.push(p.key());
         }
-        self.raise = Some(p);
+        self.raise = Some(p.key());
+    }
+
+    /// a further Terminal window with session s of the device (console::open_session) opens
+    pub(crate) fn open_term(&mut self, s: u32) {
+        let key = TERM_KEY0 + s;
+        if !self.terms.contains(&s) {
+            self.terms.push(s);
+            self.place.push(key);
+        }
+        self.raise = Some(key);
     }
 
     /// the window that draws the console: the Terminal or the MIB-Browser, the higher one
@@ -486,13 +511,12 @@ pub(crate) fn clock_text(n: &Net, dev: u32, form: usize) -> String {
 }
 
 // new windows (DIP): right of the icons, cascaded, as large as the work area lets them be
-fn place_new(st: &mut DeskState, list: &[Prog], work: [i32; 2], icons_w: i32) {
+fn place_new(st: &mut DeskState, list: &[u32], work: [i32; 2], icons_w: i32) {
     let known = st.order().len().saturating_sub(list.len());
-    for (i, p) in list.iter().enumerate() {
+    for (i, &key) in list.iter().enumerate() {
         // (a maximised one: where it goes when restored)
-        let key = p.key();
         let Some(r) = st.rect(key) else { continue };
-        let row = p.row();
+        let row = Prog::row_of(key);
         let tbh = (r[3] - row.4[1]).max(0);
         let (mw, mh) = (row.5[0], row.5[1] + tbh);
         let c = ((known + i) % 6) as i32;
@@ -513,14 +537,20 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     let win_id = super::win_id(k);
     let lk = Look::of(n, ui);
     let clock = clock_text(n, dev, n.prefs.desk_clock);
+    let on = n.doc.proj.device(dev).is_some_and(|d| !d.off);
     let Some(w) = n.devwin.get(k) else { return };
     let d = &mut w.desk;
+    // the sessions that end: of the windows closed this frame, of a desktop given up
+    let mut ended: Vec<(u32, u32)> = Vec::new();
     if d.dev != dev {
+        ended.extend(d.terms.iter().map(|&s| (d.dev, s)));
         *d = Desk::new(dev);
     }
-    let titles: Vec<&'static str> = d.open.iter().map(|p| p.name()).collect();
+    let mut titles: Vec<String> = d.open.iter().map(|p| String::from(p.name())).collect();
+    titles.extend(d.terms.iter().map(|s| format!("{} ({})", Prog::Terminal.name(), s + 1)));
     let names: Vec<&'static str> = Prog::ALL.iter().map(|p| p.name()).collect();
-    let wins: Vec<DeskWin> = d.open.iter().zip(&titles).map(|(p, t)| p.win(t)).collect();
+    let np = d.open.len();
+    let wins: Vec<DeskWin> = d.open.iter().zip(&titles).map(|(p, t)| p.win(t)).chain(d.terms.iter().zip(&titles[np..]).map(|(&s, t)| term_win(s, t))).collect();
     d.console_at = d.console_owner();
     let sel = d.sel;
     let mut st = core::mem::take(&mut d.desk);
@@ -541,6 +571,8 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     while let Some(key) = ui.desk_next(&mut st) {
         if let Some(p) = Prog::of_key(key) {
             content(n, ui, k, id, dev, p);
+        } else if let Some(s) = key.checked_sub(TERM_KEY0) {
+            terminal_window(n, ui, k, dev, Some(s));
         }
     }
     // the taskbar: Start and its menu, the windows, Vollbild, the clock
@@ -550,7 +582,7 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         ui.popup_open(base + 2);
     }
     ui.tooltip(t("Die Programme des Geräts"));
-    let started = start_menu(ui, base);
+    let (started, more) = start_menu(ui, base, on);
     ui.desk_taskbar(base, &mut st, 0);
     let mut full = (ui.window_state(win_id) & UWS_FULLSCREEN != 0) as i32;
     ui.next_icon(JN_FULLSCREEN);
@@ -568,11 +600,16 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
     d.desk = st;
     d.place.extend(place);
     for ev in evs {
-        if let DeskEv::Close(key) = ev
-            && let Some(p) = Prog::of_key(key)
-        {
-            d.open.retain(|&o| o != p);
-            d.place.retain(|&o| o != p);
+        if let DeskEv::Close(key) = ev {
+            if let Some(p) = Prog::of_key(key) {
+                d.open.retain(|&o| o != p);
+            } else if let Some(s) = key.checked_sub(TERM_KEY0) {
+                d.terms.retain(|&o| o != s);
+                ended.push((dev, s));
+            } else {
+                continue;
+            }
+            d.place.retain(|&o| o != key);
             d.desk.forget(key);
             ui.repass();
         }
@@ -591,20 +628,44 @@ pub(crate) fn tab(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
             ui.window_activate(win_id);
         }
     }
-    if let Some(p) = d.raise.take() {
-        if d.desk.contains(p.key()) {
-            d.desk.activate(p.key());
+    if let Some(key) = d.raise.take() {
+        if d.desk.contains(key) {
+            d.desk.activate(key);
         }
         ui.repass();
     }
     if opened == Some(Prog::Terminal) {
         n.cons.focus = Some(dev);
     }
+    for (dv, s) in ended {
+        console::close_session(n, dv, s);
+    }
+    // "Weiteres Terminal": a session of its own in a window of its own
+    if more {
+        match console::open_session(n, dev) {
+            Some(s) => {
+                if let Some(w) = n.devwin.get(k) {
+                    w.desk.open_term(s);
+                }
+                n.cons.focus_ses = Some((dev, s));
+                if ui.window_state(win_id) & UWS_ACTIVE == 0 {
+                    ui.window_activate(win_id);
+                }
+            }
+            None => {
+                let name = n.doc.proj.device(dev).map(|d| d.name.clone()).unwrap_or_default();
+                n.file.msg = Some((IB_INFO, String::from(t("Keine weitere Sitzung")), crate::app::tr::tf("{} nimmt keine weitere Sitzung an: es hat keine Befehlszeile oder keinen Strom.", &[&name])));
+            }
+        }
+        ui.repass();
+    }
 }
 
-// the start menu (a flyout above Start): the programs in their groups -> the one chosen
-fn start_menu(ui: &mut Ui, base: u32) -> Option<Prog> {
+// the start menu (a flyout above Start): the programs in their groups -> the one chosen, and
+// whether "Weiteres Terminal" was (on: the device has power)
+fn start_menu(ui: &mut Ui, base: u32, on: bool) -> (Option<Prog>, bool) {
     let mut chosen = None;
+    let mut more = false;
     if ui.flyout_begin(base + 2, FL_ABOVE) {
         for (g, title) in GROUPS.iter().enumerate() {
             ui.box_begin(0, BOX_V | pad(4), 0);
@@ -615,6 +676,14 @@ fn start_menu(ui: &mut Ui, base: u32) -> Option<Prog> {
                 if ui.menu_item(base + 0x10 + *p as u32, p.name()) & EV_ACT != 0 {
                     chosen = Some(*p);
                 }
+                // one more Terminal window, with a session of its own
+                if *p == Prog::Terminal {
+                    ui.next_icon(JN_TERMINAL);
+                    ui.next_flags(if on { 0 } else { ST_DISABLED });
+                    if ui.menu_item(base + 0x1F, t("Weiteres Terminal")) & EV_ACT != 0 && on {
+                        more = true;
+                    }
+                }
             }
             if g + 1 < GROUPS.len() {
                 ui.menu_sep();
@@ -622,7 +691,7 @@ fn start_menu(ui: &mut Ui, base: u32) -> Option<Prog> {
         }
     }
     ui.flyout_end();
-    chosen
+    (chosen, more)
 }
 
 // a program's window content
@@ -631,7 +700,7 @@ fn content(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32, p: Prog) {
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V | if p == Prog::Terminal { 0 } else { pad(8) }, 8);
     match p {
-        Prog::Terminal => terminal_window(n, ui, k, dev),
+        Prog::Terminal => terminal_window(n, ui, k, dev, None),
         Prog::Files => super::filemgr::program(n, ui, k, base + 0x200, dev),
         Prog::Editor => super::editor::program(n, ui, k, base + 0x100, dev),
         Prog::IpConfig => super::progs::ipconfig(n, ui, k, id + 0x10, dev),
@@ -667,17 +736,23 @@ pub(crate) fn console_or_note(n: &mut Net, ui: &mut Ui, k: usize, dev: u32, p: P
     if ui.button(nid, t("Zeigen")) & EV_ACT != 0
         && let Some(w) = n.devwin.get(k)
     {
-        w.desk.raise = Some(other);
+        w.desk.raise = Some(other.key());
         n.cons.focus = Some(dev);
     }
     ui.box_end();
 }
 
-/// the Terminal window's content: its session (X1e: console::view_session for Desk::term_sess)
-/// or, without one, the device's console
-pub(crate) fn terminal_window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
-    let _sess = n.devwin.get(k).and_then(|w| w.desk.term_sess);
-    console_or_note(n, ui, k, dev, Prog::Terminal);
+/// a Terminal window's content: the device's console (s None: the program Terminal) or a further
+/// session of its own (a session that ended says so and takes no input)
+pub(crate) fn terminal_window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32, s: Option<u32>) {
+    let Some(s) = s else {
+        console_or_note(n, ui, k, dev, Prog::Terminal);
+        return;
+    };
+    ui.next_size(-1, -1);
+    ui.box_begin(0, BOX_V, 0);
+    console::view_session(n, ui, dev, s);
+    ui.box_end();
 }
 
 /// the IDE's window (it starts maximised): until IDE1 a note and the way to the Skripte tab --
