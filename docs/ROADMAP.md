@@ -1427,8 +1427,42 @@ Fensterrand hinaus.
 
 ## 8. Rendering
 
-- **P2** · *fehlt* · GPU-Rendering (D3D11 / Vulkan / OpenGL / WebGPU); heute rechnet alles
-  die CPU.
+- **P2** · *entschieden* (2026-10-31) · Allgemeiner GPU-Support in der Library für die UI,
+  2D-CAD und 3D-Spiele (Entscheidungsvorlage „GPU-Rendering in JFLib“, Fassung vom
+  31.10.2026, alle acht Empfehlungen freigegeben).
+  - Grafik-APIs: Vulkan unter Windows, Linux und Android, WebGPU im Browser, Metal später für
+    einen nativen Apple-Port; D3D12 höchstens als späterer Rückfall unter Windows (Remote-Desktop,
+    VMs, WARP). D3D11, WebGL2 und GLES entfallen.
+  - Shader in WGSL mit eigenem Compiler nach SPIR-V (später MSL); der Browser nimmt WGSL direkt.
+  - Linux: GUI- und Spielprogramme werden dynamisch gegen glibc gelinkt (sonst nichts),
+    `libvulkan.so.1` per `dlopen`, Threads über `pthread_create` (der rohe `clone` in
+    `linux_thread.rs` hat keinen TLS, den Treiber voraussetzen), das Bild als dmabuf über den
+    eigenen Wayland- und X11-Code (`zwp_linux_dmabuf_v1`, DRI3/Present). Kommandozeilen- und
+    Serverprogramme bleiben statisch ohne libc.
+  - Zwei Funktionsstufen der GPU-Schicht: Basis (was WebGPU und Vulkan 1.1 können: Compute,
+    Speicherpuffer, einzelnes indirektes Zeichnen) und Voll (Vulkan 1.3: Bindless, indirektes
+    Zeichnen mit Anzahl aus der GPU, Subgroups; Mesh-Shader und Raytracing, wo vorhanden).
+  - Die UI rastert weiter auf der CPU und bleibt pixelgleich; die GPU übernimmt Ausgabe,
+    Ebenen, Bilder und Leinwände. Ohne GPU zeichnet die UI wie heute.
+  - Reihenfolge: G1 GPU-Schicht und Messszene (Windows), G2 Shader-Compiler, G3 UI über die
+    GPU, G4 Linux / Android / Browser, G5 3D-Engine-Kern, G6 2D-Renderer für CAD, G7
+    Spiel-Bausteine. Über G5 wird nach der Messung aus G1 entschieden.
+- **P2** · *in Arbeit* · G1: GPU-Schicht `lib/gpu` mit Vulkan unter Windows (Gerät,
+  Speicher, Puffer, Texturen, Pipelines, Befehlslisten, Swapchain mit Vsync, Gerät-verloren,
+  GPU-Zeitstempel, `jfgui_GPU=0`), SPIR-V-Schreiber `lib/shader`, Messszene in `gputest`
+  (100 000 bis 1 000 000 Objekte, Sichtbarkeit per Compute-Shader, CPU- und GPU-Zeit je Bild).
+- **P2** · *fehlt* · G2: Shader-Compiler WGSL → SPIR-V mit Fehlermeldungen mit Zeile.
+- **P2** · *fehlt* · G3: UI über die GPU (Windows): Ausgabe mit Vsync, Ebenen, `Cmd::Image`,
+  Leinwand-API mit Zoom und Verschieben für PaintCraft, Kritzel, JFNetworker, Bildbetrachter
+  und Diagramm.
+- **P2** · *fehlt* · G4: Linux (glibc-Build, dmabuf), Android (Vulkan über die C-Brücke, ohne
+  Auflösungsgrenze), Browser (WebGPU).
+- **P2** · *fehlt* · G5: 3D-Engine-Kern (Szene, Meshes, Materialien, Licht, Schatten,
+  Sichtbarkeit auf der GPU, Instanzen, glTF-Import).
+- **P3** · *fehlt* · G6: 2D-Renderer für CAD (Linien mit Breite und Muster, Kurven,
+  Füllungen, Schraffuren, Text, Auswahl und Fang, große Koordinaten). G7: Spiel-Bausteine
+  (Animation, Nachladen großer Welten, Physik, Werkzeuge). Später: Metal, D3D12-Rückfall,
+  GPU-Rasterung der Widgets.
 - **P2** · *erledigt* (2026-10-22) · Stufe 0 des GPU-Plans, Teil 1: Scroll-Kopie
   (`lib/ui/scrollcopy.rs`). Hat sich in einer Scroll-Ansicht nur der Inhalt verschoben, werden
   die noch sichtbaren Pixel im Framebuffer verschoben (Zeilen per `copy_within`, Reihenfolge
