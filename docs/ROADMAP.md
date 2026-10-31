@@ -319,8 +319,14 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   kein installiertes Icon).
 - **P1** · *erledigt* · OS-Benachrichtigungen (`plat::tray::notify`, `ui.notify`; Klick →
   `UIC_NOTE`): Windows als Balloon des Infobereich-Symbols, den Windows 10/11 als Toast zeigt;
-  Linux über `org.freedesktop.Notifications` mit Bild und Standard-Aktion. Es fehlen noch:
-  echte WinRT-Toasts mit Buttons, Web und Android.
+  Linux über `org.freedesktop.Notifications` mit Bild und Standard-Aktion. Browser (seit
+  2026-11-01, `web/notify.js`): die Notification-API, die Erlaubnis aus der Geste des Klicks
+  erfragt, Klick holt den Tab nach vorn; Android: NotificationManager mit Kanal,
+  `POST_NOTIFICATIONS` zur Laufzeit (API 33+), Tippen öffnet die Activity, Wegwischen meldet
+  `UIC_NOTE_GONE` (`android/GalleryNotify.java`). Getestet mit
+  `apps/androidGallery/tests/system_web.mjs` (Chromium, Firefox) und `android_system.py`
+  (Emulator API 35). Es fehlen noch: echte WinRT-Toasts mit Buttons; Benachrichtigungen im
+  Browser auf Android (nur über einen Service Worker).
 - **P1** · *erledigt* · Symbol im Infobereich (`ui.tray_set` mit Menü aus der Befehlstabelle,
   `UIC_TRAY`): Windows `Shell_NotifyIconW` mit nativem Menü; Linux StatusNotifierItem mit
   dbusmenu auf einer eigenen D-Bus-Verbindung (getestet gegen einen Fake-Bus). GNOME zeigt
@@ -332,8 +338,14 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   (`SPI_GETHIGHCONTRAST`, `GetSysColor`, `SPI_GETCLIENTAREAANIMATION`, `TextScaleFactor`,
   `GetDoubleClickTime`, `GetCaretBlinkTime`), Linux aus dem Settings-Portal
   (`org.freedesktop.appearance`, GNOME-Schlüssel; getestet gegen ein Fake-Portal); die
-  Systemsprache seit §5. `jfgui_*`-Variablen überschreiben, headless gelten nur sie. Es fehlen
-  noch: KDE ohne Portal (kdeglobals), Web (`prefers-*`) und Android.
+  Systemsprache seit §5. Browser (seit 2026-11-01, `web/system.js`): `prefers-color-scheme`,
+  `prefers-contrast`, `forced-colors` mit den Systemfarben, `prefers-reduced-motion`, die
+  Standard-Schriftgröße als Textskalierung, live über Media-Query-Listener; Android: Nachtmodus
+  und Schriftgröße der Konfiguration (`onConfigurationChanged`), `ANIMATOR_DURATION_SCALE` 0,
+  kontrastreicher Text, Kontraststufe (API 34), Akzent aus den dynamischen Farben (API 31+;
+  `android/GallerySystem.java`). `jfgui_*`-Variablen überschreiben, headless gelten nur sie. Es
+  fehlen noch: KDE ohne Portal (kdeglobals); Akzentfarbe im Browser (`AccentColor` ist nicht
+  überall die des Systems).
 - **P2** · *erledigt* · Drag & Drop ([`ui/dnd.rs`](../lib/ui/dnd.rs),
   [`plat/dnd.rs`](../lib/plat/dnd.rs)): Widgets sind Quellen (`drag_source` / `drag_set` mit
   `DragData`: Dateien, Text, URLs, HTML, PNG, eigene Art + Bytes) und Ziele (`drop_target` mit
@@ -365,8 +377,9 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   `PrepareForSleep`), Abmelden / Herunterfahren als `UIC_SESSION_END` (`WM_QUERYENDSESSION`,
   SIGTERM). Getestet mit echten Power-Requests (`plattest --test power`), einem Fake-Bus
   (`tools/platshared/desktop_bus.py`) und dem echten xdg-desktop-portal (GTK-Backend) in WSL.
-  Es fehlen: Web (Screen Wake Lock), Android (WakeLock / `FLAG_KEEP_SCREEN_ON`), Abmelden
-  aufhalten (`ShutdownBlockReasonCreate`, Portal-Flag 1).
+  Browser (seit 2026-11-01): `INHIBIT_IDLE` als Screen Wake Lock, nach `visibilitychange` neu
+  geholt; Android: `FLAG_KEEP_SCREEN_ON` und ein partieller WakeLock für `INHIBIT_SUSPEND`
+  (`web_power.rs`). Es fehlen: Abmelden aufhalten (`ShutdownBlockReasonCreate`, Portal-Flag 1).
 - **P2** · *erledigt* · Autostart ([`plat/autostart.rs`](../lib/plat/autostart.rs), seit
   2026-10-18): `plat::autostart_set(an, args)`, `autostart_get()`, `autostart_entry()`;
   Ändern braucht das Manifest-Recht `autostart`. Windows: der Wert `<app id>` unter
@@ -1108,8 +1121,11 @@ Fensterrand hinaus.
   `PrepareForSleep`), `UIC_SESSION_END` (Abmelden / Herunterfahren: `WM_QUERYENDSESSION`, SIGTERM),
   `UIC_SETTINGS` (Theme, Format, Kontrast, Schriften: `WM_SETTINGCHANGE`, Settings-Portal;
   Theme und Locale folgen dem System selbst); Start und Exit gibt es mit `init` und `UIC_EXIT`
-  (auch bei `--auto-close`). Getestet mit `lifetest` (Skriptbefehl `system …`) und Fake-Bussen.
-  Es fehlen noch: Web (`visibilitychange`) und Android (`onPause` / `onResume`).
+  (auch bei `--auto-close`). Browser und Android (seit 2026-11-01): `visibilitychange` bzw.
+  `onStop` / `onStart` als `UIC_SUSPEND` 2 / 0 (Skriptbefehl `system background|foreground`),
+  `onPause` / `onResume` als `UIC_ACTIVE`. Getestet mit `lifetest` (Skriptbefehl `system …`),
+  Fake-Bussen, `system_web.mjs` und `android_system.py`. Es fehlen noch: Speicherknappheit
+  (`onTrimMemory`) hat keinen passenden `UIC_*`-Befehl.
 - **P2** · *erledigt* · Typisierte Einstellungen ([`base/settings.rs`](../lib/base/settings.rs)):
   `Key<bool | i64 | f64 | String | usize (Auswahl) | u32 (Farbe)>` mit Vorgabe, Grenzen,
   Beschriftung, Hilfetext, „versteckt“ und „Neustart nötig“; ein `Schema` mit Version,

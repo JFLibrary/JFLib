@@ -73,6 +73,7 @@ public final class GalleryActivity extends Activity {
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         GalleryHost.attach(this);
+        GallerySystem.attach(this); // the system's settings, the screen kept on, notifications
         // the displays now and after every change (a projection, a folding phone)
         screens();
         android.hardware.display.DisplayManager dm =
@@ -132,11 +133,23 @@ public final class GalleryActivity extends Activity {
     }
     @Override public void onResume() { super.onResume(); gallery.resume(); }
     @Override public void onPause() { gallery.pause(); super.onPause(); }
+    // the lifecycle, the configuration, a tapped notification, its permission (GallerySystem, GalleryNotify)
+    @Override public void onStart() { super.onStart(); GallerySystem.started(this); }
+    @Override public void onStop() { GallerySystem.stopped(this); super.onStop(); }
+    @Override public void onConfigurationChanged(android.content.res.Configuration c) {
+        super.onConfigurationChanged(c);
+        GallerySystem.configuration(this);
+    }
+    @Override protected void onNewIntent(Intent intent) { super.onNewIntent(intent); setIntent(intent); GalleryNotify.intent(intent); }
+    @Override public void onRequestPermissionsResult(int code, String[] permissions, int[] results) {
+        if (!GalleryNotify.permissions(code, results)) super.onRequestPermissionsResult(code, permissions, results);
+    }
     @Override public void onDestroy() {
         android.hardware.display.DisplayManager dm =
             (android.hardware.display.DisplayManager) getSystemService(Context.DISPLAY_SERVICE);
         if (dm != null && displayListener != null) dm.unregisterDisplayListener(displayListener);
         GalleryHost.detach(this);
+        GallerySystem.detach(this);
         super.onDestroy();
     }
     // the system's picker answered (GalleryHost.request)
