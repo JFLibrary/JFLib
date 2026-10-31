@@ -1,0 +1,3 @@
+#!args --test compute
+# a compute shader writes f(i) into a storage buffer: 1000 and 1M elements read back, the
+# elements after n untouched; queue.write_buffer / read_buffer

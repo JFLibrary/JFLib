@@ -1,0 +1,2 @@
+#!args --test timestamps
+# GPU timestamps over two submissions: monotonic, plausible against the CPU clock
