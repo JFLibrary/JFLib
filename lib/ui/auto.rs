@@ -37,7 +37,8 @@
 //                                 of the last `theme file` contains TEXT
 //   expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
 //   expect pixel X Y #RRGGBB      the main window's pixel at (X, Y), rendered now
-//   expect same FILE.png          the main window rendered now has the pixels of that shot
+//   expect same FILE.png [X Y W H]   the main window (that part of it, DIP) rendered now has
+//                                 the pixels of that shot (one taken with the same crop)
 //   print TEXT      echo
 //   bench N         time N frames (build, full render, unchanged frame) with the real clock
 //   bench N anim [MAX_US]   N frames 16 ms apart on the virtual clock (timers, animations):
@@ -1924,13 +1925,30 @@ impl Ui {
         }
     }
 
-    // expect same FILE.png: the main window rendered now is the shot saved in FILE (the same
-    // PNG bytes: the same pixels)
+    // expect same FILE.png [X Y W H]: the main window rendered now (the crop, DIP, as `shot`
+    // takes it) is the shot saved in FILE (the same PNG bytes: the same pixels)
     fn expect_same(&mut self, p: &[u8]) {
-        let path = String::from(String::from_utf8_lossy(p).trim());
+        let p = skip_ws(p);
+        let i = p.iter().position(|&c| c == b' ' || c == b'\t').unwrap_or(p.len());
+        let path = String::from(String::from_utf8_lossy(&p[..i]).trim());
+        let q = skip_ws(&p[i..]);
         self.render();
         let sf = self.win_fb(0);
-        let png = img_png::encode(&sf.px, sf.w as usize, sf.h as usize, sf.stride as usize, false);
+        let png = if q.is_empty() {
+            img_png::encode(&sf.px, sf.w as usize, sf.h as usize, sf.stride as usize, false)
+        } else {
+            let (x, r) = parse_int(q);
+            let (y, r) = parse_int(r);
+            let (w, r) = parse_int(r);
+            let (h, _) = parse_int(r);
+            match crop_surface(sf, self.win_dpi(0), [x, y, w, h]) {
+                Some(v) => img_png::encode(&v.px, v.w as usize, v.h as usize, v.stride as usize, false),
+                None => {
+                    self.fail(b"the crop lies outside the window");
+                    return;
+                }
+            }
+        };
         let file = super::perm::trusted(|| plat::read_file(&path));
         match file {
             None => self.fail(b"no such file"),

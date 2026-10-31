@@ -1,0 +1,53 @@
+#!args --font-dirs "apps/fonttest/tests/cff2;apps/fonttest/tests/cff2ref" --fontconf apps/fontpicktest/tests/fonts.conf
+# CFF2 variable fonts (tools/cff2_fixtures.py) in the font dialog (wid("dialog") = 184878562)
+# and the preview: the named instances are the styles (German names), each axis gets its
+# name, a slider and a number box; the preview card of the CFF2 font at an instance has
+# exactly the pixels of the CFF font with that instance's outlines (apps/fonttest/tests/
+# cff2ref): `expect same` on the card (16 148 688 64)
+theme light
+click "Schriftart…"
+expect window 184878562 open
+type "jfgui cff2"
+expect "Leicht" exists
+expect "Halbfett" exists
+expect "Condensed Black" exists
+expect "Strichstärke" exists
+expect "Breite" exists
+# the choice (400, upright) is the named instance "Standard"
+expect #259148013 selected
+click "Halbfett"
+expect #178140836 value 650
+expect #249397451 text "650"
+shot build/fontpick_cff2_light.png window 184878562
+theme dark
+shot build/fontpick_cff2_dark.png window 184878562
+theme light
+focus #157544224
+key ctrl+a
+type "28\n"
+click "OK"
+expect window 184878562 closed
+expect text:"Auswahl: jfgui CFF2 650 normal 28" exists
+expect text:"Geladen: jfgui CFF2" exists
+shot build/fontpick_cff2_650.png 16 148 688 64
+# the CFF font with the outlines of wght=650 (and its advances): the same pixels
+click "jfgui CFF2"
+type "jfgui cff2 ref 650"
+click "jfgui CFF2 Ref 650"
+expect text:"Auswahl: jfgui CFF2 Ref 650 650 normal 28" exists
+expect same build/fontpick_cff2_650.png 16 148 688 64
+# Condensed Black: a named instance on both axes
+click "Schriftart…"
+type "jfgui cff2"
+click "Condensed Black"
+expect #154319853 value 75
+click "OK"
+expect text:"Auswahl: jfgui CFF2 900 normal 28 wdth=75" exists
+shot build/fontpick_cff2_cb.png 16 148 688 64
+click "jfgui CFF2"
+type "jfgui cff2 ref cb"
+click "jfgui CFF2 Ref CB"
+expect text:"Geladen: jfgui CFF2 Ref CB" exists
+expect same build/fontpick_cff2_cb.png 16 148 688 64
+shot build/fontpick_cff2_main.png
+expect_nowarn
