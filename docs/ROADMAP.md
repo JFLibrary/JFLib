@@ -650,10 +650,44 @@ Seit 2026-10-17 auch Glyph-Fallback und IME unter X11.
   variable Schriften und ihre unabhängig berechneten Erwartungswerte, API, ein Glyph-Cache-Eintrag
   je Instanz, Arbeitsbudget gegen absichtlich teure gvar-Daten, abgeschnittene und verfälschte
   Dateien), `fontpicktest/tests/var_dialog.uis` (hell und dunkel), `uitest --only themes`. Es
-  fehlen: CFF2-Konturen (solche Schriften laden weiterhin nicht), avar 2 über die Segmentkarten
-  hinaus, VVAR und vertikale Metriken, Variationen in COLRv1; `opsz` einer Theme-Schrift folgt
-  11 pt (eine Font-ID für alle Textgrößen), `ui.font_load` hält nur die Instanzen der letzten 64
-  variablen Auswahlen.
+  fehlen: avar 2 über die Segmentkarten hinaus, VVAR und vertikale Metriken, Variationen in
+  COLRv1; `opsz` einer Theme-Schrift folgt 11 pt (eine Font-ID für alle Textgrößen),
+  `ui.font_load` hält nur die Instanzen der letzten 64 variablen Auswahlen. CFF2: der nächste
+  Punkt.
+- **P2** · *erledigt* (2026-10-31) · CFF2-Schriften ([`text/cff.rs`](../lib/text/cff.rs),
+  [`text/var.rs`](../lib/text/var.rs), [`text/fontdb.rs`](../lib/text/fontdb.rs)): Fedora
+  installiert Noto Sans / Serif CJK als variable CFF2-Schriften (`google-noto-sans-cjk-vf-fonts`,
+  `NotoSansCJK-VF.ttc`); bisher luden sie nicht, CJK-Text zeigte Kästchen. Jetzt: CFF2-Kopf und
+  Top DICT ohne Name- / String-INDEX, INDEXe mit 32-Bit-Zählern, CharStrings, globale und lokale
+  Subrs (Bias wie CFF), FDArray mit je einem Private DICT (Subrs, `vsindex`, `blend` in seinen
+  Werten), FDSelect in den Formaten 0, 3 und 4 (ohne: Font-DICT 0), FontMatrix, `maxstack`
+  (193 bis 513), der VariationStore. Charstrings ohne Breite und `endchar`, `vsindex` und
+  `blend` mit den Regionen der ItemVariationData an den normalisierten Koordinaten der Instanz
+  (derselbe Weg wie bei TrueType: `Text::vary`, Schriftdialog, `FontDb::load_var`; Regionen wie
+  HarfBuzz in `var.rs`), Vorschübe aus hmtx + HVAR. Hat eine Schrift CFF2 und CFF, gilt CFF2.
+  Collections (`.ttc` / `.otc`, deren Schnitte eine CFF2-Tabelle teilen) und `FontDb` wie bei
+  anderen Schriften (Flag `FDFF_CFF2`, Cache-Version 3: ein alter Cache kannte CFF2-Dateien ohne
+  Schnitte und wird verworfen), damit auch der CJK-Fallback. Grenzen: Stapel `maxstack`, Subr-
+  Tiefe 10, höchstens 512 Regionen je ItemVariationData, `blend`-Operanden gegen den Stapel
+  geprüft, `vsindex` nach `blend` ist ein Fehler; kaputte Daten geben leere Glyphen, nie einen
+  Absturz. Tests: `fonttest --selftest` mit `tools/cff2_fixtures.py` (eine CFF2-Schrift mit zwei
+  Achsen, zwei Font-DICTs, `blend` in Charstrings mit bis zu 79 Operanden und in Private DICTs,
+  allen Pfadoperatoren; dieselben Konturen als `.otf` und als Collection mit FDSelect 4 und
+  1240 globalen Subrs; CFF-1-Vergleichsschriften mit den vom Generator berechneten Konturen
+  von vier Instanzen: die CFF2-Schrift rastert an jeder Instanz byteweise gleich, Masken in
+  neun Größen und vier Phasen und eine Textzeile; Erwartungswerte an sechs Instanzen;
+  `limits.bin` mit je einer Glyphe pro Grenze; FontDb, Cache, CJK-Fallback auf einem Ordner
+  nur mit CFF2-Schnitten; abgeschnittene und verfälschte Dateien),
+  `fontpicktest/tests/var_cff2.uis` (Dialog hell und dunkel; die Vorschau an einer Instanz hat
+  die Pixel der CFF-Vergleichsschrift: `expect same` mit Ausschnitt). Gegengeprüft mit
+  HarfBuzz 14.3.1 und FreeType 2.14.3 aus dem Flatpak-SDK (`tools/cff2_crosscheck.py`, auch für
+  echte Schriften gegen `fonttest --outlines`): Konturen höchstens 0,0005 Einheiten neben
+  HarfBuzz, Vorschübe gleich; FreeType liest FDSelect 4 nicht (die Collection prüft nur
+  HarfBuzz). Es fehlen: Hinting von CFF2 (wie bei CFF: Stems werden gezählt und übersprungen),
+  eine Probe mit einer echten CFF2-Schrift (auf diesem Rechner gibt es keine; Fedora-Test
+  ausstehend), `blend` in Private-DICT-Werten wirkt nicht (Hinting-Werte werden nicht
+  gebraucht), VVAR / vertikale CJK-Metriken; Schnitte einer Collection teilen ihre Daten nicht
+  (jeder geladene Schnitt liest die ganze Datei).
 
 ## 5. Internationalisierung
 
