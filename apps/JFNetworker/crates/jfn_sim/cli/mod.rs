@@ -72,6 +72,10 @@
 //   coreutils  cd, pwd, mv, head, tail, grep, find, wc, sort, uniq, cut, tree, du, df, less,
 //            file, stat, date, seq, tee, test, xargs, env, export, history, which, type, help
 //   man      help, man PAGE and CMD --help in our own German words
+//   ses      the sessions of a device: the console (0), local terminals and telnet sessions;
+//            the API above is the console's, Engine::cli_open / cli_close / cli_sessions and
+//            the cli_ses_* forms are every session's.  CliDev holds the command line of the
+//            session in place (the console, outside the engine's work for another one)
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -92,7 +96,7 @@ use jfn_model::catalog::{CliStyle, Model};
 use crate::action::ActErr;
 use crate::driver::Report;
 use crate::jobs::JobId;
-use crate::kernel::{Engine, Ev, Ns};
+use crate::kernel::{Engine, Ns};
 use crate::trace::{HopId, Note};
 
 pub mod fmt;
@@ -124,6 +128,7 @@ pub mod sh;
 pub mod shrun;
 pub mod coreutils;
 pub mod man;
+pub mod ses;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;
@@ -334,6 +339,15 @@ pub struct CliDev {
     /// the shell's session: working directory, variables, history, the line that runs, jobs
     /// (cli/sh.rs, cli/shrun.rs; IOS-like devices keep their working directory of flash: here)
     pub sh: sh::Shell,
+    /// the session whose command line the fields from `mode` to `sh` hold (0: the console);
+    /// the others wait in `parked` (cli/ses.rs)
+    pub cur: u32,
+    /// every session of the device, the console first
+    pub sessions: Vec<ses::SesInfo>,
+    /// the command lines of the sessions not in place, by session id
+    pub parked: BTreeMap<u32, ses::SesCli>,
+    /// the id the next session gets
+    pub next_ses: u32,
 }
 
 impl CliDev {
@@ -365,6 +379,10 @@ impl CliDev {
             sg_name: String::new(),
             rs_name: String::new(),
             sh: sh::Shell::new(m.cli),
+            cur: 0,
+            sessions: alloc::vec![ses::SesInfo::console(m.cli)],
+            parked: BTreeMap::new(),
+            next_ses: 1,
         }
     }
 }
@@ -428,6 +446,10 @@ impl Engine {
         if text.is_empty() {
             return;
         }
+        // the output of another session than the console (cli/ses.rs)
+        if self.ses_out(ni, text) {
+            return;
+        }
         let dev = self.dev_of(ni);
         let at = self.now;
         if let Some(Report::CliOut { dev: d, at: a, bytes }) = self.cli.reports.last_mut()
@@ -446,6 +468,10 @@ impl Engine {
         if self.sh_bg_ctx(ni).is_some() {
             return;
         }
+        // another session reports its prompt or writes it into its connection (cli/ses.rs)
+        if self.ses_state(ni) {
+            return;
+        }
         let dev = self.dev_of(ni);
         let now = (self.prompt_of(ni), self.cdev(ni).is_some_and(|c| c.job.is_some()));
         let Some(c) = self.cdev_mut(ni) else {
@@ -458,10 +484,14 @@ impl Engine {
         self.cli.reports.push(Report::CliState { dev, prompt: now.0, busy: now.1 });
     }
 
-    fn prompt_of(&self, ni: usize) -> String {
+    pub(crate) fn prompt_of(&self, ni: usize) -> String {
         let Some(c) = self.cdev(ni) else {
             return String::new();
         };
+        // the login of a Linux telnetd session (telnetd.rs)
+        if let Some(p) = c.ses(c.cur).and_then(|i| self.login_prompt(ni, i)) {
+            return p;
+        }
         if let Some(g) = &c.gate {
             return g.prompt();
         }
@@ -499,30 +529,44 @@ impl Engine {
     /// a line typed at a device's console
     pub fn cli_line(&mut self, dev: u32, line: &str) -> Result<(), ActErr> {
         let ni = self.console(dev)?;
+        self.ses_took_line(ni);
+        self.cli_line_at(ni, line);
+        Ok(())
+    }
+
+    /// a line typed at the session in place of node `ni` (cli/ses.rs: every session's)
+    pub(crate) fn cli_line_at(&mut self, ni: usize, line: &str) {
         let line = line.trim_end_matches(['\r', '\n']);
         if self.cdev(ni).is_some_and(|c| c.job.is_some()) {
             // a console program that reads the console (nc) takes the line
             if self.proc_line(ni, line) {
-                return Ok(());
+                return;
             }
             if let Some(c) = self.cdev_mut(ni) {
                 c.queue.push_back(String::from(line));
             }
-            return Ok(());
+            return;
         }
         let ios = self.cdev(ni).is_some_and(|c| c.style == CliStyle::Ios);
         if ios && line.ends_with('?') && self.cdev(ni).is_some_and(|c| c.ask.is_none() && c.gate.is_none() && c.mode != Mode::Out) {
             let h = self.ios_help(ni, &line[..line.len() - 1]);
             self.out(ni, &h);
-            return Ok(());
+            // a telnet session's prompt comes again
+            if self.ses_cur(ni) != 0 {
+                self.cli_state(ni);
+            }
+            return;
         }
         let _ = self.cli_run(ni, line);
         self.cli_state(ni);
-        Ok(())
     }
 
     /// runs one line now; Err with the first line of the console's complaint
     pub(crate) fn cli_run(&mut self, ni: usize, line: &str) -> Result<(), String> {
+        // the login of a Linux telnetd session takes the line (telnetd.rs)
+        if self.login_line(ni, line) {
+            return Ok(());
+        }
         let Some(c) = self.cdev(ni) else {
             return Ok(());
         };
@@ -547,6 +591,12 @@ impl Engine {
     /// Ctrl+C / Ctrl+Shift+6
     pub fn cli_interrupt(&mut self, dev: u32) -> Result<(), ActErr> {
         let ni = self.console(dev)?;
+        self.cli_interrupt_at(ni);
+        Ok(())
+    }
+
+    /// Ctrl+C at the session in place of node `ni`
+    pub(crate) fn cli_interrupt_at(&mut self, ni: usize) {
         let style = self.cdev(ni).map(|c| c.style).unwrap_or(CliStyle::None);
         let job = self.cdev_mut(ni).and_then(|c| {
             c.queue.clear();
@@ -569,7 +619,6 @@ impl Engine {
             }
         }
         self.cli_state(ni);
-        Ok(())
     }
 
     /// the text of "?" typed after `line` (IOS; Linux shells have no such help)
@@ -607,7 +656,8 @@ impl Engine {
     }
     /// the console waits for a line typed without echo (a password); the app hides it
     pub fn cli_secret(&self, dev: u32) -> bool {
-        self.node_index(dev).and_then(|ni| self.cdev(ni)).is_some_and(|c| c.gate.as_ref().is_some_and(|g| g.secret()))
+        // also while a telnet session's far end asks for a password (telnetd.rs)
+        self.node_index(dev).and_then(|ni| self.cdev(ni).map(|c| (ni, c))).is_some_and(|(ni, c)| c.gate.as_ref().is_some_and(|g| g.secret()) || self.prog_hides(ni, &c.job))
     }
     /// the running configuration (IOS: as "show running-config" lists it from "!" to "end";
     /// Linux: the shell commands that set the device up as it is)
@@ -685,6 +735,8 @@ impl Engine {
             self.ios_snap(ni);
             // the console asks for a login when "line con 0" is configured for it (cli/aaa.rs)
             self.console_login(ni);
+            // the vty lines' telnet server listens when a line takes logins (telnetd.rs)
+            self.vty_sync(ni);
         }
     }
 
@@ -694,7 +746,7 @@ impl Engine {
     pub(crate) fn cli_wake_at(&mut self, ni: usize, at: Ns) {
         // a background job of the shell wakes on its own (cli/shrun.rs)
         if let Some(no) = self.sh_bg_ctx(ni) {
-            self.schedule(at, Ev::Cli { node: ni, epoch: shrun::BG_WAKE | no });
+            self.cli_sched(ni, at, shrun::BG_WAKE | no);
             return;
         }
         let Some(c) = self.cdev_mut(ni) else {
@@ -702,7 +754,8 @@ impl Engine {
         };
         c.epoch = c.epoch.wrapping_add(1);
         let epoch = c.epoch;
-        self.schedule(at, Ev::Cli { node: ni, epoch });
+        // (another session than the console's wakes as Ev::Ses: cli/ses.rs)
+        self.cli_sched(ni, at, epoch);
     }
 
     pub(crate) fn cli_wake(&mut self, ni: usize, epoch: u32) {
@@ -727,9 +780,13 @@ impl Engine {
         let Some(line) = self.cdev_mut(ni).and_then(|c| c.queue.pop_front()) else {
             return;
         };
-        // a line typed while the previous command ran: the console shows it now
-        let echo = format!("{}{}\n", self.prompt_of(ni), line);
-        self.out(ni, &echo);
+        // a line typed while the previous command ran: the console shows it now (a telnet
+        // client showed it as it was typed: cli/ses.rs)
+        if !self.ses_remote(ni) {
+            let echo = format!("{}{}\n", self.prompt_of(ni), line);
+            self.out(ni, &echo);
+        }
+        self.ses_took_line(ni);
         let _ = self.cli_run(ni, &line);
         self.cli_state(ni);
         self.cli_next(ni);
@@ -751,6 +808,11 @@ impl Engine {
         let Some(&ni) = self.cli.jobs.get(&id) else {
             return;
         };
+        // a job of another session: with that session in place (cli/ses.rs)
+        if let Some(s) = self.ses_of_job(ni, id) {
+            self.in_ses(ni, s, |e| e.cli_job(id));
+            return;
+        }
         // a background job's (cli/shrun.rs)
         if let Some(no) = self.sh_bg_of_job(ni, id) {
             self.sh_bg_event(ni, no, |e| e.job_progress(ni));

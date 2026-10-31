@@ -1,8 +1,11 @@
 // terminal -- the Terminal panel: a tab per open console (doc/console.rs keeps them), the shown
 // console, and the consoles in windows of their own
 //
-//   panel(n, ui)        the tabs, the buttons of the shown tab (rename, own window, side by
-//                       side, clear, close) and its console; without a console how to open one
+//   panel(n, ui)        the tabs, the buttons of the shown tab (a new session of its device,
+//                       rename, own window, side by side, clear, close) and its console; without
+//                       a console how to open one.  A further session's tab ("PC1 (2)",
+//                       doc/console.rs new_tab) is a terminal of its own on the device; closing
+//                       the tab ends the session
 //   windows(n, ui)      the windows of consoles (after the main window's content); closing one
 //                       brings its console back into the panel
 //   states(n, ui)       enabled / disabled of the console commands (every frame)
@@ -28,7 +31,7 @@ use crate::workspace::{canvas, devwin};
 
 /// the Terminal panel
 pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
-    let docked = n.cons.docked();
+    let docked = n.cons.docked_keys();
     if docked.is_empty() {
         let floating = !n.cons.tabs.is_empty();
         ui.next_size(-1, -1);
@@ -41,38 +44,50 @@ pub(crate) fn panel(n: &mut Net, ui: &mut Ui) {
         ui.box_end();
         return;
     }
-    let cur = match n.cons.cur.filter(|d| docked.contains(d)) {
-        Some(d) => d,
+    let cur = match n.cons.cur.map(|d| (d, n.cons.cur_ses)).filter(|k| docked.contains(k)) {
+        Some(k) => k,
         None => docked[0],
     };
-    n.cons.cur = Some(cur);
-    let titles: Vec<String> = docked.iter().map(|&d| n.cons.title(&n.doc.proj, d)).collect();
+    n.cons.cur = Some(cur.0);
+    n.cons.cur_ses = cur.1;
+    let titles: Vec<String> = docked.iter().map(|&(d, s)| n.cons.title_of(&n.doc.proj, d, s)).collect();
     let refs: Vec<&str> = titles.iter().map(String::as_str).collect();
-    let mut sel = docked.iter().position(|&d| d == cur).unwrap_or(0) as i32;
+    let mut sel = docked.iter().position(|&k| k == cur).unwrap_or(0) as i32;
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 0);
     ui.box_begin(0, BOX_H | BOX_XCENTER | pad(2), 2);
     ui.next_size(-1, 0);
     if ui.tabs_scrolling(ID_TERM_TABS, &mut sel, &refs) & EV_ACT != 0 {
-        if let Some(&d) = docked.get(sel.max(0) as usize) {
+        if let Some(&(d, s)) = docked.get(sel.max(0) as usize) {
             n.cons.cur = Some(d);
-            n.cons.focus = Some(d);
+            n.cons.cur_ses = s;
+            if s == 0 {
+                n.cons.focus = Some(d);
+            } else {
+                n.cons.focus_ses = Some((d, s));
+            }
         }
         ui.repass();
     }
+    // a further session of the shown tab's device (cli/ses.rs)
+    ui.cmd_button(CMD_TERM_SESSION, ST_ICON_ONLY | ST_SUBTLE | ST_COMPACT);
     ui.cmd_button(CMD_TERM_RENAME, ST_ICON_ONLY | ST_SUBTLE | ST_COMPACT);
     rename_flyout(n, ui);
     for c in [CMD_TERM_FLOAT, CMD_TERM_TILE, CMD_TERM_CLEAR, CMD_TERM_CLOSE] {
         ui.cmd_button(c, ST_ICON_ONLY | ST_SUBTLE | ST_COMPACT);
     }
     ui.box_end();
-    let cur = n.cons.cur.unwrap_or(cur);
-    here(n, ui, cur);
+    let cur = (n.cons.cur.unwrap_or(cur.0), n.cons.cur_ses);
+    here(n, ui, cur.0, cur.1);
     ui.box_end();
 }
 
-// the console of `dev` here, or where it is shown instead
-fn here(n: &mut Net, ui: &mut Ui, dev: u32) {
+// the console of session `s` of `dev` here, or (the console) where it is shown instead
+fn here(n: &mut Net, ui: &mut Ui, dev: u32, s: u32) {
+    if s != 0 {
+        console::view_session(n, ui, dev, s);
+        return;
+    }
     match devwin::shows(n, dev) {
         Some(win) => {
             let name = n.doc.proj.device(dev).map_or_else(String::new, |d| d.name.clone());
@@ -135,8 +150,8 @@ fn rename_flyout(n: &mut Net, ui: &mut Ui) {
             if let Some(r) = n.cons.rename.take() {
                 let name = n.doc.proj.device(r.dev).map_or_else(String::new, |d| d.name.clone());
                 let t = String::from(r.text.trim());
-                if let Some(i) = n.cons.tab(r.dev) {
-                    n.cons.tabs[i].title = if t.is_empty() || t == name { None } else { Some(t) };
+                if let Some(i) = n.cons.tab_of(r.dev, r.ses) {
+                    n.cons.tabs[i].title = if t.is_empty() || (t == name && r.ses == 0) { None } else { Some(t) };
                 }
             }
             ui.popup_close();
@@ -154,15 +169,15 @@ fn rename_flyout(n: &mut Net, ui: &mut Ui) {
 /// the windows of consoles; closing one brings its console back into the panel
 pub(crate) fn windows(n: &mut Net, ui: &mut Ui) {
     for k in 0..TERM_WINS {
-        let dev = n.cons.in_win(k);
+        let key = n.cons.in_win_key(k);
         let (open, rect) = (n.cons.wins[k].0.clone(), n.cons.wins[k].1.clone());
-        if dev.is_none() {
+        if key.is_none() {
             open.set(0);
         }
-        let title = dev.map_or_else(String::new, |d| tf("Konsole – {}", &[&n.cons.title(&n.doc.proj, d)]));
+        let title = key.map_or_else(String::new, |(d, s)| tf("Konsole – {}", &[&n.cons.title_of(&n.doc.proj, d, s)]));
         let id = ID_TERM_WIN0 + 0x10 * k as u32;
         if ui.window_begin(id, &title, Some(&open), WF_TOOL | WF_RESIZABLE, Some(&rect)) {
-            if let Some(dev) = dev {
+            if let Some((dev, ses)) = key {
                 ui.next_size(-1, -1);
                 ui.box_begin(0, BOX_V | pad(6), 4);
                 ui.box_begin(0, BOX_H | BOX_XCENTER, 4);
@@ -175,21 +190,21 @@ pub(crate) fn windows(n: &mut Net, ui: &mut Ui) {
                 ui.next_icon(IC_BACK_TO_WINDOW);
                 ui.next_flags(ST_SUBTLE | ST_COMPACT);
                 if ui.button(id + 1, t("Andocken")) & EV_ACT != 0 {
-                    console::dock(n, dev);
+                    console::dock_tab(n, dev, ses);
                     ui.repass();
                 }
                 ui.box_end();
-                here(n, ui, dev);
+                here(n, ui, dev, ses);
                 ui.box_end();
             }
         }
         ui.window_end();
         // closed by the user: back into the panel
-        if let Some(d) = dev
+        if let Some((d, s)) = key
             && open.get() == 0
-            && n.cons.tab(d).is_some_and(|i| n.cons.tabs[i].win == Some(k))
+            && n.cons.tab_of(d, s).is_some_and(|i| n.cons.tabs[i].win == Some(k))
         {
-            console::dock(n, d);
+            console::dock_tab(n, d, s);
             ui.repass();
         }
     }
@@ -212,17 +227,29 @@ pub(crate) fn states(n: &Net, ui: &mut Ui) {
     let dev = selected_device(n);
     ui.cmd_state(CMD_CONSOLE, flag(!dev.is_some_and(|d| console::has_cli(&n.doc.proj, d)), CF_DISABLED));
     ui.cmd_state(CMD_DEVWIN, flag(dev.is_none(), CF_DISABLED));
-    let tab = n.cons.cur.is_some_and(|d| n.cons.tab(d).is_some_and(|i| n.cons.tabs[i].win.is_none()));
+    let s = n.cons.cur_ses;
+    let tab = n.cons.cur.is_some_and(|d| n.cons.tab_of(d, s).is_some_and(|i| n.cons.tabs[i].win.is_none()));
     for c in [CMD_TERM_CLOSE, CMD_TERM_RENAME, CMD_TERM_FLOAT, CMD_TERM_CLEAR] {
         ui.cmd_state(c, flag(!tab, CF_DISABLED));
     }
     ui.cmd_state(CMD_TERM_TILE, flag(n.cons.tabs.is_empty(), CF_DISABLED));
+    // a further session of the shown tab's device: it needs power (cli/ses.rs)
+    let on = n.cons.cur.filter(|_| tab).and_then(|d| n.doc.proj.device(d)).is_some_and(|d| !d.off);
+    ui.cmd_state(CMD_TERM_SESSION, flag(!on, CF_DISABLED));
 }
 
 /// the console commands (App::command) -> handled
 pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32) -> bool {
-    let cur = n.cons.cur.filter(|&d| n.cons.tab(d).is_some_and(|i| n.cons.tabs[i].win.is_none()));
+    let s = n.cons.cur_ses;
+    let cur = n.cons.cur.filter(|&d| n.cons.tab_of(d, s).is_some_and(|i| n.cons.tabs[i].win.is_none()));
     match id {
+        CMD_TERM_SESSION => {
+            if let Some(d) = cur
+                && let Err(e) = console::new_tab(n, ui, d)
+            {
+                n.file.msg = Some((IB_INFO, String::from(t("Keine weitere Sitzung")), e));
+            }
+        }
         CMD_CONSOLE => {
             if let Some(d) = selected_device(n) {
                 open_console(n, ui, d);
@@ -234,26 +261,32 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32) -> bool {
             }
         }
         CMD_TERM_CLOSE => {
+            // a further session's tab ends its session (cli/ses.rs)
             if let Some(d) = cur {
-                console::close(n, d);
+                console::close_tab(n, d, s);
             }
         }
         CMD_TERM_RENAME => {
             if let Some(d) = cur {
-                let text = n.cons.title(&n.doc.proj, d);
-                n.cons.rename = Some(Rename { dev: d, text, opened: false });
+                let text = n.cons.title_of(&n.doc.proj, d, s);
+                n.cons.rename = Some(Rename { dev: d, ses: s, text, opened: false });
             }
         }
         CMD_TERM_FLOAT => {
             if let Some(d) = cur
-                && !console::float(n, ui, d)
+                && !console::float_tab(n, ui, d, s)
             {
                 n.file.msg = Some((IB_INFO, String::from(t("Kein Fenster frei")), tf("Höchstens {} Konsolen laufen in eigenen Fenstern; „Andocken“ gibt eines frei.", &[&TERM_WINS.to_string()])));
             }
         }
         CMD_TERM_TILE => console::tile(n, ui),
         CMD_TERM_CLEAR => {
-            if let Some(c) = cur.and_then(|d| n.cons.by_dev.get_mut(&d)) {
+            let c = match cur {
+                Some(d) if s == 0 => n.cons.by_dev.get_mut(&d),
+                Some(d) => n.cons.sess.get_mut(&(d, s)),
+                None => None,
+            };
+            if let Some(c) = c {
                 c.term.clear();
             }
         }

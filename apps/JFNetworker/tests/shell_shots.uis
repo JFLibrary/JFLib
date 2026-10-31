@@ -21,7 +21,7 @@ wait 2500
 expect text:"2" exists
 type "sleep 60 &\n"
 type "ps; ls -l logs\n"
-expect text:"  PID USER     TIME COMMAND" exists
+expect text:"  PID USER     TTY      TIME COMMAND" exists
 shot build/jfnetworker/shell_terminal_light_100.png
 theme dark
 shot build/jfnetworker/shell_terminal_dark_100.png

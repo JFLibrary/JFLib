@@ -1,0 +1,92 @@
+# JFNetworker-Szenario sessions.scn: „Sitzungen und Telnet“, 5 Geräte, 4 Verbindungen, Seed 21
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/4 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/4 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R1      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet0/0/0 is up
+   0.000000000  R2      *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet0/0/0 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  --      run 1s
+   1.000000000  ADMIN   root@ADMIN:~# telnet 10.0.0.1
+   1.000000000  --      run 1s
+   1.000000000  ADMIN   Trying 10.0.0.1 ...
+   1.000005776  ADMIN   % Connected. The escape is Ctrl+Shift+6.
+   1.000009336  ADMIN   
+   2.000000000  ADMIN   Password: cisco
+   2.000000000  --      run 100ms
+   2.100000000  ok      expect ADMIN output contains "R1>"
+   2.100000000  ADMIN   R1>enable
+   2.100000000  --      run 100ms
+   2.200000000  ADMIN   R1#configure terminal
+   2.200000000  --      run 100ms
+   2.200004104  ADMIN   Configuration mode: one command per line; end or Ctrl+Z leaves it.
+   2.300000000  ADMIN   R1(config)#interface Loopback0
+   2.300000000  --      run 100ms
+   2.300001684  R1      *Mar  1 00:00:02.300: %LINK-3-UPDOWN: Loopback0 is up
+   2.300001684  R1      *Mar  1 00:00:02.300: %LINEPROTO-5-UPDOWN: line protocol on Loopback0 is up
+   2.400000000  ADMIN   R1(config-if)#ip address 192.168.1.1 255.255.255.255
+   2.400000000  --      run 100ms
+   2.500000000  ADMIN   R1(config-if)#end
+   2.500000000  --      run 100ms
+   2.500001444  R1      *Mar  1 00:00:02.500: %SYS-5-CONFIG_I: configuration changed from vty 0 (10.0.0.100)
+   2.600000000  ok      expect R1 output contains "%SYS-5-CONFIG_I: configuration changed from vty 0 (10.0.0.100)"
+   2.600000000  ADMIN   R1#show users
+   2.600000000  --      run 100ms
+   2.600005496  ADMIN       Line       User       Privilege  Idle      Location
+   2.600005496  ADMIN       con 0      -          1          00:00:02
+   2.600005496  ADMIN   *   vty 0      -          15         00:00:00  10.0.0.100
+   2.700000000  ok      expect ADMIN output contains "*   vty 0      -          15"
+   2.700000000  ADMIN   R1#show ip interface brief
+   2.700000000  --      run 100ms
+   2.700015608  ADMIN   Interface              IP-Address      OK? Method Status                Protocol
+   2.700015608  ADMIN   GigabitEthernet0/0/0   10.0.0.1        YES NVRAM  up                    up
+   2.700015608  ADMIN   GigabitEthernet0/0/1   unassigned      YES unset  administratively down down
+   2.700015608  ADMIN   GigabitEthernet0/0/2   unassigned      YES unset  administratively down down
+   2.700015608  ADMIN   GigabitEthernet0/0/3   unassigned      YES unset  administratively down down
+   2.700015608  ADMIN   TenGigabitEthernet0/1/0 unassigned      YES unset  administratively down down
+   2.700015608  ADMIN   TenGigabitEthernet0/1/1 unassigned      YES unset  administratively down down
+   2.700015608  ADMIN   Serial0/2/0            unassigned      YES unset  administratively down down
+   2.700015608  ADMIN   Serial0/2/1            unassigned      YES unset  administratively down down
+   2.700015608  ADMIN   Loopback0              192.168.1.1     YES manual up                    up
+   2.800000000  ok      expect ADMIN output contains "Loopback0"
+   2.800000000  ADMIN   R1#exit
+   2.800000000  --      run 1s
+   2.800002888  ADMIN   
+   2.800002888  ADMIN   % Connection closed by foreign host
+   3.800000000  ok      expect ADMIN output contains "% Connection closed by foreign host"
+   3.800000000  R1      R1>show users
+   3.800000000  R1          Line       User       Privilege  Idle      Location
+   3.800000000  R1      *   con 0      -          1          00:00:00
+   3.800000000  ADMIN   root@ADMIN:~# telnet 10.0.0.2
+   3.800000000  --      run 1s
+   3.800000000  ADMIN   Trying 10.0.0.2 ...
+   3.800005776  ADMIN   % Connected. The escape is Ctrl+Shift+6.
+   3.800009336  ADMIN   
+   4.800000000  ADMIN   Username: admin
+   4.800000000  --      run 100ms
+   4.900000000  ADMIN   Password: adminpw
+   4.900000000  --      run 100ms
+   5.000000000  ok      expect ADMIN output contains "R2#"
+   5.000000000  R2      R2>show users
+   5.000000000  R2          Line       User       Privilege  Idle      Location
+   5.000000000  R2      *   con 0      -          1          00:00:00
+   5.000000000  R2          vty 0      admin      15         00:00:00  10.0.0.100
+   5.000000000  ok      expect R2 output contains "vty 0"
+   5.000000000  --      run 90s
+  64.900003560  ADMIN   R2#
+  64.900003560  ADMIN   % No input for 00:01:00: the session ends
+  64.900004232  ADMIN   
+  64.900004232  ADMIN   % Connection closed by foreign host
+  95.000000000  ok      expect ADMIN output contains "% No input for 00:01:00: the session ends"
+  95.000000000  ok      expect ADMIN output contains "% Connection closed by foreign host"
+  95.000000000  R2      R2>show users
+  95.000000000  R2          Line       User       Privilege  Idle      Location
+  95.000000000  R2      *   con 0      -          1          00:00:00
+  95.000000000  ADMIN   root@ADMIN:~# who
+  95.000000000  ADMIN   root     tty1         2025-12-31 23:59
+# 9 von 9 Erwartungen erfüllt

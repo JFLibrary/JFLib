@@ -1,0 +1,48 @@
+# Sitzungen und Telnet: der Admin-PC meldet sich per Telnet an R1 an (Leitungspasswort cisco),
+# richtet dort ein Loopback-Interface ein und sieht mit show users seine vty-Sitzung neben der
+# Konsole; R1s Konsole meldet, von wo die Konfiguration kam.  Dann meldet er sich an R2 an (login
+# local, Benutzer admin) und vergisst die Sitzung: nach der Leerlaufzeit der Leitung (exec-timeout
+# 1 0) schließt R2 sie, und show users an R2s Konsole zeigt nur noch die Konsole.  Die Passwörter
+# tippt der Admin ohne Echo; der Bericht zeigt sie wie jede getippte Zeile.
+run 1s
+ADMIN: telnet 10.0.0.1
+run 1s
+ADMIN: cisco
+run 100ms
+expect ADMIN output contains "R1>"
+ADMIN: enable
+run 100ms
+ADMIN: configure terminal
+run 100ms
+ADMIN: interface Loopback0
+run 100ms
+ADMIN: ip address 192.168.1.1 255.255.255.255
+run 100ms
+ADMIN: end
+run 100ms
+expect R1 output contains "%SYS-5-CONFIG_I: configuration changed from vty 0 (10.0.0.100)"
+ADMIN: show users
+run 100ms
+expect ADMIN output contains "*   vty 0      -          15"
+ADMIN: show ip interface brief
+run 100ms
+expect ADMIN output contains "Loopback0"
+ADMIN: exit
+run 1s
+expect ADMIN output contains "% Connection closed by foreign host"
+R1: show users
+# R2: angemeldet und vergessen
+ADMIN: telnet 10.0.0.2
+run 1s
+ADMIN: admin
+run 100ms
+ADMIN: adminpw
+run 100ms
+expect ADMIN output contains "R2#"
+R2: show users
+expect R2 output contains "vty 0"
+run 90s
+expect ADMIN output contains "% No input for 00:01:00: the session ends"
+expect ADMIN output contains "% Connection closed by foreign host"
+R2: show users
+ADMIN: who

@@ -52,6 +52,8 @@
 // (group scriptmod: jfn_sim::scriptsvc's loader and DebugOp, script's modules and debug.rs).
 // desktoptest.rs: what a host's desktop builds on (group desk: jfn_sim::procs against ps, the
 // CPU time per second, the Dateimanager's copies and moves, the console's window, contrast).
+// sessiontest.rs: command-line sessions and the telnet servers (group sessions: jfn_sim::cli::ses,
+// telnetd, the vty parts of cli/aaa.rs and cli/ios.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -131,9 +133,11 @@ mod shelltest;
 mod scriptmodtest;
 #[path = "desktoptest.rs"]
 mod desktoptest;
+#[path = "sessiontest.rs"]
+mod sessiontest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 44] = [
+    let groups: [(&'static str, fn(&mut T)); 45] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -178,6 +182,7 @@ pub fn run() -> i32 {
         ("shell", shelltest::run),
         ("scriptmod", scriptmodtest::run),
         ("desk", desktoptest::run),
+        ("sessions", sessiontest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

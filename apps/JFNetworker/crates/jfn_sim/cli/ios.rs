@@ -31,6 +31,9 @@
 // username / password.
 // SNMP (cli/snmp.rs): snmp-server community, location, contact, host, enable traps and "no
 // snmp-server"; show snmp [community]; debug snmp packets.
+// The vty lines and sessions (telnetd.rs): "transport input", "access-class" in line mode,
+// terminal [no] monitor, show line, clear line; exit / logout in a vty or local session ends
+// it, "%SYS-5-CONFIG_I" names the session the configuration came from.
 
 use alloc::format;
 use alloc::string::String;
@@ -259,6 +262,12 @@ pub enum K {
     Mkdir,
     Rmdir,
     Rename,
+    // the vty lines and the sessions (telnetd.rs, cli/ses.rs)
+    TransportInput,
+    AccessClass,
+    TermMonitor,
+    ShowLine,
+    ClearLine,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -623,6 +632,9 @@ fn build(caps: u32) -> Tree<K> {
         t.add(m, "telnet WORD=host", "Address or name of the host", Some(K::Telnet), 0);
         t.add(m, "telnet WORD=host <1-65535>=port", "The TCP port (23 if not given)", Some(K::Telnet), 0);
     }
+    // ---- the vty lines and the sessions: transport input, access-class, terminal monitor,
+    // show line, clear line (telnetd.rs)
+    crate::telnetd::build_vty(&mut t, [user, prv, line]);
     t
 }
 
@@ -808,6 +820,10 @@ impl Engine {
             }
         };
         self.ios_snap(ni);
+        // the telnet server follows the vty lines (telnetd.rs; at boot once at the end)
+        if !self.booting(ni) {
+            self.vty_sync(ni);
+        }
         r
     }
 
@@ -850,6 +866,11 @@ impl Engine {
             K::Disable => self.disable_cmd(ni, p),
             K::Exit => match mode {
                 Mode::User | Mode::Priv => {
+                    // a vty or local session ends (cli/ses.rs, telnetd.rs)
+                    if self.ses_cur(ni) != 0 {
+                        self.ses_logout(ni);
+                        return Ok(());
+                    }
                     // a configured login re-locks the console (accounting stop first)
                     if self.line_login_plan(ni, "con 0").is_some() {
                         let user = self.cdev(ni).map(|c| c.user.clone()).unwrap_or_default();
@@ -868,7 +889,8 @@ impl Engine {
                 }
                 Mode::Config => {
                     self.set_mode(ni, Mode::Priv);
-                    self.ios_log(ni, "%SYS-5-CONFIG_I: configuration changed at the console");
+                    let from = self.ses_config_from(ni);
+                    self.ios_log(ni, &format!("%SYS-5-CONFIG_I: configuration changed {}", from));
                     Ok(())
                 }
                 _ => {
@@ -879,7 +901,8 @@ impl Engine {
             K::End => {
                 self.set_mode(ni, Mode::Priv);
                 if !self.booting(ni) {
-                    self.ios_log(ni, "%SYS-5-CONFIG_I: configuration changed at the console");
+                    let from = self.ses_config_from(ni);
+                    self.ios_log(ni, &format!("%SYS-5-CONFIG_I: configuration changed {}", from));
                 }
                 Ok(())
             }
@@ -1196,6 +1219,7 @@ impl Engine {
             | K::ShowUsers
             | K::TestAaa => self.ios_aaa(ni, p, line),
             K::Telnet => self.ios_telnet(ni, p),
+            K::TransportInput | K::AccessClass | K::TermMonitor | K::ShowLine | K::ClearLine => self.ios_vty(ni, p),
         }
     }
 

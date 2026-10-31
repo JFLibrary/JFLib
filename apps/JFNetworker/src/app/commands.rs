@@ -46,7 +46,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 109] = [
+pub(crate) static CMDS: [Command; 110] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -156,6 +156,7 @@ pub(crate) static CMDS: [Command; 109] = [
     Command::new(CMD_BG_FIT, "Hintergrundbild an &Ansicht anpassen", 0, 0, 0, CF_DISABLED),
     Command::new(CMD_BG_REMOVE, "Hintergrund ent&fernen", 0, 0, 0, CF_DISABLED),
     Command::new(CMD_DESK_FULL, "&Vollbild", JN_FULLSCREEN, 0, VK_F11, 0),
+    Command::new(CMD_TERM_SESSION, "Neue &Sitzung", IC_ADD, 0, 0, CF_DISABLED),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -564,6 +565,8 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         CMD_BG_OPEN..=CMD_BG_CHOSEN => return canvas::backdrop::command(n, ui, id),
         // the desktop of hosts (V2): F11, the active device window into full screen and back
         CMD_DESK_FULL => crate::workspace::devwin::fullscreen(n, ui),
+        // a further command-line session as a tab of the Terminal panel (X1e)
+        CMD_TERM_SESSION => return terminal::command(n, ui, id),
         _ => return false,
     }
     ui.repass();

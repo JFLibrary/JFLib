@@ -17,8 +17,12 @@
 //                                 setting the inspector applied itself; later the console's
 //                                 "copy running-config startup-config")
 //   send(Cmd) -> Result<Tick>     every command of the UI goes here (U3: Cli, Interrupt; U4: the
-//                                 modes and steps); console output and changes collect for
+//                                 modes and steps; X1e: the Ses* commands of further sessions,
+//                                 always in the present); console output and changes collect for
 //                                 take_reports()
+//   open_session(dev) -> Result<u32>   Cmd::SesOpen with the new session's id (doc/console.rs);
+//                                 live_mut(): the present engine for `?` and Tab of a session
+//                                 (it is put in place and back, nothing changes)
 //   arm() -> ms / tick()          the timer (UIC_TIMER): the clock follows the wall clock
 //   view / leds / ver             the snapshot after the last change for the canvas and the
 //                                 inspector; ver changes with it, led_key with the LEDs
@@ -618,6 +622,8 @@ impl Sim {
         let edit = match &c {
             Cmd::Apply(a) => !matches!(a, Action::Move { .. } | Action::Scale { .. }),
             Cmd::Cli { .. } | Cmd::Interrupt { .. } => true,
+            // the further sessions run in the present (doc/console.rs)
+            Cmd::SesOpen { .. } | Cmd::SesClose { .. } | Cmd::SesLine { .. } | Cmd::SesInterrupt { .. } => true,
             _ => false,
         };
         if edit {
@@ -628,6 +634,23 @@ impl Sim {
         self.changed();
         self.follow();
         r
+    }
+
+    /// a further session of a device (Cmd::SesOpen, in the present) -> its id
+    pub(crate) fn open_session(&mut self, dev: u32) -> Result<u32, ActErr> {
+        self.catch_up();
+        self.to_live();
+        self.topo = self.topo.wrapping_add(1);
+        let r = self.drv.open_session(dev, plat::task::now_us());
+        self.changed();
+        self.follow();
+        r
+    }
+
+    /// the present engine for a question that changes nothing in the end: `?` and Tab of a
+    /// further session put it in place and back (Engine::cli_ses_help / cli_ses_complete)
+    pub(crate) fn live_mut(&mut self) -> &mut Engine {
+        &mut self.drv.eng
     }
 
     // something changed: a snapshot now, the timer soon

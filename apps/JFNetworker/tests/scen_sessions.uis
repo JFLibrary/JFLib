@@ -1,0 +1,8 @@
+#!args apps/JFNetworker/tests/fixtures/sessions.jfnet --scenario apps/JFNetworker/tests/scen/sessions.scn --golden apps/JFNetworker/tests/scen/sessions.report
+# golden scenario: command-line sessions and the telnet servers (X1e). The admin PC telnets
+# into R1 (line password), configures a loopback there and sees its vty session in show users
+# while R1's console names the vty line the change came from; then it logs in to R2 (login
+# local) and forgets the session, which R2's exec-timeout of one minute ends. The GUI program
+# runs tests/scen/sessions.scn on tests/fixtures/sessions.jfnet without a window and ends with
+# the report, which must equal tests/scen/sessions.report byte for byte on every target (CR LF
+# there counts as LF; the script itself is not run).
