@@ -5,9 +5,11 @@ Checkbox, Schalter, Slider, Fortschrittsanzeige, Akzentfarben, hellem/dunklem De
 Unicode-Textfeld und einer Karte „Dateien & Zwischenablage“ (Öffnen, Speichern unter, Ordner
 über den System-Picker, eine Notiz, die einen Neustart überlebt, ein Startzähler, Kopieren und
 Einfügen über die System-Zwischenablage; [`files.rs`](files.rs)) sowie „Sicherer Speicher“
-(ein Wert im Android Keystore bzw. im Browser-Speicher von `plat::secret`; [`secrets.rs`](secrets.rs)).
-Vertikal wischen scrollt die
-Seite; horizontal ziehen bewegt den Slider. Die App benötigt keine Berechtigungen und keinen
+(ein Wert im Android Keystore bzw. im Browser-Speicher von `plat::secret`; [`secrets.rs`](secrets.rs))
+und „System“ (Einstellungen des Systems live, eine Benachrichtigung, Bildschirm anlassen,
+Lebenszyklus; [`system.rs`](system.rs)). Vertikal wischen scrollt die
+Seite; horizontal ziehen bewegt den Slider. Die App braucht nur `POST_NOTIFICATIONS` (gefragt
+bei der ersten Benachrichtigung) und `WAKE_LOCK` (Bildschirm anlassen), keinen
 Netzwerkzugang: Dokumente anderer Apps erreicht sie nur über die Freigabe im Picker.
 
 ## APK bauen
@@ -272,6 +274,37 @@ Am 21.10.2026 auf einem x86_64-Emulator mit Android 15 / API 35: Phase 1 33 Selb
 Sicherheitsstufe 0); `android_files.py`, `GalleryInstrumentation` (78) und
 `GalleryA11yInstrumentation` (30) weiter grün. Browser: 56 Prüfungen in Chromium und Firefox,
 28 in Chromium mit `--threads`; `a11y_web.mjs` (33) weiter grün.
+
+## System prüfen (seit 01.11.2026)
+
+Die Karte „06 System“ zeigt, was das System der App sagt (Design, Kontrast, Bewegung,
+Textgröße, Akzent, die `UIC_SETTINGS` mit ihren Bits), schickt eine Benachrichtigung
+(`ui.notify`; Klick: `UIC_NOTE`, weg: `UIC_NOTE_GONE`), hält mit „Bildschirm anlassen“
+`plat::inhibit(INHIBIT_IDLE)` und zählt den Lebenszyklus (`UIC_ACTIVE`, `UIC_SUSPEND` 2 / 0).
+„Design des Systems“ lässt das Design dem System folgen (sonst bleibt die Galerie hell).
+
+```powershell
+python apps/androidGallery/tests/android_system.py --serial SERIAL [--apk build/android/androidGallery-x86_64-debug.apk]
+python build_rs.py app androidGallery --target web
+node apps/androidGallery/tests/system_web.mjs build [--threads]
+```
+
+Das Android-Skript startet die Galerie mit `jfgui_SELFTEST=system` (die Karte oben, ihr Zustand
+in `data://system-state.txt`, gelesen mit `run-as`), tippt ihre Knöpfe über `uiautomator dump`
+an und ändert das System wie ein Nutzer: `cmd uimode night yes|no`, `font_scale 1.3`,
+`animator_duration_scale 0`, `high_text_contrast_enabled 1`; Benachrichtigung abgelehnt und
+erlaubt im Dialog des Systems, angetippt in der Leiste (die Galerie kommt nach vorn), weggewischt,
+dauerhaft verweigert (`pm revoke`, `user-fixed`); `FLAG_KEEP_SCREEN_ON` (`dumpsys window`) und
+der WakeLock (`dumpsys power`); `KEYCODE_HOME` und Neustart aus dem Launcher. Am Ende stellt es
+jede geänderte Einstellung wieder her. Ohne `--apk` installiert es
+`build/android/androidGallery-<ro.product.cpu.abi>-debug.apk`, falls vorhanden; es läuft so auch
+auf einem Telefon (entsperrt). Der Browsertest emuliert die Media Queries in Chromium und Firefox,
+klickt eine echte Notification an, prüft Erlaubnis erteilt / noch nicht gefragt / verweigert,
+den Screen Wake Lock über einen versteckten Tab hinweg und `UIC_SUSPEND`.
+
+Am 01.11.2026 auf einem x86_64-Emulator mit Android 15 / API 35: 37 Prüfungen bestanden
+(das Wegwischen nimmt SystemUI im Emulator nicht immer als Geste an; dann meldet das Skript es
+als nicht geprüft). Browser: 45 Prüfungen in Chromium, 41 in Firefox, mit `--threads` 86.
 
 ## Regressionstest für Android-Eingabe und Leerlauf
 

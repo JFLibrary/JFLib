@@ -209,7 +209,7 @@ and on Wayland compositors without server-side decorations the library draws a t
   | `UIC_WAKE` | `plat::wake()` from another thread (a background job finished) |
   | `UIC_EXIT` | the window loop ends (only after a real window ran: save settings here) |
   | `UIC_ACTIVE` | `arg` 1: one of the app's windows got the keyboard, 0: none has it (pause animations, poll less) |
-  | `UIC_SUSPEND` | `arg` 1: the system goes to sleep (save, close connections), 0: it woke up; to keep it awake see `plat::inhibit` (section 21) |
+  | `UIC_SUSPEND` | `arg` 1: the system goes to sleep (save, close connections), 2: the app went to the background -- the browser hid the tab (`visibilitychange`), Android stopped the activity (`onStop`); the app may be ended without another word, so save here too --, 0: it woke up / is visible again; to keep it awake see `plat::inhibit` (section 21) |
   | `UIC_SESSION_END` | logout, shutdown or SIGTERM: save now; `UIC_EXIT` and the end follow |
   | `UIC_SETTINGS` | `arg` = `plat::SET_THEME \| SET_LOCALE \| SET_CONTRAST \| SET_FONTS \| SET_MONITORS`: system settings changed; a system theme and the format (`i18n::locale()`) are already updated; `SET_MONITORS`: a monitor came, went, moved or changed its scale or work area (`ui.monitors()`, section 21) |
   | `UIC_HOTKEY`, `UIC_HOTKEY_LOST` | `arg` = id: a global shortcut was pressed anywhere / the desktop dropped it (`ui.hotkey_error(id)`; section 21) |
@@ -820,7 +820,15 @@ ui.dialog_end(); // always
   id; a click on it sends `UIC_NOTE` (arg = id), and `UIC_NOTE_GONE` arrives when it closes unclicked.
   Call `tray_set` again after `cmd_state` changes. `ui.bring_to_front()` restores the window. Windows uses
   `Shell_NotifyIconW` (the notification is the symbol's balloon, which Windows 10 / 11 show as a toast);
-  Linux uses StatusNotifierItem + dbusmenu and `org.freedesktop.Notifications`. Headless runs only
+  Linux uses StatusNotifierItem + dbusmenu and `org.freedesktop.Notifications`. The browser and
+  Android have notifications but no symbol (`tray_set` answers `false`): the browser uses the
+  Notification API (`web/notify.js`) -- not asked yet, the page asks for the permission when the
+  first notification comes (it comes from the user's click, inside the click's activation), refused
+  the note goes away at once (`UIC_NOTE_GONE`) and later ones answer 0; a click focuses the tab.
+  Android uses the NotificationManager with the channel "jfgui" (`android/GalleryNotify.java`;
+  API 33+ asks for `POST_NOTIFICATIONS` at the first note, which the manifest must list); a tap
+  opens the activity. The app's `PERMISSIONS` has no rule for notifications on any platform: the
+  system's permission is the gate. Headless runs only
   print what they would show. `apps/traydemo` shows all of it. An installed app runs under its
   explicit AppUserModelID (section 21, "The app's identity on Windows"): Windows files its
   notifications under that id, and the setup's start menu shortcut carries it -- the shortcut
@@ -1331,7 +1339,13 @@ if (desc.render)(&args, &mut dst) == 0 {
   dark choice (with `theme_set(2)`), its accent colour (unless the `AppDesc` or `--accent` set
   one), high contrast, "reduce motion" (`ui.anim_off()`), the text scale, the double-click and
   caret blink times -- at start and live when they change (`UIC_SETTINGS`; Windows registry and
-  system calls, Linux the settings portal). Headless runs take only the `jfgui_THEME`,
+  system calls, Linux the settings portal; the browser its media queries `prefers-color-scheme`,
+  `prefers-contrast`, `forced-colors` with the forced scheme's system colours,
+  `prefers-reduced-motion` and the default font size as the text scale (`web/system.js`); Android
+  the night mode and font scale of its configuration, `ANIMATOR_DURATION_SCALE` 0 as "reduce
+  motion", high-contrast text and the contrast level, the dynamic colours' accent on API 31+
+  (`android/GallerySystem.java`; the manifest's `configChanges` must name `uiMode|fontScale`).
+  The `jfgui_*` variables win everywhere). Headless runs take only the `jfgui_THEME`,
   `jfgui_ACCENT`, `jfgui_CONTRAST`, `jfgui_REDUCE_MOTION`, `jfgui_TEXT_SCALE`,
   `jfgui_DOUBLE_CLICK_MS`, `jfgui_CARET_BLINK_MS`, `jfgui_FONT_AA`, `jfgui_FONT_HINTING`,
   `jfgui_FONT_RGBA` overrides, so shots stay the same. The system's font smoothing off draws
@@ -1517,7 +1531,7 @@ in DIP):
 | `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back |
 | `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
-| `system focus in\|out`, `system suspend\|resume`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...) |
+| `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
 | `system hotkey ID`, `system pick RRGGBB\|cancel` | a recorded global shortcut pressed (`UIC_HOTKEY`); the user's answer to a running colour pick (`UIC_PICK`, a `CP_PIPETTE` picker; section 21) |
 | `clip text "s"`, `clip file F`, `clip dib F`, `clip clear`, `clip save F [bmp]`, `clip expect none\|text\|image\|png` | the headless clipboard (never the real one) |
 | `clip utf8 F` | exact UTF-8 text clipboard bytes from a file (up to 4 MiB), including CR/LF and long paste payloads; opt-in Rust extension |
@@ -2562,8 +2576,17 @@ self.busy = None;
 * Windows uses a power request, Linux the Inhibit portal (also in Flatpak), else
   `org.freedesktop.ScreenSaver` / `PowerManagement`. Some Linux desktops only inhibit idle:
   then `INHIBIT_SUSPEND` gives `None` and `INHIBIT_IDLE` still works.
-* The other direction already arrives as commands: `UIC_SUSPEND` (sleep / wake up) and
-  `UIC_SESSION_END` (logout, shutdown) -- see the table in section 3.
+* The browser keeps only the screen on: `INHIBIT_IDLE` takes the Screen Wake Lock (the browser
+  drops it while the tab is hidden; the page takes it again once it is visible), `INHIBIT_SUSPEND`
+  alone and browsers without the API give `None`. Android: `INHIBIT_IDLE` is
+  `FLAG_KEEP_SCREEN_ON` on the activity's window, `INHIBIT_SUSPEND` (which `INHIBIT_IDLE`
+  implies) a partial WakeLock -- the CPU keeps running with the screen off, so drop the guard
+  when `UIC_SUSPEND` 2 says the app is in the background and it is not needed there; the manifest
+  needs `android.permission.WAKE_LOCK`.
+* The other direction already arrives as commands: `UIC_SUSPEND` (sleep / wake up; 2 / 0 when
+  the browser hides / shows the tab or Android stops / starts the activity) and
+  `UIC_SESSION_END` (logout, shutdown) -- see the table in section 3. Android's `onPause` /
+  `onResume` are `UIC_ACTIVE` 0 / 1.
 * `plat::inhibited()` returns the bits the live guards hold.
 
 **Starting at login.** `plat::autostart_set(true, &["--tray"])` makes the system start the

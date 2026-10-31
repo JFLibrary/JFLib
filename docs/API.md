@@ -61,7 +61,7 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
-  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
+  <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [web_system.rs](#platweb_systemrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
   <br>[lib.rs](#base-crate-root) · [ini.rs](#baseinirs) · [encoding.rs](#baseencodingrs) · [xml.rs](#basexmlrs) · [num.rs](#basenumrs) · [settings.rs](#basesettingsrs) · [rng.rs](#baserngrs) · [metrics.rs](#basemetricsrs) · [cmdtree.rs](#basecmdtreers) · [hashring.rs](#basehashringrs) · [lru.rs](#baselrurs) · [pattern.rs](#basepatternrs)
 - [datetime](#datetime) -- timestamps, civil dates, RFC 3339, IANA time zones with DST, cron schedules
@@ -3867,8 +3867,10 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                   runs (the median and the retries ride out a busy machine), FAIL when none
                   does
   quit
-  system focus in|out | suspend | resume | session-end | settings theme|locale|contrast|fonts|N
-                      the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...)
+  system focus in|out | suspend | resume | background | foreground | session-end |
+         settings theme|locale|contrast|fonts|N
+                      the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...;
+                      background / foreground: a hidden tab, Android's onStop / onStart)
   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
 Windows (ID = the app's window id, 0 / main = the main window):
@@ -4913,7 +4915,7 @@ UIC_NOTE: u32 = 0x7FFF_000D  // arg = id: a system notification was clicked (not
 UIC_NOTE_GONE: u32 = 0x7FFF_000E  // arg = id: a notification went away unclicked
 // lifecycle (runtime.rs)
 UIC_ACTIVE: u32 = 0x7FFF_000F  // arg 1: one of the app's windows got the keyboard, 0: none has it
-UIC_SUSPEND: u32 = 0x7FFF_0010  // arg 1: the system goes to sleep, 0: it woke up
+UIC_SUSPEND: u32 = 0x7FFF_0010  // arg 1: the system goes to sleep, 2: the app went to the background (browser, Android), 0: it woke up / is back
 UIC_SESSION_END: u32 = 0x7FFF_0011  // logout / shutdown / SIGTERM: save now; UIC_EXIT and the end follow
 UIC_SETTINGS: u32 = 0x7FFF_0012  // arg = plat::SET_* bits: system settings changed (theme and format already applied)
 // drag and drop (dnd.rs)
@@ -19231,7 +19233,9 @@ Windows (win_tray.rs): Shell_NotifyIconW on a message-only window of the UI thre
 with TrackPopupMenuEx, notifications as the symbol's balloon (Windows 10 / 11 show it as a
 toast; without a visible symbol a hidden one is added for the time it is shown).  Linux
 (linux_tray.rs): StatusNotifierItem with a com.canonical.dbusmenu menu and
-org.freedesktop.Notifications, on a session-bus connection of its own thread.  Elsewhere
+org.freedesktop.Notifications, on a session-bus connection of its own thread.  Browser and
+Android (web_notify.rs): notifications only -- the Notification API (the permission asked for
+from the user's gesture), NotificationManager with POST_NOTIFICATIONS; no symbol.  Elsewhere
 nothing is shown.  jfgui_TRAY_DRYRUN=1 prints what would be shown instead (tests).
 ```
 
@@ -19311,7 +19315,8 @@ power -- keep the computer awake while the app works: no standby, no screen save
                                    also to keep the screen on and the session active
                                    (INHIBIT_IDLE: presentations, videos; implies
                                    INHIBIT_SUSPEND).  The guard releases it when dropped.
-                                   None: not possible here (no service, web, Android)
+                                   None: not possible here (no service; the browser:
+                                   INHIBIT_SUSPEND alone, no Screen Wake Lock)
   inhibited() -> u32               the INHIBIT_* bits the live guards of this process hold
 
 reason is shown by the system (`powercfg /requests`, the desktop's list of inhibitors);
@@ -19330,7 +19335,9 @@ only best effort beside idle) -- all on a session-bus connection of plat that st
 while a guard lives (the desktop ends inhibitions with their connection; it is closed when
 the last guard goes).  A backend may still drop an inhibition later; the guard does not
 notice.  logind's Inhibit is not used: it answers with a file descriptor, which plat's
-D-Bus client does not receive.
+D-Bus client does not receive.  Browser and Android (web_power.rs): the Screen Wake Lock
+(INHIBIT_IDLE only; taken again when the tab is visible again), FLAG_KEEP_SCREEN_ON and a
+partial WakeLock (INHIBIT_SUSPEND).
 ```
 
 ```rust
@@ -23438,7 +23445,8 @@ REQUEST_UNSAVED: u32 = 22
   Wall-clock time from the host calendar: nanoseconds since 1970-01-01 00:00 UTC.
 
 - **`fn theme() -> i32`**
-  Theme requested by the host: 0 light, 1 dark, or -1 unspecified.
+  Theme requested by the host: 0 light, 1 dark, or -1 unspecified (jfgui_THEME, else the
+  system's scheme the host reported: prefers-color-scheme, Android's night mode).
 
 - **`fn cpu_count() -> u32`**
   Available compute workers in a shared-memory bundle, otherwise one app worker.
@@ -23566,6 +23574,8 @@ REQUEST_UNSAVED: u32 = 22
 
 - **`extern "C" fn jfgui_event( typ: u32, button: u32, mods: u32, window: u32, x: i32, y: i32, data: u32, ) -> u32`**
   Enqueue a bounded platform event; pointer/resize events update virtual window routing.
+  The lifecycle comes this way too: E_POWER with data 2 when the page was hidden / Android's
+  activity stopped (onStop), 3 when it is visible / started again (UIC_SUSPEND 2 / 0).
 
 - **`extern "C" fn jfgui_env(len: u32) -> u32`**
   Set a per-instance environment value from the host before jfgui_start; inbox: UTF-8
@@ -23855,6 +23865,60 @@ REQUEST_PICK_COLOR: u32 = 21
 - **`extern "C" fn jfgui_color(id: u32, status: i32, rgb: u32) -> u32`**
   The EyeDropper's answer to the pick request id: status 2 = picked (rgb 0xRRGGBB), -4
   cancelled, -1 refused, -3 not supported, else failed.  1 = taken.
+
+### `plat/web_system.rs`
+
+Source: [`lib/plat/web_system.rs`](../lib/plat/web_system.rs)
+
+```text
+web_system -- what the browser / Android host says about the system: the user's settings
+(settings.rs), the permission for notifications and whether the screen can be kept on
+(web_notify.rs, web_power.rs), the answers of the notifications
+
+  jfgui_system(len) -> count   the inbox: "key=value" lines -> how many keys were taken; a
+                               key that is missing keeps its value.  The host sends all of
+                               them before jfgui_start and the changed ones after every
+                               change; once the app runs, a change of what sys_settings()
+                               answers is E_SETTINGS with its SET_* bits (dark, accent:
+                               SET_THEME; contrast, forced, colors: SET_CONTRAST; scale:
+                               SET_FONTS; motion: SET_OTHER).  Keys:
+    dark=1|0|-        a dark / light scheme, "-" no preference (prefers-color-scheme;
+                      Android: Configuration.uiMode, UI_MODE_NIGHT_YES)
+    contrast=1|0      more contrast (prefers-contrast: more; Android: high-contrast text, the
+                      contrast level of API 34 at "high")
+    forced=1|0        the browser's forced colours (forced-colors: active, Windows' contrast
+                      themes in the browser): high contrast with the colours of `colors`
+    colors=RRGGBB,..  eight system colours of the forced scheme: Canvas, CanvasText,
+                      Highlight, HighlightText, ButtonFace, ButtonText, GrayText, LinkText
+                      (HcColors in that order); empty: none
+    motion=1|0        fewer animations (prefers-reduced-motion: reduce; Android:
+                      Settings.Global.ANIMATOR_DURATION_SCALE 0)
+    scale=PERCENT     the text size (the browser's default font size against 16 px;
+                      Android: Configuration.fontScale)
+    accent=RRGGBB|-   the system's accent colour (Android 12+: the dynamic colours,
+                      system_accent1_600); "-" none
+    notify=granted|default|denied|unsupported   (browser) the Notification permission:
+                      default = asked at the first notification (from the user's gesture)
+    wakelock=1|0      (browser) navigator.wakeLock exists (Screen Wake Lock)
+  jfgui_note(id, clicked) -> 1   a notification of tray::notify was clicked (1; the host
+                               brought the tab / the activity to the front) or went away
+                               unclicked (0: closed, swiped away, refused) -> TrayEvent
+  sys_settings_host(&mut s)    (settings.rs) the host's values; the jfgui_* overrides follow
+  dark() -> Option<bool>       (web.rs theme())
+  notify_state() / wakelock()  (web_notify.rs, web_power.rs)
+
+The lifecycle needs no export of its own: the host sends E_POWER through jfgui_event (data 2:
+the tab was hidden / Android's onStop, 3: visible / started again) and the runtime turns it
+into UIC_SUSPEND.
+```
+
+- **`extern "C" fn jfgui_system(len: u32) -> u32`**
+  The host's system settings and states (inbox: "key=value" lines, see the module header)
+  -> the keys taken.  A change once the app runs is E_SETTINGS.
+
+- **`extern "C" fn jfgui_note(id: u32, clicked: u32) -> u32`**
+  A notification of tray::notify was clicked (clicked 1) or went away without a click (0)
+  -> 1 taken (0: the app has not started).
 
 ### `plat/android_ime.rs`
 
