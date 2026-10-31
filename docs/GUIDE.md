@@ -854,7 +854,7 @@ ui.dialog_end(); // always
   button at the side the layout puts close. Without these settings (Windows, other desktops) the
   style decides as before. Overrides: `jfgui_BUTTON_LAYOUT=close,minimize,maximize:`,
   `jfgui_TITLEBAR_DOUBLE_CLICK`, `_MIDDLE_CLICK`, `_RIGHT_CLICK` (GNOME's names).
-  The resize band of a window without a system frame (5 DIP at the edges, 12 DIP corners) lies
+  The resize band of a window without a system frame (`SM_GRIP`, about 5 DIP, `SM_GRIP_CORNER` corners) lies
   inside the window, under the caption buttons: there the buttons win (their top row and the
   close button's corner click the button), elsewhere the band resizes; it is off while the
   window is maximized or in full screen and on the tiled edges of a tiled window (GTK puts the
@@ -1551,7 +1551,9 @@ in DIP):
 | `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back |
 | `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
-| `system focus in\|out`, `system suspend\|resume`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...) |
+| `system focus in\|out`, `system suspend\|resume`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|other\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...) |
+| `system env NAME VALUE\|-` | set (`-` removes) a `jfgui_*` environment variable of the run: the overrides of the system settings (then `system settings ...`), `jfgui_CSD` (the library title bar and its resize band from the next pass) |
+| `expect wm none\|move\|menu\|minimize\|maximize\|restore\|close\|lower\|resize EDGE` | what the title bar or the resize band asked the window manager for since the last check (headless runs only record it; EDGE `n`, `s`, `w`, `e`, `nw`, `ne`, `sw`, `se`, physical) |
 | `system hotkey ID`, `system pick RRGGBB\|cancel` | a recorded global shortcut pressed (`UIC_HOTKEY`); the user's answer to a running colour pick (`UIC_PICK`, a `CP_PIPETTE` picker; section 21) |
 | `clip text "s"`, `clip file F`, `clip dib F`, `clip clear`, `clip save F [bmp]`, `clip expect none\|text\|image\|png` | the headless clipboard (never the real one) |
 | `clip utf8 F` | exact UTF-8 text clipboard bytes from a file (up to 4 MiB), including CR/LF and long paste payloads; opt-in Rust extension |

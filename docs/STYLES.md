@@ -230,7 +230,8 @@ entries, so the stock painters fit every style's palette.
 
 **Layout values:** `StyleChrome::metric(SM_*)` gives dialog widths and paddings, bar heights,
 caption button widths, title text styles, grips. Conventions: `SM_CAP_LEFT` 1 puts the caption
-buttons at the left end in the order close, minimise, maximise; `SM_DLG_BTN_ORDER` right-aligns
+buttons at the left end in the order close, minimise, maximise (on Linux the desktop's
+`button-layout` wins over it: GUIDE §7, "Title bar"); `SM_DLG_BTN_ORDER` right-aligns
 the dialog buttons at their natural width with the default button last (1) or first (2);
 `SM_TB_ICON` 0 hides the title bar icon; `SM_DOCK_HDR` / `SM_DOCK_BTN` are the height of a
 dock group's tab strip and of its buttons (0: 32 / 28 DIP). A few values have functions of
