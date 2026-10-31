@@ -1181,6 +1181,8 @@ impl Ui {
         c.uiclip = [0, 0, w, h];
         let cur = c.hit_cur;
         c.hits[cur].clear();
+        self.wp.chrome.cap_n = 0; // the caption buttons' boxes of this pass (chrome.rs)
+        let c = &mut self.wp.ctx;
         c.zones[cur].clear();
         self.hot_update();
         self.dnd_pass_begin(); // the drop target under a drag (previous pass)

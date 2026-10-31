@@ -9,16 +9,23 @@
 // sleep, 0 woke up); the settings portal's SettingChanged(namespace, key, value) on the
 // session bus -> E_SETTINGS with SET_THEME (color-scheme, accent-color, gtk-theme),
 // SET_CONTRAST (contrast, high-contrast), SET_FONTS (font names, text-scaling-factor),
-// SET_LOCALE (region); other keys are ignored.  Without a bus the thread ends quietly;
-// jfgui_LIFE=0 turns it off.
+// SET_LOCALE (region), SET_OTHER (org.gnome.desktop.wm.preferences button-layout,
+// action-*-titlebar: the library's title bar); other keys are ignored.  The settings files
+// without the portal (linux_settings.rs: GTK's gtk-4.0 / gtk-3.0 settings.ini, KDE's kdeglobals)
+// through inotify on $XDG_CONFIG_HOME and its gtk-4.0 / gtk-3.0 folders (not recursive; the
+// folders are watched once created): a write, rename or removal of one of those files ->
+// E_SETTINGS SET_THEME | SET_OTHER, once per batch of events, and only while the last read of
+// the settings used the files (the portal said everything: its signals are enough).  Without
+// a bus and without inotify the thread ends quietly; jfgui_LIFE=0 turns it off.
 
 use alloc::boxed::Box;
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use rt::os::syscall6;
+use alloc::string::String;
+use rt::os::{syscall3, syscall6};
 
 use crate::linux_dbus::{Conn, Msg, T_SIGNAL, Value};
-use crate::{E_POWER, E_SESSION_END, E_SETTINGS, Event, SET_CONTRAST, SET_FONTS, SET_LOCALE, SET_THEME};
+use crate::{E_POWER, E_SESSION_END, E_SETTINGS, Event, SET_CONTRAST, SET_FONTS, SET_LOCALE, SET_OTHER, SET_THEME};
 
 const SYS_RT_SIGACTION: usize = 13;
 const SIGTERM: usize = 15;
@@ -77,10 +84,16 @@ fn watch() {
     if let Some(c) = ses.as_mut() {
         add_match(c, "type='signal',interface='org.freedesktop.portal.Settings',member='SettingChanged'");
     }
+    let mut files = Files::new();
     loop {
         for c in [sys.as_mut(), ses.as_mut()].into_iter().flatten() {
             while let Some(m) = c.read(0) {
                 handle(&m);
+            }
+        }
+        if let Some(f) = files.as_mut() {
+            if f.changed() && crate::linux_settings::files_used() {
+                push(E_SETTINGS, SET_THEME | SET_OTHER);
             }
         }
         if sys.as_ref().is_some_and(|c| c.broken) {
@@ -89,13 +102,96 @@ fn watch() {
         if ses.as_ref().is_some_and(|c| c.broken) {
             ses = None;
         }
-        let fds = [sys.as_ref().map_or(-1, |c| c.fd()), ses.as_ref().map_or(-1, |c| c.fd())];
-        if fds == [-1, -1] {
+        let fds = [sys.as_ref().map_or(-1, |c| c.fd()), ses.as_ref().map_or(-1, |c| c.fd()), files.as_ref().map_or(-1, |f| f.fd as i32)];
+        if fds == [-1, -1, -1] {
             return;
         }
-        let mut pfd = [fds[0] as u32 as u64 | (1u64 << 32), fds[1] as u32 as u64 | (1u64 << 32)];
-        // SAFETY: two pollfd records (a negative fd is skipped).
-        unsafe { syscall6(7, pfd.as_mut_ptr() as usize, 2, usize::MAX, 0, 0, 0) };
+        let mut pfd = fds.map(|fd| fd as u32 as u64 | (1u64 << 32));
+        // SAFETY: three pollfd records (a negative fd is skipped).
+        unsafe { syscall6(7, pfd.as_mut_ptr() as usize, 3, usize::MAX, 0, 0, 0) };
+    }
+}
+
+const IN_NONBLOCK: usize = 0o4000;
+const IN_CLOEXEC: usize = 0o2000000;
+const IN_CLOSE_WRITE: u32 = 0x8;
+const IN_MOVED_FROM: u32 = 0x40;
+const IN_MOVED_TO: u32 = 0x80;
+const IN_CREATE: u32 = 0x100;
+const IN_DELETE: u32 = 0x200;
+const IN_ISDIR: u32 = 0x4000_0000;
+const IN_MASK: u32 = IN_CLOSE_WRITE | IN_MOVED_FROM | IN_MOVED_TO | IN_CREATE | IN_DELETE;
+
+/// the settings files without the portal: inotify on the config folder and GTK's folders
+struct Files {
+    fd: usize,
+    home: String,
+    /// the watch descriptors of $XDG_CONFIG_HOME, gtk-4.0, gtk-3.0 (-1: none yet)
+    wd: [i32; 3],
+}
+
+impl Files {
+    fn new() -> Option<Files> {
+        let home = crate::config_dir()?;
+        // SAFETY: no pointers.
+        let fd = unsafe { syscall3(294 /* inotify_init1 */, IN_NONBLOCK | IN_CLOEXEC, 0, 0) };
+        if fd < 0 {
+            return None;
+        }
+        let mut f = Files { fd: fd as usize, home, wd: [-1; 3] };
+        f.add(0);
+        f.add(1);
+        f.add(2);
+        Some(f)
+    }
+
+    // watch folder k (0 the config home, 1 gtk-4.0, 2 gtk-3.0) when it exists
+    fn add(&mut self, k: usize) {
+        let dir = match k {
+            0 => self.home.clone(),
+            1 => alloc::format!("{}/gtk-4.0", self.home),
+            _ => alloc::format!("{}/gtk-3.0", self.home),
+        };
+        let z: alloc::vec::Vec<u8> = dir.bytes().chain(core::iter::once(0)).collect();
+        // SAFETY: a NUL-terminated path.
+        let wd = unsafe { syscall3(254 /* inotify_add_watch */, self.fd, z.as_ptr() as usize, IN_MASK as usize) };
+        self.wd[k] = if wd < 0 { -1 } else { wd as i32 };
+    }
+
+    /// read the queued events -> one of the settings files changed
+    fn changed(&mut self) -> bool {
+        let mut buf = [0u8; 4096];
+        let mut hit = false;
+        loop {
+            // SAFETY: the buffer is writable for its length.
+            let n = unsafe { syscall3(0 /* read */, self.fd, buf.as_mut_ptr() as usize, buf.len()) };
+            if n <= 0 {
+                return hit;
+            }
+            let (n, mut off) = (n as usize, 0usize);
+            while off + 16 <= n {
+                let rd = |i: usize| u32::from_ne_bytes([buf[off + i], buf[off + i + 1], buf[off + i + 2], buf[off + i + 3]]);
+                let (wd, mask, len) = (rd(0) as i32, rd(4), rd(12) as usize);
+                let name = &buf[off + 16..(off + 16 + len).min(n)];
+                let name = &name[..name.iter().position(|&c| c == 0).unwrap_or(name.len())];
+                off += 16 + len;
+                if wd == self.wd[0] {
+                    if mask & IN_ISDIR != 0 && mask & (IN_CREATE | IN_MOVED_TO) != 0 {
+                        // GTK's folder made after the start: watch it, its file may be new too
+                        match name {
+                            b"gtk-4.0" => self.add(1),
+                            b"gtk-3.0" => self.add(2),
+                            _ => continue,
+                        }
+                        hit = true;
+                    } else if name == b"kdeglobals" {
+                        hit = true;
+                    }
+                } else if (wd == self.wd[1] || wd == self.wd[2]) && name == b"settings.ini" {
+                    hit = true;
+                }
+            }
+        }
     }
 }
 
@@ -129,6 +225,11 @@ pub(crate) fn setting_bits(ns: &str, key: &str) -> u32 {
         "font-name" | "monospace-font-name" | "document-font-name" | "text-scaling-factor" | "font-antialiasing"
         | "font-hinting" | "font-rgba-order" => SET_FONTS,
         "region" if ns.contains("locale") => SET_LOCALE,
+        "button-layout" | "action-double-click-titlebar" | "action-middle-click-titlebar" | "action-right-click-titlebar"
+            if ns == "org.gnome.desktop.wm.preferences" =>
+        {
+            SET_OTHER
+        }
         _ => 0,
     }
 }

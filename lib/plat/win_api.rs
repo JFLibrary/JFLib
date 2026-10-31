@@ -73,7 +73,7 @@ use crate::{
     PWF_TOOL, PWS_SHOWNA, WCMD_CLOSE, WCMD_MAXIMIZE, WCMD_MINIMIZE, WST_ACTIVE, WST_MAXIMIZED, WST_MINIMIZED, evq_count,
     evq_push,
 };
-use crate::{WCMD_FULLSCREEN, WCMD_WINDOWED, WST_FULLSCREEN};
+use crate::{WCMD_FULLSCREEN, WCMD_LOWER, WCMD_WINDOWED, WST_FULLSCREEN};
 
 #[path = "win_clip.rs"]
 mod clip;
@@ -2070,6 +2070,9 @@ pub fn win_cmd(w: i32, cmd: u32) {
             }
             WCMD_FULLSCREEN => fs_enter(r),
             WCMD_WINDOWED => fs_leave(r),
+            WCMD_LOWER => {
+                SetWindowPos(h, 1 /* HWND_BOTTOM */, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            }
             _ if r.fs.get() && IsIconic(h) == 0 => fs_leave(r),
             _ => {
                 ShowWindow(h, SW_RESTORE);

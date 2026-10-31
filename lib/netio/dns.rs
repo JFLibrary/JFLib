@@ -4,7 +4,14 @@
 //                     directly; Windows: the system resolver (plat); Linux: /etc/hosts, then
 //                     the name servers of /etc/resolv.conf (search domains, ndots)
 //   resolve_with(host, port, &Config)   the same with a given configuration (tests)
-//   Config::system()                    /etc/hosts + /etc/resolv.conf
+//   Config::system()                    /etc/hosts + /etc/resolv.conf; Windows: the hosts file
+//                                       of %SystemRoot% and the DNS servers of the adapters
+//                                       (plat::net::dns_servers)
+//
+// Name servers on IPv6 link-local addresses carry their zone into the socket address
+// (sin6_scope_id): "nameserver fe80::1%eth0" (the interface by name or by number, "%2";
+// plat::net::ip_scope_parse), the adapter's index on Windows.  A server whose zone names no
+// interface of this computer is left out.
 //
 // Queries: A and AAAA over UDP (2 s per server and attempt, two rounds), over TCP when the answer
 // is truncated; an answer must come from the server asked and carry the query's id and question.
@@ -38,6 +45,16 @@ impl Config {
     /// /etc/hosts and /etc/resolv.conf of this machine
     pub fn system() -> Config {
         let read = |p: &str| plat::read_file(p).map(|b| String::from_utf8_lossy(&b).into_owned()).unwrap_or_default();
+        if cfg!(windows) {
+            let mut c = Config { ndots: 1, ..Config::default() };
+            c.nameservers = plat::net::dns_servers().into_iter().take(3).collect();
+            if c.nameservers.is_empty() {
+                c.nameservers.push(SocketAddr::new(IpAddr::LOCALHOST_V4, 53));
+            }
+            let root = plat::env("SystemRoot").unwrap_or_else(|| String::from("C:\\Windows"));
+            c.hosts = read(&format!("{}\\System32\\drivers\\etc\\hosts", root));
+            return c;
+        }
         let mut c = Config::from_resolv_conf(&read("/etc/resolv.conf"));
         c.hosts = read("/etc/hosts");
         c
@@ -50,9 +67,10 @@ impl Config {
             let mut w = line.split_whitespace();
             match w.next() {
                 Some("nameserver") => {
-                    if let Some(ip) = w.next().and_then(|a| IpAddr::parse(a.split('%').next().unwrap_or(a))) {
+                    // a link-local server with its zone (fe80::1%eth0, fe80::1%2)
+                    if let Some((ip, scope)) = w.next().and_then(plat::net::ip_scope_parse) {
                         if c.nameservers.len() < 3 {
-                            c.nameservers.push(SocketAddr::new(ip, 53));
+                            c.nameservers.push(SocketAddr::with_scope(ip, 53, scope));
                         }
                     }
                 }
@@ -248,8 +266,8 @@ fn not_found() -> NetError {
 
 pub fn resolve_with(host: &str, port: u16, cfg: &Config) -> NetResult<Vec<SocketAddr>> {
     let h = host.trim_start_matches('[').trim_end_matches(']');
-    if let Some(ip) = IpAddr::parse(h) {
-        return Ok(alloc::vec![SocketAddr::new(ip, port)]);
+    if let Some((ip, scope)) = plat::net::ip_scope_parse(h) {
+        return Ok(alloc::vec![SocketAddr::with_scope(ip, port, scope)]);
     }
     if h.eq_ignore_ascii_case("localhost") || h.to_ascii_lowercase().ends_with(".localhost") {
         return Ok(alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)]);

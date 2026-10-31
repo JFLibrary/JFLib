@@ -3612,12 +3612,19 @@ caption buttons, the chrome of secondary windows, edge grips       [src/ui/ui_ch
        32 DIP bar (layer fill, top divider) laying out its children left to right,
        vertically centred, 16 DIP apart (captions: text(TS_CAPTION, ...))
   edge_grips()   resize handles for frameless windows on Linux (the runtime calls it;
-       also for resizable secondary windows with the library frame)
+       also for resizable secondary windows with the library frame); the caption buttons
+       win over them where they are
   titlebar_begin(title, icon) / titlebar_end()
        custom title bar row (style: SM_TB_H, SM_TB_H_LARGE with next_flags(ST_LARGE)):
        icon + title, then the caller's widgets; empty parts are an HB_DRAG region, the end
        adds the caption buttons (HB_MIN / HB_MAX / HB_CLOSE; with SM_CAP_LEFT the begin puts
-       them first, close / min / max)
+       them first, close / min / max).  The system's layout (SysSettings::titlebar: GNOME's
+       button-layout) wins over the style's: its left buttons come first, its right ones
+       last, missing ones are not shown; right-to-left mirrors the whole bar (as GTK does).
+       A double click, a middle and a right click on the empty part do what the system says
+       (default: maximize / restore, nothing, the window menu; a left press moves the
+       window).  Headless runs only record what they would ask the window manager for
+       (scripts: expect wm ...)
 Windows (win.rs):
   win_chrome_begin(i) / win_chrome_end(i) -> natural content height (DIP)
        border, title bar (28 DIP tool / 32 DIP dialog: title, close button) and the
@@ -3867,10 +3874,16 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                   runs (the median and the retries ride out a busy machine), FAIL when none
                   does
   quit
-  system focus in|out | suspend | resume | session-end | settings theme|locale|contrast|fonts|N
-                      the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...)
+  system focus in|out | suspend | resume | session-end | settings theme|locale|contrast|fonts|
+                      other|N   the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...)
   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
+  system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
+                      overrides of the system settings (follow with `system settings ...`),
+                      jfgui_CSD (the library title bar and its resize band, next pass)
+  expect wm none|move|menu|minimize|maximize|restore|close|lower|resize EDGE   what the title
+                      bar or the resize band asked the window manager for since the last check
+                      (EDGE n, s, w, e, nw, ne, sw, se: physical edges)
 Windows (ID = the app's window id, 0 / main = the main window):
   window ID|main|any            selectors only look into that window (default any)
   expect window ID open|closed|visible|active|modal|keys|fullscreen|windowed
@@ -17675,7 +17688,17 @@ Source: [`lib/plat/net.rs`](../lib/plat/net.rs)
 ```text
 net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
 
-  IpAddr / SocketAddr: parse ("10.0.0.5:9443", "[::1]:80"), Display, loopback / unspecified
+  IpAddr / SocketAddr: parse ("10.0.0.5:9443", "[::1]:80", "[fe80::1%eth0]:53"), Display,
+            loopback / unspecified; SocketAddr::scope: the IPv6 zone (sin6_scope_id, the
+            interface index of a link-local address; 0 none)
+  ip_scope_parse("fe80::1%eth0") -> (address, interface index): a zone by name (Linux:
+            /sys/class/net/NAME/ifindex, else ioctl SIOCGIFINDEX; Windows: if_nametoindex) or
+            by number ("%2")
+  local_addrs() -> this computer's addresses (port 0, link-local ones with their scope):
+            Windows GetAdaptersAddresses; Linux SIOCGIFCONF (IPv4), /proc/net/if_inet6 (IPv6)
+  dns_servers() -> (Windows) the DNS servers of the adapters that are up, with their scope
+            (the well-known site-local fec0:0:0:ffff::1..3 Windows lists without IPv6 DNS
+            are left out); Linux: empty (netio::dns reads /etc/resolv.conf)
   TcpListener::bind(&addr) / accept() / accept_timeout(ms) / local_addr()
   TcpStream::connect(&addr, timeout_ms) / read / write / write_all / read_exact,
             set_read_timeout / set_write_timeout (ms, None = block), set_nodelay,
@@ -17718,12 +17741,34 @@ one thread may read while another writes (Arc<TcpStream>).
   an IP address and a port
   - `ip: IpAddr`
   - `port: u16`
+  - `scope: u32` -- IPv6: the zone of a link-local (or other scoped) address, the interface index the
+    socket address carries as sin6_scope_id (0: none)
 
 **`impl SocketAddr`**
 
 - **`const fn new(ip: IpAddr, port: u16) -> SocketAddr`**
+- **`const fn with_scope(ip: IpAddr, port: u16, scope: u32) -> SocketAddr`**
+  an IPv6 address with its zone (the interface index; ip_scope_parse)
 - **`fn parse(s: &str) -> Option<SocketAddr>`**
-  "1.2.3.4:80", "[::1]:80"
+  "1.2.3.4:80", "[::1]:80", "[fe80::1%eth0]:53" (a zone by name or number)
+
+- **`fn ip_scope_parse(s: &str) -> Option<(IpAddr, u32)>`**
+  an IP address with an optional IPv6 zone ("fe80::1%eth0", "fe80::1%2") -> the address and
+  the zone's interface index (0: none).  None: not an address, or a zone that names no
+  interface of this computer (a zone on an IPv4 address too)
+
+- **`fn if_index(name: &str) -> Option<u32>`**
+  the index of a network interface by its name (Linux: "eth0"; Windows: the NDIS name, e.g.
+  "ethernet_32769") -> None: there is none
+
+- **`fn local_addrs() -> Vec<SocketAddr>`**
+  this computer's addresses (port 0; link-local IPv6 addresses with their scope), see the top
+  of this file
+
+- **`fn dns_servers() -> Vec<SocketAddr>`**
+  (Windows) the DNS servers of the network adapters that are up (port 53, link-local ones
+  with their scope), in the system's adapter order; Linux: empty (netio::dns reads
+  /etc/resolv.conf)
 
 - **`enum NetErrorKind`**
   - `TimedOut`
@@ -20748,6 +20793,14 @@ SPI_GETFONTSMOOTHING, SPI_GETFONTSMOOTHINGTYPE (ClearType: subpixels) and
 SPI_GETFONTSMOOTHINGORIENTATION; Linux the portal's org.gnome.desktop.interface
 font-antialiasing / font-hinting / font-rgba-order, else what fontconfig's conf.d turns on
 (10-hinting-*.conf, 10-sub-pixel-*.conf, 10-no-antialias.conf, 10-yes-antialias.conf).
+
+The title bar the library draws (titlebar: the buttons and what clicks on the bar do): Linux
+GNOME's org.gnome.desktop.wm.preferences button-layout, action-double-click-titlebar,
+action-middle-click-titlebar, action-right-click-titlebar (the portal), else GTK's
+gtk-decoration-layout / gtk-titlebar-*-click (settings.ini); Windows has none (its own title
+bar and the system's snap / caption behaviour).  Overrides: jfgui_BUTTON_LAYOUT=LAYOUT (GNOME's
+syntax, e.g. "close,minimize,maximize:"), jfgui_TITLEBAR_DOUBLE_CLICK / _MIDDLE_CLICK /
+_RIGHT_CLICK=toggle-maximize|minimize|lower|menu|none.
 ```
 
 - **`struct HcColors`**
@@ -20788,6 +20841,41 @@ FONT_RGBA_VBGR: u8 = 4
 - **`fn font_rgba_parse(s: &str) -> Option<u8>`**
   a FONT_RGBA_\* name ("none", "rgb", "bgr", "vrgb", "vbgr"; "grayscale" is none)
 
+```rust
+/// Titlebar::buttons: the caption buttons of a title bar the library draws
+TB_BTN_CLOSE: u8 = 1
+TB_BTN_MIN: u8 = 2
+TB_BTN_MAX: u8 = 3
+/// Titlebar::double / middle / right: what a click on the empty part of the bar does
+TB_ACT_NONE: u8 = 0
+/// maximize, or restore a maximized window
+TB_ACT_MAXIMIZE: u8 = 1
+TB_ACT_MINIMIZE: u8 = 2
+/// below the other windows (X11; Wayland has no request for it: nothing)
+TB_ACT_LOWER: u8 = 3
+/// the window manager's window menu (move, resize, always on top, ...)
+TB_ACT_MENU: u8 = 4
+```
+
+- **`struct Titlebar`**
+  the buttons and click actions of a title bar the library draws (SysSettings::titlebar)
+  - `buttons: Option<([u8; 3], [u8; 3])>` -- the buttons at the left end and at the right end, each side left to right (TB_BTN_\*,
+    0 ends a side; each button at most once); None: the style's places
+  - `double: u8` -- TB_ACT_\* of a double click, a middle click and a right click
+  - `middle: u8`
+  - `right: u8`
+
+- **`fn titlebar_layout_parse(s: &str) -> ([u8; 3], [u8; 3])`**
+  a button layout in GNOME's button-layout syntax (GTK's gtk-decoration-layout): the left
+  side, ':', the right side, names separated by ','.  close, minimize and maximize are kept,
+  other names (appmenu, icon, menu, spacer) and repeats skipped; without ':' everything is
+  the left side (as GTK reads it)
+
+- **`fn titlebar_action_parse(s: &str) -> Option<u8>`**
+  a title bar action as GNOME names it (GDesktopTitlebarAction): toggle-maximize (also
+  -horizontally / -vertically, which xdg-shell can not do: GTK treats them alike), minimize,
+  lower, menu, none; toggle-shade is none (no compositor shades client-side windows)
+
 - **`struct SysSettings`**
   what the system says (see the module comment)
   - `dark: Option<bool>` -- None: no preference
@@ -20801,6 +20889,7 @@ FONT_RGBA_VBGR: u8 = 4
   - `font_aa: Option<bool>` -- font smoothing: Some(false) = off (sharp black-and-white glyphs)
   - `font_hinting: Option<u8>` -- FONT_HINT_\*
   - `font_rgba: Option<u8>` -- FONT_RGBA_\* (subpixel smoothing and its order)
+  - `titlebar: Titlebar` -- the title bar the library draws (Linux client-side decorations, AF_CUSTOM_TITLEBAR)
 
 - **`fn sys_settings() -> SysSettings`**
   the system's settings and the jfgui_\* overrides
@@ -23134,8 +23223,14 @@ its own (linux_dbus.rs): logind's PrepareForSleep(b) on the system bus -> E_POWE
 sleep, 0 woke up); the settings portal's SettingChanged(namespace, key, value) on the
 session bus -> E_SETTINGS with SET_THEME (color-scheme, accent-color, gtk-theme),
 SET_CONTRAST (contrast, high-contrast), SET_FONTS (font names, text-scaling-factor),
-SET_LOCALE (region); other keys are ignored.  Without a bus the thread ends quietly;
-jfgui_LIFE=0 turns it off.
+SET_LOCALE (region), SET_OTHER (org.gnome.desktop.wm.preferences button-layout,
+action-*-titlebar: the library's title bar); other keys are ignored.  The settings files
+without the portal (linux_settings.rs: GTK's gtk-4.0 / gtk-3.0 settings.ini, KDE's kdeglobals)
+through inotify on $XDG_CONFIG_HOME and its gtk-4.0 / gtk-3.0 folders (not recursive; the
+folders are watched once created): a write, rename or removal of one of those files ->
+E_SETTINGS SET_THEME | SET_OTHER, once per batch of events, and only while the last read of
+the settings used the files (the portal said everything: its signals are enough).  Without
+a bus and without inotify the thread ends quietly; jfgui_LIFE=0 turns it off.
 ```
 
 - **`fn life_start()`**
@@ -24243,6 +24338,14 @@ WST_CSD: u32 = 32  // no system frame: the app must draw its own title bar
 /// the window is drawn inside its owner (a Wayland subsurface): win_get_rect / win_set_rect /
 /// E_WINPOS use positions relative to the owner's surface origin (px), the owner carries it
 WST_CHILD: u32 = 64
+/// with WST_TILED: which edges touch the tiling (EDGE_* << WST_TILED_SHIFT; Wayland's
+/// xdg_toplevel tiled_* states, X11 the edges of a one-direction maximize); the UI keeps its
+/// resize band off them, as from a maximized window
+WST_TILED_SHIFT: u32 = 7
+WST_TILED_TOP: u32 = EDGE_TOP << WST_TILED_SHIFT
+WST_TILED_BOTTOM: u32 = EDGE_BOTTOM << WST_TILED_SHIFT
+WST_TILED_LEFT: u32 = EDGE_LEFT << WST_TILED_SHIFT
+WST_TILED_RIGHT: u32 = EDGE_RIGHT << WST_TILED_SHIFT
 ```
 
 *clipboard formats*
@@ -24318,6 +24421,9 @@ HB_CURSOR_SHIFT: u32 = 12
 ```rust
 WCMD_FULLSCREEN: u32 = 5  // the window covers its monitor without a frame
 WCMD_WINDOWED: u32 = 6  // back to the place and frame it had before
+// below the other windows (a title bar action, TB_ACT_LOWER: X11 and Windows; Wayland has no
+// such request: nothing)
+WCMD_LOWER: u32 = 7
 ```
 
 ### `plat/evq.rs`
@@ -28994,7 +29100,14 @@ dns -- host names to addresses
                     directly; Windows: the system resolver (plat); Linux: /etc/hosts, then
                     the name servers of /etc/resolv.conf (search domains, ndots)
   resolve_with(host, port, &Config)   the same with a given configuration (tests)
-  Config::system()                    /etc/hosts + /etc/resolv.conf
+  Config::system()                    /etc/hosts + /etc/resolv.conf; Windows: the hosts file
+                                      of %SystemRoot% and the DNS servers of the adapters
+                                      (plat::net::dns_servers)
+
+Name servers on IPv6 link-local addresses carry their zone into the socket address
+(sin6_scope_id): "nameserver fe80::1%eth0" (the interface by name or by number, "%2";
+plat::net::ip_scope_parse), the adapter's index on Windows.  A server whose zone names no
+interface of this computer is left out.
 
 Queries: A and AAAA over UDP (2 s per server and attempt, two rounds), over TCP when the answer
 is truncated; an answer must come from the server asked and carry the query's id and question.

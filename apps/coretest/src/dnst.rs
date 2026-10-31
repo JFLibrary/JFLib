@@ -1,5 +1,8 @@
 // dnst -- checks of netio::dns: hosts files, resolv.conf, the message format, and a small name
-// server on loopback (UDP, truncation and TCP, search domains, unknown names)
+// server on loopback (UDP, truncation and TCP, search domains, unknown names); IPv6 zones
+// (plat::net::ip_scope_parse, SocketAddr::scope) and the same name server on a link-local
+// address of this computer, named by its zone in resolv.conf (skipped, with a note, when the
+// computer has none or it can not be bound)
 
 use alloc::boxed::Box;
 use alloc::string::String;
@@ -57,14 +60,14 @@ fn answer(q: &[u8], tcp: bool) -> Vec<u8> {
     m
 }
 
-/// a TCP listener and a UDP socket on one free loopback port. The system's free TCP port is
-/// mostly free for UDP too, but another program may hold it, and Windows hands out ports in
-/// sequence and excludes whole ranges per protocol (Hyper-V, WSL), so the next ones fail alike:
-/// then random ports of the dynamic range, a bounded number of times
-fn bind_same_port() -> Option<(TcpListener, UdpSocket)> {
+/// a TCP listener and a UDP socket on one free port of `at` (port 0). The system's free TCP
+/// port is mostly free for UDP too, but another program may hold it, and Windows hands out
+/// ports in sequence and excludes whole ranges per protocol (Hyper-V, WSL), so the next ones
+/// fail alike: then random ports of the dynamic range, a bounded number of times
+fn bind_same_port(at: SocketAddr) -> Option<(TcpListener, UdpSocket)> {
     for i in 0..64 {
         let port = if i == 0 { 0 } else { 49152 + (plat::random_u64() % 16384) as u16 };
-        let Ok(tcp) = TcpListener::bind(&SocketAddr::new(IpAddr::LOCALHOST_V4, port)) else { continue };
+        let Ok(tcp) = TcpListener::bind(&SocketAddr { port, ..at }) else { continue };
         let Ok(addr) = tcp.local_addr() else { continue };
         if let Ok(udp) = UdpSocket::bind(&addr) {
             return Some((tcp, udp));
@@ -75,7 +78,12 @@ fn bind_same_port() -> Option<(TcpListener, UdpSocket)> {
 
 /// a name server on a free loopback port (UDP and TCP on the same port)
 fn server() -> Option<SocketAddr> {
-    let (tcp, udp) = bind_same_port()?;
+    server_at(SocketAddr::new(IpAddr::LOCALHOST_V4, 0))
+}
+
+/// the name server on a free port of an address of this computer
+fn server_at(at: SocketAddr) -> Option<SocketAddr> {
+    let (tcp, udp) = bind_same_port(at)?;
     let addr = tcp.local_addr().ok()?;
     plat::thread_spawn(64 * 1024, Box::new(move || {
         let mut buf = [0u8; 512];
@@ -110,8 +118,13 @@ pub fn run(t: &mut T) {
     t.eq("hosts: full name", dns::hosts_lookup(hosts, "box.example.lan."), alloc::vec![IpAddr::V4([127, 0, 1, 1])]);
     t.check("hosts: unknown", dns::hosts_lookup(hosts, "other").is_empty());
     // resolv.conf
-    let c = Config::from_resolv_conf("# x\nnameserver 10.0.0.53\nnameserver fe80::1%eth0\nsearch corp.example lab.example.\noptions edns0 ndots:2\n");
+    let c = Config::from_resolv_conf("# x\nnameserver 10.0.0.53\nnameserver fe80::1%2\nsearch corp.example lab.example.\noptions edns0 ndots:2\n");
     t.eq("resolv.conf: name servers", c.nameservers.len(), 2);
+    let ll = IpAddr::parse("fe80::1").unwrap_or(IpAddr::LOCALHOST_V6);
+    t.eq("resolv.conf: a link-local server keeps its zone (%2)", c.nameservers.get(1).copied(), Some(SocketAddr::with_scope(ll, 53, 2)));
+    t.eq("resolv.conf: a zone naming no interface: the server is left out",
+        Config::from_resolv_conf("nameserver fe80::1%nosuchif9\nnameserver 10.0.0.53\n").nameservers, alloc::vec![SocketAddr::new(IpAddr::V4([10, 0, 0, 53]), 53)]);
+    scopes(t, ll);
     t.eq("resolv.conf: search", c.search.clone(), alloc::vec![String::from("corp.example"), String::from("lab.example")]);
     t.eq("resolv.conf: ndots", c.ndots, 2);
     t.eq("resolv.conf: empty -> local stub", Config::from_resolv_conf("").nameservers, alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, 53)]);
@@ -152,4 +165,75 @@ pub fn run(t: &mut T) {
     t.check("within the time limits", plat::time_us() - t0 < 20_000_000);
     // this machine: localhost always; its own name through the system's hosts file (Linux)
     t.check("localhost", dns::resolve("localhost", 80).is_ok_and(|v| v[0].ip.is_loopback()));
+    let sys = Config::system();
+    t.check("Config::system: name servers (link-local ones with their zone)",
+        !sys.nameservers.is_empty() && sys.nameservers.iter().all(|a| !link_local(&a.ip) || a.scope != 0));
+    link_local_server(t);
+}
+
+fn link_local(ip: &IpAddr) -> bool {
+    matches!(ip, IpAddr::V6(a) if a[0] == 0xfe && a[1] & 0xc0 == 0x80)
+}
+
+// IPv6 zones: parsing, printing, the interface names of this system
+fn scopes(t: &mut T, ll: IpAddr) {
+    use plat::net::{if_index, ip_scope_parse};
+    t.eq("zone by number", ip_scope_parse("fe80::1%3"), Some((ll, 3)));
+    t.eq("no zone", ip_scope_parse("fe80::1"), Some((ll, 0)));
+    t.eq("zone of an IPv4 address refused", ip_scope_parse("10.0.0.1%2"), None);
+    t.eq("unknown interface refused", ip_scope_parse("fe80::1%nosuchif9"), None);
+    t.eq("SocketAddr::parse with a zone", SocketAddr::parse("[fe80::1%3]:53"), Some(SocketAddr::with_scope(ll, 53, 3)));
+    t.eq("SocketAddr shows its zone", alloc::format!("{}", SocketAddr::with_scope(ll, 53, 3)), String::from("[fe80::1%3]:53"));
+    t.eq("numeric host with a zone", dns::resolve_with("fe80::1%3", 80, &Config::default()).map(|v| v[0]), Ok(SocketAddr::with_scope(ll, 80, 3)));
+    t.check("if_index: no such interface", if_index("nosuchif9").is_none() && if_index("../x").is_none() && if_index("").is_none());
+    // the loopback interface by its name: lo (Linux), loopback_0 (Windows' NDIS name)
+    let lo = if cfg!(windows) { "loopback_0" } else { "lo" };
+    t.eq("if_index of the loopback interface", if_index(lo), Some(1));
+    t.eq("zone by name", ip_scope_parse(&alloc::format!("fe80::1%{lo}")), Some((ll, 1)));
+}
+
+// a name server on a link-local address of this computer, asked through a resolv.conf line with
+// the zone (Linux: the interface's name; Windows: its number)
+fn link_local_server(t: &mut T) {
+    let mine = plat::net::local_addrs();
+    t.check("local_addrs: loopback or an address of this computer", !mine.is_empty());
+    let Some(at) = mine.iter().copied().find(|a| link_local(&a.ip) && a.scope != 0) else {
+        plat::write_stdout(b"  dns: no link-local address on this computer: the link-local name server is not tried\n");
+        return;
+    };
+    let Some(ns) = server_at(at) else {
+        plat::write_stdout(alloc::format!("  dns: the name server can not be bound to {}: not tried\n", at).as_bytes());
+        return;
+    };
+    let zone = zone_name(at.scope).unwrap_or_else(|| alloc::format!("{}", at.scope));
+    let conf = alloc::format!("nameserver {}%{}\n", at.ip, zone);
+    let mut cfg = Config::from_resolv_conf(&conf);
+    t.eq("link-local: the zone of the resolv.conf line", cfg.nameservers.first().map(|a| (a.ip, a.scope)), Some((at.ip, at.scope)));
+    for a in cfg.nameservers.iter_mut() {
+        a.port = ns.port;
+    }
+    cfg.search = alloc::vec![String::from("test")];
+    let got = dns::resolve_with("fake.test", 443, &cfg).map(|v| v.into_iter().map(|a| a.ip).collect::<Vec<_>>());
+    t.eq(&alloc::format!("link-local: a name server on {} (nameserver ...%{})", ns, zone), got,
+        Ok(alloc::vec![IpAddr::V4([10, 1, 2, 3]), IpAddr::parse("fd00::7").unwrap_or(IpAddr::LOCALHOST_V6)]));
+    t.eq("link-local: truncated -> TCP with the zone", dns::resolve_with("big.test", 1, &cfg).map(|v| v.len()), Ok(40));
+    // (Linux refuses a link-local destination without a zone at once; Windows may pick one)
+    if cfg!(target_os = "linux") {
+        let lost = Config { nameservers: cfg.nameservers.iter().map(|a| SocketAddr { scope: 0, ..*a }).collect(), ..cfg.clone() };
+        t.check("link-local: without the zone the server can not be reached", dns::resolve_with("fake.test", 1, &lost).is_err());
+    }
+}
+
+// the name of interface `index` (Linux: /sys/class/net; Windows: the number is the zone)
+fn zone_name(index: u32) -> Option<String> {
+    if cfg!(windows) {
+        return None;
+    }
+    let mut found = None;
+    plat::dir_list("/sys/class/net", &mut |name, _, _| {
+        if found.is_none() && plat::net::if_index(name) == Some(index) {
+            found = Some(String::from(name));
+        }
+    });
+    found
 }

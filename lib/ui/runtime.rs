@@ -366,6 +366,7 @@ impl Ui {
             text_scale: 100,
             dbl_ms: 500,
             font_prefs: (None, None, None),
+            tb_sys: plat::Titlebar::default(),
             blink_ms: 530,
             warns: 0,
             ui_debug: plat::getenv("jfgui_DEBUG").is_some(),

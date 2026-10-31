@@ -92,6 +92,14 @@ pub const WST_CSD: u32 = 32; // no system frame: the app must draw its own title
 /// the window is drawn inside its owner (a Wayland subsurface): win_get_rect / win_set_rect /
 /// E_WINPOS use positions relative to the owner's surface origin (px), the owner carries it
 pub const WST_CHILD: u32 = 64;
+/// with WST_TILED: which edges touch the tiling (EDGE_* << WST_TILED_SHIFT; Wayland's
+/// xdg_toplevel tiled_* states, X11 the edges of a one-direction maximize); the UI keeps its
+/// resize band off them, as from a maximized window
+pub const WST_TILED_SHIFT: u32 = 7;
+pub const WST_TILED_TOP: u32 = EDGE_TOP << WST_TILED_SHIFT;
+pub const WST_TILED_BOTTOM: u32 = EDGE_BOTTOM << WST_TILED_SHIFT;
+pub const WST_TILED_LEFT: u32 = EDGE_LEFT << WST_TILED_SHIFT;
+pub const WST_TILED_RIGHT: u32 = EDGE_RIGHT << WST_TILED_SHIFT;
 
 // ---- clipboard formats
 pub const CLIP_TEXT: u32 = 1; // UTF-8
@@ -152,3 +160,6 @@ pub const HB_CURSOR_SHIFT: u32 = 12;
 // ---- (L7) full screen: win_cmd commands; win_state reports WST_FULLSCREEN
 pub const WCMD_FULLSCREEN: u32 = 5; // the window covers its monitor without a frame
 pub const WCMD_WINDOWED: u32 = 6; // back to the place and frame it had before
+// below the other windows (a title bar action, TB_ACT_LOWER: X11 and Windows; Wayland has no
+// such request: nothing)
+pub const WCMD_LOWER: u32 = 7;

@@ -363,6 +363,7 @@ fn plattest() -> i32 {
         Some("life-bus") => t_life::t_life_bus,        // Linux: against tools/platshared/life_bus.py
         Some("settings") => t_settings::t_settings,    // the system settings: overrides, defaults
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
+        Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
         Some("a11y") => t_a11y::t_a11y,                // the accessibility tree, headless
         Some("a11y-bus") => t_a11y::t_a11y_bus,        // Linux: against tools/platshared/atspi_bus.py
         Some("uia") => t_a11y::t_uia,                  // Windows, by hand: UI Automation

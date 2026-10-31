@@ -337,6 +337,7 @@ impl Ui {
             self.theme_invalidate(); // every pixel of text changes: redraw everything
         }
         self.font_prefs = (s.font_aa, s.font_hinting, s.font_rgba);
+        self.tb_sys = s.titlebar; // the library's title bar (chrome.rs)
         self.theme_build();
     }
 

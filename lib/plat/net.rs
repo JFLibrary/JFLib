@@ -1,6 +1,16 @@
 // net -- TCP, UDP and Unix domain sockets (IPv4 and IPv6) with timeouts
 //
-//   IpAddr / SocketAddr: parse ("10.0.0.5:9443", "[::1]:80"), Display, loopback / unspecified
+//   IpAddr / SocketAddr: parse ("10.0.0.5:9443", "[::1]:80", "[fe80::1%eth0]:53"), Display,
+//             loopback / unspecified; SocketAddr::scope: the IPv6 zone (sin6_scope_id, the
+//             interface index of a link-local address; 0 none)
+//   ip_scope_parse("fe80::1%eth0") -> (address, interface index): a zone by name (Linux:
+//             /sys/class/net/NAME/ifindex, else ioctl SIOCGIFINDEX; Windows: if_nametoindex) or
+//             by number ("%2")
+//   local_addrs() -> this computer's addresses (port 0, link-local ones with their scope):
+//             Windows GetAdaptersAddresses; Linux SIOCGIFCONF (IPv4), /proc/net/if_inet6 (IPv6)
+//   dns_servers() -> (Windows) the DNS servers of the adapters that are up, with their scope
+//             (the well-known site-local fec0:0:0:ffff::1..3 Windows lists without IPv6 DNS
+//             are left out); Linux: empty (netio::dns reads /etc/resolv.conf)
 //   TcpListener::bind(&addr) / accept() / accept_timeout(ms) / local_addr()
 //   TcpStream::connect(&addr, timeout_ms) / read / write / write_all / read_exact,
 //             set_read_timeout / set_write_timeout (ms, None = block), set_nodelay,
@@ -178,14 +188,22 @@ impl fmt::Display for IpAddr {
 pub struct SocketAddr {
     pub ip: IpAddr,
     pub port: u16,
+    /// IPv6: the zone of a link-local (or other scoped) address, the interface index the
+    /// socket address carries as sin6_scope_id (0: none)
+    pub scope: u32,
 }
 
 impl SocketAddr {
     pub const fn new(ip: IpAddr, port: u16) -> SocketAddr {
-        SocketAddr { ip, port }
+        SocketAddr { ip, port, scope: 0 }
     }
 
-    /// "1.2.3.4:80", "[::1]:80"
+    /// an IPv6 address with its zone (the interface index; ip_scope_parse)
+    pub const fn with_scope(ip: IpAddr, port: u16, scope: u32) -> SocketAddr {
+        SocketAddr { ip, port, scope }
+    }
+
+    /// "1.2.3.4:80", "[::1]:80", "[fe80::1%eth0]:53" (a zone by name or number)
     pub fn parse(s: &str) -> Option<SocketAddr> {
         let (host, port) = if let Some(rest) = s.strip_prefix('[') {
             let (h, p) = rest.split_once("]:")?;
@@ -199,7 +217,8 @@ impl SocketAddr {
         if port.is_empty() || !port.bytes().all(|b| b.is_ascii_digit()) {
             return None;
         }
-        Some(SocketAddr { ip: IpAddr::parse(host)?, port: port.parse().ok()? })
+        let (ip, scope) = ip_scope_parse(host)?;
+        Some(SocketAddr { ip, port: port.parse().ok()?, scope })
     }
 }
 
@@ -207,9 +226,55 @@ impl fmt::Display for SocketAddr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.ip {
             IpAddr::V4(_) => write!(f, "{}:{}", self.ip, self.port),
+            IpAddr::V6(_) if self.scope != 0 => write!(f, "[{}%{}]:{}", self.ip, self.scope, self.port),
             IpAddr::V6(_) => write!(f, "[{}]:{}", self.ip, self.port),
         }
     }
+}
+
+/// an IP address with an optional IPv6 zone ("fe80::1%eth0", "fe80::1%2") -> the address and
+/// the zone's interface index (0: none).  None: not an address, or a zone that names no
+/// interface of this computer (a zone on an IPv4 address too)
+pub fn ip_scope_parse(s: &str) -> Option<(IpAddr, u32)> {
+    let Some((a, zone)) = s.split_once('%') else { return Some((IpAddr::parse(s)?, 0)) };
+    let ip = IpAddr::parse(a)?;
+    if !matches!(ip, IpAddr::V6(_)) || zone.is_empty() {
+        return None;
+    }
+    let scope = if zone.bytes().all(|b| b.is_ascii_digit()) { zone.parse::<u32>().ok()? } else { if_index(zone)? };
+    Some((ip, scope))
+}
+
+/// the index of a network interface by its name (Linux: "eth0"; Windows: the NDIS name, e.g.
+/// "ethernet_32769") -> None: there is none
+pub fn if_index(name: &str) -> Option<u32> {
+    if name.is_empty() || name.len() > 255 || name.bytes().any(|b| b == 0 || b == b'/') || name == "." || name == ".." {
+        return None;
+    }
+    sys::if_index(name).filter(|i| *i != 0)
+}
+
+/// this computer's addresses (port 0; link-local IPv6 addresses with their scope), see the top
+/// of this file
+pub fn local_addrs() -> Vec<SocketAddr> {
+    let mut v = sys::local_addrs();
+    v.dedup();
+    v
+}
+
+/// (Windows) the DNS servers of the network adapters that are up (port 53, link-local ones
+/// with their scope), in the system's adapter order; Linux: empty (netio::dns reads
+/// /etc/resolv.conf)
+pub fn dns_servers() -> Vec<SocketAddr> {
+    let mut out: Vec<SocketAddr> = Vec::new();
+    for a in sys::dns_servers() {
+        // Windows' stand-ins without IPv6 DNS: fec0:0:0:ffff::1, ::2, ::3 (site-local, deprecated)
+        let standin = matches!(a.ip, IpAddr::V6(b) if b[..14] == [0xfe, 0xc0, 0, 0, 0, 0, 0xff, 0xff, 0, 0, 0, 0, 0, 0] && (1..=3).contains(&b[15]) && b[14] == 0);
+        if !standin && !out.contains(&a) {
+            out.push(a);
+        }
+    }
+    out
 }
 
 // ------------------------------------------------------------------ errors
@@ -341,7 +406,100 @@ mod sys {
         fn FreeAddrInfoW(ai: *mut AddrInfoW);
     }
 
+    #[link(name = "iphlpapi", kind = "raw-dylib")]
+    unsafe extern "system" {
+        fn GetAdaptersAddresses(family: u32, flags: u32, reserved: usize, buf: *mut u8, size: *mut u32) -> u32;
+        fn if_nametoindex(name: *const u8) -> u32;
+    }
+
     static STARTED: AtomicU8 = AtomicU8::new(0);
+
+    /// if_nametoindex (iphlpapi: the NDIS interface name)
+    pub fn if_index(name: &str) -> Option<u32> {
+        let z: alloc::vec::Vec<u8> = name.bytes().chain(core::iter::once(0)).collect();
+        // SAFETY: a NUL-terminated name.
+        let i = unsafe { if_nametoindex(z.as_ptr()) };
+        (i != 0).then_some(i)
+    }
+
+    // the adapters of GetAdaptersAddresses (flags: GAA_FLAG_*) -> f(record) for each one that
+    // is up, the record's bytes valid during the call
+    fn adapters(flags: u32, f: &mut dyn FnMut(*const u8)) {
+        let mut size = 16u32 << 10;
+        for _ in 0..4 {
+            let mut buf = alloc::vec![0u64; (size as usize).div_ceil(8)];
+            // SAFETY: a buffer of `size` bytes (8-aligned); size is updated on overflow.
+            let r = unsafe { GetAdaptersAddresses(0, flags, 0, buf.as_mut_ptr() as *mut u8, &mut size) };
+            if r == 111 {
+                continue; // ERROR_BUFFER_OVERFLOW: size holds what it needs
+            }
+            if r != 0 {
+                return;
+            }
+            const P: usize = core::mem::size_of::<usize>();
+            let mut a = buf.as_ptr() as *const u8;
+            while !a.is_null() {
+                // SAFETY: IP_ADAPTER_ADDRESSES records inside buf, linked by Next (after the
+                // 8-byte Length / IfIndex head); OperStatus after the fixed fields.
+                let (up, next) = unsafe { ((a.add(32 + 9 * P) as *const u32).read_unaligned() == 1, (a.add(8) as *const *const u8).read_unaligned()) };
+                if up {
+                    f(a);
+                }
+                a = next;
+            }
+            return;
+        }
+    }
+
+    // the socket addresses of one list of IP_ADAPTER_*_ADDRESS records (head 8 bytes, Next,
+    // SOCKET_ADDRESS { lpSockaddr, iSockaddrLength })
+    fn sockaddrs(mut e: *const u8, out: &mut alloc::vec::Vec<super::SocketAddr>, port: u16) {
+        const P: usize = core::mem::size_of::<usize>();
+        for _ in 0..64 {
+            if e.is_null() {
+                return;
+            }
+            // SAFETY: a record of the list GetAdaptersAddresses filled (see adapters).
+            let (sa, len, next) = unsafe {
+                ((e.add(8 + P) as *const *const u8).read_unaligned(), (e.add(8 + 2 * P) as *const i32).read_unaligned(), (e.add(8) as *const *const u8).read_unaligned())
+            };
+            if !sa.is_null() && (8..=128).contains(&len) {
+                // SAFETY: lpSockaddr points to iSockaddrLength bytes.
+                let raw = unsafe { core::slice::from_raw_parts(sa, len as usize) };
+                if let Some(mut a) = super::decode_sockaddr(raw) {
+                    a.port = port;
+                    out.push(a);
+                }
+            }
+            e = next;
+        }
+    }
+
+    /// the unicast addresses of the adapters that are up
+    pub fn local_addrs() -> alloc::vec::Vec<super::SocketAddr> {
+        const P: usize = core::mem::size_of::<usize>();
+        let mut out = alloc::vec::Vec::new();
+        // GAA_FLAG_SKIP_ANYCAST | SKIP_MULTICAST | SKIP_DNS_SERVER | SKIP_FRIENDLY_NAME
+        adapters(0x2 | 0x4 | 0x8 | 0x20, &mut |a| {
+            // SAFETY: FirstUnicastAddress of the record.
+            let first = unsafe { (a.add(8 + 2 * P) as *const *const u8).read_unaligned() };
+            sockaddrs(first, &mut out, 0);
+        });
+        out
+    }
+
+    /// the DNS servers of the adapters that are up
+    pub fn dns_servers() -> alloc::vec::Vec<super::SocketAddr> {
+        const P: usize = core::mem::size_of::<usize>();
+        let mut out = alloc::vec::Vec::new();
+        // GAA_FLAG_SKIP_UNICAST | SKIP_ANYCAST | SKIP_MULTICAST | SKIP_FRIENDLY_NAME
+        adapters(0x1 | 0x2 | 0x4 | 0x20, &mut |a| {
+            // SAFETY: FirstDnsServerAddress of the record.
+            let first = unsafe { (a.add(8 + 5 * P) as *const *const u8).read_unaligned() };
+            sockaddrs(first, &mut out, 53);
+        });
+        out
+    }
 
     fn startup() {
         if STARTED.load(Ordering::Acquire) == 1 {
@@ -531,7 +689,73 @@ mod sys {
     const SYS_GETSOCKOPT: usize = 55;
     const SYS_FCNTL: usize = 72;
     const SYS_ACCEPT4: usize = 288;
+    const SYS_IOCTL: usize = 16;
+    const SIOCGIFCONF: usize = 0x8912;
+    const SIOCGIFINDEX: usize = 0x8933;
     const EINTR: isize = 4;
+
+    /// /sys/class/net/NAME/ifindex, else ioctl SIOCGIFINDEX (struct ifreq: 16 bytes of name,
+    /// the index)
+    pub fn if_index(name: &str) -> Option<u32> {
+        if let Some(b) = crate::read_file_raw(&alloc::format!("/sys/class/net/{name}/ifindex")) {
+            if let Ok(i) = core::str::from_utf8(&b).unwrap_or("").trim().parse::<u32>() {
+                return Some(i);
+            }
+        }
+        if name.len() >= 16 {
+            return None;
+        }
+        let s = socket(AF_INET, 2, 0).ok()?;
+        let mut req = [0u8; 40];
+        req[..name.len()].copy_from_slice(name.as_bytes());
+        // SAFETY: an ifreq of 40 bytes with the NUL-terminated name.
+        let r = unsafe { syscall3(SYS_IOCTL, s, SIOCGIFINDEX, req.as_mut_ptr() as usize) };
+        close(s);
+        (r == 0).then(|| u32::from_ne_bytes([req[16], req[17], req[18], req[19]]))
+    }
+
+    /// IPv4: SIOCGIFCONF (struct ifreq of 40 bytes: the name, a sockaddr_in); IPv6:
+    /// /proc/net/if_inet6 ("address index prefix scope flags name", scope 0x20 = link-local)
+    pub fn local_addrs() -> alloc::vec::Vec<super::SocketAddr> {
+        let mut out = alloc::vec::Vec::new();
+        if let Ok(s) = socket(AF_INET, 2, 0) {
+            let mut buf = alloc::vec![0u8; 40 * 64];
+            let mut conf = [0u64; 2]; // struct ifconf { int len; char *buf } (padded)
+            conf[0] = buf.len() as u64;
+            conf[1] = buf.as_mut_ptr() as u64;
+            // SAFETY: an ifconf naming a buffer of its length.
+            let r = unsafe { syscall3(SYS_IOCTL, s, SIOCGIFCONF, conf.as_mut_ptr() as usize) };
+            close(s);
+            if r == 0 {
+                let n = (conf[0] as u32 as usize).min(buf.len());
+                for req in buf[..n].chunks_exact(40) {
+                    if u16::from_ne_bytes([req[16], req[17]]) == AF_INET as u16 {
+                        out.push(super::SocketAddr::new(super::IpAddr::V4([req[20], req[21], req[22], req[23]]), 0));
+                    }
+                }
+            }
+        }
+        let text = crate::read_file_raw("/proc/net/if_inet6").unwrap_or_default();
+        for line in core::str::from_utf8(&text).unwrap_or("").lines() {
+            let f: alloc::vec::Vec<&str> = line.split_whitespace().collect();
+            if f.len() < 6 || f[0].len() != 32 {
+                continue;
+            }
+            let mut a = [0u8; 16];
+            if (0..16).any(|i| u8::from_str_radix(&f[0][2 * i..2 * i + 2], 16).map(|v| a[i] = v).is_err()) {
+                continue;
+            }
+            let idx = u32::from_str_radix(f[1], 16).unwrap_or(0);
+            let link = u32::from_str_radix(f[3], 16).unwrap_or(0) == 0x20;
+            out.push(super::SocketAddr::with_scope(super::IpAddr::V6(a), 0, if link { idx } else { 0 }));
+        }
+        out
+    }
+
+    /// (Windows only: Linux names its servers in /etc/resolv.conf, netio::dns)
+    pub fn dns_servers() -> alloc::vec::Vec<super::SocketAddr> {
+        alloc::vec::Vec::new()
+    }
 
     #[repr(C)]
     pub struct PollFd {
@@ -672,6 +896,7 @@ fn encode_sockaddr(a: &SocketAddr) -> Vec<u8> {
             b[..2].copy_from_slice(&(sys::AF_INET6 as u16).to_ne_bytes());
             b[2..4].copy_from_slice(&a.port.to_be_bytes());
             b[8..24].copy_from_slice(&ip);
+            b[24..28].copy_from_slice(&a.scope.to_ne_bytes()); // sin6_scope_id
             b
         }
     }
@@ -688,7 +913,8 @@ fn decode_sockaddr(b: &[u8]) -> Option<SocketAddr> {
     } else if fam == sys::AF_INET6 && b.len() >= 24 {
         let mut ip = [0u8; 16];
         ip.copy_from_slice(&b[8..24]);
-        Some(SocketAddr::new(IpAddr::V6(ip), port))
+        let scope = if b.len() >= 28 { u32::from_ne_bytes([b[24], b[25], b[26], b[27]]) } else { 0 };
+        Some(SocketAddr::with_scope(IpAddr::V6(ip), port, scope))
     } else {
         None
     }
@@ -1041,8 +1267,8 @@ pub fn connect_unix(path: &str, timeout_ms: u32) -> NetResult<UnixStream> {
 /// through the system resolver (Linux: netio::dns)
 pub fn resolve(host: &str, port: u16) -> NetResult<Vec<SocketAddr>> {
     let h = host.trim_start_matches('[').trim_end_matches(']');
-    if let Some(ip) = IpAddr::parse(h) {
-        return Ok(alloc::vec![SocketAddr::new(ip, port)]);
+    if let Some((ip, scope)) = ip_scope_parse(h) {
+        return Ok(alloc::vec![SocketAddr::with_scope(ip, port, scope)]);
     }
     if h.eq_ignore_ascii_case("localhost") {
         return Ok(alloc::vec![SocketAddr::new(IpAddr::LOCALHOST_V4, port), SocketAddr::new(IpAddr::LOCALHOST_V6, port)]);

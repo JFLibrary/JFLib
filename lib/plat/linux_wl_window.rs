@@ -1234,7 +1234,11 @@ pub(crate) fn wlh_top_configure(wl: &mut Wl, _id: u32, a: &Args, u: u64) {
             1 => st |= WST_MAXIMIZED,
             2 => st |= WST_FULLSCREEN,
             4 => st |= WST_ACTIVE,
-            5..=8 => st |= WST_TILED,
+            // tiled_left, tiled_right, tiled_top, tiled_bottom
+            5 => st |= WST_TILED | crate::WST_TILED_LEFT,
+            6 => st |= WST_TILED | crate::WST_TILED_RIGHT,
+            7 => st |= WST_TILED | crate::WST_TILED_TOP,
+            8 => st |= WST_TILED | crate::WST_TILED_BOTTOM,
             _ => {}
         }
     }

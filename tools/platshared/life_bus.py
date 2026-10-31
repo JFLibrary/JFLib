@@ -6,9 +6,13 @@ system bus and a fake session bus.  Run inside WSL / Linux from the repository r
 
 The system bus plays logind: after the AddMatch it sends PrepareForSleep(true) and
 PrepareForSleep(false).  The session bus plays the settings portal: SettingChanged for
-color-scheme (u), an unrelated key (s) and text-scaling-factor (d).  plattest --test life-bus
-must see E_POWER 1 / 0 and E_SETTINGS SET_THEME / SET_FONTS; then this script sends SIGTERM
-and plattest must get E_SESSION_END and end normally.  Exit code 0 = passed.
+color-scheme (u), an unrelated key (s), text-scaling-factor (d) and GNOME's button-layout (s).
+plattest --test life-bus must see E_POWER 1 / 0 and E_SETTINGS SET_THEME / SET_FONTS /
+SET_OTHER.  Its ReadAll has no answer, so plattest reads the settings files of a scratch
+XDG_CONFIG_HOME; when it says so, this script rewrites kdeglobals (as KDE does: a new file
+renamed over the old one) and plattest must see E_SETTINGS SET_THEME | SET_OTHER (inotify, once
+for the batch).  Then this script sends SIGTERM and plattest must get E_SESSION_END and end
+normally.  Exit code 0 = passed.
 """
 import argparse, os, signal, socket, subprocess, sys, tempfile, threading, time
 from pathlib import Path
@@ -27,22 +31,33 @@ def check(name, ok, info=""):
 
 
 def serve(path, rec, signals):
-    """a bus that answers Hello / AddMatch and sends `signals` after the first AddMatch"""
-    srv = listen_unix(path, 1)
+    """a bus that answers Hello / AddMatch and sends `signals` after the first AddMatch; every
+    connection gets a thread (plattest reads the settings, then its watcher connects)"""
+    srv = listen_unix(path, 4)
     srv.settimeout(20)
-    try:
-        c, _ = srv.accept()
-    except socket.timeout:
-        rec["error"] = "no connection"
-        return
+    first = True
+    while True:
+        try:
+            c, _ = srv.accept()
+        except (socket.timeout, OSError):
+            if first:
+                rec["error"] = "no connection"
+            return
+        first = False
+        threading.Thread(target=conn, args=(c, rec, signals), daemon=True).start()
+
+
+def conn(c, rec, signals):
     c.settimeout(15)
+    authed = False
     buf = b""
     while b"BEGIN\r\n" not in buf:
         d = c.recv(4096)
         if not d:
             return
         buf += d
-        if b"AUTH EXTERNAL" in buf and b"\r\n" in buf.split(b"AUTH", 1)[1] and not rec.get("auth"):
+        if b"AUTH EXTERNAL" in buf and b"\r\n" in buf.split(b"AUTH", 1)[1] and not authed:
+            authed = True  # once per connection
             rec["auth"] = True
             c.sendall(b"OK 0123456789abcdef0123456789abcdef\r\n")
     buf = buf.split(b"BEGIN\r\n", 1)[1]
@@ -92,14 +107,20 @@ def main():
     sett = "org.freedesktop.portal.Settings"
     settings = [(desk, sett, "SettingChanged", "ssv", ["org.freedesktop.appearance", "color-scheme", ("u", 1)]),
                 (desk, sett, "SettingChanged", "ssv", ["org.example.app", "whatever", ("s", "x")]),
-                (desk, sett, "SettingChanged", "ssv", ["org.gnome.desktop.interface", "text-scaling-factor", ("d", 1.25)])]
+                (desk, sett, "SettingChanged", "ssv", ["org.gnome.desktop.interface", "text-scaling-factor", ("d", 1.25)]),
+                (desk, sett, "SettingChanged", "ssv", ["org.gnome.desktop.wm.preferences", "button-layout", ("s", "close:")])]
     with tempfile.TemporaryDirectory() as d:
         sp, ep = os.path.join(d, "system"), os.path.join(d, "session")
         ts = [threading.Thread(target=serve, args=(listen_unix(sp, 1), sysrec, sleep), daemon=True),
               threading.Thread(target=serve, args=(listen_unix(ep, 1), sesrec, settings), daemon=True)]
         for t in ts:
             t.start()
-        env = dict(os.environ, DBUS_SYSTEM_BUS_ADDRESS=f"unix:path={sp}", DBUS_SESSION_BUS_ADDRESS=f"unix:path={ep}")
+        cfg = os.path.join(d, "config")
+        os.makedirs(os.path.join(cfg, "gtk-3.0"))
+        with open(os.path.join(cfg, "kdeglobals"), "w") as f:
+            f.write("[General]\nColorScheme=BreezeLight\n")
+        env = dict(os.environ, DBUS_SYSTEM_BUS_ADDRESS=f"unix:path={sp}", DBUS_SESSION_BUS_ADDRESS=f"unix:path={ep}",
+                   XDG_CONFIG_HOME=cfg)
         env.pop("jfgui_LIFE", None)
         p = subprocess.Popen([str(exe), "--test", "life-bus"], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         out = []
@@ -109,6 +130,14 @@ def main():
             if not ln:
                 break
             out.append(ln.rstrip("\n"))
+            if "waiting for a file" in ln:
+                time.sleep(0.2)
+                tmp = os.path.join(cfg, "kdeglobals.new")
+                with open(tmp, "w") as f:
+                    f.write("[General]\nColorScheme=BreezeDark\n")
+                os.replace(tmp, os.path.join(cfg, "kdeglobals"))
+                with open(os.path.join(cfg, "unrelated.rc"), "w") as f:
+                    f.write("x=1\n")
             if "waiting for SIGTERM" in ln and not killed:
                 time.sleep(0.2)
                 os.kill(p.pid, signal.SIGTERM)

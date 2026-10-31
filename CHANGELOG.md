@@ -80,6 +80,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **script:** Tests in jfs: assert(cond, msg) and assert_eq(a, b, msg) in the standard library (assert_eq compares lists and maps by content and names both values); the runner runs the test_* functions with jfs --test FILE... (each in a fresh VM, a summary, exit code 1 on a failure) and has a console debugger (jfs --debug FILE)
 - **ui:** An HTML document of the viewer keeps its element tree (ui::MdNode handles that stay the same across changes; MdDoc::by_id, select / select_first / select_in / matches with tags, classes, ids, attributes and descendant / child combinators, set_text, set_attr, add_class / remove_class / toggle_class, create_element, insert, remove, free, set_inner_html; MdDoc::update derives the blocks again, in place for a change inside one paragraph); MdViewState::doc_mut / update keep the view's place, selection, focus and the fields' values across changes (page scripts of a browser)
 - **ui:** A subset of CSS in the HTML viewer: <style> sheets and style attributes with selectors by tag, class, id, attributes and descendant / child combinators, the cascade by specificity, source order and !important, the text's properties inherited, display:none; boxes for block elements (ui::MdBox, MdDoc::boxes: margins, padding, borders per side, backgrounds) drawn around their blocks in light, dark and high contrast themes, at any text scale and in mirrored windows
+- **ui:** Linux: the library's own title bar follows GNOME's button-layout (buttons left / right, missing ones hidden, mirrored in RTL) and action-double/middle/right-click-titlebar from the settings portal (GTK's settings.ini without it), live through SettingChanged; jfgui_BUTTON_LAYOUT and jfgui_TITLEBAR_*_CLICK override them
+- **plat:** Linux: light / dark and the accent without a settings portal from GTK's gtk-4.0 / gtk-3.0 settings.ini and KDE's kdeglobals, followed live through inotify
 
 ### Changed
 
@@ -137,6 +139,8 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** Wayland: windows come to the front through xdg-activation -- the launcher's $XDG_ACTIVATION_TOKEN (Plasma's menu, KRunner, Dolphin, GNOME's shell; KWin 6 gives a new window the keyboard only with it) is used for the first window and removed from the environment; win_activate / ui.bring_to_front raise and restore a minimized window (before nothing happened: the tray's 'show window' and a click on a notification left it minimized) with the token KDE's tray (ProvideXdgActivationToken) or the notification server (ActivationToken) gave, else one asked for with the last input; a later start of an AF_SINGLE_INSTANCE app hands its token to the running instance
 - **plat:** The library builds with Rust 1.99 too: Atomic*::fetch_update, deprecated there (renamed), is try_update (already in 1.98)
 - **plat:** plat::instance builds for the web and Android again (the stand-in casts of encode / decode)
+- **ui:** Linux: the caption buttons of a frameless window win over the resize band (their top row and the close button's corner started a resize before); no band on the tiled edges of a tiled window; jfgui_CSD=1 also asks for no system frame (X11, Wayland's xdg-decoration)
+- **netio:** DNS servers on IPv6 link-local addresses work: the zone of resolv.conf (fe80::1%eth0, %2) and of the Windows adapters' DNS servers reaches the socket address (SocketAddr::scope, sin6_scope_id); plat::net::ip_scope_parse, if_index, local_addrs, dns_servers
 
 ### Security
 
