@@ -1,0 +1,4 @@
+#!args --test all --validate
+# every test once with VK_LAYER_KHRONOS_validation and synchronization validation: a validation
+# error fails (syncval provokes one hazard on purpose and expects it); without the layer (no
+# Vulkan SDK) the tests run as without --validate

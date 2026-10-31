@@ -1,0 +1,3 @@
+#!args --test copies
+# buffer -> texture -> buffer with padded rows; write_texture into every mip and layer of a
+# 2D array texture, read back per mip; views of a mip and layer

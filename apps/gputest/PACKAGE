@@ -1,0 +1,12 @@
+# apps/gputest/PACKAGE: the app's identity (docs/PACKAGING.md) -- the test program of lib/gpu
+display=GPU-Test
+version=0.1.0
+publisher=JFLib
+summary=Selbsttests der GPU-Schicht (lib/gpu): Vulkan unter Windows
+description=GPU-Test: Adapter, Rechen-Shader, Kopien, Grafik mit Tiefentest, indirekte Aufrufe, Zeitstempel und ein Fenster mit Swapchain; die Testanwendung von lib/gpu.
+generic=GPU-Test
+categories=Development;
+deb_name=gputest
+# Flatpak, AppStream and the MSIX identity: reverse DNS of a domain or project you control
+app_id=org.jflib.gputest
+homepage=https://github.com/JFLibrary/JFLib

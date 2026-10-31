@@ -1,0 +1,2 @@
+#!args --test bindless
+# (level Voll) storage buffers and textures indexed from one Bindless table; a slot replaced
