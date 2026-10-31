@@ -33,6 +33,8 @@
 // (Ctrl+Shift+G), Gruppe zuklappen / aufklappen, the context menu of a group; the background
 // picture (canvas/backdrop.rs): Ansicht › Hintergrundbild …, … sperren, … an Ansicht anpassen,
 // Hintergrund entfernen, the context menu of the picture.
+// The desktop of hosts (V2, devwin/desktop.rs): Vollbild (F11) puts the active device window
+// into full screen and back, without one the main window.
 
 use jfn_model::CableKind;
 use ui::*;
@@ -44,7 +46,7 @@ use crate::workspace::canvas::{self, cables, tools, tools::Tool};
 use crate::workspace::icons::*;
 use crate::workspace::terminal;
 
-pub(crate) static CMDS: [Command; 108] = [
+pub(crate) static CMDS: [Command; 109] = [
     Command::new(CMD_NEW, "&Neu", IC_DOCUMENT, MOD_CTRL, b'N' as u32, 0),
     Command::new(CMD_OPEN, "Ö&ffnen …", IC_OPEN_FILE, MOD_CTRL, b'O' as u32, 0),
     Command::new(CMD_SAVE, "&Speichern", IC_SAVE, MOD_CTRL, b'S' as u32, 0),
@@ -153,6 +155,7 @@ pub(crate) static CMDS: [Command; 108] = [
     Command::new(CMD_BG_LOCK, "Hintergrundbild &sperren", IC_LOCK, 0, 0, CF_DISABLED),
     Command::new(CMD_BG_FIT, "Hintergrundbild an &Ansicht anpassen", 0, 0, 0, CF_DISABLED),
     Command::new(CMD_BG_REMOVE, "Hintergrund ent&fernen", 0, 0, 0, CF_DISABLED),
+    Command::new(CMD_DESK_FULL, "&Vollbild", JN_FULLSCREEN, 0, VK_F11, 0),
 ];
 
 pub(crate) static MENUBAR: [Mi; 6] = [
@@ -559,6 +562,8 @@ pub(crate) fn command(n: &mut Net, ui: &mut Ui, id: u32, arg: u32) -> bool {
         // groups and the background picture of the canvas (G1)
         CMD_GROUP..=CMD_GROUP_EXPAND => return canvas::groups::command(n, ui, id),
         CMD_BG_OPEN..=CMD_BG_CHOSEN => return canvas::backdrop::command(n, ui, id),
+        // the desktop of hosts (V2): F11, the active device window into full screen and back
+        CMD_DESK_FULL => crate::workspace::devwin::fullscreen(n, ui),
         _ => return false,
     }
     ui.repass();

@@ -19,8 +19,8 @@ use crate::app::tr::{t, tf};
 use crate::app::Net;
 use crate::doc::edits;
 
-/// the name of a kind of service (in the current language)
-fn kind_name(kind: &str) -> &str {
+/// the name of a kind of service (in the current language; also the desktop's Systemmonitor)
+pub(crate) fn kind_name(kind: &str) -> &str {
     t(match kind {
         "dhcp-client" => "DHCP-Client",
         "dhcp-server" => "DHCP-Server",

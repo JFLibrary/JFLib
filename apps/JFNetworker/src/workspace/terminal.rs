@@ -11,8 +11,8 @@
 //                       or without a command line, its device window), a note's text
 //
 // A console is drawn in one place at a time: while a device window shows it (its CLI tab, the
-// desktop's prompt) its tab and its window say so, with a button that brings that window to
-// the front.
+// desktop's Terminal or MIB-Browser window) its tab and its window say so, with a button that
+// brings that window to the front.
 
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;

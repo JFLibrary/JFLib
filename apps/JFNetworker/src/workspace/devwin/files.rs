@@ -6,6 +6,8 @@
 //   has_tab(project, dev)          a device with a file store (IOS-like or a host)
 //   tab(n, ui, k, dev)             the space line, the grid, the chosen file's text (or what it
 //                                  is), Löschen, Importieren …, Exportieren …
+//   import_into(n, dev, dir) / export_from(n, dev, path)   the same dialogs for the desktop's
+//                                  Dateimanager (devwin/filemgr.rs)
 //   dialog(n, ui)                  the file dialog of import and export (once per frame)
 //   command(n, ui, id)             CMD_FILES_IMPORT_DONE / CMD_FILES_EXPORT_DONE: the dialog's
 //                                  answer
@@ -272,6 +274,16 @@ fn remove(n: &mut Net, dev: u32, path: &str) {
         n.doc.apply(e);
     }
     n.devwin.files.err.clear();
+}
+
+/// Importieren … into a directory of the device (the desktop's Dateimanager)
+pub(crate) fn import_into(n: &mut Net, dev: u32, dir: &str) {
+    open_dialog(n, Ask::Import { dev, dir: String::from(dir) });
+}
+
+/// Exportieren … of a file of the device (the desktop's Dateimanager)
+pub(crate) fn export_from(n: &mut Net, dev: u32, path: &str) {
+    open_dialog(n, Ask::Export { dev, path: String::from(path) });
 }
 
 fn open_dialog(n: &mut Net, ask: Ask) {

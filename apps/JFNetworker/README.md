@@ -159,6 +159,10 @@ Queues, Lastgeneratoren, eigene Skripte).
   Dateien des Geräts; ein Skript-Dienst lässt sich in virtueller Zeit anhalten und schrittweise
   ausführen, mit Haltepunkten, Aufrufliste und Variablen (die Schnittstelle für die kommende
   IDE); `assert` und `assert_eq` für Tests (siehe [Skripte in Hosts](#skripte-in-hosts)).
+- **Mini-Desktop (V2):** das Gerätefenster eines Hosts ist ein kleiner PC – Programme in eigenen
+  Fenstern (Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail,
+  MIB-Browser, Systemmonitor, Einstellungen), Symbole, eine Taskleiste mit Startmenü und Uhr,
+  F11 für das Vollbild (siehe [Desktop der Hosts](#desktop-der-hosts)).
 
 ## Bedienung
 
@@ -178,7 +182,8 @@ Queues, Lastgeneratoren, eigene Skripte).
 - **Tastatur:** Strg+1 … 8 zeigen die Bereiche und geben ihnen die Tastatur, Strg+9 die
   Topologie; dort wählt Tab die Geräte und Notizen, dann die Kabel (Eingabe auf einem Kabel: seine
   Eigenschaften). Werkzeugleiste und Palette sind Fokusgruppen (ein Tab-Halt, Pfeiltasten
-  innen). F1 zeigt alle Tastenkürzel.
+  innen). F1 zeigt alle Tastenkürzel. F11 schaltet das aktive Gerätefenster (ohne eines das
+  Hauptfenster) in den Vollbildmodus und zurück.
 - **Einstellungen** (Werkzeuge › Einstellungen, Strg+,): Raster und Rasterweite, Einrasten,
   Minimap, Tempo beim Start, Bewegung (wie das System, reduziert, voll), Sprache (wie das
   System, Deutsch, English), automatisches Sichern (Sekunden, 0 aus). Sie liegen in
@@ -318,6 +323,12 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `shell_terminal.uis` | PC1s Shell im Terminal-Panel: `mkdir`, `cd` (der Prompt zeigt `~/app`), Tab ergänzt einen Ordner mit `/`, eine Datei mit Leerzeichen, bei mehreren Treffern erst den gemeinsamen Teil und dann die Liste, eine Pipe, ein Skript als Prozess mit Strg+C beendet (`$?` 130), ein Job im Hintergrund mit `[1] PID` und seiner Fertig-Zeile, `less` mit --More-- |
 | `shell_shots.uis` | die Bilder der Shell (PC1 mit Ordnern, `tree`, einer Pipeline, `ps` und `ls -l`; R1 mit Ordnern in `flash:`) hell und dunkel mit 100 und 150 % (`build/jfnetworker/shell_*.png`) |
 | `model.uis`, Gruppe `scriptmod` | Module und Debugger der Skripte (siehe [Skripte in Hosts](#skripte-in-hosts)): Importe aus den Dateien des Geräts mit absolutem und relativem Pfad, die Zeit der Disk, eine fehlende Datei, ein Zyklus, ein Fehler im Modul in Fehler, Log und Status, ein angehaltener Dienst mit verspäteten Timer-Runden, Schritte, ein Ausdruck im Halt, ein Haltepunkt mit Bedingung, Determinismus |
+| `desk_programs.uis` | der Desktop von PC1 (siehe [Desktop der Hosts](#desktop-der-hosts)): das Gerätefenster öffnet auf ihm, Symbole (ein Klick wählt, Doppelklick, Eingabe und Pfeiltasten), das Startmenü mit seinen Gruppen, drei Programme in Fenstern, die Taskleiste (aktivieren, minimieren, zurückholen, ihr Menü schließt ein Fenster), Maximieren und Minimieren mit der Titelleiste, Verschieben, Alt+F6, F11 und Vollbild, das Terminal als Konsole des Geräts (der Terminal-Bereich verweist dorthin), der Desktop wie zuvor, nachdem das Gerätefenster zu und wieder offen war |
+| `desk_files.uis` | Texteditor und Dateimanager: die Notizen, ein Text mit „Speichern unter …“ als Datei, die die Shell mit `cat` liest; Neuer Ordner, Umbenennen, Kopieren und Einfügen in den neuen Ordner, Löschen mit Rückgängig und Wiederholen, die Kopie per Doppelklick im Texteditor, Eigenschaften |
+| `desk_monitor.uis` | Systemmonitor und Einstellungen: ein Job aus dem Terminal (`sleep 100 &`) unter den Prozessen, mit „Beenden“ (`kill` im Terminal) beendet, `init` nicht; die Dienste von SRV1 mit dem laufenden Webserver, CPU-Last und Speicher; Hintergrund, Symbolgröße und Uhr, dieselben Werte unter Werkzeuge › Einstellungen |
+| `desk_rtl.uis` | der Desktop in einem gespiegelten Fenster: Symbole rechts, Taskleiste und Titelleisten gespiegelt, wie gezeichnet bedienbar; Bilder hell und dunkel mit 150 % |
+| `desk_shots.uis` | die Bilder des Desktops (drei Fenster, das Startmenü) hell und dunkel mit 100 und 150 %, Hochkontrast, die Hintergründe Netz und Sand mit großen Symbolen (`build/jfnetworker/desk_*.png`) |
+| `model.uis`, Gruppe `desk` | worauf der Desktop baut: die Prozesse von `jfn_sim/procs.rs` gegen `ps` (ein Job mit PID und Befehl, `kill`, ein Dienst, der kein Job ist), die CPU-Zeit je Sekunde gegen die Zahlen des Webservers, freie Namen, Kopien eines Ordnerbaums und Verschieben im Dateimanager, welches Fenster die Konsole zeigt, der Kontrast der Beschriftungen auf jedem Hintergrund in beiden Themes |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -408,6 +419,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | SNMP | [`crates/jfn_sim/snmpd.rs`](crates/jfn_sim/snmpd.rs), [`snmpmib.rs`](crates/jfn_sim/snmpmib.rs), [`snmptrapd.rs`](crates/jfn_sim/snmptrapd.rs), [`snmptrace.rs`](crates/jfn_sim/snmptrace.rs), [`cli/snmp.rs`](crates/jfn_sim/cli/snmp.rs), [`src/workspace/devwin/mib.rs`](src/workspace/devwin/mib.rs), [`src/snmptest.rs`](src/snmptest.rs), [`lib/netpkt/ber.rs`](../../lib/netpkt/ber.rs), [`lib/netpkt/snmp.rs`](../../lib/netpkt/snmp.rs), [`lib/netpkt/mib.rs`](../../lib/netpkt/mib.rs) | der Agent mit seiner Sicht auf das Gerät, der Trap-Empfänger, die Notizen, die IOS-artigen Befehle und die Werkzeuge der Shell, der MIB-Browser, der Selbsttest, BER, die Nachrichten von SNMPv1 und v2c und die kleine MIB (Library; siehe [SNMP](#snmp)) |
 | Shell | [`crates/jfn_sim/cli/sh.rs`](crates/jfn_sim/cli/sh.rs), [`shrun.rs`](crates/jfn_sim/cli/shrun.rs), [`coreutils.rs`](crates/jfn_sim/cli/coreutils.rs), [`man.rs`](crates/jfn_sim/cli/man.rs), [`cli/files.rs`](crates/jfn_sim/cli/files.rs), [`lib/base/pattern.rs`](../../lib/base/pattern.rs), [`src/shelltest.rs`](src/shelltest.rs) | die Shell einer Sitzung (Arbeitsverzeichnis, Variablen, Verlauf, Jobs), ihre Grammatik, die Werkzeuge, Hilfe und Handbuchseiten, Prozesse mit `jfs`, Ordner in `flash:`, Platzhalter und reguläre Ausdrücke, ihr Selbsttest (siehe [Die Shell: Ordner, Werkzeuge, Prozesse](#die-shell-ordner-werkzeuge-prozesse)) |
 | Module und Debugger | [`lib/script/module.rs`](../../lib/script/module.rs), [`lib/script/debug.rs`](../../lib/script/debug.rs), [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs) (`Host::load`, `DebugOp`), [`src/scriptmodtest.rs`](src/scriptmodtest.rs) | `import()` aus den Dateien des Geräts, Anhalten und Schritte eines Skript-Dienstes in virtueller Zeit, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
+| Desktop der Hosts | [`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), [`progs.rs`](src/workspace/devwin/progs.rs), [`editor.rs`](src/workspace/devwin/editor.rs), [`filemgr.rs`](src/workspace/devwin/filemgr.rs), [`sysmon.rs`](src/workspace/devwin/sysmon.rs), [`crates/jfn_sim/procs.rs`](crates/jfn_sim/procs.rs), [`src/desktoptest.rs`](src/desktoptest.rs) | der Desktop im Gerätefenster eines Hosts: Programme in Fenstern (die Fensterfläche von `lib/ui`), Symbole, Taskleiste mit Startmenü, Uhr und Vollbild; Terminal, Dateimanager, Texteditor, IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser, Systemmonitor, Einstellungen; die Prozesse und die CPU-Zeit je Sekunde aus dem Simulator |
 
 ### Gerätekatalog
 
@@ -499,11 +511,11 @@ Access Point beteiligt ist, sonst die schnellste Datenverbindung mit den kleinst
   sichern“), Dienste (DHCP, DNS, Syslog, NTP, TCP-Testdienste mit Zustand und Zahlen; die des
   Projekts schalten sich sofort ein und aus, auch rückgängig ohne Neustart, und ihre
   „Einstellungen …“ sind JSON, siehe [Labore und Aufgaben](#labore-und-aufgaben)), CLI (dieselbe
-  Konsole wie im Terminal-Tab) und bei Hosts ein Desktop: IP-Konfiguration (statisch oder
-  DHCP), Eingabeaufforderung, Texteditor (`notizen.txt`: die Notizen des Geräts, gespeichert
-  im Projekt, bis der Simulator ein Dateisystem hat) und ein Webbrowser, der bisher nur Adressen
-  und Ports auflöst; Seiten über HTTP laden und zeigen ist Meilenstein B1 (siehe
-  [Fahrplan](#fahrplan)). Eine Konsole erscheint an einer Stelle: Zeigt das Gerätefenster sie,
+  Konsole wie im Terminal-Tab) und bei Hosts ein Desktop mit Programmen in eigenen Fenstern,
+  auf dem ihr Gerätefenster öffnet (siehe [Desktop der Hosts](#desktop-der-hosts)); sein
+  Webbrowser löst bisher nur Adressen und Ports auf, Seiten über HTTP laden und zeigen ist
+  Meilenstein B1 (siehe [Fahrplan](#fahrplan)). F11 zeigt ein Gerätefenster mit jedem Reiter
+  im Vollbild. Eine Konsole erscheint an einer Stelle: Zeigt das Gerätefenster sie,
   verweist der Tab dorthin. Offen sind höchstens zwei Gerätefenster und drei Konsolenfenster.
   Der Reiter Dateien zeigt die Dateien des Geräts mit Import und Export (siehe
   [Dateien, TFTP und FTP](#dateien-tftp-und-ftp)).
@@ -3130,6 +3142,71 @@ Für Programme: `Action::Snmp { dev, set }` mit `SnmpSet`, `Engine::snmp_agent(d
 ([`src/snmptest.rs`](src/snmptest.rs)), BER und SNMP Byte für Byte in der coretest-Gruppe
 `snmp`, dazu das Szenario `snmp_monitor.scn` und die Fensterskripte `snmp_services.uis`,
 `snmp_console.uis`, `snmp_mib.uis` und `snmp_shots.uis`.
+
+### Desktop der Hosts
+
+Das Gerätefenster eines Hosts öffnet auf seinem **Desktop**
+([`src/workspace/devwin/desktop.rs`](src/workspace/devwin/desktop.rs), Meilenstein V2): ein
+kleiner PC mit Programmen in eigenen Fenstern, Symbolen auf einem eigenen Hintergrund und einer
+Taskleiste. Die Fenster sind die der Library (`ui.desk_begin`, L7): Titelleiste, Verschieben,
+Größe an Rändern und Ecken, Maximieren (auch Doppelklick auf die Titelleiste), Minimieren,
+Einrasten an den Rändern und Hälften, Alt+F6 / Alt+Umschalt+F6 zum nächsten / vorigen Fenster,
+Alt+F10, Alt+F9 und Alt+Minus für das Menü des Fensters; für Screenreader ist jedes Fenster ein
+Dialog mit seinem Titel.
+
+- **Symbole und Start:** die Programme als Symbole in Spalten von links oben; ein Klick wählt
+  eines, ein Doppelklick oder Eingabe öffnet es. Die Symbole sind ein Tab-Halt (die Pfeiltasten
+  wählen innen) und für Screenreader eine Liste „Desktop“. „Start“ öffnet die Programme als Menü
+  in Gruppen: Netzwerk (IP-Konfiguration, Webbrowser, E-Mail, MIB-Browser), System (Terminal,
+  Dateimanager, Systemmonitor, Einstellungen), Entwicklung (Texteditor, IDE).
+- **Taskleiste:** Start, eine Schaltfläche je offenem Fenster (ein Klick holt es nach vorn, ein
+  zweiter minimiert es, ein Rechtsklick öffnet sein Menü), Vollbild und die Uhr des Geräts in der
+  Simulation.
+- **Vollbild:** F11 schaltet das aktive Gerätefenster in den Vollbildmodus und zurück (ohne
+  aktives Gerätefenster das Hauptfenster), ebenso Vollbild in der Taskleiste; jeder Reiter lässt
+  sich so zeigen. Ein neues Fenster öffnet rechts der Symbole so groß, wie Platz ist; E-Mail,
+  MIB-Browser und IDE starten maximiert.
+- **Terminal:** die Konsole des Geräts – derselbe `TermState` wie im Reiter CLI und im
+  Terminal-Bereich, der dorthin verweist, solange das Fenster sie zeigt. Es gibt höchstens ein
+  Terminal-Fenster; die Sitzungen von X1e bekommt es über `Desk::term_sess` und
+  `desktop::terminal_window`.
+- **Dateimanager** ([`filemgr.rs`](src/workspace/devwin/filemgr.rs)): die Ordner als Baum, die
+  Einträge des Ordners mit Größe, Art und Zeit; Neuer Ordner, Umbenennen, Löschen, Kopieren,
+  Ausschneiden, Einfügen (ein vergebener Name bekommt „(Kopie)“), Öffnen (ein Ordner, eine Datei
+  in ihrem Programm, Skripte über `desktop::open_jfs`, bis zur IDE im Texteditor), Eigenschaften,
+  Importieren … und Exportieren … über die Dateidialoge des Reiters Dateien – so kommt ein
+  `.jfs`-Skript herein und hinaus. In der Liste: Entf, F2, Strg+C / X / V, Eingabe. Jede
+  Änderung ist ein Rückgängig-Schritt des Projekts, dem der Simulator sofort folgt.
+- **Texteditor** ([`editor.rs`](src/workspace/devwin/editor.rs)): ohne Wahl die Notizen des
+  Geräts als `notizen.txt` – wie bisher im Projekt gespeichert, ältere Projekte bleiben, wie sie
+  waren; Öffnen … und Speichern unter … wählen Dateien des Geräts über eine kleine Auswahl, in
+  der die Notizen ein eigener Eintrag sind. Jede Speicherung ist ein Rückgängig-Schritt, den die
+  Shell sofort sieht (`cat`).
+- **Systemmonitor** ([`sysmon.rs`](src/workspace/devwin/sysmon.rs)): die Prozesse, wie `ps` sie
+  zeigt (PID, Benutzer, CPU-Zeit, Befehl; `Engine::processes` in
+  [`procs.rs`](crates/jfn_sim/procs.rs)) – „Beenden“ tippt `kill PID` ins Terminal, nur bei
+  Hintergrund-Jobs; die Dienste mit Art, Zustand und CPU-Zeit; Leistung: die CPU-Last der
+  letzten Minute (`Engine::cpu_secs`, die vier CPUs von `top`) und der Speicher der Skripte (die
+  Zeitreihe `heap_kb`) als kleine Diagramme.
+- **IP-Konfiguration** und **Webbrowser** ([`progs.rs`](src/workspace/devwin/progs.rs)),
+  **E-Mail** ([`email.rs`](src/workspace/devwin/email.rs)), **MIB-Browser**
+  ([`mib.rs`](src/workspace/devwin/mib.rs)) wie zuvor, jetzt in Fenstern; der MIB-Browser zeigt
+  die Konsole unter dem Baum, solange das Terminal-Fenster nicht über ihm liegt.
+- **Einstellungen:** der Hintergrund (Schiefer, Salbei, Sand, Nachtblau, Punktraster, Netz; im
+  Hochkontrast die Fläche des Fensters ohne Muster), die Größe der Symbole und die Form der Uhr.
+  Sie sind Einstellungen des Benutzers für alle Desktops (`config://settings.ini`, auch unter
+  Werkzeuge › Einstellungen › Desktop), keine Konfiguration der simulierten Geräte.
+- **IDE:** startet maximiert und zeigt bis zu Meilenstein IDE1 einen Hinweis mit dem Weg zum
+  Reiter Skripte (`desktop::ide_window`).
+- **Wo der Zustand liegt:** Fenster, offene Programme und was sie zeigen gehören zur Sitzung,
+  nicht ins Projekt und nicht ins Rückgängig: je Gerät, solange die App läuft. Ein geschlossenes
+  und wieder geöffnetes Gerätefenster zeigt den Desktop wie zuvor; ein neues oder geladenes
+  Projekt beginnt ohne.
+
+Geprüft wird der Desktop in der Selbsttest-Gruppe `desk`
+([`src/desktoptest.rs`](src/desktoptest.rs)) und mit den Fensterskripten `desk_programs.uis`,
+`desk_files.uis`, `desk_monitor.uis`, `desk_rtl.uis` und `desk_shots.uis`; die Skripte von
+E-Mail und MIB-Browser öffnen ihre Programme dort.
 
 ## Performance
 

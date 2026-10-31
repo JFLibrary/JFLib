@@ -22,8 +22,7 @@ scale 100
 # ---- the MIB-Browser after a Get of sysDescr
 dblclick listitem:"MON" shift
 expect window 26624 open
-click tab:"Desktop"
-click button:"MIB-Browser"
+dblclick listitem:"MIB-Browser"
 click #69633
 type "10.0.10.1"
 click listitem:"sysDescr"

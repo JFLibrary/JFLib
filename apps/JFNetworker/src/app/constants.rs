@@ -590,3 +590,14 @@ pub(crate) const ID_MIB0: u32 = 0x0001_1000;
 /// Formatieren, + 5 Gliederung on / off, + 8 the split of the editor and the outline, + 0x40 the
 /// outline (rows + 1 + i))
 pub(crate) const ID_SCRIPTLS0: u32 = 0x0001_4000;
+
+// ---- V2: the desktop of a host's device window (commands 750 .. 779, widgets 0x0001_6000 ..
+// 0x0001_7FFF, timers 0x1AC .. 0x1AF unused)
+/// F11: the active device window into full screen and back (else the main window)
+pub(crate) const CMD_DESK_FULL: u32 = 750;
+/// the desktop of device window k: ID_DESK0 + 0x1000 k .. + 0xFFF (devwin/desktop.rs: + 0 the
+/// window area, + 1 Start and its menu, + 3 Vollbild, + 0x10 + p the start menu's rows, + 0x20
+/// the icons' group, + 0x30 + p the icons, + 0x40 the background; + 0x100 the Texteditor,
+/// + 0x200 the Dateimanager, + 0x400 the Systemmonitor, + 0x600 Einstellungen, + 0x700 IDE,
+/// + 0x710 Terminal, + 0x720 the MIB-Browser's note)
+pub(crate) const ID_DESK0: u32 = 0x0001_6000;

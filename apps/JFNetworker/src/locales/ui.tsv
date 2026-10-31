@@ -361,10 +361,8 @@ Die Formulare tippen ihre Befehle in die Konsole des Geräts; sie gelten sofort 
 Zuletzt in der Konsole:	Last in the console:
 IP-Konfiguration	IP configuration
 Adresse, Maske und Gateway oder DHCP	Address, mask and gateway, or DHCP
-Eingabeaufforderung	Command prompt
 Die Shell des Geräts	The device's shell
 Texteditor	Text editor
-Notizen zum Gerät	Notes on the device
 Webbrowser	Web browser
 Seiten als Text	Pages as text
 Dieses Gerät hat keine IPv4-Schnittstelle.	This device has no IPv4 interface.
@@ -378,7 +376,7 @@ z. B. 255.255.255.0	e.g. 255.255.255.0
 Per DHCP	By DHCP
 noch keine Adresse	no address yet
 , Gateway {}	, gateway {}
-Statische Einstellungen laufen als Befehle in der Eingabeaufforderung und werden Teil der Startkonfiguration; DHCP holt Adresse und Gateway vom Server.	Static settings run as commands in the command prompt and become part of the startup configuration; DHCP gets address and gateway from the server.
+Statische Einstellungen laufen als Befehle im Terminal und werden Teil der Startkonfiguration; DHCP holt Adresse und Gateway vom Server.	Static settings run as commands in the Terminal and become part of the startup configuration; DHCP gets address and gateway from the server.
 „{}“ ist keine Subnetzmaske.	“{}” is no subnet mask.
 gesichert	saved
 Verwerfen	Discard
@@ -394,7 +392,7 @@ Die Adresse nennt keinen Rechner.	The address names no host.
 {} (der Name ist auf diesem Gerät nicht eingetragen), Port {}, Pfad {}	{} (the name is not known on this device), port {}, path {}
 Dieser Browser zeigt nur, wohin die Adresse führt.	This browser only shows where the address leads.
 Ziel: {}	Destination: {}
-Die Seite selbst holt „curl {}“ in der Eingabeaufforderung über den Simulator.	The page itself: “curl {}” in the command prompt fetches it through the simulator.
+Die Seite selbst holt „curl {}“ im Terminal über den Simulator.	The page itself: “curl {}” in the Terminal fetches it through the simulator.
 #
 # ---- the simulation mode (workspace/sim)
 Echtzeit	Real time
@@ -1266,7 +1264,7 @@ Agent	Agent
 z. B. 10.0.0.1	e.g. 10.0.0.1
 Community	Community
 Version	Version
-Links ein Objekt wählen; Get, GetNext, Walk und Set laufen als Befehle in der Eingabeaufforderung des Geräts.	Choose an object on the left; Get, GetNext, Walk and Set run as commands in the device's command prompt.
+Links ein Objekt wählen; Get, GetNext, Walk und Set laufen als Befehle im Terminal des Geräts.	Choose an object on the left; Get, GetNext, Walk and Set run as commands in the device's Terminal.
 nicht lesbar	not readable
 Einzelwert	scalar
 Spalte einer Tabelle	column of a table
@@ -1279,7 +1277,7 @@ Walk	Walk
 der neue Wert	the new value
 Set	Set
 Agent und Community ohne Leerzeichen angeben.	Give the agent and the community without spaces.
-Die Antworten in der Eingabeaufforderung von {}	The answers in the command prompt of {}
+Die Antworten im Terminal von {}	The answers in the Terminal of {}
 Schreibt eine Zeile ins Protokoll des Geräts, mit dem Namen des Dienstes davor.	Writes a line to the device's log, with the service's name in front.
 Eine Zeile der Stufe debug ins Protokoll des Geräts.	A line of level debug in the device's log.
 Eine Zeile der Stufe info ins Protokoll des Geräts.	A line of level info in the device's log.
@@ -1319,3 +1317,99 @@ Formatieren (Umschalt+Alt+F): Einrückung, Leerzeichen, eine Anweisung je Zeile 
 Name umbenennen	Rename name
 Gliederung: die Funktionen und globalen Variablen neben dem Editor, ein Klick springt hin	Outline: the functions and global variables beside the editor, a click jumps there
 Neuer Name (jede Stelle im Skript)	New name (every place in the script)
+# ---- V2: the desktop of hosts (workspace/devwin/desktop.rs, progs.rs, editor.rs, filemgr.rs,
+# sysmon.rs; app/prefs.rs's section Desktop; the shortcuts' section Desktop)
+&Vollbild	&Full screen
+Vollbild	Full screen
+Vollbild (F11)	Full screen (F11)
+Start	Start
+Die Programme des Geräts	The device's programs
+Dateimanager	File manager
+Systemmonitor	System monitor
+IDE	IDE
+Ordner und Dateien des Geräts	The device's folders and files
+Notizen und Dateien des Geräts bearbeiten	Edit the device's notes and files
+Prozesse, Dienste, CPU und Speicher	Processes, services, CPU and memory
+Hintergrund, Symbole und Uhr des Desktops	The desktop's background, icons and clock
+Skripte des Geräts entwickeln	Develop the device's scripts
+Netzwerk	Network
+System	System
+Entwicklung	Development
+Die Konsole des Geräts ist im Fenster „{}“ offen.	The device's console is open in the window “{}”.
+Zeigen	Show
+Die Skripte des Geräts	The device's scripts
+Die Skripte bearbeitet, prüft und startet bis auf Weiteres der Reiter Skripte dieses Fensters.	For now the Scripts tab of this window edits, checks and starts the scripts.
+Reiter Skripte öffnen	Open the Scripts tab
+Hintergrund	Background
+Der Hintergrund der Desktops aller Hosts; im Hochkontrast eine ruhige Fläche.	The background of every host's desktop; a plain area in high contrast.
+Schiefer	Slate
+Salbei	Sage
+Sand	Sand
+Nachtblau	Night blue
+Punktraster	Dot grid
+Größe der Symbole	Icon size
+Klein	Small
+Mittelgroß	Medium
+Groß	Large
+Uhr der Taskleiste	Taskbar clock
+Stunden und Minuten	Hours and minutes
+Mit Sekunden	With seconds
+Mit Datum	With the date
+Sie zeigt die Uhr des Geräts in der Simulation.	It shows the device's clock in the simulation.
+Sie gelten für die Desktops aller Hosts und stehen auch unter Werkzeuge › Einstellungen › Desktop; das Projekt und die Geräte ändern sie nicht.	They apply to every host's desktop and are also under Tools › Settings › Desktop; they change neither the project nor the devices.
+der Name ist vergeben	the name is taken
+das Gerät erlaubt es nicht	the device does not allow it
+„{}“ ist keine Textdatei.	“{}” is not a text file.
+Öffnen …	Open …
+Speichern unter …	Save as …
+„{}“ wurde nicht gespeichert: {}.	“{}” was not saved: {}.
+Notizen des Geräts	The device's notes
+Speichern unter	Save as
+Datei öffnen	Open a file
+Nach oben	Up
+Neuer Ordner	New folder
+Kopieren	Copy
+Ausschneiden	Cut
+Einfügen	Paste
+Neuer Name	New name
+OK	OK
+Der Ordner ist leer	The folder is empty
+Neuer Ordner legt einen an, Einfügen und Importieren … bringen Dateien hierher.	New folder makes one, Paste and Import … bring files here.
+Art	Kind
+Skript (jfs)	Script (jfs)
+Textdatei	Text file
+{} in Dateien darin	{} in the files inside
+{} ({} Bytes)	{} ({} bytes)
+vom System	by the system
+Einträge: {}	Entries: {}
+Einträge: {}; zum Verschieben bereit: {}	Entries: {}; ready to move: {}
+Einträge: {}; zum Kopieren bereit: {}	Entries: {}; ready to copy: {}
+{} gewählt	{} chosen
+{} von {} gewählt	{} of {} chosen
+„{}“ bleibt: {}.	“{}” stays: {}.
+„{}“ kommt nicht hierher: {}.	“{}” cannot come here: {}.
+„{}“ geht nicht: {}.	“{}” does not work: {}.
+Prozesse	Processes
+Leistung	Performance
+Das Gerät ist ausgeschaltet: es läuft nichts.	The device is switched off: nothing runs.
+Prozesse: {}	Processes: {}
+Beenden	End
+Beendet den gewählten Hintergrund-Job mit kill im Terminal; Dienste schaltet der Reiter Dienste.	Ends the chosen background job with kill in the Terminal; the Services tab switches services.
+PID	PID
+CPU-Zeit	CPU time
+Befehl	Command
+Auf diesem Gerät läuft kein Dienst.	No service runs on this device.
+CPU-Last	CPU load
+Die letzte Minute; {} CPUs wie bei top.	The last minute; {} CPUs as top counts them.
+Arbeitsspeicher der Skripte	Memory of the scripts
+{} KiB	{} KiB
+Die Heaps der Skript-Dienste, eine Messung je Sekunde.	The heaps of the script services, one sample a second.
+Noch keine Messwerte	No samples yet
+Alt+F6 / Alt+Umschalt+F6	Alt+F6 / Alt+Shift+F6
+zum nächsten / vorigen Fenster des Desktops	to the next / previous window of the desktop
+Alt+F10 / Alt+F9	Alt+F10 / Alt+F9
+das aktive Fenster maximieren und zurück / minimieren	maximize the active window and back / minimize it
+Alt+Minus	Alt+Minus
+das Menü des aktiven Fensters	the active window's menu
+Doppelklick / Eingabe	Double click / Enter
+das Programm eines Symbols öffnen	open an icon's program
