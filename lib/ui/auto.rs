@@ -55,11 +55,17 @@
 //                   does
 //   quit
 //   system focus in|out | suspend | resume | background | foreground | session-end |
-//          settings theme|locale|contrast|fonts|N
+//          settings theme|locale|contrast|fonts|other|N
 //                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...;
 //                       background / foreground: a hidden tab, Android's onStop / onStart)
 //   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
 //                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
+//   system env NAME VALUE|-   set (- removes) a jfgui_* environment variable of the run: the
+//                       overrides of the system settings (follow with `system settings ...`),
+//                       jfgui_CSD (the library title bar and its resize band, next pass)
+//   expect wm none|move|menu|minimize|maximize|restore|close|lower|resize EDGE   what the title
+//                       bar or the resize band asked the window manager for since the last check
+//                       (EDGE n, s, w, e, nw, ne, sw, se: physical edges)
 // Windows (ID = the app's window id, 0 / main = the main window):
 //   window ID|main|any            selectors only look into that window (default any)
 //   expect window ID open|closed|visible|active|modal|keys|fullscreen|windowed
@@ -1180,11 +1186,25 @@ impl Ui {
     // inject(type, btn, x, y, data): queue one event (current mods) and process it; keys
     // and text go to the keyboard window, pointer events to the script's window
     // system focus in | out, suspend, resume, background, foreground (the browser's hidden tab,
-    // Android's onStop / onStart), session-end, settings theme | locale | contrast | fonts | N:
-    // the lifecycle events of the platform (UIC_ACTIVE, UIC_SUSPEND, ...);
-    // fullscreen on | off [ID | main]: the platform changed the window's full screen (L7)
+    // Android's onStop / onStart), session-end, settings theme | locale | contrast | fonts |
+    // other | N: the lifecycle events of the platform (UIC_ACTIVE, UIC_SUSPEND, ...);
+    // fullscreen on | off [ID | main]: the platform changed the window's full screen (L7);
+    // env NAME VALUE | -: a jfgui_* variable of the run
     fn sc_system(&mut self, app: &mut dyn App, a: &[u8]) {
         let w = |n: &str| word_eq(a, n).is_some();
+        if w("env") {
+            let r = next_word(a);
+            let name_len = r.iter().position(|&c| c == b' ' || c == b'\t').unwrap_or(r.len());
+            let name = String::from_utf8_lossy(&r[..name_len]).into_owned();
+            let value = String::from(String::from_utf8_lossy(skip_ws(&r[name_len..])).trim_end());
+            if !name.starts_with("jfgui_") || value.is_empty() {
+                self.fail(b"system env: a jfgui_* NAME and a VALUE (- removes it)");
+                return;
+            }
+            plat::setenv(&name, if value == "-" { None } else { Some(&value) });
+            self.run_passes(app);
+            return;
+        }
         if w("fullscreen") {
             let r = next_word(a);
             let on = word_eq(r, "on").is_some();
@@ -1219,7 +1239,7 @@ impl Ui {
             (plat::E_SESSION_END, 0)
         } else if w("settings") {
             let r = next_word(a);
-            let bits = [("theme", plat::SET_THEME), ("locale", plat::SET_LOCALE), ("contrast", plat::SET_CONTRAST), ("fonts", plat::SET_FONTS), ("monitors", plat::SET_MONITORS)]
+            let bits = [("theme", plat::SET_THEME), ("locale", plat::SET_LOCALE), ("contrast", plat::SET_CONTRAST), ("fonts", plat::SET_FONTS), ("other", plat::SET_OTHER), ("monitors", plat::SET_MONITORS)]
                 .iter()
                 .find(|(n, _)| word_eq(r, n).is_some())
                 .map_or_else(|| parse_int(r).0 as u32, |(_, b)| *b);
@@ -1724,6 +1744,15 @@ impl Ui {
             let name = got.map_or("none", plat::audio::sound_name);
             if !want.starts_with(name.as_bytes()) || (want.len() > name.len() && want[name.len()] > b' ') {
                 self.fail(alloc::format!("sound {name}").as_bytes());
+            }
+            return;
+        }
+        if let Some(r) = word_eq(a, "wm") {
+            // what the title bar / the resize band asked the window manager for (chrome.rs)
+            let want = String::from(String::from_utf8_lossy(skip_ws(r)).trim_end());
+            let got = super::chrome::wm_req_name(core::mem::take(&mut self.m.chrome.wm_req));
+            if want != got {
+                self.fail(alloc::format!("wm {got}").as_bytes());
             }
             return;
         }

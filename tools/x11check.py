@@ -49,8 +49,13 @@ real mouse and keyboard stay untouched), captures it and measures idle CPU time.
       xdg_popup) reaching below the main window, a click on its last row arrives as the main
       window's press and closes it; X11 knows the work area: the calendar opens below its
       button, out of the window (Wayland keeps a popup that fits inside the window)
+  python tools/x11check.py csd [--backend x11|wayland] [--exe build/linux/gallery]
+      the library's own title bar (jfgui_CSD=1; on Wayland the real case in WSLg): the top
+      edge beside the buttons resizes, the top row of the maximize button maximizes and
+      restores, the corner pixel of the close button ends the app; the style's layout and
+      GNOME's close,minimize,maximize: (jfgui_BUTTON_LAYOUT)
   python tools/x11check.py all [--bindir build/linux] [--out-dir build]
-      every check on X11, kritzel + keys + grab + windows + popups + edges on Wayland
+      every check on X11, kritzel + keys + grab + windows + popups + edges + csd on Wayland
 
 WSLg shows undecorated X11 windows with a 32 px transparent margin (Weston XWM
 shadow); the margin is measured from the capture.  Exit code 0 = all checks passed.
@@ -335,8 +340,7 @@ def check_kritzel(a):
     time.sleep(1.5)
     cw3, ch3 = content_size(app, (cw2, ch2))
     check((cw3, ch3) == (cw, ch), f"{backend}: restore button", f"-> {cw3}x{ch3}")
-    # (edge resizing: the UI core has no resize band that calls plat_begin_resize yet;
-    # "x11check.py grab" tests plat_begin_resize itself)
+    # (edge resizing and the caption buttons over the resize band: "x11check.py csd")
     # close button
     time.sleep(1.0)                             # WSLg: let the restored window settle
     click(hwnd, m + cw3 - 23, m + 16)
@@ -695,6 +699,75 @@ def check_grab(a):
     ups = [l for l in out.splitlines() if l.strip().startswith("event 3 ")]
     check(len(ups) >= 2, f"{backend}: E_UP after each grab (buttons released for the app)", f"{len(ups)} E_UP")
     app.kill()
+
+
+def check_csd(a):
+    """The library's own title bar on a real window (gallery, jfgui_CSD=1; WSLg's Weston has
+    no xdg-decoration, so on Wayland it is the real case): the top edge left of the buttons
+    resizes the window, the top row of the maximize button maximizes (no resize), the
+    maximize button restores, the corner pixel of the close button ends the app (exit 0).
+    Twice: the style's layout (buttons at the right) and GNOME's close,minimize,maximize:
+    (jfgui_BUTTON_LAYOUT: close in the left corner).  The app is ended by its pid only."""
+    backend = a.backend
+    exe = a.exe if a.exe and "gallery" in a.exe else a.bindir + "/gallery"
+    for layout in ("", "close,minimize,maximize:"):
+        tag = "left" if layout else "right"
+        print(f"--- library title bar on {backend} (buttons {tag})")
+        env = {"jfgui_CSD": "1"}
+        if layout:
+            env["jfgui_BUTTON_LAYOUT"] = layout
+        app = App(exe, ["--log-events", "--size", "900x600", "--auto-close", "90000"], backend, "jfgui Galerie", env=env,
+                  log=f"build/x11check_csd_{backend}_{tag}.log")
+
+        def end():
+            pid = app.pid()
+            if pid and app.wait(0.1) is None:
+                wsl(f"kill {pid} 2>/dev/null || true")
+            app.wait(5)
+
+        hwnd = app.window()
+        if not check(hwnd is not None, f"{backend} {tag}: gallery window appears"):
+            end()
+            continue
+        w, h, px, pos = wait_content(hwnd)
+        time.sleep(0.8)
+        w, h, px, pos = wslcap.capture(hwnd, False)
+        m = margin_of(w, h, px)
+        if m == 0 and backend == "x11":
+            m = 32
+        cw, ch = content_size(app, (w - 2 * m, h - 2 * m))
+        if cw < w:
+            m = (w - cw) // 2
+        out = os.path.join(a.out_dir, f"x11check_csd_{backend}_{tag}.png")
+        wslcap.write_png(out, w, h, px)
+        print(f"window {w}x{h}, margin {m}, content {cw}x{ch} -> {out}")
+        # the top edge left / right of the buttons: a resize from the top (the window gets lower)
+        ex = cw - 300 if layout else 300
+        drag(hwnd, m + ex, m + 1, m + ex, m + 61, steps=12)
+        time.sleep(1.2)
+        cw1, ch1 = content_size(app, (cw, ch))
+        check(ch1 < ch - 20 and cw1 == cw, f"{backend} {tag}: the top edge beside the buttons resizes", f"{cw}x{ch} -> {cw1}x{ch1}")
+        r = app.rect()
+        # the top row of the maximize button: maximized, not resized
+        mx = 115 if layout else cw1 - 69
+        click(hwnd, m + mx, m + 1)
+        time.sleep(1.5)
+        cw2, ch2 = content_size(app, (cw1, ch1))
+        check(cw2 > cw1 + 100, f"{backend} {tag}: the top row of the maximize button maximizes", f"{cw1}x{ch1} -> {cw2}x{ch2}")
+        mx2 = 115 if layout else cw2 - 69
+        click(hwnd, mx2, 16)                    # restore (maximized: no margin, see check_kritzel)
+        time.sleep(1.5)
+        cw3, ch3 = content_size(app, (cw2, ch2))
+        check((cw3, ch3) == (cw1, ch1), f"{backend} {tag}: the maximize button restores", f"-> {cw3}x{ch3}")
+        time.sleep(1.0)
+        # the corner pixel of the close button (the corner of the resize band before)
+        cx = 0 if layout else cw3 - 1
+        click(hwnd, m + cx, m + 0)
+        rc = app.wait(5)
+        check(rc == 0, f"{backend} {tag}: the corner pixel of the close button ends the app", f"exit {rc}, window was {r}")
+        if rc is None:
+            wslcap.write_png(os.path.join(a.out_dir, f"x11check_csd_{backend}_{tag}_noclose.png"), *wslcap.capture(hwnd, False)[:3])
+            end()
 
 
 # ---- a proxy X "server" (runs inside WSL): records the client's authentication and
@@ -1626,7 +1699,7 @@ def main():
     except Exception:
         pass
     ap = argparse.ArgumentParser()
-    ap.add_argument("what", choices=["kritzel", "keys", "clip", "present", "grab", "dpi", "conn", "windows", "popups", "edges", "all"])
+    ap.add_argument("what", choices=["kritzel", "keys", "clip", "present", "grab", "dpi", "conn", "windows", "popups", "edges", "csd", "all"])
     ap.add_argument("--backend", default="x11", choices=["x11", "wayland"])
     ap.add_argument("--exe", help="the app of a single check")
     ap.add_argument("--bindir", default="build/linux", help="where Kritzel / linuxtest are (default build/linux)")
@@ -1653,6 +1726,8 @@ def main():
         check_popups(a)
     if a.what in ("edges", "all"):
         check_edges(a)
+    if a.what in ("csd", "all"):
+        check_csd(a)
     if a.what == "all":
         a.backend = "wayland"
         check_kritzel(a)
@@ -1661,6 +1736,7 @@ def main():
         check_windows(a)
         check_popups(a)
         check_edges(a)
+        check_csd(a)
     print(f"x11check: {len(FAILS)} failure(s)")
     return 1 if FAILS else 0
 

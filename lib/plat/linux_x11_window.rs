@@ -37,7 +37,7 @@ use crate::{
     PWF_MODAL, PWF_NOACTIVATE, PWF_RESIZABLE, PWF_SYSFRAME, PWF_TOOL, PWS_SHOWNA, WCMD_CLOSE, WCMD_MAXIMIZE,
     WCMD_MINIMIZE, WCMD_RESTORE, WST_ACTIVE, WST_FULLSCREEN, WST_MAXIMIZED, WST_MINIMIZED, WST_TILED,
 };
-use crate::{WCMD_FULLSCREEN, WCMD_WINDOWED};
+use crate::{WCMD_FULLSCREEN, WCMD_LOWER, WCMD_WINDOWED};
 
 const TITLE_MAX: usize = 1024;
 const WANT_DPI: u32 = 2; // X11::want bits (global work)
@@ -623,6 +623,16 @@ impl X11 {
                 self.net_state(w, if cmd == WCMD_FULLSCREEN { NET_STATE_ADD } else { NET_STATE_REMOVE }, f, 0);
                 self.flush();
             }
+            WCMD_LOWER => {
+                // ConfigureWindow stack-mode Below (a reparenting manager restacks its frame
+                // on the ConfigureRequest)
+                let win = self.xw[i].win;
+                let (o, _) = self.req(XR_CONFIGURE_WINDOW, 16);
+                wr32(&mut self.out, o, win);
+                wr16(&mut self.out, o + 4, 0x40); // CWStackMode
+                wr32(&mut self.out, o + 8, 1); // Below
+                self.flush();
+            }
             _ => {}
         }
     }
@@ -762,8 +772,10 @@ impl X11 {
         }
         if vh == 3 {
             st |= WST_MAXIMIZED;
-        } else if vh != 0 {
-            st |= WST_TILED;
+        } else if vh == 1 {
+            st |= WST_TILED | crate::WST_TILED_TOP | crate::WST_TILED_BOTTOM; // maximized vertically
+        } else if vh == 2 {
+            st |= WST_TILED | crate::WST_TILED_LEFT | crate::WST_TILED_RIGHT;
         }
         let ws = self.atoms[A_WM_STATE];
         if let Some(r) = self.get_property(win, ws, ws, 0, 2, false) {

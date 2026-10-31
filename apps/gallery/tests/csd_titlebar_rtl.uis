@@ -1,0 +1,43 @@
+#!args --rtl
+# csd_titlebar_rtl -- the library's own title bar right to left (csd_titlebar.uis): the bar is
+# mirrored as a whole, the system's layout too (as GTK mirrors its header bar): the left part of
+# button-layout comes to the right end.  Rectangles and points are physical.
+size 900 300
+theme light
+system env jfgui_CSD 1
+# the style's layout: minimize, maximize, close mirrored to the left end, close in the corner
+expect #0xFFFF7403 rect 0 0 46 32
+expect #0xFFFF7402 rect 46 0 46 32
+expect #0xFFFF7401 rect 92 0 46 32
+shot build/csd/tb_rtl_default.png 0 0 900 40
+click 0,0
+expect wm close
+click 100,1
+expect wm minimize
+# the band: the edges keep their physical names
+down 899,0
+expect wm resize ne
+up 899,0
+down 0,100
+expect wm resize w
+up 0,100
+down 400,0
+expect wm resize n
+up 400,0
+down 0,299
+expect wm resize sw
+up 0,299
+# GNOME's "close,minimize,maximize:": the start side, at the right end
+system env jfgui_BUTTON_LAYOUT close,minimize,maximize:
+system settings other
+expect #0xFFFF7403 rect 854 0 46 32
+expect #0xFFFF7401 rect 808 0 46 32
+expect #0xFFFF7402 rect 762 0 46 32
+shot build/csd/tb_rtl_left.png 0 0 900 40
+click 899,0
+expect wm close
+down 0,0
+expect wm resize nw
+up 0,0
+dblclick 400,16
+expect wm maximize

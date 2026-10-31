@@ -63,7 +63,11 @@ pub fn window_create(title: &str, w_dip: i32, h_dip: i32, af: u32) -> bool {
 /// system puts it) and maximized (its normal size w_dip x h_dip)
 pub fn window_create_at(title: &str, w_dip: i32, h_dip: i32, af: u32, x: i32, y: i32, maximized: bool) -> bool {
     let mut f = 0;
-    if af & AF_CUSTOM_TITLEBAR == 0 {
+    // Linux: jfgui_CSD=1 (the UI draws its own title bar) asks for no system frame too, so the
+    // forced case is a real client-side window (X11: no window manager frame; Wayland: the
+    // client-side mode of xdg-decoration)
+    let csd = cfg!(target_os = "linux") && crate::env("jfgui_CSD").is_some_and(|v| v.starts_with('1'));
+    if af & AF_CUSTOM_TITLEBAR == 0 && !csd {
         f = PWF_SYSFRAME;
     }
     if af & AF_RESIZABLE != 0 {

@@ -16,12 +16,19 @@
 //        32 DIP bar (layer fill, top divider) laying out its children left to right,
 //        vertically centred, 16 DIP apart (captions: text(TS_CAPTION, ...))
 //   edge_grips()   resize handles for frameless windows on Linux (the runtime calls it;
-//        also for resizable secondary windows with the library frame)
+//        also for resizable secondary windows with the library frame); the caption buttons
+//        win over them where they are
 //   titlebar_begin(title, icon) / titlebar_end()
 //        custom title bar row (style: SM_TB_H, SM_TB_H_LARGE with next_flags(ST_LARGE)):
 //        icon + title, then the caller's widgets; empty parts are an HB_DRAG region, the end
 //        adds the caption buttons (HB_MIN / HB_MAX / HB_CLOSE; with SM_CAP_LEFT the begin puts
-//        them first, close / min / max)
+//        them first, close / min / max).  The system's layout (SysSettings::titlebar: GNOME's
+//        button-layout) wins over the style's: its left buttons come first, its right ones
+//        last, missing ones are not shown; right-to-left mirrors the whole bar (as GTK does).
+//        A double click, a middle and a right click on the empty part do what the system says
+//        (default: maximize / restore, nothing, the window menu; a left press moves the
+//        window).  Headless runs only record what they would ask the window manager for
+//        (scripts: expect wm ...)
 // Windows (win.rs):
 //   win_chrome_begin(i) / win_chrome_end(i) -> natural content height (DIP)
 //        border, title bar (28 DIP tool / 32 DIP dialog: title, close button) and the
@@ -32,6 +39,8 @@
 // close +3); status bar 0xFFFF7410, 0xFFFF7411; edge grips 0xFFFF7430..
 
 use alloc::string::String;
+
+use super::ctx::Hit;
 
 use super::consts::*;
 use super::keys::*;
@@ -45,8 +54,14 @@ const TB_MAX_ID: u32 = 0xFFFF_7402;
 const TB_CLOSE_ID: u32 = 0xFFFF_7403;
 const SB_ID: u32 = 0xFFFF_7410;
 const SB_INNER_ID: u32 = 0xFFFF_7411;
-#[cfg_attr(windows, allow(dead_code))]
 const GRIP_ID: u32 = 0xFFFF_7430; // + 0..7
+
+// what a headless run would have asked the window manager for (S::wm_req: kind | arg << 8;
+// scripts: expect wm ...)
+const WMR_MOVE: u32 = 1;
+const WMR_MENU: u32 = 2;
+const WMR_CMD: u32 = 3; // plat::WCMD_* in arg
+const WMR_RESIZE: u32 = 4; // plat::EDGE_* in arg
 
 /// state shared by all windows
 #[derive(Default)]
@@ -54,8 +69,39 @@ pub(crate) struct S {
     /// width of the next caption button (DIP, 0 = SM_CAP_W)
     cap_w: i32,
     /// id of the first edge grip of the window being built
-    #[cfg_attr(windows, allow(dead_code))]
     grip_base: u32,
+    /// EDGE_* bits of the tiled edges of the window being built (no handles there)
+    grip_off: u32,
+    /// (headless) the last request for the window manager since the last check (WMR_*)
+    pub(crate) wm_req: u32,
+}
+
+/// the request a headless run recorded (S::wm_req) as a script names it: none, move, menu,
+/// minimize, maximize, restore, close, lower, fullscreen, windowed, resize n|s|w|e|nw|ne|sw|se
+pub(crate) fn wm_req_name(r: u32) -> String {
+    let arg = r >> 8;
+    let s = match r & 255 {
+        WMR_MOVE => "move",
+        WMR_MENU => "menu",
+        WMR_CMD => match arg {
+            plat::WCMD_MINIMIZE => "minimize",
+            plat::WCMD_MAXIMIZE => "maximize",
+            plat::WCMD_RESTORE => "restore",
+            plat::WCMD_CLOSE => "close",
+            plat::WCMD_LOWER => "lower",
+            plat::WCMD_FULLSCREEN => "fullscreen",
+            plat::WCMD_WINDOWED => "windowed",
+            _ => "command",
+        },
+        WMR_RESIZE => {
+            let mut e = String::from("resize ");
+            e.push_str(if arg & plat::EDGE_TOP != 0 { "n" } else if arg & plat::EDGE_BOTTOM != 0 { "s" } else { "" });
+            e.push_str(if arg & plat::EDGE_LEFT != 0 { "w" } else if arg & plat::EDGE_RIGHT != 0 { "e" } else { "" });
+            return e;
+        }
+        _ => "none",
+    };
+    String::from(s)
 }
 
 /// per-window state (ui_chrome_wb0: content dialog, title bar, window chrome; swapped by
@@ -77,6 +123,11 @@ pub(crate) struct W {
     tb_overlay: bool,
     /// dialog_buttons closed the content box of a dialog window
     wc_footer: bool,
+    /// the caption buttons' hit boxes of this pass: edge_grips puts them on top again, so
+    /// the buttons win over the resize band where they are (cap_n: how many; reset with
+    /// the pass)
+    cap_hits: [Hit; 4],
+    pub(crate) cap_n: u8,
 }
 
 // a dialog part id: (id << 3 | k) | 0x80000000
@@ -481,37 +532,16 @@ impl Ui {
         if !overlay { st.window_titlebar(self, &sp); }
         // the whole bar is a drag region; widgets placed on it later win the hit test
         let ev = self.behave(TB_ID, HB_DRAG);
-        if !self.headless {
-            let mut release = false;
-            if ev & EV_DOUBLE != 0 {
-                plat::window_cmd(if tbs & plat::WST_MAXIMIZED != 0 { plat::WCMD_RESTORE } else { plat::WCMD_MAXIMIZE });
-                release = true;
-            } else if self.wp.ctx.active == TB_ID && self.wp.ctx.pressed & (1 << BTN_LEFT) != 0 {
-                plat::begin_move();
-                release = true;
-            }
-            if release {
-                // the OS owns the pointer now: forget the press
-                self.wp.ctx.active = 0;
-                self.wp.ctx.mbtn &= !(1 << BTN_LEFT);
-            }
-            // Linux: a right press on the bar opens the window manager's window menu (the
-            // system menu of Windows' own caption)
-            #[cfg(target_os = "linux")]
-            if self.wp.ctx.ractive == TB_ID && self.wp.ctx.pressed & (1 << BTN_RIGHT) != 0 {
-                plat::window_menu(self.wp.ctx.mx, self.wp.ctx.my);
-                self.wp.ctx.ractive = 0;
-                self.wp.ctx.mbtn &= !(1 << BTN_RIGHT);
-            }
-        }
+        self.tb_clicks(ev, tbs);
         self.wp.ctx.last_state = 0;
         self.sem(K_TITLEBAR, TB_ID, title, 0);
-        // caption buttons at the left end (SM_CAP_LEFT: macOS)
-        if st.metric(SM_CAP_LEFT) != 0 {
-            self.spacer(st.metric(SM_TB_PAD));
-            self.tb_cap_close();
-            self.tb_cap_min();
-            self.tb_cap_max();
+        // caption buttons at the left end (the system's layout, else SM_CAP_LEFT: macOS)
+        let left = self.tb_side(false);
+        if left[0] != 0 {
+            if st.metric(SM_CAP_LEFT) != 0 {
+                self.spacer(st.metric(SM_TB_PAD));
+            }
+            self.tb_caps(left);
         }
         // icon and title
         self.spacer(st.metric(SM_TB_PAD)); // space before the icon / title (DIP)
@@ -555,13 +585,108 @@ impl Ui {
                 self.spacer(8);
             }
         }
-        if st.metric(SM_CAP_LEFT) == 0 {
+        let right = self.tb_side(true);
+        if right[0] != 0 {
             if !self.wp.chrome.tb_overlay { self.spacer(-1); }
-            self.tb_cap_min();
-            self.tb_cap_max();
-            self.tb_cap_close();
+            self.tb_caps(right);
+            if st.metric(SM_CAP_LEFT) != 0 {
+                self.spacer(st.metric(SM_TB_PAD)); // the style's buttons keep off the edge
+            }
         }
         self.box_end();
+    }
+
+    // tb_clicks(ev, state): the presses on the empty part of the title bar (behave's events
+    // ev, plat::WST_* state): a double click, a middle and a right press do what the system
+    // says (SysSettings::titlebar), a left press lets the system move the window.  The window
+    // manager owns the pointer afterwards: the press is forgotten (not in headless runs, which
+    // only record the request)
+    fn tb_clicks(&mut self, ev: u32, tbs: u32) {
+        let tb = self.tb_sys;
+        let c = &self.wp.ctx;
+        let (act, btn) = if ev & EV_DOUBLE != 0 && tb.double != plat::TB_ACT_NONE {
+            (tb.double, BTN_LEFT)
+        } else if c.active == TB_ID && c.pressed & (1 << BTN_LEFT) != 0 {
+            (u8::MAX, BTN_LEFT) // move
+        } else if c.hot == TB_ID && c.pressed & (1 << BTN_MIDDLE) != 0 && tb.middle != plat::TB_ACT_NONE {
+            (tb.middle, BTN_MIDDLE)
+        } else if c.ractive == TB_ID && c.pressed & (1 << BTN_RIGHT) != 0 && tb.right != plat::TB_ACT_NONE {
+            (tb.right, BTN_RIGHT)
+        } else {
+            return;
+        };
+        let (mx, my) = (c.mx, c.my);
+        match act {
+            u8::MAX => self.wm_move(),
+            plat::TB_ACT_MAXIMIZE => self.tb_cmd(if tbs & plat::WST_MAXIMIZED != 0 { plat::WCMD_RESTORE } else { plat::WCMD_MAXIMIZE }),
+            plat::TB_ACT_MINIMIZE => self.tb_cmd(plat::WCMD_MINIMIZE),
+            plat::TB_ACT_LOWER => self.tb_cmd(plat::WCMD_LOWER),
+            _ => self.wm_menu(mx, my),
+        }
+        if self.headless {
+            return;
+        }
+        // the OS owns the pointer now: forget the press
+        let c = &mut self.wp.ctx;
+        match btn {
+            BTN_LEFT => c.active = 0,
+            BTN_RIGHT => c.ractive = 0,
+            _ => {}
+        }
+        c.mbtn &= !(1 << btn);
+    }
+
+    // wm_move / wm_menu(x, y) / wm_resize(edge): plat::begin_move, window_menu (Linux; the
+    // OS's own caption has it elsewhere), begin_resize -- headless runs only record them
+    fn wm_move(&mut self) {
+        if self.headless {
+            self.m.chrome.wm_req = WMR_MOVE;
+        } else {
+            plat::begin_move();
+        }
+    }
+
+    fn wm_menu(&mut self, _x: i32, _y: i32) {
+        if self.headless {
+            self.m.chrome.wm_req = WMR_MENU;
+            return;
+        }
+        #[cfg(target_os = "linux")]
+        plat::window_menu(_x, _y);
+    }
+
+    fn wm_resize(&mut self, edge: u32) {
+        if self.headless {
+            self.m.chrome.wm_req = WMR_RESIZE | edge << 8;
+        } else {
+            plat::begin_resize(edge);
+        }
+    }
+
+    // tb_side(right) -> the caption buttons of one end of the title bar, left to right
+    // (plat::TB_BTN_*, 0 ends): the system's layout, else the style's (SM_CAP_LEFT: close,
+    // minimize, maximize at the left; else minimize, maximize, close at the right)
+    fn tb_side(&self, right: bool) -> [u8; 3] {
+        if let Some((l, r)) = self.tb_sys.buttons {
+            return if right { r } else { l };
+        }
+        match (self.style.metric(SM_CAP_LEFT) != 0, right) {
+            (true, false) => [plat::TB_BTN_CLOSE, plat::TB_BTN_MIN, plat::TB_BTN_MAX],
+            (false, true) => [plat::TB_BTN_MIN, plat::TB_BTN_MAX, plat::TB_BTN_CLOSE],
+            _ => [0; 3],
+        }
+    }
+
+    // tb_caps(buttons): the caption buttons of one end, in order
+    fn tb_caps(&mut self, b: [u8; 3]) {
+        for k in b {
+            match k {
+                plat::TB_BTN_CLOSE => self.tb_cap_close(),
+                plat::TB_BTN_MIN => self.tb_cap_min(),
+                plat::TB_BTN_MAX => self.tb_cap_max(),
+                _ => break,
+            }
+        }
     }
 
     // tb_cap_min / tb_cap_max / tb_cap_close: one caption button of the title bar and its
@@ -587,9 +712,11 @@ impl Ui {
         }
     }
 
-    // tb_cmd(cmd): plat::window_cmd, except in headless runs
+    // tb_cmd(cmd): plat::window_cmd (headless runs record it)
     fn tb_cmd(&mut self, cmd: u32) {
-        if !self.headless {
+        if self.headless {
+            self.m.chrome.wm_req = WMR_CMD | cmd << 8;
+        } else {
             plat::window_cmd(cmd);
         }
     }
@@ -602,7 +729,16 @@ impl Ui {
         let w = if self.m.chrome.cap_w != 0 { self.m.chrome.cap_w } else { st.metric(SM_CAP_W) };
         let w = self.dp(w);
         self.place(w, bh);
+        let n = self.wp.ctx.hits[self.wp.ctx.hit_cur].len();
         let ev = self.behave(id, hb);
+        // its hit box, for edge_grips
+        if let Some(h) = self.wp.ctx.hits[self.wp.ctx.hit_cur].get(n).copied() {
+            let c = &mut self.wp.chrome;
+            if let Some(slot) = c.cap_hits.get_mut(c.cap_n as usize) {
+                *slot = h;
+                c.cap_n += 1;
+            }
+        }
         // paint (style)
         let active = (self.wp.chrome.tb_state & plat::WST_ACTIVE != 0) as i32;
         let mut sp = Sp { ev, flags: hb, icon, value: active, ..Default::default() };
@@ -658,9 +794,14 @@ impl Ui {
             self.wp.ctx.last_state = 0;
             self.sem(K_TITLEBAR, ids, Some(&title), 0);
             self.spacer(st.metric(SM_WC_TITLE_PAD)); // space before the title (DIP)
-            // close button at the left end (SM_CAP_LEFT: macOS)
+            // close button at the left end (SM_CAP_LEFT: macOS; the system's layout puts it
+            // there; a layout without it keeps the style's side: the window has no other way
+            // to be closed with the pointer)
             let mut capw = 0; // its width (DIP)
-            let left = st.metric(SM_CAP_LEFT);
+            let left = match self.tb_sys.buttons {
+                Some((l, r)) if l.contains(&plat::TB_BTN_CLOSE) || r.contains(&plat::TB_BTN_CLOSE) => l.contains(&plat::TB_BTN_CLOSE) as i32,
+                _ => st.metric(SM_CAP_LEFT),
+            };
             if left != 0 {
                 capw = self.wc_close_btn(ids, i);
                 if capw != 0 {
@@ -758,23 +899,36 @@ impl Ui {
     /// ui_edge_grips: invisible resize handles along the window edges for windows without a
     /// system frame on Linux (AF_CUSTOM_TITLEBAR or the library's CSD title bar): a press
     /// starts plat::begin_resize with the edge; the pointer shows the matching arrows.
-    /// Called by the runtime after App::frame (so the grips win the hit test).  Nothing on
-    /// Windows (WM_NCHITTEST does it there), in headless runs or while maximized /
-    /// fullscreen.
-    #[cfg(windows)]
-    pub(crate) fn edge_grips(&mut self) {}
-
-    #[cfg(not(windows))]
+    /// Called by the runtime after App::frame (so the grips win the hit test); the caption
+    /// buttons of the pass are put on top of them again, so a button wins over the band
+    /// where it is (its top edge, the corner of a close button at the window's corner) and the
+    /// band stays usable elsewhere.  (GTK puts the band outside the visible frame, into the
+    /// shadow; the library's windows have no shadow margin.)  Nothing on Windows (WM_NCHITTEST
+    /// does it there) or while maximized / full screen, none on the tiled edges of a tiled
+    /// window (plat::WST_TILED_*: the screen edge stays the title bar's); headless runs only
+    /// with the forced library title bar (jfgui_CSD=1: scripts test the band), recording the
+    /// request.
     pub(crate) fn edge_grips(&mut self) {
-        if self.headless {
+        let on = if self.headless { plat::getenv("jfgui_CSD").is_some_and(|v| v.starts_with('1')) } else { !cfg!(windows) };
+        if !on {
             return;
         }
         // ids: the main window's, else in the window's chrome range
         let i = self.uiw_cur & (WIN_MAX as u32 - 1);
         self.m.chrome.grip_base = if i == 0 { GRIP_ID } else { (i << 4) + 8 | WCH_BASE };
-        if plat::window_state() & (plat::WST_MAXIMIZED | plat::WST_FULLSCREEN) != 0 {
+        let state = if !self.headless {
+            plat::window_state()
+        } else if self.m.win.recs[i as usize].fs {
+            plat::WST_FULLSCREEN
+        } else {
+            0
+        };
+        if state & (plat::WST_MAXIMIZED | plat::WST_FULLSCREEN) != 0 {
             return;
         }
+        // tiled: no handles on the edges that touch the tiling (as GTK; a corner touching one
+        // goes too)
+        self.m.chrome.grip_off = if state & plat::WST_TILED != 0 { state >> plat::WST_TILED_SHIFT & 15 } else { 0 };
         let st = self.style;
         let t = self.dp(st.metric(SM_GRIP)); // edge handle thickness
         let c = self.dp(st.metric(SM_GRIP_CORNER)); // corner handle size
@@ -793,19 +947,34 @@ impl Ui {
         self.grip(5, EDGE_TOP | right, nesw, w - c, 0, c, c);
         self.grip(6, EDGE_BOTTOM | left, nesw, 0, h - c, c, c);
         self.grip(7, EDGE_BOTTOM | right, nwse, w - c, h - c, c, c);
+        // the caption buttons on top again (the same widget: continuation boxes)
+        let layer = self.wp.ctx.cmd_layer_ui as u8;
+        for k in 0..self.wp.chrome.cap_n as usize {
+            let mut h = self.wp.chrome.cap_hits[k];
+            h.continuation = true;
+            h.layer = h.layer.max(layer);
+            let c = &mut self.wp.ctx;
+            if c.hits[c.hit_cur].len() < super::ctx::HITS_MAX {
+                c.hits[c.hit_cur].push(h);
+            }
+        }
     }
 
     // grip(k, edge, cursor, x, y, w, h): one handle; a press resizes
-    #[cfg(not(windows))]
     #[allow(clippy::too_many_arguments)]
     fn grip(&mut self, k: u32, edge: u32, cur: u32, x: i32, y: i32, w: i32, h: i32) {
+        if edge & self.m.chrome.grip_off != 0 {
+            return; // a tiled edge
+        }
         let id = k.wrapping_add(self.m.chrome.grip_base);
         self.hit_rect(id, x, y, w, h, (cur & 0xFF) << HB_CURSOR_SHIFT);
         if self.wp.ctx.active == id && self.wp.ctx.pressed & (1 << BTN_LEFT) != 0 {
-            plat::begin_resize(edge);
-            // the window manager owns the pointer now: forget the press
-            self.wp.ctx.active = 0;
-            self.wp.ctx.mbtn &= !(1 << BTN_LEFT);
+            self.wm_resize(edge);
+            if !self.headless {
+                // the window manager owns the pointer now: forget the press
+                self.wp.ctx.active = 0;
+                self.wp.ctx.mbtn &= !(1 << BTN_LEFT);
+            }
         }
     }
 }

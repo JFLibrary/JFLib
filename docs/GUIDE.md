@@ -177,8 +177,10 @@ On Linux the library picks the display backend at start-up: Wayland when `WAYLAN
 set, else X11 via `DISPLAY` (`jfgui_BACKEND=x11|wayland` forces one). Apps call only `ui`,
 `gfx`, `img_core`, `text`, `fx` and the neutral `plat` helpers (files, clock, threads). The only
 platform-related choice is `AF_CUSTOM_TITLEBAR` (section 7); without it the system frame is used,
-and on Wayland compositors without server-side decorations the library draws a title bar itself
-(`jfgui_CSD=1` forces that).
+and on Wayland compositors without server-side decorations (GNOME's mutter, WSLg) the library
+draws a title bar itself (`jfgui_CSD=1` forces that, and on Linux then asks for no system frame:
+X11 without the window manager's frame, Wayland in xdg-decoration's client-side mode). That
+title bar follows GNOME's settings like GTK (section 7, "Title bar").
 
 ## 3. The model: immediate mode
 
@@ -844,6 +846,30 @@ ui.dialog_end(); // always
   ```
 
   `ui.set_title(s)` changes the window title.
+
+  On Linux the library's title bars (this one and the one it draws itself on Wayland without
+  server-side decorations) follow the desktop's settings as GTK does: GNOME's `button-layout`
+  (org.gnome.desktop.wm.preferences, read from the settings portal; without the portal GTK's
+  `gtk-decoration-layout` in `settings.ini`) puts the caption buttons at the left and / or the
+  right end (`"close,minimize,maximize:"`, GNOME's default `"appmenu:close"` shows only the close
+  button; names other than close, minimize and maximize are skipped), and right-to-left mirrors
+  the whole bar. A double click, a middle and a right click on the empty part do what
+  `action-double-click-titlebar`, `action-middle-click-titlebar` and `action-right-click-titlebar`
+  say: `toggle-maximize` (default of the double click), `minimize`, `lower` (X11; Wayland has no
+  such request), `menu` (the window manager's window menu: default of the right click) or `none`
+  (default of the middle click); a left press moves the window. Changes apply at once
+  (`UIC_SETTINGS` with `SET_OTHER`). Secondary windows with the library frame keep their close
+  button at the side the layout puts close. Without these settings (Windows, other desktops) the
+  style decides as before. Overrides: `jfgui_BUTTON_LAYOUT=close,minimize,maximize:`,
+  `jfgui_TITLEBAR_DOUBLE_CLICK`, `_MIDDLE_CLICK`, `_RIGHT_CLICK` (GNOME's names).
+  The resize band of a window without a system frame (`SM_GRIP`, about 5 DIP, `SM_GRIP_CORNER` corners) lies
+  inside the window, under the caption buttons: there the buttons win (their top row and the
+  close button's corner click the button), elsewhere the band resizes; it is off while the
+  window is maximized or in full screen and on the tiled edges of a tiled window (GTK puts the
+  band outside the visible frame, in its shadow; the library's windows have no shadow margin).
+  Scripts test it with the forced title bar: `system env jfgui_CSD 1`, then presses at the edges
+  and `expect wm resize ne` / `expect wm close` (headless runs only record what they would ask
+  the window manager for).
 * **File dialog**: `filedlg(id, FD_OPEN | FD_SAVE | FD_FOLDER | i << FD_EXT_SHIFT, &open, &mut
   path, cap, exts)` -> `EV_ACT` when a file (`FD_FOLDER`: a folder) was chosen; `path` then
   holds an absolute path with `/` separators (Windows accepts them). It shows the system dialog
@@ -1345,10 +1371,18 @@ if (desc.render)(&args, &mut dst) == 0 {
   the night mode and font scale of its configuration, `ANIMATOR_DURATION_SCALE` 0 as "reduce
   motion", high-contrast text and the contrast level, the dynamic colours' accent on API 31+
   (`android/GallerySystem.java`; the manifest's `configChanges` must name `uiMode|fontScale`).
-  The `jfgui_*` variables win everywhere). Headless runs take only the `jfgui_THEME`,
+  The `jfgui_*` variables win everywhere). On Linux without the portal (or for what it does
+  not say) the files come next: GTK's `~/.config/gtk-4.0/settings.ini`, then
+  `gtk-3.0/settings.ini` (`gtk-application-prefer-dark-theme`, a `gtk-theme-name` ending in
+  `-dark` / `:dark`), then KDE's `~/.config/kdeglobals` (the window background's luminance in
+  `[Colors:Window] BackgroundNormal`, else a `[General] ColorScheme` naming "Dark"; the accent
+  from `[General] AccentColor` on KDE or without any portal); changes of these files are followed
+  live too (inotify on `$XDG_CONFIG_HOME` and the GTK folders), `jfgui_CONFIG_SETTINGS=0` skips
+  them. Headless runs take only the `jfgui_THEME`,
   `jfgui_ACCENT`, `jfgui_CONTRAST`, `jfgui_REDUCE_MOTION`, `jfgui_TEXT_SCALE`,
   `jfgui_DOUBLE_CLICK_MS`, `jfgui_CARET_BLINK_MS`, `jfgui_FONT_AA`, `jfgui_FONT_HINTING`,
-  `jfgui_FONT_RGBA` overrides, so shots stay the same. The system's font smoothing off draws
+  `jfgui_FONT_RGBA`, `jfgui_BUTTON_LAYOUT`, `jfgui_TITLEBAR_*_CLICK` overrides, so shots stay
+  the same. The system's font smoothing off draws
   black-and-white glyphs, its subpixel order (ClearType's orientation, the portal's or
   fontconfig's `rgba`) subpixel smoothed ones (below); `ui.font_prefs()` gives smoothing,
   hinting and subpixel order.
@@ -1535,7 +1569,9 @@ in DIP):
 | `drop X Y [files F...] [text "s"] [html "s"] [url U] [image F] [copy\|move\|link]`, `drop X Y self` | other content dropped there; `self`: the app's own drag that left the window comes back |
 | `dragover X Y [files] [text] [url] [html] [image]`, `dragleave` | another program's drag hovers there / leaves |
 | `dragout expect none\|text "s"\|html "s"\|url "s"\|files N\|image\|kinds N`, `dragout end copy\|move\|link\|none` | what the app's drag handed to the platform when it left the window, the platform's answer |
-| `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
+| `system focus in\|out`, `system suspend\|resume`, `system background\|foreground`, `system session-end`, `system settings theme\|locale\|contrast\|fonts\|other\|monitors\|N` | the platform's lifecycle events (`UIC_ACTIVE`, `UIC_SUSPEND`, ...; background / foreground: a hidden tab, Android's `onStop` / `onStart`) |
+| `system env NAME VALUE\|-` | set (`-` removes) a `jfgui_*` environment variable of the run: the overrides of the system settings (then `system settings ...`), `jfgui_CSD` (the library title bar and its resize band from the next pass) |
+| `expect wm none\|move\|menu\|minimize\|maximize\|restore\|close\|lower\|resize EDGE` | what the title bar or the resize band asked the window manager for since the last check (headless runs only record it; EDGE `n`, `s`, `w`, `e`, `nw`, `ne`, `sw`, `se`, physical) |
 | `system hotkey ID`, `system pick RRGGBB\|cancel` | a recorded global shortcut pressed (`UIC_HOTKEY`); the user's answer to a running colour pick (`UIC_PICK`, a `CP_PIPETTE` picker; section 21) |
 | `clip text "s"`, `clip file F`, `clip dib F`, `clip clear`, `clip save F [bmp]`, `clip expect none\|text\|image\|png` | the headless clipboard (never the real one) |
 | `clip utf8 F` | exact UTF-8 text clipboard bytes from a file (up to 4 MiB), including CR/LF and long paste payloads; opt-in Rust extension |
@@ -1973,6 +2009,12 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
 * `netio::ssh::Client` -- run commands on a machine over SSH (curve25519, ssh-ed25519,
   chacha20-poly1305, strict key exchange), host key pinned by fingerprint.
 * `netio::dns::resolve` -- names to addresses (Linux: hosts file, resolv.conf, UDP and TCP).
+  A name server on an IPv6 link-local address keeps its zone: `nameserver fe80::1%eth0` (the
+  interface by name, from `/sys/class/net/NAME/ifindex`, or by number, `%2`) becomes the socket
+  address's `sin6_scope_id` (`SocketAddr::scope`); `netio::dns::Config::system()` on Windows takes
+  the adapters' DNS servers with their scope (`plat::net::dns_servers`). `plat::net::ip_scope_parse`,
+  `if_index` and `local_addrs` (the computer's own addresses) are the pieces; `SocketAddr::parse`
+  and `Display` know `[fe80::1%2]:53`.
 * `datastore::Store` -- JSON collections in a crash-safe journal database with transactions;
   `Journal` for append-only logs.
 * `cas::Repo` -- content-addressed, deduplicated, encrypted repositories with signed snapshots.

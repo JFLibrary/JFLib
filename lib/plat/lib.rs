@@ -194,6 +194,8 @@ pub mod a11y;
 // the system settings the UI follows (theme, accent, contrast, motion, text scale, timing)
 mod settings;
 pub use settings::{HcColors, SysSettings, sys_settings, sys_settings_env, font_hint_parse, font_rgba_parse,
+    Titlebar, titlebar_layout_parse, titlebar_action_parse, TB_BTN_CLOSE, TB_BTN_MIN, TB_BTN_MAX,
+    TB_ACT_NONE, TB_ACT_MAXIMIZE, TB_ACT_MINIMIZE, TB_ACT_LOWER, TB_ACT_MENU,
     FONT_HINT_NONE, FONT_HINT_SLIGHT, FONT_HINT_MEDIUM, FONT_HINT_FULL,
     FONT_RGBA_NONE, FONT_RGBA_RGB, FONT_RGBA_BGR, FONT_RGBA_VRGB, FONT_RGBA_VBGR};
 // the user's languages and regional format (BCP 47 tags)

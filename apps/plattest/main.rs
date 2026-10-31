@@ -72,8 +72,10 @@
 //                                          against a fake AT-SPI2 bus (tools/platshared/
 //                                          atspi_bus.py); Windows through IUIAutomation (by
 //                                          hand); caret: the caret for screen magnifiers
-//   plattest --test settings / settings-bus   (t_settings.rs) the system settings: the jfgui_*
-//                                          overrides; Linux against a fake settings portal
+//   plattest --test settings / settings-bus / settings-bus-files   (t_settings.rs) the system
+//                                          settings: the jfgui_* overrides, the title bar's
+//                                          layout; Linux: GTK's / KDE's files, against a fake
+//                                          settings portal (with and without appearance keys)
 //   plattest --test secret / secret-bus    (t_secret.rs) the system's secret store: the real
 //                                          one (Credential Manager + DPAPI, Secret Service; the
 //                                          test entries are removed again); Linux against a
@@ -363,6 +365,7 @@ fn plattest() -> i32 {
         Some("life-bus") => t_life::t_life_bus,        // Linux: against tools/platshared/life_bus.py
         Some("settings") => t_settings::t_settings,    // the system settings: overrides, defaults
         Some("settings-bus") => t_settings::t_settings_bus, // Linux: against tools/platshared/settings_bus.py
+        Some("settings-bus-files") => t_settings::t_settings_bus_files, // Linux: the same, a portal without appearance keys
         Some("a11y") => t_a11y::t_a11y,                // the accessibility tree, headless
         Some("a11y-bus") => t_a11y::t_a11y_bus,        // Linux: against tools/platshared/atspi_bus.py
         Some("uia") => t_a11y::t_uia,                  // Windows, by hand: UI Automation

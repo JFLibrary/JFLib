@@ -504,6 +504,8 @@ pub struct Ui {
     pub(crate) dbl_ms: u32,
     /// the system's font rendering: smoothing, hinting, subpixel order (SysSettings)
     pub(crate) font_prefs: (Option<bool>, Option<u8>, Option<u8>),
+    /// the system's title bar: buttons and click actions (SysSettings::titlebar, chrome.rs)
+    pub(crate) tb_sys: plat::Titlebar,
     pub(crate) blink_ms: u32,
     pub(crate) warns: u32,
     pub(crate) ui_debug: bool,

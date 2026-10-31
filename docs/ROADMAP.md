@@ -338,14 +338,40 @@ Vorhanden: [`plat/vfs.rs`](../lib/plat/vfs.rs) ([VFS.md](VFS.md)) seit 2026-10-1
   (`SPI_GETHIGHCONTRAST`, `GetSysColor`, `SPI_GETCLIENTAREAANIMATION`, `TextScaleFactor`,
   `GetDoubleClickTime`, `GetCaretBlinkTime`), Linux aus dem Settings-Portal
   (`org.freedesktop.appearance`, GNOME-Schlüssel; getestet gegen ein Fake-Portal); die
-  Systemsprache seit §5. Browser (seit 2026-11-01, `web/system.js`): `prefers-color-scheme`,
-  `prefers-contrast`, `forced-colors` mit den Systemfarben, `prefers-reduced-motion`, die
-  Standard-Schriftgröße als Textskalierung, live über Media-Query-Listener; Android: Nachtmodus
-  und Schriftgröße der Konfiguration (`onConfigurationChanged`), `ANIMATOR_DURATION_SCALE` 0,
-  kontrastreicher Text, Kontraststufe (API 34), Akzent aus den dynamischen Farben (API 31+;
-  `android/GallerySystem.java`). `jfgui_*`-Variablen überschreiben, headless gelten nur sie. Es
-  fehlen noch: KDE ohne Portal (kdeglobals); Akzentfarbe im Browser (`AccentColor` ist nicht
-  überall die des Systems).
+  Systemsprache seit §5. Seit 2026-10-31 ohne Portal (oder für das, was es nicht sagt) aus den
+  Dateien: GTKs `gtk-4.0` / `gtk-3.0/settings.ini` (`gtk-application-prefer-dark-theme`,
+  `gtk-theme-name` auf `-dark`), dann KDEs `kdeglobals` (Helligkeit von `[Colors:Window]
+  BackgroundNormal`, sonst `ColorScheme`; `AccentColor` unter KDE oder ohne Portal), live über
+  inotify; dazu GNOMEs Titelleisten-Einstellungen (`button-layout`, `action-*-titlebar`) für die
+  eigene Titelleiste (siehe „Eigene Titelleiste unter Linux“). Getestet mit `plattest --test
+  settings` (Dateien in einem Scratch-`XDG_CONFIG_HOME`), `settings_bus.py` (zweiter Lauf mit
+  einem Portal ohne Erscheinungsbild-Schlüssel) und `life_bus.py` (`SettingChanged` von
+  `button-layout`, eine umbenannte `kdeglobals`). Browser (seit 2026-11-01, `web/system.js`):
+  `prefers-color-scheme`, `prefers-contrast`, `forced-colors` mit den Systemfarben,
+  `prefers-reduced-motion`, die Standard-Schriftgröße als Textskalierung, live über
+  Media-Query-Listener; Android: Nachtmodus und Schriftgröße der Konfiguration
+  (`onConfigurationChanged`), `ANIMATOR_DURATION_SCALE` 0, kontrastreicher Text, Kontraststufe
+  (API 34), Akzent aus den dynamischen Farben (API 31+; `android/GallerySystem.java`).
+  `jfgui_*`-Variablen überschreiben, headless gelten nur sie. Es fehlen noch: Akzentfarbe im
+  Browser (`AccentColor` ist nicht überall die des Systems); die systemweiten Dateien
+  (`/etc/xdg/kdeglobals`, `/etc/gtk-3.0`) und KDEs Farbschema-Dateien selbst werden nicht
+  gelesen.
+- **P2** · *erledigt* (2026-10-31) · Eigene Titelleiste unter Linux wie GTK
+  ([`ui/chrome.rs`](../lib/ui/chrome.rs)): Ohne serverseitige Dekorationen (mutter, WSLg) und
+  mit `AF_CUSTOM_TITLEBAR` folgen die Knöpfe GNOMEs `button-layout` (links / rechts, fehlende
+  ausgeblendet, RTL gespiegelt wie GTK), Doppel-, Mittel- und Rechtsklick auf die Leiste
+  `action-double-click-titlebar` usw. (`toggle-maximize`, `minimize`, `lower` (nur X11),
+  `menu`, `none`), live über `SettingChanged`; Nebenfenster legen ihren Schließen-Knopf auf die
+  Seite von `close`. Die Knöpfe gewinnen gegen den Resize-Rand (oberste Zeile, Ecke von
+  „Schließen“), der Rand bleibt daneben nutzbar und fehlt an gekachelten Kanten
+  (`WST_TILED_*`), maximiert und im Vollbild; `jfgui_CSD=1` fordert unter Linux auch keinen
+  Systemrahmen mehr an (X11 ohne Fensterrahmen, Wayland clientseitig). Getestet mit
+  `gallery/tests/csd_titlebar.uis` und `csd_titlebar_rtl.uis` (Layouts, Klicks, Trefferprüfung
+  an den Knopfkanten gegen den Rand über `expect wm`) und `tools/x11check.py csd` mit echten
+  Fenstern unter WSLg (Wayland und X11). Es fehlen: ein Resize-Rand außerhalb des sichtbaren
+  Rahmens (GTK legt ihn in den Schatten; die Fenster der Library haben keinen
+  Schattenrand), die Knöpfe `appmenu` / `icon` / `menu` des Layouts, Tests unter mutter selbst
+  (Fedora, [LINUX_TESTPLAN.md](LINUX_TESTPLAN.md)).
 - **P2** · *erledigt* · Drag & Drop ([`ui/dnd.rs`](../lib/ui/dnd.rs),
   [`plat/dnd.rs`](../lib/plat/dnd.rs)): Widgets sind Quellen (`drag_source` / `drag_set` mit
   `DragData`: Dateien, Text, URLs, HTML, PNG, eigene Art + Bytes) und Ziele (`drop_target` mit

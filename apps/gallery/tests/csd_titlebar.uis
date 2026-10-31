@@ -1,0 +1,147 @@
+# csd_titlebar -- the library's own title bar (client-side decorations, Linux compositors
+# without xdg-decoration: GNOME, WSLg; jfgui_CSD=1 forces it) follows the system's title bar
+# settings (SysSettings::titlebar: GNOME's button-layout, action-*-titlebar; here through the
+# jfgui_* overrides): the buttons left and right, missing ones hidden, double / middle / right
+# click; the caption buttons win over the resize band at the window's edges, which stays
+# usable elsewhere (chrome.rs edge_grips).  Headless runs record what they would ask the window
+# manager for (expect wm).
+size 900 300
+theme light
+expect #0xFFFF7400 missing
+system env jfgui_CSD 1
+expect #0xFFFF7400 exists
+# the style's layout: minimize, maximize, close at the right
+expect #0xFFFF7401 rect 762 0 46 32
+expect #0xFFFF7402 rect 808 0 46 32
+expect #0xFFFF7403 rect 854 0 46 32
+shot build/csd/tb_default.png 0 0 900 40
+move 400,16
+shot build/csd/tb_full.png
+# the corner pixel and the top row of the buttons belong to the buttons, not to the band
+move 899,0
+expect #0xFFFF7403 hover
+click 899,0
+expect wm close
+click 899,31
+expect wm close
+click 770,0
+expect wm minimize
+click 820,1
+expect wm maximize
+# the band elsewhere: the top edge left of the buttons, the right edge below them, the corners
+down 400,0
+expect wm resize n
+up 400,0
+down 899,100
+expect wm resize e
+up 899,100
+down 899,299
+expect wm resize se
+up 899,299
+down 0,0
+expect wm resize nw
+up 0,0
+down 0,150
+expect wm resize w
+up 0,150
+# the empty part of the bar: a press moves, a double click maximizes, the right button opens
+# the window menu, the middle one does nothing
+down 400,16
+expect wm move
+up 400,16
+wait 600
+dblclick 400,16
+expect wm maximize
+rclick 400,16
+expect wm menu
+down 400,16 m
+up 400,16 m
+expect wm none
+# GNOME's layout with the buttons at the left (close, minimize, maximize)
+system env jfgui_BUTTON_LAYOUT close,minimize,maximize:
+system settings other
+expect #0xFFFF7403 rect 0 0 46 32
+expect #0xFFFF7401 rect 46 0 46 32
+expect #0xFFFF7402 rect 92 0 46 32
+shot build/csd/tb_left.png 0 0 900 40
+click 0,0
+expect wm close
+down 899,0
+expect wm resize ne
+up 899,0
+# only close (GNOME's default "appmenu:close"): minimize and maximize are not shown
+system env jfgui_BUTTON_LAYOUT appmenu:close
+system settings other
+expect #0xFFFF7401 missing
+expect #0xFFFF7402 missing
+expect #0xFFFF7403 rect 854 0 46 32
+shot build/csd/tb_close.png 0 0 900 40
+# both ends; repeats and unknown names are skipped
+system env jfgui_BUTTON_LAYOUT close,spacer,close:minimize,maximize
+system settings other
+expect #0xFFFF7403 rect 0 0 46 32
+expect #0xFFFF7401 rect 808 0 46 32
+expect #0xFFFF7402 rect 854 0 46 32
+shot build/csd/tb_both.png 0 0 900 40
+# no buttons at all
+system env jfgui_BUTTON_LAYOUT :
+system settings other
+expect #0xFFFF7401 missing
+expect #0xFFFF7402 missing
+expect #0xFFFF7403 missing
+down 899,0
+expect wm resize ne
+up 899,0
+# the click actions of the system
+system env jfgui_TITLEBAR_DOUBLE_CLICK minimize
+system env jfgui_TITLEBAR_MIDDLE_CLICK lower
+system env jfgui_TITLEBAR_RIGHT_CLICK none
+system settings other
+wait 600
+dblclick 400,16
+expect wm minimize
+down 400,16 m
+up 400,16 m
+expect wm lower
+rclick 400,16
+expect wm none
+system env jfgui_TITLEBAR_DOUBLE_CLICK none
+system env jfgui_TITLEBAR_MIDDLE_CLICK menu
+system settings other
+wait 600
+dblclick 400,16
+expect wm move
+down 400,16 m
+up 400,16 m
+expect wm menu
+# back to the style's
+system env jfgui_BUTTON_LAYOUT -
+system env jfgui_TITLEBAR_DOUBLE_CLICK -
+system env jfgui_TITLEBAR_MIDDLE_CLICK -
+system env jfgui_TITLEBAR_RIGHT_CLICK -
+system settings other
+move 400,16
+expect same build/csd/tb_full.png
+# full screen: no title bar, no band
+system fullscreen on
+expect #0xFFFF7400 missing
+down 400,0
+expect wm none
+up 400,0
+system fullscreen off
+expect #0xFFFF7400 exists
+system env jfgui_CSD -
+expect #0xFFFF7400 missing
+# secondary windows with the library frame keep their close button, at the side the layout
+# puts close
+size 1000 1450
+system env jfgui_BUTTON_LAYOUT close,minimize:maximize
+system settings other
+click "Werkzeugfenster"
+expect window 7600 open
+expect #0xFFFF7811 rect 13 1 40 28
+shot build/csd/wintitle_left.png window 7600
+click #0xFFFF7811
+expect window 7600 closed
+system env jfgui_BUTTON_LAYOUT -
+system settings other
