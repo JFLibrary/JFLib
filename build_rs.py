@@ -156,6 +156,9 @@ LIBS = {
     "datetime": ("lib/datetime/lib.rs", []),
     "crypto": ("lib/crypto/lib.rs", []),
     "compress": ("lib/compress/lib.rs", []),
+    # G1b: SPIR-V module builder, disassembler, validator, std140 / std430 layouts, the GPU
+    # benchmark shaders (docs/SHADER.md)
+    "shader": ("lib/shader/lib.rs", []),
     "netpkt": ("lib/netpkt/lib.rs", []),  # JFNetworker: addresses, checksums, header codecs, pcapng
     "datastore": ("lib/datastore/lib.rs", ["rt", "plat", "crypto", "agent_core"]),
     "netio": ("lib/netio/lib.rs", ["rt", "plat", "crypto", "agent_core"]),
