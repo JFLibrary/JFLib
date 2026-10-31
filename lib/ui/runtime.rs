@@ -64,6 +64,9 @@ pub fn launch(desc: &AppDesc, app: impl App + 'static, style: &'static dyn Style
         let (w, h) = plat::window_size();
         ui.wp.rt.fb = Surface::new(w, h, FMT_XRGB);
         ui.set_time(0);
+        // the system's settings the host reported (media queries, Android's configuration;
+        // plat web_system.rs) and the jfgui_* overrides
+        ui.sys_apply(plat::sys_settings());
         super::perm::ask_here(true); // permission questions: a dialog in the page (perm.rs)
         let mut app: alloc::boxed::Box<dyn App> = alloc::boxed::Box::new(app);
         if ui.wp.rt.fb.px.is_empty() || !app.init(&mut ui) { return 2; }
@@ -520,8 +523,16 @@ impl Ui {
             }
             match ev.typ {
                 plat::E_POWER => {
-                    plat::log_info("app", if ev.data != 0 { "the system goes to sleep" } else { "the system woke up" });
-                    self.call_cmd(app, UIC_SUSPEND, (ev.data != 0) as u32);
+                    // 1 sleep, 0 woke up; the browser / Android: 2 hidden / stopped (the app may
+                    // be ended without a word: UIC_SUSPEND 2), 3 visible / started again
+                    let (arg, what) = match ev.data {
+                        0 => (0, "the system woke up"),
+                        2 => (2, "the app went to the background"),
+                        3 => (0, "the app is in the foreground again"),
+                        _ => (1, "the system goes to sleep"),
+                    };
+                    plat::log_info("app", what);
+                    self.call_cmd(app, UIC_SUSPEND, arg);
                     self.run_passes(app); // an edge: its own frame
                     self.need_render = true;
                     continue;

@@ -168,6 +168,9 @@ function dispatch(m) {
     // the monitors the page sees (loader.js screens(): one line each; lib/plat/web_screen.rs)
     case "screens": if(wasm.jfgui_screens) {const data=encode.encode(String(m.text||""));inbox(data);wasm.jfgui_screens(data.length);input();} break;
     // the EyeDropper's answer to a colour pick (status 2: rgb picked)
+    // the system's settings and states that changed (system.js), a notification's answer (notify.js)
+    case "system": if(wasm.jfgui_system) {const data=encode.encode(String(m.text||""));inbox(data);wasm.jfgui_system(data.length);input();} break;
+    case "note": if(wasm.jfgui_note) {wasm.jfgui_note(m.id>>>0,+!!m.clicked);input();} break;
     case "color": if(wasm.jfgui_color) wasm.jfgui_color(m.id>>>0,m.status|0,m.rgb>>>0); else wasm.jfgui_complete(m.id,-3); input(); break;
     // (L7) the page's full screen of the canvas changed (or was refused): lib/plat/web_windows.rs
     case "fullscreen": if(wasm.jfgui_fullscreen) {wasm.jfgui_fullscreen(+!!m.on);input();} break;
@@ -258,6 +261,8 @@ self.onmessage = async ({data:m}) => {
       if (wasm.jfgui_env && langs.length) { const env = encode.encode("LANGUAGE="+langs.join(":")); inbox(env); wasm.jfgui_env(env.length); }
       // the monitors (lib/plat/web_screen.rs) before the app's first frame
       if (m.screens && wasm.jfgui_screens) { const s = encode.encode(m.screens); inbox(s); wasm.jfgui_screens(s.length); }
+      // the system's settings (system.js, lib/plat/web_system.rs) before the app's first frame
+      if (m.system && wasm.jfgui_system) { const s = encode.encode(m.system); inbox(s); wasm.jfgui_system(s.length); }
       const args = encode.encode(m.args.join("\n")); inbox(args);
       const code = wasm.jfgui_start(m.width, m.height, m.dpi, args.length);
       if (code) throw new Error(`Anwendung konnte nicht starten (${code}).`);

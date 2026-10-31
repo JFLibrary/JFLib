@@ -46,6 +46,13 @@ pub(crate) mod a11y_host;
 #[path = "web_screen.rs"]
 pub(crate) mod web_screen;
 pub use web_screen::{REQUEST_PICK_COLOR, jfgui_color, jfgui_screens};
+// web_system.rs: the host's system settings and states (jfgui_system), the notifications'
+// answers (jfgui_note); the notifications themselves: web_notify.rs (tray.rs), the screen kept
+// on: web_power.rs (power.rs)
+#[path = "web_system.rs"]
+pub(crate) mod system_host;
+pub use system_host::{jfgui_note, jfgui_system};
+pub(crate) use system_host::sys_settings_host;
 #[cfg(target_os = "android")]
 #[path = "android_ime.rs"]
 mod android_ime;
@@ -421,12 +428,13 @@ pub fn unix_time_ns() -> i64 {
     let secs = days * 86_400 + d.hour as i64 * 3600 + d.min as i64 * 60 + d.sec as i64;
     secs.saturating_mul(1_000_000_000).saturating_add(d.ms as i64 * 1_000_000)
 }
-/// Theme requested by the host: 0 light, 1 dark, or -1 unspecified.
+/// Theme requested by the host: 0 light, 1 dark, or -1 unspecified (jfgui_THEME, else the
+/// system's scheme the host reported: prefers-color-scheme, Android's night mode).
 pub fn theme() -> i32 {
     match env("jfgui_THEME").as_deref() {
         Some("dark") => 1,
         Some("light") => 0,
-        _ => -1,
+        _ => system_host::dark().map_or(-1, |d| d as i32),
     }
 }
 /// Available compute workers in a shared-memory bundle, otherwise one app worker.
@@ -807,7 +815,14 @@ pub extern "C" fn jfgui_start(width: i32, height: i32, dpi: i32, args_len: u32) 
     windows::viewport(width, height, dpi);
     rt::boot::set_handler(crate::boot::start); // rt::main!: name, app://, manifest
     // SAFETY: app entry is linked into this module, invoked only once on its worker.
-    unsafe { jfgui_main() }
+    let code = unsafe { jfgui_main() };
+    // (Android) the first frame starts the app, so the activity is resumed and has the
+    // keyboard: its focus-in (onResume) came before the start (UIC_ACTIVE 1)
+    #[cfg(target_os = "android")]
+    if code == 0 {
+        let _ = crate::evq_push(Event { typ: crate::E_FOCUS_IN, ..Event::default() });
+    }
+    code
 }
 /// Microseconds spent presenting so far (present_time: the windows' copies, the composition,
 /// the hand-over to the host); for measurements.
@@ -837,6 +852,8 @@ pub extern "C" fn jfgui_frame_delay() -> u32 {
     with_app(|app| app.frame_delay()).unwrap_or(250)
 }
 /// Enqueue a bounded platform event; pointer/resize events update virtual window routing.
+/// The lifecycle comes this way too: E_POWER with data 2 when the page was hidden / Android's
+/// activity stopped (onStop), 3 when it is visible / started again (UIC_SUSPEND 2 / 0).
 #[unsafe(no_mangle)]
 pub extern "C" fn jfgui_event(
     typ: u32,
@@ -847,7 +864,8 @@ pub extern "C" fn jfgui_event(
     y: i32,
     data: u32,
 ) -> u32 {
-    if typ > crate::E_DROP as u32 || window >= crate::PW_MAX as u32 {
+    let life = typ == crate::E_POWER as u32 && data <= 3;
+    if (typ > crate::E_DROP as u32 && !life) || window >= crate::PW_MAX as u32 {
         return 0;
     }
     windows::event(Event {

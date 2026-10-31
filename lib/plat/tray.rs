@@ -18,7 +18,9 @@
 // with TrackPopupMenuEx, notifications as the symbol's balloon (Windows 10 / 11 show it as a
 // toast; without a visible symbol a hidden one is added for the time it is shown).  Linux
 // (linux_tray.rs): StatusNotifierItem with a com.canonical.dbusmenu menu and
-// org.freedesktop.Notifications, on a session-bus connection of its own thread.  Elsewhere
+// org.freedesktop.Notifications, on a session-bus connection of its own thread.  Browser and
+// Android (web_notify.rs): notifications only -- the Notification API (the permission asked for
+// from the user's gesture), NotificationManager with POST_NOTIFICATIONS; no symbol.  Elsewhere
 // nothing is shown.  jfgui_TRAY_DRYRUN=1 prints what would be shown instead (tests).
 
 use alloc::string::String;
@@ -208,7 +210,11 @@ use crate::win_tray as native;
 #[cfg(target_os = "linux")]
 use crate::linux_tray as native;
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(any(target_arch = "wasm32", target_os = "android"))]
+#[path = "web_notify.rs"]
+mod native;
+
+#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android")))]
 mod native {
     use super::{Note, Tray};
     pub fn tray_set(_t: &Tray) -> bool {

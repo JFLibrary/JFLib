@@ -5,7 +5,8 @@
 //                                    also to keep the screen on and the session active
 //                                    (INHIBIT_IDLE: presentations, videos; implies
 //                                    INHIBIT_SUSPEND).  The guard releases it when dropped.
-//                                    None: not possible here (no service, web, Android)
+//                                    None: not possible here (no service; the browser:
+//                                    INHIBIT_SUSPEND alone, no Screen Wake Lock)
 //   inhibited() -> u32               the INHIBIT_* bits the live guards of this process hold
 //
 // reason is shown by the system (`powercfg /requests`, the desktop's list of inhibitors);
@@ -24,7 +25,9 @@
 // while a guard lives (the desktop ends inhibitions with their connection; it is closed when
 // the last guard goes).  A backend may still drop an inhibition later; the guard does not
 // notice.  logind's Inhibit is not used: it answers with a file descriptor, which plat's
-// D-Bus client does not receive.
+// D-Bus client does not receive.  Browser and Android (web_power.rs): the Screen Wake Lock
+// (INHIBIT_IDLE only; taken again when the tab is visible again), FLAG_KEEP_SCREEN_ON and a
+// partial WakeLock (INHIBIT_SUSPEND).
 
 use alloc::string::String;
 use core::sync::atomic::{AtomicU32, Ordering};
@@ -98,7 +101,11 @@ mod native;
 #[path = "linux_power.rs"]
 mod native;
 
-#[cfg(not(any(windows, target_os = "linux")))]
+#[cfg(any(target_arch = "wasm32", target_os = "android"))]
+#[path = "web_power.rs"]
+mod native;
+
+#[cfg(not(any(windows, target_os = "linux", target_arch = "wasm32", target_os = "android")))]
 mod native {
     pub struct Held;
     pub fn hold(_reason: &str, _what: u32) -> Option<Held> {

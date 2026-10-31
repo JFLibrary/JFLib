@@ -53,8 +53,10 @@
 //                   runs (the median and the retries ride out a busy machine), FAIL when none
 //                   does
 //   quit
-//   system focus in|out | suspend | resume | session-end | settings theme|locale|contrast|fonts|N
-//                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...)
+//   system focus in|out | suspend | resume | background | foreground | session-end |
+//          settings theme|locale|contrast|fonts|N
+//                       the platform's lifecycle events (UIC_ACTIVE, UIC_SUSPEND, ...;
+//                       background / foreground: a hidden tab, Android's onStop / onStart)
 //   system fullscreen on|off [ID|main]   (L7) the platform (the user) puts the window into /
 //                       takes it out of full screen by itself: UIC_FULLSCREEN (default main)
 // Windows (ID = the app's window id, 0 / main = the main window):
@@ -1176,8 +1178,9 @@ impl Ui {
 
     // inject(type, btn, x, y, data): queue one event (current mods) and process it; keys
     // and text go to the keyboard window, pointer events to the script's window
-    // system focus in | out, suspend, resume, session-end, settings theme | locale | contrast |
-    // fonts | N: the lifecycle events of the platform (UIC_ACTIVE, UIC_SUSPEND, ...);
+    // system focus in | out, suspend, resume, background, foreground (the browser's hidden tab,
+    // Android's onStop / onStart), session-end, settings theme | locale | contrast | fonts | N:
+    // the lifecycle events of the platform (UIC_ACTIVE, UIC_SUSPEND, ...);
     // fullscreen on | off [ID | main]: the platform changed the window's full screen (L7)
     fn sc_system(&mut self, app: &mut dyn App, a: &[u8]) {
         let w = |n: &str| word_eq(a, n).is_some();
@@ -1207,6 +1210,10 @@ impl Ui {
             (plat::E_POWER, 1)
         } else if w("resume") {
             (plat::E_POWER, 0)
+        } else if w("background") {
+            (plat::E_POWER, 2) // the browser's hidden tab, Android's onStop
+        } else if w("foreground") {
+            (plat::E_POWER, 3)
         } else if w("session-end") {
             (plat::E_SESSION_END, 0)
         } else if w("settings") {

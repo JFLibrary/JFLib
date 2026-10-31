@@ -138,6 +138,9 @@ pub fn sys_settings() -> SysSettings {
     let mut s = SysSettings::default();
     #[cfg(any(windows, target_os = "linux"))]
     crate::sys_settings_os(&mut s);
+    // the browser's media queries / Android's configuration, as the host sent them (web_system.rs)
+    #[cfg(any(target_arch = "wasm32", target_os = "android"))]
+    crate::web::sys_settings_host(&mut s);
     env_overrides(&mut s);
     s
 }

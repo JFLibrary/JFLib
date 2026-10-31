@@ -199,7 +199,7 @@ pub const UIC_NOTE: u32 = 0x7FFF_000D; // arg = id: a system notification was cl
 pub const UIC_NOTE_GONE: u32 = 0x7FFF_000E; // arg = id: a notification went away unclicked
 // lifecycle (runtime.rs)
 pub const UIC_ACTIVE: u32 = 0x7FFF_000F; // arg 1: one of the app's windows got the keyboard, 0: none has it
-pub const UIC_SUSPEND: u32 = 0x7FFF_0010; // arg 1: the system goes to sleep, 0: it woke up
+pub const UIC_SUSPEND: u32 = 0x7FFF_0010; // arg 1: the system goes to sleep, 2: the app went to the background (browser, Android), 0: it woke up / is back
 pub const UIC_SESSION_END: u32 = 0x7FFF_0011; // logout / shutdown / SIGTERM: save now; UIC_EXIT and the end follow
 pub const UIC_SETTINGS: u32 = 0x7FFF_0012; // arg = plat::SET_* bits: system settings changed (theme and format already applied)
 // drag and drop (dnd.rs)
