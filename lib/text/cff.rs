@@ -1,10 +1,17 @@
-// cff -- CFF ('CFF ' table of OpenType fonts): Type 2 charstrings -> cubic outlines
-//                                                                        [src/text/cff.s]
+// cff -- CFF and CFF2 ('CFF ' / 'CFF2' tables of OpenType fonts): Type 2 charstrings -> cubic
+// outlines                                                               [src/text/cff.s]
 //
-//   Cff::open(table, upem) -> context / ERR_*   the header, Top DICT, CharStrings, global and
-//        local subrs, CID-keyed FDArray / FDSelect (formats 0 and 3), FontMatrix
+//   Cff::open(table, upem) -> context / ERR_*   CFF: the header, Top DICT, CharStrings, global
+//        and local subrs, CID-keyed FDArray / FDSelect (formats 0 and 3), FontMatrix
+//   Cff::open2(table, upem) -> context / ERR_*  CFF2: the header and the Top DICT right after
+//        it (no Name / String INDEX), INDEXes with 32-bit counts, CharStrings, global subrs,
+//        FDArray (each font DICT's Private DICT: Subrs and vsindex; blend in its values),
+//        FDSelect (formats 0, 3 and 4; none: font DICT 0), the VariationStore (vstore),
+//        maxstack, FontMatrix
 //   outline(table, glyph, ol) -> false on error   run the charstring, points into the outline
 //        buffer (OLT_ON / OLT_CUBIC, font units)
+//   outline_var(table, glyph, coords, ol)   the same at a CFF2 instance's normalized
+//        coordinates (F2Dot14 per axis, avar applied: var.rs normalize; empty = the default)
 //
 // Type 2 operators: all path operators (r/h/v moveto, lineto, rrcurveto, hh/vv/hv/vh curveto,
 // rcurveline, rlinecurve, flex, hflex, hflex1, flex1), hint operators (stems are counted for
@@ -12,19 +19,33 @@
 // <= 10), return, endchar (a seac accent is ignored), the arithmetic / storage operators
 // (abs add sub div neg eq drop put get ifelse random mul sqrt dup exch index roll and or
 // not).  Argument stack 48, transient array 32, at most 200000 operators per glyph.  The
-// width argument is dropped (advances come from hmtx).  CFF2 is not supported.  Like the
-// assembly, the transient array and the random generator are process-wide.
+// width argument is dropped (advances come from hmtx).  Like the assembly, the transient
+// array and the random generator are process-wide.
+//
+// CFF2 charstrings: no width argument, no endchar (the charstring ends with its data, a subr
+// too; return and endchar are still accepted, as are the arithmetic operators, like FreeType),
+// vsindex (before the first blend; else the Private DICT's, default 0) and blend: n values,
+// n x k deltas, n -> the n values default + sum(delta x scalar), k = the regions of that item
+// variation data, their scalars at coords (var.rs ivs_scalars: HarfBuzz's region rules, f32).
+// Argument stack maxstack (default 193, here 193 ..= 513), at most 512 regions per item
+// variation data, a vsindex after a blend is an error.  Advances come from hmtx + HVAR
+// (ttf.rs); hints are skipped (CFF2 outlines are not hinted, like CFF ones).
 
 use alloc::vec;
 use alloc::vec::Vec;
 
-use rt::fx::{cvtt, sqrt};
+use rt::fx::{cvtt, cvttd, sqrt};
 
 use crate::outline::{Outline, OLT_CUBIC, OLT_ON};
 use crate::ttf::{Tb, ERR_HDR, ERR_UNSUPPORTED};
+use crate::var;
 
 const FD_MAX: u32 = 256;
 const CS_STACK: usize = 48;
+const CS2_STACK: usize = 513; // CFF2: the largest maxstack
+const CS2_DEFSTACK: i64 = 193; // CFF2: maxstack without the operator
+const CS2_REGIONS: usize = 512; // regions of one item variation data a blend may use
+const DICT2_STACK: usize = 513; // CFF2 DICT operands
 const CS_DEPTH: u32 = 10;
 const CS_BUDGET: i32 = 200_000;
 const OPS_MAX: usize = 48; // DICT operands kept
@@ -42,15 +63,23 @@ struct Index {
 }
 
 pub struct Cff {
-    cid: bool,
+    /// a CFF2 table (open2)
+    v2: bool,
+    cid: bool, // font DICTs: CID-keyed CFF, every CFF2
     cs: Index,
     gs: Index,
     ls: Index,
-    fdsel: u32,
+    fdsel: u32, // FDSelect offset (0: none, CFF2 only: font DICT 0)
     nfd: u32,
     mat: [f32; 6],
     hasmat: bool,
     fdls: Vec<Index>,
+    /// CFF2: the vsindex of each font DICT's Private DICT
+    fdvs: Vec<u16>,
+    /// CFF2: the item variation store (table offset, past vstore's length; 0 = none)
+    vstore: u32,
+    /// CFF2: the argument stack's size
+    maxstack: u32,
 }
 
 // ------------------------------------------------------------------ byte readers
@@ -133,6 +162,186 @@ fn ix_get(t: Tb, ix: &Index, i: u32) -> Option<(u32, u32)> {
         return None;
     }
     if start as u32 as i32 >= 0 { Some((start as u32, len as u32)) } else { None }
+}
+
+// ix2_parse(pos, index) -> position after a CFF2 INDEX {u32 count, offSize, offsets[count + 1],
+// data} (an empty INDEX is its count alone), or -1 (malformed; count = 0)
+fn ix2_parse(t: Tb, pos: u32, ix: &mut Index) -> i64 {
+    ix.count = 0;
+    let count = c_off(t, pos, 4);
+    if count < 0 {
+        return -1;
+    }
+    let base = pos as u64 + 4; // <= the table's length
+    if count == 0 {
+        ix.offsize = 1;
+        ix.offs = base as u32;
+        ix.data = base as u32;
+        return base as i64;
+    }
+    let os = c8(t, base as u32);
+    if !(1..=4).contains(&os) {
+        return -1;
+    }
+    let os = os as u64;
+    let offs = base + 1;
+    let data = offs + (count as u64 + 1) * os;
+    if data > t.len() as u64 {
+        return -1;
+    }
+    let last = c_off(t, (offs + count as u64 * os) as u32, os as u32);
+    if last <= 0 {
+        return -1;
+    }
+    let end = data + last as u64 - 1;
+    if end > t.len() as u64 {
+        return -1;
+    }
+    ix.count = count as u32;
+    ix.offsize = os as u32;
+    ix.offs = offs as u32;
+    ix.data = data as u32;
+    end as i64
+}
+
+// ------------------------------------------------------------------ CFF2 DICT
+
+// walk a CFF2 DICT: f(operator, operands) for every operator (0..=27 but 12 / 23, or 1200 +
+// the escaped byte); blend (23) leaves the n default values in place of its operands (the
+// values that vary are hint values, which are not used) with k = regions(vsindex) deltas per
+// value, vsindex (22) as the DICT's own sets it -> false: malformed (the walk stopped)
+fn dict2_walk(t: Tb, start: u32, end: u32, regions: &dyn Fn(u32) -> Option<u32>, f: &mut dyn FnMut(u32, &[f64])) -> bool {
+    let mut st: Vec<f64> = Vec::new();
+    let mut vsi = 0u32;
+    let mut p = start;
+    while p < end {
+        let b = c8(t, p);
+        if b < 0 {
+            return false;
+        }
+        let v: f64;
+        if b <= 27 {
+            p += 1;
+            let mut o = b as u32;
+            if o == 12 {
+                let b2 = c8(t, p);
+                if b2 < 0 {
+                    return false;
+                }
+                p += 1;
+                o = 1200 + b2 as u32;
+            }
+            if o == 23 {
+                // blend: n defaults, n x k deltas, n -> the n defaults
+                let Some(nv) = st.pop() else { return false };
+                let n = cvttd(nv);
+                let Some(k) = regions(vsi) else { return false };
+                if n < 0 {
+                    return false;
+                }
+                let need = n as u64 * (k as u64 + 1);
+                if need > st.len() as u64 {
+                    return false;
+                }
+                let keep = st.len() - need as usize + n as usize;
+                st.truncate(keep);
+                continue;
+            }
+            if o == 22 {
+                match st.last().map(|&x| cvttd(x)) {
+                    Some(i) if i >= 0 => vsi = i as u32,
+                    _ => {}
+                }
+            }
+            f(o, &st);
+            st.clear();
+            continue;
+        } else if b == 28 {
+            let w = c16(t, p.wrapping_add(1));
+            if w < 0 {
+                return false;
+            }
+            v = (w as u16 as i16) as f64;
+            p += 3;
+        } else if b == 29 {
+            let w = c_off(t, p.wrapping_add(1), 4);
+            if w < 0 {
+                return false;
+            }
+            v = (w as u32 as i32) as f64;
+            p += 5;
+        } else if b == 30 {
+            p += 1;
+            v = dict_real(t, &mut p);
+        } else if b == 31 || b == 255 {
+            p += 1; // reserved
+            st.clear();
+            continue;
+        } else if b <= 246 {
+            v = (b - 139) as f64;
+            p += 1;
+        } else {
+            let b2 = c8(t, p.wrapping_add(1));
+            if b2 < 0 {
+                return false;
+            }
+            p += 2;
+            v = if b <= 250 { ((b - 247) * 256 + b2 + 108) as f64 } else { (-((b - 251) * 256 + b2 + 108)) as f64 };
+        }
+        if st.len() >= DICT2_STACK {
+            return false;
+        }
+        st.push(v);
+    }
+    true
+}
+
+// dict2_find(start, end, op) -> the operand count of op's first occurrence (its last OPS_MAX
+// operands in ops), -1 = absent
+fn dict2_find(t: Tb, start: u32, end: u32, op: u32, regions: &dyn Fn(u32) -> Option<u32>, ops: &mut [f64; OPS_MAX]) -> i32 {
+    let mut found = -1i32;
+    dict2_walk(t, start, end, regions, &mut |o, a| {
+        if found < 0 && o == op {
+            let a = &a[a.len().saturating_sub(OPS_MAX)..];
+            ops[..a.len()].copy_from_slice(a);
+            found = a.len() as i32;
+        }
+    });
+    found
+}
+
+// CFF2: the local subrs (into ix) and the vsindex of the Private DICT that the font DICT
+// [start, end) names; blend in its values with the regions of the store at vstore
+fn cf2_private(t: Tb, start: u32, end: u32, vstore: u32, ix: &mut Index, ops: &mut [f64; OPS_MAX]) -> u16 {
+    ix.count = 0;
+    let n = dict2_find(t, start, end, 18, &|_| None, ops);
+    if n < 2 {
+        return 0;
+    }
+    let size = cvttd(ops[n as usize - 2]);
+    let off = cvttd(ops[n as usize - 1]);
+    if size <= 0 || off <= 0 || off as u32 >= t.len() {
+        return 0;
+    }
+    let off = off as u32;
+    let e = off.saturating_add(size as u32).min(t.len());
+    let regions = |vsi: u32| if vstore == 0 { None } else { var::ivs_region_count(t, vstore, vsi) };
+    let (mut subrs, mut vsi) = (None, 0u16);
+    dict2_walk(t, off, e, &regions, &mut |o, a| {
+        let last = a.last().map(|&v| cvttd(v));
+        match (o, last) {
+            (19, Some(s)) if subrs.is_none() => subrs = Some(s),
+            (22, Some(v)) if (0..=0xFFFF).contains(&v) => vsi = v as u16,
+            _ => {}
+        }
+    });
+    if let Some(s) = subrs
+        && s > 0
+        && let Some(pos) = (s as u32).checked_add(off)
+    {
+        ix2_parse(t, pos, ix); // Subrs: relative to the Private DICT
+    }
+    vsi
 }
 
 // ------------------------------------------------------------------ DICT
@@ -311,10 +520,9 @@ fn cf_private(t: Tb, start: u32, end: u32, ix: &mut Index, ops: &mut [f64; OPS_M
 }
 
 impl Cff {
-    /// cff_open: ERR_HDR (malformed) / ERR_UNSUPPORTED (not CFF 1 / not Type 2 charstrings)
-    pub fn open(t: Tb, upem: u32) -> Result<Cff, i32> {
-        let mut ops = [0f64; OPS_MAX];
-        let mut c = Cff {
+    fn empty(v2: bool) -> Cff {
+        Cff {
+            v2,
             cid: false,
             cs: Index::default(),
             gs: Index::default(),
@@ -324,7 +532,45 @@ impl Cff {
             mat: [0.0; 6],
             hasmat: false,
             fdls: Vec::new(),
-        };
+            fdvs: Vec::new(),
+            vstore: 0,
+            maxstack: CS2_DEFSTACK as u32,
+        }
+    }
+
+    /// a CFF2 table (its outline() takes normalized coordinates)
+    pub fn is_v2(&self) -> bool {
+        self.v2
+    }
+
+    /// a CFF2 table with a variation store: its outlines vary
+    pub fn varies(&self) -> bool {
+        self.v2 && self.vstore != 0
+    }
+
+    // FontMatrix operands (a b c d e f) for upem: kept unless the identity (within 1e-6)
+    fn set_matrix(&mut self, m: &[f64], upem: u32) {
+        let u = upem as i32 as f64;
+        for (i, &v) in m.iter().take(6).enumerate() {
+            self.mat[i] = (v * u) as f32;
+        }
+        let abs = |v: f32| f32::from_bits(v.to_bits() & 0x7FFF_FFFF);
+        if abs(self.mat[0] - 1.0) > F_EPS || abs(self.mat[3] - 1.0) > F_EPS {
+            self.hasmat = true;
+        } else {
+            for i in [1, 2, 4, 5] {
+                if abs(self.mat[i]) > F_EPS {
+                    self.hasmat = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    /// cff_open: ERR_HDR (malformed) / ERR_UNSUPPORTED (not CFF 1 / not Type 2 charstrings)
+    pub fn open(t: Tb, upem: u32) -> Result<Cff, i32> {
+        let mut ops = [0f64; OPS_MAX];
+        let mut c = Cff::empty(false);
         if c8(t, 0) != 1 {
             return Err(ERR_UNSUPPORTED);
         }
@@ -369,22 +615,8 @@ impl Cff {
         // FontMatrix (default 0.001 0 0 0.001 0 0 for upem 1000)
         let n = dict_find(t, ds, de, 1207, &mut ops);
         if n >= 6 {
-            let u = upem as i32 as f64;
-            for i in 0..6 {
-                c.mat[i] = (ops[i] * u) as f32;
-            }
-            // identity (within 1e-6)?
-            let abs = |v: f32| f32::from_bits(v.to_bits() & 0x7FFF_FFFF);
-            if abs(c.mat[0] - 1.0) > F_EPS || abs(c.mat[3] - 1.0) > F_EPS {
-                c.hasmat = true;
-            } else {
-                for i in [1, 2, 4, 5] {
-                    if abs(c.mat[i]) > F_EPS {
-                        c.hasmat = true;
-                        break;
-                    }
-                }
-            }
+            let m = ops;
+            c.set_matrix(&m[..6], upem);
         }
         // CID-keyed?
         if dict_find(t, ds, de, 1230, &mut ops) >= 0 {
@@ -424,9 +656,92 @@ impl Cff {
         Ok(c)
     }
 
+    /// cff2_open: ERR_HDR (malformed) / ERR_UNSUPPORTED (not CFF2)
+    pub fn open2(t: Tb, upem: u32) -> Result<Cff, i32> {
+        let mut ops = [0f64; OPS_MAX];
+        let mut c = Cff::empty(true);
+        if c8(t, 0) != 2 {
+            return Err(ERR_UNSUPPORTED);
+        }
+        // header {u8 major 2, minor, headerSize, u16 topDictLength}, the Top DICT after it
+        let hs = c8(t, 2);
+        let tdl = c16(t, 3);
+        if hs < 5 || tdl < 0 {
+            return Err(ERR_HDR);
+        }
+        let ds = hs as u32;
+        let de = ds + tdl as u32;
+        if de > t.len() {
+            return Err(ERR_HDR);
+        }
+        // CharStrings, FDArray, FDSelect, vstore, maxstack, FontMatrix (the first of each)
+        let (mut cso, mut fda, mut fds, mut vst, mut maxst) = (None, None, None, None, None);
+        let mut mat: Option<[f64; 6]> = None;
+        dict2_walk(t, ds, de, &|_| None, &mut |op, a| {
+            let last = a.last().map(|&v| cvttd(v) as i64);
+            let slot = match op {
+                17 => &mut cso,
+                1236 => &mut fda,
+                1237 => &mut fds,
+                24 => &mut vst,
+                25 => &mut maxst,
+                1207 => {
+                    if mat.is_none() && a.len() >= 6 {
+                        mat = Some([a[0], a[1], a[2], a[3], a[4], a[5]]);
+                    }
+                    return;
+                }
+                _ => return,
+            };
+            if slot.is_none() {
+                *slot = last;
+            }
+        });
+        let len = t.len() as i64;
+        let pos = |o: Option<i64>| o.filter(|&o| o > 0 && o < len).map(|o| o as u32);
+        // global subrs right after the Top DICT; CharStrings
+        if ix2_parse(t, de, &mut c.gs) < 0 {
+            return Err(ERR_HDR);
+        }
+        match pos(cso) {
+            Some(o) if ix2_parse(t, o, &mut c.cs) >= 0 && c.cs.count != 0 => {}
+            _ => return Err(ERR_HDR),
+        }
+        if let Some(m) = mat {
+            c.set_matrix(&m, upem);
+        }
+        c.maxstack = maxst.unwrap_or(CS2_DEFSTACK).clamp(CS2_DEFSTACK, CS2_STACK as i64) as u32;
+        // VariationStore {u16 length, item variation store}
+        if let Some(o) = pos(vst)
+            && o as u64 + 2 < t.len() as u64
+        {
+            c.vstore = o + 2;
+        }
+        // FDArray (every CFF2 font has one), FDSelect (none: every glyph uses font DICT 0)
+        let mut fdix = Index::default();
+        match pos(fda) {
+            Some(o) if ix2_parse(t, o, &mut fdix) >= 0 && fdix.count != 0 => {}
+            _ => return Err(ERR_HDR),
+        }
+        c.cid = true;
+        c.nfd = fdix.count.min(FD_MAX);
+        c.fdsel = pos(fds).unwrap_or(0);
+        c.fdls = vec![Index::default(); c.nfd as usize];
+        c.fdvs = vec![0; c.nfd as usize];
+        for fd in 0..c.nfd as usize {
+            if let Some((s, l)) = ix_get(t, &fdix, fd as u32) {
+                c.fdvs[fd] = cf2_private(t, s, s.wrapping_add(l), c.vstore, &mut c.fdls[fd], &mut ops);
+            }
+        }
+        Ok(c)
+    }
+
     // font DICT index of glyph (-1 on error)  [cf_fdselect]
     fn fdselect(&self, t: Tb, glyph: u32) -> i32 {
         let fs = self.fdsel;
+        if fs == 0 {
+            return 0; // CFF2 without FDSelect (a CID-keyed CFF always has one)
+        }
         match c8(t, fs) {
             0 => c8(t, fs.wrapping_add(glyph).wrapping_add(1)),
             3 => {
@@ -454,42 +769,84 @@ impl Cff {
                 }
                 c8(t, (lo - 1).wrapping_mul(3).wrapping_add(fs).wrapping_add(5))
             }
+            4 if self.v2 => {
+                // CFF2: {u32 nRanges, {u32 first, u16 fd}[nRanges], u32 sentinel}
+                let n = c_off(t, fs.wrapping_add(1), 4);
+                if n <= 0 {
+                    return -1;
+                }
+                let first = |k: u64| -> i64 {
+                    let at = fs as u64 + 5 + k * 6;
+                    if at + 6 > t.len() as u64 { -1 } else { c_off(t, at as u32, 4) }
+                };
+                let (mut lo, mut hi) = (0u64, n as u64);
+                while lo < hi {
+                    let mid = lo + (hi - lo) / 2;
+                    let f = first(mid);
+                    if f < 0 {
+                        return -1;
+                    }
+                    if f as u64 > glyph as u64 {
+                        hi = mid;
+                    } else {
+                        lo = mid + 1;
+                    }
+                }
+                if lo == 0 {
+                    return -1;
+                }
+                c16(t, (fs as u64 + 5 + (lo - 1) * 6 + 4) as u32)
+            }
             _ => -1,
         }
     }
 
     /// run the charstring of glyph into the outline buffer: false = malformed  [cff_outline]
     pub fn outline(&self, t: Tb, glyph: u32, ol: &mut Outline) -> bool {
+        self.outline_var(t, glyph, &[], ol)
+    }
+
+    /// outline at a CFF2 instance's normalized coordinates (empty: the default instance; CFF
+    /// ignores them)
+    pub fn outline_var(&self, t: Tb, glyph: u32, coords: &[i16], ol: &mut Outline) -> bool {
         if glyph >= self.cs.count {
             return true;
         }
-        let ls = if self.cid {
+        let (ls, vsi) = if self.cid {
             let fd = self.fdselect(t, glyph);
             if fd as u32 >= self.nfd {
                 return false;
             }
-            self.fdls[fd as usize]
+            (self.fdls[fd as usize], self.fdvs.get(fd as usize).copied().unwrap_or(0))
         } else {
-            self.ls
+            (self.ls, 0)
         };
         let Some((s, l)) = ix_get(t, &self.cs, glyph) else { return false };
         let mut cs = Cs {
             t,
             gs: self.gs,
             ls,
-            st: [0.0; CS_STACK],
+            st: [0.0; CS2_STACK],
             sp: 0,
+            maxst: if self.v2 { self.maxstack as usize } else { CS_STACK },
             x: 0.0,
             y: 0.0,
             px: 0.0,
             py: 0.0,
             d: [0.0; 6],
             nstems: 0,
-            wd: false,
+            wd: self.v2, // CFF2 charstrings carry no width
             open: false,
             budget: CS_BUDGET,
             trans: [0.0; 32],
             rand: 0,
+            v2: self.v2,
+            vstore: self.vstore,
+            vsi: vsi as u32,
+            coords,
+            sc: Vec::new(),
+            nreg: None,
+            blended: false,
             ol,
         };
         if cs.run(s, s.wrapping_add(l), 0) < 0 {
@@ -527,13 +884,15 @@ fn zf(a: f32, b: f32) -> bool {
     !(a < b || a > b)
 }
 
-// the Type 2 interpreter state (g_cs_*)
+// the Type 2 interpreter state (g_cs_*); CFF2: the store, the item variation data (vsindex),
+// the coordinates, the scalars of its regions (computed at the first blend), blend seen
 struct Cs<'a, 'o> {
     t: Tb<'a>,
     gs: Index,
     ls: Index,
-    st: [f32; CS_STACK],
+    st: [f32; CS2_STACK],
     sp: usize,
+    maxst: usize, // the argument stack's size (CFF: 48)
     x: f32,
     y: f32,
     px: f32,
@@ -545,6 +904,13 @@ struct Cs<'a, 'o> {
     budget: i32,
     trans: [f32; 32], // transient array and random state live per glyph
     rand: u32,
+    v2: bool,
+    vstore: u32,
+    vsi: u32,
+    coords: &'a [i16],
+    sc: Vec<f32>,
+    nreg: Option<usize>,
+    blended: bool,
     ol: &'o mut Outline,
 }
 
@@ -632,7 +998,7 @@ impl Cs<'_, '_> {
     }
 
     fn push(&mut self, v: f32) -> Flow {
-        if self.sp >= CS_STACK {
+        if self.sp >= self.maxst {
             return Flow::Err;
         }
         self.st[self.sp] = v;
@@ -674,6 +1040,47 @@ impl Cs<'_, '_> {
             }
             self.st[first] = top;
         }
+    }
+
+    // CFF2 blend: n defaults, n x k deltas, n -> the n values at the instance (k: the regions of
+    // item variation data vsi, their scalars at coords, computed once per glyph and vsindex);
+    // false: malformed (no store, too few operands)
+    fn blend(&mut self) -> bool {
+        let Some(nv) = self.top() else { return false };
+        self.sp -= 1;
+        let n = cvtt(nv);
+        if n < 0 {
+            return false;
+        }
+        let k = match self.nreg {
+            Some(k) => k,
+            None => {
+                if var::ivs_scalars(self.t, self.vstore, self.vsi, self.coords, CS2_REGIONS, &mut self.sc).is_none() {
+                    return false;
+                }
+                self.nreg = Some(self.sc.len());
+                self.sc.len()
+            }
+        };
+        let n = n as usize;
+        let Some(need) = n.checked_mul(k + 1) else { return false };
+        if need > self.sp {
+            return false;
+        }
+        let base = self.sp - need;
+        for i in 0..n {
+            let mut v = self.st[base + i];
+            let d = base + n + i * k;
+            for (r, &s) in self.sc[..k].iter().enumerate() {
+                if s != 0.0 {
+                    v = v + self.st[d + r] * s;
+                }
+            }
+            self.st[base + i] = v;
+        }
+        self.sp = base + n;
+        self.blended = true;
+        true
     }
 
     /// cs_run(start, end, depth) -> 0 (return / end of data), 1 (endchar), -1 error
@@ -926,6 +1333,23 @@ impl Cs<'_, '_> {
                         Flow::Loop
                     }
                     11 => return 0, // return
+                    15 if self.v2 => {
+                        // vsindex: the item variation data of the following blends
+                        let Some(v) = self.top() else { return -1 };
+                        let i = cvtt(v);
+                        if self.blended || i < 0 {
+                            return -1;
+                        }
+                        self.vsi = i as u32;
+                        self.nreg = None;
+                        Flow::Clear
+                    }
+                    16 if self.v2 => {
+                        if !self.blend() {
+                            return -1;
+                        }
+                        Flow::Loop // the values stay on the stack
+                    }
                     14 => {
                         // endchar (a seac accent is ignored)
                         self.wd = true;

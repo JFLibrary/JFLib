@@ -30,7 +30,8 @@
 //   --bench FILE FACE                  outline extraction and rasterization speed
 //   --selftest                         known-answer checks on the synthetic fixtures in
 //                                      apps/fonttest/tests/fixtures and tests/varfont (variable
-//                                      fonts: tools/var_fixtures.py) (tests/selftest.uis)
+//                                      fonts: tools/var_fixtures.py), tests/cff2 and cff2ref
+//                                      (CFF2: tools/cff2_fixtures.py) (tests/selftest.uis)
 //   --scan [OUT] [--cache F] [--rescan] fontdb scan: families and faces
 //   --find FAMILY WEIGHT ITALIC        fontdb find
 //   --conf FAMILY [LANG]               fontconf: the system's rules (files read), the
@@ -48,8 +49,8 @@ use alloc::vec::Vec;
 use gfx::{Dc, Surface, FMT_A8, FMT_PARGB, FMT_XRGB};
 use rt::fx::cvt;
 use text::fontconf::{is_generic, FontConf};
-use text::fontdb::{FontDb, FDB_RESCAN};
-use text::{GcRef, Text, FM_FLAGS, FMF_BOLD, FMF_ITALIC, FMF_OBLIQUE, FMF_SYN, FMF_VAR, FN_FAMILY, FN_FULL, FN_STYLE,
+use text::fontdb::{FontDb, FDB_RESCAN, FDFF_CFF, FDFF_CFF2, FDFF_VAR};
+use text::{GcRef, Text, FM_FLAGS, FMF_BOLD, FMF_CFF, FMF_ITALIC, FMF_OBLIQUE, FMF_SYN, FMF_VAR, FN_FAMILY, FN_FULL, FN_STYLE,
            FN_TYPO_FAMILY, FN_TYPO_STYLE, FONT_ICON, FONT_REG, FS_SHARP, FS_SYN_BOLD, FS_SYN_ITALIC, SUBPIXEL_BGR,
            SUBPIXEL_NONE, SUBPIXEL_RGB, SUBPIXEL_VBGR, SUBPIXEL_VRGB};
 use ui::Style;
@@ -1248,6 +1249,242 @@ impl Ft {
         self.t.unload(id as u32);
     }
 
+    // the mask of glyph g of font at size (8.8 px) and phase (empty: none)
+    fn st_mask_at(&mut self, font: u32, g: u32, size: i32, phase: i32) -> Vec<u8> {
+        match self.t.gc_get(font, g, size, phase) {
+            GcRef::Entry(e) => {
+                let mut v = alloc::vec![e.w as u8, e.h as u8, e.left as u8, e.top as u8];
+                v.extend_from_slice(&e.px);
+                v
+            }
+            _ => Vec::new(),
+        }
+    }
+
+    // text drawn in font at px pixels (A8, black) and its width
+    fn st_text(&mut self, font: u32, px: i32, s: &str) -> (Vec<u8>, i32) {
+        self.t.set_font(font, px << 8);
+        let w = self.t.measure(s);
+        let mut sf = Surface::new(640, 96, FMT_A8);
+        let mut dc = Dc::new(640, 96);
+        dc.set_color(0xFF00_0000);
+        self.t.draw(&mut dc, &mut sf, 3, px * 2, s.as_bytes());
+        (sf.px, w)
+    }
+
+    // CFF2 (tests/cff2, cff2ref: tools/cff2_fixtures.py): outlines and advances at instances
+    // against cff2/expected.txt; every instance rasterizes byte for byte like its CFF comparison
+    // font (glyph masks at many sizes and phases, a line of text); the API (axes, named
+    // instances, flags); FontDb on a folder of CFF2 faces (a collection, variations, loading at
+    // a weight, the cache); the CJK fallback when the only CJK fonts are CFF2 faces; limits;
+    // truncated and corrupted files
+    fn st_cff2(&mut self) {
+        const C2: &str = "apps/fonttest/tests/cff2/";
+        const REF: &str = "apps/fonttest/tests/cff2ref/";
+        // ---- expected.txt
+        let cases = [("jfcff2.otf", 0, "-"), ("jfcff2.otf", 0, "wght=650"), ("jfcff2.otf", 0, "wght=900,wdth=75"),
+                     ("jfcff2.otf", 0, "wght=250"), ("jfcff2.otf", 0, "wght=777"), ("jfcff2.otf", 0, "wght=160"),
+                     ("jfcff2.ttc", 1, "wght=650")];
+        self.ob.clear();
+        for (file, face, spec) in cases {
+            let base = self.t.load_file(&format!("{C2}{file}"), face);
+            if base < 0 {
+                self.st_check(false, &format!("selftest: cannot load {file} {face} ({base})\n"));
+                continue;
+            }
+            let f = if spec == "-" { base as u32 } else { self.t.vary(base as u32, &parse_axes(spec)) as u32 };
+            let mut co = self.t.var_coords(f);
+            if co.is_empty() {
+                co = alloc::vec![0; self.t.var_axes(f).len()];
+            }
+            let c: Vec<String> = co.iter().map(|v| format!("{v}")).collect();
+            self.ob(&format!("var {file} {face} {spec} coords {}\n", c.join(" ")));
+            for g in 0..self.t.metrics(f).map_or(0, |m| m.nglyphs).max(0) as u32 {
+                self.key = format!("g{g}");
+                self.put_outline(f, g);
+            }
+            self.t.unload(base as u32);
+        }
+        match plat::read_file(&format!("{C2}expected.txt")) {
+            Some(mut e) => {
+                e.retain(|&c| c != b'\r');
+                if e != self.ob {
+                    self.st_fail += 1;
+                    out("selftest: CFF2 outlines differ from cff2/expected.txt (actual output follows)\n");
+                    self.ob_flush("");
+                }
+            }
+            None => self.st_check(false, "selftest: cff2/expected.txt missing\n"),
+        }
+        self.ob.clear();
+        // ---- every instance like its CFF font, byte for byte (masks, advances, a line of text)
+        let refs = [("ref-default.otf", "-"), ("ref-w650.otf", "wght=650"), ("ref-cb.otf", "wght=900,wdth=75"),
+                    ("ref-w250.otf", "wght=250")];
+        let sizes = [9 << 8, 11 << 8, 13 << 8, 16 << 8, 20 << 8, 24 << 8, (32 << 8) + 128, 48 << 8, 96 << 8];
+        for (file, face) in [("jfcff2.otf", 0u32), ("jfcff2.ttc", 0), ("jfcff2.ttc", 1)] {
+            let base = self.t.load_file(&format!("{C2}{file}"), face);
+            for (rf, spec) in refs {
+                let r = self.t.load_file(&format!("{REF}{rf}"), 0);
+                if base < 0 || r < 0 {
+                    self.st_check(false, &format!("selftest: cannot load {file} {face} / {rf}\n"));
+                    continue;
+                }
+                let (b, r) = (base as u32, r as u32);
+                let f = if spec == "-" { b } else { self.t.vary(b, &parse_axes(spec)) as u32 };
+                let mut bad = Vec::new();
+                for g in 0..9u32 {
+                    let mut same = self.t.adv(f, g) == self.t.adv(r, g);
+                    for &sz in &sizes {
+                        for ph in 0..4 {
+                            let a = self.st_mask_at(f, g, sz, ph);
+                            same &= a == self.st_mask_at(r, g, sz, ph) && (g == 1 || !a.is_empty());
+                        }
+                    }
+                    if !same {
+                        bad.push(g);
+                    }
+                }
+                // the collection's second face maps U+4E2D to glyph 7, the comparison fonts to 6
+                let s = if face == 1 { "AOBHV Franz jagt im Taxi" } else { "AOBHV \u{4E2D} Franz jagt im Taxi" };
+                let (ta, wa) = self.st_text(f, 21, s);
+                let (tb, wb) = self.st_text(r, 21, s);
+                let ink = ta.iter().filter(|&&p| p != 0).count();
+                self.st_check(bad.is_empty() && ta == tb && wa == wb && ink > 500,
+                              &format!("selftest: CFF2 {file}:{face} {spec} unlike {rf}: glyphs {bad:?} text {} {wa}/{wb} ink {ink}\n", ta == tb));
+                self.t.unload(r);
+            }
+            if base >= 0 {
+                self.t.unload(base as u32);
+            }
+        }
+        // ---- the API: axes and named instances (German names), flags, a named instance's
+        // outlines, the instance's weight
+        let base = self.t.load_file(&format!("{C2}jfcff2.otf"), 0);
+        if base >= 0 {
+            let b = base as u32;
+            let desc: Vec<String> = self.t.var_axes(b).iter().map(|a| format!("{} {} {} {} {} {}", tag_str(a.tag), a.min, a.def, a.max, a.hidden, a.name)).collect();
+            self.st_check(desc == ["wght 100 400 900 false Strichstärke", "wdth 50 100 100 false Breite"], &format!("selftest: CFF2 var_axes {desc:?}\n"));
+            let ins: Vec<String> = self.t.var_instances(b).iter().map(|i| format!("{} {:?}", i.name, i.coords)).collect();
+            let want = ["Leicht [250.0, 100.0]", "Standard [400.0, 100.0]", "Halbfett [650.0, 100.0]", "Condensed Black [900.0, 75.0]"];
+            self.st_check(ins == want, &format!("selftest: CFF2 var_instances {ins:?}\n"));
+            let fl = self.t.metric(b, FM_FLAGS);
+            self.st_check(fl & (FMF_CFF | FMF_VAR) == FMF_CFF | FMF_VAR, &format!("selftest: CFF2 flags {fl:x}\n"));
+            let cb = self.t.vary_named(b, 3);
+            let cb2 = self.t.vary(b, &[(*b"wght", 900.0), (*b"wdth", 75.0)]);
+            let semi = self.t.vary_named(b, 2);
+            let m = self.t.metrics(semi.max(0) as u32).unwrap_or_default();
+            self.st_check(cb > b as i32 && cb == cb2 && m.weight == 650 && m.flags & FMF_BOLD != 0,
+                          &format!("selftest: CFF2 vary_named {cb} {cb2} weight {}\n", m.weight));
+            // HarfRust shapes the instance with HVAR's advances
+            self.t.set_font(semi.max(0) as u32, 1000 << 8);
+            let plain = self.t.measure("AOB HV");
+            self.t.set_shaping(true);
+            let shaped = self.t.measure("AOB HV");
+            self.t.set_shaping(false);
+            self.st_check(plain == shaped && plain == 4425 << 8, &format!("selftest: CFF2 shaped instance {} / {}\n", plain >> 8, shaped >> 8));
+            self.t.unload(b);
+        }
+        // ---- limits: one glyph per limit (cff2/limits.bin)
+        let lim = self.t.load_file(&format!("{C2}limits.bin"), 0);
+        self.st_check(lim >= 0, &format!("selftest: cannot load limits.bin ({lim})\n"));
+        if lim >= 0 {
+            let inst = self.t.vary(lim as u32, &[(*b"wght", 650.0)]) as u32;
+            let want = [Some(true), Some(false), Some(false), Some(false), Some(false), Some(false), Some(false), Some(true),
+                        None, Some(false), Some(false), None];
+            for f in [lim as u32, inst] {
+                let got: Vec<bool> = (0..want.len() as u32).map(|g| self.t.glyph_box(f, g).is_some()).collect();
+                let ok = want.iter().zip(&got).all(|(w, g)| w.is_none_or(|w| w == *g));
+                self.st_check(ok, &format!("selftest: CFF2 limits {got:?}\n"));
+            }
+            let n7 = if self.t.glyph_box(inst, 7).is_some() { self.t.ol.npts() } else { 0 };
+            self.st_check(n7 == 126, &format!("selftest: CFF2 maxstack 300: {n7} points (126)\n"));
+            self.t.unload(lim as u32);
+        }
+        // ---- FontDb on the CFF2 folder: three faces (the collection's two), their axes, a weight
+        let mut db = FontDb::new();
+        let nf = db.scan_dirs(&[C2], FDB_RESCAN);
+        let want = FDFF_CFF | FDFF_CFF2 | FDFF_VAR;
+        let flags = (0..nf).all(|i| db.face(i).is_some_and(|f| f.flags & want == want));
+        self.st_check(nf == 3 && db.family_count() == 3 && flags, &format!("selftest: fontdb CFF2 faces {nf} families {}\n", db.family_count()));
+        let sc = db.find("jfgui CFF2 SC", 400, false).map(|f| f.0);
+        self.st_check(sc.is_some_and(|i| db.face(i).is_some_and(|f| f.face == 1)), "selftest: fontdb CFF2 collection face\n");
+        if let Some((v, _)) = db.find("jfgui CFF2", 400, false) {
+            let n = db.variations(v).map_or(0, |x| x.axes.len() * 10 + x.instances.len());
+            self.st_check(n == 24, &format!("selftest: fontdb CFF2 variations {n}\n"));
+            let id = db.load(&mut self.t, "jfgui CFF2", 650, false);
+            let r = self.t.load_file(&format!("{REF}ref-w650.otf"), 0);
+            let ok = id >= 0 && r >= 0 && self.t.var_values(id as u32) == [650.0, 100.0]
+                && (0..9).all(|g| self.st_mask_at(id as u32, g, 24 << 8, 0) == self.st_mask_at(r as u32, g, 24 << 8, 0));
+            self.st_check(ok, &format!("selftest: fontdb load CFF2 at 650 ({id})\n"));
+            if r >= 0 {
+                self.t.unload(r as u32);
+            }
+        } else {
+            self.st_check(false, "selftest: fontdb finds no jfgui CFF2\n");
+        }
+        // the cache keeps the CFF2 faces; a version 2 cache (CFF2 files without faces) is not read
+        let cp = format!("{}/jfgui-fonttest-cff2.cache", plat::temp_dir().unwrap_or_default());
+        let r = db.save_cache(&cp) | db.load_cache(&cp);
+        let n = db.scan_dirs(&[C2], 0);
+        let mut old = plat::read_file(&cp).unwrap_or_default();
+        if old.len() > 8 {
+            old[4..8].copy_from_slice(&2u32.to_le_bytes());
+        }
+        let v2 = plat::write_file(&cp, &old) && db.load_cache(&cp) < 0;
+        self.st_check(r == 0 && n == 3 && v2, &format!("selftest: fontdb CFF2 cache {r} {n} {v2}\n"));
+        plat::delete(&cp);
+        // ---- the CJK fallback when the only CJK fonts installed are CFF2 faces
+        let dirs = plat::env("jfgui_FONTDIRS");
+        plat::setenv("jfgui_FONTDIRS", Some("apps/fonttest/tests/cff2"));
+        plat::setenv("jfgui_FALLBACK_FONTS", Some("jfgui CFF2 SC"));
+        let st = &style::STYLE;
+        let mut t = Text::new(st.fonts(), st.font_names());
+        if t.has(FONT_REG, 0x4E2D) {
+            out("selftest: CFF2 fallback skipped (the UI font has U+4E2D)\n");
+        } else {
+            t.set_system_fallback(true);
+            let fb = t.fallback_for(0x4E2D);
+            let ok = fb.is_some_and(|f| t.glyph(f, 0x4E2D) == 7 && t.metric(f, FM_FLAGS) & (FMF_CFF | FMF_VAR) == FMF_CFF | FMF_VAR);
+            let r = t.load_file(&format!("{REF}ref-default.otf"), 0);
+            let drawn = match (fb, r) {
+                (Some(f), r) if r >= 0 => {
+                    let m = |t: &mut Text, f: u32| match t.gc_get(f, 7, 24 << 8, 0) {
+                        GcRef::Entry(e) => e.px.clone(),
+                        _ => Vec::new(),
+                    };
+                    let a = m(&mut t, f);
+                    !a.is_empty() && a == m(&mut t, r as u32)
+                }
+                _ => false,
+            };
+            self.st_check(ok && drawn, &format!("selftest: CJK fallback to a CFF2 face {fb:?} {ok} {drawn}\n"));
+        }
+        plat::setenv("jfgui_FALLBACK_FONTS", None);
+        plat::setenv("jfgui_FONTDIRS", dirs.as_deref());
+        // ---- truncated and corrupted CFF2 files at an instance: no crash
+        let axes = [(*b"wght", 777.0), (*b"wdth", 61.0)];
+        for f in ["jfcff2.otf", "jfcff2.ttc", "limits.bin"] {
+            let Some(d) = plat::read_file(&format!("{C2}{f}")) else { continue };
+            let mut n = 12;
+            while n < d.len() {
+                self.st_var_walk(&d[..n], &axes);
+                n += 5;
+            }
+            let mut r = 0x9E37_79B9u32;
+            for _ in 0..400 {
+                let mut c = d.clone();
+                for _ in 0..4 {
+                    r ^= r << 13;
+                    r ^= r >> 17;
+                    r ^= r << 5;
+                    let k = (r as usize) % c.len();
+                    c[k] ^= (r >> 24) as u8 | 1;
+                }
+                self.st_var_walk(&c, &axes);
+            }
+        }
+    }
+
     fn cmd_selftest(&mut self) -> i32 {
         const FX: &str = "apps/fonttest/tests/fixtures/";
         let cps_tt = [0x41, 0x56, 0x4F, 0xC4, 0x53, 0x43, 0x20, 0x42, 0x1F600];
@@ -1338,6 +1575,8 @@ impl Ft {
         self.st_subpixel();
         // ---- variable fonts (tests/varfont)
         self.st_var();
+        // ---- CFF2 (tests/cff2, cff2ref)
+        self.st_cff2();
         // ---- truncated fixtures must not crash
         for f in ["mini.ttf", "mini.otf", "mini.ttc", "cbdt.ttf", "mac.ttf", "cid.otf"] {
             self.st_fuzz(&format!("{FX}{f}"));

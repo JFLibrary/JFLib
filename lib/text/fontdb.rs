@@ -2,7 +2,8 @@
 // match styles, cache the result                                      [src/text/fontdb.s]
 //
 //   scan(flags) -> faces found      walk the font folders (recursively, depth <= 8) and read
-//        only the table directory, name, OS/2 and head of every .ttf / .otf / .ttc / .otc;
+//        only the table directory, name, OS/2 and head of every .ttf / .otf / .ttc / .otc
+//        (faces with glyf, CFF, CFF2 or CBDT outlines; every face of a collection);
 //        files already in a loaded cache with the same size are not opened again (flags
 //        FDB_RESCAN: ignore the cache).  Folders: jfgui_FONTDIRS (';' separated, on Linux
 //        also ':'), else Windows %WINDIR%/Fonts and %LOCALAPPDATA%/Microsoft/Windows/Fonts;
@@ -34,11 +35,13 @@
 //   save_cache(path) / load_cache(path) -> 0 / -1
 //
 // Families group faces by the legacy family name (name ID 1); names prefer German, then
-// English.  Cache file (little endian): "FDB1", u32 version 2, u32 files, u32 faces, u32
+// English.  Cache file (little endian): "FDB1", u32 version 3, u32 files, u32 faces, u32
 // pool bytes, u64 FNV-1a hash of everything after the 28-byte header; files {u32 path, u32
 // size, u32 first face, u32 faces}; faces {u32 file, u32 face index, u16 weight, u16 flags,
 // u32 family, u32 style, u32 full, u32 typo family, u32 0}; pool of NUL-terminated UTF-8
 // strings (offsets above point into it).  Entries are validated by path and file size.
+// Version 3: CFF2 faces count (a version 2 cache lists CFF2-only files without faces, so it
+// is not read).
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -57,6 +60,8 @@ pub const FDFF_CFF: u16 = 8;
 pub const FDFF_COLOR: u16 = 16;
 pub const FDFF_VAR: u16 = 32;
 pub const FDFF_SYMBOL: u16 = 64;
+/// CFF2 outlines (FDFF_CFF is set as well)
+pub const FDFF_CFF2: u16 = 128;
 
 const DEPTH_MAX: u32 = 8;
 const PATH_CAP: usize = 4096;
@@ -68,7 +73,7 @@ const FILES_MAX: usize = 20000;
 const LOADED_MAX: usize = 256;
 const CACHE_MAGIC: u32 = 0x3142_4446; // "FDB1"
 const CACHE_HDR: usize = 28;
-const CACHE_VERSION: u32 = 2;
+const CACHE_VERSION: u32 = 3;
 const VISIT_MAX: usize = 4096;
 const TAG_TTCF: u32 = 0x7474_6366;
 const TAG_TRUE: u32 = 0x7472_7565;
@@ -79,6 +84,7 @@ const T_OS2: u32 = 0x4F53_2F32;
 const T_HEAD: u32 = 0x6865_6164;
 const T_GLYF: u32 = 0x676C_7966;
 const T_CFF: u32 = 0x4346_4620;
+const T_CFF2: u32 = 0x4346_4632;
 const T_COLR: u32 = 0x434F_4C52;
 const T_CBDT: u32 = 0x4342_4454;
 const T_FVAR: u32 = 0x6676_6172;
@@ -495,6 +501,10 @@ impl FontDb {
                     flags |= FDFF_CFF;
                     outl = true;
                 }
+                T_CFF2 => {
+                    flags |= FDFF_CFF | FDFF_CFF2;
+                    outl = true;
+                }
                 T_COLR => flags |= FDFF_COLOR,
                 T_CBDT => {
                     outl = true;
@@ -505,7 +515,7 @@ impl FontDb {
             }
         }
         if !outl || name.1 < 6 {
-            return; // no usable outlines (bitmap-only, CFF2)
+            return; // no usable outlines (e.g. sbix / SVG only)
         }
         // head
         let mut mac_style = 0u32;
