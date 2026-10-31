@@ -1319,3 +1319,153 @@ Formatieren (Umschalt+Alt+F): Einrückung, Leerzeichen, eine Anweisung je Zeile 
 Name umbenennen	Rename name
 Gliederung: die Funktionen und globalen Variablen neben dem Editor, ein Klick springt hin	Outline: the functions and global variables beside the editor, a click jumps there
 Neuer Name (jede Stelle im Skript)	New name (every place in the script)
+# IDE1: the IDE of a host (workspace/ide, doc/ide.rs; the IDE tab of the device window)
+&IDE …	&IDE …
+IDE	IDE
+den Namen gibt es dort schon	the name exists there already
+das Verzeichnis ist nicht leer	the folder is not empty
+das gehört zum System des Geräts	it belongs to the device's system
+Dieses Gerät hat keine Dateien.	This device has no files.
+„{}“ wurde nicht gespeichert: {}.	“{}” was not saved: {}.
+„{}“ geht nicht: {}.	“{}” does not work: {}.
+„{}“ gibt es schon.	“{}” exists already.
+„{}“ lässt sich nicht löschen: {}.	“{}” cannot be deleted: {}.
+„{}“ läuft schon aus einer Datei.	“{}” runs from a file already.
+Strg+S speichert es, F5 führt es als Dienst aus.	Ctrl+S saves it, F5 runs it as a service.
+angehalten	paused
+Als Prozess läuft eine Datei: ein eingebettetes Skript erst in eine Datei umwandeln.	A file runs as a process: convert an embedded script into a file first.
+Tests laufen aus einer Datei: ein eingebettetes Skript erst in eine Datei umwandeln.	Tests run from a file: convert an embedded script into a file first.
+Als Dienst läuft eine .jfs-Datei oder ein Skript des Geräts.	A .jfs file or a script of the device runs as a service.
+Kein Dienst läuft aus der IDE: Als Dienst ausführen (F5) startet die Datei.	No service runs from the IDE: Run as service (F5) starts the file.
+Haltepunkt in Zeile {}: hält, wenn	Breakpoint in line {}: stops when
+Bedingung, z. B. n > 3	Condition, e.g. n > 3
+Ein Ausdruck in jfs; leer: ein Haltepunkt ohne Bedingung.	An expression in jfs; empty: a breakpoint without a condition.
+Erfasst	Captured
+Global	Global
+Lokal	Local
+Hauptprogramm	Main program
+Funktion ohne Namen	Function without a name
+Kein Dienst aus der IDE: Als Dienst ausführen (F5) startet die Datei; ein Klick links neben eine Zeilennummer (F9) setzt einen Haltepunkt.	No service from the IDE: Run as service (F5) starts the file; a click left of a line number (F9) sets a breakpoint.
+Haltepunkt	Breakpoint
+Schritt	Step
+Anhalten	Pause
+{}, Zeile {}, Spalte {}	{}, line {}, column {}
+{} hält in {} ({})	{} is paused in {} ({})
+die Bedingung scheiterte: {}	the condition failed: {}
+{} läuft: Haltepunkte halten ihn an, Anhalten (Strg+F9) beim nächsten Schritt.	{} is running: breakpoints stop it, Pause (Ctrl+F9) at the next step.
+{} läuft nicht: Als Dienst ausführen (F5) startet ihn.	{} is not running: Run as service (F5) starts it.
+Aufrufliste	Call stack
+Nur während der Dienst angehalten ist.	Only while the service is paused.
+Variablen	Variables
+Ausdrücke	Expressions
+Ausdruck, z. B. req.path	Expression, e.g. req.path
+Ausdruck hinzufügen	Add expression
+Ausdruck hinzufügen (Eingabe)	Add expression (Enter)
+Ausdruck entfernen	Remove expression
+Ausdrücke werden im gewählten Aufruf gelesen, ohne das Programm zu ändern.	Expressions are read in the chosen call without changing the program.
+„{}“ ist keine Textdatei: die IDE zeigt sie nicht.	“{}” is no text file: the IDE does not show it.
+„{}“ gibt es nicht.	“{}” does not exist.
+Das Skript „{}“ gibt es nicht.	The script “{}” does not exist.
+Hier steht kein Name, dessen Deklaration die IDE findet.	There is no name here whose declaration the IDE finds.
+(gelöscht)	(deleted)
+Ein Doppelklick im Explorer öffnet eine Datei; „Neue Datei …“ legt eine an. Ein Skript, das noch im Projekt steht, öffnet sich unter „Eingebettete Skripte“.	A double click in the Explorer opens a file; “New file …” makes one. A script that is still in the project opens under “Embedded scripts”.
+Keine Datei offen	No file open
+Tab schließen	Close tab
+Der Dienst {} läuft noch mit der Fassung vor dem Speichern – Neu starten übernimmt die Datei.	The service {} still runs the version from before saving – Restart takes the file.
+geändert – Strg+S speichert	changed – Ctrl+S saves
+Bedingter Haltepunkt	Conditional breakpoint
+Neuer Name (jede Stelle in der Datei)	New name (every place in the file)
+Eingebettete Skripte	Embedded scripts
+Dienst {}	Service {}
+ordner	folder
+Neue Datei …	New file …
+Neue Datei im gewählten Ordner	New file in the chosen folder
+Neuer Ordner im gewählten Ordner	New folder in the chosen folder
+Neuer Ordner …	New folder …
+Umbenennen (F2)	Rename (F2)
+Umbenennen …	Rename …
+Löschen (Entf) – ein Rückgängig-Schritt	Delete (Del) – one undo step
+In Datei umwandeln	Convert into a file
+In Datei umwandeln: das Skript kommt als Datei auf das Gerät, der Dienst startet von nun an aus ihr	Convert into a file: the script becomes a file of the device, the service starts from it from now on
+Neue Datei in {}	New file in {}
+Neuer Ordner in {}	New folder in {}
+Neuer Name für {}	New name for {}
+Ein Name fehlt.	A name is missing.
+„{}“ hat ungespeicherte Änderungen: erst speichern (Strg+S), dann umwandeln.	“{}” has unsaved changes: save first (Ctrl+S), then convert.
+Debugger	Debugger
+Tests	Tests
+Dienst {} ({}, bei {}): {}	Service {} ({}, at {}): {}
+Probleme ({})	Problems ({})
+Tests ({} fehlgeschlagen)	Tests ({} failed)
+Debugger (angehalten)	Debugger (paused)
+Noch keine Ausgabe von {} in diesem Lauf: print(…) schreibt hierher.	No output of {} in this run yet: print(…) writes here.
+Hier steht, was ein Dienst ausgibt, den die IDE ausführt (Als Dienst ausführen, F5). Ein Prozess schreibt ins Terminal.	Here is what a service prints that the IDE runs (Run as service, F5). A process writes to the terminal.
+Keine Probleme in den offenen Dateien.	No problems in the open files.
+Tests ausführen	Run tests
+Die Funktionen test_… der Datei laufen im Terminal mit jfs --test, jede in einem frischen Programm (Strg+Umschalt+T)	The file's test_… functions run in the terminal with jfs --test, each in a fresh program (Ctrl+Shift+T)
+Noch kein Testlauf auf diesem Gerät.	No test run on this device yet.
+{} Tests: {} bestanden, {} fehlgeschlagen	{} tests: {} passed, {} failed
+läuft … {} von {} Tests: {} bestanden, {} fehlgeschlagen	running … {} of {} tests: {} passed, {} failed
+bestanden: {} ({})	passed: {} ({})
+lässt sich nicht übersetzen: {}:{}:{}: {}	does not compile: {}:{}:{}: {}
+lässt sich nicht laden: {}: {}	does not load: {}: {}
+fehlgeschlagen: {} ({}:{}:{}): {}	failed: {} ({}:{}:{}): {}
+fehlgeschlagen: {} ({}): {}	failed: {} ({}): {}
+{} (eingebettet)	{} (embedded)
+Neues Skript: {}	New script: {}
+Alle speichern	Save all
+Bearbeiten	Edit
+Suchen …	Find …
+In Dateien suchen	Find in files
+In Dateien ersetzen	Replace in files
+Gehe zur Definition	Go to definition
+Name umbenennen …	Rename name …
+Als Prozess ausführen	Run as process
+Als Dienst ausführen	Run as service
+Debuggen	Debug
+Schritt über	Step over
+Schritt hinein	Step into
+Schritt heraus	Step out
+Haltepunkt an / aus	Breakpoint on / off
+Bedingter Haltepunkt …	Conditional breakpoint …
+Alle Haltepunkte entfernen	Remove all breakpoints
+Seitenleiste	Side bar
+Explorer	Explorer
+Untere Leiste	Lower area
+Dienst {}: nicht im Simulator	Service {}: not in the simulator
+„{}“ hat ungespeicherte Änderungen: erst speichern, dann in den Dateien ersetzen.	“{}” has unsaved changes: save first, then replace in the files.
+„{}“ kommt in keiner Datei vor.	“{}” is in no file.
+{} Stellen in {} Dateien ersetzt (ein Rückgängig-Schritt).	{} places replaced in {} files (one undo step).
+Ersetzen ein / aus	Replace on / off
+Ersetzen ein / aus (Strg+Umschalt+H)	Replace on / off (Ctrl+Shift+H)
+Ersetzen durch	Replace with
+Jede Stelle in jeder Datei – ein Rückgängig-Schritt des Projekts	Every place in every file – one undo step of the project
+Sucht in allen .jfs-Dateien des Geräts.	Searches all .jfs files of the device.
+Keine Treffer.	No matches.
+{} Treffer in {} Dateien	{} matches in {} files
+die Datei speichern (ein Rückgängig-Schritt des Projekts)	save the file (one undo step of the project)
+Strg+Umschalt+S	Ctrl+Shift+S
+alle geänderten Dateien speichern	save all changed files
+Strg+W	Ctrl+W
+den Tab schließen (seine Änderungen bleiben)	close the tab (its changes stay)
+Strg+Bild ab / Bild auf	Ctrl+PgDn / PgUp
+zum nächsten / vorigen Tab	to the next / previous tab
+Strg+Umschalt+F / H	Ctrl+Shift+F / H
+in Dateien suchen / ersetzen	find / replace in files
+F5 / Strg+F5	F5 / Ctrl+F5
+als Dienst ausführen (angehalten: fortsetzen) / als Prozess im Terminal	run as a service (paused: continue) / as a process in the terminal
+Umschalt+F5 / Strg+Umschalt+F5	Shift+F5 / Ctrl+Shift+F5
+stoppen / neu starten	stop / restart
+F9 / Strg+Umschalt+F9	F9 / Ctrl+Shift+F9
+Haltepunkt an / aus, einer mit Bedingung	breakpoint on / off, one with a condition
+F10 / F7 / Umschalt+F7	F10 / F7 / Shift+F7
+Schritt über / hinein / heraus	step over / into / out
+Strg+F9	Ctrl+F9
+anhalten	pause
+Strg+Umschalt+T	Ctrl+Shift+T
+die Tests der Datei ausführen	run the file's tests
+F12 / F2 / Umschalt+Alt+F	F12 / F2 / Shift+Alt+F
+zur Definition / Name umbenennen / formatieren	go to definition / rename a name / format
+in der Datei suchen / ersetzen	find / replace in the file
+Seitenleiste / untere Leiste ein und aus	side bar / lower area on and off
+Strg+B / Strg+J	Ctrl+B / Ctrl+J

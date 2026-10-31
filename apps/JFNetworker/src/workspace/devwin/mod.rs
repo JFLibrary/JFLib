@@ -9,23 +9,24 @@
 //   shows(n, dev)           the window that draws this device's console now (its CLI tab, the
 //                           desktop's prompt or MIB-Browser): the Terminal panel shows a note
 //                           instead
-//   open_on(n, ui, dev, tab)   the device's window on one of its tabs (CMD_SCRIPTS: Skripte)
+//   open_on(n, ui, dev, tab)   the device's window on one of its tabs (CMD_SCRIPTS: the IDE)
+//   get(k) / peek(k)       device window k (for the tabs' modules and the IDE)
 //
 //   config.rs    Konfiguration: forms that type command lines (doc/console.rs run_lines)
 //   services.rs  Dienste: what runs on the device, switched on and off
 //   svcedit.rs   the settings of a project's service as JSON (Dienste › Einstellungen …)
 //   desktop.rs   Desktop of hosts: IP-Konfiguration, Eingabeaufforderung, Texteditor, Browser
-//   scripts.rs   Skripte of hosts: the device's scripts, a code editor with diagnostics, run,
-//                stop, apply, their output and errors (ids ID_SCRIPTS0 + 0x400 k ..)
+//   scripts.rs   IDE of hosts (once Skripte): a thin wrapper around the IDE (workspace/ide:
+//                Explorer, tabs, language services, run, debug, tests; ids ID_IDE0 + 0x1000 k ..)
 //   files.rs     Dateien: the device's files (flash:, nvram:, the Linux tree) with their text,
 //                delete, import, export (ids ID_FILES0 + 0x180 k ..)
 //   email.rs     the E-Mail program of the Desktop: account, inbox, sent, write, answer, send,
 //                fetch (ids ID_MAIL0 + 0x400 k ..)
 //   mib.rs       the MIB-Browser of the Desktop: the MIB's objects, Get, GetNext, Walk and Set
 //                as commands on the console (ids ID_MIB0 + 0x400 k ..)
-//   scriptls.rs  the language services of the Skripte tab's editor (lib/script's script::ls
-//                with the simulator's host names): completion, hover, signature help,
-//                folding, the outline, go to definition, rename, format
+//   scriptls.rs  the language services of the IDE's editor (lib/script's script::ls with the
+//                simulator's host names and the device's files for imports): completion,
+//                hover, signature help, folding, the outline, go to definition, rename, format
 //
 // Übersicht shows model, ports, power and state; Schnittstellen every interface as the
 // simulator runs it (the inspector's rows, with frame counters); CLI the device's console --
@@ -83,7 +84,7 @@ impl Tab {
             Tab::Services => "Dienste",
             Tab::Cli => "CLI",
             Tab::Desktop => "Desktop",
-            Tab::Scripts => "Skripte",
+            Tab::Scripts => "IDE",
             Tab::Files => "Dateien",
         })
     }
@@ -124,8 +125,8 @@ pub(crate) struct DevWin {
     pub desk: desktop::Desk,
     /// opened at (the oldest gives its place up)
     age: u32,
-    /// the Skripte tab
-    pub scr: scripts::Pane,
+    /// the IDE tab (workspace/ide)
+    pub ide: crate::workspace::ide::Pane,
     /// the Dateien tab's grid
     pub files: GridState,
 }
@@ -135,20 +136,25 @@ pub(crate) struct DevWins {
     clock: u32,
     /// the settings editor of a service (svcedit.rs)
     pub svc: svcedit::SvcEdit,
-    /// the scripts being edited, of every window (they outlive a closed window)
-    pub drafts: scripts::Drafts,
+    /// the IDE's drafts and breakpoints, of every window (they outlive a closed window)
+    pub ide: crate::workspace::ide::Ides,
     /// the Dateien tab's file dialog
     pub files: files::FilesUi,
 }
 
 impl DevWins {
     pub(crate) fn new() -> DevWins {
-        DevWins { wins: (0..DEVWINS).map(|_| None).collect(), clock: 0, svc: svcedit::SvcEdit::new(), drafts: scripts::Drafts::new(), files: files::FilesUi::new() }
+        DevWins { wins: (0..DEVWINS).map(|_| None).collect(), clock: 0, svc: svcedit::SvcEdit::new(), ide: crate::workspace::ide::Ides::new(), files: files::FilesUi::new() }
     }
 
     /// device window k (for the tabs' modules)
     pub(crate) fn get(&mut self, k: usize) -> Option<&mut DevWin> {
         self.wins.get_mut(k).and_then(|w| w.as_mut())
+    }
+
+    /// device window k to look at
+    pub(crate) fn peek(&self, k: usize) -> Option<&DevWin> {
+        self.wins.get(k).and_then(|w| w.as_ref())
     }
 }
 
@@ -188,7 +194,7 @@ pub(crate) fn open(n: &mut Net, ui: &mut Ui, dev: u32) {
         cfg: config::Form::new(),
         desk: desktop::Desk::new(),
         age: w.clock,
-        scr: scripts::Pane::new(dev),
+        ide: crate::workspace::ide::Pane::new(dev),
         files: GridState::default(),
     });
     ui.window_activate(base(k));
@@ -210,8 +216,9 @@ pub(crate) fn open_on(n: &mut Net, ui: &mut Ui, dev: u32, tab: Tab) {
 pub(crate) fn shows(n: &Net, dev: u32) -> Option<u32> {
     n.devwin.wins.iter().enumerate().find_map(|(k, x)| {
         let x = x.as_ref()?;
-        // the desktop's prompt and the MIB-Browser (mib.rs) draw the console too
-        let console = x.tab == Tab::Cli || (x.tab == Tab::Desktop && matches!(x.desk.app, desktop::App::Prompt | desktop::App::Mib));
+        // the desktop's prompt and the MIB-Browser (mib.rs) draw the console too, and the
+        // IDE's Terminal
+        let console = x.tab == Tab::Cli || (x.tab == Tab::Desktop && matches!(x.desk.app, desktop::App::Prompt | desktop::App::Mib)) || (x.tab == Tab::Scripts && crate::workspace::ide::shows_console(n, k, dev));
         (x.dev == dev && x.open.get() != 0 && console).then(|| base(k))
     })
 }
@@ -271,7 +278,7 @@ fn window(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
             ui.box_end();
         }
         Tab::Desktop => desktop::tab(n, ui, k, id + 0x80, dev),
-        Tab::Scripts => scripts::tab(n, ui, k, ID_SCRIPTS0 + 0x400 * k as u32, dev),
+        Tab::Scripts => scripts::tab(n, ui, k, dev),
         Tab::Files => files::tab(n, ui, k, dev),
     }
     ui.box_end();

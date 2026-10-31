@@ -39,6 +39,9 @@
 // steps (P1).
 // groups.rs: the groups of the canvas and its background picture as steps (G1); view data the
 // simulator never sees.
+// ide.rs: the IDE's steps on a device's files and script services (IDE1): saving, new files and
+// folders, renaming, deleting, replacing in files, an inline script converted into a file, a
+// service bound to a file.
 
 pub(crate) mod autosave;
 pub(crate) mod config;
@@ -52,6 +55,7 @@ pub(crate) mod assess;
 pub(crate) mod wlan;
 pub(crate) mod phys;
 pub(crate) mod groups;
+pub(crate) mod ide;
 
 use alloc::boxed::Box;
 use alloc::string::String;

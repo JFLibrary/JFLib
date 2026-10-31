@@ -94,6 +94,8 @@ pub struct Engine {
     pub(crate) wlan: crate::wlan::WlanState,
     /// the cables' lengths and the ones too long or with optics that do not fit (phys.rs)
     pub(crate) phys: crate::phys::PhysState,
+    /// the last run of `jfs --test` per device (cli/jfstest.rs)
+    pub(crate) jfs_tests: BTreeMap<u32, crate::cli::jfstest::TestRun>,
 }
 
 impl Engine {
@@ -119,6 +121,7 @@ impl Engine {
             series: crate::series::Sampler::default(),
             wlan: crate::wlan::WlanState::default(),
             phys: crate::phys::PhysState::default(),
+            jfs_tests: BTreeMap::new(),
         }
     }
     /// the virtual time

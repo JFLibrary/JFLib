@@ -29,6 +29,9 @@
 //   context_target() -> id              the widget whose context menu is open
 //   menu_item(id, label) -> EV          row inside a flyout (next_icon, next_flags
 //                                       ST_DISABLED / ST_CHECKED); activation closes popups
+//   menu_item_keys(id, label, keys) -> EV   the same with the text of its keys at the row's
+//                                       end, for keys the app's own widgets handle (IDE1)
+//   key_text(vk, mods) -> "Strg+Umschalt+S"   a key as the accelerator texts write it
 //   menu_cmd(cmd) -> EV   menu_sep()    a row for a command (queues it), a separator
 //   menu_list(base, rows)               the rows of the Mi::List with that base (the asm's
 //                                       app-owned STRLIST buffer)
@@ -1200,6 +1203,33 @@ impl Ui {
             self.pp_dismiss_all();
         }
         ev
+    }
+
+    /// menu_item with `keys` (key_text) at the end of the row: a row whose keys the app
+    /// handles itself (no command of the table)
+    #[cfg_attr(jfgui_dev, track_caller)]
+    pub fn menu_item_keys(&mut self, id: u32, label: &str, keys: &str) -> u32 {
+        let _src = self.src_scope();
+        let f = self.take_flags();
+        let mut mf = 0;
+        if f & ST_DISABLED != 0 {
+            mf |= MIF_DISABLED;
+        }
+        if f & ST_CHECKED != 0 {
+            mf |= MIF_CHECKED;
+        }
+        let icon = self.take_icon();
+        let ev = self.mitem(id, label, icon, if keys.is_empty() { None } else { Some(keys) }, mf);
+        if ev & EV_ACT != 0 {
+            self.pp_dismiss_all();
+        }
+        ev
+    }
+
+    /// a key with modifiers (MOD_*) as the accelerator texts write it: "Strg+Umschalt+S",
+    /// "F5" (the UI language's names; accel_order_set holds)
+    pub fn key_text(&self, vk: u32, mods: u32) -> String {
+        self.accel_fmt(&Command::new(0, "", 0, mods, vk, 0), 64)
     }
 
     /// ui_menu_cmd(cmd) -> EV_*: menu row for a command (widget id = command id)
