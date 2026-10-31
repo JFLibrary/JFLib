@@ -1,7 +1,8 @@
 // fontpicktest -- the system's fonts in the UI: generic families and substitutes
 // (text::fontconf), loading a choice (ui.font_load), the font picker and the font dialog
 // (ui/fontpick.rs), the system's font smoothing and its subpixel order; for tests/picker.uis,
-// dialog.uis, aa.uis, subpixel_*.uis, var_dialog*.uis (variable fonts: named instances, axes)
+// dialog.uis, aa.uis, subpixel_*.uis, var_dialog*.uis (variable fonts: named instances, axes),
+// var_cff2.uis (CFF2 variable fonts: the preview at an instance like its CFF comparison font)
 //
 //   build/win/fontpicktest.exe --script apps/fontpicktest/tests/picker.uis
 //   build/win/fontpicktest.exe        (a window on the system's fonts)

@@ -3851,7 +3851,8 @@ Script syntax (one command per line, '#' starts a comment; coordinates in DIP):
                                 of the last `theme file` contains TEXT
   expect style NAME   expect token NAME #RRGGBB|#AARRGGBB (a colour token now)
   expect pixel X Y #RRGGBB      the main window's pixel at (X, Y), rendered now
-  expect same FILE.png          the main window rendered now has the pixels of that shot
+  expect same FILE.png [X Y W H]   the main window (that part of it, DIP) rendered now has
+                                the pixels of that shot (one taken with the same crop)
   print TEXT      echo
   bench N         time N frames (build, full render, unchanged frame) with the real clock
   bench N anim [MAX_US]   N frames 16 ms apart on the virtual clock (timers, animations):
@@ -11170,13 +11171,20 @@ FONT_ICON: u32 = 3
 Source: [`lib/text/cff.rs`](../lib/text/cff.rs)
 
 ```text
-cff -- CFF ('CFF ' table of OpenType fonts): Type 2 charstrings -> cubic outlines
-                                                                       [src/text/cff.s]
+cff -- CFF and CFF2 ('CFF ' / 'CFF2' tables of OpenType fonts): Type 2 charstrings -> cubic
+outlines                                                               [src/text/cff.s]
 
-  Cff::open(table, upem) -> context / ERR_*   the header, Top DICT, CharStrings, global and
-       local subrs, CID-keyed FDArray / FDSelect (formats 0 and 3), FontMatrix
+  Cff::open(table, upem) -> context / ERR_*   CFF: the header, Top DICT, CharStrings, global
+       and local subrs, CID-keyed FDArray / FDSelect (formats 0 and 3), FontMatrix
+  Cff::open2(table, upem) -> context / ERR_*  CFF2: the header and the Top DICT right after
+       it (no Name / String INDEX), INDEXes with 32-bit counts, CharStrings, global subrs,
+       FDArray (each font DICT's Private DICT: Subrs and vsindex; blend in its values),
+       FDSelect (formats 0, 3 and 4; none: font DICT 0), the VariationStore (vstore),
+       maxstack, FontMatrix
   outline(table, glyph, ol) -> false on error   run the charstring, points into the outline
        buffer (OLT_ON / OLT_CUBIC, font units)
+  outline_var(table, glyph, coords, ol)   the same at a CFF2 instance's normalized
+       coordinates (F2Dot14 per axis, avar applied: var.rs normalize; empty = the default)
 
 Type 2 operators: all path operators (r/h/v moveto, lineto, rrcurveto, hh/vv/hv/vh curveto,
 rcurveline, rlinecurve, flex, hflex, hflex1, flex1), hint operators (stems are counted for
@@ -11184,18 +11192,36 @@ hintmask / cntrmask and skipped), callsubr / callgsubr (bias 107 / 1131 / 32768,
 <= 10), return, endchar (a seac accent is ignored), the arithmetic / storage operators
 (abs add sub div neg eq drop put get ifelse random mul sqrt dup exch index roll and or
 not).  Argument stack 48, transient array 32, at most 200000 operators per glyph.  The
-width argument is dropped (advances come from hmtx).  CFF2 is not supported.  Like the
-assembly, the transient array and the random generator are process-wide.
+width argument is dropped (advances come from hmtx).  Like the assembly, the transient
+array and the random generator are process-wide.
+
+CFF2 charstrings: no width argument, no endchar (the charstring ends with its data, a subr
+too; return and endchar are still accepted, as are the arithmetic operators, like FreeType),
+vsindex (before the first blend; else the Private DICT's, default 0) and blend: n values,
+n x k deltas, n -> the n values default + sum(delta x scalar), k = the regions of that item
+variation data, their scalars at coords (var.rs ivs_scalars: HarfBuzz's region rules, f32).
+Argument stack maxstack (default 193, here 193 ..= 513), at most 512 regions per item
+variation data, a vsindex after a blend is an error.  Advances come from hmtx + HVAR
+(ttf.rs); hints are skipped (CFF2 outlines are not hinted, like CFF ones).
 ```
 
 - **`struct Cff`**
 
 **`impl Cff`**
 
+- **`fn is_v2(&self) -> bool`**
+  a CFF2 table (its outline() takes normalized coordinates)
+- **`fn varies(&self) -> bool`**
+  a CFF2 table with a variation store: its outlines vary
 - **`fn open(t: Tb, upem: u32) -> Result<Cff, i32>`**
   cff_open: ERR_HDR (malformed) / ERR_UNSUPPORTED (not CFF 1 / not Type 2 charstrings)
+- **`fn open2(t: Tb, upem: u32) -> Result<Cff, i32>`**
+  cff2_open: ERR_HDR (malformed) / ERR_UNSUPPORTED (not CFF2)
 - **`fn outline(&self, t: Tb, glyph: u32, ol: &mut Outline) -> bool`**
   run the charstring of glyph into the outline buffer: false = malformed  [cff_outline]
+- **`fn outline_var(&self, t: Tb, glyph: u32, coords: &[i16], ol: &mut Outline) -> bool`**
+  outline at a CFF2 instance's normalized coordinates (empty: the default instance; CFF
+  ignores them)
 
 ### `text/colr.rs`
 
@@ -11540,7 +11566,8 @@ fontdb -- system font database: enumerate the installed fonts, group them into f
 match styles, cache the result                                      [src/text/fontdb.s]
 
   scan(flags) -> faces found      walk the font folders (recursively, depth <= 8) and read
-       only the table directory, name, OS/2 and head of every .ttf / .otf / .ttc / .otc;
+       only the table directory, name, OS/2 and head of every .ttf / .otf / .ttc / .otc
+       (faces with glyf, CFF, CFF2 or CBDT outlines; every face of a collection);
        files already in a loaded cache with the same size are not opened again (flags
        FDB_RESCAN: ignore the cache).  Folders: jfgui_FONTDIRS (';' separated, on Linux
        also ':'), else Windows %WINDIR%/Fonts and %LOCALAPPDATA%/Microsoft/Windows/Fonts;
@@ -11572,11 +11599,13 @@ match styles, cache the result                                      [src/text/fo
   save_cache(path) / load_cache(path) -> 0 / -1
 
 Families group faces by the legacy family name (name ID 1); names prefer German, then
-English.  Cache file (little endian): "FDB1", u32 version 2, u32 files, u32 faces, u32
+English.  Cache file (little endian): "FDB1", u32 version 3, u32 files, u32 faces, u32
 pool bytes, u64 FNV-1a hash of everything after the 28-byte header; files {u32 path, u32
 size, u32 first face, u32 faces}; faces {u32 file, u32 face index, u16 weight, u16 flags,
 u32 family, u32 style, u32 full, u32 typo family, u32 0}; pool of NUL-terminated UTF-8
 strings (offsets above point into it).  Entries are validated by path and file size.
+Version 3: CFF2 faces count (a version 2 cache lists CFF2-only files without faces, so it
+is not read).
 ```
 
 ```rust
@@ -11588,6 +11617,8 @@ FDFF_CFF: u16 = 8
 FDFF_COLOR: u16 = 16
 FDFF_VAR: u16 = 32
 FDFF_SYMBOL: u16 = 64
+/// CFF2 outlines (FDFF_CFF is set as well)
+FDFF_CFF2: u16 = 128
 ```
 
 - **`struct FdFace`**
@@ -12189,8 +12220,8 @@ WK_PUNCT: u32 = 2
 Source: [`lib/text/ttf.rs`](../lib/text/ttf.rs)
 
 ```text
-ttf -- sfnt loader for runtime fonts: TrueType (glyf), OpenType (CFF outlines via cff.rs),
-collections (TTC / OTC), colour tables (colr.rs)                      [src/text/ttf.s]
+ttf -- sfnt loader for runtime fonts: TrueType (glyf), OpenType (CFF and CFF2 outlines via
+cff.rs), collections (TTC / OTC), colour tables (colr.rs)             [src/text/ttf.s]
 
   face_count(data) -> faces (1 for a plain sfnt, n for a TTC / OTC) / ERR_*
   TtFont::open(data, face, ol, serial) -> the font context / ERR_*
@@ -12201,8 +12232,9 @@ collections (TTC / OTC), colour tables (colr.rs)                      [src/text/
        Mac Roman English
 
 Errors: ERR_TRUNC (too short / truncated directory), ERR_HDR (not an sfnt, bad head /
-maxp), ERR_UNSUPPORTED (no usable outlines: e.g. CFF2 only), ERR_FAIL (face index out of
-range), ERR_LIMIT (file >= 2 GB).
+maxp, a broken CFF / CFF2 table), ERR_UNSUPPORTED (no usable outlines), ERR_FAIL (face
+index out of range), ERR_LIMIT (file >= 2 GB).  A font with both: CFF2 before 'CFF ' (like
+HarfBuzz and FreeType), 'CFF ' when the CFF2 table does not open.
 
 Tables: head, hhea, hmtx, maxp, loca, glyf (simple + composite: offsets, scale, x/y scale,
 2x2, point matching, SCALED_COMPONENT_OFFSET; nesting <= 16, <= 4096 components per
@@ -12219,13 +12251,15 @@ Variable fonts (var.rs): fvar / avar / gvar / HVAR / MVAR / GDEF's store are rea
 (var); the plain calls give the default instance, the *_var calls an instance at
 normalized coordinates (registry.rs: VarFont):
   prep_var(g, coords, serial, ol)    the outline with gvar deltas (simple glyphs: points with
-       IUP; composites: the component offsets), shifted by its varied phantom point pp1
+       IUP; composites: the component offsets), shifted by its varied phantom point pp1; a
+       CFF2 font's charstrings with blend at coords (cff.rs)
   adv_var(g, coords)                 hmtx + HVAR; without HVAR: hmtx + the phantom points'
        deltas (adv_table: every glyph at once)
   kern_var(g1, g2, coords)           GPOS pair values + their VariationIndex deltas (GDEF)
   metrics_var(coords, wght, ol)      FONTMETRICS + header with MVAR deltas (hasc / hdsc /
        hlgp on hhea and OS/2, hcla, hcld, xhgt, cpht, undo, unds, stro, strs)
-CFF2 outlines are not supported (no usable outlines: ERR_UNSUPPORTED).
+A CFF2 font's advances: hmtx + HVAR (CFF2 has no phantom points); without fvar its outlines
+are the default's.
 ```
 
 ```rust
@@ -12257,6 +12291,7 @@ TT_CPAL: usize = 14
 TT_CBDT: usize = 15
 TT_CBLC: usize = 16
 TT_FVAR: usize = 17
+TT_CFF2: usize = 18
 TT_AVAR: usize = 20
 TT_GVAR: usize = 21
 TT_HVAR: usize = 22
@@ -12370,13 +12405,17 @@ variation store HVAR, MVAR and GDEF share
   hvar_delta(hvar, glyph, coords)    the advance delta (HVAR, with or without its mapping)
   mvar_delta(mvar, tag, coords)      a font-wide metric's delta (MVAR)
   gdef_delta(gdef, outer, inner, coords)   a GPOS VariationIndex delta (GDEF's store)
+  ivs_scalars(t, store, outer, coords, max, out), ivs_region_count(t, store, outer)   CFF2
+       (cff.rs): the region scalars of one item variation data for blend, its region count
+       for a Private DICT's blend
 
 Every offset is checked against its table (gvar data against the glyph's own range).
 Broken gvar data of a glyph: false (the glyph comes out empty, like broken glyf data);
 broken HVAR / MVAR / store data: no delta.  Bounded work: a glyph whose tuples x points
 exceed VAR_BUDGET counts as broken; a store row whose regions x axes exceed IVS_WORK has
-no delta.  Not supported: avar version 2 beyond its segment maps, CFF2 outlines (such
-fonts do not load), VVAR (no vertical layout).
+no delta (a CFF2 blend: the glyph is broken).  CFF2 outlines vary through cff.rs's blend at
+the same coordinates (advances: hmtx + HVAR).  Not supported: avar version 2 beyond its
+segment maps, VVAR (no vertical layout).
 ```
 
 ```rust

@@ -15,13 +15,17 @@
 //   hvar_delta(hvar, glyph, coords)    the advance delta (HVAR, with or without its mapping)
 //   mvar_delta(mvar, tag, coords)      a font-wide metric's delta (MVAR)
 //   gdef_delta(gdef, outer, inner, coords)   a GPOS VariationIndex delta (GDEF's store)
+//   ivs_scalars(t, store, outer, coords, max, out), ivs_region_count(t, store, outer)   CFF2
+//        (cff.rs): the region scalars of one item variation data for blend, its region count
+//        for a Private DICT's blend
 //
 // Every offset is checked against its table (gvar data against the glyph's own range).
 // Broken gvar data of a glyph: false (the glyph comes out empty, like broken glyf data);
 // broken HVAR / MVAR / store data: no delta.  Bounded work: a glyph whose tuples x points
 // exceed VAR_BUDGET counts as broken; a store row whose regions x axes exceed IVS_WORK has
-// no delta.  Not supported: avar version 2 beyond its segment maps, CFF2 outlines (such
-// fonts do not load), VVAR (no vertical layout).
+// no delta (a CFF2 blend: the glyph is broken).  CFF2 outlines vary through cff.rs's blend at
+// the same coordinates (advances: hmtx + HVAR).  Not supported: avar version 2 beyond its
+// segment maps, VVAR (no vertical layout).
 
 use alloc::string::String;
 use alloc::vec;
@@ -709,6 +713,66 @@ fn region_factor(v: i32, start: i32, peak: i32, end: i32) -> f32 {
         return 0.0;
     }
     if v < peak { (v - start) as f32 / (peak - start) as f32 } else { (end - v) as f32 / (end - peak) as f32 }
+}
+
+// item variation data `outer` of the store at s -> (its offset, the region list's offset, its
+// regionIndexCount)
+fn ivs_data(t: Tb, s: u32, outer: u32) -> Option<(u32, u32, u32)> {
+    if s == 0 || r16(t, s)? != 1 {
+        return None;
+    }
+    let rl = s.checked_add(r32(t, s.checked_add(2)?)?)?;
+    if outer >= r16(t, s.checked_add(6)?)? {
+        return None;
+    }
+    let d = s.checked_add(r32(t, at(s.checked_add(8)?, outer, 4)?)?)?;
+    Some((d, rl, r16(t, d.checked_add(4)?)?))
+}
+
+/// CFF2 (a DICT's blend): the number of regions item variation data `outer` of the store at s
+/// lists; None: no such data
+pub(crate) fn ivs_region_count(t: Tb, s: u32, outer: u32) -> Option<u32> {
+    Some(ivs_data(t, s, outer)?.2)
+}
+
+/// CFF2 (a charstring's blend): the scalars at coords of the regions that item variation data
+/// `outer` of the store at s lists, in its order, into out (all 0 at the default instance);
+/// None: a broken store or data, more than max regions, regions x axes beyond IVS_WORK
+pub(crate) fn ivs_scalars(t: Tb, s: u32, outer: u32, coords: &[i16], max: usize, out: &mut Vec<f32>) -> Option<()> {
+    out.clear();
+    let (d, rl, rc) = ivs_data(t, s, outer)?;
+    if rc as usize > max {
+        return None;
+    }
+    let axes = r16(t, rl)?;
+    let nreg = r16(t, rl.checked_add(2)?)?;
+    if rc.saturating_mul(axes.max(1)) > IVS_WORK {
+        return None;
+    }
+    let zero = coords.iter().all(|&c| c == 0);
+    let recs = rl.checked_add(4)?;
+    for k in 0..rc {
+        let ri = r16(t, at(d.checked_add(6)?, k, 2)?)?;
+        if ri >= nreg {
+            return None;
+        }
+        let mut sc = if zero { 0.0f32 } else { 1.0 };
+        if !zero {
+            for a in 0..axes {
+                let rec = at(recs, ri * axes + a, 6)?;
+                let (st, pk, en) = (s16(t, rec)?, s16(t, rec.checked_add(2)?)?, s16(t, rec.checked_add(4)?)?);
+                let v = coords.get(a as usize).copied().unwrap_or(0) as i32;
+                let f = region_factor(v, st, pk, en);
+                if f == 0.0 {
+                    sc = 0.0;
+                    break;
+                }
+                sc *= f;
+            }
+        }
+        out.push(sc);
+    }
+    Some(())
 }
 
 // the delta (outer, inner) of the item variation store at s

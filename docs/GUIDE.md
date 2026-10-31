@@ -1426,11 +1426,15 @@ if (desc.render)(&args, &mut dst) == 0 {
   styles carry over, unloading the font unloads its instances), `vary_named(id, i)`,
   `var_values(id)` (user units) and `var_coords(id)` (normalized F2Dot14, as HarfBuzz reports
   them). `FontDb::variations(face)` gives the axes and instances of an installed face. What
-  varies: TrueType outlines (gvar), advances (HVAR, else the phantom points), kerning (GPOS
-  variation deltas), avar, the metrics of MVAR; the coordinates, outlines and advances match
-  HarfBuzz. Not supported: CFF2 outlines (such fonts do not load), avar 2 beyond its segment
-  maps, VVAR. `font_load` keeps the instances of its 64 most recent variable choices; older
-  ones are unloaded again (ask `font_load` each frame instead of keeping its ids).
+  varies: TrueType outlines (gvar), CFF2 outlines (`blend` in the charstrings, e.g. Noto Sans /
+  Serif CJK VF, which Fedora installs), advances (HVAR, else the phantom points of TrueType
+  fonts), kerning (GPOS variation deltas), avar, the metrics of MVAR; the coordinates,
+  outlines and advances match HarfBuzz. CFF2 fonts (`.otf`, and collections `.ttc` / `.otc`
+  whose faces share one CFF2 table) load, are found by `FontDb` (flag `FDFF_CFF2`) and the
+  fallback like other faces; their outlines are not hinted (like CFF ones). Not supported:
+  avar 2 beyond its segment maps, VVAR. `font_load` keeps the instances of its 64 most recent
+  variable choices; older ones are unloaded again (ask `font_load` each frame instead of
+  keeping its ids).
 
   ```rust
   let mut sel = FontSel::new("Bahnschrift", 12.0);
@@ -1501,7 +1505,7 @@ in DIP):
 | `size W H`, `theme dark\|light\|contrast`, `scale P [window ID]` | window size, theme, dpi |
 | `theme file PATH`, `theme none`, `style NAME` | an app theme from a file (an error is printed and remembered, the theme stays), none, another linked style (§34) |
 | `expect theme "NAME"\|none`, `expect theme error "TEXT"\|none`, `expect style NAME` | the app theme, the error of the last `theme file` (contains TEXT), the style in use |
-| `expect token NAME #RRGGBB\|#AARRGGBB`, `expect pixel X Y #RRGGBB`, `expect same FILE.png` | a colour token now (`bg`, `accent_text`, ...), the rendered colour at a point of the main window (DIP), the main window rendered now has the pixels of an earlier `shot` |
+| `expect token NAME #RRGGBB\|#AARRGGBB`, `expect pixel X Y #RRGGBB`, `expect same FILE.png [X Y W H]` | a colour token now (`bg`, `accent_text`, ...), the rendered colour at a point of the main window (DIP), the main window (with X Y W H: that part, DIP) rendered now has the pixels of an earlier `shot` (taken with the same crop) |
 | `expect S exists\|missing\|hover\|focused\|checked\|unchecked\|disabled\|enabled\|selected\|open\|pressed` | widget states |
 | `expect S value N`, `expect S max N`, `expect S text "s"`, `expect S rect X Y W H` | values, texts, rectangles (DIP; `*` takes any value: `rect * * * 36`) |
 | `shot FILE.png [window ID\|desktop] [X Y W H]`, `dump [FILE]`, `print TEXT`, `bench N`, `quit` | output |

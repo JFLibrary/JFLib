@@ -1,5 +1,5 @@
-// ttf -- sfnt loader for runtime fonts: TrueType (glyf), OpenType (CFF outlines via cff.rs),
-// collections (TTC / OTC), colour tables (colr.rs)                      [src/text/ttf.s]
+// ttf -- sfnt loader for runtime fonts: TrueType (glyf), OpenType (CFF and CFF2 outlines via
+// cff.rs), collections (TTC / OTC), colour tables (colr.rs)             [src/text/ttf.s]
 //
 //   face_count(data) -> faces (1 for a plain sfnt, n for a TTC / OTC) / ERR_*
 //   TtFont::open(data, face, ol, serial) -> the font context / ERR_*
@@ -10,8 +10,9 @@
 //        Mac Roman English
 //
 // Errors: ERR_TRUNC (too short / truncated directory), ERR_HDR (not an sfnt, bad head /
-// maxp), ERR_UNSUPPORTED (no usable outlines: e.g. CFF2 only), ERR_FAIL (face index out of
-// range), ERR_LIMIT (file >= 2 GB).
+// maxp, a broken CFF / CFF2 table), ERR_UNSUPPORTED (no usable outlines), ERR_FAIL (face
+// index out of range), ERR_LIMIT (file >= 2 GB).  A font with both: CFF2 before 'CFF ' (like
+// HarfBuzz and FreeType), 'CFF ' when the CFF2 table does not open.
 //
 // Tables: head, hhea, hmtx, maxp, loca, glyf (simple + composite: offsets, scale, x/y scale,
 // 2x2, point matching, SCALED_COMPONENT_OFFSET; nesting <= 16, <= 4096 components per
@@ -28,13 +29,15 @@
 // (var); the plain calls give the default instance, the *_var calls an instance at
 // normalized coordinates (registry.rs: VarFont):
 //   prep_var(g, coords, serial, ol)    the outline with gvar deltas (simple glyphs: points with
-//        IUP; composites: the component offsets), shifted by its varied phantom point pp1
+//        IUP; composites: the component offsets), shifted by its varied phantom point pp1; a
+//        CFF2 font's charstrings with blend at coords (cff.rs)
 //   adv_var(g, coords)                 hmtx + HVAR; without HVAR: hmtx + the phantom points'
 //        deltas (adv_table: every glyph at once)
 //   kern_var(g1, g2, coords)           GPOS pair values + their VariationIndex deltas (GDEF)
 //   metrics_var(coords, wght, ol)      FONTMETRICS + header with MVAR deltas (hasc / hdsc /
 //        hlgp on hhea and OS/2, hcla, hcld, xhgt, cpht, undo, unds, stro, strs)
-// CFF2 outlines are not supported (no usable outlines: ERR_UNSUPPORTED).
+// A CFF2 font's advances: hmtx + HVAR (CFF2 has no phantom points); without fvar its outlines
+// are the default's.
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
@@ -90,6 +93,7 @@ pub const TT_CPAL: usize = 14;
 pub const TT_CBDT: usize = 15;
 pub const TT_CBLC: usize = 16;
 pub const TT_FVAR: usize = 17;
+pub const TT_CFF2: usize = 18;
 pub const TT_AVAR: usize = 20;
 pub const TT_GVAR: usize = 21;
 pub const TT_HVAR: usize = 22;
@@ -495,10 +499,16 @@ impl TtFont {
         // ---- outlines
         if f.tab[TT_GLYF].1 != 0 && f.tab[TT_LOCA].1 != 0 {
             f.kind = TFK_TTF;
-        } else if f.tab[TT_CFF].1 != 0 {
+        } else if f.tab[TT_CFF2].1 != 0 || f.tab[TT_CFF].1 != 0 {
             f.kind = TFK_CFF;
-            let cff = Cff::open(f.tb(TT_CFF), f.upem)?;
-            f.cff = Some(Box::new(cff));
+            let mut r = Err(ERR_UNSUPPORTED);
+            if f.tab[TT_CFF2].1 != 0 {
+                r = Cff::open2(f.tb(TT_CFF2), f.upem);
+            }
+            if r.is_err() && f.tab[TT_CFF].1 != 0 {
+                r = Cff::open(f.tb(TT_CFF), f.upem);
+            }
+            f.cff = Some(Box::new(r?));
         } else if f.tab[TT_CBDT].1 != 0 {
             f.kind = TFK_TTF; // bitmap-only colour fonts have no outlines at all
         } else {
@@ -1242,10 +1252,11 @@ impl TtFont {
         self.prep_at(glyph, &[], self.serial, ol)
     }
 
-    /// prep at normalized coordinates (gvar; CFF outlines stay the default's), the buffer's
-    /// owner serial (an instance's own)
+    /// prep at normalized coordinates (gvar, CFF2 blend; CFF outlines stay the default's), the
+    /// buffer's owner serial (an instance's own)
     pub(crate) fn prep_var(&self, glyph: u32, coords: &[i16], serial: u64, ol: &mut Outline) -> bool {
-        let coords = if self.var.as_ref().is_some_and(|v| v.has_gvar()) { coords } else { &[] };
+        let varies = self.var.as_ref().is_some_and(|v| v.has_gvar()) || self.cff.as_ref().is_some_and(|c| c.varies());
+        let coords = if varies { coords } else { &[] };
         self.prep_at(glyph, coords, serial, ol)
     }
 
@@ -1253,7 +1264,7 @@ impl TtFont {
         ol.reset();
         let ok = if self.kind == TFK_CFF {
             match &self.cff {
-                Some(c) => c.outline(self.tb(TT_CFF), glyph, ol),
+                Some(c) => c.outline_var(self.tb(if c.is_v2() { TT_CFF2 } else { TT_CFF }), glyph, coords, ol),
                 None => false,
             }
         } else {
