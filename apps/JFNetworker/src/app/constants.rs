@@ -334,6 +334,7 @@ pub(crate) const TIMER_SCRIPT_CHECK: u32 = 0x160;
 /// the Skripte tab of device window k: ID_SCRIPTS0 + 0x400 k .. + 0x3FF (devwin/scripts.rs:
 /// + 0x20 the code editor, + 0x30 the output, + 0x40 the errors (rows + 1 + i), + 0x100 the
 /// list of scripts (rows + 1 + i))
+#[allow(dead_code)] // (IDE1: free since the IDE took the Skripte tab's place)
 pub(crate) const ID_SCRIPTS0: u32 = 0xD000;
 // ---- U6a: the lab in the window -- the Metriken panel, the badges and sparklines of the
 // canvas, faults in the inspector (commands 260 .. 299, widgets 0xB000 .. 0xBFFF, timers
@@ -589,6 +590,7 @@ pub(crate) const ID_MIB0: u32 = 0x0001_1000;
 /// Name umbenennen and its flyout, + 1 the new name, + 2 Umbenennen, + 3 Abbrechen, + 4
 /// Formatieren, + 5 Gliederung on / off, + 8 the split of the editor and the outline, + 0x40 the
 /// outline (rows + 1 + i))
+#[allow(dead_code)] // (IDE1: free since the IDE took the Skripte tab's place)
 pub(crate) const ID_SCRIPTLS0: u32 = 0x0001_4000;
 
 // ---- V2: the desktop of a host's device window (commands 750 .. 779, widgets 0x0001_6000 ..
@@ -608,3 +610,9 @@ pub(crate) const CMD_TERM_SESSION: u32 = 820;
 /// the consoles of further sessions: slot k takes ID_SES0 + 8 k .. + 7 (+ 1: its input line)
 pub(crate) const ID_SES0: u32 = 0x0001_A000;
 pub(crate) const SES_SLOTS: u32 = 192;
+// ---- IDE1: the IDE of a host (commands 780 .. 819, widgets 0x0001_8000 .. 0x0001_9FFF,
+// timers 0x1B0 .. 0x1B3; none of the commands and timers is used yet)
+/// the IDE in device window k: ID_IDE0 + 0x1000 k .. + 0xFFF (workspace/ide/mod.rs lists the
+/// parts)
+pub(crate) const ID_IDE0: u32 = 0x0001_8000;
+// (the IDE's check while typing keeps TIMER_SCRIPT_CHECK of the Skripte tab it replaces)

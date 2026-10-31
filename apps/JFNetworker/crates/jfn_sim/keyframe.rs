@@ -489,6 +489,8 @@ impl Footprint {
         f.series = e.series.footprint();
         f.rest = size_of::<Engine>() + e.jobs.len() * (size_of::<crate::jobs::Job>() + 256) + e.cli.jobs.len() * 48;
         f.rest += e.faults().len() * size_of::<crate::fault::FaultMark>() + 256;
+        // the records of `jfs --test` (cli/jfstest.rs)
+        f.rest += crate::cli::jfstest::tests_footprint(e);
         f.rest += (e.wlan.devs.len() + e.wlan.stas.len() + e.wlan.assocs.len()) * 256;
         f.rest += e.trace.hops().len() * (size_of::<crate::trace::Hop>() + 16);
         f

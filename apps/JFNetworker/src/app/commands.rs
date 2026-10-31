@@ -14,7 +14,7 @@
 // Werkzeuge: the tools with their single keys (V, H, C, N, P) and Einstellungen (Ctrl+,);
 // Hilfe: Tastenkürzel (F1), Info.  Simulation (F5) and Echtzeit (Shift+F5) switch the mode,
 // Ctrl+9 gives the topology the keyboard as Ctrl+1 .. 8 do for the panels.  The context menus of the canvas:
-// a cable (route, kind, Trennen), a device (Konsole öffnen, Gerätefenster, Skripte of a host,
+// a cable (route, kind, Trennen), a device (Konsole öffnen, Gerätefenster, IDE of a host,
 // Umbenennen, Eingeschaltet, Löschen), the background.  TIMER_SIM moves the simulator's clock, TIMER_ANIM
 // the simulation mode's animation.  The consoles' commands (CMD_CONSOLE .. CMD_LOG_CLEAR: tabs,
 // windows, the log) are workspace/terminal.rs's.  The labs (U6b, workspace/task.rs): Datei ›
@@ -124,7 +124,7 @@ pub(crate) static CMDS: [Command; 110] = [
     Command::new(CMD_TASK_PANEL, "&Aufgabe", IC_FLAG, MOD_CTRL | MOD_SHIFT, b'A' as u32, 0),
     Command::new(CMD_TASK_CHECK, "Ziele &prüfen", IC_ACCEPT, 0, VK_F9, CF_DISABLED),
     Command::new(CMD_TASK_HINT, "Nächster &Hinweis", IC_LIGHTBULB, 0, 0, CF_DISABLED),
-    Command::new(CMD_SCRIPTS, "&Skripte …", IC_DEV_TOOLS, 0, 0, CF_DISABLED | CF_HIDDEN),
+    Command::new(CMD_SCRIPTS, "&IDE …", IC_DEV_TOOLS, 0, 0, CF_DISABLED | CF_HIDDEN),
     Command::new(CMD_METRICS, "Me&triken", JN_METRICS, MOD_CTRL | MOD_SHIFT, b'M' as u32, 0),
     Command::new(CMD_HEAL_ALL, "Alle &Fehler beheben", IC_REPAIR, 0, 0, CF_DISABLED),
     Command::new(CMD_AUTHOR, "&Aufgabe erstellen …", IC_EDIT, 0, 0, 0),

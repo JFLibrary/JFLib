@@ -38,6 +38,8 @@
 //   SnmpTrapHost        an SNMP agent sends notifications to an address it has no route to
 //                       (warning; snmpd.rs)
 //   SnmpOpenRw          a community that may write and that every sender may use (warning)
+//   ScriptFile          a script service from a file whose file is missing or does not compile
+//                       (scriptsvc.rs, IDE1)
 //
 // Problem::text is German; Problem::msg is the same as a template with arguments for the app's
 // catalogue (jfn_model::msg).
@@ -125,6 +127,8 @@ pub enum ProblemKind {
     SnmpTrapHost,
     /// a read-write community without an access list or network
     SnmpOpenRw,
+    /// a script service's file is missing or does not compile (scriptsvc.rs)
+    ScriptFile,
 }
 
 /// a problem of the set-up
@@ -280,6 +284,7 @@ impl Engine {
         self.phys_problems(&mut out);
         self.mail_problems(&mut out);
         self.snmp_problems(&mut out);
+        self.script_problems(&mut out);
         out.sort_by(|a, b| (a.severity, a.dev, a.port, a.kind, &a.text).cmp(&(b.severity, b.dev, b.port, b.kind, &b.text)));
         out
     }

@@ -33,7 +33,8 @@
 //                                 saved configuration, a switched service, the script editor's
 //                                 steps; also their undo): keep_steps(dev, old, new, has)
 //                                 makes the Actions, a script's new source keeps its disk;
-//                                 its files too (Action::Files, also in sync: files never
+//                                 its files too (Action::Files, before the services: a script
+//                                 that starts from a file reads it; also in sync: files never
 //                                 restart a device)
 //   mode() / view_at() / view_time() / with_engine(f)   the simulation mode: the driver's
 //                                 mode, the moment the view shows, a change of the engine
@@ -798,6 +799,11 @@ impl Sim {
     /// (Doc::apply_kept); other changes of its services still restart it at the next sync
     pub(crate) fn keep(&mut self, d: &Device) {
         let Some(m) = self.devs.get(&d.id).cloned() else { return };
+        // the files as the project has them now (a transfer's step, its undo), before the
+        // services: a script that starts from a file reads it (the IDE's "In Datei umwandeln")
+        if m.files != d.files {
+            let _ = self.act(Action::Files { dev: d.id, files: d.files.clone() });
+        }
         let eng = &self.drv.eng;
         let steps = keep_steps(d.id, &m.services, &d.services, &|name: &str| eng.service::<jfn_sim::ScriptService>(d.id, name).is_some());
         for a in steps.iter().flatten() {
@@ -805,10 +811,6 @@ impl Sim {
         }
         if m.startup != d.startup_config {
             let _ = self.act(Action::Startup { dev: d.id, text: d.startup_config.clone() });
-        }
-        // the files as the project has them now (a transfer's step, its undo)
-        if m.files != d.files {
-            let _ = self.act(Action::Files { dev: d.id, files: d.files.clone() });
         }
         let services = if steps.is_some() { d.services.clone() } else { m.services.clone() };
         self.devs.insert(d.id, MDev { startup: d.startup_config.clone(), services, files: d.files.clone(), ..m });

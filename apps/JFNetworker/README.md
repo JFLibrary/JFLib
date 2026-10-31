@@ -45,12 +45,13 @@ Queues, Lastgeneratoren, eigene Skripte).
   Einleitung, Ziele als Checkliste, die der Simulator laufend prüft, Hinweise und Fortschritt;
   die Einstellungen der Dienste lassen sich im Gerätefenster als JSON bearbeiten (siehe
   [Labore und Aufgaben](#labore-und-aufgaben)).
-- **Skript-Editor (U7):** der Reiter Skripte im Gerätefenster eines Hosts: Code-Editor mit
-  Prüfung beim Tippen und den Fehlern des laufenden Programms an ihrer Zeile, Ausführen,
-  Stoppen, Übernehmen als Rückgängig-Schritt (das Skript behält Disk und Zahlen), Ausgabe und
-  Fehler des Laufs, Vorlagen; seit SK6 mit Vervollständigung, Hover, Signaturhilfe, Sprung zur
-  Deklaration, Umbenennen, Formatieren, Falten und Gliederung (siehe
-  [Skript-Editor](#skript-editor)).
+- **IDE (IDE1, vormals Skript-Editor U7):** der Reiter IDE im Gerätefenster eines Hosts: ein
+  Explorer über die Dateien des Geräts und die noch eingebetteten Skripte, Tabs mit Entwürfen,
+  die Sprachdienste von SK6 auch über Importe hinweg, Suchen und Ersetzen in Dateien, darunter
+  Ausgabe, Terminal, Probleme, Debugger und Tests; eine Datei läuft als Prozess (`jfs DATEI`) oder
+  als Dienst, der auf die Datei verweist (`"file"`), mit Haltepunkten, Schritten, Aufrufliste,
+  Variablen und Ausdrücken; die `test_…`-Funktionen einer Datei laufen mit `jfs --test` (siehe
+  [IDE](#ide)).
 - **Spanning Tree (R4):** STP (IEEE 802.1D) und RSTP (802.1w) auf den IOS-artigen Switches, je
   Switch eingeschaltet: Wahl der Root-Bridge, Rollen und Zustände, Proposal und Agreement,
   Edge-Ports, BPDU Guard, `show spanning-tree`, bernsteinfarbene LEDs an blockierten Ports
@@ -257,16 +258,17 @@ mit 150 % nach `build/jfnetworker/` auf.
 | `task.uis` | das Panel „Aufgabe“ am Labor des Loadbalancers: leer ohne Labor, die Liste der Labore, Titel und Ziele der Reihe nach, die Einleitung zum Einklappen, „Prüfen“ mit den Befunden, Hinweise nacheinander, der Fortschritt; gelöst im Fenster: das Kabel zu WEB3, das dritte Backend in den Einstellungen von LB1 (Text ohne JSON mit Zeile und Spalte abgelehnt, eine Einstellung, die der Simulator ablehnt), alle Ziele erreicht; Rückgängig lässt sie erreicht, „Simulation zurücksetzen“ fängt neu an |
 | `labs.uis` | die Labore auf Englisch (`--lang en`): die Liste, das Panel mit den Texten der Labordatei, F9 mit den Befunden, ein Hinweis, Strg+Umschalt+A; das Cache-Labor über die Einstellungen von CACHE1 gelöst, dann (nach „Änderungen speichern?“ mit Verwerfen) das Campus-Labor in den Konsolen von MLS1, R1, PC3 und PC4 |
 | `task_shots.uis` | Bilder der Liste der Labore, des Panels (das Labor der Shards nach „Prüfen“ mit einem Hinweis) und der Einstellungen eines KV-Knotens, hell und dunkel mit 100 und 150 % (`build/jfnetworker/task_*.png`) |
-| `script_editor.uis` | den Skript-Editor (siehe [Skript-Editor](#skript-editor)) auf `fixtures/scripts.jfnet`: der Reiter aus dem Kontextmenü, die Liste mit Zustand und Fehlern, der Laufzeitfehler in Zeile 13 als Marke und in der Fehlerliste (ein Klick setzt die Schreibmarke), die Ausgabe live, Tippen mit Prüfung nach einem Augenblick, F8 und Umschalt+F8, Strg+S lehnt einen Fehler ab und übernimmt, was sich übersetzen lässt (das Skript startet mit seiner Disk neu: „Start 2“), Rückgängig und Wiederholen („Start 3“, „Start 4“), Stoppen, Ausführen, Neu starten, Verwerfen, eine Vorlage (ihr Fehler: Port 7 ist belegt), Umbenennen, Löschen und Rückgängig, der Reiter Dienste |
-| `script_editor_en.uis` | den Skript-Editor auf Englisch: Kontextmenü, Reiter, Liste, Statuszeile, Meldungen, Ausgabe und Fehler, eine Vorlage auf PC1 mit englischen Kommentaren und Texten, die Tasten in der Übersicht (F1) |
-| `script_shots.uis` | die Bilder des Skript-Editors hell und dunkel mit 100 und 150 % (`build/jfnetworker/script_shots_*.png`) |
-| `script_ls.uis` | die Sprachdienste des Skript-Editors (SK6) auf `zaehler`: Hover über einem Namen des Simulators mit Beschreibung, die Vervollständigung von `metrics.ob` mit der Beschreibung unter der Liste, die Signaturhilfe und ihr Parameter, F12 und Strg+Klick zur Deklaration, Umbenennen über das Flyout (F2, ein Rückgängig-Schritt, die Ablehnung eines Schlüsselworts), Formatieren (Umschalt+Alt+F, ein Rückgängig-Schritt, die Ablehnung mit Syntaxfehler), die Gliederung (ein neues `fn`, ein Klick setzt die Schreibmarke, „Gliederung“ blendet sie aus) |
+| `script_editor.uis` | die eingebetteten Skripte in der IDE (siehe [IDE](#ide)) auf `fixtures/scripts.jfnet`: der Reiter IDE aus dem Kontextmenü, die Skripte im Explorer, der Laufzeitfehler in Zeile 13 als Marke und in Probleme (ein Klick setzt die Schreibmarke), die Ausgabe live, Tippen mit Prüfung nach einem Augenblick, F8 und Umschalt+F8, Strg+S lehnt einen Fehler ab und speichert, was sich übersetzen lässt (das Skript startet mit seiner Disk neu: „Start 2“), Rückgängig und Wiederholen („Start 3“, „Start 4“), Stoppen, Ausführen, Neu starten, eine Vorlage als neue Datei (als Dienst ausgeführt ihr Fehler: Port 7 ist belegt), Löschen und Rückgängig, der Reiter Dienste |
+| `script_editor_en.uis` | die IDE auf Englisch: Kontextmenü, Reiter, Explorer, Statuszeile, Meldungen in Problems, Output, die Namen der Werkzeugleiste, eine Vorlage als neue Datei auf PC1 mit englischen Kommentaren und Texten, die Tasten in der Übersicht (F1) |
+| `script_shots.uis` | die Bilder eines eingebetteten Skripts in der IDE hell und dunkel mit 100 und 150 % (`build/jfnetworker/script_shots_*.png`) |
+| `script_ls.uis` | die Sprachdienste in der IDE (SK6) auf `zaehler`: Hover über einem Namen des Simulators mit Beschreibung, die Vervollständigung von `metrics.ob` mit der Beschreibung unter der Liste, die Signaturhilfe und ihr Parameter, F12 und Strg+Klick zur Deklaration, Umbenennen über das Flyout (F2, ein Rückgängig-Schritt, die Ablehnung eines Schlüsselworts), Formatieren (Umschalt+Alt+F, ein Rückgängig-Schritt, die Ablehnung mit Syntaxfehler), die Gliederung der Seitenleiste (ein neues `fn`, ein Klick setzt die Schreibmarke) |
 | `script_ls_shots.uis` | die Bilder der Sprachdienste: die Vervollständigung von `net.`, die Signaturhilfe von `net.listen` hell und dunkel mit 100 und 150 %, das Flyout „Name umbenennen“ hell und dunkel (`build/jfnetworker/script_ls_*.png`) |
-| `model.uis`, Gruppe `scripted` | worauf der Skript-Editor baut: der Quelltext einer Definition als Zeilen oder Text und zurück, Namen, die Vorlagen (übersetzbar, Deutsch und Englisch), Übernehmen, Neu, Umbenennen und Löschen über die Rückgängig-Liste mit Disk und Zahlen des laufenden Skripts und ohne Neustart des Geräts, ein Skript, das der Simulator aus der Datei nicht nehmen konnte, `keep_steps`, die Marken auf bearbeitetem Text |
+| `model.uis`, Gruppe `scripted` | worauf die Skripte der IDE bauen: der Quelltext einer Definition als Zeilen oder Text und zurück, Namen, die Vorlagen (übersetzbar, Deutsch und Englisch), Übernehmen, Neu, Umbenennen und Löschen über die Rückgängig-Liste mit Disk und Zahlen des laufenden Skripts und ohne Neustart des Geräts, ein Skript, das der Simulator aus der Datei nicht nehmen konnte, `keep_steps`, die Marken auf bearbeitetem Text |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
-`campus.jfnet` (die Abnahme), `scripts.jfnet` (zwei Skripte auf SRV1 für den Skript-Editor) und
+`campus.jfnet` (die Abnahme), `scripts.jfnet` (zwei eingebettete Skripte auf SRV1), `ide.jfnet`
+(Dateien und ein Dienst aus einer Datei auf SRV1 für die IDE) und
 die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `metrics.uis` | der Bereich Metriken auf `lab_window.jfnet`: ohne Messwerte, nach 8 s Statuszeile, Kacheln und Diagramme (die Zusammenfassungen ihrer Einträge), die Tastatur im Baum und in den Diagrammen, die Werte beim Überfahren, ein auf der Zeichenfläche gewähltes Gerät, der Simulationsmodus auch in der Vergangenheit, die Sparklines ab 75 % (siehe [Das Labor im Fenster](#das-labor-im-fenster)) |
 | `faults.uis` | Fehler aus dem Inspektor auf `lab_window.jfnet`: Strom aus, Rückgängig und Wiederholen, Wiederherstellen und Alle wiederherstellen samt Rückgängig, ein Dienst für 2 s, die Disk, ein Kabel gezogen und verschlechtert, eine Partition, Ablehnungen, das Projekt bleibt gespeichert, die Spur „Fehler“ der Zeitleiste und der Fehler als Bereich im Diagramm von LB1 |
@@ -341,6 +343,16 @@ die Netze der Golden-Szenarien. Die Bausteine aus `lib/` prüft
 | `sessions_terminal.uis` | eine zweite Sitzung von ADMIN im Terminal-Panel („Neue Sitzung“, der Tab „ADMIN (2)“) mit eigenem Prompt und Verzeichnis, `tty`, `who` von der Konsole, Schließen des Tabs beendet sie |
 | `telnet_vty.uis` | Telnet von ADMINs Konsole zu R1 und zurück: das Passwort verdeckt, R1s Prompt in der Konsole, `show users`, `exit`, der Prompt der Shell wieder |
 | `sessions_shots.uis` | die Bilder der Sitzungen (ADMIN mit einer zweiten Sitzung, darin per Telnet an R1 mit `show users`) hell und dunkel mit 100 und 150 % (`build/jfnetworker/sessions_*.png`) |
+| `model.uis`, Gruppe `ide` | worauf die IDE baut (siehe [IDE](#ide)): ein Dienst aus einer Datei mit Importen neben ihr und `config.file`, `source` und `file` zugleich abgelehnt, eine fehlende Datei und eine, die sich nicht übersetzen lässt (Fehler, Status, `script errors`, Log, das Problem `ScriptFile`), Speichern ändert den laufenden Dienst nicht, ein Neustart liest die Datei, das Umwandeln eines eingebetteten Skripts als ein Schritt mit Rückgängig und Wiederholen (die Disk zählt weiter), Speichern, neue Datei und Ordner, Umbenennen, Löschen, ein Dienst zu einer Datei, Ersetzen in zwei Dateien als ein Schritt, `jfs --test` (Bericht, Ergebnisse, Exit-Code, eine Datei mit Fehler, die Zeitgrenze, ein Port für den nächsten Test), Determinismus, ein altes Projekt mit `source` unverändert, Suchen und Ersetzen mit ganzen Wörtern |
+| `ide_explorer.uis` | der Explorer der IDE auf `fixtures/ide.jfnet`: der Baum mit `/root` offen und dem eingebetteten Skript, eine neue Datei über das Flyout, ihr Tab und ihre Zeile mit „●“, Strg+S, F2 benennt um (der Tab geht mit), Entf löscht, Rückgängig des Projekts, ein neuer Ordner, ein Entwurf übersteht seinen geschlossenen Tab, Alle speichern, ein rückgängig gemachtes Speichern im Entwurf, das eingebettete Skript im Tab, „In Datei umwandeln“ (Tab und Dienst gehen mit, die Disk zählt weiter) und sein Rückgängig |
+| `ide_language.uis` | die Sprachdienste über Dateien hinweg: Vervollständigung von `lib.` mit dem Doku-Kommentar, Signaturhilfe einer Funktion des Moduls, F12 öffnet `lib.jfs` an der Deklaration, die Gliederung (ein Klick), F2 im Flyout und Rückgängig, Probleme mit einem Klick zur Stelle |
+| `ide_search.uis` | Suchen in der Datei (Strg+F) und in Dateien (Strg+Umschalt+F mit dem Wort an der Schreibmarke, die Treffer, ein Klick öffnet die Datei), ganze Wörter, Alle ersetzen (abgelehnt mit ungespeicherten Änderungen, dann ein Schritt), Rückgängig im Menü Bearbeiten |
+| `ide_run.uis` | Ausführen: `hallo.jfs` als Prozess im Terminal, `server.jfs` als Dienst `web` mit seiner Ausgabe und einer Anfrage von PC1, Speichern im Lauf mit dem Hinweis und „Neu starten“, Stoppen, Ausführen, der Reiter Dienste |
+| `ide_debug.uis` | der Debugger: F9 setzt einen Haltepunkt, eine Anfrage von PC1 hält `web` an (die Datei an der Zeile, Ort und Grund, Aufrufliste, Variablen), F10 zur nächsten Zeile mit neuer Variable, ein Ausdruck, F5 setzt fort und PC1 bekommt die Antwort, ein bedingter Haltepunkt (ein Syntaxfehler abgelehnt, er hält erst bei der dritten Anfrage), Alle Haltepunkte entfernen |
+| `ide_tests.uis` | die Tests: Strg+Umschalt+T auf `test_lib.jfs`, der Bereich Tests mit einem bestandenen und einem gescheiterten Test (beide Werte von `assert_eq`), ein Klick zur Zeile, der Bericht im Terminal, nach der Korrektur beide bestanden |
+| `ide_shots.uis` | die Bilder der IDE (ein Halt in `server.jfs` mit dem Debugger) hell und dunkel mit 100 und 150 %, normal und maximiert, klein und in hohem Kontrast (`build/jfnetworker/ide_shots_*.png`) |
+| `ide_rtl.uis` | die IDE gespiegelt (`--rtl`): die Seitenleiste rechts, der Code links nach rechts, eine Datei aus dem Explorer, die Vervollständigung, Probleme; Bilder hell und dunkel |
+| `scen_ide_web.uis` | das Golden-Szenario eines Webservers aus einer Datei (`scen/ide_web.scn`): Anfragen von PC1, eine angehängte Zeile wirkt erst nach `script restart`, `jfs --test`, ein fehlendes Modul und eine fehlende Datei als Fehler des Dienstes |
 
 Fixtures in `tests/fixtures/`: `office.jfnet` (ein kleines Büronetz mit jeder Kabelart),
 `cables.jfnet` (Geräte ohne Kabel), `pdu_lab.jfnet` (DHCP, DNS-Zone `lab`, TCP-Echo),
@@ -418,7 +430,7 @@ Simulationsschritte, Paket-Tab; einige dunkel und mit 150 %).
 | Tests | [`tests/`](tests) | Skripte, Fixtures (`fixtures/*.jfnet`), Szenarien mit Golden-Berichten (`scen/*.scn`, `scen/*.report`) |
 | Skripte | [`crates/jfn_sim/scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs), [`cli/scripts.rs`](crates/jfn_sim/cli/scripts.rs), [`src/scripttest.rs`](src/scripttest.rs) | Skripte als Dienste in den Hosts: Host-API, Anweisungen als Rechenzeit, der Befehl `script`, ihr Selbsttest (siehe [Skripte in Hosts](#skripte-in-hosts)) |
 | Labore | [`crates/jfn_model/lab.rs`](crates/jfn_model/lab.rs), [`crates/jfn_sim/goal.rs`](crates/jfn_sim/goal.rs), [`src/workspace/task.rs`](src/workspace/task.rs), [`src/workspace/devwin/svcedit.rs`](src/workspace/devwin/svcedit.rs), [`assets/labs`](assets/labs), [`src/tasktest.rs`](src/tasktest.rs) | die Aufgabe eines Labors in der Projektdatei, das Urteil über eine Erwartung (Runner und Labor) und die Ziele über einen Lauf, das Panel „Aufgabe“ mit der Liste der Labore, die Einstellungen der Dienste als JSON, die vier Labore, ihr Selbsttest (siehe [Labore und Aufgaben](#labore-und-aufgaben)) |
-| Skript-Editor | [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/workspace/devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | der Reiter Skripte des Gerätefensters mit seinen Sprachdiensten, die Skripte eines Geräts im Projekt mit Rückgängig und Vorlagen, ihr Selbsttest (siehe [Skript-Editor](#skript-editor)) |
+| IDE | [`src/workspace/ide/`](src/workspace/ide/mod.rs) ([`explorer.rs`](src/workspace/ide/explorer.rs), [`editor.rs`](src/workspace/ide/editor.rs), [`lower.rs`](src/workspace/ide/lower.rs), [`debug.rs`](src/workspace/ide/debug.rs), [`search.rs`](src/workspace/ide/search.rs)), [`src/workspace/devwin/scripts.rs`](src/workspace/devwin/scripts.rs), [`src/workspace/devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs), [`src/doc/ide.rs`](src/doc/ide.rs), [`src/doc/scripts.rs`](src/doc/scripts.rs), [`crates/jfn_sim/cli/jfstest.rs`](crates/jfn_sim/cli/jfstest.rs), [`src/idetest.rs`](src/idetest.rs), [`src/scriptedtest.rs`](src/scriptedtest.rs) | die IDE eines Hosts (Explorer, Tabs, Sprachdienste, Suchen in Dateien, Ausführen, Debugger, Tests) und ihr Reiter im Gerätefenster, die Schritte auf Dateien und Skripten im Projekt mit Rückgängig und Vorlagen, `jfs --test` in der Shell, die Selbsttests (Gruppen `ide`, `scripted`; siehe [IDE](#ide)) |
 | Spanning Tree | [`crates/jfn_sim/stp.rs`](crates/jfn_sim/stp.rs), [`stp98.rs`](crates/jfn_sim/stp98.rs), [`rstp.rs`](crates/jfn_sim/rstp.rs), [`cli/stp.rs`](crates/jfn_sim/cli/stp.rs), [`lib/netpkt/stp.rs`](../../lib/netpkt/stp.rs), [`src/stptest.rs`](src/stptest.rs) | STP (802.1D-1998) und RSTP (802.1D-2004) auf den Switches, Einstellungen und Befehle, BPDUs, ihr Selbsttest (siehe [Spanning Tree](#spanning-tree)) |
 | Routing | [`crates/jfn_sim/rip.rs`](crates/jfn_sim/rip.rs), [`cli/rip.rs`](crates/jfn_sim/cli/rip.rs), [`src/riptest.rs`](src/riptest.rs), [`lib/netpkt/rip.rs`](../../lib/netpkt/rip.rs) | RIP als Dienst der Router und L3-Switches, seine Befehle und Anzeigen, sein Selbsttest, die Nachrichten Byte für Byte (siehe [Routing mit RIP](#routing-mit-rip)) |
 | NAT und Zugriffslisten | [`crates/jfn_sim/acl.rs`](crates/jfn_sim/acl.rs), [`nat.rs`](crates/jfn_sim/nat.rs), [`cli/acl.rs`](crates/jfn_sim/cli/acl.rs), [`cli/nat.rs`](crates/jfn_sim/cli/nat.rs), [`lib/netpkt/nat.rs`](../../lib/netpkt/nat.rs), [`src/nattest.rs`](src/nattest.rs) | Zugriffslisten und Adressübersetzung der IOS-artigen Geräte, ihre Befehle, das Umschreiben der Pakete mit ihren Prüfsummen (Library), ihr Selbsttest (siehe [NAT und Zugriffslisten](#nat-und-zugriffslisten)) |
@@ -1594,7 +1606,34 @@ eines davon (Rechenzeit und Preis einer Anweisung, Warteschlange, Grenzen, Offen
 letzter Fehler), `script errors NAME` die letzten Fehler mit Zeit, Zeile, Spalte und Aufrufen,
 `script output NAME` die Ausgabe von `print`; `script start|stop|restart NAME` steuert es, und
 `top` zeigt seine Rechenzeit. Für die Oberfläche gibt es `Engine::scripts(dev)` und
-`ScriptService::view`, `errors`, `output`, `source`; im Fenster der Skript-Editor (unten).
+`ScriptService::view`, `errors`, `output`, `source`, `file`; im Fenster die IDE (unten).
+
+**Dienste aus Dateien** (IDE1): statt des Quelltexts kann eine Definition eine Datei des Geräts
+nennen, `{"kind": "script", "name": "web", "config": {"file": "/root/app/server.jfs", "port":
+80}}` (ein relativer Pfad gilt ab `/root`; `source` und `file` zugleich lehnt der Simulator ab).
+Der Dienst liest die Datei bei jedem Start – mit dem Gerät, nach einem Stopp, bei einem Neustart
+– und übersetzt sie unter ihrem Pfad: ihre relativen Importe beginnen in ihrem Ordner, ihre
+Fehler nennen die Datei. Speichern ändert am laufenden Programm nichts; erst der nächste Start
+liest die gespeicherte Fassung (die IDE sagt das in ihrer Statuszeile und bietet „Neu starten“).
+Fehlt die Datei, ist sie kein Text oder lässt sie sich nicht übersetzen, scheitert der Start als
+Fehler des Dienstes mit der Datei (und Zeile und Spalte, wenn es eine Stelle gibt): in der
+Statuszeile („beendet nach einem Fehler: /root/app/server.jfs: die Datei gibt es nicht“), in
+`script errors`, im Log und in der Ereignisliste, und `Engine::problems` meldet `ScriptFile`
+(„Skript web auf SRV1: die Datei /root/app/server.jfs gibt es nicht.“). `config.file` nennt die
+Datei wie bei `jfs DATEI`. Projekte mit `source` laden und laufen wie bisher.
+
+**Tests in der Shell** ([`cli/jfstest.rs`](crates/jfn_sim/cli/jfstest.rs)): `jfs --test
+DATEI.jfs …` führt die Funktionen `test_…` der Dateien nacheinander in einem Prozess der Shell
+aus, jede in einem frischen Programm (die Datei wie ein Dienst sie liefe, mit
+`stop_on_error`: erst ihr Hauptprogramm, dann der Test, dann seine Timer und Rückrufe in
+virtueller Zeit). Ein Test besteht, wenn nichts mehr zu tun ist oder seine Zeit (10 s) um ist,
+und scheitert am ersten Fehler; `assert` und `assert_eq` werfen einen mit beiden Werten.
+Zwischen zwei Tests schließt, was der vorige offen hatte (`ScriptService::release`). Die
+Ausgabe folgt dem Runner `jfs` der Library („ok      NAME (DATEI)“, „FEHLER  NAME
+(DATEI:ZEILE:SPALTE): …“ mit dem, was der Test ausgab, „N Tests: P bestanden, F
+fehlgeschlagen“), der Exit-Code ist 1, wenn ein Test scheiterte, eine Datei nicht lud oder kein
+Test da war. `Engine::jfs_tests(dev)` hält den letzten Lauf eines Geräts (die Tests mit ihren
+Zeilen, die Ergebnisse, ob er fertig ist) für die IDE.
 Geprüft wird das in der Selbsttest-Gruppe `script` ([`src/scripttest.rs`](src/scripttest.rs):
 Antwortzeiten auf die Nanosekunde aus dem Fuel, Timer, UDP, TCP, HTTP, DNS, Disk, Metriken,
 Endlosschleife, Grenzen, Fehler, `script`, `top`, Determinismus, ein neuer Quelltext, der Disk,
@@ -1611,7 +1650,7 @@ Moduls nennen seine Datei: `ScriptErr::file`, die Statuszeile („… in /home/u
 Zeile 7, Spalte 12: …“), `script errors`, die Zeile im Log und der Text der Notiz; eine fehlende
 Datei, ein Zyklus und ein Modul, das sich nicht übersetzen lässt, sind fangbare Fehler.
 
-**Der Debugger eines Skripts** (die Stellen, an die die IDE andockt; noch ohne Oberfläche):
+**Der Debugger eines Skripts** (die Stellen, an die die IDE andockt, siehe [IDE](#ide)):
 `Action::ScriptDebug { dev, svc, op }` mit `DebugOp::Pause` (anhalten an der nächsten
 Anweisung, im laufenden Rückruf oder im nächsten), `Continue`, `Step(Into | Over | Out)`,
 `Break { file, line, cond }` (`file` leer: der Quelltext des Dienstes, sonst der Pfad eines
@@ -1632,62 +1671,81 @@ im Modul in Fehler, Log und Status, ein angehaltenes Skript mit verspäteten Tim
 Schritt und ein Ausdruck im Halt, ein Haltepunkt mit Bedingung, Ablehnungen, Determinismus
 zweimal und mit einem Klon im Halt).
 
-### Skript-Editor
+### IDE
 
-Die Skripte eines Hosts bearbeitet der Reiter **Skripte** seines Gerätefensters (Kontextmenü
-eines Hosts › „Skripte …“; [`devwin/scripts.rs`](src/workspace/devwin/scripts.rs),
-[`doc/scripts.rs`](src/doc/scripts.rs)):
+Die Programme eines Hosts schreibt, startet, prüft und debuggt der Reiter **IDE** seines
+Gerätefensters (Kontextmenü eines Hosts › „IDE …“; [`src/workspace/ide/`](src/workspace/ide/mod.rs),
+der Reiter ist nur ein Aufruf von `ide::view` in [`devwin/scripts.rs`](src/workspace/devwin/scripts.rs),
+so kann ihn später ein Fenster des Desktops aufnehmen). Oben stehen die Menüs Datei,
+Bearbeiten, Ausführen, Debuggen und Ansicht (jede Zeile nennt ihre Tasten) und die
+Werkzeugleiste; links die Seitenleiste mit Explorer, Suchen und Gliederung, rechts der Editor
+mit seinen Tabs, darunter Ausgabe, Terminal, Probleme, Debugger und Tests. Die Teiler behalten
+ihre Lage, Seitenleiste (Strg+B) und untere Leiste (Strg+J) lassen sich ausblenden und weichen,
+wenn das Fenster klein ist; F6 geht von Bereich zu Bereich.
 
-- **Liste:** die Skripte des Geräts in der Reihenfolge des Projekts mit Zustand (läuft, rechnet,
-  gestoppt, mit Fehler beendet, „übersetzt nicht“, wenn der Simulator die Definition aus der
-  Datei nicht nehmen konnte), CPU-Anteil der letzten Sekunden und Fehlern; „geändert“ markiert
-  nicht übernommene Änderungen. „Neu“ legt ein Skript aus einer Vorlage an (leer, UDP-Echo,
-  HTTP-Server, eine Abfrage, die regelmäßig eine URL abfragt und die Antwortzeit misst, ein
-  Schlüssel-Wert-Speicher auf der Disk; Kommentare und Texte in der Sprache des Fensters),
-  „Umbenennen“ und „Löschen“ ändern das Projekt. Jeder dieser Schritte ist ein
-  Rückgängig-Schritt, der das laufende Gerät behält: ein umbenanntes Skript läuft weiter (mit
-  Disk, Zahlen und Zeitreihen), ein gelöschtes nimmt mit, was es auf der Disk abgelegt hatte
-  (Rückgängig bringt das Skript zurück, seine Disk beginnt leer).
-- **Editor:** der Code-Editor der Library mit Hervorhebung für `.jfs`. Beim Tippen prüft er
-  höchstens alle 250 ms (Syntaxfehler, unbekannte Namen, `break` außerhalb einer Schleife …), und
-  die Fehler des laufenden Programms stehen mit Zeile und Spalte als Marken im Text – nur die
-  des aktuellen Laufs, ein Neustart räumt sie ab; ihre Zeilen folgen dem bearbeiteten Text, eine
-  geänderte Zeile verliert ihre Marke. F8 und Umschalt+F8 springen von Meldung zu Meldung, die
-  Statuszeile nennt die Stelle, die Zahl der Fehler und Warnungen und die Meldung an der
-  Schreibmarke. Jedes Skript hat einen Entwurf mit eigenem Rückgängig (Strg+Z im Editor), der
-  den Wechsel zu einem anderen Skript und das Schließen des Fensters übersteht, bis er
-  übernommen oder verworfen wird oder ein anderes Projekt kommt; ein unveränderter Entwurf
-  folgt dem Projekt.
-- **Sprachdienste (SK6):** der Editor kennt die Sprache ([`devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs)
-  auf `script::ls` der Library). Beim Tippen eines Worts, nach einem Punkt und mit
-  Strg+Leertaste öffnet sich die Vervollständigung: die Namen im Gültigkeitsbereich, die Namen
-  des Simulators (`log`, `now`, `rand`, `config`, `timer`, `net`, `dns`, `http`, `disk`,
-  `metrics` mit ihren Funktionen) mit einer kurzen Beschreibung, die Standardbibliothek und die
-  Methoden von Texten, Listen, Maps und Bytes; Tab oder Eingabe setzt ein (ein
-  Rückgängig-Schritt). Der Zeiger auf einem Namen zeigt Art, Signatur und Doku-Kommentar (`///`
-  über einem `fn` oder `let`), in einem Aufruf zeigt die Signaturhilfe den Parameter an der
-  Schreibmarke. F12 oder Strg+Klick springen zur Deklaration in der Datei, F2 oder „Name
-  umbenennen“ benennt jede Stelle eines Namens auf einmal um (ein Flyout fragt nach dem neuen,
-  eine Ablehnung – Schlüsselwort, ungültiger oder schon vergebener Name, Syntaxfehler – steht
-  darin), Umschalt+Alt+F oder „Formatieren“ setzt das Skript neu (Einrückung, Leerzeichen, eine
-  Anweisung je Zeile; mit Syntaxfehlern abgelehnt) – beides ein Rückgängig-Schritt des
-  Entwurfs. Blöcke, mehrzeilige Kommentare und Listen lassen sich in der Leiste falten. Neben
-  dem Editor steht, wenn der Reiter breit genug ist, die Gliederung („Gliederung“ blendet sie
-  aus): die Funktionen (innere eingerückt) und die globalen Variablen, ein Klick setzt die
-  Schreibmarke auf den Namen. Die Spalte für Haltepunkte bleibt aus, bis es einen Debugger gibt.
-- **Übernehmen** (Strg+S im Editor): ein Quelltext, der sich übersetzen lässt, geht als ein
-  Rückgängig-Schritt ins Projekt (die `source` der Dienstdefinition, als Liste von Zeilen oder
-  als Text, wie sie war) und in das laufende Skript: es startet mit dem neuen Programm, Disk,
-  Zahlen, Fehler, Ausgabe und Zeitreihen bleiben, das Gerät startet nicht neu. Rückgängig und
-  Wiederholen tauschen das Programm genauso. Einen Quelltext mit Fehlern lehnt es mit dem
-  ersten ab. Strg+S speichert hier also nicht die Projektdatei.
-- **Ausführen, Stoppen, Neu starten** wirken nur im Simulator, wie `script start|stop|restart`
-  in der Shell; ob ein Skript mit dem Gerät startet, bleibt Sache des Projekts (Reiter Dienste).
-- **Unten:** die Ausgabe des aktuellen Laufs (`print`, folgt live) und seine Fehler mit Zeit,
-  Zeile und Spalte (ein Klick setzt die Schreibmarke dorthin); darüber die Kennzahlen: Zustand,
-  CPU, Warteschlange, Rückrufe, Fehler, Speicher und was das Skript offen hat.
+- **Explorer** ([`explorer.rs`](src/workspace/ide/explorer.rs)): die Dateien des Geräts als
+  Baum (Ordner zuerst; `/root` und die Ordner offener Dateien sind offen), `.jfs`-Dateien mit
+  Sprachdiensten, andere Textdateien öffnen sich ebenso; neben einer Datei stehen die Dienste,
+  die sie ausführen, ein „●“ markiert ungespeicherte Änderungen. Darüber die Skripte, deren
+  Quelltext noch in der Projektdatei steht („Eingebettete Skripte“). Doppelklick oder Eingabe
+  öffnet, „Neue Datei …“, „Neuer Ordner …“ (ein Flyout fragt nach dem Namen), Umbenennen (F2)
+  und Löschen (Entf) sind Rückgängig-Schritte des Projekts ([`doc/ide.rs`](src/doc/ide.rs)),
+  Datei › „Neues Skript: …“ legt eine `.jfs`-Datei aus einer Vorlage an. Ein Dienst behält den
+  Pfad, den er nennt: eine umbenannte oder gelöschte Datei fehlt ihm beim nächsten Start.
+- **In Datei umwandeln:** ein eingebettetes Skript wird zur Datei `/root/scripts/NAME.jfs`
+  (`NAME2.jfs` …, wenn es sie gibt) und seine Definition nennt `"file"` statt `"source"` – ein
+  Rückgängig-Schritt, der das Gerät laufen lässt: der Simulator bekommt erst die Datei, dann die
+  Definition, das Skript startet aus der Datei und behält Disk und Zahlen; Rückgängig bringt den
+  eingebetteten Quelltext zurück. Tab, Entwurf und Haltepunkte gehen mit.
+- **Tabs und Entwürfe** ([`editor.rs`](src/workspace/ide/editor.rs)): jede offene Datei hat
+  einen Entwurf mit eigenem Rückgängig, der den Wechsel der Tabs, das Schließen des Tabs und des
+  Fensters übersteht; ein unveränderter folgt dem Projekt (ein Rückgängig des Speicherns zeigt
+  den Text davor), ein Tab zeigt „●“ hinter dem Namen, solange er ungespeichert ist. Strg+S
+  speichert die Datei als einen Rückgängig-Schritt des Projekts (ein eingebettetes Skript: in
+  seine Definition, ein Quelltext mit Fehlern wird mit dem ersten abgelehnt), „Alle speichern“
+  (Strg+Umschalt+S) alle Dateien in einem Schritt; Strg+W schließt den Tab, Strg+Bild ab / auf
+  wechselt.
+- **Sprachdienste (SK6)** ([`devwin/scriptls.rs`](src/workspace/devwin/scriptls.rs) auf
+  `script::ls`): Prüfung beim Tippen (höchstens alle 250 ms), Vervollständigung mit den Namen
+  des Simulators und den Namen importierter Module (die IDE liest die Dateien des Geräts, auch
+  ungespeicherte Entwürfe), Hover, Signaturhilfe, Falten, F12 und Strg+Klick zur Deklaration –
+  bei `lib.greet` in die andere Datei, die sich dort öffnet –, F2 benennt in der Datei um,
+  Umschalt+Alt+F formatiert; die Gliederung der Seitenleiste zeigt die Funktionen und globalen
+  Variablen der offenen Datei. **Probleme** listet die Meldungen der offenen Dateien und die
+  Fehler des laufenden Dienstes, ein Klick geht hin; die Fehler des Laufs stehen als Marken im
+  Text, ihre Zeilen folgen dem bearbeiteten Text.
+- **Suchen** ([`search.rs`](src/workspace/ide/search.rs)): Strg+F sucht in der Datei (die
+  Suchleiste des Editors), Strg+Umschalt+F in allen `.jfs`-Dateien des Geräts (Groß- und
+  Kleinschreibung, ganze Wörter; was ein Entwurf zeigt, wo er ungespeichert ist), die Treffer
+  als Liste, ein Klick öffnet die Datei an der Stelle; „Alle ersetzen“ ändert jede Datei in
+  einem Rückgängig-Schritt und lehnt ab, solange eine Datei mit Treffern ungespeicherte
+  Änderungen hat.
+- **Ausführen** ([`debug.rs`](src/workspace/ide/debug.rs); zuvor speichert es alles):
+  „Als Prozess ausführen“ (Strg+F5) tippt `jfs DATEI` ins **Terminal** (die Konsole des Geräts;
+  eine eigene Sitzung kann später an ihre Stelle treten, `ide::terminal`). „Als Dienst
+  ausführen“ (F5) startet den Skript-Dienst, der auf die Datei verweist, neu – gibt es keinen,
+  legt es einen als Rückgängig-Schritt an (`{"file": PFAD}`, nach der Datei benannt) –, bei einem
+  eingebetteten Skript dessen Dienst; **Ausgabe** zeigt, was er im aktuellen Lauf druckt.
+  Stoppen (Umschalt+F5) und Neu starten (Strg+Umschalt+F5) wirken im Simulator wie
+  `script stop|restart`. Läuft der Dienst einer gespeicherten Datei noch mit der Fassung davor,
+  sagt die Statuszeile das mit einem Knopf „Neu starten“.
+- **Debugger:** ein Klick links neben eine Zeilennummer oder F9 setzt einen Haltepunkt,
+  Strg+Umschalt+F9 einen mit Bedingung (ein Flyout, die Bedingung ist ein Ausdruck in jfs).
+  Die Haltepunkte gehören je Datei zur IDE und gehen an den Dienst, den sie ausführt
+  (`DebugOp::Break`, auch in importierten Dateien). Hält er, öffnet sich die Datei an der Zeile
+  (der Ausführungspfeil in der Leiste) und der Bereich **Debugger** zeigt Ort und Grund, die
+  Aufrufliste (ein Klick wählt den Aufruf und geht zu seiner Zeile), die Variablen des Aufrufs
+  (lokal, erfasst, global; Listen und Maps klappen auf) und Ausdrücke, die im Aufruf gelesen
+  werden. F5 setzt fort, Strg+F9 hält an, F10 geht über, F7 hinein, Umschalt+F7 heraus (F11
+  bleibt dem Fenster). Angehalten wird in virtueller Zeit, die Simulation läuft weiter.
+- **Tests:** „Tests ausführen“ (Strg+Umschalt+T) tippt `jfs --test DATEI` ins Terminal; der
+  Bereich **Tests** zeigt den Lauf (`Engine::jfs_tests`): bestanden und gescheitert mit Datei,
+  Zeile, Spalte und Meldung, ein Klick geht zur Stelle des Fehlers.
 
-Der Simulator ([`scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs)) bietet dafür
+Solange die IDE die Tastatur hat, gelten ihre Tasten vor denen des Hauptfensters (F5, F7 und F9
+der Simulation und des Labors); die Übersicht der Tastenkürzel (F1) führt sie unter „IDE“.
+Was die IDE ändert, ist ein Schritt des Projekts mit Rückgängig; Haltepunkte, Tabs und Entwürfe
+gehören zur Sitzung. Der Simulator ([`scriptsvc.rs`](crates/jfn_sim/scriptsvc.rs)) bietet dafür
 `Action::ScriptSource { dev, svc, config }`: das Skript bekommt eine neue Definition und bleibt
 derselbe Dienst (Nummer, Disk, Zahlen, Fehler, Ausgabe, Zeitreihen); eines, das laufen soll
 (läuft, nach einem Fehler beendet oder wartet auf Strom), startet sofort mit dem neuen Programm,
@@ -1698,7 +1756,8 @@ Dienst um, ohne ihn anzuhalten (seine Zeitreihen gehen mit). `ScriptService::run
 damit eine Anzeige nur Neues liest), `ScriptView::runs` zählt die Starts. Ersetzt
 `Action::Service` einen Dienst gleichen Namens, gibt der alte seine Bytes auf der Disk frei. Die
 Oberfläche schickt diese Actions über `Sim::keep` ([`src/doc/sim.rs`](src/doc/sim.rs),
-`keep_steps`), so laufen Bearbeiten, Rückgängig und Wiederholen ohne Neustart des Geräts.
+`keep_steps`; die Dateien eines Schritts vor seinen Diensten), so laufen Bearbeiten,
+Rückgängig und Wiederholen ohne Neustart des Geräts.
 
 ### Labore und Aufgaben
 

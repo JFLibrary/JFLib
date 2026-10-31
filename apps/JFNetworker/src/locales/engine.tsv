@@ -1344,3 +1344,9 @@ Das Gerät {} nimmt keine weitere Sitzung an.	Device {} takes no further session
 „password“ ist ein Text.	“password” is a text.
 Port {}: {} Sitzungen angenommen, {} abgewiesen	Port {}: {} sessions accepted, {} refused
 IOS-artige Geräte nehmen Telnet auf ihren vty-Leitungen an (line vty).	IOS-like devices take Telnet on their vty lines (line vty).
+# IDE1: script services from files (jfn_sim scriptsvc.rs), their problems
+beendet nach einem Fehler: {}	ended after an error: {}
+„file“ ist der Pfad einer Datei des Geräts.	“file” is the path of a file of the device.
+Ein Skript hat „source“ oder „file“, nicht beides.	A script has “source” or “file”, not both.
+Skript {} auf {}: die Datei {} gibt es nicht.	Script {} on {}: the file {} does not exist.
+Skript {} auf {}: {}, Zeile {}, Spalte {}: {}	Script {} on {}: {}, line {}, column {}: {}

@@ -1,0 +1,136 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/ide.jfnet
+# the IDE's Explorer, tabs and saving (IDE1: workspace/ide/explorer.rs, editor.rs, doc/ide.rs) on
+# SRV1 of fixtures/ide.jfnet: the device's files as a tree with /root open and the inline
+# script zaehler under "Eingebettete Skripte"; a new file in a folder (the name flyout), its
+# tab and its row with the mark of unsaved changes, Ctrl+S saves (one undo step of the
+# project), F2 renames
+# (the tab goes with it), Entf deletes, the project's undo brings it back; a new folder; a
+# draft outlives its closed tab; Alle speichern; an undone save shows the text before; the
+# inline script opens as "zaehler (eingebettet)"; In Datei umwandeln makes it a file (its tab and
+# its service go with it) and the project's undo takes that back.  Umwandeln is 98579.
+# Ids: the device window 26624; the IDE from 98304: Datei 98305, Neue Datei 98496 (its name
+# 98497, OK 98498), Neuer Ordner 98576, Umbenennen 98577, Löschen 98578, Tab schließen 98688,
+# the editor 98816.
+size 1280 900
+theme light
+wait 1500
+rclick listitem:"SRV1"
+move 700,300
+click menuitem:"IDE …"
+expect window 26624 open
+expect tab:"IDE" selected
+resizewin 26624 1100 760
+wait 300
+# the tree: /root is open, app is not; the inline script
+expect listitem:"Eingebettete Skripte" exists
+expect listitem:"zaehler" exists
+expect listitem:"notes.txt" exists
+expect listitem:"server.jfs" missing
+expect text:"Keine Datei offen" exists
+dblclick listitem:"app"
+expect listitem:"server.jfs" exists
+expect listitem:"test_lib.jfs" exists
+# a new file in app: the flyout proposes a name
+click listitem:"app"
+wait 600
+click #98496
+expect #98497 focused
+expect #98497 text "neu.jfs"
+key ctrl+a
+type "werkzeug.jfs\n"
+wait 200
+expect listitem:"werkzeug.jfs" exists
+expect tab:"werkzeug.jfs" selected
+expect #98816 focused
+# typing marks its tab, Ctrl+S saves it (one step of the project)
+type "print(\"Werkzeug\")"
+expect tab:"werkzeug.jfs ●" selected
+expect text:"geändert – Strg+S speichert" exists
+expect listitem:"werkzeug.jfs ●" exists
+key ctrl+s
+expect tab:"werkzeug.jfs" selected
+expect text:"gespeichert" exists
+shot build/jfnetworker/ide_explorer_saved.png window 26624
+# F2 in the tree renames it, its tab goes with it
+click listitem:"werkzeug.jfs"
+key f2
+expect #98497 focused
+expect #98497 text "werkzeug.jfs"
+key ctrl+a
+type "tool.jfs\n"
+wait 200
+expect listitem:"tool.jfs" exists
+expect listitem:"werkzeug.jfs" missing
+expect tab:"tool.jfs" selected
+# Entf deletes it (its tab closes), the project's undo brings it back
+wait 600
+click listitem:"tool.jfs"
+key delete
+wait 100
+expect listitem:"tool.jfs" missing
+expect tab:"tool.jfs" missing
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+wait 100
+expect listitem:"tool.jfs" exists
+# a new folder in app
+click listitem:"app"
+wait 600
+click #98576
+expect #98497 text "ordner"
+key ctrl+a
+type "modul\n"
+wait 200
+expect listitem:"modul" exists
+# tabs: a changed draft outlives its closed tab
+dblclick listitem:"lib.jfs"
+wait 200
+expect tab:"lib.jfs" selected
+key ctrl+end
+type "// mehr"
+expect tab:"lib.jfs ●" selected
+click #98688
+expect tab:"lib.jfs ●" missing
+expect listitem:"lib.jfs ●" exists
+dblclick listitem:"lib.jfs ●"
+wait 200
+expect tab:"lib.jfs ●" selected
+# Alle speichern; undoing the save brings the text before back into the draft
+click #98305
+click menuitem:"Alle speichern"
+move 640,300
+expect tab:"lib.jfs" selected
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+wait 100
+expect tab:"lib.jfs" selected
+expect text:"// mehr" missing
+# the inline script opens from the Explorer
+dblclick listitem:"zaehler"
+wait 200
+expect tab:"zaehler (eingebettet)" selected
+expect text:"wie im Projekt" exists
+shot build/jfnetworker/ide_explorer_tabs.png window 26624
+# In Datei umwandeln: zaehler becomes /root/scripts/zaehler.jfs (one step), its tab goes with
+# it, the service runs from the file; the project's undo brings the inline script back
+wait 600
+click listitem:"zaehler"
+click #98579
+wait 200
+expect tab:"zaehler.jfs" selected
+expect listitem:"Eingebettete Skripte" missing
+expect listitem:"scripts" exists
+expect listitem:"zaehler.jfs" exists
+expect text:"Dienst zaehler: läuft" exists
+expect text:"gespeichert" exists
+shot build/jfnetworker/ide_explorer_converted.png window 26624
+click menu:"Bearbeiten"
+click menuitem:"Rückgängig"
+move 640,300
+wait 200
+expect listitem:"zaehler.jfs" missing
+expect listitem:"zaehler" exists
+expect tab:"zaehler.jfs" missing
+expect_nowarn

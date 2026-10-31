@@ -1,18 +1,22 @@
 #!args --verify-dirty --open apps/JFNetworker/tests/fixtures/scripts.jfnet
-# the shot matrix of the Skripte tab's language services (SK6): SRV1's zaehler with the
-# completion list of net. (the host's names, the description of the chosen one), signature help
-# of net.listen, the flyout of Name umbenennen and the outline beside the editor; light and dark
-# at 100 and 150 % (build/jfnetworker/script_ls_<what>_<theme>_<scale>.png).  Ids: 26624 the
-# device window, 53280 the editor.
+# the shot matrix of the language services in the IDE (SK6, IDE1): SRV1's inline zaehler with
+# the completion list of net. (the host's names, the description of the chosen one), signature
+# help of net.listen, the flyout of Name umbenennen and the outline in the side bar; light and
+# dark at 100 and 150 % (build/jfnetworker/script_ls_<what>_<theme>_<scale>.png).  Ids: 26624
+# the device window, 98816 the editor, 98513 the rename flyout's name, 98567 Gliederung.
 size 1280 900
 theme light
 wait 3500
 rclick listitem:"SRV1"
 move 700,300
-click menuitem:"Skripte …"
+click menuitem:"IDE …"
 expect window 26624 open
-wait 600
-click #53280
+resizewin 26624 1100 760
+wait 300
+dblclick listitem:"zaehler"
+wait 300
+click #98567
+click #98816
 key ctrl+end
 type "\nnet."
 expect listitem:"connect – net.connect(addr, port, handlers)" exists
@@ -20,14 +24,14 @@ shot build/jfnetworker/script_ls_complete_light_100.png window 26624
 theme dark
 shot build/jfnetworker/script_ls_complete_dark_100.png window 26624
 scale 150 window 26624
-focus #53280
+focus #98816
 key ctrl+space
 shot build/jfnetworker/script_ls_complete_dark_150.png window 26624
 theme light
 shot build/jfnetworker/script_ls_complete_light_150.png window 26624
 scale 100 window 26624
 # signature help
-focus #53280
+focus #98816
 key esc
 type "listen(80, "
 expect text:"net.listen(port, handlers) – handlers – Wartet auf TCP-Verbindungen; handlers ist eine Map mit accept, data, close und binary." exists
@@ -35,14 +39,14 @@ shot build/jfnetworker/script_ls_signature_light_100.png window 26624
 theme dark
 shot build/jfnetworker/script_ls_signature_dark_100.png window 26624
 scale 150 window 26624
-focus #53280
+focus #98816
 key ctrl+shift+space
 shot build/jfnetworker/script_ls_signature_dark_150.png window 26624
 theme light
 shot build/jfnetworker/script_ls_signature_light_150.png window 26624
 scale 100 window 26624
 # the rename flyout on n
-focus #53280
+focus #98816
 key esc
 key ctrl+home
 key down
@@ -51,8 +55,8 @@ key right
 key right
 key right
 key f2
-expect #81921 focused
-expect #81921 text "n"
+expect #98513 focused
+expect #98513 text "n"
 shot build/jfnetworker/script_ls_rename_light_100.png window 26624
 theme dark
 shot build/jfnetworker/script_ls_rename_dark_100.png window 26624

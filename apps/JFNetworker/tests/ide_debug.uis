@@ -1,0 +1,104 @@
+#!args --verify-dirty --open apps/JFNetworker/tests/fixtures/ide.jfnet
+# the IDE's debugger (IDE1: workspace/ide/debug.rs on SK7's Action::ScriptDebug) on web, the
+# service of SRV1 that runs server.jfs (fixtures/ide.jfnet): a breakpoint with F9 in the gutter's
+# column, a request from PC1 stops the callback there -- the file opens at the line, the
+# Debugger pane shows where and why, the call stack and the variables of the call; F10 steps
+# over to the next line (a new variable); a watch expression is evaluated in the call; F5
+# continues and PC1 gets its answer; F9 again removes the breakpoint; a conditional one
+# (Ctrl+Shift+F9, its flyout refuses a syntax error) stops only when its condition holds (the
+# third request);
+# Debuggen › Alle Haltepunkte entfernen.
+# Ids: the device window 26624; the IDE from 98304: Debuggen 98308, Fortsetzen 98328, Schritt über
+# 98330, the condition flyout 98504 (its text 98505, OK 98506), the editor 98816, Debugger 98572,
+# the watch expression's box 98608, the call stack's rows 99585 + i.
+size 1280 900
+theme light
+wait 1500
+rclick listitem:"SRV1"
+move 700,300
+click menuitem:"IDE …"
+expect window 26624 open
+resizewin 26624 1100 760
+wait 300
+dblclick listitem:"app"
+wait 600
+dblclick listitem:"server.jfs"
+wait 300
+expect tab:"server.jfs" selected
+# F9 on line 7 sets a breakpoint (the service gets it at once)
+key ctrl+home
+key down down down down down down
+key f9
+expect text:"Zeile 7, Spalte 1" exists
+# a request from PC1 stops web on line 7
+rclick listitem:"PC1"
+move 700,300
+click menuitem:"Konsole öffnen"
+wait 200
+type "curl -s http://10.0.0.1/abc\n"
+wait 500
+expect text:"Hallo /abc (4 Zeichen)" missing
+expect text:"Dienst web: angehalten" exists
+expect #98572 selected
+expect text:"web hält in server.jfs, Zeile 7, Spalte 14 (Haltepunkt)" exists
+expect listitem:"Funktion ohne Namen (server.jfs:7)" selected
+expect text:"Zeile 7, Spalte 14" exists
+expect listitem:"Lokal (2)" exists
+expect #98328 enabled
+shot build/jfnetworker/ide_debug_break.png window 26624
+# F10: over to line 8, text is a local now
+activate 26624
+key f10
+wait 200
+expect text:"web hält in server.jfs, Zeile 8, Spalte 9 (Schritt)" exists
+expect listitem:"Funktion ohne Namen (server.jfs:8)" exists
+expect listitem:"Lokal (3)" exists
+expect listitem:"text = \"Hallo /abc (4 Zeichen)\"" exists
+# a watch expression in the call
+click #98608
+type "req.path + \"!\"\n"
+wait 100
+expect listitem:"req.path + \"!\" = \"/abc!\"" exists
+shot build/jfnetworker/ide_debug_step.png window 26624
+# F5 goes on: PC1 gets its answer
+click #98816
+key f5
+wait 300
+expect text:"Dienst web: läuft" exists
+expect text:"Hallo /abc (4 Zeichen)" exists
+expect listitem:"req.path + \"!\" = –" exists
+# F9 on line 7 again: the breakpoint goes, a request goes through
+key ctrl+home
+key down down down down down down
+key f9
+# a conditional breakpoint: a syntax error is refused, "hits > 2" stops the third request
+key ctrl+shift+f9
+expect #98505 focused
+type "hits >\n"
+expect text:"Bedingung: Hier fehlt ein Ausdruck" exists
+key ctrl+a
+type "hits > 2\n"
+wait 100
+expect #98505 missing
+rclick listitem:"PC1"
+move 700,300
+click menuitem:"Konsole öffnen"
+wait 200
+type "curl -s http://10.0.0.1/eins\n"
+wait 500
+expect text:"Hallo /eins (5 Zeichen)" exists
+type "curl -s http://10.0.0.1/zwei\n"
+wait 500
+expect text:"Hallo /zwei (5 Zeichen)" missing
+expect text:"web hält in server.jfs, Zeile 7, Spalte 14 (Haltepunkt)" exists
+# Debuggen › Alle Haltepunkte entfernen, Fortsetzen
+activate 26624
+click #98308
+click menuitem:"Alle Haltepunkte entfernen"
+move 640,300
+wait 600
+click #98328
+wait 300
+expect text:"Hallo /zwei (5 Zeichen)" exists
+expect text:"Dienst web: läuft" exists
+expect_nowarn

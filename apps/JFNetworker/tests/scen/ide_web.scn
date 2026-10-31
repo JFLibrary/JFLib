@@ -1,0 +1,48 @@
+# Ein Webserver aus einer Datei. SRV1 führt den Dienst web aus /root/app/server.jfs aus, die
+# Datei holt sich lib.jfs aus ihrem Ordner. PC1 lädt zwei Seiten mit curl; danach bekommt die
+# Datei eine Zeile dazu: der laufende Dienst bleibt, wie er war, erst ein Neustart liest die
+# gespeicherte Fassung. jfs --test prüft lib.jfs (ein Test scheitert, mit beiden Werten). Fehlt
+# lib.jfs, scheitert der nächste Start mit der Datei und Zeile des Imports; fehlt server.jfs,
+# nennt der Fehler des Dienstes die Datei.
+run 500ms
+SRV1: script
+PC1: curl -s http://10.0.0.1/abc
+run 100ms
+expect PC1 output contains "Hallo /abc (4 Zeichen)"
+PC1: curl -s http://10.0.0.1/
+run 100ms
+expect PC1 output contains "Hallo / (1 Zeichen)"
+SRV1: script output web
+expect SRV1 svc web metric calls == 3
+SRV1: echo 'print("neue Fassung")' >> /root/app/server.jfs
+run 100ms
+SRV1: script output web
+SRV1: script restart web
+run 100ms
+SRV1: script output web
+expect SRV1 output contains "neue Fassung"
+PC1: curl -s http://10.0.0.1/neu
+run 100ms
+expect PC1 output contains "Hallo /neu (4 Zeichen)"
+SRV1: jfs --test /root/app/test_lib.jfs
+run 1s
+expect SRV1 output contains "2 Tests: 1 bestanden, 1 fehlgeschlagen"
+SRV1: mv /root/app/lib.jfs /root/app/lib.alt
+SRV1: script restart web
+run 100ms
+SRV1: script errors web
+expect SRV1 output contains "Modul /root/app/lib.jfs: die Datei gibt es nicht"
+SRV1: mv /root/app/lib.alt /root/app/lib.jfs
+SRV1: mv /root/app/server.jfs /root/app/server.alt
+SRV1: script restart web
+run 100ms
+SRV1: script
+SRV1: script errors web
+expect SRV1 output contains "/root/app/server.jfs: die Datei gibt es nicht"
+SRV1: mv /root/app/server.alt /root/app/server.jfs
+SRV1: script start web
+run 100ms
+PC1: curl -s http://10.0.0.1/zurück
+run 100ms
+expect PC1 output contains "Hallo /zurück (7 Zeichen)"
+print "Ein Dienst aus einer Datei liest sie bei jedem Start; Speichern allein ändert das laufende Programm nicht"

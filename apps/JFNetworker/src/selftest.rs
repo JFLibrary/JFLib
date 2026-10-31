@@ -54,6 +54,8 @@
 // CPU time per second, the Dateimanager's copies and moves, the console's window, contrast).
 // sessiontest.rs: command-line sessions and the telnet servers (group sessions: jfn_sim::cli::ses,
 // telnetd, the vty parts of cli/aaa.rs and cli/ios.rs).
+// idetest.rs: what the IDE builds on (group ide: script services from files, jfs --test in
+// cli/jfstest.rs, doc/ide.rs's steps, the IDE's search in files).
 
 use alloc::format;
 use alloc::string::String;
@@ -135,9 +137,11 @@ mod scriptmodtest;
 mod desktoptest;
 #[path = "sessiontest.rs"]
 mod sessiontest;
+#[path = "idetest.rs"]
+mod idetest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 45] = [
+    let groups: [(&'static str, fn(&mut T)); 46] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -183,6 +187,7 @@ pub fn run() -> i32 {
         ("scriptmod", scriptmodtest::run),
         ("desk", desktoptest::run),
         ("sessions", sessiontest::run),
+        ("ide", idetest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

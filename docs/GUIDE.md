@@ -701,6 +701,10 @@ ui.menubar(None);                        // the menu bar of the AppDesc
 
   A widget without `context_menu` gets the menu key as a right click (`EV_RCLICK`); a
   `menu_popup` in answer to it opens at the widget (§27).
+  A row whose keys the app handles itself (no command of the table, e.g. inside a pane that
+  captures them with `capture_shortcut`) shows them with `menu_item_keys(id, label,
+  &ui.key_text(VK_F5, MOD_CTRL))`: `key_text(vk, mods)` writes a key as the accelerator texts
+  do ("Strg+F5", the UI language's names). JFNetworker's IDE builds its menus this way.
 
 * Drop-downs: `dropdown_button`, `split_button` (main part `EV_ACT`, chevron opens popup `id`),
   `combobox(id, &mut sel, list)`; `menu_popup(menu)` opens a menu at the pointer.

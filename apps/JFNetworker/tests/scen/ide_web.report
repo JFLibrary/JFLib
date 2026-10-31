@@ -1,0 +1,82 @@
+# JFNetworker-Szenario ide_web.scn: „Die IDE auf einem Server“, 3 Geräte, 2 Verbindungen, Seed 7
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  --      run 500ms
+   0.500000000  SRV1    root@SRV1:~# script
+   0.500000000  SRV1    Skript   Zustand  Rückrufe  Fehler  CPU-Zeit  offen
+   0.500000000  SRV1    web      läuft    1         0       120 µs    http 80
+   0.500000000  SRV1    zaehler  läuft    2         0       155 ns    nichts
+   0.500000000  PC1     root@PC1:~# curl -s http://10.0.0.1/abc
+   0.500000000  --      run 100ms
+   0.500013768  PC1     Hallo /abc (4 Zeichen)
+   0.600000000  ok      expect PC1 output contains "Hallo /abc (4 Zeichen)"
+   0.600000000  PC1     root@PC1:~# curl -s http://10.0.0.1/
+   0.600000000  --      run 100ms
+   0.600010784  PC1     Hallo / (1 Zeichen)
+   0.700000000  ok      expect PC1 output contains "Hallo / (1 Zeichen)"
+   0.700000000  SRV1    root@SRV1:~# script output web
+   0.700000000  SRV1    bereit auf Port 80
+   0.700000000  SRV1    Anfrage 1: /abc
+   0.700000000  SRV1    Anfrage 2: /
+   0.700000000  ok      expect SRV1 svc web metric calls == 3 (3)
+   0.700000000  SRV1    root@SRV1:~# echo 'print("neue Fassung")' >> /root/app/server.jfs
+   0.700000000  --      SRV1: /root/app/server.jfs gespeichert (337 Bytes)
+   0.700000000  --      run 100ms
+   0.800000000  SRV1    root@SRV1:~# script output web
+   0.800000000  SRV1    bereit auf Port 80
+   0.800000000  SRV1    Anfrage 1: /abc
+   0.800000000  SRV1    Anfrage 2: /
+   0.800000000  SRV1    root@SRV1:~# script restart web
+   0.800000000  --      run 100ms
+   0.900000000  SRV1    root@SRV1:~# script output web
+   0.900000000  SRV1    bereit auf Port 80
+   0.900000000  SRV1    Anfrage 1: /abc
+   0.900000000  SRV1    Anfrage 2: /
+   0.900000000  SRV1    bereit auf Port 80
+   0.900000000  SRV1    neue Fassung
+   0.900000000  ok      expect SRV1 output contains "neue Fassung"
+   0.900000000  PC1     root@PC1:~# curl -s http://10.0.0.1/neu
+   0.900000000  --      run 100ms
+   0.900010880  PC1     Hallo /neu (4 Zeichen)
+   1.000000000  ok      expect PC1 output contains "Hallo /neu (4 Zeichen)"
+   1.000000000  SRV1    root@SRV1:~# jfs --test /root/app/test_lib.jfs
+   1.000000000  --      run 1s
+   1.000120165  SRV1    ok      test_double (/root/app/test_lib.jfs)
+   1.000240335  SRV1    FEHLER  test_greet (/root/app/test_lib.jfs:6:3): assert_eq: erwartet "Hallo /", ist "Hallo / (1 Zeichen)"
+   1.000240335  SRV1    2 Tests: 1 bestanden, 1 fehlgeschlagen
+   2.000000000  ok      expect SRV1 output contains "2 Tests: 1 bestanden, 1 fehlgeschlagen"
+   2.000000000  SRV1    root@SRV1:~# mv /root/app/lib.jfs /root/app/lib.alt
+   2.000000000  --      SRV1: /root/app/lib.alt gespeichert (196 Bytes)
+   2.000000000  SRV1    root@SRV1:~# script restart web
+   2.000000000  --      run 100ms
+   2.100000000  SRV1    root@SRV1:~# script errors web
+   2.100000000  SRV1    2,000 s  /root/app/server.jfs, Zeile 2, Spalte 11 (start): Modul /root/app/lib.jfs: die Datei gibt es nicht
+   2.100000000  SRV1               im Hauptprogramm (/root/app/server.jfs:2:11)
+   2.100000000  ok      expect SRV1 output contains "Modul /root/app/lib.jfs: die Datei gibt es nicht"
+   2.100000000  SRV1    root@SRV1:~# mv /root/app/lib.alt /root/app/lib.jfs
+   2.100000000  --      SRV1: /root/app/lib.jfs gespeichert (196 Bytes)
+   2.100000000  SRV1    root@SRV1:~# mv /root/app/server.jfs /root/app/server.alt
+   2.100000000  --      SRV1: /root/app/server.alt gespeichert (337 Bytes)
+   2.100000000  SRV1    root@SRV1:~# script restart web
+   2.100000000  --      run 100ms
+   2.200000000  SRV1    root@SRV1:~# script
+   2.200000000  SRV1    Skript   Zustand  Rückrufe  Fehler  CPU-Zeit  offen
+   2.200000000  SRV1    web      Fehler   6         2       240 µs    nichts
+   2.200000000  SRV1    zaehler  läuft    4         0       265 ns    nichts
+   2.200000000  SRV1    root@SRV1:~# script errors web
+   2.200000000  SRV1    2,000 s  /root/app/server.jfs, Zeile 2, Spalte 11 (start): Modul /root/app/lib.jfs: die Datei gibt es nicht
+   2.200000000  SRV1               im Hauptprogramm (/root/app/server.jfs:2:11)
+   2.200000000  SRV1    2,100 s  (start): /root/app/server.jfs: die Datei gibt es nicht
+   2.200000000  ok      expect SRV1 output contains "/root/app/server.jfs: die Datei gibt es nicht"
+   2.200000000  SRV1    root@SRV1:~# mv /root/app/server.alt /root/app/server.jfs
+   2.200000000  --      SRV1: /root/app/server.jfs gespeichert (337 Bytes)
+   2.200000000  SRV1    root@SRV1:~# script start web
+   2.200000000  --      run 100ms
+   2.300000000  PC1     root@PC1:~# curl -s http://10.0.0.1/zurück
+   2.300000000  --      run 100ms
+   2.300011008  PC1     Hallo /zurück (7 Zeichen)
+   2.400000000  ok      expect PC1 output contains "Hallo /zurück (7 Zeichen)"
+   2.400000000  --      Ein Dienst aus einer Datei liest sie bei jedem Start; Speichern allein ändert das laufende Programm nicht
+# 9 von 9 Erwartungen erfüllt

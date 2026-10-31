@@ -18,6 +18,7 @@
 //   Engine::sh_job_ended / sh_go     cli_job_done: the command's console job ended, the line goes
 //                                    on; sh_interrupted (Ctrl+C), sh_abort (boot), sh_power_off
 //   jobs, fg, wait, kill, ps, sleep, jfs   the commands of processes
+//   jfs --test FILE ...              the test functions of files (cli/jfstest.rs, IDE1)
 //   JfsProc                          `jfs FILE [ARGS]`: a script of the device's files run as a
 //                                    console program (the ScriptService of scriptsvc.rs and its
 //                                    host: print to the terminal, log to the journal, net, http,
@@ -1193,6 +1194,10 @@ impl Engine {
         if file == "-h" || file == "--help" {
             self.out(ni, &super::man::usage("jfs"));
             return Ok(());
+        }
+        // the tests of files (cli/jfstest.rs)
+        if file == "--test" {
+            return self.sh_jfs_test(ni, &args[1..]);
         }
         let abs = self.sh_abs(ni, file);
         let data = match self.sh_read(ni, &abs) {
