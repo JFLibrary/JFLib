@@ -1,9 +1,10 @@
 #!args --verify-dirty --open apps/JFNetworker/tests/fixtures/mail_domains.jfnet
-# the E-Mail program on a host's Desktop (devwin/email.rs) on fixtures/mail_domains.jfnet: PC2
-# has no account, so the program starts with the form; Bob's account (submission port 587 with
-# his login) is saved as a step of the project; a new message to Anna is sent (the status line,
-# the folder Gesendet); on PC1 Anna fetches it (the status line, the inbox, the message), answers
-# it ("Re: ", to Bob, the text quoted) and sends; Bob fetches the answer; undo takes the fetched
+# the E-Mail program in its window on a host's desktop (devwin/email.rs; it starts maximised,
+# and PC2's desktop is the same when its device window opens again) on
+# fixtures/mail_domains.jfnet: PC2 has no account, so the program starts with the form; Bob's
+# account (submission port 587 with his login) is saved as a step of the project; a new message
+# to Anna is sent (the status line, the folder Gesendet); on PC1 Anna fetches it (the status
+# line, the inbox, the message), answers it ("Re: ", to Bob, the text quoted) and sends; Bob fetches the answer; undo takes the fetched
 # message from PC2's inbox again; a message removed with Löschen.  PC2's clock is a little
 # behind (as every device clock at the start): Bob's message is dated 2025-12-31 23:59.
 # Ids (window 0): Abrufen 73729, Verfassen 73730, Antworten 73731, Löschen 73732, Konto 73733;
@@ -14,8 +15,11 @@ size 1280 900
 theme light
 dblclick listitem:"PC2" shift
 expect window 26624 open
-click tab:"Desktop"
-click button:"E-Mail"
+# a larger device window: the account's form fits the E-Mail window (maximised on the desktop)
+resizewin 26624 900 680
+expect tab:"Desktop" selected
+dblclick listitem:"E-Mail"
+expect dialog:"E-Mail (maximiert)" exists
 expect text:"Noch kein Konto: die Angaben des Mailservers eintragen, dann Speichern." exists
 click #73744
 type "Bob"
@@ -54,8 +58,7 @@ close window 26624
 # Anna fetches, reads and answers
 dblclick listitem:"PC1" shift
 expect window 26624 open
-click tab:"Desktop"
-click button:"E-Mail"
+dblclick listitem:"E-Mail"
 expect tab:"Posteingang (0)" exists
 click #73729
 wait 3000
@@ -79,9 +82,9 @@ close window 26624
 # Bob fetches the answer; undo takes it from his inbox again
 dblclick listitem:"PC2" shift
 expect window 26624 open
-click tab:"Desktop"
-click button:"E-Mail"
-click #73734
+expect dialog:"E-Mail (maximiert)" exists
+expect tab:"Gesendet (1)" selected
+click tab:"Posteingang (0)"
 click #73729
 wait 3000
 expect text:"Abrufen: Eine neue Nachricht von mail.b.lab abgerufen." exists

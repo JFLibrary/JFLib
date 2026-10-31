@@ -13,8 +13,7 @@ type "echo Hallo Anna, das ist ein Test. | mail -s \"Erster Test\" anna@a.lab\n"
 wait 2000
 dblclick listitem:"PC1" shift
 expect window 26624 open
-click tab:"Desktop"
-click button:"E-Mail"
+dblclick listitem:"E-Mail"
 click #73729
 wait 2000
 expect text:"Abrufen: Eine neue Nachricht von mail.a.lab abgerufen." exists

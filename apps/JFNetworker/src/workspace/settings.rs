@@ -7,7 +7,8 @@
 //                       file is written when the dialog closes
 //   shortcuts(n, ui)    every key of the app by area: the commands with their accelerators
 //                       (from the command table, in the current language) and the keys of the
-//                       canvas, the consoles, the simulation, the window and the script editor
+//                       canvas, the consoles, the simulation, the window, the script editor
+//                       and a host's desktop (F11, the keys of its windows)
 //
 // Both are dialogs of the main window; Esc and Schließen end them.
 
@@ -124,12 +125,19 @@ const SCRIPT_KEYS: [(&str, &str); 7] = [
     ("Tab / Umschalt+Tab", "die gewählten Zeilen ein- und ausrücken"),
     ("Alt+Pfeil auf / ab", "die Zeilen verschieben"),
 ];
+// i18n
+const DESK_KEYS: [(&str, &str); 4] = [
+    ("Alt+F6 / Alt+Umschalt+F6", "zum nächsten / vorigen Fenster des Desktops"),
+    ("Alt+F10 / Alt+F9", "das aktive Fenster maximieren und zurück / minimieren"),
+    ("Alt+Minus", "das Menü des aktiven Fensters"),
+    ("Doppelklick / Eingabe", "das Programm eines Symbols öffnen"),
+];
 
 /// the overview of the shortcuts
 pub(crate) fn shortcuts(n: &mut Net, ui: &mut Ui) {
     let open = n.keys_open.clone();
     if ui.dialog_begin(ID_KEYS_DLG, t("Tastenkürzel"), &open) {
-        let sections: [(&'static str, Vec<Row>); 10] = [
+        let sections: [(&'static str, Vec<Row>); 11] = [
             (t("Datei und Bearbeiten"), cmd_rows(ui, &[CMD_NEW, CMD_OPEN, CMD_SAVE, CMD_SAVE_AS, CMD_QUIT, CMD_UNDO, CMD_REDO, CMD_DELETE, CMD_SELECT_ALL, CMD_RENAME, CMD_GROUP, CMD_UNGROUP])),
             (t("Werkzeuge"), cmd_rows(ui, &[CMD_TOOL_SELECT, CMD_TOOL_HAND, CMD_TOOL_CONNECT, CMD_TOOL_NOTE, CMD_TOOL_PDU, CMD_SETTINGS])),
             (t("Ansicht"), cmd_rows(ui, &[CMD_ZOOM_IN, CMD_ZOOM_OUT, CMD_FIT, CMD_VIEW_LOGICAL, CMD_VIEW_PHYS, CMD_PHYS_UP, CMD_PHYS_BACK])),
@@ -144,6 +152,11 @@ pub(crate) fn shortcuts(n: &mut Net, ui: &mut Ui) {
             }),
             (t("Aufgabe"), cmd_rows(ui, &[CMD_TASK_PANEL, CMD_TASK_CHECK])),
             (t("Skript-Editor"), key_rows(&SCRIPT_KEYS)),
+            (t("Desktop"), {
+                let mut v = cmd_rows(ui, &[CMD_DESK_FULL]);
+                v.extend(key_rows(&DESK_KEYS));
+                v
+            }),
         ];
         ui.next_size(500, 460);
         ui.scroll_begin(ID_KEYS_SCROLL, SC_V | pad(2));

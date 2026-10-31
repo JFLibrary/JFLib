@@ -166,6 +166,8 @@
 //   telnetd  the telnet client of the consoles ("telnet HOST [PORT]", the NVT codec of
 //            netpkt::telnet, client-side negotiation, the "%" lines of a refusal or a close);
 //            the vty telnet server is open (it needs a CLI session per vty line) (X1d)
+//   procs    the processes of a device as ps sees them (Engine::processes) and its programs'
+//            CPU time second by second (Engine::cpu_secs): the desktop's Systemmonitor (V2)
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
 // device has it; dig, host and nslookup are console programs too (cli/names.rs).
@@ -263,6 +265,7 @@ pub mod aaa;
 pub mod aaatrace;
 pub mod radiusd;
 pub mod telnetd;
+pub mod procs;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -340,3 +343,4 @@ pub use aaatrace::ANote;
 pub use radiusd::{NasService, RadiusServerSvc};
 pub use telnetd::TelnetClient;
 pub use scriptsvc::DebugOp;
+pub use procs::{ProcKind, ProcRow};

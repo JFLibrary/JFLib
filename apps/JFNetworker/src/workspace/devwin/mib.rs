@@ -6,7 +6,8 @@
 //
 // The browser has no SNMP of its own: its buttons type net-snmp's commands (snmpget,
 // snmpgetnext, snmpwalk, snmpset) on the device's console as if by hand (doc/console.rs typed),
-// so the requests are the device's and the answers stand in the console below the tree; a K1
+// so the requests are the device's and the answers stand in the console below the tree (or in
+// the desktop's Terminal window while that one is above it: desktop::console_or_note); a K1
 // recording replays them as console lines.  The tree shows mib-2 (system, interfaces, ip, snmp,
 // ifMIB) from netpkt::mib; a scalar's instance is 0, a column's the index of a row (ifIndex
 // 1 at first).  Set takes the MIB's type ("=") or one the list names.
@@ -127,7 +128,7 @@ pub(crate) fn browser(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
     match chosen {
         None => {
             ui.next_size(-1, 0);
-            ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Links ein Objekt wählen; Get, GetNext, Walk und Set laufen als Befehle in der Eingabeaufforderung des Geräts."));
+            ui.text(TS_BODY | TX_SECONDARY | TX_WRAP, t("Links ein Objekt wählen; Get, GetNext, Walk und Set laufen als Befehle im Terminal des Geräts."));
         }
         Some(c) => {
             let o = &OBJECTS[c];
@@ -197,12 +198,12 @@ pub(crate) fn browser(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
     }
     ui.box_end();
     ui.box_end();
-    // the answers: the device's console
+    // the answers: the device's console (or where the desktop shows it, desktop.rs)
     ui.next_size(-1, 0);
-    ui.text(TS_CAPTION | TX_SECONDARY, &tf("Die Antworten in der Eingabeaufforderung von {}", &[&n.doc.proj.device(dev).map(|d| d.name.clone()).unwrap_or_else(|| dev.to_string())]));
+    ui.text(TS_CAPTION | TX_SECONDARY, &tf("Die Antworten im Terminal von {}", &[&n.doc.proj.device(dev).map(|d| d.name.clone()).unwrap_or_else(|| dev.to_string())]));
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 0);
-    console::view(n, ui, dev);
+    super::desktop::console_or_note(n, ui, k, dev, super::desktop::Prog::Mib);
     ui.box_end();
     if let Some(c) = cmd {
         n.cons.focus = Some(dev);

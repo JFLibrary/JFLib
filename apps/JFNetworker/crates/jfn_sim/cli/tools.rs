@@ -1832,8 +1832,8 @@ fn f1(m: u64) -> String {
 
 const TOP_HELP: &str = "Usage: top [-b] [-n ITERATIONS] [-d SECONDS]\n  -b  batch mode: the screens one after the other, no clearing\n  -n  stop after this many screens\n  -d  seconds between two screens (3 if not given)\nThe overview shows the services of the device; Ctrl+C ends it.\n";
 
-/// CPUs a device counts for top
-const CPUS: u64 = 4;
+/// CPUs a device counts for top (and the desktop's Systemmonitor)
+pub const CPUS: u64 = 4;
 
 // ---------------------------------------------------------------- the commands
 

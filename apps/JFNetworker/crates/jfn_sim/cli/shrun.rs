@@ -1123,54 +1123,11 @@ impl Engine {
         }
     }
 
-    /// ps [aux | -ef ...]: every process of the device (the options are taken as they come)
+    /// ps [aux | -ef ...]: every process of the device (the options are taken as they come;
+    /// the rows are Engine::processes', procs.rs)
     pub(crate) fn sh_ps(&mut self, ni: usize, _args: &[&str]) -> Result<(), String> {
-        let mut rows: Vec<(u32, u64, String)> = alloc::vec![(1, 0, String::from("init")), (SHELL_PID, 0, String::from("-sh"))];
-        let jobs: Vec<(u32, Option<u32>, String)> = self
-            .sh(ni)
-            .map(|s| {
-                s.bg.iter()
-                    .filter(|j| j.ended.is_none())
-                    .map(|j| {
-                        let svc = match j.cj {
-                            Some(CliJob { out: JobOut::Proc { svc, .. }, .. }) => Some(svc),
-                            _ => None,
-                        };
-                        (j.pid, svc, j.text.clone())
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-        let mut shown: Vec<u32> = Vec::new();
-        if let Some(os) = self.os(ni) {
-            for s in os.svcs.iter().filter(|s| s.running) {
-                let pid = 100 + s.id;
-                let name = match jobs.iter().find(|j| j.1 == Some(s.id)) {
-                    Some(j) => {
-                        shown.push(j.0);
-                        j.2.clone()
-                    }
-                    None => s.name.clone(),
-                };
-                let cpu = s.svc.as_ref().map_or(0, |x| {
-                    if let Some(sc) = x.as_any().downcast_ref::<ScriptService>() {
-                        sc.busy_ns()
-                    } else if let Some(p) = x.as_any().downcast_ref::<JfsProc>() {
-                        p.inner.busy_ns()
-                    } else if let Some(h) = x.as_any().downcast_ref::<crate::httpsvc::HttpServer>() {
-                        h.busy_ns
-                    } else {
-                        0
-                    }
-                });
-                rows.push((pid, cpu, name));
-            }
-        }
-        for (pid, svc, text) in &jobs {
-            if !shown.contains(pid) && svc.is_none_or(|s| !rows.iter().any(|r| r.0 == 100 + s)) {
-                rows.push((*pid, 0, text.clone()));
-            }
-        }
+        let dev = self.dev_of(ni);
+        let mut rows: Vec<(u32, u64, String)> = self.processes(dev).into_iter().map(|p| (p.pid, p.cpu_ns, p.cmd)).collect();
         let me = rows.iter().map(|r| r.0).max().unwrap_or(SHELL_PID) + 1;
         rows.push((me, 0, String::from("ps")));
         rows.sort_by_key(|r| r.0);
