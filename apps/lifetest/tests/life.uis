@@ -14,6 +14,13 @@ expect text:"Log: INFO  app: the system goes to sleep" exists
 system resume
 expect text:"Aktiv: nein  Schlaf: nein  Ende: 0" exists
 expect text:"Log: INFO  app: the system woke up" exists
+# the browser's hidden tab / Android's onStop: UIC_SUSPEND 2, back: 0 (logged apart from sleep)
+system background
+expect text:"Aktiv: nein  Schlaf: ja  Ende: 0" exists
+expect text:"Log: INFO  app: the app went to the background" exists
+system foreground
+expect text:"Aktiv: nein  Schlaf: nein  Ende: 0" exists
+expect text:"Log: INFO  app: the app is in the foreground again" exists
 # settings: the bits reach the app; a fixed theme (theme light: one UIC_THEME) does not follow
 # the system
 system settings locale
