@@ -60,6 +60,10 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#img_svg-crate-root) · [doc.rs](#img_svgdocrs) · [render.rs](#img_svgrenderrs)
 - [fx](#fx) -- effects and adjustments
   <br>[lib.rs](#fx-crate-root) · [adj.rs](#fxadjrs) · [artistic.rs](#fxartisticrs) · [enhance.rs](#fxenhancers) · [blur.rs](#fxblurrs) · [color.rs](#fxcolorrs) · [conv.rs](#fxconvrs) · [distort.rs](#fxdistortrs) · [hist.rs](#fxhistrs) · [lochist.rs](#fxlochistrs) · [lut.rs](#fxlutrs) · [noise.rs](#fxnoisers) · [object.rs](#fxobjectrs) · [perlin.rs](#fxperlinrs) · [photo.rs](#fxphotors) · [render.rs](#fxrenderrs) · [stylize.rs](#fxstylizers) · [warp.rs](#fxwarprs)
+- [gpu](#gpu) -- the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)
+  <br>[lib.rs](#gpu-crate-root) · [vk_cmd.rs](#gpuvk_cmdrs) · [vk_dev.rs](#gpuvk_devrs) · [vk_inst.rs](#gpuvk_instrs) · [vk_res.rs](#gpuvk_resrs) · [vk_swap.rs](#gpuvk_swaprs)
+- [shader](#shader) -- SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders
+  <br>[lib.rs](#shader-crate-root) · [bench.rs](#shaderbenchrs) · [dis.rs](#shaderdisrs) · [layout.rs](#shaderlayoutrs) · [module.rs](#shadermodulers) · [parse.rs](#shaderparsers) · [spv.rs](#shaderspvrs) · [val.rs](#shadervalrs)
 - [plat](#plat) -- the platform layer: process, files, threads, windows (Windows and Linux)
   <br>[lib.rs](#plat-crate-root) · [process.rs](#platprocessrs) · [process_win.rs (Windows)](#platprocess_winrs-windows) · [process_linux.rs (Linux)](#platprocess_linuxrs-linux) · [sync.rs](#platsyncrs) · [net.rs](#platnetrs) · [fs.rs](#platfsrs) · [service.rs](#platservicers) · [watch.rs](#platwatchrs) · [certs.rs](#platcertsrs) · [rand.rs](#platrandrs) · [cpu.rs](#platcpurs) · [capabilities.rs](#platcapabilitiesrs) · [policy.rs](#platpolicyrs) · [sandbox.rs](#platsandboxrs) · [boot.rs](#platbootrs) · [vfs.rs](#platvfsrs) · [content.rs](#platcontentrs) · [secret.rs](#platsecretrs) · [instance.rs](#platinstancers) · [spell.rs](#platspellrs) · [tray.rs](#plattrayrs) · [power.rs](#platpowerrs) · [autostart.rs](#platautostartrs) · [pkg.rs](#platpkgrs) · [linux_flatpak.rs (Linux)](#platlinux_flatpakrs-linux) · [taskbar.rs](#plattaskbarrs) · [assoc.rs](#platassocrs) · [recent.rs](#platrecentrs) · [audio.rs](#plataudiors) · [screen.rs](#platscreenrs) · [hotkey.rs](#plathotkeyrs) · [log.rs](#platlogrs) · [a11y.rs](#plata11yrs) · [a11y_wire.rs](#plata11y_wirers) · [settings.rs](#platsettingsrs) · [locale.rs](#platlocalers) · [guarded.rs](#platguardedrs) · [dirs.rs](#platdirsrs) · [control_stream.rs](#platcontrol_streamrs) · [control_ipc_win.rs (Windows)](#platcontrol_ipc_winrs-windows) · [control_ipc_linux.rs (Linux)](#platcontrol_ipc_linuxrs-linux) · [pool.rs](#platpoolrs) · [task.rs](#plattaskrs) · [aio.rs](#plataiors) · [win.rs (Windows)](#platwinrs-windows) · [win_api.rs (Windows)](#platwin_apirs-windows) · [win_clip.rs (Windows)](#platwin_cliprs-windows) · [win_filedlg.rs (Windows)](#platwin_filedlgrs-windows) · [win_pen.rs (Windows)](#platwin_penrs-windows) · [win_popup.rs (Windows)](#platwin_popuprs-windows) · [win_shell.rs (Windows)](#platwin_shellrs-windows) · [win_test.rs (Windows)](#platwin_testrs-windows) · [win_inst.rs (Windows)](#platwin_instrs-windows) · [win_screen.rs (Windows)](#platwin_screenrs-windows) · [win_hotkey.rs (Windows)](#platwin_hotkeyrs-windows) · [win_uia.rs (Windows)](#platwin_uiars-windows) · [win_dnd.rs (Windows)](#platwin_dndrs-windows) · [win_sys.rs (Windows)](#platwin_sysrs-windows) · [win_thread.rs (Windows)](#platwin_threadrs-windows) · [win_print.rs (Windows)](#platwin_printrs-windows) · [win_lib.rs (Windows)](#platwin_librs-windows) · [linux.rs (Linux)](#platlinuxrs-linux) · [linux_disp.rs (Linux)](#platlinux_disprs-linux) · [linux_wl.rs (Linux)](#platlinux_wlrs-linux) · [linux_xkb.rs (Linux)](#platlinux_xkbrs-linux) · [linux_x11.rs (Linux)](#platlinux_x11rs-linux) · [linux_portal.rs (Linux)](#platlinux_portalrs-linux) · [linux_ibus.rs (Linux)](#platlinux_ibusrs-linux) · [linux_life.rs (Linux)](#platlinux_lifers-linux) · [linux_sys.rs (Linux)](#platlinux_sysrs-linux) · [linux_thread.rs (Linux)](#platlinux_threadrs-linux) · [linux_print.rs (Linux)](#platlinux_printrs-linux) · [linux_elfload.rs (Linux)](#platlinux_elfloadrs-linux) · [web.rs](#platwebrs) · [web_files.rs](#platweb_filesrs) · [android_host.rs](#platandroid_hostrs) · [web_windows.rs](#platweb_windowsrs) · [web_screen.rs](#platweb_screenrs) · [android_ime.rs](#platandroid_imers) · [web_threads.rs](#platweb_threadsrs) · [clipdrop.rs](#platclipdroprs) · [dnd.rs](#platdndrs) · [cliprich.rs](#platcliprichrs) · [consts.rs](#platconstsrs) · [evq.rs](#platevqrs) · [ime.rs](#platimers) · [icc.rs](#platiccrs) · [pwin0.rs](#platpwin0rs) · [plib.rs](#platplibrs) · [print.rs](#platprintrs) · [modhost.rs](#platmodhostrs) · [modabi.rs](#platmodabirs)
 - [base](#base) -- UTF-8, command line, settings files, numbers and text
@@ -17275,6 +17279,1984 @@ FXW_NEDGE: i32 = 7
   ln x (fdlibm e_log.c); x clamped to [DBL_MIN, DBL_MAX] (NaN, 0, negatives -> ln DBL_MIN)
   [fxm_log]
 
+## gpu
+
+*the GPU layer: adapters, devices, buffers, textures, pipelines, command lists, timestamps, swapchains (Vulkan on Windows)* -- crate root [`lib/gpu/lib.rs`](../lib/gpu/lib.rs)
+
+```text
+gpu -- GPU access for the UI, 2D CAD and 3D games: an explicit API in the manner of Vulkan
+and WebGPU over one backend per target (docs/GPU.md).  Backend now: Vulkan on Windows
+(vulkan-1.dll loaded at run time; vk_*.rs).  Planned: Vulkan on Linux and Android, WebGPU
+in the browser, Metal; they provide the same types and methods.
+
+  Instance::new() / with(&InstanceDesc) -> Result<Instance>   the system's GPU API;
+                   Err(Disabled) with jfgui_GPU=0, Err(NoLoader) without a loader
+  instance.adapters() -> Result<Vec<Adapter>>   every GPU, discrete ones first
+  instance.adapter() -> Result<Adapter>         the first usable one (jfgui_GPU_ADAPTER: an
+                   index into adapters() or a part of the name)
+  adapter.info() / features() / limits() / level() / create_device(&DeviceDesc)
+  instance.validating(), validation_messages() -> (errors, warnings)   jfgui_GPU_VALIDATE
+  device.queue() -> &Queue; features(), limits(), info(), level(), is_lost(), poll(),
+         wait(id, timeout_ns), wait_idle(), memory_reserved()
+  device.create_buffer(&BufferDesc)               Buffer: size(), write(off, &[T]),
+                                                  read(off, &mut [T]) (Upload / Readback)
+  device.create_texture(&TextureDesc)             Texture: view(), create_view(&ViewDesc),
+                                                  width(), height(), format(), mips(), layers()
+  device.create_sampler(&SamplerDesc)             Sampler
+  ShaderModule::from_spirv(&device, &[u32])       SPIR-V words (1.3 on Vulkan 1.1, up to 1.6)
+  device.create_bind_group_layout(&[Binding])     BindGroupLayout
+  device.create_pipeline_layout(&PipelineLayoutDesc)   PipelineLayout
+  device.create_bind_group(&BindGroupDesc)        BindGroup
+  device.create_bindless(&BindlessDesc)           Bindless (level Voll): set_texture /
+                                                  set_sampler / set_buffer / set_storage_texture
+  device.create_compute_pipeline(&ComputePipelineDesc)  ComputePipeline
+  device.create_render_pipeline(&RenderPipelineDesc)    RenderPipeline
+  device.create_timestamps(n)                     Timestamps: read_ms(first, n) (since the
+                                                  device's first read), read_ticks
+  device.encoder() -> CommandEncoder              copies, fill, barriers, compute, render
+                   passes, draws, indirect draws, timestamps; finish() -> CommandBuffer
+  queue.submit([cmd, ..]) -> SubmitId             timeline semaphore value
+  queue.write_buffer / write_texture (staged, before the next submit), read_buffer (waits)
+  Surface::new(&instance, plat_window)            a plat window (Windows: HWND)
+  device.create_swapchain(&surface, &SwapchainDesc) -> Swapchain: acquire() -> Option<Frame>,
+                   view(&frame), texture(&frame), present(frame, [cmd, ..]), resize()
+
+Conventions shared by every backend (and the WGSL compiler): normalized device coordinates
+with y up and depth 0 ..= 1, framebuffer and texture origin top left (Vulkan: the viewport
+is flipped); front faces counter-clockwise in framebuffer coordinates by default; group g /
+binding b of a pipeline layout = WGSL @group(g) @binding(b) = SPIR-V DescriptorSet g /
+Binding b; push constants: one block from offset 0 visible to every stage, at most
+PUSH_CONSTANTS_MAX bytes; vertex input is optional (vertex pulling from storage buffers).
+
+Feature levels: Basis = what WebGPU and Vulkan 1.1 do (compute, storage buffers, single
+indirect draws and dispatches, texture arrays, timestamps where present); Voll = Vulkan 1.3
+with descriptor indexing (Bindless), draw_indexed_indirect_count, multi-draw indirect, draw
+parameters and subgroup operations.  Mesh shaders and ray tracing are reported in Features,
+not enabled.  Renderers ask device.level() / features().
+
+Errors: every call returns Result; misuse the backend can detect (sizes, alignments, states,
+a draw without pipeline, a Voll command on Basis) is GpuError::Invalid -- recorded commands
+report it from finish().  A lost device (driver reset, GPU removed) is GpuError::DeviceLost
+on every later call; drop the Device and create a new one from the adapter.
+
+Lifetimes: resources are reference-counted handles; a command encoder borrows what it
+records, and a dropped resource is destroyed once the GPU has finished every submission made
+before the drop (the device's timeline).  Nothing waits on the CPU unless asked (wait,
+read_buffer, Timestamps::read_*).
+
+Environment: jfgui_GPU=0 (off), jfgui_GPU_DLL (the loader's file name or path),
+jfgui_GPU_ADAPTER (index or name part), jfgui_GPU_PRESENT=fifo|mailbox|immediate,
+jfgui_GPU_VALIDATE=1 (the Khronos validation layer with synchronization validation when it is
+installed, messages on stderr), jfgui_GPU_DEBUG=1 (the driver's debug messages).
+```
+
+### `gpu` crate root
+
+- **`type Result<T> = core::result::Result<T, GpuError>`**
+
+```rust
+/// the most push-constant bytes a pipeline layout may declare (every backend guarantees it)
+PUSH_CONSTANTS_MAX: u32 = 128
+/// the most bind groups of a pipeline layout
+BIND_GROUPS_MAX: u32 = 4
+/// the most colour targets of a render pass
+COLOR_TARGETS_MAX: usize = 8
+```
+
+- **`enum GpuError`**
+  what went wrong
+  - `Disabled` -- the GPU is switched off (jfgui_GPU=0)
+  - `NoLoader` -- the GPU API is not installed (no vulkan-1.dll, or jfgui_GPU_DLL names a missing file)
+  - `NoAdapter` -- no usable GPU (or jfgui_GPU_ADAPTER matched none)
+  - `Unsupported(&'static str)` -- the adapter or this backend lacks something (a feature, a format, the level)
+  - `Invalid(&'static str)` -- a call the API does not allow (sizes, alignments, states, order)
+  - `OutOfMemory` -- host or device memory exhausted
+  - `DeviceLost` -- the device was lost (driver reset, GPU removed): recreate it
+  - `SurfaceLost` -- the window's surface is gone
+  - `Timeout` -- a wait ran out of time
+  - `NotReady` -- results are not available yet (timestamps not written or not finished)
+  - `Failed(i32)` -- another failure of the GPU API (its code: a VkResult)
+
+- **`unsafe trait Pod: Copy + 'static`**
+  plain data that may be copied to and from GPU memory byte for byte: no padding, no
+  pointers, every bit pattern valid
+
+  # Safety
+  Implemented here for the integer and float types and arrays of them.
+
+- **`fn bytes_of<T: Pod>(s: &[T]) -> &[u8]`**
+  the bytes of a slice of plain data
+
+- **`enum Level`**
+  the feature level of a device (Basis &lt; Voll)
+  - `Basis` -- WebGPU / Vulkan 1.1: compute, storage buffers, single indirect draws, texture arrays
+  - `Voll` -- Vulkan 1.3 with bindless descriptors, indirect count, multi-draw, subgroups
+
+- **`enum AdapterKind`**
+  what kind of GPU
+  - `Discrete`
+  - `Integrated`
+  - `Virtual`
+  - `Cpu`
+  - `Other`
+
+- **`struct AdapterInfo`**
+  who an adapter is
+  - `name: String` -- the GPU's name ("NVIDIA GeForce RTX 2070 SUPER")
+  - `vendor_id: u32`
+  - `device_id: u32`
+  - `vendor: &'static str` -- the vendor's name for well-known vendor ids ("NVIDIA", "AMD", "Intel", ..)
+  - `kind: AdapterKind`
+  - `driver: String` -- the driver's name ("NVIDIA") and its information string (the version as the vendor
+    writes it)
+  - `driver_info: String`
+  - `driver_version: String` -- the driver version decoded by the vendor's scheme
+  - `api_version: (u32, u32, u32)` -- the API version the device supports (major, minor, patch)
+  - `backend: &'static str` -- "Vulkan", later "WebGPU" / "Metal"
+  - `missing: Option<&'static str>` -- why the backend cannot use this adapter (None: usable)
+
+- **`struct Features`**
+  what a device can do beyond the Basis level
+  - `timestamps: bool` -- GPU timestamps on the queue (Timestamps)
+  - `multi_draw_indirect: bool` -- draw_indexed_indirect_multi (several draws from one buffer)
+  - `draw_indirect_first_instance: bool` -- a first instance other than 0 in indirect draws
+  - `draw_indirect_count: bool` -- draw_indexed_indirect_count
+  - `bindless: bool` -- Bindless tables (descriptor indexing, update after bind)
+  - `subgroups: bool` -- subgroup operations (basic, vote, ballot, arithmetic, shuffle) in compute shaders
+  - `draw_parameters: bool` -- the base vertex / base instance / draw index builtins
+  - `shader_f16: bool`
+  - `shader_f64: bool`
+  - `shader_i16: bool`
+  - `shader_i64: bool`
+  - `shader_i8: bool`
+  - `storage_16bit: bool` -- 16 / 8 bit values in storage buffers
+  - `storage_8bit: bool`
+  - `texture_bc: bool` -- BC1 .. BC7 compressed textures
+  - `anisotropy: bool`
+  - `depth_clamp: bool`
+  - `vertex_stores: bool` -- storage writes in vertex / fragment shaders
+  - `fragment_stores: bool`
+  - `storage_write_without_format: bool` -- storage textures without a format in the shader
+  - `buffer_address: bool` -- shader access to buffers by address
+  - `swapchain: bool` -- presentation to windows (Swapchain)
+  - `mesh_shader: bool` -- present on the adapter, not enabled yet: mesh shaders, ray queries, ray-tracing pipelines
+  - `ray_query: bool`
+  - `ray_pipeline: bool`
+
+- **`struct Limits`**
+  the device's limits
+  - `max_texture_2d: u32`
+  - `max_texture_3d: u32`
+  - `max_texture_layers: u32`
+  - `max_storage_binding: u32` -- the largest range of a storage / uniform buffer binding (bytes)
+  - `max_uniform_binding: u32`
+  - `max_push_constants: u32` -- push-constant bytes of the device (the API allows PUSH_CONSTANTS_MAX)
+  - `max_bind_groups: u32`
+  - `max_compute_workgroup_size: [u32; 3]`
+  - `max_compute_invocations: u32`
+  - `max_compute_workgroups: [u32; 3]`
+  - `max_compute_shared_memory: u32`
+  - `min_uniform_offset_alignment: u32`
+  - `min_storage_offset_alignment: u32`
+  - `max_color_targets: u32`
+  - `max_vertex_buffers: u32`
+  - `max_vertex_attributes: u32`
+  - `max_draw_indirect_count: u32`
+  - `max_anisotropy: f32`
+  - `timestamp_period_ns: f32` -- nanoseconds per timestamp tick
+  - `subgroup_size: u32` -- threads per subgroup (0: unknown)
+  - `max_bindless_textures: u32` -- the most slots of a Bindless table (Voll; 0 on Basis)
+  - `max_bindless_samplers: u32`
+  - `max_bindless_buffers: u32`
+  - `max_bindless_storage_textures: u32`
+  - `device_memory: u64` -- bytes of the device-local memory heaps
+
+- **`struct InstanceDesc<'a>`**
+  Instance::with
+  - `app_name: &'a str` -- the application's name for the driver
+  - `validate: bool` -- the validation layer (as jfgui_GPU_VALIDATE=1)
+
+**`impl InstanceDesc<'_>`**
+
+- **`const DEFAULT: InstanceDesc<'static> = InstanceDesc { app_name: "jfgui", validate: false }`**
+
+- **`struct DeviceDesc`**
+  Adapter::create_device
+  - `max_level: Level` -- the highest level to enable (the device gets the highest it supports up to this one)
+
+**`impl DeviceDesc`**
+
+- **`const DEFAULT: DeviceDesc = DeviceDesc { max_level: Level::Voll }`**
+
+- **`struct SubmitId(pub u64)`**
+  a submission's place on the device timeline (Device::wait)
+
+- **`enum MemoryKind`**
+  where a buffer's memory lives
+  - `Device` -- GPU memory (fastest for the GPU; filled by copies or Queue::write_buffer)
+  - `Upload` -- CPU memory the GPU reads (staging, per-frame data; Buffer::write)
+  - `Readback` -- CPU memory the GPU writes (results; Buffer::read)
+
+- **`struct BufferDesc`**
+  Device::create_buffer
+  - `size: u64`
+  - `usage: BufferUsage`
+  - `memory: MemoryKind`
+
+- **`enum Format`**
+  texel formats
+  - `R8Unorm`
+  - `Rg8Unorm`
+  - `Rgba8Unorm`
+  - `Rgba8Srgb`
+  - `Bgra8Unorm`
+  - `Bgra8Srgb`
+  - `Rgb10a2Unorm`
+  - `Rg11b10Float`
+  - `R16Float`
+  - `Rg16Float`
+  - `Rgba16Float`
+  - `R32Uint`
+  - `R32Sint`
+  - `R32Float`
+  - `Rg32Uint`
+  - `Rg32Float`
+  - `Rgba32Uint`
+  - `Rgba32Float`
+  - `Depth16`
+  - `Depth32Float`
+  - `Depth24Stencil8`
+  - `Depth32FloatStencil8`
+  - `Bc1Unorm`
+  - `Bc1Srgb`
+  - `Bc3Unorm`
+  - `Bc3Srgb`
+  - `Bc4Unorm`
+  - `Bc5Unorm`
+  - `Bc7Unorm`
+  - `Bc7Srgb`
+
+**`impl Format`**
+
+- **`const fn block_bytes(self) -> u32`**
+  bytes per texel block (a texel, or a 4 x 4 block of a compressed format)
+- **`const fn block_dim(self) -> u32`**
+  the block's width and height in texels (4 for compressed formats, else 1)
+- **`const fn is_compressed(self) -> bool`**
+- **`const fn is_depth(self) -> bool`**
+- **`const fn has_stencil(self) -> bool`**
+- **`const fn is_srgb(self) -> bool`**
+
+- **`struct TextureDesc`**
+  Device::create_texture: a 2D texture (layers > 1: an array; cube: 6 \* n layers) or a 3D one
+  (depth > 1)
+  - `width: u32`
+  - `height: u32`
+  - `depth: u32` -- 1 for 2D textures
+  - `layers: u32` -- 1 for a single texture
+  - `mips: u32` -- mip levels (1 = none)
+  - `format: Format`
+  - `usage: TextureUsage`
+  - `cube: bool` -- cube faces: layers is a multiple of 6
+
+**`impl TextureDesc`**
+
+- **`const fn d2(width: u32, height: u32, format: Format, usage: TextureUsage) -> TextureDesc`**
+  a single-level 2D texture
+
+- **`enum ViewDim`**
+  a view's dimension
+  - `D2`
+  - `D2Array`
+  - `Cube`
+  - `CubeArray`
+  - `D3`
+
+- **`struct ViewDesc`**
+  Texture::create_view: a range of mips and layers (counts 0 = to the end)
+  - `dim: ViewDim`
+  - `base_mip: u32`
+  - `mips: u32`
+  - `base_layer: u32`
+  - `layers: u32`
+
+- **`enum Layout`**
+  the state a texture is in (texture_barrier, render pass attachments, write_texture)
+  - `Undefined` -- contents discarded; waits for earlier colour, copy and compute work (and for the
+    swapchain image's acquisition)
+  - `General` -- storage textures and anything at once (slower on some GPUs)
+  - `CopySrc`
+  - `CopyDst`
+  - `Sampled` -- sampled in shaders (also depth textures)
+  - `ColorTarget`
+  - `DepthTarget`
+  - `DepthRead` -- depth test without writes while shaders sample it
+  - `Present` -- handed to the window (the last layout of a swapchain image)
+
+- **`enum Filter`**
+  - `Nearest`
+  - `Linear`
+
+- **`enum AddressMode`**
+  - `Repeat`
+  - `MirrorRepeat`
+  - `ClampToEdge`
+
+- **`enum Compare`**
+  comparison functions (depth test, comparison samplers)
+  - `Never`
+  - `Less`
+  - `Equal`
+  - `LessEqual`
+  - `Greater`
+  - `NotEqual`
+  - `GreaterEqual`
+  - `Always`
+
+- **`struct SamplerDesc`**
+  Device::create_sampler
+  - `mag: Filter`
+  - `min: Filter`
+  - `mip: Filter`
+  - `address: [AddressMode; 3]` -- u, v, w
+  - `anisotropy: u16` -- 1 = off, up to Limits::max_anisotropy (needs Features::anisotropy)
+  - `compare: Option<Compare>` -- a comparison sampler (shadow maps)
+  - `lod_min: f32`
+  - `lod_max: f32`
+
+**`impl SamplerDesc`**
+
+- **`const LINEAR: SamplerDesc = SamplerDesc { mag: Filter::Linear, min: Filter::Linear, m ...`**
+- **`const NEAREST: SamplerDesc = SamplerDesc { mag: Filter::Nearest, min: Filter::Nearest, ...`**
+
+- **`enum BindingKind`**
+  what a binding holds
+  - `UniformBuffer`
+  - `StorageBuffer` -- read and written by shaders
+  - `StorageBufferRead` -- read only (also visible to vertex shaders without Features::vertex_stores)
+  - `Texture` -- a sampled texture (Layout::Sampled)
+  - `StorageTexture` -- a storage texture (Layout::General)
+  - `Sampler`
+
+- **`struct Binding`**
+  one binding of a BindGroupLayout
+  - `binding: u32`
+  - `kind: BindingKind`
+  - `stages: Stages`
+
+- **`struct PipelineLayoutDesc<'a>`**
+  Device::create_pipeline_layout
+  - `groups: &'a [&'a BindGroupLayout]` -- bind group g = @group(g); at most BIND_GROUPS_MAX
+  - `push_constants: u32` -- push-constant bytes (a multiple of 4, at most PUSH_CONSTANTS_MAX)
+
+- **`enum Resource<'a>`**
+  a resource bound into a BindGroup
+  - `Buffer { buffer: &'a Buffer, offset: u64, size: u64 }` -- a buffer range (size 0: to the end); offsets aligned to Limits::min_\*\_offset_alignment
+  - `Texture(&'a TextureView)`
+  - `StorageTexture(&'a TextureView)`
+  - `Sampler(&'a Sampler)`
+
+- **`struct BindEntry<'a>`**
+  - `binding: u32`
+  - `resource: Resource<'a>`
+
+- **`struct BindGroupDesc<'a>`**
+  Device::create_bind_group: one entry per binding of the layout
+  - `layout: &'a BindGroupLayout`
+  - `entries: &'a [BindEntry<'a>]`
+
+- **`struct BindlessDesc`**
+  Device::create_bindless: the slots of each kind (bindings 0 textures, 1 samplers, 2 storage
+  buffers, 3 storage textures of one group)
+  - `textures: u32`
+  - `samplers: u32`
+  - `buffers: u32`
+  - `storage_textures: u32`
+
+- **`struct ShaderStage<'a>`**
+  a shader entry point
+  - `module: &'a ShaderModule`
+  - `entry: &'a str`
+
+- **`struct ComputePipelineDesc<'a>`**
+  Device::create_compute_pipeline
+  - `layout: &'a PipelineLayout`
+  - `shader: ShaderStage<'a>`
+
+- **`enum Topology`**
+  - `Points`
+  - `Lines`
+  - `LineStrip`
+  - `Triangles`
+  - `TriangleStrip`
+
+- **`enum Cull`**
+  - `None`
+  - `Front`
+  - `Back`
+
+- **`enum VertexFormat`**
+  vertex attribute formats
+  - `F32`
+  - `F32x2`
+  - `F32x3`
+  - `F32x4`
+  - `U32`
+  - `U32x2`
+  - `U32x4`
+  - `Unorm8x4` -- four bytes as 0 ..= 1
+
+- **`struct VertexAttribute`**
+  - `location: u32`
+  - `format: VertexFormat`
+  - `offset: u32`
+
+- **`struct VertexBufferLayout<'a>`**
+  a vertex buffer slot (empty list: vertex pulling)
+  - `stride: u32`
+  - `per_instance: bool`
+  - `attributes: &'a [VertexAttribute]`
+
+- **`enum BlendFactor`**
+  - `Zero`
+  - `One`
+  - `Src`
+  - `OneMinusSrc`
+  - `Dst`
+  - `OneMinusDst`
+  - `SrcAlpha`
+  - `OneMinusSrcAlpha`
+  - `DstAlpha`
+  - `OneMinusDstAlpha`
+
+- **`enum BlendOp`**
+  - `Add`
+  - `Subtract`
+  - `ReverseSubtract`
+  - `Min`
+  - `Max`
+
+- **`struct BlendComponent`**
+  - `src: BlendFactor`
+  - `dst: BlendFactor`
+  - `op: BlendOp`
+
+- **`struct Blend`**
+  colour and alpha blending of a colour target
+  - `color: BlendComponent`
+  - `alpha: BlendComponent`
+
+**`impl Blend`**
+
+- **`const PREMULTIPLIED: Blend = Blend { color: BlendComponent { src: BlendFactor::One, ds ...`**
+  premultiplied alpha: src + dst \* (1 - src.a)
+- **`const ALPHA: Blend = Blend { color: BlendComponent { src: BlendFactor::SrcAlph ...`**
+  straight alpha: src \* src.a + dst \* (1 - src.a)
+- **`const ADD: Blend = Blend { color: BlendComponent { src: BlendFactor::One, ds ...`**
+  additive: src + dst
+
+- **`struct ColorTarget`**
+  a colour target of a render pipeline
+  - `format: Format`
+  - `blend: Option<Blend>`
+  - `write_mask: u32` -- bits 0..3 = r, g, b, a (0xF: all)
+
+- **`struct DepthState`**
+  the depth test of a render pipeline
+  - `format: Format`
+  - `write: bool`
+  - `compare: Compare`
+
+- **`struct RenderPipelineDesc<'a>`**
+  Device::create_render_pipeline
+  - `layout: &'a PipelineLayout`
+  - `vertex: ShaderStage<'a>`
+  - `fragment: Option<ShaderStage<'a>>`
+  - `buffers: &'a [VertexBufferLayout<'a>]` -- vertex buffer slots (empty: the vertex shader pulls its data)
+  - `topology: Topology`
+  - `cull: Cull`
+  - `front_cw: bool` -- front faces are clockwise (default counter-clockwise)
+  - `targets: &'a [ColorTarget]`
+  - `depth: Option<DepthState>`
+
+- **`enum Load`**
+  what a render pass does with an attachment's old contents
+  - `Keep`
+  - `Clear`
+  - `Discard`
+
+- **`struct ColorAttachment<'a>`**
+  a colour attachment of a render pass: the view goes from `before` to ColorTarget at the
+  start and to `after` at the end
+  - `view: &'a TextureView`
+  - `load: Load`
+  - `clear: [f32; 4]`
+  - `store: bool`
+  - `before: Layout`
+  - `after: Layout`
+
+- **`struct DepthAttachment<'a>`**
+  the depth attachment of a render pass (DepthTarget during the pass)
+  - `view: &'a TextureView`
+  - `load: Load`
+  - `clear: f32`
+  - `store: bool`
+  - `before: Layout`
+  - `after: Layout`
+
+- **`struct RenderPassDesc<'d, 'a>`**
+  CommandEncoder::begin_render (the slice may be a temporary: only the views are borrowed
+  for the encoder's lifetime)
+  - `color: &'d [ColorAttachment<'a>]`
+  - `depth: Option<DepthAttachment<'a>>`
+
+- **`enum IndexFormat`**
+  - `U16`
+  - `U32`
+
+- **`struct TextureRegion<'a>`**
+  a region of one mip of a texture: origin and size in texels (z: 3D textures), layers
+  - `texture: &'a Texture`
+  - `mip: u32`
+  - `origin: [u32; 3]`
+  - `size: [u32; 3]`
+  - `base_layer: u32`
+  - `layers: u32`
+
+**`impl<'a> TextureRegion<'a>`**
+
+- **`fn mip(texture: &'a Texture, mip: u32) -> TextureRegion<'a>`**
+  all of mip `mip` and every layer
+
+- **`struct DataLayout`**
+  the layout of texel data in a buffer or slice: rows of bytes_per_row bytes (0: tightly
+  packed), rows_per_image rows per layer / slice (0: the region's height)
+  - `offset: u64`
+  - `bytes_per_row: u32`
+  - `rows_per_image: u32`
+
+- **`enum PresentMode`**
+  how frames reach the window
+  - `Fifo` -- vsync: one image per refresh, never tears (always available)
+  - `Mailbox` -- the newest image at the refresh, older ones dropped (no tearing, low latency)
+  - `Immediate` -- at once (tears; for measurements)
+
+- **`struct SwapchainDesc`**
+  Device::create_swapchain
+  - `present: PresentMode`
+  - `srgb: bool` -- an sRGB format (the GPU encodes gamma on writes)
+  - `copy_src: bool` -- the images may be copied from (read-back of the presented image)
+  - `frames_in_flight: u32` -- frames the CPU may record ahead of the GPU (1 ..= 3)
+
+**`impl SwapchainDesc`**
+
+- **`const DEFAULT: SwapchainDesc = SwapchainDesc { present: PresentMode::Fifo, srgb: false, ...`**
+
+### `gpu/vk_cmd.rs`
+
+Source: [`lib/gpu/vk_cmd.rs`](../lib/gpu/vk_cmd.rs)
+
+```text
+vk_cmd -- command recording: CommandEncoder -> CommandBuffer
+
+  device.encoder() -> Result<CommandEncoder>      a command buffer slot, begun
+  copies (outside render passes): copy_buffer, fill_buffer, copy_buffer_to_texture (the
+       region in Layout::CopyDst), copy_texture_to_buffer (Layout::CopySrc)
+  barrier(before: Access, after: Access)          a global memory barrier
+  texture_barrier(tex, before, after) / texture_barrier_range(.., mips, layers, ..)
+  set_compute_pipeline, set_bind_group(g, &group), push_constants(off, &[T]),
+       dispatch(x, y, z), dispatch_indirect(&buf, off)
+  begin_render(&RenderPassDesc) .. end_render()   dynamic rendering; the attachments go from
+       `before` to ColorTarget / DepthTarget at the start and to `after` at the end; viewport
+       and scissor = the whole target
+  set_render_pipeline, set_viewport, set_scissor, set_vertex_buffer, set_index_buffer,
+       draw, draw_indexed, draw_indirect, draw_indexed_indirect (Basis), and on Voll
+       draw_indexed_indirect_multi and draw_indexed_indirect_count
+  reset_timestamps(&ts, first, n) (outside passes), timestamp(&ts, i)
+  finish() -> Result<CommandBuffer>               the first misuse recorded, if any
+
+Bind groups and push constants go to the pipeline set last: the compute pipeline outside
+render passes, the render pipeline inside (set the pipeline first).  Every command checks
+what the backend can know cheaply (the pipeline and pass state, bind group / pipeline layout
+compatibility, target formats, buffer usages, ranges and alignments, the Voll features); a
+failed check skips the command and finish() returns it as GpuError::Invalid.
+
+Stages and accesses per Layout (texture_barrier, attachments, write_texture), as (source;
+destination): Undefined (colour output + copy + compute, no access -- the stages the
+swapchain acquisition waits at; not a destination), General (all commands, memory read /
+write), CopySrc / CopyDst (transfer), Sampled (vertex + fragment + compute shaders), ColorTarget
+(colour output), DepthTarget (early + late fragment tests), DepthRead (fragment tests and
+shaders), Present (as Undefined; bottom of pipe).
+Viewport: y flipped (origin top left, NDC y up: lib.rs conventions).
+```
+
+- **`struct CommandEncoder<'a>`**
+  records commands; finish() makes a CommandBuffer for Queue::submit
+
+- **`struct CommandBuffer<'a>`**
+  recorded commands, ready to submit (dropped unsubmitted: discarded)
+
+**`impl Device`**
+
+- **`fn encoder(&self) -> Result<CommandEncoder<'_>>`**
+  a command encoder (a recording command buffer)
+
+**`impl<'a> CommandEncoder<'a>`**
+
+- **`fn copy_buffer(&mut self, src: &'a Buffer, src_off: u64, dst: &'a Buffer, dst_off: u64, size: u64)`**
+- **`fn fill_buffer(&mut self, buf: &'a Buffer, offset: u64, size: u64, value: u32)`**
+  fill size bytes at offset with a 32-bit value (both multiples of 4)
+- **`fn copy_buffer_to_texture(&mut self, src: &'a Buffer, layout: DataLayout, dst: TextureRegion<'a>)`**
+  buffer data -> a texture region (the region in Layout::CopyDst)
+- **`fn copy_texture_to_buffer(&mut self, src: TextureRegion<'a>, dst: &'a Buffer, layout: DataLayout)`**
+  a texture region -> buffer data (the region in Layout::CopySrc)
+- **`fn barrier(&mut self, before: Access, after: Access)`**
+  the accesses `before` finish (and their writes become visible) before the `after` ones
+- **`fn texture_barrier(&mut self, tex: &'a Texture, before: Layout, after: Layout)`**
+  every mip and layer of tex from `before` to `after`
+- **`fn texture_barrier_range(&mut self, tex: &'a Texture, base_mip: u32, mips: u32, base_layer: u32, layers: u32, before: Layout, after: Layout)`**
+  mips base_mip .. +mips and layers base_layer .. +layers of tex from `before` to `after`
+- **`fn set_compute_pipeline(&mut self, p: &'a ComputePipeline)`**
+- **`fn set_bind_group(&mut self, index: u32, group: &'a BindGroup)`**
+  bind group g (= @group(g)) of the current pipeline's layout
+- **`fn push_constants<T: Pod>(&mut self, offset: u32, data: &[T])`**
+  push constants at offset (bytes) for the current pipeline
+- **`fn dispatch(&mut self, x: u32, y: u32, z: u32)`**
+- **`fn dispatch_indirect(&mut self, buf: &'a Buffer, offset: u64)`**
+  workgroup counts (3 x u32) from buf at offset
+- **`fn begin_render(&mut self, desc: &RenderPassDesc<'_, 'a>)`**
+- **`fn end_render(&mut self)`**
+- **`fn set_render_pipeline(&mut self, p: &'a RenderPipeline)`**
+- **`fn set_viewport(&mut self, x: f32, y: f32, w: f32, h: f32, min_depth: f32, max_depth: f32)`**
+  the viewport in pixels from the top left (depth range min ..= max)
+- **`fn set_scissor(&mut self, x: u32, y: u32, w: u32, h: u32)`**
+- **`fn set_vertex_buffer(&mut self, slot: u32, buf: &'a Buffer, offset: u64)`**
+- **`fn set_index_buffer(&mut self, buf: &'a Buffer, offset: u64, format: IndexFormat)`**
+- **`fn draw(&mut self, vertices: u32, instances: u32, first_vertex: u32, first_instance: u32)`**
+- **`fn draw_indexed(&mut self, indices: u32, instances: u32, first_index: u32, base_vertex: i32, first_instance: u32)`**
+- **`fn draw_indirect(&mut self, buf: &'a Buffer, offset: u64)`**
+  one draw: vertex count, instance count, first vertex, first instance (4 x u32)
+- **`fn draw_indexed_indirect(&mut self, buf: &'a Buffer, offset: u64)`**
+  one indexed draw: index count, instance count, first index, base vertex (i32), first
+  instance (5 x 32 bits)
+- **`fn draw_indexed_indirect_multi(&mut self, buf: &'a Buffer, offset: u64, count: u32, stride: u32)`**
+  count indexed draws, stride bytes apart (Features::multi_draw_indirect)
+- **`fn draw_indexed_indirect_count(&mut self, buf: &'a Buffer, offset: u64, count_buf: &'a Buffer, count_offset: u64, max_count: u32, stride: u32)`**
+  up to max_count indexed draws, their number (u32) read from count_buf at count_offset
+  (level Voll: Features::draw_indirect_count)
+- **`fn reset_timestamps(&mut self, ts: &'a Timestamps, first: u32, n: u32)`**
+  timestamps first .. first + n may be written again (outside render passes)
+- **`fn timestamp(&mut self, ts: &'a Timestamps, i: u32)`**
+  write timestamp i once every earlier command has finished (reset it first)
+- **`fn finish(mut self) -> Result<CommandBuffer<'a>>`**
+  the recorded commands, or the first misuse
+
+### `gpu/vk_dev.rs`
+
+Source: [`lib/gpu/vk_dev.rs`](../lib/gpu/vk_dev.rs)
+
+```text
+vk_dev -- Vulkan device and queue: creation, the timeline, deferred destruction, command
+buffer slots, staged uploads, submission
+
+  adapter.create_device(&DeviceDesc) -> Result<Device>
+       one queue (the first family with graphics + compute, presentation checked per
+       surface); level Voll when the adapter has it and desc.max_level allows it.  Enabled:
+       timeline semaphores, dynamic rendering (core 1.3 or the KHR extensions on 1.1 / 1.2),
+       VK_KHR_swapchain when the instance has surfaces, the optional features of Features;
+       on Voll also descriptor indexing (update after bind, partially bound, non-uniform
+       indexing) and draw-indirect-count.  Not enabled: robust buffer access (speed).
+  device.queue() -> &Queue        queue.submit([cmd, ..]) -> Result<SubmitId>
+  queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
+  queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
+  queue.read_buffer(&buf, off, &mut [T])          copies, submits and waits (slow path)
+  queue.flush() -> Result<SubmitId>               submit the pending uploads now
+  device.wait(id, timeout_ns) -> Result<bool>     false: timed out
+  device.wait_idle(), poll() (frees what the GPU has finished with), is_lost(),
+  test_lose() (a test aid: the device behaves as lost from now on)
+
+The timeline: one timeline semaphore per device; every submit signals the next value
+(SubmitId).  completed caches the last value seen reached (vkGetSemaphoreCounterValue at
+submits, polls and waits).  A dropped resource goes to the garbage with the value of the
+latest submit and is destroyed once that value is reached -- earlier if no submit is
+pending.  Command buffers come from slots (a transient command pool with one buffer each),
+reused once their submission completed.  Uploads: staging chunks of at least 4 MiB of
+Upload memory, filled front to back; their copies are recorded into one upload command
+buffer that ends with a global barrier (copy writes -> every later access) and is put
+before the caller's command buffers in the next vkQueueSubmit.
+Device lost: VK_ERROR_DEVICE_LOST from any call sets the device's lost flag; every later
+call returns GpuError::DeviceLost (objects are still destroyed normally).
+```
+
+- **`struct Device`**
+  a logical GPU device: creates resources, records commands, owns the queue
+
+- **`struct Queue`**
+  the device's queue (graphics, compute, copies, presentation)
+
+**`impl Adapter`**
+
+- **`fn create_device(&self, desc: &DeviceDesc) -> Result<Device>`**
+  a device of this adapter (level: the highest up to desc.max_level)
+
+**`impl Device`**
+
+- **`fn queue(&self) -> &Queue`**
+- **`fn info(&self) -> &AdapterInfo`**
+- **`fn features(&self) -> &Features`**
+  what this device has enabled
+- **`fn limits(&self) -> &Limits`**
+- **`fn level(&self) -> Level`**
+- **`fn is_lost(&self) -> bool`**
+  the device was lost: every call fails with DeviceLost; create a new device
+- **`fn test_lose(&self)`**
+  (test aid) behave as a lost device from now on
+- **`fn validating(&self) -> bool`**
+  the validation layer watches this device
+- **`fn poll(&self) -> Result<()>`**
+  free what the GPU has finished with (also done by submit and wait)
+- **`fn wait(&self, id: SubmitId, timeout_ns: u64) -> Result<bool>`**
+  wait for a submission -> false when timeout_ns passed first
+- **`fn wait_idle(&self) -> Result<()>`**
+  wait for every submission so far
+- **`fn completed(&self) -> SubmitId`**
+  the last submission the GPU has finished
+- **`fn memory_reserved(&self) -> u64`**
+  bytes of device and host memory the device holds in blocks
+
+**`impl Queue`**
+
+- **`fn submit<'a, I: IntoIterator<Item = crate::CommandBuffer<'a>>>(&self, cmds: I) -> Result<SubmitId>`**
+  run command buffers in order (after the pending uploads) -> their timeline value
+- **`fn flush(&self) -> Result<SubmitId>`**
+  submit the pending uploads now
+- **`fn write_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, data: &[T]) -> Result<()>`**
+  write data into a buffer at offset before the next submission (staged)
+- **`fn write_texture(&self, dst: &TextureRegion, data: &[u8], layout: DataLayout, before: Layout, after: Layout) -> Result<()>`**
+  write texels into a texture region before the next submission (staged): the region
+  goes from `before` to CopyDst, gets the data, then goes to `after`
+- **`fn read_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, out: &mut [T]) -> Result<()>`**
+  read a buffer's contents at offset (copies through a readback buffer when needed,
+  submits and waits for the GPU: the slow path, for tools and tests)
+
+### `gpu/vk_inst.rs`
+
+Source: [`lib/gpu/vk_inst.rs`](../lib/gpu/vk_inst.rs)
+
+```text
+vk_inst -- Vulkan instance and adapters
+
+  Instance::new() / with(&InstanceDesc) -> Result<Instance>
+       jfgui_GPU=0 (or "off"): Err(Disabled); the loader from jfgui_GPU_DLL or vulkan-1.dll
+       (Err(NoLoader) without it); a loader below Vulkan 1.1: Err(Unsupported); no driver:
+       Err(NoAdapter).  Instance extensions: VK_KHR_surface + VK_KHR_win32_surface when
+       present, VK_EXT_debug_utils for jfgui_GPU_VALIDATE / jfgui_GPU_DEBUG.
+  instance.adapters() -> Result<Vec<Adapter>>   every physical device: discrete, integrated,
+       virtual, CPU, other (stable within a kind); AdapterInfo::missing says why one is
+       unusable (Vulkan 1.1, a graphics + compute queue, timeline semaphores, dynamic
+       rendering)
+  instance.adapter() -> Result<Adapter>     jfgui_GPU_ADAPTER: an index into adapters() or a
+       part of the name (case-insensitive); otherwise the first usable adapter
+  adapter.info() / features() / limits() / level()   (level: the highest it supports)
+  validation_messages() -> (errors, warnings)  counted by the debug messenger of every
+       instance of the process (tests fail on errors)
+
+Validation (jfgui_GPU_VALIDATE=1 or InstanceDesc::validate): VK_LAYER_KHRONOS_validation when
+it is installed (the Vulkan SDK; never required), with synchronization validation
+(VK_EXT_layer_settings "validate_sync", else VK_EXT_validation_features); warnings and errors
+go to stderr as "gpu: validation error: ...".  Without the layer a note is printed once and
+everything runs as without the variable.  jfgui_GPU_DEBUG=1: the messenger alone (driver
+messages, info level and up).
+```
+
+- **`fn validation_messages() -> (u32, u32)`**
+  validation errors and warnings reported by the debug messenger so far (every instance of
+  the process; 0, 0 without jfgui_GPU_VALIDATE / jfgui_GPU_DEBUG)
+
+- **`struct Instance`**
+  the GPU API of the system (Vulkan); create adapters and surfaces from it
+
+**`impl Instance`**
+
+- **`fn new() -> Result<Instance>`**
+  the system's GPU API with the default settings
+- **`fn with(desc: &InstanceDesc) -> Result<Instance>`**
+- **`fn validating(&self) -> bool`**
+  the validation layer is active on this instance
+- **`fn adapters(&self) -> Result<Vec<Adapter>>`**
+  every GPU of the system, discrete ones first (AdapterInfo::missing: unusable ones)
+- **`fn adapter(&self) -> Result<Adapter>`**
+  the adapter to use: jfgui_GPU_ADAPTER (index or name part), else the first usable one
+
+- **`struct Adapter`**
+  a GPU of the system
+
+**`impl Adapter`**
+
+- **`fn info(&self) -> &AdapterInfo`**
+- **`fn features(&self) -> &Features`**
+  what a device of the highest level would have
+- **`fn limits(&self) -> &Limits`**
+- **`fn level(&self) -> Level`**
+  the highest level a device of this adapter supports
+
+### `gpu/vk_res.rs`
+
+Source: [`lib/gpu/vk_res.rs`](../lib/gpu/vk_res.rs)
+
+```text
+vk_res -- Vulkan resources, bindings and pipelines
+
+  device.create_buffer(&BufferDesc) -> Buffer        copies to and from it always allowed;
+       Upload / Readback buffers are mapped for their lifetime: write(off, &[T]) /
+       read(off, &mut [T]) (non-coherent memory flushed / invalidated by atom)
+  device.create_texture(&TextureDesc) -> Texture     optimal tiling, starts in Layout::
+       Undefined; its default view covers everything (2D, 2D array, cube, cube array, 3D);
+       texture.create_view(&ViewDesc) -> TextureView a range of mips and layers
+  device.create_sampler(&SamplerDesc) -> Sampler
+  ShaderModule::from_spirv(&device, &[u32])          SPIR-V up to 1.3 (Vulkan 1.1), 1.5
+       (1.2), 1.6 (1.3); the header is checked, the code is the driver's
+  device.create_bind_group_layout(&[Binding])        descriptor set layout (one descriptor
+       per binding)
+  device.create_pipeline_layout(&PipelineLayoutDesc) set g = groups[g]; push constants as one
+       range for every stage (VK_SHADER_STAGE_ALL)
+  device.create_bind_group(&BindGroupDesc)           a descriptor set from the device's pools
+       (freed individually); it keeps its resources alive
+  device.create_bindless(&BindlessDesc) -> Bindless  (Voll) one update-after-bind,
+       partially bound set: binding 0 sampled textures, 1 samplers, 2 storage buffers,
+       3 storage textures; table.group() binds it, table.layout() goes into pipeline layouts
+  device.create_compute_pipeline / create_render_pipeline   (dynamic rendering: the target
+       formats are part of the pipeline; viewport and scissor are dynamic)
+  device.create_timestamps(n) -> Timestamps          read_ticks(first, n) / read_ms(first, n)
+       (Err(NotReady) until every one was written and finished)
+
+Every object holds the device (Arc) and is destroyed through the device's garbage once the
+GPU has finished the submissions made before it was dropped (vk_dev.rs).
+```
+
+- **`struct Buffer(Arc<BufInner>)`**
+  GPU memory for data: vertices, indices, storage, uniforms, indirect arguments
+
+**`impl Buffer`**
+
+- **`fn size(&self) -> u64`**
+- **`fn usage(&self) -> BufferUsage`**
+- **`fn memory(&self) -> MemoryKind`**
+- **`fn write<T: Pod>(&self, offset: u64, data: &[T]) -> Result<()>`**
+  copy data into a mapped buffer (Upload / Readback) at offset; the GPU sees it in the
+  next submission -- do not write what a pending submission still reads
+- **`fn read<T: Pod>(&self, offset: u64, out: &mut [T]) -> Result<()>`**
+  copy a mapped buffer's contents at offset into out (wait for the submission that wrote
+  them first)
+
+**`impl Device`**
+
+- **`fn create_buffer(&self, desc: &BufferDesc) -> Result<Buffer>`**
+
+- **`struct TextureView(pub(crate) Arc<ViewInner>)`**
+  a range of a texture's mips and layers as shaders and render passes see it
+
+**`impl TextureView`**
+
+- **`fn format(&self) -> Format`**
+- **`fn size(&self) -> (u32, u32)`**
+  width and height of the view's first mip
+
+- **`struct Texture`**
+  an image on the GPU: 2D, 2D array, cube (array) or 3D, with mips
+
+**`impl Texture`**
+
+- **`fn view(&self) -> &TextureView`**
+  the view of everything (its natural dimension)
+- **`fn width(&self) -> u32`**
+- **`fn height(&self) -> u32`**
+- **`fn depth(&self) -> u32`**
+- **`fn layers(&self) -> u32`**
+- **`fn mips(&self) -> u32`**
+- **`fn format(&self) -> Format`**
+- **`fn usage(&self) -> TextureUsage`**
+- **`fn create_view(&self, desc: &ViewDesc) -> Result<TextureView>`**
+  a view of some mips / layers (counts 0: to the end)
+
+**`impl Device`**
+
+- **`fn create_texture(&self, desc: &TextureDesc) -> Result<Texture>`**
+
+- **`struct Sampler(pub(crate) Arc<SamplerInner>)`**
+  how textures are filtered and addressed
+
+**`impl Device`**
+
+- **`fn create_sampler(&self, desc: &SamplerDesc) -> Result<Sampler>`**
+
+- **`struct ShaderModule(pub(crate) Arc<ShaderInner>)`**
+  compiled shader code (SPIR-V)
+
+**`impl ShaderModule`**
+
+- **`fn from_spirv(device: &Device, code: &[u32]) -> Result<ShaderModule>`**
+  a module from SPIR-V words: version up to 1.3 on Vulkan 1.1 devices, 1.5 on 1.2, 1.6 on
+  1.3 (the magic number and version are checked; the code itself is the driver's)
+
+- **`struct BindGroupLayout(pub(crate) Arc<BglInner>)`**
+  the bindings of one bind group (@group)
+
+**`impl Device`**
+
+- **`fn create_bind_group_layout(&self, bindings: &[Binding]) -> Result<BindGroupLayout>`**
+
+- **`struct PipelineLayout(pub(crate) Arc<PlInner>)`**
+  the bind group layouts and push constants of pipelines
+
+**`impl Device`**
+
+- **`fn create_pipeline_layout(&self, desc: &PipelineLayoutDesc) -> Result<PipelineLayout>`**
+
+- **`struct BindGroup(pub(crate) Arc<BgInner>)`**
+  resources bound for shaders (a descriptor set)
+
+**`impl Device`**
+
+- **`fn create_bind_group(&self, desc: &BindGroupDesc) -> Result<BindGroup>`**
+
+- **`struct Bindless`**
+  a large table of textures, samplers and buffers that shaders index (level Voll): binding 0
+  sampled textures, 1 samplers, 2 storage buffers, 3 storage textures; slots may be changed
+  while command buffers that use the table are pending, as long as those do not use the slot
+
+**`impl Device`**
+
+- **`fn create_bindless(&self, desc: &BindlessDesc) -> Result<Bindless>`**
+
+**`impl Bindless`**
+
+- **`fn group(&self) -> &BindGroup`**
+  the table as a bind group (CommandEncoder::set_bind_group)
+- **`fn layout(&self) -> &BindGroupLayout`**
+  its layout (PipelineLayoutDesc::groups)
+- **`fn counts(&self) -> [u32; 4]`**
+  slots per binding: textures, samplers, buffers, storage textures
+- **`fn set_texture(&self, slot: u32, view: &TextureView) -> Result<()>`**
+  slot of binding 0: a sampled texture (Layout::Sampled when shaders read it)
+- **`fn set_sampler(&self, slot: u32, s: &Sampler) -> Result<()>`**
+  slot of binding 1: a sampler
+- **`fn set_buffer(&self, slot: u32, buf: &Buffer, offset: u64, size: u64) -> Result<()>`**
+  slot of binding 2: a storage buffer range (size 0: to the end)
+- **`fn set_storage_texture(&self, slot: u32, view: &TextureView) -> Result<()>`**
+  slot of binding 3: a storage texture (Layout::General when shaders use it)
+
+- **`struct ComputePipeline(pub(crate) Arc<PipeInner>)`**
+  a compute shader with its layout
+
+- **`struct RenderPipeline(pub(crate) Arc<PipeInner>)`**
+  vertex + fragment shaders with their fixed state and target formats
+
+**`impl Device`**
+
+- **`fn create_compute_pipeline(&self, desc: &ComputePipelineDesc) -> Result<ComputePipeline>`**
+- **`fn create_render_pipeline(&self, desc: &RenderPipelineDesc) -> Result<RenderPipeline>`**
+
+- **`struct Timestamps(pub(crate) Arc<TsInner>)`**
+  GPU timestamps (CommandEncoder::reset_timestamps / timestamp)
+
+**`impl Device`**
+
+- **`fn create_timestamps(&self, count: u32) -> Result<Timestamps>`**
+
+**`impl Timestamps`**
+
+- **`fn count(&self) -> u32`**
+- **`fn read_ticks(&self, first: u32, n: u32) -> Result<Vec<u64>>`**
+  the raw ticks of timestamps first .. first + n (Err(NotReady): not all written and done)
+- **`fn read_ms(&self, first: u32, n: u32) -> Result<Vec<f64>>`**
+  timestamps first .. first + n in milliseconds on the GPU's clock, counted from the first
+  timestamp the device read (so f64 keeps every tick: absolute ticks reach 10^18 ns)
+
+### `gpu/vk_swap.rs`
+
+Source: [`lib/gpu/vk_swap.rs`](../lib/gpu/vk_swap.rs)
+
+```text
+vk_swap -- window surfaces and swapchains
+
+  Surface::new(&instance, window) -> Result<Surface>   a plat window (Windows: its HWND and
+       HINSTANCE through plat::win_native, VK_KHR_win32_surface); other targets: Unsupported
+  device.create_swapchain(&surface, &SwapchainDesc) -> Result<Swapchain>
+       B8G8R8A8 (or R8G8B8A8) UNORM / SRGB, sRGB non-linear colour space; the present mode of
+       the desc or jfgui_GPU_PRESENT=fifo|mailbox|immediate, FIFO when the surface lacks it;
+       image count: the surface's minimum + 1; copy_src adds TRANSFER_SRC (read-back)
+  sc.acquire() -> Result<Option<Frame>>    None while the window is minimised or has no area;
+       rebuilds the swapchain first when the window's size changed, the last present said
+       out-of-date / suboptimal, resize() or set_present_mode() asked for it, or the last frame
+       was never presented; waits until the frame slot's previous submission is done
+       (frames_in_flight)
+  sc.view(&frame) / texture(&frame)        the image: Layout::Undefined at the start of the
+       frame's commands, Layout::Present at their end
+  sc.present(frame, [cmd, ..]) -> Result<SubmitId>   submit (waiting for the image at the
+       colour-output, copy and compute stages, signalling the image's render-done semaphore),
+       then vkQueuePresentKHR
+  sc.size(), format(), present_mode(), resize(), set_present_mode(m)
+
+Rebuilding (and dropping) waits for the queue to be idle -- vkQueueWaitIdle covers the
+presents too, the timeline does not see a present's semaphore wait -- then creates the new
+swapchain with the old one as oldSwapchain and destroys the old one with its views and
+semaphores (resizes are rare; a frame never waits for this).  Semaphores: one acquire
+semaphore per frame slot (reused once the slot's submission completed), one render-done
+semaphore per image (the present that waited on it has finished when the image is acquired
+again).
+The window must not be presented by the CPU (plat::win_present) at the same time: a plat
+window that never presents keeps nothing of its own to paint (win_api.rs WM_PAINT).
+```
+
+- **`struct Surface(pub(crate) Arc<SurfShared>)`**
+  a window as a target for swapchains
+
+**`impl Surface`**
+
+- **`fn new(instance: &Instance, window: i32) -> Result<Surface>`**
+  the surface of plat window `window` (an index of plat::win_create)
+
+- **`struct Frame`**
+  an acquired swapchain image (present it with Swapchain::present)
+
+**`impl Frame`**
+
+- **`fn index(&self) -> u32`**
+  the image's index in the swapchain
+- **`fn size(&self) -> (u32, u32)`**
+
+- **`struct Swapchain`**
+  the images a window shows, presented in turn
+
+**`impl Device`**
+
+- **`fn create_swapchain(&self, surface: &Surface, desc: &SwapchainDesc) -> Result<Swapchain>`**
+
+**`impl Swapchain`**
+
+- **`fn acquire(&mut self) -> Result<Option<Frame>>`**
+  the next image to draw into; None while the window is minimised or has no area
+- **`fn view(&self, frame: &Frame) -> &TextureView`**
+  the frame's image as a render target (Undefined at the start, Present at the end)
+- **`fn texture(&self, frame: &Frame) -> &Texture`**
+  the frame's image (copies: SwapchainDesc::copy_src)
+- **`fn present<'a, I: IntoIterator<Item = CommandBuffer<'a>>>(&self, frame: Frame, cmds: I) -> Result<SubmitId>`**
+  submit the frame's commands (they leave the image in Layout::Present) and show it
+- **`fn resize(&mut self)`**
+  rebuild at the next acquire (the window's size is also checked at every acquire)
+- **`fn set_present_mode(&mut self, m: PresentMode)`**
+  another present mode from the next acquire on (FIFO when the surface lacks it)
+- **`fn present_mode(&self) -> PresentMode`**
+- **`fn format(&self) -> Format`**
+- **`fn size(&self) -> (u32, u32)`**
+  the images' size (0, 0 while the window has no area)
+- **`fn image_count(&self) -> usize`**
+
+## shader
+
+*SPIR-V: module builder, disassembler, validator, std140 / std430 layouts, the benchmark shaders* -- crate root [`lib/shader/lib.rs`](../lib/shader/lib.rs)
+
+```text
+shader -- SPIR-V for JFLib's GPU code: a module builder, a disassembler, a structural
+validator, std140 / std430 layouts and the shaders of the GPU benchmark scene.  The back
+end of the WGSL compiler (step G2), usable directly from Rust.  No GPU needed: everything
+here produces or reads words (docs/SHADER.md).
+
+  Module::new(minor)        a SPIR-V 1.minor module (1.3: Vulkan 1.1 "Basis", 1.6: Vulkan
+                            1.3 "Voll"); types, constants, globals, functions, structured
+                            control flow, instructions; finish() -> Vec<u32>
+  layout                    Rule::Std140 / Std430: align, size, stride, matrix_stride, offsets
+  dis::disassemble(words)   text close to spirv-dis
+  val::validate(words)      the structural checks (val module comment lists the rules)
+  bench                     the benchmark shaders (move, cull, cull_reset, vs_instanced,
+                            vs_single, fs_lambert), their data contract and CPU references
+  spv                       opcodes, enums and their names; parse: words -> instructions
+  to_bytes / from_bytes     words <-> the bytes of a .spv file
+```
+
+### `shader` crate root
+
+```rust
+/// the SPIR-V minor version of the feature level "Basis" (Vulkan 1.1: SPIR-V 1.3)
+BASIS: u32 = 3
+/// the SPIR-V minor version of the feature level "Voll" (Vulkan 1.3: SPIR-V 1.6)
+VOLL: u32 = 6
+```
+
+### `shader/bench.rs`
+
+Source: [`lib/shader/bench.rs`](../lib/shader/bench.rs)
+
+```text
+bench -- the GPU benchmark scene: 100 000 to 1 000 000 instanced cubes, moved, culled and
+drawn on the GPU (docs/SHADER.md, "Benchmark-Vertrag").  The shaders as SPIR-V words for
+SPIR-V 1.3 (Basis) or 1.6 (Voll), their data contract and CPU references.
+
+  Shader::{Move, Cull, CullReset, VsInstanced, VsSingle, FsLambert}.build(minor)
+  move_spv / cull_spv / cull_reset_spv / vs_instanced_spv / vs_single_spv / fs_lambert_spv
+  Object (48 bytes), Camera (176), DrawCmd (20), CubeVertex (32), Push (20): the buffer
+  records with bytes() / from_bytes(); offsets in the *_OFF constants
+  cube_vertices() (24) / cube_indices() (36, u16, counter-clockwise from outside)
+  Camera::look_at / from_view_proj: Vulkan clip space (y down, depth 0..1), planes
+  hash, unit, floor, sincos_turns, move_ref, move_all, visible, cull_ref: the CPU references
+
+Descriptor set 0 (one layout for every pipeline, stages COMPUTE | VERTEX | FRAGMENT):
+  binding 0  B_CAMERA   uniform buffer  Camera (std140)        cull, vs_*, fs_lambert
+  binding 1  B_OBJECTS  storage buffer  Object[count] (std430)  move (writes), cull, vs_*
+  binding 2  B_VISIBLE  storage buffer  uint[count]             cull (writes), vs_instanced
+  binding 3  B_DRAW     storage buffer  DrawCmd, also the INDIRECT buffer   cull_reset, cull
+  binding 4  B_CUBE     storage buffer  CubeVertex[24]          vs_*
+Push constants (all stages, offset 0, 20 bytes): Push { time, count, seed, extent,
+object_index }.  Workgroups: move and cull 256 x 1 x 1 (dispatch ceil(count / 256)),
+cull_reset 1 x 1 x 1.  Every shader: entry point "main", capability Shader only.
+
+move and cull are exact: only add, sub, mul, floor, conversions of integers below 2^24 and
+integer ops, every float result decorated NoContraction (no fused multiply-add), in the
+order of the CPU references.  Vulkan rounds add / sub / mul correctly, so the GPU results
+equal move_ref / cull_ref bit for bit (denormals may flush to zero; the visible list comes
+in atomic order: compare it sorted).
+```
+
+```rust
+SET: u32 = 0
+B_CAMERA: u32 = 0
+B_OBJECTS: u32 = 1
+B_VISIBLE: u32 = 2
+B_DRAW: u32 = 3
+B_CUBE: u32 = 4
+WG_MOVE: u32 = 256
+WG_CULL: u32 = 256
+CUBE_VERTICES: u32 = 24
+CUBE_INDICES: u32 = 36
+// Object, std430, stride 48: vec3 pos, float scale, vec4 rot (quaternion x y z w), vec3
+// color, float radius (bounding sphere)
+OBJECT_SIZE: u32 = 48
+OBJECT_OFF: [u32; 5] = [0, 12, 16, 32, 44]
+// Camera, std140: mat4 view_proj (column-major, MatrixStride 16), vec4 planes[6] (stride 16),
+// vec3 light_dir (towards the light, unit length), float ambient
+CAMERA_SIZE: u32 = 176
+CAMERA_OFF: [u32; 4] = [0, 64, 160, 172]
+// DrawCmd = VkDrawIndexedIndirectCommand, std430
+DRAW_SIZE: u32 = 20
+DRAW_OFF: [u32; 5] = [0, 4, 8, 12, 16]
+// CubeVertex, std430, stride 32: vec4 pos (w = 1), vec4 normal (w = 0)
+CUBE_VERTEX_SIZE: u32 = 32
+// Push, std430: float time, uint count, uint seed, float extent, uint object_index
+PUSH_SIZE: u32 = 20
+PUSH_OFF: [u32; 5] = [0, 4, 8, 12, 16]
+```
+
+- **`struct Object`**
+  - `pos: [f32; 3]`
+  - `scale: f32`
+  - `rot: [f32; 4]`
+  - `color: [f32; 3]`
+  - `radius: f32`
+
+**`impl Object`**
+
+- **`fn bytes(&self) -> Vec<u8>`**
+- **`fn from_bytes(b: &[u8]) -> Object`**
+  one record from 48 bytes
+
+- **`fn objects_bytes(objs: &[Object]) -> Vec<u8>`**
+  the bytes of an Object buffer
+
+- **`fn objects_from_bytes(b: &[u8]) -> Vec<Object>`**
+  an Object buffer read back (len / 48 records)
+
+- **`struct Camera`**
+  - `view_proj: [f32; 16]` -- clip = view_proj \* vec4(world, 1), column-major (view_proj[col \* 4 + row])
+  - `planes: [[f32; 4]; 6]` -- (n, d) with |n| = 1: a point p is inside when dot(n, p) + d >= 0
+  - `light_dir: [f32; 3]`
+  - `ambient: f32`
+
+- **`struct DrawCmd`**
+  - `index_count: u32`
+  - `instance_count: u32`
+  - `first_index: u32`
+  - `vertex_offset: i32`
+  - `first_instance: u32`
+
+**`impl DrawCmd`**
+
+- **`fn reset() -> DrawCmd`**
+  the command cull_reset writes: 36 indices, no instances yet
+- **`fn bytes(&self) -> Vec<u8>`**
+- **`fn from_bytes(b: &[u8]) -> DrawCmd`**
+
+- **`struct Push`**
+  - `time: f32` -- seconds since the start
+  - `count: u32`
+  - `seed: u32`
+  - `extent: f32` -- the scene's radius: orbits between 0.1 and 1.0 times extent
+  - `object_index: u32` -- vs_single: the object drawn
+
+**`impl Push`**
+
+- **`fn bytes(&self) -> Vec<u8>`**
+
+- **`fn extent_for(count: u32) -> f32`**
+  a good extent for count cubes (about 3 world units between neighbours)
+
+- **`struct CubeVertex`**
+  - `pos: [f32; 4]`
+  - `normal: [f32; 4]`
+
+- **`fn cube_vertices() -> Vec<CubeVertex>`**
+  the 24 vertices of the cube -1 ..= 1 (4 per face, normals per face)
+
+- **`fn cube_indices() -> Vec<u16>`**
+  the 36 indices (two triangles per face)
+
+- **`fn cube_bytes() -> Vec<u8>`**
+
+**`impl Camera`**
+
+- **`fn look_at(eye: [f32; 3], target: [f32; 3], fovy: f32, aspect: f32, near: f32, far: f32) -> Camera`**
+  a right-handed camera at eye looking at target (+y up), vertical field of view fovy
+  (radians), Vulkan clip space: y flipped (world up is up on screen), depth 0 (near) to
+  1 (far).  Front faces are counter-clockwise (VK_FRONT_FACE_COUNTER_CLOCKWISE).
+- **`fn from_view_proj(vp: [f32; 16]) -> Camera`**
+  planes of a view-projection matrix (Vulkan: -w &lt;= x, y &lt;= w, 0 &lt;= z &lt;= w), normalised;
+  the light comes from above (0.3, 0.8, 0.5), ambient 0.25
+- **`fn bytes(&self) -> Vec<u8>`**
+  the 176 bytes of the uniform buffer (std140)
+
+- **`fn hash(x: u32) -> u32`**
+  PCG hash (Jarkko & Olano, "Hash Functions for GPU Rendering")
+
+- **`fn unit(h: u32) -> f32`**
+  the top 24 bits as a float in [0, 1) (exact)
+
+- **`fn floor(x: f32) -> f32`**
+  floor as GLSL.std.450 Floor computes it (exact)
+
+- **`fn sincos_turns(u: f32) -> (f32, f32)`**
+  (sin, cos) of 2 pi u: u reduced to [-0.5, 0.5], sin and cos of pi r by Taylor polynomials,
+  then the double-angle formulas
+
+- **`fn move_ref(i: u32, p: &Push) -> Object`**
+  what move writes for object i
+
+- **`fn move_all(p: &Push) -> Vec<Object>`**
+  move for objects 0 .. p.count
+
+- **`fn visible(o: &Object, cam: &Camera) -> bool`**
+  cull's test: the bounding sphere is not completely outside one of the planes
+
+- **`fn cull_ref(objs: &[Object], cam: &Camera) -> Vec<u32>`**
+  the indices cull appends, ascending (the GPU's list is in atomic order: sort it first)
+
+- **`enum Shader`**
+  the six benchmark shaders
+  - `Move`
+  - `Cull`
+  - `CullReset`
+  - `VsInstanced`
+  - `VsSingle`
+  - `FsLambert`
+
+**`impl Shader`**
+
+- **`const ALL: [Shader; 6] = [Shader::Move, Shader::Cull, Shader::CullReset, Shader::V ...`**
+- **`fn name(self) -> &'static str`**
+- **`fn model(self) -> Model`**
+- **`fn build(self, minor: u32) -> Vec<u32>`**
+  the module for SPIR-V 1.minor (3 or 6)
+
+- **`fn move_spv(minor: u32) -> Vec<u32>`**
+  move: object gid = move_ref(gid, pc) for gid &lt; pc.count
+
+- **`fn cull_spv(minor: u32) -> Vec<u32>`**
+  cull: for gid &lt; pc.count, if visible(objects[gid], camera): visible[atomicAdd(
+  draw.instance_count, 1)] = gid
+
+- **`fn cull_reset_spv(minor: u32) -> Vec<u32>`**
+  cull_reset: draw = DrawCmd::reset() (one invocation; or vkCmdFillBuffer instead)
+
+- **`fn vs_instanced_spv(minor: u32) -> Vec<u32>`**
+
+- **`fn vs_single_spv(minor: u32) -> Vec<u32>`**
+
+- **`fn fs_lambert_spv(minor: u32) -> Vec<u32>`**
+  fs_lambert: colour \* (ambient + (1 - ambient) \* max(dot(normalize(n), light), 0)),
+  in: Location 0 normal, 1 colour (Flat); out: Location 0 vec4 (alpha 1)
+
+### `shader/dis.rs`
+
+Source: [`lib/shader/dis.rs`](../lib/shader/dis.rs)
+
+```text
+dis -- SPIR-V words as text in the style of spirv-dis (friendly names, the result column
+at 15 characters)
+
+  disassemble(words) -> Result<String, String>
+  fmt_float(f32) -> String    a float as spirv-dis prints it (%.9g, hex for inf / NaN)
+
+Names follow spirv-dis' FriendlyNameMapper: OpName first, then generated names for types
+(void, uint, v4float, mat4v4float, _arr_float_uint_4, _runtimearr_X, _ptr_Uniform_X,
+_struct_N) and constants (uint_4, int_n1, float_0_5, true); a taken name gets _0, _1 ...;
+everything else is its number.  Opcodes shader does not know print as OpUnknown(N) with
+their words.
+```
+
+- **`fn fmt_float(x: f32) -> String`**
+  a 32-bit float as spirv-dis prints it
+
+- **`fn disassemble(words: &[u32]) -> Result<String, String>`**
+  the module as text
+
+### `shader/layout.rs`
+
+Source: [`lib/shader/layout.rs`](../lib/shader/layout.rs)
+
+```text
+layout -- std140 / std430 offsets, sizes and strides (Vulkan "Offset and Stride Assignment")
+
+  Rule::Std140   uniform buffers: the extended alignment (arrays, structs and matrices
+                 rounded up to 16 bytes)
+  Rule::Std430   storage buffers and push constants: the base alignment
+  align / size / stride / matrix_stride / offsets(members) over any Types table (the
+  builder's Module, the validator's parsed module); matrices are column-major
+
+Base alignment: a scalar of N bytes N; vec2 2N; vec3 and vec4 4N; an array that of its
+element; a struct the largest of its members; a column-major matrix that of its column.
+A struct's size is rounded up to its alignment, an array's stride is its element's size
+rounded up to the array's alignment, a matrix is an array of its columns.  Runtime arrays
+have no size (the last member of a buffer block); bool, images and pointers have no layout.
+```
+
+- **`enum Rule`**
+  - `Std140`
+  - `Std430`
+
+- **`fn align(t: &dyn Types, ty: u32, rule: Rule) -> Option<u32>`**
+  the alignment of a type under rule (None: no layout)
+
+- **`fn matrix_stride(t: &dyn Types, mat: u32, rule: Rule) -> Option<u32>`**
+  the column stride of a column-major matrix type
+
+- **`fn stride(t: &dyn Types, elem: u32, rule: Rule) -> Option<u32>`**
+  the stride of an array of elem
+
+- **`fn size(t: &dyn Types, ty: u32, rule: Rule) -> Option<u32>`**
+  the size in bytes (None for runtime arrays and types without layout; a struct ending in
+  a runtime array: the size without it)
+
+- **`fn offsets(t: &dyn Types, members: &[u32], rule: Rule) -> Option<Vec<u32>>`**
+  the offsets of struct members laid out one after another
+
+### `shader/module.rs`
+
+Source: [`lib/shader/module.rs`](../lib/shader/module.rs)
+
+```text
+module -- the SPIR-V module builder: Module collects capabilities, types, constants,
+globals and functions in their sections and finish() writes the words.
+
+  Module::new(minor)            SPIR-V 1.minor (3: Vulkan 1.1 "Basis", 6: Vulkan 1.3 "Voll");
+                                Shader capability, GLSL450 memory model
+  types         ty_void/bool/int/u32/i32/float/f32/vec/mat/array/array_stride/runtime_array/
+                struct_/struct_layout/ptr/func/image/sampler/sampled_image; deduplicated except
+                structs and strided arrays (their decorations differ)
+  constants     const_u32/i32/f32/bool/scalar/composite/null (deduplicated)
+  globals       global, input, output, builtin, buffer, push_constant, workgroup, resource;
+                local (Function storage, placed in the entry block)
+  functions     begin_function -> (id, params), end_function, label, begin_block
+  control flow  branch, branch_cond, selection_merge, loop_merge, switch, ret, ret_value,
+                unreachable, discard (OpKill / OpTerminateInvocation), demote, phi,
+                if_then, if_else, loop_ (structured helpers)
+  instructions  arithmetic, comparisons, logic, select, conversions, access chains,
+                load / store, composites, shuffles, dot / matrix products, GLSL.std.450,
+                atomics, barriers, images, derivatives, calls; emit() for any opcode
+  finish()      the words; entry point interfaces are computed here (1.3: the Input /
+                Output variables the call tree uses, 1.4+: every global it uses)
+
+Ids are handed out in call order, so the same calls give the same words.  Capabilities
+and extensions an instruction or type needs are added on the way (Int64 for 64-bit
+integers, DerivativeControl for Fine / Coarse derivatives ...).  The builder does not check
+types beyond what it needs to infer result types: val::validate does.
+```
+
+- **`struct Id(pub u32)`**
+
+- **`enum Ty`**
+  a SPIR-V type
+  - `Void`
+  - `Bool`
+  - `Int { width: u32, signed: bool }`
+  - `Float { width: u32 }`
+  - `Vector { elem: Id, n: u32 }`
+  - `Matrix { col: Id, cols: u32 }`
+  - `Array { elem: Id, len: Id }` -- len: the id of an integer constant
+  - `RuntimeArray { elem: Id }`
+  - `Struct { members: Vec<Id> }`
+  - `Pointer { sc: u32, pointee: Id }`
+  - `Function { ret: Id, params: Vec<Id> }`
+  - `Image { sampled: Id, dim: u32, depth: u32, arrayed: u32, ms: u32, usage: u32, format: u32 }`
+  - `Sampler`
+  - `SampledImage { image: Id }`
+
+- **`trait Types`**
+  what the layout helper and the validator need to know about ids
+  - `fn ty(&self, id: u32) -> Option<&Ty>`
+  - `fn const_u32(&self, id: u32) -> Option<u32>`
+    the value of a 32-bit integer constant
+
+- **`struct Loop`**
+  the labels of the loop being built (loop_): break = branch(merge), continue = branch(cont)
+  - `merge: Id`
+  - `cont: Id`
+
+- **`struct Module`**
+  - `generator: u32` -- the generator word of the header (0: unregistered tool)
+  - `no_contraction: bool` -- decorate every float add, sub, mul, div, rem and product with NoContraction (exact
+    results: no fused multiply-add)
+
+**`impl Module`**
+
+- **`fn new(minor: u32) -> Module`**
+  a module for SPIR-V 1.minor (3 ..= 6) with the Shader capability and the logical
+  GLSL450 memory model
+- **`fn minor(&self) -> u32`**
+- **`fn id(&mut self) -> Id`**
+  a fresh id (for forward references: labels, functions called before they are built)
+- **`fn capability(&mut self, c: Cap)`**
+- **`fn extension(&mut self, name: &str)`**
+- **`fn glsl_set(&mut self) -> Id`**
+  the GLSL.std.450 import (created on first use)
+- **`fn type_of(&self, v: Id) -> Id`**
+  the type of a value id
+- **`fn ty(&self, t: Id) -> &Ty`**
+  the description of a type id
+- **`fn name(&mut self, id: Id, s: &str)`**
+- **`fn member_name(&mut self, ty: Id, member: u32, s: &str)`**
+- **`fn source(&mut self, lang: spv::Lang, version: u32)`**
+  OpSource (e.g. Lang::WGSL, version 100); no text is embedded
+- **`fn decorate(&mut self, target: Id, d: Dec, args: &[u32])`**
+  OpDecorate (the same decoration twice is written once)
+- **`fn member_decorate(&mut self, ty: Id, member: u32, d: Dec, args: &[u32])`**
+- **`fn ty_void(&mut self) -> Id`**
+- **`fn ty_bool(&mut self) -> Id`**
+- **`fn ty_int(&mut self, width: u32, signed: bool) -> Id`**
+  an integer type; 8, 16 and 64 bits add Int8 / Int16 / Int64
+- **`fn ty_u32(&mut self) -> Id`**
+- **`fn ty_i32(&mut self) -> Id`**
+- **`fn ty_float(&mut self, width: u32) -> Id`**
+  a float type; 16 and 64 bits add Float16 / Float64
+- **`fn ty_f32(&mut self) -> Id`**
+- **`fn ty_vec(&mut self, elem: Id, n: u32) -> Id`**
+- **`fn ty_mat(&mut self, col: Id, cols: u32) -> Id`**
+  a matrix of `cols` columns of the vector type `col`
+- **`fn ty_array(&mut self, elem: Id, len: u32) -> Id`**
+  an array of len elements without ArrayStride (Function, Private, Workgroup storage)
+- **`fn ty_array_stride(&mut self, elem: Id, len: u32, stride: u32) -> Id`**
+  an array decorated with ArrayStride (buffers); deduplicated by element, length, stride
+- **`fn ty_array_layout(&mut self, elem: Id, len: u32, rule: Rule) -> Id`**
+  an array laid out by `rule` (ArrayStride from the layout helper)
+- **`fn ty_runtime_array(&mut self, elem: Id, stride: Option<u32>) -> Id`**
+  a runtime array; stride Some(s): decorated with ArrayStride s (buffers)
+- **`fn ty_struct(&mut self, members: &[Id]) -> Id`**
+  a struct (never deduplicated: two structs may differ in their decorations)
+- **`fn ty_struct_layout(&mut self, name: &str, members: &[(&str, Id)], rule: Rule) -> Id`**
+  a named struct laid out by `rule`: OpName / OpMemberName, Offset on every member,
+  ColMajor and MatrixStride on matrix (and matrix array) members.  Array members must be
+  built with ty_array_layout / ty_runtime_array(.., Some(stride)) of the same rule.
+- **`fn ty_ptr(&mut self, sc: Sc, pointee: Id) -> Id`**
+- **`fn ty_func(&mut self, ret: Id, params: &[Id]) -> Id`**
+- **`fn ty_image(&mut self, sampled: Id, dim: Dim, depth: u32, arrayed: u32, ms: u32, usage: u32, format: Fmt) -> Id`**
+  OpTypeImage; usage 1: sampled, 2: storage image (format needed unless the
+  \*WithoutFormat capabilities are declared)
+- **`fn ty_sampler(&mut self) -> Id`**
+- **`fn ty_sampled_image(&mut self, image: Id) -> Id`**
+- **`fn bool_like(&mut self, t: Id) -> Id`**
+  bool (or a bool vector of the same length) for a scalar / vector type
+- **`fn scalar_of(&self, t: Id) -> Id`**
+  the component type of a vector (the type itself for a scalar)
+- **`fn const_scalar(&mut self, ty: Id, words: &[u32]) -> Id`**
+  OpConstant of an int or float type with its value words (low word first)
+- **`fn const_u32(&mut self, v: u32) -> Id`**
+- **`fn const_i32(&mut self, v: i32) -> Id`**
+- **`fn const_f32(&mut self, v: f32) -> Id`**
+- **`fn const_bool(&mut self, v: bool) -> Id`**
+- **`fn const_composite(&mut self, ty: Id, parts: &[Id]) -> Id`**
+- **`fn const_vec_f32(&mut self, v: &[f32]) -> Id`**
+  a float vector constant
+- **`fn const_null(&mut self, ty: Id) -> Id`**
+- **`fn global(&mut self, sc: Sc, pointee: Id, init: Option<Id>) -> Id`**
+  a global OpVariable of `pointee` in storage class sc
+- **`fn input(&mut self, ty: Id, location: u32) -> Id`**
+- **`fn output(&mut self, ty: Id, location: u32) -> Id`**
+- **`fn builtin(&mut self, sc: Sc, ty: Id, b: Bi) -> Id`**
+  a built-in Input or Output variable; adds the capability some built-ins need
+- **`fn buffer(&mut self, sc: Sc, block: Id, set: u32, binding: u32) -> Id`**
+  a uniform (Sc::Uniform) or storage (Sc::StorageBuffer) buffer of a laid-out struct:
+  Block on the struct, DescriptorSet and Binding on the variable
+- **`fn push_constant(&mut self, block: Id) -> Id`**
+  the push-constant block (a struct laid out by Rule::Std430)
+- **`fn workgroup(&mut self, ty: Id) -> Id`**
+- **`fn resource(&mut self, ty: Id, set: u32, binding: u32) -> Id`**
+  an image, sampler or sampled image (UniformConstant) at set / binding
+- **`fn entry_point(&mut self, model: Model, func: Id, name: &str)`**
+  an entry point; its interface is filled in by finish()
+- **`fn exec_mode(&mut self, func: Id, mode: Mode, args: &[u32])`**
+- **`fn begin_function(&mut self, ret: Id, params: &[Id]) -> (Id, Vec<Id>)`**
+  start a function (and its entry block) -> (function id, parameter ids)
+- **`fn begin_function_id(&mut self, id: Id, ret: Id, params: &[Id]) -> (Id, Vec<Id>)`**
+  begin_function with an id from id() (a function called before it is built)
+- **`fn end_function(&mut self)`**
+- **`fn label(&mut self) -> Id`**
+  a new label id (the block starts with begin_block)
+- **`fn begin_block(&mut self, l: Id)`**
+- **`fn block_open(&self) -> bool`**
+  whether the current block still needs a terminator
+- **`fn local(&mut self, ty: Id, init: Option<Id>) -> Id`**
+  a Function-storage variable (placed at the start of the entry block)
+- **`fn emit(&mut self, opc: u16, ty: Option<Id>, args: &[u32]) -> Id`**
+  any instruction in the current block: ty for opcodes with a result type; the result id
+  is allocated when the opcode has one (Id(0) otherwise)
+- **`fn branch(&mut self, target: Id)`**
+- **`fn branch_cond(&mut self, c: Id, t: Id, f: Id)`**
+- **`fn selection_merge(&mut self, merge: Id, ctl: u32)`**
+  OpSelectionMerge (ctl: spv::SEL_CTL bits, 0 = None)
+- **`fn loop_merge(&mut self, merge: Id, cont: Id, ctl: u32)`**
+  OpLoopMerge (ctl: spv::LOOP_CTL bits without arguments, 0 = None)
+- **`fn switch(&mut self, sel: Id, default: Id, cases: &[(u32, Id)])`**
+  OpSwitch on a 32-bit selector (the caller writes the OpSelectionMerge first)
+- **`fn ret(&mut self)`**
+- **`fn ret_value(&mut self, v: Id)`**
+- **`fn unreachable(&mut self)`**
+- **`fn discard(&mut self)`**
+  discard the fragment: OpKill before SPIR-V 1.6, OpTerminateInvocation from 1.6
+- **`fn demote(&mut self)`**
+  make the invocation a helper (not a terminator); before 1.6 through
+  SPV_EXT_demote_to_helper_invocation
+- **`fn phi(&mut self, ty: Id, pairs: &[(Id, Id)]) -> Id`**
+  OpPhi of (value, predecessor label) pairs
+- **`fn if_then(&mut self, c: Id, then: impl FnOnce(&mut Module))`**
+  if (c) { then }: a selection construct
+- **`fn if_else(&mut self, c: Id, then: impl FnOnce(&mut Module), els: impl FnOnce(&mut Module))`**
+  if (c) { then } else { els }
+- **`fn loop_(&mut self, cond: impl FnOnce(&mut Module) -> Id, body: impl FnOnce(&mut Module, Loop), cont: impl FnOnce(&mut Module))`**
+  while (cond) { body; cont }: header (OpLoopMerge), condition block, body, continue
+  block, merge block.  body gets the labels for break / continue.
+- **`fn binary(&mut self, opc: u16, a: Id, b: Id) -> Id`**
+- **`fn unary(&mut self, opc: u16, a: Id) -> Id`**
+- **`fn fadd(&mut self, a: Id, b: Id) -> Id`**
+- **`fn fsub(&mut self, a: Id, b: Id) -> Id`**
+- **`fn fmul(&mut self, a: Id, b: Id) -> Id`**
+- **`fn fdiv(&mut self, a: Id, b: Id) -> Id`**
+- **`fn fmod(&mut self, a: Id, b: Id) -> Id`**
+- **`fn fneg(&mut self, a: Id) -> Id`**
+- **`fn iadd(&mut self, a: Id, b: Id) -> Id`**
+- **`fn isub(&mut self, a: Id, b: Id) -> Id`**
+- **`fn imul(&mut self, a: Id, b: Id) -> Id`**
+- **`fn udiv(&mut self, a: Id, b: Id) -> Id`**
+- **`fn sdiv(&mut self, a: Id, b: Id) -> Id`**
+- **`fn umod(&mut self, a: Id, b: Id) -> Id`**
+- **`fn srem(&mut self, a: Id, b: Id) -> Id`**
+- **`fn ineg(&mut self, a: Id) -> Id`**
+- **`fn band(&mut self, a: Id, b: Id) -> Id`**
+- **`fn bor(&mut self, a: Id, b: Id) -> Id`**
+- **`fn bxor(&mut self, a: Id, b: Id) -> Id`**
+- **`fn bnot(&mut self, a: Id) -> Id`**
+- **`fn shl(&mut self, a: Id, n: Id) -> Id`**
+- **`fn shr(&mut self, a: Id, n: Id) -> Id`**
+  logical shift right
+- **`fn sar(&mut self, a: Id, n: Id) -> Id`**
+  arithmetic shift right
+- **`fn vec_scale(&mut self, v: Id, s: Id) -> Id`**
+  vector \* scalar
+- **`fn mat_scale(&mut self, m: Id, s: Id) -> Id`**
+  matrix \* scalar
+- **`fn mat_vec(&mut self, m: Id, v: Id) -> Id`**
+  matrix \* column vector
+- **`fn vec_mat(&mut self, v: Id, m: Id) -> Id`**
+  row vector \* matrix
+- **`fn mat_mat(&mut self, a: Id, b: Id) -> Id`**
+- **`fn transpose(&mut self, m: Id) -> Id`**
+- **`fn dot(&mut self, a: Id, b: Id) -> Id`**
+- **`fn cmp(&mut self, opc: u16, a: Id, b: Id) -> Id`**
+  a comparison: the result is bool or a bool vector of the operands' length
+- **`fn feq(&mut self, a: Id, b: Id) -> Id`**
+- **`fn fne(&mut self, a: Id, b: Id) -> Id`**
+- **`fn flt(&mut self, a: Id, b: Id) -> Id`**
+- **`fn fle(&mut self, a: Id, b: Id) -> Id`**
+- **`fn fgt(&mut self, a: Id, b: Id) -> Id`**
+- **`fn fge(&mut self, a: Id, b: Id) -> Id`**
+- **`fn ieq(&mut self, a: Id, b: Id) -> Id`**
+- **`fn ine(&mut self, a: Id, b: Id) -> Id`**
+- **`fn ult(&mut self, a: Id, b: Id) -> Id`**
+- **`fn ule(&mut self, a: Id, b: Id) -> Id`**
+- **`fn uge(&mut self, a: Id, b: Id) -> Id`**
+- **`fn slt(&mut self, a: Id, b: Id) -> Id`**
+- **`fn sge(&mut self, a: Id, b: Id) -> Id`**
+- **`fn land(&mut self, a: Id, b: Id) -> Id`**
+- **`fn lor(&mut self, a: Id, b: Id) -> Id`**
+- **`fn lnot(&mut self, a: Id) -> Id`**
+- **`fn any(&mut self, v: Id) -> Id`**
+- **`fn all(&mut self, v: Id) -> Id`**
+- **`fn select(&mut self, c: Id, a: Id, b: Id) -> Id`**
+  c ? a : b
+- **`fn convert(&mut self, opc: u16, ty: Id, a: Id) -> Id`**
+  a conversion opcode (ConvertFToU, ConvertSToF, Bitcast, FConvert ...) to type ty
+- **`fn u2f(&mut self, ty: Id, a: Id) -> Id`**
+- **`fn s2f(&mut self, ty: Id, a: Id) -> Id`**
+- **`fn f2u(&mut self, ty: Id, a: Id) -> Id`**
+- **`fn f2s(&mut self, ty: Id, a: Id) -> Id`**
+- **`fn bitcast(&mut self, ty: Id, a: Id) -> Id`**
+- **`fn access(&mut self, base: Id, idx: &[Id]) -> Id`**
+  OpAccessChain: the result points at the member / element the indices select
+  (struct indices must be constants)
+- **`fn access_c(&mut self, base: Id, idx: &[u32]) -> Id`**
+  access with constant u32 indices
+- **`fn load(&mut self, ptr: Id) -> Id`**
+- **`fn store(&mut self, ptr: Id, v: Id)`**
+- **`fn construct(&mut self, ty: Id, parts: &[Id]) -> Id`**
+- **`fn extract(&mut self, v: Id, idx: &[u32]) -> Id`**
+- **`fn insert(&mut self, v: Id, obj: Id, idx: &[u32]) -> Id`**
+- **`fn shuffle(&mut self, a: Id, b: Id, comps: &[u32]) -> Id`**
+  OpVectorShuffle: components of a (0..) and b (len(a)..)
+- **`fn extract_dynamic(&mut self, v: Id, i: Id) -> Id`**
+- **`fn ext(&mut self, ty: Id, inst: u32, args: &[Id]) -> Id`**
+  an extended instruction of GLSL.std.450 (spv::glsl::\*) with result type ty
+- **`fn glsl(&mut self, inst: u32, args: &[Id]) -> Id`**
+  a GLSL.std.450 instruction whose result type is its first argument's (Sin, Floor,
+  FMin, FClamp, FMix, Normalize, Cross ...)
+- **`fn length(&mut self, v: Id) -> Id`**
+  GLSL.std.450 Length (the result is the component type)
+- **`fn atomic(&mut self, opc: u16, ptr: Id, scope: u32, semantics: u32, value: Id) -> Id`**
+  an atomic read-modify-write (AtomicIAdd, AtomicUMax, AtomicExchange ...) on a 32- or
+  64-bit integer: scope and semantics become constants
+- **`fn atomic_load(&mut self, ptr: Id, scope: u32, semantics: u32) -> Id`**
+- **`fn atomic_store(&mut self, ptr: Id, scope: u32, semantics: u32, value: Id)`**
+- **`fn atomic_cas(&mut self, ptr: Id, scope: u32, eq: u32, neq: u32, value: Id, comparator: Id) -> Id`**
+  OpAtomicCompareExchange -> the original value
+- **`fn control_barrier(&mut self, exec: u32, mem: u32, semantics: u32)`**
+  OpControlBarrier (barrier() of a workgroup: Workgroup, Workgroup,
+  AcquireRelease | WorkgroupMemory)
+- **`fn memory_barrier(&mut self, mem: u32, semantics: u32)`**
+- **`fn sampled_image(&mut self, image: Id, sampler: Id) -> Id`**
+- **`fn sample(&mut self, si: Id, coord: Id) -> Id`**
+  texture(si, coord): implicit LOD (fragment shaders)
+- **`fn sample_lod(&mut self, si: Id, coord: Id, lod: Id) -> Id`**
+  textureLod(si, coord, lod)
+- **`fn fetch(&mut self, image: Id, coord: Id, lod: Id) -> Id`**
+  texelFetch(image, coord, lod) on an OpImage / sampled-usage image
+- **`fn image_read(&mut self, image: Id, coord: Id) -> Id`**
+  imageLoad of a storage image
+- **`fn image_write(&mut self, image: Id, coord: Id, texel: Id)`**
+  imageStore of a storage image
+- **`fn image_size(&mut self, ty: Id, image: Id) -> Id`**
+  OpImageQuerySize (storage images, no LOD) with result type ty
+- **`fn image_size_lod(&mut self, ty: Id, image: Id, lod: Id) -> Id`**
+  OpImageQuerySizeLod (sampled images)
+- **`fn deriv(&mut self, opc: u16, a: Id) -> Id`**
+  DPdx, DPdy, Fwidth and their Fine / Coarse forms (those add DerivativeControl)
+- **`fn dpdx(&mut self, a: Id) -> Id`**
+- **`fn dpdy(&mut self, a: Id) -> Id`**
+- **`fn fwidth(&mut self, a: Id) -> Id`**
+- **`fn call(&mut self, func: Id, args: &[Id]) -> Id`**
+  OpFunctionCall of a function built (or begun with begin_function_id) in this module
+- **`fn finish(&self) -> Vec<u32>`**
+  the module's words
+
+- **`fn to_bytes(words: &[u32]) -> Vec<u8>`**
+  words as little-endian bytes (a .spv file)
+
+- **`fn from_bytes(b: &[u8]) -> Option<Vec<u32>>`**
+  a .spv file's bytes as words (None: not a multiple of 4 bytes or no SPIR-V magic; a
+  big-endian file is swapped)
+
+### `shader/parse.rs`
+
+Source: [`lib/shader/parse.rs`](../lib/shader/parse.rs)
+
+```text
+parse -- SPIR-V words into instructions and operands (the grammar of spv::OPS)
+
+  parse(words) -> Result<Vec<Inst>, String>   the instructions after the 5-word header
+  operands(inst, f)                           f(kind, words) per operand, with the masks'
+                                              and decorations' arguments as operands of
+                                              their own kinds (spv module comment)
+  ids(inst) -> Vec<u32>                       every id operand (result type and id excluded)
+  string(words) -> (String, words used)       a literal string
+```
+
+- **`struct Inst<'a>`**
+  - `op: u16`
+  - `ty: u32` -- result type id (0: none)
+  - `res: u32` -- result id (0: none)
+  - `ops: &'a [u32]` -- the operands after the result type and id
+  - `at: usize` -- the word offset of the instruction in the module
+  - `info: Option<&'static OpInfo>`
+
+- **`fn parse(words: &[u32]) -> Result<Vec<Inst<'_>>, String>`**
+
+- **`fn string(words: &[u32]) -> (String, usize)`**
+  a literal string starting at words[0] -> (text, words it takes)
+
+- **`fn string_words(s: &str) -> Vec<u32>`**
+  the words of a literal string (UTF-8, NUL terminated, zero padded)
+
+- **`fn operands(inst: &Inst, f: &mut dyn FnMut(char, &[u32])) -> bool`**
+  walk the operands: f(kind, words).  Kinds as in the spv module comment; the arguments of
+  masks (l, m, I), execution modes (E: n, G: i), decorations (B for BuiltIn, else n) and
+  switch targets (n, i) are reported one by one after their mask / enum.  Unknown opcodes:
+  every word as 'n'.  Returns false when the words do not fit the grammar.
+
+- **`fn ids(inst: &Inst) -> Vec<u32>`**
+  every id operand of an instruction (result type and result id not included)
+
+### `shader/spv.rs`
+
+Source: [`lib/shader/spv.rs`](../lib/shader/spv.rs)
+
+```text
+spv -- the numbers of SPIR-V 1.6 (unified1 grammar) that shader uses, with their names
+
+  op::*          opcodes (op::FAdd = 129), OPS / op_info(op): name and operand grammar
+  Cap, Sc (storage class), Dec (decoration), Bi (built-in), Model (execution model),
+  Mode (execution mode), Dim, Fmt (image format), Lang (source language): typed enums with
+  name tables (CAPS, SCS, ...) for the disassembler; name(table, v) -> Option<&str>
+  scope::*, sem::* (memory semantics), mask names (fn_ctl, sel_ctl, loop_ctl, mem_access,
+  img_ops), glsl::* (GLSL.std.450 instruction numbers, GLSL_NAMES)
+
+Operand grammar (OpInfo::ops), one character per operand, `*` repeats the last kind,
+`?` makes the rest optional:
+  i id   n literal word   s string   v literal number of the result type (OpConstant)
+  C capability   A addressing model   Y memory model   M execution model
+  E execution mode + literal args   G execution mode + id args   d decoration + args
+  S storage class   D dim   F image format   Q access qualifier   k source language
+  f function control   e selection control   l loop control (+ args)
+  m memory access (+ args)   I image operands (+ id args)   x extended instruction number
+  w switch targets: (literal, id) pairs
+```
+
+```rust
+MAGIC: u32 = 0x0723_0203
+```
+
+- **`const fn version(major: u32, minor: u32) -> u32`**
+  the version word of SPIR-V major.minor
+
+```rust
+/// result flags of OpInfo::res
+R_NONE: u8 = 0
+R_ID: u8 = 1  // a result id
+R_TY: u8 = 2  // a result type and a result id
+```
+
+- **`struct OpInfo`**
+  - `op: u16`
+  - `name: &'static str`
+  - `res: u8`
+  - `ops: &'static str`
+
+- **`fn op_info(op: u16) -> Option<&'static OpInfo>`**
+  the grammar of an opcode (None: unknown to shader)
+
+- **`fn name(table: &[(u32, &'static str)], v: u32) -> Option<&'static str>`**
+  the name of v in a (value, name) table
+
+- **`enum Dim`**
+  image dimensionality (OpTypeImage)
+  - `D1 = 0`
+  - `D2 = 1`
+  - `D3 = 2`
+  - `Cube = 3`
+  - `Rect = 4`
+  - `Buffer = 5`
+  - `SubpassData = 6`
+
+```rust
+DIMS: &[(u32, &str)] = &[(0, "1D"), (1, "2D"), (2, "3D"), (3, "Cube"), (4, "Rect ...
+ADDRESSING: &[(u32, &str)] = &[(0, "Logical"), (1, "Physical32"), (2, "Physical64"), ( ...
+MEMORY_MODELS: &[(u32, &str)] = &[(0, "Simple"), (1, "GLSL450"), (2, "OpenCL"), (3, "Vulk ...
+ACCESS: &[(u32, &str)] = &[(0, "ReadOnly"), (1, "WriteOnly"), (2, "ReadWrite")]
+// masks: (bit, name, operand words that follow when the bit is set: 'n' literal, 'i' id)
+FN_CTL: &[(u32, &str, &str)] = &[(1, "Inline", ""), (2, "DontInline", ""), (4, "Pure", " ...
+SEL_CTL: &[(u32, &str, &str)] = &[(1, "Flatten", ""), (2, "DontFlatten", "")]
+LOOP_CTL: &[(u32, &str, &str)] = &[ (1, "Unroll", ""), (2, "DontUnroll", ""), (4, "Depende ...
+MEM_ACCESS: &[(u32, &str, &str)] = &[ (1, "Volatile", ""), (2, "Aligned", "n"), (4, "Nontemp ...
+IMG_OPS: &[(u32, &str, &str)] = &[ (1, "Bias", "i"), (2, "Lod", "i"), (4, "Grad", "ii"), ...
+/// the names of GLSL.std.450 (index = instruction number)
+GLSL_NAMES: &[&str] = &[ "", "Round", "RoundEven", "Trunc", "FAbs", "SAbs", "FS ...
+```
+
+**`mod scope`**
+
+scopes (the value of a constant id operand)
+
+```rust
+CrossDevice: u32 = 0
+Device: u32 = 1
+Workgroup: u32 = 2
+Subgroup: u32 = 3
+Invocation: u32 = 4
+QueueFamily: u32 = 5
+```
+
+**`mod sem`**
+
+memory semantics bits (the value of a constant id operand)
+
+```rust
+None: u32 = 0
+Acquire: u32 = 0x2
+Release: u32 = 0x4
+AcquireRelease: u32 = 0x8
+SequentiallyConsistent: u32 = 0x10
+UniformMemory: u32 = 0x40
+SubgroupMemory: u32 = 0x80
+WorkgroupMemory: u32 = 0x100
+CrossWorkgroupMemory: u32 = 0x200
+ImageMemory: u32 = 0x800
+```
+
+**`mod img`**
+
+image operand bits (OpImageSample\* and friends)
+
+```rust
+Bias: u32 = 1
+Lod: u32 = 2
+Grad: u32 = 4
+ConstOffset: u32 = 8
+Sample: u32 = 0x40
+```
+
+**`mod glsl`**
+
+GLSL.std.450 extended instructions
+
+```rust
+Round: u32 = 1
+RoundEven: u32 = 2
+Trunc: u32 = 3
+FAbs: u32 = 4
+SAbs: u32 = 5
+FSign: u32 = 6
+SSign: u32 = 7
+Floor: u32 = 8
+Ceil: u32 = 9
+Fract: u32 = 10
+Sin: u32 = 13
+Cos: u32 = 14
+Tan: u32 = 15
+Atan2: u32 = 25
+Pow: u32 = 26
+Exp: u32 = 27
+Log: u32 = 28
+Exp2: u32 = 29
+Log2: u32 = 30
+Sqrt: u32 = 31
+InverseSqrt: u32 = 32
+FMin: u32 = 37
+UMin: u32 = 38
+SMin: u32 = 39
+FMax: u32 = 40
+UMax: u32 = 41
+SMax: u32 = 42
+FClamp: u32 = 43
+UClamp: u32 = 44
+SClamp: u32 = 45
+FMix: u32 = 46
+Step: u32 = 48
+SmoothStep: u32 = 49
+Fma: u32 = 50
+Length: u32 = 66
+Distance: u32 = 67
+Cross: u32 = 68
+Normalize: u32 = 69
+Reflect: u32 = 71
+```
+
+### `shader/val.rs`
+
+Source: [`lib/shader/val.rs`](../lib/shader/val.rs)
+
+```text
+val -- a structural validator for SPIR-V modules as Vulkan consumes them.  It checks what
+a module builder can get wrong; it is not spirv-val (docs/SHADER.md lists what it leaves out).
+
+  validate(words) -> Result<(), Vec<Error>>    Error { rule, at (word offset), msg }
+
+Rules (Rule::*):
+  Header      magic, version 1.0 ..= 1.6, schema 0, every id below the bound
+  Grammar     known opcodes, operand words that fit the grammar (spv::OPS)
+  Section     the logical layout: capabilities, extensions, imports, one memory model,
+              entry points, execution modes, debug, annotations, types / constants /
+              globals, functions; nothing module-level inside a function
+  IdUnique    every result id defined once
+  IdDefined   every used id defined, before its use (except names, decorations, entry
+              points, execution modes, labels, phis, called functions), function-local ids
+              only inside their function
+  IdKind      ids of the right kind: result types are types, labels are labels, operands
+              are values, callees are functions, extended sets are imports
+  Type        types well formed (vector / matrix shapes, array lengths, runtime arrays
+              last) and type agreement of the instructions shader emits: arithmetic,
+              comparisons, logic, select, conversions, access chains, load / store,
+              composites, shuffles, products, GLSL.std.450, atomics, barriers, images,
+              derivatives, calls, phis, returns, constants, variables
+  Decoration  decoration targets of the right kind (Offset on struct members, ArrayStride
+              on arrays, Block on structs, Location on Input / Output ...), member indices
+  Storage     variables: storage class of the pointer, Function variables first in the
+              entry block, Vulkan's resource rules (Block structs in Uniform /
+              StorageBuffer / PushConstant, DescriptorSet + Binding on resources, Location
+              on user Input / Output, images in UniformConstant), no stores to read-only
+              storage, atomics only on buffer / workgroup / image memory
+  BlockLayout Offset on every block member, offsets aligned per std140 (Uniform) / std430
+              (StorageBuffer, PushConstant) and not overlapping, ArrayStride / MatrixStride
+              present, aligned and not smaller than the element, ColMajor / RowMajor on
+              matrices, push constants at most 128 bytes
+  Cfg         blocks start with OpLabel and end with one terminator, merge instructions
+              right before the branch they belong to, merge / continue targets in the
+              function, a merge block per header at most once and after it, conditional
+              branches without a merge only as break / continue, back edges only to loop
+              headers, a back edge per loop, the entry block no branch target, phis first in
+              their block with predecessors as parents
+  Interface   OpEntryPoint: a void function without parameters, the interface lists only
+              globals, before 1.4 only Input / Output ones, from 1.4 each at most once; it
+              contains every global the call tree uses (1.4+) or every Input / Output one
+  ExecMode    LocalSize for GLCompute, OriginUpperLeft (and no OriginLowerLeft) for
+              Fragment, modes for the right models, DepthReplacing when FragDepth is
+              written, fragment-only instructions (discard, demote, derivatives,
+              implicit-LOD sampling) only under Fragment entry points, Workgroup
+              variables only under GLCompute
+  Capability  the capabilities types, instructions, built-ins, images and models need
+  Version     instructions and extensions of the module's SPIR-V version (TerminateInvocation
+              and DemoteToHelperInvocation before 1.6, CopyLogical and composite Select
+              before 1.4)
+```
+
+- **`enum Rule`**
+  - `Header`
+  - `Grammar`
+  - `Section`
+  - `IdUnique`
+  - `IdDefined`
+  - `IdKind`
+  - `Type`
+  - `Decoration`
+  - `Storage`
+  - `BlockLayout`
+  - `Cfg`
+  - `Interface`
+  - `ExecMode`
+  - `Capability`
+  - `Version`
+
+- **`struct Error`**
+  - `rule: Rule`
+  - `at: usize` -- the word offset of the instruction (0: the module)
+  - `msg: String`
+
+- **`fn validate(words: &[u32]) -> Result<(), Vec<Error>>`**
+  check a module (the rules of the module comment) -> Ok or every error found
+
 ## plat
 
 *the platform layer: process, files, threads, windows (Windows and Linux)* -- crate root [`lib/plat/lib.rs`](../lib/plat/lib.rs)
@@ -21565,6 +23547,10 @@ wait, presentation, cursors                                     [src/plat/win/wi
                                     of the presented pixels (a DIB section the rectangles
                                     are copied into and BitBlt from): WM_PAINT repaints from
                                     it.
+  win_native(w) -> NativeWindow     (gpu) HWND + HINSTANCE for a GPU surface (lib/gpu); such
+                                    a window is never given to win_present: without a kept
+                                    copy WM_PAINT paints nothing and the swapchain's images
+                                    stay on screen
   win_set_cursor(w, shape)          CUR_* or a custom cursor CUR_USER0..CUR_TABLE-1
   cursor_create(px, w, h, hot_x, hot_y, dpi) -> CUR_USER0 + k / -1   a cursor from
                                     premultiplied ARGB pixels (rows of w * 4 bytes,
@@ -21598,6 +23584,16 @@ State: everything lives on the UI thread (the thread that creates the windows ru
 window procedure); the records are Cells, so the re-entrant window procedure and the
 callbacks (refresh, hit hook) never hold a reference across a Win32 call.
 ```
+
+- **`struct NativeWindow`**
+  (gpu) the native handles of a platform window for a GPU surface (VK_KHR_win32_surface)
+  - `hwnd: isize`
+  - `hinstance: isize`
+
+- **`fn win_native(w: i32) -> Option<NativeWindow>`**
+  (gpu) HWND and HINSTANCE of platform window w (None: no such window).  Its pixels then come
+  from the GPU: do not call win_present for it -- until a frame is presented WM_PAINT has no
+  kept copy to paint (WM_ERASEBKGND erases nothing, the class has no brush).
 
 - **`fn win_create(title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x: i32, y: i32) -> i32`**
   a hidden window (see the file header) -> index / -1  [plat_win_create]

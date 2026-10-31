@@ -92,6 +92,8 @@ DOCS = [
     ("docs/UPDATES.md", "Updates", "Reference", "en"),
     ("docs/AGENT_WEB.md", "Web and agent control", "Reference", "de"),
     ("docs/WASM_COMPUTE.md", "WASM compute", "Reference", "de"),
+    ("docs/GPU.md", "GPU layer", "Reference", "de"),
+    ("docs/SHADER.md", "Shaders (SPIR-V)", "Reference", "de"),
     ("apps/Kritzel/README.md", "Kritzel", "Apps", "en"),
     ("apps/PaintCraft/README.md", "PaintCraft", "Apps", "en"),
     ("plugins/README.md", "PaintCraft plugins", "Apps", "en"),
