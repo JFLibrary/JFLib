@@ -65,6 +65,8 @@
 //                             getaddrinfo: A, AAAA or both as the device can use them, in the
 //                             order of RFC 6724 (resolver.rs)
 //   Engine::udp6_input        from l3v6.rs: the socket for a UDP datagram over IPv6
+//   Os::units                 the units of a Linux host, its deployments (units.rs, deploy.rs);
+//                             SvcSlot::unit: the unit says when this service starts
 //   Os::files                 the device's files (jfn_model::files::Store: flash: and nvram: of
 //                             IOS-like devices, the Linux tree of hosts); files.rs reads and
 //                             writes them for services (OsApi::file_*) and the command lines
@@ -368,6 +370,8 @@ pub struct SvcSlot {
     pub console: bool,
     /// the console program ended with this exit status
     pub exit: Option<i32>,
+    /// a unit's service (units.rs): it starts when the unit says, not with the power
+    pub unit: bool,
 }
 
 /// a service as the inspector shows it
@@ -404,6 +408,8 @@ pub struct LogLine {
     /// "dhclient", "%DHCPD-4-PING_CONFLICT"
     pub tag: String,
     pub text: String,
+    /// the service that wrote it (0: none; journalctl -u)
+    pub svc: u32,
 }
 
 /// the log and where it goes
@@ -519,6 +525,8 @@ pub struct Os {
     pub disk: crate::disk::Disk,
     /// the device's files: they stay through power off (files.rs)
     pub files: jfn_model::files::Store,
+    /// units and deployments (units.rs, deploy.rs)
+    pub units: crate::units::Units,
 }
 
 impl Os {
@@ -544,6 +552,7 @@ impl Os {
             tcp: crate::tcp::TcpStack::new(ios),
             disk: crate::disk::Disk::default(),
             files: jfn_model::files::Store::for_model(model),
+            units: crate::units::Units::default(),
         }
     }
     /// a service by name
@@ -678,7 +687,7 @@ impl OsApi<'_> {
     /// writes to the device's log (and to its syslog hosts): `tag` is the program
     /// ("dhclient") or the IOS mnemonic ("%DHCPD-4-PING_CONFLICT")
     pub fn log(&mut self, sev: u8, tag: &str, text: &str) {
-        self.eng.os_log(self.ni, sev, tag, text, self.cause);
+        self.eng.os_log_svc(self.ni, sev, tag, text, self.cause, self.id);
     }
     /// the IPv4 interfaces
     pub fn ifaces(&self) -> &[Iface] {
@@ -810,7 +819,7 @@ impl OsApi<'_> {
 // ---------------------------------------------------------------- the engine side
 
 /// "Oct 19 12:00:05" of a device clock
-fn bsd_stamp(clock: i64) -> String {
+pub(crate) fn bsd_stamp(clock: i64) -> String {
     let c = datetime::Civil::from_unix(clock.div_euclid(1_000_000_000));
     syslog::bsd_time(c.month, c.day, c.hour, c.minute, c.second)
 }
@@ -1191,6 +1200,9 @@ impl Engine {
                 let key = (s - SLOT_SVC) % SVC_TIMERS;
                 if self.os(ni).is_some_and(|o| o.running(id)) {
                     self.svc_call(ni, id, None, |svc, api| svc.on(SvcEvent::Timer(key), api));
+                } else {
+                    // a service that does not run: its unit's RestartSec (units.rs)
+                    self.unit_timer(ni, id);
                 }
             }
             _ => {}
@@ -1228,10 +1240,12 @@ impl Engine {
             return;
         };
         if on {
-            let ids: Vec<u32> = os.svcs.iter().filter(|s| s.enabled).map(|s| s.id).collect();
+            let ids: Vec<u32> = os.svcs.iter().filter(|s| s.enabled && !s.unit).map(|s| s.id).collect();
             for id in ids {
                 self.os_push(ni, Job::Start(id));
             }
+            // the enabled units (units.rs)
+            self.units_boot(ni);
             return;
         }
         let ids: Vec<u32> = os.svcs.iter().filter(|s| s.running).map(|s| s.id).collect();
@@ -1248,6 +1262,7 @@ impl Engine {
             os.resolver.power_off(now);
             os.tcp.power_off();
         }
+        self.units_power_off(ni);
     }
 
     /// the link of a port changed: services hear about the interfaces on it
@@ -1269,6 +1284,11 @@ impl Engine {
 
     /// a line for the device's log; it goes to the syslog hosts when severe enough
     pub(crate) fn os_log(&mut self, ni: usize, sev: u8, tag: &str, text: &str, cause: Option<HopId>) {
+        self.os_log_svc(ni, sev, tag, text, cause, 0);
+    }
+
+    /// os_log for a line of service `svc` (journalctl -u finds it)
+    pub(crate) fn os_log_svc(&mut self, ni: usize, sev: u8, tag: &str, text: &str, cause: Option<HopId>, svc: u32) {
         let now = self.now;
         let (dev, host) = match self.nodes.get(ni) {
             Some(Some(n)) => (n.dev, n.name.clone()),
@@ -1289,7 +1309,7 @@ impl Engine {
         if os.log.lines.len() >= LOG_KEEP {
             os.log.lines.pop_front();
         }
-        os.log.lines.push_back(LogLine { t: now, clock, seq, fac, sev, tag: String::from(tag), text: String::from(text) });
+        os.log.lines.push_back(LogLine { t: now, clock, seq, fac, sev, tag: String::from(tag), text: String::from(text), svc });
         let quiet = sev > os.log.trap || os.log.hosts.is_empty();
         // a console that follows the log (dhclient -v: cli/netsvc.rs)
         self.cli_log_seen(ni);
@@ -1346,7 +1366,7 @@ impl Engine {
         let id = os.next_svc;
         os.next_svc += 1;
         let kind = svc.kind();
-        os.svcs.push(SvcSlot { id, name: String::from(name), kind, enabled, running: false, since: now, svc: Some(svc), console: false, exit: None });
+        os.svcs.push(SvcSlot { id, name: String::from(name), kind, enabled, running: false, since: now, svc: Some(svc), console: false, exit: None, unit: false });
         if enabled {
             self.os_push(ni, Job::Start(id));
         }
@@ -1395,13 +1415,19 @@ impl Engine {
     pub fn set_service_running(&mut self, dev: u32, name: &str, on: bool) -> Result<(), ActErr> {
         let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
         let id = self.os(ni).ok_or(ActErr::NoIp(dev))?.svc_id(name).ok_or_else(|| ActErr::Refused(msg!("Den Dienst \u{201e}{}\u{201c} gibt es nicht.", name)))?;
+        let mut unit = false;
         if let Some(s) = self.os_mut(ni).and_then(|os| os.svcs.iter_mut().find(|s| s.id == id)) {
             s.enabled = on;
+            unit = s.unit;
         }
         if on {
             self.os_push(ni, Job::Start(id));
         } else {
             self.svc_stop(ni, id);
+        }
+        // a unit's service: the unit hears of it (units.rs)
+        if unit {
+            self.units_ctl(ni, id, on);
         }
         Ok(())
     }
@@ -1607,8 +1633,14 @@ impl OsApi<'_> {
     /// outside, its sockets, timers and queued events go (Service::stop is not called: it
     /// cleaned up already); it stays enabled, so it starts again with the device or on request
     pub fn halt(&mut self) {
+        self.halt_code(1);
+    }
+    /// halt with an exit status: a unit's service tells its unit (units.rs: its restart
+    /// policy looks at it)
+    pub fn halt_code(&mut self, code: i32) {
         let (ni, id) = (self.ni, self.id);
         self.eng.svc_stop(ni, id);
+        self.eng.units_halted(ni, id, code);
     }
 }
 

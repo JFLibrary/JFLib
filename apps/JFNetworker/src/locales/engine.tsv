@@ -1350,3 +1350,73 @@ beendet nach einem Fehler: {}	ended after an error: {}
 Ein Skript hat „source“ oder „file“, nicht beides.	A script has “source” or “file”, not both.
 Skript {} auf {}: die Datei {} gibt es nicht.	Script {} on {}: the file {} does not exist.
 Skript {} auf {}: {}, Zeile {}, Spalte {}: {}	Script {} on {}: {}, line {}, column {}: {}
+# units and deployments (A2: jfn_model unit.rs, jfn_sim units.rs, deploy.rs)
+Auf {} läuft schon eine Bereitstellung.	A deployment is already running on {}.
+Bereitstellung von {} abgebrochen	Deployment of {} aborted
+Bereitstellung von {} auf {}	Deployment of {} to {}
+Bereitstellung von {} gescheitert	Deployment of {} failed
+Bereitstellung von {} gescheitert, alle Hosts zurückgerollt	Deployment of {} failed, all hosts rolled back
+Bereitstellung {}: {}	Deployment {}: {}
+Den Pfad {} gibt es auf {} nicht.	The path {} does not exist on {}.
+Die Datei von {} gibt es nicht.	The file of {} does not exist.
+Die Einheit {} fehlt oder startet nicht: {}	The unit {} is missing or does not start: {}
+Die Einheit {} gibt es auf {} nicht: weder in {} noch unter den Dateien.	The unit {} does not exist on {}: neither in {} nor among the files.
+Die Einheit {} gibt es nicht.	The unit {} does not exist.
+Die Einstellungen sind kein JSON-Objekt.	The settings are not a JSON object.
+Die Einstellungen sind kein gültiges JSON.	The settings are not valid JSON.
+Diese Bereitstellung läuft nicht.	This deployment is not running.
+Eine Bereitstellung braucht mindestens einen Host.	A deployment needs at least one host.
+Einheit {}: {}	Unit {}: {}
+Neustart in {}	restart in {}
+Start gescheitert: {}	start failed: {}
+Status {} statt {}	status {} instead of {}
+Zeile {}: ExecStart braucht einen absoluten Pfad, nicht {}.	Line {}: ExecStart needs an absolute path, not {}.
+Zeile {}: ExecStart startet hier nur jfs oder jfn-service, nicht {}.	Line {}: ExecStart starts only jfs or jfn-service here, not {}.
+Zeile {}: Restart={} gibt es hier nicht (no, on-failure, always).	Line {}: there is no Restart={} here (no, on-failure, always).
+Zeile {}: Type={} gibt es hier nicht, der Dienst läuft als simple.	Line {}: there is no Type={} here, the service runs as simple.
+Zeile {}: den Abschnitt [{}] kenne ich nicht, er zählt nicht.	Line {}: the section [{}] is unknown and does not count.
+Zeile {}: jfn-service braucht die Art des Dienstes, dahinter höchstens eine Datei mit seinen Einstellungen.	Line {}: jfn-service needs the kind of the service, then at most a file with its settings.
+Zeile {}: jfs braucht eine Datei.	Line {}: jfs needs a file.
+Zeile {}: ohne „=“ zählt die Zeile nicht.	Line {}: without “=” the line does not count.
+Zeile {}: {} gibt es hier nicht, die Zeile zählt nicht.	Line {}: there is no {} here, the line does not count.
+Zeile {}: {} ist kein Abschnitt.	Line {}: {} is not a section.
+Zeile {}: {} ist keine Zahl, es bleibt bei {}.	Line {}: {} is not a number, it stays at {}.
+Zeile {}: {} ist keine Zeit.	Line {}: {} is not a time.
+Zeile {}: {} ist nicht NAME=WERT.	Line {}: {} is not NAME=VALUE.
+Zeile {}: {} steht vor jedem Abschnitt und zählt nicht.	Line {}: {} stands before every section and does not count.
+[Service] braucht ExecStart.	[Service] needs ExecStart.
+beendet mit Status {}	ended with status {}
+beendet, Status 0	ended, status 0
+das Gerät gibt es nicht mehr	the device no longer exists
+das Gerät hat keine Adresse	the device has no address
+das Gerät hat keine Dateien	the device has no files
+das Ziel ist nicht erreichbar	the destination is unreachable
+das gibt es nicht	it does not exist
+die Datei {} gibt es nicht	the file {} does not exist
+die Datei {} ist kein Text	the file {} is no text
+die Dateien kamen nicht an: {}	the files did not arrive: {}
+die Einheit ist falsch: {}	the unit is wrong: {}
+die Einheit ist {}	the unit is {}
+die Prüfung hielt nicht: {}	the check did not hold: {}
+die Verbindung endete ohne Antwort	the connection ended without an answer
+gestartet: {}	started: {}
+kopiert	copying
+nicht begonnen	not started
+niemand lauscht auf dem Port	nobody listens on the port
+prüft	checking
+zu viele Starts in kurzer Zeit	too many starts in a short time
+zu viele Starts in kurzer Zeit: er bleibt gestoppt	too many starts in a short time: it stays stopped
+zurückgerollt	rolled back
+{} hat keine Linux-Shell und nimmt keine Einheit.	{} has no Linux shell and takes no unit.
+{} hat keine Linux-Shell: von dort lässt sich nichts bereitstellen.	{} has no Linux shell: nothing can be deployed from there.
+{} ist auf allen Hosts bereitgestellt	{} is deployed on all hosts
+{} kommt aus dem Projekt: ob der Dienst startet, steht dort (Gerätefenster, Dienste).	{} comes from the project: whether the service starts is said there (device window, Services).
+{} lässt sich nicht anlegen.	{} cannot be created.
+{}, Zeile {}, Spalte {}: {}	{}, line {}, column {}: {}
+{}: Prüfung hielt	{}: check held
+{}: fertig	{}: done
+{}: gescheitert: {}	{}: failed: {}
+{}: kopiert {} Dateien	{}: copying {} files
+{}: zurückgerollt	{}: rolled back
+{}: {} neu gestartet	{}: {} restarted
+„{}“ taugt nicht als Name einer Einheit.	“{}” is no name for a unit.

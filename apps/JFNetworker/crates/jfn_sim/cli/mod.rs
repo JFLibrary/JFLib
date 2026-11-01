@@ -78,6 +78,7 @@
 //            session in place (the console, outside the engine's work for another one)
 //   jfstest  jfs --test FILE ...: the test functions of jfs files as one process, the record
 //            of the last run per device (Engine::jfs_tests, the IDE's Tests pane)
+//   units    systemctl and journalctl: the units of a Linux host (units.rs) and its log
 //
 // A device's configuration lives in its parts (ports, bridge, IPv4); the running
 // configuration is written from them and the startup configuration runs through the same
@@ -132,6 +133,7 @@ pub mod coreutils;
 pub mod man;
 pub mod ses;
 pub mod jfstest;
+pub mod units;
 
 /// debugging switched on ("debug ip icmp", "debug arp")
 pub const D_ICMP: u32 = 1;

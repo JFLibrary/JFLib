@@ -2,7 +2,8 @@
 // Explorer, tabs of open files with drafts, SK6's language services in the editor, find and
 // replace in files, a lower area with Ausgabe, Terminal, Probleme, Debugger and Tests, a file
 // run as a process (`jfs FILE` in the terminal) or as a service, SK7's debugger and the test
-// functions of a file (`jfs --test`, jfn_sim cli/jfstest.rs)
+// functions of a file (`jfs --test`, jfn_sim cli/jfstest.rs); deploying to a group of hosts and
+// load tests with their numbers (A2)
 //
 //   Ides::new()                  the drafts and breakpoints of every window (DevWins::new: a
 //                                new project starts without)
@@ -24,7 +25,8 @@
 // explorer.rs: the Explorer; editor.rs: drafts, tabs, the code editor with its language
 // services, the outline; lower.rs: Ausgabe, Terminal, Probleme, Tests; debug.rs: running a file
 // or a script, the debugger (breakpoints, the stop, the call stack, variables, watch
-// expressions); search.rs: find and replace in files.
+// expressions); search.rs: find and replace in files; deploy.rs: Bereitstellen; load.rs:
+// Lasttest (ids from ID_A20, Ausführen › Bereitstellen and Lasttest open them, tall enough).
 //
 // The bar: Datei, Bearbeiten, Ausführen, Debuggen and Ansicht are drop-down menus (Tab goes from
 // one to the next; Enter, Space or Alt+Down open them, the arrows go through the rows, each row
@@ -62,8 +64,10 @@
 // + 0x700 the tests, + 0x800 the Explorer's tree (rows + 1 + i each).
 
 pub(crate) mod debug;
+pub(crate) mod deploy;
 pub(crate) mod editor;
 pub(crate) mod explorer;
+pub(crate) mod load;
 pub(crate) mod lower;
 pub(crate) mod search;
 
@@ -99,6 +103,8 @@ pub(crate) const LOW_TERMINAL: i32 = 1;
 pub(crate) const LOW_PROBLEMS: i32 = 2;
 pub(crate) const LOW_DEBUG: i32 = 3;
 pub(crate) const LOW_TESTS: i32 = 4;
+pub(crate) const LOW_DEPLOY: i32 = 5;
+pub(crate) const LOW_LOAD: i32 = 6;
 
 /// what a tab holds
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -227,6 +233,9 @@ pub(crate) struct Pane {
     /// the frames the flyouts were open (the name, the rename, the condition): a text box's
     /// commit in the first one is an old one's (its edit state went to the editor)
     pub(crate) fly: [u32; 3],
+    /// the panes Bereitstellen and Lasttest (A2)
+    pub(crate) deploy: deploy::DeployUi,
+    pub(crate) load: load::LoadUi,
 }
 
 impl Pane {
@@ -262,6 +271,8 @@ impl Pane {
             last_focus: 0,
             open_req: None,
             fly: [0; 3],
+            deploy: deploy::DeployUi::new(),
+            load: load::LoadUi::new(),
         }
     }
     /// the shown tab
@@ -336,6 +347,11 @@ pub(crate) enum Act {
     Restart,
     Tests,
     Dbg(debug::Op),
+    DeployStart,
+    DeployAbort,
+    DeployUnit,
+    LoadStart,
+    LoadStop,
     Bp(usize, Option<String>),
     CondBp,
     ClearBps,
@@ -370,7 +386,8 @@ pub(crate) fn view(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
         Some(s) => n.cons.ses_id(&n.doc.proj, dev, s),
         None => 0,
     };
-    let texty = f == term || [0xC1, 0xC9, 0xD1, 0x120, 0x121, 0x130, 0x200].iter().any(|o| f == id + o);
+    let a2 = ID_A20 + 0x800 * k as u32;
+    let texty = f == term || [0xC1, 0xC9, 0xD1, 0x120, 0x121, 0x130, 0x200].iter().any(|o| f == id + o) || (a2..a2 + 0x800).contains(&f);
     if let Some(w) = n.devwin.get(k) {
         if texty && f != w.ide.last_focus && ui.window_state(win) & UWS_ACTIVE == 0 {
             ui.window_activate(win);
@@ -527,6 +544,9 @@ fn bar(n: &mut Net, ui: &mut Ui, k: usize, id: u32, cx: &Cx, acts: &mut Vec<Act>
         row(ui, m + 0x23, IC_REFRESH, t("Neu starten"), (VK_F5, MOD_CTRL | MOD_SHIFT), has_svc && !off, false, acts, Act::Restart);
         ui.menu_sep();
         row(ui, m + 0x24, IC_ACCEPT, t("Tests ausführen"), (b'T' as u32, MOD_CTRL | MOD_SHIFT), file && jfs && !off, false, acts, Act::Tests);
+        ui.menu_sep();
+        row(ui, m + 0x25, IC_UPLOAD, t("Bereitstellen …"), (0, 0), !off, false, acts, Act::Lower(LOW_DEPLOY));
+        row(ui, m + 0x26, IC_OFFICE_CHART, t("Lasttest …"), (0, 0), !off, false, acts, Act::Lower(LOW_LOAD));
     }
     ui.flyout_end();
     // Debuggen
@@ -797,10 +817,32 @@ fn act(n: &mut Net, ui: &mut Ui, k: usize, cx: &Cx, acts: Vec<Act>) {
                 }
                 Ok(())
             }
+            // (a refusal stands in the pane's form)
+            Act::DeployStart => {
+                let r = deploy::start(n, k, cx);
+                if let (Err(m), Some(w)) = (r, n.devwin.get(k)) {
+                    w.ide.deploy.msg = Some(m);
+                }
+                Ok(())
+            }
+            Act::DeployAbort => deploy::abort(n, cx),
+            Act::DeployUnit => deploy::make_unit(n, k, cx),
+            Act::LoadStart => {
+                let r = load::start(n, k, cx);
+                if let (Err(m), Some(w)) = (r, n.devwin.get(k)) {
+                    w.ide.load.msg = Some(m);
+                }
+                Ok(())
+            }
+            Act::LoadStop => load::stop(n, cx),
             Act::Lower(l) => {
                 if let Some(w) = n.devwin.get(k) {
-                    w.ide.lower = l.clamp(0, 4);
+                    w.ide.lower = l.clamp(0, LOW_LOAD);
                     w.ide.lower_on = true;
+                    // Bereitstellen and Lasttest need height
+                    if l >= LOW_DEPLOY {
+                        w.ide.lower_h = w.ide.lower_h.max(deploy::PANE_H);
+                    }
                 }
                 if l == LOW_TERMINAL {
                     n.cons.focus = Some(cx.dev);

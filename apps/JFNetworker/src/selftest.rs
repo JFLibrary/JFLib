@@ -56,6 +56,8 @@
 // telnetd, the vty parts of cli/aaa.rs and cli/ios.rs).
 // idetest.rs: what the IDE builds on (group ide: script services from files, jfs --test in
 // cli/jfstest.rs, doc/ide.rs's steps, the IDE's search in files).
+// unitstest.rs: services as units and rolling deployments (group units: jfn_model::unit,
+// jfn_sim::units, deploy, cli/units.rs, the lab 05-microservices).
 
 use alloc::format;
 use alloc::string::String;
@@ -139,9 +141,11 @@ mod desktoptest;
 mod sessiontest;
 #[path = "idetest.rs"]
 mod idetest;
+#[path = "unitstest.rs"]
+mod unitstest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 46] = [
+    let groups: [(&'static str, fn(&mut T)); 47] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -188,6 +192,7 @@ pub fn run() -> i32 {
         ("desk", desktoptest::run),
         ("sessions", sessiontest::run),
         ("ide", idetest::run),
+        ("units", unitstest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

@@ -92,6 +92,11 @@ pub enum JobOut {
         delay: Ns,
         batch: bool,
     },
+    /// journalctl -f (cli/units.rs): the log's lines after `mark` (of one unit) until Ctrl+C
+    Journal {
+        unit: Option<String>,
+        mark: u32,
+    },
     /// dhclient (cli/netsvc.rs): the client's log lines after `mark` (printed with -v) until
     /// it is bound, gives up or (`release`) sent its RELEASE; the console stops waiting at
     /// `until`
@@ -632,7 +637,7 @@ impl Engine {
                 }
                 return;
             }
-            JobOut::Wait { .. } => return,
+            JobOut::Wait { .. } | JobOut::Journal { .. } => return,
             _ => {}
         }
         let JobOut::IosPing { col, fake, count, timeout, .. } = &mut cj.out else {

@@ -28,6 +28,7 @@ use crate::selftest::T;
 
 const CAMPUS: &str = include_str!("../assets/labs/01-campus-vlan.jfnet");
 const LB: &str = include_str!("../assets/labs/02-lastverteilung.jfnet");
+const MICRO: &str = include_str!("../assets/labs/05-microservices.jfnet");
 const SHARDS: &str = include_str!("../assets/labs/03-shards.jfnet");
 const CACHE: &str = include_str!("../assets/labs/04-cache.jfnet");
 const TWO_PCS: &str = include_str!("../tests/fixtures/two_pcs.jfnet");
@@ -342,7 +343,7 @@ impl Run {
 }
 
 fn bundled_t(t: &mut T) {
-    let files = [("01-campus-vlan.jfnet", CAMPUS), ("02-lastverteilung.jfnet", LB), ("03-shards.jfnet", SHARDS), ("04-cache.jfnet", CACHE)];
+    let files = [("01-campus-vlan.jfnet", CAMPUS), ("02-lastverteilung.jfnet", LB), ("03-shards.jfnet", SHARDS), ("04-cache.jfnet", CACHE), ("05-microservices.jfnet", MICRO)];
     // the app's list: every lab of app://labs, by file name
     let listed = crate::workspace::task::labs();
     t.eq("labs listed", listed.iter().map(|l| l.path.clone()).collect::<Vec<_>>(), files.iter().map(|f| format!("app://labs/{}", f.0)).collect::<Vec<_>>());

@@ -53,6 +53,7 @@ pub mod files;
 pub mod phys;
 pub mod group;
 pub mod background;
+pub mod unit;
 
 pub use cable::{cable_fits, cable_kind, CableKind, Why};
 pub use catalog::{catalog, model, Category, CliStyle, DeviceKind, Media, Model, PortSpec};

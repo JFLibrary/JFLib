@@ -29,6 +29,10 @@
 //                        refused (line and column), the old program goes on.  Replacing the
 //                        service with Action::Service instead gives a new one: its disk starts
 //                        empty.  Action::RenameService (os.rs) renames a script as it runs.
+//   "unit" in the config     the program runs for a unit (units.rs): it ends when nothing is left
+//                        to do (status 0, an error that ends it: status 1) and what it prints
+//                        goes into the log too (journalctl -u); timer key 3 waits for the end
+//                        of its last CPU time
 //   ScriptService::idle_at()   when nothing is left to do: no callback, timer, socket, server,
 //                        request, lookup or disk access (`jfs FILE` of the shell ends then:
 //                        cli/shrun.rs runs the service as a console program)
@@ -166,6 +170,8 @@ use crate::trace::{HopId, Note};
 const K_OWN: u32 = 0;
 const K_SERVE: u32 = 1;
 const K_AGENT: u32 = 2;
+/// a unit's program: the end of its last CPU time (units.rs)
+const K_UNIT: u32 = 3;
 /// errors and bytes of output a script keeps
 const ERRORS_KEEP: usize = 20;
 const OUTPUT_KEEP: usize = 16 << 10;
@@ -201,11 +207,13 @@ pub struct ScriptCfg {
     pub queue: usize,
     /// every runtime error ends the service (else only one in the top-level code)
     pub stop_on_error: bool,
+    /// it runs for a unit (units.rs): it ends when nothing is left to do, print goes to the log
+    pub unit: bool,
 }
 
 impl Default for ScriptCfg {
     fn default() -> ScriptCfg {
-        ScriptCfg { ps_per_op: 5000, slice: 100_000, limits: Limits { output: 64 << 10, ..Limits::default() }, queue: 1000, stop_on_error: false }
+        ScriptCfg { ps_per_op: 5000, slice: 100_000, limits: Limits { output: 64 << 10, ..Limits::default() }, queue: 1000, stop_on_error: false, unit: false }
     }
 }
 
@@ -2156,6 +2164,12 @@ impl Run {
         let out = vm.take_output();
         if !out.is_empty() {
             book.print(&out);
+            // a unit's output is in its journal (units.rs)
+            if def.cfg.unit {
+                for l in out.lines() {
+                    os.log(6, &book.name, l);
+                }
+            }
         }
         // a slice takes 1 ns at least (time goes on), a callback too
         let at = inv.start.saturating_add(cpu(vm.call_fuel(), def.cfg.ps_per_op));
@@ -2595,6 +2609,18 @@ impl ScriptService {
             return;
         }
         run.arm(os);
+        // a unit's program ends when nothing is left to do
+        if self.def.cfg.unit {
+            match self.idle_at() {
+                Some(t) if t <= os.now() => {
+                    self.run = None;
+                    self.book.state = ScriptState::Stopped;
+                    os.halt_code(0);
+                }
+                Some(t) => os.timer(K_UNIT, t),
+                None => {}
+            }
+        }
     }
 }
 
@@ -2639,7 +2665,9 @@ impl Service for ScriptService {
         let Some(run) = self.run.as_deref_mut() else {
             return;
         };
-        run.event(&mut self.book, &self.def, os, ev);
+        if ev != SvcEvent::Timer(K_UNIT) {
+            run.event(&mut self.book, &self.def, os, ev);
+        }
         self.settle(os);
     }
     fn stop(&mut self, _os: &mut OsApi) {
@@ -2837,6 +2865,7 @@ fn cfg_of(c: &Json) -> Result<ScriptCfg, Msg> {
     if let Some(b) = c.get("stop_on_error").and_then(|v| v.as_bool()) {
         cfg.stop_on_error = b;
     }
+    cfg.unit = c.get("unit").is_some();
     if let Some(l) = c.get("limits") {
         let n = |k: &str| l.get(k).and_then(|v| v.as_u64());
         if let Some(f) = n("fuel") {

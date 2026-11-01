@@ -66,6 +66,8 @@
 //                     login root with this password)
 //
 //   HttpLoadSet / HttpServerSet    change a running load generator or web server in place
+//   Unit                           a unit: start, stop, restart, enable, disable (units.rs)
+//   Deploy / DeployAbort           a rolling deployment (deploy.rs)
 //   ScriptSource / RenameService   a script's new definition, keeping its disk and numbers
 //                                  (scriptsvc.rs); a service's new name (os.rs)
 //
@@ -509,6 +511,10 @@ impl Engine {
                 });
                 Ok(())
             }
+            // units and deployments
+            Action::Unit { dev, name, op } => self.unit_op(dev, &name, op).map_err(|e| ActErr::Refused(e.msg())),
+            Action::Deploy { spec } => self.deploy_start(spec).map(|_| ()),
+            Action::DeployAbort { dev, id } => self.deploy_abort(dev, id),
             // a script's new definition, a service's new name
             Action::ScriptSource { dev, svc, config } => self.script_source(dev, &svc, &config),
             Action::RenameService { dev, name, to } => self.rename_service(dev, &name, &to),

@@ -58,6 +58,8 @@
 //   fault    fault injection with marks on the timeline: cables pulled or worse, power off,
 //            services stopped, slow disks, partitions; each one heals exactly what it did
 //   lab      the actions of the lab and the views of its services for the user interface
+//   units    services as units on Linux hosts: unit files, enable, restart policies
+//   deploy   rolling deployments: files and a unit, host by host, with a health check
 //   lb       load balancer: HTTP or TCP, round robin, least connections, weighted, consistent
 //            hashing; health checks, draining, numbers per backend
 //   kv       key-value store: hash ring with virtual nodes, replicas, a leader per key, read
@@ -271,6 +273,8 @@ pub mod aaatrace;
 pub mod radiusd;
 pub mod telnetd;
 pub mod procs;
+pub mod units;
+pub mod deploy;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -350,4 +354,6 @@ pub use telnetd::TelnetClient;
 pub use scriptsvc::DebugOp;
 pub use procs::{ProcKind, ProcRow};
 pub use telnetd::TelnetServer;
+pub use units::{UnitEnabled, UnitErr, UnitOp, UnitState, UnitView};
+pub use deploy::{DeployLine, DeployRun, Deployer, HostRun, HostState, RunState};
 pub use cli::ses::{SesKind, SesView};
