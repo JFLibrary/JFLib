@@ -1653,6 +1653,7 @@ impl Ui {
             crop = Some([x, y, w, h]);
         }
         self.render();
+        self.gp_settle_all();
         let ok = if desktop {
             self.shot_desktop(&file, crop)
         } else {
@@ -1963,6 +1964,7 @@ impl Ui {
             return;
         };
         self.render();
+        self.gp_settle_all();
         let dpi = self.win_dpi(0);
         let sf = self.win_fb(0);
         let (px, py) = (dp_at(x, dpi), dp_at(y, dpi));
@@ -1985,6 +1987,7 @@ impl Ui {
         let path = String::from(String::from_utf8_lossy(&p[..i]).trim());
         let q = skip_ws(&p[i..]);
         self.render();
+        self.gp_settle_all();
         let sf = self.win_fb(0);
         let png = if q.is_empty() {
             img_png::encode(&sf.px, sf.w as usize, sf.h as usize, sf.stride as usize, false)

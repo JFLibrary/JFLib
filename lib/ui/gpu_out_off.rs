@@ -14,6 +14,19 @@ impl Ui {
         false
     }
     pub(crate) fn gp_cpu_done(&mut self, _cur: u32, _pw: i32) {}
+    pub(crate) fn gp_split_wanted(&self) -> bool {
+        false
+    }
+    pub(crate) fn gp_plan_images(&mut self) -> bool {
+        false
+    }
+    pub(crate) fn gp_split_begin(&mut self, _n: i32) -> bool {
+        false
+    }
+    pub(crate) fn gp_split_draw(&mut self, _n: i32) {}
+    pub(crate) fn gp_frame_done(&mut self, _t0: u64, _n: i32, _split: bool) {}
+    pub(crate) fn gp_settle_all(&mut self) {}
+    pub(crate) fn gp_repaired(&mut self) {}
     pub(crate) fn gp_tick(&mut self) {}
     pub(crate) fn gp_deadline(&self) -> Option<u64> {
         None
@@ -34,6 +47,12 @@ impl Ui {
 
     /// (test aid) on Windows: the device behaves as lost from now on
     pub fn gpu_test_lose(&mut self) {}
+
+    /// on Windows: the pixels of the GPU's images into the framebuffer
+    pub fn gpu_settle(&mut self) {}
+
+    /// (test aid) on Windows: the bytes image textures may take
+    pub fn gpu_test_image_budget(&mut self, _bytes: u64) {}
 
     // the script command `gpu` (gpu_out.rs): a SKIP once
     pub(crate) fn sc_gpu(&mut self, _app: &mut dyn App, _a: &[u8]) {

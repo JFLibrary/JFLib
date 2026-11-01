@@ -1,0 +1,3 @@
+#!args --test images
+# big images as textures: not before their redraws have cost the upload; drawn over, under a layer,
+# in a new version, at other sizes; eviction, over the budget, translucent; a lost device

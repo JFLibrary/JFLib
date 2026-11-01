@@ -35,8 +35,8 @@
 //   device.encoder() -> CommandEncoder              copies, fill, barriers, compute, render
 //                    passes, draws, indirect draws, timestamps; finish() -> CommandBuffer
 //   queue.submit([cmd, ..]) -> SubmitId             timeline semaphore value
-//   queue.write_buffer / write_texture / write_texture_rects (staged in a ring, before the next
-//                    submit), read_buffer (waits)
+//   queue.write_buffer / write_texture / write_texture_rects / write_texture_rects_at (staged in
+//                    a ring, before the next submit), read_buffer (waits)
 //   Surface::new(&instance, plat_window)            a plat window (Windows: HWND)
 //   Surface::native(&instance, handles, plat_window)  a window given by its handles (a child)
 //   device.create_swapchain(&surface, &SwapchainDesc) -> Swapchain: acquire() -> Option<Frame>,

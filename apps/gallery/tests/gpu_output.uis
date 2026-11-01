@@ -44,6 +44,29 @@ focus #7100
 key down down down down down down down down
 gpu expect same
 gpu expect upload 12000000
+# ---- a menu goes up as a texture of its own, closing it uploads nothing of what lies below it
+# (gpu_layers.uis: all of that), and scroll copies come back afterwards
+gpu expect upload 100000000
+gpu expect base 2000000000
+click "Datei"
+gpu expect layers 1
+gpu expect same
+gpu expect screen
+gpu expect base 200000
+key esc
+gpu expect layers 0
+gpu expect same
+gpu expect screen
+gpu expect base 200000
+wheel 900,300 -120
+wait 300
+wheel 900,300 -120
+wait 300
+wheel 900,300 -120
+wait 300
+move 900,310
+expect scrollcopy 1
+gpu expect same
 # ---- a new size: that frame through the CPU path (the window's DC shows it), then the swapchain
 size 900 700
 gpu expect cpu

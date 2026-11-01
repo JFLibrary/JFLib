@@ -270,7 +270,23 @@ Re-exports: `plat::screen::{Monitor, ScreenError}`
   - `reserved: u64` -- bytes of GPU and staging memory the device holds in blocks
   - `frames: u64` -- frames presented through the swapchain / the CPU path
   - `cpu_frames: u64`
-  - `upload_bytes: u64` -- bytes uploaded to the window's texture
+  - `upload_bytes: u64` -- bytes uploaded to the window's textures, those of them to the base texture
+  - `upload_base: u64`
+  - `base_px: u64` -- pixels of the base layer drawn again (what a layer above it no longer costs)
+  - `split_frames: u64` -- frames drawn layer by layer
+  - `layer_textures: u32` -- the layers above the base with a texture now, its bytes, and the bytes kept of the pixels
+    below them
+  - `layer_bytes: u64`
+  - `layer_store: u64`
+  - `image_quads: u32` -- images drawn as textures in the window's last frame; of all windows: textures, their
+    bytes, uploads, frames that drew one, textures evicted
+  - `image_textures: u32`
+  - `image_bytes: u64`
+  - `image_uploads: u64`
+  - `image_hits: u64`
+  - `image_evicted: u64`
+  - `render_us: u64` -- time in the window's renders and presents (us)
+  - `present_us: u64`
   - `switches: u32` -- switches to the swapchain, and back to the CPU path
   - `leaves: u32`
   - `verified: u64` -- jfgui_GPU_VERIFY: images read back and compared, those that differed
@@ -355,6 +371,8 @@ event carries its window (Event::win).
 
 - **`fn fb(&self) -> &Surface`**
   ui_fb: the live window's framebuffer
+  the live window's framebuffer.  While its frames go through the GPU a big image may be
+  drawn only there: Ui::gpu_settle() first when the pixels matter
 - **`fn client_size(&self) -> (i32, i32)`**
   ui_client_size: client area in DIP
 - **`fn anim_off(&self) -> bool`**
@@ -4380,6 +4398,10 @@ function's identity and version) and the clip it is drawn in, so any visible cha
 marks its cells.  The same pass fills the content grids of the scroll views
 (scrollcopy.rs): dirty cells whose pixels a scrolled view still shows elsewhere are copied
 there before the rectangles are drawn.
+
+While a window's frames go through the GPU (gpu_out.rs, W::split) the pass also keeps the hash
+of every cell after each layer (W::through: what changed in which layer) and notes the big
+images of the base layer and which cells they end up on top of (W::top, W::imgs).
 ```
 
 **`impl Ui`**
@@ -8317,13 +8339,40 @@ frame when they come back.
 Popups (plat::popup: small, short-lived windows with a window region) and tooltips stay on the
 CPU path: a swapchain takes tens of ms, longer than many of them live.
 
+Layers (G3b).  The framebuffer stays the truth: all layers flattened, byte for byte what the CPU
+path holds.  What the GPU gets apart: a window's base texture holds the base layer only; each
+layer above it with commands has a texture of its own that holds, in the 32 x 32 px cells the
+layer touches, the pixels up to and including that layer, flattened on the CPU over what really
+lies below (shadows, translucent widgets, subpixel text, RTL: nothing to get wrong, the same
+kernels on the same pixels).  The render pass draws the base, then these cells opaque in layer
+order; the GPU blends nothing (blending a premultiplied layer differs from drawing directly by
+1 .. 2 levels in about an eighth of its translucent pixels, measured, and subpixel text needs an
+opaque target; docs/GPU.md).  Beside each texture the pixels below the layer stay in a Store,
+cell by cell, so a layer that moves or closes puts them back in the framebuffer: nothing below
+it is drawn again or uploaded; closing costs no upload at all.  dirty.rs tells per cell which
+layer changed first (W::through): gp_split_draw restores below that layer, then draws and uploads
+only from there on.  Something changing below an open layer draws what lies above it in those
+cells, as ever.  Textures and stores exist while their layer has content and LINGER_US longer
+(a menu closed and another opened need no new memory).
+
+Images (G3b).  A big opaque Cmd::Image of the base layer that has cost as much in redraws as its
+upload would (rent or buy: a static image never takes GPU memory) becomes a texture, cached by
+surface identity and version, under a budget with LRU eviction; it goes up in parts over the
+frames that draw it (IMAGE_STEP_BYTES, the CPU draws it meanwhile).  In the cells it fills, as the
+last command there, its pixels are drawn by the GPU with Dc::blit_scaled's integer mapping: the
+CPU neither draws nor uploads them (Split::owed: the framebuffer lacks them; gp_settle draws them
+before anybody reads it).  Everything else, also the cells at the image's edge or with something
+on top of it, goes the usual way.
+
 A lost device or any other failure: every window back to the CPU path (the framebuffer holds the
 frame), a new device after 2 s, 4 s, ... 5 min (jfgui_GPU_RETRY_MS: the first wait).  No Vulkan, no
 usable adapter or surface: the CPU path for good, silently.
 
 Environment: jfgui_GPU=0|1 (off, on; default: DEFAULT_ON), jfgui_GPU_VERIFY=1 (every presented
 image read back and compared with the framebuffer), jfgui_GPU_TRACE=1 (stderr: the stages and
-their times); lib/gpu's jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
+their times), jfgui_GPU_LAYERS=0 (one texture per window: no layers, no images),
+jfgui_GPU_IMAGES=0 (no images), jfgui_GPU_IMAGE_MB=n (the images' budget); lib/gpu's
+jfgui_GPU_PRESENT, jfgui_GPU_ADAPTER, jfgui_GPU_VALIDATE, ...
 
 Script command `gpu` (headless runs stay on the CPU path without it; on other targets, or
 without a GPU, it prints a SKIP once and does nothing):
@@ -8339,6 +8388,11 @@ without a GPU, it prints a SKIP once and does nothing):
                          top of ours is a note, not a failure)
   gpu expect window      the window's DC = the framebuffer (the CPU path's pixels)
   gpu expect upload N    at most N bytes uploaded since the last check
+  gpu expect base N      at most N bytes of them to the base texture since the last check
+  gpu expect raster N    at most N pixels of the base layer drawn since the last check
+  gpu expect layers N    N layers above the base have a texture now
+  gpu expect images N    N image textures exist
+  gpu budget BYTES       the images' budget
   gpu lose               the device behaves as lost from now on (Device::test_lose)
   gpu print              the counters
 ```
@@ -8350,6 +8404,10 @@ without a GPU, it prints a SKIP once and does nothing):
 - **`fn gpu_test_lose(&mut self)`**
   (test aid) the device behaves as lost from now on: the next frame goes back to the CPU
   path, a new device follows
+- **`fn gpu_test_image_budget(&mut self, bytes: u64)`**
+  (test aid) the bytes image textures may take
+- **`fn gpu_settle(&mut self)`**
+  the pixels of the images the GPU draws into the framebuffers (Ui::fb reads them then)
 
 #### `ui/gpu_out_off.rs`
 
@@ -8366,6 +8424,10 @@ every frame takes the platform's path, no Vulkan code is linked
   what window `win` (a UI window index, 0 = main) shows through: here the platform's path
 - **`fn gpu_test_lose(&mut self)`**
   (test aid) on Windows: the device behaves as lost from now on
+- **`fn gpu_settle(&mut self)`**
+  on Windows: the pixels of the GPU's images into the framebuffer
+- **`fn gpu_test_image_budget(&mut self, _bytes: u64)`**
+  (test aid) on Windows: the bytes image textures may take
 
 #### `ui/inspect.rs`
 
@@ -17555,8 +17617,8 @@ in the browser, Metal; they provide the same types and methods.
   device.encoder() -> CommandEncoder              copies, fill, barriers, compute, render
                    passes, draws, indirect draws, timestamps; finish() -> CommandBuffer
   queue.submit([cmd, ..]) -> SubmitId             timeline semaphore value
-  queue.write_buffer / write_texture / write_texture_rects (staged in a ring, before the next
-                   submit), read_buffer (waits)
+  queue.write_buffer / write_texture / write_texture_rects / write_texture_rects_at (staged in
+                   a ring, before the next submit), read_buffer (waits)
   Surface::new(&instance, plat_window)            a plat window (Windows: HWND)
   Surface::native(&instance, handles, plat_window)  a window given by its handles (a child)
   device.create_swapchain(&surface, &SwapchainDesc) -> Swapchain: acquire() -> Option<Frame>,
@@ -18281,6 +18343,7 @@ buffer slots, staged uploads, submission
   queue.write_buffer(&buf, off, &[T])            staged into an upload command buffer that
   queue.write_texture(&region, &[u8], layout, before, after)   runs first in the next submit
   queue.write_texture_rects(&tex, &rects, &[u8], stride, before, after)   rectangles of a frame
+  queue.write_texture_rects_at(&tex, &rects, origin, &[u8], stride, before, after)   of a larger image
   queue.read_buffer(&buf, off, &mut [T])          copies, submits and waits (slow path)
   queue.flush() -> Result<SubmitId>               submit the pending uploads now
   device.wait(id, timeout_ns) -> Result<bool>     false: timed out
@@ -18326,7 +18389,9 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
 - **`fn is_lost(&self) -> bool`**
   the device was lost: every call fails with DeviceLost; create a new device
 - **`fn test_lose(&self)`**
-  (test aid) behave as a lost device from now on
+  (test aid) behave as a lost device from now on (a lost device runs nothing any more and
+  its resources may go at once; here the GPU may still work on the last submission: it
+  finishes first)
 - **`fn validating(&self) -> bool`**
   the validation layer watches this device
 - **`fn poll(&self) -> Result<()>`**
@@ -18358,6 +18423,10 @@ call returns GpuError::DeviceLost (objects are still destroyed normally).
   of a 2D texture from `data`, an image of the texture's size in rows of `stride` bytes (a
   framebuffer), before the next submission; the staged bytes are those of the rectangles.
   The whole level goes from `before` to CopyDst and then to `after`, once for all of them
+- **`fn write_texture_rects_at(&self, t: &crate::Texture, rects: &[[i32; 4]], origin: (i32, i32), data: &[u8], stride: u32, before: Layout, after: Layout) -> Result<()>`**
+  write_texture_rects from an image of another size: rectangles (x, y, w, h) of `data`, an
+  image in rows of `stride` bytes, go to (x - origin.0, y - origin.1) of the texture; what
+  lies outside the image or the texture is skipped
 - **`fn read_buffer<T: Pod>(&self, buf: &crate::Buffer, offset: u64, out: &mut [T]) -> Result<()>`**
   read a buffer's contents at offset (copies through a readback buffer when needed,
   submits and waits for the GPU: the slow path, for tools and tests)
