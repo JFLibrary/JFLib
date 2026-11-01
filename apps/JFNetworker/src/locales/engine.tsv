@@ -1420,3 +1420,9 @@ zurückgerollt	rolled back
 {}: zurückgerollt	{}: rolled back
 {}: {} neu gestartet	{}: {} restarted
 „{}“ taugt nicht als Name einer Einheit.	“{}” is no name for a unit.
+„root“ muss ein absoluter Pfad sein: {}	“root” must be an absolute path: {}
+Webbrowser: Weiterleitung {} nach {}.	Web browser: redirect {} to {}.
+Nach {} Weiterleitungen kam noch eine: es bleibt dabei.	After {} redirects came another one: it stops here.
+Verschlüsselte Seiten (https) kommen mit einer späteren Ausbaustufe.	Encrypted pages (https) come with a later stage.
+Das Gerät oder der Dienst hat angehalten.	The device or the service stopped.
+{} Anfragen, {} Antworten, {} gescheitert	{} requests, {} answers, {} failed

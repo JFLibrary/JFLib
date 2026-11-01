@@ -622,3 +622,8 @@ pub(crate) const ID_IDE0: u32 = 0x0001_8000;
 /// the panes of device window k: ID_A20 + 0x800 k .. + 0x7FF (workspace/ide/deploy.rs: + 1 .. 0xFF,
 /// load.rs: + 0x200 ..)
 pub(crate) const ID_A20: u32 = 0x0001_B000;
+// ---- B1, B2: the Webbrowser (commands 870 .. 889, widgets 0x0001_C000 .. 0x0001_CFFF, timers
+// 0x1BC .. 0x1BF; the commands and timers are not used)
+/// the Webbrowser in device window k: ID_BROWSER0 + 0x100 k the page (its toolbar: the desktop's
+/// block + 0x30, devwin/browser.rs)
+pub(crate) const ID_BROWSER0: u32 = 0x0001_C000;

@@ -1,17 +1,13 @@
-// progs -- two small programs of a host's desktop (desktop.rs): IP-Konfiguration and Webbrowser
+// progs -- a small program of a host's desktop (desktop.rs): IP-Konfiguration
 //
-//   IpState::new() / WebState::new()   their fields with nothing typed
+//   IpState::new()                     its fields with nothing typed
 //   ipconfig(n, ui, k, id, dev)        IP-Konfiguration: a static address (address, mask,
 //                                      gateway) or DHCP per interface; it types shell commands
 //                                      on the console as the forms do (DHCP: the DHCP client
 //                                      service, doc/config.rs), one undo step
-//   browser(n, ui, k, id, dev)         Webbrowser: an address line and where it leads; the
-//                                      page itself comes with B1 (until then curl in the
-//                                      Terminal fetches it)
 //
-// Ids (id: the device window's desktop block + 0x10 / + 0x30, as before the desktop had
-// windows): IP-Konfiguration + 1 the interface, + 2 / + 3 Statisch / DHCP, + 4 .. + 6 address,
-// mask, gateway, + 7 Übernehmen; Webbrowser + 0 the address, + 1 Öffnen, + 2 the page.
+// Ids (id: the device window's desktop block + 0x10, as before the desktop had windows): + 1 the
+// interface, + 2 / + 3 Statisch / DHCP, + 4 .. + 6 address, mask, gateway, + 7 Übernehmen.
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -38,18 +34,6 @@ pub(crate) struct IpState {
 impl IpState {
     pub(crate) fn new() -> IpState {
         IpState { iface: 0, mode: 0, addr: String::new(), mask: String::new(), gw: String::new(), src: (String::new(), String::new(), String::new(), String::new(), -1), err: String::new() }
-    }
-}
-
-/// the Webbrowser's address and page
-pub(crate) struct WebState {
-    url: String,
-    page: Vec<String>,
-}
-
-impl WebState {
-    pub(crate) fn new() -> WebState {
-        WebState { url: String::from("http://"), page: Vec::new() }
     }
 }
 
@@ -191,72 +175,4 @@ fn set_ip(n: &mut Net, dev: u32, iface: &str, to_dhcp: bool, dhcp: bool, addr: &
     }
     n.doc.hist.group_end();
     r
-}
-
-/// Webbrowser of device window k: an address and where it leads (the page itself: curl in
-/// the Terminal, the simulator speaks HTTP there)
-pub(crate) fn browser(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
-    let hosts = n.doc.sim.state().hosts(dev);
-    let Some(w) = n.devwin.get(k) else { return };
-    let s = &mut w.desk.web;
-    let mut go = false;
-    ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
-    ui.next_size(-1, 0);
-    let ev = ui.textbox(id, Some("http://10.0.0.10/"), &mut s.url, 400);
-    if ev & EV_COMMIT != 0 && ui.focused() == id {
-        go = true;
-    }
-    ui.next_icon(IC_REFRESH);
-    if ui.button(id + 1, t("Öffnen")) & EV_ACT != 0 {
-        go = true;
-    }
-    ui.box_end();
-    if go {
-        s.page = page(&s.url, &hosts);
-        ui.repass();
-    }
-    ui.next_size(-1, -1);
-    ui.box_begin(id + 2, BOX_V | BOX_CARD | pad(12), 4);
-    if s.page.is_empty() {
-        ui.text(TS_BODY | TX_SECONDARY, t("Eine Adresse eingeben und „Öffnen“."));
-    }
-    for l in &s.page {
-        ui.next_size(-1, 0);
-        ui.text(TS_BODY | TX_WRAP, l);
-    }
-    ui.box_end();
-}
-
-// the page for an address: where it would go, and how to fetch it (curl)
-fn page(url: &str, hosts: &[(String, Ipv4)]) -> Vec<String> {
-    let u = url.trim();
-    let rest = u.strip_prefix("http://").unwrap_or(u);
-    if u.starts_with("https://") {
-        return alloc::vec![String::from(t("Verschlüsselte Seiten (https) kann dieser Browser nicht öffnen."))];
-    }
-    let (hostport, path) = match rest.find('/') {
-        Some(i) => (&rest[..i], &rest[i..]),
-        None => (rest, "/"),
-    };
-    let (host, port) = match hostport.rsplit_once(':') {
-        Some((h, p)) => match p.parse::<u16>() {
-            Ok(p) => (h, p),
-            Err(_) => return alloc::vec![tf("„{}“ ist keine Portnummer.", &[p])],
-        },
-        None => (hostport, 80),
-    };
-    if host.is_empty() {
-        return alloc::vec![String::from(t("Die Adresse nennt keinen Rechner."))];
-    }
-    let ip = Ipv4::parse(host).or_else(|| hosts.iter().find(|h| h.0.eq_ignore_ascii_case(host)).map(|h| h.1));
-    let target = match ip {
-        Some(a) if a.to_string() == host => tf("{}, Port {}, Pfad {}", &[&a.to_string(), &port.to_string(), path]),
-        Some(a) => tf("{} ({}), Port {}, Pfad {}", &[host, &a.to_string(), &port.to_string(), path]),
-        None => tf("{} (der Name ist auf diesem Gerät nicht eingetragen), Port {}, Pfad {}", &[host, &port.to_string(), path]),
-    };
-    alloc::vec![
-        String::from(t("Dieser Browser zeigt nur, wohin die Adresse führt.")),
-        tf("Ziel: {}", &[&target]),
-        tf("Die Seite selbst holt „curl {}“ im Terminal über den Simulator.", &[u]),
-    ]
 }

@@ -140,6 +140,8 @@
 //            the problems CableTooLong and OpticMismatch
 //   mailtrace MNote: the decisions of mail as notes (Note::Mail) with their German sentences
 //   mailbox  the mailboxes of the mail servers in the device's files: a Maildir per user
+//   webc     the Webbrowser's side in the engine: requests with redirects over the HTTP client
+//            (Action::WebFetch / WebCancel, Report::Web, Engine::web_client)
 //   mailc    the clients of mail: the SMTP conversation, connections by name, the E-Mail
 //            program's POP3 session, its account and folders (Action::MailSend / MailFetch,
 //            Engine::mail_client)
@@ -275,6 +277,7 @@ pub mod telnetd;
 pub mod procs;
 pub mod units;
 pub mod deploy;
+pub mod webc;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -357,3 +360,4 @@ pub use telnetd::TelnetServer;
 pub use units::{UnitEnabled, UnitErr, UnitOp, UnitState, UnitView};
 pub use deploy::{DeployLine, DeployRun, Deployer, HostRun, HostState, RunState};
 pub use cli::ses::{SesKind, SesView};
+pub use webc::{WebClient, WebClientView, WebErr, WebFail, WebReq, WebResp};

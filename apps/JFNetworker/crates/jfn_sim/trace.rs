@@ -486,6 +486,8 @@ pub enum Note {
     Unit { unit: String, what: Msg },
     /// a step of a deployment (deploy.rs)
     Deploy { id: u32, what: Msg },
+    /// the Webbrowser follows a redirect (webc.rs): the status and where it leads
+    WebRedirect { status: u16, to: String },
 }
 
 /// the kind of DHCPREQUEST a client sends
@@ -697,6 +699,7 @@ impl Note {
                 | Note::HttpIdleClose { .. }
                 | Note::HttpReply { .. }
                 | Note::HttpFailed { .. }
+                | Note::WebRedirect { .. }
         )
     }
     /// something was thrown away
@@ -1198,6 +1201,7 @@ impl Note {
             Note::Deploy { id, what } => msg!("Bereitstellung {}: {}", id, what),
             Note::Snmp(n) => n.message(),
             Note::Aaa(n) => n.message(),
+            Note::WebRedirect { status, to } => msg!("Webbrowser: Weiterleitung {} nach {}.", status, to),
         }
     }
 }

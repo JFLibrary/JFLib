@@ -58,6 +58,8 @@
 // cli/jfstest.rs, doc/ide.rs's steps, the IDE's search in files).
 // unitstest.rs: services as units and rolling deployments (group units: jfn_model::unit,
 // jfn_sim::units, deploy, cli/units.rs, the lab 05-microservices).
+// browsertest.rs: the Webbrowser (group browser: netpkt::uri, jfn_sim::webc, the static files of
+// http-server, req.form of scripts, what devwin/browser.rs decides).
 
 use alloc::format;
 use alloc::string::String;
@@ -143,9 +145,11 @@ mod sessiontest;
 mod idetest;
 #[path = "unitstest.rs"]
 mod unitstest;
+#[path = "browsertest.rs"]
+mod browsertest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 47] = [
+    let groups: [(&'static str, fn(&mut T)); 48] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -193,6 +197,7 @@ pub fn run() -> i32 {
         ("sessions", sessiontest::run),
         ("ide", idetest::run),
         ("units", unitstest::run),
+        ("browser", browsertest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

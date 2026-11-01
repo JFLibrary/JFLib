@@ -89,6 +89,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **shader:** lib/shader: a SPIR-V module builder (SPIR-V 1.3 to 1.6), a disassembler, a structural validator, std140 / std430 layouts, specialization constants (also for the workgroup size), shader::reflect (entry points, specialization constants and their values), the shaders of the GPU benchmark scene and texture sample shaders with CPU references (docs/SHADER.md)
 - **plat:** plat::win_native: the HWND and HINSTANCE of a plat window, for GPU surfaces
 - **wgsl:** lib/wgsl, JFLib's WGSL compiler: lexer, parser and checker after the W3C WGSL specification (every type, constant evaluation, overrides, the built-in functions, layouts, entry points), German diagnostics with line and column, a fully typed IR and a back end to SPIR-V 1.3 and 1.6 (wgsl::compile: one module per entry point, WGSL's runtime rules, bounds-clamped indices and texture coordinates, overrides as specialization constants with their values computed by name or @id, WebGPU's pipeline checks); the benchmark shaders in WGSL (docs/WGSL.md)
+- **netpkt:** URI references as RFC 3986 reads them (netpkt::uri: parsing, resolving a relative reference, remove_dot_segments, percent encoding, HTML's form encoding) and the Content-Type of a file by its extension (netpkt::http::mime_of)
 
 ### Changed
 
@@ -148,6 +149,7 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **plat:** plat::instance builds for the web and Android again (the stand-in casts of encode / decode)
 - **ui:** Linux: the caption buttons of a frameless window win over the resize band (their top row and the close button's corner started a resize before); no band on the tiled edges of a tiled window; jfgui_CSD=1 also asks for no system frame (X11, Wayland's xdg-decoration)
 - **netio:** DNS servers on IPv6 link-local addresses work: the zone of resolv.conf (fe80::1%eth0, %2) and of the Windows adapters' DNS servers reaches the socket address (SocketAddr::scope, sin6_scope_id); plat::net::ip_scope_parse, if_index, local_addrs, dns_servers
+- **ui:** The document view: the accessible name of a link at the start of a list item no longer holds the list's marker
 
 ### Security
 

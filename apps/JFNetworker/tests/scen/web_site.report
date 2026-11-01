@@ -1,0 +1,119 @@
+# JFNetworker-Szenario web_site.scn: „Eine kleine Website“, 4 Geräte, 3 Verbindungen, Seed 11
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/1 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/2 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINK-3-UPDOWN: GigabitEthernet1/0/3 is up
+   0.000000000  SW1     *Mar  1 00:00:00.000: %LINEPROTO-5-UPDOWN: line protocol on GigabitEthernet1/0/3 is up
+   0.000000000  --      run 1s
+   1.000000000  PC1     root@PC1:~# curl -s http://web.lab/
+   1.000000000  --      run 100ms
+   1.000148648  PC1     <!doctype html>
+   1.000148648  PC1     <html>
+   1.000148648  PC1     <head><title>Bäckerei Krume</title></head>
+   1.000148648  PC1     <body>
+   1.000148648  PC1     <h1>Bäckerei Krume</h1>
+   1.000148648  PC1     <p><img src="logo.svg" alt="Das Zeichen der Bäckerei" width="96" height="96"></p>
+   1.000148648  PC1     <p>Willkommen auf der kleinen Website im simulierten Netz.</p>
+   1.000148648  PC1     <ul>
+   1.000148648  PC1     <li><a href="brot/">Unser Brot</a></li>
+   1.000148648  PC1     <li><a href="notiz.txt">Eine Notiz als Text</a></li>
+   1.000148648  PC1     <li><a href="hilfe.md">Hilfe in Markdown</a></li>
+   1.000148648  PC1     <li><a href="lang.html#zeiten">Die Öffnungszeiten</a></li>
+   1.000148648  PC1     <li><a href="http://web.lab:8080/">Der Laden</a></li>
+   1.000148648  PC1     <li><a href="kaputt.html">Eine Seite, die es nicht gibt</a></li>
+   1.000148648  PC1     </ul>
+   1.000148648  PC1     </body>
+   1.000148648  PC1     </html>
+   1.100000000  ok      expect PC1 output contains "<title>Bäckerei Krume</title>"
+   1.100000000  PC1     root@PC1:~# curl -s -o /dev/null -w "%{http_code} %{content_type} %{size_download}\n" http://web.lab/logo.svg
+   1.100000000  --      run 100ms
+   1.100135024  PC1     200 image/svg+xml 317
+   1.200000000  ok      expect PC1 output contains "200 image/svg+xml"
+   1.200000000  PC1     root@PC1:~# curl -s -i http://web.lab/brot
+   1.200000000  --      run 100ms
+   1.200011376  PC1     HTTP/1.1 301 Moved Permanently
+   1.200011376  PC1     Server: jfn-httpd/1.0
+   1.200011376  PC1     Date: Thu, 01 Jan 2026 00:00:01 GMT
+   1.200011376  PC1     Content-Type: text/plain
+   1.200011376  PC1     Content-Length: 22
+   1.200011376  PC1     Connection: keep-alive
+   1.200011376  PC1     Location: /brot/
+   1.200011376  PC1     
+   1.200011376  PC1     301 Moved Permanently
+   1.300000000  ok      expect PC1 output contains "Location: /brot/"
+   1.300000000  PC1     root@PC1:~# curl -s -L http://web.lab/brot
+   1.300000000  --      run 100ms
+   1.300011376  PC1     301 Moved Permanently
+   1.300142488  PC1     <html><head><title>Unser Brot</title></head><body>
+   1.300142488  PC1     <h1>Unser Brot</h1>
+   1.300142488  PC1     <p>Jeden Morgen frisch: <a href="roggen.html">Roggenbrot</a> und <a href="./weizen.html">Weizenbrot</a>.</p>
+   1.300142488  PC1     <p><a href="../index.html">Zur Startseite</a></p>
+   1.300142488  PC1     </body></html>
+   1.400000000  ok      expect PC1 output contains "Roggenbrot"
+   1.400000000  PC1     root@PC1:~# curl -s -i http://web.lab/notiz.txt
+   1.400000000  --      run 100ms
+   1.400131296  PC1     HTTP/1.1 200 OK
+   1.400131296  PC1     Server: jfn-httpd/1.0
+   1.400131296  PC1     Date: Thu, 01 Jan 2026 00:00:01 GMT
+   1.400131296  PC1     Content-Type: text/plain; charset=utf-8
+   1.400131296  PC1     Content-Length: 72
+   1.400131296  PC1     Connection: keep-alive
+   1.400131296  PC1     
+   1.400131296  PC1     Notiz der Backstube
+   1.400131296  PC1     
+   1.400131296  PC1       Mehl     25 kg
+   1.400131296  PC1       Hefe      2 kg
+   1.400131296  PC1       Salz      1 kg
+   1.500000000  ok      expect PC1 output contains "Content-Type: text/plain"
+   1.500000000  PC1     root@PC1:~# curl -s -o /dev/null -w "%{http_code} %{content_type}\n" http://web.lab/hilfe.md
+   1.500000000  --      run 100ms
+   1.500133856  PC1     200 text/markdown; charset=utf-8
+   1.600000000  ok      expect PC1 output contains "200 text/markdown"
+   1.600000000  PC1     root@PC1:~# curl -s -o /dev/null -w "%{http_code}\n" http://web.lab/kaputt.html
+   1.600000000  --      run 100ms
+   1.600010944  PC1     404
+   1.700000000  ok      expect PC1 output contains "404"
+   1.700000000  PC1     root@PC1:~# curl -s -o /dev/null -w "%{http_code}\n" http://web.lab/%2e%2e/%2e%2e/root/app/laden.jfs
+   1.700000000  --      run 100ms
+   1.700011280  PC1     404
+   1.800000000  ok      expect PC1 output contains "404"
+   1.800000000  PC1     root@PC1:~# curl -s -X POST -o /dev/null -w "%{http_code}\n" http://web.lab/index.html
+   1.800000000  --      run 100ms
+   1.800011824  PC1     405
+   1.900000000  ok      expect PC1 output contains "405"
+   1.900000000  PC1     root@PC1:~# curl -s "http://web.lab:8080/suche?q=K%C3%A4se+%26+Brot"
+   1.900000000  --      run 100ms
+   2.000000000  ok      expect PC1 output contains "Gesucht wurde: Käse &amp; Brot"
+   2.000000000  PC1     <html><head><title>Suche</title></head><body><h1>Suche</h1><p>Gesucht wurde: Käse &amp; Brot</p><p><a href='/'>Zurück zum Laden</a></p></body></html>root@PC1:~# curl -s -d "ware=Roggenbrot&menge=3" http://web.lab:8080/bestellen
+   2.000000000  --      run 100ms
+   2.100000000  ok      expect PC1 output contains "Bestellung 1: 3 mal Roggenbrot"
+   2.100000000  PC1     <html><head><title>Bestellt</title></head><body><h1>Bestellt</h1><p>Bestellung 1: 3 mal Roggenbrot</p><p><a href='/'>Zurück zum Laden</a></p></body></html>root@PC1:~# curl -s -i -d "x=1" http://web.lab:8080/see
+   2.100000000  --      run 100ms
+   2.100012096  PC1     HTTP/1.1 303 See Other
+   2.100012096  PC1     Server: jfn-script/1.0
+   2.100012096  PC1     Date: Thu, 01 Jan 2026 00:00:02 GMT
+   2.100012096  PC1     Content-Type: text/plain
+   2.100012096  PC1     Content-Length: 0
+   2.100012096  PC1     Connection: keep-alive
+   2.100012096  PC1     Location: /echo
+   2.100012096  PC1     
+   2.200000000  ok      expect PC1 output contains "HTTP/1.1 303 See Other"
+   2.200000000  PC1     root@PC1:~# curl -s -L -d "x=1" http://web.lab:8080/temp
+   2.200000000  --      run 100ms
+   2.200020848  PC1     POST x=1
+   2.300000000  ok      expect PC1 output contains "POST x=1"
+   2.300000000  PC1     root@PC1:~# curl -L --max-redirs 3 http://web.lab:8080/schleife
+   2.300000000  --      run 100ms
+   2.300032537  PC1     curl: (47) Maximum (3) redirects followed
+   2.400000000  ok      expect PC1 output contains "Maximum (3) redirects followed"
+   2.400000000  WEB1    root@WEB1:~# echo "Neue Notiz" > /var/www/notiz.txt
+   2.400000000  --      WEB1: /var/www/notiz.txt gespeichert (11 Bytes)
+   2.400000000  PC1     root@PC1:~# curl -s http://web.lab/notiz.txt
+   2.400000000  --      run 100ms
+   2.400130320  PC1     Neue Notiz
+   2.500000000  ok      expect PC1 output contains "Neue Notiz"
+   2.500000000  ok      expect WEB1 svc www metric status_4xx == 3 (3)
+   2.500000000  ok      expect WEB1 svc laden metric errors == 0 (0)
+   2.500000000  --      Seiten aus Dateien und aus einem Skript, Formulare mit GET und POST, Weiterleitungen
+# 17 von 17 Erwartungen erfüllt

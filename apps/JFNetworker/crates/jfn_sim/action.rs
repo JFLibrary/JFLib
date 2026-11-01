@@ -80,6 +80,9 @@
 //                                                      unit of a Linux host (units.rs)
 //   Deploy / DeployAbort                               a rolling deployment over a list of hosts
 //                                                      (deploy.rs)
+//   WebFetch / WebCancel                               the Webbrowser of a host asks for a page
+//                                                      or gives a request up (webc.rs: the answer
+//                                                      comes as Report::Web)
 //   ScriptDebug                                        the debugger of a script service: stop,
 //                                                      go on, steps, breakpoints in virtual time
 //                                                      (scriptsvc.rs, DebugOp)
@@ -292,6 +295,11 @@ pub enum Action {
     Deploy { spec: jfn_model::unit::DeploySpec },
     /// ends deployment `id` of device `dev` where it is (deploy.rs)
     DeployAbort { dev: u32, id: u32 },
+    /// the Webbrowser of a device asks for a page or an image (webc.rs): the answer comes as
+    /// Report::Web
+    WebFetch { dev: u32, req: crate::webc::WebReq },
+    /// the Webbrowser gives a request up (webc.rs): no report comes for it
+    WebCancel { dev: u32, id: u64 },
 }
 
 /// why an action was refused (German text through Display)
@@ -684,6 +692,9 @@ impl Engine {
             Action::Snmp { dev, set } => self.snmp_apply(dev, set),
             // the debugger of a script (scriptsvc.rs)
             Action::ScriptDebug { dev, svc, op } => self.script_debug(dev, &svc, op),
+            // the Webbrowser (webc.rs)
+            Action::WebFetch { dev, req } => self.web_fetch(dev, req),
+            Action::WebCancel { dev, id } => self.web_cancel(dev, id),
             // services and the virtual OS (svcact.rs)
             other => self.os_apply(other),
         }
