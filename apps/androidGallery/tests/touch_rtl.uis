@@ -1,0 +1,20 @@
+#!args --size 390x780 --anim off --theme light --rtl
+# A finger in a mirrored window (lib/ui/touch.rs): the content follows it as it is drawn.  The row of
+# buttons on the page "Container" starts at the right; a swipe to the right rolls it on.
+pointer mouse
+click #900
+click menuitem:"Container"
+click tab:"Rollen"
+pointer touch
+expect #5040 value 0
+swipe 100,186 300,186 300 hold
+expect #5040 value 200
+swipe 300,186 150,186 300 hold
+expect #5040 value 50
+flick 100,186 200 0 80
+wait 3000
+expect #5040 value 600..1800
+# the page still rolls up and down
+size 390 240
+swipe 195,186 195,100 300 hold
+expect #25 value 1..200

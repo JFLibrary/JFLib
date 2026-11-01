@@ -1,0 +1,31 @@
+#!args --verify-dirty
+# The finger (lib/ui/touch.rs) on the editors: they roll 1:1 in their own axis, a horizontal drag
+# selects (the text cursor says so), a tap places the caret; lines of 20 px
+size 1000 680
+pointer touch
+# ---- rich text
+tap "Leeren"
+type "Eins\nZwei\nDrei\nVier\nFünf\nSechs\nSieben\nAcht\nNeun\nZehn\nElf\nZwölf\nDreizehn\nVierzehn\nFünfzehn\nSechzehn\nSiebzehn\nAchtzehn\nNeunzehn\nZwanzig\nEins\nZwei\nDrei\nVier\nFünf\nSechs\nSieben\nAcht\nNeun\nZehn\nElf\nZwölf\nDreizehn\nVierzehn\nFünfzehn\nSechzehn\nSiebzehn\nAchtzehn\nNeunzehn\nZwanzig"
+tap 400,300
+expect text:"sel: 29:4-29:4" exists
+swipe 400,300 400,500 300 hold
+wait 600
+tap 400,300
+expect text:"sel: 22:4-22:4" exists
+# ---- code
+tap tab:"Code"
+tap "100 000 Zeilen"
+expect text:"lines: 100000" exists
+wait 50
+tap 500,300
+expect text:"pos: 10:53" exists
+swipe 500,500 500,300 300 hold
+expect scrollcopy
+wait 600
+tap 500,300
+expect text:"pos: 20:53" exists
+# the finger's way rolls on after it lifted
+flick 500,500 0 -200 80
+wait 2000
+tap 500,300
+expect text:"pos: 20:53" missing

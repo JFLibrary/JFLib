@@ -27,9 +27,10 @@
 // caught up on the next 16 DIP (half a pixel per finger pixel): no jump, nothing lost.  Lifted
 // with speed (least squares over the last 100 ms, as Android's VelocityTracker; 50..8000 DIP/s)
 // the fling runs along OverScroller's curve; it hands over along the chain, a new touch stops it
-// and is no click.  A finger that rests: after 100 ms it hovers (the widget shows it is meant),
-// after 400 ms the right button (a context menu; plat::touch_long_press lets the host give
-// feedback); if it moves after that, the same decision.  After the finger left, the hover goes.
+// and is no click.  A finger that rests: after 100 ms it hovers (the widget shows it is meant, a
+// tooltip follows), after 400 ms the right button (a context menu; plat::touch_long_press lets the
+// host give feedback); if it moves after that, the same decision.  After the finger left, the
+// hover goes.
 //
 // With a finger (and at the start on Android, and in a phone's browser) there are no scroll bars:
 // no pixels and no hit box in sbar_core, the room they would have stays, so nothing jumps; a mouse
@@ -60,6 +61,7 @@ const FLING_MAX_DIP: i32 = 8000;
 const HOVER_MS: u32 = 100;
 /// after the finger left the hover stays this long: a quick tap shows on the widget too
 const LEAVE_MS: u32 = 120;
+const TIP_LEAVE_MS: u32 = 1500;
 /// the velocity: samples of the last 100 ms; a finger that rested this long before it lifted has
 /// none (VelocityTracker's horizon and ASSUME_POINTER_STOPPED_TIME)
 const VEL_HORIZON_MS: u32 = 100;
@@ -606,7 +608,10 @@ impl Ui {
                     plat::touch_reached(true);
                 }
                 if self.m.touch.hovered || !self.m.touch.no_click {
-                    self.m.touch.leave_at = Some(t.wrapping_add(LEAVE_MS));
+                    // (a tooltip the resting finger brought stays long enough to read it)
+                    self.uiw_use(self.m.touch.win);
+                    let ms = if self.tip_showing() { TIP_LEAVE_MS } else { LEAVE_MS };
+                    self.m.touch.leave_at = Some(t.wrapping_add(ms));
                 }
             }
             Mode::Widget => {

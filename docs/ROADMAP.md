@@ -1824,8 +1824,7 @@ Fensterrand hinaus.
   - Seiten hinter den Karten der Startseite, für den Finger (eine Spalte, 44 DIP): Schaltflächen,
     Menüs (Menüleiste, Kalender, Kontextmenü), Texteingabe, Listen und Bäume, Container, Werte und
     Farben, Fenster und Dialoge, Randfälle. Dazu im Host: die Zurück-Taste als Esc
-    (`plat::back_trap`), langes Drücken als rechte Taste, `ui.touch_drag` für senkrechte Züge auf
-    Farbrad, senkrechten Reglern und Griffen statt Seite rollen.
+    (`plat::back_trap`); der Finger siehe unten.
   - Sensoren: `plat::sensors` mit Wasserwaage, Handylage, Kompass und GPS (ohne Karten, ohne
     Netzwerk), gestartet nur auf ihrer Seite, im Hintergrund gestoppt; `android/GallerySensors.java`,
     `web/sensors.js`, Skriptbefehle `sensor` und `location`.
@@ -1834,9 +1833,28 @@ Fensterrand hinaus.
     API 35; am 2026-11-01 auch auf einem Samsung SM-A566B mit Android 16, dort auch
     `android_system.py`, beide grün). Das Telefon lag dabei still: Dass Lage und Kompass einer
     Bewegung folgen, und ein Fix vom GPS statt vom Netz, stehen dort noch aus (das Skript meldet
-    beides). Es fehlen: Wischen und langes Drücken im Browser auf dem Telefon (dort rollt der
-    Finger die Seite noch nicht),
-    Hinweise (Tooltips) mit dem Finger, größere Menüzeilen in den Menüs der Menüleiste.
+    beides). Es fehlen größere Menüzeilen in den Menüs der Menüleiste.
+- **P2** · *erledigt* (2026-11-01) · Der Finger wie in einer nativen App ([GUIDE §37](GUIDE.md),
+  [`lib/ui/touch.rs`](../lib/ui/touch.rs)), nach dem ersten Lauf auf einem echten Telefon (Rollen
+  nicht flüssig, zu wenig Weg, seitwärts gar nicht, Rollleisten, Fenster nicht verschiebbar).
+  - Ein Gestenerkenner in Rust für Android, Browser und Skripte: Die Hosts geben nur den rohen Finger
+    mit seiner Zeit weiter. Mitführen 1:1 mit gesperrter Richtung, verschachtelte Sichten von innen
+    nach außen, Weiterrollen auf der Kurve von `OverScroller`, Berührung hält an und klickt nicht;
+    Tippen, langes Drücken (auch Hinweise) ohne Drückblitz beim Rollen. Widgets nehmen den Finger
+    selbst (Regler auf ihrer Achse, Farbrad, Trenner, Griffe, Text seitwärts); `ui.touch_drag` nur
+    noch für Teile ohne eigenen Hit-Box.
+  - Keine Rollleisten beim Finger (Platz bleibt, nichts springt; die Maus bringt sie zurück), Fenster
+    an der Titelleiste in alle Richtungen, nicht aus der Reichweite, breitere Griffe.
+  - Bilder im Takt des Displays, solange ein Finger liegt oder etwas rollt; beim Finger immer
+    Scroll-Kopien, auch für flache Zellen. SM-A566B, 120 Hz, Startseite: `dumpsys gfxinfo` Median
+    von 24 auf 11 ms, verpasste Vsyncs von 159 auf 0, `nativeRender` von etwa 12 auf etwa 6 ms.
+  - Skriptbefehle `tap`, `longpress`, `swipe`, `flick`, `finger`; geprüft mit `touch.uis` (mehrere
+    Apps, Windows, Linux), `touch_web.mjs` (Chromium), `android_touch.py` (Emulator, SM-A566B).
+  - Offen: NEON für `lib/simd` (auf ARM rechnet der Rasterer skalar, dort liegt ein großer Teil der
+    verbleibenden 6 ms); die Bilder gehen zweimal durch den Speicher (Fenster, dann Bitmap), vom
+    GPU-Weg abgesehen; kein Skalieren mit zwei Fingern; Ziehen und Ablegen braucht in rollenden
+    Sichten einen Griff (`ui.touch_drag`); Windows und Linux melden noch keine Finger; der Browser
+    auf einem echten Telefon ist nur in Chromiums Emulation geprüft.
 - **P2** · *fehlt* · Safari / iOS im Web-Testplan.
 
 ## 10. Auslieferung und Updates

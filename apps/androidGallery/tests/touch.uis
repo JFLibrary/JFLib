@@ -248,6 +248,26 @@ pointer mouse
 key esc
 pointer touch
 
+# ---- text: a vertical swipe on a field rolls the page, a horizontal one is the field's
+pointer mouse
+click #900
+click menuitem:"Texteingabe"
+pointer touch
+expect #23 value 0
+swipe 383,700 383,500 300 hold
+expect #23 value 200
+expect #3004 exists
+flick #3004 0 -100 300
+expect #23 value 300
+expect #3004 enabled
+flick #3004 60 0 300
+expect #23 value 300
+expect #3004 focused
+pointer mouse
+key esc
+key esc
+pointer touch
+
 # ---- what takes the finger in every direction: on it the page does not roll
 pointer mouse
 click #900
@@ -308,6 +328,22 @@ window 7100
 tap 245,14
 window any
 expect window 7100 closed
+# a tooltip comes to a resting finger and stays a moment after it lifted
+pointer mouse
+click #7003
+expect window 7500 open
+pointer touch
+window 7500
+finger down #7503
+wait 800
+expect text:"Ein Tooltip, der über den unteren Rand des Fensters hinausragt" exists
+finger up
+wait 500
+expect text:"Ein Tooltip, der über den unteren Rand des Fensters hinausragt" exists
+wait 1500
+expect text:"Ein Tooltip, der über den unteren Rand des Fensters hinausragt" missing
+window any
+close window 7500
 # a modal dialog window too
 pointer mouse
 click #7001

@@ -500,7 +500,7 @@ def main():
             x, y = center(n)
             d.sh("input", "swipe", str(x), str(y), str(x), str(y), "900")
             ok(find(label("Eigenschaften"), "the context menu", 10) is not None, "a long press opens the context menu")
-        # a vertical swipe scrolls, but drags on a row's handle (ui.touch_drag)
+        # a vertical swipe scrolls, but drags on a row's handle (ui.touch_drag; more in android_touch.py)
         d.sh("am", "force-stop", PKG)
         launch(["--es", "jfgui_SELFTEST", "sensors", "--es", "jfgui_PAGE", "lists"])
         row1, row3 = find(label("Ebene 1"), '"Ebene 1"', 30), find(label("Ebene 3"), '"Ebene 3"', 10)
