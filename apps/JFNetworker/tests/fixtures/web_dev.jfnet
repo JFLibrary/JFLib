@@ -206,7 +206,7 @@
         },
         {
           "path": "/var/www/basis.css",
-          "text": "/* basis.css: was alle Seiten des Ladens gemeinsam haben */\nh1 { color: #111111; font-style: italic }\np.mitte { color: #222222 }\n.karte { border: 2px solid #336699; padding: 8px; background: #E8F0F8 }\n.ende { color: #333333 }\n"
+          "text": "/* basis.css: was alle Seiten des Ladens gemeinsam haben */\nbody { background: #FBF7EC; color: #222222; padding: 8px }\na { color: #1C5A8A }\nh1 { color: #111111; font-style: italic }\np.mitte { color: #222222 }\n.karte { border: 2px solid #336699; padding: 8px; background: #E8F0F8 }\n.ende { color: #333333 }\n"
         },
         {
           "path": "/var/www/ende.css",

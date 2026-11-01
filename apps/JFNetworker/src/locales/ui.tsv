@@ -1749,3 +1749,4 @@ die Domain passt nicht zur Adresse	the domain does not fit the address
 HttpOnly dürfen Skripte nicht setzen oder überschreiben	scripts may not set or overwrite HttpOnly
 Secure geht nur über https	Secure works only over https
 SameSite=None braucht Secure	SameSite=None needs Secure
+Zertifikat abgelehnt	Certificate refused

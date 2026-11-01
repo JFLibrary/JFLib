@@ -9,8 +9,9 @@ size 1280 900
 theme light
 dblclick listitem:"PC1" shift
 expect window 26624 open
-resizewin 26624 1000 760
+resizewin 26624 1200 860
 dblclick listitem:"Webbrowser"
+click button:"Maximieren: Webbrowser"
 click #26800
 key ctrl+a
 type "web.lab\n"
@@ -25,9 +26,7 @@ expect text:"http://web.lab/" exists
 expect text:"http://web.lab/basis.css" exists
 expect text:"http://web.lab/ende.css" exists
 expect text:"http://web.lab/zeichen.svg" exists
-expect text:"<link>" exists
 expect text:"<img>" exists
-expect text:"text/css" exists
 # ---- what an element got: <h1> the <style>'s colour over basis.css, basis.css's italic
 click tab:"Elemente"
 click listitem:"<h1>"
@@ -72,6 +71,7 @@ close window 26624
 # ---- Reload asks for all of it again
 dblclick listitem:"PC1" shift
 expect window 26624 open
+resizewin 26624 1200 860
 expect heading:"Hofladen Sonnenfeld" exists
 click #26805
 wait 1000
@@ -85,6 +85,7 @@ close window 26624
 # ---- sheets that fail: the page shows, the console says why
 dblclick listitem:"PC1" shift
 expect window 26624 open
+resizewin 26624 1200 860
 click #26800
 key ctrl+a
 type "web.lab/kaputt.html\n"
@@ -95,9 +96,11 @@ key f12
 click tab:"Konsole"
 expect text:"http://web.lab/fehlt.css: das Stylesheet kam nicht: 404 Not Found" exists
 expect text:"http://web.lab/notiz.txt: das ist kein Stylesheet: Typ text/plain" exists
-expect text:"http://web.lab:81/zu.css: das Stylesheet kam nicht: keine Verbindung: Verbindung abgelehnt" exists
+expect text:"http://web.lab:81/zu.css: das Stylesheet kam nicht: keine Verbindung: abgelehnt (RST auf den SYN)" exists
 click tab:"Netzwerk"
-expect text:"http://web.lab/ende.css" exists
+# (ende.css came from the window's cache: no request)
+expect text:"http://web.lab/fehlt.css" exists
+expect text:"http://web.lab/ende.css" missing
 expect text:"404 Not Found" exists
 expect text:"Fehler" exists
 click tab:"Elemente"

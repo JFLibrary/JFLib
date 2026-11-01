@@ -501,6 +501,10 @@ impl Serve {
     pub fn owns(&self, sock: u32) -> bool {
         self.conns.contains_key(&sock)
     }
+    /// the bytes its connections' TLS holds (a keyframe's footprint)
+    pub fn tls_bytes(&self) -> usize {
+        self.conns.values().map(|c| c.wire.len() + c.tls.as_ref().map_or(0, |t| t.footprint())).sum()
+    }
     /// complete requests since the last call, in the order they came
     pub fn take(&mut self) -> Vec<ReqIn> {
         core::mem::take(&mut self.ready)

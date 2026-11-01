@@ -19,7 +19,8 @@
 //
 // Ids: base = ID_DEV0 + 0x80 k: + 0 its button, + 1 the lock, + 2 / + 3 the warning's buttons, + 4 Schließen,
 // + 5 the outer split, + 6 the tabs, + 0x10 the inner split, + 0x18 the details, + 0x20 Cookie löschen,
-// + 0x21 Alle löschen, + 0x28 the table of requests, the tree, the table of cookies (one tab at a time).
+// + 0x21 Alle löschen, + 0x28 the table of requests, + 0x2C the table of cookies, + 0x30 the tree (its
+// rows after it; one tab at a time).
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -327,7 +328,7 @@ fn flags_text(c: &Cookie) -> String {
 pub(crate) struct Dev {
     pub open: bool,
     pub tab: i32,
-    /// the page's height over the pane (0: not set yet)
+    /// the page's height over the pane as the user dragged it (0: not dragged)
     pub pos: i32,
     /// the list's size beside or above the details
     pub inner: i32,
@@ -400,7 +401,7 @@ fn net_tab(ui: &mut Ui, base: u32, dev: &mut Dev, rows: &[NetRow]) {
         return;
     }
     let cols = [
-        GridCol::new(t("Methode"), 62).flags(GC_NOSORT),
+        GridCol::new(t("Methode"), 72).flags(GC_NOSORT),
         GridCol::new(t("Adresse"), 180).flags(GC_NOSORT | GC_FILL),
         GridCol::new(t("Status"), 96).flags(GC_NOSORT),
         GridCol::new(t("Typ"), 92).flags(GC_NOSORT),
@@ -476,7 +477,7 @@ fn elements_tab(ui: &mut Ui, base: u32, dev: &mut Dev, doc: &mut Doc) {
         ui.split_begin(base + 0x10, dev.inner.max(80), !wide);
     }
     ui.next_size(-1, -1);
-    let ev = ui.tree(base + 0x28, &mut doc.tree, &rows, 0);
+    let ev = ui.tree(base + 0x30, &mut doc.tree, &rows, 0);
     if ev.sel_changed || ev.expanded.is_some() || ev.collapsed.is_some() {
         ui.repass();
     }
@@ -529,13 +530,13 @@ fn cookies_tab(ui: &mut Ui, base: u32, s: &mut Browser, url: &str, clock: i64) {
         GridCol::new(t("Wert"), 120).flags(GC_NOSORT | GC_FILL),
         GridCol::new(t("Domain"), 100).flags(GC_NOSORT),
         GridCol::new(t("Pfad"), 56).flags(GC_NOSORT),
-        GridCol::new(t("Läuft ab"), 130).flags(GC_NOSORT),
+        GridCol::new(t("Läuft ab"), 150).flags(GC_NOSORT),
         GridCol::new(t("Merkmale"), 120).flags(GC_NOSORT),
     ];
     ui.next_size(-1, -1);
     ui.box_begin(0, BOX_V, 4);
     ui.next_size(-1, -1);
-    let (first, end) = ui.grid_begin(base + 0x28, &mut s.dev.cookies, &cols, &keys);
+    let (first, end) = ui.grid_begin(base + 0x2C, &mut s.dev.cookies, &cols, &keys);
     for i in first..end {
         let c = cookies[i as usize];
         ui.grid_row(&mut s.dev.cookies, i);

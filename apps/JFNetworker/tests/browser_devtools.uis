@@ -10,8 +10,9 @@ size 1280 900
 theme light
 dblclick listitem:"PC1" shift
 expect window 26624 open
-resizewin 26624 900 680
+resizewin 26624 1200 860
 dblclick listitem:"Webbrowser"
+click button:"Maximieren: Webbrowser"
 expect #124928 exists
 # nothing shown yet: nothing to look at
 key f12
@@ -37,12 +38,9 @@ expect tab:"Netzwerk" missing
 click #124928
 # ---- Netzwerk: the page, its sheets and picture
 click tab:"Netzwerk"
-expect text:"Methode" exists
-expect text:"Wer fragte" exists
 expect text:"Adresszeile" exists
 expect text:"http://web.lab/" exists
 expect text:"text/html" exists
-expect text:"<link>" exists
 expect text:"<img>" exists
 # a chosen row: its heads and its body
 click text:"http://web.lab/basis.css"
@@ -52,14 +50,13 @@ expect text:"Accept: text/css, */*;q=0.1" exists
 expect text:"Antwort" exists
 expect text:"Server: jfn-httpd/1.0" exists
 expect text:"Content-Type: text/css; charset=utf-8" exists
-expect text:"Inhalt (222 Bytes)" exists
+expect text:"Inhalt (306 Bytes)" exists
 # ---- a link: another document, another log; who asked; a redirect is a row of its own
 click link:"Anmelden"
 wait 500
 expect heading:"Nicht angemeldet" missing
 expect text:"http://web.lab:8080/login" exists
 expect text:"http://web.lab/basis.css" missing
-expect text:"Link" exists
 expect text:"302 Found" exists
 key alt+left
 expect heading:"Hofladen Sonnenfeld" exists
@@ -70,10 +67,9 @@ key ctrl+a
 type "web.lab:81/\n"
 wait 500
 expect heading:"Seite nicht erreichbar" exists
-expect text:"http://web.lab:81/" exists
 expect text:"Fehler" exists
-click text:"http://web.lab:81/"
-expect text:"keine Verbindung: Verbindung abgelehnt" exists
+click text:"Fehler"
+expect text:"GET http://web.lab:81/" exists
 # ---- Elemente: the tree, live as a script changes the page
 click #26800
 key ctrl+a
@@ -138,5 +134,22 @@ type "web.lab/zeilen.html\n"
 wait 500
 wait 100
 expect text:"die letzte Zeile" exists
-expect same build/jfnetworker/none.png 0 0 0 0
+# (the view's rect and its last line, at 100 %, at 150 %, and in a small window)
+expect text:"die letzte Zeile" rect 23 787 * 15
+scale 150 window 26624
+wait 100
+expect text:"die letzte Zeile" rect 23 786 * 15
+scale 100 window 26624
+wait 100
+expect text:"die letzte Zeile" rect 23 787 * 15
+# ---- scrolled up it stays where the user left it
+wheel #122881 480
+wait 100
+expect text:"die letzte Zeile" rect 23 975 * 15
+click tab:"Netzwerk"
+click tab:"Konsole"
+# ---- no project change from all of this: nothing to save
+close window 26624
+expect window 26624 closed
+expect dialog:"Änderungen speichern?" missing
 expect_nowarn

@@ -682,7 +682,8 @@ pub(crate) fn report(n: &mut Net, dev: u32, id: u64, result: Result<WebResp, Web
                         (WebErr::Cert, Some(i)) => cert_page(i, &f.url),
                         _ => error_page(f.kind, &f.url, &why),
                     };
-                    let mut dc = html_doc(&html, title, &f.url, String::from(t("Keine Antwort")));
+                    let status = if f.kind == WebErr::Cert { t("Zertifikat abgelehnt") } else { t("Keine Antwort") };
+                    let mut dc = html_doc(&html, title, &f.url, String::from(status));
                     dc.tls = f.tls.clone();
                     if f.kind == WebErr::Cert {
                         let fp = f.tls.as_ref().and_then(|i| i.chain.first()).map(|c| c.fingerprint());
@@ -1333,7 +1334,7 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         ui.tooltip(t("Konsole der Seitenskripte (Strg+Umschalt+J)"));
     }
     let mut on = s.dev.open as i32;
-    ui.next_icon(IC_SETTINGS);
+    ui.next_icon(crate::workspace::icons::JN_APP_IDE);
     ui.next_flags(ST_ICON_ONLY | ST_SUBTLE);
     if ui.toggle_button(dev_id, t("Entwickleransicht"), &mut on) & EV_ACT != 0 {
         s.dev.open = on != 0;
@@ -1388,11 +1389,10 @@ pub(crate) fn program(n: &mut Net, ui: &mut Ui, k: usize, id: u32, dev: u32) {
         ui.next_size(-1, -1);
         ui.box_begin(0, BOX_V | BOX_FIXED, 0);
         let h = ui.px2dip(ui.box_rect()[3]);
-        if s.dev.pos == 0 && h > 0 {
-            s.dev.pos = h * 55 / 100;
-        }
+        // (until the user drags it the pane has a share of the room; it never gets squeezed out)
+        let pos = if s.dev.pos == 0 { h * 40 / 100 } else { s.dev.pos.min(h - 180) };
         ui.next_size(-1, -1);
-        ui.split_begin(dev_id + 5, s.dev.pos.max(80), true);
+        ui.split_begin(dev_id + 5, pos.max(80), true);
     }
     match &doc {
         Some(d) => {

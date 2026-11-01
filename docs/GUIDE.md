@@ -4493,7 +4493,13 @@ self.status = ev.hover.unwrap_or_default();   // the link under the pointer
   `aria-label`, `title` or placeholder; the widget ids are `md_field_id(view_id, i)`. Not
   supported: JavaScript, file inputs (they are text fields), several choices in one list.
 * CSS (HTML, a subset; [`rich_html.rs`](../lib/ui/rich_html.rs) "Style sheets"): `<style>`
-  elements (media screen / all) and `style=` attributes. Selectors: tag, `*`, `#id`, `.class`,
+  elements (media screen / all), `style=` attributes and `<link rel="stylesheet">` elements whose
+  text the app gives: the view reads nothing by itself, `doc.sheet_links()` names the addresses as
+  written (in document order, each once, also a link a script added) and
+  `doc.set_sheet(href, Some(css))` hands a text over, which counts where its link stands among the
+  `<style>` elements, from the next update on (`None` takes it back, a page without links costs
+  nothing). `doc.style_of(node)` says what the cascade gives an element (`property:value;`, without
+  what it inherits). Selectors: tag, `*`, `#id`, `.class`,
   `[attr]`, `[attr=v]` (also `~= |= ^= $= *=`), descendant and child combinators, lists; the
   cascade takes specificity, then source order, then the `style` attribute, `!important` above
   them. Properties: `color`, `background(-color)`, `font-weight`, `font-style`,

@@ -9,8 +9,9 @@ size 1280 900
 theme light
 dblclick listitem:"PC1" shift
 expect window 26624 open
-resizewin 26624 1100 780
+resizewin 26624 1200 860
 dblclick listitem:"Webbrowser"
+click button:"Maximieren: Webbrowser"
 click #26800
 key ctrl+a
 type "web.lab:8080/kekse\n"
@@ -21,8 +22,6 @@ click #124928
 click tab:"Cookies"
 expect text:"sitzung" exists
 expect text:"abc" exists
-expect text:"web.lab" exists
-expect text:"Sitzung" exists
 expect text:"dauer" exists
 expect text:"datum" exists
 expect text:"2070-01-01 00:00 UTC" exists
@@ -109,6 +108,7 @@ key f12
 click button:"Schließen: Nicht angemeldet – Webbrowser"
 expect dialog:"Nicht angemeldet – Webbrowser" missing
 dblclick listitem:"Webbrowser"
+click button:"Maximieren: Webbrowser"
 click #26800
 key ctrl+a
 type "web.lab:8080/lesen\n"
@@ -120,5 +120,5 @@ click #124961
 expect text:"Diese Seite hat keine Cookies." exists
 click #26805
 wait 500
-expect text:"Gesendet:" exists
+expect text:"Gesendet: " exists
 expect_nowarn

@@ -142,6 +142,8 @@
 //   mailbox  the mailboxes of the mail servers in the device's files: a Maildir per user
 //   webc     the Webbrowser's side in the engine: requests with redirects over the HTTP client
 //            (Action::WebFetch / WebCancel, Report::Web, Engine::web_client)
+//   tlssim   TLS in the simulator (netpkt::tls on the sockets, in http.rs): what a server's
+//            certificate says, the lab CA every device trusts, the decisions as notes (Note::Tls)
 //   mailc    the clients of mail: the SMTP conversation, connections by name, the E-Mail
 //            program's POP3 session, its account and folders (Action::MailSend / MailFetch,
 //            Engine::mail_client)

@@ -9,8 +9,9 @@ size 1280 900
 theme light
 dblclick listitem:"PC1" shift
 expect window 26624 open
-resizewin 26624 1000 760
+resizewin 26624 1200 860
 dblclick listitem:"Webbrowser"
+click button:"Maximieren: Webbrowser"
 # ---- http has no lock
 click #26800
 key ctrl+a
@@ -75,7 +76,7 @@ expect #26800 text "https://web.lab:8441/"
 expect button:"Trotzdem fortfahren" missing
 click #124929
 expect text:"Verschlüsselt, aber das Zertifikat hat Fehler" exists
-expect text:"web.lab (Eigenbau)" exists
+expect text:"Ausgestellt für" exists
 expect text:"Das Zertifikat ist von web.lab selbst unterschrieben: niemand, dem dieses Gerät vertraut, bürgt dafür." exists
 click #124929
 # what is accepted stays: Reload asks no more

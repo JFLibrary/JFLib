@@ -212,11 +212,11 @@ impl Console {
 #[derive(Default)]
 pub(crate) struct ConSeen {
     total: u64,
-    scroll: bool,
-    /// it went to the end and the user has not scrolled up since
+    /// a pass that goes to the end is due (the pane measures the lines first)
+    scroll: u8,
+    /// it was at the end in the last pass that had settled
     at_end: bool,
-    /// the place and the scale of the last pass
-    y: i32,
+    /// the scale of the last pass
     dpi: i32,
 }
 
@@ -258,26 +258,26 @@ pub(crate) fn console_pane(ui: &mut Ui, id: u32, c: &Console, seen: &mut ConSeen
     }
     ui.box_end();
     ui.scroll_end();
+    let view = ui.px2dip(ui.last_rect()[3]);
     ui.box_end();
-    let (y, dpi) = (ui.scroll_pos(id).1, ui.dpi());
+    let (y, full, dpi) = (ui.scroll_pos(id).1, ui.scroll_extent(id).1, ui.dpi());
     if seen.total != c.total {
         seen.total = c.total;
-        seen.scroll = true;
-        ui.repass();
-    } else if seen.scroll {
-        seen.scroll = false;
+        seen.scroll = 1;
         seen.at_end = true;
-        ui.scroll_to(id, -1, 1 << 24);
-    } else if seen.dpi != dpi {
+        ui.repass();
+    } else if seen.dpi != dpi && seen.at_end {
         // another scale: at the end stays at the end, once the lines are measured again
-        if seen.at_end {
-            seen.scroll = true;
-            ui.repass();
-        }
-    } else if y < seen.y {
-        seen.at_end = false;
+        seen.scroll = 1;
+        ui.repass();
+    } else if seen.scroll > 0 {
+        seen.scroll -= 1;
+        // (far enough for CON_SHOWN lines; more would overflow in pixels at a high scale)
+        ui.scroll_to(id, -1, 1 << 20);
+    } else {
+        // (the user scrolls: wherever that ends)
+        seen.at_end = y + view + 4 >= full;
     }
-    seen.y = y;
     seen.dpi = dpi;
     clear
 }

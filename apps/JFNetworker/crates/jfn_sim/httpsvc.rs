@@ -958,6 +958,9 @@ impl Service for HttpServer {
         }
         msg!("Port {}: {} Anfragen, {} Antworten, {} in Arbeit, {} wartend", self.serve.cfg.port, s.requests, s.responses, self.busy(), self.queued())
     }
+    fn footprint(&self) -> usize {
+        1024 + self.serve.tls_bytes()
+    }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())
     }
