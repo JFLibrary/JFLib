@@ -34,6 +34,8 @@
 // The vty lines and sessions (telnetd.rs): "transport input", "access-class" in line mode,
 // terminal [no] monitor, show line, clear line; exit / logout in a vty or local session ends
 // it, "%SYS-5-CONFIG_I" names the session the configuration came from.
+// SSH (cli/ssh.rs, sshd.rs): ip domain-name, crypto key generate|zeroize, ip ssh ..., show ip ssh,
+// show ssh, show crypto key, debug ip ssh and the client ssh -l USER HOST.
 
 use alloc::format;
 use alloc::string::String;
@@ -268,6 +270,22 @@ pub enum K {
     TermMonitor,
     ShowLine,
     ClearLine,
+    // SSH (cli/ssh.rs, sshd.rs)
+    Ssh,
+    IpDomainName,
+    CryptoKeyGen,
+    CryptoKeyZero,
+    IpSsh,
+    ShowIpSsh,
+    ShowSsh,
+    ShowCryptoKey,
+    DebugSsh,
+    // SNMPv3 (cli/snmp.rs)
+    SnmpEngine,
+    SnmpView,
+    SnmpGroup,
+    SnmpUser,
+    ShowSnmpV3,
 }
 
 // the modes of every tree, in the order build() makes them
@@ -635,6 +653,8 @@ fn build(caps: u32) -> Tree<K> {
     // ---- the vty lines and the sessions: transport input, access-class, terminal monitor,
     // show line, clear line (telnetd.rs)
     crate::telnetd::build_vty(&mut t, [user, prv, line]);
+    // SSH (cli/ssh.rs)
+    super::ssh::build_ssh(&mut t, [user, prv, conf]);
     t
 }
 
@@ -758,7 +778,7 @@ impl Engine {
             }
         }
     }
-    fn booting(&self, ni: usize) -> bool {
+    pub(crate) fn booting(&self, ni: usize) -> bool {
         self.cdev(ni).is_some_and(|c| c.booting)
     }
     /// an error message on the console; Err with its first line
@@ -943,7 +963,7 @@ impl Engine {
             K::Debug | K::Undebug => {
                 let off = p.cmd == K::Undebug || p.no;
                 let bits = if p.has("all") {
-                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF | super::D_BGP | super::D_SNMP | super::D_AAA | super::D_RADIUS
+                    D_ICMP | D_ARP | super::D_STP | D_RIP | super::D_NAT | super::D_ICMP6 | super::D_ND | super::D_OSPF | super::D_BGP | super::D_SNMP | super::D_AAA | super::D_RADIUS | super::D_SSH
                 } else if p.has("icmp") {
                     D_ICMP
                 } else if p.has("rip") {
@@ -1220,6 +1240,8 @@ impl Engine {
             | K::TestAaa => self.ios_aaa(ni, p, line),
             K::Telnet => self.ios_telnet(ni, p),
             K::TransportInput | K::AccessClass | K::TermMonitor | K::ShowLine | K::ClearLine => self.ios_vty(ni, p),
+            K::SnmpEngine | K::SnmpView | K::SnmpGroup | K::SnmpUser | K::ShowSnmpV3 => self.ios_snmp_v3(ni, p),
+            K::Ssh | K::IpDomainName | K::CryptoKeyGen | K::CryptoKeyZero | K::IpSsh | K::ShowIpSsh | K::ShowSsh | K::ShowCryptoKey | K::DebugSsh => self.ios_ssh(ni, p),
         }
     }
 

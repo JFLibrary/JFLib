@@ -11,6 +11,8 @@
 // recording replays them as console lines.  The tree shows mib-2 (system, interfaces, ip, snmp,
 // ifMIB) from netpkt::mib; a scalar's instance is 0, a column's the index of a row (ifIndex
 // 1 at first).  Set takes the MIB's type ("=") or one the list names.
+// Version 3 swaps the community for a row of its own: user, level, how messages are signed and
+// encrypted with their passwords (hidden while typed, in the console's command as with the tools).
 
 use alloc::format;
 use alloc::string::{String, ToString};
@@ -30,13 +32,22 @@ const ROOT: [u32; 6] = [1, 3, 6, 1, 2, 1];
 const TYPES: [&str; 7] = ["=", "s", "i", "u", "a", "o", "x"];
 // i18n
 const TYPE_NAMES: [&str; 7] = ["wie die MIB", "Text (s)", "Zahl (i)", "Zahl ohne Vorzeichen (u)", "IPv4-Adresse (a)", "Objektkennung (o)", "Bytes hexadezimal (x)"];
+/// the levels of SNMPv3 and how messages are signed (protocol words, the same in every language)
+const LEVELS: [&str; 3] = ["noAuthNoPriv", "authNoPriv", "authPriv"];
+const AUTHS: [&str; 5] = ["MD5", "SHA", "SHA-256", "SHA-384", "SHA-512"];
 
 /// the browser's fields and tree
 pub(crate) struct MibState {
     pub agent: String,
     pub community: String,
-    /// 0: version 1, 1: 2c
+    /// 0: version 1, 1: 2c, 2: 3
     pub version: i32,
+    /// version 3: the user, the level (LEVELS), how it signs (AUTHS) and the two passwords
+    pub user: String,
+    pub level: i32,
+    pub auth: i32,
+    pub auth_pw: String,
+    pub priv_pw: String,
     pub tree: TreeState,
     pub inst: String,
     /// the object the instance belongs to
@@ -52,7 +63,7 @@ impl MibState {
         if let Some(i) = OBJECTS.iter().position(|o| o.name == "system") {
             tree.expanded.insert(i as u64);
         }
-        MibState { agent: String::new(), community: String::from("public"), version: 1, tree, inst: String::new(), inst_of: None, kind: 0, value: String::new() }
+        MibState { agent: String::new(), community: String::from("public"), version: 1, user: String::new(), level: 2, auth: 1, auth_pw: String::new(), priv_pw: String::new(), tree, inst: String::new(), inst_of: None, kind: 0, value: String::new() }
     }
 }
 
@@ -80,13 +91,46 @@ pub(crate) fn browser(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
     ui.text(TS_BODY | TX_SECONDARY, t("Agent"));
     ui.next_size(160, 0);
     ui.textbox(id + 1, Some(t("z. B. 10.0.0.1")), &mut st.agent, 64);
-    ui.text(TS_BODY | TX_SECONDARY, t("Community"));
-    ui.next_size(120, 0);
-    ui.textbox(id + 2, Some("public"), &mut st.community, 32);
+    let is_v3 = st.version == 2;
+    if !is_v3 {
+        ui.text(TS_BODY | TX_SECONDARY, t("Community"));
+        ui.next_size(120, 0);
+        ui.textbox(id + 2, Some("public"), &mut st.community, 32);
+    }
     ui.text(TS_BODY | TX_SECONDARY, t("Version"));
     ui.next_size(80, 0);
-    ui.combobox(id + 3, &mut st.version, &["1", "2c"]);
+    if ui.combobox(id + 3, &mut st.version, &["1", "2c", "3"]) & EV_ACT != 0 {
+        ui.repass();
+    }
     ui.box_end();
+    // version 3: the user with their level and passwords
+    if is_v3 {
+        ui.box_begin(0, BOX_H | BOX_XCENTER | BOX_WRAP, 8);
+        ui.text(TS_BODY | TX_SECONDARY, t("Benutzer"));
+        ui.next_size(120, 0);
+        ui.textbox(id + 12, Some("admin"), &mut st.user, 32);
+        ui.text(TS_BODY | TX_SECONDARY, t("Stufe"));
+        ui.next_size(130, 0);
+        if ui.combobox(id + 13, &mut st.level, &LEVELS) & EV_ACT != 0 {
+            ui.repass();
+        }
+        if st.level >= 1 {
+            ui.text(TS_BODY | TX_SECONDARY, t("Signatur"));
+            ui.next_size(100, 0);
+            ui.combobox(id + 14, &mut st.auth, &AUTHS);
+            ui.text(TS_BODY | TX_SECONDARY, t("Passwort"));
+            ui.next_size(120, 0);
+            ui.textbox(id + 15, None, &mut st.auth_pw, 64 | TB_PASSWORD);
+        }
+        if st.level == 2 {
+            ui.text(TS_BODY | TX_SECONDARY, t("Verschlüsselung"));
+            ui.text(TS_BODY, "AES");
+            ui.text(TS_BODY | TX_SECONDARY, t("Passwort"));
+            ui.next_size(120, 0);
+            ui.textbox(id + 16, None, &mut st.priv_pw, 64 | TB_PASSWORD);
+        }
+        ui.box_end();
+    }
     // the tree and what is chosen
     let all = objects();
     let mut rows_data: Vec<(u64, u16, bool, &'static str)> = Vec::new();
@@ -106,7 +150,8 @@ pub(crate) fn browser(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
         }
     }
     let rows: Vec<TreeRow> = rows_data.iter().map(|r| TreeRow { key: r.0, depth: r.1, has_children: r.2, check: None, icon: 0, label: r.3, detail: None }).collect();
-    ui.next_size(-1, 280);
+    // (version 3 has more rows above: the console below keeps some height)
+    ui.next_size(-1, if is_v3 { 224 } else { 280 });
     ui.box_begin(0, BOX_H, 12);
     ui.next_size(260, -1);
     let ev = ui.tree(id + 0x100, &mut st.tree, &rows, 0);
@@ -132,7 +177,13 @@ pub(crate) fn browser(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
         }
         Some(c) => {
             let o = &OBJECTS[c];
-            let ready = !st.agent.trim().is_empty() && !st.community.trim().is_empty() && !st.agent.contains(char::is_whitespace) && !st.community.contains(char::is_whitespace);
+            let plain = |x: &str| !x.trim().is_empty() && !x.contains(char::is_whitespace);
+            let ready = plain(&st.agent)
+                && if st.version == 2 {
+                    plain(&st.user) && (st.level < 1 || (plain(&st.auth_pw) && st.auth_pw.len() >= 8)) && (st.level < 2 || (plain(&st.priv_pw) && st.priv_pw.len() >= 8))
+                } else {
+                    plain(&st.community)
+                };
             ui.text(TS_BODY_STRONG, &format!("{}::{}", o.module, o.name));
             ui.next_size(-1, 0);
             ui.text(TS_CAPTION | TX_SECONDARY, &mib::name_of(o.oid, true));
@@ -161,7 +212,18 @@ pub(crate) fn browser(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
             }
             let name = format!("{}::{}", o.module, o.name);
             let full = if leaf && !st.inst.trim().is_empty() { format!("{}.{}", name, st.inst.trim().trim_start_matches('.')) } else { name.clone() };
-            let head = format!("-v{} -c {} {}", if st.version == 0 { "1" } else { "2c" }, st.community.trim(), st.agent.trim());
+            let head = if st.version == 2 {
+                let mut h = format!("-v3 -u {} -l {}", st.user.trim(), LEVELS[st.level.clamp(0, 2) as usize]);
+                if st.level >= 1 {
+                    h.push_str(&format!(" -a {} -A {}", AUTHS[st.auth.clamp(0, 4) as usize], st.auth_pw.trim()));
+                }
+                if st.level == 2 {
+                    h.push_str(&format!(" -x AES -X {}", st.priv_pw.trim()));
+                }
+                format!("{} {}", h, st.agent.trim())
+            } else {
+                format!("-v{} -c {} {}", if st.version == 0 { "1" } else { "2c" }, st.community.trim(), st.agent.trim())
+            };
             ui.box_begin(0, BOX_H | BOX_XCENTER, 8);
             ui.next_flags(if ready && leaf { 0 } else { ST_DISABLED });
             if ui.button(id + 6, t("Get")) & EV_ACT != 0 {
@@ -192,7 +254,7 @@ pub(crate) fn browser(n: &mut Net, ui: &mut Ui, k: usize, dev: u32) {
             }
             if !ready {
                 ui.next_size(-1, 0);
-                ui.text(TS_CAPTION | TX_TERTIARY | TX_WRAP, t("Agent und Community ohne Leerzeichen angeben."));
+                ui.text(TS_CAPTION | TX_TERTIARY | TX_WRAP, if st.version == 2 { t("Agent und Benutzer ohne Leerzeichen angeben, Passwörter mit mindestens 8 Zeichen.") } else { t("Agent und Community ohne Leerzeichen angeben.") });
             }
         }
     }

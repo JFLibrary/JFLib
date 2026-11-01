@@ -74,6 +74,14 @@
 //             RFC 2865 / 2866 by number and name (vendor-specific ones as bytes), the hiding of
 //             User-Password, Request / Response Authenticators, the Message-Authenticator; the
 //             caller lends MD5 and HMAC-MD5 (crypto)                 (RFC 2865, 2866, 3579)
+//   snmpv3    SNMPv3 messages (V3, Usm, ScopedPdu), the USM: Level, AuthProto (HMAC-MD5-96, HMAC-SHA-96,
+//             the SHA-2 tags of RFC 7860), password_to_key, localize, sign, check, AES-128-CFB, engine
+//             IDs, report PDUs; uses crate crypto                    (RFC 3411-3414, 3826, 7860)
+//   ssh       SSH-2 without I/O: Core for a client or a server (push bytes, take_out bytes,
+//             take_events): identification, binary packets, KEXINIT, curve25519-sha256, ssh-ed25519
+//             and rsa-sha2-256, chacha20-poly1305@openssh.com, aes128-ctr and aes256-ctr with
+//             hmac-sha2-256, logins (none, password, publickey), session channels with windows;
+//             KeyPair, OpenSSH key files, dissect; uses crate crypto  (RFC 4250-4254, 8731, 8332, 8709)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -118,6 +126,8 @@ pub mod snmp;
 pub mod mib;
 pub mod telnet;
 pub mod radius;
+pub mod ssh;
+pub mod snmpv3;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

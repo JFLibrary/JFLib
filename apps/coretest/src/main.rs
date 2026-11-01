@@ -7,6 +7,7 @@
 // mib, RADIUS and Telnet of netpkt::radius and netpkt::telnet): known-answer vectors, round
 // trips, edge cases.
 // The group mail checks netpkt::smtp, netpkt::pop3 and netpkt::imf (mailt.rs).
+// The group sshcore checks netpkt::ssh and netpkt::snmpv3 (sshcoret.rs, snmpv3t.rs).
 // The group scriptls checks script's language services and formatter (scriptlst.rs).
 // The group pattern checks base::pattern: wildcards and regular expressions (patternt.rs).
 // The group scriptmod checks script's modules, debugger and test functions (scriptmodt.rs).
@@ -44,6 +45,8 @@ mod scriptt;
 mod sshd;
 mod store;
 mod tlst;
+mod sshcoret;
+mod snmpv3t;
 mod cmdtreet;
 mod scriptvmt;
 mod httpmsgt;
@@ -139,10 +142,13 @@ fn run() -> i32 {
     if let Some(p) = plat::arg_value("--ssh-serve").and_then(|p| p.parse().ok()) {
         return sshd::serve(p);
     }
+    if let Some(p) = plat::arg_value("--ssh-core-serve").and_then(|p| p.parse().ok()) {
+        return sshcoret::serve(p);
+    }
     if let Some(f) = plat::arg_value("--ssh-key") {
         return sshd::key_line(&f);
     }
-    let groups: [(&'static str, fn(&mut T)); 38] = [
+    let groups: [(&'static str, fn(&mut T)); 39] = [
         ("datetime", dt::run),
         ("crypto", crypto::run),
         ("compress", lz::run),
@@ -181,6 +187,7 @@ fn run() -> i32 {
         ("scriptls", scriptlst::run),
         ("pattern", patternt::run),
         ("scriptmod", scriptmodt::run),
+        ("sshcore", sshcoret::run),
     ];
     let mut failed = 0;
     let mut total = 0;

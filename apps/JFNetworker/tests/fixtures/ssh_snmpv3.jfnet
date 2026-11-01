@@ -1,0 +1,191 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "SSH und SNMPv3",
+  "description": "Ein Admin-PC verwaltet Router, Switch und Server über SSH und SNMPv3.",
+  "seed": 31,
+  "next_id": 10,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "R1",
+      "model": "jf-r4",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R1\n!\nip domain-name lab.test\nip ssh version 2\n!\ncrypto key generate ed25519\n!\nusername admin privilege 15 secret adminpw\nusername gast password gastgast\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.0.1 255.255.255.0\n no shutdown\n!\nsnmp-server group MONITOR v3 priv\nsnmp-server user monitor MONITOR v3 auth sha monitorauth priv aes 128 monitorpriv\n!\nline vty 0 4\n login local\n transport input ssh\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "R2",
+      "model": "jf-r4",
+      "x": 320,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname R2\n!\nip domain-name lab.test\ncrypto key generate rsa modulus 1024\n!\nusername admin privilege 15 secret adminpw\n!\ninterface GigabitEthernet0/0/0\n ip address 10.0.0.2 255.255.255.0\n no shutdown\n!\nline vty 0 4\n login local\n exec-timeout 1 0\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 160,
+      "y": 120,
+      "off": false,
+      "startup_config": "hostname SW1\n!\ninterface Vlan1\n ip address 10.0.0.3 255.255.255.0\n no shutdown\n!\nsnmp-server view NURSYS 1.3.6.1.2.1.1 included\nsnmp-server group LESER v3 auth read NURSYS\nsnmp-server group ADMINS v3 priv write NURSYS\nsnmp-server user leser LESER v3 auth sha leserauth\nsnmp-server user monitor ADMINS v3 auth sha monitorauth priv aes 128 monitorpriv\n!\nend\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "ADMIN",
+      "model": "pc",
+      "x": 0,
+      "y": 260,
+      "off": false,
+      "startup_config": "hostname ADMIN\nip addr add 10.0.0.100/24 dev eth0\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 5,
+      "name": "SRV1",
+      "model": "server-1u",
+      "x": 320,
+      "y": 260,
+      "off": false,
+      "startup_config": "hostname SRV1\nip addr add 10.0.0.10/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "sshd",
+          "name": "sshd",
+          "disabled": false,
+          "config": {
+            "password": "geheim",
+            "users": [
+              {
+                "name": "deploy",
+                "password": "deploypw"
+              }
+            ]
+          }
+        },
+        {
+          "kind": "snmpd",
+          "name": "snmpd",
+          "disabled": false,
+          "config": {
+            "users": [
+              {
+                "name": "monitor",
+                "level": "authPriv",
+                "auth": "SHA",
+                "auth_password": "monitorauth",
+                "priv": "AES",
+                "priv_password": "monitorpriv",
+                "access": "ro"
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    }
+  ],
+  "links": [
+    {
+      "id": 6,
+      "a": {
+        "dev": 1,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 2,
+        "port": "GigabitEthernet0/0/0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 8,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 9,
+      "a": {
+        "dev": 5,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 3,
+        "port": "GigabitEthernet1/0/4"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ]
+}

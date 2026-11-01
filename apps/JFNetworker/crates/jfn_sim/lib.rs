@@ -171,6 +171,10 @@
 //   cli::ses the sessions of a command line: the console, local terminals (Engine::cli_open,
 //            the Terminal panel's further tabs) and telnet sessions; show users, who, w, tty,
 //            ps's TTY column; Report::SesOut / SesPrompt / SesClosed, Cmd::Ses* (X1e)
+//   sshd     SSH on a device: the client "ssh" and "scp" as console programs, the servers (the
+//            vty lines of IOS-like devices, "sshd" on Linux hosts), a command-line session per
+//            connection, host keys as files, known_hosts, authorized_keys (X1f)
+//   sshtrace SshNote: what SSH servers and clients decide as notes (Note::Ssh)
 //   procs    the processes of a device as ps sees them (Engine::processes) and its programs'
 //            CPU time second by second (Engine::cpu_secs): the desktop's Systemmonitor (V2)
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
@@ -271,6 +275,8 @@ pub mod aaatrace;
 pub mod radiusd;
 pub mod telnetd;
 pub mod procs;
+pub mod sshtrace;
+pub mod sshd;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -344,6 +350,8 @@ pub use snmpd::{Community, SnmpAgent, SnmpCfg, SnmpSet, TrapHost};
 pub use snmptrapd::{TrapReceiver, TrapRow};
 pub use auth::{LocalAuth, Secret, UserAcct};
 pub use aaa::{Aaa, AuthResult, Method, MethodList, RadiusServer, ServerGroup};
+pub use sshd::{SshCfg, SshServer};
+pub use sshtrace::SshNote;
 pub use aaatrace::ANote;
 pub use radiusd::{NasService, RadiusServerSvc};
 pub use telnetd::TelnetClient;

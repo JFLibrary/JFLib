@@ -15,6 +15,8 @@
 //                             ""}: the login root with that password)
 //   vty_opts(lines, n)        what the "line vty" blocks that hold line n say (a later block wins
 //                             per setting)
+//   Proto                     Telnet | Ssh: what vty_free and the "transport input" of a line ask
+//                             about (sshd.rs takes the same lines)
 //   build_vty / Engine::ios_vty   "transport input telnet|ssh|all|none" and "access-class ACL
 //                             in" in line mode, terminal [no] monitor, show line, clear line
 //                             [vty N | console 0 | tty N | N]
@@ -65,6 +67,7 @@ use crate::aaa::Requester;
 use crate::aaatrace::ANote;
 use crate::cli::ios::K;
 use crate::cli::ses::{Conn, Login, SesKind, W_IDLE, W_INPUT};
+use crate::sshd::SshClient;
 use crate::cli::{CliJob, LineCfg, Mode};
 use crate::cli::print::JobOut;
 use crate::kernel::{Engine, Ev, Ns, SEC};
@@ -283,6 +286,9 @@ impl Engine {
         let Some(CliJob { out: JobOut::Proc { svc, stdin: true }, .. }) = job else {
             return false;
         };
+        if self.os(ni).and_then(|o| o.svcs.iter().find(|s| s.id == *svc)).and_then(|s| s.svc.as_ref()).and_then(|x| x.as_any().downcast_ref::<SshClient>()).is_some() {
+            return self.ssh_prog_hides(ni, job);
+        }
         self.os(ni).and_then(|o| o.svcs.iter().find(|s| s.id == *svc)).and_then(|s| s.svc.as_ref()).and_then(|x| x.as_any().downcast_ref::<TelnetClient>()).is_some_and(|t| t.remote_echo())
     }
 }
@@ -388,6 +394,13 @@ impl Service for TelnetServer {
 
 // ---------------------------------------------------------------- the vty lines
 
+/// the protocol of a session from the network
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Proto {
+    Telnet,
+    Ssh,
+}
+
 /// the first and last line of a "line vty A [B]" block
 fn vty_range(name: &str) -> Option<(u16, u16)> {
     let rest = name.strip_prefix("vty ")?;
@@ -435,10 +448,11 @@ fn vty_lines(lines: &[LineCfg]) -> Vec<u16> {
     v
 }
 
-/// the line takes telnet ("transport input": none of it means all)
-fn takes_telnet(opts: &[String]) -> bool {
+/// the line takes the protocol ("transport input": none of it means all)
+fn takes(opts: &[String], proto: Proto) -> bool {
+    let word = if proto == Proto::Ssh { "ssh" } else { "telnet" };
     match opts.iter().find(|o| o.starts_with("transport input")) {
-        Some(o) => o.split_whitespace().skip(2).any(|w| w == "telnet" || w == "all"),
+        Some(o) => o.split_whitespace().skip(2).any(|w| w == word || w == "all"),
         None => true,
     }
 }
@@ -462,7 +476,7 @@ pub(crate) fn build_vty(t: &mut Tree<K>, m: [ModeId; 3]) {
     t.add(line, "transport input", "The protocols of sessions from the network", None, 0);
     t.add(line, "transport input telnet", "Telnet", Some(K::TransportInput), 0);
     t.add(line, "transport input telnet ssh", "Telnet and SSH", Some(K::TransportInput), 0);
-    t.add(line, "transport input ssh", "SSH only (this device serves no SSH: telnet is refused)", Some(K::TransportInput), 0);
+    t.add(line, "transport input ssh", "SSH only (telnet is refused)", Some(K::TransportInput), 0);
     t.add(line, "transport input ssh telnet", "SSH and Telnet", Some(K::TransportInput), 0);
     t.add(line, "transport input all", "Every protocol (the default)", Some(K::TransportInput), 0);
     t.add(line, "transport input none", "No sessions from the network", Some(K::TransportInput), 0);
@@ -491,21 +505,26 @@ impl Engine {
     /// the vty lines' telnet server should listen: some vty line takes telnet and can log
     /// someone in
     pub(crate) fn vty_wanted(&self, ni: usize) -> bool {
+        self.vty_wanted_for(ni, Proto::Telnet)
+    }
+
+    /// some vty line takes the protocol and can log someone in
+    pub(crate) fn vty_wanted_for(&self, ni: usize, proto: Proto) -> bool {
         let Some(c) = self.cdev(ni) else {
             return false;
         };
         if c.style != CliStyle::Ios {
             return false;
         }
-        vty_lines(&c.cfg.lines).into_iter().any(|n| self.vty_usable(ni, n))
+        vty_lines(&c.cfg.lines).into_iter().any(|n| self.vty_usable(ni, n, proto))
     }
 
-    // line n takes telnet and a login can succeed there
-    fn vty_usable(&self, ni: usize, n: u16) -> bool {
+    // line n takes the protocol and a login can succeed there
+    fn vty_usable(&self, ni: usize, n: u16, proto: Proto) -> bool {
         let Some(opts) = self.cdev(ni).and_then(|c| vty_opts(&c.cfg.lines, n)) else {
             return false;
         };
-        if !takes_telnet(&opts) {
+        if !takes(&opts, proto) {
             return false;
         }
         match self.line_login_plan(ni, &format!("vty {}", n)) {
@@ -517,6 +536,8 @@ impl Engine {
     /// the telnet server of an IOS-like device follows its vty lines: made (hidden) when a line
     /// takes logins the first time, then listening or not (after every configuration line)
     pub(crate) fn vty_sync(&mut self, ni: usize) {
+        // the SSH server follows them too (sshd.rs)
+        self.ssh_sync(ni);
         if self.cdev(ni).is_none_or(|c| c.style != CliStyle::Ios) || self.os(ni).is_none() {
             return;
         }
@@ -547,15 +568,16 @@ impl Engine {
 
     // the lowest free vty line a connection from `from` may take -> Err(why, text for the
     // client)
-    fn vty_free(&mut self, ni: usize, from: IpAddr, local: IpAddr, sport: u16) -> Result<u16, (String, &'static str)> {
+    pub(crate) fn vty_free(&mut self, ni: usize, from: IpAddr, local: IpAddr, sport: u16, proto: Proto) -> Result<u16, (String, &'static str)> {
         let lines = self.cdev(ni).map(|c| vty_lines(&c.cfg.lines)).unwrap_or_default();
-        let usable: Vec<u16> = lines.into_iter().filter(|&n| self.vty_usable(ni, n)).collect();
+        let usable: Vec<u16> = lines.into_iter().filter(|&n| self.vty_usable(ni, n, proto)).collect();
+        let dport = if proto == Proto::Ssh { netpkt::ssh::PORT } else { telnet::PORT };
         let mut allowed = Vec::new();
         let mut class = None;
         for n in usable {
             let acl = self.cdev(ni).and_then(|c| vty_opts(&c.cfg.lines, n)).and_then(|o| o.iter().find_map(|x| x.strip_prefix("access-class ").map(|r| String::from(r.trim_end_matches(" in").trim()))));
             if let Some(name) = acl {
-                let flow = netpkt::nat::Flow { proto: 6, src: from.v4().unwrap_or(Ipv4::UNSPECIFIED), dst: local.v4().unwrap_or(Ipv4::UNSPECIFIED), sport, dport: telnet::PORT, ports: true, icmp: None, flags: 0x02, later: false, mf: false, id: 0 };
+                let flow = netpkt::nat::Flow { proto: 6, src: from.v4().unwrap_or(Ipv4::UNSPECIFIED), dst: local.v4().unwrap_or(Ipv4::UNSPECIFIED), sport, dport, ports: true, icmp: None, flags: 0x02, later: false, mf: false, id: 0 };
                 if self.acl_match(ni, &name, &flow) == Some(false) {
                     class = Some(name);
                     continue;
@@ -588,7 +610,7 @@ impl Engine {
         };
         let (from, port) = row.remote;
         let no = if ios {
-            match self.vty_free(ni, from, row.local.0, port) {
+            match self.vty_free(ni, from, row.local.0, port, Proto::Telnet) {
                 Ok(n) => Some(n),
                 Err((why, text)) => {
                     if !text.is_empty() {
@@ -607,7 +629,7 @@ impl Engine {
         if let Some(b) = opts.enable_us(OPT_SGA) {
             tx.extend_from_slice(&b);
         }
-        let conn = Conn { svc, sock, from, port, reader: Reader::new(true), opts, tx, rx: Vec::new(), inq: alloc::collections::VecDeque::new(), intr: false, hide: false, woken: false };
+        let conn = Conn { svc, sock, from, port, reader: Reader::new(true), opts, tx, rx: Vec::new(), inq: alloc::collections::VecDeque::new(), intr: false, hide: false, woken: false, ssh: None };
         let Some(s) = self.ses_new(ni, SesKind::Telnet, Some(conn), no) else {
             self.tcp_close(ni, svc, sock, None);
             return false;
@@ -662,35 +684,40 @@ impl Engine {
         let Some(c) = info.conn.as_mut() else {
             return;
         };
-        for item in c.reader.push(&data) {
-            match item {
-                Item::Data(d) => {
-                    for b in d {
-                        match b {
-                            b'\n' => {
-                                let l = String::from_utf8_lossy(&c.rx).into_owned();
-                                c.rx.clear();
-                                c.inq.push_back(l);
+        // an SSH connection: the core takes the bytes (sshd.rs)
+        if let Some(x) = c.ssh.as_mut() {
+            x.feed(&data, &mut c.tx);
+        } else {
+            for item in c.reader.push(&data) {
+                match item {
+                    Item::Data(d) => {
+                        for b in d {
+                            match b {
+                                b'\n' => {
+                                    let l = String::from_utf8_lossy(&c.rx).into_owned();
+                                    c.rx.clear();
+                                    c.inq.push_back(l);
+                                }
+                                0 | b'\r' => {}
+                                8 | 127 => {
+                                    c.rx.pop();
+                                }
+                                b => c.rx.push(b),
                             }
-                            0 | b'\r' => {}
-                            8 | 127 => {
-                                c.rx.pop();
-                            }
-                            b => c.rx.push(b),
                         }
                     }
-                }
-                Item::Opt { verb, opt } => {
-                    if let Some(a) = c.opts.received(verb, opt) {
-                        c.tx.extend_from_slice(&a);
+                    Item::Opt { verb, opt } => {
+                        if let Some(a) = c.opts.received(verb, opt) {
+                            c.tx.extend_from_slice(&a);
+                        }
                     }
+                    Item::Cmd(telnet::IP) => c.intr = true,
+                    Item::Cmd(telnet::AYT) => c.tx.extend_from_slice(b"\r\n[Yes]\r\n"),
+                    _ => {}
                 }
-                Item::Cmd(telnet::IP) => c.intr = true,
-                Item::Cmd(telnet::AYT) => c.tx.extend_from_slice(b"\r\n[Yes]\r\n"),
-                _ => {}
             }
         }
-        let wake = !ending && !c.woken && (!c.inq.is_empty() || c.intr);
+        let wake = !ending && !c.woken && (!c.inq.is_empty() || c.intr || c.ssh.as_ref().is_some_and(|x| !x.events.is_empty()));
         if wake {
             c.woken = true;
         }
@@ -707,6 +734,9 @@ impl Engine {
         let Some(s) = self.ses_here(ni).map(|i| i.id) else {
             return;
         };
+        // what an SSH connection brought: logins, channels, lines (sshd.rs)
+        self.ssh_events(ni);
+        let ssh = self.ssh_ref(ni).is_some();
         let intr = match self.ses_here_mut(ni).and_then(|i| i.conn.as_mut()) {
             Some(c) => {
                 c.woken = false;
@@ -716,6 +746,13 @@ impl Engine {
         };
         if intr {
             self.cli_interrupt_at(ni);
+            // (over SSH Ctrl+C at a prompt asks for the prompt again)
+            if ssh {
+                if let Some(i) = self.ses_here_mut(ni) {
+                    i.prompted = false;
+                }
+                self.cli_state(ni);
+            }
         }
         loop {
             if self.ses_here(ni).is_none_or(|i| i.ending) {
@@ -744,6 +781,17 @@ impl Engine {
         let Some(info) = c.ses(c.cur) else {
             return;
         };
+        // over SSH: no prompt before the shell; a command ends the session when it is done
+        if let Some(x) = info.conn.as_ref().and_then(|k| k.ssh.as_ref()) {
+            if x.exec && x.started && x.scp.is_none() && !busy && c.sh.fg.is_none() && !info.ending {
+                let s = info.id;
+                self.ses_end(ni, s);
+                return;
+            }
+            if !x.started || x.exec {
+                return;
+            }
+        }
         if busy || info.prompted || info.ending {
             return;
         }
@@ -757,9 +805,12 @@ impl Engine {
             && conn.hide != secret
         {
             conn.hide = secret;
-            let b = if secret { conn.opts.enable_us(OPT_ECHO) } else { conn.opts.disable_us(OPT_ECHO) };
-            if let Some(b) = b {
-                conn.tx.extend_from_slice(&b);
+            // (SSH has no such option: the client knows a password prompt by its words)
+            if conn.ssh.is_none() {
+                let b = if secret { conn.opts.enable_us(OPT_ECHO) } else { conn.opts.disable_us(OPT_ECHO) };
+                if let Some(b) = b {
+                    conn.tx.extend_from_slice(&b);
+                }
             }
         }
         if prompt.is_empty() {
@@ -776,6 +827,10 @@ impl Engine {
             return;
         };
         if kind != SesKind::Telnet {
+            return;
+        }
+        if self.ssh_ref(ni).is_some() {
+            self.ssh_start(ni);
             return;
         }
         match self.cdev(ni).map(|c| c.style) {
@@ -799,7 +854,7 @@ impl Engine {
 
     // the idle timer of the session in place: when its line's exec-timeout is up after the
     // last line typed
-    fn ses_idle_arm(&mut self, ni: usize) {
+    pub(crate) fn ses_idle_arm(&mut self, ni: usize) {
         let Some((s, no, last)) = self.ses_here(ni).map(|i| (i.id, i.no, i.last)) else {
             return;
         };
@@ -869,7 +924,12 @@ impl Engine {
         if !user.is_empty() {
             self.in_ses(ni, s, |e| e.aaa_acct(ni, Requester::Vty(n), &user, false));
         }
-        self.aaa_note(ni, ANote::VtyClosed { line: n, idle });
+        // (an SSH session says so with its own note: sshd.rs)
+        let ssh_from = self.ses_info(ni, s).and_then(|i| i.conn.as_ref()).filter(|c| c.ssh.is_some()).map(|c| c.from);
+        match ssh_from {
+            Some(from) => self.ssh_note(ni, crate::sshtrace::SshNote::Closed { from, idle }),
+            None => self.aaa_note(ni, ANote::VtyClosed { line: n, idle }),
+        }
         self.ses_end(ni, s);
     }
 
@@ -883,6 +943,10 @@ impl Engine {
         };
         if ending {
             return;
+        }
+        // an SSH connection that is gone gets no last words (sshd.rs)
+        if let Some(x) = self.ses_info_mut(ni, s).and_then(|i| i.conn.as_mut()).and_then(|c| c.ssh.as_mut()) {
+            x.gone = true;
         }
         if kind == SesKind::Telnet && self.cdev(ni).is_some_and(|c| c.style == CliStyle::Ios) {
             self.vty_close(ni, no, false);
@@ -1101,11 +1165,11 @@ impl Engine {
 
     /// who: every session of the device with its terminal, the time it began and where from
     pub(crate) fn sh_who(&mut self, ni: usize, _args: &[&str]) -> Result<(), String> {
-        let rows: Vec<(String, Ns, Option<IpAddr>, bool)> = self.cdev(ni).map(|c| c.sessions.iter().filter(|i| i.login.is_none()).map(|i| (i.line.clone(), i.since, i.conn.as_ref().map(|x| x.from), i.kind == SesKind::Local)).collect()).unwrap_or_default();
+        let rows: Vec<(String, Ns, Option<IpAddr>, String)> = self.cdev(ni).map(|c| c.sessions.iter().filter(|i| i.login.is_none()).map(|i| (i.line.clone(), i.since, i.conn.as_ref().map(|x| x.from), String::from(i.user_name()))).collect()).unwrap_or_default();
         let mut s = String::new();
-        for (line, since, from, _) in rows {
+        for (line, since, from, user) in rows {
             let (when, _) = self.login_time(ni, since);
-            s.push_str(&format!("{:<8} {:<12} {}", "root", line, when));
+            s.push_str(&format!("{:<8} {:<12} {}", user, line, when));
             if let Some(f) = from {
                 s.push_str(&format!(" ({})", f));
             }
@@ -1135,13 +1199,13 @@ impl Engine {
                 _ => String::from("-sh"),
             }
         };
-        let rows: Vec<(String, String, Ns, Ns, String)> = c
+        let rows: Vec<(String, String, String, Ns, Ns, String)> = c
             .sessions
             .iter()
             .filter(|i| i.login.is_none())
             .map(|i| {
                 let w = if i.id == here { what(&c.job, &c.sh, i.id) } else { c.parked.get(&i.id).map(|p| what(&p.job, &p.sh, i.id)).unwrap_or_default() };
-                (i.line.clone(), i.conn.as_ref().map_or_else(|| String::from("-"), |x| format!("{}", x.from)), i.since, now.saturating_sub(i.last), w)
+                (String::from(i.user_name()), i.line.clone(), i.conn.as_ref().map_or_else(|| String::from("-"), |x| format!("{}", x.from)), i.since, now.saturating_sub(i.last), w)
             })
             .collect();
         let up = now / SEC;
@@ -1149,11 +1213,11 @@ impl Engine {
         let n = rows.len();
         let mut s = format!(" {}:{:02} up {},  {} user{},  load average: 0.00, 0.00, 0.00\n", clock, sec, up_text, n, if n == 1 { "" } else { "s" });
         s.push_str("USER     TTY      FROM             LOGIN@   IDLE   WHAT\n");
-        for (line, from, since, idle, w) in rows {
+        for (user, line, from, since, idle, w) in rows {
             let (_, at) = self.login_time(ni, since);
             let idle_s = idle / SEC;
             let idle_text = if idle_s < 60 { format!("{}.00s", idle_s) } else { format!("{}:{:02}", idle_s / 60, idle_s % 60) };
-            s.push_str(&format!("{:<8} {:<8} {:<16} {:<8} {:<6} {}\n", "root", line, from, at, idle_text, w));
+            s.push_str(&format!("{:<8} {:<8} {:<16} {:<8} {:<6} {}\n", user, line, from, at, idle_text, w));
         }
         self.out(ni, &s);
         Ok(())

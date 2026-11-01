@@ -581,8 +581,8 @@ fn versions(t: &mut T) {
         o,
         s("snmpget: the agent answered noSuchName at binding 2 (SNMPv2-MIB::system.9.0)\nSNMPv2-MIB::system.9.0 = No Such Object (the agent has no object of this name)\nSNMPv2-MIB::sysName.1 = No Such Instance (the object has no such row or instance)\nIF-MIB::ifSpecific.1 = OID: SNMPv2-SMI::zeroDotZero\nIF-MIB::ifSpecific.2 = OID: SNMPv2-SMI::zeroDotZero\nIF-MIB::ifSpecific.3 = OID: SNMPv2-SMI::zeroDotZero\nIF-MIB::ifSpecific.4 = OID: SNMPv2-SMI::zeroDotZero\nIF-MIB::ifSpecific.5 = OID: SNMPv2-SMI::zeroDotZero\nIF-MIB::ifSpecific.6 = OID: SNMPv2-SMI::zeroDotZero\nIF-MIB::ifSpecific.7 = OID: SNMPv2-SMI::zeroDotZero\nIF-MIB::ifSpecific.8 = OID: SNMPv2-SMI::zeroDotZero\nSNMPv2-MIB::sysName.0 = STRING: R1\n"),
     );
-    let o = cli(&mut e, MON, &["snmpget", "snmpget -v3 -c x 10.0.0.1 sysName.0", "snmpwalk -h"], 0);
-    t.check(&format!("usage: {}", o), o.starts_with("snmpget: no community given (-c NAME)\nUsage: snmpget ") && o.contains("snmpget: version '3' is none of 1 and 2c (SNMPv3 is not here)\n") && o.contains("Usage: snmpwalk [-v 1|2c] -c COMMUNITY") && o.contains("goes through every object below OID"));
+    let o = cli(&mut e, MON, &["snmpget", "snmpget -v4 -c x 10.0.0.1 sysName.0", "snmpwalk -h"], 0);
+    t.check(&format!("usage: {}", o), o.starts_with("snmpget: no community given (-c NAME)\nUsage: snmpget ") && o.contains("snmpget: version '4' is none of 1, 2c and 3\n") && o.contains("Usage: snmpwalk [-v 1|2c] -c COMMUNITY") && o.contains("goes through every object below OID"));
 }
 
 // ---------------------------------------------------------------- traps

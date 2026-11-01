@@ -2295,6 +2295,49 @@ that any program can use (all `no_std`, no `unsafe`, see [API.md](API.md)):
   let mut p = radius::Packet::new(radius::ACCESS_REQUEST, id, auth);
   p.push(radius::Attr::text(radius::A_USER_NAME, "admin"));
   ```
+
+  SSH: `ssh` is SSH version 2 without I/O, for simulators and tests (`netio::ssh::Client` is the
+  blocking client on real sockets).  `ssh::Core::client(cfg, &seed)` and `Core::server(cfg, keys, &seed)`
+  are one side of a connection: `push` what the connection brought, `take_out` what to send,
+  `take_events` what happened; random bytes come from the seed, so the same seed gives the same
+  bytes.  It speaks curve25519-sha256, ssh-ed25519 and rsa-sha2-256, chacha20-poly1305@openssh.com,
+  aes128-ctr and aes256-ctr with hmac-sha2-256, logins by none, password and publickey and session
+  channels with windows.  The embedder decides what the protocol leaves open: `host_key_verdict`
+  answers `Event::HostKey`, `auth_accept` / `auth_reject` / `auth_pk_ok` answer `Event::AuthRequest`
+  (later if a server must be asked), `accept_channel`, `reply`.  `KeyPair` makes keys from the
+  caller's random bytes, signs, and reads and writes OpenSSH's unencrypted key files; `fingerprint`,
+  `parse_public`, `verify`, `dissect` (for inspectors; `decode::layers` shows the identification line,
+  packets in the clear and "verschlüsselt" after them).  `crypto::rsa::PrivateKey` generates and signs.
+
+  ```rust
+  let mut client = ssh::Core::client(ssh::Config::default(), &seed_a);
+  let mut server = ssh::Core::server(ssh::Config::default(), vec![ssh::KeyPair::ed25519(&key)], &seed_b);
+  loop {
+      server.push(&client.take_out());
+      client.push(&server.take_out());
+      for e in client.take_events() {
+          match e {
+              ssh::Event::HostKey { blob, .. } => client.host_key_verdict(ssh::fingerprint(&blob) == pinned),
+              ssh::Event::AuthReady => client.auth_password("admin", "secret"),
+              ssh::Event::AuthSuccess => { client.open_session(); }
+              _ => {}
+          }
+      }
+      // ... the server's events the same way, until both are quiet
+  }
+  ```
+
+  SNMPv3: `snmpv3` has the message of RFC 3412 (`V3`, `Usm`, `ScopedPdu`) around the PDUs of `snmp`,
+  and the USM: `password_to_key` and `localize` (RFC 3414 A.2), `sign` and `check` (HMAC-MD5-96,
+  HMAC-SHA-96, the SHA-2 tags of RFC 7860), `encrypt` and `decrypt` (AES-128-CFB of RFC 3826),
+  `engine_id_mac`, the counters of report PDUs (`USM_STATS_*`, `report_pdu`, `report_name`).  `decode`
+  shows msgFlags, the user and the scoped PDU, or "verschlüsselt".
+
+  ```rust
+  let kul = snmpv3::localize(AuthProto::Sha1, &snmpv3::password_to_key(AuthProto::Sha1, b"maplesyrup"), &engine);
+  let mut bytes = message.to_bytes();         // msgAuthenticationParameters: zeros of tag_len()
+  snmpv3::sign(&mut bytes, AuthProto::Sha1, &kul);
+  ```
 * `base::rng::Pcg32::new(seed, stream)` / `Pcg32::derive(seed, id)` -- deterministic random
   numbers (the reference PCG32): the same seed gives the same run on every target. For keys and
   nonces use `plat::random_bytes`.

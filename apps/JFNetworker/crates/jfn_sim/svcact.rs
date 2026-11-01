@@ -55,7 +55,10 @@
 //     snmpd           {"port": 161, "communities": [{"name": "public", "access": "ro", "source":
 //                     "10.0.0.0/24"}], "location": "...", "contact": "...", "sinks": [{"host":
 //                     "10.0.0.50", "type": "trap", "version": "2c", "community": "public"}],
-//                     "notify": ["coldstart", "linkdown", "linkup", "authentication"]} (snmpd.rs)
+//                     "notify": ["coldstart", "linkdown", "linkup", "authentication"],
+//                     "engine_id": "80007ed9...", "users": [{"name": "admin", "level": "authPriv",
+//                     "auth": "SHA", "auth_password": "...", "priv": "AES", "priv_password": "...",
+//                     "access": "rw", "subtree": "1.3.6.1.2.1.1"}]} (snmpd.rs)
 //     snmptrapd       {"port": 162, "communities": ["public"], "log": "/var/log/snmptrapd.log",
 //                     "keep": 100} (snmptrapd.rs)
 //     radius-server   {"auth_port": 1812, "acct_port": 1813, "clients": [{"address":
@@ -64,6 +67,9 @@
 //                     "/var/log/radius/accounting"} (radiusd.rs)
 //     telnetd         {"port": 23, "password": ""} (telnetd.rs: shell sessions over Telnet, the
 //                     login root with this password)
+//     sshd            {"port": 22, "password": "", "users": [{"name": "deploy", "password": "..."}],
+//                     "password_auth": true, "key_auth": true} (sshd.rs: shell sessions over SSH;
+//                     no password: keys only)
 //
 //   HttpLoadSet / HttpServerSet    change a running load generator or web server in place
 //   ScriptSource / RenameService   a script's new definition, keeping its disk and numbers
@@ -238,6 +244,8 @@ impl Engine {
             "radius-server" => Box::new(crate::radiusd::RadiusServerSvc::from_config(c).map_err(|w| bad(kind, w))?),
             "telnetd" if ios => return Err(bad(kind, msg!("IOS-artige Geräte nehmen Telnet auf ihren vty-Leitungen an (line vty)."))),
             "telnetd" => Box::new(crate::telnetd::TelnetServer::from_config(c).map_err(|w| bad(kind, w))?),
+            "sshd" if ios => return Err(bad(kind, msg!("IOS-artige Geräte nehmen SSH auf ihren vty-Leitungen an (crypto key generate, line vty)."))),
+            "sshd" => Box::new(crate::sshd::SshServer::from_config(c).map_err(|w| bad(kind, w))?),
             k => return Err(ActErr::Refused(msg!("Unbekannte Dienstart \u{201e}{}\u{201c}.", k))),
         };
         let name = if def.name.is_empty() { def.kind.clone() } else { def.name.clone() };

@@ -755,7 +755,7 @@ impl Engine {
     }
 
     /// runs a login's method list: sync methods decide here, a RADIUS group goes to the NAS
-    fn login_run(&mut self, ni: usize, via: Requester, methods: Vec<Method>, user: String, pass: String) {
+    pub(crate) fn login_run(&mut self, ni: usize, via: Requester, methods: Vec<Method>, user: String, pass: String) {
         for i in 0..methods.len() {
             match &methods[i] {
                 Method::GroupRadius | Method::Group(_) => {
@@ -883,14 +883,24 @@ impl Engine {
                 }
                 self.aaa_note(ni, ANote::LoginOk { at, user: user.clone(), how: String::from(how), level });
                 self.aaa_acct(ni, via, &user, true);
+                // an SSH login hears the answer in its protocol (sshd.rs)
+                if self.ssh_ref(ni).is_some() {
+                    self.ssh_gate_ok(ni, &user, how);
+                }
                 self.cli_state(ni);
             }
             AuthResult::Fail => {
-                self.aaa_note(ni, ANote::LoginBad { at, user });
+                self.aaa_note(ni, ANote::LoginBad { at, user: user.clone() });
+                if self.ssh_gate_bad(ni, &user) {
+                    return;
+                }
                 self.login_retry(ni, via);
             }
             _ => {
                 self.aaa_note(ni, ANote::NoMethod);
+                if self.ssh_gate_bad(ni, &user) {
+                    return;
+                }
                 self.out(ni, "% Authentication failed: no server reachable and no fallback\n\n");
                 self.login_again(ni, via);
                 self.cli_state(ni);

@@ -50,6 +50,7 @@ pub(crate) fn kind_name(kind: &str) -> &str {
         "snmptrapd" => "SNMP-Trap-Empfänger",
         "radius-server" => "RADIUS-Server",
         "telnetd" => "Telnet-Server",
+        "sshd" => "SSH-Server",
         _ => return kind,
     })
 }

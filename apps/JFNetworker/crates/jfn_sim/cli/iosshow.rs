@@ -160,6 +160,9 @@ impl Engine {
                 if d & super::D_SNMP != 0 {
                     s.push_str("Debug output for SNMP packets: on\n");
                 }
+                if d & super::D_SSH != 0 {
+                    s.push_str("Debug output for SSH: on\n");
+                }
                 s
             }
             K::ShowVersion => self.show_version(ni),
@@ -180,6 +183,8 @@ impl Engine {
         if !cfg.domain_lookup {
             s.push_str("no ip domain lookup\n!\n");
         }
+        // ip domain-name, ip ssh (cli/ssh.rs)
+        s.push_str(&self.ios_ssh_config(ni));
         // static names and name servers (cli/names.rs)
         s.push_str(&self.ios_names_config(ni));
         // the FTP client's login (cli/files.rs)

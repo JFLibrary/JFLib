@@ -1,0 +1,109 @@
+# SSH und SNMPv3: der Admin-PC meldet sich per SSH an R1 an (der Host-Schlüssel wird gemerkt, Telnet
+# ist auf der Leitung aus), sieht seine Sitzung mit show users und show ssh, richtet ein
+# Loopback-Interface ein und lässt ein Kommando an R2 im exec-Modus laufen (RSA-Schlüssel, der Status
+# kommt zurück). Auf SRV1 meldet er sich erst mit Passwort an, legt seinen Schlüssel ab und kommt dann
+# ohne Passwort hinein; scp kopiert eine Datei hin und her. Dann fragt er SW1 per SNMPv3 ab: authPriv
+# und authNoPriv, eine Sicht schließt interfaces aus, ein falsches Passwort und ein unbekannter
+# Benutzer bekommen ihre Reports; R1 antwortet mit SHA und AES, SRV1 als Linux-Agent. Zuletzt bekommt
+# SRV1 einen neuen Schlüssel, den ssh ablehnt. Der Bericht zeigt Passwörter wie jede getippte Zeile.
+run 1s
+ADMIN: telnet 10.0.0.1
+run 1s
+expect ADMIN output contains "% Connection refused by remote host"
+ADMIN: ssh -o StrictHostKeyChecking=accept-new admin@10.0.0.1
+run 1s
+expect ADMIN output contains "Password for admin at 10.0.0.1: "
+ADMIN: adminpw
+run 200ms
+expect ADMIN output contains "R1#"
+ADMIN: show users
+run 200ms
+expect ADMIN output contains "10.0.0.100 (ssh)"
+ADMIN: show ssh
+run 200ms
+ADMIN: show ip ssh
+run 200ms
+ADMIN: configure terminal
+run 200ms
+ADMIN: interface Loopback0
+run 200ms
+ADMIN: ip address 192.168.1.1 255.255.255.255
+run 200ms
+ADMIN: end
+run 200ms
+expect R1 output contains "%SYS-5-CONFIG_I: configuration changed from vty 0 (10.0.0.100)"
+ADMIN: exit
+run 1s
+expect ADMIN output contains "Session with 10.0.0.1 ended."
+R1: show users
+ADMIN: echo $?
+run 100ms
+# exec-Modus an R2: RSA-Host-Schlüssel, die Ausgabe, der Status
+ADMIN: ssh -o StrictHostKeyChecking=accept-new admin@10.0.0.2 show ip ssh
+run 1s
+ADMIN: adminpw
+run 1s
+expect ADMIN output contains "rsa-sha2-256, 1024 bits"
+ADMIN: cat ~/.ssh/known_hosts
+run 100ms
+# SRV1: Passwort, dann Schlüssel
+ADMIN: ssh-keygen -q -t ed25519
+run 100ms
+ADMIN: scp -o StrictHostKeyChecking=accept-new ~/.ssh/id_ed25519.pub root@10.0.0.10:/tmp/admin.pub
+run 1s
+ADMIN: geheim
+run 1s
+expect ADMIN output contains "id_ed25519.pub"
+SRV1: mkdir -p /root/.ssh
+SRV1: cat /tmp/admin.pub >> /root/.ssh/authorized_keys
+ADMIN: ssh root@10.0.0.10
+run 1s
+expect ADMIN output contains "root@SRV1:~# "
+ADMIN: who
+run 200ms
+expect ADMIN output contains "pts/0"
+ADMIN: exit 7
+run 1s
+ADMIN: echo $?
+run 100ms
+expect ADMIN output contains "7"
+ADMIN: ssh root@10.0.0.10 hostname
+run 1s
+expect ADMIN output contains "SRV1"
+# SNMPv3
+ADMIN: snmpget -v3 -u monitor -l authPriv -a SHA -A monitorauth -x AES -X monitorpriv 10.0.0.3 sysName.0
+run 1s
+expect ADMIN output contains "SNMPv2-MIB::sysName.0 = STRING: SW1"
+ADMIN: snmpset -v3 -u monitor -l authPriv -a SHA -A monitorauth -x AES -X monitorpriv 10.0.0.3 sysLocation.0 s Halle
+run 1s
+expect ADMIN output contains "SNMPv2-MIB::sysLocation.0 = STRING: Halle"
+ADMIN: snmpget -v3 -u leser -l authNoPriv -a SHA -A leserauth 10.0.0.3 sysLocation.0 ifNumber.0
+run 1s
+expect ADMIN output contains "IF-MIB::ifNumber.0 = No Such Object"
+ADMIN: snmpget -v3 -u leser -l authNoPriv -a SHA -A falschfalsch 10.0.0.3 sysName.0
+run 1s
+expect ADMIN output contains "the agent refused the signature"
+ADMIN: snmpget -v3 -u niemand 10.0.0.3 sysName.0
+run 1s
+expect ADMIN output contains "the agent knows no user 'niemand'"
+ADMIN: snmpget -v3 -u monitor -l authPriv -a SHA -A monitorauth -x AES -X monitorpriv 10.0.0.1 sysName.0
+run 2s
+expect ADMIN output contains "STRING: R1"
+ADMIN: snmpwalk -v3 -u monitor -l authPriv -a SHA -A monitorauth -x AES -X monitorpriv 10.0.0.10 system
+run 2s
+expect ADMIN output contains "STRING: SRV1"
+SW1: show snmp engineID
+SW1: show snmp user
+SW1: show snmp group
+# ein neuer Schlüssel auf SRV1
+SRV1: rm /etc/ssh/ssh_host_ed25519_key
+fault stop SRV1 sshd
+run 100ms
+heal all
+run 1s
+ADMIN: ssh root@10.0.0.10 hostname
+run 1s
+expect ADMIN output contains "Refused: the host key changed."
+ADMIN: echo $?
+run 100ms
+expect ADMIN output contains "255"

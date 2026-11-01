@@ -7,9 +7,18 @@
 //              snmp-server enable traps [snmp [authentication] [linkdown] [linkup] [coldstart]],
 //              their no-forms and "no snmp-server" (Action::Snmp, snmpd.rs); show snmp, show snmp
 //              community; debug snmp packets (D_SNMP: the agent's notes as console lines)
+//              SNMPv3: snmp-server engineID local HEX, snmp-server view NAME OID included|excluded,
+//              snmp-server group NAME v3 noauth|auth|priv [read VIEW] [write VIEW], snmp-server user
+//              NAME GROUP v3 [auth md5|sha|sha256|sha384|sha512 PASS [priv aes 128 PASS]], the same
+//              with "encrypted" and the localized keys in hexadecimal (that is how the running
+//              configuration writes a user: no password stands there; a changed engine ID
+//              leaves them wrong, as the keys belong to the engine); show snmp user, group,
+//              engineID, view
 //   Linux      snmpget, snmpgetnext, snmpwalk, snmpbulkwalk, snmpset [-v 1|2c] -c COMMUNITY
 //              [-r RETRIES] [-t SECONDS] [-On|-Oq|-Ov|-Os] [-Cr N] [-Cn N] AGENT [OID ...]
-//              (snmpset: OID TYPE VALUE ..., the types i u t a o s x d n and = for the MIB's)
+//              (snmpset: OID TYPE VALUE ..., the types i u t a o s x d n and = for the MIB's);
+//              version 3: -v 3 -u USER [-l noAuthNoPriv|authNoPriv|authPriv] [-a MD5|SHA|SHA-256|
+//              SHA-384|SHA-512] [-A PASS] [-x AES] [-X PASS] [-e ENGINE] [-Z BOOTS,TIME] [-n CONTEXT]
 //
 // The managers are console programs (services on the console, as dig): they send from an
 // ephemeral port, wait -t seconds (1) for the answer with the request's id, try -r more times (5)
@@ -21,6 +30,11 @@
 // GetBulk with -Cr repetitions (10).  The version is 2c unless -v says 1.  Help, usage and
 // error texts are our own words, so are the exceptions' texts (mib::show); the IOS-like show
 // output and the debug lines too.
+//
+// Version 3 of the managers (RFC 3414 4): without -e the discovery comes first, a request with an
+// empty engine ID and user whose Report names the engine ID, boots and time; then the keys are
+// localized and the request goes.  A signed usmStatsNotInTimeWindows gives the agent's clock and
+// the request goes once more; every other Report ends the tool with its own sentence.
 
 use alloc::boxed::Box;
 use alloc::format;
@@ -32,6 +46,7 @@ use base::cmdtree::{ModeId, Parsed, Tree};
 use netpkt::ber::{Oid, Value};
 use netpkt::mib::{self, Syntax};
 use netpkt::snmp::{self, Kind, Message, Pdu, VarBind, Version};
+use netpkt::snmpv3::{self as v3, AuthProto, Level, PrivProto, Scoped, ScopedPdu, Usm, V3};
 use netpkt::{IpAddr, Ipv4};
 
 use super::ios::K;
@@ -40,7 +55,7 @@ use crate::action::Action;
 use crate::kernel::{Engine, Ns, MS, SEC};
 use crate::os::{Metric, OsApi, Service, SvcEvent, ANY, ANY4};
 use crate::resolver::Family;
-use crate::snmpd::{notify_words, SnmpSet, TrapHost, N_ALL, N_AUTH, N_COLDSTART, N_LINKDOWN, N_LINKUP};
+use crate::snmpd::{notify_words, GroupRow, SnmpSet, TrapHost, UserKey, UsmUser, ViewRow, N_ALL, N_AUTH, N_COLDSTART, N_LINKDOWN, N_LINKUP};
 use crate::snmptrace::SNote;
 use crate::trace::Note;
 
@@ -106,9 +121,176 @@ pub(super) fn build_snmp(t: &mut Tree<K>, m: [ModeId; 3]) {
     for (w, _) in opts {
         t.also(conf, &format!("{} {}", base, w), base);
     }
+    // SNMPv3
+    for md in [user, prv] {
+        t.add(md, "show snmp user", "The users of SNMPv3 and their protocols", Some(K::ShowSnmpV3), 0);
+        t.add(md, "show snmp group", "The groups of SNMPv3 and their views", Some(K::ShowSnmpV3), 0);
+        t.add(md, "show snmp engineID", "The engine ID of this agent", Some(K::ShowSnmpV3), 0);
+        t.add(md, "show snmp view", "The views of SNMPv3", Some(K::ShowSnmpV3), 0);
+    }
+    a(t, "snmp-server engineID", "The engine ID of SNMPv3", None, base::cmdtree::F_NO);
+    a(t, "snmp-server engineID local", "Of this agent", None, 0);
+    a(t, "snmp-server engineID local WORD=eid", "5 to 32 bytes in hexadecimal", Some(K::SnmpEngine), 0);
+    t.add_no(conf, "snmp-server engineID local", K::SnmpEngine);
+    a(t, "snmp-server view", "A view: what a group may see", None, base::cmdtree::F_NO);
+    a(t, "snmp-server view WORD=view", "Its name", None, 0);
+    a(t, "snmp-server view WORD=view WORD=oid", "A subtree, by name or number", None, 0);
+    a(t, "snmp-server view WORD=view WORD=oid included=inc", "It belongs to the view", Some(K::SnmpView), 0);
+    a(t, "snmp-server view WORD=view WORD=oid excluded=inc", "It does not", Some(K::SnmpView), 0);
+    t.add_no(conf, "snmp-server view WORD=view", K::SnmpView);
+    t.add_no(conf, "snmp-server view WORD=view WORD=oid", K::SnmpView);
+    a(t, "snmp-server group", "A group: what its users may do", None, base::cmdtree::F_NO);
+    a(t, "snmp-server group WORD=group", "Its name", None, 0);
+    a(t, "snmp-server group WORD=group v3", "Version 3", None, 0);
+    for (lv, h) in [("noauth", "No proof of who asks"), ("auth", "Messages are signed"), ("priv", "Messages are signed and encrypted")] {
+        let g = format!("snmp-server group WORD=group v3 {}=lv", lv);
+        a(t, &g, h, Some(K::SnmpGroup), 0);
+        t.add_no(conf, &g, K::SnmpGroup);
+        a(t, &format!("{} read", g), "The view it may read (without: all)", None, 0);
+        a(t, &format!("{} read WORD=rv", g), "The view", Some(K::SnmpGroup), 0);
+        a(t, &format!("{} write", g), "The view it may change (without: nothing)", None, 0);
+        a(t, &format!("{} write WORD=wv", g), "The view", Some(K::SnmpGroup), 0);
+        a(t, &format!("{} read WORD=rv write", g), "The view it may change (without: nothing)", None, 0);
+        a(t, &format!("{} read WORD=rv write WORD=wv", g), "The view", Some(K::SnmpGroup), 0);
+    }
+    a(t, "snmp-server user", "A user of SNMPv3", None, base::cmdtree::F_NO);
+    a(t, "snmp-server user WORD=name", "The name", None, 0);
+    a(t, "snmp-server user WORD=name WORD=group", "The group", None, 0);
+    a(t, "snmp-server user WORD=name WORD=group v3", "Version 3, without keys", Some(K::SnmpUser), 0);
+    t.add_no(conf, "snmp-server user WORD=name WORD=group v3", K::SnmpUser);
+    let auths = [("md5", "HMAC-MD5-96"), ("sha", "HMAC-SHA-96"), ("sha256", "HMAC-SHA-192 of SHA-256"), ("sha384", "HMAC-SHA-256 of SHA-384"), ("sha512", "HMAC-SHA-384 of SHA-512")];
+    for pre in ["", " encrypted=enc"] {
+        let u = format!("snmp-server user WORD=name WORD=group v3{}", pre);
+        if !pre.is_empty() {
+            a(t, &u, "The keys below are localized already (in hexadecimal)", None, 0);
+        }
+        a(t, &format!("{} auth", u), "How messages are signed", None, 0);
+        for (w, h) in auths {
+            a(t, &format!("{} auth {}=ap", u, w), h, None, 0);
+            a(t, &format!("{} auth {}=ap WORD=apw", u, w), "The password (at least 8 characters)", Some(K::SnmpUser), 0);
+            a(t, &format!("{} auth {}=ap WORD=apw priv", u, w), "How messages are encrypted", None, 0);
+            a(t, &format!("{} auth {}=ap WORD=apw priv aes", u, w), "AES", None, 0);
+            a(t, &format!("{} auth {}=ap WORD=apw priv aes 128", u, w), "With a key of 128 bits", None, 0);
+            a(t, &format!("{} auth {}=ap WORD=apw priv aes 128 WORD=ppw", u, w), "The password (at least 8 characters)", Some(K::SnmpUser), 0);
+        }
+    }
 }
 
 impl Engine {
+    /// the commands of SNMPv3
+    pub(crate) fn ios_snmp_v3(&mut self, ni: usize, p: &Parsed<K>) -> Result<(), String> {
+        let dev = self.dev_of(ni);
+        let set = match p.cmd {
+            K::ShowSnmpV3 => {
+                let t = self.show_snmp_v3(ni, p);
+                self.out(ni, &t);
+                return Ok(());
+            }
+            K::SnmpEngine => {
+                if p.no {
+                    SnmpSet::EngineId(None)
+                } else {
+                    match v3::parse_engine_id(p.text("eid").unwrap_or("")) {
+                        Some(e) => SnmpSet::EngineId(Some(e)),
+                        None => return self.ios_err(ni, "% An engine ID has 5 to 32 bytes in hexadecimal\n"),
+                    }
+                }
+            }
+            K::SnmpView => {
+                let name = String::from(p.text("view").unwrap_or(""));
+                let oid = p.text("oid").map(mib::lookup);
+                if let Some(None) = oid {
+                    return self.ios_err(ni, "% No object of that name here (dotted numbers always work)\n");
+                }
+                let oid = oid.flatten();
+                if p.no {
+                    SnmpSet::NoView { name, oid }
+                } else {
+                    let Some(oid) = oid else {
+                        return Ok(());
+                    };
+                    SnmpSet::View(ViewRow { name, oid, included: p.text("inc") == Some("included") })
+                }
+            }
+            K::SnmpGroup => {
+                let name = String::from(p.text("group").unwrap_or(""));
+                let level = match p.text("lv") {
+                    Some("auth") => Level::AuthNoPriv,
+                    Some("priv") => Level::AuthPriv,
+                    _ => Level::NoAuthNoPriv,
+                };
+                if p.no {
+                    SnmpSet::NoGroup { name, level }
+                } else {
+                    SnmpSet::Group(GroupRow { name, level, read: p.text("rv").map(String::from), write: p.text("wv").map(String::from) })
+                }
+            }
+            _ => {
+                let name = String::from(p.text("name").unwrap_or(""));
+                if p.no {
+                    SnmpSet::NoUser { name }
+                } else {
+                    let group = String::from(p.text("group").unwrap_or(""));
+                    let enc = p.has("enc");
+                    let key = |e: &mut Engine, w: &str| -> Result<UserKey, String> {
+                        let text = p.text(w).unwrap_or("");
+                        if enc {
+                            return match crypto::unhex(text) {
+                                Some(b) if !b.is_empty() => Ok(UserKey::Localized(b)),
+                                _ => e.ios_err(ni, "% A localized key is hexadecimal\n").map(|_| UserKey::Localized(Vec::new())),
+                            };
+                        }
+                        if text.len() < 8 {
+                            return Err(e.ios_err(ni, "% A password needs at least 8 characters\n").err().unwrap_or_default());
+                        }
+                        Ok(UserKey::Password(String::from(text)))
+                    };
+                    let auth = match p.text("ap").and_then(AuthProto::parse) {
+                        Some(a) => Some((a, key(self, "apw")?)),
+                        None => None,
+                    };
+                    let privacy = if p.has("ppw") { Some((PrivProto::Aes128, key(self, "ppw")?)) } else { None };
+                    SnmpSet::User(UsmUser { name, group, auth, privacy })
+                }
+            }
+        };
+        match self.apply(Action::Snmp { dev, set }) {
+            Ok(()) => Ok(()),
+            Err(_) => self.ios_err(ni, "% SNMP is not possible on this device\n"),
+        }
+    }
+
+    // show snmp user, group, engineID, view (our own layout and words)
+    fn show_snmp_v3(&self, ni: usize, p: &Parsed<K>) -> String {
+        let dev = self.dev_of(ni);
+        let Some(a) = self.snmp_agent(dev) else {
+            return String::from("%SNMP agent not enabled\n");
+        };
+        let c = &a.cfg;
+        if !p.has("user") && !p.has("group") && !p.has("view") {
+            return format!("Engine ID of this agent: {}\nStarts so far: {}\n", v3::engine_id_text(&self.snmp_engine_id(ni, &c.engine_id)), a.boots);
+        }
+        if p.has("group") {
+            let mut s = String::from("Group             Level          Read view         Write view\n");
+            for g in &c.groups {
+                s.push_str(&format!("{:<17} {:<14} {:<17} {}\n", g.name, g.level.word(), g.read.as_deref().unwrap_or("(all)"), g.write.as_deref().unwrap_or("-")));
+            }
+            return s;
+        }
+        if p.has("view") {
+            let mut s = String::from("View              Subtree                       Kind\n");
+            for v in &c.views {
+                s.push_str(&format!("{:<17} {:<29} {}\n", v.name, format!("{}", v.oid), if v.included { "included" } else { "excluded" }));
+            }
+            return s;
+        }
+        let mut s = String::from("User              Group             Signed by  Encrypted by\n");
+        for u in &c.users {
+            s.push_str(&format!("{:<17} {:<17} {:<10} {}\n", u.name, u.group, u.auth.as_ref().map_or("-", |x| x.0.name()), u.privacy.as_ref().map_or("-", |x| x.0.name())));
+        }
+        s
+    }
+
     /// the commands of SNMP
     pub(crate) fn ios_snmp(&mut self, ni: usize, p: &Parsed<K>) -> Result<(), String> {
         let dev = self.dev_of(ni);
@@ -217,6 +399,49 @@ impl Engine {
             let ver = if h.version == Version::V2c { "version 2c " } else { "" };
             s.push_str(&format!("snmp-server host {} {}{}{}\n", h.addr, kind, ver, h.community));
         }
+        // SNMPv3: a user with the keys localized for this engine, no password
+        if let Some(e) = &c.engine_id {
+            s.push_str(&format!("snmp-server engineID local {}\n", v3::engine_id_text(e)));
+        }
+        for v in &c.views {
+            s.push_str(&format!("snmp-server view {} {} {}\n", v.name, v.oid, if v.included { "included" } else { "excluded" }));
+        }
+        for g in &c.groups {
+            let lv = match g.level {
+                Level::NoAuthNoPriv => "noauth",
+                Level::AuthNoPriv => "auth",
+                Level::AuthPriv => "priv",
+            };
+            s.push_str(&format!("snmp-server group {} v3 {}", g.name, lv));
+            if let Some(r) = &g.read {
+                s.push_str(&format!(" read {}", r));
+            }
+            if let Some(w) = &g.write {
+                s.push_str(&format!(" write {}", w));
+            }
+            s.push('\n');
+        }
+        for u in &c.users {
+            s.push_str(&format!("snmp-server user {} {} v3", u.name, u.group));
+            let hex = |k: &UserKey| match k {
+                UserKey::Localized(b) => crypto::hex(b),
+                UserKey::Password(p) => p.clone(),
+            };
+            if let Some((a, k)) = &u.auth {
+                let word = match a {
+                    AuthProto::Md5 => "md5",
+                    AuthProto::Sha1 => "sha",
+                    AuthProto::Sha256 => "sha256",
+                    AuthProto::Sha384 => "sha384",
+                    AuthProto::Sha512 => "sha512",
+                };
+                s.push_str(&format!(" encrypted auth {} {}", word, hex(k)));
+                if let Some((_, k)) = &u.privacy {
+                    s.push_str(&format!(" priv aes 128 {}", hex(k)));
+                }
+            }
+            s.push('\n');
+        }
         if !s.is_empty() {
             s.push_str("!\n");
         }
@@ -232,7 +457,8 @@ impl Engine {
         let c = &a.counters;
         let up = mib::ticks_text(crate::snmpmib::ticks(a.started, self.now));
         let up = up.split_once(") ").map_or(up.as_str(), |x| x.1);
-        let mut s = format!("SNMP agent of {} (versions 1 and 2c, UDP port {}), up for {}\n", self.host(ni), a.cfg.port, up);
+        let versions = if a.cfg.users.is_empty() { "versions 1 and 2c" } else { "versions 1, 2c and 3" };
+        let mut s = format!("SNMP agent of {} ({}, UDP port {}), up for {}\n", self.host(ni), versions, a.cfg.port, up);
         s.push_str(&format!("Contact:  {}\nLocation: {}\n", if a.cfg.contact.is_empty() { "-" } else { &a.cfg.contact }, if a.cfg.location.is_empty() { "-" } else { &a.cfg.location }));
         s.push_str(&format!("Received {} messages\n", c[1]));
         s.push_str(&format!("  {} with a version it does not speak, {} with an unknown community or from a sender kept out,\n", c[3], c[4]));
@@ -282,6 +508,8 @@ impl Engine {
             SNote::InformAcked { to, what } => format!("SNMP: {} acknowledged inform {}\n", to, what),
             SNote::InformLost { to, what } => format!("SNMP: inform {} to {} given up\n", what, to),
             SNote::NoRoute { to } => format!("SNMP: no route to receiver {}\n", to),
+            SNote::V3Request { from, kind, user, level, id, vars } => format!("SNMP: {} from {}, user {}, {}, id {}, {} binding{}\n", kind.name(), from, user, level.word(), id, vars, if *vars == 1 { "" } else { "s" }),
+            SNote::V3Report { to, what } => format!("SNMP: Report {} to {}\n", what, to),
             _ => String::new(),
         }
     }
@@ -318,6 +546,10 @@ impl Prog {
         let extra = if self == Prog::BulkWalk { " [-Cr N] [-Cn N]" } else { "" };
         format!("Usage: {} [-v 1|2c] -c COMMUNITY [-r RETRIES] [-t SECONDS] [-On|-Oq|-Ov|-Os]{} AGENT {}\n", self.name(), extra, what)
     }
+    // the same for version 3
+    fn usage3(self) -> String {
+        format!("Usage: {} -v 3 -u USER [-l LEVEL] [-a AUTH] [-A PASS] [-x AES] [-X PASS] [-e ENGINE] [-Z BOOTS,TIME] [-n CONTEXT] AGENT ...\n", self.name())
+    }
     fn help(self) -> String {
         let what = match self {
             Prog::Get => "asks the agent for the value of each object",
@@ -327,10 +559,15 @@ impl Prog {
             Prog::Set => "gives objects new values; TYPE is i (integer), u (unsigned), t (time ticks), a (IPv4 address), o (object identifier), s (text), x (hex bytes), d (decimal bytes), n (null) or = (the type the MIB names)",
         };
         let mut s = self.usage();
+        s.push_str(&self.usage3());
         s.push_str(&format!("  {}\n", what));
         s.push_str("  AGENT    an address or a name, :PORT after it (161), udp: or udp6: before it\n");
-        s.push_str("  -v       the version: 1 or 2c (2c when not given)\n");
+        s.push_str("  -v       the version: 1, 2c or 3 (2c when not given)\n");
         s.push_str("  -c       the community (no default)\n");
+        s.push_str("  -u, -l   version 3: the user and the level (noAuthNoPriv, authNoPriv, authPriv)\n");
+        s.push_str("  -a, -A   how messages are signed (MD5, SHA, SHA-256, SHA-384, SHA-512) and the password\n");
+        s.push_str("  -x, -X   how messages are encrypted (AES) and the password\n");
+        s.push_str("  -e, -Z   the agent's engine ID, its boots and time, instead of asking for them\n");
         s.push_str("  -r, -t   tries after the first (5) and seconds to wait for each (1)\n");
         s.push_str("  -On      names as numbers; -Oq without = and the type; -Ov values only; -Os without the MIB module\n");
         if self == Prog::BulkWalk {
@@ -370,6 +607,30 @@ impl Fmt {
     }
 }
 
+/// what version 3 of a manager needs
+#[derive(Clone, Debug, Default)]
+struct V3Tool {
+    user: String,
+    level: Option<Level>,
+    auth: Option<(AuthProto, String)>,
+    privacy: Option<(PrivProto, String)>,
+    context: String,
+    /// the authoritative engine: its ID, boots and time, when that was
+    engine: Vec<u8>,
+    boots: i32,
+    time: i32,
+    at: Ns,
+    /// the discovery is done (or -e said it)
+    known: bool,
+    kul: Vec<u8>,
+    kpriv: Vec<u8>,
+    msg_id: i32,
+    /// a request that waits for the discovery
+    pending: Option<(Kind, Vec<VarBind>)>,
+    /// tries after a Report about the time
+    again: u8,
+}
+
 /// a manager on the console: its requests one after the other to one agent
 #[derive(Clone, Debug)]
 pub struct SnmpTool {
@@ -399,6 +660,8 @@ pub struct SnmpTool {
     bytes: Vec<u8>,
     tries: u8,
     lookup: Option<u32>,
+    /// version 3
+    v3: Option<alloc::boxed::Box<V3Tool>>,
 }
 
 /// the agent of a command line: (host, port)
@@ -495,8 +758,11 @@ impl Engine {
             bytes: Vec::new(),
             tries: 0,
             lookup: None,
+            v3: None,
         };
         let mut community: Option<String> = None;
+        let mut x = V3Tool::default();
+        let mut times: Option<(i32, i32)> = None;
         let mut pos: Vec<&str> = Vec::new();
         let mut k = 0;
         // an option's value: glued to it ("-v2c") or the next word
@@ -522,11 +788,63 @@ impl Engine {
                 match flag {
                     "-v" => {
                         let v = value(&mut k, a, flag).unwrap_or_default();
-                        t.version = match Version::parse(&v) {
-                            Some(x) => x,
-                            None => return self.sh_err(ni, &format!("{}: version '{}' is none of 1 and 2c (SNMPv3 is not here)\n", name, v)),
+                        if v == "3" {
+                            t.v3 = Some(alloc::boxed::Box::new(V3Tool::default()));
+                        } else {
+                            t.version = match Version::parse(&v) {
+                                Some(x) => x,
+                                None => return self.sh_err(ni, &format!("{}: version '{}' is none of 1, 2c and 3\n", name, v)),
+                            };
+                        }
+                    }
+                    "-u" => x.user = value(&mut k, a, flag).unwrap_or_default(),
+                    "-l" => {
+                        let v = value(&mut k, a, flag).unwrap_or_default();
+                        x.level = match Level::parse(&v) {
+                            Some(l) => Some(l),
+                            None => return self.sh_err(ni, &format!("{}: '{}' is no level (noAuthNoPriv, authNoPriv, authPriv)\n", name, v)),
                         };
                     }
+                    "-a" => {
+                        let v = value(&mut k, a, flag).unwrap_or_default();
+                        match AuthProto::parse(&v) {
+                            Some(p) => x.auth = Some((p, x.auth.take().map_or_else(String::new, |o| o.1))),
+                            None => return self.sh_err(ni, &format!("{}: '{}' is no way to sign here (MD5, SHA, SHA-256, SHA-384, SHA-512)\n", name, v)),
+                        }
+                    }
+                    "-A" => {
+                        let v = value(&mut k, a, flag).unwrap_or_default();
+                        x.auth = Some((x.auth.take().map_or(AuthProto::Md5, |o| o.0), v));
+                    }
+                    "-x" => {
+                        let v = value(&mut k, a, flag).unwrap_or_default();
+                        match PrivProto::parse(&v) {
+                            Some(p) => x.privacy = Some((p, x.privacy.take().map_or_else(String::new, |o| o.1))),
+                            None => return self.sh_err(ni, &format!("{}: '{}' is no way to encrypt here (AES; DES is not here)\n", name, v)),
+                        }
+                    }
+                    "-X" => {
+                        let v = value(&mut k, a, flag).unwrap_or_default();
+                        x.privacy = Some((PrivProto::Aes128, v));
+                    }
+                    "-e" => {
+                        let v = value(&mut k, a, flag).unwrap_or_default();
+                        match v3::parse_engine_id(&v) {
+                            Some(e) => {
+                                x.engine = e;
+                                x.known = true;
+                            }
+                            None => return self.sh_err(ni, &format!("{}: '{}' is no engine ID\n", name, v)),
+                        }
+                    }
+                    "-Z" => {
+                        let v = value(&mut k, a, flag).unwrap_or_default();
+                        match v.split_once(',').and_then(|(b, t)| Some((b.parse().ok()?, t.parse().ok()?))) {
+                            Some(z) => times = Some(z),
+                            None => return self.sh_err(ni, &format!("{}: -Z wants BOOTS,TIME\n", name)),
+                        }
+                    }
+                    "-n" => x.context = value(&mut k, a, flag).unwrap_or_default(),
                     "-c" => community = value(&mut k, a, flag),
                     "-r" => match value(&mut k, a, flag).and_then(|v| v.parse::<u8>().ok()) {
                         Some(r) => t.retries = r.min(20),
@@ -571,10 +889,35 @@ impl Engine {
             pos.push(a);
             k += 1;
         }
-        let Some(c) = community.filter(|c| !c.is_empty()) else {
-            return self.sh_err(ni, &format!("{}: no community given (-c NAME)\n{}", name, prog.usage()));
-        };
-        t.community = c;
+        if t.v3.is_some() {
+            if x.user.is_empty() {
+                return self.sh_err(ni, &format!("{}: no user given (-u NAME)\n{}", name, prog.usage3()));
+            }
+            let level = x.level.unwrap_or(Level::NoAuthNoPriv);
+            x.level = Some(level);
+            if level >= Level::AuthNoPriv && !x.auth.as_ref().is_some_and(|a| a.1.len() >= 8) {
+                return self.sh_err(ni, &format!("{}: this level needs a password of at least 8 characters (-A)\n", name));
+            }
+            if level == Level::AuthPriv && !x.privacy.as_ref().is_some_and(|a| a.1.len() >= 8) {
+                return self.sh_err(ni, &format!("{}: this level needs a privacy password of at least 8 characters (-X)\n", name));
+            }
+            if level < Level::AuthPriv {
+                x.privacy = None;
+            }
+            if level == Level::NoAuthNoPriv {
+                x.auth = None;
+            }
+            if let Some((b, s)) = times {
+                x.boots = b;
+                x.time = s;
+            }
+            t.v3 = Some(alloc::boxed::Box::new(x));
+        } else {
+            let Some(c) = community.filter(|c| !c.is_empty()) else {
+                return self.sh_err(ni, &format!("{}: no community given (-c NAME)\n{}", name, prog.usage()));
+            };
+            t.community = c;
+        }
         let Some(&agent) = pos.first() else {
             return self.sh_err(ni, &format!("{}: no agent given\n{}", name, prog.usage()));
         };
@@ -682,12 +1025,191 @@ impl SnmpTool {
 
     /// a request with a new id
     fn ask(&mut self, os: &mut OsApi, kind: Kind, vbs: Vec<VarBind>) {
+        // version 3 asks who the agent is first
+        if self.v3.as_ref().is_some_and(|x| !x.known) {
+            self.discover(os, kind, vbs);
+            return;
+        }
         self.id = (os.rand() & 0x7FFF_FFFF) as i32;
         self.kind = kind;
         let pdu = if kind == Kind::GetBulk { Pdu::bulk(self.id, self.non_rep, self.max_rep, vbs) } else { Pdu::new(kind, self.id, vbs) };
-        self.bytes = Message::new(self.version, &self.community, pdu).to_bytes();
+        self.bytes = if self.v3.is_some() { self.seal_v3(os, pdu) } else { Message::new(self.version, &self.community, pdu).to_bytes() };
         self.tries = 0;
         self.send(os);
+    }
+
+    /// the discovery of RFC 3414 4: an empty engine ID and user
+    fn discover(&mut self, os: &mut OsApi, kind: Kind, vbs: Vec<VarBind>) {
+        let id = (os.rand() & 0x7FFF_FFFF) as i32;
+        self.id = (os.rand() & 0x7FFF_FFFF) as i32;
+        self.kind = Kind::Get;
+        let Some(x) = self.v3.as_mut() else {
+            return;
+        };
+        x.pending = Some((kind, vbs));
+        x.msg_id = id;
+        let m = V3 { id, max_size: v3::MAX_SIZE as i32, flags: v3::F_REPORTABLE, model: v3::MODEL_USM as i32, usm: Usm::default(), scoped: Scoped::Plain(ScopedPdu { context_engine: Vec::new(), context_name: Vec::new(), pdu: Pdu::new(Kind::Get, self.id, Vec::new()) }) };
+        self.bytes = m.to_bytes();
+        self.tries = 0;
+        self.send(os);
+    }
+
+    /// keys for the engine that is known now
+    fn keys_v3(&mut self) {
+        let Some(x) = self.v3.as_mut() else {
+            return;
+        };
+        if let Some((a, p)) = &x.auth {
+            x.kul = v3::localize(*a, &v3::password_to_key(*a, p.as_bytes()), &x.engine);
+            if let Some((_, q)) = &x.privacy {
+                x.kpriv = v3::priv_key(&v3::localize(*a, &v3::password_to_key(*a, q.as_bytes()), &x.engine));
+            }
+        }
+    }
+
+    /// a PDU as a message of version 3
+    fn seal_v3(&mut self, os: &mut OsApi, pdu: Pdu) -> Vec<u8> {
+        let id = (os.rand() & 0x7FFF_FFFF) as i32;
+        let salt = [os.rand().to_be_bytes(), os.rand().to_be_bytes()].concat();
+        let now = os.now();
+        let Some(x) = self.v3.as_mut() else {
+            return Vec::new();
+        };
+        if x.kul.is_empty() && x.auth.is_some() {
+            self.keys_v3();
+        }
+        let Some(x) = self.v3.as_mut() else {
+            return Vec::new();
+        };
+        x.msg_id = id;
+        let level = x.level.unwrap_or(Level::NoAuthNoPriv);
+        let time = x.time.saturating_add((now.saturating_sub(x.at) / SEC) as i32);
+        let scoped = ScopedPdu { context_engine: x.engine.clone(), context_name: Vec::from(x.context.as_bytes()), pdu };
+        let mut usm = Usm { engine_id: x.engine.clone(), boots: x.boots, time, user: Vec::from(x.user.as_bytes()), auth: Vec::new(), privacy: Vec::new() };
+        let body = if level == Level::AuthPriv {
+            usm.privacy = salt.clone();
+            Scoped::Encrypted(v3::encrypt(&x.kpriv, x.boots, time, &salt, &scoped.to_bytes()).unwrap_or_default())
+        } else {
+            Scoped::Plain(scoped)
+        };
+        if let Some((a, _)) = &x.auth {
+            usm.auth = alloc::vec![0u8; a.tag_len()];
+        }
+        let m = V3 { id, max_size: v3::MAX_SIZE as i32, flags: level.flags() | v3::F_REPORTABLE, model: v3::MODEL_USM as i32, usm, scoped: body };
+        let mut b = m.to_bytes();
+        if let Some((a, _)) = &x.auth {
+            v3::sign(&mut b, *a, &x.kul);
+        }
+        b
+    }
+
+    /// a message of version 3 from the agent
+    fn on_v3(&mut self, os: &mut OsApi, data: &[u8]) {
+        let Ok(m) = V3::parse(data) else {
+            return;
+        };
+        let Some(x) = self.v3.as_ref() else {
+            return;
+        };
+        if m.id != x.msg_id {
+            return;
+        }
+        // a signed message must be right; an encrypted one is opened
+        if m.flags & v3::F_AUTH != 0 {
+            let Some((a, _)) = &x.auth else {
+                return;
+            };
+            if !v3::check(data, *a, &x.kul) {
+                return;
+            }
+        }
+        let scoped = match &m.scoped {
+            Scoped::Plain(s) => s.clone(),
+            Scoped::Encrypted(e) => {
+                let plain = v3::decrypt(&x.kpriv, m.usm.boots, m.usm.time, &m.usm.privacy, e);
+                match plain.and_then(|p| ScopedPdu::parse(&p).ok()) {
+                    Some(s) => s,
+                    None => return,
+                }
+            }
+        };
+        match scoped.pdu.kind {
+            Kind::Report => self.on_report(os, &m, &scoped.pdu),
+            Kind::Response if scoped.pdu.request_id == self.id => self.answer(os, scoped.pdu),
+            _ => {}
+        }
+    }
+
+    /// a Report: the discovery's answer, the clock, or the end
+    fn on_report(&mut self, os: &mut OsApi, m: &V3, p: &Pdu) {
+        os.cancel(K_WAIT);
+        let Some(agent) = self.agent else {
+            return;
+        };
+        let counter = p.varbinds.first().map(|v| Vec::from(v.oid.arcs())).unwrap_or_default();
+        let now = os.now();
+        let name = self.name();
+        let Some(x) = self.v3.as_mut() else {
+            return;
+        };
+        if counter == v3::USM_STATS_UNKNOWN_ENGINE_IDS && !x.known {
+            x.engine = m.usm.engine_id.clone();
+            x.boots = m.usm.boots;
+            x.time = m.usm.time;
+            x.at = now;
+            x.known = true;
+            os.note(Note::Snmp(SNote::V3Discovered { from: agent, engine: v3::engine_id_text(&m.usm.engine_id) }));
+            self.keys_v3();
+            if let Some((kind, vbs)) = self.v3.as_mut().and_then(|x| x.pending.take()) {
+                self.ask(os, kind, vbs);
+            }
+            return;
+        }
+        if counter == v3::USM_STATS_NOT_IN_TIME_WINDOWS && x.again == 0 && m.flags & v3::F_AUTH != 0 {
+            x.again = 1;
+            x.boots = m.usm.boots;
+            x.time = m.usm.time;
+            x.at = now;
+            // the request once more, with the agent's clock
+            let last = Pdu::new(self.kind, self.id, self.last_vbs());
+            let pdu = if self.kind == Kind::GetBulk { Pdu::bulk(self.id, self.non_rep, self.max_rep, last.varbinds) } else { last };
+            self.bytes = self.seal_v3(os, pdu);
+            self.tries = 0;
+            self.send(os);
+            return;
+        }
+        let user = x.user.clone();
+        let level = x.level.unwrap_or(Level::NoAuthNoPriv).word();
+        let what = v3::report_name(&counter);
+        let text = if counter == v3::USM_STATS_UNKNOWN_USER_NAMES {
+            format!("{}: the agent knows no user '{}'\n", name, user)
+        } else if counter == v3::USM_STATS_WRONG_DIGESTS {
+            format!("{}: the agent refused the signature (wrong password or way to sign)\n", name)
+        } else if counter == v3::USM_STATS_UNSUPPORTED_SEC_LEVELS {
+            format!("{}: the agent does not take the level {} for user '{}'\n", name, level, user)
+        } else if counter == v3::USM_STATS_DECRYPTION_ERRORS {
+            format!("{}: the agent could not read the request (wrong privacy password)\n", name)
+        } else if counter == v3::USM_STATS_NOT_IN_TIME_WINDOWS {
+            format!("{}: the clocks do not fit: the agent says the request is out of its time\n", name)
+        } else if counter == v3::USM_STATS_UNKNOWN_ENGINE_IDS {
+            format!("{}: the agent has another engine ID\n", name)
+        } else if counter == v3::UNKNOWN_CONTEXTS {
+            format!("{}: the agent has no such context\n", name)
+        } else {
+            format!("{}: the agent answered with the report {}\n", name, what)
+        };
+        os.note(Note::Snmp(SNote::V3Refused { from: agent, what: String::from(what) }));
+        os.print(&text);
+        self.end(os, 1);
+    }
+
+    // the bindings of the request that runs
+    fn last_vbs(&self) -> Vec<VarBind> {
+        match self.prog {
+            Prog::Get | Prog::GetNext => self.oids.iter().map(|o| VarBind::null(o.clone())).collect(),
+            Prog::Set => self.sets.clone(),
+            Prog::Walk | Prog::BulkWalk => alloc::vec![VarBind::null(self.cur.clone().unwrap_or_else(|| self.root.clone()))],
+        }
     }
 
     /// sends the request (again)
@@ -826,6 +1348,10 @@ impl Service for SnmpTool {
                 }
             }
             SvcEvent::Udp(d) if d.dport == self.sock && Some(d.src) == self.agent && d.sport == self.port => {
+                if self.v3.is_some() {
+                    self.on_v3(os, &d.data);
+                    return;
+                }
                 let Ok(m) = Message::parse(&d.data) else { return };
                 let Some(p) = m.pdu() else { return };
                 if p.kind == Kind::Response && p.request_id == self.id && m.community == self.community.as_bytes() {

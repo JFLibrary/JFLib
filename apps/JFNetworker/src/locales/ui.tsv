@@ -1535,3 +1535,8 @@ zur Definition / Name umbenennen / formatieren	go to definition / rename a name 
 in der Datei suchen / ersetzen	find / replace in the file
 Seitenleiste / untere Leiste ein und aus	side bar / lower area on and off
 Strg+B / Strg+J	Ctrl+B / Ctrl+J
+SSH-Server	SSH server
+Stufe	Level
+Signatur	Signature
+Verschlüsselung	Encryption
+Agent und Benutzer ohne Leerzeichen angeben, Passwörter mit mindestens 8 Zeichen.	Give the agent and the user without spaces, passwords with at least 8 characters.

@@ -54,6 +54,8 @@
 // CPU time per second, the Dateimanager's copies and moves, the console's window, contrast).
 // sessiontest.rs: command-line sessions and the telnet servers (group sessions: jfn_sim::cli::ses,
 // telnetd, the vty parts of cli/aaa.rs and cli/ios.rs).
+// sshtest.rs: SSH (group ssh: jfn_sim::sshd, sshtrace, cli/ssh.rs).
+// snmpv3test.rs: SNMPv3 (group snmpv3: jfn_sim::snmpd's USM and VACM, cli/snmp.rs).
 // idetest.rs: what the IDE builds on (group ide: script services from files, jfs --test in
 // cli/jfstest.rs, doc/ide.rs's steps, the IDE's search in files).
 
@@ -137,11 +139,15 @@ mod scriptmodtest;
 mod desktoptest;
 #[path = "sessiontest.rs"]
 mod sessiontest;
+#[path = "sshtest.rs"]
+mod sshtest;
+#[path = "snmpv3test.rs"]
+mod snmpv3test;
 #[path = "idetest.rs"]
 mod idetest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 46] = [
+    let groups: [(&'static str, fn(&mut T)); 48] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -188,6 +194,8 @@ pub fn run() -> i32 {
         ("desk", desktoptest::run),
         ("sessions", sessiontest::run),
         ("ide", idetest::run),
+        ("ssh", sshtest::run),
+        ("snmpv3", snmpv3test::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

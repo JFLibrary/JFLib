@@ -253,6 +253,7 @@ impl Engine {
             n @ Note::Bgp(_) if d & super::D_BGP != 0 => text = self.bgp_debug(ni, n),
             // debug snmp packets (cli/snmp.rs)
             n @ Note::Snmp(_) if d & super::D_SNMP != 0 => text = self.snmp_debug(n),
+            n @ Note::Ssh(_) if d & super::D_SSH != 0 => text = self.ssh_debug(n),
             _ => {}
         }
         if text.is_empty() {
