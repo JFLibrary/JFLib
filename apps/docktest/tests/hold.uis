@@ -67,7 +67,7 @@ wait 320
 up
 click tab:"Ausgabe"
 expect window 501 closed
-# past the time the usual threshold of 4 DIP counts
+# past the time the usual threshold of 4 DIP counts, from where the pointer is then
 wait 600
 down 750,64
 wait 320
@@ -81,7 +81,8 @@ key esc
 expect button:"Links andocken" missing
 expect pixel 750 52 #F0F0F0
 up
-# movement before the time cancels nothing: it counts when the time is up, without another move
+# movement during the hold cancels nothing and never counts, however far it went: the time is
+# up here and nothing starts until the pointer leaves that place
 wait 600
 down tab:"Eigenschaften"
 wait 100
@@ -90,10 +91,68 @@ expect button:"Als Register" missing
 wait 199
 expect button:"Als Register" missing
 wait 1
+expect button:"Als Register" missing
+expect tab:"Eigenschaften" pressed
+expect pixel 750 52 #005FB8
+wait 300
+expect button:"Als Register" missing
+move 134,328
+expect button:"Als Register" missing
+move 135,328
 expect button:"Als Register" hover
 up
 expect text:"L: Dateien+Gliederung+[Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
 click button:"Zurücksetzen"
+# a slip of 10 DIP during the hold, a release at 400 ms without another move, still over the tab:
+# nothing moves, nothing floats, the release selects it
+wait 600
+down 125,64
+wait 100
+move 135,64
+wait 300
+expect button:"Links andocken" missing
+up
+expect window 501 closed
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+# the same slip off the tab and the strip: the tear-off this is all about; no drop, no click
+wait 600
+down 30,75
+wait 100
+move 30,85
+wait 300
+expect button:"Links andocken" missing
+up
+expect window 501 closed
+expect text:"L: Dateien+[Gliederung] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+click button:"Zurücksetzen"
+# a slip of 10 DIP during the hold, then a further 10 DIP after the time: 4 are not enough, then
+# the drag starts
+wait 600
+down 748,64
+wait 100
+move 758,64
+wait 200
+expect button:"Links andocken" missing
+move 762,64
+expect button:"Links andocken" missing
+move 768,64
+expect button:"Links andocken" exists
+move button:"Links andocken"
+up
+expect text:"L: [Dateien]+Gliederung, [Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
+click button:"Zurücksetzen"
+# ... on the empty part of a strip too
+wait 600
+down 840,64
+wait 100
+move 850,64
+wait 200
+expect button:"Links andocken" missing
+move 860,64
+expect button:"Links andocken" exists
+key esc
+up
+expect text:"L: [Dateien]+Gliederung | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
 # a hold of 320 ms, then a drag: it moves the tab, onto a marker, a strip, or out of the window
 drag tab:"Eigenschaften" 130,368 hold 320
 expect text:"L: [Dateien]+Gliederung, [Eigenschaften] | R: - | U: [Ausgabe], [Suche] | F: - | V: Verlauf" exists
@@ -163,34 +222,35 @@ key esc
 dblclick tab:"Gliederung"
 expect window 501 open
 expect text:"L: [Dateien] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: [Gliederung] | V: Verlauf" exists
-# a floating window's tab: quick nothing, Esc during the hold, a hold drags it back
+# a floating window's tab: quick nothing, Esc during the hold, a hold drags it back; the moves
+# are in that window, which holds the pointer (a `move` into another one would be an E_LEAVE)
 window any
 drag tab:"Gliederung" 930,312
 window main
 expect window 501 open
 expect text:"L: [Dateien] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: [Gliederung] | V: Verlauf" exists
-window any
+window 501
 down tab:"Gliederung"
 wait 320
 key esc
-move 930,312
+move 150,200
 window main
 expect button:"Rechts andocken" missing
-window any
+window 501
 up
 window main
 expect window 501 open
 expect text:"L: [Dateien] | R: [Eigenschaften] | U: [Ausgabe], [Suche] | F: [Gliederung] | V: Verlauf" exists
 # ... Esc during its drag
-window any
+window 501
 down tab:"Gliederung"
 wait 320
-move 930,312
+move 150,200
 window main
 expect button:"Rechts andocken" exists
 key esc
 expect button:"Rechts andocken" missing
-window any
+window 501
 up
 window main
 expect window 501 open

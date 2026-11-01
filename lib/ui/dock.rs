@@ -21,9 +21,10 @@
 // mirrored (RTL) window shows the left side at the right like everything else.
 // A press on a tab (or on the empty part of a tab strip: the whole group) can drag only after it
 // was held for DOCK_HOLD_MS: then the tab shows it (DOCK_TAB_HOLD, the move cursor; a timer gives
-// the pass while the pointer rests) and the usual threshold of EV_DRAG starts the drag.  Movement
-// before that cancels nothing and does not count until the time is up, a release before it is a
-// click.  Clicks, double clicks, the menu and the splitters need no hold.
+// the pass while the pointer rests), and the drag starts when the pointer moves past the usual
+// threshold from where it is at that moment.  Movement during the hold cancels nothing and never
+// counts (a slip or a tremor starts nothing), a release without a drag is a click if it is over
+// the tab.  Clicks, double clicks, the menu and the splitters need no hold.
 // A drag shows drop markers at the three edges of the area (a new group on that side) and on the
 // group under the pointer (as a tab, before, after it); a release over a tab strip inserts it
 // there; anywhere else -- also outside the window -- the panel floats in a tool window at the
@@ -792,6 +793,8 @@ pub(crate) struct Rt {
     drag: Option<Drag>,
     /// the window of a press held on a tab or a strip in the last pass (0: none or the main one)
     held_win: u32,
+    /// the press (window, widget, press_ms) whose hold is over, the pointer at that moment
+    hold_at: Option<((u32, u32, u32), [i32; 2])>,
     acts: Vec<Act>,
     wins: Vec<WinSlot>,
     /// groups (gkey) that had the keyboard focus in the last pass / this pass
@@ -1492,8 +1495,8 @@ impl Ui {
     }
 
     // the drag of a tab or a strip (widget wid, its events ev): held for DOCK_HOLD_MS, starts
-    // with EV_DRAG, follows the pointer, drops at the release -> true when the events belonged
-    // to the drag
+    // past the threshold from where the pointer was then, follows the pointer, drops at the
+    // release -> true when the events belonged to the drag
     #[allow(clippy::too_many_arguments)]
     fn dk_drag(&mut self, rt: &mut Rt, ev: u32, wid: u32, src: (u8, u32), panels: &[u32], active: u32, hdr: [i32; 4], size: [i32; 2]) -> bool {
         let win = self.uiw_cur;
@@ -1549,7 +1552,18 @@ impl Ui {
             return false;
         }
         plat::set_cursor(CUR_MOVE); // (the active widget keeps it until the release)
-        if ev & EV_DRAG == 0 {
+        // behave's threshold, but from the pointer at the end of the hold (EV_DRAG counts from
+        // the press): what it did during the hold starts nothing; (-1, -1) is outside the
+        // window (E_LEAVE), no place to measure from or to
+        let press = (win, wid, self.wp.ctx.press_ms);
+        let cur = [self.wp.ctx.mx, self.wp.ctx.my];
+        if cur == [-1, -1] {
+            return false;
+        }
+        let from = rt.hold_at.filter(|h| h.0 == press).map_or(cur, |h| h.1);
+        rt.hold_at = Some((press, from));
+        let lim = self.dp(4);
+        if cur[0].wrapping_sub(from[0]).wrapping_abs() <= lim && cur[1].wrapping_sub(from[1]).wrapping_abs() <= lim {
             return false;
         }
         let (mx, my) = self.mouse();

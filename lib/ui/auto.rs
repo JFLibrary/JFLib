@@ -13,7 +13,8 @@
 //   rclick S        dblclick S [shift|ctrl|alt]...
 //                   drag S1 S2 [steps] [hold MS] [shift|ctrl|alt|right|middle]...
 //                   drag ... hold MS   the button rests MS ms before the first move (like
-//                   `wait`: timers and animations run), the hold a dock tab asks for
+//                   `wait`: timers and animations run), the hold a dock tab asks for (its drag
+//                   counts from where the pointer is then, so the moves must leave that place)
 //                   drag ... pen|eraser P0 P1   (PN1) a pen stroke, pressure P0 -> P1 (%)
 //   pointer mouse | pen [P [TX TY]] | eraser [P [TX TY]] | touch   (PN1) pen data of the
 //                   following pointer events (touch: they are a finger, as in the next lines)

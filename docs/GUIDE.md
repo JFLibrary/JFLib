@@ -1814,9 +1814,10 @@ self.dock.focus(P_PROPS);
   group), can drag only after the button was held for `DOCK_HOLD_MS` (300 ms), so that a slip
   of the hand during a click neither moves nor floats a panel: from then on the tab shows it
   (the move cursor, `DOCK_TAB_HOLD` in the `sp.flags` of `StyleShell::dock_tab`; on a strip
-  every tab of the group) and the usual threshold starts the drag. Movement before that cancels
-  nothing and does not count until the time is up, a release before it is a click; clicks,
-  double clicks, the menu and the splitters need no hold. A drag shows drop markers at the
+  every tab of the group), and the drag starts when the pointer moves past the usual threshold
+  from where it is at that moment. Movement during the hold cancels nothing and never counts (a
+  slip or a tremor starts nothing), a release without a drag is a click if it is over the tab;
+  clicks, double clicks, the menu and the splitters need no hold. A drag shows drop markers at the
   three edges of the area and on the group under the pointer (as a tab, before, after); a
   release over a strip inserts the tab there, anywhere else -- also outside the window -- the
   panel floats in a tool window (`WF_TOOL`, window ids `ID + 1 .. ID + DOCK_FLOAT_MAX`, six at
@@ -1833,7 +1834,8 @@ self.dock.focus(P_PROPS);
   its markers; menus and markers name the sides as they show.
 * Tests: `apps/docktest` (`tests/layout.uis`, `drag.uis`, `hold.uis`, `float.uis`, `keys.uis`,
   `save.uis`, `load.uis`, `rtl.uis`, `shots.uis`). A plain `drag` lasts 128 ms and never gets
-  past the hold: `drag tab:"…" X,Y hold 320`, or `wait 320` between `down` and the first `move`.
+  past the hold: `drag tab:"…" X,Y hold 320`, or `wait 320` between `down` and the first `move`
+  (a `move` during the hold does not count towards the drag).
   A floating window is `window 501`, and `window any` + `drag tab:"…" X,Y hold 320` drags its
   tab onto a marker of the main window.
   PaintCraft keeps its own placement of floating palettes inside the main window
