@@ -3,21 +3,33 @@
 // (http.rs Agent), so DNS, TCP, the trace and the simulation mode see every request
 //
 //   Action::WebFetch { dev, req: WebReq }   a request: id (the window's own number), method, URL
-//                       (http only; a fragment is kept for the answer and not sent), headers
-//                       besides Host, User-Agent and Accept where not given, body.  The first one
-//                       makes the service.  Refused while the device is off (ActErr).
+//                       (http or https; a fragment is kept for the answer and not sent), headers
+//                       besides Host, User-Agent and Accept where not given, body; the browser's
+//                       cookies at that moment, who asks (SameSite), the certificates the user went on
+//                       with.  The first one makes the service.  Refused while the device is off
+//                       (ActErr).
 //   Action::WebCancel { dev, id }           gives a request up: its connection closes with it, no
 //                       report comes
 //   Report::Web { dev, id, at, result }     the outcome (driver.rs): WebResp (the final URL, status,
-//                       reason, headers, body, redirects followed, the time it took) or WebFail
-//                       (WebErr, the URL it stopped at, why as a Msg)
+//                       reason, headers, body, redirects followed, the time it took, every hop, what
+//                       TLS said) or WebFail (WebErr, the URL it stopped at, why as a Msg, the hops,
+//                       what TLS said)
 //   Engine::web_client(dev) -> WebClientView   the requests still running, what it counted
+//   Engine::service_status(dev, name)      a service's status line (Reiter Dienste, checks)
 //
 // Errors (WebErr): Refused (nobody listens on the port), Timeout (30 s per hop, DIAL included),
 // NoName (the resolver found nothing, or no name server answered), NoRoute (no route, the network
-// is down, ICMP unreachable), TooManyRedirects, Https (encrypted pages come with B4), BadUrl (no
-// http URL), Broken (the connection ended inside the answer, or the answer cannot be read),
+// is down, ICMP unreachable), TooManyRedirects, Cert (the server's certificate has faults: WebFail::tls
+// says which), Tls (the handshake ended otherwise: no TLS on that port, an alert), BadUrl (no http or
+// https URL), Broken (the connection ended inside the answer, or the answer cannot be read),
 // Stopped (the device or the service stopped under it).
+//
+// Cookies: the jar is the browser's window state; a request carries a snapshot of it (WebReq::jar, an
+// Arc: requests of one moment share it, and K1's recording holds it, so a replay sends the same).  Every
+// hop reads its Cookie header from the request's own copy at the device clock's time, and a Set-Cookie
+// of a redirect changes that copy for the next hop.  The hops come back in the report with their
+// Set-Cookie headers and the clock of their answers: the browser stores them in the real jar in that
+// order.  The engine keeps nothing of a jar after the report.
 //
 // Redirects (RFC 9110 15.4): 301, 302, 303, 307 and 308 with a Location are followed, resolved
 // against the URL they came from (netpkt::uri), at most MAX_REDIRECTS times: 301 and 302 turn a
@@ -32,18 +44,23 @@
 
 use alloc::boxed::Box;
 use alloc::collections::{BTreeMap, VecDeque};
+use alloc::format;
 use alloc::string::String;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::any::Any;
 
 use jfn_model::msg;
 use jfn_model::msg::Msg;
+use netpkt::cookie::{Asks, Jar, Origin};
 use netpkt::http::{Headers, Version};
+use netpkt::tls::{AL_BAD_CERTIFICATE, AL_CERTIFICATE_EXPIRED, AL_UNKNOWN_CA};
 use netpkt::uri::Uri;
 
 use crate::action::ActErr;
 use crate::driver::Report;
-use crate::http::{Agent, Done, Fail, Req, Url, UrlErr};
+pub use crate::http::TlsInfo;
+use crate::http::{Agent, Done, Fail, Req, TlsReq, Url, UrlErr};
 use crate::kernel::{Engine, Ns, SEC};
 use crate::os::{Ctl, Metric, OsApi, Service, SvcEvent};
 use crate::tcp::TcpEnd;
@@ -68,6 +85,32 @@ pub struct WebReq {
     pub url: String,
     pub headers: Headers,
     pub body: Vec<u8>,
+    /// the browser's cookies when it asked (None: none go with it)
+    pub jar: Option<Arc<Jar>>,
+    /// the site of the page that asks ("" : the user, by the address line)
+    pub site: String,
+    /// a navigation of the window (a link, a form); false: a picture, a sheet, a script's request
+    pub top: bool,
+    /// certificates the user went on with: SHA-256 of the leaf
+    pub accept: Vec<[u8; 32]>,
+}
+
+/// a hop of a request: what went and what came
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct WebHop {
+    pub method: String,
+    pub url: String,
+    /// the head as it went, Host first
+    pub sent: Headers,
+    /// 0: no answer came
+    pub status: u16,
+    pub reason: String,
+    pub headers: Headers,
+    /// the device clock when its answer came, in seconds since 1970 (what Max-Age counts from)
+    pub clock: i64,
+    /// from its start to its end
+    pub took: Ns,
+    pub tls: Option<TlsInfo>,
 }
 
 /// why a request brought no answer
@@ -78,7 +121,10 @@ pub enum WebErr {
     NoName,
     NoRoute,
     TooManyRedirects,
-    Https,
+    /// the server's certificate has faults (WebFail::tls)
+    Cert,
+    /// TLS ended otherwise
+    Tls,
     BadUrl,
     Broken,
     Stopped,
@@ -91,6 +137,10 @@ pub struct WebFail {
     /// the URL it stopped at (after the redirects)
     pub url: String,
     pub msg: Msg,
+    /// its hops, the one that failed last (status 0)
+    pub hops: Vec<WebHop>,
+    /// what TLS said on the last hop
+    pub tls: Option<TlsInfo>,
 }
 
 /// an answer
@@ -105,6 +155,10 @@ pub struct WebResp {
     pub redirects: u32,
     /// from the request to the last byte of the answer
     pub took: Ns,
+    /// its hops, the final one last
+    pub hops: Vec<WebHop>,
+    /// what TLS said on the last hop (None: no TLS)
+    pub tls: Option<TlsInfo>,
 }
 
 /// the service as the window asks about it
@@ -130,6 +184,16 @@ struct Job {
     body: Vec<u8>,
     hops: u32,
     start: Ns,
+    /// a copy of the browser's cookies: Set-Cookie on the way changes it
+    jar: Option<Arc<Jar>>,
+    site: String,
+    top: bool,
+    accept: Vec<[u8; 32]>,
+    /// the hops so far, and the head of the one on its way
+    done: Vec<WebHop>,
+    sent: Headers,
+    hop_start: Ns,
+    secure: bool,
 }
 
 /// the service of the Webbrowser (see the module header)
@@ -191,17 +255,18 @@ impl WebClient {
             self.requests += 1;
             let u = Uri::parse(q.url.trim()).encoded();
             let frag = u.fragment.clone();
-            let job = Job { id: q.id, method: q.method, url: u.text(), frag, headers: q.headers, body: q.body, hops: 0, start: os.now() };
+            let now = os.now();
+            let job = Job { id: q.id, method: q.method, url: u.text(), frag, headers: q.headers, body: q.body, hops: 0, start: now, jar: q.jar, site: q.site, top: q.top, accept: q.accept, done: Vec::new(), sent: Headers::new(), hop_start: now, secure: false };
             self.send(os, job);
         }
         self.pump(os);
     }
 
     /// a request goes to the Agent, when its URL is one for http
-    fn send(&mut self, os: &mut OsApi, job: Job) {
-        let url = match http_url(&job.url) {
+    fn send(&mut self, os: &mut OsApi, mut job: Job) {
+        let (url, secure) = match web_url(&job.url) {
             Ok(u) => u,
-            Err(e) => return self.fail(os, job, e),
+            Err(e) => return self.fail(os, job, e, None),
         };
         let mut h = Headers::new();
         h.add("User-Agent", USER_AGENT);
@@ -211,14 +276,40 @@ impl WebClient {
         for (k, v) in &job.headers.0 {
             h.set(k, v);
         }
+        if let Some(jar) = &job.jar {
+            let clock = os.clock().div_euclid(1_000_000_000);
+            let safe = job.method.eq_ignore_ascii_case("GET") || job.method.eq_ignore_ascii_case("HEAD");
+            let site = (!job.site.is_empty()).then_some(job.site.as_str());
+            let asks = Asks { host: &url.host, path: path_of(&url.target), secure, http: true, site, top: job.top, safe };
+            let c = jar.header(&asks, clock);
+            if !c.is_empty() {
+                h.set("Cookie", &c);
+            }
+        }
+        // the head as it goes, for the window's network log (the Agent puts Host first)
+        let mut sent = Headers::new();
+        sent.add("Host", &if secure { url.host_header_tls() } else { url.host_header() });
+        for (k, v) in &h.0 {
+            sent.add(k, v);
+        }
+        if !job.body.is_empty() || matches!(job.method.as_str(), "POST" | "PUT" | "PATCH") {
+            sent.add("Content-Length", &format!("{}", job.body.len()));
+        }
+        job.sent = sent;
+        job.secure = secure;
+        job.hop_start = os.now();
+        let tls = secure.then(|| TlsReq { insecure: false, accept: job.accept.clone() });
         let req = Req { method: job.method.clone(), url, version: Version::Http11, headers: h, body: job.body.clone(), timeout: TIMEOUT, connect_timeout: 0, reuse: true, keep_body: true };
-        let aid = self.agent.submit(os, req);
+        let aid = self.agent.submit_tls(os, req, tls);
         self.jobs.insert(aid, job);
     }
 
-    fn fail(&mut self, os: &mut OsApi, job: Job, e: (WebErr, Msg)) {
+    fn fail(&mut self, os: &mut OsApi, mut job: Job, e: (WebErr, Msg), tls: Option<TlsInfo>) {
         let id = job.id;
-        self.report(os, id, Err(WebFail { kind: e.0, url: job.url, msg: e.1 }));
+        let now = os.now();
+        let hop = WebHop { method: job.method.clone(), url: job.url.clone(), sent: core::mem::take(&mut job.sent), clock: os.clock().div_euclid(1_000_000_000), took: now.saturating_sub(job.hop_start), tls: tls.clone(), ..WebHop::default() };
+        job.done.push(hop);
+        self.report(os, id, Err(WebFail { kind: e.0, url: job.url, msg: e.1, hops: job.done, tls }));
     }
 
     /// the requests that finished (a failure can come at once from the Agent, so this runs until
@@ -241,14 +332,28 @@ impl WebClient {
             Ok(r) => r,
             Err(f) => {
                 let kind = kind_of(&f);
-                return self.fail(os, job, (kind, f.msg()));
+                return self.fail(os, job, (kind, f.msg()), d.tls);
             }
         };
         let status = r.head.status;
+        let clock = os.clock().div_euclid(1_000_000_000);
+        // what this hop sets counts for the next one
+        if let Some(jar) = job.jar.as_mut() {
+            let setting: Vec<&str> = r.head.headers.0.iter().filter(|(k, _)| k.eq_ignore_ascii_case("set-cookie")).map(|(_, v)| v.as_str()).collect();
+            if !setting.is_empty() {
+                let j = Arc::make_mut(jar);
+                let o = Origin { host: &d.url.host, path: path_of(&d.url.target), secure: job.secure, http: true };
+                for v in setting {
+                    let _ = j.store(v, o, clock);
+                }
+            }
+        }
+        let hop = WebHop { method: job.method.clone(), url: job.url.clone(), sent: core::mem::take(&mut job.sent), status, reason: r.head.reason.clone(), headers: r.head.headers.clone(), clock, took: d.end.saturating_sub(job.hop_start), tls: d.tls.clone() };
+        job.done.push(hop);
         let loc = if matches!(status, 301 | 302 | 303 | 307 | 308) { r.head.headers.get("location") } else { None };
         if let Some(l) = loc {
             if job.hops >= MAX_REDIRECTS {
-                return self.fail(os, job, (WebErr::TooManyRedirects, msg!("Nach {} Weiterleitungen kam noch eine: es bleibt dabei.", MAX_REDIRECTS)));
+                return self.fail(os, job, (WebErr::TooManyRedirects, msg!("Nach {} Weiterleitungen kam noch eine: es bleibt dabei.", MAX_REDIRECTS)), d.tls);
             }
             let t = Uri::parse(&job.url).join(l.trim()).encoded();
             if t.fragment.is_some() {
@@ -265,13 +370,14 @@ impl WebClient {
             os.note(Note::WebRedirect { status, to });
             return self.send(os, job);
         }
+        let base = d.url.text_web(job.secure);
         let url = match &job.frag {
-            Some(f) => alloc::format!("{}#{}", d.url.text(), f),
-            None => d.url.text(),
+            Some(f) => alloc::format!("{}#{}", base, f),
+            None => base,
         };
         let took = d.end.saturating_sub(job.start);
         let id = job.id;
-        self.report(os, id, Ok(WebResp { url, status, reason: r.head.reason, headers: r.head.headers, body: r.body, redirects: job.hops, took }));
+        self.report(os, id, Ok(WebResp { url, status, reason: r.head.reason, headers: r.head.headers, body: r.body, redirects: job.hops, took, hops: job.done, tls: d.tls }));
     }
 }
 
@@ -294,15 +400,21 @@ pub fn kind_of(f: &Fail) -> WebErr {
         Fail::Connect(TcpEnd::Refused) => WebErr::Refused,
         Fail::Connect(TcpEnd::Timeout) | Fail::Reset(TcpEnd::Timeout) => WebErr::Timeout,
         Fail::Connect(TcpEnd::Unreachable) | Fail::Reset(TcpEnd::Unreachable) => WebErr::NoRoute,
+        Fail::Tls { alert: AL_BAD_CERTIFICATE | AL_CERTIFICATE_EXPIRED | AL_UNKNOWN_CA, ours: true, .. } => WebErr::Cert,
+        Fail::Tls { .. } => WebErr::Tls,
         _ => WebErr::Broken,
     }
 }
 
-// the URL for the Agent, or why it is none
-fn http_url(s: &str) -> Result<Url, (WebErr, Msg)> {
-    Url::parse(s).map_err(|e| match e {
-        UrlErr::Scheme(x) if x.eq_ignore_ascii_case("https") => (WebErr::Https, msg!("Verschlüsselte Seiten (https) kommen mit einer späteren Ausbaustufe.")),
-        UrlErr::Scheme(x) => (WebErr::BadUrl, msg!("\u{201e}{}\u{201c}: nur http geht.", x)),
+// the path of a target, without its query
+fn path_of(target: &str) -> &str {
+    target.split('?').next().unwrap_or("/")
+}
+
+// the URL for the Agent and whether it is https, or why it is none
+fn web_url(s: &str) -> Result<(Url, bool), (WebErr, Msg)> {
+    Url::parse_web(s).map_err(|e| match e {
+        UrlErr::Scheme(x) => (WebErr::BadUrl, msg!("\u{201e}{}\u{201c}: nur http und https gehen.", x)),
         UrlErr::NoHost => (WebErr::BadUrl, msg!("Die URL nennt keinen Host.")),
         UrlErr::Port => (WebErr::BadUrl, msg!("Der Port der URL ist keine Zahl bis 65535.")),
         UrlErr::BadHost => (WebErr::BadUrl, msg!("Der Host der URL hat ungültige Zeichen.")),
@@ -329,11 +441,11 @@ impl Service for WebClient {
         // the window hears of what ran and what waited
         let m = msg!("Das Gerät oder der Dienst hat angehalten.");
         for job in core::mem::take(&mut self.jobs).into_values() {
-            self.fail(os, job, (WebErr::Stopped, m.clone()));
+            self.fail(os, job, (WebErr::Stopped, m.clone()), None);
         }
         for q in core::mem::take(&mut self.queue) {
             self.requests += 1;
-            self.report(os, q.id, Err(WebFail { kind: WebErr::Stopped, url: q.url, msg: m.clone() }));
+            self.report(os, q.id, Err(WebFail { kind: WebErr::Stopped, url: q.url, msg: m.clone(), hops: Vec::new(), tls: None }));
         }
         self.agent.reset();
     }
@@ -362,8 +474,10 @@ impl Service for WebClient {
         self
     }
     fn footprint(&self) -> usize {
-        let job = |j: &Job| j.url.len() + j.body.len() + 128;
-        512 + self.agent.held_bytes() + self.jobs.values().map(job).sum::<usize>() + self.queue.iter().map(|q| q.url.len() + q.body.len() + 128).sum::<usize>()
+        let jar = |j: &Option<Arc<Jar>>| j.as_ref().map_or(0, |x| x.bytes());
+        let hop = |h: &WebHop| h.url.len() + h.sent.0.len() * 64 + h.headers.0.len() * 64 + h.tls.as_ref().map_or(0, |t| t.chain.iter().map(|c| c.bytes()).sum::<usize>()) + 128;
+        let job = |j: &Job| j.url.len() + j.body.len() + 128 + jar(&j.jar) + j.done.iter().map(hop).sum::<usize>();
+        512 + self.agent.held_bytes() + self.jobs.values().map(job).sum::<usize>() + self.queue.iter().map(|q| q.url.len() + q.body.len() + 128 + jar(&q.jar)).sum::<usize>()
     }
 }
 
@@ -422,6 +536,12 @@ impl Engine {
         self.web_of(ni, id)?.cancels.push(req);
         self.web_wake(ni, id);
         Ok(())
+    }
+
+    /// a service's status line (None: no such service)
+    pub fn service_status(&self, dev: u32, name: &str) -> Option<String> {
+        let os = self.os(self.node_index(dev)?)?;
+        Some(os.svc(name)?.svc.as_ref()?.status())
     }
 
     /// the Webbrowser's service of a device (None: it never ran)

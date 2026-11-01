@@ -101,6 +101,9 @@ Add entries with `python build_rs.py changelog "What changed" --type added|chang
 - **eapm:** lib/eapm: EAP-MD5 and EAP-PWD as peer and server state machines without I/O
 - **ui:** The document view reports the element a click hit (`MdEv::click`, `MdDoc::element_at`), and `MdDoc::dom_size` the size of its tree
 - **script:** Several scripts in one VM with one scope of top-level names (`Vm::add_script`), as the <script> elements of a page
+- **netpkt:** Cookies as RFC 6265 reads them, without I/O and a clock (`netpkt::cookie`: `SetCookie::parse`, `parse_date`, `Jar`, SameSite from RFC 6265bis as far as a small browser needs it)
+- **netpkt:** TLS 1.3 without I/O and a clock (`netpkt::tls`: a `Core` for both sides, TLS_CHACHA20_POLY1305_SHA256, X25519, Ed25519, a seed gives the same bytes) and certificates of a private PKI (`netpkt::x509`); `decode` dissects TLS records
+- **ui:** Style sheets from outside for the document view: `MdDoc::sheet_links`, `MdDoc::set_sheet` (a text counts where its `<link>` stands), `MdDoc::style_of` (what the cascade gives an element)
 
 ### Changed
 

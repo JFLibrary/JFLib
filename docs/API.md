@@ -82,8 +82,8 @@ Not listed here: `simd` (the SSE2 / AVX2 kernel layer, see `README.md`, "SIMD ke
   <br>[lib.rs](#datastore-crate-root) · [journal.rs](#datastorejournalrs)
 - [netio](#netio) -- HTTP/1.1 server and client, TLS 1.3 subset, X.509 of a private CA, SSH-2, DNS
   <br>[lib.rs](#netio-crate-root) · [client.rs](#netioclientrs) · [der.rs](#netioderrs) · [dns.rs](#netiodnsrs) · [http.rs](#netiohttprs) · [pem.rs](#netiopemrs) · [roots.rs](#netiorootsrs) · [server.rs](#netioserverrs) · [smtp.rs](#netiosmtprs) · [ssh.rs](#netiosshrs) · [tls/mod.rs](#netiotlsmodrs) · [tls/conn.rs](#netiotlsconnrs) · [tls/keysched.rs](#netiotlskeyschedrs) · [tls/record.rs](#netiotlsrecordrs) · [trust.rs](#netiotrustrs) · [url.rs](#netiourlrs) · [x509.rs](#netiox509rs)
-- [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, EAP and IMAP without I/O, URI references, a dissector, pcapng
-  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs)
+- [netpkt](#netpkt) -- network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng
+  <br>[lib.rs](#netpkt-crate-root) · [addr.rs](#netpktaddrrs) · [arp.rs](#netpktarprs) · [checksum.rs](#netpktchecksumrs) · [decode.rs](#netpktdecoders) · [dhcp.rs](#netpktdhcprs) · [dns.rs](#netpktdnsrs) · [eth.rs](#netpktethrs) · [icmp.rs](#netpkticmprs) · [ipv4.rs](#netpktipv4rs) · [ipv6.rs](#netpktipv6rs) · [ntp.rs](#netpktntprs) · [pcapng.rs](#netpktpcapngrs) · [pkt.rs](#netpktpktrs) · [syslog.rs](#netpktsyslogrs) · [tcp.rs](#netpkttcprs) · [udp.rs](#netpktudprs) · [http.rs](#netpkthttprs) · [stp.rs](#netpktstprs) · [rip.rs](#netpktriprs) · [nat.rs](#netpktnatrs) · [icmpv6.rs](#netpkticmpv6rs) · [ospf.rs](#netpktospfrs) · [addrsel.rs](#netpktaddrselrs) · [eapol.rs](#netpkteapolrs) · [bgp.rs](#netpktbgprs) · [tftp.rs](#netpkttftprs) · [ftp.rs](#netpktftprs) · [smtp.rs](#netpktsmtprs) · [pop3.rs](#netpktpop3rs) · [imf.rs](#netpktimfrs) · [ber.rs](#netpktberrs) · [snmp.rs](#netpktsnmprs) · [mib.rs](#netpktmibrs) · [telnet.rs](#netpkttelnetrs) · [radius.rs](#netpktradiusrs) · [uri.rs](#netpkturirs) · [ssh.rs](#netpktsshrs) · [snmpv3.rs](#netpktsnmpv3rs) · [eap.rs](#netpkteaprs) · [imap.rs](#netpktimaprs) · [cookie.rs](#netpktcookiers) · [x509.rs](#netpktx509rs) · [tls.rs](#netpkttlsrs)
 - [eapm](#eapm) -- EAP-MD5 and EAP-PWD as peer and server state machines without I/O
   <br>[lib.rs](#eapm-crate-root)
 - [cas](#cas) -- content-addressed backup repositories: chunking, packs, signed encrypted snapshots, GC
@@ -1571,9 +1571,10 @@ rich_html -- RichDoc as HTML and back
                                    elements; one block element's paragraph read again
 
 Style sheets (the viewer's reader only; RichDoc::from_html takes the style attributes as
-before): the <style> elements of the tree (media screen / all, type text/css) in document
-order give rules -- selectors of md_dom.rs (tag, *, #id, .class, [attr], descendant and
-child) with declarations; comments, at-rules and rules whose selector is not in the subset
+before): the <style> elements of the tree (media screen / all, type text/css) and the
+<link rel="stylesheet"> elements whose text the app gave (MdDoc::set_sheet: a link reads
+nothing by itself) in document order give rules -- selectors of md_dom.rs (tag, *, #id,
+.class, [attr], descendant and child) with declarations; comments, at-rules and rules whose selector is not in the subset
 are left out.  An element's style is the cascade: the declarations of the rules that match
 by specificity and source order, its style attribute's, then the !important ones the same
 way (of each property the last).  The text's properties are inherited as the formats are
@@ -6896,6 +6897,17 @@ MF_BUTTON: u8 = 9
   (md_dom.rs; the view does it every frame) -> there were changes.  In place when every
   change lies inside block elements that show one paragraph of plain formatted text by
   themselves (O(those paragraphs)), else all of them (linear in the document).
+- **`fn sheet_links(&self) -> &[String]`**
+  the addresses the document's &lt;link rel="stylesheet"> elements name, as written, each once,
+  in document order (media other than screen / all left out); the view reads nothing by
+  itself: the app fetches them and answers with set_sheet
+- **`fn set_sheet(&mut self, href: &str, css: Option<&str>)`**
+  the text of a linked style sheet (None: it could not be had, its rules go): it counts where
+  its &lt;link> stands among the &lt;style> elements, from the next update on (a text for an
+  address no link names is kept for a link that comes later)
+- **`fn style_of(&self, n: MdNode) -> String`**
+  what the cascade gives an element ("property:value;" of the rules that match and its style
+  attribute, inherited properties not among them); empty for none, Markdown or a gone node
 - **`fn boxes(&self) -> &[MdBox]`**
   the boxes of CSS (MdBlock::boxes)
 - **`fn field_of(&self, n: MdNode) -> Option<usize>`**
@@ -34939,7 +34951,7 @@ KU_CRL_SIGN: u8 = 0x02
 
 ## netpkt
 
-*network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, EAP and IMAP without I/O, URI references, a dissector, pcapng* -- crate root [`lib/netpkt/lib.rs`](../lib/netpkt/lib.rs)
+*network packets byte for byte: addresses, checksums, Ethernet to TCP codecs, DHCP, DNS, NTP, syslog, SNMP, SSH, TLS 1.3, EAP and IMAP without I/O, X.509, cookies, URI references, a dissector, pcapng* -- crate root [`lib/netpkt/lib.rs`](../lib/netpkt/lib.rs)
 
 ```text
 netpkt -- network packets byte for byte: addresses, checksums, header codecs, a dissector
@@ -35034,6 +35046,14 @@ on every target (simulators, packet tools, tests).
             for one line about a packet                            (RFC 3748, 1994, 5931)
   imap      Line and LineReader (tags, literals), Command, Response, Item, SeqSet, FetchItem,
             SearchKey, envelope, internal_date, the parts of a message  (RFC 9051, 3501)
+  cookie    SetCookie::parse, parse_date, domain_match, path_match, default_path, site_of; Jar:
+            store, header, matching, script_text, purge, drop_session; SameSite as far as a small
+            browser needs it; the time comes from the caller          (RFC 6265, 6265bis)
+  x509      certificates of a private PKI (Ed25519): CertSpec::sign, Cert::parse, names, fingerprint,
+            signed_by, check_chain with F_* faults; no clock; uses crate crypto  (RFC 5280, 8410)
+  tls       TLS 1.3 without I/O: Core for a client or a server (push bytes, take_out bytes, read,
+            send, take_events), TLS_CHACHA20_POLY1305_SHA256, X25519, Ed25519; the key schedule,
+            the names of the protocol's numbers, dissect; uses crate crypto  (RFC 8446)
 
 Views (XxxView::parse) check lengths once and then read fields without copying; records
 (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -35384,6 +35404,10 @@ SSH (TCP port 22) shows the identification line and, while the connection is in 
 packet with its length, padding and message name, the lists of a KEXINIT and the values of the
 key exchange; everything after NEWKEYS is one field with the value "verschlüsselt" (a German
 word on purpose: it is what the inspector's reader needs to see, no protocol term) (ssh.rs).
+TLS (TCP ports 443 and 8443) shows every record a segment holds with its type, version and length;
+what goes in the clear field by field (ClientHello and ServerHello with their random, session id,
+suites and extensions, an alert in the clear); everything protected is one field with the value
+"verschlüsselt" (tls.rs).  Only what a capture tool can see without keys is here.
 HTTP (ports 80, 8080, 8000, and any TCP segment that starts like a request or a response)
 shows the start line, the header lines and the body bytes of every message the segment
 holds; a segment in the middle of a message is a "Continuation".
@@ -41554,6 +41578,469 @@ RECENT: &str = "\\Recent"
 - **`fn header_fields(data: &[u8], names: &[String], not: bool) -> Vec<u8>`**
   the fields of the header with these names (not: all others), each with its continuation lines,
   and the empty line
+
+### `netpkt/cookie.rs`
+
+Source: [`lib/netpkt/cookie.rs`](../lib/netpkt/cookie.rs)
+
+```text
+cookie -- HTTP cookies as RFC 6265 reads them: what a Set-Cookie header says, what a user agent
+stores and what its Cookie header sends.  No I/O and no clock: the caller passes the time in, in
+seconds since 1970, so a jar on a simulated clock works like one on a real one
+
+  SetCookie::parse(text)         the header's value (5.2): name, value and the attributes, what
+                                 cannot be read left out; None without a name-value pair
+  parse_date(text)               the tolerant date of an Expires attribute (5.1.1)
+  domain_match(host, domain)     5.1.3; path_match(request, cookie) 5.1.4; default_path(path) 5.1.4
+  canonical_host(host)           lower case, without the dot at the end (5.1.2, no IDNA here)
+  site_of(host)                  what "same site" compares: an address itself, else the last two
+                                 labels of the name (no public suffix list)
+  Origin                         who stores: host, path, secure (https), http (false: a script)
+  Asks                           who reads: host, path, secure, http, the site that asks (None:
+                                 the user), a top-level navigation, a safe method
+  Cookie                         a stored cookie: name, value, domain, host_only, path, expires
+                                 (None: until the session ends), secure, http_only, same_site
+  Jar                            store(text, origin, now) -> Result<(), Refused> (5.3),
+                                 header(asks, now) -> String (5.4: longer paths first, then the
+                                 older ones; "" for none), cookies() in order of creation,
+                                 matching(asks, now) -> the same ones as Cookies, script_text(..),
+                                 purge(now), drop_session(), remove(name, domain, path), clear(),
+                                 bytes()
+
+From RFC 6265bis, as far as a small browser needs it: SameSite (Strict is sent only within the
+site, Lax and no attribute also on a top-level navigation with a safe method, None always but
+only with Secure), a page without https cannot set Secure nor overwrite a Secure cookie, name and
+value together hold at most MAX_COOKIE bytes.  Without a public suffix list a Domain without a dot
+counts as a public suffix (5.3 step 5): the same name as the host makes a host-only cookie, any
+other is refused.  A jar holds at most MAX_PER_DOMAIN cookies of a domain and MAX_COOKIES in all;
+beyond that the oldest go.
+```
+
+```rust
+/// bytes of a cookie's name and value together at most (RFC 6265bis 5.6)
+MAX_COOKIE: usize = 4096
+/// cookies of a domain at most (RFC 6265 6.1 asks for at least 50)
+MAX_PER_DOMAIN: usize = 50
+/// cookies of a jar at most
+MAX_COOKIES: usize = 500
+```
+
+- **`enum SameSite`**
+  the SameSite attribute
+  - `Unset` -- none given (reads as Lax)
+  - `Strict`
+  - `Lax`
+  - `None`
+
+**`impl SameSite`**
+
+- **`fn name(self) -> &'static str`**
+  as a header writes it ("" for none)
+
+- **`struct SetCookie`**
+  what a Set-Cookie header says (see the module header)
+  - `name: String`
+  - `value: String`
+  - `domain: Option<String>` -- in lower case without a leading dot
+  - `path: Option<String>` -- only one that starts with "/"
+  - `expires: Option<i64>` -- seconds since 1970
+  - `max_age: Option<i64>` -- seconds from now; &lt;= 0 means at once
+  - `secure: bool`
+  - `http_only: bool`
+  - `same_site: SameSite`
+
+**`impl SetCookie`**
+
+- **`fn parse(text: &str) -> Option<SetCookie>`**
+  a header's value (RFC 6265 5.2); None: no "name=value" with a name (the user agent ignores
+  the whole header)
+
+- **`fn parse_date(text: &str) -> Option<i64>`**
+  the date of an Expires attribute (RFC 6265 5.1.1) -> seconds since 1970; None: not one
+
+- **`fn canonical_host(host: &str) -> String`**
+  a host name in lower case, without the dot at the end
+
+- **`fn domain_match(host: &str, domain: &str) -> bool`**
+  a host matches a domain (RFC 6265 5.1.3): the same, or a name that ends in ".domain"; an address
+  matches only itself
+
+- **`fn path_match(path: &str, cookie: &str) -> bool`**
+  a request's path matches a cookie's (RFC 6265 5.1.4)
+
+- **`fn default_path(path: &str) -> String`**
+  the path a cookie without one gets from its request's (RFC 6265 5.1.4)
+
+- **`fn site_of(host: &str) -> String`**
+  what "same site" compares: an address itself, else the last two labels of the name
+
+- **`struct Cookie`**
+  a stored cookie
+  - `name: String`
+  - `value: String`
+  - `domain: String`
+  - `host_only: bool` -- only the very host gets it (no Domain attribute)
+  - `path: String`
+  - `expires: Option<i64>` -- seconds since 1970; None: until the session ends
+  - `secure: bool`
+  - `http_only: bool`
+  - `same_site: SameSite`
+  - `order: u64` -- its place among the cookies: the older first (5.4), the oldest go first
+
+**`impl Cookie`**
+
+- **`fn expired(&self, now: i64) -> bool`**
+
+- **`struct Origin<'a>`**
+  who stores a cookie
+  - `host: &'a str`
+  - `path: &'a str`
+  - `secure: bool` -- the request went over https
+  - `http: bool` -- a Set-Cookie header; false: a script of the page
+
+- **`struct Asks<'a>`**
+  who reads the cookies
+  - `host: &'a str`
+  - `path: &'a str`
+  - `secure: bool`
+  - `http: bool` -- a request; false: a script of the page
+  - `site: Option<&'a str>` -- the site of the page that asks (None: the user, by the address line or a reload)
+  - `top: bool` -- a navigation of the window (a link, a form); false: an image, a sheet, a script's request
+  - `safe: bool` -- GET or HEAD
+
+- **`enum Refused`**
+  why a jar does not take a cookie
+  - `Syntax` -- no "name=value" with a name
+  - `TooLarge` -- name and value hold more than MAX_COOKIE bytes
+  - `Domain` -- the Domain does not fit the host, or is a public suffix
+  - `HttpOnly` -- a script may not set HttpOnly nor overwrite such a cookie
+  - `Secure` -- Secure from a page without https, or overwriting a Secure cookie from there
+  - `SameSiteNone` -- SameSite=None without Secure
+
+- **`struct Jar`**
+  the cookies of a browser (see the module header)
+
+**`impl Jar`**
+
+- **`fn new() -> Jar`**
+- **`fn cookies(&self) -> &[Cookie]`**
+  all of them in order of creation, expired ones too until purge
+- **`fn is_empty(&self) -> bool`**
+- **`fn bytes(&self) -> usize`**
+  the bytes its texts hold (an estimate for a budget)
+- **`fn store(&mut self, text: &str, o: Origin, now: i64) -> Result<(), Refused>`**
+  a Set-Cookie value (RFC 6265 5.3) at time `now`
+- **`fn store_parsed(&mut self, c: SetCookie, o: Origin, now: i64) -> Result<(), Refused>`**
+  the same with what the header says, read already
+- **`fn matching(&self, a: &Asks, now: i64) -> Vec<&Cookie>`**
+  the cookies of a request or a script (RFC 6265 5.4): longer paths first, then the older
+- **`fn header(&self, a: &Asks, now: i64) -> String`**
+  the value of a Cookie header ("" for none)
+- **`fn script_text(&self, host: &str, path: &str, secure: bool, now: i64) -> String`**
+  what a script of the page at this address reads (no HttpOnly cookies)
+- **`fn purge(&mut self, now: i64)`**
+  the expired ones go
+- **`fn drop_session(&mut self)`**
+  the browser ends: what lasts only for the session goes
+- **`fn remove(&mut self, name: &str, domain: &str, path: &str) -> bool`**
+  one cookie goes -> there was one
+- **`fn clear(&mut self)`**
+
+### `netpkt/x509.rs`
+
+Source: [`lib/netpkt/x509.rs`](../lib/netpkt/x509.rs)
+
+```text
+x509 -- certificates of a small private PKI without I/O and without a clock (RFC 5280; Ed25519,
+RFC 8410): written and read as DER and checked against anchors at a time the caller passes in.
+netio::x509 is the other X.509 of the library, with the web's RSA and ECDSA keys, on a crate that
+needs plat
+
+  CertSpec { serial, cn, org, not_before, not_after, public_key, is_ca, dns, ips }
+  spec.sign(issuer: Option<&Cert>, key) -> DER      issuer None: self-signed with its own name
+  Cert::parse(der) -> Option<Cert>                  subject and issuer (common name, organization),
+                                                    validity, the Ed25519 key, the CA flag, names;
+                                                    other keys parse with key None (they verify nothing)
+  cert.names(host)                                  a DNS name (case-insensitive, one wildcard
+                                                    label) or an address of its alternative names
+  cert.fingerprint() / fingerprint_text()           SHA-256 of the DER; in hex with colons
+  cert.signed_by(&issuer), cert.self_signed()       the signature checks out
+  check_chain(&[leaf, ...], anchors, host, now) -> faults   what is wrong with it: F_* bits, 0 for
+                                                    nothing
+
+Not here: revocation, name constraints, key usage checks beyond the CA flag, certificate policies.
+```
+
+```rust
+/// the time of a certificate has passed
+F_EXPIRED: u32 = 1 << 0
+/// its time has not come yet
+F_NOT_YET: u32 = 1 << 1
+/// the name asked for is not among its names
+F_NAME: u32 = 1 << 2
+/// signed by itself, and not an anchor
+F_SELF_SIGNED: u32 = 1 << 3
+/// no path to an anchor
+F_UNKNOWN_ISSUER: u32 = 1 << 4
+/// a signature that does not check out, or a key this code cannot read
+F_BAD_SIGNATURE: u32 = 1 << 5
+```
+
+- **`struct CertSpec`**
+  what a new certificate says
+  - `serial: [u8; 16]`
+  - `cn: String`
+  - `org: String`
+  - `not_before: i64` -- seconds since 1970
+  - `not_after: i64`
+  - `public_key: [u8; 32]`
+  - `is_ca: bool`
+  - `dns: Vec<String>`
+  - `ips: Vec<IpAddr>`
+
+**`impl CertSpec`**
+
+- **`fn sign(&self, issuer: Option<&Cert>, key: &Keypair) -> Vec<u8>`**
+  the DER certificate, signed by `key`; `issuer`: the certificate that issues it (None:
+  self-signed with its own name)
+
+- **`struct Cert`**
+  a certificate as this code reads it
+  - `der: Vec<u8>`
+  - `serial: Vec<u8>`
+  - `subject_cn: String`
+  - `subject_org: String`
+  - `issuer_cn: String`
+  - `issuer_org: String`
+  - `not_before: i64` -- seconds since 1970
+  - `not_after: i64`
+  - `key: Option<[u8; 32]>` -- its Ed25519 key (None: another kind of key)
+  - `is_ca: bool`
+  - `dns: Vec<String>`
+  - `ips: Vec<IpAddr>`
+
+**`impl Cert`**
+
+- **`fn parse(bytes: &[u8]) -> Option<Cert>`**
+  a certificate from DER; None: not one (or trailing bytes, or a version before v3)
+- **`fn fingerprint(&self) -> [u8; 32]`**
+  SHA-256 of the DER
+- **`fn fingerprint_text(&self) -> String`**
+  the fingerprint in hex with colons, as certificate dialogs write it
+- **`fn signed_by(&self, issuer: &Cert) -> bool`**
+  issuer's key made the signature (and the names fit)
+- **`fn self_signed(&self) -> bool`**
+  it says it issued itself, and the signature checks out
+- **`fn names(&self, host: &str) -> bool`**
+  it names this host: a DNS name (one wildcard label at the left), or an address; only its
+  alternative names count (RFC 9110 4.3.4), the common name does not
+- **`fn name_list(&self) -> Vec<String>`**
+  what the names are, for a dialog
+- **`fn bytes(&self) -> usize`**
+  bytes it holds (an estimate for a budget)
+
+- **`fn check_chain(chain: &[Cert], anchors: &[Cert], host: &str, now: i64) -> u32`**
+  what is wrong with a chain (leaf first) for this host at this time: F_\* bits, 0 for nothing
+
+### `netpkt/tls.rs`
+
+Source: [`lib/netpkt/tls.rs`](../lib/netpkt/tls.rs)
+
+```text
+tls -- TLS 1.3 without I/O (RFC 8446): a core for both sides of a connection: feed it the bytes
+that came, take the bytes to send, the plain text and the events; no sockets, no clock.  Random
+bytes come from a seed the caller passes in, so a connection is the same byte for byte for the same
+seed.  The records and the handshake are the real thing, a peer of another make understands them
+(apps/coretest group tlscore talks to netio::tls, tools/tls_interop.py --core to OpenSSL)
+
+  PORT                     443
+  CT_*, HS_*, AL_*, EXT_*  content types, handshake types, alerts, extensions; ct_name(t),
+                           hs_name(t), alert_name(a), ext_name(e), suite_name(s), group_name(g),
+                           sig_name(s)
+  SUITE, VERSION           the one suite, the version's name
+  Identity { chain, key }  a certificate chain (DER, leaf first) and the leaf's Ed25519 key
+  ClientCfg { name, anchors, now, insecure, accept }   the name asked for (also the SNI, unless an
+                           address), what the client trusts, the time for the check; insecure takes
+                           any certificate, accept these fingerprints (SHA-256 of the leaf) whatever
+                           their faults
+  Core::client(cfg, seed) / Core::server(identity, seed)
+    push(bytes)            what the connection brought (any split)
+    take_out()             the bytes to send
+    take_events()          what happened (Event)
+    read() -> bytes        the plain text that came and was not read yet
+    send(bytes)            plain text, in records of at most MAX_PLAIN bytes (after Established)
+    close()                close_notify; dead(): nothing more will come or go
+    established(), peer_closed(), name() (the SNI a client sent), peer_certs(), faults()
+    (x509 F_* bits of the server's chain), excused() (it has faults and went on all the same),
+    failure(), footprint()
+  Event                    Hello { name }, Certificate { faults }, Established, PeerClosed, Failed(Failure)
+  Failure { alert, ours, why }   the alert that ended it, whether we sent it, a word for the log
+  schedule(ecdhe) -> (handshake, master), derive(secret, label, hash), expand_label, finished,
+  traffic_keys             the key schedule (7.1, 7.3, 4.4.4)
+  Part, dissect(segment)   what a dissector sees in a TCP segment: records with their type,
+                           version and length, or bytes that do not start a record
+
+What it speaks: TLS_CHACHA20_POLY1305_SHA256, X25519 and Ed25519 signatures and certificates
+(x509.rs); ClientHello, ServerHello, EncryptedExtensions, Certificate, CertificateVerify, Finished,
+KeyUpdate received, alerts.  Not here: HelloRetryRequest (a client without an X25519 share gets
+handshake_failure), client certificates, resumption and 0-RTT, the other suites (netio::tls has a
+wider client), the middlebox-compatibility ChangeCipherSpec (one received is ignored).  A client
+checks the chain itself; a fault ends the handshake with the alert for it unless the configuration
+excuses it.  The CertificateVerify signature and both Finished are checked always.
+```
+
+```rust
+/// the well-known port of HTTP over TLS
+PORT: u16 = 443
+/// the one cipher suite
+SUITE: u16 = 0x1303
+/// the version as a dialog names it
+VERSION: &str = "TLS 1.3"
+CT_CCS: u8 = 20
+CT_ALERT: u8 = 21
+CT_HANDSHAKE: u8 = 22
+CT_DATA: u8 = 23
+HS_CLIENT_HELLO: u8 = 1
+HS_SERVER_HELLO: u8 = 2
+HS_NEW_SESSION_TICKET: u8 = 4
+HS_ENCRYPTED_EXTENSIONS: u8 = 8
+HS_CERTIFICATE: u8 = 11
+HS_CERTIFICATE_VERIFY: u8 = 15
+HS_FINISHED: u8 = 20
+HS_KEY_UPDATE: u8 = 24
+AL_CLOSE_NOTIFY: u8 = 0
+AL_UNEXPECTED_MESSAGE: u8 = 10
+AL_BAD_RECORD_MAC: u8 = 20
+AL_RECORD_OVERFLOW: u8 = 22
+AL_HANDSHAKE_FAILURE: u8 = 40
+AL_BAD_CERTIFICATE: u8 = 42
+AL_CERTIFICATE_EXPIRED: u8 = 45
+AL_ILLEGAL_PARAMETER: u8 = 47
+AL_UNKNOWN_CA: u8 = 48
+AL_DECODE_ERROR: u8 = 50
+AL_DECRYPT_ERROR: u8 = 51
+AL_PROTOCOL_VERSION: u8 = 70
+AL_INTERNAL_ERROR: u8 = 80
+AL_MISSING_EXTENSION: u8 = 109
+EXT_SERVER_NAME: u16 = 0
+EXT_GROUPS: u16 = 10
+EXT_SIG_ALGS: u16 = 13
+EXT_VERSIONS: u16 = 43
+EXT_KEY_SHARE: u16 = 51
+/// the largest plain fragment
+MAX_PLAIN: usize = 1 << 14
+/// the largest record body on the wire
+MAX_RECORD: usize = MAX_PLAIN + 256
+```
+
+- **`fn ct_name(t: u8) -> &'static str`**
+  the name of a content type
+
+- **`fn hs_name(t: u8) -> &'static str`**
+  the name of a handshake type
+
+- **`fn alert_name(a: u8) -> &'static str`**
+  the name of an alert (RFC 8446 6)
+
+- **`fn ext_name(e: u16) -> &'static str`**
+  the name of an extension
+
+- **`fn suite_name(s: u16) -> &'static str`**
+  the name of a cipher suite
+
+- **`fn group_name(g: u16) -> &'static str`**
+  the name of a key exchange group
+
+- **`fn sig_name(s: u16) -> &'static str`**
+  the name of a signature scheme
+
+- **`fn expand_label(secret: &[u8], label: &str, context: &[u8], out: &mut [u8])`**
+  HKDF-Expand-Label(secret, label, context, len) (7.1)
+
+- **`fn derive(secret: &[u8; 32], label: &str, hash: &[u8; 32]) -> [u8; 32]`**
+  Derive-Secret(secret, label, transcript hash)
+
+- **`fn schedule(ecdhe: &[u8; 32]) -> ([u8; 32], [u8; 32])`**
+  the handshake secret and the master secret from the (EC)DHE secret (no PSK)
+
+- **`fn finished(base: &[u8; 32], transcript: &[u8; 32]) -> [u8; 32]`**
+  verify_data of a Finished (4.4.4)
+
+- **`fn traffic_keys(secret: &[u8; 32]) -> ([u8; 32], [u8; 12])`**
+  the AEAD key and IV of a traffic secret (7.3)
+
+- **`struct Identity`**
+  a certificate chain (DER, leaf first) and the leaf's key
+  - `chain: Vec<Vec<u8>>`
+  - `key: Keypair`
+
+- **`struct ClientCfg`**
+  what a client trusts (see the module header)
+  - `name: String` -- the name asked for: what the certificate must name, the SNI unless it is an address
+  - `anchors: Vec<Cert>`
+  - `now: i64` -- seconds since 1970, for the certificates' times
+  - `insecure: bool` -- any certificate goes
+  - `accept: Vec<[u8; 32]>` -- fingerprints (SHA-256 of the leaf) that go whatever their faults
+
+- **`struct Failure`**
+  what ended a connection
+  - `alert: u8`
+  - `ours: bool` -- we sent the alert (false: the peer did)
+  - `why: &'static str`
+
+- **`enum Event`**
+  what happened
+  - `Hello { name: String }` -- a server: a ClientHello came, with this SNI ("" for none)
+  - `Certificate { faults: u32 }` -- a client: the server's chain came and was checked (x509 F_\* bits; 0: nothing wrong)
+  - `Established`
+  - `PeerClosed` -- close_notify came
+  - `Failed(Failure)`
+
+- **`struct Core`**
+  a connection's TLS, one side (see the module header)
+
+**`impl Core`**
+
+- **`fn client(cfg: ClientCfg, seed: &[u8; 32]) -> Core`**
+  a client: its ClientHello waits in take_out at once
+- **`fn server(id: Identity, seed: &[u8; 32]) -> Core`**
+  a server
+- **`fn established(&self) -> bool`**
+- **`fn peer_closed(&self) -> bool`**
+  close_notify came
+- **`fn dead(&self) -> bool`**
+  nothing more will come or go: a failure, or both sides said close_notify
+- **`fn name(&self) -> &str`**
+  the name: the SNI a client sent (a server), the one asked for (a client)
+- **`fn peer_certs(&self) -> &[Cert]`**
+  the server's chain, leaf first (a client, once it came)
+- **`fn faults(&self) -> u32`**
+  what is wrong with the server's chain (x509 F_\* bits)
+- **`fn excused(&self) -> bool`**
+  the server's chain has faults and the handshake went on all the same (ClientCfg)
+- **`fn failure(&self) -> Option<Failure>`**
+  what ended the handshake or the connection
+- **`fn footprint(&self) -> usize`**
+  the bytes it holds (an estimate for a budget)
+- **`fn take_out(&mut self) -> Vec<u8>`**
+- **`fn take_events(&mut self) -> Vec<Event>`**
+- **`fn read(&mut self) -> Vec<u8>`**
+  the plain text that came and was not read yet
+- **`fn send(&mut self, data: &[u8]) -> bool`**
+  plain text to send (nothing before the handshake's end: false)
+- **`fn close(&mut self)`**
+  close_notify; nothing is sent after it
+- **`fn push(&mut self, data: &[u8])`**
+  bytes from the peer (any split)
+
+- **`enum Part`**
+  a part of a TCP segment
+  - `Record { at: usize, len: usize, ty: u8, version: u16, length: usize }` -- a record: its place, its bytes here (less than 5 + length when the rest comes later), its type,
+    its version on the wire, its length
+  - `Rest { at: usize, len: usize }` -- bytes that do not start a record (the rest of one)
+
+- **`fn dissect(b: &[u8]) -> Vec<Part>`**
+  the parts of a segment's payload
 
 ## eapm
 

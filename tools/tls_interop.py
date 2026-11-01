@@ -1,6 +1,8 @@
 """tls_interop.py -- netio's TLS 1.3 against OpenSSL, curl and Python's ssl module.
 
     python tools/tls_interop.py            (Linux / WSL: needs openssl and curl)
+    python tools/tls_interop.py --core [--bin FILE]   netpkt::tls against this Python's ssl module, which
+                                           is OpenSSL (coretest --tls-core-*); here, also on Windows
 
 The certificates come from `coretest --tls-pki` (Ed25519, own CA).  Checked:
   our server  <- openssl s_client (with and without a client certificate), curl --cacert,
@@ -36,7 +38,91 @@ def wait_port(port, timeout=10):
     return False
 
 
+def core(exe):
+    """netpkt::tls, the I/O-free core on a socket, with OpenSSL on the other side"""
+    d = Path(tempfile.mkdtemp(prefix="tls-core-"))
+    subprocess.run([exe, "--tls-core-pki", str(d)], check=True)
+    results = []
+
+    def check(name, ok, detail=""):
+        results.append(bool(ok))
+        print(f"{'ok  ' if ok else 'FAIL'} {name}" + ("" if ok or not detail else f": {str(detail).strip()[:300]}"))
+
+    print(ssl.OPENSSL_VERSION)
+    # the core as the server
+    port = free_port()
+    srv = subprocess.Popen([exe, "--tls-core-serve", str(port)], stdout=subprocess.DEVNULL)
+    try:
+        wait_port(port)
+        ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        ctx.minimum_version = ssl.TLSVersion.TLSv1_3
+        ctx.load_verify_locations(str(d / "ca.pem"))
+        with socket.create_connection(("127.0.0.1", port), 5) as raw, ctx.wrap_socket(raw, server_hostname="web.lab") as s:
+            check("OpenSSL's client: TLS 1.3", s.version() == "TLSv1.3", s.version())
+            check("OpenSSL's client: the suite", s.cipher()[0] == "TLS_CHACHA20_POLY1305_SHA256", s.cipher())
+            check("OpenSSL's client: our chain verified, our name", s.getpeercert()["subject"] == ((("commonName", "web.lab"),),), s.getpeercert())
+            s.sendall(b"hallo")
+            got = b""
+            try:
+                while True:
+                    b = s.recv(4096)
+                    if not b:
+                        break
+                    got += b
+            except ssl.SSLZeroReturnError:
+                pass
+            check("OpenSSL's client: data both ways, its SNI, close_notify", got == b"sni=web.lab got=hallo", got)
+        try:
+            with socket.create_connection(("127.0.0.1", port), 5) as raw, ctx.wrap_socket(raw, server_hostname="other.lab"):
+                check("OpenSSL's client refuses another name", False)
+        except ssl.SSLCertVerificationError as e:
+            check("OpenSSL's client refuses another name", "other.lab" in str(e), e)
+        other = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+        other.minimum_version = ssl.TLSVersion.TLSv1_3
+        try:
+            with socket.create_connection(("127.0.0.1", port), 5) as raw, other.wrap_socket(raw, server_hostname="web.lab"):
+                check("OpenSSL's client without our CA refuses", False)
+        except ssl.SSLCertVerificationError as e:
+            check("OpenSSL's client without our CA refuses", True, e)
+    finally:
+        srv.terminate()
+        srv.wait(5)
+
+    # the core as the client
+    sctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    sctx.minimum_version = ssl.TLSVersion.TLSv1_3
+    sctx.load_cert_chain(str(d / "leaf.pem"), str(d / "leaf.key"))
+
+    def one(host, reply):
+        with socket.create_server(("127.0.0.1", 0)) as l:
+            port = l.getsockname()[1]
+            p = subprocess.Popen([exe, "--tls-core-get", str(port), "--host", host], stdout=subprocess.PIPE)
+            l.settimeout(10)
+            conn, _ = l.accept()
+            seen = b""
+            try:
+                with sctx.wrap_socket(conn, server_side=True) as s:
+                    seen = s.recv(4096)
+                    s.sendall(reply)
+            except (ssl.SSLError, OSError) as e:
+                seen = repr(e).encode()
+            out, _ = p.communicate(timeout=10)
+            return p.returncode, out, seen
+
+    code, out, seen = one("web.lab", b"hallo von OpenSSL\n")
+    check("OpenSSL's server: the core's request", seen == b"hallo vom Kern\n", seen)
+    check("OpenSSL's server: its answer, its chain verified", code == 0 and out == b"hallo von OpenSSL\n", (code, out))
+    code, out, seen = one("other.lab", b"nein")
+    check("OpenSSL's server: the core refuses another name with an alert it reads", code == 2 and b"BAD_CERTIFICATE" in seen.upper(), (code, seen))
+    print(f"tls_interop --core: {sum(results)} of {len(results)} passed")
+    return 0 if all(results) else 1
+
+
 def main():
+    if "--core" in sys.argv:
+        at = sys.argv.index("--bin") + 1 if "--bin" in sys.argv else 0
+        exe = str(Path(sys.argv[at]).resolve()) if at else str(ROOT / "build" / ("win" if os.name == "nt" else "linux") / "coretest")
+        return core(exe)
     if os.name == "nt":
         wsl = "/mnt/" + str(ROOT)[0].lower() + str(ROOT)[2:].replace("\\", "/")
         return subprocess.run(["wsl.exe", "-d", "Ubuntu-24.04", "-e", "sh", "-c", f"cd '{wsl}' && python3 tools/tls_interop.py"]).returncode

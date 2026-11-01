@@ -1,0 +1,59 @@
+# Verschlüsselt über TLS 1.3. WEB1 hat auf Port 443 ein Zertifikat der Lab-CA und auf den Ports 8441 bis
+# 8444 je eines mit einem Fehler (selbst signiert, abgelaufen, falscher Name, noch nicht gültig). PC1 holt
+# mit curl, was der Webbrowser holt: die Seite über https, der Handshake mit -v, jede Ablehnung und was
+# -k daraus macht, ein Skript mit TLS, eine Weiterleitung von http nach https, ein Port ohne TLS.
+run 1s
+PC1: curl -s https://web.lab/ohne.html
+run 100ms
+expect PC1 output contains "<title>Ohne Stylesheet</title>"
+PC1: curl -v https://web.lab/notiz.txt
+run 100ms
+expect PC1 output contains "* TLS connection using TLS 1.3 / TLS_CHACHA20_POLY1305_SHA256"
+expect PC1 output contains "*  subject: CN=web.lab"
+expect PC1 output contains "*  issuer: CN=JFNetworker Lab CA"
+expect PC1 output contains "*  certificate verify ok."
+expect PC1 output contains "Eine Notiz, kein Stylesheet."
+PC1: curl -s -o /dev/null -w "%{http_code} %{scheme} %{ssl_verify_result} %{url_effective} %{time_appconnect}\n" https://www.web.lab/ohne.html
+run 100ms
+expect PC1 output contains "200 HTTPS 0 https://www.web.lab/ohne.html"
+PC1: curl -sS https://web.lab:8441/
+run 100ms
+expect PC1 output contains "curl: (60) SSL certificate problem: self-signed certificate"
+PC1: curl -sS https://web.lab:8442/
+run 100ms
+expect PC1 output contains "curl: (60) SSL certificate problem: certificate has expired"
+PC1: curl -sS https://web.lab:8443/
+run 100ms
+expect PC1 output contains "curl: (60) SSL certificate problem: no alternative certificate subject name matches target host name 'web.lab'"
+PC1: curl -sS https://web.lab:8444/
+run 100ms
+expect PC1 output contains "curl: (60) SSL certificate problem: certificate is not yet valid"
+PC1: curl -s -k https://web.lab:8441/ohne.html
+run 100ms
+expect PC1 output contains "<title>Ohne Stylesheet</title>"
+PC1: curl -k -v -o /dev/null https://web.lab:8442/ohne.html
+run 100ms
+expect PC1 output contains "*  certificate verify result: certificate has expired, continuing anyway."
+PC1: curl -s https://andere.lab:8443/ohne.html
+run 100ms
+expect PC1 output contains "<title>Ohne Stylesheet</title>"
+PC1: curl -s https://web.lab:8445/
+run 100ms
+expect PC1 output contains "Über TLS: "
+PC1: curl -s -i http://web.lab:8081/
+run 100ms
+expect PC1 output contains "Location: https://web.lab/"
+PC1: curl -s -L -o /dev/null -w "%{http_code} %{num_redirects} %{url_effective}\n" http://web.lab:8081/
+run 100ms
+expect PC1 output contains "200 1 https://web.lab/"
+PC1: curl -sS https://web.lab:80/
+run 100ms
+expect PC1 output contains "curl: (35) TLS connect error"
+PC1: curl -sS http://web.lab:443/
+run 100ms
+expect WEB1 svc selbst metric tls_failed == 1
+expect WEB1 svc selbst metric tls_handshakes == 1
+expect WEB1 svc alt metric tls_failed == 1
+expect WEB1 svc anders metric tls_failed == 1
+expect WEB1 svc spaeter metric tls_failed == 1
+print "TLS 1.3 auf dem Kabel, jede Ablehnung eines Zertifikats und was -k daraus macht"

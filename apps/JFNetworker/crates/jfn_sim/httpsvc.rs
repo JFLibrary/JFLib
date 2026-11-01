@@ -11,6 +11,9 @@
 //                  "type": "text/plain", "size": 0, "chunk": 0, "time_ms": 0, "jitter_ms": 0,
 //                  "error_rate": 0, "error_status": 500, "headers": {"Cache-Control": "no-store"},
 //                  "backend": "kv"}], "kv": {"nodes": ["10.0.2.21"], "port": 7000, "rf": 2, ...}}
+//                  With "tls" (tlssim.rs: {"names": [...], "issuer": "lab" | "self", "org": "..", "days":
+//                  365, "age_days": 0, "starts_in_days": 0}) it speaks TLS; its port is then 443 unless
+//                  "port" says otherwise, and metrics add tls_handshakes and tls_failed
 //   http-client   {"url": "http://10.0.2.10/", "method": "GET", "count": 1, "interval_ms": 0,
 //                  "delay_ms": 0, "body": "", "headers": {}, "timeout_ms": 0,
 //                  "keepalive": true}
@@ -169,6 +172,11 @@ fn headers_of(v: Option<&Value>) -> Headers {
                 h.add(k, s);
             } else if let Some(n) = v.as_u64() {
                 h.add(k, &format!("{}", n));
+            } else if let Some(l) = v.as_array() {
+                // several headers of a name (Set-Cookie)
+                for s in l.iter().filter_map(|x| x.as_str()) {
+                    h.add(k, s);
+                }
             }
         }
     }
@@ -452,6 +460,8 @@ pub struct HttpServer {
     calls: BTreeMap<u64, Work>,
     pub backend_calls: u64,
     pub backend_errors: u64,
+    /// its certificate: it speaks TLS (tlssim.rs)
+    pub tls: Option<crate::tlssim::TlsSpec>,
 }
 
 impl HttpServer {
@@ -483,6 +493,7 @@ impl HttpServer {
             calls: BTreeMap::new(),
             backend_calls: 0,
             backend_errors: 0,
+            tls: None,
         }
     }
     /// the settings of its connections (port, keep-alive, limits, Server header)
@@ -842,6 +853,13 @@ impl Service for HttpServer {
         if let Some(up) = self.upstream.as_mut() {
             up.reset();
         }
+        if let Some(spec) = self.tls.clone() {
+            let id = spec.identity(os, &format!("http-server:{}", self.serve.cfg.port));
+            if let Some(c) = id.chain.first().and_then(|d| netpkt::x509::Cert::parse(d)) {
+                os.note(Note::Tls(crate::tlssim::TlsNote::CertMade { subject: c.subject_cn, issuer: c.issuer_cn }));
+            }
+            self.serve.cfg.tls = Some(alloc::sync::Arc::new(id));
+        }
         self.serve.start(os, "http-server");
     }
     fn on(&mut self, ev: SvcEvent, os: &mut OsApi) {
@@ -904,6 +922,10 @@ impl Service for HttpServer {
             Metric::new("p99_us", us(self.lat.p99(now))),
             Metric::new("busy_ms", (self.busy_ns / MS) as i64),
         ];
+        if self.tls.is_some() {
+            m.push(Metric::new("tls_handshakes", v(s.handshakes)));
+            m.push(Metric::new("tls_failed", v(s.tls_failed)));
+        }
         if let Some(up) = &self.upstream {
             m.push(Metric::new("backend_calls", v(self.backend_calls)));
             m.push(Metric::new("backend_errors", v(self.backend_errors)));
@@ -931,7 +953,13 @@ impl Service for HttpServer {
         if !self.serve.listening() {
             return msg!("Port {} ist nicht offen", self.serve.cfg.port);
         }
+        if self.tls.is_some() {
+            return msg!("Port {} (TLS): {} Anfragen, {} Antworten, {} in Arbeit, {} wartend", self.serve.cfg.port, s.requests, s.responses, self.busy(), self.queued());
+        }
         msg!("Port {}: {} Anfragen, {} Antworten, {} in Arbeit, {} wartend", self.serve.cfg.port, s.requests, s.responses, self.busy(), self.queued())
+    }
+    fn footprint(&self) -> usize {
+        1024 + self.serve.tls_bytes()
     }
     fn clone_box(&self) -> Box<dyn Service> {
         Box::new(self.clone())
@@ -1716,7 +1744,10 @@ pub fn from_def_msg(kind: &str, c: &Value) -> Result<Box<dyn Service>, Msg> {
     };
     Ok(match kind {
         "http-server" => {
-            let mut s = HttpServer::new(port(80)?);
+            let mut s = HttpServer::new(port(if c.get("tls").is_some() { netpkt::tls::PORT } else { 80 })?);
+            if let Some(t) = c.get("tls") {
+                s.tls = Some(crate::tlssim::TlsSpec::of(t)?);
+            }
             s.workers = num("workers", 0).min(1_000_000) as u32;
             s.queue_max = num("queue", 0).min(10_000_000) as u32;
             s.time = ms("time_ms", 0);

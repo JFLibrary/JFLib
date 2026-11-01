@@ -1083,6 +1083,40 @@ fn css(t: &mut T) {
     d.set_text(s, "p { color: #0d0d0d }");
     d.update();
     t.eq((col(&d, 0), col(&d, 1)), (0x0d0d0d, 0x0d0d0d), "a sheet changed");
+    // linked sheets: nothing by themselves, a text from the app counts where its link stands
+    let mut d = MdDoc::html("<style>p { color: #010101 }</style><link rel=stylesheet href=a.css><style>.s { color: #020202 }</style><link rel=\"alternate stylesheet\" href=b.css><link rel=icon href=c.png><link rel=stylesheet href=d.css media=print><link rel=stylesheet href=a.css><p>x</p><p class=s>y</p>");
+    t.eq(d.sheet_links().to_vec(), alloc::vec![String::from("a.css"), String::from("b.css")], "the links, each once, the printer's left out");
+    t.eq((col(&d, 0), col(&d, 1)), (0x010101, 0x020202), "no text yet: as without the link");
+    d.set_sheet("a.css", Some("p { color: #030303 } .s { color: #040404 }"));
+    t.check(d.update(), "a text changes the document");
+    t.eq((col(&d, 0), col(&d, 1)), (0x030303, 0x040404), "the link after the first <style>, twice the same text");
+    d.set_sheet("a.css", Some("p { color: #030303 } .s { color: #040404 }"));
+    t.check(!d.update(), "the same text again: nothing");
+    let mut e = MdDoc::html("<link rel=stylesheet href=a.css><style>p { color: #020202 }</style><p>x</p>");
+    e.set_sheet("a.css", Some("p { color: #030303 }"));
+    e.update();
+    t.eq(col(&e, 0), 0x020202, "document order: the later <style> wins");
+    d.set_sheet("zz.css", Some("p { color: #050505 }"));
+    t.check(!d.update(), "an address no link names: nothing yet");
+    d.set_sheet("a.css", None);
+    d.update();
+    t.eq((col(&d, 0), col(&d, 1)), (0x010101, 0x020202), "a text taken back");
+    let n = d.select_first("p.s").unwrap_or_default();
+    t.eq(d.style_of(n), String::from("color:#020202;"), "style_of: what the cascade gives");
+    let b = d.select_first("p").unwrap_or_default();
+    let body = d.parent(b).unwrap_or_default();
+    t.eq(d.style_of(body), String::new(), "style_of: nothing matches");
+    t.eq(d.style_of(MdNode::NONE), String::new(), "style_of: no node");
+    // a link a script adds asks too; a page without links has none
+    let l = d.create_element("link");
+    d.set_attr(l, "rel", "stylesheet");
+    d.set_attr(l, "href", "neu.css");
+    let root = d.root();
+    d.insert(root, None, l);
+    d.update();
+    t.check(d.sheet_links().iter().any(|x| x == "neu.css"), "a link made later");
+    t.eq(MdDoc::html("<p>x</p>").sheet_links().len(), 0, "no links");
+    t.eq(MdDoc::markdown("x").sheet_links().len(), 0, "Markdown has none");
     // boxes
     let d = MdDoc::html(concat!(
         "<style>.k { margin: 4px 8px; padding: 2px 3px 4px 5px; border: 2px solid #ff0000; background: #eeeeee } .k p { border-left: 3px dashed blue }",

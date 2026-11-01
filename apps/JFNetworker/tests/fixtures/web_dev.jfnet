@@ -1,0 +1,352 @@
+{
+  "format": "jfn",
+  "version": 1,
+  "title": "Ein Hofladen mit Stil, Keksen und Schloss",
+  "description": "WEB1 zeigt den Hofladen über http und https: Stylesheets aus <link>, Cookies mit allen Attributen (konto.jfs auf Port 8080), Weiterleitungen mit Set-Cookie, ein Zertifikat der Lab-CA auf Port 443 und je eines mit einem Fehler auf den Ports 8441 bis 8444 (selbst signiert, abgelaufen, falscher Name, noch nicht gültig), ein Skript mit TLS auf Port 8445. DNS1 kennt web.lab, www.web.lab und andere.lab. PC1 öffnet die Seiten im Webbrowser seines Desktops, die Entwickleransicht (F12) zeigt die Anfragen.",
+  "seed": 41,
+  "next_id": 8,
+  "strict_mdix": false,
+  "devices": [
+    {
+      "id": 1,
+      "name": "PC1",
+      "model": "pc",
+      "x": 0,
+      "y": 0,
+      "off": false,
+      "startup_config": "hostname PC1\nip addr add 10.0.0.10/24 dev eth0\necho \"nameserver 10.0.0.53\" > /etc/resolv.conf\n",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "SW1",
+      "model": "jf-s24p",
+      "x": 200,
+      "y": 0,
+      "off": false,
+      "startup_config": "",
+      "services": [],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "WEB1",
+      "model": "server-1u",
+      "x": 400,
+      "y": -80,
+      "off": false,
+      "startup_config": "hostname WEB1\nip addr add 10.0.0.1/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "http-server",
+          "name": "www",
+          "disabled": false,
+          "config": {
+            "port": 80,
+            "root": "/var/www"
+          }
+        },
+        {
+          "kind": "script",
+          "name": "konto",
+          "disabled": false,
+          "config": {
+            "file": "/root/app/konto.jfs",
+            "port": 8080
+          }
+        },
+        {
+          "kind": "http-server",
+          "name": "sicher",
+          "disabled": false,
+          "config": {
+            "root": "/var/www",
+            "tls": {
+              "names": [
+                "web.lab",
+                "www.web.lab"
+              ],
+              "org": "Hofladen Sonnenfeld"
+            },
+            "routes": [
+              {
+                "path": "/tresor",
+                "body": "Tresor\n",
+                "headers": {
+                  "Set-Cookie": "tresor=auf; Secure; Path=/"
+                }
+              },
+              {
+                "path": "/hin",
+                "status": 302,
+                "body": "",
+                "headers": {
+                  "Location": "http://web.lab:8080/lesen"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "kind": "http-server",
+          "name": "selbst",
+          "disabled": false,
+          "config": {
+            "port": 8441,
+            "root": "/var/www",
+            "tls": {
+              "names": [
+                "web.lab"
+              ],
+              "issuer": "self",
+              "org": "Eigenbau"
+            }
+          }
+        },
+        {
+          "kind": "http-server",
+          "name": "alt",
+          "disabled": false,
+          "config": {
+            "port": 8442,
+            "root": "/var/www",
+            "tls": {
+              "names": [
+                "web.lab"
+              ],
+              "age_days": 400,
+              "days": 365
+            }
+          }
+        },
+        {
+          "kind": "http-server",
+          "name": "anders",
+          "disabled": false,
+          "config": {
+            "port": 8443,
+            "root": "/var/www",
+            "tls": {
+              "names": [
+                "andere.lab"
+              ]
+            }
+          }
+        },
+        {
+          "kind": "http-server",
+          "name": "spaeter",
+          "disabled": false,
+          "config": {
+            "port": 8444,
+            "root": "/var/www",
+            "tls": {
+              "names": [
+                "web.lab"
+              ],
+              "starts_in_days": 10
+            }
+          }
+        },
+        {
+          "kind": "script",
+          "name": "echo",
+          "disabled": false,
+          "config": {
+            "file": "/root/app/echo.jfs",
+            "port": 8445
+          }
+        },
+        {
+          "kind": "http-server",
+          "name": "umleiter",
+          "disabled": false,
+          "config": {
+            "port": 8081,
+            "routes": [
+              {
+                "path": "*",
+                "status": 301,
+                "body": "",
+                "headers": {
+                  "Location": "https://web.lab/"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": [
+        {
+          "path": "/root/app",
+          "dir": true
+        },
+        {
+          "path": "/root/app/konto.jfs",
+          "text": "// konto.jfs: Cookies über Kopfzeilen, Weiterleitungen mit Set-Cookie, Port 8080\nlet port = config.port ?? 8080\nhttp.serve(port, fn(req, res) {\n  let html = {\"Content-Type\": \"text/html; charset=utf-8\"}\n  let kekse = req.headers[\"cookie\"] ?? \"\"\n  if req.path == \"/kekse\" {\n    return res.send(200, \"<html><head><title>Kekse</title></head><body><h1>Kekse</h1><p>Vier Kekse sind gesetzt.</p></body></html>\", {\n      \"Content-Type\": \"text/html; charset=utf-8\",\n      \"Set-Cookie\": [\"sitzung=abc; Path=/\", \"dauer=lang; Max-Age=60; Path=/\", \"datum=fest; Expires=Wed, 01 Jan 2070 00:00:00 GMT; Path=/\", \"nurhttp=geheim; HttpOnly; Path=/\", \"falsch=1; Domain=other.lab\", \"sicher=1; Secure; Path=/\"]\n    })\n  }\n  if req.path == \"/lesen\" {\n    return res.send(200, \"Gesendet: \" + kekse + \"\\n\")\n  }\n  if req.path == \"/pfad/lesen\" {\n    return res.send(200, \"Unter pfad: \" + kekse + \"\\n\")\n  }\n  if req.path == \"/nurpfad\" {\n    return res.send(200, \"ok\\n\", {\"Set-Cookie\": \"pfad=1; Path=/pfad\"})\n  }\n  if req.path == \"/login\" {\n    return res.send(302, \"\", {\"Location\": \"/konto\", \"Set-Cookie\": \"anmeldung=frisch; Path=/\"})\n  }\n  if req.path == \"/konto\" {\n    if kekse.contains(\"anmeldung=frisch\") {\n      return res.send(200, \"<html><head><title>Willkommen</title></head><body><h1>Willkommen</h1><p>Angemeldet mit: ${kekse}</p></body></html>\", html)\n    }\n    return res.send(401, \"<html><head><title>Nicht angemeldet</title></head><body><h1>Nicht angemeldet</h1></body></html>\", html)\n  }\n  if req.path == \"/kette\" {\n    return res.send(302, \"\", {\"Location\": \"/kette2\", \"Set-Cookie\": \"eins=1; Path=/\"})\n  }\n  if req.path == \"/kette2\" {\n    return res.send(307, \"\", {\"Location\": \"/lesen\", \"Set-Cookie\": [\"zwei=2; Path=/\", \"eins=; Max-Age=0; Path=/\"]})\n  }\n  if req.path == \"/nie\" {\n    return nil\n  }\n  res.send(404, \"gibt es nicht\\n\")\n})\n"
+        },
+        {
+          "path": "/root/app/echo.jfs",
+          "text": "// echo.jfs: ein Skript mit TLS auf Port 8445, sagt, welche Cookies über https kamen\nlet port = config.port ?? 8445\nhttp.serve(port, fn(req, res) {\n  if req.path == \"/setzen\" {\n    return res.send(200, \"gesetzt\\n\", {\"Set-Cookie\": [\"tresor=1; Secure; Path=/\", \"strikt=2; SameSite=Strict; Secure; Path=/\", \"breit=3; SameSite=None; Secure; Path=/\"]})\n  }\n  res.send(200, \"Über TLS: \" + (req.headers[\"cookie\"] ?? \"\") + \"\\n\")\n}, {tls: {names: [\"web.lab\"], org: \"Hofladen Sonnenfeld\"}})\n"
+        },
+        {
+          "path": "/var/www",
+          "dir": true
+        },
+        {
+          "path": "/var/www/index.html",
+          "text": "<!doctype html>\n<html><head><title>Hofladen Sonnenfeld</title>\n<link rel=\"stylesheet\" href=\"basis.css\">\n<style>h1 { color: #8A1C1C } p.mitte { color: #1C5A8A }</style>\n<link rel=\"stylesheet\" href=\"ende.css\">\n</head><body>\n<h1>Hofladen Sonnenfeld</h1>\n<div class=\"karte\"><p class=\"mitte\">Heute frisch: Äpfel und Birnen.</p></div>\n<p class=\"ende\">Diese Seite hat zwei Stylesheets und einen style-Block.</p>\n<p><a href=\"ohne.html\">Ohne Stylesheet</a></p>\n<p><a href=\"kaputt.html\">Mit kaputten Stylesheets</a></p>\n<p><a href=\"konto.html\">Das Konto</a></p>\n<p><a href=\"http://web.lab:8080/login\">Anmelden</a></p>\n<p><a href=\"http://web.lab:8080/kekse\">Kekse holen</a></p>\n<p><a href=\"https://web.lab/\">Dieselbe Seite über https</a></p>\n<p><img src=\"zeichen.svg\" alt=\"Das Zeichen des Ladens\"></p>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/basis.css",
+          "text": "/* basis.css: was alle Seiten des Ladens gemeinsam haben */\nbody { background: #FBF7EC; color: #222222; padding: 8px }\na { color: #1C5A8A }\nh1 { color: #111111; font-style: italic }\np.mitte { color: #222222 }\n.karte { border: 2px solid #336699; padding: 8px; background: #E8F0F8 }\n.ende { color: #333333 }\n"
+        },
+        {
+          "path": "/var/www/ende.css",
+          "text": "/* ende.css: steht nach dem style-Block und gewinnt bei gleicher Spezifität */\np.mitte { color: #2E7D32 }\n.ende { font-weight: bold }\n"
+        },
+        {
+          "path": "/var/www/ohne.html",
+          "text": "<!doctype html>\n<html><head><title>Ohne Stylesheet</title></head><body>\n<h1>Ohne Stylesheet</h1>\n<p>Diese Seite fragt nur nach sich selbst.</p>\n<p><a href=\"index.html\">Zur Startseite</a></p>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/kaputt.html",
+          "text": "<!doctype html>\n<html><head><title>Kaputte Stylesheets</title>\n<link rel=\"stylesheet\" href=\"fehlt.css\">\n<link rel=\"stylesheet\" href=\"notiz.txt\">\n<link rel=\"stylesheet\" href=\"http://web.lab:81/zu.css\">\n<link rel=\"stylesheet\" href=\"ende.css\">\n</head><body>\n<h1>Kaputte Stylesheets</h1>\n<p class=\"ende\">Die Seite zeigt sich trotzdem, die Konsole nennt die Gründe.</p>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/notiz.txt",
+          "text": "Eine Notiz, kein Stylesheet.\n"
+        },
+        {
+          "path": "/var/www/konto.html",
+          "text": "<!doctype html>\n<html><head><title>Das Konto</title></head><body>\n<h1 id=\"titel\">Das Konto</h1>\n<p id=\"anzeige\">Noch nichts gelesen.</p>\n<p><button id=\"lesen\">Lesen</button> <button id=\"setzen\">Setzen</button> <button id=\"sofort\">Sofort</button> <button id=\"sperre\">Sperre</button> <button id=\"holen\">Holen</button></p>\n<p id=\"antwort\">Noch keine Antwort.</p>\n<script type=\"text/jfs\">\nlet anzeige = document.by_id(\"anzeige\")\ndocument.by_id(\"lesen\").on(\"click\", fn(ev) {\n  anzeige.set_text(\"Kekse: \" + document.cookie)\n})\ndocument.by_id(\"setzen\").on(\"click\", fn(ev) {\n  document.cookie = \"skript=1; Path=/\"\n})\ndocument.by_id(\"sofort\").on(\"click\", fn(ev) {\n  document.set_cookie(\"sofort=2; Path=/\")\n  anzeige.set_text(\"Kekse: \" + document.cookie)\n})\ndocument.by_id(\"sperre\").on(\"click\", fn(ev) {\n  document.set_cookie(\"verboten=1; HttpOnly; Path=/\")\n  anzeige.set_text(\"Kekse: \" + document.cookie)\n})\ndocument.by_id(\"holen\").on(\"click\", fn(ev) {\n  fetch(\"http://web.lab:8080/lesen\", fn(err, r) {\n    document.by_id(\"antwort\").set_text(err ?? r.body)\n  })\n})\nprint(\"Konto bereit\")\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/langsam.html",
+          "text": "<!doctype html>\n<html><head><title>Langsam</title></head><body>\n<h1>Langsam</h1>\n<p id=\"antwort\">Es läuft noch.</p>\n<script type=\"text/jfs\">\nfetch(\"http://web.lab:8080/nie\", fn(err, r) {\n  document.by_id(\"antwort\").set_text(\"Ende: \" + (err ?? r.body))\n})\nprint(\"gefragt\")\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/baum.html",
+          "text": "<!doctype html>\n<html><head><title>Der Baum</title>\n<style>.rot { color: #AA0000 } #eins { font-weight: bold }</style>\n</head><body>\n<h1>Der Baum</h1>\n<ul id=\"liste\"><li id=\"eins\" class=\"rot\">Eins</li><li>Zwei</li></ul>\n<p><button id=\"dazu\">Dazu</button></p>\n<script type=\"text/jfs\">\ndocument.by_id(\"dazu\").on(\"click\", fn(ev) {\n  let li = document.create(\"li\")\n  li.set_attr(\"data-neu\", \"ja\")\n  li.set_text(\"Neu\")\n  document.by_id(\"liste\").append(li)\n})\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/zeilen.html",
+          "text": "<!doctype html>\n<html><head><title>Viele Zeilen</title></head><body>\n<h1>Viele Zeilen</h1>\n<script type=\"text/jfs\">\nfor i in 0..120 {\n  print(\"Zeile \" + str(i))\n}\nprint(\"die letzte Zeile\")\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/spaet.html",
+          "text": "<!doctype html>\n<html><head><title>Später</title></head><body>\n<h1>Später</h1>\n<p id=\"spaet\" class=\"spaet\">Noch ohne Stylesheet.</p>\n<p><button id=\"dazu\">Stylesheet dazu</button></p>\n<script type=\"text/jfs\">\ndocument.by_id(\"dazu\").on(\"click\", fn(ev) {\n  let l = document.create(\"link\")\n  l.set_attr(\"rel\", \"stylesheet\")\n  l.set_attr(\"href\", \"spaet.css\")\n  document.body().append(l)\n})\n</script>\n</body></html>\n"
+        },
+        {
+          "path": "/var/www/spaet.css",
+          "text": ".spaet { color: #7A1F7A }\n"
+        },
+        {
+          "path": "/var/www/zeichen.svg",
+          "text": "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"64\" height=\"32\" viewBox=\"0 0 64 32\"><rect width=\"64\" height=\"32\" rx=\"6\" fill=\"#4A7C3F\"/><circle cx=\"16\" cy=\"16\" r=\"9\" fill=\"#F2C94C\"/></svg>\n"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "DNS1",
+      "model": "server-1u",
+      "x": 400,
+      "y": 80,
+      "off": false,
+      "startup_config": "hostname DNS1\nip addr add 10.0.0.53/24 dev eth0\n",
+      "services": [
+        {
+          "kind": "dns-server",
+          "name": "dns",
+          "disabled": false,
+          "config": {
+            "zones": [
+              {
+                "origin": "lab",
+                "records": [
+                  "web A 10.0.0.1",
+                  "www.web A 10.0.0.1",
+                  "andere A 10.0.0.1",
+                  "dns A 10.0.0.53"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "comment": "",
+      "wlan": null,
+      "files": []
+    }
+  ],
+  "links": [
+    {
+      "id": 5,
+      "a": {
+        "dev": 1,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/1"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 6,
+      "a": {
+        "dev": 3,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/2"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    },
+    {
+      "id": 7,
+      "a": {
+        "dev": 4,
+        "port": "eth0"
+      },
+      "b": {
+        "dev": 2,
+        "port": "GigabitEthernet1/0/3"
+      },
+      "cable": "copper",
+      "cable_fixed": false,
+      "kbps": 1000000,
+      "delay_ns": 50,
+      "jitter_ns": 0,
+      "loss_ppm": 0,
+      "down": false,
+      "route": "straight",
+      "waypoints": []
+    }
+  ]
+}

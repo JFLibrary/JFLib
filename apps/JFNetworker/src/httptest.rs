@@ -694,7 +694,8 @@ fn curl_t(t: &mut T) {
     t.eq("connect timeout", cmd(&mut e, pc1, "curl --connect-timeout 0.5 http://10.0.0.7/", SEC), String::from("curl: (28) Failed to connect to 10.0.0.7 port 80 after 500 ms: Timeout was reached\n"));
     t.eq("slow answer", cmd(&mut e, pc1, "curl -m 0.05 http://10.0.0.2/slow", SEC), String::from("curl: (28) Operation timed out after 50 milliseconds with 0 bytes received\n"));
     t.eq("no route", cmd(&mut e, pc1, "curl http://10.0.0.9/", 4 * SEC), String::from("curl: (7) Failed to connect to 10.0.0.9 port 80 after 3000 ms: Couldn't connect to server\n"));
-    t.eq("no https", cmd(&mut e, pc1, "curl https://10.0.0.2/", 100 * MS), String::from("curl: (1) Protocol \"https\" not supported or disabled in libcurl\n"));
+    t.eq("https: nobody on its port", cmd(&mut e, pc1, "curl https://10.0.0.2/", 100 * MS), String::from("curl: (7) Failed to connect to 10.0.0.2 port 443 after 0 ms: Couldn't connect to server\n"));
+    t.eq("a scheme it does not speak", cmd(&mut e, pc1, "curl gopher://10.0.0.2/", 100 * MS), String::from("curl: (1) Protocol \"gopher\" not supported or disabled in libcurl\n"));
     t.eq("bad port", cmd(&mut e, pc1, "curl http://10.0.0.2:99999/", 100 * MS), String::from("curl: (3) URL rejected: Port number was not a decimal number between 0 and 65535\n"));
     t.eq("no url", cmd(&mut e, pc1, "curl", MS), String::from("curl: try 'curl --help' for more information\n"));
     t.eq("unknown option", cmd(&mut e, pc1, "curl -Q x", MS), String::from("curl: option -Q: is unknown\ncurl: try 'curl --help' for more information\n"));
