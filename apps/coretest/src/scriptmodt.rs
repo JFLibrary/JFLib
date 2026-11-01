@@ -8,7 +8,9 @@
 //             through recursion, closures, try / catch and module boundaries, a pause in the
 //             middle of the fuel, paused and resumed runs equal to uninterrupted ones, the
 //             stack, locals, upvalues, globals and eval, assert / assert_eq, the benchmark's
-//             programs with and without a debugger (same fuel and output)
+//             programs with and without a debugger (same fuel and output); the scripts of one
+//             VM (add_script: one scope of top-level names, errors of each with its file, a VM
+//             that goes on after them, fuel per script)
 //   bench()   `coretest --bench vm`: ns per unit of fuel of a few programs without a debugger
 //             (calls, loops, strings, maps), the best of five runs each; then all of them once
 //             with a breakpoint that never stops (the debugger checks every instruction)
@@ -560,4 +562,81 @@ pub fn run(t: &mut T) {
     debugger(t);
     asserts(t);
     bench_same(t);
+    scripts(t);
+}
+
+// run the pending invocation to its end -> the error, if any
+fn finish_vm(vm: &mut Vm, host: &mut dyn Host) -> Option<script::Error> {
+    loop {
+        match vm.run(host, 1_000_000) {
+            Status::Done(_) => return None,
+            Status::Yielded | Status::Paused(_) => {}
+            Status::Error(e) => return Some(e),
+        }
+    }
+}
+
+struct PageHost;
+
+impl Host for PageHost {
+    fn call(&mut self, _: &mut Cx, name: &str, _: &[Value]) -> Result<Value, Fail> {
+        if name == "ping" { Ok(Value::Int(7)) } else { Err(Fail::Unknown) }
+    }
+}
+
+fn scripts(t: &mut T) {
+    let stub = script::compile_with("seite", "", &["ping"]).expect("the empty program");
+    let mut vm = Vm::new(&stub, Limits::default());
+    let mut host = PageHost;
+    t.check("an empty program runs", finish_vm(&mut vm, &mut host).is_none());
+    // one scope: the second script reads and changes the first one's names
+    t.check("a script links", vm.add_script("a.jfs", "let zahl = 1\nfn plus(n) { zahl += n\n return zahl }\nprint(ping())").is_ok());
+    t.check("a script runs", finish_vm(&mut vm, &mut host).is_none());
+    t.check("the next one sees its names", vm.add_script("b.jfs", "print(plus(2), zahl)\nzahl = 10\nlet zwei = fn() { return zahl + 1 }\nprint(plus(1))").is_ok());
+    t.check("and runs", finish_vm(&mut vm, &mut host).is_none());
+    t.eq("the same variables", vm.output(), "7\n3 3\n11\n");
+    // a name declared again is the same variable, in the functions of the script before too
+    t.check("a name declared again", vm.add_script("c.jfs", "let zahl = 100\nprint(plus(1), zwei())\nfn plus(n) { return zahl - n }\nprint(plus(1))").is_ok());
+    t.check("runs", finish_vm(&mut vm, &mut host).is_none());
+    t.eq("a let assigns, a fn replaces", vm.take_output(), String::from("7\n3 3\n11\n99 101\n99\n"));
+    // a compile error: the positions of its file; the VM goes on and knows nothing of it
+    let e = vm.add_script("kaputt.jfs", "let weg = 1\nlet = 2").err().unwrap_or_default();
+    t.eq("a syntax error names file and line", e.first().map(|d| (d.file.clone(), d.line)), Some((String::from("kaputt.jfs"), 2)));
+    let e = vm.add_script("kaputt.jfs", "\n  unbekannt()").err().unwrap_or_default();
+    t.eq("an unknown name is an error", e.first().map(|d| (d.line, d.col)), Some((2, 3)));
+    t.check("a script that does not compile leaves nothing pending", !vm.busy());
+    let e = vm.add_script("spaet.jfs", "print(weg)").err().unwrap_or_default();
+    t.check("its names do not exist", e.first().is_some_and(|d| d.msg.contains("weg")));
+    // an error while it runs: its file, the next one still runs and sees what was declared
+    t.check("one that throws", vm.add_script("wirft.jfs", "let halb = 5\nfn f() {\n  throw \"nein\"\n}\nf()\nlet nie = 1").is_ok());
+    let e = finish_vm(&mut vm, &mut host);
+    t.eq("the error names its script, line and column", e.as_ref().map(|e| (e.file.clone(), e.line, e.col)), Some((String::from("wirft.jfs"), 3, 3)));
+    t.check("the trace", e.as_ref().is_some_and(|e| e.trace.len() == 2 && e.trace[1].file == "wirft.jfs" && e.trace[1].line == 5));
+    t.check("the next one links", vm.add_script("danach.jfs", "print(halb, nie)").is_ok());
+    t.check("and runs", finish_vm(&mut vm, &mut host).is_none());
+    t.eq("what ran before the error stays", vm.take_output(), String::from("5 nil\n"));
+    // calls from outside: a function of a later script, vm.global finds it
+    t.check("a function", vm.add_script("rufen.jfs", "fn gruss(x) { return \"hallo ${x}\" }").is_ok());
+    t.check("declared", finish_vm(&mut vm, &mut host).is_none());
+    t.check("vm.call finds it", vm.call("gruss", &[Value::Int(3)]).is_ok());
+    match vm.run(&mut host, 1_000_000) {
+        Status::Done(v) => t.eq("its result", vm.display(v), String::from("hallo 3")),
+        _ => t.check("the call ends", false),
+    }
+    // busy: refused; each script has its own fuel
+    let mut vm = Vm::new(&stub, Limits { fuel: 10_000, ..Limits::default() });
+    t.check("a VM with an invocation pending refuses", vm.add_script("x.jfs", "").is_err());
+    t.check("the stub", finish_vm(&mut vm, &mut host).is_none());
+    t.check("an endless loop", vm.add_script("e.jfs", "while true { }").is_ok());
+    t.eq("ends at the fuel limit", finish_vm(&mut vm, &mut host).map(|e| (e.kind, e.file, e.line)), Some((ErrorKind::Fuel, String::from("e.jfs"), 1)));
+    t.check("the next one", vm.add_script("f.jfs", "let i = 0\nwhile i < 1000 { i += 1 }\nprint(i)").is_ok());
+    t.check("has fuel of its own", finish_vm(&mut vm, &mut host).is_none());
+    t.eq("and runs to its end", vm.take_output(), String::from("1000\n"));
+    // a non-strict program: compiled like it
+    let plain = script::compile("let a = 1").expect("a program");
+    let mut vm = Vm::new(&plain, Limits::default());
+    t.check("the program", finish_vm(&mut vm, &mut host).is_none());
+    t.check("unknown names are warnings there", vm.add_script("g.jfs", "a += 1\nprint(a)\nprint(sonst ?? 0)").is_ok());
+    t.check("and fail when they run", finish_vm(&mut vm, &mut host).is_some());
+    t.eq("the program's own names are shared", vm.take_output(), String::from("2\n"));
 }

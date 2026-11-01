@@ -12,7 +12,8 @@
 // labels, choices, task boxes of list items, the values in the state, the data a form sends,
 // reset) and in a headless runtime the fields' records and the images the app supplies; the
 // element tree of HTML documents (md_dom.rs: how HTML becomes elements, selectors, the
-// elements of blocks and fields), its changes (in place and all again giving the same blocks,
+// elements of blocks and fields, the element at a place of a block's text), its changes (in place
+// and all again giving the same blocks,
 // also for 300 random changes), the view across changes (the fields' values, the focus, the
 // place, the selection) and their cost (changes in place, deep trees, many siblings and ids,
 // long selectors within time limits); the style sheets (the cascade, inheritance, boxes, what
@@ -677,6 +678,60 @@ fn rederived(d: &MdDoc) -> MdDoc {
 }
 
 // changes of the elements and the blocks that follow
+// the element around a byte of a block's text
+fn dom_element_at(t: &mut T) {
+    let d = MdDoc::html(concat!(
+        "<h1 id=h>Kopf</h1><p id=p>Eins <span id=s>zwei <b id=b>drei</b></span>  vier <a id=a href=\"/x\">Link <i id=i>hier</i></a> ende</p>",
+        "<ul><li id=li>Punkt <em id=e>wichtig</em><ul><li id=li2>innen</li></ul></li></ul>",
+        "<div id=d>vorn <u id=u>unter</u><p id=dp>mitten</p>hinten <s id=st>weg</s></div>",
+        "<table><tr id=tr><td id=c1>eins</td><td id=c2><b id=cb>zwei</b></td></tr></table>",
+        "<p id=q>a<span id=hid style=\"display: none\">nicht</span> <img id=im src=x.png alt=Bild> b <input id=in name=n> c</p>"
+    ));
+    let at = |id: &str, word: &str| -> String {
+        let Some(k) = d.blocks().iter().position(|b| b.text.contains(word) && d.attr(b.node, "id") == Some(id)) else { return String::from("kein Block") };
+        let byte = d.blocks()[k].text.find(word).unwrap_or(0);
+        String::from(d.attr(d.element_at(k, byte), "id").unwrap_or("-"))
+    };
+    t.eq(at("h", "Kopf"), String::from("h"), "a block's own text");
+    t.eq(at("p", "Eins"), String::from("p"), "text of the paragraph");
+    t.eq(at("p", "zwei"), String::from("s"), "an inline element");
+    t.eq(at("p", "drei"), String::from("b"), "the innermost one");
+    t.eq(at("p", "vier"), String::from("p"), "after it, blanks collapsed");
+    t.eq(at("p", "Link"), String::from("a"), "a link");
+    t.eq(at("p", "hier"), String::from("i"), "inside a link");
+    t.eq(at("p", "ende"), String::from("p"), "after the link");
+    t.eq(at("li", "wichtig"), String::from("e"), "a list item before its list");
+    t.eq(at("li2", "innen"), String::from("li2"), "the inner item");
+    t.eq(at("d", "unter"), String::from("u"), "a div's first paragraph");
+    t.eq(at("dp", "mitten"), String::from("dp"), "a paragraph in it");
+    t.eq(at("d", "weg"), String::from("st"), "the div's paragraph after it");
+    t.eq(at("tr", "zwei"), String::from("cb"), "a table's cell");
+    t.eq(at("q", "b"), String::from("q"), "after a hidden element and an image");
+    let k = d.blocks().iter().position(|b| d.attr(b.node, "id") == Some("q")).unwrap_or(0);
+    let text = d.blocks()[k].text.clone();
+    let obj: Vec<usize> = text.match_indices('\u{FFFC}').map(|m| m.0).collect();
+    t.eq(obj.iter().map(|&o| String::from(d.attr(d.element_at(k, o), "id").unwrap_or("-"))).collect::<Vec<_>>(), alloc::vec![String::from("im"), String::from("in")], "an image, a field");
+    t.eq(d.element_at(k, text.len()), d.blocks()[k].node, "the end: the block's element");
+    t.check(d.element_at(99, 0).is_none(), "no such block");
+    t.check(MdDoc::markdown("# Kopf").element_at(0, 0).is_none(), "Markdown has no elements");
+    // changes: the tree as it is now
+    let mut c = MdDoc::html("<p id=p>a <b id=b>b</b> c</p>");
+    let b = c.by_id("b").unwrap_or_default();
+    let sp = c.create_element("span");
+    c.set_attr(sp, "id", "neu");
+    c.set_text(sp, "neu");
+    c.insert(b, None, sp);
+    c.update();
+    let byte = c.blocks()[0].text.find("neu").unwrap_or(0);
+    t.eq(c.element_at(0, byte), sp, "an element a change brought");
+    // the size of the tree
+    let (n0, b0) = c.dom_size();
+    let x = c.create_text("zwölf Bytes!");
+    t.eq(c.dom_size(), (n0 + 1, b0 + 13), "dom_size counts every live node, out of the document too");
+    c.free(x);
+    t.eq(c.dom_size(), (n0, b0), "a freed node is gone");
+}
+
 fn dom_changes(t: &mut T) {
     t.group = "dom changes";
     let mut d = MdDoc::html("<h1>A</h1><p id=s>Stand: <b>0</b> <span class=x>!</span></p><p>B</p><ul id=l><li>1</li></ul>");
@@ -1098,6 +1153,7 @@ pub fn run() -> i32 {
     let mut t = T { group: "", ok: 0, failed: 0 };
     let t0 = plat::time_us();
     dom(&mut t);
+    dom_element_at(&mut t);
     dom_changes(&mut t);
     dom_view(&mut t);
     dom_cost(&mut t);
