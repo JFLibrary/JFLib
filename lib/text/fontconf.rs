@@ -18,7 +18,8 @@
 //                                    system-ui, emoji, math (also fontconfig's sans and mono)
 //
 // FontDb::resolve(&conf, family, lang, weight, italic) (fontdb.rs) finds the first installed
-// candidate; for a name nothing installed matches, the candidates of sans-serif.
+// candidate with Latin letters (without any, the first installed one); for a name nothing
+// installed matches, the candidates of sans-serif.
 //
 // Rules, fontconfig's semantics in short: an alias for F puts its <prefer> families right
 // before F (so a later alias's prefer list follows an earlier one), its <accept> families
