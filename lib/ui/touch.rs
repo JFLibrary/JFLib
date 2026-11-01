@@ -101,9 +101,11 @@ const FRICTION: f64 = 0.015;
 const DECEL: f64 = 2.358_201_815_154_572;
 const INFLEXION: f64 = 0.35;
 const G_INCH: f64 = 9.80665 * 39.37 * 0.84;
-/// with a finger a window's title bar is at least this high, its close button this wide (DIP)
+/// with a finger a window's title bar is at least this high, its close button this wide (DIP); not in
+/// a window narrower than CAPTION_MIN_W: the bar has to stay something to hold on to
 pub(crate) const TITLE_DIP: i32 = 40;
 pub(crate) const CAPTION_DIP: i32 = 44;
+pub(crate) const CAPTION_MIN_W: i32 = 120;
 /// where a cancelled press is released: outside everything, so it cannot click
 const OUTSIDE: i32 = -10000;
 /// TF_HOLD_LONG: a panel's title bar moves after resting this long; nothing shows before HOLD_SHOW_MS
@@ -214,8 +216,8 @@ pub(crate) struct S {
     down_t: u32,
     /// when the press went out
     press_t: u32,
-    /// the widget under the down point (its id, TF_HOLD_LONG shows on it)
-    hold_id: u32,
+    /// the widget under the down point: its id (TF_HOLD_LONG shows on it, and the press finds it again)
+    down_id: u32,
     last_t: u32,
     /// the down only stopped a fling: lifted without a move it does nothing
     no_click: bool,
@@ -275,7 +277,7 @@ impl Default for S {
             off: [0; 2],
             down_t: 0,
             press_t: 0,
-            hold_id: 0,
+            down_id: 0,
             last_t: 0,
             no_click: false,
             hovered: false,
@@ -460,7 +462,7 @@ impl Ui {
     /// without a sign
     pub fn touch_hold_part(&self, id: u32) -> Option<u32> {
         let s = &self.m.touch;
-        if s.grab & G_HOLD_LONG == 0 || s.win != self.uiw_cur || s.hold_id != id || id == 0 {
+        if s.grab & G_HOLD_LONG == 0 || s.win != self.uiw_cur || s.down_id != id || id == 0 {
             return None;
         }
         match s.mode {
@@ -776,7 +778,7 @@ impl Ui {
         self.touch_aim();
         let (hit, grab) = self.touch_under();
         let c = &self.wp.ctx;
-        self.m.touch.hold_id = hit.map_or(0, |i| c.hits[c.hit_cur ^ 1][i].id);
+        self.m.touch.down_id = hit.map_or(0, |i| c.hits[c.hit_cur ^ 1][i].id);
         self.m.touch.grab = grab;
         if stopped {
             return;
@@ -831,6 +833,29 @@ impl Ui {
         }
     }
 
+    // the press is about to go out: the layout may have moved since the finger came down (the first
+    // finger of a session: a tool window's title bar grows, what is below it moves), and what the finger
+    // came down on is what it means
+    fn touch_find_again(&mut self) {
+        let id = self.m.touch.down_id;
+        if id == 0 || self.uiw_inert_now() {
+            return;
+        }
+        let c = &self.wp.ctx;
+        let list = &c.hits[c.hit_cur ^ 1];
+        let p = self.touch_logical(self.touch_aimed(self.m.touch.down));
+        if hit_index(list, c.modal_prev, p[0], p[1]).is_some_and(|i| list[i].id == id) {
+            return;
+        }
+        let Some(h) = list.iter().rev().find(|h| h.id == id && h.x1 > h.x0 && h.y1 > h.y0) else { return };
+        let q = [p[0].clamp(h.x0, h.x1 - 1), p[1].clamp(h.y0, h.y1 - 1)];
+        if hit_index(list, c.modal_prev, q[0], q[1]).is_some_and(|i| list[i].id == id) {
+            let raw = self.touch_logical(q);
+            let s = &mut self.m.touch;
+            s.off = [raw[0] - s.down[0], raw[1] - s.down[1]];
+        }
+    }
+
     // where the widget sees the finger now
     fn touch_aimed(&self, p: [i32; 2]) -> [i32; 2] {
         let o = self.m.touch.off;
@@ -855,6 +880,8 @@ impl Ui {
 
     // the press at the down point: from here on the widget has the finger
     fn touch_press(&mut self) {
+        self.uiw_use(self.m.touch.win);
+        self.touch_find_again();
         let [x, y] = self.touch_aimed(self.m.touch.down);
         let now = self.now_ms;
         let s = &mut self.m.touch;
@@ -1003,6 +1030,8 @@ impl Ui {
                 if !cancel && !self.m.touch.no_click && !self.m.touch.long_done {
                     // a click where it came down: a finger that rolled a little within the slop
                     // still means that widget
+                    self.uiw_use(self.m.touch.win);
+                    self.touch_find_again();
                     let [x, y] = self.touch_aimed(self.m.touch.down);
                     self.touch_out(plat::E_MOVE, 0, x, y);
                     self.touch_out(plat::E_DOWN, BTN_LEFT as u8, x, y);

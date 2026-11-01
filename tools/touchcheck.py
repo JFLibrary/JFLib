@@ -284,6 +284,38 @@ def run(exe, work):
         check(abs(r2[0] - r1[0] - 150) <= 2 and abs(r2[1] - r1[1] + 60) <= 2, "panel: ... and up and to the right", (r1, r2))
         a.events()
 
+        # ---- a resizable panel: with a finger its lower edge has a band inside the window
+        hist = a.by_title("Verlauf")
+        if hist is not None:
+            h0 = rect(hist)
+            hx, hy = origin(hist)
+            cr = wt.RECT()
+            user32.GetClientRect(hist, ctypes.byref(cr))
+            a.drag(hx + cr.right // 2, hy + cr.bottom - 6, hx + cr.right // 2, hy + cr.bottom - 66, ms=250)
+            h1 = rect(hist)
+            check(h1[3] < h0[3] and h1[1] == h0[1], "panel: its lower band sizes it with a finger", (h0, h1))
+        a.events()
+
+        # ---- a combo box's list stands in a popup window of its own: its input is the owner's
+        before = set(a.windows())
+        c = wt.RECT()
+        user32.GetClientRect(main, ctypes.byref(c))
+        zx, zy = c.right - 230, c.bottom - 16
+        a.tap(ox + zx, oy + zy)
+        new = [h for h in a.windows() if h not in before]
+        print("  new windows:", [rect(h) for h in new], flush=True)
+        check(len(new) >= 1, "popup: a tap on the zoom box opens its list", len(new))
+        a.events()
+        if new:
+            # (the list is the tallest of what came: a tooltip may have come along)
+            pop = max(new, key=lambda h: rect(h)[3] - rect(h)[1])
+            r = rect(pop)
+            a.tap((r[0] + r[2]) // 2, (r[1] + r[3]) // 2)
+            ev = a.events()
+            check(pop not in a.windows(), "popup: a tap on a row closes it")
+            check(any(e[0] == 2 and is_finger(e) and e[6] == 0 for e in ev), "popup: its finger is the main window's")
+            check(not any(e[0] in (2, 3) and not is_finger(e) and e[1] == 0 for e in ev), "popup: no raw press without a finger's data")
+
         # ---- two fingers: no Ctrl + wheel, no mouse
         cx, cy = 500, 400
         a.two((ox + cx - 100, oy + cy), (ox + cx + 100, oy + cy), (-80, 0), (80, 0))

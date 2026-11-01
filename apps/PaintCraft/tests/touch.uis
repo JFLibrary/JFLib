@@ -254,6 +254,26 @@ key esc
 window any
 wait 200
 
+# ------------------------------------------------------------ the first finger after a mouse
+# the title bar of a tool window grows for a finger and what is below it moves; a tap means what it came
+# down on.  (Mouse: #4000 at y 33, #4002 at y 67: this point is the top of #4002, later it is #4000's end)
+key ctrl+0
+pointer mouse
+move 640,600
+wait 16
+expect #4002 rect 5 67 32 32
+window 24577
+finger down 21,69
+wait 50
+finger up
+window any
+wait 50
+expect #4002 checked
+pointer touch
+wait 16
+tap #4010
+wait 200
+
 # ------------------------------------------------------------ the pen comes first
 # a palm while the pen is down: nothing moves, nothing paints
 key ctrl+0

@@ -860,7 +860,9 @@ impl Ui {
         }
         let st = self.style;
         let w = st.metric(if flags & WF_TOOL != 0 { SM_CAP_W_TOOL } else { SM_CAP_W });
-        let w = if self.m.touch.on { w.max(super::touch::CAPTION_DIP) } else { w }; // (for a finger)
+        // (for a finger, unless the window is so narrow that the title bar would be gone)
+        let wide = super::layout::px2dip_at(self.wp.rt.fb.w, self.wp.rt.dpi) >= super::touch::CAPTION_MIN_W;
+        let w = if self.m.touch.on && wide { w.max(super::touch::CAPTION_DIP) } else { w };
         self.m.chrome.cap_w = w;
         let ev = self.cap_button(ids + WCH_CLOSE, IC_CHROME_CLOSE, HB_CLOSE, "Close");
         self.m.chrome.cap_w = 0;

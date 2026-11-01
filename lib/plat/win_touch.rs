@@ -348,9 +348,8 @@ pub(super) fn pointer(_hwnd: isize, msg: u32, id: u32, w: i32) -> bool {
             true
         }
         WM_POINTERCAPTURECHANGED => {
-            if let Some(k) = find(id) {
-                gone(k, FingerPhase::Cancel, None);
-            }
+            let Some(k) = find(id) else { return false }; // (the system's: a move of the main window)
+            gone(k, FingerPhase::Cancel, None);
             true
         }
         _ => true, // WM_POINTERENTER, WM_POINTERLEAVE: a finger has no hover
