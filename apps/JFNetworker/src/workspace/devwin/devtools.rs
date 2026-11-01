@@ -530,7 +530,7 @@ fn cookies_tab(ui: &mut Ui, base: u32, s: &mut Browser, url: &str, clock: i64) {
         GridCol::new(t("Wert"), 120).flags(GC_NOSORT | GC_FILL),
         GridCol::new(t("Domain"), 100).flags(GC_NOSORT),
         GridCol::new(t("Pfad"), 56).flags(GC_NOSORT),
-        GridCol::new(t("Läuft ab"), 150).flags(GC_NOSORT),
+        GridCol::new(t("Läuft ab"), 168).flags(GC_NOSORT),
         GridCol::new(t("Merkmale"), 120).flags(GC_NOSORT),
     ];
     ui.next_size(-1, -1);

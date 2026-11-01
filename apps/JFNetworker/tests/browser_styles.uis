@@ -82,6 +82,27 @@ expect window 26624 open
 click tab:"Dienste"
 expect text:"Port 80: 9 Anfragen, 9 Antworten, 0 in Arbeit, 0 wartend" exists
 close window 26624
+# ---- a <link> a script adds is fetched too, and counts
+dblclick listitem:"PC1" shift
+expect window 26624 open
+resizewin 26624 1200 860
+click #26800
+key ctrl+a
+type "web.lab/spaet.html\n"
+wait 500
+expect heading:"Später" exists
+key f12
+click tab:"Elemente"
+click listitem:"<p id=\"spaet\" class=\"spaet\">"
+expect text:"color: #7A1F7A" missing
+click button:"Stylesheet dazu"
+wait 500
+expect text:"color: #7A1F7A" exists
+click tab:"Netzwerk"
+expect text:"http://web.lab/spaet.css" exists
+click tab:"Konsole"
+key f12
+close window 26624
 # ---- sheets that fail: the page shows, the console says why
 dblclick listitem:"PC1" shift
 expect window 26624 open

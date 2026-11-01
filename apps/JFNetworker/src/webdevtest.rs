@@ -17,10 +17,9 @@ use alloc::vec::Vec;
 
 use jfn_model::project::Project;
 use jfn_sim::keyframe::digest;
-use jfn_sim::{Action, Budget, Cmd, Engine, Inline, Note, Report, WebErr, WebFail, WebReq, WebResp, MS, SEC};
+use jfn_sim::{Action, Budget, Cmd, Engine, Inline, Note, Report, WebErr, WebFail, WebReq, WebResp, SEC};
 use netpkt::cookie::Jar;
 use netpkt::decode;
-use netpkt::http::Headers;
 use netpkt::x509::{F_EXPIRED, F_NAME, F_NOT_YET, F_SELF_SIGNED};
 use ui::{MdEv, MdNode, MdViewState};
 
@@ -153,6 +152,10 @@ fn sheets(t: &mut T) {
     t.check("a text that is no sheet", line(b, "http://web.lab/notiz.txt").contains("text/plain"));
     let d = c.get(&mut e, "http://web.lab:81/zu.css");
     t.check("a server that is not there", !line(d, "http://web.lab:81/zu.css").is_empty());
+    let big = WebResp { status: 200, body: alloc::vec![b' '; (1 << 20) + 1], ..WebResp::default() };
+    t.check("a sheet too large", sheet_text(&Ok(big), "http://web.lab/gross.css").err().is_some_and(|l| l.contains("zu groß")));
+    let untyped = WebResp { status: 200, body: Vec::from(&b"p { color: red }"[..]), ..WebResp::default() };
+    t.eq("no type at all: taken", sheet_text(&Ok(untyped), "http://web.lab/x").ok(), Some(s("p { color: red }")));
     // a page without sheets asks for nothing
     let page = c.body(&mut e, "http://web.lab/ohne.html");
     let mut v = MdViewState::new();
@@ -543,8 +546,6 @@ fn determinism(t: &mut T) {
         r.run(rw, usize::MAX).then(|| r.finish())
     });
     t.eq("a replay ends in the same state", replayed.map(|p| digest(&p.eng)), Some(live));
-    let _ = MS;
-    let _: Option<Headers> = None;
 }
 
 pub(crate) fn run(t: &mut T) {

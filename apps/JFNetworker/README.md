@@ -3765,8 +3765,9 @@ ClientHello und ServerHello im Klartext, danach alles mit ChaCha20-Poly1305 vers
 Zertifikat echtes X.509 mit Ed25519, die Signatur und beide Finished geprüft. Der Kern steht ohne I/O in
 [`netpkt::tls`](../../lib/netpkt/tls.rs) und [`netpkt::x509`](../../lib/netpkt/x509.rs) und ist in
 `coretest` (Gruppe `tlscore`) gegen die RFC-8448-Werte und in beide Richtungen gegen `netio::tls` geprüft,
-das `tools/tls_interop.py` gegen OpenSSL prüft. Warum ein zweiter Kern: `netio::tls` nennt `plat`
-(Zufall, Uhr, Sockets), den darf der Simulator nicht nennen; `lib/netpkt/ssh.rs` hat es ebenso gemacht.
+mit `python tools/tls_interop.py --core` auch auf echten Sockets gegen OpenSSL als Client und als Server.
+Warum ein zweiter Kern: `netio::tls` nennt `plat` (Zufall, Uhr, Sockets), den darf der Simulator nicht
+nennen; `lib/netpkt/ssh.rs` hat es ebenso gemacht.
 
 **Was daran simuliert ist:** Die Schlüssel kommen aus dem Startwert des Projekts: Sie schützen nichts Echtes,
 und eine Wiederholung ist Bit für Bit gleich. Der Handshake kostet keine virtuelle Rechenzeit, nur die des

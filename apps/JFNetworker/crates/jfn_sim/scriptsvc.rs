@@ -2730,7 +2730,8 @@ impl Service for ScriptService {
         let breaks: usize = self.book.breaks.iter().map(|b| 48 + b.0.len() + b.2.as_ref().map_or(0, |c| c.len())).sum();
         // (a service from a file: the text it read, its path)
         let file = self.def.file.as_ref().map_or(0, |f| f.len() + self.def.source.len());
-        4096 + vm + breaks + file + self.run.as_ref().map_or(0, |r| (r.queue.len() + r.effects.len()) * 256)
+        let tls = self.run.as_ref().and_then(|r| r.serve.as_ref()).map_or(0, |s| s.tls_bytes());
+        4096 + vm + breaks + file + tls + self.run.as_ref().map_or(0, |r| (r.queue.len() + r.effects.len()) * 256)
     }
     fn metrics(&self) -> Vec<Metric> {
         self.metrics_at(self.seen)

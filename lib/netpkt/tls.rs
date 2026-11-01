@@ -2,7 +2,7 @@
 // that came, take the bytes to send, the plain text and the events; no sockets, no clock.  Random
 // bytes come from a seed the caller passes in, so a connection is the same byte for byte for the same
 // seed.  The records and the handshake are the real thing, a peer of another make understands them
-// (apps/coretest group tlscore talks to netio::tls)
+// (apps/coretest group tlscore talks to netio::tls, tools/tls_interop.py --core to OpenSSL)
 //
 //   PORT                     443
 //   CT_*, HS_*, AL_*, EXT_*  content types, handshake types, alerts, extensions; ct_name(t),

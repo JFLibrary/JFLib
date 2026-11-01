@@ -4,7 +4,8 @@
 // the same bytes), the alert for each fault and what excuses it, a changed byte refused, what is no
 // TLS; the core against netio::tls's Conn both ways with each other's certificates (RFC 8446 from
 // another implementation, the one tools/tls_interop.py checks against OpenSSL); dissect and
-// decode::layers of what they send
+// decode::layers of what they send.  --tls-core-pki DIR, --tls-core-serve PORT, --tls-core-get PORT are
+// the core on sockets for tools/tls_interop.py --core, where OpenSSL itself is the other side
 
 use alloc::string::String;
 use alloc::vec::Vec;
@@ -18,6 +19,7 @@ use netpkt::tcp::{TcpHdr, TcpOpts, ACK, PSH};
 use netpkt::tls::{self, ClientCfg, Core, Event, Failure, Identity, Part};
 use netpkt::x509::{check_chain, Cert, CertSpec, F_BAD_SIGNATURE, F_EXPIRED, F_NAME, F_NOT_YET, F_SELF_SIGNED, F_UNKNOWN_ISSUER};
 use netpkt::{IpAddr, Ipv4, Mac};
+use plat::net::{IpAddr as NetAddr, SocketAddr, TcpListener, TcpStream};
 
 use crate::T;
 
@@ -387,6 +389,99 @@ fn with_netio(t: &mut T) {
     t.check("netio's server: close_notify", c.peer_closed());
     t.eq("no failures", c.failure(), None);
     let _ = root;
+}
+
+// the certificates of --tls-core-*: a CA and web.lab, valid for a century (real sockets, a real clock)
+fn interop_pki() -> (Cert, Identity) {
+    let (a, z) = (946_684_800, 4_102_444_800);
+    let rk = key(31);
+    let root = CertSpec { serial: [31; 16], cn: String::from("Interop CA"), org: String::from("JFLib"), not_before: a, not_after: z, public_key: rk.public, is_ca: true, ..CertSpec::default() }.sign(None, &rk);
+    let root = Cert::parse(&root).unwrap_or_default();
+    let k = key(32);
+    let leaf = CertSpec { not_before: a, not_after: z, ..spec(&k, &["web.lab"]) }.sign(Some(&root), &rk);
+    (root, Identity { chain: alloc::vec![leaf], key: k })
+}
+
+/// --tls-core-pki DIR: ca.pem, leaf.pem, leaf.key for the other side
+pub fn write_pki(dir: &str) -> i32 {
+    let (root, id) = interop_pki();
+    let w = |name: &str, s: String| plat::write_file(&plat::fs::join(dir, name), s.as_bytes());
+    let ok = w("ca.pem", netio::pem::encode("CERTIFICATE", &root.der)) && w("leaf.pem", netio::pem::encode("CERTIFICATE", &id.chain[0])) && w("leaf.key", netio::pem::encode("PRIVATE KEY", &netio::x509::ed25519_pkcs8(id.key.seed())));
+    if ok { 0 } else { 1 }
+}
+
+// bytes to the socket, what came to the core, until `done` or the end -> it got there
+fn pump_socket(c: &mut Core, s: &TcpStream, done: &mut dyn FnMut(&mut Core) -> bool) -> bool {
+    let mut buf = alloc::vec![0u8; 1 << 16];
+    s.set_read_timeout(Some(5000));
+    for _ in 0..1000 {
+        let out = c.take_out();
+        if !out.is_empty() && s.write_all(&out).is_err() {
+            return false;
+        }
+        if done(c) {
+            let out = c.take_out();
+            return out.is_empty() || s.write_all(&out).is_ok();
+        }
+        if c.dead() {
+            return false;
+        }
+        match s.read(&mut buf) {
+            Ok(n) if n > 0 => c.push(&buf[..n]),
+            _ => return false,
+        }
+    }
+    false
+}
+
+/// --tls-core-serve PORT: the core as a server: each connection's first bytes come back in an answer
+pub fn serve(port: u16) -> i32 {
+    let (_, id) = interop_pki();
+    let Ok(l) = TcpListener::bind(&SocketAddr::new(NetAddr::LOCALHOST_V4, port)) else { return 1 };
+    plat::write_stdout(b"ready\n");
+    let mut n = 0u8;
+    loop {
+        let Ok(Some((s, _))) = l.accept_timeout(20_000) else { return 0 };
+        n = n.wrapping_add(1);
+        let mut c = Core::server(id.clone(), &[n; 32]);
+        pump_socket(&mut c, &s, &mut |c| {
+            let got = c.read();
+            if got.is_empty() {
+                return false;
+            }
+            let mut a = String::from("sni=");
+            a.push_str(c.name());
+            a.push_str(" got=");
+            a.push_str(&String::from_utf8_lossy(&got));
+            c.send(a.as_bytes());
+            c.close();
+            true
+        });
+    }
+}
+
+/// --tls-core-get PORT: the core as a client of web.lab: exit 0 when the answer came, 2 when the server's
+/// certificate was refused
+pub fn get(port: u16) -> i32 {
+    let (root, _) = interop_pki();
+    let Ok(s) = TcpStream::connect(&SocketAddr::new(NetAddr::LOCALHOST_V4, port), 5000) else { return 1 };
+    let cfg = ClientCfg { name: plat::arg_value("--host").unwrap_or_else(|| String::from("web.lab")), anchors: alloc::vec![root], now: plat::unix_time_ns() / 1_000_000_000, insecure: false, accept: Vec::new() };
+    let mut c = Core::client(cfg, &crypto::sha256(b"tls core get"));
+    let mut sent = false;
+    let mut answer = Vec::new();
+    let ok = pump_socket(&mut c, &s, &mut |c| {
+        if c.established() && !sent {
+            sent = true;
+            c.send(b"hallo vom Kern\n");
+        }
+        answer.extend_from_slice(&c.read());
+        !answer.is_empty()
+    });
+    plat::write_stdout(&answer);
+    if c.faults() != 0 {
+        return 2;
+    }
+    if ok { 0 } else { 1 }
 }
 
 fn frame(tcp: &[u8]) -> Vec<u8> {

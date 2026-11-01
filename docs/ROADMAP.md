@@ -1244,7 +1244,7 @@ Fensterrand hinaus.
   Seit B4 von JFNetworker auch Cookies nach RFC 6265 ([`netpkt/cookie.rs`](../lib/netpkt/cookie.rs),
   Gruppe `cookie`) und TLS 1.3 ohne I/O mit einem X.509 für eigene Zertifikate
   ([`netpkt/tls.rs`](../lib/netpkt/tls.rs), [`netpkt/x509.rs`](../lib/netpkt/x509.rs), Gruppe `tlscore`:
-  RFC-8448-Werte, in beide Richtungen gegen `netio::tls`).
+  RFC-8448-Werte, in beide Richtungen gegen `netio::tls`; `tools/tls_interop.py --core` gegen OpenSSL).
   Getestet mit `coretest` (Gruppen `netpkt`, `rng`; RFC-Vektoren, unabhängig berechnete
   Prüfsummen). Seit E6 auch DHCP (RFC 2131/2132 mit typisierten Optionen, Relay-Information
   RFC 3046, lange Optionen RFC 3396), DNS-Nachrichten (RFC 1035 mit Namenskompression in beide

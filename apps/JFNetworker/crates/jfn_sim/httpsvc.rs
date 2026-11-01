@@ -854,7 +854,7 @@ impl Service for HttpServer {
             up.reset();
         }
         if let Some(spec) = self.tls.clone() {
-            let id = spec.identity(os, "http-server");
+            let id = spec.identity(os, &format!("http-server:{}", self.serve.cfg.port));
             if let Some(c) = id.chain.first().and_then(|d| netpkt::x509::Cert::parse(d)) {
                 os.note(Note::Tls(crate::tlssim::TlsNote::CertMade { subject: c.subject_cn, issuer: c.issuer_cn }));
             }

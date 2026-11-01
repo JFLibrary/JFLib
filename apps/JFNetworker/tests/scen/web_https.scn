@@ -13,7 +13,7 @@ expect PC1 output contains "*  subject: CN=web.lab"
 expect PC1 output contains "*  issuer: CN=JFNetworker Lab CA"
 expect PC1 output contains "*  certificate verify ok."
 expect PC1 output contains "Eine Notiz, kein Stylesheet."
-PC1: curl -s -o /dev/null -w "%{http_code} %{scheme} %{ssl_verify_result} %{url_effective}\n" https://www.web.lab/ohne.html
+PC1: curl -s -o /dev/null -w "%{http_code} %{scheme} %{ssl_verify_result} %{url_effective} %{time_appconnect}\n" https://www.web.lab/ohne.html
 run 100ms
 expect PC1 output contains "200 HTTPS 0 https://www.web.lab/ohne.html"
 PC1: curl -sS https://web.lab:8441/

@@ -46,9 +46,9 @@
    1.200000000  ok      expect PC1 output contains "*  issuer: CN=JFNetworker Lab CA"
    1.200000000  ok      expect PC1 output contains "*  certificate verify ok."
    1.200000000  ok      expect PC1 output contains "Eine Notiz, kein Stylesheet."
-   1.200000000  PC1     root@PC1:~# curl -s -o /dev/null -w "%{http_code} %{scheme} %{ssl_verify_result} %{url_effective}\n" https://www.web.lab/ohne.html
+   1.200000000  PC1     root@PC1:~# curl -s -o /dev/null -w "%{http_code} %{scheme} %{ssl_verify_result} %{url_effective} %{time_appconnect}\n" https://www.web.lab/ohne.html
    1.200000000  --      run 100ms
-   1.200157968  PC1     200 HTTPS 0 https://www.web.lab/ohne.html
+   1.200157968  PC1     200 HTTPS 0 https://www.web.lab/ohne.html 0.000025
    1.300000000  ok      expect PC1 output contains "200 HTTPS 0 https://www.web.lab/ohne.html"
    1.300000000  PC1     root@PC1:~# curl -sS https://web.lab:8441/
    1.300000000  --      run 100ms

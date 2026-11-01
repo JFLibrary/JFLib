@@ -147,6 +147,15 @@ fn run() -> i32 {
     if let Some(u) = plat::arg_value("--tls-web") {
         return tlst::web(&u, plat::arg_value("--ca").as_deref());
     }
+    if let Some(d) = plat::arg_value("--tls-core-pki") {
+        return tlscoret::write_pki(&d);
+    }
+    if let Some(p) = plat::arg_value("--tls-core-serve").and_then(|p| p.parse().ok()) {
+        return tlscoret::serve(p);
+    }
+    if let Some(p) = plat::arg_value("--tls-core-get").and_then(|p| p.parse().ok()) {
+        return tlscoret::get(p);
+    }
     if let Some(p) = plat::arg_value("--ssh-serve").and_then(|p| p.parse().ok()) {
         return sshd::serve(p);
     }

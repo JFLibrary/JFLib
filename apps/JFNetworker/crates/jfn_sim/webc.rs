@@ -15,6 +15,7 @@
 //                       TLS said) or WebFail (WebErr, the URL it stopped at, why as a Msg, the hops,
 //                       what TLS said)
 //   Engine::web_client(dev) -> WebClientView   the requests still running, what it counted
+//   Engine::service_status(dev, name)      a service's status line (Reiter Dienste, checks)
 //
 // Errors (WebErr): Refused (nobody listens on the port), Timeout (30 s per hop, DIAL included),
 // NoName (the resolver found nothing, or no name server answered), NoRoute (no route, the network

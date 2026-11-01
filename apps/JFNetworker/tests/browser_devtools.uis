@@ -2,8 +2,8 @@
 # the developer view of the Webbrowser (B4) on PC1's desktop: F12 and its button, the tabs; Netzwerk with
 # a row per request and hop, a chosen row's heads and body, who asked; Elemente live as a script changes
 # the page, with attributes and styles; Konsole; each document its own log; Anhalten ends fetch and src
-# requests too; the console stays at its end when the scale changes; no project change (the title
-# stays clean); it works in a small window
+# requests too; the console stays at its end when the scale changes; it works in a small window; no
+# undo step from any of it
 # Ids (window 0): the window 26624; the address 26800, Zurück 26803, Neu laden / Anhalten 26805; the
 # console's button 122880; the developer view's button 124928, Schließen 124932
 size 1280 900
@@ -148,8 +148,28 @@ wait 100
 expect text:"die letzte Zeile" rect 23 975 * 15
 click tab:"Netzwerk"
 click tab:"Konsole"
-# ---- no project change from all of this: nothing to save
-close window 26624
-expect window 26624 closed
-expect dialog:"Änderungen speichern?" missing
+# ---- a small window: still all of it, a list and its details
+click #26800
+key ctrl+a
+type "web.lab\n"
+wait 1000
+click button:"Wiederherstellen: Hofladen Sonnenfeld – Webbrowser"
+resizewin 26624 860 620
+click tab:"Netzwerk"
+click text:"http://web.lab/"
+expect text:"GET http://web.lab/" exists
+click tab:"Elemente"
+expect listitem:"<html>" exists
+# (the login above set one for this host; another host has none)
+click tab:"Cookies"
+expect text:"anmeldung" exists
+click #26800
+key ctrl+a
+type "www.web.lab\n"
+wait 1000
+expect text:"Diese Seite hat keine Cookies." exists
+click tab:"Konsole"
+key f12
+# ---- all of this is the window's: no undo step, nothing changed in the project
+expect button:"Rückgängig" disabled
 expect_nowarn
