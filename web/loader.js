@@ -131,6 +131,9 @@ const pen=e=>{
 // The accessibility tree as an ARIA shadow tree over the canvas (a11y.js; ?a11y=0: none).
 const shadow=params.get("a11y")!=="0" && a11yRoot ? new Shadow(a11yRoot,{input,act:m=>send({type:"a11y-act",...m})}) : null;
 if(shadow) Object.defineProperty(window,"jfguiA11y",{value:shadow}); // read-only handle for tests
+// a phone: #input keeps the keys, but the system's keyboard only opens for the app's text fields
+const coarse=matchMedia("(pointer: coarse)").matches;
+if(coarse) input.inputMode="none";
 canvas.onpointerdown=e=>{if(!e.isPrimary)return;e.preventDefault();if(shadow)shadow.follow=false;input.focus({preventScroll:true});canvas.setPointerCapture(e.pointerId);event(2,button(e),...pos(e),pen(e),mods(e),false,fingerAt(e));};
 canvas.onpointermove=e=>{
   if(!e.isPrimary)return;
@@ -287,7 +290,9 @@ async function service(m) {
     }
     else if(m.kind===4) {if(!navigator.clipboard?.readText){complete(m.id,-3);return;}send({type:"clipboard",text:await navigator.clipboard.readText()});complete(m.id,2);}
     else if(m.kind===5) {if(!navigator.clipboard?.writeText){complete(m.id,-3);return;}await navigator.clipboard.writeText(value());complete(m.id,2);}
-    else if(m.kind===6) {const v=new DataView(m.data);input.style.left=Math.max(0,Math.min(canvas.clientWidth-2,v.getInt32(0,true)/devicePixelRatio))+"px";input.style.top=Math.max(0,Math.min(canvas.clientHeight-20,v.getInt32(4,true)/devicePixelRatio))+"px";input.style.height=Math.max(16,v.getInt32(8,true)/devicePixelRatio)+"px";}
+    else if(m.kind===6) {const v=new DataView(m.data);
+      if(coarse) {const want=v.getInt32(8,true)>0?"text":"none";if(input.inputMode!==want) {input.inputMode=want;if(want==="text"&&document.activeElement===input) {input.blur();input.focus({preventScroll:true});}}}
+      input.style.left=Math.max(0,Math.min(canvas.clientWidth-2,v.getInt32(0,true)/devicePixelRatio))+"px";input.style.top=Math.max(0,Math.min(canvas.clientHeight-20,v.getInt32(4,true)/devicePixelRatio))+"px";input.style.height=Math.max(16,v.getInt32(8,true)/devicePixelRatio)+"px";}
     else if(m.kind===7) canvas.style.cursor=["default","text","pointer","crosshair","move","wait","ns-resize","ew-resize","nwse-resize","nesw-resize","none"][new DataView(m.data).getUint32(0,true)]||"default";
     else if(m.kind===8) document.title=value();
     // unsaved work (plat::set_unsaved): leaving the page asks first
