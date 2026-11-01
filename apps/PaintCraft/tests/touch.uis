@@ -1,0 +1,321 @@
+# touch.uis -- PaintCraft with fingers (what a Surface showed; lib/ui/touch.rs): the gear and the zoom
+# slider by finger, panels that move after a press and hold in every direction, a pinch around the point
+# between the fingers, two fingers pan in every direction, one finger paints or pans (settings), a palm
+# while the pen is near does nothing.  #9909 text = image origin in the canvas "x,y", value = zoom.
+size 1280 800
+theme light
+expect #1400 rect 0 129 1280 639
+pointer touch
+wait 16
+
+# ------------------------------------------------------------ the gear
+tap #710
+expect window 24624 open
+window 24624
+key esc
+window any
+expect window 24624 closed
+wait 200
+# just above the button: the title bar's background, the nearest small widget is meant
+tap 1085,5
+expect window 24624 open
+window 24624
+key esc
+window any
+wait 200
+# between the gear and what is next to it, on the title bar
+tap 1067,24
+expect window 24624 open
+window 24624
+key esc
+window any
+wait 200
+# a finger that rolls off the button within the slop, a click all the same
+finger down 1085,36
+wait 40
+finger move 1085,42
+finger up
+expect window 24624 open
+window 24624
+key esc
+window any
+wait 200
+
+# ------------------------------------------------------------ the zoom slider
+expect #1026 value 11
+swipe 1208,784 1160,784 200 hold
+expect #1026 value 0..10
+expect #9909 value 100..9999
+# with the finger a little above the slider's middle, on the slider's upper edge
+swipe 1160,770 1260,772 200 hold
+expect #1026 value 20..27
+key ctrl+0
+expect #9909 value 10000
+wait 200
+
+# ------------------------------------------------------------ a panel: press and hold, then it moves
+expect window 24577 rect 8 137 74 346
+# a quick swipe on the title bar moves nothing, the view under it neither
+window 24577
+flick 20,10 60 60 200
+window any
+expect window 24577 rect 8 137 74 346
+expect #9909 value 10000
+# rests on the title bar, then goes down only
+window 24577
+finger down 20,10
+wait 900
+finger move 20,130
+finger up
+window any
+expect window 24577 rect 8 257 74 346
+wait 200
+# up and to the right
+window 24577
+finger down 20,10
+wait 900
+finger move 320,-40
+finger up
+window any
+expect window 24577 rect 308 207 74 346
+wait 200
+# not long enough: nothing
+window 24577
+finger down 20,10
+wait 300
+finger move 120,110
+finger up
+window any
+expect window 24577 rect 308 207 74 346
+# its buttons still work with the finger, the panel stays where it is
+window 24577
+tap #4000
+window any
+expect #4000 checked
+expect window 24577 rect 308 207 74 346
+tap #4010
+expect #4010 checked
+wait 200
+
+# ------------------------------------------------------------ two fingers: zoom around the point between them
+expect #9909 text "240,19"
+pinch 640,448 100 200 200
+expect #9909 value 20000
+# (the image point at 400, 300 stays under the fingers: 640 - 400 * 2, 319 - 300 * 2)
+expect #9909 text "-160,-281"
+wait 200
+pinch 640,448 200 100 200
+expect #9909 value 10000
+expect #9909 text "240,19"
+wait 200
+# a pinch that stops in between: any zoom, no preset steps
+pinch 640,448 100 137 200
+expect #9909 value 13600
+wait 200
+pinch 640,448 137 100 200
+wait 200
+# a first finger that moved on a little before the second one came: no stroke, no click
+expect #9909 value 10000
+
+# ------------------------------------------------------------ two fingers pan in every direction
+key ctrl+0
+pan2 640,448 100 0 200
+expect #9909 text "340,19"
+wait 200
+pan2 640,448 0 100 200
+expect #9909 text "340,119"
+wait 200
+pan2 640,448 -300 -200 200
+expect #9909 text "40,-81"
+wait 200
+# not out of reach: a quarter of the view stays
+pan2 640,448 -1000 0 200
+expect #9909 text "-480,-81"
+wait 200
+# the next zoom by other means: in the usual limits again
+key ctrl+0
+expect #9909 text "240,19"
+wait 200
+
+# ------------------------------------------------------------ scroll bars: none under a finger, the mouse brings them back
+cmd 230 30000
+wait 16
+expect #9909 value 30000
+# where the horizontal bar would be: a finger paints there, it rolls nothing
+expect #9905 value 0
+swipe 640,763 700,763 200 hold
+wait 50
+expect #9905 value 1
+key ctrl+z
+wait 50
+# (the mouse's bar takes the same drag)
+pointer mouse
+move 640,600
+drag 640,763 700,763
+wait 16
+expect #9905 value 0
+pointer touch
+wait 16
+key ctrl+0
+wait 200
+
+# ------------------------------------------------------------ one finger paints with the current tool
+expect #9905 value 0
+expect pixel 640 448 #FFFFFF
+tap 640,448
+wait 50
+expect #9905 value 1
+key ctrl+z
+wait 50
+# a stroke
+swipe 500,400 700,400 300 hold
+wait 50
+expect #9905 value 1
+key ctrl+z
+wait 50
+# resting first: then the press comes without a move, and no context menu
+finger down 640,448
+wait 500
+finger up
+wait 50
+expect #9905 value 1
+key ctrl+z
+wait 50
+
+# a second finger right after the first one moved off: the stroke is taken back
+finger down 500,400
+wait 16
+finger move 530,400
+wait 16
+finger 1 down 700,400
+wait 16
+finger 1 move 720,400
+wait 16
+finger up
+finger 1 up
+wait 50
+expect #9905 value 0
+expect #9909 value 11176
+key ctrl+0
+wait 200
+# a second finger long after the stroke began takes nothing from it
+finger down 500,400
+wait 16
+finger move 530,400
+wait 300
+finger move 560,400
+finger 1 down 700,400
+wait 16
+finger move 580,400
+wait 16
+expect #9909 value 10000
+finger 1 up
+finger up
+wait 50
+expect #9905 value 1
+key ctrl+z
+wait 200
+
+# ------------------------------------------------------------ one finger pans when the setting says so
+tap #710
+window 24624
+tap #5509
+wait 50
+expect #5592 value 0
+tap #5592
+wait 50
+tap listitem:"Verschiebt die Ansicht"
+wait 50
+expect #5592 value 2
+key esc
+window any
+wait 200
+key ctrl+0
+swipe 700,500 650,450 200 hold
+wait 50
+expect #9905 value 0
+expect #9909 text "190,-31"
+# a tap paints nothing then
+tap 640,448
+wait 50
+expect #9905 value 0
+key ctrl+0
+wait 200
+tap #710
+window 24624
+tap #5509
+wait 50
+tap #5592
+wait 50
+tap listitem:"Automatisch: malt, bis ein Stift benutzt wurde"
+wait 50
+expect #5592 value 0
+key esc
+window any
+wait 200
+
+# ------------------------------------------------------------ the first finger after a mouse
+# the title bar of a tool window grows for a finger and what is below it moves; a tap means what it came
+# down on.  (Mouse: #4000 at y 33, #4002 at y 67: this point is the top of #4002, later it is #4000's end)
+key ctrl+0
+pointer mouse
+move 640,600
+wait 16
+expect #4002 rect 5 67 32 32
+window 24577
+finger down 21,69
+wait 50
+finger up
+window any
+wait 50
+expect #4002 checked
+pointer touch
+wait 16
+tap #4010
+wait 200
+
+# ------------------------------------------------------------ the pen comes first
+# a palm while the pen is down: nothing moves, nothing paints
+key ctrl+0
+key ctrl+plus
+expect #9909 value 12500
+pointer pen 50
+move 300,300
+down 300,300
+pointer touch
+expect #9909 value 12500
+finger 3 down 700,500
+finger 4 down 800,500
+wait 16
+finger 3 move 760,560
+finger 4 move 860,560
+wait 16
+expect #9909 value 12500
+expect #9909 text "140,-56"
+finger 3 up
+finger 4 up
+pointer pen 50
+up 320,320
+wait 50
+expect #9905 value 1
+key ctrl+z
+# a palm right after the pen went up does nothing either
+finger 3 down 700,500
+finger 4 down 800,500
+wait 16
+finger 3 move 760,560
+finger 4 move 860,560
+wait 16
+expect #9909 text "140,-56"
+finger 3 up
+finger 4 up
+wait 600
+pointer touch
+wait 16
+# now the pen paints and one finger moves the view
+swipe 700,500 650,450 200 hold
+wait 50
+expect #9905 value 0
+expect #9909 text "90,-106"
+key ctrl+0
+wait 200

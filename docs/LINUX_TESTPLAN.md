@@ -243,3 +243,33 @@ Für eine Claude-Sitzung, die auf dem Linux-Rechner selbst läuft (oder per SSH 
   plattest), sonst nur beschreiben.
 - **Bericht** an Jakob auf Deutsch, kurz: was geprüft ist, was scheiterte, was behoben ist,
   welcher Zweig oder welches Bundle es enthält.
+
+---
+
+## 9. Touch, falls ein Rechner einen Touchscreen hat
+
+Stand 2026-11-01. `wl_touch` und XInput-2.2-Touch sind bisher nur mit eingespeisten Ereignissen geprüft
+(`plattest --test touch`), ein echter Finger kam noch nie an: In WSL gibt es kein Gerät. Gegen WSLgs Xwayland und
+Compositor lief PaintCraft nur ohne Finger: Die Touch-Maske geht bei jedem Fenster raus (`strace`), ohne X-Fehler
+(`jfgui_X11DEBUG=1`), Wayland ohne Protokollfehler. Die Erwartungen stehen in `apps/PaintCraft/docs/TOUCH.md` (Prüfliste für das Surface, Punkte 1 bis 9 gelten
+hier genauso), die Bedeutung in GUIDE §37.
+
+- **Wayland (GNOME und KDE):** `python3 build_rs.py run PaintCraft --target linux`, die Prüfliste. Besonders:
+  - Hauptfenster: Die eigene Titelleiste zieht das Fenster mit dem Finger (`xdg_toplevel.move` mit der Serial des Fingers).
+    Der Compositor sollte die Bewegung übernehmen und danach `wl_touch.cancel` oder `up` schicken.
+  - Werkzeugfenster sind Kindfenster: Halten, dann ziehen, bleibt innerhalb des Hauptfensters
+    (`linux_wl_child.rs`). Springt das Fenster beim Ziehen, liegt es am Bezugspunkt der Positionen; `MODEL_*` dort ist nur
+    für die Maus gemessen.
+  - Skalierung 125 % und 200 %: Der Finger trifft, was unter ihm liegt.
+  - Menüs und Auswahllisten (Popups): Tippen trifft den Eintrag.
+  - Textfeld antippen: Öffnet der Compositor seine Bildschirmtastatur (`text-input-v3`)?
+  - Drei Finger, Compositor-Gesten: Ein `wl_touch.cancel` beendet die Geste sauber, kein Strich bleibt hängen.
+- **X11 (Xfce, sonst `jfgui_BACKEND=x11` unter Xwayland):**
+  - `xinput list` zeigt das Gerät; ein Finger kommt als Finger an, nicht doppelt als Maus (`--log-events`: `data` mit `3` im
+    Typ-Feld, keine `btn=1` ohne Finger).
+  - Fenster ziehen: Die Bibliothek bewegt es selbst (`xi_drag_to`), der Fenstermanager sieht nur `ConfigureWindow`. Mit und
+    ohne Compositor; ein Fenstermanager mit eigenen Touch-Griffen (passive grab) könnte den Finger zuerst nehmen.
+  - Kein Einrasten am Rand (`window_snap`), das ist hier gewollt.
+- **Stift und Finger** (falls beides da ist): Handballen beim Zeichnen, Punkte 10 und 11 der Prüfliste.
+
+Ergebnisse wie immer hier eintragen.

@@ -168,6 +168,9 @@ pub(crate) struct StRec {
     pub(crate) tempdir: String,
     /// ST_PEN: (PN1) pen input
     pub(crate) pen: u32,
+    /// one finger on the canvas: 0 automatic (paints until a pen touched the canvas, then pans), 1
+    /// paints, 2 pans
+    pub(crate) finger: u32,
 }
 
 /// the state of settings.s
@@ -437,6 +440,7 @@ fn st_load_early(p: &mut Pn, ui: &mut Ui) {
         }
     }
     s.st.pen = st_geti(s, SEC_UI, "peninput", s.st.pen as i32, 0, 1) as u32; // (PN1) Windows-Tinte
+    s.st.finger = st_geti(s, SEC_UI, "finger", s.st.finger as i32, 0, 2) as u32;
     plat::pen_enable(s.st.pen != 0);
     s.st.anim = st_geti(s, SEC_UI, "animations", s.st.anim as i32, 0, 1) as u32;
     if plat::arg_value("--anim").is_none() {
@@ -836,6 +840,7 @@ fn st_collect(p: &mut Pn, ui: &mut Ui) {
     st_sets(s, SEC_UI, "accent", &acc);
     st_seti(s, SEC_UI, "animations", s.st.anim as i32);
     st_seti(s, SEC_UI, "peninput", s.st.pen as i32); // (PN1)
+    st_seti(s, SEC_UI, "finger", s.st.finger as i32);
     // ---- main window (headless runs keep the file's values)
     if !ui.headless() && s.mvalid {
         let m = s.mrect;
@@ -955,6 +960,7 @@ pub(crate) fn st_factory(p: &mut Pn, ui: &mut Ui) {
     s.theme = THEME_SYSTEM as u32;
     s.anim = 1;
     s.pen = 1; // (PN1)
+    s.finger = 0;
     s.workspace = 0;
     s.update_auto = 0;
     s.update_beta = 0;

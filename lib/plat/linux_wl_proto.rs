@@ -73,6 +73,8 @@ pub(crate) const SURFACE_SET_BUFFER_SCALE: Req = rq(8, "set_buffer_scale:i");
 pub(crate) const SURFACE_DAMAGE_BUFFER: Req = rq(9, "damage_buffer:iiii");
 pub(crate) const SEAT_GET_POINTER: Req = rq(0, "get_pointer:n");
 pub(crate) const SEAT_GET_KEYBOARD: Req = rq(1, "get_keyboard:n");
+pub(crate) const SEAT_GET_TOUCH: Req = rq(2, "get_touch:n");
+pub(crate) const TOUCH_RELEASE: Req = rd(0, "release:");
 pub(crate) const POINTER_SET_CURSOR: Req = rq(0, "set_cursor:u?oii");
 pub(crate) const POINTER_RELEASE: Req = rd(1, "release:");
 pub(crate) const KEYBOARD_RELEASE: Req = rd(0, "release:");
@@ -191,6 +193,12 @@ pub(crate) static IFACE_WL_POINTER: Iface = Iface {
            ev("button:uuuu", wlh_ptr_button), ev("axis:uuf", wlh_ptr_axis), ev("frame:", wlh_ptr_frame),
            ig("axis_source:u"), ig("axis_stop:uu"), ev("axis_discrete:ui", wlh_ptr_discrete),
            ev("axis_value120:ui", wlh_ptr_value120), ig("axis_relative_direction:uu")],
+};
+
+pub(crate) static IFACE_WL_TOUCH: Iface = Iface {
+    name: "wl_touch",
+    evs: &[ev("down:uuoiff", wlh_touch_down), ev("up:uui", wlh_touch_up), ev("motion:uiff", wlh_touch_motion), ig("frame:"),
+           ev("cancel:", wlh_touch_cancel), ig("shape:iff"), ig("orientation:if")],
 };
 
 pub(crate) static IFACE_WL_KEYBOARD: Iface = Iface {
@@ -320,6 +328,6 @@ pub(crate) static IFACE_TABLET_TOOL: Iface = Iface {
 };
 
 /// the interfaces linuxtest's synthetic events can address by name (first match wins)
-pub(crate) static ALL_IFACES: [&Iface; 8] = [&IFACE_WL_POINTER, &IFACE_WL_KEYBOARD, &IFACE_WL_SEAT, &IFACE_WL_OUTPUT,
+pub(crate) static ALL_IFACES: [&Iface; 9] = [&IFACE_WL_POINTER, &IFACE_WL_KEYBOARD, &IFACE_WL_SEAT, &IFACE_WL_OUTPUT,
                                               &IFACE_XDG_TOPLEVEL, &IFACE_WL_DATA_DEVICE, &IFACE_TABLET_SEAT,
-                                              &IFACE_TABLET_TOOL];
+                                              &IFACE_TABLET_TOOL, &IFACE_WL_TOUCH];

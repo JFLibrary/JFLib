@@ -757,6 +757,7 @@ pub(crate) const ID_SET_DIAG: u32 = 0x15CC; // 5580 Diagnose text (read-only, mu
 pub(crate) const ID_SET_DIAGCOPY: u32 = 0x15CD; // 5581 In die Zwischenablage kopieren
 pub(crate) const ID_SET_PEN: u32 = 0x15D6; // 5590 (PN1) Stift & Tablett: Windows-Tinte
 pub(crate) const ID_SET_PENDEV: u32 = 0x15D7; // 5591 (PN1) devices text, value = count (-1 unknown)
+pub(crate) const ID_SET_FINGER: u32 = 0x15D8; // 5592 Stift & Tablett: one finger on the canvas
 pub(crate) const ID_SET_PROBE: u32 = 0x170C; // 5900..5919, see docs/SETTINGS.md §6
 // ---- g_st (settings.s) -- values edited by the dialog
 pub(crate) const ST_PATH_CAP: i32 = 1040;

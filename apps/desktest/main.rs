@@ -45,6 +45,7 @@ use ui::*;
 
 const ID_DESK: u32 = 500;
 const ID_TOOL: u32 = 601; // the tool window
+const ID_TWO: u32 = 602; // (tests/touch.uis) a widget that takes two fingers
 const ID_NEW: u32 = 101;
 const ID_SAVE: u32 = 102;
 const ID_LOAD: u32 = 103;
@@ -99,6 +100,7 @@ struct Desk {
     log: Vec<String>,
     /// how often desk_end reported Close, Activate, Move, Resize, State
     evs: [u32; 5],
+    two: String,
     tool_open: Shared<i32>,
     tool_rect: Shared<WinRect>,
     fs_events: u32,
@@ -128,6 +130,7 @@ impl Default for Desk {
             clicks: 0,
             log: Vec::new(),
             evs: [0; 5],
+            two: String::new(),
             tool_open: Shared::new(0),
             tool_rect: Shared::new(WinRect::new(40, 60, 260, 120, 0)),
             fs_events: 0,
@@ -194,6 +197,26 @@ impl Desk {
         if self.log.len() > 6 {
             self.log.remove(0);
         }
+    }
+
+    // (tests/touch.uis) a widget that takes one finger or two: what ui.touch_two says, as text
+    fn two_fingers(&mut self, ui: &mut Ui) {
+        ui.next_size(SIZE_FILL, 40);
+        ui.box_begin(ID_TWO, BOX_V | BOX_FIXED, 0);
+        let ev = ui.behave(ID_TWO, HB_GRAB_H | HB_GRAB_V);
+        ui.sem(K_TEXT, ID_TWO, Some("zwei"), 0);
+        ui.touch_take(TF_BOTH | TF_SLOP | TF_TWO);
+        if let Some(t) = ui.touch_two() {
+            self.two = format!("zwei: {},{} von {},{} mal {} {}{}", t.x, t.y, t.start_x, t.start_y, (t.scale * 100.0) as i32, t.began as i32, t.taken_back as i32);
+        }
+        if ev & EV_ACT != 0 {
+            self.two = String::from("ein Klick");
+        } else if ev & EV_DRAG != 0 {
+            self.two = String::from("ein Finger zieht");
+        }
+        let t = self.two.clone();
+        ui.text(TS_BODY, &t);
+        ui.box_end();
     }
 
     fn content(&mut self, ui: &mut Ui, k: u32) {
@@ -304,6 +327,9 @@ impl App for Desk {
     fn frame(&mut self, ui: &mut Ui) {
         ui.next_size(SIZE_FILL, SIZE_FILL);
         ui.box_begin(0, BOX_V, 0);
+        if plat::env("jfgui_DESKTEST_HOLD").is_some() {
+            self.two_fingers(ui);
+        }
         ui.box_begin(0, BOX_H | BOX_XCENTER | PAD_8 | BOX_WRAP, 8);
         if ui.button(ID_NEW, "Neues Fenster") & EV_ACT != 0 {
             ui.cmd_run(CMD_NEW, 0);

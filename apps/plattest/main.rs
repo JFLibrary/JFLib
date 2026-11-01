@@ -26,6 +26,9 @@
 //   plattest --test pen                    (PN1, t_pen.rs) the pen paths without a pen: Win32
 //                                          WM_POINTER* to an own hidden window with a fake
 //                                          pointer API (Linux: not ported yet)
+//   plattest --test touch                  (t_touch.rs) the fingers without a touch screen: Win32
+//                                          WM_POINTER* to own hidden windows with a fake pointer
+//                                          API; Linux: wl_touch and XI 2.2 events fed in
 //   plattest --test cursor                 (t_cursor.rs) custom cursors: cursor_create from ARGB
 //                                          pixels, set on window 0, destroy, slot reuse, size
 //                                          limits, cursor_dpi
@@ -179,6 +182,7 @@ mod t_cliprich;
 // drag and drop between programs: the shared part, Windows' OLE objects
 mod t_dnd;
 mod t_pen;
+mod t_touch;
 mod t_spawn;
 mod t_window;
 // plat-shared: printing, the crash guard, the plugin loader, the portal
@@ -324,6 +328,7 @@ fn plattest() -> i32 {
         Some("panic") => t_panic,
         Some("window") => t_window::t_window, // plat-win
         Some("pen") => t_pen::t_pen,             // plat-win
+        Some("touch") => t_touch::t_touch,
         Some("cursor") => t_cursor::t_cursor,    // plat-win
         Some("cliprich") => t_cliprich::t_cliprich,
         Some("cliprich-owner") => t_cliprich::t_owner,

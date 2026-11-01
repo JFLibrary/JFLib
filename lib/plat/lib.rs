@@ -169,14 +169,27 @@ pub fn back_trap(on: bool) {
 }
 
 /// (ui touch.rs) the host's main pointer is a finger at the start (Android; a phone's browser:
-/// `pointer: coarse`): no scroll bars from the first frame on; the next pointer event decides again
+/// `pointer: coarse`; a Windows tablet in slate posture): no scroll bars from the first frame on; the
+/// next pointer event decides again
 pub fn touch_primary() -> bool {
     #[cfg(target_arch = "wasm32")]
     return web::touch_primary();
     #[cfg(target_os = "android")]
     return true;
-    #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
+    #[cfg(windows)]
+    return win_touch_primary();
+    #[cfg(not(any(target_arch = "wasm32", target_os = "android", windows)))]
     false
+}
+
+/// (ui touch.rs) a text field got the focus through a finger (show) or lost it: the on-screen keyboard
+/// of window w.  Windows: InputPane; Wayland: text-input follows the focus by itself (the compositor's
+/// keyboard); elsewhere the host's job (Android, the browser) or nothing there is to ask (X11)
+pub fn touch_keyboard(w: i32, show: bool) {
+    #[cfg(windows)]
+    win_touch_keyboard(w, show);
+    #[cfg(not(windows))]
+    let _ = (w, show);
 }
 
 /// (ui touch.rs) a finger's gesture reached a widget (a tap, a drag), or it did not (a scroll):

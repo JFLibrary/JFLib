@@ -786,7 +786,8 @@ impl Ui {
             // WM_NCHITTEST, Linux with a press here)
             self.behave(ids, HB_DRAG);
             if self.m.win.recs[(i as usize) & (WIN_MAX - 1)].flags & WF_TOUCH_HOLD != 0 {
-                self.touch_grab(super::touch::AX_ALL | TF_HOLD as u8);
+                self.touch_grab(super::touch::AX_ALL | (TF_HOLD | TF_HOLD_LONG) as u8);
+                self.touch_hold_show(ids);
             }
             if !self.headless && self.wp.ctx.active == ids && self.wp.ctx.pressed & (1 << BTN_LEFT) != 0 {
                 plat::begin_move(); // (the live window: plat::win_use)
@@ -859,7 +860,9 @@ impl Ui {
         }
         let st = self.style;
         let w = st.metric(if flags & WF_TOOL != 0 { SM_CAP_W_TOOL } else { SM_CAP_W });
-        let w = if self.m.touch.on { w.max(super::touch::CAPTION_DIP) } else { w }; // (for a finger)
+        // (for a finger, unless the window is so narrow that the title bar would be gone)
+        let wide = super::layout::px2dip_at(self.wp.rt.fb.w, self.wp.rt.dpi) >= super::touch::CAPTION_MIN_W;
+        let w = if self.m.touch.on && wide { w.max(super::touch::CAPTION_DIP) } else { w };
         self.m.chrome.cap_w = w;
         let ev = self.cap_button(ids + WCH_CLOSE, IC_CHROME_CLOSE, HB_CLOSE, "Close");
         self.m.chrome.cap_w = 0;
@@ -916,7 +919,8 @@ impl Ui {
     /// with the forced library title bar (jfgui_CSD=1: scripts test the band), recording the
     /// request.
     pub(crate) fn edge_grips(&mut self) {
-        let on = if self.headless { plat::getenv("jfgui_CSD").is_some_and(|v| v.starts_with('1')) } else { !cfg!(windows) };
+        // (Windows: the system's frame, for a finger it is invisible and greedy: win_touch.rs)
+        let on = if self.headless { plat::getenv("jfgui_CSD").is_some_and(|v| v.starts_with('1')) } else { !cfg!(windows) || self.m.touch.on };
         // (with a finger the main window fills the phone's page: its edges belong to the content)
         if !on || (self.m.touch.on && self.uiw_cur == 0) {
             return;

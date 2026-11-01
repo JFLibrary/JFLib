@@ -1,7 +1,7 @@
 // win_api -- the window-indexed platform API on Windows: windows (records), input, the event
 // wait, presentation, cursors                                     [src/plat/win/win_window.s]
 // (popups: win_popup.rs; clipboard, IME, drops: win_clip.rs; file dialog: win_filedlg.rs;
-//  pens: win_pen.rs; shell, theme, home, drives, spawn_self: win_shell.rs)
+//  pens: win_pen.rs; fingers: win_touch.rs; shell, theme, home, drives, spawn_self: win_shell.rs)
 //
 //   win_create(title, w_dip, h_dip, flags, owner, x, y) -> index / -1
 //        owner PW_NOOWNER: a top-level window (WS_OVERLAPPEDWINDOW, preferably index 0); else
@@ -89,6 +89,9 @@ pub use filedlg::*;
 #[path = "win_pen.rs"]
 mod pen;
 pub use pen::*;
+#[path = "win_touch.rs"]
+mod touch;
+pub use touch::{TouchApi, TouchInfo, win_touch_keyboard, win_touch_primary, touch_api_set};
 #[path = "win_popup.rs"]
 mod popup;
 pub use popup::*;
@@ -363,7 +366,10 @@ const WM_XBUTTONDOWN: u32 = 0x020B;
 const WM_XBUTTONUP: u32 = 0x020C;
 const WM_MOUSEHWHEEL: u32 = 0x020E;
 const WM_CAPTURECHANGED: u32 = 0x0215;
+const WM_NCPOINTERUPDATE: u32 = 0x0241;
+const WM_NCPOINTERUP: u32 = 0x0243;
 const WM_POINTERUPDATE: u32 = 0x0245;
+const WM_POINTERACTIVATE: u32 = 0x024B;
 const WM_POINTERCAPTURECHANGED: u32 = 0x024C;
 const WM_ENTERSIZEMOVE: u32 = 0x0231;
 const WM_EXITSIZEMOVE: u32 = 0x0232;
@@ -890,6 +896,7 @@ pub fn win_create(title: &str, w_dip: i32, h_dip: i32, flags: u32, owner: i32, x
     }
     r.hwnd.set(hwnd);
     r.dpi.set(win_query_dpi(hwnd));
+    touch::feedback_off(hwnd);
     if idx == 0 {
         super::thread::wake_window(hwnd); // plat::wake posts to the main window (g_hwnd)
         clip::win_drop_selftest(hwnd); // jfgui_TEST_DROPFILES
@@ -1188,10 +1195,21 @@ unsafe fn dispatch(hwnd: isize, msg: u32, wp: usize, lp: isize, w: i32) -> isize
     let def = || unsafe { DefWindowProcW(hwnd, msg, wp, lp) };
     match msg {
         WM_POINTERUPDATE..=WM_POINTERCAPTURECHANGED => {
-            // (PN1) pens: handled -> 0, else DefWindowProc (mouse emulation)
+            if msg == WM_POINTERACTIVATE
+                && let Some(a) = touch::activate(hwnd, wp, w)
+            {
+                return a;
+            }
+            // (PN1) pens, fingers: handled -> 0, else DefWindowProc (mouse emulation)
             if pen::win_pointer(hwnd, msg, wp, w) { 0 } else { def() }
         }
+        WM_NCPOINTERUPDATE..=WM_NCPOINTERUP => {
+            if touch::nc_pointer(hwnd, msg, wp, w) { 0 } else { def() }
+        }
         WM_MOUSEMOVE => {
+            if touch::mouse_is_stale() {
+                return 0; // (a finger: a window changed under the hidden cursor)
+            }
             let (x, y) = lp_xy(lp);
             r.mx.set(x);
             r.my.set(y);
@@ -2157,12 +2175,16 @@ fn fs_leave(r: &Ww) {
 
 /// let the system move the window (call on a button press)
 pub fn win_begin_move(w: i32) {
-    nc_drag(w, HTCAPTION as usize)
+    if !touch::begin_drag(w, 0) {
+        nc_drag(w, HTCAPTION as usize)
+    }
 }
 
 /// let the system resize the window from an edge (EDGE_* bits)
 pub fn win_begin_resize(w: i32, edges: u32) {
-    nc_drag(w, HT_EDGE[(edges & 15) as usize] as usize)
+    if !touch::begin_drag(w, edges & 15) {
+        nc_drag(w, HT_EDGE[(edges & 15) as usize] as usize)
+    }
 }
 
 fn nc_drag(w: i32, ht: usize) {
@@ -2199,7 +2221,8 @@ fn pointer_free(msg: u32) -> bool {
     matches!(msg,
         WM_CLOSE | WM_ACTIVATEAPP | WM_SETCURSOR | WM_MOUSEACTIVATE | WM_NCHITTEST | WM_NCACTIVATE
         | WM_NCMOUSEMOVE..=WM_NCLBUTTONDBLCLK | WM_KEYDOWN..=WM_SYSCHAR | WM_MOUSEMOVE..=WM_MOUSEHWHEEL
-        | WM_CAPTURECHANGED | WM_POINTERUPDATE..=WM_POINTERCAPTURECHANGED | WM_ENTERSIZEMOVE | WM_EXITSIZEMOVE
+        | WM_CAPTURECHANGED | WM_NCPOINTERUPDATE..=WM_NCPOINTERUP | WM_POINTERUPDATE..=WM_POINTERCAPTURECHANGED
+        | WM_ENTERSIZEMOVE | WM_EXITSIZEMOVE
         | WM_NCMOUSELEAVE | WM_MOUSELEAVE | WM_DISPLAYCHANGE)
 }
 
