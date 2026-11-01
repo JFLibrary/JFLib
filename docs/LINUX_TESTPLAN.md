@@ -249,8 +249,9 @@ Für eine Claude-Sitzung, die auf dem Linux-Rechner selbst läuft (oder per SSH 
 ## 9. Touch, falls ein Rechner einen Touchscreen hat
 
 Stand 2026-11-01. `wl_touch` und XInput-2.2-Touch sind bisher nur mit eingespeisten Ereignissen geprüft
-(`plattest --test touch`), noch nie gegen einen echten Compositor oder X-Server: In WSL gibt es weder Weston noch
-ein Gerät. Die Erwartungen stehen in `apps/PaintCraft/docs/TOUCH.md` (Prüfliste für das Surface, Punkte 1 bis 9 gelten
+(`plattest --test touch`), ein echter Finger kam noch nie an: In WSL gibt es kein Gerät. Gegen WSLgs Xwayland und
+Compositor lief PaintCraft nur ohne Finger: Die Touch-Maske geht bei jedem Fenster raus (`strace`), ohne X-Fehler
+(`jfgui_X11DEBUG=1`), Wayland ohne Protokollfehler. Die Erwartungen stehen in `apps/PaintCraft/docs/TOUCH.md` (Prüfliste für das Surface, Punkte 1 bis 9 gelten
 hier genauso), die Bedeutung in GUIDE §37.
 
 - **Wayland (GNOME und KDE):** `python3 build_rs.py run PaintCraft --target linux`, die Prüfliste. Besonders:

@@ -1885,8 +1885,8 @@ Fensterrand hinaus.
   - PaintCraft: Pinch und Verschieben in jede Richtung, ein Finger malt oder verschiebt (Einstellung).
   - Geprüft: Skripte (`pinch`, `pan2`), Attrappen und eingespeiste Ereignisse (`plattest --test touch`), echte Kontakte ohne
     Touchscreen (`tools/touchcheck.py`). Offen: alles, was nur ein echter Finger zeigt, und die Bildschirmtastatur
-    (Prüfliste in `TOUCH.md`, `docs/LINUX_TESTPLAN.md` Abschnitt 9); `wl_touch` und XI 2.2 liefen noch nie gegen
-    einen echten Compositor oder X-Server mit Touch.
+    (Prüfliste in `TOUCH.md`, `docs/LINUX_TESTPLAN.md` Abschnitt 9); `wl_touch` und XI 2.2 sahen noch nie einen echten
+    Finger (gegen WSLgs Xwayland und Compositor nur: die Auswahl wird angenommen).
 - **P2** · *fehlt* · Safari / iOS im Web-Testplan.
 
 ## 10. Auslieferung und Updates
