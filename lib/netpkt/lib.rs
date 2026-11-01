@@ -77,6 +77,8 @@
 //   eap       Packet: EAP Request, Response, Success and Failure with Identity, Notification and
 //             Nak, the data of EAP-MD5 (Md5Data, md5_value) and of EAP-PWD (Pwd, PwdId), info
 //             for one line about a packet                            (RFC 3748, 1994, 5931)
+//   imap      Line and LineReader (tags, literals), Command, Response, Item, SeqSet, FetchItem,
+//             SearchKey, envelope, internal_date, the parts of a message  (RFC 9051, 3501)
 //
 // Views (XxxView::parse) check lengths once and then read fields without copying; records
 // (XxxHdr, Arp, Icmp) write headers, usually with push_onto / push_v4 into a Pkt.  Multi-byte
@@ -122,6 +124,7 @@ pub mod mib;
 pub mod telnet;
 pub mod radius;
 pub mod eap;
+pub mod imap;
 
 pub use addr::{wildcard_match, IpAddr, Ipv4, Ipv6, Mac, Prefix4, Prefix6};
 pub use pkt::Pkt;

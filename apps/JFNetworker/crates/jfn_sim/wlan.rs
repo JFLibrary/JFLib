@@ -834,6 +834,27 @@ impl Engine {
         self.sta_start(dev);
     }
 
+    /// a host's supplicant file changed: a station that waited for its credentials tries again,
+    /// one without a network takes the enterprise network of the file
+    pub(crate) fn wlan_creds_changed(&mut self, ni: usize) {
+        let dev = self.dev_of(ni);
+        let Some(s) = self.wlan.stas.get(&dev) else { return };
+        if s.join.is_none() {
+            let block = self.supp_conf(dev).into_iter().find(|b| b.key_mgmt == crate::supp::KeyMgmt::WpaEap && !b.ssid.is_empty());
+            if let Some(b) = block {
+                self.wlan_join(ni, Some(WlanJoin { ssid: b.ssid, ..WlanJoin::default() }));
+            }
+            return;
+        }
+        if matches!(s.phase, Phase::Waiting(Wait::NoPassphrase | Wait::GaveUp)) {
+            if let Some(x) = self.wlan.stas.get_mut(&dev) {
+                x.failures = 0;
+                x.phase = Phase::Idle;
+            }
+            self.sta_start(dev);
+        }
+    }
+
     /// the stations that wait for a network look again; connected ones see whether to roam
     fn wlan_wake(&mut self) {
         let stas: Vec<(u32, bool)> = self.wlan.stas.iter().map(|(&d, s)| (d, matches!(s.phase, Phase::Waiting(Wait::NoNetwork)))).collect();

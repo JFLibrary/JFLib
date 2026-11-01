@@ -633,6 +633,7 @@ impl Engine {
         let linux = self.os(ni).is_some_and(|o| !o.ios);
         if linux && self.store(ni).is_some_and(|s| s.exists(CONF)) {
             let _ = self.supp_service(ni, CONF, true);
+            self.wlan_creds_changed(ni);
         }
     }
 
@@ -652,6 +653,7 @@ impl Engine {
                 }
             }
         });
+        self.wlan_creds_changed(ni);
     }
 
     /// an EAPOL frame reached a host's port: true when a supplicant took it

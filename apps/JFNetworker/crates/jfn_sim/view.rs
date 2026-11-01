@@ -141,10 +141,7 @@ impl Engine {
             return Led::Down;
         };
         match port.link {
-            Some(li) if port.admin_up && self.link_up(li) && n.bridge.as_ref().is_some_and(|b| b.ports.get(pi as usize).is_some_and(|bp| bp.closed)) => {
-                let _ = li;
-                Led::Unauth
-            }
+            Some(li) if port.admin_up && self.link_up(li) && n.bridge.as_ref().is_some_and(|b| b.ports.get(pi as usize).is_some_and(|bp| bp.closed)) => Led::Unauth,
             Some(li) if port.admin_up && self.link_up(li) => match n.bridge.as_ref().filter(|b| b.stp.on() && b.ports.get(pi as usize).is_some_and(|bp| bp.member)).map(|b| b.stp.state(pi)) {
                 Some(crate::stp::PortState::Learning) => Led::Learning,
                 Some(crate::stp::PortState::Blocking | crate::stp::PortState::Listening | crate::stp::PortState::Discarding) => Led::Blocking,

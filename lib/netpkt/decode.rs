@@ -59,6 +59,9 @@
 // EAP in an EAPOL frame is a layer of its own: code, identifier, length, type and the data of
 // Identity, Nak, EAP-MD5 and EAP-PWD field by field (eap.rs); as an EAP-Message of RADIUS one
 // line with the same words.
+// IMAP (TCP port 143) shows each line: a command with its tag, verb and arguments, a response with
+// its tag or "*", status, response code and text; the bytes of a literal as a line of data. It
+// shares the bit P_MAIL (imap.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -176,6 +179,8 @@ pub enum Proto {
     Telnet,
     /// EAP inside EAPOL
     Eap,
+    /// IMAP (port 143)
+    Imap,
 }
 
 impl Proto {
@@ -216,6 +221,7 @@ impl Proto {
             Proto::Radius => "RADIUS",
             Proto::Telnet => "Telnet",
             Proto::Eap => "EAP",
+            Proto::Imap => "IMAP",
         }
     }
     pub fn bit(self) -> u32 {
@@ -249,7 +255,7 @@ impl Proto {
             Proto::Eapol => P_EAPOL,
             Proto::Bgp => P_BGP,
             Proto::Ftp | Proto::FtpData => P_FTP,
-            Proto::Smtp | Proto::Pop3 => P_MAIL,
+            Proto::Smtp | Proto::Pop3 | Proto::Imap => P_MAIL,
             Proto::Radius => P_RADIUS,
             Proto::Telnet => P_TELNET,
             Proto::Eap => P_EAPOL,
@@ -318,6 +324,7 @@ fn tcp_app(sp: u16, dp: u16) -> Option<Proto> {
             ftp::PORT_FTP_DATA => Proto::FtpData,
             smtp::PORT_SMTP | smtp::PORT_SUBMISSION => Proto::Smtp,
             pop3::PORT_POP3 => Proto::Pop3,
+            crate::imap::PORT_IMAP => Proto::Imap,
             telnet::PORT => Proto::Telnet,
             _ => return None,
         })
@@ -629,6 +636,7 @@ pub fn layers(frame: &[u8]) -> Vec<Layer> {
             Proto::Radius => Some(radius_layer(frame, off, len)),
             Proto::Telnet => Some(telnet_layer(frame, off, len)),
             Proto::Eap => Some(eap_layer(frame, off, len)),
+            Proto::Imap => Some(imap_layer(frame, off, len, mail_response(&st, frame))),
             _ => Some(payload_layer(p, off, len)),
         };
         if let Some(b) = b {
@@ -1094,6 +1102,7 @@ fn app_info(st: &Stack, frame: &[u8]) -> Option<String> {
         Proto::Radius => Some(radius_info(b)),
         Proto::Telnet => Some(telnet_info(b)),
         Proto::Eap => Some(crate::eap::info(b)),
+        Proto::Imap => Some(imap_info(b)),
         _ => None,
     }
 }
@@ -2900,7 +2909,7 @@ fn ftp_info(b: &[u8], response: bool) -> String {
 /// the segment of an SMTP or POP3 connection comes from the server (its well-known port is the
 /// source and not the destination)
 fn mail_response(st: &Stack, frame: &[u8]) -> bool {
-    let server = |p: u16| p == smtp::PORT_SMTP || p == smtp::PORT_SUBMISSION || p == pop3::PORT_POP3;
+    let server = |p: u16| p == smtp::PORT_SMTP || p == smtp::PORT_SUBMISSION || p == pop3::PORT_POP3 || p == crate::imap::PORT_IMAP;
     match st.find(Proto::Tcp).and_then(|(o, _)| TcpView::parse(&frame[o..])) {
         Some(t) => server(t.src_port()) && !server(t.dst_port()),
         None => false,
@@ -2937,6 +2946,63 @@ fn mail_verb(line: &str, known: fn(&str) -> bool) -> Option<(String, usize, usiz
         return None;
     }
     Some((w.to_ascii_uppercase(), w.len(), lead + w.len() + 1))
+}
+
+/// IMAP lines
+fn imap_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {
+    use crate::imap;
+    let b = &frame[off..off + len];
+    let mut l = B::new(Proto::Imap, off, len, String::from("Internet Message Access Protocol"));
+    for (s, e, end) in lines_of(b) {
+        if end == b.len() && e == end && !b.ends_with(b"\n") {
+            l.f("Continuation", off + s, end - s, format!("{} bytes", end - s));
+            break;
+        }
+        let line = String::from_utf8_lossy(&b[s..e]).into_owned();
+        let parsed = imap::Line::plain(&line);
+        if response {
+            l.f("Line", off + s, end - s, line.clone());
+            match imap::Response::parse(&parsed) {
+                Some(r) => match (&r.kind, r.status) {
+                    (imap::Kind::Cont, _) => l.f("Continuation request", off + s, end - s, r.text.clone()),
+                    (kind, Some(st)) => {
+                        let tag = if let imap::Kind::Tagged(t) = kind { t.as_str() } else { "*" };
+                        l.f("Tag", off + s, tag.len(), String::from(tag));
+                        l.f("Status", off + s + tag.len() + 1, st.word().len(), String::from(st.word()));
+                        if let Some(c) = &r.code {
+                            l.f("Response code", off + s + tag.len() + st.word().len() + 3, c.len(), c.clone());
+                        }
+                    }
+                    _ if line.starts_with("* ") => l.f("Untagged", off + s + 2, e - s - 2, String::from(&line[2..])),
+                    _ => l.f("Message data", off + s, end - s, line.clone()),
+                },
+                None => l.f("Message data", off + s, end - s, line.clone()),
+            }
+        } else if let Some(c) = imap::Command::parse(&parsed).filter(|c| imap::verb_known(&c.verb)) {
+            l.f("Line", off + s, end - s, line.clone());
+            l.f("Tag", off + s, c.tag.len(), c.tag.clone());
+            l.f("Command", off + s + c.tag.len() + 1, c.verb.len(), c.verb.clone());
+            let at = c.tag.len() + c.verb.len() + 2;
+            if line.len() > at {
+                l.f("Arguments", off + s + at, e - s - at, String::from(&line[at..]));
+            }
+        } else {
+            l.f("Message data", off + s, end - s, line.clone());
+        }
+    }
+    l
+}
+
+/// the first line of a segment
+fn imap_info(b: &[u8]) -> String {
+    let n = b.iter().position(|&c| c == b'\n').unwrap_or(b.len());
+    let l = String::from_utf8_lossy(&b[..n]);
+    let t = l.trim_end();
+    let mut s: String = t.chars().take(120).collect();
+    if t.chars().count() > 120 {
+        s.push_str("...");
+    }
+    s
 }
 
 fn smtp_layer(frame: &[u8], off: usize, len: usize, response: bool) -> B {

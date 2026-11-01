@@ -1557,3 +1557,17 @@ Identität	Identity
 EAP-Methode	EAP method
 Passwort zeigen	Show password
 nicht autorisiert	not authorized
+# X1g: the E-Mail program with an IMAP account, the category of 802.1X
+Papierkorb	Trash
+Den Ordner mit dem IMAP-Server abgleichen	Compare the folder with the IMAP server
+Markieren	Flag
+Abrufen gleicht diesen Ordner mit dem IMAP-Server ab.	Fetch compares this folder with the IMAP server.
+Neu	New
+Anlegen	Create
+Ordner löschen	Delete folder
+Kontotyp	Account type
+Das Konto braucht einen SMTP- und einen IMAP-Server.	The account needs an SMTP and an IMAP server.
+Postfach (IMAP)	Mailbox (IMAP)
+IMAP-Server	IMAP server
+IMAP-Port	IMAP port
+802.1X	802.1X

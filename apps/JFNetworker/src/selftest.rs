@@ -58,6 +58,8 @@
 // cli/jfstest.rs, doc/ide.rs's steps, the IDE's search in files).
 // dot1xtest.rs: 802.1X and WPA-Enterprise (group dot1x: jfn_sim::dot1x, supp, dot1xtrace, the EAP
 // part of radiusd and wlan, cli/dot1x.rs).
+// imaptest.rs: IMAP (group imap: jfn_sim::imapd, the folders of mailbox.rs, the IMAP part of
+// mailc.rs and cli/mail.rs).
 
 use alloc::format;
 use alloc::string::String;
@@ -143,9 +145,11 @@ mod sessiontest;
 mod idetest;
 #[path = "dot1xtest.rs"]
 mod dot1xtest;
+#[path = "imaptest.rs"]
+mod imaptest;
 
 pub fn run() -> i32 {
-    let groups: [(&'static str, fn(&mut T)); 47] = [
+    let groups: [(&'static str, fn(&mut T)); 48] = [
         ("catalog", catalog_t),
         ("ifname", ifname_t),
         ("cable", cable_t),
@@ -193,6 +197,7 @@ pub fn run() -> i32 {
         ("sessions", sessiontest::run),
         ("ide", idetest::run),
         ("dot1x", dot1xtest::run),
+        ("imap", imaptest::run),
     ];
     let (mut total, mut failed) = (0, 0);
     for (name, f) in groups {

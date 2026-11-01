@@ -518,7 +518,10 @@ fn wpa_cli(t: &mut T) {
     t.check("help", o.contains("Usage: wpa_cli"));
     // the action of the desktop's form: PC2's file and its login
     let text = supp::conf_text(&[NetBlock { ssid: s(""), key_mgmt: KeyMgmt::Ieee8021x, eap: Some(eapm::Method::Pwd), identity: s("anna"), password: s("geheim") }]);
+    let _ = e.take_reports();
     let _ = e.apply(Action::Supplicant { dev: PC2, conf: text.clone() });
+    let rep: Vec<(String, bool)> = e.take_reports().into_iter().filter_map(|r| if let Report::Files { path, files, .. } = r { Some((path, files.iter().any(|f| f.path == supp::CONF))) } else { None }).collect();
+    t.eq("one step of the project, with the file", rep, alloc::vec![(s(supp::CONF), true)]);
     run_for(&mut e, 3 * SEC);
     t.eq("the form's login", state_of(&e, P_PC2), Some(PaeState::Authenticated));
     t.eq("the file", e.file_store(PC2).and_then(|f| f.read(supp::CONF).ok().map(|b| String::from_utf8_lossy(b).into_owned())), Some(text));
@@ -649,6 +652,19 @@ fn wlan_enterprise(t: &mut T) {
     let mut e = engine(&p3);
     run_for(&mut e, 2 * SEC);
     t.eq("nothing to log in with", e.wlan_station(LAP1).map(|x| x.state), Some(jfn_sim::StaState::NoPassphrase));
+    // the file comes later: the waiting station tries again; a station with no network at all takes
+    // the one of the file
+    let _ = e.apply(Action::Supplicant { dev: LAP1, conf: s("network={\n ssid=\"Firma\"\n key_mgmt=WPA-EAP\n eap=PWD\n identity=\"anna\"\n password=\"geheim\"\n}\n") });
+    run_for(&mut e, 5 * SEC);
+    t.eq("the form's file wakes it", e.wlan_station(LAP1).map(|x| x.state), Some(jfn_sim::StaState::Connected));
+    let mut p4 = wlan_project(Security::Wpa2Ent, WlanJoin::default());
+    if let Some(d) = p4.device_mut(LAP1) {
+        d.wlan = None;
+        add_conf(d, "network={\n ssid=\"Firma\"\n key_mgmt=WPA-EAP\n eap=PWD\n identity=\"anna\"\n password=\"geheim\"\n}\n");
+    }
+    let mut e = engine(&p4);
+    run_for(&mut e, 5 * SEC);
+    t.eq("the network of the file", e.wlan_station(LAP1).map(|x| x.state), Some(jfn_sim::StaState::Connected));
     // roaming and disconnects end the session: a disconnect by hand
     let mut e = engine(&p);
     run_for(&mut e, 5 * SEC);

@@ -178,6 +178,8 @@
 //   supp     the supplicant of hosts: its wpa_supplicant-like file, the hidden service
 //            "wpa_supplicant", what wpa_cli asks of it (X1g)
 //   dot1xtrace DNote: the decisions of 802.1X as notes (Note::Dot1x)
+//   imapd    the IMAP server (a subset of RFC 9051 and 3501); "imap-server", the Maildir of smtpd and
+//            pop3d with folders, flags and UIDs (X1g)
 // UDP and TCP run over both families (os.rs: sockets on ANY take both, ANY4 IPv4 only); the
 // services, the resolver (A and AAAA in the order of RFC 6724) and the tools use IPv6 where a
 // device has it; dig, host and nslookup are console programs too (cli/names.rs).
@@ -279,6 +281,7 @@ pub mod procs;
 pub mod dot1xtrace;
 pub mod dot1x;
 pub mod supp;
+pub mod imapd;
 
 pub use action::{ActErr, Action};
 pub use bridge::{Bridge, PortMode, VlanSet};
@@ -346,6 +349,7 @@ pub use mailtrace::MNote;
 pub use mailc::{Account, MailClient, MailClientView, MailDraft, MailEntry, MailJob, MailOutcome};
 pub use smtpd::{MailUser, SmtpServer};
 pub use pop3d::Pop3Server;
+pub use imapd::ImapServer;
 pub use snmptrace::SNote;
 pub use snmpmib::{IfRow, View as SnmpView};
 pub use snmpd::{Community, SnmpAgent, SnmpCfg, SnmpSet, TrapHost};

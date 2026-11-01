@@ -284,6 +284,8 @@ pub enum Action {
     ScriptDebug { dev: u32, svc: String, op: crate::scriptsvc::DebugOp },
     /// the file of the supplicant now (a window's form): written, read again (supp.rs)
     Supplicant { dev: u32, conf: String },
+    /// the E-Mail program's next step with its IMAP server (mailc.rs)
+    MailImap { dev: u32, op: crate::mailc::ImapOp },
 }
 
 /// why an action was refused (German text through Display)
@@ -670,9 +672,14 @@ impl Engine {
             Action::Bgp { dev, set } => self.bgp_apply(dev, set),
             // the files of a device (files.rs)
             Action::Files { dev, files } => self.files_set(dev, &files),
+            Action::MailImap { dev, op } => self.mail_job(dev, crate::mailc::MailJob::Imap(op)),
             Action::Supplicant { dev, conf } => {
                 let ni = self.node_index(dev).ok_or(ActErr::UnknownDevice(dev))?;
-                let _ = self.file_mkdir(ni, "/etc/wpa_supplicant", true);
+                // (one report for the project: the directory comes with the file's)
+                let t = self.file_time(ni);
+                if let Some(os) = self.os_mut(ni) {
+                    let _ = os.files.mkdir("/etc/wpa_supplicant", t, true);
+                }
                 self.file_put(ni, crate::supp::CONF, conf.as_bytes(), false).map_err(|e| ActErr::Refused(msg!("{}", e.errno_text())))?;
                 self.supp_reconfigure(ni, None);
                 Ok(())

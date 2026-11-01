@@ -1383,3 +1383,24 @@ Supplicant: keine Zugangsdaten für {}.	Supplicant: no credentials for {}.
 Supplicant: auf {} abgemeldet.	Supplicant: logged off on {}.
 EAP-Methode „{}“ gibt es hier nicht.	There is no EAP method “{}” here.
 {}: {} Anmeldungen, {} abgelehnt	{}: {} logins, {} refused
+# X1g: IMAP (jfn_sim imapd.rs, mailtrace.rs, mailc.rs)
+Port {}, {} Benutzer: {} Sitzungen, {} Anmeldungen, {} abgelehnt, {} Nachrichten geholt, {} entfernt	Port {}, {} users: {} sessions, {} logins, {} refused, {} messages fetched, {} removed
+Nicht abgerufen: das Konto nennt keinen IMAP-Server oder keinen Benutzer.	Not fetched: the account names no IMAP server or no user.
+Nicht abgerufen: {} lehnt die Anmeldung ab ({}).	Not fetched: {} refuses the login ({}).
+Nicht abgerufen: {} lehnt {} ab ({}).	Not fetched: {} refuses {} ({}).
+{} auf {} abgeglichen, nichts Neues.	{} on {} compared, nothing new.
+{} auf {} abgeglichen, eine neue Nachricht.	{} on {} compared, one new message.
+{} auf {} abgeglichen, {} neue Nachrichten.	{} on {} compared, {} new messages.
+IMAP: {} verbindet sich.	IMAP: {} connects.
+IMAP: {} ist angemeldet.	IMAP: {} is logged in.
+IMAP: Anmeldung von {} abgelehnt.	IMAP: the login of {} was refused.
+IMAP: {} wählt {} mit {} Nachrichten.	IMAP: {} selects {} with {} messages.
+IMAP: {} Nachrichten aus {} gesendet, {} Bytes.	IMAP: {} messages from {} sent, {} bytes.
+IMAP: Markierungen von {} Nachrichten in {} geändert.	IMAP: flags of {} messages in {} changed.
+IMAP: {} Nachrichten aus {} entfernt.	IMAP: {} messages removed from {}.
+IMAP: {} Nachrichten nach {} verschoben.	IMAP: {} messages moved to {}.
+IMAP: {} Nachrichten nach {} kopiert.	IMAP: {} messages copied to {}.
+IMAP: Nachricht mit {} Bytes in {} abgelegt.	IMAP: a message of {} bytes put into {}.
+IMAP: {} {}.	IMAP: {} {}.
+IMAP: {} abgelehnt.	IMAP: {} refused.
+E-Mail: {} von {} geholt, {} Nachrichten.	E-Mail: {} fetched from {}, {} messages.

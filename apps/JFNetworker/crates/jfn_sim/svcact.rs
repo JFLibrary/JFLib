@@ -233,6 +233,7 @@ impl Engine {
             "ftp-server" => Box::new(crate::ftpd::FtpServer::from_config(c).map_err(|w| bad(kind, w))?),
             "smtp-server" => Box::new(crate::smtpd::SmtpServer::from_config(c).map_err(|w| bad(kind, w))?),
             "pop3-server" => Box::new(crate::pop3d::Pop3Server::from_config(c).map_err(|w| bad(kind, w))?),
+            "imap-server" => Box::new(crate::imapd::ImapServer::from_config(c).map_err(|w| bad(kind, w))?),
             "snmpd" => Box::new(crate::snmpd::SnmpAgent::from_config(c, ios).map_err(|w| bad(kind, w))?),
             "snmptrapd" => Box::new(crate::snmptrapd::TrapReceiver::from_config(c).map_err(|w| bad(kind, w))?),
             "radius-server" => Box::new(crate::radiusd::RadiusServerSvc::from_config(c).map_err(|w| bad(kind, w))?),
