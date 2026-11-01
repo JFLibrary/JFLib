@@ -203,6 +203,7 @@ pub(crate) fn tool_input(p: &mut Kritzel, ui: &mut Ui, inp: &UiInput) {
             } else {
                 view_scroll(&mut p.view, 0, d);
             }
+            ui.repass(); // (the view is laid out with this position in the next pass)
         }
     }
     // tool modules take their own input first (shapes, selection, text, brushes)
